@@ -1,0 +1,121 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: GenView_f.htm,v 1.1 97/06/02 16:32:28 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> The Life of a View</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">GenView</A>: 4.1 <A HREF="GenView_e.htm">Advanced Concepts and Uses</A>: 
+<A NAME="47756">
+ </A>
+The Life of a View</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GenView_e.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GenView_e.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">4 Advanced Concepts and Uses</A> 
+<!-- to next --> | <A HREF="GenView_10.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.2 Documents in a View</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+When a view is first instantiated, the window system wants to make sure everything happens properly. As a result, the view sends out a series of messages intended to notify the content that the view is opening and that it should be ready to draw its document soon. Most of these messages are intended for the GenContent and VisContent objects, and you will not need to handle them if you designate your Process object as the view's content. Similarly, when the view is shutting down, it notifies its content of the fact that it is closing. Again, the Process does not typically need to handle these messages.</P>
+
+<H2 CLASS="HeadingC">
+Handling View Messages</H2>
+<PRE>MSG_META_CONTENT_SET_VIEW, MSG_META_CONTENT_VIEW_ORIGIN_CHANGED, MSG_META_CONTENT_VIEW_SCALE_FACTOR_CHANGED, MSG_META_CONTENT_VIEW_WIN_OPENED, MSG_META_CONTENT_VIEW_OPENING, MSG_META_CONTENT_VIEW_SIZE_CHANGED</PRE>
+<P>
+When a GenView is instantiated, the UI takes care of most of the work. However, the view will send several messages to its new content in order to notify it that the view is opening.</P>
+<P>
+The first message sent will be a <CODE>
+MSG_META_CONTENT_SET_VIEW</CODE>
+, which you may intercept if you need to know the view's object pointer (optr). </P>
+<P>
+The content will then receive a series of other messages indicating the view's initial state. These messages are also sent whenever the view changes its state--for example, when the user moves a scrollbar, the view's origin will change. In general, your Process will not need to handle these. If you are using one of the content objects, you may need them. They are detailed below (for full reference information on these messages, see <A HREF="../../UI/VisContent/VisContent_8.htm#94321">the VisContent chapter</A>):</P><UL>
+<LI>
+<CODE>
+MSG_META_CONTENT_VIEW_ORIGIN_CHANGED<BR>
+</CODE>
+This message indicates the initial origin of the view. See <A HREF="GenView_10.htm#44652"> Current Origin</A>
+ for more information.</LI>
+
+
+</UL>
+<UL>
+<LI>
+<CODE>
+MSG_META_CONTENT_VIEW_SCALE_FACTOR_CHANGED<BR>
+</CODE>
+This message indicates the original scale factor of the view. If you are displaying large documents, you will need to know this in order to handle input events.</LI>
+<LI>
+<CODE>
+MSG_META_CONTENT_VIEW_WIN_OPENED<BR>
+</CODE>
+This message indicates that the view window is being created. Unless you plan on keeping track of several open views, you will not need to handle this message. It is sent before the window is actually opened; this means that the view may or may not be mapped, and you should not draw your document in response to this message. You should instead wait until you receive a <CODE>
+MSG_META_EXPOSED</CODE>
+. Some applications may intercept this message to get the window handle of the GenView and cache it for future use (until the window is closed).</LI>
+<LI>
+<CODE>
+MSG_META_CONTENT_VIEW_OPENING<BR>
+</CODE>
+This message indicates that the view has received a <CODE>
+MSG_VIS_OPEN</CODE>
+ and that the content will soon be put on the screen. Your Process object will not likely handle this message, though some special VisContents may in order to prepare information needed before drawing.</LI>
+<LI>
+<CODE>
+MSG_META_CONTENT_VIEW_SIZE_CHANGED<BR>
+</CODE>
+This message indicates a change in size of the view--your Process object will not need to intercept this message unless you plan on using the view's width and height for something special.</LI>
+</UL>
+<P>
+After the view has been created and opened and is on the screen, it will send a <CODE>
+MSG_META_EXPOSED</CODE>
+ to the content. At this time, the content must make sure the document gets drawn properly (see <A HREF="GenView_11.htm#94673"> Drawing the Document</A>
+). No special handler is required when a view starts up; the <CODE>
+MSG_META_EXPOSED</CODE>
+ is the same as would be received normally.</P>
+
+
+<H2 CLASS="HeadingC">
+When the View Shuts Down</H2>
+<PRE>MSG_META_CONTENT_VIEW_CLOSING, MSG_META_CONTENT_VIEW_WIN_CLOSED, MSG_META_CONTENT_SET_VIEW</PRE>
+<P>
+When a view is about to be closed, a <CODE>
+MSG_META_CONTENT_VIEW_CLOSING</CODE>
+ is sent to the content to notify it of the shutdown. This message is primarily used by <CODE>
+VisContentClass</CODE>
+ so it can send <CODE>
+MSG_VIS_CLOSE</CODE>
+ to itself and all its children.
+
+</P>
+<P>
+When the view is being destroyed in addition to being closed, the content will receive a <CODE>
+MSG_META_CONTENT_VIEW_WIN_CLOSED</CODE>
+. You will only need to handle this message if you have cached the view's window handle. If so, your application should throw out the old window handle to avoid any future drawing to the nonexistent window.</P>
+<P>
+The content will then receive a <CODE>
+MSG_META_CONTENT_SET_VIEW</CODE>
+ again (see above), this time with a null value passed as the view's optr. As with the <CODE>
+MSG_META_CONTENT_SET_VIEW</CODE>
+ received when the view started up, your Process object will not need to intercept this message.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GenView_e.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GenView_e.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">4 Advanced Concepts and Uses</A> 
+<!-- to next --> | <A HREF="GenView_10.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.2 Documents in a View</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

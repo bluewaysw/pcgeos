@@ -1,0 +1,187 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: VisClass_16.htm,v 1.1 97/06/02 16:49:48 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Visible Layers and 32-Bit Graphics</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="sectionTitle">
+<A HREF="index.htm">VisClass</A>: 6 
+<A NAME="45302">
+ </A>
+Visible Layers and 32-Bit Graphics</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> | <A HREF="VisClass_17.htm"><IMG SRC="../../docImages/down.gif" BORDER="0" ALT="Down"></A> 
+<!-- to previous --> | <A HREF="VisClass_10.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5 Working with Visible Object Trees</A> 
+<!-- to next --> | <A HREF="VisClass_1e.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">7 VisClass Error Checking</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>MSG_VIS_LAYER_SET_DOC_BOUNDS, MSG_VIS_LAYER_GET_DOC_BOUNDS, MSG_VIS_LAYER_INSERT_OR_DELETE_SPACE</PRE>
+<P>
+<A NAME="IX_Documents:large model">
+ </A>
+The GEOS graphic space is built on a basis of 16-bit coordinates. A few applications, however, will require much more space for their documents. GEOS also supports the special use of 32-bit coordinates; applications using these coordinates are said to be using the &quot;large document&quot; model.</P>
+<P>
+The visible object library was originally designed with 16-bit coordinates in the default GEOS graphics space. All instance data, message parameters and return values, and coordinates are assumed to be word-sized integers. A large-document visible object library is not provided primarily because there is no single visible model that works well with large coordinates, and also because no single large model works efficiently for all applications.</P>
+<P>
+It is possible, however, for applications to subclass the standard visible classes in order to get them to support the large document model. In order to do this, however, you must understand the basic issues involved with the large model and with using 32-bit coordinates.</P>
+<P>
+As the application developer, you should read the following sections if you will be using the large document model. Each one deals with a different problem facing applications that want large documents.</P>
+<P>
+In addition, some complex applications may offer several different visible layers in the program. For example, a spreadsheet might want to include a graphic object layer for graphics and charts. The content object of the visible tree can be set up to have several different children, each of which is a &quot;layer&quot; that manages its own objects in the window.</P>
+<P>
+The content in charge of the layers must occasionally set and retrieve the document bounds of its children. For example, if the user wants to set the page size of the spreadsheet that has a graphical layer, the content object must set the new size for all its children. To retrieve the current document bounds of a particular object, send it a <CODE>
+MSG_VIS_LAYER_GET_DOC_BOUNDS</CODE>
+. To set the document bounds, send a <CODE>
+MSG_VIS_LAYER_SET_DOC_BOUNDS</CODE>
+. In addition, the application may add or delete space into a layer with <CODE>
+MSG_VIS_LAYER_INSERT_OR_DELETE_SPACE</CODE>
+; for example, if a spreadsheet needs to resize a column, it must send this message to the graphic layer to ensure the layers handle the sizing properly.</P>
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_LAYER_SET_DOC_BOUNDS">
+ </A>
+MSG_VIS_LAYER_SET_DOC_BOUNDS</H5>
+<PRE CLASS="syntax">void	MSG_VIS_LAYER_SET_DOC_BOUNDS(@stack
+        sdword	bottom,
+        sdword	right,
+        sdword	top,
+        sdword	left);</PRE>
+<P>
+This message sets the 32-bit document bounds for a particular layer object. This message is typically sent by a VisContent object to its children, which are assumed to be layer objects.</P>
+<P CLASS="refField">
+Source:	Unrestricted--typically sent by a VisContent to its large children.</P>
+<P CLASS="refField">
+Destination:	Any large (32-bit) visible object or composite.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+all</CODE>
+	The four parameters describe the new bounds of the large document. Since layer objects typically cover the entire document, the layer object will set its bounds to these values.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	All layer objects and large objects must subclass this message. There is no default handler.</P>
+
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_LAYER_GET_DOC_BOUNDS">
+ </A>
+MSG_VIS_LAYER_GET_DOC_BOUNDS</H5>
+<PRE CLASS="syntax">void	MSG_VIS_LAYER_GET_DOC_BOUNDS(
+        RectDWord *bounds);</PRE>
+<P>
+This message returns the 32-bit document bounds of a particular large visible object. Typically, a VisContent will query its large children with this message when it needs to know their bounds.</P>
+<P CLASS="refField">
+Source:	Unrestricted--typically sent by a VisContent to its large children.</P>
+<P CLASS="refField">
+Destination:	Any large (32-bit) visible object or composite.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+bounds</CODE>
+	A pointer to an empty <CODE>
+RectDWord</CODE>
+ structure that describes a set of large bounds.</P>
+<P CLASS="refField">
+Return:	The pointer to the filled <CODE>
+RectDWord</CODE>
+ structure. The structure should, upon return, contain the 32-bit bounds of the large visible object.</P>
+<P CLASS="refField">
+Interception:	All layer objects and large objects must subclass this message. There is no default handler.</P>
+<P CLASS="refField">
+Structures:	The <CODE>
+RectDWord</CODE>
+ structure is show below for convenience:</P>
+<PRE>typedef struct {
+    sdword   RD_left;
+    sdword   RD_top;
+    sdword   RD_right;
+    sdword   RD_bottom;
+} <A NAME="IX_RectDWord"> </A>RectDWord;</PRE>
+
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_LAYER_INSERT_OR_DELETE_SPACE">
+ </A>
+MSG_VIS_LAYER_INSERT_OR_DELETE_SPACE</H5>
+<PRE CLASS="syntax">void	MSG_VIS_LAYER_INSERT_OR_DELETE_SPACE(
+        InsertDeleteSpaceTypes 			type,
+        DWFixed 			spaceY,
+        DWFixed 			spaceX,
+        DWFixed 			positionY,
+        DWFixed 			positionX)</PRE>
+<P>
+This message should be sent by one layer to another when it changes sizes. An example would be a spreadsheet application with a graphic layer; when a column in the spreadsheet resizes, the graphic layer must resize accordingly.</P>
+<P CLASS="refField">
+Source:	Any visible layer object.</P>
+<P CLASS="refField">
+Destination:	The visible layer object requiring resizing.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+type</EM>
+	<CODE>
+InsertDeleteSpaceType</CODE>
+ specifying what sort of operation is taking place.</P>
+<DL>
+<DT>
+<EM>
+spaceX</EM>
+, <EM>
+spaceY</EM>
+</DT><DD>Change in space for the <EM>
+x</EM>
+ and <EM>
+y</EM>
+ directions.</DD>
+<DT>
+<EM>
+positionX</EM>
+, <EM>
+positionY</EM>
+</DT><DD>Change in <EM>
+x</EM>
+ and <EM>
+y</EM>
+ position.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	This message must be intercepted; it has no default behavior.</P>
+<P>
+&nbsp;</P>
+
+<P CLASS="subsectionLink">
+<A HREF="VisClass_17.htm">Using Visible Document Layers</A></P>
+<P CLASS="subsectionLink">
+<A HREF="VisClass_18.htm">Using 16-Bit Drawing Commands</A></P>
+<P CLASS="subsectionLink">
+<A HREF="VisClass_19.htm">The 16-Bit Limit on Visual Bounds</A></P>
+<P CLASS="subsectionLink">
+<A HREF="VisClass_1a.htm">Handling MSG_VIS_DRAW</A></P>
+<P CLASS="subsectionLink">
+<A HREF="VisClass_1b.htm">Managing 32-Bit Geometry</A></P>
+<P CLASS="subsectionLink">
+<A HREF="VisClass_1c.htm">Handling Mouse Events</A></P>
+<P CLASS="subsectionLink">
+<A HREF="VisClass_1d.htm">Setting Up the Objects</A></P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> | <A HREF="VisClass_17.htm"><IMG SRC="../../docImages/down.gif" BORDER="0" ALT="Down"></A> 
+<!-- to previous --> | <A HREF="VisClass_10.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5 Working with Visible Object Trees</A> 
+<!-- to next --> | <A HREF="VisClass_1e.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">7 VisClass Error Checking</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

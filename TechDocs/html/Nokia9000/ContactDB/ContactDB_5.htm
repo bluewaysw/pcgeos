@@ -1,0 +1,124 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: ContactDB_5.htm,v 1.5 97/08/21 16:15:53 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Choosing Contacts From a Log</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="sectionTitle">
+<A HREF="index.htm">Contacts</A>: 2 
+<A NAME="82044">
+ </A>
+Choosing Contacts From a Log</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="ContactDB_1.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1 Setting up a Contact List</A> 
+<!-- to next --> | <A HREF="ContactDB_6.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3 Using a Dedicated Contact</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>RecentContactsSMSControlClass, CONTACTS_CONTROL_NOTIFY_ENTRY_SELECTED_MSG</PRE>
+<A NAME="IX_RecentContactsControlClass:RecentContactsSMSControl in an example"> </A>
+<A NAME="IX_RecentContactsSMSControlClass"> </A>
+<A NAME="IX_ATTR_RECENT_CONTACTS_CONTROL_NOTIFY_ENTRY_SELECTED_MSG"> </A>
+<A NAME="IX_CONTACTS_CONTROL_NOTIFY_ENTRY_SELECTED_MSG"> </A>
+
+<P>
+For a list of recent SMS contacts, use a <CODE>
+RecentContactsSMSController</CODE>
+. You will need the following line in your <STRONG CLASS="fileName">
+.gp</STRONG>
+ file:</P>
+<PRE>library		contlog</PRE>
+<P>
+The following setup would allow the user to pick a phone number from a list of recently called SMS numbers, sending a <CODE>
+MSG_MYPROCESS_SEND_RECENT</CODE>
+ message to the application's process object:</P>
+<PRE>		@object RecentContactsSMSControlClass MyLog = {
+			GCI_output = ( TO_PROCESS );
+			ATTR_RECENT_CONTACTS_CONTROL_NOTIFY_ENTRY_SELECTED_MSG = 
+							MSG_MYPROCESS_SEND_RECENT;
+		}</PRE>
+<P>
+With this setup, when the user chooses a phone number from the log, a <CODE>
+MSG_MYPROCESS_SEND_RECENT</CODE>
+ message will be sent to the process object, which should handle the message. The message should conform to the CONTACTS_CONTROL_NOTIFY_ENTRY_SELECTED_MSG prototype. </P>
+
+<A NAME="IX_RecentContactsData"> </A>
+<A NAME="IX_RCD_&ldots;"> </A>
+
+<PRE>@prototype void
+    CONTACTS_CONTROL_NOTIFY_ENTRY_SELECTED_MSG(
+                           RecentContactsData *data)</PRE>
+<PRE>typedef struct {
+	dword               RCD_contactID;
+	NameOrNumber        RCD_number;
+} RecentContactsData;</PRE>
+<P>
+The <EM>data</EM> argument's <CODE>
+RCD_number</CODE>
+ field contains the GSM phone number of the selected contact. The code example below shows handler that extract's the name associated with the selected contact. It makes use of functions described in <A HREF="ContactDB_1.htm#65699"> Setting up a Contact List</A>
+.</P>
+<P CLASS="figTitle">
+Code Display 4-2 <A NAME="86000">
+ </A>
+Handling the RecentContacts &quot;Selected&quot; Message</P>
+<PRE>@class MyProcessClass, GenProcessClass;
+	@message (CONTACTS_CONTROL_NOTIFY_ENTRY_SELECTED_MSG)
+						MSG_MYPROCESS_SEND_RECENT;
+@endc</PRE>
+<PRE>@method MyProcessClass, MSG_MYPROCESS_SEND_RECENT {</PRE>
+<PRE>	/* Note: all of the code in this example is only useful if you need 
+	 * the contact's name. If all you need is the GSM phone number, 
+	 * none of this code is necessary. The phone number string is in 
+	 * data-&gt;RCD_number. 
+	 * 
+	 * If you do need the following code, you will need to make sure 
+	 * that your .gp file includes the lines
+		library contdb
+		library foamdb
+	 */</PRE>
+<PRE>	TCHAR           theName[MAX_NAME_DATA_LEN+1];
+	VMFileHandle    CDBHandle;
+	MemHandle       theRecord;</PRE>
+<PRE>		/* If the user chose a phone number that doesn't have a contact 
+		 * associated with it, the contact's RecordID value is -1, 
+		 * signalling an invalid contact. */
+	if ( data-&gt;RCD_contactID != LECI_INVALID_CONTACT_ID) {
+	 CDBHandle = ContactGetDBHandle();
+	 theRecord = FoamDBGetRecordFromID( CDBHandle, data-&gt;RCD_contactID );</PRE>
+<PRE>	 ContactGetName(theRecord, theName);
+
+		/* If you need more information about the contact 
+		 * (e.g., business name, job title), this is a good place 
+		 * to retrieve it. */
+
+	 FoamDBDiscardRecord(CDBHandle, theRecord );
+	 ContactReleaseDBHandle();
+	}
+
+	/* do something clever with data-&gt;RCD_number and theName */
+}</PRE>
+
+<P>
+Recent <A HREF = "../../Nokia9000/Versions/index.htm">versions</A> of the Nokia 9000i Communicator allow fax and SMS contact lists to support multiple selections. Set the <CODE>RCFCF_MULTIPLE_SELECTION</CODE> or <CODE>RCMCF_MULTIPLE_SELECTION</CODE> bit to enable multiple selection for, respectively, a fax or SMS recent contact list and specify the message <A NAME="IX_ATTR_RECENT_CONTACTS_CONTROL_NOTIFY_ENTRY_SELECTED_MSG"></A> <CODE>ATTR_RECENT_CONTACTS_CONTROL_NOTIFY_ENTRY_SELECTED_MSG</CODE> which will be sent when the user chooses an item from the list.
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="ContactDB_1.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1 Setting up a Contact List</A> 
+<!-- to next --> | <A HREF="ContactDB_6.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3 Using a Dedicated Contact</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

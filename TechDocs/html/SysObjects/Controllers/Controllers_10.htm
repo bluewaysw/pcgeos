@@ -1,0 +1,629 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Controllers_10.htm,v 1.1 97/06/02 16:10:20 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> ColorSelectorClass</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Generic UI Controllers</A>: 7.1 <A HREF="Controllers_f.htm">Other Controllers</A>: 
+<A NAME="35959">
+ </A>
+ColorSelectorClass</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Controllers_f.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Controllers_f.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">7 Other Controllers</A> 
+<!-- to next --> | <A HREF="Controllers_11.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">7.2 GenPageControlClass</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+<A NAME="IX_ColorSelectorClass">
+ </A>
+The ColorSelector controller provides all the UI necessary to allow the user to select a color, a draw mask, and a draw pattern. The color may be selected either as an index or an RGB value. The ColorSelector must be put on the GenApplication's GAGCNLT_SELF_LOAD_OPTIONS GCN list.</P>
+<P>
+The ColorSelector has the following features:</P>
+<PRE><A NAME="IX_CSF_&ldots;"> </A><A NAME="IX_CSFeatures"> </A>typedef WordFlags CSFeatures;
+#define CSF_FILLED_LIST				0x10
+#define CSF_INDEX				0x08
+#define CSF_RGB				0x04
+#define CSF_DRAW_MASK				0x02
+#define CSF_PATTERN				0x01</PRE>
+<PRE>#define CS_DEFAULT_FEATURES					(CSF_FILLED_LIST |
+		CSF_INDEX | CSF_RGB | CSF_DRAW_MASK |
+		CSF_PATTERN)</PRE>
+<P>
+<A NAME="IX_CSI_&ldots;">
+ </A>
+In addition, the ColorSelector has several instance fields, all shown below:</P>
+<PRE><A NAME="IX_color selector:instance data"> </A>@instance ColorQuad				CSI_color = {0, 0, 0, 0};
+		/* currently selected color */
+@instance byte				CSI_colorIndeterminate;
+		/* true if color is indeterminate */
+@instance SystemDrawMask CSI_drawMask = SDM_0;
+		/* draw mask in use by the color */
+@instance byte				CSI_drawMaskIndeterminate;
+		/* true if mask is indeterminate */
+@instance GraphicPattern CSI_pattern = {0, 0};
+		/* pattern in use by the color */
+@instance byte				CSI_patternIndeterminate;
+		/* true if pattern indeterminate */</PRE>
+<PRE>@instance ColorModifiedStates CSI_states = 0;
+		/* indicates which aspects have changed:
+		 * CMS_COLOR_CHANGED
+		 * CMS_DRAW_MASK_CHANGED
+		 * CMS_PATTERN_CHANGED */
+@instance ColorToolboxPreferences CSI_toolboxPrefs
+						= CTP_IS_POPUP;
+		/* preferences for color selector:
+		 * CTP_INDEX_ORIENTATION
+		 * CTP_DRAW_MASK_ORIENTATION
+		 * CTP_PATTERN_ORIENTATION
+		 * CTP_IS_POPUP */</PRE>
+<PRE>@vardata optr ATTR_COLOR_SELECTOR_DISABLE_OBJECT;
+		/* when color selector is disabled, the
+		 * object named will also be disabled */</PRE>
+
+<H2 CLASS="HeadingC">
+Messages Sent Out by the ColorSelector</H2>
+<PRE>MSG_META_COLORED_OBJECT_SET_COLOR, MSG_META_COLORED_OBJECT_SET_DRAW_MASK, MSG_META_COLORED_OBJECT_SET_PATTERN</PRE>
+<P>
+<A NAME="IX_color selector:messages">
+ </A>
+The ColorSelector sends out three messages to its data objects. These messages each serve to set a particular attribute of the object it currently controls (the target object). The target object must be able to handle these messages if it is to use the ColorSelector.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_COLORED_OBJECT_SET_COLOR">
+ </A>
+MSG_META_COLORED_OBJECT_SET_COLOR</H4>
+<PRE CLASS="syntax">void	MSG_META_COLORED_OBJECT_SET_COLOR(
+        ColorQuad color);</PRE>
+<P>
+This message notifies the controlled object that it should set its color to the passed value.</P>
+<P CLASS="refField">
+Source:	ColorSelector object.</P>
+<P CLASS="refField">
+Destination:	The current Target object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+color</CODE>
+	The <CODE>
+ColorQuad</CODE>
+ structure describing the color to be set.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Must be intercepted by the controlled object if it is to work with the ColorSelector controller.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_COLORED_OBJECT_SET_DRAW_MASK">
+ </A>
+MSG_META_COLORED_OBJECT_SET_DRAW_MASK</H4>
+<PRE CLASS="syntax">void	MSG_META_COLORED_OBJECT_SET_DRAW_MASK(
+        SystemDrawMask mask);</PRE>
+<P>
+This message notifies the controlled object that it should set its draw mask to the passed value.</P>
+<P CLASS="refField">
+Source:	ColorSelector object.</P>
+<P CLASS="refField">
+Destination:	The current Target object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+mask</CODE>
+	The <CODE>
+SystemDrawMask</CODE>
+ to be set as the object's draw mask.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Must be intercepted by the controlled object if it is to work with the ColorSelector controller.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_COLORED_OBJECT_SET_PATTERN">
+ </A>
+MSG_META_COLORED_OBJECT_SET_PATTERN</H4>
+<PRE CLASS="syntax">void	MSG_META_COLORED_OBJECT_SET_PATTERN(
+        GraphicPattern pattern);</PRE>
+<P>
+This message notifies the controlled object that it should sets its draw pattern to that passed.</P>
+<P CLASS="refField">
+Source:	ColorSelector object.</P>
+<P CLASS="refField">
+Destination:	The current Target object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+pattern</CODE>
+	The <CODE>
+GraphicPattern</CODE>
+ to be set as the object's draw pattern.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Must be intercepted by the controlled object if it is to work with the ColorSelector controller.</P>
+
+
+
+<H2 CLASS="HeadingC">
+Messages Handled by ColorSelectorClass</H2>
+<PRE>MSG_COLOR_SELECTOR_GET_COLOR, MSG_COLOR_SELECTOR_SET_COLOR, MSG_COLOR_SELECTOR_GET_DRAW_MASK, MSG_COLOR_SELECTOR_SET_DRAW_MASK, MSG_COLOR_SELECTOR_GET_PATTERN, MSG_COLOR_SELECTOR_SET_PATTERN</PRE>
+<P>
+The ColorSelector handles a number of messages including the normal <CODE>
+GenControlClass</CODE>
+ messages it inherits. These messages allow the setting or retrieval of the instance data of the controller.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_COLOR_SELECTOR_GET_COLOR">
+ </A>
+MSG_COLOR_SELECTOR_GET_COLOR</H4>
+<PRE CLASS="syntax">void	MSG_COLOR_SELECTOR_GET_COLOR(
+        ColorQuad		*retVal);</PRE>
+<P>
+This message retrieves the controller's <CODE>
+CSI_color</CODE>
+ field.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any ColorSelector object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+retVal</CODE>
+	A pointer to an empty ColorQuad structure.</P>
+<P CLASS="refField">
+Return:	The <CODE>
+ColorQuad</CODE>
+ structure pointed to by <CODE>
+retVal</CODE>
+ will be the color set in <CODE>
+CSI_color</CODE>
+.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_COLOR_SELECTOR_SET_COLOR">
+ </A>
+MSG_COLOR_SELECTOR_SET_COLOR</H4>
+<PRE CLASS="syntax">void	MSG_COLOR_SELECTOR_SET_COLOR(
+        ColorQuad color);</PRE>
+<P>
+This message sets the color in <CODE>
+CSI_color</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any ColorSelector object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+color</CODE>
+	The <CODE>
+ColorQuad</CODE>
+ structure representing the new color for the <CODE>
+CSI_color</CODE>
+ field.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_COLOR_SELECTOR_GET_DRAW_MASK">
+ </A>
+MSG_COLOR_SELECTOR_GET_DRAW_MASK</H4>
+<PRE CLASS="syntax">SystemDrawMask MSG_COLOR_SELECTOR_GET_DRAW_MASK();</PRE>
+<P>
+This message retrieves the draw mask set in <CODE>
+CSI_drawMask</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any ColorSelector object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	The <CODE>
+SystemDrawMask</CODE>
+ set in <CODE>
+CSI_drawMask</CODE>
+.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_COLOR_SELECTOR_SET_DRAW_MASK">
+ </A>
+MSG_COLOR_SELECTOR_SET_DRAW_MASK</H4>
+<PRE CLASS="syntax">void	MSG_COLOR_SELECTOR_SET_DRAW_MASK(
+        SystemDrawMask mask);</PRE>
+<P>
+This message sets the draw mask stored in <CODE>
+CSI_drawMask</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any ColorSelector object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+mask</CODE>
+	The new <CODE>
+SystemDrawMask</CODE>
+ to be set into <CODE>
+CSI_drawMask</CODE>
+.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_COLOR_SELECTOR_GET_PATTERN">
+ </A>
+MSG_COLOR_SELECTOR_GET_PATTERN</H4>
+<PRE CLASS="syntax">GraphicPattern MSG_COLOR_SELECTOR_GET_PATTERN();</PRE>
+<P>
+This message returns the pattern set in <CODE>
+CSI_pattern</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any ColorSelector object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	The GraphicPattern currently set in <CODE>
+CSI_pattern</CODE>
+.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_COLOR_SELECTOR_SET_PATTERN">
+ </A>
+MSG_COLOR_SELECTOR_SET_PATTERN</H4>
+<PRE CLASS="syntax">void	MSG_COLOR_SELECTOR_SET_PATTERN(
+        GraphicPattern pattern);</PRE>
+<P>
+This message sets the drawing pattern stored in <CODE>
+CSI_pattern</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any ColorSelector object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+pattern</CODE>
+	The <CODE>
+GraphicPattern</CODE>
+ value to be set.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.<A NAME="marker=1089">
+ </A>
+</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_COLOR_SELECTOR_UPDATE_COLOR</H4>
+<PRE CLASS="syntax">See colorC.goh</PRE>
+<P>
+Update the current color in the toolbox and normal UI. This message is normally sent from within a <CODE>
+MSG_GEN_CONTROL_UPDATE_UI</CODE>
+ handler.</P>
+<P CLASS="refField">
+Source:	Unrestricted--sent in a <CODE>
+MSG_GEN_CONTROL_UPDATE_UI</CODE>
+ handler.</P>
+<P CLASS="refField">
+Destination:	Any ColorSelector object.</P>
+<P CLASS="refField">
+Parameters:	A ColorQuad structure and an indeterminate flag.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_COLOR_SELECTOR_APPLY_COLOR</H4>
+<PRE CLASS="syntax">See colorC.goh</PRE>
+<P>
+Makes the color selector send <CODE>
+MSG_META_COLORED_OBJECT_SET_COLOR</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any ColorSelector object.</P>
+<P CLASS="refField">
+Parameters:	A Color enumeration value.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_COLOR_SELECTOR_UPDATE_FILLED_STATUS</H4>
+<PRE CLASS="syntax">See colorC.goh</PRE>
+<P>
+Makes the color selector update the draw mask and associated UI.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any ColorSelector object.</P>
+<P CLASS="refField">
+Parameters:	A <CODE>
+SystemDrawMask</CODE>
+, an indeterminate flag, and a tools update flag.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_COLOR_SELECTOR_GET_FILLED_MONIKER</H4>
+<PRE CLASS="syntax">See colorC.goh</PRE>
+<P>
+Returns the VisMoniker that should be used to represent the &quot;do draw&quot; item in the color selector.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any ColorSelector object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	The optr of the VisMoniker chunk or NullOptr to use the default.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_COLOR_SELECTOR_GET_UNFILLED_MONIKER</H4>
+<PRE CLASS="syntax">See colorC.goh</PRE>
+<P>
+Returns the VisMoniker that should be used to represent the &quot;don't draw&quot; item in the color selector.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any ColorSelector object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	The optr of the VisMoniker chunk or NullOptr to use the default.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_COLOR_SELECTOR_UPDATE_DRAW_MASK</H4>
+<PRE CLASS="syntax">See colorC.goh</PRE>
+<P>
+Update the current draw mask in the toolbox and the UI. This is often sent from within a <CODE>
+MSG_GEN_CONTROL_UPDATE_UI</CODE>
+ handler.</P>
+<P CLASS="refField">
+Source:	Unrestricted--sent in a <CODE>
+MSG_GEN_CONTROL_UPDATE_UI</CODE>
+ handler.</P>
+<P CLASS="refField">
+Destination:	Any ColorSelector object.</P>
+<P CLASS="refField">
+Parameters:	A <CODE>
+SystemDrawMask</CODE>
+ value and an indeterminate flag.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_COLOR_SELECTOR_APPLY_DRAW_MASK</H4>
+<PRE CLASS="syntax">See colorC.goh</PRE>
+<P>
+Generates <CODE>
+MSG_META_COLORED_OBJECT_SET_DRAW_MASK</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any ColorSelector object.</P>
+<P CLASS="refField">
+Parameters:	A <CODE>
+SystemDrawMask</CODE>
+ value.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_COLOR_SELECTOR_UPDATE_PATTERN</H4>
+<PRE CLASS="syntax">See colorC.goh</PRE>
+<P>
+Update the current pattern in the toolbox and the UI. This is often sent from within a <CODE>
+MSG_GEN_CONTROL_UPDATE_UI</CODE>
+ handler.</P>
+<P CLASS="refField">
+Source:	Unrestricted--sent in a <CODE>
+MSG_GEN_CONTROL_UPDATE_UI</CODE>
+ handler.</P>
+<P CLASS="refField">
+Destination:	Any ColorSelector object.</P>
+<P CLASS="refField">
+Parameters:	A <CODE>
+GraphicPattern</CODE>
+ value and an indeterminate flag.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_COLOR_SELECTOR_APPLY_PATTERN</H4>
+<PRE CLASS="syntax">See colorC.goh</PRE>
+<P>
+Generates <CODE>
+MSG_META_COLORED_OBJECT_SET_PATTERN</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any ColorSelector object.</P>
+<P CLASS="refField">
+Parameters:	A <CODE>
+GraphicPattern</CODE>
+ value.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_CS_SET_FILLED_STATUS</H4>
+<PRE CLASS="syntax">See colorC.goh</PRE>
+<P>
+Tells the controller to disable itself and set the mask to zero or to re-enable itself and set the mask to 100, based on the passed flag.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any ColorSelector object.</P>
+<P CLASS="refField">
+Parameters:	A <CODE>
+SysDrawMask</CODE>
+ value.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_CS_SET_CF_INDEX</H4>
+<PRE CLASS="syntax">See colorC.goh</PRE>
+<P>
+Sent by the color list to set a color via an index.</P>
+<P CLASS="refField">
+Source:	The color list.</P>
+<P CLASS="refField">
+Destination:	Any ColorSelector object.</P>
+<P CLASS="refField">
+Parameters:	See <STRONG CLASS="fileName">
+colorC.goh</STRONG>
+.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_CS_SET_CF_RGB_RED</H4>
+<PRE CLASS="syntax">See colorC.goh</PRE>
+<P>
+Sent by the color list to set a color's red value.</P>
+<P CLASS="refField">
+Source:	The color list.</P>
+<P CLASS="refField">
+Destination:	Any ColorSelector object.</P>
+<P CLASS="refField">
+Parameters:	see <STRONG CLASS="fileName">
+colorC.goh</STRONG>
+.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_CS_SET_CF_RGB_GREEN</H4>
+<PRE CLASS="syntax">See colorC.goh</PRE>
+<P>
+Sent by the color list to set a color's green value.</P>
+<P CLASS="refField">
+Source:	The color list.</P>
+<P CLASS="refField">
+Destination:	Any ColorSelector object.</P>
+<P CLASS="refField">
+Parameters:	see <STRONG CLASS="fileName">
+colorC.goh</STRONG>
+.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_CS_SET_CF_RGB_BLUE</H4>
+<PRE CLASS="syntax">See colorC.goh</PRE>
+<P>
+Sent by the color list to set a color's blue value.</P>
+<P CLASS="refField">
+Source:	The color list.</P>
+<P CLASS="refField">
+Destination:	Any ColorSelector object.</P>
+<P CLASS="refField">
+Parameters:	see <STRONG CLASS="fileName">
+colorC.goh</STRONG>
+.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_CS_SET_DRAW_MASK</H4>
+<PRE CLASS="syntax">See colorC.goh</PRE>
+<P>
+Sets the draw mask for the color selector.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_CS_SET_PATTERN</H4>
+<PRE CLASS="syntax">See colorC.goh</PRE>
+<P>
+Sets the pattern for the color selector<A NAME="marker=1215">
+ </A>
+.</P>
+
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Controllers_f.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Controllers_f.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">7 Other Controllers</A> 
+<!-- to next --> | <A HREF="Controllers_11.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">7.2 GenPageControlClass</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

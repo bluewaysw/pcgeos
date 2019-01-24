@@ -1,0 +1,202 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Socket_2.htm,v 1.1 97/06/02 14:14:51 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Simple Example</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="sectionTitle">
+<A HREF="index.htm">Socket</A>: 2 
+<A NAME="36532">
+ </A>
+Simple Example</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Socket_1.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1 Introduction</A> 
+<!-- to next --> | <A HREF="Socket_3.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3 Addresses</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+The sample application Appl/SDK_C/Talk provides an example of a simple application using the Socket library.</P>
+<P>
+To understand how the program works, you should, of course, look at its source code. The following is a high-level overview of what the Talk example illustrates: a simple client-server connection in which the server awaits connections, the client connects, and then the two exchange data. Note: this application assumes that the host device (the client) has already connected to the server. Remote connections are usually made through PPP or Point-to-Point Protocol. See <CODE>
+SocketOpenDomainMedium()</CODE>
+ discussed in <A HREF="Socket_6.htm#79399"> Hardware Ports</A>
+.</P>
+<P>
+The example performs the following steps:</P>
+<OL>
+<LI>
+<STRONG>
+Allocate memory in which to store data.<BR>
+</STRONG>
+When sending or receiving data, you need to provide a pointer to a buffer containing the data to be sent or received. Thus, the buffer should be in a block which can either be locked down as needed or is in fixed memory. Programs often spawn a separate thread to receive data from the socket; if this thread needs to lock down a memory block in which to store the data, then make sure that the thread can lock down the memory block. See <A HREF="../../Kernel/MultiThread/index.htm">the Multithreading chapter</A> to learn about managing threads.<BR>
+(If you follow the multi-threaded approach, be aware that when the Socket's owning thread exits, it frees the Socket. To allow a Socket to survive the exit of its thread, use <CODE>
+SocketSetIntSocketOption()</CODE>
+ to change its owning thread.)<BR>
+For this simple example, we're using a small buffer to handle the receipt of data, so we declare it as a global variable so it resides in the application's fixed memory:</LI>
+</OL>
+<PRE>char recvBuf[16];</PRE>
+<UL>
+<LI FIXME_NumListOther>
+<STRONG>
+Client Side: Make Sure Connected to Domain<BR>
+</STRONG>
+Depending on the nature of the device and application, you may need to make sure that the device is connected to the communication domain. In the Talk sample application, we make sure that the device is dialed in to an ISP: an <CODE>
+AccessPointControl</CODE>
+ object prompts the user to choose an ISP, and a call to <CODE>
+SocketOpenDomainMedium()</CODE>
+ opens a PPP connection to that ISP.</LI>
+<LI FIXME_NumListOther>
+<STRONG>
+Client Side: Get Address For Other Side of Connection.<BR>
+</STRONG>
+The Talk application allows the user to connect with another machine by specifying that machine's address. The Talk application creates a controller gadget by which the user can specify an address. <CODE>
+SocketGetAddressController()</CODE>
+ returns the controller class' pointer; <CODE>
+ObjInstantiate()</CODE>
+ creates an object of the class.<BR>
+The following code is called when the application opens. It creates the controller gadget, initializes its data, and places it in a dialog box.</LI>
+</UL>
+<PRE>ctrlClass = 
+  SocketGetAddressController(theAddress.SA_domain));</PRE>
+<PRE>ctrlOb = 
+  ObjInstantiate( 
+    HandleOf(GeodeGetOptrNS(@AddressDialog)),
+    ctrlClass);</PRE>
+<PRE>@call ctrlOb::MSG_SOCKET_ADDRESS_CONTROL_SET_ACTION(
+  ConstructOptr(0,TO_PROCESS), MSG_CTP_VALID);</PRE>
+<PRE>@call
+  GeodeGetOptrNS(@AddressDialog)::MSG_GEN_ADD_CHILD(
+    ctrlOb, CCO_FIRST);</PRE>
+<PRE>@call ctrlOb::MSG_GEN_SET_USABLE(VUM_NOW);</PRE>
+<P FIXME_BulListNoBul>
+	When the user enters an address, the following code is called. It gets the selected address from the address controller and packages it up into a form the Socket library can use.</P>
+<P FIXME_BulListNoBul>
+	<CODE>
+MSG_SOCKET_ADDRESS_CONTROL_GET_ADDRESSES</CODE>
+ returns a chunk with raw address data based on the address entered by the user. <CODE>
+SocketResolve()</CODE>
+ reduces this raw address data to a primitive form that can be used for making connections.</P>
+<PRE>adArray = @call ctrlOb::MSG_SOCKET_ADDRESS_CONTROL_GET_ADDRESSES();</PRE>
+<PRE>address1 = ChunkArrayElementToPtrHandles(
+  HandleOf(ctrlOb), adArray, 0,0);</PRE>
+<PRE>theAddress.SA_addressSize = 
+  SocketResolve(
+    theAddress.SA_domain, (byte *)&amp;address1[1],
+    address1-&gt;SACA_opaqueSize, addressBuffer,
+    MAX_ADDRESS_SIZE);</PRE>
+<PRE>LMemFreeHandles(HandleOf(ctrlOb), adArray);</PRE>
+<UL>
+<LI FIXME_NumListOther>
+<STRONG>
+Client Side: Create and Connect Socket.<BR>
+</STRONG>
+The Client side now creates a socket for its side of the connection and attempts to connect to the address extracted from the address controller. The socket will be of the stream delivery type. </LI>
+</UL>
+<PRE>dataSocket = SocketCreate(SDT_STREAM);</PRE>
+<PRE>SocketConnect(
+  dataSocket, (SocketAddress *) &amp;theAddress,
+  SOCKET_NO_TIMEOUT);</PRE>
+<UL>
+<LI FIXME_NumListOther>
+<STRONG>
+Server Side: Create Socket and Accept Connection(s)<BR>
+</STRONG>
+On the server side, the application spawns a separate thread to handle incoming connections.</LI>
+</UL>
+<P FIXME_BulListNoBul>
+	There are two &quot;sockets&quot; created on this, the server side of the connection. The first socket is bound to a particular port, and &quot;listens&quot; for incoming connections. It is possible to accept more than one connection over the listening socket--each accepted connection is represented by another socket to represent this side of the new particular connection.</P>
+<PRE>listenSocket = SocketCreate(SDT_STREAM);</PRE>
+<PRE>SocketBind(listenSocket, theAddress.SA_port, 0);</PRE>
+<PRE>SocketListen(listenSocket, 5);</PRE>
+<PRE>dataSocket = SocketAccept(
+  listenSocket, SOCKET_NO_TIMEOUT);</PRE>
+<UL>
+<LI FIXME_NumListOther>
+<STRONG>
+Either Side: Send Data<BR>
+</STRONG>
+In this example, the data to send is taken from a text object. The program loads the text into a block of memory, locks the block down to get a pointer to it, then transmits the data.</LI>
+</UL>
+<PRE>textBlock = @call
+  GeodeGetOptrNS(@InText)::
+  MSG_VIS_TEXT_GET_ALL_BLOCK(NullHandle);</PRE>
+<PRE>textPtr = MemLock(textBlock);</PRE>
+<PRE>textSize = LocalStringSize(textPtr);</PRE>
+<PRE>SocketSend(
+  dataSocket, textPtr, textSize, 0, 
+  (SocketAddress *)0);</PRE>
+<PRE>MemFree(textBlock);</PRE>
+<UL>
+<LI FIXME_NumListOther>
+<STRONG>
+Either Side: Wait For and Receive Data<BR>
+</STRONG>
+The application's listening thread waits for data to arrive and stores it away in a buffer when it does arrive. It processes the incoming data and gets ready for the next piece of data.</LI>
+</UL>
+<PRE>while ((
+  datasize = SocketRecv(
+    dataSocket, recvBuf, sizeof recvBuf, 
+    SOCKET_NO_TIMEOUT, 0, (SocketAddress *)0))
+  != 0)</PRE>
+<PRE>{ @call 
+  GeodeGetOptrNS(@OutText)::MSG_VIS_TEXT_APPEND_PTR(
+    recvBuf, datasize); }</PRE>
+<UL>
+<LI FIXME_NumListOther>
+<STRONG>
+Either Side: Close Connection<BR>
+</STRONG>
+The application has a Close button. When the user presses this button, the application shuts down its side of the connection. The <CODE>
+SocketCloseSend()</CODE>
+ routine partially shuts down the socket so that it can receive data, but cannot send it; also, the routine sends a signal to the other side that the connection is closing.</LI>
+</UL>
+<PRE>if (listenSocket) { 
+  SocketClose(listenSocket);
+  listenSocket = 0; }</PRE>
+<PRE>SocketCloseSend(dataSocket);</PRE>
+<UL>
+<LI FIXME_NumListOther>
+<STRONG>
+Either Side: Detect Closed Connection and Close Socket<BR>
+</STRONG>
+When receiving data, if either side seems to have received a zero-length packet, it checks to see if an exception has occurred, specifically to see if the connection has closed. (When <CODE>
+SocketRecv()</CODE>
+ detects an error, it sets the thread error value, which may be retrieved via <CODE>
+ThreadGetError()</CODE>
+.) If the connection has closed, then Talk closes the sockets on this side of the connection.</LI>
+</UL>
+<PRE>if (ThreadGetError() == SE_CONNECTION_CLOSED) { 
+  if (listenSocket) {
+    SocketClose(listenSocket);
+    listenSocket = 0; }
+  SocketClose(dataSocket); }</PRE>
+<UL>
+<LI FIXME_NumListOther>
+<STRONG>
+Both Sides: Sockets Freed When Thread Exits<BR>
+</STRONG>
+Lest you are worried about these Sockets you have created but not freed, know that they will be freed automatically when the owning thread exits. (To allow a Socket to survive its thread's exit, you must assign the Socket to a new thread.)</LI>
+</UL>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Socket_1.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1 Introduction</A> 
+<!-- to next --> | <A HREF="Socket_3.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3 Addresses</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

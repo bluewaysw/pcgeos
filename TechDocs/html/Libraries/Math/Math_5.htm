@@ -1,0 +1,457 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Math_5.htm,v 1.1 97/06/02 15:30:41 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Conversions to Other Types</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="sectionTitle">
+<A HREF="index.htm">The Math Library</A>: 2 
+Conversions to Other Types</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Math_1.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1 Basic Math Functions</A> 
+<!-- to next --> | <A HREF="Math_6.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3 Float Formats</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+In many cases, FP numbers will need to be converted to different types for use in different parts of an application. For example, floating point numbers may be involved in a complex function that returns an integer. FP numbers may also need to appear to the user as ASCII text.</P>
+
+<H4 CLASS="HeadingD">
+Converting Into Other Floats</H4>
+<P>
+There are several routines which convert GEOS FP numbers into other float formats, compatible with the C types <CODE>
+float</CODE>
+ and <CODE>
+double</CODE>
+. Typically in C, this conversion is accomplished by casting the FP numbers into the other type. It is therefore done automatically for you.</P>
+<P>
+If you are working in Assembly or you wish to directly pass floats or doubles to C stubs, consult <A HREF="Math_9.htm#25586"> Direct FP Operations</A>
+.</P>
+
+
+<H4 CLASS="HeadingD">
+Converting ASCII to FP Numbers</H4>
+<PRE><A NAME="IX_FloatAsciiToFloat()"> </A>FloatAsciiToFloat()</PRE>
+<P>
+<CODE>
+FloatAsciiToFloat() </CODE>
+converts a number represented in an ASCII text format into a FP number. The routine recognizes two flags:</P>
+<UL>
+<LI>
+FAF_PUSH_RESULT <BR>
+<A NAME="IX_FAF_PUSH_RESULT">
+ </A>
+Pushes the result onto the FP stack.</LI>
+<LI>
+FAF_STORE_NUMBER<BR>
+<A NAME="IX_FAF_STORE_NUMBER">
+ </A>
+Stores the result in a specified address.</LI>
+</UL>
+<P>
+The routine must also be passed a pointer to the string to convert, the number of characters in the string to convert (starting at the address) and the buffer to store the FP number if passing FAF_STORE_NUMBER.</P>
+
+
+<H4 CLASS="HeadingD">
+Converting FP Numbers to ASCII</H4>
+<PRE><A NAME="IX_FloatFloatToAscii()"> </A>FloatFloatToAscii(), <A NAME="IX_FloatFloatToAscii_StdFormat()"> </A>FloatFloatToAscii_StdFormat(), <A NAME="IX_FloatFloatIEEE64ToAscii_StdFormat()"> </A>FloatFloatIEEE64ToAscii_StdFormat()</PRE>
+<P>
+<CODE>
+FloatFloatToAscii() </CODE>
+converts an FP number into ASCII text format. The routine must be passed a stack frame, which may be set up by declaring a local variable of type <CODE>
+FFA_stackFrame </CODE>
+and moving data into the appropriate fields. You should also pass the routine a pointer to a buffer to store the resultant string. This buffer must be declared with a length of either:</P>
+<DL>
+<DT>
+	FLOAT_FLOAT_TO_ASCII_NORMAL_BUF_LEN </DT><DD>
+	FLOAT_FLOAT_TO_ASCII_HUGE_BUF_LEN</DD>
+</DL>
+<P>
+The <CODE>
+FFA_stackFrame</CODE>
+ is a union of two structures: <CODE>
+FloatFloatAsciiData</CODE>
+ or <CODE>
+FloatFloatToDateTimeData</CODE>
+. You will want to use the <CODE>
+FloatFloatToAsciiData</CODE>
+ structure in most cases; <CODE>
+FloatFloatToAsciiDateTimeData</CODE>
+ is used to format a FP number (representing a date and time) into a date-time format passed in the structure. The routine checks a bit in the structure to see which structure is being passed.</P>
+
+
+<H3 CLASS="HeadingCApp">
+Normal Conversions</H3>
+<P>
+The<CODE>
+ FloatFloatToAsciiData</CODE>
+ structure is used most often in formatting FP numbers into ASCII. The structure is rather large and cumbersome to set up. You may wish to use the routine <CODE>
+FloatFloatToAscii_StdFormat()</CODE>
+ which sets up many of these entries automatically. (<A HREF="Math_5.htm#42575"> FloatFloatToAsciiData Structure</A>
+ lists the entries of the <CODE>
+FloatFloatToAsciiData</CODE>
+ structure.)</P>
+<P CLASS="figTitle">
+
+
+Code Display D-4 <A NAME="42575">
+ </A>
+FloatFloatToAsciiData Structure</P>
+<PRE>typedef struct {</PRE>
+<PRE>/*
+ * FFA_params stores the entries that the caller must set up.
+ */
+	FloatFloatToAsciiParams			FFA_params;</PRE>
+<PRE>/*
+ * These entries store information returned by FloatFloatToAscii() that may be 
+ * examined.
+ */
+	word			FFA_startNumber;
+	word			FFA_decimalPoint;
+	word			FFA_endNumber;
+	word			FFA_numChars;
+	word			FFA_startExponent;</PRE>
+<PRE>/*
+ * The rest of the entries are for internal use only.
+ */
+	word			FFA_bufSize;
+	word			FFA_saveDI;
+	word			FFA_numSign;
+	byte			FFA_startSigCount;
+	byte			FFA_sigCount;
+	byte			FFA_noMoreSigInfo;
+	byte			FFA_startDecCount;
+	byte			FFA_decCount;
+	word			FFA_decExponent;
+	word			FFA_curExponent;
+	byte			FFA_useCommas;
+	byte			FFA_charsToComma;
+	char			FFA_commaChar;
+	char			FFA_decimalChar;
+} FloatFloatToAsciiData;</PRE>
+<P>
+FFA_<CODE>
+params</CODE>
+ is a structure that stores the following entries of its own:</P>
+<DL>
+<DT>
+<STRONG>
+formatFlags</DT><DD>
+</STRONG>
+Flags specifying the look and feel of the ASCII text format (see below for allowed flags).</DD>
+<DT>
+<EM>
+decimalOffset</DT><DD>
+</EM>
+Integer which specifies the number of decimal places to shift the output. For example, to display a number in terms of millions, a <CODE>
+decimalOffset </CODE>
+of -6 shifts the decimal point six places to the left; to display in terms of tenths would require a <CODE>
+decimalOffset </CODE>
+of 1.</DD>
+<DT>
+<EM>
+totalDigits	</DT><DD>
+</EM>
+Integer which specifies the maximum number of decimal places (integer and decimal portions) that the FP number may exhibit. The ASCII string is truncated if the length of the string is greater than this number.</DD>
+<DT>
+<EM>
+decimalLimit</DT><DD>
+</EM>
+Integer which specifies the maximum number of digits to the right of the decimal point. For example a <CODE>
+decimalLimit </CODE>
+of 2 would print out 123.456789 as 123.46.</DD>
+<DT>
+<EM>
+preNegative</DT><DD>
+</EM>
+Characters used to precede a negative number, in the format of a null terminated text string.</DD>
+<DT>
+<EM>
+postNegative</DT><DD>
+</EM>
+Characters used to follow a negative number, in the format of a null terminated text string.</DD>
+<DT>
+<EM>
+prePositive</DT><DD>
+</EM>
+Characters used to precede a positive number, in the format of a null terminated text string.</DD>
+<DT>
+<EM>
+postPositive</DT><DD>
+</EM>
+Characters used to follow a positive number, in the format of a null terminated text string.</DD>
+<DT>
+<EM>
+header</EM>
+</DT><DD>Characters used to precede the number, in the format of a null terminated text string. For example, a typical header for a currency format might be &quot;$&quot;. </DD>
+<DT>
+<EM>
+trailer</EM>
+</DT><DD>Characters used to follow a FP number, in the format of a null terminated text string.</DD>
+</DL>
+<P>
+The <CODE>
+formatFlags </CODE>
+record is a record of type <CODE>
+FloatFloatToAsciiFormatFlags</CODE>
+<A NAME="IX_FloatFloatToAsciiFormatFlags">
+ </A>
+ and defines the format of the ASCII output. Set the appropriate flags to get the desired output.</P>
+<UL>
+<LI>
+FFAF_FROM_ADDR<BR>
+Set if routine should take the FP number from a specified address, rather than the FP stack. This pointer (*number) should be passed to <CODE>
+FloatFloatToAscii()</CODE>
+ if this flag is set.</LI>
+<LI>
+FFAF_DONT_USE_SCIENTIFIC<BR>
+Set if the result should not be expressed in scientific notation under any condition. If this is set, the number will always be formatted in fixed format.</LI>
+<LI>
+FFAF_SCIENTIFIC<BR>
+Set if the result should be expressed in scientific notation even if the number can be expressed in fixed point format. For example, the number `2' will be expressed as &quot;2 x 10<EM FIXME_Superscript>
+0</EM>
+.&quot;</LI>
+<LI>
+FFAF_PERCENT<BR>
+Set if the result should be expressed as a percentage.</LI>
+<LI>
+FFAF_USE_COMMAS<BR>
+Set if the result should use commas to separate thousands.</LI>
+<LI>
+FFAF_NO_TRAIL_ZEROS<BR>
+Set if extraneous zeros to the right of the decimal point should be ignored. For example, &quot;123.67000000&quot; will be reduced to &quot;123.67.&quot;</LI>
+<LI>
+FFAF_NO_LEAD_ZEROS<BR>
+Set to ignore the lead zero for a number less than one. That is, &quot;0.123&quot; is reduced to &quot;.123.&quot;</LI>
+<LI>
+FFAF_HEADER_PRESENT<BR>
+Set if a header is present; this speeds up conversion.</LI>
+<LI>
+FFAF_TRAILER_PRESENT<BR>
+Set if a trailer is present; this speeds up conversion.</LI>
+<LI>
+FFAF_SIGN_CHAR_TO_FOLLOW_HEADER<BR>
+Set if sign character(s) should follow the header.</LI>
+<LI>
+FFAF_SIGN_CHAR_TO_PRECEDE_TRAILER<BR>
+Set if sign character(s) should precede the trailer.</LI>
+</UL>
+<P>
+The rest of the entries in <CODE>
+FloatFloatToAsciiData</CODE>
+ store information filled in by <CODE>
+FloatFloatToAscii()</CODE>
+. These entries are described below:</P>
+<DL>
+<DT>
+FFA_<CODE>
+startNumber</CODE>
+ stores the offset to the start of numeric characters in the ASCII buffer.</DT>
+<DT>
+FFA_<CODE>
+decimalPoint</CODE>
+ stores the offset to the decimal point character or zero if no decimal point is present.</DT>
+<DT>
+FFA_<CODE>
+endNumber</CODE>
+ stores the offset to the end of the numeric characters in the ASCII buffer.</DT>
+<DT>
+FFA_<CODE>
+numChars</CODE>
+ stores the total number of characters in the ASCII buffer (excluding the null terminator). This entry is set to zero if an error is encountered.</DT>
+<DT>
+FFA_<CODE>
+startExponent</CODE>
+ stores the offset to the &quot;E&quot; character in the ASCII buffer or zero if no exponent is present. Applications can check this to see if the number was expressed in scientific notation using the `E' format.</DT>
+
+
+</DL>
+<H3 CLASS="HeadingCApp">
+<A NAME="IX_Time:Math Conversions">
+ </A>
+<A NAME="IX_Date:Math Conversions">
+ </A>
+Date-Time Conversions</H3>
+<P>
+<CODE>
+FFA_stackFrame</CODE>
+ may contain <CODE>
+FloatFloatToAsciiDateTimeData</CODE>
+ if <CODE>
+FloatFloatToAscii()</CODE>
+ is being used to convert a FP number into a date-time format. In that case <CODE>
+FFA_stackFrame</CODE>
+ contains the structure <CODE>
+FloatFloatToDateTimeData</CODE>
+ instead of <CODE>
+FloatFloatToAsciiData</CODE>
+. (<CODE>
+FFA_stackFrame</CODE>
+ is a union.)</P>
+<P>
+<CODE>
+FloatFloatToDateTimeData</CODE>
+<A NAME="IX_FloatFloatToDateTimeData">
+ </A>
+ contains one entry, FFA_<CODE>
+dateTimeParams</CODE>
+. This structure contains several flags which specify how the date-time should be formatted and a number of entries which break down the date-time into its respective parts (year, month, day etc.) If none of these entries are filled in, the date-time is taken from the top of the FP stack.</P>
+<P>
+Date-times are represented by FP numbers in GEOS. The integer portion represents dates as integers counted from Jan 1, 1900, which is designated as 1. The highest date allowed is 73049 (December 31, 2099).<CODE>
+ </CODE>
+The fractional portion represents a fraction of the day between midnight (0.000000) and 11:59:59 p.m. (0.999988). This fractional value is derived from the hour, minute and second of the day.</P>
+<P CLASS="figTitle">
+
+
+Code Display D-5 DateTime Parameters</P>
+<PRE>typedef struct {
+	FloatFloatToDateTimeFlags				FFA_dateTimeFlags;
+	word				FFA_year;
+	byte				FFA_month;
+	byte				FFA_day;
+	byte				FFA_weekday;
+	byte				FFA_hours;
+	byte				FFA_minutes;
+	byte				FFA_seconds;
+} FloatFloatToDateTimeParams;</PRE>
+<PRE>/*
+ *	FloatFloatToDateTimeFlags record
+ */</PRE>
+<PRE>typedef WordFlags FloatFloatToDateTimeFlags;
+#define		FFDT_DATE_TIME_OP			0x8000
+#define		FFDT_FROM_ADDR			0x4000
+#define		FFDT_FORMAT			0x3fff</PRE>
+<P>
+The flag FFDT_DATE_TIME_OP is set to notify the <CODE>
+FloatFloatToAscii()</CODE>
+ routine that this operation is a date-time format, not a normal float to ASCII conversion. This flag must be set if you want to convert the FP number into a date-time format using <CODE>
+FloatFloatToAscii()</CODE>
+.</P>
+<P>
+FFDT_FROM_ADDR is set if the date-time FP number should not be taken from the FP stack (or passed directly in the <CODE>
+FloatFloatToDateTimeParams</CODE>
+ structure) but should instead be taken from the address passed in <CODE>
+FloatFloatToAscii()</CODE>
+.</P>
+<P>
+FFDT_FORMAT stores the <CODE>
+DateTimeFormat</CODE>
+ that the routine will use to format the number into a date-time string.</P>
+<P>
+If the date-time is directly passed in, and not taken from an FP date-time number either at a passed address or the top of an FP stack, <CODE>
+FloatFloatToAscii()</CODE>
+ looks at the other passed parameters.</P>
+<P>
+FFA_<CODE>
+year</CODE>
+ specifies the year. The value must be between 1900 and 2099. This is not a one-based year, as it is when presented as a date-time number.</P>
+<P>
+FFA_<CODE>
+month</CODE>
+ is the month of the year, a value between 1 and 12.</P>
+<P>
+FFA_<CODE>
+day</CODE>
+ is the day of a month, a value between 1 and 31. </P>
+<P>
+FFA_<CODE>
+hour</CODE>
+ specifies the hour of the day, a value between 0 and 23. Zero specifies midnight. </P>
+<P>
+FFA_<CODE>
+minutes</CODE>
+ specifies the minute of the hour, a value between 0 and 59.</P>
+<P>
+FFA_<CODE>
+seconds</CODE>
+ specifies the second of the minute, a value between 0 and 59.</P>
+
+
+<H3 CLASS="HeadingCApp">
+Using Standard Formats</H3>
+<P>
+<CODE>
+FloatFloatToAscii_StdFormat() </CODE>
+uses a pre-set stack frame, eliminating the need to set up the variables of the <CODE>
+FloatFloatToAsciiData</CODE>
+ structure manually. The only flags recognized are FFAF_FROM_ADDR, FFAF_SCIENTIFIC, FFAF_PERCENT, FFAF_USE_COMMAS, and FFAF_NO_TRAIL_ZEROS. The developer must pass the number of total digits and the number of decimal digits desired. If the flag FFAF_FROM_ADDR is used, a pointer to a FP number (not on the FP stack) must also be passed.</P>
+<P>
+The standard format sets the following elements of the stack frame to zero: <CODE>
+decimalOffset, header, trailer, postNegative, prePositive</CODE>
+, and <CODE>
+postPositive</CODE>
+. The structure element <CODE>
+preNegative </CODE>
+is set to the minus sign (&quot;<CODE FIXME_CodeTypedArgs>-</CODE>&quot;).</P>
+<P>
+<CODE>
+FloatFloatIEEE64ToAscii_StdFormat()</CODE>
+ performs the same operation as <CODE>
+FloatFloatToAscii_StdFormat()</CODE>
+ except that the FP number is passed (in 64 bit format) and is not taken from the stack. The entire FP number (not just a pointer to it) must be passed. All criteria for <CODE>
+FloatFloatToAscii_StdFormat()</CODE>
+ applies to this routine, except that the flag FFAF_FROM_ADDR is not used.</P>
+
+
+<H3 CLASS="HeadingCApp">
+Date and Time Routines</H3>
+<PRE><A NAME="IX_FloatGetDateNumber()"> </A>FloatGetDateNumber(), <A NAME="IX_FloatDateNumberGetYear()"> </A>FloatDateNumberGetYear(), <A NAME="IX_FloatDateNumberGetMonthAndDay()"> </A>FloatDateNumberGetMonthAndDay(), <A NAME="IX_FloatDateNumberGetWeekday()"> </A>FloatDateNumberGetWeekday(), <A NAME="IX_FloatGetTimeNumber("> </A>FloatGetTimeNumber(), <A NAME="IX_FloatTimeNumberGetHour()"> </A>FloatTimeNumberGetHour(), <A NAME="IX_FloatTimeNumberGetMinutes()"> </A>FloatTimeNumberGetMinutes(), <A NAME="IX_FloatTimeNumberGetSeconds()"> </A>FloatTimeNumberGetSeconds()</PRE>
+<P>
+<CODE>
+FloatGetDateNumber()</CODE>
+, when passed the month, day, and year, converts the data into an FP &quot;date number&quot; representation. This format represents dates as integers counted from Jan 1, 1900, which is designated as 1. The highest date allowed is 73050 (December 31, 2099).</P>
+<P>
+<CODE>
+FloatDateNumberGetYear(), FloatDateNumberGetMonthAndDay() </CODE>
+and<CODE>
+ FloatDateNumberGetWeekday() </CODE>
+all return the appropriate data, either the year, month and day, or weekday, given an FP &quot;date number&quot; as defined above. All data are returned as integers, not as FP numbers, and the original FP &quot;date number&quot; is popped off of the stack. Years are returned as integers between 1900 and 2099. Month and Days are returned as integers between 1 and 12, and 1 and 31, respectively. Weekdays are returned as integers between 1 and 7, where 1 is Sunday, 2 is Monday, etc. </P>
+<P>
+<CODE>
+FloatGetTimeNumber() </CODE>
+when passed hours, minutes, and seconds returns an FP decimal representation between midnight (0.000000) and 11:59:59 p.m. (0.999988). </P>
+<P>
+<CODE>
+FloatTimeNumberGetHour(), FloatTimeNumberGetMinutes() </CODE>
+and<CODE>
+ FloatTimeNumberGetSeconds() </CODE>
+return the appropriate data given an FP &quot;time number&quot; as defined above. The original FP &quot;time number&quot; is popped off of the stack.</P>
+<P>
+Note that both &quot;date numbers&quot; and &quot;time numbers&quot; can be added to specify a specific point in time. For example, 73050.999988 would specify December 31, 2099, 11:59:59. Since these formats are in FP format, they can be operated on with all standard functions in the FP library. </P>
+
+
+<H3 CLASS="HeadingCApp">
+Miscellaneous Date Time Routines</H3>
+<PRE><A NAME="IX_FloatGetDaysInMonth()"> </A>FloatGetDaysInMonth(), <A NAME="IX_FloatGetNumDigitsInIntegerPart()"> </A>FloatGetNumDigitsInIntegerPart(), <A NAME="IX_FloatFormatNumber()"> </A>FloatFormatNumber()</PRE>
+<P>
+<CODE>
+FloatGetDaysInMonth()</CODE>
+ returns the total number of days in a specific month, for a specific year. The routine must be passed the appropriate month and year.</P>
+<P>
+<CODE>
+FloatGetNumDigitsInIntegerPart()</CODE>
+ returns the number of digits in the integer portion of an FP number. Numbers between zero and one will return one as the number of digits.</P>
+<PRE>FloatStringGetDateNumber(), FloatStringGetTimeNumber()</PRE>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Math_1.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1 Basic Math Functions</A> 
+<!-- to next --> | <A HREF="Math_6.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3 Float Formats</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

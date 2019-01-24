@@ -1,0 +1,366 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Text_18.htm,v 1.1 97/06/02 16:42:23 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Paragraph Runs</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The Text Objects</A>: 4.4 <A HREF="Text_14.htm">Text Object Chunks</A>: 
+<A NAME="59559">
+ </A>
+Paragraph Runs</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Text_14.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Text_17.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.3 Character Runs</A> 
+<!-- to next --> | <A HREF="Text_19.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">5 Using VisText</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+<A NAME="IX_Paragraph runs">
+ </A>
+The paragraph attributes of your text object may also be singular or multiple. Singular paragraph attributes use one common set of characteristics for all the text in the text object. Multiple paragraph attributes store their characteristics in &quot;runs&quot; which allow separate paragraphs in the same object to use different attributes.</P>
+
+<H2 CLASS="HeadingC">
+Singular Paragraph Attributes</H2>
+<P>
+You may only need your text object to exhibit a singular set of paragraph attributes. In this case, the text object's paragraph attributes instance field (VTI_<CODE>
+paraAttrRuns</CODE>
+ for VisText, <CODE>
+GEN_TEXT_DEFAULT_PARA_ATTR</CODE>
+ or <CODE>
+GEN_TEXT_PARA_ATTR</CODE>
+ for GenText) will store a single set of attributes. This word of data will contain either a 16-bit record or a ChunkHandle to a chunk of more complex attributes.</P>
+<P>
+Unless your <CODE>
+VisTextStorageFlags</CODE>
+ (in <CODE>
+VTI_storageFlags</CODE>
+) specify VTSF_MULTIPLE_PARA_ATTRS, your paragraph attributes will be singular. (This flag will be set automatically for GenTexts using the above attributes.) Initially, all text within the text object will exhibit these same characteristics; also, any changes to the text object's paragraph attributes will affect the entire text. If your text object should allow different paragraphs to exhibit different attributes, see <A HREF="Text_18.htm#31863"> Multiple Paragraph Attributes</A>
+.</P>
+<P>
+If your paragraph attributes are singular, you have two choices: use a default set of characteristics or use a more complex (and complete) set of characteristics. What you use depends on the variety of choices you wish your application to have over the display of its text. For most simple generic text objects, the default set offers enough variety to accomplish most goals.</P>
+<P>
+To use the default paragraph attributes, specify VTSF_DEFAULT_PARA_ATTRS in the text object's <CODE>
+VTI_storageFlags</CODE>
+ field (for VisText) or set <CODE>
+ATTR_GEN_TEXT_DEFAULT_PARA_ATTR</CODE>
+ (for GenText). The default set uses the <CODE>
+VisTextDefaultParaAttr</CODE>
+ record to store the paragraph's attributes. This record offers a simple collection of paragraph justifications, tab stops and margins, and its definition is given in <A HREF="Text_12.htm#67353"> VisTextDefaultParaAttr</A>
+. If you need other paragraph styles not found in this record, you should not set VTSF_DEFAULT_PARA_ATTRS.</P>
+<P>
+By default, text objects using the default paragraph attributes will be left-justified, have default tab stops at one inch intervals, and have zero right, left, and paragraph margins.</P>
+<P>
+If you do not use the default paragraph attributes record, you must use the <CODE>
+VisTextParaAttr</CODE>
+ structure to store your text object's paragraph attributes. (In this case, do not set VTSF_DEFAULT_PARA_ATTRS in <CODE>
+VTI_storageFlags</CODE>
+.) The text object's paragraph attributes instance field will contain a ChunkHandle to this structure instead of the <CODE>
+VisTextDefaultParaAttr</CODE>
+ record.</P>
+<P CLASS="figTitle">
+Code Display 10-18 Setting VisTextParaAttr Attributes</P>
+<PRE>/* This example shows setting the initial default paragraph attributes. */
+@object GenTextClass MyTextObject = {
+    GTXI_text = &quot;&quot;;
+    ATTR_GEN_TEXT_DEFAULT_PARA_ATTR = ((J_CENTER &lt;&lt; VTDPA_JUSTIFICATION_OFFSET) | 
+			( (2*2) &lt;&lt; VTDPA_LEFT_MARGIN_OFFSET) |
+			( (1*2) &lt;&lt; VTDPA_PARA_MARGIN_OFFSET) |
+			( VTDDT_HALF_INCH &lt;&lt; VTDPA_DEFAULT_TABS_OFFSET));
+}</PRE>
+<PRE>/* This example shows setting non-default singular paragraph attributes. */
+@object GenTextClass MyTextObject = {
+    GTXI_text = &quot;&quot;;
+    ATTR_GEN_TEXT_PARA_ATTR = (ChunkHandle) @MyParaAttrs;
+}</PRE>
+<PRE>@chunk VisTextParaAttr MyParaAttrs = 
+    PARA_ATTR_STYLE_JUST_LEFT_RIGHT_PARA(0, 0, J_CENTER, 0, 2, 1);</PRE>
+
+
+<H2 CLASS="HeadingC">
+<A NAME="31863">
+ </A>
+Multiple Paragraph Attributes</H2>
+<P>
+To allow your VisText object to exhibit individual paragraph attributes, you should set VTSF_MULTIPLE_PARA_ATTRS and clear the VTSF_DEFAULT_PARA_ATTR flag in the object's <CODE>
+VTI_storageFlags</CODE>
+ record. For GenText, set the attribute <CODE>
+ATTR_GEN_TEXT_MULTIPLE_PARA_ATTR_RUNS</CODE>
+. Any multiple paragraph attribute object will not be able to use any of the default paragraph attributes of type <CODE>
+VisTextDefaultParaAttr</CODE>
+. </P>
+<P>
+Multiple paragraph attributes allow your object's individual paragraphs to exhibit different attributes. One paragraph may be left justified; another may be centered with different margins. Any paragraph may exhibit any of the attributes allowed within the <CODE>
+VisTextParaAttr</CODE>
+ structure separately.</P>
+<P>
+Multiple paragraph attributes are stored in the same manner as multiple character attributes. See <A HREF="Text_17.htm#91955"> Character Runs</A>
+ for a full description of how runs are stored.</P>
+<P>
+Paragraph attributes are specified by runs. Each paragraph run is used until another run is encountered, at which point the new paragraph attributes are applied and used. Runs are defined by the <EM>
+character</EM>
+ position within a chunk array and an associated token element; therefore, you must take care when defining a paragraph run so that it coincides with the first character of a new paragraph. At the character position, the token corresponds to a <CODE>
+VisTextParaAttr</CODE>
+ element. The paragraph attributes specified in this <CODE>
+VisTextParaAttr</CODE>
+ structure are used until the next <CODE>
+VisTextParaAttr</CODE>
+ element.</P>
+
+
+<H2 CLASS="HeadingC">
+Changing Paragraph Attributes</H2>
+<PRE>MSG_VIS_TEXT_GET_PARA_ATTR,VisTextParaAttrFlags, VisTextParaAttrBorderFlags, VisTextParaAttrDiffs, MSG_VIS_TEXT_SET_PARA_ATTR_BY_DEFAULT, MSG_VIS_TEXT_SET_PARA_ATTR, MSG_VIS_TEXT_SET_PARA_ATTRIBUTES, MSG_VIS_TEXT_ADD_PARA_ATTR</PRE>
+<P>
+There may be cases in which you would like to change the attributes exhibited by certain paragraphs in your Text object. As with character attributes, you can do this most easily by including one of the controllers mentioned at the end of this chapter.</P>
+<P>
+If you wish to manually change these character attributes, however, there are several messages to retrieve and set character attributes.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_GET_PARA_ATTR">
+ </A>
+MSG_VIS_TEXT_GET_PARA_ATTR</H4>
+<PRE CLASS="syntax">word 	MSG_VIS_TEXT_GET_PARA_ATTR(@stack
+        VisTextGetAttrFlags 			flags,
+        VisTextParaAttrDiffs 			*diffs,
+        VisTextParaAttr 			*attrs,
+        dword 			rangeEnd,
+        dword 			rangeStart);</PRE>
+<P>
+This message returns a buffer filled in with the <CODE>
+VisTextParaAttr</CODE>
+ attributes of the given range of text. If VTGAF_MERGE_WITH_PASSED is passed in the <CODE>
+VisTextGetAttrFlags</CODE>
+, then a passed <CODE>
+VisTextParaAttr</CODE>
+ structure will be merged with the range of text that this message is sent to. (If this flag is not passed, any information initially in that buffer will be ignored.)</P>
+<P>
+Over the passed range, different paragraphs may exhibit different attributes; a pointer to a <CODE>
+VisTextParaAttrDiffs</CODE>
+ structure is also passed to store information about attributes that are different across the range of text. This structure contains lists of <CODE>
+VisTextParaAttrFlags</CODE>
+ and <CODE>
+VisTextParaAttrBorderFlags</CODE>
+ specifying what paragraph and paragraph border attributes are multiply present. The structure also contains the bitfields of the <CODE>
+VisTextParaAttrAttributes</CODE>
+, <CODE>
+VisTextHyphenationInfo, VisTextKeepInfo</CODE>
+, and <CODE>
+VisTextDropCapInfo </CODE>
+present over the range of text.</P>
+<DL>
+<DT>
+Possible <CODE>
+VisTextParaAttrFlags</CODE>
+. If any of these are set, the selection exhibits the indicated multiple property over the range of text:</DT><DD>
+VTPAF_MULTIPLE_LEFT_MARGINS<BR>
+VTPAF_MULTIPLE_RIGHT_MARGINS<BR>
+VTPAF_MULTIPLE_PARA_MARGINS<BR>
+	VTPAF_MULTIPLE_LINE_SPACINGS<BR>
+VTPAF_MULTIPLE_DEFAULT_TABS<BR>
+VTPAF_MULTIPLE_TOP_SPACING<BR>
+VTPAF_MULTIPLE_BOTTOM_SPACING<BR>
+VTPAF_MULTIPLE_LEADINGS<BR>
+VTPAF_MULTIPLE_BG_COLORS<BR>
+VTPAF_MULTIPLE_BG_GRAY_SCREENS<BR>
+VTPAF_MULTIPLE_BG_PATTERNS<BR>
+VTPAF_MULTIPLE_TAB_LISTS<BR>
+VTPAF_MULTIPLE_STYLES<BR>
+VTPAF_MULTIPLE_PREPEND_CHARS<BR>
+VTPAF_MULTIPLE_PARA_NUMBERS</DD>
+<DT>
+Possible <CODE>
+VisTextParaAttrBorderFlags</CODE>
+:</DT><DD>
+VTPABF_MULTIPLE_BORDER_LEFT<BR>
+VTPABF_MULTIPLE_BORDER_TOP<BR>
+VTPABF_MULTIPLE_BORDER_RIGHT<BR>
+VTPABF_MULTIPLE_BORDER_BOTTOM<BR>
+VTPABF_MULTIPLE_BORDER_DOUBLES<BR>
+VTPABF_MULTIPLE_BORDER_DRAW_INNERS<BR>
+VTPABF_MULTIPLE_BORDER_ANCHORS<BR>
+VTPABF_MULTIPLE_BORDER_WIDTHS<BR>
+VTPABF_MULTIPLE_BORDER_SPACINGS VTPABF_MULTIPLE_BORDER_SHADOWS VTPABF_MULTIPLE_BORDER_COLORS VTPABF_MULTIPLE_BORDER_GRAY_SCREENS VTPABF_MULTIPLE_BORDER_PATTERNS </DD>
+</DL>
+<P CLASS="refField">
+Structures:	</P>
+<PRE>typedef struct {
+	VisTextParaAttrFlags 					VTPAD_diffs;
+	VisTextParaAttrBorderFlags					VTPAD_borderDiffs;
+	VisTextParaAttrAttributes					VTPAD_attributes;
+	VisTextHyphenationInfo					VTPAD_hyphenationInfo;
+	VisTextKeepInfo					VTPAD_keepInfo;
+	VisTextDropCapInfo					VTPAD_dropCapInfo;
+} VisTextParaAttrDiffs;</PRE>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any text object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+flags</EM>
+	VTGAF_MERGE_WITH_PASSED to merge the retrieved text attributes with the text in the passed range.</P>
+<DL>
+<DT>
+<EM>
+diffs</EM>
+</DT><DD>Pointer to a <CODE>
+VisTextParaAttrDiffs</CODE>
+ structure to store attribute differences.</DD>
+<DT>
+<EM>
+attrs</EM>
+</DT><DD>Pointer to a <CODE>
+VisTextParaAttr</CODE>
+ buffer to store the retrieved paragraph attributes. If VTGAF_MERGE_WITH_PASSED is passed in flags, this buffer initially contains attributes to match against the retrieved attributes.</DD>
+<DT>
+<EM>
+rangeEnd</EM>
+</DT><DD>End of the range (character position).</DD>
+<DT>
+<EM>
+rangeStart</EM>
+</DT><DD>Beginning of the range (character position).</DD>
+</DL>
+<P CLASS="refField">
+Return:	The token of the specific paragraph attribute run (word value) if the text object is storing runs of <CODE>
+VisTextParaAttr</CODE>
+ structures. The <EM>
+attrs</EM>
+ and <EM>
+diffs</EM>
+ buffers are also filled with their relevant information.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_SET_PARA_ATTR_BY_DEFAULT">
+ </A>
+MSG_VIS_TEXT_SET_PARA_ATTR_BY_DEFAULT</H4>
+<PRE CLASS="syntax">void	MSG_VIS_TEXT_SET_PARA_ATTR_BY_DEFAULT(@stack
+        VisTextDefaultParaAttr 				defParaAttrs,
+        dword 				rangeEnd,
+        dword 				rangeStart);</PRE>
+<P>
+This message sets the paragraph attributes passed in <CODE>
+VisTextDefaultParaAttr</CODE>
+ over the specified range of the text object. If the text object is not in &quot;default&quot; paragraph attribute mode (i.e. it is storing runs of <CODE>
+VisTextParaAttr</CODE>
+ structures) it will translate the default attributes into their matching <CODE>
+VisTextParaAttr</CODE>
+ attributes.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any Text object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+defParaAttrs</EM>
+	<CODE>
+VisTextDefaultParaAttr</CODE>
+ record to set over the passed range of text.</P>
+<DL>
+<DT>
+<EM>
+rangeEnd</EM>
+</DT><DD>End of the range (Character position).</DD>
+<DT>
+<EM>
+rangeStart</EM>
+</DT><DD>Start of the range (Character position).</DD>
+</DL>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_SET_PARA_ATTR">
+ </A>
+MSG_VIS_TEXT_SET_PARA_ATTR</H4>
+<PRE CLASS="syntax">void	MSG_VIS_TEXT_SET_PARA_ATTR(@stack
+        VisTextParaAttr 		*newParaAttrs,
+        dword 		rangeEnd,
+        dword 		rangeStart);</PRE>
+<P>
+This message sets the paragraph attributes passed in the <CODE>
+VisTextParaAttr</CODE>
+ buffer over the specified range of the text object. If the text object is in &quot;default&quot; paragraph attribute mode, it will force the text object to begin storing runs of <CODE>
+VisTextParaAttr</CODE>
+ structures.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any Text object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+newParaAttrs</EM>
+	Pointer to a <CODE>
+VisTextParaAttr</CODE>
+ buffer.</P>
+<DL>
+<DT>
+<EM>
+rangeEnd</EM>
+</DT><DD>End of the range (Character position).</DD>
+<DT>
+<EM>
+rangeStart</EM>
+</DT><DD>Start of the range (Character position).</DD>
+</DL>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_ADD_PARA_ATTR">
+ </A>
+MSG_VIS_TEXT_ADD_PARA_ATTR</H4>
+<PRE CLASS="syntax">word	MSG_VIS_TEXT_ADD_PARA_ATTR(
+        VisTextMaxParaAttr 		*paraAttr);</PRE>
+<P>
+This message adds a given set of paragraph attributes passed in the <CODE>
+VisTextParaAttr</CODE>
+ buffer to the paragraph &quot;run&quot; for that text object. The text object must not be in &quot;default&quot; paragraph attribute mode; it must already be storing runs of <CODE>
+VisTextParaAttr</CODE>
+ structures.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any Text object that is storing runs of <CODE>
+VisTextParaAttr</CODE>
+ structures.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+paraAttr	P</EM>
+ointer to a <CODE>
+VisTextParaAttr</CODE>
+ buffer.</P>
+<P CLASS="refField">
+Return:	Token of the paragraph run entry (word-value).</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Text_14.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Text_17.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.3 Character Runs</A> 
+<!-- to next --> | <A HREF="Text_19.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">5 Using VisText</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

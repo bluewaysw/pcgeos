@@ -1,0 +1,147 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Socket_8.htm,v 1.1 97/06/02 14:15:16 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Accepting a Connection</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="sectionTitle">
+<A HREF="index.htm">Socket</A>: 5 
+<A NAME="56352">
+ </A>
+Accepting a Connection</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Socket_7.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4 Making a Connection</A> 
+<!-- to next --> | <A HREF="Socket_9.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">6 Loading on Connection</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>SocketBind(), SocketBindInDomain(), SocketListen(), SocketAccept() </PRE>
+<P>
+There's a bit of work involved in setting up a program to receive connections from other sockets. The program must create a socket and associate it with a port. If there is to be a sequenced-packet or stream delivery connection, then the program needs to do some more work to listen for and accept these connections.</P>
+<P>
+If a program creates a socket that accepts connections, the program should probably spawn a separate thread for each accepted connection. If this is not practical, then see <CODE>
+SocketCheckReady()</CODE>
+ for a way to monitor several sockets with a single thread. </P>
+<P>
+Call <CODE>
+SocketCreate()</CODE>
+ to create a socket for this side of the connection. If the socket is to receive datagram packets, then it must be of type datagram. If the other socket in the connection will be a sequenced packet or stream delivery type, then the socket accepting the connection must be either sequenced packet or stream delivery type; however, the two sockets need not be of the same type.</P>
+<P>
+(If you follow the multi-threaded approach, be aware that when the Socket's owning thread exits, it frees the Socket. To allow a Socket to survive the exit of its thread, use <CODE>
+SocketSetIntSocketOption()</CODE>
+ to change its owning thread.)</P>
+<P>
+<A NAME="IX_SocketBind()">
+ </A>
+<A NAME="IX_SocketBindInDomain()">
+ </A>
+The other side of the connection attempts to hook up to a port number on this side of the connection. If a socket is to intercept connections to a certain port, it must somehow associate itself with that port. Use the <CODE>
+SocketBind()</CODE>
+ or <CODE>
+SocketBindInDomain()</CODE>
+ routines to associate a socket with a port number. <CODE>
+SocketBind()</CODE>
+ associates the socket with a port number. <CODE>
+SocketBindInDomain()</CODE>
+ associates the socket with a port number but only within a specific domain. </P>
+<P>
+For any given domain, normally only one socket on the machine may be bound to any port number. Thus, if you call <CODE>
+SocketBindInDomain()</CODE>
+ to bind socket A to port 3 in the TCP/IP domain, then:</P>
+<UL>
+<LI>
+<A NAME="40983">
+ </A>
+You could use <CODE>
+SocketBindInDomain()</CODE>
+ to bind socket B to port 3 in the IRLAP domain, but </LI>
+<LI>
+You couldn't use <CODE>
+SocketBindInDomain()</CODE>
+ to bind socket C to port 3 in the TCP/IP domain, and </LI>
+<LI>
+You couldn't use <CODE>
+SocketBind()</CODE>
+ to bind socket D to port 3.</LI>
+</UL>
+<P>
+There are some ways around this restriction:</P>
+<UL>
+<LI>
+To force <CODE>
+SocketBind()</CODE>
+ or <CODE>
+SocketBindInDomain()</CODE>
+ to re-use some port that another socket has bound, then pass the SBF_REUSE_PORT flag. Otherwise, be prepared to receive SE_PORT_IN_USE or SE_BIND_CONFLICT. Even the SBF_REUSE_PORT flag won't allow you to use both <CODE>
+SocketBind()</CODE>
+ and <CODE>
+SocketBindInDomain()</CODE>
+ on a single port. E.g., in the example above, you could use <CODE>
+SocketBindInDomain()</CODE>
+ with SBF_REUSE_PORT to bind socket C to port 3 in the TCP/IP domain, but you could not use <CODE>
+SocketBind()</CODE>
+ with SBF_REUSE_PORT to bind socket D to port 3. You may not use SBF_REUSE_PORT with datagram-based sockets.</LI>
+<LI>
+If there are only non-datagram-based sockets bound to a port, you may bind a datagram-based socket to that port without setting SBF_REUSE_PORT. The reverse is also true. Recall that only a datagram socket can connect with another datagram socket; non-datagram sockets connect only with other non-datagram sockets.</LI>
+<LI>
+A given socket may only be bound to one port. Trying to bind it to another port results in SE_SOCKET_ALREADY_BOUND. Create another socket to bind to the other port. </LI>
+</UL>
+<P>
+Always check for bind conflicts. Bind conflicts may occur even though a program is well-behaved: other programs may have bound ports to a socket. For reasons described in <A HREF="Socket_9.htm#61776"> Loading on Connection</A>
+, sometimes the Socket library itself may monitor a port.</P>
+<P>
+When setting up a sequenced packet or stream delivery connection, a bit more set-up work is necessary. These delivery types require a &quot;connection.&quot;</P>
+<P>
+<A NAME="IX_SocketListen()">
+ </A>
+To listen for incoming sequenced packet or stream connections, call <CODE>
+SocketListen()</CODE>
+. The socket must be bound to a port before it can listen. To allow more than one connection through the port, specify the maximum number of connections as an argument to <CODE>
+SocketListen()</CODE>
+. The <CODE>
+SocketListen()</CODE>
+ routine causes a socket to listen for incoming connections. If another socket is listening at the port, <CODE>
+SocketListen()</CODE>
+ returns SE_PORT_ALREADY_LISTENING.</P>
+<P>
+<A NAME="IX_SocketAccept()">
+ </A>
+To make a socket wait for and accept a connection, call <CODE>
+SocketAccept()</CODE>
+. The socket must be listening for connections (processed by <CODE>
+SocketListen()</CODE>
+). Because the thread blocks until a connection is made or <CODE>
+SocketAccept()</CODE>
+ times out, programs normally don't call this routine in their main execution thread. As in the Appl/SDK_C/Talk sample application, a separate thread handles accepting a connection and receiving data from the connection. </P>
+<P>
+If a connection is made, <CODE>
+SocketAccept()</CODE>
+ returns a <CODE>
+Socket</CODE>
+ used to represent the connection. Do not confuse this connected socket with the listening socket. You might be able to accept more connections from the listening socket. </P>
+<P>
+If <CODE>
+SocketAccept()</CODE>
+ returns SE_LISTEN_QUEUE_EMPTY, then there were no connections waiting to be accepted. </P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Socket_7.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4 Making a Connection</A> 
+<!-- to next --> | <A HREF="Socket_9.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">6 Loading on Connection</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

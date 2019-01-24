@@ -1,0 +1,179 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: GOCLanguage_3.htm,v 1.2 97/09/05 13:44:07 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Handles and Pointers</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">GEOS Programming</A>: 1.2 <A HREF="GOCLanguage_1.htm">Basic Data Types and Structures</A>: 
+Handles and Pointers</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GOCLanguage_1.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GOCLanguage_2.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1.1 Records and Enumerated Types</A> 
+<!-- to next --> | <A HREF="GOCLanguage_4.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">1.3 Fixed Point Structures</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+Handles and pointers are present everywhere in GEOS--they are the essential elements that make dynamic linking and efficient memory management possible.</P>
+<P>
+GEOS<A NAME="IX_Pointers">
+ </A>
+ pointers are all far pointers; that is, they are 32-bit addresses that reference specific locations in memory. They are normal C pointers and can be used as such. Two other pointer types are also used by GEOS: Object pointers (optrs) and segment pointers. Object pointers are described below; segment pointers are 16-bit addresses described in <A HREF="../../Memory/Heap/index.htm">the Memory Management chapter</A>.</P>
+<H2 CLASS="HeadingC">
+Handles</H2>
+<P>
+<A NAME="IX_Handles">
+ </A>
+Handles are 16-bit, unsigned values used for several purposes. They provide abstraction when the exact address of a data structure or other item is not known or is an inconsistent state. The kernel maintains a handle table to keep track of many of the handles in the system. Each entry in the handle table is 16 bytes that contains information about the item referenced by the handle; these 16 bytes are opaque to applications and libraries and can not be accessed or altered except by the kernel. Other handle types are managed in other tables by the kernel.</P>
+<P>
+Handles are used for the following primary purposes. For a full description of how handles are used, see <A HREF="../../Memory/Handles/index.htm">the Handles chapter</A>.
+<IMG SRC="GOCLanguage_3_handleTypes.gif">
+
+</P>
+<UL>
+<LI>
+Memory reference<BR>
+<A NAME="IX_Memory:handles">
+ </A>
+Entries for memory handles contain pointers to memory blocks; when the blocks move, the pointers are updated. However, the handle's integrity is preserved, and applications keep track of just the handle value.</LI>
+<LI>
+Virtual Memory reference<BR>
+<A NAME="IX_Virtual memory:handles">
+ </A>
+Entries for VM handles indirectly reference VM blocks similar to the way memory handles reference blocks of memory. VM handles may be used whether the VM block is resident in memory or not.</LI>
+<LI>
+File and disk reference<BR>
+<A NAME="IX_Disks:handles">
+ </A>
+<A NAME="IX_Files:handles">
+ </A>
+Entries for file and disk handles contain information about the location and status of the referenced file/disk. They provide indirect access to files and disks in a manner similar to memory handles.</LI>
+<LI>
+Data structure implementation<BR>
+<A NAME="IX_GStates:handles">
+ </A>
+<A NAME="IX_Windows:handles">
+ </A>
+<A NAME="IX_Threads:handles">
+ </A>
+<A NAME="IX_Queues, event:handles">
+ </A>
+<A NAME="IX_Threads:lock handles">
+ </A>
+<A NAME="IX_Messages:handles">
+ </A>
+<A NAME="IX_Semaphores:handles">
+ </A>
+<A NAME="IX_Geodes:handles">
+ </A>
+<A NAME="IX_Timers:handles">
+ </A>
+Certain frequently-used system data structures require a storage format that provides for quick and convenient access at all times. These data structures (for example, threads, event queues, messages, timers, and semaphores) are stored in Handle Table entries.</LI>
+<LI>
+Optimization<BR>
+The kernel will, if space permits, sometimes use Handle Table entries for optimized temporary storage. (For example, when passing parameters on the stack with messages, the kernel will occasionally use handles for storing the parameters.)</LI>
+</UL>
+<P>
+<A NAME="IX_NullHandle">
+ </A>
+<A NAME="IX_NULL">
+ </A>
+The <CODE>
+NullHandle</CODE>
+ value (zero) is used to indicate a null handle.</P>
+<P>
+There are over a dozen different types of handles that can be used by any sort of geode. These are listed in <A HREF="../../Programming/GOCLanguage/GOCLanguage_3.htm">the GEOS Programming chapter</A>. All are 16-bit unsigned integers.</P>
+
+<H2 CLASS="HeadingC">
+Chunk Handles and Object Pointers</H2>
+<P>
+<A NAME="IX_optr">
+ </A>
+<A NAME="IX_Chunk handles">
+ </A>
+<A NAME="IX_ChunkHandle">
+ </A>
+Objects and small data structures are stored in small memory pieces called chunks. Chunks are stored in memory blocks known as local memory heaps, and each local memory heap can contain several chunks. Each chunk is referenced by a combination of two handles: The MemHandle handle locates the local memory heap, and the ChunkHandle locates the chunk within the block.  A null chunk handle value is specified by <CODE>
+NullChunk</CODE>
+.</P>
+<P>
+Objects are referenced in the same way as chunks, but the handle and chunk handle are combined into a single structure called an Object Pointer, or optr. Each optr uniquely identifies a particular object in the system. Note that optrs are often used to reference non-object chunks and data structures. A null value is specified by <CODE>
+NullOptr</CODE>
+.</P>
+<P>
+GEOS provides several macros, all defined in <STRONG CLASS="fileName">
+geos.h</STRONG>
+, for creating and parsing optrs.</P>
+<UL>
+<LI>
+<CODE>
+ConstructOptr()<BR>
+</CODE>
+<A NAME="IX_ConstructOptr() macro">
+ </A>
+This macro constructs an optr from a MemHandle and a ChunkHandle.</LI>
+<LI>
+<CODE>
+OptrToHandle()<BR>
+</CODE>
+<A NAME="IX_OptrToHandle() macro">
+ </A>
+This macro extracts the MemHandle portion of the given optr.</LI>
+<LI>
+<CODE>
+OptrToChunk()<BR>
+</CODE>
+<A NAME="IX_OptrToChunk() macro">
+ </A>
+This macro extracts the chunk handle portion of a given optr.</LI>
+</UL>
+
+
+<H2 CLASS="HeadingC">
+Pointers</H2>
+<P>
+Pointers can be used normally as in C. All Goc-generated pointers are far pointers; that is, they are 32-bits long, composed of a 16-bit segment and a 16-bit offset.</P>
+<P>
+GEOS provides macros for extracting the segment and handle portions of pointers.</P>
+<UL>
+<LI>
+<CODE>
+PtrToSegment()<BR>
+</CODE>
+<A NAME="IX_PtrToSegment()">
+ </A>
+This macro returns the segment portion of the given pointer (returned as type &quot;word&quot;).</LI>
+<LI>
+<CODE>
+PtrToOffset()<BR>
+</CODE>
+<A NAME="IX_PtrToOffset()">
+ </A>
+This macro returns the offset portion of the given pointer (returned as type &quot;word&quot;).</LI>
+</UL>
+<P>
+GEOS automatically loads code resources when needed. However, when you call routines through pointers, you must take special measures to see to it that the routine is properly loaded into memory. This is discussed below in <A HREF="GOCLanguage_9.htm#67927"> Using Routine Pointers in Goc</A>
+.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GOCLanguage_1.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GOCLanguage_2.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1.1 Records and Enumerated Types</A> 
+<!-- to next --> | <A HREF="GOCLanguage_4.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">1.3 Fixed Point Structures</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

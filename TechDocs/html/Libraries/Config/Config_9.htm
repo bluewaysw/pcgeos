@@ -1,0 +1,189 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Config_9.htm,v 1.1 97/06/02 15:41:48 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> PrefItemGroupClass</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Config Library</A>: 4.3 <A HREF="Config_6.htm">Object Class Reference</A>: 
+<A NAME="IX_PrefItemGroupClass">
+ </A>
+PrefItemGroupClass</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Config_6.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Config_8.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.2 PrefValueClass</A> 
+<!-- to next --> | <A HREF="Config_a.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.4 PrefStringItemClass</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+This class acts like <CODE>
+GenItemGroupClass</CODE>
+, but has extended functionality for reading/writing strings to the .INI file. When the user triggers the dialog's Apply trigger (when the PrefItemGroup receives a <CODE>
+MSG_META_SAVE_OPTIONS</CODE>
+), the PrefItemGroup will respond by writing out strings based upon which of its children items are presently selected. These strings can be taken from the items' monikers or from strings used with <CODE>
+PrefStringItemClass</CODE>
+ objects.</P>
+<P>
+When loading options, if either the PIFF_USE_ITEM_MONIKERS or PIFF_USE_ITEM_STRINGS is set for the item group, then it will select its children based on the strings stored in the .INI file.Otherwise, the item group will default to the <CODE>
+GenItemGroupClass</CODE>
+ functionality, which uses the identifier of the items as a basis for selection.</P>
+<P CLASS="figTitle">
+Code Display 22-6 PrefItemGroupClass Instance Data</P>
+<PRE>@instance PrefInitFileFlags <A NAME="IX_PIGI_&ldots;"> </A>PIGI_initFileFlags = 0;</PRE>
+<PRE>typedef ByteFlags <A NAME="IX_PrefInitFileFlags structure"> </A>PrefInitFileFlags;
+#define <A NAME="IX_PIFF_&ldots;  (PrefInitFileFlags structure)"> </A>PIFF_USE_ITEM_STRINGS 0x80
+/* 
+ * If set, then the item group's children must be of class PrefStringItemClass,
+ * and their strings will be used to interact with the .INI file. */</PRE>
+<PRE>#define PIFF_USE_ITEM_MONIKERS 0x40
+/* If set, the monikers of the items are used to interact with the .INI file. */</PRE>
+<PRE>#define PIFF_APPEND_TO_KEY 0x20
+/* If set, the strings in this list will be ADDED 
+ * to strings that may already exist for this key */</PRE>
+<PRE>#define PIFF_ABSENT_KEY_OVERRIDES_DEFAULTS 0x10
+/* If set, an absent key for the item group will cause it to
+ * behave as if an empty key were in the .INI file, effectively
+ * overriding any default values stored with the group when it was
+ * compiled. Used primarily by those groups where one subclasses
+ * MSG_PREF_STRING_ITEM_CHECK_IF_IN_INIT_FILE_KEY to determine the
+ * initial setting, rather than looking in the .INI file. */</PRE>
+<PRE>@instance word PIGI_originalSelection = 0;</PRE>
+<PRE>@instance word PIGI_originalNumSelections = 0;</PRE>
+<PRE>@instance byte PIGI_suspendCount = 0;
+/* When suspend count is nonzero, the item group won't update text objects, nor
+ * will it enable/disable objects when the selection changes. */</PRE>
+<PRE>@vardata PrefEnableData ATTR_PREF_ITEM_GROUP_ENABLE;
+/* allows setting up an object to be enabled/disabled when
+ * settings are made in the item group */</PRE>
+<PRE>typedef struct {
+	word 		<A NAME="IX_PED_&ldots;  (PrefEnableData structure)"> </A>PED_item; 		/* Identifier of the item that controls
+					 * enabling/disabling of object. If this
+					 * is GIGS_NONE, then the action will be
+					 * performed if no items are selected. */
+	ChunkHandle 		PED_lptr; 		/* Object to be enabled/disabled */
+ 	PrefEnableFlags 		PED_flags;
+} <A NAME="IX_PrefEnableData structure"> </A>PrefEnableData;</PRE>
+<PRE>typedef ByteFlags <A NAME="IX_PrefEnableFlags structure"> </A>PrefEnableFlags;</PRE>
+<PRE>#define <A NAME="IX_PEF_&ldots;  (PrefEnableFlags structure)"> </A>PEF_DISABLE_IF_SELECTED 0x80
+/* Disable the object if the associated item is selected,
+ * otherwise do the opposite. */</PRE>
+<PRE>#define PEF_DISABLE_IF_NONE 0x40
+/* If this flag is set, then the PED_item field is ignored.
+ * Instead, the item group will disable the specified object if
+ * no items are selected -- or if there are no items in the list. */</PRE>
+<PRE>@vardata word <A NAME="IX_ATTR_PREF_ITEM_GROUP_&ldots;"> </A>ATTR_PREF_ITEM_GROUP_OVERRIDE;
+/* This attribute is used to specify an item which will act
+ * as an OVERRIDE for all other items (in a non-exclusive
+ * item group).
+ *
+ * When the specified item is SELECTED, then all other items are DE-SELECTED.
+ * When any other item is SELECTED, the override item is DE-SELECTED.
+ * If all items are DE-SELECTED, the override item becomes SELECTED */</PRE>
+<PRE>@vardata ChunkHandle ATTR_PREF_ITEM_GROUP_TEXT_DISPLAY;
+/* chunk handle of a GenText object that will be updated
+ * with the moniker of the currently selected item on APPLY/RESET. */</PRE>
+<PRE>@vardata ChunkHandle ATTR_PREF_ITEM_GROUP_STATUS_TEXT;
+/* chunk handle of a GenText object that will be updated every
+ * time this object receives a MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG. */</PRE>
+<PRE>@vardata char ATTR_PREF_ITEM_GROUP_EXTRA_STRING_SECTION[];
+/* If a string is given -- the string will always be written
+ * out as the FIRST string section for the .INI file key. For
+ * example, the &quot;Memory&quot; item group uses this to always insert
+ * &quot;disk.geo&quot; whenever writing out the memory types. Note:
+ * this item is only written if the item group has either the
+ * PIFF_USE_ITEM_MONIKERS or PIFF_USE_ITEM_STRINGS set. */</PRE>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_PREF_ITEM_GROUP_SET_ORIGINAL_SELECTION">
+ </A>
+MSG_PREF_ITEM_GROUP_SET_ORIGINAL_SELECTION</H4>
+<PRE CLASS="syntax">void 	MSG_PREF_ITEM_GROUP_SET_ORIGINAL_SELECTION(
+word selection);</PRE>
+<P>
+Set the &quot;originalSelection&quot; field of the item group. Also, sends <CODE>
+MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION</CODE>
+ to superclass. This message can only be used with exclusive item groups--for other types, use the GenItemGroup messages, and then send the object <CODE>
+MSG_PREF_SET_ORIGINAL_STATE</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Anywhere.</P>
+<P CLASS="refField">
+Destination:	An exclusive PrefItemGroup.</P>
+<P CLASS="refField">
+Parameters:	<EM>selection</EM>	Which item to select.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_PREF_ITEM_GROUP_GET_SELECTED_ITEM_TEXT">
+ </A>
+MSG_PREF_ITEM_GROUP_GET_SELECTED_ITEM_TEXT</H4>
+<PRE CLASS="syntax">word 	MSG_PREF_ITEM_GROUP_GET_SELECTED_ITEM_TEXT(
+        char 	*buffer,
+        word 	bufSize);</PRE>
+<P>
+This message returns the text in the moniker of the selected item. The value returned is the number of characters in the string. If nothing is selected, the value returned is zero.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_PREF_ITEM_GROUP_GET_ITEM_MONIKER">
+ </A>
+MSG_PREF_ITEM_GROUP_GET_ITEM_MONIKER</H4>
+<PRE CLASS="syntax">word MSG_PREF_ITEM_GROUP_GET_ITEM_MONIKER(@stack 
+        char 	*buffer,
+        word 	bufSize,
+        word 	identifier);</PRE>
+<P>
+This message retrieves the text in the moniker of one of the items of a PrefItemGroup. This works for dynamic list subclasses as well. The message returns the number of characters in the returned text.</P>
+<P CLASS="refField">
+Parameters:	<EM>buffer</EM>	Buffer in which to return moniker text.</P>
+<DL>
+<DT>
+<EM>bufSize</EM></DT><DD>Size of buffer.</DD>
+<DT>
+<EM>identifier</EM></DT><DD>Identifier of item whose moniker should be returned.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Size of item's moniker.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_PREF_ITEM_GROUP_UPDATE_TEXT">
+ </A>
+MSG_PREF_ITEM_GROUP_UPDATE_TEXT</H4>
+<PRE CLASS="syntax">void MSG_PREF_ITEM_GROUP_UPDATE_TEXT(
+        ChunkHandle 		textObject);</PRE>
+<P>
+This message updates the specified text object with text of the currently selected item. The PrefItemGroup sends this to itself in conjunction with either ATTR_PREF_ITEM_GROUP_TEXT_DISPLAY or ATTR_PREF_ITEM_GROUP_STATUS_TEXT. By default, this message will also cause the text object to send out its status message.</P>
+<P CLASS="refField">
+Source:	Self.</P>
+<P CLASS="refField">
+Destination:	Self.</P>
+<P CLASS="refField">
+Interception:	Default behavior is to fetch the moniker of the current selection, and sent that to the text. The subclasser can use different text, if desired.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Config_6.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Config_8.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.2 PrefValueClass</A> 
+<!-- to next --> | <A HREF="Config_a.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.4 PrefStringItemClass</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

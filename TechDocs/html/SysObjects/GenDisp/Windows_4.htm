@@ -1,0 +1,187 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Windows_4.htm,v 1.1 97/06/02 16:17:11 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Using the GenPrimary</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="sectionTitle">
+<A HREF="index.htm">Window Objects</A>: 2 
+Using the GenPrimary</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Windows_1.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1 A First Look at GenDisplay</A> 
+<!-- to next --> | <A HREF="Windows_5.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3 Using Multiple Displays</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>MSG_GEN_PRIMARY_GET_LONG_TERM_MONIKER, MSG_GEN_PRIMARY_USE_LONG_TERM_MONIKER, MSG_GEN_PRIMARY_REPLACE_LONG_TERM_MONIKER, HINT_PRIMARY_FULL_SCREEN, HINT_PRIMARY_NO_FILE_MENU, HINT_PRIMARY_NO_EXPRESS_MENU, HINT_PRIMARY_OPEN_ICON_BOUNDS, HINT_PRIMARY_NO_HELP_BUTTON</PRE>
+<P>
+Almost every application will have a single GenPrimary object. GEOS uses the GenPrimary to create and manage the primary window of an application. A few applications may have several GenPrimary objects; a very few will have no GenPrimary at all. (Applications with no GenPrimary generally do not have any user interface; they often are intended to work with other applications, communicating via streams.)</P>
+<P>
+The structure of the GenPrimary object is almost the same as that of GenDisplay. The instance data definitions for <CODE>
+GenPrimaryClass</CODE>
+ are shown in <A HREF="Windows_4.htm#51117"> Instance data for GenPrimaryClass</A>
+ below.</P>
+<P CLASS="figTitle">
+Code Display 4-2 <A NAME="51117">
+ </A>
+Instance data for GenPrimaryClass</P>
+<PRE>/* There is only one instance field specifically defined for GenPrimaryClass. */</PRE>
+<PRE>/* A GenPrimary object can have a long moniker, which is displayed at the top of
+ * the window. The moniker is stored in a chunk in the object block containing the
+ * GenPrimary; the attribute GPI_longTermMoniker contains the handle of this
+ * chunk. The long-term moniker is described below.*/
+    @instance ChunkHandle				GPI_longTermMoniker;</PRE>
+<PRE>/* GenPrimaryClass also modifies the default GI_attrs settings. */
+    @default GI_attrs = @default | GA_TARGETABLE;</PRE>
+<PRE>/* HINT_PRIMARY_FULL_SCREEN indicates that the primary object should be sized to
+ * fill a large portion of the screen. If this hint is not present, the Primary
+ * will be just large enough to accommodate its children.*/
+    @vardata void 			HINT_PRIMARY_FULL_SCREEN;</PRE>
+<PRE>/* Ordinarily, every Primary window is created with a File menu. You can suppress
+ * this by including HINT_PRIMARY_NO_FILE_MENU. */
+    @vardata void 			HINT_PRIMARY_NO_FILE_MENU;</PRE>
+<PRE>/* Also by default, any launched Primary window gets added to the Express Menu. If 
+ * you wish to suppress this behavior, add HINT_PRIMARY_NO_EXPRESS_MENU. */
+    @vardata void			HINT_PRIMARY_NO_EXPRESS_MENU;</PRE>
+<PRE>/* If a primary object is minimizable, the location of the minimized primary is
+ * stored in the vardata field HHINT_PRIMARY_OPEN_ICON_BOUNDS.
+ */
+    @vardata Rectangle			<A NAME="IX_HINT_PRIMARY_OPEN_ICON_BOUNDS"> </A>HINT_PRIMARY_OPEN_ICON_BOUNDS</PRE>
+<PRE>/* By default, all primary windows have a &quot;help&quot; button; when the user clicks on
+ * it, the window's help text is brought up. If you don't want the primary to
+ * provide help text, you can use the hint HINT_PRIMARY_NO_HELP_BUTTON.
+ */
+    @vardata void 		<A NAME="IX_HINT_PRIMARY_NO_HELP_BUTTON"> </A>HINT_PRIMARY_NO_HELP_BUTTON;</PRE>
+<P>
+When a Primary window is created, it is usually sized to contain all of its components. However, you can suggest that it be sized to fill almost all the screen by setting the hint <A NAME="IX_HINT_PRIMARY_FULL_SCREEN">
+ </A>
+<CODE>
+HINT_PRIMARY_FULL_SCREEN</CODE>
+. This hint says that the Primary should be sized to fill a large portion of the screen, though not all of it. (For example, OSF/Motif sets the Primary to fill the whole screen except for a narrow space for icons at the bottom.) If this hint is not present, the Primary will be just large enough to accommodate its children.</P>
+<P>
+A GenPrimary normally creates a File menu within its menu bar. To suppress creation of this file menu, add <A NAME="IX_HINT_PRIMARY_NO_FILE_MENU">
+ </A>
+<CODE>
+HINT_PRIMARY_NO_FILE_MENU</CODE>
+. GenPrimarys, by default, are also added to the list of active applications within the system's express menu. Add <CODE>
+HINT_PRIMARY_NO_EXPRESS_MENU</CODE>
+<A NAME="IX_HINT_PRIMARY_NO_EXPRESS_MENU">
+ </A>
+ if you wish to avoid adding the launched GenPrimary to the express menu.</P>
+<P>
+When a Primary is minimized, it is displayed as an icon with a caption beneath it. The icon and caption will be taken from the Primary's moniker list (GI<CODE>
+_visMoniker</CODE>
+). If the Primary lacks either a text moniker or a graphic moniker, the missing moniker will be read from the Application object's GI<CODE>
+_visMoniker</CODE>
+ field. Most applications will not set GI<CODE>
+_visMoniker</CODE>
+ in the Primary object, since it would usually mean duplicating the monikers already in the Application object. However, some applications will set this (e.g. because they have several Primary objects and want each one to have a different icon when minimized).</P>
+<P>
+When the Primary is expanded from a minimized state, its minimized location is stored in the hint HINT_PRIMARY_OPEN_ICON_BOUNDS. The next time the Primary is minimized, it will be returned to that location.</P>
+<P>
+<CODE>
+GPI_longTermMoniker</CODE>
+<A NAME="IX_Monikers:long term moniker">
+ </A>
+<A NAME="IX_GPI_longTermMoniker">
+ </A>
+ contains a secondary moniker for the Primary object. This moniker is displayed along with the Primary moniker, in a way which depends on the specific UI. (In OSF/Motif, the Primary's text monikers are shown in its title bar: first the text moniker from GI<CODE>
+_visMoniker</CODE>
+, then a dash, then the moniker from <CODE>
+GPI_longTermMoniker</CODE>
+.) If the GenPrimary has a GenDisplayGroup as a child, the GenDisplayGroup will automatically set this field to contain the moniker of the top-most GenDisplay. The application can override this by sending the Primary MSG_GEN_PRIMARY_USE_LONG_TERM_MONIKER, described below.</P>
+<P>
+Most Primary objects will have help text; under most specific UIs, the Primary will have a &quot;help&quot; button to bring up this text. If you don't want to provide help text, you should set the hint <CODE>
+HINT_PRIMARY_NO_HELP_BUTTON</CODE>
+.</P>
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_PRIMARY_GET_LONG_TERM_MONIKER">
+ </A>
+MSG_GEN_PRIMARY_GET_LONG_TERM_MONIKER</H5>
+<PRE CLASS="syntax">ChunkHandle 	MSG_GEN_PRIMARY_GET_LONG_TERM_MONIKER();</PRE>
+<P>
+Use this message to find out the moniker of a GenPrimary object. The message returns the chunk handle of the moniker; the moniker is in the same block as the GenPrimary object.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	GenPrimary.</P>
+<P CLASS="refField">
+Return:	Returns the chunk handle of the primary's long-term moniker. The chunk is in the same object block as the GenPrimary.</P>
+<P CLASS="refField">
+Interception:	This message is not ordinarily intercepted.</P>
+
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_PRIMARY_USE_LONG_TERM_MONIKER">
+ </A>
+MSG_GEN_PRIMARY_USE_LONG_TERM_MONIKER</H5>
+<PRE CLASS="syntax">void 	MSG_GEN_PRIMARY_USE_LONG_TERM_MONIKER(
+        ChunkHandle		moniker);			/* must be in same object block as
+					 * primary */</PRE>
+<P>
+This message instructs a primary window to change its long-term moniker. The new long-term moniker must already be in a chunk in the same object block as the Primary. The chunk containing the obsolete long-term moniker will not be freed; you must do this manually.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	GenPrimary.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+moniker</EM>
+	ChunkHandle of chunk in same object block as the GenPrimary. The chunk should contain the new long-term moniker.</P>
+<P CLASS="refField">
+Interception:	This message is not ordinarily intercepted.</P>
+
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_PRIMARY_REPLACE_LONG_TERM_MONIKER">
+ </A>
+MSG_GEN_PRIMARY_REPLACE_LONG_TERM_MONIKER</H5>
+<PRE CLASS="syntax">void	MSG_GEN_PRIMARY_REPLACE_LONG_TERM_MONIKER(@stack
+        VisUpdateMode 		updateMode,
+        word 		height, 
+        word 		width, 
+        word 		length,
+        VisMonikerDataType 		dataType,
+        VisMonikerSourceType 		sourceType,
+        dword 		source);</PRE>
+<P>
+This message is used to replace a primary's long term moniker with a new one. This message's arguments are precisely like those to the message <CODE>
+MSG_GEN_REPLACE_VIS_MONIKER</CODE>
+. Note that a long term moniker is ordinarily a simple text string. For more information, see <A HREF="../../SysObjects/Gen/GenClass_d.htm#97676">the GenClass chapter</A>.</P><P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	GenPrimary.</P>
+<P CLASS="refField">
+Parameters:		The parameters are the same as those for <CODE>
+MSG_GEN_REPLACE_VIS_MONIKER</CODE>
+.</P>
+<P CLASS="refField">
+Return:	Returns the chunk handle of the new long-term moniker. The moniker will be allocated in the Primary's object block.</P>
+<P CLASS="refField">
+Interception:	This message is not ordinarily intercepted.<A NAME="marker=235723">
+ </A>
+</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Windows_1.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1 A First Look at GenDisplay</A> 
+<!-- to next --> | <A HREF="Windows_5.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3 Using Multiple Displays</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

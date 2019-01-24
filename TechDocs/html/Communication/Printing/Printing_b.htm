@@ -1,0 +1,249 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Printing_b.htm,v 1.1 97/06/02 14:13:50 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Print Output Object</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The Spool Library</A>: 4.5 <A HREF="Printing_6.htm">Print Control Instance Data</A>: 
+<A NAME="40469">
+ </A>
+Print Output Object</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Printing_6.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Printing_a.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.4 Document Size</A> 
+<!-- to next --> | <A HREF="Printing_c.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.6 Document Name Output</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>PCI_output, MSG_PRINT_START_PRINTING, MSG_PRINT_VERIFY_PRINT_REQUEST, MSG_PRINT_NOTIFY_PRINT_DB</PRE>
+<P>
+Some object is going to describe the print jobs to the Print Control. When instantiating the Print Control, set the chosen object's name in the <CODE>
+PCI_output</CODE>
+<A NAME="IX_PCI_output">
+ </A>
+ field:</P>
+<PRE>PCI_output = <EM>&lt;yourObject</EM>&gt;;</PRE>
+<P>
+There are three messages the Print Control may send to its output: <CODE>
+MSG_PRINT_START_PRINTING, MSG_PRINT_VERIFY_PRINT_REQUEST, </CODE>
+and<CODE>
+ MSG_PRINT_NOTIFY_PRINT_DB</CODE>
+. The Print Output must respond to <CODE>
+MSG_PRINT_START_PRINTING</CODE>
+, which is the signal that it's time to describe a print job. The Print Output also must respond to <CODE>
+MSG_PRINT_VERIFY_PRINTING</CODE>
+ if the PrintControl's PCA_VERIFY_PRINT bit has been set. Otherwise, it need not handle this message. Finally, the Print Output may have a handler for the <CODE>
+MSG_PRINT_NOTIFY_DB</CODE>
+, a message the PrintControl will send whenever the Print dialog box comes up or goes away.</P>
+
+<H2 CLASS="HeadingC">
+<A NAME="15244">
+ </A>
+The Print Method</H2>
+<P>
+Assuming your geode doesn't try to do anything fancy with its own printing UI or weird scheduling, probably the most complicated thing you'll have to do when adding printing capability to your geode is write a Print Method.</P>
+<P>
+This message must be handled by the Print Output object, though the handler probably won't be too complicated. In its simplest form, a <CODE>
+MSG_PRINT_START_PRINTING</CODE>
+ handler could just call some graphics commands and finish off by sending <CODE>
+MSG_PRINT_CONTROL_PRINTING_COMPLETED</CODE>
+ to the PrintControl.</P>
+<P>
+The message is accompanied by a pointer back to the Print Control and a GString handle. Any graphics commands drawn to the GString handle will be retained and will become part of the print job. </P>
+<P>
+Before looking at examples, be warned that there are some requirements that every Print Method must meet:</P>
+<UL>
+<LI>
+Be sure the document size has been set correctly. Before the job is finished and you send <CODE>
+MSG_PRINT_CONTROL_PRINTING_COMPLETED</CODE>
+, you must be certain the document's size and margins have been set somewhere. This may have been set using the <CODE>
+PCI_docSizeInfo</CODE>
+ field when defining the Print Control. If you haven't already let the Print Control know about the document size elsewhere, then you must send a <CODE>
+MSG_PRINT_CONTROL_SET_DOC_SIZE</CODE>
+, probably either in the MSG_PRINT_START_PRINTING or wherever your geode sets up document information in general.</LI>
+<LI>
+Be certain the number of pages to be printed has been correctly set. If your application hasn't already set the page range (when the Print Control was created or when the Print dialog box goes up are popular times for this), send a<CODE>
+ MSG_PRINT_CONTROL_SET_TOTAL_PAGE_RANGE</CODE>
+ to your Print Control. Make sure you do it before sending in the <CODE>
+MSG_PRINT_CONTROL_PRINTING_COMPLETED</CODE>
+.</LI>
+<LI>
+Be sure the document name has been set. If you use a GenDocumentGroup as your <CODE>
+PCI_docNameOutput</CODE>
+, this will be taken care of for you. Otherwise, some time before the <CODE>
+MSG_PRINT_CONTROL_PRINTING_COMPLETED</CODE>
+ is sent, your <CODE>
+PCI_docNameOutput</CODE>
+ object is going to be asked for the document name, and the job won't be spooled until your <CODE>
+PCI_docNameOutput</CODE>
+ sends the correct name back to the Print Control.</LI>
+<LI>
+The Print Method should end each page with a <CODE>
+GrNewPage()</CODE>
+; the last thing drawn before the print job ends is a <CODE>
+GrNewPage()</CODE>
+.</LI>
+<LI>
+Finally, when the Print Method<CODE>
+ </CODE>
+is finished describing the print job, it must end with a <CODE>
+MSG_PRINT_CONTROL_PRINTING_COMPLETED</CODE>
+. Otherwise, the Print Control has no way of knowing the job is ready.</LI>
+</UL>
+<P>
+When the Print Control receives the message <CODE>
+MSG_PRINT_CONTROL_PRINTING_COMPLETED</CODE>
+, it responds by cleaning up and sending the print job to the spooler.</P>
+<P>
+Your handler can send a <CODE>
+MSG_PRINT_CONTROL_REPORT_PROGRESS</CODE>
+ to the Print Control if it is spooling a large job and wants to reassure the user. If something goes wrong, or if <CODE>
+MSG_PRINT_CONTROL_REPORT_PROGRESS</CODE>
+ returns a signal indicating the user wishes to cancel, <CODE>
+MSG_PRINT_START_PRINTING</CODE>
+ should send a <CODE>
+MSG_PRINT_CONTROL_PRINTING_CANCELLED</CODE>
+ instead.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_PRINT_START_PRINTING">
+ </A>
+MSG_PRINT_START_PRINTING</H4>
+<PRE CLASS="syntax">void	MSG_PRINT_START_PRINTING(
+        optr		printControlOD,
+        GStateHandle		gstate);</PRE>
+<P>
+The handler for this message should call a number of graphics routines, using the passed GState. When done with graphics routines, the handler should send a <CODE>
+MSG_PRINT_CONTROL_PRINTING_COMPLETED</CODE>
+ (or <CODE>
+MSG_PRINT_CONTROL_PRINTING_CANCELED</CODE>
+) to the Print Control. The handler may have to accomplish other tasks; see the above bulleted list (the one marked as &quot;the most used and useful section of this chapter&quot;).</P>
+<P CLASS="refField">
+Source:	PrintControl object.</P>
+<P CLASS="refField">
+Destination:	The object specified in <CODE>
+PCI_output</CODE>
+.</P>
+<P CLASS="refField">
+Parameters:	<EM>printControlOD</EM>	The optr of the PrintControl object.</P>
+<DL>
+<DT>
+<EM>gstate</EM> </DT><DD>The GState handle to draw to.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	The Print output object must intercept this message, build the print job by drawing to the passed GState, then send <CODE>
+MSG_PRINT_CONTROL_PRINTING_COMPLETED</CODE>
+ to the object in <CODE>
+printControlOD</CODE>
+.</P>
+
+
+
+<H2 CLASS="HeadingC">
+<A NAME="91322">
+ </A>
+Verifying User Choices</H2>
+<P>
+You may write a handler for <CODE>
+MSG_PRINT_VERIFY_PRINT_REQUEST</CODE>
+, which will be sent to the Print Output if the PCA_VERIFY_PRINT bit has been set. The message will be sent after the user has dismissed the Print dialog box, after the system has had a chance to make sure the document fits on the paper but before the document is actually spooled.</P>
+<P>
+This message gives the application a chance to check out the state of the UI and make sure that the user's choices are valid. Note that the PrintControl does its own checking to make sure that the document will fit on the page. After examining the UI, the handler must send back a <CODE>
+MSG_PRINT_CONTROL_VERIFY_COMPLETED</CODE>
+, passing the argument to say whether it's okay to print.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_PRINT_VERIFY_PRINT_REQUEST">
+ </A>
+MSG_PRINT_VERIFY_PRINT_REQUEST</H4>
+<PRE CLASS="syntax">void	MSG_PRINT_VERIFY_PRINT_REQUEST(
+        optr 	printControlOD);</PRE>
+<P>
+The handler for this message should make whatever checks are necessary to make sure that the user has made valid choices with the printing UI. The handler should then send back an indication of whether the user's choices are all right by means of a MSG_PRINT_CONTROL_VERIFY_COMPLETED.</P>
+<P CLASS="refField">
+Source:	PrintControl object.</P>
+<P CLASS="refField">
+Destination:	The object specified in <CODE>
+PCI_output</CODE>
+.</P>
+<P CLASS="refField">
+Parameters:	<EM>printControlOD</EM>	The optr of the PrintControl object.</P>
+<P CLASS="refField">
+Return:	Nothing explicitly. However, the handler for this message must send a <CODE>
+MSG_PRINT_CONTROL_VERIFY_COMPLETED</CODE>
+ back to the print control.</P>
+<P CLASS="refField">
+Interception:	If you've set the PCA_VERIFY_PRINT flag, you must intercept this message correctly or else the print job will never start.</P>
+
+
+
+<H2 CLASS="HeadingC">
+<A NAME="51301">
+ </A>
+Dialog Box Notification</H2>
+<P>
+The Print Control will send the Print Output a <CODE>
+MSG_PRINT_NOTIFY_DB</CODE>
+ every time the Print dialog box comes up or goes away. Note that this message allows the application to update the page range and print group's UI at only those times that updates are needed.</P>
+<P>
+This message will arrive with one argument, a pointer back to the PrintControl object that sent it. The handler for this message might wish to update the page range information using <CODE>
+MSG_PRINT_CONTROL_SET_TOTAL_PAGE_RANGE</CODE>
+ and <CODE>
+MSG_PRINT_CONTROL_SET_SELECTED_PAGE_RANGE</CODE>
+.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_PRINT_NOTIFY_PRINT_DB">
+ </A>
+MSG_PRINT_NOTIFY_PRINT_DB</H4>
+<PRE CLASS="syntax">void	MSG_PRINT_NOTIFY_PRINT_DB(
+        optr		printControlOD,
+        PrintControlStatus		pcs);</PRE>
+<P>
+The handler for this message can do any almost anything; this message signals that the Print dialog box has just come up or gone away.</P>
+<P CLASS="refField">
+Source:	PrintControl object.</P>
+<P CLASS="refField">
+Destination:	The object specified in <CODE>
+PCI_output</CODE>
+.</P>
+<P CLASS="refField">
+Parameters:	<EM>printControlOD</EM>	The optr of the PrintControl object.</P>
+<DL>
+<DT>
+<EM>pcs</EM> </DT><DD><A NAME="IX_PCS_&ldots;  (PrintControlStatus)">
+ </A>
+<A NAME="IX_PrintControlStatus">
+ </A>
+The status of the print control; either PCS_PRINT_BOX_VISIBLE or PCS_PRINT_BOX_NOT_VISIBLE.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Some Print Output objects will intercept this message to set page ranges.</P>
+
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Printing_6.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Printing_a.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.4 Document Size</A> 
+<!-- to next --> | <A HREF="Printing_c.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.6 Document Name Output</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

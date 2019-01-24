@@ -1,0 +1,224 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: JTable_b.htm,v 1.2 97/09/05 14:42:16 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Dragging and Dropping</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The Table Objects</A>: 4.4 <A HREF="JTable_7.htm">Using a Table Object</A>: 
+<A NAME="58099">
+ </A>
+Dragging and Dropping</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="JTable_7.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="JTable_a.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.3 Editing Cells</A> 
+<!-- to next --> | <A HREF="JTable_c.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.5 Custom Scrolling Behavior</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>TableDragDropCompleteParams, TableDragDropCell, TableDragDropFlags, MSG_TABLE_DRAG_DROP_COMPLETE</PRE>
+<P>
+The <CODE>
+Table</CODE>
+ object supports the standard GEOS drag-drop functionality. It allows the user to select one or more cells, then drag their contents to other cells in the <CODE>
+Table</CODE>
+. However, the <CODE>
+Table</CODE>
+ object does not actually keep track of the contents of the cells. Instead, it detects which cells the user dragged and where the user dropped them, and it notifies the application with <CODE>
+MSG_TABLE_DRAG_DROP_COMPLETE</CODE>
+. The application should intercept this message and use this information to copy data to its appropriate places in its storage.</P>
+<P>
+The <CODE>
+Table</CODE>
+ is put in drag-and-drop mode when the <CODE>
+TableFlags</CODE>
+ bit TF_INTERNAL_DRAG_DROP is set (for example through the sending of <CODE>
+MSG_TABLE_SET_FLAGS</CODE>
+). If the Table's column flags contain TCF_HOLD_SELECT, holding for the specified period of time to initiate a &quot;hold&quot; will also set the TF_INTERNAL_DRAG_DROP flag. When the <CODE>
+Table</CODE>
+ is in drag-and-drop mode, the user can copy a cell's contents to another cell by clicking on one cell, dragging the pointer to the other cell, and releasing. If the <CODE>
+TableFlags</CODE>
+ bit TF_EXIT_DRAG_DROP_UPON_COMPLETION is set, the <CODE>
+Table</CODE>
+ will automatically clear TF_INTERNAL_DRAG_DROP after every drag-and-drop.
+<IMG SRC="JTable_b_dragDrop.gif">
+
+</P>
+<P>
+<A NAME="43447">
+ </A>
+The <CODE>
+Table</CODE>
+ object sends <CODE>
+MSG_TABLE_DRAG_DROP_COMPLETE</CODE>
+ when the user finishes a drag-and-drop operation. This message passes one argument, a <CODE>
+TableDragDropCompleteParams</CODE>
+ structure. This structure has the following definition:</P>
+<PRE>typedef struct {
+	TableDragDropCell				TDDCP_dragDrop;
+	TableDragDropFlags				TDDCP_flags;
+} TableDragDropCompleteParams;</PRE>
+<DL>
+<DT>
+TDDCP<CODE>
+_dragDrop</DT><DD>
+</CODE>
+This structure specifies which cells are being copied, and where they will be copied to. The <CODE>
+TableDragDropCell</CODE>
+ structure is described below.</DD>
+<DT>
+TDDCP<CODE>
+_flags </CODE>
+</DT><DD>This field is a record of <CODE>
+TableDragDropFlags</CODE>
+ flags, described below.</DD>
+</DL>
+<P>
+The cells being dragged, and the location to which they are being dropped, are specified with a <CODE>
+TableDragDropCell</CODE>
+ structure. This structure has the following definition:</P>
+<PRE>typedef struct {
+	TableCellRange			TDDC_from;
+	TableCellRange			TDDC_to;
+} TableDragDropCell;</PRE>
+<DL>
+<DT>
+TDDC<CODE>
+_from</CODE>
+</DT><DD>The cell or cells being dragged.</DD>
+<DT>
+TDDC<CODE>
+_to</CODE>
+</DT><DD>The cell or cells on which TDDC<CODE>
+_from</CODE>
+ is being dropped.</DD>
+</DL>
+<P>
+When <CODE>
+MSG_TABLE_DRAG_DROP_COMPLETE</CODE>
+ is sent, the TDDCP<CODE>
+_flags</CODE>
+ field of the passed <CODE>
+TableDragDropCompleteParams</CODE>
+ is blank. If you intercept this message, you can change this field, setting any <CODE>
+TableDragDropFlags</CODE>
+ bits in this field. Currently, only one flag is defined:</P>
+<DL>
+<DT>
+TDDF_DONT_RESCAN_CELLS</DT><DD>
+If this flag is clear, the <CODE>
+Table</CODE>
+ will redraw all visible cells after a drag-drop operation. If it is set, it will not redraw any cells. (You may wish to set this flag, then force redrawing of a few affected cells with an appropriate <CODE>
+MSG_TABLE_REDRAW...</CODE>
+ message; these messages are described on <A HREF="JTable_8.htm#90904"> The Table automatically sends MSG_TABLE_QUERY_DRAW when it knows a part of the Table may be inaccurate, e.g. when the user has edited a cell. You can also instruct the Table to redraw part or all of itself by sending it one of the MSG_TABLE_REDR</A>
+.)</DD>
+</DL>
+<P>
+You should intercept the message, and perform any appropriate data operations, e.g. copying the data from the &quot;dragged&quot; cell to the location where it was &quot;dropped&quot;.</P>
+<P>
+If the TF_EXIT_DRAG_DROP_UPON_COMPLETION flag is set, drag and drop mode will be exited upon receipt of <CODE>
+MSG_TABLE_DRAG_DROP_COMPLETE</CODE>
+. Otherwise, you will need to determine when you wish to exit drag and drop mode and clear the TF_INTERNAL_DRAG_DROP flag manually by sending the Table <CODE>
+MSG_TABLE_SET_FLAGS</CODE>
+. (You might wish to do this if you want to drag and drop to multiple locations, for example.) Because you are modifying an internal flag in this process, this approach is highly discouraged.</P>
+<P CLASS="figTitle">
+Code Display 5-5 Implementing Drag and Drop Mode</P>
+<PRE>/* This message is sent to the Table whenever it completes a drag and drop 
+ * operation (by releasing the pen). In your handler, determine the starting and 
+ * ending point of the operation and copy the data from one location to the other. 
+ */</PRE>
+<PRE>@method CoffeeTableClass, MSG_TABLE_DRAG_DROP_COMPLETE
+{
+    char *fromData, *toData;
+    word fromIndex, toIndex, size;</PRE>
+<PRE>    /* We are storing our data in a chunk array (not shown). We obtain a 
+     * linear index into this data based on the cell row and column. */</PRE>
+<PRE>    fromIndex = 
+	(cellFromTo.TDDCP_dragDrop.TDDC_from.TCR_start.TCL_row * TABLE_COLS) +
+	cellFromTo.TDDCP_dragDrop.TDDC_from.TCR_start.TCL_column;</PRE>
+<PRE>    toIndex = 
+	(cellFromTo.TDDCP_dragDrop.TDDC_to.TCR_start.TCL_row * TABLE_COLS) +
+	cellFromTo.TDDCP_dragDrop.TDDC_to.TCR_start.TCL_column;</PRE>
+<PRE>    /* Check if this drag and drop is from within the same Table. */</PRE>
+<PRE>    if (pself-&gt;TI_tableFlags &amp; TF_INTERNAL_DRAG_DROP) {</PRE>
+<PRE>	MemLock(OptrToHandle(pself-&gt;CTI_chunkArray);</PRE>
+<PRE>	fromData = ChunkArrayElementToPtr((pself-&gt;CTI_chunkArray),
+					fromIndex, &amp;size);
+	toData = ChunkArrayElementToPtr((pself-&gt;CTI_chunkArray),
+					toIndex, &amp;Size);</PRE>
+<PRE>    	/* Copy the actual data. *
+	strcpy(toData, fromData);</PRE>
+<PRE>	MemUnlock(OptrToHandle(pself-&gt;CTI_chunkArray));
+    }</PRE>
+<PRE>    /* Call the superclass. This will also exit the Table from drag and drop mode 
+     * if the TF_EXIT_DRAG_DROP_UPON_COMPLETION flag is set. */</PRE>
+<PRE>    @callsuper();
+}</PRE>
+
+<H4 CLASS="RefETitle">
+MSG_TABLE_DRAG_DROP_COMPLETE</H4>
+<PRE CLASS="syntax">void	MSG_TABLE_DRAG_DROP_COMPLETE(
+        TableDragDropCompleteParams					cellFromTo);</PRE>
+<P>
+The <CODE>
+Table</CODE>
+ object sends this message to itself when the user has finished performing a drag-and-drop operation. Application writers who wish to perform operations on the data being dragged and dropped must intercept this message.</P>
+<P CLASS="refField">
+Source:	A <CODE>
+TableClass</CODE>
+ object.</P>
+<P CLASS="refField">
+Destination:	The <CODE>
+Table</CODE>
+ object sends this message to itself.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+cellFromTo.</CODE>
+TDDCP<CODE>
+_dragDrop<BR>
+</CODE>
+This field specifies what cells are being dragged, and where they are being dropped.</P>
+<DL>
+<DT>
+<CODE>
+cellFromTo.TDDCP_flags</DT><DD>
+</CODE>
+This field is initially blank. If you intercept the message, you can change the flags before calling the default handler.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Structures:	The arguments are passed in a <CODE>
+TableDragDropCompleteParams</CODE>
+ structure (described on <A HREF="JTable_b.htm#43447"> The Table object sends MSG_TABLE_DRAG_DROP_COMPLETE when the user finishes a drag-and-drop operation. This message passes one argument, a TableDragDropCompleteParams structure. This structure has the following definition:</A>
+).</P>
+<P CLASS="refField">
+Interception:	Must intercept to perform data operations necessary to implement the drag-and-drop. Afterwards, make sure to call the default handler with <CODE>
+@callsuper</CODE>
+. The default handler will cause the entire visible portion of the <CODE>
+Table</CODE>
+ to be redrawn, unless you have set the TDDF_DONT_RESCAN_CELLS bit in <CODE>
+cellFromTo.TDDCP_flags</CODE>
+.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="JTable_7.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="JTable_a.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.3 Editing Cells</A> 
+<!-- to next --> | <A HREF="JTable_c.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.5 Custom Scrolling Behavior</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

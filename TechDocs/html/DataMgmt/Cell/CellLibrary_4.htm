@@ -1,0 +1,162 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: CellLibrary_4.htm,v 1.1 97/06/02 14:32:09 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Basic Cell Array Routines</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Cell Library</A>: 2.2 <A HREF="CellLibrary_2.htm">Using the Cell Library</A>: 
+<A NAME="87527">
+ </A>
+Basic Cell Array Routines</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="CellLibrary_2.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="CellLibrary_3.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2.1 The CellFunctionParameters Structure</A> 
+<!-- to next --> | <A HREF="CellLibrary_5.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2.3 Actions on a Range of Cells</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>CellReplace(), CellLock(), CellLockGetRef(), CellDirty(), CellGetDBItem(), CellGetExtent()</PRE>
+<P>
+The basic cell routines are simple to use. One argument taken by all of them is the address of the <CODE>
+CellFunctionParameters</CODE>
+ structure. As noted, this structure must be locked or fixed in memory for the duration of a function call. You can also access cells in any of the ways you would access a DB item; for example, you can resize a cell with <CODE>
+DBReAlloc()</CODE>
+.</P>
+<P>
+All of the routines use the VM file handle specified in the <CODE>
+CellFunctionParameters</CODE>
+ structure. </P>
+<P>
+<A NAME="IX_CellReplace()">
+ </A>
+To create, replace, or free a cell, call the routine <CODE>
+CellReplace()</CODE>
+. This routine takes five arguments: </P>
+<UL>
+<LI>
+The address of the <CODE>
+CellFunctionParameters</CODE>
+ structure.</LI>
+<LI>
+The element's row.</LI>
+<LI>
+The element's column.</LI>
+<LI>
+The address of the data to copy into the new cell. This must not move during the allocation; therefore, it must not be in an ungrouped DB item in the same VM file as the cell file. In particular, it must not be another cell. The data will not be changed.</LI>
+<LI>
+The size of the new cell. If you pass a size of zero, the cell will be deleted if it already exists; otherwise, nothing will happen.</LI>
+</UL>
+<P>
+If the cell file already contains a cell with the specified coordinates, <CODE>
+CellReplace()</CODE>
+ will free it. <CODE>
+CellReplace()</CODE>
+ will then allocate a new cell and copy the specified data into it. The routine invalidates any existing pointers to ungrouped DB items in the file.</P>
+<P>
+<A NAME="IX_CellLock()">
+ </A>
+Once you have created a cell, you can lock it with <CODE>
+CellLock()</CODE>
+. This routine takes three arguments: the address of the <CODE>
+CellFunctionParameters</CODE>
+ structure, the cell's row, and the cell's column. It locks the cell and returns its address (the assembly version returns the cell's segment address and chunk handle). Remember, the cell is an ungrouped DB item, so its address may change the next time another ungrouped DB item is allocated or resized, even if the cell is locked.</P>
+<P>
+Like all DB items, cells can (under certain circumstances) be moved even while locked. For this reason, a special locking routine is provided, namely <CODE>
+CellLockGetRef()</CODE>
+<A NAME="IX_CellLockGetRef()">
+ </A>
+. This routine is just like <CODE>
+CellLock()</CODE>
+ except that it takes one additional argument, namely the address of an optr. <CODE>
+CellLockGetRef</CODE>
+ writes the locked item's global memory handle and chunk handle into the optr. <A NAME="IX_CellDeref()">
+ </A>
+You can translate an optr to a cell into a pointer by calling <CODE>
+CellDeref()</CODE>
+; this is another synonym for <CODE>
+LMemDeref()</CODE>
+, and is identical to it in all respects. </P>
+<P>
+If you change a cell, you must mark it dirty to insure that it will be updated on the disk. <A NAME="IX_CellDirty()">
+ </A>
+To do this, call the routine <CODE>
+CellDirty()</CODE>
+. This routine takes two arguments, namely the address of the <CODE>
+CellFunctionParameters</CODE>
+ structure and the address of the (locked) cell. The routine marks the cell's item block as dirty.</P>
+<P>
+Sometimes you may need to get the DB handles for a cell. For example, you may want to use a DB utility to resize the cell; to do this, you need to know its handles.<A NAME="IX_CellGetDBItem()">
+ </A>
+ For these situations, call the routine <CODE>
+CellGetDBItem()</CODE>
+. The routine takes three arguments: the address of the <CODE>
+CellFunctionParameters</CODE>
+ structure, the cell's row, and the cell's column. It returns the cell's <CODE>
+DBGroupAndItem</CODE>
+ value. You can pass this value to any of the <CODE>
+DB...Ungrouped()</CODE>
+ routines, or you can break this value into its component handles by calling <CODE>
+DBGroupFromGroupAndItem()</CODE>
+ or <CODE>
+DBItemFromGroupAndItem()</CODE>
+.</P>
+<P>
+<A NAME="IX_CellGetExtent()">
+ </A>
+If you want to find out the bounds of an existing cell file, call the routine <CODE>
+CellGetExtent()</CODE>
+. This routine takes two arguments: the address of the <CODE>
+CellFunctionParameters</CODE>
+, and the address of a <CODE>
+RangeEnumParams</CODE>
+ structure. For the purposes of this routine, only one of its fields matters, namely the field <CODE>
+REP_bounds</CODE>
+. This field is itself a structure of type <CODE>
+Rectangle</CODE>
+, whose structure is shown below in <A HREF="CellLibrary_4.htm#19886"> Rectangle</A>
+. <CODE>
+CellGetExtent()</CODE>
+ writes the bounds of the utilized section of the cell file in the <CODE>
+REP_bounds</CODE>
+ field. The index of the first row which contains a cell will be written in the rectangle's <CODE>
+R_top</CODE>
+ field; the index of the last row will be written in <CODE>
+R_bottom</CODE>
+; the index of the first column will be written in <CODE>
+R_left</CODE>
+; and the index of the last column will be written in <CODE>
+R_right</CODE>
+. If the cell file contains no cells, all four fields will be set to 
+-1.</P>
+<P CLASS="figTitle">
+Code Display 19-2 <A NAME="19886">
+ </A>
+Rectangle</P>
+<PRE>typedef	struct {
+	sword		R_left;		/* Index of first column written here. */
+	sword		R_top;		/* Index of first row written here. */
+	sword		R_right;		/* Index of last column written here. */
+	sword		R_bottom;		/* Index of last row written here. */
+} Rectangle;</PRE>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="CellLibrary_2.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="CellLibrary_3.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2.1 The CellFunctionParameters Structure</A> 
+<!-- to next --> | <A HREF="CellLibrary_5.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2.3 Actions on a Range of Cells</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

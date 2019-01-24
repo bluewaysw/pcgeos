@@ -1,0 +1,95 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: AccPnt_3.htm,v 1.1 97/06/02 14:08:39 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Searching For an Access Point</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="sectionTitle">
+<A HREF="index.htm">Access Point</A>: 3 
+<A NAME="24960">
+ </A>
+Searching For an Access Point</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="AccPnt_2.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2 Letting The User Choose</A> 
+<!-- to next --> | <A HREF="AccPnt_4.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4 Locking and Unlocking</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+Perhaps instead of allowing the user to choose an access point, the program should use a known access point. The following code example shows how a program might search for an access point, given its type and name.</P>
+<P CLASS="figTitle">
+Code Display 23-1 Searching for an Access Point</P>
+<PRE>@start  TemplateStringsResource, data;
+    @chunk  TCHAR TargetName[] = &quot;Stuckeys Sales Server&quot;;
+@end    TemplateStringsResource;</PRE>
+<PRE>@method TemplateProcessClass, MSG_TP_SEND {
+    MemHandle     aBlock;
+    ChunkHandle   theList;  /* Chunk Array of entry IDs of access points */
+    word          theID = ACCESS_POINT_INVALID_ID ;</PRE>
+<PRE>    aBlock = MemAllocLMem( LMEM_TYPE_GENERAL, 0 );
+    MemLock( aBlock );
+    theList = AccessPointGetEntries( aBlock , 0, APT_INTERNET );</PRE>
+<PRE>    ChunkArrayEnumHandles( aBlock, theList, &amp;theID, FunkyCallback);</PRE>
+<PRE>    MemUnlock( aBlock );
+    MemFree(aBlock);</PRE>
+<PRE>    if (theID == ACCESS_POINT_INVALID_ID ) {
+      /* didn't find the access point--deal with it */
+    } else {
+      /* found the access point--use it */
+    }
+}</PRE>
+<PRE>Boolean _pascal FunkyCallback( void *el, void *retVal ) {
+    char nomen[128];
+    int  nomenSize;
+    int  cmpResult;
+    char *accessPointName;</PRE>
+<PRE>    AccessPointGetStringPropertyBuffer( *((word *)el), APSP_NAME, 
+                                           nomen, &amp;nomenSize );</PRE>
+<PRE>    MemLock( OptrToHandle(@TargetName) );
+    cmpResult = LocalCmpStrings( LMemDeref( @TargetName ) , nomen, 0);
+    MemUnlock( OptrToHandle(@TargetName) );</PRE>
+<PRE>    if (cmpResult) return(FALSE); 					/* if they don't match, return FALSE so 
+					   we can keep searching. */	
+
+    *(word *)retVal = *(word *)el;					/* We found a match. grab its ID */
+    return(TRUE);				 	/* ...and we can stop searching now. */
+}</PRE>
+<P>
+The <CODE>
+AccessPointGetEntries()</CODE>
+ routine returns a chunk array containing a list of access point IDs. </P>
+<P>
+We then use the <CODE>
+ChunkArrayEnumHandles()</CODE>
+ routine to call a callback routine to examine each ID in turn. There are many other ways we could have cycled through these entries--see the documentation of chunk arrays in <A HREF="../../Memory/LMem/index.htm">the Local Memory chapter</A> to find out which is best for your purpose.</P>
+<P>
+Given an access point's ID number, we find out the name associated with that ID by calling <CODE>
+AccessPointGetStringPropertyBuffer()</CODE>
+. To specify that we're interested in the name, we pass APSP_NAME; we could also have passed some other <CODE>
+AccessPointStandardProperty</CODE>
+ value, or even a pointer to a string to search for the value of some custom property.</P>
+<P>
+While the application is using the selected access point, it can &quot;lock&quot; the access point to prevent the access point's parameters from being modified while it's in use. (See <A HREF="AccPnt_4.htm#16958"> Locking and Unlocking</A>
+.)</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="AccPnt_2.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2 Letting The User Choose</A> 
+<!-- to next --> | <A HREF="AccPnt_4.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4 Locking and Unlocking</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

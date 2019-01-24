@@ -1,0 +1,668 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: VisClass_e.htm,v 1.1 97/06/02 16:51:47 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Positioning Visible Objects</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">VisClass</A>: 4.3 <A HREF="VisClass_b.htm">Using VisClass</A>: 
+<A NAME="87564">
+ </A>
+Positioning Visible Objects</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VisClass_b.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VisClass_d.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.2 Drawing to the Screen</A> 
+<!-- to next --> | <A HREF="VisClass_f.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.4 Handling Input</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+Every visible object has an instance data field called <CODE>
+VI_bounds</CODE>
+ that records the object's visible bounds. Visible bounds are the left, top, right, and bottom bounds of a rectangle that define the maximum area covered by the visible object. The bounds are used primarily for determining the object's size and location.</P>
+<P>
+The <CODE>
+VI_bounds</CODE>
+ field is a <CODE>
+Rectangle</CODE>
+ structure, provided by the graphics system. This structure has four components, as shown below:</P>
+<PRE><A NAME="IX_R_&ldots;"> </A><A NAME="IX_Rectangle data structure"> </A>typedef struct {
+    sword   R_left;    /* x of upper-left corner */
+    sword   R_top;     /* y of upper-left corner */
+    sword   R_right;   /* x of lower-right corner */
+    sword   R_bottom;  /* y of lower-right corner */
+} Rectangle;</PRE>
+<P>
+The bounds of non-window objects are stored in document coordinates relative to the document displayed by the window in which they appear. The left and top bounds constitute the position of the object. The difference between the right and left bounds is the object's width; the difference between bottom and top is its height. Together, the width and height constitute the object's size.</P>
+<P>
+The bounds of a window or portal object (VTF_IS_WINDOW or VTF_IS_PORTAL) represent the location of the window, in document coordinates, within its parent window. The coordinate system within the window object is independent from that of its parent.</P>
+<P>
+Unless an object's bounds are set in the Goc code, they will be set at zero and must be initialized to some values before the object can be drawn. This initialization can be done with the messages that set position and size, or it can be done automatically by the geometry manager (if a composite is managing its children).</P>
+<P>
+The <CODE>
+VI_bounds</CODE>
+ instance field exists in <CODE>
+VisClass</CODE>
+ and therefore occurs also in <CODE>
+VisCompClass</CODE>
+ and <CODE>
+VisContentClass</CODE>
+ and all their subclasses. Any object can directly set any or all of its bounds; other objects (such as a parent VisComp) can direct the object to set its bounds to certain coordinates as a result of either geometry management or some user action. For example, a VisComp that has ten children may recalculate their positions if one of those children gets resized; the composite must then notify all the children of their new positions. To learn how a composite object can manage its children in different ways, see <A HREF="../../UI/VisComp/index.htm">the VisComp chapter</A>.</P>
+<H2 CLASS="HeadingC">
+Object Position and Bounds</H2>
+<PRE>MSG_VIS_GET_POSITION, MSG_VIS_SET_POSITION, MSG_VIS_GET_BOUNDS</PRE>
+<P>
+<A NAME="IX_Geometry:object position">
+ </A>
+An object's bounds determine both the location and the size of the object in the document space. The object may reposition itself or resize itself at will; for example, it may allow the user to move or resize it with the mouse. The object can also receive direction from other objects that it should change its bounds. Note that none of these messages by themselves will cause the object to redraw; you must also send a <CODE>
+MSG_VIS_MARK_INVALID</CODE>
+ to the object to get either its geometry or its image to be marked invalid.</P>
+<P>
+An object's position is represented by the upper-left corner of its bounds, defined by <CODE>
+VI_bounds</CODE>
+.<CODE>
+R_top</CODE>
+ and <CODE>
+VI_bounds</CODE>
+.<CODE>
+R_left</CODE>
+. You can retrieve an object's position by sending it <CODE>
+MSG_VIS_GET_POSITION</CODE>
+, or you can set it with <CODE>
+MSG_VIS_SET_POSITION</CODE>
+. You can also use <CODE>
+MSG_VIS_GET_BOUNDS</CODE>
+ to get all four components of the object's bounds.</P>
+<P>
+An object can access its own bounds field with a simple pointer. Since every message has <CODE>
+pself</CODE>
+ as an implicit parameter (a pointer to the object's instance data structure), any object can look at or change its bounds directly. (See the example in <A HREF="VisClass_f.htm#90374"> Grabbing and Releasing the Mouse</A>
+.)</P>
+<P>
+Using Swat, you can see a visible object's bounds with the command <CODE>
+pobj</CODE>
+.</P>
+<P>
+If you have a composite object managing several children, you can arrange to have their positions determined automatically. This is discussed in <A HREF="VisClass_e.htm#16842"> Geometry Management</A>
+.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_SET_POSITION">
+ </A>
+MSG_VIS_SET_POSITION</H4>
+<PRE CLASS="syntax">void	MSG_VIS_SET_POSITION(
+        int	xOrigin,
+        int	yOrigin);</PRE>
+<P>
+This message causes the object to set its <CODE>
+VI_bounds</CODE>
+ to the new location specified, retaining its current size. The left bound (<CODE>
+VI_bounds</CODE>
+.<CODE>
+R_left</CODE>
+) is set to the value of <CODE>
+xOrigin</CODE>
+, and the top bound (<CODE>
+VI_bounds</CODE>
+.<CODE>
+R_top</CODE>
+) is set to that of <CODE>
+yOrigin</CODE>
+. The right and bottom bounds are set to match the new origin and the width and height of the object.</P>
+<P CLASS="refField">
+Source:	Unrestricted--usually the visible parent or geometry manager.</P>
+<P CLASS="refField">
+Destination:	Any visible object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+xOrigin</CODE>
+	New horizontal coordinate of the object's position.</P>
+<DL>
+<DT>
+<CODE>
+yOrigin</CODE>
+</DT><DD>New vertical coordinate of the object's position.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely. It's much more likely that the object will subclass <CODE>
+MSG_VIS_POSITION_BRANCH</CODE>
+.</P>
+<P CLASS="refField">
+Warnings:	This message will not cause an image invalidation. You must mark the object invalid with <CODE>
+MSG_VIS_MARK_INVALID</CODE>
+.</P>
+<P CLASS="refField">
+See Also:	<CODE>
+MSG_VIS_POSITION_BRANCH</CODE>
+, <CODE>
+MSG_VIS_MARK_INVALID</CODE>
+.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_GET_POSITION">
+ </A>
+MSG_VIS_GET_POSITION</H4>
+<PRE CLASS="syntax">XYValueAsDWord MSG_VIS_GET_POSITION();</PRE>
+<P>
+This message returns the current origin of the object. The origin returned consists of the left and top object bounds (<CODE>
+VI_bounds</CODE>
+.<CODE>
+R_left</CODE>
+ and <CODE>
+VI_bounds</CODE>
+.<CODE>
+R_top</CODE>
+, respectively).</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	A dword value representing the left bound in the low word and the top bound in the high word. Use the macros DWORD_X and DWORD_Y to extract the bounds from the return value (see the file <STRONG CLASS="fileName">
+graphics.h</STRONG>
+).</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_GET_BOUNDS">
+ </A>
+MSG_VIS_GET_BOUNDS</H4>
+<PRE CLASS="syntax">void	MSG_VIS_GET_BOUNDS(
+        Rectangle *retValue);</PRE>
+<P>
+<A NAME="IX_Bounds, visible:retrieving">
+ </A>
+This message returns the current rectangle structure stored in the object's <CODE>
+VI_bounds</CODE>
+ field. This rectangle represents both the position and the size of the object by giving its left, top, right, and bottom bounds.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+retValue</CODE>
+	A pointer to an empty <CODE>
+Rectangle</CODE>
+ structure. The values in the object's <CODE>
+VI_bounds</CODE>
+ field will be returned in the structure pointed to.</P>
+<P CLASS="refField">
+Return:	The <CODE>
+retValue</CODE>
+ pointer will be returned with the bounds filled into the <CODE>
+Rectangle</CODE>
+ structure.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+
+<H2 CLASS="HeadingC">
+<A NAME="82440">
+ </A>
+Object Size</H2>
+<PRE>MSG_VIS_GET_SIZE, MSG_VIS_SET_SIZE</PRE>
+<P>
+<A NAME="IX_Geometry:object size">
+ </A>
+A visible object's size is defined as its width and height. The width is the difference between the object's left and right bounds; the height is the difference between the object's top and bottom bounds.</P>
+<P>
+You can retrieve a visible object's size with the message <CODE>
+MSG_VIS_GET_SIZE</CODE>
+, and you can set it with <CODE>
+MSG_VIS_SET_SIZE</CODE>
+. <CODE>
+MSG_VIS_SET_SIZE</CODE>
+ will set the object's right and bottom bounds without recalculating the object's position. If geometry is being managed automatically, you may want to subclass other messages; these are described in <A HREF="VisClass_e.htm#16842"> Geometry Management</A>
+.</P>
+<P>
+In Swat, you can see the object's size indirectly with the command <CODE>
+pobj</CODE>
+. This command will show, among other things, the <CODE>
+VI_bounds</CODE>
+ field of the object. You can manually calculate the size from that information.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_SET_SIZE">
+ </A>
+MSG_VIS_SET_SIZE</H4>
+<PRE CLASS="syntax">void	MSG_VIS_SET_SIZE(
+        int	width,
+        int	height);</PRE>
+<P>
+This message sets the object's height and width to the passed values, retaining the object's current position. The object's position will not be recalculated as a result of the size change. </P>
+<P CLASS="refField">
+Source:	Unrestricted--usually the geometry manager or the object's visible parent calculating geometry.</P>
+<P CLASS="refField">
+Destination:	Any visible object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+width</CODE>
+	The new width of the object. <CODE>
+width</CODE>
+ will be added to the object's left bound to get the object's new right bound.</P>
+<DL>
+<DT>
+<CODE>
+height</CODE>
+</DT><DD>The new height of the object. <CODE>
+height</CODE>
+ will be added to the object's top bound to get the object's new bottom bound.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+<P CLASS="refField">
+Warnings:	This message will not cause an image invalidation. You must mark the object invalid with <CODE>
+MSG_VIS_MARK_INVALID</CODE>
+.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_GET_SIZE">
+ </A>
+MSG_VIS_GET_SIZE</H4>
+<PRE CLASS="syntax">SizeAsDWord MSG_VIS_GET_SIZE();</PRE>
+<P>
+This message returns the current size (width and height) of the object. Both values are word-sized integers and are returned in a single dword value. The high word of this value is the object's width, and the low word is the object's height.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	A dword value representing the object's width in the low word and height in the high word. Use the macros DWORD_WIDTH and DWORD_HEIGHT to extract the width and height; see <A HREF="VisClass_d.htm#16916"> DWORD_HEIGHT</A>
+.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+
+<H2 CLASS="HeadingC">
+<A NAME="16842">
+ </A>
+Geometry Management</H2>
+<PRE>MSG_VIS_UPDATE_GEOMETRY, MSG_VIS_NOTIFY_GEOMETRY_VALID, MSG_VIS_RECALC_SIZE, MSG_VIS_GET_CENTER, MSG_VIS_RECALC_SIZE_AND_INVAL_IF_NEEDED, MSG_VIS_RESET_TO_INITIAL_SIZE, MSG_VIS_POSITION_BRANCH, MSG_VIS_POSITION_AND_INVAL_IF_NEEDED, MSG_VIS_INVAL_ALL_GEOMETRY</PRE>
+<P>
+<A NAME="IX_Geometry:VisClass messages">
+ </A>
+Geometry management consists of positioning and sizing visible objects properly. This can be done manually by the programmer or automatically by GEOS. If you wish to manually control your visible tree's geometry, set the flag VCGA_CUSTOM_MANAGE_CHILDREN in the top composite's <CODE>
+VCI_geoAttrs</CODE>
+ field (see <A HREF="../../UI/VisComp/index.htm">the VisComp chapter</A>). You can then use any messages, either native to <CODE>VisClass</STRONG>
+ or defined by your subclasses, for object positioning and sizing.</P>
+<P>
+Automatic geometry management occurs when the geometry of the visible tree is marked invalid somewhere and a visual update is initiated. The tree's geometry can be marked invalid in several ways--an object can be added to or removed from the tree, an object can be manually marked invalid (with <CODE>
+MSG_VIS_MARK_INVALID</CODE>
+), or an object can be opened or closed (<CODE>
+MSG_VIS_OPEN</CODE>
+ or <CODE>
+MSG_VIS_CLOSE</CODE>
+).</P>
+<P>
+When automatic geometry management is invoked, the geometry manager will recalculate the entire affected branch's geometry. It will calculate geometry for each affected window group, from the topmost affected window object down to the bottommost affected object. If the geometry manager encounters window groups below the topmost window, it will check first to see if the lower window's size is controlled by its children (e.g., a GenView that follows the geometry of its content). If the lower window is scrollable or otherwise not subject to its children's geometry, the geometry manager will finish calculating the geometry above the lower window before proceeding.</P>
+<P>
+Calculating geometry is an involved, complex task. The process involves composites and their children negotiating on desired sizes. How the geometry is calculated depends primarily on the relationships between the objects and how their flags are set.</P>
+<P>
+For example, if a GenView is set up to be exactly the same size as its VisContent object, the calculations will be different than if the GenView were scrollable. The same is true for visible composites that manage their children: If the composite resizes itself large enough to hold all its children, the children must be resized first.</P>
+<P>
+The negotiation between parent and child in the visible tree takes the form of a single message: <CODE>
+MSG_VIS_RECALC_SIZE</CODE>
+. This is the single most important message in calculating the tree's geometry, though others are also significant. This message is sent by a composite to each of its children in turn; it passes a suggested size, and the child returns its desired size.</P>
+<P>
+The composite collects all the desired sizes of its children and compares that to the size it thinks it should be. If necessary, it makes another pass through the children, or it passes on its desired size to its parent composite. Depending on the situation and the disparity between parent and children sizes, the geometry calculation may take a single pass or several. If the sizes can not be resolved through this negotiation, the geometry manager will make a decision after several passes, typically expanding the parent as much as possible to fit all the children.</P>
+<P>
+After a visible object has calculated its size, its size will be set either by itself or by its parent. Often this is done with <CODE>
+MSG_VIS_SET_SIZE</CODE>
+. Once all sizes have been determined and set, the objects set their positions with <CODE>
+MSG_VIS_POSITION_BRANCH</CODE>
+, which propagates down the tree. It sets the position of the topmost composite and then sets each of its children's positions appropriately.</P>
+<P>
+When geometry calculations are complete, the geometry manager will send a <CODE>
+MSG_VIS_NOTIFY_GEOMETRY_VALID</CODE>
+ to all visible objects with the flag VGA_NOTIFY_GEOMETRY_VALID set in its <CODE>
+VI_geoAttrs</CODE>
+ field.</P>
+<P>
+Several other messages may be used during geometry updates. Some of them may be intercepted to alter the behavior of the default method. These messages are listed below. Others can be used to invalidate a visible object's geometry or to cause a geometry update on the tree.</P>
+<DL>
+<DT>
+<CODE>
+MSG_VIS_UPDATE_GEOMETRY</DT><DD>
+</CODE>
+This message is typically called by the UI during a window group update. It calculates the geometry of the entire branch receiving it. It's not likely you'll subclass this method--altering its behavior can be used for certain optimizations, however.</DD>
+<DT>
+<CODE>
+MSG_VIS_NOTIFY_GEOMETRY_VALID</DT><DD>
+</CODE>
+This message will be sent to an object when all its geometry messages have been handled and its geometry has been fully resolved (at least for the moment). This message will be sent only if VGA_NOTIFY_GEOMETRY_VALID is set in the object's <CODE>
+VI_geoAttrs</CODE>
+ field. There is no default behavior for this message; it should be intercepted only if the object needs to do calculations after the geometry has settled down.</DD>
+<DT>
+<CODE>
+MSG_VIS_RECALC_SIZE</DT><DD>
+</CODE>
+This message is normally sent by the geometry manager to a composite object. The composite is expected to send it to all its children; the children will then determine their sizes, and the composite will figure the total size and return. A composite that manages its own children can also use this message to query its children for their desired sizes.</DD>
+<DT>
+<CODE>
+MSG_VIS_RECALC_SIZE_AND_INVAL_IF_NEEDED</DT><DD>
+</CODE>
+This message is an optimized <CODE>
+MSG_VIS_RECALC_SIZE</CODE>
+. Composites should use this version when sending a recalculation message to their children. This message only causes recalculation if needed and will invalidate the object if the size gets recalculated. It invalidates the object's image at its old bounds and only invalidates its geometry if the bounds change. It is highly unlikely that you'll subclass this method.</DD>
+<DT>
+<CODE>
+MSG_VIS_GET_CENTER</DT><DD>
+</CODE>
+This message returns the amount of space on each side the object wants reserved for itself. It does not, as the name suggests, return the coordinates of the object's center. Instead, it returns the distance in each direction the object requires (you may think of it as external margins).</DD>
+<DT>
+<CODE>
+MSG_VIS_RESET_TO_INITIAL_SIZE</DT><DD>
+</CODE>
+This message propagates down the visible tree and causes every object that receives it to reset itself to its original size. It does this by clearing VGA_GEOMETRY_CALCULATED in the object's <CODE>
+VI_geoAttrs</CODE>
+ field, causing the object to believe it is being put on-screen for the first time. This message will also set the object's flags to indicate that its geometry has become invalid. It's highly unlikely your application will subclass this method.</DD>
+<DT>
+<CODE>
+MSG_VIS_POSITION_BRANCH</DT><DD>
+</CODE>
+This message is sent by the geometry manager when an entire visible branch should be repositioned. If an application wants to do something special, it should subclass the handler for this message. Typically, though, only subclasses of <CODE>
+VisCompClass</CODE>
+ and perhaps <CODE>
+VisContentClass</CODE>
+ will change this method.</DD>
+<DT>
+<CODE>
+MSG_VIS_POSITION_AND_INVAL_IF_NEEDED</DT><DD>
+</CODE>
+This message is an optimized <CODE>
+MSG_VIS_POSITION_BRANCH</CODE>
+ that causes a branch reposition only if it's necessary. It will also invalidate both the object's and the parent's original images and, if the position changes, the geometry as well. It is highly unlikely that you'll subclass this method.</DD>
+<DT>
+<CODE>
+MSG_VIS_INVAL_ALL_GEOMETRY</DT><DD>
+</CODE>
+This message invalidates all geometry under the recipient object, forcing invalidation of all children. This is a brute-force message used only when absolutely necessary.</DD>
+
+</DL>
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_UPDATE_GEOMETRY">
+ </A>
+MSG_VIS_UPDATE_GEOMETRY</H4>
+<PRE CLASS="syntax">void	MSG_VIS_UPDATE_GEOMETRY();</PRE>
+<P>
+This message is sent during a visual update to cause objects to recalculate their geometry. Applications can use this message to ensure that geometry gets updated for a visual branch even if the branch is not currently drawn on the screen.</P>
+<P CLASS="refField">
+Source:	Visual update mechanism.</P>
+<P CLASS="refField">
+Destination:	Any visible object.</P>
+<P CLASS="refField">
+Interception:	May be intercepted for optimizations. A thorough knowledge of the geometry update mechanism and the specifics of the visible tree's geometry is strongly recommended, however.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_NOTIFY_GEOMETRY_VALID">
+ </A>
+MSG_VIS_NOTIFY_GEOMETRY_VALID</H4>
+<PRE CLASS="syntax">void	MSG_VIS_NOTIFY_GEOMETRY_VALID();</PRE>
+<P>
+This message is sent by the geometry manager to objects that have VGA_NOTIFY_GEOMETRY_VALID set. The message is sent only after all geometry messages have been handled for the object. It has no default behavior.</P>
+<P CLASS="refField">
+Source:	Visible update mechanism.</P>
+<P CLASS="refField">
+Destination:	Any visible object--typically a child of the object sending the message.</P>
+<P CLASS="refField">
+Interception:	This message has no default behavior. It should be intercepted by any object that needs to do something after its geometry has been made valid.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_RECALC_SIZE">
+ </A>
+MSG_VIS_RECALC_SIZE</H4>
+<PRE CLASS="syntax">SizeAsDWord MSG_VIS_RECALC_SIZE(
+        int	width,
+        int	height);</PRE>
+<P>
+This message takes the suggested height and width of the object and recalculates the object's desired size based on them. Composite objects are expected to pass this message to their children and then calculate their sizes based on those of their children. The default behavior of the handler for this is to return the current size no matter what the suggested size is.</P>
+<P CLASS="refField">
+Source:	Visible update mechanism.</P>
+<P CLASS="refField">
+Destination:	Any visible object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+width</CODE>
+	Suggested new width of the object as determined by the object's parent.</P>
+<DL>
+<DT>
+<CODE>
+height</CODE>
+</DT><DD>Suggested new height of the object as determined by the object's parent.</DD>
+</DL>
+<P CLASS="refField">
+Return:	A dword value representing the object's desired size as calculated by the object. The high word of the return value represents the width and the low word the height. Use the macros DWORD_WIDTH and DWORD_HEIGHT to extract the width and height; see <A HREF="VisClass_d.htm#16916"> DWORD_HEIGHT</A>
+.</P>
+<P CLASS="refField">
+Interception:	Default behavior is to return the object's current size no matter what the passed width and height are. Any object that wants special sizing behavior based either on the object's children or on the suggested size should subclass the method.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_RECALC_SIZE_AND_INVAL_IF_NEEDED">
+ </A>
+MSG_VIS_RECALC_SIZE_AND_INVAL_IF_NEEDED</H4>
+<PRE CLASS="syntax">SizeAsDWord MSG_VIS_RECALC_SIZE_AND_INVAL_IF_NEEDED(
+        int	width,
+        int	height);</PRE>
+<P>
+This message is the same as <CODE>
+MSG_VIS_CALC_RESIZE</CODE>
+ except that it is somewhat optimized. It will recalculate only if certain flags are set for the object, and it will mark the geometry invalid only if recalculation is done.</P>
+<P CLASS="refField">
+Source:	Visible update mechanism.</P>
+<P CLASS="refField">
+Destination:	Any visible object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+width</CODE>
+	Suggested new width of the object as determined by the object's parent.</P>
+<DL>
+<DT>
+<CODE>
+height</CODE>
+</DT><DD>Suggested new height of the object as determined by the object's parent.</DD>
+</DL>
+<P CLASS="refField">
+Return:	A dword value representing the object's desired size as calculated by the object. The low word of the return value represents the width and the high word the height.</P>
+<P CLASS="refField">
+Interception:	Unlikely--Default behavior is to return the object's current size no matter what the passed width and height are. Any object that wants special sizing behavior based either on the object's children or on the suggested size should subclass the method.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_GET_CENTER">
+ </A>
+MSG_VIS_GET_CENTER</H4>
+<PRE CLASS="syntax">void	MSG_VIS_GET_CENTER(
+        GetCenterParams *retValue);</PRE>
+<P>
+This message returns the amount of space needed by the object in each direction from its center. It does not, as the name suggests, return the coordinates of the center of the object. Instead, the object must determine the amount of space it requires from its center to each edge for geometry management and return them in the structure passed.</P>
+<P CLASS="refField">
+Source:	Visible update mechanism.</P>
+<P CLASS="refField">
+Destination:	Any visible object</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+retValue</CODE>
+	A pointer to an empty <CODE>
+GetCenterParams</CODE>
+ structure, defined below.</P>
+<P CLASS="refField">
+Return:	The method must fill the <CODE>
+GetCenterParams</CODE>
+ structure pointed to by the <CODE>
+retValue</CODE>
+ parameter.</P>
+<P CLASS="refField">
+Interception:	Any object that wants to effect a different centering than the default should subclass this method. For example, if a set of objects can be overlapped, or if they should have extra space between them, they should subclass this message and alter the returned values appropriately.</P>
+<P CLASS="refField">
+Structures:	<A NAME="IX_GCP_&ldots;">
+ </A>
+<A NAME="IX_GetCenterParams">
+ </A>
+The <CODE>
+GetCenterParams</CODE>
+ structure is defined as follows:</P>
+<PRE>typedef struct {
+    word   GCP_aboveCenter;    /* space above */
+    word   GCP_belowCenter;    /* space below */
+    word   GCP_leftOfCenter;   /* space left */
+    word   GCP_rightOfCenter;  /* space right */
+} <A NAME="IX_GetCenterParams"> </A>GetCenterParams;</PRE>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_RESET_TO_INITIAL_SIZE">
+ </A>
+MSG_VIS_RESET_TO_INITIAL_SIZE</H4>
+<PRE CLASS="syntax">void	MSG_VIS_RESET_TO_INITIAL_SIZE(
+        VisUpdateMode updateMode);</PRE>
+<P>
+This message propagates down an entire visual branch, causing the objects in it to reset their sizes to their original width and height. First it invalidates the object's geometry, then it recalculates the geometry starting at the top.</P>
+<P CLASS="refField">
+Source:	Visible update mechanism.</P>
+<P CLASS="refField">
+Destination:	Any visible object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+updateMode</CODE>
+	A <CODE>
+VisUpdateMode</CODE>
+ indicating when the visual update of the tree should occur.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_POSITION_BRANCH">
+ </A>
+MSG_VIS_POSITION_BRANCH</H4>
+<PRE CLASS="syntax">void	MSG_VIS_POSITION_BRANCH(
+        word	xOrigin,
+        word	yOrigin);</PRE>
+<P>
+This message repositions an entire visible branch. It propagates down the branch, causing each visible object to reposition itself based on the new origins passed. Composites must pass the appropriate altered positions to their children.</P>
+<P CLASS="refField">
+Source:	Visible update mechanism.</P>
+<P CLASS="refField">
+Destination:	Any visible object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+xOrigin</CODE>
+	The new horizontal position of the object relative to the document or window it's in. This value is set into the object's <CODE>
+VI_bounds</CODE>
+.<CODE>
+R_left</CODE>
+ bound, and the right bound is set according to the object's size.</P>
+<DL>
+<DT>
+<CODE>
+yOrigin</CODE>
+</DT><DD>The new vertical position of the object relative to the document or window it's in. This value is set into the object's <CODE>
+VI_bounds</CODE>
+.<CODE>
+R_top</CODE>
+ bound, and the bottom bound is set according to the object's size.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	The default behavior is to set the object to the passed position. Composite objects that want to position their children a special way should subclass this (and <EM>
+not</EM>
+ call the superclass) method. Non-composites will rarely, if ever, subclass this message.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_POSITION_AND_INVAL_IF_NEEDED">
+ </A>
+MSG_VIS_POSITION_AND_INVAL_IF_NEEDED</H4>
+<PRE CLASS="syntax">Boolean	MSG_VIS_POSITION_AND_INVAL_IF_NEEDED(
+        word	xPosition,
+        word	yPosition);</PRE>
+<P>
+This message is an optimized version of <CODE>
+MSG_VIS_POSITION_BRANCH</CODE>
+. It repositions the branch only if necessary and will mark the image invalid only if the position was changed. It returns a flag indicating whether or not the object was repositioned.</P>
+<P CLASS="refField">
+Source:	Visible update mechanism.</P>
+<P CLASS="refField">
+Destination:	Any visible object--typically sent by a composite to its children.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+xPosition</CODE>
+	The new horizontal position of the object relative to the document or window it's in. A negative value means that the object should choose its own position as best it can.</P>
+<DL>
+<DT>
+<CODE>
+yPosition</CODE>
+</DT><DD>The new vertical position of the object relative to the document or window it's in. A negative value means that the object should choose its own position as best it can.</DD>
+</DL>
+<P CLASS="refField">
+Return:	If the object was repositioned, the message will return <CODE>
+true</CODE>
+. Otherwise, it will return <CODE>
+false</CODE>
+.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_VIS_INVAL_ALL_GEOMETRY</H4>
+<PRE CLASS="syntax">void	<A NAME="IX_MSG_VIS_INVAL_ALL_GEOMETRY"> </A>MSG_VIS_INVAL_ALL_GEOMETRY(
+        VisUpdateMode		updateMode);</PRE>
+<P>
+This is a brute-force, desperation message used to invalidate all geometry in the recipient's tree; that is, all geometry of the recipient and all objects under it in the tree will be invalidated. You should only use this message when the whole tree should be recalculated.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	The object requiring geometry recalculation.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+updateMode</CODE>
+	A visual update mode indicating when the visual update of the recalculation should occur.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VisClass_b.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VisClass_d.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.2 Drawing to the Screen</A> 
+<!-- to next --> | <A HREF="VisClass_f.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.4 Handling Input</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

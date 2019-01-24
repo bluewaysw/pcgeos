@@ -1,0 +1,1438 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+<!-- This page was automatically generated from a bunch of smaller pages. -->
+<META NAME="copyright" CONTENT="Copyright GEOWORKS">
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+<TITLE>Ruler Object Library</TITLE>
+</HEAD>
+<BODY BGCOLOR="#ffffdf">
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+<A NAME="index.htm"></A>
+
+
+
+<H1 CLASS="chapterTitle">
+
+<A NAME="index.htm_97933">
+ </A>
+Ruler Object Library
+
+</H1>
+<P>
+<A NAME="index.htm_IX_Mouse:constraining to line">
+ </A>
+<A NAME="index.htm_IX_Rulers">
+ </A>
+<A NAME="index.htm_IX_ruler library">
+ </A>
+The ruler library provides objects that act as rulers. These rulers may be linked up with a GenView object so that when the user scrolls around within the GenView, the rulers update accordingly. The rulers work with a variety of measurement systems and also provide grids and guidelines to help the user to figure out the spacial layout of a graphic space. To aid the user's mouse movement, the rulers can constrain the mouse's movement to certain lines.</P>
+<P>
+To work with the basic ruler set-up, you don't need to know much about GEOS other than the basics of objects and messaging. However, for certain customizations, you will probably need to know something about GenViews and notifications they pass on to linked objects.</P>
+<P CLASS="sectionlinks">
+<STRONG>
+&nbsp;&nbsp;<A HREF="#Ruler_1.htm">1 Ruler Features</A><BR>
+&nbsp;&nbsp;<A HREF="#Ruler_2.htm">2 Ruler Setup</A><BR>
+&nbsp;&nbsp;<A HREF="#Ruler_3.htm">3 VisRuler Instance Data</A><BR>
+&nbsp;&nbsp;<A HREF="#Ruler_4.htm">4 Managing Rulers</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Ruler_5.htm">4.1 RulerShowControl</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Ruler_6.htm">4.2 Mouse Tracking</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Ruler_7.htm">4.3 Grid Spacing and Constraint</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Ruler_8.htm">4.4 Guide Constraints and Guidelines</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Ruler_9.htm">4.5 Other Mouse Constraints</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Ruler_a.htm">4.6 Esoteric Messages</A><BR>
+</STRONG>
+</P> <!-- end of sectionlinks blob -->
+
+<HR>
+<A NAME="Ruler_1.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Ruler Object Library</A>: 1 
+Ruler Features</H2>
+<P>
+Rulers are a &quot;must have&quot; feature for drawing programs or any geode concerned with layout-intensive tasks. By alerting the rulers to pointer events, the application may display marks in the ruler which track the mouse's position so that the user knows the exact mouse coordinates. The ruler library provides many more features to applications prepared to support those features:
+
+</P>
+<UL>
+<LI>
+<A NAME="Ruler_1.htm_IX_Grids:provided by ruler library">
+ </A>
+Grids<BR>
+The ruler's tick marks are of course drawn inside the ruler. However, the ruler can draw a grid over the main view so that the user may see where major units fall on the document directly.</LI>
+<LI>
+<A NAME="Ruler_1.htm_IX_Guidelines:provided by ruler library">
+ </A>
+Guides<BR>
+While a regular grid is helpful, the user may want to set up guidelines to mark off areas important to a document's layout. These guides may appear both as marks on the ruler and lines across the main view itself.</LI>
+<LI>
+Mouse Constraints<BR>
+The rulers can act as mouse constraint managers. The mouse location can snap to grid lines, guidelines, or lines at any angle through any point. </LI>
+<LI>
+Large Document Support<BR>
+The rulers work with large (32-bit) documents. They respond correctly to large mouse and scrolling events. However, at this time there is no way using C to intercept the message by which the Ruler handles large pointer events.</LI>
+<LI>
+Controller Support<BR>
+The ruler library includes a full suite of controller objects, including controllers for managing grids and guides.</LI>
+</UL>
+<HR>
+<A NAME="Ruler_2.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Ruler Object Library</A>: 2 
+Ruler Setup</H2>
+<P>
+<A NAME="Ruler_2.htm_IX_RulerViewClass">
+ </A>
+<A NAME="Ruler_2.htm_IX_RulerContentClass">
+ </A>
+For each ruler a geode displays, it will need to include three objects: an object of <CODE>
+RulerViewClass</CODE>
+ to display the ruler, a <CODE>
+RulerContentClass</CODE>
+ object to act as the top of the RulerView's visible tree, and a <CODE>
+VisRulerClass</CODE>
+ object, the ruler itself. Also, the geode may wish to include some of the available ruler control objects. 
+
+</P>
+<P>
+The RulerViews should be alerted when the main GenView scrolls or scales, so set the GenView's <CODE>
+GVI_horizLink</CODE>
+ and <CODE>
+GVI_vertLinks</CODE>
+ to hold the optrs of the RulerViews. A RulerView to the side of the GenView should be linked by the horizontal link; a RulerView above or below the GenView should be linked vertically. </P>
+<P>
+Each RulerView should have a RulerContent as its content. Set this up as you would a normal GenView/VisContent linkage. The RulerContent functions as a VisContent for most purposes; there is some subclassed behavior so that the VisRuler will be notified when the RulerView has detected a scroll or scale event.</P>
+<P>
+A VisRuler should be the child of the RulerContent. If you have more than one VisRuler associated with a view, you should use the <CODE>
+VRI_slave</CODE>
+ links to connect them. When one VisRuler receives certain messages, it will handle them and pass them on to whatever VisRuler has been designated in its <CODE>
+VRI_slave</CODE>
+ field. If this slave ruler itself has a slave, then the message will be relayed again, and so on. Thus the application only has to send messages to one ruler, instead of to all of them. The ruler which is not the target of a <CODE>
+VRI_slave</CODE>
+ link is the view's master ruler, and its VRA_MASTER bit should be set.</P>
+<P>
+If the view only has one ruler associated with it, that ruler's VRA_MASTER bit should be set.</P>
+<P>
+If you will use the ruler library's mouse constraint management support, then the VisRulers must be run in the same thread which manages the main content. The VisRuler messages which deal with mouse positions receive the mouse location parameters on the stack, and thus the handlers must be running in the same thread as the callers. This is not a major restriction: since mouse events are so common, sending them across threads to be processed would lead to slow, jerky responses.
+
+</P>
+<P>
+Your application may also include other objects:</P>
+<UL>
+<LI>
+RulerTypeControl to allow the user to use different measurement units. </LI>
+<LI>
+RulerGridControl to draw a grid on the main view to which the user may snap the mouse.</LI>
+<LI>
+RulerGuideControl to allow the user to manage guidelines.</LI>
+<LI>
+RulerShowControl to show or hide rulers. Because hidden rulers are set not usable, and thus do not work well with GCN, applications including a RulerShowControl need to do some extra work. This is not difficult, but exactly what needs to be done may vary between applications. For details, see <A HREF="#Ruler_5.htm_89528"> RulerShowControl</A>
+.</LI>
+<LI>
+If you will be using any of the ruler controllers, you must provide a way to relay classed events to the VisRuler objects. Whichever object will have the target when the controllers send out their classed events must have a special handler for <CODE>
+MSG_META_SEND_CLASSED_EVENT</CODE>
+ which determines if the message is intended for a member of VisRuler class, and if so passes it to the master VisRuler object. Note that if you are working with the grobj library, a targeted GrObjBody correctly relays classed events to rulers.</LI>
+</UL>
+<P>
+Finally, if you wish the VisRuler to take special action on certain mouse events (perhaps providing a mark on the ruler to track the mouse pointer's position), the GenView's content should intercept those mouse events and send messages to the VisRuler (again, the VisRuler at the top of the <CODE>
+VRI_slave</CODE>
+ chain) with the requested action.</P>
+<HR>
+<A NAME="Ruler_3.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Ruler Object Library</A>: 3 
+VisRuler Instance Data</H2>
+<P>
+<A NAME="Ruler_3.htm_IX_VRI_&ldots;  (VisRulerClass instance data)">
+ </A>
+<A NAME="Ruler_3.htm_IX_VisRulerClass">
+ </A>
+The VisRuler's instance data fields are listed below. Depending on your setup, the management of most of these fields will probably be taken care of by the ruler itself or some of its associated controllers. However, many programs set values for the <CODE>
+VRI_rulerAttrs</CODE>
+, <CODE>
+VRI_constrainStrategy</CODE>
+, and <CODE>
+VRI_slave</CODE>
+ fields when defining their rulers.</P>
+<P CLASS="figTitle">
+Code Display 19-1 </P>
+<PRE>@classVisRulerClass,VisClass;
+@instance VisRulerAttributes VRI_rulerAttrs;</PRE>
+<PRE>typedef ByteFlags VisRulerAttributes; 
+#define VRA_IGNORE_ORIGIN 				0x80
+#define VRA_SHOW_GUIDES 				0x40
+#define VRA_SHOW_GRID 				0x20
+#define VRA_SHOW_MOUSE 				0x10
+#define VRA_HORIZONTAL 				0x08
+#define VRA_MASTER 				0x04</PRE>
+<PRE>@instance VisRulerType VRI_type;</PRE>
+<PRE>typedef ByteEnum VisRulerType; 
+<A NAME="Ruler_3.htm_IX_VisRulerType"> </A><A NAME="IX_VRT_&ldots;"> </A>#define VRT_INCHES 			0x0
+#define VRT_CENTIMETERS 			0x1
+#define VRT_POINTS 			0x2
+#define VRT_PICAS 			0x3
+#define VRT_CUSTOM 			CUSTOM_RULER_DEFINITION
+#define VRT_NONE 			NO_RULERS
+#define VRT_DEFAULT 			SYSTEM_DEFAULT</PRE>
+<PRE>@instance VisRulerConstrainStrategy VRI_constrainStrategy;</PRE>
+<PRE>typedef WordFlags VisRulerConstrainStrategy; 
+#define VRCS_OVERRIDE 							0x8000
+#define VRCS_SET_REFERENCE 							0x2000
+#define VRCS_SNAP_TO_GRID_X_ABSOLUTE 							0x1000
+#define VRCS_SNAP_TO_GRID_Y_ABSOLUTE 							0x0800
+#define VRCS_SNAP_TO_GRID_X_RELATIVE 							0x0400
+#define VRCS_SNAP_TO_GRID_Y_RELATIVE 							0x0200
+#define VRCS_SNAP_TO_GUIDES_X 							0x0100
+#define VRCS_SNAP_TO_GUIDES_Y 							0x0080
+#define VRCS_CONSTRAIN_TO_HORIZONTAL_AXIS 							0x0040
+#define VRCS_CONSTRAIN_TO_VERTICAL_AXIS 							0x0020
+#define VRCS_CONSTRAIN_TO_UNITY_SLOPE_AXIS 							0x0010
+#define VRCS_CONSTRAIN_TO_NEGATIVE_UNITY_SLOPE_AXIS 							0x0008
+#define VRCS_CONSTRAIN_TO_VECTOR 							0x0004
+#define VRCS_CONSTRAIN_TO_VECTOR_REFLECTION 							0x0002
+#define VRCS_INTERNAL 							0x0001</PRE>
+<PRE>@instance MinIncrementType 			VRI_minIncrement; /* minimum increment displayed */</PRE>
+<PRE><A NAME="Ruler_3.htm_IX_MIT_&ldots;"> </A><A NAME="IX_MinIncrementType"> </A>typedef union {
+	MinUSMeasure 			MIT_US;
+	MinMetricMeasure 			MIT_METRIC;
+	MinPointMeasure 			MIT_POINT;
+	MinPicaMeasure 			MIT_PICA;
+} MinIncrementType;</PRE>
+<PRE>typedef ByteEnum <A NAME="Ruler_3.htm_IX_MUSM_&ldots;"> </A><A NAME="IX_MinUSMeasure"> </A>MinUSMeasure; 
+#define MUSM_EIGHTH_INCH 				0x0
+#define MUSM_QUARTER_INCH 				0x1
+#define MUSM_HALF_INCH 				0x2
+#define MUSM_ONE_INCH 				0x3 </PRE>
+<PRE>typedef ByteEnum <A NAME="Ruler_3.htm_IX_MMM_&ldots;"> </A><A NAME="IX_MinMetricMeasure"> </A>MinMetricMeasure;
+#define MMM_MILLIMETER 				0x0
+#define MMM_HALF_CENTIMETER 				0x1
+#define MMM_CENTIMETER 				0x2</PRE>
+<PRE>typedef ByteEnum <A NAME="Ruler_3.htm_IX_MPM_&ldots;"> </A><A NAME="IX_MinPointMeasure"> </A>MinPointMeasure; 
+#define MPM_25_POINT 				0x0
+#define MPM_50_POINT 				0x1
+#define MPM_100_POINT 				0x2 </PRE>
+<PRE>typedef ByteEnum <A NAME="Ruler_3.htm_IX_MPM_&ldots;"> </A><A NAME="IX_MinPicaMeasure"> </A>MinPicaMeasure;
+#define MPM_PICA 				0x0
+#define MPM_INCH 				0x1</PRE>
+<PRE>@instance WWFixed VRI_scale; /* scale factor */</PRE>
+<PRE>@instance DWFixed VRI_origin; /* 0,0 of the ruler in document coordinates */</PRE>
+<PRE>@instance PointDWFixed VRI_reference;</PRE>
+<PRE>@instance sdword VRI_mouseMark;</PRE>
+<PRE>@instance word VRI_window; /* actually a noreloc WindowHandle */</PRE>
+<PRE>@instance optr VRI_slave;</PRE>
+<PRE>@instance Grid VRI_grid;</PRE>
+<PRE>@instance WWFixed VRI_vectorSlope; /* slope of vector */</PRE>
+<PRE>@instance optr VRI_guideArray;</PRE>
+<PRE>@instance word VRI_guideInfluence; /* influence of guides in pixels */</PRE>
+<PRE>@instance word VRI_desiredSize;</PRE>
+<PRE>@instance word VRI_reserved;</PRE>
+<PRE>@instance dword VRI_invalOD; /* actually a noreloc optr */</PRE>
+<PRE>@instance word VRI_transformGState; /* actually a noreloc GStateHandle */</PRE>
+<P>
+<A NAME="Ruler_3.htm_IX_VisRulerAttributes">
+ </A>
+<A NAME="Ruler_3.htm_IX_VRA_&ldots;">
+ </A>
+The <A NAME="Ruler_3.htm_IX_VRI_rulerAttrs">
+ </A>
+<CODE>
+VRI_rulerAttrs</CODE>
+ field contains flags which determine whether the ruler will support given features. This field tends to vary between applications; put some thought into which flags to turn on.</P>
+<DL>
+<DT>
+VRA_IGNORE_ORIGIN </DT><DD>
+Using the <CODE>
+VRI_origin</CODE>
+ field, it is possible to set an origin for the user to use based upon the coordinates of the graphic space within the main view. This can come in handy when the zero point for the ruler shouldn't correspond to the very left or top of the view; GeoWrite uses this when the user wants the ruler's origin to be based upon the right edge of a text object rather than the edge of the view. The VRA_IGNORE_ORIGIN flag effectively turns off this feature.</DD>
+<DT>
+VRA_SHOW_GUIDES</DT><DD>
+This flag indicates that the user wants guidelines drawn over their main view.</DD>
+<DT>
+VRA_SHOW_GRID </DT><DD>
+This flag indicates that the user wants gridlines drawn over the main view.</DD>
+<DT>
+VRA_SHOW_MOUSE</DT><DD>
+This flag indicates that the ruler should draw a tick mark to show the mouse pointer's location.</DD>
+<DT>
+VRA_HORIZONTAL </DT><DD>
+This flag indicates that the ruler is horizontal. Horizontal rulers should have this flag turned on; vertical rulers should not.</DD>
+<DT>
+VRA_MASTER </DT><DD>
+If a given view has only one ruler associated with it, that ruler should have this flag set. If a given view has more than one ruler (perhaps having one horizontal and one vertical), one of these rulers should be set up as the master ruler. It should have the VRA_MASTER flag set and should have the second ruler's optr in its <CODE>
+VRI_slave</CODE>
+ field. If there is a third ruler, the second ruler should have its optr in its (the second ruler's) VRI_slave field, and so on. </DD>
+</DL>
+<P>
+<A NAME="Ruler_3.htm_IX_VisRulerConstrainStrategy">
+ </A>
+<A NAME="Ruler_3.htm_IX_VRCS_&ldots;">
+ </A>
+The <A NAME="Ruler_3.htm_IX_VRI_constrainStrategy">
+ </A>
+<CODE>
+VRI_constrainStrategy</CODE>
+ field contains the default mouse constraint strategy the ruler should use when constraining mouse movement.</P>
+<DL>
+<DT>
+VRCS_OVERRIDE </DT><DD>
+This flag isn't really meant to be part of the default mouse constraint; it will be ignored if in the <CODE>
+VRI_constrainStrategy</CODE>
+ field. During some events other constrain strategies may be combined with the default mouse constrain strategy; if the other strategy's VRCS_OVERRIDE flag is set, then the default mouse constraint strategy field will be ignored.</DD>
+<DT>
+VRCS_SET_REFERENCE </DT><DD>
+This flag signals that the next selection should signal that the user wishes the point clicked on to be the reference point, which is used with certain kinds of mouse constraint.</DD>
+<DT>
+VRCS_SNAP_TO_GRID_X_ABSOLUTE </DT><DD>
+This flag signals that the mouse position should be snapped to the grid horizontally.</DD>
+<DT>
+VRCS_SNAP_TO_GRID_Y_ABSOLUTE </DT><DD>
+This flag signals that the mouse position should be snapped to the grid vertically.</DD>
+<DT>
+VRCS_SNAP_TO_GRID_X_RELATIVE </DT><DD>
+This flag signals that the mouse position should be horizontally snapped to a grid such as would be formed if the present grid spacing was used with the reference point as the grid's origin.</DD>
+<DT>
+VRCS_SNAP_TO_GRID_Y_RELATIVE </DT><DD>
+This flag signals that the mouse position should be vertically snapped to a grid such as would be formed if the present grid spacing was used with the reference point as the grid's origin.</DD>
+<DT>
+VRCS_SNAP_TO_GUIDES_X </DT><DD>
+This flag signals that the mouse positions should be horizontally snapped to guidelines. Note that guidelines are only effective within range of their &quot;influence&quot; in pixels.</DD>
+<DT>
+VRCS_SNAP_TO_GUIDES_Y </DT><DD>
+This flag signals that the mouse positions should be vertically snapped to guidelines. Note that guidelines are only effective within range of their &quot;influence&quot; in pixels. </DD>
+<DT>
+VRCS_CONSTRAIN_TO_HORIZONTAL_AXIS </DT><DD>
+This flag signals that the mouse position should be restrained to the horizontal line passing through the reference point.</DD>
+<DT>
+VRCS_CONSTRAIN_TO_VERTICAL_AXIS</DT><DD>
+This flag signals that the mouse position should be restrained to the vertical line passing through the reference point.</DD>
+<DT>
+VRCS_CONSTRAIN_TO_UNITY_SLOPE_AXIS </DT><DD>
+This flag signals that the mouse position should be restrained to the diagonal line with slope (<EM>
+y </EM>
+= <EM>
+x</EM>
+) passing through the reference point.</DD>
+<DT>
+VRCS_CONSTRAIN_TO_NEGATIVE_UNITY_SLOPE_AXIS </DT><DD>
+This flag signals that the mouse position should be restrained to the diagonal line with slope (<EM>
+y</EM>
+ = <EM>
+-x</EM>
+) passing through the reference point.</DD>
+<DT>
+VRCS_CONSTRAIN_TO_VECTOR </DT><DD>
+This flag signals that the mouse position should be constrained to the line passing through the reference and vector points.</DD>
+<DT>
+VRCS_CONSTRAIN_TO_VECTOR_REFLECTION </DT><DD>
+This flag signals that the mouse position should be constrained to the reflection of the line passing through the reference and vector points.</DD>
+</DL>
+<P>
+The <A NAME="Ruler_3.htm_IX_VRI_type">
+ </A>
+<CODE>
+VRI_type</CODE>
+ and <A NAME="Ruler_3.htm_IX_VRI_minIncrement">
+ </A>
+<CODE>
+VRI_minIncrement</CODE>
+ fields determine the measurement type and ruler increment of the ruler.Normally, the user will work with the ruler's type via a RulerTypeControl. <CODE>
+RulerTypeControlClass</CODE>
+<A NAME="Ruler_3.htm_IX_RulerTypeControlClass">
+ </A>
+'s features structures are shown below.</P>
+<P CLASS="figTitle">
+Code Display 19-2 RulerTypeControl Features</P>
+<PRE>typedef WordFlags <A NAME="Ruler_3.htm_IX_RTCFeatures"> </A>RTCFeatures;
+#define <A NAME="Ruler_3.htm_IX_RTCF_&ldots;"> </A>RTCF_DEFAULT				(0x20)
+#define RTCF_SPREADSHEET 				(0x10)
+#define RTCF_INCHES 				(0x08)
+#define RTCF_CENTIMETERS 				(0x04)
+#define RTCF_POINTS 				(0x02)
+#define RTCF_PICAS 				(0x01)
+#define <A NAME="Ruler_3.htm_IX_RTC_DEFAULT_FEATURES"> </A>RTC_DEFAULT_FEATURES \
+	(RTCF_INCHES | RTCF_CENTIMETERS | RTCF_POINTS | RTCF_PICAS | RTCF_DEFAULT)</PRE>
+<PRE>typedef WordFlags <A NAME="Ruler_3.htm_IX_RTCToolboxFeatures"> </A>RTCToolboxFeatures;
+#define <A NAME="Ruler_3.htm_IX_RTCTF_&ldots;"> </A>RTCTF_DEFAULT 				(0x20)
+#define RTCTF_SPREADSHEET 				(0x10)
+#define RTCTF_INCHES 				(0x08)
+#define RTCTF_CENTIMETERS 				(0x04)
+#define RTCTF_POINTS 				(0x02)
+#define RTCTF_PICAS 				(0x01)
+#define <A NAME="Ruler_3.htm_IX_RTC_DEFAULT_TOOLBOX_FEATURES"> </A>RTC_DEFAULT_TOOLBOX_FEATURES (RTCF_INCHES | RTCF_CENTIMETERS)</PRE>
+<P>
+The RulerTypeControl uses a notification block with the following structure:</P>
+<PRE>typedef struct RulerTypeNotificationBlock {
+	VisRulerType <A NAME="Ruler_3.htm_IX_RTNB_type"> </A>RTNB_type;
+} <A NAME="Ruler_3.htm_IX_RulerTypeNotificationBlock"> </A>RulerTypeNotificationBlock;</PRE>
+<P>
+The ruler must keep track of the main view's scale; if the main view has doubled in scale, the ruler should put its tick marks twice as far apart. This scale is stored in the <CODE>
+VRI_scale</CODE>
+ field. The ruler automatically receives a MSG_VIS_RULER_VIEW_SCALE_FACTOR_CHANGED when the main view's scale changes. To set the scale independently of the main view scale, send a <CODE>
+MSG_VIS_RULER_SET_SCALE</CODE>
+. </P>
+<P>
+The <A NAME="Ruler_3.htm_IX_VRI_origin">
+ </A>
+<CODE>
+VRI_origin</CODE>
+ field allows you to set an origin for the ruler other than (0,0). The coordinates are given in terms of the main view's coordinate system.</P>
+<P>
+The reference point, used for various types of mouse constraint, is stored in the <A NAME="Ruler_3.htm_IX_VRI_reference">
+ </A>
+<CODE>
+VRI_reference</CODE>
+ field.</P>
+<P>
+<CODE>
+VRI_mouseMark</CODE>
+<A NAME="Ruler_3.htm_IX_VRI_mouseMark">
+ </A>
+ contains the coordinate at which the mouse tick is currently being drawn.</P>
+<P>
+The <A NAME="Ruler_3.htm_IX_VRI_window">
+ </A>
+<CODE>
+VRI_window</CODE>
+ field, initiated automatically, holds the window handle of the main view.</P>
+<P>
+The <A NAME="Ruler_3.htm_IX_VRI_slave">
+ </A>
+<CODE>
+VRI_slave</CODE>
+ field holds the ruler's slave ruler; see the documentation for VRA_MASTER, above, to learn about master and slave rulers.</P>
+<P>
+The<CODE>
+ VRI_grid</CODE>
+<A NAME="Ruler_3.htm_IX_VRI_grid">
+ </A>
+ field contains the information used to maintain the grid associated with a ruler.</P>
+<P>
+The <A NAME="Ruler_3.htm_IX_VRI_vectorSlope">
+ </A>
+<CODE>
+VRI_vectorSlope</CODE>
+ defines the slope of a vector that may be used with vector mouse constraints.</P>
+<P>
+The <A NAME="Ruler_3.htm_IX_VRI_guideArray">
+ </A>
+<CODE>
+VRI_guideArray</CODE>
+ field keeps track of the location where guideline data is stored; this field is initiated automatically.</P>
+<P>
+The <A NAME="Ruler_3.htm_IX_VRI_guideInfluence">
+ </A>
+<CODE>
+VRI_guideInfluence</CODE>
+ contains the influence to use when constraining the mouse position to guidelines. Guidelines will only attract the mouse if it is within a certain distance of them--this distance is the &quot;influence&quot; of the guidelines. It is measured in pixels, not points; thus, the guide influence is independent of scale. </P>
+<P>
+The <A NAME="Ruler_3.htm_IX_VRI_desiredSize">
+ </A>
+<CODE>
+VRI_desiredSize</CODE>
+ field contains the ruler's idea of its ideal thickness. By default, this is set so that the ruler will have room to draw its numbers and tick marks normally; if you will be subclassing the VisRuler to add more gadgetry, you may wish to use a different value here.</P>
+<P>
+The <A NAME="Ruler_3.htm_IX_VRI_invalOD">
+ </A>
+<CODE>
+VRI_invalOD</CODE>
+ field contains the object descriptor of the object which should be redrawn when the ruler needs to draw something differently to the main view; by the ruler's default behavior, this will be updated automatically via a <CODE>
+MSG_VIS_RULER_GAINED_SELECTION</CODE>
+.</P>
+<P>
+The <A NAME="Ruler_3.htm_IX_VRI_transformGState">
+ </A>
+<CODE>
+VRI_transformGState</CODE>
+ field contains the handle of a GState. This GState contains the transformation which is used to transform the coordinate system used with mouse constraints.</P>
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_3.htm_IX_MSG_VIS_RULER_SET_TYPE">
+ </A>
+MSG_VIS_RULER_SET_TYPE</H6>
+<PRE CLASS="syntax">void	MSG_VIS_RULER_SET_TYPE(
+        VisRulerType type);</PRE>
+<P>
+This message sets the <CODE>
+VRI_type</CODE>
+ field.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_3.htm_IX_MSG_VIS_RULER_GET_TYPE">
+ </A>
+MSG_VIS_RULER_GET_TYPE</H6>
+<PRE CLASS="syntax">VisRulerType MSG_VIS_RULER_GET_TYPE();</PRE>
+<P>
+This message returns the value in the <CODE>
+VRI_type</CODE>
+ field.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_3.htm_IX_MSG_VIS_RULER_SET_CONSTRAIN_STRATEGY">
+ </A>
+MSG_VIS_RULER_SET_CONSTRAIN_STRATEGY</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_SET_CONSTRAIN_STRATEGY(
+        VisRulerConstrainStrategy 				setflags,
+        VisRulerConstrainStrategy 				clearflags);</PRE>
+<P>
+This message sets the default mouse constrain strategy for the ruler.</P>
+<P CLASS="refField">
+Parameters:	<EM>setflags</EM>	Flags to set.</P>
+<DL>
+<DT>
+<EM>clearflags</EM></DT><DD>Flags to clear.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_3.htm_IX_MSG_VIS_RULER_GET_CONSTRAIN_STRATEGY">
+ </A>
+MSG_VIS_RULER_GET_CONSTRAIN_STRATEGY</H6>
+<PRE CLASS="syntax">VisRulerConstrainStrategy
+MSG_VIS_RULER_GET_CONSTRAIN_STRATEGY();</PRE>
+<P>
+This message gets the current default constrain strategy for the ruler.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_3.htm_IX_MSG_VIS_RULER_SET_IGNORE_ORIGIN">
+ </A>
+MSG_VIS_RULER_SET_IGNORE_ORIGIN</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_SET_IGNORE_ORIGIN(
+        Boolean 		ignore);</PRE>
+<P>
+This message sets the &quot;ignore origin&quot; state.</P>
+<P CLASS="refField">
+Parameters:	<EM>ignore</EM>	Set <EM>
+true</EM>
+ (i.e. non-zero) to ignore the origin. Set <EM>
+false</EM>
+ (i.e. zero) not to ignore the origin.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_3.htm_IX_MSG_VIS_RULER_SET_ORIGIN">
+ </A>
+MSG_VIS_RULER_SET_ORIGIN</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_SET_ORIGIN(
+        sdword 		pointInt, 
+        word 		pointFrac);</PRE>
+<P>
+Use this message to set the ruler's origin point.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_3.htm_IX_MSG_VIS_RULER_GET_ORIGIN">
+ </A>
+MSG_VIS_RULER_GET_ORIGIN</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_GET_ORIGIN(
+        DWFixedReturn *retval);</PRE>
+<P>
+Use this message to retrieve the ruler's origin point.</P>
+<P CLASS="refField">
+Structures:	</P>
+<PRE>typedef struct {
+	word 		unused;
+	word 		<A NAME="Ruler_3.htm_IX_DWFR_&ldots;"> </A>DWFR_frac;
+	sdword 		DWFR_int;
+} <A NAME="Ruler_3.htm_IX_DWFixedReturn"> </A>DWFixedReturn;</PRE>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_3.htm_IX_MSG_VIS_RULER_SET_REFERENCE">
+ </A>
+MSG_VIS_RULER_SET_REFERENCE</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_SET_REFERENCE( @stack
+        sdword 		yInt, 
+        word 		yFrac, 
+        sdword 		xInt, 
+        word 		xFrac);</PRE>
+<P>
+Set the ruler's reference point.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_3.htm_IX_MSG_VIS_RULER_SET_VECTOR">
+ </A>
+MSG_VIS_RULER_SET_VECTOR</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_SET_VECTOR( @stack
+        sdword 		yInt, 
+        word 		yFrac, 
+        sdword 		xInt, 
+        word 		xFrac);</PRE>
+<P>
+Set the point to use to define the &quot;vector&quot;--together with the reference point, this will form a slope which may be used for mouse constraints. </P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_3.htm_IX_MSG_VIS_RULER_SET_MIN_INCREMENT">
+ </A>
+MSG_VIS_RULER_SET_MIN_INCREMENT</H6>
+<PRE CLASS="syntax">void	MSG_VIS_RULER_SET_MIN_INCREMENT(
+        MinIncrementType min);</PRE>
+<P>
+This message sets the <CODE>
+VRI_minIncrement</CODE>
+ field to the passed value. It must be passed the proper <CODE>
+MinIncrementType</CODE>
+ value.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_3.htm_IX_MSG_VIS_RULER_SET_SCALE">
+ </A>
+MSG_VIS_RULER_SET_SCALE</H6>
+<PRE CLASS="syntax">void	MSG_VIS_RULER_SET_SCALE(
+        WWFixedAsDWord scale);</PRE>
+<P>
+This message sets the <CODE>
+VRI_scale</CODE>
+ field.</P>
+
+<HR>
+<A NAME="Ruler_4.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Ruler Object Library</A>: 4 
+Managing Rulers</H2>
+<P>
+Most ruler functions will happen automatically. However, certain pieces of functionality require that the geode provide certain message handlers. Some geodes may have use for subclassed ruler objects, and subclassing will require further extra code. This section provides information for those who would learn more about how to manage rulers.</P>
+<P CLASS="subsectionLink">
+<A HREF="#Ruler_5.htm">RulerShowControl</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Ruler_6.htm">Mouse Tracking</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Ruler_7.htm">Grid Spacing and Constraint</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Ruler_8.htm">Guide Constraints and Guidelines</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Ruler_9.htm">Other Mouse Constraints</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Ruler_a.htm">Esoteric Messages</A></P>
+<HR>
+<A NAME="Ruler_5.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Ruler Object Library</A>: 4.1 <A HREF="#Ruler_4.htm">Managing Rulers</A>: 
+<A NAME="Ruler_5.htm_89528">
+ </A>
+RulerShowControl</H3>
+<P>
+<A NAME="Ruler_5.htm_IX_RulerShowControlClass">
+ </A>
+The RulerShowControl allows the user to show or hide rulers. This control works by setting RulerViews not usable. However, objects which aren't usable don't work with GCN, and thus you will need to set up some other object to intercept the appropriate notifications. Don't try to include a RulerShowControl unless you know about GCN or are willing to learn.</P>
+<P>
+When declaring your RulerShowControl, you may choose a GCN list which the control will work with. The default list is MANUFACTURER_ID_GEOWORKS:<BR>
+GAGCNLT_DISPLAY_OBJECTS_WITH_RULERS. However, you may change this to be any list you like. You must also specify a message which some object will respond to.</P>
+<P>
+Some object which will be usable when the user has access to the RulerShowControl should be on the control's GCN list. This object must be prepared to handle the message in the <CODE>
+RSCI_message</CODE>
+ field. This message should take a RulerShowControlAttributes structure and set the ruler views usable or not usable accordingly. See <A HREF="#Ruler_5.htm_58469"> Sample Handler for use with RulerShowControl</A>
+ for an example.</P>
+<P CLASS="figTitle">
+Code Display 19-3 RulerShowControl Instance Data and Features</P>
+<PRE>typedef WordFlags <A NAME="Ruler_5.htm_IX_RSCCFeatures"> </A>RSCCFeatures;
+#define <A NAME="Ruler_5.htm_IX_RSCCF_&ldots;"> </A>RSCCF_SHOW_VERTICAL (0x04)
+#define RSCCF_SHOW_HORIZONTAL (0x02)
+#define RSCCF_SHOW_RULERS (0x01)</PRE>
+<PRE>typedef WordFlags <A NAME="Ruler_5.htm_IX_RSCCToolboxFeatures"> </A>RSCCToolboxFeatures;
+/* There are no toolbox features. */</PRE>
+<PRE>#define <A NAME="Ruler_5.htm_IX_RSCC_DEFAULT_&ldots;  constants"> </A>RSCC_DEFAULT_FEATURES (RSCCF_SHOW_VERTICAL | RSCCF_SHOW_HORIZONTAL)
+#define RSCC_DEFAULT_TOOLBOX_FEATURES (0)</PRE>
+<PRE>@instance RulerShowControlAttributes 					RSCI_attrs;
+typedef WordFlags <A NAME="Ruler_5.htm_IX_RulerShowControlAttributes"> </A>RulerShowControlAttributes; 
+#define <A NAME="Ruler_5.htm_IX_RSCA_SHOW_&ldots;"> </A>RSCA_SHOW_VERTICAL 				0x8000
+#define RSCA_SHOW_HORIZONTAL 				0x4000</PRE>
+<PRE>@instance GCNListType 					<A NAME="Ruler_5.htm_IX_RSCI_&ldots;  (RulerShowControl instance)"> </A>RSCI_gcnList; /* object to notify */</PRE>
+<PRE>@instance Message 					RSCI_message; /* message to notify with */</PRE>
+<P CLASS="figTitle">
+Code Display 19-4 <A NAME="Ruler_5.htm_58469">
+ </A>
+Sample Handler for use with RulerShowControl</P>
+<PRE>@method MyDisplayClass, MSG_MD_UPDATE_RULERS
+	/* The RulerShowControl's RSCI_message field should be
+	 * MSG_MD_UPDATE_RULERS. The message should have been declared
+	 * using the RULER_SHOW_CONTROL_NOTIFY prototype. */</PRE>
+<PRE>  if (attrs &amp; RSCA_SHOW_VERTICAL) { 
+	@call LeftView::MSG_GEN_SET_USABLE(VUM_NOW); 
+  }
+  else {
+	@call LeftView::MSG_GEN_SET_NOT_USABLE(VUM_NOW); 
+  }
+  if (attrs &amp; RSCA_SHOW_HORIZONTAL) { 
+	@call TopView::MSG_GEN_SET_USABLE(VUM_NOW); 
+  }
+  else {
+	@call TopView::MSG_GEN_SET_NOT_USABLE(VUM_NOW); 
+  }
+}</PRE>
+<HR>
+<A NAME="Ruler_6.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Ruler Object Library</A>: 4.2 <A HREF="#Ruler_4.htm">Managing Rulers</A>: 
+Mouse Tracking</H3>
+<P>
+The ruler has the ability to show a tick mark which tracks the mouse's movement. This can be a boon to users who wish to know the mouse's precise location. </P>
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_6.htm_IX_MSG_VIS_RULER_SHOW_MOUSE">
+ </A>
+MSG_VIS_RULER_SHOW_MOUSE</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_SHOW_MOUSE();</PRE>
+<P>
+Sets a flag such that the ruler will draw the mouse tick on pointer events.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_6.htm_IX_MSG_VIS_RULER_HIDE_MOUSE">
+ </A>
+MSG_VIS_RULER_HIDE_MOUSE</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_HIDE_MOUSE();</PRE>
+<P>
+Sets a flag such that the ruler won't draw the mouse tick on pointer events.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_6.htm_IX_MSG_VIS_RULER_DRAW_MOUSE_TICK">
+ </A>
+MSG_VIS_RULER_DRAW_MOUSE_TICK</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_DRAW_MOUSE_TICK( @stack
+        sdword 		yInt, 
+        word 		yFrac, 
+        sdword 		xInt, 
+        word 		xFrac);</PRE>
+<P>
+This message indicates that the ruler should draw a line indicating the mouse position and informs the ruler of the mouse's new position. </P>
+
+<HR>
+<A NAME="Ruler_7.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Ruler Object Library</A>: 4.3 <A HREF="#Ruler_4.htm">Managing Rulers</A>: 
+Grid Spacing and Constraint</H3>
+<P>
+Applications which provide rulers often do so to allow the user to work with the mouse more accurately. Such applications might also provide a grid. A grid helps locate the mouse pointer's exact location on the document without the need to watch the ruler. The ruler can also constrain mouse movement to the grid.</P>
+<P>
+<A NAME="Ruler_7.htm_IX_RulerGridControlClass">
+ </A>
+To allow the user to change the grid spacing, include a RulerGridControl. The features structures for the RulerGridControl are shown below.</P>
+<P CLASS="figTitle">
+Code Display 19-5 RulerGridControlClass Features</P>
+<PRE>typedef WordFlags <A NAME="Ruler_7.htm_IX_RGCFeatures"> </A>RGCFeatures; 
+#define <A NAME="Ruler_7.htm_IX_RGCF_&ldots;"> </A>RGCF_GRID_SPACING 				(0x04)
+#define RGCF_SNAP_TO_GRID 				(0x02)
+#define RGCF_SHOW_GRID 				(0x01)</PRE>
+<PRE>#define R<A NAME="Ruler_7.htm_IX_RGC_DEFAULT_&ldots;  constants"> </A>GC_DEFAULT_FEATURES \
+			(RGCF_GRID_SPACING | RGCF_SNAP_TO_GRID | RGCF_SHOW_GRID)</PRE>
+<PRE>#define RGC_DEFAULT_TOOLBOX_FEATURES (0)</PRE>
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_7.htm_IX_MSG_VIS_RULER_SHOW_GRID">
+ </A>
+MSG_VIS_RULER_SHOW_GRID</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_SHOW_GRID(); </PRE>
+<P>
+Use this message to request that the grid be drawn to the main view, setting the VRA_SHOW_GRID flag.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_7.htm_IX_MSG_VIS_RULER_HIDE_GRID">
+ </A>
+MSG_VIS_RULER_HIDE_GRID</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_HIDE_GRID(); </PRE>
+<P>
+Use this message to request that the grid not be drawn to the main view, clearing the VRA_SHOW_GRID flag.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_7.htm_IX_MSG_VIS_RULER_DRAW_GRID">
+ </A>
+MSG_VIS_RULER_DRAW_GRID</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_DRAW_GRID(
+        GStateHandle gstate);</PRE>
+<P>
+This message will draw the grid to the passed GState if the VRA_SHOW_GRID_FLAG is set.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_7.htm_IX_MSG_VIS_RULER_TURN_GRID_SNAPPING_ON">
+ </A>
+MSG_VIS_RULER_TURN_GRID_SNAPPING_ON</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_TURN_GRID_SNAPPING_ON();</PRE>
+<P>
+Set the default <CODE>
+VisRulerConstrainStrategy</CODE>
+ to support grid snapping, setting the VRCS_SNAP_TO_GRID_X_ABSOLUTE and VRCS_SNAP_TO_GRID_Y_ABSOLUTE flags.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_7.htm_IX_MSG_VIS_RULER_TURN_GRID_SNAPPING_OFF">
+ </A>
+MSG_VIS_RULER_TURN_GRID_SNAPPING_OFF</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_TURN_GRID_SNAPPING_OFF();</PRE>
+<P>
+Set the default <CODE>
+VisRulerConstrainStrategy</CODE>
+ to not include grid snapping, turning off the VRCS_SNAP_TO_GRID_X_ABSOLUTE and VRCS_SNAP_TO_GRID_Y_ABSOLUTE flags.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_7.htm_IX_MSG_VIS_RULER_SET_GRID_SPACING">
+ </A>
+MSG_VIS_RULER_SET_GRID_SPACING</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_SET_GRID_SPACING(
+        WWFixedAsDWord spacing);</PRE>
+<P>
+Set the grid's horizontal and vertical spacing, working with the <CODE>
+VRI_grid</CODE>
+ field.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_7.htm_IX_MSG_VIS_RULER_SET_HORIZONTAL_GRID_SPACING">
+ </A>
+MSG_VIS_RULER_SET_HORIZONTAL_GRID_SPACING</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_SET_HORIZONTAL_GRID_SPACING(
+        WWFixedAsDWord spacing);</PRE>
+<P>
+Set the horizontal grid spacing, leaving the vertical alone.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_7.htm_IX_MSG_VIS_RULER_SET_VERTICAL_GRID_SPACING">
+ </A>
+MSG_VIS_RULER_SET_VERTICAL_GRID_SPACING</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_SET_VERTICAL_GRID_SPACING(
+        WWFixedAsDWord spacing);</PRE>
+<P>
+Set the vertical grid spacing, leaving the horizontal alone</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_7.htm_IX_MSG_VIS_RULER_GET_GRID_SPACING">
+ </A>
+MSG_VIS_RULER_GET_GRID_SPACING</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_GET_GRID_SPACING(
+        GridSpacing* gridspace);</PRE>
+<P>
+This message returns the current grid spacing.</P>
+<P CLASS="refField">
+Structures:	This message works with the <CODE>
+GridSpacing</CODE>
+ structure. Do not confuse this structure with the <CODE>
+Grid</CODE>
+ structure.</P>
+<PRE>typedef struct {
+	WWFixed GS_y;
+	WWFixed GS_x;
+} GridSpacing;</PRE>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_7.htm_IX_MSG_VIS_RULER_GET_STRATEGIC_GRID_SPACING">
+ </A>
+MSG_VIS_RULER_GET_STRATEGIC_GRID_SPACING</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_GET_STRATEGIC_GRID_SPACING(
+        GridSpacing* gridspace);</PRE>
+<P>
+This message returns a grid spacing that will look nice on the screen at the current scale factor.</P>
+<P CLASS="refField">
+Structures:	This message works with the <CODE>
+GridSpacing</CODE>
+ structure. Do not confuse this structure with the <CODE>
+Grid</CODE>
+ structure.</P>
+<PRE>typedef struct {
+	WWFixed GS_y;
+	WWFixed GS_x;
+} <A NAME="Ruler_7.htm_IX_GS_&ldots;  (GridSpacing structure)"> </A><A NAME="IX_GridSpacing"> </A>GridSpacing;</PRE>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_7.htm_IX_MSG_VIS_RULER_SNAP_TO_GRID">
+ </A>
+MSG_VIS_RULER_SNAP_TO_GRID</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_SNAP_TO_GRID(
+        PointDWFixed _far* point);</PRE>
+<P>
+This message snaps the passed coordinate to the grid.</P>
+<P CLASS="refField">
+Parameters:	<EM>point</EM>	Point to snap to grid.</P>
+<P CLASS="refField">
+Return:	Nothing returned explicitly, however structure in <EM>point</EM> modified so that point is snapped to grid.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_7.htm_IX_MSG_VIS_RULER_SNAP_TO_GRID_X">
+ </A>
+MSG_VIS_RULER_SNAP_TO_GRID_X</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_SNAP_TO_GRID_X(
+        PointDWFixed _far* point);</PRE>
+<P>
+Snap the passed point's <EM>
+x</EM>
+ coordinate to the grid.</P>
+<P CLASS="refField">
+Parameters:	<EM>point</EM>	Point to snap to grid.</P>
+<P CLASS="refField">
+Return:	Nothing returned explicitly, however structure in <EM>point</EM> modified so that point is snapped to grid.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_7.htm_IX_MSG_VIS_RULER_SNAP_TO_GRID_Y">
+ </A>
+MSG_VIS_RULER_SNAP_TO_GRID_Y</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_SNAP_TO_GRID_Y(
+        PointDWFixed _far* point);</PRE>
+<P>
+Snap the passed point's <EM>
+y</EM>
+ coordinate to the grid.</P>
+<P CLASS="refField">
+Parameters:	<EM>point</EM>	Point to snap to grid.</P>
+<P CLASS="refField">
+Return:	Nothing returned explicitly, however structure in <EM>point</EM> modified so that point is snapped to grid.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_7.htm_IX_MSG_VIS_RULER_SNAP_RELATIVE_TO_REFERENCE">
+ </A>
+MSG_VIS_RULER_SNAP_RELATIVE_TO_REFERENCE</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_SNAP_RELATIVE_TO_REFERENCE(
+        PointDWFixed _far* point);</PRE>
+<P>
+Returns the point closest to the passed point that is an integral number of grid spacings from the reference point.</P>
+<P CLASS="refField">
+Parameters:	<EM>point</EM>	Point to snap.</P>
+<P CLASS="refField">
+Return:	Nothing returned explicitly, however structure in <EM>point</EM> modified so that point is snapped.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_7.htm_IX_MSG_VIS_RULER_SNAP_RELATIVE_TO_REFERENCE_X">
+ </A>
+MSG_VIS_RULER_SNAP_RELATIVE_TO_REFERENCE_X</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_SNAP_RELATIVE_TO_REFERENCE_X(
+        PointDWFixed _far* point);</PRE>
+<P>
+Returns the point horizontally closest to the passed point that is an integral number of grid spacings from the reference point.</P>
+<P CLASS="refField">
+Parameters:	<EM>point</EM>	Point to snap.</P>
+<P CLASS="refField">
+Return:	Nothing returned explicitly, however structure in <EM>point</EM> modified so that point is snapped.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_7.htm_IX_MSG_VIS_RULER_SNAP_RELATIVE_TO_REFERENCE_Y">
+ </A>
+MSG_VIS_RULER_SNAP_RELATIVE_TO_REFERENCE_Y</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_SNAP_RELATIVE_TO_REFERENCE_Y(
+        PointDWFixed _far* point);</PRE>
+<P>
+Returns the point vertically closest to the passed point that is an integral number of grid spacings from the reference point.</P>
+<P CLASS="refField">
+Parameters:	<EM>point</EM>	Point to snap.</P>
+<P CLASS="refField">
+Return:	Nothing returned explicitly, however structure in <EM>point</EM> modified so that point is snapped.</P>
+
+<HR>
+<A NAME="Ruler_8.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Ruler Object Library</A>: 4.4 <A HREF="#Ruler_4.htm">Managing Rulers</A>: 
+Guide Constraints and Guidelines</H3>
+<P>
+<A NAME="Ruler_8.htm_IX_RulerGuideControlClass">
+ </A>
+Sometimes the user will want to have some guidelines that do not conform to a regular grid. The user may set up their own guidelines. Normally to allow the use of guidelines, your application should include a RulerGuideControl object. The features structures for this controller class are shown below.</P>
+<P CLASS="figTitle">
+Code Display 19-6 RulerGuideControlClass Features</P>
+<PRE>typedef WordFlags <A NAME="Ruler_8.htm_IX_RulerGuideControlFeatures"> </A>RulerGuideControlFeatures; 
+#define <A NAME="Ruler_8.htm_IX_RGCF_&ldots;"> </A>RGCF_HV 			(0x08)
+#define RGCF_LIST 			(0x04)
+#define RGCF_POSITION 			(0x02)
+#define RGCF_DELETE 			(0x01)</PRE>
+<PRE>#define <A NAME="Ruler_8.htm_IX_RULER_GUIDE_CONTROL_DEFAULT_FEATURES constant"> </A>RULER_GUIDE_CONTROL_DEFAULT_FEATURES \
+			(RGCF_HV | RGCF_LIST | RGCF_POSITION | RGCF_DELETE)</PRE>
+<P>
+The following messages allow for the use and manipulation of guidelines.</P>
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_8.htm_IX_MSG_VIS_RULER_TURN_GUIDES_SNAPPING_ON">
+ </A>
+MSG_VIS_RULER_TURN_GUIDES_SNAPPING_ON</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_TURN_GUIDES_SNAPPING_ON();</PRE>
+<P>
+Set the default VisRulerConstrainStrategy to include guides snapping, turning on the VRCS_SNAP_TO_GUIDES_X and VRCS_SNAP_TO_GUIDES_Y flags.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_8.htm_IX_MSG_VIS_RULER_TURN_GUIDES_SNAPPING_OFF">
+ </A>
+MSG_VIS_RULER_TURN_GUIDES_SNAPPING_OFF</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_TURN_GUIDES_SNAPPING_OFF();</PRE>
+<P>
+Set the default VisRulerConstrainStrategy to not include guides snapping, turning off the VRCS_SNAP_TO_GUIDES_X and VRCS_SNAP_TO_GUIDES_Y flags.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_8.htm_IX_MSG_VIS_RULER_CREATE_GUIDE_ARRAY">
+ </A>
+MSG_VIS_RULER_CREATE_GUIDE_ARRAY</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_CREATE_GUIDE_ARRAY();</PRE>
+<P>
+By default, the VisRuler stores its guides in a chunk array, known as a guide array. If the ruler has no guides defined, it doesn't bother keeping this data structure around. When the first guide is created, the VisRuler will send itself this message, to which it will respond by setting up the data region.</P>
+<P>
+Subclasses might intercept this message if they have data structures which need initializing when the first guide is created.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_8.htm_IX_MSG_VIS_RULER_ADD_HORIZONTAL_GUIDE">
+ </A>
+MSG_VIS_RULER_ADD_HORIZONTAL_GUIDE</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_ADD_HORIZONTAL_GUIDE( @stack
+        sdword 		dwfInt, 
+        word 		dwfFrac);</PRE>
+<P>
+Use this message to add a horizontal guide.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_8.htm_IX_MSG_VIS_RULER_ADD_VERTICAL_GUIDE">
+ </A>
+MSG_VIS_RULER_ADD_VERTICAL_GUIDE</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_ADD_VERTICAL_GUIDE( @stack
+        sdword 		dwfInt, 
+        word 		dwfFrac);</PRE>
+<P>
+Use this message to add a vertical guide.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_8.htm_IX_MSG_VIS_RULER_DRAW_GUIDES">
+ </A>
+MSG_VIS_RULER_DRAW_GUIDES</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_DRAW_GUIDES(
+        GStateHandle gstate);</PRE>
+<P>
+Use this message to draw guidelines to a document. The default VisRuler handler for this message will draw the lines at the appropriate coordinates to the passed GState.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_8.htm_IX_MSG_VIS_RULER_DRAW_GUIDE_INDICATORS">
+ </A>
+MSG_VIS_RULER_DRAW_GUIDE_INDICATORS</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_DRAW_GUIDE_INDICATORS();</PRE>
+<P>
+This message asks the VisRuler to draw tick-marks on itself to show the positions of guides. The default VisRuler has no handler for this message; subclasses are welcome to intersect it and draw indicators appropriately.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_8.htm_IX_MSG_VIS_RULER_SNAP_TO_GUIDES">
+ </A>
+MSG_VIS_RULER_SNAP_TO_GUIDES</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_SNAP_TO_GUIDES(
+        PointDWFixed _far* point);</PRE>
+<P>
+Use this message to snap the passed point to the guides.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_8.htm_IX_MSG_VIS_RULER_SNAP_TO_GUIDES_X">
+ </A>
+MSG_VIS_RULER_SNAP_TO_GUIDES_X</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_SNAP_TO_GUIDES_X(
+        PointDWFixed _far* point);</PRE>
+<P>
+Use this message to horizontally snap the passed point to the guides.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_8.htm_IX_MSG_VIS_RULER_SNAP_TO_GUIDES_Y">
+ </A>
+MSG_VIS_RULER_SNAP_TO_GUIDES_Y</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_SNAP_TO_GUIDES_Y(
+        PointDWFixed _far* point);</PRE>
+<P>
+Use this message to vertically snap the passed point to the guides.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_8.htm_IX_MSG_VIS_RULER_GET_GUIDE_INFLUENCE">
+ </A>
+MSG_VIS_RULER_GET_GUIDE_INFLUENCE</H6>
+<PRE CLASS="syntax">word MSG_VIS_RULER_GET_GUIDE_INFLUENCE();</PRE>
+<P>
+Guidelines will only affect the mouse if the mouse pointer lies within the guide's area of influence. This message returns the present influence value.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_8.htm_IX_MSG_VIS_RULER_SET_GUIDE_INFLUENCE">
+ </A>
+MSG_VIS_RULER_SET_GUIDE_INFLUENCE</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_SET_GUIDE_INFLUENCE(
+        word influence);</PRE>
+<P>
+Guidelines will only affect the mouse if the mouse pointer lies within the guide's area of influence. This message sets the influence distance, measured in pixels.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_8.htm_IX_MSG_VIS_RULER_SELECT_HORIZONTAL_GUIDE">
+ </A>
+MSG_VIS_RULER_SELECT_HORIZONTAL_GUIDE</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_SELECT_HORIZONTAL_GUIDE( @stack
+        sdword 		dwfInt, 
+        word 		dwfFrac);</PRE>
+<P>
+Use this message to select a horizontal guide at the passed coordinates, if any. Note that only one horizontal guide may be selected at any time.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_8.htm_IX_MSG_VIS_RULER_SELECT_VERTICAL_GUIDE">
+ </A>
+MSG_VIS_RULER_SELECT_VERTICAL_GUIDE</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_SELECT_VERTICAL_GUIDE( @stack
+        sdword 		dwfInt, 
+        word 		dwfFrac);</PRE>
+<P>
+Use this message to select a vertical guide at the passed coordinates, if any. Note that only one vertical guide may be selected at any time.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_8.htm_IX_MSG_VIS_RULER_DESELECT_ALL_HORIZONTAL_GUIDES">
+ </A>
+MSG_VIS_RULER_DESELECT_ALL_HORIZONTAL_GUIDES</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_DESELECT_ALL_HORIZONTAL_GUIDES();</PRE>
+<P>
+Use this message to deselect all of the ruler's horizontal guides.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_8.htm_IX_MSG_VIS_RULER_DESELECT_ALL_VERTICAL_GUIDES">
+ </A>
+MSG_VIS_RULER_DESELECT_ALL_VERTICAL_GUIDES</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_DESELECT_ALL_VERTICAL_GUIDES();</PRE>
+<P>
+Use this message to deselect all of the ruler's vertical guides.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_8.htm_IX_MSG_VIS_RULER_DELETE_HORIZONTAL_GUIDE">
+ </A>
+MSG_VIS_RULER_DELETE_HORIZONTAL_GUIDE</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_DELETE_HORIZONTAL_GUIDE( @stack 
+        sdword 		dwfInt, 
+        word 		dwfFrac);</PRE>
+<P>
+Use this message to delete the horizontal guide at the passed coordinate, if any.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_8.htm_IX_MSG_VIS_RULER_DELETE_VERTICAL_GUIDE">
+ </A>
+MSG_VIS_RULER_DELETE_VERTICAL_GUIDE</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_DELETE_VERTICAL_GUIDE( @stack 
+        sdword 		dwfInt, 
+        word 		dwfFrac);</PRE>
+<P>
+Use this message to delete the vertical guide at the passed coordinate, if any.</P>
+
+<HR>
+<A NAME="Ruler_9.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Ruler Object Library</A>: 4.5 <A HREF="#Ruler_4.htm">Managing Rulers</A>: 
+Other Mouse Constraints</H3>
+<P>
+Up until now, we have discussed various ways to constrain mouse movement to grid- or guide-lines. However, other constraints are possible, and may be accessed through the following messages.</P>
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_9.htm_IX_MSG_VIS_RULER_CONSTRAIN_TO_AXES">
+ </A>
+MSG_VIS_RULER_CONSTRAIN_TO_AXES</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_CONSTRAIN_TO_AXES(
+        PointDWFixed _far* point);</PRE>
+<P>
+Use this message to constrain the mouse to the axes; that is to force it to be in line either horizontally or vertically with the reference point (the point stored in <CODE>
+VRI_reference</CODE>
+).</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_9.htm_IX_MSG_VIS_RULER_CONSTRAIN_TO_HORIZONTAL_AXIS">
+ </A>
+MSG_VIS_RULER_CONSTRAIN_TO_HORIZONTAL_AXIS</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_CONSTRAIN_TO_HORIZONTAL_AXIS(
+        PointDWFixed _far* point);</PRE>
+<P>
+Use this message to constrain the mouse horizontally, forcing it to be in line horizontally with the reference point (the point stored in <CODE>
+VRI_reference</CODE>
+).</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_9.htm_IX_MSG_VIS_RULER_CONSTRAIN_TO_VERTICAL_AXIS">
+ </A>
+MSG_VIS_RULER_CONSTRAIN_TO_VERTICAL_AXIS</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_CONSTRAIN_TO_VERTICAL_AXIS(
+        PointDWFixed _far* point);</PRE>
+<P>
+Use this message to constrain the mouse vertically, forcing it to be in line vertically with the reference point (the point stored in <CODE>
+VRI_reference</CODE>
+).</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_9.htm_IX_MSG_VIS_RULER_CONSTRAIN_TO_DIAGONALS">
+ </A>
+MSG_VIS_RULER_CONSTRAIN_TO_DIAGONALS</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_CONSTRAIN_TO_DIAGONALS(
+        PointDWFixed _far* point);</PRE>
+<P>
+Use this message to constrain the mouse to the diagonal axes; that is to force it to be on a line 45 degrees through the reference point (the point stored in <CODE>
+VRI_reference</CODE>
+).</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_9.htm_IX_MSG_VIS_RULER_SET_CONSTRAIN_TRANSFORM">
+ </A>
+MSG_VIS_RULER_SET_CONSTRAIN_TRANSFORM</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_SET_CONSTRAIN_TRANSFORM(
+        TransMatrix* tm)</PRE>
+<P>
+Use this message to impose a transformation on the coordinate system used to constrain the mouse. You can see this at work in GeoDraw when resizing an object which has been rotated or skewed.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_9.htm_IX_MSG_VIS_RULER_CLEAR_CONSTRAIN_TRANSFORM">
+ </A>
+MSG_VIS_RULER_CLEAR_CONSTRAIN_TRANSFORM</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_CLEAR_CONSTRAIN_TRANSFORM();</PRE>
+<P>
+Use this message to remove any transformation on the coordinate system used to constrain the mouse. </P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_9.htm_IX_MSG_VIS_RULER_CONSTRAIN_X_TO_UNITY_SLOPE_AXIS">
+ </A>
+MSG_VIS_RULER_CONSTRAIN_X_TO_UNITY_SLOPE_AXIS</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_CONSTRAIN_X_TO_UNITY_SLOPE_AXIS(
+        PointDWFixed _far* point);</PRE>
+<P>
+Use this message to determine the coordinates resulting from horizontally snapping a given point to the Northeast diagonal line passing through the reference point.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_9.htm_IX_MSG_VIS_RULER_CONSTRAIN_Y_TO_UNITY_SLOPE_AXIS">
+ </A>
+MSG_VIS_RULER_CONSTRAIN_Y_TO_UNITY_SLOPE_AXIS</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_CONSTRAIN_Y_TO_UNITY_SLOPE_AXIS(
+        PointDWFixed _far* point);</PRE>
+<P>
+Use this message to determine the coordinates resulting from vertically snapping a given point to the Northeast diagonal line passing through the reference point.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_9.htm_IX_MSG_VIS_RULER_CONSTRAIN_X_TO_NEGATIVE_SLOPE_AXIS">
+ </A>
+MSG_VIS_RULER_CONSTRAIN_X_TO_NEGATIVE_SLOPE_AXIS</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_CONSTRAIN_X_TO_NEGATIVE_SLOPE_AXIS(
+        PointDWFixed _far* point);</PRE>
+<P>
+Use this message to determine the coordinates resulting from horizontally snapping a given point to the Southeast diagonal line passing through the reference point.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_9.htm_IX_MSG_VIS_RULER_CONSTRAIN_Y_TO_NEGATIVE_SLOPE_AXIS">
+ </A>
+MSG_VIS_RULER_CONSTRAIN_Y_TO_NEGATIVE_SLOPE_AXIS</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_CONSTRAIN_Y_TO_NEGATIVE_SLOPE_AXIS(
+        PointDWFixed _far* point);</PRE>
+<P>
+Use this message to determine the coordinates resulting from horizontally snapping a given point to the Southeast diagonal line passing through the reference point.</P>
+
+
+<H6 CLASS="RefETitle">
+MSG_VIS_RULER_CONSTRAIN_TO_VECTOR</H6>
+<PRE CLASS="syntax">@message void MSG_VIS_RULER_CONSTRAIN_TO_VECTOR(
+        PointDWFixed _far* point);</PRE>
+<P>
+This message computes the point resulting from constraining the passed point using vector constraint. This means that the mouse's constrained location will end up at a certain angle from the reference angle. This angle is determined by means of a point set up my <CODE>
+MSG_VIS_RULER_SET_VECTOR</CODE>
+. This constraint will constrain the point either to the vector line or to that line's reflection.</P>
+
+
+<H6 CLASS="RefETitle">
+MSG_VIS_RULER_CONSTRAIN_X_TO_VECTOR</H6>
+<PRE CLASS="syntax">@message void MSG_VIS_RULER_CONSTRAIN_X_TO_VECTOR(
+        PointDWFixed _far* point);</PRE>
+<P>
+This message computes the point resulting from horizontally constraining the passed point to the line going through the reference point with the present vector slope.</P>
+
+
+<H6 CLASS="RefETitle">
+MSG_VIS_RULER_CONSTRAIN_X_TO_VECTOR_REFLECTION</H6>
+<PRE CLASS="syntax">@message void MSG_VIS_RULER_CONSTRAIN_X_TO_VECTOR_REFLECTION(
+        PointDWFixed _far* point);</PRE>
+<P>
+This message computes the point resulting from horizontally constraining the passed point to the line going through the reference point with the negative of the present vector slope.</P>
+
+
+<H6 CLASS="RefETitle">
+MSG_VIS_RULER_CONSTRAIN_Y_TO_VECTOR</H6>
+<PRE CLASS="syntax">@message void MSG_VIS_RULER_CONSTRAIN_Y_TO_VECTOR(
+        PointDWFixed _far* point);</PRE>
+<P>
+This message computes the point resulting from vertically constraining the passed point to the line going through the reference point with the present vector slope.</P>
+
+
+<H6 CLASS="RefETitle">
+MSG_VIS_RULER_CONSTRAIN_Y_TO_VECTOR_REFLECTION</H6>
+<PRE CLASS="syntax">@message void MSG_VIS_RULER_CONSTRAIN_Y_TO_VECTOR_REFLECTION(
+        PointDWFixed _far* point);</PRE>
+<P>
+This message computes the point resulting from vertically constraining the passed point to the line going through the reference point with the negative of the present vector slope.</P>
+
+<HR>
+<A NAME="Ruler_a.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Ruler Object Library</A>: 4.6 <A HREF="#Ruler_4.htm">Managing Rulers</A>: 
+Esoteric Messages</H3>
+<P>
+For the most part, the ruler will work together with the main view to coordinate updates. This is done by means of messages going to the ruler. Subclasses of VisRulerClass might conceivably intercept these messages to alter behavior.</P>
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_a.htm_IX_MSG_VIS_RULER_GAINED_SELECTION">
+ </A>
+MSG_VIS_RULER_GAINED_SELECTION</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_GAINED_SELECTION(
+        optr 		dest);</PRE>
+<P>
+This message notifies the ruler that the ruled object (the object in the main view) is selected and the ruler should update its UI to reflect its own attributes. </P>
+<P CLASS="refField">
+Parameters:	<EM>dest</EM>	Object to send messages to whenever a change in ruler settings should result in the ruled object being redrawn (e.g. when the user wants to draw the grid).</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_a.htm_IX_MSG_VIS_RULER_LOST_SELECTION">
+ </A>
+MSG_VIS_RULER_LOST_SELECTION</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_LOST_SELECTION();</PRE>
+<P>
+This message notifies the ruler that the ruled object is no longer selected.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_a.htm_IX_MSG_VIS_RULER_UPDATE_CONTROLLERS">
+ </A>
+MSG_VIS_RULER_UPDATE_CONTROLLERS</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_UPDATE_CONTROLLERS();</PRE>
+<P>
+This message signals that the ruler should update its associated controllers.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_a.htm_IX_MSG_VIS_RULER_UPDATE_TYPE_CONTROLLER">
+ </A>
+MSG_VIS_RULER_UPDATE_TYPE_CONTROLLER</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_UPDATE_TYPE_CONTROLLER();</PRE>
+<P>
+This message signals that the ruler should update its type controller, if any.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_a.htm_IX_MSG_VIS_RULER_UPDATE_GRID_CONTROLLER">
+ </A>
+MSG_VIS_RULER_UPDATE_GRID_CONTROLLER</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_UPDATE_GRID_CONTROLLER(); </PRE>
+<P>
+This message signals that the ruler should update its grid controller, if any.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_a.htm_IX_MSG_VIS_RULER_UPDATE_GUIDE_CONTROLLER">
+ </A>
+MSG_VIS_RULER_UPDATE_GUIDE_CONTROLLER</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_UPDATE_GUIDE_CONTROLLER();</PRE>
+<P>
+This message signals that the ruler should update its guide controller, if any.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_a.htm_IX_MSG_VIS_RULER_COMBINE_GUIDE_INFO">
+ </A>
+MSG_VIS_RULER_COMBINE_GUIDE_INFO</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_COMBINE_GUIDE_INFO(
+        MemHandle data); 		/* Handle of block containing
+			   VisRulerNotifyGuideChangeBlockHeader*/</PRE>
+<P>
+This message allows the horizontal and vertical rulers to load their respective guide information into a single structure so that the information can be collated and passed on to a RulerGuideControl.</P>
+<P CLASS="refField">
+Structures:	</P>
+<PRE>typedef struct {
+	LMemBlockHeader 			<A NAME="Ruler_a.htm_IX_VRNGCBH_&ldots;"> </A>VRNGCBH_header;
+	word 			VRNGCBH_vertGuideArray;
+	word 			VRNGCBH_horizGuideArray;
+} <A NAME="Ruler_a.htm_IX_VisRulerNotifyGuideChangeBlockHeader"> </A>VisRulerNotifyGuideChangeBlockHeader;</PRE>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_a.htm_IX_MSG_VIS_RULER_VIEW_SCALE_FACTOR_CHANGED">
+ </A>
+MSG_VIS_RULER_VIEW_SCALE_FACTOR_CHANGED</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_VIEW_SCALE_FACTOR_CHANGED( @stack
+        WindowHandle 		viewWindow,
+        WWFixedAsDWord 		yScaleFactor,
+        WWFixedAsDWord 		xScaleFactor);</PRE>
+<P>
+The ruler will receive this message when the main view's scale factor changes. Specifically, when the RulerContent `s scale is changing (which will happen because of the RulerView's link to the main view), its handler for <CODE>
+MSG_META_CONTENT_VIEW_SCALE_FACTOR_CHANGED</CODE>
+ sends this message to the VisRuler.</P>
+
+
+<H6 CLASS="RefETitle">
+MSG_VIS_RULER_GET_DESIRED_SIZE</H6>
+<PRE CLASS="syntax">@message word MSG_VIS_RULER_GET_DESIRED_SIZE();</PRE>
+<P>
+This message returns how much space the ruler thinks it needs to draw the numbers and hatch marks. </P>
+<P CLASS="refField">
+Interception:	This method should be subclassed if the subclassed ruler's size needs to vary with respect to scale factor, whether the ruler is horizontal or vertical, or whatever size seems appropriate.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Ruler_a.htm_IX_MSG_VIS_RULER_INVALIDATE_WITH_SLAVES">
+ </A>
+MSG_VIS_RULER_INVALIDATE_WITH_SLAVES</H6>
+<PRE CLASS="syntax">void MSG_VIS_RULER_INVALIDATE_WITH_SLAVES();</PRE>
+<P>
+The ruler's default behavior will result in it redrawing itself at appropriate times. Depending on what use you put your ruler to, you may have to force it to redraw itself. If so, you should probably use this message.</P>
+<P>
+&nbsp;</P>
+
+<HR>
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+</BODY>
+</HTML>

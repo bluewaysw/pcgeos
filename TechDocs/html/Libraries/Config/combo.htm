@@ -1,0 +1,1518 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+<!-- This page was automatically generated from a bunch of smaller pages. -->
+<META NAME="copyright" CONTENT="Copyright GEOWORKS">
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+<TITLE>Config Library</TITLE>
+</HEAD>
+<BODY BGCOLOR="#ffffdf">
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+<A NAME="index.htm"></A>
+
+
+
+<H1 CLASS="chapterTitle">
+
+<A NAME="index.htm_97933">
+ </A>
+Config Library
+
+</H1>
+<P>
+<A NAME="index.htm_IX_Config library">
+ </A>
+<A NAME="index.htm_IX_Preferences modules">
+ </A>
+Not all users are the same; not all computing environments are the same. Often some part of an application allows the user to tailor the UI to his wishes. The user may wish to specify some preferences at a system level rather than on an application level. To do this, the user will look to the Preferences Manager application. The <STRONG CLASS="fileName">
+config</STRONG>
+ library provides mechanisms for writing Preferences modules.</P>
+<P>
+Normally the purpose of a Preferences module's gadgetry is to set up some information in the user's .INI file. If you are encouraging other developers to take advantage of the configuration done by your module, be sure to document the .INI file categories and keys affected. </P>
+<P>
+There are three main tasks involved in writing a Preferences module:</P>
+<UL>
+<LI>
+Providing a tree of UI gadgetry which will act as the module's dialog box.</LI>
+<LI>
+Providing information Preferences will use to construct the module's button.</LI>
+<LI>
+Providing any underlying functionality other than writing information to the .INI file.</LI>
+</UL>
+<P>
+The first two routines exported in the module's .gp file will be responsible for carrying out the first two of these tasks. The final task is difficult to define--it will depend on the nature of your module.</P>
+<P>
+Preferences modules written in C will need one more thing. To indicate that the preferences module is compatible with the standard GEOS 2.0 Preferences Manager applications, the module will need a local.mk makefile for compilation, and that local.mk file should include a line that reads:</P>
+<PRE>_PROTO = 2.0</PRE>
+<P>
+For information about local.mk files, see <A HREF="../../Tools/Tools/TTools_12.htm">the Using Tools chapter</A>.</P>
+<P>
+Before you try to write a Preference module, there are some things you should already know. Each module is a library, so be sure to read <A HREF="../../Programming/Libraries/index.htm">the Libraries chapter.</A> to find out how to write a GEOS library. It will let you know, among other things, that you must place the &quot;c-api&quot; flag in your library's GP file if its entry points are in C.
+.
+
+</P>
+<P CLASS="sectionlinks">
+<STRONG>
+&nbsp;&nbsp;<A HREF="#Config_1.htm">1 Providing the UI</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Config_2.htm">1.1 Designing the UI Tree.</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Config_3.htm">1.2 UI Fetch Routine</A><BR>
+&nbsp;&nbsp;<A HREF="#Config_4.htm">2 Module Information Routine</A><BR>
+&nbsp;&nbsp;<A HREF="#Config_5.htm">3 Important Messages</A><BR>
+&nbsp;&nbsp;<A HREF="#Config_6.htm">4 Object Class Reference</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Config_7.htm">4.1 PrefClass</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Config_8.htm">4.2 PrefValueClass</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Config_9.htm">4.3 PrefItemGroupClass</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Config_a.htm">4.4 PrefStringItemClass</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Config_b.htm">4.5 PrefBooleanGroupClass</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Config_c.htm">4.6 PrefDynamicListClass</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Config_d.htm">4.7 TitledGlyphClass</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Config_e.htm">4.8 PrefInteractionClass</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Config_f.htm">4.9 PrefDialogClass</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Config_10.htm">4.10 PrefTextClass</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Config_11.htm">4.11 PrefControlClass</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Config_12.htm">4.12 PrefTimeDateControlClass</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Config_13.htm">4.13 PrefTriggerClass</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Config_14.htm">4.14 PrefTocListClass</A><BR>
+</STRONG>
+</P> <!-- end of sectionlinks blob -->
+
+<HR>
+<A NAME="Config_1.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Config Library</A>: 1 
+Providing the UI</H2>
+<P>
+There are two steps to providing the UI for your preferences module. The first is to declare the objects you will use. The second is to write and export a routine which returns the head of the tree of UI gadgetry.
+<IMG SRC="Config_1_ui.gif">
+
+</P>
+<P CLASS="subsectionLink">
+<A HREF="#Config_2.htm">Designing the UI Tree.</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Config_3.htm">UI Fetch Routine</A></P>
+<HR>
+<A NAME="Config_2.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Config Library</A>: 1.1 <A HREF="#Config_1.htm">Providing the UI</A>: 
+Designing the UI Tree.</H3>
+<P>
+Preferences modules present a dialog box to the user. You will need to design the dialog for your module. As you do so, you may find objects of the following classes useful. Each of the following classes is based upon one of the Generic UI classes.</P>
+<P>
+GenClass provides mechanisms by which objects will read and write values to the .INI file. Pref- classes provide further functionality, such as storing an &quot;original&quot; value to revert to if the user decides to Cancel their changes. </P>
+<P>
+The following Pref- classes are available:</P>
+<DL>
+<DT>
+<STRONG>
+PrefDialogClass</DT><DD>
+</STRONG>
+This class specializes in acting as the root of a Pref module's UI tree. It has been set up to provide &quot;OK&quot; and &quot;Cancel&quot; triggers by default. It has a mechanism to restart the system on an Apply if the module specifies that such a reset will be necessary to implement the user's changes.<BR>
+Often a module will use a subclass of <CODE>
+PrefDialogClass</CODE>
+ as the head of its UI tree--often the subclass intercepts <CODE>
+MSG_GEN_APPLY</CODE>
+ to ensure valid user choices and to take other appropriate actions.</DD>
+<DT>
+<STRONG>
+PrefValueClass</DT><DD>
+</STRONG>
+PrefValue objects act like objects of <CODE>
+GenValueClass</CODE>
+. However, these objects have the ability to reset their values to that originally stored in the .INI file (in case the user wants to cancel). They can handle only word-length values.</DD>
+<DT>
+<STRONG>
+PrefItemGroupClass</DT><DD>
+</STRONG>
+Objects of this class act like GenItemGroups. In addition, this class has the ability to store an &quot;original&quot; value. </DD>
+<DT>
+<STRONG>
+PrefStringItemClass</DT><DD>
+</STRONG>
+A PrefItemGroup normally writes data about selected items in the form of an integer. However, if its children are PrefStringItem objects, the PrefItemGroup can instead write out a special string associated with each PrefStringItem, resulting in a more readable .INI file.</DD>
+<DT>
+<STRONG>
+PrefBooleanGroupClass</DT><DD>
+</STRONG>
+This class acts like <CODE>
+GenBooleanGroupClass</CODE>
+ with the ability to store an &quot;original&quot; value.</DD>
+<DT>
+<STRONG>
+PrefDynamicListClass</DT><DD>
+</STRONG>
+Use objects of this class where you might otherwise use a GenDynamicList. This class will not work together with PrefStringItem objects.</DD>
+<DT>
+<STRONG>
+PrefTocListClass</DT><DD>
+</STRONG>
+This class presents an alphabetized list of files or driver names. It is used to provide lists of devices, such as the list of available printers. It can also be used to show a list of files with a given token in a given directory.</DD>
+<DT>
+<STRONG>
+TitledGlyphClass</DT><DD>
+</STRONG>
+This specialized subclass of GenGlyph shows both an icon and a text moniker. It is used to present the icon and name at the top of a typical Preferences module dialog box.</DD>
+<DT>
+<STRONG>
+PrefInteractionClass</DT><DD>
+</STRONG>
+This class acts like <CODE>
+GenInteractionClass</CODE>
+, but also will relay certain messages to its children which GenInteraction would not. Those objects which will need to work with the .INI file should receive these messages, so any Gen- objects which will work with the .INI file and any Pref objects should be grouped under PrefInteractions instead of GenInteractions.</DD>
+<DT>
+<STRONG>
+PrefTextClass</DT><DD>
+</STRONG>
+This class behaves like <CODE>
+GenTextClass</CODE>
+, except that it will load and save its value based upon that stored in the .INI file.</DD>
+<DT>
+<STRONG>
+PrefTriggerClass</DT><DD>
+</STRONG>
+This class acts as does GenTriggerClass, but has an extra action, so that two separate messages will be sent when the trigger is activated.</DD>
+<DT>
+<CODE>
+PrefControlClass</DT><DD>
+</CODE>
+This class acts as a cross between <CODE>
+PrefClass</CODE>
+ and <CODE>
+GenControlClass</CODE>
+.</DD>
+<DT>
+<CODE>
+PrefTimeDateControlClass</DT><DD>
+</CODE>
+This class allows the user to set the system date and time.</DD>
+<DT>
+<STRONG>
+PrefClass</STRONG>
+</DT><DD><CODE>
+PrefClass</CODE>
+ is something like <CODE>
+GenClass</CODE>
+--while never used directly, it is the superclass of all the other Pref- classes, and sets up several of the mechanisms which all will use.</DD>
+</DL>
+<P>
+There aren't any special restrictions on what sorts of objects appear in the UI tree of a Preferences module. However, the following rules will prove useful in constructing modules that correctly write their data to the .INI file and have a look and feel consistent with existing modules. For an example, see <A HREF="#Config_2.htm_48404"> Pref Module UI Framework</A>
+.</P>
+<UL>
+<LI>
+As a rule of thumb, the top object of the tree should be a PrefDialog.</LI>
+<LI>
+For a consistent look, the upper portion of the dialog should contain the module's icon, name, and some brief help text. This is normally done using a TitledGlyph and a GenText object. </LI>
+<LI>
+Generally the easiest way to specify the .INI file category and key to use is by means of ATTR_GEN_INIT_FILE_CATEGORY and ATTR_GEN_INIT_FILE_KEY. Assuming that the module will work with just one category, it is sufficient to declare an ATTR_GEN_INIT_FILE field for just the top object of the module's UI tree.</LI>
+<LI>
+Because of the way messages are relayed, you should use PrefInteractions instead of GenInteractions if any objects under the interaction will be saving data to the .INI file.</LI>
+</UL>
+<P CLASS="figTitle">
+Code Display 22-1 <A NAME="Config_2.htm_48404">
+ </A>
+Pref Module UI Framework</P>
+<PRE>@object MPMDialogClass MPMRoot = {
+	GI_states = @default &amp; ~GS_USABLE;
+	GI_comp = @MPMTitleGroup, @MPMOtherStuff;
+	HINT_INTERACTION_SINGLE_USAGE;
+	HINT_INTERACTION_COMPLEX_PROPERTIES;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_LEFT_JUSTIFY_CHILDREN;
+	ATTR_GEN_HELP_CONTEXT = &quot;myPrefModule&quot;;
+	ATTR_GEN_INIT_FILE_CATEGORY = &quot;myPref&quot;;
+}</PRE>
+<PRE>@object GenInteractionClass MPMTitleGroup = {
+	GI_comp = @MPMTitle, @MPMHelp;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}</PRE>
+<PRE>@object TitledGlyphClass MPMTitle = {
+	GI_visMoniker = list {
+		@FontTextMoniker, @FontLCMoniker, @FontLMMoniker, @FontLCGAMoniker
+ 	}
+}</PRE>
+<PRE>@object GenTextClass MPMHelp = {
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_text = &quot;Do such and such to configure your so and so.&quot;;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT; 
+	/* Might want HINT_MINIMUM_SIZE */
+}</PRE>
+<HR>
+<A NAME="Config_3.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Config Library</A>: 1.2 <A HREF="#Config_1.htm">Providing the UI</A>: 
+UI Fetch Routine</H3>
+<P>
+Once you have constructed the UI tree, write a routine that returns the head of that tree. This should be the first routine exported in your module's .gp file. The Preferences Manager knows to call the first exported routine when it needs the UI tree for a module.</P>
+<P>
+The routine should have the parameters</P>
+<PRE>optr _pascal (void)</PRE>
+<P>
+For an example of such a routine, see <A HREF="#Config_3.htm_95594"> UI Fetch Routine</A>
+.</P>
+<P CLASS="figTitle">
+Code Display 22-2 <A NAME="Config_3.htm_95594">
+ </A>
+UI Fetch Routine</P>
+<PRE>optr _pascal MPMGetPrefUITree(void) { return (@MPMRoot);}</PRE>
+<HR>
+<A NAME="Config_4.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Config Library</A>: 2 
+Module Information Routine</H2>
+<P>
+The Preferences application needs to know some information about each module to present the trigger which allows the user into said module. Preferences does this by calling the second routine exported by the module library. Preferences expects this routine to fill in a blank <CODE>
+PrefModuleInfo</CODE>
+ structure.</P>
+<P>
+By filling in this structure, the routine describes the button that Preferences will use to represent the module. Also, you may specify a User Level for the module, so it will be presented only to users with enough expertise to use it. You may also ask that only users with certain privileges be given access to the module; without the proper privileges, they won't see it.</P>
+<P>
+The Routine should have the parameters </P>
+<PRE>void _pascal (*PrefModuleInfo)</PRE>
+<P>
+For an example of such a routine, see <A HREF="#Config_4.htm_90279"> Module Information Routine</A>
+.</P>
+<P CLASS="figTitle">
+Code Display 22-3 <A NAME="Config_4.htm_90279">
+ </A>
+Module Information Routine</P>
+<PRE>void _pascal MPMGetModuleInfo(PrefModuleInfo *info)</PRE>
+<PRE>{	/* We'll set up this structure for both system and user information */
+ 	moduleInfo-&gt;PMI_requiredFeatures = 0;
+ 	moduleInfo-&gt;PMI_prohibitedFeatures = 0;
+ 	moduleInfo-&gt;PMI_minLevel = UIIL_ADVANCED;
+ 	moduleInfo-&gt;PMI_maxLevel = UIIL_MAX_LEVEL;
+ 	moduleInfo-&gt;PMI_monikerList = @MPMMonikerList;
+ 	moduleInfo-&gt;PMI_monikerToken = moduleToken;
+}</PRE>
+<PRE>const GeodeToken moduleToken = { &quot;MyPf&quot;, MANUFACTURER_ID_MINE };</PRE>
+<P>
+The following information about the <A NAME="Config_4.htm_IX_PrefModuleInfo structure">
+ </A>
+<CODE>
+PrefModuleInfo</CODE>
+ structure may prove useful when writing the routine:</P>
+<DL>
+<DT>
+<CODE>
+PMI_requiredFeatures</DT><DD>
+</CODE>
+<A NAME="Config_4.htm_IX_PMF_&ldots;  (PrefMgrFeatures structure)">
+ </A>
+<A NAME="Config_4.htm_IX_PrefMgrFeatures structure">
+ </A>
+<A NAME="Config_4.htm_IX_PMI_&ldots;  (PrefModuleInfo structure)">
+ </A>
+This field allows you to restrict the display of your module so that it will only appear to users which have certain privileges.</DD>
+<DT>
+    PMF_HARDWARE </DT><DD>
+These settings are for a user who has permissions to actually change the configuration of the workstation. In a network environment where users log in to different machines at different times, normal users would be prevented from changing the mouse drivers, video drivers, etc. </DD>
+<DT>
+    PMF_SYSTEM </DT><DD>
+These changes are more complex and potentially more damaging than the basic &quot;user&quot; changes, therefore, some users may be prevented from using these settings. </DD>
+<DT>
+    PMF_NETWORK </DT><DD>
+These are network settings. Generally only the system administrator should see these settings, as they affect the entire network.</DD>
+<DT>
+    PMF_USER</DT><DD>These are basic user changes. These settings are the most basic and least dangerous, controlling user preferences such as background color and screen saver types.</DD>
+<DT>
+<CODE>
+PMI_prohibitedFeatures</DT><DD>
+</CODE>
+This flag field allows you to restrict the display of your module so that it will only appear to users who <EM>
+don't</EM>
+ have certain privileges. If you had two modules, advanced UI and simple UI, one might be for the sysop and the other for normal users--this would keep the sysop's Preferences from being &quot;cluttered&quot; by the plain user module. The flags available are the same as those for <CODE>
+PMI_requiredFeatures</CODE>
+.</DD>
+<DT>
+<CODE>
+PMI_minLevel</DT><DD>
+</CODE>
+This field allows you to specify the minimum User UI Level in which your module should appear. If the module's UI is very complicated and will confuse novice users, use this field to hide it from them.</DD>
+<DT>
+<CODE>
+PMI_maxLevel</CODE>
+; </DT><DD>
+This field allows you to specify the <EM>
+maximum</EM>
+ User UI Level in which your module should appear. If you have two versions of your module--one for advanced users and one for novice users--use this field to hide the novice module from the advanced users.</DD>
+<DT>
+<CODE>
+PMI_monikerList</DT><DD>
+</CODE>
+Like the moniker list for an application, this will provide the icon shown on the main Preferences screen. Create this using the Icon editor. You should have icon formats 64x40 color, 64x40 monochrome, and 64x18 monochrome. </DD>
+<DT>
+<CODE>
+PMI_monikerToken</DT><DD>
+</CODE>
+A four character token and manufacturer ID by which to recognize the module.</DD>
+</DL>
+<HR>
+<A NAME="Config_5.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Config Library</A>: 3 
+Important Messages</H2>
+<P>
+If you're going to create a subclass for use in a Preferences module, the following messages will be of special interest, as they signal that the user is carrying out certain important actions.</P>
+<DL>
+<DT>
+MSG_PREF_INIT</DT><DD>
+When a dialog box containing Pref objects is brought up, each object will receive MSG_PREF_INIT. Developers can subclass MSG_PREF_INIT to perform basic initialization procedures.</DD>
+<DT>
+MSG_META_LOAD_OPTIONS<A NAME="Config_5.htm_IX_MSG_META_LOAD_OPTIONS:in Preferences modules">
+ </A>
+ </DT><DD>
+Generic objects (and by inheritance, Pref- objects) respond to <CODE>
+MSG_META_LOAD_OPTIONS</CODE>
+ by loading a value from the appropriate place in the .INI file. This place is determined by the object's ATTR_GEN_INIT_FILE_KEY field. If the object has an ATTR_GEN_INIT_FILE_CATEGORY field, that category will be used; otherwise the default handler will look up the Generic tree for an object with a ATTR_GEN_INIT_FILE_CATEGORY field defined and will use the value stored there.<BR>
+Unlike a GenInteraction, a PrefInteraction will relay this message to its children. When it's time to load options from the .INI file, a <CODE>
+MSG_META_LOAD_OPTIONS</CODE>
+ will be sent to the top level of the module's UI tree. This message should be propagated down the tree to reach all objects which should read their values from the .INI file. This is why it is suggested that you use PrefInteractions in place of GenInteractions if any Pref- objects will be underneath. If you create a new sort of object which should relay this message to other objects, be sure to do so.</DD>
+<DT>
+<CODE>
+MSG_META_SAVE_OPTIONS</CODE>
+<A NAME="Config_5.htm_IX_MSG_META_SAVE_OPTIONS:in Preferences modules">
+ </A>
+ </DT><DD>
+Generic objects (and by inheritance, Pref- objects) respond to <CODE>
+MSG_META_SAVE_OPTIONS</CODE>
+ by saving a value to the appropriate place in the .INI file. This place is determined by the object's ATTR_GEN_INIT_FILE_KEY field. If the object has an ATTR_GEN_INIT_FILE_CATEGORY field, that category will be used; otherwise the default handler will look up the Generic tree for an object with a ATTR_GEN_INIT_FILE_CATEGORY field defined and will use the value stored there.<BR>
+Unlike a GenInteraction, a PrefInteraction will relay this message to its children. When it's time to save options to the .INI file, a <CODE>
+MSG_META_SAVE_OPTIONS</CODE>
+ will be sent to the top level of the module's UI tree. This message should be propagated down the tree to reach all objects which should write their values to the .INI file. This is why it is suggested that you use PrefInteractions in place of GenInteractions if any Pref- objects will be underneath. If you create a new sort of object which should relay this message to other objects, be sure to do so.<BR>
+Often, interceptors of this message will carry out whatever actions are necessary to carry out the user's wishes in those cases where writing something to the .INI file is not enough to bring the change about. </DD>
+<DT>
+MSG_GEN_RESET<A NAME="Config_5.htm_IX_MSG_GEN_RESET:in Preferences modules">
+ </A>
+ </DT><DD>
+If the user clicks on a &quot;Revert&quot; or &quot;Cancel&quot; button, all values in UI gadgets should revert to those values originally stored in the .INI file. You will note that many Pref- objects have an extra field to store their &quot;original&quot; value. If you create your own kind of Preferences object, keep in mind that it will need some way to store the &quot;original&quot; value (probably initialized while handling <CODE>
+MSG_META_LOAD_OPTIONS</CODE>
+) and should intercept <CODE>
+MSG_GEN_RESET</CODE>
+ to replace its value with the &quot;original&quot; value.</DD>
+<DT>
+MSG_GEN_LOAD_OPTIONS<A NAME="Config_5.htm_IX_MSG_GEN_LOAD_OPTIONS:in Preferences modules">
+ </A>
+ </DT><DD>
+Generic objects (and thus Pref- objects) respond to MSG_META_LOAD_OPTIONS by sending themselves this message. This message is only meant to be used for managing the .INI file; any other functionality should occur in the handling of MSG_META_LOAD_OPTIONS.</DD>
+<DT>
+<CODE>
+MSG_GEN_SAVE_OPTIONS</CODE>
+<A NAME="Config_5.htm_IX_MSG_GEN_SAVE_OPTIONS:in Preferences modules">
+ </A>
+ </DT><DD>
+Generic objects (and thus Pref- objects) respond to MSG_META_SAVE_OPTIONS by sending themselves this message. This message is only meant to be used for managing the .INI file; any other functionality should occur in the handling of <CODE>
+MSG_META_SAVE_OPTIONS</CODE>
+.</DD>
+</DL>
+<P>
+If you are interested in detecting certain user actions, the following list may prove useful:</P>
+<DL>
+<DT>
+<STRONG>
+User Opens Dialog</DT><DD>
+</STRONG>
+Any objects which need to do some initialization when the user first opens the module's dialog box should intercept <CODE>
+MSG_PREF_INIT</CODE>
+. After receiving <CODE>
+MSG_PREF_INIT</CODE>
+, each object will receive a <CODE>
+MSG_META_LOAD_OPTIONS</CODE>
+.</DD>
+<DT>
+<STRONG>
+User clicks Apply</DT><DD>
+</STRONG>
+Assuming the top object of the module's UI tree is a PrefDialog and that the dialog has been set up as a Properties dialog (as it is by default), then this object will receive a <CODE>
+MSG_GEN_APPLY</CODE>
+ when the user activates the Apply trigger. The Pref dialog responds to this message by sending itself a <CODE>
+MSG_META_SAVE_OPTIONS</CODE>
+, which it will then pass on to its children. </DD>
+<DT>
+<STRONG>
+User clicks Cancel or Reset</DT><DD>
+</STRONG>
+All Gen- and Pref- objects within the UI tree will receive a <CODE>
+MSG_GEN_RESET</CODE>
+.</DD>
+</DL>
+<HR>
+<A NAME="Config_6.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Config Library</A>: 4 
+Object Class Reference</H2>
+<P>
+If you will use any of the Pref- classes in your module, the following reference material may prove useful.</P>
+<P CLASS="subsectionLink">
+<A HREF="#Config_7.htm">PrefClass</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Config_8.htm">PrefValueClass</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Config_9.htm">PrefItemGroupClass</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Config_a.htm">PrefStringItemClass</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Config_b.htm">PrefBooleanGroupClass</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Config_c.htm">PrefDynamicListClass</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Config_d.htm">TitledGlyphClass</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Config_e.htm">PrefInteractionClass</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Config_f.htm">PrefDialogClass</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Config_10.htm">PrefTextClass</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Config_11.htm">PrefControlClass</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Config_12.htm">PrefTimeDateControlClass</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Config_13.htm">PrefTriggerClass</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Config_14.htm">PrefTocListClass</A></P>
+<HR>
+<A NAME="Config_7.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Config Library</A>: 4.1 <A HREF="#Config_6.htm">Object Class Reference</A>: 
+<A NAME="Config_7.htm_IX_PrefClass">
+ </A>
+PrefClass</H3>
+<P>
+<CODE>
+PrefClass</CODE>
+ defines several fields of instance data which will be used by all of its subclasses.</P>
+<P>
+There are several variable data fields which make sure that a given Preference gadget will not be usable by those without the proper privileges; other fields make sure that the gadgets will not appear to those users whose UI levels indicate that they would be confused by the presence of such an object. Keep in mind that if all gadgets in your module demand some privilege or User level, you should reflect this in the routine which provide Preferences module information about your module.</P>
+<P CLASS="figTitle">
+Code Display 22-4 PrefClass Instance Data</P>
+<PRE>@class PrefClass, GenClass, master, variant;</PRE>
+<PRE>@instance PrefAttributes <A NAME="Config_7.htm_IX_PI_attrs"> </A>PI_attrs = (PA_LOAD_IF_USABLE|PA_SAVE_IF_USABLE);</PRE>
+<PRE>typedef ByteFlags <A NAME="Config_7.htm_IX_PrefAttributes structure"> </A>PrefAttributes;
+#define <A NAME="Config_7.htm_IX_PA_&ldots;  (PrefAttributes structure)"> </A>PA_REBOOT_IF_CHANGED 0x80
+/* This bit signals that changes in the state of 
+ * this object requires a system reboot to take effect. */</PRE>
+<PRE>#define PA_LOAD_IF_USABLE 0x40
+ /* Load options only if this object is usable (this is ON by default). */</PRE>
+<PRE>#define PA_SAVE_IF_USABLE 0x20
+ /* Save options only if this object is usable (this is ON by default) */</PRE>
+<PRE>#define PA_SAVE_IF_ENABLED 0x10
+ /* Save options only if this object is enabled */</PRE>
+<PRE>#define PA_SAVE_IF_CHANGED 0x08
+ /* Save options only if this object has changed. */</PRE>
+<PRE>@vardata optr <A NAME="Config_7.htm_IX_ATTR_PREF_&ldots;"> </A>ATTR_PREF_REBOOT_STRING;
+/* This is the string passed to MSG_PREF_MGR_DO_REBOOT_DIALOG -- the
+ * string must be in a SHARABLE LMEM resource and is incorporated into the
+ * middle of another sentence. In English, the sentence is &quot;The system software
+ * will shut down and restart to change the &lt;reboot_string&gt;. Do you wish
+ * to proceed?&quot;
+ *
+ * If an object has its PA_REBOOT_IF_CHANGED attribute set, it will scan for
+ * this attribute, first in itself, then up the generic tree, until it
+ * finds one. */
+@reloc ATTR_PREF_REBOOT_STRING, 0, optr; </PRE>
+<PRE>@vardata PrefMgrFeatures ATTR_PREF_REQUIRED_FEATURES;
+/* features bits that must be set for this object to be usable. */</PRE>
+<PRE>@vardata PrefMgrFeatures ATTR_PREF_PROHIBITED_FEATURES;
+/* features bits that must not be set for this object to be usable. */</PRE>
+<PRE>@vardata UIInterfaceLevel ATTR_PREF_MIN_LEVEL;
+/* interface level below which this object will not be usable */</PRE>
+<PRE>@vardata UIInterfaceLevel ATTR_PREF_MAX_LEVEL;
+/* interface level above which this object will not be usable */</PRE>
+<P>
+In addition to the instance data fields, there are messages which allow for the dynamic retrieval and updating of these fields.</P>
+
+<H6 CLASS="RefETitle">
+<A NAME="Config_7.htm_IX_MSG_PREF_SET_INIT_FILE_CATEGORY">
+ </A>
+MSG_PREF_SET_INIT_FILE_CATEGORY</H6>
+<PRE CLASS="syntax">void MSG_PREF_SET_INIT_FILE_CATEGORY(
+        const char *category);</PRE>
+<P>
+Pref objects automatically respond to this message by changing the value of the ATTR_GEN_INIT_FILE_CATEGORY variable data field. This is a utility message; similar functionality is available via MSG_META_ADD_VAR_DATA.</P>
+<P CLASS="refField">
+Source:	Anywhere</P>
+<P CLASS="refField">
+Destination:	Any <CODE>
+PrefClass</CODE>
+ object.</P>
+<P CLASS="refField">
+Parameters:	<EM>category</EM>	Null-terminated category string.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Config_7.htm_IX_MSG_PREF_HAS_STATE_CHANGED">
+ </A>
+MSG_PREF_HAS_STATE_CHANGED</H6>
+<PRE CLASS="syntax">Boolean MSG_PREF_HAS_STATE_CHANGED();</PRE>
+<P>
+This message determines whether the object or any of its children have changed since the last time options were loaded. This is used in conjunction with the PA_REBOOT_IF_CHANGED flag that can be set for an object--this flag signals that, if the object changes state, then GEOS should be restarted for the change to go into effect.</P>
+<P CLASS="refField">
+Source:	<CODE>
+PrefClass</CODE>
+ object sends this message to itself when handling <CODE>
+MSG_PREF_GET_REBOOT_INFO</CODE>
+.</P>
+<P CLASS="refField">
+Destination:	Self.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Should return <EM>
+true</EM>
+ (i.e. non-zero) if state has changed, <EM>
+false</EM>
+ (i.e. zero) otherwise.</P>
+<P CLASS="refField">
+Interception:	New <CODE>
+PrefClass</CODE>
+ subclasses will use this to compare the object's current state against the &quot;original&quot; state, assuming one was stored.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Config_7.htm_IX_MSG_PREF_GET_REBOOT_INFO">
+ </A>
+MSG_PREF_GET_REBOOT_INFO</H6>
+<PRE CLASS="syntax">optr MSG_PREF_GET_REBOOT_INFO();</PRE>
+<P>
+This message asks whether the system will need to reboot as a result of changes. If a reboot is necessary, the dialog will then notify the user of the reboot, and give the user a chance to abort (since the system reset may be a lengthy process on some systems). </P>
+<P CLASS="refField">
+Source:	PrefDialog sends this message to all children on an apply.</P>
+<P CLASS="refField">
+Destination:	Any Pref- object.</P>
+<P CLASS="refField">
+Interception:	Subclasses should check the PA_REBOOT_IF_CHANGED flag--if the flag is set, the object should compare its present value to its &quot;original&quot; value. If a reboot is never needed, then do nothing.<BR>
+If a reboot is necessary, the method should return the string to use when rebooting. The standard way to do this is via <CODE>
+MSG_PREF_GET_REBOOT_STRING</CODE>
+.<BR>
+If possible, developers should try to avoid situations where a system reset is necessary, and use mechanisms such as the General Change Notification instead.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Zero if no reboot needed; otherwise the OD of string to insert in the confirm-shutdown dialog box. The string will be inserted into a sentence; the string should describe what is changing. You may wish to use the value of ATTR_PREF_REBOOT_STRING.</P>
+<P CLASS="refField">
+See Also:	<CODE>
+MSG_PREF_GET_REBOOT_STRING</CODE>
+, ATTR_PREF_REBOOT_STRING.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Config_7.htm_IX_MSG_PREF_GET_REBOOT_STRING">
+ </A>
+MSG_PREF_GET_REBOOT_STRING</H6>
+<PRE CLASS="syntax">optr MSG_PREF_GET_REBOOT_STRING();</PRE>
+<P>
+This message should return the optr of a string in a sharable local memory resource. This string will display in the dialog box which asks the user if it is all right to shut down. If a given object doesn't know of a good string to supply, it should forward the message on to its parent in the generic tree. The default <CODE>
+PrefClass</CODE>
+ handler returns the value stored in ATTR_PREF_REBOOT_STRING.</P>
+<P CLASS="refField">
+Source:	Pref- object sends this message to itself.</P>
+<P CLASS="refField">
+Destination:	Any <CODE>
+PrefClass</CODE>
+ object.</P>
+<P CLASS="refField">
+Parameters:	Nothing.</P>
+<P CLASS="refField">
+Return:	Object Pointer of string (or NULL if not found).</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Config_7.htm_IX_MSG_PREF_INIT">
+ </A>
+MSG_PREF_INIT</H6>
+<PRE CLASS="syntax">void MSG_PREF_INIT(
+        PrefMgrFeatures 		features,
+        UIInterfaceLevel 		level);</PRE>
+<P>
+This message initializes the object. The object should perform any required set-up to appear on-screen. The PrefDialog object will send this object to all of its children when the dialog is first initiated.</P>
+<P CLASS="refField">
+Source:	Generic Parent</P>
+<P CLASS="refField">
+Destination:	Any Pref- object.</P>
+<P CLASS="refField">
+Parameters:	<EM>features</EM>	This structure tells you a bit what sorts of changes the user prepared to make.</P>
+<DL>
+<DT>
+<EM>level</EM></DT><DD>The user's User Level.</DD>
+</DL>
+<P CLASS="refField">
+Return:	None.</P>
+<P CLASS="refField">
+Interception:	Default behavior is to determine whether to make the object usable based on UI level and features (or will be, when implemented). Subclass should call superclass before handling, as subclass behavior may be different if the object is not usable.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Config_7.htm_IX_MSG_PREF_NOTIFY_DIALOG_CHANGE">
+ </A>
+MSG_PREF_NOTIFY_DIALOG_CHANGE</H6>
+<PRE CLASS="syntax">void MSG_PREF_NOTIFY_DIALOG_CHANGE(
+        PrefDialogChangeType 			type);</PRE>
+<P>
+This message goes out via PDGCNLT_DIALOG_CHANGE list bound to PrefDialog object telling interested parties of a change in the box's state. It is sent when the dialog box is being opened, closed, or destroyed.</P>
+<P CLASS="refField">
+Source:	PrefDialog object.</P>
+<P CLASS="refField">
+Destination:	Any Pref- object registered on PDCGCNLT_DIALOG_CHANGE.</P>
+<P CLASS="refField">
+Interception:	This message has no default handler; it must be intercepted to do anything useful.</P>
+<P CLASS="refField">
+Structures:	</P>
+<PRE>typedef enum {
+	<A NAME="Config_7.htm_IX_PDCT_&ldots;  (PrefDialogChangeType structure)"> </A>PDCT_OPEN,
+	PDCT_CLOSE,
+	PDCT_DESTROY,
+	PDCT_RESTART,
+	PDCT_SHUTDOWN
+} <A NAME="Config_7.htm_IX_PrefDialogChangeType structure"> </A>PrefDialogChangeType;</PRE>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Config_7.htm_IX_MSG_PREF_SET_ORIGINAL_STATE">
+ </A>
+MSG_PREF_SET_ORIGINAL_STATE</H6>
+<PRE CLASS="syntax">void MSG_PREF_SET_ORIGINAL_STATE();</PRE>
+<P>
+This message copies the object's current state to the &quot;original&quot; value field, which will be used on a <CODE>
+MSG_GEN_RESET</CODE>
+.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Subclasses should respond to this message by copying their current value to whatever instance field represents the &quot;original&quot; state of the object.</P>
+
+<HR>
+<A NAME="Config_8.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Config Library</A>: 4.2 <A HREF="#Config_6.htm">Object Class Reference</A>: 
+<A NAME="Config_8.htm_IX_PrefValueClass">
+ </A>
+PrefValueClass</H3>
+<P>
+PrefValue objects behave like GenValue objects except that they have the ability to store an &quot;original&quot; value in the <CODE>
+PVI_originalValue</CODE>
+ instance data field. Unlike GenValue objects, PrefValues can only handle single word values.</P>
+<P CLASS="figTitle">
+Code Display 22-5 PrefValueClass Instance Data</P>
+<PRE>@class PrefValueClass, PrefClass;</PRE>
+<PRE>@instance word <A NAME="Config_8.htm_IX_PVI_originalValue"> </A>PVI_originalValue = 0;</PRE>
+<PRE>@vardata void <A NAME="Config_8.htm_IX_ATTR_PREF_VALUE_&ldots;"> </A>ATTR_PREF_VALUE_ORIG_IS_INDETERMINATE;</PRE>
+<PRE>@vardata word ATTR_PREF_VALUE_ROUND;
+/* Specifies an integer value to which the value will be rounded on .INI file
+ * reads/writes. For instance, with a value for 10 here, the value would always
+ * round off to the nearest 10. Note that the user can still type in an illegal
+ * value, but this value will be rounded before saving to the .INI file.*/</PRE>
+
+<H6 CLASS="RefETitle">
+<A NAME="Config_8.htm_IX_MSG_PREF_VALUE_SET_ORIGINAL_VALUE">
+ </A>
+MSG_PREF_VALUE_SET_ORIGINAL_VALUE</H6>
+<PRE CLASS="syntax">void MSG_PREF_VALUE_SET_ORIGINAL_VALUE(
+        word 		orig,
+        Boolean 		indeterminate);</PRE>
+<P>
+This message sets the &quot;original&quot; value of the object--it also sets the value stored by the superclass.</P>
+
+<HR>
+<A NAME="Config_9.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Config Library</A>: 4.3 <A HREF="#Config_6.htm">Object Class Reference</A>: 
+<A NAME="Config_9.htm_IX_PrefItemGroupClass">
+ </A>
+PrefItemGroupClass</H3>
+<P>
+This class acts like <CODE>
+GenItemGroupClass</CODE>
+, but has extended functionality for reading/writing strings to the .INI file. When the user triggers the dialog's Apply trigger (when the PrefItemGroup receives a <CODE>
+MSG_META_SAVE_OPTIONS</CODE>
+), the PrefItemGroup will respond by writing out strings based upon which of its children items are presently selected. These strings can be taken from the items' monikers or from strings used with <CODE>
+PrefStringItemClass</CODE>
+ objects.</P>
+<P>
+When loading options, if either the PIFF_USE_ITEM_MONIKERS or PIFF_USE_ITEM_STRINGS is set for the item group, then it will select its children based on the strings stored in the .INI file.Otherwise, the item group will default to the <CODE>
+GenItemGroupClass</CODE>
+ functionality, which uses the identifier of the items as a basis for selection.</P>
+<P CLASS="figTitle">
+Code Display 22-6 PrefItemGroupClass Instance Data</P>
+<PRE>@instance PrefInitFileFlags <A NAME="Config_9.htm_IX_PIGI_&ldots;"> </A>PIGI_initFileFlags = 0;</PRE>
+<PRE>typedef ByteFlags <A NAME="Config_9.htm_IX_PrefInitFileFlags structure"> </A>PrefInitFileFlags;
+#define <A NAME="Config_9.htm_IX_PIFF_&ldots;  (PrefInitFileFlags structure)"> </A>PIFF_USE_ITEM_STRINGS 0x80
+/* 
+ * If set, then the item group's children must be of class PrefStringItemClass,
+ * and their strings will be used to interact with the .INI file. */</PRE>
+<PRE>#define PIFF_USE_ITEM_MONIKERS 0x40
+/* If set, the monikers of the items are used to interact with the .INI file. */</PRE>
+<PRE>#define PIFF_APPEND_TO_KEY 0x20
+/* If set, the strings in this list will be ADDED 
+ * to strings that may already exist for this key */</PRE>
+<PRE>#define PIFF_ABSENT_KEY_OVERRIDES_DEFAULTS 0x10
+/* If set, an absent key for the item group will cause it to
+ * behave as if an empty key were in the .INI file, effectively
+ * overriding any default values stored with the group when it was
+ * compiled. Used primarily by those groups where one subclasses
+ * MSG_PREF_STRING_ITEM_CHECK_IF_IN_INIT_FILE_KEY to determine the
+ * initial setting, rather than looking in the .INI file. */</PRE>
+<PRE>@instance word PIGI_originalSelection = 0;</PRE>
+<PRE>@instance word PIGI_originalNumSelections = 0;</PRE>
+<PRE>@instance byte PIGI_suspendCount = 0;
+/* When suspend count is nonzero, the item group won't update text objects, nor
+ * will it enable/disable objects when the selection changes. */</PRE>
+<PRE>@vardata PrefEnableData ATTR_PREF_ITEM_GROUP_ENABLE;
+/* allows setting up an object to be enabled/disabled when
+ * settings are made in the item group */</PRE>
+<PRE>typedef struct {
+	word 		<A NAME="Config_9.htm_IX_PED_&ldots;  (PrefEnableData structure)"> </A>PED_item; 		/* Identifier of the item that controls
+					 * enabling/disabling of object. If this
+					 * is GIGS_NONE, then the action will be
+					 * performed if no items are selected. */
+	ChunkHandle 		PED_lptr; 		/* Object to be enabled/disabled */
+ 	PrefEnableFlags 		PED_flags;
+} <A NAME="Config_9.htm_IX_PrefEnableData structure"> </A>PrefEnableData;</PRE>
+<PRE>typedef ByteFlags <A NAME="Config_9.htm_IX_PrefEnableFlags structure"> </A>PrefEnableFlags;</PRE>
+<PRE>#define <A NAME="Config_9.htm_IX_PEF_&ldots;  (PrefEnableFlags structure)"> </A>PEF_DISABLE_IF_SELECTED 0x80
+/* Disable the object if the associated item is selected,
+ * otherwise do the opposite. */</PRE>
+<PRE>#define PEF_DISABLE_IF_NONE 0x40
+/* If this flag is set, then the PED_item field is ignored.
+ * Instead, the item group will disable the specified object if
+ * no items are selected -- or if there are no items in the list. */</PRE>
+<PRE>@vardata word <A NAME="Config_9.htm_IX_ATTR_PREF_ITEM_GROUP_&ldots;"> </A>ATTR_PREF_ITEM_GROUP_OVERRIDE;
+/* This attribute is used to specify an item which will act
+ * as an OVERRIDE for all other items (in a non-exclusive
+ * item group).
+ *
+ * When the specified item is SELECTED, then all other items are DE-SELECTED.
+ * When any other item is SELECTED, the override item is DE-SELECTED.
+ * If all items are DE-SELECTED, the override item becomes SELECTED */</PRE>
+<PRE>@vardata ChunkHandle ATTR_PREF_ITEM_GROUP_TEXT_DISPLAY;
+/* chunk handle of a GenText object that will be updated
+ * with the moniker of the currently selected item on APPLY/RESET. */</PRE>
+<PRE>@vardata ChunkHandle ATTR_PREF_ITEM_GROUP_STATUS_TEXT;
+/* chunk handle of a GenText object that will be updated every
+ * time this object receives a MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG. */</PRE>
+<PRE>@vardata char ATTR_PREF_ITEM_GROUP_EXTRA_STRING_SECTION[];
+/* If a string is given -- the string will always be written
+ * out as the FIRST string section for the .INI file key. For
+ * example, the &quot;Memory&quot; item group uses this to always insert
+ * &quot;disk.geo&quot; whenever writing out the memory types. Note:
+ * this item is only written if the item group has either the
+ * PIFF_USE_ITEM_MONIKERS or PIFF_USE_ITEM_STRINGS set. */</PRE>
+
+<H6 CLASS="RefETitle">
+<A NAME="Config_9.htm_IX_MSG_PREF_ITEM_GROUP_SET_ORIGINAL_SELECTION">
+ </A>
+MSG_PREF_ITEM_GROUP_SET_ORIGINAL_SELECTION</H6>
+<PRE CLASS="syntax">void 	MSG_PREF_ITEM_GROUP_SET_ORIGINAL_SELECTION(
+word selection);</PRE>
+<P>
+Set the &quot;originalSelection&quot; field of the item group. Also, sends <CODE>
+MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION</CODE>
+ to superclass. This message can only be used with exclusive item groups--for other types, use the GenItemGroup messages, and then send the object <CODE>
+MSG_PREF_SET_ORIGINAL_STATE</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Anywhere.</P>
+<P CLASS="refField">
+Destination:	An exclusive PrefItemGroup.</P>
+<P CLASS="refField">
+Parameters:	<EM>selection</EM>	Which item to select.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Config_9.htm_IX_MSG_PREF_ITEM_GROUP_GET_SELECTED_ITEM_TEXT">
+ </A>
+MSG_PREF_ITEM_GROUP_GET_SELECTED_ITEM_TEXT</H6>
+<PRE CLASS="syntax">word 	MSG_PREF_ITEM_GROUP_GET_SELECTED_ITEM_TEXT(
+        char 	*buffer,
+        word 	bufSize);</PRE>
+<P>
+This message returns the text in the moniker of the selected item. The value returned is the number of characters in the string. If nothing is selected, the value returned is zero.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Config_9.htm_IX_MSG_PREF_ITEM_GROUP_GET_ITEM_MONIKER">
+ </A>
+MSG_PREF_ITEM_GROUP_GET_ITEM_MONIKER</H6>
+<PRE CLASS="syntax">word MSG_PREF_ITEM_GROUP_GET_ITEM_MONIKER(@stack 
+        char 	*buffer,
+        word 	bufSize,
+        word 	identifier);</PRE>
+<P>
+This message retrieves the text in the moniker of one of the items of a PrefItemGroup. This works for dynamic list subclasses as well. The message returns the number of characters in the returned text.</P>
+<P CLASS="refField">
+Parameters:	<EM>buffer</EM>	Buffer in which to return moniker text.</P>
+<DL>
+<DT>
+<EM>bufSize</EM></DT><DD>Size of buffer.</DD>
+<DT>
+<EM>identifier</EM></DT><DD>Identifier of item whose moniker should be returned.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Size of item's moniker.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Config_9.htm_IX_MSG_PREF_ITEM_GROUP_UPDATE_TEXT">
+ </A>
+MSG_PREF_ITEM_GROUP_UPDATE_TEXT</H6>
+<PRE CLASS="syntax">void MSG_PREF_ITEM_GROUP_UPDATE_TEXT(
+        ChunkHandle 		textObject);</PRE>
+<P>
+This message updates the specified text object with text of the currently selected item. The PrefItemGroup sends this to itself in conjunction with either ATTR_PREF_ITEM_GROUP_TEXT_DISPLAY or ATTR_PREF_ITEM_GROUP_STATUS_TEXT. By default, this message will also cause the text object to send out its status message.</P>
+<P CLASS="refField">
+Source:	Self.</P>
+<P CLASS="refField">
+Destination:	Self.</P>
+<P CLASS="refField">
+Interception:	Default behavior is to fetch the moniker of the current selection, and sent that to the text. The subclasser can use different text, if desired.</P>
+
+<HR>
+<A NAME="Config_a.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Config Library</A>: 4.4 <A HREF="#Config_6.htm">Object Class Reference</A>: 
+<A NAME="Config_a.htm_IX_PrefStringItemClass">
+ </A>
+PrefStringItemClass</H3>
+<P>
+Objects of this class, used together with a PrefItemGroup with its PIFF_USE_ITEM_STRINGS flag set, allow for objects which act like GenItems but can write an arbitrary string out to the .INI file if the user selects them.</P>
+<P CLASS="figTitle">
+Code Display 22-7 PrefStringItemClass Instance Data</P>
+<PRE>@class PrefStringItemClass, GenItemClass;</PRE>
+<PRE>@instance ChunkHandle <A NAME="Config_a.htm_IX_PSII_initFileString"> </A>PSII_initFileString = 0;</PRE>
+
+<H6 CLASS="RefETitle">
+<A NAME="Config_a.htm_IX_MSG_PREF_STRING_ITEM_SET_INIT_FILE_STRING">
+ </A>
+MSG_PREF_STRING_ITEM_SET_INIT_FILE_STRING</H6>
+<PRE CLASS="syntax">void MSG_PREF_STRING_ITEM_SET_INIT_FILE_STRING(
+        const char 		*str);</PRE>
+<P>
+This message sets the string that is read and written in the .INI file.</P>
+<P CLASS="refField">
+Interception:	Unlikely but possible. Default behavior sets the string and then checks again with the .INI file to make sure item should be selected.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Config_a.htm_IX_MSG_PREF_STRING_ITEM_CHECK_IF_IN_INIT_FILE_KEY">
+ </A>
+MSG_PREF_STRING_ITEM_CHECK_IF_IN_INIT_FILE_KEY</H6>
+<PRE CLASS="syntax">Boolean MSG_PREF_STRING_ITEM_CHECK_IF_IN_INIT_FILE_KEY(
+        PrefItemGroupStringVars 				*vars);</PRE>
+<P>
+This message checks the passed string to see if the string bound to this item is in one of its pieces. A PrefItemGroup will send this object when loading options if it has the PIFF_USE_ITEM_STRINGS flag set.</P>
+<P CLASS="refField">
+Source:	PrefItemGroup object.</P>
+<P CLASS="refField">
+Destination:	PrefStringItem object.</P>
+<P CLASS="refField">
+Interception:	May be intercepted if the subclass needs to check other things to decide whether it should be selected. If you also wish to have the default behavior, you may call the superclass either before or after you've made your own decision, as appropriate.</P>
+<P CLASS="refField">
+Parameters:	<EM>vars</EM>	Information about the string.</P>
+<P CLASS="refField">
+Return:	Returns <EM>
+true</EM>
+ (i.e. non-zero) if bound string is within the string stored in the local variable.</P>
+
+<HR>
+<A NAME="Config_b.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Config Library</A>: 4.5 <A HREF="#Config_6.htm">Object Class Reference</A>: 
+<A NAME="Config_b.htm_IX_PrefBooleanGroupClass">
+ </A>
+PrefBooleanGroupClass</H3>
+<P>
+This class behaves as GenBooleanGroup, except that it saves its original state and handles <CODE>
+MSG_GEN_RESET</CODE>
+ appropriately. It can also use item strings or monikers when loading and saving options.</P>
+<P CLASS="figTitle">
+Code Display 22-8 PrefBooleanGroupClass Instance Data</P>
+<PRE>@class PrefBooleanGroupClass, PrefClass;
+@instance PrefInitFileFlags 				<A NAME="Config_b.htm_IX_PBGI_&ldots;"> </A>PBGI_initFileFlags = 0;
+@instance word 				PBGI_originalState = 0;</PRE>
+
+<H6 CLASS="RefETitle">
+<A NAME="Config_b.htm_IX_MSG_PREF_BOOLEAN_GROUP_SET_ORIGINAL_STATE">
+ </A>
+MSG_PREF_BOOLEAN_GROUP_SET_ORIGINAL_STATE</H6>
+<PRE CLASS="syntax">void MSG_PREF_BOOLEAN_GROUP_SET_ORIGINAL_STATE(
+        word state);</PRE>
+<P>
+This message sets the &quot;original&quot; state of the Boolean group.</P>
+
+<HR>
+<A NAME="Config_c.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Config Library</A>: 4.6 <A HREF="#Config_6.htm">Object Class Reference</A>: 
+<A NAME="Config_c.htm_IX_PrefDynamicListClass">
+ </A>
+PrefDynamicListClass</H3>
+<P>
+Objects of <CODE>
+PrefDynamicListClass</CODE>
+ act like GenDynamicList objects, but with the intelligence to write their data to the .INI file. Developers will generally not use this class directory, but instead will subclass, intercepting the following messages:</P>
+<DL>
+<DT>
+<CODE>
+MSG_PREF_DYNAMIC_LIST_BUILD_ARRAY</DT><DD>
+</CODE>
+To build the data structures which will be used when later supplying monikers</DD>
+<DT>
+<CODE>
+MSG_PREF_ITEM_GROUP_GET_ITEM_MONIKER</DT><DD>
+</CODE>
+<A NAME="Config_c.htm_IX_MSG_PREF_ITEM_GROUP_GET_ITEM_MONIKER:with PrefDynamicList">
+ </A>
+To supply the moniker for a requested item on demand</DD>
+<DT>
+<CODE>
+MSG_PREF_DYNAMIC_LIST_FIND_ITEM</DT><DD>
+</CODE>
+To find a given item when passed its moniker.</DD>
+</DL>
+<P>
+By handling these three messages, the developer will have a dynamic list that can properly load and save its selection and will scroll to the correct item in response to keyboard input.</P>
+<P>
+The load and save mechanism is currently only configured for exclusive dynamic lists.</P>
+
+<H6 CLASS="RefETitle">
+<A NAME="Config_c.htm_IX_MSG_PREF_DYNAMIC_LIST_BUILD_ARRAY">
+ </A>
+MSG_PREF_DYNAMIC_LIST_BUILD_ARRAY</H6>
+<PRE CLASS="syntax">void MSG_PREF_DYNAMIC_LIST_BUILD_ARRAY();</PRE>
+<P>
+The PrefDynamicList sends itself this message in response to MSG_PREF_INIT.</P>
+<P CLASS="refField">
+Source:	Self.</P>
+<P CLASS="refField">
+Destination:	Self.</P>
+<P CLASS="refField">
+Interception:	The subclasser should create an array of item strings, ideally sorted.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Config_c.htm_IX_MSG_PREF_DYNAMIC_LIST_FIND_ITEM">
+ </A>
+MSG_PREF_DYNAMIC_LIST_FIND_ITEM</H6>
+<PRE CLASS="syntax"> Boolean MSG_PREF_DYNAMIC_LIST_FIND_ITEM(
+        word 		*itemPtr,
+        const char 		*str,
+        Boolean 		ignoreCase);</PRE>
+<P>
+This message finds an item given a moniker. It is normally used in the context of loading options.</P>
+<P CLASS="refField">
+Source:	Self.</P>
+<P CLASS="refField">
+Destination:	Self.</P>
+<P CLASS="refField">
+Parameters:	<EM>itemPtr</EM>	Pointer to space in which to return a word.</P>
+<DL>
+<DT>
+<EM>str</EM></DT><DD>String to search for.</DD>
+<DT>
+<EM>ignoreCase</EM></DT><DD>Flag requesting a case-insensitive search.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Returns <EM>
+true</EM>
+ (i.e. non-zero) if an item was found with a moniker matching the passed string; <EM>itmPtr</EM> will have been filled with the number of the matching item. If no such item was found, the message will return <EM>
+false</EM>
+ (i.e. zero) and <EM>itmPtr</EM> will point to the first item after the requested item.</P>
+
+<HR>
+<A NAME="Config_d.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Config Library</A>: 4.7 <A HREF="#Config_6.htm">Object Class Reference</A>: 
+<A NAME="Config_d.htm_IX_TitledGlyphClass">
+ </A>
+TitledGlyphClass</H3>
+<P>
+Each TitledGlyph displays two monikers, one icon and one text.<CODE>
+ TitledGlyphClass</CODE>
+ has no unique instance data or messages. You are expected to provide a list of monikers in the <CODE>
+GI_visMoniker</CODE>
+ field, and this list should include several icons and a text moniker. Normally the same icon is used as by the routine providing Preferences module information.</P>
+<HR>
+<A NAME="Config_e.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Config Library</A>: 4.8 <A HREF="#Config_6.htm">Object Class Reference</A>: 
+<A NAME="Config_e.htm_IX_PrefInteractionClass">
+ </A>
+PrefInteractionClass</H3>
+<P>
+If you have any Preferences objects which write out their values to the .INI file, and if you would normally have those objects appear under a GenInteraction, then you should have them appear under a PrefInteraction instead. </P>
+<P>
+Objects of the class will forward the following messages on to their children:</P>
+<DL>
+<DT>
+<CODE>
+MSG_PREF_INIT</CODE>
+<A NAME="Config_e.htm_IX_MSG_PREF_INIT:PrefInteractionClass behavior">
+ </A>
+, <A NAME="Config_e.htm_IX_MSG_PREF_SET_ORIGINAL_STATE:PrefInteractionClass behavior">
+ </A>
+<CODE>
+MSG_PREF_SET_ORIGINAL_STATE</DT><DD>
+</CODE>
+Object will send these messages to every child that is a subclass of <CODE>
+PrefClass</CODE>
+.</DD>
+<DT>
+<CODE>
+MSG_META_LOAD_OPTIONS</DT><DD>
+</CODE>
+<A NAME="Config_e.htm_IX_MSG_META_LOAD_OPTIONS:PrefInteractionClass behavior">
+ </A>
+Object will send this to each child that satisfies the appropriate criteria (based on the child's PA_LOAD_IF_USABLE flag).</DD>
+<DT>
+<CODE>
+MSG_META_SAVE_OPTIONS</DT><DD>
+</CODE>
+<A NAME="Config_e.htm_IX_MSG_META_SAVE_OPTIONS:PrefInteractionClass behavior">
+ </A>
+Object will send this to each child that satisfies the appropriate criteria (based on the child's PA_SAVE_IF_CHANGED, PA_SAVE_IF_ENABLED, and PA_SAVE_IF_USABLE flags).</DD>
+<DT>
+<CODE>
+MSG_PREF_HAS_STATE_CHANGED</CODE>
+<A NAME="Config_e.htm_IX_MSG_PREF_HAS_STATE_CHANGED:PrefInteractionClass behavior">
+ </A>
+, <A NAME="Config_e.htm_IX_MSG_PREF_GET_REBOOT_INFO:PrefInteractionClass behavior">
+ </A>
+<CODE>
+MSG_PREF_GET_REBOOT_INFO</DT><DD>
+</CODE>
+Propagates these messages to children, returning the value from the first child that returns a non-null response.</DD>
+</DL>
+<P CLASS="figTitle">
+Code Display 22-9 PrefInteractionClass Instance Data</P>
+<PRE>@class PrefInteractionClass, PrefClass;</PRE>
+<PRE>@instance PrefInteractionAttrs <A NAME="Config_e.htm_IX_PII_attrs"> </A>PII_attrs = 0;</PRE>
+<PRE>typedef ByteFlags <A NAME="Config_e.htm_IX_PrefInteractionAttrs structure"> </A>PrefInteractionAttrs;</PRE>
+<PRE>#define <A NAME="Config_e.htm_IX_PIA_&ldots;  (PrefInteractionAttrs structure)"> </A>PIA_LOAD_OPTIONS_ON_INITIATE 0x80
+/* If set, then the dialog will send MSG_PREF_INIT, 
+ * followed by MSG_META_LOAD_OPTIONS to itself when it 
+ * receives a MSG_GEN_INTERACTION_INITIATE */ </PRE>
+<PRE>#define PIA_SAVE_OPTIONS_ON_APPLY 0x40
+/* This flag is normally OFF to allow non-dialog prefInteractions to reside inside
+ * other interactions without duplicate SAVE_OPTIONS messages being sent. */</PRE>
+<HR>
+<A NAME="Config_f.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Config Library</A>: 4.9 <A HREF="#Config_6.htm">Object Class Reference</A>: 
+<A NAME="Config_f.htm_IX_PrefDialogClass">
+ </A>
+PrefDialogClass</H3>
+<P>
+The top level object of any Preferences module UI tree should probably be a PrefDialog object. If the user's changes will necessitate a system reset, then this object will be responsible for rebooting the system.</P>
+<P>
+On receiving <CODE>
+MSG_GEN_APPLY</CODE>
+, the dialog sends <CODE>
+MSG_PREF_GET_REBOOT_INFO</CODE>
+ to itself (which is propagated to all children via <CODE>
+PrefInteractionClass</CODE>
+). If any children require reboot, then the dialog sends <CODE>
+MSG_PREF_DIALOG_CONFIRM_REBOOT</CODE>
+ to itself, which normally puts up a confirmation dialog box (this can be subclassed to provide other behavior). If user confirms reboot, then the dialog will send <CODE>
+MSG_PREF_DIALOG_REBOOT</CODE>
+ to itself, and <CODE>
+MSG_GEN_APPLY</CODE>
+ to its superclass to save the options (it being assumed that the PIA_SAVE_OPTIONS_ON_APPLY flag is set).</P>
+<P CLASS="figTitle">
+Code Display 22-10 PrefDialogClass Instance Data</P>
+<PRE>@class PrefDialogClass, PrefInteractionClass;</PRE>
+<PRE>@default GII_visibility = GIV_DIALOG;</PRE>
+<PRE>@default GII_type = GIT_PROPERTIES;</PRE>
+<PRE>@default GII_attrs = @default | GIA_NOT_USER_INITIATABLE | GIA_MODAL;</PRE>
+<PRE>@default PII_attrs = @default | PIA_SAVE_OPTIONS_ON_APPLY;</PRE>
+
+<H6 CLASS="RefETitle">
+<A NAME="Config_f.htm_IX_MSG_PREF_DIALOG_CONFIRM_REBOOT">
+ </A>
+MSG_PREF_DIALOG_CONFIRM_REBOOT</H6>
+<PRE CLASS="syntax">@message Boolean MSG_PREF_DIALOG_CONFIRM_REBOOT(
+        optr 		string);</PRE>
+<P>
+By default, the PrefDialog will respond to this message by putting up a dialog box asking the user if he wants to restart the system.</P>
+<P CLASS="refField">
+Parameters:	</P>
+<DL>
+<DT>
+<EM>string</EM></DT><DD>Object pointer of string which will be inserted in a sentence of the form &quot;The system software will shut down and restart to change the <EM>string</EM>.&quot;</DD>
+</DL>
+<P CLASS="refField">
+Return:	Returns <EM>
+true</EM>
+ (i.e. non-zero) to confirm the reboot; returns <EM>
+false</EM>
+ (i.e. zero to deny the reboot.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Config_f.htm_IX_MSG_PREF_DIALOG_REBOOT">
+ </A>
+MSG_PREF_DIALOG_REBOOT</H6>
+<PRE CLASS="syntax">void MSG_PREF_DIALOG_REBOOT();</PRE>
+<P>
+This message causes GEOS to restart. This message does not return.</P>
+
+<HR>
+<A NAME="Config_10.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Config Library</A>: 4.10 <A HREF="#Config_6.htm">Object Class Reference</A>: 
+<A NAME="Config_10.htm_IX_PrefTextClass">
+ </A>
+PrefTextClass</H3>
+<P>
+Objects of this class act like GenText objects, but have mechanisms to write their text string to the .INI file.</P>
+<P CLASS="figTitle">
+Code Display 22-11 PrefTextClass Instance Data</P>
+<PRE>@class PrefTextClass, PrefClass;</PRE>
+<PRE>@instance ChunkHandle <A NAME="Config_10.htm_IX_PTI_originalText"> </A>PTI_originalText = 0;</PRE>
+<PRE>@vardata ChunkHandle <A NAME="Config_10.htm_IX_ATTR_PREF_TEXT_INIT_FILE_CATEGORY_TARGET"> </A>ATTR_PREF_TEXT_INIT_FILE_CATEGORY_TARGET;
+/* PrefTextClass has the wonderful ability that it can set another
+ * object's .INI. file category from its text. Category gets updated
+ * whenever the text object receives MSG_GEN_TEXT_SEND_STATUS_MSG.
+ * To make this happen, put the ChunkHandle of the object in this field. */</PRE>
+<HR>
+<A NAME="Config_11.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Config Library</A>: 4.11 <A HREF="#Config_6.htm">Object Class Reference</A>: 
+<A NAME="Config_11.htm_IX_PrefControlClass">
+ </A>
+PrefControlClass</H3>
+<P>
+This subclass of <CODE>
+PrefInteractionClass</CODE>
+ acts like GenControl, but bypasses some GenControl functionality. This class is assumed not to be on notification lists. Objects of this class will pass <CODE>
+MSG_GEN_RESET</CODE>
+ to their children as a normal GenInteraction would. This class has no special instance data or messages.</P>
+<HR>
+<A NAME="Config_12.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Config Library</A>: 4.12 <A HREF="#Config_6.htm">Object Class Reference</A>: 
+<A NAME="Config_12.htm_IX_PrefTimeDateControlClass">
+ </A>
+PrefTimeDateControlClass</H3>
+<P>
+This controller allows the user to set the system time. This class' messages and instance data fields are internal. To get and set the date and time directly, use <CODE>
+TimerGetDateAndTime()</CODE>
+ and <CODE>
+TimerSetDateAndTime()</CODE>
+.</P>
+<HR>
+<A NAME="Config_13.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Config Library</A>: 4.13 <A HREF="#Config_6.htm">Object Class Reference</A>: 
+<A NAME="Config_13.htm_IX_PrefTriggerClass">
+ </A>
+PrefTriggerClass</H3>
+<P>
+<CODE>
+PrefTriggerClass</CODE>
+ is not a subclass of <CODE>
+PrefClass</CODE>
+; it is a subclass of <CODE>
+GenTriggerClass</CODE>
+. It acts like a normal trigger except that when activated it will send a second message if it has been set up with a ATTR_PREF_TRIGGER_ACTION field.</P>
+<P CLASS="figTitle">
+Code Display 22-12 PrefTriggerClass Instance Data</P>
+<PRE>@class PrefTriggerClass, GenTriggerClass;</PRE>
+<PRE>@vardata PrefTriggerAction <A NAME="Config_13.htm_IX_ATTR_PREF_TRIGGER_ACTION"> </A>ATTR_PREF_TRIGGER_ACTION;</PRE>
+<PRE>typedef struct {
+ 	word <A NAME="Config_13.htm_IX_PTA_&ldots;  (PrefTriggerAction structure)"> </A>PTA_message;
+ 	optr PTA_dest;
+} <A NAME="Config_13.htm_IX_PrefTriggerAction structure"> </A>PrefTriggerAction;</PRE>
+<HR>
+<A NAME="Config_14.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Config Library</A>: 4.14 <A HREF="#Config_6.htm">Object Class Reference</A>: 
+<A NAME="Config_14.htm_IX_PrefTocListClass">
+ </A>
+PrefTocListClass</H3>
+<P>
+<CODE>
+PrefTocListClass</CODE>
+ allows users to choose a device driver by selecting the appropriate device name. It is assumed that each driver can control one or more types of devices. When you set up each driver, you will set up strings to describe which devices that driver can control.
+<IMG SRC="Config_14_TocList.gif">
+
+</P>
+<P>
+This class is a fully functional subclass of <CODE>
+PrefDynamicListClass</CODE>
+ (i.e. it handles those messages one must intercept to create a viable Preferences dynamic list class). It can be used to scan a list of files (not necessarily device drivers), as long as all of those files are in the same directory and have the same characters in their token. 
+
+</P>
+<P CLASS="figTitle">
+Code Display 22-13 PrefTocListClass Instance Data</P>
+<PRE>@class PrefTocListClass, PrefDynamicListClass; </PRE>
+<PRE>@instance TocUpdateCategoryFlags <A NAME="Config_14.htm_IX_PTLI_&ldots;"> </A>PTLI_flags = 0;</PRE>
+<PRE>
+typedef WordFlags <A NAME="Config_14.htm_IX_TocUpdateCategoryFlags structure"> </A>TocUpdateCategoryFlags;
+#define <A NAME="Config_14.htm_IX_TUCF_&ldots;  (TocUpdateCategoryFlags structure)"> </A>TUCF_EXTENDED_DEVICE_DRIVERS 0x8000
+/* Files being enumerated are assumed to be extended device drivers. */</PRE>
+<PRE>#define TUCF_CUSTOM_FILES 0x4000
+/* The TUCP_fileArrayElementSize field will be used when creating the files array.
+ * Otherwise, each element of the files array will be of size TocFileStruct. 
+ * NOTE: If this flag is used, the data structure used for each file
+ * element MUST contain TocFileStruct as its first element. */</PRE>
+<PRE>#define TUCF_ADD_CALLBACK 0x2000
+/* TUCP_addCallback contains a fptr to a callback
+ * routine that will be called when a file is added to the files array. */</PRE>
+<PRE>#define TUCF_DIRECTORY_NOT_FOUND 0x1000
+/* Don't actually scan the directory, because it doesn't exist.
+ * Just create the category, and leave it empty. */</PRE>
+<PRE>@instance TocCategoryStruct PTLI_tocInfo = {&quot;&quot;, 0, 0};</PRE>
+<PRE>typedef struct {
+	TokenChars 		<A NAME="Config_14.htm_IX_TCS_&ldots;  (TocCategoryStruct structure)"> </A>TCS_tokenChars;
+	DBGroupAndItem 		TCS_files; 		/* file name array */
+	DBGroupAndItem 		TCS_devices; 		/* device name array--only if
+					 * TCF_EXTENDED_DEVICE_DRIVERS is set. */
+} <A NAME="Config_14.htm_IX_TocCategoryStruct structure"> </A>TocCategoryStruct;</PRE>
+<PRE>@vardata PrefTocExtraEntry <A NAME="Config_14.htm_IX_ATTR_PREF_TOC_LIST_&ldots;"> </A>ATTR_PREF_TOC_LIST_EXTRA_ENTRY_1; 
+@vardata PrefTocExtraEntry ATTR_PREF_TOC_LIST_EXTRA_ENTRY_2;</PRE>
+<PRE>typedef struct {
+	ChunkHandle 		<A NAME="Config_14.htm_IX_PTEE_&ldots;  (PrefTocExtraEntry structure)"> </A>PTEE_item;
+	/* lptr of item name. For device lists, this is 
+	 * the device. For others, this is the file name */</PRE>
+<PRE>	ChunkHandle 		PTEE_driver;
+	/* Driver name (for device lists ONLY) */</PRE>
+<PRE>	word 		PTEE_info;
+	/* Extra word of information */
+} <A NAME="Config_14.htm_IX_PrefTocExtraEntry structure"> </A>PrefTocExtraEntry;</PRE>
+<PRE>@vardata char ATTR_PREF_TOC_LIST_INFO_KEY[];
+/* This key is used to write the &quot;info&quot; word for device lists */</PRE>
+<P>
+Use <A NAME="Config_14.htm_IX_ATTR_GEN_PATH_DATA:with PrefTocListClass">
+ </A>
+ATTR_GEN_PATH_DATA to tell the PrefTocList object in which directory to look for the device drivers. The PrefTocList will store the list of device drivers and device names in DB items referenced in the <CODE>
+PTLI_tocInfo</CODE>
+ field's <CODE>
+TCS_files</CODE>
+ and <CODE>
+TCS_devices</CODE>
+ slots--it will do this automatically, so if you wish the default behavior, leave these as zero when declaring the object. If you will write your own handlers for keeping track of driver information, you may wish to work with these fields as there are some routines which have been set up to work with them.</P>
+<P CLASS="figTitle">
+Code Display 22-14 PrefTocList Framework</P>
+<PRE>@object PrefTocListClass MyPrefToc = {
+	PTLI_flags		= @default | TUCF_EXTENDED_DEVICE_DRIVERS;
+	PTLI_tocInfo		= {&quot;<EM>TOKN</EM>&quot;, 0, 0};
+	HINT_ITEM_GROUP_SCROLLABLE;
+	ATTR_GEN_INIT_FILE_KEY = &quot;<EM>keyName</EM>&quot;;
+	ATTR_GEN_PATH_DATA = { <EM>file path containing drivers</EM> };
+}</PRE>
+<P>
+The following routines are rather esoteric. You should only use them if you wish to subclass <CODE>
+PrefTocListClass</CODE>
+' behavior and wish to continue using its existing data structures.</P>
+<DL>
+<DT>
+<CODE>
+TocSortedNameArrayAdd()</DT><DD>
+</CODE>
+<A NAME="Config_14.htm_IX_TocSortedNameArrayAdd()">
+ </A>
+Use this routine to add a new name to a sorted array. The new name will be inserted in its correct place in the alphabetically sorted array.</DD>
+<DT>
+<CODE>
+TocSortedNameArrayFind()</DT><DD>
+</CODE>
+<A NAME="Config_14.htm_IX_TocSortedNameArrayFind()">
+ </A>
+This routine determines whether a given name is in the TOC List's sorted name array, and will return the position of the name's element if found.</DD>
+<DT>
+<CODE>
+TocFindCategory()</DT><DD>
+</CODE>
+<A NAME="Config_14.htm_IX_TocFindCategory()">
+ </A>
+Use this routine to find a category in the Toc file. The <CODE>
+TCS_tokenChars</CODE>
+ field of the passed <CODE>
+TocCategoryStruct</CODE>
+ should already be filled in; this routine will fill in the other fields.</DD>
+<DT>
+<CODE>
+TocNameArrayFind()</DT><DD>
+</CODE>
+<A NAME="Config_14.htm_IX_TocNameArrayFind()">
+ </A>
+Use this routine to get back the token associated with a name in the name array. If the name is not found, the routine will return CA_NULL_ELEMENT.</DD>
+<DT>
+<CODE>
+TocNameArrayGetElement()</DT><DD>
+</CODE>
+<A NAME="Config_14.htm_IX_TocNameArrayGetElement()">
+ </A>
+This routine takes a name array and a token and returns information about the name array element with the given token.</DD>
+<DT>
+<CODE>
+TocUpdateCategory()</DT><DD>
+</CODE>
+<A NAME="Config_14.htm_IX_TocUpdateCategory()">
+ </A>
+This complicated routine will update a category using a callback routine which you must write. It updates the file lists by scanning the current directory.</DD>
+<DT>
+<CODE>
+TocNameArrayAdd()</DT><DD>
+</CODE>
+<A NAME="Config_14.htm_IX_TocNameArrayAdd()">
+ </A>
+Use this routine to add an element to a Toc name array.</DD>
+<DT>
+<CODE>
+TocDBLock()</DT><DD>
+</CODE>
+<A NAME="Config_14.htm_IX_TocDBLock()">
+ </A>
+Use this routine to lock one of the name arrays.</DD>
+<DT>
+<CODE>
+TocDBLockGetRef()</DT><DD>
+</CODE>
+<A NAME="Config_14.htm_IX_TocDBLockGetRef()">
+ </A>
+This C-only routine does the same thing as <CODE>
+TocDBLock()</CODE>
+ and also returns the DB item's pointer and optr.</DD>
+<DT>
+<CODE>
+TocGetFileHandle()</DT><DD>
+</CODE>
+<A NAME="Config_14.htm_IX_TocGetFileHandle()">
+ </A>
+Use this routine to get the handle of the file in which all Toc device driver information is stored.</DD>
+
+</DL>
+<H6 CLASS="RefETitle">
+<A NAME="Config_14.htm_IX_MSG_PREF_TOC_LIST_GET_SELECTED_ITEM_INFO">
+ </A>
+MSG_PREF_TOC_LIST_GET_SELECTED_ITEM_INFO</H6>
+<PRE CLASS="syntax">Boolean MSG_PREF_TOC_LIST_GET_SELECTED_ITEM_INFO(
+        word 		*infoPtr);</PRE>
+<P>
+This message returns the information word about the currently selected item. This message can only be used with PrefTocList objects that have the TCF_EXTENDED_DEVICE_DRIVERS flag set.</P>
+<P CLASS="refField">
+Parameters:	<EM>infoPtr</EM>	Pointer to a word in which to return the info word.</P>
+<P CLASS="refField">
+Return:	Returns <EM>
+false</EM>
+ (i.e. zero) if item was found, returns <EM>
+true</EM>
+ (i.e. non-zero) if item was not found.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Config_14.htm_IX_MSG_PREF_TOC_LIST_GET_SELECTED_DRIVER_NAME">
+ </A>
+MSG_PREF_TOC_LIST_GET_SELECTED_DRIVER_NAME</H6>
+<PRE CLASS="syntax">word MSG_PREF_TOC_LIST_GET_SELECTED_DRIVER_NAME(
+        char 		*buf,
+        word 		bufSize);</PRE>
+<P>
+This message returns the name of the driver for the selected device. This message may only be used if TCF_EXTENDED_DEVICE_DRIVERS is set. </P>
+<P CLASS="refField">
+Parameters:	<EM>buf</EM>	Pointer to buffer to fill with the driver name.</P>
+<DL>
+<DT>
+<EM>bufSize</EM></DT><DD>The size of <EM>buf</EM>.</DD>
+</DL>
+<P CLASS="refField">
+Return:	If the device name fits in <EM>buf</EM>, then <EM>buf</EM> is filled and the message returns the size of the device name. If the device name doesn't fit, then the message will return zero.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Config_14.htm_IX_MSG_PREF_TOC_LIST_GET_SELECTED_ITEM_PATH">
+ </A>
+MSG_PREF_TOC_LIST_GET_SELECTED_ITEM_PATH</H6>
+<PRE CLASS="syntax">void MSG_PREF_TOC_LIST_GET_SELECTED_ITEM_PATH(
+        TocItemPath 		*data);</PRE>
+<P>
+This message returns the absolute path of the selected driver or file.</P>
+<P CLASS="refField">
+Structures:	</P>
+<PRE>typedef struct {
+  word 			<A NAME="Config_14.htm_IX_TIP_&ldots;  (TocItemPath structure)"> </A>TIP_disk; /* disk handle */</PRE>
+<PRE>  MemHandle 			TIP_pathBlock; 
+	/* Handle of block holding path (locked) */</PRE>
+<PRE>  char 			*TIP_path; 
+	/* Locked null-terminated absolute path */</PRE>
+<PRE>} <A NAME="Config_14.htm_IX_TocItemPath structure"> </A>TocItemPath;</PRE>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Config_14.htm_IX_MSG_PREF_TOC_LIST_CHECK_DEVICE_AVAILABLE">
+ </A>
+MSG_PREF_TOC_LIST_CHECK_DEVICE_AVAILABLE</H6>
+<PRE CLASS="syntax">Boolean MSG_PREF_TOC_LIST_CHECK_DEVICE_AVAILABLE(
+        word 		*retvalPtr);</PRE>
+<P>
+This message determines if the device selected by the list is available in the machine. This message may only be called for PrefTocList objects that have the TCF_EXTENDED_DEVICE_DRIVERS flag set.</P>
+<P CLASS="refField">
+Parameters:	<EM>retValPtr</EM>	Pointer to a word which will be filled with the return value.</P>
+<P CLASS="refField">
+Return:	Returns <EM>
+true</EM>
+ (i.e. non-zero if the device is available; if the driver is a video driver, *<EM>retValPtr</EM> is set to the device's <CODE>
+DisplayType</CODE>
+. If the device is not available, returns <EM>
+false</EM>
+ (i.e. zero); <EM>retValPtr</EM> is zero of the device doesn't exist; otherwise it will be the value of the appropriate <CODE>
+GeodeLoadError</CODE>
+ plus one. </P>
+<DL>
+<DT>
+&nbsp;</DT>
+
+</DL>
+<HR>
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+</BODY>
+</HTML>

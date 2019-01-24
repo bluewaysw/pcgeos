@@ -1,0 +1,139 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Documents_4.htm,v 1.1 97/06/02 14:43:26 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Document Control Models</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Documents</A>: 1.3 <A HREF="Documents_1.htm">Document Control Overview</A>: 
+<A NAME="16929">
+ </A>
+Document Control Models</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Documents_1.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Documents_3.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1.2 Document Control Interaction</A> 
+<!-- to next --> | <A HREF="Documents_5.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">2 Document Control Data Fields</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+GEOS allows two distinct models of document control, a <EM>
+Procedural</EM>
+ model and an <EM>
+Object</EM>
+ model. While the two models use the same objects, they embody different programming philosophies.</P>
+<P>
+The <EM>
+Procedural</EM>
+ model of document control is much like traditional, non-object-oriented programming. Under this model, whenever a situation arises that needs the application's attention, the document control objects will send a message to a single object (generally the Process object). This object handles all of these situations.</P>
+<P>
+Under the <EM>
+Object</EM>
+ model of document control, the application defines a subclass of <CODE>
+GenDocumentClass</CODE>
+. This new document class has methods to handle situations needing the application's attention. This model is based on the philosophy of object-oriented programming; each document object has code to handle situations arising for that document.</P>
+<P>
+The main difference between the two models is where the messages are sent. Under the Procedural model, messages are sent to the Process object; under the Object model, messages are sent to the appropriate document object. Every message sent in the Procedural model corresponds to a message sent in the Object model.</P>
+<P>
+The Procedural model is simpler to use; it does not require the application to subclass objects. It is thus well-suited for simple applications which will have only one file open at a time. It may also be an easier model for programmers who are new to object-oriented programming. The Object model, on the other hand, is best suited for applications which will have many documents open at once; the application can let every document object manage a single document without worrying about other open documents.</P>
+
+<H2 CLASS="HeadingC">
+The Procedural Model</H2>
+<P>
+The <EM>
+Procedural</EM>
+ model of document control is much like traditional, procedure-oriented programming. This model is simpler to implement than the object-model. It is well suited for simple applications which have only one document open at a time.
+
+</P>
+<P>
+Under the Procedural model of document control, every time a situation arises which requires the application's attention, the document control objects will send an appropriate message to the GenDocumentGroup object's output. These messages are imported from <CODE>
+MetaClass</CODE>
+, so all objects can handle them. The application will generally use global variables for run-time data storage.</P>
+<P>
+For example, when a new document needs to be initialized, the<CODE>
+ </CODE>
+document control sends a <CODE>
+MSG_META_DOC_OUTPUT_INITIALIZE_DOCUMENT_FILE</CODE>
+ to its output object. The output object takes any appropriate steps (e.g., storing the file handle, setting up the map block, etc.).</P>
+
+
+<H2 CLASS="HeadingC">
+The Object Model</H2>
+<P>
+The <EM>
+Object</EM>
+ model of document control is better suited to advanced applications and applications which will have more than one document open at a time. Under this model, the application defines a subclass of <CODE>
+GenDocumentClass</CODE>
+. This new document class has handlers for situations requiring the application's attention. It also has local variables (i.e., instance data fields) which store any information the application will need about this document. </P>
+<P>
+Whenever a situation arises that needs the application's attention, the relevant document object will send a message to itself. This document object will then handle the message. For example, an application might define its own document class, <CODE>
+MyAppDocumentClass</CODE>
+ (a subclass of <CODE>
+GenDocumentClass)</CODE>
+. Suppose a new document has been created and needs to be initialized. First, the GenDocumentGroup object will create a new document object by instantiating an object of <CODE>
+MyAppDocumentClass</CODE>
+. Next, the new document object will send itself a <CODE>
+MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE. </CODE>
+<CODE>
+MyAppDocumentClass</CODE>
+ will have a handler for this message; the handler will initialize the file as well as the document object's data structures.</P>
+
+
+<H2 CLASS="HeadingC">
+Messages Under the Two Models</H2>
+<P>
+The simplest way to show the difference between the two models is to see how a single event is handled. This section examines one specific case, in which a document needs to be initialized; other cases are handled analogously.</P>
+<P>
+Suppose a situation arises needing the application's attention; for example, a document is created and needs to be initialized. First, the document object will send an appropriate message to itself. In this case, it would send itself the message <CODE>
+MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE</CODE>
+. If the application uses a subclass of <CODE>
+GenDocumentClass</CODE>
+ and this subclass has a handler for <CODE>
+MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE</CODE>
+, the messager will call that method; otherwise, the messager will call the handler defined for this message by <CODE>
+GenDocumentClass</CODE>
+. The handler in <CODE>
+GenDocumentClass</CODE>
+ will find out the <CODE>
+GenDocumentGroup</CODE>
+ object's output optr. If this optr is non-null, the handler will send an appropriate message (in this case, <CODE>
+MSG_META_DOC_OUTPUT_INITIALIZE_DOCUMENT_FILE</CODE>
+) to the output object.</P>
+<P>
+Note that, under normal circumstances, the application will handle only one of the two messages. For example, if the application writes a handler for <CODE>
+MSG_GEN_DOCUMENT_PHYSICAL_SAVE</CODE>
+, the handler defined by <CODE>
+GenDocumentClass</CODE>
+ will not be called; as a result, <CODE>
+MSG_META_DOC_OUTPUT_PHYSICAL_SAVE</CODE>
+ will not be sent to the <CODE>
+GenDocumentGroup</CODE>
+ object's output. This is not usually a problem, since the application will generally handle one message or the other. If, for some reason, it needs to have both messages sent, the handler for <CODE>
+MSG_GEN_DOCUMENT_SAVE</CODE>
+ should contain a <CODE>
+@callsuper</CODE>
+ instruction.
+
+</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Documents_1.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Documents_3.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1.2 Document Control Interaction</A> 
+<!-- to next --> | <A HREF="Documents_5.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">2 Document Control Data Fields</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

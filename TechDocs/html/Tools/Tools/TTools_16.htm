@@ -1,0 +1,67 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: TTools_16.htm,v 1.1 97/06/27 16:02:27 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> The Way Things Work</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Using Tools</A>: 13.6 <A HREF="TTools_10.htm">pmake</A>: 
+The Way Things Work</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="TTools_10.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="TTools_15.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">13.5 Advanced pmake Techniques</A> 
+<!-- to next --> | <A HREF="TTools_17.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">14 Swat Stub</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+When <CODE>
+pmake</CODE>
+ reads the makefile, it parses sources and targets into nodes in a graph. The graph is directed only in the sense that <CODE>
+pmake</CODE>
+ knows which way is up. Each node contains not only links to all its parents and children (the nodes that depend on it and those on which it depends, respectively), but also a count of the number of its children that have already been processed.</P>
+<P>
+The most important thing to know about how <CODE>
+pmake</CODE>
+ uses this graph is that the traversal is breadth-first and occurs in two passes.</P>
+<P>
+After <CODE>
+pmake</CODE>
+ has parsed the makefile, it begins with the nodes the user has told it to make (either on the command line, or via a .MAIN target, or by the target being the first in the file not labeled with the .NOTMAIN attribute) placed in a queue. It continues to take the node off the front of the queue, mark it as something that needs to be made, pass the node to Suff_FindDeps() (mentioned earlier) to find any implicit sources for the node, and place all the node's children that have yet to be marked at the end of the queue. If any of the children is a .USE rule, its attributes are applied to the parent, then its commands are appended to the parent's list of commands and its children are linked to its parent. The parent's unmade-children counter is then decremented (since the .USE node has been processed). This allows a .USE node to have children that are .USE nodes, and the rules will be applied in sequence. If the node has no children, it is placed at the end of another queue to be examined in the second pass. This process continues until the first queue is empty.</P>
+<P>
+At this point, all the leaves of the graph are in the examination queue; <CODE>
+pmake</CODE>
+ removes the node at the head of the queue and sees if it is out-of-date. If it is, it is passed to a function that will execute the commands for the node asynchronously. When the commands have completed, all the node's parents have their unmade-children counter decremented and, if the counter is then zero, they are placed on the examination queue. Only those parents that were marked on the downward pass are processed in this way. Thus <CODE>
+pmake</CODE>
+ traverses the graph back up to the nodes the user instructed it to create. When the examination queue is empty and no shells are running to create a target, <CODE>
+pmake</CODE>
+ is finished.</P>
+<P>
+Once all targets have been processed, <CODE>
+pmake</CODE>
+ executes the commands attached to the .END target, either explicitly or through the use of an ellipsis in a shell script. If there were no errors during the entire process but there are still some targets unmade (<CODE>
+pmake</CODE>
+ keeps a running count of how many targets are left to be made), there is a cycle in the graph. The <CODE>
+pmake</CODE>
+ program does a depth-first traversal of the graph to find all the targets that weren't made and prints them out one by one.</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="TTools_10.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="TTools_15.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">13.5 Advanced pmake Techniques</A> 
+<!-- to next --> | <A HREF="TTools_17.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">14 Swat Stub</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

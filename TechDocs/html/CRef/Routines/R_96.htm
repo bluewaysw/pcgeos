@@ -1,0 +1,213 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: R_96.htm,v 1.2 97/06/25 18:44:44 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE>GEOS C Routines: ThreadAttachToQueue() ...</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+<DIV>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="R_95.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">TextSearchInString() ...</A> 
+<!-- to next --> | <A HREF="R_97.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">ThreadGetError() ...</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</DIV>
+<DIV>
+<A NAME="IX_ThreadAttachToQueue()">
+ </A>
+<H1 CLASS="refHeading">
+ThreadAttachToQueue()</H1>
+<PRE CLASS="syntax">void	ThreadAttachToQueue(
+        QueueHandle		qh,				/* queue to attach */
+        ClassStruct		* class);				/* primary class of thread */</PRE>
+<P>
+This routine attaches the calling thread to the passed event queue. This is used only for event-driven threads. Typically, this routine is called when a thread is created; attaching to queues is automatic in nearly all cases, and you will rarely need this routine.</P>
+<P>
+Pass the handle of the queue in <CODE>
+qh</CODE>
+ and a class pointer in <CODE>
+class</CODE>
+. The class will be attached to the event queue and will handle all messages sent directly to the thread. This class should nearly always be a subclass of <CODE>
+ProcessClass</CODE>
+.</P>
+<P>
+If a queue handle of zero is passed, the thread wants to &quot;reattach&quot; to the current queue. This is used typically during shutdown of event-driven threads, and it is nearly always taken care of automatically by <CODE>
+ProcessClass</CODE>
+.</P>
+<P CLASS="refField"><STRONG>
+Include:</STRONG>	<STRONG CLASS="fileName">
+thread.h</STRONG>
+ </P>
+</DIV>
+<DIV>
+<A NAME="IX_ThreadCreate()">
+ </A>
+<A NAME="IX_PRIORITY_&ldots;">
+ </A>
+<H1 CLASS="refHeading">
+ThreadCreate()</H1>
+<PRE CLASS="syntax">ThreadHandle ThreadCreate(
+        word	priority,			/* Initial base priority of new thread */
+        word	valueToPass,			/* Optional data to pass to new thread */
+        word	(*startRoutine)(word valuePassed),
+				/* Pointer to entry routine */</PRE>
+<PRE CLASS="syntax">        word	stackSize,			/* Size of the stack for the new thread */
+        GeodeHandle owner);				/* Geode that will own the new thread */</PRE>
+<P>
+This routine creates a new procedural thread for a process. If you need a new event-driven thread, send <CODE>
+MSG_PROCESS_CREATE_EVENT_THREAD</CODE>
+ to your process object instead.</P>
+<P>
+Pass the following parameters to this routine:</P>
+<DL>
+<DT>
+<CODE>
+priority</CODE>
+</DT><DD>The priority of the new thread. Typically this will be one of the standard thread priorities (see below).</DD>
+<DT>
+<CODE>
+valueToPass</DT><DD>
+</CODE>
+A word of optional data to be passed to the entry routine of the new thread. This can be used, for example, to indicate the thread's initial context or for initializing thread variables.</DD>
+<DT>
+<CODE>
+startRoutine</DT><DD>
+</CODE>
+A pointer to the entry routine to be executed immediately for the thread. This may be in either fixed or movable memory. The segment must be a virtual segment. Note that if the routine is in movable memory, it may degrade heap performance for the life of the thread (its movable block will remain locked for extended stretches of time). The routine may return the thread's exit code or may call <CODE>
+<A HREF="../../CRef/Routines/R_96.htm#IX_ThreadDestroy()">ThreadDestroy()</A></CODE>
+ directly.</DD>
+<DT>
+<CODE>
+stackSize</CODE>
+</DT><DD>The stack size allocated for the thread. 512 bytes is typically enough for threads doing neither UI nor file system work; threads working with the file system will require 1 K. Threads working with UI objects will require 3 K.</DD>
+<DT>
+<CODE>
+owner</CODE>
+</DT><DD>The geode handle of the geode that will own the thread. If the calling thread's geode will own the new thread, it can call <CODE>
+<A HREF="../../CRef/Routines/R_34.htm#IX_GeodeGetProcessHandle()">GeodeGetProcessHandle()</A></CODE>
+ prior to calling <CODE>
+ThreadCreate()</CODE>
+.</DD>
+</DL>
+<P>
+<CODE>
+ThreadCreate()</CODE>
+ returns the thread handle of the new thread. If an error occurs, the calling thread's error code will be set and a null handle returned; you should likely call <CODE>
+<A HREF="../../CRef/Routines/R_97.htm#IX_ThreadGetError()">ThreadGetError()</A></CODE>
+ to retrieve the error code after creating the new thread. A return of NO_ERROR_RETURNED from <CODE>
+<A HREF="../../CRef/Routines/R_97.htm#IX_ThreadGetError()">ThreadGetError()</A></CODE>
+ means no error occurred.</P>
+<P>
+The standard thread priorities that may be passed in the <CODE>
+priority</CODE>
+ parameter are listed below:</P>
+<DL>
+<DT>
+PRIORITY_TIME_CRITICAL</DT><DD>
+The highest priority of all; you should not use this in general because it will pre-empt nearly all other threads. (It may be useful, however, during debugging.)</DD>
+<DT>
+PRIORITY_HIGH</DT><DD>
+A high priority; generally only used for highly important threads.</DD>
+<DT>
+PRIORITY_UI</DT><DD>
+Another high priority; this is used for User Interface threads to provide quick response to user actions.</DD>
+<DT>
+PRIORITY_FOCUS</DT><DD>
+A medium-level priority; this is used for whatever thread has the current input focus (whichever thread the user is currently working with).</DD>
+<DT>
+PRIORITY_STANDARD</DT><DD>
+The standard application thread priority; you should typically use this when creating new threads.</DD>
+<DT>
+PRIORITY_LOW</DT><DD>
+A low priority for tasks that can be done in the background.</DD>
+<DT>
+PRIORITY_LOWEST</DT><DD>
+The lowest standard priority; it is used for threads that can take any amount of time to complete.</DD>
+</DL>
+<P CLASS="refField"><STRONG>
+Include:</STRONG>	<STRONG CLASS="fileName">
+thread.h</STRONG>
+ </P>
+</DIV>
+<DIV>
+<A NAME="IX_ThreadDestroy()">
+ </A>
+<H1 CLASS="refHeading">
+ThreadDestroy()</H1>
+<PRE CLASS="syntax">void	ThreadDestroy(
+        word	errorCode,	/* Error code to indicate cause of destruction */
+        optr	ackObject,	/* Object to receive destruction acknowledgment */
+        word	ackData);	/* Additional word of data to pass (as the low
+			 * word of optr for source of MSG_META_ACK) */</PRE>
+<P>
+This routine causes the current (calling) thread to exit and then destroy itself. The thread is responsible for ensuring that it has no leftover resources allocated or semaphores locked.</P>
+<P>
+Pass it an error code or exit code meaningful to the application and the other threads in the application. This error code will be used by the debugger to determine the cause of the thread's exit; a null error code usually indicates successful completion of the thread's task.</P>
+<P>
+Pass also the optr of the object to receive acknowledgement of the thread's destruction. The object specified will receive <CODE>
+MSG_META_ACK</CODE>
+ after the calling thread is completely destroyed.</P>
+<P CLASS="refField"><STRONG>
+Be Sure To:</STRONG>	Always clean up before exiting a thread. Unlock locked resources, free allocated memory, etc. You do not have to do these things for the application's primary thread; the process object (the primary thread) will automatically clean up after itself.</P>
+<P CLASS="refField"><STRONG>
+Include:</STRONG>	<STRONG CLASS="fileName">
+thread.h</STRONG>
+ </P>
+</DIV>
+<DIV>
+<A NAME="IX_ThreadFreeSem()">
+ </A>
+<H1 CLASS="refHeading">
+ThreadFreeSem()</H1>
+<PRE CLASS="syntax">void	ThreadFreeSem(
+        SemaphoreHandle sem);			/* semaphore to be freed */</PRE>
+<P>
+This routine frees the specified semaphore that had been allocated with <CODE>
+<A HREF="../../CRef/Routines/R_95.htm#IX_ThreadAllocSem()">ThreadAllocSem()</A></CODE>
+. You must be sure that no threads are using the semaphore or will use it after it has been freed. Subsequent access attempts could cause illegal handle errors or worse.</P>
+<P CLASS="refField"><STRONG>
+Include:</STRONG>	<STRONG CLASS="fileName">
+sem.h</STRONG>
+ </P>
+<P CLASS="refField"><STRONG>
+See Also:</STRONG> <CODE><A HREF="../../CRef/Routines/R_95.htm#IX_ThreadAllocSem()">ThreadAllocSem()</A></CODE>,
+<CODE><A HREF="../../CRef/Routines/R_98.htm#IX_ThreadPSem()">ThreadPSem()</A></CODE>,
+<CODE><A HREF="../../CRef/Routines/R_98.htm#IX_ThreadVSem()">ThreadVSem()</A></CODE>,
+<CODE><A HREF="../../CRef/Routines/R_98.htm#IX_ThreadPTimedSem()">ThreadPTimedSem()</A></CODE>.</P>
+</DIV>
+<DIV>
+<A NAME="IX_ThreadFreeThreadLock()">
+ </A>
+<H1 CLASS="refHeading">
+ThreadFreeThreadLock()</H1>
+<PRE CLASS="syntax">void	ThreadFreeThreadLock(
+        ThreadLockHandle sem);				/* thread lock to be freed */</PRE>
+<P>
+This routine frees the specified thread lock that had been allocated with <CODE>
+<A HREF="../../CRef/Routines/R_95.htm#IX_ThreadAllocThreadLock()">ThreadAllocThreadLock()</A></CODE>
+. You must be sure that no threads are using or will use the thread lock after it has been freed. Subsequent attempts to grab or release the thread lock could cause illegal handle errors.</P>
+<P CLASS="refField"><STRONG>
+Include:</STRONG>	<STRONG CLASS="fileName">
+sem.h</STRONG>
+ </P>
+</DIV>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="R_95.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">TextSearchInString() ...</A> 
+<!-- to next --> | <A HREF="R_97.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">ThreadGetError() ...</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

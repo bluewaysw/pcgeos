@@ -1,0 +1,219 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: TTCL_5.htm,v 1.1 97/06/27 16:01:50 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Basic Command Syntax</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Tool Command Language</A>: 4.1 <A HREF="TTCL_4.htm">Syntax and Structure</A>: 
+Basic Command Syntax</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="TTCL_4.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="TTCL_4.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">4 Syntax and Structure</A> 
+<!-- to next --> | <A HREF="TTCL_6.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.2 Expressions</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+The Tcl language has syntactic similarities to both Unix and Lisp. However, the interpretation of commands is different in Tcl than in either of those other two systems. A Tcl command string consists of one or more commands separated by newline characters. Each command consists of a collection of fields separated by white space (spaces or tabs). The first field must be the name of a command, and the additional fields, if any, are arguments that will be passed to that command. For example, the command:</P>
+<PRE>var a 22</PRE>
+<P>
+has three fields: the first, <CODE>
+var</CODE>
+, is the name of a Tcl command, and the last two, <CODE>
+a</CODE>
+ and <CODE>
+22</CODE>
+, will be passed as arguments to the <CODE>
+var</CODE>
+ command. The command name may refer to a built-in Tcl command, an application specific command, or a command procedure defined with the built-in <CODE>
+proc</CODE>
+ command. Arguments are passed literally as text strings. Individual commands may interpret those strings in any fashion they wish. The <CODE>
+var </CODE>
+command, for example, will treat its first argument as the name of a variable and its second argument as a string value to assign to that variable. For other commands, arguments may be interpreted as integers, lists, file names, or Tcl commands.</P>
+
+<H2 CLASS="HeadingC">
+Comments</H2>
+<P>
+<A NAME="IX_Comments:in Tcl code">
+ </A>
+<A NAME="IX_Tcl:comments">
+ </A>
+If the first non-blank character in a command is <CODE>
+#</CODE>
+ (a number sign), then everything from the # up through the next newline character is treated as comment and discarded by the parser.</P>
+
+
+<H2 CLASS="HeadingC">
+Argument Grouping</H2>
+<P>
+Normally each argument field ends at the next white space (tabs or spaces), but curly braces (&quot;{&quot; and &quot;}&quot;) may be used to group arguments in different ways. If an argument field begins with a left brace, then the argument is not terminated by white space; it ends at the matching right brace. Tcl will strip off the outermost layer of braces before passing the argument to the command. For example, in the command:</P>
+<PRE>var a {b c}</PRE>
+<P>
+the <CODE>
+var</CODE>
+ command will receive two arguments: <CODE>
+a</CODE>
+ and<CODE>
+ b  c</CODE>
+. The matching right brace need not be on the same line as the left brace; in this case the newline will be included in the argument field along with any other characters up to the matching right brace. In many cases an argument field to one command consists of a Tcl command string that will be executed later; braces allow complex command structures to be built up without confusion. For example, the <CODE>
+eval</CODE>
+ command takes one argument, which is a command string; <CODE>
+eval</CODE>
+ invokes the Tcl interpreter to execute the command string. The command:</P>
+<PRE>eval {
+       var a 22
+       var b 33
+}</PRE>
+<P>
+will assign the value 22 to <CODE>
+a</CODE>
+ and 33 to <CODE>
+b</CODE>
+.</P>
+<P>
+Tcl braces act like quote characters in most other languages, in that they prevent any special interpretation of the characters between the left brace and the matching right brace.</P>
+<P>
+When an argument is in braces, then command, variable, and backslash substitutions do not occur in the normal fashion; all Tcl does is to strip off the outer layer of braces and pass the contents to the command. Braces are only significant in a command field if the first character of the field is a left brace. Otherwise neither left nor right braces in the field will be treated specially (except as part of variable substitution).</P>
+
+
+<H2 CLASS="HeadingC">
+Command Grouping</H2>
+<P>
+Normally, each command occupies one line (the command is terminated by a newline character). Thus, the string:</P>
+<PRE>var a 22
+var b 33</PRE>
+<P>
+will be interpreted as two separate commands. However, brackets may be used to group commands in ways other than one-command-per-line. If the first character of a command is an open bracket, then the command is not terminated by a newline character; instead, it consists of all the characters up to the matching close bracket. Newline characters inside a bracketed command are treated as white space (they will act as argument separators for arguments that are not enclosed in braces). For example, the string:</P>
+<PRE>[var a
+22] [var b 33]</PRE>
+<P>
+will have the same effect as the previous example.</P>
+
+
+<H2 CLASS="HeadingC">
+Command Substitution</H2>
+<P>
+If an open bracket occurs in any of the fields of a command, then command substitution occurs. All of the text up to the matching close bracket is treated as a Tcl command and executed immediately. The result of that command is substituted for the bracketed text. For example, consider the command:</P>
+<PRE>var a [var b]</PRE>
+<P>
+When the <CODE>
+var</CODE>
+ command has only a single argument, it is the name of a variable and <CODE>
+var</CODE>
+ returns the contents of that variable. In this case, if variable <CODE>
+b</CODE>
+ has the value <CODE>
+test</CODE>
+, then the command above is equivalent to the command:</P>
+<PRE>var a test</PRE>
+<P>
+Brackets can be used in more complex ways. for example, if the variable<CODE>
+ b</CODE>
+ has the value <CODE>
+tmp</CODE>
+ and the variable <CODE>
+c</CODE>
+ has the value <CODE>
+val</CODE>
+, then the command:</P>
+<PRE>var a test[var b].[var c]</PRE>
+<P>
+is equivalent to the command:</P>
+<PRE>var a testtmp.val</PRE>
+<P>
+If a field is enclosed in braces then the brackets and the characters between them are not interpreted specially; they are passed through to the argument verbatim.</P>
+
+
+<H2 CLASS="HeadingC">
+Variable Substitution</H2>
+<P>
+<A NAME="IX_Dollar sign:in Tcl">
+ </A>
+<A NAME="IX_$:in Tcl">
+ </A>
+The dollar sign ($) may be used as a special shorthand form for substituting variables. If $ appears in an argument that is not enclosed in braces then variable substitution will occur. The characters after the $, up to the first character that is not a number, letter, or underscore, are taken as a variable name and the string value of that variable is substituted for the name. Or, if the dollar sign is followed by an open curly brace, then the variable name consists of all the characters up to the next close curly brace. For example, if variable <CODE>
+outfile</CODE>
+ has the value <CODE>
+test</CODE>
+, then the command:</P>
+<PRE>var a $outfile.c</PRE>
+<P>
+is equivalent to the command:</P>
+<PRE>var a test.c</PRE>
+<P>
+ and the command:</P>
+<PRE>var a abc${outfile}tmp</PRE>
+<P>
+is equivalent to the command:</P>
+<PRE>var a abctesttmp</PRE>
+<P>
+Variable substitution does not occur in arguments that are enclosed in braces: the dollar sign and variable name are passed through to the argument verbatim.</P>
+<P>
+The dollar sign abbreviation is simply a shorthand form. <CODE>
+$a</CODE>
+ is completely equivalent to<CODE>
+ [var a]</CODE>
+; it is provided as a convenience to reduce typing.</P>
+
+
+<H2 CLASS="HeadingC">
+Backslash Substitution</H2>
+<P>
+<A NAME="IX_\ backslash substitution:in Tcl[;backslash substitution]">
+ </A>
+Backslashes may be used to insert non-printing characters into command fields and also to insert braces, brackets, and dollar signs into fields without them being interpreted specially as previously described. The backslash sequences understood by the Tcl interpreter are listed below. In each case, the backslash sequence is replaced by the given character.</P>
+<P>
+For example, in the command:</P>
+<PRE>var a \{x\[\ yz\141</PRE>
+<P>
+the second argument to <CODE>
+var</CODE>
+ is <CODE>
+{x[   yza</CODE>
+ (note the &lt;space&gt; as part of the argument).</P>
+<P>
+If a backslash is followed by something other than one of the options listed below, then the backslash is transmitted to the argument field without any special processing, and the Tcl scanner continues normal processing with the next character. For example, in the command:</P>
+<PRE>var \*a \\\{test</PRE>
+<P>
+the first argument will be <CODE>
+\*a</CODE>
+ and the second <CODE>
+\{test</CODE>
+.
+<IMG SRC="BackslashSequences.gif">
+
+</P>
+<P>
+If an argument is enclosed in braces, then backslash sequences inside the argument are parsed but no substitution occurs. In particular, backslashed braces are not counted in locating the matching right brace that terminates the argument. for example, in the command:</P>
+<PRE>var a {\{abc}</PRE>
+<P>
+the second argument to var will be <CODE>
+\{abc</CODE>
+.</P>
+<P>
+The backslash mechanism is not sufficient to generate any argument structure; it only covers the most common cases. To produce particularly complicated arguments it will probably be easiest to use the <CODE>
+format</CODE>
+ command along with command substitution.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="TTCL_4.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="TTCL_4.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">4 Syntax and Structure</A> 
+<!-- to next --> | <A HREF="TTCL_6.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.2 Expressions</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

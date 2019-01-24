@@ -1,0 +1,120 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: LMem_8.htm,v 1.1 97/06/02 15:52:48 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Using Chunks</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Local Memory</A>: 3.2 <A HREF="LMem_6.htm">Using Local Memory Heaps</A>: 
+<A NAME="27466">
+ </A>
+Using Chunks</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="LMem_6.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="LMem_7.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.1 Creating a Local Heap</A> 
+<!-- to next --> | <A HREF="LMem_9.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.3 Contracting the LMem Heap</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>LMemAlloc(), LMemDeref(), LMemFree(), LMemGetChunkSize(), LMemReAlloc(), LMemInsertAt(), LMemDeleteAt(), LMemDerefHandles(), LMemFreeHandles(), LMemGetChunkSizeHandles(), LMemReAllocHandles(), LMemInsertAtHandles(), LMemDeleteAtHandles()</PRE>
+<P>
+Once a local heap has been initialized, you can allocate, use, and free chunks at will. Chunks can only be manipulated while the block containing the LMem heap is fixed or locked on the global heap.</P>
+<P>
+<CODE>
+LMemAlloc()</CODE>
+<A NAME="IX_LMemAlloc()">
+ </A>
+ allocates a new chunk on the local heap. It is passed the handle of the block containing the heap and the size of the chunk needed. <CODE>
+LMemAlloc()</CODE>
+ returns the handle of the new chunk (which must then be dereferenced before the chunk is used). The size requested will be rounded up as necessary to ensure that the chunks are dword-aligned. An additional two bytes will be allocated to store the size of the chunk; these bytes will be before the data. This routine may compact the chunks on the local heap, so all pointers to that heap will be invalidated; they will have to be dereferenced by their chunk handles. Furthermore, the block itself may be moved (if LMF_NO_ENLARGE is not set). Even fixed blocks may be moved if they need to expand to accommodate new chunks.</P>
+<P>
+All of the following routines come in two forms. As noted, an optr is simply the handle of an object block, followed by the object's chunk handle. For this reason, most LMem routines come in two slightly different formats: one where the chunk is specified with an optr, and one where it is specified with the two handles. In all other ways, the two versions of each routine are identical. Indeed, in assembly there is only a single version of each routine; the only difference is in how the C routines take their parameters.</P>
+<P>
+<A NAME="IX_LMemDerefHandles()">
+ </A>
+<A NAME="IX_LMemDeref()">
+ </A>
+Once you have allocated a chunk, you must dereference its chunk handle in order to use it. You can do this with <CODE>
+LMemDeref()</CODE>
+. This routine takes a singe parameter, namely the optr. It returns a pointer to the data portion of the chunk (after the size word). This pointer will remain valid until the block is unlocked or until a routine is called which can cause block resizing or heap compaction (e.g. <CODE>
+LMemAlloc()</CODE>
+). Since these routines can invalidate chunk-pointers, it is important that data-synchronization routines be used if more than one thread is accessing the heap; otherwise, one thread may cause the heap to be shuffled while another thread is trying to read from it. The version which takes handles is named <CODE>
+LMemDerefHandles()</CODE>
+.</P>
+<P>
+<A NAME="IX_LMemFreeHandles()">
+ </A>
+<A NAME="IX_LMemFree()">
+ </A>
+When you are done using a chunk of memory, you should free it with <CODE>
+LMemFree()</CODE>
+. This routine is passed an optr; it does not return anything. It does not resize the block or shuffle chunks; therefore, pointers to other chunks will not be invalidated by <CODE>
+LMemFree()</CODE>
+.<A NAME="IX_LMemFreeHandles()">
+ </A>
+ The version which takes handles is named <CODE>
+LMemFreeHandles()</CODE>
+.</P>
+<P>
+<A NAME="IX_LMemGetChunkSize()">
+ </A>
+You can find out the size of any chunk by calling the routine <CODE>
+LMemGetChunkSize()</CODE>
+. This routine is passed an optr; it returns the size of the chunk in bytes (not counting the chunk's size word). <A NAME="IX_LMemGetChunkSizeHandles()">
+ </A>
+The version which takes handles is named <CODE>
+LMemGetChunkSizeHandles()</CODE>
+.</P>
+<P>
+Chunks can be resized after creation. <A NAME="IX_LMemReAlloc()">
+ </A>
+The Boolean routine <CODE>
+LMemReAlloc()</CODE>
+ takes two arguments, namely an optr and the new size of the chunk. If the new size is larger than the old one, bytes will be added to the end of the chunk; chunks may be shuffled and the block may be resized, so all pointers to chunks will be invalidated. The new bytes will not be zero-initialized. If the new chunk size is smaller than the old one, the chunk will be truncated; pointers to chunks will not be invalidated. This routine will fail only if the LMem heap ran out of space and could not be resized. In this case, it will return non-zero without changing the chunk. If it succeeds, it returns zero. <A NAME="IX_LMemReAllocHandles()">
+ </A>
+The version which takes handles is called <CODE>
+LMemReAllocHandles()</CODE>
+.</P>
+<P>
+<A NAME="IX_LMemInsertAt()">
+ </A>
+You can add bytes inside a chunk with the Boolean routine <CODE>
+LMemInsertAt()</CODE>
+. This routine takes three arguments: the optr, an offset within the chunk, and the number of bytes to add. The new space is added beginning at the specified offset; it is initialized to zeros. This may cause chunks to be shuffled and/or the block to be expanded; pointers to chunks are therefore invalidated. Note that it is your responsibility to make sure that the offset within the chunk really is in the chunk; otherwise, results are undefined. If <CODE>
+LMemInsertAt()</CODE>
+ fails (because the LMem heap ran out of space and could not be expanded), it returns non-zero without changing the chunk; otherwise it returns zero. <A NAME="IX_LMemInsertAtHandles()">
+ </A>
+The version which takes handles is named <CODE>
+LMemInsertAtHandles()</CODE>
+.</P>
+<P>
+<A NAME="IX_LMemDeleteAt()">
+ </A>
+You can delete bytes within a chunk with the routine <CODE>
+LMemDeleteAt()</CODE>
+. This routine takes three arguments: the optr, the offset within the chunk of the first byte to be deleted, and the number of bytes to delete. This routine does not invalidate pointers to chunks. The routine does not return anything. Note that it is your responsibility to make sure that all the bytes to be deleted are within the chunk, i.e. that the offset and number of bytes passed do not specify bytes that are beyond the end of the chunk. If you fail to do this, results are undefined.<A NAME="IX_LMemDeleteAtHandles()">
+ </A>
+ The version which takes handles is named <CODE>
+LMemDeleteAtHandles()</CODE>
+.</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="LMem_6.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="LMem_7.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.1 Creating a Local Heap</A> 
+<!-- to next --> | <A HREF="LMem_9.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.3 Contracting the LMem Heap</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

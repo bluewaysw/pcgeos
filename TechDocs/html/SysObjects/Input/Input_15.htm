@@ -1,0 +1,175 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Input_15.htm,v 1.1 97/06/02 16:18:32 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Using Target</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Input</A>: 5.4 <A HREF="Input_11.htm">Input Hierarchies</A>: 
+<A NAME="74791">
+ </A>
+Using Target</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Input_11.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Input_14.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.3 Using Focus</A> 
+<!-- to next --> | <A HREF="Input_16.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5.5 Using Model</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+<A NAME="IX_Target">
+ </A>
+The specific UI handles most of the manipulation of the target hierarchy. Most specific UIs interpret keyboard and mouse events and know when to switch the target from one object to another. For example, in OSF/Motif, clicking on a window will switch the target to that window from the previous target window. Before the mouse is clicked, however, the target exclusive of that window will not change. In other specific UIs which incorporate real-estate cursor behavior, merely moving the cursor over a window will transfer the target to that window.</P>
+<P>
+By default, an application will come up with certain objects having the target exclusive within their target levels. This allows the user to immediately begin typing or operating on data. For an object to grab the default exclusive, it must first be targetable. A targetable object can be any child of a valid target node. Valid nodes for the target hierarchy are:</P>
+<DL>
+<DT>
+	GenSystem</DT><DD>
+GenField<BR>
+GenApplication<BR>
+GenPrimary<BR>
+GenDisplayControl<BR>
+GenDisplay<BR>
+GenView (with GVA_TARGETABLE bit set)<BR>
+GenInteraction (independently displayable)<BR>
+VisContent</DD>
+</DL>
+<P>
+In addition, however, a generic object must be set GA_TARGETABLE in its <CODE>
+GI_attrs</CODE>
+ field to become a valid target object. This bit is set by default for the following classes:</P>
+<DL>
+<DT>
+	GenField</DT><DD>
+GenApplication<BR>
+GenPrimary<BR>
+GenDisplayControl<BR>
+GenDisplay<BR>
+GenView</DD>
+</DL>
+<P>
+<A NAME="IX_GA_TARGETABLE">
+ </A>
+If you wish a generic object to be targetable and it does not appear in this list, set it GA_TARGETABLE. If the object does not by default appear as a valid node in the Target hierarchy (such as for a custom gadget), you must subclass the object and add target instance fields and message handlers. </P>
+<P>
+<A NAME="IX_HINT_DEFAULT_TARGET">
+ </A>
+For all targetable objects within a target exclusive level, the target will be granted to the object with <CODE>
+HINT_DEFAULT_TARGET</CODE>
+ in its instance data. If no object has this hint at a particular target level, then the target will be granted to the first targetable object at that level.</P>
+
+<H2 CLASS="HeadingC">
+Grabbing and Releasing the Target</H2>
+<P>
+<A NAME="IX_MSG_META_GRAB_TARGET_EXCL">
+ </A>
+To grab the target exclusive in its level, a node should send itself <CODE>
+MSG_META_GRAB_TARGET_EXCL</CODE>
+. The default handler for this message grabs the target exclusive for the object from its parent and forces any other object on the caller's level to give the target up. The active exclusive will not be granted unless the caller is part of the active path after the grab.</P>
+<P>
+<A NAME="IX_MSG_META_RELEASE_TARGET_EXCL">
+ </A>
+When another node grabs the target exclusive, the node currently having the exclusive on that level must give it up. <CODE>
+MSG_META_RELEASE_TARGET_EXCL</CODE>
+ releases the target exclusive for the other node.</P>
+<P>
+Note that these messages only modify the exclusive at a single level. Therefore, they only affect the target optr of the parent's node; further up the target hierarchy there is no effect. Changing the target exclusive of an object will only change the direction of the target path if all parents of the new exclusive are also target exclusives.</P>
+<P>
+<CODE>
+MSG_META_GET_TARGET_EXCL</CODE>
+<A NAME="IX_MSG_META_GET_TARGET_EXCL">
+ </A>
+ may be sent to any targetable composite node to get the optr of the node's child having the exclusive. This message may be used even on nodes in the inactive path.</P>
+
+
+<H2 CLASS="HeadingC">
+Gaining and Losing the Target</H2>
+<P>
+<A NAME="IX_MSG_META_GAINED_TARGET_EXCL">
+ </A>
+When an object gains the active target exclusive and is a node in the active path, it receives <CODE>
+MSG_META_GAINED_TARGET_EXCL</CODE>
+. This indicates to the object that it will receive all keyboard input as the active keyboard object. <A NAME="IX_MSG_META_LOST_TARGET_EXCL">
+ </A>
+At some point later, when the object has lost the target exclusive, it will receive <CODE>
+MSG_META_LOST_TARGET_EXCL</CODE>
+.</P>
+
+
+<H2 CLASS="HeadingC">
+Sending Classed Events to the Target</H2>
+<P>
+<A NAME="IX_MSG_META_SEND_CLASSED_EVENT:to target">
+ </A>
+Frequently, you may wish to send messages to objects in the active Target path. The easiest way to deliver a message to an object in the target hierarchy is to use <CODE>
+MSG_META_SEND_CLASSED_EVENT</CODE>
+ with the <CODE>
+TravelOption</CODE>
+ TO_TARGET. To send a message to the leaf node of the active path, send this message with a null class. The message will be sent down the hierarchy until it reaches the leaf object, where it will be processed. (See <A HREF="Input_15.htm#57950"> Delivering Messages to the Target</A>
+.)</P>
+<P>
+This approach is desirable over using <CODE>
+MSG_META_GET_TARGET_EXCL</CODE>
+ to return an optr for later use, as the system may have corrupted the optr in the meantime. </P>
+<P CLASS="figTitle">
+Code Display 11-3 <A NAME="57950">
+ </A>
+Delivering Messages to the Target</P>
+<PRE>@method MyProcessClass, MSG_SEND_MESSAGE_TO_TARGET_INTERACTION {
+    EventHandle event;</PRE>
+<PRE>	/* The classed event is recorded to be handled by the first object of class
+	 * GenInteractionClass. */
+    event = @record GenTextClass::MSG_TEST_MESSAGE();</PRE>
+<PRE>	/* This message is then sent to the GenApplication object, from which it 
+	 * will travel down the target hierarchy until handled at the
+	 * GenInteraction level. */
+    @call MyApplication::MSG_META_SEND_CLASSED_EVENT(event, TO_TARGET);
+}</PRE>
+<PRE>/* You may also declare an object with the TravelOption TO_APP_TARGET. This will
+ * send the message to the application object and then down the target hierarchy. */</PRE>
+<PRE>@object GenTriggerClass MyTargetTrigger = {
+    GI_visMoniker = &quot;Send test message to the target&quot;;
+    GTI_actionMsg = MSG_TEST_MESSAGE;
+    GTI_destination = (TO_APP_TARGET);
+    ATTR_GEN_DESTINATION_CLASS = { (ClassStruc *)&amp;GenTextClass };
+}</PRE>
+<PRE>/* To send a message to the target leaf node, use a null class. */</PRE>
+<PRE>@method MyProcessClass, MSG_SEND_TEST_TO_TARGET_LEAF {
+    EventHandle event;</PRE>
+<PRE>	/* A classed event with the class of null is recorded. */
+    event = @record null::MSG_TEST_MESSAGE();</PRE>
+<PRE>	/* This event is sent to the GenApplication, where it will travel down the
+	 * target hierarchy to the leaf object, where it will be handled. */
+    @call MyApplication::MSG_META_SEND_CLASSED_EVENT(event, TO_TARGET);
+}</PRE>
+<PRE>/* As an alternative, an object could be set to deliver its message to the
+ * leaf target node of the application. */
+@object GenTriggerClass MyTargetLeafTrigger = {
+    GI_visMoniker = &quot;Send test message to the target leaf object&quot;;
+    GTI_actionMsg = MSG_TEST_MESSAGE;
+    GTI_destination = (TO_APP_TARGET);
+    /* An ATTR_GEN_DESTINATION_CLASS of zero specifies a null class. */
+    ATTR_GEN_DESTINATION_CLASS = 0;
+}</PRE>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Input_11.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Input_14.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.3 Using Focus</A> 
+<!-- to next --> | <A HREF="Input_16.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5.5 Using Model</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

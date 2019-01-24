@@ -1,0 +1,326 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: MetaClass_6.htm,v 1.1 97/06/02 16:20:56 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> User Interface Utility Meta Messages</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">MetaClass</A>: 2.4 <A HREF="MetaClass_2.htm">Utility Messages</A>: 
+User Interface Utility Meta Messages</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="MetaClass_2.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="MetaClass_5.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2.3 Object Management Messages</A> 
+<!-- to next --> | <A HREF="MetaClass_7.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2.5 Event Messages</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+These messages are used primarily by the User Interface. You will have very little need to subclass or send them.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_SET_FLAGS">
+ </A>
+MSG_META_SET_FLAGS</H4>
+<PRE CLASS="syntax">void 	MSG_META_SET_FLAGS(
+        ChunkHandle 	objChunk,
+        ObjChunkFlags 	bitsToSet,
+        ObjChunkFlags 	bitsToClear);</PRE>
+<P>
+<A NAME="IX_Chunk flags">
+ </A>
+This message sets the chunk flags for an object. The chunk flags determine how the object is handled with regard to state saving, dirty state, etc.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any object.</P>
+<P CLASS="refField">
+Interception:	Unnecessary, as <CODE>
+MetaClass</CODE>
+ does the right thing.</P>
+<P CLASS="refField">
+Parameters:	<EM>objChunk</EM> 	chunk to set flags for.</P>
+<DL>
+<DT>
+<EM>bitsToSet</EM> </DT><DD>bits to set.</DD>
+<DT>
+<EM>bitsToClear</EM></DT><DD>bits to clear.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_GET_FLAGS">
+ </A>
+MSG_META_GET_FLAGS</H4>
+<PRE CLASS="syntax">word 	MSG_META_GET_FLAGS( /* low byte = ObjChunkFlags */
+        ChunkHandle 	ch);</PRE>
+<P>
+This message returns the chunk flags for the object. This works just like the <CODE>
+ObjGetFlags()</CODE>
+ routine, but can be used when the object queried is being run by a different thread.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any object.</P>
+<P CLASS="refField">
+Interception:	Unnecessary, as <CODE>
+MetaClass</CODE>
+ does the right thing.</P>
+<P CLASS="refField">
+Parameters:	<EM>objChunk</EM> 	chunk to get flags for.</P>
+<P CLASS="refField">
+Return:	Word with <CODE>
+ObjChunkFlags</CODE>
+ in low byte, zero in high byte.<A NAME="IX_Chunk flags">
+ </A>
+</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_QUIT">
+ </A>
+MSG_META_QUIT</H4>
+<PRE CLASS="syntax">void 	MSG_META_QUIT();</PRE>
+<P>
+<A NAME="IX_GenApplicationClass:MSG_META_QUIT">
+ </A>
+This message, when sent to a GenApplication object, initiates the shutdown sequence for the application. All affected objects are notified.</P>
+<P>
+GenApplication does some error checking for multiple quits or detaches and then starts this sequence by passing <CODE>
+MSG_META_QUIT</CODE>
+(QL_BEFORE_UI) to the process. The default process handler for <CODE>
+MSG_META_QUIT</CODE>
+ varies depending on the <CODE>
+QuitLevel</CODE>
+, which is passed in, but only when sent to the process (see <CODE>
+MSG_META_QUIT_PROCESS</CODE>
+ alias, below).</P>
+<P>
+<A NAME="IX_QL_&ldots;">
+ </A>
+<A NAME="IX_QuitLevel">
+ </A>
+The method handler for each level of quit should then send <CODE>
+MSG_META_QUIT_ACK</CODE>
+ with the same <CODE>
+QuitLevel</CODE>
+ when it is done. The default behavior for a process' <CODE>
+MSG_META_QUIT</CODE>
+ responses are:</P>
+<DL>
+<DT>
+QL_BEFORE_UI</DT><DD>
+Sends <CODE>
+MSG_META_QUIT_ACK</CODE>
+ to self via queue.</DD>
+<DT>
+QL_UI</DT><DD>Sends <CODE>
+MSG_GEN_APPLICATION_INITIATE_UI_QUIT</CODE>
+(0) to the GenApplication.</DD>
+<DT>
+QL_AFTER_UI</DT><DD>
+ Sends <CODE>
+MSG_META_QUIT_ACK</CODE>
+ to self via queue.</DD>
+<DT>
+QL_DETACH</DT><DD> Sends <CODE>
+MSG_META_DETACH</CODE>
+ to self via queue.</DD>
+<DT>
+QL_AFTER_DETACH</DT><DD>
+Sends <CODE>
+MSG_META_QUIT_ACK</CODE>
+ to self via queue.</DD>
+</DL>
+<P>
+<A NAME="IX_Active list:MSG_META_QUIT">
+ </A>
+The generic UI objects are first asked to quit via <CODE>
+MSG_GEN_APPLICATION_INITIATE_UI_QUIT</CODE>
+ when sent to a GenApplication (active list). It will cause <CODE>
+MSG_META_QUIT</CODE>
+ to be sent to all objects on the active list that are marked as desiring them. These objects on the active list can handle the <CODE>
+MSG_META_QUIT</CODE>
+ any way they please. The process will be notified by a <CODE>
+MSG_META_QUIT_ACK</CODE>
+ with the <CODE>
+QuitLevel</CODE>
+ set to QL_UI.</P>
+<P>
+If you need to send MSG_META_QUIT from within a handler for MSG_GEN_PROCESS_OPEN_APPLICATION, make sure to send it after calling the superclass in your OPEN_APPLICATION handler. If this is undesirable, you may encapsulate MSG_META_QUIT and send it via MSG_META_FLUSH_INPUT_QUEUE. (This is needed to avoid the system thinking that a valid IACP connection is open, aborting the quit.)</P>
+<P CLASS="refField">
+Source:	Unrestricted. If you need to send MSG_META_QUIT within your MSG_GEN_PROCESS_OPEN_APPLICATION handler, please follow the guidelines illustrated above.</P>
+<P CLASS="refField">
+Destination:	GenApplication object (note that this message has aliases so that it may be sent to a Process object, or any object).</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_QUIT_PROCESS">
+ </A>
+MSG_META_QUIT_PROCESS</H4>
+<PRE CLASS="syntax">@alias (MSG_META_QUIT)
+ void 	MSG_META_QUIT_PROCESS(
+        word		quitLevel,
+        ChunkHandle 		ackODChunk);</PRE>
+<P>
+<A NAME="IX_ProcessClass:MSG_META_QUIT_PROCESS">
+ </A>
+For information about the quit mechanism, see <CODE>
+MSG_META_QUIT</CODE>
+, above.</P>
+<P>
+The process's <CODE>
+MSG_META_QUIT_ACK</CODE>
+ handler is what causes this walking down the <CODE>
+QuitList</CODE>
+; It provides the following behavior for each <CODE>
+QuitLevel</CODE>
+:</P>
+<DL>
+<DT>
+QL_BEFORE_UI</DT><DD>
+Sends <CODE>
+MSG_META_QUIT</CODE>
+(QL_UI) to self.</DD>
+<DT>
+QL_UI</DT><DD>Sends <CODE>
+MSG_META_QUIT</CODE>
+(QL_AFTER_UI) to self.</DD>
+<DT>
+QL_AFTER_UI</DT><DD>
+Sends <CODE>
+MSG_META_QUIT</CODE>
+(QL_DETACH) to self.</DD>
+<DT>
+QL_DETACH</DT><DD>Sends <CODE>
+MSG_META_QUIT</CODE>
+(QL_AFTER_DETACH) to self.</DD>
+<DT>
+QL_AFTER_DETACH</DT><DD>
+Sends <CODE>
+MSG_GEN_PROCESS_FINISH_DETACH</CODE>
+ to self.</DD>
+</DL>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Process object.</P>
+<P CLASS="refField">
+Parameters:	<EM>quitLevel</EM> 	What stage of quitting we are in.</P>
+<DL>
+<DT>
+<EM>ackODChunk</EM> </DT><DD>Acknowledgment OD to be passed on to <CODE>
+MSG_META_QUIT_ACK</CODE>
+.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+<P CLASS="refField">
+Warnings:	You cannot abort the quit at the QL_DETACH stage or later.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_QUIT_OBJECT">
+ </A>
+MSG_META_QUIT_OBJECT</H4>
+<PRE CLASS="syntax">@alias (MSG_META_QUIT)
+ void 	MSG_META_QUIT_OBJECT(
+        optr 	obj);</PRE>
+<P>
+For information about the quit mechanism, see <CODE>
+MSG_META_QUIT</CODE>
+, above.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Process object.</P>
+<P CLASS="refField">
+Parameters:	<EM>obj</EM> 	Object to send <CODE>
+MSG_META_QUIT_ACK</CODE>
+ to.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_QUIT_ACK">
+ </A>
+MSG_META_QUIT_ACK</H4>
+<PRE CLASS="syntax">void 	MSG_META_QUIT_ACK(
+        word 		quitLevel,
+        word 		abortFlag);</PRE>
+<P>
+This message is sent to a Process object in response to a <CODE>
+MSG_META_QUIT</CODE>
+. The Process object handles this message by continuing the quit sequence.</P>
+<P CLASS="refField">
+Source:	Any object having received <CODE>
+MSG_META_QUIT</CODE>
+</P>
+<P CLASS="refField">
+Destination:	OD passed in <CODE>
+MSG_META_QUIT</CODE>
+.</P>
+<P CLASS="refField">
+Parameters:	<EM>quitLevel</EM>	<CODE>
+QuitLevel</CODE>
+ acknowledging (if responding to a process).</P>
+<DL>
+<DT>
+<EM>abortFlag</EM> </DT><DD>(non-zero if you want to abort the quit).</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Warnings:	For processes that subclass <CODE>
+MSG_META_QUIT</CODE>
+, you cannot abort the quit at the QL_DETACH stage or later.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_FINISH_QUIT">
+ </A>
+MSG_META_FINISH_QUIT</H4>
+<PRE CLASS="syntax">void 	MSG_META_FINISH_QUIT(
+        Boolean		abortFlag);</PRE>
+<P>
+This message is sent to the object that initiated MSG_META_QUIT and has received MSG_META_QUIT_ACK from each party notified. This message informs the object that it has finished sending out all MSG_META_QUIT messages and can go on with quitting (or aborting the quit if that is the case).</P>
+<P CLASS="refField">
+Source:	Object that initiated MSG_META_QUIT.</P>
+<P CLASS="refField">
+Destination:	Any object.</P>
+<P CLASS="refField">
+Parameters:	<EM>abortFlag</EM> 	(non-zero if you want to abort the quit).</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="MetaClass_2.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="MetaClass_5.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2.3 Object Management Messages</A> 
+<!-- to next --> | <A HREF="MetaClass_7.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2.5 Event Messages</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

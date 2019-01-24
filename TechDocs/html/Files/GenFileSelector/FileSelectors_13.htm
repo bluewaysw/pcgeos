@@ -1,0 +1,385 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: FileSelectors_13.htm,v 1.1 97/06/02 14:47:06 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> The Current Selection</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The FileSelector Object</A>: 4.2 <A HREF="FileSelectors_11.htm">File Selector Use</A>: 
+<A NAME="20958">
+ </A>
+The Current Selection</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="FileSelectors_11.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="FileSelectors_12.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.1 When a User Selects a File</A> 
+<!-- to next --> | <A HREF="FileSelectors_14.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.3 Rescanning Directories</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>GFSI_selection</PRE>
+<P>
+Most directory and volume navigation is handled internally by the File Selector, and the application has no need to know what is happening until a file is actually selected.</P>
+<P>
+The File Selector maintains the name of the current selection in its <CODE>
+GFSI_selection</CODE>
+<A NAME="IX_GFSI_selection">
+ </A>
+ instance data field. The current full path, volume name, and disk are stored in variable data entries defined by <CODE>
+GenClass</CODE>
+. The application can easily, at any time, retrieve or set the current selection, path, or volume. Volume names, paths, and file names are all stored as null-terminated character strings in the GEOS character set. </P>
+<P>
+Current path and directory are supported by <CODE>
+GenClass</CODE>
+ and are not specific to <CODE>
+GenFileSelectorClass</CODE>
+.</P>
+<P>
+The File Selector's current path is stored in a variable data field called <CODE>
+ATTR_GEN_PATH_DATA</CODE>
+. This field is a <CODE>
+GenFilePath</CODE>
+ structure, defined below. This structure stores both an absolute path and the handle of the disk on which the path resides. For the GenFileSelector, this structure represents the currently-displayed directory.</P>
+<PRE><A NAME="IX_GFP_&ldots;"> </A><A NAME="IX_GenFilePath"> </A>typedef struct {
+    DiskHandle  GFP_disk;
+    PathName    GFP_path;
+} GenFilePath;</PRE>
+<P>
+To retrieve the current path, send the File Selector a <CODE>
+MSG_GEN_PATH_GET</CODE>
+. To set the path, send it <CODE>
+MSG_GEN_PATH_SET</CODE>
+. To retrieve just the disk handle, send <CODE>
+MSG_GEN_PATH_GET_DISK_HANDLE</CODE>
+. Each of these messages is detailed fully in <A HREF="../../SysObjects/Gen/index.htm">the GenClass chapter</A>.</P>
+<H2 CLASS="HeadingC">
+Traversing the File System</H2>
+<PRE>MSG_GEN_FILE_SELECTOR_UP_DIRECTORY, MSG_GEN_FILE_SELECTOR_OPEN_ENTRY</PRE>
+<P>
+To set the currently-displayed directory, you can send one of the following messages to the File Selector object (these are all, of course, subject to the File Selector's attributes and applied filters):</P>
+<DL>
+<DT>
+<CODE>
+MSG_GEN_FILE_SELECTOR_UP_DIRECTORY</DT><DD>
+</CODE>
+Cause the File Selector to go up one directory. If already at the root, switch to volume selection. Does nothing if FSA_ALLOW_CHANGE_DIRS is not set in <CODE>
+GFSI_attrs</CODE>
+.</DD>
+<DT>
+<CODE>
+MSG_GEN_FILE_SELECTOR_OPEN_ENTRY</DT><DD>
+</CODE>
+Cause the File Selector to attempt to open the passed entry in the current directory. Nothing will be done if the passed entry is a file; this message opens only directories and volumes. Use this with <CODE>
+MSG_GEN_FILE_SELECTOR_GET_SELECTION</CODE>
+ when a user clicks on an &quot;Open&quot; button (or something similar) in the File Selector's dialog box.</DD>
+
+</DL>
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_FILE_SELECTOR_UP_DIRECTORY">
+ </A>
+MSG_GEN_FILE_SELECTOR_UP_DIRECTORY</H4>
+<PRE CLASS="syntax">void	MSG_GEN_FILE_SELECTOR_UP_DIRECTORY();</PRE>
+<P>
+This message causes the File Selector to go up one directory in the directory tree. If the File Selector is already in the root directory, it will switch to the volume list (if FSA_ALLOW_CHANGE_VOLUMES is set in <CODE>
+GFSI_attrs</CODE>
+). This message is only valid when the File Selector is visible on the screen.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenFileSelector object that is on the screen.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_FILE_SELECTOR_OPEN_ENTRY">
+ </A>
+MSG_GEN_FILE_SELECTOR_OPEN_ENTRY</H4>
+<PRE CLASS="syntax">Boolean	MSG_GEN_FILE_SELECTOR_OPEN_ENTRY(
+        word	entryNumber);</PRE>
+<P>
+This message causes the File Selector to open and display the contents of the entry specified. It returns an error flag: if the entry opens successfully, the error flag is returned <CODE>
+false</CODE>
+; if some error occurs, the flag is returned <CODE>
+true</CODE>
+.</P>
+<P>
+The entry specified with this message must be in the current file list. First, retrieve the entry number from the File Selector with the message <CODE>
+MSG_GEN_FILE_SELECTOR_GET_SELECTION</CODE>
+. If the entry can be opened (i.e. it is in the current file list and it is a volume or directory), the File Selector will open it, scan the directory, and display the new file list. If the entry is not a directory or volume, the File Selector will do nothing. This message is only valid when the File Selector is visible on the screen.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenFileSelector object that is on the screen.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+entryNumber</CODE>
+	The number of the entry to be opened.</P>
+<P CLASS="refField">
+Return:	An error flag: <CODE>
+true</CODE>
+ if error, <CODE>
+false</CODE>
+ if no error.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+
+<H2 CLASS="HeadingC">
+The Current Selection</H2>
+<PRE>MSG_GEN_FILE_SELECTOR_SET_SELECTION, MSG_GEN_FILE_SELECTOR_SET_FULL_SELECTION_PATH, MSG_GEN_FILE_SELECTOR_GET_SELECTION, MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH</PRE>
+<P>
+The File Selector keeps track of which item is currently designated as the <EM>
+selection</EM>
+. The selection appears on the screen as the only highlighted entry in the current list (the highlighted entry may be scrolled out of the view but remains the selection). Additionally, the selection is the file or folder on which any operations (such as open) will be executed.</P>
+<P>
+The <CODE>
+GFSI_selection</CODE>
+ field of the GenFileSelector's instance data is a null-terminated character string representing the name of the selection. The format of the selection string depends on the context: If the File Selector is displaying the volume list and thus the selection is a volume label, the string will consist of a drive name followed by a colon. (For non-removable disks, the colon will be followed by [<CODE>
+volume name</CODE>
+].) If the File Selector is displaying a directory and the selection is a file or directory, the selection string will consist of the name of the file or directory selected. The selection does not contain any information about the current volume or directory.</P>
+<P>
+By sending the following messages, you can retrieve or set the current selection in your application. These messages affect <CODE>
+ATTR_GEN_PATH_DATA,</CODE>
+ managed by <CODE>
+GenClass</CODE>
+ for the File Selector, as well as the <CODE>
+GFSI_selection</CODE>
+ instance field.</P>
+<DL>
+<DT>
+<CODE>
+MSG_GEN_FILE_SELECTOR_SET_SELECTION</DT><DD>
+</CODE>
+Attempt to set the selection to the given volume, file, or directory name. The given file or subdirectory must be in the currently-displayed list.</DD>
+<DT>
+<CODE>
+MSG_GEN_FILE_SELECTOR_SET_FULL_SELECTION_PATH</DT><DD>
+</CODE>
+Attempt to set the path and selection to the given volume, file, or directory name. The passed selection must be in the directory at the end of the given path.</DD>
+<DT>
+<CODE>
+MSG_GEN_FILE_SELECTOR_GET_SELECTION</DT><DD>
+</CODE>
+Gives a null-terminated character string representing the name of the current selection. This may be a volume, directory, or file name.</DD>
+<DT>
+<CODE>
+MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH</DT><DD>
+</CODE>
+Gives the disk handle as well as a null-terminated character string representing the full path name of the current selection, excluding the drive name.</DD>
+</DL>
+<P>
+The selection retrieval messages return two word values in a single dword argument. These two values are a record of <CODE>
+GenFileSelectorEntryFlags</CODE>
+, flags that indicate the type of selection and operation underway, and an integer that indicates the place of the selection in the current file list. Two macros allow you to extract these values from the dword argument:</P>
+<DL>
+<DT>
+GFS_GET_ENTRY_NUMBER</DT><DD>
+Extracts the entry number from the given dword.</DD>
+<DT>
+GFS_GET_ENTRY_FLAGS</DT><DD>
+Extracts the selection's flags record.</DD>
+
+</DL>
+<H4 CLASS="RefETitle">
+<A NAME="IX_GFS_GET_ENTRY_NUMBER() macro">
+ </A>
+GFS_GET_ENTRY_NUMBER</H4>
+<PRE CLASS="syntax">word	GFS_GET_ENTRY_NUMBER(<EM>arg</EM>);
+        dword	<EM>arg</EM>;</PRE>
+<P>
+This takes the return value of <CODE>
+MSG_GEN_FILE_SELECTOR_GET_SELECTION</CODE>
+ and <CODE>
+MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH</CODE>
+ and returns the entry number of the selection.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_GFS_GET_ENTRY_FLAGS() macro">
+ </A>
+GFS_GET_ENTRY_FLAGS</H4>
+<PRE CLASS="syntax">word	GFS_GET_ENTRY_FLAGS(arg);
+        dword	<EM>arg</EM>;</PRE>
+<P>
+This takes the return value of <CODE>
+MSG_GEN_FILE_SELECTOR_GET_SELECTION</CODE>
+ and <CODE>
+MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH</CODE>
+ and returns the <CODE>
+GenFileSelectorEntryFlags</CODE>
+ for the selection.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_FILE_SELECTOR_SET_SELECTION">
+ </A>
+MSG_GEN_FILE_SELECTOR_SET_SELECTION</H4>
+<PRE CLASS="syntax">Boolean	MSG_GEN_FILE_SELECTOR_SET_SELECTION(
+        char	*selection);</PRE>
+<P>
+This message causes the File Selector to attempt to select a given file, directory, or volume from the currently-displayed file list. It sets the selection by setting the File Selector's <CODE>
+GFSI_selection</CODE>
+ field to the passed string.</P>
+<P>
+If the File Selector is not on the screen or is suspended when it receives this message, it will set the selection and hold it until it scans the directory. The validity of the selection is not determined until the directory is again scanned. If the directory is not scanned immediately, the message's return value will be <CODE>
+true</CODE>
+. If the File Selector is on the screen and is not suspended, it will determine the validity of the selection immediately and return a value appropriate to the file's validity.</P>
+<P>
+If the selection is valid, the user will see it highlighted in the File Selector's display. The selection will not be opened by this message; it is only selected.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenFileSelector object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+selection</CODE>
+	A pointer to a character string giving the name of the file to be selected. The selection string is case-sensitive; if selecting a DOS file, it must be all upper case.</P>
+<P CLASS="refField">
+Return:	An error flag: <CODE>
+false</CODE>
+ if the selection is successfully made. The error condition can occur if the file is not found or if the File Selector can not currently be updated (it is not visible or is suspended).</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_FILE_SELECTOR_GET_SELECTION">
+ </A>
+MSG_GEN_FILE_SELECTOR_GET_SELECTION</H4>
+<PRE CLASS="syntax">dword	MSG_GEN_FILE_SELECTOR_GET_SELECTION(
+        char	*selection);</PRE>
+<P>
+This message returns the name, the entry number, and the entry flags of the file or directory currently selected.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenFileSelector object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+selection</CODE>
+	A pointer to an empty character string at least <CODE>
+sizeof(FileLongName)</CODE>
+ characters long. If just the entry number and entry flags are desired, pass a null pointer.</P>
+<P CLASS="refField">
+Return:	The high word of the dword return value is the number of the selection in the File Selector's current file list. The low word is a record of type <CODE>
+GenFileSelectorEntryFlags</CODE>
+. Use GFS_GET_ENTRY_NUMBER to extract the entry number; use GFS_GET_ENTRY_FLAGS to extract the flags record.</P>
+<DL>
+<DT>
+<CODE>
+selection</CODE>
+</DT><DD>The character string pointed to will be the null-terminated name of the current selection.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_FILE_SELECTOR_SET_FULL_SELECTION_PATH">
+ </A>
+MSG_GEN_FILE_SELECTOR_SET_FULL_SELECTION_PATH</H4>
+<PRE CLASS="syntax">Boolean	MSG_GEN_FILE_SELECTOR_SET_FULL_SELECTION_PATH(
+        char		*selection,
+        DiskHandle		diskHandle);</PRE>
+<P>
+This message causes the File Selector to set its path data and its <CODE>
+GFSI_selection</CODE>
+ field according to the string passed in <CODE>
+selection</CODE>
+. The string's format is described below. The entry may be in any directory on any volume; the volume is specified by the passed disk handle.</P>
+<P>
+If the File Selector is suspended or not currently on the screen when it receives this message, it will set the path and selection but will do nothing else until it becomes unsuspended or visible. Otherwise, the message will be handled immediately, and the File Selector will navigate to and scan the proper directory, setting the selection if possible.</P>
+<P>
+If the path is valid but the selection is not, the File Selector will display the proper file list and set the selection to the first entry in the list. If any part of the path other than the selection is invalid, the File Selector will show the volume list.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenFileSelector object that is on the screen.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+selection</CODE>
+	A pointer to a character string containing the full path to be set as the File Selector's current path and selection. The path may be absolute or relative--if relative, it is considered relative to the File Selector's current directory and <CODE>
+diskHandle</CODE>
+ will be ignored.</P>
+<DL>
+<DT>
+<CODE>
+diskHandle</CODE>
+</DT><DD>The disk handle specifying the volume on which the new selection resides. If zero, the File Selector's currently-displayed disk will be used. If a relative path is specified in <CODE>
+selection</CODE>
+, this parameter will be ignored.</DD>
+</DL>
+<P CLASS="refField">
+Return:	This message returns an error flag: If the selection is successfully made, the flag will be <CODE>
+false</CODE>
+. If an error occurs, the flag will be <CODE>
+true</CODE>
+.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH">
+ </A>
+MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH</H4>
+<PRE CLASS="syntax">dword	MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(
+        char	*selection);</PRE>
+<P>
+This message returns the disk handle and flags as well as the full pathname of the current selection.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenFileSelector object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+selection</CODE>
+	A pointer to a character string at least PATH_BUFFER_SIZE characters long. Upon return, this string will contain the full selection path.</P>
+<P CLASS="refField">
+Return:	The returned dword contains two word-sized fields: The high word represents the File Selector's current disk handle, and the low word is a <CODE>
+GenFileSelectorEntryFlags</CODE>
+ record with the selection's flags. Use the macro GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE to extract the disk handle, and use GFS_GET_ENTRY_FLAGS to extract the flags record. If sent when the File Selector is not visible on the screen, the message will return the disk handle and path of the last valid selection.</P>
+<DL>
+<DT>
+<CODE>
+selection</CODE>
+</DT><DD>The character string pointed to will contain the full path and name of the current selection.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE() macro">
+ </A>
+GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE</H4>
+<PRE CLASS="syntax">DiskHandle GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE(<EM>arg</EM>);
+        dword	<EM>arg</EM>;</PRE>
+<P>
+This macro extracts the disk handle (the high word) from a dword argument returned by <CODE>
+MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH</CODE>
+.</P>
+
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="FileSelectors_11.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="FileSelectors_12.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.1 When a User Selects a File</A> 
+<!-- to next --> | <A HREF="FileSelectors_14.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.3 Rescanning Directories</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

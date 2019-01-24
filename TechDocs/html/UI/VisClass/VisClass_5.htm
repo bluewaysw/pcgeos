@@ -1,0 +1,190 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: VisClass_5.htm,v 1.1 97/06/02 16:50:56 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> VI_typeFlags</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">VisClass</A>: 3.2 <A HREF="VisClass_3.htm">VisClass Instance Data</A>: 
+VI_typeFlags</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VisClass_3.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VisClass_4.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.1 VI_bounds</A> 
+<!-- to next --> | <A HREF="VisClass_6.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.3 VI_attrs</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>VI_typeFlags, MSG_VIS_SET_TYPE_FLAGS, MSG_VIS_GET_TYPE_FLAGS</PRE>
+<P>
+<A NAME="IX_VTF_&ldots;">
+ </A>
+<A NAME="IX_VisTypeFlags">
+ </A>
+<A NAME="IX_VI_typeFlags">
+ </A>
+The <CODE>
+VI_typeFlags</CODE>
+ field is a bitfield record containing eight flags. These flags determine the type of the visible object and are used primarily by the UI and the windowing system. When used at all, these flags are typically set in the object's definition or when the object is first created, and they are rarely changed dynamically by an application. The eight flags in this record are listed below. The record is of type <CODE>
+VisTypeFlags</CODE>
+.</P>
+<DL>
+<DT>
+VTF_IS_COMPOSITE</DT><DD>
+<A NAME="IX_Objects:composite vis">
+ </A>
+This flag is set if the object is of <CODE>
+VisCompClass</CODE>
+ rather than <CODE>
+VisClass</CODE>
+. This flag indicates the object may have children (normal <CODE>
+VisClass</CODE>
+ objects can not have children). Because this is not the only difference between these classes, changing this flag can have unpredictable results.</DD>
+<DT>
+VTF_IS_WINDOW</DT><DD>
+<A NAME="IX_Windows:VTF_IS_WINDOW">
+ </A>
+This flag is set if the object creates a window via the window system in order to display itself and its children. This flag implies the object must also have VTF_IS_COMPOSITE set, meaning the object must actually be of <CODE>
+VisCompClass</CODE>
+ and not <CODE>
+VisClass</CODE>
+. If this flag is set, the UI will assume that the <CODE>
+VI_bounds</CODE>
+ field of the object represents the current size of the window. Objects with the VTF_IS_WINDOW flag set are skipped by the normal input and output messages such as <CODE>
+MSG_VIS_DRAW</CODE>
+ and <CODE>
+MSG_META_START_SELECT</CODE>
+; these messages will be passed directly to the object's appropriate child. VTF_IS_WINDOW and VTF_IS_PORTAL are mutually exclusive.</DD>
+<DT>
+VTF_IS_PORTAL</DT><DD>
+This flag is set if the object is a portal. A portal is an object that has its own window and appears in its parent's window. A portal differs from a window (VTF_IS_WINDOW) in that the window has no part of itself drawn in its parent window. This flag implies that the VTF_IS_COMPOSITE flag must also be set indicating the object may have visible children. All visible children of a portal will appear in the portal's associated window if VTF_CHILDREN_OUTSIDE_PORTAL_WIN is set. The object itself may display portions of itself within its parent's window, though; an example of this is the UI's implementation of the GenDisplayControl object, which manages several child windows within its own window area. Its border is drawn in the parent window, then its window is defined to be one pixel inside this border. VTF_IS_PORTAL and VTF_IS_WINDOW are mutually exclusive.</DD>
+<DT>
+VTF_IS_WIN_GROUP</DT><DD>
+This flag is set for the top visible object in a visible branch which makes that branch a realizable entity. This flag implies that both VTF_IS_COMPOSITE and VTF_IS_WINDOW must be set as well. An example would be the specific UI's implementation of a GenPrimary object--if the primary is not visible, none of its children may be visible (with some exceptions).</DD>
+<DT>
+VTF_IS_CONTENT</DT><DD>
+This flag is set if the object is the output of a window object. Typically, this will be set only if the object is of <CODE>
+VisContentClass</CODE>
+ (not for <CODE>
+VisClass</CODE>
+ or <CODE>
+VisCompClass</CODE>
+). Note that if this is set, both VTF_IS_WINDOW and VTF_IS_WIN_GROUP must also be set.</DD>
+<DT>
+VTF_IS_INPUT_NODE</DT><DD>
+This flag is an optimization bit. It is set if the object controls input flow (such as a VisContent) or is a target or focus node that is not a window group (VTF_IS_WIN_GROUP). <CODE>
+MSG_VIS_VUP_ALTER_INPUT_FLOW</CODE>
+ is sent directly to objects with this bit set unless there is a need for them to actually use the VUP mechanism, as is the case with mouse grabs in a 32-bit content. Similarly, <CODE>
+MSG_META_MUP_ALTER_FTVMC_EXCL</CODE>
+, <CODE>
+MSG_VIS_FUP_QUERY_FOCUS_EXCL</CODE>
+, and <CODE>
+MSG_VIS_VUP_QUERY_FOCUS_EXCL</CODE>
+ are sent to the first visible object up the tree that either is a window group or has this bit set.</DD>
+<DT>
+VTF_IS_GEN</DT><DD>
+This flag is set if the visible object is the specific UI counterpart to a generic object. This flag must be set for the object to handle messages that begin <CODE>
+MSG_SPEC</CODE>
+. The only objects that will ever have this flag set are those in Specific UI libraries.</DD>
+<DT>
+VTF_CHILDREN_OUTSIDE_PORTAL_WIN</DT><DD>
+This flag is set if children of a portal object may appear in the object's parent window rather than in the portal's specially-created window. The VTF_IS_PORTAL flag must also be set for this object. An example of this is the specific UI's representation of a GenView object and its children; the view's children appear along the edges of the view window rather than inside it. The GenDisplayControl, by contrast, has all its children appearing within its window; thus, it does not have this flag set.</DD>
+</DL>
+<P>
+Although the <CODE>
+VI_typeFlags</CODE>
+ record will rarely be changed at run-time, you can set new values by sending <CODE>
+MSG_VIS_SET_TYPE_FLAGS</CODE>
+ to the visible object while it is realized. To retrieve the current type flags, send the object a <CODE>
+MSG_VIS_GET_TYPE_FLAGS</CODE>
+.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_SET_TYPE_FLAGS">
+ </A>
+MSG_VIS_SET_TYPE_FLAGS</H4>
+<PRE CLASS="syntax">void	MSG_VIS_SET_TYPE_FLAGS(
+        VisTypeFlags		flagsToSet,
+        VisTypeFlags		flagsToClear);</PRE>
+<P>
+This message causes the object to set its <CODE>
+VI_typeFlags</CODE>
+ field to the values passed. The <CODE>
+flagsToSet</CODE>
+ parameter will be OR-ed with <CODE>
+VI_typeFlags</CODE>
+, and the <CODE>
+flagsToClear</CODE>
+ parameter will be logically inverted and then AND-ed with the field. The clear operation will occur after the set. Therefore a flag set in both parameters will be cleared by this message.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object; however, the object must not be realized when it receives the object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+flagsToSet</CODE>
+	A record of <CODE>
+VisTypeFlags</CODE>
+ indicating which flags are to be set for the object.</P>
+<DL>
+<DT>
+<CODE>
+flagsToClear</CODE>
+</DT><DD>A record of <CODE>
+VisTypeFlags</CODE>
+ indicating which flags are to be cleared for the object (a flag set in <CODE>
+flagsToClear</CODE>
+ will be cleared in <CODE>
+VI_typeFlags</CODE>
+).</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_GET_TYPE_FLAGS">
+ </A>
+MSG_VIS_GET_TYPE_FLAGS</H4>
+<PRE CLASS="syntax">VisTypeFlags MSG_VIS_GET_TYPE_FLAGS();</PRE>
+<P>
+This message returns a visible object's current <CODE>
+VI_typeFlags</CODE>
+ field.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	A byte of <CODE>
+VisTypeFlags</CODE>
+ representing the object's current <CODE>
+VI_typeFlags</CODE>
+ field.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VisClass_3.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VisClass_4.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.1 VI_bounds</A> 
+<!-- to next --> | <A HREF="VisClass_6.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.3 VI_attrs</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

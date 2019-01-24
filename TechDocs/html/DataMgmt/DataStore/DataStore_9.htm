@@ -1,0 +1,223 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: DataStore_9.htm,v 1.1 97/06/02 14:33:15 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> String Search</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="sectionTitle">
+<A HREF="index.htm">DataStore Library</A>: 5 
+<A NAME="40426">
+ </A>
+String Search</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="DataStore_8.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4 Building an Index</A> 
+<!-- to next --> | <A HREF="DataStore_a.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">6 Enumeration</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>DataStoreStringSearch()</PRE>
+<P>
+To do a simple string search (on a specified field or field category), use <CODE>
+DataStoreSearchString()</CODE>
+. Starting at a specified record number, this routine searches through each record until it finds a match or until it runs out of records to search.</P>
+<P>
+<CODE>
+DataStoreSearchString()</CODE>
+ uses the following parameters:</P>
+<PRE>typedef struct {
+	SearchType	SP_searchType;
+	RecordNum	SP_startRecord;
+	dword	SP_maxRecords;
+	FieldID	SP_startField;
+	FieldCategory	SP_category;
+	TCHAR	*SP_searchString;
+	SearchFlags	SP_flags;
+} SearchParams;</PRE>
+<DL>
+<DT>
+SP<CODE>
+_searchType</DT><DD>
+</CODE>
+Possible flags:</DD>
+<UL>
+<LI>
+ST_ALL<BR>
+Search all fields of <CODE>
+FieldType</CODE>
+ DFST_STRING.</LI>
+<LI>
+ST_FIELD<BR>
+Search by <CODE>
+FieldID</CODE>
+. (Specify the <CODE>
+FieldID</CODE>
+ in <CODE>
+SP_startField</CODE>
+, explained below.)</LI>
+<LI>
+ST_CATEGORY<BR>
+Search by <CODE>
+FieldCategory</CODE>
+. (Specify the <CODE>
+FieldCategory</CODE>
+ in <CODE>
+SP_category</CODE>
+, explained below.)</LI>
+</UL>
+<DT>
+SP<CODE>
+_startRecord</DT><DD>
+</CODE>
+<CODE>
+RecordNum</CODE>
+ of record to begin search. This routine updates this field with the <CODE>
+RecordNum</CODE>
+ of the last record examined.</DD>
+<DT>
+SP<CODE>
+_maxRecords</DT><DD>
+</CODE>
+Maximum number of records to search. Allows the program to break out of the search if no matches are found. (The search can be continued by incrementing the value of<CODE>
+ SP_startRecord</CODE>
+.) Passing -1 causes the routine to search all records.</DD>
+<DT>
+SP<CODE>
+_startField</DT><DD>
+</CODE>
+<CODE>
+FieldID</CODE>
+ of field to search if <CODE>
+SP_searchType</CODE>
+ is set to ST_FIELD. If you specify a non-string field, the routine will return DSE_BAD_SEARCH_PARAMS.<BR>
+<BR>
+<CODE>
+FieldID</CODE>
+ of the field to <EM>
+begin</EM>
+ the search if <CODE>
+SP_searchType</CODE>
+ is set to ST_CATEGORY. If you specify a field that is not of the specified category, the routine will start with the next field it finds of the specified category.</DD>
+<DT>
+SP<CODE>
+_category</DT><DD>
+</CODE>
+<CODE>
+FieldCategory</CODE>
+ to search if <CODE>
+SP_searchTyp</CODE>
+e is set to ST_CATEGORY<CODE>
+ </CODE>
+(otherwise this parameter is ignored).</DD>
+<DT>
+SP<CODE>
+_searchString</DT><DD>
+</CODE>
+Null-terminated string to search.</DD>
+<DT>
+SP<CODE>
+_flags</DT><DD>
+</CODE>
+Possible flags:</DD>
+<UL>
+<LI>
+SF_BACKWARDS<BR>
+Search backwards through the records.</LI>
+<LI>
+SF_START_AT_END<BR>
+Begin search from first record (going forward) or from last record if SF_BACKWARDS is also passed. If set, <CODE>
+SP_startRecord</CODE>
+ is ignored.</LI>
+<LI>
+SF_IGNORE_CASE<BR>
+Ignore case when searching.</LI>
+<LI>
+SF_NO_WILDCARDS<BR>
+Ignore wild card characters.<BR>
+<BR>
+Many libraries including DataStore support the use of wild card characters for searching. See <A HREF="../../UI/Text/Text_28.htm#85133">the Text object chapter</A> for a discussion of wild card searching; also, see /Appl/Datastore/datastore.goc for a code example.</LI>
+<LI>
+SF_PARTIAL_WORD<BR>
+Treat search string as a substring. For example, if search string is &quot;den,&quot; return &quot;gardenia,&quot; &quot;dentist,&quot; and &quot;garden.&quot;</LI>
+</UL>
+</DL>
+<P>
+The following example shows how to set up a simple string search on a specified field.</P>
+<P CLASS="figTitle">
+Code Display 9-6 Searching a DataStore</P>
+<PRE>	/* search conditions */
+	SearchParams	params;</PRE>
+<PRE>	/*  Specify search parameters. */
+	params.SP_searchType = ST_FIELD; /* search by FieldID */
+	params.SP_startRecord = 0; /* start search at first record */
+	params.SP_maxRecords = -1; /* search all records until a match is found or 
+					there are no more records to search */
+	params.SP_startField = 1; /* search &quot;country&quot; field */
+	params.SP_searchString = &quot;Albania&quot;; /* string to search for */
+	params.SP_flags = SF_IGNORE_CASE; /* ignore case when searching */</PRE>
+<PRE>	/* Open the datastore. */
+	if(DataStoreOpen(&quot;Exchange Rates&quot;, oself, 0, &amp;dsToken) == DSE_NO_ERROR)
+	{
+		/* Do the search. */
+		if(DataStoreStringSearch(dsToken, &amp;params) == DSDE_NO_ERROR)
+		{
+			 /*
+			  * If a match is found, load the record and get the data
+			  * from the &quot;exchange rate&quot; field.
+			  * Note:  DataStoreStringSearch() returns the record
+			  * number of the last examined record in SP_startRecord.
+			  */
+			if(DataStoreLoadRecordNum(dsToken, params.SP_startRecord,
+							&amp;recordID) == DSDE_NO_ERROR)
+			{
+				/* variables used for retrieving field data */
+				FloatNum		rateBuffer, *pRateBuffer;
+				RecordID		recordID;
+				MemHandle		dummy;
+				word		size;</PRE>
+<PRE>				pRateBuffer = &amp;rateBuffer;
+				size = sizeof(rateBuffer);</PRE>
+<PRE>				DataStoreGetField(dsToken, &quot;exchange rate&quot;, 0,
+					(void **)&amp;pRateBuffer, &amp;size, &amp;dummy);
+				/*
+				  * Do something with the data then 
+				  * flush the record from the buffer.
+				  */
+				DataStoreDiscardRecord(dsToken);
+			}
+		DataStoreClose(dsToken);
+		}
+	}</PRE>
+<P>
+If the routine returns DSE_NO_MORE_RECORDS, it has reached the last record in the file (either the first or last record depending on the direction of the search). If the routine returns DSE_NO_MATCH_FOUND, it did not find a match within the set of records it searched. If it returns DSE_NO_ERROR, it writes the <CODE>
+RecordNum</CODE>
+ of the matching record in <CODE>
+SP_startRecord</CODE>
+.</P>
+<P>
+The DataStore Library does not implement global searches (<EM>
+i.e.</EM>
+, searches through multiple datastores), though it is possible to implement this type of search at the application level by opening each datastore file and calling <CODE>
+DataStoreStringSearch()</CODE>
+ on each one.</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="DataStore_8.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4 Building an Index</A> 
+<!-- to next --> | <A HREF="DataStore_a.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">6 Enumeration</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

@@ -1,0 +1,313 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+<!-- This page was automatically generated from a bunch of smaller pages. -->
+<META NAME="copyright" CONTENT="Copyright GEOWORKS">
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+<TITLE>Libraries</TITLE>
+</HEAD>
+<BODY BGCOLOR="#ffffdf">
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+<A NAME="index.htm"></A>
+
+
+
+<H1 CLASS="chapterTitle">
+
+<A NAME="index.htm_97933">
+ </A>
+Libraries 
+
+</H1>
+<P>
+If you write more than one application, you may find yourself repeating a lot of effort. You may end up writing the same routines several times, or defining very similar classes for different applications. </P>
+<P>
+For this reason, GEOS lets you define <EM>
+libraries</EM>
+. Libraries are much like applications. However, they don't do anything on their own; instead, they must be loaded by other geodes. They provide applications with routines and object classes. This lets applications share code easily and efficiently.</P>
+<P>
+
+</P>
+<P CLASS="sectionlinks">
+<STRONG>
+&nbsp;&nbsp;<A HREF="#Libraries_1.htm">1 Design Philosophy</A><BR>
+&nbsp;&nbsp;<A HREF="#Libraries_2.htm">2 Library Basics</A><BR>
+&nbsp;&nbsp;<A HREF="#Libraries_3.htm">3 The Library Entry Point</A><BR>
+&nbsp;&nbsp;<A HREF="#Libraries_4.htm">4 Exported Routines and Classes</A><BR>
+&nbsp;&nbsp;<A HREF="#Libraries_5.htm">5 Header Files</A><BR>
+&nbsp;&nbsp;<A HREF="#Libraries_6.htm">6 Compiler Directives</A><BR>
+</STRONG>
+</P> <!-- end of sectionlinks blob -->
+
+<HR>
+<A NAME="Libraries_1.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Libraries</A>: 1 
+Design Philosophy</H2>
+<P>
+GEOS libraries are designed to make code-sharing simple and efficient. They allow several different applications to make use of the same routines and classes while using the minimum amount of space.</P>
+<P>
+Conventional libraries are fully included in each application. The usual technique is to write a header file which contains the code for the library's routines. Any application which needs to use the routines can then include this library. This has one main advantage: The code can be written and tested once, and applications can then rely on it to work. However, there is a severe drawback to this approach: every application which uses the library will contain identical code. This is not a problem for non-multitasking environments; if only a single application can run at a time, then there will be only a single copy of each library. In a multithreaded environment like GEOS, however, this is a very inefficient use of resources.</P>
+<P>
+GEOS libraries solve this problem. Each geode specifies which libraries it will use, either at compile-time (in the <STRONG CLASS="fileName">
+.gp</STRONG>
+ file) or at run-time (with <CODE>
+GeodeUseLibrary()</CODE>
+). The kernel will see to it that the library is loaded when necessary. This means that if a dozen applications are all using the same library, the code needs only be loaded once.</P>
+<P>
+Conventional libraries contain only routines. GEOS libraries, on the other hand, may contain both routines and object classes. There are several advantages to defining a class in a library instead of in an application. First, there is the same code-sharing benefit that routines have. If a class is defined in a library, the heap will contain at most one copy of each of the class's methods, no matter how many applications use objects from that class. There is another advantage as well; all applications which use that class can be sure that they are using objects whose definitions are identical. This makes it possible for applications to send messages to objects owned by other geodes.</P>
+<P>
+Writing a library is very much like writing an application. There are only a few differences, which are covered in this appendix. You should already be familiar with writing applications before you try to write a library.</P>
+<HR>
+<A NAME="Libraries_2.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Libraries</A>: 2 
+Library Basics</H2>
+<P>
+A library is a geode, much like an application geode. However, its behavior is slightly different. In particular, libraries do not have any threads of their own, unless they explicitly create them.</P>
+<P>
+When a geode calls a routine which is exported from a library, the routine is run by the thread which made the call, not by the library's thread. This has several implications. First, it means that a library's response time is not dependent on the number of applications which use the library. An application which uses the library a lot will do so on its own time and may have its priority reduced accordingly. Indeed, a library with many users is likely to perform better than one with few users, since its code will be less likely to be swapped out of the global heap. Similarly, library routines will use the stack of the calling thread; this means that the same routine can be called by several different threads at once, with less danger of a synchronization problem.</P>
+<P>
+Another consequence is that if a library routine allocates memory, that memory will belong to the owning geode. Thus, when the application exits, the memory will automatically be freed; on the other hand, if the library exits before the application does, the memory block will remain. If a library wants to have the block owned by the library geode, it must set the owner explicitly.</P>
+<P>
+Geodes which use a library are said to be its &quot;clients.&quot; A client may declare that it uses a library in its <STRONG CLASS="fileName">
+.gp</STRONG>
+ file, or it may load the library at runtime by calling <CODE>
+GeodeUseLibrary()</CODE>
+. One library may be a client of another; in this case, when the first library is loaded, the second will be as well.</P>
+<P>
+A library may have a single special routine, known as its <EM>
+entry point</EM>
+. The kernel calls this routine to inform the library when it is launched or freed, when it acquires a new client, or when a client is unloaded. The entry point routine is described more fully in <A HREF="#Libraries_3.htm_37345"> The Library Entry Point</A>
+.</P>
+<P>
+A library may export object classes or routines. If a routine is exported, it may be called by any geode which uses the library. If an object class is exported, any geode which uses the library may instantiate objects of that class, and may define a subclass of it.</P>
+<P>
+Every library should have a library header file. This header file contains declarations for all exported routines and classes, as well as definitions of any appropriate macros, constants, structures, etc. Every geode which uses the library will need to include this header file. If the library exports any object classes, the header file should be a Goc header file with the suffix <STRONG CLASS="fileName">
+.goh</STRONG>
+; otherwise it should be a standard C header file with the suffix <STRONG CLASS="fileName">
+.h</STRONG>
+. The header file is described in more detail in <A HREF="#Libraries_5.htm_15383"> Header Files</A>
+.</P>
+<HR>
+<A NAME="Libraries_3.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Libraries</A>: 3 
+<A NAME="Libraries_3.htm_37345">
+ </A>
+The Library Entry Point</H2>
+<PRE>LibraryEntry(), LibraryCallType</PRE>
+<P>
+A library may need to do bookkeeping when it is launched, when a client is attached, or at other times. For this reason, some libraries will have an entry point routine. The entry point routine is called by the kernel; it should never be called by other geodes. Some of the calls are made in the kernel thread, while others are made by a geode's thread. All of the calls are made automatically by the kernel.</P>
+<P>
+An entry point routine must take two arguments. The format of an entry point is shown in <A HREF="#Libraries_3.htm_95977"> A Library Entry Point</A>
+.</P>
+<P CLASS="figTitle">
+
+
+Code Display C-1 <A NAME="Libraries_3.htm_95977">
+ </A>
+A Library Entry Point</P>
+<PRE>Boolean _pascal
+	LibraryEntry(LibraryCallType				ty,
+			GeodeHandle		client);</PRE>
+<P>
+When the kernel calls the entry point routine, it passes the following arguments:</P>
+<UL>
+<LI>
+A member of the <CODE>
+LibraryCallType</CODE>
+ enumerated type. This specifies why the kernel is calling the routine. This type is described below.</LI>
+<LI>
+A geode handle. This parameter is valid only if certain <CODE>
+LibraryCallType</CODE>
+ values are passed.</LI>
+</UL>
+<P>
+The entry point should return <EM>
+true</EM>
+ if an error occurs; otherwise it should return <EM>
+false</EM>
+ (i.e. zero).</P>
+<P>
+<CODE>
+LibraryCallType</CODE>
+ contains the following members:</P>
+<DL>
+<DT>
+LCT_ATTACH</DT><DD>
+This is passed when the library has just been launched. The <EM>
+client</EM>
+ parameter is undefined. The call is made in the application's thread.</DD>
+<DT>
+LCT_DETACH</DT><DD>
+This is passed when the library is about to be unloaded. The <EM>
+client</EM>
+ parameter is undefined. The call is made in the application's thread.</DD>
+<DT>
+LCT_NEW_CLIENT</DT><DD>
+A thread has just called <CODE>
+GeodeUseLibrary()</CODE>
+, or a geode which depends on the library is being launched. The <EM>
+client</EM>
+ parameter contains the <CODE>
+GeodeHandle</CODE>
+ of the new client. The call is made in the kernel thread.</DD>
+<DT>
+LCT_NEW_CLIENT_THREAD</DT><DD>
+A geode which depends on the library has just spawned a new thread. The <EM>
+client</EM>
+ parameter contains the <CODE>
+GeodeHandle</CODE>
+ of the thread's owner. The call is made in the new thread.</DD>
+<DT>
+LCT_CLIENT_THREAD_EXIT</DT><DD>
+A thread which uses the library is being destroyed. The <EM>
+client</EM>
+ parameter contains the <CODE>
+GeodeHandle</CODE>
+ of the thread's owner. The call is made in the soon-to-be destroyed thread.</DD>
+<DT>
+LCT_CLIENT_EXIT</DT><DD>
+A client loaded this library with <CODE>
+GeodeUseLibrary()</CODE>
+ has just called <CODE>
+GeodeFreeLibrary()</CODE>
+. The <EM>
+client</EM>
+ parameter contains the <CODE>
+GeodeHandle</CODE>
+ of the former client. The call is made in the kernel thread.</DD>
+</DL>
+<P>
+Sometimes a single action can prompt several calls to the entry point, each with a different <CODE>
+LibraryCallType</CODE>
+ value. For example, suppose FooWrite is launched. This application's <STRONG CLASS="fileName">
+.gp</STRONG>
+ file specifies that it uses the BarObj library. At the time FooWrite is launched, BarObj has not been loaded. The kernel will automatically launch BarObj and immediately call the entry point with parameter LCT_ATTACH. The kernel will then call the entry point again with parameter LCT_NEW_CLIENT, passing FooWrite's <CODE>
+GeodeHandle</CODE>
+. It will then call the entry point once for each FooWrite thread, passing LCT_NEW_CLIENT_THREAD; it will make these calls as each thread is started.</P>
+<P>
+Some libraries will not need to take any actions when the entry point is called; these libraries need not have an entry point routine. On the other hand, some libraries will need to do bookkeeping chores. This is left entirely to the library's discretion.</P>
+<P>
+The entry point should take care not to perform any actions with side effects outside the library. If the entry point allocates memory, it should make sure to make the library's geode the block's owner. Similarly, the entry point should not change the working directory; instead, it should use <CODE>
+FilePushDir()</CODE>
+ and <CODE>
+FilePopDir()</CODE>
+ to make temporary changes to the working directory.</P>
+<HR>
+<A NAME="Libraries_4.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Libraries</A>: 4 
+Exported Routines and Classes</H2>
+<P>
+Writing routines for a library is very much like writing them for an application. Simply export the routine in the <STRONG CLASS="fileName">
+.gp</STRONG>
+ file and any geode which uses the library will be able to call the routine.</P>
+<P>
+It is important when writing routines for export to document the routines exhaustively. Remember that the library will probably be used by other programmers; they will rely on the routines to behave exactly as specified. Exported routines should also minimize side effects; for example, it is a bad idea for a library routine to change the working directory without changing it back, unless that is the routine's main purpose.</P>
+<P>
+Most libraries will have a number of routines which are not for export, but are used by routines that are exported. These are simply written normally, and are not exported in the <CODE>
+.gp</CODE>
+ or declared in the header file. Remember that programmers will not see these routines; their side effects should thus be fully documented with the exported routines which call them.</P>
+<P>
+Some libraries will declare classes of objects. In this case, the library should specify in the <STRONG CLASS="fileName">
+.gp</STRONG>
+ file that it uses whichever library defines the superclass of the object. For example, if a library defines a subclass of <CODE>
+GenClass</CODE>
+, it should specify that it uses the <STRONG CLASS="fileName">
+UI</STRONG>
+ library. It should then export the new class.</P>
+<P>
+Some libraries will declare classes that are not intended to be used by clients. For example, the Impex library declares <CODE>
+ImportExportClass</CODE>
+. This class is never instantiated; it contains code and instance data that are used by its subclasses (<CODE>
+ImportControlClass</CODE>
+ and <CODE>
+ExportControlClass</CODE>
+). Such &quot;hidden&quot; classes need not be exported. However, the classes must be fully declared in the header files so the subclasses can be defined accurately and consistently.</P>
+<HR>
+<A NAME="Libraries_5.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Libraries</A>: 5 
+<A NAME="Libraries_5.htm_15383">
+ </A>
+Header Files</H2>
+<P>
+Every library should have at least one header file. This file contains declarations and definitions which are needed by each of the geodes which uses the library.</P>
+<P>
+If a library exports routines but does not export object classes, its header will be a standard C header file. This file should contain declarations of every exported routine. It should also contain the definitions of any macros, constants, structures, etc., which clients might use. </P>
+<P>
+If a library exports object classes, its header will be a Goc header with the suffix <STRONG CLASS="fileName">
+.goh</STRONG>
+. In addition to routine declarations, it must contain the complete declarations of each of the exported object classes, including all the message declarations. A <STRONG CLASS="fileName">
+.goh</STRONG>
+ file should begin with the Goc directive &quot;<CODE>
+@deflib &lt;</CODE>
+libname&gt;&quot;, and end with the directive &quot;<CODE>
+@endlib</CODE>
+&quot;. This ensures that the header will only be included once, even if the code tries to include it several times.</P>
+<P>
+Large libraries may have several header files. For example, a library might declare several similar object classes. It is usually simpler to write a separate header for each class; a client can then include only the headers for classes which it will use. Note that the header for a class should use a Goc <CODE>
+@include</CODE>
+ directive to include the header for that class's superclass.</P>
+<P>
+It is of the utmost importance that the headers be kept in synchronization with the libraries they describe. As a rule, a library will include each one of those headers; that helps to keep all the files compatible. Nevertheless, you must be careful whenever changing a library.</P>
+<HR>
+<A NAME="Libraries_6.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Libraries</A>: 6 
+Compiler Directives</H2>
+<P>
+Libraries have to be compiled slightly differently from applications. Since library routines are run under application threads, they must treat global variables differently than applications do. You must therefore add pragmas to ensure that the library is compiled correctly.</P>
+<P>
+There are several steps to take:</P>
+<UL>
+<LI>
+The compiler should not to expect the <CODE>
+ss</CODE>
+ register to be the same as <CODE>
+ds</CODE>
+.</LI>
+<LI>
+The compiler must generate code to load the <CODE>
+dgroup</CODE>
+ segment address into <CODE>
+ds</CODE>
+ at the start of exported routines.</LI>
+<LI>
+The compiler must set up semaphores or other data-synchronization structures for global variables.</LI>
+</UL>
+<P>
+Most compiler manuals have a section on compiling dynamically-linked libraries (DLLs) for Microsoft Windows; this section will describe how to set up these conditions. Note that you need only do this if your library will have its own global or static variables. If the library's routines and methods use only local, automatic variables, you need not perform these actions.</P>
+<P>
+When you compile a library, you must pass the argument &quot;-L &lt;libname&gt;&quot; to Goc. Edit your <STRONG CLASS="fileName">
+local.mk</STRONG>
+ file to make it insert this flag. For more information about the <STRONG CLASS="fileName">
+local.mk</STRONG>
+ file, see <A HREF="../../Tools/Tools/TTools_12.htm">Using Tools chapter</A>.</P>
+<P>
+Finally, if your library is written in C or Goc (or if its API is in C, even if some internal routines are written in assembly), you must indicate this by putting the flag <CODE>
+c-api</CODE>
+ on the &quot;type&quot; line of the library's <STRONG CLASS="fileName">
+.gp</STRONG>
+ file. This instructs the kernel to pass arguments on the stack (instead of in registers) when calling the entry point routine.<STRONG CLASS="fileName">
+</STRONG>
+</P>
+<HR>
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+</BODY>
+</HTML>

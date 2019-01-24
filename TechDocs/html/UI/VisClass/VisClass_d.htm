@@ -1,0 +1,1190 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: VisClass_d.htm,v 1.1 97/06/02 16:51:41 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Drawing to the Screen</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">VisClass</A>: 4.2 <A HREF="VisClass_b.htm">Using VisClass</A>: 
+<A NAME="IX_VisClass:drawing">
+ </A>
+<A NAME="28950">
+ </A>
+Drawing to the Screen</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VisClass_b.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VisClass_c.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.1 Basic VisClass Rules</A> 
+<!-- to next --> | <A HREF="VisClass_e.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.3 Positioning Visible Objects</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+One of the main features of visible objects is their ability to draw themselves on the screen. The visible tree does not have to detect when drawing or redrawing should be done; the UI will do this automatically through the window system and the GenView object.</P>
+
+<H2 CLASS="HeadingC">
+<A NAME="90026">
+ </A>
+Visual Updates</H2>
+<PRE>MSG_VIS_OPEN, MSG_VIS_CLOSE</PRE>
+<P>
+The visible tree will have to draw or redraw itself when a portion of its GenView window becomes newly exposed. The GenView keeps track of its window and will notify its content when any portion of the window becomes exposed. Exposure can occur from several events: The view window could be newly created; another window could have been moved, exposing the view's window; or the view window could have been scrolled.</P>
+<P>
+Each of these exposure events looks exactly the same to the visible tree. When one of them occurs, the GenView will send a <CODE>
+MSG_META_EXPOSED</CODE>
+ to its content object. The content (a VisContent or GenDocument if you're using a visible tree) will create a GState for the window and translate the <CODE>
+MSG_META_EXPOSED</CODE>
+ into a <CODE>
+MSG_VIS_DRAW</CODE>
+. It will then send this <CODE>
+MSG_VIS_DRAW</CODE>
+ to itself.</P>
+<P>
+The default handler for <CODE>
+MSG_VIS_DRAW</CODE>
+ in a composite is to simply pass the message on to all of the composite's children. There is no default behavior for <CODE>
+MSG_VIS_DRAW</CODE>
+ in <CODE>
+VisClass</CODE>
+.</P>
+<P>
+Any object (content, composite, or leaf) that wants to represent itself on the screen must handle <CODE>
+MSG_VIS_DRAW</CODE>
+. Any composite that subclasses this message must be sure to pass it on to all of its children with the following line:</P>
+<PRE>@send @visChildren::<A NAME="IX_MSG_VIS_DRAW"> </A>MSG_VIS_DRAW(drawFlags, gstate);</PRE>
+<P>
+Redrawing is not initiated only by the view window becoming exposed. It can also be initiated by some portion of the visible tree changing so that it needs to be redrawn (e.g., a child is moved from one composite to another, which may have an effect on the visual representation of the composite). Typically, any change that necessitates a redrawing will automatically generate a <CODE>
+MSG_VIS_DRAW</CODE>
+ to the appropriate objects. These operations, however, will require a <CODE>
+VisUpdateMode</CODE>
+ to be passed along with the other parameters.</P>
+<P>
+All of the above assumes that the visible object is &quot;open&quot; or &quot;realized.&quot; If an object is not open, it will not appear on the screen or as part of a composite's geometry calculations. When a window is first created, the window's content is automatically opened with <CODE>
+MSG_VIS_OPEN</CODE>
+. In the case of a visible tree attached to a GenView, this means that the VisContent object will be opened along with the window. All of the VisContent's children will also be opened automatically (assuming their VOF_WINDOW_INVALID bits are set, which is true the first time a visible object comes up).</P>
+<P>
+If a visible object is added to an already-opened composite, the child will automatically be opened and marked invalid. This will cause the composite's geometry and image to be updated during the next visual update. If a child is added to a composite that is not currently open, the child will not be opened.</P>
+<P>
+Although it is rarely done directly, you can manually open a visible object with the message <CODE>
+MSG_VIS_OPEN</CODE>
+, and you can &quot;close&quot; an object (remove it from the screen and from the tree's geometry calculations) with <CODE>
+MSG_VIS_CLOSE</CODE>
+. To open or close an entire branch of the visible tree, you can send the appropriate message to the top composite object in the branch. The message will propagate down through all the visible children.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_OPEN">
+ </A>
+MSG_VIS_OPEN</H4>
+<PRE CLASS="syntax">void	MSG_VIS_OPEN(
+        WindowHandle window);</PRE>
+<P>
+This message is part of the visual update mechanism and will be sent by the system when an object must be visually updated to appear on the screen. It will be sent to any VOF_WINDOW_INVALID objects in a branch whose VTF_IS_WIN_GROUP object has become VA_VISIBLE. Any object added into a visible tree having VOF_WINDOW_INVALID set will receive a <CODE>
+MSG_VIS_OPEN</CODE>
+ at the next visual update. This message propagates down the visible tree and does <EM>
+not</EM>
+ cross over boundaries of window groups. This message is often subclassed by objects that want to initialize some information before being drawn on the screen. If an object subclasses this message, it should be sure to call its superclass somewhere in the handler.</P>
+<P CLASS="refField">
+Source:	Visual update mechanism.</P>
+<P CLASS="refField">
+Destination:	Any visible object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+window</CODE>
+	Handle of window in which the object is to appear, or zero if it should appear in the top window object.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Will be intercepted by objects that want to initialize certain data or take certain actions before being drawn on the screen. Any intercepting objects must call the superclass somewhere in their handler.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_CLOSE">
+ </A>
+MSG_VIS_CLOSE</H4>
+<PRE CLASS="syntax">void	MSG_VIS_CLOSE();</PRE>
+<P>
+This message is part of the visual update mechanism and is sent to objects that are being taken off the screen. The system will send this message to any objects in a visual branch whose VTF_IS_WIN_GROUP object is set not visible (~VA_VISIBLE). This message closes appropriate windows and propagates to all children to the bottom leaf objects of the visible branch. This message will <EM>
+not</EM>
+ cross window group boundaries; if a lower VTF_IS_WIN_GROUP object is encountered during the message propagation, an error will likely occur. Therefore, lower window groups must be closed before higher window groups may be closed.</P>
+<P CLASS="refField">
+Source:	Visual update mechanism.</P>
+<P CLASS="refField">
+Destination:	Any visible object.</P>
+<P CLASS="refField">
+Interception:	Will be intercepted by objects that want to do something as it is being taken off the screen. Any objects that intercept the message must call their superclasses in the handlers.</P>
+
+
+
+<H2 CLASS="HeadingC">
+<A NAME="IX_Screen Update;Update Mode;Drawing:VisUpdateMode;Redrawing:VisUpdateMode">
+ </A>
+VisUpdateMode</H2>
+<P>
+<CODE>
+VisUpdateMode</CODE>
+<A NAME="IX_VUM_&ldots;">
+ </A>
+<A NAME="IX_VisUpdateMode">
+ </A>
+ is an enumerated type that determines when and how the visible tree will be visually updated when its image or geometry becomes invalid. This type has four enumerations, described below:</P>
+<DL>
+<DT>
+VUM_MANUAL</DT><DD>
+This mode indicates that the UI should not update at all after this change. Instead, the visual update will be initiated manually later on.</DD>
+<DT>
+VUM_NOW</DT><DD>This mode indicates that the visual update should occur immediately after the change is effected.</DD>
+<DT>
+VUM_DELAYED_VIA_UI_QUEUE</DT><DD>
+This mode indicates that the visual update should occur only when the UI queue is completely empty (indicating no further changes are coming).</DD>
+<DT>
+VUM_DELAYED_VIA_APP_QUEUE</DT><DD>
+This mode indicates that the visual update should occur only when the application's queue is empty (indicating that no more changes are coming). This mode is very useful for making several changes that each require an update; it will put the updating off until the very end and will cause only a single update.</DD>
+</DL>
+<P>
+A <CODE>
+VisUpdateMode</CODE>
+ is passed as a parameter to certain Vis and Gen messages. These messages typically have some effect on the visual representation of the objects--either on the geometry or on the image itself.</P>
+
+
+<H2 CLASS="HeadingC">
+<A NAME="IX_GStates:creation for drawing">
+ </A>
+The Initial GState</H2>
+<PRE><A NAME="IX_GStates:with visible objects"> </A>MSG_VIS_VUP_CREATE_GSTATE</PRE>
+<P>
+For any drawing to occur, a graphic state must exist. The graphic state typically is associated with the GenView's window and is created automatically, either when the window is first realized on the screen or when an exposure event occurs.</P>
+<P>
+To create a GState, the system generates a <CODE>
+MSG_VIS_VUP_CREATE_GSTATE</CODE>
+ and sends it to the object that first requires a visual update. This message travels up the visible tree until it gets to a window group (an object with its VTF_IS_WINDOW flag set), and then it creates a GState associated with that window object. Sometimes a content object will subclass this message to set up its own display information before the GenView window can create the new GState. The other time in which this message may be subclassed is by a content that manages a 32-bit graphics space; the content will have to translate the gstate to the proper position in the large document before letting other objects use it.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_VUP_CREATE_GSTATE">
+ </A>
+<A NAME="32272">
+ </A>
+MSG_VIS_VUP_CREATE_GSTATE</H4>
+<PRE CLASS="syntax">GStateHandle MSG_VIS_VUP_CREATE_GSTATE();</PRE>
+<P>
+This message travels up the visible object tree until it reaches either the root object or a window group object. It then creates a graphic state associated with that object; this graphic state is then used for the subsequent visual update. You may wish to subclass this message in order to alter the GState created or to set it up to take 32-bit coordinates. If you subclass it, however, be sure to call the superclass somewhere in the handler.</P>
+<P CLASS="refField">
+Source:	Unrestricted--typically sent by a visible object to itself.</P>
+<P CLASS="refField">
+Destination:	Any visible object--typically sent by a visible object to itself.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	The GStateHandle of the newly-created GState.</P>
+<P CLASS="refField">
+Interception:	Unlikely--VisContent objects may intercept this message to translate the returned GState in a 32-bit graphics space. In this case, the VisContent must first call its superclass, then translate the GState appropriately before returning.</P>
+
+
+
+<H2 CLASS="HeadingC">
+<A NAME="IX_VisClass:window handle">
+ </A>
+<A NAME="IX_Windows:handle with visible objects">
+ </A>
+Retrieving the Current Window Handle</H2>
+<PRE>MSG_VIS_QUERY_WINDOW</PRE>
+<P>
+Often a visible object will require the window handle of the window it's currently residing in. Some objects, for example, will want to force visual updates in real-time, and they can do this by using the current window handle, creating a special GState for it, and drawing to that GState. The visible object can either cache the window handle when the window is first opened, or it can retrieve it with <CODE>
+MSG_VIS_QUERY_WINDOW</CODE>
+.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_QUERY_WINDOW">
+ </A>
+MSG_VIS_QUERY_WINDOW</H4>
+<PRE CLASS="syntax">WindowHandle MSG_VIS_QUERY_WINDOW();</PRE>
+<P>
+This message returns the window handle of the window the object currently resides in. In many cases, this will be the window handle of a GenView window.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object--typically sent by a visible object to itself to retrieve its current window handle.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	The window handle of the object's current window.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+<P CLASS="refField">
+See Also:	<CODE>
+MSG_GEN_VIEW_GET_WINDOW.</CODE>
+</P>
+
+
+
+<H2 CLASS="HeadingC">
+<A NAME="IX_VisClass:redrawing;Redrawing:visible objects;Drawing:causing redraws">
+ </A>
+Causing Redrawing</H2>
+<PRE>MSG_VIS_BOUNDS_CHANGED, MSG_VIS_REDRAW_ENTIRE_OBJECT, MSG_VIS_INVALIDATE, MSG_VIS_MARK_INVALID, MSG_VIS_INVAL_TREE, MSG_VIS_ADD_RECT_TO_UPDATE_REGION</PRE>
+<P>
+If your visible tree contains a composite that manages its own children, chances are you'll need to force a visual update after certain changes occur. For example, if you have an object that can be moved with the mouse, it will probably want to erase its image and redraw itself somewhere else after the move; since the geometry manager is not involved here, the object must force a redrawing of the affected portion of the visible tree.</P>
+<P>
+There are several ways an object can force a redraw. These all take the form of messages, each of which is described below.</P>
+<DL>
+<DT>
+<CODE>
+MSG_VIS_DRAW</DT><DD>
+</CODE>
+This message causes the entire visible branch to draw itself. This message may be sent by any object to any other object, including itself. It does not, however, update the screen image; you must call <CODE>
+MSG_VIS_VUP_UPDATE_WIN_GROUP</CODE>
+.</DD>
+<DT>
+<CODE>
+MSG_VIS_BOUNDS_CHANGED</DT><DD>
+</CODE>
+This message causes the visible object to mark the affected portions invalid, causing the visual update mechanism to redraw that portion during the next visual update. This message is part of the visible update mechanism.</DD>
+<DT>
+<CODE>
+MSG_VIS_REDRAW_ENTIRE_OBJECT</DT><DD>
+</CODE>
+This message causes the visible object to redraw itself entirely (as opposed to just the invalid portion) if it is currently drawable. Essentially, the object will send itself a <CODE>
+MSG_VIS_DRAW</CODE>
+ when it receives this message. This is especially useful if an object needs to completely change its image.</DD>
+<DT>
+<CODE>
+MSG_VIS_INVALIDATE</DT><DD>
+</CODE>
+This message invalidates the entire region inside the visible object's bounds. It will cause the window system to generate a <CODE>
+MSG_META_EXPOSED</CODE>
+ for the affected area, causing a <CODE>
+MSG_VIS_DRAW</CODE>
+ to propagate down the tree to all affected objects. Note that this message must be subclassed to work with scaled windows or large documents.</DD>
+<DT>
+<CODE>
+MSG_VIS_INVAL_TREE</DT><DD>
+</CODE>
+This message invalidates the entire region inside the visible object's bounds, including any child window areas. The window system will generate a <CODE>
+MSG_META_EXPOSED</CODE>
+ for all affected windows.</DD>
+<DT>
+<CODE>
+MSG_VIS_MARK_INVALID</DT><DD>
+</CODE>
+This message allows the caller to set an object's invalid flags so the object will be properly updated later. The object is marked as being invalid, and the default handler ensures a visual update path is created. This method may <EM>
+not</EM>
+ be subclassed by applications.</DD>
+<DT>
+<CODE>
+MSG_VIS_ADD_RECT_TO_UPDATE_REGION</DT><DD>
+</CODE>
+This message adds the passed rectangular region to a window's update list. Essentially, the window group associated with the recipient object will ensure that the given rectangle gets marked invalid and included in the next visual update.</DD>
+
+</DL>
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_DRAW">
+ </A>
+<A NAME="63045">
+ </A>
+MSG_VIS_DRAW</H4>
+<PRE CLASS="syntax">void	MSG_VIS_DRAW(
+        DrawFlags		drawFlags,
+        GStateHandle		gstate);</PRE>
+<P>
+This message causes the visible object to draw itself. The default behavior of this message for composite objects is to pass the message on to all children. There is no default behavior for <CODE>
+VisClass</CODE>
+ for this message.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+drawFlags</CODE>
+	A record of type <CODE>
+DrawFlags</CODE>
+ (defined below). The flags in this record describe what type of action initiated the <CODE>
+MSG_VIS_DRAW</CODE>
+.</P>
+<DL>
+<DT>
+<CODE>
+gstate</CODE>
+</DT><DD>The GStateHandle of the gstate created for this visual update. All drawing done in the handler should be for this GState.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	All visible objects that wish to draw anything to the screen must intercept this message. Composites that intercept it must be sure to send it to their children (with <CODE>
+@send @visChildren</CODE>
+).</P>
+<P CLASS="refField">
+Structures:	The flags in the <A NAME="IX_DrawFlags">
+ </A>
+<CODE>
+DrawFlags</CODE>
+ record are listed below:</P>
+<DL>
+<DT>
+DF_EXPOSED</DT><DD>This flag indicates the <CODE>
+MSG_VIS_DRAW</CODE>
+ is a result of a <CODE>
+MSG_META_EXPOSED</CODE>
+ from the window system. This is the standard and most usual form of <CODE>
+MSG_VIS_DRAW</CODE>
+.</DD>
+<DT>
+DF_OBJECT_SPECIFIC</DT><DD>
+This flag is used by various Specific UI objects for object-specific things. Your visible objects should not be concerned with this flag.</DD>
+<DT>
+DF_PRINT</DT><DD><A NAME="IX_Printing:visible objects">
+ </A>
+This flag indicates that the <CODE>
+MSG_VIS_DRAW</CODE>
+ is a result of a <CODE>
+MSG_META_EXPOSED_FOR_PRINT</CODE>
+, the printing message. The GState passed will be a spooler GState rather than a window GState. If this flag is set, DF_EXPOSED will also be set.</DD>
+<DT>
+DF_DONT_DRAW_CHILDREN</DT><DD>
+This flag indicates that composite objects should draw themselves but should <EM>
+not</EM>
+ propagate the drawing message on to their children (this is nonstandard behavior).</DD>
+<DT>
+DF_DISPLAY_TYPE</DT><DD><A NAME="IX_DisplayClass">
+ </A>
+<A NAME="IX_DC_&ldots;">
+ </A>
+This is actually an enumerated type indicating the display type being used by the system right now. The display type enumeration is named <CODE>
+DisplayClass</CODE>
+. For review, the types are listed below:</DD>
+<DT>
+</DT><DD>DC_TEXT, DC_GRAY_1, DC_GRAY_2, DC_GRAY_4, DC_GRAY_8, DC_COLOR_2, DC_COLOR_4, DC_CF_RGB.</DD>
+
+
+</DL>
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_BOUNDS_CHANGED">
+ </A>
+MSG_VIS_BOUNDS_CHANGED</H4>
+<PRE CLASS="syntax">void	MSG_VIS_BOUNDS_CHANGED(@stack
+        word	bottom,
+        word	right,
+        word	top,
+        word	left);</PRE>
+<P>
+The geometry manager sends this message when a geometry update changes an object's bounds.</P>
+<P CLASS="refField">
+Source:	Unrestricted--sent by the geometry manager when a visible object's bounds have changed as the result of a geometry change.</P>
+<P CLASS="refField">
+Destination:	Any visible object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+bottom</CODE>
+, <CODE>
+right</CODE>
+, <CODE>
+top</CODE>
+, <CODE>
+left<BR>
+</CODE>
+The four parameters correspond to the rectangle defining the object's old bounds. The parameters are passed on the stack.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely. If the object subclasses this message, it should invalidate any part of its old bounds that it might have drawn in (the default handler invalidates the entire passed range).</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_REDRAW_ENTIRE_OBJECT">
+ </A>
+MSG_VIS_REDRAW_ENTIRE_OBJECT</H4>
+<PRE CLASS="syntax">void	MSG_VIS_REDRAW_ENTIRE_OBJECT();</PRE>
+<P>
+This message causes the object send itself a <CODE>
+MSG_VIS_DRAW</CODE>
+, creating and destroying a GState for itself.</P>
+<P CLASS="refField">
+Source:	Unrestricted--typically sent by an object to itself because of a state change, not as part of the visual update mechanism.</P>
+<P CLASS="refField">
+Destination:	Any visible object--typically sent by an object to itself.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_INVALIDATE">
+ </A>
+MSG_VIS_INVALIDATE</H4>
+<PRE CLASS="syntax">void	MSG_VIS_INVALIDATE();</PRE>
+<P>
+This message invalidates the entire region within the object's bounds. The message will cause the window system to generate a <CODE>
+MSG_META_EXPOSED</CODE>
+ for the area covered by the bounds, causing a visual update to occur.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object.</P>
+<P CLASS="refField">
+Interception:	Must be intercepted if the object is working in a 32-bit document space. Must also be intercepted to work with scaled views.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_INVAL_TREE">
+ </A>
+MSG_VIS_INVAL_TREE</H4>
+<PRE CLASS="syntax">void	MSG_VIS_INVAL_TREE();</PRE>
+<P>
+This message has the effect of <CODE>
+MSG_VIS_INVALIDATE</CODE>
+ on an entire branch of the visible tree. The window system will generate <CODE>
+MSG_META_EXPOSED</CODE>
+ for each affected window.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_MARK_INVALID">
+ </A>
+<A NAME="69779">
+ </A>
+MSG_VIS_MARK_INVALID</H4>
+<PRE CLASS="syntax">void	MSG_VIS_MARK_INVALID(
+        VisOptFlags		flagsToSet,
+        VisUpdateMode		updateMode);</PRE>
+<P>
+This message allows the caller to set the recipient's <CODE>
+VI_optFlags</CODE>
+ record so the object will get updated properly during the next visual update. The flags that can be set with this message are VOF_GEOMETRY_INVALID, VOF_WINDOW_INVALID, and VOF_IMAGE_INVALID. For more information on these flags, see <A HREF="VisClass_7.htm#59032"> VI_optFlags</A>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+flagsToSet</CODE>
+	A record of <CODE>
+VisOptFlags</CODE>
+ indicating which type of invalidation is being caused. The flags allowed with this message are VOF_GEOMETRY_INVALID, VOF_WINDOW_INVALID, and VOF_IMAGE_INVALID.</P>
+<DL>
+<DT>
+<CODE>
+updateMode</CODE>
+</DT><DD>A <CODE>
+VisUpdateMode</CODE>
+ indicating when the visual update caused by this message should occur.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	<EM>
+May not</EM>
+ be subclassed. Certain optimizations are made in the default handler, and subclassing may have unpredictable results.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_VUP_ADD_RECT_TO_UPDATE_REGION">
+ </A>
+MSG_VIS_ADD_RECT_TO_UPDATE_REGION</H4>
+<PRE CLASS="syntax">void	MSG_VIS_ADD_RECT_TO_UPDATE_REGION(@stack
+        byte		unused,		/* for word alignment of parameters */
+        VisAddRectFlags		addRectFlags,
+        word		bottom,
+        word		right,
+        word		top,
+        word		left);</PRE>
+<P>
+This message adds the passed rectangular region to the window group's list of regions that require visual update. The handler for this message will ensure that the window group object for this branch of the tree marks the region as invalid so it will be included in the next visual update. The <CODE>
+addRectFlags</CODE>
+ parameter contains either of the flags listed below.</P>
+<P CLASS="refField">
+Source:	Unrestricted--usually sent by an object to itself.</P>
+<P CLASS="refField">
+Destination:	Any visible object--usually sent by an object to itself.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+unused</CODE>
+	An unused byte for alignment of parameters.</P>
+<DL>
+<DT>
+<CODE>
+addRectFlags</CODE>
+</DT><DD>A record of <CODE>
+VisAddRectFlags</CODE>
+, defined below.</DD>
+<DT>
+<CODE>
+rectangle coords</CODE>
+</DT><DD>The coordinates of the rectangle to be added to the invalidation region.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely--a composite object may wish to optimize invalidation by altering the passed bounds and then passing the message on to its superclass.</P>
+<P CLASS="refField">
+Structures:	The <A NAME="IX_VisAddRectFlags">
+ </A>
+<CODE>
+VisAddRectFlags</CODE>
+ are listed below:</P>
+<DL>
+<DT>
+VARF_NOT_IF_ALREADY_INVALID</DT><DD>
+This flag indicates that the passed rectangle should not be invalidated if any visible object in the hierarchy going up to the window group object is marked invalid.</DD>
+<DT>
+VARF_ONLY_REDRAW_MARGINS</DT><DD>
+This flag indicates that the object is invalidating old bounds and may indicate that the system can use a special optimization for invalidation.</DD>
+
+
+
+</DL>
+<H2 CLASS="HeadingC">
+<A NAME="IX_Windows:updating">
+ </A>
+Updating Window Groups</H2>
+<PRE>MSG_VIS_VUP_UPDATE_WIN_GROUP, MSG_VIS_UPDATE_WIN_GROUP, MSG_VIS_UPDATE_WINDOWS_AND_IMAGE</PRE>
+<P>
+<A NAME="IX_Window group">
+ </A>
+A window group is an object that has a window in which visible objects are displayed. Typically, you will not create your own window group objects, but you may need to notify a window group when it needs to be updated visually. To be a window group, an object has to have its VTF_IS_WINDOW or VTF_IS_PORTAL flag set in its <CODE>
+VI_typeFlags</CODE>
+ field.</P>
+<P>
+The window group is responsible for keeping track of the regions of its coordinate space that require visual updating. When a region or object gets invalidated, the window group remembers that it is invalid and makes sure it gets updated during the next visual update.</P>
+<P>
+Any object can request that a visual update occur for the entire branch managed by a window group. It can use the three messages described in this section to request or force a visual update for the window group.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_VUP_UPDATE_WIN_GROUP">
+ </A>
+<A NAME="83286">
+ </A>
+MSG_VIS_VUP_UPDATE_WIN_GROUP</H4>
+<PRE CLASS="syntax">Boolean	MSG_VIS_VUP_UPDATE_WIN_GROUP(
+        VisUpdateMode updateMode);</PRE>
+<P>
+This message travels up the visible tree from the recipient object to the first window group encountered; it will then cause that window group to go through a visible update by sending the window group object a <CODE>
+MSG_VIS_UPDATE_WIN_GROUP</CODE>
+, below.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object residing in the window group that is to be updated.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+updateMode</CODE>
+	A <CODE>
+VisUpdateMode</CODE>
+ indicating when the visual update should occur. VUM_MANUAL has the effect of a &quot;no operation&quot; because VUM_MANUAL does not cause visual updates.</P>
+<P CLASS="refField">
+Return:	<EM>
+True</EM>
+ if the update mechanism was invoked; <EM>
+false</EM>
+ if it was not.</P>
+<P CLASS="refField">
+Interception:	Not allowed.</P>
+<P CLASS="refField">
+Warnings:	You may not subclass this message.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_UPDATE_WIN_GROUP">
+ </A>
+MSG_VIS_UPDATE_WIN_GROUP</H4>
+<PRE CLASS="syntax">void	MSG_VIS_UPDATE_WIN_GROUP(
+        VisUpdateMode updateMode);</PRE>
+<P>
+This message may only be sent by a window group object to itself. It causes the window group to actually go through a visual update.</P>
+<P CLASS="refField">
+Source:	Visible update mechanism.</P>
+<P CLASS="refField">
+Destination:	The window group object that is to be updated.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+updateMode</CODE>
+	A <CODE>
+VisUpdateMode</CODE>
+ indicating when the visual update should occur. This is the same as passed to <CODE>
+MSG_VIS_VUP_UPDATE_WIN_GROUP.</CODE>
+</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Not allowed.</P>
+<P CLASS="refField">
+Warnings:	You may not subclass this message.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_UPDATE_WINDOWS_AND_IMAGE">
+ </A>
+MSG_VIS_UPDATE_WINDOWS_AND_IMAGE</H4>
+<PRE CLASS="syntax">void	MSG_VIS_UPDATE_WINDOWS_AND_IMAGE(
+        VisUpdateImageFlags updateImageFlags);</PRE>
+<P>
+This message is called by a window group during a visual update. It should not be sent or handled by anything other than a window group. It causes both the geometry and image of the affected branch of the visible tree to be updated, and it is used on branches which are already visually realized on the screen.</P>
+<P CLASS="refField">
+Source:	Visual update mechanism.</P>
+<P CLASS="refField">
+Destination:	A window group object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+updateImageFlags<BR>
+</CODE>
+This is a record of <CODE>
+VisUpdateImageFlags</CODE>
+ that govern the visual update of the window group.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Not allowed.</P>
+<P CLASS="refField">
+Structures:	The flags of <CODE>
+VisUpdateImageFlags</CODE>
+ are listed below:</P>
+<DL>
+<DT>
+VUIF_ALREADY_INVALIDATED</DT><DD>
+An optimization flag to keep an already-invalid composite from invalidating all its children.</DD>
+<DT>
+VUIF_SEND_TO_ALL_CHILDREN</DT><DD>
+A flag to ensure that all children get invalidated; it is used when the composite only updates its margins for optimization.</DD>
+</DL>
+<P CLASS="refField">
+Warnings:	You may not subclass this message.</P>
+
+
+
+<H2 CLASS="HeadingC">
+<A NAME="42180">
+ </A>
+Using Visual Monikers</H2>
+<PRE>MSG_VIS_DRAW_MONIKER, MSG_VIS_GET_MONIKER_POS, MSG_VIS_GET_MONIKER_SIZE, MSG_VIS_FIND_MONIKER, MSG_VIS_CREATE_VIS_MONIKER</PRE>
+<P>
+<A NAME="IX_Monikers:displaying with VisClass;Visual monikers:drawing and finding">
+ </A>
+Although visual monikers are typically used with generic objects (and are, in fact, documented in the <CODE>
+GenClass</CODE>
+ chapter), you can display monikers with visible objects as well. The four messages discussed in this section can be used to draw a visible moniker, get information about a moniker, or locate a particular moniker in the visible object tree.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_DRAW_MONIKER">
+ </A>
+MSG_VIS_DRAW_MONIKER</H4>
+<PRE CLASS="syntax">void	MSG_VIS_DRAW_MONIKER(@stack
+        DrawMonikerFlags		monikerFlags,
+        ChunkHandle		visMoniker,
+        word		textHeight,
+        GStateHandle		gstate,
+        word		yMaximum,
+        word		xMaximum,
+        word		yInset,
+        word		xInset);</PRE>
+<P>
+This message draws a visual moniker for the object. This message may be called by an object on itself in its <CODE>
+MSG_VIS_DRAW</CODE>
+ handler.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+monikerFlags</CODE>
+	A record of <CODE>
+DrawMonikerFlags</CODE>
+ indicating how the moniker should be drawn. These flags are described below.</P>
+<DL>
+<DT>
+<CODE>
+visMoniker</CODE>
+</DT><DD>The chunk handle of the chunk containing the actual moniker to be drawn. This chunk must be in the same block as the object handling the message.</DD>
+<DT>
+<CODE>
+textHeight</CODE>
+</DT><DD>A parameter used for optimization--if the caller knows the system text height, it should pass it here. If not, it should pass zero.</DD>
+<DT>
+<CODE>
+gstate</CODE>
+</DT><DD>The handle of the GState to use when drawing the moniker. Typically, this is received by <CODE>
+MSG_VIS_DRAW</CODE>
+, which invokes this message.</DD>
+<DT>
+<CODE>
+yMaximum</CODE>
+</DT><DD>The maximum bottom bound of the moniker if DMF_CLIP_TO_MAX_WIDTH is set in <CODE>
+monikerFlags</CODE>
+. Pass MAX_COORD to avoid clipping.</DD>
+<DT>
+<CODE>
+xMaximum</CODE>
+</DT><DD>The maximum right bound of the moniker if DMF_CLIP_TO_MAX_WIDTH is set in <CODE>
+monikerFlags</CODE>
+. Pass MAX_COORD to avoid clipping.</DD>
+<DT>
+<CODE>
+yInset</CODE>
+</DT><DD>The vertical inset at which to begin drawing the moniker, if left or right justified.</DD>
+<DT>
+<CODE>
+xInset</CODE>
+</DT><DD>The horizontal inset at which to begin drawing the moniker, if top or bottom justified.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+<P CLASS="refField">
+Structures:	<A NAME="IX_DMF_&ldots;">
+ </A>
+<A NAME="IX_DrawMonikerFlags">
+ </A>
+The <A NAME="IX_DrawMonikerFlags">
+ </A>
+<CODE>
+DrawMonikerFlags</CODE>
+ structure is defined as follows:</P>
+<PRE>typedef ByteFlags DrawMonikerFlags;
+#define DMF_UNDERLINE_ACCELERATOR						0x40
+		/* Underlines accelerator key, if any */
+#define DMF_CLIP_TO_MAX_WIDTH						0x20
+		/* Clips the moniker to the xMaximum
+		 * parameter */
+#define DMF_NONE						0x10
+		/* Set to draw the moniker at the
+		 * current pen position (ignore the
+		 * xInset and yInset parameters) */
+#define DMF_Y_JUST_MASK						0x0c
+#define DMF_X_JUST_MASK						0x03
+		/* These are two bitfields that
+		 * determine the justification.
+		 * Their offsets are below; they
+		 * are of type Justification. */
+#define DMF_Y_JUST_OFFSET					2
+#define DMF_X_JUST_OFFSET					0</PRE>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_GET_MONIKER_POS">
+ </A>
+MSG_VIS_GET_MONIKER_POS</H4>
+<PRE CLASS="syntax">XYValueAsDWord MSG_VIS_GET_MONIKER_POS(@stack
+        DrawMonikerFlags		monikerFlags,
+        ChunkHandle		visMoniker,
+        word		textHeight,
+        GStateHandle		gstate,
+        word		yMaximum,
+        word		xMaximum,
+        word		yInset,
+        word		xInset);</PRE>
+<P>
+This message returns the position at which the moniker would appear if it were drawn with <CODE>
+MSG_VIS_DRAW_MONIKER</CODE>
+. The moniker is not actually drawn by this message.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object.</P>
+<P CLASS="refField">
+Parameters:	See <CODE>
+MSG_VIS_DRAW_MONIKER</CODE>
+ above.</P>
+<P CLASS="refField">
+Return:	A dword value representing the horizontal and vertical positions where the moniker would be drawn if it were drawn with the passed parameters. The horizontal position is returned in the high word; the vertical position is returned in the low word. Use the DWORD_X and DWORD_Y macros to extract the <CODE>
+x</CODE>
+ and <CODE>
+y</CODE>
+ values. These macros can be found in the file <STRONG CLASS="fileName">
+graphics.h</STRONG>
+.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_GET_MONIKER_SIZE">
+ </A>
+MSG_VIS_GET_MONIKER_SIZE</H4>
+<PRE CLASS="syntax">SizeAsDWord MSG_VIS_GET_MONIKER_SIZE(@stack
+        DrawMonikerFlags		monikerFlags,
+        ChunkHandle		visMoniker,
+        word		textHeight,
+        GStateHandle		gstate,
+        word		yMaximum,
+        word		xMaximum,
+        word		yInset,
+        word		xInset);</PRE>
+<P>
+This message returns the size of the moniker specified by the parameters. The moniker is not drawn.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object.</P>
+<P CLASS="refField">
+Parameters:	See <CODE>
+MSG_VIS_DRAW_MONIKER</CODE>
+ above.</P>
+<P CLASS="refField">
+Return:	A dword value representing the size of the moniker. The width of the moniker is returned in the high word; the height is returned in the low word. Use the macros DWORD_WIDTH and DWORD_HEIGHT, which can be found in the file <STRONG CLASS="fileName">
+visC.goh</STRONG>
+ and also on <A HREF="VisClass_d.htm#16916"> DWORD_HEIGHT</A>
+.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_FIND_MONIKER">
+ </A>
+MSG_VIS_FIND_MONIKER</H4>
+<PRE CLASS="syntax">optr	MSG_VIS_FIND_MONIKER(@stack
+        VisMonikerSearchFlags			searchFlags,
+        MemHandle			destBlock,
+        ChunkHandle			monikerList,
+        DisplayType			displayType);</PRE>
+<P>
+This message locates the given visual moniker list and returns the optr of the moniker most appropriate for the passed display scheme.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+searchFlags</CODE>
+	A record of <CODE>
+VisMonikerSearchFlags</CODE>
+ (described below) indicating the attributes of the moniker that should be returned.</P>
+<DL>
+<DT>
+<CODE>
+destBlock</CODE>
+</DT><DD>Handle of the block into which the moniker chunk should be copied.</DD>
+<DT>
+<CODE>
+monikerList</CODE>
+</DT><DD>Chunk handle of the chunk containing the moniker list to search. The moniker list must be in the same object block as the object handling the message.</DD>
+<DT>
+<CODE>
+displayType</CODE>
+</DT><DD>The <CODE>
+DisplayType</CODE>
+ of the moniker to be found (see below).</DD>
+</DL>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+<P CLASS="refField">
+Structures:	<A NAME="IX_VisMonikerSearchFlags">
+ </A>
+The <A NAME="IX_VisMonikerSearchFlags">
+ </A>
+<CODE>
+VisMonikerSearchFlags</CODE>
+ are listed below.</P>
+<PRE><A NAME="IX_VMSF_&ldots;"> </A>typedef WordFlags VisMonikerSearchFlags;
+#define VMSF_STYLE					0xf000
+	/* Four bits defining the preferred style of
+	 * the moniker. These bits are of type
+	 * VMStyle, which is defined below. */</PRE>
+<PRE>#define VMSF_COPY_CHUNK					0x0400
+	/* Set if the moniker should be copied into
+	 * the block specified if not already in
+	 * that block. */
+#define VMSF_REPLACE_LIST					0x0200
+	/* Set if the moniker list chunk containing
+	 * the VisMoniker should be replaced. The
+	 * chunk handle of the list will then point
+	 * to the moniker rather than the list. */
+#define VMSF_GSTRING					0x0100
+	/* Set if a GString moniker is expected,
+	 * clear if a text moniker is expected. */</PRE>
+<PRE>	/* The remaining bits of this record are
+	 * reserved for internal use. */</PRE>
+<PRE>#define VMSF_STYLE_OFFSET 12</PRE>
+<PRE>typedef ByteEnum <A NAME="IX_VMStyle"> </A>VMStyle;
+#define VMS_TEXT					0
+			/* Normal text moniker */
+#define VMS_ABBREV_TEXT					1
+			/* short text abbreviation */
+#define VMS_GRAPHIC_TEXT					2
+			/* textual GString */
+#define VMS_ICON					3
+			/* normal GString moniker */
+#define VMS_TOOL					4
+			/* tool moniker, normally smaller
+			 * than a standard moniker */</PRE>
+<P>
+<A NAME="IX_DisplayType">
+ </A>
+<A NAME="IX_DT_&ldots;">
+ </A>
+<A NAME="IX_DT_&ldots;">
+ </A>
+<A NAME="IX_DisplayType">
+ </A>
+The <CODE>
+DisplayType</CODE>
+ flags are listed below and can be found in win.h:</P>
+<PRE>typedef ByteFlags <A NAME="IX_DisplayType"> </A>DisplayType;
+#define DT_DISP_SIZE						0xc0
+		/* <A NAME="IX_DisplaySize"> </A><A NAME="IX_DS_&ldots;"> </A>Two bits indicating the size of the
+		 * display; a DisplaySize value, one of
+		 * DS_TINY (CGA, or 256 x 320),
+		 * DS_STANDARD (EGA, VGA, HGC, MCGA),
+		 * DS_LARGE (800 x 600 SVGA), or
+		 * DS_HUGE (huge screens). */
+#define DT_DISP_ASPECT_RATIO						0x30
+		/* Two bits indicating the aspect
+		 * ratio of the screen; a value of
+		 * DisplayAspectRatio, one of
+		 * DAR_NORMAL (VGA or MCGA),
+		 * DAR_SQUISHED (EGA or HGC), or
+		 * DAR_VERY_SQUISHED (CGA) */
+#define DT_DISP_CLASS						0x0f
+		/* Four bits indicating the class of
+		 * the display driver (or closest
+		 * match); A DisplayClass value, one of
+		 * DC_TEXT (char only, not implemented),
+		 * DC_GRAY_1 (1 bit/pixel gray scale),
+		 * DC_GRAY_2 (2 bit/pixel gray scale),
+		 * DC_GRAY_4 (4 bit/pixel gray scale),
+		 * DC_GRAY_8 (8 bit/pixel gray scale),
+		 * DC_COLOR_2 (2 bit/pixel color index),
+		 * DC_COLOR_4 (4 bit/pixel color index),
+		 * DC_COLOR_8 (8 bit/pixel color index),
+		 * DC_CF_RGB (color with RGB values) */</PRE>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_CREATE_VIS_MONIKER">
+ </A>
+MSG_VIS_CREATE_VIS_MONIKER</H4>
+<PRE CLASS="syntax">ChunkHandle MSG_VIS_CREATE_VIS_MONIKER(@stack
+        CreateVisMonikerFlags			flags,
+        word			height,
+        word			width
+        word			length,
+        VisMonikerDataType			dataType,
+        VisMonikerSourceType			sourceType,
+        dword			source);</PRE>
+<P>
+This message creates a new chunk for a visual moniker within the recipient's object block. The new moniker can be created from an already existing visual moniker, a visual moniker list, a text string, a GString, or a token from the token database. The source may be defined by a far pointer, a global memory handle, or an optr. If the source is a text string or GString, a visual moniker structure will be created for the string. The newly-created chunk is marked dirty if the CVMF_DIRTY flag is passed.</P>
+<P>
+If a moniker list is passed, the entire list will be copied into the destination object block. You must make sure that all the monikers in the list will still exist when the list is used.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+flags</CODE>
+	A record of <CODE>
+CreateVisMonikerFlags</CODE>
+. Currently only one may be passed: CVMF_DIRTY, which indicates that the chunk should be marked dirty.</P>
+<DL>
+<DT>
+<CODE>
+height</CODE>
+</DT><DD>The height of the moniker.</DD>
+<DT>
+<CODE>
+width</CODE>
+</DT><DD>The width of the moniker.</DD>
+<DT>
+<CODE>
+length</CODE>
+</DT><DD>The length of the moniker, if a text string.</DD>
+<DT>
+<CODE>
+dataType</CODE>
+</DT><DD>The type of moniker, an enumeration of the type <CODE>
+VisMonikerDataType</CODE>
+. This parameter determines the type of moniker to be created.</DD>
+<DT>
+<CODE>
+sourceType</CODE>
+</DT><DD>The type of source used to create the new moniker, an enumeration of <CODE>
+VisMonikerSourceType</CODE>
+.</DD>
+<DT>
+<CODE>
+source</CODE>
+</DT><DD>This parameter can be a pointer to the source, the global handle of the block containing the source, or an optr pointing to the chunk containing the source, depending on the value in <CODE>
+sourceType</CODE>
+.</DD>
+</DL>
+<P CLASS="refField">
+Return:	The chunk handle of the new visual moniker. The visual moniker chunk resides in the object block of the object receiving the message. If the flag CVMF_DIRTY is passed, the chunk will be marked dirty.</P>
+<P CLASS="refField">
+Interception:	Unlikely--custom UI gadgets may intercept in some cases.</P>
+<P CLASS="refField">
+Structures:	<CODE>
+VisMonikerSourceType</CODE>
+ and <CODE>
+VisMonikerDataType</CODE>
+ are defined below. Both can be found in <STRONG CLASS="fileName">
+visC.goh</STRONG>
+.</P>
+<PRE>typedef ByteEnum <A NAME="IX_VisMonikerSourceType"> </A>VisMonikerSourceType;
+#define VMST_FPTR					0
+		/* Source is referenced by a pointer.
+		 * CVMF_source is a far pointer. */
+#define VMST_OPTR					1
+		/* Source is referenced by an optr.
+		 * CVMF_source is an optr. */
+#define VMST_HPTR					2
+		/* Source is referenced by a combination
+		 * memory handle and offset into the
+		 * memory block (as opposed to an optr
+		 * in which the low word is actually a
+		 * chunk handle, not an offset). */</PRE>
+<PRE>typedef ByteEnum <A NAME="IX_VisMonikerDataType"> </A>VisMonikerDataType;
+#define VMDT_NULL					0
+		/* There is no source. Not valid for
+		 * MSG_VIS_CREATE_VIS_MONIKER. */
+#define VMDT_VIS_MONIKER					1
+		/* Source is a complete VisMoniker
+		 * structure. CVMF_length indicates the
+		 * size of a complete VisMoniker
+		 * structure; CVMF_width and
+		 * CVMF_height are unused. */
+#define VMDT_TEXT					2
+		/* Source is a text string. If the
+		 * string is null-terminated,
+		 * CVMF_length should be zero.
+		 * Otherwise, CVMF_length is the length
+		 * of the string; A VisMoniker
+		 * structure will be created for the
+		 * string. CVMF_width and CVMF_height
+		 * are unused. */
+#define VMDT_GSTRING					3
+		/* Source is a GString. If CVMF_length
+		 * is zero, the GString length is
+		 * determined by scanning for
+		 * GR_END_STRING. Otherwise, CVMF_length
+		 * indicates the length of the GString.
+		 * CVMF_width and CVMF_height indicate
+		 * the width and height of the GString.
+		 * If either is zero, the dimension will
+		 * be calculated by examining the
+		 * string. A VisMoniker structure will
+		 * be created for the GString. */
+#define VMDT_TOKEN					4
+		/* Source is a GeodeToken. CVMF_length,
+		 * CVMF_width, and CVMF_height are
+		 * unused. The destination must be able
+		 * to use this data type because the
+		 * specific UI must decide which moniker
+		 * to choose from the token in the token
+		 * database. */</PRE>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="16916">
+ </A>
+DWORD_HEIGHT</H4>
+<PRE CLASS="syntax">word	<A NAME="DWORD_HEIGHT"> </A>DWORD_HEIGHT(val);
+        dword	val;</PRE>
+<P>
+This macro extracts the height from a <CODE>
+SizeAsDWord</CODE>
+ structure (dword).</P>
+
+
+<H4 CLASS="RefETitle">
+DWORD_WIDTH</H4>
+<PRE CLASS="syntax">word	<A NAME="DWORD_WIDTH"> </A>DWORD_WIDTH(val);
+        dword	val;</PRE>
+<P>
+This macro extracts the width from a <CODE>
+SizeAsDWord</CODE>
+ structure (dword).</P>
+
+
+<H4 CLASS="RefETitle">
+MAKE_SIZE_DWORD</H4>
+<PRE CLASS="syntax">SizeAsDWord <A NAME="IX_MAKE_SIZE_DWORD"> </A>MAKE_SIZE_DWORD(width, height);
+        word	width, height;</PRE>
+<P>
+This macro takes a width and height and creates a <A NAME="IX_SizeAsDWord">
+ </A>
+<CODE>
+SizeAsDWord</CODE>
+ value.</P>
+
+
+
+<H2 CLASS="HeadingC">
+<A NAME="GStates">
+ </A>
+Cached GStates</H2>
+<PRE>MSG_VIS_CREATE_CACHED_GSTATES, MSG_VIS_RECREATE_CACHED_GSTATES, MSG_VIS_DESTROY_CACHED_GSTATES</PRE>
+<P>
+Many complex visible objects (such as VisText and VisSpline) have both a cached GState and a reference count. When the reference count goes from zero to one, the Vis object creates and caches a GState; when the reference count goes from one to zero, the cached GState is destroyed. <CODE>
+VisClass</CODE>
+ has three messages to create, update, and destroy the cached GStates. None of these messages has any default behavior; they are provided for complex objects to handle should they need them.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_CREATE_CACHED_GSTATES">
+ </A>
+MSG_VIS_CREATE_CACHED_GSTATES</H4>
+<PRE CLASS="syntax">void	MSG_VIS_CREATE_CACHED_GSTATES();</PRE>
+<P>
+This message may be used to create and cache a GState, typically to avoid having a complex Vis object update several times for several simple operations (such as pointer events).</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object.</P>
+<P CLASS="refField">
+Interception:	Must be intercepted to have any effect; there is no default behavior.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_RECREATE_CACHED_GSTATES">
+ </A>
+MSG_VIS_RECREATE_CACHED_GSTATES</H4>
+<PRE CLASS="syntax">void	MSG_VIS_RECREATE_CACHED_GSTATES();</PRE>
+<P>
+This message may be used to have the Vis object destroy and recreate any cached GStates it has. For example, cached GStates of a complex visible object that gets moved or resized will no longer map to the proper place in the object's document. After the move or resize, this message may be used to update those GStates.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object.</P>
+<P CLASS="refField">
+Interception:	Must be intercepted to have any effect; there is no default behavior.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_DESTROY_CACHED_GSTATES">
+ </A>
+MSG_VIS_DESTROY_CACHED_GSTATES</H4>
+<PRE CLASS="syntax">void	MSG_VIS_DESTROY_CACHED_GSTATES();</PRE>
+<P>
+This message may be used to destroy any cached GStates the visible object may have.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object.</P>
+<P CLASS="refField">
+Interception:	Must be intercepted to have any effect; there is no default behavior.</P>
+
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VisClass_b.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VisClass_c.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.1 Basic VisClass Rules</A> 
+<!-- to next --> | <A HREF="VisClass_e.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.3 Positioning Visible Objects</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

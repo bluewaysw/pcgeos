@@ -1,0 +1,200 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Controllers_12.htm,v 1.1 97/06/02 16:10:35 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> The Float Format Controller</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Generic UI Controllers</A>: 7.3 <A HREF="Controllers_f.htm">Other Controllers</A>: 
+<A NAME="10072">
+ </A>
+The Float Format Controller</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Controllers_f.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Controllers_11.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">7.2 GenPageControlClass</A> 
+<!-- to next --> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+Including the Float Format controller in your application allows the user to format FP numbers into any of the system-defined formats. The controller also allows the user to define his or her own formats. </P>
+<P>
+The following messages, routines and data structures all manage arrays of system-defined and user-defined formats. If you include a Float Format controller, you will need to intercept these messages and call many of these routines.</P>
+
+<H2 CLASS="HeadingC">
+Retrieving Parameters of the Current Entry</H2>
+<PRE><A NAME="IX_FloatFormatGetFormatParamsWithListEntry()"> </A>FloatFormatGetFormatParamsWithListEntry(), <A NAME="IX_FloatFormatGetFormatParamsWithToken()"> </A>FloatFormatGetFormatParamsWithToken(), <A NAME="IX_FloatFormatGetFormatTokenWithName()"> </A>FloatFormatGetFormatTokenWithName()</PRE>
+<P>
+The Float Format controller routines use a <A NAME="IX_FormatInfoStruc">
+ </A>
+<CODE>
+FormatInfoStruc</CODE>
+ structure to hold information about a particular format. This structure is convenient to pass around to other float format routines. The Float Format controller contains one instance field, <CODE>
+formatInfoStrucHan</CODE>
+, that stores the handle to the current <CODE>
+FormatInfoStruc</CODE>
+, if one is being used by the controller.</P>
+<P CLASS="figTitle">
+Code Display 12-10 FormatInfoStruc</P>
+<PRE>typedef struct {</PRE>
+<PRE>	/*
+	 * FIS_signature is used internally for error-checking.
+	 */
+	word		FIS_signature;</PRE>
+<PRE>	/*
+	 * These two entries store the user defined format array for the 
+	 * controller to work on. This array is created by FloatFormatInit().
+	 */
+	FileHandle		FIS_userDefFmtArrayFileHan;
+	VMBlockHandle 		FIS_userDefFmtArrayBlkHan;</PRE>
+<PRE>	/*
+	 * These two entries store the object block and format list chunk that the 
+	 * controller resides in.
+	 */
+	word		FIS_childBlk;
+	word		FIS_chooseFmtListChunk;</PRE>
+<PRE>	/*
+	 * FIS_features stores the features list of the controller.
+	 */
+	word		FIS_features;</PRE>
+<PRE>	/*
+	 * FIS_editFlag is -1 if we are editing a current user-defined entry and 0 
+	 * if we are creating a new user-defined entry.
+	 */
+	byte		FIS_editFlag;</PRE>
+<PRE>	/* FIS_curSelection stores the current selection in the format list. */
+	word		FIS_curSelection;</PRE>
+<PRE>	/* FIS_curToken stores the token of the selected item in the list. */
+	word		FIS_curToken;</PRE>
+<PRE>	/* FIS_curParams stores the FormatParams of the selected item. */
+	FormatParams		FIS_curParams;
+} FormatInfoStruc;</PRE>
+<P>
+<CODE>
+FloatFormatGetFormatParamsWithListEntry()</CODE>
+ fills in a <CODE>
+FormatInfoStruc</CODE>
+ corresponding to the passed list entry position in the Float Format controller's dynamic list. The routine must be passed a <CODE>
+FormatInfoStruc</CODE>
+ with the entry position in FIS_<CODE>
+curSelection</CODE>
+ already filled in. You must also have the FIS_<CODE>
+userDefFmtArrayFileHan</CODE>
+ and FIS_<CODE>
+userDefFmtArrayBlkHan</CODE>
+ filled in properly before calling this routine.</P>
+<P>
+This routine is called whenever the user clicks on a new item, or whenever the dynamic list needs to retrieve new monikers for the list. You will also probably need to use this routine in your application code when intercepting many of the Float Format controller messages.</P>
+<P>
+<CODE>
+FloatFormatGetFormatParamsWithToken()</CODE>
+ fills in the <CODE>
+FormatParams</CODE>
+ of a particular format entry when passed a format's token. The routine must be passed the <CODE>
+FormatInfoStruc</CODE>
+ with FIS_<CODE>
+curToken</CODE>
+ already filled in. You must also have the FIS_<CODE>
+userDefFmtArrayFileHan</CODE>
+ and FIS_<CODE>
+userDefFmtArrayBlkHan</CODE>
+ filled in properly before calling this routine.</P>
+<P>
+<CODE>
+FloatFormatGetFormatTokenWithName()</CODE>
+ returns the format token of a particular format when passed its name (in a <CODE>
+FormatInfoStruc</CODE>
+).</P>
+
+
+<H2 CLASS="HeadingC">
+Initializing the UI</H2>
+<PRE><A NAME="IX_MSG_FLOAT_CTRL_UPDATE_UI"> </A>MSG_FLOAT_CTRL_UPDATE_UI, <A NAME="IX_MSG_FLOAT_CTRL_REQUEST_MONIKER"> </A>MSG_FLOAT_CTRL_REQUEST_MONIKER, <A NAME="IX_FloatFormatInit()"> </A>FloatFormatInit(), <A NAME="IX_FloatFormatInitFormatList()"> </A>FloatFormatInitFormatList()</PRE>
+<P>
+<CODE>
+FloatFormatInit()</CODE>
+ initializes a format array to serve as the storage space for user-defined formats. It must be passed the VM file handle to create the array within. </P>
+<P>
+MSG_FLOAT_CTRL_UPDATE_UI is sent to the Float Format controller whenever the controller needs to perform a visual update. Your Float Format controller should intercept this message and call <CODE>
+FloatFormatInitFormatList()</CODE>
+.</P>
+<P>
+<CODE>
+FloatFormatInitFormatList()</CODE>
+ initializes the Float Format dynamic list whenever the list needs to display a new moniker. It extracts the moniker text of the selected format from the <CODE>
+FormatInfoStruc </CODE>
+structure. Make sure that this structure has the proper VM file and block handles filled in prior to calling this routine.</P>
+<P>
+MSG_FLOAT_CTRL_REQUEST_MONIKER is sent to the Float Format controller whenever it needs to display the text within the controller's dynamic list. To extract the current format's moniker, intercept this message and call <CODE>
+FloatFormatGetFormatParamsWithListEntry()</CODE>
+. You can then pass the format's textual name (from FIS_<CODE>
+curParams</CODE>
+.FP_<CODE>
+formatName</CODE>
+) to MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT.</P>
+
+
+<H2 CLASS="HeadingC">
+Setting Up Selected Formats</H2>
+<PRE><A NAME="IX_MSG_FLOAT_CTRL_FORMAT_SELECTED"> </A>MSG_FLOAT_CTRL_FORMAT_SELECTED, <A NAME="IX_FloatFormatProcessFormatSelected()"> </A>FloatFormatProcessFormatSelected()</PRE>
+<P>
+MSG_FLOAT_CTRL_FORMAT_SELECTED is sent to the Float Format controller whenever the user makes a new selection. This message allows your application to set up a new <CODE>
+FormatInfoStruc</CODE>
+ based on the new selection. Your handler for this message needs to call <CODE>
+FloatFormatProcessFormatSelected()</CODE>
+.</P>
+
+
+<H2 CLASS="HeadingC">
+User Defined Format Creation</H2>
+<PRE><A NAME="IX_MSG_FLOAT_CTRL_USER_DEF_INVOKE"> </A>MSG_FLOAT_CTRL_USER_DEF_INVOKE, <A NAME="IX_FloatFormatInvokeUserDefDB()"> </A>FloatFormatInvokeUserDefDB(), <A NAME="IX_MSG_FLOAT_CTRL_USER_DEF_OK"> </A>MSG_FLOAT_CTRL_USER_DEF_OK, <A NAME="IX_FloatFormatUserDefOK()"> </A>FloatFormatUserDefOK()</PRE>
+<P>
+MSG_FLOAT_CTRL_USER_DEF_INVOKE is sent to the Float Format controller whenever the user has defined a new format and wishes to add it to the controller's dynamic list. Your handler for this message should call <CODE>
+FloatFormatInvokeUserDefDB()</CODE>
+ in turn. If the user attempts to create a new format when MAX_FORMATS already exist, the routine will invoke an error box.</P>
+<P>
+MSG_FLOAT_CTRL_USER_DEF_OK is sent to the Float Format controller to check whether the user-defined format is legal or previously duplicated. Your handler for this message should call <CODE>
+FloatFormatUserDefOK()</CODE>
+ to perform this check and apply the user-defined format to the list of format entries if it is successful.</P>
+
+
+<H2 CLASS="HeadingC">
+Deleting Formats</H2>
+<PRE><A NAME="IX_MSG_FLOAT_CTRL_FORMAT_DELETE"> </A>MSG_FLOAT_CTRL_FORMAT_DELETE, <A NAME="IX_FloatFormatDelete()"> </A>FloatFormatDelete()</PRE>
+<P>
+MSG_FLOAT_CTRL_FORMAT_DELETE is sent to the Float Format controller when the user attempts to delete a user-defined entry. Your handler for this message needs to call <CODE>
+FloatFormatDelete()</CODE>
+.</P>
+
+
+<H2 CLASS="HeadingC">
+Applying Formats</H2>
+<PRE><A NAME="IX_MSG_FLOAT_CTRL_FORMAT_APPLY"> </A>MSG_FLOAT_CTRL_FORMAT_APPLY</PRE>
+<P>
+MSG_FLOAT_CTRL_FORMAT_APPLY is sent to the FloatFormat controller when the user attempts to apply a format selected in the controller to the appropriate text selection. Your handler will need to extract information from the <CODE>
+FormatInfoStruc</CODE>
+ and call the appropriate text formatting routine (e.g. <CODE>
+FloatFloatToAsciI()</CODE>
+).</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Controllers_f.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Controllers_11.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">7.2 GenPageControlClass</A> 
+<!-- to next --> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

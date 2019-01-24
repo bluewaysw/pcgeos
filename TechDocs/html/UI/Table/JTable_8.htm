@@ -1,0 +1,366 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: JTable_8.htm,v 1.2 97/06/09 15:53:32 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Drawing Cells</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The Table Objects</A>: 4.1 <A HREF="JTable_7.htm">Using a Table Object</A>: 
+<A NAME="58532">
+ </A>
+Drawing Cells</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="JTable_7.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="JTable_7.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">4 Using a Table Object</A> 
+<!-- to next --> | <A HREF="JTable_9.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.2 Selecting Cells</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>MSG_TABLE_QUERY_DRAW, MSG_TABLE_REDRAW_TABLE, MSG_TABLE_REDRAW_ROW, MSG_TABLE_REDRAW_COLUMN, MSG_TABLE_REDRAW_CELL, MSG_TABLE_REDRAW_RANGE</PRE>
+<P>
+The <CODE>
+Table</CODE>
+ object does not actually store the contents of any of the cells. Instead, it helps the application manage and display its data. This means that whenever the <CODE>
+Table</CODE>
+ needs to draw a cell (e.g. when the <CODE>
+Table</CODE>
+ scrolls, or when a cell is covered and then exposed), it has to ask the application to draw it.</P>
+<P>
+Whenever the <CODE>
+Table</CODE>
+ object needs to draw a cell, it sends itself <CODE>
+MSG_TABLE_QUERY_DRAW</CODE>
+, once for each cell that needs to be redrawn. This message is designed to be subclassed; if you do not subclass it, the default handler will not do anything, and the cell will not be drawn.</P>
+<P>
+The message comes with two arguments:</P>
+<UL>
+<LI>
+A <CODE>
+TableCellLocation</CODE>
+ structure, specifying which cell needs to be redrawn.</LI>
+<LI>
+A <CODE>
+GStateHandle</CODE>
+. The GState's clipping region is set to the current cell's boundaries; the current position in the GState is the upper-left corner of the cell.</LI>
+</UL>
+<P>
+You should intercept this message and take whatever actions are necessary to draw the contents of the cell. Ordinarily, this means calling a routine such as <CODE>
+GrDrawTextAtCP()</CODE>
+. The default handler doesn't do anything, so you need not call the superclass. You should <EM>
+not</EM>
+ free the passed GState.</P>
+<P>
+For efficiency reasons, the <CODE>
+Table</CODE>
+ object actually uses the same GState for several cells that all need to be redrawn at once. For example, suppose the <CODE>
+Table</CODE>
+ needs to redraw cells (10, 0), (10, 1), (10, 2), and (10, 3). The table will take the following steps: </P>
+<OL>
+<LI>
+First, the <CODE>
+Table</CODE>
+ creates a GState.</LI>
+<LI>
+The <CODE>
+Table</CODE>
+ sets the GState's clipping region to the boundaries of cell (10, 0), and puts the current position in the upper-left corner of that cell. </LI>
+<LI>
+The <CODE>
+Table</CODE>
+ sends itself MSG_TABLE_QUERY_DRAW, specifying that cell (10, 0) needs to be redrawn.</LI>
+<LI>
+The application intercepts this message, drawing the contents of cell (10, 0) to the passed GState.</LI>
+<LI>
+The <CODE>
+Table</CODE>
+ changes the GState's clipping region to the boundaries of cell (10, 1), and moves the current position to the upper-left corner of that cell.</LI>
+<LI>
+The <CODE>
+Table</CODE>
+ sends itself MSG_TABLE_QUERY_DRAW, specifying that cell (10, 1) needs to be redrawn.</LI>
+<LI>
+The application intercepts this message, drawing the contents of cell (10, 1) to the passed GState.</LI>
+<LI>
+The <CODE>
+Table</CODE>
+ repeats steps 5-7 for cells (10, 2) and (10, 3).</LI>
+<LI>
+Finally, the <CODE>
+Table</CODE>
+ frees the GState.</LI>
+</OL>
+<P CLASS="figTitle">
+Code Display 5-2 Handling MSG_TABLE_QUERY_DRAW</P>
+<PRE>/* For simplicity, we previously defined an instance field to hold the optr of the 
+ * chunk array we are using. We will lock down that data using that instance 
+ * field. CoffeeTableClass is a subclass of TableClass. */</PRE>
+<PRE>@method CoffeeTableClass, MSG_TABLE_QUERY_DRAW
+{
+    char *data;
+    word cArrayIndex, size;</PRE>
+<PRE>    cArrayIndex = (location.TCL_row * TABLE_COLS) + location.TCL_column;</PRE>
+<PRE>    MemLock(OptrToHandle(pself-&gt;CTI_chunkArray));</PRE>
+<PRE>    data = ChunkArrayElementToPtr((pself-&gt;CTI_chunkArray),
+				cArrayIndex, &amp;size);</PRE>
+<PRE>    GrDrawTextAtCP(gstate, data, 0);</PRE>
+<PRE>    MemUnlock(OptrToHandle(pself-&gt;CTI_chunkArray);
+}</PRE>
+<P>
+<A NAME="90904">
+ </A>
+The <CODE>
+Table</CODE>
+ automatically sends <CODE>
+MSG_TABLE_QUERY_DRAW</CODE>
+ when it knows a part of the <CODE>
+Table</CODE>
+ may be inaccurate, e.g. when the user has edited a cell. You can also instruct the <CODE>
+Table</CODE>
+ to redraw part or all of itself by sending it one of the <CODE>
+MSG_TABLE_REDRAW...</CODE>
+ messages. These messages instruct the <CODE>
+Table</CODE>
+ to send out appropriate <CODE>
+MSG_TABLE_QUERY_DRAW</CODE>
+ messages for one or more visible cells. There are five <CODE>
+MSG_TABLE_REDRAW...</CODE>
+ messages:</P>
+<DL>
+<DT>
+<CODE>
+MSG_TABLE_REDRAW_TABLE</DT><DD>
+</CODE>
+This instructs the <CODE>
+Table</CODE>
+ to redraw all cells visible on-screen.</DD>
+<DT>
+<CODE>
+MSG_TABLE_REDRAW_ROW</DT><DD>
+</CODE>
+This instructs the <CODE>
+Table</CODE>
+ to redraw a specified row, if it's on-screen.</DD>
+<DT>
+<CODE>
+MSG_TABLE_REDRAW_COLUMN</DT><DD>
+</CODE>
+This instructs the <CODE>
+Table</CODE>
+ to redraw those cells in a specified column which are on-screen.</DD>
+<DT>
+<CODE>
+MSG_TABLE_REDRAW_CELL</DT><DD>
+</CODE>
+This instructs the <CODE>
+Table</CODE>
+ to redraw a specified cell, if it's on-screen.</DD>
+<DT>
+<CODE>
+MSG_TABLE_REDRAW_RANGE</DT><DD>
+</CODE>
+This instructs the <CODE>
+Table</CODE>
+ to redraw the portion of a specified range of cells that is visible on-screen.</DD>
+
+</DL>
+<H4 CLASS="RefETitle">
+MSG_TABLE_QUERY_DRAW</H4>
+<PRE CLASS="syntax">void	MSG_TABLE_QUERY_DRAW(
+        TableCellLocation		location,
+        GStateHandle		gstate);</PRE>
+<P>
+The <CODE>
+Table</CODE>
+ object sends itself this message whenever a cell needs to be redrawn. The default handler does nothing; when you use a <CODE>
+Table</CODE>
+ object, you must subclass this message to draw the cell.</P>
+<P CLASS="refField">
+Source:	A <CODE>
+TableClass</CODE>
+ object.</P>
+<P CLASS="refField">
+Destination:	The <CODE>
+Table</CODE>
+ sends this message to itself.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+location</CODE>
+	The cell which needs to be redrawn.</P>
+<DL>
+<DT>
+<CODE>
+gstate</CODE>
+</DT><DD>A <CODE>
+GStateHandle</CODE>
+ specifying a GState you should draw to. The GState's clipping region is set to the cell boundaries; the current position (CP) is the upper-left corner of the cell.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing. (You should <EM>
+not</EM>
+ free the GState.)</P>
+<P CLASS="refField">
+Structures:	<CODE>
+TableCellLocation</CODE>
+ (see <A HREF="JTable_9.htm#51177"> A TableCellLocation structure is used to specify a cell within the Table. It has the following definition:</A>
+).</P>
+<P CLASS="refField">
+Interception:	This message must be intercepted; your handler must draw the cell's contents. You need not call the superclass's handler (which does nothing).</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_TABLE_REDRAW_TABLE</H4>
+<PRE CLASS="syntax">void	MSG_TABLE_REDRAW_TABLE();</PRE>
+<P>
+This message instructs the <CODE>
+Table</CODE>
+ to redraw the entire portion of the <CODE>
+Table</CODE>
+ visible on-screen (creating a GState, sending out appropriate <CODE>
+MSG_TABLE_QUERY_DRAW</CODE>
+ messages, etc.).</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any <CODE>
+TableClass</CODE>
+ object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_TABLE_REDRAW_ROW</H4>
+<PRE CLASS="syntax">void	MSG_TABLE_REDRAW_ROW(
+        word	row);</PRE>
+<P>
+This message instructs the <CODE>
+Table</CODE>
+ to redraw a specified row, if it's visible on-screen (creating a GState, sending out appropriate <CODE>
+MSG_TABLE_QUERY_DRAW</CODE>
+ messages, etc.).</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any <CODE>
+TableClass</CODE>
+ object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+row</CODE>
+	The index of the row to redraw. (The first row has index 0.)<CODE>
+</CODE>
+</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_TABLE_REDRAW_COLUMN</H4>
+<PRE CLASS="syntax">void	MSG_TABLE_REDRAW_COLUMN(
+        word	column);</PRE>
+<P>
+This message instructs the <CODE>
+Table</CODE>
+ to redraw those cells in a specified column that are visible on-screen (creating a GState, sending out appropriate <CODE>
+MSG_TABLE_QUERY_DRAW</CODE>
+ messages, etc.).</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any <CODE>
+TableClass</CODE>
+ object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+column</CODE>
+	The index of the column to redraw. (The first column has index 0.)</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_TABLE_REDRAW_CELL</H4>
+<PRE CLASS="syntax">void	MSG_TABLE_REDRAW_CELL(
+        TableCellLocation		location);</PRE>
+<P>
+This message instructs the <CODE>
+Table</CODE>
+ to redraw a specified cell if it is visible on-screen (creating a GState, sending out appropriate <CODE>
+MSG_TABLE_QUERY_DRAW</CODE>
+ messages, etc.).</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any <CODE>
+TableClass</CODE>
+ object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+location</CODE>
+	The cell to redraw.<CODE>
+</CODE>
+</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Structures:	The cell is specified with a <CODE>
+TableCellLocation</CODE>
+ structure (described on <A HREF="JTable_9.htm#51177"> A TableCellLocation structure is used to specify a cell within the Table. It has the following definition:</A>
+).<CODE>
+</CODE>
+</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_TABLE_REDRAW_RANGE</H4>
+<PRE CLASS="syntax">void	MSG_TABLE_REDRAW_RANGE(
+        TableCellRange		cellRange);</PRE>
+<P>
+This message instructs the <CODE>
+Table</CODE>
+ to redraw a range of cells (creating a GState, sending out appropriate <CODE>
+MSG_TABLE_QUERY_DRAW</CODE>
+ messages, etc.).</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any <CODE>
+TableClass</CODE>
+ object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+cellRange</CODE>
+	The range of cells to redraw.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Structures:	The cell range to redraw is specified with a <CODE>
+TableCellRange</CODE>
+ structure (described on <A HREF="JTable_9.htm#54602"> A TableCellRange structure is used to specify a range of cells. It has the following definition:</A>
+).<CODE>
+</CODE>
+</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="JTable_7.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="JTable_7.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">4 Using a Table Object</A> 
+<!-- to next --> | <A HREF="JTable_9.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.2 Selecting Cells</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

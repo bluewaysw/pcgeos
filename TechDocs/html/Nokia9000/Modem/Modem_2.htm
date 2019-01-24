@@ -1,0 +1,162 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Modem_2.htm,v 1.2 97/08/21 16:16:41 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Connecting</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="sectionTitle">
+<A HREF="index.htm">Modem Connections</A>: 2 
+<A NAME="87779">
+ </A>
+Connecting</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Modem_1.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1 Introduction</A> 
+<!-- to next --> | <A HREF="Modem_3.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3 Sending Data</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+To establish a connection, MTalk does the following:</P>
+<UL>
+<LI>
+allocates a buffer to be used (later) for holding received data</LI>
+<LI>
+prompts the user for the phone number to dial</LI>
+<LI>
+calls <CODE>
+ModemConnect()</CODE>
+ (defined in modem.goc) to make the connection</LI>
+</UL>
+<P CLASS="figTitle">
+Code Display 9-1 Making A Serial Line Connection</P>
+<PRE>    /*
+     * phoneNum - Phone number to dial.
+     * retVal - Return value of ModemConnect().
+     */
+    char        phoneNum[MAX_PHONE_NUM_LENGTH + 1];
+    Boolean     retVal;</PRE>
+<PRE>    /*
+     * Allocate a global memory block to be used as a buffer to hold received data.
+     * A local buffer variable in the read function would use up
+     * precious stack space, and a global buffer variable
+     * would increase the size of the application's fixed data segment,
+     * which degrades overall memory manager performance.
+     *
+     * Allocating it to be DISCARDABLE has further advantages.
+     * Because we don't care what happens to the contents after they
+     * have been processed, we'll allow the memory manager to throw
+     * the block out if it decides it needs the heap space. This
+     * means a little extra work for us whenever we want to use the
+     * block, since we have to check for this condition, and
+     * reallocate if necessary.
+     */</PRE>
+<PRE>    recvBuffer = MemAlloc( INPUT_BUFFER_SIZE, HF_DISCARDABLE, 0 );</PRE>
+<PRE>    /*
+     * If the buffer was not successfully allocated, memory must be getting low
+     * so shut down.
+     */
+    if ( recvBuffer == NullHandle )
+    {
+	@send application::MSG_META_QUIT();
+	return;
+    }</PRE>
+<PRE>    /*
+     * Get the phone number to dial.
+     */
+    @call MTalkPhoneNumberText::MSG_VIS_TEXT_GET_ALL_PTR( phoneNum );</PRE>
+<PRE>    /*
+     * Create the modem connection and register the object and messages
+     * it will receive when data is received or when the call has ended.
+     * Note: in this example, oself refers to the process object.
+     * Remember that ModemConnect() returns FALSE if it successfully makes
+     * the connection.
+     */
+    retVal = ModemConnect( phoneNum,
+			 oself,
+			 MSG_MTALK_PROCESS_READ_DATA,
+			 MSG_MTALK_PROCESS_CALL_ENDED );</PRE>
+<PRE>    /*
+     * If the connection failed, free the buffer and return. (Note: after freeing
+     * any allocated memory, it is good practice to re-set handles and pointers to
+     * Null so that you can test for a Null value later.)
+     */
+    if ( retVal )
+    {
+	MemFree( recvBuffer );
+	recvBuffer = NullHandle;
+	return;
+    }</PRE>
+<P>
+<CODE>
+ModemConnect()</CODE>
+ takes care of the &quot;housekeeping&quot; details involved in making a connection. Specifically, this routine takes care of the following:</P>
+<UL>
+<LI>
+checks to make sure the phone is available for use</LI>
+<LI>
+opens and configures the port (on the Nokia 9000i Communicator, the &quot;virtual&quot; serial port is COM1)</LI>
+<LI>
+initializes the modem</LI>
+<LI>
+sets up to receive notification when data arrives on the serial port or when the call ends</LI>
+<LI>
+dials the phone number</LI>
+</UL>
+<P>
+<CODE>
+ModemConnect()</CODE>
+ takes four parameters:</P>
+<DL>
+<DT>
+<EM>phoneNumber</DT><DD>
+</EM>Char pointer to the phone number to dial.</DD>
+<DT>
+<EM>dataReceiver</DT><DD>
+</EM>Optr to the object that will receive data or call end notification.</DD>
+<DT>
+<EM>dataReceiptMessage</DT><DD>
+</EM>Message sent when data arrives on the port.</DD>
+<DT>
+<EM>endCallMessage</DT><DD>
+</EM>Message sent when the call has ended.</DD>
+</DL>
+<P>
+<CODE>
+ModemConnect()</CODE>
+ returns FALSE if the attempt to connect is successful. If the attempt is unsuccessful, it displays a dialog box notifying the user of the error. Possible error messages include:</P>
+<DL>
+<DT>
+&quot;Connectivity Problem: </DT><DD>
+Data calls cannot be made while another call is active.&quot;</DD>
+<DT>
+&quot;Connectivity Problem: Line is busy. Try again later.&quot;</DT>
+<DT>
+&quot;Connectivity Problem: </DT><DD>
+No answer. Check the phone number and try again later.&quot;</DD>
+<DT>
+&quot;Connectivity Problem: General Error.&quot;</DT>
+<DT>
+&quot;Connectivity Problem: Error initializing modem.&quot;</DT>
+</DL>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Modem_1.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1 Introduction</A> 
+<!-- to next --> | <A HREF="Modem_3.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3 Sending Data</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

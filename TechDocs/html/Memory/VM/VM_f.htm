@@ -1,0 +1,126 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: VM_f.htm,v 1.2 97/09/05 13:08:05 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Updating and Saving Files</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Virtual Memory</A>: 3.8 <A HREF="VM_7.htm">Using Virtual Memory</A>: 
+Updating and Saving Files</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VM_7.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VM_e.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.7 VM Block Information</A> 
+<!-- to next --> | <A HREF="VM_10.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.9 Closing Files</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>VMUpdate(), VMSave(), VMSaveAs(), VMRevert(), VMGetDirtyState() VMSave()</PRE>
+<P>
+When you dirty a memory block, that action notifies the VM manager that the block will need to be written back to the file. If the attribute VMA_SYNC_UPDATE is <EM>
+off</EM>
+, the VM manager will try to update the block to the disk file as soon as the block is unlocked, and will then mark the block as <EM>
+clean</EM>
+. However, if the flag is <EM>
+on</EM>
+, the manager does not write the block until it is specifically told to <EM>
+update</EM>
+ the file. At this point, it copies any dirty blocks back over their attached VM blocks, then marks all blocks as <EM>
+clean</EM>
+. If you use the document control objects, they will take care of updating and saving the file. However, you may need to call the updating routines specifically.</P>
+<P>
+<A NAME="IX_VMUpdate()">
+ </A>
+The routine <CODE>
+VMUpdate()</CODE>
+ instructs the VM manager to write all dirty blocks to the disk. It takes one argument, the VM file handle (which is overridden if a thread file has been set). It returns zero if the update proceeded normally; otherwise, it returns either one of the <CODE>
+FileErrors</CODE>
+ or one of the three <CODE>
+VMUpdate()</CODE>
+ status codes:</P>
+<DL>
+<DT>
+VM_UPDATE_NOTHING_DIRTY</DT><DD>
+All blocks were clean, so the VM disk file was not changed.</DD>
+<DT>
+VM_UPDATE_INSUFFICIENT_DISK_SPACE</DT><DD>
+The file has grown since the last update, and there is not enough room on the disk to accommodate it.</DD>
+<DT>
+VM_UPDATE_BLOCK_WAS_LOCKED</DT><DD>
+Some of the VM blocks were locked by another thread, so they could not be updated to the disk.</DD>
+</DL>
+<P>
+<CODE>
+VMUpdate()</CODE>
+ is optimized for updating clean files; thus, it costs very little time to call <CODE>
+VMUpdate()</CODE>
+ when you are not sure if the file is dirty. If a file is auto-saved, <CODE>
+VMUpdate()</CODE>
+ is used.
+<IMG SRC="VM_f_savingBackedUp.gif">
+
+</P>
+<P>
+<A NAME="IX_VMSave()">
+ </A>
+A VM file can maintain backup copies of updated blocks. If so, updating the file will write changes to the disk, but will not alter those backup blocks. To finalize the changes, call the routine <CODE>
+VMSave()</CODE>
+. This routine updates the file, then deletes all the backup blocks and compacts the file. If the file does not have backup capability, <CODE>
+VMSave()</CODE>
+ acts the same as <CODE>
+VMUpdate()</CODE>
+.</P>
+<P>
+<A NAME="IX_VMRevert()">
+ </A>
+If a file has the backup capability, you cannot directly access the backup blocks. However, you can instruct the VM manager to restore the file to its last-saved state. The command <CODE>
+VMRevert()</CODE>
+ causes the VM manager to check the VM file for blocks which have backups. It then deletes the <EM>
+non-backup</EM>
+ block, and changes the backup block into a regular block. It also discards all blocks in memory that were attached to the blocks which just reverted. The file will then be in its condition as of the last time it was saved. The routine may not be used on files which do not have the flag VMA_BACKUP set.</P>
+<P>
+<A NAME="IX_VMSaveAs()">
+ </A>
+You can save a file under a new name with the routine <CODE>
+VMSaveAs()</CODE>
+. If the file has backup capability, the old file will be restored to its last-saved condition (as if <CODE>
+VMRevert()</CODE>
+ had been called); otherwise, the old file will be left in the file's current state. The routine is passed the name of the new file. <CODE>
+VMSaveAs()</CODE>
+ copies all the blocks from the old file to the new one. If a block has a backup copy, the more recent version is copied. The new file will thus have the file in its current state; block handles will be preserved. After the new file has been created, if the file has backup-capability, <CODE>
+VMSaveAs()</CODE>
+ reverts the original file to its last-saved state. It then closes the old file and returns the handle of the new file. </P>
+<P>
+If you manage VM files with the document control objects, you generally don't have to call the update or save routines. The document control objects will set up a file menu with appropriate commands (&quot;Save,&quot; &quot;Save As,&quot; etc.), and will call the appropriate routines whenever the user chooses a command.</P>
+<P>
+<A NAME="IX_VMGetDirtyState()">
+ </A>
+If you need to find out whether a file is dirty, call the routine <CODE>
+VMGetDirtyState()</CODE>
+. This routine returns a two-byte value. The more significant byte is non-zero if any blocks have been dirtied since the last update or auto-save. The less significant byte is non-zero if any blocks have been dirtied since the last save, save-as, or revert action. If the file does not have backup-capability, both bytes will always be equal. Note that <CODE>
+VMUpdate()</CODE>
+ is optimized for clean files, so it is generally faster to call <CODE>
+VMUpdate()</CODE>
+ even if the file might be clean, rather than checking the dirty-state with <CODE>
+VMGetDirtyState()</CODE>
+. </P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VM_7.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VM_e.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.7 VM Block Information</A> 
+<!-- to next --> | <A HREF="VM_10.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.9 Closing Files</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

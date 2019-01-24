@@ -1,0 +1,1085 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: VisClass_f.htm,v 1.2 97/09/05 14:58:54 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Handling Input</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">VisClass</A>: 4.4 <A HREF="VisClass_b.htm">Using VisClass</A>: 
+<A NAME="65723">
+ </A>
+Handling Input</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VisClass_b.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VisClass_e.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.3 Positioning Visible Objects</A> 
+<!-- to next --> | <A HREF="VisClass_10.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">5 Working with Visible Object Trees</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+<A NAME="Input">
+ </A>
+Input events, what they mean, and how they are generated are discussed fully in <A HREF="../../SysObjects/Input/index.htm">the Input chapter</A>. The visible world has some default behavior for handling input messages such as <CODE>MSG_META_START_SELECT</CODE>
+, <CODE>
+MSG_META_END_SELECT</CODE>
+, and <CODE>
+MSG_META_PTR</CODE>
+. For the most part, however, visible objects that want to respond to input must subclass and handle the input messages that interest them.</P>
+<P>
+Composite objects will automatically pass mouse messages on to the proper child directly under the mouse pointer. Non-composite objects (direct subclasses of <CODE>
+VisClass</CODE>
+) have no special default behavior for input handling.</P>
+<P>
+<A NAME="IX_Objects:overlapping">
+ </A>
+Note that <CODE>
+VisClass</CODE>
+ does not intelligently handle layering of objects. That is, if one object is visibly on top of another object, it will not necessarily receive the input events--the events may be passed to the partially hidden object. This is due to the order in which drawing and mouse events are handled by a visible object's children.</P>
+<P>
+Take the example of a visible composite with two children. Each child draws a filled rectangle covering its bounds; the first child has a width and height of 40, and the second child has a width and height of 20. The composite's declaration shows</P>
+<PRE>    ...
+    VCI_comp = LargeChild, SmallChild;</PRE>
+<PRE>    ...</PRE>
+<P>
+Because drawing occurs in the order the children are listed, the small child will be drawn over the large child, as shown in the figure below. If each object can intercept and handle mouse events (e.g., <CODE>
+MSG_META_START_SELECT</CODE>
+), clicks will never reach the small object without special behavior added to the composite. This is because input events are handled in the same order as drawing; the input event will be given to the first child whose bounds include the event's coordinates.
+<IMG SRC="VisClass_f_drawingOrder.gif">
+
+</P>
+<P>
+So, a click event on (10, 10), which is in the middle of the small square, would first be passed to the LargeChild object. The large child would see that the click was within its bounds, and it would take the event. The event would never be handled by the small object.</P>
+<P>
+Therefore, if you need to have overlapping objects which handle user input, you will have to add special features for bounds detection. In the example of the two squares, if neither were to move, the composite could simply pass the event to the small child first and then to the large child, assuming the small child is always on top. If the objects could be moved forward and back so they hide each other, the composite (or the objects themselves) will need some other, more complex, detection behavior.</P>
+
+<H2 CLASS="HeadingC">
+Mouse <A NAME="IX_Mouse:input events">
+ </A>
+<A NAME="IX_Input:mouse events with visible objects">
+ </A>
+Events</H2>
+<PRE>MSG_META_PTR, MSG_META_START_SELECT, MSG_META_END_SELECT, MSG_META_DRAG_SELECT, MSG_META_DRAG, MSG_META_START_MOVE_COPY, MSG_META_DRAG_MOVE_COPY, MSG_META_START_OTHER, MSG_META_END_OTHER, MSG_META_DRAG_OTHER</PRE>
+<P>
+Composite objects will automatically pass mouse messages on to the first child directly under the mouse pointer. Non-composite objects (direct subclasses of <CODE>
+VisClass</CODE>
+) have no special default behavior for input handling.
+
+</P>
+<P>
+Typically, a visible object that needs to handle mouse input will subclass <CODE>
+MSG_META_START_SELECT</CODE>
+ (or one of the other press events such as <CODE>
+MSG_META_START_MOVE_COPY</CODE>
+). This message is sent when the user presses on the &quot;select&quot; mouse button while the pointer is over the object. In this method, the object should grab the mouse (as shown below). When it has the mouse grab, it will receive <CODE>
+MSG_META_PTR</CODE>
+ each time the mouse is moved; the object should subclass this message to provide the desired reaction to mouse moves. Finally, when the user releases the select button, the object will receive a <CODE>
+MSG_META_END_SELECT</CODE>
+. At this point, it should release the mouse grab.</P>
+<P>
+Typically, mouse events will arrive with coordinates specified in 16 bits. This is the default graphics space, and it represents a coordinate system more than 25 yards on a side. Nearly all applications will find this graphic system big enough for their uses. However, if you need larger coordinates, you can use the large document space with 32-bit coordinates. To do this, you must set the GVA_WINDOW_COORDINATE_MOUSE_EVENTS in the <CODE>
+GVI_attrs</CODE>
+ field of your GenView object and set up your visible objects correctly. For more information on supporting 32-bit graphic spaces with visible objects, see <A HREF="VisClass_16.htm#45302"> Visible Layers and 32-Bit Graphics</A>
+.</P>
+
+<H3 CLASS="HeadingD">
+Grabbing <A NAME="IX_Input:visible object grabs;Mouse:grabs">
+ </A>
+the Mouse</H3>
+<PRE>MSG_VIS_GRAB_MOUSE, MSG_VIS_FORCE_GRAB_MOUSE, MSG_VIS_GRAB_LARGE_MOUSE, MSG_VIS_FORCE_GRAB_LARGE_MOUSE, MSG_VIS_RELEASE_MOUSE</PRE>
+<P>
+When an object &quot;grabs the mouse,&quot; it requests that the UI send all future mouse events directly to that object. Normally, mouse events will travel down the visible object tree until they reach either the leaf object under the pointer or an object under the pointer that handles them. When an object has the mouse grab, the mouse events will go to the object with the grab regardless of the location of the pointer.</P>
+<P>
+Typically, if an object wants to receive mouse events, it will subclass <CODE>
+MSG_META_START_SELECT</CODE>
+. This message is sent to the object when the pointer is over the object's bounds and the user presses the select button. In this handler, the object grabs the UI's gadget exclusive and then grabs the mouse. A good example of this can be found in the TicTac sample application's handler for <CODE>
+MSG_META_START_SELECT</CODE>
+.</P>
+<P>
+After an object grabs the mouse, it receives all pointer and drag events that occur. These are primarily <CODE>
+MSG_META_PTR</CODE>
+ messages, and the object must subclass <CODE>
+MSG_META_PTR</CODE>
+ to achieve the proper behavior it wants. When the user lets go of the select button, the object will receive a <CODE>
+MSG_META_END_SELECT</CODE>
+. If it grabbed the mouse (which it probably did if it receives this message), it must relinquish both the gadget exclusive and its mouse grab.</P>
+<P>
+An example of getting and releasing the mouse grab (taken from the TicTac sample application) is shown in <A HREF="VisClass_f.htm#90374"> Grabbing and Releasing the Mouse</A>
+. The object subclasses these messages to let the user drag it around the screen.</P>
+<P>
+The UI allows the visible object to get the normal mouse grab by using four different messages. Each of these is detailed below. If you're using a large document (32-bit coordinates), you will use the &quot;large&quot; mouse grabs. Otherwise, the normal mouse grab messages will do.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_GRAB_MOUSE">
+ </A>
+MSG_VIS_GRAB_MOUSE</H4>
+<PRE CLASS="syntax">void	MSG_VIS_GRAB_MOUSE();</PRE>
+<P>
+A visible object sends itself this message (with <CODE>
+@call</CODE>
+) when it wants to acquire the normal mouse grab. The message <CODE>
+MSG_VIS_RELEASE_MOUSE</CODE>
+ must be used to relinquish the grab.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object--typically sent by the object to itself.</P>
+<P CLASS="refField">
+Interception:	Highly unlikely.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_FORCE_GRAB_MOUSE">
+ </A>
+MSG_VIS_FORCE_GRAB_MOUSE</H4>
+<PRE CLASS="syntax">void	MSG_VIS_FORCE_GRAB_MOUSE();</PRE>
+<P>
+A visible object sends itself this message (with <CODE>
+@call</CODE>
+) when it wants to forcibly grab the mouse input. The object will acquire the mouse grab even if another object currently has it; the other object will receive a <CODE>
+MSG_VIS_LOST_GADGET_EXCL</CODE>
+ when it loses the mouse by a forced grab. The object must release the grab later with <CODE>
+MSG_VIS_RELEASE_MOUSE</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object--typically sent by the object to itself.</P>
+<P CLASS="refField">
+Interception:	Highly unlikely.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_GRAB_LARGE_MOUSE">
+ </A>
+MSG_VIS_GRAB_LARGE_MOUSE</H4>
+<PRE CLASS="syntax">void	MSG_VIS_GRAB_LARGE_MOUSE();</PRE>
+<P>
+<A NAME="IX_Input:large mouse events">
+ </A>
+A visible object sends itself this message (with <CODE>
+@call</CODE>
+) when it wants to acquire the mouse grab and when it wants 32-bit coordinates. If the object wants 16-bit coordinates, it should use <CODE>
+MSG_VIS_GRAB_MOUSE</CODE>
+, above. The object must relinquish the mouse grab with <CODE>
+MSG_VIS_RELEASE_MOUSE</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object--typically sent by the object to itself.</P>
+<P CLASS="refField">
+Interception:	Highly unlikely.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_FORCE_GRAB_LARGE_MOUSE">
+ </A>
+MSG_VIS_FORCE_GRAB_LARGE_MOUSE</H4>
+<PRE CLASS="syntax">void	MSG_VIS_FORCE_GRAB_LARGE_MOUSE();</PRE>
+<P>
+A visible object sends itself this message (with <CODE>
+@call</CODE>
+) when it wants to forcibly grab the mouse input and when it wants large (32-bit) input coordinates. If it wants normal (16-bit) coordinates, it should use <CODE>
+MSG_VIS_FORCE_GRAB_MOUSE</CODE>
+, above. The object will acquire the mouse grab even if another object currently has it; the other object will receive a <CODE>
+MSG_VIS_LOST_GADGET_EXCL</CODE>
+ when it loses the mouse by a forced grab. The object must release the grab later with <CODE>
+MSG_VIS_RELEASE_MOUSE</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object--typically sent by the object to itself.</P>
+<P CLASS="refField">
+Interception:	Highly unlikely.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_VUP_ALTER_INPUT_FLOW">
+ </A>
+MSG_VIS_VUP_ALTER_INPUT_FLOW</H4>
+<PRE CLASS="syntax">void	MSG_VIS_VUP_ALTER_INPUT_FLOW(@stack
+        PointDWord		translation,
+        WindowHandle		window,
+        optr		object,
+        word		grapTypeAndFlags);</PRE>
+<P>
+This message is the primitive employed by the grab/release messages shown above. Objects will rarely use this unless they are large objects (using 32-bit coordinates). Large objects and composites should subclass this message. In the case of a mouse grab, they should add in their 32-bit offset amounts to the translation structure before passing the event on to their superclasses. This will result in large mouse events being properly translated for the duration of the mouse grab.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object--typically a VisContent which uses a 32-bit graphics space for its children.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+translation</CODE>
+	The offsets to the origin of the &quot;local&quot; 16-bit graphics space.</P>
+<DL>
+<DT>
+<CODE>
+window</CODE>
+</DT><DD>The handle of the view window associated with this input flow alteration.</DD>
+<DT>
+<CODE>
+object</CODE>
+</DT><DD>The optr of the object altering the input flow.</DD>
+<DT>
+<CODE>
+grabTypeAndFlags</DT><DD>
+</CODE>
+The type and flags for the input flow grab affected by this alteration. The high byte contains a record of <CODE>
+VisInputFlowGrabType</CODE>
+, described below; the low byte contains a <CODE>
+VisInputFlowGrabFlags</CODE>
+ record, also described below.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Any VisContent object that uses a large graphics space should subclass this method. In the handler, it should apply the stated translation, then call its superclass. Each subsequent mouse event will have the translation applied before being passed on to the composite's children.</P>
+<P CLASS="refField">
+Structures:	<A NAME="IX_VIFGT_&ldots;">
+ </A>
+<A NAME="IX_VisInputFlowGrabType">
+ </A>
+The types of <A NAME="IX_VisInputFlowGrabType">
+ </A>
+<CODE>
+VisInputFlowGrabType</CODE>
+ are listed below:</P>
+<DL>
+<DT>
+VIFGT_ACTIVE</DT><DD>The affected grab type is the active grab.</DD>
+<DT>
+VIFGT_PRE_PASSIVE</DT><DD>
+The affected grab type is the pre-passive grab.</DD>
+<DT>
+VIFGT_POST_PASSIVE</DT><DD>
+The affected grab type is the post-passive grab.</DD>
+<DT>
+<A NAME="IX_VIFGF_&ldots;">
+ </A>
+<A NAME="IX_VisInputFlowGrabFlags">
+ </A>
+The flags of <A NAME="IX_VisInputFlowGrabFlags">
+ </A>
+<CODE>
+VisInputFlowGrabFlags</CODE>
+ are listed below:</DT>
+<DT>
+VIFGF_NOT_HERE</DT><DD>Flag set to indicate that the message should not be handled in this method but rather passed up the tree with this flag cleared. It is used to distinguish between requests made by other objects and requests made by an object sent to itself. It also allows an object to redirect the message to another node not in the visible hierarchy by handling the message and passing it in a direction other than up the visible tree. This overrides all the other flags in this record.</DD>
+<DT>
+VIFGF_FORCE</DT><DD>Flag set if the grab should be forced. Note that both VIFGF_GRAB and VIFGT_ACTIVE must also be specified.</DD>
+<DT>
+VIFGF_GRAB</DT><DD>Flag set if the grab is being made, clear if the grab is being released. In either case, <CODE>
+object</CODE>
+ must be passed--if a release, the grab will not be released unless the objects match. Note also that only one object may have the active grab, but many objects may have either passive grab at a given time.</DD>
+<DT>
+VIFGF_KBD</DT><DD>Flag set if action is a keyboard grab or release.</DD>
+<DT>
+VIFGF_MOUSE</DT><DD>Flag set if action is a mouse grab or release.</DD>
+<DT>
+VIFGF_LARGE</DT><DD>Flag set if large mouse events are affected by the flow alteration. VIFGF_MOUSE must also be set.</DD>
+<DT>
+VIFGF_PTR</DT><DD>Flag set if mouse grab and pointer events are requested. If flag clear, only button-related events will be sent. VIFGF_MOUSE must also be set.</DD>
+
+
+</DL>
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_RELEASE_MOUSE">
+ </A>
+MSG_VIS_RELEASE_MOUSE</H4>
+<PRE CLASS="syntax">void	MSG_VIS_RELEASE_MOUSE();</PRE>
+<P>
+A visible object sends itself this message if it has the mouse grab and wants to release it. Typically, this message will be called in the object's <CODE>
+MSG_META_END_SELECT</CODE>
+ handler. It works for both large and small grabs.</P>
+<P CLASS="refField">
+Source:	Any visible object.</P>
+<P CLASS="refField">
+Destination:	Any visible object--typically sent by the object to itself.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+<P CLASS="figTitle">
+Code Display 15-2 <A NAME="90374">
+ </A>
+Grabbing and Releasing the Mouse</P>
+<PRE>/* This code display shows the<A NAME="IX_Applications, Sample:TicTac:input messages"> </A> MSG_META_START_SELECT, MSG_META_END_SELECT,
+ * and MSG_VIS_LOST_GADGET_EXCL handlers from the TicTac sample application.
+ *
+ * The sequence of input events and the messages they generate follow the
+ * following basic patterns:
+ * 1.	User presses select button
+ *	MSG_META_START_SELECT generated, sent to object under mouse pointer
+ *	If object under pointer is a game piece,
+ *		Game piece grabs gadget exclusive
+ *		Game piece grabs mouse
+ * 2.	User holds button and drags mouse
+ *	MSG_META_DRAG_SELECT generated, sent to object with mouse grab
+ *		Game piece sets internal &quot;dragging&quot; flag
+ *		Game piece draws outline
+ *	MSG_META_PTR messages generated during drag, sent to object with mouse grab
+ *		Game piece erases previous outline
+ *		Game piece draws new outline at new pointer position
+ * 3.	User releases button
+ *	MSG_META_END_SELECT generated, sent to object with mouse grab
+ *		Game piece releases gadget exclusive (MSG_VIS_RELEASE_GADGET_EXCL)
+ *		MSG_VIS_LOST_GADGET_EXCL generated, sent to mouse grab (game piece)
+ *		Game piece erases old outline, if any
+ *		Game piece moves itself, erases old bounds, draws new bounds
+ *		Game piece releases mouse grab (MSG_VIS_RELEASE_MOUSE)
+ */</PRE>
+<PRE>/***********************************************************************
+ *		MSG_META_START_SELECT for TicTacPieceClass
+ ***********************************************************************
+ * SYNOPSIS:		Grabs the mouse and calls for future pointer events.
+ * 		When the user clickes in the view, TicTacView will pass
+ * 		the click event to TicTacBoard. Since TicTacBoardClass
+ * 		does not intercept the event, VisContentClass passes
+ * 		it on to its child object currently under the pointer.
+ * PARAMETERS:
+ * 	void	(MouseReturnParams *retVal,
+ *		 word xPosition, word yPosition, word inputState);
+ *
+ * STRATEGY:		When the piece object receives this message, it means
+ * 		it has been clicked on by the user and the mouse button
+ * 		is still down. The piece must grab the mouse so that it
+ * 		gets all future mouse events, and it must request that
+ * 		all future mouse events be sent to it. This ensures
+ * 		that if the pointer leaves the object's bounds while
+ * 		the button is still pressed, the piece object will still
+ * 		receive all the pointer events (otherwise they would be
+ * 		sent to whatever object was under the new pointer position).
+ ***********************************************************************/</PRE>
+<PRE>@method TicTacPieceClass, MSG_META_START_SELECT {</PRE>
+<PRE>	/* Grab the gadget exclusive so we're allowed to grab the mouse. */
+    @call @visParent::MSG_VIS_TAKE_GADGET_EXCL(oself);</PRE>
+<PRE>	/* Grab the mouse. This requests that all future pointer
+	 * events be passed directly to this game piece. */
+    @call self::MSG_VIS_GRAB_MOUSE();</PRE>
+<PRE>	/* Finally, return that this particular click event has been processed.
+	 * If this flag is not returned, the system will send out the click
+	 * event again. */
+    retVal-&gt;flags = MRF_PROCESSED;					 /* this event processed */
+}</PRE>
+<PRE>/***********************************************************************
+ *		MSG_META_END_SELECT for TicTacPieceClass
+ ***********************************************************************
+ * SYNOPSIS:		This message is received when the selection button has
+ * 		been released and this game piece had the mouse grab.
+ * 		All it does is release the gadget exclusive.
+ * PARAMETERS:
+ * 	void	(MouseReturnParams *retVal,
+ * 		 word xPosition, word yPosition, word inputState);
+ ***********************************************************************/</PRE>
+<PRE>@method TicTacPieceClass, MSG_META_END_SELECT {
+    @call @visParent::MSG_VIS_RELEASE_GADGET_EXCL(oself);
+    retVal-&gt;flags = MRF_PROCESSED;					/* this event processed */
+}</PRE>
+<PRE>/***********************************************************************
+ *		MSG_VIS_LOST_GADGET_EXCL for TicTacPieceClass
+ ***********************************************************************
+ * SYNOPSIS:		This message is received when the selection button has
+ * 		been released and this game piece had the mouse grab.
+ * 		It first checks to see if the new, proposed bounds are
+ * 		on the game board. If the bounds are valid, then
+ * 		it sets the objects VI_bounds field to the new values
+ * 		and causes the object to erase its original drawing
+ * 		and draw itself at its new bounds. If the bounds are
+ * 		not on the game board, it will retain the original bounds
+ * 		and redraw using them.
+ * PARAMETERS:		void ();
+ ***********************************************************************/</PRE>
+<PRE>@method TicTacPieceClass, MSG_VIS_LOST_GADGET_EXCL {
+    WindowHandle win;				/* window handle of view window */
+    GStateHandle gstate;				/* temporary gstate to draw to */</PRE>
+<PRE>    /* See if piece was being dragged or not. If so, clear the outline. */</PRE>
+<PRE>    if (pself-&gt;TTP_dragging) {</PRE>
+<PRE>	    /* Get the window handle of the view window and create a
+	     * temporary gstate for it to draw to. */</PRE>
+<PRE>	win = @call TicTacView::MSG_GEN_VIEW_GET_WINDOW();
+	gstate = GrCreateState(win);</PRE>
+<PRE>	    /* Set the line color and mode for drawing the outline. */</PRE>
+<PRE>	GrSetLineColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+	GrSetMixMode(gstate, MM_INVERT);</PRE>
+<PRE>	    /* Erase outline on screen. */</PRE>
+<PRE>	    /* If the game piece type is TTPT_BOX, draw a rectangle
+	     * outline. Otherwise draw an ellipse outline. */</PRE>
+<PRE>	if (pself-&gt;TTP_pieceType == TTPT_BOX) {
+	    GrDrawRect(gstate, pself-&gt;TTP_horizPos, pself-&gt;TTP_vertPos,
+			 ((pself-&gt;TTP_horizPos) + PIECE_WIDTH),
+			 ((pself-&gt;TTP_vertPos) + PIECE_HEIGHT));
+	} else {
+	    GrDrawEllipse(gstate, pself-&gt;TTP_horizPos, pself-&gt;TTP_vertPos,
+			 ((pself-&gt;TTP_horizPos) + PIECE_WIDTH),
+			 ((pself-&gt;TTP_vertPos) + PIECE_HEIGHT));
+	}</PRE>
+<PRE>	    /* Check to see if the new bounds are on the game board. If
+	     * they are, set the object's bounds to the new values. If
+	     * the are not, retain the original values and set the values
+	     * to those last stored. */</PRE>
+<PRE>	if (@call TicTacBoard::MSG_TICTAC_VALIDATE_BOUNDS(
+			((pself-&gt;TTP_vertPos) + PIECE_HEIGHT),
+			((pself-&gt;TTP_horizPos) + PIECE_WIDTH),
+			pself-&gt;TTP_vertPos, pself-&gt;TTP_horizPos)) {</PRE>
+<PRE>	    /* Invalidate the original drawing of the game piece. Send
+	     * the VI_bounds rectangle as the parameters because they have
+	     * not been changed since the START_SELECT. This message is
+	     * the equivalent of calling GrInvalRect() with the same bounds */</PRE>
+<PRE>	    @call self::MSG_VIS_BOUNDS_CHANGED(pself-&gt;VI_bounds.R_bottom,
+					pself-&gt;VI_bounds.R_right,
+					pself-&gt;VI_bounds.R_top,
+					pself-&gt;VI_bounds.R_left);</PRE>
+<PRE>	    /* Set the game piece object's bounds to the new coordinates. */</PRE>
+<PRE>	    pself-&gt;VI_bounds.R_left = pself-&gt;TTP_horizPos;
+	    pself-&gt;VI_bounds.R_right = (pself-&gt;TTP_horizPos) + PIECE_WIDTH;
+	    pself-&gt;VI_bounds.R_top = pself-&gt;TTP_vertPos;
+	    pself-&gt;VI_bounds.R_bottom = (pself-&gt;TTP_vertPos) + PIECE_HEIGHT;</PRE>
+<PRE>	} else {</PRE>
+<PRE>	    /* If the bounds are not on the game board, then reset the
+	     * current positions to be the original bounds. */</PRE>
+<PRE>	    pself-&gt;TTP_horizPos = pself-&gt;VI_bounds.R_left;
+	    pself-&gt;TTP_vertPos = pself-&gt;VI_bounds.R_top;
+	}</PRE>
+<PRE>	    /* Now, the game piece must draw itself at its newly-set
+	     * bounds (will draw itself over its original picture if the
+	     * new bounds were invalid). */</PRE>
+<PRE>	@call self::MSG_VIS_DRAW(0, gstate);</PRE>
+<PRE>	    /* Finally, destroy the temporary gstate used for drawing. */</PRE>
+<PRE>	GrDestroyState(gstate);</PRE>
+<PRE>	    /* Clear flag to indicate we are no longer dragging. */</PRE>
+<PRE>	pself-&gt;TTP_dragging = FALSE;
+    }
+	/* Release the mouse grab now that the move has finished.
+	 * Other objects in the view (other game pieces, for example)
+	 * may now receive pointer, select, and drag events. */</PRE>
+<PRE>    @call self::MSG_VIS_RELEASE_MOUSE();
+}</PRE>
+
+
+
+<H3 CLASS="HeadingD">
+Passive <A NAME="IX_Input:passive grabs;Input:mouse filters">
+ </A>
+Grabs</H3>
+<PRE>MSG_VIS_ADD_BUTTON_PRE_PASSIVE, MSG_VIS_REMOVE_BUTTON_PRE_PASSIVE, MSG_VIS_ADD_BUTTON_POST_PASSIVE, MSG_VIS_REMOVE_BUTTON_POST_PASSIVE</PRE>
+<P>
+The type of mouse grab described in the previous section is also known as an &quot;active&quot; mouse grab. An object can also have two other types of mouse grabs: <EM>
+pre-passive</EM>
+ and <EM>
+post-passive</EM>
+. While only one object may have the active mouse grab at any given time, any number of objects may have pre- or post-passive grabs on the mouse.</P>
+<P>
+An object with a pre-passive mouse grab receives a copy of the input event before the event goes to its true destination. The copy will be a message of the form <CODE>
+MSG_META_PRE_PASSIVE_...</CODE>
+ (e.g., if the event is <CODE>
+MSG_META_PTR</CODE>
+, the pre-passive event is <CODE>
+MSG_META_PRE_PASSIVE_PTR</CODE>
+). All pre-passive events will be handled before the true event is delivered to the object with the active grab. If any of the pre-passive copies of the event is returned with the flag MRF_PREVENT_PASS_THROUGH, the active event will not be sent to its destination. You can use this feature to set up input filters, having an object receive all mouse events pre-passive and filtering out those that should not be delivered. The message <CODE>
+MSG_VIS_REMOVE_BUTTON_PRE_PASSIVE</CODE>
+ removes any pre-passive mouse grab from the object.</P>
+<P>
+A post-passive mouse grab is similar to a pre-passive except that the post-passive object receives the event <EM>
+after</EM>
+ it is sent to its normal destination. The post-passive object will receive a <CODE>
+MSG_META_POST_PASSIVE_...</CODE>
+ with the same flags and position information as sent with the input event. An object that has the post-passive grab can release it by sending itself a <CODE>
+MSG_VIS_REMOVE_BUTTON_POST_PASSIVE</CODE>
+.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_ADD_BUTTON_PRE_PASSIVE">
+ </A>
+MSG_VIS_ADD_BUTTON_PRE_PASSIVE</H4>
+<PRE CLASS="syntax">void	MSG_VIS_ADD_BUTTON_PRE_PASSIVE();</PRE>
+<P>
+A visible object sends itself this message (with <CODE>
+@call</CODE>
+) when it wants to gain a pre-passive mouse grab. The object will receive all subsequent mouse events in the form of <CODE>
+MSG_META_PRE_PASSIVE_...</CODE>
+ <EM>
+before</EM>
+ the event's destination object receives them; this message will carry the same input information as passed with the input event. The object should handle <CODE>
+MSG_META_PRE_PASSIVE_...</CODE>
+ and, if the event is not to be sent normally to its destination, should return the flag MRF_PREVENT_PASS_THROUGH from that handler. The pre-passive grab will be released when the object sends itself a <CODE>
+MSG_VIS_REMOVE_BUTTON_PRE_PASSIVE</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object--typically sent by a visible object to itself when it wants to gain a pre-passive mouse grab.</P>
+<P CLASS="refField">
+Interception:	Unlikely--Note that the object must, however, intercept any <CODE>
+MSG_META_PRE_PASSIVE...</CODE>
+ events it is interested in.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_REMOVE_BUTTON_PRE_PASSIVE">
+ </A>
+MSG_VIS_REMOVE_BUTTON_PRE_PASSIVE</H4>
+<PRE CLASS="syntax">void	MSG_VIS_REMOVE_BUTTON_PRE_PASSIVE();</PRE>
+<P>
+This message removes the pre-passive grab from a visible object.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object--typically sent by a visible object to itself when it has a pre-passive grab and wants to release it.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_ADD_BUTTON_POST_PASSIVE">
+ </A>
+MSG_VIS_ADD_BUTTON_POST_PASSIVE</H4>
+<PRE CLASS="syntax">void	MSG_VIS_ADD_BUTTON_POST_PASSIVE();</PRE>
+<P>
+A visible object sends itself this message (with <CODE>
+@call</CODE>
+) when it wants to gain the post-passive mouse grab. The object will receive all subsequent mouse events in the form of <CODE>
+MSG_META_POST_PASSIVE_...</CODE>
+ <EM>
+after</EM>
+ the event's destination object receives them; this message will carry the same input information as passed with the input event. The object should handle the appropriate <CODE>
+MSG_META_POST_PASSIVE_...</CODE>
+ to properly receive the events. The post-passive grab will be released when the object receives a <CODE>
+MSG_VIS_REMOVE_BUTTON_POST_PASSIVE</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object--typically sent by a visible object to itself when it wants to receive post-passive input events.</P>
+<P CLASS="refField">
+Interception:	Unlikely--Note that the object must, however, handle any <CODE>
+MSG_META_POST_PASSIVE_...</CODE>
+ events it is interested in.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_REMOVE_BUTTON_POST_PASSIVE">
+ </A>
+MSG_VIS_REMOVE_BUTTON_POST_PASSIVE</H4>
+<PRE CLASS="syntax">void	MSG_VIS_REMOVE_BUTTON_POST_PASSIVE();</PRE>
+<P>
+This message removes any post-passive mouse grab from the object.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object--typically sent by a visible object to itself to release a post-passive mouse grab.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+
+<H3 CLASS="HeadingD">
+<A NAME="54447">
+ </A>
+The <A NAME="IX_Input:gadget exclusive;Input:focus and target">
+ </A>
+Gadget Exclusive and Focus Hierarchy</H3>
+<PRE>MSG_VIS_TAKE_GADGET_EXCL, MSG_VIS_RELEASE_GADGET_EXCL, MSG_VIS_LOST_GADGET_EXCL, MSG_VIS_VUP_QUERY_FOCUS_EXCL, MSG_VIS_FUP_QUERY_FOCUS_EXCL, MSG_VIS_VUP_ALLOW_GLOBAL_TRANSFER</PRE>
+<P>
+The <EM>
+gadget</EM>
+ <EM>
+exclusive</EM>
+ is a marker in the system used by the UI to indicate which object has exclusive access to input gadget functionality. Only one gadget at a time may have the gadget exclusive, and the gadget exclusive may be forcibly taken from an object by another object (for example, when a system-modal dialog comes up during a drag operation).</P>
+<P>
+At times, an object will force the mouse input to go to a different object from that which has the current active grab. This is done almost exclusively by the Specific UI library and is rarely, if ever, done by applications. Three messages can be used in determining which object has the current &quot;gadget exclusive,&quot; or active mouse grab. These are shown below.</P>
+<P>
+In addition, individual objects can get information about the current state of the Focus hierarchy with <CODE>
+MSG_VIS_VUP_QUERY_FOCUS_EXCL</CODE>
+ and <CODE>
+MSG_VIS_FUP_QUERY_FOCUS_EXCL</CODE>
+, also shown below.</P>
+<P>
+To deal with a quick-transfer operation, a visible object may also have to use the message <CODE>
+MSG_VIS_VUP_ALLOW_GLOBAL_TRANSFER</CODE>
+. This message may be used to remove the mouse grab from the GenView in which the visible object resides, thereby allowing mouse events to reach other objects outside the view window.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TAKE_GADGET_EXCL">
+ </A>
+MSG_VIS_TAKE_GADGET_EXCL</H4>
+<PRE CLASS="syntax">void	MSG_VIS_TAKE_GADGET_EXCL(
+        optr	child);</PRE>
+<P>
+This message causes the passed object to be given the gadget exclusive. Any object currently having the gadget exclusive will subsequently receive a <CODE>
+MSG_VIS_LOST_GADGET_EXCL</CODE>
+. This is used primarily by the Specific UI.</P>
+<P CLASS="refField">
+Source:	Unrestricted. Typically sent by a visible object that will next grab the mouse.</P>
+<P CLASS="refField">
+Destination:	Any visible object--normally sent by an object to its visible parent.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+child</CODE>
+	The optr of the object to which the gadget exclusive will be given (normally the calling object).</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+<P CLASS="refField">
+See Also:	<CODE>
+MSG_VIS_GRAB_MOUSE</CODE>
+, <CODE>
+MSG_VIS_LOST_GADGET_EXCL</CODE>
+</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_RELEASE_GADGET_EXCL">
+ </A>
+MSG_VIS_RELEASE_GADGET_EXCL</H4>
+<PRE CLASS="syntax">void	MSG_VIS_RELEASE_GADGET_EXCL(
+        optr	child);</PRE>
+<P>
+This message causes the passed object to release the gadget exclusive. The object specified by <CODE>
+child</CODE>
+ will then receive a <CODE>
+MSG_VIS_LOST_GADGET_EXCL</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted. Typically sent by an object that has a mouse grab and expects to release it.</P>
+<P CLASS="refField">
+Destination:	Any visible object--normally sent by the object to it's parent.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+child</CODE>
+	The optr of the object which is to lose the gadget exclusive (normally the calling object).</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+<P CLASS="refField">
+See Also:	<CODE>
+MSG_VIS_RELEASE_MOUSE</CODE>
+, <CODE>
+MSG_VIS_LOST_GADGET_EXCL</CODE>
+</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_LOST_GADGET_EXCL">
+ </A>
+MSG_VIS_LOST_GADGET_EXCL</H4>
+<PRE CLASS="syntax">void	MSG_VIS_LOST_GADGET_EXCL();</PRE>
+<P>
+This message, when received, indicates that the recipient has lost its hold on the gadget exclusive. When an object receives this, it should release the active mouse grab, if appropriate.</P>
+<P CLASS="refField">
+Source:	Unrestricted--typically sent by the UI.</P>
+<P CLASS="refField">
+Destination:	The visible object losing the gadget exclusive.</P>
+<P CLASS="refField">
+Interception:	Mouse grabs should be released in this handler.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_VUP_QUERY_FOCUS_EXCL">
+ </A>
+MSG_VIS_VUP_QUERY_FOCUS_EXCL</H4>
+<PRE CLASS="syntax">void	MSG_VIS_VUP_QUERY_FOCUS_EXCL(
+        ObjectAndGrabParams *retValue);</PRE>
+<P>
+This message queries up the visible hierarchy to find the object having the current focus in the current window. The current window is taken to be the window in which the object receiving the message resides.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object--typically sent by a visible object to itself to find the focus optr in its window.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+retValue</CODE>
+	A pointer to an empty <CODE>
+ObjectAndGrabParams</CODE>
+ structure, shown below.</P>
+<P CLASS="refField">
+Return:	The <CODE>
+ObjectAndGrabParams</CODE>
+ structure pointed to by <CODE>
+retVal</CODE>
+ will be filled with the appropriate data.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+<P CLASS="refField">
+Structures:	<A NAME="IX_OAGP_&ldots;">
+ </A>
+<A NAME="IX_ObjectAndGrabParams">
+ </A>
+The structure of the <CODE>
+ObjectAndGrabParams</CODE>
+ is shown below:</P>
+<PRE>typedef struct {
+    word		OAGP_grabFlags;  /* flags */
+    word		OAGP_unused;     /* reserved */
+    optr		OAGP_object;     /* object with focus */
+} <A NAME="IX_ObjectAndGrabParams"> </A>ObjectAndGrabParams;</PRE>
+<P>
+The <CODE>
+OAGP_grabFlags</CODE>
+ field contains a record of <A NAME="IX_HierarchicalGrabFlags">
+ </A>
+<CODE>
+HierarchicalGrabFlags</CODE>
+<DL>
+, defined in <A HREF="../../SysObjects/Input/index.htm">the Input chapter</A>. The allowable flags are</P><DT>
+HGF_SYS_EXCL</DT><DD>Indicates this object has the system exclusive.</DD>
+<DT>
+HGF_APP_EXCL</DT><DD>Indicates this object has the application's exclusive.</DD>
+<DT>
+HGF_GRAB</DT><DD>Indicates this object wishes to grab the exclusive (if clear, the object wishes to release), when passed as a parameter. In the structure, it merely indicates that the object in <CODE>
+OAGP_object</CODE>
+ has the exclusive.</DD>
+<DT>
+HGF_OTHER_INFO</DT><DD>
+Twelve bits used by the specific UI depending on the type of hierarchical grab.</DD>
+
+
+</DL>
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_FUP_QUERY_FOCUS_EXCL">
+ </A>
+MSG_VIS_FUP_QUERY_FOCUS_EXCL</H4>
+<PRE CLASS="syntax">void	MSG_VIS_FUP_QUERY_FOCUS_EXCL(
+        ObjectAndGrabParams *retValue);</PRE>
+<P>
+This message queries the focus hierarchy to see which object has the current focus. The current focus object does not have to be in the caller's visible tree.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+retValue</CODE>
+	A pointer to an empty <CODE>
+ObjectAndGrabParams</CODE>
+ structure, shown above in the entry for <CODE>
+MSG_VIS_VUP_QUERY_FOCUS_EXCL</CODE>
+.</P>
+<P CLASS="refField">
+Return:	The <CODE>
+ObjectAndGrabParams</CODE>
+ structure pointed to by <CODE>
+retVal</CODE>
+ will be filled with the appropriate data.</P>
+<P CLASS="refField">
+Interception:	Unlikely. This message is not deliverd to all visible objects, rather only those marked as VTF_WIN_GROUP or VTF_IS_INPUT_NODE. If you are implementing a new focus node, and need this message, and are not a window group, you will need to set the VTF_IS_INPUT_NODE bit in your init routine.</P>
+<P CLASS="refField">
+Structures:	The structure of the <CODE>
+ObjectAndGrabParams</CODE>
+ is shown in the entry for <CODE>
+MSG_VIS_VUP_QUERY_FOCUS_EXCL</CODE>
+.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_VUP_ALLOW_GLOBAL_TRANSFER">
+ </A>
+MSG_VIS_VUP_ALLOW_GLOBAL_TRANSFER</H4>
+<PRE CLASS="syntax">void	MSG_VIS_VUP_ALLOW_GLOBAL_TRANSFER();</PRE>
+<P>
+This message is sent by a visible object to itself when a quick-transfer operation is underway and the pointer has to be allowed to leave the bounds of the object's view window. This message will travel up to the content object, which will indicate to the GenView that the pointer events must be allowed to go to other windows in the system.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object--typically sent by a visible object to itself when the global transfer must be allowed outside its window.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+
+<H3 CLASS="HeadingD">
+The <A NAME="IX_Input:mouse status">
+ </A>
+Mou<A NAME="IX_Mouse:moving the pointer;Input:moving the mouse">
+ </A>
+se Status</H3>
+<PRE>MSG_VIS_VUP_SET_MOUSE_INTERACTION_BOUNDS, MSG_VIS_VUP_GET_MOUSE_STATUS, MSG_VIS_VUP_TERMINATE_ACTIVE_MOUSE_FUNCTION, MSG_VIS_VUP_BUMP_MOUSE</PRE>
+<P>
+The UI can control the mouse image and events as they occur. Because the UI is based on the visible classes, the messages that control the mouse status are also available to you, though they will probably be of very little utility. These messages are given below.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_VUP_SET_MOUSE_INTERACTION_BOUNDS">
+ </A>
+MSG_VIS_VUP_SET_MOUSE_INTERACTION_BOUNDS</H4>
+<PRE CLASS="syntax">void	MSG_VIS_VUP_SET_MOUSE_INTERACTION_BOUNDS(@stack
+        int	bottom,
+        int	right,
+        int	top,
+        int	left);</PRE>
+<P>
+A visible object requesting the mouse grab sends this message up the visible tree. This message will be handled by a content object. It indicates a new set of draggable bounds in case the user initiates a drag-scrolling operation. This message is sent automatically when the visible object requests the grab.</P>
+<P CLASS="refField">
+Source:	A visible object requesting a mouse grab.</P>
+<P CLASS="refField">
+Destination:	The sender sends this message to itself.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+bottom, right, top, left<BR>
+</CODE>
+The four bounds of the new bounding rectangle. Default is the bounds of the object sending the message.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_VUP_GET_MOUSE_STATUS">
+ </A>
+MSG_VIS_VUP_GET_MOUSE_STATUS</H4>
+<PRE CLASS="syntax">word	MSG_VIS_VUP_GET_MOUSE_STATUS();</PRE>
+<P>
+This message is rarely used by any objects outside the UI library. It returns the information passed with the last mouse event. The word return value contains two byte-sized sets of flags. The high byte is a list of the active UI functions, and the low byte represents the current button information.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object--typically sent by a visible object to itself when it can not locally store the latest mouse information.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	A word containing two values: The high word is a record of type <CODE>
+UIFunctionsActive</CODE>
+, and the low word is a word of <CODE>
+ButtonInfo</CODE>
+.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_VUP_TERMINATE_ACTIVE_MOUSE_FUNCTION">
+ </A>
+MSG_VIS_VUP_TERMINATE_ACTIVE_MOUSE_FUNCTION</H4>
+<PRE CLASS="syntax">void	MSG_VIS_VUP_TERMINATE_ACTIVE_MOUSE_FUNCTION();</PRE>
+<P>
+This message is sent by a visible object to itself to terminate any active mouse function, forcing it to be a function of type &quot;other.&quot; This message is used only by the Specific UI library in cases where input synchronization problems occur in specific places. Applications should generally not use this message.</P>
+<P CLASS="refField">
+Source:	A visible object handling active input events.</P>
+<P CLASS="refField">
+Destination:	Sent by the visible object to itself.</P>
+<P CLASS="refField">
+Interception:	This message should <EM>
+not</EM>
+ be subclassed.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_VUP_BUMP_MOUSE">
+ </A>
+MSG_VIS_VUP_BUMP_MOUSE</H4>
+<PRE CLASS="syntax">void	MSG_VIS_VUP_BUMP_MOUSE(
+        int	xBump,
+        int	yBump);</PRE>
+<P>
+This message causes the UI to bump the pointer image on the screen by the passed offsets as if the user had moved the mouse. It's unlikely your objects will subclass this message; you may, however, use it to bump the mouse. It is most often used by specific UI objects (menus, scrollers) that make the mouse follow their movements.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+xBump</CODE>
+	The horizontal amount to bump the mouse.</P>
+<DL>
+<DT>
+<CODE>
+yBump</CODE>
+</DT><DD>The vertical amount to bump the mouse.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+
+
+<H2 CLASS="HeadingC">
+Keyboard <A NAME="IX_Input:keyboard events;Keyboard:with visible objects">
+ </A>
+Events</H2>
+<PRE>MSG_META_GRAB_KBD, MSG_META_FORCE_GRAB_KBD, MSG_META_RELEASE_KBD</PRE>
+<P>
+The keyboard, like the mouse, may be grabbed by visible objects. Keyboard events arrive in the form <CODE>
+MSG_META_KBD_CHAR</CODE>
+; a single message represents all different types of keyboard events (unlike mouse events, which can be much more diverse).</P>
+<P>
+To grab the keyboard, the visible object should send itself the message <CODE>
+MSG_META_GRAB_KBD</CODE>
+. If the grab should be made in any circumstances, the object should use <CODE>
+MSG_META_FORCE_GRAB_KBD</CODE>
+. To release the keyboard grab, the object should send itself <CODE>
+MSG_META_RELEASE_KBD</CODE>
+.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_GRAB_KBD">
+ </A>
+MSG_META_GRAB_KBD</H4>
+<PRE CLASS="syntax">void	MSG_META_GRAB_KBD();</PRE>
+<P>
+A visible object will send itself this message (using <CODE>
+@call</CODE>
+) when it wants to gain the keyboard grab. To release the grab, it must send itself a <CODE>
+MSG_META_RELEASE_KBD</CODE>
+. If it wants to gain the exclusive regardless of whether another object has it, it should use <CODE>
+MSG_META_FORCE_GRAB_KBD</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object--typically sent by a visible object to itself to gain the keyboard grab.</P>
+<P CLASS="refField">
+Interception:	Unlikely--Note that the object must, however, intercept <CODE>
+MSG_META_KBD_CHAR</CODE>
+ to receive the subsequent keyboard events.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_FORCE_GRAB_KBD">
+ </A>
+MSG_META_FORCE_GRAB_KBD</H4>
+<PRE CLASS="syntax">void	MSG_META_FORCE_GRAB_KBD();</PRE>
+<P>
+A visible object will send itself this message (using <CODE>
+@call</CODE>
+) when it wants to gain the keyboard grab whether or not another object currently has it. To release the grab, the object must later send itself <CODE>
+MSG_META_RELEASE_KBD</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object--typically sent by a visible object to itself to force a keyboard grab.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_RELEASE_KBD">
+ </A>
+MSG_META_RELEASE_KBD</H4>
+<PRE CLASS="syntax">void	MSG_META_RELEASE_KBD();</PRE>
+<P>
+A visible object that has the keyboard grab must send itself this message to release the grab.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object--typically sent by a visible object to itself to release its keyboard grab.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+
+<H2 CLASS="HeadingC">
+Ink and P<A NAME="IX_Pen input:with VisClass;Input:pen events">
+ </A>
+en Events</H2>
+<PRE>MSG_VIS_QUERY_IF_OBJECT_HANDLES_INK</PRE>
+<P>
+<A NAME="IX_Ink:VisClass ink events">
+ </A>
+If a visible object expects and wants Ink input, it should subclass the message <CODE>
+MSG_VIS_QUERY_IF_OBJECT_HANDLES_INK</CODE>
+. This message queries the visible object, which should return specific values based on the current input state and object bounds.</P>
+<P>
+This message has two default handlers; the default <CODE>
+VisClass</CODE>
+ handler always returns <CODE>
+false</CODE>
+, indicating that the visible object does not expect Ink input. You can, however, substitute a second default handler for the <CODE>
+VisClass</CODE>
+ handler by adding the following line to your Goc file after the object's class definition:</P>
+<PRE>@method <A NAME="IX_VisObjectHandlesInkReply"> </A>VisObjectHandlesInkReply, &lt;<EM>YourClass</EM>&gt;,
+                MSG_VIS_QUERY_IF_OBJECT_HANDLES_INK;</PRE>
+<P>
+This will, in essence, substitute the system-provided routine <CODE>
+VisObjectHandlesInkReply()</CODE>
+ for a subclassed message handler. This routine will do the right thing for the object in interacting with the input manager. All subsequent input events will be considered Ink events.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_QUERY_IF_OBJECT_HANDLES_INK">
+ </A>
+MSG_VIS_QUERY_IF_OBJECT_HANDLES_INK</H4>
+<PRE CLASS="syntax">void	MSG_VIS_QUERY_IF_OBJECT_HANDLES_INK(
+        VisCallChildrenInBoundsFrame					*data);</PRE>
+<P>
+This message is subclassed by objects that handle Ink input. See above for directions on handling this message. The parameters are five data words that may be modified and the bounds of a rectangle. This message will be sent to all objects whose bounds fall within the passed rectangle.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+data</CODE>
+	A pointer to a <CODE>
+VisCallChildrenInBoundsFrame</CODE>
+ structure containing the bounding rectangle and five words of data. This structure is described below.</P>
+<P CLASS="refField">
+Return:	Three fields of the <A NAME="IX_VisCallChildrenInBoundsFrame">
+ </A>
+<CODE>
+VisCallChildrenInBoundsFrame</CODE>
+ structure pointed to by <CODE>
+data</CODE>
+ will have meaning on return. See the Interception paragraph below to determine whether the return values should be set or not in a subclassed handler.</P>
+<DL>
+<DT>
+<CODE>
+VCCIBF_data1</CODE>
+</DT><DD>Memory handle of the top object desiring ink.</DD>
+<DT>
+<CODE>
+VCCIBF_data2</CODE>
+</DT><DD>Chunk handle of the top object desiring ink.</DD>
+<DT>
+<CODE>
+VCCIBF_data3</CODE>
+</DT><DD>Upper bound of the object desiring ink.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	If an object wants to receive ink messages, it should do the following things in its handler for this message: First compare the passed <CODE>
+VCCIBF_data3</CODE>
+ value with the top bound of the object. Then, if the upper bound of the object is less than the <CODE>
+VCCIBF_data3</CODE>
+ value (or if the value in <CODE>
+VCCIBF_data1</CODE>
+ is zero), then the object should return the values indicated in the Return paragraph above. Otherwise, if these conditions are not met, it should return with the structures and registers unchanged.</P>
+<P CLASS="refField">
+Structures:	The <CODE>
+VisCallChildrenInBoundsFrame</CODE>
+ structure is shown below:</P>
+<PRE>typedef struct {
+	word		VCCIBF_data1;
+	word		VCCIBF_data2;
+	word		VCCIBF_data3;
+	word		VCCIBF_data4;
+	word		VCCIBF_data5;
+		/* Five data words as described above */
+	Rectangle		VCCIBF_bounds;
+		/* bounds must be in the coordinate
+		 * system of the parent of the caller */
+} VisCallChildrenInBoundsFrame;</PRE>
+
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VisClass_b.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VisClass_e.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.3 Positioning Visible Objects</A> 
+<!-- to next --> | <A HREF="VisClass_10.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">5 Working with Visible Object Trees</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

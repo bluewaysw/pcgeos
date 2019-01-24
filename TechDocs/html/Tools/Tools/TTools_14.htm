@@ -1,0 +1,990 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: TTools_14.htm,v 1.1 97/06/27 16:02:22 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Contents of a Makefile</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Using Tools</A>: 13.4 <A HREF="TTools_10.htm">pmake</A>: 
+Contents of a Makefile</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="TTools_10.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="TTools_13.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">13.3 Command Line Arguments</A> 
+<!-- to next --> | <A HREF="TTools_15.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">13.5 Advanced pmake Techniques</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+The <CODE>
+pmake</CODE>
+ program takes as input a file that tells</P>
+<UL>
+<LI>
+which files depend on which other files and </LI>
+<LI>
+what to do about files that are &quot;out-of-date.&quot; </LI>
+</UL>
+<P>
+This file is known as a &quot;makefile&quot; and is usually kept in the top-most directory of the system to be built. While you can call the makefile anything you want, <CODE>
+pmake</CODE>
+ will look for MAKEFILE in the current directory if you don't tell it otherwise. To specify a different makefile, use the -f flag (e.g. &quot;pmake -f program.mk&quot;).</P>
+<P>
+A makefile has four different types of lines in it:</P>
+<UL>
+<LI>
+File dependency specifications</LI>
+<LI>
+Creation commands</LI>
+<LI>
+Variable assignments</LI>
+<LI>
+Comments, include statements and conditional directives</LI>
+</UL>
+<P>
+Any line may be continued over multiple lines by ending it with a backslash (&quot;\&quot;). The backslash, following newline and any initial whitespace on the following line are compressed into a single space before the input line is examined by pmake.</P>
+
+<H2 CLASS="HeadingC">
+Dependency Lines</H2>
+<P>
+<A NAME="IX_Dependency lines (makefiles)">
+ </A>
+In any system, there are dependencies between the files that make up the system. For instance, in a program made up of several C source files and one header file, the C files will need to be re-compiled should the header file be changed. For a document of several chapters and one macro file, the chapters will need to be reprocessed if any of the macros changes. These are dependencies and are specified by means of dependency lines in the makefile.</P>
+<P>
+<A NAME="IX_Source:meaning in makefiles">
+ </A>
+<A NAME="IX_Target:when making">
+ </A>
+<A NAME="IX_Targets in makefiles">
+ </A>
+On a dependency line, there are <EM>
+targets</EM>
+ and <EM>
+sources</EM>
+, separated by a one- or two-character operator. The targets &quot;depend&quot; on the sources and are usually created from them. Any number of targets and sources may be specified on a dependency line. All the targets in the line are made to depend on all the sources. Targets and sources need not be actual files, but every source must be either an actual file or another target in the makefile. If you run out of room, use a backslash at the end of the line to continue onto the next one.</P>
+<P>
+Any file may be a target and any file may be a source, but the relationship between the two (or however many) is determined by the &quot;operator&quot; that separates them. Three types of operators exist: one specifies that the datedness of a target is determined by the state of its sources, while another specifies other files (the sources) that need to be dealt with before the target can be re-created. The third operator is very similar to the first, with the additional condition that the target is out-of-date if it has no sources. These operations are represented by the colon, the exclamation point and the double-colon, respectively, and are mutually exclusive (to represent a colon in a target, you must precede it with a backslash: &quot;\:&quot;). Their exact semantics are as follows:</P>
+<DL>
+<DT>
+<A NAME="IX_\::in makefiles">
+ </A>
+: </DT><DD>If a colon is used, a target on the line is considered to be &quot;out-of-date&quot; (and in need of creation) if </DD>
+<UL>
+<LI>
+the target doesn't exist or </LI>
+<LI>
+any of the sources has been modified more recently than the target.</LI>
+</UL>
+<P>Under this operator, steps will be taken to re-create the target only if it is found to be out-of-date by using these two rules.</P>
+<DT>
+<A NAME="IX_!:in makefiles">
+ </A>
+! </DT><DD>If an exclamation point is used, the target will always be re-created, but this will not happen until all of its sources have been examined and re-created, if necessary.</DD>
+<DT>
+<A NAME="IX_\:\: in makefiles">
+ </A>
+:: </DT><DD>If a double-colon is used, a target is out-of-date if</DD>
+<UL>
+<LI>
+the target has no sources, </LI>
+<LI>
+any of the sources has been modified more recently than the target, or</LI>
+<LI>
+the target doesn't exist.</LI>
+</UL>
+<P>
+If the target is out-of-date according to these rules, it will be re-created. This operator also does something else to the targets, as described in <A HREF="TTools_14.htm#38184"> Shell Commands</A>).</P>
+</DL>
+<P>
+Suppose there are three C files (<STRONG CLASS="fileName">
+a.c</STRONG>
+, <STRONG CLASS="fileName">
+b.c</STRONG>
+ and <STRONG CLASS="fileName">
+c.c</STRONG>
+) each of which includes the file <STRONG CLASS="fileName">
+defs.h</STRONG>
+. The dependencies between the files could then be expressed as follows:</P>
+<PRE>PROGRAM.EXE 			: A.OBJ B.OBJ C.OBJ
+A.OBJ B.OBJ C.OBJ 			: DEFS.H
+A.OBJ 			: A.C
+B.OBJ 			: B.C
+C.OBJ 			: C.C</PRE>
+<P>
+You may be wondering at this point, where A.OBJ, B.OBJ and C.OBJ came in and why they depend on defs.h and the C files don't. The reason is quite simple: PROGRAM.EXE cannot be made by linking together .c files--it must be made from .obj files. Likewise, if you change DEFS.H, it isn't the .c files that need to be re-created, it's the .obj files. If you think of dependencies in these terms--which files (targets) need to be created from which files (sources)-- you should have no problems.</P>
+<P>
+An important thing to notice about the above example is that all the .obj files appear as targets on more than one line. This is perfectly all right: the target is made to depend on all the sources mentioned on all the dependency lines. For example, A.OBJ depends on both DEFS.H and A.C.</P>
+<P>
+The order of the dependency lines in the makefile is important: the first target on the first dependency line in the makefile will be the one that gets made if you don't say otherwise. That's why PROGRAM.EXE comes first in the example makefile, above.
+
+</P>
+<P>
+Both targets and sources may contain the standard C-Shell wildcard characters ({, }, *, ?, [, and ]), but the square braces may only appear in the final component (the file portion) of the target or source. The characters mean the following things:</P>
+<DL>
+<DT>
+<A NAME="IX_} in makefiles">
+ </A>
+<A NAME="IX_{ in makefiles">
+ </A>
+{ } </DT><DD>These enclose a comma-separated list of options and cause the pattern to be expanded once for each element of the list. Each expansion contains a different element. For example, </DD>
+<PRE>SRC\{WHIFFLE,BEEP,FISH}.C</PRE>
+<P>
+expands to the three words &quot;SRC\WHIFFLE.C&quot;, &quot;SRC\BEEP.C&quot;, and &quot;SRC\FISH.C&quot;. These braces may be nested and, unlike the other wildcard characters, the resulting words need not be actual files. All other wildcard characters are expanded using the files that exist when <CODE>
+pmake</CODE>
+ is started.</P>
+<DT>
+<A NAME="IX_*:in makefile">
+ </A>
+* </DT><DD>This matches zero or more characters of any sort. </DD>
+<PRE>SRC\*.C</PRE>
+<P>
+will expand to the same three words as above as long as <STRONG CLASS="fileName">
+src</STRONG>
+ contains those three files (and no other files that end in .c).</P>
+<DT>
+<A NAME="IX_&qmark;:in makefiles">
+ </A>
+? </DT><DD>Matches any single character.</DD>
+<DT>
+<A NAME="IX_]:in makefiles">
+ </A>
+<A NAME="IX_[:in makefiles">
+ </A>
+[ ] </DT><DD>This is known as a character class and contains either a list of single characters, or a series of character ranges ([a-z], for example means all characters between a and z), or both. It matches any single character contained in the list. E.g. [A-Za-z] will match all letters, while [0123456789] will match all numbers.</DD>
+
+
+</DL>
+<H2 CLASS="HeadingC">
+<A NAME="38184">
+ </A>
+Shell Commands</H2>
+<P>
+<A NAME="IX_Shell commands in makefiles">
+ </A>
+At this point, you may be wondering how files are re-created. The re-creation is accomplished by commands you place in the makefile. These commands are passed to the shell to be executed and are expected to do what's necessary to update the target file. (The <CODE>
+pmake</CODE>
+ program doesn't actually check to see if the target was created. It just assumes it's there.)</P>
+<P>
+Shell commands in a makefile look a lot like shell commands you would type, with one important exception: each command in a makefile <EM>
+must</EM>
+ be preceded by at least one tab.</P>
+<P>
+Each target has associated with it a shell script made up of one or more of these shell commands. The creation script for a target should immediately follow the dependency line for that target. While any given target may appear on more than one dependency line, only one of these dependency lines may be followed by a creation script, unless the &quot;::&quot; operator was used on the dependency line.</P>
+<P>
+If the double-colon was used, each dependency line for the target may be followed by a shell script. That script will only be executed if the target on the associated dependency line is out-of-date with respect to the sources on that line, according to the rules given earlier. </P>
+<P>
+To expand on the earlier makefile, you might add commands as follows:</P>
+<PRE>PROGRAM.EXE : A.OBJ B.OBJ C.OBJ
+	BCC A.OBJ B.OBJ C.OBJ -o PROGRAM.EXE
+A.OBJ B.OBJ C.OBJ : DEFS.H
+A.OBJ : A.C
+	bcc -c A.C
+B.OBJ : B.C
+	bcc -c B.C
+C.OBJ : C.C
+	bcc -c C.C</PRE>
+<P>
+Something you should remember when writing a makefile is that the commands will be executed if the <EM>
+target</EM>
+ on the dependency line is out-of-date, not the sources. In this example, the command &quot;bcc -c a.c&quot; will be executed if <STRONG CLASS="fileName">
+a.obj</STRONG>
+ is out-of-date. Because of the &quot;:&quot; operator, this means that should <STRONG CLASS="fileName">
+a.c</STRONG>
+ or <STRONG CLASS="fileName">
+defs.h</STRONG>
+ have been modified more recently than <STRONG CLASS="fileName">
+a.obj</STRONG>
+, the command will be executed (<STRONG CLASS="fileName">
+a.obj</STRONG>
+ will be considered out-of-date).</P>
+<P>
+There is another way in which makefile commands differ from regular shell commands. The first two characters after the initial whitespace are treated specially. If they are any combination of &quot;<A NAME="IX_@:in makefiles">
+ </A>
+@&quot; and &quot;<A NAME="IX_- (Hyphen):in makefiles">
+ </A>
+-&quot;, they cause <CODE>
+pmake</CODE>
+ to do things differently.</P>
+<P>
+In most cases, shell commands are printed before they're actually executed. This is to keep you informed of what's going on. If an &quot;@&quot; appears, however, this echoing is suppressed. In the case of an <CODE>
+echo</CODE>
+ command, perhaps &quot;echo Linking index&quot; it would be rather messy to output </P>
+<PRE>echo Linking index
+Linking index</PRE>
+<P>
+The other special character is the dash (&quot;-&quot;). Shell commands finish with a certain &quot;exit status.&quot; This status is made available by the operating system to whatever program invoked the command. Normally this status will be zero if everything went ok and non-zero if something went wrong. For this reason, <CODE>
+pmake</CODE>
+ will consider an error to have occurred if one of the shells it invokes returns a non-zero status. When it detects an error, <CODE>
+pmake</CODE>
+'s usual action is to abort whatever it's doing and exit with a non-zero status itself. This behavior can be altered, however, by placing a &quot;-&quot; at the front of a command (e.g. &quot;-copy index index.old&quot;) . In such a case, the non-zero status is simply ignored and <CODE>
+pmake</CODE>
+ keeps going.</P>
+<P>
+<A NAME="IX_`  (Backquote):In shell commands">
+ </A>
+<A NAME="IX_COMMAND.COM">
+ </A>
+If the system call should be made through the DOS COMMAND.COM, precede the shell command with a backquote (`).</P>
+
+
+<H2 CLASS="HeadingC">
+Variables</H2>
+<P>
+<A NAME="IX_Variables in makefiles">
+ </A>
+The <CODE>
+pmake</CODE>
+ program has the ability to save text in variables to be recalled later at your convenience. Variables in <CODE>
+pmake</CODE>
+ are used much like variables in the shell and, by tradition, consist of all upper-case letters. Variables are assigned using lines of the form</P>
+<PRE><EM>VARIABLE</EM> <A NAME="IX_=:in makefiles"> </A>= <EM>value</EM></PRE>
+<P>
+append using lines of the form</P>
+<PRE><EM>VARIABLE</EM> <A NAME="IX_+=:in makefiles"> </A>+= <EM>value</EM></PRE>
+<P>
+conditionally assigned (if the variable isn't already defined) by using lines of the form</P>
+<PRE><EM>VARIABLE</EM> <A NAME="IX_&qmark;=:in makefiles"> </A>?= <EM>value</EM></PRE>
+<P>
+and assigned with expansion (i.e. the value is expanded (see below) before being assigned to the variable--useful for placing a value at the beginning of a variable, or other things) by using lines of the form</P>
+<PRE><EM>VARIABLE</EM> <A NAME="IX_\:=:in makefiles"> </A>:= <EM>value</EM></PRE>
+<P>
+Any whitespace before <EM>
+value</EM>
+ is stripped off. When appending, a space is placed between the old value and the values being appended.</P>
+<P>
+The final way a variable may be assigned is using lines of the form</P>
+<PRE><EM>VARIABLE</EM> <A NAME="IX_!=:in makefiles"> </A>!= <EM>shell-command</EM></PRE>
+<P>
+or, if the shell command requires the use of the command.com interpreter, </P>
+<PRE><EM>VARIABLE</EM> != <A NAME="IX_`  (Backquote):with !="> </A>`<EM>shell-command</EM></PRE>
+<P>
+In this case, shell-command has all its variables expanded (see below) and is passed off to a shell to execute. The output of the shell is then placed in the variable. Any newlines (other than the final one) are replaced by spaces before the assignment is made. This is typically used to find the current directory via a line like:</P>
+<PRE>CURRENT_DIR != `cd</PRE>
+<P>
+The value of a variable may be retrieved by enclosing the variable name in parentheses or curly braces and preceding the whole thing with a dollar sign. For example, to set the variable CFLAGS to the string &quot;-I\NIHON\LIB\LIBC -O&quot;, you would place a line</P>
+<PRE>CFLAGS = -I\NIHON\LIB\LIBC -O</PRE>
+<P>
+<A NAME="IX_$(VAR) expressions">
+ </A>
+in the makefile and use the expression</P>
+<PRE>$(CFLAGS)</PRE>
+<P>
+ wherever you would like the string &quot;-I\NIHON\LIB\LIBC -O&quot; to appear. This is called variable expansion.</P>
+<P>
+There are two different times at which variable expansion occurs: When parsing a dependency line, the expansion occurs immediately upon reading the line. Variables in shell commands are expanded when the command is executed. Variables used inside another variable are expanded whenever the outer variable is expanded (the expansion of an inner variable has no effect on the outer variable. That is, if the outer variable is used on a dependency line and in a shell command, and the inner variable changes value between when the dependency line is read and the shell command is executed, two different values will be substituted for the outer variable).</P>
+<P>
+Variables come in four flavors, though they are all expanded the same and all look about the same. They are (in order of expanding scope)</P>
+<UL>
+<LI>
+local variables.</LI>
+<LI>
+command-line variables.</LI>
+<LI>
+global variables.</LI>
+<LI>
+environment variables.</LI>
+</UL>
+<P>
+The classification of variables doesn't matter much, except that the classes are searched from the top (local) to the bottom (environment) when looking up a variable. The first one found wins.</P>
+
+<H3 CLASS="HeadingD">
+<A NAME="52663">
+ </A>
+Local Variables</H3>
+<P>
+<A NAME="IX_Local variables">
+ </A>
+Each target can have as many as seven local variables. These are variables that are only &quot;visible&quot; within that target's shell script and contain such things as the target's name, all of its sources (from all its dependency lines), those sources that were out-of-date, etc. Four local variables are defined for all targets. They are</P>
+<DL>
+<DT>
+<A NAME="IX_.TARGET makefile local variable[;TARGET]">
+ </A>
+.TARGET </DT><DD><A NAME="IX_Targets:.TARGET local variable">
+ </A>
+The name of the target.</DD>
+<DT>
+<A NAME="IX_.OODATE makefile local variable[;OODATE]">
+ </A>
+.OODATE </DT><DD>The list of the sources for the target that were considered out-of-date. The order in the list is not guaranteed to be the same as the order in which the dependencies were given.</DD>
+<DT>
+<A NAME="IX_.ALLSRC makefile local variable[;ALLSRC]">
+ </A>
+.ALLSRC</DT><DD>The list of all sources for this target in the order in which they were given.</DD>
+<DT>
+<A NAME="IX_.PREFIX makefile local variable[;PREFIX]">
+ </A>
+.PREFIX </DT><DD>The target without its suffix and without any leading path. For example, for the target ..\..\LIB\FSREAD.C<STRONG CLASS="fileName">
+,</STRONG>
+ this variable would contain FSREAD.</DD>
+</DL>
+<P>
+One other local variable, .IMPSRC, is set only for certain targets under special circumstances. It is discussed below.</P>
+<P>
+Two of these variables may be used in sources as well as in shell scripts. These are .TARGET and .PREFIX. The variables in the sources are expanded once for each target on the dependency line, providing what is known as a &quot;dynamic source,&quot; allowing you to specify several dependency lines at once. For example,</P>
+<PRE>$(OBJS) : $(.PREFIX).c</PRE>
+<P>
+will create a dependency between each object file and its corresponding C source file.</P>
+
+
+<H3 CLASS="HeadingD">
+Command-line Variables</H3>
+<P>
+<A NAME="IX_Command-line Variables">
+ </A>
+Command-line variables are set when <CODE>
+pmake</CODE>
+ is first invoked by giving a variable assignment as one of the arguments. For example,</P>
+<PRE>pmake &quot;CFLAGS = -I\NIHON\LIB\LIBC -O&quot;</PRE>
+<P>
+would make CFLAGS be a command-line variable with the given value. Any assignments to CFLAGS in the makefile will have no effect, because once it is set, there is (almost) nothing you can do to change a command-line variable. Command-line variables may be set using any of the four assignment operators, though only = and ?= behave as you would expect them to, mostly because assignments to command-line variables are performed before the makefile is read, thus the values set in the makefile are unavailable at the time. += is the same as = because the old value of the variable is sought only in the scope in which the assignment is taking place. The := and ?= operators will work if the only variables used are in the environment. </P>
+
+
+<H3 CLASS="HeadingD">
+Global Variables</H3>
+<P>
+<A NAME="IX_Global variables">
+ </A>
+Global variables are those set or appended in the makefile. There are two classes of global variables: those you set and those <CODE>
+pmake</CODE>
+ sets. The ones you set can have any name you want them to have, except they may not contain a colon or an exclamation point. The variables <CODE>
+pmake</CODE>
+ sets (almost) always begin with a period and contain only upper-case letters. The variables are as follows:</P>
+<DL>
+<DT>
+<A NAME="IX_.PMAKE makefile variable[;PMAKE makefile variable]">
+ </A>
+.PMAKE</DT><DD>The name by which <CODE>
+pmake</CODE>
+ was invoked is stored in this variable. For compatibility, the name is also stored in the MAKE variable.</DD>
+<DT>
+<A NAME="IX_.MAKEFLAGS global variable[;MAKEFLAGS global variable]">
+ </A>
+.MAKEFLAGS </DT><DD>
+All the relevant flags with which <CODE>
+pmake</CODE>
+ was invoked. This does not include such things as &quot;-f&quot; or variable assignments. Again for compatibility, this value is stored in the MFLAGS variable as well.</DD>
+</DL>
+<P>
+Two other variables, .INCLUDES and .LIBS, are covered in the section on special targets (See <A HREF="TTools_14.htm#16472"> Special Targets</A>
+).</P>
+<P>
+Global variables may be deleted using lines of the form:</P>
+<PRE><A NAME="IX_#undef makefile directive[;undef makefile directive]"> </A>#undef <EM>variable</EM></PRE>
+<P>
+The &quot;#&quot; must be the first character on the line. Note that this may only be done to global variables.</P>
+
+
+<H3 CLASS="HeadingD">
+Environment Variables</H3>
+<P>
+<A NAME="IX_Environment variables within PMake">
+ </A>
+Environment variables are passed by the shell that invoked <CODE>
+pmake</CODE>
+ and are given by <CODE>
+pmake</CODE>
+ to each shell it invokes. They are expanded like any other variable, but they cannot be altered in any way.</P>
+<P>
+<A NAME="IX_PMAKE environment variable">
+ </A>
+One special environment variable, PMAKE, is examined by <CODE>
+pmake</CODE>
+ for command-line flags, variable assignments, etc. that it should always use. This variable is examined before the actual arguments to <CODE>
+pmake</CODE>
+ are. In addition, all flags given to <CODE>
+pmake</CODE>
+, either through the PMAKE variable or on the command line, are placed in this environment variable and exported to each shell <CODE>
+pmake</CODE>
+ executes. Thus recursive invocations of <CODE>
+pmake</CODE>
+ automatically receive the same flags as the top-most one.</P>
+<P>
+Many other standard environment variables are defined and described in the Include\GEOS.MK included Makefile.</P>
+<P>
+Using all these variables, you can compress the sample makefile even more:</P>
+<PRE>OBJS = A.OBJ B.OBJ C.OBJ
+PROGRAM.EXE : $(OBJS)
+	BCC $(.ALLSRC) -o $(.TARGET)
+$(OBJS) : DEFS.H
+A.OBJ : A.C
+	BCC -c A.C
+B.OBJ : B.C
+	BCC -c B.C
+C.OBJ : C.C
+	BCC -c C.C</PRE>
+<P>
+In addition to variables which <CODE>
+pmake</CODE>
+ will use, you can set environment variables which shell commands may use using the pmake_set directive.</P>
+<PRE>.C.EBJ :
+pmake_set CL = $(CCOMFLAGS) /Fo$(.TARGET)
+$(CCOM) $(.IMPSRC)</PRE>
+<P>
+You might use the above sequence to set up an argument list in the CL environment variable if your compiler (invoked with CCOM) needed its arguments in such a variable and was unable to take arguments in a file.</P>
+
+
+
+<H2 CLASS="HeadingC">
+Comments</H2>
+<P>
+<A NAME="IX_Comments:In makefiles">
+ </A>
+Comments in a makefile start with a &quot;#&quot; character and extend to the end of the line. They may appear anywhere you want them, except where they might be misinterpreted as a shell command.</P>
+
+
+<H2 CLASS="HeadingC">
+Transformation Rules</H2>
+<P>
+<A NAME="IX_Transformation rules in makefiles">
+ </A>
+As you know, a file's name consists of two parts: a base name, which gives some hint as to the contents of the file, and a suffix, which usually indicates the format of the file. Over the years, as DOS has developed, naming conventions, with regard to suffixes, have also developed that have become almost incontrovertible. For example, a file ending in .C is assumed to contain C source code; one with a .OBJ suffix is assumed to be a compiled, relocatable object file that may be linked into any program. One of the best aspects of <CODE>
+pmake</CODE>
+ comes from its understanding of how the suffix of a file pertains to its contents and their ability to do things with a file based solely on its suffix. This ability comes from something known as a transformation rule. A transformation rule specifies how to change a file with one suffix into a file with another suffix.</P>
+<P>
+A transformation rule looks much like a dependency line, except the target is made of two known suffixes stuck together. Suffixes are made known to <CODE>
+pmake</CODE>
+ by placing them as sources on a dependency line whose target is the special target .SUFFIXES. For example:</P>
+<PRE>.SUFFIXES 			: .obj .c
+.c.obj 			:
+	$(CCOM) $(CFLAGS) -c $(.IMPSRC)</PRE>
+<P>
+The creation script attached to the target is used to transform a file with the first suffix (in this case, .c) into a file with the second suffix (here, .obj). In addition, the target inherits whatever attributes have been applied to the transformation rule. The simple rule above says that to transform a C source file into an object file, you compile it using your C compiler with the -c flag.</P>
+<P>
+This rule is taken straight from the system makefile. Many transformation rules (and suffixes) are defined there; you should look there for more examples (type &quot;pmake -h&quot; to find out where it is).</P>
+<P>
+There are some things to note about the transformation rule given above:</P>
+<OL>
+<LI>
+<A NAME="IX_Implied source">
+ </A>
+<A NAME="IX_.IMPSRC makefile variable[;IMPSRC]">
+ </A>
+The .IMPSRC variable. This variable is set to the &quot;implied source&quot; (the file from which the target is being created; the one with the first suffix), which, in this case, is the .c file.</LI>
+<LI>
+<A NAME="IX_CFLAGS">
+ </A>
+The CFLAGS variable. Almost all of the transformation rules in the system makefile are set up using variables that you can alter in your makefile to tailor the rule to your needs. In this case, if you want all your C files to be compiled with the -g flag, to provide information for Swat or CodeView, you would set the CFLAGS variable to contain -g (&quot;CFLAGS = -g&quot;) and <CODE>
+pmake</CODE>
+ would take care of the rest.</LI>
+</OL>
+<P>
+To give you a quick example, the makefile could be changed to this:</P>
+<PRE>OBJS = A.OBJ B.OBJ C.OBJ</PRE>
+<PRE>PROGRAM .EXE			: $(OBJS)</PRE>
+<PRE>	$(CCOM) -o $(.TARGET) $(.ALLSRC)</PRE>
+<PRE>$(OBJS) 			: DEFS.H</PRE>
+<P>
+The transformation rule given above takes the place of the 6 lines.</P>
+<PRE>A.OBJ : A.C
+	BCC -c A.C
+B.OBJ : B.C
+	BCC -c B.C
+C.OBJ : C.C
+	BCC -c C.C</PRE>
+<P>
+Now you may be wondering about the dependency between the .obj and .c files--it's not mentioned anywhere in the new makefile. This is because it isn't needed: one of the effects of applying a transformation rule is the target comes to depend on the implied source (hence the name).</P>
+<P>
+For a more detailed example, Suppose you have a makefile like this:</P>
+<PRE>A.EXE 			: A.OBJ B.OBJ
+	$(CCOM) $(.ALLSRC)</PRE>
+<P>
+and a directory set up like this:</P>
+<P>
+total 4</P>
+<PRE>MAKEFILE 		  34	09-07-89 		12:43a
+A        C		 119	10-03-89 		 7:39p
+A        OBJ 		201	09-07-89 		12:43a
+B        C		  69	09-07-89 		12:43a</PRE>
+<P>
+While just typing &quot;<CODE>
+pmake</CODE>
+&quot; will do the right thing, it's much more informative to type &quot;<CODE>
+pmake</CODE>
+ <CODE>
+-ds</CODE>
+&quot; This will show you what <CODE>
+pmake</CODE>
+ is up to as it processes the files. In this case, <CODE>
+pmake</CODE>
+ prints the following:</P>
+<PRE>Suff_FindDeps (A.EXE)
+	using existing source A.OBJ
+	applying .OBJ -&gt; .EXE to &quot;A.OBJ&quot;
+Suff_FindDeps (A.OBJ)
+	trying A.C...got it
+	applying .C -&gt; .OBJ to &quot;A.C&quot;
+Suff_FindDeps (B.OBJ)
+	trying B.C...got it
+	applying .C -&gt; .OBJ to &quot;B.C&quot;
+Suff_FindDeps (A.C)
+	trying A.Y...not there
+	trying A.L...not there
+	trying A.C,V...not there
+	trying A.Y,V...not there
+	trying A.L,V...not there
+Suff_FindDeps (B.C)
+	trying B.Y...not there
+	trying B.L...not there
+	trying B.C,V...not there
+	trying B.Y,V...not there
+	trying B.L,V...not there
+--- A.OBJ ---
+bcc -c A.C
+--- B.OBJ ---
+bcc -c B.C
+--- A.EXE ---
+bcc A.OBJ B.OBJ</PRE>
+<P>
+<A NAME="IX_Suff_FindDeps() routine">
+ </A>
+<EM>
+Suff_FindDeps</EM>
+ is the name of a function in <CODE>
+pmake</CODE>
+ that is called to check for implied sources for a target using transformation rules. The transformations it tries are, naturally enough, limited to the ones that have been defined (a transformation may be defined multiple times, by the way, but only the most recent one will be used). You will notice, however, that there is a definite order to the suffixes that are tried. This order is set by the relative positions of the suffixes on the .SUFFIXES line--the earlier a suffix appears, the earlier it is checked as the source of a transformation. Once a suffix has been defined, the only way to change its position is to remove all the suffixes (by having a .SUFFIXES dependency line with no sources) and redefine them in the order you want. (Previously-defined transformation rules will be automatically redefined as the suffixes they involve are re-entered.) </P>
+<P>
+Another way to affect the search order is to make the dependency explicit. In the above example, a.exe depends on a.obj and b.obj. Since a transformation exists from .obj to .exe, <CODE>
+pmake</CODE>
+ uses that, as indicated by the &quot;using existing source a.obj&quot; message.</P>
+<P>
+The search for a transformation starts from the suffix of the target and continues through all the defined transformations, in the order dictated by the suffix ranking, until an existing file with the same base (the target name minus the suffix and any leading directories) is found. At that point, one or more transformation rules will have been found to change the one existing file into the target. </P>
+<P>
+For example, ignoring what's in the system makefile for now, say you have a makefile like this:</P>
+<PRE>.SUFFIXES : .EXE .OBJ .C .Y .L
+.L.C :
+	LEX $(.IMPSRC)
+	MOVE LEX.YY.C $(.TARGET)
+.Y.C :
+	YACC $(.IMPSRC)
+	MOVE Y.TAB.C $(.TARGET)
+.C.OBJ :
+	BCC -L $(.IMPSRC)
+.OBJ.EXE :
+	BCC -o $(.TARGET) $(.IMPSRC)</PRE>
+<P>
+and the single file jive.l. If you were to type <CODE>
+pmake -rd ms jive.exe</CODE>
+, you would get the following output for jive.exe:</P>
+<PRE>Suff_FindDeps (JIVE.EXE)
+trying JIVE.OBJ...not there
+trying JIVE.C...not there
+trying JIVE.Y...not there
+trying JIVE.L...got it
+applying .L -&gt; .C to &quot;JIVE.L&quot;
+applying .C -&gt; .OBJ to &quot;JIVE.C&quot;
+applying .OBJ -&gt; .EXE to &quot;JIVE.OBJ&quot;</PRE>
+<P>
+The <CODE>
+pmake</CODE>
+ tool starts with the target jive.exe, figures out its suffix (.exe) and looks for things it can transform to a .exe file. In this case, it only finds .obj, so it looks for the file JIVE.OBJ.</P>
+<P>
+It fails to find it, so it looks for transformations into a .obj file. Again it has only one choice: .c. So it looks for JIVE.C and fails to find it. At this point it can create the .c file from either a .y file or a .l file. Since .y came first on the .SUFFIXES line, it checks for jive.y first, but can't find it, so it looks for jive.l. At this point, it has defined a transformation path as follows: .l-&gt;.c-&gt; .obj-&gt; .exe and applies the transformation rules accordingly. For completeness, and to give you a better idea of what <CODE>
+pmake</CODE>
+ actually did with this three-step transformation, this is what <CODE>
+pmake</CODE>
+ printed for the rest of the process:</P>
+<PRE>Suff_FindDeps (JIVE.OBJ)
+using existing source JIVE.C
+applying .C -&gt; .OBJ to &quot;JIVE.C&quot;
+Suff_FindDeps (JIVE.C)
+using existing source JIVE.L
+applying .L -&gt; .C to &quot;JIVE.L&quot;
+Suff_FindDeps (JIVE.L)
+Examining JIVE.L...modified 17:16:01 Oct 4,
+ 1987...up-to-date
+Examining JIVE.C...non-existent...out-of-date
+--- JIVE.C ---
+LEX JIVE.L
+...meaningless lex output deleted...
+MV LEX.YY.C JIVE.C
+Examining JIVE.OBJ...non-existent...out-of-date
+--- JIVE.OBJ ---
+bcc -c JIVE.C
+Examining JIVE.EXE...non-existent...out-of-date
+--- JIVE.EXE ---
+bcc -o JIVE.EXE JIVE.OBJ</PRE>
+
+
+<H2 CLASS="HeadingC">
+Including Other Makefiles</H2>
+<P>
+<A NAME="IX_#include makefile directive[;include makefile directive]">
+ </A>
+Just as for programs, it is often useful to extract certain parts of a makefile into another file and just include it in other makefiles somehow. Many compilers allow you to use something like</P>
+<PRE>#include &quot;defs.h&quot;</PRE>
+<P>
+to include the contents of defs.h in the source file. The <CODE>
+pmake</CODE>
+ program allows you to do the same thing for makefiles, with the added ability to use variables in the filenames. An include directive in a makefile looks either like this</P>
+<PRE>#include &lt;file&gt;</PRE>
+<P>
+or like this</P>
+<PRE>#include &quot;file&quot;</PRE>
+<P>
+The difference between the two is where <CODE>
+pmake</CODE>
+ searches for the file: the first way, <CODE>
+pmake</CODE>
+ will look for the file only in the system makefile directory (to find out what that directory is, give <CODE>
+pmake</CODE>
+ the -h flag).</P>
+<P>
+For files in double-quotes, the search is more complex; <CODE>
+pmake</CODE>
+ will look in the following places in the given order:</P>
+<OL>
+<LI>
+The directory of the makefile that's including the file.</LI>
+<LI>
+The current directory (the one in which you invoked <CODE>
+pmake</CODE>
+).</LI>
+<LI>
+The directories given by you using -I flags, in the order in which you gave them.</LI>
+<LI>
+Directories given by .PATH dependency lines.</LI>
+<LI>
+The system makefile directory.</LI>
+</OL>
+<P>
+You are free to use <CODE>
+pmake</CODE>
+ variables in the filename--<CODE>
+pmake</CODE>
+ will expand them before searching for the file. You must specify the searching method with either angle brackets or double-quotes <EM>
+outside</EM>
+ of a variable expansion. That is, the following</P>
+<PRE>SYSTEM= &lt;command.mk&gt;
+#include $(SYSTEM)</PRE>
+<P>
+won't work; instead use the following:</P>
+<PRE>SYSTEM= command.mk
+#include &lt;$(SYSTEM)&gt;</PRE>
+
+
+<H2 CLASS="HeadingC">
+Saving Commands</H2>
+<P>
+<A NAME="IX_...  (Ellipsis) in makefiles">
+ </A>
+There may come a time when you will want to save certain commands to be executed when everything else is done, by inserting an ellipsis &quot;...&quot; in the Makefile. Commands saved in this manner are only executed if <CODE>
+pmake</CODE>
+ manages to re-create everything without an error.</P>
+
+
+<H2 CLASS="HeadingC">
+Target Attributes</H2>
+<P>
+<A NAME="IX_Target attributes in makefiles">
+ </A>
+The <CODE>
+pmake</CODE>
+ tool allows you to give attributes to targets by means of special sources. Like everything else <CODE>
+pmake</CODE>
+ uses, these sources begin with a period and are made up of all upper-case letters. By placing one (or more) of these as a source on a dependency line, you are &quot;marking&quot; the target(s) with that attribute.</P>
+<P>
+Any attributes given as sources for a transformation rule are applied to the target of the transformation rule when the rule is applied.</P>
+<DL>
+<DT>
+<A NAME="IX_.DONTCARE makefile attribute[;DONTCARE]">
+ </A>
+.DONTCARE </DT><DD>If a target is marked with this attribute and <CODE>
+pmake</CODE>
+ can't figure out how to create it, it will ignore this fact and assume the file isn't really needed or actually exists and <CODE>
+pmake</CODE>
+ just can't find it. This may prove wrong, but the error will be noted later on, not when <CODE>
+pmake</CODE>
+ tries to create the target so marked. This attribute also prevents <CODE>
+pmake</CODE>
+ from attempting to touch the target if given the &quot;-t&quot; flag.</DD>
+<DT>
+<A NAME="IX_.EXEC makefile attribute[;EXEC]">
+ </A>
+.EXEC </DT><DD>This attribute causes its shell script to be executed while having no effect on targets that depend on it. This makes the target into a sort of subroutine. EXEC sources don't appear in the local variables of targets that depend on them (nor are they touched if <CODE>
+pmake</CODE>
+ is given the -t flag).</DD>
+<DT>
+<A NAME="IX_.IGNORE makefile attribute[;IGNORE]">
+ </A>
+.IGNORE </DT><DD>Giving a target the .IGNORE attribute causes <CODE>
+pmake</CODE>
+ to ignore errors from any of the target's commands, as if they all had &quot;-&quot; before them.</DD>
+<DT>
+<A NAME="IX_.MAKE makefile attribute[;MAKE]">
+ </A>
+.MAKE </DT><DD>The .MAKE attribute marks its target as being a recursive invocation of <CODE>
+pmake</CODE>
+. This forces <CODE>
+pmake</CODE>
+ to execute the script associated with the target (if it's out-of-date) even if you gave the -n or -t flag. By doing this, you can start at the top of a system and type</DD>
+<PRE>pmake -n</PRE>
+<P>
+and have it descend the directory tree (if your makefiles are set up correctly), printing what it would have executed if you hadn't included the -n flag.</P>
+<DT>
+<A NAME="IX_.NOTMAIN makefile attribute[;NOTMAIN]">
+ </A>
+.NOTMAIN </DT><DD>Normally, if you do not specify a target to make in any other way, <CODE>
+pmake</CODE>
+ will take the first target on the first dependency line of a makefile as the target to create. That target is known as the &quot;Main Target&quot; and is labeled as such if you print the dependencies out using the -p flag. Giving a target, this attribute tells <CODE>
+pmake</CODE>
+ that the target is definitely not the Main Target. This allows you to place targets in an included makefile and have <CODE>
+pmake</CODE>
+ create something else by default.</DD>
+<DT>
+<A NAME="IX_.PRECIOUS makefile attribute[;PRECIOUS]">
+ </A>
+.PRECIOUS </DT><DD>When <CODE>
+pmake</CODE>
+ is interrupted (by someone typing control-C at the keyboard), it will attempt to clean up after itself by removing any half-made targets. If a target has the .PRECIOUS attribute, however, <CODE>
+pmake</CODE>
+ will leave it alone. A side effect of the &quot;::&quot; operator is to mark the targets as .PRECIOUS.</DD>
+<DT>
+<A NAME="IX_.SILENT makefile attribute[;SILENT]">
+ </A>
+.SILENT</DT><DD>Marking a target with this attribute keeps its commands from being printed when they're executed, just as if they had an &quot;@&quot; in front of them.</DD>
+<DT>
+<A NAME="IX_.USE makefile attribute[;USE]">
+ </A>
+.USE </DT><DD>By giving a target this attribute, you turn it into <CODE>
+pmake</CODE>
+'s equivalent of a macro. When the target is used as a source for another target, the other target acquires the commands, sources and attributes (except .USE) of the source. If the target already has commands, the .USE target's commands are added to the end. If more than one .USE-marked source is given to a target, the rules are applied sequentially.</DD>
+<P>
+The typical .USE rule will use the sources of the target to which it is applied (as stored in the .ALLSRC variable for the target) as its &quot;arguments.&quot; Several system makefiles (not to be confused with <EM>
+the</EM>
+ system makefile) make use of these .USE rules to make developing easier (they're in the default, system makefile directory).</P>
+
+</DL>
+<H2 CLASS="HeadingC">
+<A NAME="16472">
+ </A>
+Special Targets</H2>
+<P>
+<A NAME="IX_Special targets in makefiles">
+ </A>
+There are certain targets that have special meaning to <CODE>
+pmake</CODE>
+. When you use one on a dependency line, it is the only target that may appear on the left-hand-side of the operator. As for the attributes and variables, all the special targets begin with a period and consist of upper-case letters only. The targets are as follows:</P>
+<DL>
+<DT>
+<A NAME="IX_.BEGIN makefile special target[;BEGIN]">
+ </A>
+.BEGIN</DT><DD>Any commands attached to this target are executed before anything else is done. You can use it for any initialization that needs doing.</DD>
+<DT>
+<A NAME="IX_.DEFAULT makefile special target[;DEFAULT]">
+ </A>
+.DEFAULT </DT><DD>This is sort of a .USE rule for any target (that was used only as a source) that <CODE>
+pmake</CODE>
+ can't figure out any other way to create. It's only &quot;sort of&quot; a .USE rule because only the shell script attached to the .DEFAULT target is used. The .IMPSRC variable of a target that inherits .DEFAULT's commands is set to the target's own name.</DD>
+<DT>
+<A NAME="IX_.END makefile special target[;END]">
+ </A>
+.END </DT><DD>This serves a function similar to .BEGIN, in that commands attached to it are executed once everything has been re-created (so long as no errors occurred). It also serves the extra function of being a place on which <CODE>
+pmake</CODE>
+ can hang commands you put off to the end. Thus the script for this target will be executed before any of the commands you save with the ellipsis marker.</DD>
+<DT>
+<A NAME="IX_.IGNORE makefile special target[;IGNORE]">
+ </A>
+.IGNORE </DT><DD>This target marks each of its sources with the .IGNORE attribute. If you don't give it any sources, then it is like giving the -i flag when you invoke <CODE>
+pmake</CODE>
+--errors are ignored for all commands.</DD>
+<DT>
+<A NAME="IX_.INCLUDES makefile special target[;INCLUDES]">
+ </A>
+.INCLUDES </DT><DD>The sources for this target are taken to be suffixes that indicate a file that can be included in a program source file. The suffix must already be declared with .SUFFIXES. Any suffix so marked will have the directories on its search path (see .PATH, below) placed in the .INCLUDES variable, each preceded by a &quot;-I&quot; flag. This variable can then be used as an argument for the compiler in the normal fashion. The &quot;.h&quot; suffix is already marked in this way in the system makefile. For example, if you have </DD>
+<PRE>.SUFFIXES 			: .PCX
+.PATH.PCX 			: \CLIPART
+.INCLUDES 			: .PCX</PRE>
+<P>
+<CODE>
+pmake</CODE>
+ places &quot;-I\CLIPART&quot; in the .INCLUDES variable and you can say </P>
+<PRE>bcc $(.INCLUDES) -c xprogram.c</PRE>
+<P>
+(Note: the .<CODE>
+INCLUDES</CODE>
+ variable is not actually filled in until the entire makefile has been read.)</P>
+<DT>
+<A NAME="IX_.INTERRUPT makefile special target[;INTERRUPT]">
+ </A>
+.INTERRUPT </DT><DD>When <CODE>
+pmake</CODE>
+ is interrupted, it will execute the commands in the script for this target, if it exists.</DD>
+<DT>
+<A NAME="IX_.LIBS makefile special target[;LIBS]">
+ </A>
+.LIBS </DT><DD>This does for libraries what .INCLUDES does for include files, except the flag used is &quot;-L&quot;, as required by those linkers that allow you to tell them where to find libraries. The variable used is .LIBS.</DD>
+<DT>
+<A NAME="IX_.MAIN makefile special target[;MAIN]">
+ </A>
+.MAIN </DT><DD><A NAME="IX_Main target">
+ </A>
+If you didn't give a target (or targets) to create when you invoked <CODE>
+pmake</CODE>
+, it will take the sources of this target as the targets to create.</DD>
+<DT>
+<A NAME="IX_.MAKEFLAGS makefile special target[;MAKEFLAGS]">
+ </A>
+.MAKEFLAGS </DT><DD>This target provides a way for you to always specify flags for <CODE>
+pmake</CODE>
+ when the makefile is used. The flags are just as they would be typed to the shell (except you can't use shell variables unless they're in the environment), though the -f and -r flags have no effect.</DD>
+<DT>
+<A NAME="IX_.PATH makefile special target[;PATH]">
+ </A>
+.PATH </DT><DD>If you give sources for this target, <CODE>
+pmake</CODE>
+ will take them as directories in which to search for files it cannot find in the current directory. If you give no sources, it will clear out any directories added to the search path before. </DD>
+<DT>
+.PATH<EM>suffix </EM></DT><DD>
+This does a similar thing to .PATH, but it does it only for files with the given suffix. The suffix must have been defined already. Look at <A HREF="TTools_15.htm#60745"> Search Paths</A>
+ for more information.</DD>
+<DT>
+<A NAME="IX_.PRECIOUS makefile special target[;PRECIOUS]">
+ </A>
+.PRECIOUS</DT><DD>Similar to .IGNORE, this gives the .PRECIOUS attribute to each source on the dependency line, unless there are no sources, in which case the .PRECIOUS attribute is given to every target in the file.</DD>
+<DT>
+<A NAME="IX_.RECURSIVE makefile special target[;RECURSIVE]">
+ </A>
+.RECURSIVE </DT><DD>This target applies the .MAKE attribute to all its sources. It does nothing if you don't give it any sources.</DD>
+<DT>
+<A NAME="IX_.SILENT makefile special target[;SILENT]">
+ </A>
+.SILENT</DT><DD>When you use .SILENT as a target, it applies the .SILENT attribute to each of its sources. If there are no sources on the dependency line, then it is as if you gave <CODE>
+pmake</CODE>
+ the -s flag and no commands will be echoed.</DD>
+<DT>
+<A NAME="IX_.SUFFIXES makefile special target[;SUFFIXES]">
+ </A>
+.SUFFIXES </DT><DD>This is used to give new file suffixes for <CODE>
+pmake</CODE>
+ to handle. Each source is a suffix <CODE>
+pmake</CODE>
+ should recognize. If you give a .SUFFIXES dependency line with no sources, <CODE>
+pmake</CODE>
+ will forget about all the suffixes it knew.</DD>
+</DL>
+<P>
+In addition to these targets, a line of the form</P>
+<PRE><EM>attribute</EM> : <EM>sources</EM></PRE>
+<P>
+applies the attribute to all the targets listed as sources .</P>
+
+
+<H2 CLASS="HeadingC">
+Modifying Variable Expansion</H2>
+<P>
+Variables need not always be expanded verbatim. The <CODE>
+pmake</CODE>
+ program defines several modifiers that may be applied to a variable's value before it is expanded. You apply a modifier by placing it after the variable name with a colon between the two, like so:</P>
+<PRE>${<EM>VARIABLE</EM>:<EM>modifier</EM>}</PRE>
+<P>
+Each modifier is a single character followed by something specific to the modifier itself. You may apply as many modifiers as you want--each one is applied to the result of the previous and is separated from the previous by another colon.</P>
+<P>
+There are several ways to modify a variable's expansion:</P>
+<DL>
+<DT>
+<STRONG>
+:M</STRONG>
+<A NAME="IX_\:M makefile variable expansion[;M]">
+ </A>
+<STRONG>
+pattern </STRONG>
+</DT><DD>This is used to select only those words (a word is a series of characters that are neither spaces nor tabs) that match the given pattern. The pattern is a wildcard pattern like that used by the shell, where * means zero or more characters of any sort; ? is any single character; [abcd] matches any single character that is one of &quot;a&quot;, &quot;b&quot;, &quot;c&quot; or &quot;d&quot; (there may be any number of characters between the brackets); [0-9] matches any single character that is between &quot;0&quot; and &quot;9&quot; (i.e. any digit--this form may be freely mixed with the other bracket form), and `\' is used to escape any of the characters &quot;*&quot;, &quot;?&quot;, &quot;[&quot; or &quot;:&quot;, leaving them as regular characters to match themselves in a word. </DD>
+<DT>
+</DT><DD>Remember that the pattern matcher requires you to prefix certain characters with a backslash, including backslash itself. this can lead to some impressive search strings, because <CODE>
+pmake</CODE>
+ also requires that backslashes be preceded with backslashes:</DD>
+<PRE>	#if !empty(CURRENT_DIR:M*\\\\APPL\\\\*)</PRE>
+<P>
+The above line checks to see if the current directory matches the form &quot;*\APPL\*&quot;. (The pattern matcher is passed the string &quot;*\\APPL\\*&quot;.)</P>
+<DT>
+<STRONG>
+:N</STRONG>
+<A NAME="IX_\:N makefile variable expansion[;N]">
+ </A>
+<STRONG>
+pattern</STRONG>
+ </DT><DD>This is identical to :M except it substitutes all words that don't match the given pattern. </DD>
+<DT>
+<STRONG>
+:X</STRONG>
+<A NAME="IX_\:X makefile variable expansion[;X]">
+ </A>
+<STRONG>
+pattern </STRONG>
+</DT><DD>This is like :M except that it returns only part of the matching string. You mark which part of the string you are interested in by enclosing it within backslashed square brackets (&quot;\[&quot; and &quot;\]&quot;) (however, due to the backslash rules, you must actually use &quot;\\[&quot; and &quot;\\]&quot;.)</DD>
+<PRE>	DEVEL_DIR 	:= \
+	 $(CURRENT_DIR:X<A NAME="IX_\\[*\\\\$(ROOT_DIR\\:T)\\\\*\\]\\\\*) makefile example"> </A>\\[*\\\\$(ROOT_DIR:T)\\\\*\\]\\\\*)</PRE>
+<P>
+The above line returns part of the CURRENT_DIR string, specifically the directory just under the root directory. Free of backslashes, it's searching for [*\$(ROOT_DIR:T)\*]\*. If there is a subdirectory below the development directory, then this will strip off the lower layers.</P>
+<DT>
+<STRONG>
+:S/</STRONG>
+<A NAME="IX_\:S makefile string substitution[;S]">
+ </A>
+<STRONG>
+search-string</STRONG>
+<STRONG>
+/</STRONG>
+<STRONG>
+replacement-string</STRONG>
+<STRONG>
+/[g]</DT><DD>
+</STRONG>
+This causes the first occurrence of <EM>search-string</EM> in the variable to be replaced by <EM>replacement-string</EM>, unless the &quot;g&quot; flag is given at the end, in which case all occurrences of the string are replaced. The substitution is performed on each word in the variable in turn. If search-string begins with a caret (&quot;^&quot;), the string must match starting at the beginning of the word. If search-string ends with a dollar sign (&quot;$&quot;), the string must match to the end of the word (these two may be combined to force an exact match). If a backslash precedes these two characters, however, they lose their special meaning. Variable expansion also occurs in the normal fashion inside both the search-string and the replacement-string, except that a backslash is used to prevent the expansion of a &quot;$&quot;, not another dollar sign, as is usual. Note that search-string is just a string, not a pattern, so none of the usual regular-expression/wildcard characters have any special meaning save &quot;^&quot; and &quot;$&quot;. In the replacement string, the &quot;&amp;&quot; character is replaced by the search-string unless it is preceded by a backslash. Thus, &quot;:S/[A-D]/&amp;&amp;/&quot; will find the string &quot;[A-D]&quot; and replace it with the string &quot;[A-D][A-D]&quot;. You are allowed to use any character except colon or exclamation point to separate the two strings. This so-called delimiter character may be placed in either string by preceding it with a backslash.</DD>
+<DT>
+<STRONG>
+:T</STRONG>
+<A NAME="IX_\:T makefile variable expansion[;T]">
+ </A>
+ </DT><DD>Replaces each word in the variable expansion by its last component (its &quot;tail&quot;). For example, given</DD>
+<PRE>		OBJS = ..\LIB\A.OBJ B \USR\LIB\LIBM.A
+		TAILS = $(OBJS:T)</PRE>
+<P>
+the variable TAILS would expand to &quot;a.obj b libm.a&quot; .</P>
+<DT>
+<STRONG>
+:H </STRONG>
+<A NAME="IX_\:H makefile variable expansion[;H]">
+ </A>
+</DT><DD>This is similar to :T, except that every word is replaced by everything but the tail (the &quot;head&quot;). Using the same definition of OBJS, the string &quot;$(OBJS:H)&quot; would expand to &quot;..\LIB \USR\LIB&quot; Note that the final slash on the heads is removed and anything without a head is replaced by a single period.</DD>
+<DT>
+<STRONG>
+:E</STRONG>
+<A NAME="IX_\:E makefile variable expansion[;E]">
+ </A>
+ </DT><DD>This replaces each word with its suffix (&quot;extension&quot;), so &quot;$(OBJS:E)&quot; would give you &quot;.OBJ .A&quot; .</DD>
+<DT>
+<STRONG>
+:R</STRONG>
+<A NAME="IX_\:R makefile variable expansion[;R]">
+ </A>
+ </DT><DD>This replaces each word with everything but the suffix (thus returning the &quot;root&quot; of the word). &quot;$(OBJS:R)&quot; expands to &quot;..\LIB\A B \USR\LIB\LIBM&quot;.</DD>
+</DL>
+<P>
+<A NAME="IX_=:$(V\:s=r) expressions">
+ </A>
+In addition, another style of substitution is also supported. This looks like:</P>
+<PRE>$(<EM>VARIABLE</EM>:<EM>search-string</EM>=<EM>replacement</EM>)</PRE>
+<P>
+It must be the last modifier in the chain. The search is anchored at the end of each word, so only suffixes or whole words may be replaced.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="TTools_10.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="TTools_13.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">13.3 Command Line Arguments</A> 
+<!-- to next --> | <A HREF="TTools_15.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">13.5 Advanced pmake Techniques</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

@@ -1,0 +1,169 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: R_6f.htm,v 1.2 97/06/25 18:36:51 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE>GEOS C Routines: MemThreadGrab() ...</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+<DIV>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="R_6e.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">MemModifyFlags() ...</A> 
+<!-- to next --> | <A HREF="R_70.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">MemUnlock() ...</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</DIV>
+<DIV>
+<A NAME="IX_MemThreadGrab()">
+ </A>
+<H1 CLASS="refHeading">
+MemThreadGrab()</H1>
+<PRE CLASS="syntax">void	* MemThreadGrab(
+        MemHandle		mh);			/* Handle of block to grab */</PRE>
+<P>
+<CODE>
+MemThreadGrab()</CODE>
+ is used in conjunction with <CODE>
+<A HREF="../../CRef/Routines/R_6f.htm#IX_MemThreadGrabNB()">MemThreadGrabNB()</A></CODE>
+ and <CODE>
+<A HREF="../../CRef/Routines/R_6f.htm#IX_MemThreadRelease()">MemThreadRelease()</A></CODE>
+ to maintain data-access synchronization. If several threads will all have access to the same global memory block, they should use data-acess synchronization routines to make sure that their activities do not conflict. If a thread uses <CODE>
+MemThreadGrab()</CODE>
+ and no other thread has grabbed the block in question, the routine will increment the &quot;grab count,&quot; lock the block, and return its address. It can do this even if the calling thread has already grabbed the block. If another thread has grabbed the block, <CODE>
+MemThreadGrab()</CODE>
+ will put the calling thread in a queue to get the block; the thread will sleep until it gets the block, then <CODE>
+MemThreadGrab()</CODE>
+ will grab the block, lock it, and return its address.</P>
+<P>
+If the block has been discarded, <CODE>
+MemThreadGrab()</CODE>
+ grabs the block and returns a null pointer; you can then reallocate memory for the block.</P>
+<P CLASS="refField"><STRONG>
+Include:</STRONG>	heap.h</P>
+<P CLASS="refField"><STRONG>
+Be Sure To:</STRONG>	Make sure that all threads using the block use the <CODE>
+MemThread...()</CODE>
+ routines to access it (not other data-acess synchronization routines). Do not change the HM<CODE>
+_otherInfo</CODE>
+ word of the block's handle table entry (the routines use that word as a semaphore).</P>
+<P CLASS="refField"><STRONG>
+Warnings:</STRONG>	If you try to grab a block which is owned by a different geode and is non-sharable, the routine will fatal-error.</P>
+<P CLASS="refField"><STRONG>
+Never Use Situations:</STRONG>	<BR>
+Never use <CODE>
+MemThreadGrab()</CODE>
+ with a fixed block. It will try to lock the block, and fixed blocks cannot be locked. If you need data-access synchronization for a fixed block, use the <CODE>
+<A HREF="../../CRef/Routines/R_55.htm#IX_HandleP()">HandleP()</A></CODE>
+ and <CODE>
+<A HREF="../../CRef/Routines/R_56.htm#IX_HandleV()">HandleV()</A></CODE>
+ routines.</P>
+<P CLASS="refField"><STRONG>
+See Also:</STRONG> <CODE><A HREF="../../CRef/Routines/R_6f.htm#IX_MemThreadGrabNB()">MemThreadGrabNB()</A></CODE>,
+<CODE><A HREF="../../CRef/Routines/R_6f.htm#IX_MemThreadRelease()">MemThreadRelease()</A></CODE>.</P>
+</DIV>
+<DIV>
+<A NAME="IX_MemThreadGrabNB()">
+ </A>
+<H1 CLASS="refHeading">
+MemThreadGrabNB()</H1>
+<PRE CLASS="syntax">void	* MemThreadGrabNB(
+        MemHandle		mh); /* handle of block to grab */</PRE>
+<P>
+This is a data-synchronization routine to be used in conjunction with <CODE>
+<A HREF="../../CRef/Routines/R_6f.htm#IX_MemThreadGrab()">MemThreadGrab()</A></CODE>
+ and <CODE>
+<A HREF="../../CRef/Routines/R_6f.htm#IX_MemThreadRelease()">MemThreadRelease()</A></CODE>
+. It is exactly the same as <CODE>
+<A HREF="../../CRef/Routines/R_6f.htm#IX_MemThreadGrab()">MemThreadGrab()</A></CODE>
+, except that if it cannot grab the global memory block because another thread has it, the routine returns an error instead of blocking.</P>
+<P>
+If successful, <CODE>
+MemThreadGrabNB()</CODE>
+ returns a pointer to the block. If the block has been discarded, it grabs the block and returns a null pointer; you can then reallocate memory for the block. If the block has been grabbed by another thread, <CODE>
+<A HREF="../../CRef/Routines/R_6f.htm#IX_MemThreadGrab()">MemThreadGrab()</A></CODE>
+ returns the constant BLOCK_GRABBED.</P>
+<P CLASS="refField"><STRONG>
+Include:</STRONG>	heap.h</P>
+<P CLASS="refField"><STRONG>
+Tips and Tricks:</STRONG>	You can find out if the block is being accessed by looking at the HM<CODE>
+_otherInfo</CODE>
+ word (with <CODE>
+<A HREF="../../CRef/Routines/R_6c.htm#IX_MemGetInfo()">MemGetInfo()</A></CODE>
+). If HM<CODE>
+_otherInfo</CODE>
+ equals one, the block is not grabbed; if it equals zero, it is grabbed, but no threads are queued; otherwise, it equals the handle of the first thread queued.</P>
+<P CLASS="refField"><STRONG>
+Be Sure To:</STRONG>	Make sure that all threads using the block use the <CODE>
+MemThread...()</CODE>
+ routines to access the block (not other data-access synchronization routines). Do not change the HM<CODE>
+_otherInfo</CODE>
+ word of the block's handle table entry (the routines use that word as a semaphore).</P>
+<P CLASS="refField"><STRONG>
+Warnings:</STRONG>	If you try to grab a block that is owned by a different geode and is non-sharable, the routine will fatal-error.</P>
+<P CLASS="refField"><STRONG>
+Never Use Situations:</STRONG>	<BR>
+Never use <CODE>
+MemThreadGrabNB()</CODE>
+ with a fixed block. It will try to lock the block, and fixed blocks cannot be locked. If you need synchronization for a fixed block, use the <CODE>
+<A HREF="../../CRef/Routines/R_55.htm#IX_HandleP()">HandleP()</A></CODE>
+ and <CODE>
+<A HREF="../../CRef/Routines/R_56.htm#IX_HandleV()">HandleV()</A></CODE>
+ routines.</P>
+<P CLASS="refField"><STRONG>
+See Also:</STRONG> <CODE><A HREF="../../CRef/Routines/R_6f.htm#IX_MemThreadGrab()">MemThreadGrab()</A></CODE>,
+<CODE><A HREF="../../CRef/Routines/R_6f.htm#IX_MemThreadRelease()">MemThreadRelease()</A></CODE>.</P>
+</DIV>
+<DIV>
+<A NAME="IX_MemThreadRelease()">
+ </A>
+<H1 CLASS="refHeading">
+MemThreadRelease()</H1>
+<PRE CLASS="syntax">void	MemThreadRelease(
+        MemHandle		mh); /* handle of locked block to release */</PRE>
+<P>
+Use this routine to release a global memory block which you have grabbed with <CODE>
+<A HREF="../../CRef/Routines/R_6f.htm#IX_MemThreadGrab()">MemThreadGrab()</A></CODE>
+ or <CODE>
+<A HREF="../../CRef/Routines/R_6f.htm#IX_MemThreadGrabNB()">MemThreadGrabNB()</A></CODE>
+. The routine decrements the grab count; if the grab count reaches zero, the routine unlocks the block.</P>
+<P CLASS="refField"><STRONG>
+Include:</STRONG>	heap.h</P>
+<P CLASS="refField"><STRONG>
+Tips and Tricks:</STRONG>	You can find out if the block is being accessed by looking at the HM<CODE>
+_otherInfo</CODE>
+ word (with <CODE>
+<A HREF="../../CRef/Routines/R_6c.htm#IX_MemGetInfo()">MemGetInfo()</A></CODE>
+). If HM<CODE>
+_otherInfo</CODE>
+ equals one, the block is not grabbed; if it equals zero, it is grabbed, but no threads are queued; otherwise, it equals the handle of the first thread queued.</P>
+<P CLASS="refField"><STRONG>
+Be Sure To:</STRONG>	Make sure that all threads using the block use the <CODE>
+MemThread...()</CODE>
+ routines to access the block (not other data-access synchronization routines). Do not change the HM<CODE>
+_otherInfo</CODE>
+ word of the block's handle table entry (the routines use that word as a semaphore). Make sure to release the block once for every time you grab it; the block is not unlocked until each of your grabs is released.</P>
+<P CLASS="refField"><STRONG>
+Warnings:</STRONG>	If you try to release a block that you have not successfully grabbed, the routine will fatal-error.</P>
+<P CLASS="refField"><STRONG>
+See Also:</STRONG> <CODE><A HREF="../../CRef/Routines/R_6f.htm#IX_MemThreadGrab()">MemThreadGrab()</A></CODE>,
+<CODE><A HREF="../../CRef/Routines/R_6f.htm#IX_MemThreadGrabNB()">MemThreadGrabNB()</A></CODE>.</P>
+</DIV>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="R_6e.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">MemModifyFlags() ...</A> 
+<!-- to next --> | <A HREF="R_70.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">MemUnlock() ...</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

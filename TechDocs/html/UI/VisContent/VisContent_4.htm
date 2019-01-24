@@ -1,0 +1,172 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: VisContent_4.htm,v 1.1 97/06/02 16:53:21 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Fields That Affect the Document</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">VisContent</A>: 1.3 <A HREF="VisContent_1.htm">VisContent Instance Data</A>: 
+Fields That Affect the Document</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VisContent_1.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VisContent_3.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1.2 Fields That Affect the View</A> 
+<!-- to next --> | <A HREF="VisContent_5.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">1.4 Fields That Affect Input Events</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>VCNI_docOrigin, VCNI_scaleFactor, MSG_VIS_CONTENT_SET_DOC_BOUNDS, MSG_VIS_CONTENT_RECALC_SIZE_BASED_ON_VIEW</PRE>
+<P>
+<A NAME="IX_VisContent:interaction with document">
+ </A>
+The GenView object maintains quite a bit of information about the document as managed by the content object. The content must also keep information about the document and how the view is displaying it. This information is stored in two fields, <CODE>
+VCNI_docOrigin</CODE>
+ and <CODE>
+VCNI_scaleFactor</CODE>
+, both detailed below.</P>
+<P>
+The document bounds of the content are typically equal to the bounds of the VisContent itself. The content's bounds are stored in the <CODE>
+VI_bounds</CODE>
+ field inherited from <CODE>
+VisClass</CODE>
+. When a content is managing layers or large documents, however, its bounds are set to zero. It then manages its document bounds within the layer objects and the GenView. When the document bounds change, a <CODE>
+MSG_VIS_CONTENT_SET_DOC_BOUNDS</CODE>
+ should be sent to the content to get it to notify all its layer children and the GenView of the new bounds. This message is shown at the end of this section.</P>
+<P>
+If the content is not a large document and is set up to follow the GenView's geometry (it has either or both of VCNA_SAME_WIDTH_AS_VIEW or VCNA_SAME_HEIGHT_AS_VIEW set), it will be affected by changes in the view's geometry. During geometry updates, the view will send it a <CODE>
+MSG_VIS_CONTENT_RECALC_SIZE_BASED_ON_VIEW</CODE>
+. This message sets the content's width and/or height and therefore affects its <CODE>
+VI_bounds</CODE>
+ field. This message is also shown at the end of this section.</P>
+<DL>
+<DT>
+<CODE>
+VCNI_docOrigin</DT><DD>
+</CODE>
+<A NAME="IX_VCNI_docOrigin">
+ </A>
+This field contains the current origin of the view window. The origin is the location of the view's upper left corner in the document (where the scrollers are). This field is of type <CODE>
+PointDWord</CODE>
+, which has the following structure:</DD>
+<PRE>typedef struct {
+    sdword   PD_x;    /* x coordinate of origin */
+    sdword   PD_y;    /* y coordinate of origin */
+} PointDWord;</PRE>
+<DT>
+</DT><DD>Normally, this field is set when the view is first opened or when the view is scrolled, scaled, or otherwise changed in document position. The view will send the message <CODE>
+MSG_META_CONTENT_VIEW_ORIGIN_CHANGED</CODE>
+ to indicate the origin is different from its current setting.</DD>
+<DT>
+<CODE>
+VCNI_scaleFactor</DT><DD>
+</CODE>
+<A NAME="IX_VCNI_scaleFactor">
+ </A>
+This field contains the current scale factor the view is displaying. Scaling is implemented almost entirely in the GenView object; some content objects, however, will want to react in a special way when the scale factor is changed. The scale factor is stored in a <CODE>
+PointWWFixed</CODE>
+ structure, as follows:</DD>
+<PRE>typedef struct {
+    WWFixed    PF_x;   /* horizontal scale factor */
+    WWFixed    PF_y;   /* vertical scale factor */
+} PointWWFixed;</PRE>
+<DT>
+</DT><DD>The <CODE>
+WWFixed</CODE>
+ structures that determine the scale factor in each dimension consist of two elements. This structure is shown below:</DD>
+<PRE>typedef struct {
+    word    WWF_frac;   /* fractional portion */
+    word    WWF_int;    /* integral portion */
+} WWFixed;</PRE>
+<DT>
+</DT><DD>The <CODE>
+VCNI_scaleFactor</CODE>
+ field in the content is never set directly by the application; instead, it is set with <CODE>
+MSG_META_CONTENT_VIEW_SCALE_FACTOR_CHANGED</CODE>
+ whenever the view's scale factor changes.</DD>
+</DL>
+<P>
+Messages that set these fields are discussed in <A HREF="VisContent_8.htm#94321"> Messages Received from the View</A>
+.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_CONTENT_SET_DOC_BOUNDS">
+ </A>
+MSG_VIS_CONTENT_SET_DOC_BOUNDS</H4>
+<PRE CLASS="syntax">void	MSG_VIS_CONTENT_SET_DOC_BOUNDS(@stack
+        sdword	bottom,
+        sdword	right,
+        sdword	top,
+        sdword	left);</PRE>
+<P>
+This message is used to set the document bounds of a content's large document. The content will send <CODE>
+MSG_GEN_VIEW_SET_DOC_BOUNDS</CODE>
+ to its view and <CODE>
+MSG_VIS_LAYER_SET_DOC_BOUNDS</CODE>
+ to each of its children with the new bounds. The recipient content <EM>
+must</EM>
+ have the flag <CODE>
+VCNA_LARGE_DOCUMENT_MODEL</CODE>
+ set in <CODE>
+VCNI_attrs</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any <EM>
+large</EM>
+ VisContent object--if the content is not using the large document model, an error will result.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+bottom, right, top, left<BR>
+</CODE>
+The new document bounds in 32-bit document coordinates.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+<P CLASS="refField">
+Warnings:	You may only send this message to a content that is using the large document model. All other contents will not handle this message but will result in a fatal error.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_CONTENT_RECALC_SIZE_BASED_ON_VIEW">
+ </A>
+MSG_VIS_CONTENT_RECALC_SIZE_BASED_ON_VIEW</H4>
+<PRE CLASS="syntax">SizeAsDWord MSG_VIS_CONTENT_RECALC_SIZE_BASED_ON_VIEW();</PRE>
+<P>
+This message causes the content to recalculate its size based on the view's geometry. It will try to set its width if it has VCNA_SAME_WIDTH_AS_VIEW set, and it will try to set its height if it has VCNA_SAME_HEIGHT_AS_VIEW set.</P>
+<P CLASS="refField">
+Source:	Unrestricted--typically sent by the view or by the content to itself during geometry updates.</P>
+<P CLASS="refField">
+Destination:	Any VisContent object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	A <CODE>
+SizeAsDWord</CODE>
+ value indicating the new size of the content. Use the macros DWORD_HEIGHT and DWORD_WIDTH to extract the appropriate values.</P>
+<P CLASS="refField">
+Interception:	Unlikely<A NAME="marker=314574">
+ </A>
+.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VisContent_1.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VisContent_3.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1.2 Fields That Affect the View</A> 
+<!-- to next --> | <A HREF="VisContent_5.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">1.4 Fields That Affect Input Events</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

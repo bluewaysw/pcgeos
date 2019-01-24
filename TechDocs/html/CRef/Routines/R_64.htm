@@ -1,0 +1,249 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: R_64.htm,v 1.2 97/06/25 18:34:35 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE>GEOS C Routines: LMemGetChunkSize() ...</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+<DIV>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="R_63.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">LMemAlloc() ...</A> 
+<!-- to next --> | <A HREF="R_65.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">LMemReAlloc() ...</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</DIV>
+<DIV>
+<A NAME="IX_LMemGetChunkSize()">
+ </A>
+<H1 CLASS="refHeading">
+LMemGetChunkSize()</H1>
+<PRE CLASS="syntax">word	LMemGetChunkSize(
+        optr	chunk);					/* optr of subject chunk */</PRE>
+<P>
+This routine returns the size (in bytes) of a chunk in an LMem heap. Since LMem chunks are dword-aligned, the chunk's size may be slightly larger than the size specified when it was allocated. The routine is guaranteed not to compact or resize the heap; thus, all pointers within the block remain valid.</P>
+<P CLASS="refField"><STRONG>
+Be Sure To:</STRONG>	Lock the block on the global heap (unless it is fixed).</P>
+<P CLASS="refField"><STRONG>
+Include:</STRONG>	<STRONG CLASS="fileName">
+lmem.h</STRONG>
+ </P>
+<P CLASS="refField"><STRONG>
+See Also:</STRONG> <CODE><A HREF="../../CRef/Routines/R_64.htm#IX_LMemGetChunkSizeHandles()">LMemGetChunkSizeHandles()</A></CODE>.</P>
+</DIV>
+<DIV>
+<A NAME="IX_LMemGetChunkSizeHandles()">
+ </A>
+<H1 CLASS="refHeading">
+LMemGetChunkSizeHandles()</H1>
+<PRE CLASS="syntax">word	Routine(
+        MemHandle		mh,				/* Handle of LMem heap */
+        ChunkHandle		chunk);				/* Handle of chunk in question */</PRE>
+<P>
+This routine is just like <CODE>
+<A HREF="../../CRef/Routines/R_64.htm#IX_LMemGetChunkSize()">LMemGetChunkSize()</A></CODE>
+ above, except that the chunk is specified by its global and chunk handles (instead of by an optr).</P>
+<P CLASS="refField"><STRONG>
+Be Sure To:</STRONG>	Lock the block on the global heap (unless it is fixed).</P>
+<P CLASS="refField"><STRONG>
+Include:</STRONG>	<STRONG CLASS="fileName">
+lmem.h</STRONG>
+ </P>
+<P CLASS="refField"><STRONG>
+See Also:</STRONG> <CODE><A HREF="../../CRef/Routines/R_64.htm#IX_LMemGetChunkSize()">LMemGetChunkSize()</A></CODE>.</P>
+</DIV>
+<DIV>
+<A NAME="IX_LMemInitHeap()">
+ </A>
+<A NAME="IX_LMemType:with LMemInitHeap()">
+ </A>
+<A NAME="IX_LocalMemoryFlags">
+ </A>
+<A NAME="IX_LMF_&ldots;">
+ </A>
+<H1 CLASS="refHeading">
+LMemInitHeap()</H1>
+<PRE CLASS="syntax">void	LMemInitHeap(
+        MemHandle		mh,				/* Handle of (locked or fixed)
+						 * block which will contain heap 	*/</PRE>
+<PRE CLASS="syntax">        LMemType		type,				/* Type of heap to create */
+        LocalMemoryFlags		flags,				/* Record of LocalMemoryFlags */
+        word		lmemOffset,				/* Offset of first chunk in heap */
+        word		numHandles,				/* Size of starter handle table */
+        word		freeSpace);				/* Size of first free chunk 
+						 * created */</PRE>
+<P>
+This routine creates an LMem heap in a global memory block. The block must be locked or fixed in memory. The routine initializes the <CODE>
+LMemBlockHeader</CODE>
+, creates a handle table, allocates a single free chunk, and turns on the HF_LMEM flag for the block. The block will be reallocated if necessary to make room for the heap. The routine takes six arguments:</P>
+<DL>
+<DT>
+<CODE>
+mh</CODE>
+</DT><DD>The memory block's handle</DD>
+<DT>
+<CODE>
+type</CODE>
+</DT><DD>A member of the <CODE>
+LMemType </CODE>
+enumerated type, specifying the kind of block to create. For most applications, this will be LMEM_TYPE_GENERAL.</DD>
+<DT>
+<CODE>
+flags</CODE>
+</DT><DD>A record of <CODE>
+LocalMemoryFlags</CODE>
+, specifying certain properties of the heap. Most applications will pass a null record.</DD>
+<DT>
+<CODE>
+lmemOffset</CODE>
+</DT><DD>The offset within the block at which to start the heap. This must be larger than the size of the <CODE>
+LMemBlockHeader</CODE>
+ structure which begins every heap block. Any space between the <CODE>
+LMemBlockHeader</CODE>
+ and the heap is left untouched by all LMem routines. Usually you can just pass sizeof(<CODE>
+LMemBlockHeader</CODE>
+) as this argument, or sizeof(<CODE>
+ObjLMemBlockHeader</CODE>
+) for object blocks.</DD>
+<DT>
+<CODE>
+numHandles</CODE>
+</DT><DD>The number of entries to create in the block's chunk handle table. The chunk handle table will grow automatically when all entries have been used up. Applications should generally pass the constant STD_INIT_HANDLES; they should definitely pass a positive number.</DD>
+<DT>
+<CODE>
+freeSpace</CODE>
+</DT><DD>The amount of space to allocate to the first free chunk. Applications should generally pass the constant STD_INIT_HEAP; they should definitely pass a positive number.</DD>
+</DL>
+<P>
+To destroy an LMem heap, call <CODE>
+<A HREF="../../CRef/Routines/R_6c.htm#IX_MemFree()">MemFree()</A></CODE>
+ to free the block containing the heap.</P>
+<P CLASS="refField"><STRONG>
+Structures:</STRONG>	There are two special data types used by this routine: <CODE>
+LMemType</CODE>
+ and <CODE>
+LocalMemoryFlags</CODE>
+.</P>
+<P>
+LMem heaps are created for many different purposes. Some of these purposes require the heap to have special functionality. For this reason, you must pass a member of the <CODE>
+LMemType</CODE>
+ enumerated type to specify the kind of heap to create. The following types can be used; other types exist but should not be used with <CODE>
+LMemInitHeap()</CODE>
+.</P>
+<DL>
+<DT>
+LMEM_TYPE_GENERAL</DT><DD>
+Ordinary heap. Most application LMem heaps will be of this type.</DD>
+<DT>
+LMEM_TYPE_OBJ_BLOCK</DT><DD>
+The heap will contain object instance chunks.</DD>
+</DL>
+<P>
+When an LMem heap is created, you must pass a record of flags to <CODE>
+LMemInitHeap()</CODE>
+ to indicate how the heap should be treated. Most of the <CODE>
+LocalMemoryFlags</CODE>
+ are only passed by system routines; the flags available for this routine are: LMF_HAS_FLAGS, LMF_DETACHABLE, LMF_NO_ENLARGE, LMF_RETURN_ERRORS. The flags can be read by examining the <CODE>
+LMemBlockHeader</CODE>
+ structure at the beginning of the block. Ordinarily, general LMem heaps will have all flags cleared.</P>
+<P CLASS="refField"><STRONG>
+Tips and Tricks:</STRONG>	If you want a fixed data space after the header, declare a structure whose first element is an <CODE>
+LMemBlockHeader</CODE>
+ and whose other fields are for the data you will store in the fixed data space. Pass the size of this structure as the <EM>
+LMemOffset</EM>
+ argument. You can now access the fixed data area by using the fields of the structure.</P>
+<P CLASS="refField"><STRONG>
+Be Sure To:</STRONG>	Pass an offset at least as large as <CODE>
+sizeof(LMemBlockHeader)</CODE>
+. If you pass an offset that is too small, the results are undefined. Lock the block on the global heap before calling this routine (unless the block is fixed).</P>
+<P CLASS="refField"><STRONG>
+Warnings:</STRONG>	The block may be relocated, if its initial size is too small to accommodate the heap. This is true even for fixed blocks. If the flag LMF_NO_ENLARGE is set, the block will never be relocated; however, you must make sure it starts out large enough to accommodate the entire heap.</P>
+<P CLASS="refField"><STRONG>
+Include:</STRONG>	<STRONG CLASS="fileName">
+lmem.h</STRONG>
+ </P>
+<P CLASS="refField"><STRONG>
+See Also:</STRONG> <CODE><A HREF="../../CRef/Structs/S_25.htm#IX_LMemBlockHeader">LMemBlockHeader</A></CODE>,
+<CODE><A HREF="../../CRef/Structs/S_26.htm#IX_LMemType">LMemType</A></CODE>,
+<CODE><A HREF="../../CRef/Structs/S_26.htm#IX_LocalMemoryFlags">LocalMemoryFlags</A></CODE>,
+<CODE><A HREF="../../CRef/Routines/R_6b.htm#IX_MemAlloc()">MemAlloc()</A></CODE>,
+<CODE><A HREF="../../CRef/Routines/R_6b.htm#IX_MemAllocLMem()">MemAllocLMem()</A></CODE>,
+<CODE><A HREF="../../CRef/Routines/R_6c.htm#IX_MemFree()">MemFree()</A></CODE>,
+<CODE><A HREF="../../CRef/Routines/R_a1.htm#IX_VMAllocLMem()">VMAllocLMem()</A></CODE>.</P>
+</DIV>
+<DIV>
+<A NAME="IX_LMemInsertAt()">
+ </A>
+<H1 CLASS="refHeading">
+LMemInsertAt()</H1>
+<PRE CLASS="syntax">void	LMemInsertAt(
+        optr	chunk,				/* optr of chunk to resize */
+        word	insertOffset,				/* Offset within chunk of first byte
+					 * to be added */</PRE>
+<PRE CLASS="syntax">        word	insertCount);				/* # of bytes to add */</PRE>
+<P>
+This routine inserts space in the middle of a chunk and zero-initializes the new space. The first new byte will be at the specified offset within the chunk. </P>
+<P CLASS="refField"><STRONG>
+Be Sure To:</STRONG>	Lock the block on the global heap (unless it is fixed). Make sure the offset is within the specified chunk.</P>
+<P CLASS="refField"><STRONG>
+Warnings:</STRONG>	This routine may resize or compact the heap; thus, all pointers to data within the block are invalidated.</P>
+<P>
+You must pass an <CODE>
+insertOffset</CODE>
+ that is actually within the chunk; if the offset is out-of-bounds, results are undefined.</P>
+<P CLASS="refField"><STRONG>
+Include:</STRONG>	<STRONG CLASS="fileName">
+lmem.h</STRONG>
+ </P>
+<P CLASS="refField"><STRONG>
+See Also:</STRONG> <CODE><A HREF="../../CRef/Routines/R_65.htm#IX_LMemReAlloc()">LMemReAlloc()</A></CODE>,
+<CODE><A HREF="../../CRef/Routines/R_63.htm#IX_LMemDeleteAt()">LMemDeleteAt()</A></CODE>,
+<CODE><A HREF="../../CRef/Routines/R_64.htm#IX_LMemInsertAtHandles()">LMemInsertAtHandles()</A></CODE>.</P>
+</DIV>
+<DIV>
+<A NAME="IX_LMemInsertAtHandles()">
+ </A>
+<H1 CLASS="refHeading">
+LMemInsertAtHandles()</H1>
+<PRE CLASS="syntax">void	LMemInsertAtHandles(
+        MemHandle		mh,				/* Handle of LMem heap */
+        ChunkHandle		chunk,				/* Chunk to resize */
+        word		insertOffset,				/* Offset within chunk of first byte
+						 * to be added */</PRE>
+<PRE CLASS="syntax">        word		insertCount);				/* # of bytes to add */</PRE>
+<P>
+This routine is just like <CODE>
+<A HREF="../../CRef/Routines/R_64.htm#IX_LMemInsertAt()">LMemInsertAt()</A></CODE>
+ above, except that the chunk is specified by its global and chunk handles (instead of by an optr).</P>
+<P CLASS="refField"><STRONG>
+Be Sure To:</STRONG>	Lock the block on the global heap (unless it is fixed). Make sure the offset is within the specified chunk.</P>
+<P CLASS="refField"><STRONG>
+Warnings:</STRONG>	This routine may resize or compact the heap; thus, all pointers to data within the block are invalidated.</P>
+<P>
+You must pass an <CODE>
+insertOffset</CODE>
+ that is actually within the chunk; if the offset is out-of-bounds, results are undefined.</P>
+<P CLASS="refField"><STRONG>
+Include:</STRONG>	<STRONG CLASS="fileName">
+lmem.h</STRONG>
+ </P>
+</DIV>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="R_63.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">LMemAlloc() ...</A> 
+<!-- to next --> | <A HREF="R_65.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">LMemReAlloc() ...</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

@@ -1,0 +1,200 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Windows_8.htm,v 1.1 97/06/02 16:17:29 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Using GenDisplayClass Objects</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Window Objects</A>: 3.3 <A HREF="Windows_5.htm">Using Multiple Displays</A>: 
+Using GenDisplayClass Objects</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Windows_5.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Windows_7.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.2 GenDisplayControl</A> 
+<!-- to next --> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+All GenDisplay objects must be children of a GenDisplayGroup object. GenDisplay objects can be created in several ways: an application can declare them in its code; it can instantiate them at run-time and make them children of the GenDisplayGroup; or, if the application uses the Document Control objects, it can have the Document Control create a new display automatically whenever a document is opened. (For details about using a Document Control to create GenDisplay objects, see <A HREF="../../Files/Documents/index.htm">the Documents Objects chapter</A>.)</P>
+<H2 CLASS="HeadingC">
+<A NAME="98120">
+ </A>
+Closing GenDisplays</H2>
+<PRE>MSG_GEN_DISPLAY_CLOSE</PRE>
+<P>
+Most specific UIs provide a way for the user to close windows. For example, OSF/Motif lets a user close a window by double-clicking the control button. When the user uses the specific UI's close mechanism, the Display or Primary is sent MSG_GEN_DISPLAY_CLOSE. </P>
+<P>
+<CODE>
+GenDisplayClass</CODE>
+ does only one thing when it receives MSG_GEN_DISPLAY_CLOSE: it sends MSG_GEN_DOCUMENT_CLOSE to the document specified by GDI<CODE>
+_document</CODE>
+. The <CODE>
+GenDisplayClass</CODE>
+ handler for MSG_GEN_DISPLAY_CLOSE does not, in fact, destroy the display. If the display is linked to a GenDocument, the GenDocument will respond to MSG_GEN_DOCUMENT_CLOSE by closing the application and removing the GenDisplay. Otherwise, you will have to remove the GenDisplay yourself by writing a handler for MSG_GEN_DISPLAY_CLOSE.</P>
+<P>
+The <CODE>
+GenPrimaryClass</CODE>
+ handler for MSG_GEN_DISPLAY_CLOSE closes the application. If you want to add to or replace this behavior, you may have your Primary subclass this message.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_DISPLAY_CLOSE">
+ </A>
+MSG_GEN_DISPLAY_CLOSE</H4>
+<PRE CLASS="syntax">void	MSG_GEN_DISPLAY_CLOSE();</PRE>
+<P>
+This message is sent to a Display to close it. The system sends it when the user uses the specific UI's way of closing a window. The <CODE>
+GenDisplayClass</CODE>
+ handler does nothing but send a MSG_GEN_DOCUMENT_CLOSE to the Document object specified in GDI<CODE>
+_document</CODE>
+. The <CODE>
+GenPrimaryClass</CODE>
+ handler closes the application.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	GenDisplay.</P>
+<P CLASS="refField">
+Interception:	If the Display is not associated with a GenDocument, you will need to subclass this message for it to have any effect at all. If the display is associated with a GenDocument object, you should probably subclass your Document object's <CODE>
+MSG_GEN_DOCUMENT_CLOSE</CODE>
+ instead. Primary objects may subclass this message if they want to alter or replace the default behavior (of closing the application).</P>
+
+
+
+<H2 CLASS="HeadingC">
+Menu Bar PopOuts</H2>
+<PRE>ATTR_GEN_DISPLAY_MENU_BAR_POPPED_OUT</PRE>
+<P>
+Some objects contain the ability to &quot;pop out&quot; of their sub-group locations and become floating dialog boxes.The menu bar of a GenDisplay is one such GenInteraction. If the menu bar of a GenDisplay is currently in the &quot;popped-out&quot; state, it will contain the vardata entry ATTR_GEN_DISPLAY_MENU_BAR_POPPED_OUT.</P>
+
+
+<H2 CLASS="HeadingC">
+<A NAME="67217">
+ </A>
+Messages sent to GenDisplays</H2>
+<PRE>MSG_GEN_DISPLAY_UPDATE_FROM_DOCUMENT, MSG_GEN_DISPLAY_GET_DOCUMENT</PRE>
+<P>
+Many of the messages which can be sent to GenDisplay objects have already been discussed above in <A HREF="Windows_1.htm#43164"> A First Look at GenDisplay</A>
+. However, there are a few messages which are ordinarily sent to Displays but not to Primaries. These messages are discussed here.</P>
+<P>
+GenDisplay objects often work in close conjunction with the Document Control objects. It is common for every open document to have its own GenDisplay object as well as its own GenDocument. The two objects work in conjunction, sending messages back and forth to communicate. You can send or intercept these messages yourself to add functionality.</P>
+<P>
+When the document object changes in certain significant ways, the Display has to be brought into accord with it. For example, if the name of the file changes, the GenDisplay's moniker will have to be changed to reflect this. Whenever a significant change takes place, the Document Control objects send a MSG_GEN_DISPLAY_UPDATE_FROM_DOCUMENT to the appropriate Display. The Display then requests all necessary information from the GenDocument and makes any necessary changes to its own instance data. You can force this updating by sending the message directly to the Display. You can also subclass this message if you want to add special updating behavior; however, you should be sure to pass this message to the superclass' handler.</P>
+<P>
+You can find out which Document object is associated with a given Display by sending <CODE>
+MSG_GEN_DISPLAY_GET_DOCUMENT</CODE>
+ to the Display. The message will return an optr to the corresponding Document object.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_DISPLAY_UPDATE_FROM_DOCUMENT">
+ </A>
+MSG_GEN_DISPLAY_UPDATE_FROM_DOCUMENT</H4>
+<PRE CLASS="syntax">void	MSG_GEN_DISPLAY_UPDATE_FROM_DOCUMENT();</PRE>
+<P>
+This message instructs a GenDisplay to update its instance data from its associated GenDocument object (if any). This message is ordinarily sent by the Document Control objects.</P>
+<P CLASS="refField">
+Source:	Unrestricted--ordinarily sent only by Document Control objects.</P>
+<P CLASS="refField">
+Destination:	<CODE>
+GenDisplay.</CODE>
+</P>
+<P CLASS="refField">
+Interception:	Normally not intercepted. If you subclass this message to add special updating behavior, be sure to end with an <STRONG>@callsuper</STRONG>.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_DISPLAY_GET_DOCUMENT">
+ </A>
+MSG_GEN_DISPLAY_GET_DOCUMENT</H4>
+<PRE CLASS="syntax">optr	MSG_GEN_DISPLAY_GET_DOCUMENT();</PRE>
+<P>
+This message returns the optr of the GenDocument associated with a given GenDisplay. This is equal to the value of the GenDisplay's GDI<CODE>
+_document</CODE>
+ field.</P>
+<P CLASS="refField">
+Source:	Unrestricted--ordinarily sent only by Document Control objects.</P>
+<P CLASS="refField">
+Destination:	<CODE>
+GenDisplay.</CODE>
+</P>
+<P CLASS="refField">
+Interception:	Normally not intercepted. </P>
+
+
+
+<H2 CLASS="HeadingC">
+<A NAME="18187">
+ </A>
+Traveling Objects</H2>
+<PRE>ATTR_GEN_DISPLAY_TRAVELLING_OBJECTS</PRE>
+<P>
+<A NAME="IX_Traveling objects">
+ </A>
+If you use multiple GenDisplay objects, it is sometimes useful to set up a group of &quot;traveling objects.&quot; Traveling objects are children of whichever display is active. When a different GenDisplay is brought to the top, all traveling objects will be set &quot;not usable&quot; and removed from the Generic tree. They will then be added as children of the new top display and set &quot;usable.&quot; (Any children of the traveling objects will naturally move with them.) Traveling objects are most commonly Toolbox Interactions, but they can be any kind of generic object.</P>
+<P>
+Traveling objects can only be used under certain circumstances. Every display must belong to its own object block, and all of these object blocks must be copies of the same original. This is because the traveling objects are added as children to a specified chunk in whichever object block contains the new top display. If you want to use traveling objects, you should declare a special &quot;template&quot; object block which contains a GenDisplay and its children. Whenever you need to create a GenDisplay, you should duplicate this object block. The traveling objects should be in another resource altogether. If you use the Document Control objects to create displays, the objects will use this technique, duplicating an object block for each new display; this will let you use traveling objects.</P>
+<P>
+Every traveling object is indicated by a <CODE>
+TravelingObjectReference</CODE>
+ structure (see <A HREF="Windows_8.htm#58380"> TravelingObjectReference</A>
+). To attach traveling objects to the active display, create a chunk which contains a list of <CODE>
+TravelingObjectReference</CODE>
+ structures; this chunk must be in the same object block as the active display. Then set the Display's ATTR_GEN_DISPLAY_TRAVELING_OBJECTS to the ChunkHandle of the list. The list will automatically be moved to the block of the active display whenever the traveling objects are moved.</P>
+<P CLASS="figTitle">
+Code Display 4-5 <A NAME="58380">
+ </A>
+TravelingObjectReference</P>
+<PRE>typedef struct {
+    optr		TIR_travelingObject;			/* optr to traveling object whose
+					 * reference this is */</PRE>
+<PRE>    ChunkHandle		TIR_parent;			/* Chunk Handle of object in Display's
+					 * block that will be the parent of this
+					 * object */</PRE>
+<PRE>    word		TIR_compChildFlags;			/* CompChildFlags to use when
+					 * adding the traveling object */
+} TravelingObjectReference;</PRE>
+<P>
+<A NAME="IX_TravelingObjectReference">
+ </A>
+The TravelingObjectReference structure has the following three fields:</P>
+<DL>
+<DT>
+TIR<A NAME="IX_TIR_&ldots;">
+ </A>
+<CODE>
+_travelingObject</DT><DD>
+</CODE>
+This field is an optr to the traveling object whose reference this is.</DD>
+<DT>
+TIR<CODE>
+_parent</CODE>
+</DT><DD>This field holds the chunk handle of an object in the display block. When the traveling object is added to a display block, it will be made a child of the object whose chunk handle this is.</DD>
+<DT>
+TIR<CODE>
+_compChildFlags</DT><DD>
+</CODE>
+This is the set of <CODE>
+CompChildFlags</CODE>
+ which will be used when attaching this object to its new parent.</DD>
+
+</DL>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Windows_5.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Windows_7.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.2 GenDisplayControl</A> 
+<!-- to next --> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

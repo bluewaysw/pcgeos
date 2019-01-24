@@ -1,0 +1,337 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: GenView_10.htm,v 1.2 97/09/05 14:19:52 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Documents in a View</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">GenView</A>: 4.2 <A HREF="GenView_e.htm">Advanced Concepts and Uses</A>: 
+<A NAME="56401">
+ </A>
+Documents in a View</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GenView_e.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GenView_f.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.1 The Life of a View</A> 
+<!-- to next --> | <A HREF="GenView_11.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.3 Drawing the Document</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+The coordinate space is the graphics space owned by your geode for drawing. Your actual data may occupy any portion of it, but the view considers the entire space to be valid. However, you can constrain the view to a certain portion of the coordinate space--for example, if your data only fills 8.5 inches by 11 inches, you can instruct the view to scroll only in that 8.5 by 11 area (or any smaller or larger portion of it).</P>
+
+<H2 CLASS="HeadingC">
+Document Coordinates</H2>
+<P>
+Applications do all their drawing to a device-independent coordinate space. Document coordinates occur in real-world points (72 points per inch). The default graphics system is 8192 points square, with the origin in the middle. The maximum size of a default document is about 113.8 inches on a side. GEOS uses a &quot;large&quot; graphics space as well, represented by 32-bit coordinates that allow documents up to 940 miles on a side. The GenView's coordinates are all given in these 32-bit values to accommodate either the large or the default system.</P>
+<P>
+Your document's data may fill any or all of the coordinate space. Most small documents will have their upper-left corners at the origin and will occupy only a small portion of a 16-bit coordinate space.</P>
+
+
+<H2 CLASS="HeadingC">
+<A NAME="44652">
+ </A>
+Current Origin</H2>
+<PRE>GVI_origin, MSG_GEN_VIEW_SET_ORIGIN, MSG_GEN_VIEW_GET_ORIGIN, MSG_GEN_VIEW_SET_ORIGIN_LOW</PRE>
+<P>
+<A NAME="IX_GVI_origin">
+ </A>
+The GenView must know where in the coordinate space it is located. To do this, it maintains an origin--the upper left coordinates of the window's scrollers. That is, the origin is the upper-left position in the document. The origin is stored in the field <CODE>
+GVI_origin</CODE>
+, a <CODE>
+PointDWFixed</CODE>
+ structure containing two <CODE>
+DWFixed</CODE>
+ structures. The <CODE>
+PointDWFixed</CODE>
+ structure definition is shown below:</P>
+<PRE><A NAME="IX_PDF_&ldots;"> </A><A NAME="IX_PointDWFixed"> </A>typedef struct {
+	DWFixed		PDF_x;		/* x origin coord */
+	DWFixed		PDF_y;		/* y origin coord */
+} PointDWFixed;
+</PRE>
+
+<IMG SRC="GenView_10_origin.gif">
+
+<P>
+The view notifies its content each time the origin is changed with the message <CODE>
+MSG_META_CONTENT_VIEW_ORIGIN_CHANGED</CODE>
+. Typically, the view will also automatically scroll its window to the new origin when the origin changes. You can override this behavior, forcing the view not to scroll on origin changes, by setting the vardata attribute <CODE>
+ATTR_GEN_VIEW_DO_NOT_WIN_SCROLL</CODE>
+. This attribute, in effect, disconnects the scrollers from the visible position of the document. The notification message <CODE>
+MSG_META_CONTENT_VIEW_ORIGIN_CHANGED</CODE>
+ will still be sent to the content; the window will not scroll, however.</P>
+<P>
+The default origin of the view is (0,0), but this may be set in your Goc code as follows:</P>
+<PRE>GVI_origin = {
+    <EM>xPosition</EM>,			/* x coordinate of origin */
+    <EM>yPosition			</EM>/* y coordinate of origin */
+}</PRE>
+<P>
+You can also change the origin during execution either by causing the view to scroll or by sending a <CODE>
+MSG_GEN_VIEW_SET_ORIGIN</CODE>
+. To retrieve the view's current origin, use <CODE>
+MSG_GEN_VIEW_GET_ORIGIN</CODE>
+.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VIEW_SET_ORIGIN">
+ </A>
+MSG_GEN_VIEW_SET_ORIGIN</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VIEW_SET_ORIGIN(@stack
+        sdword	yOrigin,		/* y coordinate of new origin */
+        sdword	xOrigin);		/* x coordinate of new origin */</PRE>
+<P>
+This message changes the view's current origin, causing it to scroll immediately to the new location. The origin represents the upper-left corner of the view in the scrollable document space and is made up of two signed long integers. Each coordinate must be in document coordinates (points).</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenView object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+yOrigin</CODE>
+	The new Y coordinate of the origin.</P>
+<DL>
+<DT>
+<CODE>
+xOrigin</CODE>
+</DT><DD>The new X coordinate of the origin.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+<P CLASS="refField">
+See Also:	<CODE>
+MSG_GEN_VIEW_SCROLL</CODE>
+,<CODE>
+ MSG_GEN_VIEW_SCROLL_..., MSG_GEN_VIEW_MAKE_RECT_VISIBLE</CODE>
+</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VIEW_GET_ORIGIN">
+ </A>
+MSG_GEN_VIEW_GET_ORIGIN</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VIEW_GET_ORIGIN(
+        PointDWord *origin);</PRE>
+<P>
+This message returns a <CODE>
+PointDWord</CODE>
+ structure containing the current X and Y coordinates of the view's origin.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenView object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+origin</CODE>
+	A pointer to an empty <CODE>
+PointDWord</CODE>
+ structure.</P>
+<P CLASS="refField">
+Return:	The <CODE>
+origin</CODE>
+ pointer will point to a filled structure containing the X and Y coordinates of the current origin. This corresponds to the GenView's <CODE>
+GVI_origin</CODE>
+ field.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+<P CLASS="refField">
+See Also:	<CODE>
+MSG_GEN_VIEW_GET_DOC_BOUNDS</CODE>
+, <CODE>
+MSG_GEN_VIEW_GET_DOC_SIZE</CODE>
+</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_GEN_VIEW_SET_ORIGIN_LOW</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VIEW_SET_ORIGIN_LOW(@stack
+        sdword		yOrigin,
+        sdword		xOrigin);</PRE>
+<P>
+This low-level scroll message is just like <CODE>
+MSG_GEN_VIEW_SET_ORIGIN</CODE>
+ except that it will not propagate to linked views.</P>
+<P CLASS="refField">
+Source:	Unrestricted--usually encapsulated by <CODE>
+MSG_GEN_VIEW_SET_ORIGIN</CODE>
+ for later dispatch with <CODE>
+MSG_GEN_VIEW_SEND_TO_HLINK</CODE>
+ or <CODE>
+MSG_GEN_VIEW_SEND_TO_VLINK</CODE>
+ handler.</P>
+<P CLASS="refField">
+Destination:	Any GenView.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+yOrigin</CODE>
+	The new vertical origin of the GenView, in document coordinates. For no change, pass GVSOL_NO_CHANGE.</P>
+<DL>
+<DT>
+<CODE>
+xOrigin</CODE>
+</DT><DD>The new horizontal origin of the GenView, in document coordinates. For no change, pass GVSOL_NO_CHANGE.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+<P CLASS="refField">
+Structures:	GVSOL_NO_CHANGE is equal to 0x8000000.</P>
+
+
+
+<H2 CLASS="HeadingC">
+Document Bounds</H2>
+<PRE>GVI_docBounds, MSG_GEN_VIEW_SET_DOC_BOUNDS, MSG_GEN_VIEW_GET_DOC_BOUNDS</PRE>
+<P>
+Because most documents will not actually require the entire document space, the view has an instance data field that defines the view's scrollable boundaries. This field is a <CODE>
+RectDWord</CODE>
+ structure containing four signed dwords, each of which represents a specific boundary of the document. The <CODE>
+RectDWord</CODE>
+ structure is shown below:</P>
+<PRE><A NAME="IX_RD_&ldots;"> </A><A NAME="IX_RectDWord"> </A>typedef struct {
+	sdword		RD_left;		/* left bound */
+	sdword		RD_top;		/* top bound */
+	sdword		RD_right;		/* right bound */
+	sdword		RD_bottom;		/* bottom bound */
+} RectDword;</PRE>
+<P>
+<A NAME="IX_GVI_docBounds">
+ </A>
+The document bounds are stored in the view's <CODE>
+GVI_docBounds</CODE>
+ instance field. The defaults are shown in the following code; note that each of the values in the field must be in document coordinates.</P>
+<PRE>GVI_docBounds = {0, 0, 0, 0};					/* zero size */</PRE>
+<P>
+To change the scrollable document bounds at run-time, send the view a message <CODE>
+MSG_GEN_VIEW_SET_DOC_BOUNDS</CODE>
+. To retrieve the current document bounds, send <CODE>
+MSG_GEN_VIEW_GET_DOC_BOUNDS</CODE>
+.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VIEW_SET_DOC_BOUNDS">
+ </A>
+MSG_GEN_VIEW_SET_DOC_BOUNDS</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VIEW_SET_DOC_BOUNDS(@stack
+        sdword	bottom,		/* new bottom document bound */
+        sdword	right,		/* new right document bound */
+        sdword	top,		/* new top document bound */
+        sdword	left);		/* new left document bound */</PRE>
+<P>
+This message sets the view's scrollable document bounds to those passed. Each of the four parameters must be given in document coordinates (points), and all are signed long integers. If the new document bounds cause the view to show invalid coordinates, the view will scroll until it is showing valid document space.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenView object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+bottom</CODE>
+, <CODE>
+right</CODE>
+, <CODE>
+top</CODE>
+, <CODE>
+left<BR>
+</CODE>
+As described in the header above.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VIEW_GET_DOC_BOUNDS">
+ </A>
+MSG_GEN_VIEW_GET_DOC_BOUNDS</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VIEW_GET_DOC_BOUNDS(
+        RectDWord *bounds);</PRE>
+<P>
+This message returns the current boundaries of the view's scrollable document space.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenView object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+bounds</CODE>
+	A pointer to an empty <CODE>
+RectDWord</CODE>
+ structure, to be filled in by the method.</P>
+<P CLASS="refField">
+Return:	The structure pointed to by <CODE>
+bounds</CODE>
+ will be filled with the current scrollable document boundaries of the GenView, as stored in <CODE>
+GVI_docBounds</CODE>
+.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+
+<H2 CLASS="HeadingC">
+Current Coordinates in the View</H2>
+<PRE>MSG_GEN_VIEW_GET_VISIBLE_RECT</PRE>
+<P>
+To learn what visible rectangle the view is currently displaying, send it a <CODE>
+MSG_GEN_VIEW_GET_VISIBLE_RECT</CODE>
+. This message will return the current visible rectangle in document coordinates (a <CODE>
+RectDWord</CODE>
+ structure). If the view is not on the screen, the message will return a structure full of zeros.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VIEW_GET_VISIBLE_RECT">
+ </A>
+MSG_GEN_VIEW_GET_VISIBLE_RECT</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VIEW_GET_VISIBLE_RECT(
+        RectDWord *rect);</PRE>
+<P>
+<A NAME="IX_Clipping:finding visible part of view">
+ </A>
+This message returns the rectangle currently visible in the view, in document coordinates.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenView object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+rect</CODE>
+	A pointer to an empty <CODE>
+RectDWord</CODE>
+ structure to be filled in by the method.</P>
+<P CLASS="refField">
+Return:	The structure pointed to by rect will contain the bounds of the visible portion of the document. If the view window is not visible on the screen, the structure will contain all zeros.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+<P CLASS="refField">
+Tips:	If your document is particularly complex, you might want to call this message and draw only the visible portions upon receiving either <CODE>
+MSG_META_EXPOSED</CODE>
+ or <CODE>
+MSG_VIS_DRAW</CODE>
+.</P>
+
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GenView_e.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GenView_f.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.1 The Life of a View</A> 
+<!-- to next --> | <A HREF="GenView_11.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.3 Drawing the Document</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

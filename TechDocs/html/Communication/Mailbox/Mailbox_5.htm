@@ -1,0 +1,125 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Mailbox_5.htm,v 1.1 97/06/02 14:10:31 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Mailbox Structures &amp; Utilities</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="sectionTitle">
+<A HREF="index.htm">The Mailbox Library</A>: 3 
+Mailbox Structures &amp; Utilities</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Mailbox_4.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2 Inbox/Outbox Structure</A> 
+<!-- to next --> | <A HREF="Mailbox_6.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4 Data Formats</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>MailboxGetVMFile(), MailboxMessageFlags, MailboxMessagePriority, MailboxDeliveryVerb</PRE>
+<P>
+There are a few data types that are used at various parts of the message-transmission and reception process. There are also a few concepts related to these types that need to be discussed first.</P>
+<P>
+First of all, we need to distinguish between two basic data types: <EM>
+data format types</EM>
+, and <EM>
+data storage types</EM>
+.</P>
+<P>
+Every message has two data tokens associated with it. One is the data format type, and the other is the data storage type. The data storage type describes the gross structure of the message data. Every data driver can accept one data storage type. For example, the GEOS system includes data drivers for messages whose bodies are stored in VM trees, and messages whose bodies are stored in byte-files. The data driver is not concerned with the message on a lower level. If you send a message in a VM tree, the data drivers at both machines will make sure that the message arives in a valid VM tree (which may mean fixing up the VM handles that make up the links in the tree), but they won't care about the data inside the blocks of the tree.</P>
+<P>
+On a higherlevel, every message has its own data format type. This type describes how the data is actually stored in the underlying structure. For example, a message might be stored as a GString in a VM chain. In this case, the message's data storage type would be &quot;VM tree&quot; (a VM chain is a special kind of VM tree), and the data format type would be &quot;VM Gstring&quot;.</P>
+<P>
+Every data format type implies a particular data storage type; all messages with data format type <EM>
+a</EM>
+ will necessarily use data storage type <EM>
+x</EM>
+. The converse, however, is not necessarily true. For example, all messages with data format type &quot;VM GString&quot; have data storage type &quot;VM tree&quot;; as do all messages with data format &quot;VM composite&quot;.</P>
+<P>
+When an application passes a message to a data driver, it may designate the message body as either &quot;volatile&quot; or &quot;non-volatile&quot;. If the data is marked &quot;volatile&quot;, the application may alter or destroy the data as soon as it has registered the message. That is, when the application registers the message, the appropriate Data Driver copies all the message's information out of the passed message before execution returns to the application. You should pass &quot;volatile&quot; if, for example, you are passing a pointer to a VM file used by the application.</P>
+<P>
+If you designate the data as <EM>
+non-volatile</EM>
+, you are not allowed to alter or delete the data in the message. If you ask it to, the data driver will take care of freeing the storage used for the message when it is done with it. Every data driver has its own conventions about what applications should do with non-volatile messages after sending them.</P>
+<P>
+For example, if you send a message through the VM tree data driver, you should write non-volatile messages to a special VM file created by the routine <CODE>
+MailboxGetVMFile()</CODE>
+. This routine is passed a single argument, the number of blocks you expect to allocate in the VM block. The routine returns the handle of a VM file. You can write the message in this file, and register the message (designated &quot;non-volatile&quot;). The data driver will then take care of freeing the file's storage when the message has been safely delivered.</P>
+<P>
+Each message is associated with a set of <CODE>
+MailboxMessageFlags</CODE>
+. These are a byte-length record. This record has the following flags:</P>
+<DL>
+<DT>
+MMF_BODY_DATA_VOLATILE</DT><DD>
+As discussed above, this flag indicates that the data in the message must be copied immediately, as it is subject to change or freeing without further notice.</DD>
+<DT>
+MMF_SEND_WITHOUT_QUERY</DT><DD>
+This flag indicates that the message should be sent without asking the user for permission.</DD>
+<DT>
+MMF_PRIORITY</DT><DD>
+This is a member of the <CODE>
+MailboxMessagePriority</CODE>
+ enumerated type, discussed below.</DD>
+<DT>
+MMF_VERB</DT><DD>This is a member of the <CODE>
+MailboxDeliveryVerb</CODE>
+ enumerated type, discussed below.</DD>
+</DL>
+<P>
+Every message can be assigned a priority. This priority is represented by a member of the <CODE>
+MailboxMessagePriority</CODE>
+ enumerated type. The priority affects how the Mailbox library will handle the message at both the sending and the receiving end. This type has the following values:</P>
+<DL>
+<DT>
+MMF_EMERGENCY</DT><DD>
+The recipient user should be notified immediately, and not allowed to do anything before he or she receives the message.</DD>
+<DT>
+MMP_URGENT</DT><DD>
+The user should be notified immediately, and told there is an urgent message awaiting. The user does not, however, have to read the message right away.</DD>
+<DT>
+MMP_FIRST_CLASS</DT><DD>
+The user should be notified on the next periodic check of the Inbox. There are no other constraints on when the user should read the message.</DD>
+<DT>
+MMP_THIRD_CLASS</DT><DD>
+The Inbox should not notify the user of the message's arrival; instead, the appropriate application should notify the user, if appropriate. For outgoing messages, the user must explicitly request that the message be sent; it will not happen automatically once a connection is made.</DD>
+</DL>
+<P>
+Every message has a &quot;delivery verb&quot; associated with it. This is useful in notifying the user of the message's arrival. Each delivery verb is represented by a member of the <CODE>
+MailboxDeliveryVerb</CODE>
+ enumerated type. This type has the following members:</P>
+<DL>
+<DT>
+MDV_DELIVER</DT><DD>
+This is the default verb.</DD>
+<DT>
+MDV_VIEW</DT><DD>The message is some sort of image that can be viewed, e.g. a received fax.</DD>
+<DT>
+MDV_PLAY</DT><DD>The message is some kind of continuous message with a definite starting point and ending point, e.g. a voice recording or MPEG movie.</DD>
+<DT>
+MDV_ACCEPT</DT><DD>
+Another generic verb.</DD>
+<DT>
+MDV_READ</DT><DD>The message is mainly textual, and can be read (e.g. an old-fashioned EMail message).</DD>
+<DT>
+MDV_FILE</DT><DD>The message is, or contains, one or more units that should be stored in a document that can contain many such units (e.g. an address-book card).</DD>
+</DL>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Mailbox_4.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2 Inbox/Outbox Structure</A> 
+<!-- to next --> | <A HREF="Mailbox_6.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4 Data Formats</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

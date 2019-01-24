@@ -1,0 +1,570 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Text_28.htm,v 1.1 97/06/02 16:43:46 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Search and Replace and Spell-Checking</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The Text Objects</A>: 7.3 <A HREF="Text_25.htm">The Controllers</A>: 
+<A NAME="85133">
+ </A>
+Search and Replace and Spell-Checking</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Text_25.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Text_27.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">7.2 Paragraph Attribute Controllers</A> 
+<!-- to next --> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>TextSearchInString(), TextSearchInHugeArray(), SearchOptions, WildCard</PRE>
+<P>
+Text searches are not specifically part of <CODE>
+VisTextClass</CODE>
+, but are commonly used on text objects, and they are discussed here for that reason.</P>
+<P>
+<CODE>
+TextSearchInString()</CODE>
+<A NAME="IX_TextSearchInString()">
+ </A>
+ searches in a single text chunk for a passed text string. If a match is found, a pointer to that match (and the length of the match) are returned in buffers. <A NAME="IX_TextSearchInHugeArray()">
+ </A>
+<CODE>
+TextSearchInHugeArray()</CODE>
+ performs the same searching operations, but can return the segment and offset of a found match within a huge array.</P>
+<P>
+<A NAME="IX_SearchOptions">
+ </A>
+The following <CODE>
+SearchOptions</CODE>
+ may affect the search procedure:</P>
+<DL>
+<DT>
+SO_NO_WILDCARDS</DT><DD>
+If set, the search mechanism ignores any passed <CODE>
+WildCard</CODE>
+ values and treats them as the control character values (CTRL_P, CTRL_Q and CTRL_R) which they overlap.</DD>
+<DT>
+SO_IGNORE_SOFT_HYPHENS</DT><DD>
+If set, soft hyphens in the &quot;searched-in&quot; text are treated as if they do not exist, therefore allowing the text &quot;hyphenation&quot; to match &quot;hyphen-ation&quot; in the destination text. If the match string contains soft hyphens, do not set this flag as strings will never match.</DD>
+<DT>
+SO_BACKWARD_SEARCH</DT><DD>
+If set, the search will propagate backwards.</DD>
+<DT>
+SO_IGNORE_CASE</DT><DD>
+If set, case will be ignored in the search criteria.</DD>
+<DT>
+SO_PARTIAL_WORD</DT><DD>
+If set, partial words will be matched.</DD>
+<DT>
+SO_PRESERVE_CASE_OF_DOCUMENT_STRING</DT><DD>
+If set, the case of the match string will be altered to preserve the case of the before </DD>
+</DL>
+<P>
+<A NAME="IX_WildCard">
+ </A>
+<A NAME="IX_WC_&ldots;">
+ </A>
+Both routines may take wild cards (type <CODE>
+WildCard</CODE>
+) in the place of any character. These wildcards tell the search mechanism to accept any character in the allotted space. Passing WC_MATCH_MULTIPLE_CHAR instructs the search mechanism to accept any number of random characters in that place in the search string. The values of <CODE>
+WildCard</CODE>
+ are:</P>
+<DL>
+<DT>
+	WC_MATCH_SINGLE_CHAR</DT><DD>
+WC_MATCH_MULTIPLE_CHAR<BR>
+WC_MATCH_WHITESPACE_CHAR</DD>
+</DL>
+<P>
+You can set higher-level features of your text objects with the <CODE>
+SearchReplaceControlClass</CODE>
+ and <CODE>
+SpellControlClass</CODE>
+ controllers. These controllers allow spell-checking and search and replace. These two controllers are designed to interact with each other and use common messages.</P>
+
+<H3 CLASS="HeadingD">
+SearchReplaceControlClass</H3>
+<P>
+<A NAME="IX_SearchReplaceControlClass">
+ </A>
+This controller allows the use of the text object's built-in search and replace features. The controller must be placed on the GAGCNLT_SELF_LOAD_OPTIONS Application GCN list. This controller sends out the following messages to its GCI_<CODE>
+output</CODE>
+, which may be intercepted to provide custom behavior:</P>
+<DL>
+<DT>
+	MSG_SEARCH</DT><DD>
+MSG_REPLACE_CURRENT<BR>
+MSG_REPLACE_ALL_OCCURENCES<BR>
+MSG_REPLACE_ALL_OCCURENCES_IN_SELECTION<BR>
+MSG_META_GET_OBJECT_FOR_SEARCH_SPELL<BR>
+MSG_META_DISPLAY_OBJECT_FOR_SEARCH_SPELL</DD>
+</DL>
+<P>
+Because many of these messages are shared by the SpellControlClass, they are described in <A HREF="Text_28.htm#91425"> Shared Functionality</A>
+.</P>
+<P>
+The Search &amp; Replace messages make use of a <CODE>
+SearchReplaceStruct</CODE>
+. This structure is followed by text string(s) that represent the strings to search (and replace if that is the case). These strings may contain <CODE>
+WildCard</CODE>
+ values (unless SO_NO_WILDCARDS is set in <EM>
+params</EM>
+).The <CODE>
+SearchReplaceStruct</CODE>
+ is shown below:</P>
+<PRE>typedef struct {
+	word		searchSize;
+	word		replaceSize;
+	byte		params;
+	optr		replyObject;
+	Message		replyMsg;
+} SearchReplaceStruct;</PRE>
+<P>
+<EM>
+searchSize</EM>
+ stores the number of characters in the search string, including the null terminator.</P>
+<P>
+<EM>
+replaceSize</EM>
+ stores the number of characters in the replace string (if present), including the null terminator.</P>
+<P>
+<EM>
+params</EM>
+ stores the <CODE>
+SearchOptions</CODE>
+ in use for this operation.</P>
+<P>
+<EM>
+replyObject</EM>
+ stores the optr of the object to send the <EM>
+replyMsg</EM>
+ to if the string is not found.</P>
+<P>
+<EM>
+replyMsg</EM>
+ stores the message sent to the <EM>
+replyObject</EM>
+ above.</P>
+<P>
+The block containing this <CODE>
+SearchReplaceStruct</CODE>
+ will contain either one null-terminated string (if the operation is just a simple search operation) or a null-terminated search string followed by a null-terminated replace string (if the operation is a search &amp; replace).</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_SEARCH">
+ </A>
+MSG_SEARCH</H4>
+<PRE CLASS="syntax">@importMessage MetaSearchSpellMessages, void MSG_SEARCH(
+        MemHandle		searchInfo);</PRE>
+<P>
+This message is sent by the SearchReplace controller when an object is starting a search operation. You may intercept this message to find out the nature and specifics of the search.</P>
+<P CLASS="refField">
+Source:	Search controller.</P>
+<P CLASS="refField">
+Destination:	GCI_<CODE>
+output</CODE>
+ of the search controller (usually a text object).</P>
+<P CLASS="refField">
+Parameters:	<EM>
+searchInfo</EM>
+	Handle of block containing the <CODE>
+SearchReplaceStruct</CODE>
+. The search string immediately follows this structure in the passed block. This block should be freed by the message handler.</P>
+<P CLASS="refField">
+Interception:	Intercept to find out the nature of the search and replace operation.</P>
+<P>
+The features and tools of this controller are shown in <A HREF="Text_28.htm#81800"> SearchReplaceControlClass Features</A>
+.</P>
+<P CLASS="figTitle">
+Code Display 10-40 <A NAME="81800">
+ </A>
+SearchReplaceControlClass Features</P>
+<PRE><A NAME="IX_SRCF_&ldots;"> </A><A NAME="IX_SRCFeatures"> </A>typedef WordFlags SRCFeatures;
+#define SRCF_CLOSE					0x200
+#define SRCF_FIND_NEXT					0x100
+#define SRCF_FIND_PREV					0x80
+#define SRCF_REPLACE_CURRENT					0x40
+#define SRCF_REPLACE_ALL_IN_SELECTION					0x20
+#define SRCF_REPLACE_ALL					0x10
+#define SRCF_PARTIAL_WORDS					0x08
+#define SRCF_IGNORE_CASE					0x04
+#define SRCF_WILDCARDS					0x02
+#define SRCF_SPECIAL_CHARS					0x01</PRE>
+<PRE><A NAME="IX_SRCTF_SEARCH_REPLACE"> </A><A NAME="IX_SRCToolboxFeatures"> </A>typedef WordFlags SRCToolboxFeatures;
+#define SRCTF_SEARCH_REPLACE					0x01</PRE>
+<PRE>#define <A NAME="IX_SRC_DEFAULT_FEATURES"> </A>SRC_DEFAULT_FEATURES				(SRCF_FIND_NEXT | SRCF_FIND_PREV |
+				 SRCF_REPLACE_CURRENT | SRCF_REPLACE_ALL |
+				 SRCF_PARTIAL_WORDS | SRCF_IGNORE_CASE |
+				 SRCF_WILDCARDS | SRCF_SPECIAL_CHARS | 
+				 SRCF_REPLACE_ALL_IN_SELECTION | SRCF_CLOSE)
+#define <A NAME="IX_SRC_DEFAULT_TOOLBOX_FEATURES"> </A>SRC_DEFAULT_TOOLBOX_FEATURES (SRCTF_SEARCH_REPLACE)</PRE>
+
+
+
+<H3 CLASS="HeadingD">
+SpellControlClass</H3>
+<P>
+<A NAME="IX_SpellControlClass">
+ </A>
+This controller allows you to include the advanced spelling-checker features of the text object. The controller must be placed on the GAGCNLT_SELF_LOAD_OPTIONS Application GCN list. The <CODE>
+SpellControlClass</CODE>
+ controller defaults to a state of not enabled; it should be set GS_ENABLED before use. </P>
+<P>
+If the controller will affect a text object within a document object, the SpellControl should be added to the GenDocumentControlClass object's GDCI_<CODE>
+enableDisableList</CODE>
+. This will ensure that the spell controller is automatically enabled when text appears within the document.</P>
+<P>
+This controller sends out the following messages, which may be intercepted to provide custom behavior:</P>
+<DL>
+<DT>
+	MSG_SPELL_CHECK</DT><DD>
+MSG_REPLACE_CURRENT<BR>
+MSG_REPLACE_ALL_OCCURENCES<BR>
+MSG_META_GET_CONTEXT<BR>
+MSG_META_CONTEXT<BR>
+MSG_META_GET_OBJECT_FOR_SEARCH_SPELL<BR>
+MSG_META_DISPLAY_OBJECT_FOR_SEARCH_SPELL</DD>
+
+</DL>
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_SPELL_CHECK">
+ </A>
+MSG_SPELL_CHECK</H4>
+<PRE CLASS="syntax">@importMessage MetaSearchSpellMessages, void MSG_SPELL_CHECK(@stack
+        optr		replyObj,
+        dword		numCharsToCheck,
+        SpellCheckOptions		options,
+        MemHandle		ICbuff);</PRE>
+<P>
+This message is sent by the Spell controller to continue spell checking from the current position in the document.</P>
+<P CLASS="refField">
+Source:	Spell controller.</P>
+<P CLASS="refField">
+Destination:	GCI_<CODE>
+output</CODE>
+ of the spell controller.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+replyObj</EM>
+	Object to send MSG_SPELL_CHECK_COMPLETED.</P>
+<DL>
+<DT>
+<EM>
+numCharsToCheck</DT><DD>
+</EM>
+Number of characters to check (if <EM>
+options</EM>
+ has SCO_CHECK_NUM_CHARS set).</DD>
+<DT>
+<EM>
+options</EM>
+</DT><DD><CODE>
+SpellCheckOptions</CODE>
+ in use for this operation.</DD>
+<DT>
+<CODE>
+IC</CODE>
+<EM>
+buff</EM>
+</DT><DD>Handle of buffer to pass spell check library.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	Intercept to find out the nature of the spell checking operation.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_GET_CONTEXT">
+ </A>
+MSG_META_GET_CONTEXT</H4>
+<PRE CLASS="syntax">@importMessage MetaSearchSpellMessages, void MSG_META_GET_CONTEXT(@stack
+        dword		position,
+        ContextLocation		location,
+        word		numCharsToGet,
+        optr		replyObj);</PRE>
+<P>
+This message is sent by the Spell controller to find out the current context of the text object. Other objects may also send this message to the text object. The text object will return MSG_META_CONTEXT to the requestor.</P>
+<P CLASS="refField">
+Source:	The Spell controller. (Other objects may want to send this to retrieve the text context displayed in the spell box.)</P>
+<P CLASS="refField">
+Destination:	GCI_<CODE>
+output</CODE>
+ of the Spell controller (usually a text object).</P>
+<P CLASS="refField">
+Parameters:	<EM>
+position</EM>
+	Position of the context. The context returned depends on this value and the <CODE>
+ContextLocation</CODE>
+ passed in <EM>
+location</EM>
+.</P>
+<DL>
+<DT>
+<EM>
+location</EM>
+</DT><DD><CODE>
+ContextLocation</CODE>
+. This may be one of the following values:</DD>
+<DT>
+	CL_STARTING_AT_POSITION</DT><DD>
+CL_ENDING_AT_POSITION<BR>
+CL_CENTERED_AROUND_POSITION<BR>
+CL_CENTERED_AROUND_SELECTION<BR>
+CL_CENTERED_AROUND_SELECTION_START<BR>
+CL_SELECTED_WORD</DD>
+<DT>
+<EM>
+numCharsToGet</EM>
+</DT><DD>Maximum number of characters to return.</DD>
+<DT>
+<EM>
+replyObj</EM>
+</DT><DD>Optr of the object to reply to via MSG_META_CONTEXT.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	You may intercept to alter the nature of the context request.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_CONTEXT">
+ </A>
+MSG_META_CONTEXT</H4>
+<PRE CLASS="syntax">@importMessage MetaSearchSpellMessages, void MSG_META_CONTEXT(
+        MemHandle		data);</PRE>
+<P>
+This message returns the current context to the SpellControl object.</P>
+<P CLASS="refField">
+Source:	A text object receiving MSG_META_GET_CONTEXT.</P>
+<P CLASS="refField">
+Destination:	The object that sent the request.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+data</EM>
+	<CODE>
+ContextData</CODE>
+ structure storing information on the context, and the null-terminated context string.</P>
+<P CLASS="refField">
+Structures:	</P>
+<PRE>typedef struct {
+	optr			CD_object;
+	dword			CD_numChars;
+	dword			CD_startPos;
+	VisTextRange			CD_selection;
+} ContextData;</PRE>
+<P>
+CD_<CODE>
+object</CODE>
+ stores the optr of the object that the context is coming from.</P>
+<P>
+CD_<CODE>
+numChars</CODE>
+ stores the number of characters in the text object.</P>
+<P>
+CD_<CODE>
+range</CODE>
+ stores the range of characters that this context represents within the text object.</P>
+<P>
+CD_<CODE>
+selection</CODE>
+ stores the range of characters that represent the current text selection.</P>
+<P>
+The null-terminated context data follows this structure.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+<P>
+Its feature and tool definitions are shown in <A HREF="Text_28.htm#32174"> SpellControlClass</A>
+. </P>
+<P CLASS="figTitle">
+Code Display 10-41 <A NAME="32174">
+ </A>
+SpellControlClass</P>
+<PRE><A NAME="IX_SF_SPELL (SpellFeatures)"> </A><A NAME="IX_SpellFeatures"> </A>typedef WordFlags SpellFeatures;
+#define SF_CLOSE				0x2000
+#define SF_CONTEXT				0x1000
+#define SF_SIMPLE_MODAL_BOX				0x0800
+#define SF_SUGGESTIONS				0x0400
+#define SF_CHECK_ALL				0x0200
+#define SF_CHECK_TO_END				0x0100
+#define SF_CHECK_SELECTION				0x0080
+#define SF_SKIP				0x0040
+#define SF_SKIP_ALL				0x0020
+#define SF_REPLACE_CURRENT				0x0010
+#define SF_REPLACE_ALL				0x0008
+#define SF_ADD_TO_USER_DICTIONARY				0x0004
+#define SF_EDIT_USER_DICTIONARY				0x0002
+#define SF_STATUS				0x0001</PRE>
+<PRE><A NAME="IX_STF_SPELL"> </A><A NAME="IX_SpellToolboxFeatures"> </A>typedef WordFlags SpellToolboxFeatures;
+#define STF_SPELL				0x01</PRE>
+<PRE>#define <A NAME="IX_SC_DEFAULT_FEATURES"> </A>SC_DEFAULT_FEATURES					(SF_STATUS | SF_EDIT_USER_DICTIONARY | 
+		SF_ADD_TO_USER_DICTIONARY | SF_REPLACE_ALL | SF_REPLACE_CURRENT |
+		SF_SKIP_ALL | SF_SKIP | SF_CHECK_SELECTION | SF_CHECK_TO_END |
+		SF_SUGGESTIONS | SF_CLOSE | SF_CONTEXT)
+#define <A NAME="IX_SC_DEFAULT_TOOLBOX_FEATURES"> </A>SC_DEFAULT_TOOLBOX_FEATURES					STF_SPELL</PRE>
+
+
+
+<H3 CLASS="HeadingD">
+<A NAME="91425">
+ </A>
+Shared Functionality</H3>
+<P>
+The SearchReplace and Spell controllers share a common range of messages (<CODE>
+MetaSearchSpellMessages</CODE>
+) imported from <CODE>
+MetaClass</CODE>
+. (The messages MSG_SEARCH and MSG_SPELL_CHECK are specific to their respective controllers and were described earlier.) These messages common to both controllers are listed and described here.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_REPLACE_CURRENT">
+ </A>
+MSG_REPLACE_CURRENT</H4>
+<PRE CLASS="syntax">@importMessage MetaSearchSpellMessages, void MSG_REPLACE_CURRENT(
+        MemHandle		replaceInfo);</PRE>
+<P>
+This message is sent by the SearchReplace controller when an object is starting a search operation that should replace the found match with the passed replacement string. This message involves a single replacement operation. To perform a replace-all operation, use MSG_REPLACE_ALL_OCCURENCES.</P>
+<P CLASS="refField">
+Source:	Search controller.</P>
+<P CLASS="refField">
+Destination:	GCI_<CODE>
+output</CODE>
+ of the search controller (usually a text object).</P>
+<P CLASS="refField">
+Parameters:	<EM>
+replaceInfo</EM>
+	Handle of block containing the <CODE>
+SearchReplaceStruct</CODE>
+. The null-terminated search string immediately follows this structure. The null-terminated replace string follows that string. This block should be freed by the message handler.</P>
+<P CLASS="refField">
+Interception:	Intercept to find out the nature of the replacement operation.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_REPLACE_ALL_OCCURRENCES">
+ </A>
+MSG_REPLACE_ALL_OCCURRENCES</H4>
+<PRE CLASS="syntax">@importMessage MetaSearchSpellMessages, void MSG_REPLACE_ALL_OCCURRENCES(
+        MemHandle		replaceInfo,
+        Boolean		replaceFromBeginning);</PRE>
+<P>
+This message is sent by the SearchReplace controller when an object is starting a search operation that should replace all found matches (in the search string) with the passed replacement string. </P>
+<P CLASS="refField">
+Source:	Search controller.</P>
+<P CLASS="refField">
+Destination:	GCI_<CODE>
+output</CODE>
+ of the search controller (usually a text object).</P>
+<P CLASS="refField">
+Parameters:	<EM>
+replaceInfo</EM>
+	Handle of block containing the <CODE>
+SearchReplaceStruct</CODE>
+. The null-terminated search string immediately follows this structure. The null-terminated replace string follows that string. This block should be freed by the message handler.</P>
+<DL>
+<DT>
+<EM>
+replaceFromBeginning</DT><DD>
+</EM>
+Non-zero if the replace-all operation should proceed from the beginning of the document; normally, the replace-all operation begins after the current position.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	Intercept to find out the nature of the replacement operation.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_REPLACE_ALL_OCCURRENCES_IN_SELECTION">
+ </A>
+MSG_REPLACE_ALL_OCCURRENCES_IN_SELECTION</H4>
+<PRE CLASS="syntax">@importMessage MetaSearchSpellMessages, void MSG_REPLACE_ALL_OCCURRENCES_IN_SELECTION(
+        MemHandle		replaceInfo,
+        Boolean		replaceFromBeginning);</PRE>
+<P>
+This message is sent by the SearchReplace controller when an object is starting a search operation that should replace all found matches within a selection (in the search string) with the passed replacement string. </P>
+<P CLASS="refField">
+Source:	Search controller.</P>
+<P CLASS="refField">
+Destination:	GCI_<CODE>
+output</CODE>
+ of the search controller (usually a text object).</P>
+<P CLASS="refField">
+Parameters:	<EM>
+replaceInfo</EM>
+	Handle of block containing the <CODE>
+SearchReplaceStruct</CODE>
+. The null-terminated search string immediately follows this structure. The null-terminated replace string follows that string. This block should be freed by the message handler.</P>
+<DL>
+<DT>
+<EM>
+replaceFromBeginning</DT><DD>
+</EM>
+Non-zero if the replace-all operation should proceed from the beginning of the selection; normally, the replace-all operation begins after the current position.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	Intercept to find out the nature of the replacement operation.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_GET_OBJECT_FOR_SEARCH_SPELL">
+ </A>
+MSG_META_GET_OBJECT_FOR_SEARCH_SPELL</H4>
+<PRE CLASS="syntax">@importMessage MetaSearchSpellMessages, void MSG_META_GET_OBJECT_FOR_SEARCH_SPELL(
+        GetSearchSpellObjectOption					option,
+        optr					curObject);</PRE>
+<P>
+This message is sent by a text object to itself when a search reaches the end of the current object and needs to determine where to continue the search. </P>
+<P CLASS="refField">
+Source:	Any text object.</P>
+<P CLASS="refField">
+Destination:	The text object sends this to itself.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+option</EM>
+	<CODE>
+GetSearchSpellObjectOption</CODE>
+ specifying the next object to continue the search at. This value may be GSSOT_FIRST_OBJECT, GSSOT_LAST_OBJECT, GSSOT_NEXT_OBJECT, or GSSOT_PREV_OBJECT.</P>
+<DL>
+<DT>
+<EM>
+curObject</EM>
+</DT><DD>Optr of the object that is currently being searched through. If you intercept this message, you can use this information to set the <EM>
+option</EM>
+ above.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	May intercept if you want to direct where a search or spell check operation should continue to.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_DISPLAY_OBJECT_FOR_SEARCH_SPELL">
+ </A>
+MSG_META_DISPLAY_OBJECT_FOR_SEARCH_SPELL</H4>
+<PRE CLASS="syntax">@importMessage MetaSearchSpellMessages, void MSG_META_DISPLAY_OBJECT_FOR_SEARCH_SPELL();</PRE>
+<P>
+This message is sent by the text object to itself when a matching word (or misspelled word if the controller is a Spell controller) has been found and should be displayed.</P>
+<P CLASS="refField">
+Source:	The text object.</P>
+<P CLASS="refField">
+Destination:	The text object sends this to itself.</P>
+<P CLASS="refField">
+Interception:	You may intercept this message at the text object to receive notification of a match.</P>
+
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Text_25.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Text_27.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">7.2 Paragraph Attribute Controllers</A> 
+<!-- to next --> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

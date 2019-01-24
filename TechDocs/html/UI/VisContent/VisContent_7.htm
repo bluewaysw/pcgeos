@@ -1,0 +1,131 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: VisContent_7.htm,v 1.1 97/06/02 16:53:37 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Setting Up Sizing Behavior</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">VisContent</A>: 2.1 <A HREF="VisContent_6.htm">Basic VisContent Usage</A>: 
+<A NAME="IX_Geometry:view and content">
+ </A>
+Setting Up Sizing Behavior</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VisContent_6.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VisContent_6.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">2 Basic VisContent Usage</A> 
+<!-- to next --> | <A HREF="VisContent_8.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2.2 Messages Received from the View</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+Most geometry behavior revolves around whether the GenView is scrollable or not. You can set up several different sizing behaviors depending on the attributes you set in the GenView. Some are listed below with the attributes you should set in both the GenView and the VisContent.</P>
+<P>
+Typically, setting the view's attributes will involve either setting or not setting the GVDA_SCROLLABLE flag in the appropriate GenView dimension; also, you will want to be aware of the GVDA_NO_LARGER_THAN_CONTENT and GVDA_NO_SMALLER_THAN_CONTENT flags.</P>
+
+<H2 CLASS="HeadingC">
+If the Content Is Fixed Size</H2>
+<P>
+Typically, if the content object is a fixed size, the view will either conform to the content's size or scroll in one or both dimensions. This behavior is determined entirely within the GenView's instance data. Three types of this behavior are shown in <A HREF="VisContent_7.htm#39153"> Sizing the View with a Fixed Content</A>
+.</P>
+<P CLASS="figTitle">
+Code Display 17-3 <A NAME="39153">
+ </A>
+Sizing the View with a Fixed Content</P>
+<PRE>/* This code display shows three different types of sizing behavior of the GenView
+ * if its VisContent object is of a fixed size. Note that if the content is
+ * managing its geometry, its bounds (and therefore the view's) will be determined
+ * by the content's children. */</PRE>
+<PRE>/* The view window is scrollable in both dimensions. This will result in the view
+ * being sizable and scrollable in both dimensions. */</PRE>
+<PRE>@object GenViewClass MyView = {
+    GVI_content = @MyVisContent;
+    GVI_horizAttrs = @default | GVDA_SCROLLABLE;
+    GVI_vertAttrs = @default | GVDA_SCROLLABLE;
+};</PRE>
+<PRE>/* The view window is scrollable in only the vertical dimension. It follows the
+ * width of the VisContent object and therefore does not scroll vertically. The
+ * VisContent's VI_bounds field should be set by the content. */</PRE>
+<PRE>@object GenViewClass MyView = {
+    GVI_content = @MyVisContent;
+    GVDI_horizAttrs = @default				| GVDA_NO_LARGER_THAN_CONTENT
+				| GVDA_NO_SMALLER_THAN_CONTENT;
+    GVDI_vertAttrs = @default				| GVDA_SCROLLABLE;
+};</PRE>
+<PRE>/* The view window sizes itself exactly to the size of the VisContent's bounds.
+ * The VisContent's VI_bounds field should be set appropriately by the content. 
+ * Note that this is not a valid combination for VisContents that display large
+ * documents or layer objects. */</PRE>
+<PRE>@object GenViewClass MyView = {
+    GVI_content = @MyVisContent;
+    GVDI_horizAttrs = @default				| GVDA_NO_LARGER_THAN_CONTENT
+				| GVDA_NO_SMALLER_THAN_CONTENT;
+    GVDI_vertAttrs = @default				| GVDA_NO_LARGER_THAN_CONTENT
+				| GVDA_NO_SMALLER_THAN_CONTENT;
+}</PRE>
+<P>
+Another type of behavior with fixed-size contents is called &quot;keeping the aspect ratio.&quot; The view and content can work together to allow the user to resize the view while automatically setting the view's scale factor to keep the entire content in the window. This might be used, for example, for a game board; the game could be resized, and the entire game board would stay in the view.</P>
+<P>
+In this situation, the content calculates its new size based on one of the view's dimensions. For example, when the user resizes the view, the content may keep the width but calculate the height based on the width. The proper scale factor is then set, and the content does not have to do anything special beyond that. To gain this behavior, set up your view and content as shown in <A HREF="VisContent_7.htm#27948"> Keeping the View Aspect Ratio</A>
+.</P>
+<P CLASS="figTitle">
+Code Display 17-4 <A NAME="27948">
+ </A>
+Keeping the View Aspect Ratio</P>
+<PRE>/* This example shows a view and its content. The content object is of a fixed
+ * size, and the view is resizable. The content/view pair will keep the aspect
+ * ratio to automatically figure the view's height based on its width and then
+ * scale the image to keep the entire bounds of the content within the view
+ * window. */</PRE>
+<PRE>@object GenViewClass MyView = {
+    GVI_content = @MyVisContent;
+    GVDI_horizAttrs = @default				| GVDA_NO_LARGER_THAN_CONTENT
+				| GVDA_NO_SMALLER_THAN_CONTENT;
+    GVDI_vertAttrs = @default				| GVDA_KEEP_ASPECT_RATIO;
+};</PRE>
+<PRE>@object VisContentClass MyVisContent = {
+    VI_bounds =		{0,	/* left bound */
+		 0,	/* top bound */
+		 250,	/* right bound */
+		 250};	/* bottom bound */
+    VCI_comp =			/* put any children here */;
+    VCI_geoAttrs = VCGA_CUSTOM_MANAGE_CHILDREN;
+		/* This is set because typically a content's bounds are determined
+		 * by its children. If we want to set our own bounds, we should
+		 * custom manage our geometry. This is true of contents used with
+		 * the views in the previous example. */
+};</PRE>
+
+
+<H2 CLASS="HeadingC">
+If the Content Is Variable Size</H2>
+<P>
+Many visible trees will have contents that are of variable size. How the content determines its size differs from use to use; some contents will adjust their geometries to those of their view objects, and some will resize themselves based on the geometry of their children.</P>
+<P>
+Typically, if the content resizes itself based on its children's geometry, the view either will be scrollable or will adjust its size to that of its content.</P>
+<P>
+If the content rearranges its children to meet the size of the view, the view will not be scrollable and will not adjust its size to the content at all. Instead, the content will have the VCNA_SAME_WIDTH_AS_VIEW and VCNA_SAME_HEIGHT_AS_VIEW flags set in its <CODE>
+VCNI_attrs</CODE>
+ field<A NAME="marker=314577">
+ </A>
+.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VisContent_6.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VisContent_6.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">2 Basic VisContent Usage</A> 
+<!-- to next --> | <A HREF="VisContent_8.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2.2 Messages Received from the View</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

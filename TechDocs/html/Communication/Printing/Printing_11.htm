@@ -1,0 +1,279 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Printing_11.htm,v 1.1 97/06/06 13:59:20 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Flow of Control Messages</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The Spool Library</A>: 5.2 <A HREF="Printing_f.htm">Print Control Messages</A>: 
+<A NAME="88534">
+ </A>
+Flow of Control Messages</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Printing_f.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Printing_10.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.1 Common Response Messages</A> 
+<!-- to next --> | <A HREF="Printing_12.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5.3 Working with Instance Data</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>MSG_PRINT_CONTROL_PRINTING_COMPLETED, MSG_PRINT_CONTROL_REPORT_PROGRESS, MSG_PRINT_CONTROL_PRINTING_CANCELLED, MSG_PRINT_CONTROL_REPORT_STRING, MSG_PRINT_CONTROL_INITIATE_PRINT, MSG_PRINT_CONTROL_PRINT, MSG_PRINT_CONTROL_INITIATE_OUTPUT_UI</PRE>
+<P>
+Sending these messages to the Print Control signals that a new stage of printing is ready to begin.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_PRINT_CONTROL_PRINTING_COMPLETED">
+ </A>
+MSG_PRINT_CONTROL_PRINTING_COMPLETED</H4>
+<PRE CLASS="syntax">void	MSG_PRINT_CONTROL_PRINTING_COMPLETED();</PRE>
+<P>
+This message signals the Print Control that the application is finished describing the print job. The application must send this message (or a <CODE>
+MSG_PRINT_CONTROL_PRINTING_CANCELLED</CODE>
+) some time after receiving a <CODE>
+MSG_PRINT_START_PRINTING</CODE>
+.</P>
+<P CLASS="refField">
+Source:	The object that received <CODE>
+MGS_PRINT_START_PRINTING</CODE>
+.</P>
+<P CLASS="refField">
+Destination:	Any PrintControl object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely, unadvised.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_PRINT_CONTROL_REPORT_PROGRESS">
+ </A>
+MSG_PRINT_CONTROL_REPORT_PROGRESS</H4>
+<PRE CLASS="syntax">Boolean	MSG_PRINT_CONTROL_REPORT_PROGRESS(
+        PCProgressType 	progress,
+        int 	pageOrPercent);</PRE>
+<P>
+This message may be sent between the time the Print Output receives a <CODE>
+MSG_PRINT_START_PRINTING</CODE>
+ and the time it sends a <CODE>
+MSG_PRINT_CONTROL_PRINTING_COMPLETED</CODE>
+. Its arguments include a progress type (page number or percentage) and a number representing the progress. It returns a Boolean value, which will normally be <EM>
+true</EM>
+ but will be <EM>
+false</EM>
+ if the user wishes to cancel printing.</P>
+<P>
+The application should send out this message periodically over the course of a long print job, probably about once per page. Progress may be reported as a page number, a percentage of the job completed, or as a null-terminated string. </P>
+<P>
+If the return value is <EM>
+false</EM>
+, the application should stop drawing to the print GString immediately and send the Print Control a <CODE>
+MSG_PRINT_CONTROL_PRINTING_CANCELLED</CODE>
+. The return value may be safely ignored, but if the user wishes to cancel printing, it's polite to cancel immediately instead of making him wait until the MSG_PRINT_START_PRINTING has finished describing the entire job.</P>
+<P CLASS="refField">
+Source:	The object that received <CODE>
+MGS_PRINT_START_PRINTING</CODE>
+ when building a time-consuming job.</P>
+<P CLASS="refField">
+Destination:	The PrintControl object specified by <CODE>
+MSG_PRINT_START_PRINTING</CODE>
+.</P>
+<P CLASS="refField">
+Parameters:	<EM>progress</EM> 	How progress is being reported, by page (PCPT_PAGE) or percent (PCPT_PERCENT).</P>
+<DL>
+<DT>
+<EM>pageOrPercent</EM></DT><DD>How much progress has been made.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Flag signalling that printing should continue. If the flag is <EM>
+false</EM>
+ (i.e. zero), then the user wants to cancel printing, and it would be polite to stop.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+<P CLASS="refField">
+Structures:	The <A NAME="IX_PCProgressType">
+ </A>
+<CODE>
+PCProgressType</CODE>
+ enumeration is defined:</P>
+<PRE><A NAME="IX_PCPT_&ldots;"> </A>typedef enum {
+ PCPT_PAGE,
+ PCPT_UNUSED1, /* Unused type */
+ PCPT_PERCENT,
+ PCPT_UNUSED2, /* Unused type */
+ PCPT_TEXT
+} PCProgressType;</PRE>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_PRINT_CONTROL_REPORT_PROGRESS_STRING">
+ </A>
+MSG_PRINT_CONTROL_REPORT_PROGRESS_STRING</H4>
+<PRE CLASS="syntax">@alias(MSG_PRINT_CONTROL_REPORT_PROGRESS) \ 
+Boolean	MSG_PRINT_CONTROL_REPORT_PROGRESS_STRING(
+        PCProgressType 	progress,
+        Chars 	*progressString);</PRE>
+<P>
+This message may be sent between the time the Print Output receives a <CODE>
+MSG_PRINT_START_PRINTING</CODE>
+ and the time it sends a <CODE>
+MSG_PRINT_CONTROL_PRINTING_COMPLETED</CODE>
+. Its arguments include a text string giving some indication of progress. This message returns a Boolean value, which will normally be <EM>
+true</EM>
+ but will be <EM>
+false</EM>
+ if the user wishes to cancel printing.</P>
+<P>
+The application should send out this message periodically over the course of a long print job, probably about once per page. Progress may be reported as a page number, a percentage of the job completed, or as a null-terminated string. </P>
+<P>
+If the return value is <EM>
+false</EM>
+, the application should stop drawing to the print GString immediately and send the Print Control a <CODE>
+MSG_PRINT_CONTROL_PRINTING_CANCELLED</CODE>
+. The return value may be safely ignored, but if the user wishes to cancel printing, it's polite to cancel immediately instead of making him wait until the MSG_PRINT_START_PRINTING has finished describing the entire job.</P>
+<P CLASS="refField">
+Source:	The object that received <CODE>
+MGS_PRINT_START_PRINTING</CODE>
+ when building a time-consuming job.</P>
+<P CLASS="refField">
+Destination:	The PrintControl object specified by <CODE>
+MSG_PRINT_START_PRINTING</CODE>
+.</P>
+<P CLASS="refField">
+Parameters:	<EM>progress</EM> 	This must be PCPT_TEXT. The reason that this parameter has only one possible value is that this message is actually an alias of <CODE>
+MSG_PRINT_CONTROL_REPORT_PROGRESS</CODE>
+, handled by the same assembly routine.</P>
+<DL>
+<DT>
+<EM>progressString</EM></DT><DD>A string of text, giving an indication of progress.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Flag signalling that printing should continue. If the flag is <EM>
+false</EM>
+ (i.e. zero), then the user wants to cancel printing, and it would be polite to stop.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+<P CLASS="refField">
+Structures:	The <CODE>
+PCProgressType</CODE>
+ enumeration is defined:</P>
+<PRE>typedef enum {
+ PCPT_PAGE,
+ PCPT_UNUSED1, /* Unused type */
+ PCPT_PERCENT,
+ PCPT_UNUSED2, /* Unused type */
+ PCPT_TEXT
+} PCProgressType;</PRE>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_PRINT_CONTROL_INITIATE_OUTPUT_UI">
+ </A>
+MSG_PRINT_CONTROL_INITIATE_OUTPUT_UI</H4>
+<PRE CLASS="syntax">void MSG_PRINT_CONTROL_INITIATE_OUTPUT_UI(
+        PrinterDriverType type);</PRE>
+<P>
+Display the output dialog box.</P>
+<P CLASS="refField">
+Source:	Anything.</P>
+<P CLASS="refField">
+Destination:	PrintControl object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+type</EM>
+	PrinterDriverType value specifying what sort of printer device.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Rare. This messages is generally used internally only, as the PrintControl normally provides all the UI neededfor printing.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_PRINT_CONTROL_PRINTING_CANCELLED">
+ </A>
+MSG_PRINT_CONTROL_PRINTING_CANCELLED</H4>
+<PRE CLASS="syntax">void	MSG_PRINT_CONTROL_PRINTING_CANCELLED();</PRE>
+<P>
+The application may send this message to the PrintControl after receiving a <CODE>
+MSG_PRINT_START_PRINTING</CODE>
+. Do not send both this message and a <CODE>
+MSG_PRINT_CONTROL_PRINTING_COMPLETED</CODE>
+ for a single print job.</P>
+<P>
+The application may send this message to cancel a document while describing a print job, before it would send the <CODE>
+MSG_PRINT_CONTROL_PRINTING_COMPLETED</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted, probably the <CODE>
+PCI_output</CODE>
+. </P>
+<P CLASS="refField">
+Destination:	The PrintControl object specified by <CODE>
+MSG_PRINT_START_PRINTING</CODE>
+.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_PRINT_CONTROL_INITIATE_PRINT">
+ </A>
+MSG_PRINT_CONTROL_INITIATE_PRINT</H4>
+<PRE CLASS="syntax">void	MSG_PRINT_CONTROL_INITIATE_PRINT();</PRE>
+<P>
+This message, normally sent by the Print trigger in the File menu, is the signal that the Print Control should display the Print dialog box. Geodes with custom print triggers should make sure that those triggers send this message to the Print Control. Geodes using the Print Control's provided print trigger need not send this message.</P>
+<P CLASS="refField">
+Source:	Unrestricted--typically the user print trigger (or fax trigger).</P>
+<P CLASS="refField">
+Destination:	Any PrintControl object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_PRINT_CONTROL_PRINT">
+ </A>
+MSG_PRINT_CONTROL_PRINT</H4>
+<PRE CLASS="syntax">void	MSG_PRINT_CONTROL_PRINT();</PRE>
+<P>
+This message, normally sent by the Print trigger in the Print dialog box, is the signal that the user has made his printing choices and is ready for the Print Control to verify those choices and spool the job. </P>
+<P CLASS="refField">
+Source:	Unrestricted--typically the Print trigger in the Print Dialog Box.</P>
+<P CLASS="refField">
+Destination:	Any PrintControl object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Printing_f.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Printing_10.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.1 Common Response Messages</A> 
+<!-- to next --> | <A HREF="Printing_12.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5.3 Working with Instance Data</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

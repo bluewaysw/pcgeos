@@ -1,0 +1,319 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Lists_13.htm,v 1.1 97/06/02 16:36:42 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> GenBooleanGroup Usage</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The List Objects</A>: 5.2 <A HREF="Lists_11.htm">GenBooleanGroups</A>: 
+GenBooleanGroup Usage</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Lists_11.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Lists_12.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.1 GenBooleanGroup Instance Data</A> 
+<!-- to next --> | <A HREF="Lists_14.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5.3 Altering Instance Data</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+The GenBooleanGroup manages up to 16 GenBoolean objects. You must define a new (or use a pre-existing) constant to represent each GenBoolean within the GenBooleanGroup. Each constant represents a bit within a word-length record. </P>
+<P>
+The GenBooleanGroup uses 16-bit records to designate its list of items; each bit in the record corresponds to an item. The GenBooleanGroup keeps three such records: GBGI_<CODE>
+selectedBooleans</CODE>
+, GBGI_<CODE>
+indeterminateBooleans</CODE>
+, and GBGI_<CODE>
+modifiedBooleans</CODE>
+ to represent the selected state, the indeterminate state, and the modified state of each GenBoolean.</P>
+
+<H2 CLASS="HeadingC">
+Selected Booleans</H2>
+<PRE>GBI_identifier, GBGI_selectedBooleans</PRE>
+<P>
+GBI_<CODE>
+identifier</CODE>
+ stores the identifying keyword for a GenBoolean item. The BooleanGroup object will always use this identifier when referring to GenBooleans. These identifiers are set up as constants representing bits in a 16-bit record. (See <A HREF="Lists_13.htm#67029"> Setting Up a GenBooleanGroup</A>
+.)</P>
+<P CLASS="figTitle">
+Code Display 11-9 <A NAME="67029">
+ </A>
+Setting Up a GenBooleanGroup</P>
+<PRE>/* The identifiers for any particular GenBooleanGroup are
+ * constant bits within a word-length bitfield. */</PRE>
+<PRE>typedef WordFlags USCities;
+#define USC_CHICAGO 				0x0001		/* The first bit */
+#define USC_NEW_YORK				0x0002		/* The second bit */
+#define USC_SAN_FRANCISCO				0x0004		/* The third bit */</PRE>
+<PRE>@object GenBooleanGroupClass CityList = {
+    GI_comp = @Chicago, @NewYork, @SanFrancisco;
+	/* The first and second bit in the selectedBooleans record are set to
+	 * indicate that Chicago and New York are initially selected. */
+    GBGI_selectedBooleans = USC_CHICAGO | USC_NEW_YORK;
+}</PRE>
+<PRE>@object GenBooleanClass Chicago = {
+    GI_visMoniker = &quot;Chicago&quot;;
+    GBI_identifier = USC_CHICAGO;
+}</PRE>
+<PRE>@object GenBooleanClass NewYork = {
+    GI_visMoniker = &quot;New York&quot;;
+    GBI_identifier = USC_NEW_YORK;
+}</PRE>
+<PRE>@object GenBooleanClass SanFrancisco = {
+    GI_visMoniker = &quot;San Francisco&quot;;
+    GBI_identifier = USC_SAN_FRANCISCO;
+}</PRE>
+<P>
+GBGI_<A NAME="IX_GBGI_selectedBooleans">
+ </A>
+<CODE>
+selectedBooleans</CODE>
+ stores a 16-bit record corresponding to the selection state of a GenBooleanGroup's children. Selecting or deselecting the Booleans will alter the bit representing that GenBoolean child in this instance field. By setting selections in this field, you can specify initial selections for the GenBooleanGroup to initially appear set.</P>
+
+
+<H2 CLASS="HeadingC">
+Indeterminate and Modified Booleans</H2>
+<PRE>GBGI_indeterminateBooleans, GBGI_modifiedBooleans</PRE>
+<P>
+GBGI_<A NAME="IX_GBGI_indeterminateBooleans">
+ </A>
+<CODE>
+indeterminateBooleans</CODE>
+ stores a 16-bit record corresponding to the indeterminate state of a GenBooleanGroup's children. Your BooleanGroup may appear initially with GenBooleans in an indeterminate state. As opposed to a GenItemGroup, where either the entire list is indeterminate or not, individual Booleans may be indeterminate on their own accord. </P>
+<P>
+A GenBoolean may be indeterminate while it is either selected or unselected. Making an item indeterminate will not change its selected state, though the item's visual representation might change. (In OSF/Motif, an indeterminate selection appears &quot;off&quot; whether or not it is also selected.)</P>
+<P>
+GBGI_<A NAME="IX_GBGI_modifiedBooleans">
+ </A>
+<CODE>
+modifiedBooleans</CODE>
+ stores a 16-bit record corresponding to the modified state of a GenBooleanGroup's children. Any GenBooleans that have been modified since the occurrence of the last apply action will be marked modified. In general, you should not need to set any GenBooleans initially modified.</P>
+<P>
+Whenever the GenBooleanGroup receives notice to &quot;apply&quot; any changes, it will check whether any Booleans have been modified. If any have, the GenBooleanGroup will send its apply action to its destination. </P>
+<P>
+In immediate mode, any change to the GenBoolean's state automatically sets the corresponding bit in the BooleanGroup's GBGI_<CODE>
+modifiedBooleans</CODE>
+ instance data and also sends out <CODE>
+MSG_GEN_APPLY</CODE>
+. Therefore, in immediate mode, any user changes will cause the apply action to be sent out immediately. In delayed mode, the corresponding bits in the GBGI_<CODE>
+modifiedBooleans</CODE>
+ are set, but <CODE>
+MSG_GEN_APPLY</CODE>
+ will be sent out at a later time. The apply action will only occur when the user forces it (such as clicking on an &quot;apply&quot; trigger) or when the application forces it (with <CODE>
+MSG_GEN_APPLY</CODE>
+).</P>
+
+
+<H2 CLASS="HeadingC">
+Destination</H2>
+<PRE>GBGI_applyMsg, GBGI_destination, GEN_BOOLEAN_GROUP_APPLY_MSG, ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED</PRE>
+<P>
+<A NAME="IX_GBGI_destination">
+ </A>
+When the GenBooleanGroup receives notice to apply any changes made in the list, it will first determine whether the group has been modified (by checking GBGI_<CODE>
+modifiedBooleans</CODE>
+). If any GenBoolean has been modified, the BooleanGroup will send the apply message stored in GBGI_<CODE>
+applyMsg</CODE>
+ to the destination stored in GBGI_<CODE>
+destination</CODE>
+.</P>
+<P>
+GBGI_<A NAME="IX_GBGI_applyMsg">
+ </A>
+<CODE>
+applyMsg</CODE>
+ should contain the message you wish the GenBooleanGroup to send out whenever changes should be applied. This message should be based on the prototype GEN_BOOLEAN_GROUP_APPLY_MSG so the proper arguments are passed to its handler. GBGI_<CODE>
+destination</CODE>
+ should contain the object or process that will handle the message sent out by this group.</P>
+<P>
+You can force an apply to occur by marking GenBooleans modified with <CODE>
+MSG_GEN_BOOLEAN_GROUP_SET_MODIFIED_STATE</CODE>
+ and sending <CODE>
+MSG_GEN_APPLY</CODE>
+ to the GenBooleanGroup. You can also override the default behavior, forcing the object to send out its apply action on all applies, with <CODE>
+ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED</CODE>
+ in the object's instance data.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_GEN_BOOLEAN_GROUP_APPLY_MSG">
+ </A>
+GEN_BOOLEAN_GROUP_APPLY_MSG</H4>
+<PRE CLASS="syntax">void	GEN_BOOLEAN_GROUP_APPLY_MSG(
+        word	selectedBooleans,
+        word	indeterminateBooleans,
+        word	modifiedBooleans);</PRE>
+<P>
+Use this prototype to define the apply message for your GenBooleanGroup (stored in GBGI_<CODE>
+applyMsg</CODE>
+). This prototype ensures that the message passes the correct parameters to your message handler. </P>
+<P CLASS="refField">
+Source:	Your GenBooleanGroup object.</P>
+<P CLASS="refField">
+Destination:	The destination of your GenBooleanGroup.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+selectedBooleans	</EM>
+The currently selected GenBooleans (the contents of the GBGI_<CODE>
+selectedBooleans</CODE>
+ instance field).</P>
+<DL>
+<DT>
+<EM>
+indeterminateBooleans</DT><DD>
+</EM>
+The current indeterminate GenBooleans (the contents of the GBDI_<CODE>
+indeterminateBooleans</CODE>
+ instance field).</DD>
+<DT>
+<EM>
+modifiedBooleans</DT><DD></EM>
+The current modified GenBooleans (the contents of the GBGI_<CODE>
+modifiedBooleans</CODE>
+ instance field).</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+
+<H2 CLASS="HeadingC">
+Sending the Status Messages</H2>
+<PRE>GEN_BOOLEAN_GROUP_STATUS_MSG, ATTR_GEN_BOOLEAN_GROUP_STATUS_MSG, MSG_GEN_BOOLEAN_GROUP_SEND_STATUS_MSG</PRE>
+<P>
+In delayed mode, GenBooleanGroups will only send out their apply action if an apply occurs. If you wish your application to receive notice whenever any user changes take place in the list's state, even if those changes should not be &quot;applied,&quot; you may set up a status message in the object's instance data. </P>
+<P>
+Set a message based on the prototype GEN_BOOLEAN_GROUP_STATUS_MSG. Set ATTR_GEN_BOOLEAN_GROUP_STATUS_MSG to this message in your object declaration, and provide a handler for this message in the class.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_GEN_BOOLEAN_GROUP_STATUS_MSG">
+ </A>
+GEN_BOOLEAN_GROUP_STATUS_MSG</H4>
+<PRE CLASS="syntax">void	GEN_BOOLEAN_GROUP_STATUS_MSG(
+        word	selectedBooleans,
+        word	indeterminateBooleans,
+        word	changedBooleans);</PRE>
+<P>
+Use this prototype to define a status message for your GenBooleanGroup (stored in the ATTR_GEN_BOOLEAN_GROUP_STATUS_MSG vardata). This prototype ensures that the message passes the correct parameters to your message handler. </P>
+<P CLASS="refField">
+Source:	Your GenBooleanGroup object.</P>
+<P CLASS="refField">
+Destination:	The destination of your GenBooleanGroup object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+selectedBooleans	</EM>
+The currently selected GenBooleans (the contents of the GBGI_<CODE>
+selectedBooleans</CODE>
+ instance field).</P>
+<DL>
+<DT>
+<EM>
+indeterminateBooleans</DT><DD>
+</EM>
+The current indeterminate GenBooleans (the contents of the GBDI_<CODE>
+indeterminateBooleans</CODE>
+ instance field).</DD>
+<DT>
+<EM>
+changedBooleans</DT><DD></EM>
+The GenBooleans that caused the status message to be sent out (not necessarily the contents of the GBGI_<CODE>
+modifiedBooleans</CODE>
+ instance field).</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_BOOLEAN_GROUP_SEND_STATUS_MSG">
+ </A>
+MSG_GEN_BOOLEAN_GROUP_SEND_STATUS_MSG</H4>
+<PRE CLASS="syntax">void	MSG_GEN_BOOLEAN_GROUP_SEND_STATUS_MSG(
+        word	changedBooleans);</PRE>
+<P>
+This message causes the GenBooleanGroup to send out its status message stored in <CODE>
+ATTR_GEN_ITEM_GROUP_STATUS_MSG</CODE>
+. The message should include the current state of the GenBooleanGroup. (Base the status message on the prototype <CODE>
+GEN_BOOLEAN_GROUP_STATUS_MSG</CODE>
+ to ensure this.) To mark individual GenBooleans as changed since the last apply action, pass this message a record of the changed GenBooleans.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenBooleanGroup object with a status message.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+changedBooleans</EM>
+	A record representing the GenBooleans that have changed to cause this GenBooleanGroup to send out its status message.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+
+<H2 CLASS="HeadingC">
+BooleanGroup Links</H2>
+<PRE>ATTR_GEN_BOOLEAN_GROUP_LINK</PRE>
+<P>
+<A NAME="IX_Boolean Group Links">
+ </A>
+Just as you may create links between GenItemGroups, you may also create links between BooleanGroups. For more complete information on the purpose and effects of linked groups, see <A HREF="Lists_b.htm#59896"> GenItemGroup Links</A>
+.</P>
+<P>
+To enable linked BooleanGroups, you may set up small sub-sets of GenBooleans as separate GenBooleanGroups. Within each BooleanGroup, include a link to the next BooleanGroup with <CODE>
+ATTR_GEN_BOOLEAN_GROUP_LINK</CODE>
+. Links should be circular; i.e., if three BooleanGroups should be linked, the first group should point to the second, the second to the third, and the third to the first. The three linked BooleanGroups will act as one entity.</P>
+
+
+<H2 CLASS="HeadingC">
+Scrolling Boolean Groups</H2>
+<PRE>HINT_BOOLEAN_GROUP_SCROLLABLE, MSG_GEN_BOOLEAN_GROUP_MAKE_BOOLEAN_VISIBLE</PRE>
+<P>
+Boolean group lists, like item group lists, can be scrollable. To make a Boolean list scrollable, set <A NAME="IX_HINT_BOOLEAN_GROUP_SCROLLABLE">
+ </A>
+<CODE>
+HINT_BOOLEAN_GROUP_SCROLLABLE</CODE>
+. To make a particular item in a scrollable Boolean list visible, use the message <CODE>
+MSG_GEN_BOOLEAN_GROUP_MAKE_BOOLEAN_VISIBLE</CODE>
+.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_BOOLEAN_GROUP_MAKE_BOOLEAN_VISIBLE">
+ </A>
+MSG_GEN_BOOLEAN_GROUP_MAKE_BOOLEAN_VISIBLE</H4>
+<PRE CLASS="syntax">void	MSG_GEN_BOOLEAN_GROUP_MAKE_BOOLEAN_VISIBLE(
+        word	identifier);</PRE>
+<P>
+This message, when sent to a scrollable BooleanGroup object, will make the specified GenBoolean visible in the list. If the passed identifier is unknown or is not usable, the BooleanGroup will do nothing.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any scrollable, usable GenBooleanGroup.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+identifier</CODE>
+	The item number of the GenBoolean to be made visible.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Lists_11.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Lists_12.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.1 GenBooleanGroup Instance Data</A> 
+<!-- to next --> | <A HREF="Lists_14.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5.3 Altering Instance Data</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

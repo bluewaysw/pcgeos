@@ -1,0 +1,144 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: VM_12.htm,v 1.1 97/06/02 15:53:39 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> File-Access Synchronization</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Virtual Memory</A>: 3.11 <A HREF="VM_7.htm">Using Virtual Memory</A>: 
+<A NAME="57104">
+ </A>
+File-Access Synchronization</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VM_7.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VM_11.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.10 The VM File's Map Block</A> 
+<!-- to next --> | <A HREF="VM_13.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.12 Other VM Utilities</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>VMGrabExclusive(), VMReleaseExclusive()</PRE>
+<P>
+<A NAME="IX_Shared files:VM files">
+ </A>
+Sometimes several different geodes will need access to the same VM file. Generally, these will be several different copies of the same application, perhaps running on different machines on a network. GEOS provides three different ways shared-access can be handled.</P>
+<P>
+A VM file can be one of three different types: standard, &quot;public,&quot; and &quot;shared-multiple.&quot; By default, all new VM files are standard. The file's type is one of its extended attributes, and can be changed with the routine <CODE>
+FileSetHandleExtendedAttributes()</CODE>
+ (see <A HREF="../../Files/FileSys/FileSys_d.htm#49785">the File System chapter</A>). The document control automatically lets the user select what kind of file to create, and changes its type accordingly. (See <A HREF="../../Files/Documents/index.htm">the Document Objects chapter</A>.)</P><P>
+Only one geode may write to a standard GEOS VM file at a time. If a geode has the file open for read/write access, no other geode will be allowed to open that file. If a geode has the file open for read-only access, other geodes are allowed to open it for read-only access, but not for read-write access. If a file is opened for read-only access, blocks cannot be dirtied or updated. If a geode tries to open a file for writing when the file is already open, or if the geode tries to open it for reading when the file has already been opened for writing, <CODE>
+VMOpen()</CODE>
+ will return an error.</P>
+<P>
+In general, when a file is opened, it is by default opened for read-write access. For example, the document control objects present a dialog box which lets the file be opened for read-only access, but has this option initially turned off. However, some files are used mainly for reference and are infrequently changed. For example, a company might keep a client address book on a network drive. Most of the time, people would just read this file; the file would only occasionally be changed. For this reason, GEOS lets you declare VM file as &quot;public.&quot; Public files are, by default, opened for read-only access. In all other respects the file is the same as a standard GEOS VM file; it can be opened by several readers at a time, but by only one geode at a time if the geode will be writing.</P>
+<P>
+<A NAME="IX_VMGrabExclusive()">
+ </A>
+Sometimes several geodes will need to be able to write to a file at once. For example, a company might have a large customer database, and several users might be writing records to the database at the same time. For this reason, GEOS lets you create &quot;shared-multiple&quot; files. Several geodes can have a &quot;shared-multiple&quot; file open at once. However, a geode cannot access the file whenever it wants. Instead, it must get the file's semaphore to access the file's data. When it needs to access the file, it calls <CODE>
+VMGrabExclusive()</CODE>
+. This routine takes four arguments:</P>
+<UL>
+<LI>
+The handle of the VM file</LI>
+<LI>
+A timeout value<BR>
+If a timeout value is passed, <CODE>
+VMGrabExclusive()</CODE>
+ will give up trying to get the semaphore after a specified number of seconds has passed. If a timeout value of zero is passed, <CODE>
+VMGrabExclusive()</CODE>
+ will block until it can get the file's semaphore.</LI>
+<LI>
+A member of the <CODE>
+VMOperation</CODE>
+ enumerated type<BR>
+This specifies the kind of operation to be performed on the locked file. The <CODE>
+VMOperation</CODE>
+ values are described below.</LI>
+<LI>
+A pointer to a word-length variable.<BR>
+If this call to <CODE>
+VMGrabExclusive()</CODE>
+ fails and times out, the operation currently being performed will be written here.</LI>
+</UL>
+<P>
+<A NAME="IX_VMStartExclusiveReturnValue">
+ </A>
+The routine returns a member of the <CODE>
+VMStartExclusiveReturnValue</CODE>
+ enumerated type. The following return values are possible:</P>
+<DL>
+<DT>
+VMSERV_NO_CHANGES</DT><DD>
+No other thread has changed this file since the last time this thread had access to the file.</DD>
+<DT>
+VMSERV_CHANGES</DT><DD>
+The file may have been altered since the last time this thread had access to it; the thread should take appropriate actions (such as re-reading any cached data).</DD>
+<DT>
+VMSERV_TIMEOUT</DT><DD>
+This call to <CODE>
+VMGrabExclusive()</CODE>
+ failed and timed out without getting access to the file.</DD>
+</DL>
+<P>
+<A NAME="IX_VMOperation">
+ </A>
+When a geode calls <CODE>
+VMGrabExclusive()</CODE>
+, it must pass a member of the <CODE>
+VMOperation</CODE>
+ enumerated type. Most of the values are used internally by the system; while a geode should never pass these values, they may be returned by <CODE>
+VMGrabExclusive()</CODE>
+ if the call times out. The following values are defined in <STRONG CLASS="fileName">
+vm.h</STRONG>
+:</P>
+<DL>
+<DT>
+VMO_READ</DT><DD>
+<A NAME="IX_VMO_&ldots;">
+ </A>
+This indicates that the geode will not change the file during this access. This lets the kernel perform some optimizations.</DD>
+<DT>
+VMO_INTERNAL </DT>
+<DT>
+VMO_SAVE </DT>
+<DT>
+VMO_SAVE_AS </DT>
+<DT>
+VMO_REVERT </DT>
+<DT>
+VMO_UPDATE</DT><DD>
+These values are set only by the kernel. Applications should never pass them.</DD>
+<DT>
+VMO_WRITE</DT><DD>
+This indicates that the geode may write to the file during this access.</DD>
+</DL>
+<P>
+The application may also pass any value between VMO_FIRST_APP_CODE and <STRONG>0xffff</STRONG>. The kernel treats all these values as synonymous with VMO_WRITE; however, the application may choose to associate meanings with numbers in this range (perhaps by defining an enumerated type whose starting value is VMO_FIRST_APP_CODE).<A NAME="marker=377638">
+ </A>
+</P>
+<P>
+<A NAME="IX_VMReleaseExclusive()">
+ </A>
+When a thread is done accessing a file, it should release its exclusive access by calling <CODE>
+VMReleaseExclusive()</CODE>
+. The routine takes one argument, namely the file handle. It does not return anything.</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VM_7.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VM_11.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.10 The VM File's Map Block</A> 
+<!-- to next --> | <A HREF="VM_13.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.12 Other VM Utilities</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

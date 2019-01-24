@@ -1,0 +1,417 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: FileSys_f.htm,v 1.1 97/06/02 14:46:32 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> FileEnum()</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The File System</A>: 5.5 <A HREF="FileSys_a.htm">Files</A>: 
+<A NAME="51873">
+ </A>
+FileEnum()</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="FileSys_a.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="FileSys_e.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.4 File Utilities</A> 
+<!-- to next --> | <A HREF="FileSys_10.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5.6 Bytewise File Operations</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>FileEnum(), FileEnumLocateAttr(), FileEnumWildcard(), FileEnumAttrs, FileEnumSearchFlags, FileEnumStandardReturnType, FEDosInfo, FENameAndAttr, FileEnumCallbackData</PRE>
+<P>
+<A NAME="IX_FileEnum()">
+ </A>
+You may sometimes need to perform an action on every file that matches certain criteria. For these situations, the file system provides the routine <CODE>
+FileEnum()</CODE>
+. <CODE>
+FileEnum()</CODE>
+ can be called in two ways. The usual way is to have <CODE>
+FileEnum()</CODE>
+ provide certain information about every file in a directory (or every file of a given type); when called, <CODE>
+FileEnum()</CODE>
+ will allocate a buffer and fill it with data structures, one for each matching file. Less commonly, you can have <CODE>
+FileEnum()</CODE>
+ call a callback routine for every file which matches certain criteria; this callback routine can take a broader range of actions.
+
+</P>
+<P>
+You should not often need to use the <CODE>
+FileEnum()</CODE>
+ routine. The most common time that applications would need this functionality is when they present a list of the files in a directory to the user. The GenFileSelector object provides this functionality, making all necessary calls to <CODE>
+FileEnum()</CODE>
+ transparently to both the user and the geode. Note that the document control objects automatically create and manipulate a file selector when appropriate. For further information, see <A HREF="../../Files/GenFileSelector/index.htm">the FileSelector object chapter</A>.</P><P>
+<CODE>
+FileEnum()</CODE>
+ takes the following arguments:</P>
+<UL>
+<LI>
+A pointer to a <CODE>
+FileEnumParams</CODE>
+ structure (see below). The data in this structure will tell <CODE>
+FileEnum()</CODE>
+ what to do.</LI>
+<LI>
+A pointer to a MemHandle variable. <CODE>
+FileEnum()</CODE>
+ will allocate a memory block to hold information about the files, and will write the block's handle to this location.</LI>
+<LI>
+A pointer to a word variable. If <CODE>
+FileEnum()</CODE>
+ was unable to fit information about all the files into the block passed, it will write the number of files not handled into this variable.</LI>
+</UL>
+<P>
+<CODE>
+FileEnum()</CODE>
+ returns the number of files which were returned in the buffer.</P>
+<P>
+<A NAME="IX_FileEnumParams">
+ </A>
+The <CODE>
+FileEnumParams</CODE>
+ structure specifies how <CODE>
+FileEnum()</CODE>
+ should perform. The structure is defined as follows. A summary of each field's role follows; for full details, see the reference entry for <CODE>
+FileEnum()</CODE>
+.</P>
+<PRE>typedef struct _FileEnumParams {
+	FileEnumSearchFlags 				FEP_searchFlags;
+	FileExtAttrDesc *				FEP_returnAttrs;
+	word 				FEP_returnSize;
+	FileExtAttrDesc *				FEP_matchAttrs;
+	word 				FEP_bufSize;
+	word 				FEP_skipCount;
+	word _pascal (*FEP_callback) 
+		(struct _FileEnumParams *					params,
+		 FileEnumCallbackData *					fecd,
+		 word 					frame);
+	FileExtAttrDesc *				FEP_callbackAttrs;
+	dword 				FEP_cbData1;
+	dword 				FEP_cbData2;
+	word 				FEP_headerSize;
+} FileEnumParams;</PRE>
+<DL>
+<DT>
+<CODE>
+FEP_searchFlags</DT><DD>
+</CODE>
+<A NAME="IX_FEP_&ldots;">
+ </A>
+This is a byte-length flag field. The flags are of type <CODE>
+FileEnumSearchFlags</CODE>
+ (described below). These flags specify which files at the current location will be examined by <CODE>
+FileEnum()</CODE>
+. They also specify such things as whether a callback routine should be used.</DD>
+<DT>
+<CODE>
+FEP_returnAttrs</DT><DD>
+</CODE>
+This field specifies what information is wanted about the files. It is a pointer to an array of <CODE>
+FileExtAttrDesc</CODE>
+ structures (see <A HREF="FileSys_d.htm#40864"> FEA_MULTIPLE</A>
+). The attributes will be written to the return buffer; each file will have an entry, containing all the attributes requested for that file. You can also request certain return values by setting <CODE>
+FEP_returnAttrs</CODE>
+ to equal a member of the <CODE>
+FileEnumStandardReturnType</CODE>
+ (again, by casting the <CODE>
+FileEnumStandardReturnType</CODE>
+ value to type <CODE>
+void *</CODE>
+). The <CODE>
+FileEnumStandardReturnType</CODE>
+ enumerated type is described later in this section.</DD>
+<DT>
+<CODE>
+FEP_returnSize</DT><DD>
+</CODE>
+This is the size of each entry in the returned buffer. If a standard return type or an array of <CODE>
+FileExtAttrDesc</CODE>
+ structures was passed, each entry in the returned buffer will contain all the extended attribute information requested for that file.</DD>
+<DT>
+<CODE>
+FEP_matchAttrs</DT><DD>
+</CODE>
+This field specifies which files should be enumerated by <CODE>
+FileEnum()</CODE>
+. It is a pointer to an array of <CODE>
+FileExtAttrDesc</CODE>
+ structures (see <A HREF="FileSys_d.htm#40864"> FEA_MULTIPLE</A>
+). These structures specify values for certain extended attributes. Only those files whose extended attributes match these will be enumerated. If you do not want to filter out any files in the working directory, or if you will use the callback routine to filter the files, pass a null pointer in this field.</DD>
+<DT>
+<CODE>
+FEP_bufsize</CODE>
+</DT><DD>This field specifies the maximum number of entries to be returned in the buffer. If you do not want to set a limit, pass the constant FEP_BUFSIZE_UNLIMITED. The buffer will be grown as necessary.</DD>
+<DT>
+<CODE>
+FEP_skipCount</DT><DD>
+</CODE>
+This field contains the number of matching files to be ignored before the first one is processed. It is often used in conjunction with <CODE>
+FEP_bufSize</CODE>
+ to examine many files a few at a time. Each time <CODE>
+FileEnum()</CODE>
+ is called, you can enumerate a certain number of files; by adjusting the skip count each time, you can start each enumeration where the previous one ended. In this way you could walk through all the matching files in the directory. Note that if the <CODE>
+FileEnumSearchFlags</CODE>
+ bit FESF_REAL_SKIP is set (in FEP<CODE>
+_searchFlags</CODE>
+), the first files in the directory will be skipped <EM>
+before</EM>
+ they are tested to see if they match. This is faster, since the match condition won't have to be checked for the first files in the directory.</DD>
+<DT>
+<CODE>
+FEP_callback</DT><DD>
+</CODE>
+This field holds a pointer to a Boolean callback routine. The callback routine can check to see if the file matches some other arbitrary criteria. The callback routine is called for any files which match all the above criteria. It can then decide whether to enumerate the file however it wishes. The callback routine should be declared <CODE>
+_pascal</CODE>
+. If the file should be accepted by <CODE>
+FileEnum()</CODE>
+, the callback should return <EM>
+true</EM>
+; otherwise it should return <EM>
+false</EM>
+. You can also instruct <CODE>
+FileEnum()</CODE>
+ to use one of the standard callback routines by passing a member of the <CODE>
+FileEnumStandardCallback</CODE>
+ enumerated type. In this case, <CODE>
+FEP_callbackAttrs</CODE>
+ is ignored; <CODE>
+FileEnum()</CODE>
+ will automatically pass the appropriate information to the callback routine. (Note that if the FESF_CALLBACK bit of the <CODE>
+FEP_searchFlags</CODE>
+ field is not set, the <CODE>
+FEP_callback</CODE>
+ field is ignored.) The callback routine may not call any routines which are in movable memory at the time <CODE>
+FileEnum()</CODE>
+ is called, except for routines which are in the same resource as the callback routine.</DD>
+<DT>
+<CODE>
+FEP_callbackAttrs</DT><DD>
+</CODE>
+This field specifies what additional attributes should be read for the callback routine. This field is a pointer to an array of <CODE>
+FileExtAttrDesc</CODE>
+ structures (see <A HREF="FileSys_d.htm#40864"> FEA_MULTIPLE</A>
+). The array will be filled in with the appropriate information for each file before the callback routine is called. Note that if the FESF_CALLBACK bit of the <CODE>
+FEP_searchFlags </CODE>
+is not set, the <CODE>
+FEP_callbackAttrs </CODE>
+is ignored. If you do not need any attributes passed to the callback routine, set this field to be a null pointer.</DD>
+<DT>
+<CODE>
+FEP_cbData1</CODE>
+, <CODE>
+FEP_cbData2</DT><DD>
+</CODE>
+These are dword-length fields. Their contents are ignored by <CODE>
+FileEnum()</CODE>
+; they are used to pass information to the callback routine. If you do not call a standard callback routine, you may use these fields any way you wish.</DD>
+<DT>
+<CODE>
+FEP_headerSize</DT><DD>
+</CODE>
+If the flag FESF_LEAVE_HEADER is set, <CODE>
+FileEnum()</CODE>
+ will leave an empty header space at the beginning of the return buffer. The size of the header is specified by this field. If the flag FESF_LEAVE_HEADER is clear, this field is ignored.</DD>
+</DL>
+<P>
+<A NAME="IX_FESF_&ldots;">
+ </A>
+<A NAME="IX_FileEnumSearchFlags">
+ </A>
+The first field of the <CODE>
+FileEnumParams</CODE>
+ structure, <CODE>
+FEP_searchFlags</CODE>
+, is a word-length record containing <CODE>
+FileEnumSearchFlags</CODE>
+. The following flags are available:</P>
+<DL>
+<DT>
+FESF_DIRS</DT><DD>Directories should be examined by <CODE>
+FileEnum()</CODE>
+.</DD>
+<DT>
+FESF_NON_GEOS</DT><DD>
+Non-GEOS files should be examined by <CODE>
+FileEnum()</CODE>
+.</DD>
+<DT>
+FESF_GEOS_EXECS</DT><DD>
+GEOS executable files should be examined by <CODE>
+FileEnum()</CODE>
+.</DD>
+<DT>
+FESF_GEOS_NON_EXECS</DT><DD>
+GEOS non-executable files (e.g., VM files) should be examined by <CODE>
+FileEnum()</CODE>
+.</DD>
+<DT>
+FESF_REAL_SKIP</DT><DD>
+If a skip count of <EM>
+n</EM>
+ is specified, the first <EM>
+n</EM>
+ files will be skipped regardless of whether they matched the attributes passed. In this case, <CODE>
+FileEnum()</CODE>
+ will return the number of files passed through in order to get enough files to fill the buffer; the return value can thus be the real-skip count for the next pass.</DD>
+<DT>
+FESF_CALLBACK</DT><DD>
+<CODE>
+FileEnum()</CODE>
+ should call a callback routine to determine whether a file should be accepted.</DD>
+<DT>
+FESF_LOCK_CB_DATA</DT><DD>
+This flag indicates that the <CODE>
+FileEnumParams</CODE>
+ fields <CODE>
+FEP_callback1</CODE>
+ and <CODE>
+FEP_callback2</CODE>
+ are far pointers to movable memory that must be locked before <CODE>
+FileEnum()</CODE>
+ is called.</DD>
+<DT>
+FESF_LEAVE_HEADER</DT><DD>
+If set, <CODE>
+FileEnum()</CODE>
+ should leave an empty header space at the start of the return buffer. The size of this buffer is specified by the <CODE>
+FEP_headerSize</CODE>
+ field.</DD>
+</DL>
+<P>
+You can specify precisely which data you want about each file and in which arrangement it should be returned. However, for most purposes, you can get enough information by requesting one of the standard return types. <A NAME="IX_FESRT_&ldots;">
+ </A>
+<A NAME="IX_FileEnumStandardReturnType">
+ </A>
+If you pass a member of <CODE>
+FileEnumStandardReturnType</CODE>
+ in <CODE>
+FEP_returnAttrs</CODE>
+, <CODE>
+FileEnum()</CODE>
+ will write an array of structures to the return buffer; each file will have one such structure. The structures are shown below in <A HREF="FileSys_f.htm#57154"> Standard FileEnum() Return Structures</A>
+. <CODE>
+FileEnumStandardReturnType</CODE>
+ has the following values:</P>
+<DL>
+<DT>
+FESRT_COUNT_ONLY</DT><DD>
+<CODE>
+FileEnum()</CODE>
+ will not allocate any memory or return data about files; instead, it will simply return the number of files which match the specified criteria.</DD>
+<DT>
+FESRT_DOS_INFO</DT><DD>
+<CODE>
+FileEnum()</CODE>
+ will return an array of <CODE>
+FEDosInfo</CODE>
+ structures. These structures contain basic information about the file: its virtual name, size, modification date, DOS attributes, and path information (as a <CODE>
+DirPathInfo</CODE>
+ record).</DD>
+<DT>
+FESRT_NAME</DT><DD>
+<CODE>
+FileEnum()</CODE>
+<A NAME="IX_FileLongName">
+ </A>
+<A NAME="IX_FILE_LONGNAME_BUFFER_SIZE">
+ </A>
+ will return an array of <CODE>
+FileLongName</CODE>
+ strings, each one of which is FILE_LONGNAME_BUFFER_SIZE characters long; every one of these will contain a file's virtual name followed by a null terminator.</DD>
+<DT>
+FESRT_NAME_AND_ATTR</DT><DD>
+<CODE>
+FileEnum()</CODE>
+ will return an array of <CODE>
+FENameAndAttr</CODE>
+ structures, each one of which contains a file's DOS attributes and virtual name.</DD>
+</DL>
+<P>
+<A NAME="IX_DPI_&ldots;">
+ </A>
+<A NAME="IX_FEDosInfo">
+ </A>
+The <CODE>
+FEDosInfo</CODE>
+ structure includes a word-sized record which describes the file's position relative to the standard paths. It contains the following fields:</P>
+<DL>
+<DT>
+DPI_EXISTS_LOCALLY</DT><DD>
+This bit is set if the file exists in a directory under the primary tree.</DD>
+<DT>
+DPI_ENTRY_NUMBER_IN_PATH</DT><DD>
+This is the mask for a seven-bit field whose offset is DPI_ENTRY_NUMBER_IN_PATH_OFFSET.</DD>
+<DT>
+DPI_STD_PATH</DT><DD>
+This is the mask for an eight-bit field whose offset is DPI_STD_PATH_OFFSET. If the file is in a standard path, this field will contain a <CODE>
+StandardPath</CODE>
+ constant for a standard path containing the file. This need not be the &quot;closest&quot; standard path; for example, if the file is in the &quot;World&quot; directory, this constant might nevertheless be SP_TOP.</DD>
+</DL>
+<P CLASS="figTitle">
+Code Display 17-2 <A NAME="57154">
+ </A>
+Standard FileEnum() Return Structures</P>
+<PRE>/* These structures are the standard FileEnum() return types. You can also
+ * instruct FileEnum() to return any arbitrary extended attribute information.
+ */</PRE>
+<PRE>typedef struct {			/* These are returned if you specify FESRT_DOS_INFO */
+    FileAttrs 		FEDI_attributes;			/* File's DOS attributes; 
+					 * see <A HREF="FileSys_10.htm#88250"> Getting and Setting Information about a Byte File</A> */
+    FileDateAndTime 		FEDI_modTimeDate			/* Last modification time; see <A HREF="FileSys_d.htm#38588"> FEA_MODIFICATION</A> */
+    dword 		FEDI_fileSize;			/* Size of file (in bytes) */
+    FileLongName		FEDI_name;			/* File's virtual name; null-terminated */
+    DirPathInfo 		FEDI_pathInfo;			/* PathInfo structure, described above */
+} FEDosInfo;</PRE>
+<PRE>typedef struct{ 			/* These are returned if you specify FESRT_NAME_AND_ATTR */
+    FileAttrs 		FENAA_attributes;			/* File's DOS attributes; 
+					 * see <A HREF="FileSys_10.htm#88250"> Getting and Setting Information about a Byte File</A> */
+    FileLongName 		FENAA_name;			/* File's virtual name; null-terminated */
+} FENameAndAttr;</PRE>
+<P>
+<A NAME="IX_FileEnumWildcard()">
+ </A>
+There is currently one standard callback routine provided. This routine, <CODE>
+FileEnumWildcard()</CODE>
+, rejects all files whose names don't match a wildcard string. To call this routine, set <CODE>
+FEP_callback</CODE>
+ as follows:</P>
+<PRE>enumParams.FEP_callback = (void *) FESC_WILDCARD;</PRE>
+<P>
+<CODE>
+FEP_cbData1</CODE>
+ should be a pointer to a null-terminated wildcard string. In this string, &quot;*&quot; denotes a sequence of zero or more of any character, and &quot;?&quot; denotes any one character; all other characters represent themselves. If a file's virtual name matches the wildcard string, information about it will be returned by <CODE>
+FileEnum()</CODE>
+. If the lowest byte of <CODE>
+FEP_cbData2</CODE>
+ is non-zero, the comparison will be case-insensitive; otherwise, it will be case-sensitive. (The other bytes of <CODE>
+FEP_cbData2</CODE>
+ are ignored.) This is different from standard DOS wildcarding; for example, the name &quot;doc*.&quot; matches any file that begins with the letters &quot;doc&quot; and ends with a period, whereas a DOS wildcard string &quot;doc*.&quot; would match only those files whose name start with &quot;doc&quot; and which have no extension.</P>
+<P>
+<A NAME="IX_FileEnumLocateAttr()">
+ </A>
+If you're writing your own callback routine, you may wish to use the <CODE>
+FileEnumLocateAttr()</CODE>
+ utility routine. This routine searches a <CODE>
+FileExtAttrDesc</CODE>
+ array (as passed to <CODE>
+FileEnum()</CODE>
+ callbacks), and will search the array for a file matching a particular attribute.</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="FileSys_a.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="FileSys_e.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.4 File Utilities</A> 
+<!-- to next --> | <A HREF="FileSys_10.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5.6 Bytewise File Operations</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

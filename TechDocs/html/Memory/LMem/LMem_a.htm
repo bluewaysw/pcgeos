@@ -1,0 +1,110 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: LMem_a.htm,v 1.1 97/06/02 15:52:56 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Example of LMem Usage</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Local Memory</A>: 3.4 <A HREF="LMem_6.htm">Using Local Memory Heaps</A>: 
+Example of LMem Usage</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="LMem_6.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="LMem_9.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.3 Contracting the LMem Heap</A> 
+<!-- to next --> | <A HREF="LMem_b.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">4 Special LMem Uses</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+At first, the local memory techniques can seem tricky. This section contains an example of LMem usage in Goc. The example shows the basic principles of LMem usage.</P>
+<P CLASS="figTitle">
+Code Display 16-1 LMem Usage in GOC</P>
+<PRE>/*
+ * Declarations
+ */</PRE>
+<PRE>/* We'll want to have a fixed data area at the start of the block. That area will
+ * have to start with an LMemBlockHeader, but after that, we can put whatever we
+ * want. To make it easy to access the fixed data, we define a structure.
+ */
+typedef struct {
+	LMemBlockHeader		MLMBH_standardHeader;
+	float		MLMBH_someData;
+	float		MLMBH_someMoreData;
+	char		MLMBH_someChars[10];
+} MyLMemBlockHeader;</PRE>
+<PRE>MyLMemBlockHeader 			*thisHeapsHeader;
+MemHandle			thisHeapsHandle;
+ChunkHandle			firstChH, secondChH;
+char 			*firstChPtr, *secondChPtr;
+int			i;</PRE>
+<PRE>/*
+ * Code
+ */</PRE>
+<PRE>/* We have to create the LMem heap. First, we create the block: */
+thisHeapsHandle = MemAlloc(					/* MemAlloc returns the block handle */
+			2048,		/* Allocate 2K; can grow as necessary */
+			HF_SWAPABLE,		/* Make block swapable. LMemInitHeap()
+					 * will add the flag HF_LMEM. */
+			HAF_ZERO_INIT | HAF_LOCK); 				/* Zero &amp; lock the block
+							 * upon allocation */</PRE>
+<PRE>LMemInitHeap(thisHeapsHandle,					/* Pass handle of locked block */
+		LMEM_TYPE_GENERAL,			/* Allocate a general heap */
+		0,			/* Don't pass any flags */
+		sizeof(MyLMemBlockHeader), 	/* Offset to leave room for header */
+		STD_INIT_HANDLES,			/* Standard # of starter handles */
+		STD_INIT_HEAP);		/* Allocate standard amt. of empty heap */</PRE>
+<PRE>/* The block is still locked; we can initialize the fixed data section. */
+thisHeapsHeader = (MyLMemBlockHeader *) MemDeref(thisHeapsHandle);
+thisHeapsHeader-&gt;MLMBH_someData = 3.1415926;</PRE>
+<PRE>/* Now, we allocate some chunks. This invalidates pointers to this heap (such as 
+ * thisHeapsHeader), since chunk allocation may cause the heap to be resized (and
+ * thus moved). The block must be locked when we do this.
+ */
+firstChH = LMemAlloc(					/* LMemAlloc returns a chunk handle */
+		thisHeapsHandle,			/* Pass handle of block . . . */
+		100);			/* . . . and number of bytes in chunk */</PRE>
+<PRE>secondChH = LMemAlloc(thisHeapsHandle, 50);</PRE>
+<PRE>/* Now, we start writing data to a chunk: */
+firstChPtr = (char *) LMemDerefHandles(thisHeapsHandle, firstChH);
+for(i = 0; i &lt;= 30; i++)
+   firstChPtr[i] = 'x';</PRE>
+<PRE>/* We can insert 10 bytes into the middle of the second chunk. This may cause the
+ * chunks or blocks to be shuffled; all pointers are invalidated
+ */
+LMemInsertAtHandles(thisHeapsHandle, secondChH, 						/* Block &amp; chunk handles */
+		20,				/* Insert after 20th byte */
+		30);				/* Insert 30 null bytes */</PRE>
+<PRE>/* If we want to access the first chunk, we need to dereference its handle again:
+ */
+firstChPtr = (char *) LMemDeref(thisHeapsHandle, firstChH);
+for(i = 1; i &lt;= 15; i++)
+    firstChPtr[(i&lt;&lt;1)] = 'o';</PRE>
+<PRE>/* When we're done with a chunk, we should free it. This does not invalidate 
+ * any pointers to other chunks.
+ */
+LMemFreeHandles(thisHeapsHandle, firstChH);</PRE>
+<PRE>/* If we won't be using an LMem heap for a while, we should unlock it the way we 
+ * would any block: */
+MemUnlock(thisHeapsHandle);</PRE>
+<PRE>/* When we're done with the LMem heap, we can just free it. */
+MemFree(thisHeapsHandle);</PRE>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="LMem_6.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="LMem_9.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.3 Contracting the LMem Heap</A> 
+<!-- to next --> | <A HREF="LMem_b.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">4 Special LMem Uses</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

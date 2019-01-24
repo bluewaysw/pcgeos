@@ -1,0 +1,389 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: ImportExport_7.htm,v 1.1 97/06/02 14:34:10 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> The ExportControl Object</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The Import/Export Library</A>: 2.3 <A HREF="ImportExport_4.htm">Using Impex</A>: 
+The ExportControl Object</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="ImportExport_4.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="ImportExport_6.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2.2 The ImportControl Object</A> 
+<!-- to next --> | <A HREF="ImportExport_8.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">3 Writing Translation Libraries</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+<A NAME="IX_ExportControlClass">
+ </A>
+Applications which use the Impex library will generally have a single ExportControl object. This object is usually a child of the File menu; however, applications may put it wherever they want. They should also place it on the application object's GAGCNLT_SELF_LOAD_OPTIONS GCN list. Applications should disable this object (with MSG_GEN_SET_NOT_ENABLED) whenever they are not able to prepare data for export; for example, some applications will choose to disable file exporting whenever the &quot;Cut&quot; and &quot;Copy&quot; functions are disabled.</P>
+<P>
+The ExportControl object is subclassed from <CODE>
+GenControlClass</CODE>
+ (by way of <CODE>
+ImportExportClass</CODE>
+, as noted above). It thus has all the functionality of that class. It also has a few instance data fields of its own; they are shown in <A HREF="ImportExport_7.htm#34105"> ExportControlClass Instance Data</A>
+.</P>
+<P CLASS="figTitle">
+Code Display 16-2 <A NAME="34105">
+ </A>
+ExportControlClass Instance Data</P>
+<PRE>/* ECI_attrs is a word-length record which stores attribute information for the
+ * ImportControl object. It has only one flag, ECA_IGNORE_INPUT. */
+    @instance ExportControlAttrs					ECI_attrs = 0;</PRE>
+<PRE>/* ECI_dataClasses is a word-length record which indicates what Metafile formats
+ * are supported by the application. The application must set this field. */
+    @instance ImpexDataClasses					ECI_dataClasses = 0;</PRE>
+<PRE>/* ECI_destination and ECI_message indicate what message should be sent when the
+ * ExportControl object is preparing to export a file. The application must set
+ * these fields. The message must take a single argument, namely a pointer to an
+ * ImpexTranslationParams structure in ss:bp (on the stack). */
+    @instance optr					ECI_destination;
+    @instance word					ECI_message;</PRE>
+<PRE>/* Applications may wish to add their own UI objects to the Export dialog box.
+ * They can do so by defining a generic tree (the top object of which must be not
+ * &quot;usable&quot;), and putting an optr to the top object in ATTR_EXPORT_CONTROL_APP_UI.
+ */
+    @vardata optr 					ATTR_EXPORT_CONTROL_APP_UI;</PRE>
+<PRE>/* Controller features flags */
+typedef ByteFlags 			ExportControlFeatures;
+#define EXPORTCF_BASIC			0x01</PRE>
+<PRE>typedef	ByteFlags 			ExportControlToolboxFeatures;
+#define EXPORTCTF_DIALOG_BOX				0x01</PRE>
+
+<H2 CLASS="HeadingC">
+ECI_attrs</H2>
+<PRE>ExportControlAttrs, MSG_EXPORT_CONTROL_GET_ATTRS, MSG_EXPORT_CONTROL_SET_ATTRS</PRE>
+<P>
+ECI<A NAME="IX_ExportControlAttrs">
+ </A>
+<A NAME="IX_ECI_attrs">
+ </A>
+<CODE>
+_attrs</CODE>
+ is a word-length record of type <CODE>
+ExportControlAttrs</CODE>
+. This record contains only one flag:</P>
+<DL>
+<DT>
+ECA_IGNORE_INPUT</DT><DD>
+<A NAME="IX_ECA_&ldots;">
+ </A>
+If this flag is on, the ExportControl will consume all input to the application while the import occurs. By default, this flag is off.</DD>
+</DL>
+<P>
+To find out the current setting of this field, send <CODE>
+MSG_EXPORT_CONTROL_GET_ATTRS</CODE>
+ to the ImportControl. To change this field, send MSG_EXPORT_CONTROL_SET_ATTRS to the ImportControl.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_EXPORT_CONTROL_GET_ATTRS">
+ </A>
+MSG_EXPORT_CONTROL_GET_ATTRS</H4>
+<PRE CLASS="syntax">ExportControlAttrs	 MSG_EXPORT_CONTROL_GET_ATTRS();</PRE>
+<P>
+This message retrieves the current setting of the ExportControl's ECI<CODE>
+_attrs</CODE>
+ field.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any ExportControl object.</P>
+<P CLASS="refField">
+Return:	The ExportControl's ECI<CODE>
+_attrs</CODE>
+ field.</P>
+<P CLASS="refField">
+Interception:	This message should not be intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_EXPORT_CONTROL_SET_ATTRS">
+ </A>
+MSG_EXPORT_CONTROL_SET_ATTRS</H4>
+<PRE CLASS="syntax">void	MSG_EXPORT_CONTROL_SET_ATTRS(
+        ExportControlAttrs		attrs);</PRE>
+<P>
+This message changes the current settings of an ExportControl's ECI<CODE>
+_attrs</CODE>
+ field. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any ExportControl object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+attrs</CODE>
+	The new settings for the ECI<CODE>
+_attrs</CODE>
+ field.</P>
+<P CLASS="refField">
+Interception:	This message should not be intercepted.</P>
+
+
+
+<H2 CLASS="HeadingC">
+ECI_dataClasses</H2>
+<PRE>MSG_EXPORT_CONTROL_GET_DATA_CLASSES, MSG_EXPORT_CONTROL_SET_DATA_CLASSES</PRE>
+<P>
+<A NAME="IX_ECI_dataClasses">
+ </A>
+When you declare an Export object, you must specify what kind of Metafiles your application is able to create. You do this by setting the value of the ECI<CODE>
+_dataClasses</CODE>
+ field. This field is a word-length record of type <CODE>
+ImpexDataClasses</CODE>
+ (described in <A HREF="ImportExport_5.htm#69269"> ImpexTranslationParams</A>
+). If (for example) only the IDC_TEXT bit is set, the ExportControl will use only those export libraries which expect text Metafile input. More than one bit may be set; when the ExportControl sends its notification, it will tell the application what type of data it expects to export.</P>
+<P>
+To find out the current settings of the ECI<CODE>
+_dataClasses</CODE>
+ field, send MSG_EXPORT_CONTROL_GET_DATA_CLASSES. To change the settings of this field, send MSG_EXPORT_CONTROL_SET_DATA_CLASSES.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_EXPORT_CONTROL_GET_DATA_CLASSES">
+ </A>
+MSG_EXPORT_CONTROL_GET_DATA_CLASSES</H4>
+<PRE CLASS="syntax">ImpexDataClasses	 MSG_EXPORT_CONTROL_GET_DATA_CLASSES();</PRE>
+<P>
+This message retrieves the current setting of the ExportControl's ECI<CODE>
+_dataClasses</CODE>
+ field. This tells you what kind of data can be exported.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any ExportControl object.</P>
+<P CLASS="refField">
+Return:	The ExportControl's ECI<CODE>
+_dataClasses</CODE>
+ field.</P>
+<P CLASS="refField">
+Interception:	This message should not be intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_EXPORT_CONTROL_SET_DATA_CLASSES">
+ </A>
+MSG_EXPORT_CONTROL_SET_DATA_CLASSES</H4>
+<PRE CLASS="syntax">void	MSG_EXPORT_CONTROL_SET_DATA_CLASSES(
+        ImpexDataClasses 		dataClasses);</PRE>
+<P>
+This message changes the current settings of an ExportControl's ECI<CODE>
+_dataClasses</CODE>
+ field. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any ExportControl object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+dataClasses</CODE>
+	The new settings for the ECI<CODE>
+_dataClasses</CODE>
+ field.</P>
+<P CLASS="refField">
+Interception:	This message should not be intercepted.</P>
+
+
+
+<H2 CLASS="HeadingC">
+The ExportControl Action</H2>
+<PRE>MSG_EXPORT_CONTROL_GET_ACTION, MSG_EXPORT_CONTROL_SET_ACTION</PRE>
+<P>
+The ExportControl does most of its work transparently to the application. It interacts with the rest of the application after the user selects the name, location, and format of the exported file. At this point the ExportControl creates a temporary transfer file and sends a notification message to the application; the notification message passes the file handle and the format expected. The application responds by creating a VM chain in the transfer file and filling it with the data to export, formatted in the appropriate Metafile format. The ExportControl can then call the translation library to create the output file.</P>
+<P>
+<A NAME="IX_ECI_message">
+ </A>
+<A NAME="IX_ECI_destination">
+ </A>
+The application determines what notification message will be sent, and to what object, by setting the ECI<CODE>
+_destination</CODE>
+ and ECI<CODE>
+_message</CODE>
+ fields. Whatever object will receive the message should define an appropriate message.<A NAME="IX_ITP_&ldots; :with export">
+ </A>
+<A NAME="IX_ImpexTranslationParams:with export">
+ </A>
+ The ExportControl will send this message with a single parameter: <CODE>
+itp</CODE>
+, a pointer to an <CODE>
+ImpexTranslationParams</CODE>
+ structure. The fields of the structure have the following meanings in this situation:</P>
+<DL>
+<DT>
+<CODE>
+ITP_impexOD</DT><DD>
+</CODE>
+The object to which the application should send its acknowledgment message. In this case, it is the optr of the ExportControl.</DD>
+<DT>
+ITP<CODE>
+_returnMsg</DT><DD>
+</CODE>
+The acknowledgment message to send when the export has been completed. In this case, it is <CODE>
+MSG_EXPORT_CONTROL_EXPORT_COMPLETE.</CODE>
+</DD>
+<DT>
+ITP<CODE>
+_dataClass</DT><DD>
+</CODE>
+An <CODE>
+ImpexDataClasses</CODE>
+ record with one flag set. This flag indicates what type of Metafile should be prepared.</DD>
+<DT>
+ITP<CODE>
+_transferVMFile</DT><DD>
+</CODE>
+The <CODE>
+VMFileHandle</CODE>
+ of the temporary transfer file.</DD>
+<DT>
+ITP<CODE>
+_transferVMChain</DT><DD>
+</CODE>
+A null handle. When the application has created the transfer VM chain, it should write the <CODE>
+VMBlockHandle</CODE>
+ of the head of the chain to this field. If the application fails for any reason, it should leave this field as a null handle.</DD>
+<DT>
+ITP<CODE>
+_internal</DT><DD>
+</CODE>
+This field is for use by the ExportControl and should not be changed by the application.</DD>
+</DL>
+<P>
+The recipient of the message should take any appropriate action; usually this entails translating the current selection into the Metafile format and writing it to a VM chain. When the application is finished, it should call <CODE>
+ImpexImportExportCompleted()</CODE>
+. This routine will send the appropriate acknowledgment message to the ExportControl object (in this case, <CODE>
+MSG_EXPORT_CONTROL_EXPORT_COMPLETE</CODE>
+). This routine takes one parameter, namely the <CODE>
+itp</CODE>
+ pointer which was passed to the object. The ITP<CODE>
+_transferVMChain</CODE>
+ field of the <CODE>
+ImpexTranslationParams</CODE>
+ structure should be set to the handle of the head block in the VM chain. If the application was unable to prepare the data for export, it should clear this field.</P>
+<P>
+The ExportControl object will have created a temporary file for the application to use. This file will be entirely empty when the application gets it. The ExportControl will ignore everything in the file except for the VM chain indicated by ITP<CODE>
+_transferVMChain</CODE>
+; thus, an application can feel free to allocate blocks in the VM file for scratch space. The ExportControl will destroy the file when the translation library has finished preparing the output file.</P>
+<P>
+Applications which use the object model of document control will often set ECI<CODE>
+_destination</CODE>
+ to TO_APP_TARGET; this will make it send its messages to the target object. The application can find out the ExportControl's action by sending it <CODE>
+MSG_EXPORT_CONTROL_GET_ACTION</CODE>
+. The application can change the ExportControl's action by sending it <CODE>
+MSG_EXPORT_CONTROL_SET_ACTION</CODE>
+. </P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_IMPORT_CONTROL_GET_ACTION">
+ </A>
+MSG_EXPORT_CONTROL_GET_ACTION</H4>
+<PRE CLASS="syntax">void	MSG_EXPORT_CONTROL_GET_ACTION(
+        ObjectState *		retValue);</PRE>
+<P>
+This message retrieves the values of an ExportControl's ECI<CODE>
+_destination</CODE>
+ and ECI<CODE>
+_message</CODE>
+ fields. These fields indicate what action the ExportControl will take when it needs to have data prepared for export.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any ImportControl object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+retValue</CODE>
+	A pointer to an <CODE>
+ObjectState</CODE>
+ structure.</P>
+<P CLASS="refField">
+Return:	The value of ICI<CODE>
+_message</CODE>
+ (i.e. the message sent by the ExportControl).</P>
+<DL>
+<DT>
+<CODE>
+recipient</CODE>
+</DT><DD>A pointer to an <CODE>
+ObjectState</CODE>
+ structure describing the message sent.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	This message should not be intercepted.</P>
+<P CLASS="refField">
+Structures:	The message and recipient are written to an <CODE>
+ObjectState</CODE>
+ structure:</P>
+<PRE>typedef struct {
+	int	notUsed;
+	word	message;		/* Message sent */
+	optr	destOD;		/* Destination of message */
+} ObjectState;</PRE>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_EXPORT_CONTROL_SET_ACTION">
+ </A>
+MSG_EXPORT_CONTROL_SET_ACTION</H4>
+<PRE CLASS="syntax">void	MSG_EXPORT_CONTROL_SET_ACTION(
+        optr	destOD,	/* Send messages to this object. */
+        word	ECImsg);	/* Send this message to the above recipient. */</PRE>
+<P>
+This message changes the values of an ExportControl's ECI<CODE>
+_destination</CODE>
+ and ECI<CODE>
+_message</CODE>
+ fields. These fields indicate what action the ExportControl will take when it is finished preparing a file for export.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any ExportControl object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+recipient</CODE>
+	Set ECI<CODE>
+_destination</CODE>
+ to this value. </P>
+<DL>
+<DT>
+<CODE>
+message</CODE>
+</DT><DD>Set ECI<CODE>
+_message</CODE>
+ to this value.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	This message should not be intercepted.<A NAME="marker=439364">
+ </A>
+</P>
+
+
+
+<H2 CLASS="HeadingC">
+Adding to the Import Dialog Box</H2>
+<P>
+<A NAME="IX_ATTR_EXPORT_CONTROL_APP_UI">
+ </A>
+When the user selects the &quot;Export&quot; trigger or tool, the Export controller brings up a dialog box. The application can, if it wishes, add UI objects to this box. It does so by defining a tree of generic objects (the top object of which must be set &quot;not usable&quot;). It must place an optr to the top object in the tree in ATTR_EXPORT_CONTROL_APP_UI. When the ExportControl builds the dialog box, it will add that optr as one of the children in the tree and set it &quot;usable&quot;.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="ImportExport_4.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="ImportExport_6.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2.2 The ImportControl Object</A> 
+<!-- to next --> | <A HREF="ImportExport_8.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">3 Writing Translation Libraries</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

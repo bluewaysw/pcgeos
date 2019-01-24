@@ -1,0 +1,1003 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+<!-- This page was automatically generated from a bunch of smaller pages. -->
+<META NAME="copyright" CONTENT="Copyright GEOWORKS">
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+<TITLE>Memory Management</TITLE>
+</HEAD>
+<BODY BGCOLOR="#ffffdf">
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+<A NAME="index.htm"></A>
+
+
+
+<H1 CLASS="chapterTitle">
+
+<A NAME="index.htm_97933">
+ </A>
+Memory Management
+
+</H1>
+<P>
+<A NAME="index.htm_IX_Memory">
+ </A>
+<A NAME="index.htm_40630">
+ </A>
+Managing memory in a multitasking system is complex because many different entities--the kernel, libraries, and applications--are all trying to use the same memory space. To ensure that each gets all the memory it needs, without having to worry about what other memory users are doing, GEOS provides a memory manager.</P>
+<P>
+
+</P>
+<P CLASS="sectionlinks">
+<STRONG>
+&nbsp;&nbsp;<A HREF="#Memory_1.htm">1 Design Philosophy</A><BR>
+&nbsp;&nbsp;<A HREF="#Memory_2.htm">2 The Structure of Memory</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Memory_3.htm">2.1 Expanded/Extended Memory</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Memory_4.htm">2.2 Main Memory</A><BR>
+&nbsp;&nbsp;<A HREF="#Memory_5.htm">3 Using Global Memory</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Memory_6.htm">3.1 Memory Etiquette</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Memory_7.htm">3.2 Requesting Memory</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Memory_8.htm">3.3 Freeing Memory</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Memory_9.htm">3.4 Accessing Data in a Block</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Memory_a.htm">3.5 Accessing Data: An Example</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Memory_b.htm">3.6 Data-Access Synchronization</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Memory_c.htm">3.7 Retrieving Block Information</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Memory_d.htm">3.8 The Reference Count</A><BR>
+&nbsp;&nbsp;<A HREF="#Memory_e.htm">4 malloc()</A><BR>
+</STRONG>
+</P> <!-- end of sectionlinks blob -->
+
+<HR>
+<A NAME="Memory_1.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Memory Management</A>: 1 
+Design Philosophy</H2>
+<P>
+Some systems make each application maintain and manage its own memory. In a multitasking system, this is not only difficult and time-consuming but also potentially dangerous, as applications can easily start trashing memory used by other processes. GEOS protects and relieves applications by providing comprehensive memory management.</P>
+<P>
+The GEOS memory management system is designed to meet rigorous demands. Some of the requirements are</P>
+<UL>
+<LI>
+Independence of memory location<BR>
+Ideally, an application should not have to keep track of the address of each of its data items; rather, the memory management system should allow the application to reference its memory virtually.</LI>
+<LI>
+Hardware independence<BR>
+Applications are much easier to write and maintain if they can ignore hardware specifics. An application should be able to specify its memory requirements in generic terms (&quot;I need a package this big which behaves in this way&quot;) and let the memory manager worry about where it comes from.</LI>
+<LI>
+Efficient use of memory<BR>
+A good operating system should be able to rearrange memory in order to gather as much space as possible. It should also be able to discard certain data or copy it to mass-storage devices (like a hard disk) if more memory is needed.</LI>
+<LI>
+Management of Shared Data<BR>
+Applications should be able to share common data or code. In a multitasking system, proper synchronization of shared resources is essential to maintain data integrity.</LI>
+</UL>
+<P>
+The GEOS memory manager meets all of these needs. Applications often take advantage of the memory manager without trying; for example, the memory manager swaps methods into memory when messages need to be handled. Applications can also request memory at run-time, either by requesting raw memory from the memory manager, or by creating Virtual Memory files through the VM library (see <A HREF="../../Memory/VM/index.htm">the VM chapter</A>).</P><HR>
+<A NAME="Memory_2.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Memory Management</A>: 2 
+The Structure of Memory</H2>
+<P>
+The GEOS memory manager currently uses real mode memory addressing, and is designed to run on PCs with as little as 512K RAM. Typically, between 30K and 160K of that is occupied by DOS. The remaining RAM is used for the global handle table and the global heap (described below). The GEOS kernel is kept in the global heap.</P>
+<P>
+Because of the constraints of real-mode memory addressing, GEOS uses memory in segments of at most 64K. Each segment may be subdivided and parceled out to fill memory requests from applications. Sometimes an application will need a seemingly contiguous section of memory which is larger than 64K; in these situations, it should use the HugeArray routines (see <A HREF="../../Memory/VM/VM_14.htm#87156">the VM chapter</A>).</P><P CLASS="subsectionLink">
+<A HREF="#Memory_3.htm">Expanded/Extended Memory</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Memory_4.htm">Main Memory</A></P>
+<HR>
+<A NAME="Memory_3.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Memory Management</A>: 2.1 <A HREF="#Memory_2.htm">The Structure of Memory</A>: 
+Expanded/Extended Memory</H3>
+<P>
+<A NAME="Memory_3.htm_IX_EMS">
+ </A>
+<A NAME="Memory_3.htm_IX_XMS">
+ </A>
+<A NAME="Memory_3.htm_IX_Expanded memory">
+ </A>
+<A NAME="Memory_3.htm_IX_Extended memory">
+ </A>
+While GEOS is designed to run on a standard system, it makes efficient use of expanded and extended memory, if it is available. GEOS treats extended memory as a fast and convenient RAM disk, swapping blocks into the extended memory rather than out to a slower disk drive. This incurs none of the usual overhead of a RAM disk such as a directory because it is treated as normal memory. Expanded memory is used in a similar manner.</P>
+<HR>
+<A NAME="Memory_4.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Memory Management</A>: 2.2 <A HREF="#Memory_2.htm">The Structure of Memory</A>: 
+Main Memory</H3>
+<P>
+<A NAME="Memory_4.htm_IX_Heap">
+ </A>
+Memory available to applications is organized in a data structure called the Global Heap. The size of the global heap may vary from machine to machine and can change from session to session, but during a single execution of GEOS, the heap size remains constant. Usually, the global heap occupies approximately 450K bytes of a 640K system.</P>
+<P>
+When an application requests memory, it is allocated a &quot;block&quot; on the heap. Blocks may be of almost any size but may not be larger than 64K. (However, the heap is most efficient when blocks are 2K-6K in size; see <A HREF="#Memory_6.htm_65805"> Memory Etiquette</A>
+.) Every block is allocated a unique handle (described below) from the Handle Table; by calling a memory manager routine, the application can translate a handle to a conventional pointer.</P>
+<P>
+When GEOS shuts down, all the blocks on the global heap are freed, even if they are locked or fixed. If an application will need to store the data over a shutdown, it should make the block part of a VM file, which it can then reopen when it restores from state. The GEOS kernel attaches object blocks to system VM files and takes care of storing them to state and restoring them when GEOS restarts.</P>
+
+<H4 CLASS="HeadingC">
+Blocks and Handles</H4>
+<P>
+GEOS segments memory into blocks. A block is simply a number of contiguous bytes on the global heap in which code or data may be stored. Any given block may be of any size but must be less than 64K, due to the segmented addressing scheme used by the 80x86 processors. A block's size is determined when it is allocated--the process that requests the memory must specify the desired size.</P>
+<P>
+To facilitate efficient memory usage and to present all applications with enough memory to function, blocks are dynamic in nature. This means that unless a block is fixed or has been locked (see <A HREF="#Memory_9.htm_19276"> Accessing Data in a Block</A>
+), there is no telling its precise address on the heap, or indeed whether it is on the heap at all. For this reason, applications are not given the address of an allocated block; rather, they are given the block's handle.</P>
+<P>
+Memory handles are indexes into the global handle table. Geodes may not access the table directly. When they want to access the memory indicated by a handle, they pass the handle to the memory manager and are returned the segment address of the block's current location on the heap.</P>
+<P>
+In addition to storing the actual address of the block, the handle table entry records the block's attributes, such as whether the block is discardable, swapable, or fixed. The memory manager uses all these attributes to manipulate the block.</P>
+
+
+<H4 CLASS="HeadingC">
+Enabling Block Access</H4>
+<P>
+Dynamic memory, while providing significant benefits, poses one major problem: What happens if a block is accessed while being moved, swapped, or discarded? GEOS responds to this problem with the implementation of a system for locking and unlocking blocks. When a block is locked on the heap, the Memory Manager may not move, swap, or discard it until it is unlocked. This locking mechanism allows applications to gain control over their memory during periods of access and relinquish it when it is not in active use. Applications, however, should not leave blocks locked for extended periods as this may interfere with heap compaction.</P>
+<P>
+When a process wants to use a block, it instructs the memory manager to lock the block by calling <CODE>
+MemLock()</CODE>
+ (see <A HREF="#Memory_9.htm_70173"> MemLock() locks a block on the heap. It is passed the handle of the block; it returns a pointer to the start of the block on the heap. If the block has been discarded, MemLock() returns a null pointer.</A>
+). The application passes the handle of the block, and the memory manager locks the block and returns a pointer to the block's area in the global heap. While a block is unlocked, the memory manager can, depending on the block's category, move the block on the heap, swap it to disk or extended/expanded memory, or discard it altogether.</P>
+
+
+<H4 CLASS="HeadingC">
+Types of Blocks</H4>
+<P>
+When a geode requests memory, it may specify how that memory is to be treated by the memory manager. The memory request includes a set of <CODE>
+HeapFlags</CODE>
+ (see <A HREF="#Memory_4.htm_85480"> HF_FIXED The block will not move from its place in the global heap until it is freed. If this flag is off, the memory manager may move the block when it is unlocked. If it is on, the block may not be locked. This flag cannot be changed after the</A>
+) which specifies how and when the block can be moved. Broadly speaking, memory blocks can be divided into four categories:</P>
+<UL>
+<LI>
+Fixed<BR>
+<A NAME="Memory_4.htm_IX_Fixed memory">
+ </A>
+A fixed block has the flag HF_FIXED set to one, and HF_DISCARDABLE and HF_SWAPABLE set to zero. A fixed block is allocated on the global heap and stays exactly where it was created until it is freed. An application can therefore reference data within a fixed block with normal pointers; the application does not need to use the memory manager to translate a handle into a pointer. Accessing fixed blocks is very quick since the memory never needs to be read from disk and the handle does not need to be dereferenced. However, since the memory manager cannot relocate fixed blocks, they tend to degrade the memory manger's performance; therefore, applications should generally use small amounts of fixed memory. Note that if a fixed block is resized, it may be moved on the global heap; therefore, after resizing a fixed block, a geode should reset its pointers within the block by dereferencing the block handle.</LI>
+<LI>
+Moveable<BR>
+<A NAME="Memory_4.htm_IX_Moveable memory">
+ </A>
+A moveable block has the flag HF_FIXED set to zero. When a moveable block is not in use (i.e. unlocked), the memory manager may move it within the global heap. This lets the memory manager keep the global heap compacted (see <A HREF="#Memory_4.htm_42030"> Maximizing Free Space in Memory</A>
+). Accessing moveable blocks is slightly slower than accessing fixed blocks since the application needs to call the memory manager to lock the block and translate the memory handle to a pointer. In addition to being moveable, a block may also be swapable and/or discardable (as described below).</LI>
+<LI>
+Swapable<BR>
+<A NAME="Memory_4.htm_IX_Swapable memory">
+ </A>
+A swapable block has the flag HF_FIXED set to zero and HF_SWAPABLE set to one. If a block is marked &quot;swapable,&quot; the memory manager has the option of swapping it out of main memory (either to the hard disk, or to extended or expanded memory) when it is unlocked. This keeps space on the global heap free for other requests. If an application tries to lock a block which has been swapped out of main memory, the memory manager will copy the entire block back to the global heap, then lock it normally. By using swapable memory, geodes can potentially use much more memory than the roughly 450K available in the global heap. However, accessing an unlocked swapable block can potentially be much slower than accessing a non-swapable block, as the block may have to be copied in from the disk.</LI>
+<LI>
+Discardable<BR>
+<A NAME="Memory_4.htm_IX_Discardable memory">
+ </A>
+A discardable block has HF_FIXED set to zero and HF_DISCARDABLE set to one. Sometimes it doesn't make sense to copy a block to the disk. For example, many memory blocks contain code or unchanging data which is read in from the disk. It would make no sense to swap these blocks back to disk, since the data is already there. Instead, one can mark a block &quot;discardable.&quot; This indicates that when the block is unlocked, the memory manager can, at will, discard the block. If a process attempts to lock a block which has been discarded, the memory manager will return an error. The application can then &quot;re-allocate&quot; memory for that block (see <CODE>
+MemReAlloc()</CODE>
+ on <A HREF="#Memory_7.htm_41911"> To change the size of a block, call the routine MemReAlloc(). This routine is also used to allocate memory for a block that has been discarded. The routine is passed the memory handle, the new size, and the HeapAllocFlags; it returns the block's</A>
+) and copy the data back from the disk. (The system takes care of reloading discarded code resources as necessary.) A block can be both discardable and swapable (indeed, discardable blocks are usually swapable). If a block has both HF_DISCARDABLE and HF_SWAPABLE set, the memory manager can either swap the block to extended/expanded memory or discard it; it will not swap the block to the disk.</LI>
+</UL>
+<P>
+Fixed blocks must be declared as such when they are allocated, and they remain so until they are freed. However, non-fixed blocks may become or cease to be discardable or swapable after they are created. To enable or disable these characteristics, call the routine <CODE>
+MemModifyFlags()</CODE>
+ (see <A HREF="#Memory_c.htm_60044"> MemModifyFlags() is used to change a block's HeapFlags record. It takes three arguments: The handle of the block, the HeapFlags to turn on, and the HeapFlags to clear. It returns nothing. Not all HeapFlags can be changed after a block is created</A>
+).</P>
+
+
+<H4 CLASS="HeadingC">
+<A NAME="Memory_4.htm_42030">
+ </A>
+Maximizing Free Space in Memory</H4>
+<P>
+Moveable, swapable, and discardable blocks are allocated from the top of the heap using a first-fit method. Fixed blocks are allocated from the bottom of the heap. If there is not enough contiguous free memory to satisfy an allocation request, the memory manager attempts to shuffle moveable blocks in order to place all free memory together in one large mass.</P>
+<P>
+This shuffling is called heap compaction. If the free space resulting from compaction still is not enough, blocks are discarded or swapped to liberate more free space, and the heap is again compacted. Because of the multitasking nature of GEOS, compaction occurs in the background and is invisible to both the user and applications. The memory manager will also periodically compact memory during periods of low activity; this helps insure that there will be memory instantly available for a sudden large demand (e.g. when an application is launched).</P>
+<P>
+The compaction is not arbitrary. The kernel decides which blocks to swap or discard based on recent usage patterns. This means, for example, that if you haven't used routines in a code resource for a while, that resource is more likely to be discarded than the resources you've accessed recently. (For this reason, geodes normally isolate their initialization code in one resource, which can be discarded later.)</P>
+<P>
+A block left locked for extended periods could interfere with heap compaction. Suppose, for example, that the moveable locked block in the middle of the heap were left locked during an application's entire execution. Essentially, this would cause the heap to be fractured into two subheaps, making compaction more difficult and possibly slowing the system down.
+
+</P>
+<P>
+All compaction, swapping, and discarding are functions of the Memory Manager. Applications need only indicate how much space is needed and when space can be freed. Applications may also resize blocks at will; if necessary, the memory manager will compact the heap to accommodate the request.</P>
+
+
+<H4 CLASS="HeadingC">
+Block Attributes</H4>
+<PRE>HeapAllocFlags, HeapFlags</PRE>
+<P>
+Blocks are allocated with certain flags that help the Memory Manager manipulate memory efficiently. These flags can be found in the GEOS file <STRONG CLASS="fileName">
+heap.h</STRONG>
+, which should be included in all applications that plan to allocate memory dynamically with the memory manager routines.</P>
+<P>
+The flags fall into two categories: those used when the block is allocated (stored in a record called <CODE>
+HeapAllocFlags</CODE>
+) and those used to describe the block as it is manipulated (stored in a record called <CODE>
+HeapFlags</CODE>
+).</P>
+<P>
+<A NAME="Memory_4.htm_IX_HAF_&ldots;">
+ </A>
+<A NAME="Memory_4.htm_IX_HeapAllocFlags">
+ </A>
+The <CODE>
+HeapAllocFlags</CODE>
+ record is used to determine what qualities the memory manager should give the block when it is first allocated. Some of these flags are also relevant when memory is being reallocated. These qualities include:</P>
+<DL>
+<DT>
+HAF_ZERO_INIT</DT><DD>
+Upon allocation, initialize data in block to zeros.</DD>
+<DT>
+HAF_LOCK</DT><DD>Upon allocation, the block should be locked on the global heap. Use <CODE>
+MemDeref()</CODE>
+ (<A HREF="#Memory_c.htm_91285"> MemDeref() is passed the handle of a block on the global heap; it returns the block's address on the global heap. As noted above, this routine is useful when you allocate a fixed or locked block. If the block has been discarded, it returns a nul</A>
+) to get a pointer to the block.</DD>
+<DT>
+HAF_NO_ERR</DT><DD>
+Do not return error codes; system error if block cannot be allocated. Use of this flag is strongly discouraged.</DD>
+<DT>
+HAF_OBJECT_RESOURCE</DT><DD>
+This block is an object-block. This is set by the system <EM>
+only</EM>
+.</DD>
+<DT>
+HAF_UI</DT><DD>If both HAF_OBJECT_RESOURCE and HAF_UI are set, the memory manager will set the block to allow the application's UI thread to manipulate objects in the block. This is set by the system <EM>
+only</EM>
+.</DD>
+<DT>
+HAF_READ_ONLY</DT><DD>
+This block's data will not be modified.</DD>
+<DT>
+HAF_CODE</DT><DD>This block contains executable code.</DD>
+<DT>
+HAF_CONFORMING</DT><DD>
+If this block contains code, the code may be run by a less privileged entity. If the block contains data, the data may be accessed or altered by a less privileged entity.</DD>
+</DL>
+<P>
+<A NAME="Memory_4.htm_IX_HF_&ldots;">
+ </A>
+<A NAME="Memory_4.htm_IX_HeapFlags">
+ </A>
+Once a block is allocated, it has certain properties that govern how the Memory Manager manipulates it. These properties are determined by the <CODE>
+HeapFlags</CODE>
+. The <CODE>
+HeapFlags</CODE>
+ also contain data about whether the block has been swapped or discarded. These flags are stored in the block's handle-table entry, so they can be retrieved without locking the block. To retrieve the flags, call the routine <CODE>
+MemGetInfo()</CODE>
+ with the flag MGIT_FLAGS_AND_LOCK_COUNT. (See <CODE>
+MemGetInfo()</CODE>
+ on <A HREF="#Memory_c.htm_19383"> MemGetInfo() is a general-purpose block information routine. It is passed two arguments: the handle of the block, and a member of the MemGetInfoType enumerated type. The return value is always word-length; however, its significance depends on th</A>
+.) Some of the flags can be changed after the block has been allocated; for details, see <CODE>
+MemModifyFlags()</CODE>
+ on <A HREF="#Memory_c.htm_60044"> MemModifyFlags() is used to change a block's HeapFlags record. It takes three arguments: The handle of the block, the HeapFlags to turn on, and the HeapFlags to clear. It returns nothing. Not all HeapFlags can be changed after a block is created</A>
+. The flags include</P>
+<DL>
+<DT>
+HF_FIXED</DT><DD><A NAME="Memory_4.htm_85480">
+ </A>
+The block will not move from its place in the global heap until it is freed. If this flag is <EM>
+off</EM>
+, the memory manager may move the block when it is unlocked. If it is <EM>
+on</EM>
+, the block may not be locked. This flag <EM>
+cannot</EM>
+ be changed after the block has been allocated.</DD>
+<DT>
+HF_SHARABLE</DT><DD>
+The block may be locked by geodes other than the owner. This flag can be changed with <CODE>
+MemModifyFlags()</CODE>
+.</DD>
+<DT>
+HF_DISCARDABLE</DT><DD>
+If the block is unlocked and space is needed, the memory manager may discard it. This flag can be changed with <CODE>
+MemModifyFlags()</CODE>
+.</DD>
+<DT>
+HF_SWAPABLE</DT><DD>
+If the block is unlocked and space is needed, it may be swapped to expanded or extended memory or to the hard disk. This flag can be changed with <CODE>
+MemModifyFlags()</CODE>
+.</DD>
+<DT>
+HF_LMEM</DT><DD>
+The block is a local-memory block, managed by the LMem module (see <A HREF="../../Memory/LMem/index.htm">the Local Memory chapter</A>). The flag is set automatically by <CODE>LMemInitHeap()</STRONG>
+. It can be changed with <CODE>
+MemModifyFlags()</CODE>
+; however, an application should not change this flag.</DD>
+<DT>
+HF_DISCARDED</DT><DD>
+The block has been discarded by the memory manager. Only the system can set or clear this flag.</DD>
+<DT>
+HF_SWAPPED</DT><DD>
+The block has been swapped to extended or expanded memory or to the hard disk. Only the system can set or clear this flag.</DD>
+
+</DL>
+<HR>
+<A NAME="Memory_5.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Memory Management</A>: 3 
+Using Global Memory</H2>
+<P>
+When an application needs more raw memory at run-time, it can use the memory manager kernel routines to allocate, use, and free new blocks. An application can also create a Virtual Memory file to get memory with more advanced functionality, such as the ability to save to a disk file (see <A HREF="../../Memory/VM/index.htm">the VM chapter</A>). However, one must understand the raw memory routines in order to use VM files.</P><P>
+If you will be storing small pieces of information in a block, you should create a local memory heap (a special kind of memory block). LMem heaps are also useful for storing arrays of information or for storing objects. For more information, see <A HREF="../../Memory/LMem/index.htm">the Local Memory chapter</A>.</P><P CLASS="subsectionLink">
+<A HREF="#Memory_6.htm">Memory Etiquette</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Memory_7.htm">Requesting Memory</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Memory_8.htm">Freeing Memory</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Memory_9.htm">Accessing Data in a Block</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Memory_a.htm">Accessing Data: An Example</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Memory_b.htm">Data-Access Synchronization</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Memory_c.htm">Retrieving Block Information</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Memory_d.htm">The Reference Count</A></P>
+<HR>
+<A NAME="Memory_6.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Memory Management</A>: 3.1 <A HREF="#Memory_5.htm">Using Global Memory</A>: 
+<A NAME="Memory_6.htm_65805">
+ </A>
+Memory Etiquette</H3>
+<P>
+The GEOS memory manager tries to fulfill every memory request. It does not enforce many rules on how the geodes should use memory. This gives each geode maximum flexibility, but it also means that the geodes have to take responsibility for their behavior; they must see to it that their memory usage does not degrade the system's performance.</P>
+<P>
+First and foremost, applications should never use memory which has not been assigned to them by the memory manager. Unlike some operating systems (e.g. UNIX), GEOS does not enforce divisions between memory spaces. This allows GEOS to run on PCs which do not provide protected-mode access. It means, however, that the system will not stop an application from loading a bad address into a pointer, accessing that address, and thus writing to another memory space. An application should access only that memory which the memory manager assigns to it directly (via calls to memory routines or data-space assigned at startup) or indirectly (through other libraries, such as the VM library). This also means that you should not save pointers to movable memory after unlocking the memory block. If you are not careful, you can accidently access memory which no longer contains your data, with sometimes-fatal results.</P>
+<P>
+Another rule is to minimize the amount of memory you keep locked at a time. When memory is locked, the memory manager cannot move it on the global heap or swap it out of memory. This can result in the heap becoming fragmented, which in turn makes it more likely that memory requests will fail. Keep memory unlocked as much as possible. It's worthwhile to unlock memory even if you'll be locking it again very soon; this gives the memory manager a chance to compact the heap. If you have some data which you will need locked for long periods of time, it is best to put it in a fixed block, since fixed blocks are allocated from the bottom of the global heap and thus cause less fragmentation. Of course, you should free the fixed block as soon as possible.</P>
+<P>
+Try to have as few blocks locked at a time as possible. Every locked block increases the danger that the heap will be unable to comply with a memory request. Try to organize your use of memory to minimize the number of blocks you will have to keep locked at a time.</P>
+<P>
+In the same vein, try to keep the amount of memory you have on the global heap to a minimum. You should declare all of your non-fixed memory as swappable and/or discardable. Remember, you can use <CODE>
+MemModifyFlags()</CODE>
+ to change these characteristics; during a timing-critical period, you could have a block set as non-swappable, and then make it swappable again as soon as timing becomes less important. If you use Virtual Memory files, the VM Manager does much of this for you.</P>
+<P>
+Try to keep your memory blocks small. Although memory blocks can, in principle, grow to 64K, the memory manager is best suited for dealing with blocks in the 2K-6K range. If you need a contiguous data space which grows beyond 8K in size, you should use the Huge Array mechanism (see <A HREF="../../Memory/VM/VM_14.htm#87156">the VM chapter</A>), which automatically (and almost transparently) divides a large data space across several smaller memory blocks. If you use many small data items, you should use the Database library, which automatically distributes data items among different memory blocks, keeping each block near the optimum size. (See <A HREF="../../Memory/Database/index.htm">the DB chapter</A>).</P><HR>
+<A NAME="Memory_7.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Memory Management</A>: 3.2 <A HREF="#Memory_5.htm">Using Global Memory</A>: 
+Requesting Memory</H3>
+<PRE>MemAlloc(), MemAllocSetOwner(), MemReAlloc()</PRE>
+<P>
+When you need a block of raw memory, you must use one of the kernel's memory allocation routines. You also must use kernel memory routines to change the size of a block or to reallocate space for a discarded block.</P>
+<P>
+<CODE>
+MemAlloc()</CODE>
+<A NAME="Memory_7.htm_IX_MemAlloc()">
+ </A>
+ creates a block and assigns a handle to it. The routine must be passed the size (in bytes) of the block to be allocated, along with the <CODE>
+HeapAllocFlags</CODE>
+ and <CODE>
+HeapFlags</CODE>
+ for that block. <CODE>
+MemAlloc()</CODE>
+ will set the block's owner as the owner of the thread that called it. It will return the handle of the newly-allocated block. </P>
+<P>
+<CODE>
+MemAllocSetOwner()</CODE>
+<A NAME="Memory_7.htm_IX_MemAllocSetOwner()">
+ </A>
+ is the same as <CODE>
+MemAlloc()</CODE>
+, except that the caller explicitly sets the owner of the new block by passing the handle of the owning geode. Like <CODE>
+MemAlloc()</CODE>
+, it returns the handle of the new block. This is commonly used by drivers and shared libraries, which allocate memory owned by the geode which calls them. When the block's owner exits, the block will be freed, even if the block's creator is still running.</P>
+<P>
+If you request a fixed block or pass the flag HAF_LOCK, the block will be allocated locked on the heap. However, the routine will still return just the memory handle. To translate this handle to a pointer, call the routine <CODE>
+MemDeref()</CODE>
+. <CODE>
+MemDeref()</CODE>
+ is passed a block's handle and returns a pointer to the block (or a null pointer if the block has been discarded).</P>
+<P>
+<A NAME="Memory_7.htm_IX_MemReAlloc()">
+ </A>
+To change the size of a block, call the routine <A NAME="Memory_7.htm_41911">
+ </A>
+<CODE>
+MemReAlloc()</CODE>
+. This routine is also used to allocate memory for a block that has been discarded. The routine is passed the memory handle, the new size, and the <CODE>
+HeapAllocFlags</CODE>
+; it returns the block's memory handle. You can reallocate a fixed or locked block; however, the block may be moved on the global heap to satisfy the request. (This is the only way a fixed block can move.) As with <CODE>
+MemAlloc()</CODE>
+, you can request that the memory manager lock the block after reallocating it; you will then have to call <CODE>
+MemDeref()</CODE>
+ to get the address of the block. Note that if the new size is <EM>
+smaller</EM>
+ than the original size, the routine is guaranteed to succeed, and the block will not move from its current position. Reallocating a block to zero bytes discards the block but preserves its handle; the block can then be reallocated later.</P>
+<P>
+If the memory manager is unable to accommodate a request, it will return an error condition. The requestor can prevent error messages by passing the flag HAF_NO_ERR; this will result in a system error if the memory cannot be allocated. Passing HAF_NO_ERR is therefore strongly discouraged.</P>
+<HR>
+<A NAME="Memory_8.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Memory Management</A>: 3.3 <A HREF="#Memory_5.htm">Using Global Memory</A>: 
+Freeing Memory</H3>
+<PRE>MemFree()</PRE>
+<P>
+When you are done using a block, you should free it. Every block takes up space in the global handle table; if blocks are not freed, the handle table may fill up, causing a system error. Furthermore, non-swapable, non-discardable blocks take up space in the global heap until they are freed.</P>
+<P>
+<A NAME="Memory_8.htm_IX_MemFree()">
+ </A>
+To free a block, call <CODE>
+MemFree()</CODE>
+ and pass the handle of the block to be freed. The block will be freed even if it is locked. Therefore, if the block can be used by other threads, you should make sure no other thread has locked the block before you free it.</P>
+<P>
+You can also set a reference count for a block. When a block's reference count drops to zero, the memory manager will automatically free it. This is useful if several threads will be accessing the same block. For more information, see <A HREF="#Memory_d.htm_66200"> The Reference Count</A>
+.</P>
+<P>
+When a geode exits, all blocks owned by it are automatically freed.</P>
+<HR>
+<A NAME="Memory_9.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Memory Management</A>: 3.4 <A HREF="#Memory_5.htm">Using Global Memory</A>: 
+<A NAME="Memory_9.htm_19276">
+ </A>
+Accessing Data in a Block</H3>
+<PRE>MemLock(), MemUnlock()</PRE>
+<P>
+Because the memory manager is constantly reorganizing the global heap, applications must have a way of making sure a block stays put when they want to use it. Applications must also have a way of recalling swapped blocks when they are needed.</P>
+<P>
+These requirements are met by the memory manager's locking scheme. Whenever you need to access data in a non-fixed block, you must first lock it. This will cause the memory manager to copy the block back into the global heap if it had been swapped; the memory manager will not move, swap, or discard a block while the block is locked.</P>
+<P>
+Any block may be locked several times. Each lock increments the block's lock count (to a maximum of 255 locks per block), and each unlock decrements it. The memory manager can only move the block when the lock count is zero.</P>
+<P>
+One warning about locking blocks: Do not try to lock a block which was allocated as fixed. Attempting to do so will result in a system error. If you need to translate a fixed-block handle to a pointer, call <CODE>
+MemDeref()</CODE>
+.
+
+</P>
+<P>
+<CODE>
+MemLock()</CODE>
+<A NAME="Memory_9.htm_70173">
+ </A>
+<A NAME="Memory_9.htm_IX_MemLock()">
+ </A>
+ locks a block on the heap. It is passed the handle of the block; it returns a pointer to the start of the block on the heap. If the block has been discarded, <CODE>
+MemLock()</CODE>
+ returns a null pointer.</P>
+<P>
+<A NAME="Memory_9.htm_IX_MemUnlock()">
+ </A>
+Immediately after you are done using a block, you should unlock it by calling <CODE>
+MemUnlock()</CODE>
+. It is better to lock and unlock the same block several times than to retain control of it for an extended period, as locked blocks degrade the performance of the heap compaction mechanism. To unlock a block, call <CODE>
+MemUnlock()</CODE>
+, passing the handle of the block to be unlocked. <CODE>
+MemUnlock()</CODE>
+ decrements the lock count.</P>
+<P>
+A block may be locked by any of the threads run by its creator; if the block is sharable, it may be run by any other thread as well. There is nothing in the <CODE>
+MemLock()</CODE>
+ routine to prevent different threads from locking a block at the same time, causing potential synchronization problems. For this reason, if threads will be sharing a block, they should use the synchronization routines (see <A HREF="#Memory_b.htm_68631"> Data-Access Synchronization</A>
+).</P>
+<HR>
+<A NAME="Memory_a.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Memory Management</A>: 3.5 <A HREF="#Memory_5.htm">Using Global Memory</A>: 
+Accessing Data: An Example</H3>
+<P>
+<A HREF="#Memory_a.htm_82700"> Allocating and Using a Block</A>
+ shows how to allocate a block, lock it, access a word of data in the block, and unlock the block. This example shows the basic principles of using blocks.</P>
+<P CLASS="figTitle">
+Code Display 8-1 <A NAME="Memory_a.htm_82700">
+ </A>
+Allocating and Using a Block</P>
+<PRE>/*
+ * Variable Declarations
+ */</PRE>
+<PRE>MemHandle 	myBlockHandle;
+char 	charArray[50], *blockBaseAddress;</PRE>
+<PRE>/* First, we allocate a block of the desired size. Since we'll use the block right
+ * away, we allocate the block already locked.
+ */
+myBlockhandle = MemAlloc(					/* MemAlloc returns the block handle */
+			2048,		/* Allocate 2K of memory */
+			HF_SWAPABLE,		/* HeapFlags: Make block swapable */
+			HAF_ZERO_INIT|HAF_LOCK);			/* HeapAllocFlags: Initialize
+						 * the memory to zero &amp; lock it */
+</PRE>
+<PRE>/* The block is already locked on the global heap. However, we do not have the
+ * block's address; we just have its handle. Therefore, we need to call a routine
+ * to dereference the handle. */
+blockBaseAddress = (char *) MemDeref(myBlockHandle);						/* Returns a ptr to base of
+						 * block */</PRE>
+<PRE>/* Enter some data in the block */
+strcpy(blockBaseAddress,
+	&quot;I can resist anything except temptation.\n   --Wilde&quot;</PRE>
+<PRE>/* We're done with the block for the moment, so we unlock it. */
+MemUnlock(myBlockHandle); /* blockBaseAddress is now meaningless */</PRE>
+<PRE>/* Here we do some other stuff . . . */</PRE>
+<PRE>/* Now we want to use the block again. First we have to lock it. */
+blockBaseAddress = (byte *) MemLock(myBlockHandle);						/* Returns a ptr to locked 
+						 * block */</PRE>
+<PRE>/* Read a string from the block: */
+strcpy(charArray, blockBaseAddress);</PRE>
+<PRE>/* We're done with the block, so we free it. Note that we can free the block
+ * without unlocking it first.
+ */
+MemFree(myBlockhandle); /* myBlockHandle is now meaningless */</PRE>
+<HR>
+<A NAME="Memory_b.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Memory Management</A>: 3.6 <A HREF="#Memory_5.htm">Using Global Memory</A>: 
+<A NAME="Memory_b.htm_68631">
+ </A>
+Data-Access Synchronization</H3>
+<PRE>MemThreadGrab(), MemThreadGrabNB(), MemThreadRelease(), MemLockShared(), MemUnlockShared(), MemLockExcl(), MemDowngradeExclLock(), MemUpgradeSharedLock(), MemUnlockExcl(), HandleP(), HandleV(), MemPLock(), MemUnlockV()</PRE>
+<P>
+Blocks can have the property of being sharable--that is, the same block may be locked by threads owned by several different geodes. However, this can cause data synchronization problems; one application can be changing data while another application is trying to use it. To prevent this, GEOS provides semaphore routines. Only one thread can have the block's semaphore at a time. When an application wants to use a shared block, it should call a routine to set the semaphore. Once the routine returns, the application can use the block; when it is done, it should release the block's semaphore so other applications can use the block.</P>
+<P>
+Note that use of semaphores is entirely voluntary by each application. Even if thread A has the semaphore on a block, thread B can call <CODE>
+MemLock()</CODE>
+ on the block and start changing it. However, all threads using shared blocks ought to use the semaphore routines to prevent confusion.
+
+</P>
+<P>
+There are several different sets of routines which can be used to control a block's semaphore. The different sets of routines make different trade-offs between faster operation and increased flexibility. Any one block should be accessed with only one set of routines; different threads should all be using the same routines to access a given block, and a thread should not switch from one set of routines to another for a particular block. If this rule isn't followed, results are undefined. All of these routines access the HM<CODE>
+_otherInfo</CODE>
+ word of the handle table entry; if the block will be locked by any of these routines, you must not alter that word. None of these routines is used to access object blocks; instead, special object-block locking routines are provided.</P>
+<P>
+<A NAME="Memory_b.htm_IX_Deadlock:avoidance">
+ </A>
+<A NAME="Memory_b.htm_IX_MemThreadGrab()">
+ </A>
+Most geodes should use <CODE>
+MemThreadGrab()</CODE>
+, <CODE>
+MemThreadGrabNB()</CODE>
+, and <CODE>
+MemThreadRelease()</CODE>
+ to access sharable blocks. These routines provide the maximum protection against deadlock in exchange for a slightly slower execution. </P>
+<P>
+<CODE>
+MemThreadGrab()</CODE>
+ gives the thread the semaphore for the block in question and locks the block. It is passed the handle of the block and returns the block's address on the global heap. If no thread has the block's semaphore, it gives the semaphore to the calling thread. If the calling thread already has the semaphore, a &quot;semaphore count&quot; is incremented; the thread will not release the semaphore until it has been released as many times as it has been grabbed. (For example, two different objects run by the same thread could each grab the semaphore; the semaphore would not be released until each object called <CODE>
+MemThreadRelease()</CODE>
+.) If another thread has the semaphore, <CODE>
+MemThreadGrab()</CODE>
+ blocks until it can get the semaphore; it then increments the semaphore, locks the block, and returns the address.</P>
+<P>
+<CODE>
+MemThreadGrabNB()</CODE>
+<A NAME="Memory_b.htm_IX_MemThreadGrabNB()">
+ </A>
+ is the same as <CODE>
+MemThreadGrab()</CODE>
+, except that it never blocks. If you call <CODE>
+MemThreadGrabNB()</CODE>
+ while another thread has the semaphore, the routine will immediately return an error. <CODE>
+MemThreadGrabNB()</CODE>
+ takes the handle of the block; it increments the semaphore, locks the block, and returns the block's address on the heap.</P>
+<P>
+<CODE>
+MemThreadRelease()</CODE>
+<A NAME="Memory_b.htm_IX_MemThreadRelease()">
+ </A>
+ releases a block grabbed by either <CODE>
+MemThreadGrab()</CODE>
+ or <CODE>
+MemThreadGrabNB()</CODE>
+. It is passed the block's handle. It unlocks the block and decrements the block's semaphore. </P>
+<P>
+One common situation is that several threads may need to read a block but only once in a while will an application need to write to the block. In this case, there is no synchronization problem in having several readers at once; however, if any thread is writing, no other thread should be reading or writing. For this situation, GEOS provides this set of <CODE>
+MemLock</CODE>
+ routines: <CODE>
+MemLockShared()</CODE>
+, <CODE>
+MemUnlockShared()</CODE>
+, <CODE>
+MemLockExcl()</CODE>
+, and <CODE>
+MemUnlockExcl()</CODE>
+. </P>
+<P>
+These routines, like the others, maintain a queue of threads which have requested thread access. The difference is that any number of readers can have access at once. When a thread wants read access, it calls <CODE>
+MemLockShared()</CODE>
+<A NAME="Memory_b.htm_IX_MemLockShared()">
+ </A>
+. If the queue is empty and the block is unlocked or locked for reading, the routine returns and the thread is given shared access; otherwise, the thread is blocked, and the request goes on the queue.<A NAME="Memory_b.htm_IX_MemUnlockShared()">
+ </A>
+ When a routine is finished reading the block, it should call <CODE>
+MemUnlockShared()</CODE>
+.</P>
+<P>
+<A NAME="Memory_b.htm_IX_MemLockExcl()">
+ </A>
+When a routine needs to write to a block, it should call <CODE>
+MemLockExcl()</CODE>
+. If nobody has locked the block (and thus the queue is empty), the thread will immediately be given exclusive access; otherwise, the thread will block, and the request will go on the queue.<A NAME="Memory_b.htm_IX_MemUnlockExcl()">
+ </A>
+ When the thread no longer needs write access, it should call <CODE>
+MemUnlockExcl()</CODE>
+.</P>
+<P>
+When all threads with access to a block have released their locks, the queued thread with the highest priority will be awakened and given the lock on the block. If that thread had requested shared access, all other threads on the queue that had requested shared access will also be awakened and given locks.</P>
+<P>
+A thread can change its lock from shared to exclusive or vice versa.<A NAME="Memory_b.htm_IX_MemDowngradeExclLock()">
+ </A>
+ If a thread has an exclusive lock on a block, it can change the lock to shared by calling <CODE>
+MemDowngradeExclLock()</CODE>
+. This routine takes one argument, namely the block's global handle. It changes the lock to &quot;shared&quot; and wakes up all sleeping threads which are waiting for shared access. For convenience, <CODE>
+MemDowngradeExclLock()</CODE>
+ returns the address of the block; however, the block is guaranteed not to move.</P>
+<P>
+<A NAME="Memory_b.htm_IX_MemUpgradeSharedLock()">
+ </A>
+If a thread has shared access and wants exclusive access, it can call <CODE>
+MemUpgradeSharedLock()</CODE>
+. If the thread has the only lock on the block, its lock will be changed to &quot;exclusive&quot; (even if there are writers on the queue). If any other threads have the block locked, the routine will release the thread's lock and put the thread on the queue. When the thread comes to the head of the queue, the routine will wake the thread and give it an exclusive lock. The routine returns the block's address on the global heap. Note that the block may be altered or moved during this call if the call blocked.</P>
+<P>
+Once a thread has been given a shared lock, there is nothing to prevent it from altering (or even freeing) the block. The routines rely on good citizenship by the threads using them.Also, if a thread isn't careful, there is a great danger of deadlock. If (for example) a thread requests exclusive access to a block when it already has access, the thread will deadlock: it will block until the threads with access all release the block, but it can't release its own lock because it is blocked. If you may need to have multiple locks on a block, use the <CODE>
+MemThread</CODE>
+ routines, which check for these situations.</P>
+<P>
+There are other sets of routines which can be used to access a block's semaphore. As noted, a block should be accessed via just one set of routines. These routines provide less protection against deadlock than the <CODE>
+MemThread</CODE>
+ routines do; however, they have a slightly faster response time.</P>
+<P>
+A more primitive group of routines is <CODE>
+HandleP()</CODE>
+, <CODE>
+HandleV()</CODE>
+, <CODE>
+MemPLock()</CODE>
+, and <CODE>
+MemUnlockV()</CODE>
+. These routines function much like the <CODE>
+MemThread</CODE>
+ routines. <A NAME="Memory_b.htm_IX_HandleP()">
+ </A>
+<CODE>
+HandleP()</CODE>
+ grabs the block's semaphore and returns; it does not lock the block. This makes it very useful for working with fixed blocks (which cannot be locked).<A NAME="Memory_b.htm_IX_HandleV()">
+ </A>
+ <CODE>
+HandleV()</CODE>
+ releases the block's semaphore and returns; it does not unlock the block. Note, however, that <CODE>
+HandleP()</CODE>
+ will block if <EM>
+any</EM>
+ thread controls the semaphore, even the thread that called <CODE>
+HandleP()</CODE>
+. If a thread calls <CODE>
+HandleP()</CODE>
+ while it controls the semaphore, it will block until the semaphore is released, but it can't release the semaphore because it has blocked. Thus, the thread will deadlock, and no other thread will be able to get the semaphore. Therefore, a thread should use <CODE>
+HandleP()</CODE>
+ only if it is very confident that it will never try to double-set the semaphore.
+
+</P>
+<P>
+Usually, when a thread grabs a block's semaphore, it needs to have the block locked on the heap. For this reason, GEOS provides the routines <CODE>
+MemPLock()</CODE>
+ and <CODE>
+MemUnlockV()</CODE>
+.<A NAME="Memory_b.htm_IX_MemPLock()">
+ </A>
+ <CODE>
+MemPLock()</CODE>
+ simply calls <CODE>
+HandleP()</CODE>
+ and then calls <CODE>
+MemLock()</CODE>
+.<A NAME="Memory_b.htm_IX_MemUnlockV()">
+ </A>
+ <CODE>
+MemUnlockV()</CODE>
+, correspondingly, calls <CODE>
+MemUnlock()</CODE>
+ and then calls <CODE>
+HandleV()</CODE>
+. These routines are completely compatible with <CODE>
+HandleP()</CODE>
+ and <CODE>
+HandleV()</CODE>
+; for example, a thread could grab and lock a block with <CODE>
+MemPLock()</CODE>
+, then unlock it with <CODE>
+MemUnlock()</CODE>
+ and release it with <CODE>
+HandleV()</CODE>
+.</P>
+<P>
+<CODE>
+HandleP()</CODE>
+ and <CODE>
+HandleV()</CODE>
+ are general-purpose handle routines. They can be called on any type of global handle. For example, if two threads need to synchronize their access to a file, they can lock and unlock the file handle with <CODE>
+HandleP()</CODE>
+ and <CODE>
+HandleV()</CODE>
+. However, they are most commonly used with memory blocks.</P>
+<HR>
+<A NAME="Memory_c.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Memory Management</A>: 3.7 <A HREF="#Memory_5.htm">Using Global Memory</A>: 
+Retrieving Block Information</H3>
+<PRE>MemDeref(), MemPtrToHandle(), MemGetInfo(), MemOwner(), MemModifyFlags(), HandleModifyOwner(), MemModifyOtherInfo()</PRE>
+<P>
+GEOS offers several routines to retrieve and change information about a block. Each of these routines has a full entry in the Routine Reference Book.</P>
+<P>
+<CODE>
+MemDeref()</CODE>
+<A NAME="Memory_c.htm_IX_MemDeref()">
+ </A>
+<A NAME="Memory_c.htm_91285">
+ </A>
+ is passed the handle of a block on the global heap; it returns the block's address on the global heap. As noted above, this routine is useful when you allocate a fixed or locked block. If the block has been discarded, it returns a null pointer. </P>
+<P>
+<CODE>
+MemPtrToHandle()</CODE>
+<A NAME="Memory_c.htm_IX_MemPtrToHandle()">
+ </A>
+, passed a pointer to a locked block, finds the handle of that memory block.</P>
+<P>
+<CODE>
+MemGetInfo()</CODE>
+<A NAME="Memory_c.htm_IX_MemGetInfoType">
+ </A>
+<A NAME="Memory_c.htm_IX_MGIT_&ldots;">
+ </A>
+<A NAME="Memory_c.htm_IX_MGIT_&ldots;">
+ </A>
+<A NAME="Memory_c.htm_IX_MemGetInfo()">
+ </A>
+<A NAME="Memory_c.htm_19383">
+ </A>
+ is a general-purpose block information routine. It is passed two arguments: the handle of the block, and a member of the <CODE>
+MemGetInfoType</CODE>
+ enumerated type. The return value is always word-length; however, its significance depends on the <CODE>
+MemGetInfoType</CODE>
+ value passed:</P>
+<DL>
+<DT>
+MGIT_SIZE</DT><DD>Returns the size of the memory block (in bytes).</DD>
+<DT>
+MGIT_FLAGS_AND_LOCK_COUNT</DT><DD>
+Upper byte is the number of locks on the block; lower eight bits are the block's <CODE>
+HeapFlags</CODE>
+ record (see <A HREF="#Memory_4.htm_85480"> HF_FIXED The block will not move from its place in the global heap until it is freed. If this flag is off, the memory manager may move the block when it is unlocked. If it is on, the block may not be locked. This flag cannot be changed after the</A>
+).</DD>
+<DT>
+MGIT_OWNER_OR_VM_FILE_HANDLE</DT><DD>
+If the block is attached to a GEOS Virtual Memory file, <CODE>
+MemGetInfo()</CODE>
+ returns the VM file handle. Otherwise, it returns the <CODE>
+GeodeHandle</CODE>
+ of the owning thread.</DD>
+<DT>
+</DT><DD><A NAME="Memory_c.htm_IX_MemOwner()">
+ </A>
+The <CODE>
+MemOwner()</CODE>
+ routine also returns the owning geode of the passed block; however, if the block belongs to a VM file, the file's owner will be returned instead of the file handle.</DD>
+<DT>
+MGIT_ADDRESS</DT><DD>
+Returns the block's segment address, if it is on the global heap; otherwise, it returns zero. If the block is resized or is not locked, the address may change without warning. Note that the segment address is returned as a word, not as a pointer; this is of limited utility in C.</DD>
+<DT>
+MGIT_OTHER_INFO</DT><DD>
+Returns the <CODE>
+HM_otherInfo</CODE>
+ word from the block's handle table entry. The usage of this word varies depending on the block's nature; for example, object blocks store the handle of their burden thread here.</DD>
+<DT>
+MGIT_EXEC_THREAD</DT><DD>
+This is useful for object blocks only. Returns the handle of the thread executing methods for objects in the block.</DD>
+</DL>
+<P>
+<CODE>
+MemModifyFlags()</CODE>
+<A NAME="Memory_c.htm_IX_MemModifyFlags()">
+ </A>
+<A NAME="Memory_c.htm_60044">
+ </A>
+ is used to change a block's <CODE>
+HeapFlags</CODE>
+ record. It takes three arguments: The handle of the block, the <CODE>
+HeapFlags</CODE>
+ to turn on, and the <CODE>
+HeapFlags</CODE>
+ to clear. It returns nothing. Not all <CODE>
+HeapFlags</CODE>
+ can be changed after a block is created; only HF_SHARABLE, HF_DISCARDABLE, HF_SWAPABLE, and HF_LMEM can be so changed. </P>
+<P>
+<CODE>
+HandleModifyOwner()</CODE>
+<A NAME="Memory_c.htm_IX_HandleModifyOwner()">
+ </A>
+ changes the geode owning a given block. It takes two arguments, namely the handle of the block and the handle of the new owner. It returns nothing. If the block is not sharable, only the owner of a block can change the block's owner.</P>
+<P>
+<CODE>
+MemModifyOtherInfo()</CODE>
+<A NAME="Memory_c.htm_IX_MemModifyOtherInfo()">
+ </A>
+ changes the <CODE>
+HM_otherInfo</CODE>
+ word of the block's handle table entry. It takes two arguments: The handle of the block, and one word of data to store in the <CODE>
+HM_otherInfo</CODE>
+ field. It returns nothing.</P>
+<HR>
+<A NAME="Memory_d.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Memory Management</A>: 3.8 <A HREF="#Memory_5.htm">Using Global Memory</A>: 
+<A NAME="Memory_d.htm_66200">
+ </A>
+The Reference Count</H3>
+<PRE>MemInitRefCount(), MemIncRefCount(), MemDecRefCount()</PRE>
+<P>
+Sometimes several different threads will need to look at the same block of memory. For example, a single thread might need to send the same information to objects in several different threads. The simplest way to do that would be to write the information in a global memory block and pass the block's handle to the objects. However, it's a bad idea to allocate global blocks for longer than necessary, since this uses up handles. It therefore becomes important to free these blocks when everyone's done with them.</P>
+<P>
+GEOS provides a simple mechanism for managing this. Every block can have a <EM>
+reference count</EM>
+. When a reference count for a block reaches zero, the block is automatically freed. That way, for example, if an object needed to send the same information to five objects, it could write the data to a block, give that data block a reference count of five, and send the block's handle to the objects. Each object, when it finished accessing the data, would decrement the data block's reference count. When all five objects had decremented the reference count, the block would be freed.</P>
+<P>
+You must be careful about a few things while using the reference count mechanism. First of all, the reference count is kept in the HM<CODE>
+_otherInfo</CODE>
+ field of the block's handle table entry. For this reason, you must not use the reference count routines if you will be using HM<CODE>
+_otherInfo</CODE>
+ for any other purpose. In particular:
+
+</P>
+<UL>
+<LI>
+The block may not be an object block; the HM_otherInfo field for an object block stores the handle of the burden thread for that block.</LI>
+<LI>
+You may not use any of the data-access synchronization routines described in <A HREF="#Memory_b.htm_68631"> Data-Access Synchronization</A>
+, since all of those routines store the semaphore in HM<CODE>
+_otherInfo</CODE>
+. You should generally use the reference count only for blocks that will not be changed until they are freed, so that data synchronization will not be an issue.</LI>
+</UL>
+<P>
+Once the reference count is decremented to zero, the block is <EM>
+immediately</EM>
+ freed. Once a block is freed, its handle may be used for something else. If you try to increment or decrement the reference count of the block, the results are undefined. For this reason, you should make sure that the reference count does not reach zero until all threads are done with the block. One way to arrange for this is to have a single thread do all the decrementing. For example, an object might set the reference count to five, and send the handle to five other objects. Each of these objects, when finished with the block, would send a message back to the first object, which would decrement the reference count. As an alternative, you could have each of the objects decrement the count itself when it was finished. In this case, the first object would have to assume that the block was freed as soon as it sent out all of the messages, since it would have no way of knowing when the other objects would be finished with the block.</P>
+<P>
+Finally, since the reference count is stored in HM<CODE>
+_otherInfo</CODE>
+, it has a maximum value of (2<small><sup>16</sup></small>-1). If you try to increment the reference count past this value, the results are undefined. This will not be a problem for most applications.</P>
+<P>
+<A NAME="Memory_d.htm_IX_MemInitRefCount()">
+ </A>
+To set up a reference count for a block, call <CODE>
+MemInitRefCount()</CODE>
+. This routine takes two arguments: the handle of a global memory block, and the reference count for that block. The reference count must be greater than zero. <CODE>
+MemInitRefCount()</CODE>
+ sets the block's HM<CODE>
+_otherInfo</CODE>
+ field to the specified reference count. <CODE>
+MemInitRefCount()</CODE>
+ does not return anything.</P>
+<P>
+<A NAME="Memory_d.htm_IX_MemIncRefCount()">
+ </A>
+To increment the reference count, call <CODE>
+MemIncRefCount()</CODE>
+. This routine is passed a single argument, namely the handle of the global memory block. The routine simply increments HM<CODE>
+_otherInfo</CODE>
+. It does not return anything.</P>
+<P>
+<A NAME="Memory_d.htm_IX_MemDecRefCount()">
+ </A>
+To decrement the reference count, call <CODE>
+MemDecRefCount()</CODE>
+. This routine is passed the handle of a global memory block. It decrements the block's HM<CODE>
+_otherInfo</CODE>
+ field. If the field reaches zero, <CODE>
+MemDecRefCount()</CODE>
+ will immediately free the block. The routine does not return anything.</P>
+<HR>
+<A NAME="Memory_e.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Memory Management</A>: 4 
+<A NAME="Memory_e.htm_96024">
+ </A>
+malloc()</H2>
+<PRE>malloc(), calloc(), realloc(), free()</PRE>
+<P>
+GEOS provides support for the Standard C memory allocation routines. However, support is limited by the nature of the 80x86 and the GEOS memory management system.</P>
+<P>
+A geode can request memory with <CODE>
+malloc()</CODE>
+ or <CODE>
+calloc()</CODE>
+. When a geode does this for the first time, the memory manager will allocate a fixed block and return a pointer to within the fixed block. (This block is actually a special kind of LMem heap.) Because the memory is in a fixed block, the geode does not need to access it with handles; it can use the pointer directly. If the block fills up, the manager can allocate another fixed block for these requests.</P>
+<P>
+However, there are some problems with this. The main problem is that fixed blocks degrade the memory manager's performance. The more a geode uses <CODE>
+malloc()</CODE>
+, the more memory is tied up in fixed blocks. And, as always, contiguous memory is limited to 64K by the 80x86 segmented addressing scheme.</P>
+<P>
+Most of the time, geodes should use other types of memory allocation. For allocating small chunks of data, applications should use <CODE>
+LMem</CODE>
+ routines or techniques built on top of them (database items, chunk arrays, etc.); for larger chunks of memory, applications should use memory manager routines or HugeArrays. However, to help writers port C code to GEOS, <CODE>
+malloc()</CODE>
+ and its relatives are available.</P>
+<P>
+To get a stretch of contiguous memory, use the routines <CODE>
+malloc()</CODE>
+ or <CODE>
+calloc()</CODE>
+. <CODE>
+malloc()</CODE>
+<A NAME="Memory_e.htm_IX_malloc()">
+ </A>
+ takes one argument, a size in bytes; it returns a void pointer to that many bytes of fixed memory.<A NAME="Memory_e.htm_IX_calloc()">
+ </A>
+ <CODE>
+calloc()</CODE>
+ takes two arguments: a number of structures, and the size of each such structure. It allocates enough memory for that many structures and returns a void pointer to the memory. Both <CODE>
+malloc()</CODE>
+ and <CODE>
+calloc()</CODE>
+ zero-initialize the memory when they allocate it.</P>
+<P>
+If a routine wants to change the size of memory allocated with <CODE>
+malloc()</CODE>
+ or <CODE>
+calloc()</CODE>
+ it can use <CODE>
+realloc()</CODE>
+. <A NAME="Memory_e.htm_IX_realloc()">
+ </A>
+<CODE>
+realloc()</CODE>
+ takes two arguments: a pointer to a piece of memory allocated with <CODE>
+malloc()</CODE>
+ or <CODE>
+calloc()</CODE>
+, and a new size in bytes. It returns a void pointer to the memory, which may have been moved to satisfy the request. If it could not satisfy the request, it returns a null pointer, and the original memory is untouched. Note that the pointer you pass <CODE>
+realloc()</CODE>
+ <EM>
+must</EM>
+ be the same pointer that was returned by <CODE>
+malloc/calloc</CODE>
+; if (for example) you allocate 100 bytes and are returned 008Bh:30h, and try to resize it by passing 008Bh:40h to <CODE>
+realloc()</CODE>
+, inappropriate memory will be affected, and the results are undefined.</P>
+<P>
+If you decrease the size of a memory section with <CODE>
+realloc()</CODE>
+, the routine is guaranteed to succeed. If you increase the size, it may fail; if it does succeed, the new memory will <EM>
+not</EM>
+ be zero-initialized. Reallocating a block down to zero memory is the same as freeing it. You can pass a null pointer to <CODE>
+realloc()</CODE>
+ along with the size; this makes <CODE>
+realloc()</CODE>
+ function like <CODE>
+malloc()</CODE>
+. </P>
+<P>
+When you are done with memory allocated by <CODE>
+malloc</CODE>
+-family routines, you should call <CODE>
+free()</CODE>
+ to free the memory for other <CODE>
+malloc()</CODE>
+ calls. As with <CODE>
+realloc()</CODE>
+, you must pass the same pointer that you were originally given.</P>
+<HR>
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+</BODY>
+</HTML>

@@ -1,0 +1,771 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Controllers_c.htm,v 1.1 97/06/02 16:11:36 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Advanced GenControlClass Usage</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Generic UI Controllers</A>: 4.3 <A HREF="Controllers_9.htm">Creating Your Own Controllers</A>: 
+Advanced GenControlClass Usage</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Controllers_9.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Controllers_b.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.2 Subclassing GenControlClass</A> 
+<!-- to next --> | <A HREF="Controllers_d.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">5 GenToolControlClass</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+Everything you need to create a basic custom controller class is detailed in the previous sections. <CODE>
+GenControlClass</CODE>
+, however, has a number of messages and structures that will be used by some subclasses, though this will be relatively rare. This section details these messages and structures.</P>
+
+<H2 CLASS="HeadingC">
+Adding and Removing UI Gadgetry</H2>
+<PRE>MSG_GEN_CONTROL_GENERATE_UI, MSG_GEN_CONTROL_DESTROY_UI, MSG_GEN_CONTROL_GENERATE_TOOLBOX_UI, MSG_GEN_CONTROL_DESTROY_TOOLBOX_UI, MSG_GEN_CONTROL_UPDATE_UI, MSG_GEN_CONTROL_ENABLE_DISABLE, MSG_GEN_CONTROL_ADD_APP_UI, MSG_GEN_CONTROL_ADD_APP_TOOLBOX_UI, MSG_GEN_CONTROL_REBUILD_NORMAL_UI, MSG_GEN_CONTROL_REBUILD_TOOLBOX_UI</PRE>
+<P>
+<CODE>
+GenControlClass</CODE>
+<A NAME="IX_controllers:additional UI gadgetry">
+ </A>
+ has several messages that add, remove, and manipulate the controller UI gadgetry. Keep in mind also that, as a subclass of <CODE>
+GenInteractionClass</CODE>
+ and thereby of <CODE>
+GenClass</CODE>
+, the GenControl also can use any of the generic UI messages for object tree manipulation. These messages are detailed in the following list.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_CONTROL_GENERATE_UI">
+ </A>
+MSG_GEN_CONTROL_GENERATE_UI</H4>
+<PRE CLASS="syntax">void	MSG_GEN_CONTROL_GENERATE_UI();</PRE>
+<P>
+This message generates the UI gadgetry for the controller.</P>
+<P CLASS="refField">
+Source:	Unrestricted--sent by self as part of specific UI build.</P>
+<P CLASS="refField">
+Destination:	Any GenControl object</P>
+<P CLASS="refField">
+Interception:	If subclassed to add functionality, the subclass must call the superclass at the beginning of the handler.</P>
+<P CLASS="refField">
+Warnings:	If you intercept this message, you should also intercept <CODE>
+MSG_GEN_CONTROL_DESTROY_UI</CODE>
+, below.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_CONTROL_DESTROY_UI">
+ </A>
+MSG_GEN_CONTROL_DESTROY_UI</H4>
+<PRE CLASS="syntax">void	MSG_GEN_CONTROL_DESTROY_UI();</PRE>
+<P>
+This message destroys the UI gadgetry for the controller.</P>
+<P CLASS="refField">
+Source:	Unrestricted--sent by self when being taken off the screen.</P>
+<P CLASS="refField">
+Destination:	Any GenControl object</P>
+<P CLASS="refField">
+Interception:	Any subclass that intercepts <CODE>
+MSG_GEN_CONTROL_GENERATE_UI</CODE>
+ must intercept this. The subclass must call the superclass at the end of the handler.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_CONTROL_GENERATE_TOOLBOX_UI">
+ </A>
+MSG_GEN_CONTROL_GENERATE_TOOLBOX_UI</H4>
+<PRE CLASS="syntax">void	MSG_GEN_CONTROL_GENERATE_TOOLBOX_UI(
+        optr	parent);</PRE>
+<P>
+This message generates the UI gadgetry for the controller's tool box.</P>
+<P CLASS="refField">
+Source:	Sent by tool box object via the active list as part of its specific UI build mechanism.</P>
+<P CLASS="refField">
+Destination:	The GenControl object that owns the tool box.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+parent</CODE>
+	The optr of GenInteraction that will be the parent of the controller's tools.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	A subclass may intercept this to add UI gadgetry to the toolbox when the toolbox is built. The subclass must call the superclass at the beginning of the handler.</P>
+<P CLASS="refField">
+Warnings:	Any controller that subclasses this message must also subclass <CODE>
+MSG_GEN_CONTROL_DESTROY_TOOLBOX_UI</CODE>
+ as well.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_CONTROL_DESTROY_TOOLBOX_UI">
+ </A>
+MSG_GEN_CONTROL_DESTROY_TOOLBOX_UI</H4>
+<PRE CLASS="syntax">void	MSG_GEN_CONTROL_DESTROY_TOOLBOX_UI();</PRE>
+<P>
+This message destroys all toolbox UI associated with the controller.</P>
+<P CLASS="refField">
+Source:	Sent by the tool box being destroyed as part of its specific UI destruction mechanism.</P>
+<P CLASS="refField">
+Destination:	The GenControl object that owns the tool box.</P>
+<P CLASS="refField">
+Interception:	Any controller class that subclasses the message <CODE>
+MSG_GEN_CONTROL_GENERATE_TOOLBOX_UI</CODE>
+ must also subclass this message. The subclass must call its superclass at the end of its handler.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_CONTROL_UPDATE_UI">
+ </A>
+MSG_GEN_CONTROL_UPDATE_UI</H4>
+<PRE CLASS="syntax">void	MSG_GEN_CONTROL_UPDATE_UI(@stack
+        MemHandle		toolBlock,
+        MemHandle		childBlock,
+        WordFlags		toolboxFeatures,
+        WordFlags		features,
+        MemHandle		data,
+        word		changeID,
+        ManufacturerID		manufID);</PRE>
+<P>
+This message updates all <CODE>
+UI</CODE>
+ components for the recipient controller.</P>
+<P CLASS="refField">
+Source:	Sent by <CODE>
+GenControlClass</CODE>
+ in its default handler for MSG_META_NOTIFY_WITH_DATA_BLOCK.</P>
+<P CLASS="refField">
+Destination:	The GenControl object being updated.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+toolBlock</CODE>
+	Handle of the object resource block containing the controller's tool UI gadgetry.</P>
+<DL>
+<DT>
+<CODE>
+childBlock</CODE>
+</DT><DD>Handle of the object resource block containing the controller's default UI gadgetry. This may be taken from the <CODE>
+TEMP_GEN_CONTROL_INSTANCE</CODE>
+ vardata field.</DD>
+<DT>
+<CODE>
+toolboxFeatures</CODE>
+</DT><DD>A record of flags indicating which tools are currently on for the controller. This may be taken from the <CODE>
+TEMP_GEN_CONTROL_INSTANCE</CODE>
+ vardata field. If the toolbox UI is not interactible, then this field will be zero.</DD>
+<DT>
+<CODE>
+features</CODE>
+</DT><DD>A record of flags indicating which features are currently on for the controller. This may be taken from the <CODE>
+TEMP_GEN_CONTROL_INSTANCE</CODE>
+ vardata field. If the UI is not interactible, then this field will be zero.</DD>
+<DT>
+<CODE>
+data</CODE>
+</DT><DD>The data block handle passed with the notification message.</DD>
+<DT>
+<CODE>
+changeID</CODE>
+</DT><DD>The type of update to undergo, as passed with the notification message.</DD>
+<DT>
+<CODE>
+manufID</CODE>
+</DT><DD>The manufacturer ID of the notification type passed with the notification message.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	Controllers should intercept this message in order to properly update their UI gadgetry. There is no default handler for this message.</P>
+<P CLASS="refField">
+Structures:	The <CODE>
+TEMP_GEN_CONTROL_INSTANCE</CODE>
+ vardata field is of type <CODE>
+TempGenControlInstance</CODE>
+, which has the following structure:</P>
+<PRE><A NAME="IX_TGCI_&ldots;"> </A><A NAME="IX_TempGenControlInstance"> </A>typedef struct {
+	GenControlInteractableFlags
+				TGCI_interactableFlags;
+	MemHandle			TGCI_childBlock;
+	MemHandle			TGCI_toolBlock;
+	optr			TGCI_toolParent;
+	WordFlags			TGCI_features;
+	WordFlags			TGCI_toolboxFeatures;
+	GCNListType			TGCI_activeNotificationList;
+	GenControlInteractableFlags TGCI_upToDate;
+} TempGenControlInstance;</PRE>
+<DL>
+<DT>
+<CODE>
+TGCI_interactableFlags</DT><DD>
+</CODE>
+This record describes which, if any, of a controller's UI parts is interactable (visible and usable). Its flags are listed below.</DD>
+<DT>
+<CODE>
+TGCI_childBlock</DT><DD>
+</CODE>
+The handle of the resource block containing the controller's default UI objects.</DD>
+<DT>
+<CODE>
+TGCI_toolBlock</DT><DD>
+</CODE>
+The handle of the resource block containing the tool objects.</DD>
+<DT>
+<CODE>
+TGCI_toolParent</DT><DD>
+</CODE>
+The optr of the object passed with <CODE>
+MSG_GEN_CONTROL_GENERATE_TOOLBOX_UI</CODE>
+, if any (tools will be added to this object).</DD>
+<DT>
+<CODE>
+TGCI_features</DT><DD>
+</CODE>
+A record of flags indicating which controller features are currently active.</DD>
+<DT>
+<CODE>
+TGCI_toolboxFeatures</DT><DD>
+</CODE>
+A record of flags indicating which controller tools are currently active.</DD>
+<DT>
+<CODE>
+TGCI_activeNotificationList</DT><DD>
+</CODE>
+The notification type currently active.</DD>
+<DT>
+<CODE>
+TGCI_upToDate</DT><DD>
+</CODE>
+The status of <CODE>
+GenControlInteractableFlags</CODE>
+ at the time of the last notification; that is, which portions of the controller's UI were up to date. This is used by the specific UI for drawing optimizations.</DD>
+</DL>
+<P>
+The flags for the <CODE>
+GenControlInteractableFlags</CODE>
+ record are listed below:</P>
+<DL>
+<DT>
+GCIF_CONTROLLER</DT><DD>
+This flag indicates the controller object is interactable.</DD>
+<DT>
+GCIF_TOOLBOX_UI</DT><DD>
+This flag indicates that some or all of the controller's tool gadgetry is interactable.</DD>
+<DT>
+GCIF_NORMAL_UI</DT><DD>
+This flag indicates that some or all of the controller's normal feature gadgetry is interactable.</DD>
+
+
+</DL>
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_CONTROL_ENABLE_DISABLE">
+ </A>
+MSG_GEN_CONTROL_ENABLE_DISABLE</H4>
+<PRE CLASS="syntax">void	MSG_GEN_CONTROL_ENABLE_DISABLE(
+        Message		msg;
+        VisUpdateMode		updateMode);</PRE>
+<P>
+This message enables or disables the controller object as well as its default and tool box UI gadgetry.</P>
+<P CLASS="refField">
+Source:	Sent by <CODE>
+GenControlClass</CODE>
+ to the controller object when it receives <CODE>
+MSG_META_NOTIFY_WITH_DATA_BLOCK</CODE>
+.</P>
+<P CLASS="refField">
+Destination:	Sent by controller to itself.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+msg</CODE>
+	Either <CODE>
+MSG_GEN_SET_ENABLED</CODE>
+ or <CODE>
+MSG_GEN_SET_NOT_ENABLED</CODE>
+ as appropriate.</P>
+<DL>
+<DT>
+<CODE>
+updateMode</CODE>
+</DT><DD>A <CODE>
+VisUpdateMode</CODE>
+ indicating when the visual update should occur.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	Unlikely--typically should not be intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_CONTROL_ADD_APP_UI">
+ </A>
+MSG_GEN_CONTROL_ADD_APP_UI</H4>
+<PRE CLASS="syntax">void	MSG_GEN_CONTROL_ADD_APP_UI(
+        optr	appUI);</PRE>
+<P>
+This message adds the passed UI object to the controller's generic tree as if it had been originally defined in the default child block. By default, the new object is added as the last child of the controller.</P>
+<P CLASS="refField">
+Source:	Unrestricted--generated as part of the default functionality of <CODE>
+MSG_GEN_CONTROL_GENERATE_UI</CODE>
+ if the controller has <CODE>
+ATTR_GEN_CONTROL_APP_UI</CODE>
+ set.</P>
+<P CLASS="refField">
+Destination:	Any GenControl object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+appUI</CODE>
+	The optr of the object to be added.</P>
+<P CLASS="refField">
+Interception:	Should be intercepted by controllers that wish to add the new object somewhere other than as the last child.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_CONTROL_ADD_APP_TOOLBOX_UI">
+ </A>
+MSG_GEN_CONTROL_ADD_APP_TOOLBOX_UI</H4>
+<PRE CLASS="syntax">void	MSG_GEN_CONTROL_ADD_APP_TOOLBOX_UI(
+        optr	appUI);</PRE>
+<P>
+This message adds the passed UI object to the controller's tool UI gadgetry as if it had been defined as a tool in the tool resource block. By default, the new object is added as the last child of the controller.</P>
+<P CLASS="refField">
+Source:	Unrestricted--generated as part of the default functionality of <CODE>
+MSG_GEN_CONTROL_GENERATE_TOOLBOX_UI</CODE>
+ if the controller has <CODE>
+ATTR_GEN_CONTROL_APP_TOOLBOX_UI</CODE>
+ set.</P>
+<P CLASS="refField">
+Destination:	Any GenControl object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+appUI</CODE>
+	The optr of the object to be added.</P>
+<P CLASS="refField">
+Interception:	Should be intercepted by controllers that wish to add the new object somewhere other than as the last child.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_CONTROL_REBUILD_NORMAL_UI">
+ </A>
+MSG_GEN_CONTROL_REBUILD_NORMAL_UI</H4>
+<PRE CLASS="syntax">void	MSG_GEN_CONTROL_REBUILD_NORMAL_UI();</PRE>
+<P>
+This message forces the normal UI of the controller to be rebuilt; each component will be visually destroyed and rebuilt.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenControl object.</P>
+<P CLASS="refField">
+Interception:	Should not be intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_CONTROL_REBUILD_TOOLBOX_UI">
+ </A>
+MSG_GEN_CONTROL_REBUILD_TOOLBOX_UI</H4>
+<PRE CLASS="syntax">void	MSG_GEN_CONTROL_REBUILD_TOOLBOX_UI();</PRE>
+<P>
+This message forces the toolbox UI of the controller to be rebuilt; each component will be visually destroyed and rebuilt.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenControl object.</P>
+<P CLASS="refField">
+Interception:	Should not be intercepted.</P>
+
+
+
+<H2 CLASS="HeadingC">
+Adding and Removing Features and Tools</H2>
+<PRE>MSG_GEN_CONTROL_SCAN_FEATURE_HINTS, MSG_GEN_CONTROL_ADD_FEATURE, MSG_GEN_CONTROL_REMOVE_FEATURE, MSG_GEN_CONTROL_ADD_TOOLBOX_FEATURE, MSG_GEN_CONTROL_REMOVE_TOOLBOX_FEATURE, MSG_GEN_CONTROL_GET_NORMAL_FEATURES, MSG_GEN_CONTROL_GET_TOOLBOX_FEATURES</PRE>
+<P>
+<A NAME="IX_controllers:adding and removing tools">
+ </A>
+Besides being able to set and clear features of a given controller, both the controller class and outside agents can dynamically alter the features of a given controller object. <CODE>
+GenControlClass</CODE>
+ has several messages that you can use for this purpose; these messages are detailed below.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_CONTROL_SCAN_FEATURE_HINTS">
+ </A>
+MSG_GEN_CONTROL_SCAN_FEATURE_HINTS</H4>
+<PRE CLASS="syntax">void	MSG_GEN_CONTROL_SCAN_FEATURE_HINTS(
+        GenControlUIType		type,
+        GenControlScanInfo		*info);</PRE>
+<P>
+This message scans the feature hints set for the controller object to set the required and prohibited features.</P>
+<P CLASS="refField">
+Source:	Unrestricted--Sent by <CODE>
+GenControlClass</CODE>
+ to itself in numerous circumstances.</P>
+<P CLASS="refField">
+Destination:	The GenControl object to be scanned.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+type</CODE>
+	An indicator whether the normal or tool box UI hints are to be scanned. This should be GCUIT_NORMAL for the normal hints, GCUIT_TOOLBOX for the tool box hints.</P>
+<DL>
+<DT>
+<CODE>
+info</CODE>
+</DT><DD>A pointer to an empty <CODE>
+GenControlScanInfo</CODE>
+ structure to be filled in by the handler. This structure is shown below.</DD>
+</DL>
+<P CLASS="refField">
+Return:	No value is returned directly.</P>
+<DL>
+<DT>
+<CODE>
+info</CODE>
+</DT><DD>The pointer to the <CODE>
+GenControlScanInfo</CODE>
+ structure filled in by the method.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	Should not be intercepted.</P>
+<P CLASS="refField">
+Structures:	<A NAME="IX_GenControlScanInfo">
+ </A>
+<A NAME="IX_GCSI_&ldots;">
+ </A>
+The <CODE>
+GenControlScanInfo</CODE>
+ structure has the following fields:</P>
+<PRE>typedef struct {
+	WordFlags		GCSI_userAdded;
+	WordFlags		GCSI_userRemoved;
+	WordFlags		GCSI_appRequired;
+	WordFlags		GCSI_appProhibited;
+} GenControlScanInfo;</PRE>
+<DL>
+<DT>
+<CODE>
+GCSI_userAdded</DT><DD>
+</CODE>
+A record of features added by the user through the use of the GenToolControl object. This record also reflects the use of <CODE>
+MSG_GEN_CONTROL_ADD_FEATURE</CODE>
+.</DD>
+<DT>
+<CODE>
+GCSI_userRemoved</DT><DD>
+</CODE>
+A record of features removed by the user through the use of the GenToolControl object.</DD>
+<DT>
+<CODE>
+GCSI_appRequired</DT><DD>
+</CODE>
+A record of features required; this is set for the controller with <CODE>
+ATTR_GEN_CONTROL_REQUIRE_TOOLBOX_UI</CODE>
+ or <CODE>
+ATTR_GEN_CONTROL_REQUIRE_UI</CODE>
+.</DD>
+<DT>
+<CODE>
+GCSI_appProhibited</DT><DD>
+</CODE>
+A record of features prohibited; this is set for the controller with <CODE>
+ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI</CODE>
+ or <CODE>
+ATTR_GEN_CONTROL_PROHIBIT_UI</CODE>
+.</DD>
+
+
+</DL>
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_CONTROL_ADD_FEATURE">
+ </A>
+MSG_GEN_CONTROL_ADD_FEATURE</H4>
+<PRE CLASS="syntax">void	MSG_GEN_CONTROL_ADD_FEATURE(
+        WordFlags featureToAdd);</PRE>
+<P>
+This message adds a feature to those currently supported by the controller. This is used for the default settings only, not for tool box UI. The controller is destroyed and then rebuilt with the new feature, causing it to be marked for saving to the state file in the new configuration.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenControl object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+featureToAdd</CODE>
+	A feature record with the flag of the feature to be added set.</P>
+<P CLASS="refField">
+Interception:	Should not be intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_CONTROL_REMOVE_FEATURE">
+ </A>
+MSG_GEN_CONTROL_REMOVE_FEATURE</H4>
+<PRE CLASS="syntax">void	MSG_GEN_CONTROL_REMOVE_FEATURE
+        WordFlags featureToRemove);</PRE>
+<P>
+This message removes a feature from those currently supported by the controller. It does not affect the active tools. The controller will be marked for saving to the state file in the new configuration; it is destroyed and rebuilt with feature removed.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenControl object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+featureToRemove</CODE>
+	A feature record with the flag of the feature to be removed set.</P>
+<P CLASS="refField">
+Interception:	Should not be intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_CONTROL_ADD_TOOLBOX_FEATURE">
+ </A>
+MSG_GEN_CONTROL_ADD_TOOLBOX_FEATURE</H4>
+<PRE CLASS="syntax">void	MSG_GEN_CONTROL_ADD_TOOLBOX_FEATURE(
+        WordFlags featureToAdd);</PRE>
+<P>
+This message adds a tool to those currently supported by the controller. This is used for the tool box settings only, not for the default UI features. The controller is destroyed and then rebuilt with the new tool, causing it to be marked for saving to the state file in the new configuration.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenControl object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+featureToAdd</CODE>
+	A feature record with the flag of the to be added set.</P>
+<P CLASS="refField">
+Interception:	Should not be intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_CONTROL_REMOVE_TOOLBOX_FEATURE">
+ </A>
+MSG_GEN_CONTROL_REMOVE_TOOLBOX_FEATURE</H4>
+<PRE CLASS="syntax">void	MSG_GEN_CONTROL_REMOVE_TOOLBOX_FEATURE(
+        WordFlags featureToRemove);</PRE>
+<P>
+This message removes a tool from those currently supported by the controller. It does not affect the default active feature list. The controller will be marked for saving to the state file in the new configuration; it is destroyed and rebuilt with the tool removed.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenControl object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+featureToRemove</CODE>
+	A feature record with the flag of the tool to be removed set.</P>
+<P CLASS="refField">
+Interception:	Should not be intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_CONTROL_GET_NORMAL_FEATURES">
+ </A>
+MSG_GEN_CONTROL_GET_NORMAL_FEATURES</H4>
+<PRE CLASS="syntax">void MSG_GEN_CONTROL_GET_NORMAL_FEATURES(
+        GenControlGetFeaturesReturn *return);</PRE>
+<P>
+This message returns a structure indicating which of the default features of the controller are currently active, which are required, and which are prohibited.</P>
+<P CLASS="refField">
+Source:	Unrestricted--typically GenToolControl.</P>
+<P CLASS="refField">
+Destination:	Any GenControl object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+return</CODE>
+	A pointer to an empty structure to be returned.</P>
+<P CLASS="refField">
+Return:	The <CODE>
+return</CODE>
+ parameter, upon return, points to a filled <CODE>
+GenControlGetFeaturesReturn</CODE>
+ structure.</P>
+<P CLASS="refField">
+Structures:	<A NAME="IX_GCSR_&ldots;">
+ </A>
+<A NAME="IX_GenControlGetFeaturesReturn">
+ </A>
+The <CODE>
+GenControlGetFeaturesReturn</CODE>
+ structure is shown below:</P>
+<PRE>typedef struct {
+	WordFlags		GCSR_features;
+	WordFlags		GCSR_required;
+	WordFlags		GCSR_prohibited;
+	WordFlags		GCSR_supported;
+} GenControlGetFeaturesReturn;</PRE>
+<DL>
+<DT>
+<CODE>
+GCSR_features</DT><DD>
+</CODE>
+A record of flags indicating which features are currently active.</DD>
+<DT>
+<CODE>
+GCSR_required</DT><DD>
+</CODE>
+A record of flags indicating which features, at the least, are required for the controller.</DD>
+<DT>
+<CODE>
+GCSR_prohibited</DT><DD>
+</CODE>
+A record of flags indicating which features are prohibited to the controller.</DD>
+<DT>
+<CODE>
+GCSR_supported</DT><DD>
+</CODE>
+A record of flags indicating the full range of supported features.</DD>
+
+
+</DL>
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_CONTROL_GET_TOOLBOX_FEATURES">
+ </A>
+MSG_GEN_CONTROL_GET_TOOLBOX_FEATURES</H4>
+<PRE CLASS="syntax">void MSG_GEN_CONTROL_GET_TOOLBOX_FEATURES(
+        GenControlGetFeaturesReturn *return);</PRE>
+<P>
+This message returns a structure indicating which of the controller's tools are currently active, which are required, and which are prohibited.</P>
+<P CLASS="refField">
+Source:	Unrestricted--typically GenToolControl.</P>
+<P CLASS="refField">
+Destination:	Any GenControl object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+return</CODE>
+	A pointer to an empty structure to be returned.</P>
+<P CLASS="refField">
+Return:	The <CODE>
+return</CODE>
+ parameter, upon return, points to a filled <CODE>
+GenControlGetFeaturesReturn</CODE>
+ structure.</P>
+<P CLASS="refField">
+Structures:	The <CODE>
+GenControlGetFeaturesReturn</CODE>
+ structure is shown in <CODE>
+MSG_GEN_CONTROL_GET_NORMAL_FEATURES</CODE>
+, above.</P>
+
+
+
+<H2 CLASS="HeadingC">
+Working with GCN Lists</H2>
+<PRE>MSG_GEN_CONTROL_ADD_TO_GCN_LISTS, MSG_GEN_CONTROL_REMOVE_FROM_GCN_LISTS</PRE>
+<P>
+<A NAME="IX_controllers:with GCN lists">
+ </A>
+Because <CODE>
+GenControlClass</CODE>
+ uses GCN lists, it has two messages that add itself to and remove itself from the lists. You can intercept or send these if you need to; applications generally will not, however. These two messages are detailed below.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_CONTROL_ADD_TO_GCN_LISTS">
+ </A>
+MSG_GEN_CONTROL_ADD_TO_GCN_LISTS</H4>
+<PRE CLASS="syntax">void	MSG_GEN_CONTROL_ADD_TO_GCN_LISTS();</PRE>
+<P>
+This message adds the controller object to the GCN lists specified by its return value of <CODE>
+MSG_GEN_CONTROL_GET_INFO</CODE>
+. It will force a status update to ensure that the controller updates itself.</P>
+<P CLASS="refField">
+Source:	Generated internally on startup and at other times.</P>
+<P CLASS="refField">
+Destination:	Sent to self.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted. Subclasses should use this only to see when the controller is being added to its lists; it should call the superclass to do the actual addition.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_CONTROL_REMOVE_FROM_GCN_LISTS">
+ </A>
+MSG_GEN_CONTROL_REMOVE_FROM_GCN_LISTS</H4>
+<PRE CLASS="syntax">void	MSG_GEN_CONTROL_REMOVE_FROM_GCN_LISTS();</PRE>
+<P>
+This message removes the controller from all its GCN lists.</P>
+<P CLASS="refField">
+Source:	Generated internally on shutdown and at other times.</P>
+<P CLASS="refField">
+Destination:	Sent to self.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted. Subclasses should use this only to see when the controller is being removed from its lists; it should call the superclass to do the actual removal.</P>
+
+
+
+<H2 CLASS="HeadingC">
+Working with Controller Visibility</H2>
+<PRE>MSG_GEN_CONTROL_NOTIFY_INTERACTABLE, MSG_GEN_CONTROL_NOTIFY_NOT_INTERACTABLE, MSG_GEN_CONTROL_UNBUILD_NORMAL_UI_IF_POSSIBLE</PRE>
+<P>
+<A NAME="IX_controllers:interactability">
+ </A>
+Because controllers are generic objects which may or may not be interactable, <CODE>
+GenControlClass</CODE>
+ has two messages to handle the interactable state. It has an additional message to close the normal UI tools, if possible. These three messages are detailed below.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_CONTROL_NOTIFY_INTERACTABLE">
+ </A>
+MSG_GEN_CONTROL_NOTIFY_INTERACTABLE</H4>
+<PRE CLASS="syntax">void	MSG_GEN_CONTROL_NOTIFY_INTERACTABLE(
+        GenControlInteractableFlags flags);</PRE>
+<P>
+This message instructs the controller to take any actions necessary before being put on the screen and made interactable. It causes the controller to add itself to its GCN lists (if it wasn't already) and take any final steps to get ready to go on the screen.</P>
+<P CLASS="refField">
+Source:	Generated Internally--do not generate externally.</P>
+<P CLASS="refField">
+Destination:	Sent to self.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+flags</CODE>
+	A single record of flags indicating which portions of the controller will be made interactable.</P>
+<P CLASS="refField">
+Interception:	May be intercepted to circumvent default behavior.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_CONTROL_NOTIFY_NOT_INTERACTABLE">
+ </A>
+MSG_GEN_CONTROL_NOTIFY_NOT_INTERACTABLE</H4>
+<PRE CLASS="syntax">void	MSG_GEN_CONTROL_NOTIFY_NOT_INTERACTABLE(
+        GenControlInteractableFlags flags);</PRE>
+<P>
+This message indicates that the UI has determined that the controller can no longer be seen or interacted with by the user. The default behavior of the controller is to remove itself from its GCN lists for optimization.</P>
+<P CLASS="refField">
+Source:	Generated Internally--do not generate externally.</P>
+<P CLASS="refField">
+Destination:	Sent to self.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+flags</CODE>
+	A single record of flags indicating which portions of the controller are no longer interactable.</P>
+<P CLASS="refField">
+Interception:	May be intercepted to circumvent default behavior.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_CONTROL_UNBUILD_NORMAL_UI_IF_POSSIBLE">
+ </A>
+MSG_GEN_CONTROL_UNBUILD_NORMAL_UI_IF_POSSIBLE</H4>
+<PRE CLASS="syntax">void	MSG_GEN_CONTROL_UNBUILD_NORMAL_UI_IF_POSSIBLE();</PRE>
+<P>
+This internal message requests that the normal default controller UI gadgetry be removed and destroyed if they are not in use. This is an optimization intended to save swap space and perhaps memory space; it causes the objects to be loaded back in again when needed, however. Thus, the optimization is only suited to machines with limited swap space (it originated due to these conditions on palmtop machines).</P>
+<P CLASS="refField">
+Source:	Generated internally. Do not generate externally.</P>
+<P CLASS="refField">
+Destination:	Sent to self.</P>
+<P CLASS="refField">
+Interception:	May be intercepted to avoid the optimization. May also need to be intercepted if a subclass creates its own UI gadgetry by intercepting <CODE>
+MSG_GEN_CONTROL_GENERATE_UI</CODE>
+<A NAME="marker=1107">
+ </A>
+.</P>
+
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Controllers_9.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Controllers_b.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.2 Subclassing GenControlClass</A> 
+<!-- to next --> | <A HREF="Controllers_d.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">5 GenToolControlClass</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

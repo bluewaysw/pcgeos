@@ -1,0 +1,407 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: FileSys_10.htm,v 1.1 97/06/02 14:44:40 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Bytewise File Operations</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The File System</A>: 5.6 <A HREF="FileSys_a.htm">Files</A>: 
+<A NAME="48613">
+ </A>
+Bytewise File Operations</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="FileSys_a.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="FileSys_f.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.5 FileEnum()</A> 
+<!-- to next --> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+There are several routines designed for working with files as a string of bytes. These routines may be used to work with DOS files or with GEOS byte files. You can open any file (including an executable file or a VM file) for byte-level access. This may be useful for such things as file-compression routines; however, be aware that if you make any changes to such files, you could invalidate them. For this reason, if you open a VM or executable file for byte-level access, you should open it for read-only use.
+
+</P>
+
+<H2 CLASS="HeadingC">
+<A NAME="59832">
+ </A>
+Opening and Closing Files</H2>
+<PRE>FileOpen(), FileCreate(), FileCreateTempFile(), FileClose(), FileAccessFlags</PRE>
+<P>
+The GEOS file system provides several routines for opening files for byte-level access. If you are working with GEOS Virtual Memory files, you should use the appropriate VM routines to open and close the files (see <A HREF="../../Memory/VM/index.htm">the VM chapter</A>). You should use the byte-level routines only if you are working with DOS files or with GEOS byte files. You may occasionally want to read a VM file or an executable file as a string of bytes. In this rare case, you must use the routines in this section. Note, however, that you should not change the VM file with these routines; it is safe only to open it for read-only access.</P><P>
+<A NAME="IX_FileOpen()">
+ </A>
+To open a file, call <CODE>
+FileOpen()</CODE>
+. This routine takes two arguments: a set of <CODE>
+FileAccessFlags</CODE>
+ and a pointer to a null-terminated string. The string should specify the name of the file (either the virtual name or the native name may be used). It may simply be a file name, or it may be a relative or absolute path. The <CODE>
+FileAccessFlags</CODE>
+ record specifies two things: what kind of access the caller wants, and what type of access is permitted to other geodes.<A NAME="IX_FILE_ACCESS_&ldots;">
+ </A>
+<A NAME="IX_FileAccessFlags">
+ </A>
+ A set of <CODE>
+FileAccessFlags</CODE>
+ is thus a bit-wise OR of two different values. The first specifies what kind of access the calling geode wants and has the following values:</P>
+<DL>
+<DT>
+FILE_ACCESS_R</DT><DD>
+The geode will only be reading from the file.</DD>
+<DT>
+FILE_ACCESS_W</DT><DD>
+The geode will write to the file but will not read from it.</DD>
+<DT>
+FILE_ACCESS_RW</DT><DD>
+The geode will read from and write to the file.</DD>
+</DL>
+<P>
+<A NAME="IX_FILE_DENY_&ldots;">
+ </A>
+The second part specifies what kind of access other geodes may have. Note that if you try to deny a permission which has already been given to another geode (e.g. you open a file with FILE_DENY_W when another geode has the file open for write-access), the call will fail. The following permissions can be used:</P>
+<DL>
+<DT>
+FILE_DENY_RW</DT><DD>
+No geode may open the file for any kind of access, whether read, write, or read/write.</DD>
+<DT>
+FILE_DENY_R</DT><DD>
+No geode may open the file for read or read/write access.</DD>
+<DT>
+FILE_DENY_W</DT><DD>
+No geode may open the file for write or read/write access.</DD>
+<DT>
+FILE_DENY_NONE</DT><DD>
+Other geodes may open the file for any kind of access.</DD>
+</DL>
+<P>
+Two flags, one from each of these sets of values, are combined to make up a proper <CODE>
+FileAccessFlags</CODE>
+ value. For example, to open the file for read-only access while prohibiting other geodes from writing to the file, you would pass the flags FILE_ACCESS_R and FILE_DENY_W as follows:</P>
+<PRE>myHandle = FileOpen(&quot;MyFile&quot;,
+		(FILE_ACCESS_R | FILE_DENY_W));</PRE>
+<P>
+If successful, <CODE>
+FileOpen()</CODE>
+ returns the file's handle. If it is unsuccessful, it returns a null handle and sets the thread's error value. The following error values are commonly returned:</P>
+<DL>
+<DT>
+ERROR_FILE_NOT_FOUND</DT><DD>
+No file with the specified name could be found in the appropriate directory.</DD>
+<DT>
+ERROR_PATH_NOT_FOUND</DT><DD>
+A relative or absolute path had been passed, and the path included a directory which did not exist.</DD>
+<DT>
+ERROR_TOO_MANY_OPEN_FILES</DT><DD>
+There is a limit to how many files may be open at once. If this limit is reached, <CODE>
+FileOpen()</CODE>
+ will fail until a file is closed.</DD>
+<DT>
+ERROR_ACCESS_DENIED</DT><DD>
+Either the caller requested access which could not be granted (e.g. it requested write access when another geode had already opened the file with FILE_DENY_W), or the caller tried to deny access when that access had already been granted to another geode (e.g. it tried to open the file with FILE_DENY_W when another geode already had it open for write-access).</DD>
+<DT>
+ERROR_WRITE_PROTECTED</DT><DD>
+The caller requested write or read-write access to a file in a write-protected volume.</DD>
+</DL>
+<P>
+Note that if you use the document control objects, they automatically make all appropriate calls to <CODE>
+FileOpen()</CODE>
+ when the user requests it; you will automatically be passed the file's handle.</P>
+<P>
+<CODE>
+FileOpen()</CODE>
+ can only be called if the file already exists.<A NAME="IX_FileCreate()">
+ </A>
+ In order to create a byte file, you must call <CODE>
+FileCreate()</CODE>
+. <CODE>
+FileCreate()</CODE>
+ takes four arguments: a set of <CODE>
+FileCreateFlags</CODE>
+, a set of <CODE>
+FileAccessFlags</CODE>
+, a set of <CODE>
+FileAttrs</CODE>
+, and a pointer to a string containing a name for the file.<A NAME="IX_FCF_&ldots;">
+ </A>
+<A NAME="IX_FileCreateFlags">
+ </A>
+ As with <CODE>
+FileOpen()</CODE>
+, the name may be a name alone or a relative or absolute path. The <CODE>
+FileCreateFlags</CODE>
+ specifies whether the file should be created if it already exists. The following flags are available:</P>
+<DL>
+<DT>
+FILE_CREATE_TRUNCATE</DT><DD>
+If a file with the given name exists, it should be opened and truncated; that is, all data should be deleted.</DD>
+<DT>
+FILE_CREATE_NO_TRUNCATE</DT><DD>
+If the file exists, it should be opened without being truncated.</DD>
+<DT>
+FILE_CREATE_ONLY</DT><DD>
+If the file exists, the routine should fail and set the thread's error value to ERROR_FILE_EXISTS.</DD>
+<DT>
+FCF_NATIVE</DT><DD>
+This flag is combined with one of the above flags if the file should be created in the device's native format; e.g. if it should be a DOS file instead of a GEOS file. The name passed must be an acceptable native file name. If a GEOS file with the specified name already exists, <CODE>
+FileCreate()</CODE>
+ will fail with error condition ERROR_FILE_FORMAT_MISMATCH.</DD>
+</DL>
+<P>
+The first three flags (FILE_CREATE_...) are mutually exclusive; exactly one of them must be passed to <CODE>
+FileCreate()</CODE>
+. That flag may or may not be combined with FCF_NATIVE.</P>
+<P>
+The <CODE>
+FileAccessFlags</CODE>
+ are the same as described in <CODE>
+FileOpen()</CODE>
+. Note, however, that you must request either write access or read/write access when you use <CODE>
+FileCreate()</CODE>
+.</P>
+<P>
+Every file has a set of attributes. These record certain information about the file. If you create a file, you will need to specify values for these attributes. The attributes are described above in the section on <A HREF="FileSys_d.htm#66195"> FEA_FILE_ATTR</A>
+.</P>
+<P>
+If <CODE>
+FileCreate()</CODE>
+ is successful, it will open the file and return its handle. If it fails, it will return a null handle and set the thread's error value. It may return any of the <CODE>
+FileOpen()</CODE>
+ errors. It may also return the following errors:</P>
+<DL>
+<DT>
+ERROR_FILE_EXISTS</DT><DD>
+Returned if <CODE>
+FileCreate()</CODE>
+ was called with FILE_CREATE_ONLY and a file with the specified name already exists.</DD>
+<DT>
+ERROR_FORMAT_MISMATCH</DT><DD>
+Returned if <CODE>
+FileCreate()</CODE>
+ was called with FILE_CREATE_TRUNCATE or FILE_CREATE_NO_TRUNCATE and a file exists in a different format than desired; i.e. you passed FCF_NATIVE and the file already exists in the GEOS format, or vice versa.</DD>
+</DL>
+<P>
+<A NAME="IX_FileCreateTempFile()">
+ </A>
+It is often useful to create temporary files which are not seen by the user. In these cases, you generally don't care about the file's name since you will most likely be deleting the file on exit. For these situations GEOS provides the routine <CODE>
+FileCreateTempFile()</CODE>
+. <CODE>
+FileCreateTempFile()</CODE>
+ is passed a directory; it chooses a unique name for the file. This routine takes two arguments:</P>
+<UL>
+<LI>
+A set of <CODE>
+FileAttrs</CODE>
+, as described above.</LI>
+<LI>
+A pointer to a null-terminated string specifying the path for the temporary file. This path may be relative or absolute. To create the temporary file in the current directory, pass the string &quot;.&quot; This string should contain fourteen extra null bytes at the end, as <CODE>
+FileCreateTempFile()</CODE>
+ will write the name of the temporary file at the end of the string. Temporary files are typically created in SP_WASTE_BASKET.</LI>
+</UL>
+<P>
+If successful, <CODE>
+FileCreateTempFile()</CODE>
+ will open the temporary file and return its handle. It will also write the file's name to the end of the string passed. You will need to know the name to delete the file. The name is also useful if GEOS shuts down while a temporary file is open; the geode will need to know the temporary file's name in order to reopen it.</P>
+<P>
+<A NAME="IX_FileClose()">
+ </A>
+When you are done with a file, you should close it by calling <CODE>
+FileClose()</CODE>
+. This releases any restrictions you may have placed on the file and allows the file to be moved or deleted. It is passed two arguments: the file handle and a Boolean value which should be set to <EM>
+true</EM>
+ (i.e. non-zero) if the geode cannot handle error messages; it will cause <CODE>
+FileClose()</CODE>
+ to fatal-error if it cannot successfully close the file. (This should only be used during development; the flag should never be passed in a finished program.) The routine returns zero if successful; otherwise, it returns a <CODE>
+FileError</CODE>
+ value.</P>
+
+
+<H2 CLASS="HeadingC">
+<A NAME="15825">
+ </A>
+Reading From and Writing To Files</H2>
+<PRE>FileRead(), FileWrite(), FilePos(), FileCommit()</PRE>
+<P>
+There are a few specific operations you are allowed to perform on data in a byte-file. You can copy data from the file into memory; you can copy data from memory into the file, overwriting the file's contents; you can write data to the end of a file; and you can cut data from the end of the file. If you want to perform more elaborate manipulations on a byte-file, you may wish to create a temporary VM file and copy the data there (see <A HREF="../../Memory/VM/index.htm">the VM chapter</A>).</P><P>
+<A NAME="IX_File position">
+ </A>
+Every file handle has a <EM>
+file position</EM>
+ associated with it. All read and write operations begin at that position; they may also change the position. The first byte in a file is considered to be at position zero. If the file is a GEOS byte file, position zero is immediately after the GEOS header; thus, the header cannot be accessed or altered via the read and write operations.</P>
+<P>
+<A NAME="IX_FileRead()">
+ </A>
+To read data from a file, call <CODE>
+FileRead()</CODE>
+. This routine takes four arguments. The first is the file's handle. The second is the address of a buffer. <CODE>
+FileRead()</CODE>
+ will copy the requested number of bytes from the file to the buffer. The third is the number of bytes to read. The fourth is a Boolean indicating whether the caller can handle errors. (This is <EM>
+true</EM>
+ if the geode cannot handle error messages; it will cause <CODE>
+FileRead()</CODE>
+ to fatal-error if it cannot successfully read the data. This should only be used during development; the flag should never be passed in a finished program.) <CODE>
+FileRead() </CODE>
+returns the number of bytes actually read. This may be less than the number requested, if the end of file is reached; in this case, the thread's error value will be set to ERROR_SHORT_READ_WRITE. If <CODE>
+FileRead()</CODE>
+ was unable to gain access to the file, it will return -1 and set the thread's error value to ERROR_ACCESS_DENIED. In any event, the file position will be incremented by the number of bytes read; thus, it will point to the first byte after the data read.</P>
+<P>
+<A NAME="IX_FileWrite()">
+ </A>
+To write data to a file, call <CODE>
+FileWrite()</CODE>
+. This routine takes four arguments. The first is the file's handle. The second is the address of a buffer in memory. The third is the number of bytes to write. The fourth is a Boolean indicating whether the caller can handle errors. <CODE>
+FileWrite()</CODE>
+ will copy the specified number of bytes from the buffer to the file, starting at the current position and expanding the file as necessary. It will also increment the current position by the number of bytes written. If the current position is not at the end of the file, <CODE>
+FileWrite()</CODE>
+ will overwrite the file's existing data. <CODE>
+FileWrite()</CODE>
+ returns the number of bytes written. This may be less than the number requested, if the disk ran out of space; in this case, the thread's error value will be set to ERROR_SHORT_READ_WRITE. If <CODE>
+FileWrite()</CODE>
+ could not get access to the file (as, for example, if the geode had read-only access to the file), it will return -1 and set the thread's error value to ERROR_ACCESS_DENIED. </P>
+<P>
+If a file is on a removable disk, the kernel will make sure that the disk is in the appropriate drive before reading from or writing to it. If the disk is not in the drive, the kernel will prompt the user to insert it. The user will have the option of aborting the operation; this will result in the file-access routine failing with error condition ERROR_DISK_UNAVAILABLE.</P>
+<P>
+<A NAME="IX_FileCommit()">
+ </A>
+When you write changes to a file, either the GEOS file system or the underlying DOS may choose to cache those changes to save time. All cached changes will be written to the disk when the file is closed. However, you can force the cached changes to be written immediately by calling <CODE>
+FileCommit()</CODE>
+. This routine takes two arguments. The first is the file's handle. The second is a Boolean indicating whether the caller can handle errors. The routine returns zero if the operation was successful; otherwise it returns an error code.</P>
+<P>
+<A NAME="IX_FilePos()">
+ </A>
+To change the current file position, call <CODE>
+FilePos()</CODE>
+. This routine takes three arguments. The first is the file handle.<A NAME="IX_FILE_POS_&ldots;">
+ </A>
+<A NAME="IX_FilePosMode">
+ </A>
+ The second is a member of the <CODE>
+FilePosMode</CODE>
+ enumerated type; this value indicates how the new position is specified. The third argument is a number of bytes; it specifies how far the file position will be moved. <CODE>
+FilePosMode</CODE>
+ has the following possible values:</P>
+<DL>
+<DT>
+FILE_POS_START</DT><DD>
+The file position is set to a specified number of bytes after the start of the file. Passing this mode with an offset of zero will set the file position to the start of the file (i.e. immediately after the header information).</DD>
+<DT>
+FILE_POS_RELATIVE</DT><DD>
+The file position is incremented or decremented by a specified number of bytes.</DD>
+<DT>
+FILE_POS_END</DT><DD>
+The file position is set to a specified number of bytes before the end of the file. Passing this mode with an offset of zero will set the file position to the end of the file.</DD>
+</DL>
+<P>
+<CODE>
+FilePos()</CODE>
+ returns a 32-bit integer. This integer specifies the file position after the move (relative to the start of the file). To find out the current file position without changing it, call <CODE>
+FilePos()</CODE>
+ with mode FILE_POS_RELATIVE and offset zero.</P>
+
+
+<H2 CLASS="HeadingC">
+<A NAME="88250">
+ </A>
+Getting and Setting Information about a Byte File</H2>
+<PRE>FileGetDateAndTime(), FileSetDateAndTime(), FileGetAttributes(), FileSetAttributes()</PRE>
+<P>
+GEOS provides several routines to get information about files. To get information about a GEOS file, you would ordinarily use one of the extended attributes routines (see <A HREF="FileSys_d.htm#49785"> GEOS Extended Attributes</A>
+). These routines are ordinarily used for non-GEOS files. Nevertheless, all of the following routines can be used on GEOS files.</P>
+<P>
+<CODE>
+FileGetDateAndTime()</CODE>
+<A NAME="IX_FileGetDateAndTime()">
+ </A>
+ and<A NAME="IX_FileSetDateAndTime()">
+ </A>
+ <CODE>
+FileSetDateAndTime()</CODE>
+ are used to get and set the file's modification time. To access a GEOS file's modification time, you would ordinarily call an extended attribute routine, passing FEA_MODIFICATION. However, special-purpose routines are provided specifically for changing a file's modification time. Note that these routines may be used for GEOS or non-GEOS files. Similarly, you can change the FEA_MODIFICATION attribute even for non-GEOS files. To find out the modification time, call <CODE>
+FileGetDateAndTime()</CODE>
+. This routine is passed the file's handle and returns a <CODE>
+FileDateAndTime</CODE>
+ value (as described above on <A HREF="FileSys_d.htm#38588"> FEA_MODIFICATION</A>
+). To change the modification time, call <CODE>
+FileSetDateAndTime()</CODE>
+. This routine is passed the file's handle and a <CODE>
+FileDateAndTime</CODE>
+ value. If successful, it returns zero; otherwise, it returns an error code. You must have write permission to change the modification time; otherwise, <CODE>
+FileSetDateAndTime()</CODE>
+ will fail with condition ERROR_ACCESS_DENIED. <A NAME="IX_TimerGetFileDateTime()">
+ </A>
+The <CODE>
+TimerGetFileDateTime()</CODE>
+ routine returns the current date and time in a <CODE>
+FileDateAndTime</CODE>
+ structure.</P>
+<P>
+<A NAME="IX_FileGetAttributes()">
+ </A>
+To find out a DOS file's attributes, call <CODE>
+FileGetAttributes()</CODE>
+. This routine is passed a file's path.<A NAME="IX_FileSetAttributes()">
+ </A>
+ It returns the file's <CODE>
+FileAttrs</CODE>
+ record (as described on <A HREF="FileSys_d.htm#66195"> FEA_FILE_ATTR</A>
+). To change the file's attributes, call <CODE>
+FileSetAttributes()</CODE>
+. This routine takes two arguments: the address of a null-terminated path string and a <CODE>
+FileAttrs</CODE>
+ record. It returns zero if it was successful; otherwise, it returns an error condition. Note that a file's attributes cannot be changed if the file is open.</P>
+
+
+<H2 CLASS="HeadingC">
+<A NAME="12930">
+ </A>
+Data-Access Synchronization</H2>
+<PRE>FileLockRecord(), FileUnlockRecord()</PRE>
+<P>
+GEOS provides routines to help threads synchronize file access. This functionality is very elaborate for VM files. For byte files it is less so. Several threads can synchronize their access to a single handle by using <CODE>
+HandleP()</CODE>
+ and <CODE>
+HandleV()</CODE>
+, described in <A HREF="../../Memory/Heap/Memory_b.htm#68631">the Memory Management chapter</A>. If they want to use the file at the same time, they should use <CODE>FileLockRecord()</STRONG>
+ and <CODE>
+FileUnlockRecord()</CODE>
+.</P>
+<P>
+<CODE>
+FileLockRecord()</CODE>
+<A NAME="IX_FileLockRecord()">
+ </A>
+ takes three arguments: the file handle, a dword specifying the start of the region to be locked, and a dword specifying the length (in bytes) of the region to be locked. If there are no locks on any part of that region, <CODE>
+FileLockRecord()</CODE>
+ returns zero; otherwise, it returns the error code ERROR_ALREADY_LOCKED. Note that there is nothing to stop another thread or geode from reading or writing to that region. The lock simply prevents anyone from <EM>
+locking</EM>
+ that region with <CODE>
+FileLockRecord()</CODE>
+. The file's users have to remember to lock any part of the file before accessing it.</P>
+<P>
+<A NAME="IX_FileUnlockRecord()">
+ </A>
+To release a lock on a part of a file, call <CODE>
+FileUnlockRecord()</CODE>
+. This routine takes the same arguments as <CODE>
+FileLockRecord()</CODE>
+.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="FileSys_a.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="FileSys_f.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.5 FileEnum()</A> 
+<!-- to next --> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

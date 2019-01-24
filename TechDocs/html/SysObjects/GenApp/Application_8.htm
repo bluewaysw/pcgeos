@@ -1,0 +1,199 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Application_8.htm,v 1.1 97/06/02 16:15:39 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> IACP</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The Application Object</A>: 1.7 <A HREF="Application_1.htm">GenApplication Basics</A>: 
+IACP</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Application_1.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Application_7.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1.6 Application Features and Levels</A> 
+<!-- to next --> | <A HREF="Application_9.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">2 Advanced GenApplication Usage</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>GAI_iacpConnects, MSG_GEN_APPLICATION_IACP_REGISTER, MSG_GEN_APPLICATION_IACP_UNREGISTER, MSG_GEN_APPLICATION_IACP_GET_NUMBER_OF_CONNECTIONS, MSG_GEN_APPLICATION_IACP_
+GET_NUMBER_OF_APP_MODE_CONNECTIONS, MSG_GEN_APPLICATION_IACP_SHUTDOWN_ALL_CONNECTIONS, MSG_GEN_APPLICATION_IACP_COMPLETE_CONNECTIONS, MSG_GEN_APPLICATION_APP_MODE_COMPLETE</PRE>
+<P>
+IACP (the GEOS <EM>
+I</EM>
+nter <EM>
+A</EM>
+pplication <EM>
+C</EM>
+ommunication <EM>
+P</EM>
+rotocol) allows applications to communicate with each other. IACP is flexible enough to let applications know whether another application is open, closed, or in the process of attaching or detaching. IACP allows applications to convey information to one another, and could be used to support updating data (e.g. documents) across applications. The IACP mechanism is discussed more fully in <A HREF="../../Kernel/Geodes/index.htm">the Applications and Geodes chapter</A>. The information included below only discusses <CODE>GenApplicationClass</STRONG>
+ support of IACP mechanisms.</P>
+<P>
+GAI_<CODE>
+iacpConnects</CODE>
+ stores the chunk handle to an array of active IACP connections. This chunk stores the IACP connection value referring to the remote application and the type of IACP connection (i.e. a connection that is enabled during a MSG_GEN_PROCESS_OPEN_APPLICATION, for example). These values are manipulated internally and there is no need to access them. You will instead use a variety of messages provided with <CODE>
+GenApplicationClass</CODE>
+ to register and unregister for application notification.</P>
+<P>
+<A NAME="IX_GenApplicationClass">
+ </A>
+A good deal of support has been added to <CODE>
+GenApplicationClass</CODE>
+ to support IACP. The main things you need to know about this support are:</P>
+<UL>
+<LI>
+A GenApplication object will refuse to quit so long as there are IACP connections open to it. It can, however, be forcibly detached, as happens when the system shuts down. In such a case, it will call <CODE>
+IACPShutdownAll()</CODE>
+ to shut down all remaining connections either to or from it.</LI>
+<LI>
+When it receives <CODE>
+MSG_META_IACP_LOST_CONNECTION</CODE>
+ sent to it as a server, it will eventually call <CODE>
+IACPShutdown()</CODE>
+ for the connection when it is certain no more messages relating to the connection are in any relevant queue. It will forward this message to all GenDocument objects below any GenDocumentGroup object in the application, so they can close themselves if the lost connection was the last reference to them.</LI>
+<LI>
+It will automatically register itself as a server for the application's token, either when it receives MSG_META_APP_STARTUP if the <CODE>
+AppLaunchBlock</CODE>
+ indicates it's running in engine mode, or when it receives MSG_META_ATTACH and has attached all the various pieces of UI. It will unregister itself as a server when it loses its last IACP connection and is no longer functioning in application mode (either because the user quit the application long since, or because it was never functioning in application mode).</LI>
+<LI>
+It registers and unregisters itself by sending <CODE>
+MSG_GEN_APPLICATION_IACP_REGISTER</CODE>
+ and <CODE>
+MSG_GEN_APPLICATION_IACP_UNREGISTER</CODE>
+ to itself, allowing an application to subclass these messages and register with other lists as appropriate.</LI>
+<LI>
+To determine whether it has any IACP connections remaining, it invokes <CODE>
+MSG_GEN_APPLICATION_IACP_GET_NUMBER_OF_CONNECTIONS</CODE>
+ on itself. Should an application register the GenApplication or any other object as a server for another list, it can determine how many connections remain from that list and augment the number returned by the default handler in <CODE>
+GenApplicationClass</CODE>
+. If this returns non-zero, GenApplication will not shut down the application voluntarily.</LI>
+<LI>
+After unregistering, it will force-queue a message to itself that will check the number of connections again. If the number has become non-zero between the unregister and the check, it re-registers and does not shut down. If the number remains zero, however, the application will exit.</LI>
+<LI>
+When forcibly detached, it will send <CODE>
+MSG_GEN_APPLICATION_IACP_SHUTDOWN_ALL_CONNECTIONS</CODE>
+ to itself. The default handler will call<CODE>
+ IACPShutdownAll()</CODE>
+, passing its own optr. A subclass can use this to perform a similar operation for any other server objects the application might have.</LI>
+</UL>
+
+<H4 CLASS="RefETitle">
+MSG_GEN_APPLICATION_IACP_REGISTER</H4>
+<PRE CLASS="syntax">void	MSG_GEN_APPLICATION_IACP_REGISTER();</PRE>
+<P>
+This message is sent by a GenApplication object to itself when it registers for IACP. It is not a message meant to be sent externally to an application to register it for IACP. Instead, you can subclass this message and register the object with other lists.</P>
+<P CLASS="refField">
+Source:	Sent by the GenApplication object to itself.</P>
+<P CLASS="refField">
+Destination:	The GenApplication object to register with IACP.</P>
+<P CLASS="refField">
+Interception:	May be intercepted if there are other lists with which you want to register the application, or other server objects. You must make sure to call the superclass, however.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_GEN_APPLICATION_IACP_UNREGISTER</H4>
+<PRE CLASS="syntax">void	MSG_GEN_APPLICATION_IACP_UNREGISTER();</PRE>
+<P>
+This message is sent by a GenApplication object to itself when it unregisters for IACP. It is not a message meant to be sent externally to an application to unregister it for IACP. Instead, you can subclass this message and unregister the object with other lists.</P>
+<P CLASS="refField">
+Source:	Sent by the GenApplication object to itself.</P>
+<P CLASS="refField">
+Destination:	The GenApplication object to unregister with IACP.</P>
+<P CLASS="refField">
+Interception:	May be intercepted if there are other lists with which you need to unregister the application, or other server objects. You must make sure to call the superclass, however.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_GEN_APPLICATION_IACP_GET_NUMBER_OF_CONNECTIONS</H4>
+<PRE CLASS="syntax">word	MSG_GEN_APPLICATION_IACP_GET_NUMBER_OF_CONNECTIONS();</PRE>
+<P>
+This message returns the number of active engine or app-mode IACP connections for a given application. This message is used to check whether an application open only for IACP purposes may be closed.</P>
+<P CLASS="refField">
+Source:	Called by GenProcessClass when the UI has finished processing MSG_META_QUIT for the application; this determines if the application should exit at this point or if there are client applications that need the application to stay open.</P>
+<P CLASS="refField">
+Destination:	GenApplication object of the application.</P>
+<P CLASS="refField">
+Return:	Number of open connections. If non-zero, application will remain open.</P>
+<P CLASS="refField">
+Interception:	Only intercept if you have other server objects beside your GenApplication object. If intercepting, call the superclass first and then add the number of connections to the other objects onto the result returned by <CODE>
+GenApplicationClass</CODE>
+.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_GEN_APPLICATION_IACP_GET_NUMBER_OF_APP_MODE_CONNECTIONS</H4>
+<PRE CLASS="syntax">word	MSG_GEN_APPLICATION_IACP_GET_NUMBER_OF_APP_MODE_CONNECTIONS();</PRE>
+<P>
+This message retrieves the number of connections which require that the application be open in app-mode (as opposed to engine mode). This message is used to check whether an application can be closed down into engine mode even if some IACP connections are still open.</P>
+<P CLASS="refField">
+Source:	This message is called by the <CODE>
+GenProcessClass</CODE>
+ when the UI has finished processing MSG_META_QUIT to determine if the application should really close down to engine mode.</P>
+<P CLASS="refField">
+Destination:	GenApplication object of application.</P>
+<P CLASS="refField">
+Return:	Number of open app-mode connections. </P>
+<P CLASS="refField">
+Interception:	Only intercept if you have other server objects besides your GenApplication object. You should call the superclass first and then add the number of connections to other objects onto the result returned by <CODE>
+GenApplicationClass</CODE>
+.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_GEN_APPLICATION_IACP_SHUTDOWN_ALL_CONNECTIONS</H4>
+<PRE CLASS="syntax">void	MSG_GEN_APPLICATION_IACP_SHUTDOWN_ALL_CONNECTIONS();</PRE>
+<P>
+This message shuts down all IACP connections for a given application, either on the server or the client side of the connection.</P>
+<P CLASS="refField">
+Source:	Sent by the GenApplication object to itself.</P>
+<P CLASS="refField">
+Destination:	GenApplication object of the application.</P>
+<P CLASS="refField">
+Interception:	May be intercepted to allow connections to other server objects to be shut down. You must call the superclass at some point to ensure that application connections are shut down as well.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_GEN_APPLICATION_APP_MODE_COMPLETE</H4>
+<PRE CLASS="syntax">void	MSG_GEN_APPLICATION_APP_MODE_COMPLETE();</PRE>
+<P>
+This message is sent to the application when its life as a user-interactable app is complete. The default behavior is to continue shutting down the process if there are no IACP connections active.</P>
+<P CLASS="refField">
+Source:	Sent by the GenProcess object after it receives a MSG_META_ACK from detaching the application.</P>
+<P CLASS="refField">
+Destination:	GenApplication object.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted; If you have other server connections which you want taken into account before shutting the application completely down, you should intercept MSG_GEN_APPLICATION_IACP_GET_NUMBER_OF_CONNECTIONS instead.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_GEN_APPLICATION_IACP_COMPLETE_CONNECTIONS</H4>
+<PRE CLASS="syntax">void	MSG_GEN_APPLICATION_IACP_COMPLETE_CONNECTIONS();</PRE>
+<P>
+This message completes all pending IACP connections, accepting any queued messages that have been waiting to be handled. If you subclass it, be sure to call the superclass at some point.</P>
+<P CLASS="refField">
+Source:	Sent by the GenApplication object to itself in its default MSG_GEN_APPLICATION_OPEN_COMPLETE method, as we assume that the object should be able to handle IACP messages at this latter stage of opening the IACP mechanism.</P>
+<P CLASS="refField">
+Destination:	GenApplication object of the application.</P>
+<P CLASS="refField">
+Interception:	May be intercepted if there are other lists besides those connected to the application's token, if those other connections might be pending. If intercepting, you must call the superclass eventually.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Application_1.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Application_7.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1.6 Application Features and Levels</A> 
+<!-- to next --> | <A HREF="Application_9.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">2 Advanced GenApplication Usage</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

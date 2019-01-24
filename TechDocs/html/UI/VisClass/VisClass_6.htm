@@ -1,0 +1,190 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: VisClass_6.htm,v 1.1 97/06/02 16:51:03 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> VI_attrs</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">VisClass</A>: 3.3 <A HREF="VisClass_3.htm">VisClass Instance Data</A>: 
+VI_attrs</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VisClass_3.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VisClass_5.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.2 VI_typeFlags</A> 
+<!-- to next --> | <A HREF="VisClass_7.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.4 VI_optFlags</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>VI_attrs, MSG_VIS_GET_ATTRS, MSG_VIS_SET_ATTRS</PRE>
+<P>
+<A NAME="IX_VI_attrs">
+ </A>
+The <CODE>
+VI_attrs</CODE>
+ field is a record of eight flags (<CODE>
+VisAttrs</CODE>
+)that determine the general visible attributes of the object. These attributes may be changed on the fly and often are. Applications that don't involve visible tree operations (adding, removing, or moving branches) probably will not change these attributes dynamically.</P>
+<P>
+<A NAME="IX_VisAttrs">
+ </A>
+To set the flags after the object has been instantiated, send it a <CODE>
+MSG_VIS_SET_ATTRS</CODE>
+ with the appropriate flags to be set. To retrieve the <CODE>
+VI_attrs</CODE>
+ record, send the object a <CODE>
+MSG_VIS_GET_ATTRS</CODE>
+. The VA_REALIZED flag may not be changed with <CODE>
+MSG_VIS_SET_ATTRS</CODE>
+.</P>
+<P>
+The eight flags of the <CODE>
+VisAttrs</CODE>
+ record are listed below:</P>
+<DL>
+<DT>
+VA_VISIBLE<A NAME="IX_VA_&ldots;">
+ </A>
+</DT><DD>This flag is effective only for window group objects (those with VTF_IS_WIN_GROUP set in <CODE>
+VI_typeFlags</CODE>
+) and is ignored for other objects. If set, it indicates that the visible branch headed by this object can be made visible as soon as it is linked visibly to another visible branch. For example, a window group object may have this bit set and not be on the screen if its parent window group is not set VA_VISIBLE; as soon as the parent window group becomes VA_VISIBLE, though, the entire branch will become visible.</DD>
+<DT>
+VA_FULLY_ENABLED</DT><DD>
+This flag is normally set for visible objects. If it is set, the object is fully enabled when visible on the screen. If not set, the object is not fully enabled--the object will typically be drawn in a 50% pattern (grayed out) and will not receive click events. This flag works even for normal visible objects, though this behavior is seen almost exclusively with generic UI objects.</DD>
+<DT>
+VA_MANAGED</DT><DD>
+This flag indicates that the object's location is managed by its parent. If the flag is set, space is set aside in the parent composite by the geometry manager. When the window displaying this object changes, the geometry will have to be calculated. If this flag is not set, the object can alter its own location and bounds without affecting the parent's geometry.</DD>
+<DT>
+VA_DRAWABLE</DT><DD>
+This flag indicates whether the object is drawn or invisible. If the flag gets set or reset during execution, the rectangle defined by its <CODE>
+VI_bounds</CODE>
+ field will automatically be marked invalid.</DD>
+<DT>
+VA_DETECTABLE</DT><DD>
+This flag, when set, indicates that the object might respond to mouse, pointer, keyboard, or other similar events. If the flag is reset (such as with display-only objects), its parent composite object will not bother passing it these events. This flag must be set if the object is a window composite. If the status of this flag is changed during execution, the object's grab state will not change. For example, if the object has the mouse grab when a <CODE>
+MSG_VIS_SET_ATTRS</CODE>
+ resets the flag, the object will retain the mouse grab until it is released or preempted normally.</DD>
+<DT>
+VA_BRANCH_NOT_MINIMIZABLE</DT><DD>
+This flag is used <EM>
+only</EM>
+ by the visible counterparts of generic UI objects. If set, it indicates that this branch (e.g., a GenInteraction and its children) stays visible and usable even when the parent primary window is minimized.</DD>
+<DT>
+VA_OLD_BOUNDS_SAVED</DT><DD>
+This flag, when set, causes the geometry manager to store the object's old bounds when its <CODE>
+VI_bounds</CODE>
+ field changes. The old bounds are stored in a TEMP_VIS_OLD_BOUNDS vardata field.</DD>
+<DT>
+VA_REALIZED</DT><DD>
+This flag indicates whether the object is visibly open on the screen--i.e., whether it is positioned on an open window. If the flag is set, the object is visible on the screen. When the object is no longer visible on the screen, this flag is reset. This flag may <EM>
+not</EM>
+ be altered by <CODE>
+MSG_VIS_SET_ATTRS</CODE>
+; it may only be changed by <CODE>
+MSG_VIS_OPEN</CODE>
+ (which sets the flag) and <CODE>
+MSG_VIS_CLOSE</CODE>
+ (which resets it).</DD>
+
+</DL>
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_SET_ATTRS">
+ </A>
+MSG_VIS_SET_ATTRS</H4>
+<PRE CLASS="syntax">void	MSG_VIS_SET_ATTRS(
+        VisAttrs		attrsToSet,
+        VisAttrs		attrsToClear,
+        VisUpdateMode		updateMode);</PRE>
+<P>
+This message sets the object's <CODE>
+VI_attrs</CODE>
+ field to the values passed. The <CODE>
+attrsToSet</CODE>
+ parameter will be OR-ed with <CODE>
+VI_attrs</CODE>
+, and the <CODE>
+attrsToClear</CODE>
+ parameter will be logically inverted and then AND-ed with the field. The clear operation will occur after the set, and therefore a flag set in both parameters will be cleared. The <CODE>
+updateMode</CODE>
+ parameter indicates when the visual update of the object should occur after the new attributes have been set.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+attrsToSet</CODE>
+	A record of <CODE>
+VisAttrs</CODE>
+ indicating which flags are to be set for the object.</P>
+<DL>
+<DT>
+<CODE>
+attrsToClear</CODE>
+</DT><DD>A record of <CODE>
+VisAttrs</CODE>
+ indicating which flags are to be cleared for the object (a flag set in <CODE>
+attrsToClear</CODE>
+ will be cleared in <CODE>
+VI_attrs</CODE>
+).</DD>
+<DT>
+<CODE>
+updateMode</CODE>
+</DT><DD>A <CODE>
+VisUpdateMode</CODE>
+ indicating when the object should be visually updated on the screen.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+<P CLASS="refField">
+Warnings:	Not all flags in the <CODE>
+VI_attrs</CODE>
+ record may be set with this message.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_GET_ATTRS">
+ </A>
+MSG_VIS_GET_ATTRS</H4>
+<PRE CLASS="syntax">VisAttrs	MSG_VIS_GET_ATTRS();</PRE>
+<P>
+This message returns a visible object's current <CODE>
+VI_attrs</CODE>
+ field.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	A byte of type <CODE>
+VisAttrs</CODE>
+ representing the current flags set in the object's <CODE>
+VI_attrs</CODE>
+ field.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VisClass_3.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VisClass_5.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.2 VI_typeFlags</A> 
+<!-- to next --> | <A HREF="VisClass_7.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.4 VI_optFlags</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

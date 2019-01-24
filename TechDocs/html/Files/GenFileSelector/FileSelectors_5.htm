@@ -1,0 +1,228 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: FileSelectors_5.htm,v 1.1 97/06/02 14:47:38 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Messages to Handle</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The FileSelector Object</A>: 2.3 <A HREF="FileSelectors_2.htm">File Selector Basics</A>: 
+Messages to Handle</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="FileSelectors_2.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="FileSelectors_4.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2.2 Supporting the File Selector</A> 
+<!-- to next --> | <A HREF="FileSelectors_6.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2.4 Some Common Customizations</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+The list above shows two different messages that your File Selector's basic configuration: The first results from the user clicking on an entry and comes from the File Selector object, and the second is sent by the &quot;Insert&quot; trigger when the user clicks on it. The following descriptions show what you must do when handling these messages. (Note that in many cases only one message, the File Selector's action message, will be used; this occurs when the &quot;Insert&quot; trigger is actually an IC_OK or similar response trigger.)</P>
+<P>
+<A HREF="FileSelectors_5.htm#21264"> Handling a File Selector Selection</A>
+ shows a sample handler for the message sent by the File Selector. <A HREF="FileSelectors_5.htm#43812"> Handling a File Selector "OK" Button</A>
+ shows a sample handler for the message sent by the Reply Bar's Insert trigger. Both these handlers are written to go with the code in <A HREF="FileSelectors_3.htm#24357"> A Basic File Selector</A>
+, and both handle the simplest case. Where application-specific code is required, comments have been inserted. </P>
+<P>
+You should not, in general, <EM>
+have</EM>
+ to handle any more than the File Selector's notification message. You may add your own gadgetry to add other functionality, however.</P>
+<P>
+The File Selector's notification message is the message you set in <CODE>
+GFSI_notificationMsg</CODE>
+. This message should have the same definition as the prototype <CODE>
+GEN_FILE_SELECTOR_NOTIFICATION_MSG</CODE>
+, which is defined below. You can either define it with the same parameters, or you can define it exactly on the prototype. (The latter is recommended.) The prototype carries with the notification a word of <CODE>
+GenFileSelectorEntryFlags</CODE>
+; this record contains the following flag fields:</P>
+<DL>
+<DT>
+GFSEF_TYPE</DT><DD>
+This is a two-bit field (at offset GFSEF_TYPE_OFFSET) that describes the type of the selection. This may be one of GFSET_FILE (selection is a file), GFSET_SUBDIR (selection is a subdirectory), or GFSET_VOLUME (selection is a volume or disk). These are values of <CODE>
+GenFileSelectorEntryType</CODE>
+.</DD>
+<DT>
+GFSEF_OPEN</DT><DD>Set if the selection action was an &quot;open&quot; (i.e. double-click).</DD>
+<DT>
+GFSEF_NO_ENTRIES</DT><DD>
+Set if no entries are in the list.</DD>
+<DT>
+GFSEF_ERROR</DT><DD>
+Set if there was an error opening the selected entry on a double-click or a <CODE>
+MSG_GEN_FILE_SELECTOR_OPEN_ENTRY</CODE>
+.</DD>
+<DT>
+GFSEF_TEMPLATE</DT><DD>
+Set if the file is a template (i.e. has GFHF_TEMPLATE set).</DD>
+<DT>
+GFSEF_SHARED_MULTIPLE</DT><DD>
+Set if the file is shared with multiple writers (i.e. has GFHF_SHARED_MULTIPLE).</DD>
+<DT>
+GFSEF_SHARED_SINGLE</DT><DD>
+Set if the file is shared and has a single writer (i.e. has GFHF_SHARED_SINGLE).</DD>
+<DT>
+GFSEF_READ_ONLY</DT><DD>
+Set if the file is read-only (i.e. has FA_RDONLY).</DD>
+<DT>
+GFSEF_PARENT_DIR</DT><DD>
+Set if the current selection is the parent directory (i.e. the first entry in the file selector's list).</DD>
+
+</DL>
+<H4 CLASS="RefETitle">
+GEN_FILE_SELECTOR_NOTIFICATION_MSG</H4>
+<PRE CLASS="syntax">void	GEN_FILE_SELECTOR_NOTIFICATION_MSG(
+        word				entryNum,
+        GenFileSelectorEntryFlags				entryFlags);</PRE>
+<P>
+This prototype should be used for all notification messages sent out by the File Selector; that is, any message you set in <CODE>
+GFSI_notificationMsg</CODE>
+ should be based on this prototype.</P>
+<P CLASS="refField">
+Source:	The GenFileSelector object.</P>
+<P CLASS="refField">
+Destination:	The object specified in <CODE>
+GFSI_destination</CODE>
+.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+entryNum</CODE>
+	The entry number selected in the list.</P>
+<DL>
+<DT>
+<CODE>
+entryFlags</CODE>
+</DT><DD>A <CODE>
+GenFileSelectorEntryFlags</CODE>
+ record describing the selection. To get the entry type from the flags record, use the macro GFS_GET_ENTRY_TYPE, described after this reference entry.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Structures:	<CODE>
+GenFileSelectorEntryFlags</CODE>
+ is a record with the following flags:</P>
+<PRE>typedef WordFlags GenFileSelectorEntryFlags;
+#define GFSEF_TYPE						0xc000
+#define GFSEF_OPEN						0x2000
+#define GFSEF_NO_ENTRIES 						0x1000
+#define GFSEF_ERROR 						0x0800
+#define GFSEF_TEMPLATE 						0x0400
+#define GFSEF_SHARED_MULTIPLE 						0x0200
+#define GFSEF_SHARED_SINGLE 						0x0100
+#define GFSEF_READ_ONLY 						0x0080
+#define GFSEF_PARENT_DIR 						0x0040</PRE>
+<PRE>#define GFSEF_TYPE_OFFSET 					14</PRE>
+<P>
+The GFSEF_TYPE field is two bits defined by one of the following <CODE>
+GenFileSelectorEntryType</CODE>
+ constants. These two bits define the type of entry selected.</P>
+<PRE>typedef ByteEnum GenFileSelectorEntryType;
+#define GFSET_FILE				0
+#define GFSET_SUBDIR				1
+#define GFSET_VOLUME				2</PRE>
+<P CLASS="refField">
+Interception:	The notification message must be intercepted and handled for the selection of a file to have any effect in your application. There is no default behavior, except in the document control objects (which create their own File Selectors).</P>
+
+
+<H4 CLASS="RefETitle">
+GFS_GET_ENTRY_TYPE</H4>
+<PRE CLASS="syntax">byte	GFS_GET_ENTRY_TYPE(flags)
+        word	flags;</PRE>
+<P>
+This macro extracts the high two bits from a <CODE>
+GenFileSelectorEntryFlags</CODE>
+ record delivered as a parameter of a File Selector's notification message. Compare the value to GFSET_FILE, GFSET_SUBDIR, and GFSET_VOLUME.</P>
+<P CLASS="figTitle">
+Code Display 14-2 <A NAME="21264">
+ </A>
+Handling a File Selector Selection</P>
+<PRE>/*
+ * C handler for MSG_MY_APP_FILE_SELECTED. The message is sent by the File Selector
+ * object (MyFileSel) to the application's Process object (MyProcessClass) when the
+ * user clicks on an entry in the displayed file list. This code display is per the
+ * setup in <A HREF="FileSelectors_3.htm#24357"> A Basic File Selector</A>.
+ */</PRE>
+<PRE>/*
+ * Format of the message:
+ * void MSG_MY_APP_FILE_SELECTED(word entryNum,
+ *					GenFileSelectorEntryFlags entryFlags)
+ */</PRE>
+<PRE>@method	MyProcessClass, MSG_MY_APP_FILE_SELECTED {
+    /* First check if this is an OPEN operation (double-click). If so,
+     * then test whether the selection is a file. If so, simulate the &quot;Insert&quot;
+     * trigger by sending the trigger's message to ourselves. If it is not a file,
+     * or if the operation is not OPEN, we need do nothing. */</PRE>
+<PRE>    if (GFS_GET_ENTRY_FLAGS(entryFlags) &amp; GFSEF_OPEN) {    /* Is the operation
+						      * a double-click? */
+	if (GFS_GET_ENTRY_TYPE(entryFlags) &amp; GFSET_FILE) {
+						/* Is the selection a file? */
+	    /* Execute application-specific code here. */
+	}
+    }
+}</PRE>
+<PRE>/* Note that we do not necessarily have to handle double-click operations in this
+ * way. Since a double-click automatically activates the GenInteraction's default
+ * element (typically an &quot;Ok&quot; trigger), we can simply handle the press of the
+ * &quot;Ok&quot; trigger as shown in <A HREF="FileSelectors_5.htm#43812"> Handling a File Selector "OK" Button</A>. */</PRE>
+<P CLASS="figTitle">
+Code Display 14-3 <A NAME="43812">
+ </A>
+Handling a File Selector &quot;OK&quot; Button</P>
+<PRE>/* C handler for MSG_MY_APP_INSERT_TRIGGER_SELECTED, the message sent by the Insert
+ * trigger to the application's Process object when the user clicks on it.
+ * Format of this message: void MSG_MY_APP_INSERT_TRIGGER_SELECTED().
+ * This code display is per the setup shown in <A HREF="FileSelectors_3.htm#24357"> A Basic File Selector</A>. */</PRE>
+<PRE>@method	MyProcessClass, MSG_MY_APP_INSERT_TRIGGER_SELECTED {
+    /* Declare a local dword of flags and entry number. */
+    dword selFlags;</PRE>
+<PRE>    /* First, retrieve the selection number and flags from the File Selector.
+     * For now, we can ignore the selection name and path. To retrieve this
+     * information, send the message MSG_GEN_FILE_SELECTOR_GET_SELECTION to the 
+     * File Selector. This message will return a dword (selFlags) that contains the
+     * selection's entry number and a GenFileSelectorEntryFlags record. (To ignore
+     * the selection name, pass a null pointer with the message.) */</PRE>
+<PRE>    selFlags = @call MyFileSel::MSG_GEN_FILE_SELECTOR_GET_SELECTION(NULL);</PRE>
+<PRE>    /* Next, determine whether the selection is a file. To do this, check the
+     * returned GenFileSelectorEntryFlags record against GFSET_FILE. If the result
+     * is true, the selection is a file. If false, it is a directory or volume. If
+     * the selection is a file, we will operate on it appropriately (this is
+     * specific to each application). If not, we will direct the File Selector to
+     * open the entry. Note that we can assume an OPEN operation is in progress
+     * because the only two ways to get to this point are through a double-click
+     * on a selection and through a click on the &quot;Insert&quot; trigger.
+     */</PRE>
+<PRE>    /* Note the use of the two macros GFS_GET_ENTRY_FLAGS and GFS_GET_ENTRY_NUMBER.
+     * The first extracts the GenFileSelectorEntryFlags record from the dword
+     * selFlags, and the second extracts the entry number from selFlags. */</PRE>
+<PRE>    if (GFS_GET_ENTRY_FLAGS(selFlags) == GFSET_FILE) {	/* the selection is a file */</PRE>
+<PRE>	/* Execute application-specific code here. */</PRE>
+<PRE>    } else {				/* the selection is a volume or directory */</PRE>
+<PRE>	/* Now direct the File Selector to open the entry. Use the message
+	 * MSG_GEN_FILE_SELECTOR_OPEN_ENTRY, which returns a flag; if the flag is
+	 * set, then an error occurred. If the flag is clear, the operation
+	 * succeeded. */</PRE>
+<PRE>	if (@call MyFileSel::MSG_GEN_FILE_SELECTOR_OPEN_ENTRY(
+					GFS_GET_ENTRY_NUMBER(selFlags))) {
+	    /* Provide a proper error message or beep sound. */
+	}
+}</PRE>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="FileSelectors_2.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="FileSelectors_4.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2.2 Supporting the File Selector</A> 
+<!-- to next --> | <A HREF="FileSelectors_6.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2.4 Some Common Customizations</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

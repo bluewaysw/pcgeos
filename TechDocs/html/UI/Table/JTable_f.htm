@@ -1,0 +1,139 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: JTable_f.htm,v 1.2 97/09/05 14:42:30 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Changing Column Definitions</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The Table Objects</A>: 4.8 <A HREF="JTable_7.htm">Using a Table Object</A>: 
+<A NAME="91726">
+ </A>
+Changing Column Definitions</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="JTable_7.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="JTable_e.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.7 Table Headings</A> 
+<!-- to next --> | <A HREF="JTable_10.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">5 TableContentClass</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+You may wish in exceptional circumstances to display different columns than the ones you statically define using TI_<CODE>
+columnDefinitions</CODE>
+. In that case, you may want to define alternate column definitions and switch which ones you use at appropriate times in your application. There is a fair amount of overhead in doing this yourself--there currently exists no API to take care of this behavior--so you should make sure you want to take that approach.
+<IMG SRC="JTable_f_changeColDefns.gif">
+
+</P>
+<P>
+The following steps are recommended to get this behavior:</P>
+<UL>
+<LI>
+Define separate column definitions for each group of columns you want displayed. Each column definition should reside in its own separate chunk. Make sure that each set of column definitions resides within the resource block of the table object. (Because <CODE>
+TI_columnDefinitions</CODE>
+ is a chunk handle, it cannot reference chunks outside of the resource.)</LI>
+<LI>
+Create an instance field in your Table subclass to index which column definitions you are currently using. You will use this instance field to determine what chunk array of data to use.</LI>
+<LI>
+Create separate chunk arrays to hold your individual sets of data and an instance field to hold the correct pointer to that chunk array. Alternatively, you could have one chunk array hold both sets of data and define an offset into the second set of data.</LI>
+<LI>
+Define a message in your Table subclass to change the column definitions, passing it an index number of the column definitions you want to use. Set TI_<CODE>
+columnDefinitions</CODE>
+ to the appropriate column definitions in your handler for this message. Also change your index number to indicate the new column definitions being used and the pointer to the chunk array of data.</LI>
+<LI>
+Redraw the Table by sending <CODE>
+MSG_TABLE_REDRAW_TABLE</CODE>
+ from this handler. This will dispatch <CODE>
+MSG_TABLE_QUERY_DRAW</CODE>
+ to each of the affected cells.</LI>
+<LI>
+Handle <CODE>
+MSG_TABLE_QUERY_DRAW</CODE>
+ as usual.</LI>
+</UL>
+<P CLASS="figTitle">
+Code Display 5-8 Dynamically Changing Column Definitions</P>
+<PRE>/* First, make sure you create a message to change the column definitions and an 
+ * instance field to indicate which column definitions we are using. */</PRE>
+<PRE>@class MyTableClass, TableClass;</PRE>
+<PRE>    @message void MSG_MY_TABLE_CHANGE_COLUMN_DEFINITIONS(int columnIndex);</PRE>
+<PRE>    @instance int 			MTI_columnIndex = 0;
+    @instance optr			MTI_chunkArray = NullOptr;</PRE>
+<PRE>@endc;</PRE>
+<PRE>@classdecl MyTableClass;</PRE>
+<PRE>/* Define your column definitions. Make sure that each set of column definitions 
+ * adds up to 240 pixels across. Note that if you want headers for each of these 
+ * column definitions, you will need to handle that yourself.*/</PRE>
+<PRE>#define MY_COLUMN_FLAGS (TCF_START_SELECT | TCF_DOUBLE_SELECT | TCF_DRAG_SELECT | 
+			TCF_HOLD_SELECT | TRIT_CELL )</PRE>
+<PRE>@chunk TableColumnDefinition ColumnSet1[] = {
+    MY_COLUMN_FLAGS, 25,
+    MY_COLUMN_FLAGS, 100,
+    MY_COLUMN_FLAGS, 45,
+    MY_COLUMN_FLAGS, 70};</PRE>
+<PRE>@chunk TableColumnDefinition ColumnSet2[] = {
+    MY_COLUMN_FLAGS, 25,
+    MY_COLUMN_FLAGS, 100,
+    MY_COLUMN_FLAGS, 115};</PRE>
+<PRE>/* Define our cell data in two separate chunk arrays. */</PRE>
+<PRE>@chunkArray CellDataStruct myMainData = {
+    &quot;0&quot;,&quot;Viennese&quot;,&quot;DARK&quot;, &quot;$ 8.75&quot;,
+    &quot;1&quot;,&quot;Italian&quot;,&quot;DARK&quot;,&quot;$ 8.75&quot;,
+    &quot;2&quot;,&quot;French&quot;,&quot;DARK&quot;,&quot;$ 9.25&quot;,
+    &quot;3&quot;,&quot;Sumatra&quot;,&quot;RICH&quot;,&quot;$ 8.95&quot;};</PRE>
+<PRE>@chunkArray CellDataStruct mySecondaryData = {
+    &quot;0&quot;,&quot;Mr. Cringle&quot;,&quot;1412 Dowdy Ln.&quot;,
+    &quot;1&quot;,&quot;Ms. Holworth&quot;,&quot;23 Abercrombie&quot;,
+    &quot;2&quot;,&quot;Jeeves&quot;,&quot;10 Downing St.&quot;,
+    &quot;3&quot;,&quot;Kahlia&quot;,&quot;345 Cedar St.&quot;};</PRE>
+<PRE>/* Define your method for MSG_MY_TABLE_CHANGE_COLUMN_DEFINITIONS. */</PRE>
+<PRE>@method MyTableClass, MSG_MY_TABLE_CHANGE_COLUMN_DEFINITIONS
+{
+    switch(columnIndex) {
+	case COLUMN_SET_1:
+	    pself-&gt;TI_columnDefinitions = OptrToHandle(@ColumnSet1);
+	    pself-&gt;MTI_chunkArray = @myMaindata;
+	    break;
+	case COLUMN_SET_2:
+	    pself-&gt;TI_columnDefinitions = OptrToHandle(@ColumnSet2);
+	    pself-&gt;MTI_chunkArray = @mySecondaryData;
+	    break;
+	default:
+	    break;
+    }</PRE>
+<PRE>    pself-&gt;MTI_columnIndex = columnIndex;</PRE>
+<PRE>    @call self::MSG_TABLE_REDRAW_TABLE;
+}</PRE>
+<PRE>/* Handle MSG_TABLE_QUERY_DRAW. Because we set up the MTI_chunkArray instance 
+ * field in MSG_MY_TABLE_CHANGE_COLUMN_DEFINITIONS, nothing special is done here. 
+ */</PRE>
+<PRE>@method MyTableClass, MSG_TABLE_QUERY_DRAW
+{
+    char *data;
+    word cArrayIndex, offset, size;</PRE>
+<PRE>    cArrayIndex = (location.TCL_row * TABLE_COLS) + location.TCL_column;</PRE>
+<PRE>    MemLock(OptrToHandle(pself-&gt;MTI_chunkArray));</PRE>
+<PRE>    data = ChunkArrayElementToPtr((pself-&gt;MTI_chunkArray),
+				cArrayIndex, &amp;size);</PRE>
+<PRE>    GrDrawTextAtCP(gstate, data, 0);</PRE>
+<PRE>    MemUnlock(OptrToHandle(pself-&gt;MTI_chunkArray);
+}</PRE>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="JTable_7.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="JTable_e.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.7 Table Headings</A> 
+<!-- to next --> | <A HREF="JTable_10.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">5 TableContentClass</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

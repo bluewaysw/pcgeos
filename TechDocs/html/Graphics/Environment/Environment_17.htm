@@ -1,0 +1,189 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Environment_17.htm,v 1.1 97/06/02 15:07:51 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Drawing and Scanning</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Graphics Environment</A>: 8.5 <A HREF="Environment_12.htm">Graphics Strings</A>: 
+Drawing and Scanning</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Environment_12.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Environment_16.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">8.4 Creating GStrings Dynamically</A> 
+<!-- to next --> | <A HREF="Environment_18.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">8.6 Editing GStrings Dynamically</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>GrDrawGString(), GrDrawGStringAtCP(), GrSetGStringPos(), GrGetGStringBounds(), GrGetGStringBoundsDWord()</PRE>
+<P>
+There are several ways to use a GString. You've already seen how to use one as the visual moniker for a UI gadget. In that case, the UI is responsible for drawing the moniker. If you are learning about interfacing with printers, you probably know that you pass a GString to a PrintControl object to describe print jobs.</P>
+<P>
+There is also a kernel graphics routine for drawing GStrings directly. The <CODE>
+GrDrawGString()</CODE>
+ command draws a GString, or a part thereof. Remember that the GString must be loaded for drawing; you must call <CODE>
+GrLoadGString()</CODE>
+<A NAME="IX_GrLoadGString()">
+ </A>
+ if you have not done so already (or if you have destroyed the GString since you last called <CODE>
+GrLoadGString()</CODE>
+).</P>
+<P CLASS="figTitle">
+Code Display 23-7 <A NAME="98898">
+ </A>
+GrDrawGString() in Action</P>
+<PRE>@method StaticContentClass, MSG_VIS_DRAW {
+	word 	lElem;
+	static const byte gstringData[] = {
+		GSSetAreaColorIndex(C_RED), GSFillRect(0, 0, 72, 72),
+		GSEndString() };
+	@callsuper();
+	gstring = GrLoadGString 			(PtrToSegment(gstringData), GST_PTR,
+				 PtrToOffset(gstringData));
+	GrDrawGString(gstate, gstring, 0, 0, 0, &amp;lElem); }</PRE>
+<PRE>@method DynamicContentClass, MSG_VIS_DRAW{
+	Handle 		gstring;
+	VMFileHandle		file;
+	char 		fileString[] = &quot;.&quot;, 0;
+	VMBlockHandle		gstringData;
+	GStringElement		lElem;</PRE>
+<PRE>	@callsuper();
+	file = VMOpen(fileString, 
+		   (VMAF_FORCE_READ_WRITE | VMAF_USE_BLOCK_LEVEL_SYNCHRONIZATION),
+		   VMO_CREATE_TRUNCATE, 
+		   0);</PRE>
+<PRE>	gstring = GrCreateGString(file, GST_VMEM, &amp;gstringData);
+	GrSetAreaColor(gstring, CF_INDEX, C_RED, 0, 0);
+	GrFillRect(gstring, 0, 0, 72, 72);
+	GrEndGString(gstring);
+	GrDestroyGString(gstring, NULL, GSKT_LEAVE_DATA);</PRE>
+<PRE>	gstring = GrLoadGString(file, GST_VMEM, gstringData);
+	GrDrawGString(gstate, gstring, 0, 0, 0, &amp;lElem);
+	GrDestroyGString(gstring, NULL, GSKT_DESTROY_DATA);</PRE>
+<PRE>	FileDelete(fileString);</PRE>
+<P>
+The <A NAME="IX_GrDrawGString()">
+ </A>
+<CODE>
+GrDrawGString()</CODE>
+ routine has several arguments. A simple usage of the routine is shown in <A HREF="Environment_17.htm#98898"> GrDrawGString() in Action</A>
+. To take advantage of some of the more powerful features of <CODE>
+GrDrawGString()</CODE>
+, you should know what the purpose of the arguments.</P>
+<UL>
+<LI>
+You must provide a GState to draw to. You may wish to call <CODE>
+GrSaveState()</CODE>
+ on the GState before drawing the GString (and call <CODE>
+GrRestoreState()</CODE>
+ afterwards). If you will draw anything else to this GState after the GString, you must call <CODE>
+GrDestroyGString()</CODE>
+ on the GString, and pass this GState's handle as the gstate argument so that <CODE>
+GrDestroyGString()</CODE>
+ can clean up the GState.</LI>
+<LI>
+You must provide a GString to draw. The GString must be properly loaded (probably by means of <CODE>
+GrLoadGString()</CODE>
+).</LI>
+<LI>
+You can provide a pair of coordinates at which to draw the GString. The graphics system will translate the coordinate system by these coordinates before carrying out the graphics commands stored in the GString.</LI>
+<LI>
+You can provide a <CODE>
+GSControl</CODE>
+ argument which requests that the system stop drawing the GString when it encounters a certain type of GString element. If the GString interpreter encounters one of these elements, it will immediately stop drawing. The GString will remember where it stopped drawing. If you call <CODE>
+GrDrawGString() </CODE>
+with that same GString, it will continue drawing where you left off. Note that any time a GString-traversing function such as <CODE>
+GrDrawGString()</CODE>
+ returns, it returns a <A NAME="IX_GSRT_&ldots;">
+ </A>
+<A NAME="IX_GSRetType">
+ </A>
+<CODE>
+GSRetType</CODE>
+ value which makes it clear exactly why it stopped traversing the GString.</LI>
+<LI>
+You must provide a pointer to an empty <CODE>
+GStringElement</CODE>
+ structure. <CODE>
+GrDrawGString()</CODE>
+ will return a value here when it is finished drawing. If the GString has stopped drawing partway through due to a passed <CODE>
+GSControl</CODE>
+, the returned <CODE>
+GStringElement</CODE>
+ value will tell you what sort of command was responsible for halting drawing. For instance, if you had instructed <CODE>
+GrDrawGString()</CODE>
+ to halt on an `output' element (GrDraw...() or GrFill...() commands), then when <CODE>
+GrDrawGString()</CODE>
+ returns, you would check the value returned to see what sort of output element was present.</LI>
+</UL>
+<P>
+Note that those last two arguments aren't very useful except when used in conjunction with some other GString routines which we will get to later.</P>
+<P>
+The <A NAME="IX_GrDrawGStringAtCP()">
+ </A>
+<CODE>
+GrDrawGStringAtCP()</CODE>
+ routine functions in much the same way as <CODE>
+GrDrawGString()</CODE>
+, except that the current pen position will be used in the place of passed coordinate arguments.</P>
+<P>
+The <A NAME="IX_GrSetGStringPos()">
+ </A>
+<CODE>
+GrSetGStringPos()</CODE>
+ routine allows you to skip any number of GString elements, or go back to the beginning or end of the GString. You specify whether you want to skip to the beginning, end, or ahead by a few steps; this is specified by the <A NAME="IX_GSSPT_&ldots;">
+ </A>
+<A NAME="IX_GStringSetPosType">
+ </A>
+<CODE>
+GStringSetPosType</CODE>
+ argument. This routine is useful both when drawing and editing GStrings. Note that you may also use this routine to jump backwards in a GString, but this only works with VM-based GStrings. The GString must be loaded for drawing or editing, and you will pass in the GString's global handle, as supplied by <CODE>
+GrLoadGString()</CODE>
+ or<CODE>
+ GrEditGString()</CODE>
+.</P>
+<P CLASS="figTitle">
+Code Display 23-8 GrSetGStringPos() In Action</P>
+<PRE>/* The following routine is used to allow creating an `overlay' effect. Normally,
+ * multi-page GStrings will contain form feed elements that signal the break
+ * between pages. Here we see a section of code which will filter out form feeds by
+ * skipping those elements. The result will be a single page in which all the pages
+ * of the original GString are drawn on top of each other. */</PRE>
+<PRE>	for (	gsr = GrDrawGString(gstate, gstring, 0, 0, GSC_NEW_PAGE, gse);
+		gsr == GSR_FORM_FEED;
+		gsr = GrDrawGString(gstate, gstring, 0, 0, GSC_NEW_PAGE, gse) )
+			{GrSetGStringPos(gstring, GSSPT_SKIP_1, 0); }</PRE>
+<P>
+Because a GString remembers its place when you stop drawing partway through, if you wish to `reset' the GString position, you should use <CODE>
+GrSetGStringPos()</CODE>
+ to set it back to the beginning.</P>
+<P>
+Occasionally you may be curious to know how much space is necessary to draw a GString. The<CODE>
+ GrGetGStringBounds()</CODE>
+<A NAME="IX_GrGetGStringBounds()">
+ </A>
+ routine determines this, returning the coordinates describing the GString's bounding rectangle. If the GString may have very large bounds, you should use the <CODE>
+GrGetGStringBoundsDWord()</CODE>
+<A NAME="IX_GrGetGStringBoundsDWord()">
+ </A>
+ routine instead.</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Environment_12.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Environment_16.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">8.4 Creating GStrings Dynamically</A> 
+<!-- to next --> | <A HREF="Environment_18.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">8.6 Editing GStrings Dynamically</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

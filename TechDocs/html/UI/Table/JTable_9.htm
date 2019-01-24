@@ -1,0 +1,273 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: JTable_9.htm,v 1.2 97/09/05 14:41:58 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Selecting Cells</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The Table Objects</A>: 4.2 <A HREF="JTable_7.htm">Using a Table Object</A>: 
+<A NAME="63407">
+ </A>
+Selecting Cells</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="JTable_7.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="JTable_8.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.1 Drawing Cells</A> 
+<!-- to next --> | <A HREF="JTable_a.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.3 Editing Cells</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>TableCellLocation, CellRange, MSG_TABLE_SELECT, MSG_TABLE_GET_CURRENT_SELECTION, MSG_TABLE_SET_CURRENT_SELECTION. MSG_TABLE_SET_ROW_RANGE_SELECTION</PRE>
+<P>
+You can configure under what circumstances a <CODE>
+Table</CODE>
+ object will select a cell by setting the <CODE>
+TableColumnFlags</CODE>
+ for the various columns in the table. The <CODE>
+TableColumnFlags</CODE>
+ determine what will constitute a &quot;selection event&quot;, and what cells will be selected. When a selection event occurs, the <CODE>
+Table</CODE>
+ object will send itself MSG_TABLE_SELECT. This message passes two arguments:</P>
+<UL>
+<LI>
+A <CODE>
+TableCellLocation</CODE>
+ structure (described below). This structure specifies which cell was selected. If more than one cell was selected, this will specify the cell where the selection action <EM>
+began</EM>
+.</LI>
+<LI>
+A <CODE>
+TableColumnFlags</CODE>
+ record. This record specifies two things. It specifies what pointer event or events caused the selection; and it specifies, in its TCF_TRIT field, which cells should be highlighted as selected.</LI>
+</UL>
+<P>
+<A NAME="51177">
+ </A>
+A <CODE>
+TableCellLocation</CODE>
+ structure is used to specify a cell within the <CODE>
+Table</CODE>
+. It has the following definition:</P>
+<PRE>typedef struct {
+	word	TCL_row;
+	word	TCL_column;
+} TableCellLocation;</PRE>
+<DL>
+<DT>
+TCL<CODE>
+_row</CODE>
+</DT><DD>This is the cell's row. (The first row is row number zero, as always.)</DD>
+<DT>
+TCL<CODE>
+_column</CODE>
+</DT><DD>This is the cell's column. (The first column is column number zero, as always.)</DD>
+</DL>
+<P>
+The default handler for this message causes an area of the table to be highlighted. The area is determined by the TCF_TRIT field of the <CODE>
+TableColumnFlags</CODE>
+ record passed with the message. If you wish, you may intercept the message before it is handled by the default handler, and change the TCF_TRIT field in the passed <CODE>
+TableColumnFlags</CODE>
+; this will change which cells will be highlighted by the default handler. For example, if you change the TCF_TRIT field to contain TRIT_NONE, then the default handler will not highlight any rows.
+<IMG SRC="JTable_9_selectCell.gif">
+
+</P>
+<P>
+You can find out what cells, if any, are currently selected by sending MSG_TABLE_GET_CURRENT_SELECTION to the <CODE>
+Table</CODE>
+ object. This message takes one argument, a pointer to a <CODE>
+TableCellRange</CODE>
+ structure. The handler will fill in this structure with the currently selected range.</P>
+<P>
+<A NAME="54602">
+ </A>
+A <CODE>
+TableCellRange</CODE>
+ structure is used to specify a range of cells. It has the following definition:</P>
+<PRE>typedef struct {
+	TableCellLocation				TCR_start;
+	TableCellLocation				TCR_end;
+} TableCellRange;</PRE>
+<DL>
+<DT>
+TCR<CODE>
+_start</CODE>
+</DT><DD>This <CODE>
+TableCellLocation</CODE>
+ specifies the first cell in the selected range. (The <CODE>
+TableCellLocation</CODE>
+ structure is described on <A HREF="JTable_9.htm#51177"> A TableCellLocation structure is used to specify a cell within the Table. It has the following definition:</A>
+.)<CODE>
+</CODE>
+</DD>
+<DT>
+TCR<CODE>
+_end</CODE>
+</DT><DD>This <CODE>
+TableCellLocation</CODE>
+ specifies the last cell in the selected range. (Note that this cell may be higher up in the <CODE>
+Table</CODE>
+ then TCR<CODE>
+_start</CODE>
+; the same range is defined, whichever order TCR<CODE>
+_start</CODE>
+ and TCR<CODE>
+_end</CODE>
+ appear in.)</DD>
+</DL>
+<P>
+Note that a <CODE>
+TableCellRange</CODE>
+ forms a rectangle. You can change the selected cells at any time by sending <CODE>
+MSG_TABLE_SET_CURRENT_SELECTION</CODE>
+. This message is passed one argument, a <CODE>
+TableCellRange</CODE>
+ structure; that structure specifies what the current selection should be. The <CODE>
+Table</CODE>
+ object responds by changing the current selection but does not send a <CODE>
+MSG_TABLE_SELECT</CODE>
+. To cancel the current selection (and leave the <CODE>
+Table</CODE>
+ with nothing selected), send <CODE>
+MSG_TABLE_SET_CURRENT_SELECTION</CODE>
+, and put the constant T_NONE_SELECTED in the TCR<CODE>
+_start.</CODE>
+TCL<CODE>
+_column</CODE>
+ field of the passed <CODE>
+TableCellRange</CODE>
+ structure. (If you do this, the other fields of the <CODE>
+TableCellRange</CODE>
+ will be ignored.) Again, <CODE>
+MSG_TABLE_SELECT</CODE>
+ is not sent in this case.</P>
+
+<H4 CLASS="RefETitle">
+MSG_TABLE_SELECT</H4>
+<PRE CLASS="syntax">void	MSG_TABLE_SELECT(
+        TableCellLocation		location,
+        TableColumnFlags		tableColumnFlags);</PRE>
+<P>
+The <CODE>
+Table</CODE>
+ object sends this message to itself when the user selects one or more cells with a pointer object. (I.e. this message is generated through use of the pointer for Table selection, not when the selection changes through other means.) The <CODE>
+TableColumnFlags</CODE>
+ of the various columns determine whether a particular mouse action is interpreted as a selection. If it is, the <CODE>
+Table</CODE>
+ object sends itself this message, instructing itself to highlight the appropriate cells.</P>
+<P CLASS="refField">
+Source:	A <CODE>
+TableClass</CODE>
+ object.</P>
+<P CLASS="refField">
+Destination:	The <CODE>
+Table</CODE>
+ object sends this message to itself.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+location</CODE>
+	This is the selected cell; that is, the cell in which the pointer was when the column's selection criteria were met.</P>
+<DL>
+<DT>
+<CODE>
+tableColumnFlags</CODE>
+</DT><DD>This is a record of <CODE>
+TableColumnFlags</CODE>
+. The flags specify two things: They specify what criteria were used to determine that a selection had happened; and they specify (in the TCF_TRIT field) which cells should be highlighted.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Structures:	<CODE>
+TableCellLocation</CODE>
+ (see <A HREF="JTable_9.htm#51177"> A TableCellLocation structure is used to specify a cell within the Table. It has the following definition:</A>
+) and <CODE>
+TableColumnFlags</CODE>
+ (see <A HREF="JTable_5.htm#38024"> The TableColumnFlags record has the following flags:</A>
+).</P>
+<P CLASS="refField">
+Interception:	You may intercept this. If you intercept this message, you can change which cells will be highlighted by changing the <CODE>
+tableColumnFlags.</CODE>
+TCF_TRIT field.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_TABLE_GET_CURRENT_SELECTION</H4>
+<PRE CLASS="syntax">void	MSG_TABLE_GET_CURRENT_SELECTION(
+        TableCellRange *		cellRange);</PRE>
+<P>
+This message retrieves what cells are currently selected within a Table object</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any <CODE>
+TableClass</CODE>
+ object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+cellRange</CODE>
+	A pointer to a <CODE>
+TableCellRange</CODE>
+ structure.</P>
+<P CLASS="refField">
+Return:	<CODE>
+*cellRange</CODE>
+ will specify the first and last selected cells.</P>
+<P CLASS="refField">
+Structures:	<CODE>
+TableCellRange</CODE>
+ (described on <A HREF="JTable_9.htm#54602"> A TableCellRange structure is used to specify a range of cells. It has the following definition:</A>
+).</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_TABLE_SET_CURRENT_SELECTION</H4>
+<PRE CLASS="syntax">void	MSG_TABLE_SET_CURRENT_SELECTION(
+        TableCellRange		cellRange);</PRE>
+<P>
+This message changes what cells are currently selected within a Table object.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any <CODE>
+TableClass</CODE>
+ object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+cellRange</CODE>
+	A pointer to a <CODE>
+TableCellRange</CODE>
+ structure, specifying what cells should be selected. (If <CODE>
+cellRange.</CODE>
+TCR<CODE>
+_start.</CODE>
+TCL<CODE>
+_column</CODE>
+ = T_NONE_SELECTED, no cells will be selected.)</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Structures:	<CODE>
+TableCellRange</CODE>
+ (described on <A HREF="JTable_9.htm#54602"> A TableCellRange structure is used to specify a range of cells. It has the following definition:</A>
+).</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="JTable_7.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="JTable_8.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.1 Drawing Cells</A> 
+<!-- to next --> | <A HREF="JTable_a.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.3 Editing Cells</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

@@ -1,0 +1,445 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+<!-- This page was automatically generated from a bunch of smaller pages. -->
+<META NAME="copyright" CONTENT="Copyright GEOWORKS">
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+<TITLE>Cell Library</TITLE>
+</HEAD>
+<BODY BGCOLOR="#ffffdf">
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+<A NAME="index.htm"></A>
+
+
+
+<H1 CLASS="chapterTitle">
+
+<A NAME="index.htm_20518">
+ </A>
+Cell Library
+
+</H1>
+<P>
+<A NAME="index.htm_IX_cell library">
+ </A>
+For some applications, it is natural to organize data in a two-dimensional array. The classic example of this is the spreadsheet, in which every entry (or <EM>
+cell</EM>
+) can be uniquely identified by two integers: the cell's row and its column.</P>
+<P>
+The cell library lets you arrange data this way. The cell library saves the cells as DB items in a VM file. It insulates the application from the actual DB mechanism, letting the application behave as if its data is stored in a two-dimensional array. The library also provides routines to sort the cells by row or by column and to apply a routine to every cell in a range of rows and/or columns.</P>
+<P>
+A collection of cells arranged into rows and columns is termed a <EM>
+cell file</EM>
+. Every cell file is contained in a VM file. There is often a one-to-one correspondence between cell files and the VM files which contain them. However, this correspondence is optional. There is nothing to stop an application from maintaining several distinct cell files in a single VM file.</P>
+<P CLASS="sectionlinks">
+<STRONG>
+&nbsp;&nbsp;<A HREF="#CellLibrary_1.htm">1 Structure and Design</A><BR>
+&nbsp;&nbsp;<A HREF="#CellLibrary_2.htm">2 Using the Cell Library</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#CellLibrary_3.htm">2.1 The CellFunctionParameters Structure</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#CellLibrary_4.htm">2.2 Basic Cell Array Routines</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#CellLibrary_5.htm">2.3 Actions on a Range of Cells</A><BR>
+</STRONG>
+</P> <!-- end of sectionlinks blob -->
+
+<HR>
+<A NAME="CellLibrary_1.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Cell Library</A>: 1 
+<A NAME="CellLibrary_1.htm_99717">
+ </A>
+Structure and Design</H2>
+<P>
+Most of the internal structure of a cell file is transparent to the geode which uses it. A geode can, for example, lock a cell with <CODE>
+CellLock()</CODE>
+, specifying the cell's row and column. The cell library will find the appropriate DB item and lock it, returning the locked item's address. For most operations, the geode does not need to know anything about the internal structure of the cell file. However, the internal structure does matter for some purposes. For this reason, we present a quick overview of the structure of a cell file.</P>
+<P>
+A cell file can contain up to 16,512 rows, numbered from zero to 16,511. 
+Of these 16,512 rows, the last 128 are &quot;scratch-pad&quot; rows. They are intended to be used for holding information or formulae that will not be displayed or associated with a specific cell. The scratch-pad rows are never shifted; if you create a cell in the first scratch-pad row, it will always stay in that row. All other rows are called &quot;visible&quot; rows. Visible rows can be shifted when rows are created or deleted. For example, if you insert a new row 10, all the cells in the old row 10 will now be in row 11, and so on. The first scratch-pad row will be unchanged. Be aware that the database will not delete cells from rows that are shifted off the spreadsheet. For example, if you insert a new row, the last visible row will be shifted off the spreadsheet; the references to cells in that row will be removed, but the cells themselves will stay as DB items in the file. This is not generally a problem, since few cell files will need to use the last visible rows. If you add a row that will cause cells to be shifted off, you should delete those cells first. </P>
+<P>
+The first row has an index number of zero. The last visible row has an index equal to the preprocessor constant LARGEST_VISIBLE_ROW<A NAME="CellLibrary_1.htm_IX_LARGEST_VISIBLE_ROW">
+ </A>
+. The first scratch-pad row has an index equal to (LARGEST_VISIBLE_ROW + 1). The last scratch-pad row has an index equal to LARGEST_ROW (which equals (LARGEST_VISIBLE_ROW + 128) or 16,511). The constants are all defined in <STRONG CLASS="fileName">
+cell.h</STRONG>
+.</P>
+<P>
+The basic data unit in a cell file is the <EM>
+cell</EM>
+. The cell library treats cells as opaque data structures; their internal structure is entirely up to the geode using them. Cells are stored as ungrouped DB items. This restricts cell size to the size of a DB item; that is, a cell can theoretically be as large as 64K, but in practice should not grow larger than around 8K (and ideally should be under a kilobyte in size). Remember, whenever a DB item is created or resized, pointers to all other items in the group are invalidated. Since cells are ungrouped items, whenever you create or resize a cell, you invalidate any pointers to all other ungrouped items in that VM file. In particular, you invalidate pointers to all other cells in that VM file (even if the cells belong to another cell file in the VM file).
+<IMG SRC="CellLibrary_1_sidebar.gif">
+
+
+<IMG SRC="CellLibrary_1_inserting.gif">
+
+</P>
+<P>
+Cells are grouped into <EM>
+rows</EM>
+. A row can have up to 256 cells, numbered from zero to 255. Within a row, cells are identified by their column index. The column index can fit into an <EM>
+unsigned</EM>
+ byte variable. The cell library creates a <EM>
+column array</EM>
+ for every row which contains cells. The column array contains one entry for each cell in the row. A row often contains just a few widely scattered elements. For this reason, the column array is implemented as a <EM>
+sparse array</EM>
+. Each cell in the row has an entry consisting of two parts, namely the cell's column number and its <CODE>
+DBGroupAndItem</CODE>
+ structure. The advantage of this arrangement is that the column array need only contain entries for those cells which exist in the row (instead of maintaining entries for the blank spaces between cells). The disadvantage is that when you lock a cell, the cell manager has to make a search through the column array to find its reference; however, this is generally a small cost.</P>
+<P>
+The column arrays themselves belong to <EM>
+row blocks</EM>
+. Each row block is an LMem heap stored in the VM file, and each of its column arrays is a chunk in that heap. Row blocks contain up to 32 rows. These rows are sequential; that is, any existing rows from row zero to row 31 will always belong to the same row block, and none of them will ever be in the same row block as row 32. Since the row blocks and column arrays are not kept in DB items, they can be accessed and altered without causing any locked items to move. To keep track of the row blocks, you must have a <CODE>
+CellFunctionParameters</CODE>
+ structure for each cell file. That structure need not be kept in the VM file (although it often is); rather, you must pass the address of the structure to any cell library routine you call.</P>
+<P>
+Owing to the structure of a cell file, some actions are faster than others. The essential thing to remember is that cells are grouped together in rows, which are themselves grouped together to form a cell file. This means that you can access several cells belonging to the same row faster than you could access cells belonging to different rows. Similarly, if you insert a cell, it is much more efficient to shift the rest of the row over (which involves accessing only that one row) than to shift the rest of the column down (which involves accessing every visible row). Similarly, you can access groups of cells faster if they belong to the same row block.</P>
+<HR>
+<A NAME="CellLibrary_2.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Cell Library</A>: 2 
+Using the Cell Library</H2>
+<P>
+The cell library is versatile. The basic cell access routines are very simple, but more advanced utilities give you a wide range of actions. This section will explain the techniques used to set up and use a cell file, as well as the more advanced techniques available.</P>
+<P CLASS="subsectionLink">
+<A HREF="#CellLibrary_3.htm">The CellFunctionParameters Structure</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#CellLibrary_4.htm">Basic Cell Array Routines</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#CellLibrary_5.htm">Actions on a Range of Cells</A></P>
+<HR>
+<A NAME="CellLibrary_3.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Cell Library</A>: 2.1 <A HREF="#CellLibrary_2.htm">Using the Cell Library</A>: 
+<A NAME="CellLibrary_3.htm_45469">
+ </A>
+The CellFunctionParameters Structure</H3>
+<P>
+The cell library needs to have certain information about any cell file on which it acts; for example, it needs to know the handles of the VM file and of the row blocks. That information is kept in a <A NAME="CellLibrary_3.htm_IX_CellFunctionParameters">
+ </A>
+<CODE>
+CellFunctionParameters</CODE>
+ structure. The geode which uses a cell file is responsible for creating a <CODE>
+CellFunctionParameters</CODE>
+ structure. The C definition of the structure is shown below.</P>
+<P CLASS="figTitle">
+Code Display 19-1 CellFunctionParameters</P>
+<PRE>typedef	struct {
+	CellFunctionParameterFlags
+			CFP_flags;		/* Initialize this to zero. */
+	VMFileHandle		CFP_file;		/* The handle of the VM file containing
+					 * the cell file. Reinitialize this each
+					 * time you open the file. */
+	VMBlockHandle		CFP_rowBlocks[N_ROW_BLOCKS];			/* Initialize these to zero. */
+} CellFunctionParameters;</PRE>
+<P>
+In order to create a cell file, you must create a <CODE>
+CellFunctionParameters</CODE>
+ structure. Simply allocate the space for the structure and initialize the data fields. When you call a cell library routine, lock the structure on the global heap and pass its address. Geodes will usually allocate a VM block in the same file as the cell file, and use this block to hold the <CODE>
+CellFunctionParameters</CODE>
+ structure; this ensures that the structure will be saved along with the cell file. They may often declare this to be the map block, making it easy to locate (see <A HREF="../../Memory/VM/VM_11.htm#49125">the VM chapter</A>). However, this is entirely at the programmer's discretion. All that the cell library requires is that the structure be locked or fixed in memory every time a cell library routine is called.</P><P>
+The <CODE>
+CellFunctionParameters</CODE>
+ structure contains the following fields:</P>
+<DL>
+<DT>
+<CODE>
+CFP_flags</CODE>
+</DT><DD><A NAME="CellLibrary_3.htm_IX_CellFunctionsParameterFlags">
+ </A>
+<A NAME="CellLibrary_3.htm_IX_CFPF_DIRTY">
+ </A>
+The cell library uses this byte for miscellaneous bookkeeping. When you create the structure, initialize this field to zero. There is only one flag which you should check or change; that is the flag CFPF_DIRTY. The cell library routines set this bit whenever they change the <CODE>
+CellFunctionParameters</CODE>
+ structure, thus indicating that the structure ought to be resaved. After you save it, you may clear this bit.</DD>
+<DT>
+<CODE>
+CFP_file</CODE>
+</DT><DD>This field must contain the file handle of the VM file containing the cell file. A VM file can have a new file handle every time it is opened; thus, you must reinitialize this field every time you open the file. </DD>
+<DT>
+<CODE>
+CFP_rowBlocks</DT><DD>
+</CODE>
+This field is an array of VM block handles, one for every existing or potential row block. If a row block exists in the cell file, its handle is recorded here. If it does not exist, a null handle is kept in the appropriate place. The length of this array is a number of words equal to the constant N_ROW_BLOCKS (defined in <STRONG CLASS="fileName">
+cell.h</STRONG>
+). When you create a cell file, initialize all of these handles to zero; do not access or change this field thereafter.</DD>
+</DL>
+<P>
+One warning: The cell library expects the <CODE>
+CellFunctionParameters</CODE>
+ structure to remain motionless for the duration of a call. Therefore, if you allocate it as a DB item in the same VM file as the cell file, you must <EM>
+not</EM>
+ have the structure be an ungrouped item. Remember, all the cells are ungrouped DB items; allocating or resizing a cell can potentially move any or all of the ungrouped DB items in that file.</P>
+<HR>
+<A NAME="CellLibrary_4.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Cell Library</A>: 2.2 <A HREF="#CellLibrary_2.htm">Using the Cell Library</A>: 
+<A NAME="CellLibrary_4.htm_87527">
+ </A>
+Basic Cell Array Routines</H3>
+<PRE>CellReplace(), CellLock(), CellLockGetRef(), CellDirty(), CellGetDBItem(), CellGetExtent()</PRE>
+<P>
+The basic cell routines are simple to use. One argument taken by all of them is the address of the <CODE>
+CellFunctionParameters</CODE>
+ structure. As noted, this structure must be locked or fixed in memory for the duration of a function call. You can also access cells in any of the ways you would access a DB item; for example, you can resize a cell with <CODE>
+DBReAlloc()</CODE>
+.</P>
+<P>
+All of the routines use the VM file handle specified in the <CODE>
+CellFunctionParameters</CODE>
+ structure. </P>
+<P>
+<A NAME="CellLibrary_4.htm_IX_CellReplace()">
+ </A>
+To create, replace, or free a cell, call the routine <CODE>
+CellReplace()</CODE>
+. This routine takes five arguments: </P>
+<UL>
+<LI>
+The address of the <CODE>
+CellFunctionParameters</CODE>
+ structure.</LI>
+<LI>
+The element's row.</LI>
+<LI>
+The element's column.</LI>
+<LI>
+The address of the data to copy into the new cell. This must not move during the allocation; therefore, it must not be in an ungrouped DB item in the same VM file as the cell file. In particular, it must not be another cell. The data will not be changed.</LI>
+<LI>
+The size of the new cell. If you pass a size of zero, the cell will be deleted if it already exists; otherwise, nothing will happen.</LI>
+</UL>
+<P>
+If the cell file already contains a cell with the specified coordinates, <CODE>
+CellReplace()</CODE>
+ will free it. <CODE>
+CellReplace()</CODE>
+ will then allocate a new cell and copy the specified data into it. The routine invalidates any existing pointers to ungrouped DB items in the file.</P>
+<P>
+<A NAME="CellLibrary_4.htm_IX_CellLock()">
+ </A>
+Once you have created a cell, you can lock it with <CODE>
+CellLock()</CODE>
+. This routine takes three arguments: the address of the <CODE>
+CellFunctionParameters</CODE>
+ structure, the cell's row, and the cell's column. It locks the cell and returns its address (the assembly version returns the cell's segment address and chunk handle). Remember, the cell is an ungrouped DB item, so its address may change the next time another ungrouped DB item is allocated or resized, even if the cell is locked.</P>
+<P>
+Like all DB items, cells can (under certain circumstances) be moved even while locked. For this reason, a special locking routine is provided, namely <CODE>
+CellLockGetRef()</CODE>
+<A NAME="CellLibrary_4.htm_IX_CellLockGetRef()">
+ </A>
+. This routine is just like <CODE>
+CellLock()</CODE>
+ except that it takes one additional argument, namely the address of an optr. <CODE>
+CellLockGetRef</CODE>
+ writes the locked item's global memory handle and chunk handle into the optr. <A NAME="CellLibrary_4.htm_IX_CellDeref()">
+ </A>
+You can translate an optr to a cell into a pointer by calling <CODE>
+CellDeref()</CODE>
+; this is another synonym for <CODE>
+LMemDeref()</CODE>
+, and is identical to it in all respects. </P>
+<P>
+If you change a cell, you must mark it dirty to insure that it will be updated on the disk. <A NAME="CellLibrary_4.htm_IX_CellDirty()">
+ </A>
+To do this, call the routine <CODE>
+CellDirty()</CODE>
+. This routine takes two arguments, namely the address of the <CODE>
+CellFunctionParameters</CODE>
+ structure and the address of the (locked) cell. The routine marks the cell's item block as dirty.</P>
+<P>
+Sometimes you may need to get the DB handles for a cell. For example, you may want to use a DB utility to resize the cell; to do this, you need to know its handles.<A NAME="CellLibrary_4.htm_IX_CellGetDBItem()">
+ </A>
+ For these situations, call the routine <CODE>
+CellGetDBItem()</CODE>
+. The routine takes three arguments: the address of the <CODE>
+CellFunctionParameters</CODE>
+ structure, the cell's row, and the cell's column. It returns the cell's <CODE>
+DBGroupAndItem</CODE>
+ value. You can pass this value to any of the <CODE>
+DB...Ungrouped()</CODE>
+ routines, or you can break this value into its component handles by calling <CODE>
+DBGroupFromGroupAndItem()</CODE>
+ or <CODE>
+DBItemFromGroupAndItem()</CODE>
+.</P>
+<P>
+<A NAME="CellLibrary_4.htm_IX_CellGetExtent()">
+ </A>
+If you want to find out the bounds of an existing cell file, call the routine <CODE>
+CellGetExtent()</CODE>
+. This routine takes two arguments: the address of the <CODE>
+CellFunctionParameters</CODE>
+, and the address of a <CODE>
+RangeEnumParams</CODE>
+ structure. For the purposes of this routine, only one of its fields matters, namely the field <CODE>
+REP_bounds</CODE>
+. This field is itself a structure of type <CODE>
+Rectangle</CODE>
+, whose structure is shown below in <A HREF="#CellLibrary_4.htm_19886"> Rectangle</A>
+. <CODE>
+CellGetExtent()</CODE>
+ writes the bounds of the utilized section of the cell file in the <CODE>
+REP_bounds</CODE>
+ field. The index of the first row which contains a cell will be written in the rectangle's <CODE>
+R_top</CODE>
+ field; the index of the last row will be written in <CODE>
+R_bottom</CODE>
+; the index of the first column will be written in <CODE>
+R_left</CODE>
+; and the index of the last column will be written in <CODE>
+R_right</CODE>
+. If the cell file contains no cells, all four fields will be set to 
+-1.</P>
+<P CLASS="figTitle">
+Code Display 19-2 <A NAME="CellLibrary_4.htm_19886">
+ </A>
+Rectangle</P>
+<PRE>typedef	struct {
+	sword		R_left;		/* Index of first column written here. */
+	sword		R_top;		/* Index of first row written here. */
+	sword		R_right;		/* Index of last column written here. */
+	sword		R_bottom;		/* Index of last row written here. */
+} Rectangle;</PRE>
+<HR>
+<A NAME="CellLibrary_5.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Cell Library</A>: 2.3 <A HREF="#CellLibrary_2.htm">Using the Cell Library</A>: 
+<A NAME="CellLibrary_5.htm_56688">
+ </A>
+Actions on a Range of Cells</H3>
+<PRE>RangeExists(), RangeInsert(), RangeEnum(), RangeSort(), RangeInsertParams</PRE>
+<P>
+The cell library provides a number of routines which act on a range of cells. All of these routines take the address of a <CODE>
+CellFunctionParameters</CODE>
+ structure as an argument. Many of these routines also take the address of a special parameter structure; for example, <CODE>
+RangeInsert()</CODE>
+ takes the address of a <CODE>
+RangeInsertParams</CODE>
+ structure. In these cases, the structure should be in locked or fixed memory. If the routine might allocate or resize cells, the structure must not be in an ungrouped DB item.</P>
+<P>
+<A NAME="CellLibrary_5.htm_IX_RangeExists()">
+ </A>
+You may want to find out if there are any cells in a specified section of the cell file. To do this, call the routine <CODE>
+RangeExists()</CODE>
+. This routine takes five arguments:</P>
+<UL>
+<LI>
+The address of the locked <CODE>
+CellFunctionParameters</CODE>
+ structure</LI>
+<LI>
+The index of the first row in the section to be checked</LI>
+<LI>
+The index of the first column in the section to be checked</LI>
+<LI>
+The index of the last row in the section to be checked</LI>
+<LI>
+The index of the last column in the section to be checked</LI>
+</UL>
+<P>
+If any cells exist in that section, the routine returns <EM>
+true</EM>
+ (i.e. non-zero). Otherwise, it returns <EM>
+false</EM>
+.</P>
+<P>
+<A NAME="CellLibrary_5.htm_IX_RangeInsert()">
+ </A>
+You may wish to insert several cells at once. For this reason, the cell library provides the routine <CODE>
+RangeInsert()</CODE>
+. This routine does not actually allocate cells; instead, it shifts existing cells to make room for new ones. You specify a section of the cell file to shift. Any cells in that section will be shifted over; the caller specifies whether they should be shifted horizontally or vertically. <A NAME="CellLibrary_5.htm_IX_RangeInsertParams">
+ </A>
+The routine takes two arguments, namely the address of the <CODE>
+CellFunctionParameters</CODE>
+ and the address of a <CODE>
+RangeInsertParams</CODE>
+ structure. It does not return anything. The definition of the <CODE>
+RangeInsertParams</CODE>
+ structure is shown in <A HREF="#CellLibrary_5.htm_76081"> The RangeInsertParams and Point structures</A>
+. The calling geode should allocate it and initialize it before calling <CODE>
+RangeInsert()</CODE>
+.</P>
+<P CLASS="figTitle">
+Code Display 19-3 <A NAME="CellLibrary_5.htm_76081">
+ </A>
+The RangeInsertParams and Point structures</P>
+<PRE>typedef	struct {		/* defined in cell.h */
+	Rectangle			RIP_bounds;		/* Range of cells to shift */
+	Point			RIP_delta;		/* Specify which way to shift */
+	CellFunctionParameters			*RIP_cfp;
+} RangeInsertParams;</PRE>
+<PRE>typedef	struct {		/* defined in graphics.h */
+	sword		P_x;	/* Distance to shift horizontally */
+	sword		P_y;	/* Distance to shift vertically */
+} Point;</PRE>
+<P>
+<A NAME="CellLibrary_5.htm_IX_RIP_&ldots;">
+ </A>
+The <CODE>
+RangeInsertParams</CODE>
+ structure has three fields. The calling geode should initialize the fields to determine the behavior of <CODE>
+RangeInsert()</CODE>
+:</P>
+<DL>
+<DT>
+RIP<CODE>
+_bounds</DT><DD></CODE>
+This field specifies which cells should be shifted. The cells currently in this range will be shifted across or down, depending on the value of <CODE>
+RIP_delta</CODE>
+; this shifts more cells, and so on, to the edge of the visible portion of the cell file. The field is a <CODE>
+Rectangle</CODE>
+ structure. To insert an entire row (which is much faster than inserting a partial row), set <CODE>
+RIP_bounds.R_left = 0</CODE>
+ and <CODE>
+RIP_bounds.R_right = </CODE>
+LARGEST_COLUMN<CODE>
+.</CODE>
+</DD>
+<DT>
+RIP<CODE>
+_delta</DT><DD></CODE>
+This field specifies how far the cells should be shifted and in which direction. The field is a <CODE>
+Point</CODE>
+ structure (see <A HREF="#CellLibrary_5.htm_76081"> The RangeInsertParams and Point structures</A>
+). If the range of cells is to be shifted horizontally, <CODE>
+RIP_delta.P_x</CODE>
+ should specify how far the cells should be shifted to the right, and <CODE>
+RIP_delta.P_y</CODE>
+ should be zero. If the cells are to be shifted vertically, <CODE>
+RIP_delta.P_y</CODE>
+ should specify how far the cells should be shifted down, and<CODE>
+ RIP_delta.P_x</CODE>
+ should be zero.</DD>
+<DT>
+RIP<CODE>
+_cfp</DT><DD></CODE>
+This is the address of the <CODE>
+CellFunctionParameters</CODE>
+ structure. You don't have to initialize this; the routine will do so automatically.</DD>
+</DL>
+<P>
+<A NAME="CellLibrary_5.htm_IX_RangeEnum()">
+ </A>
+You may need to perform a certain function on every one of a range of cells. For this purpose, the cell library provides the routine <CODE>
+RangeEnum()</CODE>
+. This routine lets you specify a range of cells and a callback routine; the routine will be called on each cell in that range.</P>
+<P>
+<A NAME="CellLibrary_5.htm_IX_RangeSort()">
+ </A>
+You can sort a range of cells, by row or by column, based on any criteria you choose. Use the routine <CODE>
+RangeSort()</CODE>
+. This routine uses a QuickSort algorithm to sort the cells specified. You supply a pointer to a callback routine which is used to compare cells.<A NAME="CellLibrary_5.htm_marker=396417">
+ </A>
+</P>
+<HR>
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+</BODY>
+</HTML>

@@ -1,0 +1,132 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Geodes_9.htm,v 1.2 97/07/21 11:44:24 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Geode Protocols and Release Levels</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Applications and Geodes</A>: 1.8 <A HREF="Geodes_1.htm">Geodes</A>: 
+Geode Protocols and Release Levels</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Geodes_1.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Geodes_8.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1.7 Working with Geodes</A> 
+<!-- to next --> | <A HREF="Geodes_a.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">1.9 Temporary Geode Memory</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+<A NAME="IX_Release number">
+ </A>
+<A NAME="IX_Protocols:geode">
+ </A>
+Every GEOS geode and VM file has both a release level and a protocol level as extended attributes of the file. These two items help ease the transitions for both programmer and user when changes are made to applications, libraries, drivers, system software, etc. To control release and protocol numbers, use the GREV tool and a REV file as described in <A HREF="../../Tools/Tools/TTools_7.htm">the Grev section of the Using Tools chapter</A>.</P>
+
+<H2 CLASS="HeadingC">
+Release Numbers</H2>
+<P>
+<A NAME="IX_FEA_RELEASE">
+ </A>
+The release number is a <CODE>
+ReleaseNumber</CODE>
+ structure which consists of four components: The <CODE>
+RN_major</CODE>
+ and <CODE>
+RN_</CODE>
+<EM>
+minor</EM>
+ numbers are the most significant. The <CODE>
+RN_</CODE>
+<EM>
+change</EM>
+ and <CODE>
+RN_</CODE>
+<EM>
+engineering</EM>
+ numbers are less significant and are used primarily to indicate non-released or running upgrade types of changes to the geode. <A NAME="IX_ReleaseNumber">
+ </A>
+The <CODE>
+ReleaseNumber</CODE>
+ of a geode or VM file is stored in the file's FEA_RELEASE extended attribute, and its structure is shown below:</P>
+<PRE>typedef struct {
+    word    RN_major;
+    word    RN_minor;
+    word    RN_change;
+    word    RN_engineering;
+} ReleaseNumber;</PRE>
+<P>
+The contents of the release number are up to the particular geode and are product-specific. Release numbers are not used by GEOS for compatibility checking or any other validation of files, though they are used during installation procedures.</P>
+<P>
+To retrieve the release number of a given geode, use the routine <CODE>
+GeodeGetInfo()</CODE>
+. Release levels should be set at compile time and are not changeable at run-time.</P>
+
+
+<H2 CLASS="HeadingC">
+<A NAME="74509">
+ </A>
+Protocol Numbers</H2>
+<P>
+<A NAME="IX_FEA_PROTOCOL">
+ </A>
+The protocol number is a structure of type <CODE>
+ProtocolNumber</CODE>
+ stored in the file's FEA_PROTOCOL extended attribute. Each GEOS geode and data file has a protocol level associated with it. The protocol level is used for compatibility checking for both geodes and documents.</P>
+<P>
+<A NAME="IX_ProtocolNumber">
+ </A>
+The <CODE>
+ProtocolNumber</CODE>
+ structure consists of two parts, the major protocol and the minor protocol. This structure is shown below:</P>
+<PRE>typedef struct {
+    word    PN_major;
+    word    PN_minor;
+} ProtocolNumber;</PRE>
+<P>
+Differences in protocol levels indicate incompatibilities between two geodes, between a geode and its document format, or between a geode and its state file format. If the major protocols are different, the two items are not compatible at all (unless special provisions are made). If the minor protocol is greater than expected, some incompatibility may exist but should not affect the program. You should increment a geode's or document's protocol whenever a change is made.</P>
+<P>
+<A NAME="IX_Libraries:protocol numbers">
+ </A>
+If a change to a library is upward-compatible, only the minor protocol needs to be incremented. For example, if a library acquires a new function but the library's entry points are undisturbed, the minor protocol should be incremented and the major protocol left as is. If the new function causes relocation of the entry point numbers, however, the major protocol must also be incremented.</P>
+<P>
+An application's protocol must be increased whenever a change will affect the application's state files. If you make a change to an application, for example, and the user has old state files, either the changes in the application can be replaced with the old information, or the state file will cause an incompatibility with unpredictable results. If the change to the application is simply functional, increment the minor protocol. If the change is to any part of a UI resource or to any other item saved to a state file, increment the major protocol. State files will be loaded if minor protocols are different and will be ignored if major protocols are different.</P>
+<P>
+If an application's document format changes, you should make sure the new documents are not loaded by old applications or vice versa (unless you take the necessary conversion steps). When opening a document, you can check its protocol by checking the document file's extended attribute FEA_PROTOCOL. If the protocol level needs to be changed (after conversions have been done, of course), you can change them by setting FEA_PROTOCOL. (See <A HREF="../../Files/FileSys/index.htm">the File System chapter</A>.)</P><P>
+A few examples of when minor and major protocols should be incremented follow. Keep in mind that this list is by no means exhaustive.</P>
+<UL>
+<LI>
+If you add a data structure to a document format and older versions of the application will still be able to open the document, increment the document's minor protocol only.</LI>
+<LI>
+If you change the instance data structure of an object that gets saved to the document, increment the major protocol, as the new methods will be using the wrong offsets to access data in the old object.</LI>
+<LI>
+If you add a new class to your application and don't disturb any of the other classes' entry points (i.e. add the class at the end), increment the minor protocol only.</LI>
+<LI>
+If you add a new class, disturbing entry points, increment the major protocol.</LI>
+<LI>
+If you add or delete a resource, increment the major protocol.</LI>
+<LI>
+If you add a chunk or object to a resource that gets saved to state files, increment the major protocol.</LI>
+<LI>
+If you change an object's flags (e.g. mark it ignore-dirty), increment the major protocol. Otherwise, the flags will be restored from the state file and will override the changes you made.</LI>
+</UL>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Geodes_1.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Geodes_8.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1.7 Working with Geodes</A> 
+<!-- to next --> | <A HREF="Geodes_a.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">1.9 Temporary Geode Memory</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

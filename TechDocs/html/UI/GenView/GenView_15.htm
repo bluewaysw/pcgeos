@@ -1,0 +1,892 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: GenView_15.htm,v 1.1 97/06/02 16:30:24 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Scrolling</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">GenView</A>: 4.7 <A HREF="GenView_e.htm">Advanced Concepts and Uses</A>: 
+<A NAME="24925">
+ </A>
+Scrolling</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GenView_e.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GenView_14.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.6 Children of the View</A> 
+<!-- to next --> | <A HREF="GenView_16.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.8 Monitoring Input</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+When a document is larger than the view window, the user must have some means of navigation around it. The most common implementation of this is scrolling. In most situations, scrolling will be automatic when you use a view. However, you can modify the view's scrolling behavior.</P>
+
+<H2 CLASS="HeadingC">
+Removing the Scrollbars</H2>
+<PRE>HINT_VIEW_REMOVE_SCROLLERS_WHEN_NOT_SCROLLABLE, HINT_VIEW_SHOW_SCROLLERS_WHEN_NOT_SCROLLABLE</PRE>
+<P>
+You can determine when scrollbars will be visible on your GVDA_SCROLLABLE view in several ways. One is to set the GVDA_DONT_DISPLAY_SCROLLBAR attribute, either dynamically or in your .goc file, to force a scrollbar not to be displayed. Another is to allow the user to use the GenViewControl to turn the scrollbars on or off.</P>
+<P>
+A third is to allow the GenView to update itself dynamically, by using the hints <CODE>
+HINT_VIEW_REMOVE_SCROLLERS_WHEN_NOT_SCROLLABLE</CODE>
+ and <CODE>
+HINT_VIEW_SHOW_SCROLLERS_WHEN_NOT_SCROLLABLE</CODE>
+.</P>
+<P>
+The first causes the view to remove the scroller objects when scrolling is not needed (i.e. when the entire content or document fits inside the view's window). The second causes the view to show scrollers in all cases, as long as the view is GVDA_SCROLLABLE and GVDA_DONT_DISPLAY_SCROLLBAR is not set.</P>
+
+
+<H2 CLASS="HeadingC">
+Making the View Scrollable</H2>
+<P>
+Views, by default, are not scrollable. To make your view scrollable, set the GVDA_SCROLLABLE attribute in both the <CODE>
+GVI_horizAttrs</CODE>
+ and <CODE>
+GVI_vertAttrs</CODE>
+ records. It is easiest to do this in your Goc code, as follows:</P>
+<PRE>GVI_horizAttrs = @default | GVDA_SCROLLABLE;
+GVI_vertAttrs = @default | GVDA_SCROLLABLE;</PRE>
+<P>
+You can also set these attributes during execution by sending the message <CODE>
+MSG_GEN_VIEW_SET_DIMENSION_ATTRS</CODE>
+ to the view. See <A HREF="GenView_b.htm#85585"> Dimensional Attributes</A>
+.</P>
+
+
+<H2 CLASS="HeadingC">
+Normal Scrolling</H2>
+<P>
+There are three basic ways scrolling can be initiated: First, the user can click on a special scroller object. Second, the user can initiate &quot;drag scrolling&quot; by clicking within the view and dragging outside the window's bounds. Third, the view's content object can request a scrolling action. Only the first of these three is activated by default.</P>
+<P>
+When a scrollable view is first created, scroller objects are also instantiated. This is automatic and for the most part transparent to the geode. The scroller objects may be customized or placed in a certain spot in the generic tree: to learn how to do this, see <A HREF="GenView_15.htm#71216"> Customizing the Scrollers</A>
+.</P>
+<P>
+Scrollers are generic by nature so they can conform to the specific UI in use; in OSF/Motif, for example, scrollers are manifested as scrollbars that position themselves at the right and bottom sides of the view. However, other specific UIs might implement dials, sliders, or some other gadgets for scrolling.</P>
+<P>
+In normal scrolling, the user provides input to a scroller (for example, clicking on the up-arrow of a vertical scrollbar in OSF/Motif). The scroller then sends a message to the view indicating that a scroll should take place. The view calculates the new portion of the document and sends a <CODE>
+MSG_META_EXPOSED</CODE>
+ to its content to indicate that the document must be redrawn. The content then draws its document to the view's window handle, and the view takes care of clipping the document and translating it to the screen.</P>
+<P>
+To take advantage of the normal scrolling features, therefore, you only have to make the view scrollable and respond to <CODE>
+MSG_META_EXPOSED</CODE>
+.</P>
+
+
+<H2 CLASS="HeadingC">
+Drag Scrolling</H2>
+<PRE>MSG_GEN_VIEW_INITIATE_DRAG_SCROLL, MSG_GEN_VIEW_SET_DRAG_BOUNDS, HINT_VIEW_IMMEDIATE_DRAG_UPDATES, HINT_VIEW_DELAYED_DRAG_UPDATES</PRE>
+<P>
+In many cases, applications will want to supplement normal scrolling with drag scrolling, in which a user clicks within the view and drags beyond its edge, causing the view to scroll in that direction. Also, some applications may wish to implement scrolling without the use of scrollers--drag scrolling provides a good way of doing this.</P>
+<P>
+Two hints affect how drag scrolling is implemented. <CODE>
+HINT_VIEW_IMMEDIATE_DRAG_UPDATES</CODE>
+ causes the view to be updated constantly during drags. <CODE>
+HINT_VIEW_DELAYED_DRAG_UPDATES</CODE>
+ causes the view to be updated only at the end of drags. The default behavior is to update periodically during the drag in order to provide visual feedback to the user and to avoid excessive overhead in drawing repeatedly.</P>
+<P>
+To implement drag scrolling, your view must be scrollable. It also must have the GVA_DRAG_SCROLLING attribute of the <CODE>
+GVI_attrs</CODE>
+ record set. You can do this in Goc as follows:</P>
+<PRE>GVI_horizAttrs = @default | GVDA_SCROLLABLE;
+GVI_vertAttrs = @default | GVDA_SCROLLABLE;
+GVI_attrs = @default | GVA_DRAG_SCROLLING;</PRE>
+<P>
+You can also set the drag scrolling attribute by sending the view the message <CODE>
+MSG_GEN_VIEW_SET_ATTRS</CODE>
+ (see <A HREF="GenView_a.htm#65491"> The GVI_attrs Attribute</A>
+).</P>
+<P>
+Normally, drag scrolling works only for the select button (in OSF/Motif, the left mouse button). <CODE>
+MSG_GEN_VIEW_INITIATE_DRAG_SCROLL</CODE>
+ allows you to change this. For example, if you received a <CODE>
+MSG_META_START_MOVE_COPY</CODE>
+ (indicating that the user used the direct-action button), you might want to initiate drag scrolling if your application does not support quick-transfer.</P>
+<P>
+Additionally, if you wanted drag scrolling to work only in a portion of your document (for example, if you wanted the user to be able to move an object on the screen but only move it so far), you could set the temporary drag bounds directly after initiating the drag scrolling. This is done by sending the view a <CODE>
+MSG_GEN_VIEW_SET_DRAG_BOUNDS</CODE>
+.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VIEW_INITIATE_DRAG_SCROLL">
+ </A>
+MSG_GEN_VIEW_INITIATE_DRAG_SCROLL</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VIEW_INITIATE_DRAG_SCROLL();</PRE>
+<P>
+This message instructs the view to begin drag scrolling until the pressed mouse button is let go by the user. When drag scrolling is enabled, the select button initiates it; this message allows initiation by any mouse button.</P>
+<P CLASS="refField">
+Source:	Unrestricted--called by an application on a <CODE>
+MSG_META_START_</CODE>
+... mouse event.</P>
+<P CLASS="refField">
+Destination:	The GenView in which the mouse button was clicked.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VIEW_SET_DRAG_BOUNDS">
+ </A>
+MSG_GEN_VIEW_SET_DRAG_BOUNDS</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VIEW_SET_DRAG_BOUNDS(@stack
+        sdword	bottom,	/* bottom scrolling bound */
+        sdword	right,	/* right scrolling bound */
+        sdword	top,	/* top scrolling bound */
+        sdword	left);	/* left scrolling bound */</PRE>
+<P>
+This message sets a temporary rectangle in which drag scrolling can operate if the user should not drag scroll across the entire document.</P>
+<P CLASS="refField">
+Source:	Unrestricted--called by an application on the initiation of drag scrolling.</P>
+<P CLASS="refField">
+Destination:	The GenView in which the drag scrolling is underway.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+bottom</CODE>
+, <CODE>
+right</CODE>
+, <CODE>
+top</CODE>
+, <CODE>
+left<BR>
+</CODE>
+The bounds (in document coordinates) of the rectangle limiting scrolling. These temporary bounds will be used only during the current drag scroll. The restriction will then be lifted.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+
+<H2 CLASS="HeadingC">
+Modifying Scrolling</H2>
+<P>
+Many applications may find a need to scroll the view without user input or to modify the scrolling behavior of the view. For example, if your application has a trigger or menu item that brings a certain portion of the document onto the screen, you will need to instruct the view to scroll to that point, or perhaps your application must scroll by different increments depending on the situation.</P>
+
+<H3 CLASS="HeadingD">
+Scrolling from the Content</H3>
+<PRE>MSG_GEN_VIEW_SCROLL_...</PRE>
+<P>
+All typical messages sent by scrollers to the view are also available for sending by applications and other geodes. These messages are listed below. Note: With the exception of <CODE>
+MSG_GEN_VIEW_SCROLL</CODE>
+, these messages work only when the view is visibly initialized. This means that a view that is not on the screen will ignore these messages.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VIEW_SCROLL">
+ </A>
+MSG_GEN_VIEW_SCROLL</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VIEW_SCROLL(@stack
+        sdword	yOffset,		/* amount to scroll vertically */
+        sdword	xOffset);		/* amount to scroll horizontally */</PRE>
+<P>
+This message causes the view to scroll a given amount in both the X and Y directions.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenView object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+yOffset</CODE>
+	The signed vertical amount to scroll.</P>
+<DL>
+<DT>
+<CODE>
+xOffset</CODE>
+</DT><DD>The signed horizontal amount to scroll.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted. If you want to alter scrolling behavior, see <A HREF="GenView_15.htm#75362"> Tracking the Scrolling</A>
+.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VIEW_SCROLL_TOP">
+ </A>
+MSG_GEN_VIEW_SCROLL_TOP</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VIEW_SCROLL_TOP();</PRE>
+<P>
+Causes the view to scroll to the top of the document.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenView object--views not visible will ignore these messages.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VIEW_SCROLL_PAGE_UP">
+ </A>
+MSG_GEN_VIEW_SCROLL_PAGE_UP</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VIEW_SCROLL_PAGE_UP();</PRE>
+<P>
+Causes the view to scroll up one window height.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenView object--views not visible will ignore these messages.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VIEW_SCROLL_UP">
+ </A>
+MSG_GEN_VIEW_SCROLL_UP</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VIEW_SCROLL_UP();</PRE>
+<P>
+Causes the view to scroll up one increment.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenView object--views not visible will ignore these messages.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VIEW_SCROLL_SET_Y_ORIGIN">
+ </A>
+MSG_GEN_VIEW_SCROLL_SET_Y_ORIGIN</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VIEW_SCROLL_SET_Y_ORIGIN(
+        sdword	yOrigin);</PRE>
+<P>
+Causes the view to scroll to a given vertical point and sets the Y component of the origin to the passed value. It keeps the X component of the origin fixed.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenView object--views not visible will ignore these messages.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VIEW_SCROLL_DOWN">
+ </A>
+MSG_GEN_VIEW_SCROLL_DOWN</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VIEW_SCROLL_DOWN();</PRE>
+<P>
+Causes the view to scroll down one increment.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenView object--views not visible will ignore these messages.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VIEW_SCROLL_PAGE_DOWN">
+ </A>
+MSG_GEN_VIEW_SCROLL_PAGE_DOWN</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VIEW_SCROLL_PAGE_DOWN();</PRE>
+<P>
+Causes the view to scroll down one window height.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenView object--views not visible will ignore these messages.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VIEW_SCROLL_BOTTOM">
+ </A>
+MSG_GEN_VIEW_SCROLL_BOTTOM</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VIEW_SCROLL_BOTTOM();</PRE>
+<P>
+Causes the view to scroll to the bottom of the document.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenView object--views not visible will ignore these messages.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VIEW_SCROLL_LEFT_EDGE">
+ </A>
+MSG_GEN_VIEW_SCROLL_LEFT_EDGE</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VIEW_SCROLL_LEFT_EDGE();</PRE>
+<P>
+Causes the view to scroll to the document's left edge.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenView object--views not visible will ignore these messages.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VIEW_SCROLL_PAGE_LEFT">
+ </A>
+MSG_GEN_VIEW_SCROLL_PAGE_LEFT</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VIEW_SCROLL_PAGE_LEFT();</PRE>
+<P>
+Causes the view to scroll left one window width.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenView object--views not visible will ignore these messages.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VIEW_SCROLL_LEFT">
+ </A>
+MSG_GEN_VIEW_SCROLL_LEFT</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VIEW_SCROLL_LEFT();</PRE>
+<P>
+Causes the view to scroll left one increment.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenView object--views not visible will ignore these messages.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VIEW_SCROLL_SET_X_ORIGIN">
+ </A>
+MSG_GEN_VIEW_SCROLL_SET_X_ORIGIN</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VIEW_SCROLL_SET_X_ORIGIN(
+        sdword	xOrigin);</PRE>
+<P>
+Causes the view to scroll to a given horizontal point and sets the X component of the origin to the passed value. It keeps the Y component of the origin fixed.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenView object--views not visible will ignore these messages.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VIEW_SCROLL_RIGHT">
+ </A>
+MSG_GEN_VIEW_SCROLL_RIGHT</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VIEW_SCROLL_RIGHT();</PRE>
+<P>
+Causes the view to scroll right one increment.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenView object--views not visible will ignore these messages.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VIEW_SCROLL_PAGE_RIGHT">
+ </A>
+MSG_GEN_VIEW_SCROLL_PAGE_RIGHT</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VIEW_SCROLL_PAGE_RIGHT();</PRE>
+<P>
+Causes the view to scroll right one window width.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenView object--views not visible will ignore these messages.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VIEW_SCROLL_RIGHT_EDGE">
+ </A>
+MSG_GEN_VIEW_SCROLL_RIGHT_EDGE</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VIEW_SCROLL_RIGHT_EDGE();</PRE>
+<P>
+Causes the view to scroll to the document's right edge.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenView object--views not visible will ignore these messages.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+
+<H3 CLASS="HeadingD">
+Making a Rectangle Visible</H3>
+<PRE>MSG_GEN_VIEW_MAKE_RECT_VISIBLE</PRE>
+<P>
+You can easily make any portion of your document visible with the passage of a single message. For example, if you were displaying a map of the United States and the user clicked on a menu item to show the area around Cincinnati, you could easily determine the coordinates of Cincinnati and instruct the view to scroll there.</P>
+<P>
+To make a certain rectangle of the document visible in the view, pass the message <CODE>
+MSG_GEN_VIEW_MAKE_RECT_VISIBLE</CODE>
+ to the view. You can include a percentage to indicate how far through the rectangle the view should scroll--zero percent causing the rectangle to appear just at the near edge of the view and 100 percent causing the rectangle to appear just at the far edge. Fifty percent causes the object to be centered in the view window.</P>
+<P>
+Normally, this message will not cause any scrolling if the rectangle is already on the screen. However, you can indicate that this message should always cause scrolling (useful if you want to center a rectangle that is already partially on the screen).</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VIEW_MAKE_RECT_VISIBLE">
+ </A>
+MSG_GEN_VIEW_MAKE_RECT_VISIBLE</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VIEW_MAKE_RECT_VISIBLE(@stack
+        word	yFlags,	/* MakeRectVisibleFlags for y dimension */
+        word	yMargin,	/* percentage to scroll onto screen in y */
+        word	xFlags,	/* MakeRectVisibleFlags for x dimension */
+        word	xMargin,	/* percentage to scroll onto screen in x */
+        sdword	bottom,	/* bottom bound of the target rectangle */
+        sdword	right,	/* right bound of the target rectangle */
+        sdword	top,	/* top bound of the target rectangle */
+        sdword	left);	/* left bound of the target rectangle */</PRE>
+<P>
+This message causes the view to scroll until a given portion of a passed rectangle is visible in the display window. If the rectangle is already partially visible, the view will not scroll unless instructed to do so by the flags arguments. If the view is not visibly initialized, this message will have no effect.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenView object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+yFlags</CODE>
+	A record of flags indicating when and how scrolling occurs. See below.</P>
+<DL>
+<DT>
+<CODE>
+yMargin</CODE>
+</DT><DD>The amount of the rectangle to be scrolled onto the screen in the vertical dimension. This is a percentage of the screen height and is based from the edge of the screen closest to the rectangle. For example, a <CODE>
+yMargin</CODE>
+ of 50% centers the rectangle vertically; a <CODE>
+yMargin</CODE>
+ of 100% puts the rectangle at the far edge of the screen from where it started. The percentages available are shown below.</DD>
+<DT>
+<CODE>
+xFlags</CODE>
+</DT><DD>A record of flags indicating when and how scrolling occurs. See below.</DD>
+<DT>
+<CODE>
+xMargin</CODE>
+</DT><DD>The amount of the rectangle to be scrolled onto the screen in the horizontal dimension. This is a percentage of the screen width and is based from the edge of the screen closest to the rectangle. For example, an <CODE>
+xMargin</CODE>
+ of 50% centers the rectangle horizontally; an <CODE>
+xMargin</CODE>
+ of 100% puts the rectangle at the far edge of the screen from where it started. The percentages available are shown below.</DD>
+<DT>
+<CODE>
+bottom</CODE>
+, <CODE>
+right</CODE>
+, <CODE>
+top</CODE>
+, <CODE>
+left</DT><DD>
+</CODE>
+The bounds of the rectangle to be made visible. These should be in document coordinates.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Structures:	The <CODE>
+yFlags</CODE>
+ and <CODE>
+xFlags</CODE>
+ parameters are of type <CODE>
+MakeRectVisibleFlags</CODE>
+; this type has the following values:</P>
+<DL>
+<DT>
+MRVF_ALWAYS_SCROLL</DT><DD>
+This flag indicates that the view should scroll even when the rectangle is already partially visible.</DD>
+<DT>
+MRVF_USE_MARGIN_FROM_TOP_LEFT</DT><DD>
+This flag indicates that margin percentages should be taken relative to the top and left edges of the view rather than the edges closest to the defined rectangle.</DD>
+</DL>
+<P>
+The percentages passed in <CODE>
+yMargin</CODE>
+ and <CODE>
+xMargin</CODE>
+ have a special format. You can use a predefined constant, or you can pass custom percentage. To use your own percentage, multiply the decimal representing the desired percentage (e.g. &quot;.50&quot; represents 50 percent) by the hexadecimal number 0xffff; or, instead of doing that math, you can use one of the following system-provided constants:</P>
+<PRE>MRVM_0_PERCENT
+MRVM_25_PERCENT
+MRVM_50_PERCENT
+MRVM_75_PERCENT
+MRVM_100_PERCENT</PRE>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+
+<H3 CLASS="HeadingD">
+Handling Complex Scrolling Operations</H3>
+<PRE>MSG_GEN_VIEW_SUSPEND_UPDATE, MSG_GEN_VIEW_UNSUSPEND_UPDATE</PRE>
+<P>
+If you cause the view to go through several scrolling operations in rapid order, you may want to suspend the view from sending a <CODE>
+MSG_META_EXPOSED</CODE>
+ after each--it is much better to wait until all the updates have been made before the redrawing occurs.</P>
+<P>
+To suspend a view's updates temporarily, send it the message <CODE>
+MSG_GEN_VIEW_SUSPEND_UPDATE</CODE>
+. After you have finished sending the scrolling messages, unsuspend the view's updates by sending <CODE>
+MSG_GEN_VIEW_UNSUSPEND_UPDATE</CODE>
+.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VIEW_SUSPEND_UPDATE">
+ </A>
+MSG_GEN_VIEW_SUSPEND_UPDATE</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VIEW_SUSPEND_UPDATE();</PRE>
+<P>
+This message causes the view to suspend sending <CODE>
+MSG_META_EXPOSED</CODE>
+ until it receives <CODE>
+MSG_GEN_VIEW_UNSUSPEND_UPDATE</CODE>
+. Suspend-unsuspend pairs can be nested.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenView object.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VIEW_UNSUSPEND_UPDATE">
+ </A>
+MSG_GEN_VIEW_UNSUSPEND_UPDATE</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VIEW_UNSUSPEND_UPDATE();</PRE>
+<P>
+This message allows the view to send a <CODE>
+MSG_META_EXPOSED</CODE>
+ again after being suspended with <CODE>
+MSG_GEN_VIEW_SUSPEND_UPDATE</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenView object.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+<P CLASS="refField">
+Warnings:	It is an error to send this message to a non-suspended view.</P>
+
+
+
+
+<H2 CLASS="HeadingC">
+<A NAME="75362">
+ </A>
+Tracking the Scrolling</H2>
+<PRE>MSG_META_CONTENT_TRACK_SCROLLING, MSG_GEN_VIEW_SETUP_TRACKING_ARGS, MSG_GEN_VIEW_TRACKING_COMPLETE</PRE>
+<P>
+For flexibility, the view allows applications to track scrolling as it happens and alter it before it gets implemented. When GVA_TRACK_SCROLLING is set in <CODE>
+GVI_attrs</CODE>
+, all scrolling events will be sent to the content object before being implemented. Because there are often many scrolling events, you should avoid track scrolling unless truly necessary.</P>
+<P>
+If you are going to track the scrolling, your content object <EM>
+must</EM>
+ handle the message <CODE>
+MSG_META_CONTENT_TRACK_SCROLLING</CODE>
+. This message passes a <CODE>
+TrackScrollingParams</CODE>
+ structure containing all the information needed about the upcoming scrolling event. When you receive it, you must do the following three steps:</P>
+<OL>
+<LI>
+Send <CODE>
+MSG_GEN_VIEW_SETUP_TRACKING_ARGS</CODE>
+ to the view<BR>
+This message fills in all the information of the <CODE>
+TrackScrollingParams</CODE>
+ structure. You must call this routine to ensure that there are no synchronization problems with the scrolling event.</LI>
+<LI FIXME_NumListOther>
+Alter the scrolling event<BR>
+If you choose to alter the scrolling event, change the <CODE>
+TrackScrollingParams</CODE>
+ structure to the appropriate values.</LI>
+<LI FIXME_NumListOther>
+Send <CODE>
+MSG_GEN_VIEW_TRACKING_COMPLETE</CODE>
+ to the view<BR>
+This message updates the <CODE>
+TrackScrollingParams</CODE>
+ structure based on your changes, then sends a message to the view with the new scrolling information. The view will then scroll according to your changes.</LI>
+</OL>
+<P>
+<A NAME="IX_TrackScrollingParams">
+ </A>
+The <CODE>
+TrackScrollingParams</CODE>
+ structure contains complete information about the scrolling event including context information, the view's width and height, the view's document origin, and the action in progress. It also contains a field called <CODE>
+TSP_change</CODE>
+, which is a structure of type <CODE>
+PointDWord</CODE>
+ and should, after you change the scrolling, contain an offset from the proposed origin to the new origin you desire. See <A HREF="GenView_15.htm#57080"> TrackScrollingParams and Associated Structures</A>
+ for the definition of the structure.</P>
+<P CLASS="figTitle">
+Code Display 9-4 <A NAME="57080">
+ </A>
+TrackScrollingParams and Associated Structures</P>
+<PRE>/*
+ * The TrackScrollingParams structure contains all the necessary information about
+ * a given scrolling event. It is made up of several substructures, each of which
+ * is shown below.
+ */</PRE>
+<PRE><A NAME="IX_SA_&ldots;"> </A><A NAME="IX_ScrollAction"> </A>/*
+ * ScrollAction is an enumerated type, each enumeration of which designates a
+ * different type of event. The handler should <EM>not</EM> change these.
+ */
+typedef ByteEnum ScrollAction;				/* byte-length enumeration */
+/*  SA_NOTHING			* No scrolling action
+    SA_TO_BEGINNING			* Scrolling to beginning of document
+    SA_PAGE_BACK			* Scrolling back one screen height or width
+    SA_INC_BACK			* Scrolling back one increment
+    SA_INC_FWD			* Scrolling forward one increment
+    SA_DRAGGING			* Drag scrolling is underway
+    SA_PAGE_FWD			* Scrolling forward one page
+    SA_TO_END			* Scrolling to end of document
+    SA_SCROLL			* Generic scrolling message sent
+    SA_SCROLL_INTO			* Scrolling while keeping a point on screen
+    SA_INITIAL_POS			* Indicating the initial scrolling position.
+    			* Subsequent scroll messages will be relative to
+    			* this origin.
+    SA_SCALE			* Scaling may cause scrolling
+    SA_PAN			* Pan-scrolling is underway. Otherwise
+    			* identical to SA_SCROLL
+    SA_DRAG_SCROLL			* Drag-scrolling, otherwise like SA_SCROLL
+    SA_SCROLL_FOR_SIZE_CHANGE				* Scrolling because view size changed
+*/</PRE>
+<PRE><A NAME="IX_SF_&ldots;  (ScrollFlags)"> </A><A NAME="IX_ScrollFlags"> </A>/*
+ * ScrollFlags is a byte record of flags used to determine the type of scrolling
+ * taking place and the context of the scroll.
+ */</PRE>
+<PRE>typedef ByteFlags ScrollFlags;
+#define	SF_VERTICAL		0x80	/* Scrolling is vertical if set. If clear,
+				 * scrolling is horizontal. Invalid for
+				 * ScrollAction types SA_SCROLL_INTO,
+				 * SA_SCROLL, and SA_INITIAL_POS. */
+#define	SF_ABSOLUTE		0x40	/* Scrolling is to an absolute point. Set for
+				 * ScrollAction types SA_TO_BEGINNING,
+				 * SA_TO_END, SA_INITIAL_POS, SA_SCROLL_INTO,
+				 * SA_DRAGGING, and some SA_SCROLL. */
+#define	SF_DOC_SIZE_CHANGE 0x20			/* Scroll resulted from document size change. */
+#define	SF_WINDOW_NOT_SUSPENDED 0x10
+				/* Flag used internally only. */
+#define	SF_SCALE_TO_FIT		0x08	/* Flag used when the View is in scale-to-fit
+				 * mode (often changes scrolling behavior). */
+#define	SF_SETUP_HAPPENED  0x04			/* Flag for error checking only. */</PRE>
+<PRE>/*
+ * The TrackScrollingParams structure contains several elements, each of
+ * which is described in the comments below. All the fields will be filled by
+ * MSG_GEN_VIEW_SETUP_TRACKING_ARGS; however, only certain fields will be filled
+ * by MSG_META_CONTENT_TRACK_SCROLLING. Therefore, you should always send
+ * MSG_GEN_VIEW_SETUP_TRACKING_ARGS in the handler for this message.
+ */</PRE>
+<PRE><A NAME="IX_TSP_&ldots;"> </A>typedef struct {
+    ScrollAction		TSP_action;		/* The type of scrolling underway */
+    ScrollFlags		TSP_flags;		/* flags shown above */
+    optr		TSP_caller;		/* The sender of the scroll message */
+    PointDWord		TSP_change;		/* The relative amount being scrolled */
+    PointDWord		TSP_newOrigin;		/* The new absolute origin */
+    PointDWord		TSP_oldOrigin;		/* The original origin */
+    sword		TSP_viewWidth;		/* Current view width */
+    sword		TSP_viewHeight;		/* Current view height */
+} TrackScrollingParams;<A NAME="marker=106547"> </A></PRE>
+<P>
+To set <CODE>
+TSP_change</CODE>
+, you must first understand how the entire <CODE>
+TrackScrollingParams</CODE>
+ structure is used. When a scrolling event is being tracked, three sets of information are needed:</P>
+<UL>
+<LI>
+The current origin and size of the view. This is represented by the field <CODE>
+TSP_oldOrigin</CODE>
+.</LI>
+<LI>
+The scrolling event's proposed change to the view's origin. This is represented by the field <CODE>
+TSP_newOrigin</CODE>
+.</LI>
+<LI>
+The final change to the view's origin after your adjustments have been added. This is represented by a combination of <CODE>
+TSP_oldOrigin</CODE>
+ and <CODE>
+TSP_change</CODE>
+. You should set <CODE>
+TSP_change</CODE>
+ understanding that it gets added to <CODE>
+TSP_oldOrigin</CODE>
+ to produce the final origin of the view.</LI>
+</UL>
+<P>
+Tracking the scrolling, however, can introduce noticeable lag in scrolling speed. If you do not need to track the scrolling, you probably shouldn't. However, if you need to track the scrolling for simple or few changes, you should consider subclassing <CODE>
+GenViewClass</CODE>
+ and altering the functionality of the method for <CODE>
+MSG_META_CONTENT_TRACK_SCROLLING</CODE>
+. The GenView's handler for this message simply passes the message on to the content.</P>
+<P>
+If you just need to track changes to the origin, subclass <CODE>
+GenViewClass</CODE>
+ and intercept <CODE>
+MSG_META_CONTENT_VIEW_ORIGIN_CHANGED</CODE>
+.</P>
+<P CLASS="figTitle">
+Code Display 9-5 Handling Track Scrolling</P>
+<PRE>/* This message is sent by the view to its content object when track scrolling is
+ * enabled and a scrolling event is begun. If you plan to track the scrolling, you
+ * MUST handle this message. The first thing your handler should do is send
+ * MSG_GEN_VIEW_SETUP_TRACKING_ARGS to the view. This message fills in the
+ * TrackScrollingParams structure. The last thing the handler must do is send
+ * MSG_GEN_VIEW_TRACKING_COMPLETE to the view. This message locks your changes
+ * in and directs the view to implement them.
+ * The format of this message is
+ *	void (TrackScrollingParams *args);								*/</PRE>
+<PRE>@message		MyProcessClass, MSG_META_CONTENT_TRACK_SCROLLING {
+    @call (args-&gt;TSP_caller)::MSG_GEN_VIEW_SETUP_TRACKING_ARGS(args);
+	/* Here you can do whatever you want to args-&gt;TSP_change. */
+    @call MyView::MSG_GEN_VIEW_TRACKING_COMPLETE(&amp;args);
+}</PRE>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VIEW_SETUP_TRACKING_ARGS">
+ </A>
+MSG_GEN_VIEW_SETUP_TRACKING_ARGS</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VIEW_SETUP_TRACKING_ARGS(
+        TrackScrollingParams *args);</PRE>
+<P>
+This message takes the <CODE>
+TrackScrollingParams</CODE>
+ structure and fills in remaining fields not passed by <CODE>
+MSG_META_CONTENT_TRACK_SCROLLING</CODE>
+.</P>
+<P CLASS="refField">
+Source:	The content object tracking scrolling (in the handler for <CODE>
+MSG_META_CONTENT_TRACK_SCROLLING</CODE>
+).</P>
+<P CLASS="refField">
+Destination:	The calling object, found in <CODE>
+args-&gt;TSP_caller</CODE>
+.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+args</CODE>
+	A pointer to the mostly complete structure of <CODE>
+TrackScrollingParams</CODE>
+, to be filled in by the method.</P>
+<P CLASS="refField">
+Return:	The structure pointed to by <CODE>
+args</CODE>
+ will be filled.</P>
+<P CLASS="refField">
+Structures:	See <A HREF="GenView_15.htm#57080"> TrackScrollingParams and Associated Structures</A>
+.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VIEW_TRACKING_COMPLETE">
+ </A>
+MSG_GEN_VIEW_TRACKING_COMPLETE</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VIEW_TRACKING_COMPLETE(
+        TrackScrollingParams *args);</PRE>
+<P>
+This message sets the altered scrolling arguments and makes them official, instructing the view to implement them.</P>
+<P CLASS="refField">
+Source:	The content object tracking scrolling (in its handler for <CODE>
+MSG_META_CONTENT_TRACK_SCROLLING</CODE>
+).</P>
+<P CLASS="refField">
+Destination:	The calling object, found in <CODE>
+args-&gt;TSP_caller</CODE>
+.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+args</CODE>
+	A pointer to the completed structure of <CODE>
+TrackScrollingParams</CODE>
+.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Structures:	See <A HREF="GenView_15.htm#57080"> TrackScrollingParams and Associated Structures</A>
+.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_CONTENT_TRACK_SCROLLING">
+ </A>
+MSG_META_CONTENT_TRACK_SCROLLING</H4>
+<PRE CLASS="syntax">void	MSG_META_CONTENT_TRACK_SCROLLING(
+        TrackScrollingParams *args);</PRE>
+<P>
+This message is sent by the GenView to its content if the content has requested track-scrolling (with GVA_TRACK_SCROLLING set in the GenView's instance data).</P>
+<P CLASS="refField">
+Source:	Sent by a GenView object to its content when a scrolling event occurs and the view has GVA_TRACK_SCROLLING set.</P>
+<P CLASS="refField">
+Destination:	The content of the GenView.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+args</CODE>
+	A pointer to a <CODE>
+TrackScrollingParams</CODE>
+ structure.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Structures:	See <A HREF="GenView_15.htm#57080"> TrackScrollingParams and Associated Structures</A>
+.</P>
+<P CLASS="refField">
+Interception:	Any content that tracks scrolling <EM>
+must</EM>
+ handle this message. It should send <CODE>
+MSG_GEN_VIEW_SETUP_TRACKING_ARGS</CODE>
+ and <CODE>
+MSG_GEN_VIEW_TRACKING_COMPLETE</CODE>
+ to the object specified in <CODE>
+TSP_caller</CODE>
+.</P>
+
+
+
+<H2 CLASS="HeadingC">
+<A NAME="71216">
+ </A>
+Customizing the Scrollers</H2>
+<PRE>HINT_VALUE_X_SCROLLER, HINT_VALUE_Y_SCROLLER</PRE>
+<P>
+Although a view's scrollers should remain generic to maintain UI consistency, you may set your own GenValue objects to be the scrollers of your view. This allows special placement of the scrollers not only around the view but also within the generic object tree.</P>
+<P>
+Before creating its own scrollers, the view will search for any objects below it in the generic object tree that have the hint HINT_VALUE_X_SROLLER or HINT_VALUE_Y_SCROLLER<A NAME="IX_HINT_VALUE_Y_SCROLLER">
+ </A>
+<A NAME="IX_HINT_VALUE_X_SCROLLER">
+ </A>
+. For example, if you wanted to put your vertical scroller on the left of the view rather than on the right, you could add the following code:</P>
+<PRE>@object GenViewClass MyView = {
+    /* other view attributes */
+    GI_comp = MyViewScroller;
+}</PRE>
+<PRE>@object GenRangeClass MyViewScroller = {
+    HINT_Y_SCROLLER;
+    HINT_SEEK_LEFT_OF_VIEW;
+}</PRE>
+<P>
+Custom scrollers do not need to be direct children of the view; instead, they may be any number of generations below the view in the generic object tree.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GenView_e.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GenView_14.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.6 Children of the View</A> 
+<!-- to next --> | <A HREF="GenView_16.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.8 Monitoring Input</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

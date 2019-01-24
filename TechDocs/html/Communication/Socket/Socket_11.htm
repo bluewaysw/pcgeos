@@ -1,0 +1,234 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Socket_11.htm,v 1.2 97/08/21 14:11:15 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> TCP/IP--GEOS Specific</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Socket</A>: 10.1 <A HREF="Socket_10.htm">Domain-Specific Information</A>: 
+<A NAME="IX_TCP/IP:Socket domain">
+ </A>
+<A NAME="77846">
+ </A>
+TCP/IP--GEOS Specific</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Socket_10.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Socket_10.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">10 Domain-Specific Information</A> 
+<!-- to next --> | <A HREF="Socket_12.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">10.2 TCP/IP--Standard</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+The TCP/IP domain is a popular standard used for internet communications. The GEOS-specific version supports 32-bit port numbers. GEOS TCP/IP data may be transmitted via a regular TCP/IP network, though both the sending and receiving machines must support GEOS TCP/IP.</P>
+<DL>
+<DT>
+<STRONG>
+Domain Name:</DT><DD>
+</STRONG>
+&quot;TCPIP_GEOS<A NAME="IX_TCPIP_GEOS">
+ </A>
+&quot;</DD>
+<DT>
+<STRONG>
+Port Numbers:</DT><DD>
+</STRONG>
+32-bit values.</DD>
+<DT>
+<STRONG>
+Opaque Address Format:</DT><DD>
+</STRONG>
+This address will be either a <CODE>
+TcpAccPntExtendedAddress</CODE>
+,a <CODE>
+TcpOnlyExtendedAddress</CODE>
+, or a <CODE>
+TcpNonAccPntExtendedAddress</CODE>
+.</DD>
+<DT>
+  <A NAME="IX_TAPEA_&ldots;">
+ </A>
+  <A NAME="IX_TcpAccPntExtendedAddress structure">
+ </A>
+TcpAccPntExtendedAddress: Use this structure when referring to an address identified by an access point ID number.</DT>
+<DT>
+   <A NAME="IX_TOEA_&ldots;">
+ </A>
+ <A NAME="IX_TcpOnlyExtendedAddress structure">
+ </A>
+TcpOnlyExtendedAddress: Use this structure to identify a TCP address by its address instead of by its ID.</DT>
+<DT>
+   <A NAME="IX_TNAPEA_&ldots;">
+ </A>
+ <A NAME="IX_TcpNonAccPntExtendedAddress structure">
+ </A>
+TcpNonAccPntExtendedAddress: Use this structure to identify a TCP address that is not a known access point. You will need to specify a link address (a phone number) as well as an IP address.</DT>
+<DT>
+Notes:</DT>
+<UL>
+<LI>
+<A NAME="IX_PPP">
+ </A>
+On some devices (including the Nokia 9000i Communicator), you cannot make a TCP/IP connection or send packets until the device has a &quot;raw&quot; connection to the network--a PPP connection. Calling <CODE>
+SocketOpenDomainMedium()</CODE>
+<A NAME="IX_SocketOpenDomainMedium():Creating PPP connections in TCP/IP domain">
+ </A>
+ with the TCP medium creates a PPP connection. The modem will dial, and the machine will connect to the PPP server, but no TCP level packets will be sent. If the PPP connection is already made, this routine will return SE_NORMAL, just as if the connection had been just now made. If the modem is already in use, an SE_MEDIUM_BUSY error will be returned. Use the <CODE>
+SocketCloseDomaninMedium()</CODE>
+ to hang up the phone when done.</LI>
+<LI>
+The Talk sample application shows how a device can make a raw PPP connection with the Internet Service Provider (ISP), getting the necessary information about the ISP from the built-in Access Point library. (Notice how the object AccpntControl is declared; notice the sample's TalkAddressClass handler for <CODE>
+MSG_GEN_GUP_INTERACTION_COMMAND</CODE>
+, which queries the AccessPointControl for the selected ISP and extracts the useful information about that ISP; finally, the MSG_CTP_CONNECT handler dials the phone to make the PPP connection.)</LI>
+</UL>
+</DL>
+<P CLASS="figTitle">
+Code Display 23-2 Making the Raw TCP/IP Connection</P>
+<P CLASS="figCaption">
+Here we see three snippets of code from the Talk sample application<BR>
+The AccessPointControl allows the user to choose an ISP:</P>
+<PRE>@chunk char accpntMkr[] = &quot;Access List&quot;;</PRE>
+<PRE>@object AccessPointControlClass AccpntControl = {
+	GI_states = GS_USABLE|GS_ENABLED;
+	HINT_ACCESS_POINT_CONTROL_MINIMIZE_SIZE;
+	ATTR_ACCESS_POINT_CONTROL_LIST_MONIKER = @accpntMkr; }</PRE>
+<P CLASS="figCaption">
+In @method TalkAddressClass, MSG_GEN_GUP_INTERACTION_COMMAND, we get information we'll need about the ISP</P>
+<PRE>point = @call \
+GeodeGetOptrNS(@AccpntControl)::MSG_ACCESS_POINT_CONTROL_GET_SELECTION();</PRE>
+<PRE>/* store link info into address buffer */
+rawAddress.UTA_link.TAPEA_linkSize = 3;
+rawAddress.UTA_link.TAPEA_linkType = LT_ID;
+rawAddress.UTA_link.TAPEA_accPntID = point;</PRE>
+<PRE>/* the text of the address follows the link info */
+alen = @call GeodeGetOptrNS(@IPText)::MSG_VIS_TEXT_GET_ALL_PTR( 
+						(char *)&amp;(rawAddress.UTA_ip[0]));</PRE>
+<PRE>if (alen &gt; MAX_IP_ADDR_STRING_LENGTH) FatalError(0);  /* too much text */</PRE>
+<PRE>/* resolve the raw address into a SocketAddress */
+theAddress.SA_addressSize = SocketResolve(theAddress.SA_domain,
+					(byte *)(&amp;rawAddress),
+					sizeof(TcpAccPntExtendedAddress)+alen,
+					(byte *)(&amp;addressBuffer),
+					MAX_ADDRESS_SIZE);</PRE>
+<P CLASS="figCaption">
+In MSG_CTP_CONNECT's handler, we make the PPP connection:</P>
+<PRE>rval = SocketOpenDomainMedium((SocketAddress *) &amp;theAddress, SOCKET_NO_TIMEOUT);</PRE>
+<UL>
+<LI>
+TCP/IP only supports one byte of urgent data in a packet. If you send a multi-byte packet marked urgent, it will be divided into two packets (on the receiving side). For example, a 32-byte packet marked urgent would be broken up into a 31-byte normal packet and a one-byte urgent packet.</LI>
+<P>
+	If you set the SSF_URGENT flag to <CODE>
+SocketSend()</CODE>
+ when sending a multi-byte packet, the last byte of the packet will be marked urgent.</P>
+<P>
+	Recall that you can set the in-line option to specify that urgent data should be treated as normal data. In this case, urgent data will be treated as a normal 1-byte packet.</P>
+<LI>
+<A NAME="29792">
+ </A>
+If you're not familiar with TCP/IP, <EM>
+TCP/IP illustrated</EM>
+ by W. Richard Stevens provides a good introduction.<BR>
+<BR>
+The TCP/IP standard is defined in a number of RFCs. The RFCs listed below may be of interest. If you research these documents, note that the first is an index to the others.<BR>
+<BR>
+1720 	J. Postel, I. Architecture Board (IAB), &quot;INTERNET OFFICIAL PROTOCOL STANDARDS&quot;, 11/23/1994. (Obsoletes RFC1610) (Obsoleted by RFC1780) (STD 1)<BR>
+<BR>
+1700 	J. Reynolds, J. Postel, &quot;ASSIGNED NUMBERS&quot;, 10/20/1994. (Obsoletes RFC1340)<BR>
+<BR>
+1122 	R. Braden, &quot;Requirements for Internet hosts - communication layers&quot;, 10/01/1989.<BR>
+<BR>
+1123 	R. Braden, &quot;Requirements for Internet hosts - application and support&quot;, 10/01/1989.<BR>
+<BR>
+0791 	J. Postel, &quot;Internet Protocol&quot;, 09/01/1981. (Obsoletes RFC0760)<BR>
+<BR>
+0950 	J. Mogul, J. Postel, &quot;Internet standard subnetting procedure&quot;, 08/01/1985.<BR>
+<BR>
+0919 	J. Mogul, &quot;Broadcasting Internet datagrams&quot;, 10/01/1984.<BR>
+<BR>
+0922 	J. Mogul, &quot;Broadcasting Internet datagrams in the presence of subnets&quot;, 10/01/1984.<BR>
+<BR>
+0792 	J. Postel, &quot;Internet Control Message Protocol&quot;, 09/01/1981. (Obsoletes RFC0777)<BR>
+<BR>
+0768 	J. Postel, &quot;User Datagram Protocol&quot;, 08/28/1980.<BR>
+<BR>
+0793 	J. Postel, &quot;Transmission Control Protocol&quot;, 09/01/1981. (Updates RFC0761)<BR>
+<BR>
+1034 	P. Mockapetris, &quot;Domain names - concepts and facilities&quot;, 11/01/1987. (Obsoletes RFC0973) (Updated by RFC1101)<BR>
+<BR>
+1035 	P. Mockapetris, &quot;Domain names - implementation and specification&quot;, 11/01/1987. (Obsoletes RFC0973) (Updated by RFC1348)<BR>
+<BR>
+0974 	C. Partridge, &quot;Mail routing and the domain system&quot;, 01/01/1986.<BR>
+<BR>
+1531 	R. Droms, &quot;Dynamic Host Configuration Protocol&quot;, 10/07/1993. (Obsoleted by RFC1541)<BR>
+<BR>
+1533 	S. Alexander, R. Droms, &quot;DHCP Options and BOOTP Vendor Extensions&quot;, 10/08/1993. (Obsoletes RFC1497)<BR>
+<BR>
+1534 	R. Droms, &quot;Interoperation Between DHCP and BOOTP&quot;, 10/08/1993.<BR>
+<BR>
+1144 	V. Jacobson, &quot;Compressing TCP/IP headers for low-speed serial links&quot;, 02/01/1990. <BR>
+<BR>
+1547 	D. Perkins, &quot;Requirements for an Internet Standard Point-to-Point Protocol&quot;, 12/09/1993. <BR>
+<BR>
+1662 	W. Simpson, &quot;PPP in HDLC-like Framing&quot;, 07/21/1994. (Obsoletes RFC1549) <BR>
+<BR>
+1334 	B. Lloyd, W. Simpson, &quot;PPP Authentication Protocols&quot;, 10/20/1992. <BR>
+<BR>
+1661 	W. Simpson, &quot;The Point-to-Point Protocol (PPP)&quot;, 07/21/1994. (Obsoletes RFC1548)<BR>
+<BR>
+1570 	W. Simpson, &quot;PPP LCP Extensions&quot;, 01/11/1994. (Updates RFC1548) <BR>
+<BR>
+1663 	D. Rand, &quot;PPP Reliable Transmission&quot;, 07/21/1994.<BR>
+<BR>
+1332 PS   G. McGregor, &quot;The PPP Internet Protocol Control Protocol (IPCP)&quot;, 05/26/1992. (Obsoletes RFC1172) </LI>
+<LI>
+Some (16-bit) constants (defined in <STRONG CLASS="fileName">
+sockmisc.h</STRONG>
+) are available with the port numbers for common TCP services:</LI>
+</UL>
+<PRE>#define <A NAME="IX_ECHO"> </A>ECHO            7  /* TCP/UDP */
+#define <A NAME="IX_DISCARD"> </A>DISCARD         9  /* TCP/UDP */
+#define <A NAME="IX_FTP_DATA"> </A>FTP_DATA        20 /* TCP */
+#define <A NAME="IX_FTP"> </A>FTP             21 /* TCP */
+#define <A NAME="IX_TELNET_SERVER"> </A>TELNET_SERVER   23 /* TCP */
+#define <A NAME="IX_NAME_SERVER"> </A>NAME_SERVER     42 /* UDP */
+#define <A NAME="IX_WHOIS"> </A>WHOIS           43 /* TCP */
+#define <A NAME="IX_DOMAIN_SERVER"> </A>DOMAIN_SERVER   53 /* TCP/UDP */
+#define <A NAME="IX_FINGER"> </A>FINGER          79 /* TCP */</PRE>
+<UL>
+<LI>
+The address data information with a <CODE>
+SocketAddress</CODE>
+ structure takes the following form for the TCP domain:</LI>
+<PRE>typedef struct {
+	word    <A NAME="IX_TOEA_&ldots;"> </A>TOEA_linkSize; 				/* 0 */
+	byte    TOEA_ipAddr[4]; /* IP address */
+} <A NAME="IX_TcpOnlyResolvedAddress"> </A>TcpOnlyResolvedAddress;</PRE>
+<P>
+	A variation on this structure is used for storing the address information for a TCP access point address. Along with the address information, there are three bytes of information about the nature of the link: the first of these bytes should have value LT_ID, so that the driver will know that the next two bytes represent a link ID; the other two bytes should be the access point's ID.</P>
+<PRE>typedef struct {
+	word	TAPRA_linkSize; /* 3 */
+	byte	TAPRA_linkType; /* LinkType (LT_ID) */
+	word	TAPRA_accPntID;
+	byte	 <A NAME="IX_TAPRA_&ldots;"> </A>TAPRA_ipAddr[4]; /* IP address */
+} <A NAME="IX_TcpAccPntResolvedAddress"> </A>TcpAccPntResolvedAddress;</PRE>
+</UL>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Socket_10.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Socket_10.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">10 Domain-Specific Information</A> 
+<!-- to next --> | <A HREF="Socket_12.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">10.2 TCP/IP--Standard</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

@@ -1,0 +1,199 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Parse_2.htm,v 1.2 97/09/05 12:38:41 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> The Scanner</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Parse Library</A>: 1.1 <A HREF="Parse_1.htm">Parse Library Behavior</A>: 
+The Scanner</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Parse_1.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Parse_1.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">1 Parse Library Behavior</A> 
+<!-- to next --> | <A HREF="Parse_3.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">1.2 The Parser</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+The scanner translates a text string into a sequence of tokens. The tokens can then be processed by the parser. Every token is associated with some data.</P>
+<P>
+The scanner can be treated as a part of the parser. It is never used independently; instead, the parser is called on to parse a string, and the parser calls the scanner to translate the string into tokens.</P>
+<P>
+The scanner does not keep track of tokens after it processes them. For this reason, it will not notice if, for example, parentheses are not balanced. It returns errors only if it is passed a string which does not scan as a sequence of tokens.</P>
+
+<H2 CLASS="HeadingC">
+Scanner Tokens</H2>
+<P>
+The scanner recognizes the tokens listed below. Note that applications will never directly encounter the scanner tokens; the tokens translates them into parser tokens before returning them. A complete list of parser tokens (with their names) is given in <A HREF="Parse_3.htm#82255"> Parser Tokens</A>
+.</P>
+<DL>
+<DT>
+NUMBER</DT><DD>This is some kind of numerical constant. The format in the string is determined by the localization settings. The data section of the token is a floating-point number (even if the string contained an integer).</DD>
+<DT>
+STRING</DT><DD>This is a sequence of characters surrounded by &quot;double-quotes.&quot; All characters within double quotes are translated into their ASCII equivalents, with the exceptions noted below in <A HREF="Parse_2.htm#61053"> Strings</A>
+. The data section is a pointer to the ASCII string specified.</DD>
+<DT>
+CELL</DT><DD>This is a reference to a cell in a database. The format is described in <A HREF="Parse_2.htm#25231"> Cell References</A>
+.</DD>
+<DT>
+END_OF_EXPRESSION</DT><DD>
+The scanner returns this token when it has examined and translated an entire text string and reached its end.</DD>
+<DT>
+OPEN_PAREN</DT><DD>
+This is simply a left parenthesis character, i.e. &quot;(&quot;. There is no data section associated with this token.</DD>
+<DT>
+CLOSE_PAREN</DT><DD>
+This is simply a right parenthesis character, i.e. &quot;)&quot;. There is no data section associated with this token.</DD>
+<DT>
+OPERATOR</DT><DD>This is a unary or binary operator. The operators are described in <A HREF="Parse_2.htm#84664"> Operators</A>
+. The data section specifies which operator was encountered.</DD>
+<DT>
+LIST_SEPARATOR</DT><DD>
+This is a comma, i.e. &quot;,&quot;. It is used to separate arguments to functions. There is no data section associated with this token.</DD>
+<DT>
+IDENTIFIER</DT><DD>This is a sequence of characters, not in quotation marks, which does not match the format for cell references. Identifiers may be functions (built-in or application-defined) or variables; see <A HREF="Parse_2.htm#77135"> Identifiers</A>
+. The data section is a string containing the identifier.</DD>
+
+
+</DL>
+<H2 CLASS="HeadingC">
+<A NAME="61053">
+ </A>
+Strings</H2>
+<P>
+The string passed to the scanner may, itself, contain strings. These inner strings are not further analyzed; rather, their contents are associated with the string token. Strings are delimited by double-quotes. All characters within the double-quotes are copied directly into the token's data, with the exception of the backslash, i.e. &quot;\&quot;. This character signals that the character (or characters) which immediately follow it are to be interpreted literally. Backslash-codes include the following:</P>
+<DL>
+<DT>
+\&quot;</DT><DD>This code represents a double-quote character (i.e. ASCII 0x22, or &quot;); it indicates that the double-quote should be copied into the string, instead of read as a string delimiter.</DD>
+<DT>
+\n</DT><DD>This code represents a newline control code (i.e. ASCII 0x0A, or control-J).</DD>
+<DT>
+\t</DT><DD>This code represents a hard-tab control code (i.e. ASCII 0x09, or control-I).</DD>
+<DT>
+\f</DT><DD>This code represents a form-feed control code (i.e. ASCII 0x0C, or control-L).</DD>
+<DT>
+\b</DT><DD>This code represents a backspace control code (i.e. ASCII 0x10, or control-H).</DD>
+<DT>
+\\</DT><DD>This code represents a backslash character (i.e. ASCII 0x5C, or &quot;\&quot;).</DD>
+<DT>
+\<EM>
+nnn</EM>
+</DT><DD>This code is a literal octal value. The backslash must be followed by three digits, making up an octal integer in the range 0-177o (i.e. 0-255). The byte specified is inserted directly into the string. Thus, for example, &quot;\134&quot; is functionally identical to &quot;\\&quot;.</DD>
+
+
+</DL>
+<H2 CLASS="HeadingC">
+<A NAME="25231">
+ </A>
+Cell References</H2>
+<P>
+The parse library is often used in conjunction with cell files; for example, the spreadsheet objects use the two libraries together. For this reason, the scanner recognizes cell references. Cell references are described by the regular expression [A-Z]+[0-9]+; that is, one or more capital letters, followed by one or more digits. The capital letters indicate the cell's column. The first column (the column with index 0) is indicated by the letter A; column 1 is B, column 2 is C, and so on, up to column 25 (which is Z). Column 26 is AA, followed by AB, AC, and so on to AZ (column 51); this column is followed by BA, and so on, to the largest column, IV (column 255). The rows are indicated by number, with the first row having number 1.</P>
+<P>
+<A NAME="IX_CellReference">
+ </A>
+The data portion of a cell reference token is a <CODE>
+CellReference</CODE>
+ structure. This structure records the row and column indices of the cell; the scanner translates the cell reference to these indices. For more information about the cell library, see <A HREF="../../DataMgmt/Cell/index.htm">the Cell Library chapter</A>.</P><P>
+When the evaluator needs to get the value of a cell, it calls a callback routine, passing the cell's <CODE>
+CellReference</CODE>
+ structure. The application is responsible for looking up the cell's value and returning it to the evaluator. If you manage a cell file with a Spreadsheet object, this work is done for you; the Spreadsheet will be called by the evaluator, returning the values of cells as needed. (The spreadsheet returns zero for empty or unallocated cells.)</P>
+<P>
+Note that while the cell library numbers both rows and columns starting from zero, the Parse library numbers rows starting from one. This is because historically, spreadsheets have had the first row be row number 1. Therefore, if the parser encounters a reference to cell A1, it will translate this into a cell reference which specifies row zero, column zero.</P>
+
+
+<H2 CLASS="HeadingC">
+<A NAME="84664">
+ </A>
+Operators</H2>
+<P>
+The scanner recognizes a number of built-in operators. Neither the scanner nor the parser does any simplification or evaluation of operator expressions; this is done by the evaluator. All operators are represented by the token SCANNER_TOKEN_OPERATOR.<A NAME="IX_OperatorType">
+ </A>
+ The token has a one-byte data section, which is a member of the enumerated type <CODE>
+OperatorType</CODE>
+; this value specifies which operator was encountered. This section begins with a listing of currently supported operators in order of precedence, from highest precedence to lowest; this is followed by a detailed description of the operators. All operators listed here will always be supported; other operators may be added in the future.</P>
+<P>
+Note that neither the scanner nor the parser does any evaluation of arguments. All type-checking is done at evaluation time. Thus, if parse the text &quot;(3 * &quot;HELLO&quot;)&quot;, the parser will not complain; the evaluator, however, will return a &quot;bad argument type&quot; error.</P>
+<P>
+<A NAME="IX_OP_&ldots;  (OperatorType)">
+ </A>
+The figure below lists the operators in order of precedence. Highest-precedence operators are listed first. Operators with the same precedence are listed together; a blank line implies a drop in precedence. Operators of the same precedence level are grouped from left to right; that is, &quot;1 - 2 - 3&quot; is the same as &quot;(1 - 2) - 3&quot;.
+<IMG SRC="Parse_2_operators.gif">
+
+</P>
+<DL>
+<DT>
+:</DT><DD>This is a range separator. The range separator is a binary infix operator. The parser recognizes expressions of the format <EM>
+Cell1</EM>
+:<EM>
+Cell2</EM>
+ as describing a rectangular range of cells, with the two specified cells being diagonally opposite corners. The data portion of this token is the constant OP_RANGE_SEPARATOR.</DD>
+<DT>
+... </DT><DD>This is another range separator. It is functionally identical to the colon operator. The data portion of this token is the constant OP_RANGE_SEPARATOR. (The formatter will turn this back into a colon.)</DD>
+<DT>
+- </DT><DD>This can be either of two different operators. It can be a negation operator. This is a unary prefix operator which reverses the arithmetic sign of the operand. It can also be a subtraction operator. This is a binary infix operator. The parser determines which operator is represented. For example, in &quot;(-1)&quot;, the hyphen is a negation operator; in &quot;(1-2)&quot;, it is a subtraction operator. The data portion of this token is either OP_NEGATION or OP_SUBTRACTION; the scanner assigns the neutral OP_SUBTRACTION_NEGATION, and the parser decides (from context) which value is appropriate.</DD>
+<DT>
+%</DT><DD>This can be either of two operators. It can be a percent operator. This is a unary postfix operator which divides its operand by 100; that is, &quot;50%&quot; evaluates to 0.5. It can also be a modulo arithmetic operator. This is a binary infix operator which returns the remainder when its first operand is divided by its second operand; that is, &quot;11%4&quot; evaluates to 3.0. The parser determines which operator is represented. The data portion of this token is either OP_PERCENT or OP_MODULO; the scanner assigns the neutral OP_PERCENT_MODULO, and the parser decides (from context) which constant is appropriate.</DD>
+<DT>
+^</DT><DD>This is the exponentiation operator. It is a binary infix operator; it raises its first operand to the power of the second operand (e.g. &quot;2^3&quot; evaluates to 8.0). The data portion of this token is the constant OP_RANGE_EXPONENTIATION.</DD>
+<DT>
+* </DT><DD>This is the multiplication operator. It is a binary infix operator. It multiplies the two operands. The data portion of this token is the constant OP_MULTIPLICATION.</DD>
+<DT>
+/ </DT><DD>This is the division operator. It is a binary infix operator. It divides the first operand by the second. The data portion of this token is the constant OP_ DIVISION. The constant OP_DIVISION_GRAPHIC is functionally equivalent; however, the formatter will display the operator as &quot; &quot;.</DD>
+<DT>
++</DT><DD>This is the addition operator. It is a binary infix operator. It adds the two operands. The data portion of this token is the constant OP_RANGE_ADDITION.</DD>
+</DL>
+<P>
+<DL>
+Several Boolean operators are also provided. In every case, if a Boolean expression is true, it evaluates to 1.0; if it is false, it evaluates to 0.0. (There is no Boolean negation operator; however, there is a Boolean negation function, NOT, which returns 1.0 if its argument is zero, and otherwise returns zero.) Boolean operators may be used for numbers or strings. They work in the conventional way for numbers. Strings are &quot;equal&quot; if they are identical. One string is said to be &quot;less than&quot; another if it comes first in lexical order. The parse library uses localized string comparison routines to compare strings; thus, the local lexical ordering is automatically used. (For more information, see <A HREF="../../Programming/Localization/index.htm">the Localization chapter</A>.)</P><DT>
+=</DT><DD>This is the equality operator. It is a binary infix operator. An expression evaluates to 1.0 if both operands evaluate to identical values. The data portion of this token is the constant OP_EQUAL.</DD>
+<DT>
+&lt;&gt;</DT><DD>This is the inequality operator. It is a binary infix operator. An expression evaluates to 1.0 if the two operands evaluate to different values. The data portion of this token is OP_NOT_EQUAL. The constant OP_NOT_EQUAL_GRAPHIC is functionally equivalent; however, the formatter will display the operator as &quot; &quot;.</DD>
+<DT>
+&gt;</DT><DD>This is the &quot;greater-than&quot; operator. It is a binary infix operator. It returns 1.0 if the first operand evaluates to a larger number than the second operand. The data portion of this token is OP_GREATER_THAN.</DD>
+<DT>
+&lt;</DT><DD>This is the &quot;less-than&quot; operator. It is a binary infix operator. It returns 1.0 if the first operand evaluates to a smaller number than the second operand. The data portion of this token is OP_LESS_THAN.</DD>
+<DT>
+&gt;=</DT><DD>This is the &quot;greater-than-or-equal-to&quot; operator. It is a binary infix operator. It returns 1.0 if the first operator evaluates to a number that is greater than or equal to the value of the second operand. The data portion of this token is OP_GREATER_THAN_OR_EQUAL. The constant OP_GREATER_THAN_OR_EQUAL_GRAPHIC is functionally equivalent; however, the formatter will display the operator as &quot; &quot;.</DD>
+<DT>
+&lt;=</DT><DD>This is the &quot;less-than-or-equal-to&quot; operator. It is a binary infix operator. It returns 1.0 if the first operator evaluates to a number that is less than or equal to the value of the second operand. The data portion of this token is OP_LESS_THAN_OR_EQUAL. The constant OP_LESS_THAN_OR_EQUAL_GRAPHIC is functionally equivalent; however, the formatter will display the operator as &quot;£&quot;.</DD>
+</DL>
+<P>
+Some special-purpose operators are also provided:</P>
+<DL>
+<DT>
+&amp;</DT><DD>This is the &quot;string-concatenation&quot; operator. It is a binary infix operator. The arguments must be strings. The result is a single string, composed of all the characters of the first string (without its null terminator) followed by all the characters of the second string (with its null terminator); for example, (&quot;Franklin&quot; &amp; &quot;Poomm&quot;) evaluates to &quot;FranklinPoomm&quot;. The data portion of this token is OP_STRING_CONCAT.</DD>
+<DT>
+#</DT><DD>This is the &quot;range-intersection&quot; operator. It is a binary infix operator. Both arguments must be cell ranges. The result is the range of cells which falls in both of the operand cell ranges. Note that cell ranges must be rectangular; there is, therefore, no &quot;range-union&quot; operator. The data portion of this token is OP_RANGE_INTERSECTION.</DD>
+
+
+</DL>
+<H2 CLASS="HeadingC">
+<A NAME="77135">
+ </A>
+Identifiers</H2>
+<P>
+Any unbroken alphanumeric character sequence which does not appear in quotes, and which is not in the format for a cell reference, is presumed to be an identifier. Identifiers serve two roles: they may be function names, or they may be labels.</P>
+<P>
+The scanner merely notes that an identifier has been found; it does not take any other action. The parser will find out what the identifier signifies. If the identifier's position indicates that it is a function (but the name is not that of a built-in function), the parser will prompt its caller for a pointer to a callback routine which will perform this function. If its position indicates that it is an identifier, the parser will request the value associated with the identifier; this may be a string, a number, or a cell reference.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Parse_1.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Parse_1.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">1 Parse Library Behavior</A> 
+<!-- to next --> | <A HREF="Parse_3.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">1.2 The Parser</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

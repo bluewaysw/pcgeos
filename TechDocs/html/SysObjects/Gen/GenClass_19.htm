@@ -1,0 +1,330 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: GenClass_19.htm,v 1.1 97/06/02 16:12:51 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Generic Upward Queries</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">GenClass</A>: 7.2 <A HREF="GenClass_17.htm">Special Message Passing</A>: 
+Generic Upward Queries</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GenClass_17.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GenClass_18.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">7.1 Parent and Child Message Passing</A> 
+<!-- to next --> | <A HREF="GenClass_1a.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">7.3 Object-Specific Queries</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>MSG_GEN_GUP_CALL_OBJECT_OF_CLASS, MSG_GEN_GUP_SEND_TO_OBJECT_OF_CLASS, MSG_GEN_GUP_TEST_FOR_OBJECT_OF_CLASS, MSG_GEN_GUP_FIND_OBJECT_OF_CLASS, MSG_GEN_GUP_QUERY, MSG_GEN_GUP_INTERACTION_COMMAND, MSG_GEN_GUP_FINISH_QUIT</PRE>
+<P>
+<CODE>
+GenClass</CODE>
+<A NAME="IX_Generic upward queries">
+ </A>
+ provides the capability to search up the generic tree beyond the parent. Using the following messages, the UI can continue passing classed events up the generic tree until it reaches an object of the proper class. This behavior is known as a Generic UPward query (GUP).</P>
+<P>
+For example, if you specify <CODE>
+GenInteractionClass</CODE>
+ in your classed event and later send a GUP message to any object in the generic tree, the stored message will be handled at the first available GenInteraction object it encounters. </P>
+<P>
+<CODE>
+MSG_GEN_GUP_CALL_OBJECT_OF_CLASS</CODE>
+ performs a GUP, returning values from the passed message. You must cast the return values into the proper type based on the return values of the passed message. <CODE>
+MSG_GEN_GUP_SEND_TO_OBJECT_OF_CLASS</CODE>
+ performs a GUP but does not allow return values.</P>
+<P>
+<CODE>
+MSG_GEN_GUP_TEST_FOR_OBJECT_OF_CLASS</CODE>
+ performs a GUP whose sole function is to search for the existence of an object of the specified class among the object's parents.</P>
+<P>
+<CODE>
+MSG_GEN_GUP_FIND_OBJECT_OF_CLASS</CODE>
+ performs a GUP searching for any object of the passed class, but it also returns the optr of the object found. Note that it is unwise to later use this optr as the generic tree may have changed.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_GUP_CALL_OBJECT_OF_CLASS">
+ </A>
+MSG_GEN_GUP_CALL_OBJECT_OF_CLASS</H4>
+<PRE CLASS="syntax">void	MSG_GEN_GUP_CALL_OBJECT_OF_CLASS(
+        EventHandle event);</PRE>
+<P>
+This message performs a generic upward query, passing the classed event upward until it reaches an object of the passed class. This message allows return values and should be cast into whatever return values are expected of the passed message. This is most easily done by enclosing the message sent within parentheses.</P>
+<P>
+An object of the expected class should be present or the event will not be delivered to any object. To check for the existence of such a class, use <CODE>
+MSG_GEN_GUP_TEST_FOR_OBJECT_OF_CLASS</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any generic object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+event</EM>
+	The classed event to deliver to an object up the generic tree.</P>
+<P CLASS="refField">
+Return:	The return values of the classed event (cast to the proper type).</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted. Custom gadgets may handle to supplement or supersede default functionality. </P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_GUP_SEND_TO_OBJECT_OF_CLASS">
+ </A>
+MSG_GEN_GUP_SEND_TO_OBJECT_OF_CLASS</H4>
+<PRE CLASS="syntax">void	MSG_GEN_GUP_SEND_TO_OBJECT_OF_CLASS(
+        EventHandle event);</PRE>
+<P>
+This message performs a generic upward query, passing the classed event upward until it reaches an object of the described class. Since this message performs a send, it does not allow return values. An object of the expected class should be present; otherwise, the event will not be delivered to any object. To check for the existence of such a class, use <CODE>
+MSG_GEN_GUP_TEST_FOR_OBJECT_OF_CLASS</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any generic object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+event</EM>
+	The classed event to deliver to an object up the generic tree.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted. Custom gadgets may handle to supplement or supersede default functionality. </P>
+<P CLASS="figTitle">
+Code Display 2-29 Nesting Classed Events</P>
+<PRE>/* The following method can be used by any object in the generic tree below the
+ * primary to set all menus and GenInteractions below the primary window enabled
+ * all at once. */</PRE>
+<PRE>@method MyProcessClass, MSG_ENABLE_ALL_MY_MENUS {
+    EventHandle menuEvent, primaryEvent;</PRE>
+<PRE>/* The first classed event (menuEvent) encapsulates MSG_GEN_SET_ENABLED for any
+ * object of GenInteractionClass (typically menus). The @record keyword
+ * encapsulates the message to be handled by GenInteractionClass. The
+ * VisUpdateMode delays updates via the Application queue to avoid constant visual
+ * updates and &quot;flashing.&quot; */</PRE>
+<PRE>    menuEvent = @record GenInteractionClass::MSG_GEN_SET_ENABLED( 
+					VUM_DELAYED_VIA_APP_QUEUE);</PRE>
+<PRE>/* The second classed event binds MSG_GEN_SEND_TO_CHILDREN to the GenPrimaryClass.
+ * Sending this message to the GenPrimary will send the menuEvent to all
+ * its children. In this case, sending this event to the Primary will send
+ * MSG_GEN_SET_ENABLED to all its GenInteraction children. */</PRE>
+<PRE>    primaryEvent = @record GenPrimaryClass::MSG_GEN_SEND_TO_CHILDREN(menuEvent);</PRE>
+<PRE>/* Finally, to send this message to the GenPrimary from any object below the
+ * GenPrimary, simply send a MSG_GEN_GUP_SEND_TO_OBJECT_OF_CLASS with the
+ * PrimaryEvent above. The GUP message will send the message
+ * MSG_GEN_SEND_TO_CHILDREN up the generic tree until it encounters the GenPrimary,
+ * at which point the Primary will send the MenuEvent MSG_GEN_SEND_TO_CHILDREN to
+ * all its GenInteraction children. */</PRE>
+<PRE>    @send @MyObject::MSG_GEN_GUP_SEND_TO_OBJECT_OF_CLASS(primaryEvent);
+}</PRE>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_GUP_TEST_FOR_OBJECT_OF_CLASS">
+ </A>
+MSG_GEN_GUP_TEST_FOR_OBJECT_OF_CLASS</H4>
+<PRE CLASS="syntax">Boolean	MSG_GEN_GUP_TEST_FOR_OBJECT_OF_CLASS(
+        ClassStruct  *class);</PRE>
+<P>
+This message searches up the generic tree for any object of the specific class. This message is useful for testing the existence of required classes before sending <CODE>
+MSG_GEN_GUP_CALL_OBJECT_OF_CLASS</CODE>
+ and <CODE>
+MSG_GEN_GUP_SEND_TO_OBJECT_OF_CLASS</CODE>
+. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any generic object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+class</EM>
+	<CODE>
+ClassStruct</CODE>
+ to search for among the object's parents.</P>
+<P CLASS="refField">
+Return:	Will return <CODE>
+true </CODE>
+if the class is found, <CODE>
+false</CODE>
+ if not.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted. Custom gadgets may handle to supplement or supersede default functionality.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_GUP_FIND_OBJECT_OF_CLASS">
+ </A>
+MSG_GEN_GUP_FIND_OBJECT_OF_CLASS</H4>
+<PRE CLASS="syntax">optr	MSG_GEN_GUP_FIND_OBJECT_OF_CLASS(
+        ClassStruct  *class);</PRE>
+<P>
+This message performs a function similar to that of <CODE>
+MSG_GEN_GUP_TEST_FOR_OBJECT_OF_CLASS</CODE>
+, but it returns the optr of the class found, if any. This optr can then be used as the recipient of other messages. You should not use an optr returned by this message at a later time, as the object may have been removed.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any generic object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+class</EM>
+	<CODE>
+ClassStruct</CODE>
+ to search for.</P>
+<P CLASS="refField">
+Return:	The optr of the object of the requested class, or a null optr if no such object was found.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted. Custom gadgets may handle to supplement or supersede default functionality.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_GUP_QUERY">
+ </A>
+MSG_GEN_GUP_QUERY</H4>
+<PRE CLASS="syntax">void 	MSG_GEN_GUP_QUERY(
+        GenReturnParams 		*retValue,
+        word 		queryType);</PRE>
+<P>
+This message is used to query up the generic composite tree. </P>
+<P CLASS="refField">
+Source:	Anyone.</P>
+<P CLASS="refField">
+Destination:	Any usable generic object, though only certain objects will answer certain queries.</P>
+<P CLASS="refField">
+Parameters:	<EM>retValue</EM> 	Structure to hold return values.</P>
+<DL>
+<DT>
+<EM>queryType</EM> </DT><DD><CODE>
+GenUpwardQueryType</CODE>
+.</DD>
+</DL>
+<P>
+The <CODE>
+GenUpwardQueryType</CODE>
+ should be one of the following:</P>
+<DL>
+<DT>
+GUQT_DELAYED_OPERATION</DT><DD>
+<A NAME="IX_GenUpwardQueryType">
+ </A>
+<A NAME="IX_GUQT_DELAYED_OPERATION">
+ </A>
+This query type determines if a gadget should be operating in &quot;delayed mode,&quot; i.e., whether it should wait for a MSG_GEN_APPLY before sending notification to its output, or whether it should send notification whenever it changes state.</DD>
+<DT>
+GUQT_FIELD</DT><DD>
+<A NAME="IX_GUQT_&ldots;">
+ </A>
+Returns field object in GRP_<CODE>
+cx</CODE>
+:GRP_<CODE>
+dx</CODE>
+ and window (if realized) handle in GRP_<CODE>
+bp</CODE>
+. This is a reasonably safe thing to do, since the field window will remain open until all applications within the field are shut down. Only field objects or substitutes for them should intercept this message.</DD>
+<DT>
+GUQT_SCREEN</DT><DD>
+Returns screen object in GRP_<CODE>
+cx</CODE>
+:GRP_<CODE>
+dx</CODE>
+ and window (if any) handle in GRP_<CODE>
+bp</CODE>
+. This is a reasonably safe thing to do, since the screen window will remain open until all applications within the field are shut down. Screen object being returned will be default screen for the field.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing returned explicitly. <EM>retValue</EM> struct filled with values which depend on query type.</P>
+<P CLASS="refField">
+Structures:	</P>
+<PRE><A NAME="IX_GenReturnParams"> </A><A NAME="IX_GRP_&ldots;"> </A>typedef struct {
+	word 	GRP_ax;
+	word 	GRP_bp;
+	word 	GRP_cx;
+	word 	GRP_dx;</PRE>
+<PRE>} GenReturnParams;</PRE>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_GUP_INTERACTION_COMMAND">
+ </A>
+MSG_GEN_GUP_INTERACTION_COMMAND</H4>
+<PRE CLASS="syntax">Boolean 	MSG_GEN_GUP_INTERACTION_COMMAND(
+        InteractionCommand 		command);</PRE>
+<P>
+This message travels up the generic tree until it reaches a non-GIT_ORGANIZATIONAL GenInteraction. Once there, it performs the indicated <CODE>
+InteractionCommand</CODE>
+. See <CODE>
+InteractionCommand</CODE>
+ declaration for the different command types and how specific user interfaces interpret the commands. If the GenInteraction is a dialog brought up with <CODE>
+UserDoDialog()</CODE>
+, <CODE>
+InteractionCommand</CODE>
+ will be returned to the caller, after performing the command, via <CODE>
+MSG_GEN_INTERACTION_RELEASE_BLOCKED_THREAD_WITH_RESPONSE</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted. Normally sent by a <CODE>
+MSG_GEN_INTERACTION_ACTIVATE_COMMAND</CODE>
+ handler or by a custom trigger's action message handler to perform some default command after perform some application-specific function.</P>
+<P CLASS="refField">
+Destination:	Any generic object. Will travel up generic tree, stopping at first non organizational interaction.</P>
+<P CLASS="refField">
+Parameters:	<EM>command</EM> 	Standard InteractionCommand.</P>
+<P CLASS="refField">
+Return:	Returns <EM>
+true</EM>
+ if handled.</P>
+<P CLASS="refField">
+Interception:	Not normally intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_GUP_FINISH_QUIT">
+ </A>
+MSG_GEN_GUP_FINISH_QUIT</H4>
+<PRE CLASS="syntax">void 	MSG_GEN_GUP_FINISH_QUIT(
+        Boolean 		abortFlag, 
+        Boolean 		notifyParent); </PRE>
+<P>
+<A NAME="IX_Active list:MSG_GEN_GUP_FINISH_QUIT">
+ </A>
+Message to be used by nodes that implement a GCN active list. This should be used if <CODE>
+MSG_META_QUIT</CODE>
+ is handled and sent to the active list items by that node. When a node has finished sending a <CODE>
+MSG_META_QUIT</CODE>
+ to the active list or if the quit is aborted, this allows the notification of the above node in the generic tree.</P>
+<P CLASS="refField">
+Source:	Sent by active list nodes that implement quit mechanism.</P>
+<P CLASS="refField">
+Destination:	Any generic object involved in quit mechanism.</P>
+<P CLASS="refField">
+Parameters:	<EM>abortFlag</EM> 	Pass true to abort. This will be passed on to <CODE>
+MSG_META_FINISH_QUIT</CODE>
+.</P>
+<DL>
+<DT>
+<EM>notifyParent</EM> </DT><DD>Pass true to notify parent of finished quit sequence.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	Generally not intercepted. Default handler sends <CODE>
+MSG_META_FINISH_QUIT</CODE>
+ to self, then sends to generic parent if flag indicates such. <CODE>
+MSG_META_FINISH_QUIT</CODE>
+ is normally the message to intercept to know when a quit is aborted or finished.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GenClass_17.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GenClass_18.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">7.1 Parent and Child Message Passing</A> 
+<!-- to next --> | <A HREF="GenClass_1a.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">7.3 Object-Specific Queries</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

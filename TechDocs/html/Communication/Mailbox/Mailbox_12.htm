@@ -1,0 +1,137 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Mailbox_12.htm,v 1.1 97/06/02 14:09:47 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Sending a Message</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The Mailbox Library</A>: 6.2 <A HREF="Mailbox_10.htm">Application Responsibilities</A>: 
+Sending a Message</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Mailbox_10.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Mailbox_11.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">6.1 Providing a User-Interface</A> 
+<!-- to next --> | <A HREF="Mailbox_13.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">6.3 Receiving and Processing Messages</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+A user will generally send a message by using the application's MailboxSendControl object. This object lets the user send the selected material in the application. It lets the user select such things as the message's destination, transmission time, subject line, etc.</P>
+<P>
+Once the user has selected the message, the MailboxSendControl sends the message MSG_META_MAILBOX_CREATE_MESSAGE to its output object (generally the application object). This message instructs the object to create an appropriate message. </P>
+<P>
+When the application has been notified that it should create a message, it should then determine what data type the message will need. It does this by sending MSG_MAILBOX_SEND_CONTROL_CHOOSE_FORMAT to its MailboxSendControl. It can find out other information about the message to be sent by sending other messages to the MailboxSendControl.</P>
+<P>
+The MailboxSendControl informs the application what data type it should use. The application must determine what data to send (generally the current selection); it then assembles this data into the format requested by the send control object. Finally, it registers the message by sending MSG_MAILBOX_SEND_CONTROL_REGISTER_MESSAGE to its MailboxSendControl. This message instructs the MailboxSendControl to register the message with the Mailbox library.</P>
+
+<H4 CLASS="RefETitle">
+MSG_META_MAILBOX_CREATE_MESSAGE()</H4>
+<PRE CLASS="syntax">MetaMailboxMessage void MSG_META_MAILBOX_CREATE_MESSAGE(
+        optr		sendControl,
+        word		transHandle);</PRE>
+<P>
+This message informs the output of a MailboxSendControl that it should create the body of the message. It is the obligation of that object to notify the controller that it has accomplished this task with MSG_MAILBOX_SEND_CONTROL_REGISTER_MESSAGE.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_MAILBOX_SEND_CONTROL_REGISTER_MESSAGE</H4>
+<PRE CLASS="syntax">MailboxMessage 	MSG_MAILBOX_SEND_CONTROL_REGISTER_MESSAGE(
+        word		TransID,
+        MailboxStorage		bodyStorage,
+        MailboxDataFormat		bodyFormat,
+        const void *		bodyRef,
+        unsigned word		bodyRefLen,
+        MailboxMessageFlags		flags,
+        const char *		subject,
+        const GeodeToken *		destApp)</PRE>
+<P>
+When an application wishes to send a message, it does this by <EM>
+registering</EM>
+ a message with the Mailbox library. The Mailbox library then loads the appropriate data and transport drivers to actually deliver the message. The application registers a message by sending MSG_MAILBOX_SEND_CONTROL_REGISTER_MESSAGE to its MailboxSendControl object.</P>
+<P CLASS="refField">
+Source:	The recipient of MSG_META_MAILBOX_CREATE_MESSAGE. Generally sent by the Application object.</P>
+<P CLASS="refField">
+Destination:	The application's MailboxSendControl.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+TransID</CODE>
+	This is the token the MailboxSendControl passed with its <CODE>
+MSG_META_MAILBOX_CREATE_MESSAGE</CODE>
+.<CODE>
+</CODE>
+</P>
+<DL>
+<DT>
+<CODE>
+bodyStorage</CODE>
+</DT><DD>The 32-bit token (of type <CODE>
+MailboxStorage</CODE>
+) identifying the data driver which should be used. (The message will be passed in a format appropriate to that data driver.)</DD>
+<DT>
+<CODE>
+bodyFormat</DT><DD></CODE>
+The 32-bit token (of type <CODE>
+MailboxDataFormat</CODE>
+) identifying the kind of data in the message body. Each format token implies a particular storage type. </DD>
+<DT>
+<CODE>
+bodyRef</CODE>
+</DT><DD>A pointer to the beginning of a data block. This block instructs the data driver where the message body is. (Each data driver may have its own conventions for interpreting the data in this block.)</DD>
+<DT>
+<CODE>
+bodyRefLen</CODE>
+</DT><DD>The number of bytes at <CODE>
+*bodyRef</CODE>
+.</DD>
+<DT>
+<CODE>
+flags</CODE>
+</DT><DD>A word of <CODE>
+MailboxMessageFlags</CODE>
+.</DD>
+<DT>
+<CODE>
+subject</CODE>
+</DT><DD>A pointer to a null-terminated string containing the subject or summary line describing the message. (The string may contain newline characters.)</DD>
+<DT>
+<CODE>
+destApp</CODE>
+</DT><DD>the <CODE>
+GeodeToken</CODE>
+ of the application which will receive the message (on whichever machine receives the message). If this is a generic token, the recipient machine's Mailbox library will automatically convert it to the token of whichever application will actually receive the message.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	If you define a subclass of the MailboxSendControl, you may wish to intercept this message to add functionality.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_META_MAILBOX_MESSAGE_REGISTERED</H4>
+<PRE CLASS="syntax">MetaMailboxMessage void MSG_META_MAILBOX_MESSAGE_REGISTERED(
+        MemHamdle		args);</PRE>
+<P>
+This message is sent by the MailboxSendControl once it has attempted (via <CODE>
+MailboxRegisterMessage()</CODE>
+) to register the message. The controller may call <CODE>
+MailboxDoneWithVMFile()</CODE>
+(or any other cleanup procedures) in response to this message. &lt;</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Mailbox_10.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Mailbox_11.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">6.1 Providing a User-Interface</A> 
+<!-- to next --> | <A HREF="Mailbox_13.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">6.3 Receiving and Processing Messages</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

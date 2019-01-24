@@ -1,0 +1,190 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: FileSelectors_e.htm,v 1.1 97/06/02 14:48:21 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Matching a File's File Attributes</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The FileSelector Object</A>: 3.7 <A HREF="FileSelectors_7.htm">File Selector Instance Data</A>: 
+Matching a File's File Attributes</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="FileSelectors_7.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="FileSelectors_d.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.6 Masking File Names</A> 
+<!-- to next --> | <A HREF="FileSelectors_f.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.8 Searching Via Callback Routine</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>ATTR_GEN_FILE_SELECTOR_FILE_ATTR, MSG_GEN_FILE_SELECTOR_GET_FILE_ATTRS, MSG_GEN_FILE_SELECTOR_SET_FILE_ATTRS</PRE>
+<P>
+<A NAME="IX_FileAttrs">
+ </A>
+All files have a number of attributes stored in a record of type <CODE>
+FileAttrs</CODE>
+. (For full information on <CODE>
+FileAttrs</CODE>
+, see <A HREF="../../Files/FileSys/index.htm">the File System chapter</A>.) To filter files based on the <CODE>FileAttrs</CODE>
+ record, set your File Selector's variable data instance field <CODE>
+ATTR_GEN_FILE_SELECTOR_FILE_ATTR</CODE>
+ to reflect the attributes that must be on and those that must be off.</P>
+<P>
+<CODE>
+ATTR_GEN_FILE_SELECTOR_FILE_ATTR</CODE>
+<A NAME="IX_ATTR_GEN_FILE_SELECTOR_FILE_ATTR">
+ </A>
+ is a structure of type <CODE>
+GenFileSelectorFileAttrs</CODE>
+<A NAME="IX_GenFileSelectorFileAttrs">
+ </A>
+, shown below. This structure contains two fields: <CODE>
+GFSFA_match</CODE>
+ represents the attributes an acceptable file has on, and <CODE>
+GFSFA_mismatch</CODE>
+ represents the attributes an acceptable file has off.</P>
+<PRE>typedef struct {
+<A NAME="IX_GFSFA_&ldots;"> </A>    FileAttrs    GFSFA_match;
+    FileAttrs    GFSFA_mismatch;
+} GenFileSelectorFileAttrs;</PRE>
+<P>
+<A NAME="IX_FA_&ldots;">
+ </A>
+<DL>
+The allowable file attributes are listed below and are discussed fully in <A HREF="../../Files/FileSys/index.htm">the File System chapter</A>. If you don't explicitly set the file attribute limitations, the File Selector will automatically filter out all files with either FA_SYSTEM or FA_HIDDEN.</P><DT>
+FA_ARCHIVE</DT><DD>This flag indicates that the file requires a backup.</DD>
+<DT>
+FA_SYSTEM</DT><DD>This flag indicates that the file used by DOS.</DD>
+<DT>
+FA_HIDDEN</DT><DD>This flag indicates that the file not seen by normal searches. </DD>
+<DT>
+FA_RDONLY</DT><DD>This flag indicates that the file is read-only.</DD>
+</DL>
+<P>
+Note: For directories not to be filtered out when FSFC_DIRS isn't set, you must mismatch FA_SYSTEM and FA_HIDDEN. That is, to show only those subdirectories which match your filter criteria, ensure FSFC_DIRS is not set, and set mismatch attributes thus:</P>
+<PRE>ATTR_GEN_FILE_SELECTOR_FILE_ATTR = {
+				0,
+				FA_HIDDEN | FA_SYSTEM
+}</PRE>
+<P>
+You may retrieve the current file attributes by sending the message <CODE>
+MSG_GEN_FILE_SELECTOR_GET_FILE_ATTRS</CODE>
+ to the File Selector object. You may set new file attribute limitations by sending it the message <CODE>
+MSG_GEN_FILE_SELECTOR_SET_FILE_ATTRS</CODE>
+.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_FILE_SELECTOR_SET_FILE_ATTRS">
+ </A>
+MSG_GEN_FILE_SELECTOR_SET_FILE_ATTRS</H4>
+<PRE CLASS="syntax">void	MSG_GEN_FILE_SELECTOR_SET_FILE_ATTRS(
+        FileAttrs setAttrs,
+        FileAttrs clearAttrs);</PRE>
+<P>
+This message sets the <CODE>
+ATTR_GEN_FILE_SELECTOR_FILE_ATTR</CODE>
+ vardata instance field of the File Selector. If the File Selector is visible on the screen when it receives this message, it will rescan the directory immediately with the new attributes.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenFileSelector object</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+setAttrs</CODE>
+	A <CODE>
+FileAttrs</CODE>
+ record to be set into <CODE>
+GFSFA_match</CODE>
+. Only files with these flags set will pass the filter.</P>
+<DL>
+<DT>
+<CODE>
+clearAttrs</CODE>
+</DT><DD>A <CODE>
+FileAttrs</CODE>
+ record to be set into <CODE>
+GFSFA_mismatch</CODE>
+. Only files with these flags cleared will pass the filter.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+<P CLASS="refField">
+See Also:	<CODE>
+MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA</CODE>
+</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_FILE_SELECTOR_GET_FILE_ATTRS">
+ </A>
+MSG_GEN_FILE_SELECTOR_GET_FILE_ATTRS</H4>
+<PRE CLASS="syntax">word	MSG_GEN_FILE_SELECTOR_GET_FILE_ATTRS();</PRE>
+<P>
+This message returns the ATTR_GEN_FILE_SELECTOR_FILE_ATTR of the File Selector. This attribute contains two byte-sized fields which represent the match and mismatch attributes (see above).</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenFileSelector object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	A word value: The high byte represents the mismatch attributes, and the low byte represents the match attributes. To extract these two fields from the returned value, use the macros GET_MATCH_FILE_ATTRS and GET_MISMATCH_FILE_ATTRS (below).</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+<P CLASS="refField">
+See Also:	<CODE>
+MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA</CODE>
+</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_GET_MATCH_FILE_ATTRS() macro">
+ </A>
+GET_MATCH_FILE_ATTRS</H4>
+<PRE CLASS="syntax">byte	GET_MATCH_FILE_ATTRS(<EM>attr</EM>);
+        word	<EM>attr</EM>;</PRE>
+<P>
+This macro extracts the <CODE>
+GFSFA_match</CODE>
+ portion of the word value returned by <CODE>
+MSG_GEN_FILE_SELECTOR_GET_FILE_ATTRS</CODE>
+. The extracted value is a record of <CODE>
+FileAttrs</CODE>
+.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_GET_MISMATCH_FILE_ATTRS() macro">
+ </A>
+GET_MISMATCH_FILE_ATTRS</H4>
+<PRE CLASS="syntax">byte	GET_MISMATCH_FILE_ATTRS(<EM>attr</EM>);
+        word	<EM>attr</EM>;</PRE>
+<P>
+This macro extracts the <CODE>
+GFSFA_mismatch</CODE>
+ portion of the word value returned by <CODE>
+MSG_GEN_FILE_SELECTOR_GET_FILE_ATTRS</CODE>
+. The extracted value is a record of <CODE>
+FileAttrs</CODE>
+.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="FileSelectors_7.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="FileSelectors_d.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.6 Masking File Names</A> 
+<!-- to next --> | <A HREF="FileSelectors_f.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.8 Searching Via Callback Routine</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

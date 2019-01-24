@@ -1,0 +1,94 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: MultiThread_b.htm,v 1.1 97/06/02 15:32:31 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> How GEOS Threads Are Created</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Threads and Semaphores</A>: 4.1 <A HREF="MultiThread_a.htm">Using Multiple Threads</A>: 
+How GEOS Threads Are Created</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="MultiThread_a.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="MultiThread_a.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">4 Using Multiple Threads</A> 
+<!-- to next --> | <A HREF="MultiThread_c.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.2 Managing Priority Values</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+GEOS threads can be created in three different ways. The first thread (or pair of threads, in the dual-thread architecture) for each application is created automatically when the application is launched. By calling the appropriate routines, the application can create additional threads to handle messages sent to certain objects or to run procedural code.</P>
+
+<H2 CLASS="HeadingCApp">
+The Application's Primary Thread</H2>
+<P>
+The application's primary thread is created automatically by GEOS when the application is launched. (See <A HREF="../../Kernel/Geodes/index.htm">the Applications and Geodes chapter</A>for information on launching applications.) For example, if a user double-clicks on your application's icon in a GeoManager window, GeoManager calls the library routine <CODE>
+UserLoadApplication()</CODE>
+, specifying the geode file and certain other parameters. This calls the<CODE>
+ GeodeLoad() </CODE>
+routine in the GEOS kernel.</P>
+<P>
+If the program is written using the single-thread model, GEOS creates an event-driven thread to handle messages sent to any object in the program. If the program is written using the dual-thread model, GEOS creates one event-driven thread to handle messages sent to the program's user interface objects and another to handle messages sent to other objects in the program.</P>
+<P>
+If the program requires more than two threads, the extra thread(s) must be allocated manually on startup and destroyed before the application exits completely.</P>
+
+
+<H2 CLASS="HeadingCApp">
+Event-Driven Threads</H2>
+<PRE>ThreadAttachToQueue()</PRE>
+<P>
+<A NAME="IX_Event queues">
+ </A>
+To create an event-driven thread (one that handles messages sent to certain objects), send a <CODE>
+MSG_PROCESS_CREATE_EVENT_THREAD</CODE>
+ to your application's primary thread, passing as arguments the object class for the new thread (a sublass of<CODE>
+ ProcessClass</CODE>
+) and the stack size for the new thread (1 K bytes is usually a good value, or around 3 K bytes for threads that will handle keyboard navigation or manage a text object). This message is detailed in <A HREF="../../SysObjects/Process/index.htm">the Process Object chapter</A>.</P><P>
+GEOS will create the new thread, give it an event queue, and send it a <CODE>
+MSG_META_ATTACH</CODE>
+. Initially, the thread will handle only messages sent to the thread itself. If the thread creates any new objects, however, it will handle messages sent to those objects as well. To control the behavior of the new thread, define a subclass of <CODE>
+ProcessClass</CODE>
+ and a new handler for <CODE>
+MSG_META_ATTACH</CODE>
+. The new handler can create objects or perform whatever task is needed.<CODE>
+ </CODE>
+Be sure to start your new handler with <CODE>
+@callsuper()</CODE>
+ so that the predefined initializations are done as well.</P>
+<P>
+<A NAME="IX_ThreadAttachToQueue()">
+ </A>
+If you have a thread that you want attached to a different event queue, you can use <CODE>
+ThreadAttachToQueue()</CODE>
+. This routine is not widely used except when applications are shutting down and objects need to continue handling messages while not returning anything. It's unlikely you will ever use this routine.</P>
+
+
+<H2 CLASS="HeadingCApp">
+Threads That Run Procedural Code</H2>
+<PRE>ThreadCreate()</PRE>
+<P>
+To create a thread to run procedural code, first load the initial function into fixed memory. <A NAME="IX_ThreadCreate()">
+ </A>
+Then call the system routine <CODE>
+ThreadCreate()</CODE>
+, passing the following arguments: The base priority for the new thread, an optional sixteen-bit argument to pass to the new thread, the entry point for the code, the amount of stack space GEOS should allocate for the new thread, and the owner of the new thread.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="MultiThread_a.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="MultiThread_a.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">4 Using Multiple Threads</A> 
+<!-- to next --> | <A HREF="MultiThread_c.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.2 Managing Priority Values</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

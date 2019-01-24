@@ -1,0 +1,228 @@
+#!/usr/public/perl
+
+# makeIndex
+# 
+# $Id: makeMSGList,v 1.2 97/08/05 16:22:52 lawrence Exp $
+#
+# Usage:
+#  makeMSGList IXInfo
+#
+# This script takes a file full of index information (as generated 
+# by the extractIXInfo script) and creates a bunch of pages from it.
+# Run makeMSGList in the top of the techdoc HTML tree--after you've 
+# generated the IXInfo there.
+
+%prefixMap = (
+
+  'MSG_SOCKET_ADDRESS_CONTROL_' , 'SocketAddressControlClass',
+  'MSG_GEN_DOCUMENT_CONTROL_' , 'GenDocumentControlClass',
+  'MSG_GEN_DOCUMENT_GROUP_' , 'GenDocumentGroupClass',
+  'MSG_PREF_BOOLEAN_GROUP_' , 'PrefBooleanGroupClass',
+  'MSG_GEN_BOOLEAN_GROUP_' , 'GenBooleanGroupClass',
+  'MSG_GEN_DISPLAY_GROUP_' , 'GenDisplayGroupClass',
+  'MSG_GEN_FILE_SELECTOR_' , 'GenFileSelectorClass',
+  'MSG_PREF_DYNAMIC_LIST_' , 'PrefDynamicListClass',
+  'MSG_GEN_VIEW_CONTROL_' , 'GenViewControlClass',
+  'MSG_GEN_DYNAMIC_LIST_' , 'GenDynamicListClass',
+  'MSG_PREF_STRING_ITEM_' , 'PrefStringItemClass', 
+  'MSG_GEN_APPLICATION_' , 'GenApplicationClass',
+  'MSG_GEN_INTERACTION_' , 'GenInteractionClass',
+  'MSG_PREF_ITEM_GROUP_' , 'PrefItemGroupClass',
+  'MSG_COLOR_SELECTOR_' , 'ColorSelectorClass',
+  'MSG_EXPORT_CONTROL_' , 'ExportControlClass',
+  'MSG_IMPORT_CONTROL_' , 'ImportControlClass',
+  'MSG_GEN_ITEM_GROUP_' , 'GenItemGroupClass',
+  'MSG_GEN_TOOL_GROUP_' , 'GenToolGroupClass',
+  'MSG_PREF_TOC_LIST_' , 'PrefTocListClass',
+  'MSG_PRINT_CONTROL_' , 'PrintControlClass',
+  'MSG_CONTACT_LIST_' , 'ContactListClass',
+  'MSG_GEN_DOCUMENT_' , 'GenDocumentClass',
+  'MSG_HELP_CONTROL_' , 'HelpControlClass',
+  'MSG_GEN_TRIGGER_' , 'GenTriggerClass',
+  'MSG_GEN_BOOLEAN_' , 'GenBooleanClass',
+  'MSG_GEN_CONTENT_' , 'GenContentClass',
+  'MSG_GEN_CONTROL_' , 'GenControlClass',
+  'MSG_GEN_DISPLAY_' , 'GenDisplayClass',
+  'MSG_GEN_PRIMARY_' , 'GenPrimaryClass', 
+  'MSG_GEN_PROCESS_' , 'GenProcessClass',
+  'MSG_PREF_DIALOG_' , 'PrefDialogClass',
+  'MSG_VIS_CONTENT_' , 'VisContentClass',
+  'MSG_FLOAT_CTRL_' , 'FloatFormatClass',
+  'MSG_PREF_VALUE_' , 'PrefValueClass',
+  'MSG_VIS_RULER_' , 'VisRulerClass', 
+  'MSG_GEN_VALUE_' , 'GenValueClass',
+  'MSG_CALENDAR_' , 'CalendarClass',
+  'MSG_GEN_ITEM_' , 'GenItemClass', 
+  'MSG_GEN_TEXT_' , 'GenTextClass',
+  'MSG_GEN_VIEW_' , 'GenViewClass',
+  'MSG_VIS_COMP_' , 'VisCompClass',
+  'MSG_VIS_TEXT_' , 'VisTextClass',
+  'MSG_PRINTER_' , 'MetaClass',
+  'MSG_PROCESS_' , 'ProcessClass', 
+  'MSG_REPLACE_' , 'MetaClass',
+  'MSG_NOTIFY_' , 'MetaClass',
+  'MSG_SEARCH' , 'MetaClass',
+  'MSG_PRINT_' , 'MetaClass',
+  'MSG_SPELL_' , 'MetaClass', 
+  'MSG_META_' , 'MetaClass',
+  'MSG_PREF_' , 'PrefClass',
+  'MSG_SPEC_' , 'VisClass',
+  'MSG_FSA_' , 'FoamSubApplicationClass',
+  'MSG_GDC_' , 'GenDisplayControlClass',
+  'MSG_GEN_' , 'GenClass',
+  'MSG_INK_' , 'InkClass',
+  'MSG_PZC_' , 'PageSizeControlClass',
+  'MSG_VIS_' , 'VisClass',
+
+);
+
+  # In the prefix list, make sure that longer prefixes appear before 
+  # their shorter siblings.  That is, if we check for "MSG_GEN_..." 
+  # before we check for "MSG_GEN_TRIGGER_...", then we're going to 
+  # incorrectly assign all GenTriggerClass messages to GenClass.
+@unsortedPrefixes = keys %prefixMap;
+@prefixes = sort byLength @unsortedPrefixes;
+
+@unsortedClasses = values %prefixMap;
+@classesWithDupes = sort @unsortedClasses;
+$classNum = 0;  $lastClass = "";
+foreach $class (@classesWithDupes) {
+  unless ($class eq $lastClass) {
+    $classes[$classNum++] = $class;
+    $lastClass = $class;
+  }  
+}
+
+
+LINE: while(<>) {
+  next LINE unless (/^MSG_/) ;
+  $foundIt = 0;
+
+  PREFIX: foreach $prefix (@prefixes) {
+    if ( $prefix eq (substr($_, 0, length($prefix))) ) {
+      $foundIt = 1;
+      $entries{$prefixMap{$prefix}} = $entries{$prefixMap{$prefix}} . $_ ;
+      last PREFIX ;
+    }
+  }
+  unless ($foundIt) { print STDERR "Couldn't assign MSG_ to class: $_"; }
+}
+
+# Generate each page
+
+$bullet = "<IMG SRC=\"../../docImages/ix.gif\" BORDER=\"0\" ALT=\"x\">" ;
+
+$pageTop1 =<<"EOPT1";
+<HTML>
+<HEAD>
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<META NAME="description" CONTENT="GEOS SDK TechDocs: List of Messages"> 
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback\@geoworks.com">
+EOPT1
+
+$pageTop2 =<<"EOPT2";
+</HEAD>
+<BODY BGCOLOR="#dfdfff">
+EOPT2
+
+$pageBottom =<<"EOPB";
+<HR>
+<strong>
+<A HREF="../../index.htm">GEOS SDK</A>
+<A HREF="index.htm">List of Messages, Organized by Class</A>
+</strong>
+</BODY>
+</HTML>
+EOPB
+
+foreach $class (@classes) {
+#  print"---\n$class\n";
+#  print $entries{$class} ;
+
+   $fileName = "docIndexes/msgList/$class.htm";
+   open( INDEXFILE, ">$fileName" );
+   print( INDEXFILE $pageTop1 );
+   print( INDEXFILE "<TITLE>GEOS SDK Message List: $class</TITLE>\n" );
+   print( INDEXFILE $pageTop2 );
+   print( INDEXFILE "<H1><A HREF=\"../../index.htm\">GEOS SDK</A>: <A HREF=\"index.htm\">List of Messages</A> for $class</H1>\n" );
+
+   @fodder = split(/\n/, $entries{$class});
+   foreach $entry (@fodder) {
+     $_ = $entry;
+     ( $theKey, $theURL ) = /(.*)\t(.*)/ ;
+     $theText = $theURL;
+     $theText =~ s/.*IX_// ;
+     $theText =~ s/&ldots;/\.\.\./g ;
+     $theText =~ s/\[;.*\]// ;
+     $theText =~ s/([^\\]):\s*/\1<BR>&nbsp;&nbsp;&nbsp;&nbsp;/ ;
+     $theText =~ s/\\:/:/g;
+     $theText =~ s/&qmark;/\?/g; 
+
+     $theTextRoot = $theText;
+     $theTextRoot =~ s/<BR>.*// ;
+
+     if ( $theText eq $lastText ) {
+       $outText = "<A HREF=\"../../" . $theURL . "\"> " . $bullet . "</A>" ;
+     }
+     elsif ( $theTextRoot eq $lastTextRoot ) {
+       $outText = $theText;
+       $outText =~ s/.*<BR>&nbsp;&nbsp;&nbsp;&nbsp;// ;
+       $outText = "<A HREF=\"../../" . $theURL . "\">" . $outText . " " . $bullet . "</A>\n" ;
+       print( INDEXFILE "<BR>\n&nbsp;&nbsp;&nbsp;&nbsp;");
+     } 
+     else {
+       $outText = "<BR>\n<A HREF=\"../../" . $theURL . "\"> " . $theText . " " . $bullet . "</A>" ;      
+     }
+   $lastTextRoot = $theTextRoot;
+   $lastText = $theText;
+   
+   print(INDEXFILE $outText);
+   }
+
+   print( INDEXFILE $pageBottom );
+   close( INDEXFILE );   
+}
+
+# Finally, we create the index.htm page that points to the class pages
+
+@alphaClasses = sort( @classes );
+
+$ixTop =<<"EOIT";
+<HTML>
+<HEAD>
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<META NAME="description" CONTENT="GEOS SDK TechDocs: List of Messages"> 
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback\@geoworks.com">
+<TITLE>GEOS SDK Message List</TITLE>
+</HEAD>
+<BODY BGCOLOR="#dfdfff">
+<H1><A HREF="../../index.htm">GEOS SDK</A>: List of Messages</A></H1>
+<P>Choose the name of a class below to visit a page with links to messages of that class</P>
+<UL>
+EOIT
+
+$ixBottom = <<"EOIB";
+</UL>
+<HR>
+<strong>
+<A HREF="../../index.htm">GEOS SDK</A> List of Messages, Organized by Class
+</strong>
+</BODY>
+</HTML>
+EOIB
+
+open( INDEXFILE, ">docIndexes/msgList/index.htm" );
+print( INDEXFILE $ixTop ) ;
+
+foreach $class (@alphaClasses) {
+  print(INDEXFILE "<LI><A HREF=\"$class.htm\">$class</A></LI>\n" );
+}
+
+print( INDEXFILE $ixBottom );
+close( INDEXFILE );
+
+sub byLength {
+  length($b) <=> length($a) ;
+}

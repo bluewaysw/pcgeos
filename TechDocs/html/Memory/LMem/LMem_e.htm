@@ -1,0 +1,229 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: LMem_e.htm,v 1.1 97/06/02 15:53:14 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Name Arrays</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Local Memory</A>: 4.3 <A HREF="LMem_b.htm">Special LMem Uses</A>: 
+Name Arrays</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="LMem_b.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="LMem_d.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.2 Element Arrays</A> 
+<!-- to next --> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+<A NAME="IX_Name arrays">
+ </A>
+Applications can build on chunk arrays and element arrays in many ways. The chunk array library includes one example of an elaboration on these structures: the <EM>
+name array</EM>
+. The name array is a special kind of element array in which elements can be accessed by a &quot;name&quot; label as well as by a token. Elements in a name array are of variable size. Each element is divided into three sections: The first is the <CODE>
+RefElementHeader</CODE>
+; every element in an element array must begin with one of these (and the name array is a kind of element array). The second is the data section. The data section is the same size for every element in a given name array; this size may be anything from zero bytes up to a maximum of<EM>
+ </EM>
+NAME_ARRAY_MAX_DATA_SIZE<EM>
+ </EM>
+(64 bytes). The data section is followed by a &quot;name&quot; section. This section contains a sequence of bytes of any length up to a maximum of NAME_ARRAY_MAX_NAME_SIZE (256 bytes). The name may contain nulls and need not be null terminated. You can translate a name into the element's token by calling <CODE>
+NameArrayFind()</CODE>
+ (described below).</P>
+<P>
+Note that creating elements in a name array, as in any element array, requires a search through all elements; it thus takes linear time. Furthermore, translating a name into a token also requires a linear search through the elements, and thus also takes linear time. Name arrays thus become slow if they grow too large. Accessing an element by token, however, still takes constant time.</P>
+
+<H2 CLASS="HeadingC">
+Creating a Name Array</H2>
+<PRE>NameArrayCreate(), NameArrayCreateAt(), NameArrayCreateAtHandles(), NameArrayAdd(), NameArrayAddHandles(), NameArrayHeader, NameArrayAddFlags</PRE>
+<P>
+<A NAME="IX_NameArrayHeader">
+ </A>
+Creating a name array is much like creating an element array. Every name array must begin with a <CODE>
+NameArrayHeader</CODE>
+. This structure has the following definition:</P>
+<PRE>typedef struct {
+	ElementArrayHeader				NAH_meta;
+	word				NAH_dataSize;</PRE>
+<PRE>} NameArrayHeader;</PRE>
+<P>
+This structure contains one new field, namely NAH<CODE>
+_datasize</CODE>
+. This field specifies the size of the data area of each element; the name area is of variable size. You may examine this field at will, but you may not change it. You may set up a fixed data area between the <CODE>
+NameArrayHeader</CODE>
+ and the elements. The usual way to do this is to define a structure whose first element is a <CODE>
+NameArrayHeader</CODE>
+ structure.</P>
+<P>
+<A NAME="IX_NameArrayCreate()">
+ </A>
+To create a name array, call the routine <CODE>
+NameArrayCreate()</CODE>
+. This routine is passed three arguments:</P>
+<UL>
+<LI>
+The global handle of an LMem heap. The name array will be created in this block.</LI>
+<LI>
+The size of the data area in each element. The total size of the element will vary, depending on the size of the name. Remember, there is a three byte <CODE>
+RefElementHeader</CODE>
+ at the start of every element (before the data section).</LI>
+<LI>
+The size of the header structure for the name array. If you will not need a fixed data area, you can pass a size of zero, and enough space will automatically be left for a <CODE>
+NameArrayHeader</CODE>
+.</LI>
+</UL>
+<P>
+The routine allocates a chunk in the specified heap, initializes a name array in that chunk, and returns the chunk's handle. If it fails for any reason, it returns a null chunk handle. Since the routine allocates a chunk, all pointers to the LMem heap are invalidated.</P>
+<P>
+<A NAME="IX_NameArrayCreateAt()">
+ </A>
+If you want to create a name array in a specific chunk, call <CODE>
+NameArrayCreateAt()</CODE>
+. This routine is almost the same as <CODE>
+NameArrayCreate()</CODE>
+. However, instead of being passed a memory handle, <CODE>
+NameArrayCreateAt()</CODE>
+ is passed an optr to a chunk. The name array will be created in that chunk. Any data in that chunk (outside of the fixed data area) will be destroyed. Note that if the chunk is too small for the name array, <CODE>
+NameArrayCreateAt()</CODE>
+ will resize it; thus, pointers to the LMem heap may be invalidated. <A NAME="IX_NameArrayCreateAtHandles()">
+ </A>
+There is a version of this routine which takes the chunk's global and chunk handles instead of its optr; this routine is called <CODE>
+NameArrayCreateAtHandles()</CODE>
+.</P>
+<P>
+<A NAME="IX_NameArrayAdd()">
+ </A>
+To create an element, call <CODE>
+NameArrayAdd()</CODE>
+. This routine creates an element and copies the data and name into it. The routine takes five arguments:</P>
+<UL>
+<LI>
+The optr to the name array.</LI>
+<LI>
+A pointer to an array of characters containing the element's name.</LI>
+<LI>
+The length of the name, in bytes. This many characters will be copied into the name. If you pass a length of zero, bytes will be copied until a null byte is reached (the null will not be copied).</LI>
+<LI>
+A word-length set of <CODE>
+NameArrayAddFlags</CODE>
+. Only one flag is currently defined, namely NAAF_SET_DATA_ON_REPLACE. This flag is described below.</LI>
+<LI>
+A pointer to the data section. The data will be copied into the new element. (The length of the data portion was specified when the name array was created.)</LI>
+</UL>
+<P>
+<CODE>
+NameArrayAdd()</CODE>
+ allocates the element, copies in the data and name, and returns the element's token. If an element with the specified name already exists, <CODE>
+NameArrayAdd()</CODE>
+ will not create a duplicate. Instead, if the flag NAAF_SET_DATA_ON_REPLACE was passed, <CODE>
+NameArrayAdd()</CODE>
+ will copy the new data section into the existing element; if the flag was not passed, it will leave the existing element unchanged. In either case, it will return the existing element's token and increment its reference count. If an element is added, the name array may have to be resized; therefore, pointers into the chunk array will be invalidated. <A NAME="IX_NameArrayAddHandles()">
+ </A>
+There is a version in which the name array is specified by its global and chunk handles; this version is called <CODE>
+NameArrayAddHandles()</CODE>
+.</P>
+<P CLASS="figTitle">
+Code Display 16-4 Allocating a Name Array</P>
+<PRE>/* We want a fixed data space, so we define our own header structure. */
+typedef	struct {
+	NameArrayHeader		MNAH_meta;		/* Must begin with a NameArrayHeader!!! */
+	char *		MNAH_comments[32];
+} MyNameArrayHeader;</PRE>
+<PRE>/* The data section of the name array will be this structure: */
+typedef struct {
+	double		MDSS_myDataFloat;
+	int		MDSS_myDataInts[20];
+} MyDataSectionStruct;</PRE>
+<PRE>/* Every element in the name array will have this structure: */
+typedef struct {
+	RefElementHeader			MES_header;		/* For internal use */
+	MyDataSectionStruct			MES_data;
+	char			MES_name[]; 		/* We don't know how long this
+						 * will actually be */
+} MyElementStruct;</PRE>
+<PRE>MemHandle		myLMemHeap;		/* Assume this is initialized */
+ChunkHandle		myNameArray;</PRE>
+<PRE>/* Sample call to NameArrayCreate() */
+myNameArray = NameArrayCreate(myLMemHeap, sizeof(MyDataSectionStruct),
+				sizeof(MyNameArrayHeader));</PRE>
+
+
+<H2 CLASS="HeadingC">
+Accessing Elements in a Name Array</H2>
+<PRE>NameArrayFind(), NameArrayFindHandles(), NameArrayChangeName(), NameArrayChangeNameHandles()</PRE>
+<P>
+Name array routines can be accessed with all the routines used for accessing element arrays. However, a few special purpose routines are also provided.</P>
+<P>
+<A NAME="IX_NameArrayFind()">
+ </A>
+If you know the name of an element and want a copy of its data, call <CODE>
+NameArrayFind()</CODE>
+. This routine is passed four arguments:</P>
+<UL>
+<LI>
+The optr to the name array.</LI>
+<LI>
+A pointer to a character buffer. The buffer should contain the name of the element sought.</LI>
+<LI>
+The length of the name. If a length of zero is passed, the name is considered to be null terminated (the trailing null is <EM>
+not</EM>
+ part of the name).</LI>
+<LI>
+A pointer to a return buffer. The data portion of the element will be copied to this location.</LI>
+</UL>
+<P>
+<CODE>
+NameArrayFind()</CODE>
+ will do a linear search through the elements. If it finds one with the name specified, it will return that element's token and copy the data portion into the return buffer. If there is no element with the specified name, <CODE>
+NameArrayFind()</CODE>
+ will return the constant CA_NULL_ELEMENT. <A NAME="IX_NameArrayFindHandles()">
+ </A>
+The routine <CODE>
+NameArrayFindHandles()</CODE>
+ is identical, except that the name array is specified by its global and chunk handles.</P>
+<P>
+<A NAME="IX_NameArrayChangeName()">
+ </A>
+To change an element's name, call <CODE>
+NameArrayChangeName()</CODE>
+. This routine is passed four arguments:</P>
+<UL>
+<LI>
+The optr to the name array.</LI>
+<LI>
+The token of the element whose name will be changed.</LI>
+<LI>
+A pointer to a character buffer containing the new name for the element.</LI>
+<LI>
+The length of the new name. If a length of zero is passed, the name is considered to be null terminated (the trailing null is <EM>
+not</EM>
+ part of the name).</LI>
+</UL>
+<P>
+<CODE>
+NameArrayChangeName()</CODE>
+ changes the element's name. If the new name is longer than the old, the element will have to be resized; this will invalidate pointers within that block.<A NAME="IX_NameArrayChangeNameHandles()">
+ </A>
+ <CODE>
+NameArrayChangeNameHandles()</CODE>
+ is identical, except that the name array is specified by its global and chunk handles.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="LMem_b.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="LMem_d.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.2 Element Arrays</A> 
+<!-- to next --> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

@@ -1,0 +1,2579 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+<!-- This page was automatically generated from a bunch of smaller pages. -->
+<META NAME="copyright" CONTENT="Copyright GEOWORKS">
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+<TITLE>The FileSelector Object</TITLE>
+</HEAD>
+<BODY BGCOLOR="#ffffdf">
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+<A NAME="index.htm"></A>
+
+
+
+<H1 CLASS="chapterTitle">
+
+<A NAME="index.htm_20494">
+ </A>
+The FileSelector Object
+
+</H1>
+<P>
+<A NAME="index.htm_IX_Files:selector">
+ </A>
+<A NAME="index.htm_IX_GenFileSelectorClass">
+ </A>
+The GenFileSelector provides the user interface and functionality to allow a user to traverse directories and volumes (disks) and view the files contained therein. It can be customized to limit the displayed file names or to expand the listings to include special files.</P>
+<P>
+This object is used by the GenDocumentControl object to provide most file dialog boxes. If your application uses the Document Control objects, you will probably not need to add a GenFileSelector.</P>
+<P>
+
+</P>
+<P CLASS="sectionlinks">
+<STRONG>
+&nbsp;&nbsp;<A HREF="#FileSelectors_1.htm">1 File Selector Overview</A><BR>
+&nbsp;&nbsp;<A HREF="#FileSelectors_2.htm">2 File Selector Basics</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#FileSelectors_3.htm">2.1 Setting Up the File Selector</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#FileSelectors_4.htm">2.2 Supporting the File Selector</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#FileSelectors_5.htm">2.3 Messages to Handle</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#FileSelectors_6.htm">2.4 Some Common Customizations</A><BR>
+&nbsp;&nbsp;<A HREF="#FileSelectors_7.htm">3 File Selector Instance Data</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#FileSelectors_8.htm">3.1 The GFSI_attrs Field</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#FileSelectors_9.htm">3.2 The GFSI_fileCriteria Field</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#FileSelectors_a.htm">3.3 Matching a File's Token</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#FileSelectors_b.htm">3.4 Matching a File's Creator App</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#FileSelectors_c.htm">3.5 Matching a File's Geode Attributes</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#FileSelectors_d.htm">3.6 Masking File Names</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#FileSelectors_e.htm">3.7 Matching a File's File Attributes</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#FileSelectors_f.htm">3.8 Searching Via Callback Routine</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#FileSelectors_10.htm">3.9 Resetting a Filter</A><BR>
+&nbsp;&nbsp;<A HREF="#FileSelectors_11.htm">4 File Selector Use</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#FileSelectors_12.htm">4.1 When a User Selects a File</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#FileSelectors_13.htm">4.2 The Current Selection</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#FileSelectors_14.htm">4.3 Rescanning Directories</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#FileSelectors_15.htm">4.4 Setting Scalable UI Data</A><BR>
+</STRONG>
+</P> <!-- end of sectionlinks blob -->
+
+<HR>
+<A NAME="FileSelectors_1.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">The FileSelector Object</A>: 1 
+File Selector Overview</H2>
+<P>
+When you are not using the Document Control objects but need to allow the user to traverse directories and disks in order to locate a given file, you should use a GenFileSelector. The File Selector is designed to give tremendous flexibility for many different types of file searches, providing both directory scanning and user interface. An OSF/Motif File Selector is shown below.</P>
+<P>
+The File Selector allows users to browse all the directories and disks readable by DOS, including readable network drives. This browsing is completely internal to the File Selector; until the user selects a file from the list, your application does not need to know what the File Selector is doing.</P>
+<P>
+You can customize the searches the File Selector makes in several different ways:</P>
+<UL>
+<LI>
+Setting paths, volumes, and selections<BR>
+You may direct the File Selector to show any given directory on any given volume, and you may also set the selected file displayed. Additionally, you can navigate directories with messages sent to the File Selector. See <A HREF="#FileSelectors_13.htm_20958"> The Current Selection</A>
+.</LI>
+<LI>
+Limiting a directory scan to certain files<BR>
+The File Selector can limit its directory scans to show only the files you request. You may limit the scan based on file types, file attributes, or filename extensions. See <A HREF="#FileSelectors_7.htm_50084"> File Selector Instance Data</A>
+.</LI>
+<LI>
+Searching for associated files<BR>
+You can limit the File Selector's searches to only those files that match a given creator or token. That is, the File Selector will display only files created by a particular geode. See <A HREF="#FileSelectors_a.htm_53091"> Matching a File's Token</A>
+.</LI>
+<LI>
+Customizing the searches<BR>
+If the available search options don't fit your needs, you can create a customized search. If this type of search is employed, the File Selector will send a special message to itself--to take advantage of this, you can easily subclass the GenFileSelector and write a custom handler for this special message. See <A HREF="#FileSelectors_f.htm_27532"> Searching Via Callback Routine</A>
+.</LI>
+</UL>
+<P>
+All of the directory scanning and path navigation is internal to the GenFileSelector. When a selection is made (a user single- or double-clicks on an entry, for example), the File Selector will send out a message indicating the selection. You can, however, force the File Selector to change to any directory or search criteria at any time.
+<IMG SRC="FileSelectors_1_dump.gif">
+
+</P>
+<HR>
+<A NAME="FileSelectors_2.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">The FileSelector Object</A>: 2 
+File Selector Basics</H2>
+<P>
+The following sections describe how to set up and use the File Selector in a simple configuration and how to modify the configuration for common uses.</P>
+<P>
+Most File Selectors will be put in dialog boxes and will be accompanied by at the least a Reply Bar. (For more information on dialog boxes and reply bars, see <A HREF="../../UI/GenInteraction/index.htm">the Menus and Dialog Boxes chapter</A>.) Typically, the dialog box will be brought up by a menu item such as <EM>Open...</EM>
+ or <EM>
+Insert From Text File...</EM>
+.
+<IMG SRC="FileSelectors_2_dump.gif">
+
+</P>
+<P>
+The figure above shows a sample <EM>
+Insert From Text File</EM>
+ dialog box. (Note that you would probably use the Impex object for this functionality; this is provided for example.) This box has three basic elements: The GenGlyphDisplay (the title at the top), the File Selector (the scrolling list of files and the disk and folder icons), and the Reply Bar. In nearly all cases, these three elements will be included with every File Selector in its dialog box.</P>
+<P CLASS="subsectionLink">
+<A HREF="#FileSelectors_3.htm">Setting Up the File Selector</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#FileSelectors_4.htm">Supporting the File Selector</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#FileSelectors_5.htm">Messages to Handle</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#FileSelectors_6.htm">Some Common Customizations</A></P>
+<HR>
+<A NAME="FileSelectors_3.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The FileSelector Object</A>: 2.1 <A HREF="#FileSelectors_2.htm">File Selector Basics</A>: 
+Setting Up the File Selector</H3>
+<P>
+For a typical configuration, you will have to set up a GenInteraction as a dialog box. (For information dialog boxes, see <A HREF="../../UI/GenInteraction/index.htm">the Menus and Dialog Boxes chapter</A>.) The File Selector and other elements of the dialog should be placed as children of the Interaction.</P><P>
+<A HREF="#FileSelectors_3.htm_24357"> A Basic File Selector</A>
+ shows the Goc code required to display and use a File Selector in this basic form. You can use this code to create a similar dialog box with the proper elements or modify it to gain the functionality you want. Specific permutations of this configuration will be described in <A HREF="#FileSelectors_6.htm_16485"> Some Common Customizations</A>
+; however, the remainder of this section describes the basics of the File Selector.</P>
+<P CLASS="figTitle">
+Code Display 14-1 <A NAME="FileSelectors_3.htm_24357">
+ </A>
+A Basic File Selector</P>
+<PRE>/* Extra code for menus and other UI objects is left out. Only what is
+ * required for these objects is included. */</PRE>
+<PRE>/* This dialog box provides the organization needed to contain the File
+ * Selector, the name of the box, and the Reply Bar. */
+@object GenInteractionClass MyDialogBox = {
+    GI_visMoniker = `I', &quot;Insert From Text File&quot;;
+    GI_comp = MyGlyph, MyFileSel, MyInsertTrigger;
+    GII_visibility = (GIV_DIALOG);
+    GII_type = (GIT_COMMAND);
+};</PRE>
+<PRE>/* The Glyph Display provides the label in the dialog box. Alternatively, the
+ * moniker of the GenInteraction could be used for this functionality. */
+@object GenGlyphClass MyGlyph = {
+    GI_visMoniker = &quot;Insert From Text File&quot;;
+}</PRE>
+<PRE>/* The File Selector is as basic as possible. */
+@object GenFileSelectorClass MyFileSel = {
+    GFSI_destination = process;					/* The object receiving notification. */
+    GFSI_notificationMsg = MSG_MY_APP_FILE_SELECTED;							/* The message sent
+							 * upon selection. */
+};</PRE>
+<PRE>@object GenTriggerClass MyInsertTrigger = {
+    GI_visMoniker = &quot;Insert&quot;;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_MY_APP_INSERT_TRIGGER_SELECTED;
+    HINT_SEEK_REPLY_BAR;
+};</PRE>
+<PRE>/* Note that in most cases, this trigger will not be needed. Generally, the File
+ * Selector will include an &quot;OK&quot; or &quot;Use This File&quot; trigger in its reply bar that
+ * executes an IC_OK function. For your trigger above to demonstrate that
+ * functionality, remove the GTI_... fields and add the line
+ * ATTR_GEN_TRIGGER_INTERACTION_COMMAND = (IC_OK);
+ */</PRE>
+<HR>
+<A NAME="FileSelectors_4.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The FileSelector Object</A>: 2.2 <A HREF="#FileSelectors_2.htm">File Selector Basics</A>: 
+Supporting the File Selector</H3>
+<P>
+To use the File Selector as shown in <A HREF="#FileSelectors_3.htm_24357"> A Basic File Selector</A>
+, your application must have some object (which may be the Process object) that can handle all the cases that may arise from a user's interaction with the dialog box. All of these cases are listed below:</P>
+<UL>
+<LI>
+The user clicks once on an entry in the File Selector's list.<BR>
+When this happens, the File Selector highlights the selected entry and sends its notification message to its destination object. With the message will come a record of flags indicating the action was a single click.</LI>
+<LI>
+The user double-clicks on an entry in the File Selector's list.<BR>
+This action causes the File Selector to send its notification message to its destination object. The default action for the dialog box containing the File Selector will also occur (e.g. the default action is what happens when the &quot;Insert&quot; trigger is pressed). If the current selection is a directory, the application does not need to do anything; the File Selector will open the directory automatically. If the current selection is a file, the application must deal with the file properly and then close the dialog box containing the File Selector.</LI>
+<LI>
+The user clicks on the &quot;Insert&quot; trigger.<BR>
+This action causes the trigger to send its notification message to its destination object. In most cases, the trigger with be an IC_OK trigger that will cause the File Selector to act as if a double-click had occurred. If the current selected entry in the list is a directory, the application should instruct the File Selector to open the directory and display its file list. If the current selection is a file, the application is responsible for dealing properly with the file; additionally, the application should then close the dialog box containing the File Selector.</LI>
+</UL>
+<P>
+The above list describes the basics of File Selector support. Different File Selectors (such as SaveAs dialogs that allow the user to type in a file name) can easily be defined by adding other gadgetry to the controller. All other actions possible are internal to the file selector (e.g. the &quot;Go To Document&quot; button is a feature of the File Selector which is invisible to the application).</P>
+<HR>
+<A NAME="FileSelectors_5.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The FileSelector Object</A>: 2.3 <A HREF="#FileSelectors_2.htm">File Selector Basics</A>: 
+Messages to Handle</H3>
+<P>
+The list above shows two different messages that your File Selector's basic configuration: The first results from the user clicking on an entry and comes from the File Selector object, and the second is sent by the &quot;Insert&quot; trigger when the user clicks on it. The following descriptions show what you must do when handling these messages. (Note that in many cases only one message, the File Selector's action message, will be used; this occurs when the &quot;Insert&quot; trigger is actually an IC_OK or similar response trigger.)</P>
+<P>
+<A HREF="#FileSelectors_5.htm_21264"> Handling a File Selector Selection</A>
+ shows a sample handler for the message sent by the File Selector. <A HREF="#FileSelectors_5.htm_43812"> Handling a File Selector "OK" Button</A>
+ shows a sample handler for the message sent by the Reply Bar's Insert trigger. Both these handlers are written to go with the code in <A HREF="#FileSelectors_3.htm_24357"> A Basic File Selector</A>
+, and both handle the simplest case. Where application-specific code is required, comments have been inserted. </P>
+<P>
+You should not, in general, <EM>
+have</EM>
+ to handle any more than the File Selector's notification message. You may add your own gadgetry to add other functionality, however.</P>
+<P>
+The File Selector's notification message is the message you set in <CODE>
+GFSI_notificationMsg</CODE>
+. This message should have the same definition as the prototype <CODE>
+GEN_FILE_SELECTOR_NOTIFICATION_MSG</CODE>
+, which is defined below. You can either define it with the same parameters, or you can define it exactly on the prototype. (The latter is recommended.) The prototype carries with the notification a word of <CODE>
+GenFileSelectorEntryFlags</CODE>
+; this record contains the following flag fields:</P>
+<DL>
+<DT>
+GFSEF_TYPE</DT><DD>
+This is a two-bit field (at offset GFSEF_TYPE_OFFSET) that describes the type of the selection. This may be one of GFSET_FILE (selection is a file), GFSET_SUBDIR (selection is a subdirectory), or GFSET_VOLUME (selection is a volume or disk). These are values of <CODE>
+GenFileSelectorEntryType</CODE>
+.</DD>
+<DT>
+GFSEF_OPEN</DT><DD>Set if the selection action was an &quot;open&quot; (i.e. double-click).</DD>
+<DT>
+GFSEF_NO_ENTRIES</DT><DD>
+Set if no entries are in the list.</DD>
+<DT>
+GFSEF_ERROR</DT><DD>
+Set if there was an error opening the selected entry on a double-click or a <CODE>
+MSG_GEN_FILE_SELECTOR_OPEN_ENTRY</CODE>
+.</DD>
+<DT>
+GFSEF_TEMPLATE</DT><DD>
+Set if the file is a template (i.e. has GFHF_TEMPLATE set).</DD>
+<DT>
+GFSEF_SHARED_MULTIPLE</DT><DD>
+Set if the file is shared with multiple writers (i.e. has GFHF_SHARED_MULTIPLE).</DD>
+<DT>
+GFSEF_SHARED_SINGLE</DT><DD>
+Set if the file is shared and has a single writer (i.e. has GFHF_SHARED_SINGLE).</DD>
+<DT>
+GFSEF_READ_ONLY</DT><DD>
+Set if the file is read-only (i.e. has FA_RDONLY).</DD>
+<DT>
+GFSEF_PARENT_DIR</DT><DD>
+Set if the current selection is the parent directory (i.e. the first entry in the file selector's list).</DD>
+
+</DL>
+<H6 CLASS="RefETitle">
+GEN_FILE_SELECTOR_NOTIFICATION_MSG</H6>
+<PRE CLASS="syntax">void	GEN_FILE_SELECTOR_NOTIFICATION_MSG(
+        word				entryNum,
+        GenFileSelectorEntryFlags				entryFlags);</PRE>
+<P>
+This prototype should be used for all notification messages sent out by the File Selector; that is, any message you set in <CODE>
+GFSI_notificationMsg</CODE>
+ should be based on this prototype.</P>
+<P CLASS="refField">
+Source:	The GenFileSelector object.</P>
+<P CLASS="refField">
+Destination:	The object specified in <CODE>
+GFSI_destination</CODE>
+.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+entryNum</CODE>
+	The entry number selected in the list.</P>
+<DL>
+<DT>
+<CODE>
+entryFlags</CODE>
+</DT><DD>A <CODE>
+GenFileSelectorEntryFlags</CODE>
+ record describing the selection. To get the entry type from the flags record, use the macro GFS_GET_ENTRY_TYPE, described after this reference entry.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Structures:	<CODE>
+GenFileSelectorEntryFlags</CODE>
+ is a record with the following flags:</P>
+<PRE>typedef WordFlags GenFileSelectorEntryFlags;
+#define GFSEF_TYPE						0xc000
+#define GFSEF_OPEN						0x2000
+#define GFSEF_NO_ENTRIES 						0x1000
+#define GFSEF_ERROR 						0x0800
+#define GFSEF_TEMPLATE 						0x0400
+#define GFSEF_SHARED_MULTIPLE 						0x0200
+#define GFSEF_SHARED_SINGLE 						0x0100
+#define GFSEF_READ_ONLY 						0x0080
+#define GFSEF_PARENT_DIR 						0x0040</PRE>
+<PRE>#define GFSEF_TYPE_OFFSET 					14</PRE>
+<P>
+The GFSEF_TYPE field is two bits defined by one of the following <CODE>
+GenFileSelectorEntryType</CODE>
+ constants. These two bits define the type of entry selected.</P>
+<PRE>typedef ByteEnum GenFileSelectorEntryType;
+#define GFSET_FILE				0
+#define GFSET_SUBDIR				1
+#define GFSET_VOLUME				2</PRE>
+<P CLASS="refField">
+Interception:	The notification message must be intercepted and handled for the selection of a file to have any effect in your application. There is no default behavior, except in the document control objects (which create their own File Selectors).</P>
+
+
+<H6 CLASS="RefETitle">
+GFS_GET_ENTRY_TYPE</H6>
+<PRE CLASS="syntax">byte	GFS_GET_ENTRY_TYPE(flags)
+        word	flags;</PRE>
+<P>
+This macro extracts the high two bits from a <CODE>
+GenFileSelectorEntryFlags</CODE>
+ record delivered as a parameter of a File Selector's notification message. Compare the value to GFSET_FILE, GFSET_SUBDIR, and GFSET_VOLUME.</P>
+<P CLASS="figTitle">
+Code Display 14-2 <A NAME="FileSelectors_5.htm_21264">
+ </A>
+Handling a File Selector Selection</P>
+<PRE>/*
+ * C handler for MSG_MY_APP_FILE_SELECTED. The message is sent by the File Selector
+ * object (MyFileSel) to the application's Process object (MyProcessClass) when the
+ * user clicks on an entry in the displayed file list. This code display is per the
+ * setup in <A HREF="#FileSelectors_3.htm_24357"> A Basic File Selector</A>.
+ */</PRE>
+<PRE>/*
+ * Format of the message:
+ * void MSG_MY_APP_FILE_SELECTED(word entryNum,
+ *					GenFileSelectorEntryFlags entryFlags)
+ */</PRE>
+<PRE>@method	MyProcessClass, MSG_MY_APP_FILE_SELECTED {
+    /* First check if this is an OPEN operation (double-click). If so,
+     * then test whether the selection is a file. If so, simulate the &quot;Insert&quot;
+     * trigger by sending the trigger's message to ourselves. If it is not a file,
+     * or if the operation is not OPEN, we need do nothing. */</PRE>
+<PRE>    if (GFS_GET_ENTRY_FLAGS(entryFlags) &amp; GFSEF_OPEN) {    /* Is the operation
+						      * a double-click? */
+	if (GFS_GET_ENTRY_TYPE(entryFlags) &amp; GFSET_FILE) {
+						/* Is the selection a file? */
+	    /* Execute application-specific code here. */
+	}
+    }
+}</PRE>
+<PRE>/* Note that we do not necessarily have to handle double-click operations in this
+ * way. Since a double-click automatically activates the GenInteraction's default
+ * element (typically an &quot;Ok&quot; trigger), we can simply handle the press of the
+ * &quot;Ok&quot; trigger as shown in <A HREF="#FileSelectors_5.htm_43812"> Handling a File Selector "OK" Button</A>. */</PRE>
+<P CLASS="figTitle">
+Code Display 14-3 <A NAME="FileSelectors_5.htm_43812">
+ </A>
+Handling a File Selector &quot;OK&quot; Button</P>
+<PRE>/* C handler for MSG_MY_APP_INSERT_TRIGGER_SELECTED, the message sent by the Insert
+ * trigger to the application's Process object when the user clicks on it.
+ * Format of this message: void MSG_MY_APP_INSERT_TRIGGER_SELECTED().
+ * This code display is per the setup shown in <A HREF="#FileSelectors_3.htm_24357"> A Basic File Selector</A>. */</PRE>
+<PRE>@method	MyProcessClass, MSG_MY_APP_INSERT_TRIGGER_SELECTED {
+    /* Declare a local dword of flags and entry number. */
+    dword selFlags;</PRE>
+<PRE>    /* First, retrieve the selection number and flags from the File Selector.
+     * For now, we can ignore the selection name and path. To retrieve this
+     * information, send the message MSG_GEN_FILE_SELECTOR_GET_SELECTION to the 
+     * File Selector. This message will return a dword (selFlags) that contains the
+     * selection's entry number and a GenFileSelectorEntryFlags record. (To ignore
+     * the selection name, pass a null pointer with the message.) */</PRE>
+<PRE>    selFlags = @call MyFileSel::MSG_GEN_FILE_SELECTOR_GET_SELECTION(NULL);</PRE>
+<PRE>    /* Next, determine whether the selection is a file. To do this, check the
+     * returned GenFileSelectorEntryFlags record against GFSET_FILE. If the result
+     * is true, the selection is a file. If false, it is a directory or volume. If
+     * the selection is a file, we will operate on it appropriately (this is
+     * specific to each application). If not, we will direct the File Selector to
+     * open the entry. Note that we can assume an OPEN operation is in progress
+     * because the only two ways to get to this point are through a double-click
+     * on a selection and through a click on the &quot;Insert&quot; trigger.
+     */</PRE>
+<PRE>    /* Note the use of the two macros GFS_GET_ENTRY_FLAGS and GFS_GET_ENTRY_NUMBER.
+     * The first extracts the GenFileSelectorEntryFlags record from the dword
+     * selFlags, and the second extracts the entry number from selFlags. */</PRE>
+<PRE>    if (GFS_GET_ENTRY_FLAGS(selFlags) == GFSET_FILE) {	/* the selection is a file */</PRE>
+<PRE>	/* Execute application-specific code here. */</PRE>
+<PRE>    } else {				/* the selection is a volume or directory */</PRE>
+<PRE>	/* Now direct the File Selector to open the entry. Use the message
+	 * MSG_GEN_FILE_SELECTOR_OPEN_ENTRY, which returns a flag; if the flag is
+	 * set, then an error occurred. If the flag is clear, the operation
+	 * succeeded. */</PRE>
+<PRE>	if (@call MyFileSel::MSG_GEN_FILE_SELECTOR_OPEN_ENTRY(
+					GFS_GET_ENTRY_NUMBER(selFlags))) {
+	    /* Provide a proper error message or beep sound. */
+	}
+}</PRE>
+
+<HR>
+<A NAME="FileSelectors_6.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The FileSelector Object</A>: 2.4 <A HREF="#FileSelectors_2.htm">File Selector Basics</A>: 
+<A NAME="FileSelectors_6.htm_16485">
+ </A>
+Some Common Customizations</H3>
+<P>
+Although the basics are all covered under the previous sections and you need nothing more to add a File Selector to your application, you will probably want to customize it somewhat. Typical simple customizations include limiting the types of files displayed, restricting the search to a single directory or volume, limiting the display to directories only (no files), and limiting the search to only those files with a given filename extension.</P>
+<P>
+Each of these is shown in the displays following this section. Notice that the only changes you need to make to implement any of these customizations is to the File Selector's Goc code. You will not need to handle any other messages or add other code to your application. These customizations are shown in <A HREF="#FileSelectors_6.htm_16786"> Display Only Directories</A>
+ through <A HREF="#FileSelectors_6.htm_68431"> Show Only Files with a Given Filename Extension</A>
+ and show how to do the following (you may apply any combination):</P>
+<UL>
+<LI>
+Show directories only.<BR>
+The File Selector will display no files, only directories.</LI>
+<LI>
+Show all files in a single directory.<BR>
+The File Selector will show all files but will restrict directory navigation; the user can only select files in the current directory.</LI>
+<LI>
+Show hidden files as well as normal files.</LI>
+<LI>
+Show all files created by a given geode.<BR>
+The File Selector will restrict displayed files to only those that were created by the geode with the given <CODE>
+tokenChars</CODE>
+ and <CODE>
+tokenID</CODE>
+.</LI>
+<LI>
+Show all files with a given filename extension.<BR>
+The File Selector will restrict the files displayed to only those with the given filename extension.</LI>
+</UL>
+<P>
+These are not the only customizations you can make. Although they will satisfy the needs of the large majority of applications, you can change the File Selector's searches any way you want (you can even set up a callback routine to filter every single file or directory). The remainder of this chapter explains in detail the different things you can do to the File Selector.</P>
+<P CLASS="figTitle">
+Code Display 14-4 <A NAME="FileSelectors_6.htm_16786">
+ </A>
+Display Only Directories</P>
+<PRE>@object GenFileSelectorClass DirectorySelector = {
+    GFSI_destination = process;
+    GFSI_notificationMsg = MSG_MY_APP_DIRECTORY_SELECTED;
+    GFSI_fileCriteria = FSFC_DIRS;
+};</PRE>
+<P CLASS="figTitle">
+Code Display 14-5 Limit the Search to a Single Directory</P>
+<PRE>@object GenFileSelectorClass SingleDirFileSelector = {
+    GFSI_destination = process;
+    GFSI_notificationMsg = MSG_MY_APP_FILE_SELECTED;
+    GFSI_attrs = 			FSA_HAS_FILE_LIST;
+    GFSI_fileCriteria =			FSFC_NON_GEOS_FILES | FSFC_GEOS_EXECUTABLES
+			| FSFC_GEOS_NON_EXECUTABLES;
+    ATTR_GEN_PATH_DATA = {0, <EM>DIRECTORY</EM>};
+		/* Limit the display to this standard directory.
+		 * Note that paths may be given; relative paths are taken as
+		 * relative to the specified standard path. This attribute
+		 * is defined in GenClass. */
+};</PRE>
+<P CLASS="figTitle">
+Code Display 14-6 Show Hidden Files As Well As Normal Files</P>
+<PRE>@object GenFileSelectorClass HiddenFileSelector = {
+    GFSI_destination = process;
+    GFSI_notificationMsg = MSG_MY_APP_FILE_SELECTED;
+	/* Specify that FA_SYSTEM files are the only ones not to be displayed. */
+    ATTR_GEN_FILE_SELECTOR_FILE_ATTR = { 0, FA_SYSTEM};
+};</PRE>
+<P CLASS="figTitle">
+Code Display 14-7 Show Only Files Created by a Given Geode</P>
+<PRE>@object GenFileSelectorClass CreatorFileSelector = {
+    GFSI_destination = process;
+    GFSI_notificationMsg = MSG_MY_APP_FILE_SELECTED;
+    ATTR_GEN_FILE_SELECTOR_CREATOR_MATCH = {{&quot;CRTR&quot;}, 0};
+};</PRE>
+<P CLASS="figTitle">
+Code Display 14-8 <A NAME="FileSelectors_6.htm_68431">
+ </A>
+Show Only Files with a Given Filename Extension</P>
+<PRE>@object GenFileSelectorClass ExtensionFileSelector = {
+    GFSI_destination = process;
+    GFSI_notificationMsg = MSG_MY_APP_FILE_SELECTED;
+    ATTR_GEN_FILE_SELECTOR_NAME_MASK = {&quot;*.BAT&quot;};				/* Show files ending with BAT. */
+	/* Note that the mask is case sensitive. This means that the mask must be
+	 * in upper case to match DOS files. */
+};</PRE>
+<HR>
+<A NAME="FileSelectors_7.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">The FileSelector Object</A>: 3 
+<A NAME="FileSelectors_7.htm_50084">
+ </A>
+File Selector Instance Data</H2>
+<P>
+The File Selector is diverse and flexible, and you can customize it in many different ways. Typically, you will only need to add or modify a few lines of Goc code to achieve the results you need; however, if you have changing needs, you can change the File Selector during execution by sending it various messages.</P>
+<P>
+The File Selector has a number of attributes and variable data fields that determine its functionality. These are listed in <A HREF="#FileSelectors_7.htm_54516"> File Selector Attributes</A>
+, along with comments and the defaults that are set.</P>
+<P CLASS="figTitle">
+Code Display 14-9 <A NAME="FileSelectors_7.htm_54516">
+ </A>
+File Selector Attributes</P>
+<PRE>/* Following are several type definitions used in the instance data. */</PRE>
+<PRE><A NAME="FileSelectors_7.htm_IX_GenFileSelectorSelection"> </A>typedef FileLongName			GenFileSelectorSelection;
+typedef WordFlags			<A NAME="FileSelectors_7.htm_IX_FileSelectorFileCriteria"> </A>FileSelectorFileCriteria;
+typedef WordFlags			<A NAME="FileSelectors_7.htm_IX_FileSelectorAttrs"> </A>FileSelectorAttrs;
+typedef FileLongName			GenFileSelectorMask;</PRE>
+<PRE>typedef struct {
+    FileAttrs		GFSFA_match;
+    FileAttrs		GFSFA_mismatch;
+} <A NAME="FileSelectors_7.htm_IX_GenFileSelectorFileAttrs"> </A>GenFileSelectorFileAttrs;</PRE>
+<PRE>typedef struct {
+    GeodeAttrs		GFSGA_match;
+    GeodeAttrs		GFSGA_mismatch;
+} <A NAME="FileSelectors_7.htm_IX_GenFileSelectorGeodeAttrs"> </A>GenFileSelectorGeodeAttrs;</PRE>
+<PRE><A NAME="FileSelectors_7.htm_IX_GFSI_&ldots;"> </A>	/* GFSI_selection
+	 * The selection field contains the name of the current selection being
+	 * displayed by the File Selector. */
+    @instance GenFileSelectorSelection					<A NAME="FileSelectors_7.htm_IX_GFSI_selection"> </A>GFSI_selection = {0};</PRE>
+<PRE>	/* GFSI_fileCriteria
+	 * The file criteria field contains flags that determine the search and
+	 * filter criteria used by the File Selector when scanning directories. */
+    @instance FileSelectorFileCriteria					<A NAME="FileSelectors_7.htm_IX_GFSI_fileCriteria"> </A>GFSI_fileCriteria = 
+						FSFC_DIRS | FSFC_NON_GEOS_FILES |
+						FSFC_GEOS_EXECUTABLES |
+						FSFC_GEOS_NON_EXECTUTABLES;
+	/* Possible flags for GFSI_fileCriteria:
+	 * FSFC_DIRS				FSFC_NON_GEOS_FILES
+	 * FSFC_GEOS_EXECUTABLES				FSFC_GEOS_NON_EXECUTABLES
+	 * FSFC_MASK_CASE_INSENSITIVE				FSFC_FILE_FILTER
+	 * FSFC_FILTER_IS_C				FSFC_TOKEN_NO_ID
+	 * FSFC_USE_MASK_FOR_DIRS */</PRE>
+<PRE>	/* GFSI_attrs
+	 * The attributes field determines what features of the File Selector are
+	 * to be implemented. */
+    @instance FileSelectorAttrs				<A NAME="FileSelectors_7.htm_IX_GFSI_attrs"> </A>GFSI_attrs =		FSA_ALLOW_CHANGE_DIRS |
+						FSA_HAS_CLOSE_DIR_BUTTON |
+						FSA_HAS_OPEN_DIR_BUTTON |
+						FSA_HAS_DOCUMENT_BUTTON |
+						FSA_HAS_CHANGE_DIRECTORY_LIST |
+						FSA_HAS_CHANGE_DRIVE_LIST |
+						FSA_HAS_FILE_LIST;
+	/* Possible flags for <A NAME="FileSelectors_7.htm_IX_GFSI_attrs"> </A>GFSI_attrs:
+	 * FSA_ALLOW_CHANGE_DIRS				FSA_SHOW_FIXED_DISKS_ONLY
+	 * FSA_SHOW_FILES_DISABLED				FSA_HAS_CLOSE_DIR_BUTTON
+	 * FSA_HAS_OPEN_DIR_BUTTON				FSA_HAS_DOCUMENT_BUTTON
+	 * FSA_HAS_CHANGE_DIRECTORY_LIST				FSA_HAS_CHANGE_DRIVE_LIST
+	 * FSA_HAS_FILE_LIST				FSA_USE_VIRTUAL_ROOT</PRE>
+<PRE>	/* GFSI_destination and GFSI_notificationMsg
+	 * When a user selects a file, the File Selector sends the message
+	 * specified in GFSI_notificationMsg to the object specified in
+	 * GFSI_destination. */
+    @instance optr				<A NAME="FileSelectors_7.htm_IX_GFSI_destination"> </A>GFSI_destination;
+    @instance Message				<A NAME="FileSelectors_7.htm_IX_GFSI_notificationMsg"> </A>GFSI_notificationMsg;</PRE>
+<PRE>	/* Token and creator matches
+	 * These two vardata fields filter files according to their tokens.
+	 * A file that has a token other than that set will not be displayed
+	 * by the File Selector. If you only want to match files with certain
+	 * token characters, you can set FSFC_TOKEN_NO_ID in GFSI_fileCriteria. */
+    @vardata GeodeToken				<A NAME="FileSelectors_7.htm_IX_ATTR_GEN_FILE_SELECTOR_TOKEN_MATCH"> </A>ATTR_GEN_FILE_SELECTOR_TOKEN_MATCH;
+    @vardata GeodeToken				<A NAME="FileSelectors_7.htm_IX_ATTR_GEN_FILE_SELECTOR_CREATOR_MATCH"> </A>ATTR_GEN_FILE_SELECTOR_CREATOR_MATCH;</PRE>
+<PRE>	/* File attributes
+	 * This vardata field filters files according to the files' native
+	 * attributes. If a file does not have the attributes specified in
+	 * GFSFA_match, or if it has an attribute specified in GFSFA_mismatch,
+	 * it will not be displayed. */
+    @vardata GenFileSelectorFileAttrs					<A NAME="FileSelectors_7.htm_IX_ATTR_GEN_FILE_SELECTOR_FILE_ATTR"> </A>ATTR_GEN_FILE_SELECTOR_FILE_ATTR;</PRE>
+<PRE>	/* Geode attributes
+	 * This vardata field filters files according to the files' geode
+	 * attributes. If a file does not have the attributes specified in
+	 * GFSGA_match, or if it has an attribute specified in GFSGA_mismatch,
+	 * it will not be displayed. */
+    @vardata GenFileSelectorGeodeAttrs					<A NAME="FileSelectors_7.htm_IX_ATTR_GEN_FILE_SELECTOR_GEODE_ATTR"> </A>ATTR_GEN_FILE_SELECTOR_GEODE_ATTR;</PRE>
+<PRE>	/* Mask
+	 * This vardata field filters files based on their names. The mask is
+	 * a text string matched against file names. Files which coincide with the
+	 * mask string are displayed; others are not. The mask string will also
+	 * be applied to volumes and directories if FSFC_USE_MASK_FOR_DIRS is
+	 * set in GFSI_fileCriteria. */
+    @vardata GenFileSelectorMask				<A NAME="FileSelectors_7.htm_IX_ATTR_GEN_FILE_SELECTOR_NAME_MASK"> </A>ATTR_GEN_FILE_SELECTOR_NAME_MASK;</PRE>
+<PRE>	/* Virtual Root
+	 * This vardata field defines a &quot;virtual root&quot; for the file selector. The
+	 * user will not be allowed to navigate above the &quot;virtual root&quot; except
+	 * with the Change Drives popup list, if available. If the Change Drives
+	 * list is used, the virtual root is afterwards ignored. */
+     @vardata GenFilePath				<A NAME="FileSelectors_7.htm_IX_ATTR_GEN_FILE_SELECTOR_VIRTUAL_ROOT"> </A>ATTR_GEN_FILE_SELECTOR_VIRTUAL_ROOT;</PRE>
+<PRE>	/* Scalable UI Support
+	 * This hint is used to support scalable UI within the File Selector based
+	 * on the application's features (MSG_GEN_APPLICATION_GET_APP_FEATURES).
+	 * This hint takes an array of GenFileSelectorScalableUIEntry structures.
+	 * Typically, one element will have GFSSUIC_SET_FEATURES_IF_APP_FEATURE_ON,
+	 * and one element will have GFSSUIC_SET_FEATURES_IF_APP_FEATURE_OFF.
+	 * The structures are defined below. */
+    @vardata GenFileSelectorScalableUIEntry <A NAME="FileSelectors_7.htm_IX_HINT_FILE_SELECTOR_SCALABLE_UI_DATA"> </A>HINT_FILE_SELECTOR_SCALABLE_UI_DATA;</PRE>
+<PRE>	/* The structures for the above hint are given below.
+	 * GenFileSelectorScalableUIEntry is a structure with three fields; each
+	 * element in the array is one of these structures.
+	 * GenFileSelectorScalableUICommand is the type of the first field.
+	 * If the data in GFSSUIE_appFeature is true according to the type in
+	 * GFSSUIE_command, then the features in GFSSUIE_fsFeatures will be set
+	 * accordingly. */
+    typedef ByteEnum GenFileSelectorScalableUICommand;
+    #define GFSSUIC_SET_FEATURES_IF_APP_FEATURE_ON							0
+    #define GFSSUIC_SET_FEATURES_IF_APP_FEATURE_OFF							1
+    #define GFSSUIC_ADD_FEATURES_IF_APP_FEATURE_ON							2
+    #define GFSSUIC_SET_FEATURES_IF_APP_LEVEL							3
+    #define GFSSUIC_ADD_FEATURES_IF_APP_LEVEL							4</PRE>
+<PRE>typedef struct {
+    GenFileSelectorScalableUICommand					GFSSUIE_command;
+    WordFlags					GFSSUIE_appFeature;
+    FileSelectorAttrs					GFSSUIE_fsFeatures;
+} GenFileSelectorScalableUIEntry;</PRE>
+<PRE>	/* Number of files
+	 * This hint determines the number of files that are visible at once. */
+<A NAME="FileSelectors_7.htm_IX_HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW"> </A>    @vardata word				HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW;</PRE>
+<PRE>	/* File List Width
+	 * This hint defines the width of the file list. The data is a number of
+	 * average-width characters, up to a maximum of 255.
+    @vardata word 				<A NAME="FileSelectors_7.htm_IX_HINT_FILE_SELECTOR_FILE_LIST_WIDTH"> </A>HINT_FILE_SELECTOR_FILE_LIST_WIDTH;</PRE>
+<P CLASS="subsectionLink">
+<A HREF="#FileSelectors_8.htm">The GFSI_attrs Field</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#FileSelectors_9.htm">The GFSI_fileCriteria Field</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#FileSelectors_a.htm">Matching a File's Token</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#FileSelectors_b.htm">Matching a File's Creator App</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#FileSelectors_c.htm">Matching a File's Geode Attributes</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#FileSelectors_d.htm">Masking File Names</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#FileSelectors_e.htm">Matching a File's File Attributes</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#FileSelectors_f.htm">Searching Via Callback Routine</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#FileSelectors_10.htm">Resetting a Filter</A></P>
+<HR>
+<A NAME="FileSelectors_8.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The FileSelector Object</A>: 3.1 <A HREF="#FileSelectors_7.htm">File Selector Instance Data</A>: 
+The GFSI_attrs Field</H3>
+<PRE>GFSI_attrs, MSG_GEN_FILE_SELECTOR_GET_ATTRS, MSG_GEN_FILE_SELECTOR_SET_ATTRS</PRE>
+<P>
+<A NAME="FileSelectors_8.htm_IX_FSA_&ldots;">
+ </A>
+<A NAME="FileSelectors_8.htm_IX_FileSelectorAttrs">
+ </A>
+<A NAME="FileSelectors_8.htm_IX_GFSI_attrs">
+ </A>
+The GenFileSelector has ten attributes in <CODE>
+GFSI_attrs</CODE>
+, shown below. They are stored as a word-sized record of type <CODE>
+FileSelectorAttrs</CODE>
+; they may be retrieved with <CODE>
+MSG_GEN_FILE_SELECTOR_GET_ATTRS</CODE>
+ and set with <CODE>
+MSG_GEN_FILE_SELECTOR_SET_ATTRS</CODE>
+.</P>
+<DL>
+<DT>
+FSA_ALLOW_CHANGE_DIRS</DT><DD>
+This flag allows the user to change directories by double clicking; it is set by default.</DD>
+<DT>
+FSA_SHOW_FIXED_DISKS_ONLY</DT><DD>
+This flag does not allow removable volumes (e.g. floppy disks) to be shown in the File Selector volume list. By default, this flag is off.</DD>
+<DT>
+FSA_SHOW_FILES_DISABLED</DT><DD>
+This flag instructs the File Selector to display files as disabled. This is useful for SaveAs operations, for example, when files must be displayed but should not be selectable by the user. By default, this flag is off. Setting this flag will turn all other search criteria off, so all filenames will be displayed.</DD>
+<DT>
+FSA_HAS_CLOSE_DIR_BUTTON</DT><DD>
+This flag causes the File Selector to include a &quot;Close Directory&quot; button.</DD>
+<DT>
+FSA_HAS_OPEN_DIR_BUTTON</DT><DD>
+This flag causes the File Selector to include an &quot;Open Directory&quot; button.</DD>
+<DT>
+FSA_HAS_DOCUMENT_BUTTON</DT><DD>
+This flag causes the File Selector to include a &quot;Go to Document&quot; button that displays the DOCUMENT directory.</DD>
+<DT>
+FSA_HAS_CHANGE_DIRECTORY_LIST</DT><DD>
+This flag causes the File Selector to include a list that allows the user to change directories.</DD>
+<DT>
+FSA_HAS_CHANGE_DRIVE_LIST</DT><DD>
+This flag causes the File Selector to include a list that allows the user to change drives.</DD>
+<DT>
+FSA_HAS_FILE_LIST</DT><DD>
+This flag causes the File Selector to include a file list.</DD>
+<DT>
+FSA_USE_VIRTUAL_ROOT</DT><DD>
+This flag causes the File Selector to use the information in the <CODE>
+ATTR_GEN_FILE_SELECTOR_VIRTUAL_ROOT</CODE>
+ attribute. This allows changing the File Selector without altering the vardata.</DD>
+
+</DL>
+<H6 CLASS="RefETitle">
+<A NAME="FileSelectors_8.htm_IX_MSG_GEN_FILE_SELECTOR_SET_ATTRS">
+ </A>
+MSG_GEN_FILE_SELECTOR_SET_ATTRS</H6>
+<PRE CLASS="syntax">void	MSG_GEN_FILE_SELECTOR_SET_ATTRS(
+        FileSelectorAttrs attributes);</PRE>
+<P>
+This message sets the File Selector's <CODE>
+GFSI_attrs</CODE>
+ record to a new set of attributes. The File Selector will rescan the current directory using the new attributes. If the File Selector is not visible when it receives this message, it will set the attributes but will not rescan the directory.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenFileSelector object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+attributes</CODE>
+	A record of <CODE>
+FileSelectorAttrs</CODE>
+ to set into the File Selector's <CODE>
+GFSI_attrs</CODE>
+ record.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="FileSelectors_8.htm_IX_MSG_GEN_FILE_SELECTOR_GET_ATTRS">
+ </A>
+MSG_GEN_FILE_SELECTOR_GET_ATTRS</H6>
+<PRE CLASS="syntax">FileSelectorAttrs MSG_GEN_FILE_SELECTOR_GET_ATTRS();</PRE>
+<P>
+This message returns the current attributes set in the File Selector's <CODE>
+GFSI_attrs</CODE>
+ instance data.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenFileSelector object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	A record of <CODE>
+FileSelectorAttrs</CODE>
+ representing the flags set in the File Selector's <CODE>
+GFSI_attrs</CODE>
+ field.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+<HR>
+<A NAME="FileSelectors_9.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The FileSelector Object</A>: 3.2 <A HREF="#FileSelectors_7.htm">File Selector Instance Data</A>: 
+<A NAME="FileSelectors_9.htm_44968">
+ </A>
+The GFSI_fileCriteria Field</H3>
+<PRE>GFSI_fileCriteria, MSG_GEN_FILE_SELECTOR_GET_FILE_CRITERIA, MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA</PRE>
+<P>
+<A NAME="FileSelectors_9.htm_IX_GFSI_fileCriteria">
+ </A>
+Each File Selector can limit or extend its searches in several different ways. The File Selector's instance data contains information about which types of files to include in the display, which not to include, and other special criteria. (Note that if the proper <CODE>
+GFSI_attrs</CODE>
+ are set, directories and volumes will be unaffected by these scan limitations.)</P>
+<P>
+<A NAME="FileSelectors_9.htm_IX_FileSelectorFileCriteria">
+ </A>
+The attribute field <CODE>
+GFSI_fileCriteria</CODE>
+ is a record that indicates which of several search limiters should be considered in a directory scan. Note that some limitations may be invoked without a corresponding <CODE>
+GFSI_fileCriteria</CODE>
+ entry. There are several possible entries in <CODE>
+GFSI_fileCriteria</CODE>
+, and any or all may be turned on at once. Each flag in the field is shown below, along with the field that it affects:</P>
+<DL>
+<DT>
+FSFC_DIRS</DT><DD><A NAME="FileSelectors_9.htm_IX_FSFC_&ldots;">
+ </A>
+This flag indicates that subdirectories should be displayed in the File Selector's directory scans. This flag is set by default.</DD>
+<DT>
+FSFC_NON_GEOS_FILES</DT><DD>
+This flag indicates that non-GEOS files should be displayed. This flag is set by default.</DD>
+<DT>
+FSFC_GEOS_EXECUTABLES</DT><DD>
+This flag indicates that GEOS executable files should be displayed. This flag is set by default.</DD>
+<DT>
+FSFC_GEOS_NON_EXECUTABLES</DT><DD>
+This flag indicates that GEOS non-executable files (documents and other types) should be displayed. This flag is set by default.</DD>
+<DT>
+FSFC_MASK_CASE_INSENSITIVE</DT><DD>
+This flag indicates that the filename mask (if any) should be case-insensitive. The mask applies only to files unless FSFC_USE_MASK_FOR_DIRS is also set (see below); the mask is set in <CODE>
+ATTR_GEN_FILE_SELECTOR_NAME_MASK</CODE>
+.</DD>
+<DT>
+FSFC_FILE_FILTER</DT><DD>
+This flag makes the File Selector use an application-defined callback routine when scanning. The callback routine is used after all other filters have been applied. The callback routine must be defined in a subclass of <CODE>
+GenFileSelectorClass</CODE>
+.</DD>
+<DT>
+FSFC_FILTER_IS_C</DT><DD>
+This flag indicates that the callback filter routine is written in C and follows the Pascal calling convention.</DD>
+<DT>
+FSFC_TOKEN_NO_ID</DT><DD>
+This flag indicates that when using a token to match files, the File Selector should ignore the token ID. In other words, it will only match the token characters.</DD>
+<DT>
+FSFC_USE_MASK_FOR_DIRS</DT><DD>
+This flag indicates that if a filename mask is used, the File Selector should apply the mask to directories as well as to files. By default, the mask is applied only to file names.</DD>
+</DL>
+<P>
+You should set the proper <CODE>
+GFSI_fileCriteria</CODE>
+ attributes in your application's Goc code. However, you can change the <CODE>
+GFSI_fileCriteria</CODE>
+ field at run-time with <CODE>
+MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA</CODE>
+. You can also get the flags with <CODE>
+MSG_GEN_FILE_SELECTOR_GET_FILE_CRITERIA</CODE>
+. Both of these messages are detailed below.</P>
+
+<H6 CLASS="RefETitle">
+<A NAME="FileSelectors_9.htm_IX_MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA">
+ </A>
+MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA</H6>
+<PRE CLASS="syntax">void	MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA(
+        FileSelectorFileCriteria fileCriteria);</PRE>
+<P>
+This message sets the File Selector's<CODE>
+ GFSI_fileCriteria</CODE>
+ record to a new set of flags. If the File Selector is visible when it receives this message, it will rescan the current directory with the new attributes. Otherwise, it will set the <CODE>
+GFSI_fileCriteria</CODE>
+ record but will not rescan.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenFileSelector object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+fileCriteria</CODE>
+	A record of <CODE>
+FileSelectorFileCriteria</CODE>
+ to set into the File Selector's <CODE>
+GFSI_fileCriteria</CODE>
+ record.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+<P CLASS="refField">
+See Also:	<CODE>
+MSG_GEN_FILE_SELECTOR_SET_FILE_ATTRS</CODE>
+, <CODE>
+MSG_GEN_FILE_SELECTOR_SET_TOKEN</CODE>
+, <CODE>
+MSG_GEN_FILE_SELECTOR_SET_CREATOR</CODE>
+, <CODE>
+MSG_GEN_FILE_SELECTOR_SET_GEODE_ATTRS</CODE>
+, <CODE>
+MSG_GEN_FILE_SELECTOR_SET_MASK</CODE>
+</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="FileSelectors_9.htm_IX_MSG_GEN_FILE_SELECTOR_GET_FILE_CRITERIA">
+ </A>
+MSG_GEN_FILE_SELECTOR_GET_FILE_CRITERIA</H6>
+<PRE CLASS="syntax">FileSelectorFileCriteria MSG_GEN_FILE_SELECTOR_GET_FILE_CRITERIA();</PRE>
+<P>
+This message returns the File Selector's current <CODE>
+GFSI_fileCriteria</CODE>
+ record. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenFileSelector object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	A record of <CODE>
+FileSelectorFileCriteria</CODE>
+ representing the File Selector's <CODE>
+GFSI_fileCriteria</CODE>
+ flags.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+<P CLASS="refField">
+See Also:	<CODE>
+MSG_GEN_FILE_SELECTOR_SET_FILE_ATTRS</CODE>
+, <CODE>
+MSG_GEN_FILE_SELECTOR_SET_TOKEN</CODE>
+, <CODE>
+MSG_GEN_FILE_SELECTOR_SET_CREATOR</CODE>
+, <CODE>
+MSG_GEN_FILE_SELECTOR_SET_GEODE_ATTRS</CODE>
+, <CODE>
+MSG_GEN_FILE_SELECTOR_SET_MASK</CODE>
+</P>
+
+<HR>
+<A NAME="FileSelectors_a.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The FileSelector Object</A>: 3.3 <A HREF="#FileSelectors_7.htm">File Selector Instance Data</A>: 
+<A NAME="FileSelectors_a.htm_53091">
+ </A>
+Matching a File's Token</H3>
+<PRE>ATTR_GEN_FILE_SELECTOR_TOKEN_MATCH, MSG_GEN_FILE_SELECTOR_SET_TOKEN, MSG_GEN_FILE_SELECTOR_GET_TOKEN</PRE>
+<P>
+Since every GEOS file has a token associated with it, you can limit directory scans to include only those files with a given token. (Note that directories and volumes are not affected by this limitation.) Alternatively, because the token is made up of two items, the token chars and the token ID, you can arrange a search based on just the token characters (you can not search on only the ID).</P>
+<P>
+<A NAME="FileSelectors_a.htm_IX_ATTR_GEN_FILE_SELECTOR_TOKEN_MATCH">
+ </A>
+Both the match token ID and the match token characters are stored in the File Selector's <CODE>
+ATTR_GEN_FILE_SELECTOR_TOKEN_MATCH</CODE>
+ instance field. This field is of type <CODE>
+GeodeToken</CODE>
+, the structure of which is shown below:</P>
+<PRE><A NAME="FileSelectors_a.htm_IX_GT_&ldots;"> </A><A NAME="IX_GeodeToken"> </A>typedef struct {
+   TokenChars			GT_chars[TOKEN_CHARS_LENGTH];
+   ManufacturerID			GT_manufID;
+} GeodeToken;</PRE>
+<P>
+The <CODE>
+GT_chars</CODE>
+ field is four characters as defined in the geode's geode parameters (<STRONG CLASS="fileName">
+.gp</STRONG>
+) file. The <CODE>
+GT_manufID</CODE>
+ field is the manufacturer ID number allotted to the particular developer who created the geode.</P>
+<P>
+If the <CODE>
+GFSI_fileCriteria</CODE>
+ attribute FSFC_TOKEN_NO_ID is set, only the token characters will be matched. The ID portion of the token will be ignored by the File Selector (until FSFC_TOKEN_NO_ID is turned off). See <A HREF="#FileSelectors_9.htm_44968"> The GFSI_fileCriteria Field</A>
+ for more information on <CODE>
+GFSI_fileCriteria</CODE>
+.</P>
+<P>
+If no token information is set, no filter will be applied based on tokens. To set the token at run-time, send <CODE>
+MSG_GEN_FILE_SELECTOR_SET_TOKEN</CODE>
+ to the File Selector. To retrieve the token match information, send <CODE>
+MSG_GEN_FILE_SELECTOR_GET_TOKEN</CODE>
+.</P>
+
+<H6 CLASS="RefETitle">
+<A NAME="FileSelectors_a.htm_IX_MSG_GEN_FILE_SELECTOR_SET_TOKEN">
+ </A>
+MSG_GEN_FILE_SELECTOR_SET_TOKEN</H6>
+<PRE CLASS="syntax">void	MSG_GEN_FILE_SELECTOR_SET_TOKEN(
+        dword		tokenChars,
+        ManufacturerID		manufacturerID);</PRE>
+<P>
+This message sets the <CODE>
+ATTR_GEN_FILE_SELECTOR_TOKEN_MATCH</CODE>
+ field to the two passed values. The token set with this message will be used to filter out certain files; directories and volumes are not affected by this filter.</P>
+<P>
+If the File Selector is visible when it receives this message, it will rescan the current directory using the new token information. Otherwise, the File Selector will store the passed token.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenFileSelector object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+tokenChars</CODE>
+	The token characters of the token to match files against. Use the macro SET_TOKEN_CHARS (below) to set this dword value from the four individual characters.</P>
+<DL>
+<DT>
+<CODE>
+manufacturerID</CODE>
+</DT><DD>The token ID of the token to match files against.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+<P CLASS="refField">
+See Also:	<CODE>
+MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA</CODE>
+, <CODE>
+MSG_GEN_FILE_SELECTOR_SET_CREATOR</CODE>
+</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="FileSelectors_a.htm_IX_MSG_GEN_FILE_SELECTOR_GET_TOKEN">
+ </A>
+MSG_GEN_FILE_SELECTOR_GET_TOKEN</H6>
+<PRE CLASS="syntax">void	MSG_GEN_FILE_SELECTOR_GET_TOKEN(
+        GetTokenCreatorParams *retValue);</PRE>
+<P>
+This message returns the current token match information set in the File Selector's <CODE>
+ATTR_GEN_FILE_SELECTOR_TOKEN_MATCH</CODE>
+ field.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenFileSelector object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+retValue</CODE>
+	A pointer to a <CODE>
+GetTokenCreatorParams </CODE>
+structure, shown below. The structure may be empty when passed.</P>
+<P CLASS="refField">
+Return:	The <CODE>
+GetTokenCreatorParams </CODE>
+structure pointed to by <CODE>
+retValue</CODE>
+ will contain the token in <CODE>
+ATTR_GEN_FILE_SELECTOR_TOKEN_MATCH</CODE>
+.</P>
+<P CLASS="refField">
+Structures:	The <CODE>
+GetTokenCreatorParams</CODE>
+ structure consists of two elements: a <CODE>
+GeodeToken</CODE>
+ structure containing the File Selector's token characters and manufacturer ID fields, and a reserved word. Its structure is shown below:</P>
+<PRE>typedef struct {
+    GeodeToken   GTP_Token;
+    word         GTP_Unused;						/* reserved */
+} GetTokenCreatorParams;</PRE>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+<P CLASS="refField">
+See Also:	<CODE>
+MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA</CODE>
+, <CODE>
+MSG_GEN_FILE_SELECTOR_GET_CREATOR</CODE>
+</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="FileSelectors_a.htm_IX_SET_TOKEN_CHARS() macro">
+ </A>
+SET_TOKEN_CHARS</H6>
+<PRE CLASS="syntax">dword	SET_TOKEN_CHARS(<EM>ch1</EM>, <EM>ch2</EM>, <EM>ch3</EM>, <EM>ch4</EM>);
+        char	<EM>ch1</EM>, <EM>ch2</EM>, <EM>ch3</EM>, <EM>ch4</EM>;</PRE>
+<P>
+This macro creates a single dword containing the four given characters. Use this macro to create the <CODE>
+tokenChars</CODE>
+ parameter for <CODE>
+MSG_GEN_FILE_SELECTOR_SET_TOKEN</CODE>
+ and <CODE>
+MSG_GEN_FILE_SELECTOR_SET_CREATOR</CODE>
+.</P>
+
+<HR>
+<A NAME="FileSelectors_b.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The FileSelector Object</A>: 3.4 <A HREF="#FileSelectors_7.htm">File Selector Instance Data</A>: 
+<A NAME="FileSelectors_b.htm_12779">
+ </A>
+Matching a File's Creator App</H3>
+<PRE>ATTR_GEN_FILE_SELECTOR_CREATOR_MATCH, MSG_GEN_FILE_SELECTOR_SET_CREATOR, MSG_GEN_FILE_SELECTOR_GET_CREATOR</PRE>
+<P>
+Most applications will store their documents in a special type of file; each of these files will include the token of the creator geode. (This is a function of the Document Control objects.)</P>
+<P>
+As a result, you may limit the File Selector's searches to only those files created by a given geode. Set the token to be matched in the File Selector's <CODE>
+ATTR_GEN_FILE_SELECTOR_CREATOR_MATCH</CODE>
+<A NAME="FileSelectors_b.htm_IX_ATTR_GEN_FILE_SELECTOR_CREATOR_MATCH">
+ </A>
+ variable data instance field. This search is employed in the same manner as a token search (above), so it is also subject to the FSFC_TOKEN_NO_ID attribute of <CODE>
+GFSI_fileCriteria</CODE>
+.</P>
+<P>
+The <CODE>
+ATTR_GEN_FILE_SELECTOR_CREATOR_MATCH</CODE>
+ field is a <CODE>
+GeodeToken</CODE>
+ structure that contains both the match ID and the match characters of the creator token. The <CODE>
+GeodeToken</CODE>
+ structure is shown in the previous section. You can set the creator information in the File Selector's Goc code, or you can set it at run-time with <CODE>
+MSG_GEN_FILE_SELECTOR_SET_CREATOR</CODE>
+. To retrieve the creator token, use <CODE>
+MSG_GEN_FILE_SELECTOR_GET_CREATOR</CODE>
+.</P>
+
+<H6 CLASS="RefETitle">
+<A NAME="FileSelectors_b.htm_IX_MSG_GEN_FILE_SELECTOR_SET_CREATOR">
+ </A>
+MSG_GEN_FILE_SELECTOR_SET_CREATOR</H6>
+<PRE CLASS="syntax">void	MSG_GEN_FILE_SELECTOR_SET_CREATOR(
+        dword		tokenChars,
+        ManufacturerID		manufacturerID);</PRE>
+<P>
+This message sets the <CODE>
+ATTR_GEN_FILE_SELECTOR_CREATOR_MATCH</CODE>
+ field to the two passed values. This field is a vardata instance record of type <CODE>
+GeodeToken</CODE>
+. The token set with this message will be used to filter out certain files; directories and volumes are not affected by this filter. Only files which have their creator token the same as that of the File Selector will be displayed.</P>
+<P>
+If the File Selector is visible when it receives this message, it will rescan the directory using the new token as a filter. Otherwise, the File Selector will store the passed token for later use.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenFileSelector object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+tokenChars</CODE>
+	The token characters of the creator token to match files against. Use the macro SET_TOKEN_CHARS to set this dword value from the four individual characters. This macro is shown in the previous section.</P>
+<DL>
+<DT>
+<CODE>
+manufacturerID</CODE>
+</DT><DD>The token ID of the creator token to match files against.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+<P CLASS="refField">
+See Also:	<CODE>
+MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA</CODE>
+, <CODE>
+MSG_GEN_FILE_SELECTOR_SET_TOKEN</CODE>
+</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="FileSelectors_b.htm_IX_MSG_GEN_FILE_SELECTOR_GET_CREATOR">
+ </A>
+MSG_GEN_FILE_SELECTOR_GET_CREATOR</H6>
+<PRE CLASS="syntax">void	MSG_GEN_FILE_SELECTOR_GET_CREATOR(
+        GetTokenCreatorParams *retValue);</PRE>
+<P>
+This message returns the current creator match information set in the File Selector's <CODE>
+ATTR_GEN_FILE_SELECTOR_CREATOR_MATCH</CODE>
+ field.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenFileSelector object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+retValue</CODE>
+	A pointer to a <CODE>
+GetTokenCreatorParams </CODE>
+structure, shown below. The structure may be empty when passed.</P>
+<P CLASS="refField">
+Return:	The <CODE>
+GetTokenCreatorParams </CODE>
+structure pointed to by <CODE>
+retValue</CODE>
+ will contain the token in <CODE>
+ATTR_GEN_FILE_SELECTOR_CREATOR_MATCH</CODE>
+.</P>
+<P CLASS="refField">
+Structures:	<A NAME="FileSelectors_b.htm_IX_GetTokenCreatorParams">
+ </A>
+The <CODE>
+GetTokenCreatorParams</CODE>
+ structure consists of two elements: a <CODE>
+GeodeToken</CODE>
+ structure containing the File Selector's token characters and manufacturer ID fields, and a reserved word. Its structure is shown below:</P>
+<PRE>typedef struct {
+<A NAME="FileSelectors_b.htm_IX_GTP_&ldots;  (GetTokenCreatorParams)"> </A>    GeodeToken   GTP_token;
+    word         GTP_unused;						/* reserved */
+} GetTokenCreatorParams;</PRE>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+<P CLASS="refField">
+See Also:	<CODE>
+MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA, MSG_GEN_FILE_SELECTOR_GET_TOKEN </CODE>
+</P>
+
+<HR>
+<A NAME="FileSelectors_c.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The FileSelector Object</A>: 3.5 <A HREF="#FileSelectors_7.htm">File Selector Instance Data</A>: 
+<A NAME="FileSelectors_c.htm_13230">
+ </A>
+Matching a File's Geode Attributes</H3>
+<PRE>ATTR_GEN_FILE_SELECTOR_GEODE_ATTR, MSG_GEN_FILE_SELECTOR_SET_GEODE_ATTRS, MSG_GEN_FILE_SELECTOR_GET_GEODE_ATTRS</PRE>
+<P>
+Every geode in GEOS has a structure of type <CODE>
+GeodeAttrs</CODE>
+ stored in its file. As a result, you can limit the File Selector's searches to include only a certain set of geodes--those with the attributes set in the File Selector's <CODE>
+ATTR_GEN_FILE_SELECTOR_GEODE_ATTR</CODE>
+<A NAME="FileSelectors_c.htm_IX_ATTR_GEN_FILE_SELECTOR_GEODE_ATTR">
+ </A>
+ vardata instance field.</P>
+<P>
+<CODE>
+ATTR_GEN_FILE_SELECTOR_GEODE_ATTR</CODE>
+ is a structure of type <CODE>
+GenFileSelectorGeodeAttrs</CODE>
+<A NAME="FileSelectors_c.htm_IX_GenFileSelectorGeodeAttrs">
+ </A>
+, which consists of two parts. <CODE>
+GFSGA_match</CODE>
+ represents the geode attributes an acceptable file must have on, and <CODE>
+GFSGA_mismatch</CODE>
+ represents the geode attributes an acceptable file must have off. The structure's definition is shown below:</P>
+<PRE>typedef struct {
+<A NAME="FileSelectors_c.htm_IX_GFSGA_&ldots;"> </A>    GeodeAttrs    GFSGA_match;
+    GeodeAttrs    GFSGA_mismatch;
+} GenFileSelectorGeodeAttrs;</PRE>
+<P>
+To retrieve the current geode match information, send the message <CODE>
+MSG_GEN_FILE_SELECTOR_GET_GEODE_ATTRS</CODE>
+ to the File Selector object. To set them, send <CODE>
+MSG_GEN_FILE_SELECTOR_SET_GEODE_ATTRS</CODE>
+. If you do not explicitly set the geode match information, the File Selector will not apply the geode match filter to its directory scans.</P>
+<P>
+<A NAME="FileSelectors_c.htm_IX_GeodeAttrs">
+ </A>
+<A NAME="FileSelectors_c.htm_IX_GA_&ldots;  (GeodeAttrs)">
+ </A>
+The possible geode attributes on which you can match or mismatch are shown below. They are all flags of the <CODE>
+GeodeAttrs</CODE>
+ record, a system type that is not specific to <CODE>
+GenFileSelectorClass</CODE>
+<DL>
+. Note that none of these flags is set by default. (Geode attributes are described in detail in <A HREF="../../Kernel/Geodes/index.htm">the Applications and Geodes chapter</A>.)</P><DT>
+GA_PROCESS</DT><DD>This flag indicates the geode is a process (has an initial thread).</DD>
+<DT>
+GA_LIBRARY</DT><DD>This flag indicates the geode is a library (exports routines). </DD>
+<DT>
+GA_DRIVER</DT><DD>This flag indicates the geode is a driver (has a Driver Table).</DD>
+<DT>
+GA_KEEP_FILE_OPEN</DT><DD>
+This flag indicates the <STRONG CLASS="fileName">
+.geo</STRONG>
+ file must stay open (e.g. is a resource that is designated as discardable).</DD>
+<DT>
+GA_SYSTEM</DT><DD>This flag indicates the geode is a GEOS system geode. </DD>
+<DT>
+GA_MULTI_LAUNCHABLE</DT><DD>
+This flag indicates the geode may be loaded more than once. </DD>
+<DT>
+GA_APPLICATION</DT><DD>
+This flag indicates the geode is a user-launchable application.</DD>
+<DT>
+GA_DRIVER_INITIALIZED</DT><DD>
+Set on the fly by GEOS if the geode's driver aspect has been initialized (should not be matched).</DD>
+<DT>
+GA_LIBRARY_INITIALIZED</DT><DD>
+Set on the fly by GEOS if the geode's library aspect has been initialized (should not be matched).</DD>
+<DT>
+GA_GEODE_INITIALIZED</DT><DD>
+Set on the fly by GEOS if the geode's process aspect has been initialized (should not be matched).</DD>
+<DT>
+GA_USES_COPROC</DT><DD>
+This flag indicates that the geode uses a coprocessor if one is available.</DD>
+<DT>
+GA_REQUIRES_COPROC</DT><DD>
+This flag indicates the geode requires a coprocessor or coprocessor emulator.</DD>
+<DT>
+GA_HAS_GENERAL_CONSUMER_MODE</DT><DD>
+This flag indicates the geode can be run in GCM mode.</DD>
+<DT>
+GA_ENTRY_POINTS_IN_C</DT><DD>
+This flag indicates that the geode has library/driver entry points in C.</DD>
+
+</DL>
+<H6 CLASS="RefETitle">
+<A NAME="FileSelectors_c.htm_IX_MSG_GEN_FILE_SELECTOR_SET_GEODE_ATTRS">
+ </A>
+MSG_GEN_FILE_SELECTOR_SET_GEODE_ATTRS</H6>
+<PRE CLASS="syntax">void	MSG_GEN_FILE_SELECTOR_SET_GEODE_ATTRS(
+        GeodeAttrs		matchGeodeAttrs,
+        GeodeAttrs		mismatchGeodeAttrs);</PRE>
+<P>
+This message sets the File Selector's vardata instance field <CODE>
+ATTR_GEN_FILE_SELECTOR_GEODE_ATTR</CODE>
+ to the two passed values.</P>
+<P>
+If the File Selector is visible when it receives this message, it will automatically rescan the current directory, applying the new geode filter. Otherwise, the new geode match/mismatch records will be stored but no rescan will occur.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenFileSelector object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+matchGeodeAttrs</CODE>
+	A <CODE>
+GeodeAttrs</CODE>
+ record indicating the flags that every acceptable file must have set. This record will be set into <CODE>
+GFSGA_match</CODE>
+.</P>
+<DL>
+<DT>
+<CODE>
+mismatchGeodeAttrs</DT><DD>
+</CODE>
+A <CODE>
+GeodeAttrs</CODE>
+ record indicating the flags that every acceptable file must have clear. This record will be set into <CODE>
+GFSGA_mismatch</CODE>
+.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+<P CLASS="refField">
+See Also:	<CODE>
+MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA</CODE>
+</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="FileSelectors_c.htm_IX_MSG_GEN_FILE_SELECTOR_GET_GEODE_ATTRS">
+ </A>
+MSG_GEN_FILE_SELECTOR_GET_GEODE_ATTRS</H6>
+<PRE CLASS="syntax">dword	 MSG_GEN_FILE_SELECTOR_GET_GEODE_ATTRS();</PRE>
+<P>
+This message returns the File Selector's current geode attribute match information.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenFileSelector object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	The returned dword consists of the two <CODE>
+GeodeAttrs</CODE>
+ records stored in the File Selector's <CODE>
+ATTR_GEN_FILE_SELECTOR_GEODE_ATTR</CODE>
+ vardata field. To extract the match attributes (<CODE>
+GFSGA_match</CODE>
+), use the macro <CODE>
+GET_MATCH_ATTRS</CODE>
+. To extract the mismatch attributes (<CODE>
+GFSGA_mismatch</CODE>
+), use GET_MISMATCH_ATTRS.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+<P CLASS="refField">
+See Also:	<CODE>
+MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA</CODE>
+</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="FileSelectors_c.htm_IX_GET_MATCH_ATTRS() macro">
+ </A>
+GET_MATCH_ATTRS</H6>
+<PRE CLASS="syntax">word	GET_MATCH_ATTRS(<EM>attr</EM>);
+        dword	<EM>attr</EM>;</PRE>
+<P>
+This macro extracts the <CODE>
+GFSGA_match</CODE>
+ record (<CODE>
+GeodeAttrs</CODE>
+) from the given dword (returned by <CODE>
+MSG_GEN_FILE_SELECTOR_GET_GEODE_ATTRS</CODE>
+).</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="FileSelectors_c.htm_IX_GET_MISMATCH_ATTRS() macro">
+ </A>
+GET_MISMATCH_ATTRS</H6>
+<PRE CLASS="syntax">word	GET_MISMATCH_ATTRS(attr);
+        dword	attr;</PRE>
+<P>
+This macro extracts the <CODE>
+GFSGA_match</CODE>
+ record (<CODE>
+GeodeAttrs</CODE>
+) from the given dword (returned by <CODE>
+MSG_GEN_FILE_SELECTOR_GET_GEODE_ATTRS</CODE>
+).</P>
+
+<HR>
+<A NAME="FileSelectors_d.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The FileSelector Object</A>: 3.6 <A HREF="#FileSelectors_7.htm">File Selector Instance Data</A>: 
+Masking File Names</H3>
+<PRE>ATTR_GEN_FILE_SELECTOR_NAME_MASK, MSG_GEN_FILE_SELECTOR_SET_MASK, MSG_GEN_FILE_SELECTOR_GET_MASK</PRE>
+<P>
+By setting up a filename mask, you can limit the File Selector's displays to only those files that conform to the mask characters. For example, to show only those files with the .BAT extender, you could set the mask to<STRONG CLASS="fileName">
+ </STRONG>
+*.BAT.</P>
+<P>
+Only one mask may be in use at any given time. If you need to mask for two different sets of characters (e.g. *.BAT and *.EXE), you will need to subclass the File Selector and modify its behavior. (See <A HREF="#FileSelectors_f.htm_27532"> Searching Via Callback Routine</A>
+ for more information.)</P>
+<P>
+The mask is stored in the File Selector's variable data instance attribute <CODE>
+ATTR_GEN_FILE_SELECTOR_NAME_MASK</CODE>
+<A NAME="FileSelectors_d.htm_IX_ATTR_GEN_FILE_SELECTOR_NAME_MASK">
+ </A>
+ and consists of a null-terminated character string.<A NAME="FileSelectors_d.htm_IX_GenFileSelectorMask">
+ </A>
+ This field is defined as type <CODE>
+GenFileSelectorMask</CODE>
+, the same as <CODE>
+FileLongName</CODE>
+. This string may contain the DOS &quot;<STRONG CLASS="fileName">
+*</STRONG>
+&quot; and &quot;<STRONG CLASS="fileName">
+?</STRONG>
+&quot; wildcard characters. The filter applied by the File Selector is the same as that applied by the <CODE>
+FileEnum()</CODE>
+ routine detailed in <A HREF="../../Files/FileSys/FileSys_f.htm#51873">the File System chapter</A>. In short, the mask is taken as a character string matched to the entire file name (thus, a mask of <STRONG CLASS="fileName">*.*</CODE>
+ implies all files with a period in their names; the period separating a filename and an extension will not count as a period).</P>
+<P>
+Normally, the mask is applied only to files and not to directories or volumes. However, if the <CODE>
+GFSI_fileCriteria</CODE>
+ attribute FSFC_USE_MASK_FOR_DIRS is set, directories will also be subject to the mask. (Volumes are never subject to the mask filter.)</P>
+<P>
+By default, the mask filter is case-sensitive. You can make the mask filter be case-insensitive, however, by setting FSFC_MASK_CASE_INSENSITIVE in the File Selector's <CODE>
+GFSI_fileCriteria</CODE>
+ instance field.</P>
+<P>
+You can set the mask in your application's Goc code or by sending the message <CODE>
+MSG_GEN_FILE_SELECTOR_SET_MASK</CODE>
+ to the File Selector. To retrieve the current mask, use <CODE>
+MSG_GEN_FILE_SELECTOR_GET_MASK</CODE>
+. If you do not explicitly set a mask string, the File Selector will not make any filename mask comparisons.</P>
+
+<H6 CLASS="RefETitle">
+<A NAME="FileSelectors_d.htm_IX_MSG_GEN_FILE_SELECTOR_SET_MASK">
+ </A>
+MSG_GEN_FILE_SELECTOR_SET_MASK</H6>
+<PRE CLASS="syntax">void	MSG_GEN_FILE_SELECTOR_SET_MASK(
+        char	*mask);</PRE>
+<P>
+This message sets the <CODE>
+ATTR_GEN_FILE_SELECTOR_NAME_MASK</CODE>
+ variable instance field of the File Selector. This field contains a null-terminated character string (of type <CODE>
+GenFileSelectorMask</CODE>
+); during a directory scan, the File Selector checks all filenames against this mask, and only those files that contain the mask characters are displayed. The mask string may contain DOS wildcard characters (&quot;<STRONG CLASS="fileName">
+*</STRONG>
+&quot; and &quot;<STRONG CLASS="fileName">
+?</STRONG>
+&quot;).</P>
+<P>
+The mask works for both DOS and GEOS files. However, unless the FSFC_USE_MASK_FOR_DIRS flag is set in the <CODE>
+GFSI_fileCriteria</CODE>
+ attribute, directories will be unaffected by the mask. Volumes are unaffected in any case.</P>
+<P>
+If the File Selector is visible on the screen when it receives this message, it will automatically rescan the current directory with the new mask. Otherwise, the new mask will be stored for later use.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenFileSelector object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+mask</CODE>
+	A pointer to the mask string to be set. This is a null-terminated character string.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+<P CLASS="refField">
+See Also:	<CODE>
+MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA</CODE>
+</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="FileSelectors_d.htm_IX_MSG_GEN_FILE_SELECTOR_GET_MASK">
+ </A>
+MSG_GEN_FILE_SELECTOR_GET_MASK</H6>
+<PRE CLASS="syntax">void	MSG_GEN_FILE_SELECTOR_GET_MASK(
+        char	*mask);</PRE>
+<P>
+This message returns the mask string in the File Selector's <CODE>
+ATTR_GEN_FILE_SELECTOR_NAME_MASK</CODE>
+ field.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenFileSelector object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+mask</CODE>
+	A pointer to an empty character string. The string must be at least <CODE>
+sizeof(GenFileSelectorMask)</CODE>
+ characters.</P>
+<P CLASS="refField">
+Return:	The character string pointed to by <CODE>
+mask</CODE>
+ will contain the mask string set in <CODE>
+ATTR_GEN_FILE_SELECTOR_NAME_MASK</CODE>
+.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+<P CLASS="refField">
+See Also:	<CODE>
+MSG_GEN_FILE_SELECTOR_SET_MASK, MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA</CODE>
+</P>
+
+<HR>
+<A NAME="FileSelectors_e.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The FileSelector Object</A>: 3.7 <A HREF="#FileSelectors_7.htm">File Selector Instance Data</A>: 
+Matching a File's File Attributes</H3>
+<PRE>ATTR_GEN_FILE_SELECTOR_FILE_ATTR, MSG_GEN_FILE_SELECTOR_GET_FILE_ATTRS, MSG_GEN_FILE_SELECTOR_SET_FILE_ATTRS</PRE>
+<P>
+<A NAME="FileSelectors_e.htm_IX_FileAttrs">
+ </A>
+All files have a number of attributes stored in a record of type <CODE>
+FileAttrs</CODE>
+. (For full information on <CODE>
+FileAttrs</CODE>
+, see <A HREF="../../Files/FileSys/index.htm">the File System chapter</A>.) To filter files based on the <CODE>FileAttrs</CODE>
+ record, set your File Selector's variable data instance field <CODE>
+ATTR_GEN_FILE_SELECTOR_FILE_ATTR</CODE>
+ to reflect the attributes that must be on and those that must be off.</P>
+<P>
+<CODE>
+ATTR_GEN_FILE_SELECTOR_FILE_ATTR</CODE>
+<A NAME="FileSelectors_e.htm_IX_ATTR_GEN_FILE_SELECTOR_FILE_ATTR">
+ </A>
+ is a structure of type <CODE>
+GenFileSelectorFileAttrs</CODE>
+<A NAME="FileSelectors_e.htm_IX_GenFileSelectorFileAttrs">
+ </A>
+, shown below. This structure contains two fields: <CODE>
+GFSFA_match</CODE>
+ represents the attributes an acceptable file has on, and <CODE>
+GFSFA_mismatch</CODE>
+ represents the attributes an acceptable file has off.</P>
+<PRE>typedef struct {
+<A NAME="FileSelectors_e.htm_IX_GFSFA_&ldots;"> </A>    FileAttrs    GFSFA_match;
+    FileAttrs    GFSFA_mismatch;
+} GenFileSelectorFileAttrs;</PRE>
+<P>
+<A NAME="FileSelectors_e.htm_IX_FA_&ldots;">
+ </A>
+<DL>
+The allowable file attributes are listed below and are discussed fully in <A HREF="../../Files/FileSys/index.htm">the File System chapter</A>. If you don't explicitly set the file attribute limitations, the File Selector will automatically filter out all files with either FA_SYSTEM or FA_HIDDEN.</P><DT>
+FA_ARCHIVE</DT><DD>This flag indicates that the file requires a backup.</DD>
+<DT>
+FA_SYSTEM</DT><DD>This flag indicates that the file used by DOS.</DD>
+<DT>
+FA_HIDDEN</DT><DD>This flag indicates that the file not seen by normal searches. </DD>
+<DT>
+FA_RDONLY</DT><DD>This flag indicates that the file is read-only.</DD>
+</DL>
+<P>
+Note: For directories not to be filtered out when FSFC_DIRS isn't set, you must mismatch FA_SYSTEM and FA_HIDDEN. That is, to show only those subdirectories which match your filter criteria, ensure FSFC_DIRS is not set, and set mismatch attributes thus:</P>
+<PRE>ATTR_GEN_FILE_SELECTOR_FILE_ATTR = {
+				0,
+				FA_HIDDEN | FA_SYSTEM
+}</PRE>
+<P>
+You may retrieve the current file attributes by sending the message <CODE>
+MSG_GEN_FILE_SELECTOR_GET_FILE_ATTRS</CODE>
+ to the File Selector object. You may set new file attribute limitations by sending it the message <CODE>
+MSG_GEN_FILE_SELECTOR_SET_FILE_ATTRS</CODE>
+.</P>
+
+<H6 CLASS="RefETitle">
+<A NAME="FileSelectors_e.htm_IX_MSG_GEN_FILE_SELECTOR_SET_FILE_ATTRS">
+ </A>
+MSG_GEN_FILE_SELECTOR_SET_FILE_ATTRS</H6>
+<PRE CLASS="syntax">void	MSG_GEN_FILE_SELECTOR_SET_FILE_ATTRS(
+        FileAttrs setAttrs,
+        FileAttrs clearAttrs);</PRE>
+<P>
+This message sets the <CODE>
+ATTR_GEN_FILE_SELECTOR_FILE_ATTR</CODE>
+ vardata instance field of the File Selector. If the File Selector is visible on the screen when it receives this message, it will rescan the directory immediately with the new attributes.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenFileSelector object</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+setAttrs</CODE>
+	A <CODE>
+FileAttrs</CODE>
+ record to be set into <CODE>
+GFSFA_match</CODE>
+. Only files with these flags set will pass the filter.</P>
+<DL>
+<DT>
+<CODE>
+clearAttrs</CODE>
+</DT><DD>A <CODE>
+FileAttrs</CODE>
+ record to be set into <CODE>
+GFSFA_mismatch</CODE>
+. Only files with these flags cleared will pass the filter.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+<P CLASS="refField">
+See Also:	<CODE>
+MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA</CODE>
+</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="FileSelectors_e.htm_IX_MSG_GEN_FILE_SELECTOR_GET_FILE_ATTRS">
+ </A>
+MSG_GEN_FILE_SELECTOR_GET_FILE_ATTRS</H6>
+<PRE CLASS="syntax">word	MSG_GEN_FILE_SELECTOR_GET_FILE_ATTRS();</PRE>
+<P>
+This message returns the ATTR_GEN_FILE_SELECTOR_FILE_ATTR of the File Selector. This attribute contains two byte-sized fields which represent the match and mismatch attributes (see above).</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenFileSelector object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	A word value: The high byte represents the mismatch attributes, and the low byte represents the match attributes. To extract these two fields from the returned value, use the macros GET_MATCH_FILE_ATTRS and GET_MISMATCH_FILE_ATTRS (below).</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+<P CLASS="refField">
+See Also:	<CODE>
+MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA</CODE>
+</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="FileSelectors_e.htm_IX_GET_MATCH_FILE_ATTRS() macro">
+ </A>
+GET_MATCH_FILE_ATTRS</H6>
+<PRE CLASS="syntax">byte	GET_MATCH_FILE_ATTRS(<EM>attr</EM>);
+        word	<EM>attr</EM>;</PRE>
+<P>
+This macro extracts the <CODE>
+GFSFA_match</CODE>
+ portion of the word value returned by <CODE>
+MSG_GEN_FILE_SELECTOR_GET_FILE_ATTRS</CODE>
+. The extracted value is a record of <CODE>
+FileAttrs</CODE>
+.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="FileSelectors_e.htm_IX_GET_MISMATCH_FILE_ATTRS() macro">
+ </A>
+GET_MISMATCH_FILE_ATTRS</H6>
+<PRE CLASS="syntax">byte	GET_MISMATCH_FILE_ATTRS(<EM>attr</EM>);
+        word	<EM>attr</EM>;</PRE>
+<P>
+This macro extracts the <CODE>
+GFSFA_mismatch</CODE>
+ portion of the word value returned by <CODE>
+MSG_GEN_FILE_SELECTOR_GET_FILE_ATTRS</CODE>
+. The extracted value is a record of <CODE>
+FileAttrs</CODE>
+.</P>
+
+<HR>
+<A NAME="FileSelectors_f.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The FileSelector Object</A>: 3.8 <A HREF="#FileSelectors_7.htm">File Selector Instance Data</A>: 
+<A NAME="FileSelectors_f.htm_27532">
+ </A>
+Searching Via Callback Routine</H3>
+<PRE>MSG_GEN_FILE_SELECTOR_GET_FILTER_ROUTINE, GenFileSelectorFilterRoutine</PRE>
+<P>
+If the built-in search limitations do not provide the functionality you require, you can set up a callback routine that the File Selector will call for each file or subdirectory in a directory scan. This routine will serve as the final filter for each file; if a file passes all other filters, it will be subjected to your routine. This procedure adds overhead to any scan, of course, so you should try to use the built-in File Selector functions whenever possible.</P>
+<P>
+To set the File Selector to use the callback functionality, you must set FSFC_FILTER_FILE in the <CODE>
+GFSI_fileCriteria</CODE>
+ field. If your callback routine is written in C, you must also set FSFC_FILTER_IS_C; the routine must also follow the Pascal calling convention.</P>
+<P>
+In order to take advantage of the callback functionality, you must first subclass <CODE>
+GenFileSelectorClass</CODE>
+ to handle the message <CODE>
+MSG_GEN_FILE_SELECTOR_GET_FILTER_ROUTINE</CODE>
+, which the File Selector will send to itself before beginning the directory scan. Your handler should return the address of the callback routine along with a pointer to an array of attributes that will be passed to it.</P>
+<P>
+The callback routine can assume that if it is being called, the file has passed all other filters--the callback is therefore the last word on acceptance or rejection of the file. In essence, the callback is asked whether the file should be rejected: It should return the constant TRUE if the file is to be rejected but FALSE if it is not to be rejected.</P>
+<P>
+As mentioned above, you can designate an array of extended file attributes that will be passed to the callback routine. This array contains a number of <CODE>
+FileExtAttrDesc</CODE>
+ structures, each of which defines a certain attribute and some extra data for the attribute. This structure is shown below:</P>
+<PRE>typedef struct {
+    FileExtendedAttribute FEAD_attr;
+				/* file attribute to
+				 * get or set */
+    void		* FEAD_value;
+				/* pointer to a buffer
+				 * or new value */</PRE>
+<PRE>    word		FEAD_size;		/* size of buffer or
+				 * new value */
+    char		* FEAD_name;
+				/* if custom attribute,
+				 * pointer to name */
+} FileExtAttrDesc;</PRE>
+<P>
+In the above context, <CODE>
+FEAD_value</CODE>
+ is meaningless and <CODE>
+FEAD_size</CODE>
+ is the number of bytes required to hold the value of the attribute. Note that this array is not passed to the callback routine; instead, it specifies the structure and composition of the values that will be.</P>
+<P>
+<A NAME="FileSelectors_f.htm_IX_FEAD_&ldots;">
+ </A>
+<A NAME="FileSelectors_f.htm_IX_FileExtAttrDesc">
+ </A>
+An example of filtering files using a callback routine is shown in <A HREF="#FileSelectors_f.htm_59157"> Filtering Files Via a Callback Routine</A>
+. The <CODE>
+FileExtAttrDesc</CODE>
+ structure is defined and detailed in <A HREF="../../Files/FileSys/index.htm">the File System chapter</A>.</P><P CLASS="figTitle">
+Code Display 14-10 <A NAME="FileSelectors_f.htm_59157">
+ </A>
+Filtering Files Via a Callback Routine</P>
+<PRE>/*******************************************************************************
+ * This is a sample handler for MSG_GEN_FILE_SELECTOR_GET_FILTER_ROUTINE.
+ * You should be able to use this code in your subclass. Note that the routine
+ * name &quot;FilterFileSelectorRoutine&quot; is application-specific; it can be whatever
+ * you want. It must be declared as static Boolean, however. See below.
+ * PARAMETERS: 
+ * void (GenFileSelectorGetFilterRoutineResults *filter) 
+ *******************************************************************************/</PRE>
+<PRE>@method FilterFileSelectorClass, MSG_GEN_FILE_SELECTOR_GET_FILTER_ROUTINE {</PRE>
+<PRE>    /* We need to return a virtual pointer to the filter routine so the
+     * file selector can lock and unlock the routine's code resource as
+     * appropriate. Unfortunately, the compiler optimizes the simple
+     * implementation (just assigning filter-&gt;filterRoutine the address of
+     * the routine) by storing CS for the segment, which is unhelpful. So
+     * we need a static variable holding the routine's address instead. */</PRE>
+<PRE>    static GenFileSelectorFilterRoutine *const filterRoutine =
+					&amp;FilterFileSelectorRoutine;</PRE>
+<PRE>    /* Specify the address of the routine to call. It need not be locked into
+     * memory, as the GenFileSelector will do that for us. */</PRE>
+<PRE>    filter-&gt;filterRoutine = filterRoutine;</PRE>
+<PRE>    /* Specify the additional attributes we need to look at in our filter
+     * routine. As with the filterRoutine, these need not be in fixed or
+     * locked memory. */</PRE>
+<PRE>    filter-&gt;filterAttrs = &amp;filterFileSelectorFilterAttrs;
+}</PRE>
+<PRE>/*******************************************************************************
+ * This is a sample File Selector callback routine. It may be called whatever
+ * you want and must be declared static Boolean.
+ * This routine is called once per file or directory that passes all other File
+ * Selector filters. This routine is limited to examining the attributes of the
+ * file. It may not do anything that could cause the File Selector's instance chunk
+ * to move in memory.
+ * Return: TRUE to reject the file, FALSE to accept the file.
+ *******************************************************************************/</PRE>
+<PRE>static Boolean FilterFileSelectorRoutine(optr oself,
+				FileEnumCallbackData *fecd, word frame)</PRE>
+<PRE>/* The code of the routine is not included here; to see it, look at the FSFilter
+ * sample application. */</PRE>
+<PRE>	/* Following is the array of attributes examined by our filter routine.
+	 * This array contains an arbitrary number of elements, the last of which
+	 * has FEA_END_OF_LIST as its FEAD_attr field. FEAD_value is unused in this
+	 * context. FEAD_size is set to the total number of bytes needed for each
+	 * attribute. 
+	 * Each structure's fields are FEAD_attr, FEAD_value, FEAD_size,
+	 * and FEAD_name */</PRE>
+<PRE>const FileExtAttrDesc filterFileSelectorFilterAttrs[] = {
+    { FEA_NAME, 0, sizeof(FileLongName), NULL },
+    { FEA_FILE_ATTR, 0, sizeof(FileAttrs), NULL },
+    { FEA_FILE_TYPE, 0, sizeof(GeosFileType), NULL },
+    { FEA_END_OF_LIST, 0, 0, NULL }
+};</PRE>
+
+<H6 CLASS="RefETitle">
+<A NAME="FileSelectors_f.htm_IX_MSG_GEN_FILE_SELECTOR_GET_FILTER_ROUTINE">
+ </A>
+MSG_GEN_FILE_SELECTOR_GET_FILTER_ROUTINE</H6>
+<PRE CLASS="syntax">void	MSG_GEN_FILE_SELECTOR_GET_FILTER_ROUTINE(
+        GenFileSelectorGetFilterRoutineResults *filter);</PRE>
+<P>
+This message returns the address of the callback routine used by the File Selector as well as the array of <CODE>
+FileExtAttrDesc</CODE>
+ structures specifying the callback's parameters.</P>
+<P>
+For the callback function to be used, you must set FSFC_FILE_FILTER in the File Selector's <CODE>
+GFSI_fileCriteria</CODE>
+ instance data field. If your callback routine is in C, you must also set FSFC_FILTER_IS_C. In addition, the callback routine must follow the Pascal calling convention.</P>
+<P CLASS="refField">
+Source:	Sent by the File Selector object to itself before calling <CODE>
+FileEnum()</CODE>
+. Also may be used by other objects to retrieve the callback information for the File Selector.</P>
+<P CLASS="refField">
+Destination:	Any GenFileSelector object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+filter</CODE>
+	A pointer to an empty return value structure. This structure is detailed below.</P>
+<P CLASS="refField">
+Return:	The structure pointed to by <CODE>
+filter</CODE>
+ must be filled by this method.</P>
+<P CLASS="refField">
+Structures:	<A NAME="FileSelectors_f.htm_IX_GenFileSelectorGetFilterRoutineResults">
+ </A>
+The single parameter is a pointer to an empty structure of type <CODE>
+GenFileSelectorGetFilterRoutineResults</CODE>
+. This structure has two parts: <CODE>
+filterRoutine</CODE>
+ is a pointer to your callback routine, and <CODE>
+filterAttrs</CODE>
+ is a pointer to an array of <CODE>
+FileExtAttrDesc</CODE>
+ structures. You must fill in this structure in your handler so the File Selector knows how to call your callback routine. The structure is shown below:</P>
+<PRE>typedef struct {
+    GenFileSelectorFilterRoutine						*filterRoutine;
+    const FileExtAttrDesc						*filterAttrs;
+} GenFileSelectorGetFilterRoutineResults;</PRE>
+<P CLASS="refField">
+Interception:	If a callback routine is to be used, you must subclass and handle this message to return the proper structures.</P>
+<P CLASS="refField">
+Tips:	If your callback has no requirements other than the file name, you can pass NULL in the <CODE>
+filterAttrs</CODE>
+ field of <CODE>
+filter</CODE>
+.</P>
+<P CLASS="refField">
+Warnings:	The handler for this message must return a virtual segment for the callback routine in <CODE>
+filter</CODE>
+'s <CODE>
+filterRoutine</CODE>
+ field. This can cause problems with most compilers; to avoid these problems, set a static variable in your method as shown in <A HREF="#FileSelectors_f.htm_59157"> Filtering Files Via a Callback Routine</A>
+, below (taken from the FSFilter sample application).</P>
+<P CLASS="refField">
+See Also:	<CODE>
+FileEnum()</CODE>
+</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="FileSelectors_f.htm_IX_GenFileSelectorFilterRoutine()">
+ </A>
+GenFileSelectorFilterRoutine()</H6>
+<PRE CLASS="syntax">Boolean	<EM>GenFileSelectorFilterRoutine</EM>(
+        optr			oself,
+        FileEnumCallbackData			*fecd,
+        word			frame);</PRE>
+<P>
+This routine is defined by your application and is called for each file in a directory scan. It may be of any name of your choice as shown in <A HREF="#FileSelectors_f.htm_59157"> Filtering Files Via a Callback Routine</A>
+. It serves as the final filter; when called, it can assume the subject file has passed all other filters applied. This routine is set up and executed in the same manner as the callback routine for <CODE>
+FileEnum()</CODE>
+; see <A HREF="../../Files/FileSys/FileSys_f.htm#51873">the File System chapter</A>for complete details.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+oself</CODE>
+	The optr of the File Selector object</P>
+<DL>
+<DT>
+<CODE>
+fecd</CODE>
+</DT><DD>A pointer to a <CODE>
+FileEnumCallbackData</CODE>
+ structure.</DD>
+<DT>
+<CODE>
+frame</CODE>
+</DT><DD>An inherited stack frame passed by <CODE>
+FileEnum()</CODE>
+ to each of its helper routines.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Your callback must return the constant FALSE if the file should be accepted, TRUE if the file should be rejected.</P>
+<P CLASS="refField">
+Warnings:	Your routine must not do anything that may cause the File Selector or its object block to move in memory (adding variable data fields, for instance).</P>
+<P CLASS="refField">
+See Also:	<CODE>
+FileEnum()</CODE>
+</P>
+
+<HR>
+<A NAME="FileSelectors_10.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The FileSelector Object</A>: 3.9 <A HREF="#FileSelectors_7.htm">File Selector Instance Data</A>: 
+Resetting a Filter</H3>
+<P>
+Once a filter is set (such as a filename mask or a file attribute match/mismatch filter), you may wish to delete the filter. To remove a filter designated by a flag in an instance field, simply clear the flag with the appropriate message.</P>
+<P>
+If the filter is applied via a variable data field, however, you will have to use <CODE>
+MSG_META_DELETE_VARDATA</CODE>
+. This message is detailed in <CODE>
+MetaClass</CODE>
+ and must be passed the name of the variable data field to be removed. Removal of the field equates to removal of the filter.</P>
+<HR>
+<A NAME="FileSelectors_11.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">The FileSelector Object</A>: 4 
+File Selector Use</H2>
+<P>
+Besides setting the File Selector's attributes and dynamically manipulating its instance data, you can change its display and current file lists using several messages. You can also retrieve its current state with other messages. These functions are detailed in the following sections.</P>
+<P CLASS="subsectionLink">
+<A HREF="#FileSelectors_12.htm">When a User Selects a File</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#FileSelectors_13.htm">The Current Selection</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#FileSelectors_14.htm">Rescanning Directories</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#FileSelectors_15.htm">Setting Scalable UI Data</A></P>
+<HR>
+<A NAME="FileSelectors_12.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The FileSelector Object</A>: 4.1 <A HREF="#FileSelectors_11.htm">File Selector Use</A>: 
+<A NAME="FileSelectors_12.htm_85254">
+ </A>
+When a User Selects a File</H3>
+<PRE>GFSI_destination, GFSI_notificationMsg, MSG_GEN_FILE_SELECTOR_GET_ACTION, MSG_GEN_FILE_SELECTOR_SET_ACTION</PRE>
+<P>
+When a user selects an entry in the File Selector's displayed list, either by double-clicking or by clicking on an &quot;Open&quot; button, the File Selector will notify a predetermined object or process that a selection has been made. In addition, if the selection is a volume or a directory, the File Selector will automatically (on a double-click) open the selection and show the new file list.</P>
+<P>
+<A NAME="FileSelectors_12.htm_IX_GFBI_destinationMsg">
+ </A>
+<A NAME="FileSelectors_12.htm_IX_GFBI_notificationMsg">
+ </A>
+When defining your GenFileSelector, you must designate an output object and a message that will be sent to it when the user makes a selection. The message is stored in the <CODE>
+GFSI_notificationMsg</CODE>
+ instance field, and the object's optr is stored in the <CODE>
+GFSI_destination</CODE>
+ instance field. Note that instead of an optr, you may use a <CODE>
+TravelOption</CODE>
+ as the output destination (TO_TARGET, TO_FOCUS, etc.); you can also use <CODE>
+ATTR_GEN_DESTINATION_CLASS</CODE>
+ to specify the class of the output object to ensure the notification message is only delivered to a class that can handle it.</P>
+<P>
+When the user makes a selection, the File Selector will send the notification message to the destination object along with flags indicating whether the selection was a single or double click. The message is defined by the class that will receive it; for example, the File Selector definition in <A HREF="#FileSelectors_3.htm_24357"> A Basic File Selector</A>
+ designates <CODE>
+MSG_MY_APP_FILE_SELECTED</CODE>
+ as the notification message that will be sent to the application's process object (the destination object).</P>
+<P>
+You must set both the notification message and the destination object in your File Selector's Goc code. If you don't, no message will be sent, and your application will ignore user input to the File Selector. (The File Selector will still allow the user to navigate throughout the file system, and your application can query the File Selector as to its current selection, however.)</P>
+<P>
+You may retrieve or set the File Selector's notification message and destination object at run-time by sending the following messages:</P>
+<DL>
+<DT>
+<CODE>
+MSG_GEN_FILE_SELECTOR_GET_ACTION</DT><DD>
+</CODE>
+Returns the File Selector's current notification message and destination object.</DD>
+<DT>
+<CODE>
+MSG_GEN_FILE_SELECTOR_SET_ACTION</DT><DD>
+</CODE>
+Sets the File Selector's <CODE>
+GFSI_destination</CODE>
+ and <CODE>
+GFSI_notificationMsg</CODE>
+ fields to new values.</DD>
+
+</DL>
+<H6 CLASS="RefETitle">
+<A NAME="FileSelectors_12.htm_IX_MSG_GEN_FILE_SELECTOR_GET_ACTION">
+ </A>
+MSG_GEN_FILE_SELECTOR_GET_ACTION</H6>
+<PRE CLASS="syntax">void	MSG_GEN_FILE_SELECTOR_GET_ACTION(
+        GetActionParams *retValue);</PRE>
+<P>
+This message returns the File Selector's output object and notification message.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenFileSelector object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+retValue</CODE>
+	A pointer to an empty <CODE>
+GetActionParams</CODE>
+ structure (detailed below), which will be filled with the return data.</P>
+<P CLASS="refField">
+Return:	The <CODE>
+GetActionParams</CODE>
+ structure pointed to by <CODE>
+retValue</CODE>
+ will contain the output optr and notification message set for the File Selector.</P>
+<P CLASS="refField">
+Structures:	The <CODE>
+GetActionParams</CODE>
+ structure is shown below:</P>
+<PRE><A NAME="FileSelectors_12.htm_IX_GAP_&ldots;"> </A><A NAME="IX_GetActionParams"> </A>typedef struct {
+    Message  GAP_message; /* GFSI_notificationMsg */
+    word     GAP_unused;  /* Internal field */
+    optr     GAP_output;  /* GFSI_destination */
+} GetActionParams;</PRE>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="FileSelectors_12.htm_IX_MSG_GEN_FILE_SELECTOR_SET_ACTION">
+ </A>
+MSG_GEN_FILE_SELECTOR_SET_ACTION</H6>
+<PRE CLASS="syntax">void	MSG_GEN_FILE_SELECTOR_SET_ACTION(
+        optr		actionOD,
+        Message		actionMessage);</PRE>
+<P>
+This message sets the File Selector's <CODE>
+GFSI_notificationMsg</CODE>
+ field to <CODE>
+actionMessage</CODE>
+ and the <CODE>
+GFSI_destination</CODE>
+ field to <CODE>
+actionOD</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenFileSelector object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+actionOD</CODE>
+	The optr of the new output object.</P>
+<DL>
+<DT>
+<CODE>
+actionMessage</CODE>
+</DT><DD>The new output notification message.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+<HR>
+<A NAME="FileSelectors_13.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The FileSelector Object</A>: 4.2 <A HREF="#FileSelectors_11.htm">File Selector Use</A>: 
+<A NAME="FileSelectors_13.htm_20958">
+ </A>
+The Current Selection</H3>
+<PRE>GFSI_selection</PRE>
+<P>
+Most directory and volume navigation is handled internally by the File Selector, and the application has no need to know what is happening until a file is actually selected.</P>
+<P>
+The File Selector maintains the name of the current selection in its <CODE>
+GFSI_selection</CODE>
+<A NAME="FileSelectors_13.htm_IX_GFSI_selection">
+ </A>
+ instance data field. The current full path, volume name, and disk are stored in variable data entries defined by <CODE>
+GenClass</CODE>
+. The application can easily, at any time, retrieve or set the current selection, path, or volume. Volume names, paths, and file names are all stored as null-terminated character strings in the GEOS character set. </P>
+<P>
+Current path and directory are supported by <CODE>
+GenClass</CODE>
+ and are not specific to <CODE>
+GenFileSelectorClass</CODE>
+.</P>
+<P>
+The File Selector's current path is stored in a variable data field called <CODE>
+ATTR_GEN_PATH_DATA</CODE>
+. This field is a <CODE>
+GenFilePath</CODE>
+ structure, defined below. This structure stores both an absolute path and the handle of the disk on which the path resides. For the GenFileSelector, this structure represents the currently-displayed directory.</P>
+<PRE><A NAME="FileSelectors_13.htm_IX_GFP_&ldots;"> </A><A NAME="IX_GenFilePath"> </A>typedef struct {
+    DiskHandle  GFP_disk;
+    PathName    GFP_path;
+} GenFilePath;</PRE>
+<P>
+To retrieve the current path, send the File Selector a <CODE>
+MSG_GEN_PATH_GET</CODE>
+. To set the path, send it <CODE>
+MSG_GEN_PATH_SET</CODE>
+. To retrieve just the disk handle, send <CODE>
+MSG_GEN_PATH_GET_DISK_HANDLE</CODE>
+. Each of these messages is detailed fully in <A HREF="../../SysObjects/Gen/index.htm">the GenClass chapter</A>.</P>
+<H4 CLASS="HeadingC">
+Traversing the File System</H4>
+<PRE>MSG_GEN_FILE_SELECTOR_UP_DIRECTORY, MSG_GEN_FILE_SELECTOR_OPEN_ENTRY</PRE>
+<P>
+To set the currently-displayed directory, you can send one of the following messages to the File Selector object (these are all, of course, subject to the File Selector's attributes and applied filters):</P>
+<DL>
+<DT>
+<CODE>
+MSG_GEN_FILE_SELECTOR_UP_DIRECTORY</DT><DD>
+</CODE>
+Cause the File Selector to go up one directory. If already at the root, switch to volume selection. Does nothing if FSA_ALLOW_CHANGE_DIRS is not set in <CODE>
+GFSI_attrs</CODE>
+.</DD>
+<DT>
+<CODE>
+MSG_GEN_FILE_SELECTOR_OPEN_ENTRY</DT><DD>
+</CODE>
+Cause the File Selector to attempt to open the passed entry in the current directory. Nothing will be done if the passed entry is a file; this message opens only directories and volumes. Use this with <CODE>
+MSG_GEN_FILE_SELECTOR_GET_SELECTION</CODE>
+ when a user clicks on an &quot;Open&quot; button (or something similar) in the File Selector's dialog box.</DD>
+
+</DL>
+<H6 CLASS="RefETitle">
+<A NAME="FileSelectors_13.htm_IX_MSG_GEN_FILE_SELECTOR_UP_DIRECTORY">
+ </A>
+MSG_GEN_FILE_SELECTOR_UP_DIRECTORY</H6>
+<PRE CLASS="syntax">void	MSG_GEN_FILE_SELECTOR_UP_DIRECTORY();</PRE>
+<P>
+This message causes the File Selector to go up one directory in the directory tree. If the File Selector is already in the root directory, it will switch to the volume list (if FSA_ALLOW_CHANGE_VOLUMES is set in <CODE>
+GFSI_attrs</CODE>
+). This message is only valid when the File Selector is visible on the screen.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenFileSelector object that is on the screen.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="FileSelectors_13.htm_IX_MSG_GEN_FILE_SELECTOR_OPEN_ENTRY">
+ </A>
+MSG_GEN_FILE_SELECTOR_OPEN_ENTRY</H6>
+<PRE CLASS="syntax">Boolean	MSG_GEN_FILE_SELECTOR_OPEN_ENTRY(
+        word	entryNumber);</PRE>
+<P>
+This message causes the File Selector to open and display the contents of the entry specified. It returns an error flag: if the entry opens successfully, the error flag is returned <CODE>
+false</CODE>
+; if some error occurs, the flag is returned <CODE>
+true</CODE>
+.</P>
+<P>
+The entry specified with this message must be in the current file list. First, retrieve the entry number from the File Selector with the message <CODE>
+MSG_GEN_FILE_SELECTOR_GET_SELECTION</CODE>
+. If the entry can be opened (i.e. it is in the current file list and it is a volume or directory), the File Selector will open it, scan the directory, and display the new file list. If the entry is not a directory or volume, the File Selector will do nothing. This message is only valid when the File Selector is visible on the screen.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenFileSelector object that is on the screen.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+entryNumber</CODE>
+	The number of the entry to be opened.</P>
+<P CLASS="refField">
+Return:	An error flag: <CODE>
+true</CODE>
+ if error, <CODE>
+false</CODE>
+ if no error.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+
+<H4 CLASS="HeadingC">
+The Current Selection</H4>
+<PRE>MSG_GEN_FILE_SELECTOR_SET_SELECTION, MSG_GEN_FILE_SELECTOR_SET_FULL_SELECTION_PATH, MSG_GEN_FILE_SELECTOR_GET_SELECTION, MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH</PRE>
+<P>
+The File Selector keeps track of which item is currently designated as the <EM>
+selection</EM>
+. The selection appears on the screen as the only highlighted entry in the current list (the highlighted entry may be scrolled out of the view but remains the selection). Additionally, the selection is the file or folder on which any operations (such as open) will be executed.</P>
+<P>
+The <CODE>
+GFSI_selection</CODE>
+ field of the GenFileSelector's instance data is a null-terminated character string representing the name of the selection. The format of the selection string depends on the context: If the File Selector is displaying the volume list and thus the selection is a volume label, the string will consist of a drive name followed by a colon. (For non-removable disks, the colon will be followed by [<CODE>
+volume name</CODE>
+].) If the File Selector is displaying a directory and the selection is a file or directory, the selection string will consist of the name of the file or directory selected. The selection does not contain any information about the current volume or directory.</P>
+<P>
+By sending the following messages, you can retrieve or set the current selection in your application. These messages affect <CODE>
+ATTR_GEN_PATH_DATA,</CODE>
+ managed by <CODE>
+GenClass</CODE>
+ for the File Selector, as well as the <CODE>
+GFSI_selection</CODE>
+ instance field.</P>
+<DL>
+<DT>
+<CODE>
+MSG_GEN_FILE_SELECTOR_SET_SELECTION</DT><DD>
+</CODE>
+Attempt to set the selection to the given volume, file, or directory name. The given file or subdirectory must be in the currently-displayed list.</DD>
+<DT>
+<CODE>
+MSG_GEN_FILE_SELECTOR_SET_FULL_SELECTION_PATH</DT><DD>
+</CODE>
+Attempt to set the path and selection to the given volume, file, or directory name. The passed selection must be in the directory at the end of the given path.</DD>
+<DT>
+<CODE>
+MSG_GEN_FILE_SELECTOR_GET_SELECTION</DT><DD>
+</CODE>
+Gives a null-terminated character string representing the name of the current selection. This may be a volume, directory, or file name.</DD>
+<DT>
+<CODE>
+MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH</DT><DD>
+</CODE>
+Gives the disk handle as well as a null-terminated character string representing the full path name of the current selection, excluding the drive name.</DD>
+</DL>
+<P>
+The selection retrieval messages return two word values in a single dword argument. These two values are a record of <CODE>
+GenFileSelectorEntryFlags</CODE>
+, flags that indicate the type of selection and operation underway, and an integer that indicates the place of the selection in the current file list. Two macros allow you to extract these values from the dword argument:</P>
+<DL>
+<DT>
+GFS_GET_ENTRY_NUMBER</DT><DD>
+Extracts the entry number from the given dword.</DD>
+<DT>
+GFS_GET_ENTRY_FLAGS</DT><DD>
+Extracts the selection's flags record.</DD>
+
+</DL>
+<H6 CLASS="RefETitle">
+<A NAME="FileSelectors_13.htm_IX_GFS_GET_ENTRY_NUMBER() macro">
+ </A>
+GFS_GET_ENTRY_NUMBER</H6>
+<PRE CLASS="syntax">word	GFS_GET_ENTRY_NUMBER(<EM>arg</EM>);
+        dword	<EM>arg</EM>;</PRE>
+<P>
+This takes the return value of <CODE>
+MSG_GEN_FILE_SELECTOR_GET_SELECTION</CODE>
+ and <CODE>
+MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH</CODE>
+ and returns the entry number of the selection.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="FileSelectors_13.htm_IX_GFS_GET_ENTRY_FLAGS() macro">
+ </A>
+GFS_GET_ENTRY_FLAGS</H6>
+<PRE CLASS="syntax">word	GFS_GET_ENTRY_FLAGS(arg);
+        dword	<EM>arg</EM>;</PRE>
+<P>
+This takes the return value of <CODE>
+MSG_GEN_FILE_SELECTOR_GET_SELECTION</CODE>
+ and <CODE>
+MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH</CODE>
+ and returns the <CODE>
+GenFileSelectorEntryFlags</CODE>
+ for the selection.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="FileSelectors_13.htm_IX_MSG_GEN_FILE_SELECTOR_SET_SELECTION">
+ </A>
+MSG_GEN_FILE_SELECTOR_SET_SELECTION</H6>
+<PRE CLASS="syntax">Boolean	MSG_GEN_FILE_SELECTOR_SET_SELECTION(
+        char	*selection);</PRE>
+<P>
+This message causes the File Selector to attempt to select a given file, directory, or volume from the currently-displayed file list. It sets the selection by setting the File Selector's <CODE>
+GFSI_selection</CODE>
+ field to the passed string.</P>
+<P>
+If the File Selector is not on the screen or is suspended when it receives this message, it will set the selection and hold it until it scans the directory. The validity of the selection is not determined until the directory is again scanned. If the directory is not scanned immediately, the message's return value will be <CODE>
+true</CODE>
+. If the File Selector is on the screen and is not suspended, it will determine the validity of the selection immediately and return a value appropriate to the file's validity.</P>
+<P>
+If the selection is valid, the user will see it highlighted in the File Selector's display. The selection will not be opened by this message; it is only selected.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenFileSelector object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+selection</CODE>
+	A pointer to a character string giving the name of the file to be selected. The selection string is case-sensitive; if selecting a DOS file, it must be all upper case.</P>
+<P CLASS="refField">
+Return:	An error flag: <CODE>
+false</CODE>
+ if the selection is successfully made. The error condition can occur if the file is not found or if the File Selector can not currently be updated (it is not visible or is suspended).</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="FileSelectors_13.htm_IX_MSG_GEN_FILE_SELECTOR_GET_SELECTION">
+ </A>
+MSG_GEN_FILE_SELECTOR_GET_SELECTION</H6>
+<PRE CLASS="syntax">dword	MSG_GEN_FILE_SELECTOR_GET_SELECTION(
+        char	*selection);</PRE>
+<P>
+This message returns the name, the entry number, and the entry flags of the file or directory currently selected.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenFileSelector object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+selection</CODE>
+	A pointer to an empty character string at least <CODE>
+sizeof(FileLongName)</CODE>
+ characters long. If just the entry number and entry flags are desired, pass a null pointer.</P>
+<P CLASS="refField">
+Return:	The high word of the dword return value is the number of the selection in the File Selector's current file list. The low word is a record of type <CODE>
+GenFileSelectorEntryFlags</CODE>
+. Use GFS_GET_ENTRY_NUMBER to extract the entry number; use GFS_GET_ENTRY_FLAGS to extract the flags record.</P>
+<DL>
+<DT>
+<CODE>
+selection</CODE>
+</DT><DD>The character string pointed to will be the null-terminated name of the current selection.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="FileSelectors_13.htm_IX_MSG_GEN_FILE_SELECTOR_SET_FULL_SELECTION_PATH">
+ </A>
+MSG_GEN_FILE_SELECTOR_SET_FULL_SELECTION_PATH</H6>
+<PRE CLASS="syntax">Boolean	MSG_GEN_FILE_SELECTOR_SET_FULL_SELECTION_PATH(
+        char		*selection,
+        DiskHandle		diskHandle);</PRE>
+<P>
+This message causes the File Selector to set its path data and its <CODE>
+GFSI_selection</CODE>
+ field according to the string passed in <CODE>
+selection</CODE>
+. The string's format is described below. The entry may be in any directory on any volume; the volume is specified by the passed disk handle.</P>
+<P>
+If the File Selector is suspended or not currently on the screen when it receives this message, it will set the path and selection but will do nothing else until it becomes unsuspended or visible. Otherwise, the message will be handled immediately, and the File Selector will navigate to and scan the proper directory, setting the selection if possible.</P>
+<P>
+If the path is valid but the selection is not, the File Selector will display the proper file list and set the selection to the first entry in the list. If any part of the path other than the selection is invalid, the File Selector will show the volume list.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenFileSelector object that is on the screen.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+selection</CODE>
+	A pointer to a character string containing the full path to be set as the File Selector's current path and selection. The path may be absolute or relative--if relative, it is considered relative to the File Selector's current directory and <CODE>
+diskHandle</CODE>
+ will be ignored.</P>
+<DL>
+<DT>
+<CODE>
+diskHandle</CODE>
+</DT><DD>The disk handle specifying the volume on which the new selection resides. If zero, the File Selector's currently-displayed disk will be used. If a relative path is specified in <CODE>
+selection</CODE>
+, this parameter will be ignored.</DD>
+</DL>
+<P CLASS="refField">
+Return:	This message returns an error flag: If the selection is successfully made, the flag will be <CODE>
+false</CODE>
+. If an error occurs, the flag will be <CODE>
+true</CODE>
+.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="FileSelectors_13.htm_IX_MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH">
+ </A>
+MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH</H6>
+<PRE CLASS="syntax">dword	MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(
+        char	*selection);</PRE>
+<P>
+This message returns the disk handle and flags as well as the full pathname of the current selection.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenFileSelector object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+selection</CODE>
+	A pointer to a character string at least PATH_BUFFER_SIZE characters long. Upon return, this string will contain the full selection path.</P>
+<P CLASS="refField">
+Return:	The returned dword contains two word-sized fields: The high word represents the File Selector's current disk handle, and the low word is a <CODE>
+GenFileSelectorEntryFlags</CODE>
+ record with the selection's flags. Use the macro GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE to extract the disk handle, and use GFS_GET_ENTRY_FLAGS to extract the flags record. If sent when the File Selector is not visible on the screen, the message will return the disk handle and path of the last valid selection.</P>
+<DL>
+<DT>
+<CODE>
+selection</CODE>
+</DT><DD>The character string pointed to will contain the full path and name of the current selection.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="FileSelectors_13.htm_IX_GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE() macro">
+ </A>
+GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE</H6>
+<PRE CLASS="syntax">DiskHandle GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE(<EM>arg</EM>);
+        dword	<EM>arg</EM>;</PRE>
+<P>
+This macro extracts the disk handle (the high word) from a dword argument returned by <CODE>
+MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH</CODE>
+.</P>
+
+
+<HR>
+<A NAME="FileSelectors_14.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The FileSelector Object</A>: 4.3 <A HREF="#FileSelectors_11.htm">File Selector Use</A>: 
+Rescanning Directories</H3>
+<PRE>MSG_GEN_FILE_SELECTOR_RESCAN, MSG_GEN_FILE_SELECTOR_SUSPEND, MSG_GEN_FILE_SELECTOR_END_SUSPEND</PRE>
+<P>
+Each time the File Selector changes directories, it scans that directory and displays only the files it is supposed to. It looks into each file briefly to check the file against each criterion set in the File Selector. You can force the GenFileSelector to rescan the current directory with the message <CODE>
+MSG_GEN_FILE_SELECTOR_RESCAN</CODE>
+.</P>
+<P>
+Occasionally you will want to scan the current directory only once after changing many parameters instead of rescanning after each change (search limitations, current volume, current selection, etc.). To optimize redrawing and rescanning, you can temporarily keep the GenFileSelector from scanning each time a <CODE>
+MSG_GEN_FILE_SELECTOR_SET_...</CODE>
+ message is sent. To do this, send the following messages (both must be used, though not at the same time):</P>
+<DL>
+<DT>
+<CODE>
+MSG_GEN_FILE_SELECTOR_SUSPEND</DT><DD>
+</CODE>
+Notifies the File Selector that several operations in a row are coming and that it should suspend scanning the disk until the counterpart to this message (below) is received.</DD>
+<DT>
+<CODE>
+MSG_GEN_FILE_SELECTOR_END_SUSPEND</DT><DD>
+</CODE>
+Indicates to the File Selector that directories may now be rescanned and displayed.</DD>
+
+</DL>
+<H6 CLASS="RefETitle">
+<A NAME="FileSelectors_14.htm_IX_MSG_GEN_FILE_SELECTOR_RESCAN">
+ </A>
+MSG_GEN_FILE_SELECTOR_RESCAN</H6>
+<PRE CLASS="syntax">void	MSG_GEN_FILE_SELECTOR_RESCAN();</PRE>
+<P>
+This message causes the File Selector to rescan its current directory. The File Selector will re-build and re-display its entire file list. This message will only work when the File Selector is visible on the screen.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenFileSelector object that is on the screen.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="FileSelectors_14.htm_IX_MSG_GEN_FILE_SELECTOR_SUSPEND">
+ </A>
+MSG_GEN_FILE_SELECTOR_SUSPEND</H6>
+<PRE CLASS="syntax">Boolean	MSG_GEN_FILE_SELECTOR_SUSPEND();</PRE>
+<P>
+This message causes the File Selector to suspend directory scans until a <CODE>
+MSG_GEN_FILE_SELECTOR_END_SUSPEND</CODE>
+ is received. This provides the ability to avoid unnecessary directory rescans when several different attributes are being changed in succession (e.g. volume, mask, and file types).</P>
+<P>
+No user action is affected by this message; only the following attribute-setting messages will be affected (their normal automatic rescan will not happen). Note that all messages have the prefix <CODE>
+MSG_GEN_FILE_SELECTOR_</CODE>
+:</P>
+<DL>
+<DT>
+<CODE>
+SET_SELECTION	SET_FULL_SELECTION_PATH</DT><DD>
+SET_MASK	SET_FILE_ATTRS<BR>
+SET_TOKEN	SET_CREATOR<BR>
+SET_GEODE_ATTRS	SET_ATTRS<BR>
+SET_FILE_CRITERIA</CODE>
+</DD>
+</DL>
+<P>
+In addition to the above messages, the <CODE>
+GenClass</CODE>
+ message <CODE>
+MSG_GEN_PATH_SET</CODE>
+ will also be suspended.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any non-suspended GenFileSelector object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	An error flag: <CODE>
+true</CODE>
+ if the File Selector is already suspended, <CODE>
+false</CODE>
+ if the suspension is successful.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+<P CLASS="refField">
+Warnings:	After suspending a File Selector with this message, be sure to unsuspend it with <CODE>
+MSG_GEN_FILE_SELECTOR_END_SUSPEND</CODE>
+.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="FileSelectors_14.htm_IX_MSG_GEN_FILE_SELECTOR_END_SUSPEND">
+ </A>
+MSG_GEN_FILE_SELECTOR_END_SUSPEND</H6>
+<PRE CLASS="syntax">Boolean	MSG_GEN_FILE_SELECTOR_END_SUSPEND();</PRE>
+<P>
+This message unsuspends a File Selector that had previously been suspended with <CODE>
+MSG_GEN_FILE_SELECTOR_SUSPEND</CODE>
+. This message automatically causes a directory rescan. Because multiple suspension attempts are disallowed, this message only needs to be sent once to unsuspend the File Selector.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any suspended GenFileSelector object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	An error flag: <CODE>
+true</CODE>
+ if the File Selector was not previously suspended, <CODE>
+false</CODE>
+ if the File Selector is successfully unsuspended.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+<HR>
+<A NAME="FileSelectors_15.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The FileSelector Object</A>: 4.4 <A HREF="#FileSelectors_11.htm">File Selector Use</A>: 
+Setting Scalable UI Data</H3>
+<PRE>HINT_FILE_SELECTOR_SCALABLE_UI_DATA</PRE>
+<P>
+The File Selector lets you set which features you want based on the current application features, using <CODE>
+HINT_FILE_SELECTOR_SCALABLE_UI_DATA</CODE>
+. This hint will query the application object to get the current application features set, and it will set the File Selector's feature set (<CODE>
+GFSI_attrs</CODE>
+) accordingly.</P>
+<P>
+The hint takes an array of <CODE>
+GenFileSelectorScalableUIEntry</CODE>
+ structures, each of which has three fields:</P>
+<DL>
+<DT>
+<CODE>
+GFSSUIE_command</DT><DD>
+</CODE>
+This field is a <CODE>
+GenFileSelectorScalableUICommand</CODE>
+, which is an enumerated type describing the effect of this particular entry. The five commands are detailed below.</DD>
+<DT>
+<CODE>
+GFSSUIE_appFeature</DT><DD>
+</CODE>
+This word represents the application's feature set or user level. The hint, when processed, will query the GenApplication object (the <CODE>
+GAI_appFeatures</CODE>
+ value) and check those features against the features in this field. If they match, the hint will cause the features in <CODE>
+GFSSUIE_fsFeatures</CODE>
+ to be set or cleared as appropriate.</DD>
+<DT>
+<CODE>
+GFSSUIE_fsFeatures</DT><DD>
+</CODE>
+This field represents the File Selector attributes that should be turned on or off depending on the command and the application features (see both fields above). The commands are defined below.</DD>
+</DL>
+<P>
+Following are the <CODE>
+GenFileSelectorScalableUICommand</CODE>
+s. Each queries the <CODE>
+GFSSUIE_appFeature</CODE>
+ field and then acts appropriately.</P>
+<DL>
+<DT>
+GFSSUIC_SET_FEATURES_IF_APP_FEATURE_ON</DT><DD>
+This command will set the features in <CODE>
+GFSSUIE_fsFeatures</CODE>
+ if the feature(s) in <CODE>
+GFSSUIE_appFeature</CODE>
+ are turned on.</DD>
+<DT>
+GFSSUIC_SET_FEATURES_IF_APP_FEATURE_OFF</DT><DD>
+This command will set the features in <CODE>
+GFSSUIE_fsFeatures</CODE>
+ if the feature(s) in <CODE>
+GFSSUIE_appFeature</CODE>
+ are off.</DD>
+<DT>
+GFSSUIC_ADD_FEATURES_IF_APP_FEATURE_ON</DT><DD>
+This command will turn on the additional features in <CODE>
+GFSSUIE_fsFeatures</CODE>
+ if the features in <CODE>
+GFSSUIE_appFeature</CODE>
+ are turned on.</DD>
+<DT>
+GFSSUIC_SET_FEATURES_IF_APP_LEVEL</DT><DD>
+This command will set the features in <CODE>
+GFSSUIE_fsFeatures</CODE>
+ if the application is at the user level specified in <CODE>
+GFSSUIE_appFeature</CODE>
+.</DD>
+<DT>
+GFSSUIC_ADD_FEATURES_IF_APP_LEVEL</DT><DD>
+This command will add the additional features in <CODE>
+GFSSUIE_fsFeatures</CODE>
+ if the application is at the user level specified in <CODE>
+GFSSUIE_appFeature</CODE>
+.</DD>
+</DL>
+<HR>
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+</BODY>
+</HTML>

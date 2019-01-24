@@ -1,0 +1,302 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: LMem_d.htm,v 1.1 97/06/02 15:53:10 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Element Arrays</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Local Memory</A>: 4.2 <A HREF="LMem_b.htm">Special LMem Uses</A>: 
+Element Arrays</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="LMem_b.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="LMem_c.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.1 Chunk Arrays</A> 
+<!-- to next --> | <A HREF="LMem_e.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.3 Name Arrays</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+<A NAME="IX_Element arrays">
+ </A>
+Sometimes an application will create an array with a high duplication rate; that is, the array may contain many identical elements. This can be inefficient if the duplication rate is very high or elements are very large. For this reason, GEOS provides a special variant of the chunk array known as the <EM>
+element array</EM>
+. Every element in an element array has a reference count. When you insert an element, the insertion routine checks whether an identical element already exists in the array. If it does, the routine does not add another copy; instead, it increments the reference count of the element already in the array and returns its element index. If no such element exists, the routine copies the new element into the array, gives it a reference count of 1, and returns its element number. The application may specify a comparison routine which determines whether an element already exists in the array; or it may instruct the insertion routine to do a byte-level comparison.</P>
+<P>
+Note that elements in an element array may be of fixed, uniform size, or they may be of variable size (just as with chunk arrays). When you create an element array, you must specify the size of each element; specifying a size of zero indicates that the elements are of variable size.</P>
+<P>
+Members of an element array keep their index numbers until they are freed. If an element is deleted, the element array routines actually just resize the element to zero and add it to a free list. This means that an element with index 12 might not be the thirteenth element in the array, as it would in a chunk array (remember, indexes start with zero); there might be freed elements before it. For this reason, we speak of an element in an element array having a &quot;token&quot; instead of an index; you should generally consider a token to be an opaque value. Nevertheless, in most situations, element array tokens behave just like chunk array indexes.</P>
+<P>
+When you delete a reference to an element, its reference count is decremented. If the reference count reaches zero, the routine calls an application-specified callback routine to delete the element itself.</P>
+<P>
+Note that adding an element to an element array requires a linear search through the existing elements; thus, element arrays are inefficient for large numbers of elements, if elements will be continually added. Accessing elements, however, takes constant time, since the element array routines can quickly translate an element's token into the offset to that element. Thus, it takes no longer to access an element in an element array than it does to access one in a chunk array.</P>
+
+<H2 CLASS="HeadingC">
+Creating an Element Array</H2>
+<PRE>ElementArrayCreate(), ElementArrayCreateAt(), ElementArrayCreateAtHandles(), ElementArrayHeader</PRE>
+<P>
+<A NAME="IX_ElementArrayCreate()">
+ </A>
+To create an element array, call the routine <CODE>
+ElementArrayCreate()</CODE>
+. Like <CODE>
+ChunkArrayCreate()</CODE>
+, it takes three arguments: the LMem heap's handle, the size of each element (or 0 for variable-sized elements), and the size to leave for the array header. The routine allocates a chunk in the LMem heap and initializes it as an element array. There is one significant difference: <A NAME="IX_ElementArrayHeader">
+ </A>
+Element arrays begin with an <CODE>
+ElementArrayHeader</CODE>
+, a structure whose first component is a <CODE>
+ChunkArrayHeader</CODE>
+. If you are allocating free space between the header and the array, make sure to leave enough room for an <CODE>
+ElementArrayHeader</CODE>
+. If you do not need to allocate free space, you can pass a header size of zero, as with <CODE>
+ChunkArrayCreate()</CODE>
+.</P>
+<P>
+Note that when you specify the size of each element in the element array, you must include the size of each element's header. Thus, if each element's body were six bytes long, you would tell <CODE>
+ElementArrayCreate()</CODE>
+ that the size of each element is &quot;6 + sizeof(<CODE>
+RefElementHeader</CODE>
+)&quot;.</P>
+<P>
+<A NAME="IX_ElementArrayCreateAt()">
+ </A>
+There is another version of this routine, <CODE>
+ElementArrayCreateAt()</CODE>
+, which creates the element array in a pre-existing chunk. This routine takes three arguments: an optr indicating the chunk, the size of each element, and the size of the header. It creates the element array in the specified chunk, resizing it if necessary. Any data in the chunk may be overwritten (except for whatever data falls in the header area after the <CODE>
+ElementArrayHeader</CODE>
+). <A NAME="IX_ElementArrayCreateAtHandles()">
+ </A>
+There is also a version which takes handles instead of an optr; it is called <CODE>
+ElementArrayCreateAtHandles()</CODE>
+.</P>
+<P>
+The routine returns the handle of the newly-created element array. It can cause heap compaction or resizing; therefore, all pointers to the heap are invalidated.</P>
+
+
+<H2 CLASS="HeadingC">
+Adding an Element</H2>
+<PRE>ElementArrayAddElement(), ElementArrayAddElementHandles(), ElementArrayAddReference(), ElementArrayAddReferenceHandles()</PRE>
+<P>
+Adding an element to an element array is somewhat different from adding one to a chunk array. To add an element to a chunk array, you merely call the append routine, then write the element into the allocated space. If you want to add an element to an element array, you must first write out the data for the element in a buffer.<A NAME="IX_ElementArrayAddElement()">
+ </A>
+ You then pass the address of this data to <CODE>
+ElementArrayAddElement()</CODE>
+, which compares your new element with the elements already in the array, and copies it into the array if necessary.</P>
+<P>
+<CODE>
+ElementArrayAddElement()</CODE>
+ takes four arguments:</P>
+<UL>
+<LI>
+An optr indicating the element array;</LI>
+<LI>
+The address of the element to copy into the array;</LI>
+<LI>
+A pointer to a callback comparison routine (see below), or a null pointer to do a byte-wise comparison;</LI>
+<LI>
+A dword of data to pass to the comparison routine.</LI>
+</UL>
+<P>
+You may have your own criteria for deciding whether an element should be copied into an array. For example, elements in the array may have three data fields; perhaps you count two elements as matching if the first two data fields match. For this reason, <CODE>
+ElementArrayAddElement()</CODE>
+ lets you specify your own comparison routine. The callback routine should be a Boolean routine, declared _pascal, which takes three arguments:</P>
+<UL>
+<LI>
+The address of the element to add;</LI>
+<LI>
+The address of an element in the array to compare the new element to; </LI>
+<LI>
+The callback data dword passed to <CODE>
+ElementArrayAddElement()</CODE>
+.</LI>
+</UL>
+<P>
+<CODE>
+ElementArrayAddElement()</CODE>
+ calls the callback routine to compare the new element to each element in the array. If the callback routine ever returns <EM>
+true</EM>
+, <CODE>
+ElementArrayAddElement()</CODE>
+ has found a matching element in the array; it will increment that element's reference count and return its index. If the callback routine returns <EM>
+false</EM>
+ for every element, <CODE>
+ElementArrayAddElement()</CODE>
+ copies the new element into the array and gives it a reference count of 1. It returns the element's index; the element will keep that index until it is freed. Note that there is no way to specify where in an element array a new element should be added. If there are free spaces in the array, the new element will be created in the first free space; otherwise, it will be appended to the end of the array.</P>
+<P>
+If you want to do a bytewise comparison, pass in a null pointer as the callback routine. <CODE>
+ElementArrayAddElement()</CODE>
+ will then do a bytewise comparison of the elements, treating two elements as equal only if every byte in the element <EM>
+bodies</EM>
+ matches. (It's okay if the two elements have different headers and reference counts; the bytewise comparison routine only compares the element bodies.) The bytewise comparison is implemented as a machine-language string instruction; it is therefore very fast. </P>
+<P>
+<A NAME="IX_ElementArrayAddReference()">
+ </A>
+If you know that the element you want to add is already in the array, call <CODE>
+ElementArrayAddReference()</CODE>
+. This routine simply increments the reference count of a specified element; it does no comparisons. It is therefore much faster than <CODE>
+ElementArrayAddElement()</CODE>
+.</P>
+<P>
+<A NAME="IX_ElementArrayAddElementHandles()">
+ </A>
+Both of these routines have counterparts which are passed handles instead of an optr; these counterparts are named <CODE>
+ElementArrayAddElementHandles()</CODE>
+ and<A NAME="IX_ElementArrayAddReferenceHandles()">
+ </A>
+ <CODE>
+ElementArrayAddReferenceHandles()</CODE>
+.</P>
+
+
+<H2 CLASS="HeadingC">
+Accessing Elements in an Element Array</H2>
+<PRE>ElementArrayElementChanged(), ElementArrayElementChangedHandles()</PRE>
+<P>
+Elements in element arrays are accessed in almost the same way as elements in chunk arrays. There is one major difference. Each element in an element array begins with a <CODE>
+RefElementHeader</CODE>
+ structure, which contains the element's reference count. For this reason, it is a good idea to declare special structures for your elements and have the first component of that structure be the <CODE>
+RefElementHeader</CODE>
+ structure (as in the code sample below).</P>
+<P CLASS="figTitle">
+Code Display 16-3 Structure for Element Array Elements</P>
+<PRE>/* We need to declare two different structures. One will have all the data fields 
+ * in the body of the element; it will be called &quot;MyElementBody&quot;. The other
+ * structure begins with the &quot;RefElementHeader&quot; structure, which must begin every
+ * element in an element array; the other field of the structure is a
+ * &quot;MyElementBody&quot; structure. When you create an element, you pass the address of
+ * the <EM>MyElement</EM> structure to ElementArrayCreateElement().
+ */</PRE>
+<PRE>typedef struct {
+	word		amount;		/* This has the element's data fields */
+	float		interestRate;
+	char		description[20];
+} MyElementBody;</PRE>
+<PRE>typedef struct {
+	RefElementHeader			header; 	/* We won't use this--it holds ref count */
+	MyElementBody		body;
+} MyElement;</PRE>
+<P>
+Note that if you change an element, this may make it identical to another element in the element array; in this case, the two could be combined into one. <A NAME="IX_ElementArrayElementChanged()">
+ </A>
+To check for this situation, call <CODE>
+ElementArrayElementChanged()</CODE>
+. This routine takes four arguments: the optr to the element array, the token for the element changed, a callback comparison routine, and a dword of data which is passed to the callback routine. <CODE>
+ElementArrayElementChanged()</CODE>
+ checks to see if the element is identical to any other element in the array. It calls the comparison routine to compare elements. (You can force a bytewise comparison by passing a null function pointer; this comparison will make sure that all bytes in the element <EM>
+body</EM>
+ match, though it's okay if the elements have different values in their <CODE>
+RefElementHeader</CODE>
+ structures.) If it matches another element, the two elements will be combined; i.e., the element passed will be deleted, and the matching element will have its reference count increased appropriately. The matching element's token will be returned; you will have to change any references to the old element appropriately. If no match is found, the token which was passed will be returned. <A NAME="IX_ElementArrayElementChangedHandles()">
+ </A>
+The version which takes handles is called <CODE>
+ElementArrayElementChangedHandles()</CODE>
+.</P>
+
+
+<H2 CLASS="HeadingC">
+Removing An Element From An Element Array</H2>
+<PRE>ElementArrayRemoveReference(), ElementArrayRemoveReferenceHandles(), ElementArrayDelete(), ElementArrayDeleteHandles()</PRE>
+<P>
+<A NAME="IX_ElementArrayRemoveReference()">
+ </A>
+When you want to remove an element from an element array, you should ordinarily call <CODE>
+ElementArrayRemoveReference()</CODE>
+. This routine decrements the element's reference count; it does not, however, delete the element unless the reference count reaches zero (i.e. the last reference to the element has been deleted). </P>
+<P>
+This routine takes four arguments: the optr of the array, the index of the element, a pointer to a callback routine, and a dword-sized constant to be passed to it. There may be certain bookkeeping tasks you want to perform when an element is actually being deleted but not when it is just having its reference count decremented. In this case, you can pass the address of a callback routine, which will be called on any element to be deleted just before the deletion occurs. After the callback routine returns, the element will be removed. If you do not need to have a callback routine called, pass a null function pointer. As noted, when an element is removed, it is actually just resized to zero; that way the index numbers of following elements are preserved.</P>
+<P>
+<A NAME="IX_ElementArrayDelete()">
+ </A>
+If you want to delete an element regardless of its reference count, call <CODE>
+ElementArrayDelete()</CODE>
+. This routine takes two arguments, namely the optr indicating the array and the index of the element to be deleted. It does not take a callback routine; perform any necessary bookkeeping before you call it.</P>
+<P>
+<A NAME="IX_ElementArrayRemoveReferenceHandles()">
+ </A>
+Both of these routines have counterparts which take handles; these counterparts are named <CODE>
+ElementArrayRemoveReferenceHandles()</CODE>
+ and<A NAME="IX_ElementArrayDeleteHandles()">
+ </A>
+ <CODE>
+ElementArrayDeleteHandles()</CODE>
+.</P>
+
+
+<H2 CLASS="HeadingC">
+The &quot;Used Index&quot; and Other Index Systems</H2>
+<PRE>ElementArrayGetUsedCount(), ElementArrayGetUsedCountHandles(), ElementArrayUsedIndexToToken(), ElementArrayUsedIndexToTokenHandles(), ElementArrayTokenToUsedIndex(), ElementArrayTokenToUsedIndexHandles()</PRE>
+<P>
+Sometimes its useful to have a special index system for element arrays. Perhaps you would like the used elements to be numbered sequentially, that is, the first &quot;used&quot; element would be element &quot;zero,&quot; even if there were free elements before it. This would require setting up a second index system, besides the one used by the element array routines. GEOS provides routines with this functionality.
+
+</P>
+<P>
+<A NAME="IX_ElementArrayGetUsedCount()">
+ </A>
+To find out the number of elements in an element array, call <CODE>
+ElementArrayGetUsedCount()</CODE>
+. This routine can return either the number of elements in use or the number of &quot;in use&quot; elements which satisfy any arbitrary criteria. The routine takes three arguments: the optr to the element array, a dword of data which is passed to a callback routine, and a pointer to a Boolean callback routine. That callback routine should itself take two arguments: a pointer to an element, and the dword passed to <CODE>
+ElementArrayGetUsedCount()</CODE>
+. The callback routine is called once for each &quot;in use&quot; element. The callback should return <EM>
+true</EM>
+ if the element should be counted; otherwise, it should return <EM>
+false</EM>
+. For example, the callback routine might return <EM>
+true</EM>
+ if the element is longer than 10 bytes; in this case, <CODE>
+ElementArrayGetUsedCount()</CODE>
+ would return the number of elements which are longer than 10 bytes. To have every used element counted, pass a null function pointer. <A NAME="IX_ElementArrayGetUsedCountHandles()">
+ </A>
+The version of this routine which takes handles is called <CODE>
+ElementArrayGetUsedCountHandles()</CODE>
+.</P>
+<P>
+<A NAME="IX_ElementArrayUsedIndexToToken()">
+ </A>
+If you use a different indexing scheme, you will need a way to translate the index into the normal element array token. To do this, call the routine <CODE>
+ElementArrayUsedIndexToToken()</CODE>
+. This routine takes four arguments: the optr of the element array, the index count, a dword (which is passed to the callback routine), and a callback routine. The callback routine is of the same format as the callback routine passed to <CODE>
+ElementArrayGetUsedCount()</CODE>
+; it should return <EM>
+true</EM>
+ if the element meets some criterion. <CODE>
+ElementArrayUsedIndexToToken()</CODE>
+ translates the index passed into the element array's token for that element. For example, if the callback routine returns <EM>
+true</EM>
+ for elements which are longer than 10 bytes, and you pass an index of five, <CODE>
+ElementArrayUsedIndexToToken()</CODE>
+ will return the token for the sixth element in the element array which is longer than 10 bytes. (Remember, all indexes are zero-based.) Again, passing a null function pointer makes the routine count all &quot;in-use&quot; elements.<A NAME="IX_ElementArrayUsedIndexToTokenHandles()">
+ </A>
+ The version which takes the element array's handles is called <CODE>
+ElementArrayUsedIndexToTokenHandles()</CODE>
+.</P>
+<P>
+<A NAME="IX_ElementArrayTokenToUsedIndex()">
+ </A>
+To translate a token back into this kind of index, call <CODE>
+ElementArrayTokenToUsedIndex()</CODE>
+. This routine takes four arguments: the optr to the element array, an element token, a callback routine (as with the other routines in this section), and a dword which is passed along to the callback routine. The routine finds the element whose token was passed and returns the index it would have under the indexing system defined by the callback routine. Again, passing a null function pointer makes the routine count every &quot;in-use&quot; element. <A NAME="IX_ElementArrayTokenToUsedIndexHandles()">
+ </A>
+The routine which takes handles is called <CODE>
+ElementArrayTokenToUsedIndexHandles()</CODE>
+.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="LMem_b.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="LMem_c.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.1 Chunk Arrays</A> 
+<!-- to next --> | <A HREF="LMem_e.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.3 Name Arrays</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

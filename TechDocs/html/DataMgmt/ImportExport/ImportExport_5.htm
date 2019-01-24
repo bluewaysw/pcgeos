@@ -1,0 +1,169 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: ImportExport_5.htm,v 1.1 97/06/02 14:33:58 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Common Impex Concepts</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The Import/Export Library</A>: 2.1 <A HREF="ImportExport_4.htm">Using Impex</A>: 
+Common Impex Concepts</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="ImportExport_4.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="ImportExport_4.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">2 Using Impex</A> 
+<!-- to next --> | <A HREF="ImportExport_6.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2.2 The ImportControl Object</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+There are certain concepts and structures which are used by both of the Impex objects. Applications which use the Impex objects will have to be familiar with them.</P>
+
+<H2 CLASS="HeadingC">
+Metafile Formats</H2>
+<PRE>ImpexDataClasses</PRE>
+<P>
+The Impex objects are designed to translate into a few specific formats. These formats are known collectively as the <EM>
+Metafile</EM>
+ formats. These formats (except for the &quot;font&quot; format) are identical to the standard &quot;Clipboard Item Formats&quot; described in <A HREF="../../SysObjects/Clipboard/Clipboard_8.htm#16385">the Clipboard chapter</A>. When an application uses the Impex objects, it has to specify what types of data it is prepared to import or export. <A NAME="IX_IDC_&ldots;"> </A>
+<A NAME="IX_ImpexDataClasses">
+ </A>
+It does this by setting an <CODE>
+ImpexDataClasses</CODE>
+ record in both the ImportControl and the ExportControl objects. <CODE>
+ImpexDataClasses</CODE>
+ has the following fields:</P>
+<DL>
+<DT>
+IDC_TEXT</DT><DD>The data is in the Metafile Text format. This is identical to the Clipboard's CIF_TEXT format. In addition to text, this format records information about fonts, spacing, embedded graphics, etc.</DD>
+<DT>
+IDC_GRAPHICS</DT><DD>
+<A NAME="IX_GStrings:with impex">
+ </A>
+The data is in the Metafile Graphics format. This is simply a GString in a VM chain. This format is identical to the Clipboard's CIF_GRAPHICS_STRING format.</DD>
+<DT>
+IDC_SPREADSHEET</DT><DD>
+<A NAME="IX_Spreadsheets:with impex">
+ </A>
+The data is in the Metafile Spreadsheet format. This corresponds to the Clipboard's CIF_SPREADSHEET format.</DD>
+<DT>
+IDC_FONT</DT><DD><A NAME="IX_Fonts:with impex">
+ </A>
+The data is in the Metafile Font format. This format is used to translate fonts between representations.</DD>
+</DL>
+<P>
+Every translation library translates a DOS file into a VM chain in one of these four formats, and vice versa. When an application declares an Impex object, it specifies what formats should be supported for that application. The user will be allowed to choose translation libraries which translate to or from a supported Metafile format.</P>
+
+
+<H2 CLASS="HeadingC">
+<A NAME="69269">
+ </A>
+ImpexTranslationParams</H2>
+<PRE>ImpexTranslationParams</PRE>
+<P>
+The Import and Export objects have to pass information to the application and the translation libraries. The same sort of information gets passed in many situations; for example, the objects often have to pass the <CODE>
+VMFileHandle</CODE>
+ and <CODE>
+VMBlockHandle</CODE>
+ which specify the VM chain. For simplicity, the Impex objects just pass a pointer to a <CODE>
+ImpexTranslationParams</CODE>
+<A NAME="IX_ImpexTranslationParams">
+ </A>
+ structure when they send messages to the translation libraries or the application. The library or application takes the appropriate action, changing the <CODE>
+ImpexTranslationParams</CODE>
+ structure as necessary; it then sends a response message, which takes a pointer to the same <CODE>
+ImpexTranslationParams</CODE>
+. <CODE>
+ImpexTranslationParams</CODE>
+ has the following structure:</P>
+<PRE>typedef struct {
+	<A NAME="IX_ITP_&ldots;"> </A>optr			ITP_impexOD;
+	Message			ITP_returnMsg;
+	ImpexDataClasses			ITP_dataClass;
+	VMFileHandle			ITP_transferVMFile;
+	VMBlockHandle			ITP_transferVMChain;
+	dword			ITP_internal;
+	ManufacturerID			ITP_manufacturerID;
+	ClipboardFormat			ITP_clipboardFormat;
+} ImpexTranslationParams;</PRE>
+<DL>
+<DT>
+<CODE>
+ITP_impexOD</DT><DD>
+</CODE>
+This field holds the optr of whatever Impex object sent the message. The response message should be addressed to this optr.</DD>
+<DT>
+ITP<CODE>
+_returnMsg</DT><DD>
+</CODE>
+This field holds the message which the library or application should send to the Impex object when it is finished. This message always takes a single argument, namely a pointer to the <CODE>
+ImpexTranslationParams</CODE>
+<CODE>
+. </CODE>
+The application should just pass the pointer to the <CODE>
+ImpexTranslationParams</CODE>
+ to the routine <CODE>
+ImpexImportExportCompleted()</CODE>
+; this routine will send the appropriate notification message.</DD>
+<DT>
+ITP<CODE>
+_dataClass</DT><DD>
+</CODE>
+This is a <CODE>
+ImpexDataClasses</CODE>
+ record. Exactly one of the flags will be set, indicating what sort of Metafile format is being used.</DD>
+<DT>
+<CODE>
+ITP_transferVMFile</DT><DD>
+</CODE>
+This is the <CODE>
+VMFileHandle</CODE>
+ of the transfer file. The transfer file is automatically created and destroyed by an Impex object.</DD>
+<DT>
+ITP<CODE>
+_transferVMChain</DT><DD>
+</CODE>
+This is the <CODE>
+VMBlockHandle</CODE>
+ of the first block in the transfer VM chain. In Import operations, the translation library creates the VM chain in the transfer file; in Export operations, the application creates it. The chain will be freed when the Impex object destroys the transfer VM file. For information about creating VM chains, see <A HREF="../../Memory/VM/VM_14.htm">the VM chapter</A>.</DT><P CLASS="WorList">
+<CODE>
+ITP_internal<BR>
+</CODE>
+This field is for internal use by the Impex objects. You should not change it.</P>
+<DT>
+<CODE>
+ITP_manufacturerID<BR>
+</CODE>
+This field contains the manufacturer ID which should be used for the Metafile data; see <A HREF="../../SysObjects/Clipboard/index.htm">the Clipboard chapter</A>.</DT><P CLASS="WorList">
+<CODE>
+ITP_clipboardFormat<BR>
+</CODE>
+</DL>
+This field specifies what format should be used for the Metafile data; see <A HREF="../../SysObjects/Clipboard/index.htm">the Clipboard chapter</A>.</P><P>
+The meaning of each field can change, depending on the circumstances. For example, when the ImportControl sends its message to the application, the ITP<CODE>
+_transferVMChain</CODE>
+ field will contain the handle of a VM chain containing the imported data. In contrast, when the ExportControl sends its message, ITP<CODE>
+_transferVMChain</CODE>
+ contains a null handle; the application should allocate a VM chain, fill it with data, and write the <CODE>
+VMBlockHandle</CODE>
+ of the chain to this field. When a field has a special meaning, the documentation will explain it.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="ImportExport_4.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="ImportExport_4.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">2 Using Impex</A> 
+<!-- to next --> | <A HREF="ImportExport_6.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2.2 The ImportControl Object</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

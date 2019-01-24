@@ -1,0 +1,95 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Geometry_3.htm,v 1.1 97/06/02 16:33:02 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> How Geometry Is Managed</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Managing UI Geometry</A>: 1.2 <A HREF="Geometry_1.htm">Geometry Manager Overview</A>: 
+How Geometry Is Managed</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Geometry_1.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Geometry_2.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1.1 Geometry Manager Features</A> 
+<!-- to next --> | <A HREF="Geometry_4.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">2 Arranging Your Generic Objects</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+The geometry manager is one part of the system that draws objects on the screen and redraws them when necessary. This system is called the &quot;visual update mechanism.&quot;</P>
+<P>
+The visual update mechanism is invoked any time the geometry or image of an object is marked invalid. If only the image is invalid, typically no geometry calculations will be done. If, however, the geometry of an object is marked invalid, the geometry manager is called in to calculate the new size and position of all the affected objects in the object tree.</P>
+<P>
+Normally, you won't have to do any more than set certain hints (for generic objects) or attribute flags (for visible objects) to get the desired geometry behavior. If, however, you plan on modifying how the geometry of a particular set of objects is set, you will want to understand the sequence of events that happen during a geometry update. Typically, only programmers who are building their own specific UI libraries and those who have complex visual object trees will need to understand the geometry calculation sequence.</P>
+<P>
+The geometry manager's calculation can be thought of as a multiple-pass, recursive algorithm. It traverses the object tree, managing geometry within each composite until it reaches the top-most object that is unaffected by the geometry calculations.</P>
+<P>
+<A NAME="IX_VOF_WINDOW_INVALID">
+ </A>
+<A NAME="IX_VOF_GEOMETRY_INVALID">
+ </A>
+The geometry update process is invoked when an object has its geometry marked invalid. This is determined by the object's visual flags (its <CODE>
+VI_optFlags</CODE>
+ field), VOF_GEOMETRY_INVALID and VOF_WINDOW_INVALID. If either of these flags is set, the object's geometry requires recalculation.</P>
+<P>
+The geometry manager sends <A NAME="IX_MSG_VIS_UPDATE_GEOMETRY">
+ </A>
+<CODE>
+MSG_VIS_UPDATE_GEOMETRY</CODE>
+ to the visible object with invalid geometry. This message determines which objects in the tree are potentially affected by the geometry update, and then it recalculates the tree's geometry.</P>
+<P>
+If the object initially marked invalid is a composite, all its children are automatically included in the update. If the object is a child of a composite, the geometry manager will travel up the tree, marking any parents and siblings that also require recalculation. (Recalculation does not cross VTF_IS_WIN_GROUP boundaries, however. A VTF_IS_WIN_GROUP is any windowed object; geometry calculations generally do not cross windowed objects (move into another window layer) unless explicitly instructed to do so.)</P>
+<P>
+The geometry manager then returns to the bottom-most affected object in the tree and sends it a <A NAME="IX_MSG_VIS_RECALC_SIZE">
+ </A>
+<CODE>
+MSG_VIS_RECALC_SIZE</CODE>
+. This message passes the object a suggested size, which will be the same as the object's original size. (The original size is passed as an optimization in case the object does not need its geometry changed; many changes will affect many objects but will actually change only a few.)</P>
+<P>
+The object then returns its new desired size based on the geometry change. If this is the original object marked invalid, the returned size will be the direct result of the geometry change. If this object is a descendent of the invalid object, it may not want to change its geometry at all and may therefore return its current size.</P>
+<P>
+The geometry manager collects the returned sizes of all siblings at a given level and calculates the suggested size of their parent composite. The parent composite is then sent <CODE>
+MSG_VIS_RECALC_SIZE</CODE>
+ with the newly calculated size and returns the size it wants to be as a result. (Some composites will have fixed, maximum, or minimum sizes or may have their sizing tied to other factors; these objects may return a different size.) If the returned size is different from the passed size, the geometry manager arbitrates between the objects. Typically, the composite will be grown large enough (even if fixed or maximum size) to fit all its children.</P>
+<P>
+The geometry manager will go up the tree in this manner, calculating the new geometry of each child and then each composite until it reaches an object that is unaffected by the geometry change. (For example, if a child shrinks but other children cause the composite to remain the same size, the geometry update will stop at the composite because objects higher up are not affected.) If all objects in the tree are affected by the change, the geometry update will stop at the topmost object in the branch (the first VTF_IS_WIN_GROUP object).</P>
+<P>
+If any parent objects disagree with their children on the new size, the geometry manager will arbitrate. The geometry manager may make several passes to suggest width and height changes to both the child and parent before deciding on an ultimate geometry. The geometry manager may alter child spacing, wrap the children, grow the composite, or even clip the children if necessary. A result will quickly be reached, however--the geometry manager will not thrash between the parent and children (unless you subclass <CODE>
+MSG_VIS_RECALC_SIZE</CODE>
+ or <CODE>
+MSG_VIS_GET_CENTER</CODE>
+ and do not pay close attention to how the message is handled).</P>
+<P>
+After the geometry is recalculated up to the first VTF_IS_WIN_GROUP object (or up to the top affected object), a <A NAME="IX_MSG_VIS_NOTIFY_GEOMETRY_VALID">
+ </A>
+<CODE>
+MSG_VIS_NOTIFY_GEOMETRY_VALID</CODE>
+ will be sent to each of the invalid objects that have <A NAME="IX_VGA_NOTIFY_GEOMETRY_VALID">
+ </A>
+VGA_NOTIFY_GEOMETRY_VALID set in their <CODE>
+VI_attrs</CODE>
+ field. A visual update will then be started to draw the new geometry to the screen. Once a branch's geometry has been calculated, the branch will remain unaffected until the next time the geometry of one of its objects is marked invalid.</P>
+<P>
+If a recalculation of a branch's geometry causes a VTF_IS_WIN_GROUP object to change its size or position, the window system will determine the effects. For example, if a VisContent object grows as a result of a geometry change, it will send a <CODE>
+MSG_GEN_VIEW_SET_DOC_BOUNDS</CODE>
+ to the GenView; the geometry recalculation mechanism will not scroll the content-view connection. What happens to the view and its parent window then depends on the attributes of the view. For example, if the view is set to follow the size of its content, it will grow, bumping the size of its parent in the process. If the view is scrollable, it likely will stay the same size.</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Geometry_1.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Geometry_2.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1.1 Geometry Manager Features</A> 
+<!-- to next --> | <A HREF="Geometry_4.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">2 Arranging Your Generic Objects</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

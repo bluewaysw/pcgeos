@@ -1,0 +1,1057 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+<!-- This page was automatically generated from a bunch of smaller pages. -->
+<META NAME="copyright" CONTENT="Copyright GEOWORKS">
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+<TITLE>The Import/Export Library</TITLE>
+</HEAD>
+<BODY BGCOLOR="#ffffdf">
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+<A NAME="index.htm"></A>
+
+
+
+<H1 CLASS="chapterTitle">
+
+<A NAME="index.htm_97933">
+ </A>
+The Import/Export Library
+
+</H1>
+<P>
+<A NAME="index.htm_IX_impex library">
+ </A>
+Most applications which write data files should be compatible with other applications. For example, applications will want to be able to <EM>
+import</EM>
+ data, i.e. open a file written by another application and translate its data into a format the application can use. However, writing code to open another application's file and translate it into your own application's format can be difficult. Any application that wanted to properly support file-importing would have to provide a great many of these utilities. Furthermore, there would be a lot of duplicated effort; one application's routine for importing a particular file format would be much like another's. Applications would have similar problems <EM>
+exporting</EM>
+ data, i.e. writing their data in another application's format.</P>
+<P>
+The Impex (Import/Export) Library, along with specific translation libraries, solves these problems. They automatically translate files from non-GEOS formats into the <EM>
+Metafile</EM>
+ (i.e. Clipboard) format and back. Applications just need to include the Import and Export objects; once they do this, importing and exporting data is just like using the Clipboard. Furthermore, extending the Impex Library to handle new formats is easy. All you have to do is write a new translation library for that one format and put the library in the SP_IMPORT_EXPORT_DRIVERS standard path. All applications which use the Impex objects will then be able to use that new format. Developers can write their own translation libraries; however, few will need to do this, since GEOS provides libraries for the most popular formats.</P>
+<P>
+The Impex library currently supports import and export of text and graphic files. Geoworks is planning on extending it to allow the import and export of spreadsheet and font files as well. When these capabilities are available, they will be just like the already-supported text and graphic import and export.</P>
+<P>
+
+</P>
+<P CLASS="sectionlinks">
+<STRONG>
+&nbsp;&nbsp;<A HREF="#ImportExport_1.htm">1 Impex Basics</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#ImportExport_2.htm">1.1 The Impex Objects</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#ImportExport_3.htm">1.2 How the Impex Objects Work</A><BR>
+&nbsp;&nbsp;<A HREF="#ImportExport_4.htm">2 Using Impex</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#ImportExport_5.htm">2.1 Common Impex Concepts</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#ImportExport_6.htm">2.2 The ImportControl Object</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#ImportExport_7.htm">2.3 The ExportControl Object</A><BR>
+&nbsp;&nbsp;<A HREF="#ImportExport_8.htm">3 Writing Translation Libraries</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#ImportExport_9.htm">3.1 How Translation Libraries Work</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#ImportExport_a.htm">3.2 Intermediate Formats</A><BR>
+</STRONG>
+</P> <!-- end of sectionlinks blob -->
+
+<HR>
+<A NAME="ImportExport_1.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">The Import/Export Library</A>: 1 
+Impex Basics</H2>
+<P>
+The Impex library provides a uniform way of importing data from files written by non-GEOS applications, and of exporting data to files written in these formats. It also saves coding time. Every outside format needs a single translation library, which translates between the Metafile format and the format for that specific library. The Impex objects provide all the necessary user interface (though the libraries and applications can add more), and also do all necessary interaction with the translation libraries.</P>
+<P>
+In order to import data, an application will need to have an ImportControl object. Similarly, in order to export data, an application will need an ExportControl. Most applications that produce data files will want to use both of these objects.</P>
+<P>
+Some applications will create a new GEOS file for imported data; others will add it into the current document, as if they were pasting data from the clipboard. Similarly, some applications will export the entire current document; others will export only the current selection, if any. This is left entirely to the discretion of the application.</P>
+<P CLASS="subsectionLink">
+<A HREF="#ImportExport_2.htm">The Impex Objects</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#ImportExport_3.htm">How the Impex Objects Work</A></P>
+<HR>
+<A NAME="ImportExport_2.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The Import/Export Library</A>: 1.1 <A HREF="#ImportExport_1.htm">Impex Basics</A>: 
+The Impex Objects</H3>
+<P>
+There are two Impex objects which applications need to know about: ImportControl and ExportControl. These objects are both subclassed off of <CODE>
+ImportExportClass</CODE>
+, which provides some functionality needed for both objects; however, all this functionality is internal, so you can ignore this class. (No one should ever create an ImportExport object, and it has no instance data which applications may set.) <CODE>
+ImportExportClass</CODE>
+ is itself subclassed from <CODE>
+GenControlClass</CODE>
+; therefore, ImportControl and ExportControl objects inherit all the functionality of controllers.</P>
+<P>
+Applications will generally have one ImportControl and one ExportControl object. Applications may put these in different places; for example, some will place both of these on the File menu, while others may put them in the &quot;Open&quot; or &quot;Save As&quot; dialog boxes. Applications should decide this based on how they think the user will be using the import and export capabilities.</P>
+<P>
+The ImportControl and ExportControl objects communicate with the application by sending messages. The ImportControl object sends a message to its recipient near the end of the Import process, when it has translated a file into a VM chain for the application to copy. The ExportControl object sends a message near the beginning of the export process, instructing the application to create a VM chain for the application to export. In both cases the message sent and the recipient are set by the application. Most applications will have the messages sent to their process arguments; however, applications which use the object model of document control may want to have the messages sent to the target object. </P>
+<HR>
+<A NAME="ImportExport_3.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The Import/Export Library</A>: 1.2 <A HREF="#ImportExport_1.htm">Impex Basics</A>: 
+How the Impex Objects Work</H3>
+<P>
+The Impex objects manage the user interface for importing and exporting data. They also open and create the appropriate files when necessary. If a user wants to import a file, the Import object lets the user select a source file and format. The import object will then call an appropriate library to translate the source file into a VM chain in the clipboard (i.e. MetaFile) format. At this point, it sends a message to the application, passing the handle of the VM chain. Similarly, when the user wants to export data, the Export object first lets the user select a name and format for the destination file. The Export object then sends a message to the application requesting a source VM chain in the Metafile format. The Export object then calls the appropriate translation library, which translates the MetaFile into a corresponding DOS file in the specified format.</P>
+<P>
+It may help to give a blow-by-blow example. Let's suppose someone is using FooPaint, a graphics program for GEOS. FooPaint uses both the ImportControl and ExportControl objects to let the user import and export graphics. The user wants to import a graphic file written by BazDraw, a non-GEOS application. The user activates the &quot;Import&quot; trigger. The following things happen:</P>
+<OL>
+<LI>
+The ImportControl checks what translation libraries are available. This tells it what formats can be imported.</LI>
+<LI FIXME_NumListOther>
+The ImportControl presents a dialog box to the user. This box contains a list of available formats. It also contains a file selector, which the user uses to select a file of the appropriate format. Assume the user chooses the BazDraw format, and the file FISH.BAZ.</LI>
+<LI FIXME_NumListOther>
+The ImportControl opens FISH.BAZ and a temporary VM file. It then starts up the BazDraw-to-Metafile library. It then sends a message to this library, passing both files' handles with the message.</LI>
+<LI FIXME_NumListOther>
+The library reads FISH.BAZ and writes an equivalent Metafile sequence in a VM chain in the temporary file. When it is done, it returns the VM chain handle to the ImportControl.</LI>
+<LI FIXME_NumListOther>
+The ImportControl sends a message to its destination object (often the application's Process object). This is the application's first direct involvement in the import. The message includes such information as the handles of the VM chain, the type of data being imported (in this case, a graphics metafile), and the message to send on completion.</LI>
+<LI FIXME_NumListOther>
+The application copies the information from the VM chain. This is almost identical to pasting data from the clipboard. FooPaint will probably respond by adding the graphic to the target document.</LI>
+<LI FIXME_NumListOther>
+When the application is finished copying the data, it calls the <CODE>
+ImpexImportExportCompleted()</CODE>
+ utility routine. This routine sends an appropriate acknowledgment message to the ImportControl object. The ImportControl destroys the temporary VM file.</LI>
+</OL>
+<P>
+Note that almost all of this takes place without any action by the application. The only thing the application has to do is copy data from the VM chain to its own file, translating from the Metafile format to its own format. This is exactly what the application does whenever it pastes data from the clipboard; thus, applications which use the clipboard already have almost everything they need to use the Impex objects.</P>
+<P>
+Exporting data is almost the same as importing it. The application is sent a message at the beginning of the operation, asking the application to write a VM chain in the Metafile format. The ExportControl will already have created a temporary VM file for the application to use; the application just has to allocate a chain in it and fill it with the appropriate information. The ExportControl presents a dialog box to the user, letting the user select a name, format, and location for the exported file; it then starts up the appropriate translation library to write the file.</P>
+<HR>
+<A NAME="ImportExport_4.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">The Import/Export Library</A>: 2 
+Using Impex</H2>
+<P>
+The Impex objects are easy to use. Essentially, an application has to declare two objects and handle a single message from each of them. Applications which can use the clipboard already have most of the code they will need to use the Impex objects.</P>
+<P CLASS="subsectionLink">
+<A HREF="#ImportExport_5.htm">Common Impex Concepts</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#ImportExport_6.htm">The ImportControl Object</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#ImportExport_7.htm">The ExportControl Object</A></P>
+<HR>
+<A NAME="ImportExport_5.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The Import/Export Library</A>: 2.1 <A HREF="#ImportExport_4.htm">Using Impex</A>: 
+Common Impex Concepts</H3>
+<P>
+There are certain concepts and structures which are used by both of the Impex objects. Applications which use the Impex objects will have to be familiar with them.</P>
+
+<H4 CLASS="HeadingC">
+Metafile Formats</H4>
+<PRE>ImpexDataClasses</PRE>
+<P>
+The Impex objects are designed to translate into a few specific formats. These formats are known collectively as the <EM>
+Metafile</EM>
+ formats. These formats (except for the &quot;font&quot; format) are identical to the standard &quot;Clipboard Item Formats&quot; described in <A HREF="../../SysObjects/Clipboard/Clipboard_8.htm#16385">the Clipboard chapter</A>. When an application uses the Impex objects, it has to specify what types of data it is prepared to import or export. <A NAME="ImportExport_5.htm_IX_IDC_&ldots;"> </A>
+<A NAME="ImportExport_5.htm_IX_ImpexDataClasses">
+ </A>
+It does this by setting an <CODE>
+ImpexDataClasses</CODE>
+ record in both the ImportControl and the ExportControl objects. <CODE>
+ImpexDataClasses</CODE>
+ has the following fields:</P>
+<DL>
+<DT>
+IDC_TEXT</DT><DD>The data is in the Metafile Text format. This is identical to the Clipboard's CIF_TEXT format. In addition to text, this format records information about fonts, spacing, embedded graphics, etc.</DD>
+<DT>
+IDC_GRAPHICS</DT><DD>
+<A NAME="ImportExport_5.htm_IX_GStrings:with impex">
+ </A>
+The data is in the Metafile Graphics format. This is simply a GString in a VM chain. This format is identical to the Clipboard's CIF_GRAPHICS_STRING format.</DD>
+<DT>
+IDC_SPREADSHEET</DT><DD>
+<A NAME="ImportExport_5.htm_IX_Spreadsheets:with impex">
+ </A>
+The data is in the Metafile Spreadsheet format. This corresponds to the Clipboard's CIF_SPREADSHEET format.</DD>
+<DT>
+IDC_FONT</DT><DD><A NAME="ImportExport_5.htm_IX_Fonts:with impex">
+ </A>
+The data is in the Metafile Font format. This format is used to translate fonts between representations.</DD>
+</DL>
+<P>
+Every translation library translates a DOS file into a VM chain in one of these four formats, and vice versa. When an application declares an Impex object, it specifies what formats should be supported for that application. The user will be allowed to choose translation libraries which translate to or from a supported Metafile format.</P>
+
+
+<H4 CLASS="HeadingC">
+<A NAME="ImportExport_5.htm_69269">
+ </A>
+ImpexTranslationParams</H4>
+<PRE>ImpexTranslationParams</PRE>
+<P>
+The Import and Export objects have to pass information to the application and the translation libraries. The same sort of information gets passed in many situations; for example, the objects often have to pass the <CODE>
+VMFileHandle</CODE>
+ and <CODE>
+VMBlockHandle</CODE>
+ which specify the VM chain. For simplicity, the Impex objects just pass a pointer to a <CODE>
+ImpexTranslationParams</CODE>
+<A NAME="ImportExport_5.htm_IX_ImpexTranslationParams">
+ </A>
+ structure when they send messages to the translation libraries or the application. The library or application takes the appropriate action, changing the <CODE>
+ImpexTranslationParams</CODE>
+ structure as necessary; it then sends a response message, which takes a pointer to the same <CODE>
+ImpexTranslationParams</CODE>
+. <CODE>
+ImpexTranslationParams</CODE>
+ has the following structure:</P>
+<PRE>typedef struct {
+	<A NAME="ImportExport_5.htm_IX_ITP_&ldots;"> </A>optr			ITP_impexOD;
+	Message			ITP_returnMsg;
+	ImpexDataClasses			ITP_dataClass;
+	VMFileHandle			ITP_transferVMFile;
+	VMBlockHandle			ITP_transferVMChain;
+	dword			ITP_internal;
+	ManufacturerID			ITP_manufacturerID;
+	ClipboardFormat			ITP_clipboardFormat;
+} ImpexTranslationParams;</PRE>
+<DL>
+<DT>
+<CODE>
+ITP_impexOD</DT><DD>
+</CODE>
+This field holds the optr of whatever Impex object sent the message. The response message should be addressed to this optr.</DD>
+<DT>
+ITP<CODE>
+_returnMsg</DT><DD>
+</CODE>
+This field holds the message which the library or application should send to the Impex object when it is finished. This message always takes a single argument, namely a pointer to the <CODE>
+ImpexTranslationParams</CODE>
+<CODE>
+. </CODE>
+The application should just pass the pointer to the <CODE>
+ImpexTranslationParams</CODE>
+ to the routine <CODE>
+ImpexImportExportCompleted()</CODE>
+; this routine will send the appropriate notification message.</DD>
+<DT>
+ITP<CODE>
+_dataClass</DT><DD>
+</CODE>
+This is a <CODE>
+ImpexDataClasses</CODE>
+ record. Exactly one of the flags will be set, indicating what sort of Metafile format is being used.</DD>
+<DT>
+<CODE>
+ITP_transferVMFile</DT><DD>
+</CODE>
+This is the <CODE>
+VMFileHandle</CODE>
+ of the transfer file. The transfer file is automatically created and destroyed by an Impex object.</DD>
+<DT>
+ITP<CODE>
+_transferVMChain</DT><DD>
+</CODE>
+This is the <CODE>
+VMBlockHandle</CODE>
+ of the first block in the transfer VM chain. In Import operations, the translation library creates the VM chain in the transfer file; in Export operations, the application creates it. The chain will be freed when the Impex object destroys the transfer VM file. For information about creating VM chains, see <A HREF="../../Memory/VM/VM_14.htm">the VM chapter</A>.</DT><P CLASS="WorList">
+<CODE>
+ITP_internal<BR>
+</CODE>
+This field is for internal use by the Impex objects. You should not change it.</P>
+<DT>
+<CODE>
+ITP_manufacturerID<BR>
+</CODE>
+This field contains the manufacturer ID which should be used for the Metafile data; see <A HREF="../../SysObjects/Clipboard/index.htm">the Clipboard chapter</A>.</DT><P CLASS="WorList">
+<CODE>
+ITP_clipboardFormat<BR>
+</CODE>
+</DL>
+This field specifies what format should be used for the Metafile data; see <A HREF="../../SysObjects/Clipboard/index.htm">the Clipboard chapter</A>.</P><P>
+The meaning of each field can change, depending on the circumstances. For example, when the ImportControl sends its message to the application, the ITP<CODE>
+_transferVMChain</CODE>
+ field will contain the handle of a VM chain containing the imported data. In contrast, when the ExportControl sends its message, ITP<CODE>
+_transferVMChain</CODE>
+ contains a null handle; the application should allocate a VM chain, fill it with data, and write the <CODE>
+VMBlockHandle</CODE>
+ of the chain to this field. When a field has a special meaning, the documentation will explain it.</P>
+
+<HR>
+<A NAME="ImportExport_6.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The Import/Export Library</A>: 2.2 <A HREF="#ImportExport_4.htm">Using Impex</A>: 
+The ImportControl Object</H3>
+<P>
+<A NAME="ImportExport_6.htm_IX_ImportControlClass">
+ </A>
+Applications which use the Impex library will generally have a single ImportControl object. This object is usually a child of the File menu; however, applications may put it wherever they want. They should also place it on the application object's GAGCNLT_SELF_LOAD_OPTIONS General Change Notification list. Applications should disable this object (with MSG_GEN_SET_NOT_ENABLED) whenever they are not prepared to accept imported data; for example, some applications will choose to disable file importing whenever they are unable to open a new document.</P>
+<P>
+The ImportControl object is subclassed from <CODE>
+GenControlClass</CODE>
+ (by way of <CODE>
+ImportExportClass</CODE>
+, as noted above). It thus has all the functionality of that class. It also has a few instance data fields of its own; they are shown in <A HREF="#ImportExport_6.htm_62707"> ImportControlClass Instance Data</A>
+.</P>
+<P CLASS="figTitle">
+Code Display 16-1 <A NAME="ImportExport_6.htm_62707">
+ </A>
+ImportControlClass Instance Data</P>
+<PRE>/* ICI_attrs is a word-length record which stores attribute information for the
+ * ImportControl object. It has only one flag, ICA_IGNORE_INPUT. */
+    @instance ImportControlAttrs					ICI_attrs = 0;</PRE>
+<PRE>/* ICI_dataClasses is a word-length record which indicates what Metafile formats
+ * are supported by the application. The application must set this field. */
+    @instance ImpexDataClasses					ICI_dataClasses = 0;</PRE>
+<PRE>/* ICI_destination and ICI_message indicate what message should be sent when the
+ * ImportControl object has finished importing a file. The application must set
+ * these fields. The message must take a single argument, namely a pointer to an
+ * ImpexTranslationParams structure in ss:bp (on the stack). */
+    @instance optr					ICI_destination;
+    @instance word					ICI_message;</PRE>
+<PRE>/* Applications may wish to add their own UI objects to the Import dialog box.
+ * They can do so by defining a generic tree (the top object of which must be not
+ * &quot;usable&quot;), and putting an optr to the top object in ATTR_IMPORT_CONTROL_APP_UI.
+ */
+    @vardata optr 					ATTR_IMPORT_CONTROL_APP_UI;</PRE>
+<PRE>/* Controller features flags */
+typedef ByteFlags 			ImportControlFeatures;
+#define IMPORTCF_BASIC			0x01</PRE>
+<PRE>typedef	ByteFlags 			ImportControlToolboxFeatures;
+#define IMPORTCTF_DIALOG_BOX				0x01</PRE>
+
+<H4 CLASS="HeadingC">
+ICI_attrs</H4>
+<PRE>ImportControlAttrs, MSG_IMPORT_CONTROL_GET_ATTRS, MSG_IMPORT_CONTROL_SET_ATTRS</PRE>
+<P>
+ICI<A NAME="ImportExport_6.htm_IX_ImportControlAttrs">
+ </A>
+<A NAME="ImportExport_6.htm_IX_ICI_attrs">
+ </A>
+<CODE>
+_attrs</CODE>
+ is a word-length record of type <CODE>
+ImportControlAttrs</CODE>
+. This record contains only one flag:</P>
+<DL>
+<DT>
+ICA_IGNORE_INPUT</DT><DD>
+<A NAME="ImportExport_6.htm_IX_ICA_IGNORE_INPUT">
+ </A>
+If this flag is on, the ImportControl will consume all input to the application while the import occurs. By default, this flag is off.</DD>
+</DL>
+<P>
+To find out the current setting of this field, send <CODE>
+MSG_IMPORT_CONTROL_GET_ATTRS</CODE>
+ to the ImportControl. To change this field, send MSG_IMPORT_CONTROL_SET_ATTRS to the ImportControl.</P>
+
+<H6 CLASS="RefETitle">
+<A NAME="ImportExport_6.htm_IX_MSG_IMPORT_CONTROL_GET_ATTRS">
+ </A>
+MSG_IMPORT_CONTROL_GET_ATTRS</H6>
+<PRE CLASS="syntax">ImportControlAttrs	 MSG_IMPORT_CONTROL_GET_ATTRS();</PRE>
+<P>
+This message retrieves the current setting of the ImportControl's ICI<CODE>
+_attrs</CODE>
+ field.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any ImportControl object.</P>
+<P CLASS="refField">
+Return:	The ImportControl's ICI<CODE>
+_attrs</CODE>
+ field.</P>
+<P CLASS="refField">
+Interception:	This message should not be intercepted.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="ImportExport_6.htm_IX_MSG_IMPORT_CONTROL_SET_ATTRS">
+ </A>
+MSG_IMPORT_CONTROL_SET_ATTRS</H6>
+<PRE CLASS="syntax">void	MSG_IMPORT_CONTROL_SET_ATTRS(
+        ImportControlAttrs		attrs);</PRE>
+<P>
+This message changes the current settings of an ImportControl's ICI<CODE>
+_attrs</CODE>
+ field. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any ImportControl object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+attrs</CODE>
+	The new settings for the ICI<CODE>
+_attrs</CODE>
+ field.</P>
+<P CLASS="refField">
+Interception:	This message should not be intercepted.</P>
+
+
+
+<H4 CLASS="HeadingC">
+ICI_dataClasses</H4>
+<PRE>MSG_IMPORT_CONTROL_GET_DATA_CLASSES, MSG_IMPORT_CONTROL_SET_DATA_CLASSES</PRE>
+<P>
+When you declare an Import object, you must specify what kind of Metafiles your application is prepared to accept. You do this by setting the value of the ICI<CODE>
+_dataClasses</CODE>
+ field. This field is a word-length record of type <CODE>
+ImpexDataClasses</CODE>
+ (described in <A HREF="#ImportExport_5.htm_69269"> ImpexTranslationParams</A>
+). If (for example) only the IDC_TEXT bit is set, the ImportControl will use only those import libraries which produce text Metafile output. More than one bit may be set; when the ImportControl sends its notification, it will tell the application what type of data is being imported.</P>
+<P>
+To find out the current settings of the ICI<CODE>
+_dataClasses</CODE>
+ field, send MSG_IMPORT_CONTROL_GET_DATA_CLASSES. To change the settings of this field, send MSG_IMPORT_CONTROL_SET_DATA_CLASSES.</P>
+
+<H6 CLASS="RefETitle">
+<A NAME="ImportExport_6.htm_IX_MSG_IMPORT_CONTROL_GET_DATA_CLASSES">
+ </A>
+MSG_IMPORT_CONTROL_GET_DATA_CLASSES</H6>
+<PRE CLASS="syntax">ImpexDataClasses	 MSG_IMPORT_CONTROL_GET_DATA_CLASSES();</PRE>
+<P>
+This message retrieves the current setting of the ImportControl's ICI<CODE>
+_dataClasses</CODE>
+ field. This tells you what kind of data can be imported.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any ImportControl object.</P>
+<P CLASS="refField">
+Return:	The ImportControl's ICI<CODE>
+_dataClasses</CODE>
+ field.</P>
+<P CLASS="refField">
+Interception:	This message should not be intercepted.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="ImportExport_6.htm_IX_MSG_IMPORT_CONTROL_SET_DATA_CLASSES">
+ </A>
+MSG_IMPORT_CONTROL_SET_DATA_CLASSES</H6>
+<PRE CLASS="syntax">void	MSG_IMPORT_CONTROL_SET_DATA_CLASSES(
+        ImpexDataClasses 		dataClass);</PRE>
+<P>
+This message changes the current settings of an ImportControl's ICI<CODE>
+_dataClasses</CODE>
+ field. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any ImportControl object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+dataClass</CODE>
+	The new settings for the ICI<CODE>
+_dataClasses</CODE>
+ field.</P>
+<P CLASS="refField">
+Interception:	This message should not be intercepted.</P>
+
+
+
+<H4 CLASS="HeadingC">
+The ImportControl Action</H4>
+<PRE>MSG_IMPORT_CONTROL_GET_ACTION, MSG_IMPORT_CONTROL_SET_ACTION, ImpexImportExportCompleted()</PRE>
+<P>
+The ImportControl does most of its work transparently to the application. It interacts with the rest of the application only when the user has selected a file to import and the appropriate translation library has produced a VM chain. At this point the ImportControl sends a notification message to the application. The application responds by copying the data from the VM chain and sending back an acknowledgment message. The ImportControl can then destroy the temporary VM transfer file.</P>
+<P>
+<A NAME="ImportExport_6.htm_IX_ICI_message">
+ </A>
+<A NAME="ImportExport_6.htm_IX_ICI_destination">
+ </A>
+The application determines what message will be sent, and to what object, by setting the ICI<CODE>
+_destination</CODE>
+ and ICI<CODE>
+_message</CODE>
+ fields. Whatever object will receive the message should define an appropriate message. <A NAME="ImportExport_6.htm_IX_ImpexTranslationParams:with import">
+ </A>
+The ImportControl will send this message with a single parameter: <CODE>
+itp</CODE>
+, a pointer to an <CODE>
+ImpexTranslationParams</CODE>
+ structure (see <A HREF="#ImportExport_5.htm_69269"> ImpexTranslationParams</A>
+). The fields of the structure have the following meanings in this case:</P>
+<DL>
+<DT>
+<CODE>
+ITP_impexOD</DT><DD>
+</CODE>
+<A NAME="ImportExport_6.htm_IX_ITP_&ldots; :with import">
+ </A>
+The object to which the application should send its acknowledgment message. In this case, it is the optr of the ImportControl.</DD>
+<DT>
+ITP<CODE>
+_returnMsg</DT><DD>
+</CODE>
+The acknowledgment message to send when the import has been completed. In this case, it is <CODE>
+MSG_IMPORT_CONTROL_IMPORT_COMPLETE.</CODE>
+</DD>
+<DT>
+ITP<CODE>
+_dataClass</DT><DD>
+</CODE>
+An <CODE>
+ImpexDataClasses</CODE>
+ record with one flag set. This flag indicates what type of Metafile has been prepared.</DD>
+<DT>
+ITP<CODE>
+_transferVMFile</DT><DD>
+</CODE>
+The <CODE>
+VMFileHandle</CODE>
+ of the temporary transfer file.</DD>
+<DT>
+ITP<CODE>
+_transferVMChain</DT><DD>
+</CODE>
+The <CODE>
+VMBlockHandle</CODE>
+ of the lead block in the VM chain containing the imported data.</DD>
+<DT>
+ITP<CODE>
+_internal</DT><DD>
+</CODE>
+For use by the ImportControl and should not be changed by the application.</DD>
+</DL>
+<P>
+The recipient of the message should take any appropriate action; usually this entails copying the data from the VM chain, as if it were pasting data from the Clipboard. When the application is finished, it should call <CODE>
+ImpexImportExportCompleted()</CODE>
+. This routine takes one parameter, namely the <CODE>
+itp</CODE>
+ pointer which was passed to the object. (The <CODE>
+ImpexTranslationParams</CODE>
+ structure should not have been changed.) <CODE>
+ImpexImportExportCompleted()</CODE>
+ reads the appropriate message and destination from the <CODE>
+ImpexTranslationParams</CODE>
+ and sends the proper acknowledgment message (which in this case is <CODE>
+MSG_IMPORT_CONTROL_IMPORT_COMPLETE</CODE>
+).</P>
+<P>
+Applications which use the object model of document control will often set ICI<CODE>
+_destination</CODE>
+ to TO_APP_TARGET; this will make it send its messages to the target object. The application can find out the ImportControl's action by sending it <CODE>
+MSG_IMPORT_CONTROL_GET_ACTION</CODE>
+. The application can change the ImportControl's action by sending it <CODE>
+MSG_IMPORT_CONTROL_SET_ACTION</CODE>
+. </P>
+
+<H6 CLASS="RefETitle">
+<A NAME="ImportExport_6.htm_IX_MSG_IMPORT_CONTROL_GET_ACTION">
+ </A>
+MSG_IMPORT_CONTROL_GET_ACTION</H6>
+<PRE CLASS="syntax">void	MSG_IMPORT_CONTROL_GET_ACTION(
+        ImpexAction *		retValue);</PRE>
+<P>
+This message retrieves the values of an ImportControl's ICI<CODE>
+_destination</CODE>
+ and ICI<CODE>
+_message</CODE>
+ fields. These fields indicate what action the ImportControl will take when it is finished preparing a file for import.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any ImportControl object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+retValue</CODE>
+	A pointer to an <CODE>
+ImpexAction</CODE>
+ structure.</P>
+<P CLASS="refField">
+Return:	The value of ICI<CODE>
+_message</CODE>
+ (i.e. the message sent by the ImportControl).</P>
+<DL>
+<DT>
+<CODE>
+recipient</CODE>
+</DT><DD>A pointer to an <CODE>
+ImpexAction</CODE>
+ structure describing the message sent.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	This message should not be intercepted.</P>
+<P CLASS="refField">
+Structures:	The message and recipient are written to an <CODE>
+ImpexAction</CODE>
+ structure:</P>
+<PRE>typedef struct {
+	word	message;		/* message sent */
+	word	unused;
+	optr	destOD;		/* Destination of message */
+} ImpexAction;</PRE>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="ImportExport_6.htm_IX_MSG_IMPORT_CONTROL_SET_ACTION">
+ </A>
+MSG_IMPORT_CONTROL_SET_ACTION</H6>
+<PRE CLASS="syntax">void	MSG_IMPORT_CONTROL_SET_ACTION(
+        optr	destOD,	/* Send messages to this object. */
+        word	ICImsg);	/* Send this message to the above recipient. */</PRE>
+<P>
+This message changes the values of an ImportControl's ICI<CODE>
+_destination</CODE>
+ and ICI<CODE>
+_message</CODE>
+ fields. These fields indicate what action the ImportControl will take when it is finished preparing a file for import.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any ImportControl object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+destOD</CODE>
+	Set ICI<CODE>
+_destination</CODE>
+ to this value. </P>
+<DL>
+<DT>
+<CODE>
+ICImsg</CODE>
+</DT><DD>Set ICI<CODE>
+_message</CODE>
+ to this value.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	This message should not be intercepted.<A NAME="ImportExport_6.htm_marker=439340">
+ </A>
+</P>
+
+
+
+<H4 CLASS="HeadingC">
+Adding to the Import Dialog Box</H4>
+<P>
+<A NAME="ImportExport_6.htm_IX_ATTR_IMPORT_CONTROL_APP_UI">
+ </A>
+When the user selects the &quot;Import&quot; trigger or tool, the Import controller brings up a dialog box. The application can, if it wishes, add UI objects to this box. It does so by defining a tree of generic objects (the top object of which must be set &quot;not usable&quot;). It must place an optr to the top object in the tree in ATTR_IMPORT_CONTROL_APP_UI. When the ImportControl builds the dialog box, it will add that optr as one of the children in the tree and set it &quot;usable&quot;.</P>
+
+<HR>
+<A NAME="ImportExport_7.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The Import/Export Library</A>: 2.3 <A HREF="#ImportExport_4.htm">Using Impex</A>: 
+The ExportControl Object</H3>
+<P>
+<A NAME="ImportExport_7.htm_IX_ExportControlClass">
+ </A>
+Applications which use the Impex library will generally have a single ExportControl object. This object is usually a child of the File menu; however, applications may put it wherever they want. They should also place it on the application object's GAGCNLT_SELF_LOAD_OPTIONS GCN list. Applications should disable this object (with MSG_GEN_SET_NOT_ENABLED) whenever they are not able to prepare data for export; for example, some applications will choose to disable file exporting whenever the &quot;Cut&quot; and &quot;Copy&quot; functions are disabled.</P>
+<P>
+The ExportControl object is subclassed from <CODE>
+GenControlClass</CODE>
+ (by way of <CODE>
+ImportExportClass</CODE>
+, as noted above). It thus has all the functionality of that class. It also has a few instance data fields of its own; they are shown in <A HREF="#ImportExport_7.htm_34105"> ExportControlClass Instance Data</A>
+.</P>
+<P CLASS="figTitle">
+Code Display 16-2 <A NAME="ImportExport_7.htm_34105">
+ </A>
+ExportControlClass Instance Data</P>
+<PRE>/* ECI_attrs is a word-length record which stores attribute information for the
+ * ImportControl object. It has only one flag, ECA_IGNORE_INPUT. */
+    @instance ExportControlAttrs					ECI_attrs = 0;</PRE>
+<PRE>/* ECI_dataClasses is a word-length record which indicates what Metafile formats
+ * are supported by the application. The application must set this field. */
+    @instance ImpexDataClasses					ECI_dataClasses = 0;</PRE>
+<PRE>/* ECI_destination and ECI_message indicate what message should be sent when the
+ * ExportControl object is preparing to export a file. The application must set
+ * these fields. The message must take a single argument, namely a pointer to an
+ * ImpexTranslationParams structure in ss:bp (on the stack). */
+    @instance optr					ECI_destination;
+    @instance word					ECI_message;</PRE>
+<PRE>/* Applications may wish to add their own UI objects to the Export dialog box.
+ * They can do so by defining a generic tree (the top object of which must be not
+ * &quot;usable&quot;), and putting an optr to the top object in ATTR_EXPORT_CONTROL_APP_UI.
+ */
+    @vardata optr 					ATTR_EXPORT_CONTROL_APP_UI;</PRE>
+<PRE>/* Controller features flags */
+typedef ByteFlags 			ExportControlFeatures;
+#define EXPORTCF_BASIC			0x01</PRE>
+<PRE>typedef	ByteFlags 			ExportControlToolboxFeatures;
+#define EXPORTCTF_DIALOG_BOX				0x01</PRE>
+
+<H4 CLASS="HeadingC">
+ECI_attrs</H4>
+<PRE>ExportControlAttrs, MSG_EXPORT_CONTROL_GET_ATTRS, MSG_EXPORT_CONTROL_SET_ATTRS</PRE>
+<P>
+ECI<A NAME="ImportExport_7.htm_IX_ExportControlAttrs">
+ </A>
+<A NAME="ImportExport_7.htm_IX_ECI_attrs">
+ </A>
+<CODE>
+_attrs</CODE>
+ is a word-length record of type <CODE>
+ExportControlAttrs</CODE>
+. This record contains only one flag:</P>
+<DL>
+<DT>
+ECA_IGNORE_INPUT</DT><DD>
+<A NAME="ImportExport_7.htm_IX_ECA_&ldots;">
+ </A>
+If this flag is on, the ExportControl will consume all input to the application while the import occurs. By default, this flag is off.</DD>
+</DL>
+<P>
+To find out the current setting of this field, send <CODE>
+MSG_EXPORT_CONTROL_GET_ATTRS</CODE>
+ to the ImportControl. To change this field, send MSG_EXPORT_CONTROL_SET_ATTRS to the ImportControl.</P>
+
+<H6 CLASS="RefETitle">
+<A NAME="ImportExport_7.htm_IX_MSG_EXPORT_CONTROL_GET_ATTRS">
+ </A>
+MSG_EXPORT_CONTROL_GET_ATTRS</H6>
+<PRE CLASS="syntax">ExportControlAttrs	 MSG_EXPORT_CONTROL_GET_ATTRS();</PRE>
+<P>
+This message retrieves the current setting of the ExportControl's ECI<CODE>
+_attrs</CODE>
+ field.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any ExportControl object.</P>
+<P CLASS="refField">
+Return:	The ExportControl's ECI<CODE>
+_attrs</CODE>
+ field.</P>
+<P CLASS="refField">
+Interception:	This message should not be intercepted.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="ImportExport_7.htm_IX_MSG_EXPORT_CONTROL_SET_ATTRS">
+ </A>
+MSG_EXPORT_CONTROL_SET_ATTRS</H6>
+<PRE CLASS="syntax">void	MSG_EXPORT_CONTROL_SET_ATTRS(
+        ExportControlAttrs		attrs);</PRE>
+<P>
+This message changes the current settings of an ExportControl's ECI<CODE>
+_attrs</CODE>
+ field. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any ExportControl object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+attrs</CODE>
+	The new settings for the ECI<CODE>
+_attrs</CODE>
+ field.</P>
+<P CLASS="refField">
+Interception:	This message should not be intercepted.</P>
+
+
+
+<H4 CLASS="HeadingC">
+ECI_dataClasses</H4>
+<PRE>MSG_EXPORT_CONTROL_GET_DATA_CLASSES, MSG_EXPORT_CONTROL_SET_DATA_CLASSES</PRE>
+<P>
+<A NAME="ImportExport_7.htm_IX_ECI_dataClasses">
+ </A>
+When you declare an Export object, you must specify what kind of Metafiles your application is able to create. You do this by setting the value of the ECI<CODE>
+_dataClasses</CODE>
+ field. This field is a word-length record of type <CODE>
+ImpexDataClasses</CODE>
+ (described in <A HREF="#ImportExport_5.htm_69269"> ImpexTranslationParams</A>
+). If (for example) only the IDC_TEXT bit is set, the ExportControl will use only those export libraries which expect text Metafile input. More than one bit may be set; when the ExportControl sends its notification, it will tell the application what type of data it expects to export.</P>
+<P>
+To find out the current settings of the ECI<CODE>
+_dataClasses</CODE>
+ field, send MSG_EXPORT_CONTROL_GET_DATA_CLASSES. To change the settings of this field, send MSG_EXPORT_CONTROL_SET_DATA_CLASSES.</P>
+
+<H6 CLASS="RefETitle">
+<A NAME="ImportExport_7.htm_IX_MSG_EXPORT_CONTROL_GET_DATA_CLASSES">
+ </A>
+MSG_EXPORT_CONTROL_GET_DATA_CLASSES</H6>
+<PRE CLASS="syntax">ImpexDataClasses	 MSG_EXPORT_CONTROL_GET_DATA_CLASSES();</PRE>
+<P>
+This message retrieves the current setting of the ExportControl's ECI<CODE>
+_dataClasses</CODE>
+ field. This tells you what kind of data can be exported.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any ExportControl object.</P>
+<P CLASS="refField">
+Return:	The ExportControl's ECI<CODE>
+_dataClasses</CODE>
+ field.</P>
+<P CLASS="refField">
+Interception:	This message should not be intercepted.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="ImportExport_7.htm_IX_MSG_EXPORT_CONTROL_SET_DATA_CLASSES">
+ </A>
+MSG_EXPORT_CONTROL_SET_DATA_CLASSES</H6>
+<PRE CLASS="syntax">void	MSG_EXPORT_CONTROL_SET_DATA_CLASSES(
+        ImpexDataClasses 		dataClasses);</PRE>
+<P>
+This message changes the current settings of an ExportControl's ECI<CODE>
+_dataClasses</CODE>
+ field. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any ExportControl object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+dataClasses</CODE>
+	The new settings for the ECI<CODE>
+_dataClasses</CODE>
+ field.</P>
+<P CLASS="refField">
+Interception:	This message should not be intercepted.</P>
+
+
+
+<H4 CLASS="HeadingC">
+The ExportControl Action</H4>
+<PRE>MSG_EXPORT_CONTROL_GET_ACTION, MSG_EXPORT_CONTROL_SET_ACTION</PRE>
+<P>
+The ExportControl does most of its work transparently to the application. It interacts with the rest of the application after the user selects the name, location, and format of the exported file. At this point the ExportControl creates a temporary transfer file and sends a notification message to the application; the notification message passes the file handle and the format expected. The application responds by creating a VM chain in the transfer file and filling it with the data to export, formatted in the appropriate Metafile format. The ExportControl can then call the translation library to create the output file.</P>
+<P>
+<A NAME="ImportExport_7.htm_IX_ECI_message">
+ </A>
+<A NAME="ImportExport_7.htm_IX_ECI_destination">
+ </A>
+The application determines what notification message will be sent, and to what object, by setting the ECI<CODE>
+_destination</CODE>
+ and ECI<CODE>
+_message</CODE>
+ fields. Whatever object will receive the message should define an appropriate message.<A NAME="ImportExport_7.htm_IX_ITP_&ldots; :with export">
+ </A>
+<A NAME="ImportExport_7.htm_IX_ImpexTranslationParams:with export">
+ </A>
+ The ExportControl will send this message with a single parameter: <CODE>
+itp</CODE>
+, a pointer to an <CODE>
+ImpexTranslationParams</CODE>
+ structure. The fields of the structure have the following meanings in this situation:</P>
+<DL>
+<DT>
+<CODE>
+ITP_impexOD</DT><DD>
+</CODE>
+The object to which the application should send its acknowledgment message. In this case, it is the optr of the ExportControl.</DD>
+<DT>
+ITP<CODE>
+_returnMsg</DT><DD>
+</CODE>
+The acknowledgment message to send when the export has been completed. In this case, it is <CODE>
+MSG_EXPORT_CONTROL_EXPORT_COMPLETE.</CODE>
+</DD>
+<DT>
+ITP<CODE>
+_dataClass</DT><DD>
+</CODE>
+An <CODE>
+ImpexDataClasses</CODE>
+ record with one flag set. This flag indicates what type of Metafile should be prepared.</DD>
+<DT>
+ITP<CODE>
+_transferVMFile</DT><DD>
+</CODE>
+The <CODE>
+VMFileHandle</CODE>
+ of the temporary transfer file.</DD>
+<DT>
+ITP<CODE>
+_transferVMChain</DT><DD>
+</CODE>
+A null handle. When the application has created the transfer VM chain, it should write the <CODE>
+VMBlockHandle</CODE>
+ of the head of the chain to this field. If the application fails for any reason, it should leave this field as a null handle.</DD>
+<DT>
+ITP<CODE>
+_internal</DT><DD>
+</CODE>
+This field is for use by the ExportControl and should not be changed by the application.</DD>
+</DL>
+<P>
+The recipient of the message should take any appropriate action; usually this entails translating the current selection into the Metafile format and writing it to a VM chain. When the application is finished, it should call <CODE>
+ImpexImportExportCompleted()</CODE>
+. This routine will send the appropriate acknowledgment message to the ExportControl object (in this case, <CODE>
+MSG_EXPORT_CONTROL_EXPORT_COMPLETE</CODE>
+). This routine takes one parameter, namely the <CODE>
+itp</CODE>
+ pointer which was passed to the object. The ITP<CODE>
+_transferVMChain</CODE>
+ field of the <CODE>
+ImpexTranslationParams</CODE>
+ structure should be set to the handle of the head block in the VM chain. If the application was unable to prepare the data for export, it should clear this field.</P>
+<P>
+The ExportControl object will have created a temporary file for the application to use. This file will be entirely empty when the application gets it. The ExportControl will ignore everything in the file except for the VM chain indicated by ITP<CODE>
+_transferVMChain</CODE>
+; thus, an application can feel free to allocate blocks in the VM file for scratch space. The ExportControl will destroy the file when the translation library has finished preparing the output file.</P>
+<P>
+Applications which use the object model of document control will often set ECI<CODE>
+_destination</CODE>
+ to TO_APP_TARGET; this will make it send its messages to the target object. The application can find out the ExportControl's action by sending it <CODE>
+MSG_EXPORT_CONTROL_GET_ACTION</CODE>
+. The application can change the ExportControl's action by sending it <CODE>
+MSG_EXPORT_CONTROL_SET_ACTION</CODE>
+. </P>
+
+<H6 CLASS="RefETitle">
+<A NAME="ImportExport_7.htm_IX_MSG_IMPORT_CONTROL_GET_ACTION">
+ </A>
+MSG_EXPORT_CONTROL_GET_ACTION</H6>
+<PRE CLASS="syntax">void	MSG_EXPORT_CONTROL_GET_ACTION(
+        ObjectState *		retValue);</PRE>
+<P>
+This message retrieves the values of an ExportControl's ECI<CODE>
+_destination</CODE>
+ and ECI<CODE>
+_message</CODE>
+ fields. These fields indicate what action the ExportControl will take when it needs to have data prepared for export.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any ImportControl object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+retValue</CODE>
+	A pointer to an <CODE>
+ObjectState</CODE>
+ structure.</P>
+<P CLASS="refField">
+Return:	The value of ICI<CODE>
+_message</CODE>
+ (i.e. the message sent by the ExportControl).</P>
+<DL>
+<DT>
+<CODE>
+recipient</CODE>
+</DT><DD>A pointer to an <CODE>
+ObjectState</CODE>
+ structure describing the message sent.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	This message should not be intercepted.</P>
+<P CLASS="refField">
+Structures:	The message and recipient are written to an <CODE>
+ObjectState</CODE>
+ structure:</P>
+<PRE>typedef struct {
+	int	notUsed;
+	word	message;		/* Message sent */
+	optr	destOD;		/* Destination of message */
+} ObjectState;</PRE>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="ImportExport_7.htm_IX_MSG_EXPORT_CONTROL_SET_ACTION">
+ </A>
+MSG_EXPORT_CONTROL_SET_ACTION</H6>
+<PRE CLASS="syntax">void	MSG_EXPORT_CONTROL_SET_ACTION(
+        optr	destOD,	/* Send messages to this object. */
+        word	ECImsg);	/* Send this message to the above recipient. */</PRE>
+<P>
+This message changes the values of an ExportControl's ECI<CODE>
+_destination</CODE>
+ and ECI<CODE>
+_message</CODE>
+ fields. These fields indicate what action the ExportControl will take when it is finished preparing a file for export.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any ExportControl object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+recipient</CODE>
+	Set ECI<CODE>
+_destination</CODE>
+ to this value. </P>
+<DL>
+<DT>
+<CODE>
+message</CODE>
+</DT><DD>Set ECI<CODE>
+_message</CODE>
+ to this value.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	This message should not be intercepted.<A NAME="ImportExport_7.htm_marker=439364">
+ </A>
+</P>
+
+
+
+<H4 CLASS="HeadingC">
+Adding to the Import Dialog Box</H4>
+<P>
+<A NAME="ImportExport_7.htm_IX_ATTR_EXPORT_CONTROL_APP_UI">
+ </A>
+When the user selects the &quot;Export&quot; trigger or tool, the Export controller brings up a dialog box. The application can, if it wishes, add UI objects to this box. It does so by defining a tree of generic objects (the top object of which must be set &quot;not usable&quot;). It must place an optr to the top object in the tree in ATTR_EXPORT_CONTROL_APP_UI. When the ExportControl builds the dialog box, it will add that optr as one of the children in the tree and set it &quot;usable&quot;.</P>
+
+<HR>
+<A NAME="ImportExport_8.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">The Import/Export Library</A>: 3 
+Writing Translation Libraries</H2>
+<P>
+GEOS comes with many translation libraries, and more are being added all the time. Geoworks is continually adding new translation libraries for popular formats. Nevertheless, we cannot guarantee to support every format. Developers may decide to write their own translation libraries. This section describes how the libraries work in enough detail that developers will be able to do preliminary work in writing the libraries.
+
+</P>
+<P>
+Most applications will find the provided translation libraries sufficient for their needs. Therefore, most developers can skip this section. You should read this if you are planning on writing translation libraries, or just if you want more understanding of the importing and exporting process.</P>
+<P>
+Remember: once a translation library has been written, all a user has to do to install it is copy it to the appropriate directory. All existing applications which use Impex will then automatically be able to import and export that format. Users will be able to buy translation library collections from third-party vendors the way they buy font collections now.</P>
+<P CLASS="subsectionLink">
+<A HREF="#ImportExport_9.htm">How Translation Libraries Work</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#ImportExport_a.htm">Intermediate Formats</A></P>
+<HR>
+<A NAME="ImportExport_9.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The Import/Export Library</A>: 3.1 <A HREF="#ImportExport_8.htm">Writing Translation Libraries</A>: 
+How Translation Libraries Work</H3>
+<P>
+A translation library's task is easily stated. It has to do two things: read a native-format file and produce a Metafile translation, and read data in a Metafile and write corresponding data in a native-format file. How easy this is to do depends on the formats involved.</P>
+<P>
+Every translation library specifies what format of Metafile it expects to work with. For example, the FooWrite translation library would translate FooWrite files into IDC_TEXT Metafiles and vice versa. When a user activates the &quot;Import&quot; trigger, he will be presented with a list of formats to use; those formats will correspond to all the libraries which can translate files into formats the application can accept. For example, if the application specified that it could accept text or graphics Metafiles, the user's choice of format would depend on which of the installed libraries could generate text or graphics Metafiles.</P>
+<P>
+The translation library can also suggest a file mask. For example, the FooWrite translation library might specify that FooWrite data files meet the pattern &quot;*.FOO&quot;. By default, the Import file selector will show only the files that match the library's mask. However, the user can override this mask, setting a different one or no mask at all.</P>
+<P>
+When a user decides to import a file, the ImportControl opens the source file and creates a temporary transfer VM file. The ImportControl then starts up the appropriate translation library and passes the two file handles to it. The translation library should read the entire source file, translate it to the appropriate Metafile format, and write it to a VM chain in the transfer file. It then returns the <CODE>
+VMBlockHandle</CODE>
+ of the head of the <CODE>
+VMChain</CODE>
+ to the ImportControl. If it was unable to translate the file, it should return a null handle; the ImportControl then displays an appropriate error message. The ImportControl will close the source file automatically.</P>
+<P>
+When a user decides to export a file, the ExportControl creates a temporary transfer file and opens an empty native-format file for the output. The ExportControl then calls the translation library. The library is passed the handles of the two files, as well as the handle of the Metafile VM chain. The library reads the Metafile and writes an appropriate data file. When it is finished, it notifies the ExportControl, which automatically closes the destination file and destroys the temporary transfer file.</P>
+<HR>
+<A NAME="ImportExport_a.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The Import/Export Library</A>: 3.2 <A HREF="#ImportExport_8.htm">Writing Translation Libraries</A>: 
+Intermediate Formats</H3>
+<P>
+Many libraries will want to make use of intermediate formats. For example, a company may have defined its own transfer format for its applications. The simplest way for it to translate files into the GEOS Metafile might be to translate the file into its own transfer format, then translate from this format into the Metafile format. GEOS supports this with its use of intermediate translation libraries.</P>
+<P>
+An intermediate library is much like an ordinary translation library. Like other libraries, it must translate from its own format into the Metafile format. The only difference is that intermediate libraries are not called by the Impex objects; instead, they are called by other translation libraries.</P>
+<P>
+For example, suppose FooWare, Inc., has a line of graphic FooApps which includes FooDraw, FooPaint, FooSketch, and FooScribble. FooWare has developed its own file-transfer format, <A NAME="ImportExport_a.htm_IX_FooInterchangeFormat">
+ </A>
+FooInterchangeFormat (FIF); it has code written to translate any FooApp's files into FIF and back. </P>
+<P>
+FooWare now wants to write translation libraries for GEOS. The first thing FooWare does is write an intermediate translation library which takes a DOS file containing FIF data and produces a VM chain containing a GEOS graphic Metafile, and vice versa. Once this is written, FooWare has an easy time writing the actual translation libraries. For example, the FooPaint translation library imports files by converting a FooPaint data file into the analogous FIF file. Since FooWare already has routines to do this translation, it just has to port existing code to the GEOS library. The FooPaint translation library then calls the FIF-to-Metafile intermediate translation library and gets the finished translation. Similarly, the FooPaint translation library exports data by calling the FIF-to-Metafile library to produce a FIF version of the data; it can then use ported code to produce an actual FooPaint file.</P>
+<P>
+Note that any ordinary translation library can also be used as an intermediate translation library. For example, let's suppose that FooWare has code written to translate FIF files into PostScript files. This makes translating the documents even easier. The FIF-to-Metafile library can just use ported code to produce a PostScript version of the data; it can then call the PostScript-to-Metafile translation library, which is provided with GEOS. GEOS comes with translation libraries for many popular file-interchange formats; thus, many developers will be able to write translation libraries just by porting code from their pre-existing translators, then calling one of the GEOS translation libraries.<A NAME="ImportExport_a.htm_marker=439368">
+ </A>
+</P>
+<HR>
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+</BODY>
+</HTML>

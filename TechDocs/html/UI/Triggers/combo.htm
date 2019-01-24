@@ -1,0 +1,666 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+<!-- This page was automatically generated from a bunch of smaller pages. -->
+<META NAME="copyright" CONTENT="Copyright GEOWORKS">
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+<TITLE>GenTrigger</TITLE>
+</HEAD>
+<BODY BGCOLOR="#ffffdf">
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+<A NAME="index.htm"></A>
+
+
+
+<H1 CLASS="chapterTitle">
+
+<A NAME="index.htm_97933">
+ </A>
+GenTrigger
+
+</H1>
+<P>
+<A NAME="index.htm_IX_GenTriggerClass">
+ </A>
+The GenTrigger object allows a user to initiate an action. In most graphical user interfaces, a GenTrigger is represented by a button; clicking on the button initiates the action. This action sends a pre-specified message to a pre-specified object or process in the trigger's instance data. You may also customize a GenTrigger to pass data along with the message.</P>
+<P>
+<P CLASS="sectionlinks">
+<STRONG>
+&nbsp;&nbsp;<A HREF="#Triggers_1.htm">1 GenTrigger Overview</A><BR>
+&nbsp;&nbsp;<A HREF="#Triggers_2.htm">2 GenTrigger Usage</A><BR>
+&nbsp;&nbsp;<A HREF="#Triggers_3.htm">3 Supplemental GenTrigger Usage</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Triggers_4.htm">3.1 Passing Data with a GenTrigger</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Triggers_5.htm">3.2 Interaction Commands</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Triggers_6.htm">3.3 Interpreting Double-Clicks</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Triggers_7.htm">3.4 Initiating an Action</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Triggers_8.htm">3.5 Setting a Trigger As the Default</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Triggers_9.htm">3.6 Manipulating Instance Data</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Triggers_a.htm">3.7 Other Hints</A><BR>
+&nbsp;&nbsp;<A HREF="#Triggers_b.htm">4 Customizations</A><BR>
+</STRONG>
+</P> <!-- end of sectionlinks blob -->
+
+<HR>
+<A NAME="Triggers_1.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">GenTrigger</A>: 1 
+GenTrigger Overview</H2>
+<P>
+Whenever you need to allow the user to initiate a single action, you should probably use a GenTrigger. When activated, a GenTrigger simply sends a message to another object or process. Both the message and its destination can be set up in the GenTrigger's instance data. The trigger can also send data with the message. This is useful if several triggers send the same message (for example MSG_CHOOSE_COLOR) but send different data (for example &quot;Blue,&quot; &quot;Red,&quot; or &quot;Green&quot;). 
+<IMG SRC="Triggers_1_dumps.gif">
+
+</P>
+<P>
+In some cases, the use of triggers is readily apparent (the &quot;OK&quot; button in a dialog box, for example, which will dismiss the dialog box) while at other times the use of triggers is not as obvious (as menu items, for example). The GenTrigger is a simple and widely used object, appearing in menus, dialog boxes, and primary windows--wherever you need a UI object whose sole action is to send out a message, a GenTrigger will probably suffice.</P>
+<P>
+Because of the trigger's basic role, they cannot have children. Note that this does not mean that activating a trigger may not necessarily bring up an object indirectly (such as a dialog box), but only that an object may not be directly attached below a GenTrigger in a generic object tree.</P>
+<P>
+Your application will choose the function of the trigger but it is left to the Specific UI to choose in what manner a trigger will be activated. (For example, under OSF/Motif, a GenTrigger may be built as a button and will be activated by clicking on the button.) </P>
+<P>
+<CODE>
+GenTriggerClass</CODE>
+ provides two instance fields. These instance fields are listed in <A HREF="#Triggers_1.htm_76896"> GenTrigger Instance Fields</A>
+.</P>
+<P CLASS="figTitle">
+Code Display 5-1 <A NAME="Triggers_1.htm_76896">
+ </A>
+GenTrigger Instance Fields</P>
+<PRE>/* GenTrigger inherits all the instance fields of GenClass. */</PRE>
+<PRE>    @instance optr GTI_destination = 0;
+    @instance Message GTI_actionMsg = 0;</PRE>
+<PRE>@vardata void HINT_TRIGGER_BRINGS_UP_WINDOW;
+@vardata void ATTR_GEN_TRIGGER_IMMEDIATE_ACTION;
+@vardata void HINT_TRIGGER_DESTRUCTIVE_ACTION;
+@vardata word ATTR_GEN_TRIGGER_ACTION_DATA;
+@vardata word ATTR_GEN_TRIGGER_INTERACTION_COMMAND;
+@vardata Message ATTR_GEN_TRIGGER_CUSTOM_DOUBLE_PRESS;</PRE>
+<PRE>    /* Alias for messages with &quot;void (word a, word b)&quot; */
+<A NAME="Triggers_1.htm_IX_TwoWordArgs"> </A>typedef struct { word a, b; } TwoWordArgs;
+@vardataAlias (ATTR_GEN_TRIGGER_ACTION_DATA)
+		TwoWordArgs ATTR_GEN_TRIGGER_ACTION_TWO_WORDS;</PRE>
+<PRE>    /* Alias for messages with &quot;void (word a, word b, word c)&quot; */
+<A NAME="Triggers_1.htm_IX_ThreeWordArgs"> </A>typedef struct { word a, b, c; } ThreeWordArgs;
+@vardataAlias (ATTR_GEN_TRIGGER_ACTION_DATA)
+		ThreeWordArgs ATTR_GEN_TRIGGER_ACTION_THREE_WORDS;</PRE>
+<PRE>    /* Alias for messages with &quot;void (optr output, word a)&quot; */</PRE>
+<P>
+<A NAME="Triggers_1.htm_IX_GTI_actionMsg">
+ </A>
+The GTI<CODE>
+_actionMsg</CODE>
+ instance field sets the message for the trigger to send out upon activation. The activation itself is determined by the specific UI. The trigger will send this message to the output specified in the GTI_<CODE>
+destination</CODE>
+ instance field.</P>
+<P>
+<A NAME="Triggers_1.htm_IX_GTI_destination">
+ </A>
+The<CODE>
+ </CODE>
+GTI<CODE>
+_destination </CODE>
+instance<CODE>
+ </CODE>
+field sets the object or process for the trigger to send its message to upon activation. The trigger will send the message in the GTI<CODE>
+_actionMsg</CODE>
+ field to this optr. Often this will be a <CODE>
+TravelOption</CODE>
+ or a <CODE>
+GenTravelOption</CODE>
+.
+<IMG SRC="Triggers_1_menuItem.gif">
+
+</P>
+<HR>
+<A NAME="Triggers_2.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">GenTrigger</A>: 2 
+GenTrigger Usage</H2>
+<P>
+A simple GenTrigger should contain a message to send out upon activation, a destination to send the message to, and a visual moniker to distinguish the trigger from other objects (and describe its function to the user).</P>
+<P>
+<A NAME="Triggers_2.htm_IX_GEN_TRIGGER_ACTION prototype">
+ </A>
+You may use the prototype GEN_TRIGGER_ACTION to define the action message. This prototype passes the optr of the sending trigger in the variable name `trigger' and can be accessed within a message handler.</P>
+<P>
+GenTriggers may appear within GenPrimarys, GenViews, or, most often, within a GenInteraction. If a GenTrigger is placed as a child of a GIV_POPUP GenInteraction, the GenTriggers may be represented as menu items. </P>
+<P CLASS="figTitle">
+Code Display 5-2 Code for Basic GenTriggers</P>
+<PRE>/* Use the prototype GEN_TRIGGER_ACTION to define a GenTrigger's action message. 
+ * Within a method, you can retrieve this optr with the variable name `trigger.' */</PRE>
+<PRE>@message (GEN_TRIGGER_ACTION) MSG_HELLO_CHANGE_TO_BLUE();
+@message (GEN_TRIGGER_ACTION) MSG_HELLO_CHANGE_TO_GOLD();</PRE>
+<PRE>/* The GenInteraction object will contain the child GenTriggers. */</PRE>
+<PRE>@object GenInteractionClass HelloColorBox = {
+    GI_comp = @HelloBlueTrigger, @HelloGoldTrigger;
+    GI_visMoniker = 'C', &quot;Color&quot;;
+    GII_visibility = GIV_DIALOG;
+}</PRE>
+<PRE>/* GenTriggers
+ * Buttons are implemented by GenTriggerClass. When the trigger is pushed by
+ * the user (clicked on with the mouse), it will send the specified message
+ * to the specified destination object. In both cases below, the trigger will
+ * send an application-defined message to the application's Process
+ * object. A trigger's moniker is displayed within the trigger. In this
+ * case both are text, but any graphics string could also be used to create
+ * graphical triggers. */</PRE>
+<PRE>@object GenTriggerClass HelloBlueTrigger = {
+    GI_visMoniker = 'B', &quot;Blue&quot;;
+	/* Send MSG_HELLO_CHANGE_TO_BLUE to the Process object. */
+    GTI_destination = process;
+    GTI_actionMsg = MSG_HELLO_CHANGE_TO_BLUE;
+}</PRE>
+<PRE>@object GenTriggerClass HelloGoldTrigger = {
+    GI_visMoniker = 'G', &quot;Gold&quot;;
+	/* Send MSG_HELLO_CHANGE_TO_GOLD to the Process object. */
+    GTI_destination = process;
+    GTI_actionMsg = MSG_HELLO_CHANGE_TO_GOLD;
+}</PRE>
+<HR>
+<A NAME="Triggers_3.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">GenTrigger</A>: 3 
+Supplemental GenTrigger Usage</H2>
+<P>
+GenTriggers may also perform other actions besides the simple sending of a message to an object.</P>
+<P>
+ For example, your trigger may pass data along with its message; you may then use this data within a method to perform some additional work. In some cases, this data may be interpreted by a GenInteraction object to provide additional functionality to dialog boxes.</P>
+<P>
+You may also alter the manner in which a trigger is initiated through the implementation of hints and several messages. You can also modify the trigger's instance data dynamically, reassigning its action message and destination.</P>
+<P CLASS="subsectionLink">
+<A HREF="#Triggers_4.htm">Passing Data with a GenTrigger</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Triggers_5.htm">Interaction Commands</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Triggers_6.htm">Interpreting Double-Clicks</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Triggers_7.htm">Initiating an Action</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Triggers_8.htm">Setting a Trigger As the Default</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Triggers_9.htm">Manipulating Instance Data</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Triggers_a.htm">Other Hints</A></P>
+<HR>
+<A NAME="Triggers_4.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">GenTrigger</A>: 3.1 <A HREF="#Triggers_3.htm">Supplemental GenTrigger Usage</A>: 
+Passing Data with a GenTrigger</H3>
+<PRE>ATTR_GEN_TRIGGER_ACTION_DATA, ATTR_GEN_TRIGGER_ACTION_TWO_WORDS, ATTR_GEN_TRIGGER_ACTION_THREE_WORDS</PRE>
+<P>
+A GenTrigger may pass data along with its message. Use ATTR_GEN_TRIGGER_ACTION_DATA<A NAME="Triggers_4.htm_IX_ATTR_GEN_TRIGGER_ACTION_DATA">
+ </A>
+ to assign a word of data that you wish to pass with the particular message. If you need to pass more than a single word of data, you will have to use <CODE>
+@vardataAlias</CODE>
+; this Goc keyword allows ATTR_GEN_TRIGGER_ACTION_DATA to pass a structure instead of a single word.</P>
+<P>
+Several ATTR_GEN_TRIGGER_ACTION_DATA aliases already exist for your use. <A NAME="Triggers_4.htm_IX_ATTR_GEN_TRIGGER_ACTION_TWO_WORDS">
+ </A>
+ATTR_GEN_TRIGGER_ACTION_TWO_WORDS and ATTR_GEN_TRIGGER_ACTION_THREE_WORDS<A NAME="Triggers_4.htm_IX_ATTR_GEN_TRIGGER_ACTION_THREE_WORDS">
+ </A>
+ allow you to pass two or three words of data along with the trigger's message<A NAME="Triggers_4.htm_IX_ATTR_GEN_TRIGGER_ACTION_OPTR_AND_WORD">
+ </A>
+.</P>
+<P>
+If you need to pass more than three words of data with a message, you will need to use the stack to pass arguments. To do so, use the <CODE>
+@stack</CODE>
+ parameter within your message definition; because of the implementation of the stack, make sure to set up your structure to pass its arguments <EM>
+in reverse order</EM>
+.</P>
+<P CLASS="figTitle">
+Code Display 5-3 Passing Data from a GenTrigger</P>
+<PRE>/* In a class declaration, you should define a message that passes data. */</PRE>
+<PRE>@class MyProcessClass, GenProcessClass;
+@message void MSG_SET_MY_DATA(int myData);
+@endc;</PRE>
+<PRE>@object GenTriggerClass MyHundredTrigger = {
+	/* This trigger will pass 100 to the method for MSG_SET_MY_DATA. */
+    GI_visMoniker = &quot;Set My Data to 100&quot;;
+    GTI_actionMsg = MSG_SET_MY_DATA;
+    GTI_destination = process;
+    ATTR_GEN_TRIGGER_ACTION_DATA = 100;					/* This object's data is 100. */
+}</PRE>
+<PRE>@object GenTriggerClass MyTenTrigger = {
+	/* This trigger will pass `10' to the method for MSG_SET_MY_DATA.*/
+    GI_visMoniker = &quot;Set My Data to 10&quot;;
+    GTI_actionMsg = MSG_SET_MY_DATA;
+    GTI_destination = process;
+    ATTR_GEN_TRIGGER_ACTION_DATA = 10;					/* This object's data is 10. */
+}</PRE>
+<PRE>@method MyProcessClass, MSG_SET_MY_DATA {
+	/* This message passes one parameter (the integer myData). Goc knows
+	 * that the data is located within the ATTR_GEN_TRIGGER_ACTION_DATA
+	 * field. */
+    UpdateDisplay(myData);				/* Use that data for your own purposes. */
+}</PRE>
+<PRE>/* The following examples show how to pass longer structures than the above. */</PRE>
+<PRE>	/* Define the message. */
+@message void MSG_CUSTOM_MESSAGE(@stack char name[10], optr arg1, int arg2);
+	/* Define the structure you wish to pass with the message. If the
+	 * message will pass parameters on the stack (as in this case), you
+	 * must define your structure to pass its elements in reverse order. */
+typedef struct { 
+    int		MS_arg2;
+    optr		MS_arg1;
+    char		MS_name[10]
+} MyStruct;</PRE>
+<PRE>	/* Use @vardataAlias to define your own attribute (ATTR_MY_STRUCT_TO_PASS)
+	 * to store the custom structure. */
+@vardataAlias (ATTR_GEN_TRIGGER_ACTION_DATA) MyStruct ATTR_MY_STRUCT_TO_PASS;</PRE>
+<PRE>	/* Declare your object and set the arguments to pass. */
+@object GenTriggerClass MyTrigger = {
+    GI_visMoniker = &quot;Custom Trigger&quot;;
+    GTI_actionMsg = MSG_CUSTOM_MESSAGE;
+    GTI_destination = process;
+    ATTR_MY_STRUCT_TO_PASS = { 100, @ListObject, &quot;Zow!&quot; }
+}</PRE>
+<HR>
+<A NAME="Triggers_5.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">GenTrigger</A>: 3.2 <A HREF="#Triggers_3.htm">Supplemental GenTrigger Usage</A>: 
+Interaction Commands</H3>
+<PRE>ATTR_GEN_TRIGGER_INTERACTION_COMMAND</PRE>
+<P>
+<A NAME="Triggers_5.htm_IX_GenInteractionClass: Interaction Commands">
+ </A>
+A GenTrigger may perform special actions within a GenInteraction object. The <A NAME="Triggers_5.htm_IX_ATTR_GEN_TRIGGER_INTERACTION_COMMAND">
+ </A>
+ATTR_GEN_TRIGGER_INTERACTION_COMMAND attribute sets the special activity for these types of triggers. This attribute indicates that the GenTrigger is an Interaction command trigger for the parent GenInteraction object. ATTR_GEN_TRIGGER_INTERACTION_COMMAND takes a word of data (of type <CODE>
+InteractionCommand</CODE>
+) specifying the command type of the trigger. A trigger with an <CODE>
+InteractionCommand</CODE>
+ can perform one of several standard actions. Most of these actions are specific to dialog boxes.</P>
+<P>
+The <CODE>
+InteractionCommand</CODE>
+ types are</P>
+<DL>
+<DT>
+IC_NULL</DT><DD>This command is special, alerting an application that the interaction containing the trigger has been closed because the system is about to shut down. You should never set any triggers to this <CODE>
+InteractionCommand</CODE>
+. </DD>
+<DT>
+IC_DISMISS</DT><DD>This command instructs the UI to dismiss the parent GenInteraction. Set this if you want the trigger to dismiss an Interaction or provide a custom &quot;Close&quot; trigger.</DD>
+<DT>
+IC_INTERACTION_COMPLETE</DT><DD>
+This command is special, indicating to the UI that a single interaction has been completed (the user has clicked on an <CODE>
+InteractionCommand</CODE>
+ trigger marked with GA_SIGNAL_INTERACTION_COMPLETE). You should never set any triggers to this <CODE>
+InteractionCommand</CODE>
+. If you wish a trigger to exhibit this behavior, set its GI_<CODE>
+attrs</CODE>
+ field to include GA_SIGNAL_INTERACTION_COMPLETE. (See <A HREF="../../SysObjects/Gen/GenClass_3.htm#40387">the GenClass chapter</A>.)</DT><P CLASS="WorList">
+IC_APPLY	This command instructs the UI to apply any properties within a GIT_PROPERTIES Interaction. By default, this trigger will send out a <CODE>
+MSG_GEN_APPLY</CODE>
+.</P>
+<DT>
+IC_RESET	This command instructs the UI that this is a &quot;reset&quot; trigger for a properties Interaction; the application is responsible for actual reset behavior. You should provide a method to handle the message sent out by this trigger, set up the state of items to reset, and call <CODE>
+MSG_GEN_RESET</CODE>
+ within that handler.</DD>
+<DT>
+IC_OK</DT><DD>This command instructs the UI that the user has acknowledged a GIT_NOTIFICATION and should take any appropriate measures.</DD>
+<DT>
+IC_YES</DT><DD>This command instructs the UI that the user has signalled a positive response from a GIT_AFFIRMATION Interaction. </DD>
+<DT>
+IC_NO</DT><DD>This command instructs the UI that the user has signalled a negative response from a GIT_AFFIRMATION Interaction.</DD>
+<DT>
+IC_STOP</DT><DD>This command instructs the UI to halt a GIT_PROGRESS Interaction; (the application is responsible for halting any ongoing operations related to that Interaction).</DD>
+<DT>
+IC_EXIT</DT><DD>This command is special, causing the trigger to exit the application. Typically, the File menu already has a trigger set to this command. </DD>
+<DT>
+</DL>
+IC_HELP</DT><DD>This command indicates that this GenTrigger brings up help, searching for the proper help context (ATTR_GEN_HELP_CONTEXT) and bringing up the help dialog box with that context. Any contexts below the trigger's containing dialog are ignored, however; i.e. the lowest possible context is the that on the dialog box itself. For more information on Help, see <A HREF="../../UI/Help/index.htm">the Help Library chapter</A>.</DT><P CLASS="Body">
+In most cases, you should not provide a visual moniker for any triggers with an <CODE>
+InteractionCommand</CODE>
+; the specific UI will select an appropriate moniker. (You may supply a moniker if you wish to override the specific UI's selection, however.) </P>
+<P>
+Activating an ATTR_GEN_TRIGGER_INTERACTION_COMMAND trigger will cause the UI to send MSG_GEN_GUP_INTERACTION_COMMAND to the trigger itself. This message will travel up to the appropriate GenInteraction object, where it will be handled. </P>
+<P>
+This activity only occurs if both the trigger's destination and its action message fields are null, however. If these fields are non-null (specifying your own action message and destination), the sending of the <CODE>
+InteractionCommand</CODE>
+ will be overridden. You may want to do this to replace the default functionality of a Specific UI-supplied trigger. For complete usage of an <CODE>
+InteractionCommand</CODE>
+ trigger within a GenInteraction object, see <A HREF="../../UI/GenInteraction/index.htm">the GenInteractionClass chapter</A>.</P><HR>
+<A NAME="Triggers_6.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">GenTrigger</A>: 3.3 <A HREF="#Triggers_3.htm">Supplemental GenTrigger Usage</A>: 
+Interpreting Double-Clicks</H3>
+<PRE>ATTR_GEN_TRIGGER_CUSTOM_DOUBLE_PRESS</PRE>
+<P>
+<A NAME="Triggers_6.htm_IX_Mouse:double-clicks on triggers">
+ </A>
+Your trigger sends out the message in the GTI_<CODE>
+actionMsg</CODE>
+ field and data in the ATTR_GEN_TRIGGER_ACTION_DATA field whenever the user clicks on the trigger, whether that click is a single or a double-click. If you wish your trigger to send out an alternate message if the user double-clicks, use ATTR_GEN_TRIGGER_CUSTOM_DOUBLE_PRESS<A NAME="Triggers_6.htm_IX_ATTR_GEN_TRIGGER_CUSTOM_DOUBLE_PRESS">
+ </A>
+. </P>
+<P>
+If you set a message for this attribute, the trigger may send out two different messages: one for a single click action and another for a double-click action.</P>
+<P CLASS="figTitle">
+Code Display 5-4 A Trigger with a Double-Click Message</P>
+<PRE>@object GenTriggerClass DoubleClickTrigger = {</PRE>
+<PRE>/* If the user single-clicks on this trigger, MSG_MY_ACTION will be sent along
+ * with data1 to the process. If the user double-clicks,
+ * MSG_MY_DOUBLE_PRESS_ACTION will be sent instead. */</PRE>
+<PRE>    GTI_actionMsg = MSG_MY_ACTION;
+    GTI_destination = process;
+    GI_visMoniker = &quot;Single or Double Click!&quot;;
+    ATTR_GEN_TRIGGER_ACTION_DATA = data1;
+    ATTR_GEN_CUSTOM_DOUBLE_PRESS = MSG_MY_DOUBLE_PRESS_ACTION;
+}</PRE>
+<HR>
+<A NAME="Triggers_7.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">GenTrigger</A>: 3.4 <A HREF="#Triggers_3.htm">Supplemental GenTrigger Usage</A>: 
+Initiating an Action</H3>
+<PRE>MSG_GEN_TRIGGER_SEND_ACTION, MSG_GEN_ACTIVATE </PRE>
+<P>
+In almost all cases, the specific UI initiates the action of the GenTrigger. Once the specific UI determines that a trigger is activated, it will send a <CODE>
+MSG_GEN_TRIGGER_SEND_ACTION </CODE>
+to the object, which will in turn send the message in<CODE>
+ </CODE>
+GTI_<CODE>
+actionMsg</CODE>
+ to the object in GTI_<CODE>
+destination</CODE>
+. In some rare cases, however, you may wish to manually &quot;trigger&quot; the GenTrigger yourself. This can be done by sending the object the <CODE>
+MSG_GEN_TRIGGER_SEND_ACTION </CODE>
+yourself. </P>
+<P>
+Note that this message, in effect, skips the specific UI and thus any specific functionality defined for activating a trigger will be ignored. In OSF/Motif, for example, a trigger may &quot;blink&quot; (display itself in reverse video) when activated. To perform the default specific UI behavior, send the object a <CODE>
+MSG_GEN_ACTIVATE</CODE>
+ instead, which will perform the default activation for an object and then call <CODE>
+MSG_GEN_TRIGGER_SEND_ACTION</CODE>
+. 
+
+</P>
+
+<H6 CLASS="RefETitle">
+<CODE>
+MSG_GEN_TRIGGER_SEND_ACTION</CODE>
+<A NAME="Triggers_7.htm_IX_MSG_GEN_TRIGGER_SEND_ACTION">
+ </A>
+</H6>
+<PRE CLASS="syntax">void	MSG_GEN_TRIGGER_SEND_ACTION(
+        Boolean doublePressFlag);</PRE>
+<P>
+This message causes a GenTrigger to send its action message specified in <CODE>
+GTI_actionMsg</CODE>
+ to the output specified in GTI_<CODE>
+destination </CODE>
+if the object is GS_USABLE. This message is sent automatically by the UI as part of the default behavior when a GenTrigger is activated by the specific UI. If you wish to simulate a double-click, sending the message included in an object's ATTR_GEN_TRIGGER_CUSTOM_DOUBLE_PRESS, pass this message with a value of <EM>
+true</EM>
+. Double-press messages may not pass any data in a trigger's ATTR_GEN_TRIGGER_ACTION_DATA.</P>
+<P>
+Slightly more useful is the<CODE>
+ GenClass</CODE>
+ message <CODE>
+MSG_GEN_ACTIVATE</CODE>
+, which activates the trigger at the specific UI's level, performing any default activation behavior (such as making the trigger blink to show that it is being activated).</P>
+<P CLASS="refField">
+Source:	Unrestricted. Usually the specific UI.</P>
+<P CLASS="refField">
+Destination:	Any usable GenTrigger object</P>
+<P CLASS="refField">
+Parameters:	<EM>
+doublePressFlag</EM>
+	Pass <EM>
+true</EM>
+ to use the message stored in ATTR_GEN_TRIGGER_CUSTOM_DOUBLE_PRESS rather than message in GTI_<CODE>
+actionMsg</CODE>
+.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+<P CLASS="refField">
+See Also:	<CODE>
+MSG_GEN_ACTIVATE</CODE>
+ </P>
+
+<HR>
+<A NAME="Triggers_8.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">GenTrigger</A>: 3.5 <A HREF="#Triggers_3.htm">Supplemental GenTrigger Usage</A>: 
+Setting a Trigger As the Default</H3>
+<PRE>MSG_GEN_TRIGGER_MAKE_DEFAULT_ACTION</PRE>
+<P>
+<A NAME="Triggers_8.htm_IX_GenInteractionClass:default action">
+ </A>
+Often, a dialog box or other windowed generic object will have several triggers. You will likely want one of these triggers to be the default action--the default action is activated when the user double-clicks on some item in the dialog or when the user hits Return, typically. (Specific UIs can determine how the activation occurs.)</P>
+<P>
+To set a trigger the default, use <CODE>
+HINT_DEFAULT_DEFAULT_ACTION</CODE>
+; this only works for the first time the trigger is created, though. To set a trigger to be the default action item dynamically, use the message <CODE>
+MSG_GEN_TRIGGER_MAKE_DEFAULT_ACTION</CODE>
+.</P>
+
+<H6 CLASS="RefETitle">
+<A NAME="Triggers_8.htm_IX_MSG_GEN_TRIGGER_MAKE_DEFAULT_ACTION">
+ </A>
+MSG_GEN_TRIGGER_MAKE_DEFAULT_ACTION</H6>
+<PRE CLASS="syntax">void	MSG_GEN_TRIGGER_MAKE_DEFAULT_ACTION();</PRE>
+<P>
+This message sets the trigger to be the default action in its windowed parent. It is the message equivalent of <CODE>
+HINT_DEFAULT_DEFAULT_ACTION</CODE>
+, defined in <CODE>
+GenClass</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenTrigger object.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+<HR>
+<A NAME="Triggers_9.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">GenTrigger</A>: 3.6 <A HREF="#Triggers_3.htm">Supplemental GenTrigger Usage</A>: 
+Manipulating Instance Data</H3>
+<PRE>MSG_GEN_TRIGGER_GET_ACTION_MSG, MSG_GEN_TRIGGER_SET_ACTION_MSG, MSG_GEN_TRIGGER_GET_DESTINATION, MSG_GEN_TRIGGER_SET_DESTINATION </PRE>
+<P>
+A GenTrigger's instance data need not be static. The instance data can be altered dynamically using the following messages of <CODE>
+GenTriggerClass</CODE>
+.</P>
+
+<H6 CLASS="RefETitle">
+<A NAME="Triggers_9.htm_IX_MSG_GEN_TRIGGER_GET_ACTION_MSG">
+ </A>
+MSG_GEN_TRIGGER_GET_ACTION_MSG</H6>
+<PRE CLASS="syntax">Message MSG_GEN_TRIGGER_GET_ACTION_MSG();</PRE>
+<P>
+This message retrieves the GTI_<CODE>
+actionMsg</CODE>
+ instance data of the trigger.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenTrigger object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Message in GTI_<CODE>
+actionMsg</CODE>
+.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Triggers_9.htm_IX_MSG_GEN_TRIGGER_SET_ACTION_MSG">
+ </A>
+MSG_GEN_TRIGGER_SET_ACTION_MSG</H6>
+<PRE CLASS="syntax">void	MSG_GEN_TRIGGER_SET_ACTION_MSG(
+        Message message);</PRE>
+<P>
+This message sets the GTI_<CODE>
+actionMsg</CODE>
+ instance field of a GenTrigger to the message passed.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenTrigger object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+message</EM>
+	Message to assign GTI_<CODE>
+actionMsg</CODE>
+ to.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Triggers_9.htm_IX_MSG_GEN_TRIGGER_GET_DESTINATION">
+ </A>
+MSG_GEN_TRIGGER_GET_DESTINATION</H6>
+<PRE CLASS="syntax">optr	MSG_GEN_TRIGGER_GET_DESTINATION();</PRE>
+<P>
+This message returns the GTI_<CODE>
+destination</CODE>
+ instance data field of the GenTrigger. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenTrigger object.</P>
+<P CLASS="refField">
+Parameters:	Nothing.</P>
+<P CLASS="refField">
+Return:	The optr of destination object (in GTI_<CODE>
+destination</CODE>
+).</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Triggers_9.htm_IX_MSG_GEN_TRIGGER_SET_DESTINATION">
+ </A>
+MSG_GEN_TRIGGER_SET_DESTINATION</H6>
+<PRE CLASS="syntax">void	MSG_GEN_TRIGGER_SET_DESTINATION(
+        optr dest);</PRE>
+<P>
+This message sets the GTI_<CODE>
+destination</CODE>
+ instance field of the GenTrigger to the optr passed.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenTrigger object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+dest</EM>
+	The optr of the new destination.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+<HR>
+<A NAME="Triggers_a.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">GenTrigger</A>: 3.7 <A HREF="#Triggers_3.htm">Supplemental GenTrigger Usage</A>: 
+Other Hints</H3>
+<PRE>HINT_TRIGGER_BRINGS_UP_WINDOW, ATTR_GEN_TRIGGER_IMMEDIATE_ACTION, HINT_TRIGGER_DESTRUCTIVE_ACTION </PRE>
+<P>
+Besides the hints discussed in earlier sections and the hints inherited from <CODE>
+GenClass</CODE>
+, <CODE>
+GenTriggerClass</CODE>
+ provides two others, as well as one additional attribute:</P>
+<UL>
+<LI>
+<CODE>
+HINT_TRIGGER_BRINGS_UP_WINDOW<BR>
+</CODE>
+<A NAME="Triggers_a.htm_IX_HINT_TRIGGER_BRINGS_UP_WINDOW">
+ </A>
+Use this hint if your trigger action indirectly brings up a window (such as a GIV_DIALOG GenInteraction or some other interaction window). This hint, depending on the specific UI, may be used to display the button with an ellipsis &quot;...&quot; to symbolize that the trigger leads to some other interaction.</LI>
+<LI>
+<CODE>
+ATTR_GEN_TRIGGER_IMMEDIATE_ACTION<BR>
+</CODE>
+<A NAME="Triggers_a.htm_IX_ATTR_GEN_TRIGGER_IMMEDIATE_ACTION">
+ </A>
+Use this attribute if your trigger is in a menu (GIV_POPUP interaction) and its action should take place immediately before other pending UI events. This will prevent default UI events from occurring before the trigger's action. For example, this attribute is used for the tack trigger in the menu box, to prevent the menu from being closed before it is tacked. </LI>
+<LI>
+HINT_TRIGGER_DESTRUCTIVE_ACTION<A NAME="Triggers_a.htm_IX_HINT_TRIGGER_DESTRUCTIVE_ACTION">
+ </A>
+<CODE>
+ <BR>
+Use this hint if your action may be potentially destructive. This hint prevents the trigger from being recognized as the default trigger. </CODE>
+</LI>
+</UL>
+<P>
+For more information on other hints not specific to GenTriggers see <A HREF="../../UI/Geometry/index.htm">the Managing UI Geometry chapter</A> and hints defined under <CODE>
+GenClass</CODE>
+.</P>
+<HR>
+<A NAME="Triggers_b.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">GenTrigger</A>: 4 
+Customizations</H2>
+<P>
+You may customize a GenTrigger using all the basic <CODE>
+GenClass </CODE>
+attributes as shown in <A HREF="../../SysObjects/Gen/index.htm">the GenClass chapter</A>. Of special significance are the ways in which you can tailor a moniker to print a graphics string on a button, as in a DOS room icon. The moniker should have as its argument a GString. (See <A HREF="../../Graphics/Environment/Environment_12.htm">the Graphics Environment chapter</A>).</P><P CLASS="figTitle">
+Code Display 5-5 Code for a &quot;Graphic Button&quot; GenTrigger</P>
+<PRE>@start TriggerGraphicsMonikerResource, notDetachable;</PRE>
+<PRE>@visMoniker TriggerGraphicsMoniker = {
+	size = standard;
+	color = color4;
+	aspectRatio = normal;
+	cachedSize = 95, 70;
+	gstring {
+		GSBeginString
+		GSDrawBitmapAtCP &lt;(EndTriggerGraphicsIcon-
+					StartTriggerGraphicsIcon)&gt;
+		StartTriggerGraphicsIcon label byte
+		&lt;...Bitmap here...&gt;
+		EndTriggerGraphicsIcon label byte
+		GSEndString
+	}
+}</PRE>
+<PRE>@end	TriggerGraphicsMonikerResource;</PRE>
+<PRE>@object GenTriggerClass GraphicTrigger = {
+	GI_visMoniker = list
+		{
+		TriggerGraphicsMoniker
+		}
+	GTI_actionMsg = MSG_CUSTOM_MESSAGE;
+	GTI_destination = process;
+	ATTR_GEN_TRIGGER_ACTION_DATA = {DataToPass};
+}</PRE>
+<P>
+<A NAME="Triggers_b.htm_marker=754940">
+ </A>
+&nbsp;</P>
+<HR>
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+</BODY>
+</HTML>

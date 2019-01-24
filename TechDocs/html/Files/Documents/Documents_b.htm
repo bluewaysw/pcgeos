@@ -1,0 +1,565 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Documents_b.htm,v 1.1 97/06/02 14:44:05 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> From the Doc Control Objects</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Documents</A>: 3.2 <A HREF="Documents_9.htm">Basic DC Messages</A>: 
+From the Doc Control Objects</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Documents_9.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Documents_a.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.1 Other Document Group Messages</A> 
+<!-- to next --> | <A HREF="Documents_c.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">4 Advanced DC Usage</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+Often the document control will need to notify the application to take an action. For example, when a document is created, the application needs to be told to initialize the document and the user interface. There are two basic models for handling these situations: the &quot;Procedure&quot; model and the &quot;Object&quot; model. (The differences between these models are discussed at more length in the section <A HREF="Documents_4.htm#16929"> Document Control Models</A>
+.) Each model has its own way of messaging.</P>
+<P>
+Under the Procedure model, every time the application needs to be notified, the document control sends a message to the GenDocumentGroup's output object, which is ordinarily the process object. Under the Object model, the affected document object will send a message to itself; this message has no handler under <CODE>
+GenDocumentClass</CODE>
+, so the application must use a subclass of <CODE>
+GenDocumentClass</CODE>
+ with handlers for these messages.</P>
+<P>
+A single user action can generate several messages. For example, when the user opens a document, four messages are sent: <CODE>
+MSG_..._PHYSICAL_OPEN</CODE>
+,<CODE>
+ MSG_..._READ_CACHED_DATA_FROM_FILE</CODE>
+,<CODE>
+ MSG_..._CREATE_UI_FOR_DOCUMENT</CODE>
+, and <CODE>
+MSG_..._ATTACH_UI_TO_DOCUMENT</CODE>
+. Furthermore, a given message might be sent as the result of several different user actions; for example, the message MSG_..._CREATE_UI_FOR_DOCUMENT is sent when the user creates a new file or opens an existing one. If a handler needs to know what user action precipitated a given message, it can send a <CODE>
+MSG_GEN_DOCUMENT_GET_OPERATION</CODE>
+ to the document object.</P>
+
+<H2 CLASS="HeadingC">
+Messages Handled under the Procedure Model</H2>
+<P>
+Whenever the application needs to be notified to take an action, a message will be sent to the GenDocumentGroup's output object. Two arguments accompany such messages: A pointer to the relevant document object and the handle of the file associated with that document. All of these messages are exported from <CODE>
+MetaClass</CODE>
+, so they can be handled by objects of any class.</P>
+<P>
+Each of these messages corresponds to a document-model message, all of which are described in <A HREF="Documents_b.htm#18073"> Messages Handled under the Object Model</A>
+. These are just the basic messages; for more advanced functionality, see the message listings in the advanced section.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_DOC_OUTPUT_INITIALIZE_DOCUMENT_FILE">
+ </A>
+MSG_META_DOC_OUTPUT_INITIALIZE_DOCUMENT_FILE</H4>
+<PRE CLASS="syntax">void	MSG_META_DOC_OUTPUT_INITIALIZE_FILE(
+        optr		document, /* document object to initialize */
+        FileHandle		file); /* Handle of file to initialize */</PRE>
+<P>
+The GenDocumentGroup object sends this message out when a new document has been created and needs to be initialized. Applications which use VM files will allocate the map block and initialize it. If an application maintains data caches for its files, it should initialize the caches at this point.</P>
+<P>
+Note that the handler for this message should not take any UI-related actions. These should be left to the handlers for <CODE>
+MSG_META_DOC_OUTPUT_CREATE_UI_FOR_DOCUMENT</CODE>
+ and <CODE>
+MSG_META_DOC_OUTPUT_ATTACH_UI_FOR_DOCUMENT</CODE>
+.</P>
+<P CLASS="refField">
+Source:	The GenDocumentGroup object.</P>
+<P CLASS="refField">
+Destination:	The output of GenDocumentGroup (usually the Process object).</P>
+<P CLASS="refField">
+Parameters:	<EM>
+document</EM>
+	<EM>
+The optr of the document object which has just been created.</EM>
+</P>
+<DL>
+<DT>
+<EM>
+file</EM>
+</DT><DD>The <CODE>
+FileHandle</CODE>
+ of the file which has just been created or opened.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	If you are using the Procedure model, you must write a handler for this message in whatever class will be receiving it (usually the process class).</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_DOC_OUTPUT_CREATE_UI_FOR_DOCUMENT">
+ </A>
+MSG_META_DOC_OUTPUT_CREATE_UI_FOR_DOCUMENT</H4>
+<PRE CLASS="syntax">void	MSG_META_DOC_OUTPUT_CREATE_UI_FOR_DOCUMENT(
+        optr		document, /* Pointer to document object */
+        FileHandle		file); /* Handle of file associated with 
+				 * document object */</PRE>
+<P>
+The GenDocumentGroup object sends this message after a document has been created or opened. Before this message is sent, the GenDocumentControl object will enable those objects on its <CODE>
+GDCI_enableDisableList</CODE>
+, and the GenDocumentGroup object will copy the GenDisplay resource for the document (if one is defined).</P>
+<P>
+Applications that use dynamic UI objects will commonly respond to this message by creating the objects for the newly-opened document. Applications that use static UI objects will commonly respond to this message by enabling the objects.</P>
+<P CLASS="refField">
+Source:	The GenDocumentGroup object.</P>
+<P CLASS="refField">
+Destination:	The output of GenDocumentGroup (usually the Process object).</P>
+<P CLASS="refField">
+Parameters:	<EM>
+document</EM>
+	<EM>
+The optr of the appropriate document object.</EM>
+</P>
+<DL>
+<DT>
+<EM>
+file</EM>
+</DT><DD>The FileHandle of the appropriate file.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	If you are using the Procedure model, you must write a handler for this message in whatever class will be receiving it (usually the process class).</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_DOC_OUTPUT_ATTACH_UI_TO_DOCUMENT">
+ </A>
+MSG_META_DOC_OUTPUT_ATTACH_UI_TO_DOCUMENT</H4>
+<PRE CLASS="syntax">void	MSG_META_DOC_OUTPUT_ATTACH_UI_TO_DOCUMENT(
+        optr		document, /* optr of document object */
+        FileHandle 		file); /* handle of file for this document */</PRE>
+<P>
+The GenDocumentGroup object sends this message when the UI for a newly-opened document has been created. It also sends this message when re-opening a document as part of restoring GEOS from a state file. Applications may respond to this by attaching dynamic UI objects and setting the values of static UI objects.</P>
+<P CLASS="refField">
+Source:	The GenDocumentGroup object.</P>
+<P CLASS="refField">
+Destination:	Output of GenDocumentGroup (usually the Process object).</P>
+<P CLASS="refField">
+Parameters:	<EM>
+document</EM>
+	The optr of the document object.</P>
+<DL>
+<DT>
+<EM>
+file</EM>
+</DT><DD>The FileHandle of the appropriate file.</DD>
+
+
+</DL>
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_DOC_OUTPUT_DETACH_UI_FROM_DOCUMENT">
+ </A>
+MSG_META_DOC_OUTPUT_DETACH_UI_FROM_DOCUMENT</H4>
+<PRE CLASS="syntax">void 	MSG_META_DOC_OUTPUT_DETACH_UI_FROM_DOCUMENT(
+        optr		document, /* pointer to document object */
+        FileHandle 		file); /* handle of file for this document */</PRE>
+<P>
+The GenDocumentGroup sends this message when a document is being closed, whether because a user closes the file or because the application is being closed. It also sends this message when GEOS is in the process of saving itself to a state file prior to shutting down. Applications generally respond to this by detaching dynamic UI objects. Note that the GenDocumentControl object will automatically disable any objects in its <CODE>
+GDCI_enableDisableList</CODE>
+. </P>
+<P CLASS="refField">
+Source:	The GenDocumentGroup object.</P>
+<P CLASS="refField">
+Destination:	Output of GenDocumentGroup (usually the Process object).</P>
+<P CLASS="refField">
+Parameters:	<EM>
+document</EM>
+	<EM>
+The optr of the appropriate document object.</EM>
+</P>
+<DL>
+<DT>
+<EM>
+file</EM>
+</DT><DD>The FileHandle of the appropriate file.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	If you are using the Procedure model, you must write a handler for this message in whatever class will be receiving it (usually the process class).</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_DOC_OUTPUT_DESTROY_UI_FOR_DOCUMENT">
+ </A>
+MSG_META_DOC_OUTPUT_DESTROY_UI_FOR_DOCUMENT</H4>
+<PRE CLASS="syntax">void	MSG_META_DOC_OUTPUT_DESTROY_UI_FOR_DOCUMENT(
+        optr	document, /* pointer to document object */
+        FileHandle 	file); /* handle of file for this document */</PRE>
+<P>
+The GenDocumentGroup object sends this message out when a document is being closed, whether because a user closes the file or because the application is being closed. Applications will generally disable static display objects and delete dynamic display objects. Note that the GenDocumentControl object will automatically disable all objects in its <CODE>
+GDCI_enableDisableList</CODE>
+, and the GenDocumentGroup will delete the display block it created for a document, if any.</P>
+<P CLASS="refField">
+Source:	The GenDocumentGroup object.</P>
+<P CLASS="refField">
+Destination:	Output of GenDocumentGroup (usually the Process object).</P>
+<P CLASS="refField">
+Parameters:	<EM>
+document</EM>
+	<EM>
+The optr of the appropriate document object.</EM>
+</P>
+<DL>
+<DT>
+<EM>
+file</EM>
+</DT><DD>The FileHandle of the appropriate file.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	If you are using the Procedure model, you must write a handler for this message in whatever class will be receiving it (usually the process class).</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_DOC_OUTPUT_ATTACH_FAILED">
+ </A>
+MSG_META_DOC_OUTPUT_ATTACH_FAILED</H4>
+<PRE CLASS="syntax">void	MSG_META_DOC_OUTPUT_ATTACH_FAILED(
+        optr	document, /* pointer to document object */
+        FileHandle 	File); /* (former) handle of file for this document */</PRE>
+<P>
+When GEOS restores itself from state, the document control tries to reattach all documents which were attached when GEOS was shut down. If this is impossible (as for example if a document was deleted after GEOS shut down), the<CODE>
+ </CODE>
+GenDocumentGroup object will send this message to its output.</P>
+<P CLASS="refField">
+Source:	The GenDocumentGroup object.</P>
+<P CLASS="refField">
+Destination:	Output of GenDocumentGroup (usually the Process object).</P>
+<P CLASS="refField">
+Parameters:	<EM>
+document</EM>
+	<EM>
+The optr of the appropriate document object.</EM>
+</P>
+<DL>
+<DT>
+<EM>
+file</EM>
+</DT><DD>The FileHandle of the appropriate file.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	If you are using the Procedure model, you must write a handler for this message in whatever class will be receiving it (usually the process class).</P>
+
+
+
+<H2 CLASS="HeadingC">
+<A NAME="18073">
+ </A>
+Messages Handled under the Object Model</H2>
+<P>
+<A NAME="IX_GenDocumentClass">
+ </A>
+If an application uses the Object model of document control, it will generally not handle the messages to the GenDocumentGroup's output. Instead, it will define a subclass of <CODE>
+GenDocumentClass</CODE>
+; this subclass will have methods for those situations which require the application's attention. Note that <CODE>
+GenDocumentClass</CODE>
+ does not have handlers for any of these messages; if the application does not define a method for a given message, that message will have no effect.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE">
+ </A>
+MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE</H4>
+<PRE CLASS="syntax">Boolean	MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE();</PRE>
+<P>
+When a new document is created, the document object sends this message to itself. VM file based applications will generally respond to this message by allocating and initializing the map block. DOS file based applications will commonly initialize data structures for a default file. If an application maintains data caches for its files, it should initialize the caches at this point.</P>
+<P>
+The application should not take any UI-related actions; those should be postponed until the messages <CODE>
+MSG_GEN_DOCUMENT_CREATE_UI_FOR_DOCUMENT</CODE>
+ and <CODE>
+MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT</CODE>
+ are received.</P>
+<P CLASS="refField">
+Source:	A GenDocument object.</P>
+<P CLASS="refField">
+Destination:	The document object sends this message to itself.</P>
+<P CLASS="refField">
+Parameters:	Nothing.</P>
+<P CLASS="refField">
+Return:	If the handler could not initialize the file, it should return <EM>
+true</EM>
+; the document control will then destroy the new file.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_DOCUMENT_CREATE_UI_FOR_DOCUMENT">
+ </A>
+MSG_GEN_DOCUMENT_CREATE_UI_FOR_DOCUMENT</H4>
+<PRE CLASS="syntax">void	MSG_GEN_DOCUMENT_CREATE_UI_FOR_DOCUMENT();</PRE>
+<P>
+The GenDocument object sends this message to itself after a document has been created or opened. Before this message is sent, the GenDocumentControl object will enable those objects on its <CODE>
+GDCI_enableDisableList</CODE>
+, and the GenDocumentGroup object will copy the GenDisplay block for the document (if one is defined).</P>
+<P>
+Applications that use dynamic UI objects will commonly respond to this message by creating the objects for the newly-opened document. Applications that use static UI objects will commonly respond to this message by enabling the objects.</P>
+<P CLASS="refField">
+Source:	A GenDocument object.</P>
+<P CLASS="refField">
+Destination:	The document object sends this message to itself.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT">
+ </A>
+MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT</H4>
+<PRE CLASS="syntax">void	MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT();</PRE>
+<P>
+The document object sends this message to itself when the UI for a newly-opened document has been created. It also sends this message when re-opening a document as part of restoring GEOS from a state file. Applications may respond to this by attaching dynamic UI objects and setting the values of static UI objects.</P>
+<P CLASS="refField">
+Source:	A GenDocument object.</P>
+<P CLASS="refField">
+Destination:	The document object sends this message to itself.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT">
+ </A>
+MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT</H4>
+<PRE CLASS="syntax">void	MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT();</PRE>
+<P>
+The document object sends this message when a document is being closed, whether because a user closes the file or because the application is being closed. It also sends this message when GEOS is in the process of saving itself to a state file prior to shutting down. Applications generally respond to this by detaching dynamic UI objects. Note that the GenDocumentControl object will automatically disable any objects in its <CODE>
+GDCI_enableDisableList</CODE>
+.</P>
+<P CLASS="refField">
+Source:	A GenDocument object.</P>
+<P CLASS="refField">
+Destination:	The document object sends this message to itself.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_DOCUMENT_DESTROY_UI_FOR_DOCUMENT">
+ </A>
+MSG_GEN_DOCUMENT_DESTROY_UI_FOR_DOCUMENT</H4>
+<PRE CLASS="syntax">void	MSG_GEN_DOCUMENT_DESTROY_UI_FOR_DOCUMENT();</PRE>
+<P>
+The GenDocumentGroup object sends this message out when a document is being closed, whether because a user closes the file or because the application is being closed. Applications will generally disable static display objects and delete dynamic display objects. Note that the GenDocumentControl object will automatically disable all objects in its <CODE>
+GDCI_enableDisableList</CODE>
+, and the GenDocumentGroup will delete the display block it created for a document, if any.</P>
+<P CLASS="refField">
+Source:	A GenDocument object.</P>
+<P CLASS="refField">
+Destination:	The document object sends this message to itself.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_DOCUMENT_ATTACH_FAILED">
+ </A>
+MSG_GEN_DOCUMENT_ATTACH_FAILED</H4>
+<PRE CLASS="syntax">void	MSG_GEN_DOCUMENT_ATTACH_FAILED();</PRE>
+<P>
+When GEOS restores itself from state, the document control tries to reattach all documents which were attached when GEOS was shut down. If this is impossible (as for example if a document was deleted after GEOS shut down), the document object will send this message to itself.</P>
+<P CLASS="refField">
+Source:	A GenDocument object.</P>
+<P CLASS="refField">
+Destination:	The document object sends this message to itself.</P>
+
+
+
+<H2 CLASS="HeadingC">
+Messages Associated with Common User Actions</H2>
+<P>
+A single user action can precipitate several application-handled messages. This section lists the messages associated with each of several common user actions. Note that some messages are sent as the result of many user actions. If a handler needs to find out what user action caused a message to be sent, it should send <CODE>
+MSG_GEN_DOCUMENT_GET_OPERATION</CODE>
+ to the document object.</P>
+<P>
+If a message is not ordinarily handled, it is enclosed in [brackets] below. These messages are documented in the advanced usage section. Actions taken by the document control objects (other than messages sent) are listed in <EM>
+italics</EM>
+. The messages listed are sent by the appropriate GenDocument object to itself. If the message is not subclassed by the GenDocument object, it sends a corresponding procedural-model message (of the form <CODE>
+MSG_META_DOC_OUTPUT...)</CODE>
+ to the GenDocumentGroup object's output. The one exception is MSG_GEN_DOCUMENT_PHYSICAL_SAVE_AS; as noted on <A HREF="Documents_f.htm#35277"> MSG_META_DOC_OUTPUT_PHYSICAL_SAVE_AS_FILE_HANDLE</A>
+, this message does not have a corresponding MSG_META_DOC_OUTPUT_PHYSICAL_SAVE_AS.</P>
+<UL>
+<LI>
+New document is created:<BR>
+[<CODE>
+MSG_GEN_DOCUMENT_PHYSICAL_CREATE</CODE>
+]<BR>
+<EM>
+new file is created<BR>
+VM files: initialize </EM>
+VM<EM>
+ attributes, token, protocol<BR>
+</EM>
+<CODE>
+MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE<BR>
+</CODE>
+<EM>
+if saveAs/Revert supported, save file so revert will return to this state<BR>
+</EM>
+[<CODE>
+MSG_GEN_DOCUMENT_WRITE_CACHED_DATA_TO_FILE</CODE>
+]<BR>
+[<CODE>
+MSG_GEN_DOCUMENT_PHYSICAL_SAVE</CODE>
+]<BR>
+<CODE>
+MSG_GEN_DOCUMENT_CREATE_UI_FOR_DOCUMENT<BR>
+MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT</CODE>
+</LI>
+<LI>
+Document is opened:<BR>
+[<CODE>
+MSG_GEN_DOCUMENT_PHYSICAL_OPEN</CODE>
+]<BR>
+[<CODE>
+MSG_GEN_DOCUMENT_READ_CACHED_DATA_FROM_FILE</CODE>
+]<BR>
+<CODE>
+MSG_GEN_DOCUMENT_CREATE_UI_FOR_DOCUMENT<BR>
+MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT</CODE>
+</LI>
+<LI>
+Document is saved:<BR>
+[<CODE>
+MSG_GEN_DOCUMENT_WRITE_CACHED_DATA_TO_FILE</CODE>
+]<BR>
+[<CODE>
+MSG_GEN_DOCUMENT_PHYSICAL_SAVE</CODE>
+]<BR>
+VM<EM>
+ files: call made to VMSave</EM>
+</LI>
+<LI>
+Document is &quot;Saved As&quot;:<BR>
+[<CODE>
+MSG_GEN_DOCUMENT_WRITE_CACHED_DATA_TO_FILE</CODE>
+]<BR>
+[<CODE>
+MSG_GEN_DOCUMENT_PHYSICAL_SAVE_AS</CODE>
+]<BR>
+[DOS files: <CODE>
+MSG_GEN_DOCUMENT_PHYSICAL_SAVE_AS_FILE_HANDLE</CODE>
+]<BR>
+VM<EM>
+ files: VMSaveAs called<BR>
+</EM>
+[<CODE>
+MSG_GEN_DOCUMENT_SAVE_AS_COMPLETED</CODE>
+]</LI>
+<LI>
+Document is reverted to last-saved version:<BR>
+<CODE>
+MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT<BR>
+</CODE>
+[<CODE>
+MSG_GEN_DOCUMENT_PHYSICAL_REVERT</CODE>
+]<BR>
+VM<EM>
+: VMRevert called<BR>
+</EM>
+[<CODE>
+MSG_GEN_DOCUMENT_READ_CACHED_DATA_FROM_FILE</CODE>
+]<BR>
+<CODE>
+MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT</CODE>
+</LI>
+<LI>
+Document is about to be closed:<BR>
+[MSG_GEN_DOCUMENT_PHYSICAL_CHECK_FOR_MODIFICATIONS]</LI>
+</UL>
+<DL>
+<DT>
+If document is modified &amp; user wants to save changes:</DT><DD>
+[<CODE>
+MSG_GEN_DOCUMENT_WRITE_CACHED_DATA_TO_FILE</CODE>
+]<BR>
+[<CODE>
+MSG_GEN_DOCUMENT_PHYSICAL_SAVE</CODE>
+]<BR>
+VM<EM>
+: VMSave called<BR>
+</EM>
+<CODE>
+MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT<BR>
+MSG_GEN_DOCUMENT_DESTROY_UI_FOR_DOCUMENT</CODE>
+</DD>
+<DT>
+If document is modified and user does not want to save changes:</DT><DD>
+<CODE>
+MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT<BR>
+</CODE>
+[<CODE>
+MSG_GEN_DOCUMENT_PHYSICAL_REVERT</CODE>
+]<BR>
+VM<EM>
+: VMRevert called<BR>
+</EM>
+<CODE>
+MSG_GEN_DOCUMENT_DESTROY_UI_FOR_DOCUMENT<BR>
+</CODE>
+[<CODE>
+MSG_GEN_DOCUMENT_PHYSICAL_CLOSE</CODE>
+]</DD>
+<DT>
+If document is not modified:</DT><DD>
+<CODE>
+MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT<BR>
+MSG_GEN_DOCUMENT_DESTROY_UI_FOR_DOCUMENT<BR>
+</CODE>
+[<CODE>
+MSG_GEN_DOCUMENT_PHYSICAL_CLOSE</CODE>
+]</DD>
+<DT>
+If document is not modified and untitled:</DT><DD>
+<CODE>
+MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT<BR>
+MSG_GEN_DOCUMENT_DESTROY_UI_FOR_DOCUMENT<BR>
+</CODE>
+[<CODE>
+MSG_GEN_DOCUMENT_PHYSICAL_CLOSE</CODE>
+]<BR>
+[<CODE>
+MSG_GEN_DOCUMENT_PHYSICAL_REVERT</CODE>
+]</DD>
+<UL>
+<LI>
+GEOS restoring from state, document being attached:<BR>
+[<CODE>
+MSG_GEN_DOCUMENT_PHYSICAL_OPEN</CODE>
+]<BR>
+[<CODE>
+MSG_GEN_DOCUMENT_READ_CACHED_DATA_FROM_FILE</CODE>
+]<BR>
+<CODE>
+MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT</CODE>
+</LI>
+<LI>
+GEOS restoring from state, attach failed:<BR>
+<CODE>
+MSG_GEN_DOCUMENT_ATTACH_FAILED<BR>
+MSG_GEN_DOCUMENT_DESTROY_UI_FOR_DOCUMENT</CODE>
+</LI>
+<LI>
+GEOS shutting down, document being detached:<BR>
+[<CODE>
+MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT</CODE>
+]<BR>
+[<CODE>
+MSG_GEN_DOCUMENT_PHYSICAL_UPDATE</CODE>
+]<BR>
+VM<EM>
+ files: VMUpdate called<BR>
+</EM>
+<CODE>
+MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT<BR>
+</CODE>
+[<CODE>
+MSG_GEN_DOCUMENT_PHYSICAL_CLOSE</CODE>
+]</LI>
+</UL>
+
+</DL>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Documents_9.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Documents_a.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.1 Other Document Group Messages</A> 
+<!-- to next --> | <A HREF="Documents_c.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">4 Advanced DC Usage</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

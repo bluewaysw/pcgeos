@@ -1,0 +1,99 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: FaxSend_5.htm,v 1.1 97/06/06 13:59:06 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Supplying the Fax's Contents</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Fax Sending</A>: 2.3 <A HREF="FaxSend_2.htm">Drawing the Contents</A>: 
+<A NAME="78210">
+ </A>
+Supplying the Fax's Contents</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="FaxSend_2.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="FaxSend_4.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2.2 Supplying the Document's Name</A> 
+<!-- to next --> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+The process object (or whatever object is specified in the <CODE>
+PrintControl</CODE>
+'s <CODE>
+PCI_output</CODE>
+ field) describes the fax's contents in the method for the imported message <CODE>
+MSG_PRINT_START_PRINTING</CODE>
+. It will receive this message after the user has specified a recipient for the fax. This message is defined:</P>
+<PRE>void MSG_PRINT_START_PRINTING( \
+			optr 			printCtrlOD , \
+			GStateHandle 			gstate );</PRE>
+<P>
+There are some things that the handler for this message must do:</P>
+<UL>
+<LI>
+It should draw the fax's contents.</LI>
+<LI>
+After drawing the fax's contents, it should call <CODE>
+GrNewPage()</CODE>
+ to generate a form feed. (It should also call <CODE>
+GrNewPage()</CODE>
+ between the pages of a multi-page fax, of course.)</LI>
+<LI>
+It should send the <CODE>
+PrintControl</CODE>
+ <CODE>
+MSG_PRINT_CONTROL_PRINTING_COMPLETED</CODE>
+.</LI>
+</UL>
+<P>
+There are many things that the handler for this message may do. For information about some of them, see <A HREF="../../Communication/Printing/index.htm">thePrinting chapter</A>. (If you read that chapter, you might think it's important that the print job's page range is also determined; this is not important for faxing.)</P>
+<P>
+The following example shows a handler that draws a fax's contents to contain some text and a rectangle:</P>
+<P CLASS="figTitle">
+Code Display 4-4 Handling MSG_PRINT_START_PRINTING when faxing</P>
+<PRE>@method MyProcessClass, MSG_PRINT_START_PRINTING {
+/* We draw the contents of the fax. */
+    GrDrawText(gstate, 20,40, &quot;Good Morning&quot;, 0);
+    GrDrawRect(gstate, 10,30, 110,55);</PRE>
+<PRE>/* Make sure that our last drawing command is a form-feed */
+    GrNewPage(gstate, PEC_FORM_FEED);</PRE>
+<PRE>/* Let the PrintControl know we're done */
+    @send printCtrlOD::MSG_PRINT_CONTROL_PRINTING_COMPLETED();
+}</PRE>
+<P>
+In the example, we draw the fax's contents with a couple of kernel graphics commands. We might just have easily passed gstate as the graphic state argument to some Visible object's <CODE>
+MSG_VIS_DRAW</CODE>
+ message (also passing the <CODE>
+DrawFlag</CODE>
+ DF_PRINT).</P>
+<P>
+We also need to tell the <CODE>
+PrintControl</CODE>
+ how many pages we're printing. The first page that we draw on is page one. If there is a separate cover page, that will be page zero. To specify how many pages there are to print, we call MSG_PRINT_CONTROL_SET_SELECTED_PAGE_RANGE, and then MSG_PRINT_CONTROL_SET_SELECTED_PAGE_RANGE, passing the number of pages to print as that message's second argument.</P>
+<P>
+It is possible that the fax cover page will appear on the same page on which drawing starts. To find out how much vertical space this cover page will take up on the first page, call the PrintControl with <CODE>
+MSG_PRINT_GET_FIRST_PAGE_OFFSET</CODE>
+; the return value will be the height of the cover page. (To properly follow naming conventions, this message should be called <CODE>
+MSG_PRINT_CONTROL_GET_FIRST_PAGE_OFFSET</CODE>
+; as of this writing it has not yet had its name fixed.)</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="FaxSend_2.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="FaxSend_4.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2.2 Supplying the Document's Name</A> 
+<!-- to next --> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

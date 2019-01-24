@@ -1,0 +1,166 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: DataStore_4.htm,v 1.1 97/06/02 14:32:52 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Adding Records</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">DataStore Library</A>: 2.2 <A HREF="DataStore_2.htm">Creating a DataStore</A>: 
+<A NAME="12958">
+ </A>
+Adding Records</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="DataStore_2.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="DataStore_3.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2.1 Adding Fields</A> 
+<!-- to next --> | <A HREF="DataStore_5.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2.3 Deleting Records</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>DataStoreOpen(), DataStoreNewRecord(), DataStoreSetField(), DataStoreSaveRecord()</PRE>
+<P>
+To manage synchronization between applications accessing the same datastore, the DataStore Manager creates a &quot;session&quot; each time an application opens a datastore with <CODE>
+DataStoreOpen()</CODE>
+. Each session has its own &quot;record buffer;&quot; to modify a record, you must load it into the record buffer first. The loaded record is called the &quot;current record.&quot; There can only be one record loaded in the buffer at a time. <CODE>
+DataStoreNewRecord()</CODE>
+ adds a new record and makes that record the &quot;current record.&quot;</P>
+<P>
+To write to a record, call <CODE>
+DataStoreSetField()</CODE>
+. When you write to a record, you are actually writing to a copy of the record loaded in the record buffer. Any changes made to this copy do not become permanent until you call <CODE>
+DataStoreSaveRecord()</CODE>
+. To cancel changes, call <CODE>
+DataStoreDiscardChanges()</CODE>
+. Both routines flush the current record from the buffer.</P>
+<P>
+Most routines that access fields (such as <CODE>
+DataStoreSetField()</CODE>
+) take both a <CODE>
+FieldID</CODE>
+ and a field name as parameters. You can reference the field by either parameter. To reference a field by its name, pass its name in the name parameter and zero in the <CODE>
+FieldID</CODE>
+ parameter. To reference a field by its <CODE>
+FieldID</CODE>
+, pass its <CODE>
+FieldID</CODE>
+ in the <CODE>
+FieldID</CODE>
+ parameter andNULL in the name parameter. Fields are numbered from zero. (There are routines for obtaining the <CODE>
+FieldID</CODE>
+ corresponding to a given field name and vice versa; see <CODE>
+DataStoreFieldNameToID()</CODE>
+ and <CODE>
+DataStoreFieldIDToName()</CODE>
+ in the C Reference Book.)</P>
+<P>
+The following code example shows how to open an existing datastore, add a new record, and write data to two of its fields.</P>
+<P CLASS="figTitle">
+Code Display 9-2 Adding a Record to a DataStore</P>
+<PRE>	/* Opening a datastore returns a token. */
+	word			dsToken;</PRE>
+<PRE>	/*
+	 * Saving changes to a record returns both the record's RecordNum
+	 * and RecordID
+	 */
+	RecordID			recordID;
+	RecordNum			recordNum;</PRE>
+<PRE>	/* 
+	 * Open the &quot;Exchange Rates&quot; datastore with sharable access
+	 * (i.e., no flag passed). &quot;Oself&quot; refers to the object which is to
+	 * receive change notifications; in this case, assume oself refers to
+	 * the process class.
+	 */
+	if(DataStoreOpen(&quot;Exchange Rates&quot;, oself, 0, &amp;dsToken) == DSE_NO_ERROR)
+	{
+		/* Add a new record. */
+		if(DataStoreNewRecord(dsToken) == DSDE_NO_ERROR)
+		{
+			/* 
+			 * Write data to the country and exchange rate fields.
+			 * You can refer to a field by its name or FieldID;
+			 * the examples below show both methods. 
+			 */
+			TCHAR			countryBuffer[] = &quot;Albania&quot;;</PRE>
+<PRE>			/* refer to a field by its name */
+			DataStoreSetField(dsToken, &quot;country&quot;, 0, countryBuffer,
+							strlen(countryBuffer));</PRE>
+<PRE>			FloatNum			rateBuffer = .9234;</PRE>
+<PRE>			/* refer to a field by its FieldID */
+			DataStoreSetField(dsToken, NULL, 3, &amp;rateBuffer,
+							sizeof(rateBuffer));</PRE>
+<PRE>			/* Save the record. */
+			DataStoreSaveRecord(dsToken, 0, 0, &amp;recordNum, &amp;recordID);
+		}
+		/* Close the datastore. */
+		DataStoreClose(dsToken);
+	}</PRE>
+<P>
+<CODE>
+DataStoreSaveRecord()</CODE>
+ writes the <CODE>
+RecordNum</CODE>
+ and <CODE>
+RecordID</CODE>
+ of the saved record to the passed variables. A record's <CODE>
+RecordNum</CODE>
+ is its relative place in the datastore; this value may change when records are added or deleted. A record's <CODE>
+RecordID</CODE>
+ is its unique identifier and does not change. <CODE>
+RecordNums</CODE>
+ are numbered from zero; <CODE>
+RecordIDs</CODE>
+ are numbered from one.</P>
+<P>
+You can use a callback function with <CODE>
+DataStoreSaveRecord()</CODE>
+ to specify where in the datastore the record is to be saved. The calling routine passes the record to be inserted (<EM>rec1</EM>) and a record from the datastore (<EM>rec2</EM>) to the callback; the callback decides which of the two records comes before the other. (The callback cannot modify the records, however.)</P>
+<P>
+The callback should return a value greater than zero if <EM>rec1</EM> comes before <EM>rec2</EM>; otherwise, a value less than zero. <A HREF="DataStore_4.htm#15327"> Declaration of Callback Function in DataStoreSaveRecord()</A>
+ shows the declaration of the callback.</P>
+<P CLASS="figTitle">
+Code Display 9-3 <A NAME="15327">
+ </A>
+Declaration of Callback Function in DataStoreSaveRecord()</P>
+<PRE>sword SortCallback(RecordHeader *rec1, RecordHeader *rec2,
+						word dsToken, void *cbData);</PRE>
+<P>
+The actual data in the record follows the <CODE>
+RecordHeader</CODE>
+. Use <CODE>
+DataStoreGetFieldPtr()</CODE>
+ or <CODE>
+DataStoreFieldEnum()</CODE>
+ to access fields within the records.</P>
+<PRE>typedef struct {
+	RecordID	RH_uniqueID;
+	byte	RH_fieldCount; /* # of fields */
+	word	RH_size; /* # of bytes */
+} RecordHeader;</PRE>
+<P>
+If you do not specify a callback routine in <CODE>
+DataStoreSaveRecord()</CODE>
+, it will insert the record according to values in the key field(s). If two records have matching values in one key field, they will be inserted according to the first <EM>
+non-matching</EM>
+ key field value. Records with matching key field(s) values are stored in the order they are added. Records with empty key fields are inserted at the beginning of the file.</P>
+<P>
+If there is no callback or key, records are added to the end of the file. </P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="DataStore_2.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="DataStore_3.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2.1 Adding Fields</A> 
+<!-- to next --> | <A HREF="DataStore_5.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2.3 Deleting Records</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

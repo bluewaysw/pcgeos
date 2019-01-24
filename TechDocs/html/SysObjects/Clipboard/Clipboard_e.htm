@@ -1,0 +1,134 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Clipboard_e.htm,v 1.1 97/06/02 16:10:00 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Handling Paste</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The Clipboard</A>: 3.5 <A HREF="Clipboard_9.htm">Using The Clipboard</A>: 
+Handling Paste</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Clipboard_9.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Clipboard_d.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.4 Handling Cut and Copy</A> 
+<!-- to next --> | <A HREF="Clipboard_f.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.6 Unregistering with the Clipboard</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>ClipboardRequestItemFormat(), MSG_META_CLIPBOARD_PASTE</PRE>
+<P>
+<A NAME="IX_MSG_META_CLIPBOARD_PASTE">
+ </A>
+The Paste operation pulls data off the Clipboard and places it at the insertion point in the application's data. The Clipboard remains unchanged throughout the operation; the data is simply duplicated and passed on to the application.</P>
+<P>
+The steps in handling a <CODE>
+MSG_META_CLIPBOARD_PASTE</CODE>
+ are simple; each is enumerated below, and a sample method for pasting is shown in <A HREF="Clipboard_e.htm#31137"> MSG_META_CLIPBOARD_PASTE</A>
+.</P>
+<OL>
+<LI>
+Query the Clipboard<BR>
+First, you must make sure that you have exclusive access to the clipboard item. To this end call <CODE>
+ClipboardQueryItem()</CODE>
+. You should also call <A NAME="IX_ClipboardRequestItemFormat()">
+ </A>
+<CODE>
+ClipboardRequestItemFormat()</CODE>
+ to make sure that the present clipboard item is pasteable.</LI>
+<LI FIXME_NumListOther>
+Allocate memory if necessary<BR>
+If necessary, allocate the memory into which the transfer item will be duplicated. You can not simply reference handles to the transfer item in the clipboard because the transfer item may be changed by another thread at any time.</LI>
+<LI FIXME_NumListOther>
+Lock the Transfer VM File and grab the transfer item<BR>
+<A NAME="UserRequestTransfer()">
+ </A>
+Lock the Transfer VM File with a call to <CODE>
+ClipboardRequestItemFormat()</CODE>
+. Finally, copy the transfer item into your pre-allocated memory.</LI>
+<LI FIXME_NumListOther>
+Unlock the Transfer VM File<BR>
+By calling <CODE>
+ClipboardDoneWithItem()</CODE>
+, relinquish your exclusive access to the Transfer VM File and to the clipboard item itself. The Paste operation can then be completed entirely by your application by assimilating the pasted data and displaying it properly.</LI>
+</OL>
+<P CLASS="figTitle">
+Code Display 7-9 <A NAME="31137">
+ </A>
+MSG_META_CLIPBOARD_PASTE</P>
+<PRE>/* This message handler goes through the necessary steps to grab the transfer item
+ * from the Clipboard and copy it into application's memory. This example uses a
+ * single global variable called textHandle, a memory handle of the only data block
+ * owned by the application. The memory block contains text.
+ * MSG_META_CLIPBOARD_PASTE has no parameters and requires no return value. */</PRE>
+<PRE>@method ClipSampProcessClass, MSG_META_CLIPBOARD_PASTE {
+    ClipboardQueryArgs				query;		/* returned by
+						 * ClipboardQueryItem() */
+    ClipboardRequestArgs 				request;		/* returned by
+						 * ClipboardRequestItemFormat() */
+    TextTransferBlockHeader				*dataBlock		/* pointer to block header */
+    MemHandle				dataBlockMemHandle; /* handle of locked block */
+    word				charsAvail;		/* number of chars in block */
+    int				textLength;		/* length of text */
+    word				transferFlags = 0; /* flags for the transfer
+						 * (normal transfer) */</PRE>
+<PRE>	    /* Call ClipboardQueryItem() to be sure that a normal
+	     * transfer item exists in the Clipboard. */
+    ClipboardQueryItem(transferFlags, &amp;query);
+					/* Fills ClipboardQueryArgs structure */</PRE>
+<PRE>	    /* If a transfer item exists, check for a CIF_TEXT
+	     * version, the only format we support. */
+    if (query.CQA_numFormats) {				/* if more than zero formats available */
+       if (ClipboardTestItemFormat(query.CQA_header,
+					FormatIDFromManufacturerAndType(
+							MANUFACTURER_ID_ME,
+							CIF_TEXT))) {</PRE>
+<PRE>	/* A CIF_TEXT version exists. Now we grab that transfer item by calling
+	 * ClipboardRequestItemFormat(). This routine fills ClipboardRequestArgs,
+	 * which contains information about the Transfer VM File and the
+	 * ClipboardItemHeader block in that file. */</PRE>
+<PRE>	    ClipboardRequestItemFormat(FormatIDFromManufacturerAndType(
+					MANUFACTURER_ID_ME, CIF_TEXT),
+					query.CQA_header, &amp;request);</PRE>
+<PRE>	/* Now we have the VM file handle of the Transfer VM File and the VM block
+	 * handle of the ClipboardItemHeader structure. From this we can get the
+	 * data in the data block. To speed things up, we will copy the transfer
+	 * text directly into our already-allocated memory block; the handle to our
+	 * memory block is in textHandle. */</PRE>
+<PRE>	dataBlock = (TextTransferBlockHeader *)VMLock(
+				request.CRA_file,
+				VMCHAIN_GET_VM_BLOCK(request.CRA_data),
+				&amp;dataBlockMemHandle);
+	textHugeArray = VMCHAIN_GET_VM_BLOCK(dataBlock-&gt;TTBH_text);
+	VMUnlock(dataBlockMemHandle);</PRE>
+<PRE>	/* Since the data is CIF_TEXT, we know the data block is in the format of
+	 * TextTransferBlockHeader. We get the text by cycling through the
+	 * format's HugeArray. This code has been taken out of this example for
+	 * simplicity; you can look at the ClipSamp sample application source
+	 * code for it. */
+    }</PRE>
+<PRE>    /* After copying the text into our block, we signal we're done with the
+     * transfer file. We do this by calling ClipboardDoneWithItem(). After
+     * that, we update our view and return. */</PRE>
+<PRE>    ClipboardDoneWithItem(query.CQA_header);
+    ResetViewArea();				/* Routine defined in ClipSamp. */
+}<A NAME="marker=631871"> </A></PRE>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Clipboard_9.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Clipboard_d.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.4 Handling Cut and Copy</A> 
+<!-- to next --> | <A HREF="Clipboard_f.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.6 Unregistering with the Clipboard</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

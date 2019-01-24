@@ -1,0 +1,219 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+<!-- This page was automatically generated from a bunch of smaller pages. -->
+<META NAME="copyright" CONTENT="Copyright GEOWORKS">
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+<TITLE>The Process Object</TITLE>
+</HEAD>
+<BODY BGCOLOR="#ffffdf">
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+<A NAME="index.htm"></A>
+
+
+
+<H1 CLASS="chapterTitle">
+
+<A NAME="index.htm_97933">
+ </A>
+The Process Object
+
+</H1>
+<P>
+<CODE>
+ProcessClass</CODE>
+<A NAME="index.htm_IX_ProcessClass">
+ </A>
+ implements all the functionality for creating and managing the process aspect of a geode. It creates the process thread and associated message queues. <CODE>
+ProcessClass</CODE>
+ is a subclass of <CODE>
+MetaClass</CODE>
+ and is the superclass of <CODE>
+GenProcessClass</CODE>
+, below. You will probably not use <CODE>
+ProcessClass</CODE>
+ directly, but you will almost certainly use <CODE>
+GenProcessClass</CODE>
+.</P>
+<P>
+<CODE>
+ProcessClass</CODE>
+ has no instance data fields of its own. The messages defined by it are listed below:</P>
+
+<H2 CLASS="refHeading">
+<A NAME="index.htm_IX_MSG_PROCESS_NOTIFY_PROCESS_EXIT">
+ </A>
+MSG_PROCESS_NOTIFY_PROCESS_EXIT</H2>
+<PRE CLASS="syntax">void	MSG_PROCESS_NOTIFY_PROCESS_EXIT(
+        GeodeHandle 		exitProcess,
+        word		exitCode);</PRE>
+<P>
+This is sent to a Process object when one of its child processes exits. Many types of processes do not need to know when a child process exists; these processes need not handle this message.</P>
+<P CLASS="refField">
+Source:	Kernel</P>
+<P CLASS="refField">
+Destination:	Process of creating geode of child process exiting.</P>
+<P CLASS="refField">
+Parameters:	This message is provided as notification only, i.e. there is no default handling of it. May be intercepted as desired.</P>
+<P CLASS="refField">
+Parameters:	<EM>exitProcess</EM> 	Child process that exited.</P>
+<DL>
+<DT>
+<EM>exitCode</EM> </DT><DD>Exit code. May be an error code.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H2 CLASS="refHeading">
+<A NAME="index.htm_IX_MSG_PROCESS_NOTIFY_THREAD_EXIT">
+ </A>
+MSG_PROCESS_NOTIFY_THREAD_EXIT</H2>
+<PRE CLASS="syntax">void	MSG_PROCESS_NOTIFY_THREAD_EXIT(
+        ThreadHandle		exitProcess,
+        word		exitCode);</PRE>
+<P>
+This message is sent to a Process object when a thread owned by it (via the <CODE>
+ThreadCreate()</CODE>
+ routine) exits.</P>
+<P CLASS="refField">
+Source:	Kernel.</P>
+<P CLASS="refField">
+Destination:	Process owning thread which is exiting.</P>
+<P CLASS="refField">
+Interception:	This message is provided as notification only (i.e. there is no default handling of it). May be intercepted as desired.</P>
+<P CLASS="refField">
+Parameters:	<EM>exitProcess</EM> 	Handle of thread that exited.</P>
+<DL>
+<DT>
+<EM>exitCode</EM> </DT><DD>Exit code (may be an error code).</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H2 CLASS="refHeading">
+<A NAME="index.htm_IX_MSG_PROCESS_MEM_FULL">
+ </A>
+MSG_PROCESS_MEM_FULL</H2>
+<PRE CLASS="syntax">void	MSG_PROCESS_MEM_FULL(
+        word 	type);</PRE>
+<P>
+This message is sent to a Process object by the memory manager when the heap is getting full. A Process object receiving this message should try to free memory (or mark it discardable) if possible.</P>
+<P CLASS="refField">
+Source:	Kernel's heap manager.</P>
+<P CLASS="refField">
+Destination:	All processes.</P>
+<P CLASS="refField">
+Interception:	Any process which can adjust the amount of memory that it is using should respond to this message by reducing its demands on the system heap. For instance, buffers or UI object trees kept purely for performance reasons could be freed or reduced in number.</P>
+<P CLASS="refField">
+Parameters:	<EM>type</EM> 	<CODE>
+HeapCongestion</CODE>
+.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Structures:	</P>
+<PRE><A NAME="index.htm_IX_HC_&ldots;"> </A><A NAME="IX_HeapCongestion"> </A>typedef enum {</PRE>
+<PRE>	/* HC_SCRUBBING: 
+	 * Heap is being scrubbed. */
+	HC_SCRUBBING,</PRE>
+<PRE>	/* HC_CONGESTED:
+	 * Scrubber couldn't free a satisfactory 
+	 * amount of memory. */
+	HC_CONGESTED,</PRE>
+<PRE>	/* HC_DESPERATE:
+	 * Heap is perilously close to overflowing. */
+	HC_DESPERATE</PRE>
+<PRE>} HeapCongestion;</PRE>
+
+
+<H2 CLASS="refHeading">
+<A NAME="index.htm_IX_MSG_PROCESS_CREATE_UI_THREAD">
+ </A>
+MSG_PROCESS_CREATE_UI_THREAD</H2>
+<PRE CLASS="syntax">Boolean	MSG_PROCESS_CREATE_UI_THREAD(
+        ThreadHandle		*newThread,
+        ClassStruct 		*class,
+        word 		stackSize);</PRE>
+<P>
+<A NAME="index.htm_IX_Threads:creating event threads">
+ </A>
+This is a low-level utility message requesting that the process create the UI thread for an application. Does nothing more than <CODE>
+MSG_PROCESS_CREATE_EVENT_THREAD</CODE>
+, but is split out to allow for interception or to change class or stack size.</P>
+<P CLASS="refField">
+Source:	First thread of application process if geode has one or more resources marked as &quot;ui-object&quot; blocks.</P>
+<P CLASS="refField">
+Destination:	First thread of application process.</P>
+<P CLASS="refField">
+Interception:	May be intercepted to change class or stack size before calling superclass, or to replace default handling completely.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+newThread</EM>
+	Pointer to a <CODE>
+ThreadHandle</CODE>
+ buffer to store the created thread handle.</P>
+<DL>
+<DT>
+<EM>class</EM> </DT><DD>Object class for the new thread. If you don't have any special messages to handle in this thread, besides those intended for objects run by the thread, you can just specify <CODE>
+ProcessClass</CODE>
+ as the object class.</DD>
+<DT>
+<EM>stackSize</EM> </DT><DD>Stack size for the new thread (3K bytes is probably reasonable).</DD>
+</DL>
+<P CLASS="refField">
+Return:	<EM>
+true</EM>
+ if the thread was not created because of some problem.</P>
+<P CLASS="refField">
+Warnings:	Be careful of deadlock situations.</P>
+
+
+<H2 CLASS="refHeading">
+<A NAME="index.htm_IX_MSG_PROCESS_CREATE_EVENT_THREAD">
+ </A>
+MSG_PROCESS_CREATE_EVENT_THREAD</H2>
+<PRE CLASS="syntax">Boolean	MSG_PROCESS_CREATE_EVENT_THREAD(
+        ThreadHandle		*newThread
+        ClassStruct 		*class,
+        word		stackSize);</PRE>
+<P>
+This message is a utility that creates a new event-driven thread owned by the recipient Process object. Typically, a Process object will send this message to itself when it needs an additional event thread. (It cannot be used to create a non-event driven thread. Use <CODE>
+ThreadCreate()</CODE>
+ for this purpose instead.) This is implemented at ProcessClass and takes care of all the details of creating a new event-driven thread. The thread will always receive a <CODE>
+MSG_META_ATTACH</CODE>
+ as its first event.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any process. This process will own the thread.</P>
+<P CLASS="refField">
+Interception:	Not necessary, as the default handler provides the message's utility.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+newThread</EM>
+	Pointer to a <CODE>
+ThreadHandle</CODE>
+ buffer to store the created thread handle.</P>
+<DL>
+<DT>
+<EM>class</EM> </DT><DD>Object class for the new thread. If you don't have any special messages to handle in this thread besides those intended for objects run by the thread, you can just specify <CODE>
+ProcessClass</CODE>
+ as the object class.</DD>
+<DT>
+<EM>stackSize</EM> </DT><DD>Stack size for the new thread. 512 bytes is probably reasonable. If the thread will be running any objects that can undergo keyboard navigation (like dialog boxes and triggers and so forth), you'll probably want to make it 1K. The kernel already adds some extra space for handling interrupts (about 100 bytes).</DD>
+</DL>
+<P CLASS="refField">
+Return:	<EM>
+true</EM>
+ if the thread was not created because of some problem.</P>
+<P CLASS="refField">
+Warnings:	Be careful of deadlock situations.</P>
+
+
+<HR>
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+</BODY>
+</HTML>

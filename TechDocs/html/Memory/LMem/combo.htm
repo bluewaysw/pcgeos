@@ -1,0 +1,1496 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+<!-- This page was automatically generated from a bunch of smaller pages. -->
+<META NAME="copyright" CONTENT="Copyright GEOWORKS">
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+<TITLE>Local Memory</TITLE>
+</HEAD>
+<BODY BGCOLOR="#ffffdf">
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+<A NAME="index.htm"></A>
+
+
+
+<H1 CLASS="chapterTitle">
+
+<A NAME="index.htm_97933">
+ </A>
+Local Memory
+
+</H1>
+<P>
+<A NAME="index.htm_IX_Local memory">
+ </A>
+<A NAME="index.htm_97957">
+ </A>
+The GEOS memory manager is well suited to dealing with blocks of memory in the 2K-6K range. However, for small amounts of memory, the manager's overhead becomes significant. For this reason, GEOS provides local memory (or <EM>
+LMem</EM>
+) routines. These routines let an application allocate a block of memory and designate it as a <EM>
+local memory heap</EM>
+. The application can then request small amounts of memory from this heap. The LMem library automatically reorganizes the heap when necessary to make space available.</P>
+<P>
+The local memory routines are also used to manipulate objects. All objects are special LMem chunks which are stored in a special type of LMem heap (called an <EM>
+object block</EM>
+). Most of the routines which work on chunks can also be used on objects.</P>
+<P>
+
+</P>
+<P CLASS="sectionlinks">
+<STRONG>
+&nbsp;&nbsp;<A HREF="#LMem_1.htm">1 Design Philosophy</A><BR>
+&nbsp;&nbsp;<A HREF="#LMem_2.htm">2 Structure of a Local Memory Heap</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#LMem_3.htm">2.1 The Local Heap</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#LMem_4.htm">2.2 Chunks and Chunk Handles</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#LMem_5.htm">2.3 Types of LMem Heaps</A><BR>
+&nbsp;&nbsp;<A HREF="#LMem_6.htm">3 Using Local Memory Heaps</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#LMem_7.htm">3.1 Creating a Local Heap</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#LMem_8.htm">3.2 Using Chunks</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#LMem_9.htm">3.3 Contracting the LMem Heap</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#LMem_a.htm">3.4 Example of LMem Usage</A><BR>
+&nbsp;&nbsp;<A HREF="#LMem_b.htm">4 Special LMem Uses</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#LMem_c.htm">4.1 Chunk Arrays</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#LMem_d.htm">4.2 Element Arrays</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#LMem_e.htm">4.3 Name Arrays</A><BR>
+</STRONG>
+</P> <!-- end of sectionlinks blob -->
+
+<HR>
+<A NAME="LMem_1.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Local Memory</A>: 1 
+Design Philosophy</H2>
+<P>
+The GEOS memory manager is designed to deal with blocks of memory which are measured in kilobytes. Every memory block needs an entry in the global handle table; each such entry takes up 16 bytes. This memory overhead is insignificant for a 10K code block but very significant for, for example, a 100 byte database entry. Furthermore, GEOS allows a limited number of global handles. If an application were to use global blocks for small amounts of data, it could use up too many handles.</P>
+<P>
+On the other hand, if an application were to store many small pieces of data in a single global block, it might have to write elaborate memory-management routines. It would have to make sure that it could resize a piece of data at will and shuffle other data to make room. This could force programmers to spend a lot of their time writing support code.</P>
+<P>
+For these reasons, GEOS provides local memory routines. Applications can designate a block of memory as a local-memory heap and use LMem routines to request small amounts (<EM>
+chunks</EM>
+) of data. The local memory library automatically shuffles chunks in that heap to make room for new requests. Applications can change the size of a chunk at will. The cost of using the LMem routines is one added layer of indirection and a small amount of memory overhead for each chunk. </P>
+<P>
+The LMem routines have another advantage. They provide a uniform way of managing small pieces of memory. This lets GEOS add functionality which applications can use in a variety of ways. For example, GEOS implements an array-management scheme based on LMem chunks; this scheme comes complete with a modified Quicksort routine. Similarly, all GEOS objects are stored in object blocks, which are a special kind of local-memory heap. This makes it easy to add or delete objects dynamically.</P>
+<HR>
+<A NAME="LMem_2.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Local Memory</A>: 2 
+<A NAME="LMem_2.htm_85325">
+ </A>
+Structure of a Local Memory Heap</H2>
+<P>
+<A NAME="LMem_2.htm_IX_Chunks">
+ </A>
+A local memory heap looks and acts much like the global heap. However, it is contained entirely within a single memory block. This block is initialized with a 16-byte <CODE>
+LMemBlockHeader</CODE>
+ (described on <A HREF="#LMem_7.htm_53143"> The offset within the block where the local heap's handle table will begin. The local heap will fill the space to the end of the block; any data between the LMemBlockHeader and the indicated offset will be zero-initialized. If an application wil</A>
+), a local memory handle table, and a local memory heap. Optionally, a space for data may be allocated between the header and the handle table.</P>
+<P>
+Each allocated section of memory within a local heap is called a <EM>
+chunk</EM>
+, and the handles of these chunks are called <EM>
+chunk handles</EM>
+. 
+<P>
+Chunks comprise a chunk of data preceded by a word that contains the length of the data (in bytes). When the heap is created, a certain number of chunk handles will be allocated. If a chunk is requested after all of these chunks have been given out, the local memory routines will enlarge the LMem handle table, relocating chunks as necessary. Unused chunks are stored in a linked list.</P>
+<P CLASS="subsectionLink">
+<A HREF="#LMem_3.htm">The Local Heap</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#LMem_4.htm">Chunks and Chunk Handles</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#LMem_5.htm">Types of LMem Heaps</A></P>
+<HR>
+<A NAME="LMem_3.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Local Memory</A>: 2.1 <A HREF="#LMem_2.htm">Structure of a Local Memory Heap</A>: 
+The Local Heap</H3>
+<P>
+An application may designate any block as a local memory heap. The block may or may not be fixed, swapable, or discardable, as the application desires. </P>
+<P>
+A block may have other data besides the local heap. When a local heap is created, an offset into the block can be specified. The heap will put its header structure at the beginning of the block and the handle table at the specified offset; everything in between will be left untouched by the LMem routines. The offset must be larger than the standard header or else may be zero, indicating that the default offset should be used.
+<IMG SRC="LMem_3_lmemHeap.gif">
+
+</P>
+<P>
+Before performing any operations on a local memory heap, an application must lock the heap the way it would any other block. Some local memory routines may need to resize the block; this may cause the block to be moved on the global heap. Therefore, you should assume that these routines may invalidate all pointers to the relevant block. The descriptions of routines which may behave this way will contain a warning to that effect. When you initialize an LMem heap, you can specify that it should never be resized; this is advisable if the heap is in a fixed block.</P>
+<P>
+A virtual-memory file block may contain an LMem heap. For details on this, see <A HREF="../../Memory/VM/index.htm#83616">the Virtual Memory chapter</A>.</P><HR>
+<A NAME="LMem_4.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Local Memory</A>: 2.2 <A HREF="#LMem_2.htm">Structure of a Local Memory Heap</A>: 
+<A NAME="LMem_4.htm_56910">
+ </A>
+Chunks and Chunk Handles</H3>
+<P>
+Just as blocks on the local heap are accessed with handles, chunks are accessed via chunk handles.<A NAME="LMem_4.htm_IX_Chunk handles">
+ </A>
+ Each chunk handle is an offset into the block containing the local memory heap; thus, the segment address of the locked heap, combined with the chunk handle, make up a pointer to a location within the local memory heap's chunk handle table. That location contains another offset which, when combined with the segment address of the block, composes a far-pointer to the actual chunk. </P>
+<P>
+Chunks are movable within the local heap; whenever a chunk is created or resized, the local memory manager may move any chunks in that heap. There is no locking mechanism for chunks; thus, creating or resizing a chunk can potentially invalidate pointers to all the other chunks, forcing the application to again dereference the handles for these chunks. Be warned that many message handlers can cause heap compaction. As a general rule, you should not save chunk addresses around message sends; instead, dereference the chunk handles to get the current address.
+<IMG SRC="LMem_4_referencing.gif">
+
+</P>
+<P>
+Chunks are aligned along dwords. This speeds up chunk moves and similar operations. This means that when you request a chunk, its size may be slightly larger than you request.</P>
+<P>
+Objects are special kinds of LMem chunks. An optr is simply the global memory handle of an LMem heap followed by the chunk handle of an object. For this reason, many LMem routines come in two formats: one which is passed an optr, and one which is passed the global and chunk handles. There is also a macro, <CODE>
+ConstructOptr()</CODE>
+, which is passed a memory handle and a chunk handle and returns an optr constructed from the two.
+
+</P>
+<HR>
+<A NAME="LMem_5.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Local Memory</A>: 2.3 <A HREF="#LMem_2.htm">Structure of a Local Memory Heap</A>: 
+<A NAME="LMem_5.htm_13234">
+ </A>
+Types of LMem Heaps</H3>
+<PRE>LMemType, LMemFlags</PRE>
+<P>
+<A NAME="LMem_5.htm_IX_LMEM_TYPE_&ldots;">
+ </A>
+<A NAME="LMem_5.htm_79694">
+ </A>
+In addition to being used for general memory needs, local memory heaps perform many specific functions in the GEOS system. When an LMem heap is created, a member of the <CODE>
+LMemType</CODE>
+ enumerated type is passed, indicating to what use the LMem heap will be put. Several types are available:</P>
+<DL>
+<DT>
+LMEM_TYPE_GENERAL</DT><DD>
+The LMem heap will be used for general data storage, possibly including a chunk, name, or element array. When an application creates an LMem heap, it will almost always be of type &quot;General&quot; or &quot;Object.&quot;</DD>
+<DT>
+LMEM_TYPE_WINDOW</DT><DD>
+Windows are stored in memory as LMem heaps. The header contains information about the window; each region in the window is stored as a chunk. Applications will not directly create Window heaps.</DD>
+<DT>
+LMEM_TYPE_OBJ_BLOCK</DT><DD>
+Objects are stored in object blocks, which are LMem heaps. An object block has some extra header information and contains one chunk which contains only flags. All the objects in the block are stored as chunks on the heap. Applications can directly create object blocks; for more information, see <A HREF="../../Programming/GOCLanguage/index.htm">the GEOS Programming chapter</A>.</DT><P CLASS="WorList">
+LMEM_TYPE_GSTATE<BR>
+A GState is an LMem heap. The GState information is in the header, and the application clip-rectangle is stored in a chunk. Applications do not directly create GState blocks; rather, they call a GState creation routine, which creates the block. (See <A HREF="../../Graphics/Environment/index.htm">the Graphics Environment chapter</A>.)</P><DT>
+LMEM_TYPE_FONT_BLOCK<BR>
+Font blocks are stored as LMem heaps. Applications do not create font blocks directly.</DD>
+<DT>
+LMEM_TYPE_GSTRING</DT><DD>
+Whenever a GString is created or loaded, a GString LMem heap is created, and elements are added as chunks. The heap is created automatically by the GString routines; applications should not create GString blocks. (See <A HREF="../../Graphics/Environment/Environment_12.htm#16169">the Graphics Environment chapter</A>.)</DT><P CLASS="WorList">
+LMEM_TYPE_DB_ITEMS<BR>
+The Virtual Memory mechanism provides routines to create and manage <EM>
+database items</EM>
+</DL>
+, short pieces of data which are dynamically allocated and are saved with the VM file. These items are stored in special database LMem heaps, which are created in special database blocks in the VM file. Applications do not directly allocate DB blocks; rather, they call DB routines, which see to it that the blocks are created. (See <A HREF="../../Memory/Database/index.htm">the Database chapter</A>.)</P><P>
+<A NAME="LMem_5.htm_IX_LMF_&ldots;">
+ </A>
+<A NAME="LMem_5.htm_IX_LocalMemoryFlags">
+ </A>
+<A NAME="LMem_5.htm_60651">
+ </A>
+When an LMem heap is allocated, certain flags are passed to indicate properties the heap should have. Some of these flags are passed only for system-created heaps. The flags are stored in a word-length record (<CODE>
+LocalMemoryFlags</CODE>
+); the record also contains flags indicating the current state of the heap. The <CODE>
+LocalMemoryFlags</CODE>
+ are listed below:</P>
+<DL>
+<DT>
+LMF_HAS_FLAGS<BR>
+Set if the block has a chunk containing only flags. This flag is set for object blocks; it is usually cleared for general LMem heaps.</DD>
+<DT>
+LMF_IN_RESOURCE</DT><DD>
+Set if the block has just been loaded from a resource and has not been changed since being loaded. This flag is set only for object blocks created by the compiler.</DD>
+<DT>
+LMF_DETACHABLE</DT><DD>
+Set if the block is an object block which can be saved to a state file.</DD>
+<DT>
+LMF_DUPLICATED</DT><DD>
+Set if block is an object block created by the <CODE>
+ObjDuplicateResource()</CODE>
+ routine. This flag should not be set by applications.</DD>
+<DT>
+LMF_RELOCATED</DT><DD>
+Set if all the objects in the block have been relocated. The object system sets this when it has relocated all the objects in the block. </DD>
+<DT>
+LMF_AUTO_FREE</DT><DD>
+This flag is used by several object routines. It indicates that if the block's in-use count drops to zero, the block may be freed. This flag should not be set by applications.</DD>
+<DT>
+LMF_IN_MEM_ALLOC</DT><DD>
+This flag is used in error-checking code to prevent the heap from being validated while a chunk is being allocated. For internal use only--do not modify<EM>
+.</EM>
+</DD>
+<DT>
+LMF_IS_VM</DT><DD>
+Set if LMem heap is in a VM block and the block should be marked dirty whenever a chunk is marked dirty. This flag is automatically set by the VM code when an LMem heap is created in or attached to a VM file. This flag should not be set by applications.</DD>
+<DT>
+LMF_NO_HANDLES</DT><DD>
+Set if block does not use chunk handles. A block can be set to simulate the C <CODE>
+malloc() </CODE>
+routine; in this case, chunks are not relocated after being created, so chunk handles are not needed. Ordinarily, these blocks are created by the <CODE>
+malloc()</CODE>
+ routine, not by applications. (See the discussion of <CODE>
+malloc()</CODE>
+ in <A HREF="../../Memory/Heap/Memory_e.htm">the Memory Management chapter</A>.)</DT><P CLASS="WorList">
+LMF_NO_ENLARGE<BR>
+Indicates that the local-memory routines should not enlarge this block to fulfill chunk requests. This guarantees that the block will not be moved by a chunk allocation request; however, it makes these requests more likely to fail.</P>
+<DT>
+LMF_RETURN_ERRORS<BR>
+Set if local memory routines should return errors when allocation requests cannot be fulfilled. If the flag is not set, allocation routines will fatal-error if they cannot comply with requests. This flag is generally clear for expandable LMem blocks, since many system routines (such as <CODE>
+ObjInstantiate()</CODE>
+) are optimized in such a way that they cannot deal with LMem allocation errors.</DD>
+<DT>
+LMF_DEATH_COUNT</DT><DD>
+This field occupies the least significant three bits of the flag field. It means nothing if the value is zero. If it is non-zero, it indicates the number of remove-block messages left which must hit <CODE>
+BlockDeathCommon</CODE>
+ before it will free the block. This flag is used some error-checking code in the kernel.</DD>
+<DT>
+STD_LMEM_OBJECT_FLAGS</DT><DD>
+This is a constant which combines the LMF_HAS_FLAGS and LMF_RELOCATED flags. These flags should be set for all object blocks.</DD>
+</DL>
+<HR>
+<A NAME="LMem_6.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Local Memory</A>: 3 
+Using Local Memory Heaps</H2>
+<P>
+Local memory heaps are much like the global heap and are accessed in much the same way. Local heaps are simple to create and manage.</P>
+<P>
+Many applications will not need to use local heaps directly; instead, they will use more advanced data-management mechanisms based on local heaps, such as chunk arrays or database blocks. However, even if you use these mechanisms, you should be familiar with this section; this will help you understand how the other mechanisms work.</P>
+<P>
+Remember that every local memory heap resides in a global memory block. All the rules for using memory blocks apply. (See <A HREF="../../Memory/Heap/Memory_6.htm#65805">the Memory Management chapter</A>.)</P><P CLASS="subsectionLink">
+<A HREF="#LMem_7.htm">Creating a Local Heap</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#LMem_8.htm">Using Chunks</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#LMem_9.htm">Contracting the LMem Heap</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#LMem_a.htm">Example of LMem Usage</A></P>
+<HR>
+<A NAME="LMem_7.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Local Memory</A>: 3.1 <A HREF="#LMem_6.htm">Using Local Memory Heaps</A>: 
+<A NAME="LMem_7.htm_62735">
+ </A>
+Creating a Local Heap</H3>
+<PRE>LMemInitHeap(), MemAllocLMem()</PRE>
+<P>
+Before you create a local heap, you must first allocate and lock a block on the global heap using <CODE>
+MemAlloc()</CODE>
+ and <CODE>
+MemLock()</CODE>
+. (Alternatively, you can allocate a fixed block.) Then, you must call <CODE>
+LMemInitHeap()</CODE>
+. (If you are creating a local heap to hold objects, you should use the <CODE>
+UserAllocObjBlock()</CODE>
+ routine instead; it's much simpler to use.)</P>
+<P>
+<CODE>
+LMemInitHeap()</CODE>
+<A NAME="LMem_7.htm_IX_LMemInitHeap()">
+ </A>
+ creates and initializes a local memory heap. It must be passed several arguments:</P>
+<UL>
+<LI>
+The handle of a locked or fixed block which will contain the local memory heap. It may be moveable, discardable, both, or neither; it should <EM>
+not</EM>
+ have the flag HF_LMEM set. If the LMem heap will be resizable, the block may be of any size; the LMem routines will enlarge it if necessary. If the heap will not be resizable (i.e. LMF_NO_ENLARGE is passed), it must be created large enough to accommodate the heap.</LI>
+<LI>
+<A NAME="LMem_7.htm_53143">
+ </A>
+The offset within the block where the local heap's handle table will begin. The local heap will fill the space to the end of the block; any data between the <CODE>
+LMemBlockHeader</CODE>
+ and the indicated offset will be zero-initialized. If an application will not need a fixed data space, it should specify an offset of zero; the handle table will then be put immediately after the <CODE>
+LMemBlockHeader</CODE>
+. If the created block will be an object block, then it will need room for an <CODE>
+ObjLMemBlockHeader</CODE>
+ structure. Often, when an application needs a fixed data space, it will define a special structure, the first element of which is an <CODE>
+LMemBlockHeader</CODE>
+, and will pass the size of that structure as the offset. It can then access the fixed data by using the fields of the structure. If the offset specified is less than the size of an <CODE>
+LMemBlockHeader</CODE>
+, <CODE>
+LMemInitHeap()</CODE>
+ will return an error.</LI>
+<LI>
+A member of the <CODE>
+LMemType</CODE>
+ enumerated type, specifying the type of block to be created (see <A HREF="#LMem_5.htm_79694"> In addition to being used for general memory needs, local memory heaps perform many specific functions in the GEOS system. When an LMem heap is created, a member of the LMemType enumerated type is passed, indicating to what use the LMem heap wil</A>
+).</LI>
+<LI>
+A word of <CODE>
+LocalMemoryFlags</CODE>
+ for the heap. (See <A HREF="#LMem_5.htm_60651"> When an LMem heap is allocated, certain flags are passed to indicate properties the heap should have. Some of these flags are passed only for system-created heaps. The flags are stored in a word-length record (LocalMemoryFlags); the record also </A>
+.)</LI>
+<LI>
+A word specifying the number of chunk handles to leave room for in the starter handle table. When these chunks have all been allocated, the local memory manager will expand the LMem handle table to create more chunk handles. No matter how big the starter handle table is, the heap will initially contain just one chunk (whose size is specified by the next argument). Applications should generally pass the constant STD_INIT_HANDLES.</LI>
+<LI>
+A word specifying the amount of space to be assigned to the chunk created when the heap is initialized. When more space is needed, the chunks will expand to the end of the block, and (if necessary) the block itself will be expanded. Applications should generally pass the constant STD_INIT_HEAP.</LI>
+</UL>
+<P>
+<CODE>
+LMemInitHeap()</CODE>
+ creates the <CODE>
+LMemBlockHeader</CODE>
+ and the chunk handle table. It also creates a single free chunk; more chunks will automatically be created as needed. It may resize the block passed (unless the flag LMF_NO_ENLARGE is passed); therefore, any pointers to the block may become invalid. It does not return anything.</P>
+<P>
+<A NAME="LMem_7.htm_IX_MemAllocLMem()">
+ </A>
+If you want to create a memory block and initialize it as an LMem heap in one operation, call<CODE>
+ MemAllocLMem()</CODE>
+. This routine takes two arguments: a member of the <CODE>
+LMemType</CODE>
+ enumerated type, and the amount of space to leave for the header (again, a zero size indicates that the default header size should be used). <CODE>
+MemAllocLMem()</CODE>
+ allocates a movable, swapable block in the global heap, then initializes an LMem heap in that block. If you specify an <CODE>
+LMemType</CODE>
+ of LMEM_TYPE_OBJ_BLOCK, <CODE>
+MemAllocLMem()</CODE>
+ will pass the STD_LMEM_OBJECT_FLAGS flags; otherwise, it will pass a clear <CODE>
+LocalMemoryFlags</CODE>
+ record.</P>
+<HR>
+<A NAME="LMem_8.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Local Memory</A>: 3.2 <A HREF="#LMem_6.htm">Using Local Memory Heaps</A>: 
+<A NAME="LMem_8.htm_27466">
+ </A>
+Using Chunks</H3>
+<PRE>LMemAlloc(), LMemDeref(), LMemFree(), LMemGetChunkSize(), LMemReAlloc(), LMemInsertAt(), LMemDeleteAt(), LMemDerefHandles(), LMemFreeHandles(), LMemGetChunkSizeHandles(), LMemReAllocHandles(), LMemInsertAtHandles(), LMemDeleteAtHandles()</PRE>
+<P>
+Once a local heap has been initialized, you can allocate, use, and free chunks at will. Chunks can only be manipulated while the block containing the LMem heap is fixed or locked on the global heap.</P>
+<P>
+<CODE>
+LMemAlloc()</CODE>
+<A NAME="LMem_8.htm_IX_LMemAlloc()">
+ </A>
+ allocates a new chunk on the local heap. It is passed the handle of the block containing the heap and the size of the chunk needed. <CODE>
+LMemAlloc()</CODE>
+ returns the handle of the new chunk (which must then be dereferenced before the chunk is used). The size requested will be rounded up as necessary to ensure that the chunks are dword-aligned. An additional two bytes will be allocated to store the size of the chunk; these bytes will be before the data. This routine may compact the chunks on the local heap, so all pointers to that heap will be invalidated; they will have to be dereferenced by their chunk handles. Furthermore, the block itself may be moved (if LMF_NO_ENLARGE is not set). Even fixed blocks may be moved if they need to expand to accommodate new chunks.</P>
+<P>
+All of the following routines come in two forms. As noted, an optr is simply the handle of an object block, followed by the object's chunk handle. For this reason, most LMem routines come in two slightly different formats: one where the chunk is specified with an optr, and one where it is specified with the two handles. In all other ways, the two versions of each routine are identical. Indeed, in assembly there is only a single version of each routine; the only difference is in how the C routines take their parameters.</P>
+<P>
+<A NAME="LMem_8.htm_IX_LMemDerefHandles()">
+ </A>
+<A NAME="LMem_8.htm_IX_LMemDeref()">
+ </A>
+Once you have allocated a chunk, you must dereference its chunk handle in order to use it. You can do this with <CODE>
+LMemDeref()</CODE>
+. This routine takes a singe parameter, namely the optr. It returns a pointer to the data portion of the chunk (after the size word). This pointer will remain valid until the block is unlocked or until a routine is called which can cause block resizing or heap compaction (e.g. <CODE>
+LMemAlloc()</CODE>
+). Since these routines can invalidate chunk-pointers, it is important that data-synchronization routines be used if more than one thread is accessing the heap; otherwise, one thread may cause the heap to be shuffled while another thread is trying to read from it. The version which takes handles is named <CODE>
+LMemDerefHandles()</CODE>
+.</P>
+<P>
+<A NAME="LMem_8.htm_IX_LMemFreeHandles()">
+ </A>
+<A NAME="LMem_8.htm_IX_LMemFree()">
+ </A>
+When you are done using a chunk of memory, you should free it with <CODE>
+LMemFree()</CODE>
+. This routine is passed an optr; it does not return anything. It does not resize the block or shuffle chunks; therefore, pointers to other chunks will not be invalidated by <CODE>
+LMemFree()</CODE>
+.<A NAME="LMem_8.htm_IX_LMemFreeHandles()">
+ </A>
+ The version which takes handles is named <CODE>
+LMemFreeHandles()</CODE>
+.</P>
+<P>
+<A NAME="LMem_8.htm_IX_LMemGetChunkSize()">
+ </A>
+You can find out the size of any chunk by calling the routine <CODE>
+LMemGetChunkSize()</CODE>
+. This routine is passed an optr; it returns the size of the chunk in bytes (not counting the chunk's size word). <A NAME="LMem_8.htm_IX_LMemGetChunkSizeHandles()">
+ </A>
+The version which takes handles is named <CODE>
+LMemGetChunkSizeHandles()</CODE>
+.</P>
+<P>
+Chunks can be resized after creation. <A NAME="LMem_8.htm_IX_LMemReAlloc()">
+ </A>
+The Boolean routine <CODE>
+LMemReAlloc()</CODE>
+ takes two arguments, namely an optr and the new size of the chunk. If the new size is larger than the old one, bytes will be added to the end of the chunk; chunks may be shuffled and the block may be resized, so all pointers to chunks will be invalidated. The new bytes will not be zero-initialized. If the new chunk size is smaller than the old one, the chunk will be truncated; pointers to chunks will not be invalidated. This routine will fail only if the LMem heap ran out of space and could not be resized. In this case, it will return non-zero without changing the chunk. If it succeeds, it returns zero. <A NAME="LMem_8.htm_IX_LMemReAllocHandles()">
+ </A>
+The version which takes handles is called <CODE>
+LMemReAllocHandles()</CODE>
+.</P>
+<P>
+<A NAME="LMem_8.htm_IX_LMemInsertAt()">
+ </A>
+You can add bytes inside a chunk with the Boolean routine <CODE>
+LMemInsertAt()</CODE>
+. This routine takes three arguments: the optr, an offset within the chunk, and the number of bytes to add. The new space is added beginning at the specified offset; it is initialized to zeros. This may cause chunks to be shuffled and/or the block to be expanded; pointers to chunks are therefore invalidated. Note that it is your responsibility to make sure that the offset within the chunk really is in the chunk; otherwise, results are undefined. If <CODE>
+LMemInsertAt()</CODE>
+ fails (because the LMem heap ran out of space and could not be expanded), it returns non-zero without changing the chunk; otherwise it returns zero. <A NAME="LMem_8.htm_IX_LMemInsertAtHandles()">
+ </A>
+The version which takes handles is named <CODE>
+LMemInsertAtHandles()</CODE>
+.</P>
+<P>
+<A NAME="LMem_8.htm_IX_LMemDeleteAt()">
+ </A>
+You can delete bytes within a chunk with the routine <CODE>
+LMemDeleteAt()</CODE>
+. This routine takes three arguments: the optr, the offset within the chunk of the first byte to be deleted, and the number of bytes to delete. This routine does not invalidate pointers to chunks. The routine does not return anything. Note that it is your responsibility to make sure that all the bytes to be deleted are within the chunk, i.e. that the offset and number of bytes passed do not specify bytes that are beyond the end of the chunk. If you fail to do this, results are undefined.<A NAME="LMem_8.htm_IX_LMemDeleteAtHandles()">
+ </A>
+ The version which takes handles is named <CODE>
+LMemDeleteAtHandles()</CODE>
+.</P>
+<HR>
+<A NAME="LMem_9.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Local Memory</A>: 3.3 <A HREF="#LMem_6.htm">Using Local Memory Heaps</A>: 
+Contracting the LMem Heap</H3>
+<PRE>LMemContract()</PRE>
+<P>
+The local memory manager routines ordinarily take care of heap compaction. However, you can also order compaction at will.</P>
+<P>
+<A NAME="LMem_9.htm_IX_LMemContract()">
+ </A>
+The routine <CODE>
+LMemContract()</CODE>
+ compacts the heap and then frees all the unused heap space (by truncating the block with the LMem heap). The routine takes one argument, namely the handle of the (locked or fixed) block containing the LMem heap. It shuffles all the chunks, thus invalidating pointers to chunks; however, it is guaranteed not to move the block on the global heap. </P>
+<HR>
+<A NAME="LMem_a.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Local Memory</A>: 3.4 <A HREF="#LMem_6.htm">Using Local Memory Heaps</A>: 
+Example of LMem Usage</H3>
+<P>
+At first, the local memory techniques can seem tricky. This section contains an example of LMem usage in Goc. The example shows the basic principles of LMem usage.</P>
+<P CLASS="figTitle">
+Code Display 16-1 LMem Usage in GOC</P>
+<PRE>/*
+ * Declarations
+ */</PRE>
+<PRE>/* We'll want to have a fixed data area at the start of the block. That area will
+ * have to start with an LMemBlockHeader, but after that, we can put whatever we
+ * want. To make it easy to access the fixed data, we define a structure.
+ */
+typedef struct {
+	LMemBlockHeader		MLMBH_standardHeader;
+	float		MLMBH_someData;
+	float		MLMBH_someMoreData;
+	char		MLMBH_someChars[10];
+} MyLMemBlockHeader;</PRE>
+<PRE>MyLMemBlockHeader 			*thisHeapsHeader;
+MemHandle			thisHeapsHandle;
+ChunkHandle			firstChH, secondChH;
+char 			*firstChPtr, *secondChPtr;
+int			i;</PRE>
+<PRE>/*
+ * Code
+ */</PRE>
+<PRE>/* We have to create the LMem heap. First, we create the block: */
+thisHeapsHandle = MemAlloc(					/* MemAlloc returns the block handle */
+			2048,		/* Allocate 2K; can grow as necessary */
+			HF_SWAPABLE,		/* Make block swapable. LMemInitHeap()
+					 * will add the flag HF_LMEM. */
+			HAF_ZERO_INIT | HAF_LOCK); 				/* Zero &amp; lock the block
+							 * upon allocation */</PRE>
+<PRE>LMemInitHeap(thisHeapsHandle,					/* Pass handle of locked block */
+		LMEM_TYPE_GENERAL,			/* Allocate a general heap */
+		0,			/* Don't pass any flags */
+		sizeof(MyLMemBlockHeader), 	/* Offset to leave room for header */
+		STD_INIT_HANDLES,			/* Standard # of starter handles */
+		STD_INIT_HEAP);		/* Allocate standard amt. of empty heap */</PRE>
+<PRE>/* The block is still locked; we can initialize the fixed data section. */
+thisHeapsHeader = (MyLMemBlockHeader *) MemDeref(thisHeapsHandle);
+thisHeapsHeader-&gt;MLMBH_someData = 3.1415926;</PRE>
+<PRE>/* Now, we allocate some chunks. This invalidates pointers to this heap (such as 
+ * thisHeapsHeader), since chunk allocation may cause the heap to be resized (and
+ * thus moved). The block must be locked when we do this.
+ */
+firstChH = LMemAlloc(					/* LMemAlloc returns a chunk handle */
+		thisHeapsHandle,			/* Pass handle of block . . . */
+		100);			/* . . . and number of bytes in chunk */</PRE>
+<PRE>secondChH = LMemAlloc(thisHeapsHandle, 50);</PRE>
+<PRE>/* Now, we start writing data to a chunk: */
+firstChPtr = (char *) LMemDerefHandles(thisHeapsHandle, firstChH);
+for(i = 0; i &lt;= 30; i++)
+   firstChPtr[i] = 'x';</PRE>
+<PRE>/* We can insert 10 bytes into the middle of the second chunk. This may cause the
+ * chunks or blocks to be shuffled; all pointers are invalidated
+ */
+LMemInsertAtHandles(thisHeapsHandle, secondChH, 						/* Block &amp; chunk handles */
+		20,				/* Insert after 20th byte */
+		30);				/* Insert 30 null bytes */</PRE>
+<PRE>/* If we want to access the first chunk, we need to dereference its handle again:
+ */
+firstChPtr = (char *) LMemDeref(thisHeapsHandle, firstChH);
+for(i = 1; i &lt;= 15; i++)
+    firstChPtr[(i&lt;&lt;1)] = 'o';</PRE>
+<PRE>/* When we're done with a chunk, we should free it. This does not invalidate 
+ * any pointers to other chunks.
+ */
+LMemFreeHandles(thisHeapsHandle, firstChH);</PRE>
+<PRE>/* If we won't be using an LMem heap for a while, we should unlock it the way we 
+ * would any block: */
+MemUnlock(thisHeapsHandle);</PRE>
+<PRE>/* When we're done with the LMem heap, we can just free it. */
+MemFree(thisHeapsHandle);</PRE>
+<HR>
+<A NAME="LMem_b.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Local Memory</A>: 4 
+Special LMem Uses</H2>
+<P>
+Local memory heaps are used for many purposes in GEOS. Objects are stored in special LMem heaps, called <EM>
+object blocks</EM>
+; windows, GStrings, and many other things are implemented as LMem heaps; and LMem heaps can be used to manage arrays of data. Most of these things are done by the system, transparent to the user; however, some of these things can be called on directly by applications.</P>
+<P>
+Most of these techniques are described in their own chapters. One use of LMem heaps will be described in this chapter; namely, the use of LMem chunks to store special arrays of data via the Chunk Array routines. The chapter will also describe special purpose variants of the Chunk Array: the Element Array and the Name Array.</P>
+<P CLASS="subsectionLink">
+<A HREF="#LMem_c.htm">Chunk Arrays</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#LMem_d.htm">Element Arrays</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#LMem_e.htm">Name Arrays</A></P>
+<HR>
+<A NAME="LMem_c.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Local Memory</A>: 4.1 <A HREF="#LMem_b.htm">Special LMem Uses</A>: 
+<A NAME="LMem_c.htm_72816">
+ </A>
+Chunk Arrays</H3>
+<P>
+<A NAME="LMem_c.htm_IX_Chunk arrays">
+ </A>
+Very often an application will need to keep track of many different pieces of data and access them by an index. An application can do this in the traditional way, i.e., allocate a block of memory and set it up as an array. However, GEOS provides a mechanism which is often more suitable: the <EM>
+chunk array</EM>
+. The chunk array routines let you dynamically insert or delete elements in the middle of an array; you can get a pointer to an arbitrary element (specified by its index number); you can sort the array based on any arbitrary criterion. The array can be specified as &quot;uniform-size&quot; (all elements the same size, specified when the chunk array is created), or &quot;variable-size&quot; (each element can be created at an arbitrary size and can be resized at will). Note that either type of array can grow or shrink dynamically; while the elements may be of a fixed size, the array need not be.</P>
+<P>
+The chunk array is implemented on top of the LMem routines. The entire array is a single chunk in a local memory heap (hence the name). It therefore has a maximum total size of somewhat less than 64K, and memory efficiency drops significantly if it is larger than roughly 6K. If you need a larger array, you should use a Huge Array (see <A HREF="../../Memory/VM/VM_17.htm#43357">the VM chapter</A>). If you will be using the chunk array routines, you should include <STRONG CLASS="fileName">chunkarr.h</STRONG>
+.</P>
+
+<H4 CLASS="HeadingC">
+Structure of the Chunk Array</H4>
+<P>
+<A NAME="LMem_c.htm_IX_ChunkArrayHeader">
+ </A>
+A chunk array is contained in a single chunk in an LMem heap. It begins with a special header structure which specifies certain characteristics of the chunk array: the number of elements in the array, the size of each element (or zero for variable sized arrays), the offset from the start of the chunk to the first element, and the offset from the first element to the end of the array. The header is a structure of type <CODE>
+ChunkArrayHeader</CODE>
+; an application can examine the fields of this structure directly or by using chunk array routines. The creating application can request that the chunk array contain some blank space between the header and the first element; it can use that space however it likes.</P>
+<P>
+Elements can be referenced by index number. The first element has index number zero. You can translate element numbers to pointers, and vice versa, by calling <CODE>
+ChunkArrayElementToPtr()</CODE>
+ and <CODE>
+ChunkArrayPtrToElement()</CODE>
+ (see <A HREF="#LMem_c.htm_17554"> Adding, Removing, and Accessing Elements</A>
+).</P>
+<P>
+A uniform-size chunk array has a simple structure. After the header (and the extra space, if any) come the elements. They follow one after another, with no free space between them. An application can request a pointer to any element, specified by index; the chunk array routine multiplies the index by the size of each element and adds the product to the address of the first element, producing a pointer to the requested element. An application can also proceed through the array, going from one element to the next, without specifically requesting pointers.
+<IMG SRC="LMem_c_unifCArray.gif">
+
+</P>
+<P>
+The structure of a variable-size chunk array is a little bit more complicated. After the header (and extra space) is a lookup-table of two-byte entries, each containing the offset from the start of the chunk to the appropriate element. The chunk array routines maintain this table automatically. When an application wants to reference a given element, the chunk array routine doubles the index number and adds it to the offset to the start of this table; this produces the address of a table entry, which itself contains the offset to the actual element. Effectively, there are two arrays with the same number of elements; the first is a uniform-sized array of offsets to the entries in the second (variable-sized) array. However, this is transparent to the application, which merely requests a pointer to element <EM>
+n</EM>
+ and is returned that pointer. It does not need to know or care about the extra table constructed by the chunk array routines.
+<IMG SRC="LMem_c_varCArray.gif">
+
+</P>
+
+
+<H4 CLASS="HeadingC">
+Creating a Chunk Array</H4>
+<PRE>ChunkArrayCreate(), ChunkArrayCreateAt(), ChunkArrayCreateAtHandles(), ChunkArrayHeader</PRE>
+<P>
+Chunk arrays are created in local memory heaps. An LMem heap can have several chunk arrays, and it can have other types of chunks besides chunk arrays; however, since an LMem heap is limited to 64K in total size, the more you put in the heap, the less room there is for a chunk array to grow.</P>
+<P>
+The first step in creating a chunk array is to create an LMem heap. Create the heap the same way you would any general LMem heap. The heap should probably be left resizable, since that way it will be able to grow to accommodate the chunk array.</P>
+<P>
+<A NAME="LMem_c.htm_IX_ChunkArrayCreate()">
+ </A>
+Once you have created the heap, use the routine <CODE>
+ChunkArrayCreate()</CODE>
+ to create the chunk array. This routine will allocate a chunk for the chunk array, initialize the array, and return the chunk handle. Since the routine allocates a chunk, it can cause chunk shuffling or heap resizing; thus, all pointers to the heap are invalidated. </P>
+<P>
+<CODE>
+ChunkArrayCreate()</CODE>
+ takes four arguments:</P>
+<UL>
+<LI>
+The handle of a locked block containing the LMem heap;</LI>
+<LI>
+The size of each element, or zero if the elements are variable-size; and</LI>
+<LI>
+<A NAME="LMem_c.htm_IX_ChunkArrayHeader:with ChunkArrayCreate()">
+ </A>
+The size of the header for the chunk array. If you pass zero, the routine will automatically leave enough space for a <CODE>
+ChunkArrayHeader</CODE>
+ structure; if you pass a non-zero argument, it must be larger than the size of a <CODE>
+ChunkArrayHeader</CODE>
+. If you will need a data space at the start of the array, it is a good idea to define a structure, the first element of which is a <CODE>
+ChunkArrayHeader</CODE>
+, and use that structure to access the fixed data area; you can then pass the size of that structure as this argument.</LI>
+<LI>
+A field of <CODE>
+ObjChunkFlags</CODE>
+ which act as those passed to <CODE>
+LMemAlloc()</CODE>
+.</LI>
+</UL>
+<P>
+There is another version of this routine which creates a chunk array in an existing chunk.<A NAME="LMem_c.htm_IX_ChunkArrayCreateAt()">
+ </A>
+ This routine, <CODE>
+ChunkArrayCreateAt()</CODE>
+, takes three arguments, namely an optr indicating the chunk, the size of each element, and the size of the header. It allocates a chunk array in that chunk, resizing it if necessary, and returns the chunk's handle. Any data in the chunk may be overwritten (except for whatever data falls in the header area after the <CODE>
+ChunkArrayHeader</CODE>
+).<A NAME="LMem_c.htm_IX_ChunkArrayCreateAtHandles()">
+ </A>
+ The version which takes handles is called <CODE>
+ChunkArrayCreateAtHandles()</CODE>
+.</P>
+<P>
+When you are done with a chunk array, you can free it with <CODE>
+LMemFree()</CODE>
+ the way you would any other chunk.</P>
+
+
+<H4 CLASS="HeadingC">
+<A NAME="LMem_c.htm_17554">
+ </A>
+Adding, Removing, and Accessing Elements</H4>
+<PRE>ChunkArrayAppend(), ChunkArrayAppendHandles(), ChunkArrayInsertAt(), ChunkArrayInsertAtHandle(), ChunkArrayDelete(), ChunkArrayDeleteHandle(), ChunkArrayDeleteRange(), ChunkArrayDeleteRangeHandles(), ChunkArrayElementResize(), ChunkArrayElementResizeHandles(), ChunkArrayElementToPtr(), ChunkArrayElementToPtrHandles(), ChunkArrayPtrToElement(), ChunkArrayPtrToElementHandle(), ChunkArrayGetElement(), ChunkArrayGetElementHandles()</PRE>
+<P>
+The chunk array library provides a high-level interface for working with the arrays. The application specifies a request in general terms (e.g., &quot;Insert a new element before element five,&quot; &quot;Give me a pointer to element 20&quot;). The routines take care of the low-level memory management: inserting bytes, swapping chunks to make room, etc. These routines depend on the LMem routines; therefore, the block containing the LMem heap must be locked or fixed when you use these routines (or any other chunk array routines).</P>
+<P>
+When you call a chunk array routine, you must pass the handles specifying the chunk. As with other routines which act on a chunk, these routines come in two formats: one in which the chunk is specified with an optr, and one in which it is specified with the global memory handle and the chunk handle.</P>
+<P>
+<A NAME="LMem_c.htm_IX_ChunkArrayHeader:with ChunkArrayAppend()">
+ </A>
+Adding elements to a chunk array is easy. <A NAME="LMem_c.htm_IX_ChunkArrayAppend()">
+ </A>
+To add an element to the end of a chunk array, use the routine <CODE>
+ChunkArrayAppend()</CODE>
+. This routine automatically updates the <CODE>
+ChunkArrayHeader</CODE>
+ (and the lookup-table, if elements are variable-sized). The routine takes two arguments, namely the optr and the size of the new element. The size must be greater than zero. If the array elements are uniform-sized, the size argument is ignored. The routine will resize the chunk to accommodate the new element, update its header table (and lookup table if necessary), and return a pointer to the element. Since the chunk is resized, all other chunk pointers (and pointers within the chunk array) are invalidated. <A NAME="LMem_c.htm_IX_ChunkArrayAppendHandles()">
+ </A>
+The version which takes handles is named <CODE>
+ChunkArrayAppendHandles()</CODE>
+.</P>
+<P>
+You can also add an element within the middle of an array.<A NAME="LMem_c.htm_IX_ChunkArrayInsertAt()">
+ </A>
+ The routine <CODE>
+ChunkArrayInsertAt()</CODE>
+ takes three arguments, namely the optr, a pointer to the location at which to insert the element, and the size of the element (ignored for uniform-sized arrays). The size must be greather than zero. The routine will insert the appropriate number of bytes at that location in the chunk, update the header and lookup-table, and return a pointer to the new element. Pointers to chunks are invalidated. <A NAME="LMem_c.htm_IX_ChunkArrayInsertAtHandle()">
+ </A>
+The version which takes the chunk handle, <CODE>
+ChunkArrayInsertAtHandle()</CODE>
+, is slightly unusual in that it is passed the chunk handle but not the global memory handle; the routine gets the segment address of the chunk from the passed pointers.</P>
+<P>
+<A NAME="LMem_c.htm_IX_ChunkArrayDelete()">
+ </A>
+When you are done with an element, free it with <CODE>
+ChunkArrayDelete()</CODE>
+. This routine takes two arguments, namely the optr and a pointer to the element to be deleted. It shrinks the chunk; thus, it is guaranteed not to shuffle chunks, so chunk pointers remain valid (though pointers to elements within the chunk array will be invalidated if the elements come after the deleted element). <A NAME="LMem_c.htm_IX_ChunkArrayDeleteHandle()">
+ </A>
+Again, the handle version, <CODE>
+ChunkArrayDeleteHandle()</CODE>
+, is passed the chunk handle but not the global handle.</P>
+<P>
+<A NAME="LMem_c.htm_IX_ChunkArrayDeleteRange()">
+ </A>
+If you need to delete several consecutive elements, call <CODE>
+ChunkArrayDeleteRange()</CODE>
+. This routine takes three arguments: the optr to the chunk array, the index of the first element to delete, and the number of elements to delete. The specified elements will be deleted. As with <CODE>
+ChunkArrayDelete()</CODE>
+, the global and local heaps will not be shuffled.<A NAME="LMem_c.htm_IX_ChunkArrayDeleteRangeHandles()">
+ </A>
+ The handle version, <CODE>
+ChunkArrayDeleteRangeHandles()</CODE>
+, is passed the global handle of the LMem heap and the chunk handle of the chunk array instead of the optr to the chunk array.</P>
+<P>
+<A NAME="LMem_c.htm_IX_ChunkArrayElementResize()">
+ </A>
+Elements in variable-sized arrays can be resized after creation with the routine <CODE>
+ChunkArrayElementResize()</CODE>
+. This routine takes three arguments: the optr, the element number, and the new size. The new size must be greater than zero. The routine resizes the element and updates the lookup table. If the new size is larger than the old, null bytes will be added to the end of the element; chunks may be shuffled, so all chunk pointers are invalidated. If the new size is smaller than the old, the element will be truncated. This is guaranteed not to shuffle chunks, so pointers to chunks remain valid, though pointers within the array may be invalidated.<A NAME="LMem_c.htm_IX_ChunkArrayElementResizeHandles()">
+ </A>
+ The version which takes handles, <CODE>
+ChunkArrayElementResizeHandles()</CODE>
+, is passed both the global memory handle and the chunk handle.</P>
+<P>
+<A NAME="LMem_c.htm_IX_ChunkArrayElementToPtr()">
+ </A>
+If you have the index of an element and you want to access that element, use the routine <CODE>
+ChunkArrayElementToPtr()</CODE>
+. It takes three arguments: the optr, the element number, and a pointer to a word-length variable. The routine writes the size of the element in the variable and returns a pointer to the element. (If you are not interested in the element's size, pass a null pointer.) It does not change the chunk in any way, so no pointers are invalidated. If you pass an index which is out-of-bounds, <CODE>
+ChunkArrayElementToPtr()</CODE>
+ will treat it as the index of the last element. (The constant CA_LAST_ELEMENT is often used for this purpose.) However, the error-checking version will always fatal-error if passed the index CA_NULL_ELEMENT (i.e. 0xffff). <A NAME="LMem_c.htm_IX_ChunkArrayElementToPtrHandles()">
+ </A>
+The version which takes handles is named <CODE>
+ChunkArrayElementToPtrHandles()</CODE>
+.</P>
+<P>
+<A NAME="LMem_c.htm_IX_ChunkArrayPtrToElement()">
+ </A>
+If you know the address of an element and you need to find out its index, use the routine <CODE>
+ChunkArrayPtrToElement()</CODE>
+. This routine takes two arguments, namely the optr and a pointer to the element. It returns the index number of the element. <A NAME="LMem_c.htm_IX_ChunkArrayPtrToElementHandle()">
+ </A>
+The version which takes the chunk handle, <CODE>
+ChunkArrayPtrToElementHandle()</CODE>
+, is passed the chunk handle and the pointer but not the global memory handle.</P>
+<P>
+<A NAME="LMem_c.htm_IX_ChunkArrayGetElement()">
+ </A>
+You can copy an element to a specified location with the routine <CODE>
+ChunkArrayGetElement()</CODE>
+. This routine takes three arguments: the optr, the element number, and a pointer to a buffer big enough to hold the entire element. The routine will copy the element to the specified buffer.<A NAME="LMem_c.htm_IX_ChunkArrayGetElementHandles()">
+ </A>
+ The version which takes handles is called <CODE>
+ChunkArrayGetElementHandles()</CODE>
+.</P>
+
+
+<H4 CLASS="HeadingC">
+Chunk Array Utilities</H4>
+<PRE>ChunkArrayGetCount(), ChunkArrayGetCountHandles(), ChunkArrayZero(), ChunkArrayZeroHandles(), ChunkArrayEnum(), ChunkArrayEnumHandles(), ChunkArrayEnumRange(), ChunkArrayEnumRangeHandles(), ChunkArraySort(), ArrayQuickSort(), bsearch()</PRE>
+<P>
+<A NAME="LMem_c.htm_IX_ChunkArrayGetCount()">
+ </A>
+To find out how many elements are in a chunk array, use the routine <CODE>
+ChunkArrayGetCount()</CODE>
+. This routine takes one argument, namely the optr. It returns the number of elements in the array. It does not change the array; no pointers are invalidated. <A NAME="LMem_c.htm_IX_ChunkArrayGetCountHandles()">
+ </A>
+The version which takes handles is named <CODE>
+ChunkArrayGetCountHandles()</CODE>
+.</P>
+<P>
+<A NAME="LMem_c.htm_IX_ChunkArrayZero()">
+ </A>
+If you want to delete all elements in the array but you don't want to free the array itself, use the routine <CODE>
+ChunkArrayZero()</CODE>
+. This routine takes one argument, namely the optr. It does not return anything. This routine deletes all the elements in the array, updates the header and lookup tables, and resizes the chunk. Since the chunk is truncated, no chunks are swapped, so no chunk pointers are invalidated (though pointers to elements are, naturally, invalidated). <A NAME="LMem_c.htm_IX_ChunkArrayZeroHandles()">
+ </A>
+The version which takes handles is named <CODE>
+ChunkArrayZeroHandles()</CODE>
+.</P>
+<P>
+<A NAME="LMem_c.htm_IX_ChunkArrayEnum()">
+ </A>
+If you want to apply a function to every element in the array, use <CODE>
+ChunkArrayEnum()</CODE>
+. This routine is passed three arguments:</P>
+<UL>
+<LI>
+The optr.</LI>
+<LI>
+A pointer to a Boolean callback routine. This routine will be called for each element in succession. This routine must be declared _pascal. If the callback routine ever returns <EM>
+true</EM>
+, <CODE>
+ChunkArrayEnum()</CODE>
+ will immediately return with value <EM>
+true</EM>
+ (without checking any more elements). If the callback routine returns <EM>
+false</EM>
+ for every element, <CODE>
+ChunkArrayEnum()</CODE>
+ will return with value <EM>
+false. </EM>
+</LI>
+<LI>
+A pointer which is passed to the callback routine.</LI>
+</UL>
+<P>
+The callback routine should be written to take two arguments:</P>
+<UL>
+<LI>
+A pointer to the start of an element</LI>
+<LI>
+The pointer passed to <CODE>
+ChunkArrayEnum()</CODE>
+</LI>
+</UL>
+<P>
+<CODE>
+ChunkArrayEnum()</CODE>
+ can be used for many different purposes, depending on the nature of the callback routine. For example, it can perform some action on every element (in which case it ought always to return <EM>
+false</EM>
+); it can analyze the data in the various elements; it can check to see if any element meets some criterion. If it needs to write its results, it might do so at the location indicated by the pointer. <CODE>
+ChunkArrayEnum()</CODE>
+ will not cause heap shuffling unless the callback routine causes it; thus, if the callback routine avoids shuffling the heap, it can (for example) be passed a pointer to a chunk in the same LMem heap as the chunk array. <A NAME="LMem_c.htm_IX_ChunkArrayEnumHandles()">
+ </A>
+The version which is passed handles is named <CODE>
+ChunkArrayEnumHandles()</CODE>
+.</P>
+<P>
+There is another version of <CODE>
+ChunkArrayEnum()</CODE>
+ which acts on a range of elements. <A NAME="LMem_c.htm_IX_ChunkArrayEnumRange()">
+ </A>
+This routine is called <CODE>
+ChunkArrayEnumRange()</CODE>
+. This routine takes the same arguments as <CODE>
+ChunkArrayEnum()</CODE>
+, plus two more: a start index, and a number of elements to enumerate. <CODE>
+ChunkArrayEnumRange()</CODE>
+ calls the callback routine for the element with the specified index, and for every element thereafter until it has processed the specified number of elements. You can have it enumerate to the end of the chunk array by passing a count of 0xffff. There is a version which takes handles called <CODE>
+ChunkArrayEnumRangeHandles()</CODE>
+.</P>
+
+<P>You can get into trouble if more than one thread of execution 
+is accessing a single ChunkArray and one or both of these threads 
+is using one of the ChunkArrayEnum...() routines.  The error-checking 
+version of the kernel detects this situation and generates a 
+CHUNK_ARRAY_ENUM_INSERT_OR_DELETE_RUN_BY_MULTIPLE_THREADS warning 
+if it detects such.  If your code is getting this warning, you should 
+add some synchronization between threads.  While one thread is enumerating 
+through chunks in the chunk array, the other should do nothing to 
+enumerate the same array, nor alter the array in any way.</P>
+
+<P>
+<A NAME="LMem_c.htm_IX_ChunkArraySort()">
+ </A>
+The chunk array library also provides a sorting routine, <CODE>
+ChunkArraySort()</CODE>
+. This routine performs a modified Quicksort on the array, using insertion sorts for subarrays below a certain size. 
+The sort routine takes three arguments: the chunk array's optr, a pointer to a comparison function, and a word of data which is passed to the comparison function.</P>
+<P>
+Whenever the sort routine needs to decide which of two elements comes first, it calls the comparison routine. The comparison routine takes two arguments, namely the optr and the word of data passed to <CODE>
+ChunkArraySort()</CODE>
+. It returns a signed word with the following significance: If the first of the elements should come first in the sorted array, it returns a negative number; if the first element ought to come after the second, it should return a positive number; and if it doesn't matter which comes first, it should return zero. You can write a general-purpose comparison routine which can compare based on any of several parts of the element, and you can use the data word to instruct it which part to sort on; or you can use the data word to tell it to sort in ascending or descending order. <CODE>
+ChunkArraySort()</CODE>
+ does not cause heap shuffling as long as the comparison routine does not.<A NAME="LMem_c.htm_IX_ChunkArraySortHandles()">
+ </A>
+ The routine which takes handles is called <CODE>
+ChunkArraySortHandles()</CODE>
+.</P>
+<P>
+<CODE>
+ChunkArraySort()</CODE>
+<A NAME="LMem_c.htm_IX_ArrayQuickSort()">
+ </A>
+ is based on a more general array sorting routine, <CODE>
+ArrayQuickSort()</CODE>
+. <CODE>
+ChunkArraySort()</CODE>
+ reads data about the array from the array header and passes the information to <CODE>
+ArrayQuickSort()</CODE>
+. You can call <CODE>
+ArrayQuickSort()</CODE>
+ directly for arrays which are not chunk arrays, provided all elements are of uniform size. <CODE>
+ArrayQuickSort()</CODE>
+ takes five arguments: a pointer to an array (which should be locked or fixed in memory), the number of elements in the array, the size of each element, a pointer to a callback routine (which has exactly the same format as the <CODE>
+ChunkArraySort()</CODE>
+ callback routine), and a data word to pass to that callback routine. It does not return anything. </P>
+<P>
+Note that <CODE>
+ChunkArraySort()</CODE>
+ is currently implemented only for chunk arrays with fixed-sized elements.</P>
+<P>
+<A NAME="LMem_c.htm_IX_bsearch()">
+ </A>
+The <CODE>
+bsearch()</CODE>
+ routine conducts a binary search on an a sorted array.</P>
+
+
+<H4 CLASS="HeadingC">
+Example of Chunk Array Usage</H4>
+<P>
+This section contains an example of how a chunk array might be used. It shows several common chunk array actions, including sorting the array.</P>
+<P CLASS="figTitle">
+Code Display 16-2 Example of Chunk Array Usage</P>
+<PRE>/*
+ *	Declarations (not in any routine)
+ */</PRE>
+<PRE>/* We want to store some data right after the chunk array header, so we define our
+ * own header structure. Data in this structure (except for the ChunkArrayHeader
+ * proper) will not be affected by the chunk array routines. */
+typedef struct {
+	ChunkArrayHeader			standardChunkArrayHeader;
+	int			someData;
+	float			someMoreData;
+} MyChunkArrayHeader;</PRE>
+<PRE>/* For simplicity, we define a structure which will be used for each element in the
+ * array. (This is entirely optional.) */
+typedef struct {
+	char	someText[80];
+	int	anInteger;
+	float	aFloat;
+} MyElementStructure;</PRE>
+<PRE>/* We define some values to pass to the sort routine. The routine will sort by a
+ * different field depending on what value it's passed. */
+#define	SORT_ARRAY_BY_STRING				0
+#define	SORT_ARRAY_ASCENDING_BY_INT				1
+#define	SORT_ARRAY_DESCENDING_BY_FLOAT				2</PRE>
+<PRE>/* This is the routine we will use to sort the array. We pass the address of this
+ * routine to ChunkArraySort(), which will call this routine to compare elements.
+ * It returns a negative number if the first element should come before the second
+ * in the sorted array, and a positive integer if the second should come before the
+ * first. If the elements can be in either order, it returns zero. */
+sword _pascal MyElementCompareRoutine(
+	MyElementStructure 			*e1,	/* Address of first element */
+	MyElementStructure 			*e2,	/* Address of second element */
+	word		valueForCallback) 		/* Datum passed in to ChunkArraySort() */
+{</PRE>
+<PRE>	/* We sort differently depending on what the value of valueForCallback is.
+	 * That way, we can use this one routine for all our sorting.
+	 */
+	switch(valueForCallback) {
+	    case SORT_ARRAY_ASCENDING_BY_INT:
+	    /* Compare the elements based on their integer fields. Smaller int
+	     * comes first.*/
+		if (e1-&gt;anInteger &lt; e2-&gt;anInteger)
+		    return(-1);
+		else if (e1-&gt;anInteger &gt; e2-&gt;anInteger)
+		    return(1);
+		else return(0);
+		break;</PRE>
+<PRE>	    case SORT_ARRAY_DESCENDING_BY_FLOAT:
+	    /* Compare the elements based on their float fields. Larger float
+	     * comes first.*/
+		if (e1-&gt;aFloat &gt; e2-&gt;aFloat)
+		    return(-1);
+		else if (e2-&gt;aFloat &lt; e2-&gt;aFloat)
+		    return(1);
+		else return(0);
+		break;</PRE>
+<PRE>	    case SORT_ARRAY_BY_STRING:
+		/* In this case, we call the localization routine to compare the
+		 * two strings. The localization routine has the same return
+		 * conventions as this routine, so we return its result directly.
+		 */
+			return(LocalCmpStrings(e1-&gt;someText, e2-&gt;someText, 40));
+			break;
+	    default:
+		/* If we get here, we were passed a bad callback word. The callback
+		 * routine therefore does not express a preference in ordering the
+		 * two elements; it shows this by returning zero.
+		 */
+	} /* end of switch */</PRE>
+<PRE>}</PRE>
+<PRE>/* All of the above appears in some declaration section. The code below might
+ * appear in any routine which creates a chunk array. First, the declarations:
+ */
+MemHandle			blockWithHeap;
+chunkHandle			myChunkArray;
+MyChunkArrayHeader			*chunkArrayAddress;
+MyElementStructure			*currentElement;</PRE>
+<PRE>/* Now the code. Here, blockWithHeap has already been set to hold the block handle
+ * of an LMem heap.
+ */</PRE>
+<PRE>MemLock(blockWithHeap); /* Always lock LMem heap before acting on it */
+myChunkArray = ChunkArrayCreate(blockWithHeap, 
+			sizeof(MyElementStructure), /* Size of each element */
+			sizeof(MyChunkArrayHeader) /* Size of header */
+			0);</PRE>
+<PRE>/* Let's write some data into our part of the header. We need the array's address: */
+chunkArrayAddress = LMemDerefHandles(blockWithHeap, myChunkArray);
+chunkArrayAddress-&gt;someData = 42;						/* This data won't be affected */
+chunkArrayAddress-&gt;someMoreData = 2.7182818;						/* by chunk array actions */</PRE>
+<PRE>/* Now, let's create an element: */
+currentElement = ChunkArrayAppendHandles(blockWithHeap, myChunkArray, 0);
+	/* That invalidates chunkArrayAddress */
+currentElement-&gt;anInteger = 1999;
+currentElement-&gt;aFloat = 1.4142135;
+strcpy(currentElement-&gt;someText, 				&quot;Work is the curse of the drinking class.\n&quot; \
+				&quot;  --Oscar Wilde&quot;)</PRE>
+<PRE>/* We're done with the array for the moment, so we unlock it: */
+MemUnlock(blockWithHeap);</PRE>
+<PRE>/* Let's assume that several other elements are created now. */</PRE>
+<PRE>/* . . . */</PRE>
+<PRE>/* Now we need to sort the array: */
+MemLock(blockWithHeap);
+ChunkArraySortHandles(blockWithHeap, myChunkArray, 
+		SORT_ARRAY_ASCENDING_BY_INT, /* this is passed to comp. routine */
+		MyElementCompareRoutine);</PRE>
+<PRE>/* Array is now sorted! */</PRE>
+
+<HR>
+<A NAME="LMem_d.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Local Memory</A>: 4.2 <A HREF="#LMem_b.htm">Special LMem Uses</A>: 
+Element Arrays</H3>
+<P>
+<A NAME="LMem_d.htm_IX_Element arrays">
+ </A>
+Sometimes an application will create an array with a high duplication rate; that is, the array may contain many identical elements. This can be inefficient if the duplication rate is very high or elements are very large. For this reason, GEOS provides a special variant of the chunk array known as the <EM>
+element array</EM>
+. Every element in an element array has a reference count. When you insert an element, the insertion routine checks whether an identical element already exists in the array. If it does, the routine does not add another copy; instead, it increments the reference count of the element already in the array and returns its element index. If no such element exists, the routine copies the new element into the array, gives it a reference count of 1, and returns its element number. The application may specify a comparison routine which determines whether an element already exists in the array; or it may instruct the insertion routine to do a byte-level comparison.</P>
+<P>
+Note that elements in an element array may be of fixed, uniform size, or they may be of variable size (just as with chunk arrays). When you create an element array, you must specify the size of each element; specifying a size of zero indicates that the elements are of variable size.</P>
+<P>
+Members of an element array keep their index numbers until they are freed. If an element is deleted, the element array routines actually just resize the element to zero and add it to a free list. This means that an element with index 12 might not be the thirteenth element in the array, as it would in a chunk array (remember, indexes start with zero); there might be freed elements before it. For this reason, we speak of an element in an element array having a &quot;token&quot; instead of an index; you should generally consider a token to be an opaque value. Nevertheless, in most situations, element array tokens behave just like chunk array indexes.</P>
+<P>
+When you delete a reference to an element, its reference count is decremented. If the reference count reaches zero, the routine calls an application-specified callback routine to delete the element itself.</P>
+<P>
+Note that adding an element to an element array requires a linear search through the existing elements; thus, element arrays are inefficient for large numbers of elements, if elements will be continually added. Accessing elements, however, takes constant time, since the element array routines can quickly translate an element's token into the offset to that element. Thus, it takes no longer to access an element in an element array than it does to access one in a chunk array.</P>
+
+<H4 CLASS="HeadingC">
+Creating an Element Array</H4>
+<PRE>ElementArrayCreate(), ElementArrayCreateAt(), ElementArrayCreateAtHandles(), ElementArrayHeader</PRE>
+<P>
+<A NAME="LMem_d.htm_IX_ElementArrayCreate()">
+ </A>
+To create an element array, call the routine <CODE>
+ElementArrayCreate()</CODE>
+. Like <CODE>
+ChunkArrayCreate()</CODE>
+, it takes three arguments: the LMem heap's handle, the size of each element (or 0 for variable-sized elements), and the size to leave for the array header. The routine allocates a chunk in the LMem heap and initializes it as an element array. There is one significant difference: <A NAME="LMem_d.htm_IX_ElementArrayHeader">
+ </A>
+Element arrays begin with an <CODE>
+ElementArrayHeader</CODE>
+, a structure whose first component is a <CODE>
+ChunkArrayHeader</CODE>
+. If you are allocating free space between the header and the array, make sure to leave enough room for an <CODE>
+ElementArrayHeader</CODE>
+. If you do not need to allocate free space, you can pass a header size of zero, as with <CODE>
+ChunkArrayCreate()</CODE>
+.</P>
+<P>
+Note that when you specify the size of each element in the element array, you must include the size of each element's header. Thus, if each element's body were six bytes long, you would tell <CODE>
+ElementArrayCreate()</CODE>
+ that the size of each element is &quot;6 + sizeof(<CODE>
+RefElementHeader</CODE>
+)&quot;.</P>
+<P>
+<A NAME="LMem_d.htm_IX_ElementArrayCreateAt()">
+ </A>
+There is another version of this routine, <CODE>
+ElementArrayCreateAt()</CODE>
+, which creates the element array in a pre-existing chunk. This routine takes three arguments: an optr indicating the chunk, the size of each element, and the size of the header. It creates the element array in the specified chunk, resizing it if necessary. Any data in the chunk may be overwritten (except for whatever data falls in the header area after the <CODE>
+ElementArrayHeader</CODE>
+). <A NAME="LMem_d.htm_IX_ElementArrayCreateAtHandles()">
+ </A>
+There is also a version which takes handles instead of an optr; it is called <CODE>
+ElementArrayCreateAtHandles()</CODE>
+.</P>
+<P>
+The routine returns the handle of the newly-created element array. It can cause heap compaction or resizing; therefore, all pointers to the heap are invalidated.</P>
+
+
+<H4 CLASS="HeadingC">
+Adding an Element</H4>
+<PRE>ElementArrayAddElement(), ElementArrayAddElementHandles(), ElementArrayAddReference(), ElementArrayAddReferenceHandles()</PRE>
+<P>
+Adding an element to an element array is somewhat different from adding one to a chunk array. To add an element to a chunk array, you merely call the append routine, then write the element into the allocated space. If you want to add an element to an element array, you must first write out the data for the element in a buffer.<A NAME="LMem_d.htm_IX_ElementArrayAddElement()">
+ </A>
+ You then pass the address of this data to <CODE>
+ElementArrayAddElement()</CODE>
+, which compares your new element with the elements already in the array, and copies it into the array if necessary.</P>
+<P>
+<CODE>
+ElementArrayAddElement()</CODE>
+ takes four arguments:</P>
+<UL>
+<LI>
+An optr indicating the element array;</LI>
+<LI>
+The address of the element to copy into the array;</LI>
+<LI>
+A pointer to a callback comparison routine (see below), or a null pointer to do a byte-wise comparison;</LI>
+<LI>
+A dword of data to pass to the comparison routine.</LI>
+</UL>
+<P>
+You may have your own criteria for deciding whether an element should be copied into an array. For example, elements in the array may have three data fields; perhaps you count two elements as matching if the first two data fields match. For this reason, <CODE>
+ElementArrayAddElement()</CODE>
+ lets you specify your own comparison routine. The callback routine should be a Boolean routine, declared _pascal, which takes three arguments:</P>
+<UL>
+<LI>
+The address of the element to add;</LI>
+<LI>
+The address of an element in the array to compare the new element to; </LI>
+<LI>
+The callback data dword passed to <CODE>
+ElementArrayAddElement()</CODE>
+.</LI>
+</UL>
+<P>
+<CODE>
+ElementArrayAddElement()</CODE>
+ calls the callback routine to compare the new element to each element in the array. If the callback routine ever returns <EM>
+true</EM>
+, <CODE>
+ElementArrayAddElement()</CODE>
+ has found a matching element in the array; it will increment that element's reference count and return its index. If the callback routine returns <EM>
+false</EM>
+ for every element, <CODE>
+ElementArrayAddElement()</CODE>
+ copies the new element into the array and gives it a reference count of 1. It returns the element's index; the element will keep that index until it is freed. Note that there is no way to specify where in an element array a new element should be added. If there are free spaces in the array, the new element will be created in the first free space; otherwise, it will be appended to the end of the array.</P>
+<P>
+If you want to do a bytewise comparison, pass in a null pointer as the callback routine. <CODE>
+ElementArrayAddElement()</CODE>
+ will then do a bytewise comparison of the elements, treating two elements as equal only if every byte in the element <EM>
+bodies</EM>
+ matches. (It's okay if the two elements have different headers and reference counts; the bytewise comparison routine only compares the element bodies.) The bytewise comparison is implemented as a machine-language string instruction; it is therefore very fast. </P>
+<P>
+<A NAME="LMem_d.htm_IX_ElementArrayAddReference()">
+ </A>
+If you know that the element you want to add is already in the array, call <CODE>
+ElementArrayAddReference()</CODE>
+. This routine simply increments the reference count of a specified element; it does no comparisons. It is therefore much faster than <CODE>
+ElementArrayAddElement()</CODE>
+.</P>
+<P>
+<A NAME="LMem_d.htm_IX_ElementArrayAddElementHandles()">
+ </A>
+Both of these routines have counterparts which are passed handles instead of an optr; these counterparts are named <CODE>
+ElementArrayAddElementHandles()</CODE>
+ and<A NAME="LMem_d.htm_IX_ElementArrayAddReferenceHandles()">
+ </A>
+ <CODE>
+ElementArrayAddReferenceHandles()</CODE>
+.</P>
+
+
+<H4 CLASS="HeadingC">
+Accessing Elements in an Element Array</H4>
+<PRE>ElementArrayElementChanged(), ElementArrayElementChangedHandles()</PRE>
+<P>
+Elements in element arrays are accessed in almost the same way as elements in chunk arrays. There is one major difference. Each element in an element array begins with a <CODE>
+RefElementHeader</CODE>
+ structure, which contains the element's reference count. For this reason, it is a good idea to declare special structures for your elements and have the first component of that structure be the <CODE>
+RefElementHeader</CODE>
+ structure (as in the code sample below).</P>
+<P CLASS="figTitle">
+Code Display 16-3 Structure for Element Array Elements</P>
+<PRE>/* We need to declare two different structures. One will have all the data fields 
+ * in the body of the element; it will be called &quot;MyElementBody&quot;. The other
+ * structure begins with the &quot;RefElementHeader&quot; structure, which must begin every
+ * element in an element array; the other field of the structure is a
+ * &quot;MyElementBody&quot; structure. When you create an element, you pass the address of
+ * the <EM>MyElement</EM> structure to ElementArrayCreateElement().
+ */</PRE>
+<PRE>typedef struct {
+	word		amount;		/* This has the element's data fields */
+	float		interestRate;
+	char		description[20];
+} MyElementBody;</PRE>
+<PRE>typedef struct {
+	RefElementHeader			header; 	/* We won't use this--it holds ref count */
+	MyElementBody		body;
+} MyElement;</PRE>
+<P>
+Note that if you change an element, this may make it identical to another element in the element array; in this case, the two could be combined into one. <A NAME="LMem_d.htm_IX_ElementArrayElementChanged()">
+ </A>
+To check for this situation, call <CODE>
+ElementArrayElementChanged()</CODE>
+. This routine takes four arguments: the optr to the element array, the token for the element changed, a callback comparison routine, and a dword of data which is passed to the callback routine. <CODE>
+ElementArrayElementChanged()</CODE>
+ checks to see if the element is identical to any other element in the array. It calls the comparison routine to compare elements. (You can force a bytewise comparison by passing a null function pointer; this comparison will make sure that all bytes in the element <EM>
+body</EM>
+ match, though it's okay if the elements have different values in their <CODE>
+RefElementHeader</CODE>
+ structures.) If it matches another element, the two elements will be combined; i.e., the element passed will be deleted, and the matching element will have its reference count increased appropriately. The matching element's token will be returned; you will have to change any references to the old element appropriately. If no match is found, the token which was passed will be returned. <A NAME="LMem_d.htm_IX_ElementArrayElementChangedHandles()">
+ </A>
+The version which takes handles is called <CODE>
+ElementArrayElementChangedHandles()</CODE>
+.</P>
+
+
+<H4 CLASS="HeadingC">
+Removing An Element From An Element Array</H4>
+<PRE>ElementArrayRemoveReference(), ElementArrayRemoveReferenceHandles(), ElementArrayDelete(), ElementArrayDeleteHandles()</PRE>
+<P>
+<A NAME="LMem_d.htm_IX_ElementArrayRemoveReference()">
+ </A>
+When you want to remove an element from an element array, you should ordinarily call <CODE>
+ElementArrayRemoveReference()</CODE>
+. This routine decrements the element's reference count; it does not, however, delete the element unless the reference count reaches zero (i.e. the last reference to the element has been deleted). </P>
+<P>
+This routine takes four arguments: the optr of the array, the index of the element, a pointer to a callback routine, and a dword-sized constant to be passed to it. There may be certain bookkeeping tasks you want to perform when an element is actually being deleted but not when it is just having its reference count decremented. In this case, you can pass the address of a callback routine, which will be called on any element to be deleted just before the deletion occurs. After the callback routine returns, the element will be removed. If you do not need to have a callback routine called, pass a null function pointer. As noted, when an element is removed, it is actually just resized to zero; that way the index numbers of following elements are preserved.</P>
+<P>
+<A NAME="LMem_d.htm_IX_ElementArrayDelete()">
+ </A>
+If you want to delete an element regardless of its reference count, call <CODE>
+ElementArrayDelete()</CODE>
+. This routine takes two arguments, namely the optr indicating the array and the index of the element to be deleted. It does not take a callback routine; perform any necessary bookkeeping before you call it.</P>
+<P>
+<A NAME="LMem_d.htm_IX_ElementArrayRemoveReferenceHandles()">
+ </A>
+Both of these routines have counterparts which take handles; these counterparts are named <CODE>
+ElementArrayRemoveReferenceHandles()</CODE>
+ and<A NAME="LMem_d.htm_IX_ElementArrayDeleteHandles()">
+ </A>
+ <CODE>
+ElementArrayDeleteHandles()</CODE>
+.</P>
+
+
+<H4 CLASS="HeadingC">
+The &quot;Used Index&quot; and Other Index Systems</H4>
+<PRE>ElementArrayGetUsedCount(), ElementArrayGetUsedCountHandles(), ElementArrayUsedIndexToToken(), ElementArrayUsedIndexToTokenHandles(), ElementArrayTokenToUsedIndex(), ElementArrayTokenToUsedIndexHandles()</PRE>
+<P>
+Sometimes its useful to have a special index system for element arrays. Perhaps you would like the used elements to be numbered sequentially, that is, the first &quot;used&quot; element would be element &quot;zero,&quot; even if there were free elements before it. This would require setting up a second index system, besides the one used by the element array routines. GEOS provides routines with this functionality.
+
+</P>
+<P>
+<A NAME="LMem_d.htm_IX_ElementArrayGetUsedCount()">
+ </A>
+To find out the number of elements in an element array, call <CODE>
+ElementArrayGetUsedCount()</CODE>
+. This routine can return either the number of elements in use or the number of &quot;in use&quot; elements which satisfy any arbitrary criteria. The routine takes three arguments: the optr to the element array, a dword of data which is passed to a callback routine, and a pointer to a Boolean callback routine. That callback routine should itself take two arguments: a pointer to an element, and the dword passed to <CODE>
+ElementArrayGetUsedCount()</CODE>
+. The callback routine is called once for each &quot;in use&quot; element. The callback should return <EM>
+true</EM>
+ if the element should be counted; otherwise, it should return <EM>
+false</EM>
+. For example, the callback routine might return <EM>
+true</EM>
+ if the element is longer than 10 bytes; in this case, <CODE>
+ElementArrayGetUsedCount()</CODE>
+ would return the number of elements which are longer than 10 bytes. To have every used element counted, pass a null function pointer. <A NAME="LMem_d.htm_IX_ElementArrayGetUsedCountHandles()">
+ </A>
+The version of this routine which takes handles is called <CODE>
+ElementArrayGetUsedCountHandles()</CODE>
+.</P>
+<P>
+<A NAME="LMem_d.htm_IX_ElementArrayUsedIndexToToken()">
+ </A>
+If you use a different indexing scheme, you will need a way to translate the index into the normal element array token. To do this, call the routine <CODE>
+ElementArrayUsedIndexToToken()</CODE>
+. This routine takes four arguments: the optr of the element array, the index count, a dword (which is passed to the callback routine), and a callback routine. The callback routine is of the same format as the callback routine passed to <CODE>
+ElementArrayGetUsedCount()</CODE>
+; it should return <EM>
+true</EM>
+ if the element meets some criterion. <CODE>
+ElementArrayUsedIndexToToken()</CODE>
+ translates the index passed into the element array's token for that element. For example, if the callback routine returns <EM>
+true</EM>
+ for elements which are longer than 10 bytes, and you pass an index of five, <CODE>
+ElementArrayUsedIndexToToken()</CODE>
+ will return the token for the sixth element in the element array which is longer than 10 bytes. (Remember, all indexes are zero-based.) Again, passing a null function pointer makes the routine count all &quot;in-use&quot; elements.<A NAME="LMem_d.htm_IX_ElementArrayUsedIndexToTokenHandles()">
+ </A>
+ The version which takes the element array's handles is called <CODE>
+ElementArrayUsedIndexToTokenHandles()</CODE>
+.</P>
+<P>
+<A NAME="LMem_d.htm_IX_ElementArrayTokenToUsedIndex()">
+ </A>
+To translate a token back into this kind of index, call <CODE>
+ElementArrayTokenToUsedIndex()</CODE>
+. This routine takes four arguments: the optr to the element array, an element token, a callback routine (as with the other routines in this section), and a dword which is passed along to the callback routine. The routine finds the element whose token was passed and returns the index it would have under the indexing system defined by the callback routine. Again, passing a null function pointer makes the routine count every &quot;in-use&quot; element. <A NAME="LMem_d.htm_IX_ElementArrayTokenToUsedIndexHandles()">
+ </A>
+The routine which takes handles is called <CODE>
+ElementArrayTokenToUsedIndexHandles()</CODE>
+.</P>
+
+<HR>
+<A NAME="LMem_e.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Local Memory</A>: 4.3 <A HREF="#LMem_b.htm">Special LMem Uses</A>: 
+Name Arrays</H3>
+<P>
+<A NAME="LMem_e.htm_IX_Name arrays">
+ </A>
+Applications can build on chunk arrays and element arrays in many ways. The chunk array library includes one example of an elaboration on these structures: the <EM>
+name array</EM>
+. The name array is a special kind of element array in which elements can be accessed by a &quot;name&quot; label as well as by a token. Elements in a name array are of variable size. Each element is divided into three sections: The first is the <CODE>
+RefElementHeader</CODE>
+; every element in an element array must begin with one of these (and the name array is a kind of element array). The second is the data section. The data section is the same size for every element in a given name array; this size may be anything from zero bytes up to a maximum of<EM>
+ </EM>
+NAME_ARRAY_MAX_DATA_SIZE<EM>
+ </EM>
+(64 bytes). The data section is followed by a &quot;name&quot; section. This section contains a sequence of bytes of any length up to a maximum of NAME_ARRAY_MAX_NAME_SIZE (256 bytes). The name may contain nulls and need not be null terminated. You can translate a name into the element's token by calling <CODE>
+NameArrayFind()</CODE>
+ (described below).</P>
+<P>
+Note that creating elements in a name array, as in any element array, requires a search through all elements; it thus takes linear time. Furthermore, translating a name into a token also requires a linear search through the elements, and thus also takes linear time. Name arrays thus become slow if they grow too large. Accessing an element by token, however, still takes constant time.</P>
+
+<H4 CLASS="HeadingC">
+Creating a Name Array</H4>
+<PRE>NameArrayCreate(), NameArrayCreateAt(), NameArrayCreateAtHandles(), NameArrayAdd(), NameArrayAddHandles(), NameArrayHeader, NameArrayAddFlags</PRE>
+<P>
+<A NAME="LMem_e.htm_IX_NameArrayHeader">
+ </A>
+Creating a name array is much like creating an element array. Every name array must begin with a <CODE>
+NameArrayHeader</CODE>
+. This structure has the following definition:</P>
+<PRE>typedef struct {
+	ElementArrayHeader				NAH_meta;
+	word				NAH_dataSize;</PRE>
+<PRE>} NameArrayHeader;</PRE>
+<P>
+This structure contains one new field, namely NAH<CODE>
+_datasize</CODE>
+. This field specifies the size of the data area of each element; the name area is of variable size. You may examine this field at will, but you may not change it. You may set up a fixed data area between the <CODE>
+NameArrayHeader</CODE>
+ and the elements. The usual way to do this is to define a structure whose first element is a <CODE>
+NameArrayHeader</CODE>
+ structure.</P>
+<P>
+<A NAME="LMem_e.htm_IX_NameArrayCreate()">
+ </A>
+To create a name array, call the routine <CODE>
+NameArrayCreate()</CODE>
+. This routine is passed three arguments:</P>
+<UL>
+<LI>
+The global handle of an LMem heap. The name array will be created in this block.</LI>
+<LI>
+The size of the data area in each element. The total size of the element will vary, depending on the size of the name. Remember, there is a three byte <CODE>
+RefElementHeader</CODE>
+ at the start of every element (before the data section).</LI>
+<LI>
+The size of the header structure for the name array. If you will not need a fixed data area, you can pass a size of zero, and enough space will automatically be left for a <CODE>
+NameArrayHeader</CODE>
+.</LI>
+</UL>
+<P>
+The routine allocates a chunk in the specified heap, initializes a name array in that chunk, and returns the chunk's handle. If it fails for any reason, it returns a null chunk handle. Since the routine allocates a chunk, all pointers to the LMem heap are invalidated.</P>
+<P>
+<A NAME="LMem_e.htm_IX_NameArrayCreateAt()">
+ </A>
+If you want to create a name array in a specific chunk, call <CODE>
+NameArrayCreateAt()</CODE>
+. This routine is almost the same as <CODE>
+NameArrayCreate()</CODE>
+. However, instead of being passed a memory handle, <CODE>
+NameArrayCreateAt()</CODE>
+ is passed an optr to a chunk. The name array will be created in that chunk. Any data in that chunk (outside of the fixed data area) will be destroyed. Note that if the chunk is too small for the name array, <CODE>
+NameArrayCreateAt()</CODE>
+ will resize it; thus, pointers to the LMem heap may be invalidated. <A NAME="LMem_e.htm_IX_NameArrayCreateAtHandles()">
+ </A>
+There is a version of this routine which takes the chunk's global and chunk handles instead of its optr; this routine is called <CODE>
+NameArrayCreateAtHandles()</CODE>
+.</P>
+<P>
+<A NAME="LMem_e.htm_IX_NameArrayAdd()">
+ </A>
+To create an element, call <CODE>
+NameArrayAdd()</CODE>
+. This routine creates an element and copies the data and name into it. The routine takes five arguments:</P>
+<UL>
+<LI>
+The optr to the name array.</LI>
+<LI>
+A pointer to an array of characters containing the element's name.</LI>
+<LI>
+The length of the name, in bytes. This many characters will be copied into the name. If you pass a length of zero, bytes will be copied until a null byte is reached (the null will not be copied).</LI>
+<LI>
+A word-length set of <CODE>
+NameArrayAddFlags</CODE>
+. Only one flag is currently defined, namely NAAF_SET_DATA_ON_REPLACE. This flag is described below.</LI>
+<LI>
+A pointer to the data section. The data will be copied into the new element. (The length of the data portion was specified when the name array was created.)</LI>
+</UL>
+<P>
+<CODE>
+NameArrayAdd()</CODE>
+ allocates the element, copies in the data and name, and returns the element's token. If an element with the specified name already exists, <CODE>
+NameArrayAdd()</CODE>
+ will not create a duplicate. Instead, if the flag NAAF_SET_DATA_ON_REPLACE was passed, <CODE>
+NameArrayAdd()</CODE>
+ will copy the new data section into the existing element; if the flag was not passed, it will leave the existing element unchanged. In either case, it will return the existing element's token and increment its reference count. If an element is added, the name array may have to be resized; therefore, pointers into the chunk array will be invalidated. <A NAME="LMem_e.htm_IX_NameArrayAddHandles()">
+ </A>
+There is a version in which the name array is specified by its global and chunk handles; this version is called <CODE>
+NameArrayAddHandles()</CODE>
+.</P>
+<P CLASS="figTitle">
+Code Display 16-4 Allocating a Name Array</P>
+<PRE>/* We want a fixed data space, so we define our own header structure. */
+typedef	struct {
+	NameArrayHeader		MNAH_meta;		/* Must begin with a NameArrayHeader!!! */
+	char *		MNAH_comments[32];
+} MyNameArrayHeader;</PRE>
+<PRE>/* The data section of the name array will be this structure: */
+typedef struct {
+	double		MDSS_myDataFloat;
+	int		MDSS_myDataInts[20];
+} MyDataSectionStruct;</PRE>
+<PRE>/* Every element in the name array will have this structure: */
+typedef struct {
+	RefElementHeader			MES_header;		/* For internal use */
+	MyDataSectionStruct			MES_data;
+	char			MES_name[]; 		/* We don't know how long this
+						 * will actually be */
+} MyElementStruct;</PRE>
+<PRE>MemHandle		myLMemHeap;		/* Assume this is initialized */
+ChunkHandle		myNameArray;</PRE>
+<PRE>/* Sample call to NameArrayCreate() */
+myNameArray = NameArrayCreate(myLMemHeap, sizeof(MyDataSectionStruct),
+				sizeof(MyNameArrayHeader));</PRE>
+
+
+<H4 CLASS="HeadingC">
+Accessing Elements in a Name Array</H4>
+<PRE>NameArrayFind(), NameArrayFindHandles(), NameArrayChangeName(), NameArrayChangeNameHandles()</PRE>
+<P>
+Name array routines can be accessed with all the routines used for accessing element arrays. However, a few special purpose routines are also provided.</P>
+<P>
+<A NAME="LMem_e.htm_IX_NameArrayFind()">
+ </A>
+If you know the name of an element and want a copy of its data, call <CODE>
+NameArrayFind()</CODE>
+. This routine is passed four arguments:</P>
+<UL>
+<LI>
+The optr to the name array.</LI>
+<LI>
+A pointer to a character buffer. The buffer should contain the name of the element sought.</LI>
+<LI>
+The length of the name. If a length of zero is passed, the name is considered to be null terminated (the trailing null is <EM>
+not</EM>
+ part of the name).</LI>
+<LI>
+A pointer to a return buffer. The data portion of the element will be copied to this location.</LI>
+</UL>
+<P>
+<CODE>
+NameArrayFind()</CODE>
+ will do a linear search through the elements. If it finds one with the name specified, it will return that element's token and copy the data portion into the return buffer. If there is no element with the specified name, <CODE>
+NameArrayFind()</CODE>
+ will return the constant CA_NULL_ELEMENT. <A NAME="LMem_e.htm_IX_NameArrayFindHandles()">
+ </A>
+The routine <CODE>
+NameArrayFindHandles()</CODE>
+ is identical, except that the name array is specified by its global and chunk handles.</P>
+<P>
+<A NAME="LMem_e.htm_IX_NameArrayChangeName()">
+ </A>
+To change an element's name, call <CODE>
+NameArrayChangeName()</CODE>
+. This routine is passed four arguments:</P>
+<UL>
+<LI>
+The optr to the name array.</LI>
+<LI>
+The token of the element whose name will be changed.</LI>
+<LI>
+A pointer to a character buffer containing the new name for the element.</LI>
+<LI>
+The length of the new name. If a length of zero is passed, the name is considered to be null terminated (the trailing null is <EM>
+not</EM>
+ part of the name).</LI>
+</UL>
+<P>
+<CODE>
+NameArrayChangeName()</CODE>
+ changes the element's name. If the new name is longer than the old, the element will have to be resized; this will invalidate pointers within that block.<A NAME="LMem_e.htm_IX_NameArrayChangeNameHandles()">
+ </A>
+ <CODE>
+NameArrayChangeNameHandles()</CODE>
+ is identical, except that the name array is specified by its global and chunk handles.</P>
+
+<HR>
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+</BODY>
+</HTML>

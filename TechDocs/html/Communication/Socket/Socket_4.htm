@@ -1,0 +1,187 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Socket_4.htm,v 1.1 97/06/02 14:14:59 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Letting the User Choose an Address</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Socket</A>: 3.1 <A HREF="Socket_3.htm">Addresses</A>: 
+<A NAME="41559">
+ </A>
+Letting the User Choose an Address</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Socket_3.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Socket_3.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">3 Addresses</A> 
+<!-- to next --> | <A HREF="Socket_5.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.2 Managing Addresses</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>SocketAddressControllerClass, SocketGetDomains(), SocketGetAddressController(), SocketCreateResolvedAddress(), SocketResolve(), SocketInterruptResolve()</PRE>
+<P>
+<A NAME="IX_SocketGetDomains()">
+ </A>
+Given a domain, you can request the Socket library to provide UI gadgetry so that the user can choose an address within that domain. Many programs only support socket connections over one domain. However, if you need a list of all domains supported in the user's environment, call <CODE>
+SocketGetDomains()</CODE>
+.</P>
+<P>
+The <CODE>
+SocketGetDomains()</CODE>
+ routine takes the optr of a chunk array and fills in that array with elements. Each element contains a (non-null-terminated) string which is the name of a supported domain. This chunk array has a standard <CODE>
+ChunkArrayHeader</CODE>
+ header and variable-sized elements. </P>
+<P>
+If you want the routine to allocate the chunk array for you, pass an optr that contains a NullChunk (<EM>
+i.e.</EM>
+, a null ChunkHandle):</P>
+<PRE>MemHandle	myHandle;</PRE>
+<PRE>Optr	myOptr;</PRE>
+<PRE>myHandle = OptrToHandle(myHandle);</PRE>
+<PRE>myOptr = ConstructOptr(myHandle, NULL);</PRE>
+<P>
+For more information about working with chunk arrays, see <A HREF="../../Memory/LMem/index.htm">the Local Memory chapter</A>. In short, to manage the chunk array of domain names: </P><OL>
+<LI>
+Lock down the local memory heap with <CODE>
+MemLock()</CODE>
+.</LI>
+<LI FIXME_NumListOther>
+Use <CODE>
+LMemDerefHandles()</CODE>
+ to get a pointer to the chunk array.</LI>
+<LI FIXME_NumListOther>
+To get the number of domains, call <CODE>
+ChunkArrayGetCount()</CODE>
+.</LI>
+<LI FIXME_NumListOther>
+To get a pointer to the nth string in the chunk array, call <CODE>
+ChunkArrayElementToPtr()</CODE>
+ or <CODE>
+ChunkArrayElementToPtrHandles()</CODE>
+.</LI>
+<LI FIXME_NumListOther>
+When finished reading domain strings, call <CODE>
+MemUnlock()</CODE>
+ on the local memory heap.</LI>
+</OL>
+<P>
+<A NAME="IX_SocketGetAddressController()">
+ </A>
+Given a domain name, you can create some UI gadgetry for choosing addresses within that domain. As shown in the Appl/SDK_C/Talk example, call <CODE>
+SocketGetAddressController()</CODE>
+ to get the class of an appropriate controller. This class is guaranteed to support the messages shown in <A HREF="Socket_4.htm#68306"> SocketAddressControllerClass</A>
+.</P>
+<P CLASS="figTitle">
+Code Display 23-1 <A NAME="68306">
+ </A>
+<A NAME="IX_SocketAddressControllerClass">
+ </A>
+SocketAddressControllerClass</P>
+<PRE>/* Domain-specific subclasses of SocketAddressControllerClass all support 
+ * the following messages. MSG_SOCKET_ADDRESS_CONTROL_GET_ADDRESSES is probably 
+ * the most commonly used message. */</PRE>
+<PRE>/*
+ * Build the block of data that holds the addresses selected by the user
+ * to pass to the transport driver. If OK, returns ChunkArray of SACAddress
+ * structures in same block as controller. Else, returns 0.</PRE>
+<PRE> * As of this writing, all address controllers return at most one address 
+ * in the list of addresses. </PRE>
+<PRE> * The returned address(es) are not in its primitive form; use 
+ * SocketResolve() to transform the address into something usable.
+ */
+<A NAME="IX_MSG_SOCKET_ADDRESS_CONTROL_&ldots;"> </A>@message word MSG_SOCKET_ADDRESS_CONTROL_GET_ADDRESSES();</PRE>
+<PRE><A NAME="IX_SACAddress"> </A><A NAME="IX_SACA_opaqueSize"> </A>typedef struct {
+	word 		SACA_opaqueSize;
+	/* label byte 		SACA_opaque;    Pass this to SocketResolve */ 
+	/* after the opaque address, there is a null-terminated
+	 *  human-readable form of the address. */
+} SACAddress;</PRE>
+<PRE>/*
+ * Inform the subclass of the type of medium selected by the user
+ * so it can customize its appearance appropriately, should the controller
+ * handle media that have different ways of addressing.
+ */
+@message void MSG_SOCKET_ADDRESS_CONTROL_SET_MEDIUM (
+				MediumType mediumType);</PRE>
+<PRE>/*
+ * Set the current user-editable address to the passed address.
+ */
+@message void MSG_SOCKET_ADDRESS_CONTROL_SET_ADDRESSES(optr addr);</PRE>
+<PRE>/*
+ * Inform the controller of the message and destination object it should use to
+ * notify the invoker that a valid address exists.
+ */
+@message void MSG_SOCKET_ADDRESS_CONTROL_SET_ACTION (
+				optr dest,
+				word actionMsg);</PRE>
+<PRE>/*
+ * Let the containing dialog know whether the address we've got is a
+ * valid one, so it can decide whether to allow the user to send the
+ * message.
+ */
+@message void MSG_SOCKET_ADDRESS_CONTROL_SET_VALID_STATE(Boolean valid);</PRE>
+<P>
+<A NAME="IX_SocketResolve()">
+ </A>
+You cannot use an address with Socket library routines unless that address is in its primitive form. This primitive form is created by taking a higher-level form of the address and passing it to the <CODE>
+SocketCreateResolvedAddress()</CODE>
+ routine or the <CODE>
+SocketResolve()</CODE>
+ routine. Exactly how the Socket library resolves the address depends upon the domain.</P>
+<P>
+Recall that addresses returned by the address controller are not in their primitive form. The primitive form of an address can be volatile: feel free to re-use them if making several connections over a short period of time, but re-resolve the address if it's been a long time since it was last resolved. Note that there can be a large overhead when it comes to resolving addresses. Also note that IRLAP numeric addresses are especially volatile, changing every time the protocol connection starts, <EM>
+i.e.,</EM>
+ every time the IRLAP driver is loaded, either for the first time or after more than a minute of inactivity.</P>
+<P>
+<A NAME="IX_SocketCreateResolvedAddress()">
+ </A>
+The <CODE>
+SocketCreateResolvedAddress()</CODE>
+ routine takes a pointer to a domain name and raw address data and returns a buffer with a <CODE>
+SocketAddress</CODE>
+ structure and the address data. Depending on what you're going to use the address for, you may need to fill in the structure's <CODE>
+SA_port</CODE>
+ field. </P>
+<P>
+<CODE>
+SocketResolve()</CODE>
+ is the same as <CODE>
+SocketCreateResolvedAddress()</CODE>
+ except that <CODE>
+SocketResolve()</CODE>
+ takes a buffer to hold the resolved address data. If the buffer isn't big enough, <CODE>
+SocketResolve()</CODE>
+ returns SE_BUFFER_TOO_SMALL. Depending on the domain, calling <CODE>
+SocketResolve()</CODE>
+ on an address already in its primitive form may have undesired results. </P>
+<P>
+The resolution process may or may not require network access, depending on the domain and the input format. Depending on the domain, the addressing system may be volatile. Under these conditions, put off resolving the address as long as possible, until just before using the address; there will be less time for the address to go bad. If the network goes down, the Socket library might not be able to resolve addresses. In this case, <CODE>
+SocketCreateResolvedAddress()</CODE>
+ or <CODE>
+SocketResolve()</CODE>
+ returns SE_TEMPORARY_ERROR.</P>
+<P>
+<A NAME="IX_SocketInterruptResolve()">
+ </A>
+If you wish to interrupt the resolution process (perhaps you allow the user to cancel the operation), use the <CODE>
+SocketInterruptResolve()</CODE>
+ function. This function attempts to halt the resolution process. It is, however, unreliable. It may not succeed in interrupting the resolution process; it may also interrupt other resolves happening at the same time.</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Socket_3.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Socket_3.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">3 Addresses</A> 
+<!-- to next --> | <A HREF="Socket_5.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.2 Managing Addresses</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

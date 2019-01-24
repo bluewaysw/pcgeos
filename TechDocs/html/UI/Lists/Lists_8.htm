@@ -1,0 +1,972 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Lists_8.htm,v 1.2 97/08/15 15:53:12 cgroom Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> GenItemGroup Basics</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The List Objects</A>: 3.3 <A HREF="Lists_5.htm">GenItemGroups</A>: 
+GenItemGroup Basics</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Lists_5.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Lists_7.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.2 GenItem Instance Data</A> 
+<!-- to next --> | <A HREF="Lists_9.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.4 Working with Items</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+The GenItemGroup manages a group of GenItems. In general, you must decide which behavior type you wish your GenItemGroup to exhibit, the message for the list to send out, and the object (or process) to handle messages sent out by this group. You may also set a number of initial conditions (items selected, whether the list is indeterminate or modified, etc.) for the list.</P>
+
+<H2 CLASS="HeadingC">
+<A NAME="52180">
+ </A>
+GenItemGroup Behavior</H2>
+<PRE>GIGI_behaviorType, MSG_GEN_ITEM_GROUP_SET_BEHAVIOR_TYPE, MSG_GEN_ITEM_GROUP_GET_BEHAVIOR_TYPE</PRE>
+<P>
+There are several types of user selection behavior for a GenItemGroup. Items can be set up so that only one is selected at a time, one or none is selected at a time, multiple items can be selected, or multiple items can be selected only when extending the selection (e.g. dragging the mouse).</P>
+<P>
+<A NAME="IX_GIGI_behaviorType">
+ </A>
+The GIGI_<CODE>
+behaviorType</CODE>
+ instance field defines the selection behavior of the list. The instance data must be of the enumerated type <CODE>
+GenItemGroupBehaviorType</CODE>
+<A NAME="IX_GenItemGroupBehaviorType">
+ </A>
+. The default type is GIGBT_EXCLUSIVE, which creates an exclusive list; one and only one selection in an exclusive list may be selected at any time. The available types are listed below.</P>
+<DL>
+<DT>
+GIGBT_EXCLUSIVE</DT><DD>
+<A NAME="IX_GIGBT_&ldots;">
+ </A>
+This is a list where only one option may be selected at a time. Once a selection has been made, making another selection will deselect the previous item. The user may not deselect a currently selected item. Many specific UIs represent these items with radio buttons; OSF/Motif represents these items with &quot;diamond&quot; settings. This type of list is the default for a GenItemGroup. </DD>
+<DT>
+GIGBT_EXCLUSIVE_NONE</DT><DD>
+This list is also exclusive--at most one option may be selected at a time--but the user can also deselect an item, leaving no items selected. GenItemGroups show a &quot;none-selected&quot; state with GIGS_NONE in their GIGI_<CODE>
+selection</CODE>
+ instance fields.</DD>
+<DT>
+GIGBT_EXTENDED_SELECTION</DT><DD>
+This list is normally exclusive, unless the user &quot;extends&quot; the selection. The user can extend the selection either by dragging the mouse through another selection or by clicking on a new selection in conjunction with a special keystroke. In OSF/Motif, clicking on an item while holding the SHIFT key will extend the selection (leaving any other selections unaffected) to the one clicked on. Extending a selection to a currently selected item will deselect that item.</DD>
+<DT>
+GIGBT_NON_EXCLUSIVE</DT><DD>
+This list does not exhibit any exclusive behavior. Any or all settings may be on at any time, and selecting any items will not affect the state of other settings. In many case, you may want to use a GenBooleanGroup in place of a non-exclusive GenItemGroup. For example, a non-exclusive GenItemGroup cannot store individual indeterminate or modified states for its children; GenBooleanGroup stores this information.</DD>
+
+</DL>
+<H3 CLASS="HeadingD">
+Exclusive Lists</H3>
+<P>
+<A NAME="IX_Exclusive lists">
+ </A>
+Exclusive lists are designed for cases in which one and only item should be selected at any given time. For example, a graphics application may want to prompt the user to select a color for drawing lines. The application can display this list of colors within an exclusive list. Only one color may be selected. Once a color is selected, selecting any other color will deselect the first color.</P>
+<P>
+Exclusive lists may (and by default do) appear without any item initially selected. This may lead to problems if the application tries to apply any changes before an item is selected (such as within a delayed-mode dialog box). If your application needs an item to be selected at all times in order to operate correctly, your list should appear with one of the items initially selected (or with the &quot;apply&quot; trigger disabled).</P>
+
+
+<H3 CLASS="HeadingD">
+Exclusive-None Lists</H3>
+<P>
+Exclusive-None lists are designed for cases in which either one item must be selected or no items should be selected. For example, a word processor may have a &quot;Justifications&quot; menu with several options such as left-justified, right-justified, or center-justified. Selecting any of these options will perform the justification operation on the current paragraph, but the user may also deselect any option, leaving no justification on the paragraph.</P>
+<P>
+Exclusive-None lists by default appear without any items initially selected. Your application should, of course, be able to handle this case of nothing selected; if it cannot, the list should probably not be exclusive-none.</P>
+
+
+<H3 CLASS="HeadingD">
+Extended-Selection Lists</H3>
+<P>
+Extended-Selection lists are designed for cases in which the application usually needs an exclusive selection but also desires to let the user select multiple items for bulk operations. Multiple selections are stored as lists of items.</P>
+<P>
+For example, a disk copy operation may have an extended-selection list to specify the drive to copy a file to. In most cases, the user will only want to copy to one drive, and the list normally operates in exclusive mode to accommodate this. By extending the selection, however, the user can request the list to copy the file to multiple drives.</P>
+<P>
+It is up to the specific UI how the user may extend a selection. In OSF/Motif, the user may select another item in tandem with a special keystroke (the SHIFT key) to extend the selection from one item to several. Extending a selection to an already selected item will deselect that item, leaving any other items unchanged.</P>
+
+
+<H3 CLASS="HeadingD">
+<A NAME="IX_Non-exclusive lists">
+ </A>
+Non-Exclusive Lists</H3>
+<P>
+Non-exclusive lists are designed for cases in which any or all of the items may be selected at once. Multiple selections, as in the extended-selection GenItemGroup, are stored as lists of items. Selecting an already selected item will deselect that item. Therefore, there may be a state where nothing is selected within a non-exclusive list.</P>
+<P>
+For example, an interactive tutorial may ask the user if he wants more information on certain topics, giving these topics in a non-exclusive list. The user can freely choose as many or as few items as he wishes, and then select &quot;Print&quot; to print out information on those items.</P>
+<P>
+In most cases, however, you might rather use a GenBooleanGroup object in place of a non-exclusive GenItemGroup. A GenBooleanGroup acts similar to a non-exclusive list but is streamlined to operate efficiently for lists with 16 or fewer items. (GenBooleanGroups represent their children's state through a word-length bitfield; therefore they may only accommodate 16 children.) You may also need to use a GenBooleanGroup if you need to keep track of individual indeterminate and modified states.</P>
+<P>
+<CODE>
+MSG_GEN_ITEM_GROUP_GET_BEHAVIOR_TYPE</CODE>
+ returns the behavior type stored in the list's GIGI_<CODE>
+behaviorType</CODE>
+ instance field. To set a new behavior type, send the list a <CODE>
+MSG_GEN_ITEM_GROUP_SET_BEHAVIOR_TYPE</CODE>
+.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_ITEM_GROUP_GET_BEHAVIOR_TYPE">
+ </A>
+MSG_GEN_ITEM_GROUP_GET_BEHAVIOR_TYPE</H4>
+<PRE CLASS="syntax">GenItemGroupBehaviorType MSG_GEN_ITEM_GROUP_GET_BEHAVIOR_TYPE();</PRE>
+<P>
+This message returns the current behavior type of a GenItemGroup (stored in the GIGI_<CODE>
+behaviorType</CODE>
+ instance field).</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenItemGroup.</P>
+<P CLASS="refField">
+Parameters:	Nothing.</P>
+<P CLASS="refField">
+Return:	The<CODE>
+ GenItemGroupBehaviorType</CODE>
+ of the GenItemGroup.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_ITEM_GROUP_SET_BEHAVIOR_TYPE">
+ </A>
+MSG_GEN_ITEM_GROUP_SET_BEHAVIOR_TYPE</H4>
+<PRE CLASS="syntax">void	MSG_GEN_ITEM_GROUP_SET_BEHAVIOR_TYPE(
+        GenItemGroupBehaviorType				behaviorType);</PRE>
+<P>
+This message sets a new behavior type for a GenItemGroup by changing the object's GIGI_<CODE>
+behaviorType</CODE>
+ instance field. This message should only be sent while the object is not usable. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any non-usable GenItemGroup object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+behaviorType</EM>
+	The new <CODE>
+GenItemGroupBehaviorType</CODE>
+.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+
+
+<H2 CLASS="HeadingC">
+GenItemGroup Selections</H2>
+<PRE>GIGI_selection, GII_identifier, GIGI_numSelections, MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED, MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION, MSG_GEN_ITEM_GROUP_SET_MULTIPLE_SELECTIONS, MSG_GEN_ITEM_GROUP_GET_SELECTION, MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS, MSG_GEN_ITEM_GROUP_GET_MULTIPLE_SELECTIONS</PRE>
+<P>
+Within a GenItemGroup, each GenItem must contain an identifier, often an enumerated value, to uniquely identify that item. The GenItemGroup will use this identifying value whenever referencing the GenItem (or items), either through its instance data or through messages. This value is stored in the GenItem's GII_<CODE>
+identifier</CODE>
+ instance data. </P>
+<P>
+In most cases, your collection of GenItems within a particular GenItemGroup should be different enumerated values. Each item within a specific GenItemGroup must have a unique identifier to reference each item. To ensure this, it is usually convenient to use an enumerated type. Make sure that you don't use two different enumerated types because they may not contain unique values across types.</P>
+<P>
+<A NAME="IX_GIGI_selection">
+ </A>
+In an exclusive or exclusive-none list, the GenItemGroup will store the identifier of the current selection in the GIGI_<CODE>
+selection</CODE>
+ instance field. If no item is selected, this instance field will instead store the value GIGS_NONE (-1). (For an exclusive list, this case could only arise before an item is initially selected.)</P>
+<P>
+<A NAME="IX_GIGI_numSelections">
+ </A>
+Note that -1 is still a legal identifier for a GenItem. If you do use this identifier you must be sure to check the GIGI_<CODE>
+numSelections</CODE>
+ instance field to check whether the GIGI_<CODE>
+selection</CODE>
+ value corresponds to an item or to the GIGS_NONE value.</P>
+<P>
+GenItemGroups by default appear with no items initially set (GIGI_<CODE>
+selection</CODE>
+ is set to GIGS_NONE). If you wish a GenItemGroup to initially appear with a selection set to one of the GenItems, set GIGI_<CODE>
+selection</CODE>
+ to the identifier of that GenItem.</P>
+<P CLASS="figTitle">
+Code Display 11-3 Setting Enumerated Types As Identifiers</P>
+<PRE>/* In most cases, each GenItemGroup should have a single set of enumerated types
+ * to name its children. In this case, MyCityGroup will have settings all related
+ * to the enumerated type USCities, and San Francisco will be the initial
+ * selection. */</PRE>
+<PRE>typedef ByteEnum USCitiesEnum;
+#define CITY_CHICAGO 1
+#define CITY_NEW_YORK 2
+#define CITY_SAN_FRANCISCO 3
+#define CITY_LOS_ANGELES 4</PRE>
+<PRE>@object GenItemGroupClass MyCityGroup = {
+    GI_comp = @Chicago, @NewYork, @SanFrancisco, @LosAngeles;
+    GIGI_selection = CITY_SAN_FRANCISCO;
+}</PRE>
+<PRE>@object GenItemClass Chicago = {
+    GI_visMoniker = `C', &quot;Chicago&quot;;
+    GII_identifier = CITY_CHICAGO;
+}</PRE>
+<PRE>@object GenItemClass NewYork = {
+    GI_visMoniker = `N', &quot;New York&quot;;
+    GII_identifier = CITY_NEW_YORK;
+}</PRE>
+<PRE>@object GenItemClass SanFrancisco = {
+    GI_visMoniker = `S', &quot;San Francisco&quot;;
+    GII_identifier = CITY_SAN_FRANCISCO;
+}</PRE>
+<PRE>@object GenItemClass LosAngeles = {
+    GI_visMoniker = `L', &quot;Los Angeles&quot;;
+    GII_identifier = CITY_LOS_ANGELES;
+}</PRE>
+<P>
+In an extended-selection or non-exclusive list, more than one item may be selected at a time. In this case, the GIGI_<CODE>
+selection</CODE>
+ instance field will not store a single identifier but instead will store a ChunkHandle to a list of identifiers. This functionality is internal to the operation of the list.</P>
+<P>
+You may set up a list (if it is extended-selection or non-exclusive) to initially appear with multiple selections. The list of identifiers may be of arbitrary size but must be manually set up in its own chunk. Set GIGI_<CODE>
+selection</CODE>
+ to the ChunkHandle of the chunk containing this list. In this case, you must also set GIGI_<CODE>
+numSelections</CODE>
+ to the proper number of selections. (See <A HREF="Lists_8.htm#24753"> Setting Multiple Initial Selections</A>
+.)</P>
+<P>
+For multiple selection lists (GIGBT_EXTENDED_SELECTION or GIGBT_NON_EXCLUSIVE) GIGI_<CODE>
+numSelections</CODE>
+ may be set greater than 1 if more than one item is selected. In this case, GIGI_<CODE>
+selection</CODE>
+ will contain a ChunkHandle to a list of identifiers instead of a single identifier.</P>
+<P CLASS="figTitle">
+Code Display 11-4 <A NAME="24753">
+ </A>
+Setting Multiple Initial Selections</P>
+<PRE>/* To set a GenItemGroup to appear initially with multiple selections, set up a
+ * chunk containing the identifiers and a ChunkHandle in the GIGI_selection
+ * instance field. Only the new list chunk and the GenItemGroup are shown; other
+ * information is in the previous code display. */</PRE>
+<PRE>@object GenItemGroupClass MyCityGroup = {
+    GI_comp = @Chicago, @NewYork, @SanFrancisco, @LosAngeles;
+    GIGI_behaviorType = GIGBT_NON_EXCLUSIVE;
+    GIGI_numSelections = 2;
+    GIGI_selection = (ChunkHandle) ChunkOf(@SelectionList);
+}</PRE>
+<PRE>@chunk word SelectionList[2] = {
+    CITY_CHICAGO, CITY_SAN_FRANCISCO
+};</PRE>
+<P>
+In most cases, the user will change the selections of the GenItemGroup by clicking on items. Your application may also retrieve or alter the items selected with the following messages. In many of these messages, you may have to pass an indeterminate state; if you are unsure about what indeterminate state a list object should be in, pass FALSE. Most GenItemGroups do not need to worry about their indeterminate state.</P>
+<P>
+None of the messages which alter the state or number of selections cause an apply or status message to be sent out by the GenItemGroup. If you wish to send out an apply or a status message in these cases, mark the GenItemGroup modified and send the object <CODE>
+MSG_GEN_APPLY</CODE>
+ or <CODE>
+MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG</CODE>
+.</P>
+<P>
+<CODE>
+MSG_GEN_ITEM_GROUP_GET_SELECTION</CODE>
+ returns the currently selected item for the GenItemGroup. If there are no items currently selected, this message will return GIGS_NONE. If there is more than one item selected, this message will only return the first item selected in that GenItemGroup. (You should use <CODE>
+MSG_GEN_ITEM_GROUP_GET_MULTIPLE_SELECTIONS</CODE>
+ in this case.) </P>
+<P>
+<CODE>
+MSG_GEN_ITEM_GROUP_GET_MULTIPLE_SELECTIONS</CODE>
+ returns the current list of selections for non-exclusive and extended-selection lists. You must pass this message a pointer to a buffer to hold the list of selections, along with the number of items the buffer can hold. Make sure to allocate enough space in this buffer, or the buffer will not be filled in. Also make sure to send this message with <CODE>
+@call</CODE>
+ and not <CODE>
+@send</CODE>
+, as it passes a pointer. You can check for the number of items currently selected with <CODE>
+MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS</CODE>
+.</P>
+<P>
+<CODE>
+MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED</CODE>
+ deselects any settings currently on so that the list will appear with no items selected. It takes a flag indicating whether the list should be in its indeterminate state. This message will also clear the object's modified flag. If you wish to set this flag, send the GenItemGroup a <CODE>
+MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE</CODE>
+ after sending this message.</P>
+<P>
+<CODE>
+MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION</CODE>
+ sets a single selection for a GenItemGroup. Any old selections will be deselected automatically, regardless of the behavior type of the list. It takes a flag indicating whether the list should be in its indeterminate state. If the GenItemGroup is scrollable and exclusive, this message will usually ensure that the list will automatically scroll to the selected item. This message also clears the object's modified flag.</P>
+<P>
+<CODE>
+MSG_GEN_ITEM_GROUP_SET_MULTIPLE_SELECTIONS</CODE>
+ sets a a group of selections for a GenItemGroup. Any previously selected items will be deselected. The message must pass the number of selections and a pointer to the list of identifiers to set. This message will clear the GenItemGroup's modified flag. </P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_ITEM_GROUP_GET_SELECTION">
+ </A>
+MSG_GEN_ITEM_GROUP_GET_SELECTION</H4>
+<PRE CLASS="syntax">word	MSG_GEN_ITEM_GROUP_GET_SELECTION();</PRE>
+<P>
+This message returns the current selection identifier for the GenItemGroup. If there is no selection, this message returns GIGS_NONE. If there are multiple selections, this message only returns the first selection. Use <CODE>
+MSG_GEN_ITEM_GROUP_GET_MULTIPLE_SELECTIONS</CODE>
+ for multiple selections. A selection may be returned even if the item is not usable, not enabled, or not in the GenItemGroup.</P>
+<P>
+If you are using a GenItemGroup which may contain a selection of -1, you will want to call <CODE>
+MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS</CODE>
+ to differentiate between the item with -1 being selected and GIGS_NONE.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenItemGroup object.</P>
+<P CLASS="refField">
+Return:	The current selection stored in the GenItemGroup's GIGI_<CODE>
+selection</CODE>
+ instance field (or GIGS_NONE if there are no selections).</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_ITEM_GROUP_GET_MULTIPLE_SELECTIONS">
+ </A>
+MSG_GEN_ITEM_GROUP_GET_MULTIPLE_SELECTIONS</H4>
+<PRE CLASS="syntax">word	MSG_GEN_ITEM_GROUP_GET_MULTIPLE_SELECTIONS(
+        word	*selectionList,
+        word	maxSelections);</PRE>
+<P>
+This message returns the current list of selections for non-exclusive and extended-selection GenItemGroups. The caller must allocate a buffer for the entries and pass the size of that buffer. If there is insufficient space in the passed buffer, no entries will be filled in. You should call <CODE>
+MSG_GEN_ITEM_GET_NUM_SELECTIONS</CODE>
+ beforehand in order to allocate the correct maximum size for the buffer. </P>
+<P>
+This message returns the number of selections filled into the buffer. The buffer is filled in with the proper identifiers. The list of identifiers within the buffer will not be null-terminated.</P>
+<P>
+If you are using an exclusive or exclusive-none list, use <CODE>
+MSG_GEN_ITEM_GROUP_GET_SELECTION</CODE>
+ instead.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenItemGroup object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+selectionList</EM>
+	A pointer to the buffer to store the selection entries. </P>
+<DL>
+<DT>
+<EM>
+maxSelections</EM>
+</DT><DD>The maximum number of selections that may be returned by the message.</DD>
+</DL>
+<P CLASS="refField">
+Return:	The total number of selections returned in the buffer.</P>
+<DL>
+<DT>
+<EM>
+selectionList</EM>
+</DT><DD>The pointer to the buffer containing the identifiers of the selections.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS">
+ </A>
+MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS</H4>
+<PRE CLASS="syntax">word	MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS();</PRE>
+<P>
+This message returns the GenItemGroup's current number of selections (stored in GIGI_<CODE>
+numSelections</CODE>
+), or zero if there is no selection. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenItemGroup object.</P>
+<P CLASS="refField">
+Return:	The number of selections in the GenItemGroup.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED">
+ </A>
+MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED</H4>
+<PRE CLASS="syntax">void	MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(
+        Boolean		indeterminate);</PRE>
+<P>
+This message sets a GenItemGroup to show no selections; it should not be sent to an exclusive GenItemGroup. This message will also clear the GenItemGroup's modified flag. If you wish to set the modified flag, send the list a <CODE>
+MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE</CODE>
+. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenItemGroup object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+indeterminate</EM>
+	Pass TRUE if the GenItemGroup should be marked indeterminate, FALSE otherwise.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION">
+ </A>
+MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION</H4>
+<PRE CLASS="syntax">void	MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+        word		identifier,
+        Boolean		indeterminate);</PRE>
+<P>
+This message sets exactly one selection for a GenItemGroup. Any previously-selected items will be deselected, regardless of the GenItemGroup's behavior type. To set items without disturbing other settings, use <CODE>
+MSG_GEN_ITEM_GROUP_SET_ITEM_STATE</CODE>
+. If the list is on-screen, this message will cause a visual update. If the GenItemGroup is scrollable, this message will usually ensure that the item selected will appear on-screen.</P>
+<P>
+This message clears the list's modified state. If you wish to set the group modified, send it a <CODE>
+MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE</CODE>
+. You may set a selection that is not usable, not enabled, or even not in the GenItemGroup. (This is useful for linked GenItemGroups.) </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenItemGroup.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+identifier</EM>
+	The identifier (enumerated value) of the item to select.</P>
+<DL>
+<DT>
+<EM>
+indeterminate</EM>
+</DT><DD>Pass TRUE if the group should be marked indeterminate.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+<P CLASS="refField">
+Tips:	An item with a matching identifier need not be present to become the GenItemGroup's &quot;selection.&quot; Using this knowledge, you can set up several &quot;linked&quot; GenItemGroups, each with only one selection. (See <A HREF="Lists_b.htm#59896"> GenItemGroup Links</A>
+ for information and examples.)</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_ITEM_GROUP_SET_MULTIPLE_SELECTIONS">
+ </A>
+MSG_GEN_ITEM_GROUP_SET_MULTIPLE_SELECTIONS</H4>
+<PRE CLASS="syntax">void	MSG_GEN_ITEM_GROUP_SET_MULTIPLE_SELECTIONS(
+        word	*selectionList,
+        word	numSelections);</PRE>
+<P>
+This message sets multiple selections for a GenItemGroup. The caller must pass a pointer to a list of identifiers that should be selected, along with the number of selections to set. This message will clear the GenItemGroup's modified flag. If you wish to set the group modified send it a <CODE>
+MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE</CODE>
+. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenItemGroup object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+selectionList</EM>
+	A pointer to the buffer containing a list of item identifiers.</P>
+<DL>
+<DT>
+<EM>
+numSelections</EM>
+</DT><DD>The number of selections in the passed list.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+
+<H2 CLASS="HeadingC">
+GenItemGroup States</H2>
+<PRE>GIGI_stateFlags, ATTR_GEN_ITEM_GROUP_SET_MODIFIED_ON_REDUNDANT_SELECTION, MSG_GEN_ITEM_GROUP_SET_INDETERMINATE_STATE, MSG_GEN_ITEM_GROUP_IS_INDETERMINATE, MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE, MSG_GEN_ITEM_GROUP_IS_MODIFIED</PRE>
+<P>
+The GIGI_<CODE>
+stateFlags</CODE>
+ contains flags relating to the state of the entire GenItemGroup. The two flags possible are</P>
+<UL>
+<LI>
+GIGSF_INDETERMINATE<BR>
+This flag marks the GenItemGroup indeterminate. Only the group may be indeterminate; individual GenItems may not be marked indeterminate.</LI>
+<LI>
+GIGSF_MODIFIED<BR>
+This flag marks the GenItemGroup modified. Only the group may be marked as modified; individual GenItems may not be marked as modified.</LI>
+</UL>
+<P>
+A GenItemGroup is in the indeterminate state if its GIGI_<CODE>
+stateFlags</CODE>
+ contains the GIGSF_INDETERMINATE flag. GenItems cannot be in an indeterminate state by themselves; either the entire list is indeterminate or it is not. If you want individual items to be indeterminate, you may want to use a GenBooleanGroup object instead.</P>
+<P>
+A GenItemGroup is in the modified state if its GIGI_<CODE>
+stateFlags</CODE>
+ contains the GIGSF_MODIFIED flag. GenItems may not be in a modified state by themselves; either the entire list is modified or it is not. If you want to mark individual items as modified, you may want to use a GenBooleanGroup object instead.</P>
+<P>
+In immediate mode, any user change to the GenItemGroup's state automatically sets the GIGSF_MODIFIED flag and also forces an &quot;apply.&quot; Therefore, in immediate mode, any user changes will, by default, cause the apply action to be sent out immediately. In delayed mode, the GIGSF_MODIFIED flag is set, but an apply action will not automatically occur. The apply action will only occur when the user forces it (such as clicking on an &quot;apply&quot; trigger) or when the application forces it (by sending out a <CODE>
+MSG_GEN_APPLY</CODE>
+).</P>
+<P>
+You can force an apply by sending the GenItemGroup <CODE>
+MSG_GEN_APPLY</CODE>
+. You can also override the default behavior, forcing the object to send out its notification message on all applies, by including <CODE>
+ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED</CODE>
+ in the object's instance data. Any time the object receives an &quot;apply,&quot; the GenItemGroup will send out the notification message even if the object does not contain any modified GenItem children.</P>
+<P>
+In general, if the user makes redundant changes (such as repeatedly selecting the same item) the group will not be marked modified--the group has not changed state since the last apply, so there is no need to send out a notification message. If, however, you wish for the group to be set modified on redundant changes, add the vardata attribute ATTR_GEN_ITEM_GROUP_SET_MODIFIED_ON_REDUNDANT_SELECTION to the object's instance data. Whenever the user makes any selection, the group will be marked modified. </P>
+<P>
+To check whether a GenItemGroup is indeterminate, send it a <CODE>
+MSG_GEN_ITEM_GROUP_IS_INDETERMINATE</CODE>
+. The message will return <CODE>
+true</CODE>
+ if the list is indeterminate, <CODE>
+false</CODE>
+ if it is not. </P>
+<P>
+To set a GenItemGroup indeterminate, send it <CODE>
+MSG_GEN_ITEM_GROUP_SET_INDETERMINATE_STATE</CODE>
+. Note that the messages to set a GenItemGroup's selections already provide an argument to set the GenItemGroup indeterminate. </P>
+<P>
+To check whether a GenItemGroup has been modified, send it <CODE>
+MSG_GEN_ITEM_GROUP_IS_MODIFIED</CODE>
+. This will return <CODE>
+true</CODE>
+ if the list has been modified, <CODE>
+false</CODE>
+ if it has not. To set a GenItemGroup modified, send it a <CODE>
+MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE</CODE>
+.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_ITEM_GROUP_SET_INDETERMINATE_STATE">
+ </A>
+MSG_GEN_ITEM_GROUP_SET_INDETERMINATE_STATE</H4>
+<PRE CLASS="syntax">void	MSG_GEN_ITEM_GROUP_SET_INDETERMINATE_STATE(
+        Boolean		indeterminateState);</PRE>
+<P>
+This message sets the GenItemGroup's GIGSF_INDETERMINATE flag in its GIGI_<CODE>
+stateFlags</CODE>
+ instance field. Usually this message is used in conjunction with <CODE>
+MSG_GEN_ITEM_GROUP_SET_MULTIPLE_SELECTIONS</CODE>
+. (<CODE>
+MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED</CODE>
+ and <CODE>
+MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION</CODE>
+ set the indeterminate state themselves.)</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenItemGroup object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+indeterminate</EM>
+	Pass TRUE to mark the group indeterminate, FALSE to set the group not indeterminate.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_ITEM_GROUP_IS_INDETERMINATE">
+ </A>
+MSG_GEN_ITEM_GROUP_IS_INDETERMINATE</H4>
+<PRE CLASS="syntax">Boolean	MSG_GEN_ITEM_GROUP_IS_INDETERMINATE();</PRE>
+<P>
+This message checks whether a GenItemGroup is in the indeterminate state; it checks the GIGSF_INDETERMINATE flag in the GenItemGroup's GIGI_<CODE>
+stateFlags</CODE>
+. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenItemGroup object.</P>
+<P CLASS="refField">
+Return:	TRUE if the GenItemGroup is indeterminate, FALSE otherwise.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE">
+ </A>
+MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE</H4>
+<PRE CLASS="syntax">void	MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(
+        Boolean		modifiedState);</PRE>
+<P>
+This message marks a GenItemGroup modified by setting the GIGSF_MODIFIED flag in its GIGI_<CODE>
+stateFlags</CODE>
+ instance field.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenItemGroup object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+modifiedState</EM>
+	TRUE to mark the list modified, FALSE otherwise.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_ITEM_GROUP_IS_MODIFIED">
+ </A>
+MSG_GEN_ITEM_GROUP_IS_MODIFIED</H4>
+<PRE CLASS="syntax">Boolean	MSG_GEN_ITEM_GROUP_IS_MODIFIED();</PRE>
+<P>
+This message checks whether a GenItemGroup has been modified by checking the GIGSF_MODIFIED flag in the GenItemGroup's GIGI_<CODE>
+stateFlags</CODE>
+. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenItemGroup object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	TRUE if GenItemGroup is marked modified, FALSE otherwise.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+
+<H2 CLASS="HeadingC">
+Sending the Event</H2>
+<PRE>GIGI_applyMsg, GIGI_destination, GEN_ITEM_GROUP_APPLY_MSG, ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED, MSG_GEN_ITEM_GROUP_GET_DESTINATION, MSG_GEN_ITEM_GROUP_SET_DESTINATION, MSG_GEN_ITEM_GROUP_GET_APPLY_MSG, MSG_GEN_ITEM_GROUP_SET_APPLY_MSG</PRE>
+<P>
+<A NAME="IX_GIGI_destination">
+ </A>
+When the GenItemGroup receives notice to apply any changes to its state, it will first check its GIGSF_MODIFIED flag. If the list has been modified, the GenItemGroup will send the apply action stored in its GIGI_<CODE>
+applyMsg</CODE>
+ field to the destination stored in its GIGI_<CODE>
+destination</CODE>
+ field.</P>
+<P>
+GIGI_<A NAME="IX_GIGI_applyMsg">
+ </A>
+<CODE>
+applyMsg</CODE>
+ stores the apply action you wish the GenItemGroup to send out whenever you make a selection choice within the group. This message should be based on the prototype GEN_ITEM_GROUP_APPLY_MSG so that the proper arguments (<CODE>
+selection</CODE>
+, <CODE>
+numSelections</CODE>
+, and <CODE>
+stateFlags</CODE>
+) are automatically passed. GIGI_<CODE>
+destination</CODE>
+ should store the object or process you wish to handle the message sent out by this group. This object should have a handler for the GIGI_<CODE>
+applyMsg</CODE>
+.</P>
+<P>
+You can force a GenItemGroup to apply its changes with <CODE>
+MSG_GEN_APPLY</CODE>
+. You can also override the default behavior, forcing the object to send out its apply action on all applies, whether modified or not, by including <CODE>
+ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED</CODE>
+ in the object's instance data. Any time the object needs to apply its changes, the GenItemGroup will send out the notification message even if the object is not marked GIGSF_MODIFIED.</P>
+<P>
+To retrieve the object or process stored in the GenItemGroup's GIGI_<CODE>
+destination</CODE>
+ instance field or the message stored in its GIGI_<CODE>
+applyMsg</CODE>
+ instance field, send the list <CODE>
+MSG_GEN_ITEM_GROUP_GET_DESTINATION</CODE>
+ or <CODE>
+MSG_GEN_ITEM_GROUP_GET_APPLY_MSG</CODE>
+.</P>
+<P>
+To set the GenItemGroup's destination, send the list <CODE>
+MSG_GEN_ITEM_GROUP_SET_DESTINATION</CODE>
+, passing the optr of the new destination. To set the GenItemGroup's notification message, send the list <CODE>
+MSG_GEN_ITEM_GROUP_SET_APPLY_MSG</CODE>
+, passing it the message to use.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_GEN_ITEM_GROUP_APPLY_MSG">
+ </A>
+GEN_ITEM_GROUP_APPLY_MSG</H4>
+<PRE CLASS="syntax">void	GEN_ITEM_GROUP_APPLY_MSG(
+        word	selection,
+        word	numSelections
+        byte	stateFlags);</PRE>
+<P>
+Use this prototype to define the apply message for your GenItemGroup (stored in the GIGI_<CODE>
+applyMsg</CODE>
+ instance field). This prototype ensures that the message passes the correct parameters to your message handler. </P>
+<P CLASS="refField">
+Source:	Your GenItemGroup object.</P>
+<P CLASS="refField">
+Destination:	Destination of your GenItemGroup.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+selection</EM>
+	The current selection of the GenItemGroup.</P>
+<DL>
+<DT>
+<EM>
+numSelections</EM>
+</DT><DD>The current number of selections of the GenItemGroup.</DD>
+<DT>
+<EM>
+stateFlags</EM>
+</DT><DD>The current state flags of the GenItemGroup.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_ITEM_GROUP_GET_DESTINATION">
+ </A>
+MSG_GEN_ITEM_GROUP_GET_DESTINATION</H4>
+<PRE CLASS="syntax">optr	MSG_GEN_ITEM_GROUP_GET_DESTINATION();</PRE>
+<P>
+This message returns the optr of the current destination object as specified in the GIGI_<CODE>
+destination</CODE>
+ instance field.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenItemGroup object.</P>
+<P CLASS="refField">
+Parameters:	Nothing.</P>
+<P CLASS="refField">
+Return:	The optr of the current destination object.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_ITEM_GROUP_SET_DESTINATION">
+ </A>
+MSG_GEN_ITEM_GROUP_SET_DESTINATION</H4>
+<PRE CLASS="syntax">void	MSG_GEN_ITEM_GROUP_SET_DESTINATION(
+        optr	dest);</PRE>
+<P>
+This message sets a new destination object for the list, stored in the list's GIGI_<CODE>
+destination</CODE>
+ field. The apply and status messages of this GenItemGroup will be sent to this new destination.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenItemGroup.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+dest</EM>
+	The optr of the new destination object to be put in GIGI_<CODE>
+destination</CODE>
+.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_ITEM_GROUP_GET_APPLY_MSG">
+ </A>
+MSG_GEN_ITEM_GROUP_GET_APPLY_MSG</H4>
+<PRE CLASS="syntax">Message	MSG_GEN_ITEM_GROUP_GET_APPLY_MSG();</PRE>
+<P>
+This message returns the current apply message in the GenItemGroup's GIGI_<CODE>
+applyMsg</CODE>
+ instance field.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenItemGroup.</P>
+<P CLASS="refField">
+Parameters:	Nothing.</P>
+<P CLASS="refField">
+Return:	The current apply message.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_ITEM_GROUP_SET_APPLY_MSG">
+ </A>
+MSG_GEN_ITEM_GROUP_SET_APPLY_MSG</H4>
+<PRE CLASS="syntax">void	MSG_GEN_ITEM_GROUP_SET_APPLY_MSG(
+        Message		message);</PRE>
+<P>
+This message sets a new apply message in the GenItemGroup's GIGI_<CODE>
+applyMsg</CODE>
+ instance field.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenItemGroup object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+message</EM>
+	The new notification message.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+
+<H2 CLASS="HeadingC">
+Sending Status Messages</H2>
+<PRE>GEN_ITEM_GROUP_STATUS_MSG, ATTR_GEN_ITEM_GROUP_STATUS_MSG, MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG</PRE>
+<P>
+If you wish your application to receive notice whenever the list's state changes, even if those changes will not be immediately applied, you may set a status message in the object's instance data. </P>
+<P>
+For example, a color selection dialog box provides two means to set the RGB value of a color: one in a GenItemGroup listing the total possible states and another in a GenBooleanGroup with separate toggle states for Red, Green, and Blue. In delayed mode, setting the values in one group should change the display of the other group simultaneously but should not result in an apply action until the user activates the apply trigger. </P>
+<P>
+One list can notify its partner of state changes with a status message. The other list can respond to state changes (and therefore change its corresponding state) without actually applying those changes.</P>
+<P>
+To set up a status message, add a message based on the prototype GEN_ITEM_GROUP_STATUS_MSG. This message will be sent to the list's destination object. Set ATTR_GEN_ITEM_GROUP_STATUS_MSG to the status message.</P>
+<P CLASS="figTitle">
+Code Display 11-5 Status Message in GenItemGroup</P>
+<PRE>/* Use the prototype GEN_ITEM_GROUP_STATUS_MSG to set up a status message. The
+ * prototype takes three arguments: selection (the contents of GIGI_selection),
+ * numSelections (the contents of GIGI_numSelections), and stateFlags (the contents
+ * of GIGI_stateFlags). */</PRE>
+<PRE>	/* In the destination's class definition: */
+@message (GEN_ITEM_GROUP_STATUS_MSG) MSG_COLOR_STATUS_CHANGE;</PRE>
+<PRE>	/* In the GenItemGroup's object declaration, set
+	 * ATTR_GEN_ITEM_GROUP_STATUS_MSG to the message you declared. */
+@object GenItemGroupClass MyColorGroup = {
+    GIGI_applyMsg = MSG_COLOR_CHANGE;
+    GIGI_destination = process;
+    ATTR_GEN_ITEM_GROUP_STATUS_MSG = MSG_COLOR_STATUS_CHANGE;
+}</PRE>
+<PRE>	/* Finally, in your handler for this status message, do required work. */
+@method MyProcessClass, MSG_COLOR_STATUS_CHANGE {
+    switch (selection) {
+	case C_BLACK:
+	    /* ...(code)... */
+	case C_WHITE:
+	    /* ...(code)... */
+    }
+}</PRE>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_GEN_ITEM_GROUP_STATUS_MSG">
+ </A>
+GEN_ITEM_GROUP_STATUS_MSG</H4>
+<PRE CLASS="syntax">void	GEN_ITEM_GROUP_STATUS_MSG(
+        word	selection,
+        word	numSelections,
+        byte	stateFlags);</PRE>
+<P>
+Use this prototype to define a status message for your GenItemGroup (stored in the ATTR_GEN_ITEM_GROUP_STATUS_MSG vardata). This prototype ensures that your status message passes the correct parameters. </P>
+<P CLASS="refField">
+Source:	Your GenItemGroup object.</P>
+<P CLASS="refField">
+Destination:	The destination of your GenItemGroup.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+selection</EM>
+	The current selection (enumerated type stored in GIGI_<CODE>
+selection</CODE>
+) of the GenItemGroup.</P>
+<DL>
+<DT>
+<EM>
+numSelections</EM>
+</DT><DD>The current number of selections (stored in GIGI_<CODE>
+numSelections</CODE>
+) of the GenItemGroup.</DD>
+<DT>
+<EM>
+stateFlags</EM>
+</DT><DD>The current state flags (stored in GIGI_<CODE>
+stateFlags</CODE>
+) of the GenItemGroup.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Tips:	It is usually convenient to set up a switch statement based on the enumerated value of the <EM>
+selection</EM>
+ passed in this message handler.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG">
+ </A>
+MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG</H4>
+<PRE CLASS="syntax">void	MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG(
+        Boolean modifiedState);</PRE>
+<P>
+This message causes the GenItemGroup to send out the status message to the destination object. This status message is stored in <CODE>
+ATTR_GEN_ITEM_GROUP_STATUS_MSG</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenItemGroup object that contains a status message.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+modifiedState</EM>
+	Pass TRUE if the GenItemGroup should be marked modified.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H2 CLASS="HeadingC">
+List Focus</H2>
+
+<PRE>MSG_GEN_ITEM_GROUP_GET_FOCUS_ITEM, MSG_GEN_ITEM_GROUP_SET_FOCUS_ITEM</PRE>
+
+<P>
+A GenItem in a GenItemGroup which has the cursor over it is said to have the focus. Your application may get or set the current focus of any exclusive GenItemGroup.
+</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_ITEM_GROUP_GET_FOCUS_ITEM">
+ </A>
+MSG_GEN_ITEM_GROUP_GET_FOCUS_ITEM</H4>
+<PRE CLASS="syntax">word  MSG_GEN_ITEM_GROUP_GET_FOCUS_ITEM();</PRE>
+<P>
+Gets the focus item of a GenItemGroup. 
+</P>
+<P CLASS="refField">
+Source: Anywhere.</P>
+<P CLASS="refField">
+Destination:    Any GenItemGroup.</P>
+<P CLASS="refField">
+Return: The identifier of the item which currently has the focus. If the GenItemGroup is not an exclusive list or if no item has focus,  this message will return <CODE>GIGS_NONE</CODE>.</P>
+<P CLASS="refField">
+Tips:   This message differs from <CODE>MSG_META_GET_FOCUS_EXCL</CODE> because it works on lists that don't have the focus and it does not suffer from possible synchronization problems.</P>
+
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_ITEM_GROUP_SET_FOCUS_ITEM">
+ </A>
+MSG_GEN_ITEM_GROUP_SET_FOCUS_ITEM</H4>
+<PRE CLASS="syntax"> void   MSG_GEN_ITEM_GROUP_SET_FOCUS_ITEM(word identifier);</PRE>
+<P>
+This message scrolls the GenItemGroup list so that the specified item will be the visible focus. While this message can be sent to a GenItemGroup at any time, it will only affect item groups which have already been visually built.</P>
+<P CLASS="refField">
+Source: Anywhere.</P>
+<P CLASS="refField">
+Destination:    Any GenItemGroup.</P>
+<P CLASS="refField">
+Parameters:
+<DL>
+<DT>
+<EM>
+identifier </EM>
+</DT><DD>The ID of the item which will be the focus of the item group. <EM>identifier</EM> may represent an item that is not usable, not enabled, not in the item group, or it may even be set to GIGS_NONE and represent no item. If <EM>identifier</EM> cannot be made the focus of the list, then no item in that list will have the exclusive focus. </DD>
+</DL>
+<P CLASS="refField">
+Return: Nothing.</P>
+
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Lists_5.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Lists_7.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.2 GenItem Instance Data</A> 
+<!-- to next --> | <A HREF="Lists_9.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.4 Working with Items</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

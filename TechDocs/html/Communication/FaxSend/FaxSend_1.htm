@@ -1,0 +1,138 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: FaxSend_1.htm,v 1.2 97/08/21 14:11:06 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Destination Phone Number</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="sectionTitle">
+<A HREF="index.htm">Fax Sending</A>: 1 
+<A NAME="81499">
+ </A>
+Destination Phone Number</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="index.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">Fax Sending</A> 
+<!-- to next --> | <A HREF="FaxSend_2.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2 Drawing the Contents</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+To prompt the user for the fax's destination phone number while employing the device's standard look and feel, we will use the Mailbox library and its fax adjuncts. Specifically, we will use a <CODE>
+MailboxSendControl</CODE>
+ object, configured for use with fax.</P>
+<P>
+Make sure the following lines appear in the application's .gp file:</P>
+<PRE>library mailbox   # Defines MailboxSendControlClass
+library spool     # Defines PrintControlClass</PRE>
+<P>
+We will use a <CODE>
+MailboxSendControl</CODE>
+ object to provide the UI that prompts the user for a phone number. When it comes time to draw the contents of our fax, we'll also need a <CODE>
+PrintControl</CODE>
+ object. </P>
+<P>
+We make sure that these controller objects are added to the correct GCN lists in the declaration of our application's Application object:</P>
+<P CLASS="figTitle">
+Code Display 4-1 <A NAME="25429">
+ </A>
+Adding the Fax Controls to the Proper GCN Lists</P>
+<P CLASS="figCaption">
+In the declaration of the application's Application object, we make sure that the MailboxSendControl and PrintControl objects are placed on the proper GCN lists.</P>
+<PRE>@object ... MyApp = {
+    ...
+    gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS) =
+				... @MyPrintControl, @MySendControl;
+    gcnList(MANUFACTURER_ID_GEOWORKS, MGCNLT_ACTIVE_LIST) = ... @MySendControl;
+    gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_MAILBOX_SEND_CONTROL) =
+							... @MySendControl;
+    ATTR_GEN_APPLICATION_PRINT_CONTROL = @MyPrintControl;
+}</PRE>
+<P>
+We make sure that the <CODE>
+MailboxSendControl</CODE>
+ will be visible to the user; the straightforward way to do this is to add it to the application's generic UI tree. For example:</P>
+<PRE>@object GenPrimaryClass MyPrimary = {</PRE>
+<PRE>    GI_comp  = ..., @MySendControl;</PRE>
+<PRE>}</PRE>
+<P>
+Finally, we're ready to declare the <CODE>
+MailboxSendControl</CODE>
+ object itself:</P>
+<P CLASS="figTitle">
+Code Display 4-2 <A NAME="25475">
+ </A>
+MailboxSendControl Object Ready for Fax</P>
+<PRE>@object MailboxSendControlClass MySendControl = {
+    GI_visMoniker = &quot;Send&quot;;
+    GII_visibility = GIV_POPUP;
+    GCI_output = process;
+    MSCI_defBodyType = MOT_SELECTION;</PRE>
+<PRE>    ATTR_MAILBOX_SEND_CONTROL_SEND_SELECTION;
+    ATTR_GEN_INIT_FILE_CATEGORY = &quot;fax&quot; ;</PRE>
+<PRE>    ATTR_MAILBOX_SEND_CONTROL_SINGLE_TRANSPORT = {
+    {GMID_CELL_MODEM, MANUFACTURER_ID_GEOWORKS},
+    {GMTID_FAX_SEND, MANUFACTURER_ID_GEOWORKS},0};</PRE>
+<PRE>    ATTR_MAILBOX_SEND_CONTROL_TRANSPORT_HINT_OPTR =  {
+      {GMTID_FAX_SEND, MANUFACTURER_ID_GEOWORKS}, 0,
+      @MyPrintControl};
+}</PRE>
+<P>
+(If your application is to run on the Nokia 9000i Communicator, use ComplexMonikerClass to give your <CODE>
+MailboxSendControl</CODE>
+ the standard Nokia 9000i Communicator look and feel. In the example above, you would replace</P>
+<PRE>@object MailboxSendControlClass MySendControl = {
+    GI_visMoniker = &quot;Send&quot;;</PRE>
+<P>
+...with...</P>
+<PRE>@object ComplexMonikerClass MySendControl = {
+    ComplexMoniker = MailboxSendControlClass;
+    CMI_topText = CMT_SELECT_RECEIVER;</PRE>
+<PRE>    HINT_SEEK_REPLY_BAR; /* make this button 0 */
+    HINT_SEEK_SLOT = 0;</PRE>
+<P>
+)</P>
+<P>
+<CODE>
+ATTR_MAILBOX_SEND_CONTROL_TRANSPORT_HINT_OPTR</CODE>
+ tells the <CODE>
+MailboxSendControl</CODE>
+ that when it comes time to send a fax, it should look to the <CODE>
+MyPrintControl</CODE>
+ object to provide the data. The FaxSendTD Mailbox transport driver knows how to interact with PrintControl objects; we will add code to our program to work with the PrintControl to draw our fax contents.</P>
+<P>
+ATTR_GEN_INIT_FILE_CATEGORY tells the send control where to find the user's faxing preferences within the INI file--the &quot;fax&quot; category.</P>
+<P>
+<CODE>
+ATTR_MAILBOX_SEND_CONTROL_SINGLE_TRANSPORT</CODE>
+ specifies that this <CODE>
+MailboxSendControl</CODE>
+ only sends data by fax. To allow your application to send data in additional ways, get rid of this ATTR.</P>
+<P>
+The <CODE>
+MailboxSendControl</CODE>
+ would ask the user what data they wish to send: the current selection, current page, all pages. In most fax programs, we don't want to give the user that choice. In our example, we use the <CODE>
+ATTR_MAILBOX_SEND_CONTROL_SEND_SELECTION</CODE>
+ vardata field to prevent the controller from presenting the user with this choice--the <CODE>
+MailboxSendControl</CODE>
+ will always try to send the &quot;current selection,&quot; though our program ignores any idea of selection. </P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="index.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">Fax Sending</A> 
+<!-- to next --> | <A HREF="FaxSend_2.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2 Drawing the Contents</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

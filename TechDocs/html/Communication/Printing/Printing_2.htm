@@ -1,0 +1,129 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Printing_2.htm,v 1.1 97/06/02 14:13:08 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Simple Printing Example</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="sectionTitle">
+<A HREF="index.htm">The Spool Library</A>: 2 
+<A NAME="17726">
+ </A>
+Simple Printing Example</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Printing_1.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1 Introduction to Printing</A> 
+<!-- to next --> | <A HREF="Printing_3.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3 How Jobs Get Printed</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+Adding printing capability to an application is fairly simple, especially if it will be printing WYSIWYG. Somewhere in the application there is probably a message handler which is in charge of drawing the document. By including a Print Control object and writing handlers to some standard messages, it is a simple manner to redirect the document drawing commands to a printer.</P>
+<P CLASS="figTitle">
+Code Display 14-1 Printing Example</P>
+<PRE>@include &lt;spool.goh&gt;
+@object GenApplicationClass MyApp = {
+	/* ...Much other GenApplication instance data omitted... */
+	gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS) = 
+ 		@MyPrintControl;
+	ATTR_GEN_APPLICATION_PRINT_CONTROL = @MyPrintControl; 
+}</PRE>
+<PRE>@object PrintControlClass MyPrintControl = {
+/* The PrintControlClass is a subclass of GenControlClass. Its &quot;features&quot;
+ * correspond to the &quot;Print&quot; and &quot;Fax&quot; triggers in the File menu. Its instance
+ * data contains information about the document to be printed, and links to
+ * objects which will provide information. */</PRE>
+<PRE>/* Single page documents would leave out page range UI from the Print dialog: 
+	PCI_attrs = 		(@default &amp; ~(PCA_PAGE_CONTROLS| PCA_VERIFY_PRINT)); 
+	PCI_startUserPage = 1;
+	PCI_endUserPage = 1 */</PRE>
+<PRE>/* The PCI_output, or Print Output object, is in charge of supplying the graphics
+ * commands describing the print job whenever the user wants to print. This object
+ * is expected to handle a MSG_PRINT_CONTROL_START_PRINTING. */	</PRE>
+<PRE> * The print output object is normally either the model, target or process. */
+	PCI_output = 		( TO_APP_TARGET ) ;</PRE>
+<PRE>/* The PCI_docNameOutput object is supposed to provide the name of the document
+ * on demand. This name is used to identify the document to the user in the Print
+ * Control Panel. If this object is a GenDocumentGroup, it automatically does this.
+ * If the object is not a GenDocumentGroup object, then * it must have a handler
+ * for MSG_PRINT_GET_DOC_NAME that sends a nmae to the PrintControl via
+ * MSG_PRINT_CONTROL_SET_DOC_NAME. */
+	PCI_docNameOutput = MyGenDocumentGroup;</PRE>
+<PRE>/* The PCI_docSize field specifies the size of the document to print (not to 
+ * be confused with the size of the printer's paper). */</PRE>
+<PRE>/* Many simple applications only support one document size,
+ * and may specify it in the PrintControl and never bother with it again. </PRE>
+<PRE> * We're setting the margins to all zero because they'll be updated via 
+ * MSG_PRINT_CONTROL_GET_MARGINS. */
+	PCI_docSizeInfo = {			(15/2*72), 
+				(19/2*72), 
+				0, 
+				{0, 0, 0, 0}}; */
+/* Many simple applications do not support multiple documents. These applications 
+ * should set the GS_ENABLED flag of the PrintControl's GI_states field. */
+}</PRE>
+<PRE>@method MVTStartPrinting, MyVisTargetedClass, MSG_PRINT_START_PRINTING
+/* We've set up our Print Control to send this message to the Target, so whatever
+ * object will have the target when the user wants to print needs a handler for 
+ * this message. We could have easily have put the Model or process in charge
+ * of printing, changing PCI_output accordingly. It is often convenient to use
+ * the same object to handle drawing to screen and to the printer. */</PRE>
+<PRE>/* Arguments:		optr 		printControlOD,
+		GStateHandle		gstate */</PRE>
+<PRE>{
+	PCMarginParams 	margins;</PRE>
+<PRE>/*
+ * 	Applications which allow the user to change the document size may handle
+ *	the situation in more than one way. If the user has changed the page setup
+ *	by working with a PageSizeControl, then the application has probably 
+ * 	already been alerted to the page size. If the application has its own
+ *	way of computing document size, it should use it. Such applications should
+ * 	send MSG_PRINT_CONTROL_SET_DOC_SIZE and MSG_PRINT_CONTROL_SET_DOC_MARGINS 
+ * 	to the PrintControl, either in this handler or else whenever the page size
+ *	changes. Either time is fine, just so long as the document size is set
+ * 	correctly by the time this MSG_PRINT_START_PRINTING handler is finished.</PRE>
+<PRE> *	Applications	 supporting only a single document size should probably set
+ *	the size (and margins) in the PrintControl's instance data, as shown
+ *	above. It is also possible to send a MSG_PRINT_CONTROL_SET_DOC_SIZE on
+ *	every print, but if the size never changes, this is a bit wasteful.</PRE>
+<PRE> *	This application supports only one size of document. If the document
+ *	doesn't fit on the page, the spooler will tile it onto multiple pages
+ *	as necessary. It uses the printer's margins as the document margins: */</PRE>
+<PRE>	@call 	MyPrintControl::MSG_PRINT_CONTROL_GET_PRINTER_MARGINS(
+		&amp;margins, 		/* Fill in structure with printer's margins */
+		TRUE);		/* ...and automatically use printer margins
+				 * as document margins */</PRE>
+<PRE>	@call 	self::MSG_VIS_DRAW(DF_PRINT, gstate);</PRE>
+<PRE>	/* If the MSG_VIS_DRAW handler didn't end with a form feed, put one in: 
+	GrNewPage(gstate, PEC_FORM_FEED); */</PRE>
+<PRE>	@send 	MyPrintControl::MSG_PRINT_CONTROL_PRINTING_COMPLETED();
+}</PRE>
+<PRE>@method MVTDraw, MyVisTargetClass, MSG_VIS_DRAW
+/* Chances are, whatever object this is has some sort of draw handler already.
+ * However, if you're building up this class from scratch, you'll be glad to
+ * know that commands of the following form work just as well drawing in
+ * response to a print request as they do drawing anything else: */</PRE>
+<PRE>{	GrSetLineColor(gstate, CF_INDEX, C_RED, 0, 0);
+	GrDrawLine(gstate, 144, 144, 288, 288);
+	GrNewPage(gstate, PEC_FORM_FEED);
+}</PRE>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Printing_1.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1 Introduction to Printing</A> 
+<!-- to next --> | <A HREF="Printing_3.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3 How Jobs Get Printed</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

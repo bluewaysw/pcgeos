@@ -1,0 +1,358 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Menus_13.htm,v 1.2 97/09/05 14:15:00 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Thread Blocking Routines</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Menus and Dialog Boxes</A>: 4.5 <A HREF="Menus_e.htm">Supplemental Usage</A>: 
+<A NAME="75893">
+ </A>
+Thread Blocking Routines</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Menus_e.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Menus_12.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.4 Managing Input</A> 
+<!-- to next --> | <A HREF="Menus_14.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">5 Interaction Commands</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+Occasionally, you may need a response from the user before continuing with a thread of execution. In these cases, you should use a dialog box to prompt the user for the needed response. However, you also need a means to block the thread of execution until the user responds to this dialog box. The routines <CODE>
+UserDoDialog()</CODE>
+, <CODE>
+UserStandardDialog()</CODE>
+, and <CODE>
+UserStandardDialogOptr()</CODE>
+ provide this functionality.</P>
+
+<H2 CLASS="HeadingC">
+UserDoDialog()</H2>
+<PRE>UserDoDialog(), UserCreateDialog(), UserDestroyDialog()</PRE>
+<P>
+<A NAME="IX_UserDoDialog()">
+ </A>
+You may bring dialog boxes on-screen with several routines. The most common and easiest to use of these routines is <CODE>
+UserDoDialog()</CODE>
+. <CODE>
+UserDoDialog()</CODE>
+ only operates on GIV_DIALOG Interactions set both GIA_MODAL and GIA_INITIATED_WITH_USER_DO_DIALOG. </P>
+<P>
+This routine, when passed the optr of a dialog box, will bring the dialog Interaction on-screen. In addition to bringing up a dialog, however, <CODE>
+UserDoDialog()</CODE>
+ will also block the calling thread until a response trigger in the dialog is activated by the user. When this happens, <CODE>
+UserDoDialog()</CODE>
+ returns a value representing the response trigger selected. This return value is usually an <CODE>
+InteractionCommand</CODE>
+.</P>
+<P>
+The dialog may contain any UI gadgetry but must have response triggers with valid <CODE>
+InteractionCommand</CODE>
+s to terminate the dialog box. These triggers should have a null output and message and have <CODE>
+ATTR_GEN_TRIGGER_INTERACTION_COMMAND</CODE>
+ vardata set to the proper <CODE>
+InteractionCommand</CODE>
+s. (See <A HREF="../../UI/Triggers/index.htm">the GenTrigger chapter</A>.) This <CODE>InteractionCommand</CODE>
+ will be the response value returned by <CODE>
+UserDoDialog()</CODE>
+ when that trigger is activated. This can be one of the predefined <CODE>
+InteractionCommand</CODE>
+s or an application-defined one with IC_CUSTOM_START. </P>
+<P>
+The response triggers should also have the attribute GA_SIGNAL_INTERACTION_COMPLETE set to ensure that the dialog will be dismissed when they are activated. (This may be omitted to gain manual control over dismissal over the dialog, but you still must provide a way to dismiss the dialog.) Any response triggers in the dialog should have the hint <CODE>
+HINT_SEEK_REPLY_BAR</CODE>
+ to place the triggers within the dialog's reply bar, but this is not necessary.</P>
+<P>
+Because the calling thread is blocked by <CODE>
+UserDoDialog()</CODE>
+, views run by that thread will not be updated when exposed.</P>
+<P CLASS="figTitle">
+Code Display 7-18 Using UserDoDialog()</P>
+<PRE>/* This dialog box asks for confirmation before beginning a delete file operation.
+ * Therefore, it is advisable to block threads before beginning this operation. The
+ * dialog using UserDoDialog() should be marked both GIA_MODAL and
+ * GIA_INITIATED_VIA_USER_DO_DIALOG. */</PRE>
+<PRE>@object GenInteractionClass ConfirmDeleteBox = {
+    GI_comp = @ConfirmDeleteText;
+    GII_type = GIT_AFFIRMATION;
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG | GIA_MODAL;
+}</PRE>
+<PRE>@object GenTextClass ConfirmDeleteText = {
+    GTI_text = &quot;Are you sure you want to delete this file?&quot;;
+}</PRE>
+<PRE>/* This dialog box is displayed through a normal routine call with
+ * the optr of the dialog box as its one argument. */</PRE>
+<PRE>/* Check for positive response. */
+if (UserDoDialog(@ConfirmDeleteBox) == IC_YES) {
+    /* delete file. */
+}</PRE>
+<P>
+<CODE>
+UserDoDialog()</CODE>
+ may also return IC_NULL to indicate that the modal dialog has been dismissed by the system, so it is always a good idea to check for and act on positive responses even if only one response is possible (such as in a GIT_NOTIFICATION dialog box).</P>
+<P>
+<CODE>
+UserCreateDialog()</CODE>
+<A NAME="IX_UserCreateDialog()">
+ </A>
+ duplicates a dialog box to initiate later with <CODE>
+UserDoDialog()</CODE>
+. Typically, the dialog box duplicated is within a template object block; the dialog box must be both not GS_USABLE and not attached to the generic tree when created. The dialog box must also be marked GIA_INITIATED_VIA_USER_DO_DIALOG.</P>
+<P>
+<A NAME="IX_UserDestroyDialog()">
+ </A>
+The template block that contains the dialog box and its children must be sharable and read-only.<CODE>
+ UserCreateDialog() </CODE>
+duplicates a template dialog box, attaches the dialog box to the GenApplication object and sets it fully GS_USABLE; it may then be called with <CODE>
+UserDoDialog()</CODE>
+. When you no longer have a need for the dialog box, send it <CODE>
+UserDestroyDialog()</CODE>
+.</P>
+<P>
+These routines are useful for conserving memory space; they only take up space when actually being used. In some cases, you may need to use these routines. For example, within libraries, dialog boxes must be duplicated before being used because multiple applications may require their own copy of the dialog box template.</P>
+<P CLASS="figTitle">
+Code Display 7-19 Using UserCreateDialog(), UserDestroyDialog()</P>
+<PRE>/* 
+ * The template dialog box must not be GS_USABLE. The object must also be marked 
+ * GIA_INITIATED_VIA_USER_DO_DIALOG. The block must be sharable, read-only, and 
+ * the top GenInteraction must not be linked into the generic tree.
+ */</PRE>
+<PRE>@object GenInteractionClass MyDialogTemplate = {
+    GI_visMoniker = &quot;Template&quot;;
+    GI_states = @default &amp; ~GS_USABLE;
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG | 
+	GIA_NOT_USER_INITIATABLE | GIA_MODAL;
+    GII_type = GIT_NOTIFICATION;
+    GI_comp = @NotificationGlyph;
+}</PRE>
+<PRE>@method SomeProcessClass, MSG_BRING_UP_DUPLICATED_DIALOG
+{
+    optr		newDialog;</PRE>
+<PRE>    newDialog = UserCreateDialog(@MyDialogTemplate);</PRE>
+<PRE>    if (UserDoDialog(@newDialog) == IC_OK) {
+	/*** code ***/
+    }</PRE>
+<PRE>    UserDestroyDialog(@newDialog);
+}</PRE>
+
+
+<H2 CLASS="HeadingC">
+UserStandardDialog()</H2>
+<PRE>UserStandardDialog(), UserStandardDialogOptr(), CustomDialogBoxFlags</PRE>
+<P>
+<CODE>
+UserStandardDialog()</CODE>
+<A NAME="IX_UserStandardDialog()">
+ </A>
+ displays standardized dialog boxes. The dialog is standardized in that it has a text area, an icon glyph representing the type of situation that caused the dialog to be displayed, and one or more response triggers. Like <CODE>
+UserDoDialog()</CODE>
+, <CODE>
+UserStandardDialog() </CODE>
+blocks the calling thread until the user activates one of the response triggers. Unlike <CODE>
+UserDoDialog()</CODE>
+, however, <CODE>
+UserStandardDialog() </CODE>
+does not need an application-defined dialog box. <CODE>
+UserStandardDialog() </CODE>
+builds a dialog box at run-time following the specifications passed.</P>
+<P>
+<CODE>
+UserStandardDialog()</CODE>
+ passes a number of parameters:</P>
+<UL>
+<LI>
+<CODE>
+CustomDialogBoxFlags<BR>
+</CODE>
+<A NAME="IX_CustomDialogBoxFlags">
+ </A>
+<A NAME="IX_CDBF_&ldots;">
+ </A>
+This bitfield stores the <CODE>
+CustomDialogType</CODE>
+ (CDBF_DIALOG_TYPE) and the <CODE>
+GenInteractionType</CODE>
+ (CDBF_INTERACTION_TYPE) to display the Interaction with, along with several miscellaneous flags</LI>
+</UL>
+<DL>
+<DT>
+CDBF_SYSTEM_MODAL indicates that the dialog box brought up by <CODE>
+UserDoDialog()</CODE>
+ should not only be application modal but also system modal.</DT>
+<DT>
+CDBF_DESTRUCTIVE_ACTION indicates that an affirmative response by the user to the dialog box denotes a destructive action, and thus should not be made the default. </DT>
+<DT>
+CDBF_DIALOG_TYPE indicates the type of situation creating the dialog box. <A NAME="IX_CustomDialogType">
+ </A>
+<A NAME="IX_CDT_&ldots;">
+ </A>
+This type determines the icon glyph that represents what caused the dialog to be displayed. The available types (<CODE>
+CustomDialogType</CODE>
+) are:</DT>
+<DT>
+	CDT_QUESTION: 	Ask the user a question;</DT><DD>
+CDT_WARNING: 		Warn the user of a potential problem;<BR>
+CDT_NOTIFICATION: 		Notify the user of some event;<BR>
+CDT_ERROR: 		Report an error to the user.</DD>
+<DT>
+</DT><DD>The Specific UI will determine the appropriate icon glyph to use for each dialog type. For example, in OSF/Motif, a CDT_QUESTION icon glyph is a graphic question mark.</DD>
+<DT>
+</DT><DD>The system will also issue a beep when a CDT_ERROR dialog is displayed.</DD>
+<DT>
+CDBF_INTERACTION_TYPE indicates the type of GenInteraction being initiated. This type specifies what response triggers should be built and is a sub-set of the supplied <CODE>
+GenInteractionType</CODE>
+ enums. The available types are:</DT>
+<DT>
+GIT_NOTIFICATION</DT><DD>
+The specific UI will supply a standard response trigger that has the IC_OK response value.</DD>
+<DT>
+GIT_AFFIRMATION</DT><DD>
+The specific UI will supply standard response triggers that have the IC_YES and IC_NO response values.</DD>
+<DT>
+GIT_MULTIPLE_RESPONSE </DT><DD>
+The application must provide its own trigger monikers and response values. If this value is set, you will have to pass the array of custom triggers.
+<IMG SRC="Menus_13_CustomDialogType.gif">
+
+</DD>
+<UL>
+<LI>
+Dialog string (and <EM>
+arg1</EM>
+ and <EM>
+arg2</EM>
+)<BR>
+This is the string to display in the dialog box text area. The string can have up to two parameters. These parameters are other strings that are passed to <CODE>
+UserStandardDialog()</CODE>
+ in <EM>
+arg1</EM>
+ and <EM>
+arg2</EM>
+. They will replace all occurrences of \001 and \002 in the dialog string. This is useful for including filenames or other variable text in the dialog string.</LI>
+<LI>
+Response trigger monikers and values<BR>
+If GIT_MULTIPLE_RESPONSE is used, this indicates how many triggers and what labels and response values the response triggers should have.</LI>
+<LI>
+Help context<BR>
+The help context to use for this dialog box layer.</LI>
+</UL>
+</DL>
+<P CLASS="figTitle">
+Code Display 7-20 Using UserStandardDialog()</P>
+<PRE>/* 
+ * This simple example uses no help context, custom triggers, or string arguments. 
+ */</PRE>
+<PRE>if ((UserStandardDialog(			(char *)0,
+			(char *)0,
+			(char *)0,
+			(char *)0,
+			&quot;Do you wish to continue?&quot;,
+			((CDT_QUESTION &lt;&lt; CDBF_DIALOG_TYPE_OFFSET) |
+			(GIT_AFFIRMATION &lt;&lt; CDBF_INTERACTION_TYPE_OFFSET))
+			) == IC_YES)) {
+	/* code to perform on a positive response. */
+    }</PRE>
+<PRE>else {
+	/* code to perform on a negative response. */
+    }</PRE>
+<P>
+You may also use <CODE>
+UserStandardDialogOptr()</CODE>
+ for cases in which the strings are referenced through optrs rather than pointers.</P>
+<P CLASS="figTitle">
+Code Display 7-21 A ConfirmDeleteBox with explicit monikers</P>
+<PRE>/* For this case, since we want to provide explicit monikers, we must use the
+ * GIT_MULTIPLE_RESPONSE interaction type. Using this allows us to pass in the
+ * monikers and response values for the response triggers for the dialog. This is
+ * done by passing a pointer to a table consisting of the number of triggers in the
+ * dialog and a StandardDialogResponseTriggerEntry for each trigger. Each entry
+ * contains an optr of the moniker to use and the response value for the trigger.
+ * The moniker may be simple text or a graphics string. The response value may be
+ * one of the predefined InteractionCommands or an application-defined value based
+ * on IC_CUSTOM_START. */</PRE>
+<PRE>@visMoniker ConfirmYesMoniker = &quot;Delete this file&quot;;</PRE>
+<PRE>@visMoniker ConfirmNoMoniker = &quot;Skip this file&quot;;</PRE>
+<PRE>/* Create a table to hold the trigger data. */</PRE>
+<PRE>static const StandardDialog2ResponseTriggerTable confirmResponseTable [] = {
+    2,				/* SD2RTT_numTriggers */
+	/* WRT_trigger1 */
+    {ConfirmYesMoniker,				/* SDRTE_moniker */
+	IC_YES}, 			/* SDRTE_responseValue */
+	/* WRT_trigger2 */
+    {ConfirmNoMoniker,				/* SDRTE_moniker */
+	IC_NO}			/* SDRTE_responseValue */
+};</PRE>
+<PRE>/* Display the dialog with UserStandardDialog(). */</PRE>
+<PRE>if (UserStandardDialog(			(char *)0,
+			(char *)&amp;confirmResponseTable,
+			(char *)0,
+			(char *)0,
+			&quot;Are you sure you want to delete this file?&quot;,
+			((CDT_QUESTION &lt;&lt; CDBF_DIALOG_TYPE_OFFSET) |
+			/* interaction type - application supplied trigger */
+			(GIT_MULTIPLE_RESPONSE &lt;&lt; CBDF_INTERACTION_TYPE_OFFSET)))
+		== IC_YES) {
+	/* delete file */
+}</PRE>
+<P CLASS="figTitle">
+Code Display 7-22 A IC_CUSTOM_START Interaction</P>
+<PRE>#define SAVE_CHANGES				IC_CUSTOM_START+0
+#define ABORT_CHANGES				IC_CUSTOM_START+1
+#define CANCEL_CLOSE				IC_CUSTOM_START+2</PRE>
+<PRE>@visMoniker CloseSaveMoniker = &quot;Save Changes&quot;;
+@visMoniker CloseAbortMoniker = &quot;Abort Changes&quot;:
+@visMoniker CloseCancelMoniker = &quot;Cancel Close&quot;;</PRE>
+<PRE>static const StandardDialog3ResponseTriggerTable closeResponseTable [] = {
+     3, 					/* SD3RTT_numTriggers */
+	/* WRT_trigger1 */
+    {CloseSaveMoniker,					/* SDRTE_moniker */
+    IC_YES},					/* SDRTE_responseValue */
+	/* WRT_trigger2 */
+    {CloseAbortMoniker,					/* SDRTE_moniker */
+    IC_YES},					/* SDRTE_responseValue */
+	/* WRT_trigger3 */
+    {CloseCancelMoniker,					/* SDRTE_moniker */
+    IC_NO}					/* SDRTE_responseValue */
+};</PRE>
+<PRE>closeWithChangesResponse = 
+	(UserStandardDialog(
+		(char *)0,
+		(char *)&amp;closeResponseTable,
+		(char *)0,
+		(char *)0,
+		((CDT_QUESTION &lt;&lt; CDBF_DIALOG_TYPE_OFFSET) |
+		/* interaction type - application supplied triggers */
+		(GIT_MULTIPLE_RESPONSE &lt;&lt; CDBF_INTERACTION_TYPE_OFFSET)),
+		(char *)0);</PRE>
+<PRE>switch (closeWithChangesResponse) {
+    case SAVE_CHANGES:
+	/* save changes */
+    case ABORT_CHANGES:
+	/* abort changes */
+    case IC_CANCEL_CLOSE:
+	/* cancel close */
+    case IC_NULL:
+	/* IC_NULL is always a potential response */
+}</PRE>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Menus_e.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Menus_12.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.4 Managing Input</A> 
+<!-- to next --> | <A HREF="Menus_14.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">5 Interaction Commands</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

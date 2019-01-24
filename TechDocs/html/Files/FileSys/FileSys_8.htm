@@ -1,0 +1,159 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: FileSys_8.htm,v 1.2 97/08/06 15:27:46 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Current Path and Directory Stack</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The File System</A>: 4.2 <A HREF="FileSys_6.htm">Directories and Paths</A>: 
+<A NAME="33340">
+ </A>
+Current Path and Directory Stack</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="FileSys_6.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="FileSys_7.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.1 Standard Paths</A> 
+<!-- to next --> | <A HREF="FileSys_9.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.3 Creating and Deleting Directories</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>FileSetCurrentPath(), FileGetCurrentPath(), FileConstructFullPath(), FileParseStandardPath(), FileResolveStandardPath(), FilePushDir(), FilePopDir(), FileResolveStandardPathFlags</PRE>
+<P>
+Every thread has a <EM>
+current path</EM>
+. When the thread opens a file, it can pass just the name of the file; the file system combines this name with the current path to find the file. The path is a combination of a disk handle and a directory sequence. To set the thread's current path, call the routine <CODE>
+FileSetCurrentPath()</CODE>
+<A NAME="IX_FileSetCurrentPath()">
+ </A>
+, which takes two arguments: a disk handle and a pointer to a null-terminated string. The string should contain a sequence of directories specified in the normal DOS convention. To change to a standard path, pass the path constant as the disk handle and a null string (i.e. a pointer to a null byte). To change to a subdirectory of a standard path, pass the path constant as the disk handle and a pointer to a relative or absolute path specification; for example, to change to the HELLO directory in PRIVDATA, pass the disk handle constant SP_PRIVATE_DATA and a pointer to the string &quot;HELLO&quot;. <CODE>
+FileSetCurrentPath()</CODE>
+ returns the handle of the disk. If you change to a standard path, it returns the path constant; if you change to a directory within a standard path, it returns the constant of the closest standard path. In the event of error, it returns a null handle and sets the thread's error value. The error most commonly returned is ERROR_PATH_NOT_FOUND, indicating that the specified directory could not be found or does not exist. <A NAME="IX_FileSetStandardPath()">
+ </A>
+To set the current path equal to a standard path, use the <CODE>
+FileSetStandardPath()</CODE>
+ routine.</P>
+<P>
+<A NAME="IX_FileGetCurrentPath()">
+ </A>
+To find out the current path, call the routine <CODE>
+FileGetCurrentPath()</CODE>
+. This routine takes two arguments: the address of a character buffer and the size of the buffer. It returns the handle of the current path's disk and writes the path (without drive specifier) to the buffer, truncating the path if the buffer is too small. If the directory is a standard path or a subdirectory of one, <CODE>
+FileGetCurrentPath()</CODE>
+ will return the disk-handle constant for that path and will write an absolute path to the buffer. <A NAME="IX_FileConstructFullPath()">
+ </A>
+If you want a full path, use <CODE>
+FileConstructFullPath()</CODE>
+, described below.</P>
+<P>
+To translate a standard path into a full path, call <CODE>
+FileConstructFullPath()</CODE>
+, which takes five arguments:</P>
+<UL>
+<LI>
+A Boolean value indicating whether the drive name should be prepended to the path string returned. </LI>
+<LI>
+The handle of a disk. A null argument indicates that the path string passed is relative to the current working directory. The handle may be a standard path constant, indicating that the path string passed is relative to that standard path.</LI>
+<LI>
+A pointer to a string containing a path relative to the location indicated by the previous argument. This may be an empty string.</LI>
+<LI>
+A pointer to a pointer to a character buffer. The path will be written to this buffer. The routine will update this to be a pointer to a pointer to the null terminator.</LI>
+<LI>
+The length of that buffer.</LI>
+</UL>
+<P>
+The routine writes the full path to the buffer and returns the disk handle. If it is unable to construct a full path, it returns a null handle. The pointer to the path buffer will have been changed to point to the end of the string; you may want to keep a copy of the old value of the pointer around when using this routine.</P>
+<P>
+<A NAME="IX_FileParseStandardPath()">
+ </A>
+To find the standard path to a given location, call the routine <CODE>
+FileParseStandardPath()</CODE>
+. This routine is passed two arguments:</P>
+<UL>
+<LI>
+The handle of the disk. Passing a null disk handle indicates that the path string contains a drive specifier.</LI>
+<LI>
+A pointer to a pointer to a path string. This path should begin at the root of the disk specified.</LI>
+</UL>
+<P>
+<CODE>
+FileParseStandardPath()</CODE>
+ returns the standard path constant. It also updates the pointer to point to the remaining portion of the path. For example, if you pass a pointer to a pointer to the string &quot;\GEOWORKS\DOCUMENT\MEMOS\APRIL&quot;, the pointer would be updated to point to the &quot;\MEMOS\APRIL&quot; portion, and the handle SP_DOCUMENT would be returned. If the path passed does not belong to a standard path, the constant SP_NOT_STANDARD_PATH will be returned, and the pointers will not be changed.</P>
+<P>
+<A NAME="IX_FileResolveStandardPath()">
+ </A>
+Because each standard path is made up of one or more directories (possibly on different devices), it can be hard to know just where a file is. For that reason, GEOS provides <CODE>
+FileResolveStandardPath()</CODE>
+. This routine is passed a relative path to a file; it then constructs the full path of the file, starting from the root of the disk (<EM>
+not</EM>
+ from a standard path); it also returns the handle of the actual disk containing the file. <CODE>
+FileResolveStandardPath()</CODE>
+ is passed several arguments:</P>
+<UL>
+<LI>
+A pointer to a pointer to a character buffer. The full path will be written to that buffer, and the pointer will be updated to point to the null terminator.</LI>
+<LI>
+The length of the buffer, in bytes.</LI>
+<LI>
+A pointer to a relative path string. This path is relative to the current working directory, which is usually a standard path.</LI>
+<LI>
+A set of <CODE>
+FileResolveStandardPathFlags</CODE>.</LI>
+<LI>A pointer to an empty <CODE>FileAttrs</CODE> buffer; the routine will 
+fill in this buffer with the passed file's attributes, if any.</LI>
+</UL>
+<P>
+<CODE>
+FileResolveStandardPath()</CODE>
+ writes the full, absolute path to the buffer specified. It also returns the handle of the disk containing that file. If it cannot find the file specified, it returns a null handle.<A NAME="IX_FRSPF_&ldots;">
+ </A>
+<A NAME="IX_FileResolveStandardPathFlags">
+ </A>
+ There are two <CODE>
+FileResolveStandardPathFlags</CODE>
+ available:</P>
+<DL>
+<DT>
+FRSPF_ADD_DRIVE_NAME</DT><DD>
+The path string written to the buffer should begin with the drive name (e.g., &quot;C:\GEOWORKS\DOCUMENT\MEMOS&quot;).</DD>
+<DT>
+FRSPF_RETURN_FIRST_DIR</DT><DD>
+<CODE>
+FileResolveStandardPath()</CODE>
+ should not check whether the passed path actually exists; instead, it should assume that the path exists in the first directory comprising the standard path, and return accordingly.</DD>
+</DL>
+<P>
+<A NAME="IX_Directory stack">
+ </A>
+In addition to having a current path, every thread has a <EM>
+directory stack</EM>
+. The stack is used for switching paths quickly. <A NAME="IX_FilePushDir()">
+ </A>
+You can at any time push the current path onto the stack by calling <CODE>
+FilePushDir()</CODE>
+. This routine pushes the directory on the directory stack and returns nothing. <A NAME="IX_FilePopDir()">
+ </A>
+You can change the current path to the one on top of the directory stack by calling <CODE>
+FilePopDir()</CODE>
+. This pops the top directory off the stack and makes it the current path. (If the directory stack is empty, the result is undefined.) These routines are very useful when you write subroutines which may need to change the current working directory; they can push the old directory at the start of the routine and pop it at the end.</P>
+<P>
+Files are often specified &quot;by their paths.&quot; This simply means specifying them with a string containing the directory path and ending with the file name. This path may be either relative or absolute. </P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="FileSys_6.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="FileSys_7.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.1 Standard Paths</A> 
+<!-- to next --> | <A HREF="FileSys_9.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.3 Creating and Deleting Directories</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>
