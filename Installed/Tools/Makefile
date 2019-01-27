@@ -1,6 +1,6 @@
 
 #if defined(linux)
-MK_SET = 
+MK_SET = export
 MK_MAKE = mkdir -p $PARAM ; \
 		cd $PARAM ; \
 		$(MAKE) -k -I$PARAM
@@ -35,7 +35,7 @@ $(BINS) : $(LIBS)
 #if defined(linux)
 	mkdir -p $(ROOT_DIR)/Installed/$(.TARGET) ; \
 	cd $(ROOT_DIR)/Installed/$(.TARGET) ; \
-	$(MAKE) -k -I$(ROOT_DIR)/Installed/$(.TARGET) installlinux \
+	$(MAKE) -k -I$(ROOT_DIR)/Installed/$(.TARGET) installlinux ; \
 	$(MAKE) -k -I$(ROOT_DIR)/Installed/$(.TARGET) installwin32
 #else
 	mkdir $(ROOT_DIR)\Installed\$(.TARGET:S/\//\\/g) & \
