@@ -1,16 +1,12 @@
 
 #if defined(linux)
-MK_SET = export
 MK_MAKE = mkdir -p $PARAM ; \
 		cd $PARAM ; \
 		$(MAKE) -k -I$PARAM
 #else
-MK_SET = set
 MK_MAKE = mkdir %PARAM% & \
 		cd %PARAM% & \
 		$(MAKE) -k -I%PARAM%
-MK_SEP = \	
-
 #endif
 
 
