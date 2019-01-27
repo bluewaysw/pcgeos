@@ -70,7 +70,7 @@ win32OBJS       = win32.md/assert.obj win32.md/code.obj win32.md/data.obj\
 win32LIBS       =
 
 
-SUBDIRS         = test
+SUBDIRS         = 
 
 #if exists(local.mk)
 #include	"local.mk"
