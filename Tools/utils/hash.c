@@ -38,12 +38,9 @@
  *
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: hash.c,v 1.4 96/05/20 18:55:46 dbaumann Exp $";
-#endif lint
 
 #include <config.h>
+#include <search.h>
 #include <compat/queue.h>
 #include <compat/string.h>
 

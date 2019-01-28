@@ -34,10 +34,6 @@
  *	Functions to deal with type descriptions.
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: type.c,v 1.13 94/05/15 15:09:07 adam Exp $";
-#endif lint
 
 
 #include    "esp.h"

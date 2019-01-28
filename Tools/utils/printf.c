@@ -41,13 +41,9 @@
  *
  ***********************************************************************/
 
-#ifndef lint
-static char *rcsid =
-"$Id: printf.c,v 1.10 93/01/13 22:38:58 josh Exp $";
-#endif lint
-
 #include <config.h>
 #include <ctype.h>
+#include <math.h>
 
 #if defined(is68k) || defined(sparc)
 #define sprintf sprintf_is_declared_wrong

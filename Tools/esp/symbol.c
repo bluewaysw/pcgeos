@@ -68,10 +68,6 @@
  *	are placed in the "groups" array.
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: symbol.c,v 3.32 94/03/30 17:57:18 jimmy Exp $";
-#endif lint
 
 #include    "esp.h"
 #include    <objfmt.h>

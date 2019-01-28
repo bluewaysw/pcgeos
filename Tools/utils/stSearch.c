@@ -17,10 +17,6 @@
  *	Utility used to search a hash chain for a string.
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: stSearch.c,v 1.8 92/06/03 16:35:24 adam Exp $";
-#endif lint
 
 #include <config.h>
 #include "stInt.h"

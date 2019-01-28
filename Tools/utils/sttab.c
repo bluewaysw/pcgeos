@@ -31,10 +31,6 @@
  *	string. The strings are never freed.
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: sttab.c,v 1.3 92/06/03 16:35:39 adam Exp $";
-#endif lint
 
 #include <config.h>
 #include <compat/string.h>

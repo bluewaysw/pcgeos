@@ -17,11 +17,6 @@
  *	Look for and enter, if not found, a string in a string table
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: stEnt.c,v 1.3 92/06/22 15:15:20 jimmy Exp $";
-#endif lint
-
 #include <config.h>
 #include "stInt.h"
 
@@ -131,7 +126,7 @@ STAlloc(VMHandle    	vmHandle,   /* Handle of file containing table */
      *
      * Copy the string in and null-terminate it.
      */
-    bcopy(name, stcp->string, len);
+    memcpy(stcp->string, name, len);
     stcp->string[len] = '\0';
     
     /*

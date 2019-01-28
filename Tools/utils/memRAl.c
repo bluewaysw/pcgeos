@@ -22,11 +22,6 @@
  *	Change the size of an existing block.
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: memRAl.c,v 1.2 92/06/02 21:17:54 adam Exp $";
-#endif lint
-
 #include <config.h>
 #include <compat/string.h>
 #include "malloc.h"

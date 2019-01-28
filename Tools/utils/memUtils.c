@@ -24,14 +24,10 @@
  *	Functions to deal with the handle table
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: memUtils.c,v 1.7 96/05/20 18:57:08 dbaumann Exp $";
-#endif lint
-
 #include <config.h>
 #include <compat/string.h>
 #include <compat/stdlib.h>
+#include <compat/file.h>
 
 #ifdef _WIN32
 #include <io.h>

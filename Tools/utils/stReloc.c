@@ -17,10 +17,6 @@
  *	Byte-swapping for string-table blocks.
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: stReloc.c,v 1.7 92/06/22 15:19:10 jimmy Exp $";
-#endif lint
 
 #include <config.h>
 #include "stInt.h"

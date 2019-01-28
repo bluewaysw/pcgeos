@@ -23,16 +23,13 @@
  *	Synchronize a VM file with its in-core image
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: vmUpdate.c,v 1.14 96/05/01 20:07:54 adam Exp $";
-#endif lint
 
 #include <config.h>
 #include <compat/queue.h>
+#include <compat/file.h>
+#include <search.h>
 #include "vmInt.h"
 #include "malloc.h"
-#include <compat/file.h>
 
 #if !defined(_WIN32)
 # define size_t	other_size_t
@@ -737,7 +734,7 @@ VMUpdate(VMHandle   vmHandle)
 	    file->fileHdr.v2.VMFH_headerSize = swapword(block->VMB_size);
 	    file->fileHdr.v2.VMFH_signature = swapword(VMFH_SIG);
 	    FileUtil_Write(file->fd,
-			   (char *)&file->fileHdr.v2,
+			   (const void *)&file->fileHdr.v2,
 			   sizeof(file->fileHdr.v2),
 			   &bytesWritten);
 	    if (bytesWritten != sizeof(file->fileHdr.v2))
@@ -749,7 +746,7 @@ VMUpdate(VMHandle   vmHandle)
 	    file->fileHdr.v1.VMFH_headerSize = swapword(block->VMB_size);
 	    file->fileHdr.v1.VMFH_signature = swapword(VMFH_SIG);
 	    FileUtil_Write(file->fd,
-			   (char *)&file->fileHdr.v1,
+			   (const void *)&file->fileHdr.v1,
 			   sizeof(file->fileHdr.v1),
 			   &bytesWritten);
 	    if (bytesWritten != sizeof(file->fileHdr.v1))

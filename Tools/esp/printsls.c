@@ -21,12 +21,8 @@
  *	Program to print out the contents of an object file.
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: printobj.c,v 3.25 95/02/17 16:27:30 adam Exp $";
-#endif lint
 
-#include    <config.h>
+#include    "config.h"
 
 #include    <st.h>
 #include    <objfmt.h>

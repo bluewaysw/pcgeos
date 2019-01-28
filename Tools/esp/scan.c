@@ -28,10 +28,6 @@
  *	Lexical analyzer for Esp. Taken mostly from the scanner for Asap.
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: scan.c,v 1.51 94/03/31 13:20:54 jimmy Exp $";
-#endif lint
 
 #include    "esp.h"
 #include    "scan.h"
@@ -79,7 +75,7 @@ int 	    	lexdebug=0;
 #define DBG(args)
 #endif
 
-FILE	    	*yyin = stdin;
+FILE	    	*yyin;
 int	    	yylineno=1;
 
 LexProc	    	*yylex;
@@ -240,7 +236,7 @@ static MacState	    *freeState = (MacState *)NULL;
  *	ardeb	8/29/89		Initial Revision
  *
  ***********************************************************************/
-inline void
+static inline void
 yynewline(void)
 {
     yylineno++;
@@ -776,7 +772,7 @@ NextID(char **pbPtr)	    /* Place to store original pushback pointer
 			     * if the next token is indeed an identifier */
 {
     char    *cp;
-    char    c;
+    int     c;
     int	    pushspace = 0; /* Non-zero if should push back
 			    * a single space when done. */
     int	    retval = TRUE;
@@ -831,6 +827,10 @@ NextID(char **pbPtr)	    /* Place to store original pushback pointer
 /*
  * Include the keyword table definitions.
  */
+#define inline static
+#define __inline /* nothing */
+#undef __GNUC__
+
 #include    "opcodes.h"
 #undef MIN_WORD_LENGTH
 #undef MAX_WORD_LENGTH
@@ -880,6 +880,8 @@ NextID(char **pbPtr)	    /* Place to store original pushback pointer
 #undef MAX_HASH_VALUE
 #undef TOTAL_KEYWORDS
 
+#undef inline
+#undef __inline
 
 /*
  * Stack of opcode-search functions to try. Certain contexts require special
@@ -908,7 +910,7 @@ static int  	opfTop = -1;
  *	ardeb	8/18/89		Initial Revision
  *
  ***********************************************************************/
-inline int
+int
 Scan_UseOpProc(OpProc	*proc)
 {
     assert(opfTop != MAX_OP_FUNCS);
@@ -932,7 +934,7 @@ Scan_UseOpProc(OpProc	*proc)
  *	ardeb	8/18/89		Initial Revision
  *
  ***********************************************************************/
-inline void
+void
 Scan_DontUseOpProc(int	idx)
 {
     if (idx != opfTop) {
@@ -1389,7 +1391,7 @@ ScanEquate(YYSTYPE  *yylval)
     MBlk    *head;
     MBlk    *tail;
     char    *cp;
-    char    c;
+    int      c;
 
     /*
      * Skip leading white-space
@@ -1564,7 +1566,7 @@ ScanComment(void)
      * on that line and go back and fetch another token.
      */
     char    delim;
-    char    c;
+    int     c;
 
     DBPRINTF((stderr,"Skipping comment block\n"));
     while((c = input()) == ' ' || c == '\t') {
@@ -3359,7 +3361,7 @@ yyreadmacrobody(char	***paramsPtr,/* Array of words to be mapped when macro
 		**mpp,    	/* Place to store address of next block */
 		*head;    	/* Head of the chain of text */
     char	*cp;	    	/* Current place in mp->text */
-    char	c;	    	/* Character read */
+    int  	c;	    	/* Character read */
     int		i;	    	/* Argument number */
     int	    	nesting=0;  	/* Macro nesting level to determine when an
 				 * "endm" is actually for this macro */
@@ -3434,7 +3436,7 @@ yyreadmacrobody(char	***paramsPtr,/* Array of words to be mapped when macro
 		 * via doubling), nor does it deal with nested <> strings
 		 */
 		instring = 0;
-	    } else if (c == '"' || c == '\'' && !instring) {
+	    } else if ((c == '"' || c == '\'') && !instring) {
 		/*
 		 * Found start of string -- avoid recognizing and skipping
 		 * comments inside it.

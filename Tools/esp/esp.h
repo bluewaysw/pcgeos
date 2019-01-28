@@ -20,7 +20,7 @@
 #ifndef _ESP_H_
 #define _ESP_H_
 
-#include <config.h>
+#include "config.h"
 #include <compat/queue.h>
 #include <compat/string.h>
 #include <compat/stdlib.h>
@@ -36,10 +36,6 @@
 #include <bswap.h>
 #include <st.h>			/* String table definitions */
 #include <malloc.h>
-
-#if !defined(_LINUX)
-#define alloca(size) alloca_isnt_portable_you_goob_so_dont_use_it()
-#endif
 
 #define FALSE	  0
 #define TRUE	  (!FALSE)
@@ -201,8 +197,8 @@ extern ID   	    	*libNames;    	/* Name(s) of library being assembled */
 extern int  	    	numLibNames;
 
 /* parse.y */
-extern void	yywarning(char *fmt, ...);
-extern void     yyerror(char *fmt, ...);
+extern void	yywarning(const char *fmt, ...);
+extern void     yyerror(const char *fmt, ...);
 extern int  	yyparse(void);
 extern int  	dot;
 extern int  	fall_thru;  	    	/* Set if .fall_thru directive was

@@ -24,17 +24,6 @@
 #ifndef _STRING_H_
 #define _STRING_H_
 
-/*
- * For now, I'm assuming that these are going to vary by OS rather
- * than compiler.  If that ever stops working, feel free to change
- * this appropriately.
- */
-#if defined(unix)
-#include <strings.h>
-#elif defined(_MSDOS) || defined(_WIN32) || defined(_LINUX)
 #include <string.h>
-#else
-#error Your compiler/OS is not yet supported
-#endif
 
 #endif /* _STRING_H_ */

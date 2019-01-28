@@ -17,10 +17,6 @@
  *	Change the user-assigned ID number for a VM block
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: vmModUID.c,v 1.5 91/04/26 11:53:29 adam Exp $";
-#endif lint
 
 #include <config.h>
 #include "vmInt.h"

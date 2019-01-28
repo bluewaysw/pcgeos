@@ -26,10 +26,12 @@
 
 #if defined(unix)
 # include <sys/file.h>
+# include <sys/types.h>
 # include <unistd.h>
 #elif defined(_LINUX)
 /*# include <sys/file.h>*/
 # include <sys/stat.h>
+# include <sys/types.h>
 # include <unistd.h>
 # include <fcntl.h>
 #elif defined(_MSDOS) || defined(_WIN32)

@@ -27,10 +27,6 @@
  *	XXX: Eventually, this will have to support external constants.
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: expr.c,v 3.49 95/02/17 16:25:49 adam Exp $";
-#endif lint
 
 #include    "esp.h"
 #include    "expr.h"
@@ -3896,6 +3892,7 @@ Expr_Eval(Expr      	*expr,	    	/* Expression to evaluate */
 			val = (1<<10); break;
 		    case SYM_CHUNK:
 			val = (1<<11); break;
+			default:;
 		    }
 		} else if (tos->type == EXPR_TYPE_SEGSYM) {
 		    /* segment constant */
@@ -3907,6 +3904,7 @@ Expr_Eval(Expr      	*expr,	    	/* Expression to evaluate */
 			case SYM_ETYPE: 	val = (1<< 8)|(1<<11); break;
 			case SYM_TYPE:  	val = (1<<11); break;
 			case SYM_RECORD:	val = (1<< 9)|(1<<11); break;
+			default:;
 			}
 		    } else if (tos->data.type->tn_type == TYPE_NEAR) {
 			/* near code */
@@ -4549,6 +4547,7 @@ Expr_Eval(Expr      	*expr,	    	/* Expression to evaluate */
 				ExprError("cannot find low portion of expression");
 			    case EXPR_HIGHPART:
 				ExprError("cannot find high portion of expression");
+				default:;
 			}
 		    }
 		} else if (elt->op == EXPR_LOWPART || elt->op == EXPR_HIGHPART){

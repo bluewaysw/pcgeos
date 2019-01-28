@@ -17,10 +17,6 @@
  *	Lock a VM block, returning its handle and address
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: vmLock.c,v 1.6 92/06/17 17:41:27 jimmy Exp $";
-#endif lint
 
 #include <config.h>
 #include "vmInt.h"

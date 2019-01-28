@@ -21,10 +21,6 @@
  *	Functions to set/get the VM file's attribute bits.
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: vmAttr.c,v 1.3 92/12/10 22:08:46 adam Exp $";
-#endif lint
 
 #include <config.h>
 #include "vmInt.h"

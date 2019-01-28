@@ -151,12 +151,7 @@
 
 #define HAVE_STRCASECMP
 
-/*
- * Argh, SunOS doesn't have strerror(), so we can't define
- * HAVE_STRERROR here.
- */
-/* #define HAVE_STRERROR */
-
+#define HAVE_STRERROR
 
 #define HAVE_STRNCASECMP
 

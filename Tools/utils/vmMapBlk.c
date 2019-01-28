@@ -23,10 +23,6 @@
  *	Functions for playing with the map block
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: vmMapBlk.c,v 1.6 92/06/02 21:19:08 adam Exp $";
-#endif lint
 
 #include <config.h>
 #include "vmInt.h"

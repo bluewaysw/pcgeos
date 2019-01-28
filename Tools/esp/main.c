@@ -18,10 +18,6 @@
  *	Main module for Esp. Initialization and control.
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: main.c,v 1.58 95/04/27 18:07:55 jimmy Exp $";
-#endif lint
 
 #include    <config.h>
 #include    <compat/file.h>

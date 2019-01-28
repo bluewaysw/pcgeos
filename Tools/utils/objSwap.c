@@ -22,11 +22,6 @@
  *	PC/GEOS object file.
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: objSwap.c,v 1.10 96/05/20 18:57:19 dbaumann Exp $";
-#endif lint
-
 #include <config.h>
 #include <os90.h>
 #include "objSwap.h"

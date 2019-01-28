@@ -17,10 +17,6 @@
  *	Nuke any memory associated witha block
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: vmEmpty.c,v 3.1 91/04/26 11:52:08 adam Exp $";
-#endif lint
 
 #include <config.h>
 #include "vmInt.h"

@@ -27,6 +27,8 @@ void __eprintf ();		/* Defined in gnulib */
 
 # ifdef __STDC__
 
+extern void abort();
+
 # define __assert(expression, file, line)  \
   (__eprintf ("Failed assertion " expression		\
 	      " at line %d of `" file "'.\n", line),	\

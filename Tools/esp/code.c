@@ -82,10 +82,6 @@
  *	Code generators. All functions are FixProc's...
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: code.c,v 3.43 95/09/20 14:50:21 weber Exp $";
-#endif lint
 
 #include    "esp.h"
 #include    "fixup.h"

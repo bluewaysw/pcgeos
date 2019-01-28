@@ -22,11 +22,6 @@
  *	Allocate a block.
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: memAl.c,v 1.1 91/04/26 11:47:36 adam Exp $";
-#endif lint
-
 #include <config.h>
 #include <compat/string.h>
 

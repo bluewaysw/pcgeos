@@ -1,7 +1,3 @@
-#if !defined(lint)
-static	char *sccsid = "@(#)malloc.c 1.1 86/09/24 SMI";
-#endif
-
 /*
  * Copyright (c) 1986 by Sun Microsystems, Inc.
  *
@@ -34,6 +30,7 @@ static	char *sccsid = "@(#)malloc.c 1.1 86/09/24 SMI";
 #include <fileUtil.h>
 #include <stddef.h>
 #include <stdarg.h>
+#include <compat/string.h>
 
 #if defined(_MSDOS) && defined(__HIGHC__)
 #include <pharlap.h>

@@ -22,11 +22,6 @@
  *	Free a block and handle
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: memFree.c,v 1.4 91/04/26 11:47:54 adam Exp $";
-#endif lint
-
 #include <config.h>
 #include "malloc.h"
 #include "memInt.h"

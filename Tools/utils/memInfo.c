@@ -22,11 +22,6 @@
  *	Retrieve information about a handle
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: memInfo.c,v 1.6 92/06/17 17:42:48 jimmy Exp $";
-#endif lint
-
 #include <config.h>
 #include "memInt.h"
 

@@ -22,11 +22,6 @@
  *	Allocate a block and lock it immediately.
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: memAlLkd.c,v 1.1 91/04/26 11:47:46 adam Exp $";
-#endif lint
-
 #include <config.h>
 #include "memInt.h"
 

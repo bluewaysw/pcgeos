@@ -17,11 +17,6 @@
  *	Return the hash value for an identifier
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: stIndex.c,v 1.4 91/04/26 11:50:08 adam Exp $";
-#endif lint
-
 #include <config.h>
 #include "stInt.h"
 #include <stddef.h>

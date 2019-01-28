@@ -34,10 +34,6 @@
  *	XXX: Optimize for byte-sized elements?
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: table.c,v 1.12 92/06/30 12:47:49 jimmy Exp $";
-#endif lint
 
 #include    "esp.h"
 #include    "table.h"

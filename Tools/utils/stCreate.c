@@ -17,11 +17,6 @@
  *	Create a string table in a VM file
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: stCreate.c,v 1.6 91/04/26 11:49:32 adam Exp $";
-#endif lint
-
 #include <config.h>
 #include "stInt.h"
 

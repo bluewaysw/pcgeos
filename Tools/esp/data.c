@@ -29,10 +29,6 @@
  *	(there being nothing to optimize or finalize as far as data go).
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: data.c,v 1.35 94/11/10 14:51:34 adam Exp $";
-#endif lint
 
 #if defined(__HIGHC__)
 pragma Code("MYDATA");

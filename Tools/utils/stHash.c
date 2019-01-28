@@ -17,11 +17,6 @@
  *	Hash function for string table.
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: stHash.c,v 1.7 92/06/03 16:34:57 adam Exp $";
-#endif lint
-
 #include <config.h>
 #include "stInt.h"
 
