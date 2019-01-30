@@ -27,6 +27,7 @@
 #include <config.h>
 #include <compat/queue.h>
 #include <compat/file.h>
+#include <compat/string.h>
 #include <search.h>
 #include "vmInt.h"
 #include "malloc.h"
@@ -126,13 +127,13 @@ VMFlushWrites(VMFilePtr	    file)
 {
     genptr	buf;
     int	    	inbuf;
-    struct stat	stb;
+    /* struct stat	stb; */
     VMQueue 	*q, *nq;
     int	    	offset;
     int	    	blksize = 2048;	/* assume 2048, unless we can
 				 * find out more in a particular
  				 * OS */
-    int	    	fstatResult;
+    /* int	    	fstatResult; */
     long    	bytesWritten = 0;
 
 #if 0
@@ -185,7 +186,7 @@ VMFlushWrites(VMFilePtr	    file)
 	     * offset accordingly.
 	     */
 	    if (inbuf + q->size < blksize) {
-		bcopy(q->block, buf+inbuf, q->size);
+		memcpy(buf+inbuf, q->block, q->size);
 		inbuf += q->size;
 		offset += q->size;
 		q->size = 0;
@@ -198,7 +199,7 @@ VMFlushWrites(VMFilePtr	    file)
 		 */
 		int n = blksize - inbuf;
 
-		bcopy(q->block, buf+inbuf, n);
+		memcpy(buf+inbuf, q->block, n);
 		q->size -= n;
 		q->block += n;
 		offset += n;
@@ -358,7 +359,6 @@ VMWriteBlock(VMFilePtr	file,	    /* File to which block belongs */
 
     VMBlockHandle blockH;
     int	    	doSwap=0;
-    int         bytesWritten = 0;
 
     hdr = file->blkHdr;
     
@@ -520,20 +520,23 @@ VMWriteBlock(VMFilePtr	file,	    /* File to which block belongs */
 	/*
 	 * Write the data out.
 	 */
-	FileUtil_Write(file->fd, addr, size, &bytesWritten);
-	if (bytesWritten < size) {
-	    /*
-	     * No room on device? Mark the block as still dirty and return 0
-	     * to signal error.
-	     *
-	     * XXX: Release file space?
-	     */
-	    /*
-	     * Swap header back, if necessary.
-	     */
-	    VMSwapHeader(file->blkHdr, size);
-	    block->VMB_sig = VM_DIRTY_BLK_SIG;
-	    return 0;
+	{
+		int         bytesWritten = 0;
+		FileUtil_Write(file->fd, addr, size, &bytesWritten);
+		if (bytesWritten < size) {
+			/*
+			 * No room on device? Mark the block as still dirty and return 0
+			 * to signal error.
+			 *
+			 * XXX: Release file space?
+			 */
+			/*
+			 * Swap header back, if necessary.
+			 */
+			VMSwapHeader(file->blkHdr, size);
+			block->VMB_sig = VM_DIRTY_BLK_SIG;
+			return 0;
+		}
 	}
 
 	/*

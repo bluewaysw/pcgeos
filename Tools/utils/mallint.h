@@ -92,7 +92,7 @@ struct	dblk	{
  *	can be introduced by errant programs.
  */
 
-#define blkhdr(p)   	(Dblk)((p)==0?(malloc_t)0:(((malloc_t)p)-(int)&((Dblk)0)->data))
+#define blkhdr(p)   	(Dblk)((p)==0?(malloc_t)0:(((malloc_t)p)-(intptr_t)&((Dblk)0)->data))
 #define	weight(x)	((x) == NIL? 0: (x->size))
 #define	roundup(x, y)   ((((x)+((y)-1))/(y))*(y))
 #define	nextblk(p, size) ((Dblk) ((malloc_t) (p) + (size)))
@@ -105,9 +105,9 @@ struct	dblk	{
 #define heapsize()	(_ubound - _lbound)
 
 #if defined(sparc)
-#define misaligned(p)	((unsigned)(p)&7)
+#define misaligned(p)	((intptr_t)(p)&7)
 #else
-#define misaligned(p)	((unsigned)(p)&3)
+#define misaligned(p)	((intptr_t)(p)&3)
 #endif
 
 extern	Freehdr	_root;

@@ -18,6 +18,7 @@
  *
  ***********************************************************************/
 #include <config.h>
+#include <compat/string.h>
 #include "stInt.h"
 
 

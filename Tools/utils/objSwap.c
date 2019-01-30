@@ -725,7 +725,7 @@ ObjSwap_Reloc(VMHandle	    vmHandle,	/* File from whence it comes */
 	      MemHandle	    handle, 	/* Its memory handle */
 	      genptr block) 	/* The base of the locked block */
 {
-    static const VMRelocRoutine  *relocRoutines[] = {
+    static VMRelocRoutine  *relocRoutines[] = {
 	ST_Reloc,   	      /* OID_STRING_HEAD */
 	ST_Reloc,   	      /* OID_STRING_CHAIN */
 	ObjSwapRelBlock,      /* OID_REL_BLOCK */
@@ -775,7 +775,7 @@ ObjSwap_Reloc_NewFormat(
 	      MemHandle	    handle, 	/* Its memory handle */
 	      genptr block) 	/* The base of the locked block */
 {
-    static const VMRelocRoutine  *relocRoutines_NewFormat[] = {
+    static VMRelocRoutine  *relocRoutines_NewFormat[] = {
 	ST_Reloc, 	  /* OID_STRING_HEAD */
 	ST_Reloc,    	  /* OID_STRING_CHAIN */
 	ObjSwapRelBlock,  /* OID_REL_BLOCK */

@@ -30,6 +30,7 @@
 #include <fileUtil.h>
 #include <stddef.h>
 #include <stdarg.h>
+#include <stdint.h>
 #include <compat/string.h>
 
 #if defined(_MSDOS) && defined(__HIGHC__)
@@ -175,8 +176,8 @@ static	int debug_level = 1;
 
 #else	/*!DEBUG	=================================================*/
 
-#define malloc_debug(level) 0
-#define malloc_verify() 1
+#define malloc_debug(level) do {} while(0)
+#define malloc_verify() do {} while(0)
 #define debug_level 0
 #define badblksize(p,size) 0
 
@@ -490,7 +491,7 @@ delete(register Freehdr	*p)
 		if (left_weight == 0) {
 		    /* zero-length block */
 		    error("blocksize=0 at %#x\n",
-			  (int)left_branch->block->data);
+			  (intptr_t)left_branch->block->data);
 		    break;
 		}
 		*p = left_branch;
@@ -505,8 +506,8 @@ delete(register Freehdr	*p)
 	    if (right_branch != NIL) {
 		if (right_weight == 0) {
 		    /* zero-length block */
-		    error("blocksize=0 at %#x\n",
-			  (int)right_branch->block->data);
+		    error("blocksize=0 at %p\n",
+			  right_branch->block->data);
 		    break;
 		}
 		*p = right_branch;
@@ -834,8 +835,7 @@ free(malloc_t ptr)
     LOG(("f %d %#x\n", nbytes, oldblk));
 
     if (badblksize(oldblk,nbytes)) {
-	error("free: bad block size (%d) at %#x\n",
-	      (int)nbytes, (int)oldblk );
+	error("free: bad block size (%d) at %p\n", nbytes, oldblk);
 	return;
     }
 
@@ -869,8 +869,8 @@ free(malloc_t ptr)
 		 * is bad news.  Return to avoid
 		 * further fouling up the the tree.
 		 */
-		error("free: blocks %#x, %#x overlap\n",
-		      (int)oldblk, (int)neighbor_blk);
+		error("free: blocks %p, %p overlap\n",
+		      oldblk, neighbor_blk);
 		return;
 	    } else {
 		/*
@@ -904,8 +904,7 @@ free(malloc_t ptr)
 		/*
 		 * This block has already been freed
 		 */
-		error("free: block %#x was already free\n",
-		      (int)ptr);
+		error("free: block %p was already free\n", ptr);
 		return;
 	    } else {
 		/*
@@ -918,7 +917,7 @@ free(malloc_t ptr)
 	     * This block has already been freed
 	     * as "oldblk == neighbor_blk"
 	     */
-	    error("free: block %#x was already free\n", (int)ptr);
+	    error("free: block %p was already free\n", ptr);
 	    return;
 	}			/*else*/
 
@@ -1528,7 +1527,7 @@ getfreehdr(int allowgc)
     if (nfreehdrs <= 0) {
 	size = NFREE_HDRS*sizeof(struct freehdr) + sizeof(struct dblk);
 	blk = (Dblk) sbrk(size);
-	if ((int)blk == -1) {
+	if ((intptr_t)blk == -1) {
 	    if (noerr) {
 		malloc_err(1, oom, strlen(oom));
 		if (allowgc) {
@@ -2176,7 +2175,7 @@ malloc_printstats(malloc_printstats_callback *printFunc, void *data)
     while (p < (Dblk) _ubound) {
 	size = p->size;
 #if !defined(DEBUG)
-	fp = (Freehdr)(p->tag == 0xff);
+	fp = (Freehdr)(intptr_t)(p->tag == 0xff);
 #else
 	fp = malloc_findhdr(p);
 #endif
@@ -2259,7 +2258,7 @@ shrinkheap(void)
 	 * Final block is at the end of memory. Good. See if we can reduce
 	 * it a page or more...
 	 */
-	malloc_t p = (malloc_t)roundup((int)hp->block,nbpg);
+	malloc_t p = (malloc_t)roundup((intptr_t)hp->block,nbpg);
 	Dblk	b;
 	int 	size;
 

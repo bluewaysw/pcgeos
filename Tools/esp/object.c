@@ -1291,6 +1291,7 @@ ObjRelocType(SymbolPtr	tag,	    /* VarData tag for which table is
 	    }
 	    break;
 	}
+	default:;
     }
 }
 

@@ -40,7 +40,8 @@
 #if defined(__HIGHC__)
 typedef unsigned long Opaque;
 #else
-typedef void *Opaque;
+#include <stdint.h>
+typedef intptr_t Opaque;
 #endif
 typedef char *Address;
 typedef int Boolean;

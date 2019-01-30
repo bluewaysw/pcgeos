@@ -1928,6 +1928,7 @@ Data_Enter(int	    	*addrPtr,   /* IN/OUT: address at which to store */
 		case TYPE_PTR:
 		    return Data_Enter(addrPtr, type->tn_u.tn_array.tn_base,
 				      expr, type->tn_u.tn_array.tn_length);
+		default:;
 	    }
 	}
 	

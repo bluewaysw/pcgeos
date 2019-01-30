@@ -583,6 +583,7 @@ FixupReadWriteCheck(int	       *addrPtr,  /* IN/OUT: Address of inst start */
     {
 	case FR_UNDEF: return(FR_UNDEF);
 	case FR_ERROR: return (FR_ERROR);
+	default:;
     }
 
     /*
@@ -2199,6 +2200,7 @@ Code_Arith2(int	*addrPtr,	/* IN/OUT: Address of instruction start */
     {
 	case FR_UNDEF: return(FR_UNDEF);
 	case FR_ERROR: return (FR_ERROR);
+	default:;
     }
 
     /*
@@ -2455,6 +2457,7 @@ Code_BitNF(int	    *addrPtr,	/* IN/OUT: Address of instruction start/end */
     {
 	case FR_UNDEF: return(FR_UNDEF);
 	case FR_ERROR: return (FR_ERROR);
+	default:;
     }
 
     /*
@@ -3244,7 +3247,6 @@ Code_DPShift(int *addrPtr,	/* IN/OUT: Address of instruction start */
 				 * + sib + 4 disp + db */
     byte    	*ip = ibuf;
     int	    	opSize;
-    int		isDWord;	/* 1 if opSize is 4, 0 if not */
     ExprResult	res1, res2;
     FixResult	result;
     long	count = (long)data;
@@ -3273,7 +3275,6 @@ Code_DPShift(int *addrPtr,	/* IN/OUT: Address of instruction start */
     {
 	return(FR_ERROR);
     }
-    isDWord = (opSize == 4) ? 1 : 0;
 
     if (RES_IS_CONST(res1.type) || RES_IS_CONST(res2.type)) {
 	Notify(NOTIFY_ERROR, expr1->file, expr1->line,
@@ -3781,7 +3782,6 @@ Code_Fcom(int	    *addrPtr,	/* address of instruction start */
     int	    	fixAddr;
     OpCode  	*op = (OpCode *)data;
     int	    	delay=0, startAddr, typesize;
-    byte    	regValue;
 
 
 
@@ -3791,8 +3791,6 @@ Code_Fcom(int	    *addrPtr,	/* address of instruction start */
 
     ADD_FWAIT_FOR_8087(fixAddr, ip);
 
-    /* regValue contains register info for modrm byte */
-    regValue = (byte)((op->value & 0xf000) >> 12);
     if (expr1 == NULL)	/* if no operands, just stick in the opcode */
     {
 	*ip = (byte)((op->value & 0x0f00) >> 8);
@@ -4484,7 +4482,7 @@ Code_Fxch(int	    *addrPtr,	/* IN/OUT: Address of instruction start */
     FixResult	result;
     int	    	fixAddr;
     OpCode  	*op = (OpCode *)data;
-    int	    	delay, startAddr;
+    int	    	delay;
 
     START_CODEGEN(pass, *addrPtr, FR_DONE, FR_ERROR);
 
@@ -4528,7 +4526,6 @@ Code_Fxch(int	    *addrPtr,	/* IN/OUT: Address of instruction start */
     /*
      * Install the instruction itself.
      */
-    startAddr = *addrPtr;
     if (res == NULL) /* no operands */ {
     	CodeFinal(addrPtr, pass, ip-ibuf, prevSize, ibuf, res,
 		    -1, NullID, 0, delay);
@@ -6718,6 +6715,7 @@ Code_Move(int	*addrPtr,	/* IN/OUT: Address of instruction start */
     {
 	case FR_UNDEF: return(FR_UNDEF);
 	case FR_ERROR: return (FR_ERROR);
+	default:;
     }
 
     /*
@@ -7075,7 +7073,6 @@ Code_NoArg(int	*addrPtr,	/* IN/OUT: Address of instruction start */
 {
     OpCode  	*op = (OpCode *)data;
     byte    	ibuf[3], *ip = ibuf;
-    int	    	len = 1;
 
     START_CODEGEN(pass, *addrPtr, FR_DONE, FR_ERROR);
 
@@ -8615,7 +8612,6 @@ Code_Xchg(int	*addrPtr,	/* IN/OUT: Address of instruction start */
     int	    	opSize;
     int	    	notByte;    	/* 0 if opSize is 1, 1 if not -- used
 				 * when forming opcodes */
-    int		isDWord;	/* 1 if opSize is 4, 0 if not */
     int	    	delay, startAddr;
 
     START_CODEGEN(pass, *addrPtr, FR_DONE, FR_ERROR);
@@ -8662,7 +8658,6 @@ Code_Xchg(int	*addrPtr,	/* IN/OUT: Address of instruction start */
     }
 
     notByte = (opSize == 1) ? 0 : 1;
-    isDWord = (opSize == 4) ? 1 : 0;
 
     /*
      * Handle special case of exchanging AX with a word register...
@@ -8740,19 +8735,19 @@ static const struct {
     word    pop;
     int	    mask;
 } regsave[] = {
-    0x50,   0x58,   1L << REG_AX,
-    0x51,   0x59,   1L << REG_CX,
-    0x52,   0x5a,   1L << REG_DX,
-    0x53,   0x5b,   1L << REG_BX,
-    0x54,   0x5c,   1L << REG_SP,
-    0x55,   0x5d,   1L << REG_BP,
-    0x56,   0x5e,   1L << REG_SI,
-    0x57,   0x5f,   1L << REG_DI,
-    0x06,   0x07,   1L << (REG_SEGBASE+REG_ES),
-    0x16,   0x17,   1L << (REG_SEGBASE+REG_SS),
-    0x1e,   0x1f,   1L << (REG_SEGBASE+REG_DS),
-    0x0fa0, 0x0fa1, 1L << (REG_SEGBASE+REG_FS),
-    0x0fa8, 0x0fa9, 1L << (REG_SEGBASE+REG_GS),
+    { 0x50,   0x58,   1L << REG_AX },
+    { 0x51,   0x59,   1L << REG_CX },
+    { 0x52,   0x5a,   1L << REG_DX },
+    { 0x53,   0x5b,   1L << REG_BX },
+    { 0x54,   0x5c,   1L << REG_SP },
+    { 0x55,   0x5d,   1L << REG_BP },
+    { 0x56,   0x5e,   1L << REG_SI },
+    { 0x57,   0x5f,   1L << REG_DI },
+    { 0x06,   0x07,   1L << (REG_SEGBASE+REG_ES) },
+    { 0x16,   0x17,   1L << (REG_SEGBASE+REG_SS) },
+    { 0x1e,   0x1f,   1L << (REG_SEGBASE+REG_DS) },
+    { 0x0fa0, 0x0fa1, 1L << (REG_SEGBASE+REG_FS) },
+    { 0x0fa8, 0x0fa9, 1L << (REG_SEGBASE+REG_GS) },
 };
 
 #define ALL_REG	((1L<<REG_SEGBASE)-1)

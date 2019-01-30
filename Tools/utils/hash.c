@@ -576,7 +576,7 @@ Hash(register Hash_Table    *tablePtr,
 	    }
 	    break;
 	case HASH_ONE_WORD_KEYS:
-	    i = (int) key;
+	    i = (int)(intptr_t) key;
 	    break;
 	case 2:
 	    i = ((int *) key)[0] + ((int *) key)[1];

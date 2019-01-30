@@ -19,6 +19,7 @@
  ***********************************************************************/
 
 #include <config.h>
+#include <compat/string.h>
 #include "stInt.h"
 
 
@@ -70,7 +71,7 @@ STSearch(VMHandle   	vmHandle,   	/* Handle of VM file */
 	     stcp = ST_NEXT_CP(stcp,stcp->length))
 	{
 	    if ((stcp->hashval == hashval) && (stcp->length == len) &&
-		bcmp(stcp->string, name, len) == 0)
+		memcmp(stcp->string, name, len) == 0)
 	    {
 		result = (ID)((hdr->chains[bucket] << 16) |
 			      (stcp->string - (char *)chdr));

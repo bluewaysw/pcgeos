@@ -92,7 +92,6 @@ VMSetHeader(VMHandle	    vmHandle,
 {
     VMFilePtr	file = (VMFilePtr)vmHandle;
     long	bytesWritten = 0;
-    int		seekPos = 0;
 
     FileUtil_Seek(file->fd, 0L, SEEK_SET);
     if (file->flags & VM_2_0) {

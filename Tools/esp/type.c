@@ -54,29 +54,29 @@ static struct {
     TypePtr 	    ptrto;
     int	    	    size;
 }	typeInts[] = {
-    TYPE_INT, 	    0,	0,  0,	0,
-    TYPE_INT,	    0,	0,  0,	1,
-    TYPE_INT,	    0,	0,  0,	2,
-    TYPE_INT,	    0,	0,  0,	3,  /* BOGUS */
-    TYPE_INT,	    0,	0,  0,	4,
-    TYPE_INT,	    0,	0,  0,	5,  /* BOGUS */
-    TYPE_INT,	    0,	0,  0,	6,  /* BOGUS */
-    TYPE_INT,	    0,	0,  0,	7,  /* BOGUS */
-    TYPE_INT,	    0,	0,  0,	8,
-    TYPE_INT,	    0,	0,  0,	9,  /* BOGUS */
-    TYPE_INT,	    0,	0,  0,	10,
+    { TYPE_INT, 	    0,	0,  0,	0, },
+    { TYPE_INT,	    0,	0,  0,	1, },
+    { TYPE_INT,	    0,	0,  0,	2, },
+    { TYPE_INT,	    0,	0,  0,	3,  /* BOGUS */ },
+    { TYPE_INT,	    0,	0,  0,	4, },
+    { TYPE_INT,	    0,	0,  0,	5,  /* BOGUS */ },
+    { TYPE_INT,	    0,	0,  0,	6,  /* BOGUS */ },
+    { TYPE_INT,	    0,	0,  0,	7,  /* BOGUS */ },
+    { TYPE_INT,	    0,	0,  0,	8, },
+    { TYPE_INT,	    0,	0,  0,	9,  /* BOGUS */ },
+    { TYPE_INT,	    0,	0,  0,	10, },
 },	typeSInts[] = {
-    TYPE_SIGNED,    0,	0,  0,	0,
-    TYPE_SIGNED,    0,	0,  0,	1,
-    TYPE_SIGNED,    0,	0,  0,	2,
-    TYPE_SIGNED,    0,	0,  0,	3,  /* BOGUS */
-    TYPE_SIGNED,    0,	0,  0,	4,
-    TYPE_SIGNED,    0,	0,  0,	5,  /* BOGUS */
-    TYPE_SIGNED,    0,	0,  0,	6,  /* BOGUS */
-    TYPE_SIGNED,    0,	0,  0,	7,  /* BOGUS */
-    TYPE_SIGNED,    0,	0,  0,	8,
-    TYPE_SIGNED,    0,	0,  0,	9,  /* BOGUS */
-    TYPE_SIGNED,    0,	0,  0,	10,
+    { TYPE_SIGNED,    0,	0,  0,	0, },
+    { TYPE_SIGNED,    0,	0,  0,	1, },
+    { TYPE_SIGNED,    0,	0,  0,	2, },
+    { TYPE_SIGNED,    0,	0,  0,	3,  /* BOGUS */ },
+    { TYPE_SIGNED,    0,	0,  0,	4, },
+    { TYPE_SIGNED,    0,	0,  0,	5,  /* BOGUS */ },
+    { TYPE_SIGNED,    0,	0,  0,	6,  /* BOGUS */ },
+    { TYPE_SIGNED,    0,	0,  0,	7,  /* BOGUS */ },
+    { TYPE_SIGNED,    0,	0,  0,	8, },
+    { TYPE_SIGNED,    0,	0,  0,	9,  /* BOGUS */ },
+    { TYPE_SIGNED,    0,	0,  0,	10, },
 };
 #define NUM_INTS (sizeof(typeInts)/sizeof(typeInts[0]))
 #define NUM_SINTS (sizeof(typeSInts)/sizeof(typeSInts[0]))

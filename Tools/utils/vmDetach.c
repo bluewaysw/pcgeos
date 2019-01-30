@@ -82,7 +82,7 @@ VMDetach(VMHandle   	vmHandle,
 	    /*
 	     * No copy of the block in the file -- choke now.
 	     */
-	    return((MemHandle)NULL);
+	    return 0;
 	}
     }
     

@@ -382,7 +382,7 @@ decode_access:
     FileUtil_Seek(file->fd, 0L, SEEK_SET);
 
     errno = 0;			/* In case file smaller than file header */
-    FileUtil_Read(file->fd, (char *)&file->fileHdr, HEADER_SIZE, &bytesRead);
+    FileUtil_Read(file->fd, (void *)&file->fileHdr, HEADER_SIZE, &bytesRead);
     switch (bytesRead) {
 	case 0:
 	    /*

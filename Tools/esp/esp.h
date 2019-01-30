@@ -30,6 +30,7 @@
 #include <stdio.h>
 #undef sprintf
 #include <stdarg.h>
+#include <stdint.h>
 
 #include <mem.h>
 #include <os90.h>
