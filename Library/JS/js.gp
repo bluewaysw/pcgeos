@@ -163,9 +163,9 @@ incminor
 export JSEGETOBJECTDATA
 export JSESETOBJECTDATA
 
-resource JSEMEM_TEXT fixed
+resource jsemem_TEXT fixed
 #resource CommonCode fixed
-resource FPEMUL_TEXT fixed
+resource fpemul_TEXT fixed
 resource ASM_TEXT fixed
 incminor
 

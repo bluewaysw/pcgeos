@@ -147,7 +147,7 @@
 #include <Ansi/string.h>
 #include <Ansi/stdlib.h>
 #include <Ansi/ctype.h>
-#include <geomisc.h>
+#include <geoMisc.h>
 #include <ProfPnt.goh>
 
 /* GEOS memory stuff */

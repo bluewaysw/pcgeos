@@ -41,7 +41,7 @@
 /* Ansi function for converting a string to a double.  End pointer is
  * always returned as the trailing null!!
  */
-extern double strtod(const char _FAR *s, char _FAR *_FAR *endptr) 
+extern double strtod(const char _FAR_ *s, char _FAR_ *_FAR_ *endptr) 
 {
 	double retValue;
 	int i = 0;		/* number of chars in a legal number */

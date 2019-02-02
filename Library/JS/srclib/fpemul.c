@@ -9,7 +9,7 @@ static void IConvertToFloat(jsenumber *p_f)
 {
     /* Push a dword, pop a float */
     FloatDwordToFloat(p_f->l) ;
-    FloatPopNumber(&p_f->f) ;
+    FloatPopNumber((double*) &p_f->f) ;
 }
 
 #define IIsFloat(p_f)  ((p_f)->t.type!=JSENUMBER_TYPE_LONG)
@@ -24,12 +24,12 @@ static void IEnsureFloat(jsenumber *p_f)
 static void IPushFloat(jsenumber *p_f)
 {
     if (IIsFloat(p_f))
-        FloatPushNumber(&(p_f->f)) ;
+        FloatPushNumber((double*)&(p_f->f)) ;
     else
         FloatDwordToFloat(p_f->l) ;
 }
  
-#define IPopFloat(p_f)   FloatPopNumber(&(p_f)->f)
+#define IPopFloat(p_f)   FloatPopNumber((double*)&(p_f)->f)
 
 double JSE_FP_CAST_TO_DOUBLE(jsenumber F)
 {
@@ -155,9 +155,9 @@ jsebool JSE_FP_LTE(jsenumber FP1,jsenumber FP2)
 jsenumber JSE_FP_NEGATE(jsenumber FP)
 {
     if (IIsFloat(&FP))  {
-        FloatPushNumber(&FP.f) ;
+        FloatPushNumber((double*)&FP.f) ;
         FloatNegate() ;
-        FloatPopNumber(&FP.f) ;
+        FloatPopNumber((double*)&FP.f) ;
     } else {
         FP.l = -FP.l ;
     }
@@ -197,11 +197,11 @@ jsenumber JSE_FP_FLOOR(jsenumber f)
 
     /* Floor only on floats */
     if (IIsFloat(&f))  {
-        FloatPushNumber(&f.f) ;
+        FloatPushNumber((double*)&f.f) ;
         FloatIntFrac() ;
         if (!FloatEq0())  {
-            FloatPopNumber(&integer.f);
-            FloatPushNumber(&f.f) ;
+            FloatPopNumber((double*)&integer.f);
+            FloatPushNumber((double*)&f.f) ;
             FloatMinus1() ;
             FloatAdd() ;
             FloatDup() ;
@@ -211,11 +211,11 @@ jsenumber JSE_FP_FLOOR(jsenumber f)
             }
             FloatIntFrac() ;
             /* Discard fraction */
-            FloatPopNumber(&f) ;
+            FloatPopNumber((double*)&f) ;
             /* Take integer */
-            FloatPopNumber(&f) ;
+            FloatPopNumber((double*)&f) ;
         } else {
-            FloatPopNumber(&f.f);
+            FloatPopNumber((double*)&f.f);
         }
     }
     return f ;
@@ -227,11 +227,11 @@ jsenumber JSE_FP_CEIL(jsenumber f)
 
     /* Ceil only on floats */
     if (IIsFloat(&f))  {
-        FloatPushNumber(&f.f) ;
+        FloatPushNumber((double*)&f.f) ;
         FloatIntFrac() ;
         if (!FloatEq0())  {
-            FloatPopNumber(&integer.f);
-            FloatPushNumber(&f.f) ;
+            FloatPopNumber((double*)&integer.f);
+            FloatPushNumber((double*)&f.f) ;
             Float1() ;
             FloatAdd() ;
             FloatDup() ;
@@ -241,11 +241,11 @@ jsenumber JSE_FP_CEIL(jsenumber f)
             }
             FloatIntFrac() ;
             /* Discard fraction */
-            FloatPopNumber(&f) ;
+            FloatPopNumber((double*)&f) ;
             /* Take integer */
-            FloatPopNumber(&f) ;
+            FloatPopNumber((double*)&f) ;
         } else {
-            FloatPopNumber(&f.f);
+            FloatPopNumber((double*)&f.f);
         }
     }
     return f ;
@@ -254,10 +254,10 @@ jsenumber JSE_FP_CEIL(jsenumber f)
 void JSE_FP_INCREMENT_ptr(jsenumber *FP)
 {
     if (IIsFloat(FP))  {
-        FloatPushNumber(&FP->f) ;
+        FloatPushNumber((double*)&FP->f) ;
         Float1() ;
         FloatAdd() ;
-        FloatPopNumber(&FP->f) ;
+        FloatPopNumber((double*)&FP->f) ;
     } else {
         FP->l++ ;
     }
@@ -266,10 +266,10 @@ void JSE_FP_INCREMENT_ptr(jsenumber *FP)
 void JSE_FP_DECREMENT_ptr(jsenumber *FP)
 {
     if (IIsFloat(FP))  {
-        FloatPushNumber(&FP->f) ;
+        FloatPushNumber((double*)&FP->f) ;
         Float1() ;
         FloatSub() ;
-        FloatPopNumber(&FP->f) ;
+        FloatPopNumber((double*)&FP->f) ;
     } else {
         FP->l-- ;
     }
@@ -289,7 +289,7 @@ jsenumber JSE_FP_CAST_FROM_SLONG(slong L)
 slong JSE_FP_CAST_TO_SLONG(jsenumber f)
 {
     if (IIsFloat(&f))  {
-        FloatPushNumber(&f) ;
+        FloatPushNumber((double*)&f) ;
 	FloatTrunc();	/* prevent rounding */
         return FloatFloatToDword() ;
     } else {
@@ -346,16 +346,16 @@ jsenumber JSE_FP_STRTOD( const jsecharptr s, jsecharptr *endptr )
     dbF[m] = 0;
     FloatAsciiToFloat(FAF_STORE_NUMBER, maxlen, dbF, &r.f) ;
 #else
-    FloatAsciiToFloat(FAF_STORE_NUMBER, i, s, &r.f) ;
+    FloatAsciiToFloat(FAF_STORE_NUMBER, i, (void*) s, (double*) &r.f) ;
 #endif
     /* if not fractional and small, change to long */
     if (!haveFrac && ((r.f.F_exponent & 0x7fff) <= 0x401e))  {
-        FloatPushNumber(&r.f) ;
+        FloatPushNumber((double*)&r.f) ;
         r.l = FloatFloatToDword() ;        
         r.t.type = JSENUMBER_TYPE_LONG ;
     }
     if (endptr)
-        *endptr = &(s[i]);
+        *endptr = (char*) &(s[i]);
 
     return r ;
 }
@@ -424,7 +424,7 @@ jsebool jseIsZero(jsenumber num)
 {
     sword sign ;
     if (IIsFloat(&num))  {
-        FloatPushNumber(&num.f) ;
+        FloatPushNumber((double*)&num.f) ;
         sign = FloatEq0() ;
         return (sign)?TRUE:FALSE ;
     } else {
@@ -445,8 +445,8 @@ jsebool jseIsPosZero(jsenumber num)
 jsenumber JSE_FP_FABS(jsenumber fp)
 {
     if (IIsFloat(&fp))  {
-        FloatPushNumber(&fp.f) ;
-        FloatPopNumber(&fp.f) ;
+        FloatPushNumber((double*)&fp.f) ;
+        FloatPopNumber((double*)&fp.f) ;
     } else {
         if (fp.l < 0)
             fp.l = -fp.l ;
@@ -476,7 +476,7 @@ ulong JSE_FP_CAST_TO_ULONG(jsenumber f)
 {
     /* LIke ..._FROM_ULONG, this isn't quite correct */
     if (IIsFloat(&f))  {
-        FloatPushNumber(&f) ;
+        FloatPushNumber((double*)&f) ;
         return FloatFloatToDword() ;
     } else {
         return f.l ;
@@ -488,7 +488,7 @@ jsenumber JSE_FP_CAST_FROM_DOUBLE(double D)
     jsenumber f ;
 
     FloatIEEE64ToGeos80(&D);
-    FloatPopNumber(&f.f) ;
+    FloatPopNumber((double*)&f.f) ;
 
     return f ;
 }
@@ -512,14 +512,14 @@ void _export initialize_FP_constants(void)
 {
     jseNaN.f.F_exponent = FP_NAN;
     Float1() ;
-    FloatPopNumber(&jseInfinity.f) ;
+    FloatPopNumber((double*)&jseInfinity.f) ;
     jseInfinity.t.type = JSENUMBER_TYPE_POS_INFINITY;
     FloatMinus1() ;
-    FloatPopNumber(&jseNegInfinity.f) ;
+    FloatPopNumber((double*)&jseNegInfinity.f) ;
     jseNegInfinity.t.type = JSENUMBER_TYPE_NEG_INFINITY;
     Float0() ;
     FloatNegate() ;
-    FloatPopNumber(&jseNegZero) ;
+    FloatPopNumber((double*)&jseNegZero) ;
     jseZero.l = 0 ;
     jseZero.t.type = JSENUMBER_TYPE_LONG ;
     jseOne.l = 1 ;
@@ -527,12 +527,12 @@ void _export initialize_FP_constants(void)
     jseNegOne.l = -1 ;
     jseNegOne.t.type = JSENUMBER_TYPE_LONG ;
     FloatPi() ;
-    FloatPopNumber(&jsePI) ;
+    FloatPopNumber((double*)&jsePI) ;
     Float1() ;
-    FloatPopNumber(&jse_DBL_MAX) ;
+    FloatPopNumber((double*)&jse_DBL_MAX) ;
     jse_DBL_MAX.f.F_exponent = DECIMAL_EXPONENT_UPPER_LIMIT ;
     FloatMinus1() ;
-    FloatPopNumber(&jse_DBL_MIN) ;
+    FloatPopNumber((double*)&jse_DBL_MIN) ;
     jse_DBL_MIN.f.F_exponent = DECIMAL_EXPONENT_UPPER_LIMIT ;
 }
 
@@ -563,7 +563,7 @@ jsenumber JSE_FP_RAND(void)
     jsenumber f ;
 
     FloatRandom() ;
-    FloatPopNumber(&f.f) ;
+    FloatPopNumber((double*)&f.f) ;
 
     return f ;
 }
@@ -571,10 +571,10 @@ jsenumber JSE_FP_RAND(void)
 jsenumber JSE_FP_MODF(jsenumber fp1,jsenumber *fp2)
 {
     if (IIsFloat(&fp1))  {
-        FloatPushNumber(&fp1.f) ;
+        FloatPushNumber((double*)&fp1.f) ;
         FloatIntFrac() ;
-        FloatPopNumber(&fp2->f) ;
-        FloatPopNumber(&fp1.f) ;
+        FloatPopNumber((double*)&fp2->f) ;
+        FloatPopNumber((double*)&fp1.f) ;
         return fp1 ;
     } else {
         *fp2 = fp1 ;

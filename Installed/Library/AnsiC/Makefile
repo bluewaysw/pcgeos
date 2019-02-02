@@ -15,9 +15,11 @@ OBJS            = stdlib_asm.obj stdio_asm.obj string_asm.obj ansic.obj\
                   stdio.obj string.obj
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
+LIBOBJ_PRODS    = $(DEVEL_DIR)/Include/DBCS/$(GEODE).ldf
 LIBNAME         = ansic
 
 PRODUCTS        = DBCS 
+PRODUCT_LDFS    = DBCS
 
 SYSMAKEFILE     = geode.mk
 

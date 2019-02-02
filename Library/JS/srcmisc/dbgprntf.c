@@ -42,7 +42,7 @@
 void GeosDebugPrintf(jsechar *buffer) {
     /* dummy code */
     if (*buffer) {
-	asm {nop};
+	/*asm {nop};*/
     }
 }
 #endif

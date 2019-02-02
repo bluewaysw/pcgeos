@@ -35,6 +35,9 @@
     !defined(JSETOOLKIT_LINK)
 #  define JSETOOLKIT_APP
 #endif
+#ifdef __WATCOM__
+#define __WATCOMC__
+#endif
 
 /* if they havnt alread defined __JSE_DLLLOAD__ or __JSE_DLLRUN__
      then flag to link with the static library
@@ -42,7 +45,6 @@
 #if !defined(__JSE_DLLLOAD__) && !defined(__JSE_LIB__)
 #  define __JSE_LIB__
 #endif
-
 #if defined(__DJGPP__)
 #  if !defined(__JSE_DOS32__)
 #     define __JSE_DOS32__
@@ -79,6 +81,8 @@
 #     endif
 #  elif defined(__QNX__)
 #    error QNX currently not supported
+#  elif defined(__GEOS__) /* GEOS implementation */
+#	 define __JSE_GEOS__
 #  elif defined(__NETWARE__)
 #     if !defined(__JSE_NWNLM__)
 #        define __JSE_NWNLM__
