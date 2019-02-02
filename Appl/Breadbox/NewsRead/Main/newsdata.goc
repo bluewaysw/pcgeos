@@ -1,0 +1,858 @@
+/**********************************************************************
+ * FILE: DATABASE.GOC -- Data handling code
+ * Project - News Reader
+ * Started 4/28/98
+ **********************************************************************/
+
+/* Standard libraries */
+@include <stdapp.goh>
+#include <Ansi/stdio.h>
+#include <Ansi/string.h>
+#include <Ansi/stdlib.h>
+
+/* Compile options */
+@include "options.goh"
+
+/* Other headers */
+@include "utils.goh"
+@include "newsread.goh"
+@include "Localize/strings.goh"
+#include "news.h"
+@include "newsdata.goh"
+@include "errors.goh"
+@include "extern.goh"
+
+/* Global database VM File Handle */
+VMFileHandle G_databaseVMFH = NullHandle ;
+DatabaseMapBlock *G_mapBlock = NullHandle ;
+MemHandle G_mapBlockMem = NullHandle ;
+word G_lockMapBlockCount = 0 ;
+
+NewsgroupEntry *G_group = NULL ;
+static word G_groupIndex = NEWS_DATA_NEWSGROUP_NONE ;
+
+ThreadEntry *G_thread = NULL ;
+static word G_threadIndex = NEWS_DATA_THREAD_NONE ;
+
+ArticleEntry *G_article = NULL ;
+static word G_articleIndex = NEWS_DATA_ARTICLE_NONE ;
+
+#ifdef DEBUG
+extern void ECValidateGroupIndex(word groupIndex) ;
+extern void ECValidateUnsubGroupIndex(word groupIndex) ;
+extern void ECValidateGroupPtr(NewsgroupEntry *p_group) ;
+extern void ECValidateThreadIndex(word threadIndex) ;
+extern void ECValidateThreadPtr(ThreadEntry *p_thread) ;
+extern void ECValidateArticleIndex(word articleIndex) ;
+extern void ECValidateArticlePtr(ArticleEntry *p_article) ;
+#else
+#define ECValidateGroupIndex(index)
+#define ECValidateUnsubGroupIndex(index)
+#define ECValidateGroupPtr(p_group)
+#define ECValidateThreadIndex(index)
+#define ECValidateThreadPtr(p_thread)
+#define ECValidateArticleIndex(index)
+#define ECValidateArticlePtr(p_article)
+#endif
+
+#define INDEX_BAD   0xFFFFFFFF
+
+/*-------------------------------------------------------------------------
+ | Internal types:
+ *-----------------------------------------------------------------------*/
+#define MAX_REFERENCES_PER_LIST    8
+typedef struct {
+    byte MRL_numRef ;
+    word  MRL_offsets[MAX_REFERENCES_PER_LIST] ;
+    dword MRL_hash[MAX_REFERENCES_PER_LIST] ;
+} T_msgRefList ;
+
+/*-------------------------------------------------------------------------
+ | Prototypes:
+ *-----------------------------------------------------------------------*/
+void ICreateDatabase(void) ;
+dword ICreateHashForMsgID(byte *p_msgId) ;
+void ICreateRefList(char *p_refLine, T_msgRefList *p_refList) ;
+word IFindThreadWithReference(char *p_refLine, T_msgRefList *refList) ;
+word IFindArticleWithReference(char *p_refLine, T_msgRefList *refList) ;
+Boolean ICompareRefs(char *p_refLine, T_msgRefList *refList) ;
+void IAppendText(optr text, BucketHugeArrayHandle linesArray,
+            dword start, dword end) ;
+void IAppendTextWithPrefix(optr text, char *p_prefix) ;
+dword IArticleIDToIndex(NewsUniqueID articleID) ;
+void IInsertHashEntry(ArticleEntry *p_article) ;
+dword IFindArticleWithHash(
+				char *p_string, 
+				NewsUniqueID articleID,
+				dword hashValue) ;
+dword IFindFirstArticleWithHash(dword hashValue) ;
+word IFindArticleInThread(NewsUniqueID articleID) ;
+void ISelectThreadWithID(NewsUniqueID threadID) ;
+
+/*-------------------------------------------------------------------------
+ | Routine:  NewsDataLock
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Lock the map block quickly.  Keep the lock count ourselves.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/06/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+DatabaseMapBlock *NewsDataLock(void)
+{
+    VMBlockHandle map ;
+
+    EC_ERROR_IF(G_databaseVMFH==NullHandle, ERROR_NEWS_DATA_FILE_NOT_OPEN) ;
+
+    G_lockMapBlockCount++ ;
+    if (G_lockMapBlockCount == 1)  {
+        /* Just locked, do the real lock. */
+        map = VMGetMapBlock(G_databaseVMFH);
+        EC_ERROR_IF(map==NullHandle, ERROR_NEWS_DATA_MISSING_MAP_BLOCK) ;
+
+        if (map)  {
+            G_mapBlock = VMLock(G_databaseVMFH, map, &G_mapBlockMem);
+            EC_ERROR_IF(G_mapBlock==NullHandle, ERROR_NEWS_DATA_CANT_LOCK_MAP_BLOCK) ;
+        } else {
+            G_mapBlock = NULL ;
+        }
+    } else {
+        EC_ERROR_IF(
+            G_lockMapBlockCount==0,
+            ERROR_NEWS_DATA_FILE_MAP_BLOCK_LOCKED_TOO_MANY_TIMES) ;
+    }
+
+    return G_mapBlock ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  NewsDataUnlock
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Unlock the map block quickly.  Keep the lock count ourselves.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/06/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+void NewsDataUnlock(void)
+{
+    EC_ERROR_IF(
+        G_mapBlock==NULL,
+        ERROR_NEWS_DATA_MAP_BLOCK_ALREADY_UNLOCKED) ;
+    EC_ERROR_IF(
+        G_mapBlockMem==NullHandle,
+        ERROR_NEWS_DATA_MAP_BLOCK_ALREADY_UNLOCKED) ;
+
+    G_lockMapBlockCount-- ;
+    if (G_lockMapBlockCount==0)  {
+        /* Last lock release, let go */
+        VMUnlock(G_mapBlockMem) ;
+        G_mapBlockMem = NullHandle ;
+        G_mapBlock = NULL ;
+    } else {
+        EC_ERROR_IF(
+            G_lockMapBlockCount==0xFFFF,
+            ERROR_NEWS_DATA_MAP_BLOCK_UNLOCKED_TOO_MANY_TIMES) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  NewsDataCountNewsgroups
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Return the number of subscribed newsgroups in the database.
+ |
+ | Outputs:
+ |    word                        -- Found number of newsgroups.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/06/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+word NewsDataCountNewsgroups(void)
+{
+    word count ;
+
+    NewsDataLock() ;
+    count = BucketHugeArrayGetCount(
+                G_databaseVMFH,
+                G_mapBlock->DMB_subscribedArray) ;
+    NewsDataUnlock() ;
+
+    return count ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  NewsDataCountUnsubNewsgroups
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Return the number of unsubscribed newsgroups in the database.
+ |
+ | Outputs:
+ |    word                        -- Found number of newsgroups.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/06/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+word NewsDataCountUnsubNewsgroups(void)
+{
+    dword count ;
+
+    NewsDataLock() ;
+    count = BucketHugeArrayGetCount(
+                G_databaseVMFH,
+                G_mapBlock->DMB_groupsArray) ;
+    if (count > MAX_UNSUBSCRIBED_NEWSGROUPS)
+        count = MAX_UNSUBSCRIBED_NEWSGROUPS ;
+    NewsDataUnlock() ;
+
+    return count ;
+}
+
+
+/*-------------------------------------------------------------------------
+ | Routine:  NewsDataSelectGroup
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Choose the actively locked newsgroup.
+ |
+ | Inputs:
+ |    word groupIndex             -- Index into list of subscribed
+ |                                   newsgroups.  If
+ |                                   NEWS_DATA_NEWSGROUP_NONE then unlock
+ |                                   the currently selected.
+ |
+ | Outputs:
+ |    word                        -- Previously selected group so
+ |                                   its easy to put back.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/06/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+word NewsDataSelectGroup(word groupIndex)
+{
+    word previousGroupIndex = G_groupIndex ;
+
+    if (G_groupIndex != groupIndex)  {
+        EC_ERROR_IF(
+            G_threadIndex != NEWS_DATA_THREAD_NONE,
+            ERROR_NEWS_DATA_CANT_SELECT_NEW_GROUP_IF_THREAD_SELECTED) ;
+
+        if (groupIndex == NEWS_DATA_NEWSGROUP_NONE)  {
+            NewsDataGroupUnlock(G_group) ;
+            G_group = NULL ;
+        } else {
+            ECValidateGroupIndex(groupIndex) ;
+
+            /* Don't change if same */
+            if (groupIndex != G_groupIndex)  {
+                /* Unlock the old one (if we had one) */
+                if (G_groupIndex != NEWS_DATA_NEWSGROUP_NONE)  {
+                    NewsDataGroupUnlock(G_group) ;
+                    G_groupIndex = NEWS_DATA_NEWSGROUP_NONE ;
+                }
+
+                /* Lock the new one */
+                if (groupIndex != NEWS_DATA_NEWSGROUP_NONE)
+                    G_group = NewsDataGroupLock(groupIndex) ;
+            }
+        }
+        G_groupIndex = groupIndex ;
+    }
+
+    return previousGroupIndex ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  NewsDataGetSelectedGroup
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Tell what group is currently selected.
+ |
+ | Outputs:
+ |    word                        -- Index to currently selected group.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/06/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+word NewsDataGetSelectedGroup(void)
+{
+    return G_groupIndex ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  NewsDataGroupLock
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Lock a newsgroup entry in the subscribed list.
+ |
+ | Inputs:
+ |    word groupIndex             -- Index in group
+ |
+ | Outputs:
+ |    NewsgroupEntry *            -- Pointer to locked entry.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/06/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+NewsgroupEntry *NewsDataGroupLock(word groupIndex)
+{
+    word ignoredSize ;
+    NewsgroupEntry *p_entry ;
+
+    /* Check the index first */
+    ECValidateGroupIndex(groupIndex) ;
+
+    NewsDataLock() ;
+    BucketHugeArrayLock(
+        G_databaseVMFH,
+        G_mapBlock->DMB_subscribedArray,
+        (dword)groupIndex,
+        (void**) &p_entry,
+        &ignoredSize);
+    NewsDataUnlock() ;
+
+    return p_entry ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  NewsDataGroupUnlock
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Unlock the given newsgroup item
+ |
+ | Inputs:
+ |    NewsgroupEntry *p_group     -- Previously locked group
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/06/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+void NewsDataGroupUnlock(NewsgroupEntry *p_group)
+{
+    ECValidateGroupPtr(p_group) ;
+    BucketHugeArrayUnlock(p_group) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  NewsDataGroupCountThreads
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Count the number of threads in the currently selected newsgroup
+ |
+ | Outputs:
+ |    word                        -- Index of newly created thread, or
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/06/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+word NewsDataGroupCountThreads(void)
+{
+    ECValidateGroupPtr(G_group) ;
+
+    return BucketHugeArrayGetCount(G_databaseVMFH, G_group->NE_threadArray) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  NewsDataGroupCountArticles
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Count the number of articles in the currently selected newsgroup
+ |
+ | Outputs:
+ |    word                        -- Number of articles
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    DEH  02/18/00  Created
+ |
+ *-----------------------------------------------------------------------*/
+word NewsDataGroupCountArticles(void)
+{
+	ECValidateGroupPtr(G_group) ;
+
+	return BucketHugeArrayGetCount(G_databaseVMFH, G_group->NE_articleArray) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  NewsDataGroupSelectThread
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Choose the actively locked thread, or unlock the last one.
+ |
+ | Inputs:
+ |    word threadIndex            -- Thread withing current group to lock.
+ |
+ | Outputs:
+ |    word                        -- Previously selected thread.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/06/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+word NewsDataGroupSelectThread(word threadIndex)
+{
+    word previousThreadIndex = G_threadIndex ;
+
+    if (G_threadIndex != threadIndex)  {
+        EC_ERROR_IF(
+            G_articleIndex != NEWS_DATA_ARTICLE_NONE,
+            ERROR_NEWS_DATA_CANT_SELECT_NEW_THREAD_IF_ARTICLE_SELECTED) ;
+
+        if (threadIndex == NEWS_DATA_THREAD_NONE)  {
+            NewsDataThreadUnlock(G_thread) ;
+            G_thread = NULL ;
+        } else {
+            ECValidateThreadIndex(threadIndex) ;
+
+            /* Don't change if same */
+            if (threadIndex != G_threadIndex)  {
+                /* Unlock the old one (if we had one) */
+                if (G_threadIndex != NEWS_DATA_THREAD_NONE)
+                    NewsDataThreadUnlock(G_thread) ;
+
+                /* Lock the new one */
+                if (threadIndex != NEWS_DATA_THREAD_NONE)
+                    G_thread = NewsDataThreadLock(threadIndex) ;
+            }
+        }
+
+        G_threadIndex = threadIndex ;
+    }
+
+    return previousThreadIndex ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  NewsDataGroupGetSelectedThread
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Tell what thread is currently selected.
+ |
+ | Outputs:
+ |    word                        -- Index to currently selected thread
+ |                                   in the current thread.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/06/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+word NewsDataGroupGetSelectedThread(void)
+{
+    return G_threadIndex ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  NewsDataUnsubGroupLock
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Lock a newsgroup entry in the unsubscribed list.
+ |
+ | Inputs:
+ |    word groupIndex             -- Index in group
+ |
+ | Outputs:
+ |    UnsubscribedGroupEntry *    -- Pointer to locked entry.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/06/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+UnsubscribedGroupEntry *NewsDataUnsubGroupLock(word groupIndex)
+{
+    word ignoredSize ;
+    UnsubscribedGroupEntry *p_entry ;
+
+    /* Check the index first */
+    ECValidateUnsubGroupIndex(groupIndex) ;
+
+    NewsDataLock() ;
+    BucketHugeArrayLock(
+        G_databaseVMFH,
+        G_mapBlock->DMB_groupsArray,
+        (dword)groupIndex,
+        (void**)&p_entry,
+        &ignoredSize);
+    NewsDataUnlock() ;
+
+    return p_entry ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  NewsDataThreadLock
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Lock a thread entry of the current newsgroup.
+ |
+ | Inputs:
+ |    word threadIndex            -- Index of thread
+ |
+ | Outputs:
+ |    ThreadEntry *               -- Pointer to locked thread entry.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/06/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+ThreadEntry *NewsDataThreadLock(word threadIndex)
+{
+    ThreadEntry *p_thread = NULL ;
+    word ignoredSize ;
+
+    ECValidateThreadIndex(threadIndex) ;
+    ECValidateGroupPtr(G_group);
+    BucketHugeArrayLock(
+        G_databaseVMFH,
+        G_group->NE_threadArray,
+        threadIndex,
+        (void**)&p_thread,
+        &ignoredSize) ;
+
+    return p_thread ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  NewsDataThreadUnlock
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Unlock a thread entry of the current newsgroup.
+ |
+ | Inputs:
+ |    ThreadEntry *               -- Pointer to locked thread entry.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/06/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+void NewsDataThreadUnlock(ThreadEntry *p_thread)
+{
+    ECValidateThreadPtr(p_thread) ;
+    BucketHugeArrayUnlock(p_thread) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  NewsDataThreadCountArticles
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Count the number of articles in the current thread
+ |
+ | Outputs:
+ |    word                        -- Count of articles
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/06/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+word NewsDataThreadCountArticles(void)
+{
+    ECValidateThreadPtr(G_thread) ;
+
+    return BucketHugeArrayGetCount(G_databaseVMFH, G_thread->TE_articleArray) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  NewsDataThreadSelectArticle
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Choose the actively locked article, or unlock the last one.
+ |
+ | Inputs:
+ |    word articleIndex           -- Article within current thread to lock.
+ |
+ | Outputs:
+ |    word                        -- Previously selected article.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/06/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+word NewsDataThreadSelectArticle(word articleIndex)
+{
+    word previousArticleIndex = G_articleIndex ;
+
+    if (G_articleIndex != articleIndex)  {
+        if (articleIndex == NEWS_DATA_ARTICLE_NONE)  {
+            NewsDataArticleUnlock(G_article) ;
+            G_article = NULL ;
+        } else {
+            ECValidateArticleIndex(articleIndex) ;
+
+            /* Don't change if same */
+            if (articleIndex != G_articleIndex)  {
+                /* Unlock the old one (if we had one) */
+                if (G_articleIndex != NEWS_DATA_ARTICLE_NONE)
+                    NewsDataArticleUnlock(G_article) ;
+
+                /* Lock the new one */
+                if (articleIndex != NEWS_DATA_ARTICLE_NONE)
+                    G_article = NewsDataArticleLock(articleIndex) ;
+            }
+        }
+
+        G_articleIndex = articleIndex ;
+    }
+
+    return previousArticleIndex ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  NewsDataUnsubGroupUnlock
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Unlock the given newsgroup item
+ |
+ | Inputs:
+ |    UnsubscribedGroupEntry *p_group -- Pointer to locked group.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/06/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+void NewsDataUnsubGroupUnlock(UnsubscribedGroupEntry *p_group)
+{
+    BucketHugeArrayUnlock(p_group) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  NewsDataLockArticleHeaderLine
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Search the current article for a subject line with the same given
+ |    prefix.
+ |
+ | Inputs:
+ |    ArticleEntry *p_article     -- Article to search within
+ |    char *p_prefix              -- null terminated prefix to find
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/06/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+void *NewsDataLockArticleHeaderLine(
+         ArticleEntry *p_article,
+         char *p_prefix)
+{
+    word i ;
+    word count ;
+    word ignoredLineLen ;
+    char *p_line = NULL ;
+    word len ;
+
+    len = strlen(p_prefix) ;
+
+    ECValidateArticlePtr(p_article) ;
+    if ((p_article) && (p_article->AE_headers))  {
+        count = BucketHugeArrayGetCount(G_databaseVMFH, p_article->AE_headers) ;
+        for (i=0; i<count; i++)  {
+            BucketHugeArrayLock(
+               G_databaseVMFH,
+               p_article->AE_headers,
+               i,
+               (void**)&p_line,
+               &ignoredLineLen) ;
+            if (strncmp(p_line, p_prefix, len) == 0)
+                break ;
+            BucketHugeArrayUnlock(p_line) ;
+        }
+        if (i==count)
+            p_line = NULL ;
+    }
+
+    return p_line ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  NewsDataUnlockHeaderLine
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Unlock previously locked line from NewsDataLockArticleHeaderLine.
+ |
+ | Inputs:
+ |    char *p_line                -- Previously locked line.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/06/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+void NewsDataUnlockHeaderLine(char *p_line)
+{
+    EC_ERROR_IF(p_line==NullHandle, ERROR_NEWS_DATA_LINE_IS_NULL) ;
+    BucketHugeArrayUnlock(p_line) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  NewsDataLockArticleMessageID
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Searches for "Message-Id" in an article.
+ |
+ | Inputs:
+ |    ArticleEntry *p_article     -- Current article to search.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/06/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+char *NewsDataLockArticleMessageID(ArticleEntry *p_article)
+{
+    return NewsDataLockArticleHeaderLine(p_article, "Message-ID: ") ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  NewsDataArticleLock
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Lock an article entry of the current thread.
+ |
+ | Inputs:
+ |    word articleIndex           -- Index of thread
+ |
+ | Outputs:
+ |    ArticleEntry *              -- Pointer to locked entry.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/06/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+ArticleEntry *NewsDataArticleLock(word articleIndex)
+{
+    ArticleReferenceEntry *p_ref = NULL ;
+    ArticleEntry *p_article = NULL ;
+    word ignoredSize ;
+    dword articleLookupIndex ;
+    NewsUniqueID articleID ;
+
+    ECValidateArticleIndex(articleIndex) ;
+    ECValidateThreadPtr(G_thread);
+
+    /* Convert the thread's article reference to an article id */
+    BucketHugeArrayLock(
+        G_databaseVMFH,
+        G_thread->TE_articleArray,
+        articleIndex,
+        (void**)&p_ref,
+        &ignoredSize) ;
+    articleID = p_ref->AR_articleID ;
+    BucketHugeArrayUnlock(p_ref) ;
+
+    /* Convert the article id to an exact index in the group list */
+    articleLookupIndex = IArticleIDToIndex(articleID) ;
+    if (articleLookupIndex != INDEX_BAD)  {
+        BucketHugeArrayLock(
+            G_databaseVMFH,
+            G_group->NE_articleArray,
+            articleLookupIndex,
+            (void**)&p_article,
+            &ignoredSize) ;
+
+        EC_ERROR_IF(
+            ignoredSize != sizeof(ArticleEntry),
+            ERROR_NEWS_DATA_CORRUPT_ARTICLE_ENTRY) ;
+    }
+
+    return p_article ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  NewsDataArticleUnlock
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Unlock an article entry of the current thread.
+ |
+ | Inputs:
+ |    ArticleEntry *p_article     -- Pointer to an article
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/06/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+void NewsDataArticleUnlock(ArticleEntry *p_article)
+{
+    ECValidateArticlePtr(p_article) ;
+    BucketHugeArrayUnlock(p_article) ;
+}
+
+
+
+
+
+
+/**********************************************************************
+ * END OF FILE: DATABASE.GOC -- Data handling code
+ **********************************************************************/
+
