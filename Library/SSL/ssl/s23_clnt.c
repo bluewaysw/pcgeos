@@ -90,7 +90,7 @@ int ver;
 		return(NULL);
 	}
 
-SSL_METHOD * _export _pascal SSLv23_client_method()
+SSL_METHOD* _export _pascal SSLv23_client_method()
 	{
 	static int SSLV23CM_init=1;
 	static SSL_METHOD SSLv23_client_data;

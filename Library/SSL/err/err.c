@@ -79,8 +79,8 @@ static LHASH *thread_hash=NULL;
 static unsigned long err_hash(ERR_STRING_DATA *a);
 static int err_cmp(ERR_STRING_DATA *a, ERR_STRING_DATA *b);
 #endif /* GEOS_CLIENT */
-static unsigned long pid_hash(ERR_STATE *pid);
-static int pid_cmp(ERR_STATE *a,ERR_STATE *pid);
+unsigned long pid_hash(ERR_STATE *pid);
+int pid_cmp(ERR_STATE *a,ERR_STATE *pid);
 static unsigned long get_error_values(int inc,char **file,int *line,
 	char **data,int *flags);
 static void ERR_STATE_free(ERR_STATE *s);
@@ -89,8 +89,8 @@ static void ERR_STATE_free(ERR_STATE *s);
 static unsigned long err_hash();
 static int err_cmp();
 #endif /* GEOS_CLIENT */
-static unsigned long pid_hash();
-static int pid_cmp();
+unsigned long pid_hash();
+int pid_cmp();
 static void ERR_STATE_free();
 ERR_STATE *s;
 #endif
@@ -529,7 +529,7 @@ unsigned long e;
 #endif /* GEOS_CLIENT */
 
 #ifdef __GEOS__
-#pragma codeseg FixedCallbacks
+#pragma code_seg(FixedCallbacks)
 #endif
 
 #ifndef GEOS_CLIENT
@@ -552,20 +552,20 @@ ERR_STRING_DATA *a,*b;
 
 #endif /* GEOS_CLIENT */
 
-static unsigned long pid_hash(a)
+unsigned long pid_hash(a)
 ERR_STATE *a;
 	{
 	return(a->pid*13);
 	}
 
-static int pid_cmp(a,b)
+int pid_cmp(a,b)
 ERR_STATE *a,*b;
 	{
 	return((int)((long)a->pid - (long)b->pid));
 	}
 
 #ifdef __GEOS__
-#pragma codeseg
+#pragma code_seg()
 #endif
 
 #ifndef GEOS_CLIENT

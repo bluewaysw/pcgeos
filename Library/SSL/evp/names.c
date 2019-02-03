@@ -77,31 +77,31 @@ static STACK /* EVP_CIPHERS */ *ciphers=NULL;
 static STACK /* EVP_MD */ *digests=NULL;
 
 #ifdef __GEOS__
-#pragma codeseg FixedCallbacks
+#pragma code_seg(FixedCallbacks)
 #endif
 
-static int cipher_nid_cmp(a,b)
+int cipher_nid_cmp(a,b)
 EVP_CIPHER **a,**b;
 #ifdef __GEOS__
 	{
 		int res;
-		asm{push es};
+		PUSHES;
 		res = (*a)->nid - (*b)->nid;
-		asm{pop es};
+		POPES;
 		return(res);
 	}
 #else
 	{ return((*a)->nid - (*b)->nid); }
 #endif
 
-static int digest_type_cmp(a,b)
+int digest_type_cmp(a,b)
 EVP_MD **a,**b;
 #ifdef __GEOS__
 	{
 		int res;
-		asm{push es};
+		PUSHES;
 		res = (*a)->pkey_type - (*b)->pkey_type;
-		asm{pop es};
+		POPES;
 		return(res);
 	}
 #else
@@ -109,7 +109,7 @@ EVP_MD **a,**b;
 #endif
 
 #ifdef __GEOS__
-#pragma codeseg
+#pragma code_seg()
 #endif
 
 int EVP_add_cipher(c)
@@ -164,17 +164,16 @@ EVP_MD *md;
 	}
 
 #ifdef __GEOS__
-#pragma codeseg FixedCallbacks
+#pragma code_seg(FixedCallbacks)
 #endif
 
-static CALLCONV int alias_cmp(a,b)
-ALIASES **a,**b;
+int CALLCONV alias_cmp(ALIASES **a,ALIASES **b)
 	{
 #ifdef __GEOS__
 	int res;
-	asm{push es};
+	PUSHES;
 	res = strcmp((*a)->alias,(*b)->alias);
-	asm{pop es};
+	POPES;
 	return(res);
 #else
 	return(strcmp((*a)->alias,(*b)->alias));
@@ -182,7 +181,7 @@ ALIASES **a,**b;
 	}
 
 #ifdef __GEOS__
-#pragma codeseg
+#pragma code_seg()
 #endif
 
 int EVP_add_alias(name,aname)
@@ -207,7 +206,7 @@ char *aname;
 	PUSHDS;
 	if (aliases == NULL)
 		{
-		aliases=sk_new(alias_cmp);
+		aliases=sk_new((int (*)())alias_cmp);
 		if (aliases == NULL) goto err;
 		}
 

@@ -157,7 +157,7 @@ SSL_METHOD *meth;
 	return(1);
 	}
 
-SSL * _export SSL_new(ctx)
+SSL * _export _pascal SSL_new(ctx)
 SSL_CTX *ctx;
 	{
 	SSL *s;
@@ -225,7 +225,7 @@ err:
 	return(NULL);
 }
 
-void _export SSL_free(s)
+void _export _pascal SSL_free(s)
 SSL *s;
 	{
 	int i;
@@ -348,7 +348,7 @@ SSL *s;
 #endif /* GEOS_CLIENT */
 
 #ifndef NO_SOCK
-int _export SSL_set_fd(s, fd)
+int _export _pascal SSL_set_fd(s, fd)
 SSL *s;
 int fd;
 	{
@@ -608,7 +608,7 @@ SSL *s;
 
 #endif /* GEOS_CLIENT */
 
-int _export SSL_connect(s)
+int _export _pascal SSL_connect(s)
 SSL *s;
 	{
         int result ;
@@ -632,7 +632,7 @@ SSL *s;
 #endif
 	}
 
-int _export SSL_read(s,buf,num)
+int _export _pascal SSL_read(s,buf,num)
 SSL *s;
 char *buf;
 int num;
@@ -682,7 +682,7 @@ int num;
 
 #endif /* GEOS_CLIENT */
 
-int _export SSL_write(s,buf,num)
+int _export _pascal SSL_write(s,buf,num)
 SSL *s;
 char *buf;
 int num;
@@ -712,7 +712,7 @@ int num;
 }
 
 
-int _export SSL_shutdown(s)
+int _export _pascal SSL_shutdown(s)
 SSL *s;
 	{
 		int report = 1 ;
@@ -792,7 +792,7 @@ SSL_CIPHER *a,*b;
 #endif /* GEOS_CLIENT */
 
 #ifdef __GEOS__
-#pragma codeseg FixedCallbacks
+#pragma code_seg(FixedCallbacks)
 #endif
 
 #ifdef __GEOS__
@@ -805,25 +805,25 @@ SSL_CIPHER **ap,**bp;
 	long l;
 
 #ifdef __GEOS__
-	asm{push es};
+	PUSHES;
 #endif
 	l=(*ap)->id-(*bp)->id;
 	if (l == 0L)
 #ifdef __GEOS__
-		{asm{pop es};return(0);}
+		{POPES;return(0);}
 #else
 		return(0);
 #endif
 	else
 #ifdef __GEOS__
-		{asm{pop es};return((l > 0)?1:-1);}
+		{POPES;return((l > 0)?1:-1);}
 #else
 		return((l > 0)?1:-1);
 #endif
 	}
 
 #ifdef __GEOS__
-#pragma codeseg
+#pragma code_seg()
 #endif
 
 /* return a STACK of the ciphers available for the SSL and in order of
@@ -1014,7 +1014,7 @@ err:
 	}
 
 #ifdef __GEOS__
-#pragma codeseg FixedCallbacks
+#pragma code_seg(FixedCallbacks)
 #endif
 
 unsigned long SSL_SESSION_hash(a)
@@ -1039,10 +1039,10 @@ SSL_SESSION *b;
 	}
 
 #ifdef __GEOS__
-#pragma codeseg
+#pragma code_seg()
 #endif
 
-SSL_CTX * _export SSL_CTX_new(meth)
+SSL_CTX * _export _pascal SSL_CTX_new(meth)
 SSL_METHOD *meth;
 	{
 	SSL_CTX *ret;
@@ -1166,7 +1166,7 @@ err2:
 	return(NULL);
 	}
 
-void _export SSL_CTX_free(a)
+void _export _pascal SSL_CTX_free(a)
 SSL_CTX *a;
 	{
 	int i;
@@ -1463,7 +1463,7 @@ int mode;
 		}
 	}
 
-SSL_METHOD * _export SSL_get_ssl_method(s)
+SSL_METHOD * _export _pascal SSL_get_ssl_method(s)
 SSL *s;
 	{
 	SSL_METHOD *ret;
@@ -1473,7 +1473,7 @@ SSL *s;
 	return(ret);
 	}
 
-int _export SSL_set_ssl_method(s,meth)
+int _export _pascal SSL_set_ssl_method(s,meth)
 SSL *s;
 SSL_METHOD *meth;
 	{

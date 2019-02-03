@@ -65,7 +65,7 @@
 #include "lhash.h"
 #include "ssl_locl.h"
 
-void _export SSLeay_add_ssl_algorithms()
+void _export _pascal SSLeay_add_ssl_algorithms()
 	{
     SSLEnter() ;
 #ifndef NO_DES

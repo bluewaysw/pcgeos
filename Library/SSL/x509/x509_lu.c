@@ -184,7 +184,7 @@ X509_OBJECT *ret;
 	}
 
 #ifdef __GEOS__
-#pragma codeseg FixedCallbacks
+#pragma code_seg(FixedCallbacks)
 #endif
 
 static unsigned long x509_object_hash(a)
@@ -228,7 +228,7 @@ X509_OBJECT *a,*b;
 	}
 
 #ifdef __GEOS__
-#pragma codeseg
+#pragma code_seg()
 #endif
 
 X509_STORE *X509_STORE_new()

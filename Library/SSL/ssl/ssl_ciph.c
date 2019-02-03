@@ -166,17 +166,17 @@ static int init_ciphers=1;
 static void load_ciphers();
 
 #ifdef __GEOS__
-#pragma codeseg FixedCallbacks
+#pragma code_seg(FixedCallbacks)
 #endif
 
-static int cmp_by_name(a,b)
+int cmp_by_name(a,b)
 SSL_CIPHER **a,**b;
 	{
 #ifdef __GEOS__
 	int res;
-	asm{push es};
+	PUSHES;
 	res = strcmp((*a)->name,(*b)->name);
-	asm{pop es};
+	POPES;
 	return(res);
 #else
 	return(strcmp((*a)->name,(*b)->name));
@@ -184,7 +184,7 @@ SSL_CIPHER **a,**b;
 	}
 
 #ifdef __GEOS__
-#pragma codeseg
+#pragma code_seg()
 #endif
 
 static void load_ciphers()
@@ -610,7 +610,7 @@ end_loop:
 		(cipher_list == NULL) ||
 		(*cipher_list == NULL))
 		goto err;
-	sk_set_cmp_func(*cipher_list_by_id,ssl_cipher_ptr_id_cmp);
+	sk_set_cmp_func(*cipher_list_by_id,(int (*)())ssl_cipher_ptr_id_cmp);
 
 	ok=ret;
 	ret=NULL;

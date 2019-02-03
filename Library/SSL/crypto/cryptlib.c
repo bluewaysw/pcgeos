@@ -204,7 +204,7 @@ void SSL_Leave(void)
  * use it
  */
 
-#pragma codeseg FIXEDCALLBACKS
+#pragma code_seg(FixedCallbacks)
 
 void *MapMalloc(word blockSize)
 {
@@ -233,7 +233,7 @@ void MapFree(void *blockPtr)
     }
 }
 
-#pragma codeseg
+#pragma code_seg()
 
 #endif
 

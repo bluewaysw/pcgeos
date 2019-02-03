@@ -31,7 +31,7 @@
 #                  (avoids crashes from outside calls mangling SI)
 # -WDE          Does dgroup fixup on _export'd routines
 #
-CCOMFLAGS	+= -K -d -X -Fs- -dc -p -WDE -rd
+#CCOMFLAGS	+= -K -d -X -Fs- -dc -p -WDE -rd
 
 #
 # main options

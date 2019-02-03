@@ -745,8 +745,8 @@ void BIO_ssl_shutdown(BIO *ssl_bio);
 #endif
 
 int	SSL_CTX_set_cipher_list(SSL_CTX *,char *str);
-SSL_CTX *SSL_CTX_new(SSL_METHOD *meth);
-void	SSL_CTX_free(SSL_CTX *);
+SSL_CTX* _pascal SSL_CTX_new(SSL_METHOD *meth);
+void	_pascal SSL_CTX_free(SSL_CTX *);
 void	SSL_clear(SSL *s);
 void	SSL_CTX_flush_sessions(SSL_CTX *ctx,long tm);
 
@@ -761,7 +761,7 @@ char *	SSL_get_shared_ciphers(SSL *s, char *buf, int len);
 int	SSL_get_read_ahead(SSL * s);
 int	SSL_pending(SSL *s);
 #ifndef NO_SOCK
-int	SSL_set_fd(SSL *s, int fd);
+int	_pascal SSL_set_fd(SSL *s, int fd);
 int	SSL_set_rfd(SSL *s, int fd);
 int	SSL_set_wfd(SSL *s, int fd);
 #endif
@@ -843,14 +843,14 @@ void SSL_CTX_set_default_passwd_cb(SSL_CTX *ctx,int (*cb)());
 int SSL_CTX_check_private_key(SSL_CTX *ctx);
 int SSL_check_private_key(SSL *ctx);
 
-SSL *	SSL_new(SSL_CTX *ctx);
+SSL *	_pascal SSL_new(SSL_CTX *ctx);
 void    SSL_clear(SSL *s);
-void	SSL_free(SSL *ssl);
+void	_pascal SSL_free(SSL *ssl);
 int 	SSL_accept(SSL *ssl);
-int 	SSL_connect(SSL *ssl);
-int 	SSL_read(SSL *ssl,char *buf,int num);
+int 	_pascal SSL_connect(SSL *ssl);
+int 	_pascal SSL_read(SSL *ssl,char *buf,int num);
 int 	SSL_peek(SSL *ssl,char *buf,int num);
-int 	SSL_write(SSL *ssl,char *buf,int num);
+int 	_pascal SSL_write(SSL *ssl,char *buf,int num);
 long	SSL_ctrl(SSL *ssl,int cmd, long larg, char *parg);
 long	SSL_CTX_ctrl(SSL_CTX *ctx,int cmd, long larg, char *parg);
 
@@ -862,15 +862,15 @@ int SSL_CTX_set_ssl_version(SSL_CTX *ctx,SSL_METHOD *meth);
 
 SSL_METHOD *SSLv2_method(void);		/* SSLv2 */
 SSL_METHOD *SSLv2_server_method(void);	/* SSLv2 */
-SSL_METHOD *SSLv2_client_method(void);	/* SSLv2 */
+SSL_METHOD* _pascal SSLv2_client_method(void);	/* SSLv2 */
 
 SSL_METHOD *SSLv3_method(void);		/* SSLv3 */
 SSL_METHOD *SSLv3_server_method(void);	/* SSLv3 */
-SSL_METHOD *SSLv3_client_method(void);	/* SSLv3 */
+SSL_METHOD* _pascal SSLv3_client_method();	/* SSLv3 */
 
 SSL_METHOD *SSLv23_method(void);	/* SSLv3 but can rollback to v2 */
 SSL_METHOD *SSLv23_server_method(void);	/* SSLv3 but can rollback to v2 */
-SSL_METHOD *SSLv23_client_method(void);	/* SSLv3 but can rollback to v2 */
+SSL_METHOD* _pascal SSLv23_client_method(void);	/* SSLv3 but can rollback to v2 */
 
 SSL_METHOD *TLSv1_method(void);		/* TLSv1.0 */
 SSL_METHOD *TLSv1_server_method(void);	/* TLSv1.0 */
@@ -880,10 +880,10 @@ STACK *SSL_get_ciphers(SSL *s);
 
 int SSL_do_handshake(SSL *s);
 int SSL_renegotiate(SSL *s);
-int SSL_shutdown(SSL *s);
+int _pascal SSL_shutdown(SSL *s);
 
-SSL_METHOD *SSL_get_ssl_method(SSL *s);
-int SSL_set_ssl_method(SSL *s,SSL_METHOD *method);
+SSL_METHOD* _pascal SSL_get_ssl_method(SSL *s);
+int _pascal SSL_set_ssl_method(SSL *s,SSL_METHOD *method);
 char *SSL_alert_type_string_long(int value);
 char *SSL_alert_type_string(int value);
 char *SSL_alert_desc_string_long(int value);
@@ -901,7 +901,7 @@ void SSL_set_accept_state(SSL *s);
 
 long SSL_get_default_timeout(SSL *s);
 
-void SSLeay_add_ssl_algorithms(void );
+void _pascal SSLeay_add_ssl_algorithms(void );
 
 char *SSL_CIPHER_description(SSL_CIPHER *,char *buf,int size);
 STACK *SSL_dup_CA_list(STACK *sk);
@@ -954,8 +954,8 @@ int BIO_ssl_copy_session_id();
 void BIO_ssl_shutdown();
 
 int	SSL_CTX_set_cipher_list();
-SSL_CTX *SSL_CTX_new();
-void	SSL_CTX_free();
+SSL_CTX* _pascal SSL_CTX_new();
+void	_pascal SSL_CTX_free();
 void	SSL_clear();
 void	SSL_CTX_flush_sessions();
 
@@ -970,7 +970,7 @@ char *	SSL_get_shared_ciphers();
 int	SSL_get_read_ahead();
 int	SSL_pending();
 #ifndef NO_SOCK
-int	SSL_set_fd();
+int	_pascal SSL_set_fd();
 int	SSL_set_rfd();
 int	SSL_set_wfd();
 #endif
@@ -1051,14 +1051,14 @@ void SSL_CTX_set_default_passwd_cb();
 int SSL_CTX_check_private_key();
 int SSL_check_private_key();
 
-SSL *	SSL_new();
+SSL *	_pascal SSL_new();
 void    SSL_clear();
-void	SSL_free();
+void	_pascal SSL_free();
 int 	SSL_accept();
-int 	SSL_connect();
-int 	SSL_read();
+int 	_pascal SSL_connect();
+int 	_pascal SSL_read();
 int 	SSL_peek();
-int 	SSL_write();
+int 	_pascal SSL_write();
 long	SSL_ctrl();
 long	SSL_CTX_ctrl();
 
@@ -1069,15 +1069,15 @@ int SSL_CTX_set_ssl_version();
 
 SSL_METHOD *SSLv2_method();
 SSL_METHOD *SSLv2_server_method();
-SSL_METHOD *SSLv2_client_method();
+SSL_METHOD* _pascal SSLv2_client_method();
 
 SSL_METHOD *SSLv3_method();
 SSL_METHOD *SSLv3_server_method();
-SSL_METHOD *SSLv3_client_method();
+SSL_METHOD* _pascal SSLv3_client_method();
 
 SSL_METHOD *SSLv23_method();
 SSL_METHOD *SSLv23_server_method();
-SSL_METHOD *SSLv23_client_method();
+SSL_METHOD* _pascal SSLv23_client_method();
 
 SSL_METHOD *TLSv1_method();
 SSL_METHOD *TLSv1_server_method();
@@ -1087,10 +1087,10 @@ STACK *SSL_get_ciphers();
 
 int SSL_do_handshake();
 int SSL_renegotiate();
-int SSL_shutdown();
+int _pascal SSL_shutdown();
 
-SSL_METHOD *SSL_get_ssl_method();
-int SSL_set_ssl_method();
+SSL_METHOD* _pascal SSL_get_ssl_method();
+int _pascal SSL_set_ssl_method();
 char *SSL_alert_type_string_long();
 char *SSL_alert_type_string();
 char *SSL_alert_desc_string_long();
@@ -1108,7 +1108,7 @@ void SSL_set_accept_state();
 
 long SSL_get_default_timeout();
 
-void SSLeay_add_ssl_algorithms();
+void _pascal SSLeay_add_ssl_algorithms();
 
 char *SSL_CIPHER_description();
 STACK *SSL_dup_CA_list();

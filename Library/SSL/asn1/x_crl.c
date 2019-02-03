@@ -77,7 +77,7 @@
 #ifndef NOPROTO
 static int X509_REVOKED_cmp(X509_REVOKED **a,X509_REVOKED **b);
 #ifdef __GEOS__
-static CALLCONV int X509_REVOKED_seq_cmp(X509_REVOKED **a,X509_REVOKED **b);
+static int CALLCONV X509_REVOKED_seq_cmp(X509_REVOKED **a,X509_REVOKED **b);
 #else
 static int X509_REVOKED_seq_cmp(X509_REVOKED **a,X509_REVOKED **b);
 #endif
@@ -360,11 +360,11 @@ X509_REVOKED **a,**b;
 	}
 
 #ifdef __GEOS__
-static CALLCONV int X509_REVOKED_seq_cmp(a,b)
+static int CALLCONV X509_REVOKED_seq_cmp(X509_REVOKED **a, X509_REVOKED **b)
 #else
 static int X509_REVOKED_seq_cmp(a,b)
-#endif
 X509_REVOKED **a,**b;
+#endif
 	{
 	return((*a)->sequence-(*b)->sequence);
 	}

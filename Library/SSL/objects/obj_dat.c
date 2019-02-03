@@ -75,13 +75,13 @@
 #include "obj_dat.h"
 
 #ifndef NOPROTO
-static int sn_cmp(ASN1_OBJECT **a, ASN1_OBJECT **b);
-static int ln_cmp(ASN1_OBJECT **a, ASN1_OBJECT **b);
-static int obj_cmp(ASN1_OBJECT **a, ASN1_OBJECT **b);
+int sn_cmp(ASN1_OBJECT **a, ASN1_OBJECT **b);
+int ln_cmp(ASN1_OBJECT **a, ASN1_OBJECT **b);
+int obj_cmp(ASN1_OBJECT **a, ASN1_OBJECT **b);
 #else
-static int sn_cmp();
-static int ln_cmp();
-static int obj_cmp();
+int sn_cmp();
+int ln_cmp();
+int obj_cmp();
 #endif
 
 #define ADDED_DATA	0
@@ -99,33 +99,33 @@ static int new_nid=NUM_NID;
 static LHASH *added=NULL;
 
 #ifdef __GEOS__
-#pragma codeseg FixedCallbacks
+#pragma code_seg(FixedCallbacks)
 #endif
 
-static int sn_cmp(ap,bp)
+int sn_cmp(ap,bp)
 ASN1_OBJECT **ap;
 ASN1_OBJECT **bp;
 #ifdef __GEOS__
 	{
 		int res;
-		asm{push es};
+		PUSHES;
 		res = strcmp((*ap)->sn,(*bp)->sn);
-		asm{pop es};
+		POPES;
 		return(res);
 	}
 #else
 	{ return(strcmp((*ap)->sn,(*bp)->sn)); }
 #endif
 
-static int ln_cmp(ap,bp)
+int ln_cmp(ap,bp)
 ASN1_OBJECT **ap;
 ASN1_OBJECT **bp;
 #ifdef __GEOS__
 	{
 		int res;
-		asm{push es};
+		PUSHES;
 		res = strcmp((*ap)->ln,(*bp)->ln);
-		asm{pop es};
+		POPES;
 		return(res);
 	}
 #else
@@ -133,7 +133,7 @@ ASN1_OBJECT **bp;
 #endif
 
 #ifdef __GEOS__
-#pragma codeseg
+#pragma code_seg()
 #endif
 
 static unsigned long add_hash(ca)
@@ -526,10 +526,10 @@ char *s;
 	}
 
 #ifdef __GEOS__
-#pragma codeseg FixedCallbacks
+#pragma code_seg(FixedCallbacks)
 #endif
 
-static int obj_cmp(ap, bp)
+int obj_cmp(ap, bp)
 ASN1_OBJECT **ap;
 ASN1_OBJECT **bp;
 	{
@@ -538,11 +538,11 @@ ASN1_OBJECT **bp;
 	ASN1_OBJECT *b= *bp;
 
 #ifdef __GEOS__
-	asm{push es};
+	PUSHES;
 	j=(a->length - b->length);
-        if (j) {asm{pop es};return(j);}
+        if (j) {POPES;return(j);}
 	j = memcmp(a->data,b->data,a->length);
-	asm{pop es};
+	POPES;
 	return(j);
 #else
 	j=(a->length - b->length);
@@ -552,7 +552,7 @@ ASN1_OBJECT **bp;
         }
 
 #ifdef __GEOS__
-#pragma codeseg
+#pragma code_seg()
 #endif
 
 #ifdef __GEOS__

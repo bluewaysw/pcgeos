@@ -306,7 +306,7 @@ unsigned char *b;
 #ifndef SHA1_ASM
 
 #ifdef __GEOS__
-#pragma codeseg SHA1BLOCK
+#pragma code_seg(SHA1BLOCK)
 #endif
 
 void sha1_block(c, W, num)
@@ -429,7 +429,7 @@ int num;
 	}
 
 #ifdef __GEOS__
-#pragma codeseg 
+#pragma code_seg() 
 #endif
 
 #endif

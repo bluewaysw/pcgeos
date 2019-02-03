@@ -385,8 +385,36 @@ extern HINSTANCE _hInstance;
 
 /* some more GEOS stuff */
 #ifdef __GEOS__
+#ifdef __WATCOMC__
+
+#ifndef PUSHDS
+void _PUSHDS();
+#pragma aux _PUSHDS = "push ds";
+#define PUSHDS  _PUSHDS();
+#endif
+
+#ifndef PUSHES
+void _PUSHES();
+#pragma aux _PUSHES = "push es";
+#define PUSHES  _PUSHES();
+#endif
+
+#ifndef POPDS
+void _POPDS();
+#pragma aux _POPDS = "pop ds";
+#define POPDS   _POPDS();
+#endif
+
+#ifndef POPES
+void _POPES();
+#pragma aux _POPES = "pop es";
+#define POPES   _POPES();
+#endif
+
+#else
 #define PUSHDS asm push ds;GeodeLoadDGroup(GeodeGetCodeProcessHandle());
 #define POPDS asm pop ds;
+#endif
 #else
 #define PUSHDS
 #define POPDS
