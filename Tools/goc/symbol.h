@@ -129,7 +129,7 @@ typedef enum {
 
 typedef struct _Scope {
     struct _Scope *parent;		/* Higher scope */
-    int	    	restrict;   	    	/* Non-zero if this scope is
+    int	    	restricted;   	    	/* Non-zero if this scope is
 					 * restrictive => lookups shouldn't
 					 * proceed down the scope stack
 					 * if not found in this one */

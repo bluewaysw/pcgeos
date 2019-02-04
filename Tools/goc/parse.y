@@ -297,7 +297,7 @@ static int oldContext;
        return;                                          \
     } while(0)
 
-inline void
+static void
 Parse_SetReturnAndPassMessage(MsgInvocType mit,
 			      Symbol *castRet, 
 			      Symbol *castPass,
@@ -373,6 +373,8 @@ Parse_SetReturnAndPassMessage(MsgInvocType mit,
 }
 %}
 
+%debug
+
 /*
  *	Type returned by yylex()
 */
@@ -419,7 +421,7 @@ Parse_SetReturnAndPassMessage(MsgInvocType mit,
 %token <string>	FORCE_QUEUE RETURN_ERROR CHECK_DUPLICATE NO_FREE
 %token <string>	CHECK_LAST_ONLY REPLACE INSERT_AT_FRONT CAN_DISCARD_IF_DESPARATE
 %token <string>	NULL_TOKEN PARENT CHILDREN LOCALIZE
-%token <string>	COMPILER HIGHC MSC START DATA NOT_LMEM NOT_DETACHABLE END
+%token <string>	COMPILER HIGHC MSC WATCOM START DATA NOT_LMEM NOT_DETACHABLE END
 %token <string>	HEADER CHUNK CHUNK_ARRAY ELEMENT_ARRAY OBJECT SPECIFIC_UI
 %token <string> KBD_PATH RESOURCE_OUTPUT
 %token <string>	VARDATA VARDATA_ALIAS IGNORE_DIRTY DEFLIB ENDLIB EXTERN
