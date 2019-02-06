@@ -1,0 +1,1605 @@
+/**********************************************************************
+ * APPUI.GOC - User Interface Declaration                             *
+ * Project - GIFAnim Pro                                              *
+ **********************************************************************/
+
+/**********************************************************************
+ * Includes                                                           *
+ **********************************************************************/
+
+@include <stdapp.goh>
+@include <Ansi/stdio.h>
+@include <IMPBMP/impgif.h>
+@include <Ansi/string.h>
+@include <ec.h>
+
+#if PROGRESS_DISPLAY
+extern void FreeViaProgress(_ImportProgressParams_, VMFileHandle vmFile, VMBlockHandle bitmap);
+#endif
+
+typedef struct {
+#ifdef DO_DBCS
+    TCHAR picFilename[300] ;
+#else
+    char picFilename[600] ;
+#endif
+    FileHandle picFile ;
+    VMFileHandle vmFile ;
+    word numFrames ;
+    GIFHandle GIFState ;
+    Boolean lastBlock ;
+    char buffer[512] ;
+    Boolean keepGoing ;
+    ImpGIFInfo info ;
+    ImpGIFStatus status ;
+    AllocWatcherHandle watcher ;
+    Boolean useSysPal ;
+#if PROGRESS_DISPLAY
+    _ImportProgressParams_;  /* import progress data */
+#define LPDP p_work->importProgressDataP->IPD_loadProgressDataP
+    ImpGIFProgressInfo progressInfo;
+    word frameNum;
+#endif
+    MimeStatus *mimeStatus ;
+} GIFAnimWorkStruct ;
+
+/*-------------------------------------------------------------------------
+ | Routine:  is_FFs
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Determines if the following group of bytes are all 0xFF bytes
+ |
+ | Inputs:
+ |    byte *p_lineIn              -- Bytes to check
+ |    word countIn                -- Number of bytes to check
+ |
+ | Outputs:
+ |    Boolean                     -- TRUE if all FF, else FALSE
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  09/12/00  Created
+ |
+ *-----------------------------------------------------------------------*/
+Boolean is_FFs(byte *p_lineIn, word countIn)
+{
+    register word count = countIn ;
+    register byte *p_line = p_lineIn ;
+
+    while (count--)
+        if ((*(p_line++))!=0xFF)
+            return FALSE ;
+    return TRUE ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  ImpGraphCheckIfBitmapMaskCanBeRemoved
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Examines a 256 color bitmap and determines if the mask can be
+ |    removed.
+ |
+ | Inputs:
+ |    Bitmap *p_bitmap            -- Already locked/copied bitmap header
+ |    VMFileHandle file           -- File with bitmap
+ |    VMBlockHandle bitmap        -- Bitmap handle in file
+ |
+ | Outputs:
+ |    Boolean                     -- TRUE if mask not used, else FALSE
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  09/12/00  Created
+ |
+ *-----------------------------------------------------------------------*/
+Boolean ImpGraphCheckIfBitmapMaskCanBeRemoved(
+            Bitmap *p_bitmap,
+            VMFileHandle file,
+            VMBlockHandle bitmap)
+{
+    static byte maskTriangle[8] = {0x80,0xC0,0xE0,0xF0,0xF8,0xFC,0xFE,0xFF} ;
+    word y = 0;
+    byte lastMask ;
+    word num_FFs ;
+    byte *p_line ;
+    Boolean removable ;
+    word size ;
+
+    /* Must have a mask AND be uncompacted to even start */
+    if ((p_bitmap->B_type & BMT_MASK) && 
+            (p_bitmap->B_compact == BMC_UNCOMPACTED) && 
+            (p_bitmap->B_width))  {
+        /* Determine how many 0xFFs and what the last mask will be */
+        lastMask = maskTriangle[(p_bitmap->B_width-1)&0x07] ;
+        num_FFs = (p_bitmap->B_width-1)>>3 ;
+
+        /* Lock the first line.  We are going to walk */
+        /* the bitmap quickly. */
+        HugeArrayLock(file, bitmap, 0, (void**) &p_line, &size) ;
+        y = p_bitmap->B_height ;
+
+        /* Assume we are removable for now */
+        removable = TRUE ;
+        while (y--)  {
+            /* If any of the partial masks are not 0xFF */
+            /* or the last mask is not all ones, then the */
+            /* mask cannot be removed.  Stop immediately */
+            if ((!is_FFs(p_line, num_FFs)) || 
+                    ((p_line[num_FFs] & lastMask) != lastMask))  {
+                /* Can't remove the mask */
+                removable = FALSE ;
+                break ;
+            }
+            HugeArrayNext((void**)&p_line, &size) ;
+        }
+        if (p_line)
+            HugeArrayUnlock(p_line) ;
+    } else {
+        removable = FALSE ;
+    }
+    return removable ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  ImpGraphCreateBitmapWithCopiedHeader
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Create a new bitmap using the given bitmap as the setup.  This
+ |    copies over size, palette, and any other details internal to the
+ |    bitmap.  Can also change the type and compression type.
+ |
+ | Inputs:
+ |    VMFileHandle sourceFile     -- File to copy from
+ |    VMBlockHandle sourceBitmap  -- Bitmap in source file
+ |    VMFileHande destinationFile -- File to create bitmap within
+ |    byte typeBitsClear          -- Tweak the bits in B_type
+ |    byte typeBitsSet            -- Tweak the bits in B_type
+ |    BMCompact newCompactType    -- What compression will we use
+ |
+ | Outputs:
+ |    VMBlockHandle               -- New handle to bitmap or NULL if none
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  09/13/00  Created
+ |
+ *-----------------------------------------------------------------------*/
+VMBlockHandle ImpGraphCreateBitmapWithCopiedHeader(
+                        VMFileHandle sourceFile,
+                        VMBlockHandle sourceBitmap,
+                        VMFileHandle destinationFile,
+                        byte typeBitsClear,
+                        byte typeBitsSet,
+                        BMCompact newCompactType) 
+{
+    VMBlockHandle newBitmap ;
+    EditableBitmap *p_sourceHeader, *p_destHeader;
+
+    /* Create a new bitmap with the right sized header */
+    /* based on the other bitmap's header */
+    HugeArrayLockDir(sourceFile, sourceBitmap, (void**)&p_sourceHeader);
+    newBitmap = HugeArrayCreate(
+                      destinationFile, 
+                      0,
+                      p_sourceHeader->EB_header.HAD_header.LMBH_offset);
+
+    /* Copy over the bitmap info and then some */
+    HugeArrayLockDir(destinationFile, newBitmap, (void**)&p_destHeader);
+    memcpy(&(p_destHeader->EB_bm), &(p_sourceHeader->EB_bm),
+           (p_sourceHeader->EB_header.HAD_header.LMBH_offset -
+            offsetof(EditableBitmap, EB_bm)));
+    HugeArrayUnlockDir(p_sourceHeader);
+
+    /* Change the type as necessary */
+    p_destHeader->EB_bm.CB_simple.B_type &= (~typeBitsClear) ;
+    p_destHeader->EB_bm.CB_simple.B_type |= typeBitsSet ;
+    p_destHeader->EB_bm.CB_devInfo = 0;
+    p_destHeader->EB_color = NullHandle ;
+    p_destHeader->EB_bm.CB_simple.B_compact = newCompactType ;
+
+    /* Done with our bitmap header */
+    HugeArrayDirty(p_destHeader);
+    HugeArrayUnlockDir(p_destHeader);
+
+    return newBitmap ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  ImpGraphCompactBitmapIgnoringMask
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    This routine is used to not only copy a single image, but also
+ |    compress it and get rid of any unnecessary bitmap mask.
+ |    NOTE:  This ONLY works for 256 color images with/without a palette.
+ |
+ | Inputs:
+ |    VMFileHandle sourceFile     -- Bitmap file
+ |    VMBlockHandle sourceBitmap  -- Bitmap location in file
+ |    VMFileHandle destinationFile-- Where to copy bitmap
+ |    CBitmap *p_bitmap           -- Header for bitmap 
+ |                                   (assumed previously copied/locked)
+ |
+ | Outputs:
+ |    VMBlockHandle               -- New handle to bitmap or NULL if none
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  09/12/00  Created
+ |
+ *-----------------------------------------------------------------------*/
+VMBlockHandle ImpGraphCompactBitmapIgnoringMask(
+                     VMFileHandle sourceFile,
+                     VMBlockHandle sourceBitmap,
+                     VMFileHandle destinationFile,
+                     CBitmap *p_bitmap)
+{
+    word maskSize = (p_bitmap->CB_simple.B_width+7)>>3 ; /* Number of bytes in mask */
+    VMBlockHandle newBitmap = NULL ;
+    word yCount = p_bitmap->CB_simple.B_height ;
+    byte *p_line ;
+    word size ;
+    MemHandle mem ;
+    byte *p_mem ;
+    word lineSize ;
+
+    /* setup a buffer to compress into that will be the right size */
+    mem = MemAlloc(
+            2 + p_bitmap->CB_simple.B_width + ((p_bitmap->CB_simple.B_width+127)>>7), 
+            HF_DYNAMIC, 
+            0 /* No errors! */) ;
+    if (mem)  {
+        p_mem = MemLock(mem) ;
+
+        /* Create a bitmap with the right header! */
+        newBitmap = ImpGraphCreateBitmapWithCopiedHeader(
+                        sourceFile,
+                        sourceBitmap,
+                        destinationFile,
+                        BMT_MASK,
+                        0,
+                        BMC_PACKBITS) ;
+
+        /* Go through copying and compressing the bitmap scan lines */
+        HugeArrayLock(sourceFile, sourceBitmap, 0, (void**)&p_line, &lineSize) ;
+        while (yCount--)  {
+#if SCANLINE_COMPRESS
+            size = ImpPackBits(p_mem, p_line+maskSize, lineSize-maskSize);
+#else
+	    size = lineSize;
+#endif
+            HugeArrayAppend( destinationFile,newBitmap, size, p_mem) ;
+            HugeArrayNext((void**)&p_line, &size) ;
+        }
+        if (p_line)
+            HugeArrayUnlock(p_line) ;
+
+        /* Free the memory (we don't have to unlock it) */
+        MemFree(mem) ;
+    }
+
+    return newBitmap ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  ImpGraphCompactBitmap
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Determines if a bitmap has a mask to be removed, and if so,
+ |    does a special compression while removing it.  If the bitmap uses
+ |    its mask, the normal GrCompactBitmap is called.
+ |
+ | Inputs:
+ |    VMFileHandle sourceFile     -- Bitmap file
+ |    VMBlockHandle sourceBitmap  -- Bitmap location in file
+ |    VMFileHandle destinationFile-- Where to copy bitmap
+ |    NOTE:  This ONLY works for 256 color images with/without a palette.
+ |
+ | Outputs:
+ |    VMBlockHandle               -- New handle to bitmap or NULL if none
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  09/12/00  Created
+ |
+ *-----------------------------------------------------------------------*/
+VMBlockHandle ImpGraphCompactBitmap(
+        VMFileHandle sourceFile, 
+        VMBlockHandle sourceBitmap, 
+        VMFileHandle destinationFile)
+{
+    CBitmap *p_bitmap ;
+    CBitmap bitmapHeader ;
+    MemHandle mem ;
+    VMBlockHandle bitmap ;
+
+    /* Grab the bitmap's header */
+    p_bitmap = (CBitmap *)(((byte *)VMLock(sourceFile, sourceBitmap, &mem)) + 
+        sizeof(HugeArrayDirectory)) ;
+    bitmapHeader =  *p_bitmap ;
+    VMUnlock(mem) ;
+
+    /* We have a mask.  Is it removable? */
+    if (ImpGraphCheckIfBitmapMaskCanBeRemoved(
+            (Bitmap *)&bitmapHeader, 
+            sourceFile, 
+            sourceBitmap))  {
+        /* Yes, we can remove the mask. */
+        /* But since we need don't want to do a two */
+        /* step process of getting rid of the mask */
+        /* and then compacting, we'll use a specialized */
+        /* routine to do just that -- compact ignoring */
+        /* the mask */
+        bitmap = ImpGraphCompactBitmapIgnoringMask(
+                     sourceFile,
+                     sourceBitmap,
+                     destinationFile,
+                     &bitmapHeader) ;
+    } else {
+        /* Mask is used, just compact it like normal */
+        bitmap = GrCompactBitmap(
+                     sourceFile, 
+                     sourceBitmap,
+                     destinationFile) ;
+    }
+
+    return bitmap ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  IGIFAnimStart
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Starts up a GIF state for decompressing an image.
+ |
+ | Inputs:
+ |    GIFAnimWorkSruct *p_work    -- Generic structure to hold state
+ |
+ | Outputs:
+ |    Boolean                     -- FALSE if failed, else TRUE
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  09/13/00  Documented
+ |
+ *-----------------------------------------------------------------------*/
+Boolean IGIFAnimStart(GIFAnimWorkStruct *p_work)
+{
+    Boolean didStart = FALSE ;
+
+    p_work->numFrames = 0 ;
+#if PROGRESS_DISPLAY
+    /* if we have load progress data stream, don't need to open file */
+    if (p_work->importProgressDataP &&
+	p_work->importProgressDataP->IPD_callback &&
+	LPDP &&
+	LPDP->LPD_dataStream) {
+	p_work->picFile = 0xffff;
+    } else {
+	p_work->picFile = FileOpen(
+                          p_work->picFilename,
+                          FILE_DENY_NONE|FILE_ACCESS_R) ;
+    }
+#else
+    p_work->picFile = FileOpen(
+                          p_work->picFilename,
+                          FILE_DENY_NONE|FILE_ACCESS_R) ;
+#endif
+    if (p_work->picFile)  {
+        p_work->GIFState = ImpGIFCreate(
+                               p_work->vmFile,
+                               p_work->watcher,
+                               p_work->useSysPal,
+                               p_work->mimeStatus) ;
+        if (p_work->GIFState)  {
+            didStart = TRUE ;
+            p_work->status = IG_STATUS_NEED_DATA ;
+            p_work->lastBlock = FALSE ;
+            p_work->keepGoing = TRUE ;
+        }
+    }
+
+    return didStart ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  IGIFAnimEnd
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Done decompression a GIF, get rid of any related data.
+ |
+ | Inputs:
+ |    GIFAnimWorkSruct *p_work    -- Generic structure holding state info
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  09/13/00  Documented
+ |
+ *-----------------------------------------------------------------------*/
+void IGIFAnimEnd(GIFAnimWorkStruct *p_work)
+{
+    if (p_work->picFile != 0xffff) FileClose(p_work->picFile, FALSE) ;
+    ImpGIFDestroy(p_work->GIFState) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  IGIFAnimGrabFrame
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Decompress one frame in the animation in the GIF, but don't combine
+ |    it into the work frame.
+ |
+ | Inputs:
+ |    GIFAnimWorkSruct *p_work    -- Generic structure to hold state
+ |
+ | Outputs:
+ |    Boolean                     -- FALSE if no more frames, else TRUE
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  09/13/00  Documented
+ |
+ *-----------------------------------------------------------------------*/
+Boolean IGIFAnimGrabFrame(GIFAnimWorkStruct *p_work)
+{
+    Boolean grabbedFrame = FALSE ;
+    word sizeRead = 0 ;
+#if PROGRESS_DISPLAY
+    /* last line of previous slice of import progress notification */
+    word previousLine = 65535;
+    Boolean firstPass = TRUE;  /* first pass of interlaced GIFs */
+#endif
+
+    /* Make sure that we don't return a positive status if we start over. */
+    p_work->info.IGI_bitmap = NullHandle ;
+    
+    sizeRead = 0 ;
+    while ((p_work->keepGoing) && (!grabbedFrame))  {
+        p_work->status = ImpGIFProcess(
+                             p_work->GIFState,
+                             p_work->buffer,
+                             sizeRead,
+                             p_work->lastBlock) ;
+#if PROGRESS_DISPLAY
+#define SLICE_HEIGHT 10
+	/* send out whatever progress bitmap we have (only for first frame) */
+	if (p_work->status != IG_STATUS_ERROR_NOT_GIF &&
+	    p_work->importProgressDataP &&
+	    p_work->importProgressDataP->IPD_callback &&
+	    (p_work->frameNum == 0)) {
+	    ImpGIFGetProgressInfo(p_work->GIFState, &(p_work->progressInfo));
+	    if (p_work->progressInfo.IGPI_fieldWidth &&
+		p_work->progressInfo.IGPI_fieldHeight &&
+		p_work->progressInfo.IGPI_bitmap) {
+		p_work->importProgressDataP->IPD_vmFile = p_work->vmFile;
+		p_work->importProgressDataP->IPD_bitmap =
+		    p_work->progressInfo.IGPI_bitmap;
+		p_work->importProgressDataP->IPD_iad.IAD_size.XYS_width =
+		    p_work->progressInfo.IGPI_fieldWidth;
+		p_work->importProgressDataP->IPD_iad.IAD_size.XYS_height =
+		    p_work->progressInfo.IGPI_fieldHeight;
+		if (firstPass == FALSE &&
+		    (p_work->progressInfo.IGPI_yPos < previousLine)) {
+		    /* we're making another pass, invalidate bottom then
+		       start from top again */
+		    p_work->importProgressDataP->IPD_firstLine =
+			previousLine+1;
+		    p_work->importProgressDataP->IPD_lastLine =
+			p_work->progressInfo.IGPI_fieldHeight;
+		    ((pcfm_ImportProgressCallback *)ProcCallFixedOrMovable_pascal)(p_work->importProgressDataP, p_work->importProgressDataP->IPD_callback);
+		    previousLine = 65535;
+		}
+		/* invalidate current slice, if any */
+		if (p_work->progressInfo.IGPI_yPos ||
+		    firstPass==FALSE ||
+		    (p_work->status == IG_STATUS_GIF_DONE)) {
+		    p_work->importProgressDataP->IPD_firstLine =
+			previousLine+1;
+		    if ((p_work->progressInfo.IGPI_yPos ==
+			 p_work->progressInfo.IGPI_fieldHeight) ||
+			(p_work->status == IG_STATUS_GIF_DONE)) {
+			/* use full last line */
+			p_work->importProgressDataP->IPD_lastLine =
+			    p_work->progressInfo.IGPI_fieldHeight;
+		    } else {
+			/* don't use partial current line */
+			p_work->importProgressDataP->IPD_lastLine =
+			    p_work->progressInfo.IGPI_yPos-1;
+		    }
+		    if (p_work->importProgressDataP->IPD_lastLine &&
+			/* big enough slice... */
+			((p_work->importProgressDataP->IPD_lastLine >=
+			  p_work->importProgressDataP->IPD_firstLine +
+			  SLICE_HEIGHT) ||
+			 /* ...or last slice */
+			 (p_work->importProgressDataP->IPD_lastLine ==
+			  p_work->progressInfo.IGPI_fieldHeight))) {
+			((pcfm_ImportProgressCallback *)
+			 ProcCallFixedOrMovable_pascal)
+			    (p_work->importProgressDataP,
+			     p_work->importProgressDataP->IPD_callback);
+			previousLine =
+			    p_work->importProgressDataP->IPD_lastLine;
+			firstPass = FALSE;
+		    }
+		}
+	    }
+	}
+#endif
+        switch (p_work->status)  {
+            case IG_STATUS_NEED_DATA:
+            case IG_STATUS_OK:
+#if PROGRESS_DISPLAY
+		if (p_work->importProgressDataP &&
+		    p_work->importProgressDataP->IPD_callback &&
+		    LPDP) {
+		    /* read data stream, first data is automatically
+		       peek'ed so that if we get NOT_GIF error we can
+		       try to import stream as JPEG later */
+		    sizeRead = ((pcfm_LoadProgressCallback *)ProcCallFixedOrMovable_pascal)(
+			LPDP, LPCT_READ,
+			p_work->buffer, sizeof(p_work->buffer),
+			LPDP->LPD_callback);
+		} else {
+		    sizeRead = FileRead(
+                               p_work->picFile,
+                               p_work->buffer,
+                               sizeof(p_work->buffer),
+                               FALSE) ;
+		}
+#else
+                sizeRead = FileRead(
+                               p_work->picFile,
+                               p_work->buffer,
+                               sizeof(p_work->buffer),
+                               FALSE) ;
+#endif
+                if (sizeRead < sizeof(p_work->buffer))
+                    p_work->lastBlock = TRUE ;
+                break ;
+            case IG_STATUS_GIF_DONE:
+#if PROGRESS_DISPLAY
+		/* clean up data stream (sizeRead will be
+		   sizeof(p_work->buffer) or less) if small frame was
+		   read so that next frame will work */
+		if (p_work->importProgressDataP &&
+		    p_work->importProgressDataP->IPD_callback &&
+		    LPDP && LPDP->LPD_dataStream) {
+		    ((pcfm_LoadProgressCallback *)ProcCallFixedOrMovable_pascal)(
+			LPDP, LPCT_FLUSH_FIRST,
+			0, sizeRead,
+			LPDP->LPD_callback);
+		}
+#endif
+                /* Get information about this frame */
+                p_work->numFrames++ ;
+                grabbedFrame = TRUE ;
+                break ;
+#if PROGRESS_DISPLAY
+	    case IG_STATUS_END_DATA:
+		/* allow partial bitmap */
+		if (p_work->importProgressDataP &&
+		    p_work->importProgressDataP->IPD_callback) {
+		    grabbedFrame = TRUE;
+		}
+		p_work->keepGoing = FALSE;
+		break;
+#endif
+            default:
+                p_work->keepGoing = FALSE ;
+                break ;
+        }
+    }
+
+    /* If we have a bitmap, then we can return something */
+    if ((p_work->info.IGI_bitmap) && (p_work->status != IG_STATUS_FOUND_END_OF_GIF))
+        grabbedFrame = TRUE ;
+
+    if (grabbedFrame)  {
+        /* Always get the state of the currently grabbed frame */
+        ImpGIFGetInfo(p_work->GIFState, &p_work->info) ;
+    } else {
+        p_work->info.IGI_bitmap = NULL ;
+    }
+
+#if PROGRESS_DISPLAY
+    return(grabbedFrame && p_work->info.IGI_bitmap);
+#else
+    return grabbedFrame ;
+#endif
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  ISetBit, IClearBit, IIsBitSet
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Routines to set, clear, and check bits in a line.  These should
+ |    be optimized into inline assembly routines.
+ |
+ | Inputs:
+ |    byte *p_bitmask             -- Array of bits
+ |    word bitindex               -- nth bit to modify/check
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  09/13/00  Documented
+ |
+ *-----------------------------------------------------------------------*/
+void ISetBit(byte *p_bitmask, word bitindex)
+{
+    p_bitmask[bitindex>>3] |= (0x80>>(bitindex&7)) ;
+}
+
+void IClearBit(byte *p_bitmask, word bitindex)
+{
+    p_bitmask[bitindex>>3] &= (~(0x80>>(bitindex&7))) ;
+}
+
+byte IIsBitSet(byte *p_bitmask, word bitindex)
+{
+    return p_bitmask[bitindex>>3] & (0x80>>(bitindex&7)) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  IGetPixel8, IGetPixel4, IGetPixel1
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Routines to fetch a pixel out of an uncompressed array of bytes.
+ |    Since 1, 4, 8 and are divisors of 8 bits/byte, this is fast, but
+ |    for speed, we use pointers to functions (thus they are not inline).
+ |
+ | Inputs:
+ |    byte *p_raster              -- array of pixels
+ |    word offset                 -- index to pixel (not byte!)
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  09/13/00  Documented
+ |
+ *-----------------------------------------------------------------------*/
+typedef byte (_near InternalGetPixelCommand)(byte *p_raster, word offset) ;
+
+byte (_near IGetPixel8)(byte *p_raster, word offset) 
+{
+    return (p_raster[offset]) ;
+}
+
+byte (_near IGetPixel4)(byte *p_raster, word offset) 
+{
+    if (offset&1)  {
+         return (p_raster[offset>>1]&0xF) ;
+    } else {
+         return (p_raster[offset>>1]>>4)&0xF ;
+    }
+}
+
+byte (_near IGetPixel1)(byte *p_raster, word offset) 
+{
+    return (((p_raster[offset>>3])>>(offset&7)) & 1) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  ISetPixel8, ISetPixel4, ISetPixel1
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Routines to store a pixel in an array just like the IGetPixelX
+ |    routines.
+ |
+ | Inputs:
+ |    byte *p_raster              -- array of pixels
+ |    word offset                 -- index to pixel (not byte!)
+ |    byte pixel                  -- color of pixel (LSB oriented)
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  09/13/00  Documented
+ |
+ *-----------------------------------------------------------------------*/
+typedef void (_near InternalSetPixelCommand)(byte *p_raster, word offset, byte pixel) ;
+
+void (_near ISetPixel8)(byte *p_raster, word offset, byte pixel) 
+{
+    p_raster[offset] = pixel ;
+}
+
+void (_near ISetPixel4)(byte *p_raster, word offset, byte pixel)
+{
+    pixel &= 0xF ;
+    if (offset&1)  {
+       pixel <<= 4 ;
+       offset >>= 1 ;
+       p_raster[offset] &= 0x0F ;
+       p_raster[offset] |= pixel ;
+    } else {
+       offset >>= 1 ;
+       p_raster[offset] &= 0xF0 ;
+       p_raster[offset] |= pixel ;
+    }
+}
+
+void (_near ISetPixel1)(byte *p_raster, word offset, byte pixel)
+{
+    pixel &= 1 ;
+    offset >>= 3 ;
+    if (pixel)
+       p_raster[offset] |= (0x80>>(offset&7)) ;
+    else
+       p_raster[offset] &= (~(0x80>>(offset&7))) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  ICopyRaster
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Copy a raster worth of pixels from one raster line to another
+ |    while converting the types.
+ |
+ | Inputs:
+ |    BMType toFormat             -- Destination format
+ |    byte *p_rasterTo            -- Destination array of pixels
+ |    word toX                    -- Destination X position to start
+ |    word toWidth                -- Destination array width limit
+ |
+ |    BMType fromFormat           -- Source format
+ |    byte *p_rasterFrom          -- Source array of pixels
+ |    word toX                    -- Source X position to start
+ |    word toWidth                -- Source array width limit
+ |
+ |    word width                  -- Number of pixels to copy
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  09/13/00  Documented
+ |
+ *-----------------------------------------------------------------------*/
+Boolean ICopyRaster(
+         BMType toFormat,
+         byte *p_rasterTo,
+         word toX,
+         word toWidth,
+         BMType fromFormat,
+         byte *p_rasterFrom,
+         word fromX,
+         word fromWidth,
+         word width)
+{
+    byte *p_maskFrom ;
+    byte *p_maskTo ;
+    word i ;
+    InternalGetPixelCommand _near *getPixel ;
+    InternalSetPixelCommand _near *setPixel ;
+    Boolean isEverTransparent = FALSE ;
+
+    if ((fromFormat == BMF_8BIT) && (toFormat == BMF_8BIT))  {
+        /* Special fast copy */
+        memcpy(p_rasterTo+toX, p_rasterFrom+fromX, width) ;
+    } else {
+        switch (fromFormat & BMT_FORMAT)  {
+            case BMF_8BIT:
+                getPixel = IGetPixel8 ;
+                break ;
+            case BMF_4BIT:
+                getPixel = IGetPixel4 ;
+                break ;
+            case BMF_MONO:
+                getPixel = IGetPixel1 ;
+                break ;
+            default:
+                getPixel = NULL ;
+        }
+
+        if (fromFormat & BMT_MASK)  {
+            p_maskFrom = p_rasterFrom ;
+            p_rasterFrom += (fromWidth+7)>>3 ;
+        } else {
+            p_maskFrom = NULL ;
+        }
+
+        switch (toFormat & BMT_FORMAT)  {
+            case BMF_8BIT:
+                setPixel = ISetPixel8 ;
+                break ;
+            case BMF_4BIT:
+                setPixel = ISetPixel4 ;
+                break ;
+            case BMF_MONO:
+                setPixel = ISetPixel1 ;
+                break ;
+            default:
+                setPixel = NULL ;
+        }
+
+        if (toFormat & BMT_MASK)  {
+            p_maskTo = p_rasterTo ;
+            p_rasterTo += (toWidth+7)>>3 ;
+        } else {
+            p_maskTo = NULL ;
+        }
+
+        if ((getPixel) && (setPixel))  {
+            if (p_maskFrom)  {
+                if (p_maskTo)  {
+                    /* Mask on the from, and a mask on the to */
+                    for (i=0; i<width; i++)  {
+                        if (IIsBitSet(p_maskFrom, fromX))  {
+                            setPixel(
+                                p_rasterTo,
+                                toX,
+                                getPixel(p_rasterFrom, fromX)) ;
+                            ISetBit(p_maskTo, toX) ;
+                        } else {
+                            if (!IIsBitSet(p_maskTo, toX))
+                                isEverTransparent = TRUE ;
+                        }
+                        fromX++ ;
+                        toX++ ;
+                    }
+                } else {
+                    /* Mask on the from, but no mask on the to */
+                    for (i=0; i<width; i++)  {
+                        if (IIsBitSet(p_maskFrom, fromX))  {
+                            setPixel(
+                                p_rasterTo,
+                                toX++,
+                                getPixel(p_rasterFrom, fromX)) ;
+                        } else {
+                            isEverTransparent = TRUE ;
+                        }
+                        fromX++ ;
+                    }
+                }
+            } else {
+                if (p_maskTo)  {
+                    /* No mask on the from, but a mask on the to */
+                    for (i=0; i<width; i++)  {
+                        setPixel(
+                            p_rasterTo,
+                            toX,
+                            getPixel(p_rasterFrom, fromX++)) ;
+                        ISetBit(p_maskTo, toX) ;
+                        toX++ ;
+                    }
+                } else {
+                    /* No mask on the from, no mask on the to */
+                    for (i=0; i<width; i++)  {
+                        setPixel(
+                            p_rasterTo,
+                            toX++,
+                            getPixel(p_rasterFrom, fromX++)) ;
+                    }
+                }
+            }
+        }
+    }
+
+    return isEverTransparent ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  IClearRectInBitmap
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Clear a rectangular area inside of another bitmap
+ |
+ | Inputs:
+ |    VMFileHandle file           -- File containing bitmap
+ |    VMBlockHandle bitmap        -- Bitmap in file to modify
+ |    BMFormat format             -- Format of bitmap in file
+ |    sword offsetX, offsetY      -- top left of rectangle to clear
+ |    word width, height          -- size of rectangle to clear
+ |    byte color                  -- what color to clear to
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  09/13/00  Documented
+ |
+ *-----------------------------------------------------------------------*/
+void IClearRectInBitmap(
+         VMFileHandle file,
+         VMBlockHandle bitmap,
+         BMFormat format,
+         sword offsetX,
+         sword offsetY,
+         word width,
+         word height,
+         byte color)
+{
+    word i ;
+    sword x, y ;
+    InternalSetPixelCommand _near *setPixel ;
+    Bitmap *p_bitmap ;
+    Bitmap bitmapHeader ;
+    MemHandle mem ;
+    byte *p_raster ;
+    byte *p_mask ;
+    byte *p_line ;
+    sword drawWidth ;
+    word size ;
+
+    p_bitmap = (Bitmap *)&(((HugeArrayDirectory *)VMLock(file, bitmap, &mem))[1]) ;
+    bitmapHeader = *p_bitmap ;
+    VMUnlock(mem) ;
+
+    switch (format & BMT_FORMAT)  {
+        case BMF_8BIT:
+            setPixel = ISetPixel8 ;
+            break ;
+        case BMF_4BIT:
+            setPixel = ISetPixel4 ;
+            break ;
+        case BMF_MONO:
+            setPixel = ISetPixel1 ;
+            break ;
+        default:
+            setPixel = NULL ;
+    }
+
+    drawWidth = width ;
+    if ((offsetX+width) > bitmapHeader.B_width)
+        drawWidth -= bitmapHeader.B_width - (offsetX + width) ;
+    if (offsetX < 0)  {
+        width += offsetX ;
+        offsetX = 0 ;
+    }
+    if (drawWidth > 0)  {
+        for (i=0; i<height; i++)  {
+            y = offsetY + i ;
+            if (y < 0)
+                continue ;
+            if (y > bitmapHeader.B_height)
+                break ;
+
+            HugeArrayLock(file, bitmap, y, (void**)&p_line, &size) ;
+            p_raster = p_line ;
+
+            if (format & BMT_MASK)  {
+                p_mask = p_raster ;
+                p_raster += (bitmapHeader.B_width+7)>>3 ;
+            } else {
+                p_mask = NULL ;
+            }
+
+            for (x=offsetX; x<(offsetX+width); x++)  {
+                if ((x >= 0) && (x < bitmapHeader.B_width))  {
+                    setPixel(p_raster, x, color) ;
+                    if (p_mask)
+                        IClearBit(p_mask, x) ;
+                }
+            }
+
+            HugeArrayDirty(p_line) ;
+            HugeArrayUnlock(p_line) ;
+        }
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  IDrawBitmapInBitmap
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Draw one bitmap inside of another while also converting the
+ |    the color resolution.
+ |
+ | Inputs:
+ |    VMFileHandle fromFle        -- Bitmap file to draw
+ |    VMBlockHandle fromBitmap    -- Bitmap handle to draw
+ |    VMFileHandle toFile         -- Bitmap file to draw into
+ |    VMBlockHandle toBitmap      -- Bitmap handle to draw into
+ |    sword offsetX, offsetY      -- top left locatio to place bitmap
+ |    Boolean *p_isEverTransparent-- returns TRUE if the copied
+ |                                   area had a transparent spot.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  09/13/00  Documented
+ |
+ *-----------------------------------------------------------------------*/
+void IDrawBitmapInBitmap(
+         VMFileHandle fromFile,
+         VMBlockHandle fromBitmap,
+         VMFileHandle toFile,
+         VMBlockHandle toBitmap,
+         sword offsetX,
+         sword offsetY,
+         Boolean *p_isEverTransparent)
+{
+    Bitmap fromHeader, toHeader ;
+    Bitmap *p_bitmap ;
+    MemHandle mem ;
+    sword width ;
+    sword height ;
+    word insetX ;
+    word insetY ;
+    byte *p_lineFrom ;
+    byte *p_lineTo ;
+    word sizeFrom, sizeTo ;
+    dword retFrom, retTo;
+
+    /* Get the sizes of the bitmaps */
+    *p_isEverTransparent = FALSE ;
+    p_bitmap = (((byte *)VMLock(fromFile, fromBitmap, &mem)) +
+                   sizeof(HugeArrayDirectory)) ;
+    fromHeader = *p_bitmap ;
+    VMUnlock(mem) ;
+
+    p_bitmap = (((byte *)VMLock(toFile, toBitmap, &mem)) +
+                   sizeof(HugeArrayDirectory)) ;
+    toHeader = *p_bitmap ;
+    VMUnlock(mem) ;
+
+    /* Determine where we overlap and the widths and heights (if any) */
+    insetX = 0 ;
+    width = (toHeader.B_width - offsetX) ;
+    if (width > (sword)fromHeader.B_width)
+        width = fromHeader.B_width ;
+    if (offsetX < 0)  {
+        insetX = -offsetX ;
+        width -= insetX ;
+        offsetX = 0 ;
+    }
+    if (width > 0)  {
+        insetY = 0 ;
+        height = (toHeader.B_height - offsetY) ;
+        if (height > (sword)fromHeader.B_height)
+            height = fromHeader.B_height ;
+        if (offsetY < 0)  {
+            insetY = -offsetY ;
+            height -= insetY ;
+            offsetY = 0 ;
+        }
+
+        /* Only process if there is something to draw */
+        if (height > 0)  {
+            /* Do up to 8 bit to 8 bit drawing */
+            if (((fromHeader.B_type & BMT_FORMAT) <= BMF_8BIT) &&
+                    ((toHeader.B_type & BMT_FORMAT) <= BMF_8BIT))  {
+                /* Do it line by line */
+                while (height)  {
+                    /* Lock in the rasters */
+                    p_lineFrom = p_lineTo = NULL ;
+                    retFrom = HugeArrayLock(
+                        fromFile,
+                        fromBitmap,
+                        insetY,
+                        (void**)&p_lineFrom,
+                        &sizeFrom) ;
+                    retTo = HugeArrayLock(
+                        toFile,
+                        toBitmap,
+                        offsetY,
+                        (void**)&p_lineTo,
+                        &sizeTo) ;
+                    if (HAL_COUNT(retFrom) && HAL_COUNT(retTo))  {
+                        /* Copy over the data (without regard to mask) */
+                        /* Note if we ever found a single transparent pixel */
+                        if (ICopyRaster(
+                                toHeader.B_type,
+                                p_lineTo, offsetX,
+                                toHeader.B_width,
+                                fromHeader.B_type,
+                                p_lineFrom, insetX,
+                                fromHeader.B_width,
+                                width) == TRUE)
+                            *p_isEverTransparent = TRUE ;
+
+                        /* Done with this raster */
+                        HugeArrayDirty(p_lineFrom) ;
+                        HugeArrayDirty(p_lineTo) ;
+                        HugeArrayUnlock(p_lineFrom) ;
+                        HugeArrayUnlock(p_lineTo) ;
+                    } else {
+                        /* Release the maybe locked items */
+                        if (p_lineFrom)
+                            HugeArrayUnlock(p_lineFrom) ;
+                        if (p_lineTo)
+                            HugeArrayUnlock(p_lineTo) ;
+                        break ;
+                    }
+                    height-- ;
+                    offsetY++ ;
+                    insetY++ ;
+                }
+            }
+        }
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  IAttachPaletteToBitmap
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Make a bitmap have a palette.
+ |
+ | Inputs:
+ |    VMFileHandle vmFile         -- File with bitmap
+ |    VMBlockHandle bitmap        -- Actual bitmap
+ |    RGBValue *p_pal             -- pointer to list of 256 colors
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  09/13/00  Documented
+ |
+ *-----------------------------------------------------------------------*/
+void IAttachPaletteToBitmap(
+         VMFileHandle vmFile,
+         VMBlockHandle bitmap,
+         RGBValue *p_pal)
+{
+    CBitmap *p_bitmap ;
+    RGBValue *p_storedPalette ;
+    MemHandle mem ;
+    ChunkHandle palOffset ;
+
+    /* Store the palette in the header */
+    p_bitmap = (((byte *)VMLock(vmFile, bitmap, &mem)) +
+                   sizeof(HugeArrayDirectory)) ;
+
+    /* Only store if there is a place for the palette and we are 8 bit */
+    /* and its a complex bitmap */
+    if (((p_bitmap->CB_simple.B_type & BMT_FORMAT) == BMF_8BIT)  &&
+        (p_bitmap->CB_simple.B_type & BMT_PALETTE) &&
+        (p_bitmap->CB_simple.B_type & BMT_COMPLEX))  {
+        /* Find the start of the stored palette data */
+        palOffset = p_bitmap->CB_palette ;
+        p_storedPalette =
+            ((char *)p_bitmap) +
+            (word) palOffset +
+            sizeof(word) /* Number of entries entry */;
+
+        /* Now copy over the new palette */
+        memcpy(p_storedPalette, p_pal, 768) ;
+
+        /* Changed the block */
+        VMDirty(mem) ;
+    }
+    VMUnlock(mem) ;
+}
+
+#define MAX_ANIMATION_FRAMES    100
+
+/*-------------------------------------------------------------------------
+ | Routine:  ImpGIFProcessAnimationFile
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Major routine that combines all the frames of animation of a GIF
+ |    together into a standard animation type.  If only one frame is
+ |    given, returns a regular HugeImage.
+ |
+ | Inputs:
+ |    ImpBmpParams                -- Parameter structure controlling import
+ |    char *filename              -- GIF filename to decompress in
+ |                                   current working directory.
+ |    AllocWatcherHandle watcher  -- Artificial Memory limit handle
+ |    dword *usedMem              -- Returned Amount of memory used 
+ |                                   by AllocWatcher
+ |    MimeRes resolution          -- Target resolution (not used currently)
+ |    Boolean useSysPal           -- TRUE if we force images to use the
+ |                                   system palette instead of any special
+ |                                   palettes (faster drawing on 256 color
+ |                                   systems)
+ |    word statusMsg              -- Not used
+ |    Boolean *p_isAnimation      -- Returned flag telling if image or
+ |                                   animation
+ |    Boolean *p_isComplete       -- Returns TRUE if the complete image
+ |                                   was decompressed.  If the file
+ |                                   is incomplete or an abort occurs
+ |                                   this flag is FALSE.
+ |
+ | Outputs:
+ |    ImpBmpStatus                -- Import Status (did it work?)
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  09/13/00  Documented
+ |
+ *-----------------------------------------------------------------------*/
+ImpBmpStatus _pascal ImpGIFProcessAnimationFile(
+                         ImpBmpParams *params,
+                         TCHAR *filename,
+                         AllocWatcherHandle watcher,
+                         dword *usedMem,
+                         MimeRes resolution,   /* Currently ignored */
+                         Boolean useSysPal,
+                         word statusMsg,       /* Currently ignored */
+                         Boolean *p_isAnimation,
+                         Boolean *p_isComplete)
+{
+    VMBlockHandle workBitmap = NullHandle ;
+    GIFAnimWorkStruct *p_work ;
+    VMChain animation[MAX_ANIMATION_FRAMES] ;
+    AnimationFrame frames[MAX_ANIMATION_FRAMES] ;
+    ImpBmpStatus status = IBS_SYS_ERROR ;
+
+    word numFrames = 0 ;
+    VMChain previousImage = NullHandle ;
+    Bitmap *p_bitmap ;
+    MemHandle mem ;
+    HugeArrayDirectory *p_dir ;
+    word sizeHeader ;
+    word sizeHeaderWithChains ;
+    AnimationFrame *p_frames ;
+    AnimationHeader *p_header ;
+    MemHandle workHandle ;
+    word loopCount ;
+    Boolean isEverTransparent ;
+
+    *usedMem = 0 ;
+    ECCheckStack() ;
+    workHandle = MemAlloc(sizeof(*p_work), HF_DYNAMIC, 0) ;
+    if (!workHandle)  {
+        params->IBP_width = 1 ;
+        params->IBP_height = 1 ;
+        params->IBP_format = BMF_MONO ;
+        return status ;
+    }
+    p_work = MemLock(workHandle) ;
+
+    p_work->vmFile = params->IBP_dest ;
+    p_work->watcher = watcher ;
+    p_work->useSysPal = useSysPal ;
+    p_work->mimeStatus = params->IBP_mimeStatus ;
+#if PROGRESS_DISPLAY
+    /* point to import progress data */
+    p_work->importProgressDataP = params->IBP_importProgressDataP;
+    p_work->frameNum = numFrames;
+#endif
+    if (p_work->vmFile)  {
+        strncpy(p_work->picFilename, filename, (sizeof(p_work->picFilename)/sizeof(TCHAR))-1) ;
+        if (IGIFAnimStart(p_work))  {
+            /* Keep going if we have frames to grab */
+            while (IGIFAnimGrabFrame(p_work))  {
+                *usedMem += p_work->info.IGI_memoryUsed ;
+                if (workBitmap == NullHandle)  {
+                    /* When creating the work bitmap, use the image dimensions
+                       if the logical screen dimensions are zero.
+                       -Dave 9/8/99 */
+                    word workBitmapWidth = p_work->info.IGI_fieldWidth,
+                         workBitmapHeight = p_work->info.IGI_fieldHeight;
+
+                    if (workBitmapWidth == 0 || workBitmapHeight == 0)
+                    {
+                        workBitmapWidth = p_work->info.IGI_bitmapWidth;
+                        workBitmapHeight = p_work->info.IGI_bitmapHeight;
+                    }
+                    if (workBitmapWidth == 0 || workBitmapHeight == 0)
+                        /* Zero dimensions still? ABORT! */
+                        break;
+		    /* if no offset, use bitmap if smaller than field
+		       (should combine with above checks) */
+		    if ((!p_work->info.IGI_bitmapX &&
+			 workBitmapWidth > p_work->info.IGI_bitmapWidth &&
+			 p_work->info.IGI_bitmapWidth) &&
+			(!p_work->info.IGI_bitmapY &&
+			 workBitmapHeight > p_work->info.IGI_bitmapHeight &&
+			 p_work->info.IGI_bitmapHeight)) {
+			workBitmapWidth = p_work->info.IGI_bitmapWidth;
+			workBitmapHeight = p_work->info.IGI_bitmapHeight;
+			EC_WARNING(-1);
+		    }
+                    /* Use the system palette if requested AND this is an 8bit image. */
+                    /* Only 8 bit images have their palette converted */
+                    if ((useSysPal) && ((p_work->info.IGI_format&BMT_FORMAT)==BMF_8BIT))  {
+                        workBitmap = GrCreateBitmapRaw(
+                                         GIF_ANIMATION_FORMAT & (~BMT_PALETTE),
+                                         workBitmapWidth,
+                                         workBitmapHeight,
+                                         p_work->vmFile) ;
+                    } else {
+                        workBitmap = GrCreateBitmapRaw(
+                                         GIF_ANIMATION_FORMAT,
+                                         workBitmapWidth,
+                                         workBitmapHeight,
+                                         p_work->vmFile) ;
+                        IAttachPaletteToBitmap(
+                            p_work->vmFile,
+                            workBitmap,
+                            p_work->info.IGI_palette) ;
+                    }
+                } else {
+                        IAttachPaletteToBitmap(
+                            p_work->vmFile,
+                            workBitmap,
+                            p_work->info.IGI_palette) ;
+                    /* Now that we have a bitmap, let's store it. */
+                }
+
+                /* Get rid of the previous image */
+                if (previousImage)  {
+                    VMFreeVMChain(p_work->vmFile, previousImage) ;
+                    previousImage = NULL ;
+                }
+
+                /* We only need the previous graphic if we have to remove the
+                   image without leaving any traces */
+                if (p_work->info.IGI_removeMethod==GDM_OVERWRITE_PREVIOUS_GRAPHIC) {
+                  previousImage =
+                      VMCopyVMChain(
+                          p_work->vmFile,
+                          VMCHAIN_MAKE_FROM_VM_BLOCK(workBitmap),
+                          p_work->vmFile) ;
+                }
+
+                IDrawBitmapInBitmap(
+                    p_work->vmFile,
+                    p_work->info.IGI_bitmap,
+                    p_work->vmFile,
+                    workBitmap,
+                    p_work->info.IGI_bitmapX,
+                    p_work->info.IGI_bitmapY,
+                    &isEverTransparent) ;
+
+                if (numFrames < MAX_ANIMATION_FRAMES)  {
+/*                    frames[numFrames].AF_flags =
+                        (isEverTransparent)?
+                            0:ANIMATION_FLAG_NOT_TRANSPARENT ;*/
+                    frames[numFrames].AF_flags =
+                        (p_work->info.IGI_removeMethod ==
+                      GDM_OVERWRITE_BACKGROUND_WITH_BACKGROUND_COLOR)?
+                            0:ANIMATION_FLAG_NOT_TRANSPARENT ;
+                    frames[numFrames].AF_changeBox.R_left = p_work->info.IGI_bitmapX ;
+                    frames[numFrames].AF_changeBox.R_top = p_work->info.IGI_bitmapY ;
+                    frames[numFrames].AF_changeBox.R_right =
+                        p_work->info.IGI_bitmapX + p_work->info.IGI_bitmapWidth - 1 ;
+                    frames[numFrames].AF_changeBox.R_bottom =
+                        p_work->info.IGI_bitmapY + p_work->info.IGI_bitmapHeight - 1 ;
+                    frames[numFrames].AF_delayTime = p_work->info.IGI_delay*3/5 ;
+                    loopCount = p_work->info.IGI_loopCount ;
+
+                    /* Copy over the image, but be sure to compress it */
+#if PROGRESS_DISPLAY
+		    if (numFrames) {
+			/* frame #1+, so it goes into IBP_animDest */
+			animation[numFrames++] =
+			    VMCHAIN_MAKE_FROM_VM_BLOCK(ImpGraphCompactBitmap(
+				p_work->vmFile,
+				workBitmap,
+				params->IBP_animDest)) ;
+			/* unfortunately, we put frame #0 into the usual
+			   place, so we'll now have to move it from
+			   there to IBP_animDest */
+			if (numFrames == 2) {
+			    VMChain frame0 = animation[0];
+			    animation[0] = VMCopyVMChain(p_work->vmFile,
+							 frame0,
+							 params->IBP_animDest);
+			    VMFreeVMChain(p_work->vmFile, frame0);
+			}
+		    } else {
+			/* else frame #0, it goes into usual place */
+			animation[numFrames++] =
+			    VMCHAIN_MAKE_FROM_VM_BLOCK(ImpGraphCompactBitmap(
+				p_work->vmFile,
+				workBitmap,
+				p_work->vmFile)) ;
+		    }
+#else
+                    animation[numFrames++] =
+                        VMCHAIN_MAKE_FROM_VM_BLOCK(ImpGraphCompactBitmap(
+                            p_work->vmFile,
+                            workBitmap,
+                            p_work->vmFile)) ;
+#endif
+                }
+
+                /* Get rid of the old bitmap now that we have a composite */
+#if PROGRESS_DISPLAY
+		/* may be used by progress display */
+		FreeViaProgress(p_work->importProgressDataP,
+				p_work->vmFile, p_work->info.IGI_bitmap) ;
+		/* update frame number for next time */
+		p_work->frameNum = numFrames;
+#else
+                VMFreeVMChain(
+                    p_work->vmFile,
+                    VMCHAIN_MAKE_FROM_VM_BLOCK(p_work->info.IGI_bitmap)) ;
+#endif
+
+                switch (p_work->info.IGI_removeMethod) {
+                    case GDM_OVERWRITE_BACKGROUND_WITH_BACKGROUND_COLOR:
+                       /* Fill in the image */
+                       IClearRectInBitmap(
+                           p_work->vmFile,
+                           workBitmap,
+                           BMF_8BIT | BMT_MASK,
+                           p_work->info.IGI_bitmapX,
+                           p_work->info.IGI_bitmapY,
+                           p_work->info.IGI_bitmapWidth,
+                           p_work->info.IGI_bitmapHeight,
+                           p_work->info.IGI_backgroundColor) ;
+                       break ;
+                    case GDM_OVERWRITE_PREVIOUS_GRAPHIC:
+                       /* Only do if we have a previous image */
+                       if (previousImage)  {
+                           /* Free the working bitmap */
+                           VMFreeVMChain(
+                               p_work->vmFile,
+                               VMCHAIN_MAKE_FROM_VM_BLOCK(workBitmap)) ;
+
+                           /* Create a duplicate of the previous frame */
+                           workBitmap =
+                               (VMCopyVMChain(
+                                   p_work->vmFile,
+                                   previousImage,
+                                   p_work->vmFile) >> 16) ;
+                       }
+                       break ;
+                    case GDM_NOT_SPECIFIED:
+                    case GDM_DO_NOT_DISPOSE:
+                    default:
+                       break ;
+                }
+            }
+
+            /* Note if we got the complete animation */
+            if (p_work->status == IG_STATUS_ABORTED)  {
+                *p_isComplete = FALSE ;
+                status = IBS_IMPORT_STOPPED ;
+#if PROGRESS_DISPLAY
+                /* If we even got part of an image, let's keep that for now */
+                /* This won't be kept forever, though */
+                if ((numFrames == 0) && 
+                        (p_work->importProgressDataP) && 
+                        (p_work->importProgressDataP->IPD_callback) && 
+                        (p_work->progressInfo.IGPI_bitmap))  {
+		            /* else frame #0, it goes into usual place */
+		            animation[numFrames++] =
+			        VMCHAIN_MAKE_FROM_VM_BLOCK(ImpGraphCompactBitmap(
+			            p_work->vmFile,
+			            p_work->progressInfo.IGPI_bitmap,
+			            p_work->vmFile)) ;
+                    *p_isComplete = FALSE ;
+                }
+#endif
+            } else if ((p_work->status == IG_STATUS_END_DATA) || 
+                    (p_work->status == IG_STATUS_NO_GRAPHIC)) {
+                *p_isComplete = FALSE ;
+            } else {
+                *p_isComplete = TRUE ;
+            }
+
+            /* while end */
+            IGIFAnimEnd(p_work) ;
+
+            /* Clean up after ourselves */
+            if (previousImage)  {
+                VMFreeVMChain(p_work->vmFile, previousImage) ;
+                previousImage = NULL ;
+            }
+            if (workBitmap)  {
+                VMFreeVMChain(p_work->vmFile, VMCHAIN_MAKE_FROM_VM_BLOCK(workBitmap)) ;
+                workBitmap = NULL ;
+            }
+
+            if (numFrames)  {
+                if (numFrames == 1)  {
+                    *p_isAnimation = FALSE ;
+                    params->IBP_bitmap = (animation[0]>>16) ;
+                    if (params->IBP_bitmap)  {
+                        if (status != IBS_IMPORT_STOPPED)
+                            status = IBS_NO_ERROR ;
+                        p_dir = VMLock(p_work->vmFile, params->IBP_bitmap, &mem) ;
+                        p_bitmap = (Bitmap *)&p_dir[1] ;
+                        params->IBP_width = p_bitmap->B_width ;
+                        params->IBP_height = p_bitmap->B_height ;
+                        params->IBP_format = p_bitmap->B_type ;
+                        VMUnlock(mem) ;
+                    } else {
+                        if (status != IBS_IMPORT_STOPPED)
+                            status = IBS_SYS_ERROR ;
+                        params->IBP_width = 1 ;
+                        params->IBP_height = 1 ;
+                        params->IBP_format = BMF_MONO ;
+                    }
+                } else {
+                    /* We did get an animation.  Let's make a chain */
+                    *p_isAnimation = TRUE ;
+
+                    /* Get th format information abased on the first */
+                    /* frame of the animation.  All frames are the same */
+#if PROGRESS_DISPLAY
+                    p_dir = VMLock(params->IBP_animDest, (animation[0]>>16), &mem) ;
+#else
+                    p_dir = VMLock(p_work->vmFile, (animation[0]>>16), &mem) ;
+#endif
+                    p_bitmap = (Bitmap *)&p_dir[1] ;
+                    params->IBP_width = p_bitmap->B_width ;
+                    params->IBP_height = p_bitmap->B_height ;
+                    params->IBP_format = p_bitmap->B_type ;
+                    VMUnlock(mem) ;
+
+                    /* Create the header for the animation as follows: */
+                    /*    -- AnimationHeader */
+                    /*    -- AnimationFrames */
+                    /*    -- VMChains to bitmaps */
+                    sizeHeader =
+                        sizeof(AnimationHeader) +
+                        numFrames * sizeof(AnimationFrame) ;
+                    sizeHeaderWithChains =
+                        sizeHeader +
+                        numFrames * sizeof(VMChain) ;
+
+                    /* create and fill in the header */
+#if PROGRESS_DISPLAY
+                    params->IBP_bitmap =
+                        VMAlloc(params->IBP_animDest, sizeHeaderWithChains, 0) ;
+                    p_header = VMLock(params->IBP_animDest, params->IBP_bitmap, &mem) ;
+#else
+                    params->IBP_bitmap =
+                        VMAlloc(p_work->vmFile, sizeHeaderWithChains, 0) ;
+                    p_header = VMLock(p_work->vmFile, params->IBP_bitmap, &mem) ;
+#endif
+                    p_header->AH_tree.VMCT_meta.VMC_next = VM_CHAIN_TREE ;
+                    p_header->AH_tree.VMCT_offset = sizeHeader ;
+                    p_header->AH_tree.VMCT_count = numFrames ;
+                    if (loopCount == 0)
+                        loopCount = ANIMATION_LOOP_FOREVER ;
+                    else if (loopCount == ANIMATION_LOOP_FOREVER)
+                        loopCount = ANIMATION_LOOP_FOREVER-1 ;
+                    p_header->AH_loopCount = loopCount ;
+                    p_frames = (AnimationFrame *)(&p_header[1]) ;
+
+                    /* Copy over the frame data */
+                    memcpy(p_frames, frames, sizeof(frames[0]) * numFrames) ;
+                    p_frames += numFrames ;
+
+                    /* Copy over the animation chain links */
+                    memcpy(p_frames, animation, sizeof(animation[0]) * numFrames) ;
+                    VMDirty(mem) ;
+                    VMUnlock(mem) ;
+                    if (status != IBS_IMPORT_STOPPED)
+                        status = IBS_NO_ERROR ;
+                }
+            } else {
+                /* No frames, pass back nothing */
+                status = IBS_UNKNOWN_FORMAT ;
+                params->IBP_width = 1 ;
+                params->IBP_height = 1 ;
+                params->IBP_format = BMF_MONO ;
+            }
+        }
+        /* Calculate the amount of used memory */
+/*
+        *usedMem = params->IBP_width ;
+        *usedMem *= params->IBP_height ;
+        *usedMem *= numFrames ;
+        *usedMem += sizeHeaderWithChains ;
+*/
+    }
+
+    MemUnlock(workHandle) ;
+    MemFree(workHandle) ;
+
+    return status ;
+}
+
