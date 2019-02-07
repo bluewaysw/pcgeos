@@ -1,0 +1,1051 @@
+/**************************************************************************
+ * FILE:  HTMLCOL.GOC
+ **************************************************************************/
+
+/***********************************************************************
+ *
+ *                          ==CONFIDENTIAL INFORMATION==
+ *
+ * COPYRIGHT 1994-99 BREADBOX COMPUTER COMPANY -- ALL RIGHTS RESERVED  --
+ * THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER
+ * A NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ * RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ * NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ * CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ * AGREEMENT.
+ *
+ * PROJECT:       HTML parser
+ * FILE:          HTMLCol.goc
+ *
+ * AUTHOR:        Lysle Shields
+ *
+ ***********************************************************************/
+@include <stdapp.goh>
+@include <Objects/Text/tCtrlC.goh>
+
+#include <Ansi/string.h>
+#include <Ansi/stdio.h>
+#include <Ansi/stdlib.h>
+
+@include <fixes.goh>
+@include "options.goh"
+@include <html4par.goh>
+
+#include "regiont.h"
+#include "internal.h"
+#include "tableint.h"
+#include "errors.h"
+
+#define ClearLValue(lval)   (memset(&(lval), 0, sizeof(lval)))
+#define ClearArray(lval, n)   (memset(&((lval)[0]), 0, sizeof((lval)[0])*(n)))
+#define TakeMax(a, b)   {if ((b)>(a))  { (a)=(b) ; changed=TRUE;} }
+
+/* The following macro is used to make coding of the index array of columns */
+/* easier to code.  Since we are always setting up p_col in a loop, we just */
+/* continue the loop whenever the index is a non-used-column entry. */
+#define LOOKUP_OR_CONTINUE(i) \
+        if ((index = p_state->indexArray[i]) == TABLE_COLUMN_INDEX_BAD) \
+            continue ; \
+        p_col = p_state->columnArray + index 
+
+#define CONSTRAINT_PIXEL          0
+#define CONSTRAINT_PERCENT        1
+#define CONSTRAINT_PROPORTION     2
+#define CONSTRAINT_MIN_WIDTH      3
+#define CONSTRAINT_DESIRED_WIDTH  4
+#define CONSTRAINT_MIN_PERCENT    5
+#define CONSTRAINT_HARD_MIN_WIDTH 6
+
+#define CONSTRAINT_FLAG_GOT_MIN        0x80
+#define CONSTRAINT_FLAG_GOT_FIXED      0x40
+#define CONSTRAINT_FLAG_GOT_DESIRED    0x20
+#define CONSTRAINT_FLAG_GOT_HARD_MIN   0x10
+
+#define NEXT_QUEUED_NONE        ((byte)0xFF)
+#define POS_NOT_IN_QUEUE        ((byte)0xFF)
+#define POS_IN_QUEUE            ((byte)0xFE)
+
+typedef struct {
+    byte from ;  /* Put NEXT_QUEUED_NONE here if not a link */
+    byte to ;    /* Put POS_NOT_IN_QUEUE here if position is not in the queue */
+} T_spreadPosition ;
+
+typedef struct {
+    sword values[7] ;
+    byte flags ;
+    T_spreadPosition next ;    /* Next linked position */
+} T_spreadConstraints ;
+
+#define PROPORTION_MULTIPLIER     100  /* 64 */
+
+#ifdef SPREAD_DISPLAY_ON
+extern void fprintf(FileHandle file, char *fmt, ...) ;
+#endif
+
+typedef struct {
+    word width ;    /* Final calculated width */
+    word min ;      /* Absolute minimum this column can be */
+    word max ;      /* Maximum width desired */
+    word strong ;   /* Strongly desired width (say as in fixed and percent fields) */
+    word weak ;     /* Weakly desired width (calculated from other span widths, but not declared) */
+} T_spreadColumn ;
+
+typedef struct {
+    T_spreadColumn columnArray[TABLE_MAX_USED_COLUMNS] ; /* List of column widths */
+    T_columnIndex indexArray[TABLE_MAX_COLUMNS] ;        /* Indices into columnArray. */
+    word interspacing ;                                  /* Space between cells */
+    word numColumns ;                                    /* Number of columns in this table */
+    word availWidth ;                                    /* Width of table to generate */
+    word numUsedColumns ;                                /* Number of used columns. */
+} T_spreadState ;
+
+void ISpreadMin(
+        T_spreadState *p_state,
+        word column,
+        word numColumns,
+        word min,
+        dword totalMin,
+        dword totalMax)
+{
+    dword extra ;
+    word value ;
+    word i ;
+    dword total ;
+    word delta ;
+    T_columnIndex index ;
+    T_spreadColumn *p_col ;
+    word firstColumn = column ;
+
+    extra = min ;
+    if (totalMax > totalMin)  {
+        total = totalMax - totalMin ;
+        extra -= totalMin ;
+        for (i=numColumns; i; i--, column++)  {
+            LOOKUP_OR_CONTINUE(column) ;
+
+            delta = p_col->max - p_col->min ;
+            if ((totalMin) && (total))
+                value = (delta * extra) / total ;
+            else
+                value = 0 ;
+
+            p_col->min += value ;
+
+            if ((p_col->strong) && (p_col->strong < p_col->min))
+                p_col->strong = p_col->min ;
+            if ((p_col->weak) && (p_col->weak < p_col->min))
+                p_col->weak = p_col->min ;
+            if (p_col->max < p_col->min)
+                p_col->max = p_col->min ;
+
+            if (total > delta)
+                total -= delta ;
+            else
+                total = 0 ;
+
+            if (extra > value)
+                extra -= value ;
+            else
+                extra = 0 ;
+        }
+    } else {
+        /* Divide based on existing mins */
+        if (extra > totalMin)  {
+            extra -= totalMin ;
+            for (i=numColumns; (i)&&(totalMin); i--, column++)   {
+                LOOKUP_OR_CONTINUE(column) ;
+
+                EC_ERROR_IF(totalMin == 0, ERROR_HTML_LAYOUT_DIVIDE_BY_ZERO) ;
+                value = (extra * p_col->min) / totalMin ;
+                totalMin -= p_col->min ;
+                p_col->min += value ;
+
+                /* Adjust the other values to be above the min */
+                if ((p_col->strong) && (p_col->strong < p_col->min))
+                    p_col->strong = p_col->min ;
+                if ((p_col->weak) && (p_col->weak < p_col->min))
+                    p_col->weak = p_col->min ;
+                if (p_col->max < p_col->min)
+                    p_col->max = p_col->min ;
+
+                if (extra > value)
+                    extra -= value ;
+                else
+                    extra = 0 ;
+            }
+
+	    /* If any left, put on the first column */
+	    if (extra)  {
+		if ((index = p_state->indexArray[firstColumn]) != TABLE_COLUMN_INDEX_BAD)  {
+		    p_col = p_state->columnArray + index ;
+                    p_col->min += extra ;
+
+                    /* Adjust the other values to be above the min */
+                    if ((p_col->strong) && (p_col->strong < p_col->min))
+                        p_col->strong = p_col->min ;
+                    if ((p_col->weak) && (p_col->weak < p_col->min))
+                        p_col->weak = p_col->min ;
+                    if (p_col->max < p_col->min)
+                        p_col->max = p_col->min ;
+		}
+	    }
+        }
+    }
+    ProfPoint("ISpreadMin") ;
+}
+
+void ISpreadMax(
+         T_spreadState *p_state,
+         word column,
+         word numColumns,
+         word max,
+         dword totalMax)
+{
+    dword extra ;
+    word value ;
+    word i ;
+    T_columnIndex index ;
+    T_spreadColumn *p_col ;
+
+    extra = max;
+    if (totalMax)  {
+        for (i=numColumns; (i); i--, column++)   {
+            LOOKUP_OR_CONTINUE(column) ;
+
+            if (!totalMax)
+                break ;
+            value = p_col->max ;
+            if (totalMax)
+                p_col->max = (((dword)p_col->max) * ((dword)extra)) / totalMax ;
+            else
+                p_col->max = p_col->min ;
+            if (p_col->max < p_col->min)
+                p_col->max = p_col->min ;
+
+            /* Cap maximums */
+            if (p_col->max > MAXIMUM_COLUMN_WIDTH)
+                p_col->max = MAXIMUM_COLUMN_WIDTH ;
+            totalMax -= value ;
+            if (extra > p_col->max)
+                extra -= p_col->max ;
+            else
+                extra = 0 ;
+        }
+    } else {
+        /* Divide evenly */
+        totalMax = 0 ;
+        for (i=numColumns; i; i--)
+            if ((index = p_state->indexArray[column+i-1]) != TABLE_COLUMN_INDEX_BAD)
+                totalMax++ ;
+
+        for (i=numColumns; i; i--, column++)   {
+            LOOKUP_OR_CONTINUE(column) ;
+
+            value = p_col->max ;
+            if (totalMax)
+                p_col->max = extra / totalMax ;
+            else
+                p_col->max = p_col->min ;
+            if (p_col->max < p_col->min)
+                p_col->max = p_col->min ;
+
+            if (p_col->max > MAXIMUM_COLUMN_WIDTH)
+                p_col->max = MAXIMUM_COLUMN_WIDTH ;
+            totalMax-- ;
+            if (extra > p_col->max)
+                extra -= p_col->max ;
+            else
+                extra = 0 ;
+        }
+    }
+    ProfPoint("ISpreadMax") ;
+}
+
+void ISpreadStrong(
+         T_spreadState *p_state,
+         word columnLeft,
+         word numColumns,           /* Number of columns in span */
+         word spreadAmount,         /* Amount to divide up into weak and empty cells */
+         dword totalStrong)         
+{
+    dword value ;           /* 32-bit calculation variable */
+    word i ;                /* Loop counter */
+    T_spreadColumn *p_col ; /* Current column */
+    dword totalWeak = 0 ;   /* Sum of weak values of columns */
+    word numEmpty = 0 ;     /* Num columns with neither strong or weak widths */
+    dword totalMax = 0 ;
+    word max ;
+    word column ;
+    T_columnIndex index ;
+
+    /* First, tally up the number of empty columns and weak columns */
+    column = columnLeft ;
+    for (i=numColumns; i; i--, column++)  {
+        LOOKUP_OR_CONTINUE(column) ;
+
+        /* Can't have both a weak and strong width */
+        EC_ERROR_IF(p_col->weak && p_col->strong, -1) ;
+        if (p_col->weak)  {
+            /* Weak column width found */
+            totalWeak += p_col->weak ;
+        } else {
+            /* If not any strong width found, then its an 'empty' */
+            /* width definition */
+            if (!p_col->strong)  {
+                numEmpty++ ;
+                totalMax += p_col->max ;
+                if (!p_col->max)
+                    totalMax++ ;
+            }
+        }
+    }
+
+    /* If there are ANY columns without weak or strong */
+    /* settings (empty ones), then we divide all we have into those */
+    if (numEmpty)  {
+        /* Spread the spreadAmount into the empty columns weighted by */
+        /* their max value */
+        for (column=columnLeft, i=numColumns; i; i--, column++)  {
+            LOOKUP_OR_CONTINUE(column) ;
+
+            if ((p_col->weak) || (p_col->strong))
+                continue ;
+            value = spreadAmount ;
+            max = p_col->max ;
+            if (!max)
+                max++ ;
+            value *= max ;
+            EC_ERROR_IF(totalMax == 0, ERROR_HTML_LAYOUT_DIVIDE_BY_ZERO) ;
+            value /= totalMax ;
+            p_col->weak = value ;
+            totalMax -= max ;
+            spreadAmount -= p_col->weak ;
+        }
+    } else if (totalWeak) {
+        /* No empty columns here, just weak and/or strong. */
+        /* Strong has already been taken out, so we just need to add */
+        /* to the weights on the weak columns. */
+        for (column=columnLeft, i=numColumns; i; i--, column++)  {
+            LOOKUP_OR_CONTINUE(column) ;
+
+            if (!p_col->weak)
+                continue ;
+            value = spreadAmount ;
+            value *= p_col->weak ;
+            EC_ERROR_IF(totalWeak == 0, ERROR_HTML_LAYOUT_DIVIDE_BY_ZERO) ;
+            value /= totalWeak ;
+            totalWeak -= p_col->weak ;
+            p_col->weak = value ;
+            spreadAmount -= p_col->weak ;
+        }
+    } else {
+        /* All we have is strong left over */
+        /* Spread out all the strong values to their wider widths */
+        /* weighted on the current strong widths */
+        for (column=columnLeft, i=numColumns; i; i--, column++)  {
+            /* Skip the unused columns */
+            if ((index = p_state->indexArray[column]) == TABLE_COLUMN_INDEX_BAD)
+                continue ;
+            p_col = p_state->columnArray + index ;
+
+            if (!p_col->strong)
+                continue ;
+            value = spreadAmount ;
+            value *= p_col->strong ;
+            EC_ERROR_IF(totalStrong == 0, ERROR_HTML_LAYOUT_DIVIDE_BY_ZERO) ;
+            value /= totalStrong ;
+            totalStrong -= p_col->strong ;
+            EC_ERROR_IF(value > 0x4000, -1) ;
+            p_col->strong += value ;
+            if (p_col->strong < p_col->min)  {
+                value += p_col->min - p_col->strong ;
+                p_col->strong = p_col->min ;
+            }
+            if (spreadAmount > value)
+                spreadAmount -= value ;
+            else
+                spreadAmount = 0 ;
+        }
+    }
+    ProfPoint("ISpreadStrong") ;
+}
+
+/*------------------------------------------------------------------------*
+ *   API ROUTINES FOR SPREAD MODULE
+ *------------------------------------------------------------------------*/
+
+/**************************************************************************
+ * Routine:  SpreadAdd
+ **************************************************************************
+ *
+ * Description:
+ *     Add an entry to the table.  What is unique about this calculation
+ *     process is that a column span can be defined here and will be added
+ *     as well as just single columns.
+ *     This routine assumes that SpreadMarkColumnUsed has been called per
+ *     cell at some point (or at least before any spanned cells are added).
+ *
+ * Inputs:
+ *     MemHandle state            -- Spread state block
+ *     word fromLeft              -- Left column
+ *     word toRight               -- Right column (equal to left if one width)
+ *     sword pixels               -- Fixed width of column
+ *     sword percent              -- Percentage width of column
+ *     sword proportion           -- Proportional units of column
+ *     sword minWidth             -- Minimum width allowed
+ *     sword desiredWidth         -- Width column would like if had room.
+ *     sword hardMinWidth         -- Absolute min width setting
+ *
+ * Revision:
+ *     Who  Date:     Comments:
+ *     ---  --------  --------------------
+ *     LES  98/08/28  Created.
+ *     LES  00/01/04  Reconstructed version.
+ *
+ **************************************************************************/
+void SpreadAdd(
+         MemHandle state,
+         word fromLeft,
+         word toRight,
+         sword pixels,
+         sword percent,
+         sword desiredWidth,
+         sword hardMinWidth)
+{
+    T_spreadState *p_state ;
+    T_spreadColumn *p_col ;
+
+    word min, max ;
+    dword totalMin, totalMax, totalStrong, totalWeak ;
+    word i ;
+    word loss ;
+    word strong = 0 ;
+    T_columnIndex index ;
+
+	if (!hardMinWidth)
+		hardMinWidth = 1 ;
+    EC_ERROR_IF(fromLeft >= TABLE_MAX_COLUMNS, ERROR_COLUMN_INDEX_BEYOND_LIMIT) ;
+    EC_ERROR_IF(toRight >= TABLE_MAX_COLUMNS, ERROR_COLUMN_INDEX_BEYOND_LIMIT) ;
+    p_state = MemLock(state) ;
+
+    /* Use or allocate space in the column table */
+    index = p_state->indexArray[fromLeft] ;
+    if (index == TABLE_COLUMN_INDEX_BAD)  {
+        /* Is there room for more? If so, take the next column spot */
+        if (p_state->numUsedColumns < TABLE_MAX_USED_COLUMNS)  {
+            index = p_state->numUsedColumns++ ;
+            p_state->indexArray[fromLeft] = index ;
+        }
+    }
+
+    /* Early out if we don't have a column to work with (lost information, oh well) */
+    if (index != TABLE_COLUMN_INDEX_BAD)  {
+        /* Determine an absolute minimum and maximum */
+        min = hardMinWidth ;
+        if (pixels)  {
+            strong = max = pixels ;
+            if (strong < min)
+                strong = min ;
+        } else if (percent)  {
+            strong = max = (word)((((dword)percent) * ((dword)p_state->availWidth)) / 100) ;
+            if (strong < min)
+                strong = min ;
+        } else {
+            max = desiredWidth ;
+        }
+        if (max < min)
+            max = min ;
+
+        /* Handle differently for single and multi-span columns */
+        if (fromLeft==toRight)  {
+            /* Access that column (or the list from that point */
+            p_col = p_state->columnArray + index ;
+
+            /* Single column widths just take the best of the given widths */
+            if (min > p_col->min)
+                p_col->min = min ;
+
+            if (max > p_col->max)
+                p_col->max = max ;
+            if (strong > p_col->strong)
+                p_col->strong = strong ;
+
+            if ((p_col->strong) && (p_col->strong < p_col->min))
+                p_col->strong = p_col->min ;
+            if (p_col->max < p_col->min)
+                p_col->max = p_col->min ;
+        } else {
+            /* Multispan must divide their widths among the existing columns */
+
+            /* Total what we have for this span */
+            totalMin = totalMax = totalStrong = totalWeak = 0 ;
+            for (i=fromLeft; i<=toRight; i++)  {
+                LOOKUP_OR_CONTINUE(i) ;
+ 
+                totalMin += p_col->min ;
+                totalMax += p_col->max ;
+            }
+
+            /* Take out space between the columns (but only used columns) */
+            loss = 0 ;
+            for (i=fromLeft+1; i<=toRight; i++)  {
+                if (p_state->indexArray[i] != TABLE_COLUMN_INDEX_BAD)
+                    loss += p_state->interspacing ;
+            }
+
+            if (min > loss)
+                min -= loss ;
+            else
+                min = 0 ;
+            if (max > loss)
+                max -= loss ;
+            else
+                max = 0 ;
+
+            /* Divide up the min spacing first (if any) */
+            if (min > totalMin)
+                ISpreadMin(p_state, fromLeft, 1+toRight-fromLeft, min, totalMin, totalMax) ;
+
+            /* Tally up the max, strong, and weak widths since minimums */
+            /* might have changed them */
+            p_col = p_state->columnArray + fromLeft ;
+            for (i=fromLeft; i<=toRight; i++)  {
+                LOOKUP_OR_CONTINUE(i) ;
+
+                totalStrong += p_col->strong ;
+                totalWeak += p_col->weak ;
+            }
+
+            /* Divide up the max spacing */
+            if (max > totalMax) 
+                ISpreadMax(p_state, fromLeft, 1+toRight-fromLeft, max, totalMax) ;
+
+            /* Divide up any strong widths */
+            if (strong > (totalStrong+totalWeak))
+                ISpreadStrong(p_state, fromLeft, 1+toRight-fromLeft, strong-totalStrong, totalStrong) ;
+        }
+    }
+
+    MemUnlock(state) ;
+    ProfPoint("SpreadAdd") ;
+}
+
+/**************************************************************************
+ * Routine:  SpreadCalculateLayout
+ **************************************************************************
+ *
+ * Description:
+ *     Given the specified width, go ahead and calculate the full table
+ *     layout.  Future calls to SpreadGetColumnWidth will then tell
+ *     how wide each column is.
+ *
+ * Inputs:
+ *     MemHandle state            -- Spread state block
+ *     word totalWidth            -- Maximum width table is going to be.
+ *     word wantedWidth           -- Amount of width we want the table to be.
+ *                                   pass 0 if no rigid width.
+ *
+ * Outputs:
+ *     word                       -- Final width determined.
+ *
+ * Revision:
+ *     Who  Date:     Comments:
+ *     ---  --------  --------------------
+ *     LES  98/08/28  Created.
+ *     LES  00/01/04  Reconstructed version.
+ *
+ **************************************************************************/
+word SpreadCalculateLayout(MemHandle state, word totalWidth, word wantedWidth)
+{
+    T_spreadState *p_state ;
+    T_spreadColumn *p_col ;
+    dword totalMax, totalMin, totalWeak, totalStrong ;
+    word i ;
+    word numEmpty = 0 ;
+    dword remaining ;
+    dword remaining2 ;
+    dword value ;
+    word spaceAvail ;
+    word minSpaceTaken ;
+    word delta ;
+    word totalEmptyMin = 0 ;
+    word innerspacing ;
+    dword minStrong ;
+    dword minWeak ;
+    T_columnIndex index ;
+
+    remaining = totalWidth = wantedWidth ;
+    /* Spread out to the complete width */
+    p_state = MemLock(state) ;
+
+    EC_ERROR_IF(p_state->numColumns > TABLE_MAX_COLUMNS, ERROR_COLUMN_INDEX_BEYOND_LIMIT) ;
+
+    /* Take out space from innercolumn spacing */
+    if (p_state->numUsedColumns > 1)
+        innerspacing = p_state->interspacing * (p_state->numUsedColumns-1) ;
+    else
+        innerspacing = 0 ;
+
+    if (totalWidth > innerspacing)
+        totalWidth -= innerspacing ;
+    else
+        totalWidth = 0 ;
+
+    totalMax = totalMin = totalWeak = totalStrong = 0 ;
+    for (i=0; i<p_state->numColumns; i++)  {
+        LOOKUP_OR_CONTINUE(i) ;
+
+        if (p_col->max < p_col->min)
+            p_col->max = p_col->min ;
+        totalMin += p_col->min ;
+        EC_ERROR_IF(p_col->strong && p_col->weak, -1) ;
+        if (p_col->weak)  {
+            EC_WARNING_IF(p_col->weak < p_col->min, -1) ;
+//            if (p_col->weak < p_col->min)
+//                p_col->weak = p_col->min ;
+            totalWeak += p_col->weak ;
+        } else if (p_col->strong)  {
+            EC_WARNING_IF(p_col->strong < p_col->min, -1) ;
+//            if (p_col->strong < p_col->min)
+//                p_col->strong = p_col->min ;
+            totalStrong += p_col->strong ;
+        } else {
+            numEmpty++ ;
+            totalMax += p_col->max ;
+            totalEmptyMin += p_col->min ;
+        }
+    }
+
+    /* Start with the minimums.  We'll add to that. */
+    for (i=0; i<p_state->numColumns; i++)  {
+        LOOKUP_OR_CONTINUE(i) ;
+        p_col->width = p_col->min ;
+    }
+
+    /* Only continue if there is still room */
+    if (remaining > totalMin)  {
+        remaining = totalWidth ;
+        /* Process strong fields (if we have any) */
+        if ((totalStrong) && (remaining))  {
+            /* Take out the gauranteed width from other non-strong columns */
+            minSpaceTaken = minStrong = 0 ;
+            for (i=0; i<p_state->numColumns; i++)  {
+                LOOKUP_OR_CONTINUE(i) ;
+                if (p_col->strong)  {
+                    minStrong += p_col->min ;
+                    continue ;
+                }
+                minSpaceTaken += p_col->min ;
+            }
+
+            /* We will now dole out the strong widths */
+            /* Do have enough room to just take it all? */
+            /* Also, we only JUST take the space we need when we DO have */
+            /* any weak or empty columns (to eat up the remaining space, if any) */
+            if ((remaining >= (totalStrong + minSpaceTaken)) && 
+                    ((totalWeak)||(numEmpty)))  {
+                /* Oh, we got plenty of space.  Just subtract it out */
+                for (i=0; i<p_state->numColumns; i++)  {
+                    LOOKUP_OR_CONTINUE(i) ;
+                    if (!p_col->strong)
+                        continue ;
+                    p_col->width = p_col->strong ;
+                    EC_ERROR_IF(p_col->width==0, ERROR_CALCULATED_WIDTH_SHOULD_NOT_BE_ZERO) ;
+                }
+                remaining -= totalStrong ;
+            } else {
+                /* Two cases: */
+                /*   Case 1: */
+                /*     Too much strong spacing.  We need to */
+                /*     to squeeze it all up.  Scale the remaining space */
+                /*     This won't leave any space for weak widths (so they are */
+                /*     forced to their minimum widths) */
+                /*   Case 2: */
+                /*     We don't have any other weak or empty columns to go, so */
+                /*     we are forced to stretch this one to the full width. */
+                /*     The logic here works for shrinking as well as expanding. */
+                /* Determine the upper cap of space */
+
+                /* Ok, this part is a little more complex.  The variable minSpaceTaken */
+                /* declares the space used by all the weak cells.  However, I want */
+                /* to span out the space based on their full widths.  Because */
+                /* weighting the spread based on the weak widths may cause them */
+                /* to go below their min values, we have to ensure that we */
+                /* don't end up expanding the table by calculating a smaller */
+                /* width than our min width and then forcing it to at least its width. */
+                /* The way we avoid this is to calculate the amount of 'available */
+                /* space' that we are allowed to add to the individual columns. */
+                /* In this way, even though the first column wishes to take up all the */
+                /* space and leave none for the second, it will have at least an upper */
+                /* level cap based on the minimum of all the column widths. */
+                /* This is done in all the spanning logic.  -- LESD 99/12/29 */
+                if (remaining > (minSpaceTaken+minStrong))  {
+                    spaceAvail = remaining - (minSpaceTaken+minStrong) ;
+                } else {
+                    spaceAvail = 0 ;
+                }
+                remaining2 = spaceAvail ;
+
+                /* Take out the space used by other columns.  Weighting of */
+                /* columns only works on those being processed */
+                if (remaining > minSpaceTaken)
+                    remaining -= minSpaceTaken ;
+                else
+                    remaining = 0 ;
+
+                for (i=0; i<p_state->numColumns; i++)  {
+                    /* Don't put anything columns not used */
+                    LOOKUP_OR_CONTINUE(i) ;
+
+                    /* Only work on strong columns */
+                    if (!p_col->strong)
+                        continue ;
+                    value = p_col->strong ;
+                    value *= remaining ;
+                    EC_ERROR_IF(totalStrong == 0, ERROR_HTML_LAYOUT_DIVIDE_BY_ZERO) ;
+                    value /= totalStrong ;
+
+                    /* No smaller than minimum */
+                    if (value < p_col->min)
+                        value = p_col->min ;
+
+                    /* Make sure we don't use more space than is available */
+                    delta = value - p_col->min ;
+                    if (delta > spaceAvail)
+                        delta = spaceAvail ;
+                    spaceAvail -= delta ;
+                    p_col->width = p_col->min + delta ;
+					if (!p_col->width)
+						p_col->width++ ;
+
+                    /* Not how much we have to go */
+                    if (remaining > p_col->width)
+                        remaining -= p_col->width ;
+                    else
+                        remaining = 0 ;
+
+                    if (remaining2 > p_col->width)
+                        remaining2 -= p_col->width ;
+                    else
+                        remaining2 = 0 ;
+                    totalStrong -= p_col->strong ;
+                }
+                remaining = 0 ;
+            }
+            totalWidth = remaining ;
+        }
+
+        /* Now process weak fields */
+        /* (If we have any) */
+        remaining = totalWidth ;
+        if ((remaining) && (totalWeak))  {
+            /* Take out the gauranteed width from other non-weak */
+            /* (and non-strong) columns */
+            minSpaceTaken = 0 ;
+            minWeak = 0 ;
+            for (i=0; i<p_state->numColumns; i++)  {
+                LOOKUP_OR_CONTINUE(i) ;
+
+                if (p_col->weak)  {
+                    minWeak += p_col->min ;
+                    continue ;
+                }
+                if (p_col->strong)
+                    continue ;
+                minSpaceTaken += p_col->min ;
+            }
+
+            /* Do we have more space than necessary */
+            /* (and empty cells to get the rest)? */
+            if ((remaining >= (totalWeak+minSpaceTaken)) && (numEmpty))  {
+                /* We got plenty of space.  Just use up the space */
+                /* on weak fields.  This should leave some space */
+                /* for the empty columns */
+                for (i=0; i<p_state->numColumns; i++)  {
+                    LOOKUP_OR_CONTINUE(i) ;
+
+                    if (!p_col->weak)
+                        continue ;
+                    p_col->width = p_col->weak ;
+					if (!p_col->width)
+						p_col->width++ ;
+                }
+                remaining -= totalWeak ;
+            } else {
+                /* Two cases: */
+                /*   Case 1: */
+                /*     Too much weak spacing.  We will have to squeeze up */
+                /*     these weak columns.  This won't leave any space for the empty */
+                /*     columns so they will end up going to minimum widths */
+                /*   Case 2: */
+                /*     We don't have any other empty columns to go, so */
+                /*     we are forced to stretch this one to the full width. */
+                /*     The logic here works for shrinking as well as expanding. */
+
+                /* Determine the upper cap of space */
+                if (remaining > (minSpaceTaken+minWeak))
+                    spaceAvail = remaining - (minSpaceTaken+minWeak) ;
+                else
+                    spaceAvail = 0 ;
+
+                /* Take out space used by other columns that we don't need to */
+                /* factor in */
+                if (remaining > minSpaceTaken)
+                    remaining -= minSpaceTaken ;
+                else
+                    remaining = 0 ;
+
+                remaining2 = spaceAvail ;
+
+                for (i=0; i<p_state->numColumns; i++)  {
+                    /* Don't process empty columns */
+                    LOOKUP_OR_CONTINUE(i) ;
+
+                    /* Only work on strong columns */
+                    if (!p_col->weak)
+                        continue ;
+                    value = p_col->weak ;
+                    value *= remaining ;
+                    EC_ERROR_IF(totalWeak == 0, ERROR_HTML_LAYOUT_DIVIDE_BY_ZERO) ;
+                    value /= totalWeak ;
+
+                    /* We have to have our minimum at least */
+                    if (value < p_col->min)
+                        value = p_col->min ;
+
+                    /* Cap to our upper limit of space */
+                    delta = value - p_col->min ;
+                    if (delta > spaceAvail)
+                        delta = spaceAvail ;
+                    spaceAvail -= delta ;
+                    p_col->width = p_col->min + delta ;
+					if (!p_col->width)
+						p_col->width++ ;
+
+                    if (remaining > p_col->width)
+                        remaining -= p_col->width ;
+                    else
+                        remaining = 0 ;
+
+                    if (remaining2 > p_col->width)
+                        remaining2 -= p_col->width ;
+                    else
+                        remaining2 = 0 ;
+                    totalWeak -= p_col->weak ;
+                }
+                remaining = 0 ;
+            }
+            totalWidth = remaining ;
+        }
+
+        /* At this point, we may only have empty/undeclared column widths */
+        /* All we can do now is spread the remaining amount over these cells */
+        /* (weighted by their max width) */
+        remaining = totalWidth ;
+        if ((remaining) && (numEmpty))  {
+            /* Figure out what we have left to work with without minimums */
+            minSpaceTaken = totalEmptyMin ;
+            if (remaining > minSpaceTaken)
+                spaceAvail = remaining - minSpaceTaken ;
+            else
+                spaceAvail = 0 ;
+
+            for (i=0; i<p_state->numColumns; i++)  {
+                LOOKUP_OR_CONTINUE(i) ;
+
+                /* Only work on empty columns */
+                if ((p_col->weak) || (p_col->strong))
+                    continue ;
+                value = p_col->max ;
+                value *= remaining ;
+                EC_ERROR_IF(totalMax == 0, ERROR_HTML_LAYOUT_DIVIDE_BY_ZERO) ;
+                if (totalMax)  {
+                    value /= totalMax ;
+                } else {
+                    value = 0 ;
+                }
+
+                /* No smaller than our minimum size */
+                if (value < p_col->min)
+                    value = p_col->min ;
+
+                /* Cap to the space available */
+                delta = value - p_col->min ;
+                if (delta > spaceAvail)
+                    delta = spaceAvail ;
+                spaceAvail -= delta ;
+                p_col->width = p_col->min + delta ;
+				if (!p_col->width)
+					p_col->width++ ;
+
+                if (remaining > p_col->width)
+                    remaining -= p_col->width ;
+                else
+                    remaining = 0 ;
+                totalMax -= p_col->max ;
+            }
+        }
+    }
+    MemUnlock(state) ;
+
+    ProfPoint("SpreadCalculateLayout") ;
+    return 0 ;
+}
+
+/**************************************************************************
+ * Routine:  SpreadCreate
+ **************************************************************************
+ *
+ * Description:
+ *     Creates a state block to record all the column information for
+ *     the given spread table calculation.
+ *
+ * Inputs:
+ *     word numColumns            -- Number of columns in table
+ *     word interspacing          -- Pixel spaces between columns
+ *
+ * Outputs:
+ *     MemHandle                  -- Handle to created table state
+ *
+ * Revision:
+ *     Who  Date:     Comments:
+ *     ---  --------  --------------------
+ *     LES  98/08/28  Created.
+ *     LES  00/01/04  Reconstructed version.
+ *
+ **************************************************************************/
+MemHandle SpreadCreate(word numColumns, word interspacing, word availableWidth)
+{
+    MemHandle mem ;
+    T_spreadState *p_state ;
+
+    EC_WARNING_IF(numColumns > TABLE_MAX_COLUMNS, ERROR_COLUMN_INDEX_BEYOND_LIMIT) ;
+    if (numColumns > TABLE_MAX_COLUMNS)
+        numColumns = TABLE_MAX_COLUMNS ;
+
+    mem = MemAlloc(sizeof(T_spreadState), HF_DYNAMIC, HAF_ZERO_INIT | HAF_NO_ERR) ;
+    if (mem)  {
+        p_state = MemLock(mem) ;
+        p_state->numColumns = numColumns ;
+        p_state->interspacing = interspacing ;
+        p_state->availWidth = availableWidth ;
+        memset(p_state->indexArray, 0xFF, sizeof(p_state->indexArray)) ;
+        MemUnlock(mem) ;
+    }
+
+    return mem ;
+}
+
+/**************************************************************************
+ * Routine:  SpreadDestroy
+ **************************************************************************
+ *
+ * Description:
+ *     Destroy an old spread calculation state block.
+ *
+ * Inputs:
+ *     MemHandle spread           -- spread state block
+ *
+ * Revision:
+ *     Who  Date:     Comments:
+ *     ---  --------  --------------------
+ *     LES  98/08/28  Created.
+ *     LES  00/01/04  Reconstructed version.
+ *
+ **************************************************************************/
+void SpreadDestroy(MemHandle spread)
+{
+    if (spread)
+        MemFree(spread) ;
+}
+
+/**************************************************************************
+ * Routine:  SpreadGetColumnWidth
+ **************************************************************************
+ *
+ * Description:
+ *     Returns the width of a specific column.
+ *
+ * Inputs:
+ *     MemHandle state            -- Spread state block
+ *     word column                -- which column
+ *
+ * Outputs:
+ *     word                       -- Column width, or 0 if unknown.
+ *
+ * Revision:
+ *     Who  Date:     Comments:
+ *     ---  --------  --------------------
+ *     LES  98/08/28  Created.
+ *     LES  00/01/04  Reconstructed version.
+ *
+ **************************************************************************/
+word SpreadGetColumnWidth(MemHandle state, word column)
+{
+    T_spreadState *p_state ;
+    word width = 0 ;
+    T_columnIndex index ;
+
+    EC_WARNING_IF(column >= TABLE_MAX_COLUMNS, ERROR_COLUMN_INDEX_BEYOND_LIMIT) ;
+
+    if (column < TABLE_MAX_COLUMNS)  {
+        p_state = MemLock(state) ;
+
+        /* Look up the column (if valid) */
+        index = p_state->indexArray[column] ;
+        if (index != TABLE_COLUMN_INDEX_BAD)
+            width = p_state->columnArray[index].width ;
+        
+        MemUnlock(state) ;
+    } else {
+        width = 20 ;
+    }
+
+    EC_ERROR_IF(width==0, ERROR_CALCULATED_WIDTH_SHOULD_NOT_BE_ZERO) ;
+
+    return width ;
+}
+
+void SpreadMarkColumnUsed(MemHandle state, word column)
+{
+    T_spreadState *p_state ;
+    T_columnIndex index ;
+
+    EC_WARNING_IF(column >= TABLE_MAX_COLUMNS, ERROR_COLUMN_INDEX_BEYOND_LIMIT) ;
+
+    if (column < TABLE_MAX_COLUMNS)  {
+        p_state = MemLock(state) ;
+
+        /* Allocate space in the column table if it hasn't already been done so. */
+        index = p_state->indexArray[column] ;
+        if (index == TABLE_COLUMN_INDEX_BAD)  {
+            /* Is there room for more? If so, take the next column spot */
+            if (p_state->numUsedColumns < TABLE_MAX_USED_COLUMNS)  {
+                index = p_state->numUsedColumns++ ;
+                p_state->indexArray[column] = index ;
+            }
+        }
+
+        MemUnlock(state) ;
+    }
+}
+
+void SpreadCopyIndexArray(MemHandle state, T_columnIndex *p_indexArray)
+{
+    T_spreadState *p_state ;
+
+    EC_BOUNDS(p_indexArray) ;
+
+    p_state = MemLock(state) ;
+
+    memcpy(
+        p_indexArray, 
+        p_state->indexArray, 
+        TABLE_MAX_COLUMNS * sizeof(*p_indexArray)) ;
+
+    MemUnlock(state) ;
+}
+
+/**************************************************************************
+ * END OF FILE:  HTMLCOL.GOC
+ **************************************************************************/

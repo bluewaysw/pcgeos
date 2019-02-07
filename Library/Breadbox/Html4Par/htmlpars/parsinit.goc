@@ -1,0 +1,329 @@
+/***********************************************************************
+ *
+ *                          ==CONFIDENTIAL INFORMATION==
+ *
+ * COPYRIGHT 1994-99 BREADBOX COMPUTER COMPANY -- ALL RIGHTS RESERVED  --
+ * THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER
+ * A NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ * RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ * NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ * CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ * AGREEMENT.
+ *
+ * PROJECT:       HTMLPars
+ * FILE:          ParsInit.goc
+ *
+ * AUTHOR:        Marcus Gr�ber
+ *
+ * NOTE:          Main code for the HTML parser.
+ *
+ ***********************************************************************/
+
+/***************************************************************************
+ *      Include files
+ ***************************************************************************/
+@include <stdapp.goh>
+#include <chunkarr.h>
+
+#include <Ansi/string.h>
+#include <Ansi/stdio.h>
+#include <Ansi/stdlib.h>
+#include <Ansi/ctype.h>
+#include <geoMisc.h>
+
+@include <fixes.goh>
+@include <html4par.goh>
+
+@include "options.goh"
+#include "internal.h"
+#include "errors.h"
+
+/***************************************************************************
+ *        Rotuines only required at startup
+ ***************************************************************************/
+VMChain LOCAL CreateElementArray(TextArrayType tat, word elementSize)
+{
+    VMBlockHandle vmb;
+    TextElementArrayHeader *teah;
+    MemHandle memHandle;
+    ChunkHandle ch;
+
+    vmb = VMAllocLMem(HTMLext->HE_vmFile, LMEM_TYPE_GENERAL, 0);
+    VMLock(HTMLext->HE_vmFile, vmb, &memHandle);
+    ch = ElementArrayCreate(memHandle, elementSize,
+      sizeof(TextElementArrayHeader), 0);
+    teah = LMemDerefHandles(memHandle, ch);
+    teah->TEAH_arrayType = tat;
+    VMDirty(memHandle);                 /* make sure changes get saved */
+    VMUnlock(memHandle);
+
+    EC_ERROR_IF(ch != (ChunkHandle)VM_ELEMENT_ARRAY_CHUNK, -1);
+
+    return VMCHAIN_MAKE_FROM_VM_BLOCK(vmb);
+}
+
+VMChain LOCAL CreateRunArray(VMChain elementArray)
+{
+    VMBlockHandle vmb;
+    myTextLargeRunArrayHeader *tlrah;
+    MemHandle memHandle;
+
+    vmb = HugeArrayCreate(HTMLext->HE_vmFile, sizeof(TextRunArrayElement),
+      sizeof(myTextLargeRunArrayHeader));
+    tlrah = VMLock(HTMLext->HE_vmFile, vmb, &memHandle);
+    tlrah->TLRAH_elementVMBlock = VMCHAIN_GET_VM_BLOCK(elementArray);
+    VMDirty(memHandle);                 /* make sure changes get saved */
+    VMUnlock(memHandle);
+
+    return VMCHAIN_MAKE_FROM_VM_BLOCK(vmb);
+}
+
+VMBlockHandle InitTransferItem(void)
+{
+    VMBlockHandle hypertextHead, textHead, arrayBlock;
+    HypertextArrayBlockHeader *habh;
+    MemHandle memHandle;
+
+    NamePool = NamePoolCreate(HTMLext->HE_vmFile);
+
+    /* initialize main hypertext element header */
+    hypertextHead = VMAlloc(HTMLext->HE_vmFile,
+      sizeof(HypertextTransferBlockHeader), 0);
+    htbh = VMLock(HTMLext->HE_vmFile, hypertextHead, &hypertextHeaderMem);
+
+    memset(htbh, 0, sizeof(*htbh));
+    htbh->HTBH_meta.VMCT_meta.VMC_next = VM_CHAIN_TREE;
+    htbh->HTBH_meta.VMCT_offset = sizeof(htbh->HTBH_meta) +
+      sizeof(htbh->HTBH_other);
+    htbh->HTBH_meta.VMCT_count =
+      (sizeof(*htbh) - (sizeof(htbh->HTBH_meta) +
+                        sizeof(htbh->HTBH_other))) / sizeof(VMChain);
+
+    /* initialize text transfer subheader */
+    textHead = VMAlloc(HTMLext->HE_vmFile, sizeof(TextTransferBlockHeader), 0);
+    ttbh = VMLock(HTMLext->HE_vmFile, textHead, &transferHeaderMem);
+
+    memset(ttbh, 0, sizeof(*ttbh));
+    ttbh->TTBH_meta.VMCT_meta.VMC_next = VM_CHAIN_TREE;
+    ttbh->TTBH_meta.VMCT_offset =
+      sizeof(ttbh->TTBH_meta) + sizeof(ttbh->TTBH_reservedOther);
+    ttbh->TTBH_meta.VMCT_count =
+      (sizeof(*ttbh) - (sizeof(ttbh->TTBH_meta) +
+                        sizeof(ttbh->TTBH_reservedOther))) / sizeof(VMChain);
+
+    /* initialize arrays in text transfer item */
+    ttbh->TTBH_text =
+      VMCHAIN_MAKE_FROM_VM_BLOCK( HugeArrayCreate(HTMLext->HE_vmFile, 1*sizeof(TCHAR), 0) );
+
+    ttbh->TTBH_charAttrElements = CreateElementArray(TAT_CHAR_ATTRS,
+      sizeof(VisTextCharAttr));
+    ttbh->TTBH_charAttrRuns = CreateRunArray(ttbh->TTBH_charAttrElements);
+
+    ttbh->TTBH_paraAttrElements = CreateElementArray(TAT_PARA_ATTRS,
+      sizeof(VisTextParaAttr));
+    ttbh->TTBH_paraAttrRuns = CreateRunArray(ttbh->TTBH_paraAttrElements);
+
+    ttbh->TTBH_graphicElements = CreateElementArray(TAT_GRAPHICS,
+      sizeof(VisTextGraphic));
+    ttbh->TTBH_graphicRuns = CreateRunArray(ttbh->TTBH_graphicElements);
+
+    /* initialize array block */
+    arrayBlock = VMAllocLMem(HTMLext->HE_vmFile, LMEM_TYPE_GENERAL,
+      sizeof(HypertextArrayBlockHeader));
+    habh = VMLock(HTMLext->HE_vmFile, arrayBlock, &memHandle);
+    habh->HABH_imageArray = NullChunk;
+    habh->HABH_anchorArray = NullChunk; /* no extended arrays used so far */
+    habh->HABH_frameArray = NullChunk;  /* no frames yet */
+    habh->HABH_formArray = NullChunk;   /* no frames yet */
+    habh->HABH_tableArray = NullChunk;  /* no tables yet */
+    habh->HABH_cellArray = NullChunk;
+    habh->HABH_mapArray = NullChunk;    /* no map yet */
+    habh->HABH_metaArray = NullChunk;   /* no map yet */
+    habh->HABH_regionArray = NullChunk ;
+    habh->HABH_lineArray = NullHandle ;
+    habh->HABH_eventArray = NullChunk;
+    VMDirty(memHandle);                 /* make sure changes get saved */
+    VMUnlock(memHandle);
+
+    /* initialize main hypertext transfer header */
+    htbh->HTBH_other.HTBHO_fileInfo = 0;
+    htbh->HTBH_other.HTBHO_documentTitle = NAME_POOL_NONE;
+    htbh->HTBH_other.HTBHO_baseURI = NAME_POOL_NONE;
+#if EMBED_SUPPORT
+    htbh->HTBH_other.HTBHO_embed = NAME_POOL_NONE;
+#endif
+
+    htbh->HTBH_transferItem = VMCHAIN_MAKE_FROM_VM_BLOCK(textHead);
+    htbh->HTBH_arrayBlock = VMCHAIN_MAKE_FROM_VM_BLOCK(arrayBlock);
+
+    /* Setup the default margins (using the frame settings if declared) */
+    /* Of course, these settings can be overidden by the BODY tag */
+    if (HTMLext->HE_marginHeight != HTML_EXTRA_MARGIN_USE_DEFAULT)
+        htbh->HTBH_other.HTBHO_topMargin = HTMLext->HE_marginHeight ;
+    else
+        htbh->HTBH_other.HTBHO_topMargin = HTML_BODY_TAG_DEFAULT_TOP_MARGIN ;
+
+    if (HTMLext->HE_marginWidth != HTML_EXTRA_MARGIN_USE_DEFAULT)
+        htbh->HTBH_other.HTBHO_leftMargin = HTMLext->HE_marginWidth ;
+    else
+        htbh->HTBH_other.HTBHO_leftMargin = HTML_BODY_TAG_DEFAULT_LEFT_MARGIN ;
+
+    /* default background in color mode is light grey */
+    if( (HTMLext->HE_options & HTML_MONOCHROME)==0 )
+    {
+      htbh->HTBH_other.HTBHO_fileInfo |= HTML_FI_BACK_COLOR;
+      htbh->HTBH_other.HTBHO_backColor.CQ_info = CF_INDEX;
+      htbh->HTBH_other.HTBHO_backColor.CQ_redOrIndex = C_WHITE;
+    }
+
+    /* default color for visited links */
+    htbh->HTBH_other.HTBHO_vlinkColor.CQ_info = CF_INDEX;
+    htbh->HTBH_other.HTBHO_vlinkColor.CQ_redOrIndex = C_VIOLET;
+
+    /* default color for unvisited links */
+    htbh->HTBH_other.HTBHO_linkColor.CQ_info = CF_INDEX;
+    htbh->HTBH_other.HTBHO_linkColor.CQ_redOrIndex = C_BLUE;
+
+    return hypertextHead;
+}
+
+void FinishTransferItem(void)
+{
+    TextRunArrayElement endRun =
+      {{(sword)TEXT_ADDRESS_PAST_END, (sbyte)(TEXT_ADDRESS_PAST_END>>16)},
+       CA_NULL_ELEMENT};
+    TCHAR zero = 0;
+
+    HugeArrayAppend(HTMLext->HE_vmFile,
+      VMCHAIN_GET_VM_BLOCK(ttbh->TTBH_charAttrRuns), 1, &endRun);
+    HugeArrayAppend(HTMLext->HE_vmFile,
+      VMCHAIN_GET_VM_BLOCK(ttbh->TTBH_paraAttrRuns), 1, &endRun);
+    HugeArrayAppend(HTMLext->HE_vmFile,
+      VMCHAIN_GET_VM_BLOCK(ttbh->TTBH_graphicRuns), 1, &endRun);
+
+    /* Terminate text stream */
+    HugeArrayAppend(HTMLext->HE_vmFile,
+      VMCHAIN_GET_VM_BLOCK(ttbh->TTBH_text), 1, &zero);
+
+    VMChainifyLMemBlock(HTMLext->HE_vmFile, ttbh->TTBH_charAttrElements);
+    VMChainifyLMemBlock(HTMLext->HE_vmFile, ttbh->TTBH_paraAttrElements);
+    VMChainifyLMemBlock(HTMLext->HE_vmFile, ttbh->TTBH_graphicElements);
+    VMChainifyLMemBlock(HTMLext->HE_vmFile, htbh->HTBH_arrayBlock);
+
+    htbh->HTBH_namePoolLink = htbh->HTBH_other.HTBHO_namePoolToUse =
+      NamePoolVMSave(NamePool, HTMLext->HE_vmFile);
+                                        /* save and dispose of pool */
+
+    VMUnlock(hypertextHeaderMem);       /* unlock headers */
+    VMUnlock(transferHeaderMem);
+}
+
+dword OpenFileURL(FileHandle fh, HTMLFILE *f)
+{
+    f->fileHTML = fh;                   /* assign physical file */
+    f->HTMLbuf = malloc(HTML_READBUF);
+    if( !(f->HTMLbuf) )                 /* failure to allocate file buffer? */
+      return NULL;
+    f->HTMLbufp = f->HTMLbufl = 1;      /* no data in buffer yet */
+
+    return (dword)f;
+}
+
+void CloseFileURL(HTMLFILE *f)
+{
+    free(f->HTMLbuf);                   /* free read buffer */
+}
+
+
+/***************************************************************************
+ *        Main dispatcher for file import variants
+ ***************************************************************************/
+
+/* required to create proper fixup: */
+static ReadHTML_getc *pf_getc = getcOptrURL;
+#if JAVASCRIPT_SUPPORT
+static ReadHTML_getc *pf_getcScript = getcScriptURL;
+#endif
+
+int EXPORT ParseAnyFile(word fileType, word fileSource, dword data,
+  HTMLextra *ext, VMBlockHandle *item, AllocWatcherHandle watcher,
+  dword *p_usedMem)
+{
+    int ret;
+    ReadHTML_getc *gc;
+    OPTRFILE of;
+    dword data2;
+    FileHandle fh;
+
+    /* Reset the allocation information */
+    G_allocWatcher = watcher ;
+    G_hitAllocLimit = FALSE ;
+    G_amountAllocated = 0 ;
+
+    ret = 0;                            /* default: no error */
+
+    switch(fileSource)
+    {
+      case HFTT_SOURCE_OPTR:
+        of.text = data;                 /* initialize block descriptor */
+        of.i = 0;
+        data2 = (dword)&of;
+        gc = pf_getc;
+        break;
+      case HFTT_SOURCE_FILENAME:
+        fh = FileOpen((TCHAR *)data, FILE_ACCESS_R | FILE_DENY_NONE);
+        if(!fh)                         /* file not found: return error */
+          ret = 1;
+        data2 = (dword)fh;
+        gc = NULL;
+        break;
+#if JAVASCRIPT_SUPPORT
+      case HFTT_SOURCE_SCRIPT:
+        data2 = (dword)data;
+        gc = pf_getcScript;
+        break;
+#endif
+    }
+
+    if(ret == 0)                        /* no errors detected yet */
+      switch(fileType)
+      {
+        case HFTT_ASSUME_PLAIN:
+          ret = ParsePlainFile(gc, data2, ext, item);
+          break;
+        case HFTT_ASSUME_HTML:
+          ret = ParseHTMLFile(gc, data2, ext, item);
+          break;
+EC(     default: FatalError(-1); )
+      }
+
+    if(fileSource == HFTT_SOURCE_FILENAME && fh)
+      FileClose(fh, FILE_NO_ERRORS);    /* close data file, if opened */
+
+    /* Return the amount of memory allocated */
+    *p_usedMem = G_amountAllocated ;
+
+    return ret;
+}
+
+void EXPORT _pascal ParseAbort(void)
+{
+    word timeout = 0 ;
+
+    /* Only abort if we are parsing */
+    if (G_isParsing == FALSE)
+        return ;
+
+    /* Set the abort, but then block waiting for the parse to occur */
+    /* However, if it takes too long, we'll just go on.  We don't */
+    /* want to sit here forever */
+    G_abortParse = TRUE ;
+    while ((G_abortParse) && (timeout < PARSE_ABORT_TIMEOUT))  {
+        /* Wait a bit to see if the other thread gets done */
+        TimerSleep(5) ;
+        timeout+=5 ;
+    }
+
+    EC_WARNING_IF(timeout>=PARSE_ABORT_TIMEOUT, WARNING_PARSE_ABORT_TIMED_OUT) ;
+}
+

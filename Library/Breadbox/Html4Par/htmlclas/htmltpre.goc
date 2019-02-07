@@ -1,0 +1,1500 @@
+/***********************************************************************
+ *
+ *                          ==CONFIDENTIAL INFORMATION==
+ *
+ * COPYRIGHT 1994-99 BREADBOX COMPUTER COMPANY -- ALL RIGHTS RESERVED  --
+ * THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER
+ * A NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ * RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ * NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ * CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ * AGREEMENT.
+ *
+ * PROJECT:       HTMLView
+ * FILE:          HTMLTPRE.goc -- Table pre-formatting routines
+ *
+ * AUTHOR:        Lysle Shields
+ *
+ ***********************************************************************/
+@include <stdapp.goh>
+@include <Objects/Text/tCtrlC.goh>
+
+#include <Ansi/string.h>
+#include <Ansi/stdio.h>
+#include <Ansi/stdlib.h>
+
+@include <fixes.goh>
+@include "options.goh"
+@include <html4par.goh>
+
+#include "regiont.h"
+#include "internal.h"
+#include "errors.h"
+#include "tableint.h"
+
+WBFixed IDetermineLeftRightOfTextLineInRegion(
+            WBFixed lineY,
+            WBFixed deltaLineY,
+            word **pp_path,
+            word *p_left,
+            word *p_right,
+            word regionWidth)
+{
+    WBFixed nextY ;
+    sword frac ;
+    sword startY, endY ;
+    word *p_path ;
+    word *p_next ;
+
+    p_path = *pp_path ;
+
+    *p_left = 0 ;
+    *p_right = regionWidth ;
+
+    /* Determine if we have more path (or any at all) */
+    if ((p_path) && (*p_path != EOREGREC))  {
+        /* Calculate the start of the next line */
+        nextY.WBF_int = lineY.WBF_int + deltaLineY.WBF_int ;
+        frac = (sword)lineY.WBF_frac + (sword)deltaLineY.WBF_frac ;
+        nextY.WBF_int += frac/256 ;
+        nextY.WBF_frac = frac ;
+
+        /* Pull out the top and bottom of the line's rectangle */
+        startY = lineY.WBF_int ;
+        endY = nextY.WBF_int ;
+
+        /* Step through the region and determine the most inward */
+        /* left and right */
+        /* Find the first region we need to start on */
+        p_next = p_path ;
+        while (p_path[0] <= startY)  {
+            p_next = p_path ;
+            while (*p_next != EOREGREC)
+                p_next++ ;
+            p_next++ ;
+            if (*p_next == EOREGREC)
+                break ;
+            p_path = p_next ;
+        }
+        
+        /* Now check the lefts and rights of the regions we are in */
+        /* And go through all the regions that we touch */
+        p_next = p_path ;
+        do {
+            /* Determine the inside bounds */
+            if (p_path[1] > *p_left)
+                *p_left = p_path[1] ;
+            if (p_path[2] < *p_right)
+                *p_right = p_path[2] ;
+            p_path = p_next ;
+            while (*p_next != EOREGREC)
+                p_next++ ;
+            p_next++ ;
+            if (*p_next == EOREGREC)
+                break ;
+        } while ((*p_next != EOREGREC) && (p_next[0] < endY)) ;
+    }
+
+    *pp_path = p_path ;
+
+    ProfPoint("IDetermineLeftRightOfTextLineInRegion") ;
+
+    return nextY ;
+}
+
+
+/* Computes the longest line in a region given the currently already */
+/* existing longest line and calculation up to this point. */
+/* NOTE:  cellArray must be locked already. */
+word CalculateRegionLongestLine(
+         VisLargeTextRegionArrayElement *p_region,
+         word currentLen,
+         word *p_longestLine,
+         optr oself,
+         void **p_pos,
+         HTMLcellData *p_cellData,
+         Boolean *p_didGrow)
+{
+    word count ;
+    word lineWidth ;
+    struct { LineInfo li; FieldInfo fi[7]; } *liBuffer ;
+    Boolean first = TRUE ;
+    VisTextInstance *pself ;
+    VMFileHandle file ;
+    word *p_path ;
+    word regionLeft, regionRight ;
+    WBFixed lineY ;
+//  word regionWidth ;
+    word blockedWidth ;
+    word usedWidth ;
+    word size ;
+#ifdef COMPILE_OPTION_OUTPUT_LAYOUT_LOG
+    FileHandle fileLog ;
+#endif
+
+    liBuffer = *p_pos ;
+
+EC( ECCheckStack(); )
+
+    /* Lock the path around the region so we can determine if lines */
+    /* fall out of the region */
+    if (p_region->VLTRAE_region)  {
+        pself = ObjDerefVis(oself) ;
+        file = pself->VTI_vmFile ;
+        p_path = DBLockUngrouped(file, p_region->VLTRAE_region) ;
+        /* Skip the standard header (boundaries) */
+        p_path += 4 ;
+        if (*p_path == 0xFFFF)
+            p_path+=2 ;
+    } else {
+        p_path = NullHandle ;
+    }
+
+    /* Use the default values */
+    regionLeft = 0 ;
+    regionRight = p_region->VLTRAE_size.XYS_width+2 ;
+//  regionWidth = regionRight - regionLeft ;
+
+    lineY.WBF_int = 0 ;
+    lineY.WBF_frac = 0 ;
+
+    /* Only process if we still have room to add in */
+    if (currentLen < HTML_CELL_LONGEST_LINE_LIMIT)  {
+        /* Go through all the lines in this section */
+        for(count=p_region->VLTRAE_lineCount;
+            (count) && (currentLen < HTML_CELL_LONGEST_LINE_LIMIT);
+            count--/*, vtglip.VTGLIP_line++*/)
+        {
+            if (p_path)  {
+                lineY = IDetermineLeftRightOfTextLineInRegion(
+                            lineY,
+                            liBuffer->li.LI_hgt,
+                            &p_path,
+                            &regionLeft,
+                            &regionRight,
+                            p_region->VLTRAE_size.XYS_width+2) ;
+//                regionWidth = regionRight - regionLeft ;
+            }
+
+            /* Add the width to the current width */
+            lineWidth = 1+liBuffer->li.LI_lineEnd - liBuffer->li.LI_adjustment ;
+            if (first)  {
+                first = FALSE ;
+                currentLen += lineWidth ;
+            } else  {
+                currentLen += lineWidth /* +3 */ ;
+            }
+
+            if (currentLen >= HTML_CELL_LONGEST_LINE_LIMIT)
+                currentLen = HTML_CELL_LONGEST_LINE_LIMIT ;
+
+            /* Is this the end of the line? */
+            if (liBuffer->li.LI_flags &
+                   (LF_ENDS_PARAGRAPH | LF_ENDS_IN_CR | LF_ENDS_IN_NULL))  {
+                /* We are at a end of a line, compute the maximum */
+                /* up to this point and reset */
+                if (currentLen)
+                    currentLen-- ;
+                if (currentLen > *p_longestLine)
+                    *p_longestLine = currentLen ;
+                currentLen = 0 ;
+            }
+
+            /* If this line is bigger (and bigger than the min size) */
+            /* note that we have grown. Allow for one extra pixel because */
+            /* this is what the formatting routines will occasionally leave */
+            /* us with without feeling the need to wrap... */
+            blockedWidth = (p_region->VLTRAE_size.XYS_width) - (regionRight - regionLeft) ;
+            if (blockedWidth > 0xF000)
+                blockedWidth = 0 ;
+ blockedWidth = 0 ;
+            usedWidth = (lineWidth?lineWidth-1:0) + blockedWidth ;
+/*            if ((lineWidth > (1+regionRight - regionLeft))  && */
+/*            if (((usedWidth+1) > (regionWidth + 1)) &&   */
+/*            if (((liBuffer.li.LI_lineEnd) > (regionRight)) && */
+/*            if (((liBuffer.li.LI_lineEnd-1) > (regionRight)) && */
+              if ((lineWidth > p_region->VLTRAE_size.XYS_width + 1) &&  
+/*              if ((usedWidth > p_region->VLTRAE_size.XYS_width + 2) &&  */
+                (lineWidth < MAXIMUM_COLUMN_WIDTH))
+            {
+/*                if ((lineWidth-1) > p_cellData->HCD_minWidth) */
+                if (usedWidth > p_cellData->HCD_minWidth)
+                {
+/*                      p_cellData->HCD_minWidth = lineWidth-1 ; */
+                    p_cellData->HCD_minWidth = usedWidth ;
+#ifdef COMPILE_OPTION_OUTPUT_LAYOUT_LOG
+    fileLog = OpenLayoutLog() ;
+    fprintf(fileLog, "--> Cell %d new minWidth %4d\n", p_region->VLTRAE_section, usedWidth) ;
+    CloseLayoutLog(fileLog) ;
+#endif
+                    *p_didGrow = TRUE ;
+                    CellDirty(p_cellData) ;
+                }
+
+                /* If this line is bigger (and bigger than the min size) */
+                /* note that we have grown */
+                if ((lineWidth-1) > p_cellData->HCD_hardMinWidth)
+                {
+                    p_cellData->HCD_hardMinWidth = lineWidth-1 ;
+                    *p_didGrow = TRUE ;
+                    MarkTableLayoutDirty(ObjDerefVis(oself), p_cellData->HCD_table) ;
+                    CellDirty(p_cellData) ;
+                }
+            }
+
+            /* Max should never be less than min */
+            if (*p_longestLine < p_cellData->HCD_minWidth)
+                *p_longestLine = p_cellData->HCD_minWidth ;
+            if (HugeArrayNext((void**)&liBuffer, &size) == 0)  {
+                HugeArrayUnlock(liBuffer) ;
+                liBuffer = NULL ;
+                break ;
+            }
+        }
+
+        if ((p_cellData->HCD_minWidth <= MINIMUM_COLUMN_WIDTH) &&
+            (*p_longestLine >= REASONABLE_COLUMN_WIDTH))  {
+            p_cellData->HCD_minWidth = REASONABLE_COLUMN_WIDTH ;
+            *p_didGrow = TRUE ;
+            CellDirty(p_cellData) ;
+        }
+    }
+
+    if (p_path)  {
+        DBUnlock(p_path) ;
+    }
+
+    *p_pos = liBuffer ;
+
+    ProfPoint("CalculateRegionLongestLine") ;
+
+    return currentLen ;
+}
+
+/* The following routine is intended to compute the longest lines */
+/* for all the cells.  This longest line value is then used to */
+/* weight how wide columns are relative to each other */
+Boolean CalculateCellArrayLongestLines(
+               T_regionArrayHandle regArray,
+               optr cellArray,
+               optr oself,
+               word firstCell,
+               word maxCell)
+{
+    VisLargeTextRegionArrayElement *p_region;
+    HTMLcellData *p_cell = NULL ;
+    word region, numRegions;
+    word cell;
+    word longestLine = 0 ;
+    word currentLen ;
+    word lastCell = 0xFFFF ;
+    Boolean didGrow = FALSE ;
+    word size ;
+    void *p_line ;
+    VisTextInstance *pself = ObjDerefVis(oself) ;
+    dword lineNum ;
+
+EC( ECCheckStack(); )
+
+    RegionPurgeCache(oself) ;
+    numRegions = RegionArrayGetCount(regArray);
+    CellArrayStartAccess(cellArray);
+    pself = ObjDerefVis(oself) ;
+
+    /* First, find the first region and its first line number */
+    region = 0;
+    lineNum = 0 ;
+    RegionLock(regArray, region, &p_region, &size) ;
+    while (region < numRegions)  {
+        if (p_region->VLTRAE_section >= firstCell)
+            break ;
+        lineNum += p_region->VLTRAE_lineCount ;
+        RegionNext(&p_region, &size) ;
+        region++ ;
+    }
+
+    /* First region is locked here and got the line number */
+
+    /* Lock the first line */
+    if (HugeArrayLock(pself->VTI_vmFile, pself->VTI_lines, lineNum, &p_line, &size)&0xFFFF)  {
+        /* Go through all the regions from here */
+        /* and calculate maximum width */
+        while(region < numRegions)  {
+            /* The section number is the cell number */
+            cell = p_region->VLTRAE_section;
+
+            if (cell != lastCell)  {
+                if (p_cell)  {
+                    /* Record the longest line in this cell */
+                    p_cell->HCD_longestLine = longestLine ;
+                    CellDirty(p_cell) ;
+                    CellUnlock(p_cell) ;
+                    p_cell = NULL ;
+                }
+
+                /* When a different cell, reset lengths */
+                currentLen = 0 ;
+                longestLine = 0 ;
+                lastCell = cell ;
+
+                /* Must be done if out of range! */
+                if (cell >= maxCell)
+                    break ;
+
+                CellLock(cellArray, cell, &p_cell, &size);
+            }
+
+            /* Determine the longest line for all the lines in this */
+            /* region. */
+            currentLen = CalculateRegionLongestLine(
+                             p_region,
+                             currentLen,
+                             &longestLine,
+                             oself,
+                             &p_line,
+                             p_cell,
+                             &didGrow) ;
+
+            /* Last chance to find the longest line */
+            if (currentLen > longestLine)
+                longestLine = currentLen ;
+
+            /* Go to the next region, or stop */
+            region++ ;
+            if(region < numRegions)
+                RegionNext(&p_region, &size) ;
+        }
+    
+        /* Done with the lines */
+        if (p_line)
+            HugeArrayUnlock(p_line) ;
+    }
+
+    /* Unlock the cell previously locked */
+    if (p_cell)
+        CellUnlock(p_cell) ;
+
+    RegionUnlock(p_region) ;
+    CellArrayEndAccess(cellArray);
+
+    ProfPoint("CalculateCellArrayLongestLines") ;
+    return didGrow ;
+}
+
+
+/**************************************************************************
+ * Routine:  IInitializeCellDataForLayout
+ **************************************************************************
+ *
+ * Description:
+ *     Initializes all cell's layout info so they are in the top left
+ *     and the biggest cell they can be.
+ *     The minimum width is declared.
+ *     Longest line is set to zero.
+ *
+ * Revision:
+ *     Who  Date:     Comments:
+ *     ---  --------  --------------------
+ *     LES  98/04/08  Created.
+ *
+ **************************************************************************/
+void IInitializeCellDataForLayout(T_cellArrayHandle cellArray)
+{
+    HTMLcellData *p_cell ;
+    word i, n ;
+    word size ;
+
+EC( ECCheckStack(); )
+
+    if (cellArray)  {
+        CellArrayStartAccess(cellArray) ;
+        n = CellArrayGetCount(cellArray) ;
+        for (i=0; i<n; i++)  {
+            CellLock(cellArray, i, &p_cell, &size) ;
+//            memset(p_cell, 0, sizeof(*p_cell)) ;
+
+            p_cell->HCD_x = p_cell->HCD_y = p_cell->HCD_calcHeight = 0 ;
+
+            /* Make all cells start in the top left with */
+            /* the biggest sized cell/region we can have */
+            p_cell->HCD_calcWidth = INITIAL_COLUMN_WIDTH ;
+            p_cell->HCD_minWidth = MINIMUM_COLUMN_WIDTH ;
+
+            /* Hard HCD_hardMinWidth is practically the same as */
+            /* HCD_minWidth but it is calculate without considering */
+            /* fixed widths or percentages.  In other words, its the */
+            /* true minimum width that would be used if the cell had to */
+            /* be squeezed down in size.  This is so that calculations */
+            /* can be used to determine how much a table can inset its */
+            /* cells when set to a fixed width. */
+            if (p_cell->HCD_hardMinWidth < MINIMUM_COLUMN_WIDTH)
+                p_cell->HCD_hardMinWidth = MINIMUM_COLUMN_WIDTH ;
+
+            /* When initializing and we find we have been given */
+            /* a particular pixel width, force the min width here */
+            /* so it propagates through out the system from the */
+            /* beginning. */
+            if (HTML_LEN_GET_UNIT(p_cell->HCD_width) == HTML_LEN_PIXEL)  {
+                size = HTML_LEN_GET_VALUE(p_cell->HCD_width) ;
+                if (size > p_cell->HCD_minWidth)  {
+                    p_cell->HCD_minWidth = size ;
+                    p_cell->HCD_calcWidth = size ;
+                    EC_ERROR_IF(p_cell->HCD_calcWidth==0, ERROR_CALCULATED_WIDTH_SHOULD_NOT_BE_ZERO) ;
+                }
+            }
+
+//            p_cell->HCD_minHeight = 0 ;
+            p_cell->HCD_longestLine = p_cell->HCD_minWidth ;
+            p_cell->HCD_nextCellInTable = CELL_NEXT_IN_TABLE_UNKNOWN ;
+
+            CellDirty(p_cell) ;
+            CellUnlock(p_cell) ;
+        }
+        CellArrayEndAccess(cellArray) ;
+    }
+    ProfPoint("IInitializeCellDataForLayout") ;
+}
+
+/**************************************************************************
+ * Method: HTMLTextClass::MSG_HTML_TEXT_INITIALIZE_LAYOUT
+ **************************************************************************
+ *
+ * Description:
+ *     Create all the table layout entries necessary for future table
+ *     calculations.
+ *
+ * Revision:
+ *     Who  Date:     Comments:
+ *     ---  --------  --------------------
+ *     MG   ??/??/??  Created.
+ *     LES  98/04/08  Reviewed and commented.
+ *
+ **************************************************************************/
+@extern method HTMLTextClass, MSG_HTML_TEXT_INITIALIZE_LAYOUT
+{
+    /* Initialize the cell data */
+    pself = ObjDerefVis(oself) ;
+
+    /* Reset the maximum height so we try to determine if a scrollbar */
+    /* is needed. */
+    pself->HTI_maxViewHeight = HTML_INITIAL_VIEW_HEIGHT ;
+
+    /* Assume we don't know anything about the view width either */
+    pself->HTI_formattedWidth = 0 ;
+    IInitializeCellDataForLayout(pself->HTI_cellArray) ;
+    pself->HTI_numFormattedCells = 0 ;
+    ProfPoint("MSG_HTML_TEXT_INITIALIZE_LAYOUT") ;
+}
+
+/**************************************************************************
+ * Method: HTMLTextClass::MSG_VIS_LARGE_TEXT_APPEND_REGION
+ **************************************************************************
+ *
+ * Description:
+ *     This message is produced by the text object system every time a
+ *     new region is to be added after another region.  Note that
+ *     this usually occurs each time a new table cell is added (section
+ *     break), but may also occur when text overflows a table cell.
+ *
+ *     Regions that are produced from this routine will be placed at the
+ *     current x, y and width, but will have max height (to avoid more
+ *     regions).
+ *
+ * Inputs:
+ *     word region                -- region number to append after
+ *
+ * Revision:
+ *     Who  Date:     Comments:
+ *     ---  --------  --------------------
+ *     MG   ??/??/??  Created.
+ *     LES  98/04/08  Restructured for the next attempt at table layout.
+ *
+ **************************************************************************/
+@extern method HTMLTextClass, MSG_VIS_LARGE_TEXT_APPEND_REGION
+{
+    word newCellIndex ;
+    word newRegionIndex;
+    VisLargeTextRegionArrayElement *p_region=NULL, *p_prevRegion=NULL;
+    HTMLcellData *p_cell;
+    T_regionArrayHandle regArray ;
+    Boolean isContinue ;
+    word size ;
+    T_layoutStack *p_stack ;
+
+EC( ECCheckStack(); )
+
+    RegionPurgeCache(oself) ;
+    /* Get direct access to the region array */
+    regArray = RegionArrayConstruct(oself, pself) ;
+
+    /* Get rid of the last cached region since all types of things */
+    /* can now happen. */
+    if (pself->HTI_layoutStack)  {
+        p_stack = LayoutStackLock(pself->HTI_layoutStack) ;
+        p_stack->LS_lastSeekedRegion = 0xFFFF ;
+        LayoutStackUnlock(p_stack) ;
+    }
+
+    /* Let the system add the region like it normally does, we just */
+    /* modify the newly created item */
+    @callsuper();
+
+    RegionPurgeCache(oself) ;
+
+    pself = ObjDerefVis(oself);
+
+    /* Get access to the previous element in the list */
+    if(region == CA_NULL_ELEMENT)  {
+        /* No previous region.  New region is first one (0) */
+        p_prevRegion = NULL ;
+        newRegionIndex = 0 ;
+    } else  {
+        /* Got the previous region, we are next */
+        RegionLock(regArray, region, &p_prevRegion, &size);
+        newRegionIndex = region+1;
+    }
+
+    /* Access this newly created region */
+    RegionLock(regArray, newRegionIndex, &p_region, &size);
+
+    if(region == CA_NULL_ELEMENT)  {   
+        /* First region should be initialized with text size */
+        p_region->VLTRAE_charCount = HugeArrayGetCount(pself->VTI_vmFile, 
+          pself->VTI_text) - 1;
+    }
+
+    /* Do we have any cell arrays?  If not, we don't have anything to map */
+    /* to and might as well just be the full width. */
+    if (!pself->HTI_cellArray)  {
+        /* No cell data, map to full width */
+        p_region->VLTRAE_size.XYS_width =
+            pself->HTI_viewWidth ?
+              pself->HTI_viewWidth :
+              DEFAULT_START_WIDTH;
+        p_region->VLTRAE_spatialPosition.PD_x = 0 ;
+        p_region->VLTRAE_size.XYS_height = MAX_REGION_HEIGHT;
+        p_region->VLTRAE_spatialPosition.PD_y = HTML_TEXT_REGION_HIDDEN_Y ;
+    } else {
+        /* We have all the cell data we need.  We can continue */
+        /* by finding the corresponding table cell for this region. */
+
+        /* Get access to the cell array */
+        CellArrayStartAccess(pself->HTI_cellArray) ;
+
+        /* Determine if this is the first cell to be created, a continued */
+        /* region to the same cell, or just the next new cell. */
+        if (!p_prevRegion)  {
+            /* No previous region, then the new cell is the first cell. */
+            newCellIndex = 0;
+            isContinue = FALSE ;
+        } else if (RegionArrayGetCount(regArray) == region+2 &&
+                   p_prevRegion->VLTRAE_section+1 <
+                     CellArrayGetCount(pself->HTI_cellArray))  {
+
+            // TBD: this still fails if any cell in the middle of the document
+            // overflows. And overflow at the end of the document (the most
+            // frequent case) is properly recognized because we know that
+            // we've run beyond the end of the cell list, soll all the
+            // remaining text must be an overflow of the last cell.
+
+            // To fully fix this, the overflow detection must be based on
+            // whether the start of a new region was caused by a section break
+            // character or not (if not, the region has overflown).
+
+            /* go to next cell index (next section) */
+            newCellIndex = p_prevRegion->VLTRAE_section+1 ;
+
+            isContinue = FALSE ;
+        } else {
+            /* overflow: continue previous cell (same section number) */
+            newCellIndex = p_prevRegion->VLTRAE_section ;
+            isContinue = TRUE ;
+            @call oself::MSG_VIS_LARGE_TEXT_PURGE_CACHED_INFO() ;
+        }
+
+        /* Skip over empty cells since they are not rendered but we must */
+        /* make sure sections and cell indices match. */
+
+        do {
+
+            /*
+               We should never have to go beyond the last cell in the array,
+               otherwise the number of region breaks and the number of non-empty
+               cell breaks don't match.
+            */
+            EC_ERROR_IF(
+               newCellIndex >= CellArrayGetCount(pself->HTI_cellArray),
+               ERROR_CELL_INDEX_OUT_OF_RANGE);
+            CellLock(pself->HTI_cellArray, newCellIndex, &p_cell, &size) ;
+
+            if(!(p_cell->HCD_flags & HTML_CELL_NOT_EMPTY))  {
+              newCellIndex++;
+            } else  {
+              /* Leave cell locked -- its the one we wanted */
+              break ;
+            }
+            CellUnlock(p_cell) ;
+        } while (1);
+
+        /* assign non-empty cell to region */
+        p_region->VLTRAE_section = newCellIndex;
+
+        /* Determine the width and position of the new region */
+        /* either as the first region in a cell or the next */
+        /* in a line of regions in a cell. */
+        /* Remember that all the cells have been calculated to be some */
+        /* position and size (even if wrong). */
+        if (isContinue)  {
+            /* move region below previous */
+            p_region->VLTRAE_spatialPosition.PD_y =
+                p_prevRegion->VLTRAE_spatialPosition.PD_y +
+                    p_prevRegion->VLTRAE_calcHeight.WBF_int +
+                        RegionGetPathTopBound(
+                            pself->VTI_vmFile, 
+                            p_prevRegion->VLTRAE_region) ;
+
+            /* Give the region its full height so it does not append another */
+            /* region for overflow text. */
+            p_region->VLTRAE_spatialPosition.PD_x = p_cell->HCD_x ;
+            p_region->VLTRAE_spatialPosition.PD_y |= HTML_TEXT_REGION_HIDDEN_Y ;
+            p_region->VLTRAE_size.XYS_height = MAX_REGION_HEIGHT;
+            p_region->VLTRAE_size.XYS_width = (p_cell->HCD_calcWidth)?1+p_cell->HCD_calcWidth:pself->HTI_viewWidth ;
+        } else {
+            /* Go to the top left position that matches the cell. */
+            p_region->VLTRAE_spatialPosition.PD_x = p_cell->HCD_x ;
+            p_region->VLTRAE_spatialPosition.PD_y = p_cell->HCD_y | HTML_TEXT_REGION_HIDDEN_Y ;
+            p_region->VLTRAE_size.XYS_width = (p_cell->HCD_calcWidth)?1+p_cell->HCD_calcWidth:pself->HTI_viewWidth ;
+            p_region->VLTRAE_size.XYS_height = MAX_REGION_HEIGHT;
+        }
+
+        /* No longer need cell data access */
+        CellUnlock(p_cell) ;
+        CellArrayEndAccess(pself->HTI_cellArray) ;
+        pself->HTI_layoutState |= HTS_CELL_REGION_LINKS_INVALID ;
+    }
+
+    if (p_region)  {
+        RegionDirty(p_region) ;
+        RegionUnlock(p_region) ;
+    }
+    if (p_prevRegion)
+        RegionUnlock(p_prevRegion) ;
+    ProfPoint("MSG_VIS_LARGE_TEXT_APPEND_REGION") ;
+}
+
+/**************************************************************************
+ * Routine:  DivyColumns
+ **************************************************************************
+ *
+ * Description:
+ *     Divide up a span of columns across other columns using simple rules.
+ *     These rules will then allow us to determine minimum and maximum
+ *     column widths.
+ *
+ * Inputs:
+ *     word totalValue             -- Sum of all the columns currently
+ *     word cellValue              -- Desired width for full span
+ *     T_columnIndex *indexArray   -- Index into used columns
+ *     word *columnArray           -- Used column values
+ *     word startColumn            -- First column of cell span
+ *     word columnSpan             -- Number columns spanned
+ *
+ * Revision:
+ *     Who  Date:     Comments:
+ *     ---  --------  --------------------
+ *     LES  00/07/03  Created.
+ *
+ **************************************************************************/
+void DivyColumns(
+        word totalValue,
+        word cellValue,
+        T_columnIndex *indexArray,
+        word *columnArray,
+        word startColumn,
+        word columnSpan)
+{
+    word column, index, i, numEmpty=0 ;
+    word remaining ;
+    dword value ;
+
+    /* Check if this routine is miss used. */
+    EC_ERROR_IF(cellValue <= totalValue, ERROR_COLUMN_WIDTH_IS_TOO_BIG) ;
+
+    /* Search for empty columns while adding up the total */
+    for (i=0, column=startColumn; i<columnSpan; i++, column++)  {
+        /* Don't go off the end */
+        if (column >= TABLE_MAX_COLUMNS)
+            break ;
+
+        /* Skip unused columns */
+        if ((index = indexArray[column]) == TABLE_COLUMN_INDEX_BAD)
+            continue ;
+
+        /* See if the column is empty */
+        if (columnArray[index] == 0)
+            numEmpty++ ;
+    }
+
+    /* The rule is simple.  If we have ANY empty spots, they get all */
+    /* of the space evenly.  If they are all taken, then the rest is */
+    /* spread weighted on the existing values. */
+    remaining = cellValue - totalValue ;
+    for (i=0, column=startColumn; i<columnSpan; i++, column++)  {
+        /* Don't go off the end */
+        if (column >= TABLE_MAX_COLUMNS)
+            break ;
+
+        /* Skip unused columns */
+        if ((index = indexArray[column]) == TABLE_COLUMN_INDEX_BAD)
+            continue ;
+
+        if (numEmpty)  {
+            /* Found some empty ones.  Spread it evenly */
+            columnArray[index] = remaining / numEmpty ;
+            remaining -= columnArray[index] ;
+            numEmpty-- ;
+        } else {
+            /* Spread based on weighted average */
+            value = columnArray[index] ;
+            value *= remaining ;
+            if (totalValue)
+                value /= totalValue ;
+            else
+                value = remaining ;
+
+            totalValue -= columnArray[index] ;
+            columnArray[index] += value ;
+            remaining -= value ;
+        }
+    }
+}
+
+/**************************************************************************
+ * Routine:  ICalculateTableMinMax
+ **************************************************************************
+ *
+ * Description:
+ *     Recursively determine what the minimum length and maximum length
+ *     of this table is.
+ *     NOTE:  It is assumed that the tableArray and cellArray of
+ *            the text object is locked.
+ *     The result of this calculation is that we will have a minimum,
+ *     maximum (desired), and absolute minimum (per the text within
+ *     the cells) of the table from
+ *
+ *     <<========== LEFT OUTSIDE EDGE to RIGHT OUTSIDE EDGE ===========>>
+ *
+ *     +----------------------------------------------------------------+
+ *     |             Table border                                       |
+ *     | +------------------------------------------------------------+ |
+ *     | |           Cellspacing                                      | |
+ *     | | +--I-n-n-e-r-b-o-r-d-e-r------+ +--I-n-n-e-r-b-o-r-d-e-r-+ | |
+ *     | | |         Cellpadding         | |    Cellpadding         | | |
+ *     | | | + - - - - - - - - - - - - + | | + - - - - - - - - - -+ | | |
+ *     | | | |                         | | | |                    | | | |
+ *     | | | |Cell goes here           | | | | Cell here          | | | |
+ *     | | | |                         | | | |                    | | | |
+ *     | | | |                         | | | |                    | | | |
+ *     | | | |                         | | | |                    | | | |
+ *
+ * Inputs:
+ *     HTMLTextInstance *pself     -- text object to calculate in
+ *     word tableIndex             -- table to calculate
+ *     word *p_min                 -- Minimum to return
+ *                                    Really should be called the
+ *                                    "desired minimum" since the cell
+ *                                    might be smaller.
+ *     word *p_max                 -- Maximum cell width
+ *     word *p_hardMin             -- Absolute minimum when squeezed.
+ *
+ * Outputs:
+ *     word index                  -- Cell index after table
+ *
+ * Revision:
+ *     Who  Date:     Comments:
+ *     ---  --------  --------------------
+ *     LES  98/04/08  Created.
+ *     LES  99/08/27  Cleaned up, commented, and checked for validity.
+ *
+ **************************************************************************/
+
+word ICalculateTableMinMax(
+                T_minMaxStack *p_stack,
+                HTMLTextInstance *pself,
+                word tableIndex,
+                word *p_min,
+                word *p_max,
+                word *p_hardMin)
+{
+    T_cellArrayHandle cellArray = pself->HTI_cellArray;
+    T_tableArrayHandle tableArray = pself->HTI_tableArray;
+
+    HTMLtableData *p_table ;
+    HTMLcellData *p_cell ;
+    word numCells ;
+    word cellIndex ;
+    word column ;
+    word cellMin, cellMax, cellHardMin ;
+    word totalMin, totalMax, totalHardMin ;
+    word totalMaxP ;
+    word i ;
+    word value ;
+    word innerBorder ;
+    word hardMin ;
+    word size ;
+    word numCols ;
+    word extraCols = 0 ;
+    T_columnIndex numUsedCols = 0 ;
+    T_columnIndex index ;
+    word totalPercent = 0 ;
+    word cellPercent ;
+    dword wantedMax ;
+    dword multiplier ;
+#ifdef COMPILE_OPTION_OUTPUT_LAYOUT_LOG
+    FileHandle file ;
+#endif
+EC( word originalCellIndex ; )
+    word currentSpan ;
+    word colSpan ;
+    Boolean anySpan = FALSE ;
+/* Old definitions: 
+    word hardMinArray[TABLE_MAX_USED_COLUMNS] ;
+    word min[TABLE_MAX_USED_COLUMNS] ;
+    word max[TABLE_MAX_USED_COLUMNS] ;
+    word percent[TABLE_MAX_USED_COLUMNS] ;
+    T_columnIndex indexArray[TABLE_MAX_COLUMNS] ;
+    byte spanUsed[TABLE_MAX_COLUMNS+1] ;
+*/
+    word *hardMinArray ;
+    word *min ;
+    word *max ;
+    word *percent ;
+    T_columnIndex *indexArray ;
+    byte *spanUsed ;
+    T_minMaxTableFrame *p_tableFrame ;
+    word lastSpan=0 ;
+	word initSize ;
+
+EC( ECCheckStack(); )
+
+    EC_ERROR_IF(p_stack->MMS_used >= HTML_MAXTABLE, -1) ;
+
+    /* Look up the individual items (for easy access) */
+    p_tableFrame = p_stack->MMS_frames + (p_stack->MMS_used++) ;
+    hardMinArray = p_tableFrame->MMTF_hardMinArray ;
+    min = p_tableFrame->MMTF_min ;
+    max = p_tableFrame->MMTF_max ;
+    percent = p_tableFrame->MMTF_percent ;
+    indexArray = p_tableFrame->MMTF_indexArray ;
+    spanUsed = p_tableFrame->MMTF_spanUsed ;
+
+    /* Clear out our data, 0 for max, 0 for min */
+    memset(p_tableFrame, 0, sizeof(*p_tableFrame)) ;
+    memset(indexArray, 0xFF, sizeof(p_tableFrame->MMTF_indexArray)) ;
+
+    /* Start by getting the table info */
+    TableLock(tableArray, tableIndex, &p_table, &size) ;
+
+    /* If we have a border, then all the inner cells will have a one */
+    /* pixel border too */
+    innerBorder = 0 ;
+    if (TABLE_GET_BORDER(p_table->HTD_flags))
+        innerBorder++ ;
+
+    /* In the EC version, we should never go back before the first cell of the table */
+    /* This helps us find when we royal screw up and have infinite looping problems. */
+EC( originalCellIndex = p_table->HTD_firstCell ) ;
+
+    /* Go from the smallest to the largest spans in the cells and process */
+    /* each of them by combining their span widths with the rest in the column info */
+    numCells = CellArrayGetCount(cellArray) ;
+
+    /* Go through each of the table cells in the list and adjust widths */
+    cellIndex=p_table->HTD_firstCell ;
+    while (cellIndex < numCells)  {
+        /* Only process cells in this table, else stop */
+        CellLock(cellArray, cellIndex, &p_cell, &size) ;
+        if (p_cell->HCD_table != tableIndex)  {
+            CellUnlock(p_cell) ;
+            break ;
+        }
+
+        /* Setup a column to use if not already done so. */
+        /* (Regardless of the number of columns spanned). */
+        if (p_cell->HCD_col < TABLE_MAX_COLUMNS)  {
+            if ((indexArray[p_cell->HCD_col] == TABLE_COLUMN_INDEX_BAD) && 
+                (numUsedCols < TABLE_MAX_USED_COLUMNS))  {
+                indexArray[p_cell->HCD_col] = numUsedCols++ ;
+            }
+        }
+
+        /* Determine the min and max for this cell */
+        cellIndex = ICalculateCellMinMax(p_stack, pself, cellIndex, 0xFFFF, &cellMin, &cellMax, &cellHardMin, &cellPercent) ;
+
+        /* Make sure we didn't go backwards */
+        EC_ERROR_IF(
+           cellIndex <= originalCellIndex,
+           ERROR_NEXT_CELL_INDEX_IS_GOING_TO_A_PREVIOUS_INDEX) ;
+
+        /* Determine the largest min and max for that column. */
+        column = p_cell->HCD_col ;
+        colSpan = p_cell->HCD_colspan ;
+
+        /* Note that we have a span of this type */
+        if (colSpan <= TABLE_MAX_COLUMNS)
+            spanUsed[colSpan] = 1 ;
+        if (colSpan > lastSpan)
+            lastSpan = colSpan ;
+
+        /* If we are over the column limit, 
+        /* don't do it, just note the amount of extra columns */
+        if ((column+colSpan) > TABLE_MAX_COLUMNS) {
+            /* For columns past our limit, just record the most farthest out columns */
+            if ((column + colSpan - 1 - TABLE_MAX_COLUMNS) > extraCols) 
+                extraCols = column + colSpan - 1  - TABLE_MAX_COLUMNS ;
+        } else {
+            /* Only process one wide spans on this first pass */
+            if (colSpan == 1)  {
+                /* If a nice column location and a single span, we'll just compare directly */
+                /* Check each column and pass up the empty ones */
+                index = indexArray[column] ;
+                if (index != TABLE_COLUMN_INDEX_BAD)  {
+                    if (cellMin > min[index])
+                        min[index] = cellMin ;
+                    if (cellMax > max[index])
+                        max[index] = cellMax ;
+                    if (cellHardMin > hardMinArray[index]) 
+                        hardMinArray[index] = cellHardMin ;
+                    if (cellPercent > percent[index])
+                        percent[index] = cellPercent ;
+                }
+            } else {
+                anySpan = TRUE ;
+            }
+        }
+
+        CellUnlock(p_cell) ;
+    }
+
+    /* Most tables don't have spanning columns, so avoid a */
+    /* second walk through the cell array */
+    if (anySpan)  {
+        /* Go through the list again, but look for spanning columns */
+        /* We will compare these bigger columns to the group of already */
+        /* smaller columns (looking to see if things got bigger and */
+        /* determining how to span them).  The real issue here is that we */
+        /* have to handle table spans from smallest to largest spans ensuring */
+        /* that we build the widths tables correctly (by IE and Netscape comparisons). */
+        for (currentSpan=2; currentSpan <= lastSpan; currentSpan++)  {
+            /* Don't process spans that we have none of */
+            if (spanUsed[currentSpan] == 0)
+                continue ;
+
+            /* Got a span that some cell(s) use */
+            /* Start at the top and process those of matching span size */
+            cellIndex = p_table->HTD_firstCell;
+            while (cellIndex < numCells)  {
+                /* Only process cells in this table, else stop */
+                CellLock(cellArray, cellIndex, &p_cell, &size) ;
+                if (p_cell->HCD_table != tableIndex)  {
+                    CellUnlock(p_cell) ;
+                    break ;
+                }
+
+                /* Only process spans of the right width */
+                if (p_cell->HCD_colspan == currentSpan)  {
+                    /* Determine the span's min and max at this point. */
+                    column = p_cell->HCD_col ;
+                    if ((column+p_cell->HCD_col) > TABLE_MAX_COLUMNS) {
+                        /* Don't consider spans that start or go out very far */
+                    } else {
+                        /* Get the totals so far for this span */
+                        /* We can't use that amount (and must be bigger than this) */
+                        totalMin = totalMax = totalHardMin = totalPercent = 0 ;
+                        for (i=0; i<p_cell->HCD_colspan; i++, column++)  {
+                            index = indexArray[column] ;
+                            if (index == TABLE_COLUMN_INDEX_BAD)
+                                continue ;
+
+                            totalMin += min[index] ;
+                            totalMax += max[index] ;
+                            totalHardMin += hardMinArray[index] ;
+                            totalPercent += percent[index] ;
+
+                            /* If not the first column, add the table's inner border */
+                            /* and cellpadding into the calculation. */
+                            /* NOTE:  Empty columns don't get this treatment, so it works */
+                            /* out exactly right. */
+                            if (i != 0)  {
+                                value =
+                                    p_table->HTD_cellspacing +
+                                    (2 * (p_table->HTD_cellpadding + innerBorder)) ;
+                                totalMax += value ;
+                                totalMin += value ;
+                                totalHardMin += value ;
+                            }
+                            if (column >= TABLE_MAX_COLUMNS) 
+                                break;
+                        }
+
+                        /* The min and max from the text object */
+                        /* have already been calculated from above. */
+                        /* we just need to get it this time. */
+                        cellMin = p_cell->HCD_minWidth ;
+                        cellMax = p_cell->HCD_longestLine ;
+                        cellHardMin = p_cell->HCD_hardMinWidth ;
+                        if (HTML_LEN_GET_UNIT(p_cell->HCD_width) == HTML_LEN_PERCENT) 
+                            cellPercent = HTML_LEN_GET_VALUE(p_cell->HCD_width) ;
+                        else
+                            cellPercent = 0 ;
+
+                        /* Divy up all the extra stuff into the columns (if any) */
+                        if (totalMax < cellMax)
+                            DivyColumns(
+                                totalMax, 
+                                cellMax, 
+                                indexArray, 
+                                max, 
+                                p_cell->HCD_col, 
+                                p_cell->HCD_colspan) ;
+                        if (totalMin < cellMin)
+                            DivyColumns(
+                                totalMin, 
+                                cellMin, 
+                                indexArray, 
+                                min, 
+                                p_cell->HCD_col, 
+                                p_cell->HCD_colspan) ;
+                        if (totalHardMin < cellHardMin)
+                            DivyColumns(
+                                totalHardMin, 
+                                cellHardMin, 
+                                indexArray, 
+                                hardMinArray, 
+                                p_cell->HCD_col, 
+                                p_cell->HCD_colspan) ;
+                        if (totalPercent < cellPercent)
+                            DivyColumns(
+                                totalPercent, 
+                                cellPercent, 
+                                indexArray, 
+                                percent, 
+                                p_cell->HCD_col, 
+                                p_cell->HCD_colspan) ;
+
+                    }
+                }
+
+                /* Walk over to the next cell in the table */
+                cellIndex = p_cell->HCD_nextCellInTable ;
+
+                CellUnlock(p_cell) ;
+            }
+        }
+    } /* (anySpan) */
+
+    /* One more computation for the percentage calculations. */
+    totalMax = totalMaxP = totalPercent = 0 ;
+    for (column=0; column<p_table->HTD_cols; column++)  {
+        if ((index = indexArray[column]) != TABLE_COLUMN_INDEX_BAD)  {
+            if (percent[index])  {
+                totalPercent += percent[index] ;
+                totalMaxP += max[index] ;
+                if (totalMaxP > MAXIMUM_COLUMN_WIDTH)
+                    totalMaxP = MAXIMUM_COLUMN_WIDTH ;
+            } else {
+                totalMax += max[index] ;
+                if (totalMax > MAXIMUM_COLUMN_WIDTH)
+                    totalMax = MAXIMUM_COLUMN_WIDTH ;
+            }
+        }
+    }
+    
+    /* Sum up the min and max up to this point */
+    /* (Start with widths that include all the spacing up front) */
+    initSize = *p_max =
+        ((p_table->HTD_cellspacing) * (numUsedCols + 1)) +
+            (numUsedCols * (p_table->HTD_cellpadding+innerBorder) * 2) +
+                ((TABLE_GET_BORDER(p_table->HTD_flags)) * 2) ;
+
+    /* If we have any percentages, then we need to change the maximum */
+    /* desired width to something more appropriate.  Here comes the math. */
+    if (totalPercent)  {
+        /* If we are above or beyond 100%, the quick answer is to take */
+        /* all the space we can get. */
+        if (totalPercent >= 100)  {
+            *p_max = MAXIMUM_COLUMN_WIDTH ;
+        } else {
+            /* Hmmm, some percentage total less than 100% */
+            /* We will need to compute this one */
+            /* But only process if we actually have other percentages */
+            /* to bounce sizes off of */
+            if (totalMax)  {
+                /* Determine the total width wanted if this the percentage */
+                /* columns are the small parts. */
+                /* Create a multiplier where 0 is 0 and 10000 is 100% */
+                multiplier = 10000/(100-totalPercent) ;
+                wantedMax = multiplier * totalMax ;
+                wantedMax /= 100 ;
+                if (wantedMax > MAXIMUM_COLUMN_WIDTH)
+                    wantedMax = MAXIMUM_COLUMN_WIDTH ;
+                size = wantedMax ;
+                if (size > *p_max)
+                    *p_max = size ;
+
+                /* Determine the total width wanted if this the percentage */
+                /* columns are the small parts. */
+                /* Create a multiplier where 0 is 0 and 10000 is 100% */
+                multiplier = 10000/(totalPercent) ;
+                wantedMax = multiplier * totalMaxP ;
+                wantedMax /= 100 ;
+                if (wantedMax > MAXIMUM_COLUMN_WIDTH)
+                    wantedMax = MAXIMUM_COLUMN_WIDTH ;
+                size = wantedMax ;
+                if (size > *p_max)
+                    *p_max = size ;
+            }
+        }
+    }
+
+    /* Sum up the min and max up to this point */
+    /* (Start with widths that include all the spacing up front) */
+    hardMin = *p_min = initSize ;
+
+    numCols = p_table->HTD_cols ;
+    if (numCols > TABLE_MAX_COLUMNS) 
+        numCols = TABLE_MAX_COLUMNS ;
+    
+    /* Now that we have all the extra borders calculated, add up */
+    /* the actual cell sizes */
+    for (column=0; column<numCols; column++)  {
+        index = indexArray[column] ;
+        if (index == TABLE_COLUMN_INDEX_BAD)
+            continue ;
+
+        *p_min += min[index] ;
+        if (*p_min > MAXIMUM_COLUMN_WIDTH)
+            *p_min = MAXIMUM_COLUMN_WIDTH ;
+        hardMin += hardMinArray[index] ;
+        if (hardMin > MAXIMUM_COLUMN_WIDTH)
+            hardMin = MAXIMUM_COLUMN_WIDTH ;
+        *p_max += max[index] ;
+        if (*p_max > MAXIMUM_COLUMN_WIDTH)
+            *p_max = MAXIMUM_COLUMN_WIDTH ;
+    }
+
+    /* Add in some extra for extra columns past the limit */
+    if (extraCols) {
+        extraCols *= 128 ;
+        *p_min += extraCols ;
+        if (*p_min > MAXIMUM_COLUMN_WIDTH)
+            *p_min = MAXIMUM_COLUMN_WIDTH ;
+        hardMin += extraCols ;
+        if (hardMin > MAXIMUM_COLUMN_WIDTH)
+            hardMin = MAXIMUM_COLUMN_WIDTH ;
+        *p_max += extraCols ;
+        if (*p_max > MAXIMUM_COLUMN_WIDTH)
+            *p_max = MAXIMUM_COLUMN_WIDTH ;
+        extraCols /= 128 ;
+    }
+
+    /* At this point, we have the complete computed width of the table */
+    /* for all of its children.  */
+
+    /* Make sure declared width tables are considered */
+    if (HTML_LEN_GET_UNIT(p_table->HTD_width) == HTML_LEN_PIXEL)  {
+        value = HTML_LEN_GET_VALUE(p_table->HTD_width) ;
+        /* Expand the fixed width if the children are bigger */
+        /* (Fixed isn't perfectly that size) */
+        if (hardMin > value)  {
+            value = hardMin ;
+////            p_table->HTD_width = HTML_LEN_PIXEL | value ;
+        } else  {
+            hardMin = value ;
+        }
+
+        /* Soft mins expand when using a fixed width */
+        if (value > hardMin)
+            hardMin = value ;
+
+//        if (*p_min < hardMin)
+//            *p_min = hardMin ;
+
+        /* For to this one size */
+        *p_max = value ;
+        *p_min = value ;
+    } else if (HTML_LEN_GET_UNIT(p_table->HTD_width) == HTML_LEN_PERCENT)  {
+        /* Why?  -- LES 08/27/99 (should of commented in the past) */
+        /* I believe what we are saying here is that the minimum size */
+        /* doesn't really matter -- just the absolute minimums */
+        /* This means that the table can be squeezed down to its absolute */
+        /* minimums. */
+        *p_min = hardMin ;
+    }
+
+    /* Return the values in one form or another */
+    /* Note how big a table wants to be */
+    p_table->HTD_wantedWidth = *p_max ;
+    p_table->HTD_minWidth = *p_hardMin = hardMin + p_table->HTD_insetAmount ;
+    TableDirty(p_table) ;
+    TableUnlock(p_table) ;
+
+#ifdef COMPILE_OPTION_OUTPUT_LAYOUT_LOG
+    file = OpenLayoutLog() ;
+    fprintf(file, "Cell table min for %d: %d\n", tableIndex, *p_hardMin) ;
+    CloseLayoutLog(file) ;
+#endif
+    /* Done with stack entry */
+    p_stack->MMS_used-- ;
+    ProfPoint("ICalculateTableMinMax") ;
+    return cellIndex ;
+}
+
+/**************************************************************************
+ * Routine:  ICalculateCellMinMax
+ **************************************************************************
+ *
+ * Description:
+ *     Calculate the min and max for a single cell and all its continued
+ *     cells and table(s).  Also calculate an absolute minimum width.
+ *     This is for cells that contain long words or pictures and needs
+ *     room.  A regular minimum is more for fixed width cells (which
+ *     can be made thinner if needed in a squeeze).
+ *
+ *     +----------------------------------------------------------------+
+ *     |             Table border                                       |
+ *     | +------------------------------------------------------------+ |
+ *     | |           Cellspacing                                      | |
+ *     | | +--I-n-n-e-r-b-o-r-d-e-r------+ +--I-n-n-e-r-b-o-r-d-e-r-+ | |
+ *     | | |         Cellpadding         | |    Cellpadding         | | |
+ *     | | | + - - - - - - - - - - - - + | | + - - - - - - - - - -+ | | |
+ *     | | | |                         | | | |                    | | | |
+ *     | | | |Cell goes here           | | | | Cell here          | | | |
+ *     | | | |                         | | | |                    | | | |
+ *     | | | |                         | | | |                    | | | |
+ *     | | | |                         | | | |                    | | | |
+ *
+ *           <==== CELL WIDTH HERE ====>     <= CELL WIDTH HERE ==>
+ *
+ * Inputs:
+ *     HTMLTextInstance *pself     -- text object to calculate in
+ *     word cellIndex              -- cell to calculate
+ *     word cellLimit              -- cell Index to stop on
+ *     word *p_min                 -- Minimum to return
+ *                                    Really should be called the
+ *                                    "desired minimum" since the cell
+ *                                    might be smaller.
+ *     word *p_max                 -- Maximum to return
+ *     word *p_hardMin             -- Absolute minimum if squeezed
+ *
+ * Outputs:
+ *     word                        -- Cell index of cell past all
+ *                                    related ones here.
+ *
+ * Revision:
+ *     Who  Date:     Comments:
+ *     ---  --------  --------------------
+ *     LES  98/04/08  Created.
+ *     LES  99/08/27  Added more comments and double checked for validity.
+ *     LES  99/12/29  Fixed logic to make min, max, and hardMin more
+ *                    accurate.
+ *
+ **************************************************************************/
+word ICalculateCellMinMax(
+    T_minMaxStack *p_stack,
+    HTMLTextInstance *pself,
+    word cellIndex,
+    word cellLimit,
+    word *p_min,
+    word *p_max,
+    word *p_hardMin,
+        word *p_percent)
+{
+    T_cellArrayHandle cellArray = pself->HTI_cellArray;
+    T_tableArrayHandle tableArray = pself->HTI_tableArray;
+    HTMLcellData *p_cell ;
+    HTMLcellData *p_firstCell ;
+    HTMLtableData *p_table ;
+    byte firstTableLevel = 0xFF ;
+    byte tableLevel ;
+    word numCells ;
+    word min, max, hardMin ;
+    word size ;
+    T_minMaxStack *p_minMaxStack = p_stack ;
+#ifdef COMPILE_OPTION_OUTPUT_LAYOUT_LOG
+    FileHandle file ;
+    word cellIndexStart = cellIndex ;
+#endif
+EC( word originalCellIndex = cellIndex ; )
+
+EC( ECCheckStack(); )
+
+    /* Create a stack to compute with if it is not already existing */
+    if (!p_minMaxStack)
+        p_minMaxStack = MinMaxStackCreate() ;
+
+    /* All this routine requires is to calculate the minimum and */
+    /* maximum cell widths for a stream of cells until it starts */
+    /* another cell of the same table, or this table ends. */
+    /* This routine also checks all the appropriate continue cells. */
+    CellLock(cellArray, cellIndex, &p_firstCell, &size) ;
+
+    /* Start with the defaults and walk through */
+    /* the list of continue cells. */
+    *p_min = *p_max = *p_hardMin = MINIMUM_COLUMN_WIDTH ;
+    numCells = CellArrayGetCount(cellArray) ;
+    if (numCells < cellLimit)
+        cellLimit = numCells ;
+    while (cellIndex < cellLimit)  {
+        /* Get access to this cell and the cell's table */
+        CellLock(cellArray, cellIndex, &p_cell, &size) ;
+        TableLock(tableArray, p_cell->HCD_table, &p_table, &size) ;
+        tableLevel = TABLE_GET_LEVEL(p_table->HTD_flags) ;
+
+        /* Is this the first one? */
+        if (firstTableLevel == 0xFF)  {
+            /* First cell -- what table are we dealing with now? */
+            firstTableLevel = tableLevel ;
+            if (p_cell->HCD_minWidth > MAXIMUM_COLUMN_WIDTH) {
+                p_cell->HCD_minWidth = MAXIMUM_COLUMN_WIDTH ;
+                CellDirty(p_cell) ;
+            }
+            EC_ERROR_IF(
+                p_cell->HCD_minWidth > MAXIMUM_COLUMN_WIDTH, 
+                ERROR_COLUMN_WIDTH_IS_TOO_BIG) ;
+
+            /* Just grab the first cells information for now */
+            *p_min = p_cell->HCD_minWidth ;
+            *p_hardMin = p_cell->HCD_hardMinWidth ;
+            *p_max = p_cell->HCD_longestLine ;
+            if (*p_min > MAXIMUM_COLUMN_WIDTH)   
+                *p_min = MAXIMUM_COLUMN_WIDTH ;
+            if (*p_max > MAXIMUM_COLUMN_WIDTH)   
+                *p_max = MAXIMUM_COLUMN_WIDTH ;
+            if (*p_hardMin > MAXIMUM_COLUMN_WIDTH)   
+                *p_hardMin = MAXIMUM_COLUMN_WIDTH ;
+
+            /* Progress to the next cell in the list */
+            cellIndex++ ;
+        } else {
+            /* Is the cell's table level deeper, the same, or above? */
+            if (tableLevel > firstTableLevel)  {
+                /* Deeper -- meaning we found a table */
+                /* Calculate the table's properties */
+                cellIndex = ICalculateTableMinMax(p_minMaxStack, pself, p_cell->HCD_table, &min, &max, &hardMin) ;
+
+                /* Report an error if we walk backwards in the cell list */
+                EC_ERROR_IF(
+                   cellIndex <= originalCellIndex,
+                   ERROR_NEXT_CELL_INDEX_IS_GOING_TO_A_PREVIOUS_INDEX) ;
+
+                /* See if this table's sizes are bigger or not */
+                if (hardMin > *p_hardMin)
+                   *p_hardMin = hardMin ;
+                if (min > *p_min)
+                    *p_min = min ;
+                if (max > *p_max)
+                    *p_max = max ;
+            } else if (tableLevel == firstTableLevel)  {
+                /* The same level, we've found another cell in the table */
+                /* Only process if its a continuing cell */
+                if (p_cell->HCD_flags & HTML_CELL_CONTINUE)  {
+                    /* Ok, good cell.  Just get its min and max */
+                    if (p_cell->HCD_hardMinWidth > *p_min)
+                        *p_min = p_cell->HCD_hardMinWidth ;
+                    if (p_cell->HCD_hardMinWidth > *p_hardMin)
+                        *p_hardMin = p_cell->HCD_hardMinWidth ;
+                    if (p_cell->HCD_minWidth > *p_min)
+                        *p_min = p_cell->HCD_minWidth ;
+                    if (p_cell->HCD_longestLine > *p_max)
+                        *p_max = p_cell->HCD_longestLine ;
+                } else {
+                    /* Not continuing -- just stop here then */
+                    /* It must be the next cell in the cell's table */
+                    TableUnlock(p_table) ;
+                    CellUnlock(p_cell) ;
+                    break ;
+                }
+                cellIndex++ ;
+            } else {
+                /* Higher -- stop here else we'll be outside the list */
+                /* End of cell's table */
+                TableUnlock(p_table) ;
+                CellUnlock(p_cell) ;
+                break ;
+            }
+        }
+        TableUnlock(p_table) ;
+        CellUnlock(p_cell) ;
+    }
+
+    /* If a fixed cell width, max cell width is that width */
+    if (HTML_LEN_GET_UNIT(p_firstCell->HCD_width) == HTML_LEN_PIXEL) 
+        *p_max = HTML_LEN_GET_VALUE(p_firstCell->HCD_width) ;
+
+    if (HTML_LEN_GET_UNIT(p_firstCell->HCD_width) == HTML_LEN_PERCENT) 
+        *p_percent = HTML_LEN_GET_VALUE(p_firstCell->HCD_width) ;
+        else
+                *p_percent = 0 ;
+
+    /* The hard min is just that -- hard.  Nothing */
+    /* should be less than that. */
+    if (*p_max < *p_hardMin)
+        *p_max = *p_hardMin ;
+    if (*p_min < *p_hardMin)
+        *p_min = *p_hardMin ;
+
+    /* Max is never less than min */
+    if (*p_max < *p_min)
+        *p_max = *p_min ;
+
+    /* Record the biggest min and max in the first cell of the cell 'list' */
+    /* since it represents the complete cell */
+    /* But only record if this wasn't started on a continue cell. */
+    if (!(p_firstCell->HCD_flags & HTML_CELL_CONTINUE))  {
+        p_firstCell->HCD_minWidth = *p_min ;
+        p_firstCell->HCD_longestLine = *p_max ;
+        p_firstCell->HCD_hardMinWidth = *p_hardMin ;
+        CellDirty(p_firstCell) ;
+    }
+    CellUnlock(p_firstCell) ;
+
+#ifdef COMPILE_OPTION_OUTPUT_LAYOUT_LOG
+    file = OpenLayoutLog() ;
+    fprintf(file, "Cell hardMin/min/max for %3d: %4d | %4d | %4d\n", cellIndexStart, *p_hardMin, *p_min, *p_max) ;
+    CloseLayoutLog(file) ;
+#endif
+
+    /* Destroy a min max stack if we created it */
+    if (p_stack == NULL)
+        MinMaxStackDestroy(p_minMaxStack) ;
+
+    ProfPoint("ICalculateCellMinMax") ;
+    return cellIndex ;
+}
+
+T_minMaxStack *MinMaxStackCreate(void)
+{
+    MemHandle mem ;
+    T_minMaxStack *p_stack ;
+
+    mem = MemAlloc(sizeof(T_minMaxStack), HF_DYNAMIC|HF_SHARABLE, HAF_NO_ERR) ;
+    if (mem)  {
+        p_stack = MemLock(mem) ;
+        p_stack->MMS_self = mem ;
+        p_stack->MMS_used = 0 ;
+    }  else  {
+        p_stack = NULL ;
+    }
+
+    return p_stack ;
+}
+
+void MinMaxStackDestroy(T_minMaxStack *p_stack)
+{
+    MemHandle mem ;
+
+    mem = p_stack->MMS_self ;
+    MemUnlock(mem) ;
+    MemFree(mem) ;
+}

@@ -1,0 +1,1347 @@
+/***********************************************************************
+ *
+ *                          ==CONFIDENTIAL INFORMATION==
+ *
+ * COPYRIGHT 1994-99 BREADBOX COMPUTER COMPANY -- ALL RIGHTS RESERVED  --
+ * THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER
+ * A NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ * RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ * NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ * CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ * AGREEMENT.
+ *
+ * PROJECT:       HTMLView
+ * FILE:          HTMLFDrw.goc  (Form Draw routines)
+ *
+ * AUTHOR:        Marcus Gr�ber
+ *                Lysle Shields
+ *
+ * NOTES:         Routines to handle drawing form elements.  Split out
+ *                to cut down on resource usage.
+ ***********************************************************************/
+
+@include <stdapp.goh>
+@include <Objects/Text/tCtrlC.goh>
+
+#include <Ansi/string.h>
+#include <Ansi/stdio.h>
+#include <Ansi/stdlib.h>
+
+@include <fixes.goh>
+@include "options.goh"
+@include <html4par.goh>
+
+#include "regiont.h"
+#include "internal.h"
+#include "tableint.h"
+#include "htmlclas/formset.h"
+@include <extgraph.goh>
+
+
+@include "radio0.goh"
+@include "radio1.goh"
+
+@extern chunk FormButtonTextSubmit ;
+@extern chunk FormButtonTextReset ;
+
+#include "htmlclas/formset.h"
+#include <htmldrv.h>
+
+#if PROGRESS_DISPLAY
+#define RoundWWF(wwf) (IntegerOf(wwf) + ((FractionOf(wwf) >= 0x8000) ? 1 : 0))
+#endif
+
+SizeAsDWord FormElementGetSize(
+                HTMLformData *p_formData,
+                word formElement,
+                optr formArray,
+                optr NamePool) ;
+SizeAsDWord LOCAL FormElementDraw(
+                GStateHandle gstate,
+                HTMLformData *p_formData,
+                word formElement,
+                optr NamePool,
+                optr formArray,
+		optr textObj) ;
+
+char G_selectArrow[] = {
+        Bitmap (9, 6, BMC_UNCOMPACTED, (BMT_MASK | BMF_MONO)),
+            0xFF, 0x80,
+            0x00, 0x00,
+
+            0xff, 0x80,
+            0x7f, 0x00,
+
+            0x7f, 0x00,
+            0x3e, 0x00,
+
+            0x3e, 0x00,
+            0x1c, 0x00,
+
+            0x1c, 0x00,
+            0x08, 0x00,
+
+            0x08, 0x00,
+            0x00, 0x00,
+        GSEndString()
+} ;
+
+
+word LOCAL FormIsTVMode(void)
+{
+    static word tvModeForm = 2 ;
+    optr app ;
+    DisplayScheme scheme ;
+
+    if (tvModeForm == 2)  {
+        /* Determine if we are doing tv or not */
+        app = GeodeGetAppObject(GeodeGetProcessHandle()) ;
+        @call app::MSG_GEN_APPLICATION_GET_DISPLAY_SCHEME(&scheme) ;
+        if (((scheme.DS_displayType & DT_DISP_ASPECT_RATIO) >> 
+                DT_DISP_ASPECT_RATIO_OFFSET) == DAR_TV)
+            tvModeForm = 1 ;
+        else
+            tvModeForm = 0 ;
+    }
+
+    return tvModeForm;
+}
+
+#ifdef DO_DBCS
+
+/* these apply any code page font mappings */
+
+extern void ApplyFontWeightWidthAndSpacingAdjustment(VisTextCharAttr *p_cs, Boolean useCodePage);
+
+word TweakFont(word fid, word size)
+{
+    VisTextCharAttr vtca;
+
+    vtca.VTCA_pointSize.WBF_int = size;
+    vtca.VTCA_pointSize.WBF_frac = 0;
+    vtca.VTCA_fontID = fid;
+    ApplyFontWeightWidthAndSpacingAdjustment(&vtca, TRUE);
+    return vtca.VTCA_fontID;
+}
+
+word TweakPointSize(word size, word fid)
+{
+    VisTextCharAttr vtca;
+
+    vtca.VTCA_pointSize.WBF_int = size;
+    vtca.VTCA_pointSize.WBF_frac = 0;
+    vtca.VTCA_fontID = fid;
+    ApplyFontWeightWidthAndSpacingAdjustment(&vtca, TRUE);
+    return vtca.VTCA_pointSize.WBF_int;
+}
+
+#endif 
+     
+word FormGetPointSize(void)
+{
+#ifdef DO_DBCS
+    if(FormIsTVMode())
+      return TweakFont(FORM_TEXT_POINT_SIZE_TV, DEFAULT_FORMS_FONT);
+    else
+      return TweakPointSize(FORM_TEXT_POINT_SIZE, DEFAULT_FORMS_FONT);
+#else
+    if(FormIsTVMode())
+      return FORM_TEXT_POINT_SIZE_TV;
+    else
+      return FORM_TEXT_POINT_SIZE;
+#endif
+}
+
+word FormGetFont(void)
+{
+#ifdef DO_DBCS
+    return TweakFont(DEFAULT_FORMS_FONT,
+		     (FormIsTVMode() ?
+		      FORM_TEXT_POINT_SIZE_TV : FORM_TEXT_POINT_SIZE));
+#else
+    return DEFAULT_FORMS_FONT;
+#endif
+}
+
+void FormSetTextAttr(GStateHandle gstate)
+{
+    const TextAttr formTextAttribute = {
+      C_BLACK, CF_INDEX, 0, 0,
+      SDM_100,
+      PT_SOLID,0,
+      0,0,
+      TM_DRAW_BOTTOM | TM_DRAW_BASE | TM_DRAW_ACCENT, TM_DRAW_OPTIONAL_HYPHENS,
+      0,0,
+      DEFAULT_FORMS_FONT,
+      0,FORM_TEXT_POINT_SIZE,
+      0,
+      100,
+      100};
+
+    const TextAttr formTextAttributeTV = {
+      C_BLACK, CF_INDEX, 0, 0,
+      SDM_100,
+      PT_SOLID,0,
+      0,0,
+      TM_DRAW_BOTTOM | TM_DRAW_BASE | TM_DRAW_ACCENT, TM_DRAW_OPTIONAL_HYPHENS,
+      0,0,
+      DEFAULT_FORMS_FONT,
+      0,FORM_TEXT_POINT_SIZE_TV,
+      0,
+      100,
+      100};
+
+    if(FormIsTVMode())
+      GrSetTextAttr(gstate, &formTextAttributeTV);
+    else
+      GrSetTextAttr(gstate, &formTextAttribute);
+#ifdef DO_DBCS
+    GrSetFont(gstate, FormGetFont(), MakeWWFixed(FormGetPointSize()));
+#endif
+}
+
+void LOCAL FormElementDrawSelectList(
+         GStateHandle gstate,
+         HTMLformData *p_formData,
+         SizeAsDWord size,
+         optr NamePool,
+         optr formArray,
+         word selectElement)
+{
+    word i, num ;
+    HTMLformData *p_option ;
+    TCHAR buf[MAX_FORM_ELEMENT_OPTION_LENGTH+1] ;
+    word line ;
+    word yPos ;
+    word width ;
+    word height ;
+    word selected, skip;
+
+    width = DWORD_WIDTH(size)-1 ;
+    height = DWORD_HEIGHT(size)-1 ;
+
+    /* Make sure we are using the right font. */
+    FormSetTextAttr(gstate);
+
+    /* Draw the border first */
+    GrSetLineColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+    GrDrawRect(gstate, 0, 0, width, height) ;
+    GrDrawRect(gstate, 1, 1, width-1, height-1) ;
+
+    /* Clip all drawing to inside the border */
+    GrSetClipRect(gstate, PCT_REPLACE,
+       3, 3,
+       width-2, height-2);
+
+    /* Draw all the elments in the selection list in order and toggled */
+    /* accordingly. */
+    MemLock(OptrToHandle(formArray)) ;
+    num = ChunkArrayGetCount(formArray) ;
+    /* if multi-line single selection, figure out where to
+       start drawing, based on selection */
+    line = 0;
+    selected = 0;
+    if (p_formData->HFD_var.select.size != 1 &&
+	!(p_formData->HFD_var.select.flags & HTML_SELECT_MULTI)) {
+	for(i=0; i<num; i++) {
+	    p_option = ChunkArrayElementToPtr(formArray, i, (word*)&size) ;
+	    if ((p_option->HFD_itemType == HTML_FORM_OPTION) &&
+		(p_option->HFD_formNumber == p_formData->HFD_formNumber) &&
+		(p_option->HFD_var.option.menuElement == selectElement) &&
+		!(p_option->HFD_var.option.flags & HTML_OPTION_DELETED) &&
+		(p_option->HFD_value != NAME_POOL_NONE)) {
+		if (p_option->HFD_runtimeState & HTML_OPTION_SELECTED) {
+		    selected = line;  /* if MULTI flag is wrong, this'll be
+					 last selected item */
+		}
+		line++;  /* count all items */
+	    }
+	}
+    }
+    skip = 0;
+    if (selected >= p_formData->HFD_var.select.size) {
+	skip = selected - (p_formData->HFD_var.select.size - 1);
+    }
+    /* now, draw it */
+    line = 0 ;
+    yPos = 3 ;
+    for(i=0; i<num; i++)  {
+        p_option = ChunkArrayElementToPtr(formArray, i, (word*)&size) ;
+        /* Only bother with options in the same form */
+        if ((p_option->HFD_itemType == HTML_FORM_OPTION) &&
+            (p_option->HFD_formNumber == p_formData->HFD_formNumber) &&
+	    !(p_option->HFD_var.option.flags & HTML_OPTION_DELETED))  {
+            if (p_option->HFD_var.option.menuElement == selectElement)  {
+                if (p_option->HFD_value != NAME_POOL_NONE)  {
+		    if (skip) {
+			skip--;
+		    } else {
+                    NamePoolCopy(
+                              NamePool,
+                              buf,
+                              sizeof(buf)-1*sizeof(TCHAR),
+                              p_option->HFD_value,
+                              NULL);
+
+                    /* Set up the colors and attributes */
+                    if ((p_option->HFD_runtimeState & HTML_OPTION_SELECTED) &&
+                        (p_formData->HFD_var.select.size != 1))  {
+                        /* Show as selected */
+                        GrSetAreaColor(gstate, CF_INDEX, C_BLACK, 0, 0) ;
+                        GrSetTextColor(gstate, CF_INDEX, C_WHITE, 0, 0) ;
+                    } else {
+                        /* Show as not selected */
+                        GrSetAreaColor(gstate, CF_INDEX, C_WHITE, 0, 0) ;
+                        GrSetTextColor(gstate, CF_INDEX, C_BLACK, 0, 0) ;
+                    }
+
+                    if ((p_formData->HFD_var.select.size != 1) ||
+                        (p_option->HFD_runtimeState & HTML_OPTION_SELECTED))  {
+                        GrFillRect(
+                            gstate,
+                            3, yPos,
+                            width-2, yPos + FormGetPointSize()) ;
+                        GrDrawText(gstate, 3, yPos + FormGetPointSize() - 4, buf, 0) ;
+
+                        yPos += FormGetPointSize() ;
+                        line++ ;
+                    }
+		    }
+
+                    /* Stop if we no longer have room to draw */
+                    if (line >= p_formData->HFD_var.select.size)
+                        break ;
+                }
+            }
+        }
+    }
+    MemUnlock(OptrToHandle(formArray)) ;
+
+    /* Put the little arrow on if its NOT multi-selectable (thus a drop down) */
+    if (!(p_formData->HFD_var.select.flags&HTML_SELECT_MULTI))  {
+         GrDrawBitmap(
+             gstate, 
+             width-12, height - 9, 
+             (Bitmap *)G_selectArrow, 
+             NULL) ;
+    }
+}
+
+void LOCAL FormElementRadioButtonDraw(
+         GStateHandle gstate,
+         HTMLformData *p_formData)
+{
+    /* Draw if checked */
+    if (p_formData->HFD_runtimeState & HTML_BOOLEAN_SELECTED)  {
+        /* Put a dot in the middle of the circle */
+        GrDrawBitmap(gstate, 1, 1, (Bitmap *)G_radioBitmapOn, NULL) ;
+    } else {
+        GrDrawBitmap(gstate, 1, 1, (Bitmap *)G_radioBitmapOff, NULL) ;
+    }
+}
+
+void LOCAL FormElementTextDrawButton(
+         GStateHandle gstate,
+         SizeAsDWord size,
+         TCHAR *p_buttonText)
+{
+    word width ;
+    word height ;
+
+    width = DWORD_WIDTH(size)-1 ;
+    height = DWORD_HEIGHT(size)-1 ;
+
+    GrSetAreaColor(gstate, CF_INDEX, C_LIGHT_GRAY, 0, 0) ;
+    GrFillRect(gstate, 0, 0, width, height) ;
+    GrSetLineColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+    GrDrawRect(gstate, 0, 0, width, height) ;
+    FormSetTextAttr(gstate);
+    GrDrawText(gstate, 6, height-6, p_buttonText, 0);
+
+    GrSetLineColor(gstate, CF_INDEX, C_DARK_GRAY, 0, 0);
+    GrDrawLine(gstate, 1, height-1, width, height-1) ;
+    GrDrawLine(gstate, width-1, height-1, width-1, 1) ;
+    GrDrawLine(gstate, 2, height-2, width-1, height-2) ;
+    GrDrawLine(gstate, width-2, height-2, width-2, 2) ;
+
+    GrSetLineColor(gstate, CF_INDEX, C_WHITE, 0, 0);
+    GrDrawLine(gstate, 1, 1, width, 1) ;
+    GrDrawLine(gstate, 1, 1, 1, height-1) ;
+    GrDrawLine(gstate, 2, 2, width-1, 2) ;
+    GrDrawLine(gstate, 2, 2, 2, height-2) ;
+}
+
+word *wstrchr(const word *s, int c)
+{
+    word *r = 0;
+
+    while (*s) {
+	if (*s == (word) c) {
+	    r = (word*) s;
+	    break;
+	}
+	s++;
+    }
+    return r;
+}
+
+/* Draw a text form element on the screen */
+void LOCAL FormElementTextDraw(
+         GStateHandle gstate,
+         HTMLformData *p_formData,
+         SizeAsDWord size,
+         Boolean isTextHidden,
+         optr NamePool)
+{
+    TCHAR text[200] ;
+    TCHAR *p_text ;
+    word width ;
+    word height ;
+    word i ;
+    word top ;
+    MemHandle mem ;
+    MemHandle lineInfo;
+    word *lPtr = 0;
+    word tOff = 0;
+    word lineHeight;
+
+    width = DWORD_WIDTH(size)-1 ;
+    height = DWORD_HEIGHT(size)-1 ;
+
+    /* Draw a white box with a black edge */
+    GrSetAreaColor(gstate, CF_INDEX, C_WHITE, 0, 0);
+    GrFillRect(gstate, 0, 0, width, height) ;
+    GrSetLineColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+    GrDrawRect(gstate, 0, 0, width, height) ;
+
+    /* Draw the text in the box and clipped (if any). */
+    if (p_formData->HFD_runtimeState)  {
+        text[0] = '\0' ;
+        GrSetClipRect(gstate, PCT_REPLACE,
+           2, 2,
+           width-1, height-1);
+        if (p_formData->HFD_itemType == HTML_FORM_TEXTAREA)  {
+            mem = (MemHandle)p_formData->HFD_runtimeState ;
+            p_text = MemLock(mem) ;
+	    lineInfo = p_formData->HFD_var.textarea.lines;
+	    if (lineInfo) {
+		lPtr = MemLock(lineInfo);
+	    }
+        } else {
+            NamePoolCopy(
+                      NamePool,
+                      text,
+                      sizeof(text)-1*sizeof(TCHAR),
+                      p_formData->HFD_runtimeState,
+                      NULL) ;
+            p_text = text ;
+        }
+        FormSetTextAttr(gstate);
+
+        /* If a password, hide with stars */
+        if (isTextHidden)
+            for (i=0; (i<sizeof(text)) && text[i]; i++)
+                text[i] = FORM_PASSWORD_CHARACTER ;
+
+        lineHeight = (int)GrFontMetrics(gstate, GFMI_BASELINE_ROUNDED);
+
+        /* Draw the text */
+#ifdef IN_PLACE_TEXT_ENTRY
+	if (p_formData->HFD_itemType == HTML_FORM_TEXTAREA) {
+	    top = lineHeight-2 ;
+	} else {
+	    top = FormGetPointSize()+1 ;
+	}
+#else
+        top = FormGetPointSize()-1 ;
+#endif
+        GrMoveTo(gstate, 2, top) ;
+        while (*p_text)  {
+	    if (lPtr) {
+		/* have line info */
+		/* if line wraps here, do it */
+		if (tOff && wstrchr(lPtr, tOff)) {
+		    top += lineHeight;
+		    GrMoveTo(gstate, 2, top);
+		}
+		/* don't draw explicit line wraps */
+		if ((*p_text != '\r') && (*p_text != '\n'))  {
+@ifdef DO_DBCS
+		    GrDrawCharAtCP(gstate, *p_text);
+@else
+		    GrDrawCharAtCP(gstate, (byte)*p_text);
+@endif
+		}
+	    } else {
+		/* just use CR/LF */
+		if ((*p_text == '\r') || (*p_text == '\n'))  {
+		    top += lineHeight;
+		    GrMoveTo(gstate, 2, top) ;
+		} else {
+@ifdef DO_DBCS
+		    GrDrawCharAtCP(gstate, *p_text);
+@else
+		    GrDrawCharAtCP(gstate, (byte)*p_text);
+@endif
+		}
+	    }
+            p_text++ ;
+	    tOff++;
+        }
+
+        /* When done, unlock the datablock (if a textarea) */
+        if (p_formData->HFD_itemType == HTML_FORM_TEXTAREA)  {
+            MemUnlock(mem) ;
+	    if (lineInfo) {
+		MemUnlock(lineInfo);
+	    }
+        }
+    }
+}
+
+/* Draw a text form element on the screen */
+void LOCAL FormElementCheckboxDraw(
+         GStateHandle gstate,
+         HTMLformData *p_formData,
+         SizeAsDWord size)
+{
+    word width ;
+    word height ;
+
+    width = DWORD_WIDTH(size)-1 ;
+    height = DWORD_HEIGHT(size)-1 ;
+
+    /* Draw a white box with a black edge */
+    GrSetAreaColor(gstate, CF_INDEX, C_WHITE, 0, 0);
+    GrFillRect(gstate, 0, 0, width, height) ;
+    GrSetLineColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+    GrDrawRect(gstate, 0, 0, width, height) ;
+
+    /* Draw if checked */
+    if (p_formData->HFD_runtimeState & HTML_BOOLEAN_SELECTED)  {
+        /* Put an X in the middle of the square */
+        GrDrawLine(gstate, 0, 0, width, height) ;
+        GrDrawLine(gstate, width+1, 0, 0, height+1) ;
+    }
+}
+
+extern optr FormElementEnableTextAreaEntry(
+    HTMLformData *p_formData,
+    optr NamePool,
+    word formElement, optr formArray,
+    optr urlTextObj,
+    Boolean dummy);
+extern void FormEntryDisableTextEntry(
+    optr oself,
+    optr formArray, word formElement,
+    optr namePool);
+
+SizeAsDWord LOCAL FormElementDraw(
+                GStateHandle gstate,
+                HTMLformData *p_formData,
+                word formElement,
+                optr NamePool,
+                optr formArray,
+		optr textObj)
+{
+    SizeAsDWord size ;
+    TCHAR buf[FORM_MAX_CHARACTERS_IN_SUBMIT_OR_RESET_BUTTON] ;
+
+    /* Get the size we said this would be originally and adjust up. */
+    size = FormElementGetSize(p_formData, formElement, formArray, NamePool) ;
+    GrApplyTranslationDWord(gstate, 0, 1-(sdword)(DWORD_HEIGHT(size))) ;
+
+/* NEW!!! */
+    p_formData->y -= DWORD_HEIGHT(size) ;
+
+    /* Draw the form element */
+    switch(p_formData->HFD_itemType)  {
+        case HTML_FORM_TEXTAREA:
+	    /* ensure line info for word-wrapping */
+	    if (!p_formData->HFD_var.textarea.lines) {
+		MemHandle mem = p_formData->HFD_runtimeState;
+		word tLen = 0;
+		if (mem) {
+		    TCHAR *p_text = MemLock(mem);
+		    tLen = strlen(p_text);
+		    MemUnlock(mem);
+		}
+		/* only necessary if we've got enough stuff to wrap */
+		if (tLen > 1) {
+		    FormEntryDisableTextEntry(
+			FormElementEnableTextAreaEntry(p_formData,
+						       NamePool,
+						       formElement, formArray,
+						       textObj,
+						       TRUE),
+			formArray, formElement, NamePool);
+		}
+	    }
+	    /* then fall through to draw */
+        case HTML_FORM_FILE:
+        case HTML_FORM_TEXT:
+            FormElementTextDraw(gstate, p_formData, size, FALSE, NamePool) ;
+            break ;
+        case HTML_FORM_CHECKBOX:
+            FormElementCheckboxDraw(gstate, p_formData, size) ;
+            break ;
+        case HTML_FORM_RADIO:
+            FormElementRadioButtonDraw(gstate, p_formData) ;
+            break ;
+        case HTML_FORM_PASSWORD:
+            FormElementTextDraw(gstate, p_formData, size, TRUE, NamePool) ;
+            break ;
+        case HTML_FORM_RESET:
+            if (p_formData->HFD_value != NAME_POOL_NONE)  {
+                NamePoolCopy(NamePool, buf, sizeof(buf), p_formData->HFD_value, NULL);
+                FormElementTextDrawButton(gstate, size, buf) ;
+            } else {
+                MemLock(OptrToHandle(@FormButtonTextReset)) ;
+                FormElementTextDrawButton(gstate, size, LMemDeref(@FormButtonTextReset)) ;
+                MemUnlock(OptrToHandle(@FormButtonTextReset)) ;
+            }
+            break ;
+        case HTML_FORM_SUBMIT:
+        case HTML_FORM_BUTTON:
+            if (p_formData->HFD_value != NAME_POOL_NONE)  {
+                NamePoolCopy(NamePool, buf, sizeof(buf), p_formData->HFD_value, NULL);
+                FormElementTextDrawButton(gstate, size, buf) ;
+            } else {
+                MemLock(OptrToHandle(@FormButtonTextSubmit)) ;
+                FormElementTextDrawButton(gstate, size, LMemDeref(@FormButtonTextSubmit)) ;
+                MemUnlock(OptrToHandle(@FormButtonTextSubmit)) ;
+            }
+            break ;
+        case HTML_FORM_SELECT:
+            FormElementDrawSelectList(gstate, p_formData, size, NamePool, formArray, formElement) ;
+            break ;
+        default:
+            /* Stop here if we are trying to draw something */
+            /* that has no view */
+            EC_ERROR(-1) ;
+            /* Draw the generic Green square here */
+            GrSetLineColor(gstate, CF_INDEX, C_GREEN, 0, 0);
+            GrSetLineWidth(gstate, MakeWWFixed(1));
+            GrDrawRect(gstate,
+              0,
+              0,
+              DWORD_WIDTH(size) - 1,
+              DWORD_HEIGHT(size) - 1);
+            sprintf(buf, _TEXT("%u"), p_formData->HFD_itemType);
+            FormSetTextAttr(gstate);
+            GrDrawText(gstate, 2, 7, buf, 0);
+            break ;
+    }
+
+    return size ;
+}
+
+/* even if broken, we could have frames to draw */
+/*** To be implemented ***/
+#define DRAW_BROKEN_ANI                 
+
+/**************************************************************************
+ * Routine: DrawVarGraphic
+ **************************************************************************
+ *
+ * Description:
+ *     Draws the current frame of the passed image to the passed GState.
+ *     If a range of lines is specified, the routine tries to minimize
+ *     the effort of updating by restricting redraws to this area.
+ *     If invalFrom==0xFFFF, the image is always fully redrawn.
+ *
+ * Inputs:
+ *     GStateHandle gstate        -- GState to draw to
+ *     HTMLimageData *iae         -- Data of image to draw
+ *     optr namePool              -- Name pool (for alt text entries)
+ *     word invalFrom             -- First line of updated range
+ *     word invalTo               -- Last line of updated range
+ *
+ **************************************************************************/
+void DrawVarGraphic(GStateHandle gstate, HTMLimageData *iae, optr namePool,
+                    word invalFrom, word invalTo)
+{
+    AnimationHeader *p_header ;
+    EditableBitmap *p_bitmap ;
+    MemHandle mem ;
+    TransMatrix matrix ;
+    word frame, prevFrame ;
+    AnimationFrame *p_frame, *p_newFrame ;
+    VMBlockHandle bitmap;
+    TCHAR buf[80];
+    NameToken alt;
+    GStateHandle gstring;
+    GStringElement *lastElement;
+    Boolean allowInval;
+    XYSize pixSize;
+
+    if(iae->HID_size.XYS_width<1 || iae->HID_size.XYS_height<1)
+      return;                           /* Don't draw if graphic is too small */
+
+    GrSaveState(gstate) ;
+    
+    GrApplyTranslationDWord(gstate, iae->HID_pos.P_x, iae->HID_pos.P_y) ;
+    GrApplyTranslationDWord(gstate, iae->hspace, iae->vspace);
+
+    /* TBD: may require more testing for GStrings with a nonzero origin */
+    GrApplyTranslationDWord(gstate, 
+      iae->HID_drawOffset.XYO_x, iae->HID_drawOffset.XYO_y);
+ 
+    /* if we got here, we're allowed to draw freely */
+    iae->flags &= ~HTML_IDF_SIZE_DIRTY;
+    
+    if(  (iae->flags & HTML_IDF_RESOLVED) &&
+        !(iae->flags & HTML_IDF_BROKEN) )
+    {
+      /* Prepare the scaling matrix */
+      memset(&matrix, 0, sizeof(matrix)) ;
+      matrix.TM_e11 = iae->HID_tmatrixE11 ;
+      matrix.TM_e22 = iae->HID_tmatrixE22 ;
+
+      /* Scale the image */
+      GrApplyTransform(gstate, &matrix);
+
+      /* Untransform to get size in image coordinates */
+      pixSize.XYS_width = RoundWWF(GrSDivWWFixed(
+        MakeWWFixed(iae->HID_size.XYS_width),
+        *(WWFixedAsDWord *)&matrix.TM_e11));
+      pixSize.XYS_height = RoundWWF(GrSDivWWFixed(
+        MakeWWFixed(iae->HID_size.XYS_height),
+        *(WWFixedAsDWord *)&matrix.TM_e22));
+      
+      allowInval = (invalFrom<0xFFFF);  // Do we have an update range?
+      if(invalTo >= pixSize.XYS_height)  
+        invalTo = pixSize.XYS_height - 1;
+
+      switch(iae->HID_IADType)
+      {
+        case IAD_TYPE_GSTRING:
+          gstring = GrLoadGString(iae->HID_vmf, GST_VMEM, iae->HID_vmb);
+	  GrDrawGString(gstate, gstring, 0, 0, 0, (word*)&lastElement);
+  	  GrDestroyGString(gstring, NULL, GSKT_LEAVE_DATA);
+          break;
+    
+        case IAD_TYPE_ANIMATION:
+          frame = iae->HID_frame ;
+          p_header = VMLock(iae->HID_vmf, iae->HID_vmb, &mem) ;
+          if (frame >= p_header->AH_tree.VMCT_count)
+              frame = 0 ;
+          p_newFrame = ((AnimationFrame *)(&p_header[1]))+frame ;
+          /* Use transparency and invalidation information from the previous frame. */
+          prevFrame = (frame > 0) ? frame - 1 : p_header->AH_tree.VMCT_count - 1;
+          p_frame = ((AnimationFrame *)(&p_header[1]))+prevFrame ;
+          bitmap = (((VMChain *)(((byte *)p_header)+p_header->AH_tree.VMCT_offset))[frame])>>16 ;
+
+          /*
+           * Explanation of some drawing issues:
+           *
+           *  1.  If the image is being drawn indirectly due to invalidation,
+           *      allowInval is FALSE.  Do not clip, just draw what we got.
+           *      This may cause problems if the frame has a different pallette
+           *      from the prior frame, since the importer does not currently
+           *      generate completely accurate successive frames in this case.
+           *  2.  If the image is being drawn directly due to animation,
+           *      allowInval is TRUE.  Here, we can get intelligent:
+           *      a.  If the old frame is removed by "restore background",
+           *          ANIMATION_FLAG_NOT_TRANSPARENT is clear.  We must
+           *          invalidate the smallest region that includes the bounds
+           *          of the old and new frames.  This routine will be called
+           *          again by invalidation with the background restored, and
+           *          the new image will be drawn by #1.
+           *          (If we had the background bitmap handy, we could clip and
+           *          draw the background in the old frame's bounds, then
+           *          immediately draw the new frame in the new frame's bounds,
+           *          circumventing the two-stage invalidate and draw process.)
+           *      b.  If the old frame is removed by "do nothing",
+           *          ANIMATION_FLAG_NOT_TRANSPARENT is set.  To ensure that
+           *          image data outside of the new frame's bounds is not redrawn
+           *          (since the importer can screw this up), the clip rectangle
+           *          is set to the new frame's bounds and the image drawn.
+	   *	  c.  If the bitmap to be drawn has no mask, it cannot be transparent,
+	   *	      so we can draw it without invalidation to avoid blinking.
+           */
+          HugeArrayLockDir(iae->HID_vmf, bitmap, (void**)&p_bitmap);
+          if ((!allowInval) ||
+              ((p_frame->AF_flags & ANIMATION_FLAG_NOT_TRANSPARENT) &&
+	       /* no "do nothing" for last->first frame transition */
+		  (frame !=0)) ||
+              (!(p_bitmap->EB_bm.CB_simple.B_type & BMT_MASK)))  {
+
+            /* (CASE 1 or 2B) */
+            if (allowInval)
+            {
+                /* Make sure we only draw the part of the frame that's defined.
+                   Even though the GIF importer creates each frame as the
+                   union of its underlying frames, it doesn't work properly
+                   if the frames have different palettes. (CASE 2B) */
+                GrSetClipRect(gstate,
+                  PCT_INTERSECTION,
+                  p_newFrame->AF_changeBox.R_left,
+                  p_newFrame->AF_changeBox.R_top,
+                  p_newFrame->AF_changeBox.R_right + 1,
+                  p_newFrame->AF_changeBox.R_bottom + 1);
+            }
+            GrDrawHugeBitmap(gstate, 0, 0, iae->HID_vmf, bitmap) ;
+          } else {
+            /* Don't actually draw it this time, just invalidate the part */
+            /* that changed from the previous frame to this frame (CASE 2A) */
+            sword left = p_frame->AF_changeBox.R_left, top = p_frame->AF_changeBox.R_top,
+                  right = p_frame->AF_changeBox.R_right, bottom = p_frame->AF_changeBox.R_bottom;
+
+            /* Extend the invalidation rectangle to include the bounds of the new image. */
+            if (p_newFrame->AF_changeBox.R_left < left)
+                left = p_newFrame->AF_changeBox.R_left;
+            if (p_newFrame->AF_changeBox.R_top < top)
+                top = p_newFrame->AF_changeBox.R_top;
+            if (p_newFrame->AF_changeBox.R_right > right)
+                right = p_newFrame->AF_changeBox.R_right;
+            if (p_newFrame->AF_changeBox.R_bottom > bottom)
+                bottom = p_newFrame->AF_changeBox.R_bottom;
+            GrInvalRect(gstate, left, top, right, bottom) ;
+          }
+          HugeArrayUnlockDir(p_bitmap);
+          VMUnlock(mem) ;
+          break;
+
+        case IAD_TYPE_BITMAP:
+          HugeArrayLockDir(iae->HID_vmf, iae->HID_vmb, (void**)&p_bitmap);
+          /* We can draw the bitmap if it's either due to an invalidation
+             or if we know that there cannot be any transparency because
+             the image has no mask, or if the image is too small for a
+	     placeholder (so we can just draw over the existing background). */
+          if (!allowInval || 
+              !(p_bitmap->EB_bm.CB_simple.B_type & BMT_MASK) ||
+	      !(iae->HID_size.XYS_width>=20 && iae->HID_size.XYS_height>=20))
+          {
+            if(allowInval)              // Limit to updated region, if any
+              GrSetClipRect(
+                gstate,
+                PCT_INTERSECTION,
+                0,
+                invalFrom,
+                pixSize.XYS_width,
+                invalTo+1) ;
+
+            GrDrawHugeBitmap(gstate, 0, 0, iae->HID_vmf, iae->HID_vmb) ;
+          } 
+          else 
+          {
+            /* Don't actually draw it this time, just invalidate */
+            GrInvalRect(
+              gstate,
+              0,
+              invalFrom,
+              pixSize.XYS_width,
+              invalTo+1) ;
+          }
+          HugeArrayUnlockDir(p_bitmap);
+          break;
+      }
+    }
+    else if(iae->HID_size.XYS_width>=20 && iae->HID_size.XYS_height>=20)
+    {
+      /*
+       * Draw placeholder for an image that hasn't been loaded yet.The
+       * assumption is that a placeholder always has an identity scaling
+       * matrix.
+       */
+
+      GrSetLineColor(gstate, CF_INDEX, C_LIGHT_GREY, 0, 0);
+      GrSetLineWidth(gstate, MakeWWFixed(1));
+      GrDrawRect(gstate, 
+        0, 
+        0,
+        iae->HID_size.XYS_width - 1,
+        iae->HID_size.XYS_height - 1);
+
+      /* put a red "X" across a broken graphic */
+      if((iae->flags & HTML_IDF_BROKEN) && 
+         iae->HID_size.XYS_width >= 4 && iae->HID_size.XYS_height >= 4)
+      {
+        GrSetLineColor(gstate, CF_INDEX, C_RED, 0, 0);
+        GrSetLineWidth(gstate, MakeWWFixed(1));
+        GrDrawLine(gstate,
+          1,
+          1,
+          iae->HID_size.XYS_width - 2,
+          iae->HID_size.XYS_height - 2);
+        GrDrawLine(gstate,
+          1,
+          iae->HID_size.XYS_height - 2,
+          iae->HID_size.XYS_width - 2,
+          1);
+      }
+
+      alt = iae->imageALT;
+      if(alt != NAME_POOL_NONE &&
+         iae->HID_size.XYS_width >= 16 && iae->HID_size.XYS_height >= 16)
+      {                             /* textual name specified? */
+        NamePoolCopy(namePool, buf, sizeof(buf), alt, NULL);
+                                    /* get textual alternative name */
+
+        GrSaveState(gstate);        /* save clipping area */
+        GrSetClipRect(gstate, PCT_REPLACE,
+          2, 2 ,
+          iae->HID_size.XYS_width - 3,
+          iae->HID_size.XYS_height - 3);
+        FormSetTextAttr(gstate);
+        GrDrawText(gstate,
+          2,
+          iae->HID_size.XYS_height - 7, buf, 0);
+        GrRestoreState(gstate);
+      }
+    }
+      
+    GrRestoreState(gstate) ;
+}
+
+@extern method HTMLTextClass, MSG_VIS_TEXT_GRAPHIC_VARIABLE_DRAW
+{
+    XYValueAsDWord pos;
+    SizeAsDWord size = MAKE_SIZE_DWORD(0, 0);
+    HTMLformData *formArrayElement;
+    HTMLimageData *imageArrayElement;
+    word token, elsize;
+    word region;
+    VisLargeTextRegionArrayElement *p_region ;
+    T_regionArrayHandle regionArray ;
+    word cell;
+    HTMLcellData *p_cell ;
+    ByteFlags dirty ;
+#ifdef DO_DBCS
+    extern DosCodePage G_htmlCodePage;
+#endif
+
+    #define HIGV(_g) ((HTMLimageGraphicVariable *)\
+      (_g->VTG_data.VTGD_variable.VTGV_privateData))
+    #define HFGV(_g) ((HTMLformGraphicVariable *)\
+      (_g->VTG_data.VTGD_variable.VTGV_privateData))
+
+#ifdef DO_DBCS
+    G_htmlCodePage = pself->HTI_codePage;
+#endif
+
+    if(graphic->VTG_data.VTGD_variable.VTGV_manufacturerID==HTML_VARGRAPH_MFGID)
+    {                                   /* is it one of our own graphics? */
+      pos = GrGetCurPos(gstate);
+
+      switch(graphic->VTG_data.VTGD_variable.VTGV_type)
+      {
+        case HTML_VARGRAPH_TYPE_IMAGE:       
+          token = HIGV(graphic)->HIGV_imageIndex;
+                                        /* get index of array element */
+
+	  if (token != CA_NULL_ELEMENT) {
+          MemLock(OptrToHandle(pself->HTI_imageArray));
+          imageArrayElement = ChunkArrayElementToPtr(pself->HTI_imageArray,
+            token, &elsize);            /* deference token to image record */
+
+          pos = GrGetCurPos(gstate);    /* Cache position of image */
+
+          /* cache some information in image array element */
+          imageArrayElement->HID_pos.P_x = DWORD_X(pos) ;
+          imageArrayElement->HID_pos.P_y = DWORD_Y(pos) ;
+
+          /* See if the cell has recovered from its latest change */
+          if(imageArrayElement->flags & HTML_IDF_SIZE_DIRTY)
+          {
+            regionArray = RegionArrayConstruct(oself, pself) ;
+            region = FindRegionAtPosition(regionArray, 
+              imageArrayElement->pos) ;
+            RegionLock(regionArray, region, &p_region, &elsize) ;
+            cell = p_region->VLTRAE_section ;
+            RegionUnlock(p_region) ;
+
+            CellArrayStartAccess(pself->HTI_cellArray) ;
+            CellLock(pself->HTI_cellArray, cell, &p_cell, &elsize) ;
+            dirty = p_cell->HCD_flags2 & HTML_CELL_DIRTY_LAYOUT_MASK ;
+            CellUnlock(p_cell);
+            CellArrayEndAccess(pself->HTI_cellArray) ;
+          }
+          else
+          {
+            dirty = 0;                    // Image wasn't changed - no problems
+          }
+
+          /* only draw graphics if its bounds aren't in limbo... */
+          if(!dirty)
+            DrawVarGraphic(gstate, imageArrayElement, pself->HTI_namePool, 
+              0xFFFF, 0xFFFF);
+    
+          MemUnlock(OptrToHandle(pself->HTI_imageArray));
+	  }
+          size = MAKE_SIZE_DWORD(
+            graphic->VTG_size.XYS_width, 
+            graphic->VTG_size.XYS_height + IMAGE_HEIGHT_FUDGE_FACTOR);
+          break;
+        
+        case HTML_VARGRAPH_TYPE_FORM:
+          token = HFGV(graphic)->HFGV_formElementIndex;    
+                                        /* get index of array element */
+
+	  if (token != CA_NULL_ELEMENT) {
+          GrSaveState(gstate) ;
+          MemLock(OptrToHandle(pself->HTI_formArray));
+          formArrayElement = ChunkArrayElementToPtr(pself->HTI_formArray,
+            token, &elsize);            /* deference token to image record */
+          GrApplyTranslationDWord(gstate, DWORD_X(pos), DWORD_Y(pos)) ;
+          if (formArrayElement->x == -1)  {
+              @send ,forceQueue oself::MSG_HTML_TEXT_FORM_ELEMENT_ADJUST_POS(
+                        token, 
+                        DWORD_X(pos), 
+                        DWORD_Y(pos)) ;
+          }
+          formArrayElement->x = DWORD_X(pos) ;
+          formArrayElement->y = DWORD_Y(pos) ;
+          pself = ObjDerefVis(oself) ;
+          GrSaveState(gstate) ;
+          size = FormElementDraw(
+                     gstate,
+                     formArrayElement,
+                     token,
+                     pself->HTI_namePool,
+                     pself->HTI_formArray,
+		     oself) ;
+          GrRestoreState(gstate) ;
+          MemUnlock(OptrToHandle(pself->HTI_formArray));
+          if (pself->HTI_grabbedFormElement == token &&
+	      /* not during printing */
+	      !(pself->HTI_state & HTS_PRINTING))  {
+              GrSetClipRect(
+                  gstate, 
+                  PCT_REPLACE, 
+		  -4, 
+                  (-DWORD_HEIGHT(size))-3, 
+                  DWORD_WIDTH(size)+3,
+                  4);
+              GrSetLineColor(gstate, CF_INDEX, C_WHITE, 0, 0) ;
+              GrSetLineMaskSys(gstate, SDM_100);
+              GrSetLineWidth(gstate, MakeWWFixed(1));
+              GrDrawRect(
+                  gstate, 
+                  -1, 
+                  (-DWORD_HEIGHT(size)),
+                  DWORD_WIDTH(size),
+                  1) ;
+              GrSetLineColor(gstate, CF_INDEX, C_BLACK, 0, 0) ;
+              GrDrawRect(
+                  gstate, 
+                  -2, 
+                  (-DWORD_HEIGHT(size))-1,
+                  DWORD_WIDTH(size)+1, 
+                  2) ;
+              GrDrawRect(
+                  gstate, 
+                  -3, 
+                  (-DWORD_HEIGHT(size))-1,
+                  DWORD_WIDTH(size)+2, 
+                  2) ;
+              GrDrawRect(
+                  gstate, 
+                  -2, 
+                  (-DWORD_HEIGHT(size))-2,
+                  DWORD_WIDTH(size)+1, 
+                  3) ;
+          }
+          GrRestoreState(gstate) ;
+	  }
+          break;
+
+        default:
+          EC( FatalError(-1) );         /* Unknown graphic type */            
+      }
+    }
+    else
+      size = @callsuper();
+
+    return size;
+}
+
+@extern method HTMLTextClass, MSG_HTML_TEXT_ANIMATIONS_ON
+{
+    /* Don't start animations unless they are already off */
+    if (pself->HTI_animationTimer == NullHandle)  {
+        pself->HTI_animationChangeTable =
+            MemAlloc(
+               sizeof(word)*DEFAULT_IMAGE_LIMIT,
+               HF_DYNAMIC|HF_SHARABLE,
+               HAF_ZERO_INIT|HAF_NO_ERR) ;
+
+        pself->HTI_animationLastTime = TimerGetCount() ;
+        pself->HTI_animationTimer =
+            TimerStart(
+                TIMER_EVENT_ONE_SHOT,
+                oself,
+                1,
+                MSG_HTML_TEXT_ANIMATIONS_UPDATE,
+                1,
+                &pself->HTI_animationTimerID) ;
+    }
+}
+
+@extern method HTMLTextClass, MSG_HTML_TEXT_ANIMATIONS_OFF
+{
+    /* Stop the existing timer (if any) */
+    if (pself->HTI_animationTimer)  {
+        TimerStop(pself->HTI_animationTimer, pself->HTI_animationTimerID) ;
+        pself->HTI_animationTimer = NullHandle ;
+        MemFree(pself->HTI_animationChangeTable) ;
+        pself->HTI_animationChangeTable = NullHandle ;
+    }
+}
+
+@extern method HTMLTextClass, MSG_HTML_TEXT_DRAW_ANIMATION_CHANGES
+{
+    VMBlockHandle *p_run ;
+    optr graphicsArray ;
+    dword numGraphics ;
+    dword tokenIndex ;
+    word size ;
+//    dword graphicPos = 0 ;
+    TextRunArrayElement *p_imageRun ;
+    word *p_changeTable ;
+    VisTextGraphic graphic ;
+    HTMLimageData *imageArrayElement;
+    word numImages ;
+    union {
+       struct {
+           WordAndAHalf value24 ;
+           byte value8;
+       } value24and8 ;
+       dword        value32 ;
+    } pos ;
+    word i ;
+
+    /* At this point, the HTI_animationChangeTable has been filled in */
+    /* with the number of graphics that need to be updated per graphic */
+    /* token.  All we have to do is walk the token list to find the */
+    /* position and image to use quickly skipping images that are */
+    /* either not an animation or not currently changing. */
+    GStateHandle gstate ;
+
+    p_run = ObjVarFindData(oself, ATTR_VIS_TEXT_GRAPHIC_RUNS);
+    if (!p_run)
+        return ;
+    graphicsArray = *p_run ;
+
+    p_changeTable = MemLock(pself->HTI_animationChangeTable) ;
+
+    /* If we are here, somebody is going to draw on the screen.  Access it */
+    gstate = @call oself::MSG_VIS_VUP_CREATE_GSTATE() ;
+
+    /* Walk all the graphic tokens */
+    numGraphics = HugeArrayGetCount(pself->VTI_vmFile, graphicsArray) ;
+    if (numGraphics > DEFAULT_IMAGE_LIMIT)
+       numGraphics = DEFAULT_IMAGE_LIMIT ;
+    if (numGraphics)
+        HugeArrayLock(pself->VTI_vmFile, graphicsArray, 0, (void**)&p_imageRun, &size) ;
+    for (tokenIndex=0; tokenIndex<numGraphics; tokenIndex++)  {
+        pos.value24and8.value8 = 0 ;
+        pos.value24and8.value24 = p_imageRun->TRAE_position ;
+        if (pos.value32 < HTML_IMAGE_POS_RESERVED)  {
+        /* Does this image with given token need to be updated? */
+EC_ERROR_IF(p_imageRun->TRAE_token * sizeof(word) > MemGetInfo(pself->HTI_animationChangeTable, MGIT_SIZE), -1) ;
+            if (p_changeTable[p_imageRun->TRAE_token])  {
+                p_changeTable[p_imageRun->TRAE_token]-- ;
+                    @call oself::MSG_VIS_TEXT_GET_GRAPHIC_AT_POSITION(
+                          &graphic,
+                          pos.value32) ;
+
+                /* Find the image by its position in the parser's image data */
+                MemLock(OptrToHandle(pself->HTI_imageArray));
+                numImages = ChunkArrayGetCount(pself->HTI_imageArray) ;
+                for (i=0; i<numImages; i++)  {
+                    imageArrayElement =
+                        ChunkArrayElementToPtr(
+                           pself->HTI_imageArray,
+                           i,
+                           &size);
+                    if (imageArrayElement->pos == pos.value32)
+                        break ;
+                }
+
+                /* Make sure we found it */
+                if (i<numImages)  {
+                    /* Now that we have all the data, invalidate */
+                    /* the image */
+                    @call self::MSG_HTML_TEXT_INVALIDATE_IMAGE(&graphic, i,
+                      0, 0xFFFF) ;
+                }
+                MemUnlock(OptrToHandle(pself->HTI_imageArray));
+            }
+        }
+        HugeArrayNext((void**)&p_imageRun, &size) ;
+    }
+    if (p_imageRun)
+        HugeArrayUnlock(p_imageRun) ;
+
+    /* Clean up and move out */
+    GrDestroyState(gstate) ;
+    MemUnlock(pself->HTI_animationChangeTable) ;
+}
+
+@extern method HTMLTextClass, MSG_HTML_TEXT_ANIMATIONS_UPDATE
+{
+    word delta ;
+    dword time ;
+    word lowestTime = 0xFFFF ;
+    VisTextGraphic *p_graphic ;
+    word elsize;
+    word numImages ;
+    word imageIndex ;
+    VMBlockHandle *p_run ;
+    VMBlockHandle graphicsArrayBlock ;
+    MemHandle mem ;
+    optr graphicsArray ;
+    VisTextGraphicVariable *p_var ;
+    Boolean doDraw ;
+    MemHandle animHeaderBlock ;
+    AnimationHeader *p_header ;
+    AnimationFrame *p_frame ;
+    word *p_changeTable ;
+    Boolean didAnybodyAnimate = FALSE ;
+    HTMLimageData *iae;
+
+    if (!pself->HTI_animationTimer || !pself->HTI_imageArray)
+        return;
+
+    ObjLockObjBlock(OptrToHandle(pself->HTI_imageArray));
+
+    /* The way animations are updates is by going through all the images */
+    /* stored in the text object looking to see time has changed for */
+    /* any of the animations.  When a change is found, instead of doing */
+    /* the drawing immediately, we can avoid alot of walking of the image */
+    /* and region arrays by just recording which image has changed. */
+    /* DRAW_ANIMATION_CHANGES does the real work of drawing to the screen. */
+    pself->HTI_animationTimer = NullHandle ;
+
+    p_run = ObjVarFindData(oself, ATTR_VIS_TEXT_GRAPHIC_RUNS);
+    if (!p_run)
+        return ;
+    graphicsArrayBlock =
+        ((myTextLargeRunArrayHeader *)VMLock(pself->VTI_vmFile, *p_run, &mem))
+            ->TLRAH_elementVMBlock ;
+    VMUnlock(mem) ;
+    pself = ObjDerefVis(oself) ;
+
+    graphicsArray = ((LMemBlockHeader *)VMLockChainifiedLMemBlock(
+      pself->VTI_vmFile, graphicsArrayBlock, &mem))->LMBH_offset ;
+    graphicsArray = ConstructOptr(mem, graphicsArray) ;
+
+    p_changeTable = MemLock(pself->HTI_animationChangeTable) ;
+
+    time = TimerGetCount() ;
+
+    delta = time - pself->HTI_animationLastTime ;
+    if (delta > 0xF000)
+        delta = -delta ;
+    pself->HTI_animationLastTime = time ;
+
+    /* Walk all the images (up to the limit) looking for an update */
+    numImages = ChunkArrayGetCount(graphicsArray) ;
+    if (numImages > DEFAULT_IMAGE_LIMIT)
+       numImages = DEFAULT_IMAGE_LIMIT ;
+    for (imageIndex=0; imageIndex < numImages; imageIndex++)  {
+        /* Go through each type of stored graphic looking for animation */
+        p_graphic = ChunkArrayElementToPtr(graphicsArray, imageIndex, &elsize) ;
+        if ((p_graphic->VTG_type == VTGT_VARIABLE) &&
+            (p_graphic->VTG_meta.REH_refCount.WAAH_high == 0))  {
+            p_var = &p_graphic->VTG_data.VTGD_variable ;
+            if ((p_var->VTGV_manufacturerID == HTML_VARGRAPH_MFGID) &&
+                (p_var->VTGV_type == HTML_VARGRAPH_TYPE_IMAGE) &&
+		(HIGV(p_graphic)->HIGV_imageIndex != CA_NULL_ELEMENT))
+            {
+              iae = ChunkArrayElementToPtr(pself->HTI_imageArray,
+                HIGV(p_graphic)->HIGV_imageIndex, &elsize);     
+                                        /* deference token to image record */
+
+              if ( (iae->flags & HTML_IDF_RESOLVED) &&
+                  !(iae->flags & HTML_IDF_BROKEN) &&
+                   iae->HID_IADType == IAD_TYPE_ANIMATION )
+              {                
+                /* Found one of our animations */
+                /* Has its time elapsed? */
+                if ((iae->HID_delay <= delta) ||
+                    (iae->HID_frame == HTML_ANIMATION_VAR_FRAME_NOT_STARTED))  {
+                    /* Lock in the animation information */
+                    p_header = VMLock(iae->HID_vmf, iae->HID_vmb, &animHeaderBlock) ;
+                    /* Only animate if our animation count is not over */
+                    if (iae->HID_loopCount < p_header->AH_loopCount)  {
+                        /* This graphic is ready to update */
+                        if (iae->HID_frame == HTML_ANIMATION_VAR_FRAME_NOT_STARTED)  {
+                            doDraw = FALSE ;
+                        } else {
+                            doDraw = TRUE ;
+                        }
+                        /* Jump to the next frame */
+                        iae->HID_frame++ ;
+
+                        /* Loop around please */
+                        if (iae->HID_frame >= p_header->AH_tree.VMCT_count)  {
+                            iae->HID_loopCount++ ;
+                            if (iae->HID_loopCount == ANIMATION_LOOP_FOREVER)
+                                iae->HID_loopCount = 0 ;
+
+                            /* If we reached the end of the loop count, show*/
+                            /* the last frame (not the first) */
+                            if (iae->HID_loopCount >= p_header->AH_loopCount)
+                                iae->HID_frame = p_header->AH_tree.VMCT_count-1 ;
+                            else
+                                iae->HID_frame = 0 ;
+                        }
+
+                        /* Access this new frame of animation */
+                        p_frame = ((AnimationFrame *)(&p_header[1])) + iae->HID_frame ;
+                        iae->HID_delay = p_frame->AF_delayTime ;
+                        if (iae->HID_delay < lowestTime)
+                            lowestTime = iae->HID_delay ;
+
+                        /* Record the number of images that will want to */
+                        /* draw this animation */
+                        if (doDraw)  {
+                            p_changeTable[imageIndex] = p_graphic->VTG_meta.REH_refCount.WAAH_low ;
+                            didAnybodyAnimate = TRUE ;
+                        }
+                    }
+                    VMUnlock(animHeaderBlock) ;
+                } else {
+                    /* Subtract out the time until next time. */
+                    iae->HID_delay -= delta ;
+                    if (iae->HID_delay < lowestTime)
+                        lowestTime = iae->HID_delay ;
+                }
+              }
+            }
+        }
+    }
+
+    MemUnlock(OptrToHandle(pself->HTI_imageArray));
+
+//    if (lowestTime == 0xFFFF)
+//        return ;
+
+    /* See if anything was found */
+    if (lowestTime == 0xFFFF)
+        lowestTime = 60 ;   /* Update at least once a second */
+    else
+        VMDirty(mem) ;
+    VMUnlockChainifiedLMemBlock(mem) ;
+    MemUnlock(pself->HTI_animationChangeTable) ;
+
+    /* Only draw if there are updates */
+    if (didAnybodyAnimate)
+        @call oself::MSG_HTML_TEXT_DRAW_ANIMATION_CHANGES() ;
+
+    /* Go for the next delta time */
+    if (lowestTime == 0)
+        lowestTime = 1 ;
+    pself->HTI_animationTimer =
+        TimerStart(
+            TIMER_EVENT_ONE_SHOT,
+            oself,
+            lowestTime,
+            MSG_HTML_TEXT_ANIMATIONS_UPDATE,
+            lowestTime,
+            &pself->HTI_animationTimerID) ;
+}
+
