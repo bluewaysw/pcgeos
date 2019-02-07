@@ -3,29 +3,30 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = ConView
+GEODE           = conview
 CTXTCONTROL     = ctxtcontrolControl.asm ctxtcontrolManager.asm\
-                  ctxtcontrolControl.ui ctxtcontrolManager.ui
-FINDCONTROL     = findcontrolControl.asm findcontrolManager.asm\
-                  findcontrolControl.ui findcontrolManager.ui
-MAIN            = mainBook.asm mainContentPointer.asm mainCopy.asm\
-                  mainFile.asm mainHotspot.asm mainLink.asm mainManager.asm\
-                  mainName.asm mainNotify.asm mainSearch.asm\
-                  mainSpecialLink.asm mainStartEnd.asm mainText.asm\
-                  mainUtils.asm mainConstant.def mainContent.ui\
+                  ctxtcontrolManager.ui ctxtcontrolControl.ui
+MAIN            = mainFile.asm mainManager.asm mainText.asm mainLink.asm\
+                  mainUtils.asm mainContentPointer.asm mainCopy.asm\
+                  mainNotify.asm mainStartEnd.asm mainBook.asm\
+                  mainSearch.asm mainName.asm mainSpecialLink.asm\
+                  mainHotspot.asm mainConstant.def mainContent.ui\
                   mainManager.ui mainStrings.ui
+FINDCONTROL     = findcontrolManager.asm findcontrolControl.asm\
+                  findcontrolControl.ui findcontrolManager.ui
 NAVCONTROL      = navcontrolControl.asm navcontrolHistory.asm\
                   navcontrolManager.asm navcontrolUtils.asm\
                   navcontrolControl.ui navcontrolManager.ui
 SENDCONTROL     = sendcontrolControl.asm sendcontrolManager.asm\
                   sendcontrolControl.ui sendcontrolManager.ui
-UI_TO_RDFS      = CTXTCONTROLMANAGER.UI FINDCONTROLMANAGER.UI\
-                  MAINMANAGER.UI NAVCONTROLMANAGER.UI SENDCONTROLMANAGER.UI
+UI_TO_RDFS      = ctxtcontrolManager.ui mainManager.ui\
+                  findcontrolManager.ui navcontrolManager.ui\
+                  sendcontrolManager.ui
 OBJS            =
 COMMON          = contentConstant.def contentGeode.def contentGlobal.def
-MODULES         = CtxtControl FindControl Main NavControl SendControl
+MODULES         = CtxtControl Main FindControl NavControl SendControl
 CMODULES        =
-SRCS            = $(CTXTCONTROL) $(FINDCONTROL) $(MAIN) $(NAVCONTROL)\
+SRCS            = $(CTXTCONTROL) $(MAIN) $(FINDCONTROL) $(NAVCONTROL)\
                   $(SENDCONTROL) $(COMMON)
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
