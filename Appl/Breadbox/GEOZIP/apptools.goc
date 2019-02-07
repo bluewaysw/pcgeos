@@ -1,0 +1,488 @@
+/**************************************************************************
+ *      GEODE-File f�r Geos Zip Manager
+ *
+ *      Beschreibung:	AppTools.goc
+ *			Seltener genutzte Routinen, z.B beim �ffnen oder
+ *				Schlie�en der Applikation, SaveAs usw.
+ *
+ *      Copyright:      (c) by RABE-Soft 8/97
+ *                      ShareWare
+ *      Sonstiges:      -
+ *
+ **************************************************************************/
+
+/*  Standard include files */
+
+@include <stdapp.goh>
+@include <initfile.h>
+#include <stdio.h>
+#include <Ansi/stdlib.h>
+#include <Ansi/string.h>
+#include <vm.h>
+#include <hugearr.h>
+#include <gstring.h>
+#include <graphics.h>
+#include <uDialog.h>
+#include <ctype.h>
+
+#include "unzip.h"
+#include <token.h>	/* for assigning doc token */
+
+
+@include "geozip.goh"
+@include "process.goh"
+@include "zipui.goh"
+@include "extract.goh"
+@include "view.goh"
+
+extern StandardDialog2ResponseTriggerTable win95ResponseTable;
+extern TimerHandle sWareTimerHandle;
+extern word sWareTimerID;
+
+@extern chunk SaveFilenameTooLong;
+@extern visMoniker GZDocIconMonikerList;
+
+/*
+@extern method GZipProcessClass, MSG_GZIP_REGISTER {
+Boolean ok;
+char zahl[70];
+
+	@send GZipRegisterBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+	@call GZipRegisterText::MSG_VIS_TEXT_GET_ALL_PTR(zahl);
+	ok = GZipCheckSerialNumber(zahl);
+	if ( ok )
+	  {
+	  InfoBox(@RegisterOKText);
+	  MemLock(HandleOf(@IniKategory));
+	  InitFileWriteString(LMemDeref(@IniKategory),LMemDeref(@SerialKey),zahl);
+	  MemUnlock(HandleOf(@IniKategory));
+	  if ( isShare ) {
+		isShare = FALSE;
+		TimerStop(sWareTimerHandle,sWareTimerID);
+		@send GZipRegisterBox::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+		@send GZipShareWareTextGlyph::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+		}
+	  }
+	else 	ErrorBox(@RegisterFailedText);
+
+	}
+
+Boolean GZipCheckSerialNumber(char * zahl) {
+dword z1, z2;
+char buf[20];
+int n;
+
+	if (strlen(zahl) != 22) return FALSE;
+	if ( zahl[0] !=  'Z' ||zahl[1] != 'I' ||zahl[2] != 'P'  ||zahl[3] != 'M'
+	   ||zahl[4] != 'A' ||zahl[5] != 'N' ||zahl[6] != '-' ||zahl[7] != '4'
+	   ||zahl[8] != '6' ||zahl[9] != '3'  ||zahl[11] != '-' ||zahl[17] != '-' ) return FALSE;
+
+	z1=z2=0;
+	for (n = 0; n<17; n++)
+		{
+		z1 += (n+1)*zahl[n];
+		z2 += (17-n)*zahl[n];
+		}
+	sprintf(buf,"%lu",z1);
+
+	if ( (zahl[18] != buf[strlen(buf)-2])
+	     || (zahl[19] != buf[strlen(buf)-1]) ) return FALSE;
+	sprintf(buf,"%lu",z2);
+	if ( (zahl[20] != buf[strlen(buf)-2])
+	     || (zahl[21] != buf[strlen(buf)-1]) ) return FALSE;
+	return TRUE;
+	}
+*/
+@extern method GZipProcessClass, MSG_GZIP_SAVE_OPTIONS {
+GZipOptions opt;
+
+	opt.displayFlags = @call  GZipFileInfoSelector::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+	opt.displayFlags |= @call  GZipDirInfoSelector::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+  //	opt.scanOptions = @call GZipGeosScanSelector::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	opt.scanOptions = GZOPT_SCAN_SPECIAL;
+  //	opt.viewOptions = @call GZipViewFilesSelector::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+	opt.viewOptions = GZOPT_VIEW_START_GEODES |
+				   GZOPT_VIEW_OPEN_DOCUMENTS |
+				   GZOPT_VIEW_OPEN_DOS_DOCUMENTS;
+
+	MemLock(HandleOf(@IniKategory));
+	InitFileWriteData(LMemDeref(@IniKategory),LMemDeref(@OptionsKey),
+			&opt,sizeof(GZipOptions));
+	MemUnlock(HandleOf(@IniKategory));
+	}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_DOCUMENT_SAVE_AS for GZipDocumentClass
+ *               word *fileOrError
+ *			  DocumentCommonParams *params
+ *
+ * RETURN:     Boolean (what?)
+ *
+ *
+ * DESCRIPTION:	 add .ZIP to the file name if it isn't there
+ *
+ *
+ ***********************************************************************/
+@ifndef PRODUCT_NDO2000
+#define MAX_GPC_DOS_NAME_LENGTH  32
+@endif
+
+@extern method GZipDocumentClass, MSG_GEN_DOCUMENT_SAVE_AS {
+ char	*name, *test;
+ Boolean	changed = FALSE;
+ EventHandle evt;
+
+    name = params->DCP_name;
+
+    if (strlen(name) > 4)  {
+	  /* see if it ends in .zip */
+	  test = &name[strlen(name) - 4];
+	  if ((test[0] != '.') || ((test[1] != 'Z') && (test[1] != 'z'))
+					   || ((test[2] != 'I') && (test[2] != 'i'))
+					   || ((test[3] != 'P') && (test[3] != 'p'))) {
+		/* nope - add .zip 
+		   GPC ONLY: We need to ensure that the filename does not exceed our file system
+		   limits (if greater than 28 characters).  Yes, I know this code 
+		   is dependent upon us running on the MSLF fs, but there's no clean 
+		   way to get the running fs filename length. -- DPM 11/12/01 */
+@ifndef PRODUCT_NDO2000
+     if(strlen(name) > MAX_GPC_DOS_NAME_LENGTH - 4) {
+	 /* display an error message stating that the filename is
+	    too long */
+	 UserStandardDialogOptr(NULL, NULL, NULL, NULL, @SaveFilenameTooLong,
+				(GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET) | 
+				(CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET));
+	 evt = @record GZipDocumentControl::MSG_GEN_DOCUMENT_CONTROL_INITIATE_SAVE_AS_DOC();
+	 @send, forceQueue process::MSG_META_DISPATCH_EVENT(evt, MF_FORCE_QUEUE);
+	 return FALSE;
+     }
+@endif
+		strcat(name, ".ZIP");
+		changed = TRUE;
+		}
+	  }
+    else {
+	  /* it's <= 4 chars long, thus need to add .zip */
+	  strcat(name, ".ZIP");
+	  changed = TRUE;
+	  }
+
+    if (changed) {
+       strcpy(params->DCP_name, name);
+	  }
+
+    return(@callsuper());
+
+}
+
+@extern method GZipDocumentClass, MSG_GEN_DOCUMENT_SAVE_AS_COMPLETED {
+char *p,*n;
+
+	@callsuper();
+
+	pself->GZDI_savedOnce = TRUE;
+
+     /* this should never happen but I'll leave it in - jfh */
+	n = p = pself->GDI_fileName;
+	if ( strlen(p) < 5 ) InfoParamBox(@NameWarning,n)
+	else {
+		p=&p[strlen(p)-4];	// zeigt auf ".ZIP"
+		if ( (p[0] != '.' )
+		|| ( (p[1] != 'Z') && (p[1] != 'z') )
+		|| ( (p[2] != 'I') && (p[2] != 'i') )
+		|| ( (p[3] != 'P') && (p[3] != 'p') )
+		) InfoParamBox(@NameWarning,n);
+		}
+
+	if(pself->GZDI_new) {
+	
+		@send ,forceQueue+ oself::MSG_GEN_DOCUMENT_CLOSE(0);
+	}
+
+	}
+
+
+/* Kopieren des aktuellen Dokuments in ein neu erzeugtes */
+#define SAVE_AS_COPY_BUFFER_SIZE 8*1024
+@extern method GZipDocumentClass, MSG_GEN_DOCUMENT_PHYSICAL_SAVE_AS_FILE_HANDLE {
+char * buf;
+dword curPos,size;
+int read,write;
+Boolean failed;
+
+	curPos = FilePos(pself->GDI_fileHandle,0,FILE_POS_RELATIVE);
+	FilePos(pself->GDI_fileHandle,0,FILE_POS_START);
+	FilePos(file,0,FILE_POS_START);
+	size = FileSize(pself->GDI_fileHandle);
+	@send SaveAsBar::MSG_BARGRAF_SET_VALUE(0);
+	@send SaveAsBar::MSG_BARGRAF_SET_MAXIMUM(size);
+	@send SaveAsInfoBox::MSG_GEN_INTERACTION_INITIATE();
+
+	buf = malloc(SAVE_AS_COPY_BUFFER_SIZE);
+	read = FileRead(pself->GDI_fileHandle,buf,SAVE_AS_COPY_BUFFER_SIZE,FALSE);
+	while ( read > 0 ) {
+		  write = FileWrite(file,buf,read,FALSE);
+		  @send SaveAsBar::MSG_BARGRAF_INCREMENT_VALUE((dword)write);
+		  failed = ( write != read );
+		  if ( failed ) break;
+		  read = FileRead(pself->GDI_fileHandle,buf,SAVE_AS_COPY_BUFFER_SIZE,FALSE);
+		  }
+	free(buf);
+	FilePos(pself->GDI_fileHandle,curPos,FILE_POS_START);
+	if ( failed ) *error = ERROR_SHORT_READ_WRITE;
+	   else {
+		*error = 0;
+		UnzSetNewFileHandle(pself->GZDI_unzDesc,file);
+		}
+	@send SaveAsInfoBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+	return ( failed );	/* TRUE, if error */
+	}
+
+@extern method GZipProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION {
+/*word docoptions,size;
+int err;
+char zahl[70];
+*/
+Boolean isCUI = FALSE;
+
+
+ //   @send GZipDocumentControl::MSG_GZDC_TEST();
+  /*	err = InitFileReadInteger("uiFeatures","docControlOptions",&docoptions);
+	if (!err) if (docoptions & 0x2000 ) /* open -trigger by default */
+  /*		@send GZipOpenTrigger::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+
+    /* CUI vs AUI settings */
+    if (UserGetDefaultUILevel() == UIIL_INTRODUCTORY) {
+	  @call GZipPrimary::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	  @call GZipPrimary::MSG_META_ADD_VAR_DATA(
+			  (HINT_PRIMARY_FULL_SCREEN | VDF_SAVE_TO_STATE),
+			  0, NULL);
+	  @call GZipPrimary::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+
+	  @call GZipOptionsMenu::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+	  @call ExtractTopRightGroup::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+	  isCUI = TRUE;
+	  }
+
+ /*	MemLock(HandleOf(@IniKategory));
+	InitFileReadStringBuffer(LMemDeref(@IniKategory),LMemDeref(@SerialKey),
+			zahl,70,&size);
+	MemUnlock(HandleOf(@IniKategory));
+	isShare = !GZipCheckSerialNumber(zahl);
+
+	if ( isShare ) {
+	sWareTimerHandle = TimerStart(TIMER_EVENT_CONTINUAL,@GZipShareWareTextGlyph,
+				250,MSG_SWARE_SWITCH_TEXT, 250, &sWareTimerID);
+		}
+	else {
+	     @send GZipRegisterBox::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	     @send GZipShareWareTextGlyph::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	     }
+*/
+	if ( !(attachFlags & AAF_RESTORING_FROM_STATE) && !isCUI ) {
+		@call oself::MSG_GZIP_LOAD_OPTIONS();
+	  //	@call CreateNewZipDialog::MSG_NEWZIP_CREATE_DRIVE_AND_HISTORY_LIST();
+		}
+
+	@callsuper();
+ //	CreateBubbleHelps();
+	isTryingStartDos = FALSE;
+
+       /* needed to install doc token */
+//	 @call process::MSG_GEN_PROCESS_INSTALL_TOKEN();
+
+
+	}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_PROCESS_INSTALL_TOKEN for GZipProcessClass
+ *
+ * DESCRIPTION:	Associates token with docs
+ *
+ *
+ ***********************************************************************/
+/*@extern method GZipProcessClass, MSG_GEN_PROCESS_INSTALL_TOKEN
+{
+	 dword	docTokenChars;
+	 TokenFlags	docTokenFlags;
+
+    @callsuper();
+
+	 docTokenChars = TOKEN_CHARS('Z', 'D', (dword) 'o', (dword) 'c');
+	/* it won't work w/o the two casts */
+/*	 if (!TokenGetTokenInfo(docTokenChars, 16431, &docTokenFlags)) {
+
+		 TokenDefineToken(docTokenChars,
+		16431,
+		@GZDocIconMonikerList,
+		0);
+    }
+}
+*/
+
+/*--------------------- CreateBubbleHelps ---------------------
+ *      Aufgabe:	Dynamisch angelegten objekten eine Hilfe-Blase
+ *			verpassen
+ *      Zusammenhang:   Nur beim Programmstart ben�tigt
+ ---------------------------------------------------------------------------*/
+/*void 	CreateBubbleHelps(void)
+{
+//@extern object DocumentControlGroup;
+//@extern object DisplayControlGroup;
+@extern chunk NewBubble;
+@extern chunk OpenBubble;
+@extern chunk CloseBubble;
+@extern chunk SaveBubble;
+@extern chunk CascadeBubble;
+@extern chunk FullSizeBubble;
+@extern chunk TileBubble;
+@extern chunk SelectBubble;
+
+optr child;
+char * p;
+	MemLock(HandleOf(@NewBubble));
+
+ /*	child = @call DocumentControlGroup::MSG_GEN_FIND_CHILD_AT_POSITION(0);
+	p = LMemDeref(@NewBubble);
+	if ( child )  @call child::MSG_META_ADD_VAR_DATA
+				(ATTR_GEN_HELP_CONTEXT,strlen(p)+1,p);
+	child = @call DocumentControlGroup::MSG_GEN_FIND_CHILD_AT_POSITION(1);
+	p = LMemDeref(@OpenBubble);
+	if ( child )  @call child::MSG_META_ADD_VAR_DATA
+				(ATTR_GEN_HELP_CONTEXT,strlen(p)+1,p);
+	child = @call DocumentControlGroup::MSG_GEN_FIND_CHILD_AT_POSITION(2);
+	p = LMemDeref(@CloseBubble);
+	if ( child )  @call child::MSG_META_ADD_VAR_DATA
+				(ATTR_GEN_HELP_CONTEXT,strlen(p)+1,p);
+	child = @call DocumentControlGroup::MSG_GEN_FIND_CHILD_AT_POSITION(3);
+	p = LMemDeref(@SaveBubble);
+	if ( child )  @call child::MSG_META_ADD_VAR_DATA
+				(ATTR_GEN_HELP_CONTEXT,strlen(p)+1,p);
+*/
+/* mit DisplayControlGroup funktioniert das nicht
+	child = @call DisplayControlGroup::MSG_GEN_FIND_CHILD_AT_POSITION(0);
+	p = LMemDeref(@CascadeBubble);
+	if ( child )  @call child::MSG_META_ADD_VAR_DATA
+				(ATTR_GEN_HELP_CONTEXT,strlen(p)+1,p);
+	child = @call DisplayControlGroup::MSG_GEN_FIND_CHILD_AT_POSITION(1);
+	p = LMemDeref(@FullSizeBubble);
+	if ( child )  @call child::MSG_META_ADD_VAR_DATA
+				(ATTR_GEN_HELP_CONTEXT,strlen(p)+1,p);
+	child = @call DisplayControlGroup::MSG_GEN_FIND_CHILD_AT_POSITION(2);
+	p = LMemDeref(@TileBubble);
+	if ( child )  @call child::MSG_META_ADD_VAR_DATA
+				(ATTR_GEN_HELP_CONTEXT,strlen(p)+1,p);
+	child = @call DisplayControlGroup::MSG_GEN_FIND_CHILD_AT_POSITION(3);
+	p = LMemDeref(@SelectBubble);
+	if ( child )  @call child::MSG_META_ADD_VAR_DATA
+				(ATTR_GEN_HELP_CONTEXT,strlen(p)+1,p);
+/**/
+/*	MemUnlock(HandleOf(@NewBubble));
+}
+
+*/
+
+void GZipDeleteTempDir(DiskHandle stdPath) {
+MemHandle mh;
+DLStandardEnumType  *rPtr;
+int count, n;
+
+    FilePushDir();
+    MemLock(HandleOf(@ViewTempDirName));
+    FileSetStandardPath(stdPath);
+    FileGetAttributes(LMemDeref(@ViewTempDirName));
+    if ( ThreadGetError() == 0 ) {
+      if ( FileSetCurrentPath(0,LMemDeref(@ViewTempDirName)) != 0 )
+	{
+	count = DirListEnumSubdir (&mh, DL_EF_FILES | DL_EF_LINKS);
+	if ( count > 0 )
+		{
+		int flagsSaved;
+		flagsSaved = globalExtractFlags;
+		globalExtractFlags |= GEF_OVERWRITE_RO_TOO;
+		rPtr = MemLock(mh);
+		for ( n = 0 ; n < count ; n++, rPtr++ ) {
+			GZipDeleteFile(rPtr->DL_SET_fileName);
+			}
+		MemFree(mh);
+		globalExtractFlags = flagsSaved;
+		}
+	FileSetCurrentPath(0,"..");
+	FileDeleteDir(LMemDeref(@ViewTempDirName));
+	}
+      }
+    MemUnlock(HandleOf(@ViewTempDirName));
+    FilePopDir();
+    }
+
+@extern method GZipProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION {
+ /*	if ( isShare ) {
+		TimerStop(sWareTimerHandle,sWareTimerID);
+		}
+ */	if ( !isTryingStartDos ) {
+		GZipDeleteTempDir(SP_DOCUMENT);
+		GZipDeleteTempDir(SP_PUBLIC_DATA);
+		}
+	return @callsuper();
+	}
+
+
+@extern method GZipProcessClass, MSG_GZIP_LOAD_OPTIONS {
+word size;
+GZipOptions opt;
+Boolean err;
+
+	MemLock(HandleOf(@IniKategory));
+	err = InitFileReadDataBuffer(LMemDeref(@IniKategory),LMemDeref(@OptionsKey),
+			&opt,sizeof(GZipOptions),&size);
+	MemUnlock(HandleOf(@IniKategory));
+
+	if ( !err )  {
+	    @call  GZipFileInfoSelector::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE
+					(opt.displayFlags & GZOPT_FILE_FLAGS_MASK,0);
+	    @call  GZipDirInfoSelector::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE
+					(opt.displayFlags & GZOPT_DIR_FLAGS_MASK,0);
+    /*	    @call GZipGeosScanSelector::
+		MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(opt.scanOptions,FALSE);
+	    @call  GZipViewFilesSelector::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE
+					(opt.viewOptions,0);
+	*/    }
+
+	}
+
+@extern method GZipDocumentClass, MSG_GZIP_DOC_INVALID_ARCHIV {
+optr displ;
+	displ = @call oself::MSG_GEN_DOCUMENT_GET_DISPLAY();
+	@send displ::MSG_GEN_DISPLAY_CLOSE();
+	}
+
+
+@extern method GZipDocumentClass, MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT {
+
+  if (  pself -> GZDI_unzDesc )
+	{
+	UnzDestroyUnzDesc( pself -> GZDI_unzDesc );
+	pself -> GZDI_unzDesc = 0;		// be save
+	}
+  if (  pself -> GZDI_tempFile )
+	{
+	HugeArrayDestroy(pself -> GZDI_tempFile ,pself -> GZDI_indexArray);
+	HugeArrayDestroy(pself -> GZDI_tempFile ,pself -> GZDI_entryArray);
+	HugeArrayDestroy(pself -> GZDI_tempFile ,pself -> GZDI_textArray);
+	VMClose ( pself -> GZDI_tempFile , FALSE);
+	pself -> GZDI_tempFile = 0;	// be save
+	FilePushDir();
+	FileSetStandardPath(SP_PUBLIC_DATA);
+	FileDelete(pself->GZDI_tempFilePath);
+	pself->GZDI_tempFilePath[0] = 0;
+	FilePopDir();
+	}
+  @callsuper();
+  }
+
+
+
+
+

@@ -1,0 +1,720 @@
+/*---------------------------------------------------------------------------
+ *
+ *	Code-File f�r Geozip-Applikattion
+ *	File: Dialogs.goc
+ *
+ *	Metoden der Dialogobjekte:
+ *              OpenNewInfoClass	: InfoBox beim �ffnen eines Archivs
+ *					  oder beim Neuanlegen
+ *		NewZipInteractionClass	: Auswahl der zu komprimierenden Dateien
+ *
+ *      Copyright:      (c) by RABE-Soft 10/98
+ *      Sonstiges:      -
+ *
+ ---------------------------------------------------------------------------*/
+
+
+
+@include <stdapp.goh>
+@include <initfile.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <Ansi/string.h>
+#include <vm.h>
+#include <hugearr.h>
+#include <gstring.h>
+#include <graphics.h>
+#include <uDialog.h>
+#include <sysstats.h>
+#include "unzip.h"
+#include "zip.h"
+/*#include "main\open.goh" **/
+#include "DEBUG/debuginf.h"
+@include "geozip.goh"
+@include "process.goh"
+@include "zipui.goh"
+@include "extract.goh"
+@include "ART/FSart.goh"
+
+
+extern const byte indentIconBitmap[];
+
+
+/*###########################################################################
+	OpenNewInfoClass: InfoBox �ber die Suche in einem Archiv
+/*###########################################################################*/
+@classdecl OpenNewInfoClass;
+
+/*--------------------- MSG_ONI_INITIATE ---------------------
+ *      Aufgabe:	Archiv und seine Gr��e zur Anzeige bringen
+ *      Parameter: 	void (char * archivName, dword archivSize ,dword numberEntrys)
+ ---------------------------------------------------------------------------*/
+@method OpenNewInfoClass, MSG_ONI_INITIATE
+  {
+  char buf[64];		// be sure
+  char buf2[UHTA_NULL_TERM_BUFFER_SIZE];
+
+  @call OpenArchivNameText::MSG_VIS_TEXT_REPLACE_ALL_PTR(archivName,0);
+  @send OpenArchivFoundBar::MSG_BARGRAF_SET_VALUE(0);
+  @send OpenArchivFoundBar::MSG_BARGRAF_SET_MAXIMUM(numberEntrys);
+
+  MemLock(OptrToHandle(@ArchivSizeDummy));
+  archivSize+=50;	/* Rundung f�r Anzeige */
+  UtilHex32ToAscii(buf2, archivSize>>10, UHTAF_NULL_TERMINATE|UHTAF_THOUSANDS_SEPARATORS);  
+  sprintf(buf, LMemDeref(@ArchivSizeDummy),buf2,((int)archivSize&0x3ff)/100);
+  @call OpenArchivSizeText::MSG_VIS_TEXT_REPLACE_ALL_PTR(buf,0);
+  MemUnlock(OptrToHandle(@ArchivSizeDummy));
+  cancelOpenNew = FALSE;
+  @send OpenArchivStopTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+  @send oself::MSG_GEN_INTERACTION_INITIATE();
+  }
+
+/*--------------------- MSG_ONI_INC_COUNTER ---------------------
+ *      Aufgabe:	Gefunden-Counter erh�hen
+ ---------------------------------------------------------------------------*/
+@method OpenNewInfoClass, MSG_ONI_INC_COUNTER
+  {
+  dword v;
+  @call OpenArchivFoundBar::MSG_BARGRAF_GET_VALUE(&v);
+  v += 1;
+  @call OpenArchivFoundBar::MSG_BARGRAF_SET_VALUE(v);
+  }
+
+/*--------------------- MSG_ONI_ENDE ---------------------
+ *      Aufgabe:	Anzeige beenden, Gefunden-Counter Reset
+ ---------------------------------------------------------------------------*/
+@method OpenNewInfoClass,MSG_ONI_ENDE
+  {
+  @send oself::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+  @send NewInfoBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+  }
+
+
+@method OpenNewInfoClass,MSG_ONI_INITIATE_NEW {
+  cancelOpenNew = FALSE;
+
+  @send NewArchivStopTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+  @send NewInfoBox::MSG_GEN_INTERACTION_INITIATE();
+  }
+/* (char * file); */
+@method OpenNewInfoClass,MSG_ONI_NEW_FILE {
+	@call CreateArchivFile::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(file,VUM_NOW);
+	}
+
+@method OpenNewInfoClass,MSG_ONI_NEW_SUBDIR { /* (char * dir);*/
+	@call CreateArchivDir::MSG_VIS_TEXT_REPLACE_ALL_PTR(dir,0);
+	@call CreateArchivFile::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("(searching...)",VUM_NOW);
+	@send CompressFileProzentBar::MSG_BARGRAF_SET_VALUE(0);
+	}
+
+@method OpenNewInfoClass,MSG_ONI_STOP_OPEN {
+	cancelOpenNew = TRUE;
+	@send OpenArchivStopTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	UserStandardSound(SST_NOTIFY);
+	}
+@method OpenNewInfoClass,MSG_ONI_STOP_NEW {
+	cancelOpenNew = TRUE;
+	@send NewArchivStopTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	UserStandardSound(SST_NOTIFY);
+	}
+
+/*###########################################################################
+	NewZipInteractionClass: DialogBox zum Anlgen eines neuen Archives
+/*###########################################################################*/
+
+/*------------------------------------------------------------------------*/
+@classdecl NewZipInteractionClass;
+
+@method NewZipInteractionClass, MSG_META_DETACH {
+if (pself->NZII_fileListHandle != 0 ) {
+			MemFree(pself->NZII_fileListHandle);
+			pself->NZII_fileListHandle = 0;
+			}
+@callsuper();
+}
+
+/*------------------------------------------------------------------------*/
+
+@method NewZipInteractionClass, MSG_NEWZIP_READ_AND_DISPLAY_DIR {
+/* void ( Boolean updateHistory) */
+  int count,dirCount/*, drive*/;
+  MemHandle mh;
+//  optr item;
+  char * p,path[256] /*,moniker[38] = "a: "*/;
+  DiskHandle ndh;
+
+  /* Pfad entsprechend internen Einstellungen einstellen */
+    FilePushDir();
+    strcpy(path,pself->NZII_filePath.GFP_path);
+    ndh = FileSetCurrentPath(pself->NZII_filePath.GFP_disk,path);
+    if ( ndh == 0 ) {
+	/* if it is a problem on the floppy reset the trigger */
+	if (pself->NZII_filePath.GFP_disk != SP_DOCUMENT)
+	   @send ToFloppyTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+	DisplayErrorBox(path,GZIP_OPEN_PATH_ERROR);
+	@send, forceQueue oself::MSG_NEWZIP_TO_DOCUMENT();
+	return;
+	}
+
+    @send application::MSG_GEN_APPLICATION_MARK_BUSY();
+
+ //   drive = DiskGetDrive(pself->NZII_filePath.GFP_disk);
+ //   @call CreateNewDriveList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(drive,FALSE);
+ //   item = @call CreateNewDriveList::MSG_GEN_ITEM_GROUP_GET_ITEM_OPTR(drive);
+ //   @call item::MSG_GEN_PATH_SET(path,	pself->NZII_filePath.GFP_disk);
+    pself = ObjDerefGen(oself);
+    p = path;
+    FileConstructFullPath(&p,256,pself->NZII_filePath.GFP_disk,
+		pself->NZII_filePath.GFP_path,TRUE);
+    @call CreateNewPathText::MSG_VIS_TEXT_REPLACE_ALL_PTR(path,0);
+
+    p = path;
+    DirListParseNameFromPath(&p);
+ /*   moniker[0] = drive + 'A';
+    strcat(moniker,p); if ( !*p ) strcat(moniker,"\\");
+    @call item::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(moniker,VUM_NOW);
+
+    moniker[2]='\\'; moniker[3]=0;
+    @call RootItem::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(moniker,VUM_NOW);
+ */
+ /*   if ( updateHistory ) {
+	    @call oself::MSG_NEWZIP_UPDATE_HISTORY(path); // Path will be destroyed!
+	    }
+ */
+    pself = ObjDerefGen(oself);     	/* sicher ist sicher */
+    if (pself->NZII_fileListHandle != 0 ) MemFree(pself->NZII_fileListHandle);
+  /* Verzeichnis neu einlesen  */
+    count = DirListEnumDirsAndFiles(&mh,&dirCount,0);
+
+    pself = ObjDerefGen(oself);     	/* sicher ist sicher */
+    if ( count > 0 )
+	{
+	pself->NZII_fileListHandle = mh;
+	pself->NZII_dirCount = dirCount;
+	pself->NZII_entryCount = count;
+	pself->NZII_listHasParent= !DirListGetCurrentDirName(pself->NZII_listParentName);
+	/* DirListGetCurentDirName liefert TRUE, wenn CurrentDir == Root */
+	}
+    else
+	{
+	pself->NZII_fileListHandle = 0;
+	pself->NZII_dirCount = 0;
+	pself->NZII_entryCount = 0;
+	pself->NZII_listHasParent= !DirListGetCurrentDirName(pself->NZII_listParentName);
+	}
+    FilePopDir();
+    @call oself::MSG_NEWZIP_DISPLAY_DIR();
+    @send application::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+    }
+
+  /* Verzeichnis darstellen */
+@method NewZipInteractionClass, MSG_NEWZIP_DISPLAY_DIR
+    {
+    int count, options;
+
+ /*   options = @call CreateNewOptions::
+			MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+    /* instead of getting we'll set them */
+    options = NZ_OPT_COMPRESS_DIRNAME | NZ_OPT_SHOW_DIRS;
+
+    count = pself->NZII_entryCount;
+    if ( options & NZ_OPT_SHOW_DIRS )
+	{
+	pself->NZII_showDirs = TRUE;
+	}
+    else
+	{
+	count -= pself->NZII_dirCount;
+	pself->NZII_showDirs = FALSE;
+	}
+
+    if ( count >= 0)
+	{
+	@call CreateNewSelectedCounter::
+				MSG_GEN_VALUE_SET_INTEGER_VALUE(count,FALSE);
+	if( (pself->NZII_listHasParent) && (pself->NZII_showDirs) ) count++;
+	@send CreateNewFileList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(count);
+	@send CreateNewFileList::MSG_GEN_ITEM_GROUP_MAKE_ITEM_VISIBLE(0);
+	}
+    else {
+	@send CreateNewFileList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(0);
+	@call CreateNewSelectedCounter::
+				MSG_GEN_VALUE_SET_INTEGER_VALUE(0,FALSE);
+	}
+  }
+
+
+@method NewZipInteractionClass, MSG_GEN_INTERACTION_INITIATE {
+    int i ;
+    int count = 0 ;
+	@send, forceQueue oself::MSG_NEWZIP_READ_AND_DISPLAY_DIR(TRUE);
+    for (i=0; i<26; i++)  
+        pself->NZII_availableDrives[i] = (DriveGetStatus(i)&DS_PRESENT)?count++,TRUE:FALSE ;
+    @call DriveList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(count) ;
+	@callsuper();
+	}
+
+int FindDrive(Boolean *p_drives, int item)
+{
+    /* Find the matching drive */
+    int i, count=0 ;
+    for (i=0; i<26; i++)  {
+        if (p_drives[i] == FALSE)
+            continue ;
+        if (count == item)
+            break ;
+        count++ ;
+    }
+    return i ;
+}
+
+@method NewZipInteractionClass, MSG_NEWZIP_QUERY_DRIVE
+{
+    char name[5] ;
+
+    int driveNum = FindDrive(pself->NZII_availableDrives, item) ;
+
+    /* Found it in the list, now make a name string out of it */
+    name[0] = 'A' + driveNum ;
+    name[1] = ':' ;
+    name[2] = '\0' ;
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, name) ;
+}
+
+@method NewZipInteractionClass, MSG_NEWZIP_SELECTED_DRIVE
+{
+    int driveNum = FindDrive(pself->NZII_availableDrives, selection) ;
+	DiskHandle dh = DiskRegisterDiskSilently(driveNum);
+	if (dh) {
+	   strcpy(pself->NZII_filePath.GFP_path ,"\\");
+	   pself->NZII_filePath.GFP_disk = dh;
+       if (dh == 0)
+	       @send ToFloppyTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+       else
+	       @send ToFloppyTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+	   @send CreateNewToDocumentTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+	   @call oself::MSG_NEWZIP_READ_AND_DISPLAY_DIR(TRUE);
+	   }
+	else  {
+        InfoParamBox(@ErrDriveNotReadyMsg, 0);
+	   }
+    /* Never show a check mark on the drive list */
+    @call DriveList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+}
+
+@method NewZipInteractionClass, MSG_NEWZIP_DO_CREATE {
+	pself->NZII_newCanceled = FALSE;
+	@send oself::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+	}
+
+@method NewZipInteractionClass, MSG_NEWZIP_CANCEL {
+	pself->NZII_newCanceled = TRUE;
+	@send oself::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+	}
+
+/*
+Boolean MSG_NEWZIP_GET_RESULT(NewzipBuildInfo * info);
+return True, wenn canceled.
+*/
+@method NewZipInteractionClass, MSG_NEWZIP_GET_RESULT {
+int options;
+
+	info->nzbi_path.GFP_disk = pself->NZII_filePath.GFP_disk;
+	strcpy(info->nzbi_path.GFP_path , pself->NZII_filePath.GFP_path);
+	info->nzbi_fileListHandle = pself->NZII_fileListHandle;
+	info->nzbi_liste = @CreateNewFileList;
+
+	info->nzbi_itemsInList = @call CreateNewFileList::
+				MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS();
+
+	info->nzbi_startOffset = 0;	/* einfachster Fall */
+	if (pself->NZII_showDirs)
+		{
+		if (pself->NZII_listHasParent) {
+			info->nzbi_startOffset = 1;	/* parent ist ung�ltig*/
+			info->nzbi_offsetOffset = -1;	/* Verschiebung um 1 */
+			}
+		else info->nzbi_offsetOffset = 0;	/* Offsets identisch */
+		}
+	else info->nzbi_offsetOffset = pself->NZII_dirCount;
+
+	info->nzbi_allSelected = !@call CreateNewFileList::
+				MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS();
+   /*	options = @call CreateNewOptions::
+			MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+	/* instead of getting we'll set them */
+	options = NZ_OPT_COMPRESS_DIRNAME | NZ_OPT_SHOW_DIRS;
+	info->nzbi_compressDirname = options & NZ_OPT_COMPRESS_DIRNAME;
+	info->nzbi_recurseSubdirs = options & NZ_OPT_SHOW_DIRS;
+
+	return pself->NZII_newCanceled;
+	}
+
+/*@method NewZipInteractionClass, MSG_NEWZIP_CREATE_DRIVE_AND_HISTORY_LIST {
+optr child;
+int i;
+word ds;
+char name[4];
+
+	//Itemgroup not usable  -  zur Sicherheit
+//	@call CreateNewDriveList::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+//	@call CreateNewHistoryList::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+
+	//Drives: Beschriftung,Status auslesen und Itemgroupitems erzeugen setzen
+/*	for (i=0 ; i<25 ; i++)
+	  {
+	    //Laufwerksnummer im System vorhanden ?
+	    ds = DriveGetStatus(i);
+	    if (ds & DS_PRESENT)
+	    {
+		//Item erzeugen und anf�gen
+		child = @call TemplateItem::MSG_GEN_COPY_TREE(
+			HandleOf(@CreateNewDriveList),
+			ChunkOf(@CreateNewDriveList),
+			CCF_MARK_DIRTY | CCO_LAST);
+		//visMoniker
+		name[0] = 0x41 + i;
+		name[1] = ':';
+		name[2] = 0;
+		@call child::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(name,VUM_NOW);
+
+		//Identifier setzen
+		@call child::MSG_GEN_ITEM_SET_IDENTIFIER(i);
+		@call child::MSG_GEN_SET_USABLE(VUM_NOW);
+
+	    }
+	  }
+*/
+	// History: 10 Stufen, aber not Usable lassen
+/*	for (i=0 ; i<10 ; i++)
+	  {
+	  child = @call TemplateItem::MSG_GEN_COPY_TREE(
+		HandleOf(@CreateNewHistoryList),
+		ChunkOf(@CreateNewHistoryList),
+		CCF_MARK_DIRTY | CCO_LAST);
+	//Identifier setzen
+	@call child::MSG_GEN_ITEM_SET_IDENTIFIER(i);
+	}
+
+
+	//Itemgroups usable
+//	@call CreateNewDriveList::MSG_GEN_SET_USABLE(VUM_NOW);
+	@call CreateNewHistoryList::MSG_GEN_SET_USABLE(VUM_NOW);
+  }
+
+/*@method NewZipInteractionClass,	  MSG_NEWZIP_NEW_DRIVE {
+char name[4];
+DiskHandle dh,sdh;
+int drive;
+optr item;
+
+	if ( selection == CND_LIST_ID_ROOT ) {
+		@call oself::MSG_NEWZIP_TO_ROOT();
+		return;
+		}
+
+	dh = DiskRegisterDiskSilently(selection);
+	if ( !dh ) {
+		name[0] = 0x41 + selection;
+		name[1] = ':';
+		name[2] = 0;
+		DisplayErrorBox(name,GZIP_OPEN_DRIVE_ERROR);
+		drive = DiskGetDrive(pself->NZII_filePath.GFP_disk);
+		@send CreateNewDriveList::
+			MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(drive,FALSE);
+		return;
+		}
+
+	item = @call CreateNewDriveList::MSG_GEN_ITEM_GROUP_GET_ITEM_OPTR(selection);
+	sdh = @call item::MSG_GEN_PATH_GET_DISK_HANDLE();
+	pself = ObjDerefGen(oself);
+	if ( (dh == sdh) || (DiskGetDrive(SP_DOCUMENT) == DiskGetDrive(dh)) )
+		{
+		pself->NZII_filePath.GFP_disk  = sdh;
+		@call item::MSG_GEN_PATH_GET
+				(pself->NZII_filePath.GFP_path,sizeof(PathName));
+		}
+	else	{
+		strcpy(pself->NZII_filePath.GFP_path ,"\\");
+		pself->NZII_filePath.GFP_disk  = dh;
+		}
+
+	@call oself::MSG_NEWZIP_READ_AND_DISPLAY_DIR(TRUE);
+	}
+
+*/
+@method NewZipInteractionClass,	  MSG_NEWZIP_TO_DOCUMENT {
+	strcpy(pself->NZII_filePath.GFP_path ,".");
+	pself->NZII_filePath.GFP_disk  = SP_DOCUMENT;
+	@send CreateNewToDocumentTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	@send ToFloppyTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+	@call oself::MSG_NEWZIP_READ_AND_DISPLAY_DIR(TRUE);
+}
+
+@method NewZipInteractionClass,	  MSG_NEWZIP_TO_FLOPPY {
+DiskHandle	dh;
+
+
+	strcpy(pself->NZII_filePath.GFP_path ,"\\");
+	dh = DiskRegisterDiskSilently(0);
+	if (dh) {
+	   pself->NZII_filePath.GFP_disk = dh;
+	   @send ToFloppyTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	   @send CreateNewToDocumentTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+	   @call oself::MSG_NEWZIP_READ_AND_DISPLAY_DIR(TRUE);
+	   }
+	else  {
+        InfoParamBox(@ErrFloppyMsg, 0);
+	   }
+
+
+}
+
+/*@method NewZipInteractionClass,	  MSG_NEWZIP_TO_ROOT {
+int drive;
+	strcpy(pself->NZII_filePath.GFP_path ,"\\");
+	/* die folgende Konstruktion sichert, dass auch vom Geos-Pfad ins
+		Root gewechselt wird */
+/*	drive = DiskGetDrive(pself->NZII_filePath.GFP_disk);
+	pself->NZII_filePath.GFP_disk = DiskRegisterDiskSilently(drive);
+	@call oself::MSG_NEWZIP_READ_AND_DISPLAY_DIR(TRUE);
+	}
+*/
+
+@method NewZipInteractionClass,	MSG_NEWZIP_QUERY_FILE_FOR_LIST {
+DLStandardEnumType * stETP;
+word iconType;
+MemHandle mh;
+FileLongName name;
+int nr;
+
+GStateHandle	gsState;
+ChunkHandle 	gsChunk;
+optr		gsOptr;
+
+optr bmpOptr;
+Bitmap *ptrIconBmp;
+word		flag = 0;
+
+
+  if ( (!pself->NZII_fileListHandle) &&
+       (!pself->NZII_listHasParent) ) return;	// for savety
+						// but should not occur
+  nr = item;
+  if ( !(pself->NZII_showDirs) ) nr += pself->NZII_dirCount;
+  else if (pself->NZII_listHasParent) nr--;
+
+  if ( (pself->NZII_listHasParent) && (nr<0) )
+	{
+	strcpy(name, pself->NZII_listParentName);
+	iconType = DL_ICON_TYPE_PARENT;
+	}
+  else 	{
+	mh = pself->NZII_fileListHandle;
+	if (!mh) return;			// for savety
+						// but should not occur
+	stETP = MemLock(mh);
+	stETP += nr;
+	strcpy(name,stETP->DL_SET_fileName);
+	if ( (stETP->DL_SET_attrs) & FA_SUBDIR )
+				iconType = DL_ICON_TYPE_DIR;
+		else  {
+			iconType = DirListGetIconType(stETP->DL_SET_fileType,
+					name,DLESF_ZIP2FOLDER | DLESF_ALL);
+			}
+	MemUnlock(mh);
+	}
+
+   /* jfh - this is a temp fix for not showing @ files */
+   if (name[0] == '@') flag = RIMF_NOT_ENABLED;
+
+   gsState = GrCreateGString( OptrToHandle(oself), GST_CHUNK, (word*)&gsChunk);
+   gsOptr = ConstructOptr(OptrToHandle(oself),gsChunk);
+
+   /* get GPC bitmaps instead of Rainer's */
+   if (iconType == DL_ICON_TYPE_PARENT)
+	 bmpOptr = @FSOFoldBitmap;
+   else if (iconType == DL_ICON_TYPE_DIR)
+	 bmpOptr = @FSCFoldBitmap;
+   else
+	 bmpOptr = @FSFileBitmap;
+  //	 bmpOptr = DirListGetIconOptr(iconType);
+
+   /* do our own string writing instead of Rainer's */
+ //  DirListWriteIconizedString(gsState, bmpOptr, name, FID_BISON,-3, TRUE);
+
+	MemLock(HandleOf(bmpOptr));
+	if(iconType == DL_ICON_TYPE_PARENT)
+	{
+		ptrIconBmp = LMemDeref(bmpOptr);
+		GrMoveTo(gsState,0,1);
+		GrDrawBitmapAtCP(gsState,ptrIconBmp, 0);
+		MemUnlock(HandleOf(bmpOptr));
+		GrDrawText(gsState,18,0,name,0);
+	} 
+	else
+	{
+		GrMoveTo(gsState,0,1);
+		GrFillBitmapAtCP(gsState,(Bitmap*)indentIconBitmap, 0);
+		ptrIconBmp = LMemDeref(bmpOptr);
+		GrMoveTo(gsState,16,1);
+		GrDrawBitmapAtCP(gsState,ptrIconBmp, 0);
+		MemUnlock(HandleOf(bmpOptr));
+		GrDrawText(gsState,18 + 16,0,name,0);
+	}
+		
+   GrEndGString(gsState);
+
+   /* and tell the list */
+   @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(item,flag,0,0,0,
+				VMDT_GSTRING,VMST_OPTR,gsOptr);
+
+   GrDestroyGString(gsState,0,GSKT_KILL_DATA);
+
+/*  @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item,name); */
+  }
+
+
+/*@method NewZipInteractionClass,	MSG_NEWZIP_OPTIONS_CHANGED {
+	if ( modifiedBooleans & NZ_OPT_SHOW_DIRS  )
+			@call oself::MSG_NEWZIP_DISPLAY_DIR();
+	}
+*/
+@method NewZipInteractionClass,	MSG_NEWZIP_FILE_SELECTED {
+int sel;
+	if ( numSelections == 0 ) {
+		sel = @call CreateNewFileList::MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS();
+		if ( (sel>0) && (pself->NZII_listHasParent) ) sel--;
+		}
+	else sel = numSelections;
+
+	@call CreateNewSelectedCounter::MSG_GEN_VALUE_SET_INTEGER_VALUE(sel,FALSE);
+	}
+
+
+/*@message (DCDL_CUSTOM_DOUBLE_PRESS_MSG)	MSG_NEWZIP_FILE_DOUBLE_CLICKED;*/
+
+@method NewZipInteractionClass,	MSG_NEWZIP_FILE_DOUBLE_CLICKED {
+DLStandardEnumType * stETP;
+MemHandle mh;
+
+  if ( selCount != 1 ) return;
+  /* since we set this "permanently" then the if need not be here */
+/*  if ( ! (@call  CreateNewOptions::
+	MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(NZ_OPT_SHOW_DIRS)) )
+		{
+		UserStandardSound(SST_ERROR);
+		return;
+		}  */
+  FileSetCurrentPath(pself->NZII_filePath.GFP_disk,pself->NZII_filePath.GFP_path);
+
+  if ( ( selection == 0 ) && (pself->NZII_listHasParent) )
+	{
+	/* if we're at the virtual root don't go up any more */
+/*
+	if ((pself->NZII_filePath.GFP_disk == SP_DOCUMENT) &&
+		((pself->NZII_filePath.GFP_path[0] == 0) ||
+		 (pself->NZII_filePath.GFP_path[0] == '.'))) {
+	   @send CreateNewToDocumentTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	   return;
+	   }
+	else
+*/
+	   @send CreateNewToDocumentTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+	/* Wechseln ins Parent */
+	FileSetCurrentPath(0,"..");
+	pself->NZII_filePath.GFP_disk =
+		FileGetCurrentPath(pself->NZII_filePath.GFP_path,
+		sizeof(PathName));
+	/* if we're at doc disable trigger */
+/*
+	if ((pself->NZII_filePath.GFP_disk == SP_DOCUMENT) &&
+		((pself->NZII_filePath.GFP_path[0] == 0) ||
+		 (pself->NZII_filePath.GFP_path[0] == '.'))) {
+	   @send CreateNewToDocumentTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	   }
+*/
+	@call oself::MSG_NEWZIP_READ_AND_DISPLAY_DIR(TRUE);
+	return;
+	}
+
+
+  mh = pself->NZII_fileListHandle;
+  stETP = MemLock(mh);
+
+  if (pself->NZII_listHasParent) selection--;
+
+  stETP += selection;
+  if ( (stETP->DL_SET_attrs) & FA_SUBDIR )
+	{
+	FileSetCurrentPath(0,stETP->DL_SET_fileName);
+	pself->NZII_filePath.GFP_disk =
+		FileGetCurrentPath(pself->NZII_filePath.GFP_path,
+				sizeof(PathName));
+	MemUnlock(mh);
+	@send CreateNewToDocumentTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+	@call oself::MSG_NEWZIP_READ_AND_DISPLAY_DIR(TRUE);
+	}
+  else  {
+	MemUnlock(mh);
+	UserStandardSound(SST_ERROR);
+	}
+  }
+
+
+/*@method NewZipInteractionClass,	MSG_NEWZIP_UPDATE_HISTORY {
+/* char * path - will be destroyed!*/
+/*optr item;
+word id;
+
+	item = @call CreateNewHistoryList::MSG_GEN_FIND_CHILD_AT_POSITION(0);
+	if ( !item) return;
+
+	@call item::MSG_GEN_SET_NOT_USABLE(VUM_NOW);	// zur Sicherheit
+	@call CreateNewHistoryList::MSG_GEN_MOVE_CHILD(item,CCF_MARK_DIRTY | CCO_LAST);
+	@call item::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(path,VUM_NOW);
+	pself = ObjDerefGen(oself);
+	strcpy(path,pself->NZII_filePath.GFP_path);
+	@call item::MSG_GEN_PATH_SET(path, pself->NZII_filePath.GFP_disk);
+	@call item::MSG_GEN_SET_USABLE(VUM_NOW);
+	id = @call item::MSG_GEN_ITEM_GET_IDENTIFIER();
+	@call CreateNewHistoryList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(id,FALSE);
+	}
+
+/*@method NewZipInteractionClass,	MSG_NEWZIP_SET_FROM_HISTORY {
+char name[4];
+DiskHandle dh,sdh, ndh;
+int drive;
+optr item;
+
+	item = @call CreateNewHistoryList::MSG_GEN_ITEM_GROUP_GET_ITEM_OPTR(selection);
+	sdh = @call item::MSG_GEN_PATH_GET_DISK_HANDLE();
+	drive = DiskGetDrive(sdh);
+
+	dh = DiskRegisterDiskSilently(drive);
+	if ( !dh ) {
+		name[0] = 0x41 + drive;
+		name[1] = ':';
+		name[2] = 0;
+		DisplayErrorBox(name,GZIP_OPEN_DRIVE_ERROR);
+		@send item::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+		return;
+		}
+
+	pself->NZII_filePath.GFP_disk  = sdh;
+	@call item::MSG_GEN_PATH_GET(pself->NZII_filePath.GFP_path,sizeof(PathName));
+
+	pself = ObjDerefGen(oself);
+	ndh = FileSetCurrentPath(pself->NZII_filePath.GFP_disk,
+				 pself->NZII_filePath.GFP_path);
+	if ( ndh == 0 ) {
+		DisplayErrorBox(pself->NZII_filePath.GFP_path,GZIP_OPEN_PATH_ERROR);
+		@send item::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+		return;
+		}
+
+	@call oself::MSG_NEWZIP_READ_AND_DISPLAY_DIR(FALSE);
+
+	}
+*/
+
