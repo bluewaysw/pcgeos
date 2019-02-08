@@ -18,14 +18,14 @@ exempt color
 exempt game
 exempt sound
 
-resource APPRESOURCE object
-resource INTERFACE object
+resource AppResource object
+resource Interface object
 #resource SAVEDSTATERESOURCE object
-resource MOUSE_PICTURE object
-resource INTERFACEMOVEBOX object
+resource Mouse_Picture object
+resource InterfaceMoveBox object
 #resource INTERFACEABOUT object
 #resource STRINGSRESOURCE lmem read-only discardable shared
-resource QTIPSRESOURCE object
+resource QTipsResource object
 
 export MazeProcessClass
 export MazeViewClass

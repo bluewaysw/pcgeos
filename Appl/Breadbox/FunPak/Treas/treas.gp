@@ -47,23 +47,23 @@ exempt sound
 
 #
 # Resources: 
-resource APPRESOURCE ui-object
-resource INTERFACE ui-object
-resource BOARDBLOCK object
-resource APPMONIKERRESOURCE lmem read-only shared
-resource ACORNERSRESOURCE data
-resource AUPPERRESOURCE data
-resource ALEFTRESOURCE data
-resource ARIGHTRESOURCE data
-resource ABOTTOMRESOURCE data
-resource BCORNERSRESOURCE data
-resource BUPPERRESOURCE data
-resource BLEFTRESOURCE data
-resource BRIGHTRESOURCE data
-resource BBOTTOMRESOURCE data
-resource TREASURERESOURCE data
-resource CURSORRESOURCE data shared
-resource QTIPSRESOURCE ui-object
+resource AppResource ui-object
+resource Interface ui-object
+resource BoardBlock object
+resource AppMonikerResource lmem read-only shared
+resource ACornersResource data
+resource AUpperResource data
+resource ALeftResource data
+resource ARightResource data
+resource ABottomResource data
+resource BCornersResource data
+resource BUpperResource data
+resource BLeftResource data
+resource BRightResource data
+resource BBottomResource data
+resource TreasureResource data
+resource CursorResource data shared
+resource QTipsResource ui-object
 
 #
 # Other classes
