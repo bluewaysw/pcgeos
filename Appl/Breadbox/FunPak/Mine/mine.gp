@@ -63,20 +63,21 @@ library ansic
 # object blocks, fixed code resources, or data resources that are read-only.
 # Standard discardable code resources do not need to be mentioned.
 #
-resource APPRESOURCE object
-resource INTERFACE object
-resource BOOMMONIKERRESOURCE object
-resource SNIPMONIKERRESOURCE object
-resource INTERFACEDIALOGS1 object
-resource INTERFACEDIALOGS2 object
-resource INTERFACEDIALOGS3 object
-resource INTERFACEVIEWMENU object
-resource INTERFACEOPTIONSMENU object
-resource INTERFACEDENSITY object
-resource INTERFACEFLAGS object
-resource INTERFACESCORES object
-resource INTERFACEABOUT object
-resource STRINGSRESOURCE lmem shared discardable read-only
+resource AppResource object
+resource AppMonikerResource object
+resource Interface object
+resource BoomMonikerResource object
+resource SnipMonikerResource object
+resource InterfaceDialogs1 object
+resource InterfaceDialogs2 object
+resource InterfaceDialogs3 object
+resource InterfaceViewMenu object
+resource InterfaceOptionsMenu object
+resource InterfaceDensity object
+resource InterfaceFlags object
+resource InterfaceScores object
+resource InterfaceAbout object
+resource StringsResource lmem shared discardable read-only
 
 export MineProcessClass
 export MineViewClass
