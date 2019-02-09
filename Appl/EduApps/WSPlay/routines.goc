@@ -1,0 +1,481 @@
+/* -----------------------------------------------------------------
+ *   converting the maker into a player
+ *
+ *   7/25/00	jfh    
+ * -----------------------------------------------------------------*/
+
+@include <wsplay.goh>
+@include <externs.goh>
+
+/***************************************************************************
+ * WSP routines
+ **************************************************************************/
+
+/***************************************************************************
+ * WSPGetLetter
+ ***************************************************************************
+ * SYNOPSIS:    Get a letter from the word search.
+ *
+ **************************************************************************/
+char WSPGetLetter(optr ows, word x, word y)
+{
+    char *pRow;
+    word dummy;
+    
+    pRow = ChunkArrayElementToPtr(ows, y, &dummy);
+    return pRow[x];
+}
+
+/***************************************************************************
+ * WSPGetDocBounds
+ ***************************************************************************
+ * SYNOPSIS:    Determine the document bounds of the word search grid so
+ *              that the view properly scales-to-fit the entire grid.
+ *
+ **************************************************************************/
+void WSPGetDocBounds(WordSearchHeader *pwsh, RectDWord *pr)
+{
+    pr->RD_left = pr->RD_top = 0;
+    pr->RD_right = DRAW_GRID_MARGINS * 2
+      + pwsh->WSH_width * DRAW_GRID_SPACE_SIZE;
+    pr->RD_bottom = DRAW_GRID_MARGINS * 2
+      + pwsh->WSH_height * DRAW_GRID_SPACE_SIZE;
+}
+
+
+/***************************************************************************
+ * WSPDrawWordSearch
+ ***************************************************************************
+ * SYNOPSIS:    Called to draw the word search.
+ *
+ * STRATEGY:    Draw all of the letters in the word search.
+ *              If the answers are to be drawn, draw them as well.
+ *              If printing, scaling must be applied for the passed bounds.
+ *
+ **************************************************************************/
+void WSPDrawWordSearch(GStateHandle gstate, word nLeftBound, word nTopBound, 
+                       word nRightBound, word nBottomBound, Boolean bPrinting)
+{
+MemHandle			mhHeap;
+optr				oWordSearch;
+WordSearchHeader	*pwsh;
+word				row, col, x, y, xoff;
+char				c;
+byte				*p_found;
+
+
+    /* Ensure that no handles are null. */
+    if (g_fhDocument != NullHandle && g_bhDocHeap != NullHandle
+      && g_chDocWordSearch != NullChunk)
+    {
+        /* Lock things. */
+        VMLock(g_fhDocument, g_bhDocHeap, &mhHeap);
+        oWordSearch = ConstructOptr(mhHeap, g_chDocWordSearch);
+        pwsh = LMemDeref(oWordSearch);
+
+        /* Setup the gstate. */
+        GrSetFont(gstate, DRAW_GRID_TEXT_FONT, 
+				  MakeWWFixed(DRAW_GRID_TEXT_SIZE));
+   //	   GrSetTextColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+	   GrSetDefaultTransform(gstate);
+        GrApplyTranslation(gstate, MakeWWFixed(nLeftBound), 
+				  MakeWWFixed(nTopBound));
+        
+        /* Determine the scaling factor to use. */
+        if (bPrinting)
+        {
+            word nLargestDimension;
+            WWFixedAsDWord fScale, fHeight, fWidth, fLeft, fTop;
+
+            if (pwsh->WSH_width > pwsh->WSH_height)
+                nLargestDimension = pwsh->WSH_width * DRAW_GRID_SPACE_SIZE;
+            else
+                nLargestDimension = pwsh->WSH_height * DRAW_GRID_SPACE_SIZE;
+            fScale = GrUDivWWFixed(MakeWWFixed(nRightBound - nLeftBound), 
+                                   MakeWWFixed(nLargestDimension));
+            if (fScale > DRAW_GRID_MAX_SCALE_FACTOR)
+                fScale = DRAW_GRID_MAX_SCALE_FACTOR;
+            fHeight = GrMulWWFixed(
+              MakeWWFixed(pwsh->WSH_height * DRAW_GRID_SPACE_SIZE), fScale);
+            fWidth = GrMulWWFixed(
+              MakeWWFixed(pwsh->WSH_width * DRAW_GRID_SPACE_SIZE), fScale);
+            fLeft = (MakeWWFixed(nRightBound - nLeftBound) - fWidth) / 2;
+            fTop = (MakeWWFixed(nBottomBound - nTopBound) - fHeight) / 2;
+            GrApplyTranslation(gstate, fLeft, fTop);
+            GrApplyScale(gstate, fScale, fScale);
+        }
+            
+        /* Draw all of the letters. */
+	   MemLock(OptrToHandle(g_ltrsFoundArray));
+	   y = (DRAW_GRID_SPACE_SIZE - DRAW_GRID_TEXT_SIZE) / 2;
+        for (row = 0; row < pwsh->WSH_height; row++)
+        {
+		  x = 0;
+		  for (col = 0; col < pwsh->WSH_width; col++)
+            {
+			 /* draw reversed? */
+			 c = WSPGetLetter(oWordSearch, col, row);
+                xoff = (DRAW_GRID_SPACE_SIZE - 
+                  IntegerOf(GrCharWidth(gstate, c))) / 2;
+			 p_found = ChunkArrayElementToPtr(
+					 g_ltrsFoundArray, (row * pwsh->WSH_width + col), 0);
+			 if (*p_found) {
+		    //	    GrSetTextColor(gstate, CF_INDEX, C_WHITE, 0, 0);
+			    /* do background */
+			    GrSetAreaColor(gstate, CF_INDEX, C_LIGHT_GRAY, 0, 0);
+			    GrFillEllipse(gstate, x + xoff -2, y,
+							   x + xoff + (2*xoff), y+(2*xoff)+3);
+			    }
+		   //	 else GrSetTextColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+			 GrDrawChar(gstate, x + xoff, y, c);
+			 x += DRAW_GRID_SPACE_SIZE;
+            }
+            y += DRAW_GRID_SPACE_SIZE;
+        }
+	   MemUnlock(OptrToHandle(g_ltrsFoundArray));
+
+        /* Locate and highlight the answers. */
+	   if (g_showAnswers && g_chDocAnswers != NullChunk)
+		  WSPDrawAnswers(gstate, ConstructOptr(mhHeap, g_chDocAnswers), pwsh,
+		  ALL_ANSWERS);
+	   else if (g_chDocAnswers != NullChunk)
+		  WSPDrawAnswers(gstate, ConstructOptr(mhHeap, g_chDocAnswers), pwsh,
+		  FOUND_ANSWERS);
+
+        /* Unlock things. */
+        VMUnlock(mhHeap);
+    }
+}
+
+/***************************************************************************
+ * WSPDrawAnswers
+ ***************************************************************************
+ * SYNOPSIS:    Called to draw the word search answers.
+ *
+ * STRATEGY:    Call appropriate drawing functions.
+ *
+ **************************************************************************/
+void WSPDrawAnswers(GStateHandle gstate, optr oans, WordSearchHeader *pwsh,
+				word whichAns)
+{
+word		start, nAnswers, n;
+WordSearchAnswerElement *pAns;
+sword	sx, sy, ex, ey, tx, ty, len, dx, dy;
+WWFixedAsDWord angle;
+word		dummy;
+byte		*p_found;
+
+
+    GrSetLineColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+    GrSetAreaMaskSys(gstate, SDM_0);
+
+    if (whichAns == ALL_ANSWERS || whichAns == FOUND_ANSWERS) {
+	  nAnswers = ChunkArrayGetCount(oans);
+	  start = 0;
+	  }
+    else {
+	  start = whichAns;
+	  nAnswers = whichAns+1;
+	  }
+    for (n = start; n < nAnswers; n++) {
+	  MemLock(OptrToHandle(g_wordsFoundArray));
+	  p_found = ChunkArrayElementToPtr(g_wordsFoundArray, n, 0);
+	  if (*p_found || whichAns == ALL_ANSWERS) {
+
+	   pAns = ChunkArrayElementToPtr(oans, n, &dummy);
+        /* (sx,sy)-(ex,ey) are the bounds of the rectangle, with the origin
+           being the center of the first grid square. */
+        sx = -DRAW_GRID_ANSWER_OUTLINE;
+        sy = -DRAW_GRID_ANSWER_OUTLINE;
+        len = (pAns->WSAE_length - 1) * DRAW_GRID_SPACE_SIZE;
+        ey = DRAW_GRID_ANSWER_OUTLINE;
+	   tx = pAns->WSAE_column * DRAW_GRID_SPACE_SIZE
+          + (DRAW_GRID_SPACE_SIZE / 2);
+        ty = pAns->WSAE_row * DRAW_GRID_SPACE_SIZE
+		+ (DRAW_GRID_SPACE_SIZE / 2);
+	   if (whichAns < FOUND_ANSWERS) {
+		 tx += DRAW_GRID_SPACE_SIZE;
+		 ty += DRAW_GRID_SPACE_SIZE;
+		 }
+
+        angle = WSPDirectionToAngle(pwsh->WSH_level, pAns->WSAE_direction);
+        WSPGetDirectionOffsets(pwsh->WSH_level, pAns->WSAE_direction, &dx, &dy);
+	   if (dx != 0 && dy != 0) {
+            /* Answer is angled diagonally, must compensate length
+               and shrink size. */
+            len = IntegerOf(GrMulWWFixed(MakeWWFixed(len), WWFIXED_SQRT_TWO));
+            }
+        ex = len + DRAW_GRID_ANSWER_OUTLINE;
+
+        GrSaveTransform(gstate);
+        GrApplyTranslation(gstate, MakeWWFixed(tx), MakeWWFixed(ty));
+        GrApplyRotation(gstate, angle);
+        GrDrawRoundRect(gstate, sx, sy, ex, ey, DRAW_GRID_ANSWER_CORNER_RADIUS);
+        GrRestoreTransform(gstate);
+
+	   MemUnlock(OptrToHandle(g_wordsFoundArray));
+	   } /* end of draw it if */
+
+    }  /* end of loop thru for */
+}
+
+/***************************************************************************
+ * WSPGetDirectionOffsets
+ ***************************************************************************
+ * SYNOPSIS:    Calculate the x and y offsets for word placement, given
+ *              the difficulty level and a direction value.
+ *                     FOR DRAWING ANSWERS
+ **************************************************************************/
+void WSPGetDirectionOffsets(WordSearchLevel eLevel, word nDir, 
+                            sword *pndx, sword *pndy)
+{
+    /* These are the offsets that are repeatedly added to a coordinate pair
+       to progress in a certain diagonal along the word search.  The
+       first is right, the second is right and up, and so on, 
+       counterclockwise around the compass. */
+    static const sword dx[8] = { 1,  1,  0, -1, -1, -1, 0, 1 };
+    static const sword dy[8] = { 0, -1, -1, -1,  0,  1, 1, 1 };
+    
+    /* Upconvert directions for lower difficulty levels to the hardest,
+       since that one maps directly to the dx/dy arrays. */
+    switch (eLevel)
+    {
+        case WSL_EASY:      nDir *= 6;
+                            break;
+        case WSL_MEDIUM:    nDir *= 2;
+                            break;
+        case WSL_HARD:      break;
+        default:            EC_ERROR(-1); break;
+    }
+    
+    /* Set the offsets. */
+    *pndx = dx[nDir];
+    *pndy = dy[nDir];
+}
+
+/***************************************************************************
+ * WSPDirectionToAngle
+ ***************************************************************************
+ * SYNOPSIS:    Calculate the physical angle for word placement, given
+ *              the difficulty level and a direction value.  Zero degrees
+ *              translates to the positive x-axis.
+ *                      FOR DRAWING ANSWERS
+ **************************************************************************/
+WWFixedAsDWord WSPDirectionToAngle(WordSearchLevel eLevel, word nDir)
+{
+    switch (eLevel)
+    {
+        case WSL_EASY:      nDir *= 6;
+                            break;
+        case WSL_MEDIUM:    nDir *= 2;
+                            break;
+        case WSL_HARD:      break;
+        default:            EC_ERROR(-1); break;
+    }
+
+    return MakeWWFixed(nDir * 45);
+}
+
+/***************************************************************************
+ * WSPDrawHeader
+ ***************************************************************************
+ * SYNOPSIS:    Called to draw the word search header.
+ *                      FOR PRINTED OUTPUT ONLY
+ * STRATEGY:    Calculate the position for drawing the file name centered
+ *                horizontally within the header bounds.
+ *              Draw the file name.
+ *
+ **************************************************************************/
+void WSPDrawHeader(GStateHandle gstate)
+{
+    char szFileName[FILE_LONGNAME_BUFFER_SIZE];
+    sword x;
+    
+    if (g_oDocument != NullOptr)
+    {
+        GrSetFont(gstate, PRINT_HEADER_TEXT_FONT, PRINT_HEADER_TEXT_SIZE);
+        GrSetTextColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+        GrSetDefaultTransform(gstate);
+
+	   @call g_oDocument::MSG_GEN_DOCUMENT_GET_FILE_NAME(szFileName);
+
+        x = (PRINT_HEADER_BOUNDS_LEFT + PRINT_HEADER_BOUNDS_RIGHT -
+          GrTextWidth(gstate, szFileName, sizeof(szFileName))) / 2;
+        GrDrawText(gstate, x, PRINT_HEADER_BOUNDS_TOP, szFileName, 
+          sizeof(szFileName));
+    }
+}
+
+/***************************************************************************
+ * WSPDrawWordList
+ ***************************************************************************
+ * SYNOPSIS:    Called to print the word list.
+ *                     FOR PRINTED OUTPUT ONLY
+ * STRATEGY:    Calculate the text size, column width, number of columns,
+ *                and number of rows.
+ *              Call appropriate drawing functions.
+ *
+ **************************************************************************/
+void WSPDrawWordList(GStateHandle gstate)
+{
+    MemHandle mhHeap;
+    optr owl;
+    word n, nCount, nIndex, nLargestWord, nLargestWordIdx, nColWidth;
+    word nNumCols, nNumRows, nCol, nRow, nPrintCount;
+    sword x;
+    WWFixedAsDWord fFontSize;
+    word dummy;
+    Boolean bFits = FALSE;
+    
+    /* Ensure that no handles are null. */
+    if (g_fhDocument != NullHandle && g_bhDocHeap != NullHandle
+      && g_chDocWordList != NullChunk)
+    {
+        /* Lock things. */
+        VMLock(g_fhDocument, g_bhDocHeap, &mhHeap);
+	   owl = ConstructOptr(mhHeap, g_chDocWordList);
+        
+        nCount = ChunkArrayGetCount(owl);
+        /* No point in continuing if there are no words. */
+        if (nCount == 0)
+            return;
+            
+        /* Find the longest word.  This will determine the column width. */
+        GrSetFont(gstate, PRINT_WORD_TEXT_FONT, PRINT_WORD_MAX_TEXT_SIZE);
+        nLargestWord = 0;
+        nLargestWordIdx = 0;
+        for (nIndex = 0; nIndex < nCount; nIndex++)
+        {
+            n = GrTextWidth(gstate, ChunkArrayElementToPtr(owl, nIndex, &dummy),
+              0);
+            if (n > nLargestWord)
+            {
+                nLargestWord = n;
+                nLargestWordIdx = nIndex;
+            }
+        }
+        /* Add a small amount for spacing. */
+        nLargestWord += PRINT_WORD_COLUMN_SPACING;
+        
+        /* Start with the largest font size. */
+        for (fFontSize = PRINT_WORD_MAX_TEXT_SIZE;
+          !bFits && fFontSize >= PRINT_WORD_MIN_TEXT_SIZE; 
+          fFontSize -= PRINT_WORD_STEP_TEXT_SIZE)
+        {
+            /* Determine how many columns can be fit. */
+            GrSetFont(gstate, PRINT_WORD_TEXT_FONT, fFontSize);
+            nColWidth = GrTextWidth(gstate, ChunkArrayElementToPtr(
+              owl, nLargestWordIdx, &dummy), 0) + PRINT_WORD_COLUMN_SPACING;
+            nNumCols = PRINT_WORD_TEXT_BOX_WIDTH / nColWidth;
+                        
+            /* Determine how many rows can be fit. */
+            nNumRows = IntegerOf(GrUDivWWFixed(
+              MakeWWFixed(PRINT_WORD_TEXT_BOX_HEIGHT), fFontSize));
+            
+            /* If all of the words fit, keep this font size; otherwise,
+               shrink the font and try again. */
+            if (nNumCols * nNumRows >= nCount)
+                bFits = TRUE;
+        }
+        
+        /* Enforce the minimum font size even if all the words won't fit. */
+        if (!bFits)
+            fFontSize = PRINT_WORD_MIN_TEXT_SIZE;
+            
+        /* Calculate column width to fill the text box. */
+        nColWidth = PRINT_WORD_TEXT_BOX_WIDTH / nNumCols;
+        
+        /* Calculate how many rows will be used for printing row by row. */
+        nPrintCount = nCount;
+        if (nPrintCount > nNumCols * nNumRows)
+            nPrintCount = nNumCols * nNumRows;
+        nNumRows = (nPrintCount + nNumCols - 1) / nNumCols;
+
+        /* Setup the remainder of the GState. */
+        GrSetTextColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+        GrSetDefaultTransform(gstate);
+
+	   /* Print all words, column by column. */
+        x = PRINT_WORD_TEXT_BOX_LEFT;
+        nIndex = 0;
+        for (nCol = 0; nCol < nNumCols && nIndex < nCount; nCol++)
+        {
+            for (nRow = 0; nRow < nNumRows && nIndex < nCount; nRow++)
+            {
+                GrDrawText(gstate, x, PRINT_WORD_TEXT_BOX_TOP + 
+                  IntegerOf(GrMulWWFixed(MakeWWFixed(nRow), fFontSize)), 
+                  ChunkArrayElementToPtr(owl, nIndex, &dummy), 0);
+                nIndex ++;
+            }
+            x += nColWidth;
+        }
+    }
+}
+
+/***************************************************************************
+ * WSPCheckForWSM
+ ***************************************************************************
+ * SYNOPSIS:    sees if Word Search Maker is available
+ *
+ * PARAMETERS:
+ *
+ * STRATEGY:    tries to open app in engine mode
+ *
+ **************************************************************************/
+Boolean WSPCheckForWSM (void)
+{
+ GeodeToken		WSMToken = { "BWSM" , 16431 };
+ GeodeHandle		WSMHandle;
+ MemHandle		HALWSM;
+ word			numServers;
+ IACPConnection	iacpConnectionToken;
+ EventHandle		hToTop;
+
+
+	 /* check to see if WSM is running already */
+	 WSMHandle = GeodeFind("wsm",GEODE_NAME_SIZE,0,0);
+
+	 if(WSMHandle == NullHandle)  {  /* it is not running */
+		/* set up a launch block for it */
+		HALWSM = IACPCreateDefaultLaunchBlock(MSG_GEN_PROCESS_OPEN_ENGINE);
+
+		/* see if we can start it */
+		iacpConnectionToken = IACPConnect(
+		 &WSMToken,
+		 /*IACPCF_OBEY_LAUNCH_MODEL||*/IACPSM_NOT_USER_INTERACTIBLE,
+		 HALWSM,
+		 0,
+		 &numServers);
+
+		/* check to see if it got started */
+		if (numServers != 1)
+		  {
+		  /* it didn't so bail out... */
+		  return(FALSE);
+		  }
+
+		/* we got it started (in engine mode) so close it)
+		/* encapsulate a message telling WSM to quit */
+		hToTop = @record GenApplicationClass::MSG_META_QUIT();
+
+		/* send our message */
+		IACPSendMessage(
+		 iacpConnectionToken,
+		 hToTop,
+		 TO_MODEL,
+		 NullHandle,  /* no return msg needed */
+		 IACPS_CLIENT);
+
+		/* and close the IACP connection */
+		IACPShutdown(iacpConnectionToken, NullOptr);
+
+	 /* check to see if WSM is running already */
+	 WSMHandle = GeodeFind("wsm",GEODE_NAME_SIZE,0,0);
+
+		}  /* end of not running if */
+
+	return (TRUE);
+
+
+}
+
