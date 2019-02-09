@@ -6,9 +6,9 @@
 GEODE           = wsm
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = WSM.GOC process.goc routines.goc Import.goc WSMICON.GOH\
-                  BBOXREG.GOH wsm.goh externs.goh
-OBJS            = WSM.obj process.obj routines.obj Import.obj
+SRCS            = wsm.goc routines.goc process.goc Import.goc wsmicon.goh\
+                  bboxreg.goh wsm.goh externs.goh
+OBJS            = wsm.obj routines.obj process.obj Import.obj
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk
