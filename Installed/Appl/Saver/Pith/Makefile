@@ -3,10 +3,10 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Pith
+GEODE           = pith
 ASM_TO_OBJS     = pith.asm
-UI_TO_RDFS      = PITH.UI
-SRCS            = pith.asm pithMessage.asm pith.def pith.ui
+UI_TO_RDFS      = pith.ui
+SRCS            = pithMessage.asm pith.asm pith.def pith.ui
 OBJS            = pith.obj
 LOBJS           =
 
