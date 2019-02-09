@@ -1,0 +1,247 @@
+/***************************************************************************
+ *  FILE:  LASERDB.GOC
+ ***************************************************************************/
+
+/***************************************************************************
+ *		Include files
+ ***************************************************************************/
+
+@include <stdapp.goh>
+#include <Ansi/string.h>
+#include <Ansi/stdio.h>
+@include "options.goh"
+
+@extern chunk NoExerciseFile;
+@extern chunk Level1Samp;
+@extern chunk Level2Samp;
+@extern chunk Level3Samp;
+
+/***************************************************************************
+ *		Constants and defines:
+ ***************************************************************************/
+
+/* Name of database to hold exercises */
+#define EXERCISE_DATABASE_FILENAME        "exercise.vm"
+
+/* Exercise titles are limited in length */
+#define MAX_TITLE_LEN      80
+
+/* Exercises themselves are limited in length */
+#define MAX_EXERCISE_LEN   2048
+
+/* Number of exercises per lesson */
+#define NUM_EXERCISES      3
+
+/***************************************************************************
+ *		Custom types:
+ ***************************************************************************/
+
+typedef struct {
+    char    ES_title[MAX_TITLE_LEN] ;
+    char    ES_exercise[MAX_EXERCISE_LEN] ;
+} T_exerciseRecord ;
+
+typedef struct
+    {
+    word        MS_number ;
+    #define     MAX_EXERCISES   100
+    VMBlockHandle   MS_exercises[MAX_EXERCISES] ;
+} T_exerciseDatabaseMap ;
+
+/***************************************************************************
+ *		Global variables:
+ ***************************************************************************/
+
+/* Current database opened for exercises */
+VMFileHandle G_exerciseDBFile = NullHandle;  /* handle to the vm file. */
+
+/* Current database entry copied to memory */
+char G_titleString[MAX_TITLE_LEN] ;
+char G_exerciseString[MAX_EXERCISE_LEN] ;
+
+/* How many exercises are in the database? */
+word G_numExercises ;
+
+void StoreExercise(word index)
+{
+    MemHandle memMap ;
+    VMBlockHandle mapBlock ;
+    T_exerciseDatabaseMap *p_map ;
+    MemHandle mem ;
+    T_exerciseRecord *p_exercise ;
+
+    /* LES #14  If we get a bad index, we just ignore it.  In truth
+            I should set up a FatalError if that ever happens. */
+    if (index < MAX_EXERCISES)  {
+        /* LES #16  We have to lock in the map block to get at the
+                array of VMBlock handles */
+        mapBlock = VMGetMapBlock(G_exerciseDBFile) ;
+        p_map = VMLock(G_exerciseDBFile, mapBlock, &memMap) ;
+
+        /* LES #17  Now I'm going to do a bit of a trick.  I'm going
+                see if we have a block.  If we don't, we'll allocate
+                it here in this routine and then fall down later
+                into the regular code to store the data */
+        if (p_map->MS_exercises[index] == NullHandle)  {
+            p_map->MS_exercises[index] = VMAlloc(G_exerciseDBFile, sizeof(T_exerciseRecord), 0) ;
+            p_map->MS_number++ ;
+            G_numExercises++ ;
+            VMDirty(memMap) ;
+        }
+
+        /* LES #18  At this point, we know we have a previously existing
+                exercise block.  Lock and fill the block. */
+        p_exercise = VMLock(G_exerciseDBFile, p_map->MS_exercises[index], &mem) ;
+        strcpy(p_exercise->ES_title, G_titleString) ;
+        strcpy(p_exercise->ES_exercise, G_exerciseString) ;
+        VMDirty(mem) ;
+        VMUnlock(mem) ;
+
+        /* LES #19  Ok, now let go of the map.  We're done here, on to 20 */
+        VMUnlock(memMap) ;
+    } else  {
+        /* LES #15  Ok, to help debug the program, yeah, we'll put in
+                a fatal error if passed a bad value.  But I'll
+                enclose it with the EC() macro to make the crash
+                only occur in the EC version. */
+        EC(        FatalError(-1) ; )
+    }
+}
+
+
+void LaserExerciseDBClose(void)
+{
+    VMClose(G_exerciseDBFile, FALSE) ;
+    G_exerciseDBFile = NullHandle ;
+}
+
+void LaserExerciseDBOpen(void)
+{
+    MemHandle mh ;
+    VMBlockHandle vmbh ;
+    int i ;
+    T_exerciseDatabaseMap *mapPtr ;
+
+    FilePushDir() ;
+
+@if 0
+@if @COMPILE_OPTION_YAGO
+    FileSetCurrentPath(
+        0,
+        "F:\\GEOWORKS\\PRIVDATA\\TT Data") ;
+@else
+    FileSetCurrentPath(
+        SP_PRIVATE_DATA,
+        "TT Data") ;
+@endif
+@else
+    FileSetCurrentPath(
+        SP_PUBLIC_DATA,
+        "TT Data") ;
+
+@endif /* 0 */
+
+    /* Now we need to open up the exercise database */
+    /* If the file doesn't exist, it will be created */
+    G_exerciseDBFile = VMOpen(
+                           EXERCISE_DATABASE_FILENAME,
+                           0,
+                           VMO_CREATE_ONLY,
+                           0) ;
+
+    /* If we have a handle, we were able to create the file, so fill */
+    /* in the details */
+    if (G_exerciseDBFile != 0)  {
+		  /* tell the use we're using a sample */
+		  MemLock (OptrToHandle(@NoExerciseFile));
+		  UserStandardDialog(0, 0, 0, 0, LMemDeref(@NoExerciseFile),
+						  ( CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET ) |
+						  ( GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET )) ;
+		  MemUnlock (OptrToHandle(@NoExerciseFile));
+		  /* Setup the map block */
+        vmbh = VMAlloc(G_exerciseDBFile, sizeof(T_exerciseDatabaseMap), 0) ;
+        mapPtr = VMLock(G_exerciseDBFile, vmbh, &mh) ;
+        memset(mapPtr, 0, sizeof(*mapPtr)) ;
+        VMDirty(mh) ;
+        VMUnlock(mh) ;
+        VMSetMapBlock(G_exerciseDBFile, vmbh) ;
+
+        /* Put in the dummy exercises */
+		  MemLock (OptrToHandle(@Level1Samp));
+		  for (i=0; i < NUM_EXERCISES; i++)  {
+            /* Put default items into the array */
+            vmbh = VMGetMapBlock(G_exerciseDBFile) ;
+            mapPtr = VMLock(G_exerciseDBFile, vmbh, &mh) ;
+
+            switch (i)  {
+                case 0:
+                    strcpy(G_titleString, "Lesson 1 - Home Row (Step 1)") ;
+						  strcpy(G_exerciseString, LMemDeref(@Level1Samp)) ;
+                    break ;
+                case 1:
+                    strcpy(G_titleString, "Lesson 1 - Home Row (Step 2)") ;
+						  strcpy(G_exerciseString, LMemDeref(@Level2Samp)) ;
+                    break ;
+                case 2:
+                    strcpy(G_titleString, "Lesson 1 - Home Rom (Step 3)") ;
+						  strcpy(G_exerciseString, LMemDeref(@Level3Samp)) ;
+                    break ;
+            } /* end of switch */
+            StoreExercise(i) ;
+        } /* end of loop */
+		  MemLock (OptrToHandle(@Level1Samp));
+
+        VMSave(G_exerciseDBFile) ;
+    } else  {
+        /* Could not create, so open the file and get the data */
+        G_exerciseDBFile = VMOpen(
+                               EXERCISE_DATABASE_FILENAME,
+                               0,
+                               VMO_OPEN,
+                               0) ;
+        /* Get our map block */
+        vmbh = VMGetMapBlock(G_exerciseDBFile) ;
+        mapPtr = VMLock(G_exerciseDBFile, vmbh, &mh) ;
+
+        /* Retrieve the info */
+        G_numExercises = mapPtr->MS_number ;
+
+        /* Retrieve the first exercise */
+        VMUnlock(mh) ;
+
+//IConvert() ;
+    }
+
+    FilePopDir() ;
+}
+
+void RetrieveExercise(word index)
+{
+    MemHandle memMap ;
+    VMBlockHandle mapBlock ;
+    T_exerciseDatabaseMap *p_map ;
+    MemHandle mem ;
+    T_exerciseRecord *p_exercise ;
+
+    if (index < MAX_EXERCISES)  {
+        mapBlock = VMGetMapBlock(G_exerciseDBFile) ;
+        p_map = VMLock(G_exerciseDBFile, mapBlock, &memMap) ;
+
+        if (p_map->MS_exercises[index] == NullHandle)  {
+            G_titleString[0] = G_exerciseString[0] = '\0' ;
+        } else  {
+            p_exercise = VMLock(G_exerciseDBFile, p_map->MS_exercises[index], &mem) ;
+            strcpy(G_titleString, p_exercise->ES_title) ;
+            strcpy(G_exerciseString, p_exercise->ES_exercise) ;
+            VMUnlock(mem) ;
+        }
+
+        VMUnlock(memMap) ;
+    } else {
+        EC(        FatalError(-1) ; )
+    }
+}
+
+/***************************************************************************
+ *  END OF FILE:  LASERDB.GOC
+ ***************************************************************************/
