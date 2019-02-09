@@ -6,8 +6,8 @@
 GEODE           = wmg3ftp
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = WMG3FTP.GOC USERPASS.GOH
-OBJS            = WMG3FTP.obj
+SRCS            = wmg3ftp.goc userpass.goh
+OBJS            = wmg3ftp.obj
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = wmg3ftp
