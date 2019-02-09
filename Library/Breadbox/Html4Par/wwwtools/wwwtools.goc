@@ -346,10 +346,10 @@ int EXPORT ToolsResolveRelativeURL(TCHAR *cur,TCHAR *url)
           }
 
           /* default type for names starting with FTP is... suprise... */
-          if(LocalCmpStringsNoCase(server,_TEXT("FTP"),3)==0)
-            strcpy(curType, _TEXT("FTP"));
+          if(LocalCmpStringsNoCase((char*)server,(char*)_TEXT("FTP"),3)==0)
+            strcpy((TCHAR*)curType, _TEXT("FTP"));
           else
-            strcpy(curType, _TEXT("HTTP"));
+            strcpy((TCHAR*)curType, _TEXT("HTTP"));
         }
 
         ToolsMakeURL(curType, server, path, cur);
@@ -402,7 +402,7 @@ void EXPORT ToolsNormalizeURL(TCHAR *url)
     urlServer = urlType + URL_MAX_TYPE;
     urlPath = urlServer + URL_MAX_SERVER;
     ToolsParseURL(url,urlType,urlServer,urlPath);
-    strupr(urlType);
+    strupr((char*)urlType);
 
     /* If server name contains a "@", only normalize portion after that,
        because the stuff before is a user name and password, which is most
@@ -414,9 +414,9 @@ void EXPORT ToolsNormalizeURL(TCHAR *url)
     atsign = strchr(urlServer, C_AT_SIGN);
 @endif
     if(atsign)
-      strlwr(atsign);
+      strlwr((char*)atsign);
     else
-      strlwr(urlServer);
+      strlwr((char*)urlServer);
 
     ToolsMakeURL(urlType,urlServer,urlPath,url);
     MemFree(workBuf);
@@ -466,7 +466,7 @@ word EXPORT ToolsStringSectionFindKey(char *sect, char *key,
 
       if(mapLeftToRight)                /* key on left or right side of "="? */
       {
-        if(LocalCmpStringsNoCase(val1,subKey,len1)==0 && len1==strlen(subKey))
+        if(LocalCmpStringsNoCase((char*)val1,(char*)subKey,len1)==0 && len1==strlen(subKey))
         {
           xstrncpy(value,val2,min(len2+1,bufSize/sizeof(TCHAR)));
                                         /* return value, truncate if req'd */
@@ -475,7 +475,7 @@ word EXPORT ToolsStringSectionFindKey(char *sect, char *key,
       }
       else
       {
-        if(LocalCmpStringsNoCase(val2,subKey,len2)==0 && len2==strlen(subKey))
+        if(LocalCmpStringsNoCase((char*)val2,(char*)subKey,len2)==0 && len2==strlen(subKey))
         {
           xstrncpy(value,val1,min(len1+1,bufSize/sizeof(TCHAR)));
                                         /* return value, truncate if req'd */
@@ -499,15 +499,15 @@ optr EXPORT ToolsFormatMessage(optr msg,TCHAR *res)
 
     size = strlen(LMemDeref(msg))+2;    /* basic size of HTML message */
     if(res)                             /* insert error message? */
-      size += 2*strlen((char *)res);    /* leave room for two messages */
+      size += 2*strlen((TCHAR *)res);    /* leave room for two messages */
 
     mh = MemAlloc(size*sizeof(TCHAR), HF_DYNAMIC, HAF_NO_ERR);
     dst = MemLock(mh);
     if(res)                             /* paste error message into block */
     /* extra arguments to handle extended error messages */
-      sprintf(dst, LMemDeref(msg), (char *)res, (char *)res);
+      sprintf((TCHAR*) dst, (TCHAR*) LMemDeref(msg), (TCHAR *)res, (TCHAR *)res);
     else
-      strcpy(dst, LMemDeref(msg));
+      strcpy((TCHAR*)dst, (TCHAR*)LMemDeref(msg));
     MemUnlock(mh);
 
     MemUnlock(OptrToHandle(msg));
@@ -525,7 +525,7 @@ DiskHandle EXPORT ToolsParseDiskOrStandardPath(TCHAR **p)
 @else
     c = toupper((unsigned char)**p);    /* first letter of path */
 @endif
-    dh = FileParseStandardPath(0,p);
+    dh = FileParseStandardPath(0,(const char**)p);
 
     if(dh==SP_NOT_STANDARD_PATH && c>='A' && c<='Z' && (*p)[1]==':')
     {
@@ -576,7 +576,7 @@ void EXPORT DebugDialogPrintf(TCHAR *fmt, ...)
      va_end(arg);
 
      UserStandardDialog(             /* notify user */
-        (TCHAR *)NULL, (TCHAR *)NULL, (TCHAR *)NULL, (TCHAR *)NULL, buf,
+        (char *)NULL, (char *)NULL, (char *)NULL, (char *)NULL, (char*)buf,
         (CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
         (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
 }

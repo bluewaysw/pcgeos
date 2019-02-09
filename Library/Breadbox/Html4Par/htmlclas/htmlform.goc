@@ -483,7 +483,7 @@ void _export FormStringConvertAndAppend(MemHandle mem, TCHAR *p_string)
 @ifdef DO_DBCS
             /* conversion of Unicode to form submission data */
             d = c;
-            LocalGeosToDosChar(&d, G_htmlCodePage, 0, &status);
+            LocalGeosToDosChar((unsigned int*)&d, G_htmlCodePage, 0, (DosToGeosStringStatus*)&status);
 	    if (d > 255) len += 3;  /* %XX%XX for double-byte */
 @endif
         } else {
@@ -513,7 +513,7 @@ void _export FormStringConvertAndAppend(MemHandle mem, TCHAR *p_string)
             /* Convert Geos to ISO Latin 1 first */
             if ((c < 64) || (c >= 91 && c <= 96) || (c >= 123))  {
 @ifdef DO_DBCS
-               LocalGeosToDosChar(&c, G_htmlCodePage, 0, &status);
+               LocalGeosToDosChar((unsigned int*)&c, G_htmlCodePage, 0, (DosToGeosStringStatus*)&status);
 @else
                c = LocalGeosToCodePageChar(c, CODE_PAGE_LATIN_1, '.');
 @endif
@@ -567,7 +567,8 @@ void _export FormStringAppend(MemHandle mem, TCHAR *p_string)
 @ifdef DO_DBCS
     /* DBCS TBD: conversion of Unicode form strings to DOS */
     len++;  /* include null */
-    LocalGeosToDos(p_dest, p_string, &len, DEFCHAR, &cp, 0, &status, &backup);
+    LocalGeosToDos(p_dest, (unsigned int*) p_string, &len, DEFCHAR, &cp,
+ 		0, (DosToGeosStringStatus *)&status, &backup);
     p_formString->numChars += len-1;  /* don't include null */
 @else
     memcpy(p_dest, p_string, len+1) ;
@@ -753,7 +754,7 @@ static dword FormStringLengthMulti(T_formString *postData);
 		    /* set special get flag and remove URL at beginning */
 		    p_formString->flags |= FORM_STRING_FLAG_IS_GET_METHOD;
 		    if (argsOffset != 0xffff) {
-			strcpy(p_formString->data, p_formString->data + argsOffset);
+			strcpy((TCHAR*)p_formString->data, (TCHAR*)p_formString->data + argsOffset);
 			p_formString->numChars -= STRLENSB(p_formString->data);
 		    }
 		    MemUnlock(formString) ;
@@ -986,7 +987,7 @@ static dword FormStringLengthMulti(T_formString *postData);
 		    if (notMulti)
 			FormStringConvertAndAppend(formString, itoaBuf) ;
 		    else {
-			FormStringAppend(formString, FCVT_STRING_STR) ;
+			FormStringAppend(formString, (TCHAR*) FCVT_STRING_STR) ;
 			FormStringAppend(formString, itoaBuf) ;
 		    }
 		    if (notMulti)
@@ -1015,14 +1016,14 @@ static dword FormStringLengthMulti(T_formString *postData);
 		    if (notMulti)
 			FormStringConvertAndAppend(formString, bufP) ;
 		    else {
-			FormStringAppend(formString, (isFile ? FCVT_FILE_STR :
+			FormStringAppend(formString, (TCHAR*)(isFile ? FCVT_FILE_STR :
 						      FCVT_STRING_STR)) ;
 			FormStringAppend(formString, bufP) ;
 			if (isFile) {
 			    /* If multipart, add the mime type. */
 			    if (bufP[0] != '\0')
 				@call self::MSG_HTML_TEXT_IDENTIFY_MIME_TYPE(
-				    bufP, itoaBuf);
+				    (char*)bufP, itoaBuf);
 			    else
 				itoaBuf[0] = '\0';
 			    FormStringAppendNull(formString);
@@ -1035,7 +1036,7 @@ static dword FormStringLengthMulti(T_formString *postData);
 		    if (notMulti)
 			FormStringConvertAndAppend(formString, p_text) ;
 		    else {
-			FormStringAppend(formString, FCVT_STRING_STR) ;
+			FormStringAppend(formString, (TCHAR*)FCVT_STRING_STR) ;
 			FormStringAppend(formString, p_text) ;
 		    }
                     MemUnlock(mem) ;
@@ -1055,7 +1056,7 @@ static dword FormStringLengthMulti(T_formString *postData);
 		if (notMulti)
 		    FormStringConvertAndAppend(formString, itoaBuf);
 		else {
-		    FormStringAppend(formString, FCVT_STRING_STR) ;
+		    FormStringAppend(formString, (TCHAR*)FCVT_STRING_STR) ;
 		    FormStringAppend(formString, itoaBuf);
 		    FormStringAppendNull(formString);
 		}
@@ -1066,7 +1067,7 @@ static dword FormStringLengthMulti(T_formString *postData);
 		if (notMulti)
 		    FormStringConvertAndAppend(formString, itoaBuf);
 		else {
-		    FormStringAppend(formString, FCVT_STRING_STR) ;
+		    FormStringAppend(formString, (TCHAR*)FCVT_STRING_STR) ;
 		    FormStringAppend(formString, itoaBuf);
 		    FormStringAppendNull(formString);
 		}

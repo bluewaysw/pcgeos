@@ -3,7 +3,7 @@
 # PROJECT:      HTMLPars
 # FILE:         htmlpars.gp
 #
-# AUTHOR:       Marcus Gr”ber
+# AUTHOR:       Marcus Grï¿½ber
 #
 ##############################################################################
 
@@ -89,15 +89,15 @@ export     LMEMDUP
 
 export	   NAMEPOOLVMLOAD
 
-resource   STYLERESOURCE   lmem read-only shared
-resource   ENTITYRESOURCE  lmem read-only shared
-resource   COLORRESOURCE   lmem read-only shared
-resource   POINTERRESOURCE lmem read-only shared
-resource   FORMBUTTONRESOURCE lmem read-only shared
+resource   StyleResource   lmem read-only shared
+resource   EntityResource  lmem read-only shared
+resource   ColorResource   lmem read-only shared
+resource   PointerResource lmem read-only shared
+resource   FormButtonResource lmem read-only shared
 resource   ASM_TEXT fixed
 
 # only needed if IN_PLACE_TEXT_ENTRY in options.goh
-resource   FORMELEMENTTEXTENTRYRESOURCE object
+resource   FormElementTextEntryResource object
 
 export     NAMEPOOLFIND
 
@@ -105,7 +105,7 @@ export     NAMEPOOLFIND
 export     InPlaceTextEntryClass
 
 # only needed if IN_PLACE_SELECT_LIST in options.goh
-resource   FORMELEMENTSELECTLISTPOPUPRESOURCE ui-object
+resource   FormElementSelectListPopupResource ui-object
 export     FormElementSelectPopupListClass
 
 # FormString routines
@@ -115,7 +115,7 @@ export     FormStringConvertAndAppend
 export     FormStringDerefData
 
 # only needed if IN_PLACE_TEXT_ENTRY in options.goh
-resource   FORMELEMENTTEXTAREAENTRYRESOURCE object
+resource   FormElementTextAreaEntryResource object
 export     InPlaceTextAreaEntryClass
 
 export	   FreeHTMLTransferItem	

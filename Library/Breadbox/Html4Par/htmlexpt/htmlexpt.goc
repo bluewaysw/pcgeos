@@ -74,7 +74,8 @@ void UnTranslateChar(int ch,char *buf)
     if(!*buf)
     {
 	word status;
-	LocalGeosToDosChar(&ch, HTMLext->HE_codePage, 0, &status);
+	LocalGeosToDosChar((unsigned int*)&ch, HTMLext->HE_codePage,
+	 		0, (DosToGeosStringStatus *)&status);
 	buf[0] = ch & 0x00ff;
 	buf[1] = ch & 0xff00;  /* could be null */
 	buf[2] = 0;  /* in case two-byte char */
@@ -105,8 +106,8 @@ int _export _pascal CreateHTMLFile(optr obj, FileHandle out)
     while(len)
     {
       diff = (len>sizeof(buf))?sizeof(buf):len;
-      @call obj::MSG_VIS_TEXT_SELECT_RANGE( pos+diff, pos );
-      @call obj::MSG_VIS_TEXT_GET_SELECTION_PTR( buf );
+      @call obj::MSG_VIS_TEXT_SELECT_RANGE( (char*)pos+diff, pos );
+      @call obj::MSG_VIS_TEXT_GET_SELECTION_PTR( (char*)buf );
       for(i=0; i<(int)diff; i++)
       {
         if(buf[i]=='\r')
@@ -118,7 +119,7 @@ int _export _pascal CreateHTMLFile(optr obj, FileHandle out)
 @else
           UnTranslateChar( (unsigned char)buf[i], cbuf );
 @endif
-          FileWrite( out, cbuf, strlen(cbuf), FALSE );
+          FileWrite( out, cbuf, strlen((TCHAR*)cbuf), FALSE );
         }
         else
 	    /* DBCS: writes low byte */

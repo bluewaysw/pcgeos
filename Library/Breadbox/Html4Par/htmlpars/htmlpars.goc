@@ -35,7 +35,7 @@
 
 ReadHTML_getc LOCAL getcFileURL;   /* forward */
 #if JAVASCRIPT_SUPPORT
-ReadHTML_getc LOCAL getcScriptURL;   /* forward */
+/*ReadHTML_getc LOCAL getcScriptURL;  */ /* forward */
 #endif
 
 /* keep blocks with arrays below this size */
@@ -336,7 +336,7 @@ void ApplyFontWeightWidthAndSpacingAdjustment(VisTextCharAttr *p_cs)
 	     char buf[15];
 	     for (i = 0; i < NUM_CODE_PAGE_FONT_ADJ_ENTRIES; i++) {
 		 sprintfsbcs(buf, "cp-%d", i);
-		 if (!InitFileReadInteger("HTMLView", buf, &(cpFontAdj[i].cp))) {
+		 if (!InitFileReadInteger("HTMLView", buf, (word*)&(cpFontAdj[i].cp))) {
 		     sprintfsbcs(buf, "cp%ufadj", cpFontAdj[i].cp);
 		     cpFontAdj[i].table = IReadFontAdjustTableFromINI(buf);
 		 } else {
@@ -531,7 +531,8 @@ long AddText(VisTextCharAttr *ca,char *text)
 	     if (!addBufH) goto allocLimit;
 	     addBufP = MemLock(addBufH);
 	 }
-	 LocalDosToGeos(addBufP, text, &len, DEFCHAR, &cp, 0, &status, &backup);
+	 LocalDosToGeos((unsigned int*)addBufP, text, &len, DEFCHAR, &cp, 
+	 		0, (DosToGeosStringStatus *)&status, &backup);
 	 ConvertGeosCharEntities(addBufP, &len);
          HugeArrayAppend(HTMLext->HE_vmFile,
            VMCHAIN_GET_VM_BLOCK(ttbh->TTBH_text), len, addBufP);
@@ -1043,7 +1044,7 @@ void EndParagraph(char *p)
         }
         else                            /* already line/para break pending */
         {
-          if( STRLENSB(p) >= strlen(insertPrepend) )
+          if( STRLENSB(p) >= strlen((TCHAR*)insertPrepend) )
             STRCPYSB(insertPrepend, p);   /* prepend overrides non-prepend */
 
           insertParagraphFlags &= ~BREAK_LINE_BREAK;
@@ -1992,7 +1993,7 @@ int LOCAL getcFileURL(dword data)  /* callback routine to get one char */
 }
 
 #if JAVASCRIPT_SUPPORT
-ReadHTML_getc LOCAL getcScriptURL
+int /*LOCAL*/ getcScriptURL(dword data)
 {
     dword halRet;
     ScriptSrcHeader *p = (ScriptSrcHeader *)data, *par;
@@ -2002,7 +2003,7 @@ ReadHTML_getc LOCAL getcScriptURL
 
     /* XXX: this is non-optimal, should buffer data locally */
     do {
-      halRet = HugeArrayLock(p->file, p->block, p->i, &q, &size);
+      halRet = HugeArrayLock(p->file, p->block, p->i, (void**)&q, &size);
       if (HAL_COUNT(halRet)) {
 	  c = *q;
 	  p->i++;

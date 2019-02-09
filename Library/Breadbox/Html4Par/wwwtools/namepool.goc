@@ -311,7 +311,8 @@ NameToken EXPORT NamePoolTokenizeLenDOS(
 	}
     }
     if (bufP) {
-	LocalDosToGeos(bufP, name, &len, DEFCHAR, &cp, 0, &status, &backup);
+	LocalDosToGeos((unsigned int*)bufP, name, &len, DEFCHAR, &cp, 0, 
+				(DosToGeosStringStatus *)&status, &backup);
 	ConvertGeosCharEntities(bufP, &len);
 	tok = NamePoolTokenizeLen(pool, bufP, len, required);
     }
@@ -461,7 +462,8 @@ EC( NamePoolPrintf(_TEXT("TEST_I: %lx %u '%s' IS "), pool, token, str) ; )
 @endif
 
     /* Compare ignoring case */
-    ret = (strlen(str)==len && LocalCmpStringsNoCase(str, p->NPHAE_str, len)==0);
+    ret = (strlen(str)==len && LocalCmpStringsNoCase(
+    		(char*)str, (char*)p->NPHAE_str, len)==0);
 
     /* Release array element */
     HugeArrayUnlock(p);
@@ -498,7 +500,7 @@ EC( NamePoolPrintf(_TEXT("COPY: %lx token %u\r\n"), pool, token) ; )
                            token + CA_NULL_ELEMENT, (void**)&p, &len));
       len -= sizeof(p->NPHAE_refCount);
 
-      q = buf;                          /* default: use passed buffer */
+      q = (char*) buf;                   /* default: use passed buffer */
       mh = 0;                           /* indicates no dynamic allocation */
 
       /* DBCS: yes, *sizeof(TCHAR) only applies to 1, len is really size */
@@ -524,15 +526,16 @@ EC_ERROR_IF((buflen < (sizeof(MemHandle)+sizeof(int)+1*sizeof(TCHAR))), -1);
       {
         *((MemHandle *)q) = mh;         /* yes: store mem handle, if any */
 	*((int *)(q+sizeof(MemHandle))) = buflen;
-        *ptr = ret = q+sizeof(MemHandle)+sizeof(int);
+        ret = q+sizeof(MemHandle)+sizeof(int);
+	*ptr = (TCHAR*) ret;
       }                                 /* actual string starts after that */
       else
-        ret = buf;                      /* no: always just copy to buffer */
+        ret = (char*) buf;                      /* no: always just copy to buffer */
 
 @ifdef DO_DBCS
       EC_ERROR_IF(len & 1, -1);
 @endif
-      xstrncpy(ret, p->NPHAE_str, len/sizeof(TCHAR)+1);
+      xstrncpy((TCHAR*)ret, p->NPHAE_str, len/sizeof(TCHAR)+1);
 
       /* Release array element */
       HugeArrayUnlock(p);
@@ -550,11 +553,11 @@ EC_ERROR_IF((buflen < (sizeof(MemHandle)+sizeof(int)+1*sizeof(TCHAR))), -1);
       } else {
         /* Return a blank */
         buf[0] = '\0' ;
-        ret = buf ;
+        ret = (char*)buf ;
       }
     }
     if(ptr)                             /* return pointer requested? */
-      *ptr = ret;
+      *ptr = (TCHAR*)ret;
 }
 
 void EXPORT NamePoolDestroyIfDynamic(void *p)
@@ -840,8 +843,8 @@ NameToken EXPORT NamePoolConcatStrDOS(optr pool, NameToken tok, char *str)
     }
     if (bufP) {
 	NamePoolCopy(pool, bufP, (tokLength+1)*sizeof(TCHAR), tok, NULL);
-	LocalDosToGeos(bufP+tokLength, str, &strLength, DEFCHAR, &cp, 0,
-		       &status, &backup);
+	LocalDosToGeos((unsigned int*)bufP+tokLength, str, &strLength, DEFCHAR, &cp, 0,
+		       (DosToGeosStringStatus *)&status, &backup);
 	ConvertGeosCharEntities(bufP+tokLength, &strLength);
 	bufP[(tokLength+strLength)] = C_NULL;
 	NamePoolReleaseToken(pool, tok);
