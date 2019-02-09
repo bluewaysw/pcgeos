@@ -101,7 +101,7 @@ int ver;
 		return(NULL);
 	}
 
-SSL_METHOD * _export SSLv2_client_method()
+SSL_METHOD* _export _pascal SSLv2_client_method()
 	{
 	static int init2CM=1;
 	static SSL_METHOD SSLv2_client_data;
@@ -455,7 +455,7 @@ SSL *s;
 			return(-1);
 			}
 
-		sk_set_cmp_func(sk,ssl_cipher_ptr_id_cmp);
+		sk_set_cmp_func(sk,(int (*)())ssl_cipher_ptr_id_cmp);
 
 		/* get the array of ciphers we will accept */
 		cl=ssl_get_ciphers_by_id(s);

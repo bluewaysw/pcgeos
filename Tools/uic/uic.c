@@ -378,7 +378,7 @@ ParseArgs(int argc, char **argv)
     char	*argString = (char *)malloc(1);
     char    	*argStringPtr = argString;
     int	    	argStringLen = 1;
-    char	command[1000];
+    char	command[2000];
 #if defined(unix)
     char	*pp = "/lib/cpp";
 #elif defined(_WIN32) || defined(_LINUX)

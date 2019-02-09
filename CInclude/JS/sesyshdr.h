@@ -37,7 +37,7 @@
 #  include <Ansi/string.h>
 #  include <Ansi/stdlib.h>
 #  include <Ansi/ctype.h>
-#  include <geomisc.h>
+#  include <geoMisc.h>
 
 #  define EXIT_FAILURE	1
 #  define EXIT_SUCCESS	0
@@ -132,9 +132,9 @@
 #     include <direct.h>
 #  endif
 #     if defined( _MSC_VER ) && _MSC_VER == 600
-#        include <sys\types.h>
+#        include <sys/types.h>
 #     endif
-#     include <sys\stat.h>
+#     include <sys/stat.h>
 #  endif
 
 #  if !defined(__JSE_UNIX__) && !defined(__JSE_MAC__) && !defined(_MSC_VER) \

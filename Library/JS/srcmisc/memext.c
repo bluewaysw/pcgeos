@@ -129,7 +129,7 @@ const word memextHeapSize[] = {
 
 /* How to derefence an optr to an LMem block with no handles and the chunk
    handle is really the offset: */
-#define LMemDerefNH(o) (void *)(((byte *)MemDeref(OptrToHandle(o))) + OptrToChunk(o))
+#define LMemDerefNH(o) (void *)(((byte *)MemDeref(OptrToHandle(o))) + (word)OptrToChunk(o))
 
 GeodeHandle jsememextOwner = NullHandle;
 

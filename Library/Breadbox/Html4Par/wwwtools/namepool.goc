@@ -1,0 +1,977 @@
+/***********************************************************************
+ *
+ * PROJECT:       HTMLView
+ * FILE:          namepool.goc
+ *
+ * AUTHOR:        Marcus Gr�ber
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+@include <stdapp.goh>
+#include <initfile.h>
+#include <resource.h>
+#include <library.h>
+#include <geoMisc.h>
+#include <localize.h>
+
+#include <Ansi/string.h>
+#include <Ansi/stdio.h>
+#include <Ansi/stdlib.h>
+#include <Ansi/ctype.h>
+
+@include <fixes.goh>
+@include <html4par.goh>
+
+@include "options.goh"
+#include "internal.h"
+
+
+#define NAME_POOL_EMPTY_STRING 0xFFFF
+
+typedef struct {
+  LMemBlockHeader   NPBH_meta;
+  ChunkHandle       NPBH_poolChunk;
+
+  /* File and block handle of the huge array holding the actual strings */
+  VMFileHandle      NPBH_vmf;
+  VMBlockHandle     NPBH_array;
+} NamePoolBlockHeader;
+
+typedef struct {
+  Boolean           NPAE_inUse;
+  word              NPAE_hash;
+} NamePoolArrayEntry;
+
+typedef struct {
+  word              NPHAE_refCount;
+  TCHAR              NPHAE_str[1];
+} NamePoolHugeArrayEntry;
+
+
+#ifdef DO_ERROR_CHECKING
+#pragma argsused
+void NamePoolPrintf(TCHAR *fmt, ...)
+{
+#ifdef NAME_POOL_LOG_ON
+     TCHAR buf[512];
+     va_list arg;
+     static FileHandle npfile = NullHandle ;
+@ifdef DO_DBCS
+     DosCodePage cp = 0;
+     word len, status, backup;
+@endif
+
+     if (!npfile)  {
+         FilePushDir();
+         FileSetStandardPath(SP_TOP) ;
+         npfile = FileCreate(_TEXT("namepool.log"),
+                            FILE_CREATE_TRUNCATE | FCF_NATIVE |
+                            FILE_ACCESS_W | FILE_DENY_RW, 0 );
+         FilePopDir() ;
+     }
+
+     if (npfile)  {
+         va_start(arg, fmt);
+         vsprintf(buf, fmt, arg);
+         va_end(arg);
+@ifdef DO_DBCS
+         len = strlen(buf);
+         LocalGeosToDos(buf, buf, &len, DEFCHAR, &cp, 0, &status, &backup);
+         FileWrite(npfile, buf, len, FALSE);
+@else
+         FileWrite(npfile, buf, strlen(buf), FALSE);
+@endif
+     }
+#endif
+}
+
+#ifdef NAME_POOL_LOG_ON
+void NamePoolPrintString(TCHAR *p_string, word len)
+{
+    TCHAR string[400] ;
+    if (!len)
+        len = strlen(p_string) ;
+    if (len >= sizeof(string))
+        len = sizeof(string)-1 ;
+    strncpy(string, p_string, len) ;
+    string[len] = '\0' ;
+    NamePoolPrintf(_TEXT("%s"), string) ;
+}
+#else
+#define NamePoolPrintString(s, l)
+#endif
+#endif
+
+
+optr EXPORT NamePoolCreate(VMFileHandle vmf)
+{
+    MemHandle mem;
+    ChunkHandle ch;
+    NamePoolBlockHeader *npbh;
+
+    mem = MemAllocLMem(LMEM_TYPE_GENERAL, sizeof(NamePoolBlockHeader));
+    MemLock(mem);
+    ch = ChunkArrayCreate(mem, sizeof(NamePoolArrayEntry), 0, 0);
+    npbh = MemDeref(mem);               /* block could have moved */
+    npbh->NPBH_poolChunk = ch;          /* store pointer to chunk */
+    npbh->NPBH_vmf = vmf;               /* store associated VM file */
+    npbh->NPBH_array = HugeArrayCreate(vmf, 0, 0);
+    MemUnlock(mem);
+
+EC( NamePoolPrintf(_TEXT("CREATE: %lx\r\n"), ConstructOptr(mem, ch)); )
+    return ConstructOptr(mem, ch);
+}
+
+void EXPORT NamePoolFree(optr pool)
+{
+    NamePoolBlockHeader *npbh;
+
+EC( NamePoolPrintf(_TEXT("DESTROY: %lx\r\n"), pool) ; )
+    npbh = MemLock(OptrToHandle(pool));
+    HugeArrayDestroy(npbh->NPBH_vmf, npbh->NPBH_array);
+                                        /* free huge array with strings */
+    MemFree(OptrToHandle(pool));
+}
+
+NameToken LOCAL INamePoolFind(
+    optr pool,
+    TCHAR *name,
+    word len,
+    word *hash)
+{
+    word newhash;
+    word len2;
+    NamePoolBlockHeader *npbh;
+    NamePoolArrayEntry *npae;
+    word n, el;
+    NamePoolHugeArrayEntry *p;
+    NameToken ret = 0;
+
+    if(len==0)                          /* special handling for empty strings */
+      return NAME_POOL_EMPTY_STRING;
+
+    newhash = 0;
+    for(n=0; n<len; n++)                /* simple combination of XOR & ROL */
+    {
+@ifdef DO_DBCS
+      newhash ^= name[n];
+@else
+      newhash ^= (unsigned char)name[n];
+@endif
+      __asm rol newhash,1
+    }
+
+    npbh = MemDeref(OptrToHandle(pool));
+
+    n = ChunkArrayGetCount(pool);       /* number of tokens already defined */
+    for(el=0; el<n && !ret; el++)       /* check all elements or until found */
+    {
+      npae = ChunkArrayElementToPtr(pool, el, NULL);
+      if(npae->NPAE_inUse && newhash==npae->NPAE_hash)      
+      {                                 /* promising token: compare strings */
+        /* Lock array element for comparison */
+        HAL_EC(HugeArrayLock(npbh->NPBH_vmf, npbh->NPBH_array, el, (void**)&p, &len2));
+        len2 -= sizeof(word);  /* NPHAE_refCount */
+@ifdef DO_DBCS
+        EC_ERROR_IF(len2 & 1, -1);
+        len2 /= sizeof(TCHAR);
+@endif
+
+        /* Return element if strings match exactly */
+        if((len==len2) && strncmp(p->NPHAE_str, name, len2)==0)
+          ret = el - CA_NULL_ELEMENT;
+
+        /* Release array element */
+        HugeArrayUnlock(p);
+      }
+    }
+
+    if(hash)                            /* return hash value if requested */
+      *hash = newhash;
+
+    return ret;
+}
+
+NameToken EXPORT NamePoolTokenizeLen(
+    optr pool,
+    TCHAR *name,
+    word len,
+    Boolean required)
+{
+    NameToken ret;
+    word n,hash;
+    NamePoolBlockHeader *npbh;
+    NamePoolArrayEntry *npae;
+    NamePoolHugeArrayEntry *nphae;
+    word len2;
+
+    if(!len)                            /* make sure we know about the length */
+      len = strlen(name);
+
+    npbh = MemPLock(OptrToHandle(pool));
+    ret = INamePoolFind(pool, name, len, &hash);
+    if(ret)                             /* string already tokenized? */
+    {
+      MemUnlockV(OptrToHandle(pool));
+      NamePoolUseToken(pool, ret);      /* just use it */
+    }
+    else                                /* not tokenized: have to add it */
+    {
+EC( NamePoolPrintf(_TEXT("TOKENIZE: %lx '"), pool) ; )
+EC( NamePoolPrintString(name, len) ; )
+EC( NamePoolPrintf(_TEXT("' len:%d -> "), len) ; )
+      n = ChunkArrayGetCount(pool);     /* number of tokens already defined */
+      len2 = len*sizeof(TCHAR)+sizeof(nphae->NPHAE_refCount);
+      for(ret=0; ret<n; ret++)
+      {
+        npae = ChunkArrayElementToPtr(pool, ret, NULL);
+        if(!npae->NPAE_inUse)           /* found empty token: reuse it */
+        {
+          HugeArrayReplace(npbh->NPBH_vmf, npbh->NPBH_array, len2, ret, NULL);
+          break;
+        }
+      }
+      if(ret==n)                        /* did not find a suitable token */
+      {
+        HugeArrayAppend(npbh->NPBH_vmf, npbh->NPBH_array, len2, NULL);
+        npae = ChunkArrayAppend(pool, 0);
+                                        /* create a new entry */
+        npbh = MemDeref(OptrToHandle(pool));
+      }
+      
+      /* store string in new element */
+      HAL_EC(HugeArrayLock(npbh->NPBH_vmf, npbh->NPBH_array, ret, (void**)&nphae, &len2));
+      nphae->NPHAE_refCount = 1;        /* we have one reference already */
+      strncpy(nphae->NPHAE_str, name, len);
+      HugeArrayDirty(nphae);
+      HugeArrayUnlock(nphae);
+      
+      npae->NPAE_inUse = TRUE;          /* preset chunk array */
+      npae->NPAE_hash = hash;
+      MemUnlockV(OptrToHandle(pool));
+
+      ret -= CA_NULL_ELEMENT;           /* CA_NULL_ELEMENT translates to 0 */
+    }
+
+EC( NamePoolPrintf(_TEXT("token %u, req %s, time %ld\r\n"), ret, required?_TEXT("TRUE"):_TEXT("FALSE"), TimerGetCount()) ; )
+@ifdef COMPILE_OPTION_CHECK_NAME_TOKENS
+    EC_ERROR_IF(ret==0, -1) ;
+@endif
+
+    return ret;
+}
+
+@ifdef DO_DBCS
+void ConvertGeosCharEntities(TCHAR *str, word *len)
+{
+    int i, j;
+
+    for (i = 0; i < (int)(*len)-3; i++) {
+	if (str[i] == '&' && str[i+1] == '#') {
+	    j = i+2;
+	    while (j < (int)(*len) && str[j] >= '0' && str[j] <= '9') j++;
+	    if (j < (int)(*len) && str[j] == ';') {
+		str[j] = 0;
+		str[i] = (TCHAR)(atoi(&(str[i+2])));  /* skip '&#' */
+		/* dest: past new char, src: past ';', len: rest of str */
+		strncpy(&(str[i+1]), &(str[j+1]), (*len)-(j+1));
+		*len -= ((j+1)-i)-1;  /* replaced char entity with char */
+	    }
+	}
+    }
+}
+@endif
+
+NameToken EXPORT NamePoolTokenizeLenDOS(
+    optr pool,
+    char *name,
+    word len,
+    Boolean required)
+{
+@ifdef DO_DBCS
+    MemHandle bufH = 0;
+    TCHAR buf[128], *bufP = 0;
+    DosCodePage cp = HTMLext->HE_codePage;
+    word status, backup;
+    NameToken tok = NAME_POOL_NONE;
+
+    if (!len) len = strlensbcs(name);
+
+    if (len < 128) {
+	bufP = buf;
+    } else {
+	bufH = MemAlloc((len+1)*sizeof(TCHAR), HF_DYNAMIC, HAF_STANDARD);
+	if (bufH) {
+	    bufP = MemLock(bufH);
+	}
+    }
+    if (bufP) {
+	LocalDosToGeos((unsigned int*)bufP, name, &len, DEFCHAR, &cp, 0, 
+				(DosToGeosStringStatus *)&status, &backup);
+	ConvertGeosCharEntities(bufP, &len);
+	tok = NamePoolTokenizeLen(pool, bufP, len, required);
+    }
+    if (bufH) MemFree(bufH);
+    return tok;
+@else
+    return NamePoolTokenizeLen(pool, name, len, required);
+@endif
+}
+
+NameToken EXPORT NamePoolFind(optr pool, TCHAR *name)
+{
+    NameToken ret;
+
+    MemPLock(OptrToHandle(pool));
+    ret = INamePoolFind(pool, name, strlen(name), NULL);
+    MemUnlockV(OptrToHandle(pool));
+    return ret;
+}
+
+void EXPORT NamePoolUseToken(optr pool, NameToken token)
+{
+    NamePoolBlockHeader *npbh;
+    NamePoolHugeArrayEntry *nphae;
+    word len;
+
+@ifdef COMPILE_OPTION_CHECK_NAME_TOKENS
+    EC_ERROR_IF(token==0, -1) ;
+@endif
+    if (token && token != NAME_POOL_EMPTY_STRING)  {
+        npbh = MemPLock(OptrToHandle(pool));
+        HAL_EC(HugeArrayLock(npbh->NPBH_vmf, npbh->NPBH_array, 
+                             token + CA_NULL_ELEMENT, (void**)&nphae, &len));
+
+        /* Error checking code to make sure that we don't use a token
+           that is not already in use. */
+        EC_ERROR_IF(nphae->NPHAE_refCount==0, -1) ;
+
+        nphae->NPHAE_refCount++;        /* just add one more reference */
+        HugeArrayDirty(nphae);
+        HugeArrayUnlock(nphae);
+
+EC(     NamePoolPrintf(_TEXT("USE: %lx token %u\r\n"), pool, token) ; )
+        MemUnlockV(OptrToHandle(pool));
+    }
+}
+
+void EXPORT NamePoolReleaseToken(optr pool, NameToken token)
+{
+    NamePoolBlockHeader *npbh;
+    NamePoolArrayEntry *npae;
+    NamePoolHugeArrayEntry *nphae, empty;
+    word len;
+    word ref;
+
+@ifdef COMPILE_OPTION_CHECK_NAME_TOKENS
+    EC_ERROR_IF(token==0, -1) ;
+@endif
+    /* Make sure it is valid */
+    if (token && token != NAME_POOL_EMPTY_STRING)  {
+        npbh = MemPLock(OptrToHandle(pool));
+
+        HAL_EC(HugeArrayLock(npbh->NPBH_vmf, npbh->NPBH_array, 
+                             token + CA_NULL_ELEMENT, (void**)&nphae, &len));
+
+        /* Error checking code to make sure that we don't free a token
+           that is not already in use. */
+        EC_ERROR_IF(nphae->NPHAE_refCount==0, -1) ;
+
+        ref = --nphae->NPHAE_refCount;  /* remove one reference */
+        HugeArrayDirty(nphae);
+        HugeArrayUnlock(nphae);
+
+        if(!ref)                        /* removed last reference: free token */
+        {
+          /* replace string by a placeholder element */
+          empty.NPHAE_refCount = 0;     /* empty element */
+          HugeArrayReplace(npbh->NPBH_vmf, npbh->NPBH_array,
+            sizeof(empty)-sizeof(empty.NPHAE_str), token + CA_NULL_ELEMENT,
+            &empty);
+
+          npae = ChunkArrayElementToPtr(pool, token + CA_NULL_ELEMENT, NULL);
+          npae->NPAE_inUse = FALSE;
+        }
+
+#ifdef DO_ERROR_CHECKING
+	if (!ref) {
+	    NamePoolPrintf(_TEXT("RELEASE/FREE: %lx token %u\r\n"), pool, token) ;
+	} else {
+	    NamePoolPrintf(_TEXT("RELEASE: %lx token %u\r\n"), pool, token) ;
+	}
+#endif
+        MemUnlockV(OptrToHandle(pool));
+    }
+}
+
+Boolean EXPORT NamePoolTestEqual(optr pool, NameToken token, TCHAR *str)
+{
+    NameToken token2;
+    Boolean ret = FALSE;
+    word len;
+
+EC( NamePoolPrintf(_TEXT("TEST: %lx token %u '%s' len:0 IS "), pool, token, str) ; )
+
+    len = strlen(str);
+
+    MemPLock(OptrToHandle(pool));
+
+    /* simply look up the name token for the string and compare it... */
+    token2 = INamePoolFind(pool, str, len, NULL);
+    if(token && token==token2)
+      ret = TRUE;
+
+    MemUnlockV(OptrToHandle(pool));
+
+#ifdef DO_ERROR_CHECKING
+    if (ret)
+        NamePoolPrintf(_TEXT("TRUE\r\n")) ;
+    else
+        NamePoolPrintf(_TEXT("FALSE\r\n")) ;
+#endif
+
+    return ret;
+}
+
+Boolean EXPORT NamePoolTestEqualI(optr pool, NameToken token, TCHAR *str)
+{
+    word len;
+    NamePoolHugeArrayEntry *p;
+    Boolean ret;
+    NamePoolBlockHeader *npbh;
+
+EC( NamePoolPrintf(_TEXT("TEST_I: %lx %u '%s' IS "), pool, token, str) ; )
+
+    if(token==NAME_POOL_EMPTY_STRING)   /* special handling for empty strings */
+      return str[0]==0;
+
+    npbh = MemPLock(OptrToHandle(pool));
+
+    /* Lock array element for comparison */
+    HAL_EC(HugeArrayLock(npbh->NPBH_vmf, npbh->NPBH_array, 
+                         token + CA_NULL_ELEMENT, (void**)&p, &len));
+    len -= sizeof(p->NPHAE_refCount);
+@ifdef DO_DBCS
+    EC_ERROR_IF(len &1, -1);
+    len /= sizeof(TCHAR);
+@endif
+
+    /* Compare ignoring case */
+    ret = (strlen(str)==len && LocalCmpStringsNoCase(
+    		(char*)str, (char*)p->NPHAE_str, len)==0);
+
+    /* Release array element */
+    HugeArrayUnlock(p);
+
+    MemUnlockV(OptrToHandle(pool));
+
+#ifdef DO_ERROR_CHECKING
+    if (ret)
+        NamePoolPrintf(_TEXT("TRUE\r\n")) ;
+    else
+        NamePoolPrintf(_TEXT("FALSE\r\n")) ;
+#endif
+
+    return ret;
+}
+
+void EXPORT NamePoolCopy(optr pool, TCHAR *buf, word buflen,
+  NameToken token, TCHAR **ptr)
+{
+    word len;
+    NamePoolHugeArrayEntry *p;
+    char *q, *ret;
+    NamePoolBlockHeader *npbh;
+    MemHandle mh;
+
+EC( NamePoolPrintf(_TEXT("COPY: %lx token %u\r\n"), pool, token) ; )
+
+    if ((token) && (pool) && token != NAME_POOL_EMPTY_STRING)
+    {
+      npbh = MemPLock(OptrToHandle(pool));
+
+      /* Lock array element for copy */
+      HAL_EC(HugeArrayLock(npbh->NPBH_vmf, npbh->NPBH_array,
+                           token + CA_NULL_ELEMENT, (void**)&p, &len));
+      len -= sizeof(p->NPHAE_refCount);
+
+      q = (char*) buf;                   /* default: use passed buffer */
+      mh = 0;                           /* indicates no dynamic allocation */
+
+      /* DBCS: yes, *sizeof(TCHAR) only applies to 1, len is really size */
+      if((ptr ? sizeof(MemHandle)+sizeof(int) : 0)+len+1*sizeof(TCHAR)>buflen)/* string to big for passed buffer? */
+      {                                 
+        if(ptr)                         /* dynamic allocation allowed? */
+        {
+          mh = MemAlloc(sizeof(MemHandle)+sizeof(int)+len+1*sizeof(TCHAR), HF_DYNAMIC, HAF_STANDARD_LOCK);
+          if(mh) {                      /* was able to allocate buffer? */
+            q = MemDeref(mh);           /* yes: copy to dynamic buffer */
+	    buflen = sizeof(MemHandle)+sizeof(int)+len+1*sizeof(TCHAR);
+	  } else {
+	                                /* else, use static buffer */
+EC_ERROR_IF((buflen < (sizeof(MemHandle)+sizeof(int)+1*sizeof(TCHAR))), -1);
+	    len = buflen-sizeof(MemHandle)-sizeof(int)-1*sizeof(TCHAR);
+	  }
+        } else {
+	  len = buflen-1*sizeof(TCHAR); /* no: use passed buffer, truncate */
+	}
+      }
+
+      if(ptr)                           /* dynamic allocation allowed? */
+      {
+        *((MemHandle *)q) = mh;         /* yes: store mem handle, if any */
+	*((int *)(q+sizeof(MemHandle))) = buflen;
+        ret = q+sizeof(MemHandle)+sizeof(int);
+	*ptr = (TCHAR*) ret;
+      }                                 /* actual string starts after that */
+      else
+        ret = (char*) buf;                      /* no: always just copy to buffer */
+
+@ifdef DO_DBCS
+      EC_ERROR_IF(len & 1, -1);
+@endif
+      xstrncpy((TCHAR*)ret, p->NPHAE_str, len/sizeof(TCHAR)+1);
+
+      /* Release array element */
+      HugeArrayUnlock(p);
+
+      MemUnlockV(OptrToHandle(pool));
+    }
+    else
+    {
+      if (ptr) {
+EC_ERROR_IF((buflen < (sizeof(MemHandle)+sizeof(int)+1*sizeof(TCHAR))), -1);
+        *((MemHandle *)buf) = 0;
+	*((int *)(((byte *)buf)+sizeof(MemHandle))) = buflen;
+	*((char *)(((byte *)buf)+sizeof(MemHandle)+sizeof(int))) = 0;
+        ret = (char *)((byte *)buf)+sizeof(MemHandle)+sizeof(int);
+      } else {
+        /* Return a blank */
+        buf[0] = '\0' ;
+        ret = (char*)buf ;
+      }
+    }
+    if(ptr)                             /* return pointer requested? */
+      *ptr = (TCHAR*)ret;
+}
+
+void EXPORT NamePoolDestroyIfDynamic(void *p)
+{
+    MemHandle mh;
+
+EC_ERROR_IF(!NamePoolIsDynamic(p), -1);
+
+                                        /* check assumed pointer to handle */
+    EC_BOUNDS( ((byte *)p)-sizeof(MemHandle)-sizeof(int) );
+
+                                        /* get memory handle (below string) */
+    mh = *(MemHandle *)(((byte *)p)-sizeof(MemHandle)-sizeof(int));
+    if(mh) {                            /* dynamically allocated? */
+      MemFree(mh);                      /* release block */
+    }
+}
+
+NameToken EXPORT NamePoolTokenizeFromPool(optr pool, optr pool2, NameToken tok2,
+  Boolean required)
+{
+    word len;
+    NamePoolHugeArrayEntry *p;
+    NameToken token;
+    NamePoolBlockHeader *npbh;
+
+EC( NamePoolPrintf(_TEXT("TOKENIZE_FROM_POOL: %lx %lx token %u\r\n"), pool, pool2, tok2) ; )
+
+    if(tok2 == NAME_POOL_NONE || tok2 == NAME_POOL_EMPTY_STRING)
+      return tok2;                      /* doesn't need to be converted */
+
+    if(pool == pool2)                   /* if both pools are the same: easy */
+    {
+      NamePoolUseToken(pool, tok2);
+      return tok2;
+    }
+
+    npbh = MemPLock(OptrToHandle(pool2));
+
+    /* Lock array element for copy */
+    HAL_EC(HugeArrayLock(npbh->NPBH_vmf, npbh->NPBH_array,
+                         tok2 + CA_NULL_ELEMENT, (void**)&p, &len));
+    len -= sizeof(p->NPHAE_refCount);
+@ifdef DO_DBCS
+    EC_ERROR_IF(len & 1, -1);
+    len /= sizeof(TCHAR);
+@endif
+
+    /* Copy into new pool */
+    token = NamePoolTokenizeLen(pool, p->NPHAE_str, len, required);
+                                        
+    /* Release array element */
+    HugeArrayUnlock(p);
+
+    MemUnlockV(OptrToHandle(pool2));
+    return token;
+}
+
+/***************************************************************************
+ *      Dealing with the storage of name pools in VM files
+ ***************************************************************************/
+
+VMChain EXPORT NamePoolVMSave(optr pool, VMFileHandle vmf)
+{
+    VMFileHandle poolvmf;
+    VMBlockHandle vmb;
+    VMChain vmc;
+    NamePoolBlockHeader *npbh;
+
+EC( NamePoolPrintf(_TEXT("VMSAVE: %lx\r\n"), pool) ; )
+
+    /* get reference to Huge Array */
+    npbh = MemPLock(OptrToHandle(pool));
+    poolvmf = npbh->NPBH_vmf;
+    vmb = npbh->NPBH_array;
+    MemUnlockV(OptrToHandle(pool));
+
+    if(poolvmf == vmf)                  /* save to file that is attached? */
+    {
+      /* This is easy: just return HugeArray with strings. */
+      vmc = VMCHAIN_MAKE_FROM_VM_BLOCK(vmb);
+EC( NamePoolPrintf(_TEXT("VMSAVE: %lx\r\n"), pool) ; )
+      MemFree(OptrToHandle(pool));      /* chunk array is now obsolete */
+    }
+    else
+    {
+      /* Copy HugeArray to new file. */
+      vmc = VMCopyVMChain(poolvmf, VMCHAIN_MAKE_FROM_VM_BLOCK(vmb), vmf);
+      NamePoolFree(pool);               /* destory pool in old file */
+    } 
+
+    return vmc;
+}
+
+optr EXPORT NamePoolVMLoad(VMFileHandle vmf, VMChain vmc)
+{
+    MemHandle mem;
+    ChunkHandle ch;
+    NamePoolBlockHeader *npbh;
+    NamePoolArrayEntry *npae;
+    long i,n;
+    word newhash;
+    NamePoolHugeArrayEntry *p;
+    word j,len;
+
+    mem = MemAllocLMem(LMEM_TYPE_GENERAL, sizeof(NamePoolBlockHeader));
+    MemLock(mem);
+    ch = ChunkArrayCreate(mem, sizeof(NamePoolArrayEntry), 0, 0);
+    npbh = MemDeref(mem);               /* block could have moved */
+    npbh->NPBH_poolChunk = ch;          /* store pointer to chunk */
+    npbh->NPBH_vmf = vmf;               /* store associated VM file */
+    npbh->NPBH_array = VMCHAIN_GET_VM_BLOCK(vmc);
+
+    n = HugeArrayGetCount(npbh->NPBH_vmf, npbh->NPBH_array);
+    for(i=0; i<n; i++)
+    {
+      npae = ChunkArrayAppendHandles(mem, ch, 0); 
+                                        /* create a new entry */
+      /* Lock array element for hashing */
+      HAL_EC(HugeArrayLock(vmf, VMCHAIN_GET_VM_BLOCK(vmc), i, (void**)&p, &len));
+      len -= sizeof(p->NPHAE_refCount);
+@ifdef DO_DBCS
+      EC_ERROR_IF(len & 1, -1);
+      len /= sizeof(TCHAR);
+@endif
+            
+      if(p->NPHAE_str[0])               /* not an unused element? */
+      {
+        /* Regenerate hash value of item */
+        newhash = 0;
+        for(j=0; j<len; j++)            /* simple combination of XOR & ROL */
+        { 
+@ifdef DO_DBCS
+          newhash ^= p->NPHAE_str[j];
+@else
+          newhash ^= (unsigned char)p->NPHAE_str[j];
+@endif
+          __asm rol newhash,1
+        }
+
+        npae->NPAE_hash = newhash;      /* recreated hash value */
+        npae->NPAE_inUse = TRUE;        
+      }
+      else
+      {
+        npae->NPAE_inUse = FALSE;       /* unused element */
+      }          
+
+      /* Release array element */
+      HugeArrayUnlock(p);
+    }
+
+    MemUnlock(mem);
+
+EC( NamePoolPrintf(_TEXT("VMLOAD: %lx\r\n"), ConstructOptr(mem, ch)); )
+    return ConstructOptr(mem, ch);
+}
+
+void EXPORT NamePoolVMUnload(optr pool)
+{
+EC( NamePoolPrintf(_TEXT("VMUNLOAD: %lx\r\n"), pool) ; )
+    MemFree(OptrToHandle(pool));
+}
+
+NameToken EXPORT NamePoolTokenizeFromVM(optr pool,
+  VMFileHandle vmf, VMChain vmc, NameToken vmtok, Boolean required)
+{
+    word len;
+    NamePoolHugeArrayEntry *p;
+    NameToken token;
+
+EC( NamePoolPrintf(_TEXT("VMTOKENIZE: %lx token %u\r\n"), pool, vmtok) ; )
+    if(vmtok == NAME_POOL_NONE || vmtok == NAME_POOL_EMPTY_STRING)
+      return vmtok;                     /* doesn't need to be converted */
+
+    /* Lock array element for copy */
+    HAL_EC(HugeArrayLock(vmf, VMCHAIN_GET_VM_BLOCK(vmc), 
+                         vmtok + CA_NULL_ELEMENT, (void**)&p, &len));
+    len -= sizeof(p->NPHAE_refCount);
+@ifdef DO_DBCS
+    EC_ERROR_IF(len & 1, -1);
+    len /= sizeof(TCHAR);
+@endif
+
+    /* Copy into new pool. */
+    token = NamePoolTokenizeLen(pool, p->NPHAE_str, len, required);
+                                        
+    /* Release array element */
+    HugeArrayUnlock(p);
+
+    return token;
+}
+
+/* The following routine checks to see if a token in a name pool is */
+/* being used and returns TRUE if it is.  For the EC version, you can */
+/* choose whether or not to crash */
+Boolean EXPORT NamePoolIsTokenValid(optr pool, NameToken token, Boolean doCrash)
+{
+    Boolean isUsed = FALSE ;
+    NamePoolArrayEntry *npae;
+
+@ifdef COMPILE_OPTION_CHECK_NAME_TOKENS
+    EC_ERROR_IF(token==0, -1) ;
+@endif
+    if (token == NAME_POOL_EMPTY_STRING)
+    {
+        isUsed = TRUE;                  /* Can't be sure, but let's say yes */
+    }
+    else if (token)
+    {
+        MemPLock(OptrToHandle(pool));
+
+        npae = ChunkArrayElementToPtr(pool, token + CA_NULL_ELEMENT, NULL);
+
+        isUsed = npae->NPAE_inUse;
+
+        if (!isUsed && doCrash)
+            FatalError(-1) ;
+        MemUnlockV(OptrToHandle(pool));
+    }
+
+    return isUsed ;
+}
+
+/***************************************************************************
+ *      String operations with Name Tokens
+ ***************************************************************************/
+
+/*
+ * Append a string to the passed name token and release the original refrence
+ * to that token. The typical use of this is something like:
+ *
+ *      token = NamePoolConcatStr(pool, token, "string-to-add");
+ */
+NameToken EXPORT NamePoolConcatStr(optr pool, NameToken tok, TCHAR *str)
+{
+    MemHandle bufH = 0;
+    TCHAR buf[256], *bufP = 0;
+    word tokLength = NamePoolStrLength(pool, tok);
+    word strLength = strlen(str);
+
+    if (tokLength + strLength + 1 < 256) {
+	bufP = buf;
+    } else {
+	/* it is okay to allocate a heap block for this operation as
+	   it doesn't occur at critical times */
+	bufH = MemAlloc((tokLength + strLength + 1)*sizeof(TCHAR), HF_DYNAMIC, HAF_STANDARD);
+	if (bufH) {
+	    bufP = MemLock(bufH);
+	}
+    }
+    if (bufP) {
+	NamePoolCopy(pool, bufP, (tokLength+1)*sizeof(TCHAR), tok, NULL);
+	strcat(bufP, str);
+	NamePoolReleaseToken(pool, tok);
+	tok = NamePoolTokenize(pool, bufP, TRUE);
+    }
+    if (bufH) {
+	MemFree(bufH);
+    }
+    return tok;
+}
+
+@ifdef DO_DBCS
+NameToken EXPORT NamePoolConcatStrDOS(optr pool, NameToken tok, char *str)
+{
+    MemHandle bufH = 0;
+    TCHAR buf[256], *bufP = 0;
+    word tokLength = NamePoolStrLength(pool, tok);
+    word strLength = strlensbcs(str);
+    DosCodePage cp = HTMLext->HE_codePage;
+    word status, backup;
+
+    if (tokLength + strLength + 1 < 256) {
+	bufP = buf;
+    } else {
+	/* it is okay to allocate a heap block for this operation as
+	   it doesn't occur at critical times */
+	bufH = MemAlloc((tokLength + strLength + 1)*sizeof(TCHAR), HF_DYNAMIC, HAF_STANDARD);
+	if (bufH) {
+	    bufP = MemLock(bufH);
+	}
+    }
+    if (bufP) {
+	NamePoolCopy(pool, bufP, (tokLength+1)*sizeof(TCHAR), tok, NULL);
+	LocalDosToGeos((unsigned int*)bufP+tokLength, str, &strLength, DEFCHAR, &cp, 0,
+		       (DosToGeosStringStatus *)&status, &backup);
+	ConvertGeosCharEntities(bufP+tokLength, &strLength);
+	bufP[(tokLength+strLength)] = C_NULL;
+	NamePoolReleaseToken(pool, tok);
+	tok = NamePoolTokenize(pool, bufP, TRUE);
+    }
+    if (bufH) {
+	MemFree(bufH);
+    }
+    return tok;
+}
+@endif
+
+word EXPORT NamePoolStrLength(optr pool, NameToken token)
+{
+    word len = 0;
+    NamePoolHugeArrayEntry *p;
+    NamePoolBlockHeader *npbh;
+
+    if ((token) && (pool) && token != NAME_POOL_EMPTY_STRING)
+    {
+      npbh = MemPLock(OptrToHandle(pool));
+
+      /* Lock array element */
+      HAL_EC(HugeArrayLock(npbh->NPBH_vmf, npbh->NPBH_array, 
+                           token + CA_NULL_ELEMENT, (void**)&p, &len));
+
+      len -= sizeof(p->NPHAE_refCount);
+@ifdef DO_DBCS
+      EC_ERROR_IF(len & 1, -1);
+      len /= sizeof(TCHAR);
+@endif
+
+      /* Release array element */
+      HugeArrayUnlock(p);
+
+      MemUnlockV(OptrToHandle(pool));
+    }
+    return len;
+}
+
+Boolean EXPORT NamePoolInitializeDynamic(TCHAR *buf, int buflen, TCHAR *p, TCHAR **bufP)
+{
+    MemHandle mh = 0;
+                                /* include room for handle, size and null */
+    int neededLen = sizeof(MemHandle)+sizeof(int)+((p ? strlen(p) : 1)+1)*sizeof(TCHAR);
+    byte *q;
+    Boolean success = FALSE;
+
+    if (neededLen > buflen) {
+	/* allocate buffer if static buffer not big enough */
+	mh = MemAlloc(neededLen, HF_DYNAMIC, HAF_STANDARD_LOCK);
+	if (mh) {
+	    q = MemDeref(mh);
+	    success = TRUE;
+	}
+    } else {
+	/* use static buffer */
+	q = (byte *)buf;
+	success = TRUE;
+    }
+    if (success) {
+	/* initialize buffer */
+	*((MemHandle *)q) = mh;
+	*((int *)(q+sizeof(MemHandle))) = buflen;
+	if (p) {
+	    strcpy((TCHAR *)(q+sizeof(MemHandle)+sizeof(int)), p);
+	} else {
+	    *((TCHAR *)(q+sizeof(MemHandle)+sizeof(int))) = 0;
+	}
+    }
+    *bufP = (TCHAR *)(q+sizeof(MemHandle)+sizeof(int));
+    return success;
+}
+
+Boolean EXPORT NamePoolIsDynamic(TCHAR *p)
+{
+    MemHandle mh;
+    Boolean isDynamic = FALSE;
+
+                                        /* check assumed pointer to handle */
+    EC_BOUNDS( ((byte *)p)-sizeof(MemHandle)-sizeof(int) );
+
+    mh = *(MemHandle *)(((byte *)p)-sizeof(MemHandle)-sizeof(int));
+    if (mh) {
+	if ((MemGetInfo(mh, MGIT_ADDRESS) == PtrToSegment(p)) &&
+	    (MemGetInfo(mh, MGIT_SIZE) >= (*(int *)(((byte *)p)-sizeof(int))))) {
+	    isDynamic = TRUE;
+	}
+    } else {
+	isDynamic = TRUE;
+    }
+    return isDynamic;
+}
+
+Boolean EXPORT NamePoolResizeDynamic(TCHAR **p, int size)
+{
+    MemHandle mh;
+    Boolean success = FALSE;
+    int allocSize = sizeof(MemHandle)+sizeof(int)+size+1*sizeof(TCHAR);
+    byte *q;
+
+EC_ERROR_IF(!NamePoolIsDynamic(*p), -1);
+
+    if (allocSize <= (*(int *)(((byte *)(*p))-sizeof(int)))) {
+	success = TRUE;
+    } else {
+	mh = *(MemHandle *)(((byte *)(*p))-sizeof(MemHandle)-sizeof(int));
+	if (mh) {
+	    /* include room for handle, size and null */
+	    if (MemReAlloc(mh, allocSize, HAF_STANDARD)) {
+		q = MemDeref(mh);
+		*((int *)(q+sizeof(MemHandle))) = allocSize;
+		*p = (TCHAR *)(q+sizeof(MemHandle)+sizeof(int));
+		success = TRUE;
+	    }
+	} else {
+	    /* convert to dynamic */
+	    mh = MemAlloc(allocSize, HF_DYNAMIC, HAF_STANDARD_LOCK);
+	    if (mh) {
+		q = MemDeref(mh);
+		*((MemHandle *)q) = mh;
+		*((int *)(q+sizeof(MemHandle))) = allocSize;
+		strcpy(((TCHAR *)(q+sizeof(MemHandle)+sizeof(int))), *p);
+		*p = (TCHAR *)(q+sizeof(MemHandle)+sizeof(int));
+		success = TRUE;
+	    }
+	}
+    }
+    return success;
+}

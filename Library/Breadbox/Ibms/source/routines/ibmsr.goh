@@ -1,0 +1,385 @@
+/*
+    Index Based Memory System
+
+    I'm writing this code so that I can create software that can have a
+    large number of memory blocks stored on disk via a Huge Array, but
+    not have to keep track of how elements are added and removed.
+    In effect, all IBMS is is a Huge Array with a free list of indexes
+    not used.  Each element is variable sized.
+*/
+@include <ibms.goh>
+@include <Ansi/string.h>
+
+/* Use the following compile option to turn on a special version of this
+   library that puts the tag FREE or USED on each block and uses those
+   tags to check if items have been overwritten.  Unfortunately, this
+   option cannot be used even for just an EC version because it changes
+   the file size and format of the data.  Just use when you are having
+   problems.  In particular, use it if you are having problems with the
+   IBMS code itself.
+#define COMPILE_OPTION_USE_BLOCK_TAGS
+*/
+
+/* Header for the whole group */
+typedef struct {
+    dword IH_firstFree ;
+    VMFileHandle IH_file ;
+    VMBlockHandle IH_hugeArray ;
+    dword IH_numLocked ;
+    IBMSIndex IH_map ;
+} IBMSHeader ;
+
+typedef struct {
+#ifdef COMPILE_OPTION_USE_BLOCK_TAGS
+    char tag[4] ;
+#endif
+    IBMSIndex IFB_next ;
+} IBMSFreeBlock ;
+
+#ifdef COMPILE_OPTION_USE_BLOCK_TAGS
+typedef struct {
+    char tag[4] ;
+} IBMSBlockHeader ;
+#endif
+
+#define IBMS_HEADER_INDEX 0
+
+#define IBMS_START    IBMSHeader *p_header ; \
+                      if (group)  {   \
+                         p_header = MemLock(group) ; \
+                         if (p_header)  {  \
+
+#define IBMS_END         } \
+                         MemUnlock(group) ; \
+                      }
+
+/*-------------------------------------------------------------------------*/
+/* Create a new IBMS block group */
+VMBlockHandle IBMSCreate(VMFileHandle file)
+{
+    VMBlockHandle hugeArray ;
+    IBMSHeader header ;
+
+    /* Create a huge array with variable sized elements */
+    hugeArray = HugeArrayCreate(file, 0, 0) ;
+
+    if (hugeArray)  {
+        /* Create the zeroth block which is the header */
+        header.IH_firstFree = IBMS_BAD ;
+        header.IH_file = file ;
+        header.IH_hugeArray = hugeArray ;
+        header.IH_map = IBMS_BAD ;
+        HugeArrayAppend(file, hugeArray, sizeof(IBMSHeader), &header) ;
+    }
+
+    return hugeArray ;
+}
+
+/*-------------------------------------------------------------------------*/
+/* Open a previously created IBMS block group */
+IBMSHandle IBMSOpen(VMFileHandle file, VMBlockHandle mainBlock)
+{
+    MemHandle mem ;
+    IBMSHeader *p_header ;
+    word size ;
+    IBMSHeader *p_inMemoryHeader ;
+
+    mem = MemAlloc(sizeof(IBMSHeader), HF_DYNAMIC | HF_SHARABLE, 0) ;
+    if (mem)  {
+        p_header = NULL ;
+        HugeArrayLock(file, mainBlock, IBMS_HEADER_INDEX, (void**)&p_header, &size) ;
+        if (p_header)  {
+            /* Copy over the data from the header to the in memory copy */
+            p_inMemoryHeader = MemLock(mem) ;
+            *p_inMemoryHeader = *p_header ;
+/*
+            memcpy(p_inMemoryHeader, p_header, sizeof(*p_inMemoryHeader)) ;
+*/
+            p_inMemoryHeader->IH_file = file ;
+            p_inMemoryHeader->IH_numLocked = 0 ;
+            MemUnlock(mem) ;
+            HugeArrayUnlock(p_header) ;
+        } else {
+            /* Didn't get it.  Abort! */
+            MemFree(mem) ;
+            mem = NullHandle ;
+        }
+    }
+
+    return mem ;
+}
+
+/*-------------------------------------------------------------------------*/
+/* Close out a previously opened IBMS block group */
+void IBMSClose(IBMSHandle group)
+{
+    IBMS_START ;
+
+    IBMSSave(group) ;
+
+    IBMS_END ;
+
+    if (group)
+        MemFree(group) ;
+}
+
+/*-------------------------------------------------------------------------*/
+/* Ensure all data is saved */
+void IBMSSave(IBMSHandle group)
+{
+    IBMSHeader *p_storedHeader = NULL ;
+    word size ;
+
+    IBMS_START ;
+
+    /* Can only save if all are unlocked */
+    if (p_header->IH_numLocked > 0)
+        FatalError(-1) ;
+
+    HugeArrayLock(
+        p_header->IH_file,
+        p_header->IH_hugeArray,
+        IBMS_HEADER_INDEX,
+        (void**)&p_storedHeader,
+        &size) ;
+    if (p_storedHeader)  {
+        *p_storedHeader = *p_header ;
+/*        memcpy(p_storedHeader, p_header, sizeof(*p_storedHeader)) ; */
+        HugeArrayDirty(p_storedHeader) ;
+        HugeArrayUnlock(p_storedHeader) ;
+    }
+
+    IBMS_END ;
+}
+
+/*-------------------------------------------------------------------------*/
+/* Get rid of an old IBMS block group -- MUST BE CLOSED! */
+void IBMSDestroy(VMFileHandle file, VMBlockHandle mainBlock)
+{
+    HugeArrayDestroy(file, mainBlock) ;
+}
+
+/*-------------------------------------------------------------------------*/
+/* Allocate a block (referenced by a IBMSIndex) in the group */
+IBMSIndex _export IBMSAlloc(IBMSHandle group, word size)
+{
+    IBMSIndex newIndex = IBMS_BAD ;
+    word blocksize ;
+    IBMSFreeBlock *p_freeBlock ;
+    IBMSHeader header ;
+    Boolean got = FALSE ;
+#ifdef COMPILE_OPTION_USE_BLOCK_TAGS
+    IBMSBlockHeader *p_blockHeader ;
+#endif
+
+    IBMS_START ;
+    header = *p_header ;
+    got = TRUE ;
+    IBMS_END ;
+
+    if (got)  {
+#ifdef COMPILE_OPTION_USE_BLOCK_TAGS
+        size += +sizeof(IBMSBlockHeader) ;
+#endif
+        /* Is there a free block waiting? */
+        if (header.IH_firstFree)  {
+            /* A free block is waiting.  Pull it off the free list */
+            newIndex = header.IH_firstFree ;
+            HugeArrayLock(
+                header.IH_file,
+                header.IH_hugeArray,
+                newIndex,
+                (void**)&p_freeBlock,
+                &blocksize) ;
+            header.IH_firstFree = p_freeBlock->IFB_next ;
+#ifdef COMPILE_OPTION_USE_BLOCK_TAGS
+            /* Stop if we are not resizing a free block */
+            EC_ERROR_IF(memcmp(p_freeBlock->tag, "FREE", 4) != 0, -1) ;
+#endif
+            HugeArrayUnlock(p_freeBlock) ;
+
+            HugeArrayResize(
+                header.IH_file,
+                header.IH_hugeArray,
+                newIndex,
+                size) ;
+
+            /* Store the header */
+            p_header = MemLock(group) ;
+            *p_header = header ;
+            MemUnlock(group) ;
+        } else {
+            /* No, we need a new block */
+            newIndex = HugeArrayAppend(
+                           header.IH_file,
+                           header.IH_hugeArray,
+                           size,
+                           NULL) ;
+        }
+#ifdef COMPILE_OPTION_USE_BLOCK_TAGS
+        /* Tag the block with a USED identifier so we can see it in the */
+        /* data */
+        HugeArrayLock(
+            header.IH_file,
+            header.IH_hugeArray,
+            newIndex,
+            &p_blockHeader,
+            &blocksize) ;
+        memcpy(p_blockHeader->tag, "USED", 4) ;
+        HugeArrayDirty(p_blockHeader) ;
+        HugeArrayUnlock(p_blockHeader) ;
+#endif
+    }
+
+    return newIndex ;
+}
+
+/*-------------------------------------------------------------------------*/
+/* Free a previously allocated block.  Can't be already freed or locked */
+void _export IBMSFree(IBMSHandle group, IBMSIndex blockIndex)
+{
+    IBMSFreeBlock *p_freeBlock ;
+    word size ;
+
+    IBMS_START ;
+
+    /* Put the freed item on the free list */
+    /* Do that by resizing the element to a link (effectively freeing the */
+    /* data) and putting it on the free link list */
+    HugeArrayResize(
+        p_header->IH_file,
+        p_header->IH_hugeArray,
+        blockIndex,
+        sizeof(IBMSFreeBlock)) ;
+
+    p_freeBlock = NULL ;
+    HugeArrayLock(
+        p_header->IH_file,
+        p_header->IH_hugeArray,
+        blockIndex,
+        (void**)&p_freeBlock,
+        &size) ;
+    if (p_freeBlock)  {
+#ifdef COMPILE_OPTION_USE_BLOCK_TAGS
+        /* Stop if we are freeing a non-allocated block */
+        EC_ERROR_IF(memcmp(p_freeBlock->tag, "USED", 4) != 0, -1) ;
+#endif
+        p_freeBlock->IFB_next = p_header->IH_firstFree ;
+#ifdef COMPILE_OPTION_USE_BLOCK_TAGS
+        memcpy(p_freeBlock->tag, "FREE", 4) ;
+#endif
+        HugeArrayDirty(p_freeBlock) ;
+        HugeArrayUnlock(p_freeBlock) ;
+        p_header->IH_firstFree = blockIndex ;
+    }
+
+    IBMS_END ;
+}
+
+/*-------------------------------------------------------------------------*/
+/* Lock a particular block in the group */
+void *_export IBMSLock(IBMSHandle group, IBMSIndex blockIndex)
+{
+    void *p_data = NULL ;
+    word size ;
+
+    IBMS_START ;
+
+    HugeArrayLock(
+        p_header->IH_file,
+        p_header->IH_hugeArray,
+        blockIndex,
+        &p_data,
+        &size) ;
+
+#ifdef COMPILE_OPTION_USE_BLOCK_TAGS
+            /* Stop if we are locking a free block */
+            EC_ERROR_IF(memcmp(((IBMSBlockHeader *)p_data)->tag, "FREE", 4) == 0, -1) ;
+#endif
+    if (p_data)
+        p_header->IH_numLocked++ ;
+
+    IBMS_END ;
+
+#ifdef COMPILE_OPTION_USE_BLOCK_TAGS
+    return (((byte *)p_data)+sizeof(IBMSBlockHeader)) ;
+#else
+    return p_data ;
+#endif
+}
+
+/*-------------------------------------------------------------------------*/
+/* Unlock a block previously locked by IBMSLock */
+void IBMSUnlock(IBMSHandle group, void *p_lockedBlock)
+{
+    IBMS_START ;
+
+#ifdef COMPILE_OPTION_USE_BLOCK_TAGS
+    p_lockedBlock = ((byte *)p_lockedBlock) + sizeof(IBMSBlockHeader) ;
+#endif
+
+    /* Cannot unlock more times than locked! */
+    if (p_header->IH_numLocked == 0)
+        FatalError(-2) ;
+
+    HugeArrayUnlock(p_lockedBlock) ;
+    p_header->IH_numLocked-- ;
+
+    IBMS_END ;
+}
+
+/*-------------------------------------------------------------------------*/
+/* Mark a previously locked block dirty */
+void _export IBMSDirty(void *p_lockedBlock)
+{
+#ifdef COMPILE_OPTION_USE_BLOCK_TAGS
+    p_lockedBlock = ((byte *)p_lockedBlock) - sizeof(IBMSBlockHeader) ;
+
+    /* Stop if we dirtying a free block */
+    EC_ERROR_IF(memcmp(((IBMSBlockHeader *)p_lockedBlock)->tag, "FREE", 4) == 0, -1) ;
+#endif
+    HugeArrayDirty(p_lockedBlock) ;
+}
+
+/*-------------------------------------------------------------------------*/
+/* Routines to set and get the map index */
+IBMSIndex IBMSGetMap(IBMSHandle group)
+{
+    IBMSIndex map = IBMS_BAD ;
+
+    IBMS_START ;
+
+    map = p_header->IH_map ;
+
+    IBMS_END ;
+
+    return map ;
+}
+
+/*-------------------------------------------------------------------------*/
+void IBMSSetMap(IBMSHandle group, IBMSIndex mapIndex)
+{
+    IBMS_START ;
+
+    p_header->IH_map = mapIndex ;
+
+    IBMS_END ;
+}
+
+/*-------------------------------------------------------------------------*/
+void IBMSResize(IBMSHandle group, IBMSIndex block, word newSize)
+{
+    IBMS_START ;
+
+    EC_ERROR_IF(block==0, -1) ;
+    if (block)  {
+        HugeArrayResize(
+            p_header->IH_file,
+            p_header->IH_hugeArray,
+            block,
+            newSize) ;
+    }
+
+    IBMS_END ;
+}
+

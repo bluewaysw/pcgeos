@@ -17,8 +17,8 @@
 #include <initfile.h>
 #include <library.h>
 @include <iacp.goh>
-#include <ansi/string.h>
-#include <geomisc.h>
+#include <Ansi/string.h>
+#include <geoMisc.h>
 
 #include <htmldrv.h>
 
@@ -78,7 +78,7 @@ void BuildAssocList(void)
 {
     int sectionNum = 0;
     MemHandle dataB;
-    int dataSize;
+    word dataSize;
     TCHAR *dataP;
     TCHAR *outputP = formatList;
     int i;
@@ -152,8 +152,8 @@ void BuildAssocList(void)
 			tokenList[tokenNum].MTT_token.GT_chars[i] = *dataP++;
 		    }
 		}
-		if ((*dataP++ == C_COMMA) &&
-		    !UtilAsciiToHex32(dataP, &manuf)) {
+		if ((*dataP++ == (TCHAR) C_COMMA) &&
+		    !UtilAsciiToHex32((char*)dataP, (long*)&manuf)) {
 		    tokenList[tokenNum].MTT_token.GT_manufID = (word)manuf;
 		    tokenNum++;
 		    /* if filled our buffer, stop reading entries */
@@ -176,7 +176,7 @@ void BuildAssocList(void)
 
 
 #pragma argsused
-entry_MimeDrvGraphic MimeDrvNothing
+VMBlockHandle _pascal _export MimeDrvNothing(_MimeGraphicParams_)
 {
     return 0;
 }
@@ -186,7 +186,7 @@ entry_MimeDrvGraphic MimeDrvNothing
  *  type that is passed in *mimeType.
  */
 #pragma argsused
-entry_MimeDrvText MimeDrvMain
+dword _pascal _export MimeDrvMain(_MimeTextParams_)
 {
     GeodeToken *tokenP = 0;
     MemHandle alb;
@@ -203,7 +203,7 @@ entry_MimeDrvText MimeDrvMain
 
     /* find mime type in list */
     for (i = 0; i < tokenNum; i++ ) {
-        if (!strcmpi(formatList+tokenList[i].MTT_offset, mimeType)) {
+        if (!strcmpi((char*)formatList+tokenList[i].MTT_offset, (char*)mimeType)) {
 	    tokenP = &tokenList[i].MTT_token;
 	    engineMode = tokenList[i].MTT_engineMode;
 	    deathToProcess = tokenList[i].MTT_deathToProcess;
@@ -285,18 +285,18 @@ entry_MimeDrvText MimeDrvMain
 		/* copy file into SP_PRIVATE_DATA/impdoc */
 		FilePushDir();
 		FileSetStandardPath(SP_PRIVATE_DATA);
-		FileCreateDir(_TEXT("impdoc"));
-		FileSetCurrentPath(SP_PRIVATE_DATA, _TEXT("impdoc"));
+		FileCreateDir((char*)_TEXT("impdoc"));
+		FileSetCurrentPath(SP_PRIVATE_DATA, (char*)_TEXT("impdoc"));
 		/* try a few times to get unique name */
 		retry = 0;
 		*retryName = C_NULL;
 		while (retry < 10) {
-		    (void)FileGetAttributes(*retryName ? retryName : fileName);
+		    (void)FileGetAttributes((char*)(*retryName ? retryName : fileName));
 		    if (ThreadGetError() == ERROR_FILE_NOT_FOUND) {
 			break;
 		    } else {
 			word nameLen = strlen(fileName);
-			char *dotP = strrchr(fileName, '.');
+			TCHAR *dotP = strrchr(fileName, '.');
 			if (dotP) {
 			    /* have dot */
 			    strncpy(retryName, fileName, dotP-fileName);
@@ -332,7 +332,7 @@ entry_MimeDrvText MimeDrvMain
 		}
 		/* either found available name, or gave up (just overwrite
 		   last retryName) */
-		if (FileCopy(file, *retryName ? retryName : fileName, 0, 0) == 0) {
+		if (FileCopy((char*)file, (char*) (*retryName ? retryName : fileName), 0, 0) == 0) {
 		    /* store filename */
 		    strcpy(albP->ALB_dataFile, *retryName ? retryName : fileName);
 		    /* store path */
@@ -367,7 +367,7 @@ entry_MimeDrvText MimeDrvMain
 }
 
 #pragma argsused
-entry_MimeDrvInfo MimeDrvInfo
+char * _pascal _export MimeDrvInfo(_MimeInfoParams_)
 {
     return memcpy(buf, formatList, formatSize);
 }

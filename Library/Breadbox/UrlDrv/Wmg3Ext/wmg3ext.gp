@@ -24,7 +24,7 @@ export          URLDRVABORT
 export          URLDRVINFO
 export          URLDRVFLUSH
 
-resource HTMLRESOURCE shared lmem data
+resource HTMLResource shared lmem data
 
 usernotes "Copyright 1994-2002  Breadbox Computer Company LLC  All Rights Reserved"
 

@@ -292,6 +292,24 @@
 				     * a real symbol; its ID follows in the
 				     * next four bytes */
 
+#define CNL2_CHAR	0x8000		
+#define	CNL2_SHORT	0x8001
+#define	CNL2_USHORT	0x8002
+#define	CNL2_LONG	0x8003
+#define	CNL2_ULONG	0x8004
+#define	CNL2_REAL32	0x8005
+#define	CNL2_REAL80	0x8007
+#define	CNL2_REAL64	0x8006
+#define	CNL2_REAL128	0x8008
+#define	CNL2_QUADWORD	0x8009
+#define	CNL2_UQUADWORD	0x800a
+#define	CNL2_REAL48	0x800b
+#define	CNL2_COMPLEX32	0x800c
+#define	CNL2_COMPLEX64	0x800d
+#define	CNL2_COMPLEX80	0x800e
+#define	CNL2_COMPLEX128	0x800f
+#define	CNL2_VARSTRING	0x8010
+
 /* Calling-convention for CTL_PROCEDURE */
 #define CCC_PASCAL_NEAR	    CTL_NEAR_PTR
 #define CCC_PASCAL_FAR	    CTL_FAR_PTR

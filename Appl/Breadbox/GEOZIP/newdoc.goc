@@ -1,0 +1,895 @@
+/**************************************************************************
+ *      GEODE-File f�r Geos Zip Manager
+ *
+ *      Beschreibung:	OpenClose.goc
+ *			Seltener genutzte Routinen, z.B beim �ffnen oder f�r
+ *				neues Document
+ *
+ *      Copyright:      (c) by RABE-Soft 8/97
+ *                      Freeware
+ *      Sonstiges:      -
+ *
+ **************************************************************************/
+
+/*  Standard include files */
+
+@include <stdapp.goh>
+@include <initfile.h>
+#include <stdio.h>
+#include <Ansi/stdlib.h>
+#include <Ansi/string.h>
+#include <vm.h>
+#include <hugearr.h>
+#include <gstring.h>
+#include <graphics.h>
+#include <uDialog.h>
+#include <ctype.h>
+
+#include "unzip.h"
+
+
+@include "geozip.goh"
+@include "process.goh"
+@include "zipui.goh"
+@include "extract.goh"
+
+
+extern StandardDialog2ResponseTriggerTable win95ResponseTable;
+//extern TimerHandle sWareTimerHandle;
+//extern word sWareTimerID;
+
+
+@extern method GZipDocAttach, GZipDocumentClass, MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT {
+char path[200];
+DiskHandle dh;
+MemHandle unzDesc;
+dword fsize;
+int err, operation, count;
+NewzipBuildInfo nzbInfo;
+EventHandle evt;
+
+  pself->GZDI_new = FALSE;
+
+  pself->GZDI_displayFlags = GZOPT_DISP_LONGNAME_1ST | GZOPT_DISP_DIR_LONGNAME_1ST;
+  pself->GZDI_displayFlags |= @call  GZipFileInfoSelector::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+  pself->GZDI_displayFlags |= @call  GZipDirInfoSelector::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+  operation = @call oself::MSG_GEN_DOCUMENT_GET_OPERATION();
+
+  /* if we're creating a new zip archive */
+  if ( operation == GDO_NEW )
+	{
+	int iac;
+
+    pself->GZDI_new = TRUE;
+
+	do {
+	   iac = UserDoDialog(@CreateNewZipDialog);
+	   } while ( iac == IC_HELP);
+
+	if ( @call CreateNewZipDialog::MSG_NEWZIP_GET_RESULT(&nzbInfo) )
+		{
+		@send, forceQueue oself::MSG_GZIP_DOC_INVALID_ARCHIV();
+		@callsuper();
+		return;
+		}
+	count = @call oself::MSG_GZIP_DOC_BUILD_NEW_ARCHIVE(&nzbInfo);
+	if ( cancelOpenNew || (count ==0) )
+		{
+		if ( count == 0 ) ErrorBox(@NoCompressFilesFound);
+
+		@send, forceQueue oself::MSG_GZIP_DOC_INVALID_ARCHIV();
+		@callsuper();
+		return;
+		}
+//	@send oself::MSG_GEN_DOCUMENT_MARK_DIRTY();
+	}	/* end of creating a new archive if */
+
+  FilePushDir();
+// Zip-Archiv als Unzip-File �ffen
+
+  /* find out about the zip archive we're opening */
+  @call oself::MSG_GEN_PATH_GET(path,200);
+  dh = @call oself::MSG_GEN_PATH_GET_DISK_HANDLE();
+  pself = ObjDerefGen(oself);
+  FileSetCurrentPath(dh,path);
+  fsize = FileSize(pself->GDI_fileHandle);
+/*******************************************************
+???? �berpr�fen!
+/*******************************************************/
+
+  /* grab some info about the archive */
+  err = UnzInitUnzDesc(pself->GDI_fileHandle,&unzDesc);
+  if ( !err ) {
+	pself -> GZDI_unzDesc = unzDesc;
+	}
+  else  {
+	pself -> GZDI_unzDesc = 0;
+	}
+
+// Anlegen der tempor�ren VM-Datei, die die HugeArrays enth�lt.
+// Anlegen der HugeArrays.
+
+  /* create a temp file in USERDATA to hold our huge arrays */
+  FileSetStandardPath(SP_PUBLIC_DATA);
+
+  MemLock(HandleOf(@ViewTempDirName));
+  strcpy(pself->GZDI_tempFilePath,LMemDeref(@ViewTempDirName));
+  err = FileCreateDir(LMemDeref(@ViewTempDirName));
+  MemUnlock(HandleOf(@ViewTempDirName));
+  if ( (err != 0) && ( err != ERROR_FILE_EXISTS ) )
+	{
+	ErrorBox(@ErrorCreateTempDir);
+	ErrorBox(@MemOrTempAllocationFailed);
+	@send application::MSG_META_QUIT();
+	return;
+	}
+
+  strcat(pself->GZDI_tempFilePath,"\\");
+  pself->GZDI_tempFile = VMOpen( pself->GZDI_tempFilePath,
+		VMAF_FORCE_READ_WRITE | VMAF_FORCE_DENY_WRITE,
+		VMO_TEMP_FILE , 0 );
+
+  if(  pself->GZDI_tempFile == 0)
+	{
+	ErrorBox(@MemOrTempAllocationFailed);
+	@send application::MSG_META_QUIT();
+	return;
+	}
+
+  pself->GZDI_entryArray = HugeArrayCreate(pself->GZDI_tempFile,0,0);
+  pself->GZDI_indexArray = HugeArrayCreate(pself->GZDI_tempFile,0,0);
+  pself->GZDI_textArray = HugeArrayCreate(pself->GZDI_tempFile,0,0);
+  FilePopDir();
+
+// Wenn Zip-Datei ge�ffnet werden konnte: Auslesen und Anzeigen,
+// sonst Fehler
+  @callsuper();
+  if ( !(pself->GZDI_unzDesc) )
+	{
+	DisplayErrorBox(pself->GDI_fileName,GZIP_INVALID_ZIP_FILE);
+	@send, forceQueue oself::MSG_GZIP_DOC_INVALID_ARCHIV();
+	}
+  else  {
+	/* OK - we have a valid ZIP file and have created our arrays so let's
+	 * show the list of archived files in the zip */
+	unz_global_info globalInfo;
+
+	UnzGetGlobalInfo(pself->GZDI_unzDesc,&globalInfo);
+	@send OpenNewInfo::MSG_ONI_INITIATE(pself->GDI_fileName,fsize,globalInfo.number_entry);
+	err = @call oself::MSG_GZIP_DOC_CREATE_FILE_LIST();
+	if ( !err ) @call oself::MSG_GZIP_DOC_DISPLAY_LIST();
+	    else {
+	       if ( !cancelOpenNew) /* kein Fehlermeldung bei cancelOpenNew */
+			DisplayErrorBox(pself->GDI_fileName,GZIP_INVALID_ZIP_FILE);
+	       /* sehr wohl aber: kein g�ltiges Archiv */
+	       @send, forceQueue  oself::MSG_GZIP_DOC_INVALID_ARCHIV();
+	       }
+	@send OpenNewInfo::MSG_ONI_ENDE();
+	if ( operation == GDO_NEW ) {
+		
+		/*
+		 * Need to queue this so that document's notification
+		 * can be sent to the GenDocumentControl so that the
+		 * it properly prepares the SaveAS DB.  -Don 10/28/00
+		 */
+/*		evt = @record GenDocumentControlClass::MSG_GEN_DOCUMENT_CONTROL_INITIATE_SAVE_AS_DOC();
+		@send, application::MSG_META_SEND_CLASSED_EVENT(evt, TO_APP_MODEL); */
+		evt = @record GZipDocumentControl::MSG_GEN_DOCUMENT_CONTROL_INITIATE_SAVE_AS_DOC();
+		@send, forceQueue process::MSG_META_DISPATCH_EVENT(evt, MF_FORCE_QUEUE);
+		}
+	}
+  }
+
+
+@extern method GZipDocumentClass, MSG_GEN_DOCUMENT_GENERATE_NAME_FOR_NEW {
+int x;
+char buf[15] = "noName%u.ZIP";
+
+	x = @callsuper();
+	sprintf(buffer,buf,retryCount);
+/*
+	if (retryCount != 0) {
+		l = strlen(buffer);
+		buffer[7]++;
+		if ( l>12) buffer[12] = 0;
+		}
+		*/
+	return x;
+	}
+
+/*###########################################################################
+	Routinen zur Behandlung von langen Win95 Pfaden.
+	Notwending, solange Geos nicht komplett mit VFAT umgehen kann und
+	das Anlegen von DOS-Dateien mit "ung�ltigen" Namen fehlschl�gt
+   (trans)
+   Routines for the treatment of long Win95 paths
+   Emergency whom thing, Geos not completely with VFAT to so long deal can and
+	the creation of DOS files with "ung?ltigen" names fehlschl.gt
+/*###########################################################################*/
+
+/*@ifndef NO_LONGNAME_SUPPORT
+char invalidDosChars[] = "\":<>\\\011\174?*";
+/*@else */
+char invalidDosChars[] = " \"+,/:;<=>[\\]\011\174?*";
+/*@endif  */
+
+Boolean IsValidDosName(char *p)
+// Liefert FALSE (FEHLER) wenn kein g�ltiger DOS-Name
+// Liefert TRUE wenn der DOS-Name OK ist
+  {
+  int n;
+  char * pptr;
+  if (strlen(p) > 12) return FALSE;
+  for ( n=0; n < strlen(p) ; n++ )
+	{
+	if ( (byte)(p[n]) < 0x20 ) return FALSE;  // ung�ltiges Zeichen <= 0x1F
+	}
+  for ( n=0; n < strlen(invalidDosChars) ; n++ )
+	{
+	if ( strchr(p,invalidDosChars[n]) ) return FALSE; // ung�ltiges Zeichen
+	}
+  pptr = strchr(p,'.');
+  if  (pptr == NULL)
+	{
+	if (strlen(p)>8)  return FALSE;
+	return TRUE;
+	}
+  if ( pptr == p ) return FALSE;		// Punkt am Anfang
+  if ( strlen(pptr) > 4 ) return FALSE;		// zu lange Endung
+  if ( strchr(pptr+1,'.') ) return FALSE;	// zwei Punkte
+  if ( pptr - p > 8 ) return FALSE;		// Punkt zu sp�t
+  return TRUE;
+  }
+
+void MakeValidDosName(char * p )
+  {
+  int len, n, m;
+  len = strlen(p);
+// ung�ltige Zeichen ersetzen
+  for ( n=0 ; n < len ; n++ ) {
+    if ( (byte)(p[n]) < 0x20 ) p[n] = '_';
+    for ( m=0; m < strlen(invalidDosChars) ; m++ )
+		if ( p[n] == invalidDosChars[m] ) p[n] = '_';
+    }
+/*@ifdef NO_LONGNAME_SUPPORT */
+
+// Punkte ersetzen
+  for ( n=0 ; n < len ; n++ )
+      if ( p[n] == '.' ) p[n] = '_';
+// neuen Namen konstruieren
+  if ( len > 8 )	// bis L�nge 8: Punktlos
+    {
+    if ( len > 12 )
+	{
+	strcpy(&p[9],&p[len-3]);
+	p[8]='.';
+	}
+    else p[len-4] = '.';
+    }
+/*@endif  */
+  }
+
+Boolean MakeValidDosPath(char * path)
+  {
+  char * buf, *bufp, *bptr, *p;
+  Boolean wandeledFlag = FALSE;
+
+  buf = bufp = malloc(strlen(path) + 2);
+  p = path;
+  do {
+// kopieren des Pfadelements
+     bptr = strchr(p, '\\');
+     if ( !bptr ) bptr = strchr(p,0);
+     memcpy(bufp,p, bptr-p);
+     bufp[bptr-p] = 0;
+
+// Umwandeln
+     if ( !IsValidDosName(bufp) )
+		{
+		wandeledFlag = TRUE;
+		MakeValidDosName(bufp);
+		}
+// Vorbereiten f�r n�chsten Schritt
+     while ( *bufp != 0 ) bufp++;
+     *bufp = *bptr;	// '\\' or Zero
+     bufp++;		// evt auf Zero
+     p = bptr + 1;	// nach '\\'
+     } while ( *bptr !=0 );
+
+   if (wandeledFlag)	// Liste der Umgewandelten Pfade updaten
+	{
+	word size;
+	size = @call ViewText::MSG_VIS_TEXT_GET_TEXT_SIZE();
+	if ( size < 12000 )
+	  {
+	  @call ViewText::MSG_VIS_TEXT_APPEND_OPTR(@Win95PfadFromText,0);
+	  @call ViewText::MSG_VIS_TEXT_APPEND_PTR(path,0);
+	  @call ViewText::MSG_VIS_TEXT_APPEND_OPTR(@Win95PfadToText,0);
+	  @call ViewText::MSG_VIS_TEXT_APPEND_PTR(buf,0);
+	  }
+	}
+   strcpy(path,buf);	// zur�ckkopieren
+   free(buf);
+   return wandeledFlag;
+   }
+
+
+dword CreateStdTextEntrys(FileInZip * fizp, int pathLen, MemHandle extramem,
+		VMFileHandle fh, VMBlockHandle array )
+  {
+/* SetAttrText belegt einen String mit Buchstaben f�r die getzten Atrribute */
+#define	SetAttrTextElement(atr,AT,str,ch,n)	\
+	if ( atr & AT ) str[n] = ch ; else str[n] = ' '
+#define	SetAttrText(attr,str)	SetAttrTextElement(attr,FA_ARCHIVE,str,'A',0);\
+			SetAttrTextElement(attr,FA_RDONLY,str,'R',1);\
+			SetAttrTextElement(attr,FA_SUBDIR,str,'D',2);\
+			SetAttrTextElement(attr,FA_HIDDEN,str,'H',3);\
+			SetAttrTextElement(attr,FA_SYSTEM,str,'S',4);\
+			SetAttrTextElement(attr,FA_LINK,str,'L',5);\
+			SetAttrTextElement(attr,FA_VOLUME,str,'V',6);\
+			str[7]=0
+
+  word size;
+  dword count;
+  ListStringHeader * entry;
+  void * v;
+  char * s, *ep, *p;
+  TimerDateAndTime tdat;
+
+  // count vor Anh�ngen == Index des neuen Eintrages! (start mit NULL! )
+  // BugFix f�r zermatschtes DI-Register
+  count = HugeArrayGetCount(fh, array);
+
+  size = sizeof(ListStringHeader);
+  if ( extramem ) {
+	ep = MemLock(extramem);
+	if ( strlen(ep) > EXTRA_STRING_MAX_LEN ) {
+		ep[EXTRA_STRING_MAX_LEN] = 0;
+		}
+	size += strlen(ep);	// +1 kann man sich sparen, weil in size
+				// schon 4 Byte f�r extrafeld vorgesehen
+	}
+
+  HugeArrayAppend(fh,array,size, 0);
+  HugeArrayLock(fh,array,count, &v,&size);
+  entry = v;
+
+  strcpy(entry->dosName,&(fizp->name[pathLen]));
+/*hier*/
+  while ( strlen(entry->dosName) < 13) { strcat(entry->dosName," "); }
+
+
+  s = entry->sizeStr;
+//  sprintf(s," %10lu",fizp->uncompressedSize);
+  UtilHex32ToAscii(s, fizp->uncompressedSize, 
+			UHTAF_NULL_TERMINATE|UHTAF_THOUSANDS_SEPARATORS); 
+
+  tdat.TDAT_year = 1980+FDATExtractYear(fizp->modDate);
+  tdat.TDAT_month = FDATExtractMonth(fizp->modDate);
+  tdat.TDAT_day = FDATExtractDay(fizp->modDate);
+  tdat.TDAT_hours =  FDATExtractHour(fizp->modDate);
+  tdat.TDAT_minutes = FDATExtractMinute(fizp->modDate);
+  tdat.TDAT_seconds = 0;
+
+  s = entry->dateStr;
+  *s = ' ';s++;*s = ' ';s++;*s=0;
+  LocalFormatDateTime(s, DTF_ZERO_PADDED_SHORT, &tdat);
+
+  s = entry->timeStr;
+  *s = ' ';s++;*s = ' ';s++;*s=0;
+  LocalFormatDateTime(s, DTF_HMS, &tdat);
+
+  entry->attrStr[0] =' ';
+  p = &(entry->attrStr[1]);
+  SetAttrText(fizp->fileAttrs,p);
+
+  if ( extramem ) {
+	strcpy(entry->extraStr,ep);
+	MemUnlock(extramem);
+	}
+  else  entry->extraStr[0] = 0;
+
+  HugeArrayDirty(entry);
+  HugeArrayUnlock(entry);
+
+  return count;
+  }
+
+/*--------------------- GZipDocCheckForGeosName ---------------------
+ *      Aufgabe:
+ *      Zusammenhang:
+ *      Strategie:
+ *      Parameter:
+ ---------------------------------------------------------------------------*/
+Boolean GZipDocCheckForGeosName(MemHandle unzDesc,VMFileHandle tempFile,
+		VMBlockHandle textArray, dword arrIndex, char * name)
+{
+  #define CHECK_READ_BUFFER_SIZE	40
+  ListStringHeader * hPtr;
+  word size;
+  int err,read;
+  char buf[CHECK_READ_BUFFER_SIZE];
+  Boolean dnFound = FALSE;
+
+
+    /* open file for reading */
+    err = UnzOpenCurrentFile(unzDesc);
+    if( err != UNZ_OK) return FALSE;
+
+    do {                              /* ensure UnzCloseCurrentFile() */
+       read = UnzReadCurrentFile(unzDesc, buf, CHECK_READ_BUFFER_SIZE);
+       if (read < 0 ) 	break;
+
+       if  ( ((dword*)buf)[0] != GEOS_HEADER_MAGIC ) break;
+
+       HugeArrayResize(tempFile, textArray, arrIndex, sizeof(ListStringHeader)+34);
+       HugeArrayLock(tempFile, textArray,arrIndex,(void**)&hPtr,&size);
+       memcpy(hPtr->extraStr, &buf[4],32);
+       hPtr->extraStr[32]=0;
+
+       if  (name[0] == '@') if (strlen(name) <14) {
+			strcpy(buf,name);
+			LocalUpcaseString(buf,0);
+			if ( !strcmp(buf,"@DIRNAME.000") ) dnFound = TRUE;
+			}
+
+       HugeArrayUnlock(hPtr);
+
+       } while(0);
+       UnzCloseCurrentFile(unzDesc);
+
+  return dnFound;
+  }
+
+/*--------------------- GZipDocUpdateDirLongname ---------------------
+ *      Aufgabe:
+ *      Zusammenhang:
+ *      Strategie:
+ *      Parameter:
+ ---------------------------------------------------------------------------*/
+void GZipDocUpdateDirLongname(char * name, VMFileHandle tempFile,
+		VMBlockHandle indexArray, VMBlockHandle textArray,
+		dword sourceTextIndex)
+   {
+   IndexArrayBlockHeader * hPtr;
+   ListStringHeader	* strPtr;
+   dword pIndex, parent;
+   word size;
+   char * s;
+
+// Pfad, in dem die Dirname Steht, konstruieren
+   s = malloc(256);
+   strcpy(s,name);
+   FileToolMakeParentPath(s,TRUE);
+// Index des Pfad- Eintrages holen
+   if ( !IndexArrayExistPath(tempFile, indexArray, s, &pIndex) ) {
+			free(s);
+			return;
+			}
+
+// Index des Parent- Eintrages und Index im Text-Array holen
+   HugeArrayLock(tempFile,indexArray,pIndex,(void**)&hPtr, &size);
+   parent = hPtr->parentLink;
+   pIndex = hPtr->extraBlock;
+   HugeArrayUnlock(hPtr);
+/**/
+   if ( parent == IA_NO_PARENT ) {
+// LongName des Rootverzeichnisses wird ignoriert
+			free(s);
+			return;
+			}
+
+// Kopieren des Quell-Longname
+   HugeArrayLock(tempFile,textArray,sourceTextIndex,(void**)&strPtr, &size);
+   strcpy(s,strPtr->extraStr);
+   HugeArrayUnlock(strPtr);
+
+// Speichern im Ziel-String
+   HugeArrayResize(tempFile, textArray, pIndex, sizeof(ListStringHeader)+strlen(s)+1);
+   HugeArrayLock(tempFile, textArray,pIndex,(void**)&strPtr,&size);
+   strcpy(strPtr->extraStr,s);
+   HugeArrayUnlock(strPtr);
+
+   free(s);
+   return;
+   }
+
+/*###########################################################################
+	Ausgelagerte Document-Routinen, die nur innerhalb der DocumentClass
+	gerufen werden d�rfen da sie direkt auf instance-Variablen zugreigfen
+/*###########################################################################*/
+
+
+@extern method GZipDocumentClass, MSG_GZIP_SET_SAVE_ONCE
+{
+	pself->GZDI_savedOnce = TRUE;
+}
+
+@extern method GZipDocumentClass, MSG_GZIP_GET_SAVE_ONCE
+{
+	return(pself->GZDI_savedOnce);
+}
+
+	
+/*--------------------- MSG_GZIP_DOC_CREATE_FILE_LIST ---------------------
+ *      Aufgabe:	Anlegen einer Liste der Eintr�ge in einem
+ *			Zip-File. Belegen des EntryArrays und des IndexArrays
+ *	Return:         FALSE, wenn OK
+ *			TRUE, wenn Fehler
+ ---------------------------------------------------------------------------*/
+@extern method  GZipDocumentClass, MSG_GZIP_DOC_CREATE_FILE_LIST
+{
+	MemHandle unzDesc;
+	MemHandle mh,extramem;
+//	MemHandle dirnameData=0, dirinfoData=0;
+	unz_file_info info;
+	FileInZip * fizp ;
+
+	int encryptCounter=0;
+	int unknownMethodsCounter=0;
+	int win95PathsCounter = 0;
+	char *p, zahl[60]; // an Win95UmbenanntDummy anpassen!
+	word scanOptions;
+	Boolean dirnameFound;
+
+    unzDesc = pself->GZDI_unzDesc;
+    if( UnzGoToFirstFile(unzDesc)  != UNZ_OK)
+	{
+		return TRUE;		/* any Error */
+	}
+
+    mh = GetLockedMem(sizeof(FileInZip));
+    fizp = MemDeref(mh);
+
+  //  scanOptions = @call GZipGeosScanSelector::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    scanOptions = GZOPT_SCAN_SPECIAL;
+
+    /* prepares the win long name name change listing */
+	 @call ViewText::MSG_VIS_TEXT_REPLACE_ALL_OPTR(@Win95PfadStartText,0);
+
+    /* enumerate files in ZIP archive */
+    do 
+	{
+		/* Get info on current file */
+		if(UnzGetCurrentFileInfo(unzDesc, &info, NULL, 0, NULL, 0, NULL, 0) == UNZ_OK)
+		{
+			@send OpenNewInfo::MSG_ONI_INC_COUNTER();
+
+			if ( info.flag & UNZ_FLAG_FILE_ENCRYPTED ) encryptCounter++;
+			if ( (info.compression_method !=0 )
+					&& (info.compression_method != Z_DEFLATED ) )
+									unknownMethodsCounter++;
+
+			/* Store info in directory array */
+			fizp->compressedSize = info.compressed_size;
+			fizp->uncompressedSize = info.uncompressed_size;
+
+			fizp->modDate= (FileDateAndTime) (
+				( (info.dosDate >> 16 ))
+				| ( (info.dosDate << 16 )) );
+
+			fizp->fileAttrs = (info.external_fa & 0xFF);
+
+			fizp->versionNeed = info.version_needed;
+			fizp->versionMadeBy = info.version;
+			fizp->sizeLocalExtraField = info.size_file_extra;
+			fizp->sizeComment = info.size_file_comment;
+			fizp->isEncrypted = info.flag & 0x1;
+			fizp->compressionMethod = info.compression_method;
+
+			UnzGetGoToAtInfo(unzDesc,&fizp->quickLocateParams);
+
+			/* Get file name (now we know its actual size) */
+			UnzGetCurrentFileInfo(unzDesc, NULL, fizp->name, info.size_filename+1,
+			  NULL, 0, NULL, 0);
+
+			/* Create and store name-relevant stuff */
+			// Slash to Backslash
+			p = fizp->name;
+			while ( *p != 0 ) { if ( *p == '/' ) *p = '\\';  p++; }
+
+			// Directory?
+			p = fizp->name;
+			if ( (strlen(p) == 0) || (p[strlen(p) - 1] != '\\') ) fizp->isDir = FALSE;
+			else  	
+			{
+				fizp->isDir = TRUE;
+				p[strlen(p) - 1] = 0;
+			}
+
+			// letztes Pfadelement auf Dos-G�ltigkeit testen
+			p = fizp->name;
+			DirListParseNameFromPath(&p);
+			/*
+				while ( strchr(p,'\\') ) { p = strchr(p,'\\')+1; p++; }
+				if (p != fizp->name ) p--;
+			  */
+			if ( (!IsValidDosName(p)) /*|| (fizp->isDir) */)
+			{
+				extramem = GetLockedMem(strlen(p)+2);
+				strcpy(MemDeref(extramem),p);
+				MemUnlock(extramem);
+			}
+			else extramem = 0;
+
+			// Kompletten Pfad DOS-G�ltig machen - TRUE, wenn ge�ndert wurde
+			if (MakeValidDosPath( fizp->name) ) win95PathsCounter++;
+			if (LocalDosToGeos(fizp->name,sizeof(fizp->name),'_'))	
+			{
+				WarningParamBox(@InvalidCharsWarning,fizp->name);
+			}
+/*hier*/
+
+			// L�nge des Parent-Pfades ermitteln
+			p = fizp->name;
+			while ( strchr(p,'\\') ) { p = strchr(p,'\\')+1; p++; }
+			fizp->pathLen = p - fizp->name ;
+			if ( fizp->pathLen != 0 ) fizp->pathLen--;
+
+			// Anzeigetexte erzeugen und speichern
+			/* Indicator texts produce and store (trans) */
+			fizp->textIndex = CreateStdTextEntrys(fizp, fizp->pathLen, extramem,
+							pself->GZDI_tempFile,pself->GZDI_textArray);
+			if ( extramem) MemFree(extramem);
+
+			dirnameFound = FALSE;
+			if ( !(fizp->isDir) && (scanOptions !=  GZOPT_SCAN_NEVER) ) 
+				do
+				{
+				   char extension[4];
+
+				   if (scanOptions ==  GZOPT_SCAN_ALLWAYS) goto DoScan;
+
+				   p = fizp->name;
+				   DirListParseNameFromPath(&p);
+				   p = strchr(p,'.');
+				   if (!p) break;
+				   p++;
+				   if ( strlen(p) != 3 ) break;
+
+				   strcpy(extension,p);
+				   if ( extension[0] > 0x60 ) extension[0] -= 0x20;
+				   if ( extension[1] > 0x60 ) extension[1] -= 0x20;
+				   if ( extension[2] > 0x60 ) extension[2] -= 0x20;
+
+				   if ( ( strcmp(extension, "GEO") )
+					&& ( strcmp(extension, "LDF") )
+					&& ( strcmp(extension, "SYM") )
+					&& ( ( extension[0] > '9' ) || ( extension[0] < '0' ) )
+					) break;
+				   DoScan:
+				   p = fizp->name;
+				   DirListParseNameFromPath(&p);
+				   dirnameFound = GZipDocCheckForGeosName(unzDesc,pself->GZDI_tempFile,
+							pself->GZDI_textArray, fizp->textIndex, p );
+			   } while(0);
+	
+			/* if it is a @dirname or @nd_direc.00 add them at the end of the list so the dynamic list
+			 * for showing and selecting simply is not showing these entries.
+			 *	FR 10/25/2000 */
+			if(!LocalCmpStringsNoCase(p, "@ND_DIRE.000", 0))
+				{
+				GZipDocAddEntry(fizp,
+						pself->GZDI_tempFile,
+						pself->GZDI_entryArray,
+						pself->GZDI_indexArray,
+						pself->GZDI_textArray,
+						TRUE);
+				}
+			else
+				{
+				GZipDocAddEntry(fizp,
+						pself->GZDI_tempFile,
+						pself->GZDI_entryArray,
+						pself->GZDI_indexArray,
+						pself->GZDI_textArray,
+						dirnameFound ? TRUE : FALSE);
+				}
+			if(dirnameFound)
+				GZipDocUpdateDirLongname(
+						fizp->name,
+						pself->GZDI_tempFile, 
+						pself->GZDI_indexArray,
+						pself->GZDI_textArray, 
+						fizp->textIndex);
+
+		}
+	} 
+	while( (UnzGoToNextFile(unzDesc) == UNZ_OK) && !cancelOpenNew) ;
+    
+	MemFree(mh);
+
+    sprintf(zahl,"%u",encryptCounter);
+    if (encryptCounter!=0) DisplayErrorBox(zahl,GZIP_ENCRYPTED_FILES_FOUND);
+    sprintf(zahl,"%u",unknownMethodsCounter);
+    if (unknownMethodsCounter!=0) DisplayErrorBox(zahl,GZIP_UNKNOWN_METHODS_FOUND);
+    if ( win95PathsCounter > 0 )
+	{
+	/* we'll put this back in since we don't have win long name support
+	 * jfh 8/1/02 */
+	char * p;
+	int ret;
+
+	sprintf(zahl,"%u",win95PathsCounter);
+
+	UserStandardSound(SST_WARNING);
+/*@if 0  */
+	MemLock(HandleOf(@Win95Found));
+	p = LMemDeref(@Win95Found);
+	ret = UserStandardDialog(0,(char*)&win95ResponseTable,
+			0, zahl, p,
+			(CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET)
+			| (GIT_MULTIPLE_RESPONSE << CDBF_INTERACTION_TYPE_OFFSET) );
+	MemUnlock(HandleOf(@Win95Found));
+
+	if ( ret == IC_DETAIL ) {
+	   MemLock(HandleOf(@Win95UmbenanntDummy));
+	   p = LMemDeref(@Win95UmbenanntDummy);
+	   sprintf(zahl,p,win95PathsCounter);
+	   MemUnlock(HandleOf(@Win95UmbenanntDummy));
+	   @call ViewText::MSG_VIS_TEXT_APPEND_PTR(zahl,0);
+	   @send ViewWindow::MSG_GEN_INTERACTION_INITIATE();
+	   }
+/*@endif */
+	}
+
+    return cancelOpenNew;          /* ok wenn nicht canceled, Fehler wenn cancel*/
+			/* cancelOpenNew wird von aufrufender Routine abgefragt*/
+}
+
+
+/*--------------------- GZipDocAddEntry ---------------------
+ *      Aufgabe:	Hinzuf�gen eines neuen Eintrages zu den Arrays
+
+ ---------------------------------------------------------------------------*/
+void GZipDocAddEntry( FileInZip * fizp,
+		VMFileHandle tempFile,
+		VMBlockHandle entryArray,
+		VMBlockHandle indexArray,
+		VMBlockHandle textArray,
+		Boolean hidden)
+  {
+  dword count;
+  FileInZip * entry;
+  void * v;
+  word size, entrySize;
+  char s[256];
+
+  entrySize = sizeof(FileInZip) - MAX_FILE_SIZE_IN_ZIP + strlen(fizp->name) +1;
+  // count vor Anh�ngen == Index des neuen Eintrages! (start mit NULL! )
+  // BugFix f�r zermatschtes DI-Register
+  count = HugeArrayGetCount(tempFile, entryArray);
+
+  HugeArrayAppend(tempFile,entryArray,entrySize, 0);
+  HugeArrayLock(tempFile,entryArray,count, &v,&size);
+  entry = v;
+
+  memcpy(entry,fizp,entrySize);
+  HugeArrayDirty(entry);
+  HugeArrayUnlock(entry);
+
+@if @debugFlag
+if (strlen(fizp->name) >255) { DebugInfo("LONG PATH"); UserStandardSound(SST_ERROR);}
+@endif
+	strcpy(s,fizp->name);
+
+  if ( fizp->isDir)
+	{
+	IndexArrayBlockHeader * hPtr;
+	dword newIndex;
+	word size;
+
+	FileToolDropBackslash(s,TRUE);
+	GZipDocEnsureParentPath( s, tempFile, indexArray, textArray);
+	newIndex = IndexArrayCreatePath(tempFile,indexArray,s);
+
+	HugeArrayLock(tempFile,indexArray,newIndex,(void**)&hPtr,&size);
+	hPtr->extraBlock = fizp->textIndex;
+	HugeArrayUnlock(hPtr);	// Dirty is done by IndexArray...
+	}
+  else	{
+	GZipDocEnsureParentPath( s, tempFile, indexArray, textArray);
+	FileToolMakeParentPath(s,TRUE);
+	IndexArrayCreateFileEntryEx(tempFile,indexArray,s,
+		count,fizp->uncompressedSize, hidden);
+
+	}
+  }
+
+
+/*--------------------- GZipDocEnsureParentPath ---------------------
+ *      Aufgabe:	Sicherstellen, da� der Parentpath und alle
+ *			dazugeh�rigen TextEntrys existieren. Letzteres
+ *			kann n�mlich von den Dirlist-Routinen nicht erledigt
+ *			werden
+ ---------------------------------------------------------------------------*/
+void GZipDocEnsureParentPath( char * oriPath,
+		VMFileHandle tempFile,
+		VMBlockHandle indexArray,
+		VMBlockHandle textArray)
+{
+char * path;
+Boolean cancelFlag = FALSE;
+dword pIndex, textIndex;
+IndexArrayBlockHeader * hPtr;
+word size;
+
+	path = malloc(strlen(oriPath));
+	strcpy(path,oriPath);
+
+	cancelFlag = FileToolMakeParentPath(path,TRUE);	// True if no parent
+	if ( strlen(path) == 0 ) cancelFlag = TRUE;
+
+	if ( cancelFlag ) {
+		free(path);
+		return;		// There is no parent to ensure
+		}
+
+	// Check Parent. If none, create it
+	if ( !IndexArrayExistPath(tempFile, indexArray, path, &pIndex) ) {
+		// SEINEN Parent Path anlegen -  rekursiv
+		GZipDocEnsureParentPath( path,tempFile,indexArray,textArray);
+
+		FileToolDropBackslash(path,TRUE);	// be sure
+		pIndex = IndexArrayCreatePath(tempFile,indexArray,path);
+
+		// TextEntry im EntryArray anlegen
+		textIndex = CreateSimpleTextEntrys(path, tempFile, textArray );
+
+		// Verbindung herstellen
+		HugeArrayLock(tempFile,indexArray,pIndex,(void**)&hPtr,&size);
+		hPtr->extraBlock = textIndex;
+		HugeArrayDirty(hPtr);
+		HugeArrayUnlock(hPtr);
+		}
+
+	free(path);
+	}
+
+
+/*--------------------- CreateSimpleTextEntrys ---------------------
+ *      Aufgabe:	Entry-Text anlegen, wenn nur der DOS-Name bekannt
+ *			ist
+
+ ---------------------------------------------------------------------------*/
+dword CreateSimpleTextEntrys(char * path, VMFileHandle fh, VMBlockHandle array )
+  {
+  word size;
+  dword count;
+  ListStringHeader * entry;
+  void * v;
+  char * p, *q;
+
+  // count vor Anh�ngen == Index des neuen Eintrages! (start mit NULL! )
+  // BugFix f�r zermatschtes DI-Register
+  count = HugeArrayGetCount(fh, array);
+
+  size = sizeof(ListStringHeader);
+
+  HugeArrayAppend(fh,array,size, 0);
+  HugeArrayLock(fh,array,count, &v,&size);
+  entry = v;
+
+  q = p = malloc(strlen(path));
+  strcpy(p,path);
+
+  if (!DirListParseNameFromPath(&p)) p = q;
+  strcpy(entry->dosName,p);
+  free(q);
+
+  while ( strlen(entry->dosName) < 13) { strcat(entry->dosName," "); }
+
+  entry->sizeStr[0] = 0;
+  entry->dateStr[0] = 0;
+  entry->timeStr[0] = 0;
+  entry->attrStr[0] = 0;
+  entry->extraStr[0] = 0;
+
+  HugeArrayDirty(entry);
+  HugeArrayUnlock(entry);
+
+  return count;
+  }
+
+
+

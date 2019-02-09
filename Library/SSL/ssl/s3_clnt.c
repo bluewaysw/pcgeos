@@ -112,7 +112,7 @@ int ver;
 		return(NULL);
 	}
 
-SSL_METHOD * _export _pascal SSLv3_client_method()
+SSL_METHOD*  _export _pascal SSLv3_client_method()
 	{
 	static int init=1;
 	static SSL_METHOD SSLv3_client_data;
@@ -1198,7 +1198,7 @@ SSL *s;
 
 	d=p=(unsigned char *)s->init_buf->data;
 
-	if ((ca_sk=sk_new(ca_dn_cmp)) == NULL)
+	if ((ca_sk=sk_new((int (*)())ca_dn_cmp)) == NULL)
 		{
 		SSLerr(SSL_F_SSL3_GET_CERTIFICATE_REQUEST,ERR_R_MALLOC_FAILURE);
 		goto err;

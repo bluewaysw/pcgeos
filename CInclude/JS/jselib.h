@@ -2238,7 +2238,7 @@ JSECALLSEQ(jsebool) jseBreakpointTest(jseContext jsecontext,
 #endif
 
 #if defined(__JSE_GEOS__)
-extern double strtod(const char _FAR *s, char _FAR *_FAR *endptr);
+extern double strtod(const char _FAR_ *s, char _FAR_ *_FAR_ *endptr);
 #endif
 
 #endif

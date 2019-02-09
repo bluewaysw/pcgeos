@@ -1,0 +1,100 @@
+/***********************************************************************
+ *
+ * Copyright (C) 1998 Breadbox Computer Company
+ *
+ ***********************************************************************/
+
+/***********************************************************************
+ *
+ * PROJECT:       WebMagick (HTTP URL Driver)
+ * FILE:          wmg3con.h
+ *
+ * AUTHOR:        Lysle Shields
+ *
+ * Module used to track the number of connections used by this driver.
+ *
+ ***********************************************************************/
+
+@include "wmg3http.goh"
+#ifdef SSL_ENABLE
+#include "ssl.h"
+#endif
+
+typedef struct {
+    dword token ;
+    Socket sock ;
+    Boolean aborted ;
+    word socketState ;
+        #define STATE_UNCONNECTED  0
+        #define STATE_PREPARING    1
+        #define STATE_RESOLVING    2
+        #define STATE_HTTP_REQUEST 3
+        #define STATE_FREE         4
+    UnresolvedTCPAddress hostname;
+    URLDrvAbortState abortState ;
+    char buffer[BUFFER_SIZE] ;
+    TCHAR errBuf[ERRORSIZE];
+    optr msg ;
+    proc_URLDrvCallback *callback ;
+    HTMLFormDataHandle postData ;
+    MemHandle heap;
+    ChunkHandle mimeTypeChunk ;
+    ChunkHandle fileChunk ;
+    ChunkHandle urlChunk ;
+    TCHAR userpwd[URL_MAX_USERNAME+URL_MAX_PASSWORD+2] ;
+    TCHAR type[URL_MAX_TYPE+1] ;
+    TCHAR host[URL_MAX_SERVER+1] ;
+#ifdef PERSISTANT_CONNECTIONS
+    Boolean dontUsePersistant;
+#endif
+    TCHAR pathbuf[HTML_STATIC_BUF];
+    TCHAR *path;
+#ifdef SSL_ENABLE
+    Boolean secure ;
+    SSL *ssl;
+#endif
+#ifdef RECV_SPEED
+    long startTime ;
+#endif
+#if PROGRESS_DISPLAY
+    _LoadProgressParams_;
+#endif
+    ChunkHandle refererChunk;
+#ifdef PERSISTANT_CONNECTIONS
+    Boolean allowSocketCache;
+    Boolean socketFromCache;
+    Boolean chunked;
+    word chunkSize;
+    dword connTimeOut;
+#endif
+#ifdef CACHE_VALIDATION
+    dword maxAge;
+    CompressedDateTime lastModDate;
+#endif
+#ifdef EMAIL_ACCT_CMD
+    ChunkHandle emailCmd;
+#endif
+    word sockErr;
+#ifdef GET_RANGE
+    Boolean allowResume;
+    long resumePos;
+    long resumeLength;
+#endif
+    Boolean useProxy;
+    TCHAR proxyHost[URL_MAX_SERVER+1];
+    word hostPort;
+} T_HTTPConnection ;
+
+typedef byte HTTPConnectionHandle ;  /* Handle to a T_HTTPConnection */
+#define HTTP_CON_NONE  0xFF
+
+
+/* PROTOTYPES: */
+HTTPConnectionHandle ConnectionAllocate(dword token) ;
+T_HTTPConnection *ConnectionLock(HTTPConnectionHandle conn) ;
+void ConnectionUnlock(HTTPConnectionHandle conn) ;
+HTTPConnectionHandle ConnectionFind(dword token, T_HTTPConnection **pp_conn) ;
+void ConnectionFree(HTTPConnectionHandle conn) ;
+void ConnectionsInit(void) ;
+void ConnectionsDeinit(void) ;
+

@@ -1,0 +1,1759 @@
+/***********************************************************************
+ *
+ *                          ==CONFIDENTIAL INFORMATION==
+ *
+ * COPYRIGHT 1994-99 BREADBOX COMPUTER COMPANY -- ALL RIGHTS RESERVED  --
+ * THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER
+ * A NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ * RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ * NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ * CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ * AGREEMENT.
+ *
+ * PROJECT:       HTMLView
+ * FILE:          HTMLForm.goc
+ *
+ * AUTHOR:        Marcus Gr�ber
+ *
+ * NOTES:         Less frequently used form routines (reset / submit)
+ ***********************************************************************/
+
+@include <stdapp.goh>
+@include <Objects/Text/tCtrlC.goh>
+
+#include <Ansi/string.h>
+#include <Ansi/stdio.h>
+#include <Ansi/stdlib.h>
+#include <geoMisc.h>      /* itoa */
+
+@include <fixes.goh>
+@include "options.goh"
+@include <html4par.goh>
+#include "regiont.h"
+#include "internal.h"
+#include "errors.h"
+#include <htmlfstr.h>
+#include "htmlclas/formset.h"
+
+#define TEXTAREA_MIN_COLS                10
+#define TEXTAREA_MIN_ROWS                1
+#define FORM_SELECT_MIN_MULTI_LINES      1
+
+#define INITIAL_TEXTAREA_BLOCK_SIZE    300
+
+@ifdef DO_DBCS
+extern DosCodePage G_htmlCodePage;
+@endif
+
+
+/* this fixed a bug (1436) where JS was used to move focus, not needed for
+   JS version -- brianc 10/26/00 */
+@ifndef JAVASCRIPT_SUPPORT
+@extern method HTMLTextClass, MSG_META_GAINED_FOCUS_EXCL
+{
+    @callsuper();
+    @send, forceQueue oself::MSG_HTML_TEXT_FIND_FOCUS_FORM_ELEMENT();
+}
+@endif
+
+/* try to grab focus for single submit form element */
+@extern method HTMLTextClass, MSG_HTML_TEXT_FIND_FOCUS_FORM_ELEMENT
+{
+    HTMLformData *formElement;
+    optr formArray = pself->HTI_formArray;
+    word i, size, focusElement = FORM_ELEMENT_INVALID;
+    word itemType, itemCount = 0;
+
+    pself = ObjDerefVis(oself);
+    if (formArray && pself->HTI_grabbedFormElement == FORM_ELEMENT_INVALID) {
+	MemLock(OptrToHandle(formArray));
+	for (i = 0; i < ChunkArrayGetCount(formArray); i++) {
+	    formElement = ChunkArrayElementToPtr(formArray, i, &size);
+	    itemType = formElement->HFD_itemType;
+	    /* input objects */
+	    if (itemType == HTML_FORM_TEXT ||
+		itemType == HTML_FORM_TEXTAREA ||
+		itemType == HTML_FORM_PASSWORD ||
+		itemType == HTML_FORM_SUBMIT ||
+		itemType == HTML_FORM_BUTTON ||
+		itemType == HTML_FORM_IMAGE) {
+		itemCount++;
+	    }
+	    /* objects that we'd like to focus */
+	    if (itemType == HTML_FORM_SUBMIT ||
+		itemType == HTML_FORM_BUTTON ||
+		itemType == HTML_FORM_IMAGE) {
+		focusElement = i;
+	    }
+	}
+	MemUnlock(OptrToHandle(formArray));
+	if (itemCount == 1 && focusElement != FORM_ELEMENT_INVALID) {
+	    @send, forceQueue oself::MSG_HTML_TEXT_FORM_ELEMENT_GRAB(focusElement);
+	}
+    }
+}
+
+
+/* Go through all the form elements and initialize */
+@extern method HTMLTextClass, MSG_HTML_TEXT_INITIALIZE_FORM_ELEMENTS
+{
+    word size ;
+    optr array ;
+    HTMLformData *p_formData ;
+    word i ;
+
+    /* Go through all the form elements and reset each element */
+    /* without causing them to be drawn */
+    array = pself->HTI_formArray ;
+    if (array)  {
+        MemLock(OptrToHandle(array)) ;
+        for(i=ChunkArrayGetCount(array)-1; (int)i>=0; i--)  {
+            p_formData = ChunkArrayElementToPtr(array, i, &size) ;
+            p_formData->HFD_runtimeState = 0 ;
+            EC_BOUNDS(p_formData) ;
+            if (p_formData)  {
+                @call oself::MSG_HTML_TEXT_FORM_RESET_ELEMENT(i) ;
+                p_formData->x = p_formData->y = -1 ;
+            }
+        }
+        MemUnlock(OptrToHandle(array)) ;
+    }
+}
+
+#ifdef IN_PLACE_TEXT_ENTRY
+/* in htmlfedi.goc */
+void FormElementRemoveTextEntry(optr urlTextObj);
+#endif
+#ifdef IN_PLACE_SELECT_LIST
+/* in htmlfedi.goc */
+void FormElementRemoveSelectList(void);
+#endif
+
+/* Go through all the form elements and deinitialize */
+@extern method HTMLTextClass, MSG_HTML_TEXT_DEINITIALIZE_FORM_ELEMENTS
+{
+    word size ;
+    optr array ;
+    HTMLformData *p_formData ;
+    word i ;
+    MemHandle mem ;
+
+#ifdef IN_PLACE_TEXT_ENTRY
+    /* remove any associated text entry object */
+    FormElementRemoveTextEntry(oself);
+#endif
+#ifdef IN_PLACE_SELECT_LIST
+    /* remove any associated opened select list object */
+    FormElementRemoveSelectList();
+#endif
+    /* Go through all the form elements and reset each element */
+    /* without causing them to be drawn */
+    array = pself->HTI_formArray ;
+    if (array)  {
+        MemLock(OptrToHandle(array)) ;
+        for(i=ChunkArrayGetCount(array)-1; (int)i>=0; i--)  {
+            p_formData = ChunkArrayElementToPtr(array, i, &size) ;
+            EC_BOUNDS(p_formData) ;
+            switch(p_formData->HFD_itemType)  {
+                case HTML_FORM_TEXTAREA:
+                    mem = (MemHandle)p_formData->HFD_runtimeState ;
+                    if (mem != NullHandle)  {
+                        MemFree(mem) ;
+                        p_formData->HFD_runtimeState = NullHandle ;
+                    }
+                    break ;
+                case HTML_FORM_HIDDEN:
+                case HTML_FORM_TEXT:
+                case HTML_FORM_PASSWORD:
+                case HTML_FORM_FILE:
+                    /* Get rid of the old token and replace */
+                    /* with the new one */
+                    if (p_formData->HFD_runtimeState != NAME_POOL_NONE)  {
+                        NamePoolReleaseToken(
+                                  pself->HTI_namePool,
+                                  p_formData->HFD_runtimeState);
+                        p_formData->HFD_runtimeState = NAME_POOL_NONE ;
+                    }
+                    break ;
+                case HTML_FORM_RADIO:
+                case HTML_FORM_CHECKBOX:
+                case HTML_FORM_SELECT:
+                case HTML_FORM_OPTION:
+                case HTML_FORM_SUBMIT:
+                case HTML_FORM_RESET:
+                    break ;
+                default:
+                    /* Nothing really happens for anything else. */
+                    break ;
+            }
+        }
+        MemUnlock(OptrToHandle(array)) ;
+    }
+}
+
+/* Go through all the form elements and initialize */
+@extern method HTMLTextClass, MSG_HTML_TEXT_FORM_RESET
+{
+    word size ;
+    optr array ;
+    HTMLformData *p_formData ;
+    word i ;
+    dword pos ;
+    VisTextRange range ;
+@ifdef JAVASCRIPT_SUPPORT
+    word formElement = CA_NULL_ELEMENT;
+@endif
+
+    array = pself->HTI_formArray ;
+    if (array)  {
+        MemLock(OptrToHandle(array)) ;
+        for(i=ChunkArrayGetCount(array)-1; (int)i>=0; i--)  {
+            p_formData = ChunkArrayElementToPtr(array, i, &size) ;
+            if (p_formData->HFD_formNumber == formNumber)  {
+                /* Ok, reset that form element */
+                @call oself::MSG_HTML_TEXT_FORM_RESET_ELEMENT(i) ;
+
+                /* Only draw the embedded objects */
+                if (p_formData->HFD_itemType <= HTML_FORM_LAST_EMBED &&
+		    /* nothing happens for these, either */
+		    p_formData->HFD_itemType != HTML_FORM_BUTTON &&
+		    p_formData->HFD_itemType != HTML_FORM_RESET &&
+		    p_formData->HFD_itemType != HTML_FORM_SUBMIT)  {
+                    pos = p_formData->HFD_pos ;
+
+                    /* Redraw this element */
+                    range.VTR_start = range.VTR_end = pos ;
+                    @call oself::MSG_VIS_TEXT_INVALIDATE_RANGE(&range);
+                }
+#if JAVASCRIPT_SUPPORT
+                if(p_formData->HFD_itemType == HTML_FORM_HEADER)
+                  formElement = i;      // remember header (for event)
+#endif
+            }
+        }
+        MemUnlock(OptrToHandle(array)) ;
+    }
+@ifdef JAVASCRIPT_SUPPORT
+    @call self::MSG_HTML_TEXT_FIRE_EVENT(HTML_EVENT_RESET,
+      HTML_EVENT_OBJECT_FORM, formElement);
+@endif
+}
+
+/* NOTE:  Resetting a single element doesn't cause it to get redrawn */
+@extern method HTMLTextClass, MSG_HTML_TEXT_FORM_RESET_ELEMENT
+{
+    word size ;
+    optr array ;
+    HTMLformData *p_formData, *pfd2 ;
+    MemHandle mem ;
+    TCHAR *p_text ;
+    word num, i, count, first ;
+    Boolean someSelected;
+
+    array = pself->HTI_formArray ;
+    if (array)  {
+        MemLock(OptrToHandle(array)) ;
+        p_formData = ChunkArrayElementToPtr(array, formElement, &size) ;
+        EC_BOUNDS(p_formData) ;
+        if (p_formData)  {
+            /* Reset this form element */
+	    /* (if new items are handled here, make sure to redraw
+	       them in MSG_HTML_TEXT_FORM_RESET) */
+            switch(p_formData->HFD_itemType)  {
+                case HTML_FORM_TEXTAREA:
+                    if (p_formData->HFD_var.textarea.cols < TEXTAREA_MIN_COLS)
+                        p_formData->HFD_var.textarea.cols = TEXTAREA_MIN_COLS ;
+                    if (p_formData->HFD_var.textarea.rows < TEXTAREA_MIN_ROWS)
+                        p_formData->HFD_var.textarea.rows = TEXTAREA_MIN_ROWS ;
+
+                    /* Get rid of old data */
+                    if (p_formData->HFD_runtimeState)  {
+                        mem = (MemHandle)p_formData->HFD_runtimeState ;
+                        MemFree(mem) ;
+                        p_formData->HFD_runtimeState = NullHandle ;
+                    }
+
+                    if (p_formData->HFD_value)  {
+			word textLen;
+                        NamePoolUseToken(
+                                  pself->HTI_namePool,
+                                  p_formData->HFD_value);
+
+                        /* Allocate a block to put it into */
+			textLen = NamePoolStrLength(pself->HTI_namePool,
+						    p_formData->HFD_value)+1;
+                        mem = MemAlloc(
+				  textLen*sizeof(TCHAR),
+                                  HF_DYNAMIC|HF_SHARABLE,
+                                  HAF_ZERO_INIT) ;
+			if (mem) {
+			    p_text = MemLock(mem) ;
+			    NamePoolCopy(
+				pself->HTI_namePool,
+				p_text,
+				(textLen > FORM_MAX_CHARACTERS_IN_TEXT_AREA ? FORM_MAX_CHARACTERS_IN_TEXT_AREA : textLen)*sizeof(TCHAR),
+				p_formData->HFD_value,
+				NULL);
+			    MemUnlock(mem) ;
+			} else {
+			    /* didn't use token */
+			    NamePoolReleaseToken(
+				pself->HTI_namePool,
+				p_formData->HFD_value);
+			}
+
+                        /* Record the new block */
+                        p_formData->HFD_runtimeState = (dword)mem ;
+                    } else {
+                        p_formData->HFD_runtimeState = NullHandle ;
+                    }
+		    /* make sure this is cleared when reattaching from
+		       cache */
+		    p_formData->HFD_var.textarea.lines = NullHandle;
+                    break ;
+                case HTML_FORM_HIDDEN:
+                case HTML_FORM_TEXT:
+                case HTML_FORM_PASSWORD:
+                case HTML_FORM_FILE:
+                    /* Get rid of the old token and replace */
+                    /* with the new one */
+                    if (p_formData->HFD_runtimeState)
+                        NamePoolReleaseToken(
+                                  pself->HTI_namePool,
+                                  p_formData->HFD_runtimeState);
+                    if (p_formData->HFD_value)
+                        NamePoolUseToken(
+                                  pself->HTI_namePool,
+                                  p_formData->HFD_value);
+                    p_formData->HFD_runtimeState = p_formData->HFD_value ;
+                    break ;
+                case HTML_FORM_RADIO:
+                case HTML_FORM_CHECKBOX:
+                    p_formData->HFD_runtimeState =
+                        p_formData->HFD_var.checkbox_radio.flags ;
+                    break ;
+                case HTML_FORM_SELECT:
+                    if (p_formData->HFD_var.select.flags & HTML_SELECT_MULTI)
+                    {
+                        /* Multi select lists need at least X items */
+                        if (p_formData->HFD_var.select.size < FORM_SELECT_MIN_MULTI_LINES)
+                            p_formData->HFD_var.select.size = FORM_SELECT_MIN_MULTI_LINES ;
+                    }
+                    else
+                    {
+                        /* Need at least one line for a drop down list */
+                        if (p_formData->HFD_var.select.size == 0)
+                            p_formData->HFD_var.select.size = 1 ;
+
+                        /*
+                         * Now check if there is at least one option element
+                         * selected that belongs to this drop down menu. If
+                         * not, select the first one. This is how NS and IE
+                         * dot it...
+                         */
+
+                        num = ChunkArrayGetCount(array) ;
+                        count = 0 ;
+                        someSelected = FALSE;
+                        first = CA_NULL_ELEMENT;
+
+                        for(i=0; i<num; i++)
+                        {
+                          pfd2 = ChunkArrayElementToPtr(array, i, &size) ;
+
+                          /* Only bother with options in the our menu */
+                          if ((pfd2->HFD_itemType == HTML_FORM_OPTION) &&
+                              (pfd2->HFD_var.option.menuElement == formElement) &&
+			      !(pfd2->HFD_var.option.flags & HTML_OPTION_DELETED))
+                          {
+                            /* note if we have a selected item */
+                            if (pfd2->HFD_var.option.flags &
+                              HTML_OPTION_SELECTED)
+                                someSelected = TRUE;
+
+                            /* note the first element */
+                            if(count==0)
+                                first = i;
+
+                            count++;
+                          }
+                        }
+
+                        if(!someSelected && first != CA_NULL_ELEMENT)
+                        {
+                          pfd2 = ChunkArrayElementToPtr(array, first, &size) ;
+                          pfd2->HFD_var.option.flags |= HTML_OPTION_SELECTED;
+                          pfd2->HFD_runtimeState |= HTML_OPTION_SELECTED;
+                        }
+                    }
+                    p_formData->HFD_var.select.maxWidth = 0 ;
+                    break ;
+                case HTML_FORM_OPTION:
+                    /* Record if this option is selected */
+		    /* (no need for HTML_OPTION_DELETED handling here) */
+                    p_formData->HFD_runtimeState =
+                        p_formData->HFD_var.option.flags ;
+                    break ;
+                case HTML_FORM_SUBMIT:
+                case HTML_FORM_RESET:
+                default:
+                    /* Nothing really happens for anything else. */
+                    break ;
+            }
+        }
+        MemUnlock(OptrToHandle(array)) ;
+    }
+}
+
+
+/*------------------------------------------------------------------------*/
+/* Routines for handling FormStrings: */
+/*------------------------------------------------------------------------*/
+
+#define FORM_STRING_INITIALIZE_SIZE   (256 - sizeof(T_formString))
+#define FORM_STRING_ALLOCATE_SIZE     128
+
+MemHandle _export FormStringCreate(void)
+{
+    MemHandle mem ;
+    T_formString *p_formString ;
+
+    /* Allocate a block of the correct size */
+    mem = MemAlloc(
+              FORM_STRING_INITIALIZE_SIZE + sizeof(T_formString),
+              HF_SWAPABLE | HF_SHARABLE,
+              HAF_ZERO_INIT | HAF_NO_ERR) ;
+
+    if (mem)  {
+        /* Initialize the structure header */
+        p_formString = MemLock(mem) ;
+        p_formString->numChars = 1;   /* Always one terminate character */
+        p_formString->numAllocated = FORM_STRING_INITIALIZE_SIZE ;
+        p_formString->encoding = FORM_STRING_ENCODING_URL ;
+        p_formString->flags = 0 ;
+        p_formString->data[0] = '\0' ;
+        MemUnlock(mem) ;
+    }
+
+    /* Return handle to be used with FormStringAppendToFormString */
+    return mem ;
+}
+
+T_formString *FormStringLockAndGrow(MemHandle mem, word len)
+{
+    T_formString *p_formString ;
+
+    /* See if we need to make space for the appended data */
+    p_formString = MemLock(mem) ;
+    while ((p_formString->numChars + len) > p_formString->numAllocated)  {
+        MemReAlloc(
+            mem,
+            p_formString->numAllocated +
+                FORM_STRING_ALLOCATE_SIZE +
+                sizeof(T_formString),
+            0);
+        p_formString = MemDeref(mem) ;
+        p_formString->numAllocated += FORM_STRING_ALLOCATE_SIZE ;
+    }
+    return p_formString;
+}
+
+void _export FormStringConvertAndAppend(MemHandle mem, TCHAR *p_string)
+{
+    word len ;
+@ifdef DO_DBCS
+    TCHAR c, d;
+    word status;
+@else
+    byte c ;
+@endif
+    TCHAR *p_char ;
+    T_formString *p_formString ;
+    char *p_dest ;
+    static char hexTable[16] = "0123456789ABCDEF" ;
+
+    /* Determine the new length of the string */
+    for (len=0, p_char = p_string; *p_char; p_char++)  {
+        c = *p_char ;
+        if (c == 13) {
+	    /* CRs becomes CRLFs */
+	    len += 6;
+	} else if (((c < 64) || (c >= 91 && c <= 96) || (c >= 123)) && (c != 32) && (c != '.') && ((c<'0') || (c>'9')) && (c != '-') && (c != '_') && (c != '*'))  {
+            len += 3 ;   /* Will be %XX per irregular character */
+@ifdef DO_DBCS
+            /* conversion of Unicode to form submission data */
+            d = c;
+            LocalGeosToDosChar((unsigned int*)&d, G_htmlCodePage, 0, (DosToGeosStringStatus*)&status);
+	    if (d > 255) len += 3;  /* %XX%XX for double-byte */
+@endif
+        } else {
+            len++ ;
+        }
+    }
+
+    p_formString = FormStringLockAndGrow(mem, len);
+
+    /* Now let's create the new string (at the ending null) */
+    p_dest = p_formString->data + p_formString->numChars - 1 ;
+    for (p_char=p_string; *p_char; p_char++, p_dest++)  {
+        c = *p_char ;
+
+        /* Convert characters */
+        if (c == 32)  {
+            /* Spaces become pluses */
+            *p_dest = '+' ;
+	} else if (c == 13) {
+	    /* CRs becomes CRLFs */
+	    STRCPYSB(p_dest, "%0D%0A");
+	    p_dest += 5;  /* inc'd again in loop */
+        } else if (((c>='0') && (c <='9')) || (c == '.') || (c == '-') || (c == '_') || (c == '*'))  {
+            *p_dest = c ;
+        } else {
+            /* Punctuation and special 8 bit ASCII characters are %'d */
+            /* Convert Geos to ISO Latin 1 first */
+            if ((c < 64) || (c >= 91 && c <= 96) || (c >= 123))  {
+@ifdef DO_DBCS
+               LocalGeosToDosChar((unsigned int*)&c, G_htmlCodePage, 0, (DosToGeosStringStatus*)&status);
+@else
+               c = LocalGeosToCodePageChar(c, CODE_PAGE_LATIN_1, '.');
+@endif
+               p_dest[0] = '%' ;
+@ifdef DO_DBCS
+               /* conversion of Unicode to form submission data */
+	       /* do high word */
+	       if (c > 255) {
+		   p_dest[1] = hexTable[(c>>8)>>4] ;
+		   p_dest[2] = hexTable[(c>>8)&15] ;
+		   p_dest[3] = '%';
+		   p_dest += 3;
+		   /* continue with low word */
+		   c &= 255;
+	       }
+@endif
+               p_dest[1] = hexTable[c>>4] ;
+               p_dest[2] = hexTable[c&15] ;
+               p_dest += 2 ;
+            } else {
+               /* Everything else is copied */
+               *p_dest = c ;
+            }
+        }
+    }
+    /* And null terminate */
+    *p_dest = '\0' ;
+    p_formString->numChars += len;
+
+    MemUnlock(mem) ;
+}
+
+void _export FormStringAppend(MemHandle mem, TCHAR *p_string)
+{
+    word len ;
+    T_formString *p_formString ;
+    char *p_dest ;
+@ifdef DO_DBCS
+    DosCodePage cp = CODE_PAGE_LATIN_1;
+    word status, backup;
+@endif
+
+    /* Determine the new length of the string */
+    len = strlen(p_string) ;
+
+    /* enough for full two-byte DBCS expansion */
+    p_formString = FormStringLockAndGrow(mem, len*sizeof(TCHAR));
+
+    /* Now let's create the new string (at the ending null) */
+    p_dest = p_formString->data + p_formString->numChars - 1 ;
+@ifdef DO_DBCS
+    /* DBCS TBD: conversion of Unicode form strings to DOS */
+    len++;  /* include null */
+    LocalGeosToDos(p_dest, (unsigned int*) p_string, &len, DEFCHAR, &cp,
+ 		0, (DosToGeosStringStatus *)&status, &backup);
+    p_formString->numChars += len-1;  /* don't include null */
+@else
+    memcpy(p_dest, p_string, len+1) ;
+    p_formString->numChars += len;
+    /* Convert Geos to ISO Latin 1 */
+    LocalGeosToCodePage(p_dest, len, CODE_PAGE_LATIN_1, '.');
+@endif
+
+    MemUnlock(mem) ;
+}
+
+void * _export FormStringDerefData(MemHandle mem)
+{
+    return (void *)(((T_formString *)MemDeref(mem))->data) ;
+}
+
+void FormStringAppendNull(MemHandle mem)
+{
+    T_formString *p_formString = FormStringLockAndGrow(mem, 1);
+
+    p_formString->data[(p_formString->numChars++) - 1] = '\0';
+    MemUnlock(mem);
+}
+    
+/*------------------------------------------------------------------------*/
+
+#pragma codeseg HTMLFORM_UPLOAD
+
+/* "-dc" causes vptrs for text constants if different code segments are used */
+#pragma option -dc-
+
+void AddBoundaryString(MemHandle formString)
+{
+    /* Lots of dashes followed by some random digits should be fine. */
+    word value = (word) TimerGetCount();
+    TCHAR buf[43];
+    int i;
+    for (i = 0; i < 28; i++)
+	buf[i] = '-';
+    for (; i < 42; i++) {
+	value ^= (value >> 1);
+	buf[i] = '0' + value % 10;
+    }
+    buf[i] = '\0';
+    FormStringAppend(formString, buf);
+    FormStringAppendNull(formString);
+}
+
+/*------------------------------------------------------------------------*/
+
+#define FCVT_FILE	'F'
+#define FCVT_FILE_STR	"F"
+#define FCVT_STRING	'S'
+#define FCVT_STRING_STR	"S"
+
+FormStringCallbackStatus _pascal _export FormStringCallbackMulti(
+    T_formString *postData, byte *buffer, word bufferSize, word *bufferUsed);
+static dword FormStringLengthMulti(T_formString *postData);
+
+/* Submit the form text */
+@extern method HTMLTextClass, MSG_HTML_TEXT_FORM_SUBMIT
+{
+    word size ;
+    optr array ;
+    HTMLformData *p_formData ;
+    word i ;
+    MemHandle formString ;
+    word num ;
+    TCHAR prefix = '\0' ;
+    WordFlags method = HTML_OPT_METHOD_GET;
+    WordFlags enctype = HTML_OPT_ENCODING_DEFAULT;
+    char *p_url ;
+    NameToken urlToken = NAME_POOL_NONE, targetToken = NAME_POOL_NONE;
+    T_formString *p_formString ;
+    word imageSubmit = 0xffff;  /* nothing yet */
+    word argsOffset = 0xffff;
+
+@ifdef DO_DBCS
+    /* set code page for form submit */
+    G_htmlCodePage = pself->HTI_codePage;
+@endif
+
+    array = pself->HTI_formArray ;
+    if (array)  {
+        /* Create a string to hold all the form information */
+        formString = FormStringCreate() ;
+        if (formString)  {
+            MemLock(OptrToHandle(array)) ;
+            num = ChunkArrayGetCount(array) ;
+            for(i=0; i<num; i++)  {
+                p_formData = ChunkArrayElementToPtr(array, i, &size) ;
+                if (p_formData->HFD_formNumber == formNumber)  {
+                    /* If we found the header, record the vitals */
+                    if (p_formData->HFD_itemType == HTML_FORM_HEADER)  {
+                        method = (p_formData->HFD_var.header.options &
+                          HTML_OPT_METHOD_MASK);
+                        urlToken = p_formData->HFD_name ;
+			targetToken = p_formData->HFD_value ;
+@ifdef JAVASCRIPT_SUPPORT     
+                        /* check return value and abort submit */
+                        if (notify && !(@call self::MSG_HTML_TEXT_FIRE_EVENT(
+                          HTML_EVENT_SUBMIT, HTML_EVENT_OBJECT_FORM, i)))
+                        {
+		          method = -1;  // doesn't match any valid method
+                          i = num;      // no reason to do any more work  
+                        }
+@endif
+			enctype = (p_formData->HFD_var.header.options &
+                          HTML_OPT_ENCODING_MASK);
+			if (enctype == HTML_OPT_ENCODING_DEFAULT)
+			    enctype = HTML_OPT_ENCODING_URL;
+
+			/* Multipart mime encoding only works on a POST. */
+			if (enctype == HTML_OPT_ENCODING_MULTI
+			    && method != HTML_OPT_METHOD_POST)
+			    enctype = HTML_OPT_ENCODING_DEFAULT;
+
+			/* For multipart mime encoding, generate a boundary
+			   string now, before any elements are processed. */
+			if (enctype == HTML_OPT_ENCODING_MULTI
+			    && method == HTML_OPT_METHOD_POST)
+			    AddBoundaryString(formString);
+                    }
+
+		    /* for a nameless submit image that was pressed, we want
+		       to add its info at the end of the form string */
+		    if (p_formData->HFD_itemType == HTML_FORM_IMAGE &&
+			p_formData->HFD_var.submit.flags & HTML_SUBMIT_PRESSED &&
+			!p_formData->HFD_name) {
+			imageSubmit = i;
+		    } else
+
+                    /* Append unless we are doing a post and found the header */
+                    if ((method != HTML_OPT_METHOD_POST) ||
+                        (p_formData->HFD_itemType != HTML_FORM_HEADER))  {
+			/* point to first form argument */
+			if (argsOffset == 0xffff &&
+			    p_formData->HFD_itemType != HTML_FORM_HEADER) {
+			    p_formString = MemLock(formString);
+			    /* skip over '?' arguments delimiter */
+			    argsOffset = p_formString->numChars;
+			    MemUnlock(formString);
+			}
+                        prefix = @call oself::MSG_HTML_TEXT_FORM_APPEND_ELEMENT(
+                                       formString,
+                                       i,
+                                       prefix,
+				       enctype) ;
+                    }
+                }
+            }
+	    /* now, add the nameless submit image info, if any */
+	    if (imageSubmit != 0xffff) {
+		p_formData = ChunkArrayElementToPtr(array, i, &size);
+		/* don't need final prefix */
+		(void)(@call oself::MSG_HTML_TEXT_FORM_APPEND_ELEMENT(
+		    formString, imageSubmit, prefix, enctype));
+	    }
+            MemUnlock(OptrToHandle(array)) ;
+
+            /* Send the block */
+            if ((method == HTML_OPT_METHOD_GET) ||
+                (method == HTML_OPT_METHOD_DEFAULT))  {
+		/* check length of URL, if too long, pass GET URL
+		   using POST data block */
+		p_formString = MemLock(formString);
+		p_url = FormStringDerefData(formString);
+		/* check against typical length */
+		if (STRLENSB(p_url) <= HTML_STATIC_BUF) {
+		    /* Convert the url into a name pool token */
+		    pself = ObjDerefVis(oself);
+		    urlToken = NamePoolTokenizeDOS(pself->HTI_namePool, p_url, FALSE);
+		    MemFree(formString);
+		    NamePoolUseToken(pself->HTI_namePool, targetToken);
+		    /* Request the url (get method) */
+		    /* queue to synchronize with JS onClick, onSubmit, etc. */
+		    @send, forceQueue self::MSG_HTML_TEXT_HOTSPOT_SELECT(
+                        pself->HTI_namePool,
+			urlToken,
+			targetToken,
+			NullHandle);
+		} else {
+		    /* set special get flag and remove URL at beginning */
+		    p_formString->flags |= FORM_STRING_FLAG_IS_GET_METHOD;
+		    if (argsOffset != 0xffff) {
+			strcpy((TCHAR*)p_formString->data, (TCHAR*)p_formString->data + argsOffset);
+			p_formString->numChars -= STRLENSB(p_formString->data);
+		    }
+		    MemUnlock(formString) ;
+		    NamePoolUseToken(pself->HTI_namePool, urlToken) ;
+		    NamePoolUseToken(pself->HTI_namePool, targetToken) ;
+		    /* Request the url (get method) */
+		    /* queue to synchronize with JS onClick, onSubmit, etc. */
+		    @send, forceQueue self::MSG_HTML_TEXT_HOTSPOT_SELECT(
+                        pself->HTI_namePool,
+			urlToken,
+			targetToken,
+			formString);
+		}
+            } else if (method == HTML_OPT_METHOD_POST)  {
+		if (enctype == HTML_OPT_ENCODING_MULTI) {
+		    /* Fill in special fields before posting the FormString. */
+		    FormStringAppendNull(formString); /* last field */
+		    p_formString = MemLock(formString);
+		    p_formString->encoding = FORM_STRING_ENCODING_MULTI;
+		    p_formString->callback = (cb_FormStringCallback*)FormStringCallbackMulti;
+		    p_formString->contentLength = 
+			FormStringLengthMulti(p_formString);
+		    MemUnlock(formString) ;
+		}
+                NamePoolUseToken(pself->HTI_namePool, urlToken);
+                NamePoolUseToken(pself->HTI_namePool, targetToken);
+                /* Request the url (post method) */
+		/* queue to synchronize with JS onClick, onSubmit, etc. */
+                @send, forceQueue self::MSG_HTML_TEXT_HOTSPOT_SELECT(
+                    pself->HTI_namePool,
+                    urlToken,
+                    targetToken,
+                    formString);
+            } else {
+                MemFree(formString) ;
+            }
+        }
+    }
+}
+
+@extern method HTMLTextClass, MSG_HTML_TEXT_FORM_APPEND_ELEMENT
+{
+    word size ;
+    optr array ;
+    HTMLformData *p_formData, *p_nameData ;
+    TCHAR buf[50], *bufP = 0 ;  /* commonly small (ATTRs),
+				  will be dynamic if needed */
+    TCHAR name[200], *nameP = 0 ;  /* commonly large (i.e. FORM action),
+				     will be dynamic if needed */
+    TCHAR itoaBuf[50];  /* max for itoa */
+    TCHAR prefixNulled[2];
+    TCHAR nextPrefix = prefix ;   /* Always assume same prefix */
+    TCHAR *p_text = NULL ;
+    optr NamePool ;
+    Boolean addName = TRUE ;
+    Boolean addBuf = FALSE ;
+    Boolean addEqual = TRUE ;
+    Boolean doConvert = TRUE ;
+    Boolean doImageSubmit = FALSE ;
+    MemHandle mem ;
+    Boolean isFile = FALSE ;
+    Boolean notMulti = (enctype != HTML_OPT_ENCODING_MULTI);
+
+    prefixNulled[0] = prefix ;
+    prefixNulled[1] = '\0' ;
+
+    array = pself->HTI_formArray ;
+    NamePool = pself->HTI_namePool ;
+    if (array)  {
+        MemLock(OptrToHandle(array)) ;
+        p_formData = ChunkArrayElementToPtr(array, formElement, &size) ;
+        EC_BOUNDS(p_formData) ;
+        /* Only add an element if it was found and it has a name */
+        if ((p_formData->HFD_itemType == HTML_FORM_HEADER) &&
+            (!p_formData->HFD_name))
+            nextPrefix = '?' ;
+        if (p_formData->HFD_itemType == HTML_FORM_OPTION)  {
+            /* An option's name is from the select menu */
+	    /* (no need for HTML_OPTION_DELETED handling here) */
+            p_nameData = ChunkArrayElementToPtr(
+                array,
+                p_formData->HFD_var.option.menuElement,
+                &size) ;
+        } else {
+            p_nameData = p_formData;
+        }
+        if ((p_formData) && (p_nameData->HFD_name ||
+			     p_formData->HFD_itemType == HTML_FORM_IMAGE))  {
+            /* Reset this form element */
+            switch(p_formData->HFD_itemType)  {
+	    case HTML_FORM_HEADER:
+		nextPrefix = '?' ;
+		addName = TRUE ;  /* Name of form is action */
+		addEqual = FALSE ;
+		doConvert = FALSE ;
+		break ;
+	    case HTML_FORM_TEXTAREA:
+		mem = p_formData->HFD_runtimeState ;
+		if (mem != NullHandle)  {
+		    p_text = MemLock(mem) ;
+		}
+
+		/* Note that if we add more entries, to append a & char */
+		nextPrefix = '&' ;
+		break ;
+	    case HTML_FORM_FILE:
+		isFile = TRUE ;
+		/* FALLTHRU... */
+	    case HTML_FORM_TEXT:
+	    case HTML_FORM_PASSWORD:
+	    case HTML_FORM_HIDDEN:
+		/* runtime state contains the name of data */
+		/* we want to add */
+		if (p_formData->HFD_runtimeState)  {
+		    NamePoolCopy(
+			NamePool,
+			buf,
+			sizeof(buf)-1,
+			p_formData->HFD_runtimeState,
+			&bufP) ;
+		} else {
+		    NamePoolInitializeDynamic(buf, sizeof(buf), _TEXT(""), &bufP);
+		}
+		addBuf = TRUE ;
+
+		/* Note that if we add more entries, to append a & char */
+		nextPrefix = '&' ;
+		break ;
+	    case HTML_FORM_RADIO:
+	    case HTML_FORM_CHECKBOX:
+		if (p_formData->HFD_runtimeState & HTML_BOOLEAN_SELECTED)  {
+		    if (p_formData->HFD_value) {
+			NamePoolCopy(
+			    NamePool,
+			    buf,
+			    sizeof(buf)-1*sizeof(TCHAR),
+			    p_formData->HFD_value,
+			    &bufP) ;
+			addBuf = TRUE ;
+		    }
+		    addName = TRUE ;
+		    /* Note that if we add more entries, to append a & char */
+		    nextPrefix = '&' ;
+		} else {
+		    addName = FALSE ;
+		    addBuf = FALSE ;
+		}
+		break ;
+	    case HTML_FORM_OPTION:
+		if ((p_formData->HFD_runtimeState & HTML_OPTION_SELECTED) &&
+		    (p_formData->HFD_name || p_formData->HFD_value) &&
+		    !(p_formData->HFD_var.option.flags & HTML_OPTION_DELETED))  {
+		    NamePoolCopy(
+			NamePool,
+			buf,
+			sizeof(buf)-1*sizeof(TCHAR),
+                        p_formData->HFD_name?
+                          p_formData->HFD_name:
+                          p_formData->HFD_value,
+			&bufP) ;
+		    addBuf = TRUE ;
+		    /* Note that if we add more entries, to append a & char */
+		    nextPrefix = '&' ;
+		} else {
+		    addName = FALSE ;
+		}
+		break ;
+	    case HTML_FORM_SUBMIT:
+		addName = FALSE ;
+		if (p_formData->HFD_var.submit.flags & HTML_SUBMIT_PRESSED) {
+		    if (p_formData->HFD_value) {
+			NamePoolCopy(
+			    NamePool,
+			    buf,
+			    sizeof(buf)-1*sizeof(TCHAR),
+			    p_formData->HFD_value,
+			    &bufP) ;
+			addName = TRUE ;
+			addBuf = TRUE ;
+			/* We could have elements after the submit */
+			nextPrefix = '&';
+		    }
+		}
+		break ;
+	    case HTML_FORM_IMAGE:
+		if (p_formData->HFD_var.submit.flags & HTML_SUBMIT_PRESSED) {
+		    addName = TRUE;
+		    doImageSubmit = TRUE;
+		    /* We could have elements after the submit */
+		    nextPrefix = '&';
+		} else {
+		    addName = FALSE;
+		}
+		break ;
+	    case HTML_FORM_SELECT:
+	    case HTML_FORM_RESET:
+	    default:
+		/* Nothing really happens for anything else. */
+		addName = FALSE ;
+		break ;
+            }
+
+            if ((addName) && (p_nameData->HFD_name))  {
+                /* First, append the prefix (if any) */
+                if (notMulti && prefix)
+                    FormStringAppend(formString, prefixNulled) ;
+
+                /* Append '[name]=[value]' */
+                NamePoolCopy(NamePool,
+			     name,
+			     sizeof(name)-1*sizeof(TCHAR),
+			     p_nameData->HFD_name,
+			     &nameP) ;
+		/* handle form action with arguments already */
+		if (p_formData->HFD_itemType == HTML_FORM_HEADER &&
+		    strchr(nameP, '?')) {
+		    nextPrefix = '&';
+		}
+
+                if (notMulti && doConvert)
+                    FormStringConvertAndAppend(formString, nameP) ;
+		else
+		    FormStringAppend(formString, nameP) ;
+
+		if (doImageSubmit) {
+		    FormStringAppend(formString, (notMulti ? _TEXT(".x=") : _TEXT(".x"))) ;
+		    if (!notMulti)
+			FormStringAppendNull(formString);
+		    itoa(p_formData->HFD_var.submit.rel.P_x, itoaBuf) ;
+		    if (notMulti)
+			FormStringConvertAndAppend(formString, itoaBuf) ;
+		    else {
+			FormStringAppend(formString, (TCHAR*) FCVT_STRING_STR) ;
+			FormStringAppend(formString, itoaBuf) ;
+		    }
+		    if (notMulti)
+			FormStringAppend(formString, _TEXT("&")) ;
+		    else
+			FormStringAppendNull(formString);
+		    if (notMulti && doConvert )
+			FormStringConvertAndAppend(formString, nameP) ;
+		    else
+			FormStringAppend(formString, nameP) ;
+		    FormStringAppend(formString, _TEXT(".y")) ;
+		    itoa(p_formData->HFD_var.submit.rel.P_y, itoaBuf) ;
+		    NamePoolInitializeDynamic(buf, sizeof(buf), itoaBuf, &bufP);
+		    addBuf = TRUE ;
+		}
+
+                if (notMulti) {
+		    if (addEqual)
+			FormStringAppend(formString, _TEXT("=")) ;
+		}
+		else
+		    FormStringAppendNull(formString);
+
+                if (addBuf)  {
+                    /* Add the bulk of the data */
+		    if (notMulti)
+			FormStringConvertAndAppend(formString, bufP) ;
+		    else {
+			FormStringAppend(formString, (TCHAR*)(isFile ? FCVT_FILE_STR :
+						      FCVT_STRING_STR)) ;
+			FormStringAppend(formString, bufP) ;
+			if (isFile) {
+			    /* If multipart, add the mime type. */
+			    if (bufP[0] != '\0')
+				@call self::MSG_HTML_TEXT_IDENTIFY_MIME_TYPE(
+				    (char*)bufP, itoaBuf);
+			    else
+				itoaBuf[0] = '\0';
+			    FormStringAppendNull(formString);
+			    FormStringAppend(formString, itoaBuf);
+			}
+		    }
+                }
+
+                if (p_text)  {
+		    if (notMulti)
+			FormStringConvertAndAppend(formString, p_text) ;
+		    else {
+			FormStringAppend(formString, (TCHAR*)FCVT_STRING_STR) ;
+			FormStringAppend(formString, p_text) ;
+		    }
+                    MemUnlock(mem) ;
+                    p_text = NULL ;
+                }
+		if (!notMulti)
+		    FormStringAppendNull(formString);
+            }
+	    /* handle nameless image submits */
+	    if (doImageSubmit && addName && !(p_nameData->HFD_name)) {
+                if (prefix)
+                    FormStringAppend(formString, prefixNulled) ;
+		FormStringAppend(formString, (notMulti ? _TEXT("x=") : _TEXT("x")));
+		if (!notMulti)
+		    FormStringAppendNull(formString);
+		itoa(p_formData->HFD_var.submit.rel.P_x, itoaBuf);
+		if (notMulti)
+		    FormStringConvertAndAppend(formString, itoaBuf);
+		else {
+		    FormStringAppend(formString, (TCHAR*)FCVT_STRING_STR) ;
+		    FormStringAppend(formString, itoaBuf);
+		    FormStringAppendNull(formString);
+		}
+		FormStringAppend(formString, (notMulti ? _TEXT("&y=") : _TEXT("y")));
+		if (!notMulti)
+		    FormStringAppendNull(formString);
+		itoa(p_formData->HFD_var.submit.rel.P_y, itoaBuf);
+		if (notMulti)
+		    FormStringConvertAndAppend(formString, itoaBuf);
+		else {
+		    FormStringAppend(formString, (TCHAR*)FCVT_STRING_STR) ;
+		    FormStringAppend(formString, itoaBuf);
+		    FormStringAppendNull(formString);
+		}
+	    }
+        }
+	if (bufP)
+	    NamePoolDestroyIfDynamic(bufP);
+	if (nameP)
+	    NamePoolDestroyIfDynamic(nameP);
+        MemUnlock(OptrToHandle(array)) ;
+    }
+
+    return nextPrefix ;
+}
+
+@extern method HTMLTextClass, MSG_HTML_TEXT_GET_FORM_ELEMENT_COUNT
+{
+    word n;
+
+    n = 0;                              /* default: no images  */
+
+    if(pself->HTI_formArray)            /* form array? */
+    {
+      MemLock(OptrToHandle(pself->HTI_formArray));
+      n = ChunkArrayGetCount(pself->HTI_formArray);
+                                        /* return number of image entries */
+      MemUnlock(OptrToHandle(pself->HTI_formArray));
+    }
+
+    return n;
+}
+
+@extern method HTMLTextClass, MSG_HTML_TEXT_GET_FORM_ELEMENT
+{
+    word size;
+    HTMLformData *formArrayElement;
+
+    /* no one tests return value, so we'll just return 0s in case of error */
+    memset(data, 0, sizeof(HTMLformData));
+
+    if (pself->HTI_formArray) {
+	MemLock(OptrToHandle(pself->HTI_formArray));
+
+	formArrayElement = ChunkArrayElementToPtr(pself->HTI_formArray, n, &size);
+	/* deference token to form record */
+	memcpy(data, formArrayElement, sizeof(HTMLformData));
+
+	MemUnlock(OptrToHandle(pself->HTI_formArray));
+    }
+
+    return TRUE;                        /* successful */
+}
+
+extern void FormElementInvalidate(
+               optr oself,
+               HTMLformData *p_formData,
+               word formElement) ;
+
+@extern method HTMLTextClass, MSG_HTML_TEXT_SET_FORM_ELEMENT
+{
+    word size;
+    HTMLformData *formArrayElement;
+    Boolean update = FALSE, reset = FALSE;
+    int i;
+    optr formArray = pself->HTI_formArray;
+
+    MemLock(OptrToHandle(formArray));
+
+    @call oself::MSG_META_SUSPEND();
+
+    formArrayElement = ChunkArrayElementToPtr(formArray, n, &size);
+
+    switch(formArrayElement->HFD_itemType) {
+    case HTML_FORM_HEADER:
+	if (data->HFD_name != formArrayElement->HFD_name) {
+	    if (formArrayElement->HFD_name != NAME_POOL_NONE)
+		NamePoolReleaseToken(pself->HTI_namePool,
+				     formArrayElement->HFD_name);
+	    formArrayElement->HFD_name = data->HFD_name;
+	    /* no reset, no update needed */
+	}
+	/* set GET/POST flag */
+	formArrayElement->HFD_var.header.options &= ~HTML_OPT_METHOD_MASK;
+	formArrayElement->HFD_var.header.options |=
+	    (data->HFD_var.header.options & HTML_OPT_METHOD_MASK);
+	break;
+    case HTML_FORM_OPTION:
+	/* (no need for HTML_OPTION_DELETED handling here) */
+	if ((data->HFD_runtimeState & HTML_OPTION_SELECTED) !=
+	    (formArrayElement->HFD_runtimeState & HTML_OPTION_SELECTED)) {
+	    /* handle exclusive */
+	    int ourMenu = formArrayElement->HFD_var.option.menuElement;
+	    HTMLformData *thing = ChunkArrayElementToPtr(formArray, ourMenu, &size);
+	    if (!(thing->HFD_var.select.flags & HTML_SELECT_MULTI)) {
+		/* not multi, deselect all first */
+		int ourForm = formArrayElement->HFD_formNumber;
+		int numEls = ChunkArrayGetCount(formArray);
+		for (i = 0/*ourMenu*/; i < numEls; i++ ) {
+		    thing = ChunkArrayElementToPtr(formArray, i, &size);
+		    if ((thing->HFD_itemType == HTML_FORM_OPTION) &&
+			(thing->HFD_formNumber == ourForm) &&
+			(thing->HFD_var.option.menuElement == ourMenu)) {
+			thing->HFD_runtimeState &= ~HTML_OPTION_SELECTED;
+		    }
+		}
+	    }
+	    /* select the specified one */
+	    formArrayElement->HFD_runtimeState |=
+		(data->HFD_runtimeState & HTML_OPTION_SELECTED);
+	    /* update via our menu */
+	    n = ourMenu;
+	    formArrayElement = ChunkArrayElementToPtr(formArray, n, &size);
+	    update = TRUE;
+	}
+	break;
+    case HTML_FORM_TEXT:
+    case HTML_FORM_PASSWORD:
+    case HTML_FORM_HIDDEN:
+	if (data->HFD_value != formArrayElement->HFD_value) {
+	    if (formArrayElement->HFD_value != NAME_POOL_NONE)
+		NamePoolReleaseToken(pself->HTI_namePool,
+				     formArrayElement->HFD_value);
+	    formArrayElement->HFD_value = data->HFD_value;
+	    reset = TRUE;
+	    update = TRUE;
+	}
+	if (data->HFD_runtimeState != formArrayElement->HFD_runtimeState) {
+	    if (formArrayElement->HFD_runtimeState != NAME_POOL_NONE)
+		NamePoolReleaseToken(pself->HTI_namePool,
+				     formArrayElement->HFD_runtimeState);
+	    formArrayElement->HFD_runtimeState = data->HFD_runtimeState;
+	    update = TRUE;
+	    reset = FALSE;  /* using runtime, no reset needed */
+	}
+	break;
+    case HTML_FORM_TEXTAREA:
+	if (data->HFD_value != formArrayElement->HFD_value) {
+	    if (formArrayElement->HFD_value != NAME_POOL_NONE)
+		NamePoolReleaseToken(pself->HTI_namePool,
+				     formArrayElement->HFD_value);
+	    formArrayElement->HFD_value = data->HFD_value;
+	    reset = TRUE;
+	    update = TRUE;
+	}
+	if (formArrayElement->HFD_runtimeState)
+	    MemFree(formArrayElement->HFD_runtimeState);
+	formArrayElement->HFD_runtimeState = data->HFD_runtimeState;
+	if (formArrayElement->HFD_runtimeState)
+	    update = TRUE;
+	break;
+    case HTML_FORM_RADIO:
+	/* if turned on, enforce exclusive */
+	if (data->HFD_runtimeState & HTML_BOOLEAN_SELECTED) {
+	    int count = ChunkArrayGetCount(formArray);
+	    HTMLformData *p_element;
+	    for (i=count-1; i>=0; i--) {
+		p_element = ChunkArrayElementToPtr(formArray, i, &size);
+		/* turn off matching form radio buttons */
+		if ((p_element->HFD_itemType == HTML_FORM_RADIO) &&
+		    (p_element->HFD_formNumber ==
+		     formArrayElement->HFD_formNumber) &&
+		    (p_element->HFD_name == formArrayElement->HFD_name) &&
+		    (p_element != formArrayElement)) {
+		    if (p_element->HFD_runtimeState & HTML_BOOLEAN_SELECTED) {
+			p_element->HFD_runtimeState &= ~HTML_BOOLEAN_SELECTED;
+			FormElementInvalidate(oself, p_element, i);
+		    }
+		}
+	    }
+	}
+	/* fall through to set new state and update */
+    case HTML_FORM_CHECKBOX:
+	/* just plug in the new state and update */
+	formArrayElement->HFD_runtimeState = data->HFD_runtimeState;
+	update = TRUE;
+	break;
+    }
+    if (reset && (formArrayElement->HFD_itemType <= HTML_FORM_LAST_EMBED)) {
+	/* no redrawing here */
+	@call oself::MSG_HTML_TEXT_FORM_RESET_ELEMENT(n);
+    }
+    if ((reset || update) && (formArrayElement->HFD_itemType <= HTML_FORM_LAST_EMBED)) {
+	@call oself::MSG_HTML_TEXT_FORM_ELEMENT_INVALIDATE(n);
+    }
+
+    @call oself::MSG_META_UNSUSPEND();
+
+    MemUnlock(OptrToHandle(formArray));
+}
+
+@extern method HTMLTextClass, MSG_HTML_TEXT_ADD_OPTION_ELEMENT
+{
+    HTMLformData *el, *menu;
+    word count, i, j, fsize;
+
+    MemLock(OptrToHandle(pself->HTI_formArray));
+    count = ChunkArrayGetCount(pself->HTI_formArray);
+    /* find empty slot (from same menu! -- brianc 12/14/00) */
+    for (i = 0; i < count; i++) {
+	el = ChunkArrayElementToPtr(pself->HTI_formArray, i, &fsize);
+	if (el->HFD_formNumber == data->HFD_formNumber &&
+	    el->HFD_itemType == HTML_FORM_OPTION &&
+	    el->HFD_var.option.menuElement == data->HFD_var.option.menuElement &&
+	    el->HFD_var.option.flags & HTML_OPTION_DELETED) {
+	    break;
+	}
+    }
+    if (i >= count) {
+	/* no empty slots, append to end */
+	el = ChunkArrayAppend(pself->HTI_formArray, 0);
+	i = count;
+	count++;  /* increase for later usage */
+    }
+    /* store new option settings */
+    memcpy(el, data, sizeof(HTMLformData));
+    /* enforce exclusive */
+    menu = ChunkArrayElementToPtr(pself->HTI_formArray,
+				  data->HFD_var.option.menuElement, &fsize);
+    if (!(menu->HFD_var.select.flags & HTML_SELECT_MULTI)) {
+	/* not multi, deselect all but new selected one */
+	for (j = 0; j < count; j++ ) {
+	    el = ChunkArrayElementToPtr(pself->HTI_formArray, j, &fsize);
+	    if (el->HFD_itemType == HTML_FORM_OPTION &&
+		el->HFD_formNumber == data->HFD_formNumber &&
+		el->HFD_var.option.menuElement == data->HFD_var.option.menuElement &&
+		!(el->HFD_var.option.flags & HTML_OPTION_DELETED) &&
+		j != i) {
+		/* handle user selected */
+		if (data->HFD_runtimeState & HTML_OPTION_SELECTED) {
+		    el->HFD_runtimeState &= ~HTML_OPTION_SELECTED;
+		}
+		/* handle default selected */
+		if (data->HFD_var.option.flags & HTML_OPTION_SELECTED) {
+		    el->HFD_var.option.flags &= ~HTML_OPTION_SELECTED;
+		}
+	    }
+	}
+    }
+    MemUnlock(OptrToHandle(pself->HTI_formArray));
+    /* invalidate, in case of new selection */
+    @call oself::MSG_HTML_TEXT_FORM_ELEMENT_INVALIDATE(
+	data->HFD_var.option.menuElement);  /* select */
+    return i;  /* new index */
+}
+
+@extern method HTMLTextClass, MSG_HTML_TEXT_REMOVE_OPTION_ELEMENT
+{
+    HTMLformData *el;
+    word fsize;
+
+    MemLock(OptrToHandle(pself->HTI_formArray));
+    el = ChunkArrayElementToPtr(pself->HTI_formArray, index, &fsize);
+    if (el->HFD_itemType == HTML_FORM_OPTION) {
+	el->HFD_var.option.flags |= HTML_OPTION_DELETED;
+	if (el->HFD_name != NAME_POOL_NONE)
+	    NamePoolReleaseToken(pself->HTI_namePool, el->HFD_name);
+	el->HFD_name = NAME_POOL_NONE;
+	if (el->HFD_value != NAME_POOL_NONE)
+	    NamePoolReleaseToken(pself->HTI_namePool, el->HFD_value);
+	el->HFD_value = NAME_POOL_NONE;
+	/* invalidate fully */
+	@call oself::MSG_HTML_TEXT_FORM_RESET_ELEMENT(index);
+	@call oself::MSG_HTML_TEXT_FORM_ELEMENT_INVALIDATE(
+	    el->HFD_var.option.menuElement);  /* select */
+    }
+    MemUnlock(OptrToHandle(pself->HTI_formArray));
+}
+
+/*------------------------------------------------------------------------*/
+
+/*
+ * The Form String for FORM_STRING_ENCODING_MULTI looks like: (ZT = null)
+ *
+ * boundary + ZT
+ * [For each field:]
+ * {
+ *   [Field is string:]
+ *     name + ZT + FCVT_STRING + value + ZT
+ *   [Field is file:]
+ *     name + ZT + FCVT_FILE + ZT + filename + ZT + mimeType + ZT
+ * }
+ * ZT
+ *
+ * The resultant message will be in the usual RFC1521 MIME format:
+ *
+ * [For each field:]
+ * {
+ *   "--" + boundary + CRLF
+ *   "Content-Disposition: form-data; name=\"" + name + "\""
+ *   [Field is file:]
+ *     "; filename=\"" + filename + "\"" + CRLF
+ *     [File is valid:]
+ *       "Content-Type: " + mime type + CRLF + CRLF + file contents
+ *   [Field is string:]
+ *     CRLF + CRLF + value
+ *   CRLF
+ * }
+ * "--" + boundary "--" + CRLF
+ */
+
+/* Callback state machine states */
+typedef enum {
+    FSCMS_START = 0,
+    /* Message Boundary */
+    FSCMS_BOUNDARY_LEADER, FSCMS_BOUNDARY, FSCMS_BOUNDARY_TRAILER,
+    /* Field name */
+    FSCMS_NAME_LEADER, FSCMS_NAME, FSCMS_NAME_TRAILER,
+    /* File field */
+    FSCMS_FILENAME_LEADER, FSCMS_FILENAME, 
+    FSCMS_FILENAME_TRAILER, FSCMS_MIME_LEADER, FSCMS_MIME, FSCMS_MIME_TRAILER,
+    FSCMS_FILE, 
+    /* String field */
+    FSCMS_STRING_LEADER, FSCMS_STRING, FSCMS_FIELD_TRAILER,
+    /* End of Message Boundary */
+    FSCMS_END_BOUNDARY_LEADER, FSCMS_END_BOUNDARY, FSCMS_END_BOUNDARY_TRAILER,
+    FSCMS_END
+} FormStringCallbackMultiState;
+
+@start FormStringCallbackMultiStrings, data;
+
+/* Constant strings used in message */
+@chunk char FSCMSTR_BOUNDARY_LEADER[] = {'-','-',0};
+@chunk char FSCMSTR_CRLF[] = {'\r','\n',0};
+@chunk char FSCMSTR_NAME_LEADER[] = {'C','o','n','t','e','n','t','-','D','i','s','p','o','s','i','t','i','o','n',':',' ','f','o','r','m','-','d','a','t','a',';',' ','n','a','m','e','=','\"',0};
+@chunk char FSCMSTR_NAME_TRAILER[] = {'\"',0};
+@chunk char FSCMSTR_FILENAME_LEADER[] = {';',' ','f','i','l','e','n','a','m','e','=','\"',0};
+@chunk char FSCMSTR_FILENAME_TRAILER[] = {'\"','\r','\n',0};
+@chunk char FSCMSTR_MIME_LEADER[] = {'C','o','n','t','e','n','t','-','T','y','p','e',':',' ',0};
+@chunk char FSCMSTR_CRLFCRLF[] = {'\r','\n','\r','\n',0};
+@chunk char FSCMSTR_END_BOUNDARY_TRAILER[] = {'-','-','\r','\n',0};
+
+/* Array mapping states to constant strings */
+@chunk ChunkHandle FSCMStringArray[] = {
+    NullChunk,					/* FSCMS_START */
+    OptrToChunk(@FSCMSTR_BOUNDARY_LEADER),	/* FSCMS_BOUNDARY_LEADER */
+    NullChunk,					/* FSCMS_BOUNDARY */
+    OptrToChunk(@FSCMSTR_CRLF),			/* FSCMS_BOUNDARY_TRAILER */
+    OptrToChunk(@FSCMSTR_NAME_LEADER),		/* FSCMS_NAME_LEADER */
+    NullChunk,					/* FSCMS_NAME */
+    OptrToChunk(@FSCMSTR_NAME_TRAILER),		/* FSCMS_NAME_TRAILER */
+    OptrToChunk(@FSCMSTR_FILENAME_LEADER),	/* FSCMS_FILENAME_LEADER */
+    NullChunk,					/* FSCMS_FILENAME */
+    OptrToChunk(@FSCMSTR_FILENAME_TRAILER),	/* FSCMS_FILENAME_TRAILER */
+    OptrToChunk(@FSCMSTR_MIME_LEADER),		/* FSCMS_MIME_LEADER */
+    NullChunk,					/* FSCMS_MIME */
+    OptrToChunk(@FSCMSTR_CRLFCRLF),		/* FSCMS_MIME_TRAILER */
+    NullChunk,					/* FSCMS_FILE */
+    OptrToChunk(@FSCMSTR_CRLFCRLF),		/* FSCMS_STRING_LEADER */
+    NullChunk,					/* FSCMS_STRING */
+    OptrToChunk(@FSCMSTR_CRLF),			/* FSCMS_FIELD_TRAILER */
+    OptrToChunk(@FSCMSTR_BOUNDARY_LEADER),	/* FSCMS_END_BOUNDARY_LEADER */
+    NullChunk,					/* FSCMS_END_BOUNDARY */
+    OptrToChunk(@FSCMSTR_END_BOUNDARY_TRAILER)	/* FSCMS_END_BOUNDARY_TRAILER */
+};
+
+/* Default MIME type if file extension isn't recognized. */
+@chunk TCHAR DefaultMimeType[] = _TEXT("application/octet-stream");
+
+@end FormStringCallbackMultiStrings;
+
+/* Callback data structure */
+typedef struct {
+    FormStringCallbackMultiState state;		/* state machine */
+    word datapos;				/* index in T_formString.data[] 
+						   of current processing point */
+    ChunkHandle string;				/* constant string being sent,
+						   null if sending FormString data */
+    word soffset;				/* offset into string being sent */
+    word len;					/* remaining length of string */
+    FileHandle file;				/* file currently being sent */
+} T_formStringCallbackData;
+
+/* Callback for generating the post message from FORM_STRING_ENCODING_MULTI */
+FormStringCallbackStatus _pascal _export FormStringCallbackMulti(
+    T_formString *postData, byte *buffer, word bufferSize, word *bufferUsed)
+{
+    T_formStringCallbackData *data;
+    char *p;
+    word bufferRemain = bufferSize;
+    FormStringCallbackStatus retval = FSCS_NO_ERROR;
+
+    if (postData->callbackData == NullHandle)
+    {
+	/* This is our first call, setup a few things. */
+	postData->callbackData = MemAlloc(sizeof(T_formStringCallbackData),
+					  HF_DYNAMIC, HAF_NO_ERR | HAF_LOCK);
+	data = (T_formStringCallbackData *) MemLock(postData->callbackData);
+	data->state = FSCMS_START;
+	data->datapos = STRLENSB(postData->data) + 1; /* start at first field */
+	data->string = NullChunk;
+	data->soffset = 0;
+	data->file = NullHandle;
+    }
+    else
+	data = (T_formStringCallbackData *) MemLock(postData->callbackData);
+
+    if (bufferSize == 0)
+    {
+	/* Perform cleanup actions. */
+	if (data->state == FSCMS_FILE)
+	{
+	    if (FileClose(data->file, FALSE))	/* Close the opened file */
+		retval = FSCS_ERROR;
+	    data->file = NullHandle;
+	}
+	MemFree(postData->callbackData);
+	postData->callbackData = NullHandle;
+	return retval;
+    }
+
+    /* Run the state machine until the buffer is full. */
+    *bufferUsed = 0;
+    /* If state if FSCMS_END, our caller never told us to clean up. */
+    EC_ERROR_IF(data->state == FSCMS_END, ERROR_FORM_STRING_CALLBACK_ERROR);
+    while (bufferRemain && retval == FSCS_NO_ERROR)
+    {
+	switch (data->state)
+	{
+	case FSCMS_START:			/* starting new field */
+	    MemLock(OptrToHandle(@FSCMSTR_BOUNDARY_LEADER)); /* lock strings */
+	    p = &postData->data[data->datapos];	/* p = field name */
+	    if (p[0] == '\0')			/* last field? */
+		data->state = FSCMS_END_BOUNDARY_LEADER; /* The end is almost here! */
+	    else				/* One more field... */
+		data->state = FSCMS_BOUNDARY_LEADER;
+	    goto nextString;
+	    
+	case FSCMS_BOUNDARY_LEADER:
+	case FSCMS_BOUNDARY_TRAILER:
+	case FSCMS_NAME_LEADER:
+	case FSCMS_NAME_TRAILER:
+	case FSCMS_FILENAME_LEADER:
+	case FSCMS_FILENAME_TRAILER:
+	case FSCMS_MIME_LEADER:
+	case FSCMS_MIME_TRAILER:
+	case FSCMS_STRING_LEADER:
+	case FSCMS_FIELD_TRAILER:
+	case FSCMS_END_BOUNDARY_LEADER:
+	case FSCMS_END_BOUNDARY_TRAILER:
+	    MemLock(OptrToHandle(@FSCMSTR_BOUNDARY_LEADER)); /* lock strings */
+	    p = ((char *) LMemDerefHandles(OptrToHandle(@FSCMSTR_BOUNDARY_LEADER), 
+					   data->string)) + data->soffset;
+	    if (data->len)
+	    {
+		/* Write as much of the string as possible to the buffer. */
+		register word count = data->len;
+		if (count > bufferRemain)
+		    count = bufferRemain;
+		memcpy(buffer, p, count);
+		buffer += count;
+		data->len -= count;
+		bufferRemain -= count;
+		data->soffset += count;
+	    }
+	    /* If the end of the string was reached, advance to the next state. */
+	    if (!data->len)
+	    {
+		switch (data->state)
+		{
+		case FSCMS_NAME_TRAILER:
+		    /* Determine if the field is a string or a file, and
+		       advance the data pointer past the field type. */
+		    if (postData->data[data->datapos++] == FCVT_STRING)
+			data->state = FSCMS_STRING_LEADER;
+		    else
+			data->state = FSCMS_FILENAME_LEADER;
+		    goto nextString;
+
+		case FSCMS_FIELD_TRAILER:
+		    /* Start the next field. */
+		    data->state = FSCMS_START;
+		    break;
+
+		case FSCMS_END_BOUNDARY_TRAILER:
+		    /* The end is here! */
+		    (int)data->state ++;
+		    break;
+
+		case FSCMS_FILENAME_TRAILER:
+		    /* If the file was not opened, don't write Content-Type and
+		       skip the file state.  This also means datapos must be
+		       advanced past the ever-present mime type. */
+		    if (data->file == NullHandle)
+		    {
+			data->datapos += STRLENSB(&postData->data
+						[data->datapos]) + 1;
+			data->state = FSCMS_FIELD_TRAILER;
+			goto nextString;
+		    }
+		    /* else FALLTHRU... */
+
+		default:
+		    /* Advance to the next state and string. */
+		    (int)data->state ++;
+		nextString:
+		    data->string = ((ChunkHandle *)LMemDeref(@FSCMStringArray))
+			[(int)data->state];
+		    if (data->string != NullChunk)
+		    {
+			/* Next string is constant. */
+			data->len = STRLENSB(LMemDerefHandles(OptrToHandle(
+			    @FSCMSTR_BOUNDARY_LEADER), data->string));
+			data->soffset = 0;
+		    }
+		    else
+		    {
+			/* Next string is in the FormString. */
+			if (data->state == FSCMS_BOUNDARY ||
+			    data->state == FSCMS_END_BOUNDARY)
+			    data->soffset = 0;	/* boundary is at start of data */
+			else
+			    data->soffset = data->datapos;
+			data->len = STRLENSB(&postData->data[data->soffset]);
+		    }
+		}
+	    }
+	    MemUnlock(OptrToHandle(@FSCMSTR_BOUNDARY_LEADER)); /* unlock strings */
+	    break;
+
+	case FSCMS_BOUNDARY:
+	case FSCMS_NAME:
+	case FSCMS_FILENAME:
+	case FSCMS_MIME:
+	case FSCMS_STRING:
+	case FSCMS_END_BOUNDARY:
+	    p = &postData->data[data->soffset];
+	    if (data->len)
+	    {
+		/* Write as much of the string as possible to the buffer. */
+		register word count = data->len;
+		if (count > bufferRemain)
+		    count = bufferRemain;
+		memcpy(buffer, p, count);
+		buffer += count;
+		data->len -= count;
+		bufferRemain -= count;
+		data->soffset += count;
+	    }
+	    /* If the end of the string was reached, advance to the next state. */
+	    if (!data->len)
+	    {
+		if (data->state == FSCMS_FILENAME)
+		{
+		    /* Open the file while we still have the filename. */
+		    if (postData->data[data->datapos] != '\0')
+			data->file = FileOpen(&postData->data[data->datapos],
+					      0x80 /*FFAF_RAW*/ | FILE_ACCESS_R
+					      | FILE_DENY_W);
+		}
+		/* Advance the data pointer to the next string. */
+		if (data->state != FSCMS_BOUNDARY &&
+		    data->state != FSCMS_END_BOUNDARY)
+		    data->datapos = data->soffset + 1;
+
+		/* Advance to the next state and string. */
+		(int)data->state ++;
+		MemLock(OptrToHandle(@FSCMSTR_BOUNDARY_LEADER)); /* lock strings */
+		data->string = ((ChunkHandle *)LMemDeref(@FSCMStringArray))
+		    [(int)data->state];
+		/* The next string should always be constant. */
+		EC_ERROR_IF(data->string == NullChunk, ERROR_FORM_STRING_CALLBACK_ERROR);
+		data->len = STRLENSB(LMemDerefHandles(OptrToHandle(
+		    @FSCMSTR_BOUNDARY_LEADER), data->string));
+		data->soffset = 0;
+		MemUnlock(OptrToHandle(@FSCMSTR_BOUNDARY_LEADER));
+	    }
+	    break;
+
+	case FSCMS_FILE:
+	{
+	    /* Read as much of the file as possible into the buffer. */
+	    word count = FileRead(data->file, buffer, bufferRemain, FALSE);
+
+	    if ((sword)count == -1)
+	    {
+		FileClose(data->file, FALSE);
+		retval = FSCS_ERROR;		/* A file error occurred */
+		data->file = NullHandle;
+	    }
+	    else if (count > 0)
+	    {
+		buffer += count;
+		bufferRemain -= count;
+	    }
+	    else
+	    {
+		/* If the end of the file was reached, close it and advance
+		   to the next state. */
+		if (FileClose(data->file, FALSE))
+		{
+		    retval = FSCS_ERROR;
+		    break;
+		}
+		data->file = NullHandle;
+		data->state = FSCMS_FIELD_TRAILER;
+		MemLock(OptrToHandle(@FSCMSTR_BOUNDARY_LEADER)); /* lock strings */
+		data->string = ((ChunkHandle *)LMemDeref(@FSCMStringArray))
+		    [(int)data->state];
+		/* The next string should always be constant. */
+		EC_ERROR_IF(data->string == NullChunk, ERROR_FORM_STRING_CALLBACK_ERROR);
+		data->len = STRLENSB(LMemDerefHandles(OptrToHandle(
+		    @FSCMSTR_BOUNDARY_LEADER), data->string));
+		data->soffset = 0;
+		MemUnlock(OptrToHandle(@FSCMSTR_BOUNDARY_LEADER));
+	    }
+	    break;
+	}
+	case FSCMS_END:
+	    /* The entire message has been sent.  */
+	    retval = FSCS_DONE;
+	    break;
+	default:
+	    /* Unexpected state! */
+	    EC_ERROR(ERROR_FORM_STRING_CALLBACK_ERROR);
+	}
+    }
+    *bufferUsed = bufferSize - bufferRemain;
+    return retval;
+}
+
+/* Method for computing the content length of the post message that will be 
+   generated by FormStringCallbackMulti */
+static dword FormStringLengthMulti(T_formString *postData)
+{
+    word boundarylen = STRLENSB(postData->data);
+    char *p = postData->data + boundarylen + 1;	/* p = first field name */
+    dword contentlen = 2 + boundarylen + 2 + 2;	/* '--[boundary]--CRLF' */
+    word len;
+    FileHandle fhan;
+    dword filelen;
+    char *filename;
+    
+    while (*p != '\0')
+    {
+EC(	ECCheckBounds(p);							)
+	len = STRLENSB(p);			/* len = field name length */
+        contentlen += 2 + boundarylen + 2 +	/* '--[boundary]CRLF' */
+	    38 + len + 1;	     /* 'Content-Disposition...name="[name]"' */
+	p += len + 2;				/* p = field value (skip type) */
+	len = STRLENSB(p);			/* len = field value length */
+	if (p[-1] == FCVT_STRING)		/* field is a normal string */
+	{
+	    contentlen += 4 + len;		/* 'CRLFCRLF[value]' */
+	}
+	else					/* field is a file */
+	{
+	    EC_ERROR_IF(p[-1] != FCVT_FILE, ERROR_FORM_STRING_UNKNOWN_FIELD_TYPE);
+	    contentlen += 12 + len + 3;		/* '; filename="[name]"CRLF' */
+	    filename = p;
+	    p += len + 1;			/* p = mime type */
+	    len = STRLENSB(p);			/* len = mime type length */
+
+	    /* If no file name, no file. */
+	    if (filename[0] != '\0')
+	    {
+		/* Try opening the file.  This will determine if we send the file
+		   and should include its length. */
+		fhan = FileOpen(filename, 0x80 /*FFAF_RAW*/ | FILE_ACCESS_R
+				| FILE_DENY_W);
+		if (fhan != NullHandle)
+		{
+		    /* Get the file's size. */
+		    filelen = FileSize(fhan);
+		    FileClose(fhan, FALSE);	/* done with file */
+		    
+		    /* 'Content-Type: [mime]CRLFCRLF[data]' */
+		    contentlen += 14 + len + 4 + filelen;
+		}
+	    }
+	}
+	contentlen += 2;			/* 'CRLF' */
+	p += len + 1;				/* p = next field name */
+    }
+    return contentlen;
+}
+
+/*------------------------------------------------------------------------*/
+
+@extern method HTMLTextClass, MSG_HTML_TEXT_IDENTIFY_MIME_TYPE
+{
+    /*
+     * This handler simply returns the default MIME type.  A subclass (the
+     * browser) should intercept it and supply a better MIME type, or call
+     * the superclass for the default.
+     */
+    MemLock(OptrToHandle(@DefaultMimeType));
+    strcpy(mimeType, LMemDeref(@DefaultMimeType));
+    MemUnlock(OptrToHandle(@DefaultMimeType));
+}

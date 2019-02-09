@@ -50,7 +50,7 @@ usernotes       "based on SSLeay 0.9.0b 29-Jun-1998"
 # Code resources
 #
 nosort
-resource FIXEDCALLBACKS		fixed read-only code shared
+resource FixedCallbacks		fixed read-only code shared
 
 #
 # exported routines

@@ -485,23 +485,40 @@ CV32GetInteger(byte   **bpPtr)
 
 	if (numeric >= 0x8000) {
 
-		switch (*bp++) {
-		case CTL_WORD:
+		switch (numeric) {
+		/*case CTL_WORD:*/
+		case CNL2_USHORT:
 			MSObj_GetWord(retval, bp);
 			break;
-		case CTL_SDWORD:
-		case CTL_DWORD:
+		/*case CTL_SDWORD:*/
+		/*case CTL_DWORD:*/
+		case CNL2_LONG:
+		case CNL2_ULONG:
 			retval = *bp | (bp[1] << 8) | (bp[2] << 16) | (bp[3] << 24);
 			bp += 4;
 			break;
-		case CTL_QWORD:
-		case CTL_SQWORD:
+		/*case CTL_QWORD:*/
+		/*case CTL_SQWORD:*/
+		case CNL2_REAL32:
+		case CNL2_REAL80:
+		case CNL2_REAL64:
+		case CNL2_REAL128:
+		case CNL2_QUADWORD:
+		case CNL2_UQUADWORD:
+		case CNL2_REAL48:
+		case CNL2_COMPLEX32:
+		case CNL2_COMPLEX64:
+		case CNL2_COMPLEX80:
+		case CNL2_COMPLEX128:
+		case CNL2_VARSTRING:
 			assert(0);
-		case CTL_SBYTE:
+		/*case CTL_SBYTE:*/
+		case CNL2_CHAR:
 			retval = *bp | (*bp & 0x80 ? 0xffffff00 : 0);
 			bp++;
 			break;
-		case CTL_SWORD:
+		/*case CTL_SWORD:*/
+		case CNL2_SHORT:
 			retval = *bp | (bp[1] << 8) | (bp[1] & 0x80 ? 0xffff0000 : 0);
 			bp += 2;
 			break;
@@ -2138,7 +2155,7 @@ printf("CV32ProcessTypeRecord %x\n", typeBlock); fflush(stdout);
 			printf("union size: %ld\n", size);
 
 			name = NullID;
-			if ((bp - *bpPtr) < len) {
+			if ((bp - *bpPtr) < (len-2)) {
 				name = CV32GetString(&bp);
 			}
 			printf("union: %s\n", name);

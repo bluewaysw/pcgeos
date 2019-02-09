@@ -2296,7 +2296,7 @@ while ((c = *(++ptr)) != 0)
           {
           ptr++;   /* Can treat like ':' as far as spacing is concerned */
 
-          if (ptr[2] != '?' || strchr("=!<", ptr[3]) == NULL)
+          if (ptr[2] != '?' || strchr(_T("=!<"), ptr[3]) == NULL)
             {
             ptr += 2;    /* To get right offset in message */
             *errorptr = ERR28;
@@ -4495,7 +4495,11 @@ pcre_posix_error_code(const char *s)
 {
 size_t i;
 for (i = 0; i < sizeof(estring)/sizeof(char *); i++)
+#ifdef DO_DBCS
+  if (strcmpsbcs(s, estring[i]) == 0) return eint[i];
+#else
   if (strcmp(s, estring[i]) == 0) return eint[i];
+#endif
 return REG_ASSERT;
 }
 
@@ -4513,11 +4517,18 @@ size_t length, addlength;
 
 message = (errcode >= (int)(sizeof(pstring)/sizeof(char *)))?
   "unknown error code" : pstring[errcode];
+#ifdef DO_DBCS
+length = strlensbcs(message) + 1;
+#else
 length = strlen(message) + 1;
-
+#endif
 addmessage = " at offset ";
 addlength = (preg != NULL && (int)preg->re_erroffset != -1)?
+#ifdef DO_DBCS
+  strlensbcs(addmessage) + 6 : 0;
+#else
   strlen(addmessage) + 6 : 0;
+#endif
 
 if (errbuf_size > 0)
   {
@@ -4527,12 +4538,20 @@ if (errbuf_size > 0)
 #   ifdef __JSE_WINCE__
       strcat(errbuf,message);
 #   else
-      sprintf(errbuf, "%s%s%-6d", message, addmessage, (int)preg->re_erroffset);
+#ifdef DO_DBCS
+  sprintfsbcs(errbuf, "%s%s%-6d", message, addmessage, (int)preg->re_erroffset);
+#else
+  sprintf(errbuf, "%s%s%-6d", message, addmessage, (int)preg->re_erroffset);
+#endif
 #   endif
   }
   else
     {
+#ifdef DO_DBCS
+    strncpysbcs(errbuf, message, errbuf_size - 1);
+#else
     strncpy(errbuf, message, errbuf_size - 1);
+#endif
     errbuf[errbuf_size-1] = 0;
     }
   }
@@ -4613,7 +4632,11 @@ if ((eflags & REG_NOTEOL) != 0) options |= PCRE_NOTEOL;
 
 preg->re_erroffset = (size_t)(-1);   /* Only has meaning after compile */
 
+#ifdef DO_DBCS
+rc = pcre_exec(preg->re_pcre, NULL, string, (int)strlensbcs(string), 0, options,
+#else
 rc = pcre_exec(preg->re_pcre, NULL, string, (int)strlen(string), 0, options,
+#endif
   (int *)pmatch, (int)nmatch * 2);
 
 if (rc == 0) return 0;    /* All pmatch were filled in */

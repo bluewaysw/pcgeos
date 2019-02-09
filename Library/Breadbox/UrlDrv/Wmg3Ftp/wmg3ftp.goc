@@ -1,0 +1,1389 @@
+/***********************************************************************
+ *
+ * PROJECT:       HTMLView
+ * FILE:          wmg3ftp.goc
+ *
+ * AUTHOR:        Marcus Gr�ber
+ *                Gerd Boerrigter (ported to GEOS 3.0)
+ *
+ * Note: This code uses many functions that a very simular to the
+ *       functions in the HTTP driver.  We should really
+ *       redesign all URL drivers.  Especially the parts which
+ *       work on the URL string.
+ *
+ ***********************************************************************/
+
+/**************************************************************************
+ *                Include files
+ **************************************************************************/
+@include <stdapp.goh>
+
+@include <socket.goh>
+#include <sockmisc.h>
+
+#include <Ansi/string.h>
+#include <Ansi/stdio.h>
+#include <Ansi/stdlib.h>
+
+#include <geoMisc.h>
+#include <initfile.h>
+#include <resource.h>
+
+@include <html4par.goh>
+#include <htmldrv.h>
+#include <htmlfstr.h>
+@include <sem.h>
+@include <library.h>
+#include <timer.h>
+
+#define RECV_SPEED  /* display Kb/s during download */
+
+#define   HTTP_TIMEOUT   (60*60)
+#define   HTTP_DOMAIN    _TEXT("TCPIP")
+#define   BUFFER_SIZE    2048
+#define   RECV_BUFFER_SIZE   8192
+#define   ERRORSIZE      256
+
+#define   strn(s)             s, sizeof(s)-1
+#define   strncmpi(a,b,n)     LocalCmpStringsNoCase(a,b,n)
+
+#ifdef DO_DBCS
+#else
+#define vsprintfsbcs vsprintf
+#define strlensbcs(s) strlen(s)
+#define strchrsbcs(s,c) strchr(s,c)
+#define strncpysbcs(s,t,n) strncpy(s,t,n)
+#define LocalCmpStringsNoCaseSBCS(s,t,n) LocalCmpStringsNoCase(s,t,n)
+#define strstrsbcs(s,t) strstr(s,t)
+#define strncmpsbcs(s,t,n) strncmp(s,t,n)
+#define strrchrsbcs(s,c) strrchr(s,c)
+#endif
+
+/**************************************************************************
+ *        Some types to make handling TCP/IP addresses more convenient
+ **************************************************************************/
+typedef struct {
+     TcpAccPntExtendedAddress UTA_link;
+     TCHAR                    UTA_ip[MAX_IP_ADDR_STRING_LENGTH];
+} UnresolvedTCPAddress;
+
+typedef struct {
+     SocketAddress            RTA_sock;
+     TcpAccPntResolvedAddress RTA_addr;
+} ResolvedTCPAddress;
+
+
+/**************************************************************************
+ *        Global state variables
+ **************************************************************************/
+SocketPort  listenPort = { 0x5000, MANUFACTURER_ID_SOCKET_16BIT_PORT };
+
+#ifdef LOGFILE
+FileHandle  logFile;
+#endif
+
+Socket    sock;
+char *buffer;
+URLDrvAbortState G_abortState = 0 ;
+
+UnresolvedTCPAddress hostname;
+ResolvedTCPAddress   hostaddr = {{{0,MANUFACTURER_ID_SOCKET_16BIT_PORT},
+                                   sizeof(HTTP_DOMAIN)-1*sizeof(TCHAR),HTTP_DOMAIN,
+                                   0}};
+
+#define STATE_UNCONNECTED  0
+#define STATE_PREPARING    1
+#define STATE_RESOLVING    2
+#define STATE_FTP_REQUEST 3
+
+word socketState = STATE_UNCONNECTED;
+Boolean aborted;
+TCHAR G_userpwd[URL_MAX_USERNAME+URL_MAX_PASSWORD+2] = _TEXT("") ;
+SemaphoreHandle G_sync = NullHandle ;
+TCHAR errBuf[ERRORSIZE];
+
+
+Boolean G_sockFlag ;
+Boolean G_listenSockFlag ;
+Boolean G_dataSockFlag ;
+
+/**************************************************************************
+ *        Message strings
+ **************************************************************************/
+@start  HTMLResource, data;
+  @chunk TCHAR MsgResolveErr[] = _TEXT(
+    "<H1>Error locating host</H1>"
+    "The host address could not be determined, or the modem connection "
+    "was not established. [Socket error code: %s]");
+  @chunk TCHAR MsgConnectErr[] = _TEXT(
+    "<H1>Error contacting host</H1>"
+    "A connection to the requested host could not be established. "
+    "[Socket error code: %s]");
+  @chunk TCHAR MsgRequestErr[] = _TEXT(
+    "<H1>Error getting data</H1>"
+    "Request could not be transmitted.<BR>"
+    "The error message was '<CODE>%s</CODE>'.");
+
+  @chunk TCHAR MsgNoResponse[] = _TEXT(
+    "<H1>Error getting data</H1>"
+    "No response from remote side.<BR>");
+  @chunk TCHAR MsgReceiveErr[] = _TEXT(
+    "<H1>Error getting data</H1>"
+    "There was a problem receiving the requested data.");
+
+  @chunk TCHAR MsgFTPFileErr[] = _TEXT(
+    "<H1>FTP Error</H1>"
+    "The FTP temporary file could not be created.");
+  @chunk TCHAR MsgAccountNotSupported[] = _TEXT(
+    "<H1>FTP Error</H1>"
+    "Account logins are not supported yet.");
+  @chunk TCHAR MsgNoLoginSupported[] = _TEXT(
+    "<H1>FTP Error</H1>"
+    "Could not Login to the server.");
+  @chunk TCHAR MsgInterrupt[] = _TEXT(
+    "<H1>Transmission interrupted</H1>");
+  @chunk TCHAR MsgFileError[] = _TEXT(
+    "<H1>Temporary File Error</H1>"
+    "The data received could not be stored in a local file. One possible "
+    "cause for this is the storage medium having run out of space.");
+@end    HTMLResource;
+
+@start  StatusResource, data;
+  @chunk TCHAR StatusLocating[] = _TEXT("Locating host.");
+  @chunk TCHAR StatusContacting[] = _TEXT("Contacting host.");
+  @chunk TCHAR StatusRequest[] = _TEXT("Sending request.");
+  @chunk TCHAR StatusWaiting[] = _TEXT("Waiting for data.");
+  @chunk TCHAR StatusReceiving[] = _TEXT("Receiving data.");
+  @chunk TCHAR StatusClosing[] = _TEXT("Closing connection.");
+  @chunk TCHAR StatusLogin[] = _TEXT("Logging into FTP server.");
+
+  @chunk TCHAR ErrorEOF[] = _TEXT("EOF from server");
+@end    StatusResource;
+
+@include "userpass.goh"
+
+
+dword atol(char *s)
+{
+     dword n = 0;
+
+     while(isdigit(*s))
+     {
+       n *= 10;
+       n += (*s - '0');
+       s++;
+     }
+
+     return n;
+}
+
+#ifdef DO_DBCS
+/* only need match/no-match */
+sword LocalCmpStringsNoCaseSBCS(const char *s1, const char *s2, word len)
+{
+    int i;
+
+    /* we only care about ASCII cases */
+    for (i = 0; i < len; i++) {
+	if (toupper(s1[i]) != toupper(s2[i])) return -1;  /* no-match */
+    }
+    return 0;  /* match */
+}
+#endif
+
+int sock_getline(Socket sock, char *buffer, int len)
+{
+    int                 i;
+    char                ch;
+
+    /* This do-while construct is a quick hack not to fail on multi-line
+       replies. */
+    do {
+        i = 0;
+        while ( i < len &&
+                SocketRecv( sock, &ch, 1, HTTP_TIMEOUT, 0, NULL ) > 0 )
+        {
+            if ( ch == '\n' ) {
+                break;
+            }
+            else if ( ch != '\r' )
+            {
+                buffer[i++] = ch;
+            }
+        }
+
+        /* Aborted because of a socket error */
+        if ( i < len && ThreadGetError() != SE_NORMAL )
+        {
+          i = 0;
+          break;
+        }
+	/* keep reading until we get to last line of multi-line (response
+	   code + space) */
+    } while ( i<=3 || (' ' != buffer[ 3 ] || (buffer[0]<'0'||buffer[0]>'9') ) );
+
+    buffer[i] = '\0';
+#ifdef LOGFILE
+    FileWrite( logFile, buffer, strlensbcs(buffer), 0 );
+    FileWrite( logFile, "\r\n", 2, 0 );
+#endif
+
+    return (i);
+}
+
+Boolean sock_printf(Socket sock, char *fmt, ...)
+{
+     va_list arg;
+     char buf[512];
+
+     va_start(arg, fmt);
+     vsprintfsbcs(buf, fmt, arg);
+     va_end(arg);
+
+     SocketSend(sock, buf, strlensbcs(buf), NULL, 0);
+#ifdef LOGFILE
+     FileWrite( logFile, buf, strlensbcs(buf), 0 );
+#endif
+     return aborted;
+}
+
+/* Close socket in a way that hopefully avoids blocking if the other side
+   doesn't respond... */
+void SocketMyClose(Socket sock, Boolean *p_closingFlag)
+{
+    if (sock)  {
+       if (*p_closingFlag == FALSE)  {
+           *p_closingFlag = TRUE ;
+//         SocketCloseSend(sock);
+//           SocketReset(sock);
+           SocketClose(sock);
+           *p_closingFlag = FALSE ;
+       } else {
+           while (*p_closingFlag == TRUE)
+               {}
+           SocketClose(sock) ;
+       }
+    }
+}
+
+
+/***************************************************************************/
+/* create HTML from ftp list output */
+
+void fputs(char *s,FILE *f)
+{
+   fwrite(s,strlensbcs(s),1,f);
+}
+
+char *my_fgets(char *buf,int n,FILE *f)
+{
+   int i;
+   char c;
+
+   i=0;
+   do {
+     if( !fread(&c,1,1,f) )
+       c = EOF;
+     else
+       buf[i++] = (char)c;
+   } while(i<n-1 && c!=EOF && c!='\n');
+   buf[i] = 0;
+   if(i==0)
+     return NULL;
+   return buf;
+}
+
+word ftp_list(TCHAR *url, TCHAR *fname, optr* msg )
+{
+    char buf[254], *p, *q, *r;
+    int i;
+    PathName tname;
+    FILE *fp1, *fp2;
+    word namePos;
+#ifdef DO_DBCS
+    MemHandle urlBuf;
+    TCHAR *urlP;
+    char *urlBufP;
+
+    /* make SBCS version of url */
+    urlBuf = MemAlloc(strlen(url)+1, HF_DYNAMIC, HAF_STANDARD);
+    if (!urlBuf) {
+	*msg = @MsgFileError;
+	return URLRequestMakeRet(URL_RET_MESSAGE) | URB_RF_NOCACHE;
+    }
+    urlBufP = MemLock(urlBuf);
+    urlP = url;
+    while (*urlP) *urlBufP++ = *urlP++; *urlBufP = C_NULL;
+    (char *)url = MemDeref(urlBuf);
+#endif
+
+    strcpy(tname, fname);
+    tname[strlen(tname) - 1] = _TEXT('_');
+
+    (TCHAR *)p = strrchr(tname, _TEXT('\\'));
+    if(p==NULL)
+      (TCHAR *)p = tname;
+    else
+      ((TCHAR *)p)++;
+
+    FileRename(fname, (TCHAR *)p);
+
+    fp1 = fopen(tname, "rV");
+    fp2 = fopen(fname, "wV");
+    if (!fp1 || !fp2) {
+#ifdef DO_DBCS
+	MemFree(urlBuf);
+#endif
+        *msg = @MsgFTPFileErr;
+        return URLRequestMakeRet(URL_RET_MESSAGE) | URB_RF_NOCACHE;
+    }
+
+    p = strstrsbcs((char *)url, "//");
+    if (p)
+    {
+        p += 2;
+        p = strchrsbcs(p, '/');
+    }
+    if (!p)
+        p = (char *)url;
+
+    fputs("<HTML><HEAD><TITLE>", fp2);
+    fputs((char *)url, fp2);
+    fputs("</TITLE></HEAD>\n<BODY>\n", fp2);
+    fputs("<H1>Directory Listing</H1>\n<H2>", fp2);
+    fputs(p, fp2);
+    fputs("</H2><PRE>\n", fp2);
+
+    while (my_fgets(buf, sizeof(buf), fp1))
+    {
+        if (!LocalCmpStringsNoCaseSBCS(buf, "tota", 4)) continue;
+
+        p = &buf[strlensbcs(buf) - 1];
+        *(p--) = '\0';
+
+        /* special for ftp.cdrom.com */
+        if ( *p == 13 ) {
+            *p = '\0';
+        }
+
+	/* handle different kinds of dir listings */
+	namePos = 0;
+	for (i = 60; i >= 40; i--) {
+	    if ((strlensbcs(buf) > i) && (buf[i] == ' ') &&
+		/* ls -l formats: hh:mm<sp>name */
+		((buf[i-3] == ':') ||
+		/* ls -l formats: <sp>yyyy<sp>name */
+		 (buf[i-5] == ' ' &&
+		  (buf[i-4] == '1' || buf[i-4] == '2') &&
+		  buf[i-3] >= '0' && buf[i-3] <= '9' &&
+		  buf[i-2] >= '0' && buf[i-2] <= '9' &&
+		  buf[i-1] >= '0' && buf[i-1] <= '9' &&
+		  !strchrsbcs(&buf[i], ':')) ) ) {
+		namePos = i;
+		break;
+	    }
+	}
+	if (!namePos && strlensbcs(buf) > 38 && buf[38] == ' ' && buf[12] == ':') {
+	    namePos = 38;  /* NT */
+	}
+
+	/* handle <, > chars */
+	while((q = strchrsbcs(buf, '<'))) {
+	    if (q && strlensbcs(buf)+3-1 < 254) {  /* &lt */
+		for (r = buf+strlensbcs(buf); r >= q+1; r--) {
+		    *(r+3-1) = *r;
+		}
+		strncpysbcs(q, "&lt", 3);
+		if (q < &buf[namePos])
+		    namePos += 3-1;
+	    }
+	}
+	while((q = strchrsbcs(buf, '>'))) {
+	    if (q && strlensbcs(buf)+3-1 < 254) {  /* &gt */
+		for (r = buf+strlensbcs(buf); r >= q+1; r--) {
+		    *(r+3-1) = *r;
+		}
+		strncpysbcs(q, "&gt", 3);
+		if (q < &buf[namePos])
+		    namePos += 3-1;
+	    }
+	}
+
+	if (namePos) {
+	    buf[namePos] = '\0';
+	    p = &buf[namePos+1];
+	} else {
+	    /* search from the end of the line to the first space. */
+	    while ((*p != ' ') && (p > buf)) {
+		p--;
+	    }
+	    if (p > buf)
+	    {
+		*(p++) = '\0';
+	    }
+	}
+
+        if ( p >= buf ) {
+
+            if (LocalCmpStringsNoCaseSBCS(p, "found", 5))
+            {
+		q = strstrsbcs(p, " -&gt ");
+		if (q) {
+		    /* remove link info from HREF */
+		    *q = '\0';
+		    r = q+6;
+		}
+                if ( p > buf ) {
+                    fputs(buf, fp2);
+                }
+                fputs(" <A HREF=\"", fp2);
+                fputs( (char *)url, fp2 );
+                fputs(p, fp2);
+                fputs("\">", fp2);
+                fputs(p, fp2);
+		if (q) {
+		    /* show link info in listing */
+		    fputs(" -&gt ", fp2);
+		    fputs(r, fp2);
+		}
+                fputs("</A><BR>\n", fp2);
+            }
+            else
+            {
+                fputs(buf, fp2);
+                fputs(" ", fp2);
+                fputs(p, fp2);
+            }
+        }
+    }
+    fputs( "</PRE></BODY></HTML>\n", fp2);
+    fclose(fp1);
+    fclose(fp2);
+    FileDelete(tname);
+#ifdef DO_DBCS
+    MemFree(urlBuf);
+#endif
+    return URLRequestMakeRet(URL_RET_FILE) | URB_RF_NOCACHE;
+}
+
+
+
+/***************************************************************************
+    GetIpAddress
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Get's the IP address used for a specific socket.
+
+    Note: I have no clue what is returned, if this socket doesn't
+          belog to an TCP/IP connection.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-04-28  GerdB     Initial version.
+
+***************************************************************************/
+SocketError
+GetIpAddress( Socket sock, dword *ipAddr )
+{
+    /* This should move somewhere else, but is used only internally. */
+    typedef struct {
+        SocketAddress       IAS_sa;
+        dword               IAS_ip;
+    } IpAddressStruct;
+
+    SocketError error;
+    IpAddressStruct addr;
+    TCHAR   domain[ 10 ];
+
+    addr.IAS_sa.SA_domainSize   = sizeof( domain );
+    addr.IAS_sa.SA_domain       = domain;
+    addr.IAS_sa.SA_addressSize  = sizeof( dword );
+    addr.IAS_ip = 0;
+
+    error = SocketGetSocketName( sock, &addr.IAS_sa );
+
+    *ipAddr = addr.IAS_ip;
+
+    return error;
+
+} /* GetIpAddress */
+
+
+
+/***************************************************************************
+    FtpGet
+----------------------------------------------------------------------------
+  DESCRIPTION:
+    Downloads a file given by its URL from an FTP site.  If the file could
+    not be found, a directory list is returned.  This list is already
+    properly formated in HTML to allow download.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-04-28  GerdB     Initial version.
+
+***************************************************************************/
+TCHAR userpwd[URL_MAX_USERNAME+URL_MAX_PASSWORD+2];
+TCHAR pathbuf[HTML_STATIC_BUF], *pathP ;
+    Socket    dataSock = 0;
+    Socket    listenSock = 0;
+
+#define CL_UNKNOWN 0x7fffffffL          /* largest int, in case CL unknown */
+
+word FtpGet(
+    TCHAR *url,
+    TCHAR *file,
+    TCHAR *mimeType,
+    optr *msg,
+    TCHAR *errBuf,
+    dword token,
+    proc_URLDrvCallback *callback )
+{
+    TCHAR     type[URL_MAX_TYPE+1], host[URL_MAX_SERVER+1] ;
+    typedef enum {
+        FS_CONNECT = 0,
+        FS_FTP_INIT,
+        FS_SEND_USERNAME,
+        FS_SEND_PASSWORD,
+        FS_SEND_ACCOUNT,
+        FS_TRY_OTHER_USERPWD,
+        FS_SEND_TYPE,
+        FS_SEND_PORT,
+        FS_SEND_RETRIEVE,
+	FS_SEND_CWD,
+        FS_SEND_LIST,
+        FS_RETRIEVE_DATA
+    } FtpStatus;
+
+    int       i;
+    long      length, contentlength = CL_UNKNOWN;
+    TCHAR      *host2, *p, *q;
+    FileHandle output;
+    SocketError err;
+    word      rcode = 0;
+    word      size;
+    Boolean   gotPassword = FALSE ;
+    Boolean   doList = FALSE;
+    Boolean   isSend = FALSE;
+//    SocketPort  listenPort = { 0x2020, MANUFACTURER_ID_SOCKET_16BIT_PORT };
+    byte        ipAddr[ 4 ];
+    char    answer = '\0';
+    TCHAR*   username = 0;
+    TCHAR*   password = 0;
+    FtpStatus   ftpState;
+#ifdef RECV_SPEED
+    TCHAR     statusBuffer[80];
+    long      bytesPerSec = 0;
+    dword     startTime;
+#endif
+
+    dataSock = 0 ;
+    listenSock = 0 ;
+
+    *userpwd = 0;                       /* default: no user name/password */
+
+    *errBuf = 0;                        /* default: no error message */
+
+    ++listenPort.SP_port;
+
+    *mimeType = 0;                      /* MIME type is unknown */
+
+    if (!NamePoolInitializeDynamic(pathbuf, sizeof(pathbuf), 0, &pathP))
+	return URLRequestMakeRet(URL_RET_NO_MEMORY) | URB_RF_NOCACHE;
+                                        /* may add slash at end */
+    if (!NamePoolResizeDynamic(&pathP, (strlen(url)+1)*sizeof(TCHAR))) {
+	NamePoolDestroyIfDynamic(pathP);
+	return URLRequestMakeRet(URL_RET_NO_MEMORY) | URB_RF_NOCACHE;
+    }
+
+    ToolsParseURL(url, type, host, pathP);
+
+    /* try to split username/password from host name */
+    p = strchr(host, '@');
+    if( p )                             /* host name contains user ID? */
+    {
+      *p = 0;
+      host2 = p+1;                      /* host name starts after "@" sign */
+
+      xstrncpy(userpwd, host, sizeof(userpwd));
+                                        /* get username and/or password */
+
+      ToolsMakeURL(type, host2, pathP, url);
+                                        /* reassemble URL (passwords removed) */
+
+      /* Note that we have gotten a password */
+      gotPassword = TRUE ;
+    }
+    else  {
+      host2 = host;                     /* use entire host name */
+    }
+
+    if(!InitFileReadStringBuffer("HTMLView", "FTPProxy", (TCHAR *)buffer,
+                                 IFRF_FIRST_ONLY | URL_MAX_SERVER, &size))
+    {
+      strcpy(host2 = host, buffer);
+      strcpy(pathP, url);               /* request entire URL from proxy */
+    }
+
+    /* try to split port number from host name */
+    p = strchr(host2, ':');
+    if(p)
+    {
+      hostaddr.RTA_sock.SA_port.SP_port = atoi(p+1);
+      *p = 0;
+    }
+    else
+      hostaddr.RTA_sock.SA_port.SP_port = FTP;
+
+    /* store link info into raw address buffer */
+    hostname.UTA_link.TAPEA_linkSize =
+      sizeof(hostname.UTA_link.TAPEA_linkType) +
+      sizeof(hostname.UTA_link.TAPEA_accPntID);
+
+    /* TBD: currently, we hard code the use of access point #1. Must change. */
+    hostname.UTA_link.TAPEA_linkType = LT_ID;
+    hostname.UTA_link.TAPEA_accPntID = 1;
+
+    xstrncpy(hostname.UTA_ip, host2, MAX_IP_ADDR_STRING_LENGTH);
+
+    if(callback)
+      ((pcfm_URLDrvCallback *)ProcCallFixedOrMovable_pascal)(
+        LMemDeref(@StatusLocating), -1, -1, token, callback);
+
+    if(aborted) {                       /* abort signal during preparation? */
+      NamePoolDestroyIfDynamic(pathP);
+      return URLRequestMakeRet(URL_RET_ABORTED);
+    }
+
+    socketState = STATE_RESOLVING;
+    hostaddr.RTA_sock.SA_addressSize = SocketResolve(
+      HTTP_DOMAIN,
+      (byte*)&hostname, sizeof(hostname.UTA_link)+strlen(hostname.UTA_ip)*sizeof(TCHAR),
+      (byte*)&hostaddr.RTA_addr, sizeof(hostaddr.RTA_addr));
+
+    if(aborted) {                        /* abort signal? */
+      NamePoolDestroyIfDynamic(pathP);
+      return URLRequestMakeRet(URL_RET_ABORTED);
+    }
+
+    /* Note: ThreadGetError() sometimes incorrectly reports an error
+       after SocketResolve(), at least on the Yago. */
+    if (!hostaddr.RTA_sock.SA_addressSize /* || ThreadGetError() != SE_NORMAL */)
+    {
+      sprintf(errBuf, _TEXT("%d"), ThreadGetError());
+      *msg = @MsgResolveErr;
+      NamePoolDestroyIfDynamic(pathP);
+      return URLRequestMakeRet(URL_RET_MESSAGE) | URB_RF_NOCACHE;
+    }
+
+    /* convert URL back from URL-encoded format for all FTP commands */
+    /* DBCS TBD: shouldn't be done for DB code pages? */
+    p = q = pathP;
+    while (*p) {
+	if (*p == '%') {
+	    int c;
+	    p++;
+	    if (*p >= '0' && *p <= '9') {
+		c = (*p-'0') * 16;
+	    } else if (*p >= 'A' && *p <= 'F') {
+		c = ((*p-'A')+10) * 16;
+	    } else if (*p >= 'a' && *p <= 'f') {
+		c = ((*p-'a')+10) * 16;
+	    }
+	    p++;
+	    if (*p >= '0' && *p <= '9') {
+		c += *p-'0';
+	    } else if (*p >= 'A' && *p <= 'F') {
+		c += (*p-'A')+10;
+	    } else if (*p >= 'a' && *p <= 'f') {
+		c += (*p-'a')+10;
+	    }
+	    p++;
+	    *q++ = (char)c;
+	} else if (*p == '+') {
+	    *q++ = ' ';
+	    p++;
+	} else {
+	    *q++ = *p++;
+	}
+    }
+    *q = C_NULL;
+
+    ftpState = FS_CONNECT;
+
+    do {
+        isSend = FALSE;
+        switch ( ftpState )
+        {
+            case FS_CONNECT:
+            {
+                if(callback)
+                  ((pcfm_URLDrvCallback *)ProcCallFixedOrMovable_pascal)(
+                    LMemDeref(@StatusContacting), -1, -1, token, callback);
+
+                sock = SocketCreate(SDT_STREAM);
+		SocketSetIntSocketOption(sock, SO_RECV_BUF, RECV_BUFFER_SIZE);
+                socketState = STATE_FTP_REQUEST;
+                                        /* request is now starting */
+
+                err = SocketConnect( sock, (SocketAddress*)&hostaddr, HTTP_TIMEOUT );
+
+                if ( err != SE_NORMAL )
+                {
+                    sprintf( errBuf, _TEXT("%d"), err );
+                    *msg  = @MsgConnectErr;
+                    rcode = URLRequestMakeRet(URL_RET_MESSAGE) | URB_RF_NOCACHE;
+                } else {
+		    /* else, don't have a socket */
+		    isSend = TRUE;
+		}
+                ftpState = FS_FTP_INIT;
+                break;
+            }
+
+            case FS_FTP_INIT:
+            {
+                if(callback)
+                  ((pcfm_URLDrvCallback *)ProcCallFixedOrMovable_pascal)(
+                    LMemDeref(@StatusLogin), -1, -1, token, callback);
+
+                if( *userpwd )
+                {
+                    /* split password from username */
+                    username = userpwd;
+                    password = strchr( userpwd, ':');
+                    *password = 0;
+                    password++;
+                }
+                else
+                {
+                    /* Anonymous login. */
+                    username = _TEXT("anonymous");
+                    password = _TEXT("-www_lx\x40");
+                }
+                ftpState = FS_SEND_USERNAME;
+                break;
+            }
+
+            case FS_SEND_USERNAME:
+            {
+#ifdef DO_DBCS
+                sock_printf( sock, "USER %S\r\n", username );
+#else
+                sock_printf( sock, "USER %s\r\n", username );
+#endif
+                ftpState = FS_SEND_PASSWORD;
+		if ( sock_getline( sock, buffer, BUFFER_SIZE ) <= 0 )
+		{
+		    *msg  = @MsgNoResponse;
+		    rcode = URLRequestMakeRet(URL_RET_MESSAGE) | URB_RF_NOCACHE;
+		}
+		answer = buffer[ 0 ];
+		break;
+	    }
+
+            case FS_SEND_PASSWORD:
+            {
+                if ( '3' == answer ) {
+#ifdef DO_DBCS
+                    sock_printf( sock, "PASS %S\r\n", password );
+#else
+                    sock_printf( sock, "PASS %s\r\n", password );
+#endif
+                    ftpState = FS_SEND_ACCOUNT;
+                    if ( sock_getline( sock, buffer, BUFFER_SIZE ) <= 0 )
+                    {
+                        *msg  = @MsgNoResponse;
+                        rcode = URLRequestMakeRet(URL_RET_MESSAGE) | URB_RF_NOCACHE;
+                    }
+                    answer = buffer[ 0 ];
+                }
+                else if ( '2' == answer ) {
+                    ftpState = FS_SEND_TYPE;
+                }
+                else {
+                    ftpState = FS_TRY_OTHER_USERPWD;
+                }
+                break;
+
+            }
+
+            case FS_SEND_ACCOUNT:
+            {
+                if ( '2' == answer ) {
+                    ftpState = FS_SEND_TYPE;
+                }
+                else if ( '3' == answer ) {
+                    /* Account needed, but we don't handle that, so
+                       return error. */
+                    *msg = @MsgAccountNotSupported;
+                    rcode = URLRequestMakeRet(URL_RET_MESSAGE) | URB_RF_NOCACHE;
+                }
+                else {
+                    ftpState = FS_TRY_OTHER_USERPWD;
+                }
+                break;
+            }
+
+            case FS_TRY_OTHER_USERPWD:
+            {
+                /* Login failed. */
+                sock_printf(sock, "QUIT\r\n" );
+                SocketMyClose( sock, &G_sockFlag );
+                sock = NULL ;
+                ftpState = FS_CONNECT;
+
+                if ( !gotPassword )
+                {
+                    /* Try last password. */
+                    strcpy( userpwd, G_userpwd );
+                    gotPassword = TRUE;
+                }
+                /* Let's ask for a username and password */
+                else if ( GetUserPassword( host2, G_userpwd ))  {
+                    strcpy( userpwd, G_userpwd );
+                }
+                else
+                {
+                    *msg = @MsgNoLoginSupported;
+                    rcode = URLRequestMakeRet(URL_RET_MESSAGE) | URB_RF_NOCACHE;
+                }
+                break;
+            }
+
+            case FS_SEND_TYPE:
+            {
+                if(callback)
+                  ((pcfm_URLDrvCallback *)ProcCallFixedOrMovable_pascal)(
+                    LMemDeref(@StatusRequest), -1, -1, token, callback);
+
+                sock_printf(sock, "TYPE I\r\n", pathP );
+                ftpState = FS_SEND_PORT;
+                isSend = TRUE;
+                break;
+            }
+
+            case FS_SEND_PORT:
+            {
+                GetIpAddress( sock, (dword*)&ipAddr );
+                sock_printf(sock, "PORT %d,%d,%d,%d,%d,%d\r\n",
+                                ipAddr[ 0 ], ipAddr[ 1 ],
+                                ipAddr[ 2 ], ipAddr[ 3 ],
+                                ( listenPort.SP_port >> 8 ) & 0xff,
+                                listenPort.SP_port & 0xff );
+                ftpState = FS_SEND_RETRIEVE;
+                isSend = TRUE;
+                break;
+            }
+
+            case FS_SEND_RETRIEVE:
+            {
+                SocketCheckRequest  requests[ 2 ];
+                int     activeSock;
+
+                listenSock = SocketCreate( SDT_STREAM );
+                if ( SE_NORMAL != SocketBind( listenSock, listenPort, 0 )
+                  || SE_NORMAL != SocketListen( listenSock, 1 ) )
+                {
+                    SocketMyClose( listenSock, &G_listenSockFlag );
+                    listenSock = NULL ;
+                    ++listenPort.SP_port;
+                    ftpState = FS_SEND_PORT;
+                    break;
+                }
+
+                requests[ 0 ].SCR_socket    = listenSock;
+                requests[ 0 ].SCR_condition = SC_ACCEPT;
+                requests[ 0 ].SCR_reserved  = 0;
+                requests[ 1 ].SCR_socket    = sock;
+                requests[ 1 ].SCR_condition = SC_READ;
+                requests[ 1 ].SCR_reserved  = 0;
+
+#ifdef DO_DBCS
+                sock_printf(sock, "RETR %S\r\n", pathP );
+#else
+                sock_printf(sock, "RETR %s\r\n", pathP );
+#endif
+
+                activeSock = SocketCheckReady( requests, 2, HTTP_TIMEOUT );
+                if ( activeSock == 0 )
+                {
+                    /* Our listenSock has something to accept. */
+                    dataSock = SocketAccept( listenSock, HTTP_TIMEOUT );
+                    ftpState = FS_RETRIEVE_DATA;
+                }
+                else if ( activeSock == 1 )
+                {
+                        /* Assume file could not be found, and try to
+                           get a directory. */
+                        ftpState = FS_SEND_CWD;
+                }
+                if ( sock_getline( sock, buffer, BUFFER_SIZE ) <= 0 )
+                {
+                    *msg  = @MsgNoResponse;
+                    rcode = URLRequestMakeRet(URL_RET_MESSAGE) | URB_RF_NOCACHE;
+                } 
+		else {
+		    if (FS_SEND_CWD == ftpState && strncmpsbcs(buffer, "150 ", 4)==0 ) {
+			dataSock = SocketAccept( listenSock, HTTP_TIMEOUT );
+			ftpState = FS_RETRIEVE_DATA;
+		    }
+		    if (FS_RETRIEVE_DATA == ftpState) {
+			/* We are downloading a file, so try to get length. */
+			char* s;
+			s = strrchrsbcs( buffer, '(' );
+			length = atol( s + 1 );
+			if ( 0 != length )
+			{
+			    contentlength = length;
+			}
+	            }
+                }
+                break;
+            }
+
+	    case FS_SEND_CWD:
+	    {
+		if (*pathP && pathP[(strlen(pathP)-1)]!='/') {
+		    /* append trailing slash if not root and none there */
+#ifdef DO_DBCS
+		    sock_printf(sock, "CWD %S/\r\n", pathP);
+#else
+		    sock_printf(sock, "CWD %s/\r\n", pathP);
+#endif
+		} else {
+#ifdef DO_DBCS
+		    sock_printf(sock, "CWD %S\r\n", pathP);
+#else
+		    sock_printf(sock, "CWD %s\r\n", pathP);
+#endif
+		}
+		if ( sock_getline( sock, buffer, BUFFER_SIZE ) <= 0 )
+		{
+		    *msg  = @MsgNoResponse;
+		    rcode = URLRequestMakeRet(URL_RET_MESSAGE)|URB_RF_NOCACHE;
+		}
+		if (buffer[0] == '4' || buffer[0] == '5') {
+		    /* couldn't CD, directory doesn't exist */
+		    strcpy(errBuf, buffer);
+		    *msg = @MsgRequestErr;
+		    rcode = URLRequestMakeRet(URL_RET_MESSAGE)|URB_RF_NOCACHE;
+		}
+		ftpState = FS_SEND_LIST;
+		break;
+	    }
+
+            case FS_SEND_LIST:
+            {
+                SocketCheckRequest  requests[ 2 ];
+                int     activeSock;
+		int retries = 5;
+
+                requests[ 0 ].SCR_socket    = listenSock;
+                requests[ 0 ].SCR_condition = SC_ACCEPT;
+                requests[ 0 ].SCR_reserved  = 0;
+                requests[ 1 ].SCR_socket    = sock;
+                requests[ 1 ].SCR_condition = SC_READ;
+                requests[ 1 ].SCR_reserved  = 0;
+
+// **** THIS SHOULD CHANGE, CAN'T DEFAULT TO USER'S HOME DIR WITH / APPENDED!!
+                
+                if ( pathP[ strlen( pathP ) - 1 ] != '/') {
+                    strcat( pathP, _TEXT("/") );
+                }
+#if 0
+#ifdef DO_DBCS
+                sock_printf(sock, "LIST %S\r\n", pathP );
+#else
+                sock_printf(sock, "LIST %s\r\n", pathP );
+#endif
+#else
+		/* no need to argument since we already did a CWD */
+		sock_printf(sock, "LIST\r\n");
+#endif
+
+		retries = 5;
+retry:
+                activeSock = SocketCheckReady( requests, 2, HTTP_TIMEOUT );
+                if ( activeSock == 0 )
+                {
+                    /* Our listenSock has something to accept. */
+                    dataSock = SocketAccept( listenSock, HTTP_TIMEOUT );
+                    doList = TRUE;
+
+                    ftpState = FS_RETRIEVE_DATA;
+                }
+		else if ( activeSock == 1 && retries )
+		{
+		    /* try once more */
+		    TimerSleep(10);
+		    retries--;
+		    goto retry;
+		}
+                /* else we received an error, which will be handled
+                   by "if ( isSend )" later in this code. */
+
+                isSend = TRUE;
+                break;
+            }
+
+            case FS_RETRIEVE_DATA:
+            {
+                /*
+                   we wait until the last moment to open the output file
+                   if any specified so that we won't overwrite the file
+                   in case of error in contacting server
+                */
+
+#ifdef RECV_SPEED
+		startTime = TimerGetCount();
+#endif
+                output = FileCreate(file, (FILE_CREATE_TRUNCATE | FCF_NATIVE)
+                                          | (FILE_ACCESS_RW | FILE_DENY_RW), 0);
+
+                rcode = URLRequestMakeRet(URL_RET_FILE);
+
+                if (output)
+                {
+                    word error = 0;
+                    length = 0L;
+                    i = 0;
+
+		    /* if not directory list, report dummy mime-type,
+		       in case client wants to use it */
+		    if (!doList && callback) {
+			((pcfm_URLDrvCallback *)ProcCallFixedOrMovable_pascal)(
+			    _TEXT("*/*"), -1, -1, token, callback);
+		    }
+
+                    do {
+                        if(i)           /* already got some data? write it */
+                        {
+                            if(FileWrite(output, buffer, i, FALSE) != i)
+                            {           /* report error if write fails */
+                                rcode = URLRequestMakeRet(URL_RET_MESSAGE) | URB_RF_NOCACHE;
+                                *msg = @MsgFileError;
+                                break;
+                            }
+                            length += i;
+                        }
+
+#ifdef RECV_SPEED
+			strcpy(statusBuffer, LMemDeref(@StatusReceiving));
+			if ((TimerGetCount() - startTime + 1) > 30) {
+			    bytesPerSec = 60*length/(TimerGetCount() -
+						     startTime + 1);
+			    if (bytesPerSec < 1023) {
+				sprintf(&(statusBuffer[strlen(statusBuffer)]),
+					_TEXT(" (%ld b/s)"), bytesPerSec);
+			    } else {
+				sprintf(&(statusBuffer[strlen(statusBuffer)]),
+					_TEXT(" (%ld.%ld Kb/s)"), (bytesPerSec/1024),
+					(bytesPerSec-((bytesPerSec/1024)*1024))/103);
+			    }
+			}
+#endif
+
+                        if(callback)    /* notify caller of progress */
+                        {
+                            ((pcfm_URLDrvCallback *)ProcCallFixedOrMovable_pascal)(
+#ifdef RECV_SPEED
+			      statusBuffer, length,
+#else
+                              LMemDeref(@StatusReceiving), length,
+#endif
+                              (contentlength==CL_UNKNOWN)? -1:contentlength, token,
+                              callback);
+                        }
+
+                        i = SocketRecv(dataSock, buffer, BUFFER_SIZE,
+                                       HTTP_TIMEOUT, 0, NULL);
+                        if (i == 0)
+                            error = ThreadGetError();
+
+                    } while ((!aborted) && i > 0);
+
+                    /* No content, but some error message: return it */
+                    if(!length && *msg)
+                      rcode = URLRequestMakeRet(URL_RET_MESSAGE) | URB_RF_NOCACHE;
+
+                    if(aborted)         /* abort signal? */
+                      rcode = URLRequestMakeRet(URL_RET_ABORTED);
+                    else if(i==0 && error != SE_CONNECTION_CLOSED)
+                    {                   /* No data received because of error */
+                      *msg = @MsgReceiveErr;
+                      rcode = URLRequestMakeRet(URL_RET_MESSAGE) | URB_RF_NOCACHE;
+                    }
+
+                    FileClose(output, FALSE);
+                }
+
+                if ( doList ) {
+                    rcode = ftp_list( pathP, file, msg );
+                    strcpy(mimeType,_TEXT("text/html"));
+                }
+                break;
+            }
+
+        } /* switch ftpState */
+
+        if ( isSend )
+        {
+	    if ( sock_getline( sock, buffer, BUFFER_SIZE ) <= 0 )
+	    {
+		*msg  = @MsgNoResponse;
+		rcode = URLRequestMakeRet(URL_RET_MESSAGE) | URB_RF_NOCACHE;
+	    }
+	    answer = buffer[ 0 ];
+	    if (( '4' == answer ) || ( '5' == answer ))
+            {
+                /* A serious error occured, so return it. */
+                strcpy(errBuf, buffer);
+                *msg = @MsgRequestErr;
+                rcode = URLRequestMakeRet(URL_RET_MESSAGE) | URB_RF_NOCACHE;
+            }
+        }
+
+        if ( rcode || aborted )         /* exit code or abort signal? */
+        {
+            if(callback)                /* notify caller of progress */
+            {                           /* (closing may also take a while) */
+              ((pcfm_URLDrvCallback *)ProcCallFixedOrMovable_pascal)(
+                LMemDeref(@StatusClosing), -1, -1, token, callback);
+            }
+
+	    if (sock) {
+		sock_printf(sock, "QUIT\r\n" );
+		if ( 0 != dataSock ) {
+		    SocketMyClose( dataSock, &G_dataSockFlag );
+		    dataSock = NULL ;
+		}
+		if ( 0 != listenSock ) {
+		    SocketMyClose( listenSock, &G_listenSockFlag );
+		    listenSock = NULL ;
+		}
+		SocketMyClose( sock, &G_sockFlag );
+		sock = NULL ;
+	    }
+
+            if( aborted )
+            {
+               rcode = URLRequestMakeRet(URL_RET_ABORTED);
+            }
+
+            return rcode;                       /* pass back return data type */
+        }
+    } while ( TRUE );
+
+    NamePoolDestroyIfDynamic(pathP);
+
+    return rcode ;
+}
+
+#pragma argsused
+word _pascal _export URLDrvMain(_URLMainParams_)
+{
+    word rcode;
+    optr msg = 0;
+    TCHAR mimeBuf[MIME_MAXBUF];
+    URLRequestBlock *req;
+    ChunkHandle urlChunk, mimeChunk;
+
+    /* Grab the FTP semaphore */
+    ThreadPSem(G_sync) ;
+
+    G_sockFlag = G_listenSockFlag = G_dataSockFlag = FALSE ;
+
+    G_abortState = URL_ABORT_STATE_NORMAL ;
+
+    /* TBD: this should be done using a timed semaphore */
+    if(socketState != STATE_UNCONNECTED)  {
+      ThreadVSem(G_sync) ;
+      return URLRequestMakeRet(URL_RET_INSTANCE_LIMIT);
+                                        /* driver cannot be re-entered */
+    }
+
+    socketState = STATE_PREPARING;      /* we have an operation going on */
+    aborted = FALSE;                    /* not aborted yet */
+
+    buffer = malloc(BUFFER_SIZE);       /* allocate memory for buffer */
+    if(!buffer)                         /* out of memory? */
+    {
+      socketState = STATE_UNCONNECTED;
+      ThreadVSem(G_sync) ;
+      return URLRequestMakeRet(URL_RET_NO_MEMORY);
+                                        /* signal error */
+    }
+
+#ifdef LOGFILE
+    FilePushDir();
+    FileSetCurrentPath( SP_DOCUMENT, _TEXT(".") );
+    logFile = FileCreate( _TEXT("ftplog.txt"), ( FILE_CREATE_NO_TRUNCATE | FCF_NATIVE | FILE_ACCESS_RW ), 0 );
+    FilePos( logFile, 0, FILE_POS_END );
+    FilePopDir();
+#endif
+
+    req = MemLock(request);
+    req->URB_message = NullOptr;
+
+    /* perform request after locking frequently used message resource */
+    MemLock(OptrToHandle(@StatusLocating));
+    rcode = FtpGet(
+      LMemDerefHandles(request, req->URB_url),
+      LMemDerefHandles(request, req->URB_file), &mimeBuf,
+      &msg, errBuf, req->URB_token, req->URB_progress);
+    MemUnlock(OptrToHandle(@StatusLocating));
+
+#ifdef LOGFILE
+    FileWrite( logFile, "\r\n", 2, 0 );
+    FileClose( logFile, 0 );
+#endif
+
+    free(buffer);                       /* release buffer again */
+    socketState = STATE_UNCONNECTED;    /* free again */
+
+    /* Interpret the return values */
+    mimeChunk = 0;
+    if ((aborted) && (G_abortState ==
+         URL_ABORT_STATE_IGNORE_USER_INTERRUPT_MESSAGE))
+    {
+        /* Return a blank message */
+        req->URB_message = NullHandle ;
+        rcode = URLRequestMakeRet(URL_RET_MESSAGE) | URB_RF_NOCACHE ;
+    }
+    else
+    {
+        if(URLRequestGetRet(rcode) == URL_RET_MESSAGE)    
+        {                               /* error message */
+          req->URB_message = ToolsFormatMessage(msg, errBuf);
+        }
+        else if(URLRequestGetRet(rcode) == URL_RET_URL_REDIR)
+        {                               /* redirection to different URL */
+          urlChunk = req->URB_url;
+          LMemReAllocHandles(request, urlChunk, (strlen(errBuf)+1)*sizeof(TCHAR));
+          strcpy(LMemDerefHandles(request, urlChunk), errBuf);
+        }
+        else if(URLRequestGetRet(rcode) == URL_RET_FILE)
+        {
+          mimeChunk = LMemAlloc(request, (strlen(mimeBuf)+1)*sizeof(TCHAR));
+          strcpy(LMemDerefHandles(request, mimeChunk), mimeBuf);
+        }
+    }
+
+    /* Set up request buffer with return values. */
+    req = MemDeref(request);
+    req->URB_date = URL_TIME_UNKNOWN;   /* dates unknown */
+    req->URB_expireDate = URL_TIME_UNKNOWN;
+    req->URB_mimeType = mimeChunk;
+    req->URB_extraData = 0;
+    req->URB_errorCode = 0;
+    MemUnlock(request);                 
+
+    ThreadVSem(G_sync) ;
+    return rcode;                       /* pass back return data type */
+}
+
+/* Return TRUE if got flag */
+Boolean GrabFlag(Boolean *p_flag)
+{
+    Boolean retValue ;
+    /*TODO asm {
+       sti
+    }*/
+    if (*p_flag == FALSE)  {
+        *p_flag = TRUE ;
+        retValue = TRUE ;
+    } else {
+        retValue = FALSE ;
+    }
+    /* TODOasm {
+       cli
+    }*/
+
+    return retValue ;
+}
+
+#pragma argsused
+void _pascal _export URLDrvAbort(_URLAbortParams_)
+{
+    G_abortState = state ;
+    aborted = TRUE;                     /* flag: abort as quickly as possible */
+    if(socketState != STATE_UNCONNECTED)
+    {                                   /* are we doing something? */
+        if ((dataSock) && (GrabFlag(&G_dataSockFlag)))  {
+//            SocketCloseSend(dataSock) ;
+            SocketReset(dataSock) ;
+            G_dataSockFlag = FALSE ;
+        }
+        if ((sock) && (GrabFlag(&G_sockFlag)))  {
+//            SocketCloseSend(sock) ;
+            SocketInterrupt(sock);  /* SocketReset doesn't stop SocketConnect */
+            SocketReset(sock) ;
+            G_sockFlag = FALSE ;
+        }
+        if ((listenSock) && (GrabFlag(&G_listenSockFlag)))  {
+//            SocketCloseSend(listenSock) ;
+            SocketReset(listenSock) ;
+            G_listenSockFlag = FALSE ;
+        }
+        /* Don't see any harm in returning resolution interruption
+           functionality to the abort, as it appears to have been
+           accidentally commented out in the rewrite. DH 8/31/99 */
+        if (socketState == STATE_RESOLVING)
+        {
+          SocketInterruptResolve(       /* interrupt resolution of address */
+            HTTP_DOMAIN,
+            (byte*)&hostname, sizeof(hostname.UTA_link)+strlen(hostname.UTA_ip)*sizeof(TCHAR));
+        }
+#if 0
+/* TBD: have to abort both channels in FTP! */
+      switch(socketState)
+      {
+        case STATE_RESOLVING:           /* interrupt resolution of address */
+          SocketInterruptResolve(
+            HTTP_DOMAIN,
+            &hostname, sizeof(hostname.UTA_link)+strlen(hostname.UTA_ip));
+          break;
+        case STATE_FTP_REQUEST:        /* interrupt regular socket operation */
+          SocketInterrupt(sock);
+          break;
+      }
+#endif
+    }
+}
+
+char * _pascal _export URLDrvInfo(_URLInfoParams_)
+{
+    #define SCHEMES _TEXT("FTP\0")\
+                    _TEXT("\0")
+
+    /* Return list of supported schemes */
+    return memcpy(buf, SCHEMES, sizeof(SCHEMES));
+}
+
+void _pascal _export URLDrvFlush(void)
+{
+}
+
+void Initialize(void)
+{
+    G_sync = ThreadAllocSem(1) ;
+}
+
+void Deinitialize(void)
+{
+    ThreadFreeSem(G_sync) ;
+}
+
+#pragma argsused
+Boolean _pascal _export WMG3FTPEntry(LibraryCallType ty, GeodeHandle client)
+{
+     if (ty == LCT_ATTACH)
+          Initialize();
+     else if (ty == LCT_DETACH)
+          Deinitialize();
+
+     return FALSE;
+}

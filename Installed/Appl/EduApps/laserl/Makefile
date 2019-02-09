@@ -6,8 +6,8 @@
 GEODE           = laserl
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = LASERDB.GOC LASERL.GOC LASERDB.GOH OPTIONS.GOH
-OBJS            = LASERDB.obj LASERL.obj
+SRCS            = laserdb.goc laserl.goc options.goh laserdb.goh
+OBJS            = laserdb.obj laserl.obj
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk

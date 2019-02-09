@@ -1,0 +1,2889 @@
+/***********************************************************************
+ *
+ *                          ==CONFIDENTIAL INFORMATION==
+ *
+ * COPYRIGHT 1994-99 BREADBOX COMPUTER COMPANY -- ALL RIGHTS RESERVED  --
+ * THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER
+ * A NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ * RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ * NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ * CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ * AGREEMENT.
+ *
+ * PROJECT:       HTMLView
+ * FILE:          HTMLTPOS.GOC -- Post processing for tables
+ *
+ * AUTHOR:        Lysle Shields
+ *
+ ***********************************************************************/
+@include <stdapp.goh>
+@include <Objects/Text/tCtrlC.goh>
+
+#include <Ansi/string.h>
+#include <Ansi/stdio.h>
+#include <Ansi/stdlib.h>
+
+@include <fixes.goh>
+@include "options.goh"
+@include <html4par.goh>
+@include <initfile.h>
+
+#include "regiont.h"
+#include "internal.h"
+#include "errors.h"
+#include "tableint.h"
+
+#pragma codeseg HTMLTCEL_INIT_TEXT
+
+/* "-dc" causes vptrs for text constants if different code segments are used */
+#pragma option -dc-
+
+void ISetupRegionLinks(T_cellArrayHandle cellArray, T_regionArrayHandle regionArray) ;
+
+typedef struct {
+    Rectangle rect ;
+    word yStart ;
+    word xLeft ;
+} T_regionStart ;
+
+/* Store the width of the scroll bar here.  It is calculated directly */
+/* from the GenValue attached to a GenView to be accurate.  However, this */
+/* can be overridden with a UI setting */
+word G_widthOfScrollBar = 0 ;
+word G_invalArea = PROGRESSIVE_FORMATTING_MINIMUM_UPDATE_HEIGHT ;
+
+@ifdef IN_PLACE_TEXT_ENTRY
+extern void FormElementUpdateTextEntryPos(optr urlTextObj);
+@endif
+
+void ProfPointRoutine(char *str)
+{
+    static word lastTime = 0 ;
+    static FileHandle file = NullHandle ;
+    word time ;
+
+    time = TimerGetCount() ;
+
+    if (lastTime != time)  {
+        if (file == NullHandle)  {
+            FilePushDir() ;
+            FileSetStandardPath(SP_DOCUMENT) ;
+            FileDelete("profile.log") ;
+            file = FileCreate("profile.log", FILE_CREATE_NO_TRUNCATE|FCF_NATIVE|(FILE_DENY_NONE|FILE_ACCESS_W), FILE_ATTR_NORMAL) ;
+            lastTime = time ;
+            FilePopDir() ;
+            return ;
+        }
+        if (file)  {
+            fprintf(file, "%5d %s\r\n", time-lastTime, str) ;
+        }
+        lastTime = time ;
+    }
+}
+
+/**************************************************************************
+ * Routine: ICalculateViewSize
+ **************************************************************************
+ *
+ * Description:
+ *     Determine the full width of the view as if there is no scroll bar.
+ *     At the same time, determine height of the view.
+ *
+ * Inputs:
+ *     optr view                  -- View to calculate upon
+ *     dword *p_viewHeight        -- Returned height of view.  May be zero
+ *                                   if view is not ready.
+ *
+ * Outputs:
+ *     word                       -- full width of view
+ *
+ * Revision:
+ *     Who  Date:     Comments:
+ *     ---  --------  --------------------
+ *     LES  00/01/19  Created.
+ *
+ **************************************************************************/
+word  ICalculateViewSize(optr view, dword *p_viewHeight)
+{
+    RectDWord bounds ;
+    RectDWord visible ;
+    word viewWidth ;
+    dword viewEnd ;
+    GetScaleParams scaleFactor ;
+    WWFixedAsDWord scrollbarWidth ;
+    WWFixedAsDWord onepixelWidth ;
+
+    optr child ;
+    Rectangle childBounds ;
+
+    if (G_widthOfScrollBar == 0)  {
+        if (InitFileReadInteger("HTMLView", "scrollbarWidth", &G_widthOfScrollBar))  {
+            child = @call view::MSG_VIS_FIND_CHILD_AT_POSITION(0) ;
+            if (child)  {
+                @call child::MSG_VIS_GET_BOUNDS(&childBounds);
+                G_widthOfScrollBar = childBounds.R_right - childBounds.R_left ;
+                G_widthOfScrollBar-- ;
+		/* Add in scrollbar margin. 4 for Motif, 0 for NewUI. Check
+		   pcgeos/library/specui/commonui/cview/cviewConstant.def to
+		   see values. */
+		if (GeodeFind("motif   ", 8, GA_LIBRARY,
+			      GA_PROCESS | GA_DRIVER | GA_APPLICATION)) {
+		    G_widthOfScrollBar += 4;
+		}
+            }
+        }
+    }
+
+    /* Determine if we have a vertical scrollbar */
+    /* If we have one, the width plus the width of the scroll bar is the actual width */
+    /* If we don't have one, the width is the full width */
+    @call view::MSG_GEN_VIEW_GET_DOC_BOUNDS(&bounds) ;
+    @call view::MSG_GEN_VIEW_GET_VISIBLE_RECT(&visible) ;
+    viewEnd = *p_viewHeight = visible.RD_bottom - visible.RD_top ;
+    viewEnd += bounds.RD_top ;
+    viewWidth = visible.RD_right - visible.RD_left ;
+    if (viewWidth == 0)
+        viewWidth = DEFAULT_START_WIDTH ;
+    @call view::MSG_GEN_VIEW_GET_SCALE_FACTOR(&scaleFactor); 
+    if (bounds.RD_bottom >= viewEnd)  {
+        /* Have a scroll bar.  Determine the full width without the scrollbar */
+        scrollbarWidth = GrUDivWWFixed(
+                             MakeWWFixed(G_widthOfScrollBar), 
+                             scaleFactor.GSP_xScaleFactor) ;
+        if (FractionOf(scrollbarWidth))
+            scrollbarWidth += 65536 ;
+        viewWidth += IntegerOf(scrollbarWidth) ;
+    }
+
+    onepixelWidth = GrUDivWWFixed(
+                         MakeWWFixed(1.0), 
+                         scaleFactor.GSP_xScaleFactor) ;
+    if (FractionOf(onepixelWidth) > 0x8000)
+        onepixelWidth += 65536 ;
+
+    ProfPoint("ICalculateViewSize") ;
+
+    return viewWidth-IntegerOf(onepixelWidth) ;
+}
+
+dword IEdgesSkip(T_boundaryEdgeStack *p_edges, byte breakType)
+{
+    dword height = 0 ;
+    T_boundaryEdgeStackSide *p_side ;
+
+    /* Determine the tallest left */
+    if (breakType & HTML_CELL_BREAK_LEFT)  {
+        p_side = &p_edges->BES_sides[BOUNDARY_EDGE_LEFT] ;
+        if (p_side->BESS_count)
+            height = p_side->BESS_edgeArray[0].BE_height ;
+    }
+
+    /* Determine the tallest right */
+    if (breakType & HTML_CELL_BREAK_RIGHT)  {
+        p_side = &p_edges->BES_sides[BOUNDARY_EDGE_RIGHT] ;
+        if ((p_side->BESS_count) &&
+                (p_side->BESS_edgeArray[0].BE_height > height))
+            height = p_side->BESS_edgeArray[0].BE_height ;
+    }
+
+    /* Trim out that amount */
+    IEdgeTrim(p_edges, height) ;
+
+    ProfPoint("IEdgesSkip") ;
+
+    return height ;
+}
+
+
+dword IEdgeGetRemainingHeight(T_boundaryEdgeStack *p_edges)
+{
+    dword height = 0 ;
+    dword next ;
+
+    /* Determine highest left side */
+    if (p_edges->BES_sides[0].BESS_count)
+        height = p_edges->BES_sides[0].BESS_edgeArray[0].BE_height ;
+
+    /* Determine the highest right side */
+    if (p_edges->BES_sides[1].BESS_count)  {
+        next = p_edges->BES_sides[1].BESS_edgeArray[0].BE_height ;
+        if (next > height)
+            height = next ;
+    }
+
+    ProfPoint("IEdgeGetRemainingHeight") ;
+
+    return height ;
+}
+
+
+/* Create the path shape in the gstate for the given width */
+void IEdgeDrawPathInGState(
+         GStateHandle gstate,
+         T_boundaryEdgeStack *p_edges,
+         word fullWidth)
+{
+    T_boundaryEdgeStackSide *p_left, *p_right ;
+    word leftIndex, rightIndex ;
+    word leftX, rightX ;
+    dword leftHeight=0, rightHeight=0 ;
+    dword y ;
+    dword boxHeight ;
+    #define VALID_EDGE_INDEX(i)  (i+1)
+
+    /* Determine the left and right information */
+    p_left = &p_edges->BES_sides[BOUNDARY_EDGE_LEFT] ;
+    leftIndex = p_left->BESS_count-1 ;
+    p_right = &p_edges->BES_sides[BOUNDARY_EDGE_RIGHT] ;
+    rightIndex = p_right->BESS_count-1 ;
+
+    /* Now go through 'drawing' regions until we are no longer */
+    /* bound by a left or right edge */
+    y = 0 ;
+    while ((VALID_EDGE_INDEX(leftIndex)) || (VALID_EDGE_INDEX(rightIndex)))  {
+        /* Read in the left height if we are down to none (default case) */
+        if (!leftHeight)  {
+            if ((VALID_EDGE_INDEX(leftIndex)))  {
+                leftHeight = p_left->BESS_edgeArray[leftIndex].BE_height - y;
+            } else {
+                leftHeight = 0xFFFFFFFF ;
+            }
+        }
+
+        /* Read in the right height if we are down to none */
+        if (!rightHeight)  {
+            if (VALID_EDGE_INDEX(rightIndex))  {
+                rightHeight = p_right->BESS_edgeArray[rightIndex].BE_height - y;
+            } else {
+                rightHeight = 0xFFFFFFFF ;
+            }
+        }
+
+        /* Which is shorter?  We are describing a box for the path here. */
+        if (leftHeight < rightHeight)
+            boxHeight = leftHeight ;
+        else
+            boxHeight = rightHeight ;
+
+        /* Determine where the current edges are */
+        if (VALID_EDGE_INDEX(leftIndex))  {
+            leftX = p_left->BESS_edgeArray[leftIndex].BE_width ;
+        } else {
+            leftX = 0 ;
+        }
+        if (VALID_EDGE_INDEX(rightIndex))  {
+            rightX = fullWidth - p_right->BESS_edgeArray[rightIndex].BE_width ;
+        } else {
+            rightX = fullWidth ;
+        }
+
+        /* Ok, time to draw this part of the path */
+        if (leftX < rightX)
+            GrFillRect(gstate, leftX, y, rightX, y+boxHeight) ;
+
+        /* Move down */
+        y += boxHeight ;
+        EC_ERROR_IF(y >= 0x80000000, ERROR_Y_COORDINATE_UNREASONABLY_BIG) ;
+
+        /* Now subtract out the space and move through the indexes */
+        leftHeight -= boxHeight ;
+        if (!leftHeight)
+            leftIndex-- ;
+        rightHeight -= boxHeight ;
+        if (!rightHeight)
+            rightIndex-- ;
+    }
+
+    /* Do a final edge down the rest of the region at full width */
+    if (y < MAX_REGION_HEIGHT)
+        GrFillRect(gstate, 0, y, fullWidth, MAX_REGION_HEIGHT) ;
+
+    ProfPoint("IEdgeDrawPathInGState") ;
+}
+
+/* Create a path for the given edges into the given region */
+Boolean IEdgeCreatePathInRegion(
+             T_boundaryEdgeStack *p_edges,
+             VMFileHandle file,
+             T_regionArrayHandle regArray,
+             word regionIndex,
+             word fullWidth)
+{
+    GStateHandle gstate ;
+    MemHandle regionMem ;
+    void *p_path ;
+    void *p_path2 ;
+    DBGroupAndItem path ;
+    VisLargeTextRegionArrayElement *p_region ;
+    word size ;
+    word size2 ;
+    word dummy ;
+    Boolean regionChanged = FALSE ;
+
+    EC_ERROR_IF(
+        regionIndex >= RegionArrayGetCount(regArray),
+        ERROR_REGION_INDEX_OUT_OF_RANGE) ;
+
+    /* Determine if we need a path or not */
+    if ((p_edges->BES_sides[0].BESS_count) ||
+            (p_edges->BES_sides[1].BESS_count))  {
+
+
+        /* Draw a path using the graphics system */
+        gstate = GrCreateState(0) ;
+        GrBeginPath(gstate, PCT_REPLACE) ;
+        IEdgeDrawPathInGState(gstate, p_edges, fullWidth) ;
+        GrEndPath(gstate) ;
+
+        /* Get that path into a memory block */
+        regionMem = GrGetPathRegion(gstate, ODD_EVEN) ;
+        GrDestroyState(gstate) ;
+	if (regionMem) {
+        size = MemGetInfo(regionMem, MGIT_SIZE) ;
+
+        /* Copy the memory block into a db item */
+        path = DBAllocUngrouped(file, size);
+        DBInfoUngrouped(file, path, &size2) ;
+        p_path = DBLockUngrouped(file, path);
+        memset(p_path, 0, size2) ;
+        MemLock(regionMem) ;
+        memcpy(p_path, MemDeref(regionMem), size) ;
+
+        /* Ensure that we 'cover' the start of the region at from y 0 */
+        /* otherwise the text library gets confused. */
+        ((T_regionStart *)p_path)->yStart = 0 ;
+
+        /* Is this region any different than the original one? */
+        /* Get the old region */
+        RegionLock(regArray, regionIndex, &p_region, &dummy) ;
+        if (p_region->VLTRAE_region)  {
+            DBInfoUngrouped(file, p_region->VLTRAE_region, &size2) ;
+            if (size == size2)  {
+                p_path2 = DBLockUngrouped(file, p_region->VLTRAE_region) ;
+                if (memcmp(p_path, p_path2, size) != 0)
+                    regionChanged = TRUE ;
+                DBUnlock(p_path2) ;
+            } else {
+                regionChanged = TRUE ;
+            }
+        } else {
+            regionChanged = TRUE ;
+        }
+        RegionUnlock(p_region) ;
+
+        MemUnlock(regionMem) ;
+        MemFree(regionMem) ;
+        DBDirty(p_path) ;
+        DBUnlock(p_path) ;
+	} else {
+	    path = NullHandle;
+	}
+    } else {
+        /* NO edges, no path */
+        path = NullHandle ;
+    }
+
+    /* Reference the region to the new dbitem */
+    /* (after deleting the old one) */
+    RegionLock(regArray, regionIndex, &p_region, &size) ;
+    if (p_region->VLTRAE_region)
+        DBFreeUngrouped(file, p_region->VLTRAE_region) ;
+    p_region->VLTRAE_region = path ;
+    RegionDirty(p_region) ;
+    RegionUnlock(p_region) ;
+
+    ProfPoint("IEdgeCreatePathInRegion") ;
+
+    return regionChanged ;
+}
+
+
+
+/* Do the real work of trimming, but only one side */
+void IEdgeSideTrim(T_boundaryEdgeStackSide *p_side, dword height)
+{
+    word i ;
+    T_boundaryEdge *p_edge ;
+
+    /* Go through the list and cut down the edges.  If you find an */
+    /* edge that is shorter than the height, then we have reached */
+    /* the limit and don't have to go further ... the rest are all */
+    /* shorter and need to be deleted -- do this by storing the */
+    /* new (shorter) count */
+    for (i=0, p_edge=p_side->BESS_edgeArray;
+             i<p_side->BESS_count;
+                 i++, p_edge++)  {
+        if (p_edge->BE_height <= height)
+            break ;
+        p_edge->BE_height -= height ;
+    }
+    p_side->BESS_count = i ;
+    ProfPoint("IEdgeSideTrim") ;
+}
+
+/* Remove a certain amount from the top */
+void IEdgeTrim(
+         T_boundaryEdgeStack *p_edges,
+         dword height)
+{
+    if (height)  {
+        IEdgeSideTrim(&p_edges->BES_sides[BOUNDARY_EDGE_LEFT], height) ;
+        IEdgeSideTrim(&p_edges->BES_sides[BOUNDARY_EDGE_RIGHT], height) ;
+    }
+    ProfPoint("IEdgeTrim") ;
+}
+
+/**************************************************************************
+ * Routine:  ICellDetermineFirstRegion
+ **************************************************************************
+ *
+ * Description:
+ *     Convert a Cell index to its appropriate region index (well,
+ *     the first one).
+ *
+ * Inputs:
+ *     optr cellArray             -- Cell array to lookup
+ *     word cellNum               -- Cell to look for
+ *
+ * Outputs:
+ *     word                       -- Index to region.  If never found,
+ *                                   returns 0xFFFF
+ *
+ * Revision:
+ *     Who  Date:     Comments:
+ *     ---  --------  --------------------
+ *     LES  08/19/99  Created.
+ *
+ **************************************************************************/
+word ICellDetermineFirstRegion(T_cellArrayHandle cellArray, word cellNum)
+{
+    HTMLcellData *p_cell = NULL ;
+    word size ;
+    word region ;
+    word num ;
+
+    num = CellArrayGetCount(cellArray) ;
+
+    if (cellNum < num)  {
+        CellLock(cellArray, cellNum, &p_cell, &size) ;
+        if (p_cell)  {
+            region = p_cell->HCD_region ;
+            CellUnlock(p_cell) ;
+        } else {
+            region = 0xFFFF ;
+        }
+    } else {
+        region = 0xFFFF ;
+    }
+    ProfPoint("ICellDetermineFirstRegion") ;
+
+    return region ;
+}
+
+Boolean ILinesAdjustToNewWidth(
+            LineInfo *p_line,  /* first locked line */
+            word numLines,
+            word oldWidth,
+            word newWidth)
+{
+    word size ;
+    Boolean failed = FALSE ;
+    sword original ;
+
+    while (numLines)  {
+        EC_BOUNDS(p_line) ;
+        /* Make sure we have only one field */
+        /* If we don't, we need to stop here since it is past our ability */
+        if (p_line->LI_count.WAAH_low != p_line->LI_firstField.FI_nChars)  {
+            failed = TRUE ;
+            break ;
+        }
+
+        /* Are we not left justified? */
+        if (p_line->LI_adjustment)  {
+            /* Ok, are we not left justified */
+            /* Were we centered or right justified */
+            original = p_line->LI_adjustment ;
+            if ((p_line->LI_adjustment + p_line->LI_firstField.FI_width) == oldWidth)  {
+                /* Right justified */
+                /* Setup a new right justified size */
+                p_line->LI_adjustment = newWidth - p_line->LI_firstField.FI_width ;
+            } else {
+                /* Centered */
+                /* Setup a new centering */
+                if (newWidth > p_line->LI_firstField.FI_width)  {
+                    p_line->LI_adjustment = (newWidth - p_line->LI_firstField.FI_width)>>1 ;
+                } else {
+                    p_line->LI_adjustment = 0 ;
+                }
+            }
+            p_line->LI_lineEnd += p_line->LI_adjustment - original ;
+            HugeArrayDirty(p_line) ;
+        }
+
+        /* On to the next line */
+        if (--numLines)
+            HugeArrayNext((void**)&p_line, &size) ;
+    }
+
+    /* No longer need the line */
+    EC_BOUNDS(p_line) ;
+    HugeArrayUnlock(p_line) ;
+
+    ProfPoint("ILinesAdjustToNewWidth") ;
+
+    return failed ;
+}
+
+word RegionGetPathTopBound(
+         VMFileHandle file,
+         DBGroupAndItem path)
+{
+    word height = 0 ;
+    T_regionStart *p_path ;
+
+    /* IF there is a region, get the top boundary */
+    if (path)  {
+        p_path = (T_regionStart *)DBLockUngrouped(file, path);
+        height = p_path->rect.R_top ;
+        DBUnlock(p_path) ;
+    }
+
+    return height ;
+}
+
+#pragma codeseg HTMLTCEL_LAYOUT_TEXT
+
+/* "-dc" causes vptrs for text constants if different code segments are used */
+#pragma option -dc-
+
+/**************************************************************************
+ * Routine:  IRegionRepositionResizeAndReflow
+ **************************************************************************
+ *
+ * Description:
+ *     This routine is a the core of all reformatting of regions (besides
+ *     the big one at the beginning).  Its purpose is three fold
+ *         1) Place the region at a given location (32 bit coordinates)
+ *         2) Resize the region to a given width
+ *         3) Reflow the text within and determine a valid height
+ *            (trimming the region to that new height).
+ *     The returned height then can be used to chain regions together.
+ *
+ * Inputs:
+ *     optr oself                 -- Text object optr
+ *     word regionNum             -- Region to affect
+ *     sdword x, y                -- New coordinate location
+ *     word width                 -- Desired width of region
+ *     Boolean forcedRecalc       -- TRUE if we should ignore
+ *                                   any optimized pass (like shape
+ *                                   changed).
+ *
+ * Outputs:
+ *     word                       -- Returned height of new region
+ *
+ * Revision:
+ *     Who  Date:     Comments:
+ *     ---  --------  --------------------
+ *     LES  08/19/99  Created.
+ *
+ **************************************************************************/
+word IRegionRepositionResizeAndReflow(
+         T_layoutStack *p_stack,
+         word regionNum,
+         sdword x,
+         sdword y,
+         word width,
+         Boolean forcedRecalc,
+         HTMLcellData *p_cell,
+         Boolean *didCalc)
+{
+    optr oself = p_stack->LS_textObj ;
+    HTMLTextInstance *pself = ObjDerefVis(oself) ;
+    T_regionArrayHandle regArray ;
+    VisLargeTextRegionArrayElement *p_region ;
+    VisTextRange range ;
+    word height ;
+    word i ;
+    dword maxLen ;
+    word size ;
+    Boolean sizeMatters ;
+    word oldWidth ;
+    dword lineIndex = 0 ;
+    LineInfo *p_firstLine ;
+    word longest ;
+    word firstRegion ;
+    word boundHeight ;
+
+    RegionPurgeCache(oself) ;
+    if (width < REGION_MINIMUM_WIDTH)
+	width = REGION_MINIMUM_WIDTH ;
+    if (width>MAXIMUM_COLUMN_WIDTH) {
+        width = MAXIMUM_COLUMN_WIDTH ;
+    }
+    regArray = RegionArrayConstruct(oself, pself) ;
+    EC_ERROR_IF(
+        width > MAXIMUM_COLUMN_WIDTH,
+        ERROR_TEXT_FORMATTING_GOT_NEGATIVE_WIDTH_FOR_REGION) ;
+    EC_ERROR_IF(
+        regionNum > RegionArrayGetCount(regArray),
+        ERROR_REGION_INDEX_OUT_OF_RANGE) ;
+    EC_ERROR_IF(
+        x < 0,
+        ERROR_REGION_SHOULD_NOT_BE_PLACED_ON_NEGATIVE_X) ;
+    EC_ERROR_IF(
+        y < 0,
+        ERROR_REGION_SHOULD_NOT_BE_PLACED_ON_NEGATIVE_Y) ;
+
+
+    if (width > MAXIMUM_COLUMN_WIDTH)
+        width = 800 ;
+
+    ProfPoint("IRegionRepositionResizeAndReflow--Start") ;
+    /* Determine the range of characters that make up that region */
+
+    /* Determine if we should start from the beginning or get */
+    /* the last cached location */
+    range.VTR_start=0 ;
+    firstRegion = 0 ;
+#if 1
+    if (p_stack->LS_lastSeekedRegion <= regionNum)  {
+        firstRegion = p_stack->LS_lastSeekedRegion ;
+        range.VTR_start = p_stack->LS_seekedChar ;
+        lineIndex = p_stack->LS_seekedLine ;
+    }
+#endif
+    RegionLock(regArray, firstRegion, &p_region, &size) ;
+    for (i=firstRegion; i<regionNum; i++)  {
+        range.VTR_start += p_region->VLTRAE_charCount ;
+        lineIndex += p_region->VLTRAE_lineCount ;
+        RegionNext(&p_region, &size) ;
+    }
+    RegionUnlock(p_region) ;
+
+    /* Cache this location */
+    p_stack->LS_lastSeekedRegion = regionNum ;
+    p_stack->LS_seekedChar = range.VTR_start ;
+    p_stack->LS_seekedLine = lineIndex ;
+
+    ProfPoint("IRegionRepositionResizeAndReflow--Seek") ;
+    RegionLock(regArray, regionNum, &p_region, &size) ;
+    range.VTR_end = range.VTR_start + p_region->VLTRAE_charCount-1 ;
+    maxLen = HugeArrayGetCount(pself->VTI_vmFile, (word) pself->VTI_text)-1 ;
+    if (range.VTR_end >= maxLen)
+        range.VTR_end = TEXT_ADDRESS_PAST_END ;
+
+    /* Fill in the new parameters for our region size */
+    EC_BOUNDS(p_region) ;
+    p_region->VLTRAE_size.XYS_height = MAX_REGION_HEIGHT ;
+    p_region->VLTRAE_spatialPosition.PD_x = x ;
+    p_region->VLTRAE_spatialPosition.PD_y = y | HTML_TEXT_REGION_HIDDEN_Y ;
+    RegionDirty(p_region) ;
+
+    /* Do we have to care about reformatting? */
+    longest = p_cell->HCD_longestLine + 1 ;
+    if ((p_region->VLTRAE_size.XYS_width < longest) || 
+            (width < longest))
+        sizeMatters = TRUE ;
+    else
+        sizeMatters = FALSE ;
+
+    /* If the cell is dirty we are forced to recalc */
+    if (p_cell->HCD_flags2 & HTML_CELL_DIRTY_LAYOUT_MASK)
+        forcedRecalc = TRUE ;
+
+    /* Now that we have everything setup, reformat just this section */
+    /* But only if we have changed widths (or are forced) */
+    if ((p_region->VLTRAE_size.XYS_width != width) || (forcedRecalc))  {
+        /* Only mark dirty if we have truly changed the flag */
+        if (p_cell->HCD_flags2 & HTML_CELL_DIRTY_LAYOUT_MASK)  {
+            if (!p_stack->LS_currentMasterCellGotImage)  {
+                p_cell->HCD_flags2 &= (~HTML_CELL_DIRTY_LAYOUT_MASK) ;
+                CellDirty(p_cell) ;
+            }
+        }
+        oldWidth = p_region->VLTRAE_size.XYS_width ;
+        p_region->VLTRAE_size.XYS_width = width ;
+
+        if (p_region->VLTRAE_charCount)  {
+	    /* Don't want to keep it in memory if we are going to move */
+	    /* things around. */
+            ProfPoint("IRegionRepositionResizeAndReflow--Pre") ;
+
+            /* Only recalc if we are forced or if size matters. */
+            /* (If we are going to a size where the longest line is not that big, we */
+            /*  can cheat and just ignore it). */
+            if ((sizeMatters) || (forcedRecalc))  {
+	        RegionUnlock(p_region) ;
+                @call oself::MSG_VIS_TEXT_INVALIDATE_RANGE(&range);
+            } else {
+                HugeArrayLock(
+                    pself->VTI_vmFile,
+                    pself->VTI_lines,
+                    lineIndex,
+                    (void**)&p_firstLine,
+                    &size) ;
+                if (ILinesAdjustToNewWidth(
+                        p_firstLine,
+                        p_region->VLTRAE_lineCount,
+                        oldWidth,
+                        width))  {
+                    /* Adjust failed.  Let's do the old fashion way */
+	            RegionUnlock(p_region) ;
+                    @call oself::MSG_VIS_TEXT_INVALIDATE_RANGE(&range);
+                } else {
+	            RegionUnlock(p_region) ;
+                }
+            }
+            ProfPoint("IRegionRepositionResizeAndReflow--Post") ;
+            RegionPurgeCache(oself) ;
+        } else {
+	    /* Don't want to keep it in memory if we are going to move */
+	    /* things around. */
+	    RegionUnlock(p_region) ;
+	}
+
+        /* We are now back.  All lines have been reformatted. */
+        /* Insure we have access to the region */
+        RegionLock(regArray, regionNum, &p_region, &size) ;
+
+        /* Note that we have invalidated a section */
+        if (didCalc)
+            *didCalc = TRUE ;
+    }
+
+    pself = ObjDerefVis(oself) ;
+    boundHeight = RegionGetPathTopBound(
+                      pself->VTI_vmFile, 
+                      p_region->VLTRAE_region) ;
+
+    /* Let us determine what the height is of this region. */
+    height = p_region->VLTRAE_calcHeight.WBF_int + boundHeight ;
+
+    /* Now shrink up the size (but add in the boundary height) */
+    p_region->VLTRAE_size.XYS_height = height + boundHeight ;
+
+    /* Let's fudge a bit and make sure thin heights are truly thin */
+    if ((p_cell->HCD_minHeight) && (height <= 4) && (p_cell->HCD_minHeight <= 4))
+        height = p_cell->HCD_minHeight ;
+
+    /* ensure it is saved */
+    RegionDirty(p_region) ;
+    RegionUnlock(p_region) ;
+
+    ProfPoint("IRegionRepositionResizeAndReflow") ;
+
+    return height ;
+}
+
+#ifdef NO_TOP_SPACE
+
+@alias (MSG_VIS_TEXT_GET_TEXT_RANGE) dword MSG_VIS_TEXT_GET_TEXT_RANGE_PTR(@stack VisTextGetTextRangeFlags flags, word refHigh, char *reference, TextReferenceType refType, dword rangeEnd, dword rangeStart) = dx.ax;
+
+/**************************************************************************
+ * Routine:  EmptyTopRegion
+ **************************************************************************
+ *
+ * Description:
+ *     Determine if a region has one character and if that is just an
+ *     empty character.
+ *
+ * Inputs:
+ *     VisLargeTextRegionArrayElement *p_region -- Region element
+ *     optr textObj               -- VisLargeText object
+ *
+ * Outputs:
+ *     Boolean                    -- TRUE if empty region, else FALSE
+ *
+ * Revision:
+ *     Who  Date:     Comments:
+ *     ---  --------  --------------------
+ *     LES  08/19/99  Created.
+ *
+ **************************************************************************/
+Boolean EmptyTopRegion(VisLargeTextRegionArrayElement *p_region, optr textObj)
+{
+    TCHAR textBuf[2];
+    dword charCount;
+
+    if (p_region->VLTRAE_charCount == 1) {
+        charCount = @call textObj::MSG_VIS_TEXT_GET_TEXT_RANGE_PTR(
+                        0, 0,
+                        (char*)textBuf,
+                        TRT_POINTER,
+                        1, 0);
+        ProfPoint("EmptyTopRegion") ;
+
+@ifdef DO_DBCS
+        return(charCount == 1 && textBuf[0] == C_VERTICAL_TABULATION);
+@else
+        return(charCount == 1 && textBuf[0] == C_VT);
+@endif
+    }
+    ProfPoint("EmptyTopRegion") ;
+
+    return(FALSE);
+}
+#endif
+
+/**************************************************************************
+ * Routine:  ITableLayoutDetermineWantedWidth
+ **************************************************************************
+ *
+ * Description:
+ *     Determine how wide to make a table
+ *
+ * Inputs:
+ *     HTMLtableData *p_table     -- Current table
+ *     word *p_availableWidth     -- Available width, and then adjusted
+ *                                   to squeeze out space on the edge not
+ *                                   not used by the cells themselves 
+ *                                   (no outside borders or padding).
+ *     word innerBorder           -- Space inside cells
+ * 
+ * Outputs:
+ *     word                       -- Width to make table                  
+ *
+ **************************************************************************/
+word ITableLayoutDetermineWantedWidth(
+         HTMLtableData *p_table,
+         word *p_availableWidth,
+         word innerBorder)
+{
+    word value ;
+    word availableWidth = *p_availableWidth ;
+    word wantedWidth ;
+
+    /* How wide does this table want to be */
+    value = HTML_LEN_GET_VALUE(p_table->HTD_width) ;
+    if (availableWidth > p_table->HTD_insetAmount)
+        availableWidth -= p_table->HTD_insetAmount ;
+
+    switch(HTML_LEN_GET_UNIT(p_table->HTD_width))  {
+        case HTML_LEN_PIXEL:
+            /* Want a fixed width */
+            if (value > MAXIMUM_COLUMN_WIDTH) 
+                value = MAXIMUM_COLUMN_WIDTH ;
+            wantedWidth = value ;
+            break ;
+        case HTML_LEN_PERCENT:
+            /* Only want a percent of the current amount */
+            if (value > 100)
+                value = 100 ;
+            wantedWidth = availableWidth ;
+
+            EC_ERROR_IF(wantedWidth > 0xF000, ERROR_COLUMN_WIDTH_IS_TOO_BIG) ;
+            if (wantedWidth > 0xF000)
+                wantedWidth = 0;
+
+            /* Scale the desired based on the percentage */
+            wantedWidth = (((dword)value) * ((dword)wantedWidth)) / 100L ;
+            availableWidth = wantedWidth ;
+            break ;
+        case HTML_LEN_PROPORTION:
+            /* Hmmm ... don't know what to do with proportion */
+            /* Just make it full length */
+            wantedWidth = availableWidth ;
+            break ;
+        case HTML_LEN_VARIABLE:
+            /* Try to get the width needed for this for table completely */
+            /* But no more than available */
+            wantedWidth = p_table->HTD_wantedWidth ;
+            if (wantedWidth > availableWidth)
+                wantedWidth = availableWidth ;
+            break ;
+    }
+
+    /* Take out of the border of the table and other important widths */
+    /* (An amount of the left and right edge) */
+    value = 2 * (TABLE_GET_BORDER(p_table->HTD_flags) +
+                 p_table->HTD_cellspacing +
+                 p_table->HTD_cellpadding +
+                 innerBorder) ;
+
+    /* Trim that amount off the available width */
+    if (availableWidth > value)
+        availableWidth -= value ;
+    else
+        availableWidth = 10 ;
+
+    /* Do the same for the wanted width */
+    if (wantedWidth > value)
+        wantedWidth -= value ;
+    else
+        wantedWidth = 0;
+
+    *p_availableWidth = availableWidth ;
+    ProfPoint("ITableLayoutDetermineWantedWidth") ;
+
+    return wantedWidth ;
+}
+
+/**************************************************************************
+ * Routine:  ITableLayoutCalculateColumnWidths
+ **************************************************************************
+ *
+ * Description:
+ *     Go through all the cells and determine the width of all the columns
+ *     then finally output how wide the table is.
+ *
+ * Inputs:
+ *     T_layoutStack *p_stack     -- Layout stack with all our data.
+ *     T_layoutLevelTable *p_level -- Position on stack we are at for 
+ *                                    this table.
+ *     HTMLtableData *p_table     -- Current table
+ * 
+ * Outputs:
+ *     sword                      -- Actual table width computed                  
+ *
+ **************************************************************************/
+sword ITableLayoutCalculateColumnWidths(
+         T_layoutStack *p_stack,
+         T_layoutLevelTable *p_level,
+         HTMLtableData *p_table)
+{
+    byte spanSizes[TABLE_MAX_COLUMNS] ;
+    word cellIndex = p_level->LLT_cellIndex ;
+    MemHandle spreadState ;
+    HTMLcellData *p_cell ;
+    word size ;
+    word numCol = p_table->HTD_cols ;
+    word maxSpan = 0 ;
+    word rightSide ;
+    word span ;
+
+    /* Track which spans we see */
+    memset(spanSizes, 0, sizeof(spanSizes)) ;
+
+    /* Loop through all the cells for this table and calculate */
+    /* their widths.  As each row is completed, merge the data */
+    /* into the final sizing table (which is then used at the end). */
+    spreadState = SpreadCreate(
+                      numCol,
+                      2*(p_level->LLT_innerBorder + 
+                            p_table->HTD_cellpadding) +
+                               p_table->HTD_cellspacing,
+                      p_level->LLT_wantedWidth) ;
+
+    /*  Add single span columns */
+    while (cellIndex < p_stack->LS_numCells)  {
+        CellLock(p_stack->LS_cellArray, cellIndex, &p_cell, &size) ;
+
+        /* Stop if we are in a different table. */
+        if (p_cell->HCD_table != p_level->LLT_tableIndex)  {
+            CellUnlock(p_cell) ;
+            break;
+        }
+
+        /* Can't process columns that are past the limit */
+        if (p_cell->HCD_col < TABLE_MAX_COLUMNS)  {
+            SpreadMarkColumnUsed(spreadState, p_cell->HCD_col) ;
+            if (p_cell->HCD_colspan==1)  {
+                ICollectSizeForCell(spreadState, p_cell, numCol) ;
+            } else {
+                /* Mark the span size for the future adds */
+                if (p_cell->HCD_colspan > maxSpan)
+                    maxSpan = p_cell->HCD_colspan ;
+                if (p_cell->HCD_colspan-1 < TABLE_MAX_COLUMNS)
+                    spanSizes[p_cell->HCD_colspan-1] = 1 ;
+            }
+        }
+
+        /* Go to the next cell */
+        cellIndex = p_cell->HCD_nextCellInTable ;
+
+        CellUnlock(p_cell) ;
+    }
+
+    /* Now add multispan columns, but add from smallest to biggest */
+    for (span=2; span<=maxSpan; span++)  {
+        /* Only do a span if its size exists */
+        if (!spanSizes[span-1])
+            continue ;
+        cellIndex = p_table->HTD_firstCell ;
+        while (cellIndex < p_stack->LS_numCells)  {
+            CellLock(p_stack->LS_cellArray, cellIndex, &p_cell, &size) ;
+
+            /* Stop if we are in a different table. */
+            if (p_cell->HCD_table != p_level->LLT_tableIndex)  {
+                CellUnlock(p_cell) ;
+                break;
+            }
+
+            /* Can't process columns that are past the limit */
+            /* And only process of a certain size */
+            if ((p_cell->HCD_col < TABLE_MAX_COLUMNS) && 
+                (p_cell->HCD_colspan==span))
+                    ICollectSizeForCell(spreadState, p_cell, numCol) ;
+
+            /* Go to the next cell */
+            cellIndex = p_cell->HCD_nextCellInTable ;
+
+            CellUnlock(p_cell) ;
+        }
+    }
+
+    /* Do the actual calculation to determine column widths */
+    SpreadCalculateLayout(
+        spreadState, 
+        p_level->LLT_availableWidth, 
+        p_level->LLT_wantedWidth) ;
+
+    /* At this point, we have calculated what we think is the best */
+    /* layout settings.  We now just need to determine where the */
+    /* columns start. */
+    rightSide = ICalculateColumnStarts(
+                    spreadState,
+                    p_level,
+                    p_table) ;
+
+    /* Get rid of the table info.  We don't want to keep the block around. */
+    if (spreadState)
+        SpreadDestroy(spreadState) ;
+
+    ProfPoint("ITableLayoutCalculateColumnWidths") ;
+
+    /* Determine the true table width */
+    /* Above adds up everything for cells and the space between them */
+    /* (includes the inner borders) */
+    return (2*(TABLE_GET_BORDER(p_table->HTD_flags))) +
+                     p_table->HTD_cellspacing +
+                         rightSide-p_level->LLT_x ;
+}
+
+
+/**************************************************************************
+ * Routine:  ITableLayoutCalculateOffset
+ **************************************************************************
+ *
+ * Description:
+ *     Determine how much to push the table over to the right.
+ *     (A table can be ALIGN'd or JUSTIFY'd)
+ *
+ * Inputs:
+ *     HTMLtableData *p_table     -- Current table
+ *     word topLeft               -- Left position of table
+ *     word topRight              -- Right position of table
+ *     word topWidth              -- Width of top
+ *     word tableWidth            -- Width of the current table
+ * 
+ * Outputs:
+ *     sword                      -- Offset from left edge of cell to
+ *                                   place table.
+ *
+ **************************************************************************/
+sword ITableLayoutCalculateOffset(
+          HTMLtableData *p_table,
+          word topLeft,
+          word topRight,
+          word topWidth,
+          word tableWidth)
+{
+    sword tableOffset = 0 ;
+
+    /* We need to determine how far to inset this table if we are */
+    /* centering or right justifying. */
+    /* This offset is in reference to the very left of the area we */
+    /* are in -- even if we have a shape (and thus topLeft > 0) */
+    /* For now, default to no offset (some logic depends on this) */
+    if (TABLE_GET_ALIGN(p_table->HTD_flags))  {
+        /* IF we are aligned, we need to shift to that position */
+        /* based on different logic.  We are technically out of */
+        /* bounds and just have to go to that out of bounds location */
+        if (TABLE_GET_ALIGN(p_table->HTD_flags) == HTML_ALIGN_LEFT)  {
+            /* We've just created a hole in the shape at the top */
+            /* left of region.  Go there */
+            tableOffset = topLeft ;
+        } else {
+            /* We've just create a hole in the shape at the top right. */
+            /* We just need to buttress the right side up to that */
+            if (topRight > tableWidth)
+                tableOffset = topRight - tableWidth ;
+        }
+    } else {
+        /* For a simpler table that doesn't change the shape, we just */
+        /* need to shift the correct location.  A simpler calculation */
+        switch(TABLE_GET_JUSTIFY(p_table->HTD_flags))  {
+            case J_CENTER:
+                /* Centering is like most logic.  This one also checks */
+                /* to make sure we don't go negative. */
+                if (topWidth > tableWidth)
+                    topWidth -= tableWidth ;
+                else
+                    topWidth = 0 ;
+                tableOffset = topLeft + (topWidth>>1) ;
+                break;
+            case J_RIGHT:
+                /* On the right, just buttress to there */
+                if (topRight > tableWidth)
+                    tableOffset = topRight - tableWidth ;
+                break;
+            default:
+                /* Simplest case */
+                tableOffset = topLeft ;
+                break ;
+        }
+    }
+
+    ProfPoint("ITableLayoutCalculateOffset") ;
+    return tableOffset ;
+}
+
+/**************************************************************************
+ * Routine:  ILayoutTableEnd
+ **************************************************************************
+ *
+ * Description:
+ *     All the cells in a table have been computed (or the table shifted
+ *     into place).  Finish out the table info.
+ *     NOTE: Calls TableUnlock on p_table
+ *
+ * Inputs:
+ *     T_layoutStack *p_stack     -- Layout stack in progress
+ *     T_layoutLevelTable *p_level -- Table level in stack
+ *     HTMLtableData *p_table     -- Current table
+ * 
+ **************************************************************************/
+void ILayoutTableEnd(
+        T_layoutStack *p_stack,
+        T_layoutLevelTable *p_level,
+        HTMLtableData *p_table)
+{
+    T_boundaryEdgeStack *p_edges ;
+    T_layoutLevelCell *p_cellLevel ;
+
+    EC_ERROR_IF(
+        p_stack->LS_stackTableDepth == 0,
+        ERROR_LAYOUT_STACK_MISSING_TABLE_DATA) ;
+
+    p_level->LLT_realHeight = p_table->HTD_lastHeight ;
+
+    /* Are we an aligned table (left or right) ? */
+    if (TABLE_GET_ALIGN(p_table->HTD_flags))  {
+        /* Determine where the edges for this table are */
+        p_cellLevel = p_stack->LS_cellLayoutStack + (p_stack->LS_stackCellDepth-1) ;
+        p_edges = &p_cellLevel->LLC_edges ;
+
+        /* Yep, then add to the edge list */
+        IEdgeAdd(
+            p_edges,
+            p_table->HTD_lastHeight,
+            p_table->HTD_lastTableWidth,
+            TABLE_GET_ALIGN(p_table->HTD_flags)) ;
+
+        /* Now lie and say we are zero high so that the next section */
+        /* starts at this same y location. */
+        p_level->LLT_height = 0 ;
+    } else {
+        /* Store the height as we know it for the table */
+        p_level->LLT_height = p_table->HTD_lastHeight ;
+    }
+
+    /* Make sure our information is still good on the way out */
+    EC_ERROR_IF(
+        p_level->LLT_height >= 0x80000000,
+        ERROR_HEIGHT_UNREASONABLY_BIG) ;
+
+    /* Only get rid of the dirty flag on a table if we are */
+    /* not in the 'got image in current master cell' mode */
+    if (!p_stack->LS_currentMasterCellGotImage)
+        p_table->HTD_flags &= (~HTML_TABLE_DIRTY_LAYOUT_MASK) ;
+    TableDirty(p_table) ;
+ 
+    /* Pop the table stack item and return to cell mode */
+    p_stack->LS_stackTableDepth-- ;
+    p_stack->LS_type = LAYOUT_STACK_ELEMENT_TYPE_CELL ;
+    p_stack->LS_nextCellIndex = p_level->LLT_cellIndex ;
+
+    ProfPoint("ILayoutTableEnd") ;
+}
+
+/**************************************************************************
+ * Routine:  ILayoutTableStart
+ **************************************************************************
+ *
+ * Description:
+ *     Setup a table on the layout stack for computation then go ahead
+ *     and start by calculating the table's column widths.  If the table
+ *     is not dirty, we'll just shift it into position and not really
+ *     do anything more.
+ *
+ * Inputs:
+ *     T_layoutStack *p_stack     -- Layout stack in progress
+ *     word tableIndex            -- Index to current table
+ *     word availableWidth        -- Space available to table
+ *     dword x, y                 -- Top left position of table
+ * 
+ **************************************************************************/
+void ILayoutTableStart(
+        T_layoutStack *p_stack,
+        word tableIndex,
+        word availableWidth,
+        dword x,
+        dword y)
+{
+    T_layoutLevelTable *p_level ;
+    T_layoutLevelCell *p_cellLevel ;
+    HTMLtableData *p_table ;
+    word size ;
+    T_boundaryEdgeStack *p_edges ;
+    sword topLeft, topRight, topWidth ;
+    sword tableWidth ;
+    sdword deltaX, deltaY ;
+    T_shiftInfo shiftInfo ;
+
+EC( ECCheckStack(); )
+    EC_ERROR_IF(availableWidth >= 0x8000, ERROR_COLUMN_WIDTH_IS_TOO_BIG) ;
+    EC_ERROR_IF(x >= 0x400000, ERROR_X_COORDINATE_UNREASONABLY_BIG) ;
+    EC_ERROR_IF(y >= 0x80000000, ERROR_Y_COORDINATE_UNREASONABLY_BIG) ;
+    EC_ERROR_IF(
+        p_stack->LS_stackTableDepth >= HTML_LAYOUT_MAX_LAYOUT_LEVELS,
+        ERROR_LAYOUT_STACK_OVERFLOW_FOR_TABLES) ;
+    EC_ERROR_IF(
+        tableIndex >= TableArrayGetCount(p_stack->LS_tableArray),
+        ERROR_TABLE_INDEX_OUT_OF_RANGE) ;
+    p_level = LayoutStackTableLevelAccess(p_stack, p_stack->LS_stackTableDepth) ;
+    p_level->LLT_tableIndex = tableIndex ;
+    p_level->LLT_x = x ;
+    p_level->LLT_startY = p_level->LLT_y = y ;
+    p_level->LLT_flags = 0 ;
+    p_level->LLT_width = 0 ;
+    p_level->LLT_height = p_level->LLT_realHeight = 0 ;
+    p_level->LLT_tableOffset = 0 ;
+
+    /* Start by getting the table info */
+    TableLock(p_stack->LS_tableArray, tableIndex, &p_table, &size) ;
+
+    /* Is this a top level table?  If so, we have special rules */
+    /* on setting up their widths related to the page (just to */
+    /* be ::sour:: Netscape and IE compatible). */
+    if (!p_stack->LS_stackTableDepth)  {
+        /* If we are doing a percentage wide, then the available space */
+        /* is what width the view is */
+        if (HTML_LEN_GET_UNIT(p_table->HTD_width) == HTML_LEN_PERCENT)
+            if (availableWidth > p_stack->LS_viewWidth)
+                availableWidth = p_stack->LS_viewWidth ;
+    }
+    if (availableWidth < p_table->HTD_minWidth)
+        availableWidth = p_table->HTD_minWidth ;
+    p_level->LLT_availableWidth = p_level->LLT_originalWidth = availableWidth ;
+
+    p_cellLevel = p_stack->LS_cellLayoutStack + (p_stack->LS_stackCellDepth-1) ;
+    p_edges = &p_cellLevel->LLC_edges ;
+
+    if ((p_table->HTD_lastAvailableWidth != availableWidth) || 
+            (p_table->HTD_flags & HTML_TABLE_DIRTY_LAYOUT_MASK))  {
+        p_table->HTD_lastX = x ;
+        p_table->HTD_lastY = y ;
+        p_table->HTD_lastAvailableWidth = p_level->LLT_originalWidth ;
+
+        /* Mark the table dirty until it is completely done.  This fixes */
+        /* problems when a table is started, but aborted in the middle. */
+        p_table->HTD_flags |= HTML_TABLE_DIRTY_LAYOUT_MASK ;
+
+        TableDirty(p_table) ;
+        p_level->LLT_x += p_table->HTD_insetAmount ;
+
+        /* Our available width at this point may be zapped by having */
+        /* stuff aligned left and right.  We need this real width */
+        /* if we are going to work with tables in the flow of the text */
+        /* Interesting enough, if the table is aligned, we use the full */
+        /* width, but if it is not aligned, we use the width after all */
+        /* other things are aligned */
+
+        /* ???? The above comment is backwards!  And align usually */
+        /* depends only on the full width of the page, not a subset */
+        /*   -- LES 08/27/99 */
+        topRight = IEdgeGetTopLeftAndRight(
+                       p_edges, 
+                       p_level->LLT_originalWidth, 
+                       &topLeft) ;
+        if (topRight > topLeft)
+            topWidth = topRight - topLeft ;
+        else
+            topWidth = 0 ;
+        if (!TABLE_GET_ALIGN(p_table->HTD_flags))
+            p_level->LLT_availableWidth = topWidth ;
+
+        /* Determine the spacing between two cells */
+        p_level->LLT_innerBorder = 0 ;
+        if (TABLE_GET_BORDER(p_table->HTD_flags))
+            p_level->LLT_innerBorder++ ;
+
+        p_level->LLT_cellIndex = p_table->HTD_firstCell ;
+        p_level->LLT_x += TABLE_GET_BORDER(p_table->HTD_flags) ;
+
+        p_level->LLT_wantedWidth = 
+            ITableLayoutDetermineWantedWidth(
+                p_table,
+                &p_level->LLT_availableWidth,
+                p_level->LLT_innerBorder) ;
+
+        p_level->LLT_width = 
+            tableWidth = ITableLayoutCalculateColumnWidths(
+                        p_stack,
+                        p_level,
+                        p_table) ;
+
+        p_level->LLT_tableOffset = 
+            ITableLayoutCalculateOffset(
+                p_table,
+                topLeft,
+                topRight,
+                topWidth,
+                tableWidth) ;
+        p_table->HTD_lastXOffset = p_level->LLT_tableOffset ;
+
+        /* --------------------------------------------------------------- */
+        /* We now have a total width, column widths, and an x location     */
+        /* This table is now ready to resolve all of its children cells.   */
+        /* --------------------------------------------------------------- */
+
+        /* Start with first cell spacing and border */
+        p_level->LLT_y += 
+            TABLE_GET_BORDER(p_table->HTD_flags) + p_table->HTD_cellspacing ;
+        EC_ERROR_IF(
+            p_level->LLT_y >= 0x80000000,
+            ERROR_Y_COORDINATE_UNREASONABLY_BIG) ;
+
+        memset(
+            p_level->LLT_sizingArray, 
+            0, 
+            sizeof(p_level->LLT_sizingArray)) ;
+
+        /* One more on the stack */
+        p_stack->LS_stackTableDepth++ ;
+
+        /* Stay in table calculation mode */
+        p_stack->LS_type = LAYOUT_STACK_ELEMENT_TYPE_TABLE ;
+        p_level->LLT_row = p_level->LLT_column = 0 ;
+
+        /* --------- GO INTO TABLE UPDATE MODE FROM THIS POINT --------- */
+        /* Follow the code at ILayoutCalculateTable */
+    } else {
+        /* The table is totally the same.  Let's see if we need to just */
+        /* shift it all over */
+        deltaX = ((sdword)x) - (sdword)p_table->HTD_lastX ;
+        deltaY = ((sdword)y) - (sdword)p_table->HTD_lastY ;
+        shiftInfo.tableArray = p_stack->LS_tableArray ;
+        shiftInfo.cellArray = p_stack->LS_cellArray ;
+        shiftInfo.numCells = p_stack->LS_numCells ;
+        shiftInfo.deltaX = deltaX ;
+        shiftInfo.deltaY = deltaY ;
+
+        if ((((deltaX) || (deltaY)) && (p_table->HTD_lastTableWidth)) || 
+              (p_stack->LS_needCompleteRedraw))  {
+            /* Invalidate the old position (if we are moving and have a last position */
+            @call (p_stack->LS_textObj)::MSG_HTML_TEXT_INTERNAL_COLLECT_INVAL_AREA(
+                p_table->HTD_lastX + p_table->HTD_lastXOffset,
+                p_table->HTD_lastY,
+                p_table->HTD_lastX + p_table->HTD_lastXOffset + p_table->HTD_lastTableWidth,
+                p_table->HTD_lastY + p_table->HTD_lastHeight) ;
+        }
+
+        p_level->LLT_width = p_table->HTD_lastTableWidth ;
+        p_level->LLT_tableOffset = p_table->HTD_lastXOffset ;
+
+/* !!! Need to put back optimization when deltaX and deltaY are zero */
+/* but need a better way to skip all the cells. */
+        p_level->LLT_cellIndex = 
+            ITranslateTablePosition(
+                tableIndex, 
+                &shiftInfo) ;
+        if ((deltaX) || (deltaY))  {
+            p_level->LLT_flags |= LAYOUT_LEVEL_TABLE_FLAG_DID_CALCULATION ;
+            p_stack->LS_layoutHasChanged = TRUE ;
+        }
+
+        /* Set up an entry on the stack, but don't really use much of it */
+        p_stack->LS_stackTableDepth++ ;
+
+        /* Done with this table in the above cell */
+        ILayoutTableEnd(p_stack, p_level, p_table) ;
+
+        /* NOTE:  We never change p_stack->LS_stackTableDepth
+           or p_stack->LS_type so we effectively did everything
+           and returned */
+    }
+    TableUnlock(p_table) ;
+    ProfPoint("ILayoutTableStart") ;
+}
+
+
+/**************************************************************************
+ * Routine:  ILayoutTableDone
+ **************************************************************************
+ *
+ * Description:
+ *     The end of a table has been reached.  This code finishes up any
+ *     calculations necessary for the table before ending the table
+ *     out right.
+ *
+ * Inputs:
+ *     T_layoutStack *p_stack     -- Layout stack in progress
+ *     T_layoutLevelTable *p_level-- Current table level in stack
+ *     HTMLtableData *p_table     -- Current table information
+ * 
+ **************************************************************************/
+void ILayoutTableDone(
+         T_layoutStack *p_stack,
+         T_layoutLevelTable *p_level,
+         HTMLtableData *p_table)
+{
+    word maxRemainingHeight ;
+    word i ;
+    word value ;
+
+    /* Calculate the remaining amount of space for fixed height stables */
+    /* If we have a fixed table height, take the bigger of the two */
+    if (HTML_LEN_GET_UNIT(p_table->HTD_height) == HTML_LEN_PIXEL)  {
+        maxRemainingHeight = HTML_LEN_GET_VALUE(p_table->HTD_height) ;
+
+        /* Take out the bottom edge */
+        value =
+            p_table->HTD_cellspacing +
+            TABLE_GET_BORDER(p_table->HTD_flags) ;
+        if (maxRemainingHeight > value)
+            maxRemainingHeight -= value ;
+        else
+            maxRemainingHeight = 0 ;
+
+        /* Take out the total height (include top edge) */
+        p_level->LLT_height = p_level->LLT_y-p_level->LLT_startY ;
+        if (maxRemainingHeight > p_level->LLT_height)
+            maxRemainingHeight -= p_level->LLT_height ;
+        else
+            maxRemainingHeight = 0 ;
+    } else {
+        maxRemainingHeight = 0 ;
+    }
+
+    /* Merge the last row of data, we haven't done that yet. */
+    /* The above calculations for maxRemainingHeight will be put */
+    /* into the bottom row to fill out the table. */
+    for (i=p_level->LLT_row+1; i<p_table->HTD_rows; i++)  {
+        p_level->LLT_y += 
+            ICalculateRowHeights(
+                         p_stack->LS_cellArray,
+                         p_level,
+                         p_table->HTD_cols,
+                         i,
+                         p_table->HTD_cellspacing/* + p_level->LLT_innerBorder*/,
+                         maxRemainingHeight) ;
+    }
+    p_level->LLT_y += 
+        ICalculateRowHeights(
+                     p_stack->LS_cellArray,
+                     p_level,
+                     p_table->HTD_cols,
+                     p_table->HTD_rows,
+                     p_table->HTD_cellspacing + p_level->LLT_innerBorder,
+                     maxRemainingHeight) ;
+
+    /* End with next cell spacing and border */
+    p_level->LLT_y += 
+        TABLE_GET_BORDER(p_table->HTD_flags) + 
+            p_table->HTD_cellspacing ;
+    EC_ERROR_IF(
+        p_level->LLT_y >= 0x80000000, 
+        ERROR_Y_COORDINATE_UNREASONABLY_BIG) ;
+
+    p_table->HTD_lastHeight = p_level->LLT_y - p_level->LLT_startY ;
+    p_table->HTD_lastTableWidth = p_level->LLT_width ;
+//    p_table->HTD_lastXOffset = p_level->LLT_tableOffset ;
+
+    /* Invalidate the whole table if the we went outside the limits */
+    if (p_stack->LS_pastHeight)
+        p_table->HTD_lastAvailableWidth = 0 ;
+
+    ProfPoint("ILayoutTableDone") ;
+
+    /* Now end this table entry */
+    ILayoutTableEnd(p_stack, p_level, p_table) ;
+}
+
+/**************************************************************************
+ * Routine:  ILayoutCalculateTable
+ **************************************************************************
+ *
+ * Description:
+ *     Process one more cell in a table.
+ *
+ *     <<======================= availableWidth =======================>>
+ *
+ *     +----------------------------------------------------------------+
+ *     |             Table border                                       |
+ *     | +------------------------------------------------------------+ |
+ *     | |           Cellspacing                                      | |
+ *     | | +--I-n-n-e-r-b-o-r-d-e-r------+ +--I-n-n-e-r-b-o-r-d-e-r-+ | |
+ *     | | |         Cellpadding         | |    Cellpadding         | | |
+ *     | | | + - - - - - - - - - - - - + | | + - - - - - - - - - -+ | | |
+ *     | | |                             | |                        | | |
+ *     | | | | Region goes here        | | | | Cell region here   | | | |
+ *     | | |                             | |                        | | |
+ *     | | | |                         | | | |                    | | | |
+ *     | | |                             | |                        | | |
+ *     | | | |                         | | | |                    | | | |
+ *     | | |                             | |                        | | |
+ *     | | | |                         | | | |                    | | | |
+ *
+ * Inputs:
+ *     T_layoutStack *p_stack     -- Layout stack in progress
+ * 
+ **************************************************************************/
+void ILayoutCalculateTable(T_layoutStack *p_stack)
+{
+    HTMLtableData *p_table ;
+    HTMLcellData *p_cell ;
+    T_layoutLevelTable *p_level ;
+    T_layoutLevelCell *p_cellLevel ;
+    word size ;
+    word column ;
+    word spanWidth ;
+    word value ;
+    word i ;
+    word colWidth ;
+    T_columnIndex index ;
+
+    /* Let's recursively call all of the cells to resolve their */
+    /* heights while determine their heights. */
+    /* As each row is completed, merge the data */
+    /* into a final sizing table which is then used at the end to */
+    /* determine the total height for the row (and all cells). */
+
+    EC_ERROR_IF(
+        p_stack->LS_stackTableDepth == 0,
+        ERROR_LAYOUT_STACK_MISSING_TABLE_DATA) ;
+    p_level = LayoutStackTableLevelAccess(p_stack, p_stack->LS_stackTableDepth-1) ;
+   TableArrayStartAccess(p_stack->LS_tableArray) ;
+   CellArrayStartAccess(p_stack->LS_cellArray) ;
+   TableLock(p_stack->LS_tableArray, p_level->LLT_tableIndex, &p_table, &size) ;
+
+    /* Do the second part of a table's cell if we came through */
+    /* here last time.  We just need to collect some more info */
+    if (p_level->LLT_flags & LAYOUT_LEVEL_TABLE_PROCESSING_CELL)  {
+        /* Not the first cell, then we need to record the info */
+
+        /* What cell were we working with? */
+        CellLock(
+            p_stack->LS_cellArray, 
+            p_level->LLT_cellIndex, 
+            &p_cell, 
+            &size) ;
+
+        /* For each cell, collect height information in */
+        /* the sizing table */
+        ICollectRowInfo(
+            p_level,
+            p_table,
+            p_cell,
+            p_table->HTD_cellpadding + p_level->LLT_innerBorder) ;
+
+        /* Move to the next location */
+        CellUnlock(p_cell) ;
+        p_level->LLT_cellIndex = p_stack->LS_nextCellIndex ;
+
+        /* If any one cell was calculated, note that we need an invalidation */
+        p_cellLevel = p_stack->LS_cellLayoutStack + p_stack->LS_stackCellDepth ;
+        if (p_cellLevel->LLC_flags & 
+                LAYOUT_LEVEL_CELL_FLAG_DID_PERFORM_REGION_CALCULATION)
+            p_level->LLT_flags |= LAYOUT_LEVEL_TABLE_FLAG_DID_CALCULATION ;
+
+        p_level->LLT_flags &= (~LAYOUT_LEVEL_TABLE_PROCESSING_CELL) ;
+    }
+
+    if (p_level->LLT_cellIndex < p_stack->LS_numCells)  {
+        CellLock(p_stack->LS_cellArray, p_level->LLT_cellIndex, &p_cell, &size) ;
+
+        /* Make sure we are in the same table still (else we are done) */
+        if (p_cell->HCD_table == p_level->LLT_tableIndex)  {
+            /* Process a cell of this table */
+            /* What column are we in? */
+            column = p_cell->HCD_col ;
+
+            /* Calculate the width for this cell */
+            spanWidth = 0 ;
+            value = 2 * (p_table->HTD_cellpadding+p_level->LLT_innerBorder) ;
+            if (column >= TABLE_MAX_COLUMNS) {
+                spanWidth = COLUMN_WIDTH_WHEN_PAST_MAX_TABLE_COLUMNS ;
+            } else {
+                for (i=0; i<p_cell->HCD_colspan; i++)    {
+                    /* Stop if we are outside of the table (some spans */
+                    /* exist past the real number of table columns) */
+                    if ((column+i) >= p_table->HTD_cols)
+                        break ;
+
+                    index = p_level->LLT_indexArray[column+i] ;
+                    if (index != TABLE_COLUMN_INDEX_BAD)  {
+                        /* And the inner region's width */
+                        /* and the space for cell padding and inner border */
+                        colWidth = p_level->LLT_columnWidthArray[index] ;
+                        if (colWidth)  {
+                            spanWidth += colWidth + value ;
+                            /* Now add in the spacing between the cells if we span at all */
+                            if (i)
+                                spanWidth += p_table->HTD_cellspacing ;
+                        }
+                    }
+                }
+            }
+
+            /* If we have found a new column, let's merge the whole */
+            /* row of data with the previous one. */
+            if (p_cell->HCD_row != p_level->LLT_row)  {
+                for (i=p_level->LLT_row+1; i<=p_cell->HCD_row; i++)  {
+                    p_level->LLT_y += 
+                        ICalculateRowHeights(
+                             p_stack->LS_cellArray,
+                             p_level,
+                             p_table->HTD_cols,
+                             i,
+                             p_table->HTD_cellspacing,
+                             0) ;
+                }
+                p_level->LLT_row = p_cell->HCD_row ;
+
+                /* Add spacing between rows */
+                p_level->LLT_y += p_table->HTD_cellspacing ;
+                EC_ERROR_IF(
+                    p_level->LLT_y >= 0x80000000, 
+                    ERROR_Y_COORDINATE_UNREASONABLY_BIG) ;
+            }
+            if (p_level->LLT_y > p_stack->LS_maxViewHeight)
+                p_stack->LS_pastHeight = TRUE ;
+
+            p_stack->LS_nextCellIndex = p_level->LLT_cellIndex ;
+            if (column >= TABLE_MAX_COLUMNS)  {
+                ILayoutCellStart(
+                    p_stack,
+                    spanWidth,
+                    p_level->LLT_tableOffset + p_level->LLT_lastX +
+                        ((column-TABLE_MAX_COLUMNS)*COLUMN_WIDTH_WHEN_PAST_MAX_TABLE_COLUMNS),
+                    p_level->LLT_y,
+                    p_table->HTD_cellpadding + p_level->LLT_innerBorder) ;
+            } else {
+                index = p_level->LLT_indexArray[column] ;
+                if (index != TABLE_COLUMN_INDEX_BAD)  {
+                    EC_ERROR_IF(spanWidth==0,
+                            ERROR_AVAILABLE_WIDTH_SHOULD_NOT_BE_ZERO) ;
+                    ILayoutCellStart(
+                        p_stack,
+                        spanWidth,
+                        p_level->LLT_tableOffset + 
+                            p_level->LLT_columnLeftArray[index],
+                        p_level->LLT_y,
+                        p_table->HTD_cellpadding + 
+                            p_level->LLT_innerBorder) ;
+                } else {
+                    /* Try to use the cell's normal width */
+                    spanWidth = p_cell->HCD_minWidth ;
+
+                    /* But don't use more than we are given ... */
+                    if (spanWidth > COLUMN_WIDTH_WHEN_PAST_MAX_TABLE_COLUMNS*p_cell->HCD_colspan)
+                        spanWidth = COLUMN_WIDTH_WHEN_PAST_MAX_TABLE_COLUMNS*p_cell->HCD_colspan ;
+
+                    /* Unless we become too small! */
+                    if (spanWidth < p_cell->HCD_hardMinWidth)
+                        spanWidth = p_cell->HCD_hardMinWidth ;
+
+                    ILayoutCellStart(
+                        p_stack,
+                        spanWidth,
+                        p_level->LLT_tableOffset + p_level->LLT_lastX +
+                            ((column-TABLE_MAX_USED_COLUMNS)*COLUMN_WIDTH_WHEN_PAST_MAX_TABLE_COLUMNS),
+                        p_level->LLT_y,
+                        p_table->HTD_cellpadding + p_level->LLT_innerBorder) ;
+                }
+            }
+            p_level->LLT_flags |= LAYOUT_LEVEL_TABLE_PROCESSING_CELL ;
+        } else {
+            ILayoutTableDone(
+                p_stack,
+                p_level,
+                p_table) ;
+        }
+        CellUnlock(p_cell) ;
+    } else {
+        ILayoutTableDone(
+            p_stack,
+            p_level,
+            p_table) ;
+    }
+    TableUnlock(p_table) ;
+    TableArrayEndAccess(p_stack->LS_tableArray) ;
+    CellArrayEndAccess(p_stack->LS_cellArray) ;
+    ProfPoint("ILayoutCalculateTable") ;
+}
+
+
+/**************************************************************************
+ * Routine:  ILayoutCellStart
+ **************************************************************************
+ *
+ * Description:
+ *     Prepare a layout stack item for a cell group using the given 
+ *     information.
+ *
+ *      Cell group:
+ * 
+ *     <-------------- availableWidth ------------------->
+ *               
+ *(x,y)+-------------------------------------------------+
+ *     |                                                 |
+ *     |                       cp                        |
+ *     |                                                 |
+ *     |     +-------------------------------------+     |
+ *     |     |                                     |     |
+ *     |     |  Cell                               |     |
+ *     |     |                                     |     |
+ *     |     |- - - - - - - - - - - - - - - - - - -|     |
+ *     |     |                                     |     |
+ *     |  c  |  Continue cell or table             |  c  |
+ *     |  p  |                                     |  p  |
+ *     |     |- - - - - - - - - - - - - - - - - - -|     |
+ *     |     |                                     |     |
+ *     |     |  Continue cell or table             |     |
+ *     |     |                                     |     |
+ *     .     .                                     .     .
+ *     .     .                                     .     .
+ *     .     .                                     .     .
+ *     .     .                                     .     .
+ *     |     |                                     |     |
+ *     |     +-------------------------------------+     |
+ *     |                                                 |
+ *     |                       cp                        |
+ *     |                                                 |
+ *     +-------------------------------------------------+
+ *
+ * Inputs:
+ *     T_layoutStack *p_stack     -- Stack to process
+ *     word availableWidth        -- Width to make the cell group
+ *     dword x, y                 -- Location of upper left of cell
+ *     word cellpadding           -- padding of cell since the width
+ *                                   is outside the range
+ *
+ * Outputs:
+ *     Boolean                    -- TRUE if empty region, else FALSE
+ *
+ **************************************************************************/
+void ILayoutCellStart(
+         T_layoutStack *p_stack,
+         word availableWidth,
+         dword x,
+         dword y,
+         word cellpadding)
+{
+    T_layoutLevelCell *p_level ;
+
+EC( ECCheckStack(); )
+
+    EC_ERROR_IF(
+         availableWidth==0,
+         ERROR_AVAILABLE_WIDTH_SHOULD_NOT_BE_ZERO) ;
+    EC_ERROR_IF(
+        p_stack->LS_nextCellIndex >= p_stack->LS_numCells, 
+        ERROR_CELL_INDEX_OUT_OF_RANGE) ;
+
+    EC_ERROR_IF(availableWidth >= 0x8000, ERROR_COLUMN_WIDTH_IS_TOO_BIG) ;
+    EC_ERROR_IF(x >= 0x400000, ERROR_X_COORDINATE_UNREASONABLY_BIG) ;
+    EC_ERROR_IF(y >= 0x80000000, ERROR_Y_COORDINATE_UNREASONABLY_BIG) ;
+    EC_ERROR_IF(cellpadding >= 0x80, ERROR_CELLPADDING_UNREASONABLY_BIG) ;
+    EC_ERROR_IF(
+        p_stack->LS_stackCellDepth >= HTML_LAYOUT_MAX_LAYOUT_LEVELS,
+        ERROR_LAYOUT_STACK_OVERFLOW_FOR_CELLS) ;
+
+    p_level = p_stack->LS_cellLayoutStack + p_stack->LS_stackCellDepth ;
+    p_level->LLC_originalCellIndex = p_stack->LS_nextCellIndex ;
+    p_level->LLC_cellIndex = p_stack->LS_nextCellIndex ;
+    p_level->LLC_flags = 0 ;
+    p_level->LLC_x = x ;
+    p_level->LLC_startY = p_level->LLC_y = y ;
+    p_level->LLC_edges.BES_sides[BOUNDARY_EDGE_LEFT].BESS_count = 0 ;
+    p_level->LLC_edges.BES_sides[BOUNDARY_EDGE_RIGHT].BESS_count = 0 ;
+    p_level->LLC_totalHeight = 0 ;
+    p_level->LLC_availableWidth = availableWidth ;
+    p_level->LLC_cellpadding = cellpadding ;
+    p_level->LLC_firstTableLevel = 0xFF ;
+
+    /* One more on the stack now and we're processing cells */
+    p_stack->LS_stackCellDepth++ ;
+    p_stack->LS_type = LAYOUT_STACK_ELEMENT_TYPE_CELL ;
+
+    /* Is this the master cell? */
+    /* If so, remember this cell's state */
+    if (p_stack->LS_stackCellDepth == 1)  
+        p_stack->LS_undoCell = p_stack->LS_cellLayoutStack[0] ;
+    ProfPoint("ILayoutCellStart") ;
+}
+
+#pragma codeseg HTMLTCEL_LAYOUT2_TEXT
+
+/* "-dc" causes vptrs for text constants if different code segments are used */
+#pragma option -dc-
+
+/**************************************************************************
+ * Routine:  ILayoutCellRegions
+ **************************************************************************
+ *
+ * Description:
+ *     A cell or continue cell in a cell group can be made up of multiple
+ *     VisTextRegions.  This routine loops through all of them (usually
+ *     only one) and correctly resizes them and sets up their path.
+ *
+ * Inputs:
+ *     T_layoutStack *p_stack     -- Layout stack in progress
+ *     T_layoutLevelCell *p_level -- Stack info about this cell
+ *     HTMLcellData *p_cell       -- Current cell in text object
+ *     Boolean thinTop            -- TRUE if to make empty cells thin
+ * 
+ **************************************************************************/
+void ILayoutCellRegions(
+         T_layoutStack *p_stack, 
+         T_layoutLevelCell *p_level,
+         HTMLcellData *p_cell,
+         Boolean thinTop)
+{
+    word regionIndex ;
+    Boolean regionChanged ;
+    word tempMinHeight, tempCalcWidth ;
+    Boolean didCalc = FALSE ;
+    VisLargeTextRegionArrayElement *p_region ;
+    word size ;
+
+    /* Don't allow any of the reformatting to appear on the screen */
+    @call (p_stack->LS_textObj)::MSG_HTML_TEXT_DRAWING_ON_OFF(FALSE) ;
+
+    /* Backwards reference the cell index to its region */
+    RegionPurgeCache(p_stack->LS_textObj) ;
+    regionIndex = p_cell->HCD_region ;
+    if ((regionIndex == 0xFFFF) && ((p_level->LLC_cellIndex+1)==p_cell->HCD_nextCellInTable)) {
+        /* Oops.  We are an empty cell and it doesn't contain a table */
+        /* (because the next cell is really the next cell -- not past a bunch */
+        /* of table cells). */
+        /* Well, in that case, let's go ahead and make sure the height for this */
+        /* is valid */
+        if (HTML_LEN_GET_UNIT(p_cell->HCD_height) == HTML_LEN_PIXEL)  {
+            /* p_cell->HCD_calcHeight = p_cell->HCD_minHeight = HTML_LEN_GET_VALUE(p_cell->HCD_height) ; */
+            /* Now that we have a calculated height, move on down */
+            /* and trim the edges that make the next region's shape */
+            p_level->LLC_y +=  /*p_cell->HCD_minHeight*/ HTML_LEN_GET_VALUE(p_cell->HCD_height) ;
+            EC_ERROR_IF(
+                p_level->LLC_y >= 0x80000000, 
+                ERROR_Y_COORDINATE_UNREASONABLY_BIG) ;
+            IEdgeTrim(&p_level->LLC_edges, p_cell->HCD_minHeight) ;
+        }
+    }
+
+    /* If we didn't find the region, then we are in a table's */
+    /* encloser cell -- or an empty cell.  In any case, there */
+    /* is nothing to do, skip it. */
+    while (regionIndex < p_stack->LS_numRegions)  {
+        RegionPurgeCache(p_stack->LS_textObj) ;
+        RegionLock(p_stack->LS_regionArray, regionIndex, &p_region, &size);
+
+        /* Stop if we are not in the same cell */
+        if (p_region->VLTRAE_section != p_level->LLC_cellIndex) {
+            RegionUnlock(p_region) ;
+            break;
+        }
+        RegionUnlock(p_region) ;
+
+        /* Found a region to work with that represents this cell's */
+        /* part.  We need a shape to define a location for text */
+        /* to flow.  Do the necessary calculation and apply to */
+        /* the region directly. */
+        regionChanged = 
+            IEdgeCreatePathInRegion(
+                &p_level->LLC_edges,
+                p_stack->LS_vmFile,
+                p_stack->LS_regionArray,
+                regionIndex,
+                p_level->LLC_availableWidth - (2*p_level->LLC_cellpadding)) ;
+
+        /* Now actually reflow the text within the region. */
+        /* The location is shifted over by the padding and the size */
+        /* made smaller. */
+        /* We also add in a fudge factor of 1 pixel to all regions */
+        /* in case there is a rounding error.  This is usually not */
+        /* a problem and the worst problem is the base of a letter */
+        /* touches the cell border. -- LES 08/27/99 */
+        tempCalcWidth = p_cell->HCD_calcWidth ;
+
+        tempMinHeight =
+            IRegionRepositionResizeAndReflow(
+                p_stack,
+                regionIndex,
+                p_level->LLC_x + p_level->LLC_cellpadding,
+                p_level->LLC_y + p_level->LLC_cellpadding,
+                1 + tempCalcWidth -
+                        (2 * p_level->LLC_cellpadding),
+                regionChanged,
+                p_cell,
+                &didCalc) ;
+
+        /* Mark our invalidation point if things have changed */
+        if (didCalc)  {
+            p_level->LLC_flags |= 
+                LAYOUT_LEVEL_CELL_FLAG_DID_PERFORM_REGION_CALCULATION ;
+            p_stack->LS_layoutHasChanged = TRUE ;
+        }
+
+        /* Re-reference because reflow is very memory intensive. */
+        p_cell->HCD_minHeight = tempMinHeight ;
+
+        /* If the first cell of a group is empty (devoid of useful */
+        /* text, make its height only 1 pixel */
+        if ((thinTop) && (p_level->LLC_cellIndex == 0))  {
+            RegionPurgeCache(p_stack->LS_textObj) ;
+            RegionLock(p_stack->LS_regionArray, regionIndex, &p_region, &size);
+            if (EmptyTopRegion(p_region, p_stack->LS_textObj))  {
+                p_cell->HCD_minHeight = 0 ;
+                CellDirty(p_cell) ;
+            }
+            RegionUnlock(p_region) ;
+        }
+
+        /* Now that we have a calculated height, move on down */
+        /* and trim the edges that make the next region's shape */
+        p_level->LLC_y += p_cell->HCD_minHeight ;
+        EC_ERROR_IF(
+            p_level->LLC_y >= 0x80000000, 
+            ERROR_Y_COORDINATE_UNREASONABLY_BIG) ;
+        IEdgeTrim(&p_level->LLC_edges, p_cell->HCD_minHeight) ;
+
+        /* Next region (but stop if we are past the end) */
+        regionIndex++ ;
+    }
+
+    @call (p_stack->LS_textObj)::MSG_HTML_TEXT_DRAWING_ON_OFF(TRUE) ;
+    ProfPoint("ILayoutCellRegions") ;
+}
+
+void IReportCellLayoutStatus(T_layoutStack *p_stack)
+{
+    word numCells ;
+    word numFormatted ;
+    HTMLTextInstance *pself ;
+
+    pself = ObjDerefVis(p_stack->LS_textObj) ;
+    numCells = p_stack->LS_numCells ;
+    numFormatted = p_stack->LS_nextCellIndex ;
+    if (numFormatted > pself->HTI_lastStatusReported)  {
+        pself->HTI_lastStatusReported = numFormatted ;
+        @call (p_stack->LS_textObj)::MSG_HTML_TEXT_FORMATTING_STATUS(numCells, numFormatted) ;
+    }
+    ProfPoint("IReportCellLayoutStatus") ;
+}
+
+
+/**************************************************************************
+ * Routine:  ILayoutCellStandardAction
+ **************************************************************************
+ *
+ * Description:
+ *     Update the edges on an edge stack from the information in a cell
+ *
+ * Inputs:
+ *     T_layoutStack *p_stack     -- Layout stack in progress
+ *     T_layoutLevelCell *p_level -- Stack info about this cell
+ *     HTMLcellData *p_cell       -- Current cell in text object
+ *     Boolean thinTop            -- TRUE if to make empty cells thin
+ * 
+ **************************************************************************/
+void ILayoutCellStandardAction(
+         T_layoutStack *p_stack,
+         T_layoutLevelCell *p_level,
+         HTMLcellData *p_cell,
+         Boolean thinTop)
+{
+    /* Process a cell part if we are told to from the above logic. */
+    /* This used to be duplicated in two parts, but for the sake of */
+    /* code size, I use a flag to do this for two different reasons. */
+    /* (Plus, I got tired of making duplicate changes when one was */
+    /* modified). -- LES 08/27/99 */
+
+    /* Check for a BREAK case where we have to skip */
+    /* either the left/right/both aligned images/tables */
+    /* This helps people recover their text flow after aligning */
+    /* a picture or table onto the side */
+    if (p_cell->HCD_flags2 & HTML_CELL_BREAK_MASK)  {
+        p_level->LLC_y += 
+            IEdgesSkip(
+                 &p_level->LLC_edges,
+                 p_cell->HCD_flags2 & HTML_CELL_BREAK_MASK) ;
+        EC_ERROR_IF(
+            p_level->LLC_y >= 0x80000000, 
+            ERROR_Y_COORDINATE_UNREASONABLY_BIG) ;
+    }
+
+    /* First cell takes on the same width as given since it */
+    /* includes the cell's border and padding.  We do this mainly */
+    /* because we want to draw the border at the right location */
+    p_cell->HCD_calcWidth = p_level->LLC_availableWidth ;
+    EC_ERROR_IF(p_cell->HCD_calcWidth==0, ERROR_CALCULATED_WIDTH_SHOULD_NOT_BE_ZERO) ;
+
+    p_cell->HCD_x = p_level->LLC_x ;
+    p_cell->HCD_y = p_cell->HCD_topY = p_level->LLC_y ;
+    CellDirty(p_cell) ;
+
+    /* Resize and move the cells all around */
+    ILayoutCellRegions(p_stack, p_level, p_cell, thinTop) ;
+
+    /* Done with standard action, move to next cell */
+    p_stack->LS_nextCellIndex = ++p_level->LLC_cellIndex ;
+
+    /* Report where we are */
+    IReportCellLayoutStatus(p_stack) ;
+    ProfPoint("ILayoutCellStandardAction") ;
+}
+
+/**************************************************************************
+ * Routine:  ILayoutCellEnd
+ **************************************************************************
+ *
+ * Description:
+ *     Finish up a cell group and calculate its height.
+ *     The real reason this is not in the above routine is I wanted
+ *     an easy place to put a break point.
+ *
+ * Inputs:
+ *     T_layoutStack *p_stack     -- Layout stack in progress
+ *     T_layoutLevelCell *p_level -- Level to the cell
+ * 
+ **************************************************************************/
+void ILayoutCellEnd(
+         T_layoutStack *p_stack, 
+         T_layoutLevelCell *p_level)
+{
+    HTMLcellData *p_cell ;
+    word size ;
+    dword height ;
+
+    CellArrayStartAccess(p_stack->LS_cellArray) ;
+
+    /* Get the complete total height as we are now */
+    /* Don't forget to add in any aligned areas that are still */
+    /* hanging down */
+    p_level->LLC_totalHeight = 
+        (p_level->LLC_y-p_level->LLC_startY) + 
+        IEdgeGetRemainingHeight(&p_level->LLC_edges) ;
+
+    /* Be sure to place this in the first cell as the truly */
+    /* minimum height that the cell can be.  We'll find the */
+    /* real cell's height when its calculate as part of the row. */
+    CellLock(
+        p_stack->LS_cellArray, 
+        p_level->LLC_originalCellIndex, 
+        &p_cell, 
+        &size) ;
+
+    p_cell->HCD_minHeight = p_level->LLC_totalHeight ;
+
+    /* Make sure we are at least the size of the table cell (if declared) */
+    if (HTML_LEN_GET_UNIT(p_cell->HCD_height) == HTML_LEN_PIXEL)  {
+        height = HTML_LEN_GET_VALUE(p_cell->HCD_height) ;
+        if (height > p_level->LLC_totalHeight)
+            p_level->LLC_totalHeight = height ;
+    }
+
+    CellDirty(p_cell) ;
+    CellUnlock(p_cell) ;
+
+    /* Drop the stack level for this cell group and back to */
+    /* table processing */
+    EC_ERROR_IF(
+        p_stack->LS_stackCellDepth==0, 
+        ERROR_LAYOUT_STACK_MISSING_CELL_DATA) ;
+    p_stack->LS_stackCellDepth-- ;
+    p_stack->LS_type = LAYOUT_STACK_ELEMENT_TYPE_TABLE ;
+
+    /* If there are no more cells, then we are done totally! */
+    if (p_stack->LS_stackCellDepth == 0)
+        p_stack->LS_done = TRUE ;
+
+    CellArrayEndAccess(p_stack->LS_cellArray) ;
+    ProfPoint("ILayoutCellEnd") ;
+}
+
+/**************************************************************************
+ * Routine:  ILayoutCalculateCell
+ **************************************************************************
+ *
+ * Description:
+ *     Layout one cell or continue cell in already setup cell group.
+ *     If a table is encountered, it is started and eventually this
+ *     routine is called again to finish the table's usage.
+ *
+ *     Steps:
+ *     1. If we recently did a whole table, process its height info.
+ *        continue to the next step.
+ *     2. Determine what is the next cell type
+ *        a. If the very first cell, its a normal cell.  Do it.
+ *        b. If a table, start up the table (and do no more)
+ *        c. If a continue cell, do it immediately.
+ *        d. Anything else and we're done with this cell group.
+ *     3. If this was the last call, clean up the cell group's
+ *        stack information.
+ *
+ *  <================ availableWidth =================>
+ *
+ *  (x, y)
+ *  +-------------------------------------------------+
+ *  |                                                 |
+ *  |   Cell padding (with innerBorder, if any)       |
+ *  |                                                 |
+ *  |   + - - - - - - - - - - - - - - - +         +   |
+ *  |                                                 |
+ *  |   |    [Text region]              |             |
+ *  |                                                 | <-- region may
+ *  |   |                               |             |     be shaped
+ *  |                                                 |     (created from
+ *  |   |                               |             |      sub-tables)
+ *  |                                                 |
+ *  |   |                               + - - - - +   |
+ *  |                                                 |
+ *  |   |                                         |   |
+ *  |                                                 |
+ *  |   |                                         |   |
+ *  |                                                 |
+ *  |   |                                         |   |
+ *
+ * Inputs:
+ *     T_layoutStack *p_stack     -- Layout stack in progress
+ * 
+ **************************************************************************/
+void ILayoutCalculateCell(T_layoutStack *p_stack)
+{
+    T_layoutLevelCell *p_level ;
+    T_layoutLevelTable *p_levelTable ;
+    HTMLcellData *p_cell ;
+    HTMLtableData *p_table ;
+    word size ;
+    Boolean cellLevelDone = FALSE ;
+    dword cellStartY = 0 ;
+    Boolean doInval = FALSE ;
+    byte tableLevel ;
+
+    /* There better be data in the cell stack and not too much either */
+    EC_ERROR_IF(
+        p_stack->LS_stackCellDepth >= HTML_LAYOUT_MAX_LAYOUT_LEVELS,
+        ERROR_LAYOUT_STACK_OVERFLOW_FOR_CELLS) ;
+    EC_ERROR_IF(
+        p_stack->LS_stackCellDepth == 0,
+        ERROR_LAYOUT_STACK_MISSING_CELL_DATA) ;
+
+    /* Point at the cell's stack info */
+    p_level = p_stack->LS_cellLayoutStack + (p_stack->LS_stackCellDepth-1) ;
+
+    /* Make sure we are going forward through the list */
+    EC_ERROR_IF(
+       p_level->LLC_cellIndex < p_level->LLC_originalCellIndex,
+       ERROR_NEXT_CELL_INDEX_IS_GOING_TO_A_PREVIOUS_INDEX) ;
+
+    /* Did we just finish processing a table */
+    if (p_level->LLC_flags & LAYOUT_LEVEL_CELL_FLAG_PROCESSING_TABLE)  {
+        /* Point at the table we did */
+        p_levelTable = LayoutStackTableLevelAccess(p_stack, p_stack->LS_stackTableDepth) ;
+
+        /* Ok, move down that table height.  If the table was */
+        /* aligned, the tableHeight will be zero making us go */
+        /* nowhere */
+        p_level->LLC_y += p_levelTable->LLT_height ;
+        EC_ERROR_IF(
+            p_level->LLC_y >= 0x80000000, 
+            ERROR_Y_COORDINATE_UNREASONABLY_BIG) ;
+
+        /* Skip that amount in the edge's stack */
+        IEdgeTrim(&p_level->LLC_edges, p_levelTable->LLT_height) ;
+
+        /* Make sure we are not going backwards if we didn't plan it */
+        EC_ERROR_IF(
+            p_stack->LS_nextCellIndex <= p_level->LLC_cellIndex,
+            ERROR_NEXT_CELL_INDEX_IS_GOING_TO_A_PREVIOUS_INDEX) ;
+
+        p_level->LLC_cellIndex = p_stack->LS_nextCellIndex ;
+
+        /* Done.  Now move on. */
+        p_level->LLC_flags &= (~LAYOUT_LEVEL_CELL_FLAG_PROCESSING_TABLE) ;
+
+        if (p_stack->LS_stackCellDepth == 1)  {
+            if (p_stack->LS_currentMasterCell != p_stack->LS_nextCellIndex)  {
+                p_stack->LS_currentMasterCell = p_stack->LS_nextCellIndex ;
+
+                @call (p_stack->LS_textObj)::MSG_HTML_TEXT_INTERNAL_COLLECT_INVAL_AREA(
+                    p_levelTable->LLT_x + p_levelTable->LLT_tableOffset,
+                    p_levelTable->LLT_startY,
+                    p_levelTable->LLT_x + p_levelTable->LLT_tableOffset + p_levelTable->LLT_width,
+                    p_levelTable->LLT_startY + p_levelTable->LLT_realHeight) ;
+            }
+        }
+    }
+
+    /* Only continue if we are not past the limit */
+    if (p_level->LLC_cellIndex < p_stack->LS_numCells)  {
+        /* Track what is the current cell we are calculating */
+        p_stack->LS_currentCell = p_level->LLC_cellIndex ;
+
+        TableArrayStartAccess(p_stack->LS_tableArray) ;
+        CellArrayStartAccess(p_stack->LS_cellArray) ;
+
+        /* Dereference a cell and it's table */
+        CellLock(p_stack->LS_cellArray, p_level->LLC_cellIndex, &p_cell, &size) ;
+        TableLock(p_stack->LS_tableArray, p_cell->HCD_table, &p_table, &size) ;
+
+        /* Determine where we are in reference to the first cell */
+        tableLevel = TABLE_GET_LEVEL(p_table->HTD_flags) ;
+        if (p_level->LLC_firstTableLevel == 0xFF)  {
+            /* First time through the loop, gauranteed a normal cell */
+            p_level->LLC_firstTableLevel = tableLevel ;
+
+            /* Do the standard action for any cell */
+            cellStartY = p_level->LLC_y ;
+            ILayoutCellStandardAction(p_stack, p_level, p_cell, TRUE) ;
+            doInval = TRUE ;
+        } else {
+            /* Is the table level deeper, the same, or above? */
+            if (tableLevel > p_level->LLC_firstTableLevel)  {
+                /* Deeper -- we got a table we need to resolve */
+                ILayoutTableStart(
+                    p_stack,
+                    p_cell->HCD_table,
+                    p_level->LLC_availableWidth - (2*p_level->LLC_cellpadding),
+                    p_level->LLC_x + p_level->LLC_cellpadding,
+                    p_level->LLC_y + p_level->LLC_cellpadding) ;
+                p_level->LLC_flags |= LAYOUT_LEVEL_CELL_FLAG_PROCESSING_TABLE ;
+            } else if (tableLevel == p_level->LLC_firstTableLevel)  {
+                /* The same level */
+                /* Stop if it is not a continue cell */
+                if (!(p_cell->HCD_flags & HTML_CELL_CONTINUE))  {
+                    /* Not continuing -- just stop here then */
+                    /* Must be another group of cell parts in the table */
+                    cellLevelDone = TRUE ;
+                } else {
+                    /* Valid continue cell part.  We need to process it too */
+                    cellStartY = p_level->LLC_y ;
+                    ILayoutCellStandardAction(p_stack, p_level, p_cell, FALSE) ;
+                    doInval = TRUE ;
+                }
+            } else {
+                /* Higher -- stop here we are outside the table and done */
+                cellLevelDone = TRUE ;
+            }
+        }
+
+        TableUnlock(p_table) ;
+        CellUnlock(p_cell) ;
+
+        TableArrayEndAccess(p_stack->LS_cellArray) ;
+        CellArrayEndAccess(p_stack->LS_tableArray) ;
+    } else {
+        cellLevelDone = TRUE ;
+    }
+
+    /* Check if we've gone past the bottom of the top view and need a */
+    /* a scroll bar */
+    if (p_level->LLC_y > p_stack->LS_maxViewHeight)  {
+        p_stack->LS_pastHeight = TRUE ;
+    } else  {
+        /* Processed this cell in the master cell group.  Note that we should be moving forward. */
+        if (((p_stack->LS_stackCellDepth == 1) && (doInval)) || 
+               ((p_stack->LS_needCompleteRedraw) && (p_stack->LS_stackCellDepth==1)))  {
+            if (p_stack->LS_currentMasterCell != p_stack->LS_nextCellIndex)  {
+                p_stack->LS_currentMasterCell = p_stack->LS_nextCellIndex ;
+                @call (p_stack->LS_textObj)::MSG_HTML_TEXT_INTERNAL_COLLECT_INVAL_AREA(
+                    p_level->LLC_x,
+                    cellStartY,
+                    p_level->LLC_x + p_level->LLC_availableWidth,
+                    p_level->LLC_y) ;
+            }
+        }
+    }
+
+EC_ERROR_IF(doInval && cellLevelDone, -1) ;
+
+    /* If done with this group, let's end the cell level here */
+    if (cellLevelDone)
+        ILayoutCellEnd(p_stack, p_level) ;
+    ProfPoint("ILayoutCalculateCell") ;
+}
+
+void IBlastTableAndCellMinWidths(
+    T_cellArrayHandle cellArray, 
+    T_tableArrayHandle tableArray)
+{
+    word num ;
+    word cellIndex ;
+    HTMLcellData *p_cell ;
+    word size ;
+    HTMLtableData *p_table ;
+    word tableIndex ;
+
+    num = CellArrayGetCount(cellArray) ;
+    for (cellIndex=0; cellIndex<num; cellIndex++)  {
+        CellLock(cellArray, cellIndex, &p_cell, &size) ;
+        if (HTML_LEN_GET_UNIT(p_cell->HCD_width) == HTML_LEN_PIXEL)  {
+            size = HTML_LEN_GET_VALUE(p_cell->HCD_width) ;
+        } else {
+            size = MINIMUM_COLUMN_WIDTH ;
+        }
+        p_cell->HCD_minWidth = size ;
+        p_cell->HCD_longestLine = p_cell->HCD_minWidth ;
+        p_cell->HCD_hardMinWidth = MINIMUM_COLUMN_WIDTH ;
+        p_cell->HCD_x = p_cell->HCD_y = p_cell->HCD_calcHeight = 0 ;
+        p_cell->HCD_calcWidth = size ;
+        EC_ERROR_IF(p_cell->HCD_calcWidth==0, ERROR_CALCULATED_WIDTH_SHOULD_NOT_BE_ZERO) ;
+
+        p_cell->HCD_flags2 |= HTML_CELL_DIRTY_LAYOUT_MASK ;
+            
+        CellDirty(p_cell) ;
+        CellUnlock(p_cell) ;
+    }
+
+    num = TableArrayGetCount(tableArray) ;
+    for (tableIndex=0; tableIndex<num; tableIndex++)  {
+        TableLock(tableArray, tableIndex, &p_table, &size) ;
+        if (HTML_LEN_GET_UNIT(p_table->HTD_width) == HTML_LEN_PIXEL)  {
+            size = HTML_LEN_GET_VALUE(p_table->HTD_width) ;
+        } else {
+            size = 0 ;
+        }
+        p_table->HTD_minWidth = size ;
+        p_table->HTD_wantedWidth = size ;
+        p_table->HTD_lastAvailableWidth = 0 ;
+        p_table->HTD_flags |= HTML_TABLE_DIRTY_LAYOUT_MASK ;
+        TableDirty(p_table) ;
+        TableUnlock(p_table) ;
+    }
+    ProfPoint("IBlastTableAndCellMinWidths") ;
+}
+
+MemHandle LayoutStackAlloc(void)
+{
+    T_layoutStack *p_stack ;
+    MemHandle mem ;
+
+    mem = MemAlloc(
+            sizeof(T_layoutStack), 
+            HF_DYNAMIC, 
+            HAF_ZERO_INIT | HAF_NO_ERR) ;
+    p_stack = MemLock(mem) ;
+    p_stack->LS_self = mem ;
+    MemUnlock(mem) ;
+
+    return mem ;
+}
+
+void LayoutStackFree(MemHandle layoutStack)
+{
+    T_layoutStack *p_stack ;
+    word i ;
+
+    p_stack = LayoutStackLock(layoutStack) ;
+
+    /* Free all blocks allocated with 0 indexes (the others are */
+    /* ignored because there is always a 0 indexed entry and this */
+    /* ensures we free up all the blocks) */
+    for (i=0; i<HTML_LAYOUT_MAX_LAYOUT_LEVELS; i++)  {
+        if ((p_stack->LS_tableLayoutStackRef[i].block) && 
+                (p_stack->LS_tableLayoutStackRef[i].index == 0))  {
+            /* Free each 0'th index block */
+            MemFree(p_stack->LS_tableLayoutStackRef[i].block) ;
+        }
+    }
+
+    /* Only unlock the header block -- it's about to be freed */
+    MemUnlock(layoutStack) ;
+    MemFree(layoutStack) ;
+}
+
+T_layoutStack *LayoutStackLock(MemHandle layoutStack)
+{
+    return (T_layoutStack *)MemLock(layoutStack) ;
+}
+
+void LayoutStackUnlock(T_layoutStack *p_stack)
+{
+    word i ;
+    T_tableLayoutStackReference *p_ref ;
+
+    /* Only unlock all our table layout stack blocks if we are going from lock */
+    /* count 1 to 0 on the main layout stack block.  This allows nesting. */
+    if (MGI_LOCK_COUNT(MemGetInfo(p_stack->LS_self, MGIT_FLAGS_AND_LOCK_COUNT)) == 1)  {
+        /* Go through and unlock the active references */
+        p_ref = p_stack->LS_tableLayoutStackRef ;
+        for (i=0; i<p_stack->LS_numActiveReferences; i++, p_ref++)  {
+            if (p_ref->p_level)  {
+                p_ref->p_level = NULL ;
+                MemUnlock(p_ref->block) ;
+            }
+        }
+
+        /* No more are referenced */
+        p_stack->LS_numActiveReferences = 0 ;
+    }
+
+    /* Unlock ourself on the way out */
+    MemUnlock(p_stack->LS_self) ;
+}
+
+void ILayoutStackTableLevelAllocBlockGroup(T_layoutStack *p_stack, word level)
+{
+    word i, index ;
+    word from, to ;
+    MemHandle block ;
+    T_tableLayoutStackReference *p_ref ;
+
+    /* First, allocate a block for this group */
+    block = MemAlloc(
+                sizeof(T_layoutLevelTable) * 
+                    LAYOUT_STACK_TABLE_LEVELS_PER_BLOCK,
+                HF_DYNAMIC, 
+                HAF_ZERO_INIT) ;
+
+    /* Setup a whole block of reference pointers */
+    from = (level / LAYOUT_STACK_TABLE_LEVELS_PER_BLOCK) * LAYOUT_STACK_TABLE_LEVELS_PER_BLOCK ;
+    to = from + LAYOUT_STACK_TABLE_LEVELS_PER_BLOCK;
+    if (to > HTML_LAYOUT_MAX_LAYOUT_LEVELS)
+        to = HTML_LAYOUT_MAX_LAYOUT_LEVELS ;
+
+    p_ref = p_stack->LS_tableLayoutStackRef + from ;
+    for (i=from, index=0; i<to; i++, index++, p_ref++)  {
+        p_ref->block = block ;
+        p_ref->index = index ;
+        p_ref->p_level = NULL ;
+    }
+}
+
+T_layoutLevelTable *LayoutStackTableLevelAccess(T_layoutStack *p_stack, word level)
+{
+    T_tableLayoutStackReference *p_ref ;
+
+    EC_ERROR_IF(level >= HTML_LAYOUT_MAX_LAYOUT_LEVELS, -1) ;
+
+    /* If it is already locked, we'll return the pointer already stored */
+    p_ref = p_stack->LS_tableLayoutStackRef + level ;
+    if (p_ref->p_level)
+        return p_ref->p_level ;
+
+    /* Hmm, no pointer, is the block there? */
+    if (!p_ref->block)  {
+        /* No block!  Allocate the sucker */
+        ILayoutStackTableLevelAllocBlockGroup(p_stack, level) ;
+    }
+
+    /* Lock the corresponding block and setup a reference to it */
+    p_ref->p_level = MemLock(p_ref->block) ;
+    p_ref->p_level += p_ref->index ;
+
+    /* Record the last active reference */
+    if (level >= p_stack->LS_numActiveReferences)
+        p_stack->LS_numActiveReferences = level+1 ;
+
+    return p_ref->p_level ;
+}
+
+@extern method HTMLTextClass, MSG_HTML_TEXT_LAYOUT_START
+{
+    T_layoutStack *p_stack ;
+    word width ;
+    word leftMargin ;
+    word topMin, topSoftMin, topMax, percent ;
+    word viewWidth ;
+    GetScaleParams scaleFactor ;
+    WWFixedAsDWord scrollbarWidth ;
+    word *p_maxWidth ;
+    WordFlags oldState ;
+
+    ObjVarDeleteData(oself, ATTR_HTML_TEXT_PREVIOUS_NUM_CELLS_FORMATTED) ;
+    @call oself::MSG_HTML_TEXT_INTERNAL_INIT_INVAL_AREA(G_invalArea) ;
+
+    /* Let the sub-class know that we are starting to format */
+    /* (if we are not in the middle of a restart action */
+    if (!(pself->HTI_layoutState & HTS_RESTARTING_LAYOUT))  {
+        pself->HTI_layoutState |= HTS_CALCULATING_LAYOUT ;
+
+        @call oself::MSG_HTML_TEXT_FORMATTING_STARTED() ;
+    } else {
+        /* Ok, we've now doing the restart */
+        pself->HTI_layoutState &= (~HTS_RESTARTING_LAYOUT) ;
+    }
+
+    /* If we were already going, stop and restart */
+    if (pself->HTI_layoutStack) {
+        /* Technically, we are restarting the existing layout, so */
+        /* stop, but this is not the end of formatting */
+        oldState = pself->HTI_layoutState ;
+        pself->HTI_layoutState |= HTS_RESTARTING_LAYOUT ;
+        @call oself::MSG_HTML_TEXT_LAYOUT_STOP() ;
+
+        /* Done with our restart.  Put the formatting state back. */
+        pself->HTI_layoutState = oldState ;
+    }
+
+    /* Yep, we're definitely calculating from here on */
+    pself->HTI_layoutState |= HTS_CALCULATING_LAYOUT ;
+
+    pself->HTI_layoutStack = LayoutStackAlloc() ;
+
+    /* Initialize all pertinent data to this stack */
+    p_stack = LayoutStackLock(pself->HTI_layoutStack) ;
+/* ZERO_INIT block, don't need, but remember this is true:
+    p_stack->LS_stackCellDepth = 0 ;
+    p_stack->LS_stackTableDepth = 0 ;
+    p_stack->LS_nextCellIndex = 0 ;
+    p_stack->LS_currentMasterCell = 0 ;
+    p_stack->LS_layoutHasChanged = FALSE ;
+*/    
+    p_stack->LS_lastSeekedRegion = 0xFFFF ;
+    p_stack->LS_cellArray = pself->HTI_cellArray ;
+    p_stack->LS_tableArray = pself->HTI_tableArray ;
+    p_stack->LS_regionArray = RegionArrayConstruct(oself, pself) ;
+    p_stack->LS_maxViewHeight = pself->HTI_maxViewHeight ;
+    p_stack->LS_pastHeight = 
+        (pself->HTI_layoutState & HTS_PAST_VIEW_HEIGHT)?TRUE:FALSE ;
+    p_stack->LS_textObj = oself ;
+    p_stack->LS_vmFile = pself->VTI_vmFile ;
+
+/* ZERO_INIT block, don't need, but remember this is true:
+    p_stack->LS_done = FALSE ;
+    p_stack->LS_layoutHasChanged = FALSE ;
+    p_stack->LS_lastMasterCell = 0 ;
+    p_stack->LS_currentMasterCellGotImage = FALSE ;
+    p_stack->LS_currentCell = 0 ;
+    p_stack->LS_oneMorePass = FALSE ;
+*/
+    /* Capture the zooming state when we start the layout. */
+    p_stack->LS_needCompleteRedraw = 
+        (pself->HTI_layoutState & 
+            HTS_LAYOUT_NEED_COMPLETE_PROGRESSIVE_REDRAW)?TRUE:FALSE ;
+    
+    CellArrayStartAccess(pself->HTI_cellArray) ;
+    p_stack->LS_numCells = CellArrayGetCount(pself->HTI_cellArray) ;
+    CellArrayEndAccess(pself->HTI_cellArray) ;
+
+    RegionArrayStartAccess(p_stack->LS_regionArray) ;
+    p_stack->LS_numRegions = RegionArrayGetCount(p_stack->LS_regionArray) ;
+    RegionArrayEndAccess(p_stack->LS_regionArray) ;
+
+    /* Start with the master cell */
+    p_stack->LS_type = LAYOUT_STACK_ELEMENT_TYPE_CELL ;
+
+    viewWidth = pself->HTI_formattedWidth ;
+    if (pself->HTI_maxViewHeight == HTML_UNLIMITED_VIEW_HEIGHT)  {
+        @call (pself->HTI_myView)::MSG_GEN_VIEW_GET_SCALE_FACTOR(&scaleFactor);
+        scrollbarWidth = GrUDivWWFixed(
+                             MakeWWFixed(G_widthOfScrollBar), 
+                             scaleFactor.GSP_xScaleFactor) ;
+        if (FractionOf(scrollbarWidth))
+            scrollbarWidth += 65536 ;
+        if (viewWidth > IntegerOf(scrollbarWidth))
+            viewWidth -= IntegerOf(scrollbarWidth) ;
+    }
+    pself->HTI_viewWidth = viewWidth ;
+    EC_ERROR_IF(pself->HTI_viewWidth > 0x8000, ERROR_VIEW_WIDTH_IS_TOO_BIG) ;
+    p_stack->LS_viewWidth = pself->HTI_viewWidth ;
+
+    TableArrayStartAccess(pself->HTI_tableArray) ;
+    CellArrayStartAccess(pself->HTI_cellArray) ;
+    if (pself->HTI_layoutState & HTS_LAYOUT_NEED_TO_BLAST_HARD_MIN_WIDTHS)  {
+        IBlastTableAndCellMinWidths(pself->HTI_cellArray, pself->HTI_tableArray) ;
+        pself->HTI_layoutState &= (~HTS_LAYOUT_NEED_TO_BLAST_HARD_MIN_WIDTHS) ;
+    }
+    ICalculateCellMinMax(NULL, pself, 0, 0xFFFF, &topMin, &topMax, &topSoftMin, &percent) ;
+    CellArrayEndAccess(pself->HTI_cellArray) ;
+    TableArrayEndAccess(pself->HTI_tableArray) ;
+
+    /* Start everything at the top left and the same width as the parent */
+    width = pself->HTI_viewWidth ;
+
+    /* Eat up space for the left edge (and one pixel on the right edge) */
+    leftMargin = pself->HTI_pageLeftMargin ;
+    if (width > leftMargin+1)
+        width -= leftMargin+1 ;
+
+    /* If the width is unknown, use the default width */
+    if (width == 0)
+        width = DEFAULT_START_WIDTH ;
+
+#if 1
+    p_maxWidth = ObjVarFindData(oself, ATTR_VIS_TEXT_WRAP_AFTER_OVERFLOW) ;
+    if (p_maxWidth)  {
+        ObjVarDeleteData(oself, ATTR_VIS_TEXT_WRAP_AFTER_OVERFLOW) ;
+        p_maxWidth = ObjVarAddData(oself, ATTR_VIS_TEXT_WRAP_AFTER_OVERFLOW, sizeof(word)) ;
+        if (p_maxWidth)
+            *p_maxWidth = width ;
+        pself = ObjDerefVis(oself) ;
+    }
+#endif
+
+    /* Use a bigger width if the whole page is too narrow */
+    if (topMin > width)
+        width = topMin ;
+
+    ILayoutCellStart(
+        p_stack,
+        width,
+        leftMargin,
+        pself->HTI_pageTopMargin,
+        0) ;
+    LayoutStackUnlock(p_stack) ;
+
+    pself->HTI_numFormattedCells = 0 ;
+
+    /* Start the process */
+    @send ,forceQueue ,checkDuplicate oself::MSG_HTML_TEXT_INTERNAL_LAYOUT_UPDATE_EVENT() ;
+    ProfPoint("MSG_HTML_TEXT_LAYOUT_START") ;
+}
+
+@extern method HTMLTextClass, MSG_HTML_TEXT_LAYOUT_STOP
+{
+    T_layoutStack *p_stack ;
+
+    if (pself->HTI_layoutStack)  {
+        if (!(pself->HTI_layoutState & HTS_RESTARTING_LAYOUT))  {
+            /* Hide everything that was still in progress */
+            p_stack = LayoutStackLock(pself->HTI_layoutStack) ;
+            IHideCells(p_stack, p_stack->LS_cellLayoutStack[0].LLC_cellIndex, 0xFFFF) ;
+            LayoutStackUnlock(p_stack) ;
+
+            /* Update our boundaries */
+            @call oself::MSG_HTML_TEXT_CALCULATE_BOUNDARIES() ;
+
+            /* Let the sub-class know that we are finished */
+            @call oself::MSG_HTML_TEXT_FORMATTING_ENDED() ;
+
+            @call oself::MSG_HTML_TEXT_INTERNAL_FLUSH_INVAL_AREA() ;
+        }
+        LayoutStackFree(pself->HTI_layoutStack) ;
+        pself->HTI_layoutStack = NullHandle ;
+    } else {
+        @call oself::MSG_HTML_TEXT_INTERNAL_FLUSH_INVAL_AREA() ;
+    }
+    pself->HTI_layoutState &= ~(HTS_CALCULATING_LAYOUT | HTS_LAYOUT_DIRTY | 
+                                HTS_LAYOUT_NEED_COMPLETE_PROGRESSIVE_REDRAW) ;
+
+    /* if we're supposed to go to a non-top position, jump there now */
+    if(pself->HTI_pendingAnchor != NAME_POOL_NONE)
+    {
+      @call self::MSG_HTML_TEXT_GOTO_ANCHOR(pself->HTI_namePool, 
+        pself->HTI_pendingAnchor);
+      NamePoolReleaseToken(pself->HTI_namePool, pself->HTI_pendingAnchor);
+      pself->HTI_pendingAnchor = NAME_POOL_NONE;
+    }
+
+    ProfPoint("MSG_HTML_TEXT_LAYOUT_STOP") ;
+}
+
+void IHideCells(T_layoutStack *p_stack, word startCell, word endCell)
+{
+    word regionIndex ;
+    VisLargeTextRegionArrayElement *p_region ;
+    word size ;
+    
+    /* Find the first region of this group */
+    regionIndex = 
+        ICellDetermineFirstRegion(
+            p_stack->LS_cellArray, 
+            startCell) ;
+
+    if (regionIndex < p_stack->LS_numRegions)  {
+        /* Loop until we reach the end or an internal break occurs */
+        RegionLock(p_stack->LS_regionArray, regionIndex, &p_region, &size) ;
+        while (regionIndex < p_stack->LS_numRegions) {
+            /* Stop if we are out of bounds */
+            EC_ERROR_IF(
+                p_region->VLTRAE_section < startCell,
+                ERROR_REGION_ARRAY_HAS_CORRUPT_CELL_INDEXES) ;
+            if (p_region->VLTRAE_section >= endCell)
+                break ;
+
+            /* Hide the cell by pushing it out of bounds */
+            p_region->VLTRAE_spatialPosition.PD_y |= HTML_TEXT_REGION_HIDDEN_Y ;
+            RegionDirty(p_region) ;
+            regionIndex++ ;
+            if (regionIndex < p_stack->LS_numRegions)
+                RegionNext(&p_region, &size) ;
+        } 
+        RegionUnlock(p_region) ;
+    }
+    ProfPoint("IHideCells") ;
+}
+
+@extern method HTMLTextClass, MSG_HTML_TEXT_INTERNAL_LAYOUT_UPDATE_EVENT
+{
+    T_layoutStack *p_stack ;
+    Boolean didGrow ;
+EC( word originalCellIndex; )
+    word topMin, topMax, topHardMin ;
+    word last ;
+    word percent ;
+@ifdef JAVASCRIPT_SUPPORT
+    word focusFormElement;
+@endif
+
+    /* Turn back on the drawing here */
+    if (pself->HTI_layoutState & HTS_NEED_TO_REACTIVE_DRAWING)  {
+        @call oself::MSG_HTML_TEXT_DRAWING_ON_OFF(TRUE) ;
+        pself->HTI_layoutState &= (~HTS_NEED_TO_REACTIVE_DRAWING) ;
+    }
+
+    /* Drawing MUST be on here */
+    EC_WARNING_IF(pself->HTI_drawingOn != 0, -1) ;
+    if (pself->HTI_drawingOn != 0)  {
+        @call oself::MSG_HTML_TEXT_LAYOUT_STOP() ;
+	return ;
+    }
+
+    if (pself->HTI_layoutStack)  {
+        if (pself->HTI_layoutState & HTS_CELL_REGION_LINKS_INVALID)  {
+            ISetupRegionLinks(pself->HTI_cellArray, RegionArrayConstruct(oself, pself)) ;
+            pself->HTI_layoutState &= (~HTS_CELL_REGION_LINKS_INVALID) ;
+        }
+        p_stack = LayoutStackLock(pself->HTI_layoutStack) ;
+    EC( originalCellIndex = p_stack->LS_nextCellIndex ; )
+
+        p_stack->LS_cellArray = pself->HTI_cellArray ;
+        p_stack->LS_tableArray = pself->HTI_tableArray ;
+        p_stack->LS_regionArray = RegionArrayConstruct(oself, pself) ;
+        p_stack->LS_numRegions = RegionArrayGetCount(p_stack->LS_regionArray) ;
+        CellArrayStartAccess(pself->HTI_cellArray) ;
+        p_stack->LS_numCells = CellArrayGetCount(pself->HTI_cellArray) ;
+        CellArrayEndAccess(pself->HTI_cellArray) ;
+
+        /* Process cells in a cell group or cells in a table */
+        if (p_stack->LS_type == LAYOUT_STACK_ELEMENT_TYPE_CELL)  {
+            ILayoutCalculateCell(p_stack) ;
+        } else {
+            ILayoutCalculateTable(p_stack) ;
+        }
+
+        /* Check to see if we need to start the formatting over from the top */
+        if ((((pself->HTI_layoutState & HTS_PAST_VIEW_HEIGHT)==0) && (p_stack->LS_pastHeight)) || 
+               (pself->HTI_layoutState & HTS_LAYOUT_RESTART_REQUESTED))  {
+            /* Ok, looks like a scroll bar is needed.  Restart the layout and */
+            /* not that we went past the view's height */
+            pself->HTI_layoutState |= HTS_PAST_VIEW_HEIGHT | HTS_RESTARTING_LAYOUT ;
+            pself->HTI_layoutState &= (~HTS_LAYOUT_RESTART_REQUESTED) ;
+            pself->HTI_maxViewHeight = HTML_UNLIMITED_VIEW_HEIGHT ;
+            @call oself::MSG_HTML_TEXT_INTERNAL_FLUSH_INVAL_AREA() ;
+            @call oself::MSG_HTML_TEXT_INTERNAL_INIT_INVAL_AREA(G_invalArea) ;
+            @call oself::MSG_HTML_TEXT_LAYOUT_STOP() ;
+            @call oself::MSG_HTML_TEXT_LAYOUT_START() ;
+        } else {
+            /* Time to update a swath worth (unless we grew in size) */
+            if ((p_stack->LS_stackCellDepth == 1) && 
+                (p_stack->LS_currentMasterCell != p_stack->LS_lastMasterCell))  {
+                didGrow = CalculateCellArrayLongestLines(
+                              p_stack->LS_regionArray,
+                              p_stack->LS_cellArray,
+                              oself,
+                              p_stack->LS_lastMasterCell,
+                              p_stack->LS_currentMasterCell) ;
+                if ((didGrow) || (p_stack->LS_currentMasterCellGotImage))  {
+                    /* Undo our last state and try again */
+                    p_stack->LS_cellLayoutStack[0] = p_stack->LS_undoCell ;
+
+                    /* Revert the cell and which one to compute next */
+                    IHideCells(
+                        p_stack,
+                        p_stack->LS_lastMasterCell, 
+                        p_stack->LS_currentMasterCell) ;
+
+                    /* Repropegate the Min/Max sizing */
+                    TableArrayStartAccess(pself->HTI_tableArray) ;
+                    CellArrayStartAccess(pself->HTI_cellArray) ;
+                    ICalculateCellMinMax(
+                           NULL,
+                           pself, 
+                           (p_stack->LS_lastMasterCell)?(p_stack->LS_lastMasterCell-1):p_stack->LS_lastMasterCell, 
+                           p_stack->LS_currentMasterCell, 
+                           &topMin, 
+                           &topMax, 
+                           &topHardMin,
+                           &percent) ;
+                    CellArrayEndAccess(pself->HTI_cellArray) ;
+                    TableArrayEndAccess(pself->HTI_tableArray) ;
+
+                    if (topMin > p_stack->LS_cellLayoutStack[0].LLC_availableWidth)
+                        p_stack->LS_cellLayoutStack[0].LLC_availableWidth = topMin ;
+
+                    EC_ERROR_IF(
+                        p_stack->LS_cellLayoutStack[0].LLC_availableWidth==0,
+                        ERROR_AVAILABLE_WIDTH_SHOULD_NOT_BE_ZERO) ;
+
+                    /* Backup the position */
+                    p_stack->LS_nextCellIndex = 
+                        p_stack->LS_currentMasterCell = 
+                            p_stack->LS_lastMasterCell ;
+
+                    /* Avoid an error here by allow going backwards */
+    EC(             originalCellIndex = p_stack->LS_nextCellIndex ; )
+
+                    p_stack->LS_done = FALSE ;
+
+		    /* Reset the 'got image' flag */
+		    p_stack->LS_currentMasterCellGotImage = FALSE ;
+                } else {
+                    last = p_stack->LS_lastMasterCell ;
+                    /* Move to the next cell and update the new undo state */
+                    p_stack->LS_lastMasterCell = p_stack->LS_currentMasterCell ;
+                    p_stack->LS_undoCell = p_stack->LS_cellLayoutStack[0] ;
+
+                    /* Allow more cells to be shown now */
+                    pself->HTI_numFormattedCells = p_stack->LS_currentMasterCell ;
+                    IAdjustRegions(oself, pself, last, p_stack->LS_currentMasterCell) ;
+
+                    /* If we have cross the first area of the page, then go ahead and show it */
+                    if ((last <= 1) && (p_stack->LS_currentMasterCell > 1))  {
+                        @call oself::MSG_HTML_TEXT_INTERNAL_FLUSH_INVAL_AREA() ;
+                    } else {
+                        if ((pself->HTI_invalArea.RD_bottom - pself->HTI_invalArea.RD_top) >= pself->HTI_heightThreshold)
+                            @call oself::MSG_HTML_TEXT_INTERNAL_FLUSH_INVAL_AREA() ;
+                    }
+                }
+            }
+
+            /* Make sure we are going forward through the list */
+            EC_ERROR_IF(
+               p_stack->LS_nextCellIndex < originalCellIndex,
+               ERROR_NEXT_CELL_INDEX_IS_GOING_TO_A_PREVIOUS_INDEX) ;
+
+            /* Send out another event or stop */
+            if (!p_stack->LS_done)  {
+                LayoutStackUnlock(p_stack) ;
+                @send ,forceQueue ,checkDuplicate oself::MSG_HTML_TEXT_INTERNAL_LAYOUT_UPDATE_EVENT() ;
+            } else {
+                if ((p_stack->LS_oneMorePass) || 
+                        (pself->HTI_layoutState & HTS_LAYOUT_NEED_TO_BLAST_HARD_MIN_WIDTHS))  {
+                    p_stack->LS_oneMorePass = FALSE ;
+                    LayoutStackUnlock(p_stack) ;
+
+                    pself->HTI_layoutState |= HTS_RESTARTING_LAYOUT ;
+                    @call oself::MSG_HTML_TEXT_INTERNAL_FLUSH_INVAL_AREA() ;
+                    @call oself::MSG_HTML_TEXT_INTERNAL_INIT_INVAL_AREA(G_invalArea) ;
+                    @call oself::MSG_HTML_TEXT_LAYOUT_STOP() ;
+                    @call oself::MSG_HTML_TEXT_LAYOUT_START() ;
+                } else {
+                    LayoutStackUnlock(p_stack) ;
+
+                    /* No matter what images are waiting, we need to clear that list */
+                    @call oself::MSG_HTML_TEXT_WAITING_IMAGES_CLEAR() ;
+
+                    @call oself::MSG_HTML_TEXT_LAYOUT_STOP() ;
+@ifdef JAVASCRIPT_SUPPORT
+                    /* focus form element, if any */
+                    if ((@call oself::MSG_META_GET_VAR_DATA(ATTR_HTML_TEXT_FOCUS_FORM_ELEMENT, sizeof(word), &focusFormElement)) == sizeof(word)) {
+			@send, forceQueue oself::MSG_HTML_TEXT_FORM_ELEMENT_GRAB(focusFormElement);
+			@call oself::MSG_META_DELETE_VAR_DATA(ATTR_HTML_TEXT_FOCUS_FORM_ELEMENT);
+		    }
+@endif
+                    ECDumpHTMLText(pself, "Done") ;
+                }
+            }
+        }
+    }
+    ProfPoint("MSG_HTML_TEXT_INTERNAL_LAYOUT_UPDATE_EVENT") ;
+}
+
+
+

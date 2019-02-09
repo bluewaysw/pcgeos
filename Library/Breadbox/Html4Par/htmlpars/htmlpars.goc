@@ -1,0 +1,2362 @@
+/***********************************************************************
+ *
+ * PROJECT:       HTMLPars
+ * FILE:          htmlpars.goc
+ *
+ * AUTHOR:        Marcus Gr�ber
+ *
+ * NOTE:          To compile properly, this file requires the INCLUDE
+ *                files from the OmniGo SDK or later, because the
+ *                VisTextParaAttr structure is declared incorrectly in
+ *                earlier versions.
+ *
+ ***********************************************************************/
+
+/**************************************************************************
+ *      Include files
+ **************************************************************************/
+
+@include <stdapp.goh>
+#include <chunkarr.h>
+
+#include <Ansi/string.h>
+#include <Ansi/stdio.h>
+#include <Ansi/stdlib.h>
+#include <Ansi/ctype.h>
+#include <geoMisc.h>
+
+@include <fixes.goh>
+@include <html4par.goh>
+
+@include "options.goh"
+#include "internal.h"
+#include "errors.h"
+@include <initfile.h>
+
+ReadHTML_getc LOCAL getcFileURL;   /* forward */
+#if JAVASCRIPT_SUPPORT
+/*ReadHTML_getc LOCAL getcScriptURL;  */ /* forward */
+#endif
+
+/* keep blocks with arrays below this size */
+#define PARSE_ARRAY_MEM_SIZE_LIMIT 30000
+
+/***************************************************************************
+ *              Default style constants
+ ***************************************************************************/
+
+/* Was 12 SANS, but changed to 14 for improved appearance,
+ * and of course ROMAN should be the default font */
+@ifdef COMPILE_OPTION_BITMAP_FONTS
+const VisTextCharAttr vcaDefault =
+  CHAR_ATTR_FONT_SIZE_STYLE(DEFAULT_BITMAP_FONT, 14, 0);
+@else
+const VisTextCharAttr vcaDefault =
+  CHAR_ATTR_FONT_SIZE_STYLE(FID_DTC_URW_ROMAN, 14, 0);
+@endif
+
+const VisTextParaAttr vpaDefault=
+  PARA_ATTR_STYLE_JUST_LEFT_RIGHT_PARA(2,CA_NULL_ELEMENT, J_LEFT, 0, 0, 0);
+
+const sword fontRampDefault[] = { 12,12,14,18,20,24,28};
+/* OLD: const sword fontRampDefault[] = { 9,10,12,14,16,18,20}; */
+
+/* For TV, try to stick with sizes that have hand-tuned bitmaps */
+const sword fontRampNoSmall[] = {12,14,14,18,18,24,28};
+/* OLD const sword fontRampNoSmall[] = {12,12,12,14,16,18,20}; */
+
+
+/*
+ * Include parsing tables for tags, entities and color names:
+ */
+@include "htmlsty.goh"
+
+
+/***************************************************************************
+ *              Variables used during loading of the document
+ ***************************************************************************/
+/* (These variables may eventually go into a session-specific state block.) */
+
+HTMLextra *HTMLext;
+TextTransferBlockHeader *ttbh;
+HypertextTransferBlockHeader *htbh;
+MemHandle transferHeaderMem, hypertextHeaderMem;
+optr NamePool;
+dword textpos;
+
+word            currentFlags;
+VisTextCharAttr currentCS;
+VisTextParaAttr currentS;
+sword           currentBaseFont;
+
+VisTextCharAttr vcaBase;
+
+Boolean insertCell;
+HTMLcellData insertCellData;
+word currentCellLevel;
+
+int c2;
+
+static dword parpos;
+
+static Boolean insertParagraph;
+static Boolean insertSpace;
+static VisTextCharAttr insertSpaceCS;
+static word insertParagraphFlags;
+static VisTextCharAttr insertParagraphCS;
+VisTextParaAttr insertParagraphS;
+static char insertPrepend[10];
+
+static VisTextCharAttr lastCharAttr;
+static VisTextParaAttr lastParaAttr;
+
+static FontID fontExample;
+
+static word ignoreTags = 0 ;
+
+/* Yes, yes, more global variables.  But this watches the */
+/* memory allocation */
+AllocWatcherHandle G_allocWatcher = NullHandle ;
+dword G_amountAllocated = 0 ;
+Boolean G_hitAllocLimit = FALSE ;
+Boolean G_abortParse = FALSE ;
+Boolean G_isParsing = FALSE ;
+
+/*
+   The following variable holds the name token of the string representing
+   the content of a number of special tokens which are not being rendered
+   as plain text, like <TITLE>content</TITLE> or <TEXTAREA>..</TEXTAREA>.
+ */
+NameToken storedContent;
+
+/* Index of script fragment on page */
+static word scriptCount;
+
+#ifdef DO_DBCS
+/* code page for parsing, and later for drawing form elements, etc.
+   (used in ApplyFontWeightWidthAndSpacingAdjustment, set in ParseHTMLFile,
+   ParsePlainFile, and MSG_VIS_TEXT_GRAPHIC_VARIABLE_DRAW) */
+DosCodePage G_htmlCodePage;
+#endif
+
+/***************************************************************************
+ *              Translate between style sheet and Geos attributes
+ ***************************************************************************/
+
+/* Both VTCA_fontID & VTCA_pointSize must be set for this to work properly */
+
+void AdjustTrackKerning(VisTextCharAttr *vtca)
+{
+    if(vtca->VTCA_fontID == FID_DTC_URW_SANS) {
+
+    if(vtca->VTCA_pointSize.WBF_int <= 14) {
+        vtca->VTCA_trackKerning = 15;
+    } else {
+        vtca->VTCA_trackKerning = 7;
+    }
+    }
+}
+
+void GetCharacterBase(VisTextCharAttr *cs)
+{
+    sword *fontRamp = (HTMLext->HE_options & HTML_NO_REDUCED_SIZES)?
+      fontRampNoSmall : fontRampDefault;
+
+    *cs = vcaBase;
+/*    cs->VTCA_pointSize.WBF_int =
+      ((fontRamp[currentBaseFont-1] * vcaBase.VTCA_pointSize.WBF_int + 6) / 12); */
+    cs->VTCA_pointSize.WBF_int = fontRamp[currentBaseFont-1];
+
+    /* Set the track kerning to improve the appearance of the text */
+    AdjustTrackKerning(cs);
+}
+
+void GetParagraphBase(VisTextParaAttr *ps)
+{
+    *ps = vpaDefault;
+}
+
+@extern chunk FontCharacterAdjustmentArrayForTV ;
+
+void IAppendFontCharacterAdjustment(optr table, word nums[], word count)
+{
+    FontCharacterAdjustment *p_fontAdj ;
+    LMemReAlloc(table, (1+count) * sizeof(*p_fontAdj)) ;
+    p_fontAdj = LMemDeref(table) ;
+    p_fontAdj += count ;
+    p_fontAdj->FCA_font = nums[0] ;
+    p_fontAdj->FCA_pointSize = nums[1] ;
+    p_fontAdj->FCA_newFont = nums[2] ;
+    p_fontAdj->FCA_newPointSize = nums[3] ;
+    p_fontAdj->FCA_fontWeight = nums[4] ;
+    p_fontAdj->FCA_fontWidth = nums[5] ;
+    p_fontAdj->FCA_trackKerning = nums[6] ;
+}
+
+@ifdef DO_DBCS
+optr IReadFontAdjustTableFromINI(char *key)
+@else
+optr IReadTVFontAdjustTableFromINI(void)
+@endif
+{
+    word dataSize ;
+    TCHAR *p_c ;
+    word nums[7] ;
+    word column ;
+    MemHandle memINI = NullHandle ;
+    MemHandle mem ;
+    optr table = NullHandle ;
+    word count, num ;
+    int mode = 0 ;
+    static word ender[7] = {FID_INVALID, 0, FID_INVALID, 0, 125, 110, 3} ;
+
+@ifdef DO_DBCS
+    if (!InitFileReadStringBlock("HTMLView", key, &memINI, IFRF_READ_ALL, &dataSize))  {
+@else
+    if (!InitFileReadStringBlock("HTMLView", "tvFontAdjust", &memINI, IFRF_READ_ALL, &dataSize))  {
+@endif
+        p_c = MemLock(memINI) ;
+        mem = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+        MemLock(mem) ;
+        table = ConstructOptr(mem, LMemAlloc(mem, 0)) ;
+        count = 0 ;
+        column = 0 ;
+        while (dataSize--)  {
+            if (mode==0)  {
+                if (isdigit(*p_c))  {
+                    mode = 1 ;
+                    num = *p_c - '0' ;
+                }
+            } else if (mode==1)  {
+                if (isdigit(*p_c))  {
+                    num *= 10 ;
+                    num += *p_c - '0' ;
+                } else {
+                    mode = 0 ;
+                    nums[column++] = num ;
+                    if (column==7)  {
+                        IAppendFontCharacterAdjustment(table, nums, count++) ;
+                        column = 0 ;
+                    }
+                }
+            }
+            p_c++ ;
+        }
+        IAppendFontCharacterAdjustment(table, ender, count++) ;
+        MemUnlock(memINI) ;
+        MemFree(memINI) ;
+        MemUnlock(OptrToHandle(table)) ;
+    }
+
+    return table ;
+}
+
+FontID IApplyFontAdjustment(optr table, VisTextCharAttr *p_cs)
+{
+    FontID found ;
+    FontCharacterAdjustment *p_fontAdj ;
+
+    MemLock(OptrToHandle(table)) ;
+    p_fontAdj = LMemDeref(table) ;
+
+    /* Scan the list for a matching font and point size */
+    /* If we find a point size of 0, we've come to the end of the list */
+    /* and the contents are the default for all other fonts. */
+    while (p_fontAdj->FCA_font != FID_INVALID)  {
+        if ((p_fontAdj->FCA_font == p_cs->VTCA_fontID) &&
+                (p_fontAdj->FCA_pointSize == p_cs->VTCA_pointSize.WBF_int))
+            break ;
+        p_fontAdj++ ;
+    }
+
+    /* Found a match (or the end) */
+    found = p_fontAdj->FCA_font ;
+    if (p_fontAdj->FCA_font != FID_INVALID)
+        p_cs->VTCA_fontID = p_fontAdj->FCA_newFont ;
+    if (p_fontAdj->FCA_pointSize != 0)  {
+        p_cs->VTCA_pointSize.WBF_int = p_fontAdj->FCA_newPointSize ;
+        p_cs->VTCA_pointSize.WBF_frac = 0 ;
+    }
+    p_cs->VTCA_trackKerning = p_fontAdj->FCA_trackKerning ;
+    p_cs->VTCA_fontWeight = p_fontAdj->FCA_fontWeight ;
+    p_cs->VTCA_fontWidth = p_fontAdj->FCA_fontWidth ;
+    
+    MemUnlock(OptrToHandle(table)) ;
+
+    return found ;
+}
+
+@ifdef DO_DBCS
+void ApplyFontWeightWidthAndSpacingAdjustment(VisTextCharAttr *p_cs, Boolean useCodePage)
+@else
+void ApplyFontWeightWidthAndSpacingAdjustment(VisTextCharAttr *p_cs)
+@endif
+{
+    static word tvMode = 2 ;
+    optr app ;
+    DisplayScheme scheme ;
+    static optr tvModeINIFontAdjustTable = NullHandle ;
+    FontID found = FID_INVALID;
+@ifdef DO_DBCS
+    static CodePageFontAdjEntry cpFontAdj[NUM_CODE_PAGE_FONT_ADJ_ENTRIES] = {{0}};
+    int i;
+@endif
+
+    if (tvMode == 2)  {
+        /* Determine if we are doing tv or not */
+        app = GeodeGetAppObject(GeodeGetProcessHandle()) ;
+        @call app::MSG_GEN_APPLICATION_GET_DISPLAY_SCHEME(&scheme) ;
+        if (((scheme.DS_displayType & DT_DISP_ASPECT_RATIO) >> 
+                DT_DISP_ASPECT_RATIO_OFFSET) == DAR_TV)
+            tvMode = 1 ;
+        else
+            tvMode = 0 ;
+
+@ifdef DO_DBCS
+        tvModeINIFontAdjustTable = IReadFontAdjustTableFromINI("tvFontAdjust");
+@else
+        tvModeINIFontAdjustTable = IReadTVFontAdjustTableFromINI() ;
+@endif
+    }
+
+    /* Only adjust if we are doing tv */
+    if (tvMode==1)  {
+        if (tvModeINIFontAdjustTable)  {
+            found = IApplyFontAdjustment(tvModeINIFontAdjustTable, p_cs) ;
+        }
+        /* If not found, look in our standard table */
+        if (found == FID_INVALID)
+            IApplyFontAdjustment(@FontCharacterAdjustmentArrayForTV, p_cs) ;
+    }
+
+@ifdef DO_DBCS
+     if (useCodePage) {
+	 /* adjustments for DBCS code pages */
+	 if (cpFontAdj[0].cp == 0) {
+	     char buf[15];
+	     for (i = 0; i < NUM_CODE_PAGE_FONT_ADJ_ENTRIES; i++) {
+		 sprintfsbcs(buf, "cp-%d", i);
+		 if (!InitFileReadInteger("HTMLView", buf, (word*)&(cpFontAdj[i].cp))) {
+		     sprintfsbcs(buf, "cp%ufadj", cpFontAdj[i].cp);
+		     cpFontAdj[i].table = IReadFontAdjustTableFromINI(buf);
+		 } else {
+		     cpFontAdj[i].cp = -1;
+		     cpFontAdj[i].table = 0;
+		 }
+	     }
+	 }
+	 for (i = 0; i < NUM_CODE_PAGE_FONT_ADJ_ENTRIES; i++) {
+	     if (cpFontAdj[i].cp == -1) break;
+	     if (G_htmlCodePage == cpFontAdj[i].cp) {
+		 if (cpFontAdj[i].table) {
+		     IApplyFontAdjustment(cpFontAdj[i].table, p_cs);
+		 }
+		 break;
+	     }
+	 }
+     }
+@endif
+
+}
+
+void ApplyCharacterDelta(VisTextCharAttr *cs,CharStyleDelta *cd)
+{
+    if(cd->CSD_which & CSD_RESET)
+    {
+      GetCharacterBase(cs);
+    }
+    else
+    {
+        if(cd->CSD_which & CSD_FONT)  
+            cs->VTCA_fontID = cd->CSD_fontOrBase.fontID;
+
+        else if(cd->CSD_which & CSD_BASE)
+            switch(cd->CSD_fontOrBase.baseStyle)
+            {
+              case CSD_BASE_PLAIN:
+                cs->VTCA_fontID = vcaBase.VTCA_fontID;
+                break;
+              case CSD_BASE_EXAMPLE:
+                cs->VTCA_fontID = fontExample;
+                break;
+            }
+
+      if(cd->CSD_which & CSD_SIZE)      /* relative point size change */
+      {
+        sword *fontRamp = (HTMLext->HE_options & HTML_NO_REDUCED_SIZES)?
+          (sword*) fontRampNoSmall : (sword*) fontRampDefault;
+
+        cs->VTCA_pointSize.WBF_int = fontRamp[cd->CSD_pointSize-1];
+        cs->VTCA_pointSize.WBF_frac = 0;/* round to nearest point size */
+
+        /* Set the track kerning to improve the appearance of the text */
+//        AdjustTrackKerning(cs);
+      }
+
+      /* Adjust character weight width and spacing if size or font changed */
+      if (cd->CSD_which & (CSD_SIZE | CSD_FONT))
+@ifdef DO_DBCS
+        ApplyFontWeightWidthAndSpacingAdjustment(cs, TRUE) ;
+@else
+        ApplyFontWeightWidthAndSpacingAdjustment(cs) ;
+@endif
+
+      if(cd->CSD_which & CSD_COLOR)
+        cs->VTCA_color = cd->CSD_color;
+
+      cs->VTCA_textStyles |= cd->CSD_textStyles;
+      cs->VTCA_extendedStyles |= cd->CSD_extendedStyles ;
+    }
+}
+
+/***************************************************************************
+ *              Actual transfer item manipulation
+ ***************************************************************************/
+
+void AddAttrRun(VMChain attrs, VMChain runs, void *rec, dword pos)
+{
+    MemHandle memHandle;
+    word token;
+    TextRunArrayElement trae;
+    word dummy;
+
+    if (AllocWatcherAllocate(G_allocWatcher, sizeof(trae)) == TRUE)  {
+        VMLock(HTMLext->HE_vmFile, VMCHAIN_GET_VM_BLOCK(attrs), &memHandle);
+	if (MemGetInfo(memHandle, MGIT_SIZE) < PARSE_ARRAY_MEM_SIZE_LIMIT) {
+        token = ElementArrayAddElementHandles(memHandle, VM_ELEMENT_ARRAY_CHUNK,
+          rec, (dword)&dummy, NULL);
+        VMDirty(memHandle);                 /* make sure changes get saved */
+        VMUnlock(memHandle);
+
+        trae.TRAE_position.WAAH_low = (sword)pos;
+        trae.TRAE_position.WAAH_high = (sbyte)(pos>>16);
+        trae.TRAE_token = token;
+        HugeArrayAppend(HTMLext->HE_vmFile, VMCHAIN_GET_VM_BLOCK(runs), 1, &trae);
+
+        G_amountAllocated += sizeof(trae) ;
+	} else {
+	    VMUnlock(memHandle);
+	    G_hitAllocLimit = TRUE;
+	}
+    } else {
+        G_hitAllocLimit = TRUE ;
+    }
+}
+
+void ApplyGlobalStyle(CharStyleDelta *caDelta)
+{
+    VisTextCharAttr ca;
+    VisTextParaAttr pa;
+
+    /*
+     * Set character attributes on entire text
+     */
+    GetCharacterBase(&ca);
+    if(caDelta)                         /* apply character style if any */
+      ApplyCharacterDelta(&ca, caDelta);
+    AddAttrRun(ttbh->TTBH_charAttrElements, ttbh->TTBH_charAttrRuns, &ca, 0);
+
+    /*
+     * Set paragraph attributes on entire text
+     */
+    GetParagraphBase(&pa);
+    AddAttrRun(ttbh->TTBH_paraAttrElements, ttbh->TTBH_paraAttrRuns, &pa, 0);
+}
+
+/*
+ * Gets the position in the text stream at which the next AddText() would place
+ * its text. Use this only if you want to ensure you are in sync with an AddText
+ * that is certain to take place. Otherwise it is not yet sure if the space will
+ * actually be inserted or not.
+ */
+long GetTextpos(void)
+{
+    return textpos + (insertSpace? 1:0);
+}
+
+long AddText(VisTextCharAttr *ca,char *text)
+{
+    word len ;
+    long pos;
+@ifdef DO_DBCS
+    TCHAR addBuf[100], *addBufP = addBuf;
+    MemHandle addBufH = 0;
+    DosCodePage cp = HTMLext->HE_codePage;
+    word status, backup;
+@endif
+
+    len = STRLENSB(text) ;
+
+    if(insertSpace)                     // insert pending blank if any
+    {
+      if(textpos)                       // Never start with a space...
+      {
+        if(memcmp(&insertSpaceCS, &lastCharAttr, sizeof(VisTextCharAttr)))
+        {                               // add new run only when changed 
+          AddAttrRun(ttbh->TTBH_charAttrElements, ttbh->TTBH_charAttrRuns, 
+            &insertSpaceCS, textpos);
+          lastCharAttr = insertSpaceCS;
+        }
+
+        HugeArrayAppend(HTMLext->HE_vmFile,
+          VMCHAIN_GET_VM_BLOCK(ttbh->TTBH_text), 1, _TEXT(" "));
+        textpos++;
+        FixupStartPos(textpos-1);       // runs on stack may have to be fixed
+      }
+      insertSpace = FALSE;              // dealt with space
+    }
+
+    if(len && text[len-1]==' ')         // delay trailing space */
+    {
+      len--;                            // cut it off...
+      insertSpace = TRUE;               // ...but remember it
+      insertSpaceCS = *ca;              // also remember its attributes
+    }
+
+    pos = textpos;                      // Starting position of actual text
+
+    if(len)                             /* do not append empty strings */
+    {
+      if(textpos == 0 || memcmp(ca, &lastCharAttr, sizeof(VisTextCharAttr)))
+      {                               /* add new run only when changed */
+        AddAttrRun(ttbh->TTBH_charAttrElements, ttbh->TTBH_charAttrRuns, ca,
+          textpos);
+        lastCharAttr = *ca;
+      }
+
+      if (AllocWatcherAllocate(G_allocWatcher, len*sizeof(TCHAR)) == TRUE)  {
+@ifdef DO_DBCS
+         if (len+1 > sizeof(addBuf)/sizeof(TCHAR)) {
+	     addBufH = MemAlloc((len+1)*sizeof(TCHAR), HF_DYNAMIC, HAF_STANDARD);
+	     if (!addBufH) goto allocLimit;
+	     addBufP = MemLock(addBufH);
+	 }
+	 LocalDosToGeos((unsigned int*)addBufP, text, &len, DEFCHAR, &cp, 
+	 		0, (DosToGeosStringStatus *)&status, &backup);
+	 ConvertGeosCharEntities(addBufP, &len);
+         HugeArrayAppend(HTMLext->HE_vmFile,
+           VMCHAIN_GET_VM_BLOCK(ttbh->TTBH_text), len, addBufP);
+         if (addBufH) MemFree(addBufH);
+@else
+         HugeArrayAppend(HTMLext->HE_vmFile,
+           VMCHAIN_GET_VM_BLOCK(ttbh->TTBH_text), len, text);
+@endif
+         G_amountAllocated += len*sizeof(TCHAR) ;
+
+         textpos += len;                   /* update text position */
+      } else {
+@ifdef DO_DBCS
+allocLimit:
+@endif
+         /* Note that we could not allocate the memory */
+         G_hitAllocLimit = TRUE ;
+      }
+    }
+
+    return pos;
+}
+
+long LOCAL AddParagraph(VisTextCharAttr *ca, VisTextParaAttr *pa, char *text)
+{
+    long pos;
+
+    if(parpos == 0 || memcmp(pa, &lastParaAttr, sizeof(VisTextParaAttr)))
+    {                                 /* add new run only when changed */
+      AddAttrRun(ttbh->TTBH_paraAttrElements, ttbh->TTBH_paraAttrRuns, pa,
+        parpos);
+      memcpy(&lastParaAttr, pa, sizeof(VisTextParaAttr));
+    }
+
+    pos = AddText(ca, text);            /* add paragraph */
+    parpos = textpos;
+
+    return pos;
+}
+
+/*
+ * Add n character from the passed buffer to the JavaScript array
+ * (creating it if necessary). The routine returns the starting index
+ * of the string in the array. The buffer may be modified.
+ */
+long AddJavaScript(char *buf, int n)
+{
+    long pos;
+    int i;
+  
+    if(!htbh->HTBH_scriptCode)      // JS array not yet created?
+    {
+      /* Create it - it is a plain HugeArray wih byte-sized elements */
+      htbh->HTBH_scriptCode = VMCHAIN_MAKE_FROM_VM_BLOCK( 
+        HugeArrayCreate(HTMLext->HE_vmFile, 1, 0));
+    }
+
+    /* Get array where data will be placed */ 
+    pos = HugeArrayGetCount(HTMLext->HE_vmFile,
+      VMCHAIN_GET_VM_BLOCK(htbh->HTBH_scriptCode));
+
+    /* Update line endings */
+    for(i=0; i<n; i++)
+      if(buf[i]=='\r') buf[i] = '\n';
+    
+    HugeArrayAppend(HTMLext->HE_vmFile,
+      VMCHAIN_GET_VM_BLOCK(htbh->HTBH_scriptCode), n, buf);
+
+    return pos;
+}
+
+/*
+ * Scan the script code block between pos1 (inclusive) and pos2 (exclusive)
+ * for enclosing "<!--...-->" comment marks. If so, remove them. Leading and
+ * trailing whitespace around the comment is also removed.
+ */
+void CleanupJavaScript(long pos1, long pos2)
+{
+    char *p, *p2;
+    word size;
+    long pos;
+
+    /*
+     * Scan backwards to remove trailing "--->" and whitespace
+     */
+    pos = pos2-1;
+
+    if(pos>pos1)
+    {
+      HAL_EC( HugeArrayLock(HTMLext->HE_vmFile,
+        VMCHAIN_GET_VM_BLOCK(htbh->HTBH_scriptCode), pos, (void**)&p, &size) );
+        
+      while((*p=='\n' || *p==' ' || *p=='\t') && pos>pos1)
+      {
+        HugeArrayPrev((void**)&p, (void**)&p2, &size);
+        pos--;
+      }
+
+      if(*p=='>' && pos>pos1)
+      {
+        HugeArrayPrev((void**)&p, (void**)&p2, &size);
+        pos--;
+        while(*p=='-' && pos>pos1)
+        {
+          HugeArrayPrev((void**)&p, (void**)&p2, &size);
+          pos--;
+        }
+      }
+
+      HugeArrayUnlock(p);
+    }
+    if(pos<pos2-1)                      // found something to delete: remove it
+    {
+      HugeArrayDelete(HTMLext->HE_vmFile,
+        VMCHAIN_GET_VM_BLOCK(htbh->HTBH_scriptCode), (word)(pos2-1-pos), pos+1);
+      pos2 = pos+1;
+    }
+   
+    /*
+     * Scan forward to remove leading "<--" and whitespace. If a start-of-comment
+     * is found, everything is removed up to the end of the line.
+     */
+    pos = pos1;
+
+    HAL_EC( HugeArrayLock(HTMLext->HE_vmFile,
+      VMCHAIN_GET_VM_BLOCK(htbh->HTBH_scriptCode), pos, (void**)&p, &size) );
+        
+    while((*p=='\n' || *p==' ' || *p=='\t') && pos<pos2)
+    {
+      HugeArrayNext((void**)&p, &size);
+      pos++;
+    }
+
+    if(*p=='<' && pos<pos2)
+    {
+      HugeArrayNext((void**)&p, &size);
+      pos++;
+      if(*p=='!' && pos<pos2)
+      {
+        HugeArrayNext((void**)&p, &size);
+        pos++;
+        while(*p!='\n' && pos<pos2)
+        {
+          HugeArrayNext((void**)&p, &size);
+          pos++;
+        }
+      }
+    }
+
+    HugeArrayUnlock(p);
+    
+    if(pos>pos1)                        // found something to delete: remove it
+      HugeArrayDelete(HTMLext->HE_vmFile,
+        VMCHAIN_GET_VM_BLOCK(htbh->HTBH_scriptCode), (word)(pos-pos1), pos1);
+}
+
+/***************************************************************************
+ *              High-level transfer item manipulation
+ ***************************************************************************/
+
+word ModifyHypertextArray(word array, void *rec, word elsize, word element)
+{
+    ChunkHandle *ch, chunk;
+    MemHandle memHandle;
+    word size, ofs, index;
+    void *p;
+
+#if COMPILE_OPTION_HUGE_ARRAY_CELLS
+    EC_ERROR_IF(array == HTA_CELL_ARRAY, ERROR_HUGE_ARRAY_CELLS_CANT_HAVE_CHUNK_ARRAY_TOO) ;
+#endif
+#if COMPILE_OPTION_HUGE_ARRAY_TABLES
+    EC_ERROR_IF(array == HTA_TABLE_ARRAY, ERROR_HUGE_ARRAY_CELLS_CANT_HAVE_CHUNK_ARRAY_TOO) ;
+#endif
+
+    VMLock(HTMLext->HE_vmFile,
+      VMCHAIN_GET_VM_BLOCK(htbh->HTBH_arrayBlock), &memHandle);
+
+    switch(array)                       /* select which array to append to */
+    {
+      case HTA_IMAGE_ARRAY:
+        ofs = word_offsetof(HypertextArrayBlockHeader, HABH_imageArray);
+        size = sizeof(HTMLimageData);
+        break;
+      case HTA_ANCHOR_ARRAY:
+        ofs = word_offsetof(HypertextArrayBlockHeader, HABH_anchorArray);
+        size = sizeof(HTMLanchorData);
+        break;
+      case HTA_FRAME_ARRAY:
+        ofs = word_offsetof(HypertextArrayBlockHeader, HABH_frameArray);
+        size = sizeof(HTMLframeRec);
+        break;
+      case HTA_FORM_ARRAY:
+        ofs = word_offsetof(HypertextArrayBlockHeader, HABH_formArray);
+        size = sizeof(HTMLformData);
+        break;
+      case HTA_TABLE_ARRAY:
+        ofs = word_offsetof(HypertextArrayBlockHeader, HABH_tableArray);
+        size = sizeof(HTMLtableData);
+        break;
+      case HTA_CELL_ARRAY:
+        ofs = word_offsetof(HypertextArrayBlockHeader, HABH_cellArray);
+        size = sizeof(HTMLcellData);
+        break;
+      case HTA_MAP_ARRAY:
+        ofs = word_offsetof(HypertextArrayBlockHeader, HABH_mapArray);
+        size = 0;
+        break;
+      case HTA_META_ARRAY:
+        ofs = word_offsetof(HypertextArrayBlockHeader, HABH_metaArray);
+        size = sizeof(HTMLmetaData);
+        break;
+      case HTA_EVENT_ARRAY:
+        ofs = word_offsetof(HypertextArrayBlockHeader, HABH_eventArray);
+        size = sizeof(HTMLeventData);
+        break;
+EC(   default: FatalError(-1); )
+    }
+
+    /* Make ch point to chunk handle at position ofs within array block
+       (header is described by HypertextArrayBlockHeader structure). */
+
+    ch = (ChunkHandle *)(((byte *)MemDeref(memHandle)) + ofs);
+
+    if (MemGetInfo(memHandle, MGIT_SIZE) < PARSE_ARRAY_MEM_SIZE_LIMIT) {
+
+    if(element != CA_NULL_ELEMENT)      /* modify existing element */
+    {
+      index = element;
+      p = ChunkArrayElementToPtrHandles(memHandle, *ch, element, &elsize);
+                                        /* override passed size, if any */
+    }
+    else
+    {
+      if(0 == *ch)                      /* create array if not yet there... */
+      {
+        chunk = ChunkArrayCreate(memHandle, size, 0, 0);
+
+        /* This is why ch is computed in such a strange way... we'll have to
+           recreate the pointer after allocating a new chunk in the block
+           may have invalidated the old pointer's segment: */
+
+        ch = (ChunkHandle *)(((byte *)MemDeref(memHandle)) + ofs);
+        *ch = chunk;
+      }
+
+      index = ChunkArrayGetCountHandles(memHandle, *ch);
+      p = ChunkArrayAppendHandles(memHandle, *ch, elsize);
+                                        /* add entry in array */
+    }
+    memcpy(p, rec, size?size:elsize);   /* store entry into array */
+
+    } else {
+	/* return nothing if block too big */
+	index = CA_NULL_ELEMENT;
+    }
+
+    VMDirty(memHandle);                 /* make sure changes get saved */
+    VMUnlock(memHandle);
+
+    return index;                       /* index of newly created element */
+}
+
+word MergeIntoHypertextArrayImage(HTMLimageData *p_image)
+{
+    MemHandle memHandle ;
+    word indexImage = HTML_IMAGE_INDEX_NONE ;
+    optr array ;
+    sword i, n ;
+    HTMLimageData *p_compareImage ;
+    word size ;
+    HypertextArrayBlockHeader *p_header ;
+
+    p_header = VMLock(
+                HTMLext->HE_vmFile,
+                VMCHAIN_GET_VM_BLOCK(htbh->HTBH_arrayBlock), 
+                &memHandle);
+    if (p_header->HABH_imageArray)  {
+        array = ConstructOptr(memHandle, p_header->HABH_imageArray) ;
+        n = ChunkArrayGetCount(array) ;
+        if (n)  {
+            /* Search backwards so we assume that the more recent images */
+            /* are more likely to be duplicates */
+            p_compareImage = ChunkArrayElementToPtr(array, n-1, &size) ;
+            for (i=n-1; i>=0; i--, p_compareImage--)  {
+                if (memcmp(p_compareImage, p_image, sizeof(HTMLimageData))==0)  {
+                    /* Found match */
+                    indexImage = i ;
+                    break ;
+                }
+            }
+        }
+    }
+
+    /* No duplicate image found?  Well, just append */
+    if (indexImage == HTML_IMAGE_INDEX_NONE)
+        indexImage = AppendToHypertextArray(HTA_IMAGE_ARRAY, p_image) ;
+    VMUnlock(memHandle) ;
+
+    return indexImage ;
+}
+
+#if COMPILE_OPTION_HUGE_ARRAY_CELLS
+word AppendToHypertextArrayCell(HTMLcellData *p_cell)
+{
+    word index;
+    HTMLcellData *p_data ;
+    word size ;
+    VMBlockHandle cellArray ;
+
+    cellArray = VMCHAIN_GET_VM_BLOCK(htbh->HTBH_cellArrayLink) ;
+
+    /* Create the cell array if it doesn't exist */
+    if (!cellArray)  {
+        cellArray = HugeArrayCreate(
+                        HTMLext->HE_vmFile,
+                        sizeof(HTMLcellData),
+                        0) ;
+        htbh->HTBH_cellArrayLink = VMCHAIN_MAKE_FROM_VM_BLOCK(cellArray) ;
+    }
+
+    /* Does it exist now? */
+    if (cellArray)  {
+        /* Yep, now append the new item */
+        index = HugeArrayAppend(
+                   HTMLext->HE_vmFile,
+                   cellArray,
+                   1,
+                   p_cell) ;
+        HugeArrayLock(
+            HTMLext->HE_vmFile,
+            cellArray,
+            index,
+            (void**)&p_data,
+            &size) ;
+        *p_data = *p_cell ;
+        HugeArrayDirty(p_data) ;
+        HugeArrayUnlock(p_data) ;
+    }
+
+    return index;                       /* index of newly created element */
+}
+#endif
+
+#if COMPILE_OPTION_HUGE_ARRAY_TABLES
+word AppendToHypertextArrayTable(HTMLtableData *p_table)
+{
+    word index;
+    HTMLtableData *p_data ;
+    word size ;
+    VMBlockHandle tableArray ;
+
+    tableArray = VMCHAIN_GET_VM_BLOCK(htbh->HTBH_tableArrayLink) ;
+
+    /* Create the table array if it doesn't exist */
+    if (!tableArray)  {
+        tableArray = HugeArrayCreate(
+                         HTMLext->HE_vmFile,
+                         sizeof(HTMLtableData),
+                         0) ;
+        htbh->HTBH_tableArrayLink = VMCHAIN_MAKE_FROM_VM_BLOCK(tableArray) ;
+    }
+
+    /* Does it exist now? */
+    if (tableArray)  {
+        /* Yep, now append the new item */
+        index = HugeArrayAppend(
+                   HTMLext->HE_vmFile,
+                   tableArray,
+                   1,
+                   p_table) ;
+        HugeArrayLock(
+            HTMLext->HE_vmFile,
+            tableArray,
+            index,
+            (void**)&p_data,
+            &size) ;
+        *p_data = *p_table ;
+        HugeArrayDirty(p_data) ;
+        HugeArrayUnlock(p_data) ;
+    }
+
+    return index;                       /* index of newly created element */
+}
+
+word ModifyHypertextArrayTable(HTMLtableData *p_table, word element)
+{
+    word size ;
+    HTMLtableData *p_tableEntry ;
+    word ret ;
+    VMBlockHandle tableArray ;
+
+    tableArray = VMCHAIN_GET_VM_BLOCK(htbh->HTBH_tableArrayLink) ;
+
+    if ((element == CA_NULL_ELEMENT) || (!tableArray))  {
+        ret = AppendToHypertextArrayTable(p_table) ;
+    } else {
+        HugeArrayLock(
+            HTMLext->HE_vmFile,
+            tableArray,
+            element,
+            (void**)&p_tableEntry,
+            &size) ;
+        *p_tableEntry = *p_table ;
+        HugeArrayDirty(p_tableEntry) ;
+        HugeArrayUnlock(p_tableEntry) ;
+
+        ret = element ;
+    }
+
+    return ret ;
+}
+
+#endif
+
+/*
+ *  Check if there is a pending paragraph end. If so, physically put it into
+ *  the text object, taking into account the attributes of the paragraph that
+ *  is ended as well as those of the current one (i.e. the one to be started).
+ */
+void AddParaCond(void)
+{
+    dword pos;
+@ifdef DO_DBCS
+    const char c_vt[] = {C_VERTICAL_TABULATION, 0};
+@else
+    const char c_vt[] = {C_VT, 0};
+@endif
+	word vspace;
+
+    if(insertParagraph)
+    {
+      if( ((insertParagraphFlags & TAG_PAR_SPACING)
+          || ((currentFlags & TAG_PAR_SPACING) && !insertCell)) 
+        && !(insertParagraphFlags & BREAK_LINE_BREAK) 
+		)
+      {
+        insertParagraphS.VTPA_spaceOnBottom += INTER_PARAGRAPH_SPACING;
+      }
+
+	  if((int)insertParagraphS.VTPA_spaceOnBottom < 0)
+	  {
+		insertParagraphS.VTPA_spaceOnBottom = 0;
+		return;
+	  }
+
+      insertParagraph = FALSE;
+      insertSpace = FALSE;              /* trim trailing space, if any */
+
+      insertCellData.HCD_flags |= HTML_CELL_NOT_EMPTY;
+                                        /* this cell will contain data */
+
+      if(insertCell)                    /* use newline or VT to break */
+      {
+        /*
+         * Remove space on bottom of the previous cell
+         */
+	    vspace = insertParagraphS.VTPA_spaceOnBottom;
+        insertParagraphS.VTPA_spaceOnBottom = 0;
+
+        pos = AddParagraph(&insertParagraphCS, &insertParagraphS, c_vt);
+
+		while(vspace >= INTER_PARAGRAPH_SPACING)
+		{
+          AddParagraph(&vcaDefault, &vpaDefault, "\r");
+		  vspace -= INTER_PARAGRAPH_SPACING;
+		}
+
+        insertCell = FALSE;
+      }
+      else
+      {
+        pos = AddParagraph(&insertParagraphCS, &insertParagraphS, "\r");
+      }
+
+      if((currentFlags & TAG_PREPEND) && !*insertPrepend)
+        STRCPYSB(insertPrepend,"\t");     /* make sure it's indented */
+
+      if(*insertPrepend)                /* prepend text to paragraph? */
+        AddText(&vcaBase, insertPrepend);
+
+      FixupStartPos(pos);               /* fixup tag starting positions on
+                                           stack to after prepended text */
+    }
+}
+
+/*
+ * Special fix for inserting the correct amount of vertical space before
+ * a table, since the end-of-cell marker will generate the equivalent
+ * of an additional linefeed, which we have to compensate for.
+ */
+void AddParaCondBeforeTable(void)
+{
+	insertParagraphS.VTPA_spaceOnBottom -= INTER_PARAGRAPH_SPACING;
+	AddParaCond();
+}
+
+void EndParagraph(char *p)
+{
+        if(!insertParagraph)            /* can't close same paragraph twice */
+        {
+          if(c2!='\r')                  /* avoid empty paragraphs */
+          {
+            insertParagraph = TRUE;     /* pending paragraph */
+            insertParagraphCS = currentCS;
+            insertParagraphS = currentS;
+            insertParagraphFlags = currentFlags;
+            STRCPYSB(insertPrepend,p);    /* store data affecting the paragraph */
+          }
+        }
+        else                            /* already line/para break pending */
+        {
+          if( STRLENSB(p) >= strlen((TCHAR*)insertPrepend) )
+            STRCPYSB(insertPrepend, p);   /* prepend overrides non-prepend */
+
+          insertParagraphFlags &= ~BREAK_LINE_BREAK;
+                                        /* para break overrides line break */
+          insertParagraphFlags |= (currentFlags & TAG_PAR_SPACING);
+                                        /* always prefer maximum spacing */
+        }
+        c2 = '\r';                      /* apply paragraph flushing rules */
+}
+
+void EndLine(char *prep)
+{
+        if(!insertParagraph)            /* already at the end of a paragraph? */
+        {
+          EndParagraph(prep);
+          insertParagraphFlags |= BREAK_LINE_BREAK;
+                                        /* no inter-paragraph spacing */
+        }
+        else                            /* just add additional spacing */
+          insertParagraphS.VTPA_spaceOnBottom += INTER_PARAGRAPH_SPACING;
+}
+
+void EndCell(void)
+{
+    insertParagraphFlags |= BREAK_END_OF_CELL;
+                                        /* Adjust spacing for last-of-cell */
+    insertParagraphFlags &= ~TAG_PAR_SPACING;
+    insertParagraphS.VTPA_spaceOnBottom = 0;
+					/* Eat additional spacing at end */
+}
+
+void InsertHRule(word size, VisTextParaAttrAttributes align)
+{
+    long pos;
+	VisTextParaAttr vpa;
+	const VisTextCharAttr vcaHRule =
+      CHAR_ATTR_FONT_SIZE_STYLE(FID_DTC_URW_SANS, 4, 0);
+
+    const VisTextParaAttr vpaHRule =
+      {{{{2, 0}}, CA_NULL_ELEMENT}, VTPBF_TOP | VTPBF_DRAW_INNER_LINES, {C_BLACK, CF_INDEX, 0, 0},
+       J_CENTER << VTPAA_JUSTIFICATION_OFFSET, (0)*PIXELS_PER_INCH,
+       (0)*PIXELS_PER_INCH, (0)*PIXELS_PER_INCH, 1<<8, 0, (0)*256, (0)*256,
+       {C_WHITE, CF_INDEX, 0, 0}, 0, 2*8, 2*8, 0, SDM_100, SDM_0, {0},
+       {0}, PIXELS_PER_INCH/2*8, VIS_TEXT_DEFAULT_STARTING_NUMBER, {0}, 0, 0,
+       0, CA_NULL_ELEMENT, SL_ENGLISH, {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}};
+
+    EndParagraph("");
+    insertParagraphFlags |= TAG_PAR_SPACING;
+    AddParaCond();                      /* flush pending para end */
+
+	vpa = vpaHRule;
+	vpa.VTPA_attributes = align;
+    if(size)
+      vpa.VTPA_borderWidth = 8 * size;
+
+	pos = AddParagraph(&vcaHRule, &vpa, "\r");
+    FixupStartPos(pos);                 /* fixup tag starting positions on
+                                           stack to after prepended text */
+  
+    if(currentFlags & TAG_PREPEND)      /* prepend tab in all following paras */
+      STRCPYSB(insertPrepend, "\t");
+
+    c2='\r';                            /* treat as a paragraph */
+}
+
+
+/***************************************************************************
+ *              Utility functions
+ ***************************************************************************/
+
+#pragma codeseg HTMLPARS2_TEXT
+#pragma option -dc-
+
+int LOCAL TranslateCharNum(unsigned int num)
+{
+    HTMLEntityTable *xlate_table;
+    int i,ret=0;
+
+    if(num<128)
+    {
+      return (num>=32 || num==9 || num==13)? num:0;
+    }
+
+    MemLock( OptrToHandle(@xlateTable) );
+    xlate_table = LMemDeref(@xlateTable);
+
+    for(i=0; xlate_table[i].num; i++)
+      if( xlate_table[i].num==num )
+      {
+        ret = xlate_table[i].c;
+        break;
+      }
+
+    MemUnlock( OptrToHandle(@xlateTable) );
+    return ret;
+}
+
+/* external version */
+int _pascal HTMLTranslateCharNum(unsigned int num)
+{
+    return TranslateCharNum(num);
+}
+
+int LOCAL TranslateChar(char *tag)
+{
+    HTMLEntityTable *xlate_table;
+    int i;
+    int ret=0;
+
+    MemLock( OptrToHandle(@xlateTable) );
+    xlate_table = LMemDeref(@xlateTable);
+
+    if(*tag!='\x23')                    /* tag specified by name? */
+    {
+      for(i=0; xlate_table[i].num; i++)
+        if( tag[0]==xlate_table[i].name[0] &&
+            !STRCMPSB(xlate_table[i].name,tag) )
+        {
+          ret = xlate_table[i].c;
+          break;
+        }
+    }
+    else
+      ret = TranslateCharNum((unsigned int)(ATOISB(tag+1)));
+                                        /* convert characters to number */
+    MemUnlock( OptrToHandle(@xlateTable) );
+    return ret;
+}
+
+/* external version */
+int _pascal HTMLTranslateChar(char *entity)
+{
+    return TranslateChar(entity);
+}
+
+word LOCAL StyleNum(char *name, SpecialTagType *spec)
+{
+    word i,ret;
+    HTMLStylesTable *HTMLStyles;
+
+    MemLock( OptrToHandle(@HTMLStylesChunk) );
+                                        /* we will need the styles table now */
+
+    HTMLStyles = LMemDeref( @HTMLStylesChunk );
+
+    ret = 0;                            /* default: return first style */
+
+    for(i=0; HTMLStyles[i].name[0]!='*'; i++)
+      if(name[0]==HTMLStyles[i].name[0] && !STRCMPSB(name,HTMLStyles[i].name))
+      {
+        *spec = HTMLStyles[i].spec;
+        ret = i;                        /* return index of style found */
+        break;
+      }
+
+    MemUnlock( OptrToHandle(@HTMLStylesChunk) );
+                                        /* styles resource no longer needed */
+    return ret;
+}
+
+void LOCAL FreeStoredContent(void)
+{
+    /* Release buffer for storage of TITLE, OPTION, TEXTAREA elements */
+    if(storedContent != NAME_POOL_NONE)
+    {
+      NamePoolReleaseToken(NamePool, storedContent);
+      storedContent = NAME_POOL_NONE;   /* release old content */
+    }
+}
+
+/***************************************************************************
+ *              Tag and plain text parsing
+ ***************************************************************************/
+
+int lc;
+ReadHTML_getc *gc;
+dword data;
+
+#if JAVASCRIPT_SUPPORT
+int LOCAL getcLow(ReadHTML_getc *gc,dword data)
+{
+    register int c = EOF;  /* in case no HE_scriptSrc */
+    typedef int pcfm_getc(ReadHTML_getc *gc,dword data);
+    ScriptSrcHeader *scriptSrc;
+
+    if(HTMLext->HE_scriptSrc) {
+	scriptSrc = LMemDeref(HTMLext->HE_scriptSrc);
+	(byte *)scriptSrc += HTMLext->HE_scriptSrcOffset;
+	if (scriptSrc->block) {
+	    c = getcScriptURL((dword)scriptSrc);
+	}
+    }
+    if (c == EOF) {
+	lc = 0;  /* make sure we don't match CR/LF from script and HTML */
+        if(gc)
+          c = ((pcfm_getc *)ProcCallFixedOrMovable_cdecl)(gc,data);
+        else
+          c = getcFileURL(data);
+    }
+    return c;
+}
+#endif
+
+int LOCAL HTMLgetc(void)
+{
+    register int c;
+
+#if JAVASCRIPT_SUPPORT
+    c = getcLow(gc, data);
+#else
+    if(gc)
+      c = ((pcfm_getc *)ProcCallFixedOrMovable_cdecl)(gc,data);
+    else
+      c = getcFileURL(data);
+#endif
+
+    /* "CR after LF" or "LF after CF": skip over "the other one" */
+    if( (c=='\n' && lc=='\r') || (c=='\r' && lc=='\n') )
+#if JAVASCRIPT_SUPPORT
+      c = getcLow(gc, data);
+#else
+      if(gc)
+        c = ((pcfm_getc *)ProcCallFixedOrMovable_cdecl)(gc,data);
+      else
+        c = getcFileURL(data);
+#endif
+
+    lc = c;                             /* remember last character read */
+
+    if(c<' ' && c!=EOF)                 /* handle control characters */
+    {
+      if( c=='\n' )                     /* use only '\r' for newline */
+        c = '\r';
+      if( c!='\r' && c!='\t' )          /* non-whitespace: treat as blanks */
+        c = ' ';
+    }
+
+    return c;
+}
+
+/*
+ *  Get a string of consecutive characters into buffer buf[]. This
+ *  routine does all the decoding of special characters.
+ *
+ *  Passed in cc is a one-character look-ahead; the next character after
+ *    the string is returned from the call.
+ *  Passed in ce is an alternative character to end parsing, other than the
+ *    standard ones (tag delimiter, end of file). If ce contains a blank, a
+ *    '\r' is also interpreted as a valid terminator (=any whitespace).
+ *  formMode specifies how to treat tags and entities.
+ *  If formMode==FORM_MODE_PARAM is passed, reading of characters is not
+ *    terminated when the buffer is full; instead, excessive characters are
+ *    flushed to the next terminator. In addition, the value of c2 is not
+ *    touched, and delaying of whitespaces does not take place.
+ *
+ *  Global variables changed: c2.
+ */
+
+/* longer arguments are specially handled */
+#define PARSE_BUF_LEN 256
+
+int LOCAL GetText(int cc, int ce, char *buf, word formMode, MemHandle *overflowBuf)
+  #define FORM_MODE_HTML      0         /* tags, entities, white compression */
+  #define FORM_MODE_PARAM     1         /* (see above, otherwise like HTML) */
+  #define FORM_MODE_PRE       2         /* PRE */
+  #define FORM_MODE_TEXTAREA  3         /* TEXTAREA */
+  #define FORM_MODE_PLAINTEXT 4         /* no markup of any kind */
+{
+    register int q;
+    register int c = cc;                /* use register for higher speed */
+    char tag[HTML_MAXTAG+1];
+    int p = 0;                          /* start with empty buffer */
+    int cp, cn;
+@ifdef DO_DBCS
+    Boolean unicodeChar = FALSE;
+@endif
+
+    cp = (formMode==FORM_MODE_PARAM)? '.' : c2;
+                                        /* c2: only for non-parameter text */
+
+    /*
+     * Terminating characters:
+     *   - whatever was passed in ce
+     *   - also '\r' or '\t' (if ce specifies a blank)
+     *   - '<' and '>' (but not in plaintext or quoted parameters)
+     *   - end of file
+     */
+    while( c!=ce && ((c!='\r' && c!='\t') || ce!=' ') &&
+           ((c!='>' && c!='<') || formMode==FORM_MODE_PLAINTEXT ||
+             (formMode==FORM_MODE_PARAM && ce!=' ')) &&
+           c!=EOF )
+    {
+@ifdef DO_DBCS
+      unicodeChar = FALSE;
+@endif
+      /* handle overflow if allowed */
+      if( ( (formMode==FORM_MODE_PARAM && p>=PARSE_BUF_LEN-1) ||
+	    (formMode!=FORM_MODE_PARAM && p>=PARSE_BUF_LEN-HTML_MAXTAG-2) ) &&
+	  overflowBuf ) {
+	  int curSize;
+	  if (*overflowBuf == 0) {
+	      *overflowBuf = MemAlloc(1, HF_DYNAMIC, HAF_STANDARD_LOCK);
+	      *((char *)(MemDeref(*overflowBuf))) = 0;  /* initially null-terminated */
+	  }
+	  if (*overflowBuf) {
+	      curSize = MemGetInfo(*overflowBuf, MGIT_SIZE);
+	      if ((curSize < HTML_MAX_BUF) &&
+		  MemReAlloc(*overflowBuf,
+			     curSize+PARSE_BUF_LEN,
+			     HAF_STANDARD)) {
+		  buf[p] = 0;  /* null-terminate for copy */
+		  STRCATSB(MemDeref(*overflowBuf), buf);
+		  p = 0;  /* reset buffer */
+	      }
+	  }
+      }
+                                        /* safe to store data in buffer? */
+                                        /* (if FORM_MODE_PARAM, we can use
+                                           full PARSE_BUF_LEN since passed buf
+                                           is PARSE_BUF_LEN+HTML_MAXTAG) */
+      if( (formMode==FORM_MODE_PARAM && p>=PARSE_BUF_LEN-1) ||
+	  (formMode!=FORM_MODE_PARAM && p>=PARSE_BUF_LEN-HTML_MAXTAG-2) )
+      {
+        if(formMode==FORM_MODE_PARAM)   /* no: flush characters? */
+          c = HTMLgetc();               /* yes: just skip over char */
+        else
+          break;                        /* no: abort immediately */
+      }
+      else
+      {
+        if(c=='&' && formMode!=FORM_MODE_PLAINTEXT)
+        {                               /* process entities */
+	  Boolean isNum = FALSE;
+          cn = HTMLgetc();
+          q = 0;                        /* start tag */
+
+          if(cn=='\x23')                /* entity specified by number */
+          {
+	    isNum = TRUE;
+            tag[q++] = (char)cn;        /* get tag name */
+            cn = HTMLgetc();
+            while( isdigit(cn) && q<HTML_MAXTAG )
+            {
+              tag[q++] = (char)cn;      /* get tag name */
+              cn = HTMLgetc();
+            }
+            tag[q] = 0;                 /* terminate tag */
+            c = TranslateChar(tag);
+          }
+          else                          /* entity specified by name */
+          {
+            c = 0;
+            while( cn!=EOF && isalnum(cn) && q<HTML_MAXTAG && !c )
+            {
+              tag[q++] = (char)cn;      /* get entity name */
+              tag[q] = 0 ;
+              c = TranslateChar(tag);   /* abort as soon as char is known (this
+                                           is bad HTML, but ok with NS) */
+              cn = HTMLgetc();
+            }
+            tag[q] = 0;                 /* make sure tag is terminated */
+          }
+
+	  /* add additional check for next character not being alphanumeric,
+	     if it is, we don't have an entity.  spec says that entity must
+	     end with ;, but we'll be a bit more lenient an only require a
+	     trailing non-alphanumeric character.  previously, we didn't
+	     care what the trailing character was, fixes 4667
+	     -- brianc 10/24/00 */
+	  /* restore leniency for numeric character entity -- brianc 11/9/00 */
+          if(c && (isNum || !isalnum(cn)))         /* found a character? */
+          {
+            if(cn==';')                 /* skip over terminating ";" if any */
+              cn = HTMLgetc();
+@ifdef DO_DBCS
+            /* for DBCS, we've now got a Unicode character value, but our
+	       'buf' is still in the DOS code page.  Since we'll do DOS to
+	       Unicode conversion later, we can't just store the Unicode
+	       character in 'buf'.  Instead, we'll store the Unicode code
+	       in character entity format for special handling by the
+	       conversion routine. */
+            unicodeChar = TRUE;
+@endif
+          }
+          else
+          {
+            buf[p++]='&';               /* literally quote unknown entity */
+            for(q=0; tag[q]; q++)
+              buf[p++]=tag[q];
+            cp = '&';
+	    c = 0;
+          }
+        }
+        else                            /* not an entity symbol */
+        {
+	  /* DBCS TBD: dependes on HTMLext->HE_codePage */
+          if(c>=128)                    /* convert high-ASCII characters */
+@ifdef DO_DBCS
+	    /* DBCS TBD: assumes all multibyte code pages are above this */
+            if((unsigned int)(HTMLext->HE_codePage) < CODE_PAGE_SJIS) {
+                c = TranslateCharNum((unsigned int)c);
+                /* for DBCS, we've now got a Unicode character value, but our
+  	           'buf' is still in the DOS code page.  Since we'll do DOS to
+	           Unicode conversion later, we can't just store the Unicode
+	           character in 'buf'.  Instead, we'll store the Unicode code
+	           in character entity format for special handling by the
+	           conversion routine. */
+                if (c) unicodeChar = TRUE;
+	    }
+@else
+            c = TranslateCharNum((unsigned int)c);
+@endif
+          cn = HTMLgetc();              /* read ahead next character */
+        }
+
+        /* Find a special character (one that expands to a string?) */
+@ifdef DO_DBCS
+        if (unicodeChar && (unsigned int)c>=HTML_SPECIAL_ENTITY_BASE) {
+@else
+        if (c>=HTML_SPECIAL_ENTITY_BASE) {
+@endif
+          c -= HTML_SPECIAL_ENTITY_BASE ;
+          MemLock(OptrToHandle(@EntityStringArray)) ;
+          STRCPYSB(buf+p, ((HTMLEntityString *)LMemDeref(@EntityStringArray))[c].string) ;
+          MemUnlock(OptrToHandle(@EntityStringArray)) ;
+          p += STRLENSB(buf+p) ;
+          c = 0 ;
+          cp = '&' ;
+          if(cn==';')                   /* skip over terminating ";" if any */
+            cn = HTMLgetc();
+        }
+
+        if(c)                           /* read a valid single character */
+        {
+          if( formMode<=FORM_MODE_PARAM && (c=='\r' || c=='\t') )
+	  {
+	    if (ce == '"' || ce == '\'')
+	    {
+              c = 0;                      /* ignore CR,TAB if quoted */
+	    }
+	    else
+	    {
+              c = ' ';                    /* all whitespaces are equal... */
+	    }
+	  }
+
+	  /* change to leave redundant spaces for FORM_MODE_PARAM as some
+	     form data needs it (iqvc.com) -- brianc 11/9/00 */
+          if( c && (formMode>=FORM_MODE_PARAM || c!=' ' || (cp!=' ' && cp!='\r')) )
+          {
+            /* all blanks are made non-breaking in preformatted sections */
+            if(formMode==FORM_MODE_PRE && c==' ')
+@ifdef DO_DBCS
+	      {
+                c = C_NON_BREAKING_SPACE;
+	        unicodeChar = TRUE;
+	      }
+@else
+              c = C_NONBRKSPACE;
+@endif
+
+@ifdef DO_DBCS
+            if (unicodeChar) {
+		sprintfsbcs(buf+p, "&#%d;", (unsigned int)c);
+		p += strlensbcs(buf+p);
+            } else
+@endif
+            buf[p++] = (char)c;         /* add to "normal" text */
+            cp = c;                     /* remember character... */
+          }
+        }
+
+        c = cn;                         /* continue with next character */
+      }
+    }
+
+    if ((c == ce) && ((formMode != FORM_MODE_PRE) && (formMode != FORM_MODE_TEXTAREA))) {
+	/* skip end of text delimiter */
+	c = HTMLgetc();
+    }
+
+    if( formMode!=FORM_MODE_PARAM )     /* in main text: update previous */
+    {
+      c2 = cp;                          /* character for whitespace handling */
+    }
+    buf[p] = 0;                         /* terminate string */
+
+    return c;
+}
+
+/*
+ * Script parsing
+ *
+ * This code is placed here because it implements are different mode of parsing
+ * from the usual HTML code handling. As it also has to deal with all sorts of
+ * non well-formed (in the XML sense) files, it completely bypasses the normal
+ * parser and pipes the script source straight into the transfer item.
+ */
+
+const char endScript[] = "</SCRIPT";
+
+#define C_COMMENT 0x8000
+#define CC_COMMENT 0x4000
+#define QUOTE_CHAR 0x00ff
+
+char pbuf[3] = {0, 0, 0};  /* only accessed by single parsing thread */
+
+word HandleScriptChar(word flags, char c, char p)
+{
+    if (flags & CC_COMMENT) {
+@ifdef DO_DBCS
+	if (c==EOF || c==C_CARRIAGE_RETURN || c==C_LINE_FEED ||
+@else
+	if (c==EOF || c==C_CR || c==C_LF ||
+@endif
+	    (pbuf[0]=='-' && pbuf[1]=='-' && p=='>')) {
+	    flags &= ~CC_COMMENT;
+	}
+    } else if (flags & C_COMMENT) {
+	if (c==EOF || (c=='/' && p=='*')) {
+	    flags &= ~C_COMMENT;
+	}
+    } else if (flags & QUOTE_CHAR) {
+@ifdef DO_DBCS
+	if (c==EOF || c==C_CARRIAGE_RETURN || c==C_LINE_FEED ||
+@else
+	if (c==EOF || c==C_CR || c==C_LF ||
+@endif
+            (c==(flags & QUOTE_CHAR) && p!='\\')) {
+	    flags &= ~QUOTE_CHAR;
+	}
+    } else {
+	if ((c=='"' || c=='\'') && p!='\\') {
+	    flags = (flags & ~QUOTE_CHAR) | c;
+	} else if (c=='*' && p=='/') {
+	    flags |= C_COMMENT;
+	} else if (c=='/' && p=='/') {
+	    flags |= CC_COMMENT;
+	}
+    }
+    return flags;
+}
+
+int LOCAL HandleScript(int c, Boolean accept)
+{
+    char buf[128];
+    int n;
+    long pos1,pos2;
+    char p = 0;
+    word charFlags = 0;
+
+    if(c=='>')                          // skip over ">" of script tag
+      c=HTMLgetc();
+
+    if(accept && (HTMLext->HE_options & HTML_JAVASCRIPT)) 
+      pos1 = AddJavaScript("\n", 1);
+    
+    n = 0;
+    do {
+      while(n<sizeof(buf) && c!=EOF && ((charFlags & (QUOTE_CHAR | C_COMMENT)) || c!=endScript[0]))
+      {
+        buf[n++] = (char)c;
+	pbuf[0] = pbuf[1]; pbuf[1] = pbuf[2]; pbuf[2] = p = c;
+        c=HTMLgetc();
+	charFlags = HandleScriptChar(charFlags, c, p);
+      }
+      
+      if(n)                             // transfer script body
+      {
+        if(accept && (HTMLext->HE_options & HTML_JAVASCRIPT)) 
+          AddJavaScript(buf, n);        
+        n = 0;                          // characters have been dealt with
+      }
+      
+      while ((c != EOF) && (toupper(c)==endScript[n]))
+      {
+        buf[n++] = (char)c;
+	pbuf[0] = pbuf[1]; pbuf[1] = pbuf[2]; pbuf[2] = p = c;
+        c=HTMLgetc();
+	charFlags = HandleScriptChar(charFlags, c, p);
+      }
+    } while(c!=EOF && endScript[n]);    // until end-of-script or end-of-file
+
+    if(accept && (HTMLext->HE_options & HTML_JAVASCRIPT)) 
+    {
+      pos2 = AddJavaScript("\n", 1);    // make sure contents are properly split
+      CleanupJavaScript(pos1, pos2);    // remove comments around script code
+    }
+
+    /* handle script code */
+#if JAVASCRIPT_SUPPORT
+    if (accept && (HTMLext->HE_options & HTML_JAVASCRIPT) &&
+	HTMLext->HE_scriptHandler && 
+        (!(htbh->HTBH_other.HTBHO_fileInfo & HTML_FI_EXT_SCRIPT)))
+    {
+	((pcfm_ScriptHandlerCallback *)ProcCallFixedOrMovable_pascal)(
+	    HTMLext->HE_vmFile, VMCHAIN_GET_VM_BLOCK(htbh->HTBH_scriptCode),
+	    pos1, HTMLext->HE_frame,
+	    HTMLext->HE_scriptHandler);
+    }
+#endif
+
+    return c;   
+}
+
+Boolean LOCAL HandleExternalScript(char *p)
+{
+    word read;
+    NameToken base;
+    Boolean success, handled = FALSE;
+    long pos1;
+    VMFileHandle vmf;
+    VMBlockHandle vmb;
+    char *q;
+    word i, size;
+    char buf[128];
+@ifdef DO_DBCS
+    NameToken pToken;
+    TCHAR pBuf[HTML_STATIC_BUF], *pP;
+
+    /* convert external file URL to DBCS via the convenient NamePool API */
+    pToken = NamePoolTokenizeDOS(NamePool, p, FALSE);
+    NamePoolCopy(NamePool, pBuf, sizeof(pBuf), pToken, &pP);
+    (TCHAR *)p = pP;
+@endif
+
+    if(HTMLext->HE_getExtFile && (HTMLext->HE_options & HTML_JAVASCRIPT))
+    {
+      /* Transfer base URL into namepool of caller */
+      base = NamePoolTokenizeFromPool(HTMLext->HE_namePool, 
+        NamePool, htbh->HTBH_other.HTBHO_baseURI, FALSE);
+
+      /* We allow the callback to change the VM file in which it returns the
+         array, in case we do multiple parsing runs that cause external files
+         to be requested into different files. */
+      vmf = HTMLext->HE_vmFile;         // suggested VM file
+      
+      success = ((pcfm_GetExternalFileCallback *)ProcCallFixedOrMovable_pascal)(
+        (TCHAR *)p, HTMLext->HE_frame, HTMLext->HE_url, base, 
+        (htbh->HTBH_other.HTBHO_fileInfo & HTML_FI_EXT_SCRIPT)? 0:++scriptCount,
+        &vmf, &vmb,
+        HTMLext->HE_getExtFile);
+
+      /* Don't need base URL any more */
+      if(base != NAME_POOL_NONE)
+        NamePoolReleaseToken(HTMLext->HE_namePool, base);
+
+      /* Read file if we could get it immediately */
+      if(success && vmb)
+      {
+        pos1 = AddJavaScript("\n", 1);
+        /* while we still have data, pump it into the transfer item */
+        i = 0;
+        do {
+          read = HAL_COUNT(HugeArrayLock(vmf, vmb, i, (void**)&q, &size));
+          if(read)
+          {
+            if(read>sizeof(buf)) read = sizeof(buf);
+            memcpy(buf, q, read);       // AddJavaScript wants to write...
+            HugeArrayUnlock(q);         // done with this data
+            AddJavaScript(buf, read);   // put script into transfer item
+            i += read;                  // advance pointer
+          }
+        } while(read);
+
+	AddJavaScript("\n", 1);
+        handled = TRUE;
+      }
+      else
+      {
+        /* Flag external scripts that haven't been read yet... */
+        htbh->HTBH_other.HTBHO_fileInfo |= HTML_FI_EXT_SCRIPT;
+      }
+    }
+
+@ifdef DO_DBCS
+    NamePoolDestroyIfDynamic(pP);
+    NamePoolReleaseToken(NamePool, pToken);
+@endif
+   
+    /* handle script code */
+#if JAVASCRIPT_SUPPORT
+    if (handled && HTMLext->HE_scriptHandler && 
+        (!(htbh->HTBH_other.HTBHO_fileInfo & HTML_FI_EXT_SCRIPT)))
+    {
+	((pcfm_ScriptHandlerCallback *)ProcCallFixedOrMovable_pascal)(
+	    HTMLext->HE_vmFile, VMCHAIN_GET_VM_BLOCK(htbh->HTBH_scriptCode),
+	    pos1, HTMLext->HE_frame,
+	    HTMLext->HE_scriptHandler);
+    }
+#endif
+
+    return handled;
+}
+
+int Open_SCRIPT(optr paramArray, int c)
+{
+    char *p;
+    Boolean accept;
+    int ret;
+
+    /* Decide on whether we can handle the script type or not */
+    p = GetParamValue(paramArray, "LANGUAGE");
+    accept = (!p || (*p && 
+      (STRNCMPISB(p, "JavaScript", 10)==0 || 
+       STRNCMPISB(p, "JScript", 7)==0)));
+
+    /* Possibly read external script if specified*/
+    p = GetParamValue(paramArray, "SRC");
+    if(p && *p && accept && (HTMLext->HE_options & HTML_JAVASCRIPT))
+    {
+      /* NS and IE ignore the contents of the tag if a SRC is specified */
+      ret = HandleScript(c, FALSE);
+
+      HandleExternalScript(p);
+    }
+    else
+      ret = HandleScript(c, accept);
+
+    /* Flag scripts that we can't deal with... */
+    if(!accept)
+      htbh->HTBH_other.HTBHO_fileInfo |= HTML_FI_NON_JS_SCRIPT;
+
+    return ret;
+}
+
+int LOCAL HandleTag(MemHandle localHeap)
+{
+    register int c,p;
+    int ce,q;
+    char *e;
+    Boolean endTag;
+    word tagStyle;
+    HTMLStylesTable tagStyleEntry;
+    optr paramArray;
+    SpecialTagType spec;
+    char tag[HTML_MAXTAG+1];
+
+    c=HTMLgetc();
+    if(c=='/')
+    {
+      c=HTMLgetc();
+      endTag=TRUE;
+    }
+    else
+      endTag=FALSE;
+
+    /* get tag name */
+    p=0;                                /* start tag */
+    while( c!='>' && c!='<' && c!='=' && c!=' ' && c!='\r' && c!='\t' && c!=EOF )
+    {
+      if(p<HTML_MAXTAG)
+        tag[p++]=(char)((c>='a' && c<='z')?(c-32):c);
+                                        /* get tag name */
+      if(c=='!') break;                 /* "!": single character tag */
+      c=HTMLgetc();
+    }
+    tag[p]=0;                           /* terminate tag */
+
+    paramArray = NullOptr;              /* no parameters yet */
+
+    /* quickly skip over comments */
+    if(tag[0]=='!')                     /* <!--..--> or <!..> */
+    {
+      c = HTMLgetc();                   /* skip over '!' */
+
+      q = 0;
+      if(c=='-')                        /* skip over '--' */
+      {
+        c = HTMLgetc();
+        if(c=='-')
+        {
+          c = HTMLgetc();
+          q = 2;                        /* '<!--' must be closed by '-->' */
+        }
+      }
+
+      p = 0;                            /* no dashes seen yet */
+      while( (c!='>' || p<q) && c!=EOF )
+      {
+        if(c=='-')                      /* count consecutive dashes */
+          p++;
+        else                            /* any non-dash resets count */
+          p = 0;
+        c = HTMLgetc();
+      }
+    }
+
+    /* get tag arguments if any (but not while ignoring, e.g. in a script) */
+    if(!(currentFlags & TAG_IGNORE_TAGS))
+    {
+      while( c!='>' && c!='<' && c!=EOF)/* while tag has more data in it... */
+      {                                   
+        /* buf -- room for PARSE_BUF_LEN + one entity expansion */
+        char arg[HTML_MAXTAG+1],buf[PARSE_BUF_LEN+HTML_MAXTAG];
+	MemHandle overflowBuf = 0;
+
+        /* skip whites */
+        while(c==' ' || c=='\r' || c=='\t') c=HTMLgetc();
+
+        /* get argument name */
+        p=0;                            /* start tag */
+        while( c!='=' && c!=' ' && c!='\r' && c!='\t' && c!='>' && c!='<' &&
+               c!=EOF )
+        {
+          if(p<HTML_MAXTAG)
+            arg[p++]=(char)((c>='a' && c<='z')?(c-32):c);
+                                        /* get argument name */
+          c=HTMLgetc();
+        }
+        arg[p]=0;                       /* terminate arg name */
+
+        /* skip whites */
+        while(c==' ' || c=='\r' || c=='\t') c=HTMLgetc();
+
+        /* get argument value if available */
+        if(c=='=')
+        {
+          c=HTMLgetc();                 /* skip over "=" */
+
+          /* skip whites */
+          while(c==' ' || c=='\r' || c=='\t') c=HTMLgetc();
+
+          if(c=='"' || c=='\'')         /* quoted argument? */
+          {
+            ce=c;                       /* quote terminates */
+            c=HTMLgetc();               /* skip over quote */
+          }
+          else
+            ce=' ';                     /* whitespace terminates */
+
+          c = GetText(c, ce, buf, FORM_MODE_PARAM, &overflowBuf);
+                                        /* parse text up to terminator,
+                                           flush rest if too long */
+        }
+        else
+          *buf=0;                       /* no value */
+
+        if(arg[0])                      /* only if argument has been found */
+        {
+	  word overflowLen = 0;
+	  if (overflowBuf)
+	      overflowLen = STRLENSB(MemDeref(overflowBuf));
+
+          if(!paramArray)               /* no array yet? */
+            paramArray = ConstructOptr( localHeap,
+              ChunkArrayCreate( localHeap, 0, 0, 0 ) );
+                                        /* create array for parameters */
+
+          e = ChunkArrayAppend( paramArray, STRLENSB(arg)+overflowLen+STRLENSB(buf)+2 );
+                                        /* add array for parameters (will be
+                                           freed in OpenTag() or later...) */
+
+          STRCPYSB(e,arg);                /* copy argument name */
+	  if (overflowBuf) {
+	      int argLenPlus = STRLENSB(arg)+1;
+	      /* append overflow and value */
+	      STRCPYSB(e+argLenPlus, MemDeref(overflowBuf));
+	      STRCPYSB(e+argLenPlus+overflowLen, buf);
+	  } else
+          STRCPYSB(e+STRLENSB(arg)+1,buf);  /* append value */
+        }
+	if (overflowBuf) MemFree(overflowBuf);
+      }
+    }
+    else                                /* skip over parameter-like stuff */
+    {
+      while( c!='>' && c!='<' && c!=EOF) c=HTMLgetc();
+    }
+
+    /* copy entry from HTML tag style definitions: */
+    MemLock( OptrToHandle(@HTMLStylesChunk) );
+    tagStyle = StyleNum(tag,&spec);     /* find if tag has an assigned style */
+    tagStyleEntry = ((HTMLStylesTable *)LMemDeref(@HTMLStylesChunk))[tagStyle];
+    MemUnlock( OptrToHandle(@HTMLStylesChunk) );
+
+    if(endTag) {                        /* opening/closing a tag? */
+        /* ignore if should ignore enclosed tags */
+        if ((tagStyleEntry.flags & TAG_IGNORE_TAGS) ||
+	    /* or NOEMBED inside OBJECT */
+	    (tagStyleEntry.spec == SPEC_NOEMBED &&
+	     EnclosingCount(SPEC_OBJECT, NULL))) {
+            /* don't allow bad HTML to underflow us */
+	    if (ignoreTags)
+		ignoreTags-- ;
+        }
+        if (!ignoreTags) {
+            CloseTag( tagStyle, &tagStyleEntry, paramArray );
+        }
+    } else {
+        if (!ignoreTags) {
+            if(tagStyleEntry.spec==SPEC_SCRIPT)
+            {
+               c = Open_SCRIPT(paramArray, c);
+              tagStyleEntry.flags &= ~TAG_IGNORE_TAGS;
+            }
+            else
+              OpenTag( tagStyle, &tagStyleEntry, paramArray );
+        }
+        if ((tagStyleEntry.flags & TAG_IGNORE_TAGS) ||
+	    (tagStyleEntry.spec == SPEC_NOEMBED &&
+	        EnclosingCount(SPEC_OBJECT, NULL))) {
+            ignoreTags++ ;
+        }
+    }
+
+    if(c=='>')                          /* skip over trailing ">" */
+      c=HTMLgetc();
+
+    return c;                           /* pass back lookahead */
+}
+
+/***************************************************************************
+ *              Data stream access
+ ***************************************************************************/
+
+int getcOptrURL(dword data)  /* callback routine to get one char */
+{
+
+    unsigned char c,*p;
+
+    p = MemLock( OptrToHandle(((OPTRFILE *)data)->text) );
+
+    if( OptrToChunk( ((OPTRFILE *)data)->text ) )
+      p = LMemDeref( ((OPTRFILE *)data)->text );
+    c = p[((OPTRFILE *)data)->i++];     /* get data and advance pointer */
+
+    MemUnlock( OptrToHandle(((OPTRFILE *)data)->text) );
+
+    return c?c:EOF;
+}
+
+int LOCAL getcFileURL(dword data)  /* callback routine to get one char */
+{
+    if( ((HTMLFILE *)data)->HTMLbufp >= ((HTMLFILE *)data)->HTMLbufl )
+    {
+      ((HTMLFILE *)data)->HTMLbufl = FileRead(
+        ((HTMLFILE *)data)->fileHTML, ((HTMLFILE *)data)->HTMLbuf,
+        HTML_READBUF, FALSE);
+      ((HTMLFILE *)data)->HTMLbufp = 0; /* set pointer to start of buffer */
+      if( ((HTMLFILE *)data)->HTMLbufl==0 )
+        return EOF;                     /* read against end of file */
+    }
+    return ((HTMLFILE *)data)->HTMLbuf[ ((HTMLFILE *)data)->HTMLbufp++ ];
+                                        /* return next character from file */
+}
+
+#if JAVASCRIPT_SUPPORT
+int /*LOCAL*/ getcScriptURL(dword data)
+{
+    dword halRet;
+    ScriptSrcHeader *p = (ScriptSrcHeader *)data, *par;
+    unsigned char *q;
+    int c = EOF;
+    word size;
+
+    /* XXX: this is non-optimal, should buffer data locally */
+    do {
+      halRet = HugeArrayLock(p->file, p->block, p->i, (void**)&q, &size);
+      if (HAL_COUNT(halRet)) {
+	  c = *q;
+	  p->i++;
+	  HugeArrayUnlock(q);
+      } else {
+	  par = p->parent;		// check for enclosing fragment
+	  if(par)			// is there one?
+	  {
+	    *p = *par;			// make it the current one
+	    free(par);			// pop it from the fragment stack
+	  }
+	  else
+	  {
+	    p->block = 0;		// back to top level: get data from top
+	    p->i = 0;
+	  }
+      }
+    } while(c==EOF && p->block);        // retry to get from outer fragment
+    return c;
+}
+#endif
+
+/***************************************************************************
+ *              Main loops (external entries)
+ ***************************************************************************/
+
+int EXPORT ParseHTMLFile(ReadHTML_getc *p_gc, dword p_data, HTMLextra *ext,
+  VMBlockHandle *item)
+{
+    int c;
+    HTMLFILE fHTML;
+    MemHandle localHeap;
+    extern word G_cellCount, G_imageCount ;
+    word retValue = 0 ;
+
+    G_isParsing = TRUE ;
+
+    G_cellCount = G_imageCount = 0 ;
+
+    ignoreTags = 0;  /* allow tags on startup */
+
+    EC_BOUNDS(ext);
+
+    /*
+     * Initialize local memory
+     */
+    localHeap = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+
+    if(!localHeap)  {                      /* couldn't allocate memory? */
+      retValue = 2;                         /* abort */
+      goto cleanupExit ;
+    }
+
+    MemLock(localHeap);
+
+    /*
+     * Transfer data to global variables for fast access
+     */
+    gc = p_gc;
+    data = p_data;
+
+    if(!gc)                             /* standard mode: read from file */
+      if( !(data = OpenFileURL(data, &fHTML)) )
+      {                                 /* open file, data becomes file ptr */
+          retValue = 1 ;
+          goto cleanupExit ;            /* abort if error opening file */
+      }
+
+    HTMLext = ext;                      /* Make extra data available globally */
+#ifdef DO_DBCS
+    G_htmlCodePage = HTMLext->HE_codePage;
+#endif
+    *item = InitTransferItem();         /* initialize & return transfer item */
+    InitTagStacks(localHeap);           /* set up tag stacks */
+
+    /* Make sure the base has been adjusted for tv viewing */
+@ifdef DO_DBCS
+    ApplyFontWeightWidthAndSpacingAdjustment(&vcaDefault, FALSE) ;
+@else
+    ApplyFontWeightWidthAndSpacingAdjustment(&vcaDefault) ;
+@endif
+
+    vcaBase = vcaDefault;               /* initialize default character style */
+    currentBaseFont = 3;                /* default base fontsize index */
+
+    /* make font/size data available globally */
+    vcaBase.VTCA_pointSize.WBF_int = IntegerOf(ext->HE_pointSize);
+    vcaBase.VTCA_pointSize.WBF_frac =
+      (byte)(FractionOf(ext->HE_pointSize)>>8);
+    vcaBase.VTCA_fontID = ext->HE_plainFont;
+    fontExample = ext->HE_exampleFont;
+
+@ifdef DO_DBCS
+     /* apply any TV and code page transformations */
+     ApplyFontWeightWidthAndSpacingAdjustment(&vcaBase, TRUE);
+@endif
+
+    /* Set the track kerning to improve the appearance of the text */
+    AdjustTrackKerning(&vcaBase);
+
+    storedContent = NAME_POOL_NONE;     /* no title, text area etc. yet */
+
+    c2 = '\r';
+    textpos = parpos = 0;
+    insertSpace = FALSE;
+
+    lc = 0;                             /* no prev character for CR/LF xlate */
+
+    insertParagraph = FALSE;            /* no space before first line */
+    insertCell = FALSE;
+    currentCellLevel = 0;               /* Currently outside any table */
+
+    scriptCount = 0;                    /* no script found yet */
+
+    MemLock( OptrToHandle(@HTMLStylesChunk) );
+    GetCurrentStyles();                 /* initialize style caching */
+    MemUnlock( OptrToHandle(@HTMLStylesChunk) );
+
+    c = HTMLgetc();                     /* get first character */
+    while ((c != EOF) && (!G_hitAllocLimit) && (!G_abortParse))
+    {
+      {
+        char buf[PARSE_BUF_LEN+1];
+        word formMode;
+
+        /*
+         * Parse string of characters (up to beginning of tag or newline);
+         * abort immediately when buffer is full. Pay attention to what
+         * leve of markup characters will be supported.
+         */
+        if(EnclosingCount(SPEC_PLAINTEXT, NULL))
+        {
+          formMode = FORM_MODE_PLAINTEXT;
+        }
+        else if(EnclosingCount(SPEC_PRE, NULL))
+        {
+          formMode = FORM_MODE_PRE;
+        }
+	else if(EnclosingCount(SPEC_TEXTAREA, NULL))
+	{
+	  formMode = FORM_MODE_TEXTAREA;
+	}
+        else
+          formMode = FORM_MODE_HTML;
+
+        c = GetText(c, (formMode==FORM_MODE_HTML)?0:'\r', buf, formMode, 0);
+
+        /*
+         * Transfer parsed characters into HTML text object or process
+         * them as contents of special elements.
+         */
+        if(!(currentFlags & TAG_FLUSH_TEXT))
+        {
+          if(*buf || c=='\r')
+          {
+            AddParaCond();              /* flush pending para end */
+            AddText(&currentCS, buf);   /* Add text in current style */
+          }
+        }
+        else                            /* contents of special elements */
+        {
+          if(EnclosingCount(SPEC_TITLE, NULL) ||
+             EnclosingCount(SPEC_TEXTAREA, NULL) ||
+             EnclosingCount(SPEC_OPTION, NULL))
+          {
+	      /* nuke trailing spaces for TITLE and OPTION (all whitespace
+	         is equal (i.e. ignored)) */
+	      if (EnclosingCount(SPEC_TITLE, NULL) ||
+		  EnclosingCount(SPEC_OPTION, NULL)) {
+		  while(STRLENSB(buf) && (buf[(STRLENSB(buf)-1)] == ' ')) {
+		      buf[(STRLENSB(buf)-1)] = C_NULL;
+		  }
+	      }
+            /* Add content to the one we already have... */
+	    /* if not already too long (this may actually get a bit larger,
+	       but we truncate again when rendering the object */
+	    if (NamePoolStrLength(NamePool, storedContent) < MAX_STORED_CONTENT)
+            storedContent = NamePoolConcatStrDOS(NamePool, storedContent, buf);
+
+            if(c=='\r')                 /* preformatted CR in TEXTAREA */
+            {
+              storedContent = NamePoolConcatStrDOS(NamePool, storedContent, "\r");
+              c2 = ' ';                 /* multiple CRs are allowed */
+            }
+
+            if(EnclosingCount(SPEC_TITLE, NULL))
+              c2 = '\r';                  /* treat as if it were a paragraph */
+          }
+        }
+      }
+
+      /*
+       * Handle different reasons why parsing text was interrupted
+       */
+      switch(c)
+      {
+      case '<':                         /* text ended because of a tag */
+        c = HandleTag(localHeap);       /* process the tag */
+        break;
+
+      case '>':                         /* ignore left-over closing tag */
+        c = HTMLgetc();
+        break;
+
+      case '\r':                        /* pre-formatted CR? */
+        if(!(currentFlags & TAG_FLUSH_TEXT))
+        {
+          EndLine("");                  /* simulate line break */
+          c2 = ' ';                     /* multiple line breaks permitted */
+        }
+        c = HTMLgetc();
+        break;
+      }
+    }
+
+    if(textpos==0 || parpos==0)         /* avoid creating totally empty item */
+      c2 = '.';
+
+    EndParagraph("");                   /* finish last paragraph */
+    EmptyStacks();                      /* logically close all remaining tags */
+    AddParaCond();                      /* flush pending paragraph ending */
+    AddCellRecord();                    /* flush record for previous cell */
+
+    if(!gc)
+      CloseFileURL( &fHTML );           /* close internally opened file */
+
+    FinishTransferItem();
+
+    FreeStoredContent();                /* release content intermediate token */
+
+cleanupExit:
+    if (localHeap)
+        MemFree( localHeap );
+
+    G_isParsing = FALSE ;
+
+    if (G_abortParse)
+        G_abortParse = FALSE ;
+
+    return retValue ;
+}
+
+int EXPORT ParsePlainFile(ReadHTML_getc *p_gc, dword p_data, HTMLextra *ext,
+  VMBlockHandle *item)
+{
+    char buf[PARSE_BUF_LEN];
+    int c;
+    word n;
+    HTMLFILE fHTML;
+    MemHandle localHeap;
+    word retValue = 0 ;
+
+    EC_BOUNDS(ext);
+
+    G_isParsing = TRUE ;
+
+    /*
+     * Initialize local memory
+     */
+    localHeap = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+
+    if(!localHeap)  {                      /* couldn't allocate memory? */
+        retValue = 2;                         /* abort */
+        goto cleanupExit ;
+    }
+
+    MemLock(localHeap);
+
+    /*
+     * Transfer data to global variables for fast access
+     */
+    gc = p_gc;
+    data = p_data;
+
+    if(!gc)                             /* standard mode: read from file */
+        if(!(data = OpenFileURL(data, &fHTML)))  {
+                                        /* open file, data becomes file ptr */
+            retValue = 1;                       /* abort if error opening file */
+            goto cleanupExit ;
+        }
+
+    HTMLext = ext;                      /* Make extra data available globally */
+#ifdef DO_DBCS
+    G_htmlCodePage = HTMLext->HE_codePage;
+#endif
+    *item = InitTransferItem();         /* initialize & return transfer item */
+    InitTagStacks(localHeap);           /* set up tag stacks */
+
+    lc = 0;                             /* no prev character for CR/LF xlate */
+
+    do {
+      n = 0;                            /* no characters read yet */
+
+      while((n<sizeof(buf)) && ((c=HTMLgetc())!=EOF) && (!G_hitAllocLimit) && (!G_abortParse))
+      {
+@ifdef DO_DBCS
+        /* DBCS TBD: assumes all multibyte code pages are above this */
+        if((unsigned int)(HTMLext->HE_codePage) < CODE_PAGE_SJIS)
+@endif
+        if(c>=128)                      /* assume ISO Latin encoding */
+        {
+                                        /* translate char as in HTML file */
+          c = TranslateCharNum((unsigned int)c);
+          if(c==0) c='?';
+        }
+        buf[n++] = (char)c;             /* read up to one buffer */
+      }
+
+      if(n)  {                          /* append text (if any) to object */
+        if (AllocWatcherAllocate(G_allocWatcher, n) == TRUE)  {
+            HugeArrayAppend( HTMLext->HE_vmFile,
+              VMCHAIN_GET_VM_BLOCK(ttbh->TTBH_text), n, buf);
+            G_amountAllocated += n ;
+        } else {
+            G_hitAllocLimit = TRUE ;
+        }
+      }
+    } while((n!=0) && (!G_hitAllocLimit));
+
+    if(!gc)
+      CloseFileURL(&fHTML);             /* close internally opened file */
+
+    vcaBase = vcaDefault;               /* initialize default character style */
+    currentBaseFont = 3;                /* default base fontsize index */
+
+    /* make font/size data available globally */
+    vcaBase.VTCA_pointSize.WBF_int = IntegerOf(ext->HE_pointSize);
+    vcaBase.VTCA_pointSize.WBF_frac =
+      (byte)(FractionOf(ext->HE_pointSize)>>8);
+    vcaBase.VTCA_fontID = ext->HE_plainFont;
+    fontExample = ext->HE_exampleFont;
+
+    /* Set the track kerning to improve the appearance of the text */
+    AdjustTrackKerning(&vcaBase);
+
+    /* default attributes for all text */
+    MemLock( OptrToHandle(@vcdMono) );
+    ApplyGlobalStyle( (CharStyleDelta *)LMemDeref(@vcdMono) );
+    MemUnlock( OptrToHandle(@vcdMono) );
+
+    EmptyStacks();                      /* logically close all remaining tags */
+    AddCellRecord() ;                   /* Ensure we have a master cell. */
+    FinishTransferItem();
+
+cleanupExit:
+    if (localHeap)
+        MemFree( localHeap );
+
+    G_isParsing = FALSE ;
+
+    /* Release abort if we are aborting */
+    if (G_abortParse)
+        G_abortParse = FALSE ;
+
+    return retValue ;
+}

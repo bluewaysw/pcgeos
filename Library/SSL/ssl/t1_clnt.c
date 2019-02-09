@@ -77,7 +77,7 @@ int ver;
 		return(NULL);
 	}
 
-SSL_METHOD * _export _pascal TLSv1_client_method()
+SSL_METHOD _export _pascal *TLSv1_client_method()
 	{
 	static int TCMV1_init=1;
 	static SSL_METHOD TLSv1_client_data;

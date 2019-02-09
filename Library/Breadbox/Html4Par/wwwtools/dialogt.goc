@@ -1,0 +1,461 @@
+/***********************************************************************
+ *
+ *                          ==CONFIDENTIAL INFORMATION==
+ *
+ * COPYRIGHT 1994-99 BREADBOX COMPUTER COMPANY -- ALL RIGHTS RESERVED  --
+ * THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER
+ * A NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ * RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ * NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ * CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ * AGREEMENT.
+ *
+ * PROJECT:       HTMLPars
+ * FILE:          DialogT.goc
+ *
+ * AUTHOR:        Lysle Shields
+ *
+ * NOTE:          Tools for handling extra dialogs (progress dialog)
+ *
+ ***********************************************************************/
+
+@include <stdapp.goh>
+@include <Ansi/string.h>
+@include <dialogt.goh>
+
+/***************************************************************************
+ *      Types and defines
+ ***************************************************************************/
+#define PROGRESS_DIALOG_THREAD_STACK_SIZE   2000
+
+#define FindDialogChild(dialog, oldChild) \
+            ConstructOptr( \
+                OptrToHandle(dialog), \
+                OptrToChunk(oldChild))
+#define PROGRESS_INDICATOR_HEIGHT   20
+#define PROGRESS_INDICATOR_WIDTH    200
+
+typedef struct {
+    optr PDCB_newObject ;
+    TCHAR PDCB_title[] ;
+} ProgressDialogCreationBlock ;
+
+word IProgressDialogThread(word block) ;
+
+/***************************************************************************
+ *      Progress Dialog Template
+ ***************************************************************************/
+@start TemplateProgressDialog ;
+    /*--------------------------------------------------------------------*/
+    @object ProgressDialogClass ProgressDialog = {
+        GI_comp = @ProgressText, @ProgressIndicator, @ProgressStopButton ;
+        GII_visibility = GIV_DIALOG ;
+        GI_states = @default & (~GS_USABLE) ;
+        GII_type = GIT_ORGANIZATIONAL ;
+        GII_attrs = @default |
+                       GIA_NOT_USER_INITIATABLE |
+                       GIA_INITIATED_VIA_USER_DO_DIALOG |
+                       GIA_MODAL;
+        HINT_CENTER_CHILDREN_HORIZONTALLY ;
+    }
+    /*--------------------------------------------------------------------*/
+    @object GenTextClass ProgressText = {
+        GI_attrs = @default | GA_READ_ONLY ;
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT ;
+    }
+    /*--------------------------------------------------------------------*/
+    @object ProgressIndicatorClass ProgressIndicator = {
+        HINT_FIXED_SIZE = {
+            SST_PIXELS | PROGRESS_INDICATOR_WIDTH,
+            SST_PIXELS | PROGRESS_INDICATOR_HEIGHT,
+            0 } ;
+    }
+    /*--------------------------------------------------------------------*/
+    @object GenTriggerClass ProgressStopButton = {
+        GTI_destination = @ProgressDialog ;
+        GTI_actionMsg = MSG_PROGRESS_DIALOG_CANCEL ;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_STOP ;
+        HINT_SEEK_REPLY_BAR ;
+    }
+    /*--------------------------------------------------------------------*/
+@end TemplateProgressDialog ;
+
+
+/*-------------------------------------------------------------------------
+ | Routine:  IProgressDialogThread
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    This is the routine that controls a thread that puts up a
+ |    ProgressDialogClass object.  It basically just uses
+ |    UserCreateDialog, UserDoDialog, and USerDestroyDialog for all the
+ |    main work.
+ |
+ |    The optr to the dialog is passed back by using a pointer in the
+ |    passed structure.  This is very important because the calling
+ |    routine is in an infinite loop waiting for the result to appear.
+ |
+ | Inputs:
+ |    word/MemHandle block        -- Block of structure
+ |                                   ProgressDialogCreationBlock
+ |
+ | Output:
+ |    word                        -- Always 0
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  03/19/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+word IProgressDialogThread(word block)
+{
+    ProgressDialogCreationBlock *p_data ;
+    optr dialog ;
+    optr text ;
+
+    /* Owner of a new thread */
+
+    /* Get the passed data and create a new dialog */
+    /* from the standard template */
+    p_data = MemDeref(block) ;
+
+    /* Create a brand spanking new dialog */
+    dialog = UserCreateDialog(@ProgressDialog) ;
+    if (dialog)  {
+        /* Change the text on the dialog */
+        text = FindDialogChild(dialog, @ProgressText) ;
+        @call text::MSG_VIS_TEXT_REPLACE_ALL_PTR((char*)p_data->PDCB_title, 0) ;
+
+        /* Tell the calling routine (in the other thread) that */
+        /* we got a dialog and this is it */
+        p_data->PDCB_newObject = dialog ;
+        HandleV(block);
+
+        /* ---- NOTE:  After this point, p_data is INVALID because the --- */
+        /* calling routine destroys the block. */
+        UserDoDialog(dialog) ;
+
+        /* When we come out, just destroy the dialog */
+        UserDestroyDialog(dialog) ;
+    } else {
+        /* Note that we were not able to create the dialog */
+        p_data->PDCB_newObject = (optr)-1 ;
+    }
+
+    return 0 ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  ProgressDialogCreate
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    ProgressDialogCreate instantiates a new progress dialog.  It is
+ |    non-modal and the user can only move it and click the Stop button.
+ |    To ensure that this routine does not block, the dialog is created
+ |    under a new thread.  This new thread handles everything.  An optr
+ |    is passed back point to the dialog of class ProcessDialogClass.
+ |    The dialog will not go away until MSG_PROGRESS_DIALOG_DISMISS is
+ |    sent to it and it is the caller's responsibility to remove the
+ |    dialog.
+ |
+ |    The dialog is controlled by making MSG_PROGRESS_DIALOG_SET_PERCENTAGE
+ |    calls/sends to it.
+ |
+ |    To know if the user has cancelled, check by calling
+ |    MSG_PROGRESS_DIALOG_QUERY_CANCELLED.
+ |
+ | Output:
+ |    word percentage             -- New percentage to use
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  03/19/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+optr EXPORT ProgressDialogCreate(TCHAR *title)
+{
+    MemHandle block ;
+    ProgressDialogCreationBlock *p_data ;
+    optr newObj = NullHandle ;
+    static word (*ptr)(word) = IProgressDialogThread;
+
+    /* Create a Fixed block temporarily. */
+    block = MemAlloc(
+                (strlen(title)+1)*sizeof(TCHAR)+sizeof(ProgressDialogCreationBlock),
+                HF_FIXED, HAF_NO_ERR) ;
+    if (block != NullHandle)  {
+        p_data = MemDeref(block) ;
+        strcpy(p_data->PDCB_title, title) ;
+        p_data->PDCB_newObject = NullHandle ;
+
+        /* Grab the block so it can't be grabbed */
+        HandleP(block) ;
+
+        /* Create a new thread to do the real work */
+        ThreadCreate(
+            PRIORITY_UI,
+            block,
+            ptr,
+            PROGRESS_DIALOG_THREAD_STACK_SIZE,
+            GeodeGetProcessHandle()) ;
+
+        /* Block, waiting for the block to be released */
+        HandleP(block) ;
+        HandleV(block) ;
+
+        /* Return an object (if legal) */
+        newObj = p_data->PDCB_newObject ;
+
+        MemFree(block) ;
+    }
+
+    return newObj ;
+}
+
+/*=========================================================================*
+ *  METHODS FOR CLASS:  ProgressDialogClass
+ *=========================================================================*/
+
+
+    @classdecl ProgressDialogClass ;
+
+
+/*-------------------------------------------------------------------------
+ | Method:  ProgressDialogClass::MSG_PROGRESS_DIALOG_SET_PERCENTAGE
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Declares what percentage to show in the status dialog.
+ |
+ | Inputs:
+ |    word percentage             -- New percentage to use
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  03/19/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method ProgressDialogClass, MSG_PROGRESS_DIALOG_SET_PERCENTAGE
+{
+    optr indicator ;
+
+    if (pself->PDI_percentage != percentage)  {
+        pself->PDI_percentage = percentage ;
+
+        indicator = FindDialogChild(oself, @ProgressIndicator) ;
+        @send ,forceQueue ,checkDuplicate  indicator::
+                  MSG_PROGRESS_INDICATOR_SET_PERCENTAGE(percentage) ;
+    }
+}
+
+
+/*-------------------------------------------------------------------------
+ | Method:  ProgressDialogClass::MSG_PROGRESS_DIALOG_GET_PERCENTAGE
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Returns the current percentage.
+ |
+ | Outputs:
+ |    word percentage             -- Current percentage to use
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  03/19/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method ProgressDialogClass, MSG_PROGRESS_DIALOG_GET_PERCENTAGE
+{
+    return pself->PDI_percentage ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  ProgressDialogClass::MSG_PROGRESS_DIALOG_CANCEL
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Marks the dialog cancelled and greys out the stop button.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  03/19/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method ProgressDialogClass, MSG_PROGRESS_DIALOG_CANCEL
+{
+    optr button ;
+
+    button = FindDialogChild(oself, @ProgressStopButton) ;
+    @call button::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  ProgressDialogClass::MSG_PROGRESS_DIALOG_DISMISS
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Gets rid of the whole dialog (and out of memory).
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  03/19/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method ProgressDialogClass, MSG_PROGRESS_DIALOG_DISMISS
+{
+    @call oself::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  ProgressDialogClass::MSG_PROGRESS_DIALOG_QUERY_CANCELLED
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Determines if the user cancelled the dialog.
+ |
+ | Outputs:
+ |    Boolean                     -- TRUE if cancel has occured,
+ |                                   else false.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  03/19/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method ProgressDialogClass, MSG_PROGRESS_DIALOG_QUERY_CANCELLED
+{
+    Boolean isEnabled ;
+    optr button;
+
+    button = (FindDialogChild(oself, @ProgressStopButton)) ;
+    isEnabled = @call button::MSG_GEN_CHECK_IF_FULLY_ENABLED() ;
+
+    /* If the button is enabled, we have not cancelled the dialog */
+    if (isEnabled)
+        return FALSE ;
+
+    return TRUE ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  ProgressDialogClass::MSG_PROGRESS_DIALOG_CHANGE_TEXT
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Changes the text presented on the progress dialog.
+ |
+ | Inputs:
+ |    char *p_newText             -- New text to change to
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  03/19/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method ProgressDialogClass, MSG_PROGRESS_DIALOG_CHANGE_TEXT
+{
+    optr text ;
+
+    text = (FindDialogChild(oself, @ProgressText)) ;
+    @call text::MSG_VIS_TEXT_REPLACE_ALL_PTR((char*)p_newText, 0) ;
+}
+
+/*=========================================================================*
+ *  METHODS FOR CLASS:  ProgressIndicatorClass
+ *=========================================================================*/
+
+
+    @classdecl ProgressIndicatorClass ;
+
+
+/*-------------------------------------------------------------------------
+ | Method:  ProgressDialogClass::MSG_PROGRESS_INDICATOR_SET_PERCENTAGE
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Redraws the progress indicator if a change has occured.
+ |
+ | Inputs:
+ |    word newPercent             -- Percentage.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  03/19/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method ProgressIndicatorClass, MSG_PROGRESS_INDICATOR_SET_PERCENTAGE
+{
+    GStateHandle gstate ;
+    WindowHandle win ;
+
+    /* Only change if different (and draw) */
+    if (pself->PII_percentage != newPercent)  {
+        pself->PII_percentage = newPercent ;
+
+        /* Draw the it directly. */
+        win = @call oself::MSG_VIS_QUERY_WINDOW() ;
+        gstate = GrCreateState(win);
+        @call oself::MSG_VIS_DRAW(0, gstate) ;
+        GrDestroyState(gstate);
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  ProgressDialogClass::MSG_VIS_DRAW
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Draws the progress indicator to the given gstate.
+ |
+ | Inputs:
+ |    DrawFlags drawFlags         -- Flags on how to draw (ignored)
+ |    GStateHandle gstate         -- GState to draw to.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  03/19/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method ProgressIndicatorClass, MSG_VIS_DRAW
+{
+    Rectangle rect ;
+    word width ;
+    word x ;
+
+    @call oself::MSG_VIS_GET_BOUNDS(&rect);
+
+    /* Calculate width, but leave a one pixel border */
+    width = rect.R_right - rect.R_left - 2 ;
+
+    /* Calculate the position based on the percentage */
+    x = ((dword)width) * ((dword)(pself->PII_percentage)) / 100L ;
+
+    /* Draw the border */
+    GrSetLineColor(gstate, CF_INDEX, C_BLACK, 0, 0) ;
+    GrDrawRect(gstate, rect.R_left, rect.R_top, rect.R_right-1, rect.R_bottom-1) ;
+
+    /* Set up our colors */
+    if (x)  {
+        GrSetAreaColor(gstate, CF_INDEX, C_BLACK, 0, 0) ;
+        GrFillRect(gstate, rect.R_left+1, rect.R_top+1, rect.R_left+x, rect.R_bottom-1) ;
+    }
+
+    /* Draw the remaining part */
+    GrSetAreaColor(gstate, CF_INDEX, C_WHITE, 0, 0) ;
+    GrFillRect(gstate, rect.R_left+x+1, rect.R_top+1, rect.R_right-1, rect.R_bottom-1) ;
+}
+
+/***************************************************************************
+ *      END OF FILE:  DIALOGT.GOC
+ ***************************************************************************/

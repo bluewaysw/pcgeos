@@ -718,7 +718,7 @@ STACK *have,*pref;
 	mask=cert->mask;
 	emask=cert->export_mask;
 			
-	sk_set_cmp_func(pref,ssl_cipher_ptr_id_cmp);
+	sk_set_cmp_func(pref,(int (*)())ssl_cipher_ptr_id_cmp);
 
 	for (i=0; i<sk_num(have); i++)
 		{

@@ -1,0 +1,114 @@
+/**************************************************************************
+ *	File:		View.goh
+ *			Headerfile fÅr
+ *			Routinen und Methoden zum einsehen von dateien
+ *      Copyright:      (c) by RABE-Soft 2/99
+ *      Sonstiges:      -
+ *
+ **************************************************************************/
+
+// Returnstruktur zum finden von EintrÑgen Åber eine DOS-Datei in der INI
+typedef struct {
+	GeodeToken	Application;
+	Boolean 	found;
+	word		type;
+	}	DosAppInfo;
+
+// Werte fÅr DosAppInfo.type
+#define	DFT_BAT		1
+#define DFT_COM_EXE	2
+#define DFT_DATA	3
+
+// InfoStruktur zum Suchen des passenden Application-Tokens
+// Diese Struktur wird fÅr jeden Eintrag in "fileNameTokens" angelegt,
+// wenn der Datei eine Applikation zugeordnet ist
+typedef struct {
+	char	body[16],
+		ext[8]; 	//	NamensStrings
+	int 	bodyStar,
+		extStar;	// Position eine evt. vorhandene Sterns
+	GeodeToken tok;		// Token der zugeordneten Applikation
+	}	DosFileEntry;
+
+// Werte fÅr AnzeigeFlags. Werden in der Ini gespeichert. FÅr den Wertebereich
+// existieren keine EinschrÑnkungen (au·er type word), weil sie in einem
+// eingenen Feld (GZipOptions.viewOptions) gespeichert werden.
+
+#define GZOPT_VIEW_START_GEODES		0x01
+#define GZOPT_VIEW_OPEN_DOCUMENTS       0x02
+#define GZOPT_VIEW_OPEN_DOS_DOCUMENTS   0x10
+#define GZOPT_VIEW_START_COM_EXE        0x20
+#define GZOPT_VIEW_SHOW_BAT             0x40
+
+#define GZOPT_VIEW_GEOS_MASK		0x0F
+#define GZOPT_VIEW_DOS_MASK		0xF0
+
+
+
+
+// Header-Struktur einer geos-Datei - Ohne Garantie!
+typedef struct	{
+/*00*/	dword	Kennung;       		/* 'G+0x80','E+0x80','O','S' */
+/*04*/	char		Name[36];	/* = FILE_LONGNAME_BUFFER_SIZE  = 32 + 4 */
+/*28*/	GeosFileType	fileType;			/* word enum, 	FEA_FILE_TYPE */
+					/* ZulÑssig 0 .. 4 = GFT_NOT_GEOS_FILE .. GFT_DIRECTORY */
+					/* hîhere Werte: [CTRL-G] liefert 1.X VM-Datei */
+/*2A*/	GeosFileHeaderFlags	headerFlags;	/* WordFlags,	FEA_FLAGS */
+/*2C*/ 	ReleaseNumber	releaseNumber;		/* 4 Word,	FEA_RELEASE */
+/*34*/	ProtocolNumber	protocolNumber;	/* 2 Word;	FEA_PROTOCOL */
+/*38*/	GeodeToken	fileToken;		/* 6 Byte,	FEA_TOKEN */
+/*3E*/	GeodeToken	creatorToken;		/* 6 Byte,	FEA_CREATOR */
+/*44*/	char		notiz[99];	/* 99 Bytes, Dokument-Notizen */
+/*A7*/	Byte		fill;	  	/* 1 Byte, unbekannt, öbernahme zur Vereinfachung */
+/*A8*/  char 		copyright[32];	/* Copyright-Notiz */
+/*C8*/	FileDateAndTime	createDate;	/* Datum der Dokument-Erstellung */
+/*CC*/	Byte		password[8];	/* verschlÅsseltes Passwort */
+	} 	GeosHeader;
+
+
+// Funktionsheader
+
+// ****** Unterstes Level - Toolroutinen
+extern int ViewExtractLocatedFileToTemp(MemHandle unzDesc, FileInZip * fizp);
+extern Boolean ViewReadGeosHeader(MemHandle unzDesc, FileInZip * fizp, GeosHeader *gHeader);
+// Anzeige von Datei-Informationen
+extern void ViewToolFileDateToTimeDate( TimerDateAndTime *tdat, FileDateAndTime fdat);
+extern void ViewToolShowDate(optr glyph, FileDateAndTime fdat );
+extern void ViewToolShowTime(optr glyph, FileDateAndTime fdat );
+extern void ViewToolShowIconID(optr glyph, GeodeToken t );
+extern void ViewToolAddNumber(char * st, dword num );
+extern void ViewToolUpdateGeodeInfo(GeosHeader *header, FileInZip * fizp);
+// Holen von Infos Åber DOS-Dateien aus der geos.ini
+extern Boolean ViewToolCreateDosFileList(void);
+extern Boolean ViewToolReadFileEntry(DosFileEntry * dfep, char * text );
+extern Boolean ViewToolReadAppToken( GeodeToken *t, char * text);
+extern void ViewToolSplitDosFileName(char * fName, char * body, char * ext);
+extern Boolean ViewToolCompareFileName(DosFileEntry * dfep, char * name);
+extern void ViewToolFindTokenInfo(DosAppInfo * info, char * name);
+
+// ********  Mittleres Level - Eigentliche Handler
+extern int ViewDisplayGeodeInfo(GeosHeader * header, FileInZip * fizp);
+extern void ViewShowLocatedFile(MemHandle unzDesc, FileInZip * fizp);
+extern void ViewExecuteLocatedDosFile(MemHandle unzDesc, FileInZip * fizp);
+extern void ViewStartLocatedDosDataFile(MemHandle unzDesc, FileInZip * fizp,
+				DosAppInfo * info, word flags);
+
+// oberes Level - Ausagelagerte Routinen zur öbersicht und Main-Handler
+extern Boolean ViewExecBatFile(MemHandle unzDesc, FileInZip * fizp,
+				DosAppInfo * info, word flags);
+extern Boolean ViewExecComExeFile(MemHandle unzDesc, FileInZip * fizp,
+				DosAppInfo * info, word flags);
+extern Boolean ViewExecDosDataFile(MemHandle unzDesc, FileInZip * fizp,
+				DosAppInfo * info, word flags);
+
+extern void ViewGetDosAppInfo(char * name, DosAppInfo * info);
+
+extern Boolean ViewExecGeosDataFile(MemHandle unzDesc, FileInZip * fizp,
+				GeosHeader * header, word flags);
+extern Boolean ViewExecGeode(MemHandle unzDesc, FileInZip * fizp,
+				GeosHeader * header, word flags);
+
+extern Boolean ViewStartViewFile(MemHandle unzDesc, FileInZip * fizp);
+
+
+

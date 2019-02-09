@@ -6,12 +6,11 @@
 GEODE           = bbxmail
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = buffer.h buffer.goc mail64.goc mailacct.goc mailcomm.goc\
-                  mailmsg.goc mailqp.goc mailStrings.goc mime.goc pop3.goc\
-                  smtp.goc mailfatals.goh mime.goh
-OBJS            = buffer.obj mail64.obj mailacct.obj mailcomm.obj\
-                  mailmsg.obj mailqp.obj mailStrings.obj mime.obj pop3.obj\
-                  smtp.obj
+SRCS            = buffer.h mailacct.goc mailcomm.goc pop3.goc mail64.goc\
+                  mailqp.goc buffer.goc mailStrings.goc mime.goc smtp.goc\
+                  mailmsg.goc mime.goh mailfatals.goh
+OBJS            = mailacct.obj mailcomm.obj pop3.obj mail64.obj mailqp.obj\
+                  buffer.obj mailStrings.obj mime.obj smtp.obj mailmsg.obj
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = bbxmlib

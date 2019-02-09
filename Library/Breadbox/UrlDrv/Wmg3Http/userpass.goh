@@ -1,0 +1,117 @@
+/***********************************************************************
+ *
+ * Copyright (C) 1998 Breadbox Computer Company
+ *
+ ***********************************************************************/
+
+/***************************************************************************
+ *      User Password Dialog Template
+ ***************************************************************************/
+@start UserPasswordResource ;
+    /*--------------------------------------------------------------------*/
+    @object GenInteractionClass UserPasswordDialog = {
+        GI_visMoniker = "Authorization Required" ;
+        GI_comp = @UserNote1,
+                  @UserPasswordInfo,
+                  @UserNote2,
+                  @UserNote3,
+                  @UserNameAndPassword,
+                  @UserPasswordOK,
+                  @UserPasswordCancel ;
+        GII_visibility = GIV_DIALOG ;
+        GI_states = @default & (~GS_USABLE) ;
+        GII_type = GIT_ORGANIZATIONAL ;
+        GII_attrs = @default |
+                       GIA_NOT_USER_INITIATABLE |
+                       GIA_INITIATED_VIA_USER_DO_DIALOG |
+                       GIA_MODAL ;
+        HINT_CENTER_CHILDREN_HORIZONTALLY ;
+    }
+    /*--------------------------------------------------------------------*/
+    @object GenGlyphClass UserNote1 = {
+        GI_visMoniker = "Access to the site" ;
+    }
+    /*--------------------------------------------------------------------*/
+    @object GenTextClass UserPasswordInfo = {
+        GI_attrs = @default | GA_READ_ONLY ;
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT ;
+    }
+    /*--------------------------------------------------------------------*/
+    @object GenGlyphClass UserNote2 = {
+        GI_visMoniker = "requires a name and password." ;
+    }
+    /*--------------------------------------------------------------------*/
+    @object GenGlyphClass UserNote3 = {
+        GI_visMoniker = " " ;
+    }
+    /*--------------------------------------------------------------------*/
+    @object GenInteractionClass UserNameAndPassword = {
+        GI_comp = @UserName, @UserPassword ;
+        HINT_CENTER_CHILDREN_ON_MONIKERS;
+        HINT_DEFAULT_TARGET ;
+        HINT_DEFAULT_FOCUS ;
+    }
+    /*--------------------------------------------------------------------*/
+    @object GenTextClass UserName = {
+        GI_visMoniker = 'N', "Name:" ;
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT ;
+        HINT_DEFAULT_TARGET ;
+        HINT_DEFAULT_FOCUS ;
+    }
+    /*--------------------------------------------------------------------*/
+    @object GenTextClass UserPassword = {
+        GI_visMoniker = 'P', "Password:" ;
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT ;
+        ATTR_GEN_TEXT_CHAR_ATTR = @UserPasswordFont ;
+        HINT_FIXED_SIZE = { 0,
+                            SST_LINES_OF_TEXT | 1,
+                            0 } ;
+    }
+    /*---------------------------------------------------------------------*/
+    @chunk VisTextCharAttr UserPasswordFont =
+                               CHAR_ATTR_FONT_SIZE(FID_BISON, 13) ;
+    /*--------------------------------------------------------------------*/
+    @object GenTriggerClass UserPasswordOK = {
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_OK ;
+        HINT_SEEK_REPLY_BAR ;
+        HINT_DEFAULT_DEFAULT_ACTION ;
+    }
+    /*--------------------------------------------------------------------*/
+    @object GenTriggerClass UserPasswordCancel = {
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_DISMISS ;
+        HINT_SEEK_REPLY_BAR ;
+    }
+    /*--------------------------------------------------------------------*/
+@end UserPasswordResource ;
+
+#define DialogChild(parent, child)  \
+            ConstructOptr( \
+                OptrToHandle(parent), \
+                OptrToChunk(child))
+
+Boolean GetUserPassword(char *p_site, char *p_buffer)
+{
+    optr dialog ;
+    optr child ;
+    word answer ;
+    Boolean wantToTry = FALSE ;
+
+    dialog = UserCreateDialog(@UserPasswordDialog) ;
+    child = DialogChild(dialog, @UserPasswordInfo) ;
+    @call child::MSG_VIS_TEXT_REPLACE_ALL_PTR(p_site, 0) ;
+
+    answer = UserDoDialog(dialog) ;
+    if (answer == IC_OK)  {
+        child = DialogChild(dialog, @UserName) ;
+        @call child::MSG_VIS_TEXT_GET_ALL_PTR(p_buffer) ;
+        strcat(p_buffer, _TEXT(":")) ;
+        child = DialogChild(dialog, @UserPassword) ;
+        @call child::MSG_VIS_TEXT_GET_ALL_PTR(p_buffer + strlen(p_buffer)) ;
+        wantToTry = TRUE ;   /* Yes, we want to try again */
+    }
+
+    UserDestroyDialog(dialog) ;
+
+    return wantToTry ;
+}
+

@@ -1,0 +1,349 @@
+/***********************************************************************
+ *
+ *                          ==CONFIDENTIAL INFORMATION==
+ *
+ * COPYRIGHT 1994-99 BREADBOX COMPUTER COMPANY -- ALL RIGHTS RESERVED  --
+ * THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER
+ * A NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ * RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ * NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ * CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ * AGREEMENT.
+ *
+ * PROJECT:       HTMLView
+ * FILE:          HTMLFSiz.goc  (Form Size routines)
+ *
+ * AUTHOR:        Marcus Gr�ber
+ *                Lysle Shields
+ *
+ * NOTES:         Routines to determine the size of form elements
+ ***********************************************************************/
+
+@include <stdapp.goh>
+@include <Objects/Text/tCtrlC.goh>
+
+#include <Ansi/string.h>
+#include <Ansi/stdio.h>
+#include <Ansi/stdlib.h>
+
+@include <fixes.goh>
+@include "options.goh"
+@include <html4par.goh>
+
+#include "regiont.h"
+#include "internal.h"
+@include <extgraph.goh>
+
+@extern chunk FormButtonTextSubmit ;
+@extern chunk FormButtonTextReset ;
+
+#include "htmlclas/formset.h"
+
+word FindRegionAtPosition(T_regionArrayHandle regionArray, dword pos)
+{
+    word region ;
+    VisLargeTextRegionArrayElement *p_region ;
+    word num ;
+    word size ;
+
+    /* Go through all the existing regions and find the */
+    /* character position of where the region is.  Stop at the region */
+    /* where the position is inside */
+    num = RegionArrayGetCount(regionArray) ;
+    for (region=0; region<num; region++)  {
+        RegionLock(regionArray, region, &p_region, &size) ;
+        if (p_region->VLTRAE_charCount > pos)  {
+            RegionUnlock(p_region) ;
+            break ;
+        }
+        pos -= p_region->VLTRAE_charCount ;
+        RegionUnlock(p_region) ;
+    }
+
+    if (region >= num)
+        region = 0xFFFF ;
+
+    return region ;
+}
+
+/* Draw a text form element on the screen */
+#pragma argsused
+SizeAsDWord LOCAL FormElementGetSizeOfButton(char *p_buttonText)
+{
+    GStateHandle gstate ;
+    SizeAsDWord size ;
+
+    /* Determine the width of the text */
+    gstate = GrCreateState(0) ;
+    FormSetTextAttr(gstate);
+    GrDrawText(gstate, 0, 0, p_buttonText, 0) ;
+
+    size = MAKE_SIZE_DWORD(
+               16 + DWORD_X(GrGetCurPos(gstate)),
+               8 + FormGetPointSize()) ;
+
+    GrDestroyState(gstate) ;
+
+    return size ;
+}
+
+SizeAsDWord LOCAL FormElementGetSizeOfSelectList(
+                HTMLformData *p_formData,
+                optr formArray,
+                optr NamePool,
+                word selectElement)
+{
+    GStateHandle gstate ;
+    word maxWidth ;
+    word width ;
+    word i;
+    HTMLformData *p_option ;
+    word size ;
+    TCHAR buf[MAX_FORM_ELEMENT_OPTION_LENGTH+1] ;
+    word retWidth, retHeight ;
+
+    /* Do we need to calculate the width of the selection list? */
+    if ((maxWidth = p_formData->HFD_var.select.maxWidth) == 0)  {
+        /* Determine the maximum width of all the text entries */
+        maxWidth = SELECT_LIST_MIN_WIDTH ;
+        gstate = GrCreateState(0) ;
+        FormSetTextAttr(gstate);
+
+        MemLock(OptrToHandle(formArray)) ;
+        for(i=ChunkArrayGetCount(formArray)-1; (int)i>=0; i--)  {
+            p_option = ChunkArrayElementToPtr(formArray, i, &size) ;
+            /* Only bother with options in the same form */
+            if ((p_option->HFD_itemType == HTML_FORM_OPTION) &&
+                (p_option->HFD_formNumber == p_formData->HFD_formNumber) &&
+		!(p_option->HFD_var.option.flags & HTML_OPTION_DELETED))  {
+                if (p_option->HFD_var.option.menuElement == selectElement)  {
+                    /* We have found an option in the list that */
+                    /* matches this menu item */
+                    /* Determine it's width */
+                    GrMoveTo(gstate, 0, 0) ;
+                    if (p_option->HFD_value != NAME_POOL_NONE)  {
+                        NamePoolCopy(
+                                  NamePool,
+                                  buf,
+                                  MAX_FORM_ELEMENT_OPTION_LENGTH*sizeof(TCHAR),
+                                  p_option->HFD_value,
+                                  NULL);
+                        GrDrawTextAtCP(gstate, (char*)buf, 0) ;
+                        width = DWORD_X(GrGetCurPos(gstate)) ;
+                        if (width > maxWidth)
+                            maxWidth = width ;
+                    }
+                }
+            }
+        }
+        MemUnlock(OptrToHandle(formArray)) ;
+        GrDestroyState(gstate) ;
+
+        p_formData->HFD_var.select.maxWidth = maxWidth ;
+    }
+
+    retWidth = 4+maxWidth + ((p_formData->HFD_var.select.flags&HTML_SELECT_MULTI)?0:12) ;
+    retHeight = 6 + (FormGetPointSize() * p_formData->HFD_var.select.size) ;
+    return MAKE_SIZE_DWORD(retWidth, retHeight) ;
+}
+
+/* Determine the size of the form element */
+SizeAsDWord FormElementGetSize(
+                HTMLformData *p_formData,
+                word formElement,
+                optr formArray,
+                optr NamePool)
+{
+    SizeAsDWord size ;
+    word len;
+    TCHAR buf[FORM_MAX_CHARACTERS_IN_SUBMIT_OR_RESET_BUTTON] ;
+
+    switch(p_formData->HFD_itemType)  {
+        case HTML_FORM_FILE:
+        case HTML_FORM_PASSWORD:
+        case HTML_FORM_TEXT:
+            len = p_formData->HFD_var.text_password.size;
+            if(len > FORM_MAX_TEXT_SIZE)
+              len = FORM_MAX_TEXT_SIZE;
+            else if(len == 0)
+              len = FORM_STANDARD_TEXT_SIZE;
+#ifdef IN_PLACE_TEXT_ENTRY
+	    /* XXX: what about large-space ones? */
+            size = MAKE_SIZE_DWORD((4 + 8 * len), 4 + FormGetPointSize() + 3) ;
+#else
+            size = MAKE_SIZE_DWORD((4 + 8 * len), 4 + FormGetPointSize()) ;
+#endif
+            break ;
+        case HTML_FORM_TEXTAREA:
+#ifdef IN_PLACE_TEXT_ENTRY
+	    /* XXX: what about large-space ones? */
+            size = MAKE_SIZE_DWORD(
+                       (4 + 8 * p_formData->HFD_var.textarea.cols),
+                        4 + FormGetPointSize() * p_formData->HFD_var.textarea.rows + 3) ;
+#else
+            size = MAKE_SIZE_DWORD(
+                       (4 + 8 * p_formData->HFD_var.textarea.cols),
+                        4 + FormGetPointSize() * p_formData->HFD_var.textarea.rows) ;
+#endif
+            break ;
+        case HTML_FORM_RADIO:
+        case HTML_FORM_CHECKBOX:
+            size = MAKE_SIZE_DWORD(12, 12) ;
+            break ;
+        case HTML_FORM_SUBMIT:
+        case HTML_FORM_BUTTON:
+            if (p_formData->HFD_value == NAME_POOL_NONE)  {
+                MemLock(OptrToHandle(@FormButtonTextSubmit)) ;
+                size = FormElementGetSizeOfButton(LMemDeref(@FormButtonTextSubmit)) ;
+                MemUnlock(OptrToHandle(@FormButtonTextSubmit)) ;
+            } else {
+                NamePoolCopy(
+                    NamePool,
+                    buf,
+                    sizeof(buf),
+                    p_formData->HFD_value,
+                    NULL) ;
+                size = FormElementGetSizeOfButton((char*)buf) ;
+            }
+            break ;
+        case HTML_FORM_RESET:
+            if (p_formData->HFD_value == NAME_POOL_NONE)  {
+                MemLock(OptrToHandle(@FormButtonTextReset)) ;
+                size = FormElementGetSizeOfButton(LMemDeref(@FormButtonTextReset)) ;
+                MemUnlock(OptrToHandle(@FormButtonTextReset)) ;
+            } else {
+                NamePoolCopy(
+                    NamePool,
+                    buf,
+                    sizeof(buf),
+                    p_formData->HFD_value,
+                    NULL) ;
+                size = FormElementGetSizeOfButton((char*)buf) ;
+            }
+            break ;
+        case HTML_FORM_SELECT:
+            size = FormElementGetSizeOfSelectList(p_formData, formArray, NamePool, formElement) ;
+            break ;
+        default:
+            /* Stop here if we are trying to draw something */
+            /* that has no view */
+            EC_ERROR(-1) ;
+            /* Standard size for now */
+            size = MAKE_SIZE_DWORD(32, 32) ;
+            break ;
+    }
+
+    return size ;
+}
+
+void FormElementInvalidate(
+               optr oself,
+               HTMLformData *p_formData,
+               word formElement)
+{
+    GStateHandle gstate ;
+    T_regionArrayHandle regArray;
+    sdword x, y ;
+    VisTextGraphic oldGraphic ;
+    word region;
+    VisLargeTextRegionArrayElement *p;
+    RectDWord bounds ;
+    HTMLTextInstance *pself ;
+    dword formPos = p_formData->HFD_pos ;
+    word elsize;
+    SizeAsDWord size;
+
+    /* Find the corresponding graphic */
+    @call oself::MSG_VIS_TEXT_GET_GRAPHIC_AT_POSITION(
+              &oldGraphic,
+              formPos) ;
+    RegionPurgeCache(oself) ;
+
+    /* Now invalidate that variable image */
+    pself = ObjDerefVis(oself) ;
+    /* Get the position of the form data */
+    x = p_formData->x ;
+    y = p_formData->y ;
+
+    /* Only do this if the data is not -1, -1 (unknown) */
+    if ((x != -1) && (y != -1))  {
+        regArray = RegionArrayConstruct(oself, pself) ;
+        region = FindRegionAtPosition(regArray, formPos) ;
+
+        gstate = @call oself::MSG_VIS_VUP_CREATE_GSTATE() ;
+
+        /* Determine the region we are in and add the */
+        /* x, y upper left corner */
+        RegionArrayStartAccess(regArray) ;
+        RegionPurgeCache(oself) ;
+        RegionLock(regArray, region, &p, &elsize) ;
+        x += p->VLTRAE_spatialPosition.PD_x ;
+        y += p->VLTRAE_spatialPosition.PD_y ;
+        RegionUnlock(p) ;
+        RegionArrayEndAccess(regArray) ;
+
+        /* Determine the bounds and invalidate */
+        size = FormElementGetSize(
+                     p_formData,
+                     formElement,
+                     pself->HTI_formArray,
+                     pself->HTI_namePool) ;
+
+        bounds.RD_left = x ;
+        bounds.RD_top = y ;
+        bounds.RD_right = x + DWORD_WIDTH(size) ;
+        bounds.RD_bottom = y + DWORD_HEIGHT(size) ;
+        GrInvalRectDWord(gstate, &bounds);
+
+        /* Done.  Destroy state */
+        GrDestroyState(gstate) ;
+    }
+}
+
+
+@extern method HTMLTextClass, MSG_VIS_TEXT_GRAPHIC_VARIABLE_SIZE
+{
+    SizeAsDWord size;
+    word token, elsize;
+    HTMLformData *formArrayElement;
+    XYValueAsDWord pos;
+
+    if(graphic->VTG_data.VTGD_variable.VTGV_manufacturerID==HTML_VARGRAPH_MFGID)
+    {                                   /* is it one of our own graphics? */
+      switch(graphic->VTG_data.VTGD_variable.VTGV_type)
+      {
+        case HTML_VARGRAPH_TYPE_FORM:
+          pos = GrGetCurPos(gstate);
+          token = ((HTMLformGraphicVariable *)
+            (graphic->VTG_data.VTGD_variable.VTGV_privateData))->
+              HFGV_formElementIndex;    /* get index of array element */
+
+	  if (token != CA_NULL_ELEMENT) {
+          GrSaveState(gstate) ;
+          MemLock(OptrToHandle(pself->HTI_formArray));
+          formArrayElement = ChunkArrayElementToPtr(pself->HTI_formArray,
+            token, &elsize);            /* deference token to image record */
+          GrApplyTranslationDWord(gstate, DWORD_X(pos), DWORD_Y(pos)) ;
+          size = FormElementGetSize(
+                     formArrayElement,
+                     token,
+                     pself->HTI_formArray,
+                     pself->HTI_namePool) ;
+          MemUnlock(OptrToHandle(pself->HTI_formArray));
+          GrRestoreState(gstate) ;
+          break;
+	  }
+	  /* else, fall through */
+
+        default:
+          size = MAKE_SIZE_DWORD(
+                     graphic->VTG_size.XYS_width, 
+                     graphic->VTG_size.XYS_height+IMAGE_HEIGHT_FUDGE_FACTOR);
+       }
+    }
+    else
+      size = @callsuper();
+
+    return size;
+}
+

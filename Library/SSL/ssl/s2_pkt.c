@@ -345,7 +345,7 @@ retIt:
 		MemUnlock(s->s2->rbufH);
 		/* for some reason the compiled ASM code doesn't
 		   work if we don't have this 'nop' */
-		asm{nop};
+		/*asm{nop};*/
 		return (ret);
 #else
 		if (s->s2->ract_data_length == 0)

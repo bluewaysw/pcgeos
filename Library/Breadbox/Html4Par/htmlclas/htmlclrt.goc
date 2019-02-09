@@ -1,0 +1,1340 @@
+/***********************************************************************
+ *
+ *                          ==CONFIDENTIAL INFORMATION==
+ *
+ * COPYRIGHT 1994-99 BREADBOX COMPUTER COMPANY -- ALL RIGHTS RESERVED  --
+ * THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER
+ * A NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ * RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ * NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ * CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ * AGREEMENT.
+ *
+ * PROJECT:       HTMLView
+ * FILE:          HTMLClRt.goc
+ *
+ * AUTHOR:        Marcus Gr�ber
+ *
+ * NOTES:         More methods for HTMLTextClass, mainly used for
+ *                display and user interaction.
+ ***********************************************************************/
+
+@include <stdapp.goh>
+@include <Objects/Text/tCtrlC.goh>
+
+#include <Ansi/string.h>
+#include <Ansi/stdio.h>
+#include <Ansi/stdlib.h>
+
+@include <fixes.goh>
+@include "options.goh"
+@include <html4par.goh>
+#include "regiont.h"
+#include "internal.h"
+@include <extgraph.goh>
+
+extern void FormElementInvalidate(
+               optr oself,
+               HTMLformData *p_formData,
+               word formElement) ;
+extern void FormElementEditSelectList(
+         HTMLformData *p_formData,
+         optr NamePool,
+         optr formArray,
+         word selectElement) ;
+
+#pragma codeseg HTMLCLRT_HOTSPOT_TEXT
+
+/* "-dc" causes vptrs for text constants if different code segments are used */
+#pragma option -dc-
+
+@extern method HTMLTextClass, MSG_HTML_TEXT_HOTSPOT_NOTIFY
+{
+    optr pool = pself->HTI_namePool;
+    NameToken tok, tok2;
+    TCHAR buf[HTML_STATIC_BUF], *p;
+    HTMLanchorData *anchorArrayElement;
+    word size;
+
+    MemLock(OptrToHandle(pself->HTI_anchorArray));
+    anchorArrayElement = ChunkArrayElementToPtr(pself->HTI_anchorArray,
+      number, &size);
+    tok = anchorArrayElement->linkOrName;
+    tok2 = anchorArrayElement->target;
+    MemUnlock(OptrToHandle(pself->HTI_anchorArray));
+
+    if(data && *data)                   /* append query data part, if any */
+    {
+      NamePoolCopy(pool, buf, sizeof(buf), tok, &p);
+                                        /* get name of hotspot */
+      if (NamePoolResizeDynamic(&p, (strlen(p)+strlen(data))*sizeof(TCHAR)))
+      strcat(p, data);
+
+      tok = NamePoolTokenize(pool, p, TRUE);
+      NamePoolDestroyIfDynamic(p);
+    }
+    else
+    {
+      NamePoolUseToken(pool, tok);      /* just add refrence to token */
+    }
+    if(tok2 != NAME_POOL_NONE)
+      NamePoolUseToken(pool, tok2);   /* just add refrence to token */
+
+    if (msg == MSG_HTML_TEXT_HOTSPOT_SELECT)  {
+        @call self::MSG_HTML_TEXT_HOTSPOT_SELECT(
+          pool, tok, tok2, NullHandle);
+    } else {
+        @call self::MSG_HTML_TEXT_HOTSPOT_PTR(
+          pool, tok, tok2);
+    }
+}
+
+@extern method HTMLTextClass, MSG_HTML_TEXT_HOTSPOT_PTR
+{
+    if(link != NAME_POOL_NONE)
+      NamePoolReleaseToken(pool, link);
+    if(target != NAME_POOL_NONE)
+      NamePoolReleaseToken(pool, target);
+}
+
+@extern method HTMLTextClass, MSG_HTML_TEXT_HOTSPOT_SELECT
+{
+    VisTextRange range;
+
+    /* Unselect the selected range (but keep at the start) */
+    /* The delay here is to make sure we get a nice 'blink' when the */
+    /* user clicks on a link. (about 2 or 3 screen updates) */
+    TimerSleep(3) ;
+    @call self::MSG_VIS_TEXT_GET_SELECTION_RANGE( &range );
+    @call self::MSG_VIS_TEXT_SELECT_RANGE(range.VTR_start, range.VTR_start) ;
+
+    if(link != NAME_POOL_NONE)
+      NamePoolReleaseToken(pool, link);
+    if(target != NAME_POOL_NONE)
+      NamePoolReleaseToken(pool, target);
+}
+
+/* Search the list of form elements and find an exact match of position */
+@extern method HTMLTextClass, MSG_HTML_TEXT_FORM_ELEMENT_FROM_POS
+{
+    dword found = CA_NULL_ELEMENT ;
+    optr array ;
+    word i ;
+    HTMLformData *p_formData ;
+    word size ;
+
+    /* Only evaluate if we have an array of form elements */
+    if ((array = pself->HTI_formArray) != NullHandle)  {
+        /* See if the given position matches any of the form positions */
+        MemLock(OptrToHandle(array)) ;
+        for (i=ChunkArrayGetCount(array)-1; (int)i>=0; i--)  {
+            p_formData = ChunkArrayElementToPtr(array, i, &size) ;
+
+            /* Only consider form items that are embedded objects */
+            if (p_formData->HFD_itemType <= HTML_FORM_LAST_EMBED)  {
+                /* Do we have a match? */
+                if (p_formData->HFD_pos == pos)  {
+                    /* Take it and stop here. */
+                    found = i ;
+                    break ;
+                }
+            }
+        }
+        MemUnlock(OptrToHandle(array)) ;
+    }
+
+    return found ;
+}
+
+#pragma codeseg HTMLCLRT_TEXT
+
+/* restore strings in code segment */
+#pragma option -dc
+
+@extern method HTMLTextClass, MSG_HTML_TEXT_LINK_FROM_POS
+{
+    optr array;
+    HTMLanchorData *anchorArrayElement;
+    word i,size;
+    dword p, bestPos, best_i;
+
+    if(mode == HTML_CHP_PREVIOUS)       /* best link so far: none */
+      bestPos = 0;
+    else
+      bestPos = TEXT_ADDRESS_PAST_END;
+    best_i = CA_NULL_ELEMENT;
+
+    /*
+     * Find exact match (or nearest link in given direction if requested).
+     */
+    if(pself->HTI_anchorArray)          /* no array - no links */
+    {
+      MemLock(OptrToHandle(pself->HTI_anchorArray));
+      array = pself->HTI_anchorArray;
+      for(i=ChunkArrayGetCount(array)-1; (int)i>=0; i--)
+      {
+        anchorArrayElement = ChunkArrayElementToPtr(array, i, &size);
+        if(!(anchorArrayElement->flags & (HTML_ADF_NAME | HTML_ADF_MAP)))
+        {
+          p = anchorArrayElement->pos;
+          if(p <= pos && p + anchorArrayElement->len > pos)
+          {
+            best_i = i;                 /* found exact match: end search */
+            break;
+          }
+          else if((mode == HTML_CHP_PREVIOUS && p>=bestPos && p<pos) ||
+                  (mode == HTML_CHP_NEXT     && p<=bestPos && p>pos))
+          {                             /* closer than previous best? */
+            bestPos = p;
+            best_i = i;
+          }
+        }
+      }
+      MemUnlock(OptrToHandle(pself->HTI_anchorArray));
+    }
+
+    return best_i;                      /* return best match */
+}
+
+@extern method HTMLTextClass, MSG_HTML_TEXT_FOCUS_FROM_POS
+{
+    optr array;
+    HTMLanchorData *anchorArrayElement;
+    HTMLformData *formArrayElement;
+    word i,size;
+    dword p, bestPos, best_i;
+
+    if(mode == HTML_CHP_PREVIOUS)       /* best link so far: none */
+      bestPos = 0;
+    else
+      bestPos = TEXT_ADDRESS_PAST_END;
+    best_i = CA_NULL_ELEMENT;
+
+    /*
+     * Find exact match (or nearest link in given direction if requested).
+     */
+    if(pself->HTI_anchorArray)          /* no array - no links */
+    {
+      MemLock(OptrToHandle(pself->HTI_anchorArray));
+      array = pself->HTI_anchorArray;
+      for(i=ChunkArrayGetCount(array)-1; (int)i>=0; i--)
+      {
+        anchorArrayElement = ChunkArrayElementToPtr(array, i, &size);
+        if(!(anchorArrayElement->flags & (HTML_ADF_NAME | HTML_ADF_MAP)))
+        {
+          p = anchorArrayElement->pos;
+          if(p <= pos && p + anchorArrayElement->len > pos)
+          {
+            best_i = i;                 /* found exact match: end search */
+            break;
+          }
+          else 
+          if((mode == HTML_CHP_PREVIOUS && p>=bestPos && p<pos) ||
+                  (mode == HTML_CHP_NEXT     && p<=bestPos && p>pos))
+          {                             /* closer than previous best? */
+            bestPos = p;
+            best_i = i;
+          }
+        }
+      }
+      MemUnlock(OptrToHandle(pself->HTI_anchorArray));
+    }
+    /*
+     * Find exact match (or nearest focus in given direction if requested).
+     */
+    if (!(mode == HTML_CHP_EXACT && best_i != CA_NULL_ELEMENT)) {
+    if(pself->HTI_formArray)          /* no array - no links */
+    {
+      MemLock(OptrToHandle(pself->HTI_formArray));
+      array = pself->HTI_formArray;
+      for(i=ChunkArrayGetCount(array)-1; (int)i>=0; i--)
+      {
+        formArrayElement = ChunkArrayElementToPtr(array, i, &size);
+/*
+        if((formArrayElement->HFD_itemType == HTML_FORM_TEXT) ||
+       (formArrayElement->HFD_itemType == HTML_FORM_PASSWORD))
+        {
+*/
+        if (formArrayElement->HFD_itemType < HTML_FORM_HEADER)  {
+        p = formArrayElement->HFD_pos;
+/*
+          if(p == pos)
+          {
+            best_i = i | 0x8000;        // found exact match: end search
+            break;
+          }
+          else 
+*/
+          if ((mode == HTML_CHP_PREVIOUS && p>=bestPos && p<pos) ||
+                  (mode == HTML_CHP_NEXT     && p<=bestPos && p>pos) ||
+                  (mode == HTML_CHP_EXACT && p==pos))
+          {                             /* closer than previous best? */
+            bestPos = p;
+            best_i = i | 0x8000;
+          }
+        }
+      }
+      MemUnlock(OptrToHandle(pself->HTI_formArray));
+    }
+    }
+
+    return best_i;                      /* return best match */
+}
+
+@extern method HTMLTextClass, MSG_HTML_TEXT_HIT_FROM_COORD
+{
+    dword pos;
+    PointDWFixed p = lmd->LMD_location;
+    word i,size;
+    HTMLimageData *imgElement;
+    VisTextGetLineInfoParameters lineParams;
+    VisTextGetLineInfoReturnValues lineReturn;
+    LineInfo lineInfo;
+
+    pos = @call self::MSG_VIS_TEXT_GET_TEXT_POSITION_FROM_COORD(&p);
+
+    /*
+     * The following fix checks whether the text position returned by the
+     * message represents the left or the right edge of the object under the
+     * cursor. If the position was rounded to the right, the previous
+     * text position will be taken to ensure that the returned position is
+     * always the one on the *left* side of the element which the cursor
+     * is on.
+     */
+    if(p.PDF_x.DWF_int > lmd->LMD_location.PDF_x.DWF_int && pos>0)
+      pos--;                            /* dropped to the right: fix position */
+
+    if(posret)
+      *posret = pos;
+
+    if(relret)
+    {
+      relret->P_x = (sword)(lmd->LMD_location.PDF_x.DWF_int - p.PDF_x.DWF_int);
+      relret->P_y = (sword)(lmd->LMD_location.PDF_y.DWF_int - p.PDF_y.DWF_int);
+    }
+
+    /* check for hitting a link if requested */
+    if(link)
+      *link = @call self::MSG_HTML_TEXT_LINK_FROM_POS(pos, HTML_CHP_EXACT);
+
+    /* check for hitting a form element if requested */
+    if(formElement)
+      *formElement = @call self::MSG_HTML_TEXT_FORM_ELEMENT_FROM_POS(pos);
+
+    if(image)
+    {
+      *image = CA_NULL_ELEMENT;
+
+      pself = ObjDerefVis(oself);
+      if(pself->HTI_imageArray)
+      {
+        MemLock(OptrToHandle(pself->HTI_imageArray));
+
+        for(i=ChunkArrayGetCount(pself->HTI_imageArray)-1; (int)i>=0; i--)
+        {
+          imgElement = ChunkArrayElementToPtr(pself->HTI_imageArray, i, &size);
+          if(imgElement->pos == pos)    /* graphic under position... */
+          {
+            *image = i;
+            break;
+          }
+        }
+        MemUnlock(OptrToHandle(pself->HTI_imageArray));
+      }
+    }
+
+    /* confirm hits, as MSG_VIS_TEXT_GET_TEXT_POSITION_FROM_COORD will
+       sometimes return positions far off from the cursor position... */
+    if ((link && *link != CA_NULL_ELEMENT) || 
+        (formElement && *formElement !=CA_NULL_ELEMENT) || 
+        (image && *image != CA_NULL_ELEMENT)) {  
+                                        /* skip if no change */
+	lineParams.VTGLIP_line =
+	    @call self::MSG_VIS_TEXT_GET_LINE_FROM_OFFSET(pos);
+	lineParams.VTGLIP_buffer = &lineInfo;
+	lineParams.VTGLIP_bsize = sizeof(lineInfo);
+	/* contrary to docs, 0 is returned on success */
+	if (@call self::MSG_VIS_TEXT_GET_LINE_INFO(
+	    &lineReturn, &lineParams) == 0) {
+	    /* if pointer is outside target line, not over link */
+	    if (lmd->LMD_location.PDF_y.DWF_int >
+		(p.PDF_y.DWF_int + lineInfo.LI_hgt.WBF_int) ||
+                lmd->LMD_location.PDF_y.DWF_int < p.PDF_y.DWF_int) {
+		if (link) *link = CA_NULL_ELEMENT;
+		if (formElement) *formElement = CA_NULL_ELEMENT;
+		if (image) *image = CA_NULL_ELEMENT;
+	    }
+	}
+    }
+}
+
+@extern method HTMLTextClass, MSG_HTML_TEXT_LINK_FROM_MAP
+{
+    TCHAR uri[80];                       /* arbitrary limit for map name */
+    HTMLmapData *md;
+    word i,j,link,n,coords;
+    word size;
+    NameToken map;
+    sword dx,dy, r1, r2, r;
+    Point poly[HTML_MAXPOLYCOORD];
+    GStateHandle gstate;
+    Region *reg;
+    MemHandle regMem;
+    Rectangle bounds;
+
+
+    NamePoolCopy(pself->HTI_namePool, uri, sizeof(uri), img->usemap, NULL);
+
+    link = CA_NULL_ELEMENT;             /* default: no link found */
+
+    if(uri[0]=='\x23')                  /* can only handle local maps */
+    {
+      map = NamePoolFind(pself->HTI_namePool, uri+1);
+
+      if(map != CA_NULL_ELEMENT && pself->HTI_mapArray)
+      {                                 /* map could exist somewhere... */
+        MemLock(OptrToHandle(pself->HTI_mapArray));
+        n = ChunkArrayGetCount(pself->HTI_mapArray);
+        for(i=0; i<n && link == CA_NULL_ELEMENT; i++)
+        {                               /* scan map elements */
+          md = ChunkArrayElementToPtr(pself->HTI_mapArray, i, &size);
+          if(md->HMD_name == map)       /* element is in our map? */
+          {
+            if (md->HMD_shape == HTML_MAP_SHAPE_DEFAULT)  {
+                /* No coordinates */
+                coords = 0 ;
+            } else {
+                coords = (size - (sizeof(HTMLmapData)-sizeof(HTMLmultiLength))) /
+                  sizeof(HTMLmultiLength);
+            }
+
+            for(j=0; (j+1<coords) && (j < HTML_MAXPOLYCOORD); j+=2)  /* assume coordinates are X,Y pairs */
+            {
+              poly[j/2].P_x =
+                LengthResolve(img->HID_size.XYS_width, md->HMD_coord[j]);
+              poly[j/2].P_y =
+                LengthResolve(img->HID_size.XYS_height, md->HMD_coord[j+1]);
+            }
+
+            switch(md->HMD_shape)       /* shape-dependent hit detection */
+            {
+              case HTML_MAP_SHAPE_DEFAULT:
+                link = md->HMD_anchor;  /* "default" gets them all... */
+                break;
+
+              case HTML_MAP_SHAPE_RECT:
+                if(coords >= 4 &&
+                   rel->P_x >= poly[0].P_x && rel->P_y >= poly[0].P_y &&
+                   rel->P_x <= poly[1].P_x && rel->P_y <= poly[1].P_y)
+                {
+                  link = md->HMD_anchor;/* within rectangle: use link */
+                }
+                break;
+
+              case HTML_MAP_SHAPE_CIRCLE:
+                if(coords >= 3)
+                {
+                  dx = (rel->P_x - poly[0].P_x);
+                  dy = (rel->P_y - poly[0].P_y);
+
+                  r1 = LengthResolve(img->HID_size.XYS_height, md->HMD_coord[2]);
+                  r2 = LengthResolve(img->HID_size.XYS_width, md->HMD_coord[2]);
+                  r = (r1<r2)?r1:r2;    /* behavior specified in HTML 4 specs */
+
+                  if( ((dword)dx)*dx + ((dword)dy)*dy <= ((dword)r)*r )
+                    link = md->HMD_anchor;
+                }
+                break;
+
+              case HTML_MAP_SHAPE_POLY:
+                if(j>=6)                /* at least need a triangle */
+                {
+                  gstate = GrCreateState(0);
+                  if(gstate)
+                  {
+                    /* Convert polygon to region (required for using the
+                       built-in hit detection of the Geos graphics system).
+                       This may look like the use of excessive force, but the
+                       effect is the same as using GrTestPointInPolygon(),
+                       without any cumbersome window coordinate translations. */
+
+                    GrBeginPath(gstate, PCT_REPLACE);
+                    GrDrawPolygon(gstate, poly, j/2);
+                    GrEndPath(gstate);
+                    regMem = GrGetPathRegion(gstate, ODD_EVEN);
+
+                    if(regMem)          /* actual hit detection on region */
+                    {
+                      /* skip over 4 words of bounds information */
+                      reg = (Region *)MemLock(regMem) + 4;
+                      if(GrTestPointInReg(reg, rel->P_x, rel->P_y, &bounds))
+                      {                 /* use link if inside polygon */
+                        link = md->HMD_anchor;
+                      }
+                      MemFree(regMem);
+                    }
+                    GrDestroyState(gstate);
+                  }
+                }
+                break;
+            }
+          }
+        }
+        MemUnlock(OptrToHandle(pself->HTI_mapArray));
+      }
+    }
+
+    return link;                        /* return whatever we have found */
+}
+
+#pragma codeseg HTMLCLRT_SELECT_TEXT
+
+/* "-dc" causes vptrs for text constants if different code segments are used */
+#pragma option -dc-
+
+@extern method HTMLTextClass, MSG_HTML_TEXT_SELECT_LINK
+{
+    HTMLanchorData *anchorArrayElement;
+    word size;
+
+    MemLock(OptrToHandle(pself->HTI_anchorArray));
+
+    anchorArrayElement = ChunkArrayElementToPtr(pself->HTI_anchorArray,
+      link, &size);
+
+    if(!(anchorArrayElement->flags & HTML_ADF_MAP))
+    {                                   /* don't try to highlight image maps */
+      @call self::MSG_VIS_TEXT_SELECT_RANGE(
+        anchorArrayElement->pos + anchorArrayElement->len,
+        anchorArrayElement->pos);
+    }
+
+    pself = ObjDerefVis(oself);
+    MemUnlock(OptrToHandle(pself->HTI_anchorArray));
+
+    @call oself::MSG_HTML_TEXT_FORM_ELEMENT_RELEASE() ;
+}
+
+#ifdef IN_PLACE_TEXT_ENTRY
+/* in htmlfedi.goc */
+void FormElementRemoveTextEntry(optr urlTextObj);
+#endif
+@extern method HTMLTextClass, MSG_HTML_TEXT_PREV_HOTSPOT
+{
+    word link;
+    VisTextRange range;
+    HTMLformData *p_formData;
+
+    /* if there's a selected form element, start from there */
+    if (pself->HTI_grabbedFormElement != FORM_ELEMENT_INVALID) {
+	MemLock(OptrToHandle(pself->HTI_formArray));
+	p_formData = ChunkArrayElementToPtr(pself->HTI_formArray,
+					    pself->HTI_grabbedFormElement,
+					    NULL);
+	range.VTR_start = p_formData->HFD_pos;
+	range.VTR_end = p_formData->HFD_pos;
+	MemUnlock(OptrToHandle(pself->HTI_formArray));
+    } else
+    @call self::MSG_VIS_TEXT_GET_SELECTION_RANGE(&range);
+
+    link = CA_NULL_ELEMENT;
+    if(range.VTR_start > 0)
+#ifdef IN_PLACE_TEXT_ENTRY
+      link = @call self::MSG_HTML_TEXT_FOCUS_FROM_POS(range.VTR_start-1,
+        HTML_CHP_PREVIOUS);
+#else
+      link = @call self::MSG_HTML_TEXT_LINK_FROM_POS(range.VTR_start-1,
+        HTML_CHP_PREVIOUS);
+#endif
+
+    if(link == CA_NULL_ELEMENT)
+#ifdef IN_PLACE_TEXT_ENTRY
+      link = @call self::MSG_HTML_TEXT_FOCUS_FROM_POS(TEXT_ADDRESS_PAST_END,
+        HTML_CHP_PREVIOUS);
+#else
+      link = @call self::MSG_HTML_TEXT_LINK_FROM_POS(TEXT_ADDRESS_PAST_END,
+        HTML_CHP_PREVIOUS);
+#endif
+
+    if(link != CA_NULL_ELEMENT)
+    {
+#ifdef IN_PLACE_TEXT_ENTRY
+      FormElementRemoveTextEntry(oself);
+      @call self::MSG_META_GRAB_FOCUS_EXCL();
+      if (link & 0x8000) {
+/*
+      Point relPos;
+      relPos.P_x = 0;
+      relPos.P_y = 0;
+*/
+      @call self::MSG_HTML_TEXT_FORM_ELEMENT_GRAB(link & 0x7fff);
+      @call self::MSG_HTML_TEXT_HOTSPOT_PTR(
+        NullOptr, NAME_POOL_NONE, NAME_POOL_NONE);
+      return;
+      }
+#endif
+      @call self::MSG_HTML_TEXT_SELECT_LINK(link);
+      @call self::MSG_HTML_TEXT_HOTSPOT_NOTIFY(link,
+        MSG_HTML_TEXT_HOTSPOT_PTR, NULL);
+    }
+}
+
+#pragma codeseg HTMLCLRT_HOTSPOT_TEXT
+
+/* "-dc" causes vptrs for text constants if different code segments are used */
+#pragma option -dc-
+
+@extern method HTMLTextClass, MSG_HTML_TEXT_NEXT_HOTSPOT
+{
+    word link;
+    VisTextRange range;
+    HTMLformData *p_formData;
+
+    /* if there's a selected form element, start from there */
+    if (pself->HTI_grabbedFormElement != FORM_ELEMENT_INVALID) {
+	MemLock(OptrToHandle(pself->HTI_formArray));
+	p_formData = ChunkArrayElementToPtr(pself->HTI_formArray,
+					    pself->HTI_grabbedFormElement,
+					    NULL);
+	range.VTR_start = p_formData->HFD_pos;
+	range.VTR_end = p_formData->HFD_pos;
+	MemUnlock(OptrToHandle(pself->HTI_formArray));
+    } else
+    @call self::MSG_VIS_TEXT_GET_SELECTION_RANGE(&range);
+
+#ifdef IN_PLACE_TEXT_ENTRY
+    link = @call self::MSG_HTML_TEXT_FOCUS_FROM_POS(range.VTR_end,
+      HTML_CHP_NEXT);
+#else
+    link = @call self::MSG_HTML_TEXT_LINK_FROM_POS(range.VTR_end,
+      HTML_CHP_NEXT);
+#endif
+
+#ifdef IN_PLACE_TEXT_ENTRY
+    if(link == CA_NULL_ELEMENT)
+      link = @call self::MSG_HTML_TEXT_FOCUS_FROM_POS(0, HTML_CHP_NEXT);
+#else
+    if(link == CA_NULL_ELEMENT)
+      link = @call self::MSG_HTML_TEXT_LINK_FROM_POS(0, HTML_CHP_NEXT);
+#endif
+
+    if(link != CA_NULL_ELEMENT)
+    {
+#ifdef IN_PLACE_TEXT_ENTRY
+      FormElementRemoveTextEntry(oself);
+      @call self::MSG_META_GRAB_FOCUS_EXCL();
+      if (link & 0x8000) {
+          @call self::MSG_HTML_TEXT_FORM_ELEMENT_GRAB(link & 0x7fff);
+          @call self::MSG_HTML_TEXT_HOTSPOT_PTR(
+            NullOptr, NAME_POOL_NONE, NAME_POOL_NONE);
+          return;
+      }
+#endif
+      @call self::MSG_HTML_TEXT_SELECT_LINK(link);
+      @call self::MSG_HTML_TEXT_HOTSPOT_NOTIFY(link,
+        MSG_HTML_TEXT_HOTSPOT_PTR, NULL);
+    }
+}
+
+@extern method HTMLTextClass, MSG_HTML_TEXT_EXEC_HOTSPOT
+{
+    VisTextRange range;
+    word link;
+    Point point ;
+
+    @call self::MSG_VIS_TEXT_GET_SELECTION_RANGE( &range );
+    link = @call self::MSG_HTML_TEXT_FOCUS_FROM_POS(range.VTR_start,
+      HTML_CHP_EXACT);
+    if (link != CA_NULL_ELEMENT)         /* start is inside a hotspot */
+    {
+        if (link & 0x8000)  {
+            @call self::MSG_HTML_TEXT_FORM_ELEMENT_GRAB(link & 0x7fff);
+            point.P_x = point.P_y = 0 ;
+            @call self::MSG_HTML_TEXT_FORM_ELEMENT_START_AFTER_GRAB(link & 0x7fff, point) ;
+            @call self::MSG_HTML_TEXT_HOTSPOT_PTR(
+              NullOptr, NAME_POOL_NONE, NAME_POOL_NONE);
+        } else {
+            @call self::MSG_HTML_TEXT_HOTSPOT_NOTIFY(link,
+              MSG_HTML_TEXT_HOTSPOT_SELECT, NULL);
+        }
+        return TRUE;                      /* we have executed a hotspot */
+    }
+
+    return FALSE;                       /* no hotspot */
+}
+
+@extern method HTMLTextClass, MSG_HTML_TEXT_EXEC_NTH_HOTSPOT
+{
+    optr array = pself->HTI_anchorArray;
+    word n;
+
+    if (array)  {
+        MemLock(OptrToHandle(array));
+
+        n = ChunkArrayGetCount(array);
+        if(n)
+          @call self::MSG_HTML_TEXT_HOTSPOT_NOTIFY(nth % n,
+            MSG_HTML_TEXT_HOTSPOT_SELECT, NULL);
+
+        MemUnlock(OptrToHandle(array));
+    }
+}
+
+@start PointerResource, data;
+  @chunk PointerDef16 HotspotPointer = {16,16,0,0,
+      {
+         0xE0, 0x00,
+         0xF8, 0x00,
+         0xFE, 0x00,
+         0x7F, 0x80,
+
+         0x7F, 0xFF,
+         0x3F, 0xFF,
+         0x3F, 0xFF,
+         0x1F, 0xFF,
+
+         0x1F, 0xFF,
+         0x0F, 0xFF,
+         0x0F, 0xFF,
+         0x07, 0xFF,
+
+         0x07, 0xFF,
+         0x07, 0xFF,
+         0x07, 0xFF,
+         0x07, 0xFF,
+      },
+      {
+         0xE0, 0x00,
+         0x98, 0x00,
+         0x86, 0x00,
+         0x41, 0x80,
+
+         0x40, 0x7F,
+         0x20, 0x01,
+         0x21, 0xFD,
+         0x11, 0x05,
+
+         0x11, 0xFD,
+         0x09, 0x05,
+         0x09, 0xFD,
+         0x05, 0x05,
+
+         0x05, 0xFD,
+         0x05, 0xFD,
+         0x04, 0x01,
+         0x07, 0xFF,
+      }
+/*
+      {
+         0x00, 0x00,
+         0x60, 0x00,
+         0x78, 0x00,
+         0x3E, 0x00,
+
+         0x3F, 0x80,
+         0x1F, 0xFE,
+         0x1E, 0x02,
+         0x0E, 0xFA,
+
+         0x0E, 0x02,
+         0x06, 0xFA,
+         0x06, 0x02,
+         0x02, 0xFA,
+
+         0x02, 0x02,
+         0x02, 0x02,
+         0x03, 0xFE,
+         0x00, 0x00,
+      }
+*/
+  };
+@end PointerResource;
+
+#pragma codeseg HTMLCLRT_SELECT_TEXT
+
+/* "-dc" causes vptrs for text constants if different code segments are used */
+#pragma option -dc-
+
+@extern method HTMLTextClass, MSG_META_LARGE_START_SELECT,
+                              MSG_META_LARGE_PTR
+{
+    word link, formElement, image;
+    dword p;
+    Point rel;
+    HTMLimageData *img;
+    TCHAR buf[32];
+    word size;
+@ifdef JAVASCRIPT_SUPPORT
+    HTMLEventType msgevt = (message == MSG_META_LARGE_START_SELECT)?
+      HTML_EVENT_CLICK : HTML_EVENT_MOUSEOVER;
+    HTMLEventType evt = HTML_EVENT_NONE;
+    HTMLEventObjectType type;
+    word obj;
+    HTMLformData *frm;
+    HTMLformType fType = HTML_FORM_NONE;
+    Boolean no_veto = TRUE;             // no script has objected yet
+@endif
+
+    @call self::MSG_HTML_TEXT_HIT_FROM_COORD(largeMouseDataStruct,
+      &p, &rel, &link, &formElement, &image);
+
+    pself = ObjDerefVis(oself);
+
+    *buf = 0;                           /* default: do not append coords */
+    if(image != CA_NULL_ELEMENT)        /* hit an image? */
+    {
+      MemLock(OptrToHandle(pself->HTI_imageArray));
+
+      img = ChunkArrayElementToPtr(pself->HTI_imageArray, image, &size);
+
+      if(rel.P_x < 0)
+        rel.P_x += img->HID_size.XYS_width;
+
+      if(img->usemap != NAME_POOL_NONE) /* client side map: find link */
+      {
+        link = @call self::MSG_HTML_TEXT_LINK_FROM_MAP(img, &rel);
+@ifdef JAVASCRIPT_SUPPORT
+        if(link != CA_NULL_ELEMENT)     // found an area?
+        {
+          evt = msgevt;                 // fire corresponding event
+          type = HTML_EVENT_OBJECT_AREA;
+          obj = link;
+        }
+@endif        
+      }
+      else if(img->flags & HTML_IDF_ISMAP)
+      {                                 /* server side map: append coords */
+        sprintf(buf,_TEXT("?%d,%d"),rel.P_x,rel.P_y);
+      }
+
+      /* make sure we're using the proper form element with a submit image: */
+      formElement = img->formElementIndex;
+
+      MemUnlock(OptrToHandle(pself->HTI_imageArray));
+    }
+
+@ifdef JAVASCRIPT_SUPPORT
+    if (formElement != CA_NULL_ELEMENT)
+    {
+      evt = msgevt;
+      type = HTML_EVENT_OBJECT_ELEMENT;
+      obj = formElement;
+      /* get form type for later */
+      pself = ObjDerefVis(oself);
+      MemLock(OptrToHandle(pself->HTI_formArray));
+      frm = ChunkArrayElementToPtr(pself->HTI_formArray, formElement, &size);
+      fType = frm->HFD_itemType;
+      MemUnlock(OptrToHandle(pself->HTI_formArray));
+    }
+    else if (link != CA_NULL_ELEMENT && evt == HTML_EVENT_NONE)              
+    {                                   // link that is not an area?
+      evt = msgevt;
+      type = HTML_EVENT_OBJECT_LINK;
+      obj = link;
+    }
+
+    /* If we have a pending mouseout, send it as soon as the object changes */
+    pself = ObjDerefVis(oself);         // refresh pointer
+    if(pself->HTI_pendingEvt_evt != HTML_EVENT_NONE &&
+       (pself->HTI_pendingEvt_type != type ||
+        pself->HTI_pendingEvt_obj != obj))
+    {
+      @call self::MSG_HTML_TEXT_FIRE_EVENT(HTML_EVENT_MOUSEOUT,
+        pself->HTI_pendingEvt_type, pself->HTI_pendingEvt_obj);
+
+      pself = ObjDerefVis(oself);       // refresh pointer
+      pself->HTI_pendingEvt_evt = HTML_EVENT_NONE;
+    }
+
+    if(evt != HTML_EVENT_NONE)          // did we detect an event?
+    {
+      /* Send the event corresponding to the condition we have detected.
+         Repeated mouseovers on the same object will be suppressed. */
+	/* checkbox will fire event after click handling since event may depend
+	   on checkbox state (onclick event should happen after mouse press
+	   and release) -- brianc 11/30/00 */
+        /* same for radio button -- brianc 12/14/00 */
+      if(!((fType == HTML_FORM_CHECKBOX || fType == HTML_FORM_RADIO) &&
+	   evt == HTML_EVENT_CLICK) &&
+	 (evt != HTML_EVENT_MOUSEOVER ||
+	  pself->HTI_pendingEvt_evt == HTML_EVENT_NONE ||
+	  pself->HTI_pendingEvt_type != type ||
+	  pself->HTI_pendingEvt_obj != obj))
+      {
+        no_veto = @call self::MSG_HTML_TEXT_FIRE_EVENT(evt, type, obj);
+        pself = ObjDerefVis(oself);     // refresh pointer
+      }
+
+      if(evt == HTML_EVENT_MOUSEOVER)   // remember last mouseover
+      {
+        pself->HTI_pendingEvt_evt = evt;
+        pself->HTI_pendingEvt_type = type;
+        pself->HTI_pendingEvt_obj = obj;
+      }
+    }
+
+    /* don't execute click event in browser if a script objected */
+    if(evt == HTML_EVENT_CLICK && !no_veto)
+    {
+      retVal->flags = MRF_PROCESSED | MRF_SET_POINTER_IMAGE;
+      retVal->ptrImage = @HotspotPointer;
+      return;
+    }
+@endif
+
+    /* If there is a form element there, activate it */
+    if (formElement != CA_NULL_ELEMENT)
+    {
+        /* Move to the form item (the beginning of it) to keep from */
+        /* jumping all the time we click on it.  For big form elements */
+        /* this will cause a one time jump, but usually won't be a */
+        /* problem after that (until another item is selected). */
+
+        if(message == MSG_META_LARGE_START_SELECT)
+        {
+            @call oself::MSG_HTML_TEXT_FORM_ELEMENT_GRAB(formElement) ;
+@ifdef JAVASCRIPT_SUPPORT
+	    /* if submit or reset, check result of onClick */
+	    if ((fType == HTML_FORM_SUBMIT || fType == HTML_FORM_RESET) &&
+		((@call self::MSG_HTML_TEXT_FIRE_EVENT(evt, type, obj)) == FALSE)) {
+		evt = HTML_EVENT_NONE;  /* rejected by JS: clear event */
+	    } else {
+		@call self::MSG_HTML_TEXT_FORM_ELEMENT_START_AFTER_GRAB(formElement, rel) ;
+	    }
+            /* handle checkbox click event here, there is nothing to do with
+	       the return value, so we ignore it -- brianc 11/30/00 */
+            /* same for radio button -- brianc 12/14/00 */
+	    if ((fType == HTML_FORM_CHECKBOX || fType == HTML_FORM_RADIO) &&
+		evt == HTML_EVENT_CLICK) {
+		@call self::MSG_HTML_TEXT_FIRE_EVENT(evt, type, obj);
+	    }
+@else
+            @call self::MSG_HTML_TEXT_FORM_ELEMENT_START_AFTER_GRAB(formElement, rel) ;
+@endif
+        }
+
+        @call self::MSG_HTML_TEXT_HOTSPOT_PTR(
+          NullOptr, NAME_POOL_NONE, NAME_POOL_NONE);
+
+        retVal->flags = MRF_PROCESSED | MRF_SET_POINTER_IMAGE;
+        /* TBD: Might want to use a different cursor for form activation */
+        retVal->ptrImage = @HotspotPointer;
+    }
+    else if(link != CA_NULL_ELEMENT)    /* inside a "hot" area */
+    {
+      if(message == MSG_META_LARGE_START_SELECT)
+      {
+        @call self::MSG_HTML_TEXT_SELECT_LINK(link);
+        @call self::MSG_HTML_TEXT_HOTSPOT_NOTIFY(link,
+          MSG_HTML_TEXT_HOTSPOT_SELECT, buf);
+      }
+      else
+      {
+        @call self::MSG_HTML_TEXT_HOTSPOT_NOTIFY(link,
+          MSG_HTML_TEXT_HOTSPOT_NOTIFY, buf);
+      }
+
+      retVal->flags = MRF_PROCESSED | MRF_SET_POINTER_IMAGE;
+      retVal->ptrImage = @HotspotPointer;
+    }
+    else
+    {
+      @call self::MSG_HTML_TEXT_HOTSPOT_PTR(
+        NullOptr, NAME_POOL_NONE, NAME_POOL_NONE);
+      @callsuper();
+    }
+}
+
+@extern method HTMLTextClass, MSG_META_LARGE_START_MOVE_COPY
+{
+    dword pos;
+    VisTextRange range;
+
+    PointDWFixed p = largeMouseDataStruct->LMD_location;
+                                        /* ..._FROM_COORD may change point */
+
+    @call self::MSG_VIS_TEXT_GET_SELECTION_RANGE(&range);
+    pos = @call self::MSG_VIS_TEXT_GET_TEXT_POSITION_FROM_COORD(&p);
+                                        /* get position on which drag started */
+
+    if( (pos<range.VTR_start || pos>=range.VTR_end) &&
+      pos!=TEXT_ADDRESS_PAST_END )      /* position out of range: select it */
+    {
+      @call self::MSG_VIS_TEXT_GET_RUN_BOUNDS(
+        &range, OFFSET_FOR_GRAPHIC_RUNS, pos );
+      @call self::MSG_VIS_TEXT_SELECT_RANGE(range.VTR_start+1, range.VTR_start);
+    }
+
+    @callsuper();
+}
+
+@extern method HTMLTextClass, MSG_META_KBD_CHAR
+{
+    if(flags & (CF_FIRST_PRESS | CF_REPEAT_PRESS))
+      switch((byte)character)           /* handle keypresses */
+      {
+        case VC_UP:
+          @send self::MSG_HTML_TEXT_PREV_HOTSPOT();
+          break;
+        case VC_DOWN:
+          @send self::MSG_HTML_TEXT_NEXT_HOTSPOT();
+          break;
+        case VC_TAB:
+          if(flags & ((SS_LSHIFT | SS_RSHIFT)<<8))
+            @send self::MSG_HTML_TEXT_PREV_HOTSPOT();
+          else
+            @send self::MSG_HTML_TEXT_NEXT_HOTSPOT();
+          break;
+        case VC_ENTER:
+        case C_SPACE:
+@ifdef JAVASCRIPT_SUPPORT
+          @send self::MSG_HTML_TEXT_KBD_ACTIVATE();
+@endif
+          @send self::MSG_HTML_TEXT_EXEC_HOTSPOT();
+          break;
+      }
+    return;                             /* no key handling by VisTextClass */
+}
+
+
+@ifdef JAVASCRIPT_SUPPORT
+/* kbd activation of current selected item */
+@extern method HTMLTextClass, MSG_HTML_TEXT_KBD_ACTIVATE
+{
+    VisTextRange range;
+    word size, i;
+    HTMLimageData *imgElement;
+    word link = CA_NULL_ELEMENT, formElement = CA_NULL_ELEMENT, image = CA_NULL_ELEMENT;
+    Point rel;
+    Boolean gotEvt = FALSE;
+    HTMLEventObjectType type;
+    word obj;
+
+    /* get selected range */
+    @call self::MSG_VIS_TEXT_GET_SELECTION_RANGE(&range);
+
+    /* check for hitting a link if requested */
+    link = @call self::MSG_HTML_TEXT_LINK_FROM_POS(range.VTR_start, HTML_CHP_EXACT);
+
+    /* check for hitting a form element if requested */
+    formElement = @call self::MSG_HTML_TEXT_FORM_ELEMENT_FROM_POS(range.VTR_start);
+
+    /* check for hitting an image */
+    pself = ObjDerefVis(oself);
+    if(pself->HTI_imageArray)
+    {
+        MemLock(OptrToHandle(pself->HTI_imageArray));
+        for(i=ChunkArrayGetCount(pself->HTI_imageArray)-1; (int)i>=0; i--)
+        {
+          imgElement = ChunkArrayElementToPtr(pself->HTI_imageArray, i, &size);
+          if(imgElement->pos == range.VTR_start)    /* graphic under position... */
+          {
+            image = i;
+            break;
+          }
+        }
+        MemUnlock(OptrToHandle(pself->HTI_imageArray));
+    }
+
+    /* handle item, based on type */
+    if(image != CA_NULL_ELEMENT)        /* hit an image? */
+    {
+      MemLock(OptrToHandle(pself->HTI_imageArray));
+      imgElement = ChunkArrayElementToPtr(pself->HTI_imageArray, image, &size);
+      if(imgElement->usemap != NAME_POOL_NONE) /* client side map: find link */
+      {
+        link = @call self::MSG_HTML_TEXT_LINK_FROM_MAP(imgElement, &rel);
+        if(link != CA_NULL_ELEMENT)     // found an area?
+        {
+          type = HTML_EVENT_OBJECT_AREA;
+          obj = link;
+	  gotEvt = TRUE;
+        }
+      }
+      /* make sure we're using the proper form element with a submit image: */
+      formElement = imgElement->formElementIndex;
+      MemUnlock(OptrToHandle(pself->HTI_imageArray));
+    }
+
+    /* If there is a form element there, use it */
+    if (formElement != CA_NULL_ELEMENT)
+    {
+        type = HTML_EVENT_OBJECT_ELEMENT;
+        obj = formElement;
+	gotEvt = TRUE;
+    }
+    else if(link != CA_NULL_ELEMENT)    /* inside a "hot" area */
+    {
+      if(!gotEvt)        // No event from area yet?
+      {
+        type = HTML_EVENT_OBJECT_LINK;
+        obj = link;
+	gotEvt = TRUE;
+      }
+    }
+
+    /* send out click event, if any */
+    if(gotEvt)
+    {
+      /* Send the event corresponding to the condition we have detected.*/
+      @call self::MSG_HTML_TEXT_FIRE_EVENT(HTML_EVENT_CLICK, type, obj);
+    }
+}
+@endif
+
+#pragma codeseg HTMLCLRT_TEXT
+
+/* restore strings in code segment */
+#pragma option -dc
+
+@ifdef JAVASCRIPT_SUPPORT
+@extern method HTMLTextClass, MSG_HTML_TEXT_FOCUS_FORM_ELEMENT
+{
+    /* this is only used for JS, so we can make this check without
+       affect the fix for 3630 */
+    if (pself->HTI_grabbedFormElement != formElement) {
+	if (!(pself->HTI_layoutState & HTS_CALCULATING_LAYOUT)) {
+	    @call oself::MSG_HTML_TEXT_FORM_ELEMENT_GRAB(formElement);
+	} else {
+	    @call oself::MSG_META_ADD_VAR_DATA(ATTR_HTML_TEXT_FOCUS_FORM_ELEMENT,
+					       sizeof(word), &formElement);
+	}
+    }
+}
+@endif
+
+
+@extern method HTMLTextClass, MSG_HTML_TEXT_FORM_ELEMENT_GRAB
+/* (word formElement) ; */
+{
+    dword p ;
+    HTMLformData *p_formElement ;
+    Point point ;
+
+    if (!pself->HTI_formArray) return;
+
+#ifdef IN_PLACE_TEXT_ENTRY
+    if(formElement==pself->HTI_grabbedFormElement) {
+	word itemType;
+	/* we need to do some checking here for in-place text stuff before
+	   rejecting redundant grabs, they require re-grabbing */
+	MemLock(OptrToHandle(pself->HTI_formArray));
+	p_formElement = ChunkArrayElementToPtr(pself->HTI_formArray, formElement, NULL);
+	itemType = p_formElement->HFD_itemType;
+	MemUnlock(OptrToHandle(pself->HTI_formArray));
+	if (itemType != HTML_FORM_TEXT &&
+	    itemType != HTML_FORM_PASSWORD &&
+	    itemType != HTML_FORM_TEXTAREA)
+	    return;
+    }
+#else
+    if(formElement==pself->HTI_grabbedFormElement)
+	return;                           // ignore redudant grabs
+#endif
+    
+    /* Release the old one */
+    if (pself->HTI_grabbedFormElement != FORM_ELEMENT_INVALID)
+	@call oself::MSG_HTML_TEXT_FORM_ELEMENT_RELEASE() ;
+
+    pself->HTI_grabbedFormElement = formElement ;
+    @call oself::MSG_HTML_TEXT_FORM_ELEMENT_INVALIDATE(formElement) ;
+    MemLock(OptrToHandle(pself->HTI_formArray));
+    p_formElement = ChunkArrayElementToPtr(pself->HTI_formArray, formElement, NULL) ;
+    p = p_formElement->HFD_pos ;
+    @call self::MSG_VIS_TEXT_SELECT_RANGE(p, p);
+#ifdef IN_PLACE_TEXT_ENTRY
+    if((p_formElement->HFD_itemType == HTML_FORM_TEXT) ||
+       (p_formElement->HFD_itemType == HTML_FORM_PASSWORD) ||
+       (p_formElement->HFD_itemType == HTML_FORM_TEXTAREA))   {
+        point.P_x = point.P_y = 0 ;
+        @send ,forceQueue oself::MSG_HTML_TEXT_FORM_ELEMENT_START(formElement, point) ;
+    } else {
+	/* synchornize with forceQueue of ELEMENT_START */
+	@send, forceQueue oself::MSG_HTML_TEXT_FORM_ELEMENT_REMOVE_TEXT_ENTRY();
+    }
+#endif
+    MemUnlock(OptrToHandle(pself->HTI_formArray)) ;
+
+@ifdef JAVASCRIPT_SUPPORT
+    @call self::MSG_HTML_TEXT_FIRE_EVENT(HTML_EVENT_FOCUS,
+      HTML_EVENT_OBJECT_ELEMENT, formElement);
+@endif
+}
+
+@extern method HTMLTextClass, MSG_HTML_TEXT_FORM_ELEMENT_START_AFTER_GRAB
+{
+#ifdef IN_PLACE_TEXT_ENTRY
+    optr array = pself->HTI_formArray;
+    HTMLformData *p_formData;
+    HTMLformType formType;
+    word size;
+
+    /* In rare cases (e.g. a document.write caused by a form button) the
+       document may have already disappeared when this message is received. */
+    if(!array) return;
+
+    MemLock(OptrToHandle(array));
+    p_formData = ChunkArrayElementToPtr(array, formElement, &size);
+    formType = p_formData->HFD_itemType;
+    MemUnlock(OptrToHandle(array));
+    if ((formType == HTML_FORM_TEXT) ||
+	(formType == HTML_FORM_PASSWORD) ||
+	(formType == HTML_FORM_TEXTAREA)) return;
+#endif
+    @call oself::MSG_HTML_TEXT_FORM_ELEMENT_START(formElement, rel);
+}
+
+@extern method HTMLTextClass, MSG_HTML_TEXT_FORM_ELEMENT_RELEASE
+{
+    word oldElement = pself->HTI_grabbedFormElement ;
+
+    if (oldElement != FORM_ELEMENT_INVALID)  {
+	pself->HTI_grabbedFormElement = FORM_ELEMENT_INVALID ;
+#ifdef IN_PLACE_TEXT_ENTRY
+	FormElementRemoveTextEntry(oself);
+#endif
+	@call oself::MSG_HTML_TEXT_FORM_ELEMENT_INVALIDATE(oldElement) ;
+@ifdef JAVASCRIPT_SUPPORT
+        @call self::MSG_HTML_TEXT_FIRE_EVENT(HTML_EVENT_BLUR, 
+          HTML_EVENT_OBJECT_ELEMENT, oldElement);
+@endif
+    }
+}
+
+@extern method HTMLTextClass, MSG_HTML_TEXT_FORM_ELEMENT_REMOVE_TEXT_ENTRY
+{
+    HTMLformData *p_formData;
+
+    FormElementRemoveTextEntry(oself);
+    /* synchronize selection */
+    if (pself->HTI_grabbedFormElement != FORM_ELEMENT_INVALID) {
+	MemLock(OptrToHandle(pself->HTI_formArray));
+	p_formData = ChunkArrayElementToPtr(pself->HTI_formArray,
+					    pself->HTI_grabbedFormElement,
+					    NULL);
+	@call oself::MSG_VIS_TEXT_SELECT_RANGE(p_formData->HFD_pos,
+					       p_formData->HFD_pos);
+	MemUnlock(OptrToHandle(pself->HTI_formArray));
+    }
+}
+
+@extern method HTMLTextClass, MSG_HTML_TEXT_FORM_ELEMENT_ADJUST_POS
+/* (word formElement, word x, word y) ; */
+{
+    HTMLformData *p_formElement ;
+    Point point ;
+
+    if (pself->HTI_grabbedFormElement == formElement)  {
+#ifdef IN_PLACE_TEXT_ENTRY
+        MemLock(OptrToHandle(pself->HTI_formArray));
+
+        p_formElement = ChunkArrayElementToPtr(pself->HTI_formArray, formElement, NULL) ;
+
+        if((p_formElement->HFD_itemType == HTML_FORM_TEXT) ||
+           (p_formElement->HFD_itemType == HTML_FORM_PASSWORD) ||
+	   (p_formElement->HFD_itemType == HTML_FORM_TEXTAREA))   {
+            point.P_x = point.P_y = 0 ;
+            @send ,forceQueue oself::MSG_HTML_TEXT_FORM_ELEMENT_START(formElement, point) ;
+        }
+        MemUnlock(OptrToHandle(pself->HTI_formArray)) ;
+#endif
+    }
+}
+
+@extern method HTMLTextClass, MSG_HTML_TEXT_GET_LINK_COUNT
+{
+    word n;
+
+    n = 0;                              /* default: no images  */
+
+    if(pself->HTI_anchorArray)          /* form array? */
+    {
+      MemLock(OptrToHandle(pself->HTI_anchorArray));
+      n = ChunkArrayGetCount(pself->HTI_anchorArray);
+                                        /* return number of image entries */
+      MemUnlock(OptrToHandle(pself->HTI_anchorArray));
+    }
+
+    return n;
+}
+
+@extern method HTMLTextClass, MSG_HTML_TEXT_GET_LINK
+{
+    word size;
+    HTMLanchorData *anchorArrayElement;
+
+    MemLock(OptrToHandle(pself->HTI_anchorArray));
+
+    anchorArrayElement = ChunkArrayElementToPtr(pself->HTI_anchorArray, n, &size);
+                                        /* deference token to form record */
+    memcpy(data, anchorArrayElement, sizeof(HTMLanchorData));
+
+    MemUnlock(OptrToHandle(pself->HTI_anchorArray));
+
+    return TRUE;                        /* successful */
+}
+
+@extern method HTMLTextClass, MSG_HTML_TEXT_SET_LINK
+{
+    word size;
+    HTMLanchorData *anchorArrayElement;
+
+    MemLock(OptrToHandle(pself->HTI_anchorArray));
+
+    anchorArrayElement = ChunkArrayElementToPtr(pself->HTI_anchorArray, n, &size);
+    /* only handle changing link.href and link.target */
+    if (anchorArrayElement->linkOrName != data->linkOrName) {
+	if (anchorArrayElement->linkOrName != NAME_POOL_NONE)
+	    NamePoolReleaseToken(pself->HTI_namePool,
+				 anchorArrayElement->linkOrName);
+	/* reference already added by caller */
+	anchorArrayElement->linkOrName = data->linkOrName;
+    }
+    if (anchorArrayElement->target != data->target) {
+	if (anchorArrayElement->target != NAME_POOL_NONE)
+	    NamePoolReleaseToken(pself->HTI_namePool,
+				 anchorArrayElement->target);
+	/* reference already added by caller */
+	anchorArrayElement->target = data->target;
+    }
+
+    MemUnlock(OptrToHandle(pself->HTI_anchorArray));
+}
+
+@ifdef JAVASCRIPT_SUPPORT
+@extern method HTMLTextClass, MSG_HTML_TEXT_FIRE_EVENT
+{
+    Boolean ret = TRUE;
+    optr array = pself->HTI_eventArray;
+    word i ;
+    HTMLeventData *p_eventData ;
+    NameToken code = NAME_POOL_NONE;
+    word size ;
+
+    /* Only evaluate if we have an array of event elements */
+    if (array)  
+    {
+      /* See if the given position matches any of the event handlers */
+      MemLock(OptrToHandle(array)) ;
+      for (i=ChunkArrayGetCount(array)-1; (int)i>=0; i--)  
+      {
+        p_eventData = ChunkArrayElementToPtr(array, i, &size) ;
+
+        /* Do we have a match for this event? */
+        if (p_eventData->HED_obj == obj && p_eventData->HED_type == type &&
+            p_eventData->HED_evt == evt) 
+        {
+          code = p_eventData->HED_code;
+          break;
+        }
+      }
+      MemUnlock(OptrToHandle(array)) ;
+
+      /* Found: give browser a chance to execute the code for this event */
+      if(code != NAME_POOL_NONE)
+        ret = @call self::MSG_HTML_TEXT_HANDLE_EVENT(evt, type, obj, code);
+    }
+  
+    return ret;
+}
+@endif

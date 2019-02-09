@@ -1,0 +1,1297 @@
+/*---------------------------------------------------------------------------
+ *
+ *	UI-File f�r Geozip-Applikattion
+ *
+ ---------------------------------------------------------------------------*/
+
+#include "unzip.h"
+
+@include <stdapp.goh>
+@include <gstring.h>
+@include "geozip.goh"
+@include "view.goh"
+@include "ART/FSDocDir.goh"
+@include "ART/FSFloppy.goh"
+@include "ART/ZExtract.goh"
+@include "ART/ZView.goh"
+/*@include "ART/gzicons.goh"
+@include "ART/zipdoc.goh"
+*/
+
+/*
+�bernahme der Flags von gdocctrl.goh, weil
+@include <objects\gdocctrl.goh>
+nicht funktioniert
+*/
+typedef WordFlags GDCFeatures;
+#define GDCF_NEW			0x4000
+#define GDCF_OPEN_CLOSE			0x2000
+#define GDCF_QUICK_BACKUP		0x1000
+#define GDCF_SAVE			0x0800
+#define GDCF_SAVE_AS			0x0400
+#define GDCF_COPY			0x0200
+#define GDCF_EXPORT			0x0100
+#define GDCF_REVERT			0x0080
+#define GDCF_RENAME			0x0040
+#define GDCF_EDIT_USER_NOTES		0x0020
+#define GDCF_SET_TYPE			0x0010
+#define GDCF_SET_PASSWORD		0x0008
+#define GDCF_SAVE_AS_TEMPLATE		0x0004
+#define GDCF_SET_EMPTY_DOCUMENT		0x0002
+#define GDCF_SET_DEFAULT_DOCUMENT	0x0001
+
+typedef WordFlags GDCToolboxFeatures;
+#define GDCTF_NEW_EMPTY		0x0020
+#define GDCTF_USE_TEMPLATE	0x0010
+#define GDCTF_OPEN		0x0008
+#define GDCTF_CLOSE		0x0004
+#define GDCTF_SAVE		0x0002
+#define GDCTF_QUICK_BACKUP	0x0001
+
+#define PROG_BAR_HEIGHT 18   /* was 16 and 14 */
+
+/*@define HelpTextLook(w)	GI_visMoniker = " ";\
+	HINT_PLACE_MONIKER_TO_LEFT; \
+	GI_attrs = @default | GA_READ_ONLY; \
+	HINT_INITIAL_SIZE = {SST_AVG_CHAR_WIDTHS | w, \
+				SST_LINES_OF_TEXT | 6,6};\
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT
+/*
+	ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR =  (VTDS_12 << VTDCA_SIZE_OFFSET) \
+				 | (VTDF_URW_MONO << VTDCA_FONT_OFFSET );\
+	HINT_TEXT_NO_FRAME;\
+/*	ATTR_GEN_TEXT_DEFAULT_PARA_ATTR =  (0x0111);*/
+
+
+/*---------------------------------------------------------------------------
+ Resourcendefinition AppResource
+ enth�lt nur das Applikations-Objekt (dessen Child das Primary-Objekt ist )
+ ---------------------------------------------------------------------------*/
+@start AppResource;
+
+@object GenApplicationClass GZipApp = {
+	GI_visMoniker = list { @GZipTextMoniker,
+					   @GeozipLCMoniker,
+				/*		@GeozipLMMoniker,    */
+						@GeozipTCMoniker};
+	GI_comp = @GZipPrimary,@ExtractDialog;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @GZipPrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) = @GZipDocumentControl,
+		@GZipDisplayControl,@CreateNewZipDialog;
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP) = @GZipDocumentControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) =
+		@GZipDocumentControl,@GZipDisplayControl;
+    /*
+     * Specify the INI file category [Con 6.3] under which to save all options
+     * for this application.
+     */
+    ATTR_GEN_INIT_FILE_CATEGORY = "GeoZipManager";
+    ATTR_GEN_HELP_FILE = "GeoZip Help";
+	}	/* end of GZipApp */
+
+@visMoniker GZipTextMoniker = "GeoZip";
+@end AppResource;
+
+/*---------------------------------------------------------------------------
+ Resourcendefinition Interface
+ enth�lt die Objekte f�r die Interaktion mit dem User
+ ---------------------------------------------------------------------------*/
+@start Interface;
+@if @debugFlag
+@include "debug\debug_ui.inc"
+@endif
+
+
+/* ----------------- Elemente des Hauptfensters ------------------------------*/
+
+@object GenPrimaryClass GZipPrimary = {
+	GI_comp = @GZipFileMenu, @GZipOptionsMenu, @GZipWindowMenu,
+		@SaveAsInfoBox, @GeosInfoBox,
+		@ViewWindow, @OpenNewInfo, @NewInfoBox, @ExtractArchiveInfo,
+		@TriggerGroup, @GZipDisplayGroup, @CreateNewZipDialog
+@if @debugFlag
+	,@DebugGroup
+@endif
+	;
+	HINT_SIZE_WINDOW_AS_DESIRED;
+	HINT_CENTER_WINDOW;
+	ATTR_GEN_HELP_CONTEXT = "TOC";
+	} /* end of 	Primary */
+
+
+/* Trigger im oberen Teil des Main-Windows */
+@object GenInteractionClass TriggerGroup = {
+	GI_comp =  @ViewButton,@ExtractButton;
+	GI_states = @default & ~GS_ENABLED;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	}
+
+@visMoniker ZViewText = "View";
+@object GenTriggerClass ViewButton = {
+	GI_visMoniker = list { @ZViewMoniker, @ZViewText };
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_GZIP_DOC_VIEW_FILE;
+ //	ATTR_GEN_HELP_CONTEXT = "$$$Look into file";
+    HINT_USE_ICON_TEXT_COMBINATION_MONIKER = {0, 10};
+	}
+
+@visMoniker ZExtractText = "Extract";
+@object GenTriggerClass ExtractButton = {
+	GI_visMoniker = list { @ZExtractMoniker, @ZExtractText };
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_GZIP_DOC_START_EXTRACT;
+ //	ATTR_GEN_HELP_CONTEXT = "$$$Extract selected files";
+    HINT_USE_ICON_TEXT_COMBINATION_MONIKER = {0, 10};
+	}
+
+/* ------------------------------------------------------------------*/
+/* DialogBox zum �ffnen des Zielverzeichnisses */
+/* ------------------------------------------------------------------*/
+
+@object GenInteractionClass ExtractDialog = {
+	GI_visMoniker = "Extract files";
+	GII_attrs = @default | GIA_MODAL;
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_COMMAND;
+	GI_comp = @ExtractTopGroup, @ExtractDirShower, @ExtractTrigger;
+	ATTR_GEN_HELP_CONTEXT = "Extract";
+	}
+
+@object GenInteractionClass ExtractTopGroup = {
+	GI_comp = @ExtractFileSelector,@ExtractTopRightGroup;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_CENTER_CHILDREN_VERTICALLY;
+	}
+
+
+@object GenFileSelectorClass ExtractFileSelector = {
+	GFSI_destination = process;
+	GFSI_notificationMsg = MSG_GZIP_EXTRACT_DIR_SELECTED;
+	GFSI_fileCriteria = FSFC_DIRS;
+	GFSI_attrs = @default | FSA_USE_VIRTUAL_ROOT;
+     ATTR_GEN_FILE_SELECTOR_VIRTUAL_ROOT = {SP_DOCUMENT, "."};
+	ATTR_GEN_PATH_DATA = { SP_DOCUMENT,"." };
+	}
+
+@object GenInteractionClass ExtractTopRightGroup = {
+	GI_comp = @ExtractCreateGroup;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	}
+
+@object GenInteractionClass ExtractCreateGroup = {
+    GI_visMoniker = "New Directory";
+	GI_comp = @ExtractCreateInput,@ExtractCreateTrigger;
+	HINT_DRAW_IN_BOX;
+	HINT_PLACE_MONIKER_ABOVE;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	}
+
+@object GenTextClass ExtractCreateInput = {
+	GTXI_text= "";
+	GTXI_maxLength =  32;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	GTXI_destination = process;
+	GTXI_applyMsg = MSG_GZIP_EXTRACT_CREATE_SUBDIR;
+	ATTR_GEN_TEXT_LEGAL_FILENAMES;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_INITIAL_SIZE = {SST_AVG_CHAR_WIDTHS | 20,
+				SST_LINES_OF_TEXT | 1,0};
+	}
+@object GenTriggerClass ExtractCreateTrigger = {
+    GI_visMoniker = 't',"Create";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_GZIP_EXTRACT_CREATE_SUBDIR;
+	HINT_CENTER_MONIKER;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	}
+
+@object GenTextClass ExtractDirShower = {
+    GI_visMoniker = "To:";
+  //  ATTR_GEN_HELP_CONTEXT = "$$$Target directory";
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_text= "";
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_INITIAL_SIZE = {SST_AVG_CHAR_WIDTHS | 50,
+				SST_LINES_OF_TEXT | 1,0};
+	}
+
+@object GenTriggerClass ExtractTrigger = {
+    GI_visMoniker = 'E',"Extract";
+ //   ATTR_GEN_HELP_CONTEXT = "$$$Start decompressing";
+	GI_attrs =  @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_GZIP_DOC_DO_EXTRACT;
+	HINT_SEEK_REPLY_BAR;
+	}
+
+/* ------------------------------------------------------------------*/
+/* Men�s
+/* ------------------------------------------------------------------*/
+
+@object GenInteractionClass GZipFileMenu = {
+	 GI_comp = @GZipUserGroup, @GZipDocumentControl, @AboutGroup;
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = GIGT_FILE_MENU;
+    }
+
+@object GenInteractionClass AboutGroup = {
+	GI_comp = @AboutDBox;
+	GII_visibility = GIV_SUB_GROUP;
+}
+
+@include "ART/bbxreg.goh"
+
+@object GenInteractionClass AboutDBox = {
+	 GI_visMoniker = 'b', "About";
+	 GI_comp = @AppName, @By, @BreadBoxLogo,
+				  @Visit, @Web, @AboutSpacer1,
+				  @Copyright, @BBoxLLC, @Rights, @AboutSpacer2;
+	 GII_visibility = GIV_DIALOG;
+	 GII_type = GIT_NOTIFICATION;
+	 HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+@object GenTextClass AppName = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_text = "GeoZip";
+    ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @AppNameCharAttrs;
+}
+@chunk VisTextCharAttr AppNameCharAttrs =
+	CHAR_ATTR_FONT_SIZE_STYLE(
+		FID_DTC_URW_SANS, 36, TS_BOLD);
+
+@object GenGlyphClass By = {
+  GI_visMoniker = "by";
+}
+@object GenGlyphClass BreadBoxLogo = {
+  GI_visMoniker = list { @BreadboxLogoMoniker}
+}
+@object GenGlyphClass Visit = {
+  GI_visMoniker = "Visit us at...";
+}
+@object GenGlyphClass Web = {
+  GI_visMoniker = "www.breadbox.com";
+}
+@object GenGlyphClass AboutSpacer1 = {
+  GI_visMoniker = "   ";
+}
+@object GenGlyphClass Copyright = {
+  GI_visMoniker = "Copyright 1994-2002";
+}
+@object GenGlyphClass BBoxLLC = {
+  GI_visMoniker = "Breadbox Computer Company LLC";
+}
+@object GenGlyphClass Rights = {
+  GI_visMoniker = "All Rights Reserved";
+}
+@object GenGlyphClass AboutSpacer2 = {
+  GI_visMoniker = "   ";
+}
+
+@object GenInteractionClass GZipOptionsMenu = {
+    GI_visMoniker = 'S',"Settings";
+    GI_comp = @GZipFileInfoSelectorGroup,@GZipDirInfoSelectorGroup,
+		    @GZipSaveOptionsGroup;
+    GII_visibility = GIV_POPUP;
+    }
+
+@object GenInteractionClass GZipWindowMenu = {
+    GI_comp = @GZipDisplayControl;
+    GI_states = @default & ~GS_ENABLED;
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_WINDOW_MENU);
+    }
+
+/* ----------------------------------------------------------------------------*
+ * Document-Objekte und Controls
+ *
+ * GZipDocumentControl:	Stellt �ffnen / Schlie�en usw. - Trigger bereit
+ *			Erzeugt die FileSelektoren zum �ffnen, Speichern usw.
+ *			Resource: Interface
+ *
+ * GZipDocumentGroup:	Schnittstelle zwischen DocumentControl und Document
+ *                      Erzeugt f�r jedes Document ein Objekt des Types
+ *			GZipDocumentClass, versorgt es mit den n�tigen Messages
+ *			( ..CREATE_UI.. ..ATTACH_UI.. ) und sorgt auch f�r seine
+ *                      Vernichtung beim Schlie�en des Archives
+ *			Resource: DocumentUI, l�uft im process-thread
+ *
+ * GZipDocument:	Verwaltet eine einzelne Achiv-Datei. Enth�lt die
+ *			Methoden zum Anzeigen und lesen aus der Datei.
+ *			Objekte dieser Klasse werden nicht per @objekt
+ *			deklariert sondern zur Laufzeit erzeugt.
+ *
+ * GZipDisplay:		Top-Objekt f�r alle Gen-Objekte, die zu einem Document
+ *			geh�ren. Die Resource, in dem sich das Display-Objekt
+ *			befindet wird vom DocumentGroup-Objekt f�r jedes Document
+ *			(Archiv) dupliziert und mit dem Document verbunden, so
+ *			da� diese Objekte das Documnet (Archiv) anzeigen k�nnen.
+ *			Resource: DisplayUI, template-resource
+ *			Ganz unten definiert, weil verzweigter Tree enthalten
+ *
+ * GZipDisplayControl:  Controler enth�lt die UI-Objekte, um die Display-Group
+ *			anzusteuern
+ *			Resource: Interface
+ *
+ * GZipDisplayGroup:	Fungiert als Parent aller duplizierten Display-Objekte
+ *			und steuert deren Anordnung und welches im Vordergrund
+ *			steht
+ *			Resource: Interface
+ *
+/* ---------------------------------------------------------------------------*/
+
+@object GZipDocumentControlClass GZipDocumentControl = {
+    GDCI_attrs = (@default & (~( GDCA_VM_FILE/* | GDCA_MODE | GDCA_CURRENT_TASK*/)
+ //	| (GDCM_SHARED_SINGLE << GDCA_MODE_OFFSET)
+ //	| (GDCT_NEW << GDCA_CURRENT_TASK_OFFSET) 
+	| (GDCA_MULTIPLE_OPEN_FILES
+	| GDCA_NATIVE))) ;
+
+//	 GDCI_documentToken = {"ZDoc", 16431};
+	 GDCI_features = @default & ~(GDCF_SUPPORTS_TEMPLATES
+				 | GDCF_SUPPORTS_USER_SETTABLE_EMPTY_DOCUMENT
+				 | GDCF_SUPPORTS_USER_MAKING_SHARED_DOCUMENTS
+				 | GDCF_NAME_ON_PRIMARY);
+
+    GDCI_dialogNewText = "New:\rCreate a new Zip-archive.";
+    GDCI_dialogOpenText = "Open:\rOpen an existing Zip-archive and display its contents.";
+/*
+    GDCI_noNameText = "unnamed.zip";
+*/
+    GDCI_documentGroup = GZipDocumentGroup;
+    GDCI_enableDisableList = GZipEnableList;
+
+//    GDCI_saveAsGroup = GZipSaveAsExtra;
+ 
+	ATTR_GEN_CONTROL_REQUIRE_UI = 0x6650; /* 0x6210 f�r enable New/Open ohne Rename */
+	ATTR_GEN_CONTROL_PROHIBIT_UI = 0x07FFF & ~0x6650;
+
+    }
+
+
+@chunk optr GZipEnableList[] = { @TriggerGroup,@MenuExtractButton,
+						   @GZipWindowMenu };
+
+
+/*@object GenInteractionClass GZipSaveAsExtra = {
+	GI_comp = @GZSAEText;
+	GI_states = @default & ~GS_USABLE;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	}
+
+@object GenTextClass GZSAEText = {
+	GI_attrs = @default | GA_READ_ONLY; 
+	GTXI_text = "This is an added set of instructions about appending .ZIP to the file name...";
+	HINT_ALIGN_LEFT_EDGE_WITH_OBJECT = @GZipSaveAsExtra;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_TEXT_FRAME;
+	}
+*/
+
+
+@end Interface;
+
+/*
+ * 	Document-Goup: Managt die zur Laufzeit erzeugten Dokumente in
+ * 	Zusammenarbeit mir dem DocumentControl-Objekt
+ * 	Kommt in eine Resource, die unter dem Process-Thread l�uft und wird
+ * 	in der GP-Datei mit object gekennzeichnet - sagt jedenfalls die Dokumentation
+ */
+@start DocumentUI ;
+
+@object GZipDocumentGroupClass GZipDocumentGroup = {
+
+    GDGI_attrs = (@default | GDGA_NATIVE) & ~(GDGA_VM_FILE |
+					      GDGA_SUPPORTS_AUTO_SAVE |
+					      GDGA_AUTOMATIC_CHANGE_NOTIFICATION|
+					      GDGA_AUTOMATIC_DIRTY_NOTIFICATION);
+    /* Name for untitled documents
+     */
+    GDGI_untitledName = "NONAME_A.ZIP";
+    GDGI_documentClass = &GZipDocumentClass;
+
+    GDGI_documentControl = GZipDocumentControl;
+    GDGI_genDisplayGroup = GZipDisplayGroup;
+    GDGI_genDisplay = GZipDisplay;
+/*
+    GDGI_protocolMajor = 1;
+    GDGI_protocolMinor = 0;
+  */
+}
+
+@end DocumentUI;
+
+
+@start Interface;
+
+/* BubbleHelpChunks */
+/*@chunk char NewBubble[] = "$$$Create new archive";
+@chunk char OpenBubble[] ="$$$Open existing archive";
+@chunk char CloseBubble[] = "$$$Close archive";
+@chunk char SaveBubble[] = "$$$Save file";
+@chunk char CascadeBubble[] = "$$$Cascade archives";
+@chunk char FullSizeBubble[] = "$$$Full size archives";
+@chunk char TileBubble[] = "$$$Tile archives";
+@chunk char SelectBubble[] = "$$$Select archive";
+*/
+
+/*
+ * DisplayControl: UI um die Fenster (Displays) der einzelnen Documente
+ * (Archive), ihre Anordnung usw. zu managen. Steuert dazu die DisplayGroup an.
+ */
+@object GenDisplayControlClass GZipDisplayControl = {
+ //   ATTR_GEN_CONTROL_REQUIRE_TOOLBOX_UI = 0x5;
+ //   ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI = 0x2;
+}
+
+
+/*
+ * Display-Group managt die verschiedenen Dispays
+ * Die Displays sind die Top-Gen-Objekte der Documente und werden zur
+ * Laufzeit vom Document-Group Objekt erzeugt
+ */
+
+@object GZipDisplayGroupClass GZipDisplayGroup = {
+    HINT_INITIAL_SIZE = {
+	SST_PIXELS | 580,
+	SST_PCT_OF_FIELD_HEIGHT | PCT_40,
+	0
+	};
+
+    /*
+     * Make sure that we snag the focus and the target [Con 12.5] from the
+     * GenPrimary when we come up on-screen, so any GenDisplay we adopt
+     * will get the focus and target if it wants it.
+     */
+    HINT_DEFAULT_FOCUS;
+    HINT_DEFAULT_TARGET;
+}
+@end Interface;
+
+/* ------------------------------------------------------------------*
+ * DisplayUI enth�lt alle Objekte, die f�r jedes Dokument dupliziert
+ * werden m�ssen ( von GenDocumentGroup )
+/* ------------------------------------------------------------------*/
+@start DisplayUI ;
+
+@object GZipDisplayClass GZipDisplay = {
+    /*
+     * The display starts not usable since it is not in the generic tree.
+     * It will be set usable by the GenDocumentGroup after being added as a
+     * child of the display group.
+     */
+    GI_states = @default & ~GS_USABLE;
+    GI_comp = @FileList,@InfoGroup;
+    ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;
+}
+
+
+/* --------------- Dateiliste --------------- */
+
+@object DClickGenDynamicListClass FileList = {
+	GIGI_destination = (TO_OBJ_BLOCK_OUTPUT);
+	GIGI_applyMsg = MSG_GZIP_DOC_FILE_SELECTED;
+	GDLI_queryMsg = MSG_GZIP_DOC_QUERY_FILE_FOR_LIST;
+	GIGI_selection = GIGS_NONE;
+	GIGI_behaviorType = GIGBT_EXTENDED_SELECTION;
+	DCDLI_doublePressMsg = MSG_GZIP_DOC_FILE_DOUBLE_CLICKED;
+	DCDLI_dcmsr = DCMSR_BEEP;
+	HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+	HINT_ITEM_GROUP_SCROLLABLE;
+	HINT_INITIAL_SIZE = { SST_PIXELS | 560,
+		SST_LINES_OF_TEXT | 12, 10};
+	ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	}
+
+@object GenInteractionClass InfoGroup = {
+	GI_comp = @InfoCounter,@InfoSize;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_ALLOW_CHILDREN_TO_WRAP;
+	}
+
+@object GenValueClass InfoCounter = {
+	GI_visMoniker = " Files to extract:";
+	GI_attrs = @default | GA_READ_ONLY;
+	}
+
+
+@object GenGlyphClass InfoSize = {
+	GI_visMoniker = "";
+	GI_attrs = @default | GA_READ_ONLY;
+	}
+
+@end DisplayUI;
+
+
+
+
+/* ------------------------------------------------------------------*/
+/* Eigene Resource zum tempor�ren Anzeigen einer Datei
+/* Enth�lt au�erdem die InfoBox zur Anzeige von Geos-Infos
+/* ------------------------------------------------------------------*/
+@start ViewResource;
+
+@object GenInteractionClass ViewWindow = {
+	GI_visMoniker = "Display file content";
+	GI_comp = @ViewText;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_COMMAND;
+	HINT_INTERACTION_MAKE_RESIZABLE;
+	}
+
+@object GenTextClass ViewText = {
+	GTXI_text = "";
+	GTXI_maxLength = 32767;
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_attrs = @default | GTA_INIT_SCROLLING | GTA_DONT_SCROLL_TO_CHANGES;
+	HINT_TEXT_WHITE_WASH_COLOR;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	HINT_INITIAL_SIZE = { SST_AVG_CHAR_WIDTHS | 80,
+		SST_LINES_OF_TEXT | 20, 20};
+	ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ((VTDS_12 << VTDCA_SIZE_OFFSET) |
+					(VTDF_BISON << VTDCA_FONT_OFFSET ));
+	}
+
+
+@chunk char BlankText[] ="";
+@chunk char ErrorText[] ="* Error while loading file! *\rGeoZip is unabale to display this file.";
+
+/* ------------------ InfoBox zur Anzeige von Geos-Infos ------------------*/
+
+     @object GenInteractionClass GeosInfoBox = {
+	GI_visMoniker = "< File Name >";
+	GI_comp = @InfoCopyrightText,@GeosInfoTopGroup,@GeosInfoUserNotes;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_COMMAND;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE
+		| GIA_INITIATED_VIA_USER_DO_DIALOG
+		| GIA_MODAL;
+	}
+
+@object GenInteractionClass GeosInfoTopGroup = {
+	GI_comp = @InfoLeftClump,@InfoRightClump;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	}
+@object GenInteractionClass InfoLeftClump = {
+	GI_comp = @InfoLeftLabelGroup,@InfoLeftTextGroup;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_DRAW_IN_BOX;
+	}
+@object GenInteractionClass InfoRightClump = {
+	GI_comp = @InfoRightLabelGroup,@InfoRightTextGroup;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_DRAW_IN_BOX;
+	}
+
+@object GenInteractionClass InfoLeftLabelGroup = {
+	GI_comp = @InfoCreateDateLabel,@InfoCreateTimeLabel,@InfoCreatorLabel,
+			@InfoDosNameLabel,@InfoFileSizeLabel,@InfoIconIDLabel;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_RIGHT_JUSTIFY_CHILDREN;
+	HINT_MINIMIZE_CHILD_SPACING;
+	}
+@object GenInteractionClass InfoLeftTextGroup = {
+	GI_comp = @InfoCreateDateText,@InfoCreateTimeText,@InfoCreatorText,
+			@InfoDosNameText,@InfoFileSizeText,@InfoIconIDText;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_MINIMIZE_CHILD_SPACING;
+	}
+
+@object GenInteractionClass InfoRightLabelGroup = {
+	GI_comp = @InfoModifiedDateLabel,@InfoModifiedTimeLabel,@InfoProtocolLabel,
+			@InfoReleaseLabel,@InfoAttributeLabel,@InfoPasswordLabel;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_RIGHT_JUSTIFY_CHILDREN;
+	HINT_MINIMIZE_CHILD_SPACING;
+	}
+@object GenInteractionClass InfoRightTextGroup = {
+	GI_comp = @InfoModifiedDateText,@InfoModifiedTimeText,@InfoProtocolText,
+			@InfoReleaseText,@InfoAttributeText,@InfoPasswordText;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_MINIMIZE_CHILD_SPACING;
+	}
+
+@define INFOLABELCLASS GenGlyphClass
+
+@object @INFOLABELCLASS InfoCreateDateLabel= {
+	GI_visMoniker = "Created: "; }
+@object @INFOLABELCLASS InfoCreateTimeLabel= {
+	GI_visMoniker = "at: "; }
+@object @INFOLABELCLASS InfoCreatorLabel= {
+	GI_visMoniker = "Created by: "; }
+@object @INFOLABELCLASS InfoDosNameLabel= {
+	GI_visMoniker = "Dos name: "; }
+@object @INFOLABELCLASS InfoFileSizeLabel= {
+	GI_visMoniker = "Size: "; }
+@object @INFOLABELCLASS InfoIconIDLabel= {
+	GI_visMoniker = "Icon ID: "; }
+@object @INFOLABELCLASS InfoModifiedDateLabel= {
+	GI_visMoniker = "Last modified: "; }
+@object @INFOLABELCLASS InfoModifiedTimeLabel= {
+	GI_visMoniker = "at: "; }
+@object @INFOLABELCLASS InfoProtocolLabel= {
+	GI_visMoniker = "Protocol: "; }
+@object @INFOLABELCLASS InfoReleaseLabel= {
+	GI_visMoniker = "Release: "; }
+@object @INFOLABELCLASS InfoAttributeLabel= {
+	GI_visMoniker = "Attributes: "; }
+@object @INFOLABELCLASS InfoPasswordLabel= {
+	GI_visMoniker = "Password ? "; }
+
+
+@object @INFOLABELCLASS InfoCreateDateText= {
+	GI_visMoniker = "-"; }
+@object @INFOLABELCLASS InfoCreateTimeText= {
+	GI_visMoniker = "-"; }
+@object @INFOLABELCLASS InfoCreatorText= {
+	GI_visMoniker = "-"; }
+@object @INFOLABELCLASS InfoDosNameText= {
+	GI_visMoniker = "-"; }
+@object @INFOLABELCLASS InfoFileSizeText= {
+	GI_visMoniker = "-"; }
+@object @INFOLABELCLASS InfoIconIDText= {
+	GI_visMoniker = "-"; }
+@object @INFOLABELCLASS InfoModifiedDateText= {
+	GI_visMoniker = "-"; }
+@object @INFOLABELCLASS InfoModifiedTimeText= {
+	GI_visMoniker = "-"; }
+@object @INFOLABELCLASS InfoProtocolText= {
+	GI_visMoniker = "-"; }
+@object @INFOLABELCLASS InfoReleaseText= {
+	GI_visMoniker = "-"; }
+@object @INFOLABELCLASS InfoAttributeText= {
+	GI_visMoniker = "-"; }
+@object @INFOLABELCLASS InfoPasswordText= {
+	GI_visMoniker = "-"; }
+
+@object GenTextClass InfoCopyrightText = {
+/* jfh Rainer had a copyright symbol in place of the word which gave my
+ * compiler fits!!  And it was an SOB to find the problem. */
+	GI_visMoniker = "Copyright note:";
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_text= "";
+/*	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT; */
+	}
+
+@object GenTextClass GeosInfoUserNotes = {
+	GI_visMoniker = "User notes:";
+	GI_attrs = @default | GA_READ_ONLY;
+	HINT_PLACE_MONIKER_ABOVE;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_MINIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 20,
+				SST_LINES_OF_TEXT | 4,4};
+	HINT_TEXT_FRAME;
+	}
+
+@end ViewResource;
+
+/* ------------------------------------------------------------------*/
+/* Objekte zur Information des Users �ber den Lade- und extact-Process
+/* ------------------------------------------------------------------*/
+@start OpenNewResource;
+
+@visMoniker SearchFilesMoniker = "Searching for files";
+@visMoniker CompressFilesMoniker = "Compressing files";
+@visMoniker CancelMoniker = 'C',"Cancel";
+
+@object OpenNewInfoClass OpenNewInfo = {
+  GI_visMoniker = SearchFilesMoniker;
+  GI_comp = @OpenArchivInfoGroup,@OpenArchivStopTrigger;
+  HINT_SIZE_WINDOW_AS_DESIRED;
+  HINT_CENTER_CHILDREN_HORIZONTALLY;
+  }
+
+@object GenInteractionClass NewInfoBox = {
+  GI_visMoniker = CompressFilesMoniker;
+  GI_comp = @CreateArchivInfoGroup,@NewArchivStopTrigger;
+  GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+  GII_visibility = GIV_DIALOG;
+  HINT_SIZE_WINDOW_AS_DESIRED;
+  HINT_CENTER_CHILDREN_HORIZONTALLY;
+  }
+
+
+@object GenInteractionClass OpenArchivInfoGroup = {
+  GI_comp = @OpenArchivUpperInfoGroup,@OpenArchivFoundBar;
+  HINT_ORIENT_CHILDREN_VERTICALLY;
+  HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+  }
+@object GenInteractionClass OpenArchivUpperInfoGroup = {
+  GI_comp = @OpenArchivNameText,@OpenArchivSizeText;
+  HINT_CENTER_CHILDREN_ON_MONIKERS;
+  HINT_ORIENT_CHILDREN_VERTICALLY;
+  }
+
+@object GenTextClass OpenArchivNameText = {
+  GI_visMoniker = "   Archive:";
+  GI_attrs = @default | GA_READ_ONLY;
+  HINT_INITIAL_SIZE = {SST_AVG_CHAR_WIDTHS | 20,
+			SST_LINES_OF_TEXT | 1,0};
+  }
+@object GenTextClass OpenArchivSizeText = {
+  GI_visMoniker = "Size:";
+  GI_attrs = @default | GA_READ_ONLY;
+  HINT_INITIAL_SIZE = {SST_AVG_CHAR_WIDTHS | 20,
+			SST_LINES_OF_TEXT | 1,0};
+  }
+
+@object BargrafClass OpenArchivFoundBar = {
+	BGI_options = BGO_DEFAULT_DRAW_BAR_VALUE;
+	BGI_barColor = C_BLUE;
+	BGI_textColor = C_BLACK;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_FIXED_SIZE = {
+		0,
+		SST_LINES_OF_TEXT | 1,
+		0
+	};
+	}
+@object GenTriggerClass OpenArchivStopTrigger = {
+	GI_visMoniker = CancelMoniker;
+	GTI_destination = OpenNewInfo;
+	GTI_actionMsg = MSG_ONI_STOP_OPEN;
+	HINT_SEEK_REPLY_BAR;
+	}
+@object GenTriggerClass NewArchivStopTrigger = {
+	GI_visMoniker = CancelMoniker;
+	GTI_destination = OpenNewInfo;
+	GTI_actionMsg = MSG_ONI_STOP_NEW;
+	HINT_SEEK_REPLY_BAR;
+	}
+
+
+@object GenInteractionClass CreateArchivInfoGroup = {
+
+	GI_comp = 
+		@CreateArchivInfoGroupSpace1,
+		@CreateArchivInfoGroupContent,
+		@CreateArchivInfoGroupSpace2;
+
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenGlyphClass CreateArchivInfoGroupSpace1 = {
+
+	GI_visMoniker = " ";
+}
+
+@object GenInteractionClass CreateArchivInfoGroupContent = {
+
+  GI_comp = 
+	@CreateArchivDir/*View*/,
+	@CreateArchivFileLabel,
+	@CreateArchivFile,
+	@CompressFileProzentBar;
+
+/*  HINT_CENTER_CHILDREN_HORIZONTALLY; */
+  HINT_ORIENT_CHILDREN_VERTICALLY;
+  HINT_CENTER_CHILDREN_HORIZONTALLY;
+  }
+
+@object GenGlyphClass CreateArchivInfoGroupSpace2 = {
+
+	GI_visMoniker = " ";
+}
+
+@object GenTextClass CreateArchivDir = {
+	GI_visMoniker = "Directory:";
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_text= "";
+	HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS | 40,
+			SST_LINES_OF_TEXT | 2,2};
+	HINT_PLACE_MONIKER_ABOVE;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	}
+
+@object GenGlyphClass CreateArchivFileLabel = {
+	GI_visMoniker = "File:";
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	}
+@object GenGlyphClass CreateArchivFile = {
+	GI_visMoniker = "";
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	}
+@object BargrafClass CompressFileProzentBar = {
+	BGI_options = BGO_DEFAULT_XOR_BAR_PERCENT_TEXT;
+	BGI_prevText ="Compressed: ";
+	BGI_appText = "%";
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_FIXED_SIZE = {
+		0,
+		SST_LINES_OF_TEXT | 1,
+		0
+	};
+	}
+
+@object ExtractArchiveInfoClass ExtractArchiveInfo = {
+  GI_visMoniker = "Extracting files";
+  GI_comp = 
+	@ExtractInfoGroup,
+	@ExtractArchivProzentBar,
+	@ExtractFileProzentBar,
+	@ExtractStopTrigger;
+  HINT_ORIENT_CHILDREN_VERTICALLY;
+  HINT_RIGHT_JUSTIFY_CHILDREN;
+  }
+
+@object GenInteractionClass ExtractInfoGroup = {
+
+	GI_comp = 
+		@ExtractArchivNameText,
+		@ExtractFileText;
+
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	HINT_CENTER_CHILDREN_ON_MONIKERS;
+}
+
+@object GenTextClass ExtractArchivNameText = {
+  GI_visMoniker = "Archive:";
+  GI_attrs = @default | GA_READ_ONLY ;
+  HINT_INITIAL_SIZE = {SST_AVG_CHAR_WIDTHS | 20,
+			SST_LINES_OF_TEXT | 1,0};
+  ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+  }
+@object GenTextClass ExtractFileText = {
+  GI_visMoniker = "File:";
+  GI_attrs = @default | GA_READ_ONLY ;
+  HINT_INITIAL_SIZE = {SST_AVG_CHAR_WIDTHS | 20,
+			SST_LINES_OF_TEXT | 1,0};
+  ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+  }
+
+
+@object BargrafClass ExtractArchivProzentBar = {
+	BGI_options = BGO_DEFAULT_XOR_BAR_PERCENT_TEXT;
+	BGI_prevText ="Archive: ";
+	BGI_appText = "%";
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	}
+@object BargrafClass ExtractFileProzentBar = {
+	BGI_options = BGO_DEFAULT_XOR_BAR_PERCENT_TEXT;
+	BGI_prevText ="File: ";
+	BGI_appText = "%";
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_FIXED_SIZE = {
+		0,
+		SST_LINES_OF_TEXT | 1,
+		0
+	};
+	}
+
+@object GenTriggerClass ExtractStopTrigger = {
+	GI_visMoniker = 'p',"Stop";
+	GTI_destination = ExtractArchiveInfo;
+	GTI_actionMsg = MSG_EAI_STOP;
+	HINT_SEEK_REPLY_BAR;
+	}
+
+/*���*/
+@object GenInteractionClass SaveAsInfoBox = {
+	GI_visMoniker = "Copying file";
+	GI_comp = @SaveAsBar;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+	GII_visibility = GIV_DIALOG;
+	}
+
+@object BargrafClass SaveAsBar = {
+	BGI_options =BGO_DISPLAY_APP_TEXT | BGO_DISPLAY_VALUE | BGO_DISPLAY_VALUE_KBYTE;
+	BGI_fracDigits = 1;
+        BGI_appText = " kByte";
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_FIXED_SIZE = {
+		0,
+		SST_LINES_OF_TEXT | 1,
+		0
+	};
+	HINT_MINIMUM_SIZE = {
+		SST_PCT_OF_FIELD_WIDTH | PCT_25,
+		0,
+		0
+	};
+	}
+
+@end OpenNewResource;
+
+
+/*---------------------------------------------------------------------------
+ Resourcendefinition AppIconResource
+ enth�lt die Application Icons
+ ---------------------------------------------------------------------------*/
+@start AppIconResource, data;
+
+@include "ART/Appicon.goh"
+
+@end AppIconResource;
+
+
+@start TemplateResource;
+
+@object GenItemClass TemplateItem = {
+	GI_visMoniker = "";
+	GI_states = @default & ~GS_USABLE;
+	}
+@end TemplateResource;
+
+/* jfh - here's where we need to put in a standard file selector */
+@start OpenNewResource;
+
+@object NewZipInteractionClass CreateNewZipDialog = {
+	GI_visMoniker = "Create a new Zip-archive";
+	GI_comp = @CreateNewInfoText,@CreateNewTopGroup, 
+		@CreateNew2ndGroup;
+	GII_visibility = GIV_DIALOG;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE
+		| GIA_INITIATED_VIA_USER_DO_DIALOG
+		| GIA_MODAL;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+	ATTR_GEN_HELP_CONTEXT = "Create";
+	}
+
+@object GenTextClass CreateNewInfoText = {
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_text= "Select files and directories for compression.";
+	}
+
+@object GenInteractionClass CreateNewTopGroup = {
+	GI_comp = @CreateNewToDocumentTrigger, @ToFloppyTrigger, @DriveList;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	}
+
+
+@visMoniker ToDocumentText = "Documents";
+@object GenTriggerClass CreateNewToDocumentTrigger = {
+    GI_visMoniker = list {@FSDocDirMoniker, @ToDocumentText};
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = CreateNewZipDialog;
+	GTI_actionMsg = MSG_NEWZIP_TO_DOCUMENT;
+    HINT_USE_ICON_TEXT_COMBINATION_MONIKER = {0, 10};
+	}
+
+@visMoniker ToFloppyText = "Floppy Drive";
+@object GenTriggerClass ToFloppyTrigger = {
+    GI_visMoniker = list {@FSFloppyMoniker, @ToFloppyText};
+	GTI_destination = CreateNewZipDialog;
+	GTI_actionMsg = MSG_NEWZIP_TO_FLOPPY;
+    HINT_USE_ICON_TEXT_COMBINATION_MONIKER = {0, 10};
+	}
+
+@object GenDynamicListClass DriveList = {
+    GI_visMoniker = 'v', "Drive" ;
+    GIGI_destination = CreateNewZipDialog ;
+    GIGI_applyMsg = MSG_NEWZIP_SELECTED_DRIVE ;
+    GDLI_queryMsg = MSG_NEWZIP_QUERY_DRIVE ;
+    HINT_ITEM_GROUP_MINIMIZE_SIZE ;
+    ATTR_GEN_ITEM_GROUP_SET_MODIFIED_ON_REDUNDANT_SELECTION ;
+}
+
+@object GenInteractionClass CreateNew2ndGroup = {
+	GI_comp = @CreateNewFileList,@CreateNewPathText,
+			@CreateNewSelectedCounter,
+			@CreateNewDoTrigger,@CreateNewCancelTriger;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	}
+
+@object DClickGenDynamicListClass CreateNewFileList = {
+	DCDLI_destination = CreateNewZipDialog;
+	DCDLI_doublePressMsg = MSG_NEWZIP_FILE_DOUBLE_CLICKED;
+	DCDLI_dcmsr = DCMSR_BEEP;
+	GIGI_destination = CreateNewZipDialog;
+	GIGI_applyMsg = MSG_NEWZIP_FILE_SELECTED;
+	GDLI_queryMsg = MSG_NEWZIP_QUERY_FILE_FOR_LIST;
+	GIGI_selection = GIGS_NONE;
+	GIGI_behaviorType = GIGBT_EXTENDED_SELECTION;
+	HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+	HINT_ITEM_GROUP_SCROLLABLE;
+	HINT_INITIAL_SIZE = { SST_AVG_CHAR_WIDTHS | 45,
+		SST_LINES_OF_TEXT | 10, 10};
+	ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	}
+
+
+@object GenTextClass CreateNewPathText = {
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_text= "c:\???";
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	HINT_TEXT_FRAME;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	}
+
+@object GenValueClass CreateNewSelectedCounter = {
+	GI_visMoniker = "Items for compression:";
+	GI_attrs = @default | GA_READ_ONLY;
+	}
+
+@object GenTriggerClass CreateNewDoTrigger = {
+    GI_visMoniker = 't',"Create archive";
+	GTI_destination = CreateNewZipDialog;
+	GTI_actionMsg = MSG_NEWZIP_DO_CREATE;
+	HINT_SEEK_REPLY_BAR;
+	HINT_CENTER_MONIKER;
+	}
+
+@object GenTriggerClass CreateNewCancelTriger = {
+    GI_visMoniker = 'C',"Cancel";
+	GTI_destination = CreateNewZipDialog;
+	GTI_actionMsg = MSG_NEWZIP_CANCEL;
+	HINT_SEEK_REPLY_BAR;
+	HINT_CENTER_MONIKER;
+	}
+
+@end OpenNewResource;
+
+/* FileDetail-Info */
+/*@start Interface;
+
+/* jfh -  Someday we may want this info back. */
+/*@object	GenInteractionClass GZipFileDetailInfoBox = {
+	GI_visMoniker = "File detail information";
+	GI_comp = @DetailInfoUpperGroup,@DetailInfoLowerGroup,
+			@DetailKomentarTrigger,@DetailGeosInfoTrigger;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE
+		| GIA_INITIATED_VIA_USER_DO_DIALOG
+		| GIA_MODAL;
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_COMMAND;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+	}
+@object GenInteractionClass DetailInfoUpperGroup = {
+	GI_comp = @DetailFileNameInfo,@DetailAttributeInfo,
+			@DetailCompressionMethod;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_CENTER_CHILDREN_ON_MONIKERS;
+	HINT_MINIMIZE_CHILD_SPACING;
+	}
+@object GenInteractionClass DetailInfoLowerGroup = {
+	GI_comp = @DetailVersionMadeBy,@DetailVersionNeed,
+		@DetailCompressedSize,@DetailUncompressedSize,
+		@DetailExtraFiledSize,	@DetailCommetSize;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_CENTER_CHILDREN_ON_MONIKERS;
+	HINT_MINIMIZE_CHILD_SPACING;
+/*	HINT_DRAW_IN_BOX; */
+/*	HINT_EXPAND_WIDTH_TO_FIT_PARENT;*/
+/*	}
+@object GenTextClass DetailFileNameInfo = {
+	GI_visMoniker = " File:";
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_text = "\r\r";
+	}
+@object GenTextClass DetailAttributeInfo = {
+	GI_visMoniker = " Attributes:";
+	GI_states = @default & ~GS_USABLE;
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_text = " ";
+	}
+@object GenTextClass DetailCompressionMethod = {
+	GI_visMoniker = "Method:";
+	GI_states = @default & ~GS_USABLE;
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_text = "\r\r";
+	HINT_INITIAL_SIZE = {SST_AVG_CHAR_WIDTHS | 20,
+				SST_LINES_OF_TEXT | 2,0};
+	}
+@object GenValueClass DetailVersionMadeBy = {
+	GI_visMoniker = "Compressed by version:";
+	GI_states = @default & ~GS_USABLE;
+	GI_attrs = @default | GA_READ_ONLY;
+	GVLI_displayFormat = GVDF_DECIMAL;
+	ATTR_GEN_VALUE_DECIMAL_PLACES = 1;
+	}
+@object GenValueClass DetailVersionNeed = {
+	GI_visMoniker = "Decompressing version needed:";
+	GI_states = @default & ~GS_USABLE;
+	GI_attrs = @default | GA_READ_ONLY;
+	GVLI_displayFormat = GVDF_DECIMAL;
+	ATTR_GEN_VALUE_DECIMAL_PLACES = 1;
+	}
+@object GenTextClass DetailCompressedSize = {
+	GI_visMoniker = "Compressed size:";
+	GI_attrs = @default | GA_READ_ONLY;
+	HINT_INITIAL_SIZE = {SST_AVG_CHAR_WIDTHS | 15,
+				SST_LINES_OF_TEXT | 1,0};
+	}
+@object GenTextClass DetailUncompressedSize = {
+	GI_visMoniker = "Uncompressed size:";
+	GI_attrs = @default | GA_READ_ONLY;
+	HINT_INITIAL_SIZE = {SST_AVG_CHAR_WIDTHS | 15,
+				SST_LINES_OF_TEXT | 1,0};
+	}
+@object GenTextClass DetailExtraFiledSize = {
+	GI_visMoniker = "Size extrafield:";
+	GI_states = @default & ~GS_USABLE;
+	GI_attrs = @default | GA_READ_ONLY;
+	HINT_INITIAL_SIZE = {SST_AVG_CHAR_WIDTHS | 15,
+				SST_LINES_OF_TEXT | 1,0};
+	}
+@object GenTextClass DetailCommetSize = {
+	GI_visMoniker = "Size comment:";
+	GI_states = @default & ~GS_USABLE;
+	GI_attrs = @default | GA_READ_ONLY;
+	HINT_INITIAL_SIZE = {SST_AVG_CHAR_WIDTHS | 15,
+				SST_LINES_OF_TEXT | 1,0};
+	}
+@object GenTriggerClass DetailKomentarTrigger = {
+	GI_visMoniker = "View comment";
+	GI_attrs = @default | GA_READ_ONLY;
+	GI_states = @default & ~GS_USABLE;
+	HINT_SEEK_REPLY_BAR;
+	}
+@object GenTriggerClass DetailGeosInfoTrigger = {
+	GI_visMoniker = "Geos information";
+	GI_states = @default & ~GS_USABLE;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_DETAIL;
+	GI_attrs =  @default | GA_SIGNAL_INTERACTION_COMPLETE;
+/*	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_GZIP_DOC_TEST_FILES; */
+/*	HINT_SEEK_REPLY_BAR;
+	}
+
+
+@chunk	char ZipMethod0[] ="Stored (uncompacted)";
+@chunk	char ZipMethod1[] ="Shrunk * Not yet implemented!";
+@chunk	char ZipMethod2[] ="Reduced1 * Not yet implemented!";
+@chunk	char ZipMethod3[] ="Reduced2 * Not yet implemented!";
+@chunk	char ZipMethod4[] ="Reduced3 * Not yet implemented!";
+@chunk	char ZipMethod5[] ="Reduced4 * Not yet implemented!";
+@chunk	char ZipMethod6[] ="Imploded * Not yet implemented!";
+@chunk	char ZipMethod7[] ="Tokenized * Not yet implemented!";
+@chunk	char ZipMethod8[] ="Deflated";
+@chunk	char ZipMethod9[] ="Enhanced Deflated * Not yet implemented!";
+@chunk	char ZipMethod10[] ="Imploded * Not yet implemented!";
+@chunk	char ZipMethodX[] ="Unknown * Not yet implemented!";
+
+@end Interface;
+
+*/
+
+
+@start MenuResource;
+
+/*@object GenTriggerClass GZipOpenTrigger = {
+    GI_visMoniker = 'O',"Open archive";
+	GTI_destination = GZipDocumentControl;
+	GTI_actionMsg = MSG_GEN_DOCUMENT_CONTROL_INITIATE_OPEN_DOC;
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+	}
+*/
+@object GenInteractionClass GZipUserGroup = {
+	GI_comp = @MenuExtractButton;
+	}
+
+@object GenTriggerClass MenuExtractButton = {
+    GI_visMoniker = 'E',"Extract";
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = (TO_APP_MODEL);
+	GTI_actionMsg = MSG_GZIP_DOC_START_EXTRACT;
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+	}
+
+
+/*------------------------------ Options Men� ---------------------------*/
+
+@object GenInteractionClass GZipFileInfoSelectorGroup = {
+    GI_visMoniker = 'i',"Display file information";
+    GI_comp = @GZipFileInfoHelptext,@GZipFileInfoSelector;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_COMMAND;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_SIZE_WINDOW_AS_DESIRED; /**/
+    ATTR_GEN_HELP_CONTEXT = "ShowFileInfos";
+    }
+@object GenInteractionClass GZipDirInfoSelectorGroup = {
+    GI_visMoniker = 'd',"Display directory information";
+    GI_comp = @GZipDirInfoHelptext,@GZipDirInfoSelector;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_COMMAND;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    ATTR_GEN_HELP_CONTEXT = "ShowDirInfos";
+    }
+
+@object GenTextClass GZipFileInfoHelptext = {
+	GI_visMoniker = " ";
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_text= "Select information about files stored inside of the archive to display in the list.";
+	HINT_PLACE_MONIKER_TO_LEFT;
+	}
+
+@object GenBooleanGroupClass GZipFileInfoSelector = {
+	GI_comp = @FileInfoSize,@FileInfoDate,@FileInfoTime;
+	GBGI_selectedBooleans = GZOPT_DISP_SIZE |
+					    GZOPT_DISP_DATE |
+					    GZOPT_DISP_TIME;
+	GBGI_applyMsg = MSG_GZIP_DOCGROUP_NEW_DISPLAY_FLAGS;
+	GBGI_destination = GZipDocumentGroup;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	}
+@object GenBooleanClass FileInfoSize = {
+    GI_visMoniker = 's',"File size";
+	GBI_identifier = GZOPT_DISP_SIZE;
+	}
+@object GenBooleanClass FileInfoDate = {
+    GI_visMoniker = 'd',"File date";
+	GBI_identifier = GZOPT_DISP_DATE;
+	}
+@object GenBooleanClass FileInfoTime = {
+    GI_visMoniker = 't',"File time";
+	GBI_identifier = GZOPT_DISP_TIME;
+	}
+
+@object GenTextClass GZipDirInfoHelptext = {
+	GI_visMoniker = " ";
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_text= "Select information about directories stored inside of the archive to display in the list.";
+	HINT_PLACE_MONIKER_TO_LEFT;
+	}
+@object GenBooleanGroupClass GZipDirInfoSelector = {
+	GI_comp = @DirInfoFiles,@DirInfoSize,@DirInfoDirs;
+	GBGI_selectedBooleans = GZOPT_DISP_FILES |
+					    GZOPT_DISP_DIR_SIZE |
+					    GZOPT_DISP_SUBDIRS;
+	GBGI_applyMsg = MSG_GZIP_DOCGROUP_NEW_DISPLAY_FLAGS;
+	GBGI_destination = GZipDocumentGroup;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	}
+@object GenBooleanClass DirInfoFiles = {
+    GI_visMoniker = 'N',"Number of files";
+	GBI_identifier = GZOPT_DISP_FILES;
+	}
+@object GenBooleanClass DirInfoSize = {
+    GI_visMoniker = 'd',"Size of the directory";
+	GBI_identifier = GZOPT_DISP_DIR_SIZE;
+	}
+@object GenBooleanClass DirInfoDirs = {
+    GI_visMoniker = 's',"Number of subdirectories";
+	GBI_identifier = GZOPT_DISP_SUBDIRS;
+	}
+
+@object GenInteractionClass GZipSaveOptionsGroup  = {
+	GI_comp = @GZipSaveOptionsTrigger;
+	}
+@object GenTriggerClass GZipSaveOptionsTrigger = {
+    GI_visMoniker = 'v',"Save settings";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_GZIP_SAVE_OPTIONS;
+	}
+
+@end MenuResource;
+
