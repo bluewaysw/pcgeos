@@ -6,9 +6,11 @@
 GEODE           = dirlist
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = dirlist.goc bbxreg.goh dirlistIcon.goh
-OBJS            = dirlist.obj
+SRCS            = dirlist.goc filepic.goc
+OBJS            = dirlist.obj filepic.obj
 LOBJS           =
+LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
+LIBNAME         = dirlist
 
 SYSMAKEFILE     = geode.mk
 
