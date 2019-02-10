@@ -6,7 +6,7 @@
 GEODE           = bjack
 ASM_TO_OBJS     = bjack.asm
 UI_TO_RDFS      = bjack.ui
-SRCS            = bjackGame.asm bjack.asm bjackSound.asm sizes.def\
+SRCS            = bjack.asm bjackSound.asm bjackGame.asm sizes.def\
                   myMacros.def bjack.ui
 OBJS            = bjack.obj
 LOBJS           =
