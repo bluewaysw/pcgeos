@@ -4,7 +4,7 @@
 # AUTHOR:	John F. Howard 3/95
 #
 # DESCRIPTION:	This file contains Geode definitions for the Directory/File
-#		Lister application. 
+#		Lister application.
 #
 ##############################################################################
 
@@ -27,9 +27,9 @@ library	ansic
 library text
 library spool
 
-resource APPRESOURCE ui-object
-resource DISPLAY ui-object
-resource INTERFACE ui-object
+resource AppResource ui-object
+resource Display ui-object
+resource Interface ui-object
 
 #
 # These resources contain the bitmap monikers for use under different
@@ -43,4 +43,3 @@ resource DLMONIKERRESOURCE read-only shared lmem
 export PrintGenTextClass
 
 usernotes "Copyright 1994-2002  Breadbox Computer Company LLC  All Rights Reserved"
-
