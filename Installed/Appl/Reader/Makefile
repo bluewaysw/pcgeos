@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = READER
+GEODE           = reader
 ASM_TO_OBJS     = reader.asm
-UI_TO_RDFS      = READER.UI
+UI_TO_RDFS      = reader.ui
 SRCS            = reader.asm reader.def reader.ui
 OBJS            = reader.obj
 LOBJS           =
