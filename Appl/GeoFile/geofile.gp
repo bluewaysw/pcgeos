@@ -3,7 +3,7 @@
 #	Copyright (c) GeoWorks 1990 -- All Rights Reserved
 #
 # PROJECT:	GEOS
-# MODULE:	GeoFile 
+# MODULE:	GeoFile
 # FILE:		geofile.gp
 #
 # AUTHOR:	Eric E. Del Sesto, 11/90
@@ -32,7 +32,7 @@ longname "GeoFile"
 # Specify geode type: is an application, and will have its own process
 # (thread).  By the way, it's multi-launchable...
 #
-type	appl, process 
+type	appl, process
 #
 # Specify class name for application process. Methods sent to the Application's
 # process will be handled by the GeoFileProcessClass, which is defined
@@ -48,7 +48,7 @@ stack	14512
 heapspace	40200
 #
 # Specify application object. This is the object in the .ui file which serves
-# as the top-level UI object in the application. 
+# as the top-level UI object in the application.
 #
 appobj	GeoFileApp
 #
@@ -79,26 +79,26 @@ library	impex
 # Resources: list all resource blocks which are used by the application.
 # (standard discardable code resources do not need to be mentioned).
 #
-resource APPLICATIONUI ui-object
-resource INTERFACE ui-object
-resource FILEEDITVIEWMENUUI ui-object
-resource MENUUI ui-object
-resource TOOLUI ui-object
-resource FIELDNAVIGATIONORDERUI ui-object
-resource RECORDSIZEUI ui-object
-resource QUICKSORTUI ui-object
-resource ADVANCEDSORTUI ui-object
+resource ApplicationUI ui-object
+resource Interface ui-object
+resource FileEditViewMenuUI ui-object
+resource MenuUI ui-object
+resource ToolUI ui-object
+resource FieldNavigationOrderUI ui-object
+resource RecordSizeUI ui-object
+resource QuickSortUI ui-object
+resource AdvancedSortUI ui-object
 # resource CONTROLLERUI ui-object
 # resource ICONAREARESOURCE ui-object
-resource DOCUMENTRESOURCE object
-resource TEMPLATEUI object read-only shared
-resource DISPLAYRESOURCE ui-object read-only shared
-resource GROBJATTRMANAGER object read-only shared
-resource GROBJBODY object read-only shared
-resource HEAD object
-resource APPICONAREACMONIKERRESOURCE lmem read-only shared
+resource DocumentResource object
+resource TemplateUI object read-only shared
+resource DisplayResource ui-object read-only shared
+resource GrObjAttrManager object read-only shared
+resource GrObjBody object read-only shared
+resource Head object
+resource AppIconAreaCMonikerResource lmem read-only shared
 resource AppIconAreaAsmMonikerResource lmem read-only shared
-resource APPICONAREARNOCMONIKERRESOURCE lmem read-only shared
+resource AppIconAreaRNOCMonikerResource lmem read-only shared
 resource APPLCMONIKERRESOURCE lmem read-only shared
 resource APPLMMONIKERRESOURCE lmem read-only shared
 resource APPYCMONIKERRESOURCE lmem read-only shared
@@ -106,21 +106,21 @@ resource APPYMMONIKERRESOURCE lmem read-only shared
 resource APPSCMONIKERRESOURCE lmem read-only shared
 resource APPSMMONIKERRESOURCE lmem read-only shared
 resource APPSCGAMONIKERRESOURCE lmem read-only shared
-resource MODIFYINTERFACE ui-object
-resource MODIFYMENUUI ui-object
-resource MARKMENUUI ui-object
-resource CONTROLSTRINGS shared, lmem, read-only
-resource MARKINTERFACE	ui-object
-resource OPTIONSMENUUI	ui-object
-resource USERLEVELUI	ui-object
-resource LAYOUTINTERFACE ui-object
-resource LAYOUTMENUUI	ui-object
-resource CHOOSELAYOUTDIALOGUI	ui-object
-resource EDITLAYOUTNOTESINTERACTIONUI	ui-object
-resource RENAMELAYOUTDIALOGUI	ui-object
-resource RECORDNAVIGATIONORDERBOXUI ui-object
-resource MARKOPTIONSDIALOGUI	ui-object
-resource QUICKMARKDIALOGUI	ui-object
+resource ModifyInterface ui-object
+resource ModifyMenuUI ui-object
+resource MarkMenuUI ui-object
+resource ControlStrings shared, lmem, read-only
+resource MarkInterface	ui-object
+resource OptionsMenuUI	ui-object
+resource UserLevelUI	ui-object
+resource LayoutInterface ui-object
+resource LayoutMenuUI	ui-object
+resource ChooseLayoutDialogUI	ui-object
+resource EditLayoutNotesInteractionUI	ui-object
+resource RenameLayoutDialogUI	ui-object
+resource RecordNavigationOrderBoxUI ui-object
+resource MarkOptionsDialogUI	ui-object
+resource QuickMarkDialogUI	ui-object
 
 #exported classes
 export	GeoFileDocumentClass
