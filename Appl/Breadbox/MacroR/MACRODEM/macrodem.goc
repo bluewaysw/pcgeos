@@ -1,0 +1,366 @@
+@include <stdapp.goh>
+#include <gstring.h>
+#include <math.h>
+#include <sound.h>
+#include <stdio.h>
+#include <Ansi/string.h>
+#include <token.h>
+
+
+#include "macroeng.h"
+
+#define BREADBOX_MANUFACTURER_ID 16431
+
+@class  MonitorProcessClass, GenProcessClass;
+  @message void MSG_MONITOR_PROCESS_STORE_MACRO() ;
+  @message void MSG_MONITOR_PROCESS_RESTORE_MACRO() ;
+@endc
+
+@class  MonitorApplicationClass, GenApplicationClass;
+  @message void MSG_MAPP_KEY(word data = bp);
+@endc
+
+/*
+ ***************************************************************************
+ *		UI Objects
+ ***************************************************************************
+ */
+@start AppResource;
+
+@include "ART/app1.goh"
+@include "ART/app4.goh"
+@include "ART/doc1.goh"
+
+  @object MonitorApplicationClass MonitorApp = {
+    GI_visMoniker = list {
+                        @AppTitle,
+								@AppIcon1,
+								@AppIcon4 }
+    GI_comp = @MonitorPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @MonitorPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) = @MacroDocumentControl;
+    gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP) = @MacroDocumentControl;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) = @MacroDocumentControl;
+
+    ATTR_GEN_HELP_CONTEXT = "TOC" ;
+    ATTR_GEN_HELP_FILE = "Macro Recorder Help" ;
+  }
+  @visMoniker AppTitle = "Macro Recorder" ;
+  @visMoniker DocMonikers = list { @DocIcon1, @TinyDocIcon1  } ;
+@end AppResource;
+
+@start Interface;
+
+  @object GenPrimaryClass MonitorPrimary = {
+    GI_comp = @SpeedList,@OptionList,@Instructions, @FileMenu ;
+    HINT_SIZE_WINDOW_AS_DESIRED;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    ATTR_GEN_HELP_CONTEXT = "TOC" ;
+    ATTR_GEN_HELP_FILE = "Macro Recorder Help" ;
+  }
+  @object GenItemGroupClass SpeedList = {
+    GIGI_selection = 0x7FFF;
+    GI_comp = @Speed2,@Speed3,@Speed4,@Speed5,@Speed1;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+  }
+  @object GenItemClass Speed2 = {
+    GI_visMoniker = "Turbo";
+    GII_identifier = 0;
+  }
+  @object GenItemClass Speed3 = {
+    GI_visMoniker = "Fast";
+    GII_identifier = 1;
+  }
+  @object GenItemClass Speed4 = {
+    GI_visMoniker = "Medium";
+    GII_identifier = 5;
+  }
+  @object GenItemClass Speed5 = {
+    GI_visMoniker = "Slow";
+    GII_identifier = 30;
+  }
+  @object GenItemClass Speed1 = {
+    GI_visMoniker = "Use recorded timing";
+    GII_identifier = 0x7FFF;
+  }
+
+  @object GenBooleanGroupClass OptionList = {
+    GBGI_selectedBooleans= 1;
+    GI_comp = @SoundOption;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+  }
+  @object GenBooleanClass SoundOption = {
+    GBI_identifier = 1;
+    GI_visMoniker = "Key clicks while recording";
+  }
+
+  @object GenInteractionClass Instructions = {
+    GI_comp = @Line1, @Line2;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_MINIMIZE_CHILD_SPACING;
+  }
+  @object GenGlyphClass Line1 = {
+    GI_visMoniker = "Shift-F9 to start and end recording.";
+    HINT_MINIMUM_SIZE = { SST_PIXELS | 400, 0 } ;
+  };
+  @object GenGlyphClass Line2 = {
+    GI_visMoniker = "F9 to play back recorded macro.";
+   };
+
+  @object GenDocumentControlClass MacroDocumentControl = {
+      GDCI_noNameText = "No Macro";
+      GDCI_documentToken = { "Maco", BREADBOX_MANUFACTURER_ID } ;
+      GDCI_documentGroup = MacroDocumentGroup ;
+      GDCI_attrs = (@default & ~GDCA_CURRENT_TASK) |
+                   (GDCT_OPEN << GDCA_CURRENT_TASK_OFFSET) ;
+      GDCI_features = @default &
+                      ~( GDCF_SUPPORTS_TEMPLATES |
+                         GDCF_SUPPORTS_USER_SETTABLE_EMPTY_DOCUMENT) ;
+/*
+      GDCI_features = @default & ~(GDCF_SAVE_AS_TEMPLATE |
+                                   GDCF_SET_PASSWORD |
+                                   GDCF_QUICK_BACKUP |
+                                   GDCF_SET_TYPE) ;
+*/
+      GDCI_enableDisableList = MacroEnableList ;
+  }
+  @chunk optr MacroEnableList[] = {
+      @MacroWindow
+  } ;
+  @object GenInteractionClass MacroWindow = {
+      GI_states = @default & ~GS_ENABLED ;
+  }
+  @object GenInteractionClass FileMenu = {
+      GI_comp = @MacroDocumentControl, @AboutGroup;
+      GII_visibility = GIV_POPUP;
+      ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_FILE_MENU);
+  }
+
+@object GenInteractionClass AboutGroup = {
+	GI_comp = @AboutDBox;
+	GII_visibility = GIV_SUB_GROUP;
+}
+
+@include "ART/bbxreg.goh"
+
+@object GenInteractionClass AboutDBox = {
+	 GI_visMoniker = 'b', "About";
+	 GI_comp = @AppName, @By, @BreadBoxLogo,
+				  @Visit, @Web, @AboutSpacer1,
+				  @Copyright, @BBoxLLC, @Rights, @AboutSpacer2;
+	 GII_visibility = GIV_DIALOG;
+	 GII_type = GIT_NOTIFICATION;
+	 HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+@object GenTextClass AppName = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_text = "Macro Recorder";
+    ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @AppNameCharAttrs;
+}
+@chunk VisTextCharAttr AppNameCharAttrs =
+	CHAR_ATTR_FONT_SIZE_STYLE(
+		FID_DTC_URW_SANS, 36, TS_BOLD);
+
+@object GenGlyphClass By = {
+  GI_visMoniker = "by";
+}
+@object GenGlyphClass BreadBoxLogo = {
+  GI_visMoniker = list { @BreadboxLogoMoniker}
+}
+@object GenGlyphClass Visit = {
+  GI_visMoniker = "Visit us at...";
+}
+@object GenGlyphClass Web = {
+  GI_visMoniker = "www.breadbox.com";
+}
+@object GenGlyphClass AboutSpacer1 = {
+  GI_visMoniker = "   ";
+}
+@object GenGlyphClass Copyright = {
+  GI_visMoniker = "Copyright 1994-2002";
+}
+@object GenGlyphClass BBoxLLC = {
+  GI_visMoniker = "Breadbox Computer Company LLC";
+}
+@object GenGlyphClass Rights = {
+  GI_visMoniker = "All Rights Reserved";
+}
+@object GenGlyphClass AboutSpacer2 = {
+  GI_visMoniker = "   ";
+}
+
+@end Interface ;
+
+/* ==== */
+
+@start DocumentResource ;
+    @object GenDocumentGroupClass MacroDocumentGroup = {
+        GDGI_untitledName = "Untitled Macro" ;
+        GDGI_protocolMajor = 1 ;
+        GDGI_protocolMinor = 0 ;
+        GDGI_output = process ;
+        GDGI_documentControl = MacroDocumentControl ;
+    }
+@end DocumentResource ;
+
+/*
+ ***************************************************************************
+ *              Code for MonitorProcessClass
+ ***************************************************************************
+ */
+
+@classdecl MonitorProcessClass;
+
+MacroHotkeyList hotkeys[]={
+  {(KS_CHAR_SET_CONTROL<<8) | VC_F9,            @MonitorApp, MSG_MAPP_KEY, 1},
+  {KS_SHIFT | (KS_CHAR_SET_CONTROL<<8) | VC_F9, @MonitorApp, MSG_MAPP_KEY, 2},
+  {0,0,0, 0} /* end of list */
+};
+
+FileHandle G_currentFile = NullHandle ;
+struct {
+  word              size;
+  MacroCannedEvent  data[256];
+} macroBuffer;
+
+
+@method MonitorProcessClass, MSG_META_DOC_OUTPUT_ATTACH_UI_TO_DOCUMENT
+{
+    @callsuper();
+
+    G_currentFile = file ;
+
+    @call oself::MSG_MONITOR_PROCESS_RESTORE_MACRO() ;
+
+    MacroInit();
+    MacroSetHotkeys(hotkeys);
+}
+
+@method MonitorProcessClass, MSG_META_DOC_OUTPUT_DETACH_UI_FROM_DOCUMENT
+{
+    MacroDeinit();
+    G_currentFile = NullHandle ;
+
+    @callsuper();
+}
+
+/* Save the macro to the currently selected file */
+@method MonitorProcessClass, MSG_MONITOR_PROCESS_STORE_MACRO
+{
+    VMBlockHandle oldBlock ;
+    VMBlockHandle newBlock ;
+    void *p_data ;
+    MemHandle mem ;
+
+    EC_ERROR_IF(G_currentFile == NullHandle, -1) ;
+    if (G_currentFile)  {
+        /* See if there is already a stored macro block */
+        oldBlock = VMGetMapBlock(G_currentFile);
+        if (!oldBlock)  {
+            /* At this point, there is no map block. */
+            /* Create a new block to store all our data and */
+            /* make it the map block (the only block in the file). */
+            newBlock = VMAlloc(G_currentFile, sizeof(macroBuffer), 0) ;
+            VMSetMapBlock(G_currentFile, newBlock) ;
+        } else {
+            /* Use the same block as before. */
+            newBlock = oldBlock ;
+        }
+
+        /* Only save if we could alloc a block */
+        if (newBlock)  {
+            /* Copy the data out and store it as the map block */
+            p_data = VMLock(G_currentFile, newBlock, &mem) ;
+            if (p_data)  {
+                memcpy(p_data, &macroBuffer, sizeof(macroBuffer)) ;
+                VMDirty(mem) ;
+                VMUnlock(mem) ;
+            } else {
+                VMFree(G_currentFile, newBlock) ;
+            }
+        }
+    }
+}
+
+/* Load in the macro from the currently selected file */
+@method MonitorProcessClass, MSG_MONITOR_PROCESS_RESTORE_MACRO
+{
+    VMBlockHandle oldBlock ;
+    void *p_data ;
+    MemHandle mem ;
+
+    /* Clear out the old block */
+    macroBuffer.size = 0 ;
+
+    /* Let's bring back the block */
+    EC_ERROR_IF(G_currentFile == NullHandle, -2) ;
+    if (G_currentFile)  {
+        /* Find the old block (if any) */
+        oldBlock = VMGetMapBlock(G_currentFile);
+        if (oldBlock)  {
+            /* Yep, it exists.  Lock it in and copy it over */
+            p_data = VMLock(G_currentFile, oldBlock, &mem) ;
+            if (p_data)
+                memcpy(&macroBuffer, p_data, sizeof(macroBuffer)) ;
+            VMUnlock(mem) ;
+        }
+    }
+}
+
+/*
+ ***************************************************************************
+ *              Code for MonitorApplicationClass
+ ***************************************************************************
+ */
+
+@classdecl MonitorApplicationClass;
+
+@method MonitorApplicationClass, MSG_MAPP_KEY
+{
+     word speed, options;
+
+     switch(data)                       /* distinguish between hotkeys */
+     {
+     case 1:                            /* playback hotkey */
+       if(MacroGetStatus() & MS_playing)
+       {
+         MacroAbortPlayback();
+       }
+       else
+       {
+         speed = @call SpeedList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+         MacroStartPlayback((MacroEventBuffer *)&macroBuffer, speed);
+       }
+       break;
+
+     case 2:                            /* record hotkey */
+       if(MacroGetStatus() & MS_recording)
+       {
+         MacroEndRecording();
+         @call process::MSG_MONITOR_PROCESS_STORE_MACRO() ;
+       }
+       else
+       {
+         options = @call
+          OptionList::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+
+         MacroStartRecording((MacroEventBuffer *)&macroBuffer, sizeof(macroBuffer), options & 1);
+       }
+     }
+}
+
+/*-------------------------------------------------------------------------*/
+@method MonitorApplicationClass, MSG_GEN_APPLICATION_INSTALL_TOKEN
+{
+    @callsuper() ;
+
+    /* Install the document icon at the same time we install the */
+    /* application icon */
+    TokenDefineToken(
+        TOKEN_CHARS((dword)'M', (dword)'a', (dword)'c', (dword)'o'),
+        16431,
+        @DocMonikers,
+        TF_NEED_RELOCATION) ;
+}
