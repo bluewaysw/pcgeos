@@ -1,0 +1,848 @@
+/**********************************************************************
+ * PROCESS.GOC - ProcessClass code for AIM                            *
+ * Project - AIM Application                                          *
+ * Started 12/27/98                                                   *
+ **********************************************************************/
+
+/**********************************************************************
+ * Includes                                                           *
+ **********************************************************************/
+
+@include <stdapp.goh>
+@include <socket.goh>
+
+#include <sockmisc.h>
+#include <Ansi/stdlib.h>
+#include <Ansi/stdio.h>
+#include <Ansi/string.h>
+@include <parentc.goh>
+
+@include "aim.goh"
+@include "toc.goh"
+@include "toccfg.goh"
+@include "tocproto.goh"
+@include "extern.goh"
+@include "error.goh"
+
+#include "miscfunc.h"
+#include "debug.h"
+#include <initfile.h>
+
+/**********************************************************************
+ * Defines
+ **********************************************************************/
+
+#if ERROR_CHECK
+#define AIM_RECV_THREAD_STACK   1024
+#else
+#define AIM_RECV_THREAD_STACK   512
+#endif
+
+#ifdef SHOW_MESSAGES
+#define SM(x)   x
+#else
+#define SM(x)
+#endif
+
+#define AIM_RECV_TIMEOUT    ( 10 * 60 )
+
+#define AIM_LIST_TIMER_DELAY    ( 5 * 60 )
+
+/**********************************************************************
+ * Function Declarations
+ **********************************************************************/
+
+Boolean StartReceive(void);
+void StopReceive(void);
+Boolean IsReceiveRunning(void);
+
+/**********************************************************************
+ * Globals
+ **********************************************************************/
+
+TocConnectionData   tcd;
+
+ThreadHandle        AimRecvThread = NullHandle;
+Boolean             AimStopRecv = FALSE;
+
+Boolean             AimDetaching;
+optr                AimDetachCaller = NullHandle;
+word                AimDetachCallerID;
+
+Boolean             AimBusy = FALSE;
+
+TimerHandle         AimListTimerHandle = NullHandle;
+word                AimListTimerID = 0;
+
+/**********************************************************************
+ * Class Declaration                                                  *
+ **********************************************************************/
+
+@extern method AIMProcessClass, MSG_AIM_ADD_BUDDY;
+@extern method AIMProcessClass, MSG_AIM_ADD_GROUP;
+@extern method AIMProcessClass, MSG_AIM_REMOVE_BUDDY_OR_GROUP;
+@ifdef USE_LIST
+@extern method AIMProcessClass, MSG_AIM_DRAW_BUDDY_LIST;
+@extern method AIMProcessClass, MSG_AIM_INFO_BUDDY_LIST;
+@extern method AIMProcessClass, MSG_AIM_ATTACH_BUDDY_LIST;
+@extern method AIMProcessClass, MSG_AIM_DETACH_BUDDY_LIST;
+@else
+@extern method AIMProcessClass, MSG_AIM_QUERY_BUDDY_LIST;
+@extern method AIMProcessClass, MSG_AIM_QUERY_CONFIG_BUDDY_LIST;
+@extern method AIMProcessClass, MSG_AIM_BUDDY_LIST_ACTION;
+@extern method AIMProcessClass, MSG_AIM_CONFIG_BUDDY_LIST_ACTION;
+@endif
+@extern method AIMProcessClass, MSG_AIM_QUERY_CONFIG_LIST;
+@extern method AIMProcessClass, MSG_AIM_ADD_PD_USER;
+@extern method AIMProcessClass, MSG_AIM_REMOVE_PD_USER;
+@extern method AIMProcessClass, MSG_AIM_UPDATE_CONFIG;
+@extern method AIMProcessClass, MSG_AIM_UPDATE_PDCONFIG;
+@extern method AIMProcessClass, MSG_AIM_CONFIG_PDMODE;
+@extern method AIMProcessClass, MSG_AIM_CLOSE_IM;
+@classdecl AIMProcessClass, neverSaved;
+@classdecl IMPrimaryClass;
+@classdecl IMWindowTextClass;
+@classdecl GenTextLimitClass;
+@classdecl AimCancelTriggerClass;
+
+/**********************************************************************
+ * Login dialog box functions
+ **********************************************************************/
+/***********************************************************************
+ *
+ * FUNCTION:	ScramblePword
+ *
+ * PARAMATERS: char *plain, char *scrambled
+ *
+ * CALLED BY:  SaveLoginRemember
+ *
+ * STRATEGY:   do some simple scrambling
+ *              - convert the letters to ASCII numbers
+ *              - then and the numbers for 'breadbox'
+ *              - return as a string
+ ***********************************************************************/
+void ScramblePword(char *plain, char *scrambled)
+{
+ byte		bbox[MAX_PASSWORD_LEN] = {2,18,5,1,4,2,15,24,2,18,5,1,4,2,15,24};
+ byte		i, code;
+ char		codeChar[4], codeCharZ[4];
+
+
+	scrambled[0] = 0;
+	for (i = 0; i < strlen(plain); i++) {
+		code = (byte)plain[i];
+      code += bbox[i];
+		itoa(code, codeChar);
+		/* add leading zeros */
+		if (strlen(codeChar) == 1)  strcpy(codeCharZ, "00");
+		else if (strlen(codeChar) == 2)  strcpy(codeCharZ, "0");
+		else strcpy(codeCharZ, "");
+		strcat(codeCharZ, codeChar);
+		/* and fill in the return string */
+		strcat(scrambled, codeCharZ);
+		}
+
+}
+
+ /***********************************************************************
+ *
+ * FUNCTION:	UnscramblePword
+ *
+ * PARAMATERS: char *scrambled, char *plain
+ *
+ * CALLED BY:  CheckLoginRemember
+ *
+ * STRATEGY:
+ *
+ *
+ ***********************************************************************/
+void UnscramblePword(char *scrambled, char *plain)
+{
+ byte		bbox[MAX_PASSWORD_LEN] = {2,18,5,1,4,2,15,24,2,18,5,1,4,2,15,24};
+ byte		i, code;
+ char		codeChar[4], pwChar[2];
+
+
+	plain[0] = 0;
+	for (i = 0; i < strlen(scrambled); i+=3) {
+		strncpy(codeChar, &scrambled[i], 3);
+      codeChar[3] = 0;
+		code = atoi(codeChar);
+		code -= bbox[i/3];
+		pwChar[0] = (char)code;
+      pwChar[1] = 0;
+      strcat(plain, pwChar);
+		}
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	CheckLoginRemember
+ *
+ * PARAMATERS:	none
+ *
+ * CALLED BY:	MSG_AIM_CONNECT_FAILURE, MSG_GEN_PROCESS_OPEN_APPLICATION
+ *
+ * STRATEGY:	see if the login name or password was saved...
+ *		         if so - show it/them and set the selectors accordingly
+ *
+ ***********************************************************************/
+void CheckLoginRemember(void)
+{
+ Boolean			initError, saveName, savePword;
+ char				name[MAX_USER_NAME_LEN], pword[MAX_PASSWORD_LEN],
+					scrambled[MAX_PASSWORD_LEN * 3];
+ word				dataSize;
+
+
+	/* is the login name saved? */
+	initError = InitFileReadBoolean(AIM_INIT_CATEGORY_AIM, "sname", &saveName);
+	if (!initError && saveName) {
+		/* try to show saved name */
+		initError = InitFileReadStringBuffer(AIM_INIT_CATEGORY_AIM, "lname",
+							&name, MAX_USER_NAME_LEN, &dataSize);
+		if (!initError && dataSize) {
+			/* ok - show the name */
+			@call SignonScreenName::MSG_VIS_TEXT_REPLACE_ALL_PTR(name, dataSize);
+			@send SignonRememberGroup::
+					MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(AIM_LOGIN_NAME, TRUE);
+			}
+		else {
+			/* a problem with the name */
+			@send SignonScreenName::MSG_VIS_TEXT_DELETE_ALL();
+			@send SignonRememberGroup::
+					MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(AIM_LOGIN_NAME, FALSE);
+			}
+		}
+	else {
+		/* name not saved */
+		@send SignonScreenName::MSG_VIS_TEXT_DELETE_ALL();
+		@send SignonRememberGroup::
+					MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(AIM_LOGIN_NAME, FALSE);
+		}
+
+	/* is the password saved? */
+	initError = InitFileReadBoolean(AIM_INIT_CATEGORY_AIM, "spword", &savePword);
+	if (!initError && savePword) {
+		/* try to show saved pword */
+		initError = InitFileReadStringBuffer(AIM_INIT_CATEGORY_AIM, "lpword",
+							&scrambled, MAX_USER_NAME_LEN*3, &dataSize);
+		if (!initError && dataSize) {
+			/* ok - show the pword */
+			scrambled[dataSize] = 0;
+			UnscramblePword(&scrambled, &pword);
+			@call SignonPassword::MSG_VIS_TEXT_REPLACE_ALL_PTR(pword, 0);
+			@send SignonRememberGroup::
+					MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(AIM_LOGIN_PWORD, TRUE);
+			}
+		else {
+			/* a problem with the pword */
+			@send SignonPassword::MSG_VIS_TEXT_DELETE_ALL();
+			@send SignonRememberGroup::
+					MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(AIM_LOGIN_PWORD, FALSE);
+			}
+		}
+	else {
+		/* pword not saved */
+		@send SignonPassword::MSG_VIS_TEXT_DELETE_ALL();
+		@send SignonRememberGroup::
+					MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(AIM_LOGIN_PWORD, FALSE);
+		}
+
+}
+
+ /***********************************************************************
+ *
+ * FUNCTION:	SaveLoginRemember
+ *
+ * PARAMATERS:	none
+ *
+ * CALLED BY:	MSG_AIM_START_LOGIN
+ *
+ * STRATEGY:	see if the login name or password should be saved...
+ *		         if so - save it/them and save the GenBoolean settings
+ *
+ ***********************************************************************/
+void SaveLoginRemember(void)
+{
+ char		name[MAX_USER_NAME_LEN], pword[MAX_PASSWORD_LEN],
+			scrambled[MAX_PASSWORD_LEN * 3];
+
+
+	/* save the name? */
+	if (@call SignonRememberGroup::
+					 MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(AIM_LOGIN_NAME)) {
+		/* ok - they want to save the name */
+		InitFileWriteBoolean(AIM_INIT_CATEGORY_AIM, "sname", TRUE);
+		@call SignonScreenName::MSG_VIS_TEXT_GET_ALL_PTR(name);
+		InitFileWriteString(AIM_INIT_CATEGORY_AIM, "lname", name);
+		}
+	else {
+		/* forget the name */
+		InitFileWriteBoolean(AIM_INIT_CATEGORY_AIM, "sname", FALSE);
+		InitFileWriteString(AIM_INIT_CATEGORY_AIM, "lname", "");
+		}
+
+	/* save the pword? */
+	if (@call SignonRememberGroup::
+					 MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(AIM_LOGIN_PWORD)) {
+		/* ok - they want to save the pword */
+		InitFileWriteBoolean(AIM_INIT_CATEGORY_AIM, "spword", TRUE);
+		@call SignonPassword::MSG_VIS_TEXT_GET_ALL_PTR(pword);
+		ScramblePword(&pword, &scrambled);
+		InitFileWriteString(AIM_INIT_CATEGORY_AIM, "lpword", scrambled);
+		}
+	else {
+		/* forget the pword */
+		InitFileWriteBoolean(AIM_INIT_CATEGORY_AIM, "spword", FALSE);
+		InitFileWriteString(AIM_INIT_CATEGORY_AIM, "lpword", "");
+		}
+}
+
+/**********************************************************************
+ * Methods for AIMProcessClass                                        *
+ **********************************************************************/
+
+/********************************************************************
+ *              MSG_GEN_PROCESS_CREATE_NEW_STATE_FILE
+ ********************************************************************
+ * SYNOPSIS:     System wants us to create a new state file and
+ *               return a memblock
+ * PARAMETERS:   MemHandle appInstanceReference
+ * RETURNS:      word (VMFileHandle) - State file
+ * SIDE EFFECTS: none
+ * STRATEGY:     Simply return a NullHandle so we don't create a
+ *               new state file.
+ *******************************************************************/
+@method AIMProcessClass, MSG_GEN_PROCESS_CREATE_NEW_STATE_FILE
+{
+    return( NullHandle );
+}
+
+/**********************************************************************
+ * MSG_GEN_PROCESS_OPEN_APPLICATION                                   *
+ **********************************************************************/
+@method AIMProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+ AccessFlags		pcAccess;
+
+
+	 if (!TocInitialize() && !ConfigInitialize())
+    {
+        @callsuper();
+
+		/* check for parental control */
+		pcAccess = ParentalControlGetAccessInfo();
+		/* if no access, ask for password */
+		if (pcAccess & AF_IM)  {
+			if (@call PCRoot::MSG_PC_CHECK_PASSWORD_DB(PC_IM) == IC_OK) {
+				/* allow access */
+			}
+			else {
+				@send, forceQueue AIMApp::MSG_META_QUIT();
+			}
+		}
+
+		CheckLoginRemember();
+
+
+SM(     SetDebugWindow(@MessageText);   )
+    }
+    else
+		  @send self::MSG_GEN_PROCESS_CLOSE_APPLICATION();
+
+}
+
+/**********************************************************************
+ * MSG_AIM_START_LOGIN                                                *
+ **********************************************************************/
+@method AIMProcessClass, MSG_AIM_START_LOGIN
+{
+    char password[MAX_PASSWORD_LEN+1];
+    char password2[MAX_PASSWORD_LEN*2+3];
+
+    if (TocCreateConnection(&tcd) || TocInitialize() || ConfigInitialize())
+    {
+        /* Internal errors */
+        ErrorInternal();
+    }
+    else
+    {
+        AimBusy = TRUE;
+
+		  @send LoginDialog::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS);
+        @call application::MSG_GEN_APPLICATION_MARK_BUSY();
+
+        @call SignonScreenName::MSG_VIS_TEXT_GET_ALL_PTR(tcd.TCD_screenName);
+        @call SignonPassword::MSG_VIS_TEXT_GET_ALL_PTR(password);
+
+        RoastPassword(password, password2);
+
+        NormalizeName(tcd.TCD_screenName, tcd.TCD_normalName);
+
+        if (TocConnect(&tcd, password2))
+            @call self::MSG_AIM_CONNECT_FAILURE();
+        else
+        {
+				SaveLoginRemember();
+				TocSetConnectStatus(@TocCSConfig);
+@ifdef USE_SIMULATOR
+            TimerSleep(30);
+            @send, forceQueue self::MSG_AIM_SIM_CONFIG(NullOptr);
+@else
+            StartReceive();
+@endif
+        }
+    }
+}
+
+/**********************************************************************
+ * MSG_AIM_CONNECT_SUCCESS                                            *
+ **********************************************************************/
+@method AIMProcessClass, MSG_AIM_CONNECT_SUCCESS
+{
+    @call AIMPrimary::MSG_GEN_SET_USABLE(VUM_NOW);
+    if (AimBusy)
+    {
+        @call application::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+        AimBusy = FALSE;
+    }
+    MemLock(OptrToHandle(@CantConnect));
+SM( @call MessageText::MSG_VIS_TEXT_APPEND_PTR(LMemDeref(@Connected), 0);   )
+SM( @call MessageText::MSG_VIS_TEXT_APPEND_PTR("\r", 0);                    )
+    MemUnlock(OptrToHandle(@CantConnect));
+}
+
+/**********************************************************************
+ * MSG_AIM_CONNECT_FAILURE                                            *
+ **********************************************************************/
+@method AIMProcessClass, MSG_AIM_CONNECT_FAILURE
+{
+    @call AIMPrimary::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+    
+    if (IsReceiveRunning())
+    {
+        AimBusy = TRUE;
+        @call application::MSG_GEN_APPLICATION_MARK_BUSY();
+        
+        /* This method will be called again once the stop has occurred. */
+        StopReceive();
+    }
+    else
+    {
+        TocSetConnectStatus(NullOptr);
+        TocDestroyConnection(&tcd);
+        if (AimBusy)
+        {
+            @call application::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+            AimBusy = FALSE;
+        }
+		  CheckLoginRemember();
+		  @send LoginDialog::MSG_GEN_INTERACTION_INITIATE();
+    }
+}
+
+/**********************************************************************
+ * MSG_PROCESS_NOTIFY_THREAD_EXIT                                     *
+ **********************************************************************/
+@method AIMProcessClass, MSG_PROCESS_NOTIFY_THREAD_EXIT
+{
+    if (IsReceiveRunning() && exitProcess == AimRecvThread)
+    {
+        AimRecvThread = NullHandle;
+        TocDestroyConnection(&tcd);
+
+        if (exitCode)
+        {
+            /* If the thread exited with zero, it's because we called
+               StopReceive().  Otherwise, notify the rest of the app that the
+               connection was dropped for some bad reason. */
+            ErrorDisplaySignon(ChunkOf(@ErrorSignonDropped), exitCode);
+            @send self::MSG_AIM_CONNECT_FAILURE();
+        }
+        else if (!AimDetaching)
+        {
+            /* We've called StopReceive and were waiting until the connection
+               was closed to proceed with connection failure processing. */
+            @send self::MSG_AIM_CONNECT_FAILURE();
+        }                      
+        if (AimDetaching)
+        {
+            /* The detach message was intercepted to allow the receive
+               thread to exit.  Resend the detach to continue. */
+            @send self::MSG_META_DETACH(AimDetachCallerID, AimDetachCaller);
+        }
+    }
+}
+
+/**********************************************************************
+ * MSG_GEN_PROCESS_CLOSE_APPLICATION
+ **********************************************************************/
+@method AIMProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+    /* Since we don't have an explicit "Save configuration" trigger bound
+     * to the app object, we trap the app close here to force the issue.
+     */
+    @send application::MSG_META_SAVE_OPTIONS();
+
+    TocFreeNoise();
+    
+    return (@callsuper());
+}
+    
+/**********************************************************************
+ * MSG_META_DETACH
+ **********************************************************************/
+@method AIMProcessClass, MSG_META_DETACH
+{
+    /* Cleanup timer. */
+    if (AimListTimerHandle != NullHandle)
+        TimerStop(AimListTimerHandle, AimListTimerID);
+
+    /* If the receive thread is still running, then postpone the detach
+       until it has exited. */
+    if (AimRecvThread != NullHandle)
+    {
+        /* Ensure that the configuration gets saved before disconnecting. */
+        @call self::MSG_AIM_UPDATE_CONFIG(NullOptr);
+
+        AimDetaching = TRUE;
+        AimDetachCaller = caller;
+        AimDetachCallerID = callerID;
+        StopReceive();
+    }
+    else
+        @callsuper();
+}    
+
+/**********************************************************************
+ * MSG_AIM_RECEIVE                                                    *
+ **********************************************************************/
+@method AIMProcessClass, MSG_AIM_RECEIVE
+{
+    char *buffer;
+    word size;
+
+    if (!AimStopRecv
+      && (buffer = (char *)TocReceiveGetBuffer(&tcd, &size)) != NULL)
+    {
+SM(     @call MessageText::MSG_VIS_TEXT_APPEND_PTR(buffer, size);   )
+SM(     @call MessageText::MSG_VIS_TEXT_APPEND_PTR("\r", 0);        )
+
+        TocParseReceive(&tcd, buffer);
+        TocReceiveUnlockBuffer(&tcd);
+    }
+}
+
+/**********************************************************************
+ * MSG_AIM_SEND_MESSAGE                                               *
+ **********************************************************************/
+@method AIMProcessClass, MSG_AIM_SEND_MESSAGE
+{
+    MemHandle data;
+    optr outtext, window;
+    
+    outtext = ConstructOptr(OptrToHandle(trigger),
+      OptrToChunk(@AIM_IM_WINDOW_OUT_TEXT));
+
+    /* Load message into memblock for processing. */
+    data = @call outtext::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+
+    /* Clear the message from the object. */
+    @call outtext::MSG_VIS_TEXT_DELETE_ALL();
+
+    if (data != NullHandle)
+    {
+        char *ptext;
+        word len;
+        
+        /* If text is empty, don't do anything! */
+        ptext = MemLock(data);
+        len = strlen(ptext);
+        MemUnlock(data);
+        if (len > 0)
+        {
+            /* Perform any text processing. */
+
+            /* Send the text. */
+            window = ConstructOptr(OptrToHandle(trigger),
+              OptrToChunk(@AIM_IM_WINDOW_ROOT));
+            TocSendMessage(&tcd, window, data);
+        }
+        MemFree(data);
+    }
+}
+
+/**********************************************************************
+ * StartReceive                                                       *
+ **********************************************************************/
+Boolean StartReceive(void)
+{
+    word AimReceiveLoop(word valuePassed);
+    
+    if (!IsReceiveRunning())
+    {
+        AimRecvThread = ThreadCreate(PRIORITY_STANDARD, 0, AimReceiveLoop,
+          AIM_RECV_THREAD_STACK, GeodeGetProcessHandle());
+        AimStopRecv = FALSE;
+    }
+    return (!IsReceiveRunning());
+}
+
+/**********************************************************************
+ * StopReceive                                                        *
+ **********************************************************************/
+void StopReceive(void)
+{
+    if (IsReceiveRunning())
+    {
+        AimStopRecv = TRUE;
+        TocReceiveInterrupt(&tcd);
+        TocSendClose(&tcd);
+    }
+}
+
+/**********************************************************************
+ * IsReceiveRunning                                                   *
+ **********************************************************************/
+Boolean IsReceiveRunning(void)
+{
+    return (AimRecvThread != NullHandle);
+}
+
+/**********************************************************************
+ * AimReceiveLoop                                                     *
+ **********************************************************************/
+word AimReceiveLoop(word valuePassed)
+{
+    ReceiveStatus rs = RS_NONE;
+    
+    while (!AimStopRecv && 
+      (rs = TocReceiveFromToc(&tcd, AIM_RECV_TIMEOUT)) != RS_ERROR)
+    {
+        if (rs == RS_COMPLETE)
+        {
+            /* Send a message to the process thread and block until the receive
+               has been processed. */
+            @call process::MSG_AIM_RECEIVE();
+        }
+    }
+    
+    TocDisconnect(&tcd);
+SM( printf("AimReceiveLoop: Exiting, ThreadGetError() = %d\n", ThreadGetError());  )
+    
+    /* Return non-zero if not exiting due to connection close. */
+    return (AimStopRecv == FALSE);
+}
+
+/**********************************************************************
+ * Methods for AimCancelTriggerClass
+ **********************************************************************/
+@method AimCancelTriggerClass, MSG_AIM_CANCEL_TRIGGER_CANCEL
+{
+    /* Disable the cancel trigger. */
+    @send self::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+    /* Perform the interrupt. */
+    AimStopRecv = TRUE;     /* Imitate calling StopReceive() */
+    TocReceiveInterrupt(&tcd);
+}
+
+/**********************************************************************
+ * Methods for IMPrimaryClass
+ **********************************************************************/
+
+/**********************************************************************
+ * MSG_GEN_DISPLAY_CLOSE
+ **********************************************************************/
+@method IMPrimaryClass, MSG_GEN_DISPLAY_CLOSE
+{
+    /* The usual SPUI method sends a MSG_META_QUIT to the application.
+     * Instead, we want to send a close request for this window to the
+     * process. */
+
+    @send process::MSG_AIM_CLOSE_IM(oself);
+}
+
+/**********************************************************************
+ * Methods for IMWindowTextClass
+ **********************************************************************/
+
+/**********************************************************************
+ * MSG_META_KBD_CHAR
+ **********************************************************************/
+@method IMWindowTextClass, MSG_META_KBD_CHAR
+{
+    /* Intercept user pressing CR and trigger the send button. */
+    /* Intercept user holding down or releasing CR and do nothing. */
+    if ((character & 0xFF) == C_CR && (flags >> 8) == 0)
+    {
+        if (flags & CF_FIRST_PRESS)
+        {
+            optr trigger = ConstructOptr(OptrToHandle(oself),
+              OptrToChunk(@AIM_IM_WINDOW_SEND_TRIGGER));
+            @send trigger::MSG_GEN_TRIGGER_SEND_ACTION(0);
+        }
+    }
+    else
+        @callsuper();
+}
+
+/**********************************************************************
+ * Methods for GenTextLimitClass
+ **********************************************************************/
+
+@method GenTextLimitClass, MSG_GEN_TEXT_LIMIT_TRIM_LINES
+{
+    word lines ;
+    word maxLength ;
+    word cutLength ;
+    word curLength ;
+    optr lineInfo ;
+    VisTextInstance *p_vis ;
+    LineInfo *p_line ;
+    word size ;
+    word count ;
+    VisTextRange selection ;
+    dword numChars ;
+    word lineNum ;
+
+    cutLength = pself->GTXLI_cutLength ;
+    maxLength = pself->GTXLI_maxLength ;
+
+    /* Get the vis part and find our lines */
+    p_vis = ObjDerefVis(oself) ;
+    lineInfo = ConstructOptr(OptrToHandle(oself), p_vis->VTI_lines) ;
+
+    /* How many lines are there right now? */
+    lines = ChunkArrayGetCount(lineInfo) ;
+
+    /* How long is the text right now? */
+    curLength = @call self::MSG_VIS_TEXT_GET_TEXT_SIZE();
+
+    if (curLength > maxLength)  {
+        /* Don't show any changes until we are completely done */
+//        @call oself::MSG_META_SUSPEND() ;
+
+        numChars = 0 ;
+        lineNum = 0 ;
+        while ((curLength - numChars) > cutLength && lines > 0 )  {
+            /* We have at least one line over sized */
+            /* Delete the first line, but first find how long it is */
+            p_line = ChunkArrayElementToPtr(lineInfo, lineNum, &size) ;
+            count = p_line->LI_count.WAAH_low ;
+            if (count == 0)
+                break ;
+            numChars += count ;
+            lineNum++ ;
+            lines-- ;
+        }
+        if (numChars)  {
+            @call oself::MSG_VIS_TEXT_GET_SELECTION_RANGE(&selection);
+            @call oself::MSG_VIS_TEXT_SELECT_RANGE_SMALL(0, numChars) ;
+            @call oself::MSG_VIS_TEXT_DELETE_SELECTION();
+            @call oself::MSG_VIS_TEXT_SELECT_RANGE(
+                      selection.VTR_end - numChars,
+                      selection.VTR_start - numChars);
+            LMemContract(OptrToHandle(oself));
+        }
+
+//        @call oself::MSG_META_UNSUSPEND() ;
+    }
+}
+
+@method GenTextLimitClass, MSG_VIS_TEXT_APPEND_BLOCK
+{
+    @callsuper() ;
+    @call oself::MSG_GEN_TEXT_LIMIT_TRIM_LINES() ;
+}
+
+@method GenTextLimitClass, MSG_VIS_TEXT_APPEND_PTR
+{
+    @callsuper() ;
+    @call oself::MSG_GEN_TEXT_LIMIT_TRIM_LINES() ;
+}
+
+/**********************************************************************
+ * Simulator methods
+ **********************************************************************/
+
+@ifdef USE_SIMULATOR
+
+@method AIMProcessClass, MSG_AIM_SIM_UPDATE_BUDDY
+{
+    char buffer[256];
+    char *p;
+
+    p = strrchr(strcpy(buffer, "UPDATE_BUDDY:"), 0);
+    @call SDUBUser::MSG_VIS_TEXT_GET_ALL_PTR(p);
+    p = strrchr(buffer, 0);
+    @call SDUBArgs::MSG_VIS_TEXT_GET_ALL_PTR(p);
+
+    TocParseReceive(&tcd, buffer);
+}
+
+@method AIMProcessClass, MSG_AIM_SIM_IM_IN
+{
+    char buffer[256];
+    char *p;
+
+    p = strrchr(strcpy(buffer, "IM_IN:"), 0);
+    @call SDIIUser::MSG_VIS_TEXT_GET_ALL_PTR(p);
+    p = strrchr(strcat(buffer, ":F:"), 0);
+    @call SDIIMessage::MSG_VIS_TEXT_GET_ALL_PTR(p);
+
+    TocParseReceive(&tcd, buffer);
+}
+
+@method AIMProcessClass, MSG_AIM_SIM_CONFIG
+{
+    char buffer[256];
+
+    @call SDCData::MSG_VIS_TEXT_GET_ALL_PTR(buffer);
+
+    TocParseReceive(&tcd, buffer);
+}
+
+@method AIMProcessClass, MSG_AIM_SIM_QUOTE
+{
+    char buffer[256];
+
+    @call SDQCmd::MSG_VIS_TEXT_GET_ALL_PTR(buffer);
+
+    TocParseReceive(&tcd, buffer);
+}
+
+@endif
+
+/**********************************************************************
+ * Other methods
+ **********************************************************************/
+
+@method AIMProcessClass, MSG_AIM_START_LIST_TIMER
+{
+    if (AimListTimerHandle != NullHandle)
+        TimerStop(AimListTimerHandle, AimListTimerID);
+    AimListTimerHandle = TimerStart(TIMER_EVENT_ONE_SHOT, oself,
+      AIM_LIST_TIMER_DELAY, MSG_AIM_DO_LIST_TIMER, 0, &AimListTimerID);
+}
+
+@method AIMProcessClass, MSG_AIM_DO_LIST_TIMER
+{
+    TocProcessBuddies();
+}
+
+
+Boolean AimSoundEnabled(void)
+{
+    word flags = @call OptionsItems::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+    return (flags & AIM_OPTIONS_SOUND);
+}
+
+Boolean AimFocusEnabled(void)
+{
+    word flags = @call OptionsItems::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+    return (flags & AIM_OPTIONS_FOCUS);
+}
+

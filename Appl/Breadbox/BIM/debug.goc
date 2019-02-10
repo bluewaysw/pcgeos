@@ -1,0 +1,86 @@
+#include <geos.h>
+#include <file.h>
+#include <object.h>
+#include <Ansi/stdlib.h>
+#include <Ansi/stdio.h>
+#include <Ansi/string.h>
+#include <Ansi/ctype.h>
+#include <stdarg.h>
+@include <Objects/gProcC.goh>
+@include <Objects/vTextC.goh>
+
+#ifdef SHOW_MESSAGES
+
+optr debug_window = NullHandle;
+FileHandle debug_file = NullHandle;
+
+void SetDebugFile(FileHandle file)
+{
+     debug_file = file;
+}
+
+void SetDebugWindow(optr window)
+{
+     debug_window = window;
+}
+
+void printf(const char *format, ...)
+{
+     char buf[256];
+     va_list vargs;
+     char *p;
+
+     va_start(vargs, format);
+     vsprintf(buf, format, vargs);
+     
+     if (debug_file)
+     {
+          FileWrite(debug_file, buf, strlen(buf), FALSE);
+     }
+     if (debug_window)
+     {
+          for (p = buf; *p != '\0'; p++)
+               if (*p == '\n')
+                    *p = '\r';
+          @call debug_window::MSG_VIS_TEXT_APPEND_PTR(buf, 0);
+     }
+}
+
+void dump(const char *buf, int len)
+{
+     int c, topc, pos = 0;
+     char *p;
+     char line[80];
+
+     for (; len > 0; pos += 16, len -= 16, buf += 16)
+     {
+          sprintf(line, "%04X: ", pos);
+          if (len > 16)
+               topc = 16;
+          else
+               topc = len;
+          for (c = 0; c < topc; c++)
+          {
+               p = strchr(line, '\0');
+               sprintf(p, "%02X ", ((word)buf[c] & 0x00FF));
+               if ((c & 7) == 7)
+                    strcat(p, " ");
+          }
+          for (; c < 16; c++)
+          {
+               strcat(p, "   ");
+               if ((c & 7) == 7)
+                    strcat(p, " ");
+          }
+          p = strchr(line, '\0');
+          for (c = 0; c < topc; c++)
+               if (isprint(buf[c]))
+                    *p++ = buf[c];
+               else
+                    *p++ = '.';
+          *p++ = '\0';
+          printf("%s\n", line);
+     }
+}
+
+#endif
