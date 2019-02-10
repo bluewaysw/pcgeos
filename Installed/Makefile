@@ -3,48 +3,48 @@
 # an old ui.ldf to start with.
 #
 
-MAKELIB	:	.USE 
+MAKELIB	:	.USE
 #if defined(linux)
-	mkdir -p ../$(.TARGET) 
-	cd ../$(.TARGET) 
+	mkdir -p ../$(.TARGET)
+	cd ../$(.TARGET)
 	$(MAKE) -k -I../$(.TARGET) full lib
 #else
-	if not exist  ..\$(.TARGET:S/\//\\/g) mkdir ..\$(.TARGET:S/\//\\/g) 
-	cd ..\$(.TARGET:S/\//\\/g) 
+	if not exist  ..\$(.TARGET:S/\//\\/g) mkdir ..\$(.TARGET:S/\//\\/g)
+	cd ..\$(.TARGET:S/\//\\/g)
 	$(MAKE) -k -I..\$(.TARGET:S/\//\\/g) full lib
 #endif
 
-MAKETOOL:	.USE 
+MAKETOOL:	.USE
 #if defined(linux)
-	mkdir -p ../$(.TARGET) 
-	cd ../$(.TARGET) 
-	$(MAKE) -k -I../$(.TARGET) full 
+	mkdir -p ../$(.TARGET)
+	cd ../$(.TARGET)
+	$(MAKE) -k -I../$(.TARGET) full
 #else
-	if not exist  ..\$(.TARGET:S/\//\\/g) mkdir ..\$(.TARGET:S/\//\\/g) 
-	cd ..\$(.TARGET:S/\//\\/g) 
-	$(MAKE) -k -I..\$(.TARGET:S/\//\\/g) full 
+	if not exist  ..\$(.TARGET:S/\//\\/g) mkdir ..\$(.TARGET:S/\//\\/g)
+	cd ..\$(.TARGET:S/\//\\/g)
+	$(MAKE) -k -I..\$(.TARGET:S/\//\\/g) full
 #endif
 
-MAKEDRV:	.USE 
+MAKEDRV:	.USE
 #if defined(linux)
-	mkdir -p ../$(.TARGET) 
-	cd ../$(.TARGET) 
-	$(MAKE) -k -I../$(.TARGET) full 
+	mkdir -p ../$(.TARGET)
+	cd ../$(.TARGET)
+	$(MAKE) -k -I../$(.TARGET) full
 #else
-	if not exist  ..\$(.TARGET:S/\//\\/g) mkdir ..\$(.TARGET:S/\//\\/g) 
-	cd ..\$(.TARGET:S/\//\\/g) 
-	$(MAKE) -k -I..\$(.TARGET:S/\//\\/g) full 
+	if not exist  ..\$(.TARGET:S/\//\\/g) mkdir ..\$(.TARGET:S/\//\\/g)
+	cd ..\$(.TARGET:S/\//\\/g)
+	$(MAKE) -k -I..\$(.TARGET:S/\//\\/g) full
 #endif
 
-MAKEAPPL:	.USE 
+MAKEAPPL:	.USE
 #if defined(linux)
-	mkdir -p ../$(.TARGET) 
-	cd ../$(.TARGET) 
-	$(MAKE) -k -I../$(.TARGET) full 
+	mkdir -p ../$(.TARGET)
+	cd ../$(.TARGET)
+	$(MAKE) -k -I../$(.TARGET) full
 #else
-	if not exist  ..\$(.TARGET:S/\//\\/g) mkdir ..\$(.TARGET:S/\//\\/g) 
-	cd ..\$(.TARGET:S/\//\\/g) 
-	$(MAKE) -k -I..\$(.TARGET:S/\//\\/g) full 
+	if not exist  ..\$(.TARGET:S/\//\\/g) mkdir ..\$(.TARGET:S/\//\\/g)
+	cd ..\$(.TARGET:S/\//\\/g)
+	$(MAKE) -k -I..\$(.TARGET:S/\//\\/g) full
 #endif
 
 
@@ -95,8 +95,9 @@ minimalAppl	: minimalGame minimalUtils minimalTools minimalSavers \
 		  email manager isdesk linktool setup \
 		  launcher webmagick idialup \
 		  charm wordmat banner \
-		  bbxchat bnkr30 hmbase\
-		  newsread geozip ftpc sclock bbxmail pdfvu
+		  bbxchat bbxmail \
+		  newsread geozip sclock\
+ 	  	  hmbase pdfvu  bnkr30 ftpc
 
 minimalUtils	: prefmgr
 
@@ -104,17 +105,19 @@ minimalGame	: solitaire cword amateur bjack hearts gwpoker \
                   pyramid sokoban taipei uki mine column
 
 minimalEdu	: flash fontmgck hangman laserl mflash numbers pvault \
-                  taide thinker ttype wsm wsplay xwm
+                  taide thinker wsm wsplay xwm
+# ttype
 
 minimalSavers	: lol blackhole blank bobbin circles dribble dust \
-		  fades flame hopalong lastwords letter logo maze \
+		  fades flame hopalong letter logo maze lastwords \
 		  melt noodle palette pieces pith qix rotate sand \
 		  spotlight stars string swarm tickertape tiles worms
 
 minimalTools	: prntscrn
 
-otherEnsemble	: conview reader term tedit geofile dirls bim ffind  \
+otherEnsemble	: conview reader term tedit geofile dirls  \
 		  webbox graphvwr macror dump perf
+# bim ffind
 # bbxcd
 #geocon3
 
@@ -136,11 +139,11 @@ minimalDriver	: nimbus ms4 ntfat os2 cdrom stream dri gdi keyboard modem gdipoin
 		  etherodi msnet
 # cdados
 printerDriver	: deskjet dj500c lbp mercury pcl4 quietjet canon48 \
-		  canonbjc canonrgb epshi24 epson24 epson48 nec24 \
+		  canonbjc  epshi24 epson24 epson48 nec24 \
 		  ppds24 tosh24 pscript dumb diablo citoh9 prop9 \
  	  	  diconix9 eplx9 epmx9 eprx9 bchip9 star9 \
    	  	  oki9 grpr9 epson9 propx24
-
+#canonrgb
 #escp2 remove from above since it doesn't compile
 
 #faxDriver	: class1in class1out class2in class2out
@@ -229,7 +232,7 @@ Installed/Library/GrObj:	ui text bitmap ruler spline color \
 				styles impex MAKELIB
 
 hash	: Installed/Library/Hash
-Installed/Library/Hash:	MAKELIB	
+Installed/Library/Hash:	MAKELIB
 
 impex	: Installed/Library/Impex
 Installed/Library/Impex: 	ui MAKELIB
@@ -317,7 +320,7 @@ Installed/Library/Spreadsheet:	ui ruler cell math parse chart \
 
 spell	: Installed/Library/Spell
 Installed/Library/Spell:	ansic ui text MAKELIB
-	
+
 #EC version link arguments is too long, so link manually
 #	pmake -u > args1
 #	perl fixArgs.pl args1
@@ -774,8 +777,8 @@ Installed/Driver/Printer/DotMatrix/Ppds24:	spool MAKEDRV
 tosh24	: Installed/Driver/Printer/DotMatrix/Tosh24
 Installed/Driver/Printer/DotMatrix/Tosh24:	spool MAKEDRV
 
-pscript	: Installed\Driver\Printer\PScript
-Installed\Driver\Printer\PScript:		spool eps ps2pdf MAKEDRV
+pscript	: Installed/Driver/Printer/PScript
+Installed/Driver/Printer/PScript:		spool eps ps2pdf MAKEDRV
 
 dumb	: Installed/Driver/Printer/Ascii/Dumb
 Installed/Driver/Printer/Ascii/Dumb:		spool MAKEDRV
@@ -882,10 +885,10 @@ Installed/Library/FMTools/Linktool:	ui shell MAKEAPPL
 
 homebase:
 #	No need to do this because this is sync'ed by morning make script.
-#	p4 sync -f //depot/pcgeos/Appl/BreadBox/Homebase/...
+#	p4 sync -f //depot/pcgeos/Appl/Breadbox/Homebase/...
 
-newsread: Installed/Appl/BreadBox/NewsRead
-Installed/Appl/BreadBox/NewsRead:	ui socket ansic text spool spell \
+newsread: Installed/Appl/Breadbox/NewsRead
+Installed/Appl/Breadbox/NewsRead:	ui socket ansic text spool spell \
 	 				inetmsg extui parentc idialc \
 					MAKEAPPL
 
@@ -926,8 +929,8 @@ Installed/Appl/Games/CWord:	ui wav MAKEAPPL
 amateur	: Installed/Appl/Games/Amateur
 Installed/Appl/Games/Amateur:	ui sound game MAKEAPPL
 
-bjack	: Installed/Appl/Games/Bjack
-Installed/Appl/Games/Bjack:	ui sound game wav cards MAKEAPPL
+bjack	: Installed/Appl/Games/BJack
+Installed/Appl/Games/BJack:	ui sound game wav cards MAKEAPPL
 
 gwpoker	: Installed/Appl/Games/GWPoker
 Installed/Appl/Games/GWPoker:	ui sound game wav cards MAKEAPPL
@@ -1030,7 +1033,7 @@ Installed/Appl/Saver/Hopalong:			saver config MAKEAPPL
 Installed/Appl/Saver/Hopalong/HopalongPref:	saver config MAKEAPPL
 
 lastwords	: 	Installed/Appl/Saver/LastWords \
-			Installed/Appl/Saver/LWPref
+			Installed/Appl/Saver/LastWords
 Installed/Appl/Saver/LastWords:			saver config MAKEAPPL
 Installed/Appl/Saver/LWPref:			saver config MAKEAPPL
 
@@ -1039,8 +1042,8 @@ letter	: 	Installed/Appl/Saver/Letter \
 Installed/Appl/Saver/Letter:			saver config MAKEAPPL
 Installed/Appl/Saver/Letter/LetterPref:		saver config MAKEAPPL
 
-logo	: Installed/Appl/Saver/logo
-Installed/Appl/Saver/logo:		saver config MAKEAPPL
+logo	: Installed/Appl/Saver/Logo
+Installed/Appl/Saver/Logo:		saver config MAKEAPPL
 
 maze	: 	Installed/Appl/Saver/Maze \
 		Installed/Appl/Saver/Maze/MazePref
@@ -1210,27 +1213,14 @@ Installed/Driver/Socket/PPP:	netutils ansic accpnt MAKELIB
 
 # WebMagick app
 
-webmagick	: 	Installed/Appl/Breadbox/bbxbrow/JS \
-			Installed/Appl/Breadbox/bbxbrow/AB \
-			Installed/Appl/Breadbox/bbxbrow
-Installed/Appl/Breadbox/bbxbrow/JS:	ui ansic text spool html4par \
+webmagick	: 	Installed/Appl/Breadbox/BbxBrow
+Installed/Appl/Breadbox/BbxBrow:	ui ansic text spool html4par \
 		  			wmg3http wmg3ftp wmg3ext \
 		  			impgraph impdoc \
-		  			tcpip ppp modem \
+		  			modem \
                   			ibms parentc wav mailhub socket \
                   			js netutils cookies idialc MAKEAPPL
-Installed/Appl/Breadbox/bbxbrow/AB:	ui ansic text spool html4par \
-		  			wmg3http wmg3ftp wmg3ext \
-		  			impgraph impdoc \
-		  			tcpip ppp modem \
-                  			ibms parentc wav mailhub socket \
-                  			js netutils cookies idialc MAKEAPPL
-Installed/Appl/Breadbox/bbxbrow:	ui ansic text spool html4par \
-		  			wmg3http wmg3ftp wmg3ext \
-		  			impgraph impdoc \
-		  			tcpip ppp modem \
-                  			ibms parentc wav mailhub socket \
-                  			js netutils cookies idialc MAKEAPPL
+# ppp  tcpip
 
 # sorry, executing CLEAN in the global makefile is not only bad style, it forces
 # EVERYONE, even people not working on the browser, to compile the whole stuff
@@ -1247,7 +1237,7 @@ Installed/Appl/Breadbox/bbxbrow:	ui ansic text spool html4par \
 #	del *.sym
 #	del *.geo
 #	del *.ldf
-	$(MAKE) -I$(ROOT_DIR)\Appl\Breadbox\bbxbrow full
+#	$(MAKE) -I$(ROOT_DIR)\Appl\Breadbox\bbxbrow full
 
 # webmagick libs
 
@@ -1255,33 +1245,31 @@ Installed/Appl/Breadbox/bbxbrow:	ui ansic text spool html4par \
 #	mdcd %ROOT_DIR%\Installed\Library\Breadbox\html3par
 #	$(MAKE) -I$(ROOT_DIR)\Library\Breadbox\html3par lib full
 
-html4par	: ui ansic text extgraph
-	mdcd %ROOT_DIR%\Installed\Library\Breadbox\html4par\JS
-	mdcd %ROOT_DIR%\Installed\Library\Breadbox\html4par
-	$(MAKE) -I$(ROOT_DIR)\Library\Breadbox\html4par lib full
+html4par	: Installed/Library/Breadbox/Html4Par
+Installed/Library/Breadbox/Html4Par:	ui ansic text extgraph MAKELIB
 
-profpnt		: Installed/Library/profpnt
-Installed/Library/profpnt:		ansic MAKELIB
+profpnt		: Installed/Library/ProfPnt
+Installed/Library/ProfPnt:		ansic MAKELIB
 
-js              : Installed/Library/js
-Installed/Library/js:		ansic math borlandc mapheap profpnt MAKELIB
+js              : Installed/Library/JS
+Installed/Library/JS:		ansic math borlandc mapheap profpnt MAKELIB
 
-ibms    : Installed/Library/Breadbox/ibms
-Installed/Library/Breadbox/ibms:	ansic MAKELIB
+ibms    : Installed/Library/Breadbox/Ibms
+Installed/Library/Breadbox/Ibms:	ansic MAKELIB
 
 extgraph	: Installed/Library/Breadbox/ExtGraph
 Installed/Library/Breadbox/ExtGraph:	ansic MAKELIB
 
-wmg3http	: Installed/Library/Breadbox/urldrv/wmg3http
-Installed/Library/Breadbox/urldrv/wmg3http:	ansic socket ui ssl netutils \
+wmg3http	: Installed/Library/Breadbox/UrlDrv/Wmg3Http
+Installed/Library/Breadbox/UrlDrv/Wmg3Http:	ansic socket ui ssl netutils \
 						cookies MAKELIB
 
-wmg3ftp	: 	Installed/Library/Breadbox/urldrv/wmg3ftp
-Installed/Library/Breadbox/urldrv/wmg3ftp:	ansic html4par socket ui \
+wmg3ftp	: 	Installed/Library/Breadbox/UrlDrv/Wmg3Ftp
+Installed/Library/Breadbox/UrlDrv/Wmg3Ftp:	ansic html4par socket ui \
 						MAKELIB
 
-wmg3ext	: 	Installed/Library/Breadbox/urldrv/wmg3ext
-Installed/Library/Breadbox/urldrv/wmg3ext:	ansic ui MAKELIB
+wmg3ext	: 	Installed/Library/Breadbox/UrlDrv/Wmg3Ext
+Installed/Library/Breadbox/UrlDrv/Wmg3Ext:	ansic ui MAKELIB
 
 cookies : 	Installed/Library/Cookies
 Installed/Library/Cookies:			ansic netutils MAKELIB
@@ -1289,12 +1277,12 @@ Installed/Library/Cookies:			ansic netutils MAKELIB
 mapheap :	Installed/Library/MapHeap
 Installed/Library/MapHeap:			MAKELIB
 
-ssl	: 	Installed/Library/ssl
-Installed/Library/ssl:				ansic socket mapheap MAKELIB
+ssl	: 	Installed/Library/SSL
+Installed/Library/SSL:				ansic socket mapheap MAKELIB
 
 # product-specific dependency on fjpeg
-impgraph	: Installed/Library/Breadbox/impgraph
-Installed/Library/Breadbox/impgraph:		ansic ijgjpeg MAKELIB #fjpeg
+impgraph	: Installed/Library/Breadbox/ImpGraph
+Installed/Library/Breadbox/ImpGraph:		ansic ijgjpeg MAKELIB #fjpeg
 
 ijgjpeg	: 	Installed/Library/Breadbox/Ijgjpeg
 Installed/Library/Breadbox/Ijgjpeg:		ui ansic MAKELIB
@@ -1304,8 +1292,8 @@ Installed/Library/Breadbox/Ijgjpeg:		ui ansic MAKELIB
 #	mdcd %ROOT_DIR%\
 #	$(MAKE) -I$(ROOT_DIR)\Library\Breadbox\fjpeg lib full
 
-impdoc	: 	Installed/Library/Breadbox/impdoc
-Installed/Library/Breadbox/impdoc:		ui ansic MAKELIB
+impdoc	: 	Installed/Library/Breadbox/ImpDoc
+Installed/Library/Breadbox/ImpDoc:		ui ansic MAKELIB
 
 pdfvu	: 	Installed/Appl/PDFViewer
 Installed/Appl/PDFViewer:			ui ansic spool borlandc \
@@ -1326,8 +1314,8 @@ Installed/Library/Breadbox/zlib:		ansic MAKELIB
 
 #if defined(PRODUCT) && $(PRODUCT) == "NDO2000"
 #else
-dirlist : 	Installed/Library/Breadbox/dirlist
-Installed/Library/Breadbox/dirlist:		ansic ui MAKELIB
+dirlist : 	Installed/Library/Breadbox/DirList
+Installed/Library/Breadbox/DirList:		ansic ui MAKELIB
 #endif
 
 minizip : 	Installed/Library/Breadbox/MiniZip
@@ -1335,8 +1323,8 @@ Installed/Library/Breadbox/MiniZip:		ansic ui zlib MAKELIB
 
 #if defined(PRODUCT) && $(PRODUCT) == "NDO2000"
 #else
-geozip  : 	Installed/Appl/BreadBox/GEOZIP
-Installed/Appl/BreadBox/GEOZIP:			minizip dirlist MAKEAPPL
+geozip  : 	Installed/Appl/Breadbox/GEOZIP
+Installed/Appl/Breadbox/GEOZIP:			minizip dirlist MAKEAPPL
 # endif
 
 #
@@ -1356,7 +1344,7 @@ Installed/Appl/BreadBox/GEOZIP:			minizip dirlist MAKEAPPL
 dib	: 	Installed/Library/Trans/Graphics/Bitmap/Dib
 Installed/Library/Trans/Graphics/Bitmap/Dib:	ui ansic impex MAKELIB
 
-msmfile : 	
+msmfile :
 #Installed/Library/Trans/Text/MSMFile
 #Installed/Library/Trans/Text/MSMFile:		text MAKELIB
 
@@ -1388,32 +1376,32 @@ dbase4	: 	Installed/Library/Trans/Database/DBase4
 Installed/Library/Trans/Database/DBase4:	ansic impex MAKELIB
 
 # Other Geos stuff (not in GPC)
-conview	: 	Installed/Library/Conview
-Installed/Library/Conview:			ui spool MAKELIB
+conview	: 	Installed/Library/ConView
+Installed/Library/ConView:			ui spool MAKELIB
 
-reader	: 	Installed/Appl/Reader	
+reader	: 	Installed/Appl/Reader
 Installed/Appl/Reader:				ui text conview MAKEAPPL
 
 term	: 	Installed/Appl/Term
 Installed/Appl/Term:				ui text MAKEAPPL
 
-tedit	: 	Installed/Appl/Tedit
-Installed/Appl/Tedit:				ui text mailbox MAKEAPPL
+tedit	: 	Installed/Appl/TEdit
+Installed/Appl/TEdit:				ui text mailbox MAKEAPPL
 
-geofile	: 	Installed/Appl/Geofile
-Installed/Appl/Geofile:				ui grobj spool parse cell \
+geofile	: 	Installed/Appl/GeoFile
+Installed/Appl/GeoFile:				ui grobj spool parse cell \
 						ruler spline math spreadsheet \
 	  					text ansic bitmap ffile impex \
 						MAKEAPPL
 
-dirls	: Installed/Appl/Breadbox/Dirlist
-Installed/Appl/Breadbox/Dirlist:		ui ansic text spool MAKEAPPL
+dirls	: Installed/Appl/Breadbox/DirList
+Installed/Appl/Breadbox/DirList:		ui ansic text spool MAKEAPPL
 
-bim	: Installed/Appl/Breadbox/bim
-Installed/Appl/Breadbox/bim:			ui ansic socket sound MAKEAPPL
+bim	: Installed/Appl/Breadbox/BIM
+Installed/Appl/Breadbox/BIM:			ui ansic socket sound MAKEAPPL
 
-ffind	: Installed/Appl/Breadbox/Ffind
-Installed/Appl/Breadbox/Ffind:			ui ansic text MAKEAPPL
+ffind	: Installed/Appl/Breadbox/FFind
+Installed/Appl/Breadbox/FFind:			ui ansic text MAKEAPPL
 
 cdaudio	: Installed/Library/Breadbox/CDAudio
 Installed/Library/Breadbox/CDAudio:		MAKELIB
@@ -1424,7 +1412,7 @@ Installed/Library/Breadbox/Cdados:		MAKELIB
 bbxcd	: Installed/Appl/Breadbox/Bbxcd
 Installed/Appl/Breadbox/Bbxcd:			ui ansic sound cdaudio MAKEAPPL
 
-webbox	: Installed/Appl/Breadbox/Webbox	
+webbox	: Installed/Appl/Breadbox/Webbox
 Installed/Appl/Breadbox/Webbox:			ui ansic text spool spell \
 						MAKEAPPL
 
@@ -1435,21 +1423,21 @@ graphvwr : Installed/Appl/Breadbox/Graphvwr
 Installed/Appl/Breadbox/Graphvwr:	ui ansic extui giflib thumbdb ijgjpeg \
 					MAKEAPPL
 
-macror	: Installed/Appl/Breadbox/Macror
-Installed/Appl/Breadbox/Macror:		ui ansic MAKEAPPL
+macror	: Installed/Appl/Breadbox/MacroR
+Installed/Appl/Breadbox/MacroR:		ui ansic MAKEAPPL
 
-perf	: Installed/Appl/Perf		
+perf	: Installed/Appl/Perf
 Installed/Appl/Perf:			ui color MAKEAPPL
 
 dump	: Installed/Appl/Dump
 Installed/Appl/Dump:			spool ijgjpeg giflib MAKEAPPL
 
 # Edu Apps
-flash	: Installed/Appl/EduApps/flash
-Installed/Appl/EduApps/flash:		ui ansic text math MAKEAPPL
+flash	: Installed/Appl/EduApps/Flash
+Installed/Appl/EduApps/Flash:		ui ansic text math MAKEAPPL
 
-fontmgck : Installed/Appl/EduApps/fontmgck
-Installed/Appl/EduApps/fontmgck:	ui ansic text color gsol MAKEAPPL
+fontmgck : Installed/Appl/EduApps/Fontmgck
+Installed/Appl/EduApps/Fontmgck:	ui ansic text color gsol MAKEAPPL
 
 hangman	: Installed/Appl/EduApps/hangman
 Installed/Appl/EduApps/hangman:		ui ansic math wmlib MAKEAPPL
@@ -1466,12 +1454,12 @@ Installed/Appl/EduApps/numbers:		ui ansic math MAKEAPPL
 pvault	: Installed/Appl/EduApps/pvault
 Installed/Appl/EduApps/pvault:		ui ansic MAKEAPPL
 
-taide	: Installed/Appl/EduApps/taide
-Installed/Appl/EduApps/taide:		ui ansic text math spool basicdb \
+taide	: Installed/Appl/EduApps/TAide
+Installed/Appl/EduApps/TAide:		ui ansic text math spool basicdb \
 					gridlib treplib MAKEAPPL
 
-thinker	: Installed/Appl/EduApps/thinker
-Installed/Appl/EduApps/thinker:		ui ansic MAKEAPPL
+thinker	: Installed/Appl/EduApps/Thinker
+Installed/Appl/EduApps/Thinker:		ui ansic MAKEAPPL
 
 ttype	: Installed/Appl/EduApps/Ttype
 Installed/Appl/EduApps/Ttype:		ui ansic text treplib MAKEAPPL
@@ -1479,11 +1467,11 @@ Installed/Appl/EduApps/Ttype:		ui ansic text treplib MAKEAPPL
 wsm	: Installed/Appl/EduApps/wsm
 Installed/Appl/EduApps/wsm:		ui ansic spool MAKEAPPL
 
-wsplay	: Installed/Appl/EduApps/wsplay
-Installed/Appl/EduApps/wsplay:		ui ansic spool MAKEAPPL
+wsplay	: Installed/Appl/EduApps/WSPlay
+Installed/Appl/EduApps/WSPlay:		ui ansic spool MAKEAPPL
 
-xwm	: Installed/Appl/EduApps/xwm
-Installed/Appl/EduApps/xwm:		ui ansic spool compress MAKEAPPL
+xwm	: Installed/Appl/EduApps/XWM
+Installed/Appl/EduApps/XWM:		ui ansic spool compress MAKEAPPL
 
 tgen	: Installed/Appl/EduApps/tgen
 Installed/Appl/EduApps/tgen:		ui ansic text math spool basicdb \
