@@ -68,10 +68,10 @@ exempt borlandc
 # Resources: list all resource blocks which are used by the application.
 # (standard discardable code resources do not need to be mentioned).
 #
-resource APPRESOURCE ui-object
-resource INTERFACE ui-object
-resource BOARDBLOCK object
-resource APPMONIKERRESOURCE lmem read-only shared
+resource AppResource ui-object
+resource Interface ui-object
+resource BoardBlock object
+resource AppMonikerResource lmem read-only shared
 
 #
 # Other classes
