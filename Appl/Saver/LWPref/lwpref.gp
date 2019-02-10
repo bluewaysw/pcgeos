@@ -49,7 +49,7 @@ library ansic
 #
 # Define resources other than standard discardable code
 #
-resource LWPREFUIRESOURCE           object
+resource LWPrefUIResource           object
 
 #
 # Exported routines.  These MUST be exported first, and they must be

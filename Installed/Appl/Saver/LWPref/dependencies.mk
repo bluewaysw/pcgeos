@@ -17,7 +17,7 @@ lwpref.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh saver.goh lwpref.goh config.goh \
-                ../lastwords/lastwords.goh Objects/Text/tCtrlC.goh \
+                ../LastWords/lastwords.goh Objects/Text/tCtrlC.goh \
                 ruler.goh Objects/colorC.goh Objects/styles.goh
 lwpref.obj \
 lwpref.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \

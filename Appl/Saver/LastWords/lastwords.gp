@@ -20,7 +20,7 @@ name lastword.app
 #
 # All specific screen savers are libraries that may be launched but once
 #
-type appl, process
+type appl, process, single
 #
 # This is the name that appears in the generic saver's list
 #
@@ -47,6 +47,9 @@ library ui
 # The need for this is self-evident...
 #
 library geos
+
 class	LWProcessClass
 appobj	LWApp
 export	LWApplicationClass
+
+resource AppResource ui-object
