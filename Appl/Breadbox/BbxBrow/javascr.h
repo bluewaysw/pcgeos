@@ -12,7 +12,7 @@
 
 #if JAVASCRIPT_SUPPORT
 #define JSE_BROWSEROBJECTS 1
-#include <js/jseopt.h>
+#include <JS/jseopt.h>
 
 #include "sebrowse.h"
 

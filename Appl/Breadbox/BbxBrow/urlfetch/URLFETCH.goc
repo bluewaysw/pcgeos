@@ -1,0 +1,1067 @@
+/*
+ *                          ==CONFIDENTIAL INFORMATION==
+ *
+ * COPYRIGHT 1994-99 BREADBOX COMPUTER COMPANY -- ALL RIGHTS RESERVED  --
+ * THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER
+ * A NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ * RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ * NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ * CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ * AGREEMENT.
+ *
+*/
+/***********************************************************************
+ *
+ * PROJECT:       HTMLView
+ * FILE:          URLFetch.goc
+ *
+ * AUTHOR:        Lysle Shields
+ *
+ ***********************************************************************/
+
+#pragma option -zCURLFETCH_TEXT
+
+/**************************************************************************
+ *		Include files
+ **************************************************************************/
+
+@include <stdapp.goh>
+#include <product.h>
+@include <Ansi/string.h>
+#include <library.h>
+@include <sem.h>
+@include <thread.h>
+@include <initfile.h>
+#if PROGRESS_DISPLAY
+#include <Ansi/stdio.h>
+#endif
+
+@include "htmlview.goh"
+@include "urlfetch.goh"
+@include "options.goh"
+
+#define MAX_FETCH_ENGINE_CHILDREN 2
+#define FETCH_CHILD_STACK_SIZE      3500
+
+typedef byte T_fetchChildAction ;
+#define FETCH_CHILD_ACTION_GET_URL     0
+#define FETCH_CHILD_ACTION_DIE         1
+#define FETCH_CHILD_ACTION_DEAD        2
+#define FETCH_CHILD_ACTION_UNKNOWN     3
+
+typedef struct {
+    ThreadHandle child ;
+    Boolean isBusy ;
+    Boolean isAbort ;
+
+    SemaphoreHandle sem ;    /* Semaphore for child to wait on */
+
+    T_fetchChildAction action ;
+
+    /* Passed data */
+    NameToken url ;
+    word loadMode ;
+    HTMLFormDataHandle postData ;
+    NameToken referer;
+    optr ackObject ;
+    Message ackMessage ;
+    dword extraData ;
+
+    void *abortRoutine ;
+
+#if PROGRESS_DISPLAY
+    LoadProgressData loadProgressData;  /* loading progress data */
+#endif
+} T_fetchEngineChild ;
+
+#ifdef ALLOW_FETCH_WHILE_IMPORTING
+/* holds copy of load progress data of associated fetch thread, so it can
+   continue subsequent fetches while we are still importing */
+static LoadProgressData G_importLoadProgressData[MAX_FETCH_ENGINE_CHILDREN];
+/* if import thread is actively importing */
+extern Boolean G_importActive[];
+
+extern Boolean G_fetchWhileImport;
+#endif
+
+#ifdef __WATCOMC__
+
+#ifndef PUSHDI
+void _PUSHDI();
+#pragma aux _PUSHDI = "push di";
+#define PUSHDI  _PUSHDI();
+#endif
+
+#ifndef POPDI
+void _POPDI();
+#pragma aux _POPDI = "pop di";
+#define POPDI  _POPDI();
+#endif
+
+#endif
+
+@ifdef COMPILE_OPTION_ENABLE_NUMCONN_OPTION
+@extern object NumConnBooleanGroup;
+@endif
+
+/**************************************************************************
+ *	    Internal routines:
+ **************************************************************************/
+
+ThreadHandle IURLFetchEngineChildCreate(word childNum) ;
+word far URLFetchChildThread(word childNum) ;
+typedef word (*thread_ptr)(word value) ;
+
+/**************************************************************************
+ *	    Classes
+ **************************************************************************/
+
+    /*---------------------------------------------------------------------*/
+    @class URLFetchEngineClass, MetaClass ;
+        @instance word UFEI_numChildren = 0 ;
+
+        @instance sword numAborts = 0 ;
+
+        @message void MSG_URL_FETCH_ENGINE_KILL() ;
+@ifdef PROGRESS_DISPLAY
+        @message void MSG_URL_FETCH_ENGINE_GET_URL(
+                          NameToken url,
+                          word loadMode,
+                          HTMLFormDataHandle postData,
+			  NameToken referer,
+                          optr ackObject,
+                          Message ackMessage,
+                          dword extraData, dword loadProgressData) ;
+@else
+        @message void MSG_URL_FETCH_ENGINE_GET_URL(
+                          NameToken url,
+                          word loadMode,
+                          HTMLFormDataHandle postData,
+			  NameToken referer,
+                          optr ackObject,
+                          Message ackMessage,
+                          dword extraData) ;
+@endif
+        @message void MSG_URL_FETCH_ENGINE_START_ABORT(Boolean ignoreAbortMsg) ;
+        @message void MSG_URL_FETCH_ENGINE_END_ABORT() ;
+
+        /* Internal messages sent by the child threads */
+        @message void MSG_URL_FETCH_ENGINE_COMPLETED_URL(word childNum) ;
+        @message void MSG_URL_FETCH_ENGINE_SET_NUM_CHILDREN(word num) ;
+    @endc
+    /*---------------------------------------------------------------------*/
+
+/**************************************************************************
+ *	    Globals
+ **************************************************************************/
+
+Boolean G_fetchEngineStarted = FALSE ;
+MemHandle G_urlFetchMemory = NullHandle ;
+optr G_urlFetchObj = NullHandle ;
+word G_numExtraAllocs ;
+T_fetchEngineChild G_fetchChildren[MAX_FETCH_ENGINE_CHILDREN] ;
+word G_numChildren = 0;
+Boolean G_abortPending = FALSE;
+
+#if PROGRESS_DISPLAY
+
+/* number of fetch threads, need by import subsystem to create import
+   threads */
+int G_numFetchChildren;
+
+/* this semaphore is used to synchronize load thread and import thread */
+SemaphoreHandle G_fetchProgressSem[MAX_FETCH_ENGINE_CHILDREN];
+
+/* each fetch thread has an associated VM file (for import progress
+   bitmap) and VM huge array (for buffering load data between fetch
+   thread and import thread), one per thread prevents VM sharing
+   congestion during simulatenous fetches/imports */
+VMFileHandle G_fetchProgressVMFile[MAX_FETCH_ENGINE_CHILDREN];
+VMBlockHandle G_fetchProgressDataStream[MAX_FETCH_ENGINE_CHILDREN];
+
+/* name of temporary file in cache directory that buffers file data
+   being loaded and that holds bitmap as it is imported */
+#define WORK_FILENAME _TEXT("FETCHBUF.%03d")
+
+#endif
+
+SemaphoreHandle G_fetchSemaphore = NullHandle ;
+word G_allocBlock = NullHandle ;
+
+/**************************************************************************
+ *	    Fetch Engline Template Resource
+ **************************************************************************/
+
+@start URLFetchEngineResource ;
+    /*---------------------------------------------------------------------*/
+    /* NOTE:  Never send messages to this object */
+    @object URLFetchEngineClass URLFetchTemplate = {
+    }
+    /*---------------------------------------------------------------------*/
+@end URLFetchEngineResource ;
+
+
+/*-------------------------------------------------------------------------
+ | Routine:  URLFetchEngineStart
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Starts up the URL Fetch engine thread.
+ |
+ | Outputs:
+ |    Boolean                     -- TRUE is sucessful, else FALSE
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/16/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+Boolean URLFetchEngineStart(void)
+{
+    MemHandle dup = NullHandle ;
+    ThreadHandle newThread = NullHandle ;
+    Boolean status = FALSE ;
+    word numChildren = DEFAULT_FETCH_ENGINE_CHILDREN;
+    word i ;
+    ThreadHandle child ;
+#if PROGRESS_DISPLAY
+    FileLongName workFileName;
+#endif
+
+    InitFileReadInteger(HTMLVIEW_CATEGORY, "numConn", &numChildren) ;
+    if ((numChildren < 1) || (numChildren > MAX_FETCH_ENGINE_CHILDREN))
+        numChildren = DEFAULT_FETCH_ENGINE_CHILDREN ;
+#if PROGRESS_DISPLAY
+    G_numFetchChildren = numChildren;
+#endif
+
+@ifdef COMPILE_OPTION_ENABLE_NUMCONN_OPTION
+     @send NumConnBooleanGroup::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(\
+          (numChildren == 2) ? 1 : 0, 0);
+@endif
+
+    HWChecksumCheck() ;
+    EC_ERROR_IF(G_fetchEngineStarted, -1) ;
+    if (!G_fetchEngineStarted)  {
+        /* First create a thread that has an event queue */
+        @call process::MSG_PROCESS_CREATE_EVENT_THREAD(
+                  &newThread,
+                  &ProcessClass,
+                  4000) ;
+        if (newThread)  {
+            /* Now create an object block that is on that thread */
+            dup = ObjDuplicateResource(
+                      OptrToHandle(@URLFetchTemplate),
+                      -1,
+                      newThread) ;
+            if (dup)  {
+                /* Set up a global object pointer so all calls */
+                /* go directly to the object's queue */
+                G_urlFetchObj = ConstructOptr(
+                                dup,
+                                OptrToChunk(@URLFetchTemplate)) ;
+                G_urlFetchMemory = dup ;
+                G_numExtraAllocs = 0 ;
+
+                /* Everything got created! */
+                status = TRUE ;
+            }
+        }
+        G_fetchEngineStarted = TRUE ;
+
+        /* Now, let's create the children */
+        for (i=0; i<numChildren; i++)  {
+            G_fetchChildren[i].sem = ThreadAllocSem(1) ;
+
+            /* Immediately grab the semaphore */
+            ThreadPSem(G_fetchChildren[i].sem) ;
+
+            child = IURLFetchEngineChildCreate(i) ;
+            if (!child)
+                break ;
+            G_fetchChildren[i].child = child ;
+            G_fetchChildren[i].isBusy = FALSE ;
+            G_fetchChildren[i].isAbort = FALSE ;
+            G_fetchChildren[i].abortRoutine = NULL ;
+#if PROGRESS_DISPLAY
+	    /* allocate load progress semaphore, freed on exit? */
+	    G_fetchProgressSem[i] = ThreadAllocSem(1);
+	    /* create VM file */
+#ifdef GLOBAL_INTERNET_BUILD
+	    FileSetCurrentPath(vmCacheSP, vmCacheDir);
+#else
+	    FileSetCurrentPath(HTML_VMCACHE_SP, HTML_VMCACHE_DIR);
+#endif
+	    sprintf(workFileName, WORK_FILENAME, i);
+	    G_fetchProgressVMFile[i] = VMOpen(workFileName, VMAF_FORCE_READ_WRITE, VMO_CREATE_TRUNCATE, 1);
+	    if (G_fetchProgressVMFile[i]) {
+		/* set sync update so stuff will stay in memory for faster
+		   access */
+		VMSetAttributes(G_fetchProgressVMFile[i], VMA_SYNC_UPDATE, 0) ;
+		/* create data stream */
+		G_fetchProgressDataStream[i] = HugeArrayCreate(G_fetchProgressVMFile[i], 1, 0);
+	    }
+#endif
+        }
+
+        /* Record the number of children we got */
+        @call G_urlFetchObj::MSG_URL_FETCH_ENGINE_SET_NUM_CHILDREN(i) ;
+
+        /* Don't continue if we can't create any of the the children, stop. */
+        if (i==0)  {
+            URLFetchEngineStop() ;
+            status = FALSE ;
+        } else {
+            /* Set up a semaphore for the number of children we have */
+            G_fetchSemaphore = ThreadAllocSem(i);
+            if (G_fetchSemaphore == NullHandle)
+                status = FALSE;
+        }
+    }
+
+    if (G_allocBlock == NullHandle)  {
+        G_allocBlock = MemAllocLMem(LMEM_TYPE_GENERAL, 0) ;
+    }
+
+    return status ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  URLFetchEngineStop
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Stop the URL Fetch engine thread (kill)
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/16/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+void URLFetchEngineStop(void)
+{
+    EC_ERROR_IF(!G_fetchEngineStarted, -1) ;
+    EC_ERROR_IF(G_numExtraAllocs, -1) ;
+
+    /* First, destroy all the children */
+    /* To Be Done!!!! */
+
+    HWChecksumCheck() ;
+    if (G_fetchEngineStarted)  {
+        @send ,insertAtFront ,forceQueue
+            G_urlFetchObj::MSG_URL_FETCH_ENGINE_KILL() ;
+        G_urlFetchObj = NullHandle ;
+        G_urlFetchMemory = NullHandle ;
+        G_fetchEngineStarted = FALSE ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  URLFetchRequest
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Add a request to get another URL item (cached or not cached).
+ |
+ | Inputs:
+ |    NameToken url               -- URL to fetch (in global namePool)
+ |    word loadMode               -- Form of caching
+ |    HTMLFormDataHandle postData -- Post data block
+ |    optr ackObject              -- Object to receive message when done
+ |    word ackMessage             -- Message to send when done
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/16/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+#if PROGRESS_DISPLAY
+void URLFetchRequest(
+         NameToken url,
+         word loadMode,
+         HTMLFormDataHandle postData,
+	 NameToken referer,
+         optr ackObject,
+         Message ackMessage,
+         dword extraData, _LoadProgressParams_)
+#else
+void URLFetchRequest(
+         NameToken url,
+         word loadMode,
+         HTMLFormDataHandle postData,
+	 NameToken referer,
+         optr ackObject,
+         Message ackMessage,
+         dword extraData)
+#endif
+{
+#if PROGRESS_DISPLAY
+    dword loadProgressData = 0;
+#endif
+
+    /* For now, we'll just forward the request to the fetch engine. */
+    /* In the future, we will probably allow for multiple requests */
+    /* to be handled simultaneously (for the 3.0 stack). */
+    HWChecksumCheck() ;
+
+    NamePoolUseToken(namePool, url);    /* token is freed by message (allowing
+                                           it to be @sent) */
+
+#if PROGRESS_DISPLAY
+    /* set up loading progress data and start fetch, we must copy load
+       progress data since the fetch is asynchronous from here */
+    if (loadProgressDataP) {
+	loadProgressData = URLFetchExtraMemoryAlloc(sizeof(LoadProgressData));
+	URLFetchExtraMemoryLock(loadProgressData);
+	memcpy(URLFetchExtraMemoryDeref(loadProgressData), loadProgressDataP, sizeof(LoadProgressData));
+	URLFetchExtraMemoryUnlock(loadProgressData);
+    }
+    @send ,forceQueue G_urlFetchObj::MSG_URL_FETCH_ENGINE_GET_URL(
+                          url,
+                          loadMode,
+                          postData,
+			  referer,
+                          ackObject,
+                          ackMessage,
+                          extraData, loadProgressData) ;
+#else
+    @send ,forceQueue G_urlFetchObj::MSG_URL_FETCH_ENGINE_GET_URL(
+                          url,
+                          loadMode,
+                          postData,
+			  referer,
+                          ackObject,
+                          ackMessage,
+                          extraData) ;
+#endif
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  URLFetchExtraMemoryAlloc
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Utility routine to allocate memory in the same block as the fetch
+ |    memory engine.  Intended for a place for extra memory to be stored
+ |    from time to time (like state of requests)
+ |
+ | Inputs:
+ |    word size                   -- Requested memory size
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/16/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+optr URLFetchExtraMemoryAlloc(word size)
+{
+    ChunkHandle newChunk ;
+
+    HWChecksumCheck() ;
+    MemPLock(G_allocBlock) ;
+    newChunk = LMemAlloc(G_allocBlock, size) ;
+    MemUnlockV(G_allocBlock) ;
+
+    if (newChunk)  {
+        G_numExtraAllocs++ ;
+        return ConstructOptr(G_allocBlock, newChunk) ;
+    }
+
+    return NullHandle ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  URLFetchExtraMemoryFree
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Used to free memory allocated by URLFetchExtraMemoryAlloc.
+ |
+ | Inputs:
+ |    optr extraMem               -- optr returned by
+ |                                   URLFetchExtraMemoryAlloc
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/16/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+void URLFetchExtraMemoryFree(optr extraMem)
+{
+    HWChecksumCheck() ;
+    MemPLock(G_allocBlock) ;
+    LMemFree(extraMem) ;
+    MemUnlockV(G_allocBlock) ;
+    G_numExtraAllocs-- ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  URLFetchEngineAbortAll
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    This routine is called when a request has come in to stop all
+ |    transactions (user abort).  All messages are then flushed out of
+ |    URLFetch engine.
+ |    NOTE:  This is done asyncronously.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/19/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+void URLFetchEngineAbortAll(Boolean ignoreAbortMsg)
+{
+    word i;
+    void *abort;
+
+    EC_ERROR_IF(!G_fetchEngineStarted, -1) ;
+
+    HWChecksumCheck() ;
+    if (G_fetchEngineStarted)  {
+	/* if there are no free fetch threads, the fetch engine is blocked
+	   waiting for a free one, so the below messages won't be handled
+	   until one becomes free; we'll manually stop all current fetch
+	   threads first */
+	for (i=0; i<G_numChildren; i++)  {
+	    abort = G_fetchChildren[i].abortRoutine;
+	    if (G_fetchChildren[i].isBusy && abort)  {
+		G_fetchChildren[i].isAbort = TRUE ;
+		((pcfm_URLDrvAbort *)ProcCallFixedOrMovable_pascal)(
+		    i,
+		    ((ignoreAbortMsg)?     /* Note if we want a stop msg or not */
+                     URL_ABORT_STATE_IGNORE_USER_INTERRUPT_MESSAGE:
+                     URL_ABORT_STATE_NORMAL),
+		    abort);
+	    }
+	}
+	G_abortPending = TRUE;
+        /* Put a start at the beginning of the queue and an end at */
+        /* the end of the queue (thus straddling all the events */
+        /* to be ignore/removed). */
+        @send ,forceQueue ,insertAtFront G_urlFetchObj::MSG_URL_FETCH_ENGINE_START_ABORT(ignoreAbortMsg) ;
+        @send ,forceQueue G_urlFetchObj::MSG_URL_FETCH_ENGINE_END_ABORT() ;
+    }
+}
+
+void *URLFetchExtraMemoryLock(optr em)
+{
+    return MemPLock(OptrToHandle(em)) ;
+}
+
+void URLFetchExtraMemoryUnlock(optr em)
+{
+    MemUnlockV(OptrToHandle(em));
+}
+
+/***************************************************************************
+ *              URLFetchEngineClass
+ ***************************************************************************/
+
+@classdecl URLFetchEngineClass ;
+
+/*-------------------------------------------------------------------------
+ | Method:  URLFetchEngineClass::MSG_URL_FETCH_ENGINE_KILL
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Kill the current thread (after clean up, if any).
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/16/98  Created
+ |    LES  07/22/98  Now kills all the children processes
+ |
+ *-----------------------------------------------------------------------*/
+@method URLFetchEngineClass, MSG_URL_FETCH_ENGINE_KILL
+{
+    word i;
+    T_fetchEngineChild *p_child ;
+#if PROGRESS_DISPLAY
+    FileLongName workFileName;
+#endif
+
+    HWChecksumCheck() ;
+
+    /* First, kill all the children */
+    for (i=0; i<pself->UFEI_numChildren; i++)  {
+        p_child = G_fetchChildren+i ;
+
+        /* Call abort on the child!  TBD! */
+        if (p_child->isBusy == TRUE)  {
+            /* ABORT! */
+        }
+
+        /* Wait until the child is no longer busy */
+        while (p_child->isBusy == TRUE)
+            {}
+    }
+
+    /* Tell each child to die */
+    for (i=0; i<pself->UFEI_numChildren; i++)  {
+        p_child = G_fetchChildren+i ;
+        /* Now that the child is not doing anything, tell it to die */
+        p_child->action = FETCH_CHILD_ACTION_DIE ;
+
+        /* Release the child */
+        ThreadVSem(p_child->sem);
+    }
+
+    /* Wait for all children to be dead */
+    for (i=0; i<pself->UFEI_numChildren; i++)  {
+        p_child = G_fetchChildren+i ;
+        while (p_child->action != FETCH_CHILD_ACTION_DEAD)
+            {}
+#if PROGRESS_DISPLAY
+	/* free semaphore */
+	ThreadFreeSem(G_fetchProgressSem[i]);
+	/* free VM file and data stream */
+	if (G_fetchProgressVMFile[i]) {
+	    HugeArrayDestroy(G_fetchProgressVMFile[i],
+			     G_fetchProgressDataStream[i]);
+	    VMClose(G_fetchProgressVMFile[i], FILE_NO_ERRORS);
+	    sprintf(workFileName, WORK_FILENAME, i);
+#ifdef GLOBAL_INTERNET_BUILD
+	    FileSetCurrentPath(vmCacheSP, vmCacheDir);
+#else
+	    FileSetCurrentPath(HTML_VMCACHE_SP, HTML_VMCACHE_DIR);
+#endif
+	}
+#endif
+
+        /* Each child ends its own thread */
+    }
+
+    if(lastURLDriver)
+      GeodeFreeLibrary(lastURLDriver);
+
+    /* Destroy the thread we are currently in */
+    @send ConstructOptr(ThreadGetInfo(0, TGIT_THREAD_HANDLE), 0)::
+      MSG_META_DETACH(0, NullHandle) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  URLFetchEngineClass::MSG_URL_FETCH_ENGINE_GET_URL
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Causes the engine to go out and fetch a URL.  When completed,
+ |    sends out a message to the acknowledgement object.
+ |
+ | Inputs:
+ |    NameToken url               -- URL to fetch (in global namePool)
+ |    word loadMode               -- Form of caching
+ |    HTMLFormDataHandle postData -- Post data block
+ |    optr ackObject              -- Object to receive message when done
+ |    word ackMessage             -- Message to send when done
+ |    dword loadProgressData      -- load progress data
+ |    NameToken referer           -- refererer URL (in global namePool)
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/16/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method URLFetchEngineClass, MSG_URL_FETCH_ENGINE_GET_URL
+{
+    URLFetchResult urlResult ;
+    URLFetchResult *p_urlResult ;
+    MemHandle mem ;
+    Boolean isAborting ;
+    word childNum ;
+    T_fetchEngineChild *p_child ;
+
+    HWChecksumCheck() ;
+    /* For now, this routine blocks on all requests and only allows */
+    /* one request at a time. */
+
+    /* Determine if we are in abort mode (non zero count) */
+    isAborting = (pself->numAborts)?TRUE:FALSE ;
+
+    urlResult.url = url ;
+    urlResult.extraData = extraData ;
+
+    /* Do the actual load to the file */
+    /* NOTE:  The post data is freed in LoadURLToFile */
+    if (isAborting)  {
+        /* If we are aborting, don't actually do a request for the */
+        /* URL -- just act as if an abort occured for each request */
+        urlResult.retType = URLRequestMakeRet(URL_RET_ABORTED) ;
+        urlResult.htmlMsg = NullHandle ;
+	urlResult.anchor = NAME_POOL_NONE;
+        if (postData)  {
+            MemFree(postData) ;
+            postData = NullHandle ;
+        }
+#if PROGRESS_DISPLAY
+	/* clean this up too */
+	if (loadProgressData) {
+	    URLFetchExtraMemoryFree(loadProgressData);
+	}
+#endif
+
+        /* Send the bad results */
+        mem = MemAlloc(
+                  sizeof(URLFetchResult),
+                  HF_DYNAMIC | HF_SHARABLE,
+                  HAF_ZERO_INIT) ;
+        if (mem)  {
+            p_urlResult = MemLock(mem) ;
+            memcpy(p_urlResult, &urlResult, sizeof(urlResult)) ;
+            MemUnlock(mem) ;
+            @send ,forceQueue (ackObject)::{URL_FETCH_ACK}(ackMessage)(mem) ;
+        }
+    } else {
+        /* Not aborting, so let's pass on the request to the child */
+        /* But, first we must wait for a child to become free */
+        /* Do this by grabbing one of the semaphore counts. */
+        ThreadPSem(G_fetchSemaphore);
+        pself = ObjDeref(oself, 0) ;
+
+        /* Ok, we know at this point that one of the children is free */
+        for (childNum=0; childNum<pself->UFEI_numChildren; childNum++)  {
+            if (G_fetchChildren[childNum].isBusy == FALSE)
+                break ;
+        }
+
+        if (childNum >= pself->UFEI_numChildren)  {
+            /* !!!! What?!?  This is not to happen with a correct semaphore */
+            FatalError(-1) ;
+        }
+
+        /* Declare this child busy and send on the request */
+        p_child = G_fetchChildren + childNum ;
+        p_child->isBusy = TRUE ;
+	/* only clear abort state if an abort is not pending */
+        if (!G_abortPending) p_child->isAbort = FALSE ;
+
+        /* Fill the structure with passed in data */
+        p_child->url = url ;
+        p_child->loadMode = loadMode ;
+        p_child->postData = postData ;
+	p_child->referer = referer ;
+        p_child->ackObject = ackObject ;
+        p_child->ackMessage = ackMessage ;
+        p_child->extraData = extraData ;
+        p_child->action = FETCH_CHILD_ACTION_GET_URL ;
+#if PROGRESS_DISPLAY
+	/* copy loading progress data into static thread structure */
+	if (loadProgressData) {
+	    URLFetchExtraMemoryLock(loadProgressData);
+	    memcpy(&(p_child->loadProgressData), URLFetchExtraMemoryDeref(loadProgressData), sizeof(LoadProgressData));
+	    URLFetchExtraMemoryUnlock(loadProgressData);
+	    URLFetchExtraMemoryFree(loadProgressData);
+ #ifdef ALLOW_FETCH_WHILE_IMPORTING
+	    /* cancel progressive loading if we are still importing the
+	       previous one for this fetch thread;
+	       cancel by clearing LPD_callback */
+	    if (G_fetchWhileImport && G_importActive[childNum]) {
+		p_child->loadProgressData.LPD_callback = 0;
+	    }
+ #endif
+	} else {
+	    memset(&(p_child->loadProgressData), 0, sizeof(LoadProgressData));
+	}
+#endif
+
+        /* Release the child from the semaphore */
+        ThreadVSem(p_child->sem);
+/*
+        @send ,forceQueue (G_fetchChildren[childNum].child)::MSG_URL_FETCH_ENGINE_CHILD_GET_URL(
+                          url,
+                          loadMode,
+                          postData,
+                          ackObject,
+                          ackMessage,
+                          extraData,
+                          childNum) ;
+*/
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  URLFetchEngineClass::MSG_URL_FETCH_ENGINE_START_ABORT
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    An abort request has come in.  Start aborting.
+ |
+ | Inputs:
+ |    Boolean ignoreAbortMsg      -- Flag telling if we want to ignore
+ |                                   the returned stop message.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/19/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method URLFetchEngineClass, MSG_URL_FETCH_ENGINE_START_ABORT
+{
+    word i;
+    void *abort;
+
+    PUSHDI;
+
+    HWChecksumCheck() ;
+    pself->numAborts++ ;
+
+    G_abortPending = FALSE;
+    for (i=0; i<pself->UFEI_numChildren; i++)  {
+        abort = G_fetchChildren[i].abortRoutine;
+        if (G_fetchChildren[i].isBusy && abort &&
+	    !G_fetchChildren[i].isAbort)  {
+            G_fetchChildren[i].isAbort = TRUE ;
+            ((pcfm_URLDrvAbort *)ProcCallFixedOrMovable_pascal)(
+                 i,
+                 ((ignoreAbortMsg)?     /* Note if we want a stop msg or not */
+                     URL_ABORT_STATE_IGNORE_USER_INTERRUPT_MESSAGE:
+                     URL_ABORT_STATE_NORMAL),
+                 abort);
+        }
+    }
+
+    POPDI;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  URLFetchEngineClass::MSG_URL_FETCH_ENGINE_END_ABORT
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    The end of the abort list has been reached.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/19/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method URLFetchEngineClass, MSG_URL_FETCH_ENGINE_END_ABORT
+{
+    HWChecksumCheck() ;
+    pself->numAborts-- ;
+
+    EC_ERROR_IF(pself->numAborts < 0, -1) ;
+}
+
+@method URLFetchEngineClass, MSG_URL_FETCH_ENGINE_SET_NUM_CHILDREN
+{
+    pself->UFEI_numChildren = num ;
+    /* ugh, mirror in global for URLFetchEngineAbortAll */
+    G_numChildren = num;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  IURLFetchEngineChildCreate
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Starts up the URL Fetch engine child thread.
+ |
+ | Outputs:
+ |    ThreadHandle                -- Created thread, else NullHandle
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  07/20/98  Created
+ |    LES  07/21/98  Converted from event based object to standard thread
+ |
+ *-----------------------------------------------------------------------*/
+//#define FP_SEG( fp )( (unsigned )( void _seg * )( void far * )( fp ))
+//#define FP_OFF( fp )( (unsigned )( fp ))
+ThreadHandle IURLFetchEngineChildCreate(word childNum)
+{
+    ThreadHandle child = NullHandle ;
+    /* Have to use this static/global to get the correct fixup location */
+    static thread_ptr thread = URLFetchChildThread ;
+
+    HWChecksumCheck() ;
+
+    child = ThreadCreate(
+                PRIORITY_STANDARD,
+                childNum,
+		        thread,
+		        FETCH_CHILD_STACK_SIZE,
+		        GeodeGetProcessHandle());
+
+    return child ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  URLFetchChildThread                           * THREAD *
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    The actual thread of a child process that waits on a semaphore
+ |    until data is placed in the global variable G_fetchChildren and
+ |    then the semaphore is freed.  The action structure element is then
+ |    checked and an appropriate action is taken (DIE or get next URL).
+ |
+ | Inputs:
+ |    word                        -- Child index.
+ |
+ | Outputs:
+ |    word                        -- Status variable, always 0
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  07/21/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+/* For now, this routine blocks on all requests and only allows */
+/* one request at a time. */
+word far URLFetchChildThread(word childNum)
+{
+    T_fetchEngineChild *p_child ;
+    URLFetchResult urlResult ;
+    URLFetchResult *p_urlResult ;
+    MemHandle mem ;
+    Boolean isAborting ;
+    LoadProgressData *lpd;
+
+    p_child = G_fetchChildren + childNum ;
+
+    /* INFINITE LOOP START */
+    while (1)  {
+        /* Wait for the fetch engine to setup a request */
+        ThreadPSem(p_child->sem);
+
+        HWChecksumCheck() ;
+
+        if (p_child->action == FETCH_CHILD_ACTION_GET_URL)  {
+            /* Determine if we are in abort mode (non zero count) */
+            isAborting = (p_child->isAbort)?TRUE:FALSE ;
+
+            urlResult.url = p_child->url ;
+            urlResult.extraData = p_child->extraData ;
+
+            /* Do the actual load to the file */
+            /* NOTE:  The post data is freed in LoadURLToFile */
+            if (isAborting)  {
+                /* If we are aborting, don't actually do a request for the */
+                /* URL -- just act as if an abort occured for each request */
+                urlResult.retType = URLRequestMakeRet(URL_RET_ABORTED) ;
+                urlResult.htmlMsg = NullHandle ;
+                if (p_child->postData)  {
+                    MemFree(p_child->postData) ;
+                    p_child->postData = NullHandle ;
+                }
+            } else {
+#if PROGRESS_DISPLAY
+		/* set up loading progress data and fetch (do not alter
+		   LPD_callback, that determines whether we really have
+		   a callback or not) */
+		p_child->loadProgressData.LPD_loadThread = childNum;
+		p_child->loadProgressData.LPD_sem = G_fetchProgressSem[childNum];
+		p_child->loadProgressData.LPD_emptyQueue = 0;  /* sem */
+		p_child->loadProgressData.LPD_bytesAvail = 0;
+		p_child->loadProgressData.LPD_preReadOffset = 0;
+		p_child->loadProgressData.LPD_fileDone = FALSE;
+		/* even though we point to the stream here, it won't be
+		   used unless we go out to the MIME driver */
+		p_child->loadProgressData.LPD_dataFile = G_fetchProgressVMFile[childNum];
+		p_child->loadProgressData.LPD_dataStream = G_fetchProgressDataStream[childNum];
+		lpd = &(p_child->loadProgressData);
+ #ifdef ALLOW_FETCH_WHILE_IMPORTING
+		if (G_fetchWhileImport) {
+		    /* copy load progress data to safe place */
+		    if (p_child->loadProgressData.LPD_callback) {
+			memcpy(&(G_importLoadProgressData[childNum]), &(p_child->loadProgressData), sizeof(LoadProgressData));
+			lpd = &(G_importLoadProgressData[childNum]);
+		    }
+		} else  /* encloses ThreadAllocSem only */
+ #endif
+		/* allocate semaphore to synchronize import thread, if any */
+		p_child->loadProgressData.LPD_importSync = ThreadAllocSem(1);
+                urlResult.retType = LoadURLToFile(
+                                        &urlResult.url,
+                                        urlResult.curHTML,
+                                        urlResult.mimeType,
+                                        p_child->loadMode,
+                                        &urlResult.htmlMsg,
+                                        p_child->postData,
+					p_child->referer,
+					&urlResult.anchor,
+                                        childNum,
+                                        &(p_child->abortRoutine),
+					lpd);
+ #ifdef ALLOW_FETCH_WHILE_IMPORTING
+		if (!G_fetchWhileImport) {
+ #endif
+		/* if import was started, we'll block from handling further
+		   fetch requests until it finishes */
+		ThreadPSem(p_child->loadProgressData.LPD_importSync);
+		ThreadFreeSem(p_child->loadProgressData.LPD_importSync);
+ #ifdef ALLOW_FETCH_WHILE_IMPORTING
+		}
+ #endif
+#else
+                urlResult.retType = LoadURLToFile(
+                                        &urlResult.url,
+                                        urlResult.curHTML,
+                                        urlResult.mimeType,
+                                        p_child->loadMode,
+                                        &urlResult.htmlMsg,
+                                        p_child->postData,
+					p_child->referer,
+					&urlResult.anchor,
+                                        childNum,
+                                        &(p_child->abortRoutine));
+#endif
+            }
+
+            /* Now that the URL is loaded, create a structure to inform */
+            /* the acknowledgement object what happend */
+            mem = MemAlloc(
+                      sizeof(URLFetchResult),
+                      HF_DYNAMIC | HF_SHARABLE,
+                      HAF_ZERO_INIT) ;
+            if (mem)  {
+                p_urlResult = MemLock(mem) ;
+                memcpy(p_urlResult, &urlResult, sizeof(urlResult)) ;
+                MemUnlock(mem) ;
+                @send ,forceQueue (p_child->ackObject)::{URL_FETCH_ACK}(p_child->ackMessage)(mem) ;
+            }
+
+            /* We can now release this thread for another message */
+            G_fetchChildren[childNum].isBusy = FALSE ;
+
+            /* Ok, were done with this child */
+//            ThreadVSem(p_child->sem) ;
+
+            /* Also increment the number of free children */
+            ThreadVSem(G_fetchSemaphore);
+        } else if (p_child->action == FETCH_CHILD_ACTION_DIE)  {
+            /* Easy one.  Just quit out of infinite loop */
+            /* after cleaning up the semaphores */
+//            ThreadVSem(p_child->sem) ;
+            ThreadVSem(G_fetchSemaphore) ;
+
+            break ;   /* INFINITE LOOP EXIT POINT! */
+        } else {
+            /* Any other action constitutes a mistake.  Note in EC version */
+EC(            FatalError(-1) ; )
+        }
+    }
+    /* INFINITE LOOP END */
+
+    G_fetchChildren[childNum].action = FETCH_CHILD_ACTION_DEAD ;
+
+    return 0 ;
+}
+
+
+/***************************************************************************
+ * END OF FILE:  URLFETCH.GOC
+ ***************************************************************************/

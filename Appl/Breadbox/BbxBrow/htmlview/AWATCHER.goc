@@ -1,0 +1,204 @@
+/***************************************************************************
+ *  FILE:  AWATCHER.GOC
+ ***************************************************************************/
+
+/*-------------------------------------------------------------------------
+ | Project:  WebMagick (HTML Browser)
+ |
+ | Module:   Allocation Watcher
+ |           Used to keep track of a global amount of allocation and
+ |           to parse it out little by little to the callers.
+ |
+ |           Copyright (c) 1998 Breadbox Computer Company
+ |
+ | Author:   Lysle E. Shields III
+ |
+ | History:
+ |    Who: Date:     Comment:
+ |    ---- --------- --------------------
+ |    LES  05/13/98  Created.
+ |
+ *-----------------------------------------------------------------------*/
+
+@include <stdapp.goh>
+#include <awatcher.h>
+
+typedef struct {
+    dword AW_amount ;
+    dword AW_maximum ;
+} AllocationWatcher ;
+
+typedef MemHandle AllocWatcherHandle ;
+
+#define IGrabWatcher(watch)     ((AllocationWatcher *)MemPLock(watch))
+#define IReleaseWatcher(watch)  MemUnlockV(watch)
+
+/*-------------------------------------------------------------------------
+ | Routine:  AllocWatcherCreate
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Creates a new allocation watcher block.
+ |
+ | Inputs:
+ |    dword startingAmount        -- Number of allocation units to start
+ |                                   with.
+ |
+ | Outputs:
+ |    AllocWatcherHandle          -- Created handle
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  05/13/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+AllocWatcherHandle AllocWatcherCreate(dword startingAmount)
+{
+    MemHandle mem ;
+    AllocationWatcher *p_watch ;
+
+    mem = MemAlloc(
+              sizeof(AllocationWatcher),
+              HF_SHARABLE | HF_SWAPABLE,
+              0) ;
+
+    if (mem)  {
+        p_watch = MemLock(mem) ;
+        p_watch->AW_amount = startingAmount ;
+        p_watch->AW_maximum = startingAmount ;
+        MemUnlock(mem) ;
+    }
+
+    return mem ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  AllocWatcherDestroy
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Destroys an allocation watcher block
+ |
+ | Inputs:
+ |    AllocWatcherHandle watch    -- Handle to watcher to destroy
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  05/13/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+void AllocWatcherDestroy(AllocWatcherHandle watch)
+{
+    /* Grab the memory block and free it */
+    IGrabWatcher(watch) ;
+    MemFree(watch) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  AllocWatcherAllocate
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Request for allocation in the watcher.
+ |
+ | Inputs:
+ |    AllocWatcherHandle watch    -- Handle to the watcher
+ |    dword amount                -- Desired amount to allocate
+ |
+ | Outputs:
+ |    Boolean                     -- TRUE if allocation allowed, else
+ |                                   FALSE
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  05/13/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+Boolean AllocWatcherAllocate(AllocWatcherHandle watch, dword amount)
+{
+    AllocationWatcher *p_watch ;
+    Boolean result = FALSE ;
+
+    p_watch = IGrabWatcher(watch) ;
+    if (amount <= p_watch->AW_amount)  {
+        p_watch->AW_amount -= amount ;
+        result = TRUE ;
+    }
+    IReleaseWatcher(watch) ;
+
+    return result ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  AllocWatcherFree
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Return allocation units to the watcher.
+ |
+ | Inputs:
+ |    AllocWatcherHandle watch    -- Handle to the watcher
+ |    dword amount                -- Amount to free
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  05/13/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+void AllocWatcherFree(AllocWatcherHandle watch, dword amount)
+{
+    AllocationWatcher *p_watch ;
+    dword newAmount ;
+
+    p_watch = IGrabWatcher(watch) ;
+    newAmount = p_watch->AW_amount + amount ;
+    if (newAmount > p_watch->AW_maximum)  {
+        /* Crash in EC if we tried to free more than we allocated */
+        EC_ERROR_IF(newAmount > p_watch->AW_maximum, -1) ;
+        p_watch->AW_amount = p_watch->AW_maximum ;
+    } else {
+        p_watch->AW_amount = newAmount ;
+    }
+
+    IReleaseWatcher(watch) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  AllocWatcherGetRemaining
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Returns the amount still available.
+ |
+ | Inputs:
+ |    AllocWatcherHandle watch    -- Handle to the watcher
+ |
+ | Outputs:
+ |    dword                       -- Number of units left.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  05/13/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+dword AllocWatcherGetRemaining(AllocWatcherHandle watch)
+{
+    AllocationWatcher *p_watch ;
+    dword result = FALSE ;
+
+    p_watch = IGrabWatcher(watch) ;
+    result = p_watch->AW_amount ;
+    IReleaseWatcher(watch) ;
+
+    return result ;
+}
+
+/***************************************************************************
+ *  END OF FILE:  AWATCHER.GOC
+ ***************************************************************************/
+

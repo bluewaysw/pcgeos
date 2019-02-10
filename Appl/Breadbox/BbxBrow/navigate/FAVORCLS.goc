@@ -1,0 +1,1022 @@
+/*
+ *                          ==CONFIDENTIAL INFORMATION==
+ *
+ * COPYRIGHT 1994-99 BREADBOX COMPUTER COMPANY -- ALL RIGHTS RESERVED  --
+ * THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER
+ * A NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ * RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ * NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ * CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ * AGREEMENT.
+ *
+*/
+/***************************************************************************
+ *  FILE:  FAVORCLS.GOC
+ ***************************************************************************/
+
+/*-------------------------------------------------------------------------
+ | Project:  WebMagick (HTML Browser)
+ |           Copyright (c) 1997 Breadbox Computer Company
+ *-----------------------------------------------------------------------*/
+
+@include <stdapp.goh>
+@include <Ansi/string.h>
+@include "options.goh"
+
+
+@ifdef COMPILE_OPTION_FAVORITES
+
+@include "favorcls.goh"
+@include "favorite.goh"
+@include "htmlview.goh"
+
+#define NUM_FAVORITES_IN_TRIGGER_LIST  10
+#define FAVORITE_INSET_STEP            20
+#define FAVORITE_DIALOG_MAX_FAVORITES_SHOWN    2000
+
+optr FDLocateListFromDialog(optr dialog) ;
+word FDGetListItemSelected(optr dialog) ;
+void FDRedrawListItem(optr dialog, word item) ;
+void FDSelectItem(optr dialog, word item) ;
+
+@extern object FavoriteCreateClose ;
+@extern object FavoriteCreateDialog ;
+@extern object FavoriteCreateFavoriteTrigger ;
+@extern object FavoriteCreateGroupClose ;
+@extern object FavoriteCreateGroupDialog ;
+@extern object FavoriteCreateGroupInside ;
+@extern object FavoriteCreateGroupName ;
+@extern object FavoriteCreateGroupNotes ;
+@extern object FavoriteCreateGroupTrigger ;
+@extern object FavoriteCreateInside ;
+@extern object FavoriteCreateName ;
+@extern object FavoriteCreateNotes ;
+@extern object FavoriteCreatePage ;
+@extern object FavoriteCreateTrigger ;
+@extern object FavoriteEditDialog ;
+@extern object FavoriteEditDialogCancel ;
+@extern object FavoriteEditDialogNameText ;
+@extern object FavoriteEditDialogNotesText ;
+@extern object FavoriteEditDialogOK ;
+@extern object FavoriteEditDialogURLText ;
+@extern object FavoriteEditGroupDialog ;
+@extern object FavoriteEditGroupDialogCancel ;
+@extern object FavoriteEditGroupDialogNameText ;
+@extern object FavoriteEditGroupDialogNotesText ;
+@extern object FavoriteEditGroupDialogOK ;
+@extern object FavoritesBottomLeft ;
+@extern object FavoritesBottomLeftGlyph ;
+@extern object FavoritesBottomRegion ;
+@extern object FavoritesBottomRight ;
+@extern object FavoritesBottomRightInnerGroup ;
+@extern object FavoritesDialogAddToTop ;
+@extern object FavoritesDialogClose ;
+@extern object FavoritesDialogDelete ;
+@extern object FavoritesDialogDown ;
+@extern object FavoritesDialogEdit ;
+@extern object FavoritesDialogGo ;
+@extern object FavoritesDialogList ;
+@extern object FavoritesDialogUp ;
+@extern object FavoritesDialogUpDown ;
+@extern object FavoritesDynamicList ;
+@extern object FavoritesListContainer ;
+@extern object FavoritesListDialog ;
+@extern object FavoritesListList ;
+@extern object FavoritesMoreTrigger ;
+@extern object FavoritesOrganizeMenu ;
+@extern object FavoritesOrganizeRegion ;
+@extern object FavoriteTriggerAdd ;
+@extern object FavoriteTriggerList ;
+
+@extern object HTMLDisplayGroup ;
+@extern object HTMLDocumentGroup ;
+
+@extern chunk GPCFavoriteGroupIconMoniker ;
+@extern chunk GPCTopFavoriteIconMoniker ;
+@extern chunk GPCFavoriteIconMoniker ;
+
+extern Boolean G_foldersInFolders ;
+
+@start FavoritesStrings, data;
+
+  @chunk TCHAR DeleteFavoritesItemString[] = _TEXT("Are you sure that you want to delete this item?");
+  @chunk TCHAR DeleteFavoritesGroupString[] = _TEXT("This will delete the group and all items in the group. Are you sure that you want to delete this group?");
+
+@end FavoritesStrings;
+
+/*=========================================================================*
+ *  METHODS FOR CLASS:  FavoritesDialogClass
+ *=========================================================================*/
+
+
+    @classdecl FavoritesDialogClass ;
+
+
+/*-------------------------------------------------------------------------
+ | Method:  FavoritesDialogClass::MSG_GEN_INTERACTION_INITIATE
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Handle initializing the data.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/13/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method FavoritesDialogClass, MSG_GEN_INTERACTION_INITIATE
+{
+    optr list ;
+
+    list = pself->FCDI_list ;
+
+    @callsuper() ;
+
+    if (list)  {
+        @call list::MSG_GEN_DYNAMIC_LIST_INITIALIZE(FavoritesGetCount()) ;
+        @call list::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE) ;
+        @call oself::MSG_FAVORITES_DIALOG_STATUS() ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  FavoritesDialogClass::MSG_FAVORITES_DIALOG_QUERY
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Query for favorite data.
+ |
+ | Inputs:
+ |    optr list                   -- List needing the data
+ |    word item                   -- Item in list being queried
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/13/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method FavoritesDialogClass, MSG_FAVORITES_DIALOG_QUERY
+{
+    FDRedrawListItem(oself, item) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  FavoritesDialogClass::MSG_FAVORITES_DIALOG_GO
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Go to the currently selected bookmark by sending an event to the
+ |    application's model object.
+ |
+ | Inputs:
+ |    optr trigger                -- Calling trigger
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/14/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method FavoritesDialogClass, MSG_FAVORITES_DIALOG_GO
+{
+    word item ;
+    EventHandle event ;
+
+    /* Determine what item is selected */
+    item = FDGetListItemSelected(pself->FCDI_list) ;
+    if (item != GIGS_NONE)  {
+        /* If valid, jump to that location */
+        event = @record
+                     URLDocumentClass::MSG_URL_DOCUMENT_GO_TO_FAVORITE(item, 1) ;
+        @send application::MSG_META_SEND_CLASSED_EVENT(event, TO_APP_MODEL);
+        @send FavoritesListDialog::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS);
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  FavoritesDialogClass::MSG_FAVORITES_DIALOG_DELETE
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Go to the currently selected bookmark by sending an event to the
+ |    application's model object.
+ |
+ | Inputs:
+ |    optr trigger                -- Calling trigger
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/14/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method FavoritesDialogClass, MSG_FAVORITES_DIALOG_DELETE
+{
+    word item = FDGetListItemSelected(pself->FCDI_list) ;
+
+    if (item != GIGS_NONE) {
+	MemLock(OptrToHandle(@DeleteFavoritesItemString));
+	/* since this happens in UI thread, we don't want to use UserDoDialog */
+	@call application::MSG_GEN_APPLICATION_DO_STANDARD_DIALOG(
+	    MSG_FAVORITES_DIALOG_DELETE_LOW,
+	    oself,
+	    0,
+	    0,
+	    0,
+	    0,
+	    (FavoriteIsFolder(item) ?
+	     LMemDeref(@DeleteFavoritesGroupString) :
+	     LMemDeref(@DeleteFavoritesItemString)),
+	    (CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET) |
+	    (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET) |
+	    CDBF_DESTRUCTIVE_ACTION);
+	MemUnlock(OptrToHandle(@DeleteFavoritesItemString));
+    }
+}
+
+@method FavoritesDialogClass, MSG_FAVORITES_DIALOG_DELETE_LOW
+{
+    word item ;
+    optr list ;
+
+    if (response == IC_YES) {
+	/* Determine what item is selected */
+	item = FDGetListItemSelected(pself->FCDI_list) ;
+	if (item != GIGS_NONE)  {
+	    /* If valid, delete that item */
+	    list = FDLocateListFromDialog(oself) ;
+	    @call list::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS(item, 1) ;
+	    (void)FavoriteDelete(item) ;
+	    FDRebuildTriggerList(item) ;
+	    FDSelectItem(oself, item) ;
+	}
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  FavoritesDialogClass::MSG_FAVORITES_DIALOG_EDIT
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Edit the currently selected bookmark.
+ |
+ | Inputs:
+ |    optr trigger                -- Calling trigger
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/14/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method FavoritesDialogClass, MSG_FAVORITES_DIALOG_EDIT
+{
+    word item ;
+    T_lockedFavorite *p_favorite ;
+    word len ;
+
+    /* Determine what item is selected */
+    item = FDGetListItemSelected(pself->FCDI_list) ;
+    if (item != GIGS_NONE)  {
+        if (FavoriteIsFolder(item))  {
+            p_favorite = FavoriteLock(item) ;
+            if (p_favorite)  {
+                /* Copy the data into the bookmark edit dialog */
+                if (p_favorite->p_title)
+                    @call FavoriteEditGroupDialogNameText::MSG_VIS_TEXT_REPLACE_ALL_PTR(p_favorite->p_title, 0) ;
+                else
+                    @call FavoriteEditGroupDialogNameText::MSG_VIS_TEXT_DELETE_ALL() ;
+
+                if (p_favorite->p_notes)
+                    @call FavoriteEditGroupDialogNotesText::MSG_VIS_TEXT_REPLACE_ALL_PTR(p_favorite->p_notes, 0) ;
+                else
+                    @call FavoriteEditGroupDialogNotesText::MSG_VIS_TEXT_DELETE_ALL() ;
+                FavoriteUnlock(p_favorite) ;
+
+                /* If valid, edit that item */
+                if (UserDoDialog(@FavoriteEditGroupDialog) == IC_OK)  {
+                    p_favorite = FavoriteLock(item) ;
+                    len = @call FavoriteEditGroupDialogNameText::MSG_VIS_TEXT_GET_TEXT_SIZE() ;
+                    FavoriteResizeLockedField(p_favorite, FAVORITE_LOCKED_FIELD_TITLE, (len+1)*sizeof(TCHAR)) ;
+                    @call FavoriteEditGroupDialogNameText::MSG_VIS_TEXT_GET_ALL_PTR(p_favorite->p_title) ;
+
+                    len = @call FavoriteEditGroupDialogNotesText::MSG_VIS_TEXT_GET_TEXT_SIZE() ;
+                    FavoriteResizeLockedField(p_favorite, FAVORITE_LOCKED_FIELD_NOTES, (len+1)*sizeof(TCHAR)) ;
+                    @call FavoriteEditGroupDialogNotesText::MSG_VIS_TEXT_GET_ALL_PTR(p_favorite->p_notes) ;
+                    FavoriteUnlock(p_favorite) ;
+
+                    /* Make the dynamic list reflect the change */
+                    FDRedrawListItem(oself, item) ;
+
+                    /* Update the trigger list */
+                    FDRebuildTriggerList(item) ;
+                    FDSelectItem(oself, item) ;
+                }
+            }
+        } else {
+            p_favorite = FavoriteLock(item) ;
+            if (p_favorite)  {
+                /* Copy the data into the bookmark edit dialog */
+                if (p_favorite->p_title)
+                    @call FavoriteEditDialogNameText::MSG_VIS_TEXT_REPLACE_ALL_PTR(p_favorite->p_title, 0) ;
+                else
+                    @call FavoriteEditDialogNameText::MSG_VIS_TEXT_DELETE_ALL() ;
+
+                if (p_favorite->p_location)
+                    @call FavoriteEditDialogURLText::MSG_VIS_TEXT_REPLACE_ALL_PTR(p_favorite->p_location, 0) ;
+                else
+                    @call FavoriteEditDialogURLText::MSG_VIS_TEXT_DELETE_ALL() ;
+
+                if (p_favorite->p_notes)
+                    @call FavoriteEditDialogNotesText::MSG_VIS_TEXT_REPLACE_ALL_PTR(p_favorite->p_notes, 0) ;
+                else
+                    @call FavoriteEditDialogNotesText::MSG_VIS_TEXT_DELETE_ALL() ;
+
+                FavoriteUnlock(p_favorite) ;
+
+                /* If valid, edit that item */
+                if (UserDoDialog(@FavoriteEditDialog) == IC_OK)  {
+                    p_favorite = FavoriteLock(item) ;
+                    len = @call FavoriteEditDialogNameText::MSG_VIS_TEXT_GET_TEXT_SIZE() ;
+                    FavoriteResizeLockedField(p_favorite, FAVORITE_LOCKED_FIELD_TITLE, (len+1)*sizeof(TCHAR)) ;
+                    @call FavoriteEditDialogNameText::MSG_VIS_TEXT_GET_ALL_PTR(p_favorite->p_title) ;
+
+                    len = @call FavoriteEditDialogURLText::MSG_VIS_TEXT_GET_TEXT_SIZE() ;
+                    FavoriteResizeLockedField(p_favorite, FAVORITE_LOCKED_FIELD_LOCATION, (len+1)*sizeof(TCHAR)) ;
+                    @call FavoriteEditDialogURLText::MSG_VIS_TEXT_GET_ALL_PTR(p_favorite->p_location) ;
+
+                    len = @call FavoriteEditDialogNotesText::MSG_VIS_TEXT_GET_TEXT_SIZE() ;
+                    FavoriteResizeLockedField(p_favorite, FAVORITE_LOCKED_FIELD_NOTES, (len+1)*sizeof(TCHAR)) ;
+                    @call FavoriteEditDialogNotesText::MSG_VIS_TEXT_GET_ALL_PTR(p_favorite->p_notes) ;
+
+                    FavoriteUnlock(p_favorite) ;
+
+                    /* Make the dynamic list reflect the change */
+                    FDRedrawListItem(oself, item) ;
+
+                    /* Update the trigger list */
+                    FDRebuildTriggerList(item) ;
+
+                    FDSelectItem(oself, item) ;
+                }
+            }
+        }
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  FavoritesDialogClass::MSG_FAVORITES_DIALOG_EDIT
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Edit the currently selected bookmark.
+ |
+ | Inputs:
+ |    optr trigger                -- Calling trigger
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/14/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method FavoritesDialogClass, MSG_FAVORITES_DIALOG_UP
+{
+    word item ;
+    dword newPos ;
+
+    /* Determine what item is selected */
+    item = FDGetListItemSelected(pself->FCDI_list) ;
+    if ((item != GIGS_NONE) && (item != 0))  {
+        /* If valid, swap with the previous item */
+        newPos = FavoritePushUp(item) ;
+
+        /* Make sure the trigger list is updated too. */
+        FDRebuildTriggerList(newPos) ;
+        FDSelectItem(oself, newPos) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  FavoritesDialogClass::MSG_FAVORITES_DIALOG_DOWN
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Edit the currently selected bookmark.
+ |
+ | Inputs:
+ |    optr trigger                -- Calling trigger
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/14/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method FavoritesDialogClass, MSG_FAVORITES_DIALOG_DOWN
+{
+    word item ;
+    dword newPos ;
+
+    /* Determine what item is selected */
+    item = FDGetListItemSelected(pself->FCDI_list) ;
+    if (item != GIGS_NONE)  {
+        /* If valid, swap with the previous item */
+        newPos = FavoritePushDown(item) ;
+
+        /* Make sure the trigger list is updated too. */
+        FDRebuildTriggerList(item) ;
+
+        /* Select the top of the new position */
+        FDSelectItem(oself, newPos) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  FavoritesDialogClass::MSG_FAVORITES_DIALOG_GET_LIST
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Simple method to return the list associated with this dialog.
+ |
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  02/16/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method FavoritesDialogClass, MSG_FAVORITES_DIALOG_GET_LIST
+{
+    return pself->FCDI_list ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  FavoritesDialogClass::MSG_FAVORITES_DIALOG_TOGGLE_TOP_TEN
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Toggle the current selected item to being on or off the top ten list.
+ |
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  02/16/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method FavoritesDialogClass, MSG_FAVORITES_DIALOG_TOGGLE_TOP_TEN
+{
+    word item ;
+
+    /* Determine which list we are dealing with */
+    item = FDGetListItemSelected(FDLocateListFromDialog(oself)) ;
+
+    /* Only process entries, not folders */
+    if (!FavoriteIsFolder(item))  {
+        /* Is the favorite already on the top list? */
+        if (FavoriteIsTopTen(item))  {
+            /* On the top ten, remove it */
+            FavoriteRemoveFromTopTen(item) ;
+        } else {
+            /* Not on the top list, add it */
+            FavoriteAddToTopTen(item) ;
+        }
+
+        /* Update the UI */
+        FDRebuildTriggerList(item) ;
+        FDRedrawListItem(oself, item) ;
+        FDSelectItem(oself, item) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  FavoritesDialogClass::MSG_FAVORITES_DIALOG_STATUS
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Update the buttons in the FavoritesDialog so that certain items
+ |    are on or off based on correct entry choices.
+ |
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  02/17/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@define FAV_DISABLE(OPTR)   @call OPTR::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE)
+@define FAV_ENABLE(OPTR)    @call OPTR::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE)
+@method FavoritesDialogClass, MSG_FAVORITES_DIALOG_STATUS
+{
+    word selection ;
+    word count ;
+    word numTop ;
+    Boolean isFolder ;
+    byte depth ;
+
+    /* Find the currently selected item (if any) */
+    selection = FDGetListItemSelected(FDLocateListFromDialog(oself)) ;
+    count = FavoritesGetCount() ;
+
+    /* If none selected, disable most */
+    if ((selection == GIGS_NONE) || ((selection+1)>count))  {
+        @FAV_DISABLE(FavoritesDialogUp) ;
+        @FAV_DISABLE(FavoritesDialogDown) ;
+        @FAV_DISABLE(FavoritesDialogAddToTop) ;
+        @FAV_DISABLE(FavoritesDialogEdit) ;
+        @FAV_DISABLE(FavoritesDialogDelete) ;
+        @FAV_DISABLE(FavoritesDialogGo) ;
+    } else {
+        numTop = FavoriteCountTopTen() ;
+
+        /* Nope, its real, enable most */
+        if (selection != 0)
+            @FAV_ENABLE(FavoritesDialogUp) ;
+        else
+            @FAV_DISABLE(FavoritesDialogUp) ;
+
+        if ((FavoriteFindNextDown(selection, &depth) != FAVORITE_BAD) ||
+                ((depth != 0)&&(G_foldersInFolders)))  {
+            @FAV_ENABLE(FavoritesDialogDown) ;
+        } else  {
+            @FAV_DISABLE(FavoritesDialogDown) ;
+        }
+
+        /* Go is enabled if its not a folder */
+        if (FavoriteIsFolder(selection))  {
+            @FAV_DISABLE(FavoritesDialogGo) ;
+        } else {
+            @FAV_ENABLE(FavoritesDialogGo) ;
+        }
+
+        isFolder = FavoriteIsFolder(selection) ;
+        if (FavoriteIsTopTen(selection))  {
+            /* Change the text to 'Remove from Top Ten' */
+            @call FavoritesDialogAddToTop::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+                      _TEXT("Remove from Top Ten"),
+                      VUM_DELAYED_VIA_UI_QUEUE) ;
+            @FAV_ENABLE(FavoritesDialogAddToTop) ;
+        } else {
+            @call FavoritesDialogAddToTop::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+                      _TEXT("Add to Top Ten"),
+                      VUM_DELAYED_VIA_UI_QUEUE) ;
+            /* Only enable 'add' if not full */
+            if ((numTop >= NUM_FAVORITES_IN_TRIGGER_LIST)||(isFolder))  {
+                @FAV_DISABLE(FavoritesDialogAddToTop) ;
+            } else {
+                @FAV_ENABLE(FavoritesDialogAddToTop) ;
+            }
+        }
+
+        @FAV_ENABLE(FavoritesDialogEdit) ;
+        @FAV_ENABLE(FavoritesDialogDelete) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  FDLocateListFromDialog
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Figure out the location of the list from the dialog's optr.
+ |
+ | Inputs:
+ |    optr dialog                 -- FavoritesDialogClass object pointer
+ |
+ | Outputs:
+ |    optr                        -- optr to GenDynamicList of bookmarks
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/14/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+optr FDLocateListFromDialog(optr dialog)
+{
+    return @call dialog::MSG_FAVORITES_DIALOG_GET_LIST() ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  FDGetListItemSelected
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Get what item is currently selected in the dynamic list in the given
+ |
+ | Inputs:
+ |    optr list                   -- FavoritesDyanmic list.
+ |
+ | Outputs:
+ |    word                        -- Dialog's selected item in list.
+ |                                   GIGS_NONE if nothing selected.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/14/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+word FDGetListItemSelected(optr list)
+{
+    word num ;
+    word item ;
+
+    item = @call list::MSG_GEN_ITEM_GROUP_GET_SELECTION() ;
+    num = @call list::MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS() ;
+    if (num == 0)
+        item = GIGS_NONE ;
+
+    return item ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  FDRebuildTriggerList
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Cause the bookmark trigger list to get rebuilt.
+ |
+ | Inputs:
+ |    word lowestItem             -- Earliest item affected.  0 for always.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/14/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+#pragma argsused
+void FDRebuildTriggerList(word lowestItem)
+{
+    dword num ;
+    word numTop ;
+
+    /* Only rebuild if affecting the first NUM_FAVORITES_IN_TRIGGER_LIST */
+    /* always update since new top-ten handling is a bit complex */
+    FavoritesBuildUIList(@FavoriteTriggerList) ;
+    num = FavoritesGetCount() ;
+    if (num > FAVORITE_DIALOG_MAX_FAVORITES_SHOWN)
+        num = FAVORITE_DIALOG_MAX_FAVORITES_SHOWN ;
+    @call FavoritesListList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num) ;
+    @call FavoritesDynamicList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(num) ;
+    @call FavoritesDialogList::MSG_FAVORITES_DIALOG_STATUS() ;
+    numTop = FavoriteCountTopTen() ;
+
+    /* Determine if we show the More... trigger or not */
+    /* Do we have any top favorites? */
+    if (numTop)  {
+        /* Top favorites exist.  Show more if there are any favorites */
+        /* that are not in the top favorites */
+        if (numTop >= num)  {
+            @call FavoritesMoreTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+        } else {
+            @call FavoritesMoreTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+        }
+    } else {
+        /* No top favorites.  Is our list longer than what we can show? */
+        if (num <= NUM_FAVORITES_IN_TRIGGER_LIST)  {
+            @call FavoritesMoreTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+        } else {
+            @call FavoritesMoreTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+        }
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  FDRedrawListItem
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Cause an item in the dialog's list to be redrawn with the correct
+ |    moniker.
+ |
+ | Inputs:
+ |    optr dialog                 -- FavoritesDialogClass object
+ |    word item                   -- Entry to redraw
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/14/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+void FDRedrawListItem(optr dialog, word item)
+{
+    optr list ;
+    T_lockedFavorite *p_favorite ;
+    optr iconPic ;
+    GStateHandle gstate ;
+    word width ;
+    word height ;
+    optr icon ;
+
+    list = FDLocateListFromDialog(dialog) ;
+    if (FavoriteIsFolder((dword)item))  {
+        icon = @GPCFavoriteGroupIconMoniker ;
+    } else  {
+        if (FavoriteIsTopTen(item))  {
+            icon = @GPCTopFavoriteIconMoniker ;
+        } else {
+            icon = @GPCFavoriteIconMoniker ;
+        }
+    }
+
+    /* Lock in the item to be shown */
+    p_favorite = FavoriteLock(item) ;
+    if (p_favorite)  {
+        /* Change the moniker on the favorite entry */
+        iconPic = FavoriteCreateIcon(
+                      p_favorite,
+                      icon,
+                      p_favorite->depth * FAVORITE_INSET_STEP,
+                      &width,
+                      &height,
+                      &gstate) ;
+        FavoriteUnlock(p_favorite) ;
+
+        @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(
+                  item,
+                  0,
+                  height,
+                  width,
+                  0,
+                  VMDT_GSTRING,
+                  VMST_OPTR,
+                  iconPic) ;
+
+        FavoriteDestroyIcon(gstate, iconPic) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  FDSelectItem
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Select one item in the list.
+ |
+ | Inputs:
+ |    optr dialog                 -- FavoritesDialogClass object
+ |    word item                   -- Entry to select
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/14/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+void FDSelectItem(optr dialog, word item)
+{
+    optr list ;
+
+    list = FDLocateListFromDialog(dialog) ;
+    @call list::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(item, FALSE) ;
+    @call dialog::MSG_FAVORITES_DIALOG_STATUS() ;
+}
+
+
+/*=========================================================================*
+ *  METHODS FOR CLASS:  FavoriteCreateDialogClass
+ *=========================================================================*/
+
+
+    @classdecl FavoriteCreateDialogClass ;
+
+
+@method FavoriteCreateDialogClass, MSG_FAVORITE_CREATE_DIALOG_CREATE
+{
+    TCHAR *titleString ;
+    TCHAR *urlString ;
+    TCHAR *notesString ;
+    MemHandle titleMem ;
+    MemHandle urlMem ;
+    MemHandle notesMem ;
+    dword newPos = 0xFFFF ;
+    T_lockedFavorite *p_favorite ;
+
+    titleMem = @call FavoriteCreateName::MSG_VIS_TEXT_GET_ALL_BLOCK(0) ;
+    if (titleMem)  {
+        titleString = MemLock(titleMem) ;
+
+        notesMem = @call FavoriteCreateNotes::MSG_VIS_TEXT_GET_ALL_BLOCK(0) ;
+        urlMem = @call FavoriteCreatePage::MSG_VIS_TEXT_GET_ALL_BLOCK(0) ;
+        if (urlMem && notesMem)  {
+            urlString = MemLock(urlMem) ;
+            notesString = MemLock(notesMem) ;
+
+            /* Add a new bookmark */
+            newPos = FavoriteAppend() ;
+            if (newPos != FAVORITE_BAD)  {
+                p_favorite = FavoriteLock(newPos) ;
+                FavoriteResizeLockedField(
+                    p_favorite,
+                    FAVORITE_LOCKED_FIELD_TITLE,
+                    (1+strlen(titleString))*sizeof(TCHAR)) ;
+                strcpy(p_favorite->p_title, titleString) ;
+
+                FavoriteResizeLockedField(
+                    p_favorite,
+                    FAVORITE_LOCKED_FIELD_LOCATION,
+                    (1+strlen(urlString))*sizeof(TCHAR)) ;
+                strcpy(p_favorite->p_location, urlString) ;
+
+                FavoriteResizeLockedField(
+                    p_favorite,
+                    FAVORITE_LOCKED_FIELD_NOTES,
+                    (1+strlen(notesString))*sizeof(TCHAR)) ;
+                strcpy(p_favorite->p_notes, notesString) ;
+
+                FavoriteUnlock(p_favorite) ;
+            }
+
+            MemUnlock(notesMem) ;
+            MemFree(notesMem) ;
+
+            MemUnlock(urlMem) ;
+            MemFree(urlMem) ;
+        }
+
+        MemUnlock(titleMem) ;
+        MemFree(titleMem) ;
+        FavoritesUpdate() ;
+    }
+    if (newPos != 0xFFFF)  {
+        FDRebuildTriggerList(0) ;
+        FDRedrawListItem(@FavoritesDialogList, newPos) ;
+        FDSelectItem(@FavoritesDialogList, newPos) ;
+    }
+}
+
+/*=========================================================================*
+ *  METHODS FOR CLASS:  FavoriteCreateGroupDialogClass
+ *=========================================================================*/
+
+
+    @classdecl FavoriteCreateGroupDialogClass ;
+
+
+/*-------------------------------------------------------------------------
+ | Method:  FavoriteCreateGroupDialogClass::
+ |          MSG_FAVORITE_CREATE_GROUP_DIALOG_CREATE
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Handle initializing the data for the creation of a favorite group
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/18/99  Create
+ |
+ *-----------------------------------------------------------------------*/
+@method FavoriteCreateGroupDialogClass, MSG_FAVORITE_CREATE_GROUP_DIALOG_CREATE
+{
+    TCHAR *titleString ;
+    TCHAR *notesString ;
+    MemHandle titleMem ;
+    MemHandle notesMem ;
+    dword newPos = 0xFFFF ;
+    T_lockedFavorite *p_favorite ;
+
+    titleMem = @call FavoriteCreateGroupName::MSG_VIS_TEXT_GET_ALL_BLOCK(0) ;
+    if (titleMem)  {
+        titleString = MemLock(titleMem) ;
+
+        notesMem = @call FavoriteCreateGroupNotes::MSG_VIS_TEXT_GET_ALL_BLOCK(0) ;
+        if (notesMem)  {
+            notesString = MemLock(notesMem) ;
+
+            /* Add a new bookmark */
+            newPos = FavoriteAppendFolder(titleString) ;
+            if (newPos != FAVORITE_BAD)  {
+                p_favorite = FavoriteLock(newPos) ;
+                FavoriteResizeLockedField(
+                    p_favorite,
+                    FAVORITE_LOCKED_FIELD_NOTES,
+                    (1+strlen(notesString))*sizeof(TCHAR)) ;
+                strcpy(p_favorite->p_notes, notesString) ;
+
+                FavoriteUnlock(p_favorite) ;
+            }
+
+            MemUnlock(notesMem) ;
+            MemFree(notesMem) ;
+        }
+
+        MemUnlock(titleMem) ;
+        MemFree(titleMem) ;
+    }
+    if (newPos != 0xFFFF)  {
+        FDRebuildTriggerList(0) ;
+        FDRedrawListItem(@FavoritesDialogList, newPos) ;
+        FDSelectItem(@FavoritesDialogList, newPos) ;
+    }
+}
+
+/*=========================================================================*
+ *  METHODS FOR CLASS:  FavoriteManagerClass
+ *=========================================================================*/
+
+
+    @classdecl FavoriteManagerClass ;
+
+
+/*-------------------------------------------------------------------------
+ | Method:  FavoriteManagerClass::MSG_FAVORITE_MANAGER_INITIATE_CREATE_DIALOG
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Handle initializing the data for the creation of a favorite link.
+ |
+ | Revision History:
+ |    Who     Date:     Comments:
+ |    ---     --------  ---------
+ |    brianc  05/02/99  Created
+ |    LES     10/18/99  Patched up a leak of name pool tokens.
+ |
+ *-----------------------------------------------------------------------*/
+@method FavoriteManagerClass, MSG_FAVORITE_MANAGER_INITIATE_CREATE_DIALOG
+{
+    NameToken url,title;
+    TCHAR buffer[HTML_STATIC_BUF], *p ;
+    optr doc ;
+
+    if (!(@call HTMLDocumentGroup::MSG_META_GET_MODEL_EXCL(&doc))) doc = 0 ;
+
+    /* Start with a blank dialog */
+    @call FavoriteCreateName::MSG_VIS_TEXT_DELETE_ALL() ;
+    @call FavoriteCreatePage::MSG_VIS_TEXT_DELETE_ALL() ;
+    @call FavoriteCreateNotes::MSG_VIS_TEXT_DELETE_ALL() ;
+
+    if (doc)  {
+        url = @call doc::MSG_URL_DOCUMENT_GET_URL();
+        title = @call doc::MSG_URL_DOCUMENT_GET_TITLE();
+
+        if (url != NAME_POOL_NONE)
+        {
+            /* Get the URL and title for the favorite */
+            NamePoolCopy(namePool, buffer, sizeof(buffer), url, &p);
+            @call FavoriteCreatePage::MSG_VIS_TEXT_REPLACE_ALL_PTR(p, 0) ;
+	    NamePoolDestroyIfDynamic(p);
+
+            NamePoolCopy(namePool, buffer, sizeof(buffer),
+              title?title:url, &p);
+            @call FavoriteCreateName::MSG_VIS_TEXT_REPLACE_ALL_PTR(p, 0) ;
+	    NamePoolDestroyIfDynamic(p);
+        }
+
+        /* Now release the tokens */
+        if (url != NAME_POOL_NONE)
+            NamePoolReleaseToken(namePool, url) ;
+        if (title != NAME_POOL_NONE)
+            NamePoolReleaseToken(namePool, title) ;
+    }
+
+    @call FavoriteCreateDialog::MSG_GEN_INTERACTION_INITIATE();
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  FavoriteManagerClass::MSG_FAVORITE_MANAGER_INITIATE_CREATE_GROUP_DIALOG
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Handle initializing the data for the creation of a favorite link.
+ |
+ | Revision History:
+ |    Who     Date:     Comments:
+ |    ---     --------  ---------
+ |    brianc  05/02/99  Create
+ |    LES     10/18/99  Patched up a leak of name pool tokens.
+ |
+ *-----------------------------------------------------------------------*/
+@method FavoriteManagerClass, MSG_FAVORITE_MANAGER_INITIATE_CREATE_GROUP_DIALOG
+{
+    NameToken title;
+    TCHAR buffer[HTML_STATIC_BUF], *p ;
+    optr doc ;
+
+    if (!(@call HTMLDocumentGroup::MSG_META_GET_MODEL_EXCL(&doc))) doc = 0 ;
+
+    /* Start with a blank dialog */
+    @call FavoriteCreateGroupName::MSG_VIS_TEXT_DELETE_ALL() ;
+    @call FavoriteCreateGroupNotes::MSG_VIS_TEXT_DELETE_ALL() ;
+
+    if (doc)  {
+        title = @call doc::MSG_URL_DOCUMENT_GET_TITLE();
+
+        if (title != NAME_POOL_NONE)
+        {
+            /* Get the title for the favorite group */
+            NamePoolCopy(namePool, buffer, sizeof(buffer), title, &p);
+            @call FavoriteCreateGroupName::MSG_VIS_TEXT_REPLACE_ALL_PTR(p, 0) ;
+	    NamePoolDestroyIfDynamic(p);
+            NamePoolReleaseToken(namePool, title) ;
+        }
+    }
+
+    @call FavoriteCreateGroupDialog::MSG_GEN_INTERACTION_INITIATE();
+}
+
+@endif  /* COMPILE_OPTION_FAVORITES */
+
+/***************************************************************************
+ *  END OF FILE:  FAVORCLS.GOC
+ ***************************************************************************/

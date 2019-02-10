@@ -1,0 +1,428 @@
+/*
+ *                          ==CONFIDENTIAL INFORMATION==
+ *
+ * COPYRIGHT 1994-99 BREADBOX COMPUTER COMPANY -- ALL RIGHTS RESERVED  --
+ * THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER
+ * A NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ * RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ * NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ * CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ * AGREEMENT.
+ *
+*/
+/***********************************************************************
+ *
+ * PROJECT:       HTMLView
+ * FILE:          Localpag.goc
+ *
+ * AUTHOR:        Marcus Gr�ber
+ *
+ ***********************************************************************/
+
+/**************************************************************************
+ *		Include files
+ **************************************************************************/
+
+@include <stdapp.goh>
+
+#include <Ansi/string.h>
+#include <Ansi/stdio.h>
+#include <Ansi/stdlib.h>
+
+@include <fixes.goh>
+@include "htmlview.goh"
+
+
+@ifdef COMPILE_OPTION_LOCAL_PAGES
+
+@extern object @LocalSaveDlg;
+@extern object @LocalSavePageName;
+@extern object @LocalOpenList;
+@extern object @LocalDelete;
+@extern chunk @MsgFileExists;
+@extern chunk @MsgCannotSave;
+@extern chunk @MsgLocalPageLimit;
+
+@extern method URLDocumentClass, MSG_URL_DOCUMENT_SAVE_LOCAL
+{
+    NameToken           title;
+    Boolean             repeatRequest, doSave, ret;
+    FileLongName        saveFile;
+    FileHandle          hFile;
+    word                fileCount;
+    char                i,j;
+
+    /*
+     *  Enforce limit for total number of local page.
+     */
+    MemLock(OptrToHandle(localPageArray));
+    fileCount = ChunkArrayGetCount(localPageArray);
+    MemUnlock(OptrToHandle(localPageArray));
+
+    if(fileCount>=LOCAL_PAGE_LIMIT)
+    {
+      /* Notify that page limit has been reached. */
+      UserStandardDialogOptr(0, 0, 0, 0, @MsgLocalPageLimit,
+        (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+          (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+
+      /* Bring up dialog for the user. */
+      @send LocalDelete::MSG_GEN_INTERACTION_INITIATE();
+
+      return;                           /* cancel operation */
+    }
+
+    title = @call self::MSG_URL_DOCUMENT_GET_TITLE();
+    NamePoolCopy(namePool, saveFile, FILE_LONGNAME_LENGTH+1, title, NULL);
+    NamePoolReleaseToken(namePool, title);
+
+    /* Pre-process to make a valid file name by removing invalid characters. */
+    for(i=j=0; saveFile[i]; i++)
+      if(!strchr(_TEXT("*?:\\"), saveFile[i]))
+        saveFile[j++] = saveFile[i];
+    saveFile[j] = 0;
+
+    /* Preset dialog entry fields */
+    @call LocalSavePageName::MSG_VIS_TEXT_REPLACE_ALL_PTR(saveFile, 0);
+
+    do {
+
+      /* Assume that the user will not want to be asked for a */
+      /* download location and file over and over */
+      repeatRequest = doSave = FALSE ;
+
+      /* Ask where to store this file. */
+      if(UserDoDialog(@LocalSaveDlg) != IC_OK)
+        break;
+
+      /* Get file name to save under */
+      @call LocalSavePageName::MSG_VIS_TEXT_GET_ALL_PTR(saveFile);
+
+      if(*saveFile)                   /* re-ask if no file name entered. */
+      {
+        /* Does the file exist? */
+        FilePushDir();
+        FileSetCurrentPath(HTML_LOCAL_PAGE_SP, HTML_LOCAL_PAGE_DIR);
+        hFile = FileOpen((TCHAR *) saveFile, FILE_ATTR_NORMAL | FILE_DENY_NONE);
+        FilePopDir();
+        if (hFile)
+        {
+          if(UserStandardDialogOptr(0, 0, 0, 0, @MsgFileExists,
+               (CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET) |
+                 (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET))
+             != IC_YES)
+          {
+            /* User does not want to overwrite */
+            /* Go back to asking the filename name and location */
+            repeatRequest = TRUE ;
+          }
+          else
+            doSave = TRUE;
+
+          /* In all cases, close the opened file. */
+          FileClose(hFile, FALSE) ;
+        }
+        else
+          doSave = TRUE;
+
+        if(doSave)                      /* file should be saved */
+        {
+          ret = @call self::MSG_URL_DOCUMENT_STORE_TO_FILENAME(saveFile);
+
+          if(!ret)                      /* Did not save? Ask again... */
+          {
+            UserStandardDialogOptr(0, 0, 0, 0, @MsgCannotSave,
+              (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+                (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+
+            repeatRequest = TRUE;       /* failed: notify user, redo */
+          }
+        }
+      }
+      else
+        repeatRequest = TRUE;           /* no filename specified: repeat */
+
+    } while (repeatRequest == TRUE) ;
+
+    @call process::MSG_HMLVP_LOCAL_PAGE_UPDATE();
+}
+
+@extern method URLDocumentClass, MSG_URL_DOCUMENT_OPEN_LOCAL
+{
+    FileLongName fileName;
+    VMFileHandle localFile;
+    VMBlockHandle root;
+    NameToken *page, name;
+
+    MemLock(OptrToHandle(localPageArray));
+    page = ChunkArrayElementToPtr(localPageArray, selection, NULL);
+    name = *page;
+    NamePoolCopy(namePool, fileName, sizeof(fileName), name, NULL);
+    MemUnlock(OptrToHandle(localPageArray));
+
+    FilePushDir();
+    FileSetCurrentPath(HTML_LOCAL_PAGE_SP, HTML_LOCAL_PAGE_DIR);
+    localFile = VMOpen(fileName, 0, VMO_OPEN, 0);
+                                        /* create file to store into */
+    if(localFile)                       /* successfully opened? do it */
+    {
+      root = VMGetMapBlock(localFile);  /* get entry into stored page */
+      @call self::MSG_URL_DOCUMENT_RESTORE_FROM_VM(localFile, root, name);
+      VMClose(localFile, 0);
+    }
+
+    FilePopDir();
+}
+
+@extern method URLDocumentClass, MSG_URL_DOCUMENT_STORE_TO_FILENAME
+{
+    VMFileHandle  localFile;
+    VMBlockHandle root;
+    Boolean       ret;
+    NameToken     tok;
+
+    static GeodeToken fileToken = {{LOCAL_PAGE_TOKEN}, LOCAL_PAGE_MFID};
+    static GeodeToken creatorToken = {{WM_CREATOR_TOKEN}, WM_CREATOR_MFID};
+    static ProtocolNumber fileProtocol = {LOCAL_PAGE_MAJOR, LOCAL_PAGE_MINOR};
+    static FileExtAttrDesc attr[] =
+      {{ FEA_TOKEN, &fileToken, sizeof(GeodeToken), NULL },
+       { FEA_CREATOR, &creatorToken, sizeof(GeodeToken), NULL },
+       { FEA_PROTOCOL, &fileProtocol, sizeof(fileProtocol), NULL }};
+
+
+    FilePushDir();
+    FileSetCurrentPath(HTML_LOCAL_PAGE_SP, HTML_LOCAL_PAGE_DIR);
+    localFile = VMOpen(saveFile, VMAF_FORCE_READ_WRITE,
+      VMO_CREATE_TRUNCATE, 0);          /* create file to store into */
+    FilePopDir();
+
+    if(localFile)                       /* successful: store data */
+    {
+      /* set extended attributes of file to what we want */
+      FileSetHandleExtAttributes(localFile, FEA_MULTIPLE,
+        &attr, sizeof(attr)/sizeof(attr[0]));
+
+      /* Serialize current document to VM file structure */
+      root = @call self::MSG_URL_DOCUMENT_STORE_TO_VM(localFile);
+
+      /* The head block of the chain becomes the map block of the file */
+      VMSetMapBlock(localFile, root);
+
+      VMClose(localFile, 0);
+
+      ret = TRUE;                       /* success */
+
+      /* set name of currently displayed local page */
+      tok = NamePoolTokenize(namePool, saveFile, TRUE);
+      @call self::MSG_URL_DOCUMENT_SET_LOCAL_PAGE(tok);
+      NamePoolReleaseToken(namePool, tok);
+    }
+    else
+      ret = FALSE;                      /* was not successful */
+
+    return ret;
+}
+
+@extern method URLDocumentClass, MSG_URL_DOCUMENT_STORE_TO_VM
+{
+    MemHandle temp, rootMem;
+    VMBlockHandle root = 0;
+    optr frame = pself->UDCI_topFrame;
+    optr newPool, frameSet;
+    word frames, i;
+    VMChainTree *hdr;
+    HTMLframeRec *frameRecs;
+    HTMLframeRecWithItem *rec;
+    VMChain *links;
+    word size;
+    HypertextTransferBlockHeader *htbh;
+    MemHandle hypertextHeaderMem;
+
+    temp = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+    if(temp)
+    {
+      newPool = NamePoolCreate(vmf);
+      if(newPool)
+      {
+        MemLock(temp);
+
+        /* create array to hold frame set */
+        frameSet = ConstructOptr(temp,
+          ChunkArrayCreate(temp, sizeof(HTMLframeRecWithItem), 0, 0));
+
+        @call frame::MSG_URL_FRAME_COLLECT_FRAMES_WITH_ITEMS(frameSet, 0,
+          vmf, newPool);
+
+        frames = ChunkArrayGetCount(frameSet);
+
+        /*
+         * Allocate space for a block consisting of:
+         *
+         *   - A VMChainTree header, because it is the root of the chain...
+         *   - An array of <frames> HTMLframeRec structures
+         *   - A VMChain pointing to the name pool
+         *   - An array of <frames> VMChain entries pointing to the frame items
+         */
+        root = VMAlloc(vmf,
+          sizeof(VMChainTree)
+            + (sizeof(HTMLframeRec) + sizeof(VMChain)) * frames
+            + sizeof(VMChain),
+          0);
+
+        hdr = VMLock(vmf, root, &rootMem);
+        hdr->VMCT_meta.VMC_next = VM_CHAIN_TREE;
+        hdr->VMCT_offset = sizeof(*hdr) + sizeof(*frameRecs) * frames;
+        hdr->VMCT_count = frames+1;
+
+        frameRecs = (HTMLframeRec *)( ((byte *)hdr) + sizeof(*hdr) );
+        links = (VMChain *)( ((byte *)hdr) + hdr->VMCT_offset );
+
+        /* save name pool with local names to VM file */
+        links[0] = NamePoolVMSave(newPool, vmf);
+
+        /* Store frame records and associated VMChain links to items in a
+           form that makes them a valid VMChainTree. Also, store name pool
+           link individually with each item to allow it to be processed
+           normally as if created by the parser. */
+        for(i=0; i<frames; i++)
+        {
+          rec = ChunkArrayElementToPtr(frameSet, i, &size);
+          frameRecs[i] = rec->HFRWI_rec;
+          links[i+1] = rec->HFRWI_item;
+
+          if(rec->HFRWI_item)           /* has associated item? */
+          {
+            htbh = VMLock(vmf, VMCHAIN_GET_VM_BLOCK(rec->HFRWI_item),
+              &hypertextHeaderMem);
+
+            htbh->HTBH_other.HTBHO_namePoolToUse = links[0];
+                                        /* link to its name pool */
+
+            VMDirty(hypertextHeaderMem);
+            VMUnlock(hypertextHeaderMem);
+          }
+        }
+
+        VMDirty(rootMem);
+        VMUnlock(rootMem);
+        MemUnlock(temp);
+      }
+      MemFree(temp);
+    }
+
+    return root;
+}
+
+@extern method URLDocumentClass, MSG_URL_DOCUMENT_RESTORE_FROM_VM
+{
+    MemHandle temp, rootMem;
+    VMChainTree *hdr;
+    HTMLframeRec *frameRecs;
+    HTMLframeRecWithItem *rec;
+    VMChain *links, pool;
+    optr frame = pself->UDCI_topFrame;
+    optr frameSet;
+    word frames, i;
+
+    temp = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+    if(temp)
+    {
+      MemLock(temp);
+
+      /* create array to hold frame set */
+      frameSet = ConstructOptr(temp,
+        ChunkArrayCreate(temp, sizeof(HTMLframeRecWithItem), 0, 0));
+
+      hdr = VMLock(vmf, root, &rootMem);
+      frameRecs = (HTMLframeRec *)( ((byte *)hdr) + sizeof(*hdr) );
+      links = (VMChain *)( ((byte *)hdr) + hdr->VMCT_offset );
+
+      frames = hdr->VMCT_count-1;       /* number of frames in set */
+      pool = links[0];                  /* name pool */
+
+      /* Store frame records and associated VMChain links to items in a
+         form that makes them a valid VMChainTree. Name pool entries are
+         already moved into the active name pool here because they will be
+         needed anyway when the frame set is established. */
+
+      for(i=0; i<frames; i++)
+      {
+        rec = ChunkArrayAppend(frameSet, 0);
+        rec->HFRWI_rec = frameRecs[i];
+        rec->HFRWI_rec.HF_name =
+          NamePoolTokenizeFromVM(namePool, vmf, pool, rec->HFRWI_rec.HF_name,
+            FALSE);
+        rec->HFRWI_rec.HF_url =
+          NamePoolTokenizeFromVM(namePool, vmf, pool, rec->HFRWI_rec.HF_url,
+            FALSE);
+        rec->HFRWI_rec.HF_title =
+          NamePoolTokenizeFromVM(namePool, vmf, pool, rec->HFRWI_rec.HF_title,
+            FALSE);
+        rec->HFRWI_rec.HF_base =
+          NamePoolTokenizeFromVM(namePool, vmf, pool, rec->HFRWI_rec.HF_base,
+            FALSE);
+        rec->HFRWI_rec.HF_target =
+          NamePoolTokenizeFromVM(namePool, vmf, pool, rec->HFRWI_rec.HF_target,
+            FALSE);
+        rec->HFRWI_item = links[i+1];
+      }
+
+      VMUnlock(rootMem);
+
+      /* Set up frame sets according to the array and the transfer items
+         pointed to by it. */
+      @call frame::MSG_URL_FRAME_FETCH_FRAMES_WITH_ITEMS(
+        frameSet, DIR_GO, vmf, localPage);
+
+      FreeArrayNameTokens(frameSet, namePool, TOKEN_FIELDS_FRAME_REC);
+      MemFree(temp);
+    }
+}
+
+@extern method URLDocumentClass, MSG_URL_DOCUMENT_SET_LOCAL_PAGE
+{
+    HWChecksumCheck() ;
+    if(pself->UDCI_localPage != NAME_POOL_NONE)
+    {
+      NamePoolReleaseToken(namePool, pself->UDCI_localPage);
+      pself = ObjDerefGen(oself);
+    }
+    pself->UDCI_localPage = localPage;
+    if(localPage != NAME_POOL_NONE)
+    {
+      NamePoolUseToken(namePool, localPage);
+      NamePoolUseToken(namePool, localPage);    /* 2nd copy for notification */
+    }
+
+    @send process::MSG_HMLVP_NOTIFY_LOCAL_PAGE_CHANGE(localPage);
+
+    HWChecksumCheck() ;
+}
+
+@extern method URLDocumentClass, MSG_URL_DOCUMENT_GET_LOCAL_PAGE
+{
+    NameToken tok = pself->UDCI_localPage;
+
+    if(tok != NAME_POOL_NONE)
+      NamePoolUseToken(namePool, tok);
+    return tok;
+}
+
+@extern method URLDocumentClass, MSG_URL_DOCUMENT_UPDATE_LOCAL
+{
+    if(pself->UDCI_localPage)           /* Something to update? */
+    {
+      pself->UDCI_updatingLocal = TRUE; /* Save page when we're finished */
+      @call self::MSG_URL_DOCUMENT_RELOAD();
+    }
+}
+
+@extern method URLDocumentClass, MSG_URL_DOCUMENT_REQUEST_LOCAL_PAGE_NOTIFY
+{
+    NameToken localPage;
+
+    localPage = @call self::MSG_URL_DOCUMENT_GET_LOCAL_PAGE();
+    @send process::MSG_HMLVP_NOTIFY_LOCAL_PAGE_CHANGE(localPage);
+}
+
+@endif

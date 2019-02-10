@@ -3,7 +3,7 @@
 # PROJECT:      gpcbrow
 # FILE:         WebMagi2.gp
 #
-# AUTHOR:       Marcus Gr”ber and Lysle Shields
+# AUTHOR:       Marcus Grï¿½ber and Lysle Shields
 #
 ##############################################################################
 
@@ -77,59 +77,59 @@ library    socket
 
 resource   URLFETCH_TEXT        code fixed
 
-resource   APPRESOURCE          ui-object
-resource   INTERFACE            ui-object
-resource   STATUSRESOURCE       ui-object
-resource   TOOLBARRESOURCE      ui-object
-resource   SEARCHRESOURCE       ui-object
-resource   DOWNLOADDIALOGRESOURCE ui-object
-resource   BBOXLOGORESOURCE     ui-object
-resource   FILERESOURCE         ui-object
-resource   EDITRESOURCE         ui-object
-resource   VIEWRESOURCE         ui-object
-resource   NAVIGATERESOURCE     ui-object
-resource   OPTIONSRESOURCE      ui-object
-resource   WINDOWRESOURCE       ui-object
+resource   AppResource          ui-object
+resource   Interface            ui-object
+resource   StatusResource       ui-object
+resource   ToolbarResource      ui-object
+resource   SearchResource       ui-object
+resource   DownloadDialogResource ui-object
+resource   BboxLogoResource     ui-object
+resource   FileResource         ui-object
+resource   EditResource         ui-object
+resource   ViewResource         ui-object
+resource   NavigateResource     ui-object
+resource   OptionsResource      ui-object
+resource   WindowResource       ui-object
 
-resource   UIRESOURCE           ui-object
+resource   UIResource           ui-object
 
-resource   FRAMERESOURCE        object
-resource   TEXTRESOURCE         object
-resource   DOCGROUPRESOURCE     object
+resource   FrameResource        object
+resource   TextResource         object
+resource   DocGroupResource     object
 
-resource   HTMLRESOURCE         lmem read-only shared
+resource   HTMLResource         lmem read-only shared
 
 ifdef COMPILE_OPTION_BOOKMARKS
-resource   BOOKMARKUIRESOURCE   ui-object
+resource   BookmarkUIResource   ui-object
 export     BookmarksDialogClass
 endif
 
 ifdef COMPILE_OPTION_FAVORITES
-resource   FAVORITEUIRESOURCE               ui-object
-resource   FAVORITECREATERESOURCE           ui-object
-resource   FAVORITEUILISTDIALOGRESOURCE     ui-object
-resource   FAVORITEUIORGANIZERESOURCE       ui-object
-resource   FAVORITECREATEGROUPRESOURCE      ui-object
+resource   FavoriteUIResource               ui-object
+resource   FavoriteCreateResource           ui-object
+resource   FavoriteUIListDialogResource     ui-object
+resource   FavoriteUIOrganizeResource       ui-object
+resource   FavoriteCreateGroupResource      ui-object
 export     FavoritesDialogClass
 export     FavoriteCreateDialogClass
 export     FavoriteCreateGroupDialogClass
 endif
 
-resource   EXPIREDIALOGRESOURCE ui-object
-resource   LOCALUIRESOURCE      ui-object
-resource   HTMLMENURESOURCE     ui-object
+resource   ExpireDialogResource ui-object
+resource   LocalUIResource      ui-object
+resource   HTMLMenuResource     ui-object
 
-resource   TOPICONS1RESOURCE    ui-object
-resource   TOPICONS2RESOURCE    ui-object
-resource   TOPICONS3RESOURCE    ui-object
-resource   TOPICONS4RESOURCE    lmem read-only shared
-resource   ICONBARRESOURCE      ui-object
+resource   TopIcons1Resource    ui-object
+resource   TopIcons2Resource    ui-object
+resource   TopIcons3Resource    ui-object
+resource   TopIcons4Resource    lmem read-only shared
+resource   IconBarResource      ui-object
 
-resource   SIMPLETOOLBARRESOURCE ui-object
+resource   SimpleToolbarResource ui-object
 
 ifdef GLOBAL_INTERNET_BUILD
-resource   HELPUIRESOURCE       ui-object
-resource   HELPFRAMERESOURCE  object
+resource   HelpUIResource       ui-object
+resource   HelpFrameResource  object
 endif
 
 export     URLDocumentControlClass
@@ -149,31 +149,31 @@ export     WMViewControlClass
 export     WMSearchReplaceControlClass
 
 ifdef COMPILE_OPTION_FAVORITES
-resource   FAVORITEMANAGERRESOURCE      object
+resource   FavoriteManagerResource      object
 export     FavoriteManagerClass
-resource   FAVORITESSTRINGS             lmem read-only shared
+resource   FavoritesStrings             lmem read-only shared
 endif
 
 #
 #these two only needed for COMPILE_OPTION_PARENTAL_CONTROL
 #
-resource   PCRESOURCE		ui-object
-resource   PCROOTRESOURCE	object
+resource   PCResource		ui-object
+resource   PCRootResource	object
 
-resource   VIEWGROUPTEMPLATERESOURCE    ui-object
-resource   VIEWTEMPLATERESOURCE         ui-object
-resource   FRAMETEMPLATERESOURCE        object
+resource   ViewGroupTemplateResource    ui-object
+resource   ViewTemplateResource         ui-object
+resource   FrameTemplateResource        object
 
-resource   CACHECLEANUPDIALOGRESOURCE   ui-object
+resource   CacheCleanupDialogResource   ui-object
 # only needed for COMPILE_OPTION_DOWNLOAD_PROGRESS_DIALOG
-resource   DOWNLOADPROGRESSDIALOGRESOURCE ui-object
+resource   DownloadProgressDialogResource ui-object
 
 export     URLDocumentGroupClass
 export	   FastStatusClass
 
 ifdef JAVASCRIPT_SUPPORT
-resource   CONTINUESEGMENT              code fixed
-resource   JSUIRESOURCE                 ui-object
+resource   ContinueSegment              code fixed
+resource   JSUIResource                 ui-object
 endif
 
 ifdef COMPILE_OPTION_PROFILING_ON
@@ -181,10 +181,9 @@ library profpnt
 endif
 
 ifdef JAVASCRIPT_SUPPORT
-resource   WINDOWOPENUIRESOURCE       ui-object
-resource   WINDOWOPENFRAMERESOURCE    object
+resource   WindowOpenUIResource       ui-object
+resource   WindowOpenFrameResource    object
 export     WindowOpenInteractionClass
 endif
 
 usernotes "Copyright 1994-2002  Breadbox Computer Company LLC  All Rights Reserved"
-

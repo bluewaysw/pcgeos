@@ -1,0 +1,1270 @@
+/***********************************************************************
+ *
+ * PROJECT:	  HTMLView
+ * FILE:          HTMLView.goh
+ *
+ * AUTHOR:	  Marcus Gr�ber
+ *
+ ***********************************************************************/
+
+@include <product.goh>
+#include <product.h>
+
+@include <Objects/gViewCC.goh>
+@include "options.goh"
+
+@include <html4par.goh>         /* interface to HTML reader */
+#include <htmldrv.h>            /* interface to various drivers */
+#include <htmlfstr.h>
+@include <htmlstat.goh>
+#include <hwlib.h>
+#include <awatcher.h>
+
+@include "urlfetch.goh"
+
+@ifdef EMAIL_ACCT_CMD
+@include <mailhub.goh>
+
+typedef struct {
+    GeodeHandle geode;
+    TCHAR acctname[MAIL_NAME_MAX];
+    TCHAR password[MAIL_NAME_MAX];
+} PendingEmailDeleteAcctData;
+@endif
+
+@include <Objects/Text/tCtrlC.goh>
+
+#define LOCAL _near _pascal     /* only used within that module */
+
+#define HTMLVIEW_CATEGORY       "HTMLView"
+
+
+/* Directory for source file cache and its index. This directory is created
+   automatically if it doesn't exist. */
+#define HTML_CACHE_SP           SP_PRIVATE_DATA
+#define HTML_CACHE_DIR          _TEXT("CACHE")
+#ifdef NUM_CACHE_DIRS
+#ifdef ALT_SRC_CACHE
+#define HTML_CACHE_FILE         _TEXT("CACHE\\%s%ld\\%08lx.%s")
+#else
+#define HTML_CACHE_FILE         _TEXT("CACHE\\%ld\\%08lx.%s")
+#endif
+#else
+#define HTML_CACHE_FILE         _TEXT("CACHE\\%08lx.%s")
+#endif
+
+/* Directory for VM Cache file (HTML_CACHE_NAME). This directory is not
+   created automatically. It should normally be the same as the one for
+   the source file cache. */
+#define HTML_VMCACHE_SP         SP_PRIVATE_DATA
+#define HTML_VMCACHE_DIR        _TEXT("CACHE")
+
+#ifdef SKIPPER_PRO_BUILD
+#define HTML_CACHE_NAME         _TEXT("Skipper Pro Cache File %d")
+#define WM_CREATOR_TOKEN        "Skip"
+#define WM_CREATOR_MFID         16431
+#else
+#ifdef SKIPPER_VERSION
+#define HTML_CACHE_NAME         _TEXT("Skipper Cache File %d")
+#define WM_CREATOR_TOKEN        "Skip"
+#define WM_CREATOR_MFID         16431
+#else
+#ifdef YAGO_2_BUILD
+#define HTML_CACHE_NAME         _TEXT("GlobeHopper Cache File %d")
+#define WM_CREATOR_TOKEN        "WMK2"
+#define WM_CREATOR_MFID         16431
+#else
+#define HTML_CACHE_NAME         _TEXT("WEBCA%03d.000")
+#define WM_CREATOR_TOKEN        "WMK2"
+#define WM_CREATOR_MFID         16431
+#endif
+#endif
+#endif
+
+#ifdef GLOBAL_INTERNET_BUILD
+#define TEXT_OBJ_FILE_NAME      _TEXT("TEXTOBJF.000")
+#endif
+
+#define GR_CACHE_ITEM_SIZE_LIMIT 20  /* in K */
+
+#ifdef CACHE_VALIDATION
+/* If defined: default expiration time for pages not specifying any */
+#define DEFAULT_MAX_AGE (1*86400)    /* in seconds */
+#endif
+
+#ifdef COMPILE_OPTION_LOCAL_PAGES
+/* Directory for storing local pages. This directory is created
+   automatically if it doesn't exist. */
+#define HTML_LOCAL_PAGE_SP      SP_PRIVATE_DATA
+#define HTML_LOCAL_PAGE_DIR     _TEXT("Local Web Pages")
+
+/* Maximum number of local pages in directory */
+#define LOCAL_PAGE_LIMIT 15
+
+/* File type token for local pages */
+#define LOCAL_PAGE_TOKEN "WWWP"
+#define LOCAL_PAGE_MFID  16431
+
+/* Protocol number for local pages */
+#define LOCAL_PAGE_MAJOR 1
+#define LOCAL_PAGE_MINOR 0
+#endif
+
+/* Default values for fonts and sizes in the absence of INI settings... */
+#if COMPILE_OPTION_BITMAP_FONTS
+#define FONT_DEFAULT            FID_BERKELEY
+#else
+#define FONT_DEFAULT            FID_DTC_URW_ROMAN
+#endif
+
+#define FONT_DEFAULT_EXAMPLE    FID_DTC_URW_MONO
+#define FONT_DEFAULT_SIZE       14
+#define FONT_DEFAULT_SIZE_INTRO 14
+
+/* Bitfields for option toggeles */
+#define HTMLV_SOURCE_CACHE      0x0002
+#define HTMLV_OBJECT_CACHE      0x0004
+#define HTMLV_ENABLE_TOOLBAR    0x0008
+#define HTMLV_NOFRAME           0x0010
+#define HTMLV_TRUNC_NAMES       0x0020
+
+/* # of entries in histroy buffer */
+#define HTML_HISTORY  20
+
+/* Minimum width of a frame (in pixels) */
+#define MIN_FRAME_WIDTH 1
+
+@ifdef COMPILE_OPTION_PARENTAL_CONTROL
+/* Parental Control flags */
+typedef WordFlags ParentalControlFlags;
+#define PCF_REQUIRE_PASSWORD 0x0001
+#define PCF_GOT_PASSWORD 0x0002
+#define PCF_ADDED_SITE 0x0004
+#define PCF_REMOVED_SITE 0x0008
+#define PCF_ABORT_PASSWORD 0x0010
+@endif
+
+/***************************************************************************
+ *              HTML viewer process class
+ ***************************************************************************/
+
+@class     HTMLVProcessClass, GenProcessClass;
+  @message (GEN_TEXT_APPLY_MSG) MSG_HMLVP_URL_CHANGED;
+  @message void MSG_CUSTOM_OPEN_HTML_DOC();
+  @message (GEN_FILE_SELECTOR_NOTIFICATION_MSG) MSG_CUSTOM_OPEN_SELECTOR_ACTION;
+  @message (GEN_BOOLEAN_GROUP_APPLY_MSG) MSG_HMLVP_OPTIONS_CHANGED;
+  @message void MSG_HMLVP_EDIT_TRIGGER();
+  @message void MSG_HMLVP_HOME_TRIGGER();
+  @message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_HMLVP_HISTORY_QUERY;
+  @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_HMLVP_HISTORY_SELECT;
+
+@ifndef UPDATE_ON_UI_THREAD
+  @message void MSG_HMLVP_STATUS_UPDATE(
+    TCHAR *text, HTMLStatusType type);
+  @message void MSG_HMLVP_STATUS_UPDATE_OPTR(
+    optr text, HTMLStatusType type);
+  @message void MSG_HMLVP_STATUS_UPDATE_BLOCK(
+    MemHandle text, HTMLStatusType type);
+@define CallStatusUpdate(text, type) @call process::MSG_HMLVP_STATUS_UPDATE(text, type)
+@define SendStatusUpdateOptr(text, type) @send process::MSG_HMLVP_STATUS_UPDATE_OPTR(text, type)
+@define CallStatusUpdateOptr(text, type) @call process::MSG_HMLVP_STATUS_UPDATE_OPTR(text, type)
+@define SendStatusUpdateBlock(text, type) @send process::MSG_HMLVP_STATUS_UPDATE_BLOCK(text, type)
+  @message void MSG_HMLVP_STATUS_GET_PTR(HTMLStatusType type, TCHAR *p_message, word limit) ;
+@define CallStatusGet(type, p_message, limit)  @call process::MSG_HMLVP_STATUS_GET_PTR(type, p_message, limit)
+@endif
+
+  @message void MSG_HMLVP_NOTIFY_NAVIGATION_CHANGE(NameToken flags);
+  @message void MSG_HMLVP_NOTIFY_TOP_CHANGE(NameToken url, NameToken title);
+  @message void MSG_HMLVP_NOTIFY_LOCAL_PAGE_CHANGE(NameToken localPage);
+
+  @message void MSG_HMLVP_GET_EXTRA(HTMLextra *ext);
+
+  @message void MSG_HMLVP_CLEAR_CACHE() ;
+  @message void MSG_HMLVP_UPDATE_ALLOC_WATCHER_READ_OUT() ;
+
+@ifdef COMPILE_OPTION_AUTO_BROWSE
+  @message void MSG_HMLVP_BULK_TEST_TRIGGER();
+  @message void MSG_HMLVP_AUTO_BROWSE_TRIGGER();
+  @message void MSG_HMLVP_BULK_TEST_INDEX_FILE_TRIGGER();
+  @message void MSG_HMLVP_DO_AUTO_BROWSE();
+#define AB_OPTION_DELAY 0x0001
+#define AB_OPTION_CLEAR_CACHE 0x0002
+#define AB_OPTION_JAVA_TO_LOG 0x0004
+#define AB_OPTION_LOG_UNSUPPORTED_JS 0x0008
+#define AB_OPTION_JS_TOTALS_ON_EACH_PAGE 0x0010
+#define AB_BROWSE_DELAY 20*60
+@endif
+
+@ifdef COMPILE_OPTION_LOCAL_PAGES
+  @message void MSG_HMLVP_DELETE_LOCAL_TRIGGER();
+  @message (GEN_FILE_SELECTOR_NOTIFICATION_MSG) MSG_HMLVP_DELETE_LOCAL_FILE;
+  @message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_HMLVP_LOCAL_PAGE_QUERY;
+  @message void MSG_HMLVP_LOCAL_PAGE_UPDATE();
+  @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_HMLVP_LOCAL_PAGE_OPEN;
+@endif
+
+  @message (GEN_BOOLEAN_GROUP_APPLY_MSG) MSG_HMLVP_LOAD_GRAPHICS_CHANGED;
+
+@ifdef COMPILE_OPTION_SHOW_HIDE_TOOLBAR
+  @message void MSG_HMLVP_SHOW_TOOLBAR();
+  @message void MSG_HMLVP_HIDE_TOOLBAR();
+@endif
+
+@ifdef COMPILE_OPTION_TOGGLE_BARS
+  @message void MSG_HMLVP_TOGGLE_GOTO_BAR();
+  @message void MSG_HMLVP_TOGGLE_STATUS_BAR();
+#define TOGGLE_BARS_GOTO_ON 0x0001
+#define TOGGLE_BARS_STATUS_ON 0x0002
+@endif
+
+  @message void MSG_HMLVP_OPEN_URL(MemHandle urlData);
+@ifdef GLOBAL_INTERNET_BUILD
+  @message void MSG_HMLVP_JUMP();
+  @message void MSG_HMLVP_SEARCH(int type);
+@endif
+@ifdef COMPILE_OPTION_PARENTAL_CONTROL
+  @message void MSG_HMLVP_PC_ADD_SITE();
+  @message void MSG_HMLVP_PC_REMOVE_SITE();
+  @message void MSG_HMLVP_PC_TOGGLE();
+  @message void MSG_HMLVP_PC_TURN_OFF();
+  @message void MSG_HMLVP_PC_TURN_ON();
+@endif
+
+@ifdef COMPILE_OPTION_TOGGLE_BARS
+  @message void MSG_HMLVP_GOTO();
+@endif
+
+@ifdef COPY_TO_SCRAPBOOK
+
+#define CTS_COPY 0
+#define CTS_LAUNCH 1
+#define CTS_PASTE 2
+  @message void MSG_HMLVP_COPY_TO_SCRAPBOOK(word func);
+
+/* create alias for first scrapbook process class message */
+typedef struct {
+    FileLongName name;
+    DiskHandle   diskHandle;
+    PathName     path;
+} FileInfo;
+@alias (MSG_HMLVP_URL_CHANGED) void MSG_SCRAPBOOK_PASTE_APPEND_TO_FILE(MemHandle fileInfo);
+
+@endif
+
+@ifdef COMPILE_OPTION_PROGRESS_INDICATOR
+
+/* progress indicator states */
+#define PI_START 0
+#define PI_TIMER 1
+#define PI_FORMATTING 2
+#define PI_NUM_FRAMES 3  /* data = num frames */
+#define PI_NEW_ITEM 4
+#define PI_DONE_ITEM 5
+#define PI_DONE 6
+#define PI_SET_VALUE 7
+
+@ifndef UPDATE_ON_UI_THREAD
+/* update page status */
+  @message void MSG_HMLVP_UPDATE_PROGRESS_INDICATOR(word state, word data);
+  @message void MSG_HMLVP_PROGRESS_TIMER();
+@define SendUpdateProgress(state, data) @send process::MSG_HMLVP_UPDATE_PROGRESS_INDICATOR(state, data)
+@endif
+
+@endif
+
+@ifdef TV_BW_OPTION
+  @message (GEN_BOOLEAN_GROUP_APPLY_MSG) MSG_HMLVP_TV_BW_CHANGED;
+@endif
+
+@if defined(JAVASCRIPT_SUPPORT) && defined(DO_ERROR_CHECKING)
+  @message void MSG_HMLVP_ANALYZE_JS();
+@endif
+
+@ifdef JAVASCRIPT_SUPPORT
+  @message void MSG_HMLVP_STANDARD_DIALOG(MemHandle strBlock, word arg1, word arg2, CustomDialogBoxFlags dialogFlags);
+@ifndef JS_ERROR_DIALOG
+  @message void MSG_HMLVP_REPORT_JS_ERROR();
+@endif
+@endif
+@if defined(JAVASCRIPT_SUPPORT) || defined(COMPILE_OPTION_AUTO_BROWSE)
+  @message (GEN_BOOLEAN_GROUP_APPLY_MSG) MSG_HMLVP_HTML_OPTIONS_CHANGED;
+@endif
+@ifdef COMPILE_OPTION_ENABLE_NUMCONN_OPTION
+  @message (GEN_BOOLEAN_GROUP_APPLY_MSG) MSG_HMLVP_NUMCONN_OPTION_CHANGED;
+@endif
+
+@ifdef DO_DBCS
+  @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_HMLVP_CHANGE_ENCODING;
+@endif
+@endc;
+
+
+/***************************************************************************
+ *              HTML viewer application class
+ ***************************************************************************/
+
+@class     HTMLVApplicationClass, GenApplicationClass;
+  /* number of StartOperation() calls */
+  @instance word HVAI_operationLevel = 0;
+
+  /* close application asap... */
+  @instance Boolean HVAI_doomed = FALSE;
+
+  /* detach application asap... */
+  @instance Boolean HVAI_detaching = FALSE;
+  @instance word HVAI_callerID = 0;
+  @instance optr HVAI_caller = 0;
+
+  @instance word HVAI_ignoreCount = 0 ;   /* Number of IGNORE's done */
+
+  @instance Boolean HVAI_launchURL = FALSE;  /* TRUE if launching URL */
+
+  @instance Boolean HVAI_connectionError = FALSE;  /* TRUE if connection error */
+@ifdef COMPILE_OPTION_IGNORE_INPUT_DURING_LOADING
+  @instance Boolean HVAI_ignoreInput = FALSE;
+@endif
+  @instance byte HVAI_busy = 0;
+    #define BF_BUSY 0x01
+    #define BF_OVERRIDE 0x02
+    #define BF_COMPLETELY 0x4
+
+  @message void MSG_HMLVA_STOP_TRIGGER();
+  @message void MSG_HMLVA_START_OPERATION();
+    @define StartOperation() @send HTMLVApp::MSG_HMLVA_START_OPERATION()
+  @message void MSG_HMLVA_ABORT_OPERATION(Boolean ignoreStopMsg, Boolean dontSendDocumentStopMessage, optr frame);
+    @define AbortOperation(ism, dsdsm, frame) @call HTMLVApp::MSG_HMLVA_ABORT_OPERATION(ism, dsdsm, frame)
+  @message Boolean MSG_HMLVA_REQUEST_DETACH(word callerID, optr caller);
+  @message void MSG_HMLVA_END_OPERATION();
+    @define EndOperation() @send HTMLVApp::MSG_HMLVA_END_OPERATION()
+  @message Boolean MSG_HMLVA_GET_LAUNCH_URL();
+@ifdef UPDATE_ON_UI_THREAD
+  @message void MSG_HMLVA_STATUS_UPDATE(
+    TCHAR *text, HTMLStatusType type);
+  @message void MSG_HMLVA_STATUS_UPDATE_OPTR(
+    optr text, HTMLStatusType type);
+  @message void MSG_HMLVA_STATUS_UPDATE_BLOCK(
+    MemHandle text, HTMLStatusType type);
+@define CallStatusUpdate(text, type) @call HTMLVApp::MSG_HMLVA_STATUS_UPDATE(text, type)
+@define SendStatusUpdateOptr(text, type) @send HTMLVApp::MSG_HMLVA_STATUS_UPDATE_OPTR(text, type)
+@define CallStatusUpdateOptr(text, type) @call HTMLVApp::MSG_HMLVA_STATUS_UPDATE_OPTR(text, type)
+@define SendStatusUpdateBlock(text, type) @send HTMLVApp::MSG_HMLVA_STATUS_UPDATE_BLOCK(text, type)
+  @message void MSG_HMLVA_STATUS_GET_PTR(HTMLStatusType type, TCHAR *p_message, word limit) ;
+@define CallStatusGet(type, p_message, limit)  @call HTMLVApp::MSG_HMLVA_STATUS_GET_PTR(type, p_message, limit)
+@endif
+@ifdef UPDATE_ON_UI_THREAD
+/* update page status */
+  @message void MSG_HMLVA_UPDATE_PROGRESS_INDICATOR(word state, word data);
+  @message void MSG_HMLVA_PROGRESS_TIMER();
+@define SendUpdateProgress(state, data) @send HTMLVApp::MSG_HMLVA_UPDATE_PROGRESS_INDICATOR(state, data)
+@endif
+  @message void MSG_HMLVA_SET_CONNECTION_ERROR();
+  @message void MSG_HMLVA_CLEAR_CONNECTION_ERROR();
+  @message Boolean MSG_HMLVA_CHECK_CONNECTION_ERROR();
+@ifdef COMPILE_OPTION_DOWNLOAD_PROGRESS_DIALOG
+  @message void MSG_HMLVA_UPDATE_DOWNLOAD_PROGRESS_DIALOG(MemHandle updateTxt);
+@endif
+@ifdef COMPILE_OPTION_IGNORE_INPUT_DURING_LOADING
+  @message void MSG_HMLVA_IGNORE_INPUT();
+  @message void MSG_HMLVA_ACCEPT_INPUT();
+  @message Boolean MSG_HMLVA_IGNORING_INPUT();  /* check state */
+@endif
+  @message void MSG_HMLVA_MARK_BUSY();
+  @message void MSG_HMLVA_MARK_NOT_BUSY();
+  @message void MSG_HMLVA_OVERRIDE_BUSY();
+  @message void MSG_HMLVA_RESTORE_BUSY();
+@endc;
+
+
+/***************************************************************************
+ *              Image Mime type support
+ ***************************************************************************/
+
+optr SaveUnknownFile(TCHAR *file, NameToken url);
+optr HandleUnknownType(TCHAR *file, NameToken url, TCHAR *mimeType,
+  VMFileHandle vmf, VMBlockHandle *item, dword *memUsed);
+
+#if PROGRESS_DISPLAY
+VMBlockHandle ToolsImportGraphicByDriver(TCHAR *file, TCHAR *mimeType,
+  VMFileHandle vmf, ImageAdditionalData *size, dword *memUsed, MimeStatus *mimeStatus,
+  _ImportProgressParams_);
+#else
+VMBlockHandle ToolsImportGraphicByDriver(TCHAR *file, TCHAR *mimeType,
+  VMFileHandle vmf, ImageAdditionalData *size, dword *memUsed, MimeStatus *mimeStatus);
+#endif
+
+
+/***************************************************************************
+ *              Histroy buffer + management routines
+ ***************************************************************************/
+
+#define HTML_LRUSIZE  10        /* # of entries in LRU buffer */
+
+void InitNavigation(void);
+void InitCache(void);
+void DeInitNavigation(void);
+void DisableInappropriateOptions(void);
+void UpdateToolbar(Boolean enable);
+
+
+#define HTML_HIST_HOME    0x10  /* flag: "go home" is possible */
+
+void HistoryUpdateLRU(optr frameSet, NameToken name);
+word HistoryGetEntryNum(void);
+NameToken HistoryGetEntryName(word item);
+optr HistoryGetEntryFrames(word item);
+void HistoryClear(void) ;
+
+Boolean NavigateGetHome(MemHandle *buf);
+void NavigateSetHome(TCHAR *p);
+
+#ifdef SECURE_INI_URLS
+/* this value needs to be set correctly in .ini file to allow override */
+/* it should be abitrarily changed for each new version of the browser,
+   later, it can be a checksum of the .ini value */
+#define SECURE_INI_FLAG 0x629e  /* should not be zero */
+#define SECURE_INI_KEY "url"
+/*#if _NDO2000
+#define SECURE_INI_HOME _TEXT("http://www.newdealinc.com")
+/*#else */
+#define SECURE_INI_HOME _TEXT("http://www.breadbox.com")
+/*#endif  */
+#define SECURE_INI_JUMP _TEXT("http://www.breadbox.com")
+#endif
+
+
+/* Name management */
+extern optr namePool;
+
+/* Association arrays for extensions and mime types */
+extern optr assocExtType;
+extern optr assocTypeDriver;
+
+/* Association arrays for URL drivers */
+extern optr assocSchemeDriver;
+
+extern AllocWatcherHandle G_allocWatcher ;
+
+#if PROGRESS_DISPLAY
+extern Boolean progressDisplay;
+extern word progressLoadWait;
+extern word progressMinHeight;
+#endif
+
+typedef struct {
+  optr frameSet;                /* handle of array describing frame set */
+  word name;                    /* associated document name */
+} LRUBufferData;
+
+typedef struct {
+  optr frameSet;                /* handle of array describing frame set */
+} historyBufferData;
+
+/***************************************************************************
+ *              Caching (Source and Object)
+ ***************************************************************************/
+
+#ifdef CACHE_VALIDATION
+#define CACHE_VAL_LOAD_ARG ,&cacheTime, &maxAge, &lastModDate
+#define CACHE_VAL_LOAD_PROTO ,dword *cacheTime ,dword *maxAge, CompressedDateTime *lastModDate
+#define CACHE_VAL_ADD_ARG ,cacheTime, maxAge, &lastModDate
+#define CACHE_VAL_ADD_PROTO ,dword cacheTime, dword maxAge, CompressedDateTime *lastModDate
+#define CACHE_VAL_FIND_ARG ,&tryModified, &lastModDate
+#define CACHE_VAL_FIND_PROTO ,Boolean *tryModified ,CompressedDateTime *lastModDate
+#else
+#define CACHE_VAL_LOAD_ARG
+#define CACHE_VAL_LOAD_PROTO
+#define CACHE_VAL_ADD_ARG
+#define CACHE_VAL_ADD_PROTO
+#define CACHE_VAL_FIND_ARG
+#define CACHE_VAL_FIND_PROTO
+#endif
+
+/* Flag to set in source/object cache ID when item is to be stored in
+   the "alternative" cache */
+#define CACHE_ALT_FLAG      0x80000000
+
+typedef struct {
+  word url;                     /* token of associated URL */
+  dword size;                   /* size stored for entry */
+
+  word mimeType;                /* token of associated mime type */
+  dword id;
+
+  TCHAR ext[8];
+#ifdef CACHE_VALIDATION
+  dword expiration;             /* expiry date in seconds, from Date: and
+				   Expires: HTTP headers; if both exist
+				   and cache-hit comes before max-age,
+				   no cache validation necessary; else
+				   need to do cache validation */
+  CompressedDateTime lastModDate;  /* Last-Modified: HTTP header; if specified,
+				      use conditional HTTP request for cache
+				      validation; else unconditional request */
+#endif
+} srcCacheData;                 /* data structure describing cached names */
+
+/* this should be changed when the source cache format changes, it is
+   combined with the geode version number and stored in the cache,
+   with only this number being used for version checking */
+/* version 1.0: initial version */
+#define SRC_CACHE_MAJOR_VERSION 1
+#define SRC_CACHE_MINOR_VERSION 0
+
+typedef long ObjCacheToken;
+  #define OCT_NULL 0
+
+typedef struct {
+  ObjCacheToken oct;            /* Token of object in cache */
+
+  NameToken url;                /* token of associated URL */
+#ifdef DEFAULT_OBJECT_CACHE_LIMIT
+  dword size;                   /* size stored for entry */
+#endif
+
+  ByteFlags OCD_flags;
+    #define OCDF_TYPE_MASK 0x03
+      #define OCT_TEXTOBJ   0
+      #define OCT_GSTRING   1
+    #define OCDF_NOCACHE   0x80
+
+  byte vmfIndex;                /* number of VM file in which item lives */
+  VMBlockHandle OCD_data;
+
+  union {
+    byte text;
+    ImageAdditionalData graph;
+  } auxdata;                    /* opaque, type dependent data */
+
+  word lockCount ;              /* Number of times locked because in use */
+                                /* Can't delete while locked */
+} objCacheData;
+
+/* this should be changed when the object cache format changes, it is
+   combined with the geode version number and stored in the cache,
+   with only this number being used for version checking */
+/* version 2.0: JavaScript version */
+/* version 2.1: add name to HTMLimageData */
+/* version 2.2: add referer to HTMLframeData */
+/* version 2.3: add flags to HTMLformData HFD_var.textarea */
+#define OBJ_CACHE_MAJOR_VERSION 2
+#define OBJ_CACHE_MINOR_VERSION 3
+
+extern optr srcCachePool, objCachePool;
+extern VMFileHandle srcCacheBlock;
+extern MemHandle objCacheBlock, frameCacheBlock;
+extern optr srcCacheArray, objCacheArray,localPageArray;
+#ifdef ALT_SRC_CACHE
+extern optr altSrcCacheArray;
+#endif
+extern LRUBufferData LRUBuffer[];
+extern GeodeHandle lastMimeDriver, lastURLDriver;
+extern SemaphoreHandle MimeDriverSemaphore;
+
+extern dword srcFileNum, srcCacheSize, objCacheSize;
+extern ObjCacheToken objFileNum;
+#ifdef ALT_SRC_CACHE
+extern dword altSrcFileNum, altSrcCacheSize, altObjCacheSize;
+extern MemHandle altSrcCacheHosts, altSrcCacheExts;
+#endif
+#ifdef NUM_VMCACHE_FILES
+  #ifdef ALT_SRC_CACHE
+    #define NUM_CACHE_FILES NUM_VMCACHE_FILES * 2
+  #else
+    #define NUM_CACHE_FILES NUM_VMCACHE_FILES
+  #endif
+#else
+  #ifdef ALT_SRC_CACHE
+    #define NUM_CACHE_FILES 2
+  #else
+    #define NUM_CACHE_FILES 1
+  #endif
+#endif
+extern VMFileHandle cacheFiles[], srcCacheFile;
+/* size limit for VM header of each file, enforced in
+   IMPORT_THREAD_ENGINE_IMPORT_GRAPHIC */
+#define CACHE_FILE_HEADER_SIZE_LIMIT 65535
+#ifdef GLOBAL_INTERNET_BUILD
+extern word vmCacheSP;
+extern TCHAR vmCacheDir[];
+#endif
+#ifdef GLOBAL_INTERNET_BUILD
+extern VMFileHandle textObjFile;
+#endif
+
+void AddCacheFileReference(void);
+void RemoveCacheFileReference(void);
+
+extern SemaphoreHandle srcCacheSem ;
+#define SrcCacheGrab()          (ThreadPSem(srcCacheSem))
+#define SrcCacheRelease()       (ThreadVSem(srcCacheSem))
+extern SemaphoreHandle objCacheSem ;
+#define ObjCacheGrab()          (ThreadPSem(objCacheSem))
+#define ObjCacheRelease()       (ThreadVSem(objCacheSem))
+
+void AttachToSrcCache(void);
+void SrcCacheCommit(void);
+dword SrcCacheGenerateID(TCHAR *urlP);
+void CreateTempName(dword id,TCHAR *ext,TCHAR *buf);
+word SrcCacheRemoveEntryByID(dword id);
+word SrcCacheFindEntry(NameToken url, srcCacheData **data);
+word SrcCacheFindEntryByID(dword id, srcCacheData **data);
+Boolean SrcCacheFindURL(NameToken url, dword *id, TCHAR *ext, TCHAR *mimeType CACHE_VAL_FIND_PROTO);
+void SrcCacheAddURL(dword id, TCHAR *ext, TCHAR *mimeType, NameToken url, dword size CACHE_VAL_ADD_PROTO);
+void SrcCacheClear(void) ;
+Boolean SrcCacheFreeURL(NameToken url);
+#ifdef CACHE_VALIDATION
+Boolean SrcCacheExpireURL(NameToken url);
+#endif
+
+void AttachToObjCache(void);
+void DetachFromObjCache(void);
+VMFileHandle ObjCacheGetVMFile(NameToken url);
+ObjCacheToken ObjCacheFindURL(ByteEnum type, NameToken url, Boolean doLock,
+                              Boolean checkExp);
+ObjCacheToken ObjCacheAddURL(VMFileHandle vmf, VMChain data, ByteEnum type,
+                             void *aux, word size, NameToken url, Boolean doLock,
+                             Boolean nocache);
+void ObjCacheClear(void) ;
+Boolean ObjCacheLockItem(ObjCacheToken oct, VMFileHandle *vmf, VMChain *vmc,
+                         void *auxdata, word size);
+void ObjCacheUnlockItem(ObjCacheToken oct) ;
+void ObjCacheForceNocache(ByteEnum type, NameToken url);
+void ObjCacheForceCachable(ObjCacheToken oct);
+
+@ifdef CACHE_ALL
+extern Boolean G_cacheAll;
+@endif
+
+/***************************************************************************
+ *              URL handling
+ ***************************************************************************/
+
+#if PROGRESS_DISPLAY
+word LoadURLToFile(NameToken *url, TCHAR *tempname, TCHAR *mime,
+                   word loadMode, dword *ret, HTMLFormDataHandle postData,
+		   NameToken referer, NameToken *anchor,
+                   dword token, void **abortRoutine, _LoadProgressParams_);
+#else
+word LoadURLToFile(NameToken *url, TCHAR *tempname, TCHAR *mime,
+                   word loadMode, dword *ret, HTMLFormDataHandle postData,
+		   NameToken referer, NameToken *anchor,
+                   dword token, void **abortRoutine);
+#endif
+#define ULM_NEVER  0
+#define ULM_CACHE  1
+#define ULM_ALWAYS 2
+
+/* flush any privdate data for the URL drivers */
+void FlushURLData(void);
+
+void EnsureINISettings(AppAttachFlags attachFlags) ;
+
+#ifdef CACHE_VALIDATION
+extern Boolean weakCacheExpiration;
+#endif
+
+#ifdef UNSUPPORTED_EXTS
+extern MemHandle unSupportedExts;
+#endif
+
+/* busy cursor */
+extern Boolean isBusyOff;
+
+/* URL driver management */
+void InitURLDrivers(void);
+void DeInitURLDrivers(void);
+
+/***************************************************************************
+ *              URL document control class
+ ***************************************************************************/
+
+@class URLDocumentControlClass, GenDocumentControlClass;
+  @message void MSG_URL_DOC_CONTROL_CLOSE_AND_OPEN() ;
+@endc;
+
+@class URLDocumentGroupClass, GenDocumentGroupClass;
+@endc
+
+
+/***************************************************************************
+ *              URL document
+ ***************************************************************************/
+
+typedef struct {
+  HTMLframeRec HFRWI_rec;
+  VMChain HFRWI_item;
+} HTMLframeRecWithItem;
+
+#define DIR_ABSOLUTE 0                  /* new URL was entered/clicked */
+#define DIR_GO       1                  /* as ABSOLUTE, but ignore context */
+#define DIR_FORWARD  2                  /* result of a forward step */
+#define DIR_BACK     3                  /* result of a backward step */
+#define DIR_RELOAD   4                  /* reload current URL */
+#define DIR_FRAME    5                  /* consequence of setting up frames */
+#define DIR_SOURCE   6                  /* redisplay URL as HTML source */
+#define DIR_SAVE     7                  /* save URL to a file */
+#define DIR_FRAME_FORCE_RELOAD     8    /* consequence of setting up frames
+                                           plus reload the frame content    */
+#define DIR_ABSOLUTE_GO 9               /* like DIR_ABSOLUTE and DIR_GO */
+#define DIR_CROSS_FRAME_LOAD 10         /* like DIR_RELOAD, but use history */
+
+@class URLDocumentClass, GenDocumentClass;
+
+  @instance optr UDCI_topFrame;
+
+  @instance word UDCI_historyHead;
+  @instance word UDCI_historyTail;
+  @instance ChunkHandle UDCI_historyBuffer;
+
+  @instance word UDCI_historyForward;
+  @instance ChunkHandle UDCI_forwardBuffer;
+
+  @instance word UDCI_numPendingFrames;
+
+@ifdef COMPILE_OPTION_LOCAL_PAGES
+  @instance NameToken UDCI_localPage;
+  @instance Boolean UDCI_updatingLocal;
+@endif
+  @instance Boolean UDCI_allowHistory;
+
+  @message void MSG_URL_DOCUMENT_INT_ADD_FORWARD_URL(optr frameSet);
+  @message void MSG_URL_DOCUMENT_INT_DROP_FORWARD();
+  @message void MSG_URL_DOCUMENT_INT_DROP_BACK();
+  @message void MSG_URL_DOCUMENT_INT_ADD_BACK_URL(optr frameSet);
+  @message void MSG_URL_DOCUMENT_INT_UPDATE_LRU(optr frameSet);
+
+  @message void MSG_URL_DOCUMENT_INC_PENDING();
+  @message void MSG_URL_DOCUMENT_DEC_PENDING();
+
+  @message void MSG_URL_DOCUMENT_NOTIFY_FRAME_CHANGE_PRE(word dir);
+  @message void MSG_URL_DOCUMENT_NOTIFY_FRAME_CHANGE_POST(word dir);
+  @message void MSG_URL_DOCUMENT_NOTIFY_TOP_CHANGE(
+    NameToken url, NameToken title);
+  @message void MSG_URL_DOCUMENT_NOTIFY_DOCUMENT_COMPLETE();
+
+  @message void MSG_URL_DOCUMENT_LOAD_URL(NameToken url, word dir);
+  @message void MSG_URL_DOCUMENT_LOAD_FRAME_SET(optr frameArray, word dir);
+
+  @message int MSG_URL_DOCUMENT_FORWARD();
+  @message int MSG_URL_DOCUMENT_BACK();
+  @message void MSG_URL_DOCUMENT_MAKE_NEW_HOME();
+
+  @message void MSG_URL_DOCUMENT_UPDATE_FRAME_UI();
+  @message void MSG_URL_DOCUMENT_RELOAD();
+  @message void MSG_URL_DOCUMENT_SOURCE();
+  @message void MSG_URL_DOCUMENT_SAVE();
+  @message void MSG_URL_DOCUMENT_LOAD_GRAPHICS();
+
+  @message optr MSG_URL_DOCUMENT_GET_TOP_FRAME();
+
+  @message WordFlags MSG_URL_DOCUMENT_GET_STATE();
+    #define HTML_HIST_BACK    0x01  /* flag: back is possible */
+    #define HTML_HIST_FORWARD 0x02  /* flag: forward is possible */
+    #define HTML_HIST_CURRENT 0x04  /* flag: we have a "current" URL */
+    #define HTML_HIST_LOAD_GR 0x20  /* flag: "load images" is possible */
+
+@ifdef COMPILE_OPTION_BOOKMARKS
+  @message void MSG_URL_DOCUMENT_ADD_BOOKMARK() ;
+  @message void MSG_URL_DOCUMENT_GO_TO_BOOKMARK(word bookmarkNum) ;
+@endif
+@ifdef COMPILE_OPTION_FAVORITES
+  @message void MSG_URL_DOCUMENT_GO_TO_FAVORITE(word favoriteNum, word useAll) ;
+@endif
+
+  @message void MSG_URL_DOCUMENT_RECALCULATE() ;
+  @message Boolean MSG_URL_DOCUMENT_TEST_UNRESOLVED_IMAGES();
+
+  @message NameToken MSG_URL_DOCUMENT_GET_URL();
+  @message NameToken MSG_URL_DOCUMENT_GET_TITLE();
+
+@ifdef COMPILE_OPTION_LOCAL_PAGES
+  @message void MSG_URL_DOCUMENT_SAVE_LOCAL();
+  @message void MSG_URL_DOCUMENT_OPEN_LOCAL(word selection);
+  @message Boolean MSG_URL_DOCUMENT_STORE_TO_FILENAME(TCHAR *saveFile);
+  @message VMBlockHandle MSG_URL_DOCUMENT_STORE_TO_VM(VMFileHandle vmf);
+  @message void MSG_URL_DOCUMENT_RESTORE_FROM_VM(
+       VMFileHandle vmf, VMBlockHandle root, NameToken localPage);
+  @message void MSG_URL_DOCUMENT_SET_LOCAL_PAGE(NameToken localPage);
+  @message NameToken MSG_URL_DOCUMENT_GET_LOCAL_PAGE();
+  @message void MSG_URL_DOCUMENT_UPDATE_LOCAL();
+  @message void MSG_URL_DOCUMENT_REQUEST_LOCAL_PAGE_NOTIFY();
+@endif
+
+@ifdef COMPILE_OPTION_PARENTAL_CONTROL
+  @message void MSG_URL_DOCUMENT_PC_ADD_SITE();
+  @message void MSG_URL_DOCUMENT_PC_REMOVE_SITE();
+@endif
+  @message void MSG_URL_DOCUMENT_STOP(optr frame) ;
+  @message void MSG_URL_DOCUMENT_ALLOW_HISTORY();
+  @message void MSG_URL_DOCUMENT_DISALLOW_HISTORY();
+@ifdef JAVASCRIPT_SUPPORT
+  @instance Boolean UDCI_jsError = FALSE;
+  @message void MSG_URL_DOCUMENT_SET_JS_ERROR(Boolean state);
+  @message Boolean MSG_URL_DOCUMENT_GET_JS_ERROR();
+  @message void MSG_URL_DOCUMENT_CLEAR_OBJ_CACHE();
+  @instance Boolean UDCI_haveJS = FALSE;
+  @message void MSG_URL_DOCUMENT_SET_JS();
+  @message void MSG_URL_DOCUMENT_ENSURE_SCRIPT_CONTEXT();
+@endif
+@endc;
+
+
+/***************************************************************************
+ *              URL frame window (internal model)
+ ***************************************************************************/
+@define frameChildren @children 0, \
+                                word_offsetof(URLFrameInstance, UFI_comp), \
+                                word_offsetof(URLFrameInstance, UFI_link)
+
+/* Entry in chunk array pointed to by UFI_pendingURLs */
+typedef struct {
+  NameToken     PU_url;
+  VMFileHandle  PU_vmf;
+  VMBlockHandle PU_vmb;
+} PendingURL;
+
+/* Entry in chunk array pointed to by UFI_completedScripts.
+   These records holds the document.write fragments generated by each <script>
+   tag, identified by the position up to which the script has to be executed
+   (counting based on the HugeArray containing all the <script> code) to produce
+   this output. */
+typedef struct {
+  dword		CS_endpos;	// position to which the script must have run
+  VMFileHandle	CS_vmf;		// handle of file with document.write output
+  VMBlockHandle CS_vmb;		// huge array with document.write output
+  Boolean       CS_docWrite;    // value of UFI_docWrite after script
+} CompletedScript;
+
+@class URLFrameClass, MetaClass;
+
+  /* optr of enclosing document object */
+  @instance optr UFI_document;
+
+  /* optr of associated URLText object */
+  @instance optr UFI_text = NullHandle ;
+  /* Token under which the text item is cached */
+  @instance ObjCacheToken UFI_cacheToken = OCT_NULL;
+
+  /* optr of associated GenInteraction */
+  @instance optr UFI_interaction;
+
+  /* parent/child linkage of frames */
+  @instance @link UFI_link;
+  @instance @composite UFI_comp = UFI_link;
+
+  /* token of name pool entry for current URL */
+  @instance NameToken UFI_currentURL = NAME_POOL_NONE;
+
+  /* title and base URI of currently loaded URL, if any */
+  @instance NameToken UFI_documentTitle = NAME_POOL_NONE;
+  @instance NameToken UFI_baseURI = NAME_POOL_NONE;
+  @instance NameToken UFI_baseTarget = NAME_POOL_NONE;
+#if EMBED_SUPPORT
+  @instance NameToken UFI_embed = NAME_POOL_NONE;
+#endif
+  @instance NameToken UFI_referrer = NAME_POOL_NONE;
+
+  /* token of name pool entry for current window's name */
+  @instance NameToken UFI_windowName = NAME_POOL_NONE;
+
+  @instance WordFlags UFI_frameState = 0;
+    #define FS_ACTIVE           0x0001
+    #define FS_DUMMY            0x8000
+
+  @instance WordFlags UFI_frameFlags = HTML_FRF_SCROLLING;
+  @instance HTMLmultiLength UFI_size = HTML_LEN_VARIABLE;
+
+  /* Attributes used in last frame geometry computation, set to "impossible"
+     values initially to force update. */
+  @instance XYSize UFI_geoSize = {0xFFFE, 0xFFFE};
+  @instance WordFlags UFI_geoFlags = 0xAAAA;
+
+  /* data for handling "refresh" requests */
+  @instance NameToken UFI_refreshURL = NAME_POOL_NONE;  /* NONE = no refresh */
+  @instance TimerHandle UFI_refreshTimer = NullHandle;
+  @instance word UFI_refreshID;
+  @instance word UFI_refreshTime = 0 ;
+
+@ifdef JAVASCRIPT_SUPPORT
+  /* has JavaScript window object been built or not? */
+  @instance word UFI_hasScriptContext = FALSE;
+  /* do we allow window.open?, must set before SCRIPT_INTERPRET msg
+     and before calling browserInterpret or browserEventHandler */
+  @instance Boolean UFI_canWindowOpen = FALSE;
+@endif
+
+#define URL_FRAME_MARGIN_DEFAULT HTML_EXTRA_MARGIN_USE_DEFAULT
+  @instance word UFI_marginWidth = URL_FRAME_MARGIN_DEFAULT ;
+  @instance word UFI_marginHeight = URL_FRAME_MARGIN_DEFAULT ;
+
+  /* Reference to chunk array with PendingURL elements, listing files that must
+     be received into the source cache before the suspended Ack can be
+     re-processed. */
+  @instance optr UFI_pendingURLs;
+  /* Reference to chunk array with ScriptResult elements, tracking the URL under
+     which scripts have been found. */
+  @instance optr UFI_completedScripts;
+  /* Suspended Ack from a fetch request that could not be completed
+     for lack of certain files. */
+  @instance MemHandle UFI_pendingFetchMem;
+  /* Count of requests in UFI_pendingURLs list that were completed */
+  @instance word UFI_pendingDone;
+  /* Count of requests that were completed with an error message */
+  @instance word UFI_pendingBroken;
+
+  @message void MSG_URL_FRAME_GOT_URL(
+       ObjCacheToken oct, NameToken url, NameToken anchor, NameToken referer,
+       WordFlags flags, word dir);
+
+    /* Generated in response to forced reload. Handle consecutive requests
+       the same way... */
+    #define GUF_RELOAD          0x0001
+
+  @message void MSG_URL_FRAME_GOT_PAGE_NOFRAME(
+       ObjCacheToken oct, NameToken anchor, WordFlags flags,
+       Boolean dummy);
+  @message void MSG_URL_FRAME_ESTABLISH_FRAMES(optr frameArray, word framePtr,
+					       word dir);
+  @message void MSG_URL_FRAME_COLLECT_FRAMES(optr frameArray, word level);
+
+  /* returns object to give focus to */
+  @message void MSG_URL_FRAME_UPDATE_FRAME_UI(optr *focusP);
+
+  @message WordFlags MSG_URL_FRAME_GET_STATE();
+  @message void MSG_URL_FRAME_SET_STATE(WordFlags set, WordFlags clear);
+  @message void MSG_URL_FRAME_ACTIVATE(Boolean dummy);
+  @message void MSG_URL_FRAME_DELETE_ALL(Boolean deactivate);
+
+                       /* pass pointer address of dynamic NamePool buffer */
+  @message Boolean MSG_URL_FRAME_COMPLETE_URL(char **buf);
+  @message void MSG_URL_FRAME_FETCH_URL(
+       NameToken url, word dir, HTMLFormDataHandle postData, NameToken referer);
+  @message void MSG_URL_FRAME_FETCH_FRAMES(
+       optr frameSet, word dir);
+  @message void MSG_URL_FRAME_SET_URL_TITLE(NameToken url, NameToken title);
+  @message optr MSG_URL_FRAME_FIND_TARGET_BY_TITLE(NameToken target);
+
+  @message void MSG_URL_FRAME_SET_URL_TITLE_BASE_TARGET(
+       NameToken url, NameToken title, NameToken base, NameToken target,
+       NameToken referer);
+#if EMBED_SUPPORT
+  @message void MSG_URL_FRAME_SET_EMBED(NameToken embed);
+#endif
+  @message void MSG_URL_FRAME_SET_FLAGS_SIZE_NAME(WordFlags flags,
+       HTMLmultiLength size, NameToken name);
+  @message void MSG_URL_FRAME_SET_NAME(NameToken name);
+
+  @message NameToken MSG_URL_FRAME_GET_URL();
+  @message NameToken MSG_URL_FRAME_GET_TITLE();
+  @message NameToken MSG_URL_FRAME_GET_NAME();
+  @message NameToken MSG_URL_FRAME_GET_REFERRER();
+  @message optr MSG_URL_FRAME_FIND_REAL_FRAME();
+
+  @message HTMLmultiLength MSG_URL_FRAME_GET_SIZE();
+  @message HTMLmultiLength MSG_URL_FRAME_GET_COMPUTED_DIMENSION_PIXELS(
+       Boolean getWidth, Boolean allowVariable);
+
+  @message void MSG_URL_FRAME_RELOAD();
+  @message void MSG_URL_FRAME_SOURCE();
+  @message void MSG_URL_FRAME_SAVE();
+  @message void MSG_URL_FRAME_LOAD_GRAPHICS();
+
+  @message void MSG_URL_FRAME_HANDLE_LINK(
+       NameToken link, NameToken target, HTMLFormDataHandle postData,
+       Boolean execute);
+
+  @message optr MSG_URL_FRAME_FIND_PARENT();
+  @message optr MSG_URL_FRAME_FIND_CHILD(word child);
+  @message word MSG_URL_FRAME_COUNT_CHILDREN();
+
+  @message optr MSG_URL_FRAME_GET_TEXT_OBJ();
+  @message void MSG_URL_FRAME_SET_TEXT_OBJ(optr textObject);
+
+  @message optr MSG_URL_FRAME_GET_DOCUMENT_OBJ();
+  @message void MSG_URL_FRAME_SET_DOCUMENT_OBJ(optr documentObject);
+
+  @message optr MSG_URL_FRAME_GET_INTERACTION_OBJ();
+  @message void MSG_URL_FRAME_SET_INTERACTION_OBJ(optr interactionObject);
+
+  @message void MSG_URL_FRAME_RECALCULATE() ;
+
+  @message void MSG_URL_FRAME_REQUEST_URL(
+        dword requestToken,
+        NameToken url, NameToken anchor,
+        word dir, HTMLFormDataHandle postData, NameToken referer);
+
+  @message Boolean MSG_URL_FRAME_REQUIRE_EXT_FILE(
+        VMFileHandle *vmf, VMBlockHandle *vmb,
+        NameToken *url,
+        NameToken referer,
+        word scriptIdx);
+  @message void MSG_URL_FRAME_RELEASE_EXT_FILES();
+
+  @message (URL_FETCH_ACK) MSG_URL_FRAME_URL_FETCHED ;
+#if EMBED_SUPPORT
+  @message (URL_FETCH_ACK) MSG_URL_FRAME_EMBED_FETCHED;
+#endif
+  @message (URL_FETCH_ACK) MSG_URL_FRAME_EXT_FILE_FETCHED;
+
+  @message void MSG_URL_FRAME_SET_REFRESH(NameToken url, word secs);
+  @message void MSG_URL_FRAME_REFRESH_TIMER_EXPIRED();
+
+  @message Boolean MSG_URL_FRAME_TEST_UNRESOLVED_IMAGES();
+
+  @message optr MSG_URL_FRAME_FIND_TEXT_OBJECT();
+
+@ifdef COMPILE_OPTION_LOCAL_PAGES
+  @message void MSG_URL_FRAME_COLLECT_FRAMES_WITH_ITEMS(
+       optr frameArray, word level, VMFileHandle vmf, optr pool);
+  @message void MSG_URL_FRAME_ESTABLISH_FRAMES_WITH_ITEMS(
+       optr frameArray, word framePtr, VMFileHandle vmf);
+  @message void MSG_URL_FRAME_FETCH_FRAMES_WITH_ITEMS(
+       optr frameSet, word dir, VMFileHandle vmf, NameToken localPage);
+@endif
+
+  @message void MSG_URL_FRAME_NOTIFY_FRAME_CHANGE_PRE(word dir);
+  @message void MSG_URL_FRAME_NOTIFY_FRAME_CHANGE_POST(word dir);
+  @message void MSG_URL_FRAME_NOTIFY_FRAME_COMPLETE() ;
+
+  @message void MSG_URL_FRAME_FLIP_PAGE(ObjCacheToken oct, Boolean reload);
+
+  @message void MSG_URL_FRAME_INC_PENDING();
+  @message void MSG_URL_FRAME_DEC_PENDING();
+
+@ifdef COMPILE_OPTION_PARENTAL_CONTROL
+  @message void MSG_URL_FRAME_PC_ADD_SITE(ParentalControlFlags *pcFlags);
+  @message void MSG_URL_FRAME_PC_REMOVE_SITE(ParentalControlFlags *pcFlags);
+@endif
+
+@ifdef COMPILE_OPTION_SECURE_STATUS
+  @message void MSG_URL_FRAME_UPDATE_SECURE_ICON(NameToken urlT);
+@endif
+
+  @message void MSG_URL_FRAME_CREATE_CHILD();
+  @message void MSG_URL_FRAME_CREATE_VIEW_GROUP();
+  @message void MSG_URL_FRAME_DETACH_VIEW_CONTENT_TREE();
+  @message void MSG_URL_FRAME_DESTRUCT_TEXT_TREE();
+  @message WordFlags MSG_URL_FRAME_GET_FRAME_FLAGS();
+  @message void MSG_URL_FRAME_STOP() ;
+  @message void MSG_URL_FRAME_CLEAR_REFRESH();
+
+@ifdef JAVASCRIPT_SUPPORT
+  @message void MSG_URL_FRAME_CREATE_SCRIPT_CONTEXT();
+  @message void MSG_URL_FRAME_DESTROY_SCRIPT_CONTEXT(Boolean fullDestroy);
+  @message Boolean MSG_URL_FRAME_INTERPRET_SCRIPT_SOURCE(
+    BrowserScriptSource *bss);
+  @message Boolean MSG_URL_FRAME_INTERPRET_SCRIPT_TOKEN(
+    NameToken tok, dword offset);
+  @message Boolean MSG_URL_FRAME_INTERPRET_SCRIPT_HA(
+    VMFileHandle vmf, VMBlockHandle vmb, dword offset);
+  @message Boolean MSG_URL_FRAME_HANDLE_EVENT(HTMLEventType evt,
+    HTMLEventObjectType type, word obj, NameToken code);
+  @message void MSG_URL_FRAME_FETCH_URL_AND_RELEASE(
+      NameToken url, word dir, HTMLFormDataHandle postData, NameToken referer);
+  @message Boolean MSG_URL_FRAME_CAN_WINDOW_OPEN();
+
+  /* Frame timers */
+  @instance ChunkHandle UFI_timeoutList = NullHandle ;
+
+  typedef word FrameTimerID ;
+  #define FRAME_TIMER_ID_BAD 0
+  @message FrameTimerID MSG_URL_FRAME_START_TIMER(
+				    dword millisecs,
+					NameToken codeToRun,
+					Boolean isIntervalTimer);
+  @message void MSG_URL_FRAME_STOP_TIMER(
+				    FrameTimerID uniqueTimerID,
+					Boolean runCode);
+  @message void MSG_URL_FRAME_TIMER_EXPIRED(
+	                FrameTimerID timerID = bp);
+  @message void MSG_URL_FRAME_KILL_ALL_TIMEOUTS() ;
+  /* End of frame timers */
+
+  @message void MSG_URL_FRAME_SET_JS_ERROR();
+
+  @message void MSG_URL_FRAME_INTERPRET_SCRIPT_HA_DURING_PARSING(
+      VMFileHandle file, VMBlockHandle code, dword offset);
+  @message void MSG_URL_FRAME_ADD_SCRIPT_SRC(char *code);
+  @message void MSG_URL_FRAME_FLUSH_SCRIPT_SRC();
+  @instance Boolean UFI_docWrite = FALSE;
+  @message void MSG_URL_FRAME_CLEAR_OBJ_CACHE();
+  /* for document.write-generated pages */
+  @message void MSG_URL_FRAME_SET_NO_URL();
+  @instance Boolean UFI_noURL = FALSE;
+  @message void MSG_URL_FRAME_CLEAR_SCRIPT_CONTEXT_STATE();
+  @message void MSG_URL_FRAME_ENSURE_SCRIPT_CONTEXT();
+
+  @instance ChunkHandle UFI_eventsList = NullHandle;
+
+  @instance word UFI_frameLevel = 0;
+  @message word MSG_URL_FRAME_GET_FRAME_LEVEL();
+
+  @instance ScriptSrcHeader UFI_scriptSrc;
+  @message void MSG_URL_FRAME_CLEAR_SCRIPT_SRC();
+
+  @instance optr UFI_opener = 0;
+  @message optr MSG_URL_FRAME_GET_OPENER();
+  @message void MSG_URL_FRAME_SET_OPENER(optr opener);
+
+  @instance NameToken UFI_framesetCode = NAME_POOL_NONE;
+@endif
+
+  @instance word UFI_frameLoadCount = 0;
+  @message void MSG_URL_FRAME_LOADING_FINISHED();
+@endc;
+
+Boolean CompleteURLBuffer(NameToken base, TCHAR **buf);
+
+
+/***************************************************************************
+ *              URL-aware HTML page class
+ ***************************************************************************/
+
+@class URLTextClass, HTMLTextClass;
+
+  @instance optr UTI_frame;
+  @instance word UTI_numPendingRequests = 0 ;
+
+  /* Tracks the amount of memory used by this text object */
+  @instance dword UTI_usedMem = 0 ;
+
+  /* Set if SELF_DESTRUCT couldn't free the object because there were
+     still pending requests... */
+  @instance word UTI_doomed = FALSE;
+
+  @message void MSG_URL_TEXT_LOAD_GRAPHICS();
+  @message void MSG_URL_TEXT_PROCESS_GRAPHICS(Boolean forceLoad);
+  @message void MSG_URL_TEXT_MARK_VISITED_LINKS();
+
+  @message void MSG_URL_TEXT_SET_FRAME_OBJ(optr frameObject);
+  @message optr MSG_URL_TEXT_GET_FRAME_OBJ();
+
+  @message (URL_FETCH_ACK) MSG_URL_TEXT_GRAPHIC_FETCHED ;
+
+  @message void MSG_URL_TEXT_DEC_PENDING() ;
+  @message void MSG_URL_TEXT_INC_PENDING() ;
+
+  @message void MSG_URL_TEXT_INTERNAL_REPLACE_LIKE_GRAPHICS(
+    ObjCacheToken oct, NameToken url, word invalFrom, word invalTo);
+  @message void MSG_URL_TEXT_RECALCULATE() ;
+  @message void MSG_URL_TEXT_INCREASE_USED_MEMORY(dword usedMem) ;
+  @message dword MSG_URL_TEXT_GET_MEMORY_AVAILABLE() ;
+
+  @message void MSG_URL_TEXT_SELF_DESTRUCT();
+@ifdef PROGRESS_DISPLAY
+  @message void MSG_URL_TEXT_IMPORT_GRAPHIC_PROGRESS(MemHandle importProgressData);
+  @message void MSG_URL_TEXT_LOAD_GRAPHIC_PROGRESS(LoadProgressData *loadProgressDataP);
+  @message void MSG_URL_TEXT_FREE_PROGRESS_BITMAP(VMFileHandle vmFile, VMBlockHandle bitmap, NameToken imageToken);
+@endif
+@ifdef COMPILE_OPTION_PARENTAL_CONTROL
+  @message void MSG_URL_TEXT_PC_ADD_EMBEDDED_SITES(ParentalControlFlags *pcFlags);
+  @message void MSG_URL_TEXT_PC_REMOVE_EMBEDDED_SITES(ParentalControlFlags *pcFlags);
+@endif
+
+  @message void MSG_URL_TEXT_STOP() ;
+
+@ifdef JAVASCRIPT_SUPPORT
+  /* Note that the url token is released by this message, so it can be sent */
+  @message void MSG_URL_TEXT_CHANGE_GRAPHIC(word i, NameToken url);
+  @message void MSG_URL_TEXT_PRELOAD_GRAPHIC(NameToken url);
+  @message (URL_FETCH_ACK) MSG_URL_TEXT_GRAPHIC_PRELOADED;
+  /* name search */
+  @message word MSG_URL_TEXT_FIND_LINK_FROM_NAME(NameToken nameT);
+  @message word MSG_URL_TEXT_FIND_IMAGE_FROM_NAME(NameToken nameT);
+  @message word MSG_URL_TEXT_FIND_FORM_FROM_NAME(NameToken nameT);
+  @message word MSG_URL_TEXT_FIND_ELEMENT_FROM_NAME(NameToken nameT, word head);
+@endif
+@endc;
+
+
+/***************************************************************************
+ *              URL entry field class
+ ***************************************************************************/
+
+@class URLEntryClass, GenTextClass;
+  @instance WWFixedAsDWord UEI_pointSize = MakeWWFixed(FONT_DEFAULT_SIZE);
+  @instance FontID         UEI_plainFont = FONT_DEFAULT;
+
+  @message FontID MSG_URL_ENTRY_GET_FONT_ID();
+  @message WWFixedAsDWord MSG_URL_ENTRY_GET_POINT_SIZE();
+@endc;
+
+/***************************************************************************
+ *              Controller classes
+ ***************************************************************************/
+
+@class WMViewControlClass, GenViewControlClass;
+@endc;
+
+@class WMSearchReplaceControlClass, SearchReplaceControlClass;
+@endc;
+
+/***************************************************************************
+ *              window.open window class
+ ***************************************************************************/
+
+@ifdef JAVASCRIPT_SUPPORT
+
+@class WindowOpenInteractionClass, GenInteractionClass;
+@endc;
+
+@endif
+
+/***************************************************************************
+ *              Various global variables and routines
+ ***************************************************************************/
+
+@ifdef COMPILE_OPTION_AUTO_BROWSE
+extern Boolean didAutoTest ;
+extern sdword bulkTestCount;
+extern word bulkTestType;
+extern word abTimerID;
+extern void ABLog(TCHAR *fmt, ...) ;
+extern dword IBM ;
+@endif
+
+@ifdef COPY_TO_SCRAPBOOK
+/* current page title */
+extern TCHAR G_curTitle[80];
+@endif
+
+
+@ifdef COMPILE_OPTION_PARENTAL_CONTROL
+@include <parentc.goh>
+void PCIndicateOn(void);
+void PCIndicateOff(void);
+void PCIndicateStatus(void);
+extern Boolean G_pcBypassed ;
+extern AccessFlags G_pcAccess ;
+extern Boolean G_startupPassword ;
+@endif
+
+@ifdef TV_BW_OPTION
+extern void _pascal SetVidBW(word bwOn);
+@endif
+
+@ifdef COMPILE_OPTION_TOGGLE_BARS
+void UpdateToggleBars(word toggleBars) ;
+@endif
+
+
+void UpdateStop(Boolean enabled);
+void UserAbortStart(void) ;
+void UpdateStop(Boolean enabled) ;
+
+@ifdef GLOBAL_INTERNET_BUILD
+#define SEARCH_URL_TEMPLATE "searchURL%d"
+@endif
+
+void extern _pascal OpenConnection(SemaphoreHandle quitSem);
+
+extern GeodeHandle G_Html4Par;
+
+#ifdef DO_DBCS
+extern DosCodePage G_codePage;
+
+/* something recognizable */
+#define DEFCHAR '@'
+#endif
+
+#include <ProfPnt.goh>

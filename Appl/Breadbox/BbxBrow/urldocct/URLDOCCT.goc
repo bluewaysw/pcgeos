@@ -1,0 +1,131 @@
+/*
+ *                          ==CONFIDENTIAL INFORMATION==
+ *
+ * COPYRIGHT 1994-99 BREADBOX COMPUTER COMPANY -- ALL RIGHTS RESERVED  --
+ * THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER
+ * A NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ * RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ * NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ * CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ * AGREEMENT.
+ *
+*/
+/***********************************************************************
+ *
+ * PROJECT:       HTMLView
+ * FILE:          URLDocCt.goc
+ *
+ * AUTHOR:        Marcus Gr�ber
+ *
+ ***********************************************************************/
+
+/**************************************************************************
+ *		Include files
+ **************************************************************************/
+
+@include <stdapp.goh>
+#include <geoMisc.h>                    /* various unix-like goodies */
+#include <initfile.h>
+
+#include <Ansi/string.h>
+#include <Ansi/stdio.h>
+#include <Ansi/stdlib.h>
+
+@include <fixes.goh>
+@include "htmlview.goh"
+
+
+/***************************************************************************
+ *              URL document controller class
+ ***************************************************************************/
+
+@classdecl URLDocumentControlClass;
+
+@method URLDocumentControlClass,
+        MSG_GEN_DOCUMENT_CONTROL_CONFIGURE_FILE_SELECTOR
+{
+    @callsuper();
+    @call fileSelector::MSG_GEN_FILE_SELECTOR_SET_MASK(_TEXT("*.HTM"));
+}
+
+@extern object DocumentControl ;
+
+@method URLDocumentControlClass, MSG_URL_DOC_CONTROL_CLOSE_AND_OPEN
+{
+    EventHandle evt ;
+
+    evt = @record URLDocumentClass::MSG_GEN_DOCUMENT_CLOSE(NullHandle) ;
+    @call application::MSG_META_SEND_CLASSED_EVENT(evt, TO_APP_MODEL);
+    @send DocumentControl::MSG_GEN_DOCUMENT_CONTROL_INITIATE_OPEN_DOC() ;
+}
+
+@if 1
+@method URLDocumentControlClass, MSG_GEN_DOCUMENT_CONTROL_DISPLAY_DIALOG
+{
+    TempGenControlInstance tempData;
+    static int openDialogInit;
+           /* Simple state machine to prevent initiating the
+	      File Open Dialog too many times. --hack */
+
+    if ((@call oself::MSG_META_GET_VAR_DATA(TEMP_GEN_CONTROL_INSTANCE,
+					    sizeof(tempData),
+					    &tempData) == 0xffff) ||
+	!(tempData.TGCI_interactableFlags & GCIF_CONTROLLER)) {
+        // Respond to initial dialog request on boot.
+	@call oself::MSG_GEN_DOCUMENT_CONTROL_INITIATE_NEW_DOC() ;
+        openDialogInit = 1;
+
+    } else if (openDialogInit) {
+        // Respond to subsequent file menu requests.
+@ifdef COMPILE_OPTION_FILE_OPEN_MENU
+	@call oself::MSG_URL_DOC_CONTROL_CLOSE_AND_OPEN() ;
+@endif
+        openDialogInit = 0;
+    } else {
+        openDialogInit = 1;
+    }
+}
+
+@else
+@ifdef COMPILE_OPTION_NO_NEW_OPEN_DIALOG
+@method URLDocumentControlClass, MSG_GEN_DOCUMENT_CONTROL_DISPLAY_DIALOG
+{
+    TempGenControlInstance tempData;
+
+    /* we only do this if we're not already active (to fix lazarus
+       problem) */
+    if ((@call oself::MSG_META_GET_VAR_DATA(TEMP_GEN_CONTROL_INSTANCE,
+					    sizeof(tempData),
+					    &tempData) == 0xffff) ||
+	!(tempData.TGCI_interactableFlags & GCIF_CONTROLLER)) {
+	@call oself::MSG_GEN_DOCUMENT_CONTROL_INITIATE_NEW_DOC() ;
+    }
+}
+@endif
+@endif
+
+
+/***************************************************************************
+ *              URL document group class
+ ***************************************************************************/
+
+@classdecl URLDocumentGroupClass;
+
+@method URLDocumentGroupClass, MSG_META_SEND_CLASSED_EVENT
+{
+    ClassStruct *eventClass;
+    DocumentCommonParams dcp;
+
+    if ((ObjGetMessageInfo(event, (dword*)&eventClass)==MSG_URL_DOCUMENT_LOAD_URL)&&
+	(eventClass == &URLDocumentClass)) {
+	/* ensure we have a document */
+	if (@call oself::MSG_GEN_FIND_CHILD_AT_POSITION(0) == NullOptr) {
+	    dcp.DCP_flags = 0;
+	    dcp.DCP_diskHandle = 0;
+	    dcp.DCP_docAttrs = GDA_UNTITLED;
+	    dcp.DCP_connection = 0;
+	    @call oself::MSG_GEN_DOCUMENT_GROUP_NEW_DOC(&dcp);
+	}
+    }
+    @callsuper();
+}

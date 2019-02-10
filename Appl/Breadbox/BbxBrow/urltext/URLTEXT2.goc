@@ -1,0 +1,427 @@
+/*
+ *                          ==CONFIDENTIAL INFORMATION==
+ *
+ * COPYRIGHT 1994-99 BREADBOX COMPUTER COMPANY -- ALL RIGHTS RESERVED  --
+ * THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER
+ * A NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ * RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ * NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ * CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ * AGREEMENT.
+ *
+*/
+/***********************************************************************
+ *
+ * PROJECT:       HTMLView
+ * FILE:          URLText.goc
+ *
+ * AUTHOR:        Marcus Gr�ber
+ *
+ ***********************************************************************/
+
+/**************************************************************************
+ *      Include files
+ **************************************************************************/
+
+@include <stdapp.goh>
+#include <geoMisc.h>                    /* various unix-like goodies */
+
+#include <Ansi/string.h>
+#include <Ansi/stdio.h>
+#include <Ansi/stdlib.h>
+
+@include <fixes.goh>
+@include "htmlview.goh"
+
+
+VMBlockHandle IConvertGraphic(
+            optr textObj,
+            VMFileHandle vmFile,
+            VisTextGraphic *p_graphic)
+{
+    GStateHandle gstate ;
+    VMBlockHandle gstring ;
+    VMBlockHandle newLink = NullHandle ;
+    SizeAsDWord size ;
+
+    /* Make sure we need to do this conversion */
+    if (p_graphic->VTG_data.VTGD_variable.VTGV_manufacturerID ==
+            HTML_VARGRAPH_MFGID)  {
+        switch(p_graphic->VTG_data.VTGD_variable.VTGV_type)  {
+            case HTML_VARGRAPH_TYPE_IMAGE:
+            case HTML_VARGRAPH_TYPE_FORM:
+                /* Create a gstring out of the form drawing */
+                gstate = GrCreateGString(
+                             vmFile,
+                             GST_VMEM,
+                             &gstring) ;
+
+                /* Simulate the way the text library draws */
+                size = @call textObj::MSG_VIS_TEXT_GRAPHIC_VARIABLE_SIZE(
+                          gstate,
+                          p_graphic) ;
+                GrMoveTo(gstate, 0, DWORD_HEIGHT(size)-p_graphic->VTG_size.XYS_height);
+                @call textObj::MSG_VIS_TEXT_GRAPHIC_VARIABLE_DRAW(
+                          gstate,
+                          p_graphic) ;
+
+                GrEndGString(gstate) ;
+                GrDestroyGString(gstate, 0, GSKT_LEAVE_DATA) ;
+
+                /* We are now a Gstring chain */
+                p_graphic->VTG_vmChain = VMCHAIN_MAKE_FROM_VM_BLOCK(gstring) ;
+                p_graphic->VTG_type = VTGT_GSTRING ;
+                newLink = gstring ;
+
+                /* No scaling, no offset on the gstring */
+                memset(
+                    &p_graphic->VTG_data.VTGD_gstring,
+                    0,
+                    sizeof(p_graphic->VTG_data.VTGD_gstring)) ;
+                p_graphic->VTG_data.VTGD_gstring.VTGG_tmatrix.TM_e11.WWF_int =
+                p_graphic->VTG_data.VTGD_gstring.VTGG_tmatrix.TM_e22.WWF_int = 1 ;
+                p_graphic->VTG_size.XYS_width = DWORD_WIDTH(size) ;
+                p_graphic->VTG_size.XYS_height = DWORD_HEIGHT(size) ;
+                break ;
+            default:
+                break ;
+        }
+    }
+
+    return newLink ;
+}
+
+/* It ain't pretty, but it works.  The concept is simple. */
+/* If we have a run of graphics in our text, make it use the point size of the previous text */
+/* If there isn't any previous text, use a point size of 14. */
+/* If there is never any text afterwards, then pass back a TRUE saying that all character */
+/*   and paragraph attributes can be dropped. */
+/* If there was more to do, I'd make a single graphic be a GString on the clipboard */
+/*   instead of this graphic in a text object.  But this stuff works nicely with multiple graphics. */
+/* All of this has been nicely done to walk the Huge arrays with HugeArrayNext */
+/*   instead of blunt Lock/Unlock */
+Boolean IFixupCharRunsForGraphics(
+         VMFileHandle file,
+         VMBlockHandle graphicRuns,
+         VMBlockHandle charAttrRuns,
+         VMBlockHandle charAttrElements)
+{
+    optr elements ;
+    LMemBlockHeader *p_elements ;
+    MemHandle mem ;
+    TextRunArrayElement *p_charRun ;
+    TextRunArrayElement *p_graphicRun ;
+    word size ;
+    word numGraphics ;
+    word numCharAttrs ;
+    word previousToken = 0xFFFF ;
+    word previousPreviousToken = 0xFFFF ;
+    VisTextCharAttr *p_previousAttr, *p_currentAttr ;
+    Boolean atLeastOneGraphic = FALSE ;
+
+    /* Get access to the elements */
+    p_elements = VMLock(file, charAttrElements, &mem) ;
+    EC_ERROR_IF((p_elements == 0), -1);
+    elements = ConstructOptr(mem, p_elements->LMBH_offset) ;
+    numGraphics = HugeArrayLock(file, graphicRuns, 0, (void**)&p_graphicRun, &size) ;
+    numCharAttrs = HugeArrayLock(file, charAttrRuns, 0, (void**)&p_charRun, &size) ;
+
+    /* Walk simultaneously through the graphics and run arrays */
+    while (numGraphics)  {
+        /* Scan to a charRun that is after or equal to the graphic run */
+        while (numCharAttrs) {
+            if (((byte)p_charRun->TRAE_position.WAAH_high) >
+                    ((byte)p_graphicRun->TRAE_position.WAAH_high))  {
+                break ;
+            } else if (((byte)p_charRun->TRAE_position.WAAH_high) ==
+                    ((byte)p_graphicRun->TRAE_position.WAAH_high))  {
+                if (p_charRun->TRAE_position.WAAH_low >= p_graphicRun->TRAE_position.WAAH_low)  {
+                    break ;
+                }
+            }
+
+            /* Next Run */
+            previousPreviousToken = previousToken ;
+            previousToken = p_charRun->TRAE_token ;
+
+            numCharAttrs-- ;
+            if (numCharAttrs)  {
+                p_charRun++ ;
+            } else {
+                numCharAttrs = HugeArrayNext((void**)&p_charRun, &size) ;
+                if (numCharAttrs == 0)
+                    HugeArrayUnlock(p_charRun) ;
+            }
+        }
+
+        /* If no more, then end scan */
+        if (!numCharAttrs)
+            break ;
+        if (p_charRun->TRAE_position.WAAH_high == -1)
+            break ;
+        if (p_graphicRun->TRAE_position.WAAH_high == -1)
+            break ;
+
+        atLeastOneGraphic = TRUE ;
+
+        /* Are we a match? */
+        if ((p_charRun->TRAE_position.WAAH_high == p_graphicRun->TRAE_position.WAAH_high) &&
+                (p_charRun->TRAE_position.WAAH_low == p_graphicRun->TRAE_position.WAAH_low)) {
+            /* A match! */
+            /* Use the previous element for this element (unless none) */
+            /* and update the reference counts correctly */
+            if (previousToken != 0xFFFF)  {
+		EC(MemHandle saveH;)
+	        EC(saveH = *((word *)p_elements);)
+	        EC(*((word *)p_elements) = mem;)
+                p_currentAttr = ChunkArrayElementToPtr(elements, p_charRun->TRAE_token, NULL) ;
+                p_previousAttr = ChunkArrayElementToPtr(elements, previousToken, NULL) ;
+		EC(*((word *)p_elements) = saveH;)
+                p_currentAttr->VTCA_meta.SSEH_meta.REH_refCount.WAAH_low-- ;
+                if (p_currentAttr->VTCA_meta.SSEH_meta.REH_refCount.WAAH_low == -1)
+                    p_currentAttr->VTCA_meta.SSEH_meta.REH_refCount.WAAH_high-- ;
+                p_previousAttr->VTCA_meta.SSEH_meta.REH_refCount.WAAH_low++ ;
+                if (p_previousAttr->VTCA_meta.SSEH_meta.REH_refCount.WAAH_low == 0)
+                    p_previousAttr->VTCA_meta.SSEH_meta.REH_refCount.WAAH_high++ ;
+                p_charRun->TRAE_token = previousToken ;
+                HugeArrayDirty(p_charRun) ;
+            } else {
+                /* Let's just modify this 4 point one into a 12.0 one */
+		EC(MemHandle saveH2;)
+	        EC(saveH2 = *((word *)p_elements);)
+	        EC(*((word *)p_elements) = mem;)
+                p_currentAttr = ChunkArrayElementToPtr(elements, p_charRun->TRAE_token, NULL) ;
+		EC(*((word *)p_elements) = saveH2;)
+                p_currentAttr->VTCA_pointSize.WBF_frac = 0 ;
+                p_currentAttr->VTCA_pointSize.WBF_int = 12 ;
+            }
+        }
+
+        /* Next graphic run */
+        numGraphics-- ;
+        if (numGraphics == 0)  {
+            numGraphics = HugeArrayNext((void**)&p_graphicRun, &size) ;
+            if (numGraphics == 0)
+                HugeArrayUnlock(p_graphicRun) ;
+        } else {
+            p_graphicRun++ ;
+        }
+    }
+    if (numGraphics)
+        HugeArrayUnlock(p_graphicRun) ;
+    if (numCharAttrs)
+        HugeArrayUnlock(p_charRun) ;
+    VMDirty(mem) ;
+    VMUnlock(mem) ;
+
+    /* Return TRUE if we want to drop the character attributes and elements */
+    return ((previousPreviousToken == 0xFFFF) && (atLeastOneGraphic))?TRUE:FALSE ;
+}
+
+@extern method URLTextClass, MSG_URL_TEXT_COPY_IMAGE_TO_CLIPBOARD
+{
+	HTMLimageData		image ;
+    ClipboardItemHeader *headerMem ;
+    MemHandle           headerMemHandle ;
+    VMFileHandle        transferVMFile ;
+    VMBlockHandle       dataVMBlock ;
+    VMBlockHandle       headerVMBlock ;
+    GStateHandle        gstate;
+	VisTextGraphic		graphic ;
+
+    @call application::MSG_GEN_APPLICATION_MARK_BUSY() ;
+	@call oself::MSG_HTML_TEXT_GET_IMAGE(imageNum, &image);
+	@call oself::MSG_VIS_TEXT_GET_GRAPHIC_AT_POSITION(&graphic, image.pos) ;
+
+    transferVMFile = ClipboardGetClipboardFile() ;
+
+    gstate = GrCreateGString(transferVMFile, GST_VMEM, &dataVMBlock);
+    @call oself::MSG_VIS_TEXT_GRAPHIC_VARIABLE_DRAW(
+              gstate,
+              &graphic) ;
+    GrEndGString(gstate);
+
+    headerVMBlock = VMAlloc(transferVMFile, sizeof(ClipboardItemHeader), 1111) ;
+    headerMem = (ClipboardItemHeader *)VMLock(
+                 transferVMFile, headerVMBlock, &headerMemHandle) ;
+    headerMem->CIH_owner = ConstructOptr(GeodeGetProcessHandle(), 0) ;
+    headerMem->CIH_flags = 0 ;
+	strcpy(headerMem->CIH_name, _TEXT("Browser Image")) ;
+    headerMem->CIH_formatCount = 1;
+    headerMem->CIH_sourceID = 0 ;
+    headerMem->CIH_formats[0].CIFI_format =
+        FormatIDFromManufacturerAndType(
+             MANUFACTURER_ID_GEOWORKS,
+             CIF_GRAPHICS_STRING) ;
+    headerMem->CIH_formats[0].CIFI_vmChain =
+        (VMChain)(((dword)(dataVMBlock))<<16L) ;
+    headerMem->CIH_formats[0].CIFI_extra1 = image.HID_size.XYS_width ;
+    headerMem->CIH_formats[0].CIFI_extra2 = image.HID_size.XYS_height ;
+    VMDirty(headerMemHandle);
+    VMUnlock(headerMemHandle) ;
+    ClipboardRegisterItem(BlockIDFromFileAndBlock(transferVMFile,
+        headerVMBlock),
+        0) ;
+    @send application::MSG_GEN_APPLICATION_MARK_NOT_BUSY() ;
+}
+
+
+@extern method URLTextClass, MSG_META_CLIPBOARD_COPY
+{
+    ClipboardQueryArgs query ;
+    ClipboardRequestArgs request ;
+    TextTransferBlockHeader *p_textHeader ;
+    MemHandle dataBlockMem ;
+    LMemBlockHeader *p_graphicElements ;
+    MemHandle graphicElemMem ;
+    optr graphicArray ;
+    word num, i ;
+    VisTextGraphic *p_graphic ;
+    VMBlockHandle newLink ;
+    VMChain *p_links ;
+    VisTextRange vtr;
+	TCHAR data[2] ;
+	HTMLimageData image ;
+	Boolean doText = TRUE ;
+    EC(MemHandle saveH2;)
+
+	/* Determine if we have only one graphic selected */
+	/* Do we have only one character selected? */
+    @call self::MSG_VIS_TEXT_GET_SELECTION_RANGE(&vtr);
+	if (1+vtr.VTR_start == vtr.VTR_end)  {
+		/* Yes, we got one character */
+		@call oself::MSG_VIS_TEXT_GET_SELECTION_PTR(data) ;
+
+		/* That one character must be a graphic */
+@ifdef DO_DBCS
+		if (data[0] == C_SUBSTITUTE)  {
+@else
+		if (data[0] == C_GRAPHIC)  {
+@endif
+			/* Yep, we have a graphic imbedded in the page */
+			/* Find that graphic */
+			num = @call oself::MSG_HTML_TEXT_GET_IMAGE_COUNT();
+			for (i=0; i<num; i++)  {
+				@call oself::MSG_HTML_TEXT_GET_IMAGE(i, &image);
+				if (image.pos == vtr.VTR_start)  {
+					@call oself::MSG_URL_TEXT_COPY_IMAGE_TO_CLIPBOARD(i) ;
+					doText = FALSE ;
+					break ;
+				}
+			}
+		}
+	}
+
+	/* Only do a text copy if we failed to do a graphic copy */
+	if (doText)  {
+		@callsuper() ;
+
+		/* Convert the items on the clipboard directly */
+		ClipboardQueryItem(0, &query) ;
+		if (query.CQA_numFormats)  {
+			if (ClipboardTestItemFormat(
+				   query.CQA_header,
+				   FormatIDFromManufacturerAndType(
+					   MANUFACTURER_ID_GEOWORKS,
+					   CIF_TEXT)))  {
+				ClipboardRequestItemFormat(
+					FormatIDFromManufacturerAndType(
+						MANUFACTURER_ID_GEOWORKS,
+						CIF_TEXT),
+					query.CQA_header,
+					&request) ;
+				p_textHeader = (TextTransferBlockHeader *)VMLock(
+								request.CRA_file,
+								VMCHAIN_GET_VM_BLOCK(request.CRA_data),
+								&dataBlockMem) ;
+//				EC(saveH1 = *((word *)p_textHeader);)
+//				EC(*((word *)p_textHeader) = dataBlockMem;)
+
+				if (p_textHeader->TTBH_graphicElements)  {
+					p_graphicElements = VMLock(
+									  request.CRA_file,
+									  VMCHAIN_GET_VM_BLOCK(p_textHeader->TTBH_graphicElements),
+									  &graphicElemMem) ;
+//					EC(saveH2 = *((word *)p_graphicElements);)
+//					EC(*((word *)p_graphicElements) = graphicElemMem;)
+					EC_ERROR_IF((p_graphicElements == 0), -1);
+					graphicArray = ConstructOptr(
+									   graphicElemMem,
+									   p_graphicElements->LMBH_offset) ;
+
+					/* Convert each graphic */
+					EC(saveH2 = *((word *)p_graphicElements);)
+					EC(*((word *)p_graphicElements) = graphicElemMem;)
+					num = ChunkArrayGetCount(graphicArray) ;
+					EC(*((word *)p_graphicElements) = saveH2;)
+
+					/* Find where the links are */
+					p_links = (VMChain *)(((char *)p_textHeader) +
+								  p_textHeader->TTBH_meta.VMCT_offset) ;
+
+					/* All the links we want are at the end of the list */
+					p_links += (p_textHeader->TTBH_meta.VMCT_count - num) ;
+
+					for (i=0; i<num; i++)  {
+					        EC(saveH2 = *((word *)p_graphicElements);)
+					        EC(*((word *)p_graphicElements) = graphicElemMem;)
+						p_graphic = ChunkArrayElementToPtr(graphicArray, i, NULL) ;
+						EC(*((word *)p_graphicElements) = saveH2;)
+						newLink = IConvertGraphic(
+									  oself,
+									  request.CRA_file,
+									  p_graphic) ;
+						if (newLink)  {
+							/* Get rid of that old chain item */
+							VMFreeVMChain(request.CRA_file, p_links[i]) ;
+
+							/* Put in our new one */
+							p_links[i] = VMCHAIN_MAKE_FROM_VM_BLOCK(newLink) ;
+						}
+					}
+
+//					EC(*((word *)p_graphicElements) = saveH2;)
+					VMDirty(graphicElemMem) ;
+					VMUnlock(graphicElemMem) ;
+				}
+
+				/* If we have graphic runs and character runs, we need to make sure we */
+				/* setup the characters at where the graphics are to take on the */
+				/* the previous text's attributes */
+				if ((p_textHeader->TTBH_graphicRuns) &&
+						(p_textHeader->TTBH_charAttrRuns) &&
+							(p_textHeader->TTBH_charAttrElements))  {
+					if (IFixupCharRunsForGraphics(
+							request.CRA_file,
+							VMCHAIN_GET_VM_BLOCK(p_textHeader->TTBH_graphicRuns),
+							VMCHAIN_GET_VM_BLOCK(p_textHeader->TTBH_charAttrRuns),
+							VMCHAIN_GET_VM_BLOCK(p_textHeader->TTBH_charAttrElements)))  {
+						/* Wants to get rid of all character attributes */
+						/* Let's drop them */
+						VMFreeVMChain(request.CRA_file, p_textHeader->TTBH_charAttrRuns) ;
+						p_textHeader->TTBH_charAttrRuns = NullHandle ;
+						VMFreeVMChain(request.CRA_file, p_textHeader->TTBH_charAttrElements) ;
+						p_textHeader->TTBH_charAttrElements = NullHandle ;
+
+						/* We might as well get rid of all paragraph attributes too */
+						if (p_textHeader->TTBH_paraAttrRuns)  {
+							VMFreeVMChain(request.CRA_file, p_textHeader->TTBH_paraAttrRuns) ;
+							p_textHeader->TTBH_paraAttrRuns = NullHandle ;
+						}
+						if (p_textHeader->TTBH_paraAttrElements)  {
+							VMFreeVMChain(request.CRA_file, p_textHeader->TTBH_paraAttrElements) ;
+							p_textHeader->TTBH_paraAttrElements = NullHandle ;
+						}
+					}
+				}
+//				EC(*((word *)p_textHeader) = saveH1;)
+				VMDirty(dataBlockMem) ;
+				VMUnlock(dataBlockMem) ;
+			}
+			ClipboardDoneWithItem(query.CQA_header) ;
+
+			@call self::MSG_VIS_TEXT_SELECT_RANGE(vtr.VTR_start, vtr.VTR_start);
+			@call self::MSG_VIS_REDRAW_ENTIRE_OBJECT();
+		}
+	}
+}

@@ -3,42 +3,42 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = BBXBROW
+GEODE           = bbxbrow
 JS              = browser.goc sebrowse.goc
-INIT            = EXPIRE.GOC INIT.GOC EXPIREUI.GOH
+URLFRAME        = FRFETCH.goc URLFRAME.goc
+URLTEXT         = URLTEXT2.goc URLTEXT.goc
 ASMTOOLS        = asmtoolsManager.asm
-HTMLVIEW        = AWATCHER.GOC IMPORTG.GOC LoadURL.goc scrapbk.goc\
-                  STATTEXT.GOC UIOften.goc OpenClos.goc GLBANIM.GOC\
-                  HTMLVIEW.GOC UIAction.goc UIRare.goc
-NAVIGATE        = BOOKCLAS.GOC BOOKMARK.GOC FAVORCLS.GOC FAVORITE.GOC\
-                  NAVCACHE.GOC NAVIGATE.GOC
-URLDOC          = LOCALPAG.GOC URLDOC.GOC
-URLDOCCT        = URLDOCCT.GOC
-URLFETCH        = URLFETCH.GOC
-URLFRAME        = FRFETCH.GOC URLFRAME.GOC
-URLTEXT         = URLTEXT.GOC URLTEXT2.GOC
+INIT            = EXPIRE.goc INIT.goc expireui.goh
+URLFETCH        = URLFETCH.goc
+URLDOCCT        = URLDOCCT.goc
+NAVIGATE        = NAVIGATE.goc FAVORCLS.goc FAVORITE.goc BOOKMARK.goc\
+                  NAVCACHE.goc BOOKCLAS.goc
+URLDOC          = LOCALPAG.goc URLDOC.goc
+HTMLVIEW        = scrapbk.goc StatText.goc UIRare.goc GLBANIM.goc\
+                  AWATCHER.goc HTMLVIEW.goc ImportG.goc UIAction.goc\
+                  LoadURL.goc OpenClos.goc UIOften.goc
 UI_TO_RDFS      =
-OBJS            = browser.obj sebrowse.obj EXPIRE.obj INIT.obj AWATCHER.obj\
-                  IMPORTG.obj LoadURL.obj scrapbk.obj STATTEXT.obj\
-                  UIOften.obj OpenClos.obj GLBANIM.obj HTMLVIEW.obj\
-                  UIAction.obj UIRare.obj BOOKCLAS.obj BOOKMARK.obj\
-                  FAVORCLS.obj FAVORITE.obj NAVCACHE.obj NAVIGATE.obj\
-                  LOCALPAG.obj URLDOC.obj URLDOCCT.obj URLFETCH.obj\
-                  FRFETCH.obj URLFRAME.obj URLTEXT.obj URLTEXT2.obj
-COMMON          = BOOKCLAS.GOH BOOKMARK.GOH BOOKUI.GOH EXPIRE.GOH\
-                  FAVORCLS.GOH FAVORITE.GOH FAVORUI.GOH GLBANIM.GOH\
-                  HTMLV_UI.GOH HTMLVIEW.GOH IMPORTG.GOH javascr.h\
-                  LOCALUI.GOH OPTIONS.GOH prodGPC.goh prodNDO.goh\
-                  sebrowse.h STATTEXT.GOH URLFETCH.GOH
+OBJS            = browser.obj sebrowse.obj FRFETCH.obj URLFRAME.obj\
+                  URLTEXT2.obj URLTEXT.obj EXPIRE.obj INIT.obj URLFETCH.obj\
+                  URLDOCCT.obj NAVIGATE.obj FAVORCLS.obj FAVORITE.obj\
+                  BOOKMARK.obj NAVCACHE.obj BOOKCLAS.obj LOCALPAG.obj\
+                  URLDOC.obj scrapbk.obj StatText.obj UIRare.obj\
+                  GLBANIM.obj AWATCHER.obj HTMLVIEW.obj ImportG.obj\
+                  UIAction.obj LoadURL.obj OpenClos.obj UIOften.obj
+COMMON          = expire.goh htmlview.goh htmlv_ui.goh javascr.h\
+                  favorite.goh stattext.goh options.goh bookclas.goh\
+                  urlfetch.goh favorcls.goh prodgpc.goh bookui.goh\
+                  prodndo.goh glbanim.goh localui.goh favorui.goh\
+                  sebrowse.h bookmark.goh importg.goh
 MODULES         = ASMTOOLS
-CMODULES        = JS init htmlview navigate urldoc urldocct urlfetch\
-                  urlframe urltext
-SRCS            = $(JS) $(INIT) $(ASMTOOLS) $(HTMLVIEW) $(NAVIGATE)\
-                  $(URLDOC) $(URLDOCCT) $(URLFETCH) $(URLFRAME) $(URLTEXT)\
+CMODULES        = js urlframe urltext init urlfetch urldocct navigate\
+                  urldoc htmlview
+SRCS            = $(JS) $(URLFRAME) $(URLTEXT) $(ASMTOOLS) $(INIT)\
+                  $(URLFETCH) $(URLDOCCT) $(NAVIGATE) $(URLDOC) $(HTMLVIEW)\
                   $(COMMON)
 LOBJS           =
 
-PRODUCTS        = AB  JS JSAB #JSABDBCS JSDBCS ABDBCS DBCS
+PRODUCTS        = AB JSAB 
 
 SYSMAKEFILE     = geode.mk
 
@@ -59,26 +59,6 @@ SYSMAKEFILE     = geode.mk
 #include "AB/$(DEPFILE)"
 #endif
 
-#if exists(ABDBCS/$(DEPFILE))
-#include "ABDBCS/$(DEPFILE)"
-#endif
-
-#if exists(DBCS/$(DEPFILE))
-#include "DBCS/$(DEPFILE)"
-#endif
-
-#if exists(JS/$(DEPFILE))
-#include "JS/$(DEPFILE)"
-#endif
-
 #if exists(JSAB/$(DEPFILE))
 #include "JSAB/$(DEPFILE)"
-#endif
-
-#if exists(JSABDBCS/$(DEPFILE))
-#include "JSABDBCS/$(DEPFILE)"
-#endif
-
-#if exists(JSDBCS/$(DEPFILE))
-#include "JSDBCS/$(DEPFILE)"
 #endif
