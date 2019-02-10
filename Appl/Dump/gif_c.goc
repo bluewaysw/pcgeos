@@ -7,7 +7,7 @@
 #include <Ansi/string.h>
 
 @include <Objects/clipbrd.goh>
-@include <GifLib.goh>
+@include <giflib.goh>
 
 extern VMBlockHandle	G_bitmapHandle;
 extern word				G_currentLine;
@@ -24,9 +24,9 @@ GIFPrologue(BMFormat fmt, FileHandle file, word width, word height)
 	{
 		GStateHandle bmstate;
 		G_bitmapHandle = GrCreateBitmap(
-								fmt, width, height, 
+								fmt, width, height,
 								ClipboardGetClipboardFile(), 0, &bmstate);
-		
+
 		if(G_bitmapHandle)
 		{
 			GrDestroyBitmap(bmstate, BMD_LEAVE_DATA);
@@ -59,7 +59,7 @@ GIFSlice(FileHandle file, MemHandle memblock, word size)
 	{
 		word hal_count = 0;
 
-		p_data = p_header + 1;
+		p_data = (byte*) (p_header + 1);
 
 		elemPtr = 0;
 
@@ -76,9 +76,9 @@ GIFSlice(FileHandle file, MemHandle memblock, word size)
 
 				hal_count = HAL_COUNT(HugeArrayLock(
 					ClipboardGetClipboardFile(),
-					G_bitmapHandle, 
+					G_bitmapHandle,
 					loop + G_currentLine,
-					&elemPtr,
+					(void**)&elemPtr,
 					&elemSize));
 
 				if(!hal_count)
@@ -86,19 +86,19 @@ GIFSlice(FileHandle file, MemHandle memblock, word size)
 					goto error;
 				}
 			}
-					
+
 			lineLoop = 0;
 			while(lineLoop < elemSize)
 			{
 				elemPtr[lineLoop] = p_data[lineLoop];
-				
+
 				lineLoop++;
 			}
 
 			p_data += p_header->B_width * 3;
 			hal_count--;
 			elemPtr += elemSize;
-						
+
 			loop++;
 		}
 
@@ -115,9 +115,9 @@ GIFSlice(FileHandle file, MemHandle memblock, word size)
 			GStateHandle bmstate;
 
 			bitmap = GrCreateBitmap(
-									BMF_8BIT|BMT_PALETTE, G_bitmapWidth, G_bitmapHeight, 
+									BMF_8BIT|BMT_PALETTE, G_bitmapWidth, G_bitmapHeight,
 									ClipboardGetClipboardFile(), 0, &bmstate);
-			
+
 			if(bitmap)
 			{
 				GifError gifstat;
@@ -127,7 +127,7 @@ GIFSlice(FileHandle file, MemHandle memblock, word size)
 				gifstat = GifExportBitmapFHandle(ClipboardGetClipboardFile(), bitmap, file);
 
 				GrDestroyBitmap(bmstate, BMD_KILL_DATA);
-			
+
 				if(gifstat != GE_NO_ERROR)
 				{
 					goto error;
@@ -141,7 +141,7 @@ GIFSlice(FileHandle file, MemHandle memblock, word size)
 error:
 
 	/* remove the temporary bitmap */
-	VMFreeVMChain(ClipboardGetClipboardFile(), 
+	VMFreeVMChain(ClipboardGetClipboardFile(),
 								VMCHAIN_MAKE_FROM_VM_BLOCK(G_bitmapHandle));
 	return TRUE;
 }
@@ -152,7 +152,7 @@ GIFEpilogue(FileHandle file)
 	file++;
 
 	/* remove the temporary bitmap */
-	VMFreeVMChain(ClipboardGetClipboardFile(), 
+	VMFreeVMChain(ClipboardGetClipboardFile(),
 								VMCHAIN_MAKE_FROM_VM_BLOCK(G_bitmapHandle));
 
 	return FALSE;

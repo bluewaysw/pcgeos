@@ -3,18 +3,19 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = DUMP
-ASM_TO_OBJS     = bmp.asm clipboard.asm eps.asm epsTiff.asm fps.asm gif.asm\
-                  input.asm jpeg.asm jpegerr.asm pcx.asm psc.asm tiff.asm\
-                  dump.asm
-UI_TO_RDFS      = DUMP.UI
-SRCS            = bmp.asm clipboard.asm eps.asm epsTiff.asm fps.asm gif.asm\
-                  input.asm jpeg.asm jpegerr.asm pcx.asm psc.asm tiff.asm\
-                  dump.asm dump.def psc.def dump.ui bmp_c.goc gif_c.goc\
-                  jpeg_c.goc chkcol.goc
-OBJS            = bmp.obj clipboard.obj eps.obj epsTiff.obj fps.obj gif.obj\
-                  input.obj jpeg.obj jpegerr.obj pcx.obj psc.obj tiff.obj\
-                  dump.obj bmp_c.obj gif_c.obj jpeg_c.obj chkcol.obj
+GEODE           = dump
+ASM_TO_OBJS     = epsTiff.asm clipboard.asm pcx.asm eps.asm bmp.asm\
+                  jpegerr.asm gif.asm dump.asm tiff.asm jpeg.asm fps.asm\
+                  input.asm psc.asm
+UI_TO_RDFS      = dump.ui
+SRCS            = epsTiff.asm clipboard.asm pcx.asm eps.asm bmp.asm\
+                  jpegerr.asm gif.asm dump.asm tiff.asm jpeg.asm fps.asm\
+                  input.asm psc.asm psc.def dump.def dump.ui gif_c.goc\
+                  jpeg_c.goc chkcol.goc bmp_c.goc
+OBJS            = epsTiff.obj clipboard.obj pcx.obj eps.obj bmp.obj\
+                  jpegerr.obj gif.obj dump.obj tiff.obj jpeg.obj fps.obj\
+                  input.obj psc.obj gif_c.obj jpeg_c.obj chkcol.obj\
+                  bmp_c.obj
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk

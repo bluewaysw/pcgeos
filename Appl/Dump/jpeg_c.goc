@@ -1,6 +1,6 @@
 @include <stdapp.goh>
 #include <graphics.h>
-#include <Ansi\stdio.h>
+#include <Ansi/stdio.h>
 #include <vm.h>
 #include <hugearr.h>
 #include <Ansi/string.h>
@@ -25,7 +25,7 @@ JPEGPrologue(BMFormat fmt, FileHandle file, word width, word height)
 	{
 		GStateHandle bmstate;
 		G_bitmapHandle = GrCreateBitmap(
-								fmt, width, height, 
+								fmt, width, height,
 								ClipboardGetClipboardFile(), 0, &bmstate);
 
 		if(G_bitmapHandle)
@@ -53,7 +53,7 @@ JPEGSlice(FileHandle file, MemHandle memblock, word size)
 	word lineLoop;
 
 	size++;
-	
+
 	p_header = MemLock(memblock);
 
 	if(p_header)
@@ -77,9 +77,9 @@ JPEGSlice(FileHandle file, MemHandle memblock, word size)
 
 				hal_count = HAL_COUNT(HugeArrayLock(
 					ClipboardGetClipboardFile(),
-					G_bitmapHandle, 
+					G_bitmapHandle,
 					loop + G_currentLine,
-					&elemPtr,
+					(void**)&elemPtr,
 					&elemSize));
 			}
 
@@ -87,7 +87,7 @@ JPEGSlice(FileHandle file, MemHandle memblock, word size)
 			while(lineLoop < elemSize)
 			{
 				elemPtr[lineLoop] = p_data[lineLoop];
-				
+
 				lineLoop++;
 			}
 
@@ -134,7 +134,7 @@ JPEGSlice(FileHandle file, MemHandle memblock, word size)
 			word i ;
 			word errorHandlerContext;
 
-			/* getting quality */ 
+			/* getting quality */
 			quality = 75;
 
 			/* Step 1: allocate and initialize JPEG compression object */
@@ -148,17 +148,17 @@ JPEGSlice(FileHandle file, MemHandle memblock, word size)
 
 			/* set error handler */
 			if (!set_error_handler(&errorHandlerContext)) {
-      
-				jpeg_set_error_handler_context(&cinfo, errorHandlerContext);
-			
+
+				jpeg_set_error_handler_context((struct jpeg_common_struct *)&cinfo, errorHandlerContext);
+
 			} else {
-      
-				jpeg_set_error_handler_context(&cinfo, 0);
-				jpeg_destroy_decompress(&cinfo);
-				
+
+				jpeg_set_error_handler_context((struct jpeg_common_struct *)&cinfo, 0);
+				jpeg_destroy_decompress((struct jpeg_decompress_struct *)&cinfo);
+
 				if (outfile)
 					fdclose(outfile);
-				
+
 				goto error;
 			}
 
@@ -187,13 +187,13 @@ JPEGSlice(FileHandle file, MemHandle memblock, word size)
 			cinfo.image_height = G_bitmapHeight;
 			cinfo.input_components = 3;		/* # of color components per pixel */
 			cinfo.in_color_space = JCS_RGB; 	/* colorspace of input image */
-  
+
 			/* Now use the library's routine to set default compression parameters.
 			 * (You must set at least cinfo.in_color_space before calling this,
 			 * since the defaults depend on the source color space.)
 			 */
 			jpeg_set_defaults(&cinfo);
-			
+
 			/* Now you can set any non-default parameters you wish to.
 			 * Here we just illustrate the use of quality (quantization table) scaling:
 			 */
@@ -214,20 +214,20 @@ JPEGSlice(FileHandle file, MemHandle memblock, word size)
 			 * To keep things simple, we pass one scanline per call; you can pass
 			 * more if you wish, though.
 			 */
-			
+
 			while (cinfo.next_scanline < cinfo.image_height) {
-				
+
 				/* jpeg_write_scanlines expects an array of pointers to scanlines.
 				 * Here the array is only one element long, but you could pass
 				 * more than one scanline at a time if that's more convenient.
 				 */
 
 				if(!HAL_COUNT(HugeArrayLock(ClipboardGetClipboardFile(), G_bitmapHandle,
-						  cinfo.next_scanline, &lineptr, &size)))
+						  cinfo.next_scanline, (void**)&lineptr, &size)))
 				{
-					jpeg_set_error_handler_context(&cinfo, 0);
-					jpeg_destroy_decompress(&cinfo);
-					
+					jpeg_set_error_handler_context((struct jpeg_common_struct *)&cinfo, 0);
+					jpeg_destroy_decompress((struct jpeg_decompress_struct *)&cinfo);
+
 					if (outfile)
 						fdclose(outfile);
 					goto error;
@@ -249,7 +249,7 @@ JPEGSlice(FileHandle file, MemHandle memblock, word size)
 
 			jpeg_finish_compress(&cinfo);
 			/* After finish_compress, we can close the output file. */
-  
+
 			fdclose(outfile);
 
 			/* Step 7: release JPEG compression object */
@@ -264,7 +264,7 @@ JPEGSlice(FileHandle file, MemHandle memblock, word size)
 	}
 
 error:
-	VMFreeVMChain(ClipboardGetClipboardFile(), 
+	VMFreeVMChain(ClipboardGetClipboardFile(),
 								VMCHAIN_MAKE_FROM_VM_BLOCK(G_bitmapHandle));
 
 	return TRUE;
@@ -275,7 +275,7 @@ JPEGEpilogue(FileHandle file)
 {
 	file++;
 
-	VMFreeVMChain(ClipboardGetClipboardFile(), 
+	VMFreeVMChain(ClipboardGetClipboardFile(),
 								VMCHAIN_MAKE_FROM_VM_BLOCK(G_bitmapHandle));
 
 	return FALSE;

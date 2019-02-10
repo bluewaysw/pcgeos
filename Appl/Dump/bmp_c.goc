@@ -31,7 +31,7 @@ typedef struct
 	dword	biYPelsPerMeter;
 	dword	biClrUsed;
 	dword	biClrImportant;
-} BITMAP_INFO; 
+} BITMAP_INFO;
 
 BITMAP_INFO		G_bitmapInfo;
 VMBlockHandle	G_bitmapHandle;
@@ -52,9 +52,9 @@ BMPPrologue(BMFormat fmt, FileHandle file, word width, word height)
 	{
 		GStateHandle bmstate;
 		G_bitmapHandle = GrCreateBitmap(
-								fmt, width, height, 
+								fmt, width, height,
 								ClipboardGetClipboardFile(), 0, &bmstate);
-		
+
 		if(G_bitmapHandle)
 		{
 			GrDestroyBitmap(bmstate, BMD_LEAVE_DATA);
@@ -115,9 +115,9 @@ BMPSlice(FileHandle file, MemHandle memblock, word size)
 
 				hal_count = HAL_COUNT(HugeArrayLock(
 						ClipboardGetClipboardFile(),
-						G_bitmapHandle, 
+						G_bitmapHandle,
 						loop + G_currentLine,
-						&elemPtr,
+						(void**)&elemPtr,
 						&elemSize));
 
 				if(!hal_count)
@@ -125,12 +125,12 @@ BMPSlice(FileHandle file, MemHandle memblock, word size)
 					goto error;
 				}
 			}
-					
+
 			lineLoop = 0;
 			while(lineLoop < elemSize)
 			{
 				elemPtr[lineLoop] = p_data[lineLoop];
-				
+
 				lineLoop++;
 			}
 
@@ -163,8 +163,8 @@ BMPSlice(FileHandle file, MemHandle memblock, word size)
 			file_header.bfReserved1 = 0;
 			file_header.bfReserved2 = 0;
 			file_header.bfOffs = sizeof(file_header) + sizeof(G_bitmapInfo);
-			file_header.bfSize = 
-				file_header.bfOffs + ((((dword) G_bitmapInfo.biWidth * 3) + 3) & 0xFFFFFFFC) * 
+			file_header.bfSize =
+				file_header.bfOffs + ((((dword) G_bitmapInfo.biWidth * 3) + 3) & 0xFFFFFFFC) *
 																			G_bitmapInfo.biHeight;
 			if(sizeof(file_header) != FileWrite(file, &file_header, sizeof(file_header), 0))
 			{
@@ -187,14 +187,14 @@ BMPSlice(FileHandle file, MemHandle memblock, word size)
 
 				if(!HAL_COUNT(HugeArrayLock(
 					ClipboardGetClipboardFile(),
-					G_bitmapHandle, 
+					G_bitmapHandle,
 					loop,
-					&elemPtr,
+					(void**)&elemPtr,
 					&elemSize)))
 				{
 					goto error;
 				}
-			
+
 				lineLoop = 0;
 				while(lineLoop < G_bitmapInfo.biWidth)
 				{
@@ -209,7 +209,7 @@ BMPSlice(FileHandle file, MemHandle memblock, word size)
 				written = FileWrite(file, elemPtr, write, 0);
 
 				HugeArrayUnlock(elemPtr);
-			
+
 				if(write != written)
 				{
 					goto error;
@@ -222,7 +222,7 @@ BMPSlice(FileHandle file, MemHandle memblock, word size)
 
 error:
 	/* remove the temporary bitmap */
-	VMFreeVMChain(ClipboardGetClipboardFile(), 
+	VMFreeVMChain(ClipboardGetClipboardFile(),
 								VMCHAIN_MAKE_FROM_VM_BLOCK(G_bitmapHandle));
 
 	return TRUE;
@@ -234,7 +234,7 @@ BMPEpilogue(FileHandle file)
 	file++;
 
 	/* remove the temporary bitmap */
-	VMFreeVMChain(ClipboardGetClipboardFile(), 
+	VMFreeVMChain(ClipboardGetClipboardFile(),
 								VMCHAIN_MAKE_FROM_VM_BLOCK(G_bitmapHandle));
 
 	return FALSE;

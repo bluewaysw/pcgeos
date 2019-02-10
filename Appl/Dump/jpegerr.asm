@@ -1,6 +1,6 @@
 include stdapp.def
 include vm.def
-include objects\gCtrlC.def
+include Objects/gCtrlC.def
 include library.def
 include resource.def    ; idata/udata, ProcCallFixedOrMovable etc.
 include gstring.def
