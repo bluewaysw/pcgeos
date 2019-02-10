@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = BlackHolePref
+GEODE           = blackholepref
 ASM_TO_OBJS     = blackholepref.asm
-UI_TO_RDFS      = BLACKHOLEPREF.UI
+UI_TO_RDFS      = blackholepref.ui
 SRCS            = blackholepref.asm blackholepref.ui
 OBJS            = blackholepref.obj
 LOBJS           =
