@@ -187,7 +187,7 @@ X509_OBJECT *ret;
 #pragma code_seg(FixedCallbacks)
 #endif
 
-static unsigned long x509_object_hash(a)
+unsigned long x509_object_hash(a)
 X509_OBJECT *a;
 	{
 	unsigned long h;
@@ -206,7 +206,7 @@ X509_OBJECT *a;
 	return(h);
 	}
 
-static int x509_object_cmp(a,b)
+int x509_object_cmp(a,b)
 X509_OBJECT *a,*b;
 	{
 	int ret;

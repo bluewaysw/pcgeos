@@ -41,9 +41,15 @@
 		-I../GraphicsCommonH -I$(INSTALL_DIR:H)/GraphicsCommonH \
 		-I$(DEVEL_DIR)/Include -I$(INCLUDE_DIR)
 
+#if defined(linux)
 CCOMFLAGS	+= -I./CommonH -I$(INSTALL_DIR)/CommonH \
 		-I../GraphicsCommonH -I$(INSTALL_DIR:H)/GraphicsCommonH \
 		-I$(DEVEL_DIR)/Include -I$(INCLUDE_DIR)
+#else
+CCOMFLAGS	+= -I.\CommonH -I$(INSTALL_DIR:S/\//\\/g)\CommonH \
+			-I..\GraphicsCommonH -I$(INSTALL_DIR:H:S/\//\\/g)\GraphicsCommonH \
+			-I$(DEVEL_DIR:S/\//\\/g)\Include -I$(INCLUDE_DIR:S/\//\\/g)
+#endif
 
 PROTOCONST	= XLATLIB
 LIBNAME		= pcx,xlatlib

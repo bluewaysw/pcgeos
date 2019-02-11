@@ -27,7 +27,7 @@ GOCFLAGS += -L ftplib
 
 # CCOMFLAGS += -DLOGFILE
 
-LINKFLAGS += -N Copyright\20Breadbox\20Comp\201998
+LINKFLAGS += -N "Copyright Breadbox Comp 1998"
 
 #
 # Tell what *_PROTO_{MAJOR,MINOR} constants to use for the driver protocol

@@ -1,7 +1,7 @@
 #include <$(SYSMAKEFILE)>
 
 GOCFLAGS += -L flllib
-LINKFLAGS += -N Copyright\20Breadbox\20Comp\201998
+LINKFLAGS += -N "Copyright Breadbox Comp 1998"
 
 #GREV ?= grev
 #REVFILE = $(GEODE).rev
