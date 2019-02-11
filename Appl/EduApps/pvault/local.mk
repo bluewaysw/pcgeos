@@ -21,5 +21,5 @@ GOCFLAGS += $(COMPILE_OPTIONS)
 #endif
 
 # Set Copyright notice
-XLINKFLAGS = -N \(C\)2019\20blueway.Softworks $(COMPILE_OPTIONS)
+XLINKFLAGS = -N "(C)2019 blueway.Softworks" $(COMPILE_OPTIONS)
 

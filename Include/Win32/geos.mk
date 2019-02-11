@@ -870,14 +870,14 @@ LINK		: .USE
 
 
 .c.eobj		:
-	$(CCOM) -DDO_ERROR_CHECKING $(CCOMFLAGS) -fo=$(.TARGET) "$(.IMPSRC)" $(GEOERRFL)
+	$(CCOM) -DDO_ERROR_CHECKING $(CCOMFLAGS) -fo="$(.TARGET)" "$(.IMPSRC)" $(GEOERRFL)
 
 .c.obj		:
-	$(CCOM) $(CCOMFLAGS) -fo=$(.TARGET) "$(.IMPSRC)" $(GEOERRFL)
+	$(CCOM) $(CCOMFLAGS) -fo="$(.TARGET)" "$(.IMPSRC)" $(GEOERRFL)
 
 .goc.obj	:
 	$(GOC) $(GOCFLAGS) -o $(.TARGET:R).nc $(.IMPSRC) $(GEOERRFL)
-	$(CCOM) $(CCOMFLAGS) -fo=$(.TARGET) $(.TARGET:R).nc $(GEOERRFL)
+	$(CCOM) $(CCOMFLAGS) -fo="$(.TARGET)" "$(.TARGET:R).nc" $(GEOERRFL)
 #if $(DEVEL_DIR:T) == "Installed"
 #if defined(linux)
 	rm $(.TARGET:R).nc
@@ -888,7 +888,7 @@ LINK		: .USE
 
 .goc.eobj	:
 	$(GOC) -DDO_ERROR_CHECKING $(GOCFLAGS) -o $(.TARGET:R).ec $(.IMPSRC) $(GEOERRFL)
-	$(CCOM) -DDO_ERROR_CHECKING $(CCOMFLAGS) -fo=$(.TARGET) $(.TARGET:R).ec $(GEOERRFL)
+	$(CCOM) -DDO_ERROR_CHECKING $(CCOMFLAGS) -fo="$(.TARGET)" "$(.TARGET:R).ec" $(GEOERRFL)
 #if $(DEVEL_DIR:T) == "Installed"
 #if defined(linux)
 	rm $(.TARGET:R).ec

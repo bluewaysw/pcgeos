@@ -4,18 +4,18 @@
 # If you edit it, you will lose your changes, should it be regenerated.
 #
 GEODE           = graphvwr
+GRAPH           = quant.c quant.h
 ASMMOD          = asmmodManager.asm
-GRAPH           = QUANT.C QUANT.H
-IMPBMP          = IBCOMMON.H IMPBMP.H IMPGIF.H IMPPCX.H IMP_BMP.H\
-                  IMPPCX.GOC IMPBMP.GOC IMPGIF.GOC IMP_BMP.GOC
-MAIN            = BMPVIEW.GOC STRINGS.GOH
+MAIN            = bmpview.goc strings.goh
+IMPBMP          = imppcx.h impbmp.h impgif.h ibcommon.h imp_bmp.h\
+                  impgif.goc impbmp.goc imp_bmp.goc imppcx.goc
 UI_TO_RDFS      =
-OBJS            = QUANT.obj IMPPCX.obj IMPBMP.obj IMPGIF.obj IMP_BMP.obj\
-                  BMPVIEW.obj
-COMMON          = BVDIRMON.GOH BVDIRUP.GOH CONFIG.GOH TOKEN.GOH
+OBJS            = quant.obj bmpview.obj impgif.obj impbmp.obj imp_bmp.obj\
+                  imppcx.obj
+COMMON          = token.goh bvdirmon.goh bvdirup.goh config.goh
 MODULES         = ASMMOD
-CMODULES        = GRAPH IMPBMP MAIN
-SRCS            = $(ASMMOD) $(GRAPH) $(IMPBMP) $(MAIN) $(COMMON)
+CMODULES        = GRAPH MAIN IMPBMP
+SRCS            = $(GRAPH) $(ASMMOD) $(MAIN) $(IMPBMP) $(COMMON)
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk

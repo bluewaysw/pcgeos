@@ -116,10 +116,11 @@ minimalSavers	: lol blackhole blank bobbin circles dribble dust \
 minimalTools	: prntscrn
 
 otherEnsemble	: conview reader term tedit geofile dirls  \
-		  webbox graphvwr macror dump perf
+		   graphvwr macror dump perf
 # bim ffind
 # bbxcd
 #geocon3
+#webbox
 
 #
 # Drivers

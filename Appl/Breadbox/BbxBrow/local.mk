@@ -30,7 +30,7 @@ XCCOMFLAGS = $(COMPILE_OPTIONS:S|JAVASCRIPT_SUPPORT|JAVASCRIPT_SUPPORT=1|g)
 #endif
 
 # Allow for easy including of JS header files
-CCOMFLAGS       += -I$(CINCLUDE_DIR)/JS
+CCOMFLAGS       += -i="$(CINCLUDE_DIR)/JS"
 
 # Set Copyright notice
 #XLINKFLAGS = -N (C)98\20Breadbox\20Computer\20Company $(COMPILE_OPTIONS)

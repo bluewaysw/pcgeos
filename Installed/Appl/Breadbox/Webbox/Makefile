@@ -6,17 +6,17 @@
 GEODE           = webbox
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = uimenu2.goc msgmenu3.goc men2str.goc msgmenu2.goc\
-                  msgmenu4.goc text.goc msgsptag.goc uisptag.goc\
-                  msgmenu1.goc uibutton.goc uimenu1.goc uiabout.goc\
-                  men1str.goc uistat.goc msgproc.goc msgprim.goc\
-                  bstrings.goc msgbuton.goc men2str.goh men1str.goh app.goh\
-                  bstrings.goh global.goh
-OBJS            = uimenu2.obj msgmenu3.obj men2str.obj msgmenu2.obj\
-                  msgmenu4.obj text.obj msgsptag.obj uisptag.obj\
-                  msgmenu1.obj uibutton.obj uimenu1.obj uiabout.obj\
-                  men1str.obj uistat.obj msgproc.obj msgprim.obj\
-                  bstrings.obj msgbuton.obj
+SRCS            = bstrings.goc men1str.goc men2str.goc msgbuton.goc\
+                  msgmenu1.goc msgmenu2.goc msgmenu3.goc msgmenu4.goc\
+                  msgprim.goc msgproc.goc msgsptag.goc text.goc uiabout.goc\
+                  uibutton.goc uimenu1.goc uimenu2.goc uisptag.goc\
+                  uistat.goc app.goh bstrings.goh global.goh men1str.goh\
+                  men2str.goh
+OBJS            = bstrings.obj men1str.obj men2str.obj msgbuton.obj\
+                  msgmenu1.obj msgmenu2.obj msgmenu3.obj msgmenu4.obj\
+                  msgprim.obj msgproc.obj msgsptag.obj text.obj uiabout.obj\
+                  uibutton.obj uimenu1.obj uimenu2.obj uisptag.obj\
+                  uistat.obj
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk
