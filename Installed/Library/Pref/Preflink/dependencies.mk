@@ -1,38 +1,38 @@
-PREFLINK.rdef: GENERIC.UIH PRODUCT.UIH CONFIG.UIH OBJECTS/COLORC.UIH \
-                ART/MKRPREFLINK.UI
-PREFLINK.obj \
-PREFLINK.eobj: GEOS.DEF HEAP.DEF GEODE.DEF RESOURCE.DEF EC.DEF \
-                LIBRARY.DEF OBJECT.DEF LMEM.DEF GRAPHICS.DEF FONTID.DEF \
-                FONT.DEF COLOR.DEF GSTRING.DEF TEXT.DEF CHAR.DEF WIN.DEF \
-                DRIVE.DEF DISK.DEF FILE.DEF UI.DEF VM.DEF INPUT.DEF \
-                HWR.DEF LOCALIZE.DEF SLLANG.DEF OBJECTS/PROCESSC.DEF \
-                OBJECTS/METAC.DEF CHUNKARR.DEF GEOWORKS.DEF GCNLIST.DEF \
-                TIMEDATE.DEF OBJECTS/TEXT/TCOMMON.DEF STYLESH.DEF \
-                IACP.DEF OBJECTS/UIINPUTC.DEF OBJECTS/VISC.DEF \
-                OBJECTS/VCOMPC.DEF OBJECTS/VCNTC.DEF INTERNAL/VUTILS.DEF \
-                OBJECTS/GENC.DEF UDIALOG.DEF OBJECTS/GINTERC.DEF \
-                TOKEN.DEF OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF \
-                OBJECTS/GPROCC.DEF ALB.DEF OBJECTS/GFIELDC.DEF \
-                OBJECTS/GSCREENC.DEF OBJECTS/GFSELC.DEF \
-                OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF OBJECTS/GCTRLC.DEF \
-                OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                CONFIG.DEF OBJECTS/COLORC.DEF INTERNAL/SERIALDR.DEF \
-                INTERNAL/STREAMDR.DEF DRIVER.DEF INTERNAL/FSDRIVER.DEF \
-                INTERNAL/FSD.DEF INTERNAL/DRIVEINT.DEF \
-                INTERNAL/SEMINT.DEF INTERNAL/DISKINT.DEF \
-                INTERNAL/FILEINT.DEF FILEENUM.DEF INTERNAL/DOS.DEF \
-                INTERNAL/RFSD.DEF PREFLINK.DEF PREFLINK.RDEF \
-                PREFDRIVELIST.ASM PREFLINKDIALOG.ASM PREFLINKCONNECT.ASM
+preflink.rdef: generic.uih product.uih config.uih Objects/colorC.uih \
+                Art/mkrPrefLink.ui
+preflink.obj \
+preflink.eobj: geos.def heap.def geode.def resource.def ec.def \
+                library.def object.def lmem.def graphics.def fontID.def \
+                font.def color.def gstring.def text.def char.def win.def \
+                drive.def disk.def file.def ui.def vm.def input.def \
+                hwr.def localize.def sllang.def Objects/processC.def \
+                Objects/metaC.def chunkarr.def geoworks.def gcnlist.def \
+                timedate.def Objects/Text/tCommon.def stylesh.def \
+                iacp.def Objects/uiInputC.def Objects/visC.def \
+                Objects/vCompC.def Objects/vCntC.def Internal/vUtils.def \
+                Objects/genC.def uDialog.def Objects/gInterC.def \
+                token.def Objects/clipbrd.def Objects/gSysC.def \
+                Objects/gProcC.def alb.def Objects/gFieldC.def \
+                Objects/gScreenC.def Objects/gFSelC.def \
+                Objects/gViewC.def Objects/gContC.def Objects/gCtrlC.def \
+                Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                config.def Objects/colorC.def Internal/serialDr.def \
+                Internal/streamDr.def driver.def Internal/fsDriver.def \
+                Internal/fsd.def Internal/driveInt.def \
+                Internal/semInt.def Internal/diskInt.def \
+                Internal/fileInt.def fileEnum.def Internal/dos.def \
+                Internal/rfsd.def preflink.def preflink.rdef \
+                prefDriveList.asm preflinkDialog.asm preflinkConnect.asm
 
-PreflinkEC.geo Preflink.geo : GEOS.LDF UI.LDF CONFIG.LDF 
+preflinkEC.geo preflink.geo : geos.ldf ui.ldf config.ldf 

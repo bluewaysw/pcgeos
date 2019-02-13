@@ -3,11 +3,11 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Preflink
+GEODE           = preflink
 ASM_TO_OBJS     = preflink.asm
-UI_TO_RDFS      = PREFLINK.UI
-SRCS            = prefDriveList.asm preflink.asm preflinkConnect.asm\
-                  preflinkDialog.asm preflink.def preflink.ui
+UI_TO_RDFS      = preflink.ui
+SRCS            = preflinkDialog.asm preflink.asm prefDriveList.asm\
+                  preflinkConnect.asm preflink.def preflink.ui
 OBJS            = preflink.obj
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
