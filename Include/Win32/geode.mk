@@ -561,14 +561,14 @@ CMODULES =
 MODULES =
 #endif MODULES
 
-#ifndef CPP
+##ifndef CPP
 ## Use cpp32 instead of cpp so that it can find include files in
 ## directories that are longer than 8.3 (e.g.,
 ## -Is:\pcgeos\LongProductName\Include).  cpp.exe from bc45 and earlier
 ## can't handle that...
 CPP	= uicpp -M
 #wcc -pcl 
-#endif
+##endif
 
 #ifndef ASM_TO_OBJS
 ## This won't be defined for large model.
