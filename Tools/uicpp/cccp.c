@@ -599,9 +599,9 @@ main (argc, argv)
 
   for (i = 1; i < argc; i++) {
     if (argv[i][0] != '-') {
-      if (out_fname != NULL)
+      /*if (out_fname != NULL)
 	fatal2 ("Usage: %s [switches] input output", argv[0]);
-      else if (in_fname != NULL)
+      else */if (in_fname != NULL)
 	out_fname = argv[i];
       else
 	in_fname = argv[i];

@@ -41,6 +41,8 @@ static char *rcsid =
 #include    <stdlib.h>
 #include    "symbol.h"
 
+#include    "fileargs.h"
+
 FILE		  *yyin;
 FILE		  *output;
 
@@ -280,6 +282,10 @@ main(int argc, char **argv)
      */
     malloc_noerr(1);
 
+    if ((argc == 2) && HAS_ARGS_FILE(argv))
+    {
+  GetFileArgs(ARGS_FILE(argv), &argc, &argv);
+    }
     ParseArgs(argc, argv);
 
     Symbol_Init();
