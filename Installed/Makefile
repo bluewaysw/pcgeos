@@ -1037,7 +1037,7 @@ Installed/Appl/Saver/Hopalong:			saver config MAKEAPPL
 Installed/Appl/Saver/Hopalong/HopalongPref:	saver config MAKEAPPL
 
 lastwords	: 	Installed/Appl/Saver/LastWords \
-			Installed/Appl/Saver/LastWords
+			Installed/Appl/Saver/LWPref
 Installed/Appl/Saver/LastWords:			saver config MAKEAPPL
 Installed/Appl/Saver/LWPref:			saver config MAKEAPPL
 
