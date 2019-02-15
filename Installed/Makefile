@@ -91,7 +91,7 @@ extraPrefLibs	: prefpag prefjfep
 #
 minimalAppl	: minimalGame minimalUtils minimalTools minimalSavers \
 		  minimalEdu calendar geodex geocalc geodraw geowrite \
-		  scrapbk clock bigcalc \
+		  scrapbk clock bigcalc geopoint \
 		  email manager isdesk linktool setup \
 		  launcher webmagick idialup \
 		  charm wordmat banner \
@@ -842,6 +842,9 @@ Installed/Appl/GeoCalc:		ui spool cell parse math spreadsheet \
 geodraw	: Installed/Appl/GeoDraw
 Installed/Appl/GeoDraw:		ui spool ruler text spline grobj chart \
 				bitmap spell color convert MAKEAPPL
+
+geodraw	: Installed/Appl/GeoPoint
+Installed/Appl/GeoPoint:		ui ansic text color MAKEAPPL
 
 geowrite	: Installed/Appl/GeoWrite
 Installed/Appl/GeoWrite:	ui spool ruler text spline grobj chart \

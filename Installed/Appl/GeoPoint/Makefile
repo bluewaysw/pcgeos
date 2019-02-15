@@ -3,11 +3,11 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = GeoPoint
+GEODE           = geopoint
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = functs.goc proc.goc show.goc ui.goc GeoPoint.goh
-OBJS            = functs.obj proc.obj show.obj ui.obj
+SRCS            = proc.goc ui.goc show.goc functs.goc geopoint.goh
+OBJS            = proc.obj ui.obj show.obj functs.obj
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk
