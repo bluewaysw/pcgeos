@@ -843,7 +843,7 @@ geodraw	: Installed/Appl/GeoDraw
 Installed/Appl/GeoDraw:		ui spool ruler text spline grobj chart \
 				bitmap spell color convert MAKEAPPL
 
-geodraw	: Installed/Appl/GeoPoint
+geopoint	: Installed/Appl/GeoPoint
 Installed/Appl/GeoPoint:		ui ansic text color MAKEAPPL
 
 geowrite	: Installed/Appl/GeoWrite
