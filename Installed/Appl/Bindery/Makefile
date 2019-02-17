@@ -3,38 +3,38 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Bindery
+GEODE           = bindery
+MAIN            = mainAppUI.asm mainApp.asm mainManager.asm mainProcess.asm
 ARTICLE         = articleArticle.asm articleManager.asm
-DOCUMENT        = documentArticle.asm documentAttrMgr.asm documentBody.asm\
-                  documentContent.asm documentConvert.asm documentData.asm\
-                  documentDisplay.asm documentDocument.asm documentDraw.asm\
-                  documentFlow.asm documentFrame.asm documentHdrFtr.asm\
-                  documentHead.asm documentHelp.asm documentImpex.asm\
-                  documentManager.asm documentManip.asm\
-                  documentMasterPage.asm documentMerge.asm\
-                  documentMergeScrap.asm documentMisc.asm\
-                  documentNotify.asm documentOpenClose.asm documentPage.asm\
-                  documentPageSetup.asm documentPrint.asm\
-                  documentRegion.asm documentScroll.asm\
-                  documentSearchSp.asm documentSection.asm\
-                  documentUserSection.asm documentUtils.asm\
-                  documentVariable.asm documentData.ui documentManager.ui
-MAIN            = mainApp.asm mainAppUI.asm mainManager.asm mainProcess.asm
-UI              = uiFixed.asm uiManager.asm uiPageName.asm uiRowColumn.asm\
-                  uiAppMoniker.ui uiDisplay.ui uiDocMoniker.ui\
-                  uiDocument.ui uiEdit.ui uiFixed.ui uiGraphics.ui\
-                  uiHelpEdit.ui uiLayout.ui uiMain.ui uiManager.ui\
-                  uiOptions.ui uiPageSetup.ui uiPlatform.ui uiPrint.ui\
-                  uiRowColumn.ui uiText.ui uiView.ui
-UI_TO_RDFS      = DOCUMENTMANAGER.UI UIMANAGER.UI
+DOCUMENT        = documentPageSetup.asm documentOpenClose.asm\
+                  documentAttrMgr.asm documentDocument.asm\
+                  documentMerge.asm documentSearchSp.asm\
+                  documentManager.asm documentPage.asm documentSection.asm\
+                  documentData.asm documentNotify.asm documentMisc.asm\
+                  documentUserSection.asm documentConvert.asm\
+                  documentImpex.asm documentFrame.asm documentDraw.asm\
+                  documentDisplay.asm documentVariable.asm\
+                  documentArticle.asm documentPrint.asm documentManip.asm\
+                  documentMergeScrap.asm documentFlow.asm\
+                  documentMasterPage.asm documentHead.asm documentHelp.asm\
+                  documentBody.asm documentRegion.asm documentUtils.asm\
+                  documentScroll.asm documentHdrFtr.asm documentContent.asm\
+                  documentData.ui documentManager.ui
+UI              = uiRowColumn.asm uiPageName.asm uiManager.asm uiFixed.asm\
+                  uiDocument.ui uiMain.ui uiEdit.ui uiText.ui uiFixed.ui\
+                  uiHelpEdit.ui uiPlatform.ui uiAppMoniker.ui uiView.ui\
+                  uiDisplay.ui uiLayout.ui uiManager.ui uiPrint.ui\
+                  uiOptions.ui uiRowColumn.ui uiDocMoniker.ui uiGraphics.ui\
+                  uiPageSetup.ui
+UI_TO_RDFS      = documentManager.ui uiManager.ui
 OBJS            =
-COMMON          = flowRegion.def studioApplication.def studioArticle.def\
-                  studioConstant.def studioControl.def studioDisplay.def\
-                  studioDocument.def studioGeode.def studioGrObjBody.def\
-                  studioGrObjHead.def studioHdrFtr.def studioProcess.def
-MODULES         = Article Document Main UI
+COMMON          = studioApplication.def studioArticle.def studioHdrFtr.def\
+                  flowRegion.def studioProcess.def studioConstant.def\
+                  studioDisplay.def studioDocument.def studioControl.def\
+                  studioGrObjHead.def studioGrObjBody.def studioGeode.def
+MODULES         = Main Article Document UI
 CMODULES        =
-SRCS            = $(ARTICLE) $(DOCUMENT) $(MAIN) $(UI) $(COMMON)
+SRCS            = $(MAIN) $(ARTICLE) $(DOCUMENT) $(UI) $(COMMON)
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk
