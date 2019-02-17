@@ -1,186 +1,186 @@
-ARTICLE.obj \
-ARTICLE.eobj: Article/ArticleMANAGER.ASM \
-                STUDIOGEODE.DEF GEOS.DEF HEAP.DEF GEODE.DEF RESOURCE.DEF \
-                EC.DEF OBJECT.DEF LMEM.DEF GRAPHICS.DEF FONTID.DEF \
-                FONT.DEF COLOR.DEF CHUNKARR.DEF FILE.DEF VM.DEF DBASE.DEF \
-                CHAR.DEF INPUT.DEF HWR.DEF THREAD.DEF \
-                INTERNAL/THREADIN.DEF ASSERT.DEF DISK.DEF DRIVE.DEF \
-                OBJECTS/WINC.DEF WIN.DEF OBJECTS/METAC.DEF GEOWORKS.DEF \
-                OBJECTS/INPUTC.DEF UI.DEF TEXT.DEF LOCALIZE.DEF \
-                SLLANG.DEF OBJECTS/PROCESSC.DEF GCNLIST.DEF TIMEDATE.DEF \
-                OBJECTS/TEXT/TCOMMON.DEF STYLESH.DEF IACP.DEF \
-                OBJECTS/UIINPUTC.DEF OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF \
-                OBJECTS/VCNTC.DEF INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF \
-                UDIALOG.DEF OBJECTS/GINTERC.DEF TOKEN.DEF \
-                OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF \
-                ALB.DEF OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                SPOOL.DEF PRINT.DEF INTERNAL/PRODFEATURES.DEF IMPEX.DEF \
-                IECOMMON.DEF RULER.DEF GROBJ.DEF OBJECTS/SPLINE.DEF \
-                OBJECTS/COLORC.DEF OBJECTS/VTEXTC.DEF HUGEARR.DEF \
-                OBJECTS/STYLES.DEF BITMAP.DEF SSMETA.DEF HYPRLNK.DEF \
-                HOTSPOT.DEF OBJECTS/VLTEXTC.DEF CONVIEW.DEF COMPRESS.DEF \
-                TIMER.DEF HELPFILE.DEF STUDIOCONSTANT.DEF \
-                STUDIODOCUMENT.DEF STUDIOARTICLE.DEF ARTICLEARTICLE.ASM
-DOCUMENT.obj \
-DOCUMENT.eobj: Document/DocumentMANAGER.ASM \
-                STUDIOGEODE.DEF GEOS.DEF HEAP.DEF GEODE.DEF RESOURCE.DEF \
-                EC.DEF OBJECT.DEF LMEM.DEF GRAPHICS.DEF FONTID.DEF \
-                FONT.DEF COLOR.DEF CHUNKARR.DEF FILE.DEF VM.DEF DBASE.DEF \
-                CHAR.DEF INPUT.DEF HWR.DEF THREAD.DEF \
-                INTERNAL/THREADIN.DEF ASSERT.DEF DISK.DEF DRIVE.DEF \
-                OBJECTS/WINC.DEF WIN.DEF OBJECTS/METAC.DEF GEOWORKS.DEF \
-                OBJECTS/INPUTC.DEF UI.DEF TEXT.DEF LOCALIZE.DEF \
-                SLLANG.DEF OBJECTS/PROCESSC.DEF GCNLIST.DEF TIMEDATE.DEF \
-                OBJECTS/TEXT/TCOMMON.DEF STYLESH.DEF IACP.DEF \
-                OBJECTS/UIINPUTC.DEF OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF \
-                OBJECTS/VCNTC.DEF INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF \
-                UDIALOG.DEF OBJECTS/GINTERC.DEF TOKEN.DEF \
-                OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF \
-                ALB.DEF OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                SPOOL.DEF PRINT.DEF INTERNAL/PRODFEATURES.DEF IMPEX.DEF \
-                IECOMMON.DEF RULER.DEF GROBJ.DEF OBJECTS/SPLINE.DEF \
-                OBJECTS/COLORC.DEF OBJECTS/VTEXTC.DEF HUGEARR.DEF \
-                OBJECTS/STYLES.DEF BITMAP.DEF SSMETA.DEF HYPRLNK.DEF \
-                HOTSPOT.DEF OBJECTS/VLTEXTC.DEF CONVIEW.DEF COMPRESS.DEF \
-                TIMER.DEF HELPFILE.DEF STUDIOCONSTANT.DEF \
-                STUDIODOCUMENT.DEF STUDIOAPPLICATION.DEF \
-                STUDIODISPLAY.DEF STUDIOPROCESS.DEF SYSTEM.DEF \
-                GSTRING.DEF LIBRARY.DEF INTERNAL/GRWININT.DEF \
-                INTERNAL/CONVERT.DEF OBJECTS/TEXT/TCTRLC.DEF MATH.DEF \
-                CELL.DEF PARSE.DEF SSHEET.DEF STUDIOARTICLE.DEF \
-                STUDIOGROBJHEAD.DEF STUDIOGROBJBODY.DEF STUDIOHDRFTR.DEF \
-                FLOWREGION.DEF DOCUMENTMANAGER.RDEF DOCUMENTDATA.ASM \
-                DOCUMENTDOCUMENT.ASM DOCUMENTOPENCLOSE.ASM \
-                DOCUMENTCONTENT.ASM DOCUMENTARTICLE.ASM \
-                DOCUMENTSECTION.ASM DOCUMENTPAGE.ASM DOCUMENTDRAW.ASM \
-                DOCUMENTMANIP.ASM DOCUMENTUTILS.ASM DOCUMENTFLOW.ASM \
-                DOCUMENTFRAME.ASM DOCUMENTNOTIFY.ASM DOCUMENTMISC.ASM \
-                DOCUMENTPRINT.ASM DOCUMENTMERGE.ASM \
-                DOCUMENTMERGESCRAP.ASM DOCUMENTHEAD.ASM \
-                DOCUMENTATTRMGR.ASM DOCUMENTBODY.ASM DOCUMENTHDRFTR.ASM \
-                DOCUMENTUSERSECTION.ASM DOCUMENTPAGESETUP.ASM \
-                DOCUMENTREGION.ASM DOCUMENTMASTERPAGE.ASM \
-                DOCUMENTDISPLAY.ASM DOCUMENTSCROLL.ASM DOCUMENTIMPEX.ASM \
-                DOCUMENTVARIABLE.ASM DOCUMENTCONVERT.ASM DOCUMENTHELP.ASM \
-                DOCUMENTSEARCHSP.ASM
-MAIN.obj \
-MAIN.eobj: Main/MainMANAGER.ASM \
-                STUDIOGEODE.DEF GEOS.DEF HEAP.DEF GEODE.DEF RESOURCE.DEF \
-                EC.DEF OBJECT.DEF LMEM.DEF GRAPHICS.DEF FONTID.DEF \
-                FONT.DEF COLOR.DEF CHUNKARR.DEF FILE.DEF VM.DEF DBASE.DEF \
-                CHAR.DEF INPUT.DEF HWR.DEF THREAD.DEF \
-                INTERNAL/THREADIN.DEF ASSERT.DEF DISK.DEF DRIVE.DEF \
-                OBJECTS/WINC.DEF WIN.DEF OBJECTS/METAC.DEF GEOWORKS.DEF \
-                OBJECTS/INPUTC.DEF UI.DEF TEXT.DEF LOCALIZE.DEF \
-                SLLANG.DEF OBJECTS/PROCESSC.DEF GCNLIST.DEF TIMEDATE.DEF \
-                OBJECTS/TEXT/TCOMMON.DEF STYLESH.DEF IACP.DEF \
-                OBJECTS/UIINPUTC.DEF OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF \
-                OBJECTS/VCNTC.DEF INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF \
-                UDIALOG.DEF OBJECTS/GINTERC.DEF TOKEN.DEF \
-                OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF \
-                ALB.DEF OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                SPOOL.DEF PRINT.DEF INTERNAL/PRODFEATURES.DEF IMPEX.DEF \
-                IECOMMON.DEF RULER.DEF GROBJ.DEF OBJECTS/SPLINE.DEF \
-                OBJECTS/COLORC.DEF OBJECTS/VTEXTC.DEF HUGEARR.DEF \
-                OBJECTS/STYLES.DEF BITMAP.DEF SSMETA.DEF HYPRLNK.DEF \
-                HOTSPOT.DEF OBJECTS/VLTEXTC.DEF CONVIEW.DEF COMPRESS.DEF \
-                TIMER.DEF HELPFILE.DEF STUDIOCONSTANT.DEF \
-                STUDIOPROCESS.DEF STUDIODOCUMENT.DEF \
-                STUDIOAPPLICATION.DEF FLOWREGION.DEF INITFILE.DEF \
-                OBJECTS/TEXT/TCTRLC.DEF STUDIOCONTROL.DEF MAINPROCESS.ASM \
-                MAINAPP.ASM MAINAPPUI.ASM
+Main.obj \
+Main.eobj: Main/mainManager.asm \
+                studioGeode.def geos.def heap.def geode.def resource.def \
+                ec.def object.def lmem.def graphics.def fontID.def \
+                font.def color.def chunkarr.def file.def vm.def dbase.def \
+                char.def input.def hwr.def thread.def \
+                Internal/threadIn.def assert.def disk.def drive.def \
+                Objects/winC.def win.def Objects/metaC.def geoworks.def \
+                Objects/inputC.def ui.def text.def localize.def \
+                sllang.def Objects/processC.def gcnlist.def timedate.def \
+                Objects/Text/tCommon.def stylesh.def iacp.def \
+                Objects/uiInputC.def Objects/visC.def Objects/vCompC.def \
+                Objects/vCntC.def Internal/vUtils.def Objects/genC.def \
+                uDialog.def Objects/gInterC.def token.def \
+                Objects/clipbrd.def Objects/gSysC.def Objects/gProcC.def \
+                alb.def Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                spool.def print.def Internal/prodFeatures.def impex.def \
+                ieCommon.def ruler.def grobj.def Objects/spline.def \
+                Objects/colorC.def Objects/vTextC.def hugearr.def \
+                Objects/styles.def bitmap.def ssmeta.def hyprlnk.def \
+                hotspot.def Objects/vLTextC.def conview.def compress.def \
+                timer.def helpFile.def studioConstant.def \
+                studioProcess.def studioDocument.def \
+                studioApplication.def flowRegion.def initfile.def \
+                Objects/Text/tCtrlC.def studioControl.def mainProcess.asm \
+                mainApp.asm mainAppUI.asm
+Article.obj \
+Article.eobj: Article/articleManager.asm \
+                studioGeode.def geos.def heap.def geode.def resource.def \
+                ec.def object.def lmem.def graphics.def fontID.def \
+                font.def color.def chunkarr.def file.def vm.def dbase.def \
+                char.def input.def hwr.def thread.def \
+                Internal/threadIn.def assert.def disk.def drive.def \
+                Objects/winC.def win.def Objects/metaC.def geoworks.def \
+                Objects/inputC.def ui.def text.def localize.def \
+                sllang.def Objects/processC.def gcnlist.def timedate.def \
+                Objects/Text/tCommon.def stylesh.def iacp.def \
+                Objects/uiInputC.def Objects/visC.def Objects/vCompC.def \
+                Objects/vCntC.def Internal/vUtils.def Objects/genC.def \
+                uDialog.def Objects/gInterC.def token.def \
+                Objects/clipbrd.def Objects/gSysC.def Objects/gProcC.def \
+                alb.def Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                spool.def print.def Internal/prodFeatures.def impex.def \
+                ieCommon.def ruler.def grobj.def Objects/spline.def \
+                Objects/colorC.def Objects/vTextC.def hugearr.def \
+                Objects/styles.def bitmap.def ssmeta.def hyprlnk.def \
+                hotspot.def Objects/vLTextC.def conview.def compress.def \
+                timer.def helpFile.def studioConstant.def \
+                studioDocument.def studioArticle.def articleArticle.asm
+Document.obj \
+Document.eobj: Document/documentManager.asm \
+                studioGeode.def geos.def heap.def geode.def resource.def \
+                ec.def object.def lmem.def graphics.def fontID.def \
+                font.def color.def chunkarr.def file.def vm.def dbase.def \
+                char.def input.def hwr.def thread.def \
+                Internal/threadIn.def assert.def disk.def drive.def \
+                Objects/winC.def win.def Objects/metaC.def geoworks.def \
+                Objects/inputC.def ui.def text.def localize.def \
+                sllang.def Objects/processC.def gcnlist.def timedate.def \
+                Objects/Text/tCommon.def stylesh.def iacp.def \
+                Objects/uiInputC.def Objects/visC.def Objects/vCompC.def \
+                Objects/vCntC.def Internal/vUtils.def Objects/genC.def \
+                uDialog.def Objects/gInterC.def token.def \
+                Objects/clipbrd.def Objects/gSysC.def Objects/gProcC.def \
+                alb.def Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                spool.def print.def Internal/prodFeatures.def impex.def \
+                ieCommon.def ruler.def grobj.def Objects/spline.def \
+                Objects/colorC.def Objects/vTextC.def hugearr.def \
+                Objects/styles.def bitmap.def ssmeta.def hyprlnk.def \
+                hotspot.def Objects/vLTextC.def conview.def compress.def \
+                timer.def helpFile.def studioConstant.def \
+                studioDocument.def studioApplication.def \
+                studioDisplay.def studioProcess.def system.def \
+                gstring.def library.def Internal/grWinInt.def \
+                Internal/convert.def Objects/Text/tCtrlC.def math.def \
+                cell.def parse.def ssheet.def studioArticle.def \
+                studioGrObjHead.def studioGrObjBody.def studioHdrFtr.def \
+                flowRegion.def documentManager.rdef documentData.asm \
+                documentDocument.asm documentOpenClose.asm \
+                documentContent.asm documentArticle.asm \
+                documentSection.asm documentPage.asm documentDraw.asm \
+                documentManip.asm documentUtils.asm documentFlow.asm \
+                documentFrame.asm documentNotify.asm documentMisc.asm \
+                documentPrint.asm documentMerge.asm \
+                documentMergeScrap.asm documentHead.asm \
+                documentAttrMgr.asm documentBody.asm documentHdrFtr.asm \
+                documentUserSection.asm documentPageSetup.asm \
+                documentRegion.asm documentMasterPage.asm \
+                documentDisplay.asm documentScroll.asm documentImpex.asm \
+                documentVariable.asm documentConvert.asm documentHelp.asm \
+                documentSearchSp.asm
 UI.obj \
-UI.eobj: UI/UIMANAGER.ASM \
-                STUDIOGEODE.DEF GEOS.DEF HEAP.DEF GEODE.DEF RESOURCE.DEF \
-                EC.DEF OBJECT.DEF LMEM.DEF GRAPHICS.DEF FONTID.DEF \
-                FONT.DEF COLOR.DEF CHUNKARR.DEF FILE.DEF VM.DEF DBASE.DEF \
-                CHAR.DEF INPUT.DEF HWR.DEF THREAD.DEF \
-                INTERNAL/THREADIN.DEF ASSERT.DEF DISK.DEF DRIVE.DEF \
-                OBJECTS/WINC.DEF WIN.DEF OBJECTS/METAC.DEF GEOWORKS.DEF \
-                OBJECTS/INPUTC.DEF UI.DEF TEXT.DEF LOCALIZE.DEF \
-                SLLANG.DEF OBJECTS/PROCESSC.DEF GCNLIST.DEF TIMEDATE.DEF \
-                OBJECTS/TEXT/TCOMMON.DEF STYLESH.DEF IACP.DEF \
-                OBJECTS/UIINPUTC.DEF OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF \
-                OBJECTS/VCNTC.DEF INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF \
-                UDIALOG.DEF OBJECTS/GINTERC.DEF TOKEN.DEF \
-                OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF \
-                ALB.DEF OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                SPOOL.DEF PRINT.DEF INTERNAL/PRODFEATURES.DEF IMPEX.DEF \
-                IECOMMON.DEF RULER.DEF GROBJ.DEF OBJECTS/SPLINE.DEF \
-                OBJECTS/COLORC.DEF OBJECTS/VTEXTC.DEF HUGEARR.DEF \
-                OBJECTS/STYLES.DEF BITMAP.DEF SSMETA.DEF HYPRLNK.DEF \
-                HOTSPOT.DEF OBJECTS/VLTEXTC.DEF CONVIEW.DEF COMPRESS.DEF \
-                TIMER.DEF HELPFILE.DEF SPELL.DEF STUDIOCONSTANT.DEF \
-                STUDIODOCUMENT.DEF STUDIOAPPLICATION.DEF \
-                STUDIOPROCESS.DEF STUDIODISPLAY.DEF STUDIOGROBJHEAD.DEF \
-                STUDIOCONTROL.DEF GSTRING.DEF OBJECTS/TEXT/TCTRLC.DEF \
-                UIMANAGER.RDEF UI/UIPAGENAME.ASM
-DOCUMENTMANAGER.rdef: GENERIC.UIH PRODUCT.UIH GROBJ.UIH OBJECTS/COLORC.UIH \
-                OBJECTS/STYLES.UIH BITMAP.UIH OBJECTS/TEXT/TCTRL.UIH \
-                RULER.UIH HOTSPOT.UIH DOCUMENT/DOCUMENTDATA.UI
-UIMANAGER.rdef: GENERIC.UIH PRODUCT.UIH IMPEX.UIH SPOOL.UIH GROBJ.UIH \
-                OBJECTS/COLORC.UIH OBJECTS/STYLES.UIH BITMAP.UIH \
-                OBJECTS/TEXT/TCTRL.UIH RULER.UIH SPELL.UIH \
-                OBJECTS/SPLINE.UIH HYPRLNK.UIH UI/UISTUDIO.UIH \
-                UI/UIMAIN.UI ART/MKREDITTEXTTOOL.UI \
-                ART/MKRBITMAPPTRTOOL.UI ART/MKRSTUDIO.UI UI/UIPRINT.UI \
-                UI/UIPAGESETUP.UI UI/UIEDIT.UI UI/UIVIEW.UI \
-                UI/UIOPTIONS.UI USRLEVEL.UIH UI/UILAYOUT.UI \
-                UI/UIGRAPHICS.UI UI/UITEXT.UI UI/UIHELPEDIT.UI \
-                UI/UIPLATFORM.UI UI/UIDOCUMENT.UI UI/UIDISPLAY.UI \
-                UI/UIDOCMONIKER.UI ART/MKRMBOOKDOC.UI ART/MKRCBOOKDOC.UI \
-                ART/MKRSTUDIODOC.UI
+UI.eobj: UI/uiManager.asm \
+                studioGeode.def geos.def heap.def geode.def resource.def \
+                ec.def object.def lmem.def graphics.def fontID.def \
+                font.def color.def chunkarr.def file.def vm.def dbase.def \
+                char.def input.def hwr.def thread.def \
+                Internal/threadIn.def assert.def disk.def drive.def \
+                Objects/winC.def win.def Objects/metaC.def geoworks.def \
+                Objects/inputC.def ui.def text.def localize.def \
+                sllang.def Objects/processC.def gcnlist.def timedate.def \
+                Objects/Text/tCommon.def stylesh.def iacp.def \
+                Objects/uiInputC.def Objects/visC.def Objects/vCompC.def \
+                Objects/vCntC.def Internal/vUtils.def Objects/genC.def \
+                uDialog.def Objects/gInterC.def token.def \
+                Objects/clipbrd.def Objects/gSysC.def Objects/gProcC.def \
+                alb.def Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                spool.def print.def Internal/prodFeatures.def impex.def \
+                ieCommon.def ruler.def grobj.def Objects/spline.def \
+                Objects/colorC.def Objects/vTextC.def hugearr.def \
+                Objects/styles.def bitmap.def ssmeta.def hyprlnk.def \
+                hotspot.def Objects/vLTextC.def conview.def compress.def \
+                timer.def helpFile.def spell.def studioConstant.def \
+                studioDocument.def studioApplication.def \
+                studioProcess.def studioDisplay.def studioGrObjHead.def \
+                studioControl.def gstring.def Objects/Text/tCtrlC.def \
+                uiManager.rdef UI/uiPageName.asm
+documentManager.rdef: generic.uih product.uih grobj.uih Objects/colorC.uih \
+                Objects/styles.uih bitmap.uih Objects/Text/tCtrl.uih \
+                ruler.uih hotspot.uih Document/documentData.ui
+uiManager.rdef: generic.uih product.uih impex.uih spool.uih grobj.uih \
+                Objects/colorC.uih Objects/styles.uih bitmap.uih \
+                Objects/Text/tCtrl.uih ruler.uih spell.uih \
+                Objects/spline.uih hyprlnk.uih UI/uiStudio.uih \
+                UI/uiMain.ui Art/mkrEditTextTool.ui \
+                Art/mkrBitmapPtrTool.ui Art/mkrStudio.ui Art/mkrTC.ui \
+                UI/uiPrint.ui UI/uiPageSetup.ui UI/uiEdit.ui UI/uiView.ui \
+                UI/uiOptions.ui usrLevel.uih UI/uiLayout.ui \
+                UI/uiGraphics.ui UI/uiText.ui UI/uiHelpEdit.ui \
+                UI/uiPlatform.ui UI/uiDocument.ui UI/uiDisplay.ui \
+                UI/uiDocMoniker.ui Art/mkrMBookDoc.ui Art/mkrCBookDoc.ui \
+                Art/mkrStudioDoc.ui Art/mkrTCDoc.ui
 
-BinderyEC.geo Bindery.geo : GEOS.LDF UI.LDF TEXT.LDF GROBJ.LDF RULER.LDF BITMAP.LDF HYPRLNK.LDF HOTSPOT.LDF SPOOL.LDF IMPEX.LDF SPELL.LDF SSMETA.LDF CONVERT.LDF COMPRESS.LDF 
+binderyEC.geo bindery.geo : geos.ldf ui.ldf text.ldf grobj.ldf ruler.ldf bitmap.ldf hyprlnk.ldf hotspot.ldf spool.ldf impex.ldf spell.ldf ssmeta.ldf convert.ldf compress.ldf 

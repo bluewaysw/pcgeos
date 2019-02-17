@@ -3,11 +3,12 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Hyperlink
+GEODE           = hyperlink
 ASM_TO_OBJS     = hyperlinkManager.asm
-UI_TO_RDFS      = HYPERLINK.UI
-SRCS            = hyperlinkMain.asm hyperlinkManager.asm hyperlinkUtils.asm\
-                  pageMain.asm hyperlinkConstant.def hyperlink.ui pageUI.ui
+UI_TO_RDFS      = hyperlink.ui
+SRCS            = pageMain.asm hyperlinkUtils.asm hyperlinkManager.asm\
+                  hyperlinkMain.asm hyperlinkConstant.def pageUI.ui\
+                  hyperlink.ui
 OBJS            = hyperlinkManager.obj
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf

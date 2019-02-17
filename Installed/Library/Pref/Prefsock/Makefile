@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Prefsock
+GEODE           = prefsock
 ASM_TO_OBJS     = prefsock.asm
-UI_TO_RDFS      = PREFSOCK.UI
+UI_TO_RDFS      = prefsock.ui
 SRCS            = prefsock.asm prefsock.def prefsock.ui
 OBJS            = prefsock.obj
 LOBJS           =

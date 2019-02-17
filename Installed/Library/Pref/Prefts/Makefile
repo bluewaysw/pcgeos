@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Prefts
+GEODE           = prefts
 ASM_TO_OBJS     = prefts.asm
-UI_TO_RDFS      = PREFTS.UI
+UI_TO_RDFS      = prefts.ui
 SRCS            = prefts.asm prefts.def prefts.ui
 OBJS            = prefts.obj
 LOBJS           =

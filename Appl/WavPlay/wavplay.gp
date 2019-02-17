@@ -39,9 +39,9 @@ library wav
 #
 # Define resources other than standard discardable code
 #
-resource APPRESOURCE ui-object
-resource INTERFACE ui-object
-resource APPMONIKERRESOURCE lmem read-only shared
+resource AppResource ui-object
+resource Interface ui-object
+resource AppMonikerResource lmem read-only shared
 #
 # Define exported entry points (for object saving)
 #

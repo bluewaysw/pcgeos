@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Preflvl
+GEODE           = preflvl
 ASM_TO_OBJS     = preflvl.asm
-UI_TO_RDFS      = PREFLVL.UI
+UI_TO_RDFS      = preflvl.ui
 SRCS            = preflvl.asm preflvl.ui
 OBJS            = preflvl.obj
 LOBJS           =
