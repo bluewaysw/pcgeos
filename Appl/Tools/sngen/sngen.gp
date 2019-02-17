@@ -45,7 +45,7 @@ library math
 
 #
 # Resources:
-resource APPRESOURCE ui-object
-resource INTERFACE ui-object
+resource AppResource ui-object
+resource Interface ui-object
 
 
