@@ -1,0 +1,688 @@
+@include <stdapp.goh>
+#include <Ansi/string.h>
+#include "global.h"
+#include "impdefs.h"
+#include "text.h"
+#include "groups.h"
+#include "control.h"
+#include "import.h"
+#include "charset.h"
+#include "rtfinput.h"
+
+#pragma option -w-par
+
+extern optr Text;
+extern dword TextCurPos;
+extern char cLastCharacter;
+extern int nInputBufPos;
+
+#if _DO_HELP
+extern Boolean waitingForContextRangeStart;
+extern Boolean boolHyperLinksEnabled;
+extern Boolean hyperlinkStarted;
+extern Boolean bLastCharWasPound;
+extern HyperlinkItem hyperlink;
+extern Boolean waitingForHyperlinkReference;
+extern Boolean contextReferenceStarted;
+extern ContextBufferStruct HyperlinkContextBuffer;
+extern word rangeToken;
+extern ContextBufferStruct ContextIdBuffer;
+dword contextRangeStart = 0;
+#endif
+
+Boolean bButtonAttr = FALSE;   /* tells us whether we've been preceded by a char border.
+				  intercepted by SetShadowAnchor to set button style. */
+
+/*
+typedef Boolean ControlFunc(ControlType eType,
+  ControlTableEntry* pEntry, WWFixedAsDWord* pfParam, Boolean bHasParam);
+*/
+
+Boolean ResetCharAttrs(ControlType eType,
+  ControlTableEntry* pEntry, WWFixedAsDWord* pfParam, Boolean bHasParam)
+    {
+    VisTextCharAttr* pChar = GetGroupCharAttrs();
+
+    if (pChar)
+        {
+        memcpy (pChar, &DefaultCharAttrs, sizeof(DefaultCharAttrs));
+#if _DO_HELP
+     bButtonAttr = FALSE;
+#endif
+        SetGroupCharAttrsDirty();
+        }
+    GroupsUnlock();
+
+    return FALSE;
+    }
+
+Boolean ResetParaAttrs(ControlType eType,
+  ControlTableEntry* pEntry, WWFixedAsDWord* pfParam, Boolean bHasParam)
+    {
+    VisTextParaAttr* pPara = GetGroupParaAttrs();
+
+    if (pPara)
+        {
+        memcpy (pPara, &DefaultParaAttrs, sizeof(DefaultParaAttrs));
+        SetGroupParaAttrsDirty();
+        }
+    GroupsUnlock();
+    return FALSE;
+    }
+
+/* Divide pfParam by the integer in CTE_extra. */
+Boolean ScaleByExtra(ControlType eType,
+  ControlTableEntry* pEntry, WWFixedAsDWord* pfParam, Boolean bHasParam)
+    {
+    WWFixedAsDWord fScale = MakeWWFixed(pEntry->CTE_extra);
+    if (bHasParam)
+        *pfParam = GrSDivWWFixed (*pfParam, fScale);
+    return TRUE;
+    }
+
+Boolean JustificationMask(ControlType eType,
+  ControlTableEntry* pEntry, WWFixedAsDWord* pfParam, Boolean bHasParam)
+    {
+    *pfParam = (WWFixedAsDWord) VTPAA_JUSTIFICATION;
+    return TRUE;
+    }
+
+/*  Since the left and para margins are both offsets from the left boundary,
+    we must set them both same when the left margin (\liN) changes.  The
+    para margin is adjusted by the amount that the left margin changes. */
+/*  NOTE: MARGINS ARE STORED IN 13.3 FORMAT */
+Boolean SetLeftAndParaMargins(ControlType eType,
+  ControlTableEntry* pEntry, WWFixedAsDWord* pfParam, Boolean bHasParam)
+    {
+    VisTextParaAttr* pAttr = GetGroupParaAttrs();
+    sword nMargin = (sword)ConvertParameter(*pfParam, CDT_133) / 20;
+    sword nDiff = 0;
+
+    if (bHasParam && pAttr)
+        {
+        nDiff = nMargin - pAttr->VTPA_leftMargin;
+        pAttr->VTPA_leftMargin = nMargin;
+        pAttr->VTPA_paraMargin += nDiff;
+        SetGroupParaAttrsDirty();
+        }
+    GroupsUnlock();
+    return FALSE;
+    }
+
+/*  Now we have a new first line indent (\fiN), and the para margin
+    is adjusted by the offset passed. */
+/*  NOTE: MARGINS ARE STORED IN 13.3 FORMAT */
+Boolean SetParaMargin(ControlType eType,
+  ControlTableEntry* pEntry, WWFixedAsDWord* pfParam, Boolean bHasParam)
+    {
+    VisTextParaAttr* pAttr = GetGroupParaAttrs();
+    sword nMargin = (sword)ConvertParameter(*pfParam, CDT_133) / 20;
+
+    if (bHasParam && pAttr)
+    	{
+        pAttr->VTPA_paraMargin = pAttr->VTPA_leftMargin + nMargin;
+        SetGroupParaAttrsDirty();
+    	}
+    GroupsUnlock();
+    return FALSE;
+    }
+
+/*  Used in Color Table group to set an RGB component of the current
+    working color. */
+Boolean SetColorComponent(ControlType eType,
+  ControlTableEntry* pEntry, WWFixedAsDWord* pfParam, Boolean bHasParam)
+    {
+    ColorQuad* pCQ = GroupColorTableGetWorkspace();
+    byte *pColor = (byte*)pCQ + pEntry->CTE_offset;
+
+    if (bHasParam && pCQ != NULL && GetGroup() == GT_COLORTBL)
+        *pColor = (byte)(IntegerOf(*pfParam));
+    return FALSE;
+    }
+
+/*  Performs lookup in Color Table to fill in a ColorQuad struct.
+    This depends on the usual property copy mechanism. */
+Boolean SetColor(ControlType eType,
+  ControlTableEntry* pEntry, WWFixedAsDWord* pfParam, Boolean bHasParam)
+    {
+    int nIndex = (int)(IntegerOf(*pfParam));
+
+    if (bHasParam && (GetGroupFlags() & GF_COLORTBL))
+        if (GroupColorTableFindColor(nIndex, (ColorQuad*)pfParam))
+            return TRUE;
+    return FALSE;
+    }
+
+/*  Normally, we look up and set the font character attribute.
+    In GT_FONTTBL, we set the font number in the workspace. */
+Boolean SetFontNum(ControlType eType,
+  ControlTableEntry* pEntry, WWFixedAsDWord* pfParam, Boolean bHasParam)
+    {
+    FontID nFID;
+
+    if (bHasParam)
+        {
+        if (GetGroup() == GT_FONTTBL)
+            GroupFontTableWorkSetFontID ((word)IntegerOf(*pfParam));
+        else
+            {
+            nFID = GroupFontTableFindFont ((word)IntegerOf(*pfParam));
+            if (nFID == FID_INVALID)
+                nFID = DefaultCharAttrs.VTCA_fontID;
+            if (GetGroup() == GT_RTF)
+            	{
+            	word index;
+            	if (GroupFontTableFindFontIndex(nFID, &index))
+            		RTFSetCodePage (GroupFontTableGetCodePage(index));
+            	}
+            WWFixedToInt(*pfParam) = nFID;
+            return TRUE;
+            }
+        }
+    return FALSE;
+    }
+
+Boolean SetFontCharset(ControlType eType,
+  ControlTableEntry* pEntry, WWFixedAsDWord* pfParam, Boolean bHasParam)
+    {
+    if (GetGroup() == GT_FONTTBL)
+        GroupFontTableWorkSetCharset((byte)IntegerOf(*pfParam));
+    return FALSE;
+    }
+
+Boolean SetFontFamily(ControlType eType,
+  ControlTableEntry* pEntry, WWFixedAsDWord* pfParam, Boolean bHasParam)
+    {
+    if (GetGroup() == GT_FONTTBL)
+        GroupFontTableWorkSetFamily((FontFamily)pEntry->CTE_extra);
+    return FALSE;
+    }
+
+Boolean SetFontPitch(ControlType eType,
+  ControlTableEntry* pEntry, WWFixedAsDWord* pfParam, Boolean bHasParam)
+    {
+    if (GetGroup() == GT_FONTTBL)
+        GroupFontTableWorkSetPitch((word)IntegerOf(*pfParam));
+    return FALSE;
+    }
+
+Boolean SetHexReadMode(ControlType eType,
+  ControlTableEntry* pEntry, WWFixedAsDWord* pfParam, Boolean bHasParam)
+    {
+    SetReadMode(RM_HEX);
+    return FALSE;
+    }
+
+Boolean SetBinReadMode(ControlType eType,
+  ControlTableEntry* pEntry, WWFixedAsDWord* pfParam, Boolean bHasParam)
+    {
+    long int nCount = (long int)*(pfParam);
+    SetReaderBinCount(nCount);
+    SetReadMode(RM_BIN);
+    return FALSE;
+    }
+
+/* Add a tab to the current group's tab workspace. */
+Boolean AddTab(ControlType eType,
+  ControlTableEntry* pEntry, WWFixedAsDWord* pfParam, Boolean bHasParam)
+    {
+    VisTextMaxParaAttr* pAttr = (VisTextMaxParaAttr*)GetGroupParaAttrs();
+    Tab* pWorkTab = GetGroupWorkTab();
+    byte nTabCount;
+
+    if (pAttr != NULL && pWorkTab != NULL)
+        {
+        /* Set the tab's position and default anchor. */
+        *pfParam = GrSDivWWFixed(*pfParam, MakeWWFixed(20));
+        pWorkTab->T_position = (word)ConvertParameter(*pfParam, CDT_133);
+        pWorkTab->T_anchor = '.';
+
+        /* Set line information if this is a bar tab.  (Or pay it :) */
+        if (pEntry->CTE_extra)
+            {
+            pWorkTab->T_lineWidth = 1 * 8;
+            pWorkTab->T_lineSpacing = 1 * 8;
+            pWorkTab->T_grayScreen = SDM_100;
+            }
+
+        /* Ensure we don't exceed the maximum number of tabs. */
+        nTabCount = pAttr->VTMPA_paraAttr.VTPA_numberOfTabs;
+        if (nTabCount < VIS_TEXT_MAX_TABS)
+            {
+            /* Copy the tab, increment the count, and set dirty state. */
+            memcpy (&pAttr->VTMPA_tabs[nTabCount], pWorkTab, sizeof(Tab));
+            pAttr->VTMPA_paraAttr.VTPA_numberOfTabs ++;
+            SetGroupParaAttrsDirty();
+            }
+
+        /* Clear the workspace. */
+        memset (pWorkTab, 0, sizeof(Tab));
+        }
+    GroupsUnlock();
+    GroupsUnlock();
+
+    return FALSE;
+    }
+
+/*  System draw masks for percentage mask fall between SDM_100 (25)
+    and SDM_0 (89), with 64 degrees of precision.
+    The parameter has units of hundredths of a %. */
+Boolean SetDrawMask(ControlType eType,
+  ControlTableEntry* pEntry, WWFixedAsDWord* pfParam, Boolean bHasParam)
+    {
+    if (*pfParam <= MakeWWFixed(10000))
+        {
+        /* (n / 100)% / 100 * 64 = n / 156.25 */
+        *pfParam = MakeWWFixed (SDM_0 -
+          IntegerOf(GrSDivWWFixed(*pfParam, MakeWWFixed(156.25))));
+        return TRUE;
+        }
+    return FALSE;
+    }
+
+/*  In addition to setting a graphic pattern for a background fill,
+    we must also set the grayscreen to SDM_100 and the color to black. */
+Boolean PSSetGraphicPattern(ControlType eType,
+  ControlTableEntry* pEntry, WWFixedAsDWord* pfParam, Boolean bHasParam)
+    {
+    VisTextParaAttr* pAttr = GetGroupParaAttrs();
+
+    if (pAttr != NULL)
+        {
+        pAttr->VTPA_bgGrayScreen = SDM_100;
+        pAttr->VTPA_bgColor.CQ_redOrIndex = C_BLACK;
+        pAttr->VTPA_bgColor.CQ_info = CF_INDEX;
+        pAttr->VTPA_bgPattern.HP_type = PT_SYSTEM_HATCH;
+        pAttr->VTPA_bgPattern.HP_data = (byte)pEntry->CTE_extra;
+        SetGroupParaAttrsDirty();
+        }
+    GroupsUnlock();
+    return FALSE;
+    }
+
+/*  If the BG grayscreen isn't SDM_0, we set the background color by \cfpat
+    and ignore \cbpat.  Otherwise, \cbpat alone is a solid background fill;
+    we set the background color AND set the grayscreen to SDM_100. */
+Boolean SetParaBGColor(ControlType eType,
+  ControlTableEntry* pEntry, WWFixedAsDWord* pfParam, Boolean bHasParam)
+    {
+    VisTextParaAttr* pAttr = GetGroupParaAttrs();
+
+    if (pAttr != NULL)
+        {
+        if (pAttr->VTPA_bgGrayScreen == SDM_0)
+            {
+            /* Set color and grayscreen on \cbpat. */
+            if (!pEntry->CTE_extra)
+                {
+                pAttr->VTPA_bgGrayScreen = SDM_100;
+			    GroupsUnlock();
+                return SetColor(eType, pEntry, pfParam, bHasParam);
+                }
+            }
+        else
+            {
+            if (pEntry->CTE_extra)
+	            {
+                /* Set color only on \cfpat. */
+			    GroupsUnlock();
+                return SetColor(eType, pEntry, pfParam, bHasParam);
+	            }
+            }
+        }
+    GroupsUnlock();
+    return FALSE;
+    }
+
+/*  In addition to setting a graphic pattern for a background fill,
+    we must also set the grayscreen to SDM_100 and the color to black. */
+Boolean CSSetGraphicPattern(ControlType eType,
+  ControlTableEntry* pEntry, WWFixedAsDWord* pfParam, Boolean bHasParam)
+    {
+    VisTextCharAttr* pAttr = GetGroupCharAttrs();
+
+    if (pAttr != NULL)
+        {
+        pAttr->VTCA_bgGrayScreen = SDM_100;
+        pAttr->VTCA_bgColor.CQ_redOrIndex = C_BLACK;
+        pAttr->VTCA_bgColor.CQ_info = CF_INDEX;
+        pAttr->VTCA_bgPattern.HP_type = PT_SYSTEM_HATCH;
+        pAttr->VTCA_bgPattern.HP_data = (byte)pEntry->CTE_extra;
+        SetGroupCharAttrsDirty();
+        }
+    GroupsUnlock();
+    return FALSE;
+    }
+
+/*  If the BG grayscreen isn't SDM_0, we set the background color by \chcfpat
+    and ignore \chcbpat.  Otherwise, \chcbpat alone is a solid background
+    fill; we set the background color AND set the grayscreen to SDM_100. */
+Boolean SetCharBGColor(ControlType eType,
+  ControlTableEntry* pEntry, WWFixedAsDWord* pfParam, Boolean bHasParam)
+    {
+    VisTextCharAttr* pAttr = GetGroupCharAttrs();
+
+    if (pAttr != NULL)
+        {
+        if (pAttr->VTCA_bgGrayScreen == SDM_0)
+            {
+            /* Set color and grayscreen on \chcbpat. */
+            if (!pEntry->CTE_extra)
+                {
+                pAttr->VTCA_bgGrayScreen = SDM_100;
+                pAttr->VTCA_extendedStyles |= VTES_BACKGROUND_COLOR;
+			    GroupsUnlock();
+                return SetColor(eType, pEntry, pfParam, bHasParam);
+                }
+            }
+        else
+            {
+            if (pEntry->CTE_extra)
+                {
+                /* Set color only on \chcfpat. */
+                pAttr->VTCA_extendedStyles |= VTES_BACKGROUND_COLOR;
+				GroupsUnlock();
+                return SetColor(eType, pEntry, pfParam, bHasParam);
+                }
+            }
+        }
+    GroupsUnlock();
+    return FALSE;
+    }
+
+Boolean bSect = FALSE;
+
+Boolean SetSection(ControlType eType,
+  ControlTableEntry* pEntry, WWFixedAsDWord* pfParam, Boolean bHasParam)
+	{
+	bSect = TRUE;
+	return FALSE;
+	}
+
+Boolean CheckSection(ControlType eType,
+  ControlTableEntry* pEntry, WWFixedAsDWord* pfParam, Boolean bHasParam)
+	{
+	/* Prevent usage if bSect is TRUE. */
+	return !bSect;
+	}
+
+Boolean CheckSectionScale(ControlType eType,
+  ControlTableEntry* pEntry, WWFixedAsDWord* pfParam, Boolean bHasParam)
+	{
+	if (bSect)
+		return ScaleByExtra(eType, pEntry, pfParam, bHasParam);
+	else
+		return FALSE;
+	}
+
+Boolean CheckSectionSet(ControlType eType,
+  ControlTableEntry* pEntry, WWFixedAsDWord* pfParam, Boolean bHasParam)
+	{
+	if (bSect)
+		{
+		*pfParam = MakeWWFixed(pEntry->CTE_extra);
+		return TRUE;
+		}
+	else
+		return FALSE;
+	}
+
+Boolean SetShadowAnchor(ControlType eType,
+  ControlTableEntry* pEntry, WWFixedAsDWord* pfParam, Boolean bHasParam)
+	{
+    VisTextParaAttr* pAttr = GetGroupParaAttrs();
+    VisTextCharAttr* pCharAttr = GetGroupCharAttrs();
+
+    /* turn ON button style if we were preceded by a character border */
+    if(bButtonAttr == TRUE) {
+	pCharAttr->VTCA_extendedStyles &= ~VTES_BOXED;
+	pCharAttr->VTCA_extendedStyles |= VTES_BUTTON;
+
+	/* turn OFF underlining */
+	pCharAttr->VTCA_textStyles &= ~TS_UNDERLINE;
+
+	SetGroupCharAttrsDirty();
+	bButtonAttr = FALSE;
+    }
+    else if (pAttr != NULL)
+    {
+	pAttr->VTPA_borderShadow = 1 * 8;
+	pAttr->VTPA_borderFlags = (pAttr->VTPA_borderFlags & ~VTPBF_ANCHOR)
+	    | SA_TOP_LEFT;
+        SetGroupParaAttrsDirty();
+    }
+    GroupsUnlock();
+    return TRUE;
+    }
+
+Boolean SetDoubleBorderGap(ControlType eType,
+  ControlTableEntry* pEntry, WWFixedAsDWord* pfParam, Boolean bHasParam)
+	{
+    VisTextParaAttr* pAttr = GetGroupParaAttrs();
+
+	if (pAttr != NULL)
+		{
+		pAttr->VTPA_borderShadow = 1 * 8;
+        SetGroupParaAttrsDirty();
+		}
+    GroupsUnlock();
+    return TRUE;
+    }
+
+Boolean TwipsToPoint8(ControlType eType,
+  ControlTableEntry* pEntry, WWFixedAsDWord* pfParam, Boolean bHasParam)
+	{
+	if (bHasParam)
+		/* Shift left thrice, then divide by 20. (Or, shift 1, divide by 5.) */
+	    *pfParam = MakeWWFixed((IntegerOf(*pfParam) << 1) / 5);
+    return TRUE;
+	}
+
+Boolean SetLineSpacing(ControlType eType,
+  ControlTableEntry* pEntry, WWFixedAsDWord* pfParam, Boolean bHasParam)
+	{
+	if (!bHasParam || (bHasParam && *pfParam == 0))
+		{
+		/* Use the default of single line spacing. */
+		*pfParam = MakeWWFixed(1);
+		return TRUE;
+		}
+	else
+		{
+		if ((signed int)IntegerOf(*pfParam) < 0)
+			*pfParam = -(*pfParam);
+		return ScaleByExtra(eType, pEntry, pfParam, bHasParam);
+		}
+	}
+
+Boolean EnableButtonFlag(ControlType eType,
+  ControlTableEntry* pEntry, WWFixedAsDWord* pfParam, Boolean bHasParam)
+{
+#if _DO_HELP
+    VisTextCharAttr* pCharAttr = GetGroupCharAttrs();
+#endif
+
+    if(bHasParam && *pfParam == 0) {
+	bButtonAttr = FALSE;
+
+#if _DO_HELP
+     pCharAttr->VTCA_extendedStyles &= ~VTES_BUTTON;
+     SetGroupCharAttrsDirty();
+#endif
+
+     }
+    else {
+	bButtonAttr = TRUE;
+
+#if _DO_HELP
+     pCharAttr->VTCA_extendedStyles &= ~VTES_BOXED;
+     pCharAttr->VTCA_extendedStyles |= VTES_BUTTON;
+
+     /* turn OFF underlining */
+     pCharAttr->VTCA_textStyles &= ~TS_UNDERLINE;
+
+     SetGroupCharAttrsDirty();
+#endif
+
+    }
+
+#if _DO_HELP
+     GroupsUnlock();
+#endif
+
+    return TRUE;
+}
+
+Boolean DisableButtonFlag(ControlType eType,
+  ControlTableEntry* pEntry, WWFixedAsDWord* pfParam, Boolean bHasParam)
+{
+    bButtonAttr = FALSE;
+    return TRUE;
+}
+
+#if _DO_HELP
+/* \uldb and \ul
+ * Starts a hyperlink
+ */
+Boolean StartOrEndHyperlink(ControlType eType,
+  ControlTableEntry* pEntry, WWFixedAsDWord* pfParam, Boolean bHasParam)
+{
+    static int refCount = 0;
+    VisTextCharAttr* pCharAttr = GetGroupCharAttrs();
+
+    if(boolHyperLinksEnabled) {
+	if(bHasParam && *pfParam == 0) {
+	    if(refCount) refCount--;
+	    if(refCount == 0 && hyperlinkStarted) {  /* make sure we've reached the last underline
+							before turning the hyperlink off */
+		/* hyperlink OFF */
+		EndHyperlink();
+	    }
+	}
+	else {
+	    refCount++;    /* increase the underline reference count */
+	    if(!hyperlinkStarted) {
+		/* hyperlink ON, set the position */
+		hyperlinkStarted = TRUE;
+		TextBufferDump();
+		hyperlink.HI_rangeStart = TextCurPos;
+	    }
+	}
+    }
+
+    if(pCharAttr->VTCA_extendedStyles & VTES_BUTTON) {
+	/* don't underline in the middle of a button style */
+	GroupsUnlock();
+	return FALSE;
+    }
+    GroupsUnlock();
+    return TRUE;
+}
+
+/* \v
+ * Start a context reference for a previously defined hyperlink
+ */
+Boolean StartHyperlinkContextRef(ControlType eType,
+  ControlTableEntry* pEntry, WWFixedAsDWord* pfParam, Boolean bHasParam)
+{
+    if(boolHyperLinksEnabled) {
+	if(bHasParam && *pfParam == 0
+	    && contextReferenceStarted) {
+	    EndContextReference();
+	}
+	else if(hyperlinkStarted ||
+	        waitingForHyperlinkReference) {
+	    contextReferenceStarted = TRUE;
+	    if(hyperlinkStarted) {
+		EndHyperlink();
+	    }
+	    waitingForHyperlinkReference = FALSE;
+
+	    /* reset the context buffer */
+	    HyperlinkContextBuffer.CBS_nCount = 0;
+	}
+    }
+    /* skip over hidden text */
+    SetDestMode(DM_SKIP);
+    return TRUE;
+}
+
+/*
+ * \footnote
+ *
+ * Starts a context ID
+ */
+Boolean StartingContextID(ControlType eType,
+  ControlTableEntry* pEntry, WWFixedAsDWord* pfParam, Boolean bHasParam)
+{
+    if(boolHyperLinksEnabled && bLastCharWasPound) {
+	/* tell TextBufferAddChar not to add the '#' */
+	bLastCharWasPound = FALSE;
+
+	/* change destination to context id buffer */
+	pEntry->CTE_offset = DM_CONTEXT_ID;
+	HandleDestControl(*pEntry);
+	pEntry->CTE_offset = DM_SKIP;
+    }
+    return TRUE;
+}
+
+/* called when we run into startcontextrange */
+Boolean StartContextTypeRange(ControlType eType,
+  ControlTableEntry* pEntry, WWFixedAsDWord* pfParam, Boolean bHasParam)
+{
+    if(boolHyperLinksEnabled == TRUE) {
+	waitingForContextRangeStart = FALSE;
+	/* save the starting position of the range */
+	if(rangeToken != 0xffff) {
+	    TextBufferDump();
+	    contextRangeStart = TextCurPos;
+	}
+    }
+    return TRUE;
+}
+
+/* called when we run into endcontextrange */
+Boolean ControlEndContextTypeRangeFunc(ControlType eType,
+  ControlTableEntry* pEntry, WWFixedAsDWord* pfParam, Boolean bHasParam)
+{
+    dword contextRangeEnd;
+
+    /* save the end position of the range */
+    if(rangeToken != 0xffff) {
+	TextBufferDump();
+	if(contextRangeStart <= TextCurPos) {
+	    contextRangeEnd = TextCurPos;
+
+	    /* add the context with this range */
+	    @call Text::MSG_VIS_TEXT_SET_CONTEXT(VTCF_TOKEN,
+						 rangeToken,
+						 contextRangeEnd,
+						 contextRangeStart);
+	    @call Text::MSG_VIS_TEXT_SET_CONTEXT(VTCF_TOKEN,
+						 0xffff,
+						 contextRangeEnd,
+						 contextRangeEnd);
+	}
+
+	/* done with token, get rid of it for the next range */
+	rangeToken = 0xffff;
+
+	 /* reset the buffer */
+	 ContextIdBuffer.CBS_nCount = 0;
+    }
+    return TRUE;
+}
+
+
+/* \geoshelp
+ * Enables the interpretation of GEOS help stuff
+ */
+Boolean EnableGeosHelpInterpretation(ControlType eType,
+  ControlTableEntry* pEntry, WWFixedAsDWord* pfParam, Boolean bHasParam)
+{
+    boolHyperLinksEnabled = TRUE;
+    return TRUE;
+}
+
+#endif

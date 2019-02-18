@@ -1,0 +1,196 @@
+#include "ctrlfunc.h"
+
+static const ControlTableEntry ControlTable[] = {
+/* Control symbols */
+{ "\\", CT_CHAR, NULL, 0, 0, '\\' },
+{ "{", CT_CHAR, NULL, 0, 0, '{' },
+{ "}", CT_CHAR, NULL, 0, 0, '}' },
+{ "|", CT_CHAR, NULL, 0, 0, '|' },
+{ "-", CT_CHAR, NULL, 0, 0, C_OPTHYPHEN },
+{ "_", CT_CHAR, NULL, 0, 0, C_NONBRKHYPHEN },
+{ "~", CT_CHAR, NULL, 0, 0, C_NONBRKSPACE },
+{ "'", CT_OTHER, (ControlFuncPtr) SetHexReadMode, 0, 0, 0 },
+
+/* Special characters. */
+{ "par", CT_CHAR, NULL, 0, 0, C_CR },
+{ "row", CT_CHAR, NULL, 0, 0, C_CR },
+{ "tab", CT_CHAR, NULL, 0, 0, C_TAB },
+{ "cell", CT_CHAR, NULL, 0, 0, C_TAB },
+{ "\t", CT_CHAR, NULL, 0, 0, C_TAB },
+/*{ "sect", CT_CHAR, (ControlFuncPtr) SetSection, 0, 0, C_SECTION_BREAK },	// section break causes Write to crash */
+{ "sect", CT_OTHER, (ControlFuncPtr) SetSection, 0, 0, 0 },
+{ "page", CT_CHAR, NULL, 0, 0, C_PAGE_BREAK },
+{ "column", CT_CHAR, NULL, 0, 0, C_COLUMN_BREAK },
+{ "line", CT_CHAR, NULL, 0, 0, C_CR },
+{ "emdash", CT_CHAR, NULL, 0, 0, C_EMDASH },
+{ "endash", CT_CHAR, NULL, 0, 0, C_ENDASH },
+{ "emspace", CT_CHAR, NULL, 0, 0, C_EMSPACE },
+{ "enspace", CT_CHAR, NULL, 0, 0, C_ENSPACE },
+{ "bullet", CT_CHAR, NULL, 0, 0, C_BULLET },
+{ "lquote", CT_CHAR, NULL, 0, 0, C_QUOTESNGLEFT },
+{ "rquote", CT_CHAR, NULL, 0, 0, C_QUOTESNGRIGHT },
+{ "ldblquote", CT_CHAR, NULL, 0, 0, C_QUOTEDBLLEFT },
+{ "rdblquote", CT_CHAR, NULL, 0, 0, C_QUOTEDBLRIGHT },
+
+/* Character formatting properties */
+{ "plain", CT_OTHER, (ControlFuncPtr) ResetCharAttrs, 0, 0, 0 },
+{ "b", CT_CPROP, NULL, offsetof(VisTextCharAttr, VTCA_textStyles), MAKE_CSDT(CST_TOGGLE, CDT_BYTEFLAG), TS_BOLD },
+
+#if _DO_HELP
+/* \uldb starts hyperlinks */
+{ "uldb", CT_CPROP, (ControlFuncPtr) StartOrEndHyperlink, offsetof(VisTextCharAttr, VTCA_textStyles), MAKE_CSDT(CST_TOGGLE, CDT_BYTEFLAG), TS_UNDERLINE },
+{ "ul", CT_CPROP, (ControlFuncPtr) StartOrEndHyperlink, offsetof(VisTextCharAttr, VTCA_textStyles), MAKE_CSDT(CST_TOGGLE, CDT_BYTEFLAG), TS_UNDERLINE },
+{ "BUTTON", CT_CPROP, (ControlFuncPtr) EnableButtonFlag, offsetof(VisTextCharAttr, VTCA_extendedStyles), MAKE_CSDT(CST_TOGGLE, CDT_WORDFLAG), VTES_BUTTON | CONTROL_GEOS_HELP},
+#else
+{ "uldb", CT_CPROP, NULL, offsetof(VisTextCharAttr, VTCA_textStyles), MAKE_CSDT(CST_TOGGLE, CDT_BYTEFLAG), TS_UNDERLINE },
+{ "ul", CT_CPROP, NULL, offsetof(VisTextCharAttr, VTCA_textStyles), MAKE_CSDT(CST_TOGGLE, CDT_BYTEFLAG), TS_UNDERLINE },
+#endif
+
+{ "i", CT_CPROP, NULL, offsetof(VisTextCharAttr, VTCA_textStyles), MAKE_CSDT(CST_TOGGLE, CDT_BYTEFLAG), TS_ITALIC },
+{ "super", CT_CPROP, NULL, offsetof(VisTextCharAttr, VTCA_textStyles), MAKE_CSDT(CST_FLAGSET, CDT_BYTEFLAG), TS_SUPERSCRIPT },
+{ "sub", CT_CPROP, NULL, offsetof(VisTextCharAttr, VTCA_textStyles), MAKE_CSDT(CST_FLAGSET, CDT_BYTEFLAG), TS_SUBSCRIPT },
+{ "nosupersub", CT_CPROP, NULL, offsetof(VisTextCharAttr, VTCA_textStyles), MAKE_CSDT(CST_FLAGRESET, CDT_BYTEFLAG), TS_SUPERSCRIPT | TS_SUBSCRIPT },
+{ "ulnone", CT_CPROP, NULL, offsetof(VisTextCharAttr, VTCA_textStyles), MAKE_CSDT(CST_FLAGRESET, CDT_BYTEFLAG), TS_UNDERLINE },
+{ "strike", CT_CPROP, NULL, offsetof(VisTextCharAttr, VTCA_textStyles), MAKE_CSDT(CST_TOGGLE, CDT_BYTEFLAG), TS_STRIKE_THRU },
+{ "outl", CT_CPROP, NULL, offsetof(VisTextCharAttr, VTCA_textStyles), MAKE_CSDT(CST_TOGGLE, CDT_BYTEFLAG), TS_OUTLINE },
+{ "caps", CT_CPROP, NULL, offsetof(VisTextCharAttr, VTCA_extendedStyles), MAKE_CSDT(CST_TOGGLE, CDT_WORDFLAG), VTES_ALL_CAP },
+{ "scaps", CT_CPROP, NULL, offsetof(VisTextCharAttr, VTCA_extendedStyles), MAKE_CSDT(CST_TOGGLE, CDT_WORDFLAG), VTES_SMALL_CAP },
+#if _DO_HELP
+{ "v", CT_CPROP, (ControlFuncPtr) StartHyperlinkContextRef, offsetof(VisTextCharAttr, VTCA_extendedStyles), MAKE_CSDT(CST_TOGGLE, CDT_WORDFLAG), VTES_HIDDEN },
+#else
+{ "v", CT_CPROP, NULL, offsetof(VisTextCharAttr, VTCA_extendedStyles), MAKE_CSDT(CST_TOGGLE, CDT_WORDFLAG), VTES_HIDDEN },
+#endif
+{ "fs", CT_CPROP, (ControlFuncPtr) ScaleByExtra, offsetof(VisTextCharAttr, VTCA_pointSize), MAKE_CSDT(CST_VALUE, CDT_WBFIXED), 2 },
+{ "charscalex", CT_CPROP, NULL, offsetof(VisTextCharAttr, VTCA_fontWidth), MAKE_CSDT(CST_VALUE, CDT_BYTENUM), 0 },
+{ "cf", CT_CPROP, (ControlFuncPtr) SetColor, offsetof(VisTextCharAttr, VTCA_color), MAKE_CSDT(CST_VALUE, CDT_DWORD), 0 },
+{ "cb", CT_CPROP, (ControlFuncPtr) SetCharBGColor, offsetof(VisTextCharAttr, VTCA_bgColor), MAKE_CSDT(CST_VALUE, CDT_DWORD), FALSE },
+
+/* Paragraph formatting properties */
+{ "pard", CT_OTHER, (ControlFuncPtr) ResetParaAttrs, 0, 0, 0 },
+{ "ql", CT_PPROP, (ControlFuncPtr) JustificationMask, offsetof(VisTextParaAttr, VTPA_attributes), MAKE_CSDT(CST_FLAGMASK, CDT_WORDFLAG), J_LEFT << VTPAA_JUSTIFICATION_OFFSET },
+{ "qr", CT_PPROP, (ControlFuncPtr) JustificationMask, offsetof(VisTextParaAttr, VTPA_attributes), MAKE_CSDT(CST_FLAGMASK, CDT_WORDFLAG), J_RIGHT << VTPAA_JUSTIFICATION_OFFSET },
+{ "qj", CT_PPROP, (ControlFuncPtr) JustificationMask, offsetof(VisTextParaAttr, VTPA_attributes), MAKE_CSDT(CST_FLAGMASK, CDT_WORDFLAG), J_FULL << VTPAA_JUSTIFICATION_OFFSET },
+{ "qc", CT_PPROP, (ControlFuncPtr) JustificationMask, offsetof(VisTextParaAttr, VTPA_attributes), MAKE_CSDT(CST_FLAGMASK, CDT_WORDFLAG), J_CENTER << VTPAA_JUSTIFICATION_OFFSET },
+{ "li", CT_PPROP, (ControlFuncPtr) SetLeftAndParaMargins, 0, 0, 0 },
+{ "ri", CT_PPROP, (ControlFuncPtr) ScaleByExtra, offsetof(VisTextParaAttr, VTPA_rightMargin), MAKE_CSDT(CST_VALUE, CDT_133), 20 },
+{ "fi", CT_PPROP, (ControlFuncPtr) SetParaMargin, 0, 0, 0 },
+{ "sl", CT_PPROP, (ControlFuncPtr) SetLineSpacing, offsetof(VisTextParaAttr, VTPA_lineSpacing), MAKE_CSDT(CST_VALUE, CDT_BBFIXED), 240 },
+{ "sb", CT_PPROP, (ControlFuncPtr) ScaleByExtra, offsetof(VisTextParaAttr, VTPA_spaceOnTop), MAKE_CSDT(CST_VALUE, CDT_133), 20 },
+{ "sa", CT_PPROP, (ControlFuncPtr) ScaleByExtra, offsetof(VisTextParaAttr, VTPA_spaceOnBottom), MAKE_CSDT(CST_VALUE, CDT_133), 20 },
+{ "hyphpar", CT_PPROP, NULL, offsetof(VisTextParaAttr, VTPA_attributes), MAKE_CSDT(CST_TOGGLE, CDT_WORDFLAG), VTPAA_ALLOW_AUTO_HYPHENATION },
+{ "keep", CT_PPROP, NULL, offsetof(VisTextParaAttr, VTPA_attributes), MAKE_CSDT(CST_FLAGSET, CDT_WORDFLAG), VTPAA_KEEP_PARA_TOGETHER },
+{ "nowidctlpar", CT_PPROP, NULL, offsetof(VisTextParaAttr, VTPA_attributes), MAKE_CSDT(CST_FLAGRESET, CDT_WORDFLAG), VTPAA_KEEP_LINES },
+{ "widctlpar", CT_PPROP, NULL, offsetof(VisTextParaAttr, VTPA_attributes), MAKE_CSDT(CST_FLAGSET, CDT_WORDFLAG), VTPAA_KEEP_LINES },
+{ "keepn", CT_PPROP, NULL, offsetof(VisTextParaAttr, VTPA_attributes), MAKE_CSDT(CST_FLAGSET, CDT_WORDFLAG), VTPAA_KEEP_PARA_WITH_NEXT },
+{ "pagebb", CT_PPROP, NULL, offsetof(VisTextParaAttr, VTPA_attributes), MAKE_CSDT(CST_FLAGSET, CDT_WORDFLAG), VTPAA_COLUMN_BREAK_BEFORE },
+
+/* Tab properties */
+{ "tqr", CT_TABPROP, NULL, offsetof(Tab, T_attr), MAKE_CSDT(CST_FLAGSET, CDT_BYTEFLAG), TT_RIGHT << TabType_OFFSET },
+{ "tqc", CT_TABPROP, NULL, offsetof(Tab, T_attr), MAKE_CSDT(CST_FLAGSET, CDT_BYTEFLAG), TT_CENTER << TabType_OFFSET },
+{ "tqdec", CT_TABPROP, NULL, offsetof(Tab, T_attr), MAKE_CSDT(CST_FLAGSET, CDT_BYTEFLAG), TT_ANCHORED << TabType_OFFSET },
+{ "tldot", CT_TABPROP, NULL, offsetof(Tab, T_attr), MAKE_CSDT(CST_FLAGSET, CDT_BYTEFLAG), TL_DOT << TabLeader_OFFSET },
+{ "tlhyph", CT_TABPROP, NULL, offsetof(Tab, T_attr), MAKE_CSDT(CST_FLAGSET, CDT_BYTEFLAG), TL_BULLET << TabLeader_OFFSET },
+{ "tlul", CT_TABPROP, NULL, offsetof(Tab, T_attr), MAKE_CSDT(CST_FLAGSET, CDT_BYTEFLAG), TL_LINE << TabLeader_OFFSET },
+{ "tlth", CT_TABPROP, NULL, offsetof(Tab, T_attr), MAKE_CSDT(CST_FLAGSET, CDT_BYTEFLAG), TL_BULLET << TabLeader_OFFSET },
+{ "tleq", CT_TABPROP, NULL, offsetof(Tab, T_attr), MAKE_CSDT(CST_FLAGSET, CDT_BYTEFLAG), TL_BULLET << TabLeader_OFFSET },
+{ "tx", CT_OTHER, (ControlFuncPtr) AddTab, 0, 0, FALSE },
+{ "tb", CT_OTHER, (ControlFuncPtr) AddTab, 0, 0, TRUE },
+
+/* Document formatting properties */
+{ "deftab", CT_DEFPPROP, (ControlFuncPtr) ScaleByExtra, offsetof(VisTextParaAttr, VTPA_defaultTabs), MAKE_CSDT(CST_VALUE, CDT_133), 20 },
+{ "widowctrl", CT_DEFPPROP, NULL, offsetof(VisTextParaAttr, VTPA_attributes), MAKE_CSDT(CST_TOGGLE, CDT_WORDFLAG), VTPAA_KEEP_LINES },
+{ "hyphauto", CT_DEFPPROP, NULL, offsetof(VisTextParaAttr, VTPA_attributes), MAKE_CSDT(CST_TOGGLE, CDT_WORDFLAG), VTPAA_ALLOW_AUTO_HYPHENATION },
+{ "paperw", CT_DEFDOCPROP, (ControlFuncPtr) ScaleByExtra, offsetof(RTFDocumentAttr, RTFDA_pageInfo.PSI_page.XYS_width), MAKE_CSDT(CST_VALUE, CDT_WORDNUM), 20 },
+{ "paperh", CT_DEFDOCPROP, (ControlFuncPtr) ScaleByExtra, offsetof(RTFDocumentAttr, RTFDA_pageInfo.PSI_page.XYS_height), MAKE_CSDT(CST_VALUE, CDT_WORDNUM), 20 },
+{ "margl", CT_DEFDOCPROP, (ControlFuncPtr) ScaleByExtra, offsetof(RTFDocumentAttr, RTFDA_pageInfo.PSI_leftMargin), MAKE_CSDT(CST_VALUE, CDT_133), 20 },
+{ "margr", CT_DEFDOCPROP, (ControlFuncPtr) ScaleByExtra, offsetof(RTFDocumentAttr, RTFDA_pageInfo.PSI_rightMargin), MAKE_CSDT(CST_VALUE, CDT_133), 20 },
+{ "margt", CT_DEFDOCPROP, (ControlFuncPtr) ScaleByExtra, offsetof(RTFDocumentAttr, RTFDA_pageInfo.PSI_topMargin), MAKE_CSDT(CST_VALUE, CDT_133), 20 },
+{ "margb", CT_DEFDOCPROP, (ControlFuncPtr) ScaleByExtra, offsetof(RTFDocumentAttr, RTFDA_pageInfo.PSI_bottomMargin), MAKE_CSDT(CST_VALUE, CDT_133), 20 },
+{ "landscape", CT_DEFDOCPROP, NULL, offsetof(RTFDocumentAttr, RTFDA_pageInfo.PSI_layout), MAKE_CSDT(CST_FLAGSET, CDT_WORDFLAG), PO_LANDSCAPE * PLP_ORIENTATION },
+{ "cols", CT_DEFDOCPROP, (ControlFuncPtr) CheckSection, offsetof(RTFDocumentAttr, RTFDA_pageInfo.PSI_numColumns), MAKE_CSDT(CST_VALUE, CDT_WORDNUM), 0 },
+{ "colsx", CT_DEFDOCPROP, (ControlFuncPtr) CheckSectionScale, offsetof(RTFDocumentAttr, RTFDA_pageInfo.PSI_columnSpacing), MAKE_CSDT(CST_VALUE, CDT_133), 20 },
+{ "linebetcol", CT_DEFDOCPROP, (ControlFuncPtr) CheckSectionSet, offsetof(RTFDocumentAttr, RTFDA_pageInfo.PSI_ruleWidth), MAKE_CSDT(CST_VALUE, CDT_133), 1 },
+
+
+/* Paragraph borders and shading. */
+{ "brdrt", CT_PPROP, (ControlFuncPtr) DisableButtonFlag, offsetof(VisTextParaAttr, VTPA_borderFlags), MAKE_CSDT(CST_FLAGSET, CDT_WORDFLAG), VTPBF_TOP },
+{ "brdrb", CT_PPROP, (ControlFuncPtr) DisableButtonFlag, offsetof(VisTextParaAttr, VTPA_borderFlags), MAKE_CSDT(CST_FLAGSET, CDT_WORDFLAG), VTPBF_BOTTOM },
+{ "brdrl", CT_PPROP, (ControlFuncPtr) DisableButtonFlag, offsetof(VisTextParaAttr, VTPA_borderFlags), MAKE_CSDT(CST_FLAGSET, CDT_WORDFLAG), VTPBF_LEFT },
+{ "brdrr", CT_PPROP, (ControlFuncPtr) DisableButtonFlag, offsetof(VisTextParaAttr, VTPA_borderFlags), MAKE_CSDT(CST_FLAGSET, CDT_WORDFLAG), VTPBF_RIGHT },
+{ "box", CT_PPROP, (ControlFuncPtr) DisableButtonFlag, offsetof(VisTextParaAttr, VTPA_borderFlags), MAKE_CSDT(CST_FLAGSET, CDT_WORDFLAG), VTPBF_TOP | VTPBF_BOTTOM | VTPBF_LEFT | VTPBF_RIGHT },
+{ "brdrbtw", CT_PPROP, NULL, offsetof(VisTextParaAttr, VTPA_borderFlags), MAKE_CSDT(CST_FLAGSET, CDT_WORDFLAG), VTPBF_DRAW_INNER_LINES },
+{ "brdrcf", CT_PPROP, (ControlFuncPtr) SetColor, offsetof(VisTextParaAttr, VTPA_borderColor), MAKE_CSDT(CST_VALUE, CDT_DWORD), 0 },
+{ "brdrsh", CT_PPROP, (ControlFuncPtr) SetShadowAnchor, offsetof(VisTextParaAttr, VTPA_borderFlags), MAKE_CSDT(CST_FLAGSET, CDT_WORDFLAG), VTPBF_SHADOW },
+{ "brdrdb", CT_PPROP, (ControlFuncPtr) SetDoubleBorderGap, offsetof(VisTextParaAttr, VTPA_borderFlags), MAKE_CSDT(CST_FLAGSET, CDT_WORDFLAG), VTPBF_DOUBLE },
+{ "brdrw", CT_PPROP, (ControlFuncPtr) TwipsToPoint8, offsetof(VisTextParaAttr, VTPA_borderWidth), MAKE_CSDT(CST_VALUE, CDT_BYTENUM), 0 },
+{ "brsp", CT_PPROP, (ControlFuncPtr) TwipsToPoint8, offsetof(VisTextParaAttr, VTPA_borderSpacing), MAKE_CSDT(CST_VALUE, CDT_BYTENUM), 0 },
+{ "shading", CT_PPROP, (ControlFuncPtr) SetDrawMask, offsetof(VisTextParaAttr, VTPA_bgGrayScreen), MAKE_CSDT(CST_VALUE, CDT_BYTENUM), 0 },
+{ "bghoriz", CT_OTHER, (ControlFuncPtr) PSSetGraphicPattern, 0, 0, SH_HORIZONTAL },
+{ "bgvert", CT_OTHER, (ControlFuncPtr) PSSetGraphicPattern, 0, 0, SH_VERTICAL },
+{ "bgfdiag", CT_OTHER, (ControlFuncPtr) PSSetGraphicPattern, 0, 0, SH_135_DEGREE },
+{ "bgbdiag", CT_OTHER, (ControlFuncPtr) PSSetGraphicPattern, 0, 0, SH_45_DEGREE },
+{ "cfpat", CT_PPROP, (ControlFuncPtr) SetParaBGColor, offsetof(VisTextParaAttr, VTPA_bgColor), MAKE_CSDT(CST_VALUE, CDT_DWORD), TRUE },
+{ "cbpat", CT_PPROP, (ControlFuncPtr) SetParaBGColor, offsetof(VisTextParaAttr, VTPA_bgColor), MAKE_CSDT(CST_VALUE, CDT_DWORD), FALSE },
+
+/* Character borders and shading. */
+{ "chbrdr", CT_CPROP, (ControlFuncPtr) EnableButtonFlag, offsetof(VisTextCharAttr, VTCA_extendedStyles), MAKE_CSDT(CST_FLAGSET, CDT_WORDFLAG), VTES_BOXED },
+{ "chshdng", CT_CPROP, (ControlFuncPtr) SetDrawMask, offsetof(VisTextCharAttr, VTCA_bgGrayScreen), MAKE_CSDT(CST_VALUE, CDT_BYTENUM), 0 },
+{ "chbghoriz", CT_OTHER, (ControlFuncPtr) CSSetGraphicPattern, 0, 0, SH_HORIZONTAL },
+{ "chbgvert", CT_OTHER, (ControlFuncPtr) CSSetGraphicPattern, 0, 0, SH_VERTICAL },
+{ "chbgfdiag", CT_OTHER, (ControlFuncPtr) CSSetGraphicPattern, 0, 0, SH_135_DEGREE },
+{ "chbgbdiag", CT_OTHER, (ControlFuncPtr) CSSetGraphicPattern, 0, 0, SH_45_DEGREE },
+{ "chcfpat", CT_CPROP, (ControlFuncPtr) SetCharBGColor, offsetof(VisTextCharAttr, VTCA_bgColor), MAKE_CSDT(CST_VALUE, CDT_DWORD), TRUE },
+{ "chcbpat", CT_CPROP, (ControlFuncPtr) SetCharBGColor, offsetof(VisTextCharAttr, VTCA_bgColor), MAKE_CSDT(CST_VALUE, CDT_DWORD), FALSE },
+
+/* Color Table specific controls. */
+{ "red", CT_OTHER, (ControlFuncPtr) SetColorComponent, offsetof(ColorQuad, CQ_redOrIndex), 0, 0 },
+{ "green", CT_OTHER, (ControlFuncPtr) SetColorComponent, offsetof(ColorQuad, CQ_green), 0, 0 },
+{ "blue", CT_OTHER, (ControlFuncPtr) SetColorComponent, offsetof(ColorQuad, CQ_blue), 0, 0 },
+
+/* Font Table specific controls. */
+{ "f", CT_CPROP, (ControlFuncPtr) SetFontNum, offsetof(VisTextCharAttr, VTCA_fontID), MAKE_CSDT(CST_VALUE, CDT_WORDNUM), 0 },
+{ "froman", CT_OTHER, (ControlFuncPtr) SetFontFamily, 0, 0, FF_SERIF },
+{ "fswiss", CT_OTHER, (ControlFuncPtr) SetFontFamily, 0, 0, FF_SANS_SERIF },
+{ "fmodern", CT_OTHER, (ControlFuncPtr) SetFontFamily, 0, 0, FF_MONO },
+{ "ftech", CT_OTHER, (ControlFuncPtr) SetFontFamily, 0, 0, FF_SYMBOL },
+{ "fscript", CT_OTHER, (ControlFuncPtr) SetFontFamily, 0, 0, FF_SCRIPT },
+{ "fdecor", CT_OTHER, (ControlFuncPtr) SetFontFamily, 0, 0, FF_ORNAMENT },
+{ "fprq", CT_OTHER, (ControlFuncPtr) SetFontPitch, 0, 0, 0 },
+{ "fcharset", CT_OTHER, (ControlFuncPtr) SetFontCharset, 0, 0, 0 },
+
+/* Destinations/Groups */
+{ "rtf", CT_DEST, NULL, DM_NORMAL, MAKE_CSDT(GT_RTF, GT_NONE), DT_RTF },
+{ "colortbl", CT_DEST, NULL, DM_NO_BUFFER, MAKE_CSDT(GT_COLORTBL, GT_RTF), DT_COLORTBL },
+{ "fonttbl", CT_DEST, NULL, DM_NO_BUFFER, MAKE_CSDT(GT_FONTTBL, GT_RTF), DT_FONTTBL },
+
+/* Destinations to be ignored */
+{ "filetbl", CT_DEST, NULL, DM_SKIP, MAKE_CSDT(0, GT_RTF), 0 },
+{ "stylesheet", CT_DEST, NULL, DM_SKIP, MAKE_CSDT(0, GT_RTF), 0 },
+{ "info", CT_DEST, NULL, DM_SKIP, MAKE_CSDT(0, GT_RTF), 0 },
+{ "header", CT_DEST, NULL, DM_SKIP, MAKE_CSDT(0, GT_RTF), 0 },
+{ "headerl", CT_DEST, NULL, DM_SKIP, MAKE_CSDT(0, GT_RTF), 0 },
+{ "headerr", CT_DEST, NULL, DM_SKIP, MAKE_CSDT(0, GT_RTF), 0 },
+{ "headerf", CT_DEST, NULL, DM_SKIP, MAKE_CSDT(0, GT_RTF), 0 },
+{ "footer", CT_DEST, NULL, DM_SKIP, MAKE_CSDT(0, GT_RTF), 0 },
+{ "footerl", CT_DEST, NULL, DM_SKIP, MAKE_CSDT(0, GT_RTF), 0 },
+{ "footerr", CT_DEST, NULL, DM_SKIP, MAKE_CSDT(0, GT_RTF), 0 },
+{ "footerf", CT_DEST, NULL, DM_SKIP, MAKE_CSDT(0, GT_RTF), 0 },
+{ "pict", CT_DEST, NULL, DM_SKIP, MAKE_CSDT(0, GT_RTF), 0 },
+{ "shp", CT_DEST, NULL, DM_SKIP, MAKE_CSDT(0, GT_RTF), 0 },
+#if _DO_HELP
+{ "footnote", CT_OTHER, (ControlFuncPtr) StartingContextID, DM_SKIP, MAKE_CSDT(0, GT_RTF), 0 },
+#else
+{ "footnote", CT_DEST, NULL, DM_SKIP, MAKE_CSDT(0, GT_RTF), 0 },
+#endif
+
+/* Other things */
+{ "bin", CT_OTHER, (ControlFuncPtr) SetBinReadMode, DM_SKIP, MAKE_CSDT(CST_LONGINT, CDT_DWORD), 0 },
+
+/* GEOS HELP tags */
+#if _DO_HELP
+{ "geoshelp", CT_OTHER, (ControlFuncPtr) EnableGeosHelpInterpretation, DM_SKIP, MAKE_CSDT(CST_TOGGLE, CDT_BYTEFLAG), CONTROL_GEOS_HELP },
+{ "startcontextrange", CT_OTHER, (ControlFuncPtr) StartContextTypeRange, DM_SKIP, MAKE_CSDT(CST_TOGGLE, CDT_BYTEFLAG), CONTROL_GEOS_HELP },
+{ "endcontextrange", CT_OTHER, (ControlFuncPtr) EndContextTypeRange, DM_SKIP, MAKE_CSDT(CST_TOGGLE, CDT_BYTEFLAG), CONTROL_GEOS_HELP }
+#endif
+
+};

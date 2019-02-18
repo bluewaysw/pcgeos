@@ -1,0 +1,129 @@
+/***********************************************************************
+ *
+ * PROJECT:       RTF
+ * FILE:          ExptProc.goc
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+@include <stdapp.goh>
+@include <Objects/clipbrd.goh>
+@include <impex.goh>
+#include <vm.h>
+#include <xlatLib.h>
+#include <Ansi/string.h>
+#include <localize.h>
+#include "rtf.h"
+#include "global.h"
+
+#if _DO_HELP
+extern Boolean boolHyperLinksEnabled;
+#endif
+
+/*
+ * Copy page layout structure to export format.
+ */
+void CopyPageLayout(VMFileHandle vmf,VMBlockHandle bh,PageSetupInfo *pInfo)
+{
+    VMBlockHandle h;
+    MemHandle mh;
+    TextTransferBlockHeader *ttbh;
+    PageSetupInfo *psi;
+
+    ttbh = VMLock(vmf,bh,&mh);
+    h = VMCHAIN_GET_VM_BLOCK( ttbh->TTBH_pageSetup );
+    VMUnlock(mh);
+
+    psi = VMLock(vmf,h,&mh);
+    memcpy(pInfo,psi,sizeof(PageSetupInfo));
+    VMUnlock(mh);
+}
+
+word _pascal ExportProcedure(ExportFrame *ieb)
+{
+    optr textObj;
+    int ret;
+    RTFTransferData td;
+
+    /*
+     * copy transfer format to object for easy manipulation
+     */
+    /*
+     * determine whether or not type runs exist
+     */
+#if _DO_HELP
+    TextTransferBlockHeader* tt;
+    VisTextType* vttRun;
+    TextRunArrayElement* runElement;
+    MemHandle ttHandle, typeElementsArrayHandle;
+    LMemBlockHeader* lmbh;
+    dword n;
+    word size;
+
+    tt = VMLock(ieb->EF_transferVMFile, VMCHAIN_GET_VM_BLOCK(ieb->EF_transferVMChain), &ttHandle);
+    boolHyperLinksEnabled = FALSE;
+    if(VMCHAIN_GET_VM_BLOCK(tt->TTBH_typeRuns)) {
+	/* determine whether we have type runs in the transfer item.  We do this by counting the number
+	   of type runs in the transfer item.  If there are two, then the first run will be pointing at an
+	   element in the type runs element array, and the second will be the end marker for the type runs.
+	   So we check the element in the type runs array, and make sure that there is no hyperlink or context
+	   defined.  If that is so, then there are no type runs in the array. */
+	n = HugeArrayGetCount(ieb->EF_transferVMFile, VMCHAIN_GET_VM_BLOCK(tt->TTBH_typeRuns));
+	if(n == 2) {
+	    /* there are two elements in the type array.  Make sure that the first token in the type array
+	       does not point to a hyperlink or context run. */
+	    HugeArrayLock(ieb->EF_transferVMFile, VMCHAIN_GET_VM_BLOCK(tt->TTBH_typeRuns), 0,
+			  &runElement, &size);
+	    lmbh = VMLock(ieb->EF_transferVMFile, VMCHAIN_GET_VM_BLOCK(tt->TTBH_typeElements), &typeElementsArrayHandle);
+	    vttRun = ChunkArrayElementToPtrHandles(typeElementsArrayHandle, lmbh->LMBH_offset,
+						   runElement->TRAE_token, NULL);
+	    HugeArrayUnlock(runElement);
+	    if(vttRun->VTT_hyperlinkName != 0xffff ||
+	       vttRun->VTT_hyperlinkFile != 0xffff ||
+	       vttRun->VTT_context != 0xffff) {
+		/* this is a type run.  */
+		boolHyperLinksEnabled = TRUE;
+	    }
+	    VMUnlock(typeElementsArrayHandle);
+	}
+	else {
+	    boolHyperLinksEnabled = TRUE;
+	}
+    }
+    VMUnlock(ttHandle);
+
+    /* allocate and appropriate text object depending on whether or not
+       it contains type runs */
+    if(boolHyperLinksEnabled)
+	textObj = TextAllocClipboardObject( ieb->EF_transferVMFile,
+					    VTSF_MULTIPLE_CHAR_ATTRS | VTSF_MULTIPLE_PARA_ATTRS | VTSF_GRAPHICS | VTSF_TYPES, 0);
+    else
+#endif /* DO_HELP */
+	textObj = TextAllocClipboardObject( ieb->EF_transferVMFile,
+					    VTSF_MULTIPLE_CHAR_ATTRS | VTSF_MULTIPLE_PARA_ATTRS | VTSF_GRAPHICS, 0);
+
+    if(!textObj) return TE_ERROR;       /* return error if alloc fails */
+
+    @call textObj::MSG_VIS_TEXT_REPLACE_WITH_TEXT_TRANSFER_FORMAT(
+      VMCHAIN_GET_VM_BLOCK( ieb->EF_transferVMChain ),
+      ieb->EF_transferVMFile, 0, 0, 0);
+
+    /*
+     * export text object to RTF
+     */
+    CopyPageLayout( ieb->EF_transferVMFile, VMCHAIN_GET_VM_BLOCK(
+      ieb->EF_transferVMChain ), &td.RTFTD_pageInfo);
+    ret = RTFExport(textObj, ieb->EF_outputFile, &td);
+
+    /*
+     * we don't need the object any more
+     */
+    TextFinishWithClipboardObject(
+      textObj, TCO_RETURN_NOTHING, HandleToOptr(GeodeGetProcessHandle()), "" );
+
+    return ret;
+}

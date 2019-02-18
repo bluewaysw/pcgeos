@@ -1,0 +1,647 @@
+/*  Structures in this file are global and are therefore placed in dgroup.
+    There is no provision for performing two simultaneous translations. */
+
+@include <stdapp.goh>
+#include <Ansi/string.h>
+@include <impex.goh>
+#include "impdefs.h"
+#include "warnings.h"
+#include "groups.h"
+#include "import.h"
+#include "text.h"
+#include "global.h"
+
+/*********************************************************/
+/********************** ERROR CODE ***********************/
+/*********************************************************/
+
+TransError RTFError;
+/*********************************************************/
+/***************** TEXT INSERTION BUFFER *****************/
+/*********************************************************/
+
+TextBufferStruct    TextBuffer;
+
+extern optr oVLTInput;
+extern optr Text;
+extern dword TextCurPos;
+
+#if _DO_HELP
+extern Boolean bButtonAttr;
+
+Boolean boolHyperLinksEnabled = FALSE;      /* specifies whether hyperlinks/contexts
+					       are used in this document */
+optr oHyperlinkList = NullOptr;             /* list of hyperlinks to add when we're done
+					       processing the RTF file */
+word rangeToken = 0xffff;                   /* range token to set for this context range. 0xffff means no
+					       token. */
+HyperlinkItem hyperlink;                    /* information about the current hyperlink to set */
+Boolean hyperlinkStarted = FALSE;
+Boolean contextReferenceStarted = FALSE;
+Boolean waitingForHyperlinkReference = FALSE;
+Boolean waitingForContextRangeStart = FALSE;
+Boolean bLastCharWasPound = FALSE;
+ContextBufferStruct HyperlinkContextBuffer;
+ContextBufferStruct ContextIdBuffer;
+#endif
+
+/*  TextBufferInit initializes the text buffer. The byte count and all of
+    the buffer storage are zeroed. */
+
+void TextBufferInit(void)
+    {
+    char *pc = TextBuffer.TBS_cData;
+    char *pEnd = &TextBuffer.TBS_cData[TEXT_BUFFER_LEN - 1];
+
+    TextBuffer.TBS_nCount = 0;
+    for (; pc <= pEnd; pc++)
+        *pc = '\0';
+    }
+
+/*  TextBufferIsEmpty is used to test the empty state of the buffer. */
+
+Boolean TextBufferIsEmpty(void)
+    {
+    return (TextBuffer.TBS_nCount == 0);
+    }
+
+/*  TextBufferAddChar is used to append a single character to the buffer.
+    If the character cannot be added because the buffer is full, the
+    buffer will first be emptied via TextBufferDump(). */
+
+void TextBufferAddChar(char c)
+    {
+#if _DO_HELP
+	if(!waitingForContextRangeStart) {   /* don't output anything immediately after footnote */
+	    if(bLastCharWasPound) {
+		if (TextBuffer.TBS_nCount == TEXT_BUFFER_LEN - 1)
+		    TextBufferDump();
+		TextBuffer.TBS_cData[TextBuffer.TBS_nCount++] = '#';
+		if (GetDestMode() == DM_NO_BUFFER)
+		    TextBufferDump();
+	    }
+	    if(c != '#') {
+		bLastCharWasPound = FALSE;
+#endif
+	    if (TextBuffer.TBS_nCount == TEXT_BUFFER_LEN - 1)
+		TextBufferDump();
+	    TextBuffer.TBS_cData[TextBuffer.TBS_nCount++] = c;
+	    if (GetDestMode() == DM_NO_BUFFER)
+		TextBufferDump();
+#if _DO_HELP
+	    }
+	    else {
+		bLastCharWasPound = TRUE;
+	    }
+	}
+#endif
+    }
+
+#if _DO_HELP
+/* Appends a single character to the hyperlink context name buffer.  */
+void HyperlinkContextBufferAddChar(char c)
+{
+    if(c != ' ' &&    /* WinHelp context names (topic IDs) don't have spaces */
+       HyperlinkContextBuffer.CBS_nCount != NAME_ARRAY_MAX_NAME_LENGTH)
+	HyperlinkContextBuffer.CBS_cData[HyperlinkContextBuffer.CBS_nCount++] = c;
+    if (GetDestMode() == DM_NO_BUFFER)
+	TextBufferDump();
+}
+
+/* Appends a single character to a context id name buffer. */
+void ContextIDBufferAddChar(char c)
+{
+    if(c != ' ' &&
+       ContextIdBuffer.CBS_nCount != NAME_ARRAY_MAX_NAME_LENGTH)
+	ContextIdBuffer.CBS_cData[ContextIdBuffer.CBS_nCount++] = c;
+    if (GetDestMode() == DM_NO_BUFFER)
+	TextBufferDump();
+}
+#endif
+
+/*  TextBufferDump empties the buffer into the current destination. */
+
+void TextBufferDump(void)
+    {
+    if (!TextBufferIsEmpty())
+        {
+        char *pc = &TextBuffer.TBS_cData[TextBuffer.TBS_nCount - 1];
+
+        EmitTextToCurrentDestination (TextBuffer.TBS_cData,
+          TextBuffer.TBS_nCount);
+        for (; pc >= TextBuffer.TBS_cData; pc--)
+            *pc = '\0';
+        TextBuffer.TBS_nCount = 0;
+        }
+    }
+
+/*  TextBufferFree frees any resources used by the text buffer.
+    In the static allocation case, nothing needs to happen. */
+
+void TextBufferFree(void)
+    {
+    }
+
+
+/*********************************************************/
+/**** DEFAULT PARAGRAPH/CHARACTER/DOCUMENT PROPERTIES ****/
+/*********************************************************/
+
+VisTextParaAttr     DefaultParaAttrs;
+VisTextCharAttr     DefaultCharAttrs;
+RTFDocumentAttr     DefaultDocAttrs;
+
+@start DefaultAttrs, data;
+
+@chunk VisTextParaAttr DefaultParaAttrsChunk =
+  PARA_ATTR_STYLE_JUST_LEFT_RIGHT_PARA(0, CA_NULL_ELEMENT, J_LEFT, 0, 0, 0);
+@localize not;
+@chunk VisTextCharAttr DefaultCharAttrsChunk =
+  CHAR_ATTR_FONT_SIZE(FID_DTC_URW_ROMAN, 12);
+@localize not;
+@chunk RTFDocumentAttr DefaultDocAttrsChunk = {
+  {                                             /* RTFDA_pageInfo */
+    {0},                                            /* PSI_meta */
+    {12240/20, 15840/20},                           /* PSI_page */
+    {(PO_PORTRAIT * PLP_ORIENTATION) | PT_PAPER},   /* PSI_layout */
+    1,                                              /* PSI_numColumns */
+    720/20 << 3,                                    /* PSI_columnSpacing */
+    0,                                              /* PSI_ruleWidth */
+    1800/20 << 3,                                   /* PSI_leftMargin */
+    1800/20 << 3,                                   /* PSI_rightMargin */
+    1440/20 << 3,                                   /* PSI_topMargin */
+    1440/20 << 3,                                   /* PSI_bottomMargin */
+  }
+};
+@localize not;
+
+@end DefaultAttrs;
+
+/*  DefaultAttrsInit fills in these defaults from chunks located in
+    a library resource. */
+
+void DefaultAttrsInit(void)
+    {
+    MemLock(HandleOf(@DefaultParaAttrsChunk));
+    memcpy (&DefaultParaAttrs, LMemDeref(@DefaultParaAttrsChunk),
+        sizeof(DefaultParaAttrs));
+    memcpy (&DefaultCharAttrs, LMemDeref(@DefaultCharAttrsChunk),
+        sizeof(DefaultCharAttrs));
+    memcpy (&DefaultDocAttrs, LMemDeref(@DefaultDocAttrsChunk),
+        sizeof(DefaultDocAttrs));
+    MemUnlock (HandleOf(@DefaultParaAttrsChunk));
+    }
+
+
+/*********************************************************/
+/********************** GROUP STACK **********************/
+/*********************************************************/
+
+optr    Stack;
+
+#define STACK_INIT_ELEMENTS     10
+#define STACK_MAX_ELEMENTS      50
+
+typedef struct
+    {
+    DestinationType GSE_curDest;
+    GroupType GSE_curGroup;
+    word GSE_curGroupDepth;
+    DestMode GSE_destMode;
+    VisTextCharAttr GSE_textCharAttr;
+    VisTextMaxParaAttr GSE_textParaAttr;
+    }
+GroupStackElement;
+
+#define GROUPSTACKELEMENTSIZE(p) ( sizeof(GroupStackElement) - sizeof(VisTextMaxParaAttr) + VISTEXTPARAATTRSIZE(&p->GSE_textParaAttr.VTMPA_paraAttr) )
+
+/*  GroupStackInit initializes the Group Stack. The Stack LMemHeap
+    and ChunkArray are created. FALSE is returned if memory
+    allocation fails. */
+
+Boolean GroupStackInit(void)
+    {
+    MemHandle   mhStack;
+    ChunkHandle chStack;
+    Boolean success = FALSE;
+
+    Stack = NullOptr;
+    mhStack = MemAlloc (STD_INIT_HEAP, HF_SWAPABLE, HAF_STANDARD_LOCK);
+    if (mhStack != NullHandle)
+        {
+        LMemInitHeap (mhStack, LMEM_TYPE_GENERAL, 0, sizeof(LMemBlockHeader),
+          2, STD_INIT_HEAP);
+        chStack = ChunkArrayCreate (mhStack, 0, 0, 0);
+        if (chStack != NullChunk)
+            {
+            Stack = ConstructOptr (mhStack, chStack);
+            success = TRUE;
+            MemUnlock (mhStack);
+            }
+        }
+    else
+        SetError(TE_OUT_OF_MEMORY);
+    return success;
+    }
+
+/*  GroupStackFree frees the Stack MemBlock. */
+
+void GroupStackFree(void)
+    {
+    MemFree (HandleOf(Stack));
+    }
+
+static void GroupStackGetAllAttrs(VisTextCharAttr* pChar, VisTextParaAttr *pPara)
+    {
+    VisTextCharAttr* pSrcChar = GetGroupCharAttrs();
+    VisTextParaAttr* pSrcPara = GetGroupParaAttrs();
+
+    if (pSrcChar)
+        memcpy (pChar, pSrcChar, sizeof(VisTextCharAttr));
+    if (pSrcPara)
+        memcpy (pPara, pSrcPara, VISTEXTPARAATTRSIZE(pSrcPara));
+    GroupsUnlock();
+    GroupsUnlock();
+    }
+
+/*  GroupStackPush creates and appends a GroupStackEntry to the array.
+    In addition, TextBufferDump() and IncGroupDepth() are called. */
+
+Boolean GroupStackPush(void)
+    {
+    GroupStackElement *pElement;
+    Boolean result = FALSE;
+    word nIndex;
+
+    /* Update the text object before pushing state. */
+    TextBufferDump();
+
+    /* Must lock Stack before doing anything. */
+    MemLock (HandleOf(Stack));
+
+    if (ChunkArrayGetCount (Stack) < STACK_MAX_ELEMENTS)   /* Overflow test */
+        {
+        /* Append a new element to the stack. */
+        pElement = ChunkArrayAppend (Stack, sizeof(GroupStackElement));
+        if (pElement != NULL)
+            {
+        EC_WARNING_IF (pElement == NULL, RTF_WARNING_GROUP_STACK_PUSH_FAILED);
+
+            /* Fill in the new element. */
+            pElement->GSE_curDest = GetDestination();
+            pElement->GSE_curGroup = GetGroup();
+            pElement->GSE_curGroupDepth = GetGroupDepth();
+            pElement->GSE_destMode = GetDestMode();
+
+            GroupStackGetAllAttrs(&pElement->GSE_textCharAttr,
+              &pElement->GSE_textParaAttr.VTMPA_paraAttr);
+
+            /* Resize it to rid unused tab space in VisTextParaAttr. */
+            nIndex = ChunkArrayPtrToElement (Stack, pElement);
+            ChunkArrayElementResize (Stack, nIndex, GROUPSTACKELEMENTSIZE(pElement));
+
+            IncGroupDepth();
+            result = TRUE;
+            }
+        }
+    if (!result)
+    	{
+	    /* This shouldn't happen!! */
+	    EC_WARNING(RTF_WARNING_GROUP_STACK_PUSH_FAILED);
+	    SetError(TE_IMPORT_ERROR);
+    	}
+
+    MemUnlock (HandleOf(Stack));
+    return result;
+    }
+
+static void GroupStackSetAllAttrs(VisTextCharAttr* pChar, VisTextParaAttr *pPara)
+    {
+    VisTextCharAttr* pDestChar = GetGroupCharAttrs();
+    VisTextParaAttr* pDestPara = GetGroupParaAttrs();
+
+    if (pDestChar)
+        if (memcmp (pDestChar, pChar, sizeof(VisTextCharAttr)))
+	    {
+            memcpy (pDestChar, pChar, sizeof(VisTextCharAttr));
+#if _DO_HELP
+     if(hyperlinkStarted &&
+	!(pDestChar->VTCA_textStyles & TS_UNDERLINE)) {
+	 /* we're ending a hyperlink group, so we need
+	    to end the hyperlink */
+	 EndHyperlink();
+     }
+     if(contextReferenceStarted &&
+	!(pDestChar->VTCA_extendedStyles & VTES_HIDDEN)) {
+	 /* now we're ending a hyperlink context reference */
+	 EndContextReference();
+     }
+#endif
+            SetGroupCharAttrsDirty();
+            }
+    if (pDestPara)
+        if (memcmp (pDestPara, pPara, VISTEXTPARAATTRSIZE(pPara)))
+            {
+            memcpy (pDestPara, pPara, VISTEXTPARAATTRSIZE(pPara));
+            SetGroupParaAttrsDirty();
+            }
+    GroupsUnlock();
+    GroupsUnlock();
+    }
+
+/*  GroupStackPop removes the last Stack entry and restores the translator
+    state by it.  */
+
+Boolean GroupStackPop(void)
+    {
+    GroupStackElement *pElement;
+    byte nOldGroupDepth;
+    int nLastElement;
+    Boolean result = FALSE;
+    word nSize;
+
+    /* Update the text object before poping state. */
+    TextBufferDump();
+
+    /* Must lock Stack before doing anything. */
+    MemLock (HandleOf(Stack));
+
+    nLastElement = ChunkArrayGetCount (Stack) - 1;
+    if (nLastElement >= 0)                    /* Underflow test */
+        {
+        /* Reference the last element in the stack. */
+        pElement = ChunkArrayElementToPtr (Stack, nLastElement, &nSize);
+#if _DO_HELP
+     if(GetDestMode() == DM_CONTEXT_ID &&
+	pElement->GSE_destMode != DM_CONTEXT_ID) {
+	 /* we're ending a context id buffer */
+	 ContextIdBuffer.CBS_cData[ContextIdBuffer.CBS_nCount] = '\0';
+	 AddContextId(ContextIdBuffer.CBS_cData, &rangeToken, NULL);
+	 waitingForContextRangeStart = TRUE;
+     }
+
+     /* turn off button attribute if necessary */
+     if(!bButtonAttr) {
+	 pElement->GSE_textCharAttr.VTCA_extendedStyles &= ~VTES_BUTTON;
+     }
+     else {
+	 pElement->GSE_textCharAttr.VTCA_extendedStyles |= VTES_BUTTON;
+     }
+#endif
+
+        SetDestMode (pElement->GSE_destMode);
+        SetGroup (pElement->GSE_curGroup);
+
+        SetDestination (pElement->GSE_curDest);
+        GroupStackSetAllAttrs (&pElement->GSE_textCharAttr,
+          &pElement->GSE_textParaAttr.VTMPA_paraAttr);
+        nOldGroupDepth = pElement->GSE_curGroupDepth;
+
+        ChunkArrayDelete (Stack, pElement);
+
+        DecGroupDepth();
+        EC_WARNING_IF (nOldGroupDepth != GetGroupDepth(),
+          RTF_WARNING_GROUP_STACK_POP_DESYNCHED);    /* sanity? */
+        result = TRUE;
+        }
+    else
+	    SetError(TE_IMPORT_ERROR);
+
+    MemUnlock (HandleOf(Stack));
+    return result;
+    }
+
+
+/* Utility function called to notify user of import/export progress. */
+Boolean RTFReportStatus(dword nSize, dword nPos)
+	{
+	word per;
+	if (nSize > 0 && nPos < nSize)
+		{
+		if (nPos == nSize - 1)
+			per = 100;
+		else
+			per = nPos * 100 / nSize;
+		return ImpexUpdateImportExportStatus(NULL, per);
+		}
+	return TRUE;
+	}
+
+TCHAR* GetNameString(word token, NameArrayMaxElement* buffer)
+{
+    word elementLength;
+    TCHAR* str;
+
+     /* get the context name from the name array */
+    elementLength = @call oVLTInput::MSG_VIS_TEXT_FIND_NAME_BY_TOKEN(token, buffer);
+
+    /* null terminate the name string */
+    str = buffer;
+    *(str+elementLength) = 0;
+
+    /* get a pointer to the name string */
+    str += sizeof(VisTextNameArrayElement);
+    return str;
+}
+
+void StringConvertAndAppend(MemHandle *mem, TCHAR *p_string)
+{
+    word len ;
+    TCHAR c ;
+    TCHAR *p_char ;
+    TCHAR *p_formString ;
+    TCHAR *p_dest ;
+    TCHAR hexTable[16] = "0123456789ABCDEF" ;
+
+    /* Determine the new length of the string */
+    for (len=0, p_char = p_string; *p_char; p_char++)  {
+        c = *p_char ;
+        if (((c < 64) || (c >= 127)) && (c != 32) && (c != '.') && ((c<'0') || (c>'9')) && (c != '-'))  {
+            len += 3 ;   /* Will be %XX per irregular character */
+        } else {
+            len++ ;
+        }
+    }
+
+    /* allocate the memory for the new string */
+    *mem = MemAlloc(len, HF_FIXED, NULL);
+    p_formString = MemDeref(*mem);
+
+    /* Now let's create the new string */
+    p_dest = p_formString;
+    for (p_char=p_string; *p_char; p_char++, p_dest++)  {
+        c = *p_char ;
+
+        /* Convert characters */
+        if (c == 32)  {
+            /* Spaces become pluses */
+            *p_dest = '+' ;
+        } else if (((c>='0') && (c <='9')) || (c == '.') || (c == '-'))  {
+            *p_dest = c ;
+        } else {
+            /* Punctuation and special 8 bit ASCII characters are %'d */
+            /* Convert Geos to ISO Latin 1 first */
+            if ((c < 64) || (c >= 127))  {
+               c = LocalGeosToCodePageChar(c, CODE_PAGE_LATIN_1, '.');
+               p_dest[0] = '%' ;
+               p_dest[1] = hexTable[c>>4] ;
+               p_dest[2] = hexTable[c&15] ;
+               p_dest += 2 ;
+            } else {
+               /* Everything else is copied */
+               *p_dest = c ;
+            }
+        }
+    }
+    /* And null terminate */
+    *p_dest = '\0' ;
+}
+
+#define ASCII_TO_DECIMAL(c) if(c >= 'A') \
+                               c = (c - 'A') + 0xA; \
+                	    else \
+                               c = c - '0';
+
+MemHandle DecodeEncodedString(TCHAR* p_string)
+{
+    TCHAR* p_char;
+    TCHAR* p_dest;
+    TCHAR* p_destString;
+    TCHAR c, c1, c2;
+    MemHandle mHandle;
+
+    /* allocate the memory for the new string */
+    mHandle = MemAlloc(strlen(p_string), HF_FIXED, NULL);
+    p_destString = MemDeref(mHandle);
+
+    /* Now let's create the new string */
+    p_dest = p_destString;
+
+    for(p_char = p_string; *p_char; p_char++, p_dest++) {
+	c = *p_char;
+
+	if(c == '+') {
+	    /* pluses become spaces */
+	    *p_dest = 32;
+	}
+	else if(c == '%') {
+	    /* convert punctuation */
+	    c1 = p_char[1];
+	    c2 = p_char[2];
+	    ASCII_TO_DECIMAL(c1);
+	    ASCII_TO_DECIMAL(c2);
+	    *p_dest = LocalCodePageToGeosChar(c2+(c1*0x10), CODE_PAGE_LATIN_1, '.');
+	    p_char+=2;
+	}
+	else {
+	    /* everything else gets copied */
+	    *p_dest = c;
+	}
+    }
+    *p_dest = 0;
+
+    return mHandle;
+}
+
+#if _DO_HELP
+
+/* ends a hyperlink */
+void EndHyperlink(void) {
+    hyperlinkStarted = FALSE;
+    TextBufferDump();
+    hyperlink.HI_rangeEnd = TextCurPos;  /* save the range */
+    waitingForHyperlinkReference = TRUE;
+}
+
+/* ends a hyperlink context reference */
+void EndContextReference(void) {
+    char contextName[NAME_ARRAY_MAX_NAME_LENGTH+1];
+    char filename[NAME_ARRAY_MAX_NAME_LENGTH+1];
+
+    contextReferenceStarted = FALSE;
+    /* null terminate the context buffer */
+    HyperlinkContextBuffer.CBS_cData[HyperlinkContextBuffer.CBS_nCount] = '\0';
+
+    /* add the context to our text object */
+    AddContextId(HyperlinkContextBuffer.CBS_cData, contextName, filename);
+
+    /* now add the hyperlink */
+    AddHyperlinkForRange(hyperlink.HI_rangeStart, hyperlink.HI_rangeEnd);
+}
+
+void AddHyperlinkForRange(dword startPos, dword endPos)
+{
+    MemHandle mHandle;
+    ChunkHandle cHandle;
+    HyperlinkItem* item;
+    word contextToken, filenameToken;
+
+    if(startPos != endPos) {    /* can't set a 0 length hyperlink */
+	if(HyperlinkContextBuffer.CBS_nCount != 0) {
+	    HyperlinkContextBuffer.CBS_cData[HyperlinkContextBuffer.CBS_nCount] = '\0';
+	    AddContextId(HyperlinkContextBuffer.CBS_cData, &
+			 contextToken, &filenameToken);
+
+	    /* add the hyperlink information to the hyperlink list */
+	    if(!oHyperlinkList) {
+		/* need to allocate the Chunk Array hyperlink list */
+		mHandle = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+		MemLock(mHandle);
+		cHandle = ChunkArrayCreate(mHandle, sizeof(HyperlinkItem),
+					   0, 0);
+		oHyperlinkList = ConstructOptr(mHandle, cHandle);
+		MemUnlock(mHandle);
+	    }
+	    MemLock(OptrToHandle(oHyperlinkList));
+	    item = (HyperlinkItem*)ChunkArrayAppend(oHyperlinkList, 0);
+	    item->HI_nameToken = contextToken;
+	    item->HI_nameFileToken = filenameToken;
+	    item->HI_rangeEnd = endPos;
+	    item->HI_rangeStart = startPos;
+	    MemUnlock(OptrToHandle(oHyperlinkList));
+	}
+    }
+    HyperlinkContextBuffer.CBS_nCount = 0;  /* reset the buffer */
+    HyperlinkContextBuffer.CBS_cData[0] = '\0';
+}
+
+void AddContextId(char* buffer, word* retContextToken, word* retFilenameToken)
+{
+    VisTextNameData nameData;
+    MemHandle mHandle;
+    word contextToken = 0xffff, filenameToken = 0xffff;
+    TCHAR* contextString;
+    TCHAR* filenameString;
+    TCHAR* p;
+
+    mHandle = DecodeEncodedString(buffer);
+    nameData.VTND_helpText = 0;
+
+    /* look for an @ sign.  If we find one, then we need to interpret the part of
+       the string following it as a filename */
+    contextString = MemDeref(mHandle);
+    p = contextString;
+    while(*p != '\0' && *p != '@')
+	p++;
+    if(*p == '@') {
+	*p = '\0';
+	filenameString = p+1;
+
+	/* add the filename to the name array */
+	nameData.VTND_type = VTNT_FILE;
+	nameData.VTND_contextType = VTCT_FILE;
+	nameData.VTND_file = 0xffff;
+	filenameToken = @call Text::MSG_VIS_TEXT_ADD_NAME(nameData, 0, 0, filenameString);
+    }
+    nameData.VTND_type = VTNT_CONTEXT;
+    nameData.VTND_contextType = VTCT_TEXT;
+    nameData.VTND_file = filenameToken;
+    contextToken = @call Text::MSG_VIS_TEXT_ADD_NAME(nameData, 0, 0, contextString);
+    MemFree(mHandle);
+
+    if(retContextToken)
+	*retContextToken = contextToken;
+    if(retFilenameToken)
+	*retFilenameToken = filenameToken;
+}
+#endif

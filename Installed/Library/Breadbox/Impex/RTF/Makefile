@@ -3,25 +3,24 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = RTF
-ASM_TO_OBJS     = MANAGER.ASM
+GEODE           = rtf
+ASM_TO_OBJS     = manager.asm
 UI_TO_RDFS      =
-SRCS            = MANAGER.ASM CHARSET.H CODEPAGE.H CONTROL.H CTRLFUNC.H\
-                  GLOBAL.H GROUPS.H IMPDEFS.H IMPORT.H OUTPUT.H PRESCAN.H\
-                  RTF.H RTFDEFS.H RTFINPUT.H SCAN.H SCANFUNC.H TEXT.H\
-                  VLTINPUT.H WARNINGS.H CHARSET.GOC CONTROL.GOC\
-                  CTRLFUNC.GOC EXPORT.GOC EXPTPROC.GOC GLOBAL.GOC\
-                  GROUPS.GOC IMPORT.GOC IMPTPROC.GOC OUTPUT.GOC PRESCAN.GOC\
-                  RTFINPUT.GOC SCAN.GOC SCANFUNC.GOC TEXT.GOC VLTINPUT.GOC
-OBJS            = MANAGER.obj CHARSET.obj CONTROL.obj CTRLFUNC.obj\
-                  EXPORT.obj EXPTPROC.obj GLOBAL.obj GROUPS.obj IMPORT.obj\
-                  IMPTPROC.obj OUTPUT.obj PRESCAN.obj RTFINPUT.obj SCAN.obj\
-                  SCANFUNC.obj TEXT.obj VLTINPUT.obj
+SRCS            = manager.asm rtfdefs.h output.h scan.h rtfinput.h\
+                  ctrlfunc.h text.h import.h impdefs.h groups.h scanfunc.h\
+                  control.h vltinput.h warnings.h codepage.h rtf.h\
+                  charset.h global.h prescan.h scan.goc text.goc\
+                  vltinput.goc export.goc imptproc.goc import.goc\
+                  output.goc exptproc.goc prescan.goc rtfinput.goc\
+                  control.goc groups.goc charset.goc ctrlfunc.goc\
+                  scanfunc.goc global.goc
+OBJS            = manager.obj scan.obj text.obj vltinput.obj export.obj\
+                  imptproc.obj import.obj output.obj exptproc.obj\
+                  prescan.obj rtfinput.obj control.obj groups.obj\
+                  charset.obj ctrlfunc.obj scanfunc.obj global.obj
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = rtf
-
-#PRODUCTS        = tools 
 
 SYSMAKEFILE     = geode.mk
 
@@ -36,8 +35,4 @@ SYSMAKEFILE     = geode.mk
 
 #if exists($(DEPFILE))
 #include "$(DEPFILE)"
-#endif
-
-#if exists(tools/$(DEPFILE))
-#include "tools/$(DEPFILE)"
 #endif
