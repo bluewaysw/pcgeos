@@ -251,7 +251,7 @@ csv	: Installed/Library/Trans/Database/CSV
 Installed/Library/Trans/Database/CSV:	ui impex ssmeta MAKELIB
 
 rtf	: Installed/Library/Breadbox/Impex/RTF
-INstalled/Library/Breadbox/Impex/RTF: 	ui impex text ansic MAKELIB
+Installed/Library/Breadbox/Impex/RTF: 	ui impex text ansic MAKELIB
 
 jpeg	: Installed/Library/Breadbox/Impex/JPEG
 Installed/Library/Breadbox/Impex/JPEG: ui impex ansic ijgjpeg math MAKELIB
