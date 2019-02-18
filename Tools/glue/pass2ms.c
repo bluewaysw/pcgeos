@@ -59,7 +59,7 @@ static MSSaveRecLinks	backPatches = {
  * RETURN:	    nothing
  * SIDE EFFECTS:    lots
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -94,7 +94,9 @@ Pass2MSFixupLMem(const char *file,  	/* File being linked */
     word    	    	lastOff;
 
     lmd = NULL;
-    
+
+    printf("Pass2MSFixupLMem\n");
+
     /*
      * Locate the MSObjLMemData descriptor for this lmem segment.
      */
@@ -116,7 +118,7 @@ Pass2MSFixupLMem(const char *file,  	/* File being linked */
     /*
      * We have the handle table as it was before we shuffled things around,
      * while the output file has the same info, except shifted up by
-     * heap->grpOff. 
+     * heap->grpOff.
      * Now we need to read in the heap segment from the output file and
      * actually perform all the shuffling of the heap data, symbols, address
      * map, chunk handles, and of any runtime relocations. We, unfortunately,
@@ -172,7 +174,7 @@ Pass2MSFixupLMem(const char *file,  	/* File being linked */
 	    word    	    finalVarOff;
 	    VMBlockHandle   finalVarTypesBlock = 0;
 	    Boolean 	    foundFinalType = FALSE;
-	    
+
 	    finalVarType = 0; finalVarOff = 0; /* Be quiet, GCC (these are
 						* used only when
 						* finalVarTypesBlock is found
@@ -220,7 +222,7 @@ Pass2MSFixupLMem(const char *file,  	/* File being linked */
 				finalVarType = os->u.variable.type;
 				finalVarOff = os->u.addrSym.address;
 				finalVarTypesBlock = osh->types;
-			    }			
+			    }
 			}
 		    }
 		}
@@ -267,7 +269,7 @@ Pass2MSFixupLMem(const char *file,  	/* File being linked */
 	     * size word.
 	     */
 	    size += 2;
-	    
+
 	    dest[-2] = (size) & 0xff;
 	    dest[-1] = (size) >> 8;
 
@@ -299,7 +301,7 @@ Pass2MSFixupLMem(const char *file,  	/* File being linked */
 		{
 		    word    newoff = swaps(rel->offset) + (prevOff - rndSize) -
 			(swaps(*oldHandle) - LMEM_SIZE_SIZE);
-		    
+
 		    rel->offset = swaps(newoff);
 		}
 	    }
@@ -328,7 +330,7 @@ Pass2MSFixupLMem(const char *file,  	/* File being linked */
 	assert(prevOff >= 6);	/* We need at least 4 bytes for a decent free
 				 * chunk */
 	Notify(NOTIFY_WARNING, "fixing up unused space in lmem resource %i", lmem->name);
-	
+
 	/*
 	 * Set up the free chunk at the start of "heapData" - the first word
 	 * is the size of the free chunk (prevOff-2). The second word is a
@@ -345,7 +347,7 @@ Pass2MSFixupLMem(const char *file,  	/* File being linked */
 	Out_Block(lmem->foff + offsetof(LMemBlockHeader, LMBH_freeList), b, 2);
 	/*
 	 * Take advantage of the fact that we have the size of the free chunk
-	 * already stored at the start of heapData, and just write it out. 
+	 * already stored at the start of heapData, and just write it out.
 	 */
 	Out_Block(lmem->foff + offsetof(LMemBlockHeader, LMBH_totalFree), heapData, 2);
 
@@ -405,12 +407,13 @@ Pass2MSFixupLMem(const char *file,  	/* File being linked */
 
     for (cur = heap->addrH; cur != 0; cur = next) {
 	ObjSymHeader    *osh;
-	ObjSym  	*os;
+	ObjSym  	*os, *first;
 	word	    	n;
 
 	osh = (ObjSymHeader *)VMLock(symbols, cur, (MemHandle *)NULL);
 
 	os = ObjFirstEntry(osh, ObjSym);
+        first = os;
 	if (!Obj_IsAddrSym(os)) {
 	    /*
 	     * Hit the first type block (no need to worry about undefined
@@ -420,7 +423,6 @@ Pass2MSFixupLMem(const char *file,  	/* File being linked */
 	    VMUnlock(symbols, cur);
 	    break;
 	}
-	
 	for (n = osh->num; n > 0; os++, n--) {
 	    /*
 	     * If the thing's an address symbol (XXX: what else could it be?
@@ -454,9 +456,9 @@ Pass2MSFixupLMem(const char *file,  	/* File being linked */
 		    for (nextOldHandle = oldHandle + 1,
 			 nextNewHandle = newHandle + 1,
 			 i -= 1;
-			 
+
 			 i > 0;
-			 
+
 			 nextOldHandle++, nextNewHandle++, i--)
 		    {
 			if ((*nextOldHandle != 0) &&
@@ -467,7 +469,7 @@ Pass2MSFixupLMem(const char *file,  	/* File being linked */
 		    }
 		}
 	    }
-		    
+
 	    /*
 	     * If the symbol's a variable, see if it's the body of a chunk array
 	     * and fix up the header properly if so.
@@ -479,7 +481,7 @@ Pass2MSFixupLMem(const char *file,  	/* File being linked */
 		 * GOC puts out an _carray_ and some compilers will add
 		 * an underscore to that
 		 */
-		if (strncmp(name, "_carray_", 8) == 0 || 
+		if (strncmp(name, "_carray_", 8) == 0 ||
 		    strncmp(name, "__carray_", 9) == 0) {
 		    /*
 		     * This is the actual array symbol. The preceding symbol
@@ -494,6 +496,9 @@ Pass2MSFixupLMem(const char *file,  	/* File being linked */
 		    ObjType *t;	    	/* Current piece of the array
 					 * descriptor */
 		    byte    *bp;    	/* Pointer for storing CAH_count */
+                    int     preceding;  /* index of preceding symbold
+                                         * based on addr offset */
+                    word    pl;         /* preceding loop */
 
 		    /*
 		     * Point to the first descriptor for the array type (this
@@ -504,7 +509,7 @@ Pass2MSFixupLMem(const char *file,  	/* File being linked */
 					   (MemHandle *)NULL);
 		    t = (ObjType *)(tbase + os->u.variable.type);
 		    assert(OTYPE_IS_ARRAY(t->words[0]));
-		    
+
 		    /*
 		     * Deal with arrays > OTYPE_MAX_ARRAY_LEN by moving down the
 		     * chain of ObjType's, summing the lengths from each until
@@ -513,7 +518,7 @@ Pass2MSFixupLMem(const char *file,  	/* File being linked */
 		    len = OTYPE_ARRAY_LEN(t->words[0]);
 		    while (len == OTYPE_MAX_ARRAY_LEN+1) {
 			nels += len;
-			
+
 			t = (ObjType *)(tbase + t->words[1]);
 			len = OTYPE_ARRAY_LEN(t->words[0]);
 		    }
@@ -528,16 +533,33 @@ Pass2MSFixupLMem(const char *file,  	/* File being linked */
 		     * it's legal for the header to be the first symbol in
 		     * the block, I believe... -- ardeb
 		     */
-		    assert(os-1 >= ObjFirstEntry(osh, ObjSym));
-		    assert(os[-1].type == OSYM_VAR);
 
+                    /*
+                     * WATCOM doesn't garantie offset related order of then
+                     * symbols, so we need to lookup the symbols by iterating
+                     * the symbols block and pick the var with the closest
+                     * offset address before ourself.
+                     */
+                     for (pl = 0; pl < osh->num; pl++) {
+                        if(first[pl].u.addrSym.address < os->u.addrSym.address) {
+                            if(preceding <  0) {
+                                preceding = pl;
+                            } else if(first[pl].u.addrSym.address >
+                                first[preceding].u.addrSym.address) {
+                                preceding = pl;
+                            }
+                        }
+                     }
+		    assert(preceding >= 0);
+		    assert(first[preceding].type == OSYM_VAR);
+                    
 		    /*
 		     * Point to the CAH_count (first field) of the preceding
 		     * variable in the block of heap data we've already got
 		     * around and set that word to the number of elements in
 		     * the array.
 		     */
-		    bp = heapData + os[-1].u.addrSym.address - heap->grpOff;
+		    bp = heapData + first[preceding].u.addrSym.address - heap->grpOff;
 		    *bp++ = nels;
 		    *bp = nels >> 8;
 		}
@@ -563,7 +585,7 @@ Pass2MSFixupLMem(const char *file,  	/* File being linked */
      */
     oame[-1].last = lmem->size;
     VMUnlockDirty(symbols, lmem->addrMap);
-	
+
     /*
      * Write the affected blocks (the heap segment, handle table and the
      * runtime relocations) back to the output file.
@@ -607,7 +629,7 @@ Pass2MSFixupLMem(const char *file,  	/* File being linked */
      */
     free((malloc_t)lmd);
 }
-    
+
 
 /***********************************************************************
  *				Pass2MS_Finish
@@ -632,7 +654,7 @@ Pass2MS_Finish(const char *file, int happy, int pass)
     SegDesc 	*sd;
     long    	size;
     MSSaveRec	*backpatch;
-    
+
     /*
      * Deal with back patches.
      */
@@ -697,8 +719,8 @@ Pass2MS_Finish(const char *file, int happy, int pass)
      * Free all saved back-patch records.
      */
     MSObj_FreeSaved(&backPatches);
-		
-	
+
+
     /*
      * Update the nextOff field for each segment used by the file.
      */
@@ -712,7 +734,7 @@ Pass2MS_Finish(const char *file, int happy, int pass)
 	    {
 		Pass2MSFixupLMem(file, sd, size);
 	    }
-	    
+
 	    sd->nextOff += (size + sd->alignment) & ~sd->alignment;
 	}
     }
@@ -754,7 +776,7 @@ Pass2MSProcessRels(const char 	*file,	    /* Object file being read */
     byte    	*bp;	    /* Current byte in fixups */
     void    	*rbase,	    /* Base of runtime relocation buffer */
 		*nextRel;   /* Next available byte in same */
-    
+
     /*
      * Figure where the fixups begin and end.
      */
@@ -766,7 +788,7 @@ Pass2MSProcessRels(const char 	*file,	    /* Object file being read */
 	bp = data;
 	fixlen = reclen;
     }
-    
+
     endRecord = bp + fixlen;
 
     /*
@@ -810,9 +832,9 @@ Pass2MSProcessRels(const char 	*file,	    /* Object file being read */
      */
     if (nextRel != rbase) {
 	unsigned    len = (genptr)nextRel - (genptr)rbase;
-	
+
 	assert(((byte *)rbase)[0] != 0);
-	
+
 	Out_Block(sd->roff, rbase, len);
 	sd->roff += len;
     }
@@ -820,7 +842,7 @@ Pass2MSProcessRels(const char 	*file,	    /* Object file being read */
 	free(rbase);
     }
 }
-		   
+
 
 /***********************************************************************
  *				Pass2MS_Load
@@ -892,14 +914,14 @@ Pass2MS_ProcessObject(const char *file,
 	byte	*bp;
 
 	rectype = MSObj_ReadRecord(f, &reclen, &recno);
-	
+
 	bp = msobjBuf;
 	printf("(2) rec no: %d, len: %d\r\n", recno, reclen);
 
 	if ((*msobjCheck) (file, rectype, reclen, msobjBuf, 2)) {
 	    continue;
 	}
-	
+
 
 	switch(rectype) {
 	    case MO_THEADR:
@@ -917,7 +939,7 @@ Pass2MS_ProcessObject(const char *file,
 					 * of the fixup (non-existent, but
 					 * doing so allows us to use
 					 * MSObj_DecodeFixup...) */
-			
+
 #if 0				/* XXX: DEAL WITH THIS */
 			if (!Pass2MSRelOff(file, globalSeg, &bp,
 					   &frame, &offset))
@@ -996,7 +1018,7 @@ Pass2MS_ProcessObject(const char *file,
 			 */
 			sym = name | MO_EXT_UNDEFINED;
 		    }
-		    
+
 		    Vector_Add(externals, VECTOR_END, &sym);
 
 		    /*
@@ -1075,7 +1097,7 @@ Pass2MS_ProcessObject(const char *file,
 		}
 
 		sd = Seg_Find(file, name, class);
-		
+
 		assert(sd != NULL);
 
 		/*
@@ -1084,7 +1106,7 @@ Pass2MS_ProcessObject(const char *file,
 		 */
 		size = (size + sd->alignment) & ~sd->alignment;
 		Vector_Add(segSizes, VECTOR_END, &size);
-		
+
 		/*
 		 * Place the descriptor in the segment map for this file.
 		 */
@@ -1146,7 +1168,7 @@ Pass2MS_ProcessObject(const char *file,
 		 */
 		size = reclen - (bp - msobjBuf);
 		Out_Block(sd->nextOff + startOff, bp, size);
-		
+
 		break;
 	    }
 	    case MO_LIDATA:
@@ -1185,7 +1207,7 @@ Pass2MS_ProcessObject(const char *file,
 		Out_Block(sd->nextOff + startOff, buf, size);
 
 		free((void *)buf);
-		
+
 		break;
 	    }
 	    case MO_COMDEF:
