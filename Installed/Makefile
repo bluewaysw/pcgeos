@@ -63,12 +63,12 @@ minimalLibrary	: kernel swap sound net ui isui motif spool text mailbox \
 		  saver prefLibs accpnt netutils \
 		  socket dhcp borlandrtl ffile streamc mailhub mailsmtp \
 		  mailpop3 lot123ss csv \
-		  parentc wmlib \
+		  parentc wmlib rtf \
 		  jpeg giflib gif htmlimpx n2txt inetmsg extui \
 		  winword8 zlib dirlist minizip idialc eps impex_libs \
 		  thumbdb ftplib flllib sitelist int8087 intx87\
 		  basicdb gridlib gsol treplib
-# cdaudio rtf ascii
+# cdaudio ascii
 
 prefLibs	: prefvid preftd \
 		  prefsnd prefos prefmous preflo preflf prefkbd \
