@@ -36,11 +36,11 @@ library safari
 library ansic
 library wav
 
-resource APPRESOURCE ui-object
-resource INTERFACE ui-object
-resource DOCUMENTUI object
-resource STRINGS lmem shared read-only
-resource APPICONS data object
+resource AppResource ui-object
+resource Interface ui-object
+resource DocumentUI object
+resource Strings lmem shared read-only
+resource AppIcons data object
 
 export SafBuildAppClass
 export SafBuildDocumentClass
