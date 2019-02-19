@@ -137,7 +137,7 @@ minimalDriver	: nimbus ms4 ntfat os2 cdrom stream dri gdi keyboard modem gdipoin
 		  ps2 msys msser msbus kbmouse absgen genmouse emm extmem \
 		  xms filestr nonts sblaster comm spooltd \
 		  vmtree filedd logibus logiser dma mslf kbd_drivers \
-		  etherodi msnet
+		  etherodi etherpkt msnet
 # cdados
 printerDriver	: deskjet dj500c lbp mercury pcl4 quietjet canon48 \
 		  canonbjc  epshi24 epson24 epson48 nec24 \
@@ -606,6 +606,9 @@ Installed/Driver/Video/VGAlike/VGA16:	MAKEDRV
 
 etherodi	: Installed/Driver/Socket/EtherODI
 Installed/Driver/Socket/EtherODI:	socket accpnt MAKEDRV
+
+etherodi	: Installed/Driver/Socket/EtherPKT
+Installed/Driver/Socket/EtherPKT:	socket accpnt MAKEDRV
 
 # International Keyboard Drivers
 kbd_drivers : kbdb_cf kbde_cf kbd_csa kbde_df kbdn_df kbde_be kbd_dvrk  \
