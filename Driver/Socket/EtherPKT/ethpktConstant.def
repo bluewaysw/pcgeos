@@ -1,0 +1,290 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Edward Di Geronimo Jr. 2002 -- All Rights Reserved
+
+PROJECT:	Native Ethernet Support
+MODULE:		Ethernet Packet driver
+FILE:		ethpktConstant.def
+
+AUTHOR:		Edward Di Geronimo Jr.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ed	2/24/02		Initial revision
+
+DESCRIPTION:
+	This file contains all the constant and macro definitions
+	for the packet driver.
+
+	$Id:$
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+	;
+	;  Device-specific macros
+EthDevSendDXBP		macro
+		call	EthPktTransmitPacket
+			endm
+
+EthDevProcessIpPacket	macro
+		call	EthPktProcessIpPacket
+			endm
+
+EthDevCheckLinkAddr	macro
+		clc
+			endm
+
+EthDevInit		macro
+		local	exit
+		call	EthPktContactDriver
+		jc	exit		; => Packet error
+		call	EthPktArpInit
+		call	EthPktInitRecvBuffers
+		clc
+
+exit:
+			endm
+
+EthDevExit		macro
+		call	EthPktDetachPkt
+			endm
+
+
+
+;
+; Constants
+;
+NODE_ADDR_SIZE		equ	6
+PROTOCOL_ID_SIZE	equ	6
+MIN_PACKET_SIZE		equ	40h
+LOCAL_STACK_SIZE	equ	1024
+
+;
+; Max size of an ethernet frame is 1500 bytes
+;
+ETHER_MTU		equ	2000
+
+;
+; Constants for receiving buffers
+;
+NUM_RECV_BUFFERS	equ	10
+RECV_BUFFER_SIZE	equ	ETHER_MTU
+MIN_PACKET_SIZE		equ	64
+
+;
+; Max retries on send error
+;
+MAX_SEND_ATTEMPTS	equ	5
+
+
+;
+; Types
+;
+NodeAddr	type	NODE_ADDR_SIZE dup (byte)
+ProtocolID	type	PROTOCOL_ID_SIZE dup (byte)
+
+;
+; Packet driver constants
+;
+DEVICE_CLASS_ETHERNET	equ	0x0001
+PACKET_TYPE_IP		equ	0x0008
+PACKET_TYPE_ARP		equ	0x0608
+
+;
+; Medium Access Control header
+;
+
+MACHeader		struct
+	MACH_dest	NodeAddr
+	MACH_source	NodeAddr
+	MACH_type	word
+MACHeader		ends
+
+;
+; Internal Header
+;
+
+InternalPacketHeader	struct
+	IPH_next	optr
+	IPH_macHeader	MACHeader
+InternalPacketHeader	ends
+
+;
+; Receive Buffer
+;
+
+ReceiveBuffer		struct
+	RB_nextLink	nptr
+	RB_size		word
+	RB_macHeader	MACHeader
+	RB_data		byte RECV_BUFFER_SIZE dup (?)
+ReceiveBuffer		ends
+
+;
+; The link layer header we use for EtherODI driver is simply an ECB with
+; one (1) PacketFragmentPtr.
+;
+LINK_HEADER_SIZE	equ	(size InternalPacketHeader)
+BEGIN_SEND_OFFSET	equ	(size InternalPacketHeader - size MACHeader)
+	;
+	;  Packet Driver constants
+PacketDriverFunctions		etype	word
+
+	PDF_DRIVER_INFO		enum	PacketDriverFunctions, 0x0001
+		; PASS :	AL	-> 255
+		;		BX	-> handle (optional)
+		; RETURN :	DH	<- Error code (if carry set)
+		;			   BAD_HANDLE (old drivers need handle)
+		;		BX	<- version
+		;		CH	<- class
+		;		CL	<- number
+		;		DX	<- type
+		;		DS:SI	<- name
+		;		AL	<- functionality
+		;
+	PDF_ACCESS_TYPE		enum	PacketDriverFunctions, 0x0002
+		; PASS :	AL	-> ifclass
+		;		BX	-> iftype
+		;		DL	-> ifnumber
+		;		DS:SI	-> type (char[])
+		;		CX	-> typelen
+		;		ES:DI	-> reciever int (far *reciever)()
+		; RETURN :	DH	<- Error code (if carry set)
+		;			   NO_CLASS, NO_TYPE, NO_NUMBER,
+		;			   BAD_TYPE, NO_SPACE, TYPE_INUSE
+		;		AX	<- handle
+		;
+		;	receiver call:
+		;	(*receiver)(handle, flag, len [, buffer])
+		;		int	handle;		BX
+		;		int	flag;		AX
+		;		unsigned len;		CX
+		;	if AX == 1,
+		;		char far *buffer;	DS:SI
+		;
+	PDF_RELEASE_TYPE	enum	PacketDriverFunctions, 0x0003
+	PDF_SEND_PKT		enum	PacketDriverFunctions, 0x0004
+		; PASS :	DS:SI	-> packet
+		;		CX	-> size
+		; RETURN :	carry set on error
+		;		DH	-> CANT_SEND
+	PDF_TERMINATE		enum	PacketDriverFunctions, 0x0005
+	PDF_GET_ADDRESS		enum	PacketDriverFunctions, 0x0006
+	PDF_RESET_INTERFACE	enum	PacketDriverFunctions, 0x0007
+	; high performance driver functions
+	PDF_GET_PARAMETERS	enum	PacketDriverFunctions, 0x000A
+	PDF_AS_SEND_PKT		enum	PacketDriverFunctions, 0x000B
+	; extended driver functions
+	PDF_SET_RCV_MODE	enum	PacketDriverFunctions, 0x0014
+	PDF_GET_RCV_MODE	enum	PacketDriverFunctions, 0x0015
+	PDF_SET_MULTICAST_LIST	enum	PacketDriverFunctions, 0x0016
+	PDF_GET_MULTICAST_LIST	enum	PacketDriverFunctions, 0x0017
+	PDF_GET_STATISTICS	enum	PacketDriverFunctions, 0x0018
+	PDF_SET_ADDRESS		enum	PacketDriverFunctions, 0x0019
+
+PacketFragmentPtr	struct
+	PFP_addr	fptr
+	PFP_size	word
+PacketFragmentPtr	ends
+
+PacketDriverErrorCode				etype	word, 0, 1
+	; Error codes are returned in dh if carry is set
+	PDEC_BAD_HANDLE			enum	PacketDriverErrorCode, 0x01
+	PDEC_NO_CLASS			enum	PacketDriverErrorCode, 0x02
+	PDEC_NO_TYPE			enum	PacketDriverErrorCode, 0x03
+	PDEC_NO_NUMBER			enum	PacketDriverErrorCode, 0x04
+	PDEC_BAD_TYPE			enum	PacketDriverErrorCode, 0x05
+	PDEC_NO_MULTICAST		enum	PacketDriverErrorCode, 0x06
+	PDEC_CANT_TERMINATE		enum	PacketDriverErrorCode, 0x07
+	PDEC_BAD_MODE			enum	PacketDriverErrorCode, 0x08
+	PDEC_NO_SPACE			enum	PacketDriverErrorCode, 0x09
+	PDEC_TYPE_INUSE			enum	PacketDriverErrorCode, 0x0A
+	PDEC_BAD_COMMAND		enum	PacketDriverErrorCode, 0x0B
+	PDEC_CANT_SEND			enum	PacketDriverErrorCode, 0x0C
+	PDEC_CANT_SET			enum	PacketDriverErrorCode, 0x0D
+	PDEC_BAD_ADDRESS		enum	PacketDriverErrorCode, 0x0E
+	PDEC_CANT_RESET			enum	PacketDriverErrorCode, 0x0F
+
+
+
+
+;----------------------------------------------------------------------
+; ARP stuff
+;----------------------------------------------------------------------
+
+;
+; Structure for using ARP for IP -> 10Mb/s Ethernet resolution.
+;
+IpEtherArp	struct
+	IEA_arpHeader		ArpHeader
+	IEA_senderHwAddr	NodeAddr
+	IEA_senderProtoAddr	IPAddr
+	IEA_targetHwAddr	NodeAddr
+	IEA_targetProtoAddr	IPAddr
+IpEtherArp	ends
+
+
+
+;
+; Structures for Ip -> 10Mb/s Ethernet ARP table entries
+;
+IEAEAddrOrTimestamp	union
+	IAOT_etherAddr	NodeAddr	; ethernet address (for complete entry)
+	IAOT_timestamp	word		; lower word of system counter when
+					;  request was made (for incomplete
+					;  entry)
+IEAEAddrOrTimestamp	end
+
+IpEtherArpEntry	struct
+	IEAE_ipAddr	IPAddr		; internet address, stored in network
+					;  byte order for speed
+	IEAE_addrOrTs	IEAEAddrOrTimestamp
+	IEAE_lastRef	byte		; minutes since last reference
+	IEAE_flags	ArpEntryFlags
+	IEAE_packets	optr.PacketHeader	; list of packets waiting for
+						;  this IP addr until resolved
+						;  or timeout
+IpEtherArpEntry	ends
+
+ReceiveBufferList	struct
+	RBL_next	nptr
+	RBL_size	word
+ReceiveBufferList	ends
+
+
+
+;
+; FatalErrors
+;
+PROTOCOL_ID_MISMATCH					enum	FatalErrors
+PACKET_SIZE_MUST_BE_KNOWN				enum	FatalErrors
+ERROR_GETTING_MAC_ADDRESS				enum	FatalErrors
+
+OUT_OF_RECV_BUFFERS					enum	Warnings
+PACKET_TOO_SMALL					enum	Warnings
+PACKET_TOO_LARGE_FOR_US					enum	Warnings
+RECV_BUFFER_OVERFLOW					enum	Warnings
+RECV_CANCELLED_BY_MLID					enum	Warnings
+DISCARDING_PACKET_ALREADY_USING_STACK			enum	Warnings
+IP_PACKET_TOO_SMALL					enum	Warnings
+IP_PACKET_HEADER_TOO_SMALL			enum	Warnings
+ENTER_RECEIVE						enum	Warnings
+LEAVE_RECEIVE						enum	Warnings
+ENTER_OBJ_MESSAGE				enum	Warnings
+LEFT_OBJ_MESSAGE				enum	Warnings
+
+DebugLogFuncs			etype	byte
+	LOG_NULL		enum	DebugLogFuncs
+	LOG_ARPRECV_START	enum	DebugLogFuncs
+	LOG_ARPRECV_END		enum	DebugLogFuncs
+	LOG_ARPRECV_COMP_START	enum	DebugLogFuncs
+	LOG_ARPRECV_COMP_END	enum	DebugLogFuncs
+	LOG_IPRECV_START	enum	DebugLogFuncs
+	LOG_IPRECV_END		enum	DebugLogFuncs
+	LOG_IPRECV_COMP_START	enum	DebugLogFuncs
+	LOG_IPRECV_COMP_END	enum	DebugLogFuncs
+	LOG_TRANSMIT_START	enum	DebugLogFuncs
+	LOG_TRANSMIT_END	enum	DebugLogFuncs
+	LOG_ARP_SEND_COMP_START	enum	DebugLogFuncs
+	LOG_ARP_SEND_COMP_END	enum	DebugLogFuncs
