@@ -540,6 +540,7 @@ Pass2MSFixupLMem(const char *file,  	/* File being linked */
                      * the symbols block and pick the var with the closest
                      * offset address before ourself.
                      */
+                     preceding = -1;
                      for (pl = 0; pl < osh->num; pl++) {
                         if(first[pl].u.addrSym.address < os->u.addrSym.address) {
                             if(preceding <  0) {
@@ -552,7 +553,7 @@ Pass2MSFixupLMem(const char *file,  	/* File being linked */
                      }
 		    assert(preceding >= 0);
 		    assert(first[preceding].type == OSYM_VAR);
-                    
+
 		    /*
 		     * Point to the CAH_count (first field) of the preceding
 		     * variable in the block of heap data we've already got
