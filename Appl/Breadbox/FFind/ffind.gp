@@ -17,7 +17,7 @@ library text
 
 resource AppResource ui-object
 resource Interface ui-object
-resource ConstantData object, data, swapable
+#resource ConstantData object, data, swapable
 resource OpenApplication object, code, swapable
 resource CodeResource object, code, swapable
 resource RecursiveResource object, code, swapable
