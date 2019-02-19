@@ -607,7 +607,7 @@ Installed/Driver/Video/VGAlike/VGA16:	MAKEDRV
 etherodi	: Installed/Driver/Socket/EtherODI
 Installed/Driver/Socket/EtherODI:	socket accpnt MAKEDRV
 
-etherodi	: Installed/Driver/Socket/EtherPKT
+etherpkt	: Installed/Driver/Socket/EtherPKT
 Installed/Driver/Socket/EtherPKT:	socket accpnt MAKEDRV
 
 # International Keyboard Drivers
