@@ -1,0 +1,52 @@
+##############################################################################
+#
+# 	Copyright (c) Berkeley Softworks 1988 -- All Rights Reserved
+#
+# PROJECT:	PC GEOS
+# MODULE:	SWAT -- Debugging Stub
+# FILE: 	Stub/Makefile
+# AUTHOR: 	Adam de Boor, November 15, 1988
+#
+# TARGETS:
+# 	Name			Description
+#	----			-----------
+#
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#	ardeb	11/15/88	Initial Revision
+#
+# DESCRIPTION:
+#	Makefile for creating the debugging stub
+#
+#	$Id: Makefile,v 1.6 89/06/09 02:38:17 adam Exp $
+#
+###############################################################################
+
+#include    <geos.mk>
+
+INCDIRS		= . $(INSTALL_DIR) .. $(INSTALL_DIR:H) $(DEVEL_DIR)/Kernel \
+		  $(KERNEL_DIR) $(DEVEL_DIR)/Include $(INCLUDE_DIR)
+.PATH.def	: $(INCDIRS)
+.PATH.h		: .. $(INSTALL_DIR:H)
+.PATH.asm	: $(INSTALL_DIR)
+
+OBJS		= main.obj rpc.obj com.obj kernel.obj cbreak.obj kjump.obj
+MASMFLAGS	:= $(INCDIRS:S/^/-I/g) $(MASMFLAGS:N*.INCLUDES*)
+
+.asm.obj	: .EXPORTSAME
+	/lib/cpp -P $(INCDIRS:S/^/-I/g) $(.IMPSRC) $(.PREFIX).cpp
+	$(MASM) $(MASMFLAGS) $(.PREFIX).cpp -o $(.TARGET)
+#	$(ASAP) $(MASMFLAGS:M-[ID]*) $(.PREFIX).cpp -o - | \
+#	    sed -f $(ROOT_DIR)/Tools/mashtcla > $(.PREFIX).tcl
+
+swat.exe	: $(OBJS)   	    	    	    	LINK
+#	cat $(.ALLSRC:S/.obj$/.tcl/g) > $(.PREFIX).tcl
+
+install		:: swat.exe .NOEXPORT
+	install -c -m 444 swat.exe /usr/public
+
+$(OBJS)		: stub.def rpc.h
+main.obj kernel.obj: localcon.def debug.def thread.def geos.def \
+                     errorcheck.def heap.def opaque.def geodeStruc.def
+kjump.obj	: routine.def

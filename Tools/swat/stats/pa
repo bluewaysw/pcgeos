@@ -1,0 +1,118 @@
+#!/bin/sh -
+#
+# Allocation data postprocessor when memory tracing is on so can figure
+# the callers out...
+#
+# Usage: pa <datafile> <executable>
+#
+trap "rm -f callers.$$ ncallers.$$ rawoutput.$$; exit 0" 2 3 15 0
+sed '/bytes free in/,$d' $1 | awk '$4 == "type" {print $7} $4 == "free" {print $6}' | sort -u | \
+    tee callers.$$ | cat -n | sed -e 's/^[ 	]*//' | sort > ncallers.$$
+cfile=callers.$$
+case "$2" in
+    *swat*) hfile=`expr $2 : '^\(.*\)/swat$'`/../swat.h
+	   if [ ! -f $hfile ]; then hfile=/staff/pcgeos/Tools/swat/swat.h; fi
+	   ;;
+    *esp*) hfile=`expr $2 : '^\(.*\)/esp$'`/../esp.h
+	   if [ ! -f $hfile ]; then hfile=/staff/pcgeos/Tools/esp/esp.h; fi
+	   ;;
+    *glue*) hfile=/staff/pcgeos/Tools/glue/memtags
+	   ;;
+    *)     hfile=/dev/null ;;
+esac
+(findrouts $2 `cat $cfile` | cat -n | sed -e 's/^[ 	]*//' | sort | \
+    join - ncallers.$$ ; echo _END_OF_CALLER_MAP_; \
+    egrep '^#define[ 	]*TAG' $hfile |\
+	awk '{print $2, $3}'; echo _END_OF_TYPE_MAP_ ) | \
+awk '
+NR==1,/_END_OF_CALLER_MAP_/ {
+	if ($1 != "_END_OF_CALLER_MAP_") {
+	    callers[$3] = $2
+	    callernames[$2] = $3
+	    next
+	}
+}
+/_END_OF_CALLER_MAP_/,/_END_OF_TYPE_MAP_/ {
+	if ($1 ~ /_END_OF.*/) {
+	    next
+	}
+	types[$2] = $1
+	next
+}
+$4 == "type" {
+	tbytes[$5] += $2
+	tblks[$5] += 1
+	routine = callers[$7]
+	cbytes[routine] += $2
+	cblks[routine] += 1
+	cbytes[routine ":" $5] += $2
+	cblks[routine ":" $5] += 1
+}
+$4 == "free" {
+	tbytes["free"] += $2
+	tblks["free"] += 1
+	routine = callers[$6]
+	cbytes[routine] += $2
+	cblks[routine] += 1
+	cbytes[routine ":" "free"] += $2
+	cblks[routine ":" "free"] += 1
+}
+END {
+	print "Block Type          # Bytes     # Blocks"
+	print "----------------------------------------"
+	for (type in tbytes) {
+	    if (types[type] != "") {
+		printf "%-20s%7d     %7d\n", types[type], tbytes[type], tblks[type]
+	    } else {
+		printf "%-20s%7d     %7d\n", type, tbytes[type], tblks[type]
+	    }
+	}
+	print "_THIS_IS_THE_SEPARATOR_LINE_"
+	print "Caller                        # Bytes     # Blocks"
+	print "--------------------------------------------------"
+	for (i in callernames) {
+		printf "%-30s%7d     %7d@", i, cbytes[i], cblks[i]
+		for (j in tbytes) {
+		    if (cblks[i ":" j] != "") {
+			if (types[j] != "") {
+			    printf "         %-20s%7d     %7d@", types[j], cbytes[i ":" j], cblks[i ":" j]
+			} else {
+			    printf "         %-20s%7d     %7d@", j, cbytes[i ":" j], cblks[i ":" j]
+			}
+		    }
+		}
+		printf "\n"
+	}
+}' - $1 > rawoutput.$$
+#
+# Title for by-type table
+#
+head -2 rawoutput.$$
+#
+# Named types
+#
+sed -n -e '3,/_THIS_IS_THE_SEPARATOR_LINE_/{
+/^[^0-9]/p
+}' rawoutput.$$ | sed -e '/_THIS_IS_THE_SEPARATOR_LINE_/d' | sort 
+#
+# Unknown types (by number)
+#
+sed -n -e '3,/_THIS_IS_THE_SEPARATOR_LINE_/{
+/^[0-9]/p
+}' rawoutput.$$ | sed -e '/_THIS_IS_THE_SEPARATOR_LINE_/d' | sort  -n
+echo "--------------------------------------------------------------"
+#
+# Title for by-caller table
+#
+sed -n -e '/_THIS_IS_THE_SEPARATOR_LINE_/,/^----/p' rawoutput.$$ | \
+	sed -e '/_THIS_IS_THE_SEPARATOR_LINE_/d' 
+#
+# by-caller table itself, sorted alphabetically
+#
+sed -n -e '/_THIS_IS_THE_SEPARATOR_LINE_/,$p' rawoutput.$$ | \
+	sed -e '/_THIS_IS_THE_SEPARATOR_LINE_/,/^-----/d' | \
+	sed -e 's/^_//' | sort -f | tr @ '\012' | sed -e '/^$/d'
+#
+# The total bytes free/allocated stats...
+#
+tail -7 $1

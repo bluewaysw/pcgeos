@@ -105,28 +105,6 @@ See also:
 	error {Geode name cannot be longer than eight characters}
     }
 
-    # Bring us into the idle loop, to make sure that the BIOS
-    # isn't locked because of APM concerns...
-    #
-    # Do not do this is if the kernel hasn't been loaded at all, to
-    # allow for sending before anything else starts up.
-
-    if {![null [patient find geos]]} {
-
-       if {[null [sym find proc Idle]]} {
-           var bp [brk [address-kernel-internal Idle]]
-       } else {
-           var bp [brk Idle]
-       }
-       echo Continuing to Idle loop for safety
-       stop-catch {
-           continue-patient
-           var abortFlag [wait]
-       }
-       brk clear $bp
-       if {$abortFlag} {error {Wait for Idle loop aborted}}
-    }
-
     if {($args != $sendPatient) || ($nec != $sendPatientType) ||
 	[null $sendSrc] || [null $sendDest]} {
 

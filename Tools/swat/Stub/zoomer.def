@@ -1,0 +1,155 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		zoomer.def
+
+AUTHOR:		jimmy
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jimmy	11/10/92		Initial version.
+
+DESCRIPTION:
+	serial port constants for the zoomer
+
+	$Id: zoomer.def,v 1.7 94/03/15 11:49:03 adam Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+ifdef ZOOMER
+
+;
+; Communications control ports and vectors
+; Each of the port numbers is ANDed with 0100h if COM2 is to be used, since
+; those ports are in the 02f8h-02fd range (qv. the definitions for COM1, below)
+;
+
+
+Z_BAUD_115200	equ	00h	; divisor used to get 115.2Kb
+Z_BAUD_57600	equ	01h	; divisor used to get 57.6Kb
+Z_BAUD_38400	equ	02h	; divisor used to get 38.4Kb
+Z_BAUD_19200	equ	05h	; divisor used to get 19.2Kb
+Z_BAUD_14400	equ	07h	; divisor used to get 14.4Kb
+Z_BAUD_9600	equ	15h	; divisor used to get 9600
+Z_BAUD_7200	equ	17h	; divisor used to get 7200
+Z_BAUD_4800	equ	25h	; divisor used to get 4800
+Z_BAUD_3600	equ	27h	; divisor used to get 3600
+Z_BAUD_2400	equ	35h	; divisor used to get 2400
+Z_BAUD_1800	equ	43h	; divisor used to get 1800
+Z_BAUD_1200	equ	45h	; divisor used to get 1200
+Z_BAUD_600	equ	55h	; divisor used to get 600
+Z_BAUD_300	equ	65h	; divisor used to get 300
+
+Z_OUTPUTCONTROLPORT	equ	0deh	; port to enable RS232 output device
+Z_OUTPUTCONTROLENABLE	equ	080h	
+Z_OUTPUTCONTROLDISABLE	equ	000h
+
+Z_INPUTCONTROLPORT	equ	0dfh	; input control port for RS232 device
+Z_INPUTCONTROLPOWERON	equ	001b	; power on
+Z_INPUTCONTROLSTANDBY	equ	000b	; standby mode
+Z_INPUTCONTROL3STATE	equ	010b	; 3 state mode
+Z_INPUTCONTROLWAKEUP	equ	100b	; wake up mode
+Z_INPUTCONTROLACTIVE	equ	110b	; active mode
+
+Z_COMDLLPORT	equ	050h	; Low-half of divisor
+
+Z_COMIENPORT	equ	058h	; interrupt-enable port 
+				; bit 0 -- data available
+				; bit 1 -- transmitter empty
+				; bit 2 -- line error
+				; bit 3 -- modem status
+;Z_COMERRENABLE		equ	0100b
+Z_COMRECVENABLE		equ	0010b
+Z_COMTRANSENABLE	equ	0001b
+
+Z_COMIRQPORT	equ	059h	; interrupt ID port, formatted as:
+				; bit 0 -- 0 if interrupt pending
+				; bit 1-2:
+				;	11 => Line error. reset by reading
+				;		statport (0qfdh)
+				;	10 => Data available. reset by
+				;		reading dataport
+				;	01 => Transmitter empty. reset by
+				;		reading irqport or writing
+				;		dataport
+				;	00 => Modem status change (unhandled)
+
+;COMDATAREADY	equ	100b
+;COMLINEERR	equ	110b
+;COMTRANSREADY	equ	010b
+Z_COMLINEPORT	equ	051h	; Line control port. Controls data format and
+				; whether dataport and ienport are really
+				; those ports, or the divisor for determining
+				; the baud rate. Bit 7 s/b 1 to change the
+				; baud rate and 0 otherwise.  Different
+				; divisors are listed below:
+Z_COMPOWERDOWN		equ	00h
+Z_COMPOWERENABLE	equ	01h
+Z_COMRECVENABLE2	equ	04h	; enable receive
+Z_COMTRANSENABLE2 	equ	08h	; enable transmit
+Z_COMDATALENGTH		equ	10h	; 8 data bits
+Z_COMPARITY		equ	00h	; no parity
+Z_COMSTOPBITS		equ	00h	; 1 stop bit
+
+Z_COMMODEMPORT		equ	055h	; modem control port
+				; bit 0 -- DTR
+				; bit 1 -- RTS
+				; bit 2 -- OUT1
+				; bit 3 -- OUT2
+				;	The OUT2 signal is used to gate the
+				;	IRQ signal from the 8250. If it is
+				;	set low, the IRQ line is forced
+				;	low. OUT2 must be high for
+				;	interrupts to be enabled.
+Z_COMDTR		equ	0001b
+Z_COMRTS		equ	0010b
+Z_COMOUT		equ	0100b
+;Z_COMOUT2		equ	1000b
+
+Z_COMSTATPORT	equ	052h	; line status port
+Z_COMDAVAIL	equ	0000010b; Data waiting in input register
+Z_COMBREAK	equ	1000000b; A break signal was detected on the line
+Z_COMTHRE	equ	0000001b; Transmitter holding-register 
+				; empty -- serial
+				; line ready for more data.
+Z_COMTSRE	equ	0000100b; Shift register empty too.
+
+Z_COMVEC1	equ	0ch	; interrupt vector for com1
+Z_COMVEC2	equ	0bh	; vector for com2
+Z_COMINT1MASK	equ	10h	; mask in 8259 for com1 interrupt. COM1 is IRQ4
+Z_COMINT2MASK	equ	08h	; mask in 8259 for com2 interrupt. COM2 is IRQ3
+
+Z_COMMEDIUMPORT	equ	5eh
+Z_COMSERIAL	equ	000b
+Z_COMINFRARED	equ	100b
+
+Z_COMINTCLEARPORT	equ	5ah
+Z_COMINTCLEARALL	equ	0fh
+
+
+Z_COMIRQ	equ 4
+
+Z_PROTECT_CTRL	equ	0xcf
+ZProtectControl	record
+    ZPC_DISABLE_WRITE:1		; if set, protect bit will prevent write from
+				;  taking effect
+    ZPC_INT_ENABLE:1		; if set, non-maskable IRQ13 will be generated
+				;  on illegal write
+    ZPC_PROTECT_BANK:2		; bank whose top is to be protected (0 =>
+				;  bank 1, 3 => bank 4)
+    ZPC_A13_A16:4		; bits for lowest address to be protected by
+				;  this register
+ZProtectControl end
+
+Z_EMS_START	equ	0xa000
+Z_EMS_END	equ	0xe000
+
+Z_BANK_BASE_REG	equ	0xc0
+Z_EMS_BASE_REG	equ	0x90
+Z_ROM_BANK_REG	equ	0xc8
+
+endif	; ZOOMER

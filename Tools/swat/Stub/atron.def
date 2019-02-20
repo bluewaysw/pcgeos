@@ -1,0 +1,192 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Berkeley Softworks 1989 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Swat -- Definitions for Atron Board
+FILE:		atron.def
+
+AUTHOR:		Adam de Boor, Sep 17, 1989
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Adam	09/17/89	Initial revision
+
+
+DESCRIPTION:
+	Interface definitions for the Atron Probe.
+		
+	NOTE: THIS FILE CONTAINS INFORMATION THAT IS PROPRIETARY TO
+	CADRE, INC., AND HAS BEEN PROVIDED UNDER A NON-DISCLOSURE
+	AGREEMENT. IF YOU HAVE NOT SIGNED THIS AGREEMENT, DO NOT LOOK
+	AT THIS FILE.
+
+	$Id: atron.def,v 2.3 92/04/13 00:13:08 adam Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+ifdef ATRON
+
+;
+;		     COMMAND REGISTER DEFINITIONS
+;
+CmdOverlays	etype	byte
+CR_OVLY0	enum	CmdOverlays, 0001b
+CR_OVLY1	enum	CmdOverlays, 0000b
+CR_OVLY2	enum	CmdOverlays, 0011b
+CR_OVLY3	enum	CmdOverlays, 0010b
+CR_OVLY4	enum	CmdOverlays, 0101b
+CR_OVLY5	enum	CmdOverlays, 0100b
+CR_OVLY6	enum	CmdOverlays, 0111b
+CR_OVLY7	enum	CmdOverlays, 0110b
+CR_OVLY8	enum	CmdOverlays, 1001b
+CR_OVLY9	enum	CmdOverlays, 1000b
+CR_OVLY10	enum	CmdOverlays, 1011b
+CR_OVLY11	enum	CmdOverlays, 1010b
+CR_OVLY12	enum	CmdOverlays, 1101b
+CR_OVLY13	enum	CmdOverlays, 1100b
+CR_OVLY14	enum	CmdOverlays, 1111b
+CR_OVLY15	enum	CmdOverlays, 1110b
+		
+CmdReg	record
+	CR_COUNT:1,		; Enable performance counter
+	CR_START:1,		; When pulsed high, switches board into "run"
+				;  mode, protecting the RAM and enabling the
+				;  trace buffer and hardware breakpoints
+	CR_REGMODE:1,		; Banks out top 64K overlay to provide access to
+				;  the I/O registers of the devices on the board
+	CR_STOP:1,		; When pulsed high, switches board out of "run"
+				;  mode, disabling the trace buffer and
+				;  hardware breakpoints and write-enabling
+				;  the RAM.
+	CR_OVERLAY CmdOverlays:4,; Choice of overlay when mapped into real mode.
+				;  Low bit is *inverted* for some reason.
+CmdReg	end
+
+CmdSeg	equ	0ffffh
+cmdReg	equ	{CmdReg}[0fh]
+
+
+;
+;		      MISCELLANEOUS DEFINITIONS
+;
+;
+; Definitions for enabling/disabling the IO Channel Check NMI. Port 61h
+; has many uses, one of which is the enabling of this NMI. The enable is
+; bit 5 and is active low... (q.v. IBM Personal Computer Technical Reference
+; p. 1-32)
+;
+IOCDPORT	= 61h
+IOCHKDISABLE	= 20h
+;
+;			 STATE-CHANGE MACROS
+;
+; Since we're not actually running out of the atron board's memory, there's no
+; no need to start and stop the board in the WRITE_ENABLE/WRITE_PROTECT macros.
+; we do that only when saving and restoring state.
+;
+
+;
+; Define ENABLE/PROTECT macros to diddle with the control register for the
+; board w/o modifying the current condition codes.
+; XXX: use LAHF and SAHF ?
+;
+WRITE_ENABLE	macro
+		endm
+
+WRITE_PROTECT	macro
+		endm
+;
+; PUSH_ENABLE/POP_PROTECT are similar to WRITE_ENABLE/WRITE_PROTECT, except they
+; maintain the state of the write-protection of the board. I.e. they do not
+; unilaterally write-protect the board on exit. They are guaranteed to be used
+; in the proper position so they may safely push things on the stack if need be.
+; 
+; May trash ax if needed, but not the flags.
+; 
+PUSH_ENABLE	macro
+		WRITE_ENABLE
+		endm
+
+POP_PROTECT	macro
+		WRITE_PROTECT
+		endm	
+;
+; Discard state saved by PUSH_ENABLE -- used in ComInterrupt...
+; 
+DISCARD_PROTECT	macro
+		endm
+;
+; Define SAVE_STATE and RESTORE_STATE macros to handle enter/exit to/from our
+; state. Both thrash the flags.
+;
+SAVE_STATE	macro
+		push	ax
+		;;
+		;; Turn off the trace buffer
+		;; 
+		push	es
+		mov	ax, CmdSeg
+		mov	es, ax
+		mov	es:[cmdReg], mask CR_STOP or CR_OVLY0
+		jmp	$+2
+		mov	es:[cmdReg], CR_OVLY0
+		pop	es
+		;;
+		;; Disable the I/O Channel Check NMI
+		;;
+		in	al, IOCDPORT	; Fetch port 1
+		or	al, IOCHKDISABLE ; disable I/O CHK (active low)
+		out	IOCDPORT, al
+		pop	ax
+		endm
+
+RESTORE_STATE	macro
+		;;
+		;; Enable the I/O Channel Check NMI
+		;;
+		push	ax
+		in	al, IOCDPORT	; Fetch port 1
+		and	al, NOT IOCHKDISABLE ; enable I/O CHK (active low)
+		out	IOCDPORT, al
+		;;
+		;; Reset the trace buffer counter
+		;; 
+		call	Atron_InitTrace
+		;;
+		;; Switch the board into free-running mode
+		;; 
+		push	es
+		mov	ax, CmdSeg
+		mov	es, ax
+		mov	es:[cmdReg], mask CR_START or CR_OVLY0
+		jmp	$+2
+		mov	es:[cmdReg], CR_OVLY0
+		pop	es
+		pop	ax
+		endm
+
+INIT_HARDWARE	macro
+		call	Atron_Init
+		endm
+
+;
+; Check hardware BPs here...
+;
+CHECK_NMI	macro
+		call	Atron_FieldNMI
+		endm
+
+stubInit	segment
+;
+; Initialize hardware assist
+;
+	global 	Atron_Init:far
+stubInit	ends
+
+scode		segment
+	global	Atron_InitTrace:near
+	global	Atron_FieldNMI:near
+scode		ends
+endif

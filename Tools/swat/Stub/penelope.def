@@ -1,0 +1,95 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	
+MODULE:		
+FILE:		penelope.def
+
+AUTHOR:		Jim Guggemos, May  9, 1996
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JimG	5/ 9/96   	Initial revision
+
+
+DESCRIPTION:
+	Definitions for Penelope swat stub.
+		
+	$Id: penelope.def,v 1.1 96/06/04 22:37:13 guggemos Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+; Penelope uses an E3G processor.
+;
+include Internal/E3G.def
+
+;
+; The debug com port on the penelope prototype is a memory-mapped serial
+; port located at 37FFFF0h - 37FFFFFh.  These offsets below are with respect
+; to 37FFFF0h.
+;
+
+; For the bits listed below, use equates defined in com.def.
+;
+
+; If DLAB (high bit of line control register) is low, then these ports are
+; in affect.
+;
+DCOM_DATAPORT	equ	0h	; receive buffer/transmit hold register
+DCOM_IENPORT	equ	1h	; Interrupt enable register
+				; bit 0 -- data available -> INT
+				; bit 1 -- transmitter empty -> INT
+				; bit 2 -- line error -> INT
+				; bit 3 -- modem status -> INT
+
+; If DLAB (high bit of line control register) is high, then these ports are
+; in affect.
+;
+DCOM_DLLPORT	equ	0h	; Low-half baud rate divisor
+DCOM_DLHPORT	equ	1h	; high-half baud rate divisor
+
+; These ports are always avaiable, regardless of DLAB.
+;
+DCOM_IRQPORT	equ	2h	; interrupt ID port (why IRQ was triggered)
+				; bit 0 -- 0 if interrupt pending
+				; bit 1-2:
+				;	11 => Line error. reset by reading
+				;		statport (0qfdh)
+				;	10 => Data available. reset by
+				;		reading dataport
+				;	01 => Transmitter empty. reset by
+				;		reading irqport or writing
+				;		dataport
+				;	00 => Modem status change (unhandled)
+
+DCOM_LINEPORT	equ	3h	; Line control port
+DCOM_MODEMPORT	equ	4h	; Modem control port
+DCOM_STATPORT	equ	5h	; Line status register
+
+DCOM_IRQ	equ	11	; Debug port uses IRQ11.
+DCOM_VEC	equ	73h	; IRQ11 equals interrupt 73H
+DCOM_INTMASK	equ	08h	; Mask for 2nd PIC. 11-8 = bit 3 -> 8h
+
+
+;
+; E3G registers to diddle to get to the memory mapped area.
+;
+
+DCOM_EMS_REGISTER	equ	E3G_EMST0	; mapping register
+DCOM_EMS_COMP_REGISTER	equ	E3G_EMSC0	; initializes EMS window loc
+
+    ;
+    ; We will map this EMS window at segment b000h.  Since the I/O registers
+    ; are located in the top 16 bytes of this 16K, the IO_SEGMENT is b3ffh.
+    ;
+DCOM_SEGMENT		equ	0b000h
+DCOM_IO_SEGMENT		equ	(DCOM_SEGMENT+03ffh)	; segment
+
+DCOM_BASE_ADDR		equ	37ffff0h	; physical addr of regsters
+DCOM_BASE_PAGE_NUM	equ	(DCOM_BASE_ADDR shr 14)	; page number (->EMST0)

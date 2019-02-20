@@ -21,6 +21,8 @@
 #	Name		Date		Description
 #	----		----		-----------
 #	weber   	5/19/97   	Initial Revision
+#       lshields        1/19/2001       Made to work with GEOS32 (only)
+#                                       requires pmode.tcl
 #
 # DESCRIPTION:
 #	Code to manage Intel debug registers
@@ -452,30 +454,31 @@ See also:
     # look up the address
     # if it's invalid, the system will throw an error
     #
-    var a [addr-parse $addr]
-
-    #
-    # now convert the address to linear form
-    #
-    if {[null [index $a 0]]} {
-	# it's already in linear form
-	var l [index $a 1]
-    } else {
-	# we have a handle - is it fixed?
-	var h [index $a 0]
-	if {[handle state $h] & 0x00008} {
-	    # it sure is
-	    var l [expr [list [handle segment $h] * 16 + [index $a 1]]]
-	} else {
-	    # don't panic yet - perhaps it's pseudo-fixed
-	    var id [handle id $h]
-	    var v [value fetch kdata:$id.HM_lockCount]
-	    if {!($v == -1)} {
-		echo {WARNING: Breakpoint is set at non-fixed memory.}
-	    }
-	    var l [expr [list [handle segment $h] * 16 + [index $a 1]]]
-	}
-    }
+    var l [desc-get-linear-addr $addr]
+#    var a [addr-parse $addr]
+#
+#    #
+#    # now convert the address to linear form
+#    #
+#    if {[null [index $a 0]]} {
+#	# it's already in linear form
+#	var l [index $a 1]
+#    } else {
+#	# we have a handle - is it fixed?
+#	var h [index $a 0]
+#	if {[handle state $h] & 0x00008} {
+#	    # it sure is
+#	    var l [expr [list [handle segment $h] * 16 + [index $a 1]]]
+#	} else {
+#	    # don't panic yet - perhaps it's pseudo-fixed
+#	    var id [handle id $h]
+#	    var v [value fetch kdata:$id.HM_lockCount]
+#	    if {!($v == -1)} {
+#		echo {WARNING: Breakpoint is set at non-fixed memory.}
+#	    }
+#	    var l [expr [list [handle segment $h] * 16 + [index $a 1]]]
+#	}
+#    }
 	       
     #
     # check for available breakpoints
@@ -685,3 +688,4 @@ See also:
     ]
     eval [concat $func $args]
 }]
+

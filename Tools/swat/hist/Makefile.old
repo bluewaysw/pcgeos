@@ -1,0 +1,157 @@
+###! BEGIN LOCAL RULES SECTION !###
+
+DESTDIR		= 
+LIBRARY		= libhist.a
+
+CC		= gcc -O -fstrength-reduce -fcombine-regs -finline-functions
+CFLAGS		= -g
+LOCALDEFS	= 
+SEARCHPATH	=
+
+OTHER_SOURCES	= hist.3
+INSTALL_HEADERS	= hist.h
+INSTALL_MAN	= hist.3
+INSTALL_FILES	= 
+INSTALL_EXEC	= 
+
+FAKE_all:	all
+
+###! END LOCAL RULES SECTION !###
+
+#
+#    Below here is sacred, you may not touch it lest it be replaced 
+#    on the next make makefile, lest ye die
+#
+#    $Template Header: Maketemplate.b,v 1.31 85/11/06 10:04:02 wbaker Exp $
+#
+PACKDEFS =	-DPACKAGE=\"hist\"
+
+.SUFFIXES:	.y .c .h .E .o .O
+SUFFIXES	= .y:s .c:s .h:h .E:s .o:o .O:o
+.c.o:
+		$(CC) -c $(CFLAGS) $(PACKDEFS) $(LOCALDEFS) $(SEARCHPATH) $*.c
+.y.o:		$*.y $*.sed 
+		makemiscellaneous yacc $* '${YFLAGS}' && \
+		$(CC) -c $(CFLAGS) $(PACKDEFS) $(LOCALDEFS) $(SEARCHPATH) $*.c
+.y.c:		$*.y $*.sed
+		makemiscellaneous yacc $* '${YFLAGS}' 
+.c.E:		
+		makemiscellaneous cpp $* '$(CC)' \
+			'$(CFLAGS) $(PACKDEFS) $(LOCALDEFS) $(SEARCHPATH)'
+.E.O:	
+		makemiscellaneous cppo $* '$(CC)' \
+			'$(CFLAGS) $(PACKDEFS) $(LOCALDEFS) $(SEARCHPATH)'
+
+EXTHDRS	      = /usr/include/ctype.h \
+		/usr/include/stdio.h
+HDRS	      = hidefs.h \
+		hiextern.h \
+		hist.h
+MAKEFILE      = Makefile
+OBJS	      = hifmtline.o \
+		higetline.o \
+		higets.o \
+		himisc.o \
+		hiputh.o \
+		hisplit.o \
+		hisubthis.o \
+		hiuparrow.o \
+		hiwrite.o
+SRCS	      = hifmtline.c \
+		higetline.c \
+		higets.c \
+		himisc.c \
+		hiputh.c \
+		hisplit.c \
+		hisubthis.c \
+		hiuparrow.c \
+		hiwrite.c
+
+lint:		; lint $(CFLAGS) $(PACKDEFS) $(LOCALDEFS) \
+			$(SEARCHPATH) $(SRCS) $(LOADPATH) $(LINTLIBS) 
+
+ALL_SOURCE    = $(SRCS) $(HDRS) $(OTHER_SOURCES)
+
+all:		$(LIBRARY)
+
+clean:		; rm -f $(OBJS) $(LIBRARY)
+
+$(LIBRARY):	$(OBJS)
+		echo -n "Loading $(LIBRARY) ... " ; \
+		ar rcu $(LIBRARY) $(OBJS) ; \
+		ranlib $(LIBRARY) ; \
+		echo "done" ;
+
+install:	all install_headers install_man install_files install_execs
+		echo Installing lib$(LIBRARY) in /b/guest/wbaker/exp/lib ; \
+		cp $(LIBRARY) lib$(LIBRARY) ; \
+		install -m 644 lib$(LIBRARY) /b/guest/wbaker/exp/lib ; \
+		ranlib /b/guest/wbaker/exp/lib/lib$(LIBRARY) ; \
+		chmod o-w /b/guest/wbaker/exp/lib/lib$(LIBRARY) ;
+
+depend:
+	        mkmf -f $(MAKEFILE) -F /b/guest/wbaker/exp/etc/library.mkmf \
+		    "CFLAGS=$(SEARCHPATH)" ; \
+		mkmf -f $(MAKEFILE) -d "CFLAGS=$(CFLAGS)" ; \
+		makeinstall /b/guest/wbaker/exp \
+			-I $(INSTALL_FILES) \
+			-I $(INSTALL_EXEC) \
+			-I $(INSTALL_HEADERS) \
+			-I $(INSTALL_MAN) >> Makefile
+
+resetmakefile:	; makemakefile -library
+
+makefile Makefile:		NONEXISTENT
+	make resetmakefile ; make depend
+
+export genlinks import:		NONEXISTENT
+	@DESTDIR=${DESTDIR} ; \
+	HOST=${HOST} ; \
+	HIERARCHY=${HIERARCHY} ; \
+	export DESTDIR HOST HIERARCHY ; \
+	makemiscellaneous $@ ;
+tags:				NONEXISTENT
+	@ctags -t -f .tags $(SRCS) $(HDRS)
+
+NONEXISTENT:
+
+###
+hifmtline.o: hidefs.h /usr/include/stdio.h /usr/include/ctype.h hist.h \
+	hiextern.h
+higetline.o: hidefs.h /usr/include/stdio.h /usr/include/ctype.h hist.h \
+	hiextern.h
+higets.o: hidefs.h /usr/include/stdio.h /usr/include/ctype.h hist.h \
+	hiextern.h
+himisc.o: hidefs.h /usr/include/stdio.h /usr/include/ctype.h hist.h \
+	hiextern.h
+hiputh.o: hidefs.h /usr/include/stdio.h /usr/include/ctype.h hist.h \
+	hiextern.h
+hisplit.o: hidefs.h /usr/include/stdio.h /usr/include/ctype.h hist.h \
+	hiextern.h
+hisubthis.o: hidefs.h /usr/include/stdio.h /usr/include/ctype.h hist.h \
+	hiextern.h
+hiuparrow.o: hidefs.h /usr/include/stdio.h /usr/include/ctype.h hist.h \
+	hiextern.h
+hiwrite.o: hidefs.h /usr/include/stdio.h /usr/include/ctype.h hist.h \
+	hiextern.h
+INSTALL_FILES_TARGETS	= 
+
+install_files: $(INSTALL_FILES_TARGETS) 
+
+INSTALL_EXEC_TARGETS	= 
+
+install_execs: $(INSTALL_EXEC_TARGETS) 
+
+INSTALL_HEADER_TARGETS	=  \
+	/b/guest/wbaker/exp/include/hist.h
+
+install_headers: $(INSTALL_HEADER_TARGETS) 
+/b/guest/wbaker/exp/include/hist.h: hist.h
+	install -m 644 -c hist.h /b/guest/wbaker/exp/include/hist.h
+
+INSTALL_MAN_TARGETS	=  \
+	/b/guest/wbaker/exp/man/man3/hist.3
+
+install_man: $(INSTALL_MAN_TARGETS) 
+/b/guest/wbaker/exp/man/man3/hist.3: hist.3
+	install -m 644 -c hist.3 /b/guest/wbaker/exp/man/man3/hist.3

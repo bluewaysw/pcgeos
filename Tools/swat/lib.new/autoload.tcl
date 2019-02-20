@@ -286,5 +286,7 @@
 [autoload send 1 filexfer]
 [autoload run 1 call]
 [autoload patient-default 1 patient]
+[load pmode]
+[autoload hwbrk 1 hwbrk]
 [autoload ignerr 0 ignerr]
-[autoload hwbrk 0 hwbrk]
+

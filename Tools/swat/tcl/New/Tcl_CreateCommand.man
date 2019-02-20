@@ -1,0 +1,116 @@
+'\" Copyright 1989 Regents of the University of California
+'\" Permission to use, copy, modify, and distribute this
+'\" documentation for any purpose and without fee is hereby
+'\" granted, provided that this notice appears in all copies.
+'\" The University of California makes no representations about
+'\" the suitability of this material for any purpose.  It is
+'\" provided "as is" without express or implied warranty.
+'\" 
+'\" $Header: /sprite/src/lib/tcl/RCS/Tcl_CreateCommand.man,v 1.2 89/03/24 14:15:58 ouster Exp $ SPRITE (Berkeley)
+'\" 
+.so \*(]ltmac.sprite
+.HS Tcl_CreateCommand tcl
+.BS
+.SH NAME
+Tcl_CreateCommand \- define an application-specific command binding
+.SH SYNOPSIS
+.nf
+\fB#include <tcl.h>\fR
+.sp
+\fBTcl_CreateCommand\fR(\fIinterp, cmdName, proc, clientData, deleteProc\fR)
+.SH ARGUMENTS
+.AS ClientData (*deleteProc)()
+.AP Tcl_Interp *interp in
+Interpreter in which to create new command.
+.AP char *cmdName in
+Name of new command.  Tcl_CreateCommand makes a copy of this value
+for its own use.
+.AP int (*proc)() in
+Implementation of new command:  \fIproc\fR will be called whenever
+\fIcmdName\fR is invoked as a command.
+.AP ClientData clientData in
+Arbitrary one-word value to pass to \fIproc\fR and \fIdeleteProc\fR.
+.AP void (*deleteProc)() in
+Procedure to call before \fIcmdName\fR is deleted from the interpreter;
+allows for command-specific cleanup.  If NULL, then no procedure is
+called before the command is deleted.
+.BE
+
+.SH DESCRIPTION
+.PP
+\fBTcl_CreateCommand\fR defines a new command in \fIinterp\fR and associates
+it with procedure \fIproc\fR such that whenever \fIcmdName\fR is
+invoked as a Tcl command (via a call to \fBTcl_Eval\fR) the Tcl interpreter
+will call \fIproc\fR
+to process the command.  If there is already a command \fIcmdName\fR
+associated with the interpreter, it is deleted.  \fIProc\fP should
+have the following structure:
+.nf
+.RS
+int
+proc(\fIclientData, interp, argc, argv\fP)
+.RS
+ClientData \fIclientData\fP;
+Tcl_Interp *\fIinterp\fP;
+int \fIargc\fP;
+char *\fIargv[]\fP;
+.RE
+{
+}
+.RE
+.fi
+The \fIclientData\fP and \fIinterp\fR parameters are
+copies of the \fIclientData\fP and \fIinterp\fR arguments given
+to \fBTcl_CreateCommand\fR.
+Typically, \fIclientData\fR points to an application-specific
+data structure that describes what to do when the command procedure
+is invoked.  \fIArgc\fR and \fIargv\fR describe the arguments to
+the command, \fIargc\fR giving the number of arguments (including
+the command name) and \fIargv\fR giving the values of the arguments
+as strings.  The \fIargv\fR array will contain \fIargc\fR+1 values;
+the first \fIargc\fR values point to the argument strings, and the
+last value is NULL.
+.PP
+\fIProc\fR must return an integer code that is either \fBTCL_OK\fR, \fBTCL_ERROR\fR,
+\fBTCL_RETURN\fR, \fBTCL_BREAK\fR, or \fBTCL_CONTINUE\fR.  See the Tcl overview man page
+for details on what these codes mean.  Most normal commands will only
+return \fBTCL_OK\fR or \fBTCL_ERROR\fR.  In addition, \fIproc\fR must set
+\fIinterp->result\fR to point to a string value;
+in the case of a \fBTCL_OK\fR return code this gives the result
+of the command, and in the case of \fBTCL_ERROR\fR it gives an error message.
+The \fBTcl_Return\fR procedure provides an easy interface for setting the return
+value;  for complete details on how the \fIinterp->result\fR field is managed,
+see the \fBTcl_Interp\fR man page.  Before invoking a command procedure,
+\fBTcl_Eval\fR sets \fIinterp->result\fR to point to an empty string, so simple
+commands can return an empty result by doing nothing at all.
+.PP
+The contents of the \fIargv\fR array are copies made by the Tcl interpreter
+for the use of \fIproc\fR.  \fIProc\fR may alter any of the strings
+in \fIargv\fR.  However, the \fIargv\fR array
+is recycled as soon as \fIproc\fR returns, so \fIproc\fR must not set
+\fIinterp->result\fR to point anywhere within the \fIargv\fR values (call Tcl_Return
+with status \fBTCL_VOLATILE\fR if you want to return something from the
+\fIargv\fR array).
+.PP
+\fIDeleteProc\fR will be invoked when (if) \fIcmdName\fR is deleted.
+This can occur through a call to \fBTcl_DeleteCommand\fR or \fBTcl_DeleteInterp\fR,
+or by replacing \fIcmdName\fR in another call to Tcl_CreateCommand.
+\fIDeleteProc\fR is invoked before the command is deleted, and gives the
+application an opportunity to release any structures associated
+with the command.  \fIDeleteProc\fR should have the following form:
+.nf
+.RS
+void
+deleteProc(\fIclientData\fP)
+.RS
+ClientData \fIclientData\fP;
+.RE
+{
+}
+.RE
+.fi
+The \fIclientData\fR argument will be the same as the \fIclientData\fR
+argument passed to \fBTcl_CreateCommand\fR.
+
+.SH KEYWORDS
+bind, command, create, interpreter

@@ -1,0 +1,505 @@
+# *****************************************************************************
+#
+# 	Copyright (c) Berkeley Softworks 1989 -- All Rights Reserved
+# 
+# PROJECT:	PC GEOS
+# MODULE:	Swat System Library -- Timing Support
+# FILE:		timing.80x8x - online 80x8x instruction timing file
+# 
+# AUTHOR:	Matt Loveless, Adam de Boor
+# 
+# REVISION HISTORY:
+# 	Name	Date		Description
+# 	----	-------		-----------
+# 	Matt	4/17/89		Initial version
+#	Adam	4/89		TCL extraction/formatting working
+# 
+# DESCRIPTION:
+#
+# This file contains information on the timing of all the instructions
+# in the 8088/8086/80286 series of processors.
+#
+# Entries are organized into lists for fast reading by SWAT. Each list
+# begins with the mnemonic (all upper case) of the instruction the list
+# describes followed by the class of instruction. Succeeding elements are
+# lists organized as:
+#
+#	{<mode> <8086/8088-byte time> <8088-word time> <80286 time>}
+#
+# <mode> is the addressing mode used by the instruction being examined.
+# It is one of the following:
+#	implied		the operand is implied by the instruction and need
+#			not be checked. SWAT may also just note the existance
+#			of a single addressing mode for the instruction, if
+#			it desires.
+#	reg,reg		two register operands
+#	reg,mem		register is destination, memory is source
+#	mem,reg		memory is destination, register is source
+#	seg,reg		segment register is destination, register is source
+#	seg,mem		segment register is destination, memory is source
+#	reg		single operand is a register
+#	mem		single operand is in memory
+#	seg		single operand is a segment register
+#	label		generic label (direct transfer)
+#	label_s		short label
+#	label_n		near label
+#	label_f		far label
+#	branch_yes	if branch taken
+#	branch_no	if branch not taken
+#
+#
+# Instruction classes tell swat which of the possible addressing modes it
+# can expect to find (e.g. for a CALL instruction, it will look for mem16
+# and mem32 modes, rather than just mem). This provides for a certain amount
+# of extensibility without having to hardwire the choices into swat itself.
+# Possible classes are:
+#	control		control transfer (call, jmp, jnb, etc.)
+#	muldiv		multiply/divide
+#	ea		generic effective-address (can have reg,mem or 
+#			mem,reg or reg,reg -- doesn't distinguish timing
+#			on operand size (except for 8088/word).
+#	implied		instruction's operand is implied
+#	enter		enter instruction...
+#	esc		escape (floating-point)
+#	int		software interrupt (handle 1 extra cycle for INT 3).
+#			Also implies that entry 1 is for the 8086 and entry
+#			2 for the 8088 w/o regard to the 'word' bit.
+#	branch		conditional branch
+#	prefix		instruction is a prefix whose instruction follows.
+#			sum the timings.
+#	move		like ea, but handle special accumulator modes and
+#			segment registers.
+#	stack		push/pop/pushf/popf (no arg => implied, else ea/seg)
+#	shift		variable/constant/1-bit shifts
+#	repeat 		repeat prefix
+#	xchg		xchg (handle AX specially)
+#	return		handle retn/retf/iret, including size of dest
+#			instruction...
+#	io		IN/OUT instructions
+#
+#	$Id: timing.80x8x,v 1.4 90/04/30 18:17:23 adam Exp Locker: adam $
+#
+# ******************************************************************************
+
+
+#inst	class
+#	{mode		88b/86		88w		286}
+#
+{AAA 	implied
+	{default	8		8		3}}
+{AAD 	implied
+	{default	60		60		14}}
+{AAM 	implied
+	{default	83		83		16}}
+{AAS 	implied
+	{default	8		8		3}}
+{ADC	ea
+	{reg,reg	3		3		2}
+	{mem,reg	16		24		7}
+	{reg,mem	9		13		7}
+	{reg,immed	4		4		3}
+	{mem,immed	17		23		7}}
+{ADD	ea
+	{reg,reg	3		3		2}
+	{mem,reg	16		24		7}
+	{reg,mem	9		13		7}
+	{reg,immed	4		4		3}
+	{mem,immed	17		23		7}}
+{AND	ea
+	{reg,reg	3		3		2}
+	{mem,reg	16		24		7}
+	{reg,mem	9		13		7}
+	{reg,immed	4		4		3}
+	{mem,immed	17		23		7}}
+{ARPL	implied
+	{default	-		-		10}}
+{BOUND	cint
+	{branch_no	-		-		13}
+	{branch_yes	-		-		23+m}}
+{CALL	control
+	{label_n	19		23		7+m}
+	{label_f	28		36		13+m}
+	{reg		16		20		7+m}
+	{mem16		21		29		11+m}
+	{mem32		37		53		16+m}}
+{CBW	implied
+	{default	2		2		2}}
+{CLC	implied
+	{default	2		2		2}}
+{CLD	implied
+	{default	2		2		2}}
+{CLI	implied
+	{default	2		2		3}}
+{CLTS	implied
+	{default	-		-		2}}
+{CMC	implied
+	{default	2		2		2}}
+{CMP	ea
+	{reg,reg	3		3		2}
+	{mem,reg	9		13		7}
+	{reg,mem	9		13		6}
+	{reg,immed	4		4		3}
+	{mem,immed	10		14		6}}
+{CMPSB	implied
+	{default	22		22		8}
+	{repeat		9+22n		9+22n		5+9n}}
+{CMPSW	implied
+	{default	22		30		8}
+	{repeat		9+22n		9+30n		5+9n}}
+{CWD	implied
+	{default	5		5		2}}
+{DAA	implied
+	{default	4		4		3}}
+{DAS	implied
+	{default	4		4		3}}
+{DEC	ea
+	{reg		3		3		2}
+	{mem		15		23		7}}
+{DIV	muldiv
+	{reg8		80:90		80:90		14}
+	{mem8		86:96		86:96		17}
+	{reg16		144:162		144:162		22}
+	{mem16		150:168		158:176		25}}
+{ENTER	enter
+	{immed,immed	-		-		12+4*(n-1)}}
+{ESC	esc
+	{immed,reg	2		2		9:20}
+	{immed,mem	8		12		9:20}}
+{HLT	implied
+	{default	2		2		2}}
+{IDIV	muldiv
+	{reg8		101:112		101:112		17}
+	{mem8		108:118		107:118		20}
+	{reg16		165:184		165:184		25}
+	{mem16		171:190		175:194		28}}
+{IMUL	muldiv
+	{reg8		80:98		80:98		13}
+	{reg16		128:154		128:154		21}
+	{mem8		86:104		86:104		16}
+	{mem16		134:160		138:164		24}
+	{reg16,reg16,immed -		-		21}
+	{reg16,mem16,immed -		-		24}}
+{IN	io
+	{reg,immed	10		14		5}
+	{reg,reg	8		12		5}}
+{INC	ea
+	{reg		3		3		2}
+	{mem		15		23		7}}
+{INSB	implied
+	{default	-		-		5}
+	{repeat		-		-		5+4n}}
+{INSW	implied
+	{default	-		-		5}
+	{repeat		-		-		5+4n}}
+{INT	int
+	{default	51		71		23+m}}
+{INTO	cint
+	{branch_yes	53		73		24+m}
+	{branch_no	4		4		3}}
+{IRET	return
+	{default	32		44		17+m}}
+#
+# These are selected based on the opcodes swat prints out
+#
+{JO	branch
+	{branch_yes	16		16		7+m}
+	{branch_no	4		4		3}}
+{JNO	branch
+	{branch_yes	16		16		7+m}
+	{branch_no	4		4		3}}
+{JC	branch
+	{branch_yes	16		16		7+m}
+	{branch_no	4		4		3}}
+{JNC	branch
+	{branch_yes	16		16		7+m}
+	{branch_no	4		4		3}}
+{JZ	branch
+	{branch_yes	16		16		7+m}
+	{branch_no	4		4		3}}
+{JNZ	branch
+	{branch_yes	16		16		7+m}
+	{branch_no	4		4		3}}
+{JBE	branch
+	{branch_yes	16		16		7+m}
+	{branch_no	4		4		3}}
+{JA	branch
+	{branch_yes	16		16		7+m}
+	{branch_no	4		4		3}}
+{JS	branch
+	{branch_yes	16		16		7+m}
+	{branch_no	4		4		3}}
+{JNS	branch
+	{branch_yes	16		16		7+m}
+	{branch_no	4		4		3}}
+{JP	branch
+	{branch_yes	16		16		7+m}
+	{branch_no	4		4		3}}
+{JNP	branch
+	{branch_yes	16		16		7+m}
+	{branch_no	4		4		3}}
+{JL	branch
+	{branch_yes	16		16		7+m}
+	{branch_no	4		4		3}}
+{JGE	branch
+	{branch_yes	16		16		7+m}
+	{branch_no	4		4		3}}
+{JLE	branch
+	{branch_yes	16		16		7+m}
+	{branch_no	4		4		3}}
+{JG	branch
+	{branch_yes	16		16		7+m}
+	{branch_no	4		4		3}}
+{JCXZ	branch
+	{branch_yes	18		18		8+m}
+	{branch_no	6		6		4}}
+{JMP	control
+	{label_s	15		15		7+m}
+	{label_n	15		15		7+m}
+	{label_f	15		15		11+m}
+	{reg		11		11		7+m}
+	{mem16		18		18		11+m}
+	{mem32		24		24		15+m}}
+{LAHF	implied
+	{default	4		4		2}}
+{LAR	ea
+	{reg,reg	-		-		14}
+	{reg,mem	-		-		16}}
+{LDS	implied
+	{default	16		24		7}}
+{LES	implied
+	{default	16		24		7}}
+{LEA	implied
+	{default	2		2		3}}
+{LEAVE	implied
+	{default	-		-		5}}
+{LGDT	implied
+	{default	-		-		11}}
+{LIDT	implied
+	{default	-		-		12}}
+{LLDT	ea
+	{reg		-		-		17}
+	{mem		-		-		19}}
+{LMSW	ea
+	{reg		-		-		3}
+	{mem		-		-		6}}
+{LOCK	prefix
+	{default	2		2		0}}
+{LODSB	implied
+	{default	12		16		5}}
+{LODSW	implied
+	{default	12		16		5}}
+{LOOP	branch
+	{branch_yes	17		17		8+m}
+	{branch_no	5		5		4}}
+{LOOPE	branch
+	{branch_yes	18		18		8+m}
+	{branch_no	4		4		6}}
+{LOOPNE	branch
+	{branch_yes	19		19		8+m}
+	{branch_no	5		5		4}}
+{LSL	ea
+	{reg,reg	-		-		14}
+	{reg,mem	-		-		16}}
+{LTR	ea
+	{reg		-		-		17}
+	{mem		-		-		19}}
+{MOV	move
+	{reg,reg	2		2		2}
+	{mem,reg	9		13		3}
+	{reg,mem	8		12		5}
+	{mem,immed	10		14		3}
+	{reg,immed	4		4		2}
+	{mem,ax		10		14		3}
+	{ax,mem		10		14		3}
+	{seg,reg	2		2		2}
+	{seg,mem	8		12		5}
+	{reg,seg	2		2		2}
+	{mem,seg	9		13		3}}
+{MOVSB	implied
+	{default	18		18		5}
+	{repeat		9+17n		9+17n		5+4n}}
+{MOVSW	implied
+	{default	18		26		5}
+	{repeat		9+17n		9+25n		5+4n}}
+{MUL	muldiv
+	{reg8		70:77		70:77		13}
+	{reg16		118:113		118:113		21}
+	{mem8		76:83		76:83		16}
+	{mem16		124:139		128:143		24}}
+{NEG	ea
+	{reg		3		3		2}
+	{mem		16		24		7}}
+{NOP	implied
+	{default	3		3		3}}
+{NOT	ea
+	{reg		3		3		2}
+	{mem		16		24		7}}
+{OR	ea
+	{reg,reg	3		3		2}
+	{mem,reg	16		24		7}
+	{reg,mem	9		13		7}
+	{reg,immed	4		4		3}
+	{mem,immed	17		25		7}}
+{OUT	io
+	{immed,reg	10		14		3}
+	{reg,reg	8		12		3}}
+{OUTSB	implied
+	{default	-		-		5}
+	{repeat		-		-		5+4n}}
+{OUTSW	implied
+	{default	-		-		5}
+	{repeat		-		-		5+4n}}
+{POP	stack
+	{reg		8		12		5}
+	{mem		17		25		5}
+	{seg		8		12		5}}
+{POPA	implied
+	{default	-		-		19}}
+{POPF	stack
+	{default	8		12		5}}
+{PUSH	stack
+	{reg		11		15		3}
+	{mem		16		24		5}
+	{seg		10		14		3}
+	{immed		-		-		3}}
+{PUSHA	implied
+	{default	-		-		17}}
+{PUSHF	stack
+	{default	10		14		3}}
+{ROL	shift
+	{reg,1		2		2		2}
+	{mem,1		15		23		7}
+	{reg,cl		8+4n		8+4n		5+n}
+	{mem,cl		20+4n		28+4n		8+n}
+	{reg,immed	-		-		5+n}
+	{mem,immed	-		-		8+n}}
+{ROR	shift
+	{reg,1		2		2		2}
+	{mem,1		15		23		7}
+	{reg,cl		8+4n		8+4n		5+n}
+	{mem,cl		20+4n		28+4n		8+n}
+	{reg,immed	-		-		5+n}
+	{mem,immed	-		-		8+n}}
+{RCL	shift
+	{reg,1		2		2		2}
+	{mem,1		15		23		7}
+	{reg,cl		8+4n		8+4n		5+n}
+	{mem,cl		20+4n		28+4n		8+n}
+	{reg,immed	-		-		5+n}
+	{mem,immed	-		-		8+n}}
+{RCR	shift
+	{reg,1		2		2		2}
+	{mem,1		15		23		7}
+	{reg,cl		8+4n		8+4n		5+n}
+	{mem,cl		20+4n		28+4n		8+n}
+	{reg,immed	-		-		5+n}
+	{mem,immed	-		-		8+n}}
+{REP	repeat}
+{REPE	repeat}
+{REPNE	repeat}
+{RETN	return
+	{immed		20		24		11+m}
+	{default	16		20		11+m}}
+{RETF	return
+	{immed		25		33		15+m}
+	{default	26		34		15+m}}
+{SAHF	implied
+	{default	4		4		2}}
+{SAL	shift
+	{reg,1		2		2		2}
+	{mem,1		15		23		7}
+	{reg,cl		8+4n		8+4n		5+n}
+	{mem,cl		20+4n		28+4n		8+n}
+	{reg,immed	-		-		5+n}
+	{mem,immed	-		-		8+n}}
+{SAR	shift
+	{reg,1		2		2		2}
+	{mem,1		15		23		7}
+	{reg,cl		8+4n		8+4n		5+n}
+	{mem,cl		20+4n		28+4n		8+n}
+	{reg,immed	-		-		5+n}
+	{mem,immed	-		-		8+n}}
+{SHR	shift
+	{reg,1		2		2		2}
+	{mem,1		15		23		7}
+	{reg,cl		8+4n		8+4n		5+n}
+	{mem,cl		20+4n		28+4n		8+n}
+	{reg,immed	-		-		5+n}
+	{mem,immed	-		-		8+n}}
+{SHL	shift
+	{reg,1		2		2		2}
+	{mem,1		15		23		7}
+	{reg,cl		8+4n		8+4n		5+n}
+	{mem,cl		20+4n		28+4n		8+n}
+	{reg,immed	-		-		5+n}
+	{mem,immed	-		-		8+n}}
+{SBB	ea
+	{reg,reg	3		3		2}
+	{mem,reg	16		24		7}
+	{reg,mem	9		13		7}
+	{reg,immed	4		4		3}
+	{mem,immed	17		25		7}}
+{SCASB	implied
+	{default	15		15		7}
+	{repeat		9+15n		9+15n		5+8n}}
+{SCASW	implied
+	{default	15		19		7}
+	{repeat		9+15n		9+19n		5+8n}}
+{SGDT	implied
+	{default	-		-		11}}
+{SIDT	implied
+	{default	-		-		12}}
+{SLDT	ea
+	{reg		-		-		2}
+	{mem		-		-		3}}
+{SMSW	ea
+	{reg		-		-		2}
+	{mem		-		-		3}}
+{STC	implied
+	{default	2		2		2}}
+{STD	implied
+	{default	2		2		2}}
+{STI	implied
+	{default	2		2		2}}
+{STOSB	implied
+	{default	11		11		3}
+	{repeat		9+10n		9+10n		4+3n}}
+{STOSW	implied
+	{default	11		15		3}
+	{repeat		9+10n		9+14n		4+3n}}
+{STR	ea
+	{reg		-		-		2}
+	{mem		-		-		3}}
+{SUB	ea
+	{reg,reg	3		3		2}
+	{mem,reg	16		24		7}
+	{reg,mem	9		13		7}
+	{reg,immed	4		4		3}
+	{mem,immed	17		25		7}}
+{TEST	move
+	{reg,reg	3		3		2}
+	{reg,mem	9		13		6}
+	{reg,immed	5		5		3}
+	{mem,immed	11		11		6}
+	{ax,immed	4		4		3}}
+{VERR	ea
+	{reg		-		-		14}
+	{mem		-		-		16}}
+{VERW	ea
+	{reg		-		-		14}
+	{mem		-		-		16}}
+{WAIT	implied
+	{default	4		4		3}}
+{XCHG	xchg
+	{reg,reg	4		4		3}
+	{reg,mem	17		25		5}
+	{mem,reg	17		25		5}
+	{ax,reg		3		3		3}}
+{XLATB	implied
+	{default	11		11		5}}
+{XOR	ea
+	{reg,reg	3		3		2}
+	{mem,reg	16		24		7}
+	{reg,mem	9		13		7}
+	{reg,immed	4		4		3}
+	{mem,immed	17		25		7}}

@@ -1,0 +1,86 @@
+'\" Copyright 1989 Regents of the University of California
+'\" Permission to use, copy, modify, and distribute this
+'\" documentation for any purpose and without fee is hereby
+'\" granted, provided that this notice appears in all copies.
+'\" The University of California makes no representations about
+'\" the suitability of this material for any purpose.  It is
+'\" provided "as is" without express or implied warranty.
+'\" 
+'\" $Header: /sprite/src/lib/tcl/RCS/Tcl_Eval.man,v 1.3 90/01/07 16:02:10 ouster Exp $ SPRITE (Berkeley)
+'\" 
+.so \*(]ltmac.sprite
+.HS Tcl_Eval tcl
+.BS
+.SH NAME
+Tcl_Eval \- execute a Tcl command string
+.SH SYNOPSIS
+.nf
+\fB#include <tcl.h>\fR
+.sp
+int
+\fBTcl_Eval\fR(\fIinterp, cmd, flags, termPtr\fR)
+.SH ARGUMENTS
+.AS Tcl_Interp **termPtr;
+.AP Tcl_Interp *interp in
+Interpreter in which to execute the command.  String result will be
+stored in \fIinterp->result\fR.
+.AP char *cmd in
+Command (or sequence of commands) to execute.
+.AP char flags in
+Either \fBTCL_BRACKET_TERM\fR or 0.
+.VS
+If 0, then \fBTcl_Eval\fR will process commands from \fIcmd\fR until
+it reaches the null character at the end of the string;  newlines
+will be treated as command separators.  If \fBTCL_BRACKET_TERM\fR,
+then \fBTcl_Eval\fR will process comands from \fIcmd\fR until either it
+reaches a null character or it encounters a close bracket that isn't
+backslashed or enclosed in braces, at which
+point it will return;  newlines will treated as white space, not as
+command separators.  Under normal conditions, \fIflags\fR should be 0.
+.VE
+.AP char **termPtr out
+If 
+.VS
+\fItermPtr\fR is non-NULL, \fBTcl_Eval\fR fills in *\fItermPtr\fR with
+the address of the character just after the last one in the last command
+successfully executed (normally the null character at the end of \fIcmd\fR).
+If an error occurs in the first command in \fIcmd\fR, then \fI*termPtr\fR
+will be set to \fIcmd\fR.
+.VE
+.BE
+
+.SH DESCRIPTION
+.PP
+\fBTcl_Eval\fR parses commands from \fIcmd\fR and executes them in
+order until either an error occurs or \fBTcl_Eval\fR reaches a terminating
+character (']' or '\0', depending on the value of \fIflags\fR).
+The return value from \fBTcl_Eval\fR is one
+of the Tcl return codes \fBTCL_OK\fR, \fBTCL_ERROR\fR, \fBTCL_RETURN\fR, \fBTCL_BREAK\fR, or
+\fBTCL_CONTINUE\fR, and \fIinterp->result\fR will point to
+a string with additional information (result value or error message).
+This return information corresponds to the last command executed from
+\fIcmd\fR.
+.PP
+During the processing of a command it is legal to make nested
+calls to \fBTcl_Eval\fR (this is how conditionals, loops, and procedures
+are implemented).  If a code other than
+\fBTCL_OK\fR is returned from a nested \fBTcl_Eval\fR invocation, then the
+caller should normally return immediately, passing that same
+return code back to its caller, and so on until the top-level application is
+reached.  A few commands, like \fBfor\fR, will check for certain
+return codes, like \fBTCL_BREAK\fR and \fBTCL_CONTINUE\fR, and process them
+specially without returning.
+.PP
+\fBTcl_Eval\fR keeps track of how many nested Tcl_Eval invocations are
+in progress for \fIinterp\fR.
+If a code of \fBTCL_RETURN\fR, \fBTCL_BREAK\fR, or \fBTCL_CONTINUE\fR is
+about to be returned from the topmost \fBTcl_Eval\fR invocation for
+\fIinterp\fR, then \fBTcl_Eval\fR converts the return code to \fBTCL_ERROR\fR
+and sets \fIinterp->result\fR to point to an error message indicating that
+the \fBreturn\fR, \fBbreak\fR, or \fBcontinue\fR command was
+invoked in an inappropriate place.  This means that top-level
+applications should never see a return code from \fBTcl_Eval\fR other then
+\fBTCL_OK\fR or \fBTCL_ERROR\fR.
+
+.SH KEYWORDS
+command, execute, interpreter

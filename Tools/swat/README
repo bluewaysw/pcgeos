@@ -1,0 +1,201 @@
+*******************************************************************************
+				OVERVIEW
+*******************************************************************************
+
+This file documents some of the mechanisms used in Swat and the modules into
+which the code has been broken. From the simplest perspective, Swat is a
+large TCL interpreter broken into these pieces:
+
+	Machine-dependent
+	Machine-independent
+	UI-related
+	TCL
+	Utility routines (general data-structures, as opposed to those things
+	    actively concerned with debugging)
+
+Of course, the boundaries are fuzzier than this neat breakup would imply.
+Looking at the files in this directory, they can be categorized as follows:
+
+    break.c		MD (conditional breakpoints)/Ind (everything else)
+    buf.c		Util
+    cache.c		Util
+    cmd.c		Ind
+    cmdAM.c		Ind
+    cmdNZ.c		Ind
+    curses.c		UI
+    event.c		Ind
+    expr.y		MD
+    file.c		Ind
+    gc.c		Ind
+    handle.c		MD
+    hash.c		Util
+    help.c		UI
+    history.c		UI
+    i86Opcodes.c	MD
+    ibm.c		MD
+    ibm86.c		MD
+    ibmCache.c		MD
+    ibmCmd.c		MD
+    makedoc.c		UI (it's a program to extract documentation)
+    malloc.c		Util
+    nox11.c		UI
+    patient.c		Ind
+    rpc.c		Ind
+    shell.c		UI
+    src.c		Ind
+    string.c		Util
+    swat.c		Ind
+    sym.c		Ind
+    table.c		Util
+    tclDebug.c		TCL
+    type.c		Ind
+    ui.c		UI
+    value.c		Ind
+    var.c		Ind
+    vector.c		Util
+    version.c		Ind
+    x11.c		UI
+
+To give you an idea of the relative sizes of the pieces:
+
+    Machine-dependent: 	break.c, expr.y, handle.c, i86Opcodes.c, ibm.c
+			ibm86.c ibmCache.c ibmCmd.c
+    Machine-independent:cmd.c, cmdAM.c, cmdNZ.c, event.c, file.c, gc.c,
+			patient.c, rpc.c, src.c, swat.c, sym.c, type.c,
+			value.c, var.c, version.c
+    TCL:		tclDebug.c, tcl/
+    UI:			curses.c, help.c, history.c, makedoc.c, nox11.c,
+			shell.c, ui.c, x11.c
+    Utility routines:	buf.c, cache.c, hash.c, malloc.c, string.c, vector.c
+
+As far as subdirectories go, the important ones are:
+
+    curses		screen-control library with which the user usually
+			interacts
+    tcl			TCL support library
+    x11			special gadgets used by X11 version of Swat
+    sys			special UNIX system call library to make debugging
+			on the SUN 3 and the ISI easier by allowing
+			backtraces from system calls.
+    hist		the history package currently being used. This will
+			be replaced by something in TCL eventually.
+    Doc			formatted documentation for various parts of Swat.
+			More detailed than this.
+    Stub		PC-based debugging stub source code
+    lib			TCL system library for Swat.
+
+
+
+*******************************************************************************
+				GENERAL COMMENTS
+*******************************************************************************
+
+Procedure vectors are used heavily throughout Swat. Sometimes they take the
+form of explicit vectors (such as "MD_Decode" -- the machine-instruction
+decoder); sometimes they're callback routines passed to another routine to
+iterate over an entire data structure; still other times they are handler
+routines that are passed to registration routines to handle particular events
+as they happen. These will be detailed later.
+
+Certain source-code conventions are followed in Swat (and Esp, and Glue,
+actually) that are slightly different from those in the rest of the system.
+Because Swat is so modular, you will notice that just about every .c or .y
+file has a corresponding .h file that details the interface to that module.
+Most of the time, all routines that pertain to a particular functional piece
+of Swat live in a single .c file (e.g. break.c) whose interface is defined in
+the corresponding .h file (break.h). Few pieces break this mold, the most
+obvious being the monster known as Ibm, which would contain roughly 10,000
+lines of code in a single file were it not split into ibm.c, ibmCache.c and
+ibmCmd.c (file.c used to also live in ibm.c...).
+
+Functions and variables that form part of the interface of a module (the
+routines or variables that may be accessed from a different module) have the
+module prefix (e.g. "Break") separated from the function name by an
+underscore ("Break_Set"). Functions that are internal to the module do not
+have this underscore ("BreakFindChain"). Another clue that a function or
+variable is not exported is that it's declared "static." Remember, however,
+that just because a variable or function isn't declared static, doesn't mean
+it may be used by another module, as the containing module might have been
+broken into several files.
+
+If a module has been broken into several files for efficiency of compilation
+and avoidance of madness in the programmer, any variables or functions that
+are shared between the files that make up the module, but not to be used by
+other modules, are defined in a header file that ends in "Int.h" (e.g.
+"ibmInt.h")
+
+One other convention of note regards type definitions. Almost all structures
+are declared simlar to this:
+
+typedef struct _Break {
+	/* fields here */
+} BreakRec, *BreakPtr;
+
+There are, sadly, a few exceptions to this, but not many.
+
+
+
+*******************************************************************************
+				PROGRAM FLOW
+*******************************************************************************
+
+Once basic initialization is complete, all execution in Swat focuses around
+the dispatch loop in rpc.c. RPC stands for Remote Procedure Call. The
+dispatch loop found in the RPC system (called Rpc_Run/Rpc_Wait) watches
+various I/O streams (the connection to the PC as well as the workstation
+keyboard) and handles timed events requested both by the RPC system itself
+(e.g. when retransmitting a packet that got lost) and by any other part of
+Swat (like the 5-minute garbage collection timer or the "showmatch" cursor
+blinking that shows you the matching open paren/bracket/brace when you type
+the close).
+
+main() in swat.c calls some initialization routines, then calls Ibm_Init(),
+which does most of the work of initializing things, then calls Ui_TopLevel
+(in ui.c), which never returns. At this point, Swat is sitting at its command
+prompt. 
+
+Ui_TopLevel() is an infinite loop that invokes the command "top-level-read"
+to read a line of input, evaluates it and prints the result. top-level-read,
+in turn, calls read-line, a C procedure specific to the UI being used
+(dumb-terminal [shell.c], full-screen smart terminal [curses.c], or X11
+[x11.c]). This routine almost always tells the RPC system to watch a stream
+(such as the regular keyboard-input stream) and calls Rpc_Wait repeatedly
+until its handler for the input stream has determined that a full line has
+been retrieved. During this loop, requests for service from the PC, as well
+as pending data transmissions (or what have you) can (and often do) take
+place. Again you see that execution centers in Rpc_Wait.
+
+The third way to get to Rpc_Wait is when the machine has been continued.
+Anything that continues the patient invokes the "wait" command, which simply
+calls Rpc_Wait until the PATIENT_RUNNING flag is no longer set, or a local
+keyboard interrupt has been detected.
+
+
+Swat is very event driven, with events coming from several sources:
+
+	1) Rpc_Wait, when data are waiting on an input stream (e.g. from the
+	   keyboard)
+	2) Rpc_Wait, when a timer has expired.
+	3) Other parts of the RPC system when a call is received on the
+	   connection to the PC.
+	4) Internally dispatched events in response to some action, either on
+	   the PC or by the user.
+
+#3 occurs when the PC stops (hits a breakpoint, for example) or when a block
+of memory in which Swat is interested has changed state (been swapped in,
+e.g.), or when a thread/geode starts or exits. All events of this type are
+handled by "rpc servers" that are defined with calls to Rpc_ServerCreate
+during initialization. There are very few RPC servers in Swat (13 at last
+count) and they all lie in the machine-dependent portion of Swat. 
+
+#4 (internally dispatched events) are what make up the bulk of the activity
+in Swat. There are 15 different event types defined by Swat currently. Their
+functions range from notifying when Swat attaches to or detaches from the PC,
+to informing of the continuation of execution of the system (and from what
+state the machine is continuing). There are 34 different places from which
+events are dispatched in the C code alone (with a number of other places in
+the TCL system library). The single most important event for an avid TCL
+programmer is the "FULLSTOP" event, which drives "regwin", "ewatch" and the
+display of the instruction at which execution was stopped. Most of these
+events are exported to the TCL level for anything to use.
+

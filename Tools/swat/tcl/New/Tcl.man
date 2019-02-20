@@ -1,0 +1,1277 @@
+'\" Copyright 1989 Regents of the University of California
+'\" Permission to use, copy, modify, and distribute this
+'\" documentation for any purpose and without fee is hereby
+'\" granted, provided that this notice appears in all copies.
+'\" The University of California makes no representations about
+'\" the suitability of this material for any purpose.  It is
+'\" provided "as is" without express or implied warranty.
+'\" 
+'\" $Header: /sprite/src/lib/tcl/RCS/Tcl.man,v 1.17 90/01/18 10:42:37 ouster Exp $ SPRITE (Berkeley)
+'
+.so \*(]ltmac.sprite
+.HS Tcl tcl
+.BS
+.SH NAME
+Tcl \- overview of tool command language facilities
+.BE
+
+.SH INTRODUCTION
+.PP
+Tcl stands for ``tool command language'' and is pronounced ``tickle.''
+It is actually two things:
+a language and a library.
+First, Tcl is a simple textual language,
+intended primarily for issuing commands to interactive programs such
+as text editors, debuggers, illustrators, and shells.  It has
+a simple syntax and is also programmable, so
+Tcl users can write command procedures to provide more powerful
+commands than those in the built-in set.
+.PP
+Second, Tcl is a library package that can be embedded in application
+programs.  The Tcl library consists of a parser for the Tcl
+language, routines to implement the Tcl built-in commands, and
+procedures that allow each application to extend Tcl with additional
+commands specific to that application.  The application program
+generates Tcl commands and passes them to the Tcl parser for
+execution.  Commands may be generated
+by reading characters from an input
+source, or by associating command strings with elements of the
+application's user interface, such as menu entries, buttons, or
+keystrokes.
+When the Tcl library receives commands it parses them
+into component fields and executes built-in commands directly.
+For commands implemented by the
+application, Tcl calls back to the application to execute the
+commands.  In many cases commands will invoke recursive invocations
+of the Tcl interpreter by passing in additional strings to execute
+(procedures, looping commands, and conditional commands all work
+in this way).
+.PP
+An application program gains three advantages by using Tcl for
+its command language.  First, Tcl provides a standard syntax:  once
+users know Tcl, they will be able to issue commands easily
+to any Tcl-based application.  Second, Tcl provides programmability.
+All a Tcl application needs to do is to implement a few
+application-specific low-level commands.  Tcl provides many utility
+commands plus a general programming interface for building up
+complex command procedures.  By using Tcl, applications need not
+re-implement these features.  Third, Tcl will eventually provide
+a mechanism for communicating between applications:  it will be
+possible to send Tcl commands from one application to another.
+The common Tcl language framework will make it easier for applications
+to communicate with one another.  The communication features are not
+implemented in the current version of Tcl.
+.PP
+This manual page focusses primarily on the Tcl language.  It describes
+the language syntax and the built-in commands that will be available in
+any application based on Tcl.  The individual library
+procedures are described in more detail in separate manual pages, one
+per procedure.
+
+.SH "INTERPRETERS"
+.PP
+The central data structure in Tcl is an interpreter (C type
+``Tcl_Interp'').  An interpreter consists of a set of command
+bindings, a set of variable values, and a few other miscellaneous
+pieces of state.  Each Tcl command is interpreted in the context
+of a particular interpreter.
+Some Tcl-based applications will maintain
+multiple interpreters simultaneously, each associated with a
+different widget or portion of the application.
+Interpreters are relatively lightweight structures.  They can
+be created and deleted quickly, so application programmers should feel free to
+use multiple interpreters if that simplifies the application.
+Eventually Tcl will provide a mechanism for sending Tcl commands
+and results back and forth between interpreters, even if the
+interpreters are managed by different processes.
+
+.SH "DATA TYPES"
+.PP
+Tcl supports only one type of data:  strings.  All commands,
+all arguments to commands, all command results, and all variable values
+are strings.
+Where commands require numeric arguments or return numeric results,
+the arguments and results are passed as strings.
+Many commands expect their string arguments to have certain formats,
+but this interpretation is
+up to the individual commands.  For example, arguments often contain
+Tcl command strings, which may get executed as part of the commands.
+The easiest way to understand the Tcl interpreter is to remember that
+everything is just an operation on a string.  In many cases Tcl constructs
+will look similar to more structured constructs from other languages.
+However, the Tcl constructs
+are not structured at all;  they are just strings of characters, and this
+gives them a different behavior than the structures they may look like.
+.PP
+Although the exact interpretation of a Tcl string depends on who is
+doing the interpretation, there are three common forms that strings
+take:  commands, expressions, and lists.  The major sections below
+discuss these three forms in more detail.
+
+.SH "BASIC COMMAND SYNTAX"
+.PP
+The Tcl language has syntactic similarities to both the Unix shells
+and Lisp.  However, the interpretation of commands is different
+in Tcl than in either of those other two systems.
+A Tcl command string consists of one or more commands separated
+by newline characters or semi-colons.
+Each command consists of a collection of fields separated by
+white space (spaces or tabs).
+The first field must be the name of a command, and the
+additional fields, if any, are arguments that will be passed to
+that command.  For example, the command
+.DS
+\fBset a 22\fR
+.DE
+has three fields:  the first, \fBset\fR, is the name of a Tcl command, and
+the last two, \fBa\fR and \fB22\fR, will be passed as arguments to
+the \fBset\fR command.  The command name may refer either to a built-in
+Tcl command, an application-specific command bound in with the library
+procedure \fBTcl_CreateCommand\fR, or a command procedure defined with the
+\fBproc\fR built-in command.
+Arguments are passed literally as
+text strings.  Individual commands may interpret those strings in any
+fashion they wish.  The \fBset\fR command, for example, will treat its
+first argument as the name of a variable and its second argument as a
+string value to assign to that variable.  For other commands arguments
+may be interpreted as integers, lists, file names, or Tcl commands.
+
+.SH "COMMENTS"
+.PP
+If the first non-blank character in a command is \fB#\fR, then everything
+from the \fB#\fR up through the next newline character is treated as
+a comment and ignored.
+
+.SH "GROUPING ARGUMENTS WITH BRACES"
+.PP
+Normally each argument field ends at the next white space, but
+curly braces (``{'' and ``}'') may
+be used to group arguments in different ways.  If an argument
+field begins with a left brace, then the argument isn't
+terminated by white space;  instead it ends at the matching
+right brace.  Tcl will strip off the outermost layer of braces
+before passing the argument to the command.  This provides a simple mechanism
+for including white space in arguments.  For example, the
+command
+.DS
+\fBset a {This is a single argument}\fR
+.DE
+will pass two arguments to \fBset\fR:  \fBa\fR and
+\fBThis is a single argument\fR.  In the command
+.DS
+\fBset a {xyz a {b c d}}\fR
+.DE
+the \fBset\fR command will receive two arguments: \fBa\fR
+and \fBxyz a {b c d}\fR.
+.PP
+When braces are in effect, the matching brace need not be on
+the same line as the starting quote or brace;  in this case
+the newline will be
+included in the argument field along with any other characters up to the
+matching quote or brace.  For example, the \fBeval\fR command
+takes one
+argument, which is a command string;  \fBeval\fR invokes the Tcl
+interpreter to execute the command string.  The command
+.DS
+\fBeval {
+	set a 22
+	set b 33
+}\fR
+.DE
+will assign the value \fB22\fR to \fBa\fR and \fB33\fR to \fBb\fR.
+.PP
+When an argument is in braces, then command, variable,
+and backslash
+substitutions do not occur as described below;  all Tcl does is to
+strip off the outer layer of braces and pass the
+contents to the command.
+.PP
+If the first character of a command field isn't a left
+brace, then neither left nor right
+braces in the field will be treated specially (except as part of
+variable substitution;  see below).
+
+.SH "COMMAND SUBSTITUTION WITH BRACKETS"
+.PP
+If an open bracket occurs in any of the fields of a command, then
+command substitution occurs.  All of the text up to the matching
+close bracket is treated as a Tcl command and executed immediately.
+Then the result of that command is substituted for the bracketed
+text.  For example, consider the command
+.DS
+\fBset a [set b]\fR
+.DE
+When the \fBset\fR command has only a single argument, it is the
+name of a variable and \fBset\fR returns the contents of that
+variable.  In this case, if variable \fBb\fR has the value \fBfoo\fR,
+then the command above is equivalent to the command
+.DS
+\fBset a foo\fR
+.DE
+Brackets can be used in more complex ways.  For example, if the
+variable \fBb\fR has the value \fBfoo\fR and the variable \fBc\fR
+has the value \fBgorp\fR, then the command
+.DS
+\fBset a xyz[set b].[set c]\fR
+.DE
+is equivalent to the command
+.DS
+\fBset a xyzfoo.gorp\fR
+.DE
+A bracketed command need not be all on one line:  newlines within
+brackets are treated as argument separators, not command separators.
+If a field is enclosed in braces then the brackets and the characters
+between them are not interpreted specially;  they are passed through
+to the argument verbatim.
+
+.SH "VARIABLE SUBSTITUTION WITH $"
+.PP
+The dollar sign (\fB$\fR) may be used as a special shorthand form
+for substituting variables.  If \fB$\fR appears in an argument that
+isn't enclosed in braces
+then variable substitution will occur.  The characters after
+the \fB$\fR, up to the first character that isn't a number, letter, or
+underscore, are taken as a variable name and the string value of that
+variable is substituted for the name.  Or, if the dollar sign is followed
+by an open curly brace then the variable name consists of all the characters
+up to the next close curly brace.  For example, if variable \fBfoo\fR
+has the value \fBtest\fR, then the command
+.DS C
+\fBset a $foo.c\fR
+.DE
+is equivalent to the command
+.DS C
+\fBset a test.c\fR
+.DE
+and the command
+.DS C
+\fBset a abc${foo}bar\fR
+.DE
+is equivalent to the command
+.DS C
+\fBset a abctestbar\fR
+.DE
+Variable substitution does not occur in arguments that are enclosed
+in braces:  the
+dollar sign and variable name are passed through to the argument verbatim.
+.PP
+The dollar sign abbreviation is simply a shorthand form.  \fB$a\fR is
+completely equivalent to \fB[set a]\fR;  it is provided as a convenience
+to reduce typing.
+
+.VS
+.SH "SEPARATING COMMANDS WITH SEMI-COLONS"
+.PP
+Normally, each command occupies one line (the command is terminated by
+a newline character).  However, semi-colon (``;'') is treated
+as a command separator character;  multiple commands may be placed
+on one line by separating them with a semi-colon.
+.VE
+
+.SH "BACKSLASH SUBSTITUTION"
+.PP
+Backslashes may be used to insert non-printing characters into
+command fields and also to insert special characters like
+braces and brackets into fields
+without them being interpreted specially as described above.
+The backslash sequences understood by the Tcl interpreter are
+listed below.  In each case, the backslash
+sequence is replaced by the given character:
+.TP 20
+\fB\eb\fR
+Backspace (octal 10).
+.TP 20
+\fB\ee\fR
+Escape (octal 33).
+.TP 20
+\fB\en\fR
+Newline (octal 15).
+.TP 20
+\fB\et\fR
+Tab (octal 11).
+.TP 20
+\fB\e{\fR
+Left brace (``{'').
+.TP 20
+\fB\e}\fR
+Right brace (``}'').
+.TP 20
+\fB\e[\fR
+Open bracket (``['').
+.TP 20
+\fB\e]\fR
+Close bracket (``]'').
+.TP 20
+\fB\e<space>\fR
+Space (`` ''): doesn't terminate argument.
+.br
+.VS
+.TP 20
+\fB\e;\fR
+Semi-colon: doesn't terminate command.
+.TP 20
+\fB\e"\fR
+Double-quote.
+.TP 20
+\fB\e<newline>\fR
+Nothing:  this effectively joins two lines together
+into a single line.  This backslash feature is only provided
+when parsing Tcl commands;  it is not supported by the
+Tcl_Backslash procedure.
+.VE
+.TP 20
+\fB\e\e\fR
+Backslash (``\e'').
+.TP 20
+\fB\eC\fIx\fR
+Control-\fIx\fR (\fIx\fR AND octal 037), for any ASCII \fIx\fR except \fBM\fR
+(see below).
+.TP 20
+\fB\eM\fIx\fR
+Meta-\fIx\fR (\fIx\fR OR octal 200), for any ASCII \fIx\fR.
+.TP 20
+\fB\eCM\fIx\fR
+Control-meta-\fIx\fR ((\fIx\fR AND octal 037) OR octal 0200), for
+any ASCII \fIx\fR.
+.TP 20
+\fB\e\fIddd\fR
+The digits \fIddd\fR (one, two, or three of them) give the octal value of
+the character.
+.PP
+For example, in the command
+.DS
+\fBset a \e{x\e[\e\0yz\e141\fR
+.DE
+the second argument to \fBset\fR will be ``\fB{x[\0yza\fR''.
+.PP
+If a backslash is followed by something other than one of the options
+described above, then the backslash is transmitted to the argument
+field without any special processing, and the Tcl scanner continues
+normal processing with the next character.  For example, in the
+command
+.DS
+\fBset \e*a \e\e\e{foo\fR
+.DE
+The first argument to \fBset\fR will be \fB\e*a\fR and the second
+argument will be \fB\e{foo\fR.
+.PP
+If an argument is enclosed in braces, then backslash sequences inside
+the argument are parsed but no substitution occurs:  the backslash
+sequence is passed through to the argument as is, without making
+any special interpretation of the characters in the backslash sequence.
+In particular, backslashed braces are not counted in locating the
+matching right brace that terminates the argument.
+For example, in the
+command
+.DS
+\fBset a {\e{abc}\fR
+.DE
+the second argument to \fBset\fR will be \fB\e{abc\fR.
+.PP
+This backslash mechanism is not sufficient to generate absolutely
+any argument structure;  it only covers the
+most common cases.  To produce particularly complicated arguments
+it will probably be easiest to use the \fBformat\fR command along with
+command substitution.
+
+.SH "COMMAND SUMMARY"
+.IP [1]
+A command is just a string.
+.IP [2]
+Within a string commands are normally separated by newlines.
+.IP [3]
+If a command begins with a bracket then it is terminated by the matching
+close bracket and newlines within the command are treated as white space.
+.IP [4]
+A command consists of fields.  The first field is the name of the command
+and other fields are strings that are passed to that command as arguments.
+.IP [5]
+Fields are normally separated by white space.
+.IP [6]
+Braces defer interpretation of special characters.
+If a field begins with a left brace, then it consists of everything
+between the left brace and the matching right brace. The
+braces themselves are not included in the argument.
+No further processing is done on the information between the braces.
+.IP [7]
+If a field doesn't begin with a left brace, then backslash,
+variable, and command substitution are done on the field.  Only a
+single level of processing is done:  the results of one substitution
+are not scanned again for further substitutions or any other
+special treatment.  Substitution can
+occur on \fIany\fR field of a command, including the command name
+as well as the arguments.
+.IP [8]
+If the first non-blank character of a command is a \fB#\fR, everything
+from the \fB#\fR up through the next newline is treated as a comment
+and ignored.
+
+.SH "EXPRESSIONS"
+.PP
+The second major interpretation applied to strings in Tcl is
+as expressions.  Several commands, such as \fBexpr\fR, \fBfor\fR,
+and \fBif\fR, treat some of their arguments as expressions and
+call the Tcl expression processor (\fBTcl_Expr\fR) to evaluate them.
+A Tcl expression has C-like syntax and evaluates to an integer
+result.  Expressions
+may contain integer values, variable names in \fB$\fR notation
+(the variables' values must be integer strings),
+commands (embedded in brackets) that produce integer string results,
+parentheses for grouping, and operators.  Numeric values, whether they
+are passed directly or through variable or command substitution, may
+be specified either in decimal (the normal case), in octal (if the
+first character of the value is \fB0\fR), or in hexadecimal (if the first
+two characters of the value are \fB0x\fR).
+The valid operators are listed
+below, grouped in decreasing order of precedence:
+.TP 20
+\fB\-\0\0~\0\0!\fR
+Unary minus, bit-wise NOT, logical NOT.
+.TP 20
+\fB*\0\0/\0\0%\fR
+Multiply, divide, remainder.
+.TP 20
+\fB+\0\0\-\fR
+Add and subtract.
+.TP 20
+\fB<<\0\0>>\fR
+Left and right shift.
+.TP 20
+\fB<\0\0>\0\0<=\0\0>=\fR
+Boolean less, greater, less than or equal, and greater than or equal.
+Each operator produces 1 if the condition is true, 0 otherwise.
+.TP 20
+\fB==\0\0!=\fR
+Boolean equal and not equal.  Each operator produces a zero/one result.
+.TP 20
+\fB&\fR
+Bit-wise AND.
+.TP 20
+\fB^\fR
+Bit-wise exclusive OR.
+.TP 20
+\fB|\fR
+Bit-wise OR.
+.TP 20
+\fB&&\fR
+Logical AND.  Produces a 1 result if both operands are non-zero, 0 otherwise.
+.TP 20
+\fB||\fR
+Logical OR.  Produces a 0 result if both operands are zero, 1 otherwise.
+.PP
+See the C manual for more details on the results
+produced by each operator.
+All of the binary operators group left-to-right within the same
+precedence level.  For example, the expression
+.DS
+\fB(4*2) < 7\fR
+.DE
+evaluates to 0.  Evaluating the expression string
+.DS
+\fB($a + 3) < [set b]\fR
+.DE
+will cause the values of the variables \fBa\fR and \fBb\fR to be
+examined;  the result will be 1
+if \fBb\fR is greater than a by at least 3;  otherwise the result
+will be 0.
+.PP
+In general it is safest to enclose an expression in braces when
+entering it in a command:  otherwise, if the expression contains
+any white space then the Tcl interpreter will split it
+among several arguments.  For example, the command
+.DS C
+\fBexpr $a + $b\fR
+.DE
+results in three arguments being passed to \fBexpr\fR:  \fB$a\fR,
+\fB+\fR, and \fB$b\fR.  In addition, if the expression isn't in braces
+then the Tcl interpreter will perform variable and command substitution
+immediately (it will happen in the command parser rather than in
+the expression parser).  In many cases the expression is being
+passed to a command that will evaluate the expression later (or
+even many times if, for example, the expression is to be used to
+decide when to exit a loop).  Usually the desired goal is to re-do
+the variable or command substitutions each time the expression is
+evaluated, rather than once and for all at the beginning.  For example,
+the command
+.DS C
+\fBfor {set i 1} $i<=10 {set i [expr $i+1]} {...}\fR
+.DE
+is probably intended to iterate over all values of \fBi\fR from 1 to 10.
+After each iteration of the body of the loop, \fBfor\fR will pass
+its second argument to the expression evaluator to see whether or not
+to continue processing.  Unfortunately, in this case the value of \fBi\fR
+in the second argument will be substituted once and for all when the
+\fBfor\fR command is parsed.  If \fBi\fR was 0 before the \fBfor\fR
+command was invoked then \fBfor\fR's second argument will be \fB0<=10\fR
+which will always evaluate to 1, even though \fBi\fR's value eventually
+becomes greater than 10.  In the above case the loop will never
+terminate.  By placing the expression in braces, the
+substitution of \fBi\fR's
+value will be delayed;  it will be re-done each time the expression is
+evaluated, which is probably the desired result.
+
+.SH LISTS
+.PP
+The third major way that strings are interpreted in Tcl is as lists.
+A list is just a string with a list-like structure
+consisting of fields separated by white space.  For example, the
+string
+.DS
+\fBAl Sue Anne John\fR
+.DE
+is a list with four elements or fields.
+Lists have the same basic structure as command strings, except
+that a newline character in a list is treated as a field separator
+just like space or tab.  Conventions for braces
+and backslashes are the same for lists as for commands.  For example,
+the string
+.DS
+\fBa b\e c {d e {f g h}}\fR
+.DE
+is a list with three elements:  \fBa\fR, \fBb c\fR, and \fBd e {f g h}\fR.
+Whenever an element
+is extracted from a list, the same rules about backslashes and
+braces are applied as for commands.  Thus in the example above
+when the third element is extracted from the list, the result is
+.DS
+\fBd e {f g h}\fR
+.DE
+(when the field was extracted, all that happened was to strip off
+the outermost layer of braces).  Command substitution is never
+made on a list (at least, not by the list-processing commands;  the
+list can always be passed to the Tcl interpreter for evaluation).
+.PP
+The Tcl commands \fBconcat\fR, \fBforeach\fR, \fBindex\fR,
+\fBlength\fR, \fBlist\fR, and \fBrange\fR allow you to build lists,
+extract elements from them, search them, and perform other list-related
+functions.
+
+.SH "COMMAND RESULTS"
+.PP
+Each command produces two results:  a code and a string.  The
+code indicates whether the command completed successfully or not,
+and the string gives additional information.  The valid codes are
+defined in tcl.h, and are:
+.RS
+.TP 20
+\fBTCL_OK\fR
+This is the normal return code, and indicates that the command completed
+succesfully.  The string gives the command's return value.
+.TP 20
+\fBTCL_ERROR\fR
+Indicates that an error occurred;  the string gives a message describing
+the error.
+.VS
+The variable \fBerrorInfo\fR will contain additional information
+describing which commands and procedures were being executed when the
+error occurred.
+.VE
+.TP 20
+\fBTCL_RETURN\fR
+Indicates that the \fBreturn\fR command has been invoked, and that the
+.VS
+current procedure (or top-level command or \fBsource\fR command)
+should return immediately.  The
+string gives the return value for the procedure or command.
+.VE
+.TP 20
+\fBTCL_BREAK\fR
+Indicates that the \fBbreak\fR command has been invoked, so the
+innermost loop should abort immediately.  The string should always
+be empty.
+.TP 20
+\fBTCL_CONTINUE\fR
+Indicates that the \fBcontinue\fR command has been invoked, so the
+innermost loop should go on to the next iteration.  The string
+should always be empty.
+.RE
+Tcl programmers do not normally need to think about return codes,
+since TCL_OK is almost always returned.  If anything else is returned
+by a command, then the Tcl interpreter immediately stops processing
+commands and returns to its caller.  If there are several nested
+invocations of the Tcl interpreter in progress, then each nested
+command will usually return the error to its caller, until eventually
+the error is reported to the top-level application code.  The
+application will then display the error message for the user.
+.PP
+In a few cases, some commands will handle certain ``error'' conditions
+themselves and not return them upwards.  For example, the \fBfor\fR
+command checks for the TCL_BREAK code;  if it occurs, then \fBfor\fR
+stops executing the body of the loop and returns TCL_OK to its
+caller.  The \fBfor\fR command also handles TCL_CONTINUE codes and the
+procedure interpreter handles TCL_RETURN codes.  The \fBcatch\fR
+command allows Tcl programs to catch errors and handle them without
+aborting command interpretation any further.
+
+.SH PROCEDURES
+.PP
+Tcl allows you to extend the command interface by defining
+procedures.  A Tcl procedure can be invoked just like any other Tcl
+command (it has a name and it receives one or more arguments).
+The only difference is that its body isn't a piece of C code linked
+into the program;  it is a string containing one or more other
+Tcl commands.  See the \fBproc\fR command for information on
+how to define procedures and what happens when they are invoked.
+
+.SH VARIABLES
+.PP
+Tcl allows the definition of variables and the use of their values
+either through \fB$\fR-style variable substitution, the \fBset\fR
+command, or a few other mechanisms.  Variables need not be declared:
+a new variable will automatically be created each time a new variable
+name is used.  Variables may be either global or local.  If a variable
+name is used when a procedure isn't being executed, then it
+automatically refers to a global variable.  Variable names used
+within a procedure normally refer to local variables associated with that
+invocation of the procedure.  Local variables are deleted whenever
+a procedure exits.  The \fBglobal\fR command may be used to request
+that a name refer to a global variable for the duration of the current
+procedure (this is somewhat analogous to \fBextern\fR in C).
+
+.SH "BUILT-IN COMMANDS"
+.PP
+The Tcl library provides the following built-in commands, which will
+be available in any application using Tcl.  In addition to these
+built-in commands, there may be additional commands defined by each
+application, plus commands defined as Tcl procedures.  In the command syntax
+descriptions below, optional arguments are indicated by enclosing their
+names in brackets;  apologies in advance for the confusion between this
+descriptive use of brackets and the use of brackets to group commands.
+Words in boldface are literals that you type verbatim to Tcl.
+Words in italics are meta-symbols;  they act as names to refer to
+a class of values that you can type.
+.TP
+\fBbreak\fR
+This command may be invoked only inside the body of a loop command
+such as \fBfor\fR or \fBforeach\fR.  It returns a TCL_BREAK code
+to signal the innermost containing loop command to return immediately.
+.TP
+\fBcase\fI string \fR[\fBin\fR] \fIpatList body patList body \fR...
+.VS
+Match \fIstring\fR against each of the \fIpatList\fR arguments
+in order.  If one matches, then evaluate the following \fIbody\fR argument
+by passing it recursively to the Tcl interpreter, and return the result
+of that evaluation.  Each \fIpatList\fR argument consists of a single
+pattern or list of patterns.  Each pattern may contain any of the wild-cards
+described under \fBstring match\fR.  If a \fIpatList\fR
+argument is \fBdefault\fR, the corresponding body will be evaluated
+if no \fIpatList\fR matches \fIstring\fR.  If no \fIpatList\fR argument
+matches \fIstring\fR and no default is given, then the \fBcase\fR
+command returns an empty string.  For example,
+.RS
+.DS
+\fBcase abc in {a b} {format 1} default {format 2} a* {format 3}
+.DE
+will return \fB3\fR, 
+.DS
+\fBcase a in {a b} {format 1} default {format 2} a* {format 3}
+.DE
+will return \fB1\fR, and
+.DS
+\fBcase xyz {a b} {format 1} default {format 2} a* {format 3}
+.DE
+will return \fB2\fR.
+.RE
+.VE
+.TP
+\fBcatch\fI command \fR[\fIvarName\fR]
+The \fBcatch\fR command may be used to prevent errors from aborting
+command interpretation.  \fBCatch\fR calls the Tcl interpreter recursively
+to execute \fIcommand\fR, and always returns a TCL_OK code, regardless of
+any errors that might occur while executing \fIcommand\fR.  The return
+value from \fBcatch\fR is a decimal string giving the
+code returned by the Tcl interpreter after executing \fIcommand\fR.
+This will be \fB0\fR (TCL_OK) if there were no errors in \fIcommand\fR; otherwise
+it will have a non-zero value corresponding to one of the exceptional
+return codes (see tcl.h for the definitions of code values).  If the
+\fIvarName\fR argument is given, then it gives the name of a variable;
+\fBcatch\fR will set the value of the variable to the string returned
+from \fIcommand\fR (either a result or an error message).
+.TP
+\fBconcat\fI arg arg ...\fR
+This command treats each argument as a list and concatenates them
+into a single list.  It permits any number of arguments.  For example,
+the command
+.RS
+.DS
+\fBconcat a b {c d e} {f {g h}}\fR
+.DE
+will return
+.DS
+\fBa b c d e f {g h}\fR
+.DE
+as its result.
+.RE
+.TP
+\fBcontinue\fR
+This command may be invoked only inside the body of a loop command
+such as \fBfor\fR or \fBforeach\fR.  It returns a  TCL_CONTINUE code
+to signal the innermost containing loop command to skip the
+remainder of the loop's body
+but continue with the next iteration of the loop.
+.TP
+\fBerror \fImessage\fR
+Returns a TCL_ERROR code, which causes command interpretation to be
+unwound.  \fIMessage\fR is a string that is returned to the application
+to indicate what went wrong.
+.VS
+.TP
+\fBeval \fIarg1 arg2 ...\fR
+\fBEval\fR takes one or more arguments, which together comprise a Tcl
+command (or collection of Tcl commands separated by newlines in the
+usual way).  \fBEval\fR concatenates all its arguments in the same
+fashion as the \fBconcat\fR command, passes the concatenated string to the
+Tcl interpreter recursively, and returns the result of that
+evaluation (or any error generated by it).
+.VE
+.TP
+\fBexec \fIcommand arg1 arg2 ...\fR[\fB< \fIinput\fR]
+The \fBexec\fR command treats its \fIcommand\fR argument as the name of
+a program to execute.  It searches the directories in
+the PATH environment variable to find
+an executable file by the name \fIcommand\fR,
+then executes the file, passing it an argument list consisting of
+\fIcommand\fR plus all of the \fIarg\fRs.  If an argument \fB<\fR appears
+anywhere among the arguments to \fBexec\fR, then neither it or the
+following argument is passed to \fIcommand\fR.  Instead, the following
+argument (\fIinput\fR) consists of input to the command;  \fBexec\fR
+will create a pipe and use it to pass \fIinput\fR to \fIcommand\fR
+as standard input.  \fBExec\fR also creates a pipe to receive \fIcommand\fR's
+output (both standard output and standard error).  The information
+received over this pipe is returned as the result of the \fBexec\fR
+command.  The \fBexec\fR command also looks at the return status
+returned by \fIcommand\fR.  Normally this should be zero;  if it is then
+\fBexec\fR returns normally.  If \fIcommand\fR returns a non-zero status,
+then \fBexec\fR will return that code;  it should be one of the ones
+defined in the section ``COMMAND RESULTS'' above.  If an out-of range
+code is returned by the command, it will cause command unwinding just
+as if TCL_ERROR had been returned; at the outermost level of command
+interpretation, the Tcl interpreter will turn the code into TCL_ERROR,
+with an appropriate error message.
+.TP
+\fBexpr \fIarg\fR
+Calls the expression processor to evaluate \fIarg\fR, and returns
+the result as a decimal string.
+.TP
+\fBfile \fIname\fR \fIoption\fR
+Operate on a file or a file name.  \fIName\fR is the name of a file, and
+\fIoption\fR indicates what to do with the file name.  Any unique
+abbreviation for \fIoption\fR is acceptable.  The valid options are:
+.RS
+.TP
+\fBfile \fIname \fBdirname\fR
+Return all of the characters in \fIname\fR up to but not including
+the last slash character.  If there are no slashes in \fIname\fR
+then return ``.''.  If the last slash in \fIname\fR is its first
+character, then return ``/''.
+.TP
+\fBfile \fIname \fBexecutable\fR
+Return \fB1\fR if file \fIname\fR is executable by
+the current user, \fB0\fR otherwise.
+.TP
+\fBfile \fIname \fBexists\fR
+Return \fB1\fR if file \fIname\fR exists and the current user has
+search privileges for the directories leading to it, \fB0\fR otherwise.
+.TP
+\fBfile \fIname \fBextension\fR
+Return all of the characters in \fIname\fR after and including the
+last dot in \fIname\fR.  If there is no dot in \fIname\fR then return
+the empty string.
+.TP
+\fBfile \fIname \fBisdirectory\fR
+Return \fB1\fR if file \fIname\fR is a directory,
+\fB0\fR otherwise.
+.TP
+\fBfile \fIname \fBisfile\fR
+Return \fB1\fR if file \fIname\fR is a regular file,
+\fB0\fR otherwise.
+.TP
+\fBfile \fIname \fBowned\fR
+Return \fB1\fR if file \fIname\fR is owned by the current user,
+\fB0\fR otherwise.
+.TP
+\fBfile \fIname \fBreadable\fR
+Return \fB1\fR if file \fIname\fR is readable by
+the current user, \fB0\fR otherwise.
+.TP
+\fBfile \fIname \fBrootname\fR
+Return all of the characters in \fIname\fR up to but not including
+the last ``.'' character in the name.  If \fIname\fR doesn't contain
+a dot, then return \fIname\fR.
+.TP
+\fBfile \fIname \fBtail\fR
+Return all of the characters in \fIname\fR after the last slash.
+If \fIname\fR contains no slashes then return \fIname\fR.
+.TP
+\fBfile \fIname \fBwritable\fR
+Return \fB1\fR if file \fIname\fR is writable by
+the current user, \fB0\fR otherwise.
+.RE
+.IP
+The \fBfile\fR commands that return 0/1 results are often used in
+conditional or looping commands, for example:
+.RS
+.DS
+\fBif {![file foo exists]} then {error {bad file name}} else {...}\fR
+.DE
+.RE
+.TP
+\fBfor \fIstart test next body\fR
+\fBFor\fR is a looping command, similar in structure to the C
+\fBfor\fR statement.  The \fIstart\fR, \fInext\fR, and
+\fIbody\fR arguments must be Tcl command strings, and \fItest\fR
+is an expression string.
+The \fBfor\fR command first invokes the Tcl interpreter to
+execute \fIfirst\fR.  Then it repeatedly evaluates \fItest\fR as
+an expression;  if the result is non-zero it invokes the Tcl
+interpreter on \fIbody\fR, then invokes the Tcl interpreter on \fInext\fR,
+then repeats the loop.  The command terminates when \fItest\fR evaluates
+to 0.  If a \fBcontinue\fR command is invoked within \fIbody\fR then
+any remaining commands in the current execution of \fIbody\fR are skipped;
+processing continues by invoking the Tcl interpreter on \fInext\fR, then
+evaluating \fItest\fR, and so on.  If a \fBbreak\fR command is invoked
+within \fIbody\fR
+.VS
+or \fInext\fR,
+.VE
+then the \fBfor\fR command will
+return immediately.
+The operation of \fBbreak\fR and \fBcontinue\fR are similar to the
+corresponding statements in C.
+\fBFor\fR returns an empty string.
+.TP
+\fBforeach \fIvarname list body\fR
+In this command, \fIvarname\fR is the name of a variable, \fIlist\fR
+is a list of values to assign to \fIvarname\fR, and \fIbody\fR is a
+collection of Tcl commands.  For each field in \fIlist\fR (in order
+from left to right), \fBforeach\fR assigns the contents of the
+field to \fIvarname\fR (as if the \fBindex\fR command had been used
+to extract the field), then calls the Tcl interpreter to execute
+\fIbody\fR.  The \fBbreak\fR and \fBcontinue\fR statements may be
+invoked inside \fIbody\fR, with the same effect as in the \fBfor\fR
+command.  \fBForeach\fR an empty string.
+.TP
+\fBformat \fIformatString arg arg ...\fR
+This command generates a formatted string in the same way as the
+C \fBsprintf\fR procedure (it uses \fBsprintf\fR in its
+implementation).  \fIFormatString\fR indicates how to format
+the result, using \fB%\fR fields as in \fBsprintf\fR, and the additional
+arguments, if any, provide values to be substituted into the result.
+All of the \fBsprintf\fR options are valid;  see the \fBsprintf\fR
+man page for details.  Each \fIarg\fR must match the expected type
+from the \fB%\fR field in \fIformatString\fR;  the \fBformat\fR command
+converts each argument to the correct type (floating, integer, etc.)
+before passing it to \fBsprintf\fR for formatting.
+The only unusual conversion is for \fB%c\fR;  in this case the argument
+must be a decimal string, which will then be converted to the corresponding
+ASCII character value.
+\fBFormat\fR does backslash substitution on its \fIformatString\fR
+argument, so backslash sequences in \fIformatString\fR will be handled
+correctly even if the argument is in braces.
+The return value from \fBformat\fR
+is the formatted string.
+.TP
+\fBglob \fIfilename\fR
+.VS
+This command performs filename globbing, using csh rules.  The returned
+value from \fBglob\fR is the list of expanded filenames.
+.VE
+.TP
+\fBglobal \fIvarname varname ...\fR
+This command is ignored unless a Tcl procedure is being interpreted.
+If so, then it declares the given \fIvarname\fR's to be global variables
+rather than local ones.  For the duration of the current procedure
+(and only while executing in the current procedure), any reference to
+any of the \fIvarname\fRs will be bound to a global variable instead
+of a local one.
+.TP
+\fBif \fItest \fR[\fBthen\fR] \fItrueBody \fR[[\fBelse\fR] \fIfalseBody\fR]
+The \fIif\fR command evaluates \fItest\fR as an expression (in the
+same way that \fBexpr\fR evaluates its argument).  If the
+result is non-zero then \fItrueBody\fR is called by passing it to the
+Tcl interpreter.  Otherwise \fIfalseBody\fR is executed by passing it to
+the Tcl interpreter.  The \fBthen\fR and \fBelse\fR arguments are optional
+``noise words'' to make the command easier to read.  \fIFalseBody\fR is
+also optional;  if it isn't specified then the command does nothing if
+\fItest\fR evaluates to zero.  The return value from \fBif\fR is
+the value of the last command executed in \fItrueBody\fR or
+\fIfalseBody\fR, or the empty string if \fItest\fR evaluates to zero and
+\fIfalseBody\fR isn't specified.
+.TP
+\fBindex \fIvalue index \fR[\fBchars\fR]
+Extract an element from a list or a character from a string.  If the
+\fBchars\fR keyword isn't specified, then \fBindex\fR treats \fIvalue\fR
+as a list and returns the \fIindex\fR'th field from it.  In extracting
+the field, \fIindex\fR observes the same rules concerning braces
+and backslashes as the Tcl command interpreter;  however, variable
+substitution and command substitution do not occur.  If \fIindex\fR is
+greater than or equal to the number of elements in \fIvalue\fR, then the empty
+string is returned.  If the \fBchars\fR keyword is specified (or any
+abbreviation of it), then \fIvalue\fR is treated as a string and the
+command returns the \fIindex\fR'th character from it (or the empty string
+if there aren't at least \fIindex\fR+1 characters in the string).
+Index 0 refers to the first element or character of \fIvalue\fR.
+.TP
+\fBinfo \fIoption arg arg ...\fR
+Provide information about various internals to the Tcl interpreter.
+The legal \fIoption\fR's (which may be abbreviated) are:
+.RS
+.TP
+\fBinfo args \fIprocname\fR
+Returns a list containing the names of the arguments to procedure
+\fIprocname\fR, in order.  \fIProcname\fR must be the name of a
+Tcl command procedure.
+.TP
+\fBinfo body \fIprocname\fR
+Returns the body of procedure \fIprocname\fR.  \fIProcname\fR must be
+the name of a Tcl command procedure.
+.TP
+\fBinfo commands \fR[\fIpattern\fR]
+.VS
+If \fIpattern\fR isn't specified, returns a list of names of all the
+Tcl commands, including both the built-in commands written in C and
+the command procedures defined using the \fBproc\fR command.
+If \fIpattern\fR is specified, only those names matching \fIpattern\fR
+are returned.  Matching is determined using the same rules as for
+\fBstring match\fR.
+.VE
+.TP
+\fBinfo cmdcount\fR
+Returns a count of the total number of commands that have been invoked
+in this interpreter.
+.TP
+\fBinfo default \fIprocname arg varname\fR
+\fIProcname\fR must be the name of a Tcl command procedure and \fIarg\fR
+must be the name of an argument to that procedure.  If \fIarg\fR
+doesn't have a default value then the command returns \fB0\fR.
+Otherwise it returns \fB1\fR and places the default value of \fIarg\fR
+into variable \fIvarname\fR.
+.TP
+\fBinfo globals \fR[\fIpattern\fR]
+.VS
+If \fIpattern\fR isn't specified, returns a list of all the names
+of currently-defined global variables.
+If \fIpattern\fR is specified, only those names matching \fIpattern\fR
+are returned.  Matching is determined using the same rules as for
+\fBstring match\fR.
+.TP
+\fBinfo level\fR [\fInumber\fR]
+If \fInumber\fR is not specified, this command returns a number
+giving the stack level of the invoking procedure, or 0 if the
+command is invoked at top-level.  If \fInumber\fR is specified,
+then the result is a list consisting of the name and arguments for the
+procedure call at level \fInumber\fR on the stack.  If \fInumber\fR
+is positive then it selects a particular stack level (1 refers
+to the top-most active procedure, 2 to the procedure it called, and
+so on);  otherwise it gives a level relative to the current level
+(0 refers to the current procedure, -1 to its caller, and so on).
+See the \fBuplevel\fR command for more information on what stack
+levels mean.
+.TP
+\fBinfo locals \fR[\fIpattern\fR]
+If \fIpattern\fR isn't specified, returns a list of all the names
+of currently-defined local variables, including arguments to the
+current procedure, if any.
+If \fIpattern\fR is specified, only those names matching \fIpattern\fR
+are returned.  Matching is determined using the same rules as for
+\fBstring match\fR.
+.TP
+\fBinfo procs \fR[\fIpattern\fR]
+If \fIpattern\fR isn't specified, returns a list of all the
+names of Tcl command procedures.
+If \fIpattern\fR is specified, only those names matching \fIpattern\fR
+are returned.  Matching is determined using the same rules as for
+\fBstring match\fR.
+.TP
+\fBinfo tclversion\fR
+Returns the version number for this version of Tcl in the form \fIx.y\fR,
+where changes to \fIx\fR represent major changes with probable
+incompatibilities and changes to \fIy\fR represent small enhancements and
+bug fixes that retain backward compatibility.
+.VE
+.TP
+\fBinfo vars\fR
+Returns a list of all the names of currently-visible variables, including
+both locals and currently-visible globals.
+.RE
+.TP
+\fBlength \fIvalue\fR [\fBchars\fR]
+If \fBchars\fR isn't specified, treats \fIvalue\fR as a list
+and returns the number of elements in the list.  If \fBchars\fR
+is specified (or any abbreviation of it), then \fBlength\fR
+treats \fIvalue\fR as a string and returns the number of characters
+in it (not including the terminating null character).
+.TP
+\fBlist \fIarg1 arg2 ...\fR
+This command returns a list comprised of all the \fIarg\fRs.  Braces
+and backslashes get added as necessary, so that the \fBindex\fR command
+may be used on the result to re-extract the original arguments, and also
+so that \fBeval\fR may be used to execute the resulting list, with
+\fIarg1\fR comprising the command's name and the other \fIarg\fRs comprising
+its arguments.  \fBList\fR produces slightly different results than
+\fBconcat\fR:  \fBconcat\fR removes one level of grouping before forming
+the list, while \fBlist\fR works directly from the original arguments.
+For example, the command
+.RS
+.DS
+\fBlist a b {c d e} {f {g h}}
+.DE
+will return
+.DS
+\fBa b {c d e} {f {g h}}
+.DE
+while \fBconcat\fR with the same arguments will return
+.DS
+\fBa b c d e f {g h}\fR
+.DE
+.RE
+.TP
+\fBprint \fIstring \fR[\fIfile \fR[\fBappend\fR]]
+.VS
+Print the \fIstring\fR argument.  If no \fIfile\fR is specified then
+\fIstring\fR is output to the standard output file.  If \fIfile\fR is
+specified, then \fIstring\fR is output to that file.  If the \fBappend\fR
+option is given, then \fIstring\fR is appended to \fIfile\fR;  otherwise
+any existing contents of \fIfile\fR are discarded before \fIstring\fR
+is written to the file.
+.VE
+.TP
+\fBproc \fIname args body\fR
+The \fBproc\fR command creates a new Tcl command procedure,
+\fIname\fR, replacing
+any existing command there may have been by that name.  Whenever the
+new command is invoked, the contents of \fIbody\fR will be executed
+by the Tcl interpreter.  \fIArgs\fR specifies the formal arguments to the
+procedure.  It consists of a list, possibly empty, each of whose
+elements specifies
+one argument.  Each argument specifier is also a list with either
+one or two fields.  If there is only a single field in the specifier,
+then it is the name of the argument;  if there are two fields, then
+the first is the argument name and the second is its default value.
+braces and backslashes may be used in the usual way to specify
+complex default values.
+.IP
+When \fIname\fR is invoked, a local variable
+will be created for each of the formal arguments to the procedure;  its
+value will be the value of corresponding argument in the invoking command
+or the argument's default value.
+Arguments with default values need not be
+specified in a procedure invocation.  However, there must be enough
+actual arguments for all the
+formal arguments that don't have defaults, and there must not be any extra
+actual arguments.  There is one special case to permit procedures with
+variable numbers of arguments.  If the last formal argument has the name
+\fBargs\fR, then a call to the procedure may contain more actual arguments
+than the procedure has formals.  In this case, all of the actual arguments
+starting at the one that would be assigned to \fBargs\fR are combined into
+a list (as if the \fBlist\fR command had been used);  this combined value
+is assigned to the local variable \fBargs\fR.
+.IP
+When \fIbody\fR is being executed, variable names normally refer to
+local variables, which are created automatically when referenced and
+deleted when the procedure returns.  One local variable is automatically
+created for each of the procedure's arguments.
+Global variables can only be accessed by invoking
+the \fBglobal\fR command.
+.IP
+The \fBproc\fR command returns the null string.  When a procedure is
+invoked, the procedure's return value is the value specified in a
+\fBreturn\fR command.  If the procedure doesn't execute an explicit
+\fBreturn\fR, then its return value is the value of the last command
+executed in the procedure's body.
+If an error occurs while executing the procedure
+body, then the procedure-as-a-whole will return that same error.
+.TP
+\fBrange \fIvalue first last \fR[\fBchars\fR]
+Return a range of fields or characters from \fIvalue\fR.  If the
+\fBchars\fR keyword isn't specified, then \fIvalue\fR must be
+a list and \fBrange\fR will return a new list consisting of elements
+\fIfirst\fR through \fIlast\fR, inclusive.  The
+special keyword \fBend\fR may be specified for \fIlast\fR; in
+this case all the elements of \fIvalue\fR starting at \fIfirst\fR
+are returned.  If the \fBchars\fR keyword, or any abbreviation of
+it, is specified, then \fBrange\fR treats \fIvalue\fR as a character
+string and returns characters \fIfirst\fR through \fIlast\fR of
+it, inclusive.  Once again, the \fBend\fR keyword may be used for
+\fIlast\fR.  In both cases if a \fIlast\fR value is specified greater
+than the size of \fIvalue\fR it is equivalent to specifying \fBend\fR;
+if \fIlast\fR is less than \fIfirst\fR then an empty string is returned.
+Note: ``\fBrange \fIvalue first first\fR'' does not always produce the
+same results as ``\fBindex \fIvalue first\fR'' (although it often does
+for simple fields that aren't enclosed in braces);  it does, however,
+produce exactly the same results as ``\fBlist [index \fIvalue first\fB]\fR''
+.TP
+\fBrename \fIoldName newName\fR
+.VS
+Rename the command that used to be called \fIoldName\fR so that it
+is now called \fInewName\fR.  If \fInewName\fR is an empty string
+(e.g. {}) then \fIoldName\fR is deleted.  The \fBrename\fR command
+returns an empty string as result.
+.VE
+.TP
+\fBreturn \fR[\fIvalue\fR]
+Return immediately from the current procedure
+.VS
+(or top-level command or \fBsource\fR command),
+.VE
+with \fIvalue\fR as the return value.  If \fIvalue\fR is not specified,
+an empty string will be returned as result.
+.VE
+.TP
+\fBscan \fIstring format varname1 varname2 ...\fR
+This command parses fields from an input string in the same fashion
+as the C \fBsscanf\fR procedure.  \fIString\fR gives the input to
+be parsed and \fIformat\fR indicates how to parse it, using \fB%\fR
+fields as in \fBsscanf\fR.  All of the \fBsscanf\fR options are valid;
+see the \fBsscanf\fR man page for details.  Each \fIvarname\fR gives
+the name of a variable;  when a field is scanned from \fIstring\fR,
+the result is converted back into a string and assigned to the
+corresponding \fIvarname\fR.  The only unusual conversion is for
+\fB%c\fR;  in this case, the character value is converted to a
+decimal string, which is then assigned to the corresponding \fIvarname\fR.
+.VS
+.TP
+\fBset \fIvarname \fR[\fIvalue\fR]
+If \fIvalue\fR isn't specified, then return the current value of
+\fIvarname\fR.  If \fIvarname\fR isn't defined as a variable, then
+return the empty string.  If \fIvalue\fR is specified, then set
+the value of \fIvarname\fR to \fIvalue\fR, creating a new variable
+if one doesn't already exist.  If no procedure is active, then
+\fIvarname\fR refers to a global variable.  If a procedure is
+active, then \fIvarname\fR refers to a parameter or local variable
+of the procedure, unless the \fIglobal\fR command has been invoked
+to declare \fIvarname\fR to be global.
+.VE
+.TP
+\fBsource \fIfileName\fR
+Read file \fIfileName\fR and pass the contents to the Tcl interpreter
+as a sequence of commands to execute in the normal fashion.  The return
+value of \fBsource\fR is the return value of the last command executed
+from the file.  If an error occurs in executing the contents of the
+file, then the \fBsource\fR command will return that error.
+.VS
+If a \fBreturn\fR command is invoked from within the file, the remainder of
+the file will be skipped and the \fBsource\fR command will return
+normally with the result from the \fBreturn\fR command.
+.VE
+.TP
+\fBstring \fIoption a b\fR
+Perform a string operation on the two operands \fIa\fR and \fIb\fR,
+based on \fIoption\fR.  The possible options are:
+.RS
+.TP
+\fBstring compare \fIa b\fR
+Perform a character-by-character comparison of strings \fIa\fR and
+\fIb\fR, in the same way as the C \fBstrcmp\fR procedure.  Return
+-1, 0, or 1, depending on whether \fIa\fR is lexicographically
+less than, equal to, or greater than \fIb\fR.
+.TP
+\fBstring first \fIa b\fR
+Search \fIb\fR for a sequence of characters that exactly match
+the characters in \fIa\fR.  If found, return the index of the
+first character in the first such match within \fIb\fR.  If not
+found, return -1.
+.TP
+\fBstring last \fIa b\fR
+Search \fIb\fR for a sequence of characters that exactly match
+the characters in \fIa\fR.  If found, return the index of the
+first character in the last such match within \fIb\fR.  If there
+is no match, then return -1.
+.br
+.VS
+.TP
+\fBstring match \fIpattern\fR \fIstring\fR
+See if \fIpattern\fR matches \fIstring\fR;  return 1 if it does, 0
+if it doesn't.  Matching is done in a fashion similar to that
+used by the C-shell.  For the two strings to match, their contents
+must be identical except that the following special sequences
+may appear in \fIpattern\fR:
+.RS
+.IP \fB*\fR 10
+Matches any sequence of characters in \fIstring\fR,
+including a null string.
+.IP \fB?\fR 10
+Matches any single character in \fIstring\fR.
+.IP \fB[\fIchars\fB]\fR 10
+Matches any character in the set given by \fIchars\fR.  If a sequence
+of the form
+\fIx\fB\-\fIy\fR appears in \fIchars\fR, then any character
+between \fIx\fR and \fIy\fR, inclusive, will match.
+.IP\fB\e\fIx\fR 10
+Matches the single character \fIx\fR.  This provides a way of
+avoiding the special interpretation of the characters
+\fB*?[]\e\fR in \fIpattern\fR.
+.RE
+.RE
+.VE
+.IP
+Unique abbreviations for \fIoption\fR are acceptable.
+.TP
+\fBtime \fIcommand\fR [\fIcount\fR]
+This command will call the Tcl interpreter \fIcount\fR
+times to execute \fIcommand\fR (or once if \fIcount\fR isn't
+specified).  It will then return a string of the form
+.RS
+.DS
+\fB503 microseconds per iteration\fR
+.DE
+which indicates the average amount of time required per iteration,
+in microseconds.
+Time is measured in elapsed time, not CPU time.
+.RE
+.TP
+\fBuplevel \fIlevel command command ...\fR
+.VS
+All of the \fIcommand\fR arguments are concatenated as if they had
+been passed to \fBconcat\fR and the result is evaluated in the
+variable context indicated by \fIlevel\fR.  \fBUplevel\fR returns
+the result of that evaluation.  If \fIlevel\fR is zero,
+then top-level context is used (all variable names refer to global
+variables).  If \fIlevel\fR is a positive number, then it is treated
+as a stack level:  1 refers to the topmost active procedure, 2 to the
+procedure it called, and so on.  If \fIlevel\fR is a negative number,
+then it is treated as a level relative to the current
+procedure.  For example, a \fIlevel\fR of -1 refers to the procedure
+that called the
+one invoking the \fBuplevel\fR command (which is top-level if the
+procedure invoking \fBuplevel\fR is at level 1).
+The \fBuplevel\fR command causes the invoking procedure to disappear
+from the procedure calling stack while the command is being executed.
+For example, suppose procedure \fBx\fR is
+at level 3 and invokes the command
+.RS
+.DS
+\fBuplevel -1 {set a 43; c}
+.DE
+where \fBc\fR is another Tcl procedure.  The \fBset\fR command will
+modify variable \fBa\fR in \fBx\fR's caller, and \fBc\fR will execute
+at level 3, as if called from \fBx\fR's caller.  If it in turn executes
+the command
+.DS
+\fBuplevel -1 {set a 42}
+.DE
+then the \fBset\fR command will modify the same variable \fBa\fR in \fBx\fR's
+caller:  the procedure \fBx\fR does not appear to be on the call stack
+when \fBc\fR is executing.  The command ``\fBinfo level\fR'' may
+be used to obtain the level of the current procedure.
+\fBUplevel\fR makes it possible to implement new control
+constructs as Tcl procedures (for example, \fBuplevel\fR could
+be used to implement the \fBwhile\fR construct as a Tcl procedure).
+.VE
+.RE
+
+.VS
+.SH "BUILT-IN VARIABLES"
+.PP
+The following global variables are created and managed automatically
+by the Tcl library.  These variables should normally be treated as
+read-only by application-specific code and by users.
+.TP
+\fBerrorInfo\fR
+After an error has occurred, this string will contain two or more lines
+identifying the Tcl commands and procedures that were being executed
+when the most recent error occurred.
+.VE
+
+.SH AUTHOR
+John Ousterhout, University of California at Berkeley (ouster@sprite.berkeley.edu)

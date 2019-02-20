@@ -1,0 +1,95 @@
+'\" Copyright 1989 Regents of the University of California
+'\" Permission to use, copy, modify, and distribute this
+'\" documentation for any purpose and without fee is hereby
+'\" granted, provided that this notice appears in all copies.
+'\" The University of California makes no representations about
+'\" the suitability of this material for any purpose.  It is
+'\" provided "as is" without express or implied warranty.
+'\" 
+'\" $Header: /sprite/src/lib/tcl/RCS/Tcl_Interp.man,v 1.3 90/01/15 14:58:40 ouster Exp $ SPRITE (Berkeley)
+'\" 
+.so \*(]ltmac.sprite
+.HS Tcl_Interp tcl
+.BS
+.SH NAME
+Tcl_Interp \- client-visible fields of interpreter structures
+.SH SYNOPSIS
+.nf
+\fB#include <tcl.h>\fR
+.sp
+typedef struct {
+	char *\fIresult\fR;
+	int \fIdynamic\fR;
+	int \fIerrorLine\fR;
+} Tcl_Interp;
+.BE
+
+.SH DESCRIPTION
+.PP
+The \fBTcl_CreateInterp\fR procedure returns a pointer to a Tcl_Interp
+structure.  This pointer is then passed into other Tcl procedures
+to process commands in the interpreter and perform other operations
+on the interpreter.  Interpreter structures contain many many fields
+that are used by Tcl, but only three that may be accessed by
+clients:  \fIresult\fR and \fIdynamic\fR.  These fields are used by
+Tcl command procedures to return strings that form part of the result
+of each command.  When Tcl_Eval returns, the string pointed to be
+the \fIresult\fR field will be used by Tcl_Eval's caller
+as a return value or error message.
+.PP
+The easiest way for command procedures to manipulate the \fIresult\fR
+and \fIdynamic\fR fields is to call Tcl_Return;  Tcl_Return
+will hide all the details of managing these fields.
+The description below is for those procedures that manipulate the
+fields directly.
+.PP
+Whenever a command procedure returns, it must ensure
+that the \fIresult\fR field of its interpreter points to the string
+being returned by the command.  Normally, these strings are assumed
+to be statically allocated;  in this case, the \fIdynamic\fR field
+must be zero.  As an alternative, a command procedure may dynamically
+allocate its return value and store a pointer to it in \fIinterp->result\fR.
+In this case, the command procedure must also set \fIinterp->dynamic\fR
+to non-zero.  If \fIinterp->dynamic\fR is non-zero, then Tcl will free
+the space pointed to by \fIinterp->result\fR before it invokes the next command.
+If a client procedure overwrites \fIinterp->result\fR field when
+\fIinterp->dynamic\fR is non-zero, then it is responsible for freeing the
+old \fIinterp->result\fR.  Once again, if clients use the
+\fBTcl_Result\fR procedure to manage these fields, they need not worry
+about these issues.
+.PP
+As part of processing each command, \fBTcl_Eval\fR initializes
+\fIinterp->result\fR
+and \fIinterp->dynamic\fR just before calling the command procedure for
+the command.  The \fIdynamic\fR field will be initialized to zero,
+and \fIinterp->result\fR will point to an empty string.  Commands that
+do not return any value can simply leave the fields alone.
+Furthermore, the empty string pointed to by \fIresult\fR is actually
+part of an array of \fBTCL_RESULT_SIZE\fR characters (approximately 200).
+If a command wishes to return a short string, it can simply copy
+it to the area pointed to by \fIinterp->result\fR.  Or, it can use
+the sprintf procedure to generate a short result string at the location
+pointed to by \fIinterp->result\fR.
+.PP
+If a command procedure calls a lower-level procedure that sets
+\fIinterp->result\fR and \fIinterp->dynamic\fR (such as a recursive
+instance of \fBTcl_Eval\fR), then the command procedure must reset
+\fIinterp->result\fR if it wishes to return a value different
+than that returned by the lower-level procedure.  As part of
+resetting \fIinterp->result\fR, it must free the space if
+\fIinterp->dynamic\fR is set.  Once again, the easiest way to
+make sure this gets done right is to call \fBTcl_Result\fR.
+.PP
+The \fIerrorLine\fR
+.VS
+field is valid only after \fBTcl_Eval\fR returns
+a \fBTCL_ERROR\fR return code.  In this situation the \fIerrorLine\fR
+field identifies the line number of the command being executed when
+the error occurred.  The line numbers are relative to the command
+being executed:  1 means the first line of the command passed to
+\fBTcl_Eval\fR, 2 means the second line, and so on.  \fIErrorLine\fR
+should not normally be modified except by \fBTcl_Eval\fR.
+.VE
+
+.SH KEYWORDS
+dynamic, interpreter, result

@@ -1,0 +1,1529 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Berkeley Softworks 1988 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Swat -- Debugging Stub definitions
+FILE:		stub.def
+
+AUTHOR:		Adam de Boor, Nov 15, 1988
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Adam	11/15/88	Initial revision
+
+
+DESCRIPTION:
+	Definitions file for the Swat debugging stub.
+		
+	$Id: stub.def,v 2.54 97/05/23 09:26:18 weber Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;
+; Include common files from GEOS
+;
+_Swat		= 1
+
+; The following flag is used to compile a version of the stub that knows how
+; to handle 32 bit registers and to pass 32 bit structures to the 32-bit
+; version of SWAT.
+_Regs_32        = 1
+
+; This stub is for GEOS32.  (Required by rpc.def)
+GEOS32		= 1
+
+ALLOW_TIME_BREAK_POINT_CALIBRATING = 0
+
+; Not sure if we really need this, but I'll turn it off for now
+INT21_INTERCEPT = 0
+
+		include	geos.def
+		include product.def		; Get default feature flags
+		include rpc.def
+		include	Internal/intelbrk.def
+		include	Internal/debug.def
+		include Internal/dos.def
+		include Internal/geodeStr.def
+		include netware.def
+		include wincom.def
+
+HardwareType	etype	word
+HT_PC		enum HardwareType
+ 
+;------------------------------------------------------------------------------
+;			 SEGMENT DEFINITIONS
+;------------------------------------------------------------------------------
+;
+; Basic segment definitions. We have three:
+; 	scode		All code and most variables
+; 	sstack		Counterfeit core block and state-saving area
+; 	stubInit	where code used only for initialization resides. It gets
+; 			overwritten by the kernel.
+; 
+  
+scode		segment	para public 'CODE'
+scode		ends
+
+sstack		segment para stack 'STACK'
+sstack		ends
+;STUB_STACK_SIZE	= 1024
+STUB_STACK_SIZE	= 4096
+STACK_SLOP	= 10		; Extra space wanted for safety. If SP gets
+				; below StackTop+STACK_SLOP+SIZE StateBlock,
+				; we mask out all interrupts but our own.
+
+bptHeap		segment word public 'OOG'
+bptHeap		ends
+
+cgroup		group	scode, bptHeap
+
+stubInit	segment para public 'INIT'
+stubInit	ends
+
+;------------------------------------------------------------------------------
+;			   Random constants
+;
+
+;
+; Set this to false if compiling a stub for a 286 or below
+;
+ifndef INTEL_BREAKPOINT_SUPPORT
+INTEL_BREAKPOINT_SUPPORT equ    FALSE   ; TRUE
+endif
+
+PIC1_REG	=	021h		; Mask register for PIC1
+PIC2_REG	=	0a1h		; Mask register for PIC2
+SINGLE_STEP_INT =       1               ; Single step software interrupt
+TIMER_INT	=	08h		; Timer interrupt
+TIMER_MASK	=	1		; Mask for timer in PIC1
+TIMER_INT_VECTOR =	TIMER_INT * 4	; Timer interrupt vector
+
+I8259_COMMAND		=	20h		;8259 command register
+I8259_EOI		=	20h		;8259 EOI command
+I8259_SPEOI		=	60h		;8259 Specific EOI base
+ICEOIPORT   	equ 	20h 	; Port for EOI for PIC 1
+ICEOIPORT2	equ	0a0h	; Port for EOI for PIC 2
+ICMASKPORT2	equ	0a1h	; Port for PIC 2 interrupt mask
+ICEOI	    	equ 	20h	; specific-end-of-interrupt base.
+ICMASKPORT	equ	21h	; Port for PIC 1 interrupt mask
+;	Used to turn off floppy drive's motor
+
+BIOSMotorStatus		=	003fh
+BIOSMotorCount		=	0040h
+BIOS_MOTOR_BITS		=	00001111b
+BIOS_CMD_MOTOR_OFF	=	0ch
+BIOS_MOTOR_PORT		=	03f2h
+
+; I/O ports for the timer
+
+TIMER_IO_0_LATCH	=	40h
+TIMER_IO_COMMAND	=	43h
+
+TimerReadLoadCommand	etype	byte
+    TRLC_LATCH		enum	TimerReadLoadCommand	; latch current count
+    TRLC_MSB_ONLY	enum	TimerReadLoadCommand	; read/load MSB only
+    TRLC_LSB_ONLY	enum	TimerReadLoadCommand	; read/load LSB only
+    TRLC_WORD		enum	TimerReadLoadCommand	; read/load full word,
+							;  LSB first
+
+TimerMode		etype	byte
+    TM_IRQ_ON_TC	enum	TimerMode
+    ; interrupts when terminal count is reached. counter continues to
+    ; count, but IRQ must be acked by setting timer to mode 0
+    ; again (no count reload nec'y)
+
+    TM_ONE_SHOT		enum	TimerMode
+    ; one-shot whose start is controlled by the gate input.
+    ; since the gate is tied high on the PC, this is useless
+    ; to us.
+
+    TM_RATE_GENERATOR	enum	TimerMode
+    ; a divide-by-N counter that keeps the IRQ line high for
+    ; the whole time, only dropping it for a single clock, making
+    ;  it useless for our purposes
+
+    TM_SQUARE_WAVE	enum	TimerMode
+    ; the mode BIOS uses. It's effectively a divide-by-N counter, but it
+    ; subtracts 2 from its counter for each clock pulse, keeping its
+    ; output high for one count-to-0, and low for the next count-to-0. Fine
+    ; for a periodic timer, but hell for accurate timing of things, as
+    ; there's no way to determine in which half of the square wave one is
+    ; currently counting.
+
+    TM_SOFTWARE_STROBE	enum	TimerMode
+    ; another retriggerable one-shot, but the output is the wrong polarity.
+
+    TM_HARDWARE_STROBE	enum	TimerMode
+    ; similar to TM_SOFTWARE_STROBE, but the counting is triggered by the gate
+    ; input, which is tied high. So even if the polarity of the output were
+    ; ok, it would still be useless.
+
+TimerControlWord	record
+    TCW_COUNTER:2			; to which counter the command applies:
+					;  0, 1, or 2
+    TCW_READ_LOAD TimerReadLoadCommand:2; count format/latch-counter command
+    TCW_MODE TimerMode:3		; how to count
+    TCW_USE_BCD:1			; set if should treat counter as a
+					;  four-digit packed BCD number, not
+					;  a 16-bit binary number
+TimerControlWord	end
+
+TIMER_COMMAND_0_WRITE		=	TimerControlWord <
+		0,
+		TRLC_WORD,
+		TM_RATE_GENERATOR,
+		0
+	>
+
+TIMER_COMMAND_0_READ_COUNTER	=	TimerControlWord <
+		0,
+		TRLC_LATCH,
+		0,
+		0
+	>
+
+;	Value to load in PC timer register
+DEFAULT_TIMER_VALUE	=	0ffffh		;default value for timer
+TIMER_UNITS_PER_SECOND	=	1193180
+INTERRUPT_RATE	= 60
+GEOS_TIMER_VALUE =	TIMER_UNITS_PER_SECOND / INTERRUPT_RATE	;19886
+
+TB_CALIBRATE_COUNT	equ	32	; number of timing breakpoints to take
+					;  for calibration purposes. a nice
+					;  power of 2
+
+TFlag		= 	100h		; Trace bit in flags register
+IFlag		=	200h		; Interrupt bit in flags register
+
+BOGUS_REG	= 0AdeBh	; This is a bogus register value, used when
+				; a register's value cannot be found or a
+				; kernel variable can't be accessed. It happens
+				; to be my initials -- ardeb.
+
+NUM_VECTORS	= 32		; Number of interrupt vectors to allocate
+				; in InterruptHandlers table
+
+
+IRetDFrame       STRUC
+    iretd_eip            dword
+    iretd_cs             word
+    iretd_reserved       word
+    iretd_eflags         dword
+IRetDFrame       ENDS
+
+IRetFrame       STRUC
+    iret_ip            word
+    iret_cs            word
+    iret_flags         word
+IRetFrame       ENDS
+
+ExceptionFrame	STRUC
+    except_retIP	word
+    except_retCS	word
+    except_error	word
+    except_ip		word
+    except_cs		word
+    except_flags	word
+    except_sp		word
+    except_ss		word
+ExceptionFrame	ENDS
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		movToIbmRegFlags
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set the flags register in the IbmRegs structure.  Does the
+		right thing for both 16-bit and 32-bit builds.
+
+PASS:		location - ptr to IbmRegs
+		reg - word register containing the flags
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	LES	9/05/00   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+movToIbmRegFlags   macro   location, reg
+if _Regs_32
+    mov ({IbmRegs}location).reg_eflags.low, reg
+else
+    mov ({IbmRegs}location).reg_flags, reg
+endif
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		movFromIbmRegFlags
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Retrieve the flags register from the IbmRegs structure.
+		Does the right thing for both 16-bit and 32-bit builds.
+
+PASS:		reg - word register to receive the flags
+		location - ptr to IbmRegs
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	LES	9/05/00   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+movFromIbmRegFlags   macro   reg, location
+if _Regs_32
+    mov reg, ({IbmRegs}location).reg_eflags.low
+else
+    mov reg, ({IbmRegs}location).reg_flags
+endif
+endm
+
+;
+; State saved on the stack by SaveState and restored by RestoreState.
+; state_ip, state_cs and state_flags constitute the IRET frame for the
+; interrupt by which we were invoked.
+;
+; WARNING: There's something in this beast that relies on the ordering
+; of the fields from state_ip through state_di, though I'm damned if I can
+; find the S.O.B. Nevertheless, if you add a field between those two,
+; you will find event queues (why event queues? Ask God -- I don't know)
+; mysteriously having their queue fields zeroed while something is blocked
+; on them, causing your system to come to a rapid and disturbing halt (how
+; can a halt be rapid? Ask God -- I don't know). $20 to anyone who can prove
+; to me where the dependence on the order of this state block lies, so
+; I can eradicate the FT.
+; 
+
+StateFrame etype	word, 0	; What kind of stack frame does our caller want?
+	SF_INTERRUPT	enum	StateFrame	; Called by interrupt
+	SF_EXCEPTION	enum	StateFrame	; Called by exception
+
+StateBlock	STRUC
+if INTEL_BREAKPOINT_SUPPORT
+    state_dr7	dword		; saved breakpoint control
+    state_dr6	dword		; saved breakpoint status
+endif
+    state_timerInt dword	; Saved timer interrupt vector
+    state_timerSel word         
+    state_error word		; Error code if exception
+    state_ip	word		; IP from which we were interrupted
+    state_cs	word		; CS from which we were interrupted
+    state_flags	word		; Flags at time of call.
+    state_PIC1	byte		; Mask for PIC1
+    state_PIC2	byte		; Mask for PIC2
+    state_thread word		; currentThread variable
+    state_ds	word		; saved registers...
+    state_ss	word
+    state_es	word
+    state_fs    word
+    state_gs    word
+    state_eax	dword
+    state_ecx	dword
+    state_edx	dword
+    state_ebx	dword
+    state_esp	dword
+    state_ebp	dword
+    state_esi	dword
+    state_edi	dword
+StateBlock	ENDS
+
+state_ax equ state_eax.low
+state_al equ state_eax.low.low
+state_ah equ state_eax.low.high
+
+state_bx equ state_ebx.low
+
+state_cx equ state_ecx.low
+
+state_dx equ state_edx.low
+
+state_si equ state_esi.low
+
+state_di equ state_edi.low
+
+state_sp equ state_esp.low
+
+state_bp equ state_ebp.low
+
+TBreak		STRUC
+    tb_addr	fptr.far
+    tb_tally	word
+    tb_inst	byte
+TBreak		ENDS
+;
+; This is the structure of the information at the start of a .exe file.
+; 
+ExeHeader	STRUC
+    exe_sig		byte	2 dup(?); signature bytes
+    exe_rem		word		; valid bytes in last page
+    exe_size		word		; pages (512 bytes) in file
+    exe_numRels		word		; number of relocation items
+    exe_headerSize	word		; size of header (paragraphs)
+    exe_minPara		word		; minimum # paragraphs needed
+    exe_maxPara		word		; maximum # paragraphs usable
+    exe_ss		word		; initial SS
+    exe_sp		word		; initial SP
+    exe_csum		word		; checksum
+    exe_ip		word		; initial IP
+    exe_cs		word		; initial CS
+    exe_relOff		word		; offset to first relocation item
+    exe_overlayNum	word		; overlay number
+ExeHeader	ENDS
+
+;
+; System status flags:
+;
+SysFlags    	RECORD
+	nomap:1,	; Set if kernel can no longer map XIP pages. this
+			;  implies breakpoints set in bankable XIP pages will
+			;  no longer be installed.
+	initialized:1	; Set if system initialized
+	calibrating:1,	; Set if calibrating timing breakpoints
+	isPC:1,		; Set if running on a PC, not an AT.
+	alwaysReturn:1,	; Set if Rpc_Call should always return, regardless of
+			;  dontresume
+	dontresume:1, 	; Set by RpcInterrupt when an interrupt comes in while
+			; calling but not waiting...
+	calling:1,	; Set by Rpc_Call.
+	waiting:1,	; Set if in loop in Rpc_Wait. If clear, Com module will
+			;  call Rpc_Wait when a complete RPC is received.
+	attached:1, 	; Set if our hooks are in the kernel & the interrupt
+			;  table.
+	geosgone:1, 	; Set if geos has exited to DOS.
+	dosexec:1,	; Set if geos is running a DOS program
+	connected:1,	; Set if remote host is connected
+	:1,	; Set if geos exited as a TSR.
+	:1,	; Set if stub is restarting after a TSR.
+	running:1	; Set if patient has ever run
+SysFlags	END
+
+RpcMessageBuf	struct
+    RMB_header	RpcHeader	<>
+    RMB_data	byte	(RPC_MAX_DATA-size RpcHeader) dup (?)
+RpcMessageBuf	end
+
+
+;------------------------------------------------------------------------------
+; This is the old ThreadPrivateData - before KV_AFTER_EXCEPTION_CHANGE.
+; This was copied here so we can make the swat stub compatible with older
+; kernels (Zoomer, Jedi, Responder, ...)
+;------------------------------------------------------------------------------
+
+THREAD_PRIVATE_SIZE	equ	64
+OldThreadPrivateData	struct
+    OTPD_blockHandle	hptr	?	;handle of this block
+    OTPD_processHandle	hptr	?	;handle of associated core block
+    OTPD_dgroup		sptr	?	;segment of associated dgroup
+    OTPD_threadHandle	hptr	?	;handle of associated thread
+
+    OTPD_classPointer	fptr	?	;class to handle events
+
+    OTPD_callVector	fptr.far ?	;for ProcCallModuleRoutine (segment
+					; portion used by Int21)
+    OTPD_callTemporary	dw	?	;for ProcCallModuleRoutine/Int21
+
+    OTPD_stackBot	nptr	?	;limit for the stack in the block
+    ;
+    ; Fields after this may be altered w/o changing Glue, so long as the
+    ; overall size of the structure remains the same.
+    ;
+    OTPD_dataAX		word		;Used by ProcCallModuleRoutine
+    OTPD_dataBX		word		;Used by ProcCallModuleRoutine
+					; (dataAX and dataBX must be in this
+					; order for ProcCallFixedOrMovable
+					; to work)
+
+    OTPD_curPath		hptr.FilePath	;Thread's current directory
+    ;
+    ; Exception handlers (inherited during thread creation)
+    ;
+    OTPD_divideByZero	fptr	?	;handler for divide-by-zero exception
+    OTPD_overflow	fptr	?	;handler for arithmetic overflow (INTO)
+    OTPD_bound		fptr	?	;handler for BOUND exception
+    OTPD_fpuException	fptr	?	;handler for general floating-point
+					; exception
+    OTPD_singleStep	fptr	?	;handler for single-step exception
+    OTPD_breakPoint	fptr	?	;handler for breakpoint exception
+
+; if	(AUTO_BUSY)			;Not being used...
+;    OTPD_dispatchTime	dword	?	;system time at last dispatch, or -1
+;					;if thread is idle (Used for performance
+;					;measurement, auto-busy cursor, etc.)
+; endif
+
+    OTPD_error		word	?	;value returned by ThreadGetError()
+    ;
+    ; Filesystem-related info.
+    ; 
+    OTPD_exclFSIRLocks	byte	0	;number of exclusive locks of the
+					; FSIR by this thread
+    OTPD_sharedFSIRLocks byte	0	;number of shared locks of the FSIR
+					; by this thread.
+
+    OTPD_fsNotifyBatch	hptr	0 	;current collection of notifications
+					; waiting to be flushed (pointer to
+					; FileChangeBatchNotificationData, but
+					; having the type there makes printing
+					; out this structure painful...)
+    ;
+    ; small "heap" of words that may be allocated by geodes. The allocation
+    ; of the heap is tracked in the kernel thread's ThreadPrivateData, with
+    ; each word containing the geode handle of the geode that owns the space,
+    ; or 0 if the space is free.
+    ;
+			align	word
+    OTPD_heap		hptr	(THREAD_PRIVATE_SIZE - \
+					size OldThreadPrivateData)/2 dup(0)
+OldThreadPrivateData	ends
+
+;------------------------------------------------------------------------------
+;		      BREAKPOINT HEAP MANAGEMENT
+;------------------------------------------------------------------------------
+;
+; Descriptor of a single breakpoint. There can be multiple things interested
+; in the breakpoint, but there exists only one BptDesc structure per address
+; where a breakpoint is set.
+; 
+
+BptStateFlags	record
+	:6
+	BSF_SET_PENDING:1
+	BSF_DELETE_PENDING:1
+BptStateFlags	end
+
+BPT_NOT_XIP		equ	-1
+
+BptDesc		struct
+    BD_next	nptr.BptDesc		; next known breakpoint
+    BD_clients	nptr.BptClient		; chain of interested parties. 0
+					;  means no one is actually interested,
+					;  so the host should be notified when
+					;  the thing is hit
+    BD_addr	fptr.far		; address at which breakpoint is set
+    BD_handle	hptr			; handle of code block, if known
+    BD_inst	byte			; original instruction there
+    BD_state	BptStateFlags		; used for setting/deleting bpts
+					;  when not currently mapped in
+    BD_xipPage	word   			; BPT_NOT_XIP if not xip, else page
+					;  number
+    BD_installed word                   ; 0 if not installed, else 1ss
+BptDesc		ends
+
+BptClientFlags	record
+    BCF_AT_FRONT:1		; put the client at the front of the list for
+				;  the breakpoint, as it needs to be called
+				;  ASAP
+    BCF_LAST:1			; set if this BptClient is the last one for
+				;  a particular breakpoint. INTERNAL TO Bpt
+				;  MODULE.
+    BCF_NOTIFY_BLOCK_CHANGE:1	; set if should call the client when a block
+				;  on the heap changes its state.
+BptClientFLags	end
+
+BptCallStatus	record
+    BCS_UNCONDITIONAL:1		; set if the breakpoint is currently
+				;  unconditional
+    BCS_CONDITION_SATISFIED:1	; set if the breakpoint is conditional and
+				;  that condition has been met (if neither
+				;  this nor BCS_UNCONDITIONAL is set, the
+				;  breakpoint is conditional and the condition
+				;  has *not* been met)
+    BCS_BLOCK_CHANGE:1		; set if call is to inform that a block
+				;  on the heap has changed its state:
+				;  Pass:	ds:si	= BptClient
+				;  		bx	= affected block
+				;  		ax	= block's segment
+				;  		cx	= BptCallStatus
+				;  Return:	nothing
+				;  Destroyed:	*NOTHING*
+    BCS_BLOCK_LOAD:1		; set if call is to inform that a block on the
+				;  heap has been reloaded from its .geo file.
+				;  Pass:	ds:si	= BptClient
+				;  		bx	= affected block
+				;  		ax	= block's segment
+				;  		cx	= BptCallStatus
+				;  Return:	nothing
+				;  Destroyed:	*NOTHING*
+    BCS_TAKE_IT:1		; set if breakpoint should be taken and
+				;  reported to the host.
+BptCallStatus	end
+
+BptClientResult	etype	word, 0
+    BCR_OK		enum	BptClientResult	; If client is content
+    BCR_REMOVE		enum	BptClientResult	; Remove this client from the
+						;  list of clients
+    BCR_REMOVE_AND_FREE	enum	BptClientResult	; Remove this client from the
+						;  list and free its chunk
+
+BptClient	struct
+    BC_handler	nptr.near	; function to call when breakpoint hit:
+				; 	Pass:	ds:si	= BptClient
+				; 		cx	= BptCallStatus
+				; 		ss:bp	= state_block
+				; 	Return:	ax	= BptClientResult
+				; 		cx	= Revised BptCallStatus
+				;	Destroyed:	bx, si, di
+				; 
+    BC_next	nptr.near
+    BC_flags	BptClientFlags
+    BC_data	label	byte	; start of client-specific data
+BptClient	ends
+
+BPT_HEAP_SIZE	equ	1024	; size of static heap for breakpoints
+
+BptUsedBlock	struct
+    BUB_size	byte		; size of the block, including the size byte
+    BUB_data	label	byte	; this is to what you actually get a pointer
+BptUsedBlock	ends
+
+Bpt_Size	macro	block, dest
+	if (type (dest)) eq word
+		local	q1, q2, hi, lo
+	    q1 	instr <ax bx cx dx AX BX CX DX>, <dest >
+	    if q1
+	    	q2 substr <dest>,1,1
+		hi catstr q2, <h>
+		lo catstr q2, <l>
+		clr	hi
+		mov	lo, ds:[(block)-size BptUsedBlock].BUB_size
+	    else
+		mov	(dest), {word}ds:[(block)-size BptUsedBlock].BUB_size
+		andnf	(dest), 0x00ff
+	    endif
+	else
+		mov	(dest), ds:[(block)-size BptUsedBlock].BUB_size
+	endif
+		dec	(dest)
+		endm
+
+scode	segment
+global	Bpt_Set:near
+;	Desc:	Set a breakpoint at a particular address.
+;
+;	Pass:	cx:dx	= address at which to set it
+;		bx	= address of BptClient to attach
+;		al	= instruction, if known, or 0xcc to get the instruction
+;			  from the address
+;	Return:	si	= offset of BptDesc
+;			= 0 if breakpoint couldn't be set
+;
+
+global	Bpt_Clear:near
+;	Desc:	Clear a breakpoint given one of its clients.
+;
+;	Pass:	ds:si	= BptClient being deleted
+;	Return:	nothing
+;	Destroyed:	nothing
+;
+
+global	Bpt_Alloc:near
+;	Desc:	Alloc space in the breakpoint heap.
+;
+;	Pass:	cx	= number of bytes to allocate (at least size BptClient)
+;	Return:	si	= offset of allocated space
+;			= 0 if no more room
+
+global	Bpt_Free:near
+;	Desc:	Free space allocated with Bpt_Alloc
+;
+;	Pass:	si	= offset of allocated space
+;	Return:	nothing
+;
+
+global	Bpt_Check:near
+;	Desc:	See if the breakpoint just hit should be handled specially
+;
+;	Pass:	ss:[bp]	= state_block
+;	Return:	only if host should be notified of the breakpoint; else the
+;		machine will be continued.
+;
+
+global	Bpt_Skip:near
+;	Desc:	Set the state of the machine to skip over a breakpoint.
+;
+;	Pass:	ss:[bp]	= state_block
+;		correct instruction to be executed at the patient's cs:ip
+;		should already be in place.
+;	Return:	state block set up to continue the machine, either to
+;		execute a single instruction, or to run free (if the
+;		instruction being skipped has been emulated for some reason).
+;
+;	Notes:	Once this routine has been called, the caller need only
+;		call RestoreState and perform an iret. Everything else will
+;		be taken care of.
+
+
+global	Bpt_RpcSkip:near
+;	Desc:	Field a call from Swat to skip over a particular breakpoint.
+;
+;	Pass:	{word}CALLDATA = BptClient to skip
+;
+;	Return:	doesn't
+;
+
+DEBUG_MEM_LOADER_MOVED	enum DebugMemoryFunction
+
+global	Bpt_BlockChange:near
+;	Desc:	Deal with a block moving on, in, or out of the heap.
+;
+;	Pass:	al	= Function code:
+;			    DEBUG_REALLOC   - block reallocated
+;			    DEBUG_DISCARD   - block discarded
+;			    DEBUG_SWAPOUT   - block swapped out
+;			    DEBUG_SWAPIN    - block swapped in
+;			    DEBUG_MOVE	    - block moved
+;			    DEBUG_FREE	    - block freed
+;			    DEBUG_MODIFY    - block flags modified
+;			    DEBUG_OWNER_CHANGE
+;			    DEBUG_BANK_PAGE - bank in an new XIP page
+;			    DEBUG_MEM_LOADER_MOVED - guess. ss:[bp].state_es is
+;						 new segment of loader.
+;			    
+;		bx	= affected handle (HM_addr usable for all but
+;			  DEBUG_MOVE)
+;		ds	= kernel data segment
+;		es	= destination segment for DEBUG_MOVE
+;	Return:	nothing
+;	Destroyed:	bx if DEBUG_MEM_LOADER_MOVED, else NOTHING
+;
+
+global	Bpt_ResLoad:near
+;	Desc:	Deal with a resource being reloaded fresh.
+;
+;	Pass:	ax	= new segment of the resource
+;		bx	= handle of the resource
+;	Return:	nothing
+;	Destroyed:	NOTHING
+;
+
+global	Bpt_UpdatePending:near
+;	Desc:	deal with pending breakpoints
+;
+;	Pass:	ds = es = scode, bx = page number
+;	Return:	nothing
+;	Destroyed:	ax, bx, cx, dx, si, di
+;
+
+global	Bpt_Install:near
+;	Desc:	Install all the breakpoints we know of, if it's appropriate to
+;		how we're continuing the machine.
+;
+;	Pass:	ds = es = scode
+;	Return:	nothing
+;	Destroyed:	ax, bx, cx, dx, si, di
+;
+
+global	Bpt_Uninstall:near
+;	Desc:	Remove the breakpoints we installed before.
+;
+;	Pass:	ds = es = scode
+;	Return:	nothing
+;	Destroyed:	ax, bx, cx, dx, si, di
+;
+
+global	Bpt_SysExiting:near
+;	Desc:	Remove all movable XIP breakpoints, as kernel's about to
+;		make it impossible to bank the code in
+;
+;	Pass:	ds = es = scode
+;	Return:	nothing
+;	Destroyed:	ax, bx, cx, dx, si, di
+;
+
+scode	ends
+
+scode	segment
+
+global	Bpt_Init:near
+;	Desc:	Initialize breakpoint heap.
+;
+;	Pass:	ds = es = cgroup
+;	Return:	nothing
+;	Destroyed:	ax, bx, cx, dx
+;
+
+scode	ends
+
+;------------------------------------------------------------------------------
+;		    CONDITIONAL ASSEMBLY CONTROLS
+;------------------------------------------------------------------------------
+; Set non-zero to enable I/O Channel Check (aka NMI)
+
+ENABLE_CHANNEL_CHECK	equ	1
+ISAPortB	record	; I/O port B (61h) for ISA, EISA and MCA systems
+    IPB_PARITY_CHECK:1		; Set if motherboard parity error
+    IPB_IO_CHECK:1		; Set if I/O channel check
+    IPB_TIMER_2_OUT:1		; Timer 2 output
+    IPB_REFRESH:1		; Toggles with each memory refresh
+    IPB_ENABLE_IOCHK:1		; Enable I/O channel check (0 = enable)
+    IPB_ENABLE_PARITY:1		; Enable parity check (0 = enable)
+    IPB_SPEAKER_ENABLE:1	; Enable speaker data (1 = enable)
+    IPB_TIMER_2_GATE:1		; Enable timer 2 (1 = enable)
+ISAPortB	end
+
+XTPort61	record	; I/O port 61h for XT
+    XP61_KBD_STROBE:1		; Write 1 to clear keyboard latch
+    XP61_KBD_DISABLE:1		; Write 0 to hold keyboard clock low, thus
+				;  disabling the keyboard
+    XP61_ENABLE_IOCHK:1		; Write 0 to enable IOCHK
+    XP61_ENABLE_PARITY:1	; Write 0 to enable parity check
+    XP61_READ_LOW_SWITCHES:1	; Write 0 to read low switches (?)
+    :1
+    XP61_SPEAKER_ENABLE:1	; Enable speaker data (1 = enable)
+    XP61_TIMER_2_GATE:1		; Enable timer 2 (1 = enable)
+XTPort61	end
+
+XTPort62	record	; I/O port 62h for XT
+    XP62_PARITY_CHECK:1		; Set if motherboard parity error
+    XP62_IO_CHECK:1		; Set if I/O channel check
+    XP62_TIMER_2_OUT:1		; Timer 2 output
+    :1
+    XP62_SYSTEM_RAM_SIZE:2
+    XP62_COPROCESSOR_INSTALLED:1
+    XP62_LOOP_IN_POST:1		; Set if looping in POST
+XTPort62	end
+
+
+; Set non-zero to use special-mask mode, rather than priority rotation
+USE_SPECIAL_MASK_MODE	equ	0
+
+
+TRACK_INT_21		equ	0	; -1 to turn on counting of int21
+					;  calls in kernel.asm
+
+
+;
+; Possible debugging outputs:
+; 
+DEBUG_COM_INPUT		equ	0x00000001	; print incoming data
+DEBUG_COM_OUTPUT	equ	0x00000002	; print outgoing data
+DEBUG_MSG_PROTO		equ	0x00000004	; print things relating to
+						;  link-level message
+						;  protocol
+DEBUG_RPC_WAIT		equ	0x00000008	; print actions of Rpc_Wait
+DEBUG_RPC_CALL		equ	0x00000010	; print rpc calls from stub
+DEBUG_RPC_CALL_VERBOSE	equ	0x00000020	; verbose rpc-call related
+						;  output
+DEBUG_ENTER_EXIT	equ	0x00000040	; print entry/exit to/from stub
+DEBUG_MEM_WRITE		equ	0x00000080	; print about writing to memory
+DEBUG_BPT		equ	0x00000100	; breakpoint support
+DEBUG_INIT		equ	0x00000200	; print actions during
+						;  initialization
+DEBUG_DOS		equ	0x00000400	; print intercepted DOS calls
+DEBUG_COM_INIT		equ	0x00000800	; print info about initializing
+						;  the com port
+DEBUG_BPT_EC		equ	0x00001000	; error-check the bpt stuff
+
+DEBUG_FILE_XFER		equ	0x00002000	; file transfer stuff
+DEBUG_EXIT		equ	0x00004000	; debug exiting
+DEBUG_XIP		equ	0x00008000	; debug XIP-related support
+DEBUG_SETUP		equ	0x00020000	; kernel setup stuff
+DEBUG_NETWARE		equ	0x00040000	; debug netware stuff
+
+DEBUG_PROFILE		equ	0x00080000	; debug profiling
+						; stuff
+DEBUG_WRITE_PROTECT	equ	0x00100000
+DEBUG_WINCOM		equ	0x00200000	; debug wincom stuff
+DEBUG_HWBRK		equ	0x00400000	; debug hardware breakpoints
+
+DEBUG_CTRL_C            equ     0x00800000      ; correct CTRL-C handling
+DEBUG_TIMER_TICK        equ     0x01000000      ; timer tick -- shows that StubTimerInt is being called
+DEBUG_FALK				equ		0x02000000
+DEBUG_FALK2				equ		0x04000000
+DEBUG_FALK3				equ		0x08000000
+DEBUG_FALK5				equ		0x10000000
+
+
+; current set of debugging outputs:
+;
+
+;DEBUG		equ	DEBUG_MSG_PROTO or DEBUG_INIT or DEBUG_RPC_WAIT or DEBUG_WINCOM
+;DEBUG		equ	DEBUG_MSG_PROTO or DEBUG_INIT or DEBUG_RPC_WAIT or DEBUG_CTRL_C or DEBUG_TIMER_TICK or DEBUG_COM_INPUT or DEBUG_COM_INIT
+;DEBUG		equ DEBUG_BPT or DEBUG_ENTER_EXIT or DEBUG_MSG_PROTO or DEBUG_RPC_WAIT or DEBUG_RPC_CALL
+;DEBUG		equ DEBUG_BPT or DEBUG_ENTER_EXIT or DEBUG_MSG_PROTO or DEBUG_RPC_WAIT or DEBUG_RPC_CALL or DEBUG_COM_INPUT
+;DEBUG           equ DEBUG_EXIT or DEBUG_INIT or DEBUG_WINCOM or DEBUG_RPC_WAIT or DEBUG_COM_INPUT
+;DEBUG           equ DEBUG_FILE_XFER
+DEBUG           equ DEBUG_MSG_PROTO
+
+DebugOutputType		etype	word
+DOT_MONO_SCREEN		enum	DebugOutputType	; use second monochrome screen.
+						;  requires hardware
+DOT_BIOS		enum	DebugOutputType	; use int 10h to display.
+						;  works until video driver
+						;  loaded...
+DOT_BUFFER		enum	DebugOutputType	; put in ring buffer. Buffer
+						;  contents printable using
+						;  ddebug command found in
+						;  Internal/ddebug.tcl
+
+DOT_PIPE		enum	DebugOutputType ; Use named pipe for talking
+						; to nt.
+
+
+DEBUG_OUTPUT		equ	DOT_BIOS	; how to put out debugging
+						;  output.
+
+DEBUG_RING_BUF_SIZE	equ	2048
+
+;
+; Debugging macros.
+
+SCREEN_ATTR_NORMAL	equ	07h
+SCREEN_ATTR_INV		equ	70h
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DA
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Assemble code if any of a set of debugging outputs is set
+
+PASS:		level	= expression giving mask of debugging outputs any
+			  of which set in "DEBUG" will cause the code
+			  to be assembled.
+		code	= line of code to assemble
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	8/15/91		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+DA		macro	level, code
+if (DEBUG and (level))
+		code
+endif
+		endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DPC
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Put a character onto the screen if any of a set of
+		debugging outputs is set.
+
+PASS:		level	= expression giving mask of debugging outputs any
+			  of which set in "DEBUG" will cause the character
+			  to be printed.
+		char	= character to print. may be an ASCII string
+		[inv]	= if non-blank, character is printed in inverse
+			  mode, if possible.
+DESTROYED:	ax
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	8/15/91		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+DPC	macro	level, char, inv
+if (DEBUG and (level))
+ ifnb <inv>
+  	mov	ah, SCREEN_ATTR_INV
+ else
+	mov	ah, SCREEN_ATTR_NORMAL
+ endif
+ if <char> ne <al>
+	mov	al, char
+ endif
+ if @CurSeg eq scode
+	call	DebugPrintChar
+ else
+	call	DebugPrintCharFar
+ endif
+endif
+	endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DPS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Put a string onto the screen if any of a set of
+		debugging outputs is set.
+
+PASS:		level	= expression giving mask of debugging outputs any
+			  of which set in "DEBUG" will cause the character
+			  to be printed.
+		str	= string to print. no quotes, please
+		[inv]	= if non-blank, character is printed in inverse
+			  mode, if possible.
+DESTROYED:	ax
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	8/15/91		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+DPS	macro	level, str, inv
+if (DEBUG and (level))
+ ifnb <inv>
+  	mov	ah, SCREEN_ATTR_INV
+ else
+	mov	ah, SCREEN_ATTR_NORMAL
+ endif
+ 	local	q
+ irpc	q, <str>
+	mov	al, 'q'
+   if @CurSeg eq scode
+	call	DebugPrintChar
+   else
+	call	DebugPrintCharFar
+   endif
+ endm
+endif
+	endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DPB
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Put a byte onto the screen in hex if any of a set of
+		debugging outputs is set.
+
+PASS:		level	= expression giving mask of debugging outputs any
+			  of which set in "DEBUG" will cause the byte
+			  to be printed.
+		byte	= byte to print in hex.
+DESTROYED:	ax, unless byte is already in al
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	8/15/91		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+DPB	macro	level, byte
+if (DEBUG and (level))
+ if <byte> ne <al>
+  	mov	al, byte
+ endif
+ if @CurSeg eq scode
+	call	DebugPrintByte
+ else
+	call	DebugPrintByteFar
+ endif
+endif
+	endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DPW
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Put a word onto the screen in hex if any of a set of
+		debugging outputs is set.
+
+PASS:		level	= expression giving mask of debugging outputs any
+			  of which set in "DEBUG" will cause the word
+			  to be printed.
+		word	= word to print.
+DESTROYED:	ax unless word is already in ax
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	8/15/91		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+DPW	macro	level, word
+if (DEBUG and (level))
+ if <word> ne <ax>
+  	mov	ax, word
+ endif
+ if @CurSeg eq scode
+	call	DebugPrintWord
+ else
+	call	DebugPrintWordFar
+ endif
+endif
+	endm
+
+;
+; Macros
+;
+
+eni 	    	equ 	<sti>
+dsi 	    	equ 	<cli>
+
+
+scode		segment
+;
+; External symbols
+; 
+	global	stubCode:word
+	global	stubType:byte
+if DEBUG
+	global	DebugPrintString:near
+	global	DebugPrintByte:near
+	global	DebugPrintWord:near
+	global	DebugPrintChar:near
+	global	DebugPrintStringFar:far
+	global	DebugPrintByteFar:far
+	global	DebugPrintWordFar:far
+	global	DebugPrintCharFar:far
+ifdef WINCOM
+	global  CallVDD:near
+endif
+endif
+	;
+	; State saving and restoration
+	;
+	global	FetchTimer0:near
+	global	SaveState:near
+	global	RestoreState:near
+	global	last_SP:word
+	global	our_SS:word
+	global	PIC1_Mask:byte
+	global	PIC2_Mask:byte
+	global	COM_Mask1:byte
+	global	COM_Mask2:byte
+	global	ssTimerCount:word
+	global	ssResumeTimerCountPtr:nptr.word
+	;
+	; Interrupt interception
+	;
+	global	EmulateInterrupt:near
+	global	SetInterrupt:far
+	global	ResetInterrupt:far
+	global	CatchInterrupt:near
+	global	CatchInterruptFar:far
+	global	IgnoreInterrupt:near
+	global	ResumeFromInterrupt:near
+	global	InterruptHandlers:label near
+	global	SetStepHandler:near
+	global	IRQCommon:near
+	global	IRQCommon_StoreHaltCode:label near
+	;
+	; Miscellaneous variables
+	;
+	global	sysFlags:SysFlags
+	global	intsToIgnore:byte
+	global	PSP:sptr, swatPSP:sptr, swatDrive:byte, swatPath:byte
+	global	dataBuf:byte
+	global	dosAddr:fptr.far
+	global	stubCounter:word
+if TRACK_INT_21
+	global	int21Counts:256 dup(word)
+endif
+;
+; Conditional breakpoints
+;
+global	CBreak_Set:near
+global	CBreak_Clear:near
+global	CBreak_Change:near
+
+;
+; Tally breakpoints
+;
+global	TBreak_Set:near
+global	TBreak_GetCount:near
+global	TBreak_ZeroCount:near
+global	TBreak_Clear:near
+
+;
+; Timing breakpoints
+;
+global	TB_Set:near
+global	TB_GetTime:near
+global	TB_ZeroTime:near
+global	TB_Clear:near
+global	TB_AdjustForOverhead:near
+global	TB_Calibrate:far
+global	TB_CalibrateLoop:label near
+
+;
+; Unconditional breakpoints
+;
+global	Break_Set:near
+global	Break_Clear:near
+
+;
+; Intel breakpoints
+;
+global	IBpt_ReadRegs:near
+global	IBpt_WriteRegs:near
+global	IBpt_CheckType:near
+global	IBpt_Skip:near
+
+	;
+	; RPC system
+	;
+	global	Rpc_Wait:near
+	global	Rpc_Run:near
+	global	Rpc_Call:near
+	global	Rpc_Reply:near
+        global  Rpc_ReplyCCOut:near
+	global	Rpc_Error:near
+	global	RpcStepReply:far
+	global	Rpc_LoadRegs:near
+	global	Rpc_Exit:near
+	global	RpcExit:near
+	global	Rpc_Length:near
+
+	global	rpc_ToHost:byte
+	global	rpc_LastCall:RpcMessageBuf
+CALLDATA	equ	<ds:[rpc_LastCall].RMB_data>
+	global	lastReply:RpcMessageBuf
+REPLYDATA	equ	<ds:[lastReply].RMB_data>
+	global	stepping:word
+
+	global	nextCallID:byte	;for ID reset
+	global	RpcContinueComm:label near
+	;
+	; Serial line management
+	;
+	global	Com_GetHardwareType:far
+	global	Com_SetHardwareType:far
+	global	Com_Exit:near
+	global	Com_Read:near
+	global	Com_Write:near
+	global	Com_ReadBlock:near
+	global	Com_WriteBlock:near
+	global	Com_ReadMsg:near
+	global	Com_WriteMsg:near
+	global	com_NumMessages:byte
+	global	com_IntLevel:byte
+	global	comIrq:word
+	;
+	; Kernel interface
+	;
+	global  Kernel_GetNextDataBlock:near
+	global	Kernel_MiniIntercept:far
+	global	Kernel_Hello:near
+	global	Kernel_Setup:near
+	global	Kernel_Detach:near
+	global	Kernel_ReadMem:near
+	global	Kernel_WriteMem:near
+	global	Kernel_FillMem:near
+	global	Kernel_ReadAbs:near
+	global	Kernel_WriteAbs:near
+	global	Kernel_FillAbs:near
+	global	Kernel_BlockFind:near
+	global	Kernel_BlockInfo:near
+	global	Kernel_ReadRegs:near
+	global	Kernel_WriteRegs:near
+	global	Kernel_AttachMem:near
+	global	Kernel_DetachMem:near
+	global	Kernel_CleanHandles:near
+	global	KernelLoader:far
+	global	Kernel_EnsureESWritable:near
+	global	Kernel_RestoreWriteProtect:near
+	global	Kernel_ReadGeode:near
+	global	Kernel_IndexToOffset:near
+	global	Kernel_GetHandleAddress:far
+	global	Kernel_TestForXIPHandle:far
+	global	Kernel_CheckXIPSegment:near
+	global	Kernel_XIPSegmentToHandle:near
+	global	xipHeader:word
+	global	oldXIPPage:word
+	global	Kernel_SafeMapXIPPage:near
+	global	Kernel_ReadXmsMem:near
+
+global	Kernel_ReleaseExceptions:near
+;	Desc:	restore the vectors for the processor exceptions we intercept
+;		when attached
+;
+;	Pass:	ds	= cgroup
+;	Return:	nothing
+;	Destroyed:	nothing (interrupts turned on)
+;
+
+global	Kernel_SegmentToHandle:near
+;	Desc:	map a segment to its corresponding handle, if possible
+;
+;	Pass:	cx	= segment to map
+;	Return:	carry set if not found
+;		carry clear if successful:
+;			es:bx	= HandleMem for the thing
+;	Destroyed:	ax, dx
+;
+
+	;
+	; Header of kernel's .exe file
+	;
+	global	kernelHeader:ExeHeader
+        global  kernelSSSelector:word
+        global  kernelCSSelector:word
+        global  kernelDSSelector:word
+        global  kernelPSPSelector:word
+        global  stubCSSelector:word
+        global  stubDSSelector:word
+        global  kernelBIOSSelector:word
+        global  loaderStackSize:word
+
+	;
+	; Locations inside the kernel (from initial handshake)
+	;
+	global	kdata:word
+	global	kernelVectors:SwatVectorTable
+	curXIPPageOff 		equ <kernelVectors.SVT_curXIPPage>
+	currentThreadOff	equ <kernelVectors.SVT_currentThread>
+	geodeListPtrOff		equ <kernelVectors.SVT_geodeListPtr>
+	threadListPtrOff	equ <kernelVectors.SVT_threadListPtr>
+	dosSemOff		equ <kernelVectors.SVT_biosLock>
+	DebugLoadResOff		equ <kernelVectors.SVT_DebugLoadResource>
+	DebugMemoryOff		equ <kernelVectors.SVT_DebugMemory>
+	EndGeosOff		equ <kernelVectors.SVT_EndGeos>
+
+	global	HandleTableOff:word
+	global	MemLockVec:fptr.far
+	global	kcodeSeg:word
+	global	kernelName:char
+	global	kernelCore:hptr
+	global	loaderBase:sptr
+	global	SysCSVec:fptr.far
+
+	global	readGeodeSem:byte
+
+	global	topLevelPath:PathName
+
+	global	bleah:far
+
+;; Stops the machine as if a breakpoint had been hit, without the user having
+;; to play with IP to skip over the bpt...
+HALT_HERE	macro
+	local	poofle
+	pushf
+	push	cs
+	mov	ax, offset poofle+1
+	push	ax
+	call	IRQCommon
+	.inst byte 3
+poofle:
+	endm
+
+scode	ends
+
+;
+; Segment containing initialization/checkout code for the board. The segment
+; is overwritten when the kernel is loaded.
+;
+scode	segment
+
+;
+; Kernel_Load is a weird function. You need to pushf before calling it so
+; it can jump to DOS, allowing itself to be overlaid w/DOS returning to
+; Kernel_Load's caller...
+;
+	global	Kernel_Load:far
+;
+; Argument fetching used only by initialization code...
+;
+	global	FetchArg:far
+	global 	loaderPos:word
+;
+; Rpc_Init called from MainHandleInit in scode...
+;
+	global	Rpc_Init:near
+	global	Rpc_Serve:near
+
+;
+; Com_Init called from Rpc_Init...
+;
+	global	Com_Init:near
+scode	ends
+
+;------------------------------------------------------------------------------
+;			 HARDWARE ASSIST DEFINITIONS
+;
+; Set up default enable/protect/save/restore macros to do nothing, as
+; there's nothing to enable or protect for the base case. The individual files
+; can override things as necessary.
+;
+WRITE_ENABLE	macro
+		endm
+WRITE_PROTECT	macro
+		endm
+PUSH_ENABLE	macro
+		endm
+POP_PROTECT	macro
+		endm
+DISCARD_PROTECT	macro
+		endm
+SAVE_STATE	macro
+		endm
+RESTORE_STATE	macro
+		endm
+INIT_HARDWARE	macro
+		endm
+EXIT_HARDWARE	macro
+		endm
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		CHECK_NMI
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	The reason the machine halted is an NMI was received. Do
+		whatever is appropriate for the assist to acknowledge
+		the NMI.
+
+PASS:		ds	= scode
+		es	= scode
+		rpc_ToHost contains a HaltArgs structure
+		ss:bp	= StateBlock
+
+RETURN:
+		ax	= RPC call to issue
+
+PSEUDO CODE/STRATEGY:
+		the default just checks for IOCHK if ENABLE_CHANNEL_CHECK
+		is true and deals with it.
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	8/26/91		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+CHECK_NMI	macro
+if ENABLE_CHANNEL_CHECK
+		local	continue, handlePC
+	;
+	; If user asked us not to mess with IOCHK, don't
+	; 
+   		tst	ds:[noChannelCheck]
+		jnz	continue
+	;
+	; XT has different I/O port assignments for this sort of thing, so
+	; we have to behave differently if on an XT.
+	; 
+		test	ds:[sysFlags], mask isPC
+		jnz	handlePC
+	;
+	; ISA/EISA/MCA system...
+	; 
+		in	al, 61h
+		test	al, mask IPB_IO_CHECK	; IOCHK?
+		jz	continue		; no -- do nothing
+	;
+	; NMI was due to IOCHK, so make sure it's still enabled. NMI should
+	; be acknowledged when we iret back after RestoreState
+	;
+		mov	ah, mask IPB_ENABLE_IOCHK
+		jmp	ackIOCheck
+handlePC:
+		in	al, 62h
+		test	al, mask XP62_IO_CHECK
+		jz	continue
+	;
+	; NMI was due to IOCHK, so make sure it's still enabled. NMI should
+	; be acknowledged when we iret back after RestoreState
+	;
+		in	al, 61h
+		mov	ah, mask XP61_ENABLE_IOCHK
+ackIOCheck:
+		ornf	al, ah		; disable to clear
+		out	61h, al		; flag...
+		jmp	$+2
+		jmp	$+2
+		not	ah
+		andnf	al, ah
+		out	61h, al
+continue:
+		mov	ax, RPC_HALT
+endif
+		endm
+
+
+ifdef WORDWRITE
+_WRITE_ONLY_WORDS	= TRUE
+    ; When writing to memory (via breakpoints or other swat memory commands),
+    ; always write a word even if you are writing a byte.  Some devices have
+    ; are unable to write an unaligned byte to certain parts of memory.
+    ;
+endif
+
+
+;
+; Defines for transports.
+ifdef NETWARE
+	_NETWARE equ TRUE
+else
+	_NETWARE equ FALSE
+endif
+
+ifdef WINCOM
+	_WINCOM equ TRUE
+else
+	_WINCOM equ FALSE
+endif
+
+; The default for this option is disabled.
+;
+ifndef _WRITE_ONLY_WORDS
+_WRITE_ONLY_WORDS	= FALSE		; See comment above
+endif
+
+; GPMI calls via the GPMI vector
+scode segment
+global	GPMIAliasFirst:near
+global	GPMIAlias:near
+global	GPMIAccessRealSegment:near
+global  GPMIGetInterruptHandler:near
+global  GPMISetInterruptHandler:near
+global  GPMIGetExceptionHandler:near
+global  GPMISetExceptionHandler:near
+global  GPMIFreeAlias:near
+global  GPMISelectorCheckLimits:near
+global	GPMITestPresent:near
+global	GPMIGetInfo:near
+global	GPMIGetDescriptor:near
+scode ends
+
+NOT_TESTED_PLEASE_CRASH	macro
+        BRK
+	mov ax, 1
+	mov ds, ax
+        mov ds:[0], ax
+        BRK1
+endm
+
+STOP_HERE macro
+    mov ax, 0x4c00
+    int 21h
+endm
+
+BRK macro
+	int 3
+endm
+
+BRK1 macro
+	int 1
+endm
+
+PointDSAtStub   macro
+        mov     ds, cs:[stubDSSelector]
+endm
+
+PointESAtStub   macro
+        mov     es, cs:[stubDSSelector]
+endm

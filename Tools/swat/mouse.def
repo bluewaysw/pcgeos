@@ -1,0 +1,100 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		mouse.def
+
+AUTHOR:		jimmy
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jimmy	2/ 2/93		Initial version.
+
+DESCRIPTION:
+	definitions for mouse support
+
+	$Id: mouse.def,v 1.1 93/03/04 17:33:54 jimmy Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+mousecall	macro	num
+		;;
+		;; Place the function number in ax. Note this is different
+		;; from other systems that have the function in ah.
+		;; 
+		mov	ax, num
+		int	51
+		endm
+
+mousecallProt	macro	num
+		local	MP_no_driver
+		push	es
+		call	MouseCallFromProtectedCommon
+		jc	MP_no_driver
+		mov	ax, num
+		int	51
+MP_no_driver:
+		pop	es
+		endm
+
+MOUSEINIT	= 0		; Initialize mouse
+MOUSESHOW	= 1		; Show cursor
+MOUSEHIDE	= 2		; Hid cursor
+MOUSESTAT	= 3		; Return status. BX = buttons,
+				; CX = X (pixels) DX = Y (pixels)
+MOUSEWARP	= 4		; Change mouse position. CX = X (pixels)
+				; DX = Y (pixels)
+MOUSELIMX	= 7		; Set X limits. CX = min (pixels),
+				; DX = max (pixels)
+MOUSELIMY	= 8		; Set Y limits. CX = min (pixels),
+				; DX = max (pixels)
+MOUSETEXT	= 10		; Define text cursor. BX = 1 for hardware or
+				; 0 for software. CX = screen mask. DX =
+				; cursor mask
+MOUSEHANDLE	= 12		; Define handler. CX = call mask. ES:DX is
+				; handler address.
+MOUSEACCEL	= 30		; Set mouse accelerator. BX = type,
+				; ES:DX = vector address
+MOUSEMODE	= 33		; Set mouse mode. BX = 0 for read mode,
+				; 1 for keyboard emulation mode and 2 for
+				; inactive
+;
+; Bit masks for event type. These masks are OR'ed together to reflect
+; changes since the last time the event handler was called.
+;
+MOUSEMOTION	=	00000001b	; Mouse moved
+MOUSELPRESS	=	00000010b	; Left button pressed
+MOUSELREL	=	00000100b	; Left button released
+MOUSERPRESS	=	00001000b	; Right button pressed
+MOUSERREL	=	00010000b	; Right button released
+MOUSEMPRESS	=	00100000b	; Middle button pressed
+MOUSEMREL	=	01000000b	; Middle button released
+MOUSEALL	=	01111111b	; All events
+
+MOUSEON		=	00000001b
+MOUSECURSIN	=	00000010b
+
+BPRESS		STRUC
+xcoord		db	0	; Previous X
+ycoord		db	0	; Previous Y
+button		db	0	; Button code
+BPRESS		ENDS
+
+MAX_EVENTS = 25
+
+QSIZE = MAX_EVENTS * size BPRESS
+
+INIT_QUEUE_OFFSET = 6
+
+MOUSE_QUEUE	STRUC
+mq_head		dw	0		; Head index
+mq_tail		dw	0		; Tail index
+mq_numEvents	dw	0		; Number of characters in buffer
+mq_data		db	QSIZE DUP(?); The characters themselves
+MOUSE_QUEUE	ENDS
+
+

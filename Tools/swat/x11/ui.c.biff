@@ -1,0 +1,737 @@
+/*-
+ * ui.c --
+ *	Main file for handling the user interface.
+ *
+ * Copyright (c) 1988 by the Regents of the University of California
+ *
+ * Permission to use, copy, modify, and distribute this
+ * software and its documentation for any purpose and without
+ * fee is hereby granted, provided that the above copyright
+ * notice appear in all copies.  The University of California
+ * makes no representations about the suitability of this
+ * software for any purpose.  It is provided "as is" without
+ * express or implied warranty.
+ *
+ *
+ */
+#ifndef lint
+static char rcsid[] =
+"$Header: ui.c,v 1.4 88/05/26 01:35:10 deboor Exp $ SPRITE (Berkeley)";
+#endif lint
+
+#include    "swat.h"
+#include    "cmd.h"
+#include    "event.h"
+#include    "private.h"
+#include    "source.h"
+#include    "sym.h"
+#include    "ui.h"
+#include    "value.h"
+
+#define Boolean XtBool
+#include    <X11/Shell.h>
+#include    <X11/VPaned.h>
+#include    <X11/Label.h>
+#include    <X11/Box.h>
+#include    <X11/Xutil.h>
+#include    <X11/IntrinsicP.h>
+#include    <X11/CoreP.h>
+#undef Boolean
+
+#include    <sx.h>
+
+Widget	    ui_TopLevel = (Widget)NULL;
+XFontStruct *f = (XFontStruct *)NULL;
+char	    *geometry;
+char	    *init;
+
+#define DEFAULT_WIDTH	80
+#define DEFAULT_HEIGHT	30
+
+/*
+ * This file is sourced by Ui_Begin for each patient started up.
+ */
+#define SYS_INIT_FILE	"/sprite/src/cmds/swat/swat.tcl"
+
+static XtResource resources[] = {
+{ XtNfont, XtCFont, XtRFontStruct, sizeof(XFontStruct *), (long)&f,
+  XtRString, "fixed"},
+{ XtNinitCommands, XtCInitCommands, XtRString, sizeof(char *), (long)&init,
+  XtRString, (char *)NULL },
+};
+
+/*-
+ *-----------------------------------------------------------------------
+ * Message --
+ *
+ * Results:
+ *
+ * Side Effects:
+ *
+ *-----------------------------------------------------------------------
+ */
+/*VARARGS2*/
+Message(patient, msg, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9)
+    Patient 	  	patient;
+    char    	  	*msg;
+    int			arg1,
+			arg2,
+			arg3,
+			arg4,
+			arg5,
+			arg6,
+			arg7,
+			arg8,
+			arg9;
+{
+    XtTtyPrintf(patient->io, msg, arg1, arg2, arg3, arg4, arg5, arg6, arg7,
+		arg8, arg9);
+}
+
+/*-
+ *-----------------------------------------------------------------------
+ * MessageFlush --
+ *	Put out the message and make sure it appears right away.
+ *
+ * Results:
+ *	None.
+ *
+ * Side Effects:
+ *	Yeah.
+ *
+ *-----------------------------------------------------------------------
+ */
+/*VARARGS2*/
+MessageFlush(patient, msg, a1, a2, a3, a4, a5, a6, a7, a8, a9)
+    Patient 	  	patient;
+    char		*msg;
+{
+    XtTtyPrintf(patient->io, msg, a1, a2, a3, a4, a5, a6, a7, a8, a9);
+    XFlush(XtDisplay(patient->io));
+}
+
+/*-
+ *-----------------------------------------------------------------------
+ * Warning --
+ *	Warn the user something evil has happened.
+ *
+ * Results:
+ *	None.
+ *
+ * Side Effects:
+ *	None.
+ *
+ *-----------------------------------------------------------------------
+ */
+/*VARARGS1*/
+Warning(patient, msg, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9)
+    Patient 	  	patient;
+    char		*msg;
+    int			arg1,
+			arg2,
+			arg3,
+			arg4,
+			arg5,
+			arg6,
+			arg7,
+			arg8,
+			arg9;
+{
+    XtTtyPrintf(patient->io, "Warning: ");
+    XtTtyPrintf(patient->io, msg, arg1, arg2, arg3, arg4, arg5, arg6, arg7,
+		arg8, arg9);
+    XtTtyPrintf(patient->io, "\n");
+}
+
+/*-
+ *-----------------------------------------------------------------------
+ * UiEnter --
+ *	Callback function when <enter> pressed in patient's io widget.
+ *
+ * Results:
+ *	None.
+ *
+ * Side Effects:
+ *	The given string is passed to the patient's tcl interpreter.
+ *
+ *-----------------------------------------------------------------------
+ */
+static void
+UiEnter(w, patient, string)
+    Widget  	  	w;
+    Patient 	  	patient;
+    char		*string;
+{
+    int	    	  	result;
+
+    result = Tcl_Eval(patient->interp, string, 0, (char **)NULL);
+
+    if (patient->flags & PATIENT_FREE) {
+	free((char *)patient);
+	return;
+    } else if (result != TCL_OK) {
+	XtTtyPrintf(w, "Error: %s\n", patient->interp->result);
+    } else if (Private_GetData(patient, "interrupt")) {
+	XtTtyPrintf(w, "*** interrupted\n");
+    } else if (*patient->interp->result != '\0') {
+	XtTtyPrintf(w, "%s\n", patient->interp->result);
+    }
+    Ui_ClearInterrupt(patient);
+    XtTtyPrompt(w);
+}
+
+/*-
+ *-----------------------------------------------------------------------
+ * UiInterrupt --
+ *	Callback function for a patient's io widget interruptCallback.
+ *	Sets the "interrupt" status for the patient to true.
+ *
+ * Results:
+ *
+ * Side Effects:
+ *
+ *-----------------------------------------------------------------------
+ */
+static void
+UiInterrupt(w, patient)
+    Widget  	  	w;
+    Patient 	  	patient;
+{
+    Private_Enter(patient, "interrupt", (Opaque)TRUE, (void (*)())NULL);
+}
+
+/*-
+ *-----------------------------------------------------------------------
+ * Ui_Interrupt --
+ *	See if the interrupt character has been typed.
+ *
+ * Results:
+ *	TRUE if it has, FALSE if it hasn't.
+ *
+ * Side Effects:
+ *	None.
+ *
+ *-----------------------------------------------------------------------
+ */
+Boolean
+Ui_Interrupt(patient)
+    Patient 	  	patient;
+{
+    Ui_CheckInput(patient);
+    return ((Boolean)Private_GetData(patient, "interrupt"));
+}
+
+/*-
+ *-----------------------------------------------------------------------
+ * Ui_ClearInterrupt --
+ *	Clear the interrupt-pending flag for the patient.
+ *
+ * Results:
+ *	None.
+ *
+ * Side Effects:
+ *	The interrupt-pending flag is cleared.
+ *
+ *-----------------------------------------------------------------------
+ */
+void
+Ui_ClearInterrupt(patient)
+    Patient 	  	patient;
+{
+    Private_Enter(patient, "interrupt", (Opaque)FALSE, (void (*)())NULL);
+}
+
+/*-
+ *-----------------------------------------------------------------------
+ * UiFullStop --
+ *	Callback when the patient stops completely.
+ *
+ * Results:
+ *	EVENT_HANDLED.
+ *
+ * Side Effects:
+ *	The current frame, scope, file and line are updated. Any pending
+ *	interrupt is cleared and the status widget is updated.
+ *
+ *-----------------------------------------------------------------------
+ */
+/*ARGSUSED*/
+static int
+UiFullStop(patient, event, stopAddr)
+    Patient 	  	patient;
+    Event		event;
+    Address		stopAddr;
+{
+    Address		pc;
+
+    patient->frame = (* patient->CurrentFrame)(patient);
+    patient->scope = patient->frame->scope;
+
+    Sym_GetFuncData(patient->frame->function, &patient->file, (Type *)NULL);
+    if (patient->file == NullFile) {
+	(* patient->ReadRegister)(patient, REG_MACHINE, REG_PC, (Opaque *)&pc);
+	patient->file = NullFile;
+	patient->line = -1;
+    } else {
+	patient->line = Source_GetLine(patient->file, stopAddr, &patient->file);
+    }
+    Ui_ClearInterrupt(patient);
+    Status_Changed(patient);
+    return(EVENT_HANDLED);
+}
+
+
+/*-
+ *-----------------------------------------------------------------------
+ * UiDestroy --
+ *	Destroy the widget tree for the patient when the patient is
+ *	released.
+ *
+ * Results:
+ *	EVENT_HANDLED.
+ *
+ * Side Effects:
+ *	All widgets for the patient are destroyed.
+ *
+ *-----------------------------------------------------------------------
+ */
+static int
+UiDestroy(patient)
+    Patient 	  	patient;
+{
+    XtDestroyWidget(patient->command);
+    return(EVENT_HANDLED);
+}
+
+/*-
+ *-----------------------------------------------------------------------
+ * UiPutName --
+ *	Recursive procedure used by Ui_WidgetToName to install the full
+ *	name of a widget in the proper order.
+ *
+ * Results:
+ *	None.
+ *
+ * Side Effects:
+ *	The name of the current widget is placed in the buffer, followed
+ *	by a period and *namePtr is set to point beyond the period.
+ *
+ *-----------------------------------------------------------------------
+ */
+static void
+UiPutName(w, namePtr)
+    Widget  	  	w;
+    register char 	**namePtr;
+{
+    register WidgetRec	*core = (WidgetRec *)w;
+    register char	*cp;
+
+    if (core->core.parent != (Widget)NULL) {
+	UiPutName(core->core.parent, namePtr);
+	cp = *namePtr;
+	sprintf(cp, "%s.", core->core.name);
+	cp += strlen(cp);
+	*namePtr = cp;
+    }
+}
+
+/*-
+ *-----------------------------------------------------------------------
+ * Ui_WidgetToName --
+ *	Fetch the fully-qualified name of the given widget.
+ *	Note: Because XtNameToWidget doesn't expect the root to
+ *	be specified, for some reason, and the shells we make have
+ *	no parent, we don't include the name of the shell in the
+ *	full name of the widget.
+ *
+ * Results:
+ *	The full name of the widget, dynamically allocated.
+ *
+ * Side Effects:
+ *	None.
+ *
+ *-----------------------------------------------------------------------
+ */
+char *
+Ui_WidgetToName(w)
+    Widget  	  	w;
+{
+    register int  	len;
+    char	  	*cp;
+    char		*name;
+    register WidgetRec	*core;
+
+    len = 0;
+    for (core = (WidgetRec *)w;
+	 core->core.parent != (Widget)NULL;
+	 core = core->core.parent)
+    {
+	 len += strlen(core->core.name) + 1;
+    }
+    cp = name = (char *)malloc(len);
+    UiPutName(w, &name);
+    name[-1] = '\0';
+    return (cp);
+}
+/*-
+ *-----------------------------------------------------------------------
+ * Ui_CheckInput --
+ *	See if input has arrived that should be handled -- used by
+ *	object-file readers to handle exposes and suchlike when the
+ *	patient's command window is first mapped.
+ *
+ * Results:
+ *	None.
+ *
+ * Side Effects:
+ *	If input is waiting, it is handled.
+ *
+ *-----------------------------------------------------------------------
+ */
+/*ARGSUSED*/
+void
+Ui_CheckInput(patient)
+    Patient 	  	patient;
+{
+    XEvent  	  	event;
+    
+    while (XtPending()) {
+	XtNextEvent(&event);
+	XtDispatchEvent(&event);
+    }
+}
+
+/*-
+ *-----------------------------------------------------------------------
+ * Ui_Begin --
+ *	Start up the user-interface for the given patient. If an
+ *	initialization resource string was given, it is executed here.
+ *
+ * Results:
+ *	None.
+ *
+ * Side Effects:
+ *	Outputs the prompt for the patient.
+ *
+ *-----------------------------------------------------------------------
+ */
+void
+Ui_Begin(patient)
+    Patient 	  	patient;
+{
+    static char    	*sourceCmd = (char *)NULL;
+
+    Ui_ClearInterrupt(patient);
+
+    /*
+     * Create "source" command to read in the system definitions.
+     */
+    if (sourceCmd == (char *)NULL) {
+	sourceCmd = malloc(strlen("source ") + sizeof(SYS_INIT_FILE));
+	sprintf(sourceCmd, "source %s", SYS_INIT_FILE);
+    }
+
+    /*
+     * Read the system definitions first.
+     */
+    (void)Tcl_Eval(patient->interp, sourceCmd, 0, (char **)NULL);
+    
+    if (init != (char *)NULL) {
+	/*
+	 * Now evaluate any user initialization commands.
+	 */
+	if (Tcl_Eval(patient->interp, init, 0, (char **)NULL) != TCL_OK) {
+	    Message(patient, "Error in initialization command string: %s\n",
+		    patient->interp->result);
+	}
+    }
+    XtTtyPrompt(patient->io);
+}
+
+/*************************************************************
+ *
+ *	    	  	UI COMMANDS
+ *
+ ************************************************************/
+
+/*-
+ *-----------------------------------------------------------------------
+ * UiPromptCmd --
+ *	Re-issues the prompt for the patient.
+ *
+ * Results:
+ *	TCL_OK.
+ *
+ * Side Effects:
+ *	The prompt is re-issued.
+ *
+ *-----------------------------------------------------------------------
+ */
+
+DEFLOCALCMD(UiPrompt, uiPrompt, "Re-prompts the user for input. If given an argument, sets the prompt to that word.")
+{
+    if (argc < 2) {
+	XtTtyPrompt(patient->io);
+    } else {
+	Arg 	  arg;
+
+	XtSetArg(arg, XtNprompt, argv[1]);
+	XtSetValues(patient->io, &arg, 1);
+    }
+    
+    return(TCL_OK);
+}
+
+/*-
+ *-----------------------------------------------------------------------
+ * UiInterruptedCmd --
+ *	See if the user has typed interrupt.
+ *
+ * Results:
+ *	TCL_OK and 1 if user has typed interrupt, else TCL_OK and 0.
+ *
+ * Side Effects:
+ *	None.
+ *
+ *-----------------------------------------------------------------------
+ */
+DEFLOCALCMD(UiInterrupted, uiInterrupted, "Return non-zero if user wishes to interrupt")
+{
+    if (Ui_Interrupt(patient)) {
+	Tcl_Return(interp, "1", TCL_STATIC);
+    } else {
+	Tcl_Return(interp, "0", TCL_STATIC);
+    }
+    return(TCL_OK);
+}
+
+/*-
+ *-----------------------------------------------------------------------
+ * UiGetSelection --
+ *	Use the Sx library to fetch the mx/tx selection in the given
+ *	format.
+ *	XXX: Limits the size of the data to 1K.
+ *
+ * Results:
+ *	The requested selection and TCL_OK or an error if noone owns
+ *	the selection or the selection couldn't be converted.
+ *
+ * Side Effects:
+ *	Maybe.
+ *
+ *-----------------------------------------------------------------------
+ */
+DEFLOCALCMD(UiGetSelection, uiGetSelection,
+"Returns the current selection in the requested format. The returned value is expected to be an ASCII string.")
+{
+#define MAX_SELECT_SIZE	    1024
+    char    	  realFormat[SX_FORMAT_SIZE];
+    char    	  dataBuf[MAX_SELECT_SIZE];
+    int		  numBytes;
+
+    if (argc < 2) {
+	Tcl_Return(interp, "Usage: get_selection <format>", TCL_STATIC);
+	return(TCL_ERROR);
+    }
+    numBytes = Sx_SelectionGet(XtDisplay(ui_TopLevel),
+			       argv[1],
+			       0,
+			       sizeof(dataBuf)-1,
+			       dataBuf,
+			       realFormat);
+    if (numBytes < 0) {
+	Tcl_Return(interp, "Nothing selected", TCL_STATIC);
+	return(TCL_ERROR);
+    }
+    dataBuf[numBytes] = '\0';
+    Tcl_Return(interp, dataBuf, TCL_VOLATILE);
+    return(TCL_OK);
+}
+
+/*-
+ *-----------------------------------------------------------------------
+ * Ui_Init --
+ *	Initialize the user-interface for the new patient.
+ *
+ * Results:
+ *	None.
+ *
+ * Side Effects:
+ *	Lots.
+ *
+ *-----------------------------------------------------------------------
+ */
+Window
+Ui_Init(patient, argcPtr, argv, needsOutput)
+    Patient 	  patient;
+    int		  *argcPtr;
+    char	  **argv;
+    Boolean 	  needsOutput;
+{
+    Widget  	  shell;
+    Arg	    	  args[20];
+    Widget  	  vpane;
+    Widget  	  output;
+    char    	  *prompt;
+    static int	  widthInc,
+		  heightInc,
+		  width,
+		  height,
+		  x,
+		  y,
+		  flags;
+    static  char  userGeom[32];	    /* Place to store revised geometry,
+				     * as modified by the font size */
+    static Boolean changeGeom;
+    int	    	  i;
+    
+    if (ui_TopLevel == (Widget)NULL) {
+	ui_TopLevel = XtInitialize("swat", "Swat",
+				   (XrmOptionDescRec *)NULL, 0,
+				   argcPtr, argv);
+	XtGetApplicationResources(ui_TopLevel, (caddr_t)0,
+				  resources, XtNumber(resources),
+				  (ArgList)NULL, 0);
+	XtSetArg(args[0], XtNgeometry, &geometry);
+	XtGetValues(ui_TopLevel, args, 1);
+
+	changeGeom = FALSE;
+    
+	widthInc = f->max_bounds.rbearing - f->max_bounds.lbearing;
+	heightInc = f->max_bounds.ascent + f->max_bounds.descent;
+	if (geometry == (char *)NULL) {
+	    flags = XParseGeometry("80x30+0+0", &x, &y, &width, &height);
+	} else {
+	    changeGeom = TRUE;
+	    flags = XParseGeometry(geometry, &x, &y, &width, &height);
+	}
+	
+	if (flags & WidthValue) {
+	    width *= widthInc;
+	} else {
+	    width = DEFAULT_WIDTH * widthInc;
+	}
+	if (flags & HeightValue) {
+	    height *= heightInc;
+	} else {
+	    height = DEFAULT_HEIGHT * heightInc;
+	}
+	if (flags & XValue) {
+	    if (flags & XNegative) {
+		x = WidthOfScreen(XtScreen(ui_TopLevel)) - x - width;
+	    }
+	} else {
+	    x = 0;
+	}
+	if (flags & YValue) {
+	    if (flags & YNegative) {
+		y = HeightOfScreen(XtScreen(ui_TopLevel)) - y - height;
+	    }
+	} else {
+	    y = 0;
+	}
+	
+	i = 0;
+	
+	if (changeGeom) {
+	    /*
+	     * If user specified geometry, enlarge it by the size of
+	     * a character.
+	     */
+	    if ((flags&(XValue|YValue)) && (flags&(WidthValue|HeightValue))){
+		sprintf(userGeom, "%dx%d+%d+%d", width, height, x, y);
+	    } else if (flags&(XValue|YValue)) {
+		sprintf(userGeom, "+%d+%d", x, y);
+	    } else {
+		sprintf(userGeom, "%dx%d", width, height);
+	    }
+	}
+    }
+
+    i = 0;
+
+    if (changeGeom) {
+	XtSetArg(args[i], XtNgeometry, userGeom); i++;
+    }
+    XtSetArg(args[i], XtNwaitForWm, 1); i++;
+    XtSetArg(args[i], XtNallowShellResize, 1); i++;
+    XtSetArg(args[i], XtNtitle, patient->name); i++;
+    XtSetArg(args[i], XtNiconName, patient->name); i++;
+    XtSetArg(args[i], XtNwidthInc, widthInc); i++;
+    XtSetArg(args[i], XtNheightInc, heightInc); i++;
+    XtSetArg(args[i], XtNx, x); i++;
+    XtSetArg(args[i], XtNy, y); i++;
+    XtSetArg(args[i], XtNwidth, width); i++;
+    XtSetArg(args[i], XtNheight, height); i++;
+    shell = XtCreateApplicationShell("swat", topLevelShellWidgetClass,
+				     args, i);
+
+    patient->command = shell;
+    vpane = XtCreateManagedWidget("vpane", vPanedWidgetClass, shell,
+				  (ArgList)NULL, 0);
+
+    i = 0;
+    XtSetArg(args[i], XtNpatient, patient); i++;
+    XtSetArg(args[i], XtNwidth, width); i++;
+    patient->status = XtCreateManagedWidget("status", statusWidgetClass,
+					    vpane, args, i);
+
+    i = 0;
+    XtSetArg(args[i], XtNallowResize, True); i++;
+    XtSetArg(args[i], XtNheight, heightInc + 2); i++;
+    patient->buttons = XtCreateManagedWidget(XtNbuttonName, boxWidgetClass,
+					     vpane, args, i);
+    
+    i = 0;
+    XtSetArg(args[i], XtNwidth, width); i++;
+    XtSetArg(args[i], XtNheight, height); i++;
+    XtSetArg(args[i], XtNprompt, "(swat) "); i++;
+    
+    patient->io = XtCreateManagedWidget("io", ttyWidgetClass, vpane, args, i);
+    XtAddCallback(patient->io, XtNenterCallback, UiEnter, (caddr_t)patient);
+    XtAddCallback(patient->io, XtNinterruptCallback, UiInterrupt,
+		  (caddr_t)patient);
+
+
+    if (needsOutput) {
+	i = 0;
+	XtSetArg(args[i], XtNwidth, width); i++;
+	XtSetArg(args[i], XtNheight, 10 * heightInc + 2); i++;
+	XtSetArg(args[i], XtNmin, args[i-1].value); i++;
+	output = XtCreateManagedWidget("output", widgetClass, vpane, args, i);
+    } else {
+	output = (Widget)NULL;
+    }
+    
+    Button_Init(patient);
+    Value_Init(patient);
+    
+    XtRealizeWidget(shell);
+    XFlush(XtDisplay(shell));
+
+    (void)Event_Handle(patient, EVENT_FULLSTOP, UiFullStop, (ClientData)NULL);
+    (void)Event_Handle(patient, EVENT_RELEASE, UiDestroy, (ClientData)NULL);
+
+    /*
+     * Install our commands
+     */
+    Tcl_CreateCommand(patient->interp, "prompt", UiPromptCmd,
+		      (ClientData)patient, (void (*)())NULL);
+    Help_Register(patient, "prompt", uiPromptCmdHelp);
+    Tcl_CreateCommand(patient->interp, "interrupted", UiInterruptedCmd,
+		      (ClientData)patient, (void (*)())NULL);
+    Help_Register(patient, "interrupted", uiInterruptedCmdHelp);
+    Tcl_CreateCommand(patient->interp, "get_selection", UiGetSelectionCmd,
+		      (ClientData)patient, (void (*)())NULL);
+    Help_Register(patient, "get_selection", uiGetSelectionCmdHelp);
+
+    if (needsOutput) {
+	i = 0;
+	XtSetArg(args[i], XtNmin, 1); i++;
+	XtSetValues(output, args, i);
+	return(XtWindow(output));
+    } else {
+	return((Window)NULL);
+    }
+}
+            

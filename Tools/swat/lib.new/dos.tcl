@@ -156,7 +156,7 @@ if {[string c $_nuke_SFT_handler {}] == 0} {
     # Can't do anything if it's OS/2 (which we check for by seeing if the
     # DOS major version is 20 or the os2 patient is loaded (for WinNT))
     #
-    if {[value fetch dosVersion.low] == 20 || ![null [patient find os2]] || ![null [patient find ntfat]]} {
+    if {[value fetch dosVersion.low] == 20 || ![null [patient find os2]]} {
 	return {}
     }
 

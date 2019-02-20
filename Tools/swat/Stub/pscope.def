@@ -1,0 +1,88 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Berkeley Softworks 1989 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Swat -- Definitions for Periscope Model III Hardware Assist
+FILE:		pscope.def
+
+AUTHOR:		Adam de Boor, Sep 17, 1989
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Adam	09/17/89	Initial revision
+
+
+DESCRIPTION:
+	Interface definitions for the Periscope Model III Hardware Assist
+	
+	NOTE: THIS FILE CONTAINS INFORMATION THAT IS PROPRIETARY TO
+	PERISCOPE COMPANY AND HAS BEEN PROVIDED UNDER A NON-DISCLOSURE
+	AGREEMENT. IF YOU HAVE NOT SIGNED THIS AGREEMENT, DO NOT LOOK
+	AT THIS FILE.
+		
+	$Id: pscope.def,v 2.1 92/04/13 00:13:10 adam Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+ifdef PSCOPE
+;
+; Definitions for enabling/disabling the IO Channel Check NMI. Port 61h
+; has many uses, one of which is the enabling of this NMI. The enable is
+; bit 5 and is active low... (q.v. IBM Personal Computer Technical Reference
+; p. 1-32)
+;
+IOCDPORT	= 61h
+IOCHKDISABLE	= 20h
+;
+; Define ENABLE/PROTECT macros to diddle with the control register for the
+; board w/o modifying the current condition codes.
+; XXX: use LAHF and SAHF ?
+;
+WRITE_ENABLE	macro
+		pushf
+		and	cs:stubRegisters.SR_control, NOT SC_WRITE_PROT
+		popf
+		endm
+
+WRITE_PROTECT	macro
+		pushf
+		or	cs:stubRegisters.SR_control, SC_WRITE_PROT
+		popf
+		endm
+;
+; Define SAVE_STATE and RESTORE_STATE macros to handle enter/exit to/from our
+; state. Both thrash the flags.
+;
+SAVE_STATE	macro
+		;;
+		;; Turn off write protection and the trace buffer
+		;; 
+		and	cs:stubRegisters.SR_control, NOT (SC_WRITE_PROT or SC_TB_ON)
+		;;
+		;; Disable the I/O Channel Check NMI
+		;;
+		push	ax
+		in	al, IOCDPORT	; Fetch port 1
+		or	al, IOCHKDISABLE ; disable I/O CHK (active low)
+		out	IOCDPORT, al
+		pop	ax
+		endm
+
+RESTORE_STATE	macro
+		;;
+		;; Enable the I/O Channel Check NMI
+		;;
+		push	ax
+		in	al, IOCDPORT	; Fetch port 1
+		and	al, NOT IOCHKDISABLE ; enable I/O CHK (active low)
+		out	IOCDPORT, al
+		pop	ax
+		;;
+		;; Protect our RAM and turn on the trace buffer when we get
+		;; out of here.
+		;; 
+		or	cs:stubRegisters.SR_control, SC_WRITE_PROT or SC_TB_ON
+		endm
+endif

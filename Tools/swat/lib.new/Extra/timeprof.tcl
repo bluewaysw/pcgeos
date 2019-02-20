@@ -30,10 +30,6 @@
 [defsubr timer-profile-new {args}
 {
     [value store timerProfileOffset 0]
-    [value store timerProfileIdle 0]
-    [value store timerProfileHeap 0]
-    [value store timerProfileBIOS 0]
-    [value store timerProfileTotal 0]
 
     if {![string compare [index $args 0] pcgeos] } {
         value store timerProfileGeode -1
@@ -105,47 +101,18 @@
 	    var misc [expr $misc+[index $i 0]]
 	}
     }
-    if {$misc > 0} {
-      echo [format {%-42s %5d    %3.1f       %3.1f}
-	  Miscellaneous
-	  $misc
-	  [expr 100*$misc/$total float]
-	  [expr $misc/60 float]
-      ]
-    }
+    echo [format {%-42s %5d    %3.1f       %3.1f}
+	Miscellaneous
+	$misc
+	[expr 100*$misc/$total float]
+	[expr $misc/60 float]
+    ]
     echo [format
 	{TOTAL:                                     %5d    %3.1f      %3.1f}
 	$total
 	100.0
 	[expr $total/60 float]
     ]
-
-    var profIdle [value fetch timerProfileIdle]
-    var profHeap [value fetch timerProfileHeap]
-    var profBIOS [value fetch timerProfileBIOS]
-    var profTotal [value fetch timerProfileTotal]
-    if {$profTotal > 0} {
-      echo {}
-      echo [format
-	  {Time since last "new": %d ticks (%.1f seconds)}
-	  $profTotal [expr $profTotal/60 float]
-      ]
-      echo [format
-	  { - Idle: %d ticks (%.1f seconds) \[excluded from routine breakdown and totals\]}
-  	  $profIdle [expr $profIdle/60 float]
-      ]
-      if {$profTotal > $profIdle} {
-        echo [format
-	    { - Heap semaphore: %d ticks (%.1f seconds, %.1f%%)}
-  	    $profHeap [expr $profHeap/60 float] [expr $profHeap*100/($profTotal-$profIdle) float]
-        ]
-        echo [format
-	    { - DOS/BIOS semaphore: %d ticks (%.1f seconds, %.1f%%) \[outside of heap\]}
-  	    $profBIOS [expr $profBIOS/60 float] [expr $profBIOS*100/($profTotal-$profIdle) float]
-        ]
-      }
-      echo {}
-    }
 }]
 
 
@@ -288,7 +255,6 @@ See also:
 
     [case [index $args 0] in
 	new { timer-profile-new [index $args 1] }
-        reset { timer-profile-new [index $args 1] }
 	routine { timer-profile-routine }
 	resource { timer-profile-resource }
     ]
