@@ -1,4 +1,4 @@
-/* 
+/*
  * tclCmdIZ.c --
  *
  *	This file contains the top-level command routines for most of
@@ -571,13 +571,13 @@ See also:\n\
 		 */
 		break;
 	    }
-	    
+
 	    if (varPtr->valueLength != 0) {
 		/*
 		 * Has default -- form list of variable's name and value.
 		 */
 		char *vargv[2];
-		
+
 		vargv[0] = varPtr->name;
 		vargv[1] = varPtr->value;
 
@@ -589,7 +589,7 @@ See also:\n\
 		 * below.
 		 */
 		int len = strlen(varPtr->name);
-		
+
 		name = (char *)malloc(len+1);
 		bcopy(varPtr->name, name, len+1);
 	    }
@@ -841,7 +841,7 @@ See also:\n\
     frame = iPtr->top;
     frame->protect = argv[2];
     frame->psize = 0;
-    
+
     /*
      * Evaluate the main command and save its result.
      */
@@ -869,7 +869,7 @@ See also:\n\
     iPtr->result = iPtr->resultSpace;
 
     frame->protect = 0;
-    
+
     /*
      * Evaluate the protected command and blow away its return value
      */
@@ -1428,7 +1428,7 @@ See also:\n\
     char *cmdBuffer;
     unsigned long fileSize;
     int returnCode;
-    int bytesRead = 0;
+    long bytesRead = 0;
 
 #if defined(_MSDOS) || defined(_WIN32)
     char    *mappedName;
@@ -1460,8 +1460,8 @@ See also:\n\
 	}
     }
     *dest = '\0';
-    
-    returnCode = FileUtil_Open(&fileId, mappedName, O_RDONLY|O_TEXT, 
+
+    returnCode = FileUtil_Open(&fileId, mappedName, O_RDONLY|O_TEXT,
 			       SH_DENYWR, 0);
     if (returnCode == FALSE) {
 	if ((len < 4) ||
@@ -1474,7 +1474,7 @@ See also:\n\
 	     * Doesn't already end in .tcl, so append that and try again.
 	     */
 	    strcpy(dest, ".TCL");
-	    returnCode = FileUtil_Open(&fileId, mappedName, 
+	    returnCode = FileUtil_Open(&fileId, mappedName,
 				       O_RDONLY|O_TEXT, SH_DENYWR, 0);
 	}
 	if (returnCode == FALSE) {
@@ -1485,7 +1485,7 @@ See also:\n\
     }
     free((malloc_t)mappedName);
 #else
-    returnCode = FileUtil_Open(&fileId, argv[1], O_RDONLY|O_TEXT, 
+    returnCode = FileUtil_Open(&fileId, argv[1], O_RDONLY|O_TEXT,
 			      SH_DENYWR, 0);
     if (returnCode == FALSE) {
 	int 	  len = strlen(argv[1]);
@@ -1509,14 +1509,14 @@ See also:\n\
     if (fileSize == -1L) {
 	char errmsg[512];
 
-	FileUtil_SprintError(errmsg, "error seeking in file \"%.50s\"", 
+	FileUtil_SprintError(errmsg, "error seeking in file \"%.50s\"",
 			     argv[1]);
 	Tcl_RetPrintf(interp, "%s", errmsg);
 	(void)FileUtil_Close(fileId);
 	return TCL_ERROR;
     }
     (void)FileUtil_Seek(fileId, 0L, SEEK_SET);
-	
+
     cmdBuffer = (char *) malloc(fileSize+1);
 
     /* Don't check "read" return value against "fileSize" as CR-LF -> LF
@@ -1525,7 +1525,7 @@ See also:\n\
     if (returnCode == FALSE) {
 	char errmsg[512];
 
-	FileUtil_SprintError(errmsg, "error reading in file \"%.50s\"", 
+	FileUtil_SprintError(errmsg, "error reading in file \"%.50s\"",
 			     argv[1]);
 	Tcl_RetPrintf(interp, "%s", errmsg);
 	(void)FileUtil_Close(fileId);
@@ -1637,11 +1637,11 @@ See also:\n\
 
     switch((int)clientData) {
 	case (int)STRING_COMPARE:
-	    if (argc == 5) 
+	    if (argc == 5)
 	    {
 		char	*cp1 = argv[2];
 		char	*cp2 = argv[3];
-		
+
 		match = 0;
 		while(1)
 		{
@@ -1682,7 +1682,7 @@ See also:\n\
 	case (int)STRING_SUBST:
 	{
 	    int	global;
-	    
+
 	    if (argc == 6) {
 		if (!strncmp(argv[5], "global", strlen(argv[5]))) {
 		    global = 1;
@@ -1692,7 +1692,7 @@ See also:\n\
 	    } else {
 		global = 0;
 	    }
-		    
+
 	    Tcl_Return(interp, Tcl_StringSubst(argv[2],
 					       argv[3],
 					       argv[4],
@@ -1711,7 +1711,7 @@ See also:\n\
 
 	p = argv[2];
 	tp1 = p1 = malloc(strlen(p)+1);
-	while (*p) 
+	while (*p)
 	{
 	    *tp1 = toupper(*p);
 	    tp1++;
@@ -1719,7 +1719,7 @@ See also:\n\
 	}
 	p = argv[3];
 	tp2 = p2 = malloc(strlen(p)+1);
-	while (*p) 
+	while (*p)
 	{
 	    *tp2 = toupper(*p);
 	    tp2++;
@@ -1905,7 +1905,7 @@ See also:\n\
     int	    	cmdDynamic;
 
     oldVF = iPtr->top->localPtr;
-    
+
     if (!isdigit(argv[1][0]) && (argv[1][0] != '-') && (argv[1][0] != '+')) {
 	/*
 	 * Specifies a function for which to search.
@@ -1979,5 +1979,3 @@ See also:\n\
 
     return(result);
 }
-    
-    

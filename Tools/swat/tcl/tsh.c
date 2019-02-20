@@ -40,6 +40,7 @@ static char *rcsid =
 #include "tcl.h"
 
 #include <malloc.h>
+#include <compat/file.h>
 
 #if defined(unix)
 #include <sys/file.h>
@@ -58,7 +59,7 @@ Tcl_Interp *interp;
 
 jmp_buf	    abortBuf;
 
-int malloc_tag(void *foo) {return (0);}
+unsigned malloc_tag(malloc_t foo) {return (0);}
 
 /***********************************************************************
  *				cmdStream
@@ -94,7 +95,7 @@ stream_usage:
 	if (argc != 4) {
 	    Tcl_Error(interp, "Usage: stream open <file> (r|w|a|r+|w+)");
 	}
-	
+
 	stream = fopen(argv[2], argv[3]);
 
 	if (stream == NULL) {
@@ -106,9 +107,9 @@ stream_usage:
 	if (argc != 4) {
 	    Tcl_Error(interp, "Usage: stream read (line|list|char) <stream>");
 	}
-	
+
 	stream = (FILE *)atoi(argv[3]);
-	
+
 	if (strcmp(argv[2], "char") == 0) {
 	    int	    c = getc(stream);
 
@@ -150,11 +151,11 @@ stream_usage:
 	    size = 256;
 	    left = size-1;	/* Room for null */
 	    base = cp = (char *)malloc(size);
-	    
+
 	    while((c = getc(stream)) != EOF) {
 		char	*addMe, tbuf[5];
 		int 	addLen;
-		
+
 		switch(c) {
 		    case '\\': addMe = "\\\\"; addLen = 2; break;
 		    case '\n': addMe = "\\n"; addLen = 2; break;
@@ -207,7 +208,7 @@ stream_usage:
 	    while(!done) {
 		char	tbuf[5];
 		int 	addLen;
-		
+
 		c = getc(stream);
 
 		switch(c) {
@@ -299,7 +300,7 @@ stream_usage:
 		if (addLen) {
 		    if (left < addLen) {
 			int offset = cp - base;
-			
+
 			left += 256;
 			size += 256;
 			base = (char *)realloc(base, size);
@@ -322,7 +323,7 @@ stream_usage:
 	    Tcl_Error(interp, "Usage: stream print <list> <stream>");
 	}
 	stream = (FILE *)atoi(argv[3]);
-	
+
 	/*
 	 * Let Tcl_Merge deal with spaces etc.
 	 */
@@ -349,7 +350,7 @@ stream_usage:
 	    Tcl_Error(interp, "Usage: stream seek (<posn>|+<incr>|-<decr>|end) <stream>");
 	}
 	stream = (FILE *)atoi(argv[3]);
-	
+
 	switch (argv[2][0]) {
 	    case '+':
 		argv[2] += 1;
@@ -386,7 +387,7 @@ stream_usage:
 	    Tcl_Error(interp, "Usage: stream eof <stream>");
 	}
 	stream = (FILE *)atoi(argv[2]);
-	
+
 	Tcl_Return(interp, feof(stream) ? "1" : "0", TCL_STATIC);
     } else if (strncmp(argv[1], "close", len) == 0) {
 	if (argc != 3) {
@@ -517,16 +518,16 @@ main(argc, argv)
     Tcl_SetVar(interp, "stdout", cmd, 1);
     sprintf(cmd, "%d", stderr);
     Tcl_SetVar(interp, "stderr", cmd, 1);
-    
+
     if (argc > 1) {
 	/*
 	 * argv[1] is file to source. Merge remaining args together and
 	 * place in args variable
 	 */
 	char	*args = Tcl_Merge(argc-2, argv+2);
-	
+
 	Tcl_SetVar(interp, "args", args, 1);
-	
+
 	/*
 	 * Source the file. It should execute whatever it wants with the
 	 * args we've placed in the args variable.
@@ -544,12 +545,12 @@ main(argc, argv)
 		exit(1);
 	}
     }
-	
+
     /*
      * Interactive use. Set the prompt variable.
      */
     Tcl_SetVar(interp, "prompt", "% ", 1);
-	
+
     (void)setjmp(abortBuf);	/* Top level re-entry */
 
     while (1) {

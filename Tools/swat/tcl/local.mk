@@ -17,7 +17,7 @@
 #	ardeb	6/22/89		Initial Revision
 #
 # DESCRIPTION:
-#	
+#
 #
 #	$Id: local.mk,v 1.6 97/04/18 12:12:54 dbaumann Exp $
 #
@@ -29,7 +29,7 @@ CFLAGS		+= -g
 #endif
 
 .PATH.h		:
-.PATH.h		: ../../include ../../utils .
+.PATH.h		: ../../include ../../utils $(INSTALL_DIR:H:H)/utils .
 
 sun3OBJS	:= $(sun3OBJS:N*tsh.o:N*tcl.o)
 isiOBJS		:= $(isiOBJS:N*tsh.o:N*tcl.o)

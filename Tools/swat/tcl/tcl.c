@@ -1,4 +1,4 @@
-/* 
+/*
  * tcl.c --
  *
  *	Test driver for TCL.
@@ -22,7 +22,7 @@ static char rcsid[] = "$Id: tcl.c,v 1.9 97/04/18 12:14:33 dbaumann Exp $ SPRITE 
 #include <compat/string.h>
 #include <compat/stdlib.h>
 
-#if defined(_MSDOS) || defined(_WIN32)
+#if defined(_MSDOS) || defined(_WIN32) || defined(_LINUX)
 # include <stdio.h>
 # include <time.h>
 #else  /* not (_MSDOS or _WIN32) */
@@ -94,7 +94,7 @@ void
 debugFrame(Frame *f, int abbrev)
 {
     int	    	  i;
-    
+
     printf("%c [%s", f->stopOnReturn ? 'b' : ' ', f->argv[0]);
 
     for (i = 1; i < f->argc; i++) {
@@ -138,19 +138,19 @@ doDebug(void)
     while(1) {
 	char	  cmd[1000], *p;
 	int 	  i, result;
-	
+
 	clearerr(stdin);
-	
+
 	printf("[tcl] ");
 	fflush(stdout);
-	
+
 	gets(cmd);
 	p = index(cmd, ' ');
 	if (p == (char *)NULL) {
 	    p = cmd + strlen(cmd);
 	}
 	i = p - cmd;
-	
+
 	if (strncmp(cmd, "step", i) == 0) {
 	    stepping = 1;
 	    skipCalls = 0;
@@ -162,11 +162,11 @@ doDebug(void)
 	} else if (strncmp(cmd, "eval", i) == 0) {
 	    char	*oldResult;
 	    int	result;
-	    
+
 	    stepping = skipCalls = 0;
 	    oldResult = malloc(strlen(interp->result) + 1);
 	    strcpy(oldResult, interp->result);
-	    
+
 	    result = Tcl_Eval(interp, p, 0, 0);
 	    if (result == TCL_OK) {
 		if (*interp->result != 0) {
@@ -190,7 +190,7 @@ doDebug(void)
 	    break;
 	} else if (strncmp(cmd, "where", i) == 0) {
 	    Frame	*f;
-	    
+
 	    for (f = stack; f != (Frame *)NULL; f = f->next) {
 		debugFrame(f, 1);
 	    }
@@ -198,7 +198,7 @@ doDebug(void)
 	    debugFrame(stack, 0);
 	} else if (strncmp(cmd, "quit", i) == 0) {
 	    Frame *f;
-	    
+
 	    skipCalls = 1;
 	    stepping = 0;
 	    for (f = stack; f != (Frame *)NULL; f = f->next) {
@@ -281,7 +281,7 @@ debugCallProc(ClientData  cd,
 	debugFrame(stack, 1);
 
 	doDebug();
-    }	
+    }
 }
 
 void
@@ -294,7 +294,7 @@ debugReturnProc(ClientData	cd,
 		int		result)
 {
     Frame	  *top;
-    
+
     /*
      * We'll get called on the return from cmdDebug, but we won't have a
      * stack set up at that point, so we still need to check to make sure
@@ -320,10 +320,10 @@ debugReturnProc(ClientData	cd,
 		printf("code %d \"%s\"\n", result, interp->result);
 		break;
 	    }
-	    
+
 	    doDebug();
 	}
-	
+
 	top = stack->next;
 	free((char *)stack);
 	stack = top;
@@ -332,7 +332,7 @@ debugReturnProc(ClientData	cd,
 	}
     }
 }
-    
+
 int
 cmdDebug(ClientData	  	clientData,
 	 Tcl_Interp	  	*interp,
@@ -365,7 +365,7 @@ cmdDebug(ClientData	  	clientData,
 	    numDebug++;
 	}
     }
-    
+
     if (debugTrace == (Tcl_Trace)NULL) {
 	debugTrace = Tcl_CreateTrace(interp, 0, debugCallProc, debugReturnProc,
 				     (ClientData)NULL);
@@ -414,7 +414,7 @@ cmdUndebug(ClientData	  	clientData,
 }
 
 int
-cmdEcho(char *clientData,
+cmdEcho(ClientData clientData,
 	Tcl_Interp *interp,
 	int argc,
 	char **argv)
@@ -444,13 +444,13 @@ cmdEcho(char *clientData,
 }
 
 void
-deleteProc(char *clientData)
+deleteProc(ClientData clientData)
 {
     printf("Deleting command with clientData \"%s\".\n", clientData);
 }
 
 int
-cmdDelete(char *clientData,
+cmdDelete(ClientData clientData,
 	  Tcl_Interp *interp,
 	  int argc,
 	  char **argv)
@@ -471,46 +471,38 @@ cmdDelete(char *clientData,
 void
 traceCallProc(ClientData clientData,
 	      Tcl_Interp *interp,
-	      int level,
-	      char *command,
-	      int (*cmdProc)(),
-	      ClientData cmdClientData,
-	      int argc,
-	      char **argv)
+              Tcl_Frame *frame)
 {
     int i;
 
     printf("Level %d, clientData 0x%x, interp 0x%x, calling \"%s\"\n",
-	   level, clientData, interp, command);
+	   frame->level, clientData, interp, frame->command);
     printf("    cmdProc 0x%x, cmdClientData 0x%x\n",
-	   cmdProc, cmdClientData);
-    for (i = 0; i < argc; i++) {
-	printf("        argv[%d] = \"%s\"\n", i, argv[i]);
+	   frame->cmdProc, frame->cmdData);
+    for (i = 0; i < frame->argc; i++) {
+	printf("        argv[%d] = \"%s\"\n", i, frame->argv[i]);
     }
-	
+
 }
 
 void
 traceReturnProc(ClientData clientData,
 		Tcl_Interp *interp,
-		int level,
-		char *command,
-		int (*cmdProc)(),
-		ClientData cmdClientData,
+                Tcl_Frame *frame,
 		int result)
 {
     switch (result) {
     case TCL_OK:
-	printf ("%s returns \"%s\"\n", command, interp->result);
+	printf ("%s returns \"%s\"\n", frame->command, interp->result);
 	break;
     case TCL_ERROR:
-	printf("%s returns error \"%s\"\n", command, interp->result);
+	printf("%s returns error \"%s\"\n", frame->command, interp->result);
 	break;
     case TCL_BREAK:
-	printf("%s returns BREAK\n", command);
+	printf("%s returns BREAK\n", frame->command);
 	break;
     case TCL_CONTINUE:
-	printf("%s returns CONTINUE\n", command);
+	printf("%s returns CONTINUE\n", frame->command);
 	break;
     }
 }
@@ -572,7 +564,7 @@ main(void)
 		      NoDelProc);
 
     Tcl_SetVar(interp, "prompt", "% ", 1);
-    
+
     (void)setjmp(abortBuf);
 
     while (1) {

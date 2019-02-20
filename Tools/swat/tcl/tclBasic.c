@@ -1,4 +1,4 @@
-/* 
+/*
  * tclBasic.c --
  *
  *	Contains the basic facilities for TCL command interpretation,
@@ -102,7 +102,7 @@ Tcl_CreateInterp(void)
     register Interp *iPtr;
     register const Tcl_CommandRec * const *cmdRecPtr;
     register int i;
-#if defined(__HIGHC__) || defined(__BORLANDC__)
+#if defined(__HIGHC__) || defined(__BORLANDC__) || defined(__WATCOMC__)
     extern int printf(const char *fmt, ...);
 #else
     extern void printf(const char *fmt, ...);
@@ -154,7 +154,7 @@ Tcl_TopLevel(Tcl_Interp	*interp)
     register Interp	*iPtr;
     register Frame  	*frame, *nextFrame;
     void    	    	**fp;
-    
+
 
     iPtr = (Interp *)interp;
 
@@ -184,7 +184,7 @@ Tcl_TopLevel(Tcl_Interp	*interp)
 	if (frame->ext.flags & TCL_FRAME_FREE_SEPARGS) {
 	    free((malloc_t)frame->sepArgs);
 	}
-	
+
 	/*
 	 * Free args and argv if requested by Tcl_Eval
 	 */
@@ -194,7 +194,7 @@ Tcl_TopLevel(Tcl_Interp	*interp)
 	if (frame->ext.flags & TCL_FRAME_FREE_ARGV) {
 	    free((malloc_t)frame->ext.argv);
 	}
-	
+
 	/*
 	 * If the frame is for a command procedure (and the scope has
 	 * actually been set up), we need to free up its local variables.
@@ -220,7 +220,7 @@ Tcl_TopLevel(Tcl_Interp	*interp)
      */
     TclByteCodeResetStack(iPtr);
 }
-	     
+
 
 
 /*
@@ -285,9 +285,9 @@ Tcl_DeleteInterp(Tcl_Interp *interp)	/* Token for command interpreter
     }
     for (i = 0; i < TCL_CMD_CHAINS; i++) {
 	Command *nextCmd;
-	
+
 	for (cmdPtr = iPtr->commands[i]; cmdPtr != NULL; cmdPtr = nextCmd) {
-	    if (cmdPtr->deleteProc != 0) { 
+	    if (cmdPtr->deleteProc != 0) {
 		(*cmdPtr->deleteProc)(cmdPtr->clientData);
 	    }
 	    nextCmd = cmdPtr->nextPtr;
@@ -383,7 +383,7 @@ Tcl_CreateCommand(Tcl_Interp	*interp,	/* Token for command
     cmdPtr->flags = flags;
     cmdPtr->clientData = clientData;
     cmdPtr->deleteProc = deleteProc;
-    
+
     cmdPtr->nextPtr = iPtr->commands[TCL_CMD_GET_CHAIN(cmdName)];
     iPtr->commands[TCL_CMD_GET_CHAIN(cmdName)] = cmdPtr;
     bcopy(cmdName, cmdPtr->name, nameLength+1);
@@ -485,7 +485,7 @@ Tcl_OverrideCommand(Tcl_Interp	*interp,
 	cmdPtr->deleteProc = deleteProc;
 	return(1);
     }
-}	
+}
 
 /*
  *----------------------------------------------------------------------
@@ -529,7 +529,7 @@ Tcl_FetchCommand(Tcl_Interp 	*interp,
 	*deleteProcPtr = cmdPtr->deleteProc;
 	return(1);
     }
-}	
+}
 
 /*
  *----------------------------------------------------------------------
@@ -675,10 +675,10 @@ Tcl_Eval(Tcl_Interp *interp,	/* Token for command interpreter (returned by a
 	free((char *) iPtr->result);
 	iPtr->dynamic = 0;
     }
-    
+
     iPtr->result = iPtr->resultSpace;
     iPtr->resultSpace[0] = 0;
-    
+
 
     iPtr->numLevels++;
     iPtr->cmdCount++;
@@ -699,7 +699,7 @@ Tcl_Eval(Tcl_Interp *interp,	/* Token for command interpreter (returned by a
     }
     cmdPtr = (Command *)NULL;
     iPtr->top = &frame;
-    
+
     /*
      * There can be many sub-commands (bracketed or separated by
      * newlines) in one command string.  This outer loop iterates over
@@ -712,7 +712,7 @@ Tcl_Eval(Tcl_Interp *interp,	/* Token for command interpreter (returned by a
 	 * Skim off leading white space, skip comments, and handle brackets
 	 * at the beginning of the command by recursing.
 	 */
-    
+
 	while (isspace(*src)) {
 	    src += 1;
 	}
@@ -752,7 +752,7 @@ Tcl_Eval(Tcl_Interp *interp,	/* Token for command interpreter (returned by a
 	 * the arg pointer gets set up BEFORE the first real character
 	 * of the argument has been found.
 	 */
-    
+
 	dst = copy;
 	argc = 0;
 	frame.protect = (char *)NULL;
@@ -769,10 +769,10 @@ Tcl_Eval(Tcl_Interp *interp,	/* Token for command interpreter (returned by a
 	 * Skim off the command name and arguments by looping over
 	 * characters and processing each one according to its type.
 	 */
-    
+
 	while (1) {
 	    switch (*src) {
-    
+
 		/*
 		 * All braces are treated as normal characters
 		 * unless the first character of the argument is an
@@ -780,7 +780,7 @@ Tcl_Eval(Tcl_Interp *interp,	/* Token for command interpreter (returned by a
 		 * the argument terminates when all braces are matched.
 		 * Internal braces are also copied like normal chars.
 		 */
-    
+
 		case '{': {
 		    if ((openBraces == 0) && (src == argStart)) {
 			/*
@@ -842,9 +842,9 @@ Tcl_Eval(Tcl_Interp *interp,	/* Token for command interpreter (returned by a
 		    }
 		    break;
 		}
-    
+
 		case '[': {
-    
+
 		    /*
 		     * Open bracket: if not in middle of braces, then execute
 		     * following command and substitute result into argument.
@@ -854,7 +854,7 @@ Tcl_Eval(Tcl_Interp *interp,	/* Token for command interpreter (returned by a
 			*dst++ = '[';
 		    } else {
 			int length;
-    
+
 			/*
 			 * Set up partial frame. cmdProc is NULL to indicate
 			 * we're still working on it...
@@ -862,13 +862,13 @@ Tcl_Eval(Tcl_Interp *interp,	/* Token for command interpreter (returned by a
 			frame.ext.argc = argc;
 			frame.ext.argv = (const char **)argv;
 			frame.sepArgs[sepArgc] = (void *)NULL;
-			
+
 			result = Tcl_Eval(interp, src+1, ']', &tmp);
 			src = tmp;
 			if (result != TCL_OK) {
 			    goto done;
 			}
-    
+
 			/*
 			 * Copy the return value into the current argument.
 			 * May have to enlarge the argument storage.  When
@@ -924,7 +924,7 @@ Tcl_Eval(Tcl_Interp *interp,	/* Token for command interpreter (returned by a
 				char *newCopy;
 				ptrdiff_t delta;
 				char **av;
-				
+
 				copySize = length + NUM_CHARS + (dst - copy);
 				newCopy = (char *) malloc((unsigned) copySize);
 				bcopy(copy, newCopy, (dst-copy));
@@ -977,7 +977,7 @@ Tcl_Eval(Tcl_Interp *interp,	/* Token for command interpreter (returned by a
 		    *dst++ = ']';
 		    break;
 		}
-    
+
 		case '\n': {
 
 		    /*
@@ -985,7 +985,7 @@ Tcl_Eval(Tcl_Interp *interp,	/* Token for command interpreter (returned by a
 		     * or a space character.  If it's a space character,
 		     * just fall through to the space code below.
 		     */
-    
+
 		    if ((openBraces == 0) && (termChar == 0)) {
 			goto cmdComplete;
 		    }
@@ -995,11 +995,11 @@ Tcl_Eval(Tcl_Interp *interp,	/* Token for command interpreter (returned by a
 		case ' ':
 		case '\t': {
 		    if (openBraces > 0) {
-    
+
 			/*
 			 * Quoted space.  Copy it into the argument.
 			 */
-    
+
 			*dst++ = *src;
 		    } else {
 
@@ -1012,7 +1012,7 @@ Tcl_Eval(Tcl_Interp *interp,	/* Token for command interpreter (returned by a
 			 * arg and for NULL pointer that gets added to the
 			 * end of argv when the command is complete).
 			 */
-    
+
 			*dst++ = 0;
 
 			argc++;
@@ -1020,7 +1020,7 @@ Tcl_Eval(Tcl_Interp *interp,	/* Token for command interpreter (returned by a
 			    argSize *= 2;
 			    if (argv == argStorage) {
 				char **newArgs;
-				
+
 				newArgs = (char **)
 				    malloc((unsigned) argSize*sizeof(char *));
 				bcopy(argv, newArgs, argc * sizeof(char *));
@@ -1033,7 +1033,7 @@ Tcl_Eval(Tcl_Interp *interp,	/* Token for command interpreter (returned by a
 						     sizeof(char *));
 			    }
 			}
-			
+
 			argv[argc] = dst;
 
 			while (((i = src[1]) == ' ') || (i == '\t') ||
@@ -1093,10 +1093,10 @@ Tcl_Eval(Tcl_Interp *interp,	/* Token for command interpreter (returned by a
 				} else if (termChar && (*src != termChar)) {
 				    if (termChar == ']') {
 					syntaxMsg = "unmatched bracket";
-				    } 
+				    }
 				    goto syntaxError;
 				}
-				
+
 				len = src-argStart;
 
 				if ((limit - dst) < len) {
@@ -1107,12 +1107,12 @@ Tcl_Eval(Tcl_Interp *interp,	/* Token for command interpreter (returned by a
 				    char    	*newCopy;
 				    ptrdiff_t   delta;
 				    char    	**av;
-				    
+
 				    copySize = len + NUM_CHARS + (dst - copy);
-				    
+
 				    newCopy = (char *) malloc(copySize);
 				    bcopy(copy, newCopy, (dst-copy));
-				    
+
 				    delta = newCopy - copy;
 				    dst += delta;
 				    for (av = &argv[argc]; av >= argv; av--) {
@@ -1120,23 +1120,23 @@ Tcl_Eval(Tcl_Interp *interp,	/* Token for command interpreter (returned by a
 					    *av += delta;
 					}
 				    }
-				    
+
 				    if (copy != copyStorage) {
 					free((char *) copy);
 				    }
-				    
+
 				    frame.copyStart = copy = newCopy;
 				    frame.copyEnd = limit =
 					newCopy + copySize - BUFFER;
 				    frame.ext.flags |= TCL_FRAME_FREE_ARGS;
 				}
-				
+
 				/*
 				 * Copy the thing into the destination
 				 */
 				bcopy(argStart, dst, len);
 				dst += len;
-				
+
 				/* This'll null-terminate the arg for us... */
 				goto cmdComplete;
 			    }
@@ -1145,7 +1145,7 @@ Tcl_Eval(Tcl_Interp *interp,	/* Token for command interpreter (returned by a
 		    }
 		    break;
 		}
-    
+
 		case '\\': {
 		    int numRead;
 
@@ -1170,9 +1170,9 @@ Tcl_Eval(Tcl_Interp *interp,	/* Token for command interpreter (returned by a
 		    }
 		    break;
 		}
-    
+
 		case 0: {
-    
+
 		    /*
 		     * End of string.  Make sure that braces were
 		     * properly matched.  Also, it's only legal to
@@ -1193,25 +1193,25 @@ Tcl_Eval(Tcl_Interp *interp,	/* Token for command interpreter (returned by a
 		    }
 		    goto cmdComplete;
 		}
-    
+
 		default: {
 		    *dst++ = *src;
 		    break;
 		}
 	    }
 	    src += 1;
-    
+
 	    /*
 	     * Make sure that we're not running out of space in the
 	     * string copy area.  If we are, allocate a larger area
 	     * and copy the string.  Be sure to update all of the
 	     * relevant pointers too.
 	     */
-    
+
 	    if (dst >= limit) {
 		char 	    *newCopy;
 		ptrdiff_t   delta;
-    
+
 		copySize *= 2;
 		newCopy = (char *) malloc((unsigned) copySize);
 		bcopy(copy, newCopy, (dst-copy));
@@ -1232,7 +1232,7 @@ Tcl_Eval(Tcl_Interp *interp,	/* Token for command interpreter (returned by a
 		frame.ext.flags |= TCL_FRAME_FREE_ARGS;
 	    }
 	}
-    
+
 	/*
 	 * Terminate the last argument.  If the interpreter has been
 	 * deleted then return;  if there's no command, then go on to
@@ -1292,7 +1292,7 @@ Tcl_Eval(Tcl_Interp *interp,	/* Token for command interpreter (returned by a
 	frame.ext.cmdData = cmdPtr->clientData;
 	frame.ext.argc = argc;
 	frame.ext.argv = (const char **)argv;
-	
+
 	/*
 	 * Call trace procedures, if any, then invoke the command.
 	 */
@@ -1353,7 +1353,7 @@ Tcl_Eval(Tcl_Interp *interp,	/* Token for command interpreter (returned by a
     if (frame.ext.flags & TCL_FRAME_FREE_ARGV) {
 	free((char *) argv);
     }
-    
+
     iPtr->numLevels--;
     if (iPtr->numLevels == 0) {
 	if ((result != TCL_OK) && (result != TCL_ERROR)) {
@@ -1589,7 +1589,7 @@ TclFindCmd(Interp   *iPtr,	/* Interpreter in which to search. */
     Command **firstPtr;
     register int cmdLen;
     register char c;
-    int	i;  
+    int	i;
     int	err;
 
 
@@ -1605,12 +1605,12 @@ TclFindCmd(Interp   *iPtr,	/* Interpreter in which to search. */
 	free((char *) iPtr->result);
 	iPtr->dynamic = 0;
     }
-    
+
     iPtr->result = iPtr->resultSpace;
     iPtr->resultSpace[0] = 0;
 
     firstPtr = &iPtr->commands[TCL_CMD_GET_CHAIN(cmdName)];
-    
+
     for (i=0,prev = NULL, cur = *firstPtr; cur != NULL;
 	 prev = cur, cur = cur->nextPtr)
     {
@@ -1650,7 +1650,7 @@ TclFindCmd(Interp   *iPtr,	/* Interpreter in which to search. */
 			/*
 			 * since we only have a 200 byte buffer
 			 * if there are more than five commands that
-			 * match, then show the first 5 and then 
+			 * match, then show the first 5 and then
 			 * put out some dots to indicate that there are
 			 * in fact others
 			 */
@@ -1662,7 +1662,7 @@ TclFindCmd(Interp   *iPtr,	/* Interpreter in which to search. */
 			else if (i == 5)
 			{
 			    strcat(iPtr->resultSpace, " ... ");
-			}			    
+			}
 			i++;
 		    }
 		}

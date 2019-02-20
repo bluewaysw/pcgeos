@@ -1,4 +1,4 @@
-/* 
+/*
  * tclCmdAH.c --
  *
  *	This file contains the top-level command routines for most of
@@ -27,6 +27,9 @@ static char *rcsid = "$Id: tclCmdAH.c,v 1.53 97/05/23 13:53:51 weber Exp $ SPRIT
 #include <sys/types.h>
 #include <errno.h>
 #include <compat/stdlib.h>
+#if defined(_LINUX)
+#include <compat/file.h>
+#endif
 
 #if defined(unix)
 # include <sys/signal.h>
@@ -38,7 +41,7 @@ static char *rcsid = "$Id: tclCmdAH.c,v 1.53 97/05/23 13:53:51 weber Exp $ SPRIT
 # include <sys/dir.h>
 # include <pwd.h>
 extern int errno;
-#else 
+#else
 #include <compat/dirent.h>
 #endif
 
@@ -46,9 +49,6 @@ extern int errno;
 # include <io.h>
 # include <process.h>
 # include <fcntl.h>
-# define F_OK 0
-# define R_OK 1
-# define W_OK 2
 # if defined(_MSDOS)
 #  include <stat.h>
 #  include <dos.h>
@@ -68,7 +68,7 @@ extern int errno;
  * Library imports:
  */
 
-extern double atof(const char *);
+/*extern double atof(const char *str);*/
 
 /*
  *----------------------------------------------------------------------
@@ -201,7 +201,7 @@ See also:\n\
 		    free((char *)patArgv);
 		    Tcl_Error(interp, "case has more than one default");
 		}
-		
+
 		defaultIdx = i+1;
 	    } else if (Tcl_StringMatch(string, patArgv[j])) {
 		break;
@@ -242,7 +242,7 @@ See also:\n\
 	return(TCL_OK);
     }
 }
-    
+
 
 /*
  *----------------------------------------------------------------------
@@ -367,7 +367,7 @@ See also:\n\
     Tcl_Return(interp, p, TCL_DYNAMIC);
     for (i = 1; i < argc; i++) {
 	int len;
-	
+
 	if (*argv[i] == 0) {
 	    continue;
 	}
@@ -762,7 +762,7 @@ See also:\n\
 	} while (select(maxID+1, &readMask, &writeMask, (int *) NULL,
 			(struct timeval *)NULL) <= 0);
 
-	/* 
+	/*
 	 * Pass input to the child.
 	 */
 
@@ -882,7 +882,7 @@ See also:\n\
 	 * spawn a process to execute the next command and wait for it to
 	 * finish before continuing (unless we exec a command.com shell)
 	 */
-	
+
 	if (strcmp(argv[0], "command.com") || argc > 2)
 	{
 	    strcpy(filename, "TMXXXXXX");
@@ -977,7 +977,7 @@ See also:\n\
 	    while (*cp)
 	    {
 		if (*cp == '\r')
-		{   
+		{
 		    *cp = ' ';
 		}
 		cp++;
@@ -1088,7 +1088,7 @@ See also:\n\
 	/*
 	 * Turn the integer result back into a string.
 	 */
-	
+
 	Tcl_RetPrintf(interp, "%d", value);
     } else {
 	double value;
@@ -1175,7 +1175,7 @@ TclFileMatch(Tcl_Interp	    *interp,
     if (dir == NULL) {
 	Tcl_Error(interp, "file match: Cannot open directory");
     }
-    
+
 #if defined(_MSDOS) || defined(_WIN32)
     /*
      * If the pattern contains lower-case letters, upcase them, as we'll only
@@ -1192,7 +1192,7 @@ TclFileMatch(Tcl_Interp	    *interp,
 	 * and upcase the lower-case letters.
 	 */
 	char	*newpat;
-	
+
 	newpat = (char *)malloc(strlen(pat)+1);
 
 	cp = newpat;
@@ -1292,9 +1292,9 @@ TclFileMatch(Tcl_Interp	    *interp,
  * CALLED BY:	    (INTERNAL) Tcl_FileCmd
  * RETURN:	    the expanded path, which might be in the passed
  *		    buffer.
- * SIDE EFFECTS:    
+ * SIDE EFFECTS:
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -1308,7 +1308,7 @@ ExpandTilde(char *f,	    	/* Name to expand */
 				 * necessary */
 {
     char *file;
-    
+
 #if defined(unix)
 
     char *p;
@@ -1331,7 +1331,7 @@ ExpandTilde(char *f,	    	/* Name to expand */
 	     */
 	    char	c;
 	    struct passwd   *pwd;
-	    
+
 	    /*
 	     * Trim it down to just the user name
 	     */
@@ -1539,12 +1539,12 @@ See also:\n\
 #endif
 
     char    *file;
-    
+
 
     mode = -1;
 
     file = ExpandTilde(argv[2], path);
-		
+
     switch ((int)clientData) {
 	case (int)FILE_EXPAND:
 	    Tcl_Return(interp, file, TCL_VOLATILE);
@@ -2036,10 +2036,10 @@ sprintf for formatting. This can be used to convert numbers to hex or octal.")
 	    case 'u':
 	    {
 		char *end;
-		
-		oneWordValue = (char *)TclExprGetNum(*curArg, 
+
+		oneWordValue = (char *)TclExprGetNum(*curArg,
 						     (const char **)&end);
-		
+
 		if (end == *curArg) {
 		    Tcl_RetPrintf(interp,
 				  "expected integer but got \"%.50s\" instead",
@@ -2056,10 +2056,10 @@ sprintf for formatting. This can be used to convert numbers to hex or octal.")
 	    case 'c':
 	    {
 		char *end;
-		
+
 		oneWordValue = (void *)TclExprGetNum(*curArg,
 						     (const char **)&end);
-		
+
 		if (end == *curArg) {
 		    Tcl_RetPrintf(interp,
 				  "expected integer but got \"%.50s\" instead",
@@ -2162,7 +2162,7 @@ static const Tcl_SubCommandRec elispSendCmds[] = {
     {TCL_CMD_END}
 };
 
-DEFCMD(elispSend,Tcl_ElispSend,TCL_EXACT,elispSendCmds,swat_prog.tcl, 
+DEFCMD(elispSend,Tcl_ElispSend,TCL_EXACT,elispSendCmds,swat_prog.tcl,
 "Great help here")
 {
     SendToEmacs(argv[1]);

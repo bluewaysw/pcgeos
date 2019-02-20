@@ -176,7 +176,7 @@ extern void 	    	Tcl_CreateCommandByRec(Tcl_Interp *interp,
 					       const Tcl_CommandRec *cmdRec);
 
 /*
- * Exported Tcl procedures: 
+ * Exported Tcl procedures:
  */
 extern char		Tcl_Backslash(const char *src, int *readPtr);
 extern void		Tcl_CreateCommand(Tcl_Interp *interp,

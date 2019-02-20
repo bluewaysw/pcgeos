@@ -47,7 +47,7 @@ typedef struct Command {
  * DEFCMD is used to create a Tcl_CommandRec for entering a built-in command
  * into the interpreter. It creates a function <FuncPref>Cmd to handle the
  * command, and <FuncPref>CmdRec whose address should be passed off to
- * Tcl_CommandCreateByRec to install the command. 
+ * Tcl_CommandCreateByRec to install the command.
  *
  * cmdData should be NULL or the address of an array of Tcl_SubCommandRec
  * records describing the arguments the command expects.
@@ -297,7 +297,7 @@ typedef struct Interp {
     void (*helpSet)(const char *name, const char *class, const char *str);
     	    	    	    	/* Function to call when a procedure with
 				 * help is defined. */
-#if defined(__HIGHC__)
+#if defined(__HIGHC__) || defined(__WATCOMC__)
     int (*output)(const char *fmt, ...);
 #else
     void (*output)(const char *fmt, ...);
@@ -317,7 +317,7 @@ typedef struct Interp {
     int flags;			/* Various flag bits.  See below. */
     Trace *tracePtr;		/* List of traces for this interpreter. */
     Frame *top;  	    	/* Top-most frame */
-    
+
     TclByteStack    operands; 	/* Operands */
     TclByteStack    strings;	/* String tables */
 
@@ -438,7 +438,7 @@ typedef struct {
     Tcl_Interp	    *interp;
     unsigned	    level;
 } TBCCData;
-	
+
 extern int  	    TclExprByteCompile(Tcl_Interp *interp,
 				       const char *str,
 				       TBCCData *dataPtr);
@@ -475,7 +475,7 @@ extern void 	    TclExprByteDisasm(Tcl_Interp *interp,
 				      const unsigned char *p,
 				      unsigned long len,
 				      unsigned indent);
-				      
+
 extern unsigned long
 	TclExprByteChangeStringReferences(TBCCData *dataPtr,
 					  unsigned char *p,

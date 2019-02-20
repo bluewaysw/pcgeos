@@ -2,8 +2,8 @@
  *
  *	Copyright (c) GeoWorks 1993 -- All Rights Reserved
  *
- * PROJECT:	  
- * MODULE:	  
+ * PROJECT:
+ * MODULE:
  * FILE:	  tclByteCode.c
  *
  * AUTHOR:  	  Adam de Boor: Nov 23, 1993
@@ -47,6 +47,7 @@ static char *rcsid =
 #include <malloc.h>
 #include <compat/string.h>
 #include <compat/stdlib.h>
+#include <compat/file.h>
 #include <assert.h>
 
 #if defined(unix)
@@ -67,9 +68,11 @@ static char *rcsid =
 #include <fcntl.h>
 #include <dos.h>
 
+#if defined(_LINUX)
 #define F_OK 0
 #define R_OK 1
 #define W_OK 2
+#endif
 #define access(n,m) _access(n,m)
 
 #define stat(n,s) _stat(n,s)
@@ -169,7 +172,7 @@ static unsigned long
  * RETURN:	    the number, as an unsigned long
  * SIDE EFFECTS:    *bytePtr is advanced beyond the number.
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -200,7 +203,7 @@ TclByteCodeFetchNum(const unsigned char **bytePtr)
 	return p[0];
     }
 }
-	    
+
 
 /***********************************************************************
  *				TclByteCodeFetchSignedNum
@@ -210,7 +213,7 @@ TclByteCodeFetchNum(const unsigned char **bytePtr)
  * RETURN:	    the number, as a long
  * SIDE EFFECTS:    *bytePtr is advanced beyond the number.
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -241,7 +244,7 @@ TclByteCodeFetchSignedNum(const unsigned char **bytePtr)
 	return ((signed char)(p[0]&TBC_SHORT_NUM_MASK)<<2)>>2;
     }
 }
-	    
+
 
 /***********************************************************************
  *				TclByteCodeFetchString
@@ -251,7 +254,7 @@ TclByteCodeFetchSignedNum(const unsigned char **bytePtr)
  * RETURN:	    the string, and the length
  * SIDE EFFECTS:    *bytePtr advanced beyond the null-terminated string
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -276,7 +279,7 @@ TclByteCodeFetchString(Interp *iPtr,
 	 * the 0 length byte), it's an indexed string.
 	 */
 	unsigned long stridx;
-	
+
 	stridx = TclByteCodeFetchNum(bytePtr);
 
 	if ((stridx != 0) && (iPtr->strings.top != 0))
@@ -343,7 +346,7 @@ TclByteCodeFetchString(Interp *iPtr,
     if (lenPtr) {
 	*lenPtr = length;
     }
-    
+
     return(result);
 }
 
@@ -355,7 +358,7 @@ TclByteCodeFetchString(Interp *iPtr,
  * RETURN:	    nothing
  * SIDE EFFECTS:    interpreter's stack may be resized
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -377,7 +380,7 @@ TclByteCodePush(Interp	    	    	    *iPtr,
     } else {
 	stack = &iPtr->operands;
     }
-    
+
     if (stack->size == 0) {
 	stack->size = INIT_BYTE_OP_STACK_SIZE;
 	stack->stack =
@@ -397,7 +400,7 @@ TclByteCodePush(Interp	    	    	    *iPtr,
 
     stack->top += 1;
 }
-					   
+
 #define TBCInArgStore(elt) (((elt)->eltData >= (const void *)argStore) && ((elt)->eltData < (const void *)(&argStore[sizeof(argStore)])))
 
 #define TclByteCodePopCommon(stck) \
@@ -424,7 +427,7 @@ TclByteCodePush(Interp	    	    	    *iPtr,
  * RETURN:	    nothing
  * SIDE EFFECTS:    any element data marked as dynamic is freed.
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -451,7 +454,7 @@ TclByteCodePush(Interp	    	    	    *iPtr,
  * RETURN:	    Tcl result
  * SIDE EFFECTS:    none here
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -546,7 +549,7 @@ ByteCodeProc(ByteProc 	*procPtr,	/* Record describing procedure to be
 	/*
 	 * Invoke the commands in the procedure's body.
 	 */
-	
+
 	result = TclByteCodeEval(interp,
 				 procPtr->size,
 				 procPtr->code);
@@ -583,7 +586,7 @@ ByteCodeProc(ByteProc 	*procPtr,	/* Record describing procedure to be
     }
     return result;
 }
-    
+
 
 /***********************************************************************
  *				TclByteCodeProcCmd
@@ -593,7 +596,7 @@ ByteCodeProc(ByteProc 	*procPtr,	/* Record describing procedure to be
  * RETURN:	    TCL_OK if happiness reigns
  * SIDE EFFECTS:    existing command is biffed
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -717,7 +720,7 @@ TclByteCodeEval(Tcl_Interp    	    *interp,
 				  (Tcl_Frame *)&frame);\
 	}\
     }
-	
+
 
 #define TRACE_AFTER()	\
     if (bcDebug) {\
@@ -733,11 +736,11 @@ TclByteCodeEval(Tcl_Interp    	    *interp,
 				    (Tcl_Frame *)&frame, result);\
 	}\
     }
-	
+
 
     iPtr->numLevels += 1;
     iPtr->cmdCount += 1;
-    
+
     frame.protect = 0;
     frame.ext.cmdProc = 0;
     frame.ext.cmdFlags = 0;
@@ -753,12 +756,12 @@ TclByteCodeEval(Tcl_Interp    	    *interp,
 	frame.localPtr = &iPtr->globalFrame;
     }
     iPtr->top = &frame;
-    
+
     p = data;
-    
+
     while (p - data < size && result == TCL_OK) {
 	TclByteOpcode op = *p++;
-	
+
 	switch (op) {
 	case (int)TBOP_PUSH:
 	{
@@ -856,10 +859,10 @@ TclByteCodeEval(Tcl_Interp    	    *interp,
 		     */
 		    extra = 1;
 		    assert(ELT(nargs)->eltType == TBSET_STRING);
-		    
+
 		    procname = ELT(nargs)->eltData;
 		}
-		
+
 		cmd = TclFindCmd(iPtr, procname, 0);
 
 		if (cmd == NULL) {
@@ -878,7 +881,7 @@ TclByteCodeEval(Tcl_Interp    	    *interp,
 		    result = TCL_ERROR;
 		    break;
 		}
-		
+
 		if (builtInCmds[idx]->data) {
 		    if ((builtInCmds[idx]->data->subCommand == TCL_CMD_END) ||
 			(builtInCmds[idx]->data->subCommand[0] == '\0' &&
@@ -901,7 +904,7 @@ TclByteCodeEval(Tcl_Interp    	    *interp,
 		argv[0] = builtInCmds[idx]->name;
 		frame.ext.cmdFlags = builtInCmds[idx]->flags;
 	    }
-		    
+
 
 	    for (arg = ELT(nargs-1), i = 0; i < nargs; i++, arg++) {
 		assert(arg->eltType == TBSET_STRING);
@@ -917,7 +920,7 @@ TclByteCodeEval(Tcl_Interp    	    *interp,
 	     * interp->dynamic as Tcl_Eval does.
 	     */
 	    Tcl_Return(interp, NULL, TCL_STATIC);
-	    
+
 	    /*
 	     * Call trace procedures, if any, then invoke the command.
 	     */
@@ -949,7 +952,7 @@ TclByteCodeEval(Tcl_Interp    	    *interp,
 	    frame.ext.cmdProc = 0;
 
 	    TRACE_BEFORE();
-	    
+
 	    /*
 	     * Look for the proper body to execute, taking the first whose
 	     * test-expr evaluates non-zero, or the last one that has no
@@ -1026,7 +1029,7 @@ TclByteCodeEval(Tcl_Interp    	    *interp,
 	    assert(iPtr->operands.top - initTop >= 2);
 
 	    TRACE_BEFORE();
-	    
+
 	    while (result == TCL_OK || result == TCL_CONTINUE) {
 		int testVal;
 
@@ -1059,7 +1062,7 @@ TclByteCodeEval(Tcl_Interp    	    *interp,
 
 	    TclByteCodePopArgs(2);
 	    TRACE_AFTER();
-	    
+
 	    break;
 	}
 	case (int)TBOP_FOR:
@@ -1087,7 +1090,7 @@ TclByteCodeEval(Tcl_Interp    	    *interp,
 					     &testVal);
 		} else {
 		    assert(ELT(2)->eltType == TBSET_STRING);
-		
+
 		    result = Tcl_Expr(interp, (const char *)ELT(2)->eltData,
 				      &testVal);
 		}
@@ -1124,7 +1127,7 @@ TclByteCodeEval(Tcl_Interp    	    *interp,
 	    const char *string;	    	/* String being matched */
 	    TclByteStackElement *arg;
 	    unsigned i;
-	    
+
 	    argv[0] = "bytecode case";
 	    frame.ext.argc = 1;
 	    frame.ext.cmdProc = 0;
@@ -1148,7 +1151,7 @@ TclByteCodeEval(Tcl_Interp    	    *interp,
 		   !((nargs-1) & 1));
 
 	    TRACE_BEFORE();
-	    
+
 	    /*
 	     * Indicate no default, as yet.
 	     */
@@ -1163,7 +1166,7 @@ TclByteCodeEval(Tcl_Interp    	    *interp,
 		 * Break up the pattern list into its individual patterns.
 		 */
 		assert(arg->eltType == TBSET_STRING);
-		
+
 		result = Tcl_SplitList(interp, arg->eltData,
 				       &patArgc, &patArgv);
 		if (result != TCL_OK) {
@@ -1223,7 +1226,7 @@ TclByteCodeEval(Tcl_Interp    	    *interp,
 		    Tcl_Return(interp, NULL, TCL_STATIC);
 		}
 	    }
-	    
+
 	    /*
 	     * Pop args off the stack.
 	     */
@@ -1246,9 +1249,9 @@ TclByteCodeEval(Tcl_Interp    	    *interp,
 	    nargs = TclByteCodeFetchNum(&p);
 
 	    assert(iPtr->operands.top - initTop >= nargs);
-	    
+
 	    dynamic = 0;
-	    
+
 	    for (len = 1, i = 0, arg = ELT(nargs-1); i < nargs; i++, arg++) {
 		assert(arg->eltType == TBSET_STRING);
 		len += arg->eltSize;
@@ -1303,7 +1306,7 @@ TclByteCodeEval(Tcl_Interp    	    *interp,
 				 ELT(2)->eltData,
 				 ELT(1)->eltData);
 	    }
-	    
+
 	    TclByteCodePopArgs(5);
 	    break;
 	}
@@ -1312,7 +1315,7 @@ TclByteCodeEval(Tcl_Interp    	    *interp,
 	     * stack: retval -- */
 
 	    assert(TOP->eltType == TBSET_STRING);
-	    
+
 	    if (TBCInArgStore(TOP)) {
 		/*
 		 * In our private little heap. If it's small enough,
@@ -1355,7 +1358,7 @@ TclByteCodeEval(Tcl_Interp    	    *interp,
 	     * stack: var-name list-string body-code -- retval */
 	    int listArgc, i;
 	    char **listArgv;
-	    
+
 	    argv[0] = "bytecode foreach";
 	    frame.ext.argc = 1;
 	    frame.ext.cmdProc = 0;
@@ -1363,14 +1366,14 @@ TclByteCodeEval(Tcl_Interp    	    *interp,
 	    assert(iPtr->operands.top - initTop >= 3);
 	    assert(ELT(2)->eltType == TBSET_STRING);
 	    assert(ELT(1)->eltType == TBSET_STRING);
-	    
+
 	    TRACE_BEFORE();
-	    
+
 	    /*
 	     * Break the list up into elements, and execute the command once
 	     * for each value of the element.
 	     */
-	    
+
 	    result = Tcl_SplitList(interp, ELT(1)->eltData,
 				   &listArgc, &listArgv);
 	    if (result != TCL_OK) {
@@ -1378,7 +1381,7 @@ TclByteCodeEval(Tcl_Interp    	    *interp,
 	    }
 	    for (i = 0; i < listArgc; i++) {
 		Tcl_SetVar(interp, ELT(2)->eltData, listArgv[i], 0);
-		
+
 		result = TclByteCodeEvalOperand(interp, ELT(0));
 		if (result != TCL_OK) {
 		    if (result == TCL_CONTINUE) {
@@ -1416,7 +1419,7 @@ TclByteCodeEval(Tcl_Interp    	    *interp,
 		(ELT(0)->eltType == TBSET_STRING) ? 0 : ELT(0)->eltSize;
 
 	    TRACE_BEFORE();
-	    
+
 	    result = TclByteCodeEvalOperand(interp, ELT(1));
 	    /*
 	     * Save pointer to/duplicate result as necessary to preserve it
@@ -1429,20 +1432,20 @@ TclByteCodeEval(Tcl_Interp    	    *interp,
 		dynamic = iPtr->dynamic;
 	    } else {
 		int 	len = strlen(iPtr->result);
-		
+
 		value = (char *)malloc(len+1);
 		bcopy(iPtr->result, value, len+1);
 		dynamic = 1;
 	    }
-	    
+
 	    /*
 	     * Reset return value for evaluating the protected command
 	     */
 	    iPtr->dynamic = 0;
 	    iPtr->result = iPtr->resultSpace;
-	    
+
 	    frame.protect = 0;
-	    
+
 	    /*
 	     * Evaluate the protected command and blow away its return value
 	     */
@@ -1459,7 +1462,7 @@ TclByteCodeEval(Tcl_Interp    	    *interp,
 	    /* args:
 	     * stack: expr -- retval */
 	    int	val;
-	    
+
 
 	    argv[0] = "bytecode expr";
 	    frame.ext.argc = 1;
@@ -1482,7 +1485,7 @@ TclByteCodeEval(Tcl_Interp    	    *interp,
 	    if (result != TCL_ERROR) {
 		Tcl_RetPrintf(interp, "%d", val);
 	    }
-	    
+
 	    TclByteCodePopArgs(1);
 
 	    TRACE_AFTER();
@@ -1493,7 +1496,7 @@ TclByteCodeEval(Tcl_Interp    	    *interp,
 	    /* args:
 	     * stack: expr -- retval */
 	    double	val;
-	    
+
 	    argv[0] = "bytecode fexpr";
 	    frame.ext.argc = 1;
 	    frame.ext.cmdProc = 0;
@@ -1501,7 +1504,7 @@ TclByteCodeEval(Tcl_Interp    	    *interp,
 	    assert (iPtr->operands.top - initTop >= 1);
 
 	    TRACE_BEFORE();
-	    
+
 	    if (ELT(0)->eltType == TBSET_EXPR) {
 		result = TclFExprByteEval(interp,
 					  ELT(0)->eltData,
@@ -1515,7 +1518,7 @@ TclByteCodeEval(Tcl_Interp    	    *interp,
 	    if (result != TCL_ERROR) {
 		Tcl_RetPrintf(interp, "%.16g", val);
 	    }
-	    
+
 	    TclByteCodePopArgs(1);
 
 	    TRACE_AFTER();
@@ -1548,7 +1551,7 @@ TclByteCodeEval(Tcl_Interp    	    *interp,
 	    result = TCL_ERROR;
 	    break;
 	}
-						    
+
 	/*
 	 * If not ok, get the heck out.
 	 */
@@ -1576,7 +1579,7 @@ TclByteCodeEval(Tcl_Interp    	    *interp,
 			argTop += len+1;
 		    } else {
 			char *cp = (char *)malloc(len+1);
-			
+
 			bcopy(iPtr->result, cp, len+1);
 			iPtr->result = cp;
 			iPtr->dynamic = 1;
@@ -1618,14 +1621,14 @@ TclByteCodeEval(Tcl_Interp    	    *interp,
 	 */
 	assert(iPtr->operands.top - initTop <= 1);
 	assert(iPtr->operands.top >= initTop);
-	
+
 	if (iPtr->operands.top != initTop) {
 	    assert(TOP->eltType == TBSET_STRING);
-	    
+
 	    Tcl_Return(interp, TOP->eltData,
 		       (TOP->eltDynamic ? TCL_DYNAMIC :
 			(TBCInArgStore(TOP) ? TCL_VOLATILE : TCL_STATIC)));
-	    
+
 	    TOP->eltDynamic = 0; /* String has been stolen... */
 	    TclByteCodePop();
 	}
@@ -1653,7 +1656,7 @@ TclByteCodeEval(Tcl_Interp    	    *interp,
  * RETURN:	    nothing
  * SIDE EFFECTS:    all dynamic operands are freed.
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -1704,7 +1707,7 @@ TBCCDataInit(TBCCData	    *dataPtr,
 	    (unsigned char *)malloc(dataPtr->strings->size);
 	dataPtr->strings->refs =
 	    (unsigned short *)malloc(sizeof(unsigned short));
-	
+
 	/*
 	 * Set the number of strings to 0
 	 */
@@ -1729,7 +1732,7 @@ TBCCDataInit(TBCCData	    *dataPtr,
  * RETURN:	    nothing
  * SIDE EFFECTS:    dataPtr->data, dataPtr->tail, dataPtr->max updated
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -1750,7 +1753,7 @@ TBCCEnsureRoom(TBCCData	    	*dataPtr,
 	 * can reset the pointer should the buffer move.
 	 */
 	tdiff = dataPtr->tail - dataPtr->data;
-	
+
 	/*
 	 * Make the buffer big enough for the data being copied in, plus
 	 * the usual buffer-extension size.
@@ -1778,7 +1781,7 @@ TBCCEnsureRoom(TBCCData	    	*dataPtr,
  * RETURN:	    nothing
  * SIDE EFFECTS:    buffer may move. dataPtr->tail incremented
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -1805,7 +1808,7 @@ TBCCOutputByte(TBCCData *dataPtr,
  * RETURN:	    the number of bytes required
  * SIDE EFFECTS:    buffer overwritten
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -1852,7 +1855,7 @@ TBCCFormatNum(unsigned long n,
  * RETURN:	    nothing
  * SIDE EFFECTS:    1, 2, or 4 bytes are stored
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -1866,7 +1869,7 @@ TBCCOutputNum(TBCCData *dataPtr,
 {
     unsigned char   buf[TBC_MAX_NUM];
     unsigned long   len;
-    
+
     len = TBCCFormatNum(n, buf);
 
     TBCCEnsureRoom(dataPtr, len);
@@ -1874,7 +1877,7 @@ TBCCOutputNum(TBCCData *dataPtr,
     bcopy(buf, dataPtr->tail, len);
 
     dataPtr->tail += len;
-    
+
 }
 
 
@@ -1886,7 +1889,7 @@ TBCCOutputNum(TBCCData *dataPtr,
  * RETURN:	    nothing
  * SIDE EFFECTS:    1, 2, or 4 bytes are stored
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -1939,7 +1942,7 @@ TBCCOutputSignedNum(TBCCData *dataPtr,
  * RETURN:	    nothing
  * SIDE EFFECTS:    the usual
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -1969,9 +1972,9 @@ TBCCOutputBytes(TBCCData *dataPtr,
  *		    necessary null terminator.
  * CALLED BY:	    (INTERNAL)
  * RETURN:	    nothing
- * SIDE EFFECTS:    
+ * SIDE EFFECTS:
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -2002,13 +2005,13 @@ TBCCOutputString(TBCCData *dataPtr,
     }
 
     num = dataPtr->strings->strings[0] | (dataPtr->strings->strings[1] << 8);
-    
+
     for (bp = dataPtr->strings->strings+2, i = 0;
 	 i < num;
 	 i++, bp += 2)
     {
 	const char    	    *tstr;
-	
+
 	offset = bp[0] | (bp[1] << 8);
 	tstr = (const char *)(dataPtr->strings->strings+offset);
 	if (str[0] == tstr[0] && strncmp(str, tstr, len) == 0 &&
@@ -2025,7 +2028,7 @@ TBCCOutputString(TBCCData *dataPtr,
 	 */
 	int dorealloc = 0;
 	unsigned char *strstart;
-	
+
 	if (dataPtr->strings->free + len + 1 + 2 > 65535) {
 	    /*
 	     * Won't fit in the table -- put it out straight.
@@ -2034,7 +2037,7 @@ TBCCOutputString(TBCCData *dataPtr,
 	    TBCCOutputByte(dataPtr, 0);
 	    return;
 	}
-	
+
 	while (len + 1 + 2 >
 	       dataPtr->strings->size - dataPtr->strings->free)
 	{
@@ -2116,7 +2119,7 @@ TBCCOutputString(TBCCData *dataPtr,
      * Count another reference to the string.
      */
     dataPtr->strings->refs[i] += 1;
-    
+
     /*
      * Put out a 0 byte (to signal the indexed string) followed by the string
      * index (which is always 1-origin).
@@ -2136,7 +2139,7 @@ TBCCOutputString(TBCCData *dataPtr,
  * RETURN:	    nothing
  * SIDE EFFECTS:    dataPtr->data, dataPtr->tail, dataPtr->max updated
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -2154,7 +2157,7 @@ TBCCReplace(TBCCData	    	*dataPtr,
     int		    diff;
 
     assert (bp >= dataPtr->data && bp < dataPtr->tail);
-    
+
     diff = len - oldlen;
 
     if (diff > 0) {
@@ -2190,7 +2193,7 @@ TBCCReplace(TBCCData	    	*dataPtr,
  * RETURN:	    nothing
  * SIDE EFFECTS:    dataPtr->data, dataPtr->tail, dataPtr->max updated
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -2210,7 +2213,7 @@ TBCCReplaceNum(TBCCData	    	    *dataPtr,
     TclByteCodeFetchNum((const unsigned char **)&bp);
     TBCCReplace(dataPtr, oldbp, bp - oldbp, data, len);
 }
-    
+
 
 /***********************************************************************
  *				TBCCChangeReference
@@ -2223,7 +2226,7 @@ TBCCReplaceNum(TBCCData	    	    *dataPtr,
  * SIDE EFFECTS:    *pPtr, *basePtr, and *lenPtr adjusted
  *	    	    dataPtr->data, dataPtr->tail, dataPtr->max adjusted
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -2256,7 +2259,7 @@ TBCCChangeReference(TBCCData	    	    *dataPtr,
 	p += len + 1;
     } else {
 	unsigned long i;
-	
+
 	p += 1;
 	i = TclByteCodeFetchNum((const unsigned char **)&p);
 
@@ -2317,7 +2320,7 @@ TBCCChangeReference(TBCCData	    	    *dataPtr,
     *pPtr = p;
 }
 
-		
+
 
 /***********************************************************************
  *				TBCCChangeCodeStringReferences
@@ -2329,7 +2332,7 @@ TBCCChangeReference(TBCCData	    	    *dataPtr,
  * SIDE EFFECTS:    the code is expanded (or possibly shrunk) and the length
  *		    at the start adjusted
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -2362,7 +2365,7 @@ TBCCChangeCodeStringReferences(TBCCData *dataPtr,
      */
     p = *pPtr;
     baseOff = p - dataPtr->data;
-		
+
     /*
      * Find the length of the code and remember where it used to end.
      */
@@ -2379,18 +2382,18 @@ TBCCChangeCodeStringReferences(TBCCData *dataPtr,
 	 * Point back to the length.
 	 */
 	p = dataPtr->data + baseOff;
-	
+
 	/*
 	 * Format the new length and put it over top of the old length.
 	 */
 	lenlen = TBCCFormatNum(length, buf);
 	TBCCReplaceNum(dataPtr, p, buf, lenlen);
-	
+
 	/*
 	 * Advance beyond the compressed code.
 	 */
 	p = dataPtr->data + baseOff + lenlen + length;
-	
+
     } else {
 	/*
 	 * Embedded code has its own string table, so do nothing...
@@ -2403,7 +2406,7 @@ TBCCChangeCodeStringReferences(TBCCData *dataPtr,
 	 */
 	p += length;
     }
-    
+
     *pPtr = p;
 
     /*
@@ -2413,7 +2416,7 @@ TBCCChangeCodeStringReferences(TBCCData *dataPtr,
 	*lenPtr += (p - dataPtr->data) - oldend;
     }
 }
-    
+
 
 /***********************************************************************
  *				TBCCChangeStringReferences
@@ -2426,7 +2429,7 @@ TBCCChangeCodeStringReferences(TBCCData *dataPtr,
  * RETURN:	    the length of the new code
  * SIDE EFFECTS:    stuff moves
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -2441,13 +2444,13 @@ TBCCChangeStringReferences(TBCCData	    	    *dataPtr,
 			   const TBCCStringChange   *changes)
 {
     unsigned char *base = p;
-    
+
 /*    printf("Changing references in:\n");
     TclByteCodeDisasm(dataPtr->interp, p, len, dataPtr->level);
 */
 
     dataPtr->level += 2;
-    
+
     while (p - base < len) {
 	switch (*p++) {
 	case (int)TBOP_PUSH:
@@ -2518,7 +2521,7 @@ TBCCChangeStringReferences(TBCCData	    	    *dataPtr,
 	{
 	    /* args: #args
 	     * stack: string (pattern-list body-code)+ -- retval */
-		
+
 	    /*
 	     * Extract the number of args for the case (including the string)
 	     */
@@ -2569,19 +2572,19 @@ TBCCChangeStringReferences(TBCCData	    	    *dataPtr,
 	     * Change references within the expression
 	     */
 	    unsigned long pOff = p - dataPtr->data;
-	    unsigned long elen = 
+	    unsigned long elen =
 		               TclByteCodeFetchNum((const unsigned char **)&p);
 	    int	    	  elenlen = (p - dataPtr->data) - pOff;
 	    unsigned long nlen;
 	    unsigned char buf[TBC_MAX_NUM];
 	    unsigned long lenlen;
 	    unsigned long boff = base - dataPtr->data;
-	    
+
 	    nlen = TclExprByteChangeStringReferences(dataPtr, p, elen, changes);
 	    p = dataPtr->data + pOff;
 	    lenlen = TBCCFormatNum(nlen, buf);
 	    TBCCReplaceNum(dataPtr, p, buf, lenlen);
-	    
+
 	    base = dataPtr->data + boff;
 	    assert (dataPtr->data + pOff + nlen + lenlen >= base);
 	    p = dataPtr->data + pOff + nlen + lenlen;
@@ -2594,7 +2597,7 @@ TBCCChangeStringReferences(TBCCData	    	    *dataPtr,
 	    break;
 	case (int)TBOP_PUSHST:
 	{
-	    unsigned long len = 
+	    unsigned long len =
 		               TclByteCodeFetchNum((const unsigned char **)&p);
 	    p += len;
 	    break;
@@ -2608,7 +2611,7 @@ TBCCChangeStringReferences(TBCCData	    	    *dataPtr,
     dataPtr->level -= 2;
     assert(p >= base);
     return(p - base);
-}    
+}
 
 /***********************************************************************
  *				TBCCCompressStringTable
@@ -2621,7 +2624,7 @@ TBCCChangeStringReferences(TBCCData	    	    *dataPtr,
  * RETURN:	    nothing
  * SIDE EFFECTS:    the code may move
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -2658,7 +2661,7 @@ TBCCCompressStringTable(TBCCData    *dataPtr)
 #endif /* DEBUG_STRING_COMPRESSION */
 
     newsize = 0;
-    
+
     for (j = 1, i = 0, bp = &dataPtr->strings->strings[2];
 	 i < numStrings;
 	 i++, bp += 2)
@@ -2682,7 +2685,7 @@ TBCCCompressStringTable(TBCCData    *dataPtr)
 	 * Find the offset of this one.
 	 */
 	offset = bp[0] | (bp[1] << 8);
-	
+
 	/*
 	 * Assume we'll be removing the index references to this string and
 	 * point the change record to the string.
@@ -2720,7 +2723,7 @@ TBCCCompressStringTable(TBCCData    *dataPtr)
 	     */
 	    refsize = 3;
 	}
-	
+
 	/*
 	 * Now compare the size of the inline strings to the indexed references.
 	 * Note that changes[i] is currently set up to change the indexed
@@ -2731,10 +2734,10 @@ TBCCCompressStringTable(TBCCData    *dataPtr)
 	       i+1, changes[i].data, dataPtr->strings->refs[i], strsize,
 	       refsize);
 #endif /* DEBUG_STRING_COMPRESSION */
-	
+
 	changes[i].savings = (dataPtr->strings->refs[i] * strsize) -
 	    (dataPtr->strings->refs[i] * refsize + 2 + changes[i].dataLen);
-	
+
 	if (changes[i].savings >= 0) {
 	    /*
 	     * The compressed references are smaller or the same size as
@@ -2743,7 +2746,7 @@ TBCCCompressStringTable(TBCCData    *dataPtr)
 	     * j in the end result.
 	     */
 	    newsize += changes[i].dataLen;
-	    
+
 	    changes[i].data = 0;
 	    changes[i].dataLen = j++;
 
@@ -2797,7 +2800,7 @@ TBCCCompressStringTable(TBCCData    *dataPtr)
 		savings += changes[i].savings;
 	    }
 	}
-	
+
 	if (savings <= overhead) {
 	    /*
 	     * Not worth it. Wipe out the entire table by restoring the
@@ -2807,13 +2810,13 @@ TBCCCompressStringTable(TBCCData    *dataPtr)
 		if (changes[i].data == 0) {
 		    unsigned short offset;
 		    unsigned short next;
-		    
+
 		    /*
 		     * Point to the offset to the string and compute the offset
 		     */
 		    bp = dataPtr->strings->strings + ((i+1) * 2);
 		    offset = bp[0] + (bp[1] << 8);
-		    
+
 		    /*
 		     * Figure the offset of the next string so we can compute
 		     * the length.
@@ -2837,8 +2840,8 @@ TBCCCompressStringTable(TBCCData    *dataPtr)
 	    newsize = 0;
 	}
     }
-		    
-	    
+
+
 
     /*
      * Ok. We now know how we need to change the table. Now run through
@@ -2863,7 +2866,7 @@ TBCCCompressStringTable(TBCCData    *dataPtr)
     newstr = newtable + j * sizeof(unsigned short);
     newtable[0] = j-1;
     newtable[1] = (j-1) >> 8;
-    
+
     /*
      * Now loop through the old table copying the strings we're keeping into
      * their proper position in the new table. The new slots are assigned in
@@ -2894,7 +2897,7 @@ TBCCCompressStringTable(TBCCData    *dataPtr)
 	    newstr += len;
 	}
     }
-    
+
     /*
      * Replace the old table with the new.
      */
@@ -2928,7 +2931,7 @@ TBCCCompressStringTable(TBCCData    *dataPtr)
  *		    out. dst should be reset to argv[argc] by the caller
  *		    in any case
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -2951,7 +2954,7 @@ TBCCOutputPushIfNecessary(TBCCData *dataPtr,
 	TBCCOutputByte(dataPtr, TBOP_POP);
 	*needPopPtr = 0;
     }
-    
+
     if (dst != argv[argc]) {
 	TBCCOutputByte(dataPtr, TBOP_PUSH);
 	if (dst[-1] == '\0') {
@@ -2965,7 +2968,7 @@ TBCCOutputPushIfNecessary(TBCCData *dataPtr,
 	*argCompsPtr += 1;
     }
 }
-    
+
 
 /***********************************************************************
  *				TBCCOutputCompiledArg
@@ -2976,7 +2979,7 @@ TBCCOutputPushIfNecessary(TBCCData *dataPtr,
  * RETURN:	    TCL_ERROR/TCL_OK
  * SIDE EFFECTS:    the usual
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -2996,7 +2999,7 @@ TBCCOutputCompiledArg(TBCCData *dataPtr,
 {
     unsigned long length;
     unsigned char *nested;
-    
+
     nested = TclByteCodeCompileTop(interp, arg, 0,
 				   doPop ? TBCC_DISCARD : 0,
 				   strings, 0, &length);
@@ -3005,7 +3008,7 @@ TBCCOutputCompiledArg(TBCCData *dataPtr,
     }
     TBCCOutputByte(dataPtr, TBOP_CODE);
     TBCCOutputBytes(dataPtr, nested, length);
-    
+
     free((char *)nested);
     return (TCL_OK);
 }
@@ -3021,7 +3024,7 @@ TBCCOutputCompiledArg(TBCCData *dataPtr,
  * SIDE EFFECTS:    the expression is put out, either as a PUSHE or a
  *		    PUSHV opcode.
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -3053,13 +3056,13 @@ TBCCOutputCompiledExpr(TBCCData *dataPtr,
 	 */
 	int vlen;
 	const char *name;
-	
+
 	while (*arg != '$') {
 	    arg++;
 	}
 	/* scan off the variable name */
 	name = TclProcScanVar(interp, arg, &vlen, NULL);
-	
+
 	TBCCOutputByte(dataPtr, TBOP_PUSHV);
 	TBCCOutputString(dataPtr, name, vlen);
 	result = TCL_OK;
@@ -3092,7 +3095,7 @@ typedef struct _SpecialCmd *SpecialCmdPtr;
 
 typedef void TBCCCmdInitProc(TBCCData *dataPtr,
 			     CmdState *cmdStatePtr);
-			     
+
 typedef int TBCCArgProc(TBCCData *dataPtr,
 			Tcl_Interp *interp,
 			unsigned argComps,
@@ -3296,7 +3299,7 @@ static SpecialCmd cmds[] = {
  * RETURN:	    nothing
  * SIDE EFFECTS:    none
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -3319,7 +3322,7 @@ TBCCNullInitProc(TBCCData   *dataPtr,
  * RETURN:	    nothing
  * SIDE EFFECTS:    cmdStatePtr->ifState initialized
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -3340,9 +3343,9 @@ TBCCIfInitProc(TBCCData	*dataPtr,
  * SYNOPSIS:	    Finish compiling an "if"
  * CALLED BY:	    (INTERNAL) TclByteCodeCompileLow
  * RETURN:	    TCL_OK/TCL_ERROR
- * SIDE EFFECTS:    
+ * SIDE EFFECTS:
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -3365,7 +3368,7 @@ TBCCIfCompileProc(TBCCData *dataPtr,
     TBCCOutputNum(dataPtr, argc-1);
     return (TCL_OK);
 }
-			    
+
 
 /***********************************************************************
  *				TBCCIfArgProc
@@ -3376,7 +3379,7 @@ TBCCIfCompileProc(TBCCData *dataPtr,
  * RETURN:	    TCL_OK/TCL_ERROR
  * SIDE EFFECTS:    stuff may be emitted.
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -3401,7 +3404,7 @@ TBCCIfArgProc(TBCCData 	    	    *dataPtr,	    /* For emitting code */
 	      int   	    	    *argcPtr)       /* Arg # just finished */
 {
     int	    result;
-    
+
     /*
      * If "else" or "elif" allowed, look for them.
      */
@@ -3421,7 +3424,7 @@ TBCCIfArgProc(TBCCData 	    	    *dataPtr,	    /* For emitting code */
 	 */
 	cmdStatePtr->ifState = IFS_FINAL_CODE;
     }
-				
+
     /*
      * If a "then" is allowed here, look for it.
      */
@@ -3436,7 +3439,7 @@ TBCCIfArgProc(TBCCData 	    	    *dataPtr,	    /* For emitting code */
 	 */
 	cmdStatePtr->ifState = IFS_CODE;
     }
-    
+
     if (cmdStatePtr->ifState == IFS_CODE || cmdStatePtr->ifState == IFS_FINAL_CODE) {
 	/*
 	 * If just a string, we can compile it now.
@@ -3447,7 +3450,7 @@ TBCCIfArgProc(TBCCData 	    	    *dataPtr,	    /* For emitting code */
 	    if (result != TCL_OK) {
 		return (result);
 	    }
-					
+
 	    if (cmdStatePtr->ifState == IFS_CODE) {
 		cmdStatePtr->ifState = IFS_OPT_ELSE;
 	    } else {
@@ -3491,9 +3494,9 @@ TBCCIfArgProc(TBCCData 	    	    *dataPtr,	    /* For emitting code */
  *		    same number of args.
  * CALLED BY:	    (INTERNAL) TclByteCodeCompileLow
  * RETURN:	    TCL_OK/TCL_ERROR
- * SIDE EFFECTS:    
+ * SIDE EFFECTS:
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -3517,7 +3520,7 @@ TBCCFixedCompileProc(TBCCData *dataPtr,
     TBCCOutputByte(dataPtr, curCmd->opcode);
     return (TCL_OK);
 }
-			    
+
 
 /***********************************************************************
  *				TBCCFixedArgProc
@@ -3528,7 +3531,7 @@ TBCCFixedCompileProc(TBCCData *dataPtr,
  * RETURN:	    TCL_OK/TCL_ERROR
  * SIDE EFFECTS:    stuff may be emitted.
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -3578,9 +3581,9 @@ TBCCFixedArgProc(TBCCData    	    *dataPtr,	    /* For emitting code */
  * SYNOPSIS:	    Finish compiling an EXPR or FEXPR thing
  * CALLED BY:	    (INTERNAL) TclByteCodeCompileLow
  * RETURN:	    TCL_OK/TCL_ERROR
- * SIDE EFFECTS:    
+ * SIDE EFFECTS:
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -3607,7 +3610,7 @@ TBCCExprCompileProc(TBCCData *dataPtr,
     }
     return (TCL_OK);
 }
-			    
+
 
 /***********************************************************************
  *				TBCCExprArgProc
@@ -3618,7 +3621,7 @@ TBCCExprCompileProc(TBCCData *dataPtr,
  * RETURN:	    TCL_OK/TCL_ERROR
  * SIDE EFFECTS:    stuff may be emitted.
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -3668,9 +3671,9 @@ TBCCExprArgProc(TBCCData    	    *dataPtr,	    /* For emitting code */
  * SYNOPSIS:	    Finish compiling a "proc" or "defsubr"
  * CALLED BY:	    (INTERNAL) TclByteCodeCompileLow
  * RETURN:	    TCL_OK/TCL_ERROR
- * SIDE EFFECTS:    
+ * SIDE EFFECTS:
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -3691,7 +3694,7 @@ TBCCProcCompileProc(TBCCData *dataPtr,
 		      argv[0]);
 	return (TCL_ERROR);
     }
-    
+
     if (dataPtr->noHelp) {
 	/*
 	 * When not compiling in help, the opcode is always PROC
@@ -3707,7 +3710,7 @@ TBCCProcCompileProc(TBCCData *dataPtr,
     }
     return (TCL_OK);
 }
-			    
+
 
 /***********************************************************************
  *				TBCCProcArgProc
@@ -3718,7 +3721,7 @@ TBCCProcCompileProc(TBCCData *dataPtr,
  * RETURN:	    TCL_OK/TCL_ERROR
  * SIDE EFFECTS:    stuff may be emitted.
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -3751,7 +3754,7 @@ TBCCProcArgProc(TBCCData    	    *dataPtr,	    /* For emitting code */
 	if (result != TCL_OK) {
 	    if (interp->result == ((Interp *)interp)->resultSpace) {
 		char *cp = (char *)interp->result + strlen(interp->result);
-		
+
 		sprintf(cp, ", compiling \"%.50s\"", argv[1]);
 	    } else {
 		sprintf(((Interp *)interp)->resultSpace,
@@ -3799,7 +3802,7 @@ TBCCProcArgProc(TBCCData    	    *dataPtr,	    /* For emitting code */
  * RETURN:	    nothing
  * SIDE EFFECTS:    cmdStatePtr->caseState set
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -3820,9 +3823,9 @@ TBCCCaseInitProc(TBCCData	*dataPtr,
  * SYNOPSIS:	    Finish compiling a "case"
  * CALLED BY:	    (INTERNAL) TclByteCodeCompileLow
  * RETURN:	    TCL_OK/TCL_ERROR
- * SIDE EFFECTS:    
+ * SIDE EFFECTS:
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -3845,7 +3848,7 @@ TBCCCaseCompileProc(TBCCData *dataPtr,
     TBCCOutputNum(dataPtr, argc-1);
     return (TCL_OK);
 }
-			    
+
 
 /***********************************************************************
  *				TBCCCaseArgProc
@@ -3856,7 +3859,7 @@ TBCCCaseCompileProc(TBCCData *dataPtr,
  * RETURN:	    TCL_OK/TCL_ERROR
  * SIDE EFFECTS:    stuff may be emitted.
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -3915,9 +3918,9 @@ TBCCCaseArgProc(TBCCData    	    *dataPtr,	    /* For emitting code */
  * SYNOPSIS:	    Finish compiling a "return"
  * CALLED BY:	    (INTERNAL) TclByteCodeCompileLow
  * RETURN:	    TCL_OK/TCL_ERROR
- * SIDE EFFECTS:    
+ * SIDE EFFECTS:
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -3936,7 +3939,7 @@ TBCCRetCompileProc(TBCCData *dataPtr,
     TBCCOutputByte(dataPtr, argc == 2 ? TBOP_RET : TBOP_RETZ);
     return (TCL_OK);
 }
-			    
+
 
 /***********************************************************************
  *				TBCCRetArgProc
@@ -3947,7 +3950,7 @@ TBCCRetCompileProc(TBCCData *dataPtr,
  * RETURN:	    TCL_OK/TCL_ERROR
  * SIDE EFFECTS:    stuff may be emitted.
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -3986,9 +3989,9 @@ TBCCRetArgProc(TBCCData    	    *dataPtr,	    /* For emitting code */
  * SYNOPSIS:	    Finish compiling an arbitrary command
  * CALLED BY:	    (INTERNAL) TclByteCodeCompileLow
  * RETURN:	    TCL_OK/TCL_ERROR
- * SIDE EFFECTS:    
+ * SIDE EFFECTS:
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -4051,13 +4054,13 @@ TBCCOtherCompileProc(TBCCData *dataPtr,
 	    return (TCL_OK);
 	}
     }
-    
+
     TBCCOutputByte(dataPtr, TBOP_CALL);
     TBCCOutputNum(dataPtr, argc-1);
     TBCCOutputString(dataPtr, argv[0], strlen(argv[0]));
     return (TCL_OK);
 }
-			    
+
 
 /***********************************************************************
  *				TBCCOtherArgProc
@@ -4068,7 +4071,7 @@ TBCCOtherCompileProc(TBCCData *dataPtr,
  * RETURN:	    TCL_OK/TCL_ERROR
  * SIDE EFFECTS:    stuff may be emitted.
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -4128,7 +4131,7 @@ TBCCOtherArgProc(TBCCData   	    *dataPtr,	    /* For emitting code */
  * RETURN:	    non-zero on error
  * SIDE EFFECTS:    buffer is expanded
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -4242,7 +4245,7 @@ TclByteCodeCompileLow(Tcl_Interp *interp,   /* Token for command interpreter
 	 * Skim off leading white space, skip comments, and handle brackets
 	 * at the beginning of the command by recursing.
 	 */
-    
+
 	while (isspace(*src)) {
 	    src += 1;
 	}
@@ -4278,7 +4281,7 @@ TclByteCodeCompileLow(Tcl_Interp *interp,   /* Token for command interpreter
 		TBCCOutputByte(dataPtr, TBOP_POP);
 		needPop = 0;
 	    }
-		
+
 	    result = TclByteCodeCompileLow(interp, src+1, ']', &tmp, dataPtr);
 	    needPop = 1;
 	    src = tmp+1;
@@ -4290,11 +4293,11 @@ TclByteCodeCompileLow(Tcl_Interp *interp,   /* Token for command interpreter
 	 * the arg pointer gets set up BEFORE the first real character
 	 * of the argument has been found.
 	 */
-    
+
 	dst = copy;
 	argc = 0;
 	limit = copy + copySize - BUFFER;
-	
+
 	noeval = 0;
 	complete = 0;
 	argv[0] = dst;
@@ -4305,10 +4308,10 @@ TclByteCodeCompileLow(Tcl_Interp *interp,   /* Token for command interpreter
 	 * Skim off the command name and arguments by looping over
 	 * characters and processing each one according to its type.
 	 */
-    
+
 	while (1) {
 	    switch (*src) {
-    
+
 		/*
 		 * All braces are treated as normal characters
 		 * unless the first character of the argument is an
@@ -4316,7 +4319,7 @@ TclByteCodeCompileLow(Tcl_Interp *interp,   /* Token for command interpreter
 		 * the argument terminates when all braces are matched.
 		 * Internal braces are also copied like normal chars.
 		 */
-    
+
 		case '{': {
 		    if ((openBraces == 0) && (src == argStart)) {
 			/*
@@ -4378,9 +4381,9 @@ TclByteCodeCompileLow(Tcl_Interp *interp,   /* Token for command interpreter
 		    }
 		    break;
 		}
-    
+
 		case '[': {
-    
+
 		    /*
 		     * Open bracket: if not in middle of braces, then execute
 		     * following command and substitute result into argument.
@@ -4423,11 +4426,11 @@ TclByteCodeCompileLow(Tcl_Interp *interp,   /* Token for command interpreter
 			TBCCOutputPushIfNecessary(dataPtr, dst, argv, argc,
 						  &argComps, &needPop);
 			dst = argv[argc];
-			
+
 			TBCCOutputByte(dataPtr, TBOP_PUSHV);
 			TBCCOutputString(dataPtr, name, len);
 			argComps += 1;
-			
+
 			src = tmp-1;
 		    }
 		    break;
@@ -4449,7 +4452,7 @@ TclByteCodeCompileLow(Tcl_Interp *interp,   /* Token for command interpreter
 		    *dst++ = ']';
 		    break;
 		}
-    
+
 		case '\n': {
 
 		    /*
@@ -4457,7 +4460,7 @@ TclByteCodeCompileLow(Tcl_Interp *interp,   /* Token for command interpreter
 		     * or a space character.  If it's a space character,
 		     * just fall through to the space code below.
 		     */
-    
+
 		    if (openBraces == 0) {
 			if (noeval) {
 			    if (!openBrackets && termChar == 0) {
@@ -4479,11 +4482,11 @@ TclByteCodeCompileLow(Tcl_Interp *interp,   /* Token for command interpreter
 			 (((curCmd != NULL) && (curCmd->token == CMD_OTHER))
 			  || openBrackets)))
 		    {
-    
+
 			/*
 			 * Quoted space.  Copy it into the argument.
 			 */
-    
+
 			*dst++ = *src;
 		    } else {
 
@@ -4496,12 +4499,12 @@ TclByteCodeCompileLow(Tcl_Interp *interp,   /* Token for command interpreter
 			 * arg and for NULL pointer that gets added to the
 			 * end of argv when the command is complete).
 			 */
-    
+
 		    close_arg:
-			
+
 			*dst++ = 0;
 			noeval = 0;
-			
+
 			if (argc == 0) {
 			    /*
 			     * Special handling for the first argument,
@@ -4525,12 +4528,12 @@ TclByteCodeCompileLow(Tcl_Interp *interp,   /* Token for command interpreter
 				 */
 				curCmd =
 				    &cmds[(sizeof(cmds)/sizeof(cmds[0]))-1];
-				
+
 				TBCCOtherArgProc(dataPtr, interp, argComps,
 						 sawBraces, &cmdState, &curCmd,
 						 dst, argv, &argc);
 			    } else {
-			    
+
 				for (j = 0;
 				     j < sizeof(cmds)/sizeof(cmds[0]);
 				     j++)
@@ -4554,7 +4557,7 @@ TclByteCodeCompileLow(Tcl_Interp *interp,   /* Token for command interpreter
 				} else if (curCmd->token == CMD_EXPR) {
 				    noeval = 1;
 				}
-				
+
 			    }
 
 			    /*
@@ -4562,7 +4565,7 @@ TclByteCodeCompileLow(Tcl_Interp *interp,   /* Token for command interpreter
 			     * variables the command requires.
 			     */
 			    (*curCmd->initProc) (dataPtr, &cmdState);
-			    
+
 			    /*
 			     * If we've already compiled something from this
 			     * string, discard its result.
@@ -4590,19 +4593,19 @@ TclByteCodeCompileLow(Tcl_Interp *interp,   /* Token for command interpreter
 				goto done;
 			    }
 			}
-			
+
 			sawBraces = 0;
 			argc += 1;
 
 			if (complete) {
 			    goto cmdComplete;
 			}
-			
+
 			if (argc >= argSize-1) {
 			    argSize *= 2;
 			    if (argv == argStorage) {
 				char **newArgs;
-				
+
 				newArgs = (char **)
 				    malloc((unsigned) argSize*sizeof(char *));
 				bcopy(argv, newArgs, argc * sizeof(char *));
@@ -4614,7 +4617,7 @@ TclByteCodeCompileLow(Tcl_Interp *interp,   /* Token for command interpreter
 						     sizeof(char *));
 			    }
 			}
-			
+
 			argv[argc] = dst;
 
 			while (((i = src[1]) == ' ') || (i == '\t') ||
@@ -4629,7 +4632,7 @@ TclByteCodeCompileLow(Tcl_Interp *interp,   /* Token for command interpreter
 		    }
 		    break;
 		}
-    
+
 		case '\\': {
 		    int numRead;
 
@@ -4654,9 +4657,9 @@ TclByteCodeCompileLow(Tcl_Interp *interp,   /* Token for command interpreter
 		    }
 		    break;
 		}
-    
+
 		case 0: {
-    
+
 		    /*
 		     * End of string.  Make sure that braces were
 		     * properly matched.  Also, it's only legal to
@@ -4678,25 +4681,25 @@ TclByteCodeCompileLow(Tcl_Interp *interp,   /* Token for command interpreter
 		    complete = 1;
 		    goto close_arg;
 		}
-    
+
 		default: {
 		    *dst++ = *src;
 		    break;
 		}
 	    }
 	    src += 1;
-    
+
 	    /*
 	     * Make sure that we're not running out of space in the
 	     * string copy area.  If we are, allocate a larger area
 	     * and copy the string.  Be sure to update all of the
 	     * relevant pointers too.
 	     */
-    
+
 	    if (dst >= limit) {
 		char 	    *newCopy;
 		ptrdiff_t   delta;
-    
+
 		copySize *= 2;
 		newCopy = (char *) malloc((unsigned) copySize);
 		bcopy(copy, newCopy, (dst-copy));
@@ -4715,7 +4718,7 @@ TclByteCodeCompileLow(Tcl_Interp *interp,   /* Token for command interpreter
 		limit = newCopy + copySize - BUFFER;
 	    }
 	}
-    
+
 	cmdComplete:
 
 	noeval = 0;
@@ -4747,7 +4750,7 @@ TclByteCodeCompileLow(Tcl_Interp *interp,   /* Token for command interpreter
     if (argv != argStorage) {
 	free((char *) argv);
     }
-    
+
     return result;
 
     /*
@@ -4872,9 +4875,9 @@ TclByteCodeCompile(Tcl_Interp 	*interp,    /* Token for command interpreter
  * CALLED BY:	    (INTERNAL) TclByteCodeCompile,
  *			       TBCCOutputCOmpiledArg
  * RETURN:	    the base of the compiled output
- * SIDE EFFECTS:    
+ * SIDE EFFECTS:
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -4924,7 +4927,7 @@ TclByteCodeCompileTop(Tcl_Interp    *interp,	/* Token for command interpreter
 	 */
 	if (strings == 0) {
 	    TBCCCompressStringTable(&data);
-	    
+
 	    if (data.strings->free != 2) {
 		unsigned    	pushStart;
 		unsigned char	*newdata;
@@ -4945,7 +4948,7 @@ TclByteCodeCompileTop(Tcl_Interp    *interp,	/* Token for command interpreter
 		 */
 		pushStart = data.tail - data.data;
 		ssize = data.strings->free;
-		
+
 		TBCCOutputByte(&data, TBOP_PUSHST);
 		TBCCOutputNum(&data, ssize);
 
@@ -4999,7 +5002,7 @@ TclByteCodeCompileTop(Tcl_Interp    *interp,	/* Token for command interpreter
 	return (0);
     }
 }
-    
+
 
 
 /***********************************************************************
@@ -5010,7 +5013,7 @@ TclByteCodeCompileTop(Tcl_Interp    *interp,	/* Token for command interpreter
  * RETURN:	    nothing
  * SIDE EFFECTS:    none
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -5026,10 +5029,10 @@ TclByteCodeDisasm(Tcl_Interp *interp,
 {
     const unsigned char *base = p;
     Interp *iPtr = (Interp *)interp;
-    
+
     while (p - base < size) {
 	(*interp->output)("%*s", indent, "");
-	
+
 	switch (*p++) {
 	case (int)TBOP_PUSH:
 	{
@@ -5038,7 +5041,7 @@ TclByteCodeDisasm(Tcl_Interp *interp,
 	    unsigned long   length;
 	    const char *str = TclByteCodeFetchString((Interp *)interp,
 						     &p, &length);
-	    
+
 	    (*interp->output)("%-10s \"%s\"\n", "PUSH", str);
 	    break;
 	}
@@ -5048,7 +5051,7 @@ TclByteCodeDisasm(Tcl_Interp *interp,
 	     * stack: -- varval-string */
 	    const char *varname = TclByteCodeFetchString((Interp *)interp,
 							 &p, NULL);
-		
+
 	    (*interp->output)("%-10s \"%s\"\n", "VARREF", varname);
 	    break;
 	}
@@ -5098,13 +5101,13 @@ TclByteCodeDisasm(Tcl_Interp *interp,
 	    /* args: #bytes, bytes
 	     * stack: -- code */
 	    unsigned long length;
-		
+
 	    length = TclByteCodeFetchNum(&p);
 
 	    (*interp->output)("%-10s %d byte%s:\n", "CODE", length,
 			      length==1 ? "" : "s");
 	    TclByteCodeDisasm(interp, p, length, indent+4);
-		
+
 	    p += length;
 	    break;
 	}
@@ -5112,7 +5115,7 @@ TclByteCodeDisasm(Tcl_Interp *interp,
 	{
 	    /* args:
 	     * stack: test-expr body-code -- retval */
-		
+
 	    (*interp->output)("%-10s\n", "WHILE");
 	    break;
 	}
@@ -5120,7 +5123,7 @@ TclByteCodeDisasm(Tcl_Interp *interp,
 	{
 	    /* args:
 	     * stack: init-code test-expr next-code body-code -- retval */
-		
+
 	    (*interp->output)("%-10s\n", "FOR");
 	    break;
 	}
@@ -5128,14 +5131,14 @@ TclByteCodeDisasm(Tcl_Interp *interp,
 	{
 	    /* args: #args
 	     * stack: string (pattern-list body-code)+ -- retval */
-		
+
 	    unsigned long nargs;    	/* Number of args left to process */
-		
+
 	    /*
 	     * Extract the number of args for the case (including the string)
 	     */
 	    nargs = TclByteCodeFetchNum(&p);
-		
+
 	    (*interp->output)("%-10s %lu\n", "CASE", nargs);
 	    break;
 	}
@@ -5144,7 +5147,7 @@ TclByteCodeDisasm(Tcl_Interp *interp,
 	    /* args: #strings
 	     * stack: #strings-strings -- concatenation */
 	    unsigned long nargs;
-		
+
 	    nargs = TclByteCodeFetchNum(&p);
 
 	    (*interp->output)("%-10s %lu\n", "ARGCAT", nargs);
@@ -5194,7 +5197,7 @@ TclByteCodeDisasm(Tcl_Interp *interp,
 	case (int)TBOP_PUSHE:
 	{
 	    unsigned long len = TclByteCodeFetchNum(&p);
-	    
+
 	    (*interp->output)("%-10s %d byte%s:\n", "PUSHEXPR", len,
 			      len == 1 ? "" : "s");
 	    TclExprByteDisasm(interp, p, len, indent+4);
@@ -5211,9 +5214,9 @@ TclByteCodeDisasm(Tcl_Interp *interp,
 	{
 	    unsigned long len = TclByteCodeFetchNum(&p);
 	    unsigned short num;
-	    
+
 	    num = p[0] | (p[1] << 8);
-	    
+
 	    (*interp->output)("%-10s %d string%s, %d byte%s\n", "PUSHST",
 			      num, num == 1 ? "" : "s",
 			      len, len == 1 ? "" : "s");
@@ -5236,7 +5239,7 @@ TclByteCodeDisasm(Tcl_Interp *interp,
 	}
     }
 }
-	
+
 
 /***********************************************************************
  *				TBCReadFile
@@ -5248,7 +5251,7 @@ TclByteCodeDisasm(Tcl_Interp *interp,
  *	    	    0 on error (interp->result holds error string)
  * SIDE EFFECTS:    file opened and closed.
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -5270,10 +5273,10 @@ TBCReadFile(Tcl_Interp *interp, const char *inname, unsigned long *sizePtr)
     fd = open((char *)inname, O_RDONLY | O_BINARY, 0);
     if (fd < 0) {
 	char *newname;
-	    
+
 	newname = (char *)malloc(strlen(inname) + 4 + 1);
 	sprintf(newname, "%s.tlc", inname);
-	    
+
 	fd = open(newname, O_RDONLY | O_BINARY, 0);
 	if (fd < 0) {
 	    free((char *)newname);
@@ -5310,17 +5313,17 @@ TBCReadFile(Tcl_Interp *interp, const char *inname, unsigned long *sizePtr)
     *sizePtr = size - sizeof(tlcMagic);
     return (contents);
 }
-	
+
 
 /***********************************************************************
  *				Tcl_BCCmd
  ***********************************************************************
- * SYNOPSIS:	    
- * CALLED BY:	    
- * RETURN:	    
- * SIDE EFFECTS:    
+ * SYNOPSIS:
+ * CALLED BY:
+ * RETURN:
+ * SIDE EFFECTS:
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -5473,12 +5476,12 @@ See also:\n\
 	fd = open(argv[2], O_RDONLY | O_BINARY, 0);
 	if (fd < 0) {
 	    char *newname;
-	    
+
 	    newname = (char *)malloc(strlen(argv[2]) + 4 + 1);
 	    sprintf(newname, "%s.tcl", argv[2]);
 	    inname = newname;
 	    freeInName = 1;
-	    
+
 	    fd = open((char *)inname, O_RDONLY | O_BINARY, 0);
 	    if (fd < 0) {
 		free((char *)inname);
@@ -5502,7 +5505,7 @@ See also:\n\
 	    return(TCL_ERROR);
 	}
 	(void)close(fd);
-	
+
 	contents[size] = '\0';
 	code = TclByteCodeCompile(interp,
 				  contents,
@@ -5519,7 +5522,7 @@ See also:\n\
 	    }
 	    return(TCL_ERROR);
 	}
-	
+
 	cp = strrchr(inname, '.');
 	if (cp == NULL) {
 	    cp = inname + strlen(inname);
@@ -5592,4 +5595,3 @@ See also:\n\
     }
     return (TCL_OK);
 }
-	
