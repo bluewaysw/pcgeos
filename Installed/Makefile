@@ -132,7 +132,8 @@ otherEnsemble	: conview reader term tedit geofile dirls  \
 
 minimalDriver	: nimbus ms4 ntfat os2 cdrom stream dri gdi keyboard modem gdipointer \
 		  standard winnt parallel serial disk vidmem svga \
-		  vga vga8 vga16 ega cga mcga hgc att6300 dscga printerDriver \
+		  vga vga8 vga15 vga16 vga24 ega cga mcga hgc att6300 dscga \
+		  printerDriver \
 		  ps2 msys msser msbus kbmouse absgen genmouse emm extmem \
 		  xms filestr nonts sblaster comm spooltd \
 		  vmtree filedd logibus logiser dma mslf kbd_drivers \
@@ -600,8 +601,14 @@ Installed/Driver/Video/VGAlike/VGA:	MAKEDRV
 vga8	: Installed/Driver/Video/VGAlike/VGA8
 Installed/Driver/Video/VGAlike/VGA8:	MAKEDRV
 
+vga15	: Installed/Driver/Video/VGAlike/VGA15
+Installed/Driver/Video/VGAlike/VGA15:	MAKEDRV
+
 vga16	: Installed/Driver/Video/VGAlike/VGA16
 Installed/Driver/Video/VGAlike/VGA16:	MAKEDRV
+
+vga24	: Installed/Driver/Video/VGAlike/VGA24
+Installed/Driver/Video/VGAlike/VGA24:	MAKEDRV
 
 etherodi	: Installed/Driver/Socket/EtherODI
 Installed/Driver/Socket/EtherODI:	socket accpnt MAKEDRV
