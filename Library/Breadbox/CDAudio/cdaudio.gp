@@ -38,7 +38,7 @@ platform geos201
 
 library geos
 #library ui
-#library ansic
+library ansic
 #library sound
 
 #exempt ansic

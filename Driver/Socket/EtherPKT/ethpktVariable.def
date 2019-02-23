@@ -1,0 +1,64 @@
+	; this must be first
+	; since we're going to have our own stack, we need some 
+	; ThreadPrivateData area to be well behaved.
+udata	segment	
+		byte	LOCAL_STACK_SIZE dup (?)
+endLocalStack	label	byte
+udata	ends
+
+; Putting this into idata, as when we need it, we have no free registers
+; but still need access to the interrupt number of the packet driver. So,
+; we'll just access it from dgroup, and also store this there.
+idata		segment
+	packetTypeIP	word	PACKET_TYPE_IP
+	packetTypeARP	word	PACKET_TYPE_ARP
+
+; We don't know the packet driver interrupt, so we have to find it.
+; The int instruction requires its argument as a constant, so,
+; we have to handle it via modifying the code. We'll stick the code
+; into dgroup. Also including calls to lock/unlock the BIOS here.
+callPacketDriver	label	far
+	call	SysLockBIOS
+;pktDriverInt	equ	(this byte) + 1
+intInstruction		label	far
+	int	60h
+	call	SysUnlockBIOS
+	retf
+idata		ends
+
+udata		segment
+	pktIpHandle	word
+	pktArpHandle	word
+
+	;
+	; Ethernet address of this machine.
+	;
+	localEtherAddr	NodeAddr
+
+	;
+	; ECB and data buffers for incoming ethernet packets.
+	;
+	recvBufFreeList	nptr
+	recvBuffers	ReceiveBuffer	NUM_RECV_BUFFERS dup (<>)
+
+	;
+	; ARP table.
+	;
+	arpTable	optr.ChunkArrayHeader
+
+	; For switching to local stack
+	saveSS		word
+	saveSP		word
+
+	; For sending receive message from a different thread 
+	currentRecvBuf	nptr
+
+udata		ends
+
+ifdef	LOG
+idata		segment
+	logBuf		DebugLogFuncs	2048	dup	(0)
+	currentIndex	nptr.DebugLogFuncs	0
+idata		ends
+endif
+

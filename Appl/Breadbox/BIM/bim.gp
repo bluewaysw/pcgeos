@@ -35,14 +35,14 @@ library parentc
 resource APPMONIKERRESOURCE ui-object read-only shared
 
 # UI objects
-resource APPRESOURCE ui-object
-resource INTERFACE ui-object
-resource LOGINRESOURCE ui-object
-resource CONFIGRESOURCE ui-object
-resource IMWINDOWRESOURCE ui-object read-only
+resource AppResource ui-object
+resource Interface ui-object
+resource LoginResource ui-object
+resource ConfigResource ui-object
+resource IMWindowResource ui-object read-only
 
 # Sounds
-resource TOCNOISERESOURCE data lmem read-only shared
+resource TocNoiseResource data lmem read-only shared
 
 export IMPrimaryClass
 export IMWindowTextClass
@@ -56,4 +56,3 @@ export GenSimpleTreeListClass
 endif
 
 usernotes "Copyright 1994-2002  Breadbox Computer Company LLC  All Rights Reserved"
-

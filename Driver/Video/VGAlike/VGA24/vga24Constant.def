@@ -1,0 +1,159 @@
+COMMENT }%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+
+PROJECT:	PC GEOS
+MODULE:		VGA8 Video Driver
+FILE:           vga16Constant.def
+
+AUTHOR:		Jim DeFrisco
+
+REVISION HISTORY:
+	Name	Date	Description
+	----	----	-----------
+	Jim	10/92	initial version
+
+
+DESCRIPTION:
+		
+        $Id: vga16Constant.def,v 1.3 97/05/01 15:28:49 lshields Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%}
+
+
+;----------------------------------------------------------------------------
+;	Driver type constants
+;----------------------------------------------------------------------------
+
+IS_8                    =       TRUE    ; 8 bit driver
+IS_CLR24                =       TRUE    ; 8-bit color
+IS_VGA24                =       TRUE    ; 8-bit VGA driver
+IS_BITMAP		=	TRUE	; well, it is, sort of.
+IS_DIRECT_COLOR         =       TRUE    ; no dithering needed ;-)
+SAVE_UNDER_COUNT	=	0	; Number of save under areas
+
+MULT_RESOLUTIONS	=	TRUE	; driver supports multiple res
+MAX_MASK_BUFFER         =       161     ; max size of mask buffer, 
+MAX_POLYGON_EDGE_TABLE	=	768	; max size of edge table buffer
+
+;****************************************************************************
+;	ADDITIONAL BIOS CALLS (VGA ONLY)
+;****************************************************************************
+
+ALT_SELECT		=	12h		; major bios function number
+VIDEO_SCREEN_ON_OFF	=	36h		; subfunction number
+VGA_ENABLE_VIDEO 	=	0h		;  bios arg, video enabled
+VGA_DISABLE_VIDEO 	=	1h		;  bios arg, video disabled
+
+;****************************************************************************
+;	VESA BIOS EXTENSIONS
+;****************************************************************************
+
+VESA_BIOS_EXT		=	0x4f		; VESA defined BIOS extensions
+
+			; VESA extended BIOS functions
+VESA_GET_SVGA_INFO	=	0		; VESA fn 0, get SVGA info
+VESA_GET_MODE_INFO	=	1		; VESA fn 1, get mode info
+VESA_SET_MODE		=	2		; VESA fn 2, set video mode
+VESA_GET_MODE		=	3		; VESA fn 3, get current mode
+VESA_SAVE_STATE		=	4		; VESA fn 4, save/restore state
+VESA_WINDOW_CONTROL	=	5		; VESA fn 5, mem window cntrl
+
+			; window numbers
+VESAWindow		etype	byte, 0, 1
+VW_WINDOW_A		enum	VESAWindow
+VW_WINDOW_B		enum	VESAWindow
+
+			; VESA defined mode numbers
+VESAMode		etype	word, 0x100, 1
+VM_640x400_8		enum	VESAMode	; 640x400 256-color
+VM_640x480_8		enum	VESAMode	; 640x480 256-color
+VM_800x600_4 		enum	VESAMode	; 800x600 16-color
+VM_800x600_8		enum	VESAMode	; 800x600 256-color 
+VM_1Kx768_4		enum	VESAMode	; 1024x768 16-color 
+VM_1Kx768_8		enum	VESAMode	; 1024x768 256-color 
+VM_1280x1K_4		enum	VESAMode	; 1280x1024 16-color 
+VM_1280x1K_8		enum	VESAMode	; 1280x1024 256-color 
+VM_80x60_T              enum    VESAMode        ; 80x60 text mode
+VM_132x25_T             enum    VESAMode        ; 132x25 text mode
+VM_132x43_T             enum    VESAMode        ; 132x43 text mode
+VM_132x50_T             enum    VESAMode        ; 132x50 text mode
+VM_132x60_T             enum    VESAMode        ; 132x60 text mode
+VM_320x200_15           enum    VESAMode        ; 320x200 32K-color (1:5:5:5)
+VM_320x200_16           enum    VESAMode        ; 320x200 64K-color (5:6:5)
+VM_320x200_24           enum    VESAMode        ; 320x200 TrueColor (8:8:8)
+VM_640x480_15           enum    VESAMode        ; 640x480 32K-color (1:5:5:5)
+VM_640x480_16           enum    VESAMode        ; 640x480 64K-color (5:6:5)
+VM_640x480_24           enum    VESAMode        ; 640x480 TrueColor (8:8:8)
+VM_800x600_15           enum    VESAMode        ; 800x600 32K-color (1:5:5:5)
+VM_800x600_16           enum    VESAMode        ; 800x600 64K-color (5:6:5)
+VM_800x600_24           enum    VESAMode        ; 800x600 TrueColor (8:8:8)
+VM_1Kx768_15            enum    VESAMode        ; 1024x768 32K-color (1:5:5:5)
+VM_1Kx768_16            enum    VESAMode        ; 1024x768 64K-color (5:6:5)
+VM_1Kx768_24            enum    VESAMode        ; 1024x768 TrueColor (8:8:8)
+VM_1280x1K_15           enum    VESAMode        ; 1280x1024 32K-color (1:5:5:5)
+VM_1280x1K_16           enum    VESAMode        ; 1280x1024 64K-color (5:6:5)
+VM_1280x1K_24           enum    VESAMode        ; 1280x1024 TrueColor (8:8:8)
+
+;****************************************************************************
+;	VESA Structures and Constants
+;****************************************************************************
+
+VESAInfoBlock	struct
+    VIB_sig	char	4 dup (?)	; 'VESA' - VESA signature
+    VIB_ver	word			; version number (hi byte = major #)
+    VIB_oem	fptr.char		; far pointer to OEM string
+    VIB_caps	byte	4 dup (?)	; video capabilities
+    VIB_modes	fptr.word		; pointer to table of modes
+
+	align	256			; pad out to 256 bytes
+VESAInfoBlock	ends
+
+VESAModeAttr	record
+    :11,				; bits 5-15 reserved
+    VMA_GRAPHICS:1,			; 1=graphics mode, 0=text mode
+    VMA_COLOR:1,			; 1=color mode, 0=monochrome mode
+    VMA_BIOS:1,				; 1=BIOS supports output functions
+    VMA_EXT_INFO:1,			; 1=extended info available
+    VMA_SUPPORTED:1			; 1=mode supported by hardware 
+VESAModeAttr	end
+
+VESAWinAttr	record
+    :4,					; reserved
+    VWA_WRITEABLE:1,			; window is writeable
+    VWA_READABLE:1,			; window is readable
+    VWA_SUPPORTED:1			; window is supported
+VESAWinAttr	end
+
+VESAMemModel	etype	byte, 0, 1
+VMM_TEXT	enum	VESAMemModel	; text mode
+VMM_CGA		enum	VESAMemModel	; CGA graphics mode
+VMM_HERCULES	enum	VESAMemModel	; Hercules graphics mode
+VMM_4PLANE	enum	VESAMemModel	; 4 plane planar
+VMM_PACKED	enum	VESAMemModel	; packed pixels
+VMM_NONCHAINED4	enum	VESAMemModel	; non-chained 4, 256 color
+
+VESAModeInfo	struct
+    VMI_modeAttr	VESAModeAttr <>	; mode attributes
+    VMI_winAAttr	VESAWinAttr <>	; memory window A attributes
+    VMI_winBAttr	VESAWinAttr <>	; memory window B attributes
+    VMI_winGran		word		; memory window granularity
+    VMI_winSize		word		; memory window size
+    VMI_winASeg		sptr		; memory window A start segment
+    VMI_winBSeg		sptr		; memory window B start segment
+    VMI_winFunc		fptr.far	; pointer to window function
+    VMI_scanSize	word		; #bytes per scanline
+
+    VMI_Xres		word		; horizontal resolution
+    VMI_Yres		word		; vertical resolution
+    VMI_Xcharsize	byte		; character cell width
+    VMI_Ycharsize	byte		; character cell height
+    VMI_nplanes		byte		; number of memory planes
+    VMI_bitsPerPixel	byte		; #bits per pixel
+    VMI_nbanks		byte		; number of memory banks
+    VMI_memModel	VESAMemModel	; memory model
+    VMI_backSize	byte		; bank size, KB
+
+	align		256		; pad out to 256 bytes
+VESAModeInfo	ends

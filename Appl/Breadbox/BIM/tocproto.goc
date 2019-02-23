@@ -198,7 +198,7 @@ void TocInitiateConnectStatus(void)
 word TocCreateConnection(TocConnectionData *tcd)
 {
     word retval = 0;
-    
+
     tcd->TCD_recv = NullHandle;
     tcd->TCD_send = NullHandle;
     tcd->TCD_sock = 0;
@@ -208,31 +208,31 @@ word TocCreateConnection(TocConnectionData *tcd)
     tcd->TCD_screenName[0] = '\0';
     tcd->TCD_normalName[0] = '\0';
     tcd->TCD_interrupt = FALSE;
-    
-    retval = (tcd->TCD_recv = MemAlloc(RBH_DATA_INIT_SIZE, HF_DYNAMIC, 
+
+    retval = (tcd->TCD_recv = MemAlloc(RBH_DATA_INIT_SIZE, HF_DYNAMIC,
       HAF_STANDARD_LOCK)) == NullHandle;
     if (!retval)
     {
         RecvBufHeader *rbh;
-        
+
         rbh = MemDeref(tcd->TCD_recv);
         rbh->RBH_buflen = RBH_DATA_INIT_SIZE - sizeof(RecvBufHeader)
           + sizeof(FlapHeader);
         TocReceiveResetBuffer(rbh);
         MemUnlock(tcd->TCD_recv);
 
-        retval = (tcd->TCD_send = MemAlloc(SBH_DATA_INIT_SIZE, HF_DYNAMIC, 
+        retval = (tcd->TCD_send = MemAlloc(SBH_DATA_INIT_SIZE, HF_DYNAMIC,
           HAF_STANDARD_LOCK)) == NullHandle;
     }
     if (!retval)
     {
         SendBufHeader *sbh;
-        
+
         sbh = MemDeref(tcd->TCD_send);
         sbh->SBH_header.FH_start = FLAP_START;
         TocSendResetBuffer(tcd);
         MemUnlock(tcd->TCD_send);
-        
+
         retval = ((tcd->TCD_sem = ThreadAllocSem(1)) == NullHandle);
     }
     return retval;
@@ -318,8 +318,8 @@ word TocConnect(TocConnectionData *tcd, const char *password)
       @InitCategoryAim, @InitKeyTocPort, TOC_TOC_PORT_DEFAULT);
 
     /* Resolve the unresolved address. */
-    if ((hostaddr.RTA_sock.SA_addressSize = SocketResolve(tcpDomain, &hostname,
-      sizeof(hostname.UTA_link) + strlen(hostname.UTA_ip), &hostaddr.RTA_addr,
+    if ((hostaddr.RTA_sock.SA_addressSize = SocketResolve(tcpDomain, (byte*) &hostname,
+      sizeof(hostname.UTA_link) + strlen(hostname.UTA_ip), (byte*)&hostaddr.RTA_addr,
       sizeof(hostaddr.RTA_addr))) == 0)
     {
         retval = ThreadGetError();
@@ -340,7 +340,7 @@ SM(     printf("SocketCreate error %d\n", retval);      )
     if (!retval)
     {
 SM(     printf("Connecting to %s:%d\n", hostname.UTA_ip, hostaddr.RTA_sock.SA_port.SP_port);  )
-        retval = SocketConnect(tcd->TCD_sock, &hostaddr, 300);
+        retval = SocketConnect(tcd->TCD_sock, (SocketAddress*)&hostaddr, 300);
 SM(     if (retval != SE_NORMAL)                            )
 SM(         printf("SocketConnect error %d\n", retval);     )
     }
@@ -373,7 +373,7 @@ SM(         printf("SocketSend error %d\n", retval);        )
 SM(     printf("Waiting for FLAP version response\n");      )
 
         tcd->TCD_type = FFT_SIGNON;     /* Set sign-on FLAP type */
-        
+
         retval = TocConnectReceive(tcd, &error);
         if (!retval)
         {
@@ -407,14 +407,14 @@ SM(             printf("FLAP version received and correct\n"); )
     {
         /* Send FLAP signon request. */
         SignonFrame sf;
-        
+
 SM(     printf("Sending signon request, username %s\n", tcd->TCD_normalName); )
 
         sf.SF_version = htonl(FLAP_VERSION);
         sf.SF_tag = htons(FLAP_TLV_TAG);
         sf.SF_namelen = htons(strlen(tcd->TCD_normalName));
 
-        TocSendAddBuffer(tcd, &sf, sizeof(sf));
+        TocSendAddBuffer(tcd, (byte*)&sf, sizeof(sf));
         TocSendAddBuffer(tcd, (byte *)tcd->TCD_normalName, ntohs(sf.SF_namelen));
         retval = TocSendToToc(tcd);
     }
@@ -455,7 +455,7 @@ SM(     printf("Sending toc_signon\n"); )
     if (!retval)
     {
         /* Get signon response. */
-        
+
 SM(     printf("Waiting for signon response\n");      )
 
         retval = TocConnectReceive(tcd, &error);
@@ -486,7 +486,7 @@ SM(             printf("TocConnect: TocReceiveGetBuffer returned NULL!\n"); )
                     {
                         char *argv[2];
                         dword srverror;
-                        
+
 SM(                     printf("TocConnect: Received %s\n", buf);               )
 
                         /* Parse authorization errors. */
@@ -514,7 +514,7 @@ SM(                     printf("TocConnect: Expected %s, got %s!\n", p, buf);   
                     retval = TRUE;
                 }
                 /* Check for correct client version. */
-                else if (strcmp((char *)buf + strlen(p), 
+                else if (strcmp((char *)buf + strlen(p),
                   LMemDeref(@TocClientVersion)))
                 {
 SM(                 printf("TocConnect: Expected %s, got %s!\n", LMemDeref(@TocClientVersion), (char *)buf + strlen(p));    )
@@ -595,7 +595,7 @@ ReceiveStatus TocReceiveFromToc(TocConnectionData *tcd, word timeout)
     ReceiveStatus retval = RS_NONE;
     RecvBufHeader *rbh;
     word size;
-    
+
     if (!tcd->TCD_sock || tcd->TCD_recv == NullHandle)
     {
 SM(     printf("TocReceiveFromToc: No connection and/or buffer!\n");     )
@@ -604,7 +604,7 @@ SM(     printf("TocReceiveFromToc: No connection and/or buffer!\n");     )
     else
     {
         rbh = MemLock(tcd->TCD_recv);
-        
+
         if (rbh->RBH_locked)
         {
 SM(         printf("TocReceiveFromToc: Cannot receive into locked buffer!\n");  )
@@ -659,7 +659,7 @@ SM(                         printf("TocReceiveFromToc: FLAP header started with 
                         else if (rbh->RBH_datalen == sizeof(FlapHeader))
                         {
                             word framelen = ntohs(rbh->RBH_header.FH_len);
-                            
+
 //SM(                         printf("TocReceiveFromToc: Full header received\n"); )
                             /* If data length is zero, return complete. */
 //SM(                         printf("TocReceiveFromToc: Data length is %d\n", framelen); )
@@ -715,13 +715,13 @@ SM(                                     printf("TocReceiveFromToc: Buffer resize
                 } /* endif (size == 0) */
 
             } /* endwhile (retval == RS_NONE) */
-    
+
             /* Common state responses. */
             if (retval == RS_COMPLETE)
                 rbh->RBH_locked = TRUE; /* Lock buffer on complete recv */
             else if (retval == RS_ERROR || retval == RS_INTERRUPT)
                 TocReceiveResetBuffer(rbh); /* Reset buffer on error or interrupt */
-            
+
         } /* endif (!rbh->RBH_locked) */
 
         /* Buffer remains locked in memory if "locked" */
@@ -741,15 +741,15 @@ byte *TocReceiveGetBuffer(TocConnectionData *tcd, word *length)
 {
     RecvBufHeader *rbh;
     byte *retval = NULL;
-    
+
     if (!tcd->TCD_sock || tcd->TCD_recv == NullHandle)
     {
-SM(     printf("TocReceiveGetBuffer: No connection and/or buffer!\n");     )        
+SM(     printf("TocReceiveGetBuffer: No connection and/or buffer!\n");     )
     }
     else
     {
         rbh = MemLock(tcd->TCD_recv);
-        
+
         if (!rbh->RBH_locked)
         {
 SM(         printf("TocReceiveGetBuffer: Buffer not locked!\n"); )
@@ -769,15 +769,15 @@ SM(         printf("TocReceiveGetBuffer: Buffer not locked!\n"); )
 void TocReceiveUnlockBuffer(TocConnectionData *tcd)
 {
     RecvBufHeader *rbh;
-    
+
     if (!tcd->TCD_sock || tcd->TCD_recv == NullHandle)
     {
-SM(     printf("TocReceiveUnlockBuffer: No connection and/or buffer!\n");     )        
+SM(     printf("TocReceiveUnlockBuffer: No connection and/or buffer!\n");     )
     }
     else
     {
         rbh = MemLock(tcd->TCD_recv);
-        
+
         if (!rbh->RBH_locked)
         {
 SM(         printf("TocReceiveUnlockBuffer: Buffer not locked!\n"); )
@@ -799,7 +799,7 @@ void TocReceiveInterrupt(TocConnectionData *tcd)
     {
         if (!tcd->TCD_sock)
         {
-SM(         printf("TocReceiveInterrupt: No connection!\n");     )        
+SM(         printf("TocReceiveInterrupt: No connection!\n");     )
         }
 #ifndef USE_SIMULATOR
         else
@@ -814,7 +814,7 @@ SM(         printf("TocReceiveInterrupt: No connection!\n");     )
 void TocSendResetBuffer(TocConnectionData *tcd)
 {
     SendBufHeader *sbh = MemDeref(tcd->TCD_send);
-    
+
     sbh->SBH_freelen = MemGetInfo(tcd->TCD_send, MGIT_SIZE)
       - sizeof(SendBufHeader);
     sbh->SBH_datalen = sizeof(FlapHeader);
@@ -855,16 +855,16 @@ word TocSendAddBuffer(TocConnectionData *tcd, byte *data, word datalen)
 {
     SendBufHeader *sbh;
     word retval = 0;
-    
+
     if (!tcd->TCD_sock || tcd->TCD_send == NullHandle)
     {
-SM(     printf("TocSendAddBuffer: No connection and/or buffer!\n");     )        
+SM(     printf("TocSendAddBuffer: No connection and/or buffer!\n");     )
         retval = TRUE;
     }
     else
     {
         sbh = MemLock(tcd->TCD_send);
-        
+
         /* Make sure we don't exceed the legal send limit. */
         if (sbh->SBH_datalen + datalen - sizeof(FlapHeader) > FLAP_SEND_LEN_MAX)
         {
@@ -890,7 +890,7 @@ word TocSendCountEscapes(const char *string)
 {
     word count = 0;
     char c;
-    
+
     while ((c = *(string++)) != '\0')
         if (c == '\"' || c == '\\' || c == '$' || c == '[' || c == ']'
           || c == '{' || c == '}')
@@ -903,16 +903,16 @@ word TocSendAddString(TocConnectionData *tcd, const char *string, AddStringFlags
     SendBufHeader *sbh;
     word retval = 0;
     word datalen = 0;
-    
+
     if (!tcd->TCD_sock || tcd->TCD_send == NullHandle)
     {
-SM(     printf("TocSendAddBuffer: No connection and/or buffer!\n");     )        
+SM(     printf("TocSendAddBuffer: No connection and/or buffer!\n");     )
         retval = TRUE;
     }
     else
     {
         sbh = MemLock(tcd->TCD_send);
-        
+
         /* Make sure we don't exceed the legal send limit. */
         if (string == NULL)
             datalen = 0;
@@ -938,7 +938,7 @@ SM(         printf("TocSendAddBuffer: Legal send limit exceeded!\n");   )
         {
             char *p = (char *)SBH_DATA_END(sbh);
             char c;
-            
+
             EC_BOUNDS(p);
             EC_BOUNDS(p + datalen - 1);
 
@@ -987,16 +987,16 @@ word TocSendToToc(TocConnectionData *tcd)
 {
     SendBufHeader *sbh;
     word retval = 0;
-    
+
     if (!tcd->TCD_sock || tcd->TCD_send == NullHandle)
     {
-SM(     printf("TocSendAddBuffer: No connection and/or buffer!\n");     )        
+SM(     printf("TocSendAddBuffer: No connection and/or buffer!\n");     )
         retval = TRUE;
     }
     else
     {
         ThreadPSem(tcd->TCD_sem);
-        
+
         sbh = MemLock(tcd->TCD_send);
 
 SM(     printf("%s\n", (char *)(SBH_DATA(sbh) + sizeof(FlapHeader))); )
@@ -1004,7 +1004,7 @@ SM(     printf("%s\n", (char *)(SBH_DATA(sbh) + sizeof(FlapHeader))); )
         sbh->SBH_header.FH_type = tcd->TCD_type;
         sbh->SBH_header.FH_seq = htons(tcd->TCD_outSeq++);
         sbh->SBH_header.FH_len = htons(sbh->SBH_datalen - sizeof(FlapHeader));
-        
+
         /* Send the frame. */
 //SM(     dump((char *)SBH_DATA(sbh), sbh->SBH_datalen);  )
 #ifndef USE_SIMULATOR
@@ -1016,9 +1016,9 @@ SM(         printf("TocSendToToc: SocketSend error %d\n", retval);   )
 
         /* Reset send buffer. */
         TocSendResetBuffer(tcd);
-        
+
         ThreadVSem(tcd->TCD_sem);
-        
+
         MemUnlock(tcd->TCD_send);
     }
     return retval;
@@ -1028,11 +1028,10 @@ void TocSendClose(TocConnectionData *tcd)
 {
     if (!tcd->TCD_sock)
     {
-SM(     printf("TocSendClose: No connection!\n");     )        
+SM(     printf("TocSendClose: No connection!\n");     )
     }
 #ifndef USE_SIMULATOR
     else
         SocketCloseSend(tcd->TCD_sock);
 #endif
 }
-

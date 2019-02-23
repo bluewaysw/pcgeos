@@ -16,9 +16,12 @@
  ************************************************************************/
 
 
-#define MK_FP( seg,ofs )( (void _seg * )( seg ) +( void near * )( ofs ))
-#define FP_SEG( fp )( (unsigned )( void _seg * )( void far * )( fp ))
-#define FP_OFF( fp )( (unsigned )( fp ))
+#include <i86.h>
+
+
+/*#define MK_FP( seg,ofs )( (void _seg * )( seg ) +( void near * )( ofs ))
+  #define FP_SEG( fp )( (unsigned )( void _seg * )( void far * )( fp ))
+  #define FP_OFF( fp )( (unsigned )( fp ))*/
 
 @include <stdapp.goh>
 #include <library.h>
@@ -26,6 +29,51 @@
 #include <geode.h>
 
 @include "cdaudio.goh"
+
+
+#ifdef __WATCOMC__
+
+#ifndef PUSHDS
+void _PUSHDS();
+#pragma aux _PUSHDS = "push ds";
+#define PUSHDS  _PUSHDS();
+#endif
+
+#ifndef POPDS
+void _POPDS();
+#pragma aux _POPDS = "pop ds";
+#define POPDS   _POPDS();
+#endif
+
+#ifndef PUSHALL
+void _PUSHALL();
+#pragma aux _PUSHALL =  "push ds" \
+                        "push si" \
+                        "push ax" \
+                        "push bx" \
+                        "push cx" \
+                        "push dx" \
+                        "push di"
+#define PUSHALL   _PUSHALL();
+#endif
+
+#ifndef POPALL
+void _POPALL(word segm, word offs);
+#pragma aux _POPALL =  "pop  di" \
+                        "pop  dx" \
+                        "pop  cx" \
+                        "pop  bx" \
+                        "pop  ax" \
+                        "call ds:[si]" \
+	                      "pop  si" \
+                        "pop  ds" \
+                        parm [ds] [si]
+
+#define POPALL   _POPALL(segm, offs);
+#endif
+
+#endif
+
 
 #define MaxTracks 99
 
@@ -103,13 +151,13 @@ byte CD_UPC_Code_Valid = 0;
 void _pascal  CDLib_Reset_Valid_Flags (void)
 {
   int i;
-  asm push ds
+  PUSHDS;
   GeodeLoadDGroup( GeodeGetCodeProcessHandle() );
   CD_Drive_Volume_Valid = 0;
   CD_UPC_Code_Valid = 0;
   for (i=0;i<=MaxTracks;i++)
     trackdatvalid[i]=0;
-  asm pop ds
+  POPDS;
 }
 
 
@@ -127,31 +175,11 @@ void CallCDDriver (void)
   DriverInfoStruct * driverInfo;
   int segm;
   int offs;
-  asm {
-    push ds
-    push si
-    push ax
-    push bx
-    push cx
-    push dx
-    push di
-  }
+  PUSHALL;
   driverInfo = GeodeInfoDriver(cdDriverHandle);
   segm = FP_SEG(driverInfo) ;
   offs = FP_OFF(driverInfo) ;
-  asm {
-    pop  di
-    pop  dx
-    pop  cx
-    pop  bx
-    pop  ax
-    mov  si, offs
-    mov  ds, segm
-//    DB   03eh, 0ffh, 01ch	// call far ds:[si]
-    DB   0x3e, 0xff, 0x1c	// call far ds:[si]
-	 pop  si
-    pop  ds
-  }
+  POPALL;
 }
 
 
@@ -159,9 +187,10 @@ word _pascal  MSCDEX_Get_Version (void)
 /* returns MSCDEX_Version, major in high, minor in low byte; 0= not installed */
 {
   word back;
-  asm push ds
+  PUSHDS;
   GeodeLoadDGroup( GeodeGetCodeProcessHandle() );
   if (MSCDEX_Version==0) {
+#if 0
     asm {
       push di
       mov  di,8         /* get number of drives */
@@ -169,9 +198,11 @@ word _pascal  MSCDEX_Get_Version (void)
       pop  di
       mov  MSCDEX_CD_Drives,al
     }
+#endif
     if (MSCDEX_CD_Drives !=0) {
       int segm = FP_SEG(MSCDEX_Drive_Letters) ;
       int offs = FP_OFF(MSCDEX_Drive_Letters) ;
+#if 0
       asm {
         push di
         mov  di, 10          /* get MSCDEX version number */
@@ -183,6 +214,7 @@ word _pascal  MSCDEX_Get_Version (void)
         } CallCDDriver(); asm {
         pop  di
       }
+#endif
       MSCDEX_Drive_Letters[MSCDEX_CD_Drives]=0;
     }
   }
@@ -191,7 +223,7 @@ word _pascal  MSCDEX_Get_Version (void)
   else
     cdDemoMode = 0;
   back = MSCDEX_Version ;
-  asm pop ds
+  POPDS;
   return back;
 }
 
@@ -200,7 +232,7 @@ byte _pascal  MSCDEX_Get_Drives (void)
 /* returns number of CD drives installed */
 {
   byte back;
-  asm push ds
+  PUSHDS;
   GeodeLoadDGroup( GeodeGetCodeProcessHandle() );
   if (MSCDEX_Version == 0)
     MSCDEX_Get_Version();
@@ -208,7 +240,7 @@ byte _pascal  MSCDEX_Get_Drives (void)
     back = 1;
   else
     back = MSCDEX_CD_Drives;
-  asm pop ds
+  POPDS;
   return back;
 }
 
@@ -217,7 +249,7 @@ byte _pascal  MSCDEX_Get_Drive_Letter (byte drive)
 /* returns drive letter (A=0) of cdrom #drive */
 {
   byte back;
-  asm push ds
+  PUSHDS;
   GeodeLoadDGroup( GeodeGetCodeProcessHandle() );
   if (MSCDEX_Version == 0)
     MSCDEX_Get_Version();
@@ -225,7 +257,7 @@ byte _pascal  MSCDEX_Get_Drive_Letter (byte drive)
     back =  0;
   else
     back = MSCDEX_Drive_Letters[drive];
-  asm pop ds
+  POPDS;
   return back;
 }
 
@@ -242,17 +274,18 @@ int Call_CD_Driver_X ( byte function)
 {
   int back, segm, offs;
   byte driveLetter;
-  asm push ds
+  PUSHDS;
   GeodeLoadDGroup( GeodeGetCodeProcessHandle() );
   segm = FP_SEG(&CD_Driver_Table);
   offs = FP_OFF(&CD_Driver_Table);
   driveLetter = MSCDEX_Drive_Letters[CD_Drive_No];
   if (cdDemoMode){
-    asm pop ds
+    POPDS;
     return -1;
   }
   CD_Driver_Table.size = 0x1a;
   CD_Driver_Table.function =function;
+#if 0
   asm {
     push di
     mov  cl, driveLetter
@@ -263,19 +296,20 @@ int Call_CD_Driver_X ( byte function)
     } CallCDDriver(); asm {
     pop  di
   }
+  #endif
   if (CD_Driver_Table.status & 0x8000) {
     if (try <=3) {
       try++;   /* Fehler */
       TimerSleep(6);
-      asm pop ds
+      POPDS;
       return Call_CD_Driver_X (function);
     } else {
       back =  CD_Driver_Table.status & 0xff;
-      asm pop ds
+      POPDS;
       return back;
     }
   } else {
-    asm pop ds
+    POPDS;
     return -1;
   }
 }
@@ -284,12 +318,12 @@ int Call_CD_Driver_X ( byte function)
 int Call_CD_Driver ( byte function, byte subfunction, void * structure, word size)
 /* calls CD driver using MSCDEX function 0x10 , returns <=0:error, >0:ok */
 {
-  asm push ds
+  PUSHDS;
   GeodeLoadDGroup( GeodeGetCodeProcessHandle() );
   ((byte *)(structure))[0] = subfunction;
   CD_Driver_Table.values.table.pointer = structure ;
   CD_Driver_Table.values.table.length = size;
-  asm pop ds
+  POPDS;
   return Call_CD_Driver_X(function) ;
 }
 
@@ -304,20 +338,20 @@ char _pascal  CD_Drive_Set (byte drive)
 /* sets the current CD drive number */
 {
   int i ;
-  asm push ds
+  PUSHDS;
   GeodeLoadDGroup( GeodeGetCodeProcessHandle() );
   if (drive == CD_Drive_No) {
-    asm pop ds
+    POPDS;
     return 0;
   }
   for (i=0;(i<MSCDEX_Get_Drives())&&(drive!=MSCDEX_Get_Drive_Letter(i));i++) ;
   if (i==MSCDEX_Get_Drives()) {
-    asm pop ds
+    POPDS;
     return -1;
   }
   CD_Drive_No = i ;
   CDLib_Reset_Valid_Flags();
-  asm pop ds
+  POPDS;
   return 0;
 }
 
@@ -339,17 +373,17 @@ word _pascal  CD_Drive_Get_Status (void)
     byte subfunction;
     long status;
   } buffer;
-  asm push ds
+  PUSHDS;
   GeodeLoadDGroup( GeodeGetCodeProcessHandle() );
   if (cdDemoMode) {
-    asm pop ds
+    POPDS;
     return ( CD_STATUS_SUPPORTS_AUDIO
             |CD_STATUS_SUPPORTS_VOLUME
             |CD_STATUS_DRIVE_EMPTY
             |CD_STATUS_SUPPORTS_RED_BOOK);
   }
   Call_CD_Driver (0x3,6,&buffer,sizeof(buffer));
-  asm pop ds
+  POPDS;
   return (word)buffer.status ;
 }
 
@@ -362,10 +396,10 @@ char _pascal  CD_Drive_Get_Change (void)
 */
 {
   char status = 0;
-  asm push ds
+  PUSHDS;
   GeodeLoadDGroup( GeodeGetCodeProcessHandle() );
   if (cdDemoMode) {
-    asm pop ds
+    POPDS;
     return 0;
   }
   if (old_last != CD_Get_Tracks()) status = 1;
@@ -375,7 +409,7 @@ char _pascal  CD_Drive_Get_Change (void)
     old_length = CD_Info.length;
     CDLib_Reset_Valid_Flags();
   }
-  asm pop ds
+  POPDS;
   return status;
 }
 
@@ -384,10 +418,10 @@ byte _pascal  CD_Drive_Get_Volume (byte channel)
 /* returns the current volume setting for that channel */
 {
   byte back;
-  asm push ds
+  PUSHDS;
   GeodeLoadDGroup( GeodeGetCodeProcessHandle() );
   if (cdDemoMode) {
-    asm pop ds
+    POPDS;
     return 255;
   }
   if (CD_Drive_Volume_Valid == 0) {
@@ -395,7 +429,7 @@ byte _pascal  CD_Drive_Get_Volume (byte channel)
   }
   CD_Drive_Volume_Valid = 1;
   back = CD_Drive_Volume.outchannel[channel].volume ;
-  asm pop ds
+  POPDS;
   return back;
 }
 
@@ -403,13 +437,13 @@ byte _pascal  CD_Drive_Get_Volume (byte channel)
 void _pascal  CD_Drive_Set_Volume ( byte channel, byte volume)
 /* sets the audio volume for the given channel (0..255) */
 {
-  asm push ds
+  PUSHDS;
   GeodeLoadDGroup( GeodeGetCodeProcessHandle() );
   if (CD_Drive_Volume_Valid ==0)
     CD_Drive_Get_Volume (0);
   CD_Drive_Volume.outchannel[channel].volume = volume;
   Call_CD_Driver (0xc,3,&CD_Drive_Volume,sizeof(CD_Drive_Volume)) ;
-  asm pop ds
+  POPDS;
 }
 
 
@@ -461,10 +495,10 @@ byte _pascal  CD_Get_UPC (byte digit, byte ignore)
 {
   byte value,i;
   long data;
-  asm push ds
+  PUSHDS;
   GeodeLoadDGroup( GeodeGetCodeProcessHandle() );
   if (cdDemoMode||!CD_Info.length) {
-    asm pop ds
+    POPDS;
     return 0;
   }
   if (!CD_UPC_Code_Valid||!digit) {
@@ -504,7 +538,7 @@ byte _pascal  CD_Get_UPC (byte digit, byte ignore)
     value = value % 16;
   else
     value = value / 16;
-  asm pop ds
+  POPDS;
   return value ;
 }
 
@@ -513,7 +547,7 @@ long _pascal  CD_Get_Length (void)
 /* returns the CDs whole play time or 0 if not valid */
 {
   long back;
-  asm push ds
+  PUSHDS;
   back = 0;
   GeodeLoadDGroup( GeodeGetCodeProcessHandle() );
   if (Call_CD_Driver(0x3,10,&CD_Info,sizeof(CD_Info)) !=-1) {
@@ -525,7 +559,7 @@ long _pascal  CD_Get_Length (void)
   if (CD_Info.last > MaxTracks)
     CD_Info.last = MaxTracks;
   back = CD_Info.length;
-  asm pop ds
+  POPDS;
   return back;
 }
 
@@ -534,13 +568,13 @@ byte _pascal  CD_Get_Tracks (void )
 /* returns number of highest CD track; lowest number must be taken from TrackType */
 {
   byte back;
-  asm push ds
+  PUSHDS;
   GeodeLoadDGroup( GeodeGetCodeProcessHandle() );
   if (cdDemoMode)
     back = 0;
   else
     back = CD_Info.last ;
-  asm pop ds
+  POPDS;
   return back;
 }
 
@@ -555,14 +589,14 @@ byte _pascal  CD_Get_Track_Type (byte track)
     byte   status;
   } T_Info;
   byte back;
-  asm push ds
+  PUSHDS;
   GeodeLoadDGroup( GeodeGetCodeProcessHandle() );
   if (  cdDemoMode
       ||(track<CD_Info.first)
       ||(track>CD_Info.last)
       ||(!CD_Info.length)
      ) {
-    asm pop ds
+    POPDS;
     return 0;
   }
   T_Info.track = track;
@@ -578,7 +612,7 @@ byte _pascal  CD_Get_Track_Type (byte track)
 /* !!! fix for CDs with more than MaxTracks tracks */
     back = CD_Get_Length();
   }
-  asm pop ds
+  POPDS;
   return back;
 }
 
@@ -593,18 +627,18 @@ long _pascal  CD_Get_Track_Start (byte track)
     byte   status;
   } T_Info;
   long back;
-  asm push ds
+  PUSHDS;
   GeodeLoadDGroup( GeodeGetCodeProcessHandle() );
   if (cdDemoMode) {
-    asm pop ds
+    POPDS;
     return 0;
   }
   if (track == (CD_Info.last +1)) {
-    asm pop ds
+    POPDS;
     return CD_Get_Length();
   }
   if (CD_Get_Track_Type(track)==0) {
-    asm pop ds
+    POPDS;
     return 0;
   }
   if (track < MaxTracks) {
@@ -614,7 +648,7 @@ long _pascal  CD_Get_Track_Start (byte track)
     Call_CD_Driver(0x3,11,&T_Info,sizeof(T_Info));
     back = T_Info.start;
   }
-  asm pop ds
+  POPDS;
   return back;
 }
 
@@ -638,14 +672,14 @@ long _pascal  CD_Get_Play_Position (byte mode)
     byte cd_frm;
   } playpos;
   long time;
-  asm push ds
+  PUSHDS;
   GeodeLoadDGroup( GeodeGetCodeProcessHandle() );
   if (cdDemoMode) {
-    asm pop ds
+    POPDS;
     return 0;
   }
   if ( Call_CD_Driver (0x3,12,&playpos,sizeof(playpos)) !=-1 ) {
-    asm pop ds
+    POPDS;
     return 0;
   }
   if (mode==0) {
@@ -662,7 +696,7 @@ long _pascal  CD_Get_Play_Position (byte mode)
       time = 0;
     else
       time = RedbookPos(playpos.cd_min,playpos.cd_sec,playpos.cd_frm);
-  asm pop ds
+  POPDS;
   return time;
 }
 
@@ -677,10 +711,10 @@ char _pascal  CD_Get_Play_Status(void)
     long stop;
   } playstat;
   char back;
-  asm push ds
+  PUSHDS;
   GeodeLoadDGroup( GeodeGetCodeProcessHandle() );
   if (cdDemoMode) {
-    asm pop ds
+    POPDS;
     return -1;
   }
   Call_CD_Driver (0x3,15,&playstat,sizeof(playstat)) ;
@@ -688,7 +722,7 @@ char _pascal  CD_Get_Play_Status(void)
     back = playstat.status;
   else
     back = -1;
-  asm pop ds
+  POPDS;
   return back;
 }
 
@@ -698,10 +732,10 @@ char _pascal  CD_Play_Position (long start, long stop )
    a stop value less than start plays until end                    */
 {
   long len;
-  asm push ds
+  PUSHDS;
   GeodeLoadDGroup( GeodeGetCodeProcessHandle() );
   if (cdDemoMode) {
-    asm pop ds
+    POPDS;
     return 0;
   }
   CD_Driver_Table.mode = 0; /* HSG sector adress for easier access */
@@ -715,7 +749,7 @@ char _pascal  CD_Play_Position (long start, long stop )
       stop =  ((RedbookMin(CD_Get_Length())*60)+RedbookSec(CD_Get_Length()))*75+RedbookFrm(CD_Get_Length());
   len = stop-start;
   CD_Driver_Table.values.play.number = len;
-  asm pop ds
+  POPDS;
   return Call_CD_Driver_X(0x84);
 }
 
@@ -744,7 +778,7 @@ GeodeLoadError  driverLoadError = 0;
 Boolean _pascal LibraryEntry (LibraryCallType type, GeodeHandle client)
 {
   Boolean back;
-  asm push ds
+  PUSHDS;
   GeodeLoadDGroup( GeodeGetCodeProcessHandle() );
   switch (type) {
     case LCT_ATTACH:				/* The library was just loaded. */
@@ -777,7 +811,7 @@ Boolean _pascal LibraryEntry (LibraryCallType type, GeodeHandle client)
       else
         back = TRUE;
   }
-  asm pop ds
+  POPDS;
   return back;
 }
 
