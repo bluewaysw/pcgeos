@@ -31,8 +31,8 @@ exempt sound
 # Muá neu berechnet werden !
 heapspace 9720
 
-resource APPRESOURCE           ui-object
-resource INTERFACE             ui-object
+resource AppResource           ui-object
+resource Interface             ui-object
 resource MAXINTERFACE          ui-object
 resource ABSRESOURCE           ui-object
 resource BALANCERESOURCE       ui-object

@@ -8,7 +8,7 @@
 #ifndef __MAIN_SUBCODE_H
 #define __MAIN_SUBCODE_H
 
-//************** Funktionsprototypen *************
+/************** Funktionsprototypen *************/
 void _pascal StartPlaying (byte track);
 // start or continue playing with given track
 byte _pascal GetNextTrack (void) ;

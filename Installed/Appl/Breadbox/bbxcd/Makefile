@@ -4,18 +4,18 @@
 # If you edit it, you will lose your changes, should it be regenerated.
 #
 GEODE           = bbxcd
-MAIN            = DISPLAY.H KEY.H PCODE.H SUBCODE.H TIMEVENT.H bbxcd.goc\
-                  DISPLAY.GOC KEY.GOC PCODE.GOC PROCESS.GOC SUBCODE.GOC\
-                  TIMEVENT.GOC TXT_STRS.GOC DISPLAY.GOH PCODE.GOH\
-                  PROCESS.GOH SUBCODE.GOH TIMEVENT.GOH
-UI              = UIMAIN.GOC UIMAX.GOC DEFINE.GOH UIMAIN.GOH UIMAX.GOH
+MAIN            = pcode.h timevent.h subcode.h display.h key.h subcode.goc\
+                  txt_strs.goc pcode.goc display.goc process.goc\
+                  timevent.goc key.goc bbxcd.goc timevent.goh display.goh\
+                  pcode.goh process.goh subcode.goh
+UI              = uimain.goc uimax.goc uimain.goh uimax.goh define.goh
 UI_TO_RDFS      =
-OBJS            = bbxcd.obj DISPLAY.obj KEY.obj PCODE.obj PROCESS.obj\
-                  SUBCODE.obj TIMEVENT.obj TXT_STRS.obj UIMAIN.obj\
-                  UIMAX.obj
-COMMON          = bbxcd.H
+OBJS            = subcode.obj txt_strs.obj pcode.obj display.obj\
+                  process.obj timevent.obj key.obj bbxcd.obj uimain.obj\
+                  uimax.obj
+COMMON          = bbxcd.h
 MODULES         =
-CMODULES        = MAIN UI
+CMODULES        = Main Ui
 SRCS            = $(MAIN) $(UI) $(COMMON)
 LOBJS           =
 
