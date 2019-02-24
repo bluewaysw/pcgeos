@@ -54,7 +54,7 @@ resource TextStrings data object
 # this fake resource fixes the code content of key.goc.
 # this is necessary because key.goc contains inline assembler code
 # that may not be relocated (system crash imminent).
-resource KEY_TEXT              preload fixed code read-only
+resource Key_Text              preload fixed code read-only
 
 # usernotes "Komfortabler CD-Player mit Datenbank."
 #usernotes "Luxuriant CD-player with database."
