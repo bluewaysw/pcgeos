@@ -1416,13 +1416,13 @@ ffind	: Installed/Appl/Breadbox/FFind
 Installed/Appl/Breadbox/FFind:			ui ansic text MAKEAPPL
 
 cdaudio	: Installed/Library/Breadbox/CDAudio
-Installed/Library/Breadbox/CDAudio:		MAKELIB
+Installed/Library/Breadbox/CDAudio:		ansic MAKELIB
 
 cdados	: Installed/Library/Breadbox/Cdados
 Installed/Library/Breadbox/Cdados:		MAKELIB
 
-bbxcd	: Installed/Appl/Breadbox/Bbxcd
-Installed/Appl/Breadbox/Bbxcd:			ui ansic sound cdaudio MAKEAPPL
+bbxcd	: Installed/Appl/Breadbox/bbxcd
+Installed/Appl/Breadbox/bbxcd:			ui ansic sound cdaudio MAKEAPPL
 
 webbox	: Installed/Appl/Breadbox/Webbox
 Installed/Appl/Breadbox/Webbox:			ui ansic text spool spell \
