@@ -1,207 +1,207 @@
-SAFARI.rdef: GENERIC.UIH PRODUCT.UIH MKRINDON.UI MKRINDOFF.UI \
-                MKRCLICKON.UI MKRCLICKOFF.UI MKRSCORE.UI
-SAFARI.obj \
-SAFARI.eobj: GEOS.DEF EC.DEF TIMER.DEF HEAP.DEF SAFARI.DEF UI.DEF \
-                FILE.DEF VM.DEF TEXT.DEF FONTID.DEF GRAPHICS.DEF FONT.DEF \
-                COLOR.DEF CHAR.DEF WIN.DEF INPUT.DEF HWR.DEF LOCALIZE.DEF \
-                SLLANG.DEF OBJECTS/PROCESSC.DEF OBJECTS/METAC.DEF \
-                GEODE.DEF OBJECT.DEF LMEM.DEF CHUNKARR.DEF GEOWORKS.DEF \
-                GCNLIST.DEF TIMEDATE.DEF OBJECTS/TEXT/TCOMMON.DEF \
-                STYLESH.DEF IACP.DEF OBJECTS/UIINPUTC.DEF \
-                OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF OBJECTS/VCNTC.DEF \
-                INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF DISK.DEF DRIVE.DEF \
-                UDIALOG.DEF OBJECTS/GINTERC.DEF TOKEN.DEF \
-                OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF \
-                ALB.DEF OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                SAFARICONSTANT.DEF SAFARIGEODE.DEF RESOURCE.DEF \
-                LIBRARY.DEF SYSTEM.DEF GAME.DEF INTERNAL/XLATLIB.DEF \
-                IMPEX.DEF IECOMMON.DEF SAFARI.RDEF
-SAFARIBITMAP.obj \
-SAFARIBITMAP.eobj: SAFARIGEODE.DEF GEOS.DEF GEODE.DEF EC.DEF RESOURCE.DEF \
-                LIBRARY.DEF LMEM.DEF OBJECT.DEF GRAPHICS.DEF FONTID.DEF \
-                FONT.DEF COLOR.DEF TIMER.DEF HEAP.DEF SYSTEM.DEF \
-                LOCALIZE.DEF SLLANG.DEF UI.DEF FILE.DEF VM.DEF TEXT.DEF \
-                CHAR.DEF WIN.DEF INPUT.DEF HWR.DEF OBJECTS/PROCESSC.DEF \
-                OBJECTS/METAC.DEF CHUNKARR.DEF GEOWORKS.DEF GCNLIST.DEF \
-                TIMEDATE.DEF OBJECTS/TEXT/TCOMMON.DEF STYLESH.DEF \
-                IACP.DEF OBJECTS/UIINPUTC.DEF OBJECTS/VISC.DEF \
-                OBJECTS/VCOMPC.DEF OBJECTS/VCNTC.DEF INTERNAL/VUTILS.DEF \
-                OBJECTS/GENC.DEF DISK.DEF DRIVE.DEF UDIALOG.DEF \
-                OBJECTS/GINTERC.DEF TOKEN.DEF OBJECTS/CLIPBRD.DEF \
-                OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF ALB.DEF \
-                OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                GAME.DEF INTERNAL/XLATLIB.DEF IMPEX.DEF IECOMMON.DEF \
-                SAFARI.DEF SAFARICONSTANT.DEF
-SAFARIC.obj \
-SAFARIC.eobj: SAFARIGEODE.DEF GEOS.DEF GEODE.DEF EC.DEF RESOURCE.DEF \
-                LIBRARY.DEF LMEM.DEF OBJECT.DEF GRAPHICS.DEF FONTID.DEF \
-                FONT.DEF COLOR.DEF TIMER.DEF HEAP.DEF SYSTEM.DEF \
-                LOCALIZE.DEF SLLANG.DEF UI.DEF FILE.DEF VM.DEF TEXT.DEF \
-                CHAR.DEF WIN.DEF INPUT.DEF HWR.DEF OBJECTS/PROCESSC.DEF \
-                OBJECTS/METAC.DEF CHUNKARR.DEF GEOWORKS.DEF GCNLIST.DEF \
-                TIMEDATE.DEF OBJECTS/TEXT/TCOMMON.DEF STYLESH.DEF \
-                IACP.DEF OBJECTS/UIINPUTC.DEF OBJECTS/VISC.DEF \
-                OBJECTS/VCOMPC.DEF OBJECTS/VCNTC.DEF INTERNAL/VUTILS.DEF \
-                OBJECTS/GENC.DEF DISK.DEF DRIVE.DEF UDIALOG.DEF \
-                OBJECTS/GINTERC.DEF TOKEN.DEF OBJECTS/CLIPBRD.DEF \
-                OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF ALB.DEF \
-                OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                GAME.DEF INTERNAL/XLATLIB.DEF IMPEX.DEF IECOMMON.DEF \
-                SAFARI.DEF SAFARICONSTANT.DEF
-SAFARIGAME.obj \
-SAFARIGAME.eobj: SAFARIGEODE.DEF GEOS.DEF GEODE.DEF EC.DEF RESOURCE.DEF \
-                LIBRARY.DEF LMEM.DEF OBJECT.DEF GRAPHICS.DEF FONTID.DEF \
-                FONT.DEF COLOR.DEF TIMER.DEF HEAP.DEF SYSTEM.DEF \
-                LOCALIZE.DEF SLLANG.DEF UI.DEF FILE.DEF VM.DEF TEXT.DEF \
-                CHAR.DEF WIN.DEF INPUT.DEF HWR.DEF OBJECTS/PROCESSC.DEF \
-                OBJECTS/METAC.DEF CHUNKARR.DEF GEOWORKS.DEF GCNLIST.DEF \
-                TIMEDATE.DEF OBJECTS/TEXT/TCOMMON.DEF STYLESH.DEF \
-                IACP.DEF OBJECTS/UIINPUTC.DEF OBJECTS/VISC.DEF \
-                OBJECTS/VCOMPC.DEF OBJECTS/VCNTC.DEF INTERNAL/VUTILS.DEF \
-                OBJECTS/GENC.DEF DISK.DEF DRIVE.DEF UDIALOG.DEF \
-                OBJECTS/GINTERC.DEF TOKEN.DEF OBJECTS/CLIPBRD.DEF \
-                OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF ALB.DEF \
-                OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                GAME.DEF INTERNAL/XLATLIB.DEF IMPEX.DEF IECOMMON.DEF \
-                SAFARI.DEF SAFARICONSTANT.DEF
-SAFARIINDICATOR.obj \
-SAFARIINDICATOR.eobj: SAFARIGEODE.DEF GEOS.DEF GEODE.DEF EC.DEF RESOURCE.DEF \
-                LIBRARY.DEF LMEM.DEF OBJECT.DEF GRAPHICS.DEF FONTID.DEF \
-                FONT.DEF COLOR.DEF TIMER.DEF HEAP.DEF SYSTEM.DEF \
-                LOCALIZE.DEF SLLANG.DEF UI.DEF FILE.DEF VM.DEF TEXT.DEF \
-                CHAR.DEF WIN.DEF INPUT.DEF HWR.DEF OBJECTS/PROCESSC.DEF \
-                OBJECTS/METAC.DEF CHUNKARR.DEF GEOWORKS.DEF GCNLIST.DEF \
-                TIMEDATE.DEF OBJECTS/TEXT/TCOMMON.DEF STYLESH.DEF \
-                IACP.DEF OBJECTS/UIINPUTC.DEF OBJECTS/VISC.DEF \
-                OBJECTS/VCOMPC.DEF OBJECTS/VCNTC.DEF INTERNAL/VUTILS.DEF \
-                OBJECTS/GENC.DEF DISK.DEF DRIVE.DEF UDIALOG.DEF \
-                OBJECTS/GINTERC.DEF TOKEN.DEF OBJECTS/CLIPBRD.DEF \
-                OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF ALB.DEF \
-                OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                GAME.DEF INTERNAL/XLATLIB.DEF IMPEX.DEF IECOMMON.DEF \
-                SAFARI.DEF SAFARICONSTANT.DEF
-SAFARIOTHER.obj \
-SAFARIOTHER.eobj: SAFARIGEODE.DEF GEOS.DEF GEODE.DEF EC.DEF RESOURCE.DEF \
-                LIBRARY.DEF LMEM.DEF OBJECT.DEF GRAPHICS.DEF FONTID.DEF \
-                FONT.DEF COLOR.DEF TIMER.DEF HEAP.DEF SYSTEM.DEF \
-                LOCALIZE.DEF SLLANG.DEF UI.DEF FILE.DEF VM.DEF TEXT.DEF \
-                CHAR.DEF WIN.DEF INPUT.DEF HWR.DEF OBJECTS/PROCESSC.DEF \
-                OBJECTS/METAC.DEF CHUNKARR.DEF GEOWORKS.DEF GCNLIST.DEF \
-                TIMEDATE.DEF OBJECTS/TEXT/TCOMMON.DEF STYLESH.DEF \
-                IACP.DEF OBJECTS/UIINPUTC.DEF OBJECTS/VISC.DEF \
-                OBJECTS/VCOMPC.DEF OBJECTS/VCNTC.DEF INTERNAL/VUTILS.DEF \
-                OBJECTS/GENC.DEF DISK.DEF DRIVE.DEF UDIALOG.DEF \
-                OBJECTS/GINTERC.DEF TOKEN.DEF OBJECTS/CLIPBRD.DEF \
-                OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF ALB.DEF \
-                OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                GAME.DEF INTERNAL/XLATLIB.DEF IMPEX.DEF IECOMMON.DEF \
-                SAFARI.DEF SAFARICONSTANT.DEF
-SAFARIUTILS.obj \
-SAFARIUTILS.eobj: SAFARIGEODE.DEF GEOS.DEF GEODE.DEF EC.DEF RESOURCE.DEF \
-                LIBRARY.DEF LMEM.DEF OBJECT.DEF GRAPHICS.DEF FONTID.DEF \
-                FONT.DEF COLOR.DEF TIMER.DEF HEAP.DEF SYSTEM.DEF \
-                LOCALIZE.DEF SLLANG.DEF UI.DEF FILE.DEF VM.DEF TEXT.DEF \
-                CHAR.DEF WIN.DEF INPUT.DEF HWR.DEF OBJECTS/PROCESSC.DEF \
-                OBJECTS/METAC.DEF CHUNKARR.DEF GEOWORKS.DEF GCNLIST.DEF \
-                TIMEDATE.DEF OBJECTS/TEXT/TCOMMON.DEF STYLESH.DEF \
-                IACP.DEF OBJECTS/UIINPUTC.DEF OBJECTS/VISC.DEF \
-                OBJECTS/VCOMPC.DEF OBJECTS/VCNTC.DEF INTERNAL/VUTILS.DEF \
-                OBJECTS/GENC.DEF DISK.DEF DRIVE.DEF UDIALOG.DEF \
-                OBJECTS/GINTERC.DEF TOKEN.DEF OBJECTS/CLIPBRD.DEF \
-                OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF ALB.DEF \
-                OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                GAME.DEF INTERNAL/XLATLIB.DEF IMPEX.DEF IECOMMON.DEF \
-                SAFARI.DEF SAFARICONSTANT.DEF
+safari.rdef: generic.uih product.uih mkrIndOn.ui mkrIndOff.ui \
+                mkrClickOn.ui mkrClickOff.ui mkrScore.ui
+safariGame.obj \
+safariGame.eobj: safariGeode.def geos.def geode.def ec.def resource.def \
+                library.def lmem.def object.def graphics.def fontID.def \
+                font.def color.def timer.def heap.def system.def \
+                localize.def sllang.def ui.def file.def vm.def text.def \
+                char.def win.def input.def hwr.def Objects/processC.def \
+                Objects/metaC.def chunkarr.def geoworks.def gcnlist.def \
+                timedate.def Objects/Text/tCommon.def stylesh.def \
+                iacp.def Objects/uiInputC.def Objects/visC.def \
+                Objects/vCompC.def Objects/vCntC.def Internal/vUtils.def \
+                Objects/genC.def disk.def drive.def uDialog.def \
+                Objects/gInterC.def token.def Objects/clipbrd.def \
+                Objects/gSysC.def Objects/gProcC.def alb.def \
+                Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                game.def Internal/xlatLib.def impex.def ieCommon.def \
+                safari.def safariConstant.def
+safariBitmap.obj \
+safariBitmap.eobj: safariGeode.def geos.def geode.def ec.def resource.def \
+                library.def lmem.def object.def graphics.def fontID.def \
+                font.def color.def timer.def heap.def system.def \
+                localize.def sllang.def ui.def file.def vm.def text.def \
+                char.def win.def input.def hwr.def Objects/processC.def \
+                Objects/metaC.def chunkarr.def geoworks.def gcnlist.def \
+                timedate.def Objects/Text/tCommon.def stylesh.def \
+                iacp.def Objects/uiInputC.def Objects/visC.def \
+                Objects/vCompC.def Objects/vCntC.def Internal/vUtils.def \
+                Objects/genC.def disk.def drive.def uDialog.def \
+                Objects/gInterC.def token.def Objects/clipbrd.def \
+                Objects/gSysC.def Objects/gProcC.def alb.def \
+                Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                game.def Internal/xlatLib.def impex.def ieCommon.def \
+                safari.def safariConstant.def
+safariUtils.obj \
+safariUtils.eobj: safariGeode.def geos.def geode.def ec.def resource.def \
+                library.def lmem.def object.def graphics.def fontID.def \
+                font.def color.def timer.def heap.def system.def \
+                localize.def sllang.def ui.def file.def vm.def text.def \
+                char.def win.def input.def hwr.def Objects/processC.def \
+                Objects/metaC.def chunkarr.def geoworks.def gcnlist.def \
+                timedate.def Objects/Text/tCommon.def stylesh.def \
+                iacp.def Objects/uiInputC.def Objects/visC.def \
+                Objects/vCompC.def Objects/vCntC.def Internal/vUtils.def \
+                Objects/genC.def disk.def drive.def uDialog.def \
+                Objects/gInterC.def token.def Objects/clipbrd.def \
+                Objects/gSysC.def Objects/gProcC.def alb.def \
+                Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                game.def Internal/xlatLib.def impex.def ieCommon.def \
+                safari.def safariConstant.def
+safariIndicator.obj \
+safariIndicator.eobj: safariGeode.def geos.def geode.def ec.def resource.def \
+                library.def lmem.def object.def graphics.def fontID.def \
+                font.def color.def timer.def heap.def system.def \
+                localize.def sllang.def ui.def file.def vm.def text.def \
+                char.def win.def input.def hwr.def Objects/processC.def \
+                Objects/metaC.def chunkarr.def geoworks.def gcnlist.def \
+                timedate.def Objects/Text/tCommon.def stylesh.def \
+                iacp.def Objects/uiInputC.def Objects/visC.def \
+                Objects/vCompC.def Objects/vCntC.def Internal/vUtils.def \
+                Objects/genC.def disk.def drive.def uDialog.def \
+                Objects/gInterC.def token.def Objects/clipbrd.def \
+                Objects/gSysC.def Objects/gProcC.def alb.def \
+                Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                game.def Internal/xlatLib.def impex.def ieCommon.def \
+                safari.def safariConstant.def
+safariOther.obj \
+safariOther.eobj: safariGeode.def geos.def geode.def ec.def resource.def \
+                library.def lmem.def object.def graphics.def fontID.def \
+                font.def color.def timer.def heap.def system.def \
+                localize.def sllang.def ui.def file.def vm.def text.def \
+                char.def win.def input.def hwr.def Objects/processC.def \
+                Objects/metaC.def chunkarr.def geoworks.def gcnlist.def \
+                timedate.def Objects/Text/tCommon.def stylesh.def \
+                iacp.def Objects/uiInputC.def Objects/visC.def \
+                Objects/vCompC.def Objects/vCntC.def Internal/vUtils.def \
+                Objects/genC.def disk.def drive.def uDialog.def \
+                Objects/gInterC.def token.def Objects/clipbrd.def \
+                Objects/gSysC.def Objects/gProcC.def alb.def \
+                Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                game.def Internal/xlatLib.def impex.def ieCommon.def \
+                safari.def safariConstant.def
+safariC.obj \
+safariC.eobj: safariGeode.def geos.def geode.def ec.def resource.def \
+                library.def lmem.def object.def graphics.def fontID.def \
+                font.def color.def timer.def heap.def system.def \
+                localize.def sllang.def ui.def file.def vm.def text.def \
+                char.def win.def input.def hwr.def Objects/processC.def \
+                Objects/metaC.def chunkarr.def geoworks.def gcnlist.def \
+                timedate.def Objects/Text/tCommon.def stylesh.def \
+                iacp.def Objects/uiInputC.def Objects/visC.def \
+                Objects/vCompC.def Objects/vCntC.def Internal/vUtils.def \
+                Objects/genC.def disk.def drive.def uDialog.def \
+                Objects/gInterC.def token.def Objects/clipbrd.def \
+                Objects/gSysC.def Objects/gProcC.def alb.def \
+                Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                game.def Internal/xlatLib.def impex.def ieCommon.def \
+                safari.def safariConstant.def
+safari.obj \
+safari.eobj: geos.def ec.def timer.def heap.def safari.def ui.def \
+                file.def vm.def text.def fontID.def graphics.def font.def \
+                color.def char.def win.def input.def hwr.def localize.def \
+                sllang.def Objects/processC.def Objects/metaC.def \
+                geode.def object.def lmem.def chunkarr.def geoworks.def \
+                gcnlist.def timedate.def Objects/Text/tCommon.def \
+                stylesh.def iacp.def Objects/uiInputC.def \
+                Objects/visC.def Objects/vCompC.def Objects/vCntC.def \
+                Internal/vUtils.def Objects/genC.def disk.def drive.def \
+                uDialog.def Objects/gInterC.def token.def \
+                Objects/clipbrd.def Objects/gSysC.def Objects/gProcC.def \
+                alb.def Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                safariConstant.def safariGeode.def resource.def \
+                library.def system.def game.def Internal/xlatLib.def \
+                impex.def ieCommon.def safari.rdef
 
-SafariEC.geo Safari.geo : GEOS.LDF UI.LDF GAME.LDF 
+safariEC.geo safari.geo : geos.ldf ui.ldf game.ldf 

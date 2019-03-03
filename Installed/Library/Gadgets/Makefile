@@ -3,18 +3,18 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Gadgets
+GEODE           = gadgets
 MAIN            = mainManager.asm mainVisMonikerUtil.asm
-UI              = uiBatteryIndicator.asm uiCommon.asm uiDateInput.asm\
-                  uiDateSelector.asm uiManager.asm uiRepeatTrigger.asm\
-                  uiStopwatch.asm uiTimeInput.asm uiTimeInputParse.asm\
-                  uiTimeInputText.asm uiTimer.asm uiDateInput.ui\
-                  uiDateSelector.ui uiManager.ui uiStopwatch.ui\
-                  uiStrings.ui uiTimeInput.ui uiTimer.ui
-UI_TO_RDFS      = UIMANAGER.UI
+UI              = uiBatteryIndicator.asm uiTimeInputParse.asm\
+                  uiTimeInput.asm uiDateInput.asm uiManager.asm\
+                  uiCommon.asm uiDateSelector.asm uiTimer.asm\
+                  uiStopwatch.asm uiTimeInputText.asm uiRepeatTrigger.asm\
+                  uiDateSelector.ui uiDateInput.ui uiTimer.ui uiStrings.ui\
+                  uiManager.ui uiTimeInput.ui uiStopwatch.ui
+UI_TO_RDFS      = uiManager.ui
 OBJS            =
-COMMON          = gadgetsConstant.def gadgetsGeode.def\
-                  gadgetsVisMonikerUtil.def
+COMMON          = gadgetsGeode.def gadgetsVisMonikerUtil.def\
+                  gadgetsConstant.def
 MODULES         = Main UI
 CMODULES        =
 SRCS            = $(MAIN) $(UI) $(COMMON)

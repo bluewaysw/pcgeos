@@ -9,12 +9,13 @@
  ************************************************/
 
 @include <stdapp.goh>
-#include <Main\Key.h>
+#include <Main/key.h>
 
 void far ImAddMonitor ();
 // dummy definition
 void far ImRemoveMonitor ();
 // dummy definition
+
 
 struct MonitorChain {
                     word ownoffset;
@@ -66,13 +67,13 @@ struct MonitorChain {
         else mouse or other input
 
 *************************************************/
-
+@start Key_Text;
 
 unsigned char kbdChar  = 0;
 
 void far KeyboardIntercept ()
 {
-  asm {
+  _asm {
         TEST    AL, 1           ; // keypress already handled ?
         JZ      end
         CMP     DI, 119         ; // dunno why
@@ -91,14 +92,14 @@ void far KeyboardIntercept ()
         JZ      store
         CMP     CL, VC_F8
         JNZ     end
-  }
   store:
-  asm {
         MOV     kbdChar, CL     ; // store key for interrupt routine
         XOR     AL, AL          ; // clear unhandled flag
-      }
   end:
+  };
 }
+
+@end Key_Text;
 
 char isInstalled = 0;
 
@@ -124,16 +125,16 @@ void _pascal InstallMonitor ()
 
   if (!isInstalled) {
     buffer = (unsigned) &nextMonitor;
-    fseg = (unsigned) (void _seg *) KeyboardIntercept;
-    fofs = (unsigned) KeyboardIntercept;
+    fseg = PtrToSegment( KeyboardIntercept );
+    fofs = PtrToOffset( KeyboardIntercept );
     function = ImAddMonitor;
-    asm {
+    _asm {
         MOV     BX, buffer
         MOV     AL, 22
         MOV     CX, fseg
         MOV     DX, fofs
         CALL    function
-    }
+    };
   isInstalled = 1;
   }
 }
@@ -156,14 +157,13 @@ void _pascal KillMonitor ()
     buffer = (unsigned) &nextMonitor;
     function = ImRemoveMonitor;
 
-    asm {
+    _asm {
         MOV     BX, buffer
         MOV     AL, 64
         CALL    function
-    }
+    };
     isInstalled = 0;
   }
 }
-
 
 

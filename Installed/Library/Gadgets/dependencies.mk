@@ -1,80 +1,80 @@
-MAIN.obj \
-MAIN.eobj: Main/MainMANAGER.ASM \
-                GADGETSGEODE.DEF GEOS.DEF STDAPP.DEF GEODE.DEF \
-                RESOURCE.DEF EC.DEF LMEM.DEF OBJECT.DEF GRAPHICS.DEF \
-                FONTID.DEF FONT.DEF COLOR.DEF GSTRING.DEF TEXT.DEF \
-                CHAR.DEF HEAP.DEF UI.DEF FILE.DEF VM.DEF WIN.DEF \
-                INPUT.DEF HWR.DEF LOCALIZE.DEF SLLANG.DEF \
-                OBJECTS/PROCESSC.DEF OBJECTS/METAC.DEF CHUNKARR.DEF \
-                GEOWORKS.DEF GCNLIST.DEF TIMEDATE.DEF \
-                OBJECTS/TEXT/TCOMMON.DEF STYLESH.DEF IACP.DEF \
-                OBJECTS/UIINPUTC.DEF OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF \
-                OBJECTS/VCNTC.DEF INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF \
-                DISK.DEF DRIVE.DEF UDIALOG.DEF OBJECTS/GINTERC.DEF \
-                TOKEN.DEF OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF \
-                OBJECTS/GPROCC.DEF ALB.DEF OBJECTS/GFIELDC.DEF \
-                OBJECTS/GSCREENC.DEF OBJECTS/GFSELC.DEF \
-                OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF OBJECTS/GCTRLC.DEF \
-                OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                ASSERT.DEF LIBRARY.DEF TIMER.DEF DBASE.DEF INITFILE.DEF \
-                SYSTEM.DEF OBJECTS/INPUTC.DEF OBJECTS/VTEXTC.DEF \
-                SPOOL.DEF PRINT.DEF INTERNAL/PRODFEATURES.DEF HUGEARR.DEF \
-                INTERNAL/JEDI/JUTILS.DEF INTERNAL/POWERDR.DEF DRIVER.DEF \
-                GADGETSCONSTANT.DEF GADGETSVISMONIKERUTIL.DEF \
-                MAIN/MAINVISMONIKERUTIL.ASM
+Main.obj \
+Main.eobj: Main/mainManager.asm \
+                gadgetsGeode.def geos.def stdapp.def geode.def \
+                resource.def ec.def lmem.def object.def graphics.def \
+                fontID.def font.def color.def gstring.def text.def \
+                char.def heap.def ui.def file.def vm.def win.def \
+                input.def hwr.def localize.def sllang.def \
+                Objects/processC.def Objects/metaC.def chunkarr.def \
+                geoworks.def gcnlist.def timedate.def \
+                Objects/Text/tCommon.def stylesh.def iacp.def \
+                Objects/uiInputC.def Objects/visC.def Objects/vCompC.def \
+                Objects/vCntC.def Internal/vUtils.def Objects/genC.def \
+                disk.def drive.def uDialog.def Objects/gInterC.def \
+                token.def Objects/clipbrd.def Objects/gSysC.def \
+                Objects/gProcC.def alb.def Objects/gFieldC.def \
+                Objects/gScreenC.def Objects/gFSelC.def \
+                Objects/gViewC.def Objects/gContC.def Objects/gCtrlC.def \
+                Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                assert.def library.def timer.def dbase.def initfile.def \
+                system.def Objects/inputC.def Objects/vTextC.def \
+                spool.def print.def Internal/prodFeatures.def hugearr.def \
+                Internal/Jedi/jutils.def Internal/powerDr.def driver.def \
+                gadgetsConstant.def gadgetsVisMonikerUtil.def \
+                Main/mainVisMonikerUtil.asm
 UI.obj \
-UI.eobj: UI/UIMANAGER.ASM \
-                GADGETSGEODE.DEF GEOS.DEF STDAPP.DEF GEODE.DEF \
-                RESOURCE.DEF EC.DEF LMEM.DEF OBJECT.DEF GRAPHICS.DEF \
-                FONTID.DEF FONT.DEF COLOR.DEF GSTRING.DEF TEXT.DEF \
-                CHAR.DEF HEAP.DEF UI.DEF FILE.DEF VM.DEF WIN.DEF \
-                INPUT.DEF HWR.DEF LOCALIZE.DEF SLLANG.DEF \
-                OBJECTS/PROCESSC.DEF OBJECTS/METAC.DEF CHUNKARR.DEF \
-                GEOWORKS.DEF GCNLIST.DEF TIMEDATE.DEF \
-                OBJECTS/TEXT/TCOMMON.DEF STYLESH.DEF IACP.DEF \
-                OBJECTS/UIINPUTC.DEF OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF \
-                OBJECTS/VCNTC.DEF INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF \
-                DISK.DEF DRIVE.DEF UDIALOG.DEF OBJECTS/GINTERC.DEF \
-                TOKEN.DEF OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF \
-                OBJECTS/GPROCC.DEF ALB.DEF OBJECTS/GFIELDC.DEF \
-                OBJECTS/GSCREENC.DEF OBJECTS/GFSELC.DEF \
-                OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF OBJECTS/GCTRLC.DEF \
-                OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                ASSERT.DEF LIBRARY.DEF TIMER.DEF DBASE.DEF INITFILE.DEF \
-                SYSTEM.DEF OBJECTS/INPUTC.DEF OBJECTS/VTEXTC.DEF \
-                SPOOL.DEF PRINT.DEF INTERNAL/PRODFEATURES.DEF HUGEARR.DEF \
-                INTERNAL/JEDI/JUTILS.DEF INTERNAL/POWERDR.DEF DRIVER.DEF \
-                GADGETSCONSTANT.DEF GADGETSVISMONIKERUTIL.DEF \
-                OBJECTS/GADGETS.DEF UIMANAGER.RDEF UICOMMON.ASM \
-                UIREPEATTRIGGER.ASM UIDATESELECTOR.ASM UIDATEINPUT.ASM \
-                UITIMEINPUTPARSE.ASM UITIMEINPUTTEXT.ASM UITIMEINPUT.ASM \
-                UISTOPWATCH.ASM UITIMER.ASM UIBATTERYINDICATOR.ASM
-UIMANAGER.rdef: GENERIC.UIH PRODUCT.UIH OBJECTS/GADGETS.UIH \
-                UI/UISTRINGS.UI UI/UIDATESELECTOR.UI \
-                UI/ART/MKRSELECTOR.UI UI/UIDATEINPUT.UI \
-                UI/ART/MKRDATEINPUT.UI UI/UITIMEINPUT.UI \
-                UI/ART/MKRTIMEINPUT.UI UI/UISTOPWATCH.UI UI/UITIMER.UI
+UI.eobj: UI/uiManager.asm \
+                gadgetsGeode.def geos.def stdapp.def geode.def \
+                resource.def ec.def lmem.def object.def graphics.def \
+                fontID.def font.def color.def gstring.def text.def \
+                char.def heap.def ui.def file.def vm.def win.def \
+                input.def hwr.def localize.def sllang.def \
+                Objects/processC.def Objects/metaC.def chunkarr.def \
+                geoworks.def gcnlist.def timedate.def \
+                Objects/Text/tCommon.def stylesh.def iacp.def \
+                Objects/uiInputC.def Objects/visC.def Objects/vCompC.def \
+                Objects/vCntC.def Internal/vUtils.def Objects/genC.def \
+                disk.def drive.def uDialog.def Objects/gInterC.def \
+                token.def Objects/clipbrd.def Objects/gSysC.def \
+                Objects/gProcC.def alb.def Objects/gFieldC.def \
+                Objects/gScreenC.def Objects/gFSelC.def \
+                Objects/gViewC.def Objects/gContC.def Objects/gCtrlC.def \
+                Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                assert.def library.def timer.def dbase.def initfile.def \
+                system.def Objects/inputC.def Objects/vTextC.def \
+                spool.def print.def Internal/prodFeatures.def hugearr.def \
+                Internal/Jedi/jutils.def Internal/powerDr.def driver.def \
+                gadgetsConstant.def gadgetsVisMonikerUtil.def \
+                Objects/gadgets.def uiManager.rdef uiCommon.asm \
+                uiRepeatTrigger.asm uiDateSelector.asm uiDateInput.asm \
+                uiTimeInputParse.asm uiTimeInputText.asm uiTimeInput.asm \
+                uiStopwatch.asm uiTimer.asm uiBatteryIndicator.asm
+uiManager.rdef: generic.uih product.uih Objects/gadgets.uih \
+                UI/uiStrings.ui UI/uiDateSelector.ui \
+                UI/Art/mkrSelector.ui UI/uiDateInput.ui \
+                UI/Art/mkrDateInput.ui UI/uiTimeInput.ui \
+                UI/Art/mkrTimeInput.ui UI/uiStopwatch.ui UI/uiTimer.ui
 
-GadgetsEC.geo Gadgets.geo : GEOS.LDF UI.LDF 
+gadgetsEC.geo gadgets.geo : geos.ldf ui.ldf 

@@ -31,13 +31,13 @@ exempt sound
 # Muá neu berechnet werden !
 heapspace 9720
 
-resource APPRESOURCE           ui-object
-resource INTERFACE             ui-object
-resource MAXINTERFACE          ui-object
-resource ABSRESOURCE           ui-object
-resource BALANCERESOURCE       ui-object
+resource AppResource           ui-object
+resource Interface             ui-object
+resource MaxInterface          ui-object
+resource ABSResource           ui-object
+resource BalanceResource       ui-object
 resource CDINFORESOURCE        ui-object
-resource DBEDITORRESOURCE      ui-object
+resource DBEditorResource      ui-object
 
 resource BBXMONIKERRESOURCE    data object read-only
 resource PRTURNMONIKERRESOURCE data object read-only
@@ -47,14 +47,14 @@ resource MINMONIKERRESOURCE    data object read-only
 resource MAXMONIKERRESOURCE    data object read-only
 resource TURNMONIKERRESOURCE   data object read-only
 #resource ABSMONIKERRESOURCE    data object read-only
-resource FIRSTAIDRESOURCE      data object read-only
+resource FirstAidResource      data object read-only
 resource TURNGRAPHICRESOURCE   lmem data read-only
-resource TEXTSTRINGS data object
+resource TextStrings data object
 
 # this fake resource fixes the code content of key.goc.
 # this is necessary because key.goc contains inline assembler code
 # that may not be relocated (system crash imminent).
-resource KEY_TEXT              preload fixed code read-only
+resource Key_Text              preload fixed code read-only
 
 # usernotes "Komfortabler CD-Player mit Datenbank."
 #usernotes "Luxuriant CD-player with database."
