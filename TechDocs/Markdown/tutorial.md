@@ -1,11 +1,11 @@
-#Tutorial
+# Tutorial
 
 [TOC]
 
 
 * * *
 
-##1 Introduction
+## 1 Introduction
 
 This book will help you set up your development stations, install your development kit software, and begin writing GEOS applications quickly. It is more than a simple tutorial for using the tools; it takes you step-by-step through a GEOS application from the very basics through using multiple files and displays.
 
@@ -19,15 +19,15 @@ You'll set up your hardware, and you'll install your software. Then, you'll lear
 
 ***
 
-##2 Setting Up
+## 2 Setting Up
 
 Setting up your system involves setting up your hardware and installing software on it. This chapter explains how to do both and then provides a sequence of steps and troubleshooting tips to test your setup.
 
-###2.1 What You'll Need
+### 2.1 What You'll Need
 
 This development kit includes much of the software you will need to write and debug GEOS applications. It does not, however, include a C compiler or the hardware you will need. Make sure you have all of the items on the following lists before proceeding.
 
-####2.1.1 Hardware You'll Need
+#### 2.1.1 Hardware You'll Need
 
 This kit provides no hardware. To set up your system, you will need at least the following:
 
@@ -46,7 +46,7 @@ A null modem is required in the serial connection between the host and target PC
 **Gender Changers and/or Adapters for Serial Cables**
 Depending on the cables and connectors you have, you may need one or more serial line gender changers or other adapters.
 
-####2.1.2 Software You'll Need
+#### 2.1.2 Software You'll Need
 
 As stated above, this kit does not provide all the software you'll need. Both the host and target machines must be loaded with some version of DOS, and you will also need to have the following:
 
@@ -55,7 +55,7 @@ Currently, only Borland C/C++ 3.0 and 3.1 are supported for GEOS development. Ge
 
 You may also want to use a task-switching environment on the host machine to make switching between coding, compiling, and debugging easier and quicker.
 
-###2.2 Setting Up the Hardware
+### 2.2 Setting Up the Hardware
 
 First, set up your two PCs according to their included instructions (if any). Keep in mind that you will be switching frequently between the two machines and that you will often be using the mouse on the target machine while typing on the keyboard of the host machine.
 
@@ -65,7 +65,7 @@ Next, connect the two machines via serial cable and a null modem. Be sure to rem
 *__Figure 1-1__ Workstation Setup
 The test and development PCs communicate via a null modem serial connection.*
 
-###2.3	Installing the Software
+### 2.3	Installing the Software
 
 Once you have finished setting up your machines and have connected the serial cable, you must install the GEOS development kit. Place the SDK CD-ROM into your CD-ROM drive, change to that drive, and run the INSTALL program.
 
@@ -93,7 +93,7 @@ C:\GEOSNC>geos
 
 Again, if the set-up does not go smoothly, try reinstalling the disks. If this does not work, check that you are using the proper hardware configurations. If one or both of the two GEOS directories does not exist, try reinstalling the target disks.
 
-###2.4	Testing the Configuration
+### 2.4	Testing the Configuration
 
 Once you have finished installing all the software, your system should be ready for you to begin programming. To check it, however, run through the following sequence of steps. You will learn later exactly what these steps do in more detail, but for now it is sufficient just to try them.
 
@@ -415,11 +415,11 @@ To exit from Swat (so that you can go on to other things), type quit at the Swat
 
 ***
 
-##3 The Plan
+## 3 The Plan
 
 The body of our tutorial consists of the step-by-step construction of an application. The first step when you set out on any software development project is to plan. Thus, we will start with a simple specification.
 
-###3.1 My Chart Application
+### 3.1 My Chart Application
 
 **Precis:**
 Application accepts simple data entry and creates bar charts.
@@ -429,7 +429,7 @@ Application will allow the user to enter some numbers. Application will then cre
 
 ![](Art/tutorial-mychart_papermock.png)
 
-###3.2 Data Entry
+### 3.2 Data Entry
 
 Data will be displayed in a scrolling list. The user can select a position in the list by clicking on the list. To manipulate the piece of data at that position, the user may click on one of the three buttons below the list: New, Change, or Delete.
 
@@ -445,7 +445,7 @@ Data will be displayed in a scrolling list. The user can select a position in th
 
 + The "box" in which we will allow the user to enter numbers for use with the New or Change buttons will be a GenValueClass object. GenValueClass is another object class for use with the Generic UI, allowing the user to enter a value.
 
-###3.3 Data Storage
+### 3.3 Data Storage
 
 Eventually, we would like the user to be able to work with sets of data as "documents," and to allow multiple documents to be open at one time. To this end, we will eventually want a  GenDocumentGroup object, which specializes in the management of multiple documents.
 
@@ -455,7 +455,7 @@ Eventually, we would like the user to be able to work with sets of data as "docu
 
 + By the time we're done, we'll use a file provided by the Generic UI's document object to store our data list along, and the same file will store the object we use to display the chart.
 
-###3.4 Chart Display
+### 3.4 Chart Display
 
 The chart will be displayed in a simple rectangular area. The body of the chart will be an object in charge of drawing the axes and title(s). Each bar of the chart will be an individually selectable object, and perhaps we will allow the user to do something with a selected object.
 
@@ -472,7 +472,7 @@ In this chapter, we will explore our first stage in constructing a charting appl
 We will learn how to compile and link the application, explore its source code, and later explore the program itself using the Swat debugger.
 ![](Art/tutorial-mychart_primary_window.png)
 
-###4.1 README
+### 4.1 README
 
 You are about to start typing in the source code of a new program. Before we tell you exactly what to do, we're going to spell out some miscellaneous caveats. If you stick exactly to the instructions given in the Tutorial, none of these things should become issues; however, you might want to look over these warnings, as they might apply to future projects.
 
@@ -480,7 +480,7 @@ You are about to start typing in the source code of a new program. Before we tel
 
 + If you have trouble attaching the Swat debugger but have had no trouble sending files between the machines using the pccom tool, you might try either reducing your communication speed or consulting "Troubleshooting Communications," Appendix A of this book.
 
-###4.2 Creating the Application
+### 4.2 Creating the Application
 
 We set up our files in a subdirectory of \PCGEOS\APPL (we'll use \PCGEOS\APPL\MCHRT) on the host machine. The files are MCHRT.GP (which contains the "geode parameters," which tell the linker how the application is organized) and MCHRT.GOC, the source code of the application.
 
@@ -563,7 +563,7 @@ To try out your application on the target machine, type scrolllock-shift-s to st
 
 The window pictured on the first page of this chapter should appear on your screen.
 
-###4.3 The Application So Far
+### 4.3 The Application So Far
 
 Right now, application basically consists of a Primary Window. You might think that the application looks rather plain, and it does. However, note the following features you have already included in your application with this skeletal program:
 
@@ -579,7 +579,7 @@ Right now, application basically consists of a Primary Window. You might think t
 
 ![](Art/tutorial-mychart_multi_lunchable.png)
 
-###4.4 MCHRT.GP: Geode Parameters
+### 4.4 MCHRT.GP: Geode Parameters
 
 The geode parameters file tells the Glue linker about our application's general organization. You can get complete information about all of the possible fields in a .gp file by reading "First Steps: Hello World," Chapter 4 of the Concepts book. Let's take a look at the code and find out what each line does.
 
@@ -642,7 +642,7 @@ The ui-object keyword signals that the resources contain objects which should be
 
 If we didn't want the application to have two threads, we could have declared these resources as object instead of ui-object. By having execution take place in two separate threads, we can allow the user to interact with UI gadgetry while computation goes on in the background. This means that the user will get valuable feedback that their actions are being acknowledged,  even if our program isn't fast enough to do all of the underlying calculations quickly.
 
-###4.5 MCHRT.GOC: Source Code
+### 4.5 MCHRT.GOC: Source Code
 
 This file contains the source code for the application. Right now, there's nothing that you would recognize as procedural code. All there is to this application is a class and a couple of objects. Again, let's look at the code line by line. We will discuss what each of these lines does, but will not go into depth about their syntax here. For more information about Goc syntax, see "GEOS Programming," Chapter 5 of the Concepts book.
 
@@ -741,7 +741,7 @@ Right now our entire UI tree consists of a single object, a plain primary window
 
 We're done putting things into the INTERFACE resource for now. In fact, we're done with the program.
 
-###4.6 Exploring With Swat
+### 4.6 Exploring With Swat
 
 Right now, the application doesn't have any procedural code. In fact, there isn't very much code to the application at all. Chances are the program has no run-time errors; there just aren't very many places for them to hide. However, we can still find out how to use the debugger to find out about the object trees which make up our program.
 
@@ -1171,13 +1171,13 @@ _ _ _
 ~~~
 ***
 
-##5 Data Structures and UI Gadgetry
+## 5 Data Structures and UI Gadgetry
 
 In this chapter we add some UI gadgetry to the application. By creating some objects and writing some procedural code, we will construct a cluster of gadgetry which enables the user to maintain a list of data.
 
 We will explore the application's new code, both examining blocks of the source code to see what they do and going through a debugging session during which we set some breakpoints and do some stepping through code.
 
-###5.1 Editing the Application
+### 5.1 Editing the Application
 
 At the end of this chapter you will find a complete code listing for this stage of the application. Pieces of code which have been added or changed since the previous stage have been marked with lines like that next to this paragraph.
 
@@ -1185,7 +1185,7 @@ You should add the new parts by means of a text editor. When you are done, invok
 
 Once you've compiled the application send it down to the target machine as before: if you still have Swat attached, then use the send Swat command; otherwise, make sure that the pccom tool is running on the target machine and invoke pcs on the host machine.
 
-###5.2 The Application so Far
+### 5.2 The Application so Far
 
 Our application has sprouted a scrolling list, three buttons, and a place to input a numerical value. The buttons allow the user to add, remove, and change the values of items in the list. By typing a number in the place provided, the user can determine the value which will appear in the list. By clicking on the list, the user can determine which list item should be removed or changed, or where a new item should be added.
 
@@ -1199,7 +1199,7 @@ Our application has sprouted a scrolling list, three buttons, and a place to inp
 
 + The program is no longer multi-launchable. This makes sense, as we hard-coded the name of the file that we were using for VM storage, and copies of our application shouldn't have to share. Also, being single-launchable allows us to do some things in our program in a more simple way, not having to make clear to the linker which application's resources we will work with each time. Since our application will eventually support multiple documents, we may never bother to do the cleaning up necessary to make it multi-launchable.
 
-###5.3 MCHRT.GP Change
+### 5.3 MCHRT.GP Change
 
 We changed one line of the MCHRT.GP file to let glue know that our application is now single-launchable instead of multi-launchable.
 
@@ -1209,7 +1209,7 @@ type appl, process, single
 
 Our new addition, the "single" keyword, signals that the application is single-launchable.
 
-###5.4 MCHRT.GOC: Data & Structures
+### 5.4 MCHRT.GOC: Data & Structures
 
 Our additions to MCHRT.GOC fall into three basic categories. First, we will declare global variables and set up prototypes for routines and messages. Next, we will declare some new objects and place them into our Generic UI tree. Then we will add some procedural code by which our objects will respond to some of the messages which will be sent around. We'll look at the variables and prototypes first.
 
@@ -1285,7 +1285,7 @@ A ChunkHandle is a handle which we will use to reference a chunk, one of those m
 
 The VMFileHandle will reference the file in which our list resides, and the VMBlockHandle will reference the block within the file which will act as our local memory block, the block which will act as the "mini-heap". We will use the MemHandle to access the local memory block while that block is loaded into memory.
 
-###5.5 MCHRT.GOC: New Objects
+### 5.5 MCHRT.GOC: New Objects
 
 ~~~
 @object GenPrimaryClass MCPrimary = {
@@ -1373,7 +1373,7 @@ The MakeWWFixed() macro will construct WWFixed structures automatically.
 
 For more information about GenValue objects, see "GenValue," Chapter 8 of the Object Reference Book.
 
-###5.6 MCHRT.GOC: Procedural Code
+### 5.6 MCHRT.GOC: Procedural Code
 
 The last part of our additions is procedural code which we will use to manage our data structures and coordinate updates between objects.
 
@@ -1760,7 +1760,7 @@ retHandle = @callsuper();
 return retHandle;
 ~~~
 
-###5.7 Swat: Breakpoints and More
+### 5.7 Swat: Breakpoints and More
 
 Now that our application has some procedural code, we'll be able to use Swat for some of the more traditional uses of a debugger: setting breakpoints and stepping through code.
 
@@ -2627,13 +2627,13 @@ _ _ _
 
 ***
 
-##6 Views and Visual Objects
+## 6 Views and Visual Objects
 
 In this chapter, we'll learn about some more common program activities, such as drawing shapes and working with VM files. We'll see an example of the advanced activity of creating an object at run-time. Finally, we'll see how we can make using Swat easier by creating a SWAT.RC script file.
 
 ![](Art/tutorial-mychart_visual_objects.png)
 
-###6.1 Making the Changes
+### 6.1 Making the Changes
 
 Make the changes to MCHRT.GOC and MCHRT.GP as indicated in Code Display 4-1 and Code Display 4-2. As before, these changes are marked by vertical bars in the margin. In some cases (the handlers for MSG_GEN_PROCESS_OPEN_APPLICATION and MSG_GEN_PROCESS_CLOSE_APPLICATION), new code replaces some old code and you must figure out what old code needs to be erased.
 
@@ -2641,7 +2641,7 @@ In addition, there is a new file which also belongs in the directory from which 
 
 After making the changes to the files, remake the executable with pmake. Send the remade geode to the target machine using pcs or the send Swat command.
 
-###6.2 The Application So Far
+### 6.2 The Application So Far
 
 The application now draws a bar chart within a view window. It saves the list of data within a file, and can retain that data after closing and re-opening the application.
 
@@ -2655,7 +2655,7 @@ The application now draws a bar chart within a view window. It saves the list of
 
 + Instead of truncating our data file, we now organize the file so that we can retrieve the data. This involves retrieving the "map block" of the data file and accessing the header of a memory block. To find out about the application's ability to save data, set up a list of data, exit to DOS, and then restart GEOS. To learn more about working with VM files, see "Virtual Memory," Chapter 18 of the Concepts book.
 
-###6.3 MCHRT.GP
+### 6.3 MCHRT.GP
 
 We've added a few new lines to the geode parameters file to accommodate the addition of the object managing the bar chart.
 
@@ -2671,7 +2671,7 @@ export MCChartClass
 
 We are creating a new class, MCChartClass. This "export" line informs the linker that we've created a new class whose structures and messages our program will want to use. You may wonder why we didn't need an "export" line for the other class we've created for the application, MCProcessClass. The file's "class" line automatically signals that the class named on that line should be exported. All other created classes must have an "export" line.
 
-###6.4 MCHRT.GOC: Classes & Constants
+### 6.4 MCHRT.GOC: Classes & Constants
 
 There have been several changes made to the MCHRT.GOC file. Here we'll take a look at the new code and examine the changes.
 
@@ -2729,7 +2729,7 @@ DataBlockHeader		*dataBlockHeader;			/* Header info of our data block */
 
 We set up a global variable to store a pointer to the block header.
 
-###6.5 MCHRT.GOC: New Objects
+### 6.5 MCHRT.GOC: New Objects
 
 ~~~
 @object GenPrimaryClass MCPrimary = {
@@ -2816,7 +2816,7 @@ We're done declaring the object we want in the CONTENT resource; eventually the 
 
 We're using the @end statement to signal that we're done with the CONTENT resource; the @start symbol signals that we're going to start putting objects in the INTERFACE resource again. Note that there are now two areas within MCHRT.GOC file in which we're declaring objects which will be put in the INTERFACE resource; this is quite legal. Generally it's more readable not to do so, and normally we'd keep the INTERFACE resource in one place, but we'll leave things organized this way just to remind you that it's legal.
 
-###6.6	MCProcessClass Code
+### 6.6	MCProcessClass Code
 
 ~~~
 @method MCListInsertDataItem, MCProcessClass, MSG_MCP_INSERT_DATA_ITEM {
@@ -2961,7 +2961,7 @@ VMClose(dataFile, FALSE);
 
 As we did in the previous version of the program, we now close the data file and call the superclass.
 
-###6.7 Graphics and Drawing
+### 6.7 Graphics and Drawing
 
 ~~~
 @method MCChartClass, MSG_VIS_DRAW {
@@ -3017,7 +3017,7 @@ for (count = 0; count < pself->MCCI_numBars; count++)
 
 Once we have a pointer to the head of our data array, it's a simple matter to cycle through the array, drawing a rectangle for each bar of the graph. We use the GrFillRect() routine which takes a GState and four coordinates. To find out about other things you can draw, see "Drawing Graphics," Chapter 24 of the Concepts book.
 
-###6.8 Maintaining the Chart Data
+### 6.8 Maintaining the Chart Data
 
 ~~~
 @method MCChartClass, MSG_MCC_INSERT_BAR {
@@ -3086,7 +3086,7 @@ Since we've added a new bar and changed the positions of some others, the chart 
 
 These message handlers work in much the same way as that for MSG_MCC_INSERT_BAR.
 
-###6.9 SWAT.RC: Automating Swat
+### 6.9 SWAT.RC: Automating Swat
 
 This file contains some Swat commands we learned about in the last chapter.
 
@@ -3822,15 +3822,15 @@ _ _ _
 
 * * *
 
-##7 Documents and Displays
+## 7 Documents and Displays
 
 In this chapter, the application starts maintaining real document files and allows the user to have more than one document open at a time. This turns out to be a rather far-reaching change. Several values can no longer be stored in global variables. For example, it would be inappropriate to store the document's file handle in a global variable, since there may now be several files open. We will take a more object-oriented approach, storing this sort of information in instance data of objects representing documents.
 
-###7.1 Making the Changes
+### 7.1 Making the Changes
 
 Make the changes to MCHRT.GP and MCHRT.GOC as indicated in Code Display 5-1 and Code Display 5-2; as before, places where the code has changed are indicated by vertical bars in the margin. After making the changes to the source code, re-compile the executable with pmake.
 
-###7.2 The Application So Far
+### 7.2 The Application So Far
 
 Our chart application can now keep track of more than one document at a time. It provides UI allowing the user to choose and select document names. The system allows for automatic saving of documents. Each document appears in a separate window. More than one document window may appear at a time; the user may overlap the windows or tile them.
 
@@ -3848,7 +3848,7 @@ To make these changes, the application uses some new objects and goes through so
 
 + We're organizing our document file into two blocks: the first contains our linked list of chart data; the other contains the visual objects we're using to display that data. Note that it isn't necessary to store the visual objects; we could reconstruct them using the information stored in the linked list; we're doing things this way only to demonstrate how you might save an object within a document file.
 
-###7.3 MCHRT.GP: New Resources
+### 7.3 MCHRT.GP: New Resources
 
 Our glue parameters file has expanded to accommodate several new resources and a new subclass.
 
@@ -3877,7 +3877,7 @@ export MCDocumentClass
 
 We must export our document class so that its symbols are recognized.
 
-###7.4 MCHRT.GOC: New Structures
+### 7.4 MCHRT.GOC: New Structures
 
 The start of the application has changed quite a bit. You may notice that the global variables are all missing. These were used by the process object to keep track of document information. Now that we have multiple documents to keep track of, global variables would no longer be appropriate. Instead, we'll set up some appropriate instance data fields in our document class.
 
@@ -3936,7 +3936,7 @@ typedef struct {
 
 We've made a couple of new additions to the map block's header structure. We're now saving the visible chart object's object block in the document file. We'll store its handle in the map block's header so that we'll be able to extract it when opening the file.
 
-###7.5 MCHRT.GOC: Application Objects
+### 7.5 MCHRT.GOC: Application Objects
 
 ~~~
 @object GenApplicationClass MCApp = {
@@ -3974,7 +3974,7 @@ Our primary window now has different children. Most of the original children are
 
 Furthermore, we've added a couple of variable data fields which will make a bit more room when running the program on a machine with a small screen. the ATTR_GEN_DISPLAY_MENU_BAR_POPPED_OUT field indicates that the menu bar should be floating and the HINT_DISPLAY_MENU_BAR_HIDDEN_ON_STARTUP hint says that the menu bar should start out hidden on those systems that support hidden menu bars.
 
-###7.6 Menus and Controllers
+### 7.6 Menus and Controllers
 
 In past stages of the application, we only had one menu (the File menu), generated automatically. For this stage of the application, we create our own menus, including a File menu which takes the place of the automatically generated one. We implement each menu by means of a GenInteraction object. Recall that GenInteractions are meant to create logical groupings for UI gadgetry; since menus group UI gadgetry it makes sense to implement them in this way.
 
@@ -4028,7 +4028,7 @@ This interaction manifests as the Windows menu. As with the File menu, it uses G
 
 The display control provides the UI gadgetry for overlapping, tiling, and otherwise manipulating the multiple document displays. We aren't doing anything extraordinary with our display control, and need set no instance data for it. Because we have placed it on the appropriate General Change Notification lists, it works automatically.
 
-###7.7 Display Gadgets
+### 7.7 Display Gadgets
 
 In addition to the display control, we need to set up a display group and some objects to represent the display itself.
 
@@ -4097,7 +4097,7 @@ Any object block can have an "object block output". This "object block output" i
 
 The TO_OBJ_BLOCK_OUTPUT travel option tells our generic UI gadgetry to send their messages to the Display block's object block output, which in this case is the document object associated with the display's document. Since our document object is now in charge of maintaining the data for each object, the gadgets which work with the data use the appropriate travel option to reach the document.
 
-###7.8	Document Group
+### 7.8	Document Group
 
 ~~~
 @start 	DocGroup;
@@ -4127,7 +4127,7 @@ The Document group needs to work with the document control and display group obj
 
 The last two instance fields contain protocol numbers. If we later revised the application in a way that changed the structure of the document files, we would change the document protocol. We could then write handlers in our document class for updating old documents, which would be recognized by their low protocol numbers.
 
-###7.9 Altered Handlers
+### 7.9 Altered Handlers
 
 ~~~
 @method MCDocumentClass, MSG_MCD_SET_DATA_ITEM_MONIKER {
@@ -4366,7 +4366,7 @@ Here are more cases of objects being referred to by constructed object pointers 
 
 These message handlers have been changed in ways similar to that for MSG_MCD_INSERT_DATA_ITEM. We won't explore each change; there are just more cases of using document instance data to refer to data structures and constructing optrs to refer to objects.
 
-####7.10 Maintaining the Document
+### 7.10 Maintaining the Document
 
 We have three message handlers to maintain our data structures within the document file whenever the file is saved or opened.
 
@@ -4471,7 +4471,7 @@ This portion of code initializes the UI in the old manner, the only difference b
 This message handler removes the document's chart object from the visual tree preparatory to storing it. The document takes care of all other UI chores automatically.
 ***
 
-##Code Listing
+## Code Listing
 
 _ _ _
 **Code Display 5-1 MCHRT.GP**
@@ -5239,7 +5239,7 @@ _ _ _
 
 ***
 
-##Appendix A:Troubleshooting Communications
+## Appendix A:Troubleshooting Communications
 
 The SDK install scripts work well for those programmers who know which COM ports and IRQ levels their machines will use when communicating. However, when something goes wrong with this process, it can be very difficult to determine the correct combination of port and interrupt numbers. This chapter contains a systematic way to determine the correct configuration to use.
 
