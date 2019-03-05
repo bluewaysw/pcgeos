@@ -62,6 +62,7 @@ First, set up your two PCs according to their included instructions (if any). Ke
 Next, connect the two machines via serial cable and a null modem. Be sure to remember which serial ports you used on both machines, as you will need to know when installing the software. You may need to add in gender changer(s), 9-to-25 pin adapter(s), or other connectors, depending on your machines and your cables. A simplified diagram of the connection is shown in Figure 1-1.
 
 ![Figure 1-1](Art/tutorial-workstation_setup.png)
+
 *__Figure 1-1__ Workstation Setup
 The test and development PCs communicate via a null modem serial connection.*
 
@@ -198,7 +199,7 @@ Depends file removed.
 
 Stop.
 ~~~
- 
+
 Next, make the executable file with the pmake command.
 
 ~~~
@@ -477,6 +478,7 @@ The chart will be displayed in a simple rectangular area. The body of the chart 
 In this chapter, we will explore our first stage in constructing a charting application. This first stage consists of a primary window, which we will use to hold the rest of the program's UI gadgetry. So far, our application consists of about twenty-five lines of code, and indicates how we will organize the rest of our code.
 
 We will learn how to compile and link the application, explore its source code, and later explore the program itself using the Swat debugger.
+
 ![](Art/tutorial-mychart_primary_window.png)
 
 ### 4.1 README
@@ -1076,10 +1078,10 @@ Two of the handles are marked as THREAD handles. The first of these is the handl
 Each thread has an event queue associated with it. Whenever something sends a message to an object run by a given thread, the message will be placed on that thread's event queue. Right now, there are no messages queued for either of our threads.
 
 ~~~
-3b10h 607eh    896 3560h 1b70h  s SL a 			0 	mchrt 0:49 4320h 		R#4 (APPRESOURCE)
-4530h 425fh   2080 4bd0h 4b50h  FIXED n/a 			mchrt n/a 1h 		 R#1 (dgroup)
-4aa0h 0000h     16 0000h 0000h  sDS d 			0 	mchrt 0:51 1h 		 R#2 (MCHRT_TEXT)
-4c10h 5bb5h    928 3710h 4140h  s SL a 			0 	mchrt 0:49 4320h 		R#3 (INTERFACE)
+3b10h 607eh    896 3560h 1b70h  s SL a 			0 	mchrt 0:49 4320h 	R#4 (APPRESOURCE)
+4530h 425fh   2080 4bd0h 4b50h  FIXED n/a 			mchrt n/a 1h 		R#1 (dgroup)
+4aa0h 0000h     16 0000h 0000h  sDS d 			0 	mchrt 0:51 1h 		R#2 (MCHRT_TEXT)
+4c10h 5bb5h    928 3710h 4140h  s SL a 			0 	mchrt 0:49 4320h 	R#3 (INTERFACE)
 ~~~
 
 These are the handles of the memory blocks which hold our application's resources. The last two of these we can recognize by name: "INTERFACE" and "APPRESOURCE" appear in the TYPE column. The others are resources which are created automatically. The "dgroup" resource contains data which will be used by our process; if our application ever has any global variables, they will be stored in this resource. The dgroup resource also contains our process thread's stack. The "MCHRT_TXT" block is our code resource. So far, our application has no code, which explains the small size of this block-it is just the size of the block's header information, 16 bytes.
@@ -1104,7 +1106,7 @@ This is the handle of a window associated with our application. This is not nece
 
 ~~~
 4b40h 5dd9h   1248 33e0h 3250h  s SL a 			0 	mchrt 0:49 4320h  OBJ(mchrt:1)
-4b50h 42e1h   2176 4530h 4cf0h  FIXED n/a 			mchrt n/a  1h 		 Stack(mchrt:1)
+4b50h 42e1h   2176 4530h 4cf0h  FIXED n/a 			mchrt n/a  1h 		Stack(mchrt:1)
 ~~~
 
 Our UI thread manages two more blocks. The first of these is the handle of the object block which will contain the objects managed by this thread. The second of these is its stack.
