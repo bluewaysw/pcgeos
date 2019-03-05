@@ -131,7 +131,10 @@ Host Machine: pmake depend
 Next, create a dependencies file with the pmake depend command. The output you get should be similar to that shown below.
 
 ~~~
-makedpnd ENDCMODULES GOC GOC goc -M -D__GEOS__ -IDEPENDS -I. -IC:\PCGEOS\INCLUDE -IC:\PCGEOS\INCLUDE\ANSI -I- -IDEPENDS -I. -IC:\PCGEOS\INCLUDE -IC:\PCGEOS\INCLUDE\ANSI -w -cb ENDFLAGS HELLO.GOC ENDFILES CPP BORLAND CPP -D__GEOS__ -Ot -c -v -y -i200 -ml -I. -IC:\PCGEOS\INCLUDE -IC:\PCGEOS\INCLUDE\ANSI ENDFLAGS HELLO.C ENDFILES
+makedpnd ENDCMODULES GOC GOC goc -M -D__GEOS__ -IDEPENDS -I. -IC:\PCGEOS\INCLUDE -IC:\PCGEOS\IN
+CLUDE\ANSI -I- -IDEPENDS -I. -IC:\PCGEOS\INCLUDE -IC:\PCGEOS\INCLUDE\ANSI -w -cb ENDFLAGS HELLO
+.GOC ENDFILES CPP BORLAND CPP -D__GEOS__ -Ot -c -v -y -i200 -ml -I. -IC:\PCGEOS\INCLUDE -IC:\PC
+GEOS\INCLUDE\ANSI ENDFLAGS HELLO.C ENDFILES
 
 FILE C:\PCGEOS\INCLUDE\stdapp.goh, line 18 Warning: remaking @optimized file
 C:\PCGEOS\INCLUDE\stdapp.goh. Missing depends or pre-goc'ed file
@@ -184,7 +187,10 @@ then your makefile was not created correctly. Try running mkmf again to make sur
 + If you get the error shown below, you should make sure that you have correctly installed your C compiler, and make sure that your C compiler's executable is in your path.
 
 ~~~
-makedpnd ENDCMODULES GOC GOC goc -M -D__GEOS__ -IDEPENDS -I. -IC:\PCGEOS\INCLUDE -IC:\PCGEOS\INCLUDE\ANSI -I- -IDEPENDS -I. -IC:\PCGEOS\INCLUDE -IC:\PCGEOS\INCLUDE\ANSI -w -cb ENDFLAGS HELLO.GOC ENDFILES CPP BORLAND CPP -D__GEOS__ -u- -c -v -y -Ot -Oi -i200 -ml -I. -IC:\PCGEOS\INCLUDE -IC:\PCGEOS\INCLUDE\ANSI ENDFLAGS HELLO.C ENDFILES
+makedpnd ENDCMODULES GOC GOC goc -M -D__GEOS__ -IDEPENDS -I. -IC:\PCGEOS\INCLUDE -IC:\PCGEOS\IN
+CLUDE\ANSI -I- -IDEPENDS -I. -IC:\PCGEOS\INCLUDE -IC:\PCGEOS\INCLUDE\ANSI -w -cb ENDFLAGS HELLO
+.GOC ENDFILES CPP BORLAND CPP -D__GEOS__ -u- -c -v -y -Ot -Oi -i200 -ml -I. -IC:\PCGEOS\INCLUDE
+ -IC:\PCGEOS\INCLUDE\ANSI ENDFLAGS HELLO.C ENDFILES
 
 Processing HELLO.C...
 Depends file removed.
@@ -203,7 +209,8 @@ The output you should see is shown below.
 
 ~~~
 C:\PCGEOS\APPL\SDK_C\HELLO>pmake
-BCC -D__GEOS__ -u- -c -v -y -Ot -Oi -i200 -ml -I. -IC:\PCGEOS\INCLUDE -IC:\PCGEOS\INCLUDE\ANSI -oHELLO.OBJ HELLO.C
+BCC -D__GEOS__ -u- -c -v -y -Ot -Oi -i200 -ml -I. -IC:\PCGEOS\INCLUDE -IC:\PCGEOS\INCLUDE\ANSI 
+-oHELLO.OBJ HELLO.C
 Borland C++ Version 3.1 Copyright (c) 1992 Borland International
 hello.c:
 Available memory 3475572
@@ -465,7 +472,7 @@ The chart will be displayed in a simple rectangular area. The body of the chart 
 
 ***
 
-##4 The Primary Window
+## 4 The Primary Window
 
 In this chapter, we will explore our first stage in constructing a charting application. This first stage consists of a primary window, which we will use to hold the rest of the program's UI gadgetry. So far, our application consists of about twenty-five lines of code, and indicates how we will organize the rest of our code.
 
@@ -1029,24 +1036,24 @@ Let's take an in-depth look at how the application's memory is organized. Memory
 ~~~
 [mchrt:0] 11 => handles mchrt
 There are 2500 handles total, 847 used and 1653 free
-HANDLE ADDR   SIZE PREV   NEXT FLAGS 					LOCK 	OWNER IDLE OINFO 		TYPE
+HANDLE ADDR   SIZE PREV   NEXT FLAGS 			LOCK 	OWNER IDLE OINFO 		TYPE
 ------------------------------------------------------------------------------
 2b70h EVENT QUEUE mchrt, thread = mchrt:1, no events
-3970h 617ah    288 3fd0h 4b90h  s S 					0 	mchrt 0:51 0h
-3b10h 607eh    896 3560h 1b70h  s SL a 					0 	mchrt 0:49 4320h R#4 (APPRESOURCE)
-3ba0h 717ah    160 1c20h 45a0h  s S  a 					0 	mchrt 0:49 43a0h Geode
+3970h 617ah    288 3fd0h 4b90h  s S 			0 	mchrt 0:51 0h
+3b10h 607eh    896 3560h 1b70h  s SL a 			0 	mchrt 0:49 4320h R#4 (APPRESOURCE)
+3ba0h 717ah    160 1c20h 45a0h  s S  a 			0 	mchrt 0:49 43a0h Geode
 4320h THREAD mchrt:1
 4340h EVENT QUEUE mchrt, thread = mchrt:0, no events
 43a0h THREAD mchrt:0
-44e0h 7bb0h     32 1e10h 33c0h  s S 					0 	mchrt 0:49 1h
-4530h 425fh   2080 4bd0h 4b50h  FIXED n/a 						mchrt n/a 1h 		 R#1 (dgroup) 
+44e0h 7bb0h     32 1e10h 33c0h  s S 			0 	mchrt 0:49 1h
+4530h 425fh   2080 4bd0h 4b50h  FIXED n/a 			mchrt n/a 1h 		 R#1 (dgroup) 
 4560h FILE sfn = 31, owner = 3ba0h (mchrt)
-4aa0h 0000h     16 0000h 0000h  sDS d 					0 	mchrt 0:51 1h 		 R#2 (MCHRT_TEXT)
-4b40h 5dd9h   1248 33e0h 3250h  s SL a 					0 	mchrt 0:49 4320h  OBJ(mchrt:1) 
-4b50h 42e1h   2176 4530h 4cf0h  FIXED n/a 						mchrt n/a 1h 		 Stack(mchrt:1)
-4b90h 618ch    288 3970h 23b0h  s S 					0 	mchrt 0:51 0h
-4c10h 5bb5h    928 3710h 4140h  s SL a 					0 	mchrt 0:49 4320h R#3 (INTERFACE)
-4cc0h 96f7h   1040 1dd0h 1820h  s SL 					0 	mchrt 0:49 1h 		 WINDOW
+4aa0h 0000h     16 0000h 0000h  sDS d 			0 	mchrt 0:51 1h 		 R#2 (MCHRT_TEXT)
+4b40h 5dd9h   1248 33e0h 3250h  s SL a 			0 	mchrt 0:49 4320h  OBJ(mchrt:1) 
+4b50h 42e1h   2176 4530h 4cf0h  FIXED n/a 			mchrt n/a 1h 		 Stack(mchrt:1)
+4b90h 618ch    288 3970h 23b0h  s S 			0 	mchrt 0:51 0h
+4c10h 5bb5h    928 3710h 4140h  s SL a 			0 	mchrt 0:49 4320h R#3 (INTERFACE)
+4cc0h 96f7h   1040 1dd0h 1820h  s SL 			0 	mchrt 0:49 1h 		 WINDOW
 
 Total bytes allocated: 9152, total handles: 16
 [mchrt:0] 12 =>
@@ -1069,10 +1076,10 @@ Two of the handles are marked as THREAD handles. The first of these is the handl
 Each thread has an event queue associated with it. Whenever something sends a message to an object run by a given thread, the message will be placed on that thread's event queue. Right now, there are no messages queued for either of our threads.
 
 ~~~
-3b10h 607eh    896 3560h 1b70h  s SL a 					0 	mchrt 0:49 4320h 		R#4 (APPRESOURCE)
-4530h 425fh   2080 4bd0h 4b50h  FIXED n/a 						mchrt n/a 1h 		 R#1 (dgroup)
-4aa0h 0000h     16 0000h 0000h  sDS d 					0 	mchrt 0:51 1h 		 R#2 (MCHRT_TEXT)
-4c10h 5bb5h    928 3710h 4140h  s SL a 					0 	mchrt 0:49 4320h 		R#3 (INTERFACE)
+3b10h 607eh    896 3560h 1b70h  s SL a 			0 	mchrt 0:49 4320h 		R#4 (APPRESOURCE)
+4530h 425fh   2080 4bd0h 4b50h  FIXED n/a 			mchrt n/a 1h 		 R#1 (dgroup)
+4aa0h 0000h     16 0000h 0000h  sDS d 			0 	mchrt 0:51 1h 		 R#2 (MCHRT_TEXT)
+4c10h 5bb5h    928 3710h 4140h  s SL a 			0 	mchrt 0:49 4320h 		R#3 (INTERFACE)
 ~~~
 
 These are the handles of the memory blocks which hold our application's resources. The last two of these we can recognize by name: "INTERFACE" and "APPRESOURCE" appear in the TYPE column. The others are resources which are created automatically. The "dgroup" resource contains data which will be used by our process; if our application ever has any global variables, they will be stored in this resource. The dgroup resource also contains our process thread's stack. The "MCHRT_TXT" block is our code resource. So far, our application has no code, which explains the small size of this block-it is just the size of the block's header information, 16 bytes.
@@ -1084,28 +1091,28 @@ These are the handles of the memory blocks which hold our application's resource
 This is the handle of the file in which our application resides.
 
 ~~~
-3ba0h 717ah    160 1c20h 45a0h  s S  a 					0 	mchrt 0:49 43a0h Geode
+3ba0h 717ah    160 1c20h 45a0h  s S  a 			0 	mchrt 0:49 43a0h Geode
 ~~~
 
 This is the handle of the memory block in which our geode resides.
 
 ~~~
-4cc0h 96f7h   1040 1dd0h 1820h  s SL 					0 	mchrt 0:49 1h 		 WINDOW
+4cc0h 96f7h   1040 1dd0h 1820h  s SL 			0 	mchrt 0:49 1h 		 WINDOW
 ~~~
 
 This is the handle of a window associated with our application. This is not necessarily a "window" in the UI sense-this is a graphics window, an area where we have to worry about some drawings obscuring others. This window handle is keeping track of the area associated with our primary window, so that it will draw "on top of" other window areas. Later, when we have a chart view area, we will have another window which, while not an independently-movable UI-style "window," will still need a window data structure to keep track of the view bounds, so that we cannot draw outside the view.
 
 ~~~
-4b40h 5dd9h   1248 33e0h 3250h  s SL a 					0 	mchrt 0:49 4320h  OBJ(mchrt:1)
-4b50h 42e1h   2176 4530h 4cf0h  FIXED n/a 					mchrt n/a  1h 		 Stack(mchrt:1)
+4b40h 5dd9h   1248 33e0h 3250h  s SL a 			0 	mchrt 0:49 4320h  OBJ(mchrt:1)
+4b50h 42e1h   2176 4530h 4cf0h  FIXED n/a 			mchrt n/a  1h 		 Stack(mchrt:1)
 ~~~
 
 Our UI thread manages two more blocks. The first of these is the handle of the object block which will contain the objects managed by this thread. The second of these is its stack.
 
 ~~~
-3970h 617ah    288 3fd0h 4b90h  s S 					0 	mchrt 0:51 0h
-44e0h 7bb0h     32 1e10h 33c0h  s S 					0 	mchrt 0:49 1h
-4b90h 618ch    288 3970h 23b0h  s S 					0 	mchrt 0:51 0h
+3970h 617ah    288 3fd0h 4b90h  s S 			0 	mchrt 0:51 0h
+44e0h 7bb0h     32 1e10h 33c0h  s S 			0 	mchrt 0:49 1h
+4b90h 618ch    288 3970h 23b0h  s S 			0 	mchrt 0:51 0h
 ~~~
 
 Swat doesn't tell us very much about these blocks. If we wanted to explore their contents, we could by using the bytes command. However, decoding the contents of memory blocks by reading their raw memory contents is beyond the scope of this tutorial.
@@ -1822,13 +1829,13 @@ Thread 0 created for patient welcome
 When faced with the Welcome screen on the target, click on the "Advanced" trigger, and start up our application, which should be in the OTHER directory.
 
 ~~~
-Looking for "shell 					Elib"...C:/PCGEOS/Library/Shell/shellec.geo
-Looking for "manager				Eapp"...C:/PCGEOS/Appl/FileMgrs/GeoManag/managere.geo
+Looking for "shell 				Elib"...C:/PCGEOS/Library/Shell/shellec.geo
+Looking for "manager			Eapp"...C:/PCGEOS/Appl/FileMgrs/GeoManag/managere.geo
 Thread 0 created for patient manager
 Thread 1 created for patient manager
-Looking for "math 					Elib"...C:\PCGEOS/Library/Math/mathec.GEO
-Looking for "borlandcE					lib"...C:\PCGEOS/Library/MATH/COMPILER/BORLANDC/BORLANDC.GEO
-Looking for "mchrt 					Eapp"...C:\PCGEOS/Appl/Mchrt/mchrtec.GEO
+Looking for "math 				Elib"...C:\PCGEOS/Library/Math/mathec.GEO
+Looking for "borlandcE			Elib"...C:\PCGEOS/Library/MATH/COMPILER/BORLANDC/BORLANDC.GEO
+Looking for "mchrt 				Eapp"...C:\PCGEOS/Appl/Mchrt/mchrtec.GEO
 Thread 0 created for patient mchrt
 Thread 1 created for patient mchrt
 ~~~
@@ -2020,18 +2027,17 @@ Now we know how to break at a message handler. Actually, we're getting a bit clu
 
 ~~~
 (mchrt:0) 16 => brk list
-Num S 	Address 						Patient 		Command/Condition
-1 	E	loader::kcode::LoaderError 		ll 			echo Loader death due to [penum
-LoaderStrings [read-reg ax]]
+Num S 	Address 						Patient Command/Condition
+1 	E	loader::kcode::LoaderError 		ll 		echo Loader death due to [penumLoaderStrings [read-reg ax]]
  												expr 1
 2 	E geos::kcode::FatalError 					all
  												why
- 										assign 		kdata::errorFlag 0
+ 										assign 	kdata::errorFlag 0
  												expr 1
 3 	E geos::kcode::WarningNotice 				all 		why-warning
-4 	E geos::kcode::CWARNINGNOTICE 			all 		why-warning
-5 	E <RT_TEXT::MCLISTGETDATAITEM+10 		all 		halt
-6 	E <PROCESSMCP_DELETE_DATA_ITEM+8 		all 		halt
+4 	E geos::kcode::CWARNINGNOTICE 		all 	why-warning
+5 	E <RT_TEXT::MCLISTGETDATAITEM+10 	all 	halt
+6 	E <PROCESSMCP_DELETE_DATA_ITEM+8 	all 	halt
 (mchrt:0) 17 =>
 ~~~
 
@@ -2154,19 +2160,18 @@ It does this by inserting a breakpoint at the kernel routine which dispatches me
 
 ~~~
 [mchrt:0] 35 => brk list
-Num 	S Address 								Patient 			Command/Condition
-1 	E loader::kcode::LoaderError									all echo 			Loader death due to [penum
-LoaderStrings [read-reg ax]]
+Num 	S Address 						Patient Command/Condition
+1 	E loader::kcode::LoaderError		all echo Loader death due to [penumLoaderStrings [read-reg ax]]
 										expr 1
-2 	E geos::kcode::FatalError 								all
- 												why
- 												assign kdata::errorFlag 0
- 												expr 1
-3 	E geos::kcode::WarningNotice 						all 			why-warning
-4 	E geos::kcode::CWARNINGNOTICE 					all 			why-warning
-6 	D <PROCESSMCP_DELETE_DATA_ITEM+8					all 			halt
-7 	E <EN_PROCESS_OPEN_APPLICATION+6					all 			halt
-8 	E <os::kcode::ObjCallMethodTable					all 			si=0030h ds=4ed4h
+2 	E geos::kcode::FatalError 			all
+ 										why
+ 										assign kdata::errorFlag 0
+ 										expr 1
+3 	E geos::kcode::WarningNotice 		all 	why-warning
+4 	E geos::kcode::CWARNINGNOTICE 		all 	why-warning
+6 	D <PROCESSMCP_DELETE_DATA_ITEM+8	all 	halt
+7 	E <EN_PROCESS_OPEN_APPLICATION+6	all 	halt
+8 	E <os::kcode::ObjCallMethodTable	all 	si=0030h ds=4ed4h
  print-ow {1533 364 48 {1112312 9404 44}}
 [mchrt:0] 37 =>
 ~~~
@@ -2248,7 +2253,7 @@ Code Display 5-2 MCHRT.GOC
 @class MCProcessClass, GenProcessClass;
 /* For information about the messages listed below, see the
  * headers for their handlers, later in this file. */
-	@message (GEN_DYNAMIC_LIST_QUERY_MSG) 				MSG_MCP_SET_DATA_ITEM_MONIKER;
+	@message (GEN_DYNAMIC_LIST_QUERY_MSG) 	MSG_MCP_SET_DATA_ITEM_MONIKER;
 	@message void 					MSG_MCP_DELETE_DATA_ITEM();
 	@message void 					MSG_MCP_INSERT_DATA_ITEM();
 	@message void					MSG_MCP_SET_DATA_ITEM();
@@ -2274,11 +2279,11 @@ typedef struct {
 } ListNode;
 
 /* A given piece of data is stored:
- *	In a ListNode							tempNode
- *	referenced by a ChunkHandle							tempListItem
- *	in a memory block referenced by a MemHandle 						dataListBlock
- *	loaded from a VM block referenced by a VMBlockHandle						dataFileBlock
- *	in a file referenced by a VMFileHandle			 				dataFile
+ *	In a ListNode						tempNode
+ *	referenced by a ChunkHandle				tempListItem
+ *	in a memory block referenced by a MemHandle 	dataListBlock
+ *	loaded from a VM block referenced by a VMBlockHandle	dataFileBlock
+ *	in a file referenced by a VMFileHandle			 	dataFile
  */
 
 VMFileHandle 	dataFile;				/* File which will hold our data */
@@ -2746,7 +2751,7 @@ HINT_ORIENT_CHILDREN_HORIZONTALLY. This hint requests that our clump of data lis
 ~~~
 @object GenInteractionClass MCLeftClump = {
 	GI_comp = @MCDataList, @MCAddTrigger, @MCDeleteTrigger,
-						@MCChangeTrigger, @MCValue;
+				@MCChangeTrigger, @MCValue;
 }
 ~~~
 
