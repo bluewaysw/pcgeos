@@ -41,7 +41,7 @@ if ( $ENV{"OS"} eq "Windows_NT" ) { # NT version
     require Win32::Process;
     require "$ENV{ROOT_DIR}/Tools/scripts/perl/lib/include.pl";
 } else {			# Unix version
-    require "/staff/pcgeos/Tools/scripts/perl/lib/include.pl";
+    require "$ENV{ROOT_DIR}/Tools/scripts/perl/lib/include.pl";
 }
 
 &Include("Tools/scripts/perl/lib/osutil.pl");

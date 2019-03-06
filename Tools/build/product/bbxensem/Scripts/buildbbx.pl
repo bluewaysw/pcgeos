@@ -115,7 +115,7 @@ if ( $opt_i ) {
 #
 # Set tools directories
 #
-if ( IsWinNT() ) {
+#if ( IsWinNT() ) {
     $TopDir = $ENV{ROOT_DIR} || 
 	die "ERROR: \%ROOT_DIR\% variable must be set.\n";
     $TopDir = FormatPath( $TopDir, 0 );
@@ -124,14 +124,14 @@ if ( IsWinNT() ) {
 	die "ERROR: \%LOCAL_ROOT\% variable must be set.\n";
     $LocalDir = FormatPath( $LocalDir, 0 );
     $SourceDir = FormatPath( "$TopDir/bbxensem/Installed $TopDir/Installed $TopDir", 0 );
-} else {
+#} else {
     #
     # Running under Unix
     #
-    $TopDir = "/staff/pcgeos";
-    $LocalDir = $ENV{HOME};
-    $SourceDir = FormatPath( "/staff/pcgeos/bbxensem/Installed /staff/pcgeos/Installed /staff/pcgeos", 0 );
-}
+#    $TopDir = "/staff/pcgeos";
+#    $LocalDir = $ENV{HOME};
+#    $SourceDir = FormatPath( "/staff/pcgeos/bbxensem/Installed /staff/pcgeos/Installed /staff/pcgeos", 0 );
+#}
 
 $CommonConfigFile = "$LocalDir/$CONFIG_FILE_ROOT/$CONFIG_FILE_ROOT";
                                 # Configuration file common to all platforms
