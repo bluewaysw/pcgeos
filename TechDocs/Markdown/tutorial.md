@@ -2029,14 +2029,14 @@ Now we know how to break at a message handler. Actually, we're getting a bit clu
 
 ~~~
 (mchrt:0) 16 => brk list
-Num S 	Address 						Patient Command/Condition
-1 	E	loader::kcode::LoaderError 		ll 		echo Loader death due to [penumLoaderStrings [read-reg ax]]
+Num S 	Address 					Patient Command/Condition
+1 	E	loader::kcode::LoaderError 		ll 	echo Loader death due to [penumLoaderStrings [read-reg ax]]
  												expr 1
 2 	E geos::kcode::FatalError 					all
- 												why
- 										assign 	kdata::errorFlag 0
- 												expr 1
-3 	E geos::kcode::WarningNotice 				all 		why-warning
+ 										why
+ 							assign 	kdata::errorFlag 0
+ 											expr 1
+3 	E geos::kcode::WarningNotice 		all 	why-warning
 4 	E geos::kcode::CWARNINGNOTICE 		all 	why-warning
 5 	E <RT_TEXT::MCLISTGETDATAITEM+10 	all 	halt
 6 	E <PROCESSMCP_DELETE_DATA_ITEM+8 	all 	halt
@@ -2163,12 +2163,12 @@ It does this by inserting a breakpoint at the kernel routine which dispatches me
 ~~~
 [mchrt:0] 35 => brk list
 Num 	S Address 						Patient Command/Condition
-1 	E loader::kcode::LoaderError		all echo Loader death due to [penumLoaderStrings [read-reg ax]]
+1 	E loader::kcode::LoaderError	all echo Loader death due to [penumLoaderStrings [read-reg ax]]
 										expr 1
-2 	E geos::kcode::FatalError 			all
- 										why
- 										assign kdata::errorFlag 0
- 										expr 1
+2 	E geos::kcode::FatalError 		all
+ 									why
+ 									assign kdata::errorFlag 0
+ 									expr 1
 3 	E geos::kcode::WarningNotice 		all 	why-warning
 4 	E geos::kcode::CWARNINGNOTICE 		all 	why-warning
 6 	D <PROCESSMCP_DELETE_DATA_ITEM+8	all 	halt
