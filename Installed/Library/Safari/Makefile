@@ -3,17 +3,19 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Safari
-ASM_TO_OBJS     = safari.asm safariBitmap.asm safariC.asm safariGame.asm\
-                  safariIndicator.asm safariOther.asm safariUtils.asm
-UI_TO_RDFS      = SAFARI.UI
-SRCS            = safari.asm safariBitmap.asm safariC.asm safariGame.asm\
-                  safariIndicator.asm safariOther.asm safariUtils.asm\
-                  safariConstant.def safariGeode.def mkrClickOff.ui\
-                  mkrClickOn.ui mkrIndOff.ui mkrIndOn.ui mkrScore.ui\
-                  safari.ui
-OBJS            = safari.obj safariBitmap.obj safariC.obj safariGame.obj\
-                  safariIndicator.obj safariOther.obj safariUtils.obj
+GEODE           = safari
+ASM_TO_OBJS     = safariGame.asm safariBitmap.asm safariUtils.asm\
+                  safariIndicator.asm safariOther.asm safariC.asm\
+                  safari.asm
+UI_TO_RDFS      = safari.ui
+SRCS            = safariGame.asm safariBitmap.asm safariUtils.asm\
+                  safariIndicator.asm safariOther.asm safariC.asm\
+                  safari.asm safariConstant.def safariGeode.def\
+                  mkrClickOn.ui mkrScore.ui mkrClickOff.ui mkrIndOff.ui\
+                  mkrIndOn.ui safari.ui
+OBJS            = safariGame.obj safariBitmap.obj safariUtils.obj\
+                  safariIndicator.obj safariOther.obj safariC.obj\
+                  safari.obj
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = safari

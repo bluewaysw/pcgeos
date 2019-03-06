@@ -24,5 +24,5 @@
 #include <$(SYSMAKEFILE)>
 
 GOCFLAGS += -L cdaudio
-CCOMFLAGS += -WDE -w -Od
+#CCOMFLAGS += -WDE -w -Od
 # CCOMFLAGS += -O2 -w -w-amp -w-cln -w-pin

@@ -1,0 +1,295 @@
+/************************************************
+ *						*
+ *	project:	BSW-CD			*
+ *	module:		MAIN\PCODE.GOC		*
+ *						*
+ * 	subroutines for the process timer and 	*
+ *      the search/scan feature                 *
+ *						*
+ ************************************************/
+
+@include <stdapp.goh>
+
+#include <bbxcd.h>
+#include <Lib/cdlib.h>
+@include <Ui/uimax.goh>
+@include <Ui/uimain.goh>
+@include <Main/process.goh>
+#include <Main/timevent.h>
+#include <Main/display.h>
+#include <Main/subcode.h>
+#include <Main/key.h>
+
+
+
+int searchCounter = 0;
+flag preciseCheck = FALSE;
+
+
+long RedbookCal (long rbTime, byte addition)
+// correct Redbook time after calculation)
+{
+  if (addition) {
+    if (RedbookFrm(rbTime) >74)
+      rbTime = (rbTime & 0xffffff00) + (RedbookFrm(rbTime)/75)*0x100 + (RedbookFrm(rbTime)%75) ;
+    if (RedbookSec(rbTime) >59)
+      rbTime = (rbTime & 0xffff00ff) + (RedbookSec(rbTime)/60)*0x10000 + (RedbookSec(rbTime)%60)*0x100 ;
+  } else {
+    if (RedbookFrm(rbTime) >74)
+      rbTime = (rbTime & 0xffffff00) + (RedbookFrm(rbTime)-181) ;
+    if (RedbookSec(rbTime) >59)
+      rbTime = (rbTime & 0xffff00ff) + (RedbookSec(rbTime)-196)*0x100 ;
+  }
+  return rbTime;
+}
+
+
+void _pascal ChangeTrack (byte newTrack, flag playAgain)
+{
+  if (playAgain)
+    CalendarFrame(currentTrack,C_WHITE);
+  else
+    CalendarFrame(currentTrack,backGroundColor);
+  currentTrack = newTrack;
+  CalendarFrame(currentTrack,C_YELLOW);
+  RedrawCalendar(NullHandle);
+}
+
+void _pascal LimitTime (void)
+// limit currentDiscTime to audio area
+{
+  int i;
+  i=0;
+  while (!CD_Get_Track_Type(++i));
+  if (currentDiscTime < CD_Get_Track_Start(i))
+    currentDiscTime = CD_Get_Track_Start(i);
+  if (currentDiscTime < CD_Get_Track_Start(currentTrack))
+    ChangeTrack(currentTrack -1, TRUE);
+  if (currentDiscTime > CD_Get_Length())
+    currentDiscTime = CD_Get_Length();
+  if (currentDiscTime > CD_Get_Track_Start(currentTrack+1))
+    ChangeTrack(currentTrack +1, FALSE);
+}
+
+
+void _pascal SearchFunction (void)
+// count, display and set disc position when searching
+{
+  int increment;
+
+  // stop playing if no audible seek
+  if (searching && !searchCounter) {
+   if ((@call ModusItemGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION()) != MIG_NORMAL)
+     SetProgramMode (MIG_NORMAL);
+     // change to normal mode if not already
+   if (!(optionFlags&FBG_SEEK)&& !pauseState) {
+      CD_Play_Stop(1);
+   }
+  }
+  // reset search counter after search and set disc position if no audible seek
+  if ((!searching)&&(searchCounter)) {
+    if (isPlaying && (!(optionFlags&FBG_SEEK)||pauseState)){
+      currentDiscTime=CD_Get_Play_Position(1); // get Disc time
+      searchCounter=searchCounter+RedbookSec(currentDiscTime)+60*RedbookMin(currentDiscTime);
+      currentDiscTime=RedbookPos(searchCounter/60,searchCounter%60,0);
+      LimitTime();
+      CD_Play_Position(currentDiscTime,CD_Get_Length());
+      if (pauseState)
+        CD_Play_Stop(1);
+    }
+    searchCounter = 0;
+    if ((@call ModusItemGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION()) != MIG_NORMAL)
+      SetProgramMode (@call ModusItemGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION());
+     // change to normal mode if not already
+  }
+  // count search progress and set position if audible seek
+  if (searching) {
+    increment = 1;      // calculate progress speed
+    if ((searchCounter>8)||(searchCounter<-8))
+      increment = 2;
+    if ((searchCounter>24)||(searchCounter<-24))
+      increment = 4;
+    if ((searchCounter>56)||(searchCounter<-56))
+      increment = 8;
+    if ((searchCounter>128)||(searchCounter<-128))
+      increment = 16;
+    if (searchDirection)
+      increment = -increment;
+    searchCounter = searchCounter+increment;
+    searching--; // decrement scan flag
+    // set search progress to disc time
+    currentDiscTime=CD_Get_Play_Position(1); // get Disk time
+    if (!(optionFlags&FBG_SEEK)||pauseState)
+      currentDiscTime=RedbookPos((searchCounter+RedbookSec(currentDiscTime)+60*RedbookMin(currentDiscTime))/60,(searchCounter+RedbookSec(currentDiscTime)+60*RedbookMin(currentDiscTime))%60,0);
+    else
+      currentDiscTime=RedbookPos((increment+RedbookSec(currentDiscTime)+60*RedbookMin(currentDiscTime))/60,(increment+RedbookSec(currentDiscTime)+60*RedbookMin(currentDiscTime))%60,0);
+    LimitTime();
+    if ((optionFlags&FBG_SEEK)&&!pauseState) {
+      CD_Play_Stop(1);
+      CD_Play_Position(currentDiscTime,CD_Get_Length());
+    // include current Track correction on backward search
+    }
+  }
+  ShowTrackTime();
+}
+
+
+void _pascal CheckBalance (void)
+// check balance manipulations
+{
+  byte i;
+  i = @call BalanceValue::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+  if (balance != i){
+    balance = i;
+    dbEntry.balance = i;
+    @call process::MSG_BCD_SET_VOLUME();
+  }
+}
+
+
+void _pascal CheckPlay (void)
+// CD still playing? if not, reset ScanCounter and isPlaying flag
+{
+  static byte autostartStatus = FALSE;
+  // test CD play status
+  word cdStatus;
+  if (CD_Drive_Get_Change()) {
+    if (isPlaying)
+      @call process::MSG_BCD_TRIG_STOP();
+    ReadCDData();
+    ShowTrackTime();
+    if((optionFlags&FBG_AUTOSTART)&& CD_Get_Length() && autostartStatus) {
+      autostartStatus=FALSE;	// nur 1 Versuch !
+      @send, forceQueue process::MSG_BCD_TRIG_PLAY();
+    }
+
+  }
+  if ((CD_Get_Play_Status()==-1)&&isPlaying) // !!!
+    @call process::MSG_BCD_TRIG_STOP();
+  if (!isPlaying) {
+    preciseCheck = 0;
+    searching = 0;
+    scanMode = 0;
+    cdStatus = CD_Drive_Get_Status () ;
+    if (!(cdStatus & CD_STATUS_DOOR_OPEN))
+      ShowEjectMoniker(1);
+    else
+      ShowEjectMoniker(0);
+    if (!CD_Get_Length()){
+      ShowHandMoniker(1);
+      autostartStatus = TRUE;
+    } else {
+      ShowHandMoniker(0);
+    }
+  }
+}
+
+
+
+void _pascal BC_Timer_Event(unsigned char cdTurnPhase )
+/* 1/8 second status update */
+{
+  static word fadeVolume,fadeCounter;
+  long endtime;
+  byte i;
+
+  random = (random + 181)%256;  // update random number
+  CheckBalance();               // ensure balance manipulations are noticed
+
+  if (noInterrupt) return;
+
+  switch (kbdChar) {
+    case VC_F4: @send process::MSG_BCD_TRIG_EJECT(); break;
+    case VC_F5: @send process::MSG_BCD_TRIG_STOP(); break;
+    case VC_F6: @send process::MSG_BCD_TRIG_REW(); break;
+    case VC_F7: @send process::MSG_BCD_TRIG_PLAY(); break;
+    case VC_F8: @send process::MSG_BCD_TRIG_FWD(); break;
+  }
+  kbdChar = 0;
+
+  if (!cdTurnPhase||preciseCheck||searching)
+    CheckPlay();                  // check if CD is still playing
+  if ((isPlaying&&(cdTurnPhase%2)&&searching)||searchCounter) {
+  // check if search mode is active
+    SearchFunction();
+  }
+
+  if ((preciseCheck||!cdTurnPhase)&&isPlaying&&!searchCounter) {
+    // update CD status every second or 1/8 second near end of track while playing
+    currentDiscTime=CD_Get_Play_Position(1);
+    endtime = CD_Get_Track_Start (currentTrack+1);
+    if (CD_Get_Tracks() == currentTrack) endtime = RedbookCal(endtime - 256, FALSE);
+    if (!preciseCheck&&scanMode) {
+      fadeVolume = @call VolumeValue::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+      fadeCounter = 0;
+    }
+    if (   preciseCheck // reset volume if manual skip occurred
+        && scanMode
+        && (RedbookCal(RedbookCal(CD_Get_Track_Start(currentTrack)+512,TRUE)-currentDiscTime,FALSE)>0)
+       ) {
+      @call VolumeValue::MSG_GEN_VALUE_SET_INTEGER_VALUE(fadeVolume,FALSE);
+      @call process::MSG_BCD_SET_VOLUME();
+    }
+    if(
+       ((RedbookCal(endtime-currentDiscTime,FALSE))<0x200)
+       || (
+           (repeatMode == REPEAT_AB)
+           &&
+           ((RedbookCal(abEnd-currentDiscTime,FALSE))<0x200)
+          )
+       || (
+           scanMode
+           &&
+           (RedbookCal(RedbookCal(CD_Get_Track_Start(currentTrack)+256*scanMode,TRUE)-currentDiscTime,FALSE)<0x200)
+          )
+      )
+      preciseCheck = 1;
+    else
+      preciseCheck = 0;
+    if (scanMode && preciseCheck) {
+      if (fadeCounter < 10)
+        fadeCounter++;
+      volume = ((10-fadeCounter)*fadeVolume) /10;
+      @call VolumeValue::MSG_GEN_VALUE_SET_INTEGER_VALUE(volume,FALSE);
+      @call process::MSG_BCD_SET_VOLUME();
+      endtime = RedbookCal(CD_Get_Track_Start(currentTrack)+(256*scanMode),TRUE);
+      if (RedbookSec(endtime) >59)
+        endtime = RedbookCal(RedbookCal(endtime-256*RedbookSec(endtime),FALSE)+256*(RedbookSec(endtime)%60),TRUE) +65536 ;
+    }
+    if (currentDiscTime>=endtime) { // track ended
+      if (programMode != MIG_PROGRAM)
+        TracksToPlay(currentTrack,0); // set to 0
+      ChangeTrack(GetNextTrack(),FALSE);
+      StartPlaying (currentTrack);
+      if (scanMode) {
+        @call VolumeValue::MSG_GEN_VALUE_SET_INTEGER_VALUE(fadeVolume,FALSE);
+        @call process::MSG_BCD_SET_VOLUME();
+      }
+      if (pauseState)
+        CD_Play_Stop(1);
+      if (!currentTrack)
+        @call process::MSG_BCD_TRIG_STOP();
+    }
+    if ((repeatMode == REPEAT_AB)&&(currentDiscTime>=abEnd)) {
+      i = abTStart>>24;
+      if (programMode == MIG_PROGRAM)
+        CalendarFrame(currentTrack,backGroundColor);
+      else
+        CalendarFrame(currentTrack,C_WHITE);
+      for (i++;(i<currentTrack)&&(i<=MaxTracks);i++)
+        if (validTracks[i]) {
+          tracksToPlay[i] = 1;
+          if (programMode != MIG_PROGRAM )
+            calendarFrame[i]=C_WHITE;
+        }
+      currentTrack = abTStart>>24;
+      CalendarFrame(currentTrack,C_YELLOW);
+      CD_Play_Stop(1);
+      CD_Play_Position(abStart,CD_Get_Length());
+      if (pauseState)
+        CD_Play_Stop(1);
+      RedrawCalendar(NullHandle);
+    }
+    ShowTrackTime();
+  }
+}

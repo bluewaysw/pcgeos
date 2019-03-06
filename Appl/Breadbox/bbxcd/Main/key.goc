@@ -1,0 +1,169 @@
+/************************************************
+ *						*
+ *	project:	BSW-CD			*
+ *	module:		MAIN\KEY.GOC            *
+ *						*
+ * 	code for most display functions for   	*
+ *      GenView and Buttons                     *
+ *						*
+ ************************************************/
+
+@include <stdapp.goh>
+#include <Main/key.h>
+
+void far ImAddMonitor ();
+// dummy definition
+void far ImRemoveMonitor ();
+// dummy definition
+
+
+struct MonitorChain {
+                    word ownoffset;
+                    word ownsegment;
+                    byte priority;
+                    byte flag;
+                    word next1;
+                    word next2;
+                    word next3;
+                    word next4;
+                    word ende;
+       } nextMonitor ;
+
+
+/************************************************
+
+       KeyboardIntercept
+
+  This functions OPTR is passed to ImAddMonitor
+  (provided by the GEOS Input Manager) and
+  receives every input event (keyboard, mouse...)
+  before it is passed to the Input handler.
+  Very dirty code as used by the ScreenDumper
+  Application.
+
+  It resides in its own fixed coderesource. This
+  is done by adding
+  resource <sourcefile>_TEXT preload fixed code
+  to the .GP file.
+  Due to the mixed assembler and C code embedded
+  into an assembler call there is no direct
+  handling of the input events. Incoming and
+  selected characters are written to a global
+  variable where a timer controlled routine can
+  check them on GOC level.
+  Selected keypresses are currently removed from
+  handling (AL return value zero) but this can
+  be handled separate for every intercepted event.
+
+
+  Parameters are not completely known:
+
+  AL :  1:input event unhandled, 0:already handled
+  CL :  charactercode
+  CH :  actual charset
+  DL :  charflags
+  DH :  Shiftstate
+  Di :  if 119 then keyboard event,
+        else mouse or other input
+
+*************************************************/
+@start Key_Text;
+
+unsigned char kbdChar  = 0;
+
+void far KeyboardIntercept ()
+{
+  _asm {
+        TEST    AL, 1           ; // keypress already handled ?
+        JZ      end
+        CMP     DI, 119         ; // dunno why
+        JNZ     end
+        TEST    DL, CF_FIRST_PRESS
+        JZ      end
+        TEST    DH, (SS_LSHIFT OR SS_RSHIFT)
+        JZ      end
+        CMP     CL, VC_F4
+        JZ      store
+        CMP     CL, VC_F5
+        JZ      store
+        CMP     CL, VC_F6
+        JZ      store
+        CMP     CL, VC_F7
+        JZ      store
+        CMP     CL, VC_F8
+        JNZ     end
+  store:
+        MOV     kbdChar, CL     ; // store key for interrupt routine
+        XOR     AL, AL          ; // clear unhandled flag
+  end:
+  };
+}
+
+@end Key_Text;
+
+char isInstalled = 0;
+
+
+/************************************************
+
+       InstallMonitor
+
+  Installs the KeyboardIntercept routine as a
+  global input monitor.
+
+  The parameter 22 for AL is the desired priority,
+  which is less than the priority for ScreenDumper.
+  The parameter buffer points to a buffer where
+  the monitor data and the link to the next
+  monitor can be stored (16 bytes).
+
+*************************************************/
+void _pascal InstallMonitor ()
+{
+  void far * function;
+  unsigned fofs,fseg, buffer ;
+
+  if (!isInstalled) {
+    buffer = (unsigned) &nextMonitor;
+    fseg = PtrToSegment( KeyboardIntercept );
+    fofs = PtrToOffset( KeyboardIntercept );
+    function = ImAddMonitor;
+    _asm {
+        MOV     BX, buffer
+        MOV     AL, 22
+        MOV     CX, fseg
+        MOV     DX, fofs
+        CALL    function
+    };
+  isInstalled = 1;
+  }
+}
+
+/************************************************
+
+       KillMonitor
+
+  Removes the KeyboardIntercept routine as global
+  input monitor.
+
+  The parameter 64 for AL is currently not researched
+
+*************************************************/
+void _pascal KillMonitor ()
+{
+  void far * function;
+  unsigned buffer ;
+  if (isInstalled) {
+    buffer = (unsigned) &nextMonitor;
+    function = ImRemoveMonitor;
+
+    _asm {
+        MOV     BX, buffer
+        MOV     AL, 64
+        CALL    function
+    };
+    isInstalled = 0;
+  }
+}
+
+

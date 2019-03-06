@@ -1,0 +1,886 @@
+/************************************************
+ *						*
+ *	project:	NEW-CD			*
+ *	module:		MAIN\DISPLAY.GOC	*
+ *						*
+ * 	code for most display functions for   	*
+ *      GenView and Buttons                     *
+ *						*
+ ************************************************/
+
+@include <stdapp.goh>
+@include <Ui/define.goh>
+
+#include <bbxcd.h>
+#include <Lib/cdlib.h>
+#include <Main/display.h>
+@include <Main/process.goh>
+@include <Ui/uimain.goh>
+@include <Ui/uimax.goh>
+#include <Main/subcode.h>
+#include <stdio.h>
+#include <lmem.h>
+#include <stdlib.h>
+#include <Ansi/string.h>
+
+@extern chunk AppNameTxt;
+@extern chunk VolTxt;
+@extern chunk TrackTxt;
+@extern chunk TTimeTxt;
+@extern chunk DTimeTxt;
+@extern chunk DriveTxt;
+@extern chunk RepeatTxt;
+@extern chunk RepeatOffTxt;
+@extern chunk Repeat1Txt;
+@extern chunk RepeatCDTxt;
+@extern chunk RepeatABTxt;
+@extern chunk ProgNormalTxt;
+@extern chunk ProgRandomTxt;
+@extern chunk ProgProgramTxt;
+@extern chunk MinTrackAndTimeTxt;
+@extern chunk MinTrackTxt;
+@extern chunk PlayTxt;
+@extern chunk MaxEjectHelp;
+@extern chunk MaxLoadHelp;
+@extern chunk MaxPlayHelp;
+@extern chunk MaxPauseHelp;
+
+
+/************************************************
+ *	  				        *
+ *		MouseClickInWindow              *
+ *	  				        *
+ * Fkt:	react to a mouse click in th eMAX view  *
+ *                                              *
+ ************************************************/
+
+typedef struct	{ word		luX,luY;// X/Y for upper left corner
+	          word     	rdX,rdY;// X/Y for lower right corner
+	          byte		function;// number of function to call
+       		} TouchEntry;
+
+#define MAX_EVENTS	35
+#define VLSIZE	2	// Abstand Lautstrkestriche
+#define MAXY	MAX_Y_VIEW
+#define LSIZE	1
+#define TMSIZE	27
+#define TXSIZE	12
+#define LBSIZE	10
+
+#define XS	288
+#define YS	10
+#define XD	18
+#define YD      18
+
+const TouchEntry touchTable[MAX_EVENTS] = {	// Array of touch positions
+			{ 264,  28,  280,  90, 0 }, // Volume
+                        { XS+0*XD,YS+0*YD,XS+1*XD-3,YS+1*YD-3, 1 }, // Tr 1
+                        { XS+1*XD,YS+0*YD,XS+2*XD-3,YS+1*YD-3, 1 }, // Tr 2
+                        { XS+2*XD,YS+0*YD,XS+3*XD-3,YS+1*YD-3, 1 }, // Tr 3
+                        { XS+3*XD,YS+0*YD,XS+4*XD-3,YS+1*YD-3, 1 }, // Tr 4
+                        { XS+4*XD,YS+0*YD,XS+5*XD-3,YS+1*YD-3, 1 }, // Tr 5
+                        { XS+0*XD,YS+1*YD,XS+1*XD-3,YS+2*YD-3, 1 }, // Tr 6
+                        { XS+1*XD,YS+1*YD,XS+2*XD-3,YS+2*YD-3, 1 }, // Tr 7
+                        { XS+2*XD,YS+1*YD,XS+3*XD-3,YS+2*YD-3, 1 }, // Tr 8
+                        { XS+3*XD,YS+1*YD,XS+4*XD-3,YS+2*YD-3, 1 }, // Tr 9
+                        { XS+4*XD,YS+1*YD,XS+5*XD-3,YS+2*YD-3, 1 }, // Tr 10
+                        { XS+0*XD,YS+2*YD,XS+1*XD-3,YS+3*YD-3, 1 }, // Tr 11
+                        { XS+1*XD,YS+2*YD,XS+2*XD-3,YS+3*YD-3, 1 }, // Tr 12
+                        { XS+2*XD,YS+2*YD,XS+3*XD-3,YS+3*YD-3, 1 }, // Tr 13
+                        { XS+3*XD,YS+2*YD,XS+4*XD-3,YS+3*YD-3, 1 }, // Tr 14
+                        { XS+4*XD,YS+2*YD,XS+5*XD-3,YS+3*YD-3, 1 }, // Tr 15
+                        { XS+0*XD,YS+3*YD,XS+1*XD-3,YS+4*YD-3, 1 }, // Tr 16
+                        { XS+1*XD,YS+3*YD,XS+2*XD-3,YS+4*YD-3, 1 }, // Tr 17
+                        { XS+2*XD,YS+3*YD,XS+3*XD-3,YS+4*YD-3, 1 }, // Tr 18
+                        { XS+3*XD,YS+3*YD,XS+4*XD-3,YS+4*YD-3, 1 }, // Tr 19
+                        { XS+4*XD,YS+3*YD,XS+5*XD-3,YS+4*YD-3, 1 }, // Tr 20
+                        { XS+0*XD,YS+4*YD,XS+1*XD-3,YS+5*YD-3, 1 }, // Tr 21
+                        { XS+1*XD,YS+4*YD,XS+2*XD-3,YS+5*YD-3, 1 }, // Tr 22
+                        { XS+2*XD,YS+4*YD,XS+3*XD-3,YS+5*YD-3, 1 }, // Tr 23
+                        { XS+3*XD,YS+4*YD,XS+4*XD-3,YS+5*YD-3, 1 }, // Tr 24
+                        { XS+4*XD,YS+4*YD,XS+5*XD-3,YS+5*YD-3, 1 }, // Tr 25
+                        {   5,   1,  55,     16, 2 }, // drivenumber
+                        {  60,   1, 254,     16, 3 }, // CD title
+                        {   5,  32,  60,     60, 4 }, // track no
+                        {  70,  32, 160,     60, 5 }, // track time
+                        { 170,  32, 254,     60, 6 }, // playtime
+                        {   5,  85,  80, MAXY-1, 7 }, // status (null function)
+                        { 100,  85, 180, MAXY-1, 8 }, // repeat mode
+                        { 206,  85, 254, MAXY-1, 9 }, // program mode
+                        {   5,  65, 254,     80, 10 } // track title
+                        } ;
+
+
+void _pascal MouseClickInWindow (word xPosition, word yPosition)
+{
+  int i, value;
+
+  for (i=0;i<MAX_EVENTS;i++) {
+    if ((xPosition>=touchTable[i].luX)&&(yPosition>=touchTable[i].luY)&&(xPosition<=touchTable[i].rdX)&&(yPosition<=touchTable[i].rdY))
+      switch (touchTable[i].function) {
+	case 0:  // Volume
+	  value = 256/(touchTable[i].rdY-touchTable[i].luY);
+	  value = value * (touchTable[i].rdY-yPosition);
+	  @call VolumeValue::MSG_GEN_VALUE_SET_INTEGER_VALUE(value,FALSE);
+	  @send process::MSG_BCD_SET_VOLUME();
+	  break;
+	case 1: // Track 1-25 (i= Tracknummer)
+	  CalendarKlick(i);
+	  break;
+	case 2:	// Driveno
+          if (drivenum <driveMax)
+            drivenum++;
+          else
+            drivenum = 1;
+          @call DiscItemGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(drivenum,FALSE);
+          @send process::MSG_BCD_DIG_APPLY(drivenum,0,0);
+	  break;
+	case 3: // open CD info box
+          @send CDInfoBox::MSG_GEN_INTERACTION_INITIATE();
+	  break;
+	case 4: // Track
+	  dispTrack = dispTrack^3;
+	  RedrawTime(NullHandle);
+	  @send TrackDispList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(dispTrack,FALSE); //La 16.02.97
+	  break;
+	case 5: // Track time
+	  dispTTime = dispTTime^3;
+	  RedrawTime(NullHandle);
+	  @send TrackTimeList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(dispTTime,FALSE); //La 16.02.97
+	  break;
+	case 6: // Disc time
+	  dispDTime = dispDTime^3;
+	  RedrawTime(NullHandle);
+	  @send DiscTimeList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(dispDTime,FALSE); //La 16.02.97
+	  break;
+	case 8: // Repeat mode
+	  repeatMode = (repeatMode%REPEAT_GADGETS)+1 ;
+	  @send ModusRepeatList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(repeatMode,FALSE);
+	  RedrawModes(NullHandle);
+	  break;
+	case 9: // Program mode
+	  SetProgramMode ((programMode%MIG_GADGETS)+1);
+	  @send ModusItemGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(programMode,FALSE);
+	  break;
+	case 10: // open CD editor box
+	  if ((optionFlags & FBG_USE_DATABASE)&&(currentTrack<=MaxTracks)) {
+            @send DBEditorBox::MSG_GEN_INTERACTION_INITIATE();
+            @call DBETrackList::MSG_GEN_ITEM_GROUP_SET_ITEM_STATE(dbEditNumber,FALSE);
+            @call process::MSG_BCD_DB_LIST_APPLY(currentTrack,0,0);
+          }
+	  break;
+      }
+  }
+}
+
+
+
+
+/************************************************
+ *	  				        *
+ *		RedrawXXX                       *
+ *	  				        *
+ * Fkt:	display the genView window in MAX mode  *
+ *                                              *
+ ************************************************/
+
+void _pascal RedrawGadgets (GStateHandle gstate)
+//  static text objects and lines
+{
+  int notExposed ;
+  if (winHan!=0) {
+    notExposed = 0 ;
+    if (gstate == NullHandle) {
+      gstate = GrCreateState(winHan);
+      notExposed = 1 ;
+    }
+
+    // --- Beschriftung Lautstrke ---
+      GrSetTextColor(gstate,CF_INDEX,C_WHITE,0,0);
+      GrSetFont(gstate,FID_DTC_URW_SANS,MakeWWFixed(LBSIZE));
+      GrSetTextStyle(gstate,0,255);	// plain
+	MemLock (OptrToHandle(@VolTxt));
+		GrDrawText(gstate,touchTable[0].luX,touchTable[0].luY-20,LMemDeref(@VolTxt),0);
+
+      // --- Beschriftung TRACK,TRACK TIME,DISC TIME ---
+		GrDrawText(gstate,touchTable[28].luX,touchTable[28].luY-LBSIZE+1,LMemDeref(@TrackTxt),0);
+		GrDrawText(gstate,touchTable[29].luX,touchTable[29].luY-LBSIZE+1,LMemDeref(@TTimeTxt),0);
+		GrDrawText(gstate,touchTable[30].luX,touchTable[30].luY-LBSIZE+1,LMemDeref(@DTimeTxt),0);
+	MemUnlock (OptrToHandle(@VolTxt));
+		// --- Trennlinie ---
+      GrSetLineColor(gstate,CF_INDEX,C_WHITE,0,0);
+      GrSetLineWidth(gstate,MakeWWFixed(LSIZE));
+      GrDrawLine(gstate,touchTable[26].luX,touchTable[26].rdY+4,touchTable[27].rdX,touchTable[27].rdY+4);
+      GrDrawLine(gstate,touchTable[31].luX,touchTable[31].luY-1,touchTable[33].rdX,touchTable[33].luY-1);
+
+    if (notExposed)
+      GrDestroyState(gstate);
+  }
+}
+
+void _pascal RedrawStatus (GStateHandle gstate)
+{
+  int notExposed;
+
+  if (winHan!=0) {
+    notExposed = 0 ;
+    if (gstate == NullHandle) {
+      gstate = GrCreateState(winHan);
+      notExposed = 1 ;
+    }
+
+    // *** dynamische Statusanzeigen ***
+
+    GrSetFont(gstate,FID_DTC_URW_SANS,MakeWWFixed(TXSIZE));
+
+    // --- Status ---
+    if (notExposed) {
+      GrSetAreaColor(gstate,CF_INDEX,backGroundColor,0,0);
+      GrFillRect(gstate,touchTable[31].luX,touchTable[31].luY,touchTable[31].rdX,touchTable[31].rdY);
+    }
+    GrSetTextColor(gstate,CF_INDEX,C_WHITE,0,0);
+	 MemLock (OptrToHandle(@PlayTxt));
+	 GrDrawText(gstate,touchTable[31].luX,touchTable[31].luY,StateText(),0);
+	 MemUnlock (OptrToHandle(@PlayTxt));
+
+    if (notExposed)
+      GrDestroyState(gstate);
+  }
+  MemLock (OptrToHandle(@PlayTxt));
+  @call CDMinStatusGlyph::MSG_GEN_REPLACE_VIS_MONIKER_TEXT (StateText(), VUM_NOW);
+  MemUnlock (OptrToHandle(@PlayTxt));
+}
+
+void _pascal RedrawModes (GStateHandle gstate)
+{
+  int notExposed ;
+
+  word		f;
+  char		discText[20], numText[13];
+  word		width;
+
+  if (winHan!=0) {
+    notExposed = 0 ;
+    if (gstate == NullHandle) {
+      gstate = GrCreateState(winHan);
+      notExposed = 1 ;
+    }
+
+
+    // *** dynamische Modusanzeigen ***
+
+    GrSetFont(gstate,FID_DTC_URW_SANS,MakeWWFixed(TXSIZE));
+
+    if (notExposed) {
+      GrSetAreaColor(gstate,CF_INDEX,backGroundColor,0,0);
+      GrFillRect(gstate,touchTable[32].luX,touchTable[32].luY,touchTable[33].rdX,touchTable[33].rdY);
+      GrFillRect(gstate,touchTable[26].luX,touchTable[26].luY,touchTable[26].rdX,touchTable[26].rdY);
+    }
+
+    // --- Disc Nr ---
+    GrSetTextColor(gstate,CF_INDEX,C_WHITE,0,0);
+	MemLock (OptrToHandle(@DriveTxt));
+	strcpy(discText, LMemDeref(@DriveTxt));
+//	 discText[6]=0x30 + drivenum;
+	UtilHex32ToAscii(numText, (dword)drivenum, UHTAF_NULL_TERMINATE);
+   strcat(discText, numText);
+    GrDrawText(gstate,touchTable[26].luX,touchTable[26].luY,discText,0);
+
+    // --- Repeat ---
+    if(repeatMode == REPEAT_OFF)f=C_LIGHT_BLUE; else f=C_WHITE;
+    GrSetTextColor(gstate,CF_INDEX,f,0,0);
+	 GrDrawText(gstate,touchTable[32].luX,touchTable[32].luY,LMemDeref(@RepeatTxt),0);
+    if(repeatMode == REPEAT_OFF)
+	GrDrawTextAtCP(gstate,LMemDeref(@RepeatOffTxt),0);
+	 if(repeatMode == REPEAT_SINGLE)
+		GrDrawTextAtCP(gstate,LMemDeref(@Repeat1Txt),0);
+    if(repeatMode == REPEAT_ON)
+		GrDrawTextAtCP(gstate,LMemDeref(@RepeatCDTxt),0);
+    if(repeatMode == REPEAT_AB)
+		GrDrawTextAtCP(gstate,LMemDeref(@RepeatABTxt),0);
+
+    // --- Program ---
+	GrSetTextColor(gstate,CF_INDEX,C_WHITE,0,0);
+	/* jfh - do some right justification math */
+	if(programMode == MIG_NORMAL)  {
+		width = GrTextWidth(gstate, LMemDeref(@ProgNormalTxt), 0);
+		GrDrawText(gstate, (touchTable[33].rdX - width), touchTable[33].luY,
+						LMemDeref(@ProgNormalTxt), 0);
+		}
+	if(programMode == MIG_RANDOM)  {
+		width = GrTextWidth(gstate, LMemDeref(@ProgRandomTxt), 0);
+		GrDrawText(gstate, (touchTable[33].rdX - width), touchTable[33].luY,
+						LMemDeref(@ProgRandomTxt), 0);
+		}
+	if(programMode == MIG_PROGRAM)  {
+		width = GrTextWidth(gstate, LMemDeref(@ProgProgramTxt), 0);
+		GrDrawText(gstate, (touchTable[33].rdX - width), touchTable[33].luY,
+						LMemDeref(@ProgProgramTxt), 0);
+		}
+	MemUnlock (OptrToHandle(@DriveTxt));
+
+    if (notExposed)
+      GrDestroyState(gstate);
+  }
+}
+
+
+void _pascal RedrawVolume (GStateHandle gstate)
+{
+  int notExposed,i,y ;
+  if (winHan!=0) {
+    notExposed = 0 ;
+    if (gstate == NullHandle) {
+      gstate = GrCreateState(winHan);
+      notExposed = 1 ;
+    }
+
+    // --- Lautstrke ---
+    GrSetLineColor(gstate,CF_INDEX,C_WHITE,0,0);
+    y=touchTable[0].rdY;
+    for (i=0;i<255;i=i+8)
+    {
+      if(i>volume)GrSetLineColor(gstate,CF_INDEX,C_LIGHT_BLUE,0,0);
+      GrDrawLine(gstate,touchTable[0].luX,y,touchTable[0].rdX,y);
+      y=y-VLSIZE;
+    };
+
+    if (notExposed)
+      GrDestroyState(gstate);
+  }
+}
+
+void _pascal RedrawTime (GStateHandle gstate)
+{
+  int notExposed ;
+  if (winHan!=0) {
+    notExposed = 0 ;
+    if (gstate == NullHandle) {
+      gstate = GrCreateState(winHan);
+      notExposed = 1 ;
+    }
+
+    if (notExposed) {
+      GrSetAreaColor(gstate,CF_INDEX,backGroundColor,0,0);
+      GrFillRect(gstate,touchTable[28].luX,touchTable[28].luY+5,touchTable[30].rdX,touchTable[30].rdY);
+    }
+    GrSetFont(gstate,FID_DTC_URW_SANS,MakeWWFixed(TMSIZE));
+    GrSetTextColor(gstate,CF_INDEX,C_WHITE,0,0);
+
+    if (dispTrack==TDL_1)
+      GrDrawText(gstate,touchTable[28].luX,touchTable[28].luY,trackText,0);
+    else
+      GrDrawText(gstate,touchTable[28].luX,touchTable[28].luY,trackRemText,0);
+    if (dispTTime==TTL_1)
+      GrDrawText(gstate,touchTable[29].luX,touchTable[29].luY,titleTimeText,0);
+    else
+      GrDrawText(gstate,touchTable[29].luX,touchTable[29].luY,titleRemText,0);
+    if (indexText[4]>'1') {   // display index only if >1
+      GrSetFont(gstate,FID_DTC_URW_SANS,MakeWWFixed(LBSIZE));
+      GrDrawText(gstate,DWORD_WIDTH(GrGetCurPos(gstate)),touchTable[29].luY+(TMSIZE-LBSIZE),indexText,0);
+      GrSetFont(gstate,FID_DTC_URW_SANS,MakeWWFixed(TMSIZE));
+    }
+    if (dispDTime==DTL_1)
+      GrDrawText(gstate,touchTable[30].luX,touchTable[30].luY,discTimeText,0);
+    else
+      GrDrawText(gstate,touchTable[30].luX,touchTable[30].luY,discRemText,0);
+
+    if (notExposed)
+      GrDestroyState(gstate);
+  }
+}
+
+void _pascal RedrawCalendar (GStateHandle gstate)
+{
+  int notExposed,i ;
+  dword size;
+  char *	string = "25";
+
+  if (winHan!=0) {
+    notExposed = 0 ;
+    if (gstate == NullHandle) {
+      gstate = GrCreateState(winHan);
+      notExposed = 1 ;
+    }
+
+    // --- Trackcalendar ---
+    GrSetFont(gstate,FID_DTC_URW_SANS,MakeWWFixed(10));
+
+    GrSetLineColor(gstate,CF_INDEX,C_WHITE,0,0);
+    for (i=1;i<=MaxTracks;i++) {
+	//*** Rahmen ***
+	GrSetLineColor(gstate,CF_INDEX,calendarFrame[i],0,0);
+	GrDrawRect(gstate,touchTable[i].luX,touchTable[i].luY,touchTable[i].rdX,touchTable[i].rdY);
+	//*** TrackNr ***
+	GrSetTextColor(gstate,CF_INDEX,calendarString[i],0,0);
+	sprintf(string,"%d",i);
+	GrDrawText(gstate,touchTable[i].luX+3,touchTable[i].luY+1,string,0);
+    }
+
+    if (notExposed) {
+      GrSetAreaColor(gstate,CF_INDEX,backGroundColor,0,0);
+      GrFillRect(gstate,touchTable[34].luX,touchTable[34].luY,touchTable[34].rdX,touchTable[34].rdY);
+      GrFillRect(gstate,touchTable[27].luX,touchTable[27].luY,touchTable[27].rdX,touchTable[27].rdY);
+    }
+    GrSetFont(gstate,FID_DTC_URW_SANS,MakeWWFixed(TXSIZE));
+    GrSetTextColor(gstate,CF_INDEX,C_WHITE,0,0);
+    for (i=0;(dbEntry.cd_NAME[i]>='0')&&(dbEntry.cd_NAME[i]<='9');i++);
+    // display disc title (right bound) if not UPC-Blocked
+    size = GrTextWidth(gstate,dbEntry.cd_NAME,0);
+    if (size > (touchTable[27].rdX-touchTable[27].luX))
+      size = (touchTable[27].rdX-touchTable[27].luX) ;
+    if ((optionFlags&FBG_USE_DATABASE)&&(!(optionFlags&FBG_NO_UPC_NAME)||(i!=14)))
+      GrDrawText(gstate,touchTable[27].rdX-size,touchTable[27].luY,dbEntry.cd_NAME,0); // 31 chars maximum
+    // display actual track title (centered)
+    size = (touchTable[34].rdX-touchTable[34].luX-GrTextWidth(gstate,dbEntry.trackName[currentTrack],0))/2;
+    if ((optionFlags & FBG_USE_DATABASE)&&(currentTrack<=MaxTracks))
+      GrDrawText(gstate,touchTable[34].luX+size,touchTable[34].luY,dbEntry.trackName[currentTrack],0); // (31) Zeichen Maximum
+
+    if (notExposed)
+      GrDestroyState(gstate);
+  }
+}
+
+/********************************
+
+	RedrawAll
+
+ Redraw whole GenView
+
+ *******************************/
+void _pascal RedrawAll(void)
+{
+  GStateHandle gstate ;
+
+  gstate = GrCreateState(winHan);
+  GrInvalRect(gstate,0,0,MAX_X_VIEW,MAX_Y_VIEW);
+  GrDestroyState(gstate);
+  if (primaryModus==PRIM_MIN)       		// MIN
+  {
+    RedrawStatus(NullHandle); /* */
+  };
+}
+
+
+
+
+/************************************************
+ *	  				        *
+ *		ShowTrackTime		        *
+ *	  				        *
+ * Fkt:	calculate and display track/disc time   *
+ *                                              *
+ ************************************************/
+
+
+void _pascal ShowTrackTime (void)
+{
+  char i,j;
+  byte track,ntrack;
+  word disctime, tracktime, discremain, trackremain, index=0;
+  long time;
+  long cdlength;
+  static byte TitleSet = FALSE;
+  static byte lastTrack = 255;
+
+  cdlength = CD_Get_Length();
+  // get CD length and actual CD data
+  if (!isPlaying) {
+// general disc info if not playing
+    track = CD_Get_Tracks();
+    ntrack = track;
+    time = cdlength;
+    disctime = 60* RedbookMin(time) + RedbookSec(time);
+    discremain = disctime;
+    tracktime = 0;
+	 trackremain = 0;
+  } else {
+// actual play status
+    time=CD_Get_Play_Position(0);
+    index = RedbookFrm(time);
+    track = time>>24 ;
+    tracktime = 60* RedbookMin(time) + RedbookSec(time);
+    disctime = 60* RedbookMin(currentDiscTime) + RedbookSec(currentDiscTime);
+    time = CD_Get_Track_Start(track+1);
+    if (!time)
+      time = cdlength;
+    trackremain = 60* RedbookMin(time) + RedbookSec(time) - disctime;
+// calculate remaining disc time
+    discremain = trackremain;
+    ntrack = 1;
+    if (programMode == MIG_PROGRAM) {
+// if in program mode, check track program list
+      for (i=programCounter+1; programTracks[i]; i++) {
+        ntrack ++;
+        time = CD_Get_Track_Start(programTracks[i]+1);
+        if (time==0)
+          time = cdlength;
+        discremain = discremain + 60* RedbookMin(time) + RedbookSec(time);
+        time = CD_Get_Track_Start(programTracks[i]);
+        discremain = discremain - 60* RedbookMin(time) - RedbookSec(time);
+      }
+    } else {
+// if in shuffle or normal mode check 'to play' list
+      i=1;
+      if (isPlaying&&(programMode == MIG_NORMAL))
+        i = currentTrack;
+      for (;i<=CD_Get_Tracks();i++)
+        if ((i!=track)&&(((i<=MaxTracks)&&tracksToPlay[i])||((i>MaxTracks)&&(CD_Get_Track_Type(i)==1)))) {
+          ntrack ++;
+          time = CD_Get_Track_Start(i+1);
+          if (time==0)
+            time = cdlength;
+          discremain = discremain + 60* RedbookMin(time) + RedbookSec(time);
+          time = CD_Get_Track_Start(i);
+          discremain = discremain - 60* RedbookMin(time) - RedbookSec(time);
+        }
+    }
+  }
+  // Bereichsberschreitung "remain" prfen !!! La. 24.05.97
+
+  if ( discremain > (80*60) )
+    discremain = 0;
+  if ( trackremain > (80*60) )
+    trackremain = 0;
+
+  sprintf (trackText,"%u",track);
+  sprintf (trackRemText,"-%u",ntrack);
+  sprintf (titleTimeText,"%u:%02u",tracktime/60,tracktime%60);
+  sprintf (titleRemText,"-%u:%02u",trackremain/60,trackremain%60);
+  sprintf (discTimeText,"%u:%02u",disctime/60,disctime%60);
+  sprintf (discRemText,"-%u:%02u",discremain/60,discremain%60);
+  sprintf (indexText,"   %2u",index);
+
+  switch (displayMode) {
+   case 0:
+     sprintf (trackInfoText,"%u / %2u:%02u",track,tracktime/60,tracktime%60);
+     break;
+   case 1:
+     sprintf (trackInfoText,"%u / -%2u:%02u",track,trackremain/60,trackremain%60);
+     break;
+   case 2:
+     sprintf (trackInfoText,"%u / %2u:%02u",track,disctime/60,disctime%60);
+     break;
+   case 3:
+     sprintf (trackInfoText,"-%u / -%u:%02u",ntrack,discremain/60,discremain%60);
+     break;
+  }
+
+
+  // set title bar for inconized display
+
+
+  if ( @call BCPrimary::MSG_GEN_DISPLAY_GET_MINIMIZED() ) {
+    j=0;
+    if (isPlaying) {
+		MemLock (OptrToHandle(@MinTrackAndTimeTxt));
+		switch (symbolOptionFlags&(SBG_TRACK|SBG_TIME)) {
+        case (SBG_TRACK|SBG_TIME):
+          if ((optionFlags & FBG_USE_DATABASE) && dbEntry.trackName[track][0]&& (track<=MaxTracks))
+            sprintf (symbolText," %s %2u:%02u ",dbEntry.trackName[track],tracktime/60,tracktime%60);
+          else
+				sprintf (symbolText,LMemDeref(@MinTrackAndTimeTxt),track,tracktime/60,tracktime%60);
+          j=1;
+			 break;
+        case SBG_TRACK:
+          if (track!=lastTrack) {
+            if ((optionFlags & FBG_USE_DATABASE) && dbEntry.trackName[track][0]&& (track<=MaxTracks))
+              sprintf (symbolText,dbEntry.trackName[track]);
+            else
+				  sprintf (symbolText,LMemDeref(@MinTrackTxt),track);
+            j=1;
+          } else {
+            j=2;
+          }
+          break;
+        case SBG_TIME:
+          sprintf (symbolText," %u %2u:%02u ",track, tracktime/60,tracktime%60);
+          j=1;
+          break;
+        default:
+          break;
+      }
+		MemUnlock (OptrToHandle(@MinTrackAndTimeTxt));
+	 } else {
+      if (  (optionFlags & FBG_USE_DATABASE)
+          &&(symbolOptionFlags&SBG_TRACK)
+          && dbEntry.trackName[0][0]
+         ) {
+        sprintf (symbolText," %s ",dbEntry.trackName[0]);
+        j=1;
+      }
+    }
+	 if (j==1) {
+      @call BApp::MSG_BCAPP_REPLACE_VIS_TEXT_MONIKER(symbolText);
+      TitleSet = FALSE;
+    } else
+      if (!TitleSet&&!j) {
+        // set and center application title
+		  MemLock (OptrToHandle(@AppNameTxt));
+		  @call BApp::MSG_BCAPP_REPLACE_VIS_TEXT_MONIKER(LMemDeref(@AppNameTxt));
+		  MemUnlock (OptrToHandle(@AppNameTxt));
+		  TitleSet = TRUE;
+    }
+    lastTrack = track;
+  } else {
+  // no need to restore title if no longer minimized. This is done in
+  // the subclassed method BCPrimary::MSG_GEN_DISPLAY_SET_NOT_MINIMIZED
+    if (winHan)
+      RedrawTime(0);
+    else
+      @send TimeTrigger::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(trackInfoText,VUM_DELAYED_VIA_UI_QUEUE);
+    lastTrack = 255;
+    TitleSet=TRUE;
+  }
+}
+
+
+
+
+/************************************************
+ *	  				        *
+ *		SetTurnMonikers                 *
+ *	  				        *
+ * Fkt:	display the turn monikers in all 3      *
+ *      views                                   *
+ *                                              *
+ ************************************************/
+
+@start TURNGRAPHICRESOURCE, data;
+@include <Art/turnbmap.goh>
+@end TURNGRAPHICRESOURCE;
+
+void _pascal DrawBitmapInWin (WindowHandle win, XYValueAsDWord pos, optr bitmap )
+{
+  GStateHandle gstate;
+  if (bitmap&&win) {
+    gstate = GrCreateState(win);
+    MemLock (OptrToHandle (bitmap));
+    GrDrawBitmap(gstate,DWORD_X(pos),DWORD_Y(pos),LMemDeref(bitmap),0);
+    MemUnlock (OptrToHandle(bitmap));
+    GrDestroyState(gstate);
+  }
+}
+
+void _pascal SetTurnMonikers (word value)
+// sets all turn monikers depending on the turn phase and the current state
+// turnPhase = 8 : Manual update
+{
+  WindowHandle win;
+  optr iconptr,bitmap;
+  XYValueAsDWord pos;
+
+  if (isPlaying) {
+    if (@call BCPrimary::MSG_GEN_DISPLAY_GET_MINIMIZED()) {
+      if (symbolOptionFlags&SBG_ANIMATION) {
+        iconptr = @call BApp::MSG_VIS_FIND_CHILD_AT_POSITION(0);
+        bitmap = 0;
+        if(iconptr) {  // ensure that icon object still exists
+          win = @call iconptr::MSG_VIS_QUERY_WINDOW();
+          switch (value) {
+            case 0 :
+              bitmap = @PrTurn1Bitmap;
+              break;
+            case 2 :
+              if (!pauseState)
+						bitmap = @PrTurn2Bitmap;
+              break;
+            case 4 :
+              if (!pauseState)
+						bitmap = @PrTurn3Bitmap;
+              else
+						bitmap = @PrPauseBitmap;
+				  break;
+            case 6 :
+              if (!pauseState)
+						bitmap = @PrTurn4Bitmap;
+              break;
+          }
+          DrawBitmapInWin (win, 0, bitmap);
+        }
+      }
+    }
+    if (primaryModus==PRIM_MIN) {
+      if (optionFlags&FBG_ANIMATION) {
+        win = @call CDMinTurnGlyph::MSG_VIS_QUERY_WINDOW();
+        pos = @call CDMinTurnGlyph::MSG_VIS_GET_POSITION();
+        bitmap = 0;
+        switch (value) {
+          case 0 :
+            bitmap = @PrTurn1Bitmap;
+            break;
+          case 2 :
+            if (!pauseState)
+              bitmap = @PrTurn2Bitmap;
+            break;
+          case 4 :
+            if (!pauseState)
+              bitmap = @PrTurn3Bitmap;
+				else
+				  bitmap = @PrPauseBitmap;
+            break;
+          case 6 :
+            if (!pauseState)
+              bitmap = @PrTurn4Bitmap;
+            break;
+        }
+        DrawBitmapInWin (win, pos, bitmap);
+      }
+    }
+    if (primaryModus==PRIM_MAX) {
+      if (optionFlags&FBG_ANIMATION) {
+     // MAX-Animation
+        win = @call TurnCDGlyph::MSG_VIS_QUERY_WINDOW();
+        pos = @call TurnCDGlyph::MSG_VIS_GET_POSITION();
+        bitmap = 0;
+        switch (value) {
+          case 0 :
+              bitmap = @Turn1Bitmap;
+            break;
+          case 2 :
+            if (!pauseState)
+              bitmap = @Turn2Bitmap;
+            break;
+          case 4 :
+            if (!pauseState)
+              bitmap = @Turn3Bitmap;
+            else
+              bitmap = @TurnPauseBitmap;
+            break;
+          case 6 :
+            if (!pauseState)
+              bitmap = @Turn4Bitmap;
+            break;
+        }
+        DrawBitmapInWin (win, pos, bitmap);
+      }
+    }
+  }
+  if (value==8) {
+    if (!pauseState) {
+      @call BApp::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@PrTurn1Moniker, VUM_MANUAL);
+      @call CDMinTurnGlyph::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@PrTurn1Moniker, VUM_DELAYED_VIA_UI_QUEUE);
+      @call TurnCDGlyph::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@Turn1Moniker, VUM_DELAYED_VIA_UI_QUEUE);
+    } else {
+      @call CDMinTurnGlyph::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@PrPauseMoniker, VUM_DELAYED_VIA_UI_QUEUE);
+      @call TurnCDGlyph::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@TurnPauseMoniker, VUM_DELAYED_VIA_UI_QUEUE);
+      @call BApp::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@PrPauseMoniker, VUM_MANUAL);
+    }
+    @call BCPrimary::MSG_SPEC_UPDATE_VIS_MONIKER(0,VUM_DELAYED_VIA_UI_QUEUE,0); // JMG 12.01.97
+  }
+// if InfoWindow active!
+    win = @call InfoGrafik::MSG_VIS_QUERY_WINDOW();
+    pos = @call InfoGrafik::MSG_VIS_GET_POSITION();
+    bitmap = 0;
+    switch (value) {
+      case 0 :
+        bitmap = @PrTurn4Bitmap;
+        break;
+      case 2 :
+        bitmap = @PrTurn1Bitmap;
+        break;
+      case 4 :
+        bitmap = @PrTurn2Bitmap;
+        break;
+      case 6 :
+        bitmap = @PrTurn3Bitmap;
+        break;
+    }
+    DrawBitmapInWin (win, pos, bitmap);
+}
+
+
+
+
+/************************************************
+ *	  				        *
+ *		ShowXXXMoniker                  *
+ *	  				        *
+ * Fkt:	change the different button minikers    *
+ *                                              *
+ ************************************************/
+
+void _pascal ShowPlayMoniker (byte mode)
+// 0 = PauseMoniker, 1= PlayMoniker
+{
+ optr		newHelp;
+  static byte playState = 255 ;
+  if (mode)
+    mode = 1;
+  if (playState != mode) {
+	 @send MaxPlayTrigger::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+	 @send PlayTrigger::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+	 if (mode) {
+		newHelp = @MaxPlayHelp;
+		@call MaxPlayTrigger::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@MaxPlayMoniker, VUM_DELAYED_VIA_UI_QUEUE);
+		@call PlayTrigger::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@MinPlayMoniker, VUM_DELAYED_VIA_UI_QUEUE);
+	 } else {
+		newHelp = @MaxPauseHelp;
+		@call MaxPlayTrigger::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@MaxPauseMoniker, VUM_DELAYED_VIA_UI_QUEUE);
+		@call PlayTrigger::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@MinPauseMoniker, VUM_DELAYED_VIA_UI_QUEUE);
+    }
+	 @send MaxPlayTrigger::MSG_META_ADD_VAR_DATA(
+			 (ATTR_GEN_FOCUS_HELP | VDF_SAVE_TO_STATE),
+			 sizeof(optr), &newHelp);
+	 @send PlayTrigger::MSG_META_ADD_VAR_DATA(
+			 (ATTR_GEN_FOCUS_HELP | VDF_SAVE_TO_STATE),
+			 sizeof(optr), &newHelp);
+	 @send MaxPlayTrigger::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+	 @send PlayTrigger::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+	 playState = mode;
+  }
+}
+
+void _pascal ShowEjectMoniker (byte mode)
+// 0 = LoadMoniker, 1= EjectMoniker
+{
+ optr		newHelp;
+  static byte ejectState = 255 ;
+  if (mode)
+    mode = 1;
+  if (ejectState != mode) {
+	 @send MaxEjectTrigger::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+	 @send EjectTrigger::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+	 if (mode) {
+		newHelp = @MaxEjectHelp;
+		@call MaxEjectTrigger::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@MaxEjectMoniker, VUM_DELAYED_VIA_UI_QUEUE);
+      @call EjectTrigger::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@MinEjectMoniker, VUM_DELAYED_VIA_UI_QUEUE);
+    } else {
+		newHelp = @MaxLoadHelp;
+		@call MaxEjectTrigger::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@MaxLoadMoniker, VUM_DELAYED_VIA_UI_QUEUE);
+		@call EjectTrigger::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@MinLoadMoniker, VUM_DELAYED_VIA_UI_QUEUE);
+    }
+	 @send MaxEjectTrigger::MSG_META_ADD_VAR_DATA(
+			 (ATTR_GEN_FOCUS_HELP | VDF_SAVE_TO_STATE),
+			 sizeof(optr), &newHelp);
+	 @send EjectTrigger::MSG_META_ADD_VAR_DATA(
+			 (ATTR_GEN_FOCUS_HELP | VDF_SAVE_TO_STATE),
+			 sizeof(optr), &newHelp);
+	 @send MaxEjectTrigger::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+	 @send EjectTrigger::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+	 ejectState = mode;
+  }
+}
+
+void _pascal ShowHandMoniker (byte mode)
+// 0 = TurnPhase0Moniker, 1= HandMoniker
+{
+  static byte handState = 255 ;
+
+  if (mode)
+    mode = 1;
+  if (handState != mode) {
+    if (mode) {
+      @call TurnCDGlyph::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@MaxHandMoniker, VUM_DELAYED_VIA_UI_QUEUE);
+      @call CDMinTurnGlyph::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@PrHandMoniker, VUM_DELAYED_VIA_UI_QUEUE);
+      @call BApp::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@PrHandMoniker, VUM_MANUAL);
+      @call BCPrimary::MSG_SPEC_UPDATE_VIS_MONIKER(0,VUM_DELAYED_VIA_UI_QUEUE,0);
+    } else {
+      @call TurnCDGlyph::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@Turn1Moniker, VUM_DELAYED_VIA_UI_QUEUE);
+      @call CDMinTurnGlyph::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@PrTurn1Moniker, VUM_DELAYED_VIA_UI_QUEUE);
+      @call BApp::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@PrTurn1Moniker, VUM_MANUAL);
+    }
+    handState = mode;
+  }
+}
+

@@ -57,7 +57,7 @@ minimalLoader	: textLoader VGALoader
 # Libraries
 #
 minimalLibrary	: kernel swap sound net ui isui motif spool text mailbox \
-		  genpc ansic cell chart color compress config hash impex \
+		  genpc ansic cdaudio cell chart color compress config hash impex \
 		  borlandc math pen resolver spline ssmeta styles \
 		  wav game cards spreadsheet parse spell convert \
 		  saver prefLibs accpnt netutils \
@@ -68,7 +68,7 @@ minimalLibrary	: kernel swap sound net ui isui motif spool text mailbox \
 		  winword8 zlib dirlist minizip idialc eps impex_libs \
 		  thumbdb ftplib flllib sitelist int8087 intx87\
 		  basicdb gridlib gsol treplib
-# cdaudio ascii
+#ascii
 
 prefLibs	: prefvid preftd \
 		  prefsnd prefos prefmous preflo preflf prefkbd \
@@ -116,8 +116,7 @@ minimalSavers	: lol blackhole blank bobbin circles dribble dust \
 minimalTools	: prntscrn
 
 otherEnsemble	: conview reader term tedit geofile dirls  \
-		   graphvwr macror dump perf bim ffind
-# bbxcd
+		   graphvwr macror dump perf bim ffind bbxcd
 #geocon3
 #webbox
 
@@ -132,7 +131,8 @@ otherEnsemble	: conview reader term tedit geofile dirls  \
 
 minimalDriver	: nimbus ms4 ntfat os2 cdrom stream dri gdi keyboard modem gdipointer \
 		  standard winnt parallel serial disk vidmem svga \
-		  vga vga8 vga16 ega cga mcga hgc att6300 dscga printerDriver \
+		  vga vga8 vga15 vga16 vga24 ega cga mcga hgc att6300 dscga \
+		  printerDriver \
 		  ps2 msys msser msbus kbmouse absgen genmouse emm extmem \
 		  xms filestr nonts sblaster comm spooltd \
 		  vmtree filedd logibus logiser dma mslf kbd_drivers \
@@ -600,8 +600,14 @@ Installed/Driver/Video/VGAlike/VGA:	MAKEDRV
 vga8	: Installed/Driver/Video/VGAlike/VGA8
 Installed/Driver/Video/VGAlike/VGA8:	MAKEDRV
 
+vga15	: Installed/Driver/Video/VGAlike/VGA15
+Installed/Driver/Video/VGAlike/VGA15:	MAKEDRV
+
 vga16	: Installed/Driver/Video/VGAlike/VGA16
 Installed/Driver/Video/VGAlike/VGA16:	MAKEDRV
+
+vga24	: Installed/Driver/Video/VGAlike/VGA24
+Installed/Driver/Video/VGAlike/VGA24:	MAKEDRV
 
 etherodi	: Installed/Driver/Socket/EtherODI
 Installed/Driver/Socket/EtherODI:	socket accpnt MAKEDRV
@@ -1410,13 +1416,13 @@ ffind	: Installed/Appl/Breadbox/FFind
 Installed/Appl/Breadbox/FFind:			ui ansic text MAKEAPPL
 
 cdaudio	: Installed/Library/Breadbox/CDAudio
-Installed/Library/Breadbox/CDAudio:		MAKELIB
+Installed/Library/Breadbox/CDAudio:		ansic MAKELIB
 
 cdados	: Installed/Library/Breadbox/Cdados
 Installed/Library/Breadbox/Cdados:		MAKELIB
 
-bbxcd	: Installed/Appl/Breadbox/Bbxcd
-Installed/Appl/Breadbox/Bbxcd:			ui ansic sound cdaudio MAKEAPPL
+bbxcd	: Installed/Appl/Breadbox/bbxcd
+Installed/Appl/Breadbox/bbxcd:			ui ansic sound cdaudio MAKEAPPL
 
 webbox	: Installed/Appl/Breadbox/Webbox
 Installed/Appl/Breadbox/Webbox:			ui ansic text spool spell \
