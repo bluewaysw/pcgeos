@@ -1,0 +1,174 @@
+#
+# $Header: Makefile.library,v 2.3 87/10/16 10:41:16 brent Exp $ SPRITE (Berkeley)
+#
+
+
+# Which subdirectory are we in?  (.e.g., /sprite, /sprite/att, ...)
+LIBROOT = /sprite
+MODULE = tcl
+
+ROOT = /sprite
+SPRITEHOME = /sprite
+LIB =	  ${LIBROOT}/lib
+LINT =	  ${LIB}/lint
+H = /sprite/lib/include
+
+KERNELLINT = ${ROOT}/src/kernel/Lint
+
+# If ${H} is /sprite/att/lib/include, ${OTHERH} should be 
+# /sprite/lib/include.  ${OTHERLINT} should be set accordingly.
+# ... obsolete, both are searched by default.  fix makemake not to use
+# OTHERH.  How about lint?  ... FD 8/26/87
+OTHERH = 
+OTHERLINT = 
+
+IFLAGS =  -I.
+DBX = 	  -g
+PROFILE = -p -DPROFILE
+PROFDIR=  ./Profiled
+DFLAGS =
+CFLAGS =  ${DBX} -O ${IFLAGS} ${DFLAGS}
+PCFLAGS = ${DBX} ${IFLAGS} ${DFLAGS} ${PROFILE}
+AFLAGS =  
+CTFLAGS = -t
+PPFLAGS = -E ${IFLAGS} ${DFLAGS}
+
+CC = cc -m68010
+AS = as -m68010
+LD = ld
+
+UPDATE = update
+DEPEND = depend.csh
+DEPENDSCRIPT = ${SPRITEHOME}/lib/ex.depend
+
+.SUFFIXES: .po
+
+OTHEROBJS =
+POTHEROBJS =
+
+OBJS = tclBasic.o tclCmdAH.o tclCmdIZ.o tclExpr.o tclProc.o tclUtil.o
+
+POBJS = tclBasic.po tclCmdAH.po tclCmdIZ.po tclExpr.po tclProc.po tclUtil.po
+
+CSRCS = tclBasic.c tclCmdAH.c tclCmdIZ.c tclExpr.c tclProc.c tclUtil.c
+
+ASMSRCS = 
+
+SRCS = ${CSRCS} ${ASMSRCS}
+
+HDRS = tcl.h tclInt.h version.h
+# makemake.library will make EXTERNHDRS  undefined if
+# there are no external header files.
+EXTERNHDRS = tcl.h version.h
+
+LINTFLAGS = ${IFLAGS} -u
+# For att, make LINTLIBS include libc.ln, and take out the LINTSRCS 
+# mumbo-jumbo.
+LINTLIBS = ${LINT}/llib-lc.ln 
+ALLSRCS = ${SRCS} ${HDRS} Makefile
+
+${MODULE}.a: ${OBJS} ${OTHEROBJS}
+	rm -f ${MODULE}.a
+	ar cr ${MODULE}.a ${OBJS} ${OTHEROBJS}
+	ranlib ${MODULE}.a
+
+tclTest: ${OBJS} tcl.o
+	$(CC) ${CFLAGS} ${OBJS} tcl.o -o tclTest
+
+profile: ${PROFDIR}/${MODULE}.a
+
+${PROFDIR}/${MODULE}.a : ${POBJS} ${POTHEROBJS}
+	rm -f ${PROFDIR}/${MODULE}.a
+	ar cr ${PROFDIR}/${MODULE}.a ${POBJS} ${POTHEROBJS}
+	ranlib ${PROFDIR}/${MODULE}.a
+
+tags: ${HDRS} ${CSRCS}
+	rm -f tags
+	ctags ${CTFLAGS} ${HDRS} ${CSRCS}
+
+.c.po:
+	rm -f $*.po
+	-mv $*.o $*.so
+	${CC} -c ${PCFLAGS} $*.c
+	mv $*.o $*.po
+	-mv $*.so $*.o
+.c.o:
+	rm -f $*.o
+	${CC} ${CFLAGS} -c $*.c
+
+.s.o:
+	rm -f $*.o
+	/lib/cpp ${PPFLAGS} $*.s > $*.pp
+	${AS} ${AFLAGS} -o $*.o $*.pp
+	rm -f $*.pp
+
+# install: ${LIB}/lib${MODULE}.a installhdrs installsrc ${LINT}/${MODULE}.ln
+install: ${LIB}/lib${MODULE}.a installhdrs instlint
+
+installhdrs!
+#ifdef EXTERNHDRS
+	@${UPDATE} ${EXTERNHDRS} ${H}
+#endif
+		  
+${LIB}/lib${MODULE}.a: ${MODULE}.a
+	rm -f ${LIB}/lib${MODULE}.a
+	cp ${MODULE}.a ${LIB}/lib${MODULE}.a
+	ranlib ${LIB}/lib${MODULE}.a
+
+instlint: ${LINT}/llib-l${MODULE}.ln
+
+# The line for STUBS is used only in libc at present, but it is easier
+# to include it in the prototype and insert *Stub*.s from within
+# makemake.library than to figure out which files to insert from
+# within a libc-specific file such as Makefile.sed or Makefile.ex.
+
+STUBS = 
+
+${LINT}/llib-l${MODULE}.ln: ${CSRCS}
+	rm -f ${LINT}/llib-l${MODULE}.ln
+	lint ${LINTFLAGS} -I${H}/kernel -C${MODULE} ${CSRCS}
+	mv llib-l${MODULE}.ln ${LINT}/llib-l${MODULE}.ln
+
+lint:	${CSRCS}  ${HDRS} ${LINTLIBS}
+	rm -f lint
+	lint ${LINTFLAGS} ${CSRCS} ${LINTLIBS} > lint
+
+calls: ${CSRCS}
+	/usr/local/calls ${IFLAGS} ${CSRCS} > calls
+
+clean:
+	rm -f lint *.o
+
+#include <rdist.mk>
+
+DEPFLAGS = -p
+DEPFILE = Makefile
+#include <makedepend.mk>
+
+# below is automatically generated
+# DO NOT DELETE THIS LINE -- make depend depends on it.
+
+tcl.o: /sprite/att/lib/include/stdio.h /sprite/att/lib/include/sys/time.h
+tcl.o: tcl.h
+tclBasic.o: /sprite/att/lib/include/stdio.h /sprite/att/lib/include/ctype.h
+tclBasic.o: tclInt.h tcl.h
+tclCmdAH.o: /sprite/att/lib/include/ctype.h /sprite/att/lib/include/stdio.h
+tclCmdAH.o: /sprite/att/lib/include/sys/types.h
+tclCmdAH.o: /sprite/att/lib/include/sys/sysmacros.h
+tclCmdAH.o: /sprite/att/lib/include/sys/file.h
+tclCmdAH.o: /sprite/att/lib/include/sys/stat.h tclInt.h tcl.h
+tclCmdIZ.o: /sprite/att/lib/include/ctype.h /sprite/att/lib/include/signal.h
+tclCmdIZ.o: /sprite/att/lib/include/stdio.h
+tclCmdIZ.o: /sprite/att/lib/include/sys/types.h
+tclCmdIZ.o: /sprite/att/lib/include/sys/sysmacros.h
+tclCmdIZ.o: /sprite/att/lib/include/sys/errno.h
+tclCmdIZ.o: /sprite/att/lib/include/sys/file.h
+tclCmdIZ.o: /sprite/att/lib/include/sys/stat.h
+tclCmdIZ.o: /sprite/att/lib/include/sys/wait.h
+tclCmdIZ.o: /sprite/att/lib/include/sys/time.h
+tclCmdIZ.o: /sprite/att/lib/include/sys/resource.h tclInt.h tcl.h
+tclExpr.o: /sprite/att/lib/include/stdio.h /sprite/att/lib/include/ctype.h
+tclExpr.o: tcl.h
+tclProc.o: /sprite/att/lib/include/stdio.h /sprite/att/lib/include/ctype.h
+tclProc.o: tclInt.h tcl.h
+tclUtil.o: /sprite/att/lib/include/ctype.h tcl.h

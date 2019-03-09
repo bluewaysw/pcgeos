@@ -1,0 +1,68 @@
+# @(#)Makefile 4.22 (Berkeley) 3/11/85
+
+CPP		= /lib/cpp
+
+ISIOBJ		= getuniverse.o setuniverse.o mmap.o munmap.o getmachname.o \
+                  lockf.o plock.o punlock.o highpri.o normalpri.o ulock.o \
+                  getmachtype.o
+
+NFSOBJ		= async_daemon.o fstatfs.o getdirentries.o getdomainname.o \
+                  getfh.o nfssvc.o setdomainname.o statfs.o unmount.o
+
+OBJS		= Ovfork.o Ovadvise.o \
+                  accept.o access.o acct.o \
+                  adjtime.o bind.o brk.o \
+                  cerror.o chdir.o chmod.o chown.o chroot.o close.o connect.o \
+                  creat.o \
+                  dup.o dup2.o \
+                  execl.o execle.o exect.o execv.o execve.o _exit.o \
+                  fchmod.o fchown.o fcntl.o flock.o fork.o fstat.o fsync.o \
+                  ftruncate.o \
+                  getdtablesize.o getegid.o geteuid.o getgid.o \
+                  getgroups.o gethostid.o gethostname.o getitimer.o \
+                  getrlimit.o getpagesize.o getpeername.o getpgrp.o getpid.o \
+                  getppid.o getpriority.o getrusage.o getsockname.o \
+                  getsockopt.o gettimeofday.o getuid.o \
+                  ioctl.o \
+                  kill.o killpg.o \
+                  link.o listen.o lseek.o lstat.o \
+                  mkdir.o mknod.o mount.o \
+                  open.o \
+                  pipe.o profil.o ptrace.o \
+                  quotactl.o \
+                  read.o readlink.o readv.o reboot.o recv.o recvfrom.o \
+                  recvmsg.o rename.o rmdir.o \
+                  sbrk.o select.o send.o sendmsg.o sendto.o setregid.o \
+                  setgroups.o sethostid.o sethostname.o setitimer.o \
+                  setrlimit.o setpgrp.o setpriority.o setsockopt.o \
+                  settimeofday.o setreuid.o shutdown.o sigblock.o sigpause.o \
+                  sigreturn.o sigsetmask.o sigstack.o sigvec.o socket.o \
+                  socketpair.o stat.o swapon.o symlink.o sync.o syscall.o \
+                  truncate.o \
+                  umask.o unlink.o utimes.o \
+                  vhangup.o \
+                  wait.o wait3.o write.o writev.o \
+                  ${ISIOBJ} ${NFSOBJ}
+
+.c.o		: .EXPORTSAME
+	${CPP} -E $*.c | ${AS} -20 -o $*.o
+.SUFFIXES	: .so
+.c.so		: .EXPORTSAME
+	${CPP} -E $*.c > sys$$$$
+	${AS} -20 -o $@ sys$$$$
+	rm -f sys$$$$
+	
+#include    <makelib.mk>
+#ifdef sun
+.MAIN		: libsunsys.a
+#else
+.MAIN		: libsys.a
+#endif
+
+libsys.a	: libsys.a(${OBJS}) .EXPORTSAME	    	    	    MAKELIB
+libsunsys.a	: libsunsys.a(${OBJS:S/.o$/.so/g}) .EXPORTSAME	    MAKELIB
+
+sys.o		: $(OBJS) .EXPORTSAME
+	ld -o $(.TARGET) -r $(.ALLSRC)
+
+${OBJS}		: SYS.h NARG.h

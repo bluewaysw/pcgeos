@@ -1,0 +1,198 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Berkeley Softworks 1989 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Swat -- Definitions for BSW Hardware Assist
+FILE:		bsw.def
+
+AUTHOR:		Adam de Boor, Sep 17, 1989
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Adam	09/17/89	Initial revision
+
+
+DESCRIPTION:
+	Interface definitions for the BSW Hardware Assist, also known
+	as the Dave Board.
+		
+	$Id: bsw.def,v 2.2 92/04/13 00:13:09 adam Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+ifdef BSW
+;
+; Definitions for special locations in BSW Hardware Assist. These locations
+; are allocated in the top 16 (well, 32 actually) bytes of the stub RAM,
+; so we can just use a CS override to play with them.
+; XXX: Won't work for protected mode.
+;
+stubRegisters		equ 03ff0h
+
+StubRegisters	struct
+    SR_buttonReset	byte		; Write resets BUTTON-PRESSED bit
+    SR_tbAddr		word	 	; WORD: address for trace RAM.
+					; b0-b12 are offset into RAM block.
+					; b13 indicates address wrapped since
+					; last reset.
+    SR_breakCount	word		; Skip count for breakpoint.
+					; Initialized to 65536-<count>, where
+					; <count> is the number of times
+					; the breakpoint should be skipped.
+    SR_control		byte		; Control/status register (see SC
+					; bits, below)
+    SR_dataComp		byte		; Compare register for data bus
+    SR_addrLowComp	byte		; Compare register for a0-a7
+    SR_addrHighComp	byte		; Compare register for a8-a15
+    SR_statComp		byte		; Compare register for a16-a19,
+					;  S0, S1, S2 and AEN
+    SR_optionComp	byte		; Compare register for optional
+					;  signals:
+					;	b0	IO CHK
+					;	b1	DACK0 (REFRESH)
+					;	b2	DACK1 or IRQ2
+					;	b3	DACK2 or IRQ3
+					;	b4	DACK3 or IRQ4
+					;	b5	DRQ1 or IRQ5
+					;	b6	DRQ2 or IRQ6
+					;	b7	DRQ3 or IRQ7
+					;
+    SR_dataMask		byte		; Mask register for data bus (1 =>
+					;  significant)
+    SR_addrLowMask	byte		; Mask register for a0-a7
+    SR_addrHighMask	byte		; Mask register for a8-a15
+    SR_statMask		byte		; Mask register for a16-a19, S0, S1,
+					;  S2 and AEN.
+    SR_optionMask	byte		; Mask register for optional signals
+StubRegisters	ends
+
+;
+; Bits for SR_control
+;
+SC_WRITE_PROT	=	00000001b	; 1 => write protect RAM
+SC_TB_ON	=	00000010b	; 1 => trace buffer enabled
+SC_BP_ON	=	00000100b	; 1 => breakpoint armed
+SC_RESET	=	00001000b	; 1 => all reset. MUST BE
+				    	; WRITTEN TO 0 WHEN DONE.
+SC_BUTTON_EVENT	=	00010000b	; 1 => button caused NMI
+SC_BREAK_EVENT	=	00100000b	; 1 => breakpoint caused NMI
+
+;
+; Definitions for enabling/disabling the IO Channel Check NMI. Port 61h
+; has many uses, one of which is the enabling of this NMI. The enable is
+; bit 5 and is active low... (q.v. IBM Personal Computer Technical Reference
+; p. 1-32)
+;
+IOCDPORT	= 61h
+IOCHKDISABLE	= 20h
+;
+; Define ENABLE/PROTECT macros to diddle with the control register for the
+; board w/o modifying the current condition codes.
+; XXX: use LAHF and SAHF ?
+;
+WRITE_ENABLE	macro
+		pushf
+		and	cs:stubRegisters.SR_control, NOT SC_WRITE_PROT
+		popf
+		endm
+
+WRITE_PROTECT	macro
+		pushf
+		or	cs:stubRegisters.SR_control, SC_WRITE_PROT
+		popf
+		endm
+;
+; PUSH_ENABLE/POP_PROTECT are similar to WRITE_ENABLE/WRITE_PROTECT, except they
+; maintain the state of the write-protection of the board. I.e. they do not
+; unilaterally write-protect the board on exit. They are guaranteed to be used
+; in the proper position so they may safely push things on the stack if need be.
+; 
+; May trash ax if needed, but not the flags.
+; 
+PUSH_ENABLE	macro
+		mov	al, cs:stubRegisters.SR_control
+		push	ax
+		WRITE_ENABLE
+		endm
+
+POP_PROTECT	macro
+		pop	ax
+		mov	cs:stubRegisters.SR_control, al
+		endm	
+;
+; Discard state saved by PUSH_ENABLE -- used in ComInterrupt...
+; 
+DISCARD_PROTECT	macro
+		inc	sp
+		inc	sp
+		endm
+;
+; Define SAVE_STATE and RESTORE_STATE macros to handle enter/exit to/from our
+; state. Both thrash the flags.
+;
+SAVE_STATE	macro
+		;;
+		;; Turn off write protection and the trace buffer
+		;; 
+		and	cs:stubRegisters.SR_control, NOT (SC_WRITE_PROT or SC_TB_ON)
+		;;
+		;; Disable the I/O Channel Check NMI
+		;;
+		push	ax
+		in	al, IOCDPORT	; Fetch port 1
+		or	al, IOCHKDISABLE ; disable I/O CHK (active low)
+		out	IOCDPORT, al
+		pop	ax
+		endm
+
+RESTORE_STATE	macro
+		;;
+		;; Enable the I/O Channel Check NMI
+		;;
+		push	ax
+		in	al, IOCDPORT	; Fetch port 1
+		and	al, NOT IOCHKDISABLE ; enable I/O CHK (active low)
+		out	IOCDPORT, al
+		pop	ax
+		;;
+		;; Protect our RAM and turn on the trace buffer when we get
+		;; out of here.
+		;; 
+		or	cs:stubRegisters.SR_control, SC_WRITE_PROT or SC_TB_ON
+		endm
+
+INIT_HARDWARE	macro
+		call	BSW_Init
+		endm
+
+;
+; Deal with reseting the button upon receiving an NMI
+;
+CHECK_NMI	macro
+		local	notButton
+		;
+		; See if it's an I/O Channel Check
+		;
+		push	ax
+		in	al, 62h
+		test	al, 40h
+		jz	notButton
+		;
+		; Reset the button, in case that's what caused it.
+		; Swat will deal with the hardware breakpoint...
+		;
+		mov	cs:stubRegisters.SR_buttonReset, al
+notButton:
+		pop	ax
+		endm
+
+stubInit	segment
+;
+; Initialize hardware assist
+;
+	global 	BSW_Init:far
+stubInit	ends
+
+endif

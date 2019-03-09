@@ -1,0 +1,330 @@
+#!/usr/public/pmake -f
+# 
+# 	Copyright (c) Berkeley Softworks 1988 -- All Rights Reserved
+#
+# Makefile for Swat.
+#
+#	$Id: Makefile,v 1.17 89/06/17 22:06:26 adam Exp $
+#
+#include	<geos.mk>
+#include	<tools.mk>
+
+OBJS		= abort.o break.o buf.o cache.o cmd.o cmdAM.o cmdNZ.o curses.o\
+                  expr.o event.o file.o gc.o handle.o hash.o help.o history.o \
+                  i86Opcodes.o ibm.o ibmCache.o ibmCmd.o ibm86.o malloc.o \
+                  patient.o rpc.o shell.o string.o swat.o sym.o table.o \
+                  tclDebug.o type.o ui.o value.o var.o vector.o
+HDRS		= break.h buf.h cache.h cmd.h event.h expr.h file.h geode.h \
+                  geos.h handle.h hash.h i86Opcodes.h ibm.h ibmInt.h patient.h\
+                  private.h rpc.h string.h swat.h sym.h table.h tclDebug.h \
+                  type.h ui.h value.h var.h vector.h
+
+SRCS		= $(OBJS:Nabort.o:Nexpr.o:S/.o$/.c/g)
+TCLSRCS		= call.tcl curses.tcl dcall.tcl dos.tcl filehandle.tcl \
+                  format-inst.tcl gloss.tcl heap.tcl help.tcl ibrk.tcl int.tcl\
+                  istep.tcl kproc.tcl lisp.tcl loop.tcl memory.tcl patch.tcl\
+                  pobject.tcl print.tcl process.tcl ps.tcl pstring.tcl \
+                  region.tcl showcalls.tcl smatch.tcl stack.tcl swat.tcl \
+		  thread.tcl timing.tcl top-level.tcl unix.tcl user.tcl
+
+CFLAGS		= -g -O -W -Wreturn-type -Wunused -DISSWAT \
+		  -I. -I$(INSTALL_DIR) -I- \
+                  -I. -I$(INSTALL_DIR) \
+                  $(LIBDIRS:S/^/-I/g) $(LIBDIRS:S%^%-I$(INSTALL_DIR)/%g) \
+                  -I../include -I$(INSTALL_DIR:H)/include -I$(PMAKELIB)/lst \
+                  -fstrength-reduce -fcombine-regs \
+                  $(XCFLAGS)
+XCFLAGS		?= 
+
+CC		= gcc 
+YACC		= bison
+YFLAGS		= -vt
+
+PMAKELIB	= $(ROOT_DIR)/Tools/pmake/lib
+
+LIBDIRS		= tcl curses hist sys
+
+#
+# Define search paths for the various types of files.
+#
+.SUFFIXES	: .tcl
+.NULL		: .out
+
+.PATH.a		: $(PMAKELIB)/lst $(LIBDIRS) $(LIBDIRS:S%^%$(INSTALL_DIR)/%g)
+.PATH.h		: $(PMAKELIB)/lst $(LIBDIRS:Nsys) \
+                  $(LIBDIRS:Nsys:S%^%$(INSTALL_DIR)/%g) \
+                  ../include $(INSTALL_DIR:H)/include
+.PATH.c		: $(INSTALL_DIR)
+.PATH.h		: . $(INSTALL_DIR)
+.PATH.y		: $(INSTALL_DIR)
+.PATH.s		: $(INSTALL_DIR)
+.PATH.tcl	: lib $(INSTALL_DIR)/lib
+
+#
+# Bison-specific transformation rules
+#
+.y.c		: .EXPORTSAME
+	$(YACC) $(YFLAGS) $(.IMPSRC)
+	mv $(.PREFIX).tab.c $(.TARGET)
+
+.y.o		: .EXPORTSAME
+	$(YACC) $(YFLAGS) $(.IMPSRC)
+	mv $(.PREFIX).tab.c $(.PREFIX).c
+	$(CC) $(CFLAGS) -c $(.PREFIX).c
+
+.SUFFIXES:.i
+.c.i		:
+	$(CC) -E $(CFLAGS) $(.IMPSRC) > $(.TARGET)
+
+.c.s		:
+	$(CC) -S $(CFLAGS) $(.IMPSRC)
+
+.MAIN		: swat
+
+#ifdef sun
+MAKEDOC		= makedoc
+#else
+MAKEDOC		= makedoc.isi
+#endif
+
+swat.isi	: $(OBJS) version.c -ltcl -llst -lcurses -ltermcap -lhist \
+                  -lsys lib/DOC.new .NOEXPORT
+	$(ISIREMOTE) $(CC) $(CFLAGS) $(.LIBS) -o $(.TARGET) \
+	    -DUSERNAME=\"$(USER)\" -DHOSTNAME=\"`hostname`\" \
+	    $(.ALLSRC)
+
+swat		: $(OBJS) version.c -ltcl -llst -lcurses -ltermcap -lhist \
+                  -lsunsys lib/DOC.new .NOEXPORT
+	$(SUNREMOTE) $(CC) $(CFLAGS) $(.LIBS) -o $(.TARGET) \
+	    -DUSERNAME=\"$(USER)\" -DHOSTNAME=\"`hostname`\" \
+	    $(.ALLSRC)
+
+lib/DOC.new	: .INVISIBLE .NOEXPORT $(SRCS) $(TCLSRCS) $(MAKEDOC)
+	$(MAKEDOC) $(.ALLSRC) > $(.TARGET)
+	
+makedoc		: .INVISIBLE				.NOEXPORT
+makedoc.isi	: .INVISIBLE makedoc.o			.NOEXPORT
+	gcc -o $(.TARGET) makedoc.o
+
+sinstall install:: swat swat.isi .NOEXPORT
+	rdist -c swat silicon:/usr/public/swat
+	rdist -c swat.isi lithium:/usr/public/swat
+	install -m 444 lib/DOC.new /staff/pcgeos/Tools/swat/lib/DOC
+	install -m 444 -c swat.conf /n/silicon/public/swat.conf
+	install -m 444 -c swat.conf /n/lithium/public/swat.conf
+
+install		:: .NOEXPORT .MAKE
+	cd Stub; $(MAKE) install
+
+TAGS		: $(SRCS) $(HDRS) tcl/*.[ch] curses/*.[ch] hist/*.[ch] \
+                  .NOEXPORT
+	etags -wt $(.ALLSRC)
+
+curses.ui	: swat curses.o -lcurses -ltermcap
+	ld -e _Curses_Init -A swat -o $(.TARGET) $(.ALLSRC:Nswat)
+
+depend		: $(SRCS) expr.c .NOEXPORT
+	CC=$(CC) makedepend -s'# DO NOT DELETE THIS LINE' $(CFLAGS:M-[ID]*) \
+	    $(.ALLSRC)
+	fixsysinc
+
+# DO NOT DELETE THIS LINE -- 'depend' depends on it
+
+break.o: swat.h /usr/include/assert.h lst.h sprite.h tcl.h
+break.o: /usr/include/stdio.h /usr/include/strings.h ibm.h handle.h geos.h
+break.o: table.h hash.h geode.h /usr/include/sys/types.h
+break.o:  /usr/include/sys/param.h
+break.o:  /usr/include/sys/signal.h break.h cmd.h
+break.o: sym.h event.h expr.h private.h rpc.h /usr/include/sys/time.h type.h
+buf.o: swat.h /usr/include/assert.h lst.h sprite.h tcl.h /usr/include/stdio.h
+buf.o: /usr/include/strings.h ibm.h handle.h geos.h table.h hash.h geode.h
+buf.o: /usr/include/sys/types.h 
+buf.o: /usr/include/sys/param.h 
+buf.o: /usr/include/sys/signal.h buf.h sprite.h
+cache.o: swat.h /usr/include/assert.h lst.h sprite.h tcl.h
+cache.o: /usr/include/stdio.h /usr/include/strings.h ibm.h handle.h geos.h
+cache.o: table.h hash.h geode.h /usr/include/sys/types.h
+cache.o:  /usr/include/sys/param.h
+cache.o:  /usr/include/sys/signal.h cache.h
+cmd.o: swat.h /usr/include/assert.h lst.h sprite.h tcl.h /usr/include/stdio.h
+cmd.o: /usr/include/strings.h ibm.h handle.h geos.h table.h hash.h geode.h
+cmd.o: /usr/include/sys/types.h 
+cmd.o: /usr/include/sys/param.h 
+cmd.o: /usr/include/sys/signal.h break.h cmd.h sym.h event.h expr.h private.h
+cmd.o: type.h value.h buf.h sprite.h /usr/include/ctype.h
+cmdAM.o: swat.h /usr/include/assert.h lst.h sprite.h tcl.h
+cmdAM.o: /usr/include/stdio.h /usr/include/strings.h ibm.h handle.h geos.h
+cmdAM.o: table.h hash.h geode.h /usr/include/sys/types.h
+cmdAM.o:  /usr/include/sys/param.h
+cmdAM.o:  /usr/include/sys/signal.h cmd.h sym.h
+cmdAM.o: private.h type.h buf.h sprite.h /usr/include/ctype.h
+cmdAM.o: /usr/include/sys/file.h /usr/include/sys/fcntl.h
+cmdAM.o: /usr/include/sys/stat.h
+cmdNZ.o: swat.h /usr/include/assert.h lst.h sprite.h tcl.h
+cmdNZ.o: /usr/include/stdio.h /usr/include/strings.h ibm.h handle.h geos.h
+cmdNZ.o: table.h hash.h geode.h /usr/include/sys/types.h
+cmdNZ.o:  /usr/include/sys/param.h
+cmdNZ.o:  /usr/include/sys/signal.h buf.h
+cmdNZ.o: sprite.h cmd.h sym.h expr.h private.h rpc.h /usr/include/sys/time.h
+cmdNZ.o: type.h value.h var.h /usr/include/ctype.h /usr/include/sys/file.h
+cmdNZ.o: /usr/include/sys/fcntl.h
+curses.o: swat.h /usr/include/assert.h lst.h sprite.h tcl.h
+curses.o: /usr/include/stdio.h /usr/include/strings.h ibm.h handle.h geos.h
+curses.o: table.h hash.h geode.h /usr/include/sys/types.h
+curses.o:  /usr/include/sys/param.h
+curses.o:  /usr/include/sys/signal.h buf.h
+curses.o: sprite.h cmd.h sym.h rpc.h /usr/include/sys/time.h ui.h curses.h
+curses.o: /usr/include/sgtty.h /usr/include/sys/ioctl.h
+curses.o: /usr/include/sys/ttychars.h /usr/include/sys/ttydev.h
+curses.o: /usr/public/lib/gcc-include/stdarg.h /usr/include/ctype.h
+curses.o: /usr/include/signal.h
+event.o: swat.h /usr/include/assert.h lst.h sprite.h tcl.h
+event.o: /usr/include/stdio.h /usr/include/strings.h ibm.h handle.h geos.h
+event.o: table.h hash.h geode.h /usr/include/sys/types.h
+event.o:  /usr/include/sys/param.h
+event.o:  /usr/include/sys/signal.h cmd.h sym.h
+event.o: event.h private.h /usr/include/ctype.h
+gc.o: swat.h /usr/include/assert.h lst.h sprite.h tcl.h /usr/include/stdio.h
+gc.o: /usr/include/strings.h ibm.h handle.h geos.h table.h hash.h geode.h
+gc.o: /usr/include/sys/types.h 
+gc.o: /usr/include/sys/param.h 
+gc.o: /usr/include/sys/signal.h cmd.h sym.h type.h mallint.h
+gc.o: /usr/include/malloc.h /usr/include/sys/time.h
+gc.o: /usr/include/sys/resource.h
+handle.o: swat.h /usr/include/assert.h lst.h sprite.h tcl.h
+handle.o: /usr/include/stdio.h /usr/include/strings.h ibm.h handle.h geos.h
+handle.o: table.h hash.h geode.h /usr/include/sys/types.h
+handle.o:  /usr/include/sys/param.h
+handle.o:  /usr/include/sys/signal.h cmd.h sym.h
+handle.o: event.h rpc.h /usr/include/sys/time.h type.h
+handle.o: /usr/public/lib/gcc-include/stddef.h
+hash.o: swat.h /usr/include/assert.h lst.h sprite.h tcl.h
+hash.o: /usr/include/stdio.h /usr/include/strings.h ibm.h handle.h geos.h
+hash.o: table.h hash.h geode.h /usr/include/sys/types.h
+hash.o:  /usr/include/sys/param.h
+hash.o:  /usr/include/sys/signal.h
+help.o: swat.h /usr/include/assert.h lst.h sprite.h tcl.h
+help.o: /usr/include/stdio.h /usr/include/strings.h ibm.h handle.h geos.h
+help.o: table.h hash.h geode.h /usr/include/sys/types.h
+help.o:  /usr/include/sys/param.h
+help.o:  /usr/include/sys/signal.h cmd.h sym.h
+help.o: /usr/include/sys/file.h /usr/include/sys/fcntl.h
+history.o: swat.h /usr/include/assert.h lst.h sprite.h tcl.h
+history.o: /usr/include/stdio.h /usr/include/strings.h ibm.h handle.h geos.h
+history.o: table.h hash.h geode.h /usr/include/sys/types.h
+history.o:  /usr/include/sys/param.h
+history.o:  /usr/include/sys/signal.h cmd.h sym.h
+history.o: hist.h
+i86Opcodes.o: i86Opcodes.h
+ibm.o: swat.h /usr/include/assert.h lst.h sprite.h tcl.h /usr/include/stdio.h
+ibm.o: /usr/include/strings.h ibm.h handle.h geos.h table.h hash.h geode.h
+ibm.o: /usr/include/sys/types.h 
+ibm.o: /usr/include/sys/param.h 
+ibm.o: /usr/include/sys/signal.h cmd.h sym.h event.h ibmInt.h cache.h rpc.h
+ibm.o: /usr/include/sys/time.h private.h type.h ui.h var.h
+ibm.o: /usr/include/sys/file.h /usr/include/sys/fcntl.h
+ibm.o: /usr/include/sys/dir.h /usr/include/ctype.h
+ibm.o: /usr/public/lib/gcc-include/stddef.h
+ibmCmd.o: swat.h /usr/include/assert.h lst.h sprite.h tcl.h
+ibmCmd.o: /usr/include/stdio.h /usr/include/strings.h ibm.h handle.h geos.h
+ibmCmd.o: table.h hash.h geode.h /usr/include/sys/types.h
+ibmCmd.o:  /usr/include/sys/param.h
+ibmCmd.o:  /usr/include/sys/signal.h cmd.h sym.h
+ibmCmd.o: event.h ibmInt.h cache.h rpc.h /usr/include/sys/time.h private.h
+ibmCmd.o: type.h /usr/include/sys/file.h /usr/include/sys/fcntl.h
+ibm86.o: swat.h /usr/include/assert.h lst.h sprite.h tcl.h
+ibm86.o: /usr/include/stdio.h /usr/include/strings.h ibm.h handle.h geos.h
+ibm86.o: table.h hash.h geode.h /usr/include/sys/types.h
+ibm86.o:  /usr/include/sys/param.h
+ibm86.o:  /usr/include/sys/signal.h event.h
+ibm86.o: i86Opcodes.h private.h sym.h type.h var.h
+malloc.o: mallint.h /usr/include/malloc.h /usr/include/errno.h
+malloc.o: /usr/include/sys/errno.h /usr/public/lib/gcc-include/stddef.h
+patient.o: swat.h /usr/include/assert.h lst.h sprite.h tcl.h
+patient.o: /usr/include/stdio.h /usr/include/strings.h ibm.h handle.h geos.h
+patient.o: table.h hash.h geode.h /usr/include/sys/types.h
+patient.o:  /usr/include/sys/param.h
+patient.o:  /usr/include/sys/signal.h break.h
+patient.o: cmd.h sym.h event.h private.h type.h
+rpc.o: swat.h /usr/include/assert.h lst.h sprite.h tcl.h /usr/include/stdio.h
+rpc.o: /usr/include/strings.h ibm.h handle.h geos.h table.h hash.h geode.h
+rpc.o: /usr/include/sys/types.h 
+rpc.o: /usr/include/sys/param.h 
+rpc.o: /usr/include/sys/signal.h cmd.h sym.h rpc.h /usr/include/sys/time.h
+rpc.o: type.h var.h /usr/include/sys/ioctl.h /usr/include/sys/ttychars.h
+rpc.o: /usr/include/sys/ttydev.h /usr/include/sys/file.h
+rpc.o: /usr/include/sys/fcntl.h /usr/include/sys/uio.h /usr/include/errno.h
+rpc.o: /usr/include/sys/errno.h setjmp.h
+shell.o: swat.h /usr/include/assert.h lst.h sprite.h tcl.h
+shell.o: /usr/include/stdio.h /usr/include/strings.h ibm.h handle.h geos.h
+shell.o: table.h hash.h geode.h /usr/include/sys/types.h
+shell.o:  /usr/include/sys/param.h
+shell.o:  /usr/include/sys/signal.h cmd.h sym.h
+shell.o: rpc.h /usr/include/sys/time.h ui.h buf.h sprite.h
+shell.o: /usr/public/lib/gcc-include/stdarg.h /usr/include/ctype.h
+swat.o: swat.h /usr/include/assert.h lst.h sprite.h tcl.h
+swat.o: /usr/include/stdio.h /usr/include/strings.h ibm.h handle.h geos.h
+swat.o: table.h hash.h geode.h /usr/include/sys/types.h
+swat.o:  /usr/include/sys/param.h
+swat.o:  /usr/include/sys/signal.h event.h
+swat.o: private.h ui.h /usr/include/ctype.h
+swat.o: /usr/public/lib/gcc-include/stdarg.h
+sym.o: swat.h /usr/include/assert.h lst.h sprite.h tcl.h /usr/include/stdio.h
+sym.o: /usr/include/strings.h ibm.h handle.h geos.h table.h hash.h geode.h
+sym.o: /usr/include/sys/types.h 
+sym.o: /usr/include/sys/param.h 
+sym.o: /usr/include/sys/signal.h cmd.h sym.h event.h private.h type.h
+sym.o: /usr/public/lib/gcc-include/stddef.h
+table.o: swat.h /usr/include/assert.h lst.h sprite.h tcl.h
+table.o: /usr/include/stdio.h /usr/include/strings.h ibm.h handle.h geos.h
+table.o: table.h hash.h geode.h /usr/include/sys/types.h
+table.o:  /usr/include/sys/param.h
+table.o:  /usr/include/sys/signal.h
+tclDebug.o: swat.h /usr/include/assert.h lst.h sprite.h tcl.h
+tclDebug.o: /usr/include/stdio.h /usr/include/strings.h ibm.h handle.h geos.h
+tclDebug.o: table.h hash.h geode.h /usr/include/sys/types.h
+tclDebug.o:  /usr/include/sys/param.h
+tclDebug.o:  /usr/include/sys/signal.h cmd.h
+tclDebug.o: sym.h tclDebug.h ui.h tclInt.h /usr/include/ctype.h
+type.o: swat.h /usr/include/assert.h lst.h sprite.h tcl.h
+type.o: /usr/include/stdio.h /usr/include/strings.h ibm.h handle.h geos.h
+type.o: table.h hash.h geode.h /usr/include/sys/types.h
+type.o:  /usr/include/sys/param.h
+type.o:  /usr/include/sys/signal.h buf.h sprite.h
+type.o: cmd.h sym.h type.h vector.h /usr/public/lib/gcc-include/stdarg.h
+ui.o: swat.h /usr/include/assert.h lst.h sprite.h tcl.h /usr/include/stdio.h
+ui.o: /usr/include/strings.h ibm.h handle.h geos.h table.h hash.h geode.h
+ui.o: /usr/include/sys/types.h 
+ui.o: /usr/include/sys/param.h 
+ui.o: /usr/include/sys/signal.h cmd.h sym.h event.h ui.h
+ui.o: /usr/include/signal.h setjmp.h /usr/include/sys/ioctl.h
+ui.o: /usr/include/sys/ttychars.h /usr/include/sys/ttydev.h
+value.o: swat.h /usr/include/assert.h lst.h sprite.h tcl.h
+value.o: /usr/include/stdio.h /usr/include/strings.h ibm.h handle.h geos.h
+value.o: table.h hash.h geode.h /usr/include/sys/types.h
+value.o:  /usr/include/sys/param.h
+value.o:  /usr/include/sys/signal.h cache.h cmd.h
+value.o: sym.h event.h expr.h private.h type.h ui.h value.h var.h buf.h
+value.o: sprite.h /usr/include/ctype.h
+var.o: swat.h /usr/include/assert.h lst.h sprite.h tcl.h /usr/include/stdio.h
+var.o: /usr/include/strings.h ibm.h handle.h geos.h table.h hash.h geode.h
+var.o: /usr/include/sys/types.h 
+var.o: /usr/include/sys/param.h 
+var.o: /usr/include/sys/signal.h type.h var.h
+vector.o: swat.h /usr/include/assert.h lst.h sprite.h tcl.h
+vector.o: /usr/include/stdio.h /usr/include/strings.h ibm.h handle.h geos.h
+vector.o: table.h hash.h geode.h /usr/include/sys/types.h
+vector.o:  /usr/include/sys/param.h
+vector.o:  /usr/include/sys/signal.h vector.h
+expr.o: swat.h /usr/include/assert.h lst.h sprite.h tcl.h
+expr.o: /usr/include/stdio.h /usr/include/strings.h ibm.h handle.h geos.h
+expr.o: table.h hash.h geode.h /usr/include/sys/types.h
+expr.o:  /usr/include/sys/param.h
+expr.o:  /usr/include/sys/signal.h cmd.h sym.h
+expr.o: expr.h private.h type.h /usr/public/lib/gcc-include/stdarg.h
+expr.o: /usr/include/ctype.h
+#
+# Set to ignore the absence of all system include files as 
+# it likely just means we're on a different system.
+#
+/usr/include/assert.h /usr/include/ctype.h /usr/include/errno.h  /usr/include/malloc.h /usr/include/sgtty.h /usr/include/signal.h /usr/include/stdio.h /usr/include/strings.h /usr/include/sys/dir.h /usr/include/sys/errno.h /usr/include/sys/fcntl.h /usr/include/sys/file.h /usr/include/sys/ioctl.h /usr/include/sys/param.h /usr/include/sys/resource.h /usr/include/sys/signal.h /usr/include/sys/stat.h  /usr/include/sys/time.h /usr/include/sys/ttychars.h /usr/include/sys/ttydev.h /usr/include/sys/types.h /usr/include/sys/uio.h /usr/public/lib/gcc-include/stdarg.h /usr/public/lib/gcc-include/stddef.h: .DONTCARE

@@ -1,0 +1,56 @@
+#!/bin/sh -
+#
+# Allocation data postprocessor when memory tracing isn't on so can't figure
+# the callers out...
+#
+# Usage: panc <datafile> <executable>
+#
+trap "rm -f rawoutput.$$; exit 0" 2 3 15 0
+hfile=`expr $2 : '^\(.*\)/swat$'`/../swat.h
+if [ ! -f $hfile ]; then hfile=/staff/pcgeos/Tools/swat/swat.h; fi
+( egrep '^#define[ 	]*TAG' $hfile |\
+	awk '{print $2, $3}'; echo _END_OF_TYPE_MAP_ ) | \
+awk '
+NR==1,/_END_OF_TYPE_MAP_/ {
+	if ($1 ~ /_END_OF.*/) {
+	    next
+	}
+	types[$2] = $1
+	next
+}
+$4 == "type" {
+	tbytes[$5] += $2
+	tblks[$5] += 1
+}
+END {
+	print "Block Type          # Bytes     # Blocks"
+	print "----------------------------------------"
+	for (type in tbytes) {
+	    if (types[type] != "") {
+		printf "%-20s%7d     %7d\n", types[type], tbytes[type], tblks[type]
+	    } else {
+		printf "%-20d%7d     %7d\n", type, tbytes[type], tblks[type]
+	    }
+	}
+}' - $1 > rawoutput.$$
+#
+# Title for by-type table
+#
+head -2 rawoutput.$$
+#
+# Named types
+#
+sed -n -e '3,${
+/^[^0-9]/p
+}' rawoutput.$$ | sort 
+#
+# Unknown types (by number)
+#
+sed -n -e '3,${
+/^[0-9]/p
+}' rawoutput.$$ | sort  -n
+echo "--------------------------------------------------------------"
+#
+# The total bytes free/allocated stats...
+#
+tail -7 $1

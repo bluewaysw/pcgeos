@@ -239,7 +239,6 @@ Notes:
     	* uses -- sort by the number of times the resource has been used
     	* loads -- sort by the number of times the resource has been loaded
     	* size -- sort by resource size
-        * total -- sort by total amount of loads caused by this resource
 
     * "workset summary" gives a brief description of the parameters of the
       current working set.
@@ -520,9 +519,6 @@ if {$off == 1000} { break }
 	    }
 	    size { var sval [expr
 		($sval<<15)+[value fetch kdata:$han.HM_size]]
-	    }
-	    total { var sval [expr
-		($sval*100000000)+([value fetch kdata:$han.HM_size]*[field $entry WSRE_loads])]
 	    }
 	]
     }

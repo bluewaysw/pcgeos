@@ -1,0 +1,1385 @@
+Sat Jun 17 21:59:06 1989  Adam de Boor  (adam at promethium)
+
+	* Added support for library segments in .map reading since symbols
+	  now show up.
+
+Mon Jun 12 01:06:52 1989  Adam de Boor  (adam at promethium)
+
+	* Changed Ibm86CurrentFrame to be more conservative: it now
+	  considers the top frame to be out-of-date if the current sp
+	  doesn't match that stored in the private data for the old top
+	  frame. The problem revealed itself when performing showcalls -g,
+	  where the machine would repeatedly stop in ObjCallInstance at
+	  lower and lower levels, but the top frame would continue to be
+	  considered valid since the machine was in the same function and
+	  sp hadn't retreated above the entry sp, yet it was in a
+	  different activation of ObjCallInstance, so the return
+	  breakpoints were being set in the wrong place. This new way
+	  makes it re-examine the stack more frequently, but at least it
+	  doesn't screw up.
+
+Fri Jun  9 01:57:04 1989  Adam de Boor  (adam at promethium)
+
+	* Changed list library to not store owning list pointer in a node,
+	  since needed protection against node removal for pmake.
+	  Necessitated change to Lst_Move parameters.
+
+	* Changed Ibm_WriteRegister to clear the writhe byte when
+	  assigning to a byte register.
+
+	* Changed file to file+1 to skip slash in call to File_FindGeode
+	  when hunting for kernel.
+
+	* Fixed problem in attach where kcsum was left being the new
+	  checksum if kernel with right checksum couldn't be found.
+
+	* Changed symbol and type modules to use string table for all
+	  names. Speeds up searching and makes life easier when doing
+	  garbage collection.
+
+	* Made tracing of callers for malloc conditional on MEM_TRACE
+	  being defined. DEBUG features also dependent on this.
+
+	* Added string table to reduce impact of detach/attach with no gc.
+
+Wed Jun  7 14:51:18 1989  Adam de Boor  (adam at promethium)
+
+	* There were many, many changes since May 1, but I don't remember
+	  them all and I've been lax...
+
+	* Fixed bug in Handle_Lookup and Handle_Find that had them call
+	  Handle_Create even if the handle was created by finding the
+	  owner. They now both check the hash table after doing the
+	  Handle_Lookup on the owner to see if the handle appeared.
+
+Mon May  1 14:34:00 1989  Adam de Boor  (adam at promethium)
+
+	* Fixed bug in skipping over breakpoints revealed by running on a
+	  4.77 8088. Problem was an interrupt would arrive immediately
+	  after the iret (in spite of what the processor handbook says --
+	  interrupts are not ignored until after the first instruction
+	  following an iret) before the instruction being skipped was
+	  executed. The single-step trap would then occur following the
+	  first instruction of the interrupt routine, at which point the
+	  skipped instruction would be replaced by an INT 3, even though
+	  it hadn't actually been executed. This happened continually when
+	  performing the SKIPBPT rpc because of the four-byte reply
+	  waiting to be sent out. To get around this, IF is cleared in the
+	  state block and the previous IF saved in a variable to be
+	  restored when the instruction is replaced. This still doesn't
+	  deal with NMI's, but...
+
+Thu Apr 27 09:25:02 1989  Adam de Boor  (adam at promethium)
+
+	* Installed.
+
+	* Fixed bug in Tcl_Eval where returned static error message
+	  without freeing old dynamic result.
+
+	* Changed abortive Ibm_Stop to not cause wait command to return.
+
+	* Split tcl-level commands out of ibm.c into ibmCmd.c.
+
+	* Added "field" subcommand to "type"
+
+	* Added mapconcat command.
+
+	* Changed RPC_BEEP to return protocol revision along with checksum
+	  to avoid mismatches.
+
+	* Added local variable and instance variable searching in
+	  format-instruction (expanded from john's code).
+
+Tue Apr 18 02:48:56 1989  Adam de Boor  (adam at promethium)
+
+	* Changed Ibm86Decode to not read any registers unless decode non-zero.
+
+	* Fixed printing of x-mode operands (yes?)
+
+	* Changed Ibm86Decode to print immediate data in both decimal and hex.
+
+	* Fixed problem with referencing a register in a patient that has
+	  no threads.
+
+	* Now passes bootstrap parameter to stub to allow it to skip
+	  finding geodes and threads, allowing attachment even if too much
+	  is running to fit in an HelloReply buffer. Kernel_Hello also
+	  bounds checks amount of space left to avoid overwriting itself,
+	  returning RPC_TOOBIG if the things won't fit.
+
+	* Frees and recreates kernel handles upon rereading kernel in
+	  order to nuke any breakpoints set in the kernel.
+
+	* Changed initialization sequence to return segment of init code
+	  (0 if fully initialized).
+
+Wed Apr 12 16:04:21 1989  Adam de Boor  (adam at promethium)
+
+	* Changed ibm.c (Ibm_NewThread) to not punt if
+	  SS != Handle_Segment(core). Instead, it assumes the thread is
+	  number length(patient->threads). Allows one to attach even if
+	  a patient is in some weird state.
+
+	* Added argument to "brk list" command to return numbers of all
+	  tcl-level breakpoints at an address. Changed swat.tcl's
+	  "fullstop" routine to take advantage of this.
+
+Mon Mar 27 21:55:32 1989  Adam de Boor  (adam at promethium)
+
+	* Installed
+
+	* Added destruction of all type-description components to
+	  Type_Nuke. This includes field names, EnumRec's, structure field
+	  vectors and the removal of structure types from the structs hash
+	  table.
+
+	* Added freeing of hash table entries and other paraphernalia when
+	  a symbol is being nuked.
+
+	* TNodeRecs now allocated out of chunk kept with each ScopeRec.
+	  Allows for easy freeing of all trees when a ScopeRec is destroyed.
+
+	* Changed symbols from being a large union to being their own,
+	  class-dependent structures in order to cut down on memory usage
+	  in preparation for making FUNCTION symbols into scopes.
+
+	* Fixed bug in cvtnum that caused it to treat leading - and +
+	  chars as digits.
+
+	* Changed sizeof(int) to sizeof(struct dblk) in getfreehdr, fixing
+	  problem exposed by gc'ing kernel symbols (lots of frees with no
+	  coalescing, causing allocation of extra headers). Should have
+	  some way to release blocks containing all unused headers...
+
+	* Added mousetraps to Handle functions to catch the passing of
+	  non-handle (or ex-handle) pointers.
+
+	* Added argument to gc to turn on hefty malloc debugging.
+
+	* Changed HANDLE_FREE handler to set chain->state to OUT so
+	  Break_Clear doesn't try to replace the old instruction in a free
+	  block.
+
+	* Changed brk isset to return 1 only if chain is present and enabled
+
+	* Added "accurate" record keeping to GCCmd
+
+Thu Mar 23 12:48:39 1989  Adam de Boor  (adam at promethium)
+
+	* Added garbage collection for symbols and types, along with
+	  registration of system types with the garbage collector to make
+	  sure they don't get nuked.
+
+Sun Mar 19 18:01:58 1989  Adam de Boor  (adam at promethium)
+
+	* Installed
+
+	* Changed all built-in tcl commands to use Tcl_RetPrintf and
+	  Tcl_Return to make sure the return value is freed appropriately.
+	  Was having problems with static strings being freed because of
+	  bad interactions with the debugger.
+
+	* Fixed bug in malloc() whereby the allocator and tag fields of
+	  untagged blocks would contain random garbage. "alloc" now
+	  produces listings of blocks with all named tags and 0 and
+	  nothing else.
+
+	* Reduced memory usage 10% by (1) allocating TNodeRec's in chunks
+	  of 100, (2) resetting the buffers for object files to be 512
+	  bytes long, rather than the 8k to which they're set by stdio.
+	  This cut out 80,000 bytes or so...
+
+	* Moved sym-default into ibm.c. defaultPatient can now be either a
+	  patient (normal case) or a patient's name (when detached or
+	  before the patient is loaded). Ibm_NewGeode compares the name
+	  against each patient it creates. If a match is detected,
+	  defaultPatient is set to the proper Patient handle. detach now
+	  copies the name of the patient before detaching. This also
+	  happens should the defaultPatient exit.
+
+	* Added handling of bogus <path>. in HelpFind. <path>. now finds
+	  the same node as <path>, rather than looping indefinitely.
+
+	* Changed break-taken command to accept a value for the
+	  breakpoint-taken flag to make life easier in the cycles command.
+
+	* Added re-use of stack frames if top-most frame still valid when
+	  CurrentFrame is called for a patient. Now keeps track of the
+	  thread for which the frames are in the patient's private data. A
+	  different thread, execution in a different function, or a FALSE
+	  return from Ibm86Framevalid will cause old frames to be
+	  discarded and a new chain of frames to be decoded.
+
+Fri Mar 17 16:40:37 1989  Adam de Boor  (adam at promethium)
+
+	* Made format command understand hex numbers (to provide a
+	  consistent interface, you know).
+
+	* Added pattern and "commands" options to "info" command to allow
+	  command completion (also added to top-level-read).
+
+	* Added use of defaultPatient in expression parser and symbol
+	  matcher. sym-default command sets the default patient to use.
+
+Tue Mar 14 21:26:12 1989  Adam de Boor  (adam at promethium)
+
+	* "Finished" new help implementation.
+
+	* Fixed cbrk to not have a maxArgs for set, aset and tset.
+
+	* Added missing "break" to BRK_LIST handling.
+
+	* Fixed bug in frame command when going up exactly as many frames
+	  as exist (e.g. "up" when thread is retreated into the kernel).
+
+Sun Mar 12 07:24:17 1989  Adam de Boor  (adam at promethium)
+
+	* Installed.
+
+	* Added help classes to all commands. Now I've got to figure out
+	  how to use them.
+
+	* Changed CmdRec to support an array of subcommands. Cmd_Create
+	  vectors the command to CmdCheckUsage which makes sure the
+	  arguments are within bounds and performs unique-prefix
+	  comparisons on the various subcommands to decide which one is
+	  desired. A different piece of ClientData is passed to the
+	  argument based on the subcommand invoked. Per-command usage
+	  messages are taken care of also in this way. Changed all the
+	  complex commands over to use this system.
+
+Wed Mar  8 18:32:41 1989  Adam de Boor  (adam at promethium)
+
+	* Made Cmd_PrintSym print a newline at the end of printing out
+	  a function.
+
+	* Fixed potential bug in addch.c if the window weren't a multiple
+	  of 8 wide and a tab were printed in the last part (would loop
+	  infinitely as x would never get to the destination column).
+
+	* Added "stream" command in preparation for cycle-counting and the
+	  instruction reference.
+
+	* Added check in get-address to see if the handle of the address
+	  returned is discarded. Prints a warning if it is.
+
+	* Changed CursesInputChar to store the requisite number of spaces
+	  when TAB is input so you can reliably backspace over the thing.
+
+	* Added check in autoload to make sure the invoked procedure was
+	  actually redefined so it doesn't go into an infinite autoload loop.
+
+	* Changed prompt procedure to do all the formatting in a catch so
+	  if you screw up the prompt string, it doesn't go into an
+	  infinite loop on you.
+
+	* Changed debugOnError to not invoke the debugger if a catch is in
+	  progress when the error is detected.
+
+	* Fixed improper handling of { \{}} (would flash to the unescaped
+	  { for both }'s (wasn't checking for open being escaped before
+	  decrementing nesting.
+
+	* Fixed stupid bug in CursesEndMatch (was using _cury twice).
+
+Tue Mar  7 14:26:15 1989  Adam de Boor  (adam at promethium)
+
+	* Fixed problem in IbmAttachCmd caused by changing the development
+	  kernel -- since it was doing a strcmp on the name and the names
+	  weren't changing, just the checksum, it wouldn't re-read the kernel.
+
+	* Fixed problem in words et al caused by not parenthesizing the
+	  $addr (e.g. "words *ds:si<ret><ret>" would fail). get-address
+	  now returns the address parenthesized.
+
+Wed Mar  1 18:48:33 1989  Adam de Boor  (adam at promethium)
+
+	* Changed to a local setjmp.h since ISI and SUN save a different
+	  number of registers (ISI saves more...).
+
+	* Changed swat.tcl to not invoke wait after a step-patient, as
+	  step-patient returns when the step is complete.
+
+	* Fixed problem with single-stepping landing on a disabled
+	  breakpoint. Had to add an event handler for EVENT_STEP in
+	  IbmStepCmd. Not sure if this is the right thing to do, though...
+
+Thu Feb 16 23:59:59 1989  Adam de Boor  (adam at sniff)
+
+	* Installed
+
+	* changed CursesScrollInput to turn off the scrollok for cmdWin so 
+	  doesn't try to scroll curscr when hit a screen-wide line while going
+	  forward.
+
+	* Windows created by wcreate now have the leaveok flag set true so if
+	  nothing has changed when they're refreshed, the cursor doesn't move
+	  to their current position anyway.
+
+	* Fixed wclrtoeol to not touch the whole f***ing line -- just the part
+	  that changed, as the loop clearly intended.
+
+	* Fixed some bugs in wrefresh (not setting lx, ly correctly on scroll,
+	  not flushing stdout on ERR, etc.).
+
+	* Changed scrollnow to not move back to original position before 
+	  refreshing since that isn't strictly necessary (curses can work with
+	  the cursor wherever it may be) and causes problems on some wyse
+	  terminals when the motion causes them to be given \f characters (for
+	  some reason, some wyse50's hang for a couple seconds before moving
+	  the cursor right...).
+
+	* Fixed scroll to deal with being called for curscr correctly, dealing
+	  with AM and XN and so on.
+
+Wed Feb 15 14:05:31 1989  Adam de Boor  (adam at sniff)
+
+	* Fixed Event_Handle to return the correct token in case of
+	  an MBL handler in a chain.
+
+	* Made stub switch controller 1 into special mask mode (maybe do
+	  for controller 2 too?) so we can intercept, and generally take
+	  breakpoints in service routines for, interrupts of a higher
+	  priority than our serial port.
+
+	* Fixed Event_Delete to adjust last pointer.
+
+	* Fixed looking at serial number after Where is it? (was using lseek).
+
+	* Condensed code in IbmHalt since the only thing for which a stop
+	  is conditional is RPC_HALT_BPT.
+
+	* Added "io" command to access I/O ports.
+
+	* Made "help" command just return the help string.
+
+	* Nuked RPC_CATCH and RPC_IGNORE, since they're taken care of now by
+	  the intr command.
+
+	* Fixed bug in addr-parse that wouldn't give you the type if the
+	  handle was nil.
+
+	* Moved fp field from Frame into FramePriv structure to allow the
+	  MD module to decode the thing fully before saying what the FP
+	  is. Added fp register as well.
+
+	* Added DETACH event to make sure breakpoints are out and to
+	  support new "intr" function in its endeavors to catch arbitrary
+	  interrupts, but only while attached.
+
+Fri Feb 10 20:59:48 1989  Adam de Boor  (adam at sniff)
+
+	* Fixed bug with interrupt during call in stub -- was leaving
+	  calling flag set, so only way to continue was with a step.
+
+	* Changed Cmd_PrintSym to know about all types of symbols.
+
+	* Changed value command to notice } and { as well when returning
+	  characters.
+
+	* Made "load" command check the type of the file that exists, to
+	  avoid trying to source a directory (as happened when doing a
+	  "load curses" in swat's directory).
+
+	* Fixed problem with fields of simple structures not being defined
+	  when the kernel is re-read -- the structure was being compressed
+	  out since it was around from the previous kernel, but this was
+	  taken to mean that field symbols were already defined...which
+	  they were -- they were just inaccessible. Now looks for the
+	  first field as a symbol and enters them if it's not around.
+
+	* Added RPC_BEEP to see if the stub's alive and get the checksum
+	  so we can figure out which kernel to use, both on initialization
+	  and attach.
+
+	* Added PC-evaluated conditions to SWAT and stub. New cbrk and
+	  cond commands access same.
+
+Thu Feb  9 14:10:48 1989  Adam de Boor  (adam at sniff)
+
+	* Fixed bug in expr.y where indirecting through a handle pointer
+	  would fall into the indirection for an object pointer, with
+	  unhappy results.
+
+Wed Feb  8 11:15:16 1989  Adam de Boor  (adam at sniff)
+
+	* Fixed bug in stub where calling flag would remain set if
+	  an interrupt came in during the call.
+
+	* Fixed lookup of patient::module::symbol.
+
+	* Nuked Patient_Continue
+
+	* Fixed value things to handle CHAR variables with high bit set.
+
+	* Added optr stuff.
+
+Mon Feb  6 18:34:19 1989  Adam de Boor  (adam at sniff)
+
+	* Installed
+
+	* Changed wmove to return the new x y coord for the current window
+	  so Tony can do better pretty-printing.
+
+	* Added support for new library/driver load/exit calls to
+	  DebugProcess.
+
+	* Added I/O port access servers.
+
+	* Added interception of DOS calls to catch exit and know what
+	  thread is in DOS.
+
+Sun Feb  5 18:19:10 1989  Adam de Boor  (adam at sniff)
+
+	* Installed.
+
+	* Fixed documentation for patient command and added more comments.
+
+	* Fixed CursesShowMatch -- wasn't handling {\\{\\}} correctly
+	  (not that it needs to :).
+
+Sat Feb  4 13:52:49 1989  Adam de Boor  (adam at sniff)
+
+	* Installed
+
+	* Fixed fetching of character variables -- now formats them the
+	  same as for character arrays, including the escaping of
+	  backslashes. ahem.
+
+	* Added fromIndir field for expression tokens so we know when the
+	  handle is real (i.e. user-specified) and when it's only from an
+	  indirection so we can handle both ^hid:expr and segment^:expr
+	  correctly.
+
+	* Added simulation of MOVs and POPs to segment registers since the
+	  8086 turns off all interrupts until the following instruction
+	  is complete.
+
+	* Added showmatch to curses.
+
+	* Fixed printing of small structures to understand that some of
+	  them might be signed.
+
+Wed Feb  1 14:26:49 1989  Adam de Boor  (adam at sniff)
+
+	* Installed
+
+	* Added Ibm86InvalidateFrames as a handler for EVENT_EXIT to make
+	  sure re-used patient handles start off with validate set TRUE.
+
+	* Installed
+
+	* Added "detach" option in Ibm_NewGeode.
+
+	* Changed SymCmd to allow register symbols to be defined in
+	  geosec.tcl.
+
+	* Installed
+
+	* Made checksum mismatch error more explanatory.
+
+	* Added checks and error messages for lack of attachment.
+
+	* Installed
+
+	* Fixed decoding of x[bw] operands to place the type and override
+	  in the same place as for the e[bwd] operands.
+
+	* Fixed istep to handle a non-existent next frame when checking
+	  for SP match on a RET instruction. Also now prints out the
+	  difference.
+
+	* Added swapping of arrays of structures.
+
+	* Fixed ValueFormat to add only 4 bytes of a non-printable
+	  character so it doesn't prematurely null-terminate the thing.
+
+Tue Jan 31 20:58:53 1989  Adam de Boor  (adam at sniff)
+
+	* Installed
+
+	* Changed Tcl_Eval to not null-terminate the command before
+	  calling the trace procedures to avoid leaving a procedure
+	  truncated should an interrupt arrive and be taken in its middle.
+
+	* Allowed for forward type references by defining an empty
+	  structure symbol and, when the thing is finally defined, doing a
+	  tget instead of a find, and a find instead of a make if the
+	  thing returns false. The change to IF allows the empty structure
+	  to be defined in-line efficiently.
+
+	* Changed sym fset to keep track of the file in which the function
+	  was defined for fast access via ref et al.
+
+	* Added support for signed types in asap and print.tcl, as well as
+	  type signed command.
+
+	* Fixed errors in asap type grammar (incomplete).
+
+Mon Jan 30 15:49:10 1989  Adam de Boor  (adam at sniff)
+
+	* Changed "if" command to return the value of its test expression if
+	  the THEN clause is empty.
+
+	* Changed Ibm_NewGeode to notice when have to re-read symbols for
+	  a patient, freeing up as much stuff as it can. Calls Handle_Free
+	  on the resource handles, causing BreakInterest to delete any
+	  breakpoints in those handles (HANDLE_FREE handler deletes tcl
+	  breakpoints as well). Various changes to break.c and handle.c
+	  needed to support this.
+
+	* Installed
+
+	* Changed 'n' command in istep to stop only when back in the
+	  correct context.
+
+	* Changed print command to compress output for flags fields and
+	  suitably small nested structures.
+
+	* Changed .map file reading to not worry about having symbols for
+	  LBRY, KERN, GEST or STACK segments.
+
+	* Added defvar command for ease of script writing
+
+Sun Jan 29 16:30:54 1989  Adam de Boor  (adam at sniff)
+
+	* Installed
+
+	* Rearranged search order in SymLookupInPatient -- looks in global
+	  scope first. This was to speed up the reading of the .tcl files
+	  since most of the types are defined at the top level.
+
+	* Separated hash-table entries from hash-table overhead for
+	  tagging purposes.
+
+	* Changed print command to use the value history:
+	  * Prints the history number before the expression
+	  * Stores each full address it prints in the history
+	  * Sets repeatCommand to lastCommand if the address contains the
+	    most-recent-element indicator (@ followed by an operator or
+	    nothing), thus allowing one to chain down a list of things easily.
+
+	* Changed value history implementation to just take {handle offset
+	  type} triples and gave access to same from the value hfetch and
+	  value hstore commands. Added support for the value history to
+	  the expression parser, including the most-recent element support
+	  that's so neat in gdb.
+
+	* Nuked Block mismatch error in expr.y as well as need for the
+	  segment to be a constant (allows one to indirect through hptr
+	  variables without error).
+
+	* Fixed type emap implementation to use cvtnum and process its
+	  arguments in the right order.
+
+Fri Jan 27 21:33:54 1989  Adam de Boor  (adam at sniff)
+
+	* Installed
+
+	* Finished support for pointers. Required:
+	  * Nuking pointerTo in type record
+	  * Adding understanding of pointers to expr.y
+	  * Parsing of [nhfsl]ptr.type in asap.
+	  * Fixing definition of type_Void for fptr.far.
+
+	* Finished support for enumerated types in sym.c and enum.c.
+	  Involved:
+	  * type make enum <size>
+	  * sym make enum <name> <val> <type>
+	  * sym[bol] find enum
+	  * symbol eget
+	  * type emap <num> <type>
+	  * type members <type>
+
+
+Thu Jan 26 16:47:38 1989  Adam de Boor  (adam at sniff)
+
+	* Added isPC flag to sysFlags in the stub since we don't want to
+	  intercept interrupt 13 on the PC as it's used for the fixed disk.
+
+	* Added check in istep to notice when returning and SP isn't
+	  pointing at the return address (as kept in the next frame)
+
+Wed Jan 25 19:28:54 1989  Adam de Boor  (adam at sniff)
+
+	* Installed
+
+	* Added g and ? commands to istep, and made it notice when the
+	  current patient changes and break out of its loop when it does.
+
+	* Fixed bug in Ibm_NewGeode. Needed to seek back to the start of
+	  the file upon accepting a path in response to the Where is it?
+	  prompt, since had seeked to the serial number to verify the
+	  correctness of the file.
+
+	* Made istep wake up the current patient if it's not already
+	  awake. Also sets the current frame to be the top-most one.
+
+	* Added protection to wakeup-thread to prevent waitForWakeup from
+	  remaining non-zero.
+
+	* Moved int function into its own file and set it to auto-load
+
+	* Changed backtrace to print a * next to the current frame.
+
+	* Made step on an INT instruction step into the interrupt code.
+	  'next' will run to the instruction after the INT instruction.
+
+	* Added 'path' subcommand for patient to return the path to the
+	  patient's executable, mostly to enable the ref function to work
+	  for any known symbol.
+
+	* In break.c, changed all offsets to be Addresses, not words, to
+	  take care of breakpoints in DOS, e.g.
+
+	* In expr.y, fixed indirection through a dword to note when the
+	  segment in the dword matcheth the handle segment not and take
+	  evasive action.
+
+	* In expr.y, fixed call to Tcl_Eval -- expects the pointer to be
+	  past the open bracket that caused the call to be made.
+
+Tue Jan 24 17:49:49 1989  Adam de Boor  (adam at sniff)
+
+	* Installed
+
+	* Changed ^l to not complain about block mismatches.
+
+	* Added ^ operator (like in pascal) that binds more tightly than *
+	  and : so it can be used more easily in some circumstances. It
+	  follows the term being indirected through to avoid confusion.
+
+	* Converted some assert statements to warnings and returns, others
+	  to Punts with more explanatory messages than "assertion new failed"
+
+Mon Jan 23 19:23:15 1989  Adam de Boor  (adam at sniff)
+
+	* Installed
+
+	* Fixed Ibm86NextFrame to look in the right place to decide whether
+	  to skip CS:IP or just IP. Was looking at pushage of CS in
+	  prev->prev->prev frame (in effect). Now looks at
+	  Sym_IsFar(prev->prev)
+
+	* Changed "quit" command to note if not attached and not send
+	  anything.
+
+	* Changed handling of "iret" on ONSTACK list to note flags address.
+
+	* Fixed Ibm86NextFrame to not add anything to entrySP if
+	  ALWAYS_VALID (might be skipping over the return address of the
+	  calling function if you do).
+
+	* Fixed bug in PrintFlags (add 2, not 4, since thing is shorter).
+
+Wed Jan 18 17:31:18 1989  Adam de Boor  (adam at sniff)
+
+	* Added call to TclDebug_Reset from UiTopLevelCmd to take care of
+	  reseting the debugger flags to 0 so breakpoints, etc., will
+	  actually be taken. Can't rely on anything in the stack since we
+	  may be in a recursive command interpreter, and in any case, it's
+	  not clear how deep in the call tree we'll be (if the
+	  command-reading structure changes again, eg...)
+
+Tue Jan 17 18:17:46 1989  Adam de Boor  (adam at sniff)
+
+	* Fixed interrupt taking -- wasn't clearing the request flag so it
+	  went into an infinite loop at top-level.
+
+	* Fixed alias command to allow Tcl_CreateCommand to nuke the old
+	  alias record.
+
+	* Fixed "for" primitive to understand "break"s in the next clause
+
+Mon Jan 16 17:50:20 1989  Adam de Boor  (adam at sniff)
+
+	* Installed
+
+	* Changed symbol reading so type symbols are looked for in the
+	  current scope, not just when adding to the global scope, to make
+	  multi-file geodes (e.g. Calla) easier.
+
+	* Fixed symbol completion so it will also beep if there are no
+	  completions for a prefix.
+
+	* Changed Rpc module to only wakeup pcwin when told to, not when
+	  Rpc_Exit is given RPC_EXIT. Two new functions, Rpc_Connect and
+	  Rpc_Disconnect, take care of attaching and detaching from the
+	  terminal line, with associated watching, ignoring, and signalling.
+
+	* Added attach/detach commands and associated support logic,
+	  including the use of serial numbers in the core block.
+
+	* Added check for, and handling of, interrupts (^C's) on each call to
+	  and return from a tcl command (i.e. in TclDebugCallProc and
+	  TclDebugReturnProc). Interrupts may be disabled by calling
+	  Ui_AllowInterrupts(FALSE).
+
+Sun Jan 15 18:24:35 1989  Adam de Boor  (adam at sniff)
+
+	* Changed expression grammar to accept just FIELD as an expression.
+
+	* Changed finishframe to only call a halt in the temporary
+	  breakpoint if the same thread is executing and SP is above that
+	  in the frame being finished.
+
+	* Fixed frame command so "frame 2", e.g., doesn't print
+	  EVENT_HANDLED on return.
+
+	* Changed from using lastCommand on return to using repeatCommand
+	  and setting repeatCommand to nil each time so a command must
+	  make an effort to be repeated.
+
+	* Fixed constants for byte registers in ibm.h.
+
+	* Switched PrintFlags to just print the first letter and no equal
+	  sign. Should make  it all fit on one line.
+
+Fri Jan  6 17:06:57 1989  Adam de Boor  (adam at sniff)
+
+	* Installed
+
+	* Altered behaviour of tcl debugger 'next' command. No longer
+	  prints out the result of the frame being 'next'ed -- just stops
+	  at the next call after the nexted one returns.
+
+	* Changed tcl debugger frame print out to notice if cmdProc in the
+	  frame is NULL and print out the frame with "...evaluating args"
+	  tacked onto the end, since that's what's happening.
+
+	* Changed tcl debugger to use a flag in the Command record
+	  (TCL_DEBUG, defined in tcl.h). Required the cmdFlags to be added
+	  to the Tcl_Frame structure. Tcl_FindCommand and
+	  Tcl_OverrideCommand now deal with the command flags as well.
+
+Thu Jan  5 11:11:29 1989  Adam de Boor  (adam at sniff)
+
+	* Installed
+
+	* Changed Ibm86NextFrame to allow the SUB SP, # to follow the
+	  MOV BP, SP (just because).
+
+	* Added functions to catch SIGBUS and SIGSEGV that print out why
+	  an abortion is recommended.
+
+	* Changed stub to default kernel to geosec.exe and kernel args to
+	  ui.geo.
+
+	* Installed.
+
+	* Changed ^] to sort the symbols by name before cycling through.
+
+	* Added "beep" command and used it in top-level-read if there's
+	  more than one possible completion.
+
+	* Made an empty input line execute the previous command.
+	  set-address alters the lastCommand variable to specify the
+	  address for the last command to be nil so it can repeat.
+
+	* Changed top-level-read to not complete on a null prefix.
+
+	* Installed
+
+	* Nuked the call-related stuff from rpc.h and rpc.asm since it
+	  won't actually be needed.
+
+	* Fixed problem with KernelLoadRes: the loaded handle doesn't
+	  actually have the correct dataAddress, so if a breakpoint was
+	  hanging around waiting for the handle to come in, it gets
+	  written to a bogus part of memory. KernelLoadRes now saves the
+	  old dataAddress and stores in the new one, restoring the old
+	  when the reply to the RES_LOAD rpc is received. Also required a
+	  change to RpcContinue to just set the replied flag if in the
+	  middle of a call, since all RPC's but one (HALT) will continue
+	  the machine upon reply.
+
+	* Added /b flag to the stub to force the use of 9600 baud.
+
+	* Added another option to quit -- "leave" causes geos to remain
+	  halted. Changed Ui_TopLevel to use it should swat.tcl contain a bug.
+
+	* Updated primitive documentation strings in help.c, as well as
+	  documenting protect and case primitives.
+
+	* Added -k to apropos to search in the documentation strings
+	  themselves. Also now takes several patterns to look for at one time.
+
+	* Fixed Curses and Shell to do proper balancing of braces, etc.,
+	  in accordance with Tcl's own input rules.
+
+	* Changed Rpc_Init to accept -ti2 or, better yet, use the PTTY
+	  variable should all else fail.
+
+	* Made "while", "do" and "repeat" be aliases that expand to the
+	  proper for loop. Best of all worlds since the loop will execute
+	  in the caller's context.
+
+	* Made "load" be a primitive to get the variable assignments in
+	  the loaded file in the right place. Now have a function
+	  setup-load-path that is responsible for extracting the path from
+	  the SWATPATH envariable. It also (this is important) performs
+	  any ~-expansion required by the directories. The result is
+	  placed in the load-path variable, which can be changed by the
+	  user if desired.
+
+Wed Jan  4 12:43:33 1989  Adam de Boor  (adam at sniff)
+
+	* Added "call" and "exit" commands (well, subroutines, but...).
+	  They appear to work, but calling exit may induce fatal errors.
+	  Should probably have a command to send an EXIT event to a
+	  process instead. E.g. "kill HERMAN" calls ProcSendEvent for the
+	  process with DI = 2, BX = <pid> and AL = 0 no matter what
+	  process we're in.
+
+	* Changed top-level procedure to be top-level-read. Made prompt a
+	  tcl subroutine that prints the current recursion level (as
+	  returned by new current-level command) before the prompt if it's
+	  not 1. Extracted command processor from Ui_TopLevel and made it
+	  its own tcl primitive so call could just invoke top-level w/o
+	  having to loop and eval, etc. You now get out of a top-level by
+	  invoking break.
+
+	* Fixed wait command to actually return 1 if interrupted and 0 if
+	  not. Was returning the result of the breakpoint handler, in some
+	  cases.
+
+	* Added save-state, restore-state and discard-state commands to
+	  ibm.c in preparation for supporting function calling.
+
+	* Changed from use of atox to cvtnum in IbmSwitchCmd
+
+	* Made use of lastAddr into subroutines (get-address and
+	  set-address) for convenience and adapted the five functions
+	  (preg now uses it).
+
+	* Added "preg" command to print out a region definition graphically.
+
+	* Changed IbmSearchTree to make sure the directory also has .tcl
+	  and .map files that correspond to the .geo file before deciding
+	  it's found the thing.
+
+	* Changed ps -t to print out the function that called
+	  BlockOnLongQueue rather than BlockOnLongQueue itself.
+
+	* Fixed bug in Kernel_Hello where it wouldn't return the proper
+	  SS:SP for threads that had retreated into the kernel.
+
+	* Changed EVENT_CONTINUE data from boolean to one of CONTINUE_FULL
+	  (continue from full stop to full run), CONTINUE_STEP (continue
+	  from full stop to single-step), or CONTINUE_HALF (continue from
+	  half stop to full run) to avoid having to get the registers for
+	  the current thread when performing an implied continue by
+	  replying to an RPC.
+
+	* Left out Invalid stack segment stopCode in ibm.c.
+
+	* Fixed bug introduced by IbmDeath where registers would be read
+	  while curPatient->curThread was hosed. Also necessitated change
+	  to HandleExit to not free HANDLE_THREAD handles.
+
+Tue Jan  3 14:26:34 1989  Adam de Boor  (adam at sniff)
+
+	* Made BreakStopped look for the handle of REG_PC to handle
+	  breakpoints in DOS, where CS isn't necessarily the DOS handle,
+	  but the breakpoint's offset is based on the DOS handle's base
+	  (400). It will use the frame->handle if it's non-null. Also
+	  changed Ibm86CurrentFrame to set frame->handle to be NULL if CS
+	  doesn't match the Handle_Segment of the found handle.
+
+	* Fixed TOS printout (for all cases) to handle
+	  SS != Handle_Segment(core) (as happens when inside DOS et al)
+
+	* Fixed LOOPNZ and LOOPZ IA_BRANCH printout (had test of ZF mixed up)
+
+	* Fixed Cmd_PrintSym to not die with NullType for vars.
+
+Tue Dec 20 13:10:31 1988  Adam de Boor  (adam at sniff)
+
+	* Added "case" statement to tcl (still need to put doc in help.c)
+	  and adapted various functions to it.
+
+	* Fixed race condition involved in interrupting a conditional
+	  breakpoint. The RPC_INTERRUPT would be sent. While waiting for a
+	  reply, an RPC_HALT would come in and an EVENT_STOP dispatched.
+	  The breakpoint wouldn't be taken, so IbmHalt would call
+	  Patient_Continue and continue the machine, leaving Ibm_Stop
+	  thinking the machine is stopped when no such thing is true.
+	  Ibm_Stop now clears the PATIENT_RUNNING flag before sending the
+	  interrupt call, while IbmHalt checks to see if the machine was
+	  actually running before dispatching the STOP event, etc.
+
+	* Shifted clearing of replied and dontresume flags up to top of
+	  Rpc_Call to narrow imagined window of vulnerability.
+
+	* Added reseting of step vector in Rpc_Exit.
+
+	* Added Rpc_LoadRegs function to load registers into an IbmRegs
+	  structure. The beast is as efficient as possible, though it
+	  doesn't turn interrupts off while doing an overridden movsw...
+
+	* Fixed curses system function to default SIGTSTP while executing
+	  the subshell so the screen doesn't get biffed if you ^Z a vi.
+
+Mon Dec 19 14:22:52 1988  Adam de Boor  (adam at sniff)
+
+	* Nuked C-level print command as well as ValueFormat family of
+	  functions. Superceded by ValueCmd family with the help of
+	  "print" command.
+
+	* Added class, name and aget subcommands to "type" to support
+	  tcl-level "print" command. Also changed "value" command to put
+	  type token in field list rather then expanded name.
+
+	* Added MD_FrameInfo and use of same from "info" subcommand of
+	  "frame" command. Prints out where it's getting various registers
+	  from as well as the full name of the function and other useful
+	  things. 
+
+	* Added STACK as a dispatchable event and made Status_Changed
+	  dispatch the thing. format-instruction is now the handler for
+	  the STACK event, so just saying "frame 3" will print the
+	  instruction in the frame. IbmSetDir is also a handler for the
+	  EVENT_STACK event and sets the current directory based on the
+	  patient in the current frame.
+
+	* Added "size" subcommand of "type" command.
+
+	* No longer use curPatient->frame->scope or curPatient->scope -- just
+	  look things up in curPatient->global.
+
+	* Merged Ibm_FindGeode and Ibm_InitPatient into Ibm_NewGeode so we
+	  can remember the first patient in the patients list with the
+	  same name and get various state from there (object, libraries,
+	  path, resources[n].offset, symbol state).
+
+	* Added Sym_Copy to duplicate the symbol state from one patient to
+	  another.
+
+	* Finished support for saving and resurrecting dead patients.
+
+Fri Dec 16 17:09:48 1988  Adam de Boor  (adam at sniff)
+
+	* Added check in expr.y for address -1 in symbols and generation of
+	  appropriate error message if so.
+
+	* Made brk (clear|enable|disable) apply to all the current
+	  patient's breakpoints if no breakpoint given.
+
+	* Fixed bug in Break_Set where it would install a chain even if
+	  the handle it's in isn't.
+
+Thu Dec 15 00:15:37 1988  Adam de Boor  (adam at sniff)
+
+	* Fixed CursesInputChar so it won't read beyond the end of the
+	  line. Just ignores stdin once the CURSES_LINEREADY flag is set.
+
+	* Fixed bug in RpcSkipBpt whereby timer interrupts would remain
+	  off after skipping over a breakpoint. Now saves mask to restore
+	  and restores it when RpcSkipBpt2 is hit.
+
+	* Changed Ibm86NextFrame to notice when the function gotten is
+	  exactly at the ip in the frame and to look for another function
+	  after subtracting one from the ip. This is to handle calls to
+	  functions that don't return (e.g. FatalError) at the ends of
+	  functions, as per Tony's request.
+
+Wed Dec 14 00:06:29 1988  Adam de Boor  (adam at sniff)
+
+	* Added "wakeup" and "spawn" commands to catch thread wakeups and
+	  thread/application spawns.
+
+	* Moved many things into their own files in the swatLibDir (and
+	  defined that variable in swat.tcl) and declared them to
+	  autoload, since that now works.
+
+	* Added use of EVENT_START and support of it in the "event" command.
+
+	* Changed abort() to call _abort() only if debug is set.
+
+	* Fixed bug in auto-loading caused by the sourcecmd being freed
+	  and overwritten while the file was being sourced, so Tcl_Eval
+	  would come back and start interpreting garbage.
+
+	* Converted defcommand and defdsubr to be built-in functions in
+	  cmdAM.c to avoid the many copies that must be done if defcommand
+	  and defdsubr are TCL procedures.
+
+	* Made "switch" with no arg switch back to the real current thread.
+
+	* Added curThread register to access the ID of the current thread.
+
+	* Added ^]-type completion to cycle through the possible
+	  completions. Also converted search for common prefix to C to
+	  make it nice and fast.
+
+	* Changed yylex to try and convert undefined symbols into hex
+	  numbers w/o a leading 0 -- still need h radix char at the end.
+
+	* Rearranged expression grammar to allow:
+	  * structure references to handles (also required addition of
+	    SYM_FIELD symbol type to record the source type for the field --
+	    done by TypeCmd; needed to set curPatient in Sym_Init and keep
+	    curPatient->scope up-to-date in symbol-reading commands) and
+	    such-like -- type implied by the field. Makes life easier.
+	  * segment part of lmem handle (^lthing) is now a handle ID, to
+	    allow things like "print OLScrollbarInstance ^lbx:si", since
+	    an lmem handle in something can be accessed using the indirect
+	    operator.
+
+	* Added 'match' subcommand of symbol to implement symbol
+	  completion. Additional changes were in CursesInputChar (allow ^D
+	  and ^[ to terminate input, storing same at end of buffer),
+	  CursesReadLineCmd (second arg containing initial input as well
+	  as initial setting of lineLength to length of last line in
+	  same), CursesStartScroll to only start scrolling on a
+	  backward-scroll character, top-level in swat.tcl to actually
+	  implement the completion (placed 'prompt' invocation at outside
+	  of loop and at end so it wouldn't do it if it didn't need to).
+
+Tue Dec 13 11:55:38 1988  Adam de Boor  (adam at sniff)
+
+	* Changed Kernel_Goodbye to be Kernel_Detach, used by both RpcExit
+	  and RpcGoodbye. Kernel_Detach will also clear the BLOCK_DEBUG
+	  bit from all memory handles. Made RpcGoodbye and RpcContinueComm
+	  set the inited bit in sysFlags, too. RpcGoodbye now continues
+	  the machine so swat doesn't have to (and to avoid a race
+	  condition on Debug* calls by the kernel while still avoiding
+	  swat waiting on exit).
+
+	* Fixed 'x' operands (wasn't printing address in [] or preceded by
+	  size and jge/jle jumping determination (wasn't determining
+	  SF ^^ OF correctly).
+
+	* Added ^l and * operators to address expressions. There may be
+	  conflict between the block being indirected through and the
+	  block from which data are actually desired (e.g. "ds:*fooPtr" if
+	  fooPtr is in a different block than ds), but we'll burn that
+	  bridge when we come to it.
+
+	* Made "bytes" and "words" into tcl-commands and have them sharing
+	  a last-address variable with "listi". The variable is cleared
+	  each time the PC is continued.
+
+	* Added command history (thanks Wendell!). top-level now also does
+	  ice-unit history (. and , commands). All history-substitution is
+	  done by top-level by invoking "history subst $line" before
+	  returning the line. To avoid surprises, it is the substituted
+	  line that is kept in the ice-unit history variable ($lastCommand).
+
+Mon Dec 12 19:27:23 1988  Adam de Boor  (adam at sniff)
+
+	* Added "wtop" command to set the edge to which windows go. Still
+	  need to erase the portion of curscr that holds the windows so
+	  refreshing of the windows works correctly (there are times when
+	  characters between lines overlap and one is left with spaces on
+	  the screen where data should be displayed).
+
+	* Fixed REP <STRING-INST> w/ string override. Added new operand
+	  class 'o' that prints segover:[SI] if an override was present.
+	  Also had to make class-'N' handler notice overrides.
+
+	* Added support for more Tony code -- having a return address in a
+	  register as dictated by an ONSTACK label. Syntax is "ret=,
+	  <reg>". Have to assume the frame is always valid...
+
+	* Modified curses.c to allow windows to be on top or on bottom
+	  (but not both).
+
+	* Added -b flag to allow symbol bootstrap.
+
+	* Fixed Kernel_BlockFind. Was searching for start <= a <= end when
+	  it should have been looking for start <= a < end. Caused
+	  infinite recursion first time I tried bootstrapping.
+
+	* Fixed RPC_ERROR handling in rpc.c since Rpc_Stat's are actually
+	  bytes. Also changed Rpc_Stat declaration in rpc.h.
+
+	* Changed stub to do the decrement of ip on a breakpoint trap to
+	  speed up conditional bp's more (no need to write the registers
+	  out on continue).
+
+	* Added "addr-parse" built-in to return list {handle offset type}
+	  given an address expression.
+
+	* Made "null" be a built-in.
+
+	* Changed "dump" to be "pscope" to prepare for ice-unit emulation.
+
+	* Switched symbol-path delimiter to be :: in preparation for
+	  symbol completion. Necessitated changes in swat.tcl, expr.y and
+	  sym.c.
+
+	* Added windowsOnTop to control where user-created windows are placed.
+
+Sat Dec 10 17:15:16 1988  Adam de Boor  (adam at sniff)
+
+	* Changed all fields in an RpcHeader to be bytes instead of words.
+	  This will limit the max data size to 255, but the only RPC that
+	  might be in danger is the reply to HELLO, but the HelloReply is
+	  20 bytes, while HelloGeode and HelloThread are 6 and 8 bytes,
+	  respectively. 255 bytes should allow a respectable number of
+	  geodes/threads to be active...if not, we'll bootstrap.
+
+	* Remembered to set/reset _FULLWIN flag for cmdWin properly in
+	  curses.c when windows are deleted/created. Window commands now
+	  all seem to work properly.
+
+	* Fixed scrollnow() so it calls wrefresh after the scroll has been
+	  performed to avoid accidentally scrolling the screen by
+	  refreshing the lower-right character in the screen. All I needed
+	  to do was scroll firstch and lastch for win and curscr (which is
+	  what I was doing before, but it didn't work then...sigh).
+
+	* Added "dbg" command to allow access to 'debug' flag.
+
+Fri Dec  9 10:36:24 1988  Adam de Boor  (adam at sniff)
+
+	* Added ^E and ^Y to curses.c. All scrolling commands now appear
+	  to work.
+
+	* Changed yylex to deal with things like "kdata:bx" by remembering
+	  the last module symbol it found and using it if the full path doesn't
+	  resolve to something. This may cause problems later, but it's
+	  very useful now.
+
+	* Changed yylex to not worry about whether a register is a segment
+	  register, since the parser already deals with mapping a CONSTANT
+	  to a handle.
+
+	* Nuked all the printf calls left (sadly, caused the nuking of the
+	  nice , ... things)
+
+	* Added ^h syntax to expression parser to deref a handle.
+
+	* Fixed bug in ComInterrupt where it refered to comCurIENPort w/o
+	  having loaded DS before, thus shoving a 0 byte into a random port.
+
+	* Changed RPC_STEP to do the step, then return the new registers
+	  as its reply rather than sending a reply and a HALT call..
+
+	* Fixed miscommunication between MoveBlock and stub -- stub
+	  thought the dataAddress for the handle was set for the new
+	  address (had no other way to find out), but it wasn't, so swat
+	  was always a step behind. Now gets passed new address in ES.
+
+	* Bug in Ibm86Decode -- comparing modrm to c0 for printing out
+	  operand size, but doing it > c0, not < c0. Also wasn't wrapping
+	  double-index properly.
+
+Thu Dec  8 11:41:08 1988  Adam de Boor  (adam at sniff)
+
+	* SIG_THREAD is 0xfe00, not 0xff00...
+
+	* Changed _sprintw function in curses to be intelligent and
+	  take the string apart piece by piece. Also added _snprintf
+	  procedure that actually uses the _cnt field intelligently
+	  (gasp!) so even if you don't get complete output, you won't
+	  trash your stack.
+
+	* Added some curses support. Bugs in new scrollnow procedure:
+		* needed to scroll curscr as well
+		* needed to refresh the window before mucking with it
+		  (scrolling lastch and firstch didn't help).
+	  Scroll buffer included (wheeee).
+
+Mon Dec  5 00:07:26 1988  Adam de Boor  (adam at sniff)
+
+	* Fixed bug in stub whereby a quit kill would leave you with your
+	keyboard disabled. Needed to change state_cs and state_ip, call
+	RestoreState and iret in RpcExit, rather than pushing the EndGeos
+	address and doing a RETF, else the interrupt masks would be hosed.
+
+	* Fixed bug caused by kernel thread not being on the allThreads
+	list: once the registers were in the kernel thread descriptor, if
+	you stopped the machine in the kernel thread, it would lose in the
+	assertion that registers were needed b/c the flag never got set.
+
+	* Added ibrk routine to swat.tcl to interactively set breakpoints.
+	Also changed listi to be list and made istep recognized
+	XchgTopStack things and skip over them properly.
+
+	* Fixed entries in i86Opcodes.c for the 286 extended opcodes from
+	being OP0f0[01](None) to be DEFAULT so backing up will work ok.
+
+	* Changed "enter" clause of "symbol" command to return the symbol
+	just entered to make life easier when creating register symbols in
+	swat.tcl. Also had to alter vset to allow me to specify a null
+	type so "print" would be happy.
+
+	* Changed 'fullstop' function to notice when the special message
+	_DONT_PRINT_THIS_ is the reason for the stoppage so I can invoke
+	the FULLSTOP event at the proper places w/o worrying about nuking
+	and restoring printStop -- dynamic scoping would be so much nicer...
+
+	* Changed 'delete' command to just deal with breakpoints. Also
+	nuked the fregs command -- regs always gets registers from the
+	current frame. It'll decode the args for the current instruction
+	only if the current frame is the top one.
+
+	* Split commands into two files -- A-M and N-Z -- and altered
+	aliases to catch the overriding of an alias with a new command.
+	Also enabled me to put unalias in its proper file, since all it
+	has to do now is nuke the command....hmm. that means I can nuke
+	any command I want with it....hmmm....good? bad? indifferent?
+	We'll see.
+
+	* Added a check in Handle_Lookup to make sure the handle is
+	para-aligned before calling the PC. Added check in kernel.asm to
+	see if the handle is free (owned by 0) before checking if it's
+	discarded -- ended up with the big FREE handle in my tables where
+	I didn't want it. Also added check in Kernel_BlockInfo to make
+	sure the requested handle is w/in the bounds of the handle table.
+	Easier to do there then in SWAT itself.
+
+	* Filled out the "symbol" command to allow access to all types and
+	the fetching and setting of all types of symbol data. Still not
+	sure what to do about changing the address of a
+	function/label/variable. How does one delete from an AVL tree?
+	Grossly, I'm sure. Updated the 'regs' command to print out handles
+	etc. for the segment registers and the symbolic representation of
+	CS:IP after printing out IP.
+
+Sat Dec  3 16:08:24 1988  Adam de Boor  (adam at sniff)
+
+	* Added "switch", "thread" and "symbol" commands to allow me to
+	write "ps" in TCL. Changed Handle_Segment to return 0 on error.
+	Nuked IbmMarkRegs and IbmChangeState. Now flushes registers for
+	all known threads, so no need to flush registers for old patient
+	when switching. Nuked assert() statement in Ibm_StackEnd that
+	would have led to death should someone have switched to a patient
+	w/no threads (which "switch" will allow) and typed "where". Also
+	nuked constraint in the various continue functions that the
+	current patient have threads.
+
+	* Added flags for event handlers. Only one in use -- EVENT_MBL,
+	which specifies a handler as having to be the last one called.
+	This is used by IbmFlushState for the CONTINUE event to make sure
+	everyone has written whatever it needs to write before the data
+	are flushed. This was forced by the continue implicit in returning
+	from a BLOCK rpc -- the breakpoint module was writing stuff that
+	was never getting flushed because the continue didn't go through
+	regular channels. The BLOCK servers now all generate a CONTINUE
+	event before issuing the return.
+
+	* Fixed HandleCallInterest to use hip->data, rather than hp->data,
+	so breakpoints now work.
+
+	* Added PSP and DOS system tables pointers to the HelloReply so we
+	can do neat things like find all the open files in the
+	system/geos. 
+
+Fri Dec  2 13:42:45 1988  Adam de Boor  (adam at sniff)
+
+	* Added other basic types (char, int, short, long) to the type
+	command, as well as the creation of pointers. Still need to modify
+	Value to print out pointers. Did change value to print out
+	unsigned things in hex always (this means everything, basically).
+
+Thu Dec  1 16:31:13 1988  Adam de Boor  (adam at sniff)
+
+	* Added autoload command. Fixed bug in ChainSearch in hash.c that
+	caused it to have multiple blocks with the same key in the cache.
+	I was casting the key to an int * outside a loop, then
+	post-incrementing that pointer, thus marching up the stack while
+	comparing. Sigh. Changed HelloArgs to take WakeUpRunQueue instead
+	of TimerInterrupt since that's where time-sliced threads really
+	are. Reduced the stub's buffers to 1K each.
+
+	* Fixed NextFrame to place endStack in entrySP if hit the top of
+	the stack. This keeps FrameValid from bitching about sp being
+	above entrySP.
+
+	* Fixed problem with DestroyFrame where it would nuke the Frame
+	without nuking the private data. Revealed itself via bus errors
+	when the freed data were referenced (this was caused by fullstop's
+	insistence on deleting the frame it had...)
+
+	* Yesterday, converted all the commands to create CmdRec's that are
+	used to initialize everything, added apropos command, made
+	distinction in tcl between things that must be typed exactly and
+	those that can be done with an unique abbreviation (and set up
+	defsubr command to be the former while proc is the latter). Added
+	documentation for all the tcl primitives. Added some lisp functions.
+
+	* Added recording of location of CS in frames. frame command no
+	longer copies them, so as to save work in decoding and whatnot. If
+	a frame must be around for a while, one can use the 'copy'
+	subcommand.
+
+
+
+Tue Nov 29 16:54:34 1988  Adam de Boor  (adam at sniff)
+
+	* Added structure fields to expr.y. Still need to do value
+	history. Also should probably make fields be absolute symbols (or
+	their own type of symbol) so they can be applied w/o casting the
+	preceding expression. Added "value" command, but still need to do
+	the "store" subpart.
+
+	* Added following to swat.tcl:
+	  assoc - just like lisp
+	  read-reg - return value of given register (in decimal)
+	  regnums - assoc list of register name/register number pairs used
+		    by read-reg, and regs commands.
+
+	* Changed brk to default to set (i.e. if no other subcommand is
+	valid). Changed Handle_PrintAll to understand that some handles
+	are memory handles (thus it won't print "weird"). Also prefers
+	"process" handles over "resrc" handles.
+
+Mon Nov 28 15:44:29 1988  Adam de Boor  (adam at sniff)
+
+	* Added Handle_Segment function and changed things to use it.
+	Added Type_FindFieldData to support the location of fields by
+	offset in PrintAddress (ibm86.c) so we can print out structure
+	references nicely... Fixed Ibm86NextFrame to always copy in the
+	registers from the previous frame (regardless of the HAVE_RETADDR
+	flag) and to always set the IP_SAVED flag in the new frame's flags
+	field of the private data. A NextFrame of a copied frame used to
+	result in evil things if the previous had already had its return
+	address found (none of this information would be copied in since
+	prevPrivPtr->flags & HAVE_RETADDR...)
+
+	* Made drivers be libraries of the kernel so their symbols can be
+	found if a patient stops in one of them.
+
+	* Fixed bug in realloc where it was copying the whole block
+	(including header) rather than just the data. How this managed to
+	go undiscovered (it came this way from sun), I don't know, but the
+	addition of the allocator field triggered it...
+
+	* Nuked warning for uncovered address in Handle_Find. Added
+	catching of BPT and STEP faults. Added istep function to swat.tcl
+	to do interactive stepping much like the atron board. Added
+	"words", "bytes", "patient", "stop-patient", "stop-catch", "cache"
+	and "current-registers" commands in ibm.c to support functions in
+	swat.tcl.
+
+Wed Nov 23 15:38:44 1988  Adam de Boor  (adam at sniff)
+
+	* Added DOS and BIOS segments to the kernel patient so we can
+	actually resolve addresses within them without failing assertions
+	all over the place should we interrupt in the middle of a DOS or
+	BIOS call.
+
+	* Changed KernelMemory and KernelLoadRes to save the flags even
+	before testing the BLOCK_DEBUG flag, as various of their callers
+	actually return status in CF and set it before calling the hook.
+
+	* Fixed bug in Sym_Init where it never assigned the dgroup symbol
+	to resources[0].handle->otherInfo. Silly.
+
+	* Changed format of ps output and made it take -p, -t, -c and -m
+	flags (-m flag still unused).
+
+	* Added rpcNoTimeout to allow me to halt the PC without having the
+	host timeout on the RPC.
+
+	* Changed Rpc_Stat's to be shortwords, since gcc will pad a
+	structure to a word alignment, and the protocol is supposedly
+	defined to be word-aligned anyway. If this isn't done, we write
+	one too many bytes and the rpc system on the pc goes to hell in a
+	very large handbasket.
+
+
+

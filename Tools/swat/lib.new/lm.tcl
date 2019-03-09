@@ -81,10 +81,10 @@ See also:
 	    	    echo [format { %04xh %5d  Free  %04xh}
 		    	    $base $chunkSize $next]
     	    	} else {
-	    	    echo [format { %04xh %5d  Free  none} $base [expr $chunkSize-2]]
+	    	    echo [format { %04xh %5d  Free  none} $base $chunkSize]
     	    	}
     	    } else {
-    	    	echo [format { %04xh %5d  Used} $base [expr $chunkSize-2]]
+    	    	echo [format { %04xh %5d  Used} $base $chunkSize]
     	    }
     	}]
     } else {
@@ -113,7 +113,7 @@ See also:
 	[for {} {$firstFree != 0} {} {
 		[echo [format {      %4xh %5d  %4s  %4xh}
 		    $firstFree
-		    [expr [chunk-size $seg $firstFree]-2]
+		    [chunk-size $seg $firstFree]
 		    {Free}
 		    [value fetch $seg:$firstFree word]]]
 		var firstFree [value fetch $seg:$firstFree word]
@@ -197,7 +197,7 @@ See also:
 		var nullHandles [expr $nullHandles+1]
 		var size 0
 	    } else {
-		var size [expr [chunk-size $seg $chunkAddr]-2]
+		var size [chunk-size $seg $chunkAddr]
 	    }
 	    echo -n [format {%04xh %4xh %5d }
 			$curHandle $chunkAddr $size]

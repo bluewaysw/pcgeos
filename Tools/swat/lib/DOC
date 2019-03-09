@@ -1,0 +1,2735 @@
+brk.top|breakpoint|prog.breakpoint
+2056:Allows the user to set breakpoints in the patient. It accepts several
+subcommands:
+    pset <addr> <command>
+    	Sets a breakpoint at the given address to execute the given TCL
+	command(s). <command> is passed straight to "eval". Before it is
+	evaluated, the variable "breakpoint" is set to the name of the
+
+	breakpoint being taken. If no <command> is given, the breakpoint
+	is always taken. Otherwise, the machine stops only if the result
+	of the command is non-zero. The breakpoint will only stop threads
+	belonging to the current patient. A breakpoint is identified by a
+	string of the form "brk<n>", where <n> is an unique integer.
+    aset <addr> <command>
+    	Like "pset", but the breakpoint is set for all threads.
+    tset <addr> <command>
+	Like "pset", but the breakpoint is removed the next time the machine
+	stops.
+    clear <break>*
+ 	Removes the given breakpoint(s). If no breakpoint is given, clears
+	all breakpoints for the current patient. Asks for confirmation
+	before doing so.
+    enable <break>*
+ 	Enables the given breakpoint(s). If it is already enabled, this has
+	no effect. If no breakpoint is given, all breakpoints for the current
+	patient are enabled.
+    disable <break>*
+ 	Disable the given breakpoint(s). Has no effect if already disabled.
+	If no breakpoint is given, disables all breakpoints for the current
+	patient.
+    address <break>
+ 	Returns the address at which the given breakpoint was set
+    list [<addr>]
+ 	Lists all breakpoints, where they are set and if they are enabled.
+	If <addr> is given, returns the numbers of all breakpoints set at
+	the given address.
+    isset <addr>
+	Returns non-zero if a breakpoint is set at the given address.
+    cond <break> <criteria>
+	Changes the criteria for taking the breakpoint. If no <criteria>
+	given, makes the breakpoint unconditional. <criteria> is described
+	in the "cbrk" documentation.
+    cmd <break> <command>
+	Changes the command for the breakpoint. If none given, the breakpoint
+	is made unconditional.
+If no recognizable subcommand is given, "aset" is assumed.
+cbrk.breakpoint|prog.breakpoint
+3102:Allows the user to set fast conditional breakpoints in the patient. This
+command is very similar to the "brk" command, except a conditional
+breakpoint differs from a breakpoint set with the "brk" command in that the
+condition is evaluated on the PC, thus speeding the operation up enormously.
+There are a limited number of conditional breakpoints that may be set in
+the PC (currently 8), so they should be used mostly for heavily-travelled
+areas of code (e.g. inner loops or things like EnterGraphics in the kernel).
+
+Since the condition is checked on the PC, its scope is limited to seeing how
+word registers compare to a given set of values. Not all registers need to be
+checked, of course.
+
+In the following descriptions, <criteria> stands for a series of one or
+more arguments of the form <register><op><value>. <register> is one of
+the machine's word-sized registers, or the pseudo-register "thread",
+corresponding to the current thread's handle. <op> is one of 10 comparison
+operators: = (equal), != (not equal), > (unsigned greater-than), < (unsigned
+less-than), >= (unsigned greater-or-equal), <= (unsigned less-or-equal), +>
+(signed greater-than), +< (signed less-than), +>= (signed greater-or-equal).
+These correspond to the 8086 instructions JE, JNE, JA, JB, JAE, JBE, JG, JL,
+JGE and JLE, respectively. <value> is a standard Swat address expression.
+The resulting offset is the value with which the register will be compared
+when the breakpoint is hit.
+
+If the breakpoint is patient-specific, the condition ss=<addr-of-core-block>
+is automatically established. 
+
+The available subcommands are:
+    aset <addr> <criteria>
+    	Sets a breakpoint at the given address to be taken only when the
+	given criteria are met. But the breakpoint is set for all threads.
+    tset <addr> <criteria>
+	Like "aset", but the breakpoint is removed the next time the machine
+	stops.
+    clear <break>*
+ 	Removes the given breakpoint(s). If no breakpoint is given, clears
+	all conditional breakpoints for the current patient. Asks for
+	confirmation before doing so.
+    enable <break>*
+ 	Enables the given breakpoint(s). If it is already enabled, this has
+	no effect. If no breakpoint is given, all breakpoints for the current
+	patient are enabled.
+    disable <break>*
+ 	Disable the given breakpoint(s). Has no effect if already disabled.
+	If no breakpoint is given, disables all breakpoints for the current
+	patient.
+    address <break>
+ 	Returns the address at which the given breakpoint was set
+    list
+ 	Lists all conditional and non-conditional breakpoints, where they are
+	set and if they are enabled.
+    isset <addr>
+	Returns non-zero if a breakpoint is set at the given address.
+    cmd <break> [<command>]
+	Allows you to attach a TCL command to be evaluated when the breakpoint
+	is actually taken. If <command> is absent, any existing command is
+	removed.
+    cond <break> [<criteria>]
+	Changes the criteria for the breakpoint. If <criteria> is missing,
+	the breakpoint becomes a standard breakpoint with nothing being
+	checked on the PC.
+
+If no recognizable subcommand is given, "aset" is assumed.
+abort.obscure
+27:Dumps core (DEBUGGING ONLY)
+addr-parse.prog
+324:Parses the address expression given as its sole argument into its
+components, returning a list {<handle> <offset> <type>} where <handle> is
+a handle token, as returned by the "handle" command, <offset> is a decimal
+number, and <type> is a type token, as returned by "type". Returns nil if
+there's an error in the expression.
+alias.top
+616:Causes the first argument to execute the second and succeeding
+arguments. The pseudo-variables $1, $2, ..., $n may be used to
+interpolate the 1st, 2nd, ..., nth argument to the alias. $n-m will
+interpolate arguments n through m. If m is missing, all arguments from
+n to the end will be interpolated. $* will interpolate all the
+arguments, while $# will interpolate the actual number of arguments.
+This substitution only occurs in the alias itself, not within any
+procedures the alias calls. If you don't use any of the $n constructs,
+all the arguments will be appended to the resulting command before it
+is executed.
+alloc.obscure
+83:Prints Swat's memory allocation statistics to the file given as the first
+argument.
+assign.memory|prog.memory
+375:Performs an assignment to a patient variable or register (but not to
+an element of the value history). The first argument is the variable or
+register to be assigned and the second argument is the value to assign to
+it (which may be a regular address expression). If the first expression
+doesn't indicate a type, "word" is assumed. Only byte, word or dword
+types are supported
+autoload.prog.load|prog.file
+556:This command allows the first invocation of a command to automatically
+force the transparent reading of a file of TCL commands. It takes 3 or 5
+arguments -- the command, an integer telling if the command needs to be
+typed exactly as given to be invoked, the file that should be read to define
+the command (this should probably be absolute) and an optional documentation
+class and string for the command. This need only be given if the file being
+loaded isn't part of the system library (doesn't have its documentation
+strings extracted when swat is build).
+break-taken.prog.breakpoint
+164:Returns 1 if the patient stopped because of a breakpoint and 0 otherwise.
+If an argument is given, it is taken to be the desired value of the
+breakpoint-taken flag.
+dbg.obscure
+159:Sets or returns the state of Swat's internal debug flag. If arg is given, it
+must be numeric and is assigned to 'debug'. Returns the current state of the
+flag.
+defcommand.prog.def|prog.proc|prog.tcl.proc
+310:Arguments are CMD ARGS HELPCLASS HELP BODY. CMD ARGS BODY are used to create
+a new command procedure, while HELP is the documentation string registered
+for the command. HELPCLASS is the class(es) under which to file HELP. Refer
+to "help" for more information. This command is used to defined new Swat
+commands.
+defdsubr.prog.def|prog.proc|prog.tcl.proc
+319:Arguments are CMD ARGS HELPCLASS HELP BODY. CMD ARGS BODY are used to create
+a new subroutine procedure, while HELP is the documentation string registered
+for the subroutine. HELPCLASS is the class(es) under which to file HELP.
+Refer to "help" for more information. This command is used to defined new
+Swat subroutines.
+defhelp.prog.def|prog.help
+165:Defines the help string for an internal node of the help tree. May not
+be used to override the help for a command whose documentation resides in
+the DOC file, sorry.
+defvar.prog.def|prog.var
+371:This is used in script files to define variables that are to be global.
+The first argument is the variable to define and the second is its default
+value. If the variable doesn't already have a value, this default value is
+assigned to it. The optional third and fourth arguments are the help class
+and documentation string, respectively. Refer to defcommand for more info.
+explode.prog.proc|prog
+90:Breaks a string into a list of its component letters. Useful for parsing
+command switches.
+frame.stack|prog.stack
+2270:Command used to decode and access stack frames in the patient, as well as
+set the current stack frame. Frames are refered to using tokens of the form
+"frame<n>" as returned by several of the subcommands. The subcommands are:
+    top
+ 	Decodes and returns a token for the frame at the top of the current
+	stack.
+    cur
+    	Returns a token for the currently-selected stack frame
+    next <frame>
+ 	Decodes and returns a token for the next frame up from <frame>
+    get <address>
+ 	Decodes and returns a token for the frame at the given address
+    function [args] [<frame>]
+ 	Returns the name of the function active in <frame>. If <frame> isn't
+	given, the current frame is used. If the third argument is "args",
+	the function's arguments are also provided as lists of the
+	form {<argName> <value>}
+    funcsym [<frame>]
+	Returns the symbol token for the given (or current) frame's function
+    scope [<frame>]
+ 	Returns the full name of the active scope in <frame>. If <frame> is
+	absent, the current frame is used.
+    patient [<frame>]
+	Returns the token for the patient whose code is being executed in
+	the given frame. If <frame> is absent, the current frame is used.
+    register <regName> [<frame>]
+	Returns, as a decimal number, the contents of the register with
+	the given name in <frame>. Again, if no frame is given, the current
+	is used. All registers but "pc" are returned as decimal. "pc" is
+	returned as cs:ip where both cs and ip are in hex, preceded by 0x
+    copy <frame>
+	Duplicate a frame for long-term manipulation. All other frames
+	returned by this command are invalidated when the PC is continued.
+	If you need to keep a frame around for reference, however, it should
+	be copied in this fashion. You will only be able to use it while
+	it's valid (the patient hasn't exited it), of course.
+    delete <frame>
+    	Deletes the frame represented by the given token. Only needed for
+	frames that have been copied.
+    [(+|-|#)]<number>
+ 	Adjusts the current frame up (if the first character is +), down (if
+	the first character is -), or absolutely (if the first character is
+	# or a digit). Frames are numbered from 0. Setting the frame also
+	changes to the scope active in the new frame.
+    set <frame>
+	Sets the current frame to be the given one.
+getenv.prog
+128:Returns the value for an environment variable. Returns the empty string for
+undefined variables, in keeping with TCL traditions.
+load.prog.load|prog.file
+438:Load a file of TCL commands. If the file cannot be found as given, it
+is looked for in all the directories mentioned in the "load-path"
+variable. This variable is initialized from the SWATPATH environment
+variable, which is in the form <dir1>:<dir2>:...:<dirn>. The swat
+library directory is appended to this path, so you needn't include it
+yourself. The file need not end in ".tcl". The directories may contain
+standard C-Shell ~ syntax.
+map.prog.list
+564:Applies a command expression to the successive elements of one or more
+lists, binding each element in turn to a variable and evaluating the
+expression. The results of evaluating the expression are merged into a
+list in the same order as the elements of the lists to which the expression
+is applied. All lists must have the same number of elements. The usage is:
+    map <varlist> <list1> <list2>...<listn> <tcl-command-list>
+Thus,
+    map {a b c} {l1a l1b} {l2a l2b} {l3a l3b} {format {%s %s %s} $c $a $b}
+would result in the list
+    {{l3a l1a l2a} {l3b l1b l2b}}
+mapconcat.prog.list
+563:Applies a command expression to the successive elements of one or more
+lists, binding each element in turn to a variable and evaluating the
+expression. The results of evaluating the expression are merged into a
+string in the same order as the elements of the lists to which the
+expression is applied. All lists must have the same number of elements. The
+usage is:
+    mapconcat <varlist> <list1> <list2>...<listn> <tcl-command-list>
+Thus,
+    mapconcat {a b c} {1a 1b} {2a 2b} {3a 3b} {format {%s %s %s} $c $a $b}
+would result in the string
+    {3a 1a 2a3b 1b 2b}
+null.prog|prog.list|prog.lisp
+98:Determines if its argument is nil (the string "nil" or the empty string),
+returning non-zero if so
+pid.obscure
+89:Returns Swat's process ID. This is only useful for me when I want to
+attach to the thing.
+pscope.obscure
+194:Prints out all symbols in the given scope, or the current scope if
+none given. If the scope is ".", the current scope is also used. If
+the scope is "..", the parent of the current scope is used.
+require.prog|prog.load
+459:require is used to ensure that a particular function is loaded. It takes
+one or two arguments. The first is the function that must be resident,
+while the second is a file from which to load it. If the command isn't
+defined and a file isn't given, the name of the function will be used as
+the file. E.g.
+	require call
+will cause the filename "call" to be given to "load" for reading.
+This command is mostly useful for functions that are not set up to autoload.
+scope.obscure
+316:Change to a different scope. ".." changes to the parent of the
+current scope. Note this does not change the current stack frame, but
+only the scope used by such commands as "whatis" for symbol lookup,
+thus all expressions are evaluated using symbols from the scope in the
+current frame, NOT that set by this command.
+sleep.prog
+409:Suspends swat for a given number of seconds, or until a keyboard interrupt
+occurs, whichever comes first. Input from the PC continues to be processed,
+so a FULLSTOP event will be generated if the machine stops, but this command
+won't return until the time has elapsed. The time is given as a real number
+(e.g. 1.5) being the number of seconds for which to pause. Returns non-zero
+if slept for the entire time.
+sort.prog.list
+233:Sorts a list. Takes three optional flags: -n (treat elements as numbers,
+with the usual radix specifiers possible), -r (sort in descending order) and
+-u (make elements unique). Final argument is list to sort. Returns the
+sorted list.
+stream.prog.load|prog.file
+1592:This command allows you to read and write files from TCL. Once a stream
+is open, all access to it is via the token that the open subcommand returns.
+The available subcommands are:
+    open <file> <mode>
+	<mode> is one of r (read-only), w (write-only and truncate),
+	a (append), r+ (read/write, no truncate), w+ (read/write and
+	truncate). <file> is any filename, but remember that the working
+	directory varies with the current stack frame.
+    read (line|list|char) <stream>
+	reads a line, list or character from a stream.
+    print <string> <stream>
+	prints a string to the given stream so it can be read back in using
+	the "read list" subcommand. I.e. if the string is "foo biff", it
+	will be written to the stream as "{foo biff}\n".
+    write <string> <stream>
+	writes the string to the stream, but doesn't parse backslash
+	sequences -- the string is written as-is.
+    rewind <stream>
+	zhurdd ehsyz?
+    seek (<posn>|+<incr>|-<decr>|end) <stream>
+	Change the current position of the stream. <posn> sets it to
+	an absolute position. +<incr> advances the pointer, -<incr>
+	moves it back. end moves to the end. Returns the final position or
+	-1 if seek is improper or can't be performed.
+    state <stream>
+	Returns one of error, eof, or ok.
+    eof <stream>
+	Predicate to simplify things -- returns 1 if end-of-file has been
+	reached.
+    close <stream>
+	Shuts down a stream.
+    flush <stream>
+	For writable streams only: writes all buffered data to the stream
+Streams are a somewhat limited commodity -- be sure to use "protect" to
+ensure the closing of the stream should an error occur.
+unalias.top
+68:Removes any alias for its argument. See "alias" for more information
+unassemble.prog.memory
+379:Disassembles instruction at an address. If no address is given, or the
+address is the constant "nil", the value of the pc is used. If a second 
+argument is given and non-zero, the arguments to the instruction are decoded
+as well. The result is a 4-element list of the format:
+	{symbolic address} {instruction} {size} {args}
+If the arguments aren't requested, {args} will be empty
+wait.prog.patient
+132:Waits for the patient to stop executing, for whatever reason. Returns 0
+if the patient halted naturally and 1 if it was interrupted.
+whatis.symbol
+120:Describes an expression, giving its type in detail. The expression may be a
+complex expression, a symbol or a type name.
+beep.prog.output
+111:Alert the user to something. If the terminal supports a visible bell, does
+that. Otherwise uses an audible one.
+read-line.prog.input
+286:Reads a single line of input from the user. If optional argument CMD is
+non-zero, the line is interpreted as a TCL command and will not be returned
+until all braces/brackets are balanced. The final newline is stripped.
+Optional second argument is input to be placed in the buffer first.
+read-char.prog.input
+177:Read a character from the user. Optional first argument tells whether to
+echo the read character. If non-zero, the character will be echoed once it's
+read (this is the default).
+save.window
+386:'save <number>' sets the number of lines that are to be stored in the save
+buffer, which holds the most recent N lines of text.
+
+'save <filename>' writes the current contents of the save buffer to the
+named file, overwriting the file's previous contents. Note that if just a
+bare filename (no path) is specified, the current directory, as determined
+by the current stack frame, is used.
+echo.prog.output
+94:Prints its arguments, separated by spaces. If the first argument is -n, no
+newline is printed.
+system.prog.external
+188:Cause a shell to execute the first argument. The shell used is the bourne
+shell, so tilde's aren't expanded. Doesn't return until the command completes
+and the output isn't saved anywhere.
+wcreate.prog.window
+205:Create a window of the given height and return a token for it. The window
+is placed just above the command window, if there's room. If there aren't
+that many lines free on the screen, an error is returned.
+wdelete.prog.window
+86:Delete the given window. All windows below it move up and the command window
+enlarges.
+wpush.prog.window
+139:Switch to a new window, saving the old current-window. Use wpop to go back
+to the previous window. All I/O goes through the current window.
+wpop.prog.window
+48:Revert the current window to what it was before.
+winverse.prog.window|prog.output
+165:Sets the inverse-mode of the current window (whether newly-echoed characters
+are displayed in inverse video) on or off, depending on its argument (1 is on
+as usual).
+wmove.prog.window
+296:Moves the cursor for the current window. Takes two arguments: the new x
+position and the new y position. These positions may be absolute (0-origin)
+or relative (begin with + or -). If you attempt to move outside the current
+window, an error is generated. Returns the new cursor position as {X Y}.
+wclear.prog.window
+35:Clears the current window to blanks
+wrefresh.prog.window
+156:Synchronizes the current window with the screen. This need only be performed
+if you don't echo a newline, as echoing a newline refreshes the current
+window.
+wtop.window
+154:Sets where windows go. If argument is non-zero, windows go at the top of the
+screen and work down. Else windows go at the bottom of the screen and work up
+event.prog.event
+2529:Much of swat's function is driven by events that it dispatches internally
+from various places. As some of these events signal happenings that could
+be of interest to a swat programmer, they are made available via this
+command. Options for this command are:
+    handle <eventName> <handler> [<data>]
+ 	    The <handler> procedure is invoked each time an event of type
+	    <eventName> is dispatched. The handler receives two arguments:
+	    an event-specific piece of data, and the <data> given in this
+	    command. A handler procedure should be declared:
+	    	  proc <handler> {arg data} {<body>}
+	    Returns an <event-name> for later use in deleting it.
+	    The <handler> should return one of "EVENT_HANDLED",
+	    "EVENT_NOT_HANDLED" or "EVENT_STOP_HANDLING". If it
+	    returns "EVENT_STOP_HANDLING", the event will not be
+	    dispatched to any other handlers of that event.
+    delete <event>
+	    Deletes the event handler with the given name, as returned by
+	    an "event handle" command.
+    dispatch <eventName> <arg>
+	    Dispatches an the given event with the piece of data to all
+	    handlers of that event. If <eventName> is a pre-defined event
+	    type, <arg> will be converted to the appropriate type before
+	    being dispatched, else it is passed as a string.
+    create
+    	    Returns a number that represents a new event type. Handlers may
+	    then be defined for and events dispatched of the new type.
+    list
+    	    Lists all tcl-registered events by their event-names and the
+	    handler function
+
+Events currently defined are:
+    FULLSTOP	Generated when patient stops for a while. Argument is
+		string telling why the patient stopped.
+    CONTINUE	Generated just before the patient is continued. The
+		argument is non-zero if going to single-step.
+    TRACE   	Generated when the execution of a source line completes
+    	    	and the patient is in line-trace mode.
+    START	Generated when a new patient/thread is created. Argument
+		is name of patient involved.
+    STACK	Current stack frame has changed. The argument is non-zero
+		if the stack change comes from a change in patients/threads
+		or zero if the change comes from actually going up or down
+		the stack in the current patient.
+    DETACH	Detaching from the PC. arg is always 0x0.
+    RESET   	Returning to top level. arg is always 0x0.
+    ATTACH  	Attached to the PC. arg is always 0x0.
+    RELOAD	Kernel was reloaded. Arg is always 0x0
+    CHANGE	Current patient has changed. Argument is the token for the
+		previous patient.
+gc.top
+216:Implements a simple garbage collector to scavenge unreferenced symbols and
+types. If given an argument, turns on extensive heap checking, which
+slows things down enormously, but does ensure the heap is in good shape.
+handle.prog
+2903:This command offers access to the structures Swat uses to track memory
+and thread allocation on the PC. Tokens returned by this command should
+be regarded as temporary and should not be used across continuations of the
+PC. Anyway, there are several options to this command:
+    lookup <id>
+	<id> is the handle ID to look up. The default radix is decimal, as
+	usual, but all the regular radix characters are understood. This
+	returns a token you should use in getting information about the
+	handle.
+    find <address>
+	<address> is a typical Swat-format address expression. This also
+	returns a token you can use to get information.
+    all
+	Returns a list of all the known handle ID's
+    segment <handle>
+	Returns the segment address of the handle (in decimal -- all numbers
+	returned by this command are in decimal).
+    size <handle>
+	Returns the number of bytes allocated to the handle.
+    state <handle>
+	Returns an integer indicating the state of the handle. The bits are:
+	    0xf8000 Type        0x00800 LMem        0x00400 Kernel
+	    0x00200 Attached    0x00100 Process     0x00080 Resource
+	    0x00040 Discarded   0x00020 Swapped     0x00010 Shared
+	    0x00008 Fixed   	0x00004 Discardable 0x00002 Swapable
+ 	    0x00001 Resident
+	Handle types are:
+	    0x08000 Memory  	0x60000	Timer	    0x70000 Event stack data
+	    0x80000 Stack Event	0x90000	Event	    0xa0000 Saved block
+	    0xb0000 VM Header	0xc0000	VM File	    0xd0000 File
+	    0xe0000 Thread  	0xf0000	GSeg
+    owner <handle>
+	Returns the handle token for the owner of the handle.
+    patient <handle>
+	Returns a token for the patient to which the handle is assigned.
+	This may be passed to the "patient" command to obtain more info.
+    other <handle>
+	Returns the handle's otherInfo field. NOTE: This isn't necessarily
+	the otherInfo field from the PC. For resource handles, e.g., it's
+	the sym token of the module for the handle.
+    id <handle>
+	Returns the ID number of the handle (in decimal).
+    (isthread|iskernel|isfile|isvm|isgseg|ismem) <handle>
+	Returns non-zero if the handle matches the given type
+    interest <handle> <proc> <data>
+	Registers interest in a handle. Returns an interest token to be used
+	when the 'nointerest' subcommand is invoked.
+	When a handle's state changes, <proc> is called with the handle as
+	its first argument, the state change as its second, and <data> as
+ 	its third. The state change is one of:
+	    swapin  	Block swapped in from disk/memory
+	    load	Resource freshly loaded from disk
+	    swapout 	Block swapped to disk/memory
+	    discard 	Block discarded
+	    resize	Block changed size and maybe moved
+	    move	Block moved on heap
+	    free	Block has been freed
+	    fchange	Block's Han_flags changed
+	When the block is freed, there is no need to call handle nointerest
+	as the interest record is deleted.
+    nointerest <interest>
+	Deletes the interest record for the handle.
+help-get.prog.help
+153:Returns a list of all help strings registered for a topic. Note this
+is different from help-fetch, which can only return one string based
+on a help path.
+help-fetch.prog.help
+35:Returns the help string for a path.
+help-fetch-level.prog.help
+72:Returns a list of the topics available at a given level in the help tree
+help-scan.prog.help
+177:Given a <pattern>, expands it to be *<pattern>* and matches it against all
+strings registered in the hash table, returning the names of those topics
+whose documentation matches.
+help-is-leaf.prog.help
+109:See if <path> leads to a leaf node in the help tree (i.e. it has
+no subtopics). Returns 1 if so, 0 otherwise.
+break.prog.tcl.loop|top
+40:break out of current loop or interpreter
+case.prog.tcl.conditional
+507:Similar to the Bourne Shell's case statement, this takes a STRING and pairs
+of PATTERN COMMAND arguments. Each PATTERN is made up of one or more patterns
+as for the shell (using *, ? and [], though you should be sure to quote any
+[]'s you use). Patterns in a PATTERN argument are separated with |'s. If
+one of the patterns is the string "default", the COMMAND for that pattern
+is used if none of the other patterns matches. The STRING may be followed by
+the argument "in" if desired, but it is not required.
+catch.prog.tcl.error
+214:execute COMMAND catching any errors. Optional second arg VAR is name of
+variable into which string result of COMMAND is placed. Returns the code
+returned by the command, i.e. 0 if command succeeded, non-zero if not
+concat.prog.tcl.list|prog.list|prog.string
+148:concatenates multiple list arguments into a single list. E.g.
+    concat a b {c d e} {f {g h}}
+yields the list
+    a b c d e f {g h}
+see also "list"
+continue.prog.tcl.loop
+35:go back to start of containing loop
+error.prog.tcl.error
+67:generate an error with single argument MESSAGE telling what's wrong
+eval.prog.tcl
+45:evaluate the given BODY and return the result
+exec.top|prog.tcl
+531:Invokes a shell to execute COMMAND passing it the rest of the arguments.
+The output of the command is captured and returned as the result of the
+exec. If one of the arguments is <, neither it nor the following argument is
+given to the command. Rather, the following argument is given to the command
+as its input. This can be used, e.g. to pass the contents of a variable to
+"sort" to have them sorted. exec returns the code with which COMMAND
+exited, if it's one of those known to TCL. If the code is unknown, an error
+is generated
+expr.top|prog.tcl
+262:Evaluates the expression given as an argument. This can contain most C
+operators, as well as TCL variables and commands (in [], of course). Returns
+the value of the expression. Hex and octal numbers are specified as in C.
+MASM radix characters are not supported.
+file.prog.tcl
+1259:Performs an operation on a file or file name:
+    file <name> dirname	    Returns the directory portion of <name>. If <name>
+			    has no directory portion, returns "."
+    file <name> executable  Returns non-zero if <name> is executable by the
+			    user.
+    file <name> exists	    Returns non-zero if <name> is an existing file.
+    file <name> expand	    Expands any home directory spec and returns
+			    the result.
+    file <name> extension   Returns all characters after and including the
+    	    	    	    last "." in the <name>. Returns empty if there's
+    	    	    	    no "." in <name>.
+    file <name> isdirectory Returns non-zero if <name> is an existing directory.
+    file <name> isfile	    Returns non-zero if <name> is an existing file.
+    file <name> owner 	    Returns non-zero if <name> is owned by the user.
+    file <name> readable    Returns non-zero if <name> is readable by the user.
+    file <name> rootname    Returns all characters up to but not including the
+    	    	    	    last "." in <name>.
+    file <name> tail  	    Returns all of the characters in <name> after the
+    	    	    	    last slash, or <name>, if it contains no slashes.
+    file <name> writable    Returns non-zero if <name> is writable by the user.
+for.prog.tcl.loop
+449:This is a looping command similar to the for statement in C. It takes four
+arguments: start, test, next and body. start, next and body are regular
+TCL commands, while test is an expression as for the "expr" command. start is
+executed at the beginning, then for each iteration:
+    - test is evaluated. If it is 0, the loop is finished.
+    - the body is evaluated,
+    - next is evaluated
+The loop can be exited prematurely using the "break" command
+foreach.prog.tcl.loop
+173:Takes three arguments: VAR, LIST and BODY. VAR is an iteration variable that
+is filled with each of the elements of LIST in turn with BODY being executed
+for each iteration.
+format.prog.tcl|top
+381:Much like the C function sprintf(3) (type "man 3 sprintf" from the shell for
+more information). The only difference is that %c takes a decimal number that
+is the ASCII code for a character and produces the proper character. Other
+arguments are converted into the proper C data type before being passed to
+sprintf for formatting. This can be used to convert numbers to hex or octal.
+global.prog.tcl.var
+248:Declares the argument variables to be global. For the duration of the
+procedure in which it is executed, the global values of the variables will be
+used and/or modified. Without this, all variables are local and go away when
+the procedure finishes.
+if.prog.tcl.conditional
+348:This is TCL's conditional and has the form
+    if test [then] truebody [elif test truebody [elif ...]] [[else] falsebody]
+While the "then" and "else" keywords are optional, the "elif" keywords must
+be given if additional conditional clauses are needed. If a truebody is empty,
+and the test evaluated non-zero, if will return the result of the test.
+index.prog.list|prog.tcl|prog.string
+245:Takes two arguments VALUE and INDEX and returns the INDEXth field of VALUE.
+If an optional third argument "chars" is given, each character in VALUE is
+considered a field. Otherwise, VALUE is treated as a list and divided into
+fields accordingly.
+info.prog.tcl
+993:Provides information about things, as:
+    args <procname> Returns the list of arguments for the procedure
+    body <procname> Returns the body of the procedure
+    cmdcount   	    Returns the total number of commands executed by
+    	    	    the interpreter
+    commands [<pattern>]
+    	    	    Returns all known commands, if no pattern given, else
+		    only returns those that match the given pattern.
+    default <procname> <arg> <varname>
+    	    	    <procname> is the name of a TCL procedure, and
+    	    	    <arg> is the name of one of its arguments. If the
+		    argument has a default value, that value is placed
+		    in the variable <varname> and 1 is returned,
+		    else 0.
+    globals    	    Returns a list of the names of all global variables
+    locals	    Returns a list of the names of local variables,
+		    including procedure arguments.
+    procs  	    Returns a list of all TCL command procedures
+    vars   	    Returns a list of all currently-visible variables.
+length.prog.list|prog.string|prog.tcl.list
+110:Returns the length of a list. If second arg "chars" is given, the number of
+characters in the list is returned
+list.prog.list|prog.tcl.list
+172:Creates a list of its arguments. For example
+    list a b {c d e} {f {g h}}
+produces
+    a b {c d e} {f {g h}}
+as opposed to "concat", which produces
+    a b c d e f {g h}}
+proc.prog.proc|prog.tcl.proc|prog.def
+908:This is used to define a new TCL procedure. It takes three arguments: the
+name of the procedure, a list of arguments for it, and the body of it, which
+will be evaluated when the command is invoked. The argument list is a list
+of variable names or {VAR DEFAULT} pairs (these may be mixed, though it's
+not very useful to place an arg with a default value before one with no
+default in a list). The number of arguments given to the command must exactly
+match the number of arguments in the list except in two cases:
+    - if every unspecified argument has a default value, fewer may be given
+    - if the last argument in the list is "args", more args may be given. The
+      excess arguments are bound into a list and assigned to the  args
+      variable for the procedure. This allows for procedures that take a
+      variable number of arguments.
+Procedures return values via the "return" command, which see.
+defsubr.prog.proc|prog.tcl.proc|prog.def
+178:Like "proc", except the procedure's name must be typed exactly to invoke it,
+unlike procedures defined with "proc" or "defcommand", for which an unique
+abbreviation is sufficient
+defsys.prog.proc|prog.tcl.proc|prog.def
+357:Like "defsubr", except it inherits all the variables of its caller, unlike
+with "proc" or any other procedure-definition command whose procedures have
+their own local scope and can access variables at the global scope only -- not
+those in their caller's local scope. Any new variables are created in the
+called procedure's scope and go away upon its return.
+protect.prog.tcl.error
+143:Takes two commands as arguments and makes sure the second one gets executed
+even if the first returns an error or executes return-to-top-level.
+range.prog.list|prog.string|prog.tcl.list
+424:This is used to extract pieces of a VALUE (its first arg). The second and
+third args FIRST and LAST specify what part of the value is to be extracted.
+If the optional fourth arg is "chars", the VALUE is treated as a string and
+its fields are characters. Otherwise VALUE is treated as a list. Fields are
+numbered from 0. If LAST is "end", the part extracted extends from the FIRSTth
+field through the end of VALUE, inclusive.
+return.prog.proc
+200:This is used to return from a procedure, as defined by "proc" or one of the
+"def" commands. If given an argument, that is the value returned by the 
+procedure. Otherwise, the empty string is returned.
+scan.prog.string
+186:This parses fields from an input string as does sscanf(3) (which see). The
+only difference is %c produces a decimal number, not a character. Usage is
+    scan STRING FORMAT VAR1 VAR2 ...
+source.prog.load|prog.file
+142:Reads the given file as a series of TCL commands. If the file can't be found,
+".tcl" is appended to it and another attempt is made to read it.
+string.prog.string
+751:Four options are available with this command:
+    string compare STR1 STR2
+    	Compares STR2 to STR2 character-by-character, returning -1, 0 or 1
+    	depending on whether STR1 is lexicographically less than, equal to,
+    	or greater than STR2
+    string first STR1 STR2
+    	Searches STR2 for a STR1 If found, returns the index of the first
+    	character in the first such match. If not found, returns -1
+    string last STR1 STR2
+    	Searches STR2 for the last occurrence of STR1. Returns the index of
+    	the first character of the last such match. If none found, returns -1.
+    string match STR1 STR2
+    	Takes STR2 to be a pattern as for filename wildcarding in the shell
+    	and sees if STR1 matches that pattern. Returns non-zero if so.
+uplevel.prog
+716:uplevel is used to access the variables of another procedure, typically for
+rather specialized routines (such as additional looping constructs).
+
+The command takes two arguments: a level, and a command to execute. The level
+is an integer, with the following meanings:
+    > 0	    indicates the number of scopes to go up. For example, if you
+	    say "uplevel 1 {var foo 36}", you would modify (or create) the
+	    variable "foo" in your caller's scope.
+    <= 0    indicates the number of scopes to go down from from the global
+	    one. "uplevel 0 <cmd>" will execute <cmd> in the top-most
+	    scope, i.e. no local variables are involved, and any variables
+	    created by the command persist as global variables.
+
+var.prog.tcl.var|top
+689:Accepts a variable name and an optional value as arguments. If no value is
+given, returns the value of the variable (if the variable isn't defined,
+returns the empty string). The value of a variable may also be found using
+a $ construct. In this case, however, the variable name must begin with a
+letter and may consist only of letters, digits and underscores. If a value is
+given, that value is assigned to the variable. If invoked in a procedure on a
+variable that has not been declared global (using the "global" command), this
+applies to the LOCAL variable of the given name. Multiple variables may be
+assigned "in parallel" by giving successive variable name/value pairs as
+arguments.
+history.top
+346:This command manipulates the history list. Options are:
+    <n>		Prints the most-recent <n> commands
+    set <size>	Sets the number of commands saved
+    subst <str>	Performs history substitution on <str> and enters it into
+		the history queue.
+    cur		Returns the current history number.
+If no argument is given, all saved commands are printed.
+find-opcode.prog
+1437:Locates the mnemonic for and decodes an opcode. Accepts a list of bytes from
+which the instruction is to be decoded. Returns a list of data from the
+opcode descriptor:
+	{name length branch-type args modrm bRead bWritten inst}
+length is the length of the instruction.
+branch-type is one of:
+
+	1	none (flow passes to next instruction)
+	j	absolute jump
+	b   	pc-relative jump (branch)
+	r	near return
+	R	far return
+	i	interrupt return
+	I	interrupt instruction
+
+args is a list of two-character argument descriptors. The first character
+indicates the type of argument. The second indicates the argument size.
+The first is taken from the following list:
+
+	c	code address -- indicates a flow change
+	d	data -- an immediate value
+	e	effective address -- contents of register or memory
+	m	memory
+	r	register
+	x	simple memory (used for short Ax MOV's)
+	N	next instruction. arg size ignored
+	o	string instruction source operand only if override
+
+Any argument descriptor that doesn't match is to be taken as a literal. E.g.
+AX as a descriptor means AX is that operand.
+modrm is the modrm byte for the opcode.
+bRead is the number of bytes that may be read by the instruction, if one of
+its operands is in memory. bWritten is the number of bytes that may be written
+by the instruction, if one of its operands is in memory.
+inst is the decoded form of the instruction. If not enough bytes were given
+to decode the instruction, inst is returned as empty.
+dcache.prog
+592:Control the data cache. Parameters are as follows:
+	bsize <n>   	Set block size to <n> bytes. This MUST be a power
+			two. Giving <n> as 0 turns off caching. This resets
+			the cache statistics and flushes all cached blocks.
+	length <n>	Set the maximum number of blocks in the cache to
+			<n>, which must be greater than 0 (use a block size
+			of 0 to turn off caching). Resets the cache stats
+			but only flushes data if there are more than <n>
+			blocks currently in the cache.
+	stats		Prints out statistics on hit ratio and cache usage.
+	params		Returns the block and cache size as a list.
+stop-catch.prog.event
+247:Execute the argument TCL clause, preventing a FULLSTOP event from being
+dispatched (with associated return to the top level of the interpreter)
+should the PC stop during the clause's execution. Returns the value of
+the final command in the clause.
+quit.top
+243:Causes the debugger to exit. If the argument "cont" is given, geos is
+allowed to continue. If the argument "leave" is given, however, geos
+remains stopped. If some other argument, or no argument, is given, it exits
+to MS-DOS (if you're lucky).
+set-masks.prog.obscure
+122:Sets the interrupt masks used while the stub is active. First argument is
+mask for controller 1, second, for controller 2.
+patient.prog
+964:This command provides access to information about a patient. For those
+subcommands for which the <patient> is optional, the current patient will
+be used if no patient handle is given.
+
+Possible options are:
+    name [<patient>]	    Returns the name of the patient
+    fullname [<patient>]    Returns the full permanent name w/extension and 
+			    padding spaces.
+    threads [<patient>]	    Returns a list of the thread tokens (NOT handle
+			    ID's) for the patient.
+    resources [<patient>]   Returns a list of the handle tokens for the
+			    resources of the current or given patient.
+    path [<patient>]	    Returns the path to the patient's executable.
+    data [<patient>]	    Returns a list {name} {fullname} {thread#}
+    all			    Returns a list of tokens for all patients in the
+			    system.
+    find <name>		    Takes the name of a patient to find (not its
+			    permanent name, but its name in swat) and returns
+			    the patient token for it.
+thread.prog|prog.thread
+602:Returns information about a thread. A thread token can be obtained via the
+"patient threads" command or "handle other" on a thread handle. The
+options are:
+    id <thread>
+	Returns the handle ID of the thread.
+    register <thread> <regname>
+	Returns the contents of the register for the thread.
+    handle <thread>
+	Returns the handle token for the thread.
+    endstack <thread>
+	Returns the bottom of the stack for the thread.
+    number <thread>
+	Returns the number of the thread in its own universe (e.g. the
+	application thread is thread 0)
+    all
+	Returns a list of tokens for all known threads.
+switch.top|prog.thread
+517:Switches between applications/threads. Takes a single argument of the form
+<patient>:<thread-num> or <threadID>. With the first form, :<thread-num> is
+optional -- if the patient has threads, the first thread is selected.
+To switch to another thread of the same patient, give just :<thread-num>.
+You can also switch to a patient/thread by specifying the thread handle ID.
+NOTE: The switch doesn't happen on the PC -- just inside SWAT.
+
+If you don't give an argument, it switches to the actual current
+thread in the PC.
+link.obscure
+407:Links the first patient as a library of the second. This only works if
+both patients are active. It persists across detach/attach sequences as
+long as the second patient isn't re-downloaded. If only one patient is
+given, it is linked as a library of the current patient. Cycles are not
+allowed. I.e. don't link your application as a library of the UI -- it
+won't work...or if it does, it will make swat die.
+detach.top
+222:Detaches SWAT from the PC, allowing it to continue on its merry way.
+You can re-attach to the PC (possibly after downloading new applications
+or a new kernel) using the "attach" command. Takes the same arguments
+as "quit".
+attach.top
+427:Re-attach to the PC. If any geode has changed since you detached from
+the PC, the symbols for it are re-read. Accepts one optional argument to
+tell whether symbols should be bootstrapped (i.e. read only when the geode
+is encountered). This argument is "-b" if should bootstrap and "+b" if
+should not. If no argument given, the most-recent bootstrap indication
+(either from the command line or a previous attach command) is used
+sym-default.top
+367:Sets the patient to use when parsing an address expression should a symbol
+not be defined in the current patient. You can use this if you're just going
+to be debugging a single patient but its code might be called by another
+patient and you want to have access to the symbols of the non-current one.
+
+Returns the name of the default patient if not given any argument.
+save-state.prog.patient|prog.thread
+97:Records the state of the current thread (its registers) for later
+restoration by "restore-state".
+restore-state.prog.patient|prog.thread
+131:Restores the most-recently saved set of registers for the current thread.
+These registers are saved using the "save-state" command.
+discard-state.prog.thread|prog.patient
+88:Discards the most-recently-saved state for the current thread, as saved
+by "save-state".
+continue-patient.prog.patient
+136:Continues the current patient. If optional first arg is non-zero, timer
+interrupts (and thus forced context switches) will be disallowed
+step-patient.prog.patient
+215:Make the system execute a single instruction. No other thread will be 
+allowed to run, as the timer interrupt will be left off, so you shouldn't
+allow the thread to context switch. Returns once the step is complete.
+current-registers.prog.thread|prog.patient
+55:Returns a list of the registers for the current thread.
+stop-patient.prog.patient
+65:Stop the PC without going back to the top-level interpreter loop.
+io.memory
+474:Allows you to access I/O ports on the PC. If first arg is "w", a full
+16-bit access is performed (either read or write). Next (first, if 8-bit
+access) argument is the port number to access (default radix is decimal).
+Optional final argument is the value to store in the port (radix is also
+decimal). NOTE: The stub handles accesses to ports 20h and a0h specially,
+so it may not track the actual behaviour of the interrupt controllers, 
+as the stub does NOT emulate the 8059.
+fill.memory
+482:Fills memory with a constant value. Usage is:
+    fill (b[yte]|w[ord]) <addr> <length> <value>
+<addr>, <length> and <value> are all standard address expressions. Both the
+segment and offset of <addr> are used as the start of the memory area to be
+filled. For <length> and <value>, only the offset portion is used. <length>
+gives the number of bytes or words to fill and <value> is the value that is
+to be stored. If <addr> is handle relative, <length> may not go outside the
+handle.
+rpc-dbg.obscure
+164:Sets or returns the state of SWAT's internal rpc debug flag. If arg is 
+given, it must be numeric and is assigned to 'debug'. Returns the current
+state of the flag.
+rpc.prog.obscure
+3139:This command provides access to the RPC system by which Swat communicates
+with the stub running on the PC. IT IS INTENDED ONLY FOR SYSTEMS TCL
+PROGRAMMERS WHO KNOW WHAT THEY ARE DOING. While screwing up will cause no
+permanent damage, it can make your debugging session rather unhappy.
+
+With this in mind, these are the possible subcommands:
+    call <proc> <argType> <args> <repType>
+	<proc> is the procedure number to call in the stub. <argType> is a
+	type token describing the arguments being passed. <args> is a value
+	string such as would be returned from "value fetch" of <argType>.
+	<repType> is the type of data expected in return. This may be
+	oversized if a variable amount of response data is expected, but it
+	must reflect the actual type of data being returned so the values can
+	be properly byte-swapped. It is not an error to get too little data
+	back from the stub. Too much data, however, is. Returns the data
+	returned by the stub as a value list.
+	
+	If the call cannot be completed, this will return an error, the
+	message for which will describe the problem.
+    serve <proc> <argType> <repType> <procName> [<data>]
+	Register a server procedure with the RPC system. <proc> is the
+	procedure number to serve. <argType> is a type token describing
+	the arguments expected for the procedure, while <repType> describes
+	the data returned by the server. <procName> is the name of the server
+	procedure. It will be called:
+	    <procName> <length> <args> <data>
+	<length> is the number of bytes of data received. <args> is a value
+	list of the passed data, while <data> is the same as the <data>
+	argument to this call. This argument will always be passed, even if
+	<data> is omitted when the server is registered.
+    event <time> <procName> [<data>]
+	Register an event to be called at a regular interval. <time> is the
+	number of seconds between calls (as a real number). <procName> is
+	the name of the procedure to call and <data> an optional piece of
+	data to pass it. The procedure is called:
+	    <procName> <data> <event>
+	<event> is the event token returned by this call. All three arguments
+	are passed, regardless of the presence of a <data> parameter to this
+	call. The procedure should return a non-zero number if the RPC system
+	should return immediately, rather than going to sleep to wait for
+	something on one of its input streams.
+    delete (<server>|<event>)
+	If argument is a server token, as returned by "rpc serve", the
+	server is unregistered. If it's an event token, as returned by
+	"rpc event", the event is deleted.
+    debug [(on|off|0|1)]
+	Turns the RPC system's debugging on or off, returning the new/current
+	state of the system.
+    timeout [(on|off|0|1)]
+	Turns on/off timeout errors for RPC calls. If timeout errors are shut
+	off, the call will be placed twice, if necessary, and will not return
+	until a response is received. When timeout errors are enabled, if the
+	PC hasn't responded in 2 seconds (a 1 second interval between the
+	two calls), the call will return an error. THIS AFFECTS ALL CALLS,
+	NOT JUST THOSE ISSUED WITH THE "rpc call" COMMAND.
+    wait
+	Wait for something to happen.
+read-line.prog.input
+217:Reads a single line of input from the user. If optional argument CMD is
+non-zero, the line is interpreted as a TCL command and will not be returned
+until all braces/brackets are balanced. The final newline is stripped
+read-char.prog.input
+117:Reads a single character from the user. This will actually read an entire
+line and return just the first character...
+echo.prog.output
+141:Prints its arguments, separated by spaces. If the first argument is -n, no
+newline is printed. The arguments are printed separated by spaces.
+system.prog.external
+188:Cause a shell to execute the first argument. The shell used is the bourne
+shell, so tilde's aren't expanded. Doesn't return until the command completes
+and the output isn't saved anywhere.
+src.prog
+393:Allows access to source-line information from Tcl procedures. Commands are:
+    line <addr>
+	Returns the full path and line number for the indicated address (a
+	regular Swat address-expression).
+    read <file> <line>
+	Reads the indicated line from the indicated file (should be an
+	absolute path, as returned by the "line" subcommand). The line does
+	not contain the line's trailing newline.
+
+string-stats.obscure
+43:Print out statistics for identifier hashing
+symbol.prog
+5267:Use to access the symbol tables loaded for the different patients. There are
+24 types of symbols grouped into 8 classes that may be manipulated via this
+command. As so many other commands, you must first obtain the proper token
+token for a symbol using the "find", "faddr" or "match" subcommands.
+Once you have the token, you can then extract the necessary data from the
+symbol.
+
+The 24 symbol types are fairly self-explanatory so only a list is provided:
+	typedef, struct, record, etype, field, bitfield, enum, method,
+	const, var, chunk, proc, label, loclabel, locvar, onstack,
+	blockstart, blockend, class, masterclass, variantclass, module, union
+These types are divided into eight classes with some overlap:
+    type    describes any structured type: typedef, struct, record, etype,
+	    union. Symbols of this type may also be used in place of type
+	    tokens (see the "type" command).
+    field   describes a field in a structured field: field, bitfield.
+    enum    describes a member of an enumerated type: enum, method.
+    const   a constant defined with EQU: const.
+    var     describes any variable symbol: var, chunk, locvar, class,
+	    masterclass, variantclass.
+    scope   describes any symbol that holds other symbols within it: module,
+	    proc, blockstart.
+    proc    describes only proc symbols.
+    label   describes any code-related symbol: label, proc, loclabel.
+    onstack describes only symbols created by the ON_STACK directive.
+
+The following commands must be used to obtain a symbol token that can be
+used in later commands:
+    find	Takes two or three arguments: a list of allowed classes and
+		the name. The list is in the same form as any tcl list and is
+		made of any of the above-mentioned classes. "any" may also
+		be given to indicate a lack of preference. Returns "nil" if
+		no appropriate symbol can be found. The optional third
+		argument should be a scope symbol's token and will restrict
+		the search to that scope only.
+    faddr	Takes two arguments: the allowed classes, as above, and
+		an address expression.
+    match   	Takes the allowed classes (as for "find") and a wildcard
+		pattern as arguments. Returns a list of symbol tokens whose
+		names match the pattern (the list is empty if no symbols
+		matches the pattern). The pattern may not (yet) involve
+		a symbol-path.
+The following subcommands extract information about a symbol from its token:
+    scope   	Returns a token for the scope containing the given symbol.
+    name    	Returns the name of a symbol.
+    fullname	Returns the fully-qualified name of the symbol.
+    patient 	Returns the patient to which a symbol belongs.
+    class	Returns the class of the symbol.
+    type    	Returns the actual type of the symbol.
+    tget	For those symbols that have data types (var-, field-, and
+		enum-class), returns a type token for that type. For var- and
+		field-class symbols, this is the type of data stored in the
+		variable or field. For enum-class symbols, this is the
+		containing type.
+    addr	For those symbols that have an address (var- and label-class),
+		returns that address as an integer. For locvar symbols, this
+		will be an offset from the frame pointer. For everything else,
+		it is the address within the symbol's segment.
+    get	    	Returns the type-specific data for the symbol, based on its
+	    	class, as follows:
+		var, locvar, chunk:  {addr sclass type}
+		    <addr> is the symbol's address as for the "addr"
+		    subcommand, <sclass> is the storage class of the variable
+		    and is one of static (a statically allocated variable),
+		    lmem (an lmem chunk), local (a local variable below the
+		    frame pointer), param (a local variable above the frame
+		    pointer), or reg (a register variable; address is the
+		    machine register number -- and index into the list
+		    returned by the "current-registers" command).
+		object class: {addr sclass type flag super}
+		    first three elements same as for other variables. <flag>
+	    	    is "variant" if the class is a variant class, "master"
+		    if the class is a master class, or empty if the class is
+		    nothing special. <super> is the symbol token of the
+ 	    	    class's superclass.
+	    	label-class: {addr (near|far)}
+	    	    <addr> is the symbol's address as for the "addr"
+		    subcommand. The second element is "near" or "far"
+		    depending on the type of label involved.
+	    	field-class: {bit-offset bit-width field-type struct-type}
+	    	    <bit-offset> is the offset of the field from the
+		    structure/union/record's base expressed in bits.
+		    <bit-width> is the width of the field, in bits.
+		    <field-type> is the type for the field itself, while
+		    <struct-type> is the token for the containing structured
+		    type.
+	    	const: {value}
+	    	    <value> is just the symbol's value.
+		enum-class: {value etype}
+	    	    <value> is the symbol's value. <etype> is the enumerated
+		    type's symbol.
+	    	blockstart, blockend: {addr}
+	    	    <addr> is the address bound to the symbol.
+		onstack: {addr data}
+		    <addr> is the address at which the ON_STACK was declared.
+		    <data> is the arguments given to the ON_STACK directive.
+ 	    	module: {patient}
+		    <patient> is the token for the patient owning the module.
+
+table.prog
+1091:'table' is used to create, manipulate and destroy hash tables. The entries
+in the table are keyed on strings and contain strings, as you'd expect from
+TCL. The following subcommands are available:
+    create [<initBuckets>]
+	Creates a new table and returns a token for it, to be used in all
+	future calls to this command. The optional parameter, <initBuckets>,
+	specifies the initial number of buckets the table should contain.
+	The table will expand to maintain hashing efficiency should the need
+	arise, so this isn't a number that need be carefully chosen. If you
+	don't give a number, or the number is zero, a default of 16 is used.
+    destroy <table>
+	Frees up all memory associated with the table. The token should
+	never again be used.
+    enter <table> <key> <value>
+	Enters <value> in <table> under the given <key>. Any data previously
+	entered under <key> are lost.
+    lookup <table> <key>
+	Searches <table> for the data stored under <key>. If no data are
+	stored, returns "nil", else the data themselves.
+    remove <table> <key>
+	Removes any data stored in <table> under <key>.
+debug.prog.debug
+322:Sets a breakpoint at the start of any tcl command. Execution will stop at
+the command to enable you to examine the state of things. The breakpoint can
+be removed using undebug.
+
+This command can also be used with no arguments as a breakpoint inside a
+procedure, as executing it causes an immediate entry into the debugger.
+undebug.prog.debug
+40:Removes a breakpoint from a tcl command.
+tcl-debug.prog.debug
+44:Access to interpreter internals for debugger
+type.prog
+3293:Creates, destroys and returns tokens for type descriptions. Possible sub-
+commands are:
+    word, byte, dword, qword, tbyte, sbyte, short, long, int, void
+	Returns a token for the appropriate basic type.
+    make array <length> <base-type>
+	Creates a type for an array of <length> <base-type> elements
+    make pstruct <field> <type> <field> <type> ...
+	Creates a "packed structure" where the fields follow immediately
+	after each other. <field> is the name of the field and <type> is its
+	type, which is a token returned by this command (i.e. "word" isn't
+	acceptable, you should use "[type word]")
+    make struct <field> <type> <bit-offset> <bit-length> ...
+	Creates a structure whose fields needn't be packed together or a
+	multiple of a byte long -- can be used to create a RECORD, e.g. --
+	but if so, the structure MAY NOT be more than a word long and must
+	consist entirely of such bit-fields. If you must have mixed fields,
+	create one of these and nest it inside another structure type.
+	<field> is again the field name, while <type> is the base type in
+	which the field sits (either [type byte] or [type word]). <bit-
+	offset> is the offset from the start of the byte/word in bits, while
+	<bit-length> is the length of the field, again in bits.
+    make (nptr|fptr|sptr|lptr|hptr|optr) <type>
+	Creates a type that's a pointer to the given one.
+	nptr is a near pointer, fptr is a far pointer, sptr is a segment-only
+	pointer, lptr is an lmem handle, hptr is a global handle, optr is
+	an object pointer (local and global handles in low and high words,
+	respectively).
+    make enum
+	Creates a type to which enums may be added (using 'symbol make enum')
+    delete <type>
+	Deletes a previously-defined type. This should be done whenever
+	possible to avoid wasted memory.
+    size <type>
+	Returns the size of the type in bytes.
+    class <type>
+    	Returns the class of the type: char, int, struct, enum, array,
+	pointer.
+    name <type> <varname> <expand>
+	Returns the formatted name of a type. <varname> is the name of the
+	variable to which the type belongs (placed at the proper point in the
+	result). If <expand> is non-zero, structure types are expanded to
+	display their fields.
+    aget <array-type>
+	Returns a four-element list containing the token for the base type of
+	the array, the lower bound for the array's index, the upper bound
+	for the index and the token for the index's type.
+    fields <struct-type>
+	Returns a list of four-tuples {name offset length type}, one for each
+	field in the structure. offset and length are BIT offsets from the
+	start of the structure.
+    members <enum-type>
+	Returns a list of {name value} pairs for the members of the
+	enumerated type.
+    pget <ptr-type>
+	Returns the type of pointer (near, far, seg, lmem, handle) and the
+	type to which it points.
+    emap <num> <type>
+	Maps a constant <num> to the proper member of the enumerated <type>
+    signed <type>
+	Returns non-zero if the type is signed.
+    field <type> <offset>
+	Returns a four-tuple {<name> <length> <ftype>} where <name>
+	is a string of the form <field>.<field>... that is the smallest
+	field in the, possibly nested, structure <type> that covers the
+	byte <offset> bytes from the start of the structure. <length> is the
+	bit-length of the field, <ftype> is its type.
+irq.prog
+598:Provides control over the recognition of keyboard interrupts by the system.
+If no argument is given, it returns the state of the interrupt-pending flag.
+Else, the argument should be one of:
+    no	    Disallows interrupts. Any interrupt that comes in will be held
+	    until interrupts are allowed again.
+    yes	    Allows interrupts. Any pending interrupt will be taken immediately
+    set	    Acts as if a keyboard interrupt came in.
+    clear   Clears any pending keyboard interrupt.
+The pending-interrupt flag can also be set or cleared by giving a non-zero or
+0 numeric argument, respectively
+prompt.prog.input
+152:Print the value of the  prompt  variable and flush output. $prompt may
+contain a single %s, which will be changed to be the name of the current
+patient.
+flush-output.prog.output
+26:Flushes any pending output
+completion.prog
+53:Returns the unique prefix for the given list of names
+columns.prog.output
+65:Returns the number of columns available for output on the screen.
+return-to-top-level.prog
+71:Returns to the top-level interpreter, unwinding all intermediate calls.
+top-level.prog.input
+166:Top-level command loop. Calls the function "top-level-read" and evaluates
+the line it returns, printing out the result. Loops infinitely or until
+"break" is executed.
+current-level.prog.input
+63:Returns the nesting of command interpreters. 1 is the top-most.
+value.prog.patient|prog.memory
+1019:Primitives for accessing and altering values in the patient. Usage is:
+    fetch <address> <type>
+	Returns an appropriately-formatted list of the value. All integers
+	are in decimal. If <type> is a structure, the list is an assoc list
+	of {FIELD-NAME TYPE VALUE} pairs. If <type> is an array, it is a 
+	list of the elements, properly formatted. Else, the list is just the
+	single value at the given address. If <address> has an implied type
+	(i.e. it uses a variable symbol), <type> may be omitted.
+    store <address> <type> <data>
+	<address> and <type> are as above (if <type> is to be omitted, it
+	should be given as "nil". <data> is a list formatted as above.
+    hfetch <num>
+	Return the {handle offset type} list for the <num>th element of the
+	value history.
+    hstore <addr-list>
+	Store the {handle offset type} list <addr-list> in the value history,
+	returning the number under which it was stored.
+    hset <numberSaved>
+	Set the maximum number of values saved in the value history. This
+	must be at least 1.
+read-line.prog.input
+364:Reads a single line of input from the user. If optional argument CMD is
+non-zero, the line is interpreted as a TCL command and will not be returned
+until all braces/brackets are balanced. The final newline is stripped.
+Optional second argument is input to be placed in the buffer first.
+This input must also be on-screen following the prompt, else it will
+be lost.
+read-char.prog.input
+177:Read a character from the user. Optional first argument tells whether to
+echo the read character. If non-zero, the character will be echoed once it's
+read (this is the default).
+beep.prog.output
+38:Alert the user to something by beeping
+echo.prog.output
+94:Prints its arguments, separated by spaces. If the first argument is -n, no
+newline is printed.
+system.prog.external
+129:Cause a shell to execute the first argument. The shell used is the bourne
+shell, so tilde's aren't expanded. Returns immediately.
+prompt.prog.input
+152:Print the value of the  prompt  variable and flush output. $prompt may
+contain a single %s, which will be changed to be the name of the current
+patient.
+provide-input.prog.input
+358:Used to cause a pending read-char or read-line command to return the
+passed input. First argument is line to return if in read-line. Second
+argument is character to return if in read-char. If not in either, saves
+the character in a buffer to be used for the next read-char. Should
+read-line be the next of the two called, the saved character(s) is(are) nuked
+ptrace.top
+189:Print out the contents of the Atron trace buffer. The printout proceeds
+backwards from the most recent recorded bus cycle. Optional argument MAX is
+the maximum number of records to produce.
+call-patient.prog.call
+241:Internal routine to actually perform a call. Returns non-zero if the call
+completed successfully. The previous machine state is still preserved, so
+the caller must invoke discard-state or restore-state, as it sees fit. Args
+are as for "call"
+call.top
+1213:Call a function in the current thread. First argument is the function to
+call. If it is a NEAR function, the thread must already be executing in
+the function's segment. Following arguments are in pairs:
+    <variable/register> <value>
+These pairs are passed to the "assign" command, which see. As a special case,
+if the variable is "push", the value (a word) is pushed onto the stack and
+will be popped when the call completes (if it completes successfully).
+All current registers are preserved and restored when the call is complete.
+Variables are not.
+
+Once the call has completed, you are left in a sub-interpreter to examine
+the state of the machine. Type "break" to get back to the top level.
+
+If the machine stops for any other reason than the call's completion, the
+saved register state is discarded and you are left wherever the machine
+stopped. You will not be able to get a stack trace above the called function,
+but if the call eventually completes, and no registers have actually been
+modified, things will get back on track ok.
+
+You may not call a function from a thread that has retreated into the kernel.
+This function also will not allow you to call ThreadExit. Use the "exit"
+function to do that.
+exit.top
+111:Causes the current thread to exit. Optional argument is the status to return
+to its parent, which defaults to 0
+display.window
+387:Creates a window MAXLINES high for executing the given command each time
+the machine halts. First arg may also be "list", in which case all active
+displays are listed, or "del", in which case the given display is deleted (the
+display may be given by number or by the token returned when the display was
+created). The command to execute for the display must be given as a single
+argument.
+regwin.window
+40:Turns on continuous display of registers
+dbwatch.profile
+229:dbwatch controls observation of database usage. If given no argument, or "on",
+all DB functions will be watched and their parameters and return values printed
+in a nice fashion. Observation can be shut off by saying "dbwatch off"
+dcall.profile
+132:dcall displays calls to a given routine.  Invoking dcall with no arguments
+causes dcall to be disabled.
+	Usage: dcall <routineName>
+
+read-sft.prog.obscure
+81:Returns as a list of structure-values all files in the System File Table in
+order
+sysfiles.kernel
+56:Prints out all open files in the system in tabular form.
+geosfiles.kernel
+39:Prints out all the files opened by GEOS
+dosState.dos
+61:Print out the state of the caller of the current DOS function
+dosMem.dos
+69:Travels along DOS's chain of memory blocks, providing info about each
+sftwalk.kernel
+15:Prints SFT info
+waitpostinfo.kernel
+26:Prints wait/info test info
+ec.output
+885:Gets or sets the error checking level.
+	ec		- get the error checking level
+	ec flag		- turn on "flag"
+	ec +flag	- turn on "flag"
+	ec -flag	- turn off "flag"
+	ec all		- turn on all error checking flags
+	ec none		- turn off all error checking flags
+	ec sum handle	- turn on checksum checking for handle (ec sum bx)
+	ec -sum		- turn off checksum checking
+
+	flags are:
+
+	region - region checking
+	heapFree - heap free block checking
+	lmemInternal - internal lmem error checking
+	lmemFree - lmem free area checking
+	lmemObject - lmem object checking
+	graphics - graphics checking
+	segment - extensive segment register checking
+	normal - normal error checking
+    	vm - vmem file structure checking
+    	lmemMove - force lmem blocks to move whenever possible
+    	unlockMove - force unlocked blocks to move whenever possible
+    	vmemDiscard - force vmem blocks to be discarded if possible
+
+
+emacsIgnore.variable.output
+61:If non-zero, ewatch ignores all routines in emacs-ignore-list
+ewatch.top
+759:This command controls the monitoring of program execution by EMACS. To
+operate, you must have executed "start-server" in your EMACS, either by
+typing M-x start-server or by having the command (start-server nil) in your
+.emacs file.
+
+The command takes three possible subcommands:
+    on	    every time the machine stops or you change stack frames, EMACS
+    	    will display the file and line for the current cs:ip, placing 
+	    a little "=>" at the start of the line so you know where it is.
+    off	    disables the above.
+    show    causes EMACS to display the current frame's cs:ip, but only does
+    	    it once -- it won't follow the execution on the PC.
+
+If you give no arguments, ewatch will just return the current state of the
+watching mechanism.
+emacs.top
+162:	Like vi, makes your emacs bring up the source line corresponding to
+	the current address expression, or cs:ip if no argument is specified.  
+	ewatch must be on.
+
+elist.process|object
+117:Display all events pending for a patient. If no patient name is given,
+the events for the current patient are listed.
+eqlist.process|object
+120:Display all events in a queue.  The first argument is the queue handle, the
+second is the name of the queue for printing
+fwalk.kernel|file
+213:Print out the status of all blocks on the heap.
+The letters in the 'Flags' column mean the following:
+    RW		deny RW
+    R		deny R
+    W		deny W
+    N		deny none
+    rw		access RW
+    r		access R
+    w		access RW
+fhandle.kernel|output|file
+168:Print out a handle. Single argument NUM is the handle's ID number (if you
+want it in hex, you'll have to indicate that with the usual radix specifiers
+at your disposal)
+plist.output
+190:Prints out a list of structures stored in an lmem chunk.  It takes two
+arguments, the structure type that makes up the list, and the lmem handle
+of the chunk. eg. plist FontsInUseEntry ds:di
+fonts.output|kernel
+318:Prints a variety of useful information about font usage.  Takes some
+interesting looking flags...
+	-a        list of fonts available
+	-d        list of font drivers available
+	-u (ID)   list of fonts currently in use. Optional font ID to match.
+	-s        summary of above information
+
+Defaults to showing the summary.
+pchar.output
+208:Prints out the bitmap of a character.  Takes two arguments, the character to
+print, and the address of the font.  If none is given, ^hbx is used.
+The character can either be a numeric constant or a character.
+pfont.output
+107:Prints out bitmaps of a font.  Takes one argument, the address of the
+font. If none is given, ^hbx is used.
+pusage.output
+117:Prints out usage of characters in a font. Takes one argument, the address
+of the font. If none is given, ^bx is used.
+pfontinfo.output|kernel
+75:Prints font header information for a font. Takes one argument, the
+font ID.
+showMethodNames.output
+108:If non-zero, prints out the names of the method in ax when unassembling a
+"CALL ObjMessage" or equivalent.  
+loadgeode.obscure
+503:Load a geode from Swat. Mandatory first argument is the name of the file to
+load (with path from top-level PC/GEOS directory, using / instead of \ as the
+path separator).
+
+Second and third arguments are the data words to pass to the geode. The second
+argument is passed to the geode in cx, while the third argument is passed in dx.
+
+Both the second and third arguments are optional and default to 0. They likely
+are unnecessary.
+
+NOTE: THIS MAY NOT BE USED TO LAUNCH AN APPLICATION. USE loadapp FOR THAT
+loadapp.obscure
+408:Load an application from Swat. Single argument is the file name of the
+application to launch (application must reside in the appl subdirectory of
+the PC/GEOS tree).
+
+The application is opened in normal application mode. Some day this may allow
+opening in engine mode...
+
+Note that the application will not be loaded until you continue the machine, as
+the loading is accomplished by sending a method to the UI
+gloss.reference
+131:'gloss regexp' prints out the glossary definition of 'regexp', which is a
+regular expression (or just a word) that is given to SED.
+ref.reference
+241:'ref routineName' prints out the routine header for a function. If no function
+is given, the function active in the current stack frame is used. This command
+locates the function using a tags file, so that tags file should be kept
+up-to-date
+xref.reference
+153:'xref routineName' prints out a cross reference for the given kernel function.
+If no function is given, the function active in the current frame is used.
+hbrk.break
+725:
+Usage:	"hbrk <location> (byte|word) (match|mismatch) <value>"
+
+Emulates a hardware breakpoint by checking at every method call to
+see if a location in memory has been written to, and breaks when it happens,
+telling you between which two routines the write occurred.  The information
+and the return stack will hopefully guide you to the offending line of code.
+
+Examples:
+	
+	hbrk scrollTab+10 byte match 0
+	(Continues, printing method handlers, until a zero is written at
+         scrollTab+10)
+
+	hbrk OLScrollButton+3 word mismatch 0x654f
+	(Goes until the word at OLScrollButton+3 is destroyed. Hex numbers
+	 require the 0x format)
+
+The command creates two breakpoints.  Remove these to get rid of the 
+hardware breakpoint.
+
+hwalk.kernel|heap
+822:Print out the status of all blocks on the heap. Takes two optional arguments.
+First argument is a collection of flags, beginning with '-', from the following
+set:
+    p	print prevPtr and nextPtr as well.
+    e	do error-checking on the heap.
+    l	just print out locked blocks
+    f	fast print-out -- doesn't try to figure out the type of the block.
+    s #	start at block #
+Second argument is the patient whose blocks are to be printed (either a name
+or a core-block's handle ID). The default is to print all the blocks on the
+heap.
+
+The letters in the 'Flags' column mean the following:
+    s	    sharable
+    S	    swapable
+    D	    discardable
+    L	    contains local memory heap
+    d	    discarded (by LMem module: discarded blocks don't appear here)
+    a	    attached (notice given to swat whenever state changes)
+phandle.kernel|output
+168:Print out a handle. Single argument NUM is the handle's ID number (if you
+want it in hex, you'll have to indicate that with the usual radix specifiers
+at your disposal)
+tmem.kernel
+84:Trace memory usage. Catches calls to DebugMemory, printing out the parameters
+passed
+handles.kernel|heap
+38:Prints out info for all in-use handles
+hgwalk.kernel|heap
+44:Print out all geodes and their memory usage.
+memsize.kernel|heap
+276:memsize changes the ammount of memory that GEOS thinks that it has.  It can
+only be run at startup, before the heap has been initialized.  memsize accounts
+for the size of the stub.
+    memsize 	    	Report the current memory size
+    memsize 512	    	Work like a 512K system
+
+help-verbose.variable
+76:If non-zero, performs verbose prompting, which can be annoying after a while
+help-minAspect.variable
+265:If non-zero, contains the minimum aspect ratio to be maintained when
+displaying tables in the help browser. The ratio is expressed as the fraction
+    entries_per_column*10/number_of_columns
+E.g. a minimum ratio of 1.5 would be 15 (since we don't do floating-point)
+help-help.obscure
+1572:Available commands:
+    show <topic>    Print the help for the given topic. If it has subtopics,
+    	    	    provides a menu of those subtopics for you to examine.
+    find <pattern>  Locate all help topics matching a pattern.
+    up	    	    Go back up one level in the help tree.
+    ..		    Same as "up"
+    goto <level>    Go to a specific level in the help tree.
+    menu    	    Show the menu for the current level.
+    <topic> 	    Any topic that's not one of the above commands. Performs
+    	    	    an implicit "show <topic>"
+Just as symbols may be completed by typing escape, control-] or control-D,
+topics may be completed in the same ways with the same characters (escape
+finishes out the topic, if possible, or finishes as much as is common among
+the possibilities and beeps when it becomes helpless; control-] cycles through
+the possible choices; control-D prints out a table of the possibilities).
+
+In this documentation and in usage messages, the following conventions have
+been more-or-less followed:
+    ()'s enclose a set of alternatives. The alternatives are separated by |'s
+    []'s usually enclose optional elements, except in fairly obvious cases
+	 where they imply a character class (e.g. for the "frame" command).
+    <>'s enclose "non-terminals", i.e. a type of argument, rather than a
+	 string that's to be typed as shown (e.g. "<addr>" means an address
+	 expression, whereas "(addr|biff)" means either the string "addr" or
+	 the string "biff").
+'*' following one of these constructs means 0 or more of the thing, while '+'
+means 1 or more.
+help.reference
+417:This is the user-level access to the on-line help facilities for SWAT. If
+given a topic (e.g. "brk") as its argument, it will print all help strings
+defined for the given topic (there could be more than one if the same name is
+used for both a variable and a procedure, for instance). If invoked without
+arguments, it will enter a browsing mode, allowing the user to work his/her
+way up and down the documentation tree
+breakpoint.top
+47:Commands relating to the setting of breakpoints
+kernel.top
+52:Commands used to print/decode kernel data structures
+memory.top
+46:Commands used to access memory in various ways
+misc.top
+38:Commands that fit in no other category
+obscure.top
+51:Commands that you probably don't want to know about
+output.top
+27:Commands relating to output
+patient.top
+60:Commands for accessing and altering the state of the patient
+profile.top
+57:Commands for tracing/profiling the execution of a patient
+prog.top
+29:Commands for programming swat
+reference.top
+41:Commands for accessing reference material
+stack.top
+61:Commands for examining and manipulating the stack of a thread
+thread.top
+53:Commands for accessing/altering the state of a thread
+variable.top
+39:Variables for altering swat's behaviour
+window.top
+44:Commands to alter how swat's windowing works
+breakpoint.prog
+37:Functions to set breakpoints from TCL
+def.prog
+37:Functions for defining various things
+external.prog
+64:Functions to execute things in the UNIX world (i.e. not in swat)
+file.prog
+29:Functions for accessing files
+help.prog
+50:Functions for manipulating/accessing the help tree
+input.prog
+42:Functions for fetching input from the user
+list.prog
+32:Functions for manipulating lists
+load.prog
+30:Functions for loading TCL code
+memory.prog
+39:Functions for accessing memory from TCL
+obscure.prog
+56:Really obscure functions that I don't want to know about
+output.prog
+30:Functions for producing output
+patient.prog
+55:Functions for accessing/altering the state of a patient
+stack.prog
+44:Functions for manipulating/accessing a stack
+string.prog
+34:Functions for manipulating strings
+tcl.prog
+73:General category for tcl-internal (as opposed to swat-internal) functions
+window.prog
+34:Functions for manipulating windows
+conditional.prog.tcl
+53:Functions for conditional execution/control decisions
+error.prog.tcl
+38:Functions relating to error processing
+list.prog.tcl
+32:Functions for manipulating lists
+loop.prog.tcl
+18:Looping constructs
+ibrkPageLen.var
+72:Number of instructions to skip when using the ^D and ^U commands of ibrk
+ibrk.breakpoint|top
+891:Set a breakpoint interactively. At each instruction, you have several options:
+    q	Quit back to the command level.
+    n	Go to next instruction (this also happens if you just hit
+	return).
+    p   Go to previous instruction.
+    P	Look for a different previous instruction.
+    ^D	Go down a "page" of instructions. The size of the page is controlled
+    	by the global variable ibrkPageLen. It defaults to 10.
+    ^U	Go up a "page" of instructions.
+    b	Set an unconditional breakpoint at the current instruction and
+	go back to command level.
+    a  	Like 'b', but the breakpoint is set for all patients.
+    t  	Like 'b', except the breakpoint is temporary and will be
+    	removed the next time the machine stops.
+    B	Like 'b', but can be followed by a command to execute when the
+	breakpoint is hit.
+    A	Like 'B', but for all patients.
+    T	Like 'B', but breakpoint is temporary.
+int.misc
+1038:Set or print the state of the two interrupt controllers while the machine is
+stopped. If no arguments are given, the current state is printed. Arguments,
+if given, come in pairs -- an interrupt level and its desired state.
+An interrupt level can be specified either using their names or as
+    <controller>:<number>
+<controller> is either 1 or 2, and <number> ranges from 0 to 7. The interrupts
+and their numbers are:
+    Timer   	1:0	System timer. Probably dangerous to enable.
+    Keybd	1:1 	Keyboard input.
+    Slave   	1:2 	This is how devices on controller 2 interrupt.
+    	    	    	Disabling this disables them all.
+    Com2    	1:3 	This is the port usually used by Swat, so it can't
+    	    	    	be disabled.
+    Com1    	1:4 	The other serial port -- usually the mouse.
+    LPT2    	1:5 	The second parallel port
+    Floppy  	1:6 	Floppy-disk drive
+    LPT1    	1:7 	First parallel port
+    Clock   	2:0 	Real-time clock
+    Net	    	2:1 	Network interfaces (?)
+    FPA	    	2:5 	Coprocessor
+    HardDisk	2:6 	Hard-disk drive
+intr.misc
+351:Catch, ignore or deliver an interrupt on the PC. First argument is the
+interrupt number. Optional second argument is "catch" to catch delivery of the
+interrupt, "ignore" to ignore the delivery, or "send" to send the interrupt
+(the machine will keep going once the interrupt has been handled). If no second
+argument is given, the interrupt is delivered
+stepSoftInts.variable.step
+224:If non-zero, stepping into one of the special PC/GEOS software interrupts
+will land you in the kernel, not the destination of the interrupt. For normal
+people (i.e. not kernel maintainers), this should be (and defaults to) 0
+istep.step|top
+2158:istep [default command]
+"is"
+"istep J"
+
+Step through the execution of the current patient.
+This is THE command for stepping through code.
+
+* The default command argument determines what pressing the return key
+does.  By default, return executes a step command.  Any other command
+listed below may be substituted by passing the letter of the command.
+
+Istep steps through the patient instruction by instruction, printing
+where the ip is, what instruction will be executed, and what the
+instruction arguments contain or reference.  Istep waits for the user
+to type a command which it performs and then prints out again where
+istep is executing.
+
+This is a list of istep commands:
+
+    q, ESC, ' '	Stops istep and returns to command level.
+    b           Toggles a breakpoint at the current location.
+    c           Stops istep and continues execution.
+    n		Continues to the next instruction, skipping procedure calls,
+ 		repeated string instructions, and software interrupts. Only
+		stops when the machine returns to the right context (i.e. the
+		stack pointer and current thread are the same as they are
+		when the 'n' command was given).
+    l		Goes to the next library routine.
+    N	    	Like n, but stops whenever the breakpoint is hit, whether
+    	    	you're in the same frame or not.
+    M           Goes to the next method called.   Doesn't work when the method
+    		is not handled anywhere (sorry, I forgot).
+    f	    	Finishes out the current stack frame.
+    s, RET    	Steps one instruction.
+    S		Skips the current instruction
+    J	    	Jump on a conditional jump, even when "Will not jump" 
+		appears.  This does not change the condition codes.
+    g	    	Executes the 'go' command with the rest of the line as
+    	    	arguments.
+    e 		Executes a tcl command and returns to the prompt.
+
+Emacs will load in the correct file executing and following the lines
+where istep is executing if its server is started and if ewatch is on
+in swat.  If ewatch is off emacs will not be updated.
+
+If the current patient isn't the actual current thread, this will wait for the
+patient to wake up before single-stepping it.
+
+See also listi, ewatch.
+
+skip.top
+81:Skip the current instruction. Optional argument is number of
+instructions to skip
+assoc.prog.list|prog.lisp
+269:Given a LIST of the form {{KEY VAL} {KEY VAL} ...} and a KEY for which to
+search, returns the {KEY VAL} element whose KEY matches the given one. If no
+such element, returns nil. The name derives from the list being an
+"associative" list, associating a key with a value.
+car.prog.list|prog.lisp
+37:Returns the first element of the list
+cdr.prog.list|prog.lisp
+51:Returns all but the first element of LIST as a list
+aset.prog.lisp
+189:Sets an element of an array (list). First arg ARRAY is the name of the
+array variable. Second arg IND is the index at which to store (0-origin), and
+third arg VAL is the value to put there.
+lhwalk.kernel
+172:Prints out information about a local-memory heap. Takes one argument:
+The address of the block to print. If no argument is supplied then the block
+pointed at by ds is used.
+objwalk.object
+149:Prints out information about an object block.  The address of the block to
+print. If no argument is supplied then the block pointed at by ds is used.
+loop.prog
+340:Simple integer loop procedure. Usage is:
+
+	loop <loop-variable> <start>,<end> [step <step>] <body>
+
+<start>, <end>, and <step> are integers. <body> is a string for
+TCL to evaluate. If no <step> is given, 1 or -1 (depending as <start>
+is less than or greater than <end>, respectively) is used. <loop-variable>
+is any legal TCL variable name.
+ref.reference
+241:'ref routineName' prints out the routine header for a function. If no function
+is given, the function active in the current stack frame is used. This command
+locates the function using a tags file, so that tags file should be kept
+up-to-date
+makeref.reference
+463:'makeref ' calls ref on ALL functions for a geode. First argument PATIENT is
+the patient for which to generate the reference tree. Second optional argument
+DIR is the reference directory below which to create the reference tree and
+defaults to /staff/pcgeos/refs. E.g. "makeref kernel" would cause files to be
+created in the tree /staff/pcgeos/refs/Kernel. All functions exported by the
+patient have their headers extracted in the proper form in right shadow file
+mcount.object
+27:Gives count of method calls
+get-address.prog.memory
+568:Used by the various memory-access commands. Takes one argument, ADDR, being
+the address argument for the command. Typically, the command is declared as
+    [defcommand cmd {{addr nil}} ... ]
+allowing the address to be unspecified. This function will return the given
+address if it was, else it will return the last-accessed address (stored in
+the global lastAddr variable as a 3-tuple from addr-parse) in the form of
+an address expression. If no address is recorded (lastAddr is nil), the
+default-addr argument is used.  If it is not specified then cs:ip will
+be used.
+set-address.prog.memory
+174:Set the last-accessed address recorded for memory-access commands. Single
+argument is an address expression to be used by the next memory-access
+command (except via <return>)
+listi.memory
+446:listi [address] [length]
+"listi cs:ip 20"
+
+Examine memory as a list of assembler instructions.
+
+* The address argument is the address to examine.  If not specified,
+the address after the last examined memory location is used.  If no
+address has be examined then cs:ip is used for the address.
+
+* The length argument is the number of instructions to list.  It is
+optional and defaults to 16.
+
+Pressing return after this command continues the list.
+bytes.memory
+545:bytes [address] [length]
+"bytes ds:si 32"
+
+Examine memory as a dump of bytes and characters.
+
+* The address argument is the address to examine.  If not specified, the
+address after the last examined memory location is used.  If no
+address has be examined then ds:di is used for the address.
+
+* The length argument is the number of bytes to examine.  It is optional
+and defaults to 16.
+
+Pressing return after this command continues the list.  Characters
+which are not typical ascii values are displayed as a period.
+
+See also words, dwords, imem.
+words.memory
+455:words [address] [length]
+"words ds:si 16"
+
+Examine memory as a dump of words.
+
+* The address argument is the address to examine.  If not specified, the
+address after the last examined memory location is used.  If no
+address has be examined then ds:di is used for the address.
+
+* The length argument is the number of bytes to examine.  It is optional
+and defaults to 8.
+
+Pressing return after this command continues the list.
+
+See also bytes, dwords, imem.
+dwords.memory
+481:words [address] [length]
+"words ds:si 8"
+
+Examine memory as a dump of double words (32 bit hex numbers).
+
+* The address argument is the address to examine.  If not specified, the
+address after the last examined memory location is used.  If no
+address has be examined then ds:di is used for the address.
+
+* The length argument is the number of bytes to examine.  It is optional
+and defaults to 4.
+
+Pressing return after this command continues the list.
+
+See also bytes, words, imem.
+imemPageLen.variable.memory
+82:Contains the number of elements to display when imem is given the ^D or ^U
+command
+imem.memory
+2953:imem [address] [mode]
+"imem ds:si"
+
+Examine memory and modify memory interactively.
+
+* The address argument is the address to examine.  If not specified,
+the address after the last examined memory location is used.  If no
+address has be examined then ds:di is used for the address.
+
+* The mode argument determines how the memory is displayed and
+modified.  Each of the four modes display the memory in 
+various appropiate formats. The modes are:
+
+    Mode  Size   1st column	 2nd column	 3rd column
+    ============================================================
+    b	  byte   hex byte	 signed decimal  ASCII character
+    w	  word   hex word	 unsigned dec.   signed decimal
+    d	  dword  segment:offset  signed decimal	 symbol
+    i	  ???    hex bytes	 assembler instr.
+
+The default mode is swat's best guess of what type of object is at the
+address.
+
+Imem lets you conviently examine memory at different locations and
+assign it different values.  Imem displays the memory at the current
+address according to the mode.  From there you can move to another
+memory address or you can assign the memory a value.
+
+You may choose from the the following single-character commands:
+
+    b, w, d, i	    Sets the mode to the given one and redisplays
+    	    	    the data.
+
+    n, j, <return>  Advances to the next data item.  The memory
+    	    	    address advances by the size of the mode.
+
+    p, k    	    Returns to the preceeding data item. The memory
+    	    	    address decreases by the size of the mode.  When
+    	    	    displaying instructions, a heuristic is applied to
+    	    	    locate the preceeding instruction. If it chooses
+    	    	    the wrong one, use the 'P' command to make it
+    	    	    search again.
+
+    <space> 	    Clears the data display and allows you to enter a new
+    	    	    value appropriate to the current display mode.
+    	    	    The "assign" command is used to perform the
+    	    	    assignment, so the same rules apply as for it,
+    	    	    with the exception of '- and "-quoted strings. A
+    	    	    string with 's around it ('hi mom') has its 
+    	    	    characters poked into memory starting at the current
+    	    	    address. A string with "s around it ("swat.exe") likewise
+    	    	    has its characters poked into memory, with the addition
+    	    	    of a null byte at the end.
+
+    	    	    THIS COMMAND IS NOT VALID IN 'i' MODE. 
+
+    q	    	    quit imem and return to command level. The last
+    	    	    address accessed is recorded for use by the other
+    	    	    memory-access commands. 
+
+    ^D	    	    Display a "page" of successive memory elements in the
+    	    	    current mode.
+
+    ^U	    	    Display a "page" of preceeding memory elements in the
+    	    	    current mode.
+
+    h	    	    This help list.
+
+For ^D and ^U, the size of a "page" is kept in the global variable
+imemPageLen, which defaults to 10.
+
+
+See also bytes, words, dwords, assign.
+pnimbit.output
+75:Prints out a Nimbus bitmap.  Takes one argument, the address of the bitmap.
+tnimbus.output
+62:Trace Nimbus character data commands while building character.
+pnimchar.output
+214:Prints out the Nimbus data for a character in a given font. Takes three
+arguments, the character to print, the GEOS font ID, and a list of styles.
+ The arguments can either be a numeric constants or GEOS constants.
+pnimdata.output
+96:Prints out the Nimbus data for a character. Takes one argument, the address
+of the outline data.
+pnimcommand.output
+69:Prints out Nimbus data from memory, and advances a ptr appropriately.
+obj-foreach-class.prog.ui
+374:Process all the classes for an object from its actual class up to MetaClass.
+First arg FUNC is the name of a procedure to call. Second arg OBJ is the address
+of the object to process. Remaining args are passed verbatim to FUNC after the
+symbol for the next class to process and OBJ. Returns what FUNC returns, if
+processing stops before MetaClass is reached. Else returns {}
+map-method.ui|object
+456:Map a method number to a method name. First argument is the number.
+Second argument is either a class name or the address of an object.
+
+When called from a program, the second argument should be the name of
+the class from which to start the search, and the third argument should be
+the object for which the the method name is being sought, so variant
+classes can be handled, or 0 to indicate that variant classes either won't
+occur or aren't to be handled.
+gentree.output
+600:gentree [address] [instance field]
+"gentree [impliedgrab]"     prints out the tree under the mouse
+"gentree @23 GI_states"	    print out tree with generic states
+"gentree *uiSystemObj"	    start the gentree at the root of the system
+
+Print out a generic tree.
+
+* The address argument is the address to an object in the generic
+tree.  This defaults to *ds:si. 
+
+* The instance field argument is the offset to any instance data
+within the GenInstance which should be printed out.
+
+Make sure, especially when using [impliedgrab], that you are in the
+appropriate patient.
+
+See also vistree, impliedgrab.
+
+vistree.output
+586:vistree [address] [instance field]
+"vistree"		    prints out the tree under the mouse
+"vistree @23 VI_optFlags"   print out tree with opt flags
+"vistree *uiSystemObj"	    starts the visual tree at the root of the system
+
+Print out a visual tree.
+
+* The address argument is the address to an object in the generic
+tree.  This defaults to *ds:si. 
+
+* The instance field argument is the offset to any instance data
+within the VisInstance which should be printed out.
+
+Make sure, especially when using [impliedgrab], that you are in the
+appropriate patient.
+
+See also gentree, impliedgrab.
+
+impgentree.output
+48:Prints out generic tree starting at implied grab
+impvistree.output
+48:Prints out visible tree starting at implied grab
+gup.output
+201:Prints a list of this object & all generic parents.  A second
+argument may be passed, which is the offset to any instance data within
+GenInstance which should be printed out.  (For instance, GI_states)
+vup.output
+201:Prints a list of this object & all visible parents.  A second
+argument may be passed, which is the offset to any instance data within
+VisInstance which should be printed out (For instance, VI_optFlags)
+pclass.output
+30:Prints the class of an object.
+objwatch.profile
+243:"objwatch" displays method calls that have reached a particular object.
+At this point in time, only one object at a time can be watched this way.
+Use:	objwatch <CR>		- clears current objwatch
+	objwatch ADDR <CR>	- sets watch on object at ADDR
+
+mwatch.profile
+265:"mwatch" displays all deliveries of a particular method. 
+
+Use:	mwatch <CR>			- clears current mwatch
+	mwatch METHOD1 METHOD2<CR>	- sets method watch on methods
+
+You may specify up to 8 methods to be watched (less if you have other
+conditional breakpoints active).
+
+objmessagebrk.profile
+315:"objmessagebrk" breaks anytime a method is being SENT to a particular
+object via ObjMessage.  Thus, methods that will be sent via queue are caught
+at ObjMessage, before the event is in the queue.
+Use:	objmessagebrk <CR>		- clears current objmessagebrk
+	objmessagebrk ADDR <CR>		- sets breakpoint for object at ADDR
+
+procmessagebrk.profile
+307:"procmessagebrk" breaks anytime a method is being SENT to a given process
+via ObjMessage.  Thus, methods which will be sent via queue are caught
+at ObjMessage, before the event is in the queue.
+Use:	procmessagebrk <CR>		- clears current procmessage
+	procmessagebrk HANDLE <CR>	- sets breakpoint for process
+
+objbrk.breakpoint
+278:Allows you to stop execution when a particular message is delivered to an
+object. First argument is the object to watch. Second is the method number for
+which to watch.
+
+Any previous breakpoint set by this command is cleared. If no arguments are
+given, no new breakpoint is set.
+patch.top|breakpoint
+1859:
+	Patch assists in creating breakpoints that invisibly make small
+changes to code.  This can help the programmer find several bugs without
+remaking and redownloading.
+
+    	There are several ways of invoking patch:
+
+	    patch <addr>    	Sets a patch at the given address
+	    patch   	    	Sets a patch at the most-recently accessed
+	    	    	    	address, as set by the most-recent
+				memory-access command (bytes, words,
+				listi, imem, ...)
+    	    patch del <addr>*	Removes patches at the given address(es).
+	    	    	    	If no address is given, all known patches
+				are removed.
+
+    	When creating a patch, you are prompted for its contents, each line
+of which comes from the following command set:
+
+	form			meaning			examples
+	----			-------			--------
+	<reg> = <value>		assign value to reg	ax = bx    dl = 5
+	push <reg>|<value>	push value		push ax    push 45
+	pop <reg>|<value>	pop value		pop ax     pop 45
+	pop			pop nothing (sp=sp+2)	pop
+	jmp <address>		change ip		jmp UI_Attach+45
+	scall <address> <regs>	call routine (save)	call MemLock ax=3
+	mcall <address> <regs>	call routine (modify)	call MemLock ax=3
+	xchg <reg> <reg>	swap two registers	xchg ax bx
+	set <flag>		set condition flag	set CF     set ZF
+	reset <flag>		reset condition flag	reset CF   reset ZF
+	if <flag>		if flag set then ...	if CF
+	if !<flag>		if flag reset then ...	if !ZF
+	if <expr>		if expr then...		if foo == 4
+	else
+	endif
+	ret			make function return	ret
+	$			Terminate input
+	a			Abort
+	<<any other>>		tcl command		echo $foo
+
+    	<flag> is taken from the set TF, IF, DF, OF, SF, ZF, PF, AF, CF
+and *must* be in upper-case.
+
+	The "scall" command has no effect on the current registers (not even
+for purposes of return values), while the "mcall" command changes whatever
+registers the function called modifies. See the "call" documentation for the
+format of <regs>.
+
+patchout.patch
+64:
+	patchout causes a RET to be placed at the start of a routine.
+
+patchin.patch
+39:
+	patchin undoes the work out patchout
+
+phintchunk.output|ui
+42:phintchunk ADDR - Prints out a hints chunk
+phint.output|ui
+51:phint [ADDR] - Displays Hints for the passed object
+pobject.output
+513:pobject [address] [print levels]
+"pobj *MyObject"    	prints out MyObject
+"pobj *ds:si l"	    	prints out the master levels of the object at *ds:si
+
+Print all the levels out of an object.
+
+* The address argument is the address of the object to examine.  If not
+specified then *ds:si assumed to be an object.
+
+* The print levels argument makes pobject print only the headings to each
+of the master levels along with an object history number.  Any non-nil
+value ("levels" or "l") enables this.
+
+See also pinst, piv.
+pinst.output
+398:pinst [address]
+"pinst *MyObject"
+
+Print out all the instance data to the last level of the object.
+
+* The address argument is the address of the object to examine.  If not
+specified then *ds:si assumed to be an object.
+
+This is useful for classes you've created by subclassing others and you
+are not interested in the data in the master levels, which pobject would
+display.
+
+See also pobject, piv.
+piv.output
+715:piv master iv [address]
+"piv Vis VCNI_viewHeight"   prints out Vis.VCNI_viewHeight at *ds:si
+
+This prints out the value of the instance variable specified.  
+
+* The master argument expects the name of a master level.  The name
+may be found out print using pobject to print the levels, and then
+using the name that appears after "master part: " and before the
+"_offset".
+
+* The iv argument expects the name of the instance variable to print.
+
+* The address argument is the address of the object to examine.  If not
+specified then *ds:si assumed to be an object.
+
+This is useful for when you know what instance variable you want to
+see but don't want to wade through a whole pobject command.
+
+See also pobject, pinst.
+intFormat.variable.output
+72:Contains the printf format string used to print integers. Defaults to %x
+byteAsChar.variable.output
+301:If non-zero, all byte variables will have their values converted into
+ascii characters. For single-byte variables, both the ascii and the hex
+value will be printed. For multi-byte variables, only the characters will
+be shown. This has been superseded by the "char" type, but remains for the
+hell of it
+alignFields.variable.output
+114:If non-zero, the values for all fields in a structure will be lined up when
+printed, making it easier to scan them
+dwordIsPtr.variable.output
+238:If non-zero, indicates that all dword-sized variables should be assumed to
+be generic far pointers and be printed in segment:offset format, rather than
+as one big 32-bit integer. Superseded by the various ptr types, but....
+Defaults to 1.
+noStructEnum.variable.output
+169:If non-zero, prevents fields that are structures or enums from having the
+words "struct" or "enum" placed in front of them, making for more compact
+output. Defaults to 1
+printRegions.variable.output
+140:If non-zero, causes "print" to attempt to parse any region it finds,
+printing out the size and bounds and type of region. Default value is 1
+condenseSpecial.variable.output
+172:If non-zero, causes special PC GEOS structures (rectangles and output
+descriptors, to name a couple) to be printed specially so as to present
+more information in less space
+condenseSmall.variable.output
+121:If non-zero, small (< 4 bytes) structures are printed on a single line
+with each component considered as a signed integer
+print.output
+1786:Prints the value of an expression. The expression may span multiple
+arguments (i.e. you don't need to put {}'s around it). An expression is
+usually an address that has a type or that is given a type by casting. The
+contents of memory of the given type at that address is what's printed. If
+the expression has no type, its offset part is printed in both hex and
+decimal. This is used for printing registers, eg.
+
+If the first argument begins with '-', it is taken to contain flags that
+control how the value is printed.  Multiple flags may be given in the same
+argument (in fact, this only pays attention to the first argument). The
+flags are:
+    x	integers (bytes, words, dwords if dwordIsPtr false) printed in hex
+    d	integers printed in decimal
+    o	integers printed in octal
+    c	bytes printed as characters (byte arrays printed as strings, byte
+	variables/fields printed as character followed by integer equivalent)
+    C	bytes treated as integers
+    a	align structure fields
+    A	Don't align structure fields
+    p	dwords are far pointers
+    P	dwords aren't far pointers
+These flags operate on the following TCL variables:
+    intFormat		A printf format string for integers
+    bytesAsChar		Treat bytes as characters if non-zero
+    alignFields		Align structure fields if non-zero
+    dwordIsPtr		DWord's are far pointers if non-zero
+    noStructEnum    	If non-zero, doesn't print the "struct", "enum" or
+    	    	    	"record" before the name of a structured/enumerated
+			type -- just gives the type name.
+    printRegions    	If non-zero, prints what a Region * points to (bounds
+			and so on).			
+    condenseSpecial	If non-zero, condense special structures (Rectangles,
+			OutputDescriptors, ObjectDescriptors, TMatrixes and all
+			fixed-point numbers) to one line.
+
+prenum.print
+76:Given an enumerated TYPE and a VALUE, returns the appropriate enum constant.
+precord.print
+81:Given a record type and a value, print the proper bits...we'll
+fill this in later
+wakeup-thread.prog.thread
+186:Subroutine to actually wake up a thread. Argument WHO is as for the "switch"
+command. Returns non-zero if the wakeup was successful and zero if the machine
+stopped for some other reason.
+wakeup.thread|patient
+328:Wait for a given patient/thread to wake up. WHO is of the same form as the
+argument to the "switch" command, ("help switch" to find out more). Leaves
+you stopped in the kernel in the desired thread's context unless something
+else causes the machine to stop before the patient/thread wakes up. WHO
+defaults to the current thread.
+spawn.thread|patient
+494:Set a temporary breakpoint in a not-yet-existent process/thread,
+waiting for a new one to be created. First argument is the permanent
+name of the process to watch for.  Second argument is address
+expression of where to place the breakpoint.  If no second argument is present,
+the machine will be stopped and SWAT will return to the command level.
+
+This can also be used to catch the spawning of a new thread.
+
+If the machine stops before the breakpoint can be set, you'll have to
+do this again.
+ps.misc
+430:Print out system status. Only one of the following flags may be given:
+    -p	    Prints out info on all patients. May be followed by a list of
+    	    a patients to be displayed.
+    -t	    Prints out info on all threads. May be followed by a list of
+    	    patients whose threads are to be displayed.
+    -h	    Prints out info on all handles. May be followed by a list of
+    	    patients whose handles are to be displayed.
+ptext.output|ui
+305:ptext [-lsrt] ADDR - Prints out a text object
+	-c: print out the characters (the default)
+	-e: print out elements in addition to runs
+	-l: print out line and field structures
+	-s: print out style structures
+	-r: print out ruler structures
+	-g: print out graphics structures
+	-t: print out type structures
+
+pline.output|ui
+209:pline [LINE] [ADDR] - Prints out a line of a text object
+    if there is a single argument it is assumed to be the line.
+    Default for the line is the value in 'di'.
+    Default for the address is '*ds:si'.
+
+pfield.output|ui
+214:pfield [FIELD] [ADDR] - Prints out a field of a text object
+    if there is a single argument it is assumed to be the field.
+    Default for the field is the value in 'bx'.
+    Default for the address is '*ds:si'.
+
+pgs.output|ui
+82:pgs ADDR - Prints out a graphics string.  Assumes ds:si if no address 
+ specified.
+pvismon.output|ui
+56:pvismon [ADDR] - Displays passed VisualMoniker structure
+pvm.output|ui
+57:pvm [ADDR] - Displays VisualMoniker for the passed object
+preg.output
+298:Print out the region at the given address. If first arg is -g, the region
+is printed as a series of x's and spaces (useful only for small regions).
+If no address given, uses the last-accessed address (as per "bytes" and
+"words"). Sets the last address to the first byte after the region definition.
+setcc.top
+482:setcc flag [value]
+"setcc c"   	sets the carry flag
+"setcc z 0" 	clears the zero flag
+
+Set a flag in the computer.
+
+* The first argument is the first letter of the flag to set.  The
+following is a list of the flags:
+
+    t	trap
+    i	interrupt enable
+    d	direction
+    o	overflow
+    s	sign
+    z	zero
+    a	auxiliary carry
+    p	parity
+    c	carry
+
+* The second argument is the value to assign the flag.  It defaults to
+1 but may be 0 to clear the flag.
+
+See also clrcc, compcc.
+
+clrcc.top
+348:clrcc flag [value]
+"clrcc c"   	clears the carry flag
+
+Clear a flag in the computer.
+
+* The first argument is the first letter of the flag to clear.  The
+following is a list of the flags:
+
+    t	trap
+    i	interrupt enable
+    d	direction
+    o	overflow
+    s	sign
+    z	zero
+    a	auxiliary carry
+    p	parity
+    c	carry
+
+See also setcc, compcc.
+
+compcc.top
+420:compcc flag
+"compcc c"   	complements the carry flag
+
+Complements a flag in the computer.
+
+* The first argument is the first letter of the flag to complement.
+The following is a list of the flags:
+
+    t	trap
+    i	interrupt enable
+    d	direction
+    o	overflow
+    s	sign
+    z	zero
+    a	auxiliary carry
+    p	parity
+    c	carry
+
+This command is handy to insert in a patch to flip a flag bit.
+
+See also setcc, clrcc.
+
+showcalls.profile
+1244:showcalls displays calls to various parts of PC GEOS.  The flags to showcalls
+determine the types of calls displayed.  Invoking showcalls with no arguments
+causes all call monitors to be disabled.  Flags must be all given in the first
+argument such as "showcalls -vl"
+    -p : Modify all other flags to work for the current patient only
+
+    -b : Monitors vis builds
+    -s : Monitors shutdown: METHOD_DETACH, DETACH_COMPLETE, ACK, DETACH_ABORT
+    -d : Show dispatching of threads
+    -e : Show FOCUS, TARGET, MODAL, DEFAULT, etc. exclusive grabs and releases
+    -f : Show flow object calls for mouse, kbd & window grabs & releases
+    -g : Show geometry manager resizing things (all sizes in hex)
+    -i : Show software interrupt calls
+    -l : Show local memory create, destroy, rellocate
+    -m : Show global memory alloc, free, realloc
+    -n : Show grab/exclude/include calls to window system
+    -o : Show ObjMessage and ObjCallXXX
+    -r : Show calls to a given resource
+    -t : Show calls to transfer routines
+    -v : Show calls to the video driver
+    -w : Show WinOpen, WinClose, WinMoveResize, WinChangePriority
+
+    -G : Show GrCreateState and GrDestroyState
+    -N : Show navigation calls (between fields, and between windows)
+
+smatch.top
+313:Look for symbols of a given class by pattern. First argument PATTERN is the
+pattern for which to search (it's a standard SWAT pattern using shell wildcard
+characters). Optional second argument CLASS is the class of symbol for which
+to search and is given directly to the "symbol match" command. Defaults to
+"any".
+slist.top
+415:List source lines in a given range. The range may be any of the following:
+    <address>	    	    Lists the 10 lines around the given address
+    <line>		    Lists the given line in the current file
+    <file>::<line>	    Lists the line in the given file
+    <line1>,<line2>	    Lists the lines between line1 and line2,
+			    inclusive, in the current file
+    <file>::<line1>,<line2>  Lists the range from <file>
+
+func.stack
+310:Sets or gets the current function. If no argument is given, returns the
+function in the current stack frame. If an argument is given, sets the current
+frame to be the first from the top that is for that function. If the patient
+isn't active, or there's no frame for the function, this function returns an
+error
+up.stack|top
+222:Given an argument n, shifts the current frame up n frames. If no argument is
+given, makes the next frame up the stack (where "up" is away from the top) be
+the current frame. Command may be repeated by typing just <return>.
+down.stack|top
+174:Shifts the current frame down the given number of frames, or 1 if no number
+given. "down" means towards the top of the stack. Command may be repeated by
+typing just <return>.
+backtrace.stack|top
+108:Print all active stack frames for the patient. If an argument is given, it is
+the number of frames to print.
+finishframe.prog.stack
+319:Finishes out the frame given as an argument. For this to work, SWAT must be
+able to decode the next frame down the stack (the given frame's caller), as
+it simply fetches that frame and the address in it and sets a breakpoint
+at that address. Caller should dispatch the FULLSTOP event... Returns
+non-zero if interrupted.
+finish.stack
+145:Finish the current frame, or frame n (number given by "backtrace"), if given.
+Simply allows the machine to run until it exits the selected frame.
+ret.stack
+239:Return from the function given as an argument. If no argument given, return
+from the one at the top of the stack. Note this doesn't forcibly return from
+the function, it merely lets the patient run until the function is done. q.v.
+"finish"
+dumpstack.stack
+283:Dumps a list of words, attempting to make symbolic sense of the values,
+in terms of handles, segments, & routines.  The default starting address
+is ss:sp, but may be passed, as in "wordinfo ds:si".  A second argument
+may be passed which is the # of words to print out. (default is 50
+wproc.prog
+228:Writes a command procedure NAME out to the file FILE. If optional third
+arg APPEND is non-zero, the procedure will be appended to the file. Otherwise
+it will overwrite the file. This does not know if a procedure is a subroutine.
+field.prog.list|prog.memory
+130:Assuming first argument LIST is a structure-value list from the "value"
+command, return the value for field NAME in the structure.
+go.breakpoint|top
+275:Takes as many address expressions as desired for arguments and sets
+breakpoints at all of them. These breakpoints will be removed when the machine
+stops AND ARE ONLY ACTIVE FOR THE CURRENT PATIENT. After the breakpoints
+are set, the machine is continued in the usual fashion.
+printStop.variable.misc
+122:If non-zero causes the current PC and the reason for stopping to be printed
+each time the machine comes to a complete stop
+waitForPatient.variable.obscure
+320:If non-zero, the command-level patient-continuation commands (step, next
+and cont, e.g.) will wait for the machine to stop before returning. Otherwise,
+they will return right away and you will have to use stop-patient to make
+the machine stop. This isn't fully tested and should only be set 0 in
+very weird circumstances
+step.step
+263:Make the patient execute a single machine instruction. If waitForPatient is 
+non-zero, waits for the machine to stop again. BEWARE: This doesn't do any
+of the checks for special things (XchgTopStack, software interrupts, etc.)
+performed by the s command in istep.
+next.step|breakpoint
+279:Execute a single instruction, skipping over any calls, repeated instructions,
+or software interrupts. Does not protect against recursion, however, so the
+breakpoint set may be taken in an instance of the current function different
+than the one in which you executed this command.
+cont.top
+89:Continue the machine. If waitForPatient is non-zero, waits for the machine to
+stop again.
+read-reg.prog.patient|prog.thread|patient|thread
+62:Returns the current value for register REG as a decimal number
+regs.top
+115:Print out the current registers in a nice format. This includes the flags,
+and the instruction at the current CS:IP
+why.misc
+56:Returns the enumerated constant for the error code in AX
+debugger.prog.debug
+631:Name of the command when things go wrong. The function is passed two
+arguments: a condition and the current result string from the interpreter.
+The condition is "enter" if entering a command whose debug flag is set, "exit"
+if returning from a frame whose debug flag is set, "error" if an error occurred
+and the "debugOnError" variable is non-zero, "quit" if quit (^\) is typed and
+the "debugOnReset" variable is non-zero, or "other" for some other cause
+(e.g. "debug" being invoked from within a function).
+
+Execution continues when the function returns. The result of the function
+replaces the previous result for the interpreter.
+debugOnError.prog.debug
+126:If non-zero and an uncaught error is detected by the interpreter, the
+function indicated by the "debugger" variable is invoked
+debugOnReset.prog.debug
+155:If non-zero and ^\ is typed or you answer 'n' to the 'Do you want to abort?'
+prompt, causes the function indicated by the "debugger" variable to be
+invoked
+tbrk.top|breakpoint|prog.breakpoint
+1293:This command manipulates breakpoints that tally the number of times they
+are hit without stopping execution of the machine -- the breakpoint is noted
+and the machine is immediately continued. Such a breakpoint allows for
+real-time performance analysis, which is nice.
+
+If no subcommand is recognized, a tbrk is set at the address that must be the
+first argument. A set of conditions as for "cbrk" may follow the address. Only
+stops that meet the conditions will be counted. A token of the form "tbrk<n>"
+is returned after the breakpoint is set. This token, or the <n> from the token,
+should be used for all further manipulations of the breakpoint.
+
+Example:
+    tbrk    ObjCallMethodTable ax=METHOD_ATTACH
+
+sets a tally breakpoint at ObjCallMethodTable to count all the times it is
+called with AX containing METHOD_ATTACH.
+
+Possible subcommands are:
+    clear <tbrk>+
+    del <tbrk>+
+    delete <tbrk>+
+    	All three forms delete one or more tbrk.
+
+    list
+    	Lists all active tbrks and gives their current counts.
+
+    cond <tbrk> [<criteria>|none]
+    	Change the conditions for a tbrk. <criteria> is as for the cbrk command.
+
+    count <tbrk>
+    tally <tbrk>
+    	Both forms return the current count for the given tbrk.
+
+    reset <tbrk>
+    	Resets the tally for the given tbrk to 0.
+
+threadstat.kernel
+42:Print info about all threads in the system
+pthread.kernel|output
+38:Prints out information about thread ID
+freeze.thread
+509:Attempt to prevent a thread from running by setting its priority really high,
+thereby making it not run unless it absolutely has to. The thread can be
+restored to its previous condition by executing "thaw" with the same argument.
+
+Only argument "who" is similar in format to the argument passed to "switch":
+    <patient>	    thread 0 of the indicated patient
+    :<n>    	    thread <n> of the current patient
+    <patient>:<n>   thread <n> of the indicated patient
+    <id>    	    thread with the given ID
+
+thaw.thread
+382:Allow a thread to run as usual, resetting its priority to be what it was before
+the thread was frozen.
+
+Only argument "who" is similar in format to the argument passed to "switch":
+    <patient>	    thread 0 of the indicated patient
+    :<n>    	    thread <n> of the current patient
+    <patient>:<n>   thread <n> of the indicated patient
+    <id>    	    thread with the given ID
+
+timingProcessor.variable
+76:The processor for which to generate cycle counts. One of 8086, 8088 or 80286
+cycles.profile
+847:Count instruction cycles from now until the given address is reached. Prints
+out each instruction as it is executed, along with the cycles it took. If
+no address is given, executes until a breakpoint is hit.  Takes the
+following (optional) flags:
+    -r                  Prints routines called, the total cycles for each
+			routine, and a running total, not the cycles for each
+			instruction.
+    -i	                Same as -r, but indents to show calling level. Not
+			recommended for counting cycles over deeply nested
+			routines.
+    -I	    	    	Same as -i, except uses (#) to indicate call level
+    -f			Stop counting when this routine finishes
+    -x <routine>        Step over calls to <routine>
+    -x <routine>=<val>  Step over calls to <routine> and assume that the call
+                        takes <val> cycles for timing purposes
+
+prompt.variable.input
+306:Contains a format string for the command prompt. A single %s is replaced by
+the name of the current patient. A single ! is replaced by the number of the
+current command in the command history. These escapes may only be used once.
+Note that to get a % in the prompt, you must use %% or you will get an error
+lastCommand.prog.input|variable.input
+59:The command currently being executed. Set by top-level-read
+repeatCommand.prog.input|variable.input
+211:The command to execute should the user type only a newline. Set to nil by
+top-level-read. A command that wishes to be repeated should set this to the
+appropriate value (usually based on the value of lastCommand)
+symbolCompletion.variable.input
+423:If non-zero, enables symbol completion in the command reader. An escape causes
+the reader to supply the longest common prefix of all symbols that begin with
+what you've typed so far. If the prefix begins more than one symbol, it will
+beep to tell you this. If you type control-D, the reader will print out all the
+possible completions. Typing control-] causes it to cycle through the possible
+symbols, in alphabetical order
+set-repeat.prog.input
+266:Sets the command to be repeated using a template string and the lastCommand
+variable. The variables $0...$n substitute the fields 0...n from the
+lastCommand variable, with the final result being placed in repeatCommand
+to be executed should the user type just return
+trace.whiffle
+0:
+vi.top
+268:Invoke "vi" using the given arguments. If none given, and the source file
+in which the patient is executing is known, edit that file. If the source file
+isn't known, does a "vi -t <function-name>" where <function-name> is the name
+of the function in the current frame.
+ls.misc
+142:List the current directory. -C flag automatically passed (otherwise the output
+wouldn't be in columns). Other flags you have to give yourself.
+pmake.misc
+65:Recompile the current patient. Doesn't download the thing, though
+vif.misc
+22:VI the given function.
+systemobj.output|ui
+37:Prints out address of the uiSystemObj
+flowobj.output|ui
+35:Prints out address of the uiFlowObj
+impliedwin.output|ui
+48:Prints out address of the current implied window
+impliedgrab.output|ui
+46:Prints out address of the current implied grab
+screenwin.output|ui
+56:Prints out address of the current top-most screen window
+fieldwin.output|ui
+55:Prints out address of the current top-most field window
+prinst.output|ui
+182: Prints out an instance data field, given the master offset, instance data, 
+  and object.  For instance:
+	prinst Month MI_month @65	
+	prinst Gen GI_states		;uses object at *ds:si   
+prgen.output|ui
+117: Prints out generic instance data field, for example:
+	prgen GI_states @65
+	prgen GI_moniker		;uses object at *ds:si 
+prvis.output|ui
+117: Prints out visual instance data field, for example:
+	prvis VI_bounds @65
+	prvis VI_optFlags		;uses object at *ds:si 
+prspec.output|ui
+127: Prints out visual instance data field, for example:
+	prspec OLSBI_docOffset @65
+	prspec OLCI_optFlags		;uses object at *ds:si 
+prsize.output|ui
+36: Prints out the size of an object.  
+pvmt.output|kernel
+1473:Produces a map of the blocks allocated in a VM file given either the SIG_VM's
+handle ID or a SIG_FILE's handle ID. Only the used blocks are listed. The
+columns of the table are as follows:
+    han	    	VM block handle (in hex)
+    flags    	D if the block is dirty, C if the block is clean, - if the
+		block is non-resident, L if the block is LMem, B if the block
+		has a backup.
+    memhan  	Associated memory handle. Followed by "(d)" if the memory for
+		the block was discarded.
+    block type	The type of block:
+    	    	    VMBT_USED	a normal in-use block,
+		    VMBT_DUP 	an in-use block that has been backed up or
+				allocated since the last call to VMSave
+		    VMBT_BACKUP	a place-holder to keep track of the previous
+				version of a VMBT_DUP block. The uid is the
+				VM block handle to which the file space used
+				to belong.
+		    VMBT_ZOMBIE	a block that has been freed since the last
+				VMSave. The handle is preserved in case of a
+				VMRevert.
+    uid	    	The "used ID" bound to the block.
+    size    	Number of bytes allocated for the block in the file.
+    pos	   	The position of those bytes in the file.
+
+Optional flags (preceded by '-') may appear before the handle:
+
+    -a	    	Print all blocks, including assigned and unassigned blocks.
+    -s	    	Handle is the segment of the header block, not the id of
+    	    	a file or VM handle. E.g. 'pvmt -s ds' will print the 
+		block table for the file whose VM header block is pointed
+		to by ds
+
+pvmb.output|kernel
+93:Prints out the VMBlockHandle for a VM block given the file handle H and the
+VM block handle B
+prdb.output|dbase
+238:Produces useful information about a DBase block. For now, only info about the
+map block of the DBase file is produced. First arg H is the SIG_FILE or SIG_VM
+handle's ID. Second arg B is the VM block handle for which information is
+desired
+whatat.output
+64:Given an address, print the name of the variable at that address
+wintree.output
+206:Prints out a window tree starting with the root specified.  A second
+argument may be passed, which is the offset to any instance data within
+a Window which should be printed out.  (For isntance, W_ptrFlags)
+x11-get-def-selection.prog.window
+56:Returns the PRIMARY or CUT_BUFFER0 selection as a string

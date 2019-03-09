@@ -1,0 +1,54 @@
+#!/bin/sh -
+##############################################################################
+#
+# 	Copyright (c) GeoWorks 1994 -- All Rights Reserved
+#
+# PROJECT:	
+# MODULE:	
+# FILE: 	rinstall
+# AUTHOR: 	Adam de Boor, Apr 13, 1994
+#
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#	ardeb	4/13/94		Initial Revision
+#
+# DESCRIPTION:
+#	A script to perform an rdist to another machine of one or more files
+#	doing the same stuff as the -b flag to install (i.e. creating a .old
+#	version of the thing)
+#
+#
+# USAGE:
+#	rinstall "<host>+" <file>+
+#
+#	    the first argument may be -a to install to all sites other than
+#	    the current one
+#
+#	$Id: rinstall,v 1.2 95/01/03 10:41:57 adam Exp $
+#
+###############################################################################
+
+hosts="$1"
+if [ x"$hosts" = x-a ]; then
+	read site < /staff/pcgeos/.GINSTALL_SITE_NAME
+	case $site in
+		alameda)	hosts="quark.geoworks.com tungsten.seattle.geoworks.com";;
+		berkeley)	hosts="fusion.geoworks.com tungsten.seattle.geoworks.com";;
+		seattle)	hosts="fusion.geoworks.com quark.geoworks.com";;
+		*)		echo $0: unknown current site
+				exit 1
+				;;
+	esac
+fi
+shift
+
+for i do
+	cat - << EOF > /tmp/rdist$$
+( $i ) -> ( $hosts )
+	install $i.new ;
+	special "rm -f $i.bad; ln $i $i.bad; mv $i.new $i" ;
+EOF
+	rdist -f /tmp/rdist$$
+done
+	

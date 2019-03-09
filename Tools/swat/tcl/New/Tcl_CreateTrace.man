@@ -1,0 +1,104 @@
+'\" Copyright 1989 Regents of the University of California
+'\" Permission to use, copy, modify, and distribute this
+'\" documentation for any purpose and without fee is hereby
+'\" granted, provided that this notice appears in all copies.
+'\" The University of California makes no representations about
+'\" the suitability of this material for any purpose.  It is
+'\" provided "as is" without express or implied warranty.
+'\" 
+'\" $Header: /sprite/src/lib/tcl/RCS/Tcl_CreateTrace.man,v 1.2 89/03/24 14:16:01 ouster Exp $ SPRITE (Berkeley)
+'\" 
+.so \*(]ltmac.sprite
+.HS Tcl_CreateTrace tcl
+.BS
+.SH NAME
+Tcl_CreateTrace \- arrange for command execution to be traced
+.SH SYNOPSIS
+.nf
+\fB#include <tcl.h>\fR
+.sp
+Tcl_Trace
+\fBTcl_CreateTrace\fR(\fIinterp, level, proc, clientData\fR)
+.SH ARGUMENTS
+.AS ClientData (clientData)()
+.AP Tcl_Interp *interp in
+Interpreter in which to create new command.
+.AP int level in
+Only commands at or below this nesting level will be traced.  1 means
+top-level commands only, 2 means top-level commands or those that are
+invoked as immediate consequences of executing top-level commands
+(procedure bodies, bracketed commands, etc.) and so on.
+.AP void (*proc)() in
+Procedure to call for each command that's executed.  See below for
+details on the calling sequence.
+.AP ClientData clientData in
+Arbitrary one-word value to pass to \fIproc\fR.
+.BE
+
+.SH DESCRIPTION
+.PP
+\fBTcl_CreateTrace\fR arranges for command tracing.  From now on, \fIproc\fR
+will be invoked before Tcl calls command procedures to process
+commands in \fIinterp\fR.  The return value from
+\fBTcl_CreateTrace\fR is a token for the trace,
+which may be passed to \fBTcl_DeleteTrace\fR to remove the trace.  There may
+be many traces in effect simultaneously for the same command interpreter.
+.PP
+\fIProc\fR should have the following structure:
+.nf
+.RS
+void
+proc(\fIclientData, interp, level, command, cmdProc, cmdClientData, argc, argv\fP)
+.RS
+ClientData \fIclientData\fP;
+Tcl_Interp *\fIinterp\fP;
+int \fIlevel\fP;
+char *\fIcommand\fP;
+int (*\fIcmdProc\fP)();
+ClientData \fIcmdClientData\fP;
+int \fIargc\fP;
+char *\fIargv\fP[];
+.RE
+{
+}
+.RE
+.fi
+The \fIclientData\fP and \fIinterp\fP parameters are
+copies of the corresponding arguments given to \fBTcl_CreateTrace\fR.
+\fIClientData\fR typically points to an application-specific
+data structure that describes what to do when \fIproc\fR
+is invoked.  \fILevel\fR gives the nesting level of the command
+(1 for top-level commands passed to \fBTcl_Eval\fR by the application,
+2 for the next-level commands passed to \fBTcl_Eval\fR as part of parsing
+or interpreting level-1 commands, and so on).  \fICommand\fR
+points to a string containing the text of the
+command, before any argument substitution.
+\fICmdProc\fR contains the address of the command procedure that
+will be called to process the command (i.e. the \fIproc\fR argument
+of some previous call to \fBTcl_CreateCommand\fR) and \fIcmdClientData\fR
+contains the associated client data for \fIcmdProc\fR (the \fIclientData\fR
+value passed to \fBTcl_CreateCommand\fR).  \fIArgc\fR and \fIargv\fR give
+the final argument information that will be passed to \fIcmdProc\fR, after
+command, variable, and backslash substitution.
+\fIProc\fR must not modify the \fIcommand\fR or \fIargv\fR strings.
+.PP
+Tracing will only occur for commands at nesting level less than
+or equal to the \fIlevel\fR parameter (i.e. the \fIlevel\fR
+parameter to \fIproc\fR will always be less than or equal to the
+\fIlevel\fR parameter to \fBTcl_CreateTrace\fR).
+.PP
+Calls to \fIproc\fR will be made by the Tcl parser immediately before
+it calls the command procedure for the command (\fIcmdProc\fR).  This
+occurs after argument parsing and substitution, so tracing for
+substituted commands occurs before tracing of the commands
+containing the substitutions.  If there is a syntax error in a
+command, or if there is no command procedure associated with a
+command name, then no tracing will occur for that command.  If a
+string passed to Tcl_Eval contains multiple commands (bracketed, or
+on different lines) then multiple calls to \fIproc\fR will occur,
+one for each command.  The \fIcommand\fR string for each of these
+trace calls will reflect only a single command, not the entire string
+passed to Tcl_Eval.
+
+.SH KEYWORDS
+command, create, interpreter, trace

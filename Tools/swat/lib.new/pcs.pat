@@ -2,10 +2,7 @@
 #
 #	$Id: pcs.pat,v 1.6.4.1 97/03/29 11:27:57 canavese Exp $
 #
-*/Library/Breadbox/Urldrv/*                     GEO     SYSTEM/WWW
-*/Library/Breadbox/ImpGraph/*                   GEO     SYSTEM/IMPEX
-*/Library/Breadbox/ImpDoc/*                     GEO     SYSTEM/IMPEX
-*/Library/HWR/Data/                             *       PRIVDATA/HWR
+*/Library/HWR/Data/				*	PRIVDATA/HWR
 */DOSAppl/*		  			*	.
 */Library/Spell/Dicts/* 			*	USERDATA/DICTS
 */Library/Saver/				GEO	WORLD

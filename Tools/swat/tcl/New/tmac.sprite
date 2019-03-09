@@ -1,0 +1,211 @@
+.\" This file contains extra Ditroff macros used in Sprite man pages:
+.\"
+.\" .HS name section [date [version]]
+.\"	Replacement for .TH in other man pages.  See below for valid
+.\"	section names.
+.\"
+.\" .LG
+.\"	Increase font size;  opposite of .SM
+.\"
+.\" .AP type name in/out [indent]
+.\"	Start paragraph describing an argument to a library procedure.
+.\"	type is type of argument (int, etc.), in/out is either "in", "out",
+.\"	or "in/out" to describe whether procedure reads or modifies arg,
+.\"	and indent is equivalent to second arg of .IP (shouldn't ever be
+.\"	needed;  use .AS below instead)
+.\"
+.\" .AS [type [name]]
+.\"	Give maximum sizes of arguments for setting tab stops.  Type and
+.\"	name are examples of largest possible arguments that will be passed
+.\"	to .AP later.  If args are omitted, default tab stops are used.
+.\"
+.\" .BS
+.\"	Start box enclosure.  From here until next .BE, everything will be
+.\"	enclosed in one large box.
+.\"
+.\" .BE
+.\"	End of box enclosure.
+.\"
+.\" .VS
+.\"	Begin vertical sidebar, for use in marking newly-changed parts
+.\"	of man pages.
+.\"
+.\" .VE
+.\"	End of vertical sidebar.
+.\"
+'	# Heading for Sprite man pages
+.de HS
+.PD
+.DT
+.AS
+.if n .nr IN .5i
+.if t .nr IN .5i
+.nr LL \\n(.l
+.ds ]S UNKNOWN SECTION (\\$2)
+.if '\\$2'cmds'       .ds ]S User Commands
+.if '\\$2'lib'        .ds ]S C Library Procedures
+.if '\\$2'dev'        .ds ]S Devices
+.if '\\$2'tcl'        .ds ]S Tcl Command Language Library
+.if '\\$2'admin'      .ds ]S Administrative Commands
+.if '\\$2'daemons'    .ds ]S Daemons
+.if '\\$2'files'      .ds ]S File Formats
+.ds ]H \\$1
+.ds ]D \\*(]S
+.ie '\\$3'' .ds ]L  Printed:\\ \\ \\*(DY
+.el         .ds ]L  Modified:\\ \\ \\$3
+.if t .ie '\\$4'' .ds ]W Sprite version 1.0
+.if t .el         .ds ]W Sprite version \\$4
+.if n .ie '\\$4'' .ds ]W Sprite v.1.0
+.if n .el         .ds ]W Sprite v.\\$4
+.if !"\\$3"" .ds ]L \\$3
+.wh 0 }H
+.if t .wh -1i }B
+.if n .wh -1.167i }F
+.if \\n(nl .bp 1
+.em }M
+.}E
+.DT
+.nr )I .5i
+.nr )R 0
+..
+'	# Increase point size 1 tick
+.de LG
+.ps +1
+.it 1 }N
+.if !"\\$1"" \&\\$1 \\$2 \\$3 \\$4 \\$5 \\$6
+..
+'	# Start an argument description
+.de AP
+.ie !"\\$4"" .TP \\$4
+.el \{\
+.   ie !"\\$2"" .TP \\n()Cu
+.   el          .TP 15
+.\}
+.ie !"\\$3"" \{\
+.ta \\n()Au \\n()Bu
+\&\\$1	\\fI\\$2\\fP	(\\$3)
+.\".b
+.\}
+.el \{\
+.br
+.ie !"\\$2"" \{\
+\&\\$1	\\fI\\$2\\fP
+.\}
+.el \{\
+\&\\fI\\$1\\fP
+.\}
+.\}
+.DT
+..
+'	# define tabbing values for .AP
+.de AS
+.nr )A 10n
+.if !"\\$1"" .nr )A \\w'\\$1'u+3n
+.nr )B \\n()Au+15n
+.\"
+.if !"\\$2"" .nr )B \\w'\\$2'u+\\n()Au+3n
+.nr )C \\n()Bu+\\w'(in/out)'u+2n
+..
+'	# BS - start boxed text
+.de BS
+.br
+.mk )a
+.ds )b 1
+.if n .nf
+.if n .ti 0
+.if n \l'\\n(.lu\(ul'
+.if n .fi
+..
+'	# Special macro to handle page bottom:  finish off current
+'	# box/sidebar if in box/sidebar mode, then invoked standard
+'	# page bottom macro.
+.de }B
+.if '\\*()b'1' \{\
+.ev 1
+'ti 0
+'nf
+.if t \h'-1.5n'\L'|\\n()au-1.5v'\l'\\n(.lu+3n\(ul'\L'-|\\n()au+1.5v'\l'|0u-1.5n\(ul'
+'sp -1
+.ev
+'fi
+.\}
+.if '\\*()v'2' \{\
+.if t \{\
+.ev 1
+'ti 0
+'nf
+\h'|\\n(.lu+2n'\v'-1v'\L'|\\n()bu-1v\(br'\v'-|\\n()bu+2v'\h'-|\\n(.lu+2n'
+'sp -1
+'fi
+.ev
+.\}
+.\}
+.}F
+..
+'	# What to do when the head of the page occurs during boxed text
+'	# or vertical sidebar: update starting position for box/sidebar.
+.am }H
+.mk )a
+.mk )b
+..
+'	# BE - end boxed text (draw box now)
+.de BE
+.sp -1
+.nf
+.ti 0
+.ie n \l'\\n(.lu\(ul'
+.el \{
+\h'-1.5n'\L'|\\n()au-1.5v'\l'\\n(.lu+3n\(ul'\L'-|\\n()au+1.5v'\l'|0u-1.5n\(ul'
+.\"   \h = move left 1.5n
+.\"   \L = draw up,   len=  )a units + 1.5v 
+.\"	\L draws a line, arg = distance. if negative, draws up.
+.\"	The position in reg. )a is used to draw the vertical lines.
+.\"	  |\\n)au = distance from current loc. to )a (negative distance)
+.\"	  -1.5v   = distance above )a since there is text at )a's location
+.\"   \l = draw right, len= cur. line length + 3n using underrule
+.\"   \L = draw down, len=  )a units + 1.5v 
+.\"   \l = draw left, back to original spot
+.\}
+.fi
+.br
+.ds )b 0
+..
+'	# VS - start vertical sidebar
+.de VS
+.if n 'mc \s12\(br\s0
+.if t \{\
+.mk )b
+.ds )v 2
+.\}
+..
+'	# VE - end of vertical sidebar
+.de VE
+.if n 'mc
+.if t \{\
+.ev 1
+.nf
+.ti 0
+\h'|\\n(.lu+2n'\L'|\\n()bu-1v\(br'\v'-|\\n()bu+1v'\h'-|\\n(.lu+2n'
+.sp -1
+.fi
+.ev
+.\}
+.ds )v 0
+..
+.\"
+.\"  Define the string DY to be the current date
+.\"  format:  month day, year
+.\"
+.if \n(mo-0 .ds MO January
+.if \n(mo-1 .ds MO February
+.if \n(mo-2 .ds MO March
+.if \n(mo-3 .ds MO April
+.if \n(mo-4 .ds MO May
+.if \n(mo-5 .ds MO June
+.if \n(mo-6 .ds MO July
+.if \n(mo-7 .ds MO August
+.if \n(mo-8 .ds MO September
+.if \n(mo-9 .ds MO October
+.if \n(mo-10 .ds MO November
+.if \n(mo-11 .ds MO December
+.ds DY \*(MO \n(dy, 19\n(yr

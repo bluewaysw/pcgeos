@@ -251,11 +251,7 @@ Notes:
     	    if {$last > [value fetch $seg:$off.CAH_count]} {
     	    	var last [value fetch $seg:$off.CAH_count]
     	    }
-	    if {$elsize == 0} {
-		var eoff [expr $eoff+([size word]*$elementnum)]
-	    } else {
-		var eoff [expr $eoff+($elsize*$elementnum)]
-	    }
+    	    var eoff [expr $eoff+($elsize*$elementnum)]
     	}
 	if {$nameArray} {
 	    var nameOff [expr [value fetch $seg:$off.NAH_dataSize]+[size NameArrayElement]]

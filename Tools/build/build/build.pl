@@ -18,7 +18,7 @@
 # DESCRIPTION:
 #
 #	The great big comprehensive shippin' buildin' xip-image-creatin'
-#	@dirname-constructin' slicin' dicin' salad-shootin' boffo script 
+#	@dirname-constructin' slicin' dicin' salad-shootin' boffo script
 #	we've all been waiting for.
 #
 #	$Id: build.pl,v 1.20 98/04/24 16:50:50 kliu Exp $
@@ -41,30 +41,30 @@ if ( $ENV{"OS"} eq "Windows_NT" ) { # NT version
     require Win32::Process;
     require "$ENV{ROOT_DIR}/Tools/scripts/perl/lib/include.pl";
 } else {			# Unix version
-    require "/staff/pcgeos/Tools/scripts/perl/lib/include.pl";
+    require "$ENV{ROOT_DIR}/Tools/scripts/perl/lib/include.pl";
 }
 
-&Include("Tools/scripts/perl/lib/osutil.pl");
-&Include("Tools/scripts/perl/lib/debug.pl");
-&Include("Tools/scripts/perl/lib/imageutil.pl");
-&Include("Tools/scripts/perl/lib/prettyprint.pl");
-&Include("Tools/build/build/debugbuild.pl");
-&Include("Tools/build/build/miscbuild.pl");
-&Include("Tools/build/build/var.pl");
-&Include("Tools/build/build/filetree.pl");
-&Include("Tools/build/build/fileutil.pl");
-&Include("Tools/build/build/template.pl");
+&Include("$ENV{ROOT_DIR}/Tools/scripts/perl/lib/osutil.pl");
+&Include("$ENV{ROOT_DIR}/Tools/scripts/perl/lib/debug.pl");
+&Include("$ENV{ROOT_DIR}/Tools/scripts/perl/lib/imageutil.pl");
+&Include("$ENV{ROOT_DIR}/Tools/scripts/perl/lib/prettyprint.pl");
+&Include("$ENV{ROOT_DIR}/Tools/build/build/debugbuild.pl");
+&Include("$ENV{ROOT_DIR}/Tools/build/build/miscbuild.pl");
+&Include("$ENV{ROOT_DIR}/Tools/build/build/var.pl");
+&Include("$ENV{ROOT_DIR}/Tools/build/build/filetree.pl");
+&Include("$ENV{ROOT_DIR}/Tools/build/build/fileutil.pl");
+&Include("$ENV{ROOT_DIR}/Tools/build/build/template.pl");
 
 
 #
-# Set all the variables, from the command line and build variable files. 
+# Set all the variables, from the command line and build variable files.
 #
 if ( ! &SetVars(@ARGV) ) {
     exit 1;			# Error occurred.
 }
 
 #
-# Remove translation files directory or destination directory depending on 
+# Remove translation files directory or destination directory depending on
 # the action.
 #
 
@@ -98,7 +98,7 @@ if (! (&UseResedit() && ($var{action} =~ /create_trans_files/i))) {
 	&MakeFloppyImages();
     }
     if ( "$var{makeimages}" ) {
-	
+
 	# Make sure the image directory is there before making images.
 	#
 	&MakePath("$var{desttree}/image");
@@ -114,12 +114,3 @@ if (! (&UseResedit() && ($var{action} =~ /create_trans_files/i))) {
 if (&UseResedit()) {
     &PrintReseditErrorsAndWarnings();
 }
-
-
-
-
-
-
-
-
-
