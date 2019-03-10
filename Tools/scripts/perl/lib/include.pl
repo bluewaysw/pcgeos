@@ -24,31 +24,13 @@
 #
 ###############################################################################
 
-if ( $ENV{"OS"} eq "Windows_NT" ) {		# NT version (Win32)
-    # Set the default path and the local geos paths.
-    #
-    $geosPath = $ENV{"ROOT_DIR"};
-    $geosPath =~ tr|\\|/|;	# Make it looks like Unix style.
-    $localgeospath = $ENV{"LOCAL_ROOT"};
-    $localgeospath =~ tr|\\|/|;	# Make it looks like Unix style.
+# Set the default path and the local geos paths.
+#
+$geosPath = $ENV{"ROOT_DIR"};
+$geosPath =~ tr|\\|/|;	# Make it looks like Unix style.
+$localgeospath = $ENV{"LOCAL_ROOT"};
+$localgeospath =~ tr|\\|/|;	# Make it looks like Unix style.
 
-} else {			# Unix version
-    $geosPath = "/staff/pcgeos";
-
-    # Get current working directory
-
-    $originalpath = `pwd`;
-    $_="$originalpath";
-
-    # Check if we are in a local pcgeos tree.
-
-    if ( m|.*/pcgeos/[a-z]+| ) {
-	$localgeospath = $_;
-	$localgeospath =~ s|(.*/pcgeos/[^/]*)|$1%end%|;
-	$localgeospath =~ s|%end%.*||;
-	chop($localgeospath);
-    }
-}
 1;
 
 ###############################################################################
@@ -71,7 +53,7 @@ sub Include {
 	    print("## Using local build file:\n");
 	    print("##       $localgeospath/@_\n");
 
-	} elsif ( -f "$geosPath/@_" ) { 
+	} elsif ( -f "$geosPath/@_" ) {
 
 	    require "$geosPath/@_";
 
@@ -81,7 +63,7 @@ sub Include {
 	    print("## Using local build file:\n");
 	    print("##       $localgeospath/Tools/scripts/perl/lib/@_\n");
 
-	} elsif ( -f "$geosPath/Tools/scripts/perl/lib/@_" ) { 
+	} elsif ( -f "$geosPath/Tools/scripts/perl/lib/@_" ) {
 
 	    require "$geosPath/Tools/scripts/perl/lib/@_";
 

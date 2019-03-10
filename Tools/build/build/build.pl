@@ -44,16 +44,16 @@ if ( $ENV{"OS"} eq "Windows_NT" ) { # NT version
     require "$ENV{ROOT_DIR}/Tools/scripts/perl/lib/include.pl";
 }
 
-&Include("$ENV{ROOT_DIR}/Tools/scripts/perl/lib/osutil.pl");
-&Include("$ENV{ROOT_DIR}/Tools/scripts/perl/lib/debug.pl");
-&Include("$ENV{ROOT_DIR}/Tools/scripts/perl/lib/imageutil.pl");
-&Include("$ENV{ROOT_DIR}/Tools/scripts/perl/lib/prettyprint.pl");
-&Include("$ENV{ROOT_DIR}/Tools/build/build/debugbuild.pl");
-&Include("$ENV{ROOT_DIR}/Tools/build/build/miscbuild.pl");
-&Include("$ENV{ROOT_DIR}/Tools/build/build/var.pl");
-&Include("$ENV{ROOT_DIR}/Tools/build/build/filetree.pl");
-&Include("$ENV{ROOT_DIR}/Tools/build/build/fileutil.pl");
-&Include("$ENV{ROOT_DIR}/Tools/build/build/template.pl");
+&Include("Tools/scripts/perl/lib/osutil.pl");
+&Include("Tools/scripts/perl/lib/debug.pl");
+&Include("Tools/scripts/perl/lib/imageutil.pl");
+&Include("Tools/scripts/perl/lib/prettyprint.pl");
+&Include("Tools/build/build/debugbuild.pl");
+&Include("Tools/build/build/miscbuild.pl");
+&Include("Tools/build/build/var.pl");
+&Include("Tools/build/build/filetree.pl");
+&Include("Tools/build/build/fileutil.pl");
+&Include("Tools/build/build/template.pl");
 
 
 #
