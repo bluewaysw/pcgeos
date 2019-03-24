@@ -1,0 +1,224 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Memory_b.htm,v 1.1 97/06/02 15:51:45 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Data-Access Synchronization</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Memory Management</A>: 3.6 <A HREF="Memory_5.htm">Using Global Memory</A>: 
+<A NAME="68631">
+ </A>
+Data-Access Synchronization</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Memory_5.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Memory_a.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.5 Accessing Data: An Example</A> 
+<!-- to next --> | <A HREF="Memory_c.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.7 Retrieving Block Information</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>MemThreadGrab(), MemThreadGrabNB(), MemThreadRelease(), MemLockShared(), MemUnlockShared(), MemLockExcl(), MemDowngradeExclLock(), MemUpgradeSharedLock(), MemUnlockExcl(), HandleP(), HandleV(), MemPLock(), MemUnlockV()</PRE>
+<P>
+Blocks can have the property of being sharable--that is, the same block may be locked by threads owned by several different geodes. However, this can cause data synchronization problems; one application can be changing data while another application is trying to use it. To prevent this, GEOS provides semaphore routines. Only one thread can have the block's semaphore at a time. When an application wants to use a shared block, it should call a routine to set the semaphore. Once the routine returns, the application can use the block; when it is done, it should release the block's semaphore so other applications can use the block.</P>
+<P>
+Note that use of semaphores is entirely voluntary by each application. Even if thread A has the semaphore on a block, thread B can call <CODE>
+MemLock()</CODE>
+ on the block and start changing it. However, all threads using shared blocks ought to use the semaphore routines to prevent confusion.
+
+</P>
+<P>
+There are several different sets of routines which can be used to control a block's semaphore. The different sets of routines make different trade-offs between faster operation and increased flexibility. Any one block should be accessed with only one set of routines; different threads should all be using the same routines to access a given block, and a thread should not switch from one set of routines to another for a particular block. If this rule isn't followed, results are undefined. All of these routines access the HM<CODE>
+_otherInfo</CODE>
+ word of the handle table entry; if the block will be locked by any of these routines, you must not alter that word. None of these routines is used to access object blocks; instead, special object-block locking routines are provided.</P>
+<P>
+<A NAME="IX_Deadlock:avoidance">
+ </A>
+<A NAME="IX_MemThreadGrab()">
+ </A>
+Most geodes should use <CODE>
+MemThreadGrab()</CODE>
+, <CODE>
+MemThreadGrabNB()</CODE>
+, and <CODE>
+MemThreadRelease()</CODE>
+ to access sharable blocks. These routines provide the maximum protection against deadlock in exchange for a slightly slower execution. </P>
+<P>
+<CODE>
+MemThreadGrab()</CODE>
+ gives the thread the semaphore for the block in question and locks the block. It is passed the handle of the block and returns the block's address on the global heap. If no thread has the block's semaphore, it gives the semaphore to the calling thread. If the calling thread already has the semaphore, a &quot;semaphore count&quot; is incremented; the thread will not release the semaphore until it has been released as many times as it has been grabbed. (For example, two different objects run by the same thread could each grab the semaphore; the semaphore would not be released until each object called <CODE>
+MemThreadRelease()</CODE>
+.) If another thread has the semaphore, <CODE>
+MemThreadGrab()</CODE>
+ blocks until it can get the semaphore; it then increments the semaphore, locks the block, and returns the address.</P>
+<P>
+<CODE>
+MemThreadGrabNB()</CODE>
+<A NAME="IX_MemThreadGrabNB()">
+ </A>
+ is the same as <CODE>
+MemThreadGrab()</CODE>
+, except that it never blocks. If you call <CODE>
+MemThreadGrabNB()</CODE>
+ while another thread has the semaphore, the routine will immediately return an error. <CODE>
+MemThreadGrabNB()</CODE>
+ takes the handle of the block; it increments the semaphore, locks the block, and returns the block's address on the heap.</P>
+<P>
+<CODE>
+MemThreadRelease()</CODE>
+<A NAME="IX_MemThreadRelease()">
+ </A>
+ releases a block grabbed by either <CODE>
+MemThreadGrab()</CODE>
+ or <CODE>
+MemThreadGrabNB()</CODE>
+. It is passed the block's handle. It unlocks the block and decrements the block's semaphore. </P>
+<P>
+One common situation is that several threads may need to read a block but only once in a while will an application need to write to the block. In this case, there is no synchronization problem in having several readers at once; however, if any thread is writing, no other thread should be reading or writing. For this situation, GEOS provides this set of <CODE>
+MemLock</CODE>
+ routines: <CODE>
+MemLockShared()</CODE>
+, <CODE>
+MemUnlockShared()</CODE>
+, <CODE>
+MemLockExcl()</CODE>
+, and <CODE>
+MemUnlockExcl()</CODE>
+. </P>
+<P>
+These routines, like the others, maintain a queue of threads which have requested thread access. The difference is that any number of readers can have access at once. When a thread wants read access, it calls <CODE>
+MemLockShared()</CODE>
+<A NAME="IX_MemLockShared()">
+ </A>
+. If the queue is empty and the block is unlocked or locked for reading, the routine returns and the thread is given shared access; otherwise, the thread is blocked, and the request goes on the queue.<A NAME="IX_MemUnlockShared()">
+ </A>
+ When a routine is finished reading the block, it should call <CODE>
+MemUnlockShared()</CODE>
+.</P>
+<P>
+<A NAME="IX_MemLockExcl()">
+ </A>
+When a routine needs to write to a block, it should call <CODE>
+MemLockExcl()</CODE>
+. If nobody has locked the block (and thus the queue is empty), the thread will immediately be given exclusive access; otherwise, the thread will block, and the request will go on the queue.<A NAME="IX_MemUnlockExcl()">
+ </A>
+ When the thread no longer needs write access, it should call <CODE>
+MemUnlockExcl()</CODE>
+.</P>
+<P>
+When all threads with access to a block have released their locks, the queued thread with the highest priority will be awakened and given the lock on the block. If that thread had requested shared access, all other threads on the queue that had requested shared access will also be awakened and given locks.</P>
+<P>
+A thread can change its lock from shared to exclusive or vice versa.<A NAME="IX_MemDowngradeExclLock()">
+ </A>
+ If a thread has an exclusive lock on a block, it can change the lock to shared by calling <CODE>
+MemDowngradeExclLock()</CODE>
+. This routine takes one argument, namely the block's global handle. It changes the lock to &quot;shared&quot; and wakes up all sleeping threads which are waiting for shared access. For convenience, <CODE>
+MemDowngradeExclLock()</CODE>
+ returns the address of the block; however, the block is guaranteed not to move.</P>
+<P>
+<A NAME="IX_MemUpgradeSharedLock()">
+ </A>
+If a thread has shared access and wants exclusive access, it can call <CODE>
+MemUpgradeSharedLock()</CODE>
+. If the thread has the only lock on the block, its lock will be changed to &quot;exclusive&quot; (even if there are writers on the queue). If any other threads have the block locked, the routine will release the thread's lock and put the thread on the queue. When the thread comes to the head of the queue, the routine will wake the thread and give it an exclusive lock. The routine returns the block's address on the global heap. Note that the block may be altered or moved during this call if the call blocked.</P>
+<P>
+Once a thread has been given a shared lock, there is nothing to prevent it from altering (or even freeing) the block. The routines rely on good citizenship by the threads using them.Also, if a thread isn't careful, there is a great danger of deadlock. If (for example) a thread requests exclusive access to a block when it already has access, the thread will deadlock: it will block until the threads with access all release the block, but it can't release its own lock because it is blocked. If you may need to have multiple locks on a block, use the <CODE>
+MemThread</CODE>
+ routines, which check for these situations.</P>
+<P>
+There are other sets of routines which can be used to access a block's semaphore. As noted, a block should be accessed via just one set of routines. These routines provide less protection against deadlock than the <CODE>
+MemThread</CODE>
+ routines do; however, they have a slightly faster response time.</P>
+<P>
+A more primitive group of routines is <CODE>
+HandleP()</CODE>
+, <CODE>
+HandleV()</CODE>
+, <CODE>
+MemPLock()</CODE>
+, and <CODE>
+MemUnlockV()</CODE>
+. These routines function much like the <CODE>
+MemThread</CODE>
+ routines. <A NAME="IX_HandleP()">
+ </A>
+<CODE>
+HandleP()</CODE>
+ grabs the block's semaphore and returns; it does not lock the block. This makes it very useful for working with fixed blocks (which cannot be locked).<A NAME="IX_HandleV()">
+ </A>
+ <CODE>
+HandleV()</CODE>
+ releases the block's semaphore and returns; it does not unlock the block. Note, however, that <CODE>
+HandleP()</CODE>
+ will block if <EM>
+any</EM>
+ thread controls the semaphore, even the thread that called <CODE>
+HandleP()</CODE>
+. If a thread calls <CODE>
+HandleP()</CODE>
+ while it controls the semaphore, it will block until the semaphore is released, but it can't release the semaphore because it has blocked. Thus, the thread will deadlock, and no other thread will be able to get the semaphore. Therefore, a thread should use <CODE>
+HandleP()</CODE>
+ only if it is very confident that it will never try to double-set the semaphore.
+
+</P>
+<P>
+Usually, when a thread grabs a block's semaphore, it needs to have the block locked on the heap. For this reason, GEOS provides the routines <CODE>
+MemPLock()</CODE>
+ and <CODE>
+MemUnlockV()</CODE>
+.<A NAME="IX_MemPLock()">
+ </A>
+ <CODE>
+MemPLock()</CODE>
+ simply calls <CODE>
+HandleP()</CODE>
+ and then calls <CODE>
+MemLock()</CODE>
+.<A NAME="IX_MemUnlockV()">
+ </A>
+ <CODE>
+MemUnlockV()</CODE>
+, correspondingly, calls <CODE>
+MemUnlock()</CODE>
+ and then calls <CODE>
+HandleV()</CODE>
+. These routines are completely compatible with <CODE>
+HandleP()</CODE>
+ and <CODE>
+HandleV()</CODE>
+; for example, a thread could grab and lock a block with <CODE>
+MemPLock()</CODE>
+, then unlock it with <CODE>
+MemUnlock()</CODE>
+ and release it with <CODE>
+HandleV()</CODE>
+.</P>
+<P>
+<CODE>
+HandleP()</CODE>
+ and <CODE>
+HandleV()</CODE>
+ are general-purpose handle routines. They can be called on any type of global handle. For example, if two threads need to synchronize their access to a file, they can lock and unlock the file handle with <CODE>
+HandleP()</CODE>
+ and <CODE>
+HandleV()</CODE>
+. However, they are most commonly used with memory blocks.</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Memory_5.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Memory_a.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.5 Accessing Data: An Example</A> 
+<!-- to next --> | <A HREF="Memory_c.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.7 Retrieving Block Information</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

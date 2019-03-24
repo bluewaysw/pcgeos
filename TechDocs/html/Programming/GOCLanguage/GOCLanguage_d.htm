@@ -1,0 +1,633 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: GOCLanguage_d.htm,v 1.2 97/09/05 13:44:14 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Object Structures</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">GEOS Programming</A>: 3.2 <A HREF="GOCLanguage_b.htm">The GEOS Object System</A>: 
+<A NAME="41493">
+ </A>
+Object Structures</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GOCLanguage_b.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GOCLanguage_c.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.1 GEOS Terminology</A> 
+<!-- to next --> | <A HREF="GOCLanguage_e.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.3 The GEOS Message System</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+<A NAME="IX_Objects">
+ </A>
+You do not need to know what data structures are used to store objects and classes; understanding them can make programming GEOS much easier, however.</P>
+<P>
+Each object is implemented in two parts: the instance data chunk and the class definition. Although both are integral parts of the object and they are interconnected, they are stored in different places.</P>
+<P>
+An object's instance data is stored in an instance chunk. This instance chunk is sometimes referred to as the object itself, but this isn't quite accurate--the instance chunk contains only the object's data along with a pointer to its class structure. The structure of the instance chunk is given in <A HREF="GOCLanguage_d.htm#97259"> Instance Chunk Structures</A>
+.</P>
+<P>
+An object's class structure contains all the code for the class. Since the class code may be accessed by many objects, the class definition resides in a geode's fixed memory resource. Every class (except the root, <CODE>
+MetaClass</CODE>
+) has a pointer to its superclass so it can inherit that class' methods and structures.</P>
+<P>
+All objects of a given class use the same code--the class' code--for their functions. They dynamically access this code so the code blocks need to be in memory only once, no matter how many objects are actively using them. Additionally, each class dynamically accesses its superclass' code, so any class may be accessed by all the objects of the subclasses as well. Class structures are shown in <A HREF="GOCLanguage_d.htm#58645"> Class Structure and Class Trees</A>
+.</P>
+
+<H2 CLASS="HeadingC">
+<A NAME="97259">
+ </A>
+Instance Chunk Structures</H2>
+<P>
+<A NAME="IX_Local memory:storing instance data">
+ </A>
+<A NAME="IX_Instance data:structure">
+ </A>
+<A NAME="IX_Chunks:instance chunk structure">
+ </A>
+Each object's instance data is stored in a Local Memory chunk. Several chunks are stored in one memory block, called a local memory heap. (See <A HREF="../../Memory/LMem/index.htm">the Local Memory chapter</A>.) This local memory heap, containing objects, is known as an <EM>object block</EM>
+.</P>
+<P>
+Each object block has a special header type that distinguishes it from normal local memory heaps. After the header in the block is the chunk handle table: a table containing offsets to each object in the block. Following the chunk handle table are the objects.</P>
+<P>
+<A NAME="IX_optr">
+ </A>
+Each object is referenced by an object pointer, or optr. The optr contains two items: the global memory handle of the object block and the chunk handle of the object. Note that because the optr is made up of handles, an object must be locked before its instance data can be accessed. The GEOS kernel takes care of this automatically when executing methods. 
+<IMG SRC="GOCLanguage_d_optr.gif">
+
+</P>
+<P>
+Only the object's instance data is stored in the chunk pointed to by the optr; the method table and code used by the object are stored in the class' data structures, not the object's. To reconcile this separation of code and data, every object's first four bytes of instance data are a pointer to the object's class definition. This pointer is traversed by the kernel automatically and should not be altered or accessed by applications. </P>
+<P>
+Included in an object's instance chunk are certain fields generated and filled by either Goc or the kernel. Following these fields is the object's instance data, grouped by master part. It's unlikely you'll ever have to know the actual structures used in the instance chunk because the kernel automatically calculates the proper offsets to individual instance data fields. However, understanding the underlying structures may help in understanding how the object system of GEOS works.</P>
+<P>
+<A NAME="IX_Master groups">
+ </A>
+Instance data within an instance chunk is stored in &quot;master parts&quot; or &quot;master groups.&quot; A master group is simply a number of instance data fields grouped according to their appropriate master class levels. Master classes are detailed in <A HREF="GOCLanguage_d.htm#63826"> Master Classes</A>
+.
+<IMG SRC="GOCLanguage_d_objectAndClass.gif">
+
+</P>
+<P>
+A class designated as a master class resembles a normal class in all respects save one: it determines how instance data is grouped in a chunk. Each master class is the head of a class subtree; all the classes below it in the class tree (down to the next master class) are considered to be in that master class' group. Instance data for all classes in the master group are lumped together in the instance chunk; each master group's instance data within the chunk is accessed via a special offset stored within the chunk.</P>
+<P>
+The first four bytes of an object's chunk contain a pointer to the object's class structure. The class structure (described in <A HREF="GOCLanguage_d.htm#58645"> Class Structure and Class Trees</A>
+) resides in fixed memory. (A variant-class object has a slightly different structure; this is detailed in <A HREF="GOCLanguage_d.htm#43589"> Variant Classes</A>
+.)</P>
+<P>
+An object that has no master classes in its class ancestry (unusual) has its instance data directly following its class pointer. Objects belonging to master classes or their subclasses, however, are somewhat more complex. This distinction can be mostly ignored by application and library programmers (with the exception of deciding which classes should be master classes and which should not).
+<IMG SRC="GOCLanguage_d_objectStructures.gif">
+
+</P>
+<P>
+Each master part of the chunk is located by an offset inserted directly after the object's class pointer in the chunk. The position of the word containing this offset is then stored in the master class structure so the class can find its instance data later. The combination of the class pointer and the various master offsets make up the object's &quot;base structure.&quot; When a typical object is instantiated, the base structure is all that is created.</P>
+<P>
+Each master part is left unallocated (for efficiency) until it is first accessed via a message sent to a class in the master group. When a class in the master group receives its first message, the entire master part of the chunk is allocated and initialized. This means that an object's chunk remains as small as possible until it absolutely must grow larger. Some classes even detect when a master part of the object will no longer be needed and actually remove (shrink to zero) the unwanted instance data from the chunk (<CODE>
+GenClass</CODE>
+ does this by shrinking the Vis master part to zero size when a gadget is taken off the screen).</P>
+<P>
+Any object may have &quot;variable data&quot; instance data fields; these are fields that may be added or removed dynamically to keep from having unused space in the instance chunk. Generic UI hints are &quot;variable data&quot; (also called <EM>
+vardata</EM>
+)--if an object has the hint, it appears in its instance chunk, if the object does not have the hint, the chunk does not have unused space in it.</P>
+<P>
+Vardata entries are stored all together at the end of the instance chunk, regardless of their master groups. An object with two master groups and three variable data fields, for example, would look like that shown in the figure below. Variable data and its use are discussed in full in <A HREF="GOCLanguage_10.htm#54822"> Defining and Working With Variable Data Fields</A>
+.
+<IMG SRC="GOCLanguage_d_masterGroups.gif">
+
+</P>
+
+
+<H2 CLASS="HeadingC">
+<A NAME="63826">
+ </A>
+Master Classes</H2>
+<P>
+<A NAME="IX_Master classes">
+ </A>
+A master class provides a conceptual break between levels within a class tree. Each master class is the head of a class subtree, and all its subclasses are considered to be in its &quot;master group.&quot
+<IMG SRC="GOCLanguage_d_vardata.gif">
+
+
+<IMG SRC="GOCLanguage_d_sampleInstance.gif">
+
+</P>
+<P>
+The purpose of making a class a master class is to separate its instance data from that of its superclass. Each master group's instance data is lumped together in one section of the object's instance chunk and is not initialized until a class in the master group is accessed. The initialization (allocation of extra memory within the instance chunk) occurs automatically.</P>
+<P>
+As shown in the figures below, an object of <CODE>
+RookClass</CODE>
+ would have an instance chunk with two master groups, one for the <CODE>
+PieceClass</CODE>
+ master class and one for the <CODE>
+GamePcClass </CODE>
+master class. The first of the two master parts represents the instance data for <CODE>
+PieceClass</CODE>
+ only; the second master part represents the object's instance data for all of <CODE>
+GamePcClass</CODE>
+, <CODE>
+ChessClass</CODE>
+, and <CODE>
+RookClass</CODE>
+.</P>
+<P>
+The functionality of master classes is required to implement GEOS variant classes (see <A HREF="GOCLanguage_d.htm#43589"> Variant Classes</A>
+). A variant class allows a single class to have a version of &quot;multiple inheritance&quot; in that it can have different superclasses depending on the system context.
+
+</P>
+
+
+<H2 CLASS="HeadingC">
+<A NAME="58645">
+ </A>
+Class Structure and Class Trees</H2>
+<P>
+<A NAME="IX_Class_&ldots;">
+ </A>
+For the most part, you won't ever need or want to know the internal structure of a class as implemented in memory. The class structure is created and partially filled by the Goc preprocessor and Glue linker; the remainder is filled by the kernel when the class is loaded. It's unlikely you will need to know the actual class structures; you won't ever have to manually build a class unless your program dynamically creates it (not a common procedure for typical applications).
+<IMG SRC="GOCLanguage_d_classTree.gif">
+
+</P>
+<P>
+This section will describe how the class is implemented and how class trees are structured and managed. However, it will not discuss creating new classes during execution.</P>
+<P>
+Classes are implemented with special data structures and code blocks. Each class is defined within and exported by a particular geode; when the geode is loaded the class definition and its code are loaded into the geode's fixed memory. All references to the class are then relocated by the kernel into pointers. For example, if a class is defined by a library, that library's &quot;core block&quot; (the special information kept about it by the kernel) contains an absolute pointer to the class' definition in a fixed memory resource owned by the library. Any applications then using that class load the library. The kernel examines the library's core block for the proper pointer and uses it each time the application references that class.
+
+</P>
+<P>
+Because of this, each class is loaded into memory just once; all objects that use the class use the same class structure and code. Each object has a pointer in its instance chunk directly to the class structure; each class contains a pointer to its superclass' class structure. Using these pointers, the kernel can travel up an object's class tree to access any appropriate code. </P>
+<P>
+<A NAME="IX_ClassStruct">
+ </A>
+A class is a combination of data structure and code. The data structure (<CODE>
+ClassStruct</CODE>
+) contains information about the class, its superclass, its methods, and the structure and size of its instance data. The code consists of methods (message handlers). A diagram of the data structure is given below.
+<IMG SRC="GOCLanguage_d_ClassStruct.gif">
+
+</P>
+
+<H3 CLASS="HeadingD">
+Class_superClass</H3>
+<P>
+Every class has as its first four bytes a pointer to its superclass. This points to the superclass' <CODE>
+ClassStruct</CODE>
+ structure in all cases except two: The root of any class tree has a null superclass pointer, indicating that the root has no superclass. <A NAME="IX_Variant classes:detecting">
+ </A>
+Variant classes have the integer 1 (one) always, indicating that the superclass is determined in a special manner. For more information on variant classes, see <A HREF="GOCLanguage_d.htm#43589"> Variant Classes</A>
+.</P>
+<P>
+Class trees are constructed when classes are defined; a new class is created as the subclass of some existing class, and its <CODE>
+Class_superClass</CODE>
+ pointer is automatically set to point to the superclass. There is no need to point down the tree; messages are always passed to superclasses and never to subclasses. </P>
+
+
+<H3 CLASS="HeadingD">
+Class_masterOffset</H3>
+<P>
+<CODE>
+Class_masterOffset</CODE>
+<A NAME="IX_Instance data:master offsets">
+ </A>
+<A NAME="IX_Master classes:offset">
+ </A>
+ stores the offset indicating how far into the instance chunk the object's offset to this class' master part is. Note that use of this offset is entirely internal; individual classes do not have to figure out where their instance data is within the chunk (they may, however, have to know what master level each class is).</P>
+<P>
+The master offset is used primarily because an object can have some of its master parts initialized and others uninitialized. If only one master part of the object had been initialized, the location of the instance data in the chunk may be different than if all master parts had been initialized.</P>
+
+
+<H3 CLASS="HeadingD">
+Class_methodCount</H3>
+<P>
+<CODE>
+Class_methodCount</CODE>
+ stores the total number of methods referenced in the class' method table. This is the total number of methods defined for this class only; other methods defined in other classes (even in the same master group) are stored in the method tables of those classes.</P>
+
+
+<H3 CLASS="HeadingD">
+Class_instanceSize
+<IMG SRC="GOCLanguage_d__masterOffset.gif">
+
+</H3>
+<P>
+<CODE>
+Class_instanceSize</CODE>
+<A NAME="IX_Instance data:structure">
+ </A>
+ holds the number of bytes to be allocated whenever an object of this class is instantiated. If the class is a master class or a subclass of a master class, this is the size of the master part. If the class has no master class above it, this is the number of bytes to allocate for the entire object (including superclass pointer).</P>
+
+
+<H3 CLASS="HeadingD">
+Class_vdRelocTable</H3>
+<P>
+<CODE>
+Class_vdRelocTable</CODE>
+<A NAME="IX_Relocatable data:information in ClassStruct">
+ </A>
+ is a near pointer (16 bit offset) to the variable-data relocation information. The relocation information contains the type of relocation to be done for each data type. There is one entry in the variable data relocation table for each relocatable field in each particular variable-data type. Variable data (also called <EM>
+vardata</EM>
+) is described in full in <A HREF="GOCLanguage_10.htm#54822"> Defining and Working With Variable Data Fields</A>
+.</P>
+
+
+<H3 CLASS="HeadingD">
+Class_relocTable</H3>
+<P>
+<CODE>
+Class_relocTable</CODE>
+ is a near pointer (16 bit offset) to the relocation information for the non-variable data instance fields of the class. The relocation information contains the type of relocation done for each relocatable instance field (other than variable-data entries). A relocatable instance field is one which must be updated when the object is loaded--pointers, offsets, etc. The entry in the relocation table is defined with the <CODE>
+@reloc</CODE>
+ keyword, described on <A HREF="GOCLanguage_10.htm#52446"> @reloc    &lt;iname&gt;, [(&lt;count&gt;, &lt;struct&gt;)] &lt;ptrType&gt;;</A>
+.</P>
+
+
+<H3 CLASS="HeadingD">
+<A NAME="11068">
+ </A>
+Class_flags</H3>
+<P>
+<CODE>
+Class_flags</CODE>
+<A NAME="IX_CLASSF_&ldots;">
+ </A>
+ contains seven flags (shown below) that determine the characteristics of the class. Declarers for these flags are used in the <CODE>
+@classdecl</CODE>
+ declaration (see <A HREF="GOCLanguage_10.htm#18289"> Defining a New Class or Subclass</A>
+).</P>
+<DL>
+<DT>
+CLASSF_HAS_DEFAULT</DT><DD>
+This flag indicates that the class has a special default method to handle unrecognized messages (typically, this handler simply passes the unrecognized message on to the superclass). This flag is not implemented in C. This flag is set by declaring the class as <CODE>
+hasDefault</CODE>
+.</DD>
+<DT>
+CLASSF_MASTER_CLASS</DT><DD>
+<A NAME="IX_Master classes:class flag">
+ </A>
+This flag is set if the class is a master class. This flag is set by declaring the class as <CODE>
+master</CODE>
+.</DD>
+<DT>
+CLASSF_VARIANT_CLASS</DT><DD>
+<A NAME="IX_Variant classes:class flag">
+ </A>
+This flag is set if the class is a variant class. This flag is set by declaring the class as <CODE>
+variant</CODE>
+ (all variants must also be declared as masters).</DD>
+<DT>
+CLASSF_DISCARD_ON_SAVE</DT><DD>
+<A NAME="IX_Instance data:discardable">
+ </A>
+This flag indicates the instance data for the class can be discarded when the object is saved. This flag applies only to master classes and will be heeded only when the master group is immediately above a variant-master group. This flag is set by declaring the class <CODE>
+discardOnSave</CODE>
+.</DD>
+<DT>
+CLASSF_NEVER_SAVED</DT><DD>
+This flag indicates objects of this class are never saved to a state file or loaded in from a resource. Goc will not build a relocation table for a class with this flag set. This flag is set by declaring the class <CODE>
+neverSaved</CODE>
+.</DD>
+<DT>
+CLASSF_HAS_RELOC</DT><DD>
+<A NAME="IX_Objects:relocating">
+ </A>
+This flag indicates that the class has a special routine for relocating and unrelocating objects of the class when they are loaded from or written to disk. This flag is set by declaring the class <CODE>
+hasReloc</CODE>
+.</DD>
+<DT>
+CLASSF_C_HANDLERS</DT><DD>
+This flag indicates the class' methods are written in C rather than in assembly. This flag is set by the compiler and should not be set by applications.</DD>
+
+
+</DL>
+<H3 CLASS="HeadingD">
+Class_masterMessages</H3>
+<P>
+<CODE>
+Class_masterMessages</CODE>
+ contains a number of flags set by Goc indicating whether this class has methods for messages defined within a given master level. It is used to optimize the search for a method to handle a message. These flags are internal and should not be used by programmers.</P>
+
+
+<H3 CLASS="HeadingD">
+The Method Table</H3>
+<P>
+<A NAME="IX_Methods:storage">
+ </A>
+Every class has a method table, a table that indicates the location of the code to be executed when a certain message is received. The method table is in three parts and begins at the byte labelled <CODE>
+Class_methodTable</CODE>
+ (this is simply a label, not a specific data field).</P>
+<P>
+The first part of the method table is a list of messages the class can handle. Each entry in this list is two bytes and contains the message number of a message handled by the class.</P>
+<P>
+The second part of the method table is a list of pointers to methods. Each entry in this list is a pointer (four bytes) which points to a specific routine in a code block. If the code is in a fixed block, the pointer will be a far pointer; if the code is in a moveable or discardable block, the pointer will be a far pointer containing a <EM>
+virtual segment</EM>
+. (A virtual segment, something you do not need to know about, is a handle shifted right four bits with the top four bits set. Since this represents an illegal segment address, GEOS recognizes it as a virtual segment and will take the necessary actions to lock the block into memory before access and unlock it after access. Manipulation of the bits in the virtual segment is completely internal to GEOS.)</P>
+<P>
+The kernel searches the message list until it comes across the appropriate message number and notes the message's position in the table. It then looks at the corresponding position in the pointer list. If the pointer there is a virtual segment and offset, it will load the appropriate code block, lock it, and execute the code. If the pointer points to fixed memory, the code will be executed immediately. (If the message number is not found in the table, the kernel will either execute the class' default handler or pass the message on to the class' superclass.)</P>
+
+
+
+<H2 CLASS="HeadingC">
+<A NAME="43589">
+ </A>
+Variant Classes</H2>
+<P>
+<A NAME="IX_Variant classes">
+ </A>
+A variant class is one which has no set superclass. The variant's superclass is determined at run-time based on context and other criteria. Note that <EM>
+objects</EM>
+ may not be variant--only classes may be variant. An object always has a specific class to which it belongs, and its class pointer <EM>
+always</EM>
+ points to that class' <CODE>
+ClassStruct</CODE>
+ structure. In addition, every variant class <EM>
+must</EM>
+ also be a master class.</P>
+<P>
+A variant class, however, may have different superclasses at different times. This functionality provides a form of &quot;multiple inheritance&quot;: the class may inherit the instance data and functions of different classes depending on its attributes and desired features. Note, however, that a variant class may have only one superclass at any given moment.</P>
+<P>
+<A NAME="IX_Specific user interface:variant classes">
+ </A>
+The most visible example of a variant class is <CODE>
+GenClass</CODE>
+ and how a generic object is resolved into its specific UI's appropriate representation. Each generic object (for example, a GenTrigger), is a subclass of the master class <CODE>
+GenClass</CODE>
+. All the instance data belonging to <CODE>
+GenTriggerClass</CODE>
+ and <CODE>
+GenClass</CODE>
+, therefore, is stored in the Gen master part of the instance chunk.</P>
+<P>
+<CODE>
+GenClass</CODE>
+<A NAME="IX_GenClass:variant behavior">
+ </A>
+, however, is a variant class, meaning that it does not know its superclass when the object is instantiated. Each generic object's class will be linked directly to another class provided by the specific UI in use: the specific UI's class provides the visual representation while the generic UI class provides the object's functionality. In this way, the object can actually perform many of its generic functions without having a visual representation.</P>
+<P>
+The resolution of the superclass comes when the generic object is displayed on the screen: the kernel sees that the object has no superclass and looks into its instance data and class structure. The kernel then determines what the appropriate specific UI class will be for the object's class and provides the superclass link necessary. It also then initializes the superclass' master part of the object (in this case, the master part belonging to <CODE>
+VisClass</CODE>
+), updating all the master part offsets in the instance chunk's master offset fields.</P>
+<P>
+You can see from the above discussion that <CODE>
+GenClass</CODE>
+ must know at least something about its potential superclasses. In fact, all variant classes must know at least the topmost class of all its potential superclasses. The definition of <CODE>
+GenClass</CODE>
+ is</P>
+<PRE>@class GenClass, VisClass, master, variant;</PRE>
+<P>
+The <CODE>
+@class</CODE>
+ keyword declares the new class, <CODE>
+GenClass</CODE>
+. <CODE>
+GenClass</CODE>
+ is to be a variant class and therefore must also be a master class. All the superclasses of <CODE>
+GenClass</CODE>
+ will be related to <CODE>
+VisClass</CODE>
+; this means that all specific UI classes which may act as Gen's superclass must be subclassed from <CODE>
+VisClass</CODE>
+. (Another way of looking at the definition is that <CODE>
+GenClass</CODE>
+ is an <EM>
+eventual</EM>
+ subclass of <CODE>
+VisClass</CODE>
+--you have no way of knowing beforehand how many class layers may be between the two, however.)</P>
+<P>
+The variant must specify an eventual superclass so the kernel knows how many master offset fields it must allocate when an instance of the variant is created. For example, a GenTrigger has two master groups: that of <CODE>
+GenClass</CODE>
+, and that of <CODE>
+VisClass</CODE>
+. Because the <CODE>
+GenClass</CODE>
+ master group is necessarily below the <CODE>
+VisClass</CODE>
+ master group in the class hierarchy (after the superclass link has been resolved), the <CODE>
+GenClass</CODE>
+ master offset in the instance chunk must be after the <CODE>
+VisClass</CODE>
+ master offset. If the definition did not specify <CODE>
+VisClass</CODE>
+ as an eventual superclass, no master offset field would be allocated for it, and the <CODE>
+Class_masterOffset</CODE>
+ field of <CODE>
+GenClass</CODE>
+' Class structure would not be able to hold any particular value.</P>
+<P>
+As stated at the beginning of this section, there are no &quot;variant objects.&quot; Every object belongs to a specific class, and the object's class can never change. All instances of a variant class, however, can be resolved to different superclasses due to the way the superclass of each variant is resolved. One example of this is the generic-to-specific mapping of the GenInteraction object.</P>
+<P>
+<A NAME="IX_GenInteractionClass:variant behavior">
+ </A>
+All GenInteractions are of class <CODE>
+GenInteractionClass</CODE>
+; this never changes. <CODE>
+GenInteractionClass</CODE>
+, however, is a subclass of <CODE>
+GenClass</CODE>
+, a variant class. This means that the class tree of the GenInteraction object is only partially completed; before the GenInteraction is resolved, it looks like the simplified diagram below.
+<IMG SRC="GOCLanguage_d_variantObject.gif">
+
+</P>
+<P>
+The GenInteraction object may be resolved into one of several different specific UI classes. For example, the <STRONG CLASS="fileName">
+motif.geo</STRONG>
+ library has several classes for GenInteractions; among them are the classes that implement menus, dialog boxes, and grouping interactions. These classes are all specialized subclasses of <CODE>
+VisClass</CODE>
+, the eventual superclass of <CODE>
+GenClass</CODE>
+.
+<IMG SRC="GOCLanguage_d_variantResolved.gif">
+
+</P>
+<P>
+The class tree of the GenInteraction is not complete. A class tree must have links all the way back to <CODE>
+MetaClass</CODE>
+ for it to be complete; this only goes to <CODE>
+GenClass</CODE>
+. <CODE>
+GenClass</CODE>
+ has a special value in its <CODE>
+Class_superClass</CODE>
+ field, 0001h:0000h. This represents a reserved &quot;pointer&quot; that indicates to the kernel that the class is a master class.</P>
+<P>
+The superclass of the variant can be different for every instance because the superclass pointer is actually stored in the object's instance chunk rather than in the class' <CODE>
+ClassStruct</CODE>
+ structure. This also allows a class tree to have more than one variant class in its hierarchy; for example, one variant could be resolved to be the subclass of another variant. The tree must always be headed by <CODE>
+MetaClass</CODE>
+.</P>
+<P>
+The superclass pointer for the variant is stored in the variant's master group instance data. Not all master groups have superclass pointers; only those for variant classes. After the GenInteraction is resolved, the pointer (the first four bytes of the Gen master part) points to the proper superclass for this object (in this case, <CODE>
+OLMenuWinClass</CODE>
+). The object, with its full class tree, is shown in the figure above.</P>
+
+
+<H2 CLASS="HeadingC">
+An In-Depth Example</H2>
+<P>
+<A NAME="IX_GenTriggerClass:variant behavior">
+ </A>
+<A NAME="IX_Master classes:in example">
+ </A>
+This section gives an example of a GenTrigger object after its variant part has been resolved. This example provides in-depth diagrams of the class and instance structures for those programmers who wish to understand them. There is no need to know them, however; you will not likely ever need to access the internals of either a class structure or an instance structure.</P>
+<P>
+The GenTrigger taken as an example is the &quot;New Game&quot; trigger of the TicTac sample application. This trigger is the only child of the Game menu GenInteraction; it is shown below. The code defining the trigger is given in <A HREF="GOCLanguage_d.htm#87649"> TicTac's New Game Trigger</A>
+.
+<IMG SRC="GOCLanguage_d_newgameTrigger.gif">
+
+</P>
+<P CLASS="figTitle">
+Code Display 5-4 <A NAME="87649">
+ </A>
+TicTac's New Game Trigger</P>
+<PRE>/* The TicTacNewTrigger has a moniker and an output. All its other instance data
+ * is set to the GenClass defaults. The content of these fields is not important
+ * for this example, however. */</PRE>
+<PRE>@object GenTriggerClass TicTacNewTrigger = {
+    GI_visMoniker = &quot;New Game&quot;;
+    GTI_destination = TicTacBoard;					/* Send the action message to the
+					 * TicTac game board object. */
+    GTI_actionMsg = MSG_TICTAC_NEW_GAME; 	/* The action message. */
+}</PRE>
+
+<IMG SRC="GOCLanguage_d_newgameInstance.gif">
+
+
+<H3 CLASS="HeadingD">
+The GenTrigger's Instance Chunk</H3>
+<P>
+The GenTrigger object has two master parts, just like the GenInteraction object shown in <A HREF="GOCLanguage_d.htm#43589"> Variant Classes</A>
+: the Gen master part holds the instance data for <CODE>
+GenClass</CODE>
+ and <CODE>
+GenTriggerClass</CODE>
+. The Vis master part holds the instance data for <CODE>
+VisClass</CODE>
+ and <A NAME="IX_OLButtonClass">
+ </A>
+<CODE>
+OLButtonClass</CODE>
+. The <CODE>
+MetaClass</CODE>
+ instance data consists only of the object's class pointer and has no master part.</P>
+<P>
+The trigger's instance chunk's basic structure consists of the class pointer (four bytes) followed by two words of offset into the chunk. The first offset gives the location of the Vis master part, and the second gives the location of the Gen master part. After the offsets are the master parts themselves, and if the trigger had any variable data, it would appear at the end of the chunk.
+<IMG SRC="GOCLanguage_d_newgameClassTree.gif">
+
+</P>
+<P>
+Each master part has the master class' instance fields first, followed by those of its subclasses. All the fields that belong to <CODE>
+VisClass</CODE>
+ begin VI_..., all those that belong to <CODE>
+OLButtonClass</CODE>
+ begin OLBI_..., etc.</P>
+<P>
+Notice also the first four bytes of the Gen master part: they contain a pointer to the &quot;superclass&quot; of <CODE>
+GenClass</CODE>
+ for the trigger. Although the trigger typically does not have different forms in any given specific UI (as the GenInteraction does), it will have a different class for each specific UI it encounters. For example, the OSF/Motif class is <CODE>
+OLButtonClass</CODE>
+; another specific UI will use a different class for GenTriggers.</P>
+
+
+<H3 CLASS="HeadingD">
+The GenTrigger's Full Class Tree</H3>
+<P>
+Since <CODE>
+GenClass</CODE>
+ is a variant, it has a superclass pointer of 0001h:0000h. This special value (with an illegal segment address) indicates to the kernel that this object's <CODE>
+GenClass</CODE>
+ superclass is stored in the instance chunk itself. The superclass is stored in the first four bytes of the Gen master part, as shown in the previous section.</P>
+
+
+<H3 CLASS="HeadingD">
+GenTriggerClass' ClassStruct Structure
+<IMG SRC="GOCLanguage_d_newgameSubClass.gif">
+
+</H3>
+<P>
+Because all classes have the same class structure, only <CODE>
+GenTriggerClass</CODE>
+ will be examined here. The class structure and the instance chunk structure are closely linked in several ways.</P>
+<P>
+As shown in the diagram, the instance chunk points directly to the class. The class points to its superclass, thereby providing inheritance of all the methods and structures of classes higher in the class tree such as <CODE>
+GenClass</CODE>
+.</P>
+<P>
+The class structure contains some information about the instance chunk's format, specifically <CODE>
+Class_masterOffset</CODE>
+ and <CODE>
+Class_instanceSize</CODE>
+. <CODE>
+Class_masterOffset</CODE>
+ gives the offset into the instance chunk where the offset to the master part is stored. <CODE>
+Class_instanceSize</CODE>
+ contains the size of the master part so the kernel can quickly allocate the needed space when the master part is initialized.</P>
+<P>
+The method table resides at the end of the class, and it has entries for each message handled by the class. <CODE>
+GenTriggerClass</CODE>
+ handles seven messages (stored in <CODE>
+Class_methodCount</CODE>
+); any message received by this trigger and not recognized by <CODE>
+GenTriggerClass</CODE>
+ is passed up the class tree for handling. Thus, a MSG_GEN_SET_NOT_ENABLED sent to the trigger will be passed on to <CODE>
+GenClass</CODE>
+ and will be handled there.</P>
+<P>
+<A NAME="IX_Method table">
+ </A>
+The method table has two parts: The first part is a listing of message numbers, and the second part is a listing of pointers to the method code. When the object receives a message, the kernel scans the first part to see if the class handles the message. If it does, the kernel then scans the second part of the table to get the pointer to the code. It then executes the code there as if that code were a function called by the object's code.</P>
+
+
+<H3 CLASS="HeadingD">
+How a Message Is Handled</H3>
+<P>
+<A NAME="IX_Messages:handling with variant classes">
+ </A>
+Most aspects of messages and messaging are described in the following section. This section, however, describes how the kernel finds and executes the code when a message is sent to the GenTrigger. The message is <CODE>
+MSG_GEN_SET_USABLE</CODE>
+ (handled by <CODE>
+GenClass</CODE>
+).</P>
+<P>
+Messages are sent directly to an object using its optr. That is, when you send a message to this particular GenTrigger, you send it directly to TicTacNewTrigger, not to some monolithic &quot;case&quot; statement run by your application. Since the object's optr uniquely identifies the location of the object's instance chunk in memory, the kernel can quickly access the code for the handler.</P>
+<P>
+When <CODE>
+MSG_GEN_SET_USABLE</CODE>
+ is sent to the TicTacNewTrigger, for example, the kernel looks in the object's instance chunk for its class pointer. It follows this pointer and then looks in <CODE>
+GenTriggerClass</CODE>
+' <CODE>
+ClassStruct</CODE>
+ structure. It scans the first part of the class' method table for <CODE>
+MSG_GEN_SET_USABLE</CODE>
+. If the message is not there (and it isn't), the kernel will then follow the class' <CODE>
+Class_superClass</CODE>
+ pointer and look in <CODE>
+GenClass</CODE>
+' <CODE>
+ClassStruct</CODE>
+ structure. It then scans the first part of <CODE>
+GenClass</CODE>
+' method table for the message. <CODE>
+GenClass</CODE>
+ has an entry for <CODE>
+MSG_GEN_SET_USABLE</CODE>
+, and therefore the kernel checks the second part of the method table for the code pointer. It follows this pointer to the method's entry point and begins executing the code there.</P>
+
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GOCLanguage_b.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GOCLanguage_c.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.1 GEOS Terminology</A> 
+<!-- to next --> | <A HREF="GOCLanguage_e.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.3 The GEOS Message System</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

@@ -1,0 +1,183 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Environment_9.htm,v 1.2 97/09/05 10:57:37 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Coordinate Transformations</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Graphics Environment</A>: 5.2 <A HREF="Environment_7.htm">Coordinate Space</A>: 
+<A NAME="27206">
+ </A>
+Coordinate Transformations</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Environment_7.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Environment_8.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.1 Standard Coordinate Space</A> 
+<!-- to next --> | <A HREF="Environment_a.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5.3 Precise Coordinates</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+GEOS provides routines which &quot;transform&quot; the coordinate space. These commands can shift, magnify, or rotate the coordinate grid, or perform several of these changes at once. These transformations affect structures in the GState, and new transformations can be combined with or replace a GState's current transformation.</P>
+<P>
+These transformations apply to the coordinate space, not to individual objects. As a result, if you apply a 200% scaling factor to a drawing not centered on the origin, not only will its size change, but its position will change as well. If you want these operations to affect an object but not its position, you should translate the coordinates so that the origin is at the desired center of scaling or rotation, apply the scaling or rotation, draw the object at the translated origin, then change the coordinates back. 
+<IMG SRC="Environment_9_operations.gif">
+
+</P>
+<P>
+Since they are stored in the GState, these transformations endure--they do not go away after you've drawn your next object. If you apply a 90 degree rotation, you will continue drawing rotated to 90 degrees until you either rotate to some other angle or use another Graphics State. Transformations are also cumulative. If you rotate your space 30°, then translate it up an inch, the result will be a rotated, translated coordinate space. If you want to nullify your last transformation, apply the opposite transformation.</P>
+<P>
+When applying a new transformation to a space which has already been transformed, the old transformations will affect the new one. Be careful, therefore, of the order of your transformations when combining a translation with any other kind of transformation. If you make your transformations in the wrong order, you may not get what you expected.
+<IMG SRC="Environment_9_centeredRotate.gif">
+
+</P>
+
+<H2 CLASS="HeadingC">
+Simple Transformations</H2>
+<PRE>GrApplyRotation(), GrApplyScale(), GrApplyTranslation(), GrSetDefaultTransform(), GrSetNullTransform(), GrInitDefaultTransform(), GrSaveTransform(), GrRestoreTransform()</PRE>
+<P>
+If you find yourself using transformations at all, they will probably all be rotations, scalings, and translations. The GEOS graphics system includes commands to apply these kinds of transformations to your coordinate system, taking the form <CODE>
+GrApplyTransformation()</CODE>
+. These commands work with a transformation data structure associated with the Graphics State, so everything drawn in that Graphics State will be suitably transformed. 
+
+</P>
+<P>
+<CODE>
+GrApplyRotation()</CODE>
+<A NAME="IX_GrApplyRotation()">
+ </A>
+ rotates the coordinate space, turning it counterclockwise around the origin. All objects drawn after the rotation will appear as if someone had turned their drawing surface to a new angle. With a 90° rotation, a shape centered at 
+(1,&nbsp;1)  would draw as if centered at (1,&nbsp;-1). 
+Anything drawn centered at the origin would not change position but would be drawn with the new orientation. </P>
+<P>
+<CODE>
+GrApplyScale()</CODE>
+<A NAME="IX_GrApplyScale()">
+ </A>
+ resizes the coordinate space; this is useful for zooming in and out. After applying a scale to double the size of everything in the x and y directions, everything will be drawn twice as big, centered twice as far away from the origin. Applying a negative scale causes objects to be drawn with the scale suggested by the magnitude of the scaling factor but &quot;flipped over&quot; to the other side of the coordinate axes.</P>
+<P>
+<CODE>
+GrApplyTranslation()</CODE>
+<A NAME="IX_GrApplyTranslation()">
+ </A>
+ causes the coordinate system to be shifted over. After a translation, everything will be drawn at a new position, with no change in orientation or size. </P>
+<P>
+To undo the effects of a transformation, you can apply the opposite transformation: rotate the other way, translate in the opposite direction, or scale with the inverse factor. </P>
+<P>
+<A NAME="IX_GrSetDefaultTransform()">
+ </A>
+To undo the effects of all prior transformations, return to the default transformation matrix using the <CODE>
+GrSetDefaultTransform()</CODE>
+ command.<A NAME="IX_GrSetNullTransform()">
+ </A>
+ The routine <CODE>
+GrSetNullTransform()</CODE>
+ sets the Graphics State transformation to the null transform--nullifying not only your transformations, but any the system may have imposed as well. For the most part, you should avoid using the <CODE>
+GrSetNullTransform()</CODE>
+ command and use the <CODE>
+GrSetDefaultTransform()</CODE>
+ instead. <A NAME="IX_GrInitDefaultTransform()">
+ </A>
+You can change the default transformation matrix using <CODE>
+GrInitDefaultTransform()</CODE>
+, but this is generally a bad idea since the windowing system works with the default transformation, and if a geode begins making capricious changes, this can produce strange images. </P>
+<P>
+There are &quot;push&quot; and &quot;pop&quot; operations for transformations. To keep a record of the GState's current transformation, call <CODE>
+GrSaveTransform()</CODE>
+. To restore the saved transformation, call <CODE>
+GrRestoreTransform()</CODE>
+.</P>
+
+
+<H2 CLASS="HeadingC">
+Complicated Transformations</H2>
+<PRE>GrApplyTransform(), GrSetTransform(), GrGetTransform(), GrTransformByMatrix(), GrUntransformByMatrix()</PRE>
+<P>
+You may want to make some change to the coordinate system that has no simple correspondence to scaling, rotation, or translation. Perhaps you know some linear algebra and want to use your knowledge to combine several transformation functions into a single transformation (thus improving execution speed). All transformations on the coordinate system are expressed in the form of transformation matrices. A GEOS graphics system transformation consists of a matrix containing 6 variables and 3 constants (see figure, below). The six variables allow for standard coordinate transformations. The constants (0, 0, and 1 respectively) allow these transformation matrices to be composed. For example, multiplying a scaling matrix with a rotation matrix creates a matrix which represents a combined scaling and rotation. The six variable matrix elements are stored in a <CODE>
+TransMatrix</CODE>
+<A NAME="IX_TransMatrix">
+ </A>
+ structure.
+<IMG SRC="Environment_9_matrixStandard.gif">
+
+
+<IMG SRC="Environment_9_matrixPoint.gif">
+
+</P>
+<P>
+The GEOS system uses one matrix to store the Graphics State transformation and one to store the Window transformation. When told to apply a new transformation, the graphics system constructs a matrix to represent the requested transformation change and multiplies this matrix by the old transformation matrix. To combine these matrices, GEOS multiplies them together to get the cross-product 
+<IMG SRC="Environment_9_matrixCombo.gif">
+
+</P>
+<P>
+If you know that there's a particular combination of transformations you're going to be using a lot, you can do some math in advance to compute your own transformation matrix, then apply the raw matrix as a transformation using <CODE>
+GrApplyTransform()</CODE>
+<A NAME="IX_GrApplyTransform()">
+ </A>
+. <A NAME="IX_GrSetTransform()">
+ </A>
+To replace the GState's current transformation matrix with the matrix of your choice, use <CODE>
+GrSetTransform()</CODE>
+. To find out the current transformation, call <A NAME="IX_GrGetTransform()">
+ </A>
+<CODE>
+GrGetTransform()</CODE>
+. </P>
+<P>
+You could combine these steps to pre-compute a transformation that combined a translation and a scaling:</P>
+<OL>
+<LI>
+Call <CODE>
+GrApplyTranslation()</CODE>
+ to apply a translation to the GState's coordinate space.</LI>
+<LI FIXME_NumListOther>
+Call <CODE>
+GrApplyScale()</CODE>
+ to apply the scale factor to the GState's coordinate space. The space is now both translated and scaled.</LI>
+<LI FIXME_NumListOther>
+Call <CODE>
+GrGetTransform()</CODE>
+ to get the current GState transformation (stored in a <CODE>
+TransMatrix</CODE>
+ structure).</LI>
+<LI FIXME_NumListOther>
+To apply this transformation to another GState, use the <CODE>
+GrApplyTransform()</CODE>
+ command.</LI>
+</OL>
+<P>
+<CODE>
+GrTransformByMatrix()</CODE>
+<A NAME="IX_GrTransformByMatrix()">
+ </A>
+ returns the results of transforming a passed coordinate pair using an arbitrary transformation matrix. <CODE>
+GrUntransformByMatrix()</CODE>
+<A NAME="IX_GrUntransformByMatrix()">
+ </A>
+ performs the reverse operation, returning the coordinates which would have transformed to the passed coordinates.</P>
+<P>
+Sometimes you have to be careful about the order in which these transformations are supposed to occur. When multiplying transformation matrices together, the transformation that is applied later is the first in the multiplication pair. You can combine any number of rotations and scalings together without having to worry about order: the resulting matrices will be the same. When combining a translation with any other kind of operation, it makes a difference what order you make the transformations and thus makes a difference based on what order you multiply the matrices. 
+<IMG SRC="Environment_9_ordered.gif">
+
+</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Environment_7.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Environment_8.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.1 Standard Coordinate Space</A> 
+<!-- to next --> | <A HREF="Environment_a.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5.3 Precise Coordinates</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

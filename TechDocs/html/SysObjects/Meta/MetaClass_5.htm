@@ -1,0 +1,177 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: MetaClass_5.htm,v 1.1 97/06/06 14:41:53 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Object Management Messages</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">MetaClass</A>: 2.3 <A HREF="MetaClass_2.htm">Utility Messages</A>: 
+Object Management Messages</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="MetaClass_2.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="MetaClass_4.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2.2 Class Messages</A> 
+<!-- to next --> | <A HREF="MetaClass_6.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2.4 User Interface Utility Meta Messages</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+<A NAME="IX_Instance data:resolving">
+ </A>
+These messages fill in and resolve an object's instance data. They should usually not be subclassed, and will be sent by applications infrequently (if ever).</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_RESOLVE_VARIANT_SUPERCLASS">
+ </A>
+MSG_META_RESOLVE_VARIANT_SUPERCLASS</H4>
+<PRE CLASS="syntax">ClassStruct * MSG_META_RESOLVE_VARIANT_SUPERCLASS(
+        word	MasterOffset);</PRE>
+<P>
+<A NAME="IX_Variant classes:resolving">
+ </A>
+This message is sent by the object system when it needs to know the run-time superclass of a particular object's variant master class. The system sends this message to the object when it first attempts to deliver a message to the superclass of a variant class. The object must examine itself and determine what its superclass for that master level should be.</P>
+<P CLASS="refField">
+Source:	Object system.</P>
+<P CLASS="refField">
+Destination:	Any object with a variant class in its class hierarchy.</P>
+<P CLASS="refField">
+Interception:	Because variant master classes tend to be strictly administrative in nature, providing useful and very generic functionality to their subclasses, all immediate children of a variant master class will need to intercept this message and return the appropriate class pointer.</P>
+<P CLASS="refField">
+Parameters:	<EM>MasterOffset</EM>	Master offset of the level being resolved. If you know there's a variant class above your own, you will need to examine this to determine if it is your master level whose variant is being resolved, or the one above you.</P>
+<P CLASS="refField">
+Return:	Superclass to use.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_@reloc:MSG_META_RELOCATE">
+ </A>
+<A NAME="IX_MSG_META_RELOCATE">
+ </A>
+MSG_META_RELOCATE</H4>
+<PRE CLASS="syntax">Boolean 	MSG_META_RELOCATE(
+        word		vMRelocType,
+        word		frame);</PRE>
+<P>
+<A NAME="IX_Relocatable data">
+ </A>
+This message is sent by the object system to evaluate and resolve all of the object's relocatable instance data fields (pointers, optrs, etc.). Note that this only applies if the class' CLASSF_HAS_RELOC flag is set.</P>
+<P>
+NOTE: The calling of this method is non-standard in that it does not pass through the class's method table. Rather, the handler address is placed after the method table and a direct call is issued. This means a relocation routine should not be bound to <CODE>
+MSG_META_RELOCATE</CODE>
+ but should rather be bound to <CODE>
+@reloc</CODE>
+, which Goc understands to mean the handler is for both <CODE>
+MSG_META_RELOCATE</CODE>
+ and <CODE>
+MSG_META_UNRELOCATE</CODE>
+.</P>
+<P>
+Note also that relocation-by-routine happens in addition to (but before) any relocation due to the class' relocation table. To suppress relocation-by-table, you should initialize the class record with the CLASSF_HAS_RELOC flag to prevent Goc from generating a table for the class.</P>
+<P CLASS="refField">
+Source:	Kernel, when loading in object block, general resources, or object blocks stored in VM file format.</P>
+<P CLASS="refField">
+Destination:	Individual object needing relocations beyond what the kernel can do automatically (or that simply request for this message to be sent by having their CLASSF_HAS_RELOC bit set)</P>
+<P CLASS="refField">
+Interception:	Intercepted by any class needing to perform special relocations on its instance data. Superclass should be called, in case a superclass also needs to perform this operation on its own instance data.</P>
+<P CLASS="refField">
+Parameters:	<EM>vmRelocType</EM> 	Type giving some context to the relocation.</P>
+<DL>
+<DT>
+<EM>
+frame</EM>
+</DT><DD>Frame to pass to<CODE>
+ ObjRelocOrUnRelocSuper()</CODE>
+.</DD>
+</DL>
+<P CLASS="refField">
+Return:	If an error occurred, this will return <EM>
+true</EM>
+.</P>
+<P CLASS="refField">
+Structures:	</P>
+<PRE><A NAME="IX_VMRT_&ldots;"> </A><A NAME="IX_VMRelocType"> </A>typedef enum {
+	VMRT_UNRELOCATE_BEFORE_WRITE,
+	VMRT_RELOCATE_AFTER_READ,
+	VMRT_RELOCATE_AFTER_WRITE,
+	VMRT_RELOCATE_FROM_RESOURCE,
+	VMRT_UNRELOCATE_FROM_RESOURCE
+} VMRelocType;</PRE>
+<P CLASS="refField">
+Warnings:	This method may not call <CODE>
+LMemAlloc()</CODE>
+, <CODE>
+LMemReAlloc()</CODE>
+, or <CODE>
+LMemFree()</CODE>
+.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_@reloc:MSG_META_UNRELOCATE">
+ </A>
+<A NAME="IX_MSG_META_UNRELOCATE">
+ </A>
+MSG_META_UNRELOCATE</H4>
+<PRE CLASS="syntax">Boolean 	MSG_META_UNRELOCATE(
+        word		vMRelocType,
+        word		frame);</PRE>
+<P>
+This message causes an object to unresolve all its relocatable instance data fields, returning them to special index values.</P>
+<P CLASS="refField">
+Source:	Kernel, when loading in object block, general resources, or object blocks stored in VM file format.</P>
+<P CLASS="refField">
+Destination:	Individual object needing relocations beyond what the kernel can do automatically (or that simply request for this message to be sent by having their CLASSF_HAS_RELOC bit set).</P>
+<P CLASS="refField">
+Interception:	Intercepted by any class needing to perform special relocations on its instance data. Superclass should be called, in case a superclass also needs to perform this operation on its own instance data.</P>
+<P CLASS="refField">
+Parameters:	<EM>vmRelocType</EM> 	Type giving some context to the relocation.</P>
+<DL>
+<DT>
+<EM>
+frame</EM>
+</DT><DD>Frame to pass to <CODE>
+ObjRelocOrUnRelocSuper()</CODE>
+.</DD>
+</DL>
+<P CLASS="refField">
+Return:	If an error occurred, this will return <EM>
+true</EM>
+.</P>
+<P CLASS="refField">
+Structures:	</P>
+<PRE>typedef enum {
+	VMRT_UNRELOCATE_BEFORE_WRITE,
+	VMRT_RELOCATE_AFTER_READ,
+	VMRT_RELOCATE_AFTER_WRITE,
+	VMRT_RELOCATE_FROM_RESOURCE,
+	VMRT_UNRELOCATE_FROM_RESOURCE
+} VMRelocType;</PRE>
+<P CLASS="refField">
+Warnings:	This method may not call <CODE>
+LMemAlloc()</CODE>
+, <CODE>
+LMemReAlloc()</CODE>
+, or <CODE>
+LMemFree()</CODE>
+.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="MetaClass_2.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="MetaClass_4.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2.2 Class Messages</A> 
+<!-- to next --> | <A HREF="MetaClass_6.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2.4 User Interface Utility Meta Messages</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

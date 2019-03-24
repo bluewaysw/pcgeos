@@ -1,0 +1,163 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: CellLibrary_5.htm,v 1.1 97/06/02 14:32:16 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Actions on a Range of Cells</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Cell Library</A>: 2.3 <A HREF="CellLibrary_2.htm">Using the Cell Library</A>: 
+<A NAME="56688">
+ </A>
+Actions on a Range of Cells</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="CellLibrary_2.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="CellLibrary_4.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2.2 Basic Cell Array Routines</A> 
+<!-- to next --> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>RangeExists(), RangeInsert(), RangeEnum(), RangeSort(), RangeInsertParams</PRE>
+<P>
+The cell library provides a number of routines which act on a range of cells. All of these routines take the address of a <CODE>
+CellFunctionParameters</CODE>
+ structure as an argument. Many of these routines also take the address of a special parameter structure; for example, <CODE>
+RangeInsert()</CODE>
+ takes the address of a <CODE>
+RangeInsertParams</CODE>
+ structure. In these cases, the structure should be in locked or fixed memory. If the routine might allocate or resize cells, the structure must not be in an ungrouped DB item.</P>
+<P>
+<A NAME="IX_RangeExists()">
+ </A>
+You may want to find out if there are any cells in a specified section of the cell file. To do this, call the routine <CODE>
+RangeExists()</CODE>
+. This routine takes five arguments:</P>
+<UL>
+<LI>
+The address of the locked <CODE>
+CellFunctionParameters</CODE>
+ structure</LI>
+<LI>
+The index of the first row in the section to be checked</LI>
+<LI>
+The index of the first column in the section to be checked</LI>
+<LI>
+The index of the last row in the section to be checked</LI>
+<LI>
+The index of the last column in the section to be checked</LI>
+</UL>
+<P>
+If any cells exist in that section, the routine returns <EM>
+true</EM>
+ (i.e. non-zero). Otherwise, it returns <EM>
+false</EM>
+.</P>
+<P>
+<A NAME="IX_RangeInsert()">
+ </A>
+You may wish to insert several cells at once. For this reason, the cell library provides the routine <CODE>
+RangeInsert()</CODE>
+. This routine does not actually allocate cells; instead, it shifts existing cells to make room for new ones. You specify a section of the cell file to shift. Any cells in that section will be shifted over; the caller specifies whether they should be shifted horizontally or vertically. <A NAME="IX_RangeInsertParams">
+ </A>
+The routine takes two arguments, namely the address of the <CODE>
+CellFunctionParameters</CODE>
+ and the address of a <CODE>
+RangeInsertParams</CODE>
+ structure. It does not return anything. The definition of the <CODE>
+RangeInsertParams</CODE>
+ structure is shown in <A HREF="CellLibrary_5.htm#76081"> The RangeInsertParams and Point structures</A>
+. The calling geode should allocate it and initialize it before calling <CODE>
+RangeInsert()</CODE>
+.</P>
+<P CLASS="figTitle">
+Code Display 19-3 <A NAME="76081">
+ </A>
+The RangeInsertParams and Point structures</P>
+<PRE>typedef	struct {		/* defined in cell.h */
+	Rectangle			RIP_bounds;		/* Range of cells to shift */
+	Point			RIP_delta;		/* Specify which way to shift */
+	CellFunctionParameters			*RIP_cfp;
+} RangeInsertParams;</PRE>
+<PRE>typedef	struct {		/* defined in graphics.h */
+	sword		P_x;	/* Distance to shift horizontally */
+	sword		P_y;	/* Distance to shift vertically */
+} Point;</PRE>
+<P>
+<A NAME="IX_RIP_&ldots;">
+ </A>
+The <CODE>
+RangeInsertParams</CODE>
+ structure has three fields. The calling geode should initialize the fields to determine the behavior of <CODE>
+RangeInsert()</CODE>
+:</P>
+<DL>
+<DT>
+RIP<CODE>
+_bounds</DT><DD></CODE>
+This field specifies which cells should be shifted. The cells currently in this range will be shifted across or down, depending on the value of <CODE>
+RIP_delta</CODE>
+; this shifts more cells, and so on, to the edge of the visible portion of the cell file. The field is a <CODE>
+Rectangle</CODE>
+ structure. To insert an entire row (which is much faster than inserting a partial row), set <CODE>
+RIP_bounds.R_left = 0</CODE>
+ and <CODE>
+RIP_bounds.R_right = </CODE>
+LARGEST_COLUMN<CODE>
+.</CODE>
+</DD>
+<DT>
+RIP<CODE>
+_delta</DT><DD></CODE>
+This field specifies how far the cells should be shifted and in which direction. The field is a <CODE>
+Point</CODE>
+ structure (see <A HREF="CellLibrary_5.htm#76081"> The RangeInsertParams and Point structures</A>
+). If the range of cells is to be shifted horizontally, <CODE>
+RIP_delta.P_x</CODE>
+ should specify how far the cells should be shifted to the right, and <CODE>
+RIP_delta.P_y</CODE>
+ should be zero. If the cells are to be shifted vertically, <CODE>
+RIP_delta.P_y</CODE>
+ should specify how far the cells should be shifted down, and<CODE>
+ RIP_delta.P_x</CODE>
+ should be zero.</DD>
+<DT>
+RIP<CODE>
+_cfp</DT><DD></CODE>
+This is the address of the <CODE>
+CellFunctionParameters</CODE>
+ structure. You don't have to initialize this; the routine will do so automatically.</DD>
+</DL>
+<P>
+<A NAME="IX_RangeEnum()">
+ </A>
+You may need to perform a certain function on every one of a range of cells. For this purpose, the cell library provides the routine <CODE>
+RangeEnum()</CODE>
+. This routine lets you specify a range of cells and a callback routine; the routine will be called on each cell in that range.</P>
+<P>
+<A NAME="IX_RangeSort()">
+ </A>
+You can sort a range of cells, by row or by column, based on any criteria you choose. Use the routine <CODE>
+RangeSort()</CODE>
+. This routine uses a QuickSort algorithm to sort the cells specified. You supply a pointer to a callback routine which is used to compare cells.<A NAME="marker=396417">
+ </A>
+</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="CellLibrary_2.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="CellLibrary_4.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2.2 Basic Cell Array Routines</A> 
+<!-- to next --> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

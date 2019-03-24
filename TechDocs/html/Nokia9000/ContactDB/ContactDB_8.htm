@@ -1,0 +1,178 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: ContactDB_8.htm,v 1.3 97/08/21 14:35:11 cgroom Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> To Get More Info on a Contact</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="sectionTitle">
+<A HREF="index.htm">Contacts</A>: 5 
+<A NAME="53240">
+ </A>
+To Get More Info on a Contact</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="ContactDB_7.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4 Logging Calls</A> 
+<!-- to next --> | <A HREF="ContactDB_9.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">6 The User's Own Data</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>FoamDBFieldEnum(), FoamDBGetFieldType(), FoamDBGetFieldName()</PRE>
+<P>
+In the examples above, we've shown how to get a selected contact's name and GSM phone number. It is possible to get more information about a contact given its <CODE>
+RecordID</CODE>
+ number.</P>
+<P>
+In the examples shown in <A HREF="ContactDB_1.htm#31767"> Handling the ContactList's "Selected" Message</A>
+, <A HREF="ContactDB_5.htm#86000"> Handling the RecentContacts "Selected" Message</A>
+, and <A HREF="ContactDB_6.htm#33238"> Finding the "Stuckey's Snack Shack" Contact</A>
+ there is a comment noting a good place to get more information about a contact. If, for some reason, you need to find out information about a Contact in a context other than shown in one of those examples, </P>
+<OL>
+<LI>
+You will need the record's <CODE>
+RecordID</CODE>
+ number. Presumedly, you've stored away this number after using code like that shown in one of the examples shown above.<BR>
+To query a <CODE>
+ContactList</CODE>
+ object for the <CODE>
+RecordID</CODE>
+ of its selected record, use the <CODE>
+MSG_CONTACT_LIST_GET_ID_OF_SELECTED_RECORD</CODE>
+ message. This message takes no arguments, and returns a <CODE>
+RecordID</CODE>
+.</LI>
+<LI>
+Gain access to the Contact database by calling <CODE>
+ContactGetDBHandle()</CODE>
+, storing the returned handle.</LI>
+<LI>
+To access the database record corresponding to the selected contact, call <CODE>
+FoamDBGetRecordFromID()</CODE>
+. This returns the record's handle.</LI>
+<LI>
+Get the contact information you need. Information about how you might do this is described in the paragraphs following this checklist.</LI>
+<LI>
+When you're done with the record handle, call <CODE>
+FoamDBDiscardRecord()</CODE>
+ to free the handle.</LI>
+<LI>
+Be sure to call <CODE>
+ContactReleaseDBHandle()</CODE>
+ to signal you're done with the database. You shouldn't keep the handle around for long; doing so prevents the file from being closed.</LI>
+</OL>
+<P>
+To find out any other sort of information about the contact, you'll need to access one of the fields of the record. Fields within a Foam DB record (the Contact DB is a Foam DB) are identified by a <CODE>
+FieldID</CODE>
+ number. </P>
+<A NAME="IX_FoamDBFieldEnum():in Contact DB example"> </A>
+<A NAME="IX_FoamDBGetFieldData():in Contact DB example"> </A>
+<A NAME="IX_FoamDBGetFieldName():in Contact DB example"> </A>
+
+<P>
+The <CODE>
+FoamDBFieldEnum()</CODE>
+ function provides a way to scan all the fields of a record. The following code snippet shows how you might use <CODE>
+FoamDBFieldEnum()</CODE>
+ to search for all of a contact's voice phone numbers. <CODE>
+FoamDBFieldEnum()</CODE>
+ calls a callback routine for each of the record's fields. <CODE>
+FoamDBFieldEnum()</CODE>
+ takes as arguments a record handle, a pointer to a data buffer (this pointer will be passed to the callback routine; it gives you a way to pass data to the callback; in our example, we pass the record handle in the buffer), and a pointer to a callback function. The callback function is passed a <CODE>
+FieldHeader</CODE>
+ structure and a pointer to the data buffer that was passed to<CODE>
+ FoamDBFieldEnum()</CODE>
+. From the FieldHeader, it can get the <CODE>
+FieldID</CODE>
+ from the <CODE>
+FieldHeader</CODE>
+'s <CODE>
+FH_id</CODE>
+ field. To get information about each field, use the <CODE>
+FoamDBGetFieldType()</CODE>
+, <CODE>
+FoamDBGetFieldName()</CODE>
+, and/or <CODE>
+FoamDBGetFieldData()</CODE>
+ routines. Each of these routines takes the contact database handle, a record handle, a <CODE>
+FieldID</CODE>
+, and a pointer to a buffer to fill with a return value.</P>
+<P CLASS="figTitle">
+Code Display 4-5 Checking All Fields of a Contact</P>
+<P CLASS="figCaption">
+In this example, we check all fields of a contact, and build up an array with the names and data for those fields that correspond to voice phone numbers. </P>
+<P CLASS="figCaption">
+In this example, all we know at the start is the record's RecordID number. </P>
+<PRE>void BuildNumberList( RecordID recordID ) {
+	/* Scan all fields of the Contact record */
+	/* For each one that corresponds to a voice phone number, store 
+	 * the field's name (e.g., &quot;Phone&quot;) and data (e.g., &quot;555-1212&quot;) in
+	 * the global Data array. */
+
+	VMFileHandle 		CDBHandle;
+	MemHandle		curRecord;</PRE>
+<PRE>	CDBHandle = ContactGetDBHandle();
+	curRecord = FoamDBGetRecordFromID( CDBHandle, recordID );
+	NumberOfNumbers = 0			/* Global variable: 
+					number of elements in Data array*/
+	FoamDBFieldEnum( curRecord, &amp;curRecord, &amp;BuildNumberListCallback );
+	FoamDBDiscardRecord( CDBhandle, curRecord) ; /* Done with the record */
+	ContactReleaseDBHandle(); /* Done with the Contact DB for now */
+}</PRE>
+<PRE>Boolean _pascal BuildNumberListCallback( FieldHeader *field, void *enumData ) {
+	VMFileHandle		CDBHandle;
+	byte		fieldType;
+	MemHandle		curRecord = *((MemHandle *) enumData );</PRE>
+<PRE>	CDBandle = ContactGetDBHandle();
+	FoamDBGetFieldType( CDBHandle, curRecord, field-&gt;FH_id, &amp;fieldType);
+	if (fieldType == CFT_PHONE ) { /* For each voice phone number */
+				/* To look for something other than a phone 
+				 * number, we would use a different 
+				 * ContdbFieldType value. */
+					/* Grab the field name */
+	  FoamDBGetFieldName( CDBHandle, curRecord, field-&gt;FH_id, 
+			Data[NumberOfNumbers].fName, MAX_FIELD_LABEL_LEN);
+					/* Grab the field data */
+					/* If the data has zero length, func will
+					 * return zero. */
+	  if (FoamDBGetFieldData( CDBHandle, curRecord, field-&gt;FH_id, 
+			Data[NumberOfNumbers].fData, MAX_FIELD_NUMBER_DATA_LEN)) {
+					/* If the data was not of zero length
+					 * (wasn't just a blank field), then 
+					 * up our NumberOfNumbers. */
+	    NumberOfNumbers++;
+	  }
+	}
+	ContactReleaseDBHandle(); 	/* We're done with the database */
+				/* if we return non-zero, we'll stop Enum'ing 
+				 * through the fields. Since we only have room
+				 * for 10 fields in our array... */
+	return( NumberOfNumbers &gt; 10) ; 
+}</PRE>
+<P>
+As shown above, to get the field data and field name associate with a field, use the <CODE>
+FoamDBGetFieldData()</CODE>
+ and <CODE>
+FoamDBFGetFieldName()</CODE>
+ functions. Many users will leave blank fields in their contact records; to test for a blank field, check <CODE>
+FoamDBGetFieldData()</CODE>
+'s return value; if it's zero, then the user has not filled in that field of the contact information.</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="ContactDB_7.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4 Logging Calls</A> 
+<!-- to next --> | <A HREF="ContactDB_9.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">6 The User's Own Data</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

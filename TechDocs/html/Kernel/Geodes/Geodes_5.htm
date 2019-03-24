@@ -1,0 +1,100 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Geodes_5.htm,v 1.1 97/06/02 15:29:26 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Saving and Restoring State</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Applications and Geodes</A>: 1.4 <A HREF="Geodes_1.htm">Geodes</A>: 
+<A NAME="76203">
+ </A>
+Saving and Restoring State</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Geodes_1.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Geodes_4.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1.3 Shutting Down an Application</A> 
+<!-- to next --> | <A HREF="Geodes_6.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">1.5 Using Other Geodes</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>ObjMarkDirty(), ObjSaveBlock()</PRE>
+<P>
+<A NAME="IX_Applications:saving to state file">
+ </A>
+<A NAME="IX_State files">
+ </A>
+Nearly all applications will save and restore their state so the user may shut down and return to precisely the same configuration he or she left. Saving of state is almost entirely contained within the system software; for the most part, only UI objects are saved to state files. You can, however, mark other object blocks and data for saving to a state file.</P>
+<P>
+The state file for an application is a VM file containing object blocks. Only object blocks may be saved to the state file, though you can save LMem data by setting up object blocks with only data chunks in them. (Create the blocks with <CODE>
+MemAllocLMem()</CODE>
+, passing type LMEM_TYPE_OBJ_BLOCK, then simply use <CODE>
+LMemAlloc()</CODE>
+ to allocate data chunks.) For more information about managing LMem and data chunks, see <A HREF="../../Memory/LMem/index.htm">the Local Memory chapter</A>. You can also save an extra data block to the state file using <CODE>MSG_GEN_PROCESS_CLOSE_APPLICATION</CODE>
+ and <CODE>
+MSG_GEN_PROCESS_OPEN_APPLICATION</CODE>
+. In the close message, you can return the handle of an extra block to be saved to the state file; in the open message, the handle of the extra block is given to you, and you can restore this data as necessary. See the reference information for these messages under <CODE>
+GenProcessClass</CODE>
+ for more information.</P>
+<P>
+When a state file is saved, the system recognizes and saves only the dirty (modified) objects and chunks. Later, when state is restored, the system merges the changes in the state file with the original object blocks, resulting in the state that was saved.</P>
+<P>
+<A NAME="IX_ObjMarkDirty()">
+ </A>
+<A NAME="IX_ObjSaveBlock()">
+ </A>
+For individual objects or entire object blocks to be saved to the state file, they must be marked dirty. Generic objects automatically mark themselves dirty at the appropriate times, so you don't have to worry about them. To mark other objects dirty, use the routine <CODE>
+ObjMarkDirty()</CODE>
+. Each object which has been marked dirty will be saved to a state file when appropriate. If you want to save an entire object block to the state file, you can call <CODE>
+ObjSaveBlock()</CODE>
+ on the block; the system will save the entire block, not just the dirty chunks.</P>
+<P>
+State files are dealt with at only two times: First, when the system starts up, it will check for the existence of application state files. If a state file exists, the system will attempt to load the application belonging to it; after loading the application's resources, it will merge the state changes with the default settings to restore the original state.</P>
+<P>
+The second time state files are used is when the system shuts down. A simple shutdown (called a &quot;detach&quot;) is invoked only by the UI and is not abortable. When a detach occurs, the system shuts down all geodes as cleanly and quietly as possible, saving them to state files. Only certain geodes will respond in extreme cases, offering the user the option of delaying the detach or cancelling an operation in progress. An example of this is the GEOS spooler; if one or more jobs are actively printing or queued for printing, the spooler will ask the user whether the job should continue and the detach be delayed, or whether the job should be aborted or delayed until the next startup. The spooler can not abort the detach in any case.</P>
+<P>
+Another type of detach is called a &quot;quit.&quot; Any geode may invoke a quit, which is actually a two-step detach. A quit will first notify all other geodes that the system will soon be detaching; other geodes then have the chance to abort the quit if they want. For example, if a terminal program were downloading a file and received a quit notification, it could ask the user whether she wanted to abort the quit or the download. If the user wanted to finish the download, she would abort the quit; if she wanted to quit, she would abort the download. The system would then either shut down via a normal detach or stop the quit sequence.</P>
+<P>
+When a geode is first launched, no state file exists for it. The state file is not created until the geode is actually detached to a state file. If a geode is restored from a state file, the file will exist until the geode is detached again. A geode that gets closed (not detached to state) will remove any state file it may have created during a previous detach. A geode that is detached to state will create or modify its state file as appropriate.</P>
+<P>
+The state of an application (how it was launched) is reflected in the <CODE>
+GAI_states</CODE>
+ field of the GenApplication object. To retrieve the application's state, send it <CODE>
+MSG_GEN_APPLICATION_GET_STATE</CODE>
+. It will return a value of <CODE>
+ApplicationStates</CODE>
+. The most frequent use of this message is by applications that need to know whether a &quot;quit&quot; is underway when their process objects receive the <CODE>
+MSG_GEN_PROCESS_CLOSE_APPLICATION</CODE>
+ message; the process object will query the GenApplication and see if it is in the AS_QUITTING state.</P>
+<P>
+In addition to the above state-saving functionality, the kernel provides two routines that translate handles between the state file and memory. <CODE>
+ObjMapSavedToState()</CODE>
+ takes the memory handle of an object block and returns its corresponding state file VM block handle. <CODE>
+ObjMapStateToSaved()</CODE>
+ takes the state file VM block handle and returns the corresponding memory block handle, if any.</P>
+<P>
+If your application's documents are VM files, it is a very simple matter to save document state. In fact, if you use the GenDocument and document control objects, they will take care of document state saving for you. Be sure that the VM file has the VMA_BACKUP flag set in its <CODE>
+VMAttributes</CODE>
+; then you can simply call <CODE>
+VMUpdate()</CODE>
+ on the document file. (Note--do not use <CODE>
+VMSave()</CODE>
+ instead; it will erase the backup and lock in the user's changes to the document.) If you are not using GEOS VM files, it is up to you how and if you will save the document's state. For more information about GEOS VM files, see <A HREF="../../Memory/VM/index.htm">the VM chapter</A>.</P><HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Geodes_1.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Geodes_4.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1.3 Shutting Down an Application</A> 
+<!-- to next --> | <A HREF="Geodes_6.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">1.5 Using Other Geodes</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

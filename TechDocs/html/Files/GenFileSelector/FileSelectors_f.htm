@@ -1,0 +1,246 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: FileSelectors_f.htm,v 1.1 97/06/02 14:48:26 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Searching Via Callback Routine</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The FileSelector Object</A>: 3.8 <A HREF="FileSelectors_7.htm">File Selector Instance Data</A>: 
+<A NAME="27532">
+ </A>
+Searching Via Callback Routine</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="FileSelectors_7.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="FileSelectors_e.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.7 Matching a File's File Attributes</A> 
+<!-- to next --> | <A HREF="FileSelectors_10.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.9 Resetting a Filter</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>MSG_GEN_FILE_SELECTOR_GET_FILTER_ROUTINE, GenFileSelectorFilterRoutine</PRE>
+<P>
+If the built-in search limitations do not provide the functionality you require, you can set up a callback routine that the File Selector will call for each file or subdirectory in a directory scan. This routine will serve as the final filter for each file; if a file passes all other filters, it will be subjected to your routine. This procedure adds overhead to any scan, of course, so you should try to use the built-in File Selector functions whenever possible.</P>
+<P>
+To set the File Selector to use the callback functionality, you must set FSFC_FILTER_FILE in the <CODE>
+GFSI_fileCriteria</CODE>
+ field. If your callback routine is written in C, you must also set FSFC_FILTER_IS_C; the routine must also follow the Pascal calling convention.</P>
+<P>
+In order to take advantage of the callback functionality, you must first subclass <CODE>
+GenFileSelectorClass</CODE>
+ to handle the message <CODE>
+MSG_GEN_FILE_SELECTOR_GET_FILTER_ROUTINE</CODE>
+, which the File Selector will send to itself before beginning the directory scan. Your handler should return the address of the callback routine along with a pointer to an array of attributes that will be passed to it.</P>
+<P>
+The callback routine can assume that if it is being called, the file has passed all other filters--the callback is therefore the last word on acceptance or rejection of the file. In essence, the callback is asked whether the file should be rejected: It should return the constant TRUE if the file is to be rejected but FALSE if it is not to be rejected.</P>
+<P>
+As mentioned above, you can designate an array of extended file attributes that will be passed to the callback routine. This array contains a number of <CODE>
+FileExtAttrDesc</CODE>
+ structures, each of which defines a certain attribute and some extra data for the attribute. This structure is shown below:</P>
+<PRE>typedef struct {
+    FileExtendedAttribute FEAD_attr;
+				/* file attribute to
+				 * get or set */
+    void		* FEAD_value;
+				/* pointer to a buffer
+				 * or new value */</PRE>
+<PRE>    word		FEAD_size;		/* size of buffer or
+				 * new value */
+    char		* FEAD_name;
+				/* if custom attribute,
+				 * pointer to name */
+} FileExtAttrDesc;</PRE>
+<P>
+In the above context, <CODE>
+FEAD_value</CODE>
+ is meaningless and <CODE>
+FEAD_size</CODE>
+ is the number of bytes required to hold the value of the attribute. Note that this array is not passed to the callback routine; instead, it specifies the structure and composition of the values that will be.</P>
+<P>
+<A NAME="IX_FEAD_&ldots;">
+ </A>
+<A NAME="IX_FileExtAttrDesc">
+ </A>
+An example of filtering files using a callback routine is shown in <A HREF="FileSelectors_f.htm#59157"> Filtering Files Via a Callback Routine</A>
+. The <CODE>
+FileExtAttrDesc</CODE>
+ structure is defined and detailed in <A HREF="../../Files/FileSys/index.htm">the File System chapter</A>.</P><P CLASS="figTitle">
+Code Display 14-10 <A NAME="59157">
+ </A>
+Filtering Files Via a Callback Routine</P>
+<PRE>/*******************************************************************************
+ * This is a sample handler for MSG_GEN_FILE_SELECTOR_GET_FILTER_ROUTINE.
+ * You should be able to use this code in your subclass. Note that the routine
+ * name &quot;FilterFileSelectorRoutine&quot; is application-specific; it can be whatever
+ * you want. It must be declared as static Boolean, however. See below.
+ * PARAMETERS: 
+ * void (GenFileSelectorGetFilterRoutineResults *filter) 
+ *******************************************************************************/</PRE>
+<PRE>@method FilterFileSelectorClass, MSG_GEN_FILE_SELECTOR_GET_FILTER_ROUTINE {</PRE>
+<PRE>    /* We need to return a virtual pointer to the filter routine so the
+     * file selector can lock and unlock the routine's code resource as
+     * appropriate. Unfortunately, the compiler optimizes the simple
+     * implementation (just assigning filter-&gt;filterRoutine the address of
+     * the routine) by storing CS for the segment, which is unhelpful. So
+     * we need a static variable holding the routine's address instead. */</PRE>
+<PRE>    static GenFileSelectorFilterRoutine *const filterRoutine =
+					&amp;FilterFileSelectorRoutine;</PRE>
+<PRE>    /* Specify the address of the routine to call. It need not be locked into
+     * memory, as the GenFileSelector will do that for us. */</PRE>
+<PRE>    filter-&gt;filterRoutine = filterRoutine;</PRE>
+<PRE>    /* Specify the additional attributes we need to look at in our filter
+     * routine. As with the filterRoutine, these need not be in fixed or
+     * locked memory. */</PRE>
+<PRE>    filter-&gt;filterAttrs = &amp;filterFileSelectorFilterAttrs;
+}</PRE>
+<PRE>/*******************************************************************************
+ * This is a sample File Selector callback routine. It may be called whatever
+ * you want and must be declared static Boolean.
+ * This routine is called once per file or directory that passes all other File
+ * Selector filters. This routine is limited to examining the attributes of the
+ * file. It may not do anything that could cause the File Selector's instance chunk
+ * to move in memory.
+ * Return: TRUE to reject the file, FALSE to accept the file.
+ *******************************************************************************/</PRE>
+<PRE>static Boolean FilterFileSelectorRoutine(optr oself,
+				FileEnumCallbackData *fecd, word frame)</PRE>
+<PRE>/* The code of the routine is not included here; to see it, look at the FSFilter
+ * sample application. */</PRE>
+<PRE>	/* Following is the array of attributes examined by our filter routine.
+	 * This array contains an arbitrary number of elements, the last of which
+	 * has FEA_END_OF_LIST as its FEAD_attr field. FEAD_value is unused in this
+	 * context. FEAD_size is set to the total number of bytes needed for each
+	 * attribute. 
+	 * Each structure's fields are FEAD_attr, FEAD_value, FEAD_size,
+	 * and FEAD_name */</PRE>
+<PRE>const FileExtAttrDesc filterFileSelectorFilterAttrs[] = {
+    { FEA_NAME, 0, sizeof(FileLongName), NULL },
+    { FEA_FILE_ATTR, 0, sizeof(FileAttrs), NULL },
+    { FEA_FILE_TYPE, 0, sizeof(GeosFileType), NULL },
+    { FEA_END_OF_LIST, 0, 0, NULL }
+};</PRE>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_FILE_SELECTOR_GET_FILTER_ROUTINE">
+ </A>
+MSG_GEN_FILE_SELECTOR_GET_FILTER_ROUTINE</H4>
+<PRE CLASS="syntax">void	MSG_GEN_FILE_SELECTOR_GET_FILTER_ROUTINE(
+        GenFileSelectorGetFilterRoutineResults *filter);</PRE>
+<P>
+This message returns the address of the callback routine used by the File Selector as well as the array of <CODE>
+FileExtAttrDesc</CODE>
+ structures specifying the callback's parameters.</P>
+<P>
+For the callback function to be used, you must set FSFC_FILE_FILTER in the File Selector's <CODE>
+GFSI_fileCriteria</CODE>
+ instance data field. If your callback routine is in C, you must also set FSFC_FILTER_IS_C. In addition, the callback routine must follow the Pascal calling convention.</P>
+<P CLASS="refField">
+Source:	Sent by the File Selector object to itself before calling <CODE>
+FileEnum()</CODE>
+. Also may be used by other objects to retrieve the callback information for the File Selector.</P>
+<P CLASS="refField">
+Destination:	Any GenFileSelector object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+filter</CODE>
+	A pointer to an empty return value structure. This structure is detailed below.</P>
+<P CLASS="refField">
+Return:	The structure pointed to by <CODE>
+filter</CODE>
+ must be filled by this method.</P>
+<P CLASS="refField">
+Structures:	<A NAME="IX_GenFileSelectorGetFilterRoutineResults">
+ </A>
+The single parameter is a pointer to an empty structure of type <CODE>
+GenFileSelectorGetFilterRoutineResults</CODE>
+. This structure has two parts: <CODE>
+filterRoutine</CODE>
+ is a pointer to your callback routine, and <CODE>
+filterAttrs</CODE>
+ is a pointer to an array of <CODE>
+FileExtAttrDesc</CODE>
+ structures. You must fill in this structure in your handler so the File Selector knows how to call your callback routine. The structure is shown below:</P>
+<PRE>typedef struct {
+    GenFileSelectorFilterRoutine						*filterRoutine;
+    const FileExtAttrDesc						*filterAttrs;
+} GenFileSelectorGetFilterRoutineResults;</PRE>
+<P CLASS="refField">
+Interception:	If a callback routine is to be used, you must subclass and handle this message to return the proper structures.</P>
+<P CLASS="refField">
+Tips:	If your callback has no requirements other than the file name, you can pass NULL in the <CODE>
+filterAttrs</CODE>
+ field of <CODE>
+filter</CODE>
+.</P>
+<P CLASS="refField">
+Warnings:	The handler for this message must return a virtual segment for the callback routine in <CODE>
+filter</CODE>
+'s <CODE>
+filterRoutine</CODE>
+ field. This can cause problems with most compilers; to avoid these problems, set a static variable in your method as shown in <A HREF="FileSelectors_f.htm#59157"> Filtering Files Via a Callback Routine</A>
+, below (taken from the FSFilter sample application).</P>
+<P CLASS="refField">
+See Also:	<CODE>
+FileEnum()</CODE>
+</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_GenFileSelectorFilterRoutine()">
+ </A>
+GenFileSelectorFilterRoutine()</H4>
+<PRE CLASS="syntax">Boolean	<EM>GenFileSelectorFilterRoutine</EM>(
+        optr			oself,
+        FileEnumCallbackData			*fecd,
+        word			frame);</PRE>
+<P>
+This routine is defined by your application and is called for each file in a directory scan. It may be of any name of your choice as shown in <A HREF="FileSelectors_f.htm#59157"> Filtering Files Via a Callback Routine</A>
+. It serves as the final filter; when called, it can assume the subject file has passed all other filters applied. This routine is set up and executed in the same manner as the callback routine for <CODE>
+FileEnum()</CODE>
+; see <A HREF="../../Files/FileSys/FileSys_f.htm#51873">the File System chapter</A>for complete details.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+oself</CODE>
+	The optr of the File Selector object</P>
+<DL>
+<DT>
+<CODE>
+fecd</CODE>
+</DT><DD>A pointer to a <CODE>
+FileEnumCallbackData</CODE>
+ structure.</DD>
+<DT>
+<CODE>
+frame</CODE>
+</DT><DD>An inherited stack frame passed by <CODE>
+FileEnum()</CODE>
+ to each of its helper routines.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Your callback must return the constant FALSE if the file should be accepted, TRUE if the file should be rejected.</P>
+<P CLASS="refField">
+Warnings:	Your routine must not do anything that may cause the File Selector or its object block to move in memory (adding variable data fields, for instance).</P>
+<P CLASS="refField">
+See Also:	<CODE>
+FileEnum()</CODE>
+</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="FileSelectors_7.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="FileSelectors_e.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.7 Matching a File's File Attributes</A> 
+<!-- to next --> | <A HREF="FileSelectors_10.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.9 Resetting a Filter</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

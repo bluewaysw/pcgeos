@@ -1,0 +1,212 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: GCN_5.htm,v 1.1 97/06/02 15:27:12 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Handling System Notification</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">General Change Notification</A>: 3.2 <A HREF="GCN_3.htm">System Notification</A>: 
+Handling System Notification</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GCN_3.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GCN_4.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.1 Registering for System Notification</A> 
+<!-- to next --> | <A HREF="GCN_6.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.3 Removal from a System List</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>MSG_NOTIFY_FILE_CHANGE, MSG_NOTIFY_DRIVE_CHANGE, MSG_NOTIFY_APP_STARTED, MSG_NOTIFY_APP_EXITED, MSG_NOTIFY_USER_DICT_CHANGE, MSG_NOTIFY_EXPRESS_MENU_CHANGE</PRE>
+<P>
+<A NAME="IX_GCNListSend()">
+ </A>
+When an identified change occurs, either the system (or a library) will call the routine <CODE>
+GCNListSend()</CODE>
+, passing it the appropriate notification message. This routine scans the list of all GCN lists and dispatches notification to all appropriate objects that had requested knowledge of the specified change. If any additional information relating to the change cannot be included in the message, the system allows <CODE>
+GCNListSend() </CODE>
+to pass data in a global heap block. For example, additional information about a file change (name of file, etc.) must be passed in a global heap block.</P>
+<P>
+The object or process originally requesting notification of the change should be required to handle the appropriate message. If additional data about the change is passed in a global heap block, the process should access that information with <CODE>
+MemLock() </CODE>
+and<CODE>
+ MemUnlock()</CODE>
+. You should always call the process's superclass in your message handler to make sure that the global heap block will be automatically freed by <CODE>
+MetaClass</CODE>
+. Therefore, do not free a global heap block manually in a notification handler.
+
+</P>
+<P>
+The system provides several messages which you may want to handle. These messages provide notification of file system changes, application start-up or shut-down, system clock changes, etc. These messages are mentioned with the list they correspond to in <A HREF="GCN_4.htm#42042"> Registering for System Notification</A>
+. Messages which require more detailed explanation are also mentioned below.</P>
+<P>
+<A NAME="IX_MSG_META_NOTIFY_FILE_CHANGE">
+ </A>
+The kernel sends <CODE>
+MSG_NOTIFY_FILE_CHANGE</CODE>
+ whenever a change to the file system occurs. All objects signed up on the GCN list GCNSLT_FILE_CHANGE will receive this message.</P>
+<P>
+<CODE>
+MSG_NOTIFY_FILE_CHANGE</CODE>
+ passes a <CODE>
+FileChangeNotificationType</CODE>
+ specifying the change that occurred. Some types indicate the presence of a data block (of type <CODE>
+FileChangeNotificationData) </CODE>
+containing, if applicable, the name of the file changed, the disk handle of the file changed, and the ID of the affected file. </P>
+<P>
+The notification type should be one of the following:</P>
+<DL>
+<DT>
+FCNT_CREATE</DT><DD>
+This type indicates that a file or directory was created. FCND_<CODE>
+id</CODE>
+ stores the ID of the containing directory; FCND_<CODE>
+name</CODE>
+ contains the name of the new file or directory that was created.</DD>
+<DT>
+FCNT_RENAME</DT><DD>
+This type indicates that a file or directory was renamed. FCND_<CODE>
+id</CODE>
+ stores the ID of the file or directory that was renamed; FCND_<CODE>
+name</CODE>
+ contains its new name.</DD>
+<DT>
+FCNT_OPEN</DT><DD>
+This type indicates that a file was opened. FCND_<CODE>
+id</CODE>
+ stores the ID of the file. FCND_<CODE>
+name</CODE>
+ is undefined, and may or may not be present. (You can check the size of the block to see if it is indeed present.) This notification type is generated after a call to <CODE>
+FileEnableOpenCloseNotification()</CODE>
+.</DD>
+<DT>
+FCNT_DELETE</DT><DD>
+This type indicates that a file or directory was deleted. FCND_<CODE>
+id</CODE>
+ stores the ID of the file or directory that was deleted. FCND_<CODE>
+name</CODE>
+ is undefined and may or may not be present.</DD>
+<DT>
+FCNT_CONTENTS</DT><DD>
+This type indicates that a file's contents have changed. FCND_<CODE>
+id</CODE>
+ stores the ID of the file. FCND_<CODE>
+name</CODE>
+ is undefined and may or may not be present. This notification type is generated after a call to <CODE>
+FileCommit()</CODE>
+ or <CODE>
+FileClose() </CODE>
+that results in a file modification.</DD>
+<DT>
+FCNT_ATTRIBUTES</DT><DD>
+This type indicates that a file's attributes have changed. FCND_<CODE>
+id</CODE>
+ stores the ID of the file. FCND_<CODE>
+name</CODE>
+ is undefined and may or may not be present. This notification type is generated upon completion of all changes in a <CODE>
+FileSetAttributes()</CODE>
+, <CODE>
+FileSetHandleExtAttributes()</CODE>
+, or <CODE>
+FileSetPathExtAttributes()</CODE>
+ call.</DD>
+<DT>
+FCNT_DISK_FORMAT</DT><DD>
+This type indicates that a disk has been formatted. Both FCND_<CODE>
+id</CODE>
+ and FCND_<CODE>
+name</CODE>
+ are undefined and may not be present.</DD>
+<DT>
+FCNT_CLOSE</DT><DD>
+This type indicates that a file has been closed. FCND<CODE>
+_id</CODE>
+ stores the identifier of the file. FCND<CODE>
+_name</CODE>
+ is undefined and may not be present. This notification type is generated only after a call to <CODE>
+FileEnableOpenCloseNotification()</CODE>
+.</DD>
+<DT>
+FCNT_BATCH</DT><DD>
+This type indicates that this file change notification is actually a group of notifications batched together. In this case, MSG_NOTIFY_FILE_CHANGE passes the MemHandle of a <CODE>
+FileChangeBatchNotificationData</CODE>
+ block instead. This data block stores a batch of <CODE>
+FileChangeBatchNotificationItem</CODE>
+ structures, each referring to an operation (with its own notification type, disk handle, file name, and file ID). Note that in this batched case, you must assume that all file names and file IDs that are optional (i.e. are undefined) are not present.</DD>
+<DT>
+FCNT_ADD_SP_DIRECTORY</DT><DD>
+<A NAME="IX_StandardPath:associated FileChangeNotificationType types">
+ </A>
+<A NAME="IX_Standard paths:FCNT_ADD_SP_DIRECTORY">
+ </A>
+This type indicates that a directory has been added as a <CODE>
+StandardPath</CODE>
+. FCND_<CODE>
+disk</CODE>
+ contains the <CODE>
+StandardPath</CODE>
+ that was added. This notification type is generated after a call to <CODE>
+FileAddStandardPathDirectory()</CODE>
+.</DD>
+<DT>
+FCNT_DELETE_SP_DIRECTORY</DT><DD>
+<A NAME="IX_Standard paths:FCNT_DELETE_SP_DIRECTORY">
+ </A>
+This type indicates that a directory has been deleted as a <CODE>
+StandardPath</CODE>
+. FCND_<CODE>
+disk</CODE>
+ contains the <CODE>
+StandardPath</CODE>
+ that was deleted. This notification type is generated after a call to <CODE>
+FileDeleteStandardPathDirectory()</CODE>
+.</DD>
+</DL>
+<P>
+You may access this data (after locking the block) and perform whatever actions you need within your message handler.</P>
+<P>
+<A NAME="IX_MSG_META_NOTIFY_DRIVE_CHANGE">
+ </A>
+The kernel also sends MSG_NOTIFY_DRIVE_CHANGE to GCN lists of type GCNSLT_FILE_CHANGE. This message passes a <CODE>
+GCNDriveChangeNotificationType</CODE>
+ specifying whether a drive is being created or destroyed and the ID of the affected drive.</P>
+<P>
+<A NAME="IX_MSG_META_NOTIFY_APP_STARTED">
+ </A>
+The kernel sends <CODE>
+MSG_NOTIFY_APP_STARTED</CODE>
+ whenever any application starts up within the system and <CODE>
+MSG_NOTIFY_APP_EXITED</CODE>
+ whenever an application shuts down. All objects signed up on the GCN list GCNSLT_APPLICATION will receive these messages after the change occurs. <CODE>
+MSG_NOTIFY_APP_STARTED</CODE>
+ passes the MemHandle of the application starting up, which you may access to perform any required actions. In a similar manner, <CODE>
+MSG_NOTIFY_APP_EXITED</CODE>
+<A NAME="IX_MSG_META_NOTIFY_APP_EXITED">
+ </A>
+ passes the MemHandle of the application shutting down.</P>
+<P>
+<A NAME="IX_MSG_META_NOTIFY_USER_DICT_CHANGE">
+ </A>
+The kernel sends <CODE>
+MSG_NOTIFY_USER_DICT_CHANGE</CODE>
+ whenever the system changes the current user dictionary in use. All objects signed up for the GCN list GCNSLT_USER_DICT_CHANGE will receive this message after the change occurs. <CODE>
+MSG_NOTIFY_USER_DICT_CHANGED</CODE>
+ passes the MemHandle of the Spell Box causing the change and the MemHandle of the user dictionary being changed, both of which you may access in your message handler.</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GCN_3.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GCN_4.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.1 Registering for System Notification</A> 
+<!-- to next --> | <A HREF="GCN_6.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.3 Removal from a System List</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

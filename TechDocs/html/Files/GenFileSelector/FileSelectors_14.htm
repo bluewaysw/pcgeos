@@ -1,0 +1,147 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: FileSelectors_14.htm,v 1.1 97/06/02 14:47:14 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Rescanning Directories</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The FileSelector Object</A>: 4.3 <A HREF="FileSelectors_11.htm">File Selector Use</A>: 
+Rescanning Directories</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="FileSelectors_11.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="FileSelectors_13.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.2 The Current Selection</A> 
+<!-- to next --> | <A HREF="FileSelectors_15.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.4 Setting Scalable UI Data</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>MSG_GEN_FILE_SELECTOR_RESCAN, MSG_GEN_FILE_SELECTOR_SUSPEND, MSG_GEN_FILE_SELECTOR_END_SUSPEND</PRE>
+<P>
+Each time the File Selector changes directories, it scans that directory and displays only the files it is supposed to. It looks into each file briefly to check the file against each criterion set in the File Selector. You can force the GenFileSelector to rescan the current directory with the message <CODE>
+MSG_GEN_FILE_SELECTOR_RESCAN</CODE>
+.</P>
+<P>
+Occasionally you will want to scan the current directory only once after changing many parameters instead of rescanning after each change (search limitations, current volume, current selection, etc.). To optimize redrawing and rescanning, you can temporarily keep the GenFileSelector from scanning each time a <CODE>
+MSG_GEN_FILE_SELECTOR_SET_...</CODE>
+ message is sent. To do this, send the following messages (both must be used, though not at the same time):</P>
+<DL>
+<DT>
+<CODE>
+MSG_GEN_FILE_SELECTOR_SUSPEND</DT><DD>
+</CODE>
+Notifies the File Selector that several operations in a row are coming and that it should suspend scanning the disk until the counterpart to this message (below) is received.</DD>
+<DT>
+<CODE>
+MSG_GEN_FILE_SELECTOR_END_SUSPEND</DT><DD>
+</CODE>
+Indicates to the File Selector that directories may now be rescanned and displayed.</DD>
+
+</DL>
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_FILE_SELECTOR_RESCAN">
+ </A>
+MSG_GEN_FILE_SELECTOR_RESCAN</H4>
+<PRE CLASS="syntax">void	MSG_GEN_FILE_SELECTOR_RESCAN();</PRE>
+<P>
+This message causes the File Selector to rescan its current directory. The File Selector will re-build and re-display its entire file list. This message will only work when the File Selector is visible on the screen.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenFileSelector object that is on the screen.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_FILE_SELECTOR_SUSPEND">
+ </A>
+MSG_GEN_FILE_SELECTOR_SUSPEND</H4>
+<PRE CLASS="syntax">Boolean	MSG_GEN_FILE_SELECTOR_SUSPEND();</PRE>
+<P>
+This message causes the File Selector to suspend directory scans until a <CODE>
+MSG_GEN_FILE_SELECTOR_END_SUSPEND</CODE>
+ is received. This provides the ability to avoid unnecessary directory rescans when several different attributes are being changed in succession (e.g. volume, mask, and file types).</P>
+<P>
+No user action is affected by this message; only the following attribute-setting messages will be affected (their normal automatic rescan will not happen). Note that all messages have the prefix <CODE>
+MSG_GEN_FILE_SELECTOR_</CODE>
+:</P>
+<DL>
+<DT>
+<CODE>
+SET_SELECTION	SET_FULL_SELECTION_PATH</DT><DD>
+SET_MASK	SET_FILE_ATTRS<BR>
+SET_TOKEN	SET_CREATOR<BR>
+SET_GEODE_ATTRS	SET_ATTRS<BR>
+SET_FILE_CRITERIA</CODE>
+</DD>
+</DL>
+<P>
+In addition to the above messages, the <CODE>
+GenClass</CODE>
+ message <CODE>
+MSG_GEN_PATH_SET</CODE>
+ will also be suspended.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any non-suspended GenFileSelector object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	An error flag: <CODE>
+true</CODE>
+ if the File Selector is already suspended, <CODE>
+false</CODE>
+ if the suspension is successful.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+<P CLASS="refField">
+Warnings:	After suspending a File Selector with this message, be sure to unsuspend it with <CODE>
+MSG_GEN_FILE_SELECTOR_END_SUSPEND</CODE>
+.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_FILE_SELECTOR_END_SUSPEND">
+ </A>
+MSG_GEN_FILE_SELECTOR_END_SUSPEND</H4>
+<PRE CLASS="syntax">Boolean	MSG_GEN_FILE_SELECTOR_END_SUSPEND();</PRE>
+<P>
+This message unsuspends a File Selector that had previously been suspended with <CODE>
+MSG_GEN_FILE_SELECTOR_SUSPEND</CODE>
+. This message automatically causes a directory rescan. Because multiple suspension attempts are disallowed, this message only needs to be sent once to unsuspend the File Selector.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any suspended GenFileSelector object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	An error flag: <CODE>
+true</CODE>
+ if the File Selector was not previously suspended, <CODE>
+false</CODE>
+ if the File Selector is successfully unsuspended.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="FileSelectors_11.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="FileSelectors_13.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.2 The Current Selection</A> 
+<!-- to next --> | <A HREF="FileSelectors_15.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.4 Setting Scalable UI Data</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

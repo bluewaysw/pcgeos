@@ -1,0 +1,144 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: R_1a.htm,v 1.2 97/06/25 18:11:35 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE>GEOS C Routines: DiskForEach() ...</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+<DIV>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="R_19.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">DiskCheckInUse() ...</A> 
+<!-- to next --> | <A HREF="R_1b.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">DiskGetDrive() ...</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</DIV>
+<DIV>
+<A NAME="IX_DiskForEach()">
+ </A>
+<H1 CLASS="refHeading">
+DiskForEach()</H1>
+<PRE CLASS="syntax">DiskHandle 	DiskForEach(
+        Boolean _pascal (* callback)			(DiskHandle				disk)) 		/* callback returns <EM>true
+</EM>									 * to cancel */</PRE>
+<P>
+This routine lets you perform an action on every registered disk. It calls the callback routine once for each disk, passing the disk's handle. The callback routine must be declared _pascal. The callback routine can force an early termination by returning <EM>
+true</EM>
+ (i.e. non-zero). If the callback routine ever returns <EM>
+true</EM>
+, <CODE>
+DiskForEach()</CODE>
+ terminates and returns the handle of the last disk passed to the callback routine. If the callback routine examines every disk without returning <EM>
+true</EM>
+, <CODE>
+DiskForEach()</CODE>
+ returns a null handle.</P>
+<P CLASS="refField"><STRONG>
+Tips and Tricks:</STRONG>	<CODE>
+DiskForEach()</CODE>
+ is commonly used to look for a specific disk. The callback routine checks each disk to see if it's the one; if it finds a match, the callback routine simply returns <EM>
+true</EM>
+, and <CODE>
+DiskForEach()</CODE>
+ returns the disk's handle.</P>
+<P CLASS="refField"><STRONG>
+Include:</STRONG>	<STRONG CLASS="fileName">
+disk.h</STRONG>
+ </P>
+</DIV>
+<DIV>
+<A NAME="IX_DiskFormat()">
+ </A>
+<A NAME="IX_DiskFormatFlags">
+ </A>
+<A NAME="IX_DFF_&ldots;">
+ </A>
+<A NAME="IX_FormatError">
+ </A>
+<A NAME="IX_FMT_&ldots;">
+ </A>
+<H1 CLASS="refHeading">
+DiskFormat()</H1>
+<PRE CLASS="syntax">FormatError 	DiskFormat(
+        word 		driveNumber,
+        MediaType		media,				/* Format to this size */
+        DiskFormatFlags		flags,				/* See flags below */
+        dword		*goodClusters,					/* These are filled in at the */
+        dword		*badClusters,					/* of the format */
+        Boolean _pascal (*callback)		
+			(word percentDone));						/* Return true to cancel */</PRE>
+<P>
+This routine formats a disk to the specified size. When it is finished, it fills in the passed pointers to contain the number of good and bad clusters on the disk. (To find out the size of each cluster, call <CODE>
+<A HREF="../../CRef/Routines/R_1b.htm#IX_DiskGetVolumeInfo()">DiskGetVolumeInfo()</A></CODE>
+.) The routine returns a member of the <CODE>
+FormatError</CODE>
+ enumerated type (whose members are described below).</P>
+<P>
+<CODE>
+DiskFormat()</CODE>
+ can be instructed to call a callback routine periodically. This allows the application to keep the user informed about how the format is progressing. The callback routine is passed either the percent of the disk which has been formatted, or the cylinder and head currently being formatted. The callback routine must be declared _pascal. The callback routine can cancel the format by returning <EM>
+true</EM>
+ (i.e. non-zero); otherwise, it should return <EM>
+false</EM>
+ (i.e. zero).</P>
+<P>
+The third argument passed is a word-length flag field. Currently, only three flags are defined:</P>
+<DL>
+<DT>
+DFF_CALLBACK_PERCENT_DONE</DT><DD>
+A callback routine should be called periodically. The callback routine should be passed a single argument, namely the percentage of the format which has been done.</DD>
+<DT>
+DFF_CALLBACK_CYL_HEAD</DT><DD>
+A callback routine should be called periodically. The callback routine should be passed a single argument, namely the cylinder head being formatted. If both DFF_CALLBACK_PERCENT_DONE and DFF_CALLBACK_CYL_HEAD are passed, results are undefined. If neither flag is set, the callback routine will never be called; a null function pointer may be passed.</DD>
+<DT>
+DFF_FORCE_ERASE</DT><DD>
+A &quot;hard format&quot; should be done, i.e. the sectors should be rewritten and initialized to zeros. If this flag is not set, <CODE>
+DiskFormat()</CODE>
+ will do a &quot;soft format&quot; if possible; it will check the sectors and write a blank file allocation table, but it will not necessarily erase the data from the disk.</DD>
+</DL>
+<P>
+<CODE>
+DiskFormat()</CODE>
+ returns a member of the <CODE>
+FormatError</CODE>
+ enumerated type. If the format was successful, it will return the constant FMT_DONE (which is guaranteed to equal zero). Otherwise, it will return one of the following constants:</P>
+<PRE>FMT_DRIVE_NOT_READY
+FMT_ERROR_WRITING_BOOT
+FMT_ERROR_WRITING_ROOT_DIR
+FMT_ERROR_WRITING_FAT
+FMT_ABORTED
+FMT_SET_VOLUME_NAME_ERROR
+FMT_CANNOT_FORMAT_FIXED_DISKS_IN_CUR_RELEASE
+FMT_BAD_PARTITION_TABLE
+FMT_ERR_NO_PARTITION_FOUND
+FMT_ERR_CANNOT_ALLOC_SECTOR_BUFFER
+FMT_ERR_DISK_IS_IN_USE
+FMT_ERR_WRITE_PROTECTED
+FMT_ERR_DRIVE_CANNOT_SUPPORT_GIVEN_FORMAT
+FMT_ERR_INVALID_DRIVE_SPECIFIED
+FMT_ERR_DRIVE_CANNOT_BE_FORMATTED
+FMT_ERR_DISK_UNAVAILABLE</PRE>
+<P CLASS="refField"><STRONG>
+Include:</STRONG>	<STRONG CLASS="fileName">
+disk.h</STRONG>
+ </P>
+</DIV>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="R_19.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">DiskCheckInUse() ...</A> 
+<!-- to next --> | <A HREF="R_1b.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">DiskGetDrive() ...</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

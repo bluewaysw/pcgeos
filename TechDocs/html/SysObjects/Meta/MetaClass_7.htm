@@ -1,0 +1,263 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: MetaClass_7.htm,v 1.1 97/06/02 16:21:02 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Event Messages</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">MetaClass</A>: 2.5 <A HREF="MetaClass_2.htm">Utility Messages</A>: 
+Event Messages</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="MetaClass_2.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="MetaClass_6.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2.4 User Interface Utility Meta Messages</A> 
+<!-- to next --> | <A HREF="MetaClass_8.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2.6 Variable Data Messages</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+<A NAME="IX_Classed events:MetaClass dispatchers">
+ </A>
+These messages are used to send classed events to other objects. A classed event is typically an event stored earlier with the Goc keyword <CODE>
+@record</CODE>
+.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_DISPATCH_EVENT">
+ </A>
+MSG_META_DISPATCH_EVENT</H4>
+<PRE CLASS="syntax">Boolean	MSG_META_DISPATCH_EVENT(
+        AsmPassReturn 	*retVals,
+        EventHandle 	eventHandle,
+        MessageFlags msgFlags););</PRE>
+<P>
+This message causes an object to <CODE>
+@send</CODE>
+ or <CODE>
+@call</CODE>
+ a message of another object. This is useful for getting one object run by a different thread to call yet another object or to send a reply to the first object. This message can cause complex synchronization problems if not used with extreme care.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any object.</P>
+<P CLASS="refField">
+Interception:	Unnecessary, as <CODE>
+MetaClass</CODE>
+ does the right thing.</P>
+<P CLASS="refField">
+Parameters:	<EM>retValue</EM>	structure to hold return values.</P>
+<DL>
+<DT>
+<EM>eventHandle</EM></DT><DD>Event which will be sent.</DD>
+<DT>
+<EM>msgFlags</EM> </DT><DD>flags which will determine how message is sent.</DD>
+</DL>
+<P CLASS="refField">
+Return:	If MF_CALL specified, then carry flag return value will be returned.</P>
+<P CLASS="refField">
+Structures:	</P>
+<PRE><A NAME="IX_AsmPassReturn"> </A>typedef struct {
+	word 	ax;
+	word 	cx;
+	word 	dx;
+	word 	bp;
+} AsmPassReturn;</PRE>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_SEND_CLASSED_EVENT">
+ </A>
+MSG_META_SEND_CLASSED_EVENT</H4>
+<PRE CLASS="syntax">void	MSG_META_SEND_CLASSED_EVENT(
+        EventHandle	 	event,
+        TravelOption 		whereTo);</PRE>
+<P>
+<A NAME="IX_Classed events:sending">
+ </A>
+This message sends a previously recorded classed event to a certain type of destination defined in the <CODE>
+TravelOption</CODE>
+ argument <CODE>
+whereTo</CODE>
+.</P>
+<P>
+This message's interesting behavior is actually added by the User Interface, which defines <CODE>
+GenTravelOption</CODE>
+ types. The default behavior provided here in <CODE>
+MetaClass</CODE>
+ is to destroy the event if TO_NULL is passed, else to deliver the event to itself if it is capable of handling it (the object is a member of the class stored with the event). The event is always freed, whether or not it is deliverable.</P>
+<P>
+<CODE>
+MetaClass</CODE>
+ recognizes the following <CODE>
+TravelOption</CODE>
+ values:</P>
+<DL>
+<DT>
+	TO_NULL</DT><DD>
+TO_SELF<BR>
+TO_OBJ_BLOCK_OUTPUT<BR>
+TO_PROCESS</DD>
+<DT>
+TO_OBJ_BLOCK_OUTPUT sends the event to the object block's output set in its block header.</DT>
+</DL>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any object.</P>
+<P CLASS="refField">
+Interception:	By default, <CODE>
+MetaClass</CODE>
+ handlers deal with just the most primitive of the <CODE>
+TravelOption</CODE>
+ values. Object classes can add new <CODE>
+TravelOption</CODE>
+ types, but must then intercept this message to implement them (calling the superclass if it doesn't recognize the <CODE>
+TravelOption</CODE>
+ passed).</P>
+<P CLASS="refField">
+Parameters:	<EM>event</EM>	Classed event, probably created using <CODE>
+@record</CODE>
+.</P>
+<DL>
+<DT>
+<EM>whereTo</EM></DT><DD><CODE>
+TravelOption</CODE>
+ describing target of message.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_GET_OBJ_BLOCK_OUTPUT">
+ </A>
+MSG_META_GET_OBJ_BLOCK_OUTPUT</H4>
+<PRE CLASS="syntax">optr	MSG_META_GET_OBJ_BLOCK_OUTPUT();</PRE>
+<P>
+This message returns the output optr of an object block that contains the object sent the message.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any object (except a process object).</P>
+<P CLASS="refField">
+Return:	Optr of the block's output field.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_SET_OBJ_BLOCK_OUTPUT">
+ </A>
+MSG_META_SET_OBJ_BLOCK_OUTPUT</H4>
+<PRE CLASS="syntax">void	MSG_META_SET_OBJ_BLOCK_OUTPUT(
+        optr		output);</PRE>
+<P>
+This message sets the object block output--the block containing the object sent the message-- to the passed optr. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any object (except a process object).</P>
+<P CLASS="refField">
+Parameters:	<EM>
+output</EM>
+	Optr of the object to act as the block's output.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_GET_OPTR">
+ </A>
+MSG_META_GET_OPTR</H4>
+<PRE CLASS="syntax">optr	MSG_META_GET_OPTR();</PRE>
+<P>
+<A NAME="IX_optr:accessing">
+ </A>
+This message returns the object's optr. This is useful when combined with <CODE>
+MSG_GEN_GUP_CALL_OBJECT_OF_CLASS</CODE>
+ to get the optr of an object of a given class somewhere up in a Generic Tree.</P>
+<P>
+Note: <CODE>
+MSG_GEN_GUP_CALL_OBJECT_OF_CLASS</CODE>
+ dies if an object of the class doesn't exist. Use <CODE>
+MSG_GEN_GUP_TEST_FOR_OBJECT_OF_CLASS</CODE>
+ before using <CODE>
+MSG_GEN_GUP_CALL_OBJECT_OF_CLASS</CODE>
+ if there is some question as to whether an object of a given class exists.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any object.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	The object's optr.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_GET_TARGET_AT_TARGET_LEVEL">
+ </A>
+MSG_META_GET_TARGET_AT_TARGET_LEVEL</H4>
+<PRE CLASS="syntax">void	MSG_META_GET_TARGET_AT_TARGET_LEVEL(
+        GetTargetParams *retValue,
+        TargetLevel level);</PRE>
+<P>
+<A NAME="IX_Target:accessing">
+ </A>
+This message returns the <CODE>
+GetTargetParams</CODE>
+ structure containing, among other things, the current target object at a given target level. The <CODE>
+MetaClass</CODE>
+ handler simply returns information about the current object since it is assumed to be the current target. <CODE>
+GenClass</CODE>
+ and <CODE>
+VisClass</CODE>
+ handlers will handle this message and pass it down the travel hierarchy. If you intercept this message, you should correctly pass this message down as well, either explicitly or by calling the superclass. See <A HREF="../../SysObjects/Input/index.htm">the Input chapter</A>, for information on target.</P><P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any object.</P>
+<P CLASS="refField">
+Interception:	Must be handled by target nodes to correctly pass the request on down to the next target below current node in hierarchy.</P>
+<P CLASS="refField">
+Parameters:	<EM>level</EM> 	Zero for leaf, otherwise <CODE>
+TargetLevel</CODE>
+, as defined by UI.</P>
+<DL>
+<DT>
+<EM>retValue</EM> </DT><DD>Structure to hold return value.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing returned explicitly.</P>
+<DL>
+<DT>
+<EM>retValue</EM> </DT><DD>Filled with return values.</DD>
+</DL>
+<P CLASS="refField">
+Structures:	</P>
+<PRE><A NAME="IX_GTP_&ldots;  (GetTargetParams)"> </A><A NAME="IX_GetTargetParams"> </A>typedef struct {
+	ClassStruct 				*GTP_class;
+	optr 				GTP_target;
+} GetTargetParams;</PRE>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="MetaClass_2.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="MetaClass_6.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2.4 User Interface Utility Meta Messages</A> 
+<!-- to next --> | <A HREF="MetaClass_8.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2.6 Variable Data Messages</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

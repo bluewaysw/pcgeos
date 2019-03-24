@@ -1,0 +1,312 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: GenClass_1d.htm,v 1.1 97/06/02 16:13:10 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Activation Messages</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="sectionTitle">
+<A HREF="index.htm">GenClass</A>: 10 
+Activation Messages</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GenClass_1c.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">9 Setting Sizes</A> 
+<!-- to next --> | <A HREF="GenClass_1e.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">11 Focus Modifications</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>MSG_GEN_APPLY, MSG_GEN_PRE_APPLY, MSG_GEN_POST_APPLY, MSG_GEN_RESET, MSG_GEN_MAKE_APPLYABLE, MSG_GEN_MAKE_NOT_APPLYABLE, MSG_GEN_ACTIVATE, MSG_GEN_ACTIVATE_INTERACTION_DEFAULT </PRE>
+<P>
+<A NAME="IX_Properties gadgets:activating">
+ </A>
+These messages only affect objects which contain properties. These property gadgets (such as GenItemGroups, GenValues, GenTexts, etc.) typically operate in one of two modes: <EM>
+immediate</EM>
+ or <EM>
+delayed</EM>
+.</P>
+<P>
+<A NAME="IX_Immediate mode">
+ </A>
+If an object is operating in immediate mode, any changes in the object's state will cause an immediate change to occur in the application (through the sending of an <EM>
+apply</EM>
+ message in the object's instance data). For example, if a GenBooleanGroup is operating in immediate mode, every time the user makes a selection within the BooleanGroup, those changes will be applied to the application immediately, as they occur.</P>
+<P>
+<A NAME="IX_Delayed Mode:and activation messages">
+ </A>
+If instead an object is operating in delayed mode, any changes in the object's state will not be sent out immediately. They will only be sent out at a later time when the object receives instructions to apply its changes. The UI asks a generic object to apply its changes with <CODE>
+MSG_GEN_APPLY</CODE>
+. </P>
+<P>
+Typically, each properties gadget operating in delayed mode has a modified state, indicating whether the object has changed since it last applied its changes. Upon receiving <CODE>
+MSG_GEN_APPLY</CODE>
+, the object checks whether it has been modified; if it has, it will send out its apply message in the object's instance data. Either you or the system may send out <CODE>
+MSG_GEN_APPLY</CODE>
+ to force a properties gadget to apply its changes. Sending out <CODE>
+MSG_GEN_APPLY</CODE>
+ clears any modified states associated with a properties gadget (after those properties are applied, of course). </P>
+<P>
+If <CODE>
+MSG_GEN_APPLY</CODE>
+ is sent to either a dialog GenInteraction or another GenInteraction within that dialog, it will be propagated to all property gadgets within that Interaction. In this manner, you can apply multiple properties within a dialog box all at once. A GIT_PROPERTIES GenInteraction automatically sends out <CODE>
+MSG_GEN_APPLY</CODE>
+ upon receiving <CODE>
+MSG_GEN_GUP_INTERACTION_COMMAND</CODE>
+ with the <CODE>
+InteractionCommand</CODE>
+ IC_APPLY. (This is typically through an &quot;Apply&quot; trigger in the dialog box.) The dialog will also send <CODE>
+MSG_GEN_PRE_APPLY</CODE>
+ and <CODE>
+MSG_GEN_POST_APPLY</CODE>
+ messages before and after the apply, respectively. </P>
+<P>
+<CODE>
+MSG_GEN_RESET</CODE>
+ also exhibits this automatic propagation behavior; if this message is sent to a dialog GenInteraction, it will be sent to all property gadgets within that Interaction. However, generic property gadgets provide no default handling for <CODE>
+MSG_GEN_RESET</CODE>
+. If you wish for an object to reset its properties upon receiving <CODE>
+MSG_GEN_RESET</CODE>
+, you must subclass the object and handle this message yourself. A GIT_PROPERTIES GenInteraction automatically sends out <CODE>
+MSG_GEN_RESET</CODE>
+ upon receiving <CODE>
+MSG_GEN_GUP_INTERACTION_COMMAND</CODE>
+ with the <CODE>
+InteractionCommand</CODE>
+ IC_RESET. (This is typically through a &quot;Reset&quot; trigger in the dialog box.)</P>
+<P>
+<CODE>
+MSG_GEN_MAKE_APPLYABLE</CODE>
+ instructs an object to enable any apply and reset mechanisms that may be disabled. The object must be in delayed mode.</P>
+<P>
+<CODE>
+MSG_GEN_MAKE_NOT_APPLYABLE</CODE>
+ instructs an object to disable any apply and reset mechanisms. The object must be in delayed mode.</P>
+<P>
+<CODE>
+MSG_GEN_ACTIVATE</CODE>
+ activates a generic object as if it had been activated by the user through the specific UI. For example, sending a GenTrigger <CODE>
+MSG_GEN_ACTIVATE</CODE>
+ will cause the trigger to send out its action message in the same manner as if the user had clicked on the trigger.</P>
+<P>
+<CODE>
+MSG_GEN_ACTIVATE_INTERACTION_DEFAULT</CODE>
+ sends a <CODE>
+MSG_GEN_ACTIVATE</CODE>
+ to the object marked as the default within a GenInteraction. This message travels up the generic tree to the first independently-displayable object (usually a dialog box) and then activates the default object for that windowed object.</P>
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_APPLY">
+ </A>
+MSG_GEN_APPLY</H5>
+<PRE CLASS="syntax">void	MSG_GEN_APPLY();</PRE>
+<P>
+This message is sent to property gadgets to cause them to dispatch their &quot;apply&quot; message and at the same time reset any modified states associated with that object. If this message is sent to a GenInteraction within a dialog box, the GenInteraction will propagate this message to all of its children.</P>
+<P>
+This message may be sent by a GIT_PROPERTIES Interaction upon receipt of <CODE>
+MSG_GEN_GUP_INTERACTION_COMMAND</CODE>
+ with IC_APPLY. You may send this message yourself if you wish for changes in state within the dialog box to be reflected in your application.</P>
+<P CLASS="refField">
+Source:	Usually a GIT_PROPERTIES Interaction (with an IC_APPLY trigger). You may send this message yourself to force generic objects to apply their changes.</P>
+<P CLASS="refField">
+Destination:	Any GenInteraction within a dialog box, or any gadget with properties (GenItemGroup, GenValue, etc.).</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted. </P>
+
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_PRE_APPLY">
+ </A>
+MSG_GEN_PRE_APPLY</H5>
+<PRE CLASS="syntax">Boolean 	MSG_GEN_PRE_APPLY();</PRE>
+<P>
+A properties dialog will send this message before <CODE>
+MSG_GEN_APPLY</CODE>
+. Geodes may use this to do validation of settings or to prepare for applying of changes.</P>
+<P CLASS="refField">
+Source:	Normally sent by properties dialog before sending <CODE>
+MSG_GEN_APPLY</CODE>
+.</P>
+<P CLASS="refField">
+Destination:	Same as <CODE>
+MSG_GEN_APPLY</CODE>
+.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Return <EM>
+true</EM>
+ if error.</P>
+<P CLASS="refField">
+Interception:	Must be intercepted to handle properties validation.</P>
+
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_POST_APPLY">
+ </A>
+MSG_GEN_POST_APPLY</H5>
+<PRE CLASS="syntax">void	MSG_GEN_POST_APPLY();</PRE>
+<P>
+A properties dialog will send this message after <CODE>
+MSG_GEN_APPLY</CODE>
+. This can be used to clean up after application of changes.</P>
+<P CLASS="refField">
+Source:	Normally sent by properties dialog after sending <CODE>
+MSG_GEN_APPLY</CODE>
+.</P>
+<P CLASS="refField">
+Destination:	Same as <CODE>
+MSG_GEN_APPLY</CODE>
+.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Can be intercepted to handle clean up work after <CODE>
+MSG_GEN_APPLY</CODE>
+.</P>
+
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_RESET">
+ </A>
+MSG_GEN_RESET</H5>
+<PRE CLASS="syntax">void	MSG_GEN_RESET();</PRE>
+<P>
+This message, if sent to a GenInteraction within a GIT_PROPERTIES dialog box, will propagate to all children below the receiving Interaction. This message provides a convenient means to reset properties within gadgets. There is no default handling of <CODE>
+MSG_GEN_RESET</CODE>
+ by generic objects. You must provide the reset behavior yourself by subclassing individual objects.</P>
+<P CLASS="refField">
+Source:	Usually a GIT_PROPERTIES GenInteraction (with an IC_RESET trigger), or your application.</P>
+<P CLASS="refField">
+Destination:	Any GenInteraction within a dialog box, or any gadget subclassed to handle <CODE>
+MSG_GEN_RESET</CODE>
+.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Your subclassed generic object should intercept this message to provide its own custom reset behavior.</P>
+
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_MAKE_APPLYABLE">
+ </A>
+MSG_GEN_MAKE_APPLYABLE</H5>
+<PRE CLASS="syntax">void	MSG_GEN_MAKE_APPLYABLE();</PRE>
+<P>
+This message is typically sent to a dialog GenInteraction<CODE>
+ </CODE>
+to enable its default &quot;apply&quot; and &quot;reset&quot; buttons. This message also sets up the proper user and actual states for the object. This message is useful in the implementation of custom gadgets.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GS_USABLE <CODE>
+GenClass</CODE>
+ object. (This message is only meaningful for objects within a GIT_PROPERTIES GenInteraction, however.) </P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_MAKE_NOT_APPLYABLE">
+ </A>
+MSG_GEN_MAKE_NOT_APPLYABLE</H5>
+<PRE CLASS="syntax">void	MSG_GEN_MAKE_NOT_APPLYABLE();</PRE>
+<P>
+This message is typically sent to a dialog GenInteraction<CODE>
+ </CODE>
+to disable its default &quot;apply&quot; and &quot;reset&quot; buttons. This message is useful in the implementation of custom gadgets.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GS_USABLE <CODE>
+GenClass</CODE>
+ object. (This message is only meaningful for objects within a GIT_PROPERTIES GenInteraction, however.) </P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_ACTIVATE">
+ </A>
+MSG_GEN_ACTIVATE</H5>
+<PRE CLASS="syntax">void	MSG_GEN_ACTIVATE();</PRE>
+<P>
+This message manually activates an object as if the user had activated it in the manner defined by the specific UI. For example, this message may activate GenTriggers without use of the mouse. This message causes all normal visual cues associated with the activation.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Usually sent by an object to itself.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted. </P>
+
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_ACTIVATE_INTERACTION_DEFAULT">
+ </A>
+MSG_GEN_ACTIVATE_INTERACTION_DEFAULT</H5>
+<PRE CLASS="syntax">Boolean	MSG_GEN_ACTIVATE_INTERACTION_DEFAULT();</PRE>
+<P>
+<A NAME="IX_HINT_DEFAULT_DEFAULT_ACTION">
+ </A>
+This message acts on a default exclusive object within a window, forcing that object to activate as in <CODE>
+MSG_GEN_ACTIVATE</CODE>
+. This message travels up the visible tree to the first WIN_GROUP (windowed) object and sends a <CODE>
+MSG_GEN_ACTIVATE</CODE>
+ to the default object selected there. (This default object is typically marked with the hint <CODE>
+HINT_DEFAULT_DEFAULT_ACTION</CODE>
+.)</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GS_USABLE <CODE>
+GenClass</CODE>
+ object (usually within a dialog box).</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Will return <EM>
+true</EM>
+ if the object was activated, <EM>
+false</EM>
+ if it was not.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GenClass_1c.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">9 Setting Sizes</A> 
+<!-- to next --> | <A HREF="GenClass_1e.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">11 Focus Modifications</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

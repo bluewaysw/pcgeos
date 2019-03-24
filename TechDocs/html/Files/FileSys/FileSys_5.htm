@@ -1,0 +1,548 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: FileSys_5.htm,v 1.1 97/06/02 14:44:59 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Accessing Disks</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The File System</A>: 3.2 <A HREF="FileSys_3.htm">Disks and Drives</A>: 
+Accessing Disks</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="FileSys_3.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="FileSys_4.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.1 Accessing Drives</A> 
+<!-- to next --> | <A HREF="FileSys_6.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">4 Directories and Paths</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+Applications will work with disks more than they will work with drives. Once a geode knows a disk's handle, it can ignore such questions as whether the disk is in a drive; it need merely provide the disk's handle. If necessary, the system will prompt the user to insert the disk in the appropriate drive.</P>
+
+<H2 CLASS="HeadingC">
+<A NAME="87244">
+ </A>
+Registering Disks</H2>
+<PRE>DiskRegisterDisk(), DiskRegisterDiskSilently()</PRE>
+<P>
+GEOS automatically keeps track of all disks used. The first time a disk is accessed in a session, it is <EM>
+registered</EM>
+. This means that it is assigned a <EM>
+disk handle</EM>
+. </P>
+<P>
+The disk handle records certain information, such as the disk's volume name and whether the disk is writable. It also notes in which drive the disk was last inserted; if the system prompts the user to reinsert the disk, it will insist on that drive. A disk is automatically reregistered when certain actions are performed which might invalidate a disk's handle-table entry; for example, it is reregistered if it is formatted. It is also reregistered if someone tries to write a file to a disk which is marked read-only; the user may have ejected the disk and removed its write-protect tab. Note that reregistering a disk does not change its handle; it just brings GEOS's information about the disk up-to-date.</P>
+<P>
+Note that the disk handle is not a reference to the global handle table; thus, Swat commands like <CODE>
+phandle</CODE>
+ will not work with disk handles. Disk handles should always be treated as opaque 16-bit tokens.</P>
+<P>
+<A NAME="IX_DiskRegisterDisk()">
+ </A>
+You can specifically instruct the system to register a disk by calling the routine <CODE>
+DiskRegisterDisk()</CODE>
+. The routine is passed a single argument, namely the drive number. If the disk has an entry in the disk table, the routine will not reregister the disk; it will just return the disk's handle. If the disk has no entry in the table, the system will create an entry and register the disk. In this case, also, the routine will return the (new) disk handle. If the routine fails (for example, because there is no valid disk in the specified drive, or the drive itself does not exist), it returns a null handle.</P>
+<P>
+When a disk is registered, the system notes the volume label. This label is used when the system has to prompt the user to insert a disk. If an unlabeled disk is inserted, the system will choose an arbitrary label for the volume (e.g. &quot;UNNAMED1&quot;). The system does not actually write this label to the disk; the label is used by the system and discarded when the session ends. Ordinarily, the system will present an alert box to inform the user about the temporary label.<A NAME="IX_DiskRegisterDiskSilently()">
+ </A>
+ You can suppress this notification by calling the system routine <CODE>
+DiskRegisterDiskSilently()</CODE>
+. This routine has the same arguments and return values as <CODE>
+DiskRegisterDisk()</CODE>
+.</P>
+
+
+<H2 CLASS="HeadingC">
+<A NAME="38369">
+ </A>
+Getting Information about a Disk</H2>
+<PRE>DiskGetVolumeInfo(), DiskGetVolumeFreeSpace(), DiskGetDrive(), DiskGetVolumeName(), DiskFind(), DiskCheckWritable(), DiskCheckInUse(), DiskCheckUnnamed(), DiskForEach(), DiskInfoStruct, DiskFindResult</PRE>
+<P>
+GEOS provides many routines to get information about disks. If geodes call disk routines at all, they are most likely to call these. Most of these routines are passed the handle of the disk. If you know the disk's volume label and need to find out its handle, call the routine <CODE>
+DiskFind()</CODE>
+ (described below). If you know the disk is currently in a drive and you need to find out its handle, register the disk (see <A HREF="FileSys_5.htm#87244"> Registering Disks</A>
+). Note that any routine which is passed a disk handle can be passed a standard path constant; in this case, the routine will give you information about the disk containing the <STRONG CLASS="fileName">
+geos.ini</STRONG>
+ file.</P>
+<P>
+<A NAME="IX_DiskGetVolumeInfo()">
+ </A>
+The basic disk-information routine is <CODE>
+DiskGetVolumeInfo()</CODE>
+. This returns information about the size of the disk and the amount of free space available. The routine is passed two arguments: the disk handle and a pointer to a <CODE>
+DiskInfoStruct</CODE>
+ structure (shown below). The routine fills in the fields of the <CODE>
+DiskInfoStruct</CODE>
+ structure and returns zero if it was successful. If it fails for any reason, it returns an error value and sets the thread's error value (which can be recovered with <CODE>
+ThreadGetError()</CODE>
+). The usual error value returned is the constant ERROR_INVALID_VOLUME.</P>
+<P CLASS="figTitle">
+Code Display 17-1 <A NAME="IX_DiskInfoStruct">
+ </A>
+The DiskInfoStruct Structure</P>
+<PRE>typedef struct {
+	word		DIS_blockSize;		/* # of bytes in a block; smallest size
+					 * file system can allocate at once */
+	sdword		DIS_freeSpace;		/* # of bytes free on disk */
+	sdword		DIS_totalSpace;		/* Total size of the disk in bytes */
+	char		DIS_name[VOLUME_BUFFER_SIZE];				
+					/* Volume name; if disk is unnamed, this
+					 * is the temporary name. String is
+					 * null-terminated. */
+} DiskInfoStruct;</PRE>
+<P>
+<A NAME="IX_DiskGetVolumeName()">
+ </A>
+If you just want to know a disk's name, call <CODE>
+DiskGetVolumeName()</CODE>
+. This routine takes two arguments: the disk handle and the address of a character buffer. (The buffer must be at least VOLUME_NAME_LENGTH_ZT characters long.) It writes the volume name to the buffer as a null-terminated string, and it returns the buffer's address. If the volume is unnamed, <CODE>
+DiskGetVolumeName()</CODE>
+ writes the temporary volume name.</P>
+<P>
+<A NAME="IX_DiskCheckUnnamed()">
+ </A>
+Note that all the routines which return a volume's name will return the temporary name if the volume is unnamed. For this reason, if you want to find out if a volume is unnamed, you must use a special purpose routine, namely <CODE>
+DiskCheckUnnamed()</CODE>
+. This Boolean routine is passed the disk's handle. If the volume does not have a permanent label, the routine returns <EM>
+true</EM>
+; otherwise, it returns <EM>
+false</EM>
+.</P>
+<P>
+<A NAME="IX_DiskGetVolumeFreeSpace()">
+ </A>
+If you want to know how much free space is available on a disk, call the routine <CODE>
+DiskGetVolumeFreeSpace()</CODE>
+. The routine is passed the disk handle; it returns (as a dword) the number of free bytes available. If the volume is currently read-only (e.g. a floppy disk with the write-protect tab set), it returns the amount of space that would be available if the volume were made read/write. If the volume is, by its nature, not writable (e.g. a CD-ROM disk), the routine will return zero. It will also return zero if an error condition occurs; in this case, it will also set the thread's error value.</P>
+<P>
+<A NAME="IX_DiskGetDrive()">
+ </A>
+If you want to know what drive a volume is associated with, call <CODE>
+DiskGetDrive()</CODE>
+. This routine takes one argument, namely the volume's disk handle. It returns the number of the drive which had that disk. Note that it will return this value even if that drive is no longer usable.</P>
+<P>
+<A NAME="IX_DiskFind()">
+ </A>
+If you know the label of a volume which has been registered and you need to find out its handle, call the routine <CODE>
+DiskFind()</CODE>
+. <A NAME="IX_DiskFindResult">
+ </A>
+<A NAME="IX_DFR_&ldots;">
+ </A>
+The routine takes two arguments: the address of a null-terminated string containing the volume name and a pointer to a variable of the <CODE>
+DiskFindResult</CODE>
+ enumerated type. It will return the disk's handle; if no disk with the specified name has been registered, it will return a null handle. <CODE>
+DiskFindResult</CODE>
+ has the following possible values:</P>
+<DL>
+<DT>
+DFR_UNIQUE</DT><DD>
+Exactly one volume with the specified name has been registered. The handle of that volume was returned.</DD>
+<DT>
+DFR_NOT_UNIQUE</DT><DD>
+Two or more volumes with the specified label have been registered. The handle of an arbitrary one of these volumes was returned. If you want to find the handles of all of these disks, call <CODE>
+DiskForEach()</CODE>
+, described below.</DD>
+<DT>
+DFR_NOT_FOUND</DT><DD>
+No disk with the specified label has been registered. A null handle was returned.</DD>
+</DL>
+<P>
+<A NAME="IX_DiskCheckWritable()">
+ </A>
+To check if a volume is writable, call the Boolean routine <CODE>
+DiskCheckWritable()</CODE>
+. The routine takes one argument, the disk's handle. If the disk is writable, the routine returns <EM>
+true</EM>
+ (i.e. non-zero). If the disk is non-writable, the routine returns <EM>
+false</EM>
+ (i.e. zero). </P>
+<P>
+<A NAME="IX_DiskCheckInUse()">
+ </A>
+To see if a disk is being used by any threads, call <CODE>
+DiskCheckInUse()</CODE>
+. The routine takes one argument: the disk's handle. It returns <EM>
+true</EM>
+ (i.e. non-zero) if a file on the disk is open or if any thread has a directory on that disk in its directory stack (see <A HREF="FileSys_8.htm#33340"> Current Path and Directory Stack</A>
+). If neither condition applies, the routine returns <EM>
+false</EM>
+ (i.e. zero).</P>
+<P>
+<A NAME="IX_DiskForEach()">
+ </A>
+If you want to perform an action on every disk, call <CODE>
+DiskForEach()</CODE>
+. This routine takes one argument, a pointer to a Boolean callback routine. The callback routine should take a single argument, the handle of a disk. <CODE>
+DiskForEach()</CODE>
+ calls the callback routine once for every registered disk. It passes the disk handle to the callback routine, which can take any action it wants; for example, it could call one of the other disk-information routines. The callback routine can make <CODE>
+DiskForEach()</CODE>
+ halt prematurely by returning a non-zero value. If the callback routine forced an early halt, <CODE>
+DiskForEach()</CODE>
+ returns the last disk handle which had been passed to the callback routine; otherwise it returns a null handle. This routine is commonly called to look for a specific disk. To do this, simply have the callback routine check each disk to see if it is the one sought; if it is, simply return <EM>
+true</EM>
+, and <CODE>
+DiskForEach()</CODE>
+ will return that disk's handle.</P>
+<P>
+<CODE>
+DiskForEach()</CODE>
+ does not need to examine the actual disks; it works from the information the file-system stores about all registered disks. This means that <CODE>
+DiskForEach()</CODE>
+ will not have to prompt the user to insert any disks. Of course, the callback routine may need to examine the disks, in which case the user will be prompted when necessary.</P>
+
+
+<H2 CLASS="HeadingC">
+<A NAME="58568">
+ </A>
+Saving and Restoring a Disk Handle</H2>
+<PRE>DiskSave(), DiskRestore(), DiskRestoreError</PRE>
+<P>
+A disk does not necessarily have the same handle from one execution of GEOS to another. This can pose a problem for an application which is restarting from a state file. In order to reopen a file, it has to know the file's location. If it knows the file's location relative to a standard path, there is no problem, since the application can use the standard path constant in the place of a disk handle. If the file is not in a standard path, the application will need some way of figuring out the disk's handle on restart.</P>
+<P>
+For this reason, GEOS provides <CODE>
+DiskSave()</CODE>
+ and <CODE>
+DiskRestore()</CODE>
+. <CODE>
+DiskSave()</CODE>
+<A NAME="IX_DiskSave()">
+ </A>
+ saves information about a disk in an opaque data structure. <CODE>
+DiskRestore()</CODE>
+ reads such a data buffer and returns the handle of the disk described; it even arranges to prompt the user if the disk has not been registered yet.</P>
+<P>
+To save a disk handle, call <CODE>
+DiskSave()</CODE>
+. This routine takes three arguments:</P>
+<UL>
+<LI>
+The disk handle. <BR>
+This may be a standard path.</LI>
+<LI>
+A pointer to a buffer. <BR>
+<CODE>
+DiskSave()</CODE>
+ will write opaque data to that buffer; you will need to pass that data to <CODE>
+DiskRestore()</CODE>
+ to restore the handle.</LI>
+<LI>
+A pointer to an integer. <BR>
+When you call <CODE>
+DiskSave()</CODE>
+, that integer should contain the size of the buffer (in bytes). When <CODE>
+DiskSave()</CODE>
+ exits, the integer will contain the size of the buffer needed or used (as described below).</LI>
+</UL>
+<P>
+If <CODE>
+DiskSave()</CODE>
+ was successful, it will return <EM>
+true</EM>
+. The integer parameter will contain the size of the buffer actually needed; for example, if the buffer had been 100 bytes long and <CODE>
+DiskSave()</CODE>
+ returns 60, you can safely free the last 40 bytes in the buffer. If <CODE>
+DiskSave()</CODE>
+ failed, it will return <EM>
+false</EM>
+. If it failed because the buffer was too small, it will write the size needed into the integer passed; simply call <CODE>
+DiskSave()</CODE>
+ again with a large enough buffer. If <CODE>
+DiskSave()</CODE>
+ failed for some other reason (e.g. the disk belongs to a drive which no longer exists), it will write a zero value to the integer.</P>
+<P>
+<CODE>
+</CODE>
+<A NAME="IX_DiskRestore()">
+ </A>
+To restore a disk, call <CODE>
+DiskRestore()</CODE>
+. This routine takes two arguments:</P>
+<UL>
+<LI>
+A pointer to the opaque data structure written by <CODE>
+DiskSave()</CODE>
+.</LI>
+<LI>
+A pointer to a callback routine. The callback routine is called if the user must be prompted to insert the disk. If you pass a null function pointer, <CODE>
+DiskRestore()</CODE>
+ will fail in this situation.</LI>
+</UL>
+<P>
+If the disk in question has already been registered or is currently in its drive, <CODE>
+DiskRestore()</CODE>
+ will return its handle. If the disk is not registered and is not in any drive, <CODE>
+DiskRestore()</CODE>
+ will call the callback routine. The callback routine should accept the following four arguments:</P>
+<UL>
+<LI>
+A pointer to a null-terminated string containing the drive name, specified according to the DOS convention (e.g. &quot;C:&quot;).</LI>
+<LI>
+A pointer to a null-terminated string containing the disk volume label.</LI>
+<LI>
+The <CODE>
+DiskRestoreError</CODE>
+ (see below) which would be returned if the callback routine hadn't been called.</LI>
+<LI>
+A pointer to a pointer to the opaque data structure. If the callback routine causes the data structure to move, it should fix up the pointer to point to the new location. Note that the two strings (the drive name and the disk label) are located within this data structure; thus, if you cause this structure to move, both of those pointers will be invalidated.</LI>
+</UL>
+<P>
+If the callback routine believes the user inserted the correct disk, it should return DRE_DISK_IN_DRIVE. Otherwise, it should return a <CODE>
+DiskRestoreError</CODE>
+ constant. In this case, <CODE>
+DiskRestore()</CODE>
+ will fail and set the thread's error value to the constant specified. If the callback routine returns an error, that error will generally be DRE_USER_CANCELLED_RESTORE.</P>
+<P>
+If <CODE>
+DiskRestore()</CODE>
+ is successful, it will return the disk handle; this may be different from the disk's handle in the previous execution. You may now free the data buffer, if you like. If <CODE>
+DiskRestore()</CODE>
+ fails, it will return a null handle and set the thread's error value. <A NAME="IX_DRE_&ldots;">
+ </A>
+<A NAME="IX_DiskRestoreError">
+ </A>
+There are several different <CODE>
+DiskRestoreError</CODE>
+ values; they are listed below.</P>
+<DL>
+<DT>
+DRE_DRIVE_NO_LONGER_EXISTS</DT><DD>
+The disk had last been used in a drive which is no longer attached to the system (or the appropriate file-system driver is no longer present).</DD>
+<DT>
+DRE_REMOVABLE_DRIVE_DOESNT_HOLD_DISK</DT><DD>
+The disk was in a removable-media drive, and that drive doesn't contain the disk.</DD>
+<DT>
+DRE_USER_CANCELLED_RESTORE</DT><DD>
+A callback routine was called and returned this value to <CODE>
+DiskRestore()</CODE>
+.</DD>
+<DT>
+DRE_COULDNT_CREATE_NEW_DISK_HANDLE</DT><DD>
+<CODE>
+DiskRestore()</CODE>
+ found the disk in the drive but was for some reason unable to create the disk handle.</DD>
+<DT>
+DRE_REMOVABLE_DRIVE_IS_BUSY</DT><DD>
+The appropriate drive exists but is unavailable due to some time-consuming operation (e.g. a disk format).</DD>
+
+
+</DL>
+<H2 CLASS="HeadingC">
+<A NAME="88589">
+ </A>
+Other Disk Utilities</H2>
+<PRE>DiskSetVolumeName(), DiskFormat(), DiskCopy(), FormatError, DiskCopyCallback, DiskCopyError</PRE>
+<P>
+GEOS provides several utilities for working with disks. These utilities allow geodes to copy disks, format them, and change their volume names. Most applications will never need to use these utilities; they can rely on the users to take care of disk formatting with an application like GeoManager. However, some applications will want to make use of them. For example, an archiving program might automatically format storage disks and give them appropriate labels.</P>
+
+<H3 CLASS="HeadingD">
+<A NAME="17108">
+ </A>
+Changing a Volume Name</H3>
+<P>
+<A NAME="IX_DiskSetVolumeName()">
+ </A>
+If you want to set or change a volume's name, you should call <CODE>
+DiskSetVolumeName()</CODE>
+. This routine takes two arguments: the volume's handle and the address of a null-terminated string (containing the new volume name). If it is able to change the volume's name, it returns zero; otherwise, it returns an error code. It sets or clears the thread's error value appropriately. The following error codes may be returned:</P>
+<DL>
+<DT>
+ERROR_INVALID_VOLUME</DT><DD>
+An invalid disk handle was passed to the routine.</DD>
+<DT>
+ERROR_ACCESS_DENIED</DT><DD>
+For some reason, the volume's name could not be changed. For example, the volume might not be writable.</DD>
+<DT>
+ERROR_DISK_STALE</DT><DD>
+The drive containing that disk has been deleted. This usually only happens with network drives.</DD>
+
+
+</DL>
+<H3 CLASS="HeadingD">
+Formatting a Disk</H3>
+<P>
+<A NAME="IX_DiskFormat()">
+ </A>
+If a geode needs to format a disk, it can call the routine <CODE>
+DiskFormat()</CODE>
+. This routine can do either low-level or high-level (&quot;soft&quot;) formats. The routine does not interact with the user interface; instead, it calls a callback routine, which can arrange any such interaction. <CODE>
+DiskFormat()</CODE>
+ takes seven arguments:</P>
+<UL>
+<LI>
+The number of the drive containing the disk to be formatted.</LI>
+<LI>
+The address of a null-terminated string containing the disk's new volume name.</LI>
+<LI>
+A member of the <CODE>
+MediaType</CODE>
+ enumerated type (see <A HREF="FileSys_4.htm#17696"> MEDIA_160K, MEDIA_180K, MEDIA_320K, MEDIA_360K These are all sizes used by 5.25-inch disks.</A>
+).</LI>
+<LI>
+<A NAME="IX_DFF_&ldots;">
+ </A>
+<A NAME="IX_DiskFormatFlags">
+ </A>
+Flags indicating how the format should be done. The following flags are available:</LI>
+</UL>
+<DL>
+<DT>
+    DFF_CALLBACK_PERCENT_DONE</DT><DD>
+A callback routine will be called periodically. The callback routine will be passed a single argument, namely the percentage of the format which has been done, expressed as an integer.</DD>
+<DT>
+    DFF_CALLBACK_CYL_HEAD</DT><DD>
+A callback routine will be called periodically. The callback routine will be passed a single argument, namely the cylinder head being formatted. If both DFF_CALLBACK_PERCENT_DONE and DFF_CALLBACK_CYL_HEAD are passed, results are undefined.</DD>
+<DT>
+    DFF_FORCE_ERASE</DT><DD>
+A &quot;hard format&quot; should be done; that is, the sectors should be rewritten and initialized to zeros. If this flag is not set, <CODE>
+DiskFormat()</CODE>
+ will do a &quot;soft format&quot; if possible; it will check the sectors and write a blank file allocation table, but it will not necessarily erase the data from the disk.</DD>
+<UL>
+<LI>
+A pointer to an unsigned integer variable; the number of good sectors on the disk will be written here.</LI>
+<LI>
+A pointer to an unsigned integer variable; the number of bad sectors on the disk will be written here.</LI>
+<LI>
+The address of a Boolean callback routine, as described above. The routine should be passed either the current cylinder and head or the percentage formatted, depending on the flag passed to <CODE>
+DiskFormat()</CODE>
+. It should return <EM>
+true</EM>
+ to abort the format, or <EM>
+false</EM>
+ (i.e. zero) to continue with the format. If neither DFF_CALLBACK_PERCENT_DONE nor DFF_CALLBACK_CYL_HEAD is passed, the callback routine will never be called, so this argument may be a null pointer.</LI>
+</UL>
+</DL>
+<P>
+<CODE>
+DiskFormat()</CODE>
+<A NAME="IX_FMT_&ldots;">
+ </A>
+<A NAME="IX_FormatError">
+ </A>
+ returns a member of the <CODE>
+FormatError </CODE>
+enumerated type. If the format was successful, it will return the constant FMT_DONE (which is guaranteed to equal zero). Otherwise, it will return one of the following constants:</P>
+<PRE>FMT_DRIVE_NOT_READY
+FMT_ERROR_WRITING_BOOT
+FMT_ERROR_WRITING_ROOT_DIR
+FMT_ERROR_WRITING_FAT
+FMT_ABORTED
+FMT_SET_VOLUME_NAME_ERROR
+FMT_CANNOT_FORMAT_FIXED_DISKS_IN_CUR_RELEASE
+FMT_BAD_PARTITION_TABLE,
+FMT_ERR_READING_PARTITION_TABLE,
+FMT_ERR_NO_PARTITION_FOUND,
+FMT_ERR_MULTIPLE_PRIMARY_PARTITIONS,
+FMT_ERR_NO_EXTENDED_PARTITION_FOUND
+FMT_ERR_CANNOT_ALLOC_SECTOR_BUFFER
+FMT_ERR_DISK_IS_IN_USE
+FMT_ERR_WRITE_PROTECTED
+FMT_ERR_DRIVE_CANNOT_SUPPORT_GIVEN_FORMAT
+FMT_ERR_INVALID_DRIVE_SPECIFIED
+FMT_ERR_DRIVE_CANNOT_BE_FORMATTED
+FMT_ERR_DISK_UNAVAILABLE</PRE>
+
+
+<H3 CLASS="HeadingD">
+Copying Disks</H3>
+<P>
+GEOS<A NAME="IX_DiskCopy()">
+ </A>
+ provides a routine for copying disks. This routine, <CODE>
+DiskCopy()</CODE>
+, maintains a balance between the two goals of limiting memory usage and minimizing disk swapping. It will reformat the destination disk if necessary. The routine does a sector-for-sector copy; therefore, the destination disk must either be of exactly the same type as the source disk (i.e., same medium and size), or it must be reformatable to be the same size. For this reason, neither the source nor the destination may be a fixed disk.</P>
+<P>
+<CODE>
+DiskCopy()</CODE>
+ does not interact with the user directly, even though the user may have to swap disks. Instead, it calls a callback routine whenever interaction with the user may be necessary. The routine takes the following arguments:</P>
+<UL>
+<LI>
+The drive number of the source drive.</LI>
+<LI>
+The drive number of the destination drive. This may be the same as the source drive.</LI>
+<LI>
+The address of a Boolean callback routine. The routine must take three arguments: a member of the <CODE>
+DiskCopyCallback</CODE>
+ enumerated type (described below), a disk handle, and a word-sized parameter holding any other appropriate information. The routine should return non-zero to abort the copy; otherwise, it should return zero.</LI>
+</UL>
+<P>
+<A NAME="IX_CALLBACK_&ldots;">
+ </A>
+<A NAME="IX_DiskCopyCallback">
+ </A>
+The callback routine is called under a variety of circumstances. When it is called, the first argument passed is a member of the <CODE>
+DiskCopyCallback</CODE>
+ enumerated type, which specifies both why the callback routine was called and what the other arguments signify. <CODE>
+DiskCopyCallback</CODE>
+ contains the following types:</P>
+<DL>
+<DT>
+CALLBACK_GET_SOURCE_DISK</DT><DD>
+The callback routine should prompt the user to insert the source disk. The second argument is meaningless for this call. The third argument is the number identifying the drive.</DD>
+<DT>
+CALLBACK_GET_DEST_DISK</DT><DD>
+The callback routine should prompt the user to insert the destination disk. The second argument is meaningless for this call. The third argument is the number identifying the drive.</DD>
+<DT>
+CALLBACK_REPORT_NUM_SWAPS</DT><DD>
+The second argument is meaningless for this call. The third argument is the number of disk swaps that will be necessary to copy the disk. The callback routine may wish to report this number to the user and ask for confirmation.</DD>
+<DT>
+CALLBACK_VERIFY_DEST_DESTRUCTION</DT><DD>
+If the destination disk has already been formatted, the callback routine will be called with this parameter. The callback routine may wish to remind the user that the destination disk will be erased. The second argument is the handle of the destination disk; this is useful if, for example, you want to report the disk's name. The third argument is the destination drive's number. As in the other cases, the callback routine can abort the format by returning non-zero.</DD>
+<DT>
+CALLBACK_REPORT_FORMAT_PERCT</DT><DD>
+If the destination disk needs to be formatted, <CODE>
+DiskCopy()</CODE>
+ will periodically call the callback routine with this parameter. In this case, the second argument will be meaningless; the third parameter will be the percentage of the destination disk which has been formatted.</DD>
+<DT>
+CALLBACK_REPORT_COPY_PERCT</DT><DD>
+While the copy is taking place, <CODE>
+DiskCopy()</CODE>
+ will periodically call the callback routine with this parameter. In this case, the second parameter will be meaningless; the third parameter will be the percentage of the copy which has been completed.</DD>
+</DL>
+<P>
+<A NAME="IX_DiskCopyError">
+ </A>
+If the copy was successful, <CODE>
+DiskCopy()</CODE>
+ returns zero. Otherwise, it returns a member of the <CODE>
+DiskCopyError</CODE>
+ enumerated type, which has the following members:</P>
+<DL>
+<DT>
+ERR_DISKCOPY_INSUFFICIENT_MEM</DT><DD>
+This is returned if the routine was unable to get adequate memory.</DD>
+<DT>
+ERR_CANT_COPY_FIXED_DISKS </DT>
+<DT>
+ERR_CANT_READ_FROM_SOURCE </DT>
+<DT>
+ERR_CANT_WRITE_TO_DEST </DT>
+<DT>
+ERR_INCOMPATIBLE_FORMATS </DT>
+<DT>
+ERR_OPERATION_CANCELLED</DT><DD>
+This is returned if the callback routine ever returned a non-zero value, thus aborting the copy.</DD>
+<DT>
+ERR_CANT_FORMAT_DEST </DT>
+
+
+</DL>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="FileSys_3.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="FileSys_4.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.1 Accessing Drives</A> 
+<!-- to next --> | <A HREF="FileSys_6.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">4 Directories and Paths</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

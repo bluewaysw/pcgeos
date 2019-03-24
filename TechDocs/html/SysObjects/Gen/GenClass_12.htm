@@ -1,0 +1,352 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: GenClass_12.htm,v 1.1 97/06/02 16:12:16 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Branch Construction/Destruction</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">GenClass</A>: 5.3 <A HREF="GenClass_f.htm">Generic Trees</A>: 
+Branch Construction/Destruction</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GenClass_f.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GenClass_11.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.2 Manipulating Children Directly</A> 
+<!-- to next --> | <A HREF="GenClass_13.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">6 Vardata</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>MSG_GEN_COPY_TREE, MSG_GEN_DESTROY, MSG_GEN_DESTROY_AND_FREE_BLOCK, MSG_GEN_BRANCH_REPLACE_PARAMS, MSG_GEN_BRANCH_REPLACE_OUTPUT_OPTR_CONSTANT </PRE>
+<P>
+In addition to instantiating and manipulating generic objects one at a time, you can create, move, and destroy entire branches. One way of doing this is copying a resource using <CODE>
+ObjDuplicateResource()</CODE>
+ and sending <CODE>
+MSG_GEN_ADD_CHILD</CODE>
+ to the parent object, passing it the optr of the top object in the tree. This method has the advantage of retaining the same chunk offsets to objects within the duplicated block as in the source block.</P>
+<P CLASS="figTitle">
+Code Display 2-22 Using ObjDuplicateResource()</P>
+<PRE>@start ResourceToCopy;</PRE>
+<PRE>/* For simplicity, the GenItems in this listing contain no monikers or 
+ * identifiers. */</PRE>
+<PRE>@object GenItemGroupClass MyList = {
+    GI_comp = @AirplaneEntry, @TrainEntry, @CarEntry, @BicycleEntry;
+}
+@object GenItemClass AirplaneEntry = {}
+@object GenItemClass TrainEntry = {}
+@object GenItemClass CarEntry = {}
+@object GenItemClass BicycleEntry = {}</PRE>
+<PRE>@end ResourceToCopy;</PRE>
+<PRE>@method MyProcessClass, MSG_COPY_MY_RESOURCE {
+    MemHandle newBlock;</PRE>
+<PRE>    newBlock = ObjDuplicateResource(OptrToHandle(@MyList),
+		/* Block will be owned by the same geode. */
+					-1,
+		/* Block will be run by the same thread. */
+					-1);</PRE>
+<PRE>    @call MyPrimary::MSG_GEN_ADD_CHILD(ConstructOptr(newBlock,
+					OptrToChunk(@MyList));
+}</PRE>
+<P>
+Another way to duplicate groups of objects is with <CODE>
+MSG_GEN_COPY_TREE</CODE>
+. This message greatly simplifies generic tree construction. Those branches of the tree which are roughly similar can be duplicated with one message instead of several.</P>
+<P>
+In many cases, it might be useful to create a UI resource template. This template should contain objects but should not contain object-specific information such as visual monikers, optrs, etc., as this information may be different for different instances of the branch. You can then duplicate these templates with <CODE>
+MSG_GEN_COPY_TREE</CODE>
+. The trees can then be updated to reflect their unique data either object by object or by using <CODE>
+MSG_GEN_BRANCH_REPLACE_PARAMS</CODE>
+, which will replace instance data within an entire branch.</P>
+<P>
+To set up a template, create the generic tree you wish to function as a template, making sure that the top-level object of that tree is not usable (~GS_USABLE). Then use <CODE>
+MSG_GEN_COPY_TREE</CODE>
+ to copy the tree to the proper location. You can then set the other instance data within the method. Finally, to make that tree appear on screen, set the top-level object GS_USABLE. You can remove any tree created with <CODE>
+MSG_GEN_COPY_TREE</CODE>
+ with <CODE>
+MSG_GEN_DESTROY</CODE>
+. If you use <CODE>
+ObjDuplicateResource()</CODE>
+ to copy a resource block, you can use<CODE>
+ ObjFreeDuplicate()</CODE>
+ to remove it. If the generic branch to be destroyed resides completely within a single block, you may send MSG_GEN_DESTROY_AND_FREE_BLOCK to the top object in that generic branch.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_COPY_TREE">
+ </A>
+MSG_GEN_COPY_TREE</H4>
+<PRE CLASS="syntax">optr	MSG_GEN_COPY_TREE(
+        MemHandle destBlock,
+        ChunkHandle parentChunk,
+        word flags);</PRE>
+<P>
+<A NAME="IX_Duplicating objects">
+ </A>
+This message copies an entire branch of a generic object tree, starting at the object first called. Pass this message the handle of the destination object block. The object sent the message must not be GS_USABLE. </P>
+<P>
+You may pass <CODE>
+parentChunk</CODE>
+ null if you wish the block to remain unattached to the generic tree. Note that if a generic tree is copied using <CODE>
+MSG_GEN_COPY_TREE</CODE>
+, the objects contained therein not only will have a new resource handle but will also have new chunk handles. Note that this is different from using <CODE>
+ObjDuplicateResource()</CODE>
+, which will keep the same chunk offsets into the object block.</P>
+<P>
+Unlike <CODE>
+ObjDuplicateResource()</CODE>
+, this message will copy the entire branch desired, even if those objects reside in separate resources. This message is therefore more flexible than <CODE>
+ObjDuplicateResource()</CODE>
+, which only copies a given object block.</P>
+<P>
+<CODE>
+GenClass</CODE>
+ provides the default behavior of broadcasting this message down a generic tree, where each object will make a copy of itself in the destination block. It creates an object chunk the same size as the object chunk being copied, copies over the entire contents of any instance fields and creates an outside chunk for a visual moniker, if any.</P>
+<P>
+If you have a subclass of a generic object which references (and therefore might need to create) a chunk outside the object, you must be sure to intercept this message and allocate, copy over, and update any references to this chunk. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any generic object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+destBlock</EM>
+	The block to copy the tree into. This block cannot be the same as the source object block.</P>
+<DL>
+<DT>
+<EM>
+parentChunk</EM>
+</DT><DD>The chunk handle of a generic object in the destination block. The recipient of this message will be copied into <CODE>
+parentChunk</CODE>
+. If zero, copy tree into block without linking it to a particular chunk.</DD>
+<DT>
+<EM>
+flags</EM>
+</DT><DD><CODE>
+CompChildFlags</CODE>
+ to use when adding the tree.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	This message is handled by all generic objects. If you wish to intercept this message, you should first call the superclass to copy over the <CODE>
+GenClass</CODE>
+ instance data and then copy over any lmem chunks that are referenced by instance data of the intercepting class.</P>
+<P CLASS="figTitle">
+Code Display 2-23 MSG_GEN_COPY_TREE</P>
+<PRE>/* Create a template resource block. For demonstration purposes, this block will
+ * only contain one object, a GenItem. All declared resources must also be
+ * declared in an application's corresponding .gp file. */</PRE>
+<PRE>@start MyTemplate;
+@object GenItemClass TemplateItem = {
+    GI_states = @default &amp; ~GS_USABLE;					/* Make sure it is NOT usable. */
+}
+@end MyTemplate;</PRE>
+<PRE>/* Start the Interface resource block */</PRE>
+<PRE>@start Interface;
+@object GenItemGroupClass MyList = { }
+				/* Object the template above will be added to. */
+@end Interface;</PRE>
+<PRE>@method MyProcessClass, MSG_COPY_A_LIST_ITEM {
+    optr		newListEntry;</PRE>
+<PRE>	/* This call copies TemplateItem to the location at MyList. The macros
+	 * OptrToHandle and OptrToChunk are used to cast the optr of MyList into
+	 * the proper type for MSG_GEN_COPY_TREE. This new linkage will be marked
+	 * dirty, and the child will become the first child of MyList. */
+    newListEntry = @call TemplateItem::MSG_GEN_COPY_TREE(
+				OptrToHandle(@MyList),
+				OptrToChunk(@MyList),
+				(CCF_MARK_DIRTY | CCO_FIRST));</PRE>
+<PRE>	/* The newListEntry is set usable to bring it up on screen. */
+    @call newListEntry::MSG_GEN_SET_USABLE(VUM_NOW);
+}</PRE>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_DESTROY">
+ </A>
+MSG_GEN_DESTROY</H4>
+<PRE CLASS="syntax">void	MSG_GEN_DESTROY(
+        VisUpdateMode		updateMode,
+        word		flags);</PRE>
+<P>
+This message destroys a generic branch starting at the object called. The message sets all required generic objects not usable, removes them from the generic tree, and destroys them, including any chunks associated with the specific object destroyed. This message is the safest way to destroy a generic branch. </P>
+<P>
+The message will leave the block that the objects previously resided in intact (except for objects removed, of course), but any chunks coming from those resources will be marked dirty and will be resized to zero.</P>
+<P>
+It is usually a good idea to destroy generic branches that are not needed to be saved to state when an application detaches or exits. This ensures that when an application is reattached, it will not contain the previous links. This keeps the state file more compact and avoids the possibility of a child not being saved to state while retaining the parent's child pointer.</P>
+<P>
+The only valid flag in <CODE>
+CompChildFlags</CODE>
+ is CCF_MARK_DIRTY, which will mark the links as dirty and save them to state.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any generic object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+updateMode</EM>
+	<CODE>
+VisUpdateMode</CODE>
+ to determine when the generic tree is to be visually updated. May not be VUM_MANUAL.</P>
+<DL>
+<DT>
+<EM>
+flags</EM>
+</DT><DD><CODE>
+CompChildFlags</CODE>
+ to use when destroying the branch (either CCF_MARK_DIRTY or zero).</DD>
+</DL>
+<P CLASS="refField">
+Interception:	This message is handled by all generic objects. If you wish to intercept this message, you should first destroy any chunks that are referenced by instance data of the intercepting class and then call the superclass to destroy the object's <CODE>
+GenClass</CODE>
+ instance data.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_DESTROY_AND_FREE_BLOCK">
+ </A>
+MSG_GEN_DESTROY_AND_FREE_BLOCK</H4>
+<PRE CLASS="syntax">Boolean	MSG_GEN_DESTROY_AND_FREE_BLOCK();</PRE>
+<P>
+This is a utility message used to destroy a generic branch which resides completely within one block. The block will be freed. The object called with this message must be the only top object in the block. This message is called by <CODE>
+UserDestroyDialog()</CODE>
+.</P>
+<P>
+<A NAME="IX_Active list:MSG_GEN_DESTROY_AND_FREE_BLOCK">
+ </A>
+If any object within the block resides on the application active list, or if the object is not a window, a slow, non-optimized approach is taken: the branch is set not usable, removed from the generic tree, and sent <CODE>
+MSG_META_BLOCK_FREE</CODE>
+. If no object of the block can be found on this list, an optimized approach is taken: the window is taken off the screen; FTVMC, mouse, etc. exclusives released; the linkage changed to be one-way upward; and the block sent <CODE>
+MSG_META_BLOCK_FREE</CODE>
+. In other words, the whole unbuild process is carefully avoided. </P>
+<P CLASS="refField">
+Source:	Unrestricted</P>
+<P CLASS="refField">
+Destination:	Top object within a block to be freed.</P>
+<P CLASS="refField">
+Return:	<EM>
+true</EM>
+ if the message was handled, <EM>
+false</EM>
+ otherwise.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_BRANCH_REPLACE_PARAMS">
+ </A>
+MSG_GEN_BRANCH_REPLACE_PARAMS</H4>
+<PRE CLASS="syntax">void	MSG_GEN_BRANCH_REPLACE_PARAMS(@stack
+        BranchReplaceParamType				type,
+        dword				replaceParam,
+        dword				searchParam);</PRE>
+<P>
+This message travels down a generic branch to all of an object's children; the message replaces all instance data specified in <CODE>
+type</CODE>
+ with replacement instance data. A typical way to implement this is to set up a template UI branch with <CODE>
+MSG_GEN_COPY_TREE</CODE>
+. Most often, you will use this message to search and replace optrs set within your template. This is easily done by setting these optrs to certain constant values and then searching for those values in <CODE>
+type</CODE>
+.<CODE>
+ </CODE>
+If you only wish to replace your destination optrs, use <CODE>
+MSG_GEN_BRANCH_REPLACE_OUTPUT_OPTR_CONSTANT</CODE>
+, which is just a specialized case of this message.</P>
+<P>
+When replacing optrs, the constant BRPT_DUMMY_OPTR_START should be used as the <EM>
+searchParam</EM>
+ value. If multiple optrs are to be replaced, enumerated values based on that value should be used for other optrs. These values will be constants, and since the <CODE>
+TravelOption</CODE>
+ types are also constants, care must be taken to replace these dummy values before anything else is done on the generic branch; otherwise, their output may be interpreted as a <CODE>
+TravelOption</CODE>
+.</P>
+<P>
+This message may not be supported by several subclasses of <CODE>
+GenClass</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any generic object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+searchParam	</CODE>
+Specifies the search parameter. Typically this search parameter is a pre-set constant used to identify the instance data to replace. The search parameter must be a dword.</P>
+<DL>
+<DT>
+<CODE>
+replaceParam</CODE>
+</DT><DD>Specifies the replacement parameter. Any instance data in the generic branch that matches <CODE>
+searchParam</CODE>
+ will be replaced with the data specified in <CODE>
+replaceParam</CODE>
+. The data must be a dword.</DD>
+<DT>
+<CODE>
+type</CODE>
+</DT><DD>A value of <CODE>
+BranchReplaceParamType</CODE>
+. The only value supported is BRPT_OUTPUT_OPTR, which specifies that all optrs with values matching <CODE>
+searchParam</CODE>
+ should be replaced by the value in <CODE>
+replaceParam</CODE>
+.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	This message is handled by most generic objects (although not all). If you wish to intercept this message, you should first call the superclass to search and replace any <CODE>
+GenClass</CODE>
+ instance data, if applicable, and then search and replace any instance data in the intercepting class.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_BRANCH_REPLACE_OUTPUT_OPTR_CONSTANT">
+ </A>
+MSG_GEN_BRANCH_REPLACE_OUTPUT_OPTR_CONSTANT</H4>
+<PRE CLASS="syntax">void	MSG_GEN_BRANCH_OUTPUT_OPTR_CONSTANT(
+        optr	replacementOptr,
+        word	searchConstant);</PRE>
+<P>
+This message is a special case of <CODE>
+MSG_GEN_BRANCH_REPLACE_PARAMS</CODE>
+ where the <CODE>
+BranchReplaceParamType</CODE>
+ is BRPT_OUTPUT_OPTR with a search parameter of a constant value set up beforehand. You must pass this message the optr to replace the search constant found.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any generic object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+replacementOptr</EM>
+	The optr to replace all instance fields with destinations matching the <EM>
+searchConstant</EM>
+.</P>
+<DL>
+<DT>
+<EM>
+searchConstant</EM>
+</DT><DD>The constant to search for and replace with the <EM>
+replacementOptr</EM>
+.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	Generally not intercepted. This message invokes <CODE>
+MSG_GEN_BRANCH_REPLACE_PARAMS</CODE>
+ so intercept that instead.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GenClass_f.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GenClass_11.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.2 Manipulating Children Directly</A> 
+<!-- to next --> | <A HREF="GenClass_13.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">6 Vardata</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

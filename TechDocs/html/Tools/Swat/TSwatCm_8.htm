@@ -1,0 +1,420 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: TSwatCm_8.htm,v 1.1 97/06/27 15:59:17 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Breakpoints and Code Stepping</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Swat Introduction</A>: 5.3 <A HREF="TSwatCm_5.htm">Essential Commands</A>: 
+Breakpoints and Code Stepping</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="TSwatCm_5.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="TSwatCm_7.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.2 Attaching and Detaching</A> 
+<!-- to next --> | <A HREF="TSwatCm_9.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5.4 Examining and Modifying Memory</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+The commands in this group are used to stop at specified breakpoints in an application's code and then step through the code line by line if necessary. These commands are often used with each other to examine critical areas in the application source code.</P>
+
+<H2 CLASS="HeadingC">
+<A NAME="46835">
+ </A>
+Breakpoints</H2>
+<PRE>stop, brk, go, cbrk, spawn</PRE>
+<P>
+<A NAME="IX_Breakpoints">
+ </A>
+The <CODE>
+stop</CODE>
+, <CODE>
+brk </CODE>
+and <CODE>
+cbrk</CODE>
+ commands are used to set breakpoints. The breakpoint commands have many subcommands controlling the actions and attributes of a particular breakpoint.</P>
+<P>
+The <CODE>
+cbrk</CODE>
+ command sets breakpoints to be evaluated by the Swat stub; <CODE>
+brk</CODE>
+ sets them to be evaluated by Swat. The Swat stub can evaluate the conditions much faster than Swat, but <CODE>
+cbrk</CODE>
+ has certain limitations: only a limited number of breakpoints can be set using <CODE>
+cbrk</CODE>
+, and these breakpoints can only compare registers when the breakpoint is hit with a given set of criteria.</P>
+
+<H3 CLASS="refHeading">
+stop</H3>
+<PRE CLASS="syntax">stop in &lt;class&gt;::&lt;message&gt; [if &lt;expr&gt;]
+stop in &lt;procedure&gt; [if &lt;expr&gt;]
+stop in &lt;address-history-token&gt; [if &lt;expr&gt;]
+stop at [&lt;file:]&lt;line&gt; [if &lt;expr&gt;]
+stop &lt;address&gt; [if &lt;expr&gt;]</PRE>
+<P>
+This is the main command to use when setting breakpoints in C programs. The &quot;stop in&quot; command will set a breakpoint at the beginning of a procedure, immediately after the procedure's stack frame has been set up. The &quot;stop at&quot; command will set a breakpoint at the first instruction of the given source line. If no &lt;file&gt; is specified, the source file for the current stack frame is used. If a condition is specified by means of an &quot;if &lt;expr&gt;&quot; clause, you should enclose the expression in curly braces to prevent any nested commands, such as a &quot;value fetch&quot; command, from being evaluated until the breakpoint is hit.</P>
+
+
+<H3 CLASS="refHeading">
+brk</H3>
+<PRE CLASS="Ref Swat Call">brk [&lt;sub-command&gt;]</PRE>
+<P>
+The <CODE>
+brk</CODE>
+ (breakpoint) command is used for setting nearly all breakpoints in an application's code. The simplest way to use it is to type <CODE>
+brk</CODE>
+ with a single <CODE>
+addr</CODE>
+ argument. The address is usually a routine name for a suspect procedure, and when the breakpoint is reached the code-stepping commands can be used to examine it carefully. The <CODE>
+brk</CODE>
+ command can also create conditional breakpoints which will only be taken if certain conditions are satisfied. Once set, a breakpoint is given an integer number which can be obtained using the <CODE>
+list</CODE>
+ subcommand (see <A HREF="TSwatCm_8.htm#16655"> Breakpoints</A>
+).</P>
+<DL>
+<DT>
+<CODE>brk &lt;addr&gt; [&lt;command&gt;]</CODE></DT><DD>
+The <CODE>
+brk</CODE>
+ command without any subcommands sets an unconditional breakpoint at the address specified in <EM>
+addr</EM>
+. If the <EM>
+command</EM>
+ argument is passed, the given swat command will be carried out when the breakpoint is hit.</DD>
+<DT>
+<CODE>
+brk delete &lt;break&gt;*</DT><DD>
+</CODE>
+Deletes the given breakpoint(s), just as <CODE>
+clear</CODE>
+, above.</DD>
+<DT>
+<CODE>
+brk enable &lt;break&gt;*</DT><DD>
+</CODE>
+Enables the given breakpoint(s). Has no effect on previously enabled breakpoints. If no breakpoint is given, all breakpoints for the current patient are enabled.</DD>
+<DT>
+<CODE>
+brk disable &lt;break&gt;*</DT><DD>
+</CODE>
+Disables the given breakpoint(s). It has no effect on previously disabled breakpoints. If no breakpoint is given, it disables all breakpoints for the current patient.</DD>
+<DT> 
+<CODE>
+brk list [&lt;addr&gt;]</DT><DD>
+</CODE>
+Lists all the breakpoints, whether they are enabled, where they are set, their conditions, and what actions they will take if encountered. If <CODE>
+addr</CODE>
+ is given, it returns the breakpoint numbers of all breakpoints set at the given address.<A NAME="IX_brk Tcl structure">
+ </A>
+</DD>
+<P CLASS="figCaption">
+<A NAME="16655">
+ </A>
+Breakpoints</P>
+<PRE CLASS="SwatDisplay">(geos:0) 4 =&gt; <STRONG>brk list
+</STRONG>Num S Address Patient Command/Condition
+1   E loader::kcode::LoaderError all echo Loader death due to [penum
+					LoaderStrings [read-reg ax]]
+					expr 1
+2   E kcode::FatalError all
+ 					why
+ 					assign kdata::errorFlag 0
+ 					expr 1
+3   E kcode::WarningNotice all why-warning
+4   E kcode::CWARNINGNOTICE all why-warning
+(geos:0) 5 =&gt; <STRONG>stop in Mess1Draw
+</STRONG>brk5
+(geos:0) 6 =&gt; <STRONG>brk list
+</STRONG>Num S Address Patient Command/Condition
+1   E loader::kcode::LoaderError all echo Loader death due to [penum
+					LoaderStrings [read-reg ax]]
+ 					expr 1
+2   E kcode::FatalError all
+ 					why
+ 					assign kdata::errorFlag 0
+ 					expr 1
+3   E kcode::WarningNotice all why-warning
+4   E kcode::CWARNINGNOTICE all why-warning
+5   E &lt;ss1::MESS1_TEXT::Mess1Draw+10 all halt
+(geos:0) 7 =&gt; <STRONG>brk dis brk4
+</STRONG>(geos:0) 8 =&gt; <STRONG>brk list
+</STRONG>Num S Address Patient Command/Condition
+1   E loader::kcode::LoaderError all echo Loader death due to [penum
+					LoaderStrings [read-reg ax]]
+ 					expr 1
+2   E kcode::FatalError all
+ 					why
+ 					assign kdata::errorFlag 0
+ 					expr 1
+3   E kcode::WarningNotice all why-warning
+4   D kcode::CWARNINGNOTICE all why-warning
+5   E &lt;ss1::MESS1_TEXT::Mess1Draw+10 all halt
+(geos:0) 9 =&gt;</PRE>
+</DL>
+
+
+<H3 CLASS="refHeading">
+go</H3>
+<PRE CLASS="syntax">go [&lt;address-expressions&gt;]</PRE>
+<P>
+The go command sets a one-time breakpoint and resumes execution on the target PC. The net effect of this is to let the target go until it hits a given address, then stop.</P>
+
+
+<H3 CLASS="refHeading">
+cbrk</H3>
+<PRE CLASS="Ref Swat Call">cbrk [&lt;sub-command&gt;]</PRE>
+<P>
+<A NAME="IX_Breakpoints:conditional">
+ </A>
+<A NAME="IX_cbrk Swat command">
+ </A>
+The <CODE>
+cbrk</CODE>
+ (conditional breakpoint) command is used to set fast conditional breakpoints. This command is very similar to the <CODE>
+brk</CODE>
+ command above, except that the condition is evaluated by the Swat stub--this increases the speed of the evaluation. There are, however, certain restrictions on the <CODE>
+cbrk</CODE>
+ command: only a limited number of breakpoints can be set (eight), and the scope of the evaluation is limited to comparing word registers (or a single word of memory) to a given set of values.</P>
+<P>
+In the following descriptions, <CODE>
+criteria</CODE>
+ stands for a series of one or more arguments of the form:</P>
+<PRE>&lt;register&gt; &lt;op&gt; &lt;value&gt;</PRE>
+<DL>
+<DT>
+<EM>register</EM></DT><DD>One of the machine's registers or &quot;thread,&quot; which corresponds to the current thread's handle.</DD>
+<DT>
+<EM>op</EM></DT><DD>One of the following ten comparison operators: = (equal), != (not equal), &gt; (unsigned greater-than), &lt; (unsigned less-than), &gt;= (unsigned greater-or-equal), &lt;= (unsigned less-or-equal), +&gt; (signed greater-than), +&lt; (signed less-than), +&gt;= (signed greater-or-equal), +&lt;= (signed greater-or-equal). These correspond to the 8086 instructions JE, JNE, JA, JB, JAE, JBE, JG, JL, JGE, JLE, respectively.</DD>
+<DT>
+<EM>value</EM></DT><DD>A standard Swat address expression. The resulting offset is the value with which the register will be compared when the breakpoint is hit.</DD>
+</DL>
+<DL>
+<DT>
+<STRONG>
+cbrk &lt;addr&gt; &lt;criteria&gt;*</DT><DD>
+</STRONG>
+The basic cbrk command sets a fast conditional breakpoint at the address specified in <EM>
+addr</EM>
+.</DD>
+<DT>
+<STRONG>
+cbrk cond &lt;break&gt; &lt;criteria&gt;*</DT><DD>
+</STRONG>
+Changes the criteria for the breakpoint. If no <CODE>
+criteria</CODE>
+ is given the breakpoint becomes a standard, unconditional breakpoint.</DD>
+
+
+</DL>
+<H3 CLASS="refHeading">
+spawn</H3>
+<PRE CLASS="Ref Swat Call">spawn &lt;patient-name&gt; [&lt;addr&gt;]</PRE>
+<P>
+<A NAME="IX_spawn Swat command">
+ </A>
+<A NAME="IX_Threads:breakpoints in not yet created">
+ </A>
+The <CODE>
+spawn</CODE>
+ command is used to set a temporary breakpoint in a process or thread which has not yet been created. The arguments are</P>
+<DL>
+<DT>
+<CODE>
+patient-name</DT><DD>
+</CODE>
+The permanent name, without extension, as specified by the name directive in the <STRONG CLASS="fileName">
+.gp</STRONG>
+ file; this is the name of the patient in which to set a temporary breakpoint. A unique abbreviation is sufficient for this argument.</DD>
+<DT>
+<CODE>
+addr</CODE>
+</DT><DD>A particular address at which to place the breakpoint. If no address is given, Swat will stop as soon as the given geode is loaded.</DD>
+</DL>
+<P>
+This command is used to stop the geode before any of its code can be run, allowing breakpoints to be set in the desired routines. If you could not stop the machine in this manner, the application could hit a buggy routine before a breakpoint could be set in that routine. The <CODE>
+spawn</CODE>
+ command can also be used to catch the spawning of new threads which is useful to keep track of the threads being used by an application (see <A HREF="TSwatCm_8.htm#28011"> The spawn Command</A>
+).</P>
+<P CLASS="SwatTitle">
+
+
+Swat Display 3-5 <A NAME="28011">
+ </A>
+The spawn Command</P>
+<PRE CLASS="SwatDisplay">(geos:1) 12 =&gt; <STRONG>spawn mess1 Mess1Draw
+</STRONG>Re-using patient math
+Re-using patient borlandc
+Re-using patient mess1
+Thread 0 created for patient mess1
+Interrupt 3: Breakpoint trap
+Stopped in Mess1Draw, line 211, &quot;C:OMNIGO/Appl/SDK_C/MESS1/MESS1.GOC&quot;
+Mess1Draw(GStateHandle gstate) 				/* GState to draw to */
+(mess1:0) 13 =&gt;</PRE>
+
+
+
+<H2 CLASS="HeadingC">
+Code Stepping</H2>
+<PRE>srcwin, istep, sstep</PRE>
+<P>
+<A NAME="IX_Stepping through code">
+ </A>
+Once an application is stopped at a breakpoint and you want to examine the code line by line, you can use the commands <CODE>
+istep</CODE>
+ (instruction step) and <CODE>
+sstep</CODE>
+ (source step). These enter the <EM>
+instruction step mode</EM>
+ or <EM>
+source step mode</EM>
+ to examine and execute the application code line by line.</P>
+<P>
+The subcommands for both <CODE>
+istep</CODE>
+ and <CODE>
+sstep</CODE>
+ are nearly the same and are used for actions including stepping to the next line, skipping the next instruction, or exiting the step mode and continuing the execution of the application. The <CODE>
+istep</CODE>
+ and <CODE>
+sstep</CODE>
+ commands are very similar except that <CODE>
+istep</CODE>
+ is used when stepping through assembly source code (thus stepping through instructions), and <CODE>
+sstep</CODE>
+ is used for stepping through C source code.</P>
+
+<H3 CLASS="refHeading">
+srcwin</H3>
+<PRE CLASS="syntax">srcwin &lt;numlines&gt; [view]</PRE>
+<P>
+<A NAME="IX_Source code:displaying">
+ </A>
+<A NAME="IX_srcwin Swat command">
+ </A>
+The srcwin command will display the source code surrounding the presently executing code any time execution is stopped. The presently executing line will be highlighted. You may set breakpoints with the mouse by clicking on the line numbers which appear to the side. To scroll the srcwin buffer use the arrow keys, the &lt;PgUp&gt; key, and the &lt;PgDn&gt; key.</P>
+
+
+<H3 CLASS="refHeading">
+istep, sstep</H3>
+<PRE CLASS="Ref Swat Call">istep [&lt;default subcommand&gt;]</PRE>
+<PRE CLASS="Ref Swat Call">sstep [&lt;default subcommand&gt;]</PRE>
+<P>
+<A NAME="IX_Source code:stepping through">
+ </A>
+<A NAME="IX_sstep Swat command">
+ </A>
+<A NAME="IX_istep Swat command">
+ </A>
+These two commands are used to single-step through code, executing one or more instructions at a time. The <CODE>
+default subcommand</CODE>
+ argument determines the action taken by Swat when the Return key is pressed. For example, the command</P>
+<PRE>[hello3:0] 7 =&gt; <STRONG>istep n</STRONG></PRE>
+<P>
+will enter instruction step mode, and subsequently pressing the Return key will have the same effect as pressing <CODE>
+n</CODE>
+. If no default command is given, pressing Return has the same effect as pressing <CODE>
+s</CODE>
+.</P>
+<P>
+The subcommands to the <CODE>
+istep</CODE>
+ and <CODE>
+sstep</CODE>
+ commands are</P>
+<DL>
+<DT>
+<STRONG>
+s </STRONG>
+(single step)</DT><DD>
+Step one instruction. This is the most frequently used subcommand.</DD>
+<DT>
+<STRONG>
+n, o</STRONG>
+ (next, over)</DT><DD>
+Continue to the next instruction but do not display any procedure calls, repeated string instructions, or software interrupts. They will stop when GEOS returns to the same frame as the previous displayed instruction. The frame is the same when the stack pointer and current thread are the same as when the <CODE>
+n</CODE>
+ subcommand was given. <CODE>
+o</CODE>
+ differs from <CODE>
+n</CODE>
+ in that it executes all instructions in a macro without further interpretation and can only be used with <CODE>
+istep</CODE>
+. If a breakpoint other than for the next instruction is hit, it will take effect as long as the above conditions are met.</DD>
+<DT>
+<STRONG>
+N, O</STRONG>
+ (Next, Over)</DT><DD>
+These are like <CODE>
+n</CODE>
+ and <CODE>
+o</CODE>
+ but will stop whenever a breakpoint is hit even if the frame is different. <CODE>
+O</CODE>
+ will execute all instructions in a macro without further interpretation, and it can only be used with <CODE>
+istep</CODE>
+. If a breakpoint other than one for the next instruction is hit, it will take effect as long as the above conditions are met.</DD>
+<DT>
+<STRONG>
+q, Esc, &lt;space&gt; </STRONG>
+(quit)</DT><DD>
+These stop <CODE>
+istep/sstep </CODE>
+and return to the command level. These subcommands are used when a point in the code is reached where another command needs to be used--to examine memory, for example.</DD>
+<DT>
+<STRONG>
+c</STRONG>
+ (continue)</DT><DD>
+This exits <CODE>
+istep</CODE>
+ and continues the execution of the application. When GEOS next stops, Swat will return to the command prompt.</DD>
+<DT>
+<STRONG>
+M</STRONG>
+ (message)</DT><DD>
+<A NAME="IX_Methods:stopping in with Swat">
+ </A>
+This will continue until the next handled message is received. When the handler is invoked, Swat will return to step mode. This subcommand is often used with the <CODE>
+ObjMessage()</CODE>
+ and <CODE>
+ObjCallInstanceNoLock()</CODE>
+ assembly routines.</DD>
+<DT>
+<STRONG>
+F</STRONG>
+ (finish message)</DT><DD>
+<A NAME="IX_Methods:finishing stepping through">
+ </A>
+This finishes the current message, stops when execution returns to a frame that is not part of the kernel, and remains in step mode.</DD>
+<DT>
+<STRONG>
+f</STRONG>
+ (finish frame)</DT><DD>
+This finishes the current stack frame, stops, and remains in step mode.</DD>
+<DT>
+<STRONG>
+S</STRONG>
+ (skip instruction)</DT><DD>
+This skips the current instruction, does not execute it, and goes on to the next instruction in step mode.</DD>
+
+
+</DL>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="TSwatCm_5.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="TSwatCm_7.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.2 Attaching and Detaching</A> 
+<!-- to next --> | <A HREF="TSwatCm_9.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5.4 Examining and Modifying Memory</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

@@ -1,0 +1,1037 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: TTCL_f.htm,v 1.1 97/06/27 16:02:09 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Swat Data Structure Commands</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Tool Command Language</A>: 6.1 <A HREF="TTCL_e.htm">Coding</A>: 
+<A NAME="90509">
+ </A>
+Swat Data Structure Commands</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="TTCL_e.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="TTCL_e.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">6 Coding</A> 
+<!-- to next --> | <A HREF="TTCL_10.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">6.2 Examples</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>symbol, type, patient, handle, brk, cbrk, event, thread, src, cache, table</PRE>
+<P>
+<A NAME="IX_Tcl:data structures">
+ </A>
+This section contains information about Swat's built-in data structures and the commands that access them. These commands  examine and modify vital information about the state of GEOS while it is running under Swat. </P>
+
+<DIV>
+<H2 CLASS="refHeading">
+<A NAME="IX_Breakpoints">
+ </A>
+<A NAME="IX_brk Tcl structure:command reference">
+ </A>
+brk</H2>
+<PRE CLASS="syntax">brk &lt;addr&gt; [&lt;command&gt;]
+brk pset &lt;addr&gt; [&lt;command&gt;]
+brk aset &lt;addr&gt; [&lt;command&gt;]
+brk tset &lt;addr&gt; [&lt;command&gt;]
+brk clear &lt;break&gt;*
+brk delete &lt;break&gt;*
+brk enable &lt;break&gt;*
+brk disable &lt;break&gt;*
+brk address &lt;break&gt;
+brk list [&lt;addr&gt;]
+brk debug [&lt;flag&gt;]
+brk isset &lt;addr&gt;
+brk cond &lt;break&gt; &lt;condition&gt;*
+brk cmd &lt;break&gt; [&lt;command&gt;]
+brk delcmd &lt;break&gt; [&lt;command&gt;]</PRE>
+<P CLASS="refField"><STRONG>
+Examples:</STRONG>	</P>
+
+<DL><DT>&quot;brk WinOpen&quot; </DT><DD>
+Sets the machine to stop unconditionally when any thread calls WinOpen.</DD>
+
+<DT><A NAME="IX_Patients:specific breakpoints"> </A> &quot;brk pset WinOpen&quot; </DT><DD>
+Sets the machine to stop when any thread for the current patient calls WinOpen.</DD>
+
+<DT><A NAME="IX_Threads:specific breakpoints"> </A> &quot;brk tset WinOpen&quot;</DT><DD>
+ Sets the machine to stop when any thread for the current patient calls WinOpen, and deletes the breakpoint when the machine next stops.</DD>
+
+<DT> &quot;brk enable 1 3-5&quot; </DT><DD>
+Re-enables breakpoints 1, 3, 4, and 5</DD>
+
+<DT> &quot;brk clear 2-&quot;</DT><DD>
+Clears all breakpoints from number 2 onward.</DD>
+
+<DT><A NAME="IX_Breakpoints:conditional"> </A> &quot;brk cond 3 cx=42&quot; </DT><DD>
+Sets breakpoint 3 to be conditional, stopping when the machine reaches the breakpoint's address with CX being 42.</DD>
+
+<DT> &quot;brk cond 2 (ss:0)!=1b80h&quot; </DT><DD>
+Sets breakpoint 2 to be conditional, stopping when the machine reaches the breakpoint's address with the word at ss:0 not being 1b80h. Note that the &quot;ss&quot; is the value of the <CODE>ss</CODE> register when the &quot;brk cond&quot; command is executed, not when the breakpoint is reached.</DD>
+</DL>
+
+<P>Allows you to specify that execution should stop when it reaches a particular point. These breakpoints can be conditional, and can execute an arbitrary Tcl command, which can say whether the machine is to remain stopped, or continue on its way.</P>
+<UL>
+
+<LI>Once you've set a breakpoint, &quot;brk&quot; will return to you a token for that breakpoint that begins with &quot;brk&quot; and ends with a number. When you refer to the breakpoint, you can use either the full name (as you'll usually do from a Tcl procedure), or just the number.</LI>
+
+<LI>Breakpoints have four attributes: the address at which they are set, the condition set on their being recognized, the Tcl command string to execute when they are recognized, and the Tcl command string to execute when they are deleted.</LI>
+
+<LI>The condition is set either when the breakpoint is set, using the &quot;cbrk&quot; command, or after you've set the breakpoint, by invoking the &quot;brk cond&quot; command.</LI>
+
+<LI> A breakpoint's condition is evaluated (very quickly) on the PC and can check only word registers (the 8 general registers, the three segment registers other than CS, and the current thread; each register may be checked only once in a condition) and a single word of memory. Each &lt;condition&gt; argument is of the form &quot;&lt;reg&gt;&lt;op&gt;&lt;value&gt;&quot;. &lt;reg&gt; is one of the 16-bit machine registers, &quot;thread&quot; (for the current thread), or the address of a word of memory to check, enclosed in parentheses. &lt;op&gt; is a relational operator taken from the following set:
+<DL><DT>=</DT><DD>equal-to</DD>
+<DT>!=</DT><DD>not-equal-to</DD>
+<DT>&gt; &lt; &gt;= &lt;=</DT><DD>unsigned greater-than, less-than, greater-or-equal, and
+      less-or-equal</DD>
+<DT>+&gt; +&lt; +&gt;= +&lt;=</DT><DD>signed greater-than, less-than, greater-or-equal, and
+      less-or-equal</DD>
+</DL>
+<BR>
+<A NAME="IX_Handles:in breakpoint locations"> </A> &lt;value&gt; is a regular Swat address expression. If it is handle-relative, and the &lt;reg&gt; is one of the three non-CS segment registers, the condition will be for the segment of that handle and will change automatically as the handle's memory shifts about on the heap. Similar things will happen if you specify a number as the &lt;value&gt; for a segment register and the number is the current segment of a block on the heap. </LI>
+
+<LI>If you give no &lt;condition&gt; argument to the &quot;brk cond&quot; command, you will remove any condition the breakpoint might have, making it, therefore, unconditional. </LI>
+
+<LI>If a breakpoint is given an associated &lt;command&gt; string, it will be evaluated before the breakpoint is taken. If the result of the evaluation is an error, a non-numeric string, or a numeric string that's non-zero, the breakpoint will be taken. Otherwise, the machine will be allowed to continue (so long as no other breakpoint command or other part of Swat insists that it remain stopped). You can use this to simply print out information when execution reaches the breakpoint address without interrupting the machine's execution.</LI>
+
+<LI>The global variable &quot;breakpoint&quot; contains the name of the breakpoint whose command is being evaluated while that command is being evaluated. </LI>
+
+<LI> You can change the command associated with a breakpoint with the &quot;brk cmd&quot; command. If you give no &lt;command&gt; argument, then no command will be executed and the breakpoint will always be taken, so long as any associated condition is also met. </LI>
+
+<LI> If a breakpoint has both a condition and a command, the command will not be executed until the condition has been met, unless there's another breakpoint at the same address with a different, or no, condition.</LI>
+
+<LI>You can set a breakpoint to last only during the next continuation of the machine by calling &quot;brk tset&quot;. The breakpoint thus set will be removed when next the machine comes to a full stop, regardless of why it stopped (i.e. if it hits a different breakpoint, the temporary breakpoint will still be removed). The breakpoint will only be taken if the thread executing when it is hit is owned by the patient that was current when the breakpoint was set.</LI>
+
+<LI>Each &lt;break&gt; argument to the &quot;brk clear&quot;, &quot;brk enable&quot; and &quot;brk disable&quot; commands can be either a single breakpoint token (or number), or a range of the form &lt;start&gt;-&lt;end&gt;, where either &lt;start&gt; or &lt;end&gt; may be absent. If &lt;start&gt; is missing, the command affects all breakpoints from number 1 to &lt;end&gt;. If &lt;end&gt; is missing, the command affects all breakpoints from &lt;start&gt; to the last one in existence.</LI>
+
+<LI>If you give no &lt;break&gt; argument to &quot;brk clear&quot;, &quot;brk enable&quot; or &quot;brk disable&quot;, the command will apply to all breakpoints that are specific to the current patient, i.e. that were set with the &quot;brk pset&quot; command, unless the current patient is the kernel, in which case they will apply to all breakpoints that are specific to no patient (i.e. those set with the &quot;brk aset&quot; or &quot;brk &lt;addr&gt;&quot; commands).</LI>
+
+<LI><A NAME="IX_Address expressions in Swat:of breakpoints"> </A>&quot;brk address&quot; returns the address expression for where the breakpoint is set. This will usually be of the form ^h&lt;handle-id&gt;:&lt;offset&gt;, with both &lt;handle-id&gt; and &lt;offset&gt; in hex (followed by an &quot;h&quot;, of course). If the breakpoint is set at an absolute address, you will get back only a single hex number, being the linear address at which the breakpoint is set.</LI>
+
+<LI>If you type &quot;brk list&quot; with no argument, Swat will print out a listing of the currently-active breakpoints. If you give an &lt;addr&gt; (address expression) argument, however, you'll be returned a list of the breakpoints set at the given address. If there are no breakpoints there, the list will be empty.</LI><LI> As a shortcut, you can invoke &quot;brk isset&quot; to see if any breakpoints are set at the given address, if you're not interested in which ones they are.</LI>
+</UL>
+</DIV>
+<H2 CLASS="refHeading">
+<A NAME="IX_cache Tcl structure">
+ </A>
+<A NAME="83544">
+ </A>
+cache</H2>
+<PRE CLASS="syntax">cache create (lru|fifo) &lt;maxSize&gt; [&lt;flushProc&gt;]
+cache destroy &lt;cache&gt; [flush|noflush]
+cache lookup &lt;cache&gt; &lt;key&gt;
+cache enter &lt;cache&gt; &lt;key&gt;
+cache invalone &lt;cache&gt; &lt;entry&gt;
+cache invalall &lt;cache&gt; [flush|noflush]
+cache key &lt;cache&gt; &lt;entry&gt;
+cache size &lt;cache&gt;
+cache maxsize &lt;cache&gt;
+cache setmaxsize &lt;cache&gt; &lt;maxSize&gt;
+cache getval &lt;cache&gt; &lt;entry&gt;
+cache setval &lt;cache&gt; &lt;entry&gt; &lt;value&gt;</PRE>
+<P CLASS="refField"><STRONG>
+Examples:</STRONG></P>
+<DL>
+<DT>
+&quot;var cache [cache create lru 10]&quot;</DT><DD>
+Creates a cache of 10 items that are flushed on a least-recently-used basis. The returned token is saved for later use.</DD>
+<DT>
+&quot;var entry [cache lookup $cache mom]&quot;</DT><DD>
+Sees if an entry with the key &quot;mom&quot; is in the cache and saves its entry token if so.</DD>
+<DT>
+&quot;echo mom=[cache getval $cache $entry]&quot;</DT><DD>
+Retrieves the value stored in the entry for &quot;mom&quot; and echoes it.</DD>
+<DT>
+&quot;cache invalone $cache $entry&quot;</DT><DD>
+Flushes the entry just found from the cache.</DD>
+<DT>
+&quot;cache destroy $cache&quot;</DT><DD>
+Destroys the cache.</DD>
+</DL>
+<P>
+The cache command, as the name implies, maintains a cache of data that is keyed by strings. When a new entry is added to an already-full cache, an existing entry is automatically flushed based on the usage message with which the cache was created: <EM>
+lru</EM>
+ (last recently used) or <EM>
+fifo</EM>
+ (first in, first out). If <EM>
+lru</EM>
+, the least-recently-used entry is flushed; if <EM>
+fifo</EM>
+, the oldest entry is flushed.</P>
+<UL>
+<LI>
+Unlike the &quot;table&quot; command, the &quot;cache&quot; command returns tokens for entries, not their values. This allows entries to be individually flushed or their values altered.</LI>
+<LI>
+If a &lt;flushProc&gt; is specified when the cache is created, the procedure will be called each time an entry is flushed from the cache. It will be called &quot;&lt;flushProc&gt; &lt;cache&gt; &lt;entry&gt;&quot; where &lt;cache&gt; is the token for the cache, and &lt;entry&gt; is the token for the entry being flushed.</LI>
+<LI>
+If the maximum size of a full cache is reduced, entries will be flushed from the cache to bring it down to the new maximum size. The &lt;flushProc&gt; will be called for each of them.</LI>
+<LI>
+If the values stored in the cache entries should not be freed when the cache is destroyed, pass &quot;noflush&quot; to &quot;cache destroy&quot;. The default is to flush (and hence call the &lt;flushProc&gt;) all entries from the cache before it is destroyed.</LI>
+<LI>
+If the values stored in the cache entries should not be freed when the cache is flushed, pass &quot;noflush&quot; to &quot;cache invalall&quot;. The default is to call the &lt;flushProc&gt; for each entry in the cache before it is actually flushed.</LI>
+<LI>
+If an entry is not found in the cache, &quot;cache lookup&quot; will return an empty string.</LI>
+<LI>
+When an entry is created, &quot;cache enter&quot; returns a 2-list containing the entry token as its first element, and an integer, as its second element, that is either non-zero or 0, to tell if the entry is new or was already present, respectively.</LI>
+</UL>
+
+
+
+<H2 CLASS="refHeading">
+<A NAME="IX_cbrk Tcl structure:command reference">
+ </A>
+<A NAME="IX_Breakpoints:conditional">
+ </A>
+cbrk</H2>
+<PRE CLASS="syntax">
+cbrk &lt;addr&gt; &lt;condition&gt;*
+cbrk aset &lt;addr&gt; &lt;condition&gt;*
+cbrk tset &lt;addr&gt; &lt;condition&gt;*
+cbrk clear &lt;break&gt;*
+cbrk delete &lt;break&gt;*
+cbrk enable &lt;break&gt;*
+cbrk disable &lt;break&gt;*
+cbrk address &lt;break&gt;
+cbrk list [&lt;addr&gt;]
+cbrk debug [&lt;flag&gt;]
+cbrk isset &lt;addr&gt;
+cbrk cond &lt;break&gt; &lt;condition&gt;*
+cbrk cmd &lt;break&gt; [&lt;command&gt;]
+cbrk delcmd &lt;break&gt; [&lt;command&gt;]</PRE>
+<P CLASS="refField"><STRONG>
+Examples:</STRONG>	</P>
+<DL>
+<DT>
+&quot;cbrk WinOpen di=1b80h&quot;</DT><DD>
+Stops the machine when execution reaches WinOpen() with <CODE>
+di</CODE>
+ set to 1b80h.</DD>
+</DL>
+<P>
+Allows you to set fast conditional breakpoints.</P>
+<UL>
+<LI>
+All these subcommands function the same as for the &quot;brk&quot; command, with the exception of the &quot;aset&quot; and &quot;tset&quot; commands, which expect the condition for the breakpoint, rather than an associated command. </LI>
+<LI>
+There are a limited number of these sorts of breakpoints that can be set in the PC (currently 8), so they should be used mostly for heavily-travelled areas of code (e.g. inner loops, or functions like <CODE>
+ObjCallMethodTable()</CODE>
+ in the kernel). </LI>
+<LI>
+For more information on the subcommands and the format of arguments, see the documentation for the &quot;brk&quot; command.</LI>
+</UL>
+
+
+
+<H2 CLASS="refHeading">
+<A NAME="IX_event Tcl structure">
+ </A>
+<A NAME="75960">
+ </A>
+event</H2>
+<PRE CLASS="syntax">event &lt;subcommand&gt;</PRE>
+<P>
+The <CODE>
+event</CODE>
+ command provides access to Swat's internal events. The subcommands are as follows:</P>
+<DL>
+<DT>
+<CODE>
+handle &lt;eventName&gt; &lt;handler&gt; [&lt;data&gt;]</CODE>
+</DT><DD>
+The &lt;<EM>handler</EM>&gt; procedure is invoked each time an event of type &lt;<EM>eventName</EM>&gt; is dispatched. The handler receives two arguments: an event-specific piece of data, and the given &lt;<EM>data</EM>&gt;. A handler procedure should be declared</DD>
+<PRE>proc &lt;handler&gt; {arg data} {&lt;body&gt;}</PRE>
+
+<P>The <CODE>
+handle</CODE>
+ subcommand returns an &lt;event&gt; for later use in deleting it. The &lt;<EM>handler</EM>&gt; should return one of <CODE>
+event_handled</CODE>
+, <CODE>
+event_not_handled</CODE>
+, or <CODE>
+event_stop_handling</CODE>
+. If it returns <CODE>
+event_stop_handling</CODE>
+, the event will not be dispatched to any other handlers of the event.</P>
+<DT>
+<CODE>
+delete &lt;event&gt;</CODE>
+</DT><DD>
+Deletes the given event handler given by the <CODE>
+event handle</CODE>
+ command.</DD>
+<DT>
+<CODE>
+dispatch &lt;eventName&gt; &lt;arg&gt;</CODE></DT><DD>
+Dispatches the given event with the given &lt;<EM>arg</EM>&gt; to all handlers of that event. If &lt;<EM>eventName</EM>&gt; is a pre-defined event type, &lt;<EM>arg</EM>&gt; will be converted to the appropriate type before being dispatched. Otherwise it is passed as a string.</DD>
+<DT>
+<CODE>
+create</CODE>
+</DT><DD>Returns a number that represents a new event type. Handlers may then be defined for and events dispatched of the new type.</DD>
+<DT>
+<CODE>
+list</CODE>
+</DT><DD>Lists all Tcl-registered events by event-name and handler function.</DD>
+<P>
+The events which are currently defined are:</P>
+<DL>
+<DT>
+FULLSTOP</DT><DD>
+Generated when patient stops for a while. Argument is string telling why the patient stopped.</DD>
+<DT>
+CONTINUE</DT><DD>
+<A NAME="IX_Stepping through code:swat events">
+ </A>
+Generated just before the patient is continued. The argument is non-zero if going to single-step.</DD>
+<DT>
+TRACE</DT><DD>Generated when the execution of a source line completes and the patient is in line-trace mode.</DD>
+<DT>
+START</DT><DD>Generated when a new patient/thread is created. Argument is patient token of the patient involved.</DD>
+<DT>
+STACK</DT><DD>Current stack frame has changed. The argument is non-zero if the stack change comes from a change in patients/threads or zero if the change comes from actually going up or down the stack in the current patient.</DD>
+<DT>
+DETACH</DT><DD>Detaching from the PC. The argument is always zero.</DD>
+<DT>
+RESET</DT><DD>Returning to the top level. The argument is always zero.</DD>
+<DT>
+ATTACH</DT><DD>Attached to the PC. The argument is always zero.</DD>
+<DT>
+RELOAD</DT><DD>Kernel was reloaded. The argument is always zero.</DD>
+<DT>
+CHANGE</DT><DD>Current patient has changed. The argument is the token for the previous patient.</DD>
+<DT>
+STEP</DT><DD><A NAME="IX_Stepping through code:swat events">
+ </A>
+Machine has stepped a single instruction. The argument is the value to pass to <CODE>
+patient stop</CODE>
+ if you wish the machine to stay stopped.</DD>
+<DT>
+STOP</DT><DD>Machine has hit a breakpoint. The argument is the value to pass to <CODE>
+patient stop</CODE>
+ if you wish the machine to stay stopped.</DD>
+<DT>
+INT</DT><DD>Machine has hit some other interrupt that's being caught. The argument is the interrupt number. The machine will remain stopped unless it is continued with continue-patient.</DD>
+
+</DL>
+</DL>
+<H2 CLASS="refHeading">
+<A NAME="IX_handle Tcl structure">
+ </A>
+<A NAME="91007">
+ </A>
+handle</H2>
+<PRE CLASS="syntax">
+handle lookup &lt;id&gt;
+handle find &lt;address&gt;
+handle all
+handle nointerest &lt;interest-record&gt;
+handle interest &lt;handle&gt; &lt;proc&gt; [&lt;data&gt;+]
+handle segment &lt;handle&gt;
+handle size &lt;handle&gt;
+handle state &lt;handle&gt;
+handle owner &lt;handle&gt;
+handle patient &lt;handle&gt;
+handle other &lt;handle&gt;
+handle id &lt;handle&gt;
+handle isthread &lt;handle&gt;
+handle iskernel &lt;handle&gt;
+handle isfile &lt;handle&gt;
+handle isvm &lt;handle&gt;
+handle ismem &lt;handle&gt;</PRE>
+<P CLASS="refField"><STRONG>
+Examples:</STRONG>	</P>
+<DL>
+<DT>
+&quot;handle lookup [read-reg bx]&quot;</DT><DD>
+get the handle token for the handle whose ID is in the BX register.</DD>
+<DT>
+&quot;handle interest $h ob-interest-proc [concat si=$chunk $message]&quot;</DT><DD>
+call ob-interest-proc, passing the list {si=$chunk $message}, whenever the state of the handle whose token is in $h changes.</DD>
+<DT>
+<A NAME="Handle">
+ </A>
+&quot;handle patient $h&quot;</DT><DD>
+get the token for the patient that owns the handle whose token is in $h</DD>
+<DT>
+&quot;handle all&quot;</DT><DD>
+get the list of the ID's of all handles currently in Swat's handle table.</DD>
+</DL>
+<P>
+The &quot;handle&quot; command provides access to the structures Swat uses to track memory and thread allocation on the PC.</P>
+<UL>
+<LI>
+As with most other commands that deal with Swat structures, you use this one by calling a lookup function (the &quot;lookup&quot; and &quot;find&quot; subcommands) to obtain a token that you use for further manipulations. A handle token is also returned by a few other commands, such as addr-parse.</LI>
+<LI>
+Handle tokens are valid only until the machine is continued. If you need to keep the token for a while, you will need to register interest in the handle using the &quot;interest&quot; subcommand. Most handles tokens will simply be cached while the machine is stopped and flushed from the cache when the machine continues. Only those handles for which all state changes must be known remain in Swat's handle table. For example, when a conditional breakpoint has been registered with the stub using the segment of a handle, the condition for that breakpoint must be updated immediately should the memory referred to by the handle be moved, swapped or discarded. Keeping the number of tracked handles low reduces the number of calls the stub must make to tell Swat about handle-state changes.</LI>
+<LI>
+The &lt;id&gt; passed to the &quot;lookup&quot; subcommand is an integer. Its default radix is decimal, but you can specify the radix to use in all the usual ways. The value returned is the token to use to obtain further information about the handle.</LI>
+<LI>
+&quot;handle size&quot; returns the number of bytes allocated to the handle.</LI>
+<LI>
+&quot;handle segment&quot; returns the handle's segment (if it's resident) in decimal, as it's intended for use by Tcl programs, not people.</LI>
+<LI>
+&quot;handle owner&quot; returns the token of the handle that owns the given handle, not its ID.</LI>
+<LI>
+&quot;handle all&quot; returns a list of handle ID numbers not a list of handle tokens. The list is only those handles currently known to Swat.</LI>
+<LI>
+&quot;handle interest&quot; tells Swat you wish to be informed when the handle you pass changes state in some way. The procedure &lt;proc&gt; will be called with two or more arguments. The first is the token of the handle whose state has changed, and the second is the state change the handle has undergone, taken from the following set of strings:</LI>
+<DL>
+<DT>
+<STRONG>
+swapin</STRONG>
+</DT><DD>Block swapped in from disk/memory</DD>
+<DT>
+<STRONG>
+load</STRONG>
+</DT><DD>Resource freshly loaded from disk</DD>
+<DT>
+<STRONG>
+swapout</STRONG>
+</DT><DD>Block swapped to disk/memory</DD>
+<DT>
+<STRONG>
+discard</STRONG>
+</DT><DD>Block discarded</DD>
+<DT>
+<STRONG>
+resize</STRONG>
+</DT><DD>Block changed size and maybe moved</DD>
+<DT>
+<STRONG>
+move</STRONG>
+</DT><DD>Block moved on heap</DD>
+<DT>
+<STRONG>
+free</STRONG>
+</DT><DD>Block has been freed</DD>
+<DT>
+<STRONG>
+fchange</STRONG>
+</DT><DD>Block's <CODE>
+HeapFlags</CODE>
+ changed</DD>
+</DL>
+<P>
+Any further arguments are taken from the &lt;data&gt;+ arguments provided when you expressed interest in the handle. This subcommand returns a token for an interest record that you pass to &quot;handle nointerest&quot; when you no longer care about the handle. When the block is freed (the state change is &quot;free&quot;), there is no need to call &quot;handle nointerest&quot; as the interest record is automatically deleted.</P>
+<LI>
+&quot;handle state&quot; returns an integer indicating the state of the handle. The integer is a mask of bits that mean different things:<BR>
+
+<IMG SRC="StateBlockInfo.gif"></LI>
+
+<P>
+When the integer is AND-ed with the mask for Type (0xf8000), the following values indicate the following types of handles:<BR>
+<IMG SRC="StateBlockType.gif">
+
+</P>
+<LI>
+&quot;handle other&quot; returns the handle's otherInfo field. Note: This isn't necessarily the otherInfo field from the PC. E.g., for resource handles, it's the symbol token of the module for the handle.</LI>
+</UL>
+
+<H2 CLASS="refHeading">
+<A NAME="IX_Patients:patient Tcl structure">
+ </A>
+<A NAME="IX_patient Tcl structure">
+ </A>
+<A NAME="45242">
+ </A>
+patient</H2>
+<PRE CLASS="syntax">
+patient find &lt;name&gt;
+patient name [&lt;patient&gt;]
+patient fullname [&lt;patient&gt;]
+patient data [&lt;patient&gt;]
+patient threads [&lt;patient&gt;]
+patient resources [&lt;patient&gt;] 
+patient libs [&lt;patient&gt;]
+patient path [&lt;patient&gt;]
+patient all
+patient stop [&lt;addr&gt;]</PRE>
+
+<P CLASS="refField"><STRONG>
+Examples:</STRONG>	</P>
+<DL>
+<DT>
+ &quot;patient find geos&quot; </DT><DD>
+Returns the patient token for the kernel, if it's been loaded yet.</DD>
+<DT>
+ &quot;patient fullname $p&quot;</DT><DD>
+ Returns the permanent name for the patient whose token is stored in the variable p.</DD>
+<DT>
+ &quot;patient stop $data&quot; </DT><DD>
+Tells the dispatcher of the STEP event that it should keep the machine stopped when the STEP event has been handled by everyone.</DD>
+</DL>
+<P>
+This command provides access to the various pieces of information that are maintained for each patient (geode) loaded by GEOS.</P>
+<UL>
+<LI>
+Subcommands may be abbreviated uniquely.</LI>
+<LI>
+Swat always has the notion of a &quot;current patient&quot;, whose name is displayed in the prompt. It is this patient that is used if you do not provide a token to one of the subcommands that accepts a patient token.</LI>
+<LI>
+&quot;patient name&quot; returns the name of a patient. The name is the non- extension portion of the geode's permanent name. It will have a number added to it if more than one instance of the geode is active on the PC. Thus, if two GeoWrites are active, there will be two patients in Swat: &quot;write&quot; and &quot;write2&quot;.</LI>
+<LI>
+&quot;patient fullname&quot; returns the full permanent name of the patient. It is padded with spaces to make up a full 12-character string. This doesn't mean you can obtain the non-extension part by extracting the 0th element of the result with the &quot;index&quot; command, however; you'll have to use the &quot;range&quot; command to get the first 8 characters, then use &quot;index&quot; to trim the trailing spaces off, if you want to.</LI>
+<LI>
+<A NAME="IX_Threads:current within patient">
+ </A>
+&quot;patient data&quot; returns a three-element list: {&lt;name&gt; &lt;fullname&gt; &lt;thread-number&gt;} &lt;name&gt; and &lt;fullname&gt; are the same as returned by the &quot;name&quot; and &quot;fullname&quot; subcommands. &lt;thread-number&gt; is the number of the current thread for the patient. Each patient has a single thread that is the one the user looked at most recently, and that is its current thread. The current thread of the current patient is, of course, the current thread for the whole debugger.</LI>
+<LI>
+&quot;patient threads&quot; returns a list of tokens, one for each of the patient's threads, whose elements can be passed to the &quot;thread&quot; command to obtain more information about the patient's threads (such as their numbers, handle IDs, and the contents of their registers).</LI>
+<LI>
+&quot;patient resources&quot; returns a list of tokens, one for each of the patient's resources, whose elements can be passed to the &quot;handle&quot; command to obtain more information about the patient's resources (for example, their names and handle IDs).</LI>
+<LI>
+&quot;patient libs&quot; returns a list of patient tokens, one for each of the patient's imported libraries. The kernel has all the loaded device drivers as its &quot;imported&quot; libraries.</LI>
+<LI>
+&quot;patient path&quot; returns the absolute path of the patient's executable.</LI>
+<LI>
+&quot;patient all&quot; returns a list of the tokens of all the patients known to Swat.</LI>
+<LI>
+&quot;patient stop&quot; is used only in STEP, STOP and START event handlers to indicate you want the machine to remain stopped once the event has been dispatched to all interested parties. &lt;addr&gt; is the argument passed in the STEP and STOP events. A START event handler should pass nothing.</LI>
+<LI>
+A number of other commands provide patient tokens. &quot;patient find&quot; isn't the only way to get one.</LI>
+</UL>
+
+
+
+<H2 CLASS="refHeading">
+<A NAME="IX_Source code:src Tcl structure">
+ </A>
+<A NAME="IX_src Tcl structure">
+ </A>
+<A NAME="12400">
+ </A>
+src</H2>
+<PRE CLASS="syntax">
+src line &lt;addr&gt;
+src read &lt;file&gt; &lt;line&gt;
+src cache [&lt;max&gt;]
+src addr &lt;file&gt; &lt;line&gt; [&lt;patient&gt;]</PRE>
+<P CLASS="refField"><STRONG>
+Examples:</STRONG>	</P>
+<DL>
+<DT>
+&quot;src line cs:ip&quot;</DT><DD>
+Returns a two-list holding the source-line number, and the absolute path of the file in which it lies (not in this order), that encompasses CS:IP.</DD>
+<DT>
+&quot;src read /pcgeos/appl/sdk_c/hello/hello.goc 64&quot;</DT><DD>
+Reads the single given source line from the given file.</DD>
+<DT>
+&quot;src addr icdecode.c 279&quot;</DT><DD>
+Returns an address-list for the start of the code produced for the given line.</DD>
+<DT>
+&quot;src cache 10&quot;</DT><DD>
+Allow 10 source files to be open at a time. This is the default.</DD>
+</DL>
+<P>
+The &quot;src&quot; command allows the Tcl programmer to manipulate the source- line maps contained in all the geodes' symbol files.</P>
+<UL>
+<LI>
+The &quot;src line&quot; commands returns its list as {&lt;file&gt; &lt;line&gt;}, with the &lt;file&gt; being absolute. If no source line can be found, the empty list is returned.</LI>
+<LI>
+The &lt;file&gt; given to the &quot;src read&quot; command must be absolute, as the procedure using this command may well be wrong as to Swat's current directory. Typically this name will come from the return value of a &quot;src line&quot; command, so you needn't worry.</LI>
+<LI>
+The line returned by &quot;src read&quot; contains no tabs and does not include the line terminator for the line (the &lt;lf&gt; for UNIX, or the &lt;cr&gt;&lt;lf&gt; pair for MS-DOS).</LI>
+<LI>
+&quot;src addr&quot; returns an address-list, as returned from &quot;addr-parse&quot;, not an address expression, as you would <EM>
+pass</EM>
+ to &quot;addr-parse&quot;. If the &lt;file&gt; and &lt;line&gt; cannot be mapped to an address, the result will be the empty list.</LI>
+<LI>
+The &lt;file&gt; given to &quot;src addr&quot; must be the name that was given to the assembler/compiler. This includes any leading path if the file wasn't in the current directory when the assembler/compiler was run.</LI>
+<LI>
+&quot;src cache&quot; returns the current (or new) number of open files that are cached.</LI>
+</UL>
+
+
+
+<H2 CLASS="refHeading">
+<A NAME="IX_symbol Tcl structure">
+ </A>
+<A NAME="39641">
+ </A>
+symbol</H2>
+
+<PRE CLASS="syntax">
+symbol find &lt;class&gt; &lt;name&gt; [&lt;scope&gt;]
+symbol faddr &lt;class&gt; &lt;addr&gt;
+symbol match &lt;class&gt; &lt;pattern&gt;
+symbol scope &lt;symbol&gt;
+symbol name &lt;symbol&gt;
+symbol fullname &lt;symbol&gt;
+symbol class &lt;symbol&gt;
+symbol type &lt;symbol&gt;
+symbol get &lt;symbol&gt;
+symbol patient &lt;symbol&gt;
+symbol tget &lt;symbol&gt;
+symbol addr &lt;symbol&gt;
+symbol foreach &lt;scope&gt; &lt;class&gt; &lt;callback&gt; [&lt;data&gt;]</PRE>
+
+<P CLASS="refField"><STRONG>
+Examples:</STRONG>	</P>
+<DL>
+<DT>
+&quot;symbol find type LMemType&quot;</DT><DD>
+Locate a type definition named LMemType</DD>
+<DT>
+&quot;symbol faddr proc cs:ip&quot;</DT><DD>
+Locate the procedure in which CS:IP lies.</DD>
+<DT>
+&quot;symbol faddr {proc label} cs:ip&quot;</DT><DD>
+Locate the procedure or label just before cs:ip.</DD>
+<DT>
+&quot;symbol fullname $sym&quot;</DT><DD>
+Fetch the full name of the symbol whose token is in the $sym variable.</DD>
+<DT>
+&quot;symbol scope $sym&quot;</DT><DD>
+Fetch the token of the scope containing the passed symbol. This will give the structure containing a structure field, or the procedure containing a local variable, for example.</DD>
+</DL>
+<P>
+Provides information on the symbols for all currently-loaded patients. Like many of Swat's commands, this operates by using a lookup function (the &quot;find&quot;, &quot;faddr&quot;, &quot;match&quot;, or &quot;foreach&quot; subcommands) to obtain a token for a piece of data that's internal to Swat. Given this token, you then use the other subcommands (such as &quot;name&quot; or &quot;get&quot;) to obtain information about the symbol you looked up.</P>
+<UL>
+<LI>
+There are many types of symbols that have been grouped into classes that may be manipulated with this command. For a list of the symbol types and their meaning, type &quot;help symbol-types&quot;. The type of a symbol can be obtained with the &quot;symbol type&quot; command.</LI>
+<LI>
+The symbol classes are as follows:</LI>
+<DL>
+<DT>
+<STRONG>
+type</STRONG>
+</DT><DD>describes any structured type: typedef, struct, record, etype, union. Symbols of this class may also be used in place of type tokens (see the &quot;type&quot; command).</DD>
+<DT>
+<STRONG>
+field</STRONG>
+</DT><DD>describes a field in a structured type: field, bitfield.</DD>
+<DT>
+<STRONG>
+enum</STRONG>
+</DT><DD>describes a member of an enumerated type: enum, message.</DD>
+<DT>
+<STRONG>
+const</STRONG>
+</DT><DD>a constant defined with EQU: <EM>
+const</EM>
+.</DD>
+<DT>
+<STRONG>
+var</STRONG>
+</DT><DD>describes any variable symbol: var, chunk, locvar, class, masterclass, variantclass.</DD>
+<DT>
+<STRONG>
+locvar</STRONG>
+ </DT><DD>describes any local variable symbol: locvar, locstatic.</DD>
+<DT>
+<STRONG>
+scope</STRONG>
+</DT><DD>describes any symbol that holds other symbols within it: module, proc, blockstart, struct, union, record, etype.</DD>
+<DT>
+<STRONG>
+proc</STRONG>
+</DT><DD>describes only proc symbols.</DD>
+<DT>
+<STRONG>
+label</STRONG>
+</DT><DD>describes any code-related symbol: label, proc, loclabel.</DD>
+<DT>
+<STRONG>
+onstack</STRONG>
+</DT><DD>describes only symbols created by the directive.</DD>
+<DT>
+<STRONG>
+module</STRONG>
+ </DT><DD>describes only segment/group symbols.</DD>
+<DT>
+<STRONG>
+profile</STRONG>
+</DT><DD>describes a symbol that marks where profiling code was inserted by a compiler or assembler.</DD>
+</DL>
+<LI>
+The &lt;class&gt; argument for the &quot;find&quot;, &quot;faddr&quot; and &quot;match&quot; subcommands may be a single class, or a space-separated list of classes. For example, &quot;symbol faddr {proc label} CS:IP&quot; would find the symbol closest to CS:IP (but whose address is still below or equal to CS:IP) that is either a procedure or a label.</LI>
+<LI>
+The &quot;symbol find&quot; command locates a symbol given its name (which may be a symbol path).</LI>
+<LI>
+The &quot;symbol faddr&quot; command locates a symbol that is closest to the passed address.</LI>
+<LI>
+A symbol's &quot;fullname&quot; is the symbol path, from the current patient, that uniquely identifies the symbol. Thus if a procedure-local variable belongs to the current patient, the fullname would be<BR>
+ &lt;segment&gt;::&lt;procedure&gt;::&lt;name&gt;<BR>
+ where &lt;segment&gt; is the segment holding the &lt;procedure&gt;, which is the procedure for which the local variable named &lt;name&gt; is defined.</LI>
+<LI>
+<A NAME="IX_Patients:name in symbols">
+ </A>
+You can force the prepending of the owning patient to the fullname by passing &lt;with-patient&gt; as a non-empty argument (&quot;yes&quot; or &quot;1&quot; are both fine arguments, as is &quot;with-patient&quot;).</LI>
+<LI>
+The &quot;symbol get&quot; commands provides different data for each symbol class, as follows:</LI>
+<DL>
+<DT>
+var, locvar, chunk: {&lt;addr&gt; &lt;sclass&gt; &lt;type&gt;}</DT><DD>
+&lt;addr&gt; is the symbol's address as for the &quot;addr&quot; subcommand, &lt;sclass&gt; is the storage class of the variable and is one of static (a statically allocated variable), lmem (an lmem chunk), local (a local variable below the frame pointer), param (a local variable above the frame pointer), or reg (a register variable; address is the machine register number -- and index into the list returned by the &quot;current-registers&quot; command).</DD>
+<DT>
+<A NAME="IX_Objects:as Tcl symbols">
+ </A>
+object class: {&lt;addr&gt; &lt;sclass&gt; &lt;type&gt; &lt;flag&gt; &lt;super&gt;}</DT><DD>
+first three elements same as for other variables. &lt;flag&gt; is &quot;variant&quot; if the class is a variant class, &quot;master&quot; if the class is a master class, or empty if the class is nothing special. &lt;super&gt; is the symbol token of the class's superclass.</DD>
+<DT>
+label-class: {&lt;addr&gt; (near|far)}</DT><DD>
+&lt;addr&gt; is the symbol's address as for the &quot;addr&quot; subcommand. The second element is &quot;near&quot; or &quot;far&quot; depending on the type of label involved.</DD>
+<DT>
+field-class: {&lt;bit-offset&gt; &lt;bit-width&gt; &lt;field-type&gt; &lt;struct-type&gt;}</DT><DD>
+&lt;bit-offset&gt; is the offset of the field from the structure/union/record's base expressed in bits. &lt;bit-width&gt; is the width of the field, in bits. &lt;field-type&gt; is the type for the field itself, while &lt;struct-type&gt; is the token for the containing structured type.</DD>
+<DT>
+const: {&lt;value&gt;}</DT><DD>
+&lt;value&gt; is just the symbol's value.</DD>
+<DT>
+enum-class: {&lt;value&gt; &lt;etype&gt;}</DT><DD>
+&lt;value&gt; is the symbol's value. &lt;etype&gt; is the enumerated type's symbol.</DD>
+<DT>
+blockstart, blockend: {&lt;addr&gt;}</DT><DD>
+&lt;addr&gt; is the address bound to the symbol.</DD>
+<DT>
+onstack: {&lt;addr&gt; &lt;data&gt;}</DT><DD>
+&lt;addr&gt; is the address at which the ON_STACK was declared. &lt;data&gt; is the arguments given to the ON_STACK directive.</DD>
+<DT>
+module: {&lt;patient&gt;}</DT><DD>
+&lt;patient&gt; is the token for the patient owning the module.</DD>
+</DL>
+<LI>
+A related command, &quot;symbol tget&quot; will fetch the type token for symbols that have data types (var-, field- and enum-class symbols).</LI>
+<LI>
+&quot;symbol addr&quot; can be used to obtain the address of symbols that actually have one (var-, locvar- and label-class symbols). For locvar symbols, the address is an offset from the frame pointer (positive or negative). For var- and label-class symbols (remember that a procedure is a label-class symbols), the returned integer is the offset of the symbol within its segment.</LI>
+<LI>
+&quot;symbol patient&quot; returns the token of the patient to which the symbol belongs.</LI>
+<LI>
+&quot;symbol foreach&quot; will call the &lt;callback&gt; procedure for each symbol in &lt;scope&gt; (a symbol token) that is in one of the classes given in the list &lt;class&gt;. The first argument will be the symbol token itself, while the second argument will be &lt;data&gt;, if given. If &lt;data&gt; wasn't provided, &lt;callback&gt; will receive only 1 argument. &lt;callback&gt; should return 0 to continue iterating, or non-zero to stop. A non-integer return is assumed to mean stop. &quot;symbol foreach&quot; returns whatever the last call to &lt;callback&gt; returned.</LI>
+<LI>
+By default, &quot;symbol scope&quot; will return the physical scope of the symbol. The physical scope of a symbol is the symbol for the segment in which the symbol lies, in contrast to the lexical scope of a symbol, which is where the name of the symbol lies. The two scopes correspond for all symbols but static variables local to a procedure. To obtain the lexical scope of a symbol, pass &lt;lexical&gt; as a non-zero number.</LI>
+</UL>
+<P CLASS="refField"><STRONG>
+See Also:</STRONG> <A HREF="../../Tools/Tcl/TTCL_f.htm#IX_type Tcl structure">type</A>.
+
+
+
+<H2 CLASS="refHeading">
+<A NAME="IX_table Tcl structure">
+ </A>
+<A NAME="19266">
+ </A>
+table</H2>
+<PRE CLASS="syntax">
+table create [&lt;initBuckets&gt;]
+table destroy &lt;table&gt;
+table enter &lt;table&gt; &lt;key&gt; &lt;value&gt;
+table lookup &lt;table&gt; &lt;key&gt;
+table remove &lt;table&gt; &lt;key&gt;</PRE>
+<P CLASS="refField"><STRONG>
+Examples:</STRONG>	</P>
+<DL>
+<DT>
+&quot;var kitchen [table create 32]&quot;</DT><DD>
+Create a new table with 32 hash buckets initially.</DD>
+<DT>
+&quot;table enter $t tbrk3 {1 2 3}&quot;</DT><DD>
+Enter the value &quot;1 2 3&quot; under the key &quot;tbrk3&quot; in the table whose token is stored in the variable t.</DD>
+<DT>
+&quot;table lookup $t tbrk4&quot; </DT><DD>
+Fetch the value, if any, stored under the key &quot;tbrk4&quot; in the table whose token is stored in the variable t.</DD>
+<DT>
+&quot;table remove $t tbrk3&quot; </DT><DD>
+Remove the data stored in the table, whose token is stored in the variable t, under the key &quot;tbrk3&quot;</DD>
+<DT>
+&quot;table destroy $t&quot; </DT><DD>
+Destroy the table $t and all the data stored in it.</DD>
+</DL>
+
+<PRE>(mess1:0) 159 =&gt; <STRONG>var yearTable [table create]
+</STRONG>(mess1:0) 160 =&gt; <STRONG>table enter $yearTable synclavier 1979
+</STRONG>(mess1:0) 161 =&gt; <STRONG>table enter $yearTable moog 1966
+</STRONG>(mess1:0) 162 =&gt; <STRONG>table lookup $yearTable synclavier
+</STRONG>1979
+(mess1:0) 163 =&gt; <STRONG>var yearTable
+</STRONG>1403188
+(mess1:0) 164 =&gt; <STRONG>table lookup 1403188 moog
+</STRONG>1966
+(mess1:0) 165 =&gt; <STRONG>table remove $yearTable synclavier
+</STRONG>(mess1:0) 166 =&gt; <STRONG>table lookup $yearTable synclavier
+</STRONG>nil
+(mess1:0) 167 =&gt; <STRONG>table destroy $yearTable</STRONG></PRE>
+<P>
+The &quot;table&quot; command is used to create, manipulate and destroy hash tables. The entries in the table are keyed on strings and contain strings, as you'd expect from Tcl.</P>
+<UL>
+<LI>
+The &lt;<EM>
+initBuckets</EM>
+&gt; parameter to &quot;table create&quot; is set based on the number of keys you expect the table to have at any given time. The number of buckets will automatically increase to maintain hashing efficiency, should the need arise, so &lt;<EM>
+initBuckets</EM>
+&gt; isn't a number that need be carefully chosen. It's best to start with the default (16) or perhaps a slightly larger number.</LI>
+<LI>
+If no data are stored in the table under &lt;<EM>
+key</EM>
+&gt;, &quot;table lookup&quot; will return the string &quot;nil&quot;, for which you can test with the &quot;null&quot; command.</LI>
+</UL>
+
+
+
+<H2 CLASS="refHeading">
+<A NAME="IX_Threads:thread Tcl structure">
+ </A>
+<A NAME="IX_thread Tcl structure">
+ </A>
+<A NAME="IX_Registers:value within thread">
+ </A>
+<A NAME="31438">
+ </A>
+thread</H2>
+<PRE CLASS="syntax">
+thread id &lt;thread&gt;
+thread register &lt;thread&gt; &lt;regName&gt;
+thread handle &lt;thread&gt;
+thread endstack &lt;thread&gt;
+thread number &lt;thread&gt;
+thread all</PRE>
+<P CLASS="refField"><STRONG>
+Examples:</STRONG>	</P>
+<DL>
+<DT>
+&quot;thread register $t cx&quot; </DT><DD>
+Fetches the value for the CX register for the given thread.
+</DD>
+<DT>
+&quot;thread number $t&quot;</DT><DD>
+Fetches number swat assigned to thread when it was first encountered.</DD>
+</DL>
+<PRE>(mess1:0) 145 =&gt; <STRONG>patient threads
+</STRONG>2667104
+(mess1:0) 146 =&gt; <STRONG>thread id 2667104
+</STRONG>11184
+(mess1:0) 147 =&gt; <STRONG>thread all
+</STRONG>767532 756068 1348520 1348868 1349216 1349748 1350236 1402096 1079392 2667104
+(mess1:0) 148 =&gt; <STRONG>thread handle 756068
+</STRONG>880428
+(mess1:0) 149 =&gt; <STRONG>thread number 756068
+</STRONG>0</PRE>
+<P>
+Returns information about a thread, given its thread token. Thread tokens can be obtained via the &quot;patient threads&quot; command, or the &quot;handle other&quot; command applied to a thread handle's token.</P>
+<UL>
+<LI>
+Subcommands may be abbreviated uniquely.
+</LI>
+<LI>
+&quot;thread id&quot; returns the handle ID, in decimal, of the thread's handle. This is simply a convenience.
+</LI>
+<LI>
+&quot;thread register&quot; returns the contents of the given register in the thread when it was suspended. All registers except &quot;pc&quot; are returned as a single decimal number. &quot;pc&quot; is returned as two hexadecimal numbers separated by a colon, being the cs:ip for the thread. Note that GEOS doesn't actually save the AX and BX registers when it suspends a thread, at least not where Swat can consistently locate them. These registers will always hold 0xadeb unless the thread is the current thread for the machine (as opposed to the current thread for swat).</LI>
+<LI>
+&quot;thread handle&quot; returns the token for the thread's handle.</LI>
+<LI>
+<A NAME="IX_Stack:thread stack size">
+ </A>
+&quot;thread endstack&quot; returns the maximum value SP can hold for the thread, when it is operating off its own stack. Swat maintains this value so it knows when to give up trying to decode the stack. </LI>
+<LI>
+&quot;thread number&quot; returns the decimal number Swat assigned the thread when it first encountered it. The first thread for each patient is given the number 0 with successive threads being given the highest thread number known for the patient plus one. </LI>
+<LI>
+&quot;thread all&quot; returns a list of tokens for all the threads known to Swat (for all patients).</LI>
+</UL>
+
+<H2 CLASS="refHeading">
+<A NAME="IX_type Tcl structure">
+ </A>
+<A NAME="75688">
+ </A>
+type</H2>
+<PRE CLASS="syntax">
+type &lt;basic-type-name&gt; 
+type make array &lt;length&gt; &lt;base-type&gt;
+type make pstruct (&lt;field&gt; &lt;type&gt;)+
+type make struct (&lt;field&gt; &lt;type&gt; &lt;bit-offset&gt; &lt;bit-length&gt;)+
+type make union (&lt;field&gt; &lt;type&gt;)+
+type make &lt;ptr-type&gt; &lt;base-type&gt;
+type delete &lt;type&gt;
+type size &lt;type&gt;
+type class &lt;type&gt;
+type name &lt;type&gt; &lt;var-name&gt; &lt;expand&gt;
+type aget &lt;array-type&gt;
+type fields &lt;struct-type&gt;
+type members &lt;enum-type&gt;
+type pget &lt;ptr-type&gt;
+type emap &lt;num&gt; &lt;enum-type&gt;
+type signed &lt;type&gt;
+type field &lt;struct-type&gt; &lt;offset&gt;
+type bfget &lt;bitfield-type&gt; </PRE>
+<P CLASS="refField"><STRONG>
+Examples:</STRONG>	</P>
+<DL>
+<DT>
+ &quot;type word&quot; </DT><DD>Returns a type token for a word (2-byte unsigned quantity).</DD>
+<DT>
+ &quot;type make array 10 [type char]&quot;</DT><DD>
+ Returns a type token for a 10-character array.</DD>
+<DT>
+<A NAME="IX_optr:returning Tcl type token for">
+ </A>
+ &quot;type make optr [symbol find type GenBase]&quot;</DT><DD>
+ Returns a type token for an optr (4-byte global/local handle pair) to a &quot;GenBase&quot; structure.</DD>
+</DL>
+<P>
+Provides access to the type descriptions by which all PC-based data are manipulated in Swat, and allows a Tcl procedure to obtain information about a type for display to the user, or for its own purposes. As with other Swat commands, this works by calling one subcommand to obtain an opaque &quot;type token&quot;, which you then pass to other commands.</P>
+<UL>
+<LI>
+Type tokens and symbol tokens for type-class symbols may be freely interchanged anywhere in Swat.</LI>
+<LI>
+ There are 11 predefined basic types that can be given as the &lt;basic-type-name&gt; argument in &quot;type &lt;basic-type-name&gt;&quot;. They are: byte (single-byte unsigned integer), char (single-byte character), double (eight-byte floating-point), dword (four-byte unsigned integer), float (four-byte floating-point), int (two-byte signed integer), long (four-byte signed integer), sbyte (single-byte signed integer), short (two-byte signed integer), void (nothing. useful as the base type for a pointer type), and word (two-byte unsigned integer)</LI>
+<LI>
+Most type tokens are obtained, via the &quot;symbol get&quot; and &quot;symbol tget&quot; commands, from symbols that are defined for a loaded patient. These are known as &quot;external&quot; type descriptions. &quot;Internal&quot; type descriptions are created with the &quot;type make&quot; command and should be deleted, with &quot;type delete&quot; when they are no longer needed.</LI>
+<LI>
+<A NAME="IX_Structures:creating">
+ </A>
+An internal structure type description can be created using either the &quot;pstruct&quot; (packed structure) or &quot;struct&quot; subcommands. Using &quot;pstruct&quot; is simpler, but you have no say in where each field is placed (they are placed at sequential offsets with no padding between fields), and all fields must be a multiple of 8 bits long. The &quot;struct&quot; subcommand is more complex, but does allow you to specify bitfields.</LI>
+<LI>
+&quot;type make pstruct&quot; takes 1 or more pairs of arguments of the form &quot;&lt;field&gt; &lt;type&gt;&quot;, where &lt;field&gt; is the name for the field and &lt;type&gt; is a type token giving the data type for the field. All fields must be specified for the structure in this call; fields cannot be appended to an existing type description.</LI>
+<LI>
+&quot;type make struct&quot; takes 1 or more 4-tuples of arguments of the form &quot;&lt;field&gt; &lt;type&gt; &lt;bit-offset&gt; &lt;bit-length&gt;&quot;. &lt;field&gt; is the name of the field, and &lt;type&gt; is its data type. &lt;bit-offset&gt; is the offset, in bits, from the start of the structure (starting with 0, as you'd expect). &lt;bit-length&gt; is the length of the field, in bits (starting with 1, as you'd expect). For a bitfield, &lt;type&gt; should be the field within which the bitfield is defined. For example, the C declaration: </LI>
+<PRE> struct {
+     word a:6;
+     word b:10;
+     word c;
+  }</PRE>
+<P>would result in the command &quot;type make struct a [type word] 0 6 b [type word] 6 10 c [type word] 16 16&quot;, because a and b are defined within a word type, and c is itself a word.</P>
+<LI>
+<A NAME="IX_Unions in Swat:creating">
+ </A>
+&quot;type make union&quot; is similar to &quot;type make pstruct&quot;, except all fields start at offset 0. Like &quot;pstruct&quot;, this cannot be used to hold bitfields, except by specifying a type created via &quot;type make struct&quot; command as the &lt;type&gt; for one of the fields.</LI>
+<LI>
+<A NAME="IX_Arrays in Swat:creating">
+ </A>
+&quot;type make array &lt;length&gt; &lt;base-type&gt;&quot; returns a token for an array of &lt;length&gt; elements of the given &lt;base-type&gt;, which may be any valid type token, including another array type.</LI>
+<LI>
+&quot;type make &lt;ptr-type&gt; &lt;base-type&gt;&quot; returns a token for a pointer to the given &lt;base-type&gt;. There are several different classes of pointers in GEOS:</LI>
+<DL>
+<DT>
+          <STRONG>
+nptr</STRONG>
+ </DT><DD>a near pointer. 16-bits. points to something in the same segment as the pointer itself.</DD>
+<DT>
+          <STRONG>
+fptr</STRONG>
+</DT><DD>a far pointer. 32-bits. segment in high word, offset in the low.</DD>
+<DT>
+          <STRONG>
+sptr</STRONG>
+ </DT><DD>a segment pointer. 16-bits. contains a segment only.</DD>
+<DT>
+          <STRONG>
+lptr</STRONG>
+ </DT><DD>an lmem pointer. 16-bits. contains a local-memory &quot;chunk handle&quot;. data pointed to is assumed to be in the same segment as the lptr itself, but requires two indirections to get to it.</DD>
+<DT>
+           <STRONG>
+hptr</STRONG>
+</DT><DD>a handle pointer. 16-bits. a GEOS handle.</DD>
+<DT>
+           <STRONG>
+optr</STRONG>
+ </DT><DD>an object pointer. 32-bits. contains a GEOS memory handle in the high word, and a GEOS local-memory chunk handle in the low.</DD>
+<DT>
+           <STRONG>
+vptr</STRONG>
+</DT><DD>a VM pointer. Its 32 bits contain a GEOS file handle in the high word and a GEOS VM block handle in the low word.</DD>
+<DT>
+           <STRONG>
+vfptr</STRONG>
+</DT><DD>a virtual far pointer. Its 32 bits contain a virtual segment in the high word and an offset in the low.</DD>
+</DL>
+<LI>
+&quot;type delete&quot; is used to delete a type description created by &quot;type make&quot;. You should do this whenever possible to avoid wasting memory.</LI>
+<LI>
+Any type created by the &quot;type make&quot; command is subject to garbage collection unless it is registered with the garbage collector. If you need to keep a type description beyond the end of the command being executed, you must register it. See the &quot;gc&quot; command for details.</LI>
+<LI>
+&quot;type size&quot; returns the size of the passed type, in bytes.</LI>
+<LI>
+&quot;type class&quot; returns the class of a type, a string in the following set:</LI>
+<DL>
+<DT>
+<STRONG>
+char</STRONG>
+ </DT><DD>for the basic &quot;char&quot; type only.</DD>
+<DT>
+<STRONG>
+int</STRONG>
+ </DT><DD>any integer, signed or unsigned.</DD>
+<DT>
+<STRONG>
+struct</STRONG>
+ </DT><DD>a structure, record, or union.</DD>
+<DT>
+<STRONG>
+enum</STRONG>
+ </DT><DD>an enumerated type.</DD>
+<DT>
+<STRONG>
+array</STRONG>
+</DT><DD>an array, of course,</DD>
+<DT>
+<STRONG>
+pointer</STRONG>
+ </DT><DD>a pointer to another type.</DD>
+<DT>
+<STRONG>
+void</STRONG>
+ </DT><DD>nothingness. Often a base for a pointer.</DD>
+<DT>
+<STRONG>
+function</STRONG>
+</DT><DD> a function, used solely as a base for a pointer.</DD>
+<DT>
+<STRONG>
+float</STRONG>
+ </DT><DD>a floating-point number.</DD>
+</DL>
+<LI>
+ Each type class has certain data associated with it that can only be obtained by using the proper subcommand.</LI>
+<LI>
+<A NAME="IX_Arrays in Swat:examining">
+ </A>
+&quot;type aget&quot; applies only to an array-class type token. It returns a four-element list: {&lt;base-type&gt; &lt;low&gt; &lt;high&gt; &lt;index-type&gt;} &lt;base-type&gt; is the type token describing elements of the array. &lt;low&gt; is the lower bound for an index into the array (currently always 0), &lt;high&gt; is the inclusive upper bound for an index into the array, and &lt;index-type&gt; is a token for the data type that indexes the array (currently always [type int]).</LI>
+<LI>
+&quot;type fields&quot; applies only to a struct-class type token. It returns a list of four-tuples {&lt;name&gt; &lt;offset&gt; &lt;length&gt; &lt;type&gt;}, one for each field in the structure. &lt;offset&gt; is the <EM>
+bit</EM>
+ offset from the start of the structure, while &lt;length&gt; is the length of the field, again in <EM>
+bits</EM>
+. &lt;type&gt; is the token for the data type of the field, and &lt;name&gt; is, of course, the field's name.</LI>
+<LI>
+&quot;type members&quot; applies only to an enum-class type token. It returns a list of {&lt;name&gt; &lt;value&gt;} pairs for the members of the enumerated type. </LI>
+<LI>
+&quot;type pget&quot; applies only to a pointer-class type token. It returns the type of pointer (&quot;near&quot;, &quot;far&quot;, &quot;seg&quot;, &quot;lmem&quot;, &quot;handle&quot;, or &quot;object&quot;) and the token for the type to which it points.</LI>
+<LI>
+&quot;type bfget&quot; returns a three-list for the given bitfield type: {&lt;offset&gt; &lt;width&gt; &lt;is-signed&gt;}</LI>
+<LI>
+&quot;type signed&quot; returns non-zero if the type is signed. If the &lt;type&gt; is not an int-class type, it is considered unsigned.</LI>
+<LI>
+&quot;type emap&quot; can be used to map an integer to its corresponding enumerated constant. If no member of the enumerated type described by &lt;type&gt; has the value indicated, &quot;nil&quot; is returned, else the name of the matching constant is returned.</LI>
+<LI>
+&quot;type field&quot; maps an offset into the passed struct-class type into a triple of the form {&lt;name&gt; &lt;length&gt; &lt;ftype&gt;}, where &lt;name&gt; can be either a straight field name, or a string of the form &lt;field&gt;.&lt;field&gt;... with as many .&lt;field&gt; clauses as necessary to get to the smallest field in the nested structure &lt;type&gt; that covers the given byte &lt;offset&gt; bytes from the start of the structure. &lt;length&gt; is the <EM>
+bit</EM>
+ length of the field, and &lt;ftype&gt; is its type.</LI>
+<LI>
+&quot;type name&quot; produces a printable description of the given type, using C syntax. &lt;varname&gt; is the name of the variable to which the type belongs. It will be placed at the proper point in the resulting string. If &lt;expand&gt; is non-zero, structured types (including enumerated types) are expanded to display their fields (or members, as the case may be).</LI>
+</UL>
+<P CLASS="refField"><STRONG>
+See Also:</STRONG> <A HREF="../../Tools/SwatRef/SR_10.htm#IX_gc Swat command">gc</A>,
+<A HREF="../../Tools/Tcl/TTCL_f.htm#IX_symbol Tcl structure">symbol</A>,
+<A HREF="../../Tools/SwatRef/SR_2e.htm#IX_value Swat command">value</A>.
+
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="TTCL_e.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="TTCL_e.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">6 Coding</A> 
+<!-- to next --> | <A HREF="TTCL_10.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">6.2 Examples</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

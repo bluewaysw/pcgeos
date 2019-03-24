@@ -1,0 +1,144 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Input_13.htm,v 1.2 97/09/05 14:05:43 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Common Hierarchy Basics</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Input</A>: 5.2 <A HREF="Input_11.htm">Input Hierarchies</A>: 
+Common Hierarchy Basics</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Input_11.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Input_12.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.1 The Three Hierarchies</A> 
+<!-- to next --> | <A HREF="Input_14.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5.3 Using Focus</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+All three of the input hierarchies function in a similar manner. Each relies on the basic tree structure of UI objects to build a path from the topmost system UI object (GenSystem) down to a leaf node that has the hierarchical properties (e.g., the target object).</P>
+<P>
+Each composite object can have exactly one child with each hierarchical property. The composite determines which of its children currently has the <EM>
+exclusive</EM>
+ of the hierarchy; for example, a composite with ten children may designate the fourth child as the Target node at its level. If that child is a composite with its own children, it will select one of them as the Target node at the next level.
+
+</P>
+<P>
+A message sent to any object in the path will be passed down the tree until it gets to the active target leaf, the object that actually has the system's target exclusive.</P>
+<P>
+A special feature of the hierarchical structure is that inactive paths may be maintained. The inactive path is stored in the objects themselves. The topmost object in the tree, however, has decided that object on the right has the target exclusive; if later the top object decides the object on the left has the exclusive, the target will automatically be given to the leaf node specified without actually changing the object tree (just the pointer stored in the top node).</P>
+<P>
+Note that the other hierarchies operate in a similar manner. The behavior described is not unique to the target hierarchy.</P>
+
+<H2 CLASS="HeadingC">
+Special Terminology</H2>
+<P>
+Before reading the in-depth sections on the individual hierarchies, you should know how several terms are defined and used. These terms are listed below.</P>
+<DL>
+<DT>
+<EM>
+Node</EM>
+</DT><DD>Any composite in the object tree that can be part of a path for one of the hierarchies.</DD>
+<DT>
+<EM>
+Exclusive</EM>
+</DT><DD>The active child of a composite node in the hierarchy is said to have the &quot;exclusive.&quot; Only one child of any composite may have the exclusive at that level.</DD>
+<DT>
+<EM>
+Level</EM>
+</DT><DD>A group of siblings, all of which can potentially be part of a hierarchical path. All the nodes in a given level will have the same parent. Only one node at each level may have the exclusive for that level.</DD>
+<DT>
+<EM>
+Grab</EM>
+</DT><DD>When an object grabs a hierarchy (e.g., &quot;grabs the focus&quot;), it notifies its parent that it wants to gain that hierarchy's exclusive for its level. Any other node at the same level will be forced to give up the exclusive.</DD>
+<DT>
+<EM>
+Active Path</DT><DD>
+</EM>
+The path of exclusive nodes from the top object to the leaf having the active exclusive. Only objects which have a complete active path to the top node can exhibit the property of the hierarchy (e.g., a text object in a minimized application can not have the focus because its primary window does not have the focus exclusive).</DD>
+<DT>
+<EM>
+Inactive Path</DT><DD>
+</EM>
+Any path of exclusive nodes that is broken from the top node. If the topmost node of an inactive path is given the exclusive at its level, the entire inactive path will automatically become the active path.
+<IMG SRC="Input_13_terminology.gif">
+
+</DD>
+
+
+</DL>
+<H2 CLASS="HeadingC">
+Modifying the Active Path</H2>
+<P>
+Each of the three hierarchies has messages understood by <CODE>
+MetaClass</CODE>
+ that alter the hierarchy's active path. The Specific UI takes care of most of the modifications to the active path, however, so simple applications will not need to bother with it.</P>
+<P>
+Any node can &quot;grab&quot; a hierarchical exclusive by sending the grab message to its parent. (Outside agents can alter the path by sending the grab message to the child's parent on behalf of the child.) The grab forces any other node on the child's level to give up the exclusive. Any node can release the exclusive with the appropriate message (typically done when forced to release because of another node's grab).</P>
+<P>
+Whenever a node gains the exclusive of a hierarchy, it will be notified via a message. This is to notify objects which already had their level's exclusive that they now have the active hierarchical exclusive. Similarly, if another node grabs the exclusive at any level equal or above an exclusive node, that node will be notified that it has lost the exclusive at its level. See the discussions of the individual hierarchies for more detail on the messages used.</P>
+
+
+<H2 CLASS="HeadingC">
+Sending Classed Messages</H2>
+<P>
+<A NAME="IX_MSG_META_SEND_CLASSED_EVENT:with input hierarchies">
+ </A>
+<A NAME="IX_MSG_META_SEND_CLASSED_EVENT:with travel options">
+ </A>
+<A NAME="IX_Classed events:with input heirarchies">
+ </A>
+Any object can easily send messages to the object having the active exclusive of a given hierarchy using <CODE>
+MSG_META_SEND_CLASSED_EVENT</CODE>
+. This message passes a recorded event (message) to the first object of a specified class encountered within the hierarchy. (If the destination should be a leaf, no class should be specified.)</P>
+<P>
+<A NAME="IX_TravelOption:with input heirarchies">
+ </A>
+To pass events to the active member of a specific hierarchy, you should use a <CODE>
+TravelOption</CODE>
+ with <CODE>
+MSG_META_SEND_CLASSED_EVENT</CODE>
+. <CODE>
+TravelOption</CODE>
+ is a type which describes the destination for the specified event. There are three types of <CODE>
+TravelOption</CODE>
+ for each hierarchy:</P>
+<UL>
+<LI>
+Direct<BR>
+The &quot;direct&quot; travel options are TO_FOCUS, TO_TARGET, and TO_MODEL. These send the classed event down the hierarchy's active path, treating the recipient of <CODE>
+MSG_META_SEND_CLASSED_EVENT</CODE>
+ as the active path's top node.</LI>
+<LI>
+Application-direct<BR>
+The &quot;application-direct&quot; travel options are TO_APP_FOCUS, TO_APP_TARGET, and TO_APP_MODEL. These send the classed event first to the GenApplication object associated with the recipient of <CODE>
+MSG_META_SEND_CLASSED_EVENT</CODE>
+; the GenApplication object is taken as the top node, and the event is passed down the active path until it is handled.</LI>
+<LI>
+System-direct<BR>
+The &quot;system-direct&quot; travel options are TO_SYS_FOCUS, TO_SYS_TARGET, and TO_SYS_MODEL. These send the classed event to the GenSystem object, the topmost object in the entire UI object tree. The classed event will be passed down the active path, using the GenSystem object as the path's top node.</LI>
+</UL>
+<P>
+There exist additional <CODE>
+TravelOption</CODE>
+ types that can be used to direct messages to generically-defined locations. For a complete list of these types, see <A HREF="../../Programming/GOCLanguage/GOCLanguage_14.htm#40477">the GEOS Programming chapter</A>.</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Input_11.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Input_12.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.1 The Three Hierarchies</A> 
+<!-- to next --> | <A HREF="Input_14.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5.3 Using Focus</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

@@ -1,0 +1,1637 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+<!-- This page was automatically generated from a bunch of smaller pages. -->
+<META NAME="copyright" CONTENT="Copyright GEOWORKS">
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+<TITLE>Calendar API</TITLE>
+</HEAD>
+<BODY BGCOLOR="#ffffdf">
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+<A NAME="index.htm"></A>
+
+<H1 CLASS="chapterTitle">
+Calendar API
+</H1>
+
+<P>
+<A NAME="index.htm_IX_Calendar API"> </A>
+The Nokia 9000i Communicator comes with a calendar application for
+scheduling appointments and keeping a to-do list.
+You can add appointments and to-do items
+with the API defined in <STRONG CLASS="fileName">calendar.goh</STRONG>;
+you can also retrieve, modify, and delete events that you have added.</P>
+
+<P>
+You can search for the existence of any event within a particular time
+period (including events you did not add yourself); however, Calendar
+API is <EM>not</EM> intended for use in retrieving, modifying, or
+deleting pre-existing events in the user's calendar database.</P>
+
+<P>
+Calendar API uses IACP (Inter-Application Communication Protocol); 
+your application sends a message to the Calendar application object, 
+which services your request and then returns a status code (and 
+other requested information) with a callback message.  Before reading 
+this section, you may wish to review the material on
+<A HREF="../../Kernel/Geodes/Geodes_19.htm#IX_IACP">IACP</A> or
+look at code in the <STRONG CLASS="fileName">CalApi.goc</STRONG> sample application.</P>
+
+<P>
+On the Nokia 9000i Communicator, only devices manufactured after February
+1997 support this API; your application should 
+<A HREF="#CalSamplesTop.htm_iniFile">check the Calendar application 
+version</A>.  Also, only one-time events
+may be manipulated; this API does not support repeating events.
+</P>
+
+<P CLASS="sectionlinks">
+<STRONG>
+&nbsp;&nbsp;<A HREF="#CalOverview.htm">1 Overview</A><BR>
+&nbsp;&nbsp;<A HREF="#CalSamplesTop.htm">2 Examples</A><BR>
+&nbsp;&nbsp;<A HREF="#CalReference.htm">3 Reference</A><BR>
+</STRONG>
+</P> <!-- end of sectionlinks blob -->
+
+<HR>
+<A NAME="CalOverview.htm"></A>
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Calendar API</A>: 1
+Overview</H2>
+
+
+<!-- Content starts here... -->
+
+<H3>Functionality</H3>
+<PRE>
+<A HREF="#CalReference.htm_IX_MSG_CALENDAR_ADD_EVENT">MSG_CALENDAR_ADD_EVENT</A>
+<A HREF="#CalReference.htm_IX_MSG_CALENDAR_GET_EVENT_BY_ID">MSG_CALENDAR_GET_EVENT_BY_ID</A>
+<A HREF="#CalReference.htm_IX_MSG_CALENDAR_MODIFY_EVENT_BY_ID">MSG_CALENDAR_MODIFY_EVENT_BY_ID</A>
+<A HREF="#CalReference.htm_IX_MSG_CALENDAR_DELETE_EVENT_BY_ID">MSG_CALENDAR_DELETE_EVENT_BY_ID</A>
+<A HREF="#CalReference.htm_IX_MSG_CALENDAR_CHECK_IF_EVENT_EXISTS">MSG_CALENDAR_CHECK_IF_EVENT_EXISTS</A>
+</PRE>
+
+<P>
+These five messages correspond to the operations you can perform on the
+user's calendar database: add an event, get an event you added, modify an
+event you added, delete an event you added, and search for the existence of
+any event within a specified time interval.
+
+<P>
+Because these messages are sent via IACP to the Calendar application, they
+cannot directly return status values.  In each case, you specify a callback
+message and an object to receive it; status values and requested
+information (if any) are processed by your callback method.
+
+<H3>Callback Prototypes</H3>
+<DL>
+<DT><A HREF="#CalReference.htm_IX_CALENDAR_ADD_EVENT_CALLBACK_MSG">
+<CODE>CALENDAR_ADD_EVENT_CALLBACK_MSG</CODE></A></DT>
+<DD>
+Prototype of the callback message for <CODE>MSG_CALENDAR_ADD_EVENT</CODE>;
+passes status value and the assigned event ID.
+</DD>
+
+<P>
+<DT><A HREF="#CalReference.htm_IX_CALENDAR_GET_EVENT_CALLBACK_MSG">
+<CODE>CALENDAR_GET_EVENT_CALLBACK_MSG</CODE></A></DT>
+<DD>
+Prototype of the callback message for
+<CODE>MSG_CALENDAR_GET_EVENT_BY_ID</CODE>; passes status value and handle to
+a <CODE>CalendarReturnedEventStruct</CODE>.
+</DD>
+
+<P>
+<DT><A HREF="#CalReference.htm_IX_CALENDAR_ACCESS_EVENT_COMMON_CALLBACK_MSG">
+<CODE>CALENDAR_ACCESS_EVENT_COMMON_CALLBACK_MSG</CODE></A></DT>
+<DD>
+Prototype of the callback message for <CODE>MSG_CALENDAR_MODIFY_EVENT_BY_ID,
+MSG_CALENDAR_DELETE_EVENT_BY_ID,</CODE> and
+<CODE>MSG_CALENDAR_CHECK_IF_EVENT_EXISTS</CODE>; passes status value.
+</DD>
+</DL>
+
+<H3>Event Types</H3>
+
+<DL>
+<DT>Ordinary</DT>
+<DD>
+Ordinary events have a start date, start time, end date, end time, an
+optional alarm at or before the start time, and a text description.
+
+<P>
+Only the start date is mandatory; if no start time
+(<CODE>CAL_NO_TIME</CODE>) is specified, the event is listed as a daily
+reminder (before the time-ordered list for its day).  If only a start date
+and time are specified (the end date and time are <CODE>CAL_NO_DATE</CODE>
+and <CODE>CAL_NO_TIME</CODE>), the event is listed at the start time without
+an associated interval.  If an end time is also specified, the event is
+shown spanning a time interval on a single day; if both an end date and time
+are specified, the event is shown spanning the entire interval
+from the start date and time until the end date and time.
+
+<P>
+If you specify a start time and an end date, you must also specify an
+end time; if the end time (or date and time) is specified, it must be
+later than the start time.
+
+<P>
+If you specify a start date and no start time (a daily reminder), do not
+specify an end time; specify an end date if you wish to have a multi-day
+daily reminder.  Do not use the <CODE>CEPS_reserveWholeDay</CODE> parameter
+to create a multi-day daily reminder; if you omit the start and end times,
+you will instead create a multi-day event (see below) with the default start
+and end times of 00:00 and 23:59.
+
+<P>
+<TABLE BORDER=2 CELLPADDING=4>
+<CAPTION>Result of Specifying Start and End Parameters</CAPTION>
+<TR ALIGN=CENTER>
+<TH COLSPAN=2>Start Param Specified
+<TH COLSPAN=2>End Param Specified
+<TH ROWSPAN=2>Result
+
+<TR ALIGN=CENTER>
+<TH>Date
+<TH>Time
+<TH>Date
+<TH>Time
+
+<TR ALIGN=CENTER>
+<TD>Yes<TD>No<TD>No<TD>No<TD ALIGN=LEFT>Daily reminder, listed at beginning of day.
+
+<TR ALIGN=CENTER>
+<TD>Yes<TD>No<TD>Yes<TD>No<TD ALIGN=LEFT>Multi-day daily reminder, listed at 
+the beginning of each day.
+
+<TR ALIGN=CENTER>
+<TD>Yes<TD>No<TD>*<TD>Yes<TD ALIGN=LEFT>Not defined.  Typically creates a daily
+reminder.
+
+<TR ALIGN=CENTER>
+<TD>Yes<TD>Yes<TD>No<TD>No<TD ALIGN=LEFT>Event listed (at the start time)
+with no interval.
+
+<TR ALIGN=CENTER>
+<TD>Yes<TD>Yes<TD>No<TD>Yes<TD ALIGN=LEFT>Event spanning a time interval on
+one day.
+
+<TR ALIGN=CENTER>
+<TD>Yes<TD>Yes<TD>Yes<TD>Yes<TD ALIGN=LEFT>Event (possibly) spanning
+multiple days.
+
+<TR ALIGN=CENTER>
+<TD>Yes<TD>Yes<TD>Yes<TD>No<TD ALIGN=LEFT>Not allowed.
+
+<TR ALIGN=LEFT>
+<TD COLSPAN=5> * = Doesn't matter<BR>
+"No" = CAL_NO_DATE or CAL_NO_TIME was specified
+</TABLE>
+</DD>
+
+<P>
+<DT>Multi-day</DT>
+<DD>
+Multi-day events are ordinary events that have a start and end time for each
+day in their date range, as opposed to being one continuous event spanning
+multiple days.  The start and end time is the same for each day.  Specify a
+multi-day event by including a non-zero value (the number of days) for
+<CODE>CEPS_reserveWholeDay</CODE> in <CODE>CalendarEventParamStruct</CODE>;
+also specify the start and end time (which will apply to each day) and the
+start day.  The end day value is ignored when
+<CODE>CEPS_reserveWholeDay</CODE> is non-zero.  If you omit the start or end
+time (using <CODE>CAL_NO_TIME</CODE>), it defaults to 00:00 (start time) or
+23:59 (end time).
+</DD>
+
+<P>
+<DT>To-do List</DT>
+<DD>
+To-do list events all appear in one list; they are not tied to any specific
+day.  Each to-do event has a status (high priority, normal, or completed)
+and a text description.  Specify a to-do list event by setting the start
+date to <CODE>CAL_NO_DATE</CODE> and the start time to the event's status.
+</DD>
+
+<P>
+<DT>Repeating</DT>
+<DD>
+Repeating events automatically recur according to a specified pattern
+(daily, monthly, etc.).  This API currently does not support repeating
+events; the error <CODE>CEE_EVENT_NOT_SUPPORTED</CODE> will be returned if
+you specify a non-zero <CODE>CEPS_repeatInfo</CODE> field when adding or
+modifying event, or if you attempt to get, modify, or delete a repeating
+event.  Also, <CODE>MSG_CALENDAR_CHECK_IF_EVENT_EXISTS</CODE> will not check
+for repeating events in the specified range.
+</DD>
+</DL>
+
+<H3>Alarms</H3> 
+The Calendar application displays a note and (optionally) sounds a tone when
+an event's alarm is due; this occurs at or before the event's start time.
+(Daily reminders cannot have an associated alarm.)
+You can set an alarm for an event by specifying a non-zero
+<CODE><A HREF="#CalReference.htm_IX_CalendarAlarmStruct">CalendarAlarmStruct</A></CODE>
+field in the event's parameter structure, <CODE>CalendarEventParamStruct</CODE>.
+<CODE>CalendarAlarmStruct</CODE> is actually a <CODE>WordFlag</CODE> that
+encodes whether an alarm is set and how long before the event's start
+time it should sound.  On the Nokia 9000i Communicator, this time must be
+specified in minutes.
+
+<P>
+Alarms use the RTCM (Real-Time Clock Manager) library, which allows them to
+activate when Calendar is not running or when the device is sleeping.
+
+<H3>Checking the Calendar Version</H3>
+Only versions of the Nokia 9000i Communicator manufactured after February
+1997 have the calendar geode that supports this API.  Your application can
+check the software version by looking for the INI file settting:
+<PRE>
+[Calendar]
+calApi = True
+</PRE>
+
+<P>
+See <A HREF="../../Kernel/Geodes/Geodes_10.htm">GEOS .INI Files</A> for more
+information on INI files; also see this <A HREF="#CalSamplesTop.htm_iniFile">example</A>.
+
+<H3>Data Types</H3>
+
+The following types are defined in 
+<STRONG CLASS="fileName">calendar.goh</STRONG>: 
+
+<P>
+structures:
+<PRE>
+<A HREF="#CalReference.htm_IX_CalendarEventParamStruct">CalendarEventParamStruct</A>
+<A HREF="#CalReference.htm_IX_CalendarReturnedEventStruct">CalendarReturnedEventStruct</A>
+<A HREF="#CalReference.htm_IX_CalendarEventRepeatInfo">CalendarEventRepeatInfo</A>
+<A HREF="#CalReference.htm_IX_CalendarEventRepeatDurationData">CalendarEventRepeatDurationData</A>
+</PRE>
+
+WordFlags:
+<PRE>
+<A HREF="#CalReference.htm_IX_CalendarAlarmStruct">CalendarAlarmStruct</A>
+<A HREF="#CalReference.htm_CalendarEventRepeatLength">CalendarEventRepeatLength</A>
+</PRE>
+
+ByteEnums:
+<PRE>
+<A HREF="#CalReference.htm_IX_CalendarEventDescType">CalendarEventDescType</A>
+<A HREF="#CalReference.htm_CalendarAlarmIntervalType">CalendarAlarmIntervalType</A>
+<A HREF="#CalReference.htm_IX_CalendarEventRepeatDuration">CalendarEventRepeatDuration</A>
+<A HREF="#CalReference.htm_CalendarEventRepeatLengthUnitType">CalendarEventRepeatLengthUnitType</A>
+<A HREF="#CalReference.htm_CalendarEventRepeatWeekday">CalendarEventRepeatWeekday</A>
+<A HREF="#CalReference.htm_CalendarEventRepeatIntervalType">CalendarEventRepeatIntervalType</A>
+<A HREF="#CalReference.htm_IX_CalendarEventRepeatInterval">CalendarEventRepeatInterval</A>
+</PRE>
+
+enums:
+<PRE>
+<A HREF="#CalReference.htm_IX_CalendarEventError">CalendarEventError</A>
+<A HREF="#CalReference.htm_CalendarToDoItemStatus">CalendarToDoItemStatus</A>
+</PRE>
+
+<H3>Internal Messages</H3>
+
+The following messages defined in 
+<STRONG CLASS="fileName">calendar.goh</STRONG> are intended for internal use
+only.  Do not use them in your applications.
+<PRE>
+MSG_CALENDAR_REQUEST_SEARCH
+MSG_CALENDAR_DELETE_EVENTS_BEFORE_DATE
+MSG_CALENDAR_GET_NEXT_EVENT_ID
+MSG_CALENDAR_SET_NEXT_EVENT_ID
+</PRE>
+
+<HR>
+<A NAME="CalSamplesTop.htm"></A>
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Calendar API</A>: 2
+Examples</H2>
+
+Most of these examples are from the 
+<STRONG CLASS="fileName">CalApi</STRONG> sample application.
+
+<A NAME="CalSamplesTop.htm_iniFile">
+ </A>
+<H3>Checking the Version of Calendar</H3>
+
+Calendar API routines are only supported by later versions of the Calendar
+application.  These versions will have the following INI file setting:
+
+<PRE>
+[Calendar]
+calApi = True
+</PRE>
+
+This setting can be checked as follows:
+
+<TABLE BORDER=2 CELLPADDING=10><TR><TD>
+<PRE>
+    #include &lt;initfile.h&gt;
+    Boolean calapi;
+
+    if ( InitFileReadBoolean( "Calendar", "calApi", &amp;calapi ) ) {
+
+/* entry was not found */
+
+        FoamDisplayWarning( @CantRunCalApi );
+        @send application::MSG_META_QUIT();
+    }
+    else {
+        if ( calapi == FALSE ) {
+
+/* entry has wrong value */
+
+            FoamDisplayWarning( @NoCalApiSupport );
+            @send application::MSG_META_QUIT();
+        }
+    }
+</PRE>
+</TABLE>
+
+<H3>Specifying an Ordinary Event</H3>
+
+This is an example of filling a
+<CODE>CalendarEventParamStruct</CODE> with parameters to specify an event
+with a start date, start time, optional end date, optional end time, and an
+alarm.
+<P>
+<TABLE BORDER=2 CELLPADDING=10><TR><TD>
+<PRE>
+@include &lt;calendar.goh&gt;
+#include &lt;timedate.h&gt;      /* definition of TimerDateAndTime */
+
+/* Declare event_g as a Calendar event param structure */
+
+    CalendarEventParamStruct event_g;
+
+/* Other variables in this example */
+
+    TimerDateAndTime date, time;
+    Boolean          boolEndDate, boolEndTime;
+    word             alarmMinutes;
+    TCHAR            *eventText_g;
+
+/* Fill the start date and time.  (Assume the variables "date" and "time"
+ * have already been filled.)  Variables are cast as dwords to prevent
+ * bit-shifting off the left of a too-small word. 
+ */
+
+    event_g.CEPS_startDateTime =
+        ( (dword)date.TDAT_year    &lt;&lt; FDAT_YEAR_OFFSET   ) |
+        ( (dword)date.TDAT_month   &lt;&lt; FDAT_MONTH_OFFSET  ) |
+        ( (dword)date.TDAT_day     &lt;&lt; FDAT_DAY_OFFSET    ) |
+        ( (dword)time.TDAT_hours   &lt;&lt; FDAT_HOUR_OFFSET   ) |
+        ( (dword)time.TDAT_minutes &lt;&lt; FDAT_MINUTE_OFFSET );
+
+/* Fill the end date and time.  (Assume the variables "date", "time", and 
+ * "boolEndXxxx" have already been filled.)  Variables are cast as dwords to
+ * prevent bit-shifting off the left of a too-small word.  Use CAL_NO_XXXX
+ * if a value is not specified.
+ */
+
+    if (boolEndDate) {
+        event_g.CEPS_endDateTime =
+            ( (dword)date.TDAT_year  &lt;&lt; FDAT_YEAR_OFFSET  ) |
+            ( (dword)date.TDAT_month &lt;&lt; FDAT_MONTH_OFFSET ) |
+            ( (dword)date.TDAT_day   &lt;&lt; FDAT_DAY_OFFSET   );
+    }
+    else {
+        event_g.CEPS_endDateTime = (dword)CAL_NO_DATE &lt;&lt; FDAT_DAY_OFFSET;
+    }
+
+    if (boolEndTime) {
+        event_g.CEPS_endDateTime |=
+            ( (dword)time.TDAT_hours   &lt;&lt; FDAT_HOUR_OFFSET   ) |
+            ( (dword)time.TDAT_minutes &lt;&lt; FDAT_MINUTE_OFFSET );
+    }
+    else {
+        event_g.CEPS_endDateTime |= (dword)CAL_NO_TIME &lt;&lt; FDAT_2SECOND_OFFSET;
+    }
+
+/* The event will not be a multi-day event */
+
+    event_g.CEPS_reserveWholeDay = 0;
+
+/*
+ * The alarm will go off "alarmMinutes" minutes before event time.
+ * Mask with CAS_INTERVAL to ensure alarmMinutes is in range.
+ */
+
+    event_g.CEPS_alarm = 
+          CAS_HAS_ALARM |
+        ( CAIT_MINUTES &lt;&lt; CAS_TYPE_OFFSET ) |
+        ( CAS_INTERVAL & ( alarmMinutes &lt;&lt; CAS_INTERVAL_OFFSET ));
+
+/* Event has a text description */
+
+    event_g.CEPS_eventType = CEDT_GEOS_TEXT;
+
+/* Event is not repeating */
+
+    event_g.CEPS_repeatInfo = 0;
+
+/* Assume event text is already pointed to by eventText_g */
+
+    event_g.CEPS_dataLength = LocalStringSize( eventText_g );
+    event_g.CEPS_data = eventText_g;
+</PRE>
+</TABLE>
+<H3>Specifying a To-do Event</H3>
+
+To specify a to-do list event, the start date is set to
+<CODE>CAL_NO_DATE</CODE> and the to-do priority is set in the start time
+field.
+<P>
+<TABLE BORDER=2 CELLPADDING=10><TR><TD>
+<PRE>
+@include &lt;calendar.goh&gt;
+
+/* Declare event_g as a Calendar event param structure */
+
+    CalendarEventParamStruct event_g;
+
+/* Other variables in this example */
+
+    word     myPriority;
+    TCHAR    *eventText_g;
+
+/* "myPriority" can be in the range [0-2] here, corresponding to 
+ * CTDIS_HIGH_PRIORITY, CTDIS_NORMAL_PRIORITY, and CTDIS_COMPLETED. 
+ */
+
+    event_g.CEPS_startDateTime = 
+        ((dword)CAL_NO_DATE &lt;&lt; FDAT_DAY_OFFSET) | 
+        ((dword)(myPriority + CTDIS_HIGH_PRIORITY)  &lt;&lt; FDAT_2SECOND_OFFSET);
+
+/* Assume the to-do text is already pointed to by eventText_g */
+
+    event_g.CEPS_dataLength = LocalStringSize( eventText_g );
+    event_g.CEPS_data = eventText_g;
+
+/* This parameter must be zero, otherwise the error CEE_EVENT_NOT_SUPPORTED 
+ * will be generated.
+ */
+    event_g.CEPS_repeatInfo = 0;
+</PRE>
+</TABLE>
+<P>
+Other parameters in <CODE>CalendarEventParamStruct</CODE> will be ignored.
+
+<H3>Adding an Event</H3>
+
+To add an event, send <CODE>MSG_CALENDAR_ADD_EVENT</CODE> to the Calendar
+application's process object via IACP.  The error code and assigned event ID
+can be checked in your callback method
+(<CODE>MSG_CALAPI_PROCESS_ADD_EVENT_CALLBACK</CODE> here); see examples
+of callbacks below.
+<P>
+<TABLE BORDER=2 CELLPADDING=10><TR><TD>
+<PRE>
+      /*
+       * serverGeodeToken    - token of the calendar app
+       * connectionFlags     - optional flags for connection
+       * iacpConnectionToken - token for this IACP connection
+       * serverCount         - the number of running servers
+       * hMsgToSend          - handle of the recorded message
+       * hLaunchBlock        - handle of launch block
+       * pLaunchBlock        - pointer to launch block
+       */
+    GeodeToken	     serverGeodeToken = CALENDAR_TOKEN;
+    IACPConnectFlags connectionFlags  = 0;
+    IACPConnection   iacpConnectionToken;
+    word	     serverCount;
+    EventHandle      hMsgToSend;
+    MemHandle        hLaunchBlock;
+    AppLaunchBlock * pLaunchBlock;
+
+      /*
+       * Make a launch block so that server (calendar app) is
+       * launched if not running already.
+       */
+    hLaunchBlock = IACPCreateDefaultLaunchBlock(
+        MSG_GEN_PROCESS_OPEN_APPLICATION );
+
+      /*
+       * Make sure it does not bring up the calendar on top of us.
+       * Otherwise, the user can interact with it and produce
+       * unwanted side-effects.
+       */
+    pLaunchBlock = MemLock( hLaunchBlock );
+    pLaunchBlock-&gt;ALB_launchFlags |=
+	( ALF_OPEN_IN_BACK | ALF_DO_NOT_OPEN_ON_TOP );
+    MemUnlock( hLaunchBlock );
+
+      /*
+       * Connect to the Calendar IACP server.
+       */
+    iacpConnectionToken = IACPConnect( &amp;serverGeodeToken,
+                                       connectionFlags,
+                                       hLaunchBlock,
+                                       NullOptr,
+                                       &amp;serverCount );
+
+    if ( iacpConnectionToken != IACP_NO_CONNECTION ) {
+
+          /*
+           * Record the ADD_EVENT message for transmittal via IACP.
+           */
+
+        hMsgToSend = @record null::MSG_CALENDAR_ADD_EVENT(
+                &amp;event_g;
+                ConstructOptr( GeodeGetProcessHandle(), NullChunk ),
+                MSG_CALAPI_PROCESS_ADD_EVENT_CALLBACK );
+
+          /*
+           * Send the recorded message to the Calendar process obj 
+           * using IACPSendMessage.
+           */
+
+        IACPSendMessage( iacpConnectionToken,
+                         hMsgToSend,
+                         TO_PROCESS,
+                         NULL,
+                         IACPS_CLIENT );
+          /*
+           * Shut down the IACP connection and return the error value.
+           */
+
+        IACPShutdown( iacpConnectionToken, NullOptr );
+        return( CAE_NO_ERROR );
+    }
+    else {
+          /*
+           * Return an error as something went wrong
+           * trying to connect to the calendar app.
+           */
+        return( CAE_CANNOT_CONNECT_CALENDAR );
+    }
+</PRE>
+</TABLE>
+<H3>Getting an Event</H3>
+
+To retrieve event parameters from an event you added (perhaps to check for
+any changes made by the user), send
+<CODE>MSG_CALENDAR_GET_EVENT_BY_ID</CODE> via IACP and inspect the returned
+memory block in your callback method.  Send the IACP message as above,
+replacing the ADD_EVENT request with a GET_EVENT one; the
+<CODE>eventID</CODE> is the one returned to your ADD_EVENT callback.
+<P>
+<TABLE BORDER=2 CELLPADDING=10><TR><TD>
+<PRE>
+        hMsgToSend = @record MSG_CALENDAR_GET_EVENT_BY_ID(
+                eventID,
+                GeodeGetProcessHandle(),
+                ConstructOptr( GeodeGetProcessHandle(), NullChunk ),
+                MSG_CALAPI_PROCESS_GET_EVENT_CALLBACK );
+</PRE>
+</TABLE>
+<P>
+In your callback method (the last parameter above), extract the information
+you are interested in.  See the sample application <STRONG
+CLASS="fileName">CalApi</STRONG> for the complete method; excerpts are shown
+below.
+<P>
+<TABLE BORDER=2 CELLPADDING=10><TR><TD>
+<PRE>
+/* In your class declaration: */
+
+    @message (CALENDAR_GET_EVENT_CALLBACK_MSG)
+                         MSG_CALAPI_PROCESS_GET_EVENT_CALLBACK;;
+
+/********************************************************************
+ *		MSG_CALAPI_PROCESS_GET_EVENT_CALLBACK
+ ********************************************************************
+ * SYNOPSIS:	 Callback from Calendar IACP server on result of
+ *               MSG_CALENDAR_GET_EVENT_BY_ID.
+ * PARAMETERS:	 CalendarEventError error
+ *               MemHandle          eventBlock
+ * RETURN:       void
+ *
+ * STRATEGY:  Check status value; successful if CEE_NORMAL
+ *            If successful,
+ *               Lock and dereference returned global block
+ *               Calculate pointer to event text (it follows
+ *                   the returned event structure)
+ *               Extract information from structure
+ *               Free the global memory block!
+ *
+ *******************************************************************/
+@method CalApiProcessClass, MSG_CALAPI_PROCESS_GET_EVENT_CALLBACK
+{
+      /*
+       * eventData     - pointer to the returned event data
+       * eventTextData - pointer to the event description
+       * dateTime      - dateTime structure used to display event info
+       * tempStr       - used to convert event info into strings
+       * alarmType     - used to convert alarm info into alarm setting
+       */
+    CalendarReturnedEventStruct * eventData;
+    TCHAR *                       eventTextData;
+    TimerDateAndTime              dateTime;
+    TCHAR                         tempStr[MAX_EVENT_TEXT_LENGTH];
+    CalApiAlarmType               alarmType;
+
+      /*
+       * If there are no errors in getting the event,
+       * we lock down the returned structure and dereference
+       * the event text description.
+       */
+    if ( CEE_NORMAL == error ) {
+	eventData = MemLock( eventBlock );
+	eventTextData = (TCHAR*)((TCHAR*)eventData +
+                        sizeof( CalendarReturnedEventStruct ) );
+          /*
+           * Convert the start date/time into strings.
+           * First turn the FileDateAndTime into a TimerDateAndTime.
+           * Then use LocalFormatDateTime to turn that into a string.
+           * Don't forget to handle the case where the date or
+           * time isn't specified (i.e. equals -1).
+           */
+        dateTime.TDAT_year = FDATExtractYear( eventData-&gt;CRES_startDateTime ) +
+                             FDAT_BASE_YEAR;
+        dateTime.TDAT_month = FDATExtractMonth( eventData-&gt;CRES_startDateTime );
+        dateTime.TDAT_day = FDATExtractDay( eventData-&gt;CRES_startDateTime );
+        dateTime.TDAT_hours = FDATExtractHour( eventData-&gt;CRES_startDateTime );
+        dateTime.TDAT_minutes = FDATExtractMinute(
+            eventData-&gt;CRES_startDateTime );
+        if ( ( eventData-&gt;CRES_startDateTime & 0x0000ffff ) == CAL_NO_DATE ) {
+            strcpy( tempStr, "NO_DATE" );
+        }
+        else {
+            LocalFormatDateTime( tempStr, DTF_SHORT, &amp;dateTime );
+        }
+
+        if ( ( eventData-&gt;CRES_startDateTime & 0xffff0000 ) == 
+          (dword)CAL_NO_TIME &lt;&lt; 16 ) {
+            strcpy( tempStr, "NO_TIME" );
+        }
+        else {
+            LocalFormatDateTime( tempStr, DTF_HM_24HOUR, &amp;dateTime );
+        }
+       
+     /* Perform any other processing; display information... */
+
+          /*
+           * Free the event data block.
+           */
+	MemFree( eventBlock );
+    }
+    else {
+        /* Error handling for error != CEE_NORMAL ... */
+    }
+} /* MSG_CALAPI_PROCESS_GET_EVENT_CALLBACK */
+</PRE>
+</TABLE>
+<H3>Checking for Events</H3>
+
+To check for events in a given time range, pass the start and end times with
+<CODE>MSG_CALENDAR_CHECK_IF_EVENT_EXISTS</CODE> via IACP (as in the example
+above).  Use your callback to interpret the returned status code.
+
+<TABLE BORDER=2 CELLPADDING=10><TR><TD>
+<PRE>
+/* Check for events overlapping the range 12:15 PM June 9, 1997 until
+   9:15 AM June 10, 1997  */
+
+/* Note that constants are specified as Long literals. */
+
+    FileDateAndTime          startDateTime_g =
+        ( ( ( 1997L - FDAT_BASE_YEAR ) &lt;&lt; FDAT_YEAR_OFFSET ) |
+          ( 6L    &lt;&lt; FDAT_MONTH_OFFSET  ) |
+          ( 9L    &lt;&lt; FDAT_DAY_OFFSET    ) |
+          ( 12L   &lt;&lt; FDAT_HOUR_OFFSET   ) |
+          ( 15L   &lt;&lt; FDAT_MINUTE_OFFSET ) );
+
+    FileDateAndTime          endDateTime_g =
+        ( ( ( 1997L - FDAT_BASE_YEAR ) &lt;&lt; FDAT_YEAR_OFFSET ) |
+          ( 6L    &lt;&lt; FDAT_MONTH_OFFSET  ) |
+          ( 10L   &lt;&lt; FDAT_DAY_OFFSET    ) |
+          ( 9L    &lt;&lt; FDAT_HOUR_OFFSET   ) |
+          ( 15L   &lt;&lt; FDAT_MINUTE_OFFSET ) );
+
+    hMsgToSend = @record null::MSG_CALENDAR_CHECK_IF_EVENT_EXISTS(
+            startDateTime_g,
+            endDateTime_g,
+            ConstructOptr( GeodeGetProcessHandle(), NullChunk ),
+            MSG_CALAPI_PROCESS_CHECK_IF_EVENT_EXISTS_CALLBACK );
+</PRE>
+</TABLE>
+<P>
+<TABLE BORDER=2 CELLPADDING=10><TR><TD>
+<PRE>
+/* In CalApiProcessClass, declare the method: */
+
+    @message (CALENDAR_ACCESS_EVENT_COMMON_CALLBACK_MSG)
+                  MSG_CALAPI_PROCESS_CHECK_IF_EVENT_EXISTS_CALLBACK;
+ 
+/********************************************************************
+ *            MSG_CALAPI_PROCESS_CHECK_IF_EVENT_EXISTS_CALLBACK
+ ********************************************************************
+ * SYNOPSIS:     Callback from Calendar IACP server on result of
+ *               MSG_CALENDAR_CHECK_IF_EVENT_EXISTS.
+ * PARAMETERS:   CalendarEventError error
+ * RETURN:       void
+ * STRATEGY:     If an event existed, CEE_NORMAL is returned;
+ *               otherwise, we get CEE_EVENT_NOT_FOUND.
+ *******************************************************************/
+@method CalApiProcessClass, MSG_CALAPI_PROCESS_CHECK_IF_EVENT_EXISTS_CALLBACK
+{
+    if (error == CEE_NORMAL) {
+ 
+  /* At least one event in search range... */
+
+    } else if (error == CEE_EVENT_NOT_FOUND) {
+
+  /* No events overlap search range...*/
+
+    } else {
+
+  /* A processing error occurred... */
+
+    }
+} /* MSG_CALAPI_PROCESS_CHECK_IF_EVENT_EXISTS_CALLBACK */
+</PRE>
+</TABLE>
+
+<HR>
+<A NAME="CalReference.htm"></A>
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Calendar API</A>: 3 Reference</H2>
+
+
+<H2>Messages</H2>
+<A HREF="#IX_MSG_CALENDAR_ADD_EVENT">MSG_CALENDAR_ADD_EVENT</A><BR>
+<A HREF="#IX_MSG_CALENDAR_GET_EVENT_BY_ID">MSG_CALENDAR_GET_EVENT_BY_ID</A><BR>
+<A HREF="#IX_MSG_CALENDAR_MODIFY_EVENT_BY_ID">MSG_CALENDAR_MODIFY_EVENT_BY_ID</A><BR>
+<A HREF="#IX_MSG_CALENDAR_DELETE_EVENT_BY_ID">MSG_CALENDAR_DELETE_EVENT_BY_ID</A><BR>
+<A HREF="#IX_MSG_CALENDAR_CHECK_IF_EVENT_EXISTS">MSG_CALENDAR_CHECK_IF_EVENT_EXISTS</A>
+
+<H2>Prototypes</H2>
+
+<A HREF="#IX_CALENDAR_ADD_EVENT_CALLBACK_MSG">CALENDAR_ADD_EVENT_CALLBACK_MSG</A><BR>
+<A HREF="#IX_CALENDAR_GET_EVENT_CALLBACK_MSG">CALENDAR_GET_EVENT_CALLBACK_MSG</A><BR>
+<A HREF="#IX_CALENDAR_ACCESS_EVENT_COMMON_CALLBACK_MSG">CALENDAR_ACCESS_EVENT_COMMON_CALLBACK_MSG</A>
+
+<H2>Structures</H2>
+
+<A HREF="#IX_CalendarEventParamStruct">CalendarEventParamStruct</A><BR>
+<A HREF="#IX_CalendarReturnedEventStruct">CalendarReturnedEventStruct</A><BR>
+<A HREF="#IX_CalendarEventRepeatInfo">CalendarEventRepeatInfo</A><BR>
+<A HREF="#IX_CalendarEventRepeatDurationData">CalendarEventRepeatDurationData</A>
+
+<H2>WordFlags</H2>
+<A HREF="#IX_CalendarAlarmStruct">CalendarAlarmStruct</A><BR>
+<A HREF="#CalendarEventRepeatLength">CalendarEventRepeatLength</A>
+
+<H2>ByteEnums</H2>
+<A HREF="#IX_CalendarEventDescType">CalendarEventDescType</A><BR>
+<A HREF="#CalendarAlarmIntervalType">CalendarAlarmIntervalType</A><BR>
+<A HREF="#IX_CalendarEventRepeatDuration">CalendarEventRepeatDuration</A><BR>
+<A HREF="#CalendarEventRepeatLengthUnitType">CalendarEventRepeatLengthUnitType</A><BR>
+<A HREF="#CalendarEventRepeatWeekday">CalendarEventRepeatWeekday</A><BR>
+<A HREF="#CalendarEventRepeatIntervalType">CalendarEventRepeatIntervalType</A><BR>
+<A HREF="#IX_CalendarEventRepeatInterval">CalendarEventRepeatInterval</A>
+
+<H2>enums</H2>
+<A HREF="#IX_CalendarEventError">CalendarEventError</A><BR>
+<A HREF="#CalendarToDoItemStatus">CalendarToDoItemStatus</A>
+<HR>
+
+<DIV>
+<A NAME="CalReference.htm_IX_MSG_CALENDAR_ADD_EVENT"></A>
+<H2 CLASS="refHeading">
+MSG_CALENDAR_ADD_EVENT</H2>
+
+<PRE CLASS="syntax">void        MSG_CALENDAR_ADD_EVENT(
+        <A HREF="#IX_CalendarEventParamStruct">CalendarEventParamStruct</A>
+                         *params,
+        optr             completionOptr,
+        Message          completionMsg); </PRE>
+
+<P>Adds an event to the calendar database. Only ordinary, multi-day, and
+to-do list events are supported; repeating events are not.</P>
+
+<P CLASS="refField"><STRONG>Pass: </STRONG></P>
+
+<DL>
+<DT><EM>*params</EM> </DT>
+
+<DD>Pointer to a <CODE>CalendarEventParamStruct</CODE> structure holding the
+event you are adding.</DD>
+
+<DT><EM>completionOptr</EM> </DT>
+
+<DD>Optr to the object in your application to receive the callback reply
+message; specify zero (0) for no callback.</DD>
+
+<DT><EM>completionMsg</EM> </DT>
+
+<DD>Name of your callback-handling message.</DD>
+</DL>
+
+<P CLASS="refField"><STRONG>Return:</STRONG> Nothing. Error status and event ID (if successful) are
+passed to your callback method, if specified.</P>
+
+<P CLASS="refField"><STRONG>Include:</STRONG> <STRONG CLASS="fileName">calendar.goh</STRONG> </P>
+
+<P CLASS="refField"><STRONG>See Also: </STRONG>
+<A HREF="#IX_CALENDAR_ADD_EVENT_CALLBACK_MSG">CALENDAR_ADD_EVENT_CALLBACK_MSG</A>
+prototype. </P>
+</DIV>
+
+<DIV>
+<A NAME="CalReference.htm_IX_MSG_CALENDAR_GET_EVENT_BY_ID"></A>
+<H2 CLASS="refHeading">
+MSG_CALENDAR_GET_EVENT_BY_ID</H2>
+
+<PRE CLASS="syntax">void        MSG_CALENDAR_GET_EVENT_BY_ID(
+        dword            eventID,
+        GeodeHandle      owner,
+        optr             completionOptr,
+        Message          completionMsg); </PRE>
+
+<P>Gets an event in the calendar database. Only ordinary, multi-day, and
+to-do list events are supported; repeating events are not.</P>
+
+<P CLASS="refField"><STRONG>Pass: </STRONG></P>
+
+<DL>
+<DT><EM>eventID</EM> </DT>
+
+<DD>Unique event ID specifying the event you are requesting. This ID was
+returned when you added the event with 
+<A HREF="#IX_MSG_CALENDAR_ADD_EVENT">MSG_CALENDAR_ADD_EVENT</A>.</DD>
+
+<DT><EM>owner</EM> </DT>
+
+<DD>Owner assigned to the created memory block holding the event data.
+It should correspond to the thread that will lock and read the block.</DD>
+
+<DT><EM>completionOptr</EM> </DT>
+
+<DD>Optr to the object in your application to receive the callback reply
+message.</DD>
+
+<DT><EM>completionMsg</EM> </DT>
+
+<DD>Name of your callback-handling message.</DD>
+</DL>
+
+<P CLASS="refField"><STRONG>Return:</STRONG> Nothing. Error status and data block handle are passed
+to your callback method.</P>
+
+<P CLASS="refField"><STRONG>Include:</STRONG> <STRONG CLASS="fileName">calendar.goh</STRONG> </P>
+
+<P CLASS="refField"><STRONG>See Also: </STRONG>
+<A HREF="#IX_CALENDAR_GET_EVENT_CALLBACK_MSG">CALENDAR_GET_EVENT_CALLBACK_MSG</A>
+prototype. </P>
+</DIV>
+
+<DIV>
+<A NAME="CalReference.htm_IX_MSG_CALENDAR_MODIFY_EVENT_BY_ID"></A>
+<H2 CLASS="refHeading">
+MSG_CALENDAR_MODIFY_EVENT_BY_ID</H2>
+
+<PRE CLASS="syntax">void       MSG_CALENDAR_MODIFY_EVENT_BY_ID(
+        <A HREF="#IX_CalendarEventParamStruct">CalendarEventParamStruct</A>
+                         *params,
+        dword            eventID,
+        optr             completionOptr,
+        Message          completionMsg); </PRE>
+
+<P>Modifies an event in the calendar database. Only ordinary, multi-day,
+and to-do list events are supported; repeating events are not.</P>
+
+<P CLASS="refField"><STRONG>Pass: </STRONG></P>
+
+<DL>
+<DT><EM>*params</EM> </DT>
+
+<DD>Pointer to a <CODE>CalendarEventParamStruct</CODE> structure holding the
+modified event, which will completely replace the existing event.</DD>
+
+<DT><EM>eventID</EM> </DT>
+
+<DD>Unique event ID specifying the event you are modifying. This ID was
+returned when you added the event with 
+<A HREF="#IX_MSG_CALENDAR_ADD_EVENT">MSG_CALENDAR_ADD_EVENT</A>.</DD>
+
+<DT><EM>completionOptr</EM> </DT>
+
+<DD>Optr to the object in your application to receive the callback reply
+message; specify zero (0) for no callback.</DD>
+
+<DT><EM>completionMsg</EM> </DT>
+
+<DD>Name of your callback-handling message.</DD>
+</DL>
+
+<P CLASS="refField"><STRONG>Return:</STRONG> Nothing. Error status is passed to your callback method,
+if specified.</P>
+
+<P CLASS="refField"><STRONG>Include:</STRONG> <STRONG CLASS="fileName">calendar.goh</STRONG> </P>
+
+<P CLASS="refField"><STRONG>See Also: </STRONG>
+<A HREF="#IX_CALENDAR_ACCESS_EVENT_COMMON_CALLBACK_MSG">
+CALENDAR_ACCESS_EVENT_COMMON_CALLBACK_MSG</A>
+prototype. </P>
+</DIV>
+
+<DIV>
+<A NAME="CalReference.htm_IX_MSG_CALENDAR_DELETE_EVENT_BY_ID"></A>
+<H2 CLASS="refHeading">
+MSG_CALENDAR_DELETE_EVENT_BY_ID</H2>
+
+<PRE CLASS="syntax">void        MSG_CALENDAR_DELETE_EVENT_BY_ID(
+        dword            eventID,
+        optr             completionOptr,
+        Message          completionMsg); </PRE>
+
+<P>Deletes an event in the calendar database. Only ordinary, multi-day,
+and to-do list events are supported; repeating events are not.</P>
+
+<P CLASS="refField"><STRONG>Pass: </STRONG></P>
+
+<DL>
+<DT><EM>eventID</EM> </DT>
+
+<DD>Unique event ID specifying the event you are deleting. This ID was
+returned when you added the event with 
+<A HREF="#IX_MSG_CALENDAR_ADD_EVENT">MSG_CALENDAR_ADD_EVENT</A>.</DD>
+
+<DT><EM>completionOptr</EM> </DT>
+
+<DD>Optr to the object in your application to receive the callback reply
+message; specify zero (0) for no callback.</DD>
+
+<DT><EM>completionMsg</EM> </DT>
+
+<DD>Name of your callback-handling message.</DD>
+</DL>
+
+<P CLASS="refField"><STRONG>Return:</STRONG> Nothing. Error status is passed to your callback method,
+if specified.</P>
+
+<P CLASS="refField"><STRONG>Include:</STRONG> <STRONG CLASS="fileName">calendar.goh</STRONG> </P>
+
+<P CLASS="refField"><STRONG>See Also: </STRONG>
+<A HREF="#IX_CALENDAR_ACCESS_EVENT_COMMON_CALLBACK_MSG">
+CALENDAR_ACCESS_EVENT_COMMON_CALLBACK_MSG</A> prototype.
+</P>
+</DIV>
+
+<DIV>
+<A NAME="CalReference.htm_IX_MSG_CALENDAR_CHECK_IF_EVENT_EXISTS"></A>
+<H2 CLASS="refHeading">
+MSG_CALENDAR_CHECK_IF_EVENT_EXISTS</H2>
+
+<PRE CLASS="syntax">void        MSG_CALENDAR_CHECK_IF_EVENT_EXISTS(
+        <A HREF="../../CRef/Structs/S_14.htm#IX_FileDateAndTime">FileDateAndTime</A>  startDateTime,
+        <A HREF="../../CRef/Structs/S_14.htm#IX_FileDateAndTime">FileDateAndTime</A>  endDateTime,
+        optr             completionOptr,
+        Message          completionMsg); </PRE>
+
+<P>Searches the calendar database to see whether any events occur during
+a specified interval. Only ordinary, multi-day, and to-do list events are
+checked; repeating events are not.</P>
+
+<P CLASS="refField"><STRONG>Pass: </STRONG></P>
+
+<DL>
+<DT><EM>startDateTime</EM> </DT>
+
+<DD>Start date and time of search interval.</DD>
+
+<DT><EM>endDateTime</EM> </DT>
+
+<DD>End date and time of search interval.</DD>
+
+<DT><EM>completionOptr</EM> </DT>
+
+<DD>Optr to the object in your application to receive the callback reply
+message.</DD>
+
+<DT><EM>completionMsg</EM> </DT>
+
+<DD>Name of your callback-handling message.</DD>
+</DL>
+
+<P CLASS="refField"><STRONG>Return:</STRONG> Nothing; the search result is passed to your callback
+method.  The successful results are:</P>
+
+<UL>
+<LI><CODE>CEE_NORMAL</CODE> indicates at least one event in the database overlaps your
+search range. </LI>
+
+<LI><CODE>CEE_EVENT_NOT_FOUND</CODE> indicates that no events in the database overlap
+your search range. </LI>
+</UL>
+
+<P CLASS="refField"><STRONG>Include:</STRONG> <STRONG CLASS="fileName">calendar.goh</STRONG> </P>
+
+<P CLASS="refField"><STRONG>See Also: </STRONG>
+<A HREF="#IX_CALENDAR_ACCESS_EVENT_COMMON_CALLBACK_MSG">
+CALENDAR_ACCESS_EVENT_COMMON_CALLBACK_MSG</A> prototype.
+</P>
+</DIV>
+
+<DIV>
+<A NAME="CalReference.htm_IX_CALENDAR_ADD_EVENT_CALLBACK_MSG"></A>
+<H2 CLASS="refHeading">
+CALENDAR_ADD_EVENT_CALLBACK_MSG</H2>
+
+<PRE CLASS="syntax">void        CALENDAR_ADD_EVENT_CALLBACK_MSG(
+        <A HREF="#IX_CalendarEventError">CalendarEventError</A>
+                         error,
+        dword            eventID); </PRE>
+
+<P>Template for your 
+<A HREF="#IX_MSG_CALENDAR_ADD_EVENT">MSG_CALENDAR_ADD_EVENT</A> 
+callback. Use this prototype
+to declare, in the appropriate class definition, the method that will handle
+the callback from adding an event to the calendar database. For example:
+</P>
+
+<PRE>@message (CALENDAR_ADD_EVENT_CALLBACK_MSG) MSG_MYAPP_PROCESS_ADD_EVENT_CALLBACK;
+</PRE>
+
+<P CLASS="refField"><STRONG>Pass: </STRONG></P>
+
+<DL>
+<DT><EM>error</EM> </DT>
+
+<DD>The error code of your &quot;add event&quot; request; <CODE>CEE_NORMAL</CODE>
+if successful.</DD>
+
+<DT><EM>eventID</EM> </DT>
+
+<DD>The unique identifier of this event, if it was successfully added.</DD>
+</DL>
+
+<P CLASS="refField"><STRONG>Return:</STRONG> Nothing.</P>
+
+<P CLASS="refField"><STRONG>Include: </STRONG> <STRONG CLASS="fileName">calendar.goh</STRONG> </P>
+
+<P CLASS="refField"><STRONG>See Also: </STRONG>
+<A HREF="#IX_MSG_CALENDAR_ADD_EVENT">MSG_CALENDAR_ADD_EVENT</A> </P>
+</DIV>
+
+<DIV>
+<A NAME="CalReference.htm_IX_CALENDAR_GET_EVENT_CALLBACK_MSG"></A>
+<H2 CLASS="refHeading">
+CALENDAR_GET_EVENT_CALLBACK_MSG</H2>
+
+<PRE CLASS="syntax">void        CALENDAR_GET_EVENT_CALLBACK_MSG(
+        <A HREF="#IX_CalendarEventError">CalendarEventError</A>
+                         error,
+        MemHandle        eventBlock); </PRE>
+
+<P>Template for your 
+<A HREF="#IX_MSG_CALENDAR_GET_EVENT_BY_ID">
+MSG_CALENDAR_GET_EVENT_BY_ID</A> callback. Use this
+prototype to declare, in the appropriate class definition, the method that
+will handle the callback from getting an event in the calendar database.
+For example: </P>
+
+<PRE>@message (CALENDAR_GET_EVENT_CALLBACK_MSG) MSG_MYAPP_PROCESS_GET_EVENT_CALLBACK;
+</PRE>
+
+<P CLASS="refField"><STRONG>Pass: </STRONG></P>
+
+<DL>
+<DT><EM>error</EM> </DT>
+
+<DD>The error code of your &quot;get event&quot; request; <CODE>CEE_NORMAL</CODE> if
+successful.</DD>
+
+<DT><EM>eventBlock</EM> </DT>
+
+<DD>Unlocked global memory block containing the returned 
+<A HREF="#IX_CalendarReturnedEventStruct"><CODE>CalendarReturnedEventStruct
+</CODE></A>.</DD>
+</DL>
+
+<P CLASS="refField"><STRONG>Return:</STRONG> Nothing.</P>
+
+<P CLASS="refField"><STRONG>Include: </STRONG> <STRONG CLASS="fileName">calendar.goh</STRONG> </P>
+
+<P CLASS="refField"><STRONG>See Also: </STRONG>
+<A HREF="#IX_MSG_CALENDAR_GET_EVENT_BY_ID">
+MSG_CALENDAR_GET_EVENT_BY_ID</A> </P>
+</DIV>
+
+<DIV>
+<A NAME="CalReference.htm_IX_CALENDAR_ACCESS_EVENT_COMMON_CALLBACK_MSG"></A>
+<H2 CLASS="refHeading">
+CALENDAR_ACCESS_EVENT_COMMON_CALLBACK_MSG</H2>
+
+<PRE CLASS="syntax">void        CALENDAR_ACCESS_EVENT_COMMON_CALLBACK_MSG(
+        <A HREF="#IX_CalendarEventError">CalendarEventError</A>
+                         error); </PRE>
+
+<P>Template for your
+<UL>
+<LI><A HREF="#IX_MSG_CALENDAR_MODIFY_EVENT_BY_ID">MSG_CALENDAR_MODIFY_EVENT_BY_ID</A>,
+<LI><A HREF="#IX_MSG_CALENDAR_DELETE_EVENT_BY_ID">MSG_CALENDAR_DELETE_EVENT_BY_ID</A>,
+and  <BR>
+<LI><A HREF="#IX_MSG_CALENDAR_CHECK_IF_EVENT_EXISTS">MSG_CALENDAR_CHECK_IF_EVENT_EXISTS</A>
+</UL>
+callback functions. Use this prototype
+to declare, in the appropriate class definition, the methods that will
+handle the callbacks from these requests. For example: </P>
+
+<PRE>@message (CALENDAR_ACCESS_EVENT_COMMON_CALLBACK_MSG) 
+                 MSG_MYAPP_PROCESS_EVENT_EXISTS_CALLBACK;
+</PRE>
+
+<P CLASS="refField"><STRONG>Pass: </STRONG></P>
+
+<DL>
+<DT><EM>error</EM> </DT>
+
+<DD>The error code of your request. <CODE>CEE_NORMAL</CODE>
+ indicates successful deletion
+or modification; for the 
+<A HREF="#IX_MSG_CALENDAR_CHECK_IF_EVENT_EXISTS">MSG_CALENDAR_CHECK_IF_EVENT_EXISTS</A>
+callback,
+<CODE>CEE_NORMAL</CODE> is returned if any event overlaps with the specified range,
+<CODE>CEE_EVENT_NOT_FOUND</CODE> otherwise.</DD>
+</DL>
+
+<P CLASS="refField"><STRONG>Return:</STRONG> Nothing.</P>
+
+<P CLASS="refField"><STRONG>Include: </STRONG> <STRONG CLASS="fileName">calendar.goh</STRONG> </P>
+
+<P CLASS="refField"><STRONG>See Also: </STRONG>
+
+<A HREF="#IX_MSG_CALENDAR_MODIFY_EVENT_BY_ID">MSG_CALENDAR_MODIFY_EVENT_BY_ID</A>, 
+<A HREF="#IX_MSG_CALENDAR_DELETE_EVENT_BY_ID">MSG_CALENDAR_DELETE_EVENT_BY_ID</A>,
+<A HREF="#IX_MSG_CALENDAR_CHECK_IF_EVENT_EXISTS">MSG_CALENDAR_CHECK_IF_EVENT_EXISTS</A>.</P>
+</DIV>
+
+<DIV>
+<A NAME="CalReference.htm_IX_CalendarEventParamStruct">
+ </A>
+<H2 CLASS="refHeading">
+CalendarEventParamStruct</H2>
+<TABLE BORDER=2 CELLPADDING=10><TR><TD>
+<PRE CLASS="syntax">typedef struct {
+    <A HREF="../../CRef/Structs/S_14.htm#IX_FileDateAndTime">FileDateAndTime</A>      CEPS_startDateTime;
+    /*  Event start date and time */
+ 
+    <A HREF="../../CRef/Structs/S_14.htm#IX_FileDateAndTime">FileDateAndTime</A>      CEPS_endDateTime;
+    /*  Event end date and time */
+
+    word                CEPS_reserveWholeDay;
+    /*  Number of whole day to reserve the event. The max is
+     *  CALENDAR_MAX_RESERVE_WHOLE_DAYS. 0 if not applicable. 
+     * 
+     *    If this field is non-zero, the end date specified in
+     *    CEPS_endDateTime is ignored.
+     * 
+     *    If CEPS_startDateTime does not have time specified, it is assumed
+     *    the start time is 00:00.
+     * 
+     *    If CEPS_endDateTime does not have time specified, it is assumed
+     *    the end time is 23:59
+     */
+
+    <A HREF="#IX_CalendarAlarmStruct">CalendarAlarmStruct</A>   CEPS_alarm;
+    /*  Alarm associated with the event */
+
+    <A HREF="#IX_CalendarEventDescType">CalendarEventDescType</A> CEPS_eventType;
+    /*  Type of data of the event */
+
+    <A HREF="#IX_CalendarEventRepeatInfo">CalendarEventRepeatInfo</A> *CEPS_repeatInfo;
+    /* Repeat event info. 0 if the event is not repeating */
+
+    word                CEPS_dataLength;
+    /*  The number of bytes of the data in CEPS_data. If
+     *  CEPS_eventType is CEDT_GEOS_TEXT, CEPS_dataLength does not include
+     *  NULL.
+     */ 
+
+    char*               CEPS_data;
+    /*  The event data. If the CEPS_eventType is CEDT_GEOS_TEXT, the
+     *  text passed in from this field must be null-terminated. 
+     */ 
+} CalendarEventParamStruct; </PRE></TABLE>
+
+<TABLE BORDER=2 CELLPADDING=10><TR><TD>
+<PRE CLASS="syntax"><A NAME="CalReference.htm_CalendarToDoItemStatus"></A>typedef enum {
+    CTDIS_HIGH_PRIORITY = 0x101,
+    CTDIS_NORMAL_PRIORITY,
+    CTDIS_COMPLETED,
+} CalendarToDoItemStatus;</PRE>
+</TABLE>
+
+<P>
+This structure fully specifies a calendar event.</P>
+
+<P>
+Most of the fields are self-explanatory.  If you wish to add a to-do list
+item, specify <CODE>CAL_NO_DATE</CODE> for the start date and a 
+<CODE>CalendarToDoItemStatus</CODE> enum in place of the start time.
+To-do items do not have start or end times, nor do they repeat or have alarms.</P>
+
+<P>
+<CODE>CEPS_reserveWholeDay</CODE> is used to specify a single event that
+spans multiple days.  This is a special case of ordinary events;
+instead of creating one long event,
+the start and end time you specify will apply to each day the event lasts.
+For example, you could use this to record a conference that runs 
+from 10:00 to 15:00 for three consecutive days.</P>
+
+<P>
+When specifying <CODE>FileDateAndTime</CODE> values, cast words and
+constants to type <CODE>(dword)</CODE> and specify literal long values (such 
+as "19L") before shifting their bits.
+
+<P>True repeating events are not yet supported.</P>
+
+</DIV>
+
+<DIV>
+<A NAME="CalReference.htm_IX_CalendarAlarmStruct">
+ </A>
+<H2 CLASS="refHeading">
+CalendarAlarmStruct</H2>
+<TABLE BORDER=2 CELLPADDING=10><TR><TD>
+<PRE CLASS="syntax">typedef WordFlags CalendarAlarmStruct;
+
+<A NAME="CalReference.htm_CalendarAlarmIntervalType"></A>/* CalendarAlarmIntervalType */
+#define CAS_TYPE            (0x8000 | 0x4000)
+#define CAS_TYPE_OFFSET     (14)
+
+typedef ByteEnum CalendarAlarmIntervalType;
+#define CAIT_MINUTES	(0x0)    /* Must use CAIT_MINUTES on the Communicator */
+#define CAIT_HOURS	(0x1)
+#define CAIT_DAYS	(0x2)
+
+/*  set if there is alarm */
+#define CAS_HAS_ALARM       (0x2000)
+
+/*  data according to CAS_TYPE */
+#define CAS_INTERVAL        (0x1fff)
+#define CAS_INTERVAL_OFFSET (0)</PRE>
+</TABLE>
+
+<P>
+This structure indicates whether an alarm is set, and how long before
+the event it should activate itself.</P>
+<P>
+The <CODE>CAS_HAS_ALARM</CODE> bit indicates whether the alarm is set for
+the associated event.  If so, the number masked by <CODE>CAS_INTERVAL</CODE>
+indicates when the alarm should sound. If the interval is zero, the alarm
+activates at the start time of the event; otherwise, it activates
+<CODE>CAS_INTERVAL</CODE> time units before the event.  In the latter case,
+the time units are specified by <CODE>CAS_TYPE</CODE>, although <EM>on the 
+Nokia 9000i Communicator only CAS_TYPE = CAIT_MINUTES is valid</EM>.  If 
+another <CODE>CAS_TYPE</CODE> is specified, the alarm will default to the 
+maximum number of minutes.  
+
+<P>
+For example, an alarm can be set to go off five minutes before the start of
+an event by specifying <CODE>CAS_TYPE = CAIT_MINUTES</CODE> and
+<CODE>CAS_INTERVAL = 5</CODE>.
+</P>
+</DIV>
+
+<DIV>
+<A NAME="CalReference.htm_IX_CalendarEventDescType">
+ </A>
+<H2 CLASS="refHeading">
+CalendarEventDescType</H2>
+<TABLE BORDER=2 CELLPADDING=10><TR><TD>
+<PRE CLASS="syntax">typedef ByteEnum CalendarEventDescType;
+
+#define CEDT_GEOS_TEXT  (0x0)           /* Description is a null-terminated,
+                                         * single-byte text string in the
+                                         * GEOS character set */
+#define CEDT_UNICODE    (0x1)           /* Description is a null-terminated,
+                                         * double-byte text string in the
+                                         * Unicode character set. */ 
+#define CEDT_INK        (0x2)           /* Description is digital ink. Number
+                                         * of points can be determined from
+                                         * the dataLength field. *</PRE>
+</TABLE>
+<P>
+This enum indicates the format of the event description.
+Only CEDT_GEOS_TEXT is currently supported.</P>
+</DIV>
+
+<DIV>
+<A NAME="CalReference.htm_IX_CalendarReturnedEventStruct">
+ </A>
+<H2 CLASS="refHeading">
+CalendarReturnedEventStruct</H2>
+<TABLE BORDER=2 CELLPADDING=10><TR><TD>
+<PRE CLASS="syntax">typedef struct {
+    dword               CRES_eventID;
+    /*  Unique event ID */
+
+    <A HREF="../../CRef/Structs/S_14.htm#IX_FileDateAndTime">FileDateAndTime</A>      CRES_startDateTime;
+    /*  Event start date and time */
+ 
+    <A HREF="../../CRef/Structs/S_14.htm#IX_FileDateAndTime">FileDateAndTime</A>      CRES_endDateTime;
+    /*  Event end date and time */
+
+    word                CRES_reserveWholeDay;
+    /*  Number of whole day to reserve the event. The max is
+     *  CALENDAR_MAX_RESERVE_WHOLE_DAYS. 0 if not applicable. 
+     * 
+     *    If this field is non-zero, the end date specified in
+     *    CRES_reserveWholeDay is ignored.
+     * 
+     *    If CRES_startDateTime does not have time specified, it is assumed
+     *    the start time is 00:00.
+     * 
+     *    If CRES_endDateTime does not have time specified, it is assumed
+     *    the end time is 23:59
+     */
+
+    <A HREF="#IX_CalendarAlarmStruct">CalendarAlarmStruct</A> CRES_alarm;
+    /*  Alarm associated with the event */
+
+    <A HREF="#IX_CalendarEventDescType">CalendarEventDescType</A> CRES_eventType;
+    /*  Type of data of the event */
+
+    word                CRES_repeatInfo;
+    /* Offset in this block that points to CalendarEventRepeatInfo repeat
+     * event info. 0 if the event is not repeating. */ 
+
+    word                CRES_dataLength;
+    /*  The number of bytes of the data in CRES_data. If
+     *  CRES_eventType is CEDT_GEOS_TEXT, CRES_dataLength does not include
+     *  NULL.
+     */ 
+
+/*    label     char            CRES_data;*/
+    /*  The event data. If the CRES_eventType is CEDT_GEOS_TEXT, the
+     *  text passed in from this field must be null-terminated. 
+     */ 
+} CalendarReturnedEventStruct; </PRE>
+</TABLE>
+
+<P>
+The event data (<CODE>CRES_data</CODE>) immediately follow this structure 
+in the returned block.  If <CODE>CRES_eventType = CEDT_GEOS_TEXT</CODE>, 
+the text must be null-terminated. 
+<P>
+<CODE>CRES_repeatInfo</CODE> is not currently supported.
+</P>
+</DIV>
+
+<DIV>
+<A NAME="CalReference.htm_IX_CalendarEventError">
+ </A>
+<H2 CLASS="refHeading">
+CalendarEventError</H2>
+<TABLE BORDER=2 CELLPADDING=10><TR><TD>
+<PRE CLASS="syntax">typedef enum {
+    CEE_NORMAL = 0x0,
+    CEE_GENERAL_ERROR,
+    CEE_INTERNAL_ERROR,
+    CEE_NOT_ENOUGH_MEMORY,
+    CEE_NOT_ENOUGH_DISKSPACE,
+    CEE_EVENT_NOT_FOUND,
+    CEE_EVENT_TEXT_TOO_LONG,
+    CEE_INVALID_DATE,
+    CEE_INVALID_TIME,
+    CEE_INVALID_TODO_ITEM_STATUS,
+    CEE_INVALID_RESERVE_WHOLE_DAY,
+    CEE_INVALID_ALARM,
+    CEE_INVALID_EVENT_TYPE,
+    CEE_START_DATE_LATER_THAN_END_DATE,
+    CEE_START_TIME_LATER_THAN_END_TIME,
+    CEE_MISSING_END_TIME_WHEN_START_TIME_AND_END_DATE_ARE_SET,
+    CEE_EVENT_NOT_SUPPORTED,
+    CEE_INVALID_TIME_RANGE,             /*  The time range specified
+                                         *  is invalid: end date/time
+                                         *  is earlier than start date/time.*/
+    CEE_ACCESS_DENIED                   /*  The requested event is in use and
+                                         *  your access is denied. */ 
+} CalendarEventError;</PRE>
+</TABLE>
+
+<P>
+Error codes returned by Calendar API.</P>
+</DIV>
+
+<DIV>
+<A NAME="CalReference.htm_IX_CalendarEventRepeatInfo">
+ </A>
+<H2 CLASS="refHeading">
+CalendarEventRepeatInfo</H2>
+<TABLE BORDER=2 CELLPADDING=10><TR><TD>
+<PRE CLASS="syntax">typedef struct {    
+    <A HREF="#IX_CalendarEventRepeatInterval">CalendarEventRepeatInterval</A> CERI_interval;
+    /*  how long between events? */
+
+    <A HREF="#IX_CalendarEventRepeatDuration">CalendarEventRepeatDuration</A> CERI_duration;
+    /*  how long shall we keep this up? */
+
+    <A HREF="#IX_CalendarEventRepeatDurationData">CalendarEventRepeatDurationData</A> CERI_durationData;
+    /*  more details of duration */
+
+    word        CERI_numExceptions;
+    /*  number of exception dates */
+
+/*  label       FileDate        CERI_exceptions;*/
+    /*  array of dates on which event is *not* to take place */
+
+} CalendarEventRepeatInfo;</PRE>
+</TABLE>
+
+<P>
+Included for completeness; repeating events are not supported in 
+<STRONG CLASS="fileName">calendar.goh</STRONG> API.</P>
+<P>
+This structure specifies the repeat information in a repeating event.
+An array of exception dates, if any, follows at the end of this structure.<P>
+</DIV>
+
+<DIV>
+<A NAME="CalReference.htm_IX_CalendarEventRepeatInterval">
+ </A>
+<H2 CLASS="refHeading">
+CalendarEventRepeatInterval</H2>
+<TABLE BORDER=2 CELLPADDING=10><TR><TD>
+<PRE CLASS="syntax">typedef WordFlags CalendarEventRepeatInterval;
+
+/* which week */
+#define CERI_WEEK         (0x8000 | 0x4000 | 0x2000)
+#define CERI_WEEK_OFFSET  (13)
+
+/*  number of units between events. */
+#define CERI_COUNT        (0x1000 | 0x0800 | 0x0400 | 0x0200 | 0x0100 | 0x0080 | 0x0040)
+#define CERI_COUNT_OFFSET (6)
+
+<A NAME="CalReference.htm_CalendarEventRepeatWeekday"></A>/*  CalendarEventRepeatWeekday  */
+#define CERI_DAY          (0x0020 | 0x0010 | 0x0008)
+#define CERI_DAY_OFFSET   (3)
+
+<A NAME="CalReference.htm_CalendarEventRepeatIntervalType"></A>/*  How frequently the event should be repeated */
+/* CalendarEventRepeatIntervalType */
+#define CERI_TYPE         (0x0004 | 0x0002 | 0x0001)
+#define CERI_TYPE_OFFSET  (0)
+
+<A NAME="CalReference.htm_IX_CalendarEventRepeatWeekday"></A>typedef ByteEnum CalendarEventRepeatWeekday;
+#define CERW_SUNDAY     (0x0)
+#define CERW_MONDAY     (0x1)
+#define CERW_TUESDAY    (0x2)
+#define CERW_WEDNESDAY  (0x3)
+#define CERW_THURSDAY   (0x4)
+#define CERW_FRIDAY     (0x5)
+#define CERW_SATURDAY   (0x6)
+
+<A NAME="CalReference.htm_IX_CalendarEventRepeatIntervalType"></A>typedef ByteEnum CalendarEventRepeatIntervalType;
+#define CERIT_DAILY           (0x0)
+#define CERIT_WEEKLY          (0x1)
+#define CERIT_MONTHLY_WEEKDAY (0x2)
+#define CERIT_MONTHLY_DATE    (0x3)
+#define CERIT_YEARLY_WEEKDAY  (0x4)
+#define CERIT_YEARLY_DATE     (0x5)</PRE>
+</TABLE>
+
+<P>
+Included for completeness; repeating events are not supported in 
+<STRONG CLASS="fileName">calendar.goh</STRONG> API.</P>
+<P>
+This member specifies the interval between occurrences of the event.
+The meaning of <CODE>CERI_WEEK</CODE>, <CODE>CERI_DAY</CODE>, and <CODE>CERI_COUNT</CODE>
+depends on the type of interval for the repeating event:</P>
+<DL>
+<DT>DAILY:</DT>
+<DD>
+         CERI_WEEK = unused<BR>
+         CERI_DAY = unused<BR>
+         CERI_COUNT = number of days between repeats (usually 1)</DD>
+<P>
+<DT>WEEKLY:</DT>
+<DD>
+         CERI_WEEK = unused<BR>
+         CERI_DAY = which day of week to repeat<BR>
+         CERI_COUNT = number of weeks between repeats (usually 1)</DD>
+<P>
+<DT>BI-WEEKLY:</DT>
+<DD>
+         CERI_WEEK = unused<BR>
+         CERI_DAY = which day of week to repeat<BR>
+         CERI_COUNT = number of weeks between repeats (2 in this case)</DD>
+<P>
+<DT>MONTHLY_WEEKDAY (e.g., the first Thursday of each month):</DT>
+<DD>
+         CERI_WEEK = which week in month<BR>
+         CERI_DAY = which day of week<BR>
+         CERI_COUNT = number of months between repeats (usually 1)</DD>
+<P>
+<DT>MONTH_DATE (e.g., the 15th of each month):</DT>
+<DD>
+         CERI_WEEK = unused<BR>
+         CERI_DAY = unused<BR>
+         CERI_COUNT = number of months between repeats (the date is
+                 taken from the appointment info itself, not the repeat info)</DD>
+<P>
+<DT>YEARLY_WEEKDAY (e.g., the first Thursday of November):</DT>
+<DD>
+         CERI_WEEK = which week in month<BR>
+         CERI_DAY = which day of week<BR>
+         CERI_COUNT = number of years between repeats (month is taken from
+                 the appointment info itself, not the repeat info)</DD>
+<P>
+<DT>YEARLY_DATE (e.g., birthdays):</DT>
+<DD>
+         CERI_WEEK = unused<BR>
+         CERI_DAY = unused<BR>
+         CERI_COUNT = number of years between repeats (month and day are
+                 taken from the appointment info itself, not the repeat info)</DD>
+</DL>
+
+</DIV>
+
+<DIV>
+<A NAME="CalReference.htm_IX_CalendarEventRepeatDuration">
+ </A>
+<H2 CLASS="refHeading">
+CalendarEventRepeatDuration</H2>
+<TABLE BORDER=2 CELLPADDING=10><TR><TD>
+<PRE CLASS="syntax">typedef ByteEnum CalendarEventRepeatDuration;
+#define CERD_FOREVER    (0x0)           /*  no additional data */
+#define CERD_UNTIL      (0x1)           /*  Repeat end date */
+#define CERD_LENGTH     (0x2)           /*  CalendarEventRepeatLength */</PRE>
+</TABLE>
+
+<P>
+Included for completeness; repeating events are not supported in 
+<STRONG CLASS="fileName">calendar.goh</STRONG> API.</P>
+<P>
+This member specifies how long before occurrences of the event terminate.
+Either the event is repeated indefinitely (<CODE>CERD_FOREVER</CODE>), or for
+a finite time; <CODE>CERD_UNTIL</CODE> and <CODE>CERD_LENGTH</CODE> indicate the meaning
+of the duration-length parameter.</P>
+</DIV>
+
+<DIV>
+<A NAME="CalReference.htm_IX_CalendarEventRepeatDurationData">
+ </A>
+<H2 CLASS="refHeading">
+CalendarEventRepeatDurationData</H2>
+<TABLE BORDER=2 CELLPADDING=10><TR><TD>
+<PRE CLASS="syntax">typedef union {
+    FileDate                  CERDD_until;   /* Repeat until when */
+    CalendarEventRepeatLength CERDD_length;  /* Repeat for how long */
+} CalendarEventRepeatDurationData;
+
+<A NAME="CalReference.htm_CalendarEventRepeatLength"></A>typedef WordFlags CalendarEventRepeatLength;
+#define CERL_COUNT        (0xfffc)
+#define CERL_COUNT_OFFSET (2)
+
+<A NAME="CalReference.htm_CalendarEventRepeatLengthUnitType"></A>/* CalendarEventRepeatLengthUnitType */
+#define CERL_UNIT         (0x0002 | 0x0001)
+#define CERL_UNIT_OFFSET  (0)
+
+typedef ByteEnum CalendarEventRepeatLengthUnitType;
+#define CERLUT_DAY      (0x0)
+#define CERLUT_WEEK     (0x1)
+#define CERLUT_MONTH    (0x2)
+#define CERLUT_YEAR     (0x3)
+
+typedef WordFlags FileDate;
+#define FD_YEAR		        0xfe00  /* :7 year since FDAT_BASE_YEAR */
+#define FD_MONTH		0x01e0  /* :4 month (1-12) */
+#define FD_DAY                  0x001f  /* :5 day of the month (1-31) */
+#define FD_YEAR_OFFSET	        9
+#define FD_MONTH_OFFSET	        5
+#define FD_DAY_OFFSET		0
+
+#define FDAT_BASE_YEAR		1980 </PRE>
+</TABLE>
+
+<P>
+Included for completeness; repeating events are not supported in
+<STRONG CLASS="fileName">calendar.goh</STRONG> API.</P>
+<P>
+This member specifies the duration of a repeating event that terminates.
+The repeat interval can be specified by its termination date or by
+its length.
+<P>
+<CODE>FileDate</CODE> is an absolute date in a format defined in 
+<STRONG CLASS="fileName">file.h</STRONG>.
+<CODE>CalendarEventRepeatLength</CODE> is a word specifying a time unit
+(days, weeks, months, or years) and a count.
+The count includes the initial event day; for example,
+an event repeating every day for 3 days set for 12/15 would have events on
+12/15, 12/16, and 12/17.</P>
+</DIV>
+
+<P>
+<HR>
+
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+</BODY>
+</HTML>

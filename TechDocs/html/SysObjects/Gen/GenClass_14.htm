@@ -1,0 +1,745 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: GenClass_14.htm,v 1.1 97/06/02 16:12:26 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Optional Attributes (ATTRs)</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">GenClass</A>: 6.1 <A HREF="GenClass_13.htm">Vardata</A>: 
+<A NAME="73802">
+ </A>
+Optional Attributes (ATTRs)</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GenClass_13.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GenClass_13.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">6 Vardata</A> 
+<!-- to next --> | <A HREF="GenClass_15.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">6.2 Hints to the Specific UI</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+Vardata attribute entries begin with the form ATTR_<EM>attributename </EM>(as in ATTR_GEN_DESTINATION_CLASS). You can initialize this data within your Goc<CODE>
+ </CODE>
+object declaration. <CODE>
+ATTR</CODE>
+s within <CODE>
+GenClass</CODE>
+ are available for use by any generic object. Several subclasses of <CODE>
+GenClass </CODE>
+also contain their own ATTR vardata entries. In <CODE>
+GenClass</CODE>
+ no vardata attributes or hints are set by default.</P>
+<P>
+ATTRs often behave as additional instance data that just happens to be vardata (and therefore optionally added). For generic objects, these should always be considered part of the generic state of an object and therefore may be saved out to the state file. You may, of course, decide not to save any such fields to the state file.</P>
+<P>
+Temporary vardata to be used by an object class can be specified using the format <CODE>
+TEMP</CODE>
+_<EM>tempname</EM>. Any data set up with<CODE>
+ TEMP</CODE>
+ in a generic object should not be saved to state and should not be considered part of the API but rather an internal field. In almost all cases, you will not need to access such vardata entries. </P>
+<P>
+For information on manipulating the variable length instance fields dynamically, along with a list of valid hints for <CODE>
+GenClass</CODE>
+, see <A HREF="GenClass_16.htm#89895"> Dynamically Managing VarData</A>
+.</P>
+
+<H2 CLASS="HeadingC">
+<A NAME="95328">
+ </A>
+Destination Classes</H2>
+<PRE><A NAME="IX_ATTR_GEN_DESTINATION_CLASS"> </A>ATTR_GEN_DESTINATION_CLASS</PRE>
+<P>
+<CODE>
+ATTR_GEN_DESTINATION_CLASS</CODE>
+ specifies the object class that should handle messages sent out by this object. Typically, an object marked with this ATTR will not have a specific destination optr, but instead a destination path defined by a <CODE>
+TravelOption</CODE>
+. The message for a generic object with a destination class travels down the generic tree along the path specified in the <CODE>
+TravelOption</CODE>
+ until it encounters an object class of type <CODE>
+ATTR_GEN_DESTINATION_CLASS</CODE>
+; at that point, the message will be handled.</P>
+<P>
+ATTR_GEN_DESTINATION_CLASS takes an argument of type <CODE>
+DestinationClassArgs</CODE>
+. This type contains a pointer to a <CODE>
+ClassStruct</CODE>
+. You may have to cast the class name into a <CODE>
+ClassStruct</CODE>
+ type when setting ATTR_GEN_DESTINATION_CLASS.</P>
+<PRE><A NAME="IX_DestinationClassArgs"> </A>typedef struct {
+	ClassStruct		* <A NAME="IX_DCA_class"> </A>DCA_class;
+} DestinationClassArgs;</PRE>
+<P CLASS="figTitle">
+Code Display 2-24 Using ATTR_GEN_DESTINATION_CLASS</P>
+<PRE>/* This object will send MSG_META_CUT to the application object and follow the
+ * target path until it encounters a VisTextClass object. At that point, the
+ * message will be handled. */</PRE>
+<PRE>@object GenTriggerClass MyTrigger = {
+    GI_visMoniker = &quot;This trigger cuts text from the target object.&quot;
+    GTI_actionMsg = MSG_META_CUT;
+    GTI_destination = (TO_APP_TARGET);
+/* The class pointer points to a ClassStruct structure. */
+    ATTR_GEN_DESTINATION_CLASS = { (ClassStruct *)&amp;VisTextClass };
+} </PRE>
+<PRE>/* To set up a destination class as any generic object, set
+ * ATTR_GEN_DESTINATION_CLASS to GenClass. This interaction sends
+ * MSG_GEN_SET_NOT_USABLE to the first focus object below the GenInteraction. */</PRE>
+<PRE>@object GenTriggerClass MyTrigger = {
+    GI_visMoniker = &quot;Remove the Focus object&quot;;
+    GTI_actionMsg = MSG_GEN_SET_NOT_USABLE;
+    GTI_destination = (TO_FOCUS);
+    ATTR_GEN_DESTINATION_CLASS = { (ClassStruct *)&amp;GenClass };
+}</PRE>
+<PRE><A NAME="IX_TO_&ldots;"> </A><A NAME="IX_GenTravelOption"> </A><A NAME="IX_TravelOption"> </A>typedef enum {
+		/* These values may be used as normal
+		 * TravelOptions, and have been set up
+		 * so that they will have no value in
+		 * common with normal TravelOptions. */
+	TO_GEN_PARENT=_FIRST_GenClass,
+	TO_FOCUS,
+	TO_TARGET,
+	TO_MODEL,
+	TO_APP_FOCUS,
+	TO_APP_TARGET,
+	TO_APP_MODEL,
+	TO_SYS_FOCUS,
+	TO_SYS_TARGET,
+	TO_SYS_MODEL,
+} GenTravelOption;</PRE>
+<P>
+The <CODE>
+TravelOption</CODE>
+ types provided with <CODE>
+GenClass</CODE>
+ are additional enumerations of the types supplied with <CODE>
+MetaClass</CODE>
+. <CODE>
+MetaClass</CODE>
+ provides the types TO_NULL, TO_SELF, TO_OBJ_BLOCK_OUTPUT and TO_PROCESS. Therefore, any generic object can use these types or the further enumerations included here.</P>
+<P>
+These <CODE>
+TravelOption</CODE>
+ types typically replace a generic object's destination with a path for a message to be delivered along. Most often, these <CODE>
+TravelOption</CODE>
+s are used in conjunction with the vardata attribute ATTR_GEN_DESTINATION_CLASS. Together, they allow a message to follow a path specified in <CODE>
+TravelOption</CODE>
+ until it encounters an object of a class specified in <CODE>
+ATTR_GEN_DESTINATION_CLASS</CODE>
+. This allows an object to generically send a message down an output path without knowing a specific destination.</P>
+
+
+<H2 CLASS="HeadingC">
+<A NAME="11206">
+ </A>
+Initialization File Management</H2>
+<PRE>MSG_GEN_LOAD_OPTIONS, MSG_GEN_SAVE_OPTIONS, ATTR_GEN_INIT_FILE_KEY, ATTR_GEN_INIT_FILE_CATEGORY, ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN, ATTR_GEN_USES_HIERARCHICAL_INIT_FILE_CATEGORY</PRE>
+<P>
+<A NAME="IX_Initialization file">
+ </A>
+Your object may request information from the GEOS.INI file upon startup. Each object on the appropriate GenApplication GCN list may receive a <CODE>
+MSG_GEN_LOAD_OPTIONS</CODE>
+ upon receiving <CODE>
+MSG_META_ATTACH</CODE>
+ (and a <CODE>
+MSG_GEN_SAVE_OPTIONS</CODE>
+ upon <CODE>
+MSG_META_SAVE_OPTIONS</CODE>
+). Various generic objects intercept this message and perform actions according to the information provided.</P>
+<P>
+Your object may also access information in the GEOS.INI file as it is being attached by including <A NAME="IX_ATTR_GEN_INIT_FILE_CATEGORY">
+ </A>
+ATTR_GEN_INIT_FILE_CATEGORY of the GEOS.INI category you are interested in and the <A NAME="IX_ATTR_GEN_INIT_FILE_KEY">
+ </A>
+ATTR_GEN_INIT_FILE_KEY of the specific keyword you want the data for. If a file key, but no file category, exists within an object declaration, then the system will query the application object for its ATTR_GEN_INIT_FILE_CATEGORY. </P>
+<P>
+Normally only the GenApplication object and any objects in its GCN list will receive <CODE>
+MSG_GEN_LOAD_OPTIONS</CODE>
+ and <CODE>
+MSG_GEN_SAVE_OPTIONS</CODE>
+. If you wish other children below these objects to also receive these messages (and therefore request or save information from the GEOS.INI file) you can add the attribute <A NAME="IX_ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN">
+ </A>
+ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN. Any objects with this attribute will send these messages on down the generic tree to their children. Any children may then also contain this attribute and pass the messages on down to their children, etc.</P>
+<P>
+Normally, the object itself and then the GenApplication object is queried for an ATTR_GEN_INIT_FILE_CATEGORY. If instead, the object wants a generic upward query of the object's parents, you can attach ATTR_GEN_USES_HIERARCHICAL_INIT_FILE_CATEGORY to the object. In this case, the object will be queried for its file category, and then query up the generic tree for the first object encountered with an ATTR_GEN_INIT_FILE_CATEGORY. In this manner, one parent may contain a file category and several children may contain different file keys within that category. </P>
+<P>
+Because this method is recursive, it is slow and therefore should be avoided. Most applications should only need one init file category.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_LOAD_OPTIONS">
+ </A>
+MSG_GEN_LOAD_OPTIONS</H4>
+<PRE CLASS="syntax">void	MSG_GEN_LOAD_OPTIONS(
+        GenOptionsParams		*params);</PRE>
+<P>
+This message instructs the generic object to load a value from the GEOS.INI file. It is called automatically by the handler in <CODE>
+GenClass</CODE>
+ for <CODE>
+MSG_META_LOAD_OPTIONS</CODE>
+. The message scans the object's vardata for an ATTR_GEN_INIT_FILE_KEY and an ATTR_GEN_INIT_FILE_CATEGORY to scan the .INI file. If no file category is found in the object's vardata, the handler will search up the generic tree for a parent with an ATTR_GEN_INIT_FILE_CATEGORY.</P>
+<P>
+You may send this message, passing it the proper <CODE>
+GenOptionsParams</CODE>
+. The return value must be cast into the proper type of whatever the entry within the file key is. This is a null-terminated text string.</P>
+<P CLASS="refField">
+Source:	Sent by <CODE>
+GenClass</CODE>
+ on <CODE>
+MSG_META_ATTACH</CODE>
+. <CODE>
+GenClass</CODE>
+ generates the <CODE>
+GenOptionsParams</CODE>
+ structure by looking in the object's vardata (and by querying up the generic tree, if necessary). </P>
+<P CLASS="refField">
+Destination:	Any generic object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+params</EM>
+	<CODE>
+GenOptionsParams</CODE>
+ structure (automatically generated by <CODE>
+GenClass</CODE>
+). See <CODE>
+MSG_GEN_SAVE_OPTIONS</CODE>
+.</P>
+<P CLASS="refField">
+Return:	Return values must be cast into the proper type of whatever the entry of category and file key is. </P>
+<P CLASS="refField">
+Interception:	Various generic classes intercept this and provide default behavior</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_SAVE_OPTIONS">
+ </A>
+MSG_GEN_SAVE_OPTIONS</H4>
+<PRE CLASS="syntax">void	MSG_GEN_SAVE_OPTIONS(
+        GenOptionsParams		*params);</PRE>
+<P>
+This message instructs the generic object to save its options to the initialization file.</P>
+<P CLASS="refField">
+Source:	Sent by <CODE>
+GenClass</CODE>
+ on <CODE>
+MSG_META_SAVE_OPTIONS</CODE>
+. <CODE>
+GenClass</CODE>
+ generates the proper <CODE>
+GenOptionsParams</CODE>
+ structure by looking in the object's vardata (and querying up the generic tree, if necessary). </P>
+<P CLASS="refField">
+Destination:	Any generic object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+params</EM>
+	<CODE>
+GenOptionsParams</CODE>
+ structure (automatically generated by <CODE>
+GenClass</CODE>
+).</P>
+<P CLASS="refField">
+Return:	Return values must be cast into the proper type of whatever the entry of category and file key is.</P>
+<P CLASS="refField">
+Interception:	Various generic classes intercept this and provide default behavior</P>
+<P CLASS="refField">
+Structures:	The <CODE>
+GenOptionsParams</CODE>
+ structure is defined as follows:</P>
+<PRE><A NAME="IX_GOP_&ldots;"> </A><A NAME="IX_GenOptionsParams"> </A>typedef struct {
+	char	GOP_category[INIT_CATEGORY_BUFFER_SIZE];
+	char	GOP_key[INIT_CATEGORY_BUFFER_SIZE];
+} GenOptionsParams;</PRE>
+
+
+
+<H2 CLASS="HeadingC">
+<A NAME="95545">
+ </A>
+Altering Default Geometry Management</H2>
+<PRE>ATTR_GEN_POSITION, ATTR_GEN_POSITION_X, ATTR_GEN_POSITION_Y</PRE>
+<P>
+You may wish, in rare cases, to hard-wire a generic object's position relative to its parent. You can do this by including one of these attributes with a position offset from the parent. These attributes supersede the geometry manager; because of this, you should exercise extreme caution whenever using these attributes. You should only use these attributes in the rare cases when the geometry manager (and hints) cannot accommodate your geometry concerns.</P>
+<P>
+ATTR_GEN_POSITION<A NAME="IX_ATTR_GEN_POSITION">
+ </A>
+ takes a <CODE>
+Point</CODE>
+ argument, specifying the x and y offset (in points) from the parent's top left corner. This point will become the object's top left corner.</P>
+<P>
+ATTR_GEN_POSITION_X<A NAME="IX_ATTR_GEN_POSITION_X">
+ </A>
+ specifies the horizontal (x) offset (in points) from the left edge of the parent. The vertical (y) offset will be left to the specific UI (or ATTR_GEN_POSITION_Y) to determine.</P>
+<P>
+ATTR_GEN_POSITION_Y<A NAME="IX_ATTR_GEN_POSITION_Y">
+ </A>
+ specifies the vertical (y) offset (in points) from the top edge of the parent. The horizontal (x) offset will be left to the specific UI (or ATTR_GEN_POSITION_X) to determine.</P>
+<P>
+Several hints also accomplish similar geometry overrides. <CODE>
+HINT_ALIGN_TOP_EDGE_WITH_OBJECT</CODE>
+<A NAME="IX_HINT_ALIGN_TOP_EDGE_WITH_OBJECT">
+ </A>
+ aligns an object's top edge with the top edge of the object (optr) this hint is set to. Similarly, <CODE>
+HINT_ALIGN_LEFT_EDGE_WITH_OBJECT</CODE>
+<A NAME="IX_HINT_ALIGN_LEFT_EDGE_WITH_OBJECT">
+ </A>
+, <CODE>
+HINT_ALIGN_RIGHT_EDGE_WITH_OBJECT</CODE>
+<A NAME="IX_HINT_ALIGN_RIGHT_EDGE_WITH_OBJECT">
+ </A>
+, and <CODE>
+HINT_ALIGN_BOTTOM_EDGE_WITH_OBJECT</CODE>
+<A NAME="IX_HINT_ALIGN_BOTTOM_EDGE_WITH_OBJECT">
+ </A>
+ all line up an object's edge with the same edge of the object these hints are set to. One of these hints can be used in each direction. The same concerns over superceding the default geometry manager in the above attributes are valid here as well. Therefore, avoid using these hints if possible.</P>
+
+
+<H2 CLASS="HeadingC">
+<A NAME="52019">
+ </A>
+Altering Delayed Mode Activity</H2>
+<PRE>ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED, ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_ENABLED</PRE>
+<P>
+Most generic objects act on changes made by the user. Some generic objects may not immediately react to these changes; instead these objects allow the user to select a variety of settings and then later &quot;apply&quot; these changes. These generic objects operate in <EM>
+delayed</EM>
+ <EM>
+mode</EM>
+ and each has an &quot;apply message&quot; associated with it. For these objects, the user may alter the state of the object or its children, but the application only sends out the action to perform those changes when the &quot;apply&quot; message is sent out.</P>
+<P>
+For example, a dialog box may contain a list of settings that represent the state of a paragraph in a word processor. If the user ever actually changes those settings, the dialog box is marked as modified, but the changes are not actually made until the object receives notification to apply its changes (send out its apply message).</P>
+<P>
+By default, these generic objects check whether their state has been modified since the last apply message has been sent out. If their state has not been modified and they receive a request to apply changes made, they instead will ignore the request. Likewise, objects set not enabled will ignore the request. ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED<A NAME="IX_ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED">
+ </A>
+ and <CODE>
+ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_ENABLED</CODE>
+<A NAME="IX_ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_ENABLED">
+ </A>
+ override this behavior, telling the generic object to send out its apply message regardless of the modified or enabled state of a generic object.</P>
+<P>
+In the above example, this would mean that whenever the dialog box receives notification to apply its changes it would not check whether its settings have been altered since the last time it applied its changes. Instead it would apply these changes anyway.</P>
+
+
+<H2 CLASS="HeadingC">
+<A NAME="18848">
+ </A>
+Notification of Visibility</H2>
+<PRE>ATTR_GEN_VISIBILITY_DATA, ATTR_GEN_VISIBILITY_MESSAGE, ATTR_GEN_VISIBILITY_DESTINATION</PRE>
+<P>
+If a generic object has its GA_NOTIFY_VISIBILITY bit set, it will notify the GenApplication object when it becomes visible or not visible. The object does this by sending <CODE>
+MSG_GEN_APPLICATION_VISIBILITY_NOTIFICATION</CODE>
+ to the GenApplication object, passing the sending object's optr as data.</P>
+<P>
+You can alter this default behavior by including one or more attributes. ATTR_GEN_VISIBILITY_MESSAGE<A NAME="IX_ATTR_GEN_VISIBILITY_MESSAGE">
+ </A>
+ specifies a different message than <CODE>
+MSG_GEN_APPLICATION_VISIBILITY_NOTIFICATION</CODE>
+; ATTR_GEN_VISIBILITY_DESTINATION<A NAME="IX_ATTR_GEN_VISIBILITY_DESTINATION">
+ </A>
+ specifies a different destination to send visibility notification to than the GenApplication object; ATTR_GEN_VISIBILITY_DATA<A NAME="IX_ATTR_GEN_VISIBILITY_DATA">
+ </A>
+ specifies a different word of data to send out than the default data (the optr of the sending object). These attributes will have no effect on objects not marked GA_NOTIFY_VISIBILITY.</P>
+
+
+<H2 CLASS="HeadingC">
+<A NAME="42380">
+ </A>
+Generic Properties</H2>
+<PRE>ATTR_GEN_PROPERTY, ATTR_GEN_NOT_PROPERTY</PRE>
+<P>
+<A NAME="IX_Delayed Mode">
+ </A>
+Objects that exhibit properties (List Objects, GenValues, GenTexts, etc.) sometimes do not exhibit immediate effects when the user interacts with the object. These objects act in what is known as <EM>
+delayed</EM>
+ <EM>
+mode</EM>
+; they only apply their properties when their object receives a MSG_GEN_APPLY. </P>
+<P>
+Properties objects such as these are usually placed within a GIT_PROPERTIES GenInteraction object. The GIT_PROPERTIES dialog box provides an &quot;Apply&quot; trigger to get the objects to apply their properties. You can, however, change this default behavior, though it is uncommon to need to do so.</P>
+<P>
+ATTR_GEN_PROPERTY, when added to an object that exhibits properties, allows an object to act like it is within a properties dialog box even if it normally operates in immediate mode. That is, it will not apply its changes until explicitly told to do so (using MSG_GEN_APPLY).</P>
+<P>
+ATTR_GEN_NOT_PROPERTY allows an object within a GIT_PROPERTIES dialog box to act like it is not within such a dialog box. That is, any user interaction with the object will result in an immediate application of those changes.</P>
+
+
+<H2 CLASS="HeadingC">
+<A NAME="59456">
+ </A>
+Window Management</H2>
+<P>
+<CODE>
+GenClass</CODE>
+ supplies several optional attributes that affect the display of windows within the user interface. Windowed objects include GenPrimarys, GenDisplays, and GenInteractions (as dialog boxes). </P>
+<P>
+The optional attributes that follow are divided into two groups. Window layering affects how windowed objects are arranged on the screen; i.e., where they appear and whether they appear above or below other windowed objects. In general, this layering behavior is only determined for windowed objects having the same parent, i.e., windows having the same parent can be custom layered, and their parents will be layered among its siblings.</P>
+<P>
+There also exist optional attributes to alter the manner in which input travels within a window. These optional attributes allow the application to provide floating keyboards for pen input.</P>
+
+<H3 CLASS="HeadingD">
+Window Layering</H3>
+<PRE>ATTR_GEN_WINDOW_CUSTOM_LAYER_ID, ATTR_GEN_WINDOW_CUSTOM_WINDOW_PRIORITY, ATTR_GEN_WINDOW_CUSTOM_LAYER_PRIORITY, ATTR_GEN_WINDOW_CUSTOM_PARENT, ATTR_GEN_WINDOW_CUSTOM_WINDOW</PRE>
+<P>
+ATTR_GEN_WINDOW_CUSTOM_LAYER_ID sets a unique layer identifier for the windowed object. All objects with a common identifier are considered part of the same window layer. These layers can then be manipulated as a unit. By convention, these IDs are usually set to the handles owned by the application; this avoids collisions with other application window layer IDs.</P>
+<P>
+If a null layer ID is specified, the handle of the block the object lies in will be selected as the layer ID at run-time. This is the common method of assigning layer IDs.</P>
+<P>
+ATTR_GEN_WINDOW_CUSTOM_LAYER_PRIORITY allows a windowed object to set its layer priority to a custom value. The optional attribute expects an argument of type <CODE>
+LayerPriority</CODE>
+. Note that all windowed objects with the same Layer ID <EM>
+must</EM>
+ have the same layer priority; therefore, this attribute must be used with care. It should only be used if a layer ID declared with ATTR_GEN_WINDOW_CUSTOM_LAYER_ID is also used.</P>
+<P>
+ATTR_GEN_WINDOW_CUSTOM_WINDOW_PRIORITY sets a custom window priority for this specific window among all other windows of the same layer ID. This optional attribute expects an argument of type <CODE>
+WindowPriority</CODE>
+. </P>
+<P>
+ATTR_GEN_WINDOW_CUSTOM_PARENT allows windowed objects to set a custom parent window. Because window layering applies only to the ordering of windows having the same parent, a window with a custom parent will have its layer ID, layer priority, and window priority compared to other windows having the same parent as ATTR_GEN_WINDOW_CUSTOM_PARENT.</P>
+<P>
+If ATTR_GEN_WINDOW_CUSTOM_PARENT is set null, this indicates that the system screen window should be the parent. Because this window is the parent window for all base windows in the system, an object setting the screen window as its custom parent will be able to appear on top of (or below) all other windows in the system (that do not have a matching layer ID). This is very low-level behavior and should be used with caution, however.</P>
+
+
+<H3 CLASS="HeadingD">
+Window Input Management</H3>
+<PRE>ATTR_GEN_WINDOW_ACCEPT_INK_EVEN_IF_NOT_FOCUSED, ATTR_GEN_WINDOW_KBD_OVERRIDE, ATTR_GEN_WINDOW_KBD_POSITION, MSG_GEN_SET_KBD_OVERRIDE, MSG_GEN_SET_KBD_POSITION</PRE>
+<P>
+ATTR_GEN_WINDOW_ACCEPT_INK_EVEN_IF_NOT_FOCUSED indicates that the object should accept ink even if it doesn't have the focus. In general, presses on non-focused windows will never turn into ink. If this attribute is present, then presses on the window can turn into ink. The normal mechanism for determining if a press should be ink is then followed.</P>
+<P>
+ATTR_GEN_WINDOW_KBD_OVERRIDE indicates the manner in which a floating keyboard is provided for a given window. This optional attribute expects an argument of type of <CODE>
+KeyboardOverride</CODE>
+. This attribute specifies whether a floating keyboard is provided for text input via a pen device.</P>
+<P>
+The following <CODE>
+KeyboardOverride</CODE>
+ values are valid:</P>
+<DL>
+<DT>
+KO_NO_KEYBOARD</DT><DD>
+This type indicates that the window should act as if none of its children accepts text input; no floating keyboard will be made available.</DD>
+<DT>
+KO_KEYBOARD_REQUIRED</DT><DD>
+This type indicates that the window should act as if one of its children requires text input; a floating keyboard will be brought on-screen whenever the window gains the focus.</DD>
+<DT>
+KO_KEYBOARD_EMBEDDED</DT><DD>
+This type indicates that the application is directly providing the keyboard; no system-created floating keyboard will be provided.</DD>
+</DL>
+<P>
+You can change the <CODE>
+KeyboardOverride</CODE>
+ exhibited by a windowed object by sending the object MSG_GEN_SET_KBD_OVERRIDE.</P>
+<P>
+The following rules will ensure that a keyboard will be present whenever the user interacts with a display requiring a keyboard: Set the KO_KEYBOARD_REQUIRED bit for any GenDisplay which should be accompanied by a floating keyboard. If all GenDisplays in your geode require a floating keyboard, then set this bit for each of them. GenDisplays that contain embedded keyboards should have the KO_KEYBOARD_EMBEDDED bit set instead of the KO_KEYBOARD_REQUIRED bit.</P>
+<P>
+If you want a keyboard to appear visible even when no GenDisplays are open, mark the GenPrimary KO_KEYBOARD_REQUIRED and mark each GenDisplay KO_NO_KEYBOARD.</P>
+<P>
+ATTR_GEN_WINDOW_KBD_POSITION specifies the default position for the floating keyboard to appear when the window gains the focus. If the user moves the floating keyboard, this attribute is updated to reflect the new position and the keyboard will appear at that position when brought up in the future.</P>
+<P>
+You can change this keyboard position by sending the object MSG_GEN_SET_KBD_POSITION, passing it the <CODE>
+Point</CODE>
+ to position the keyboard at.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_SET_KBD_OVERRIDE">
+ </A>
+MSG_GEN_SET_KBD_OVERRIDE</H4>
+<PRE CLASS="syntax"><STRONG>void</STRONG>	MSG_GEN_SET_KBD_OVERRIDE(
+        KeyboardOverride 		override);</PRE>
+<P>
+This message sets an object's ATTR_GEN_WINDOW_KBD_OVERRIDE to the passed <CODE>
+KeyboardOverride</CODE>
+ value.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any windowed generic object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+override</EM>
+	<CODE>
+KeyboardOverride</CODE>
+.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_SET_KBD_POSITION">
+ </A>
+MSG_GEN_SET_KBD_POSITION</H4>
+<PRE CLASS="syntax">void	MSG_GEN_SET_KBD_POSITION(
+        sword		xCoord,
+        sword		yCoord);</PRE>
+<P>
+This message sets an object's ATTR_GEN_WINDOW_KBD_POSITION to the passed <CODE>
+Point</CODE>
+ values. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any windowed generic object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+xCoord</EM>
+	<EM>
+X</EM>
+ coordinate to position the keyboard (relative to the window).</P>
+<DL>
+<DT>
+<EM>
+yCoord</EM>
+</DT><DD><EM>
+Y</EM>
+ coordinate to position the keyboard (relative to the window).</DD>
+</DL>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+
+
+<H2 CLASS="HeadingC">
+<A NAME="81506">
+ </A>
+Help Management</H2>
+<P>
+The Help system is discussed in full in <A HREF="../../UI/Help/index.htm">the Help chapter</A>. You should read that chapter if you wish to include help within your application. The information provided here is mostly an overview of that information.</P>
+<H3 CLASS="HeadingD">
+Help Files</H3>
+<PRE>ATTR_GEN_HELP_FILE, ATTR_GEN_HELP_TYPE, ATTR_GEN_HELP_FILE_FROM_INIT_FILE, ATTR_GEN_HELP_CONTEXT</PRE>
+<P>
+ATTR_GEN_HELP_FILE stores the help file associated with this object. Help files are generated by the help editor (a modified GeoWrite) from GeoWrite documents and are located in USERDATA\HELP.If the help system queries this object for a help file and this optional attribute does not exist, it will query up the generic tree for the first object with an ATTR_GEN_HELP_FILE.</P>
+<P>
+An object can use <CODE>
+ATTR_GEN_HELP_FILE_FROM_INIT_FILE</CODE>
+ to specify that its help file should be taken from the GEOS.INI file. If this attribute is used, the help controller will look in the GEOS.INI file for a category of the same name as the application and a key named &quot;helpfile.&quot; Thus, to set the help file to &quot;My Own Help File&quot; for the HelpSamp application, you could add the following to your GEOS.INI file:</P>
+<PRE>[HelpSamp]
+helpfile = My Own Help File</PRE>
+<P>
+If, however, no object has <CODE>
+ATTR_GEN_HELP_FILE_FROM_INIT_FILE</CODE>
+, this init file entry will not be noticed by the help controller.</P>
+<P>
+ATTR_GEN_HELP_TYPE stores the <CODE>
+HelpType</CODE>
+ associated with this object. If the help system queries this object for a help type and this optional attribute does not exist, it will query up the generic tree for the first object with an ATTR_GEN_HELP_TYPE.</P>
+<P>
+Each help file must have several contexts named within the file. These contexts are set up when the help file is written. When an object brings up help, it should reference the specific context for which the user needs help. This context is stored within the object's ATTR_GEN_HELP_CONTEXT field. Usually this optional attribute is placed on a windowed GenInteraction (dialog box).</P>
+<P>
+If an object needs to set a different help context for itself at run-time, it can use MSG_META_DELETE_VAR_DATA and MSG_META_ADD_VAR_DATA to alter the contents of the object's ATTR_GEN_HELP_CONTEXT.</P>
+
+
+<H3 CLASS="HeadingD">
+Focus Help</H3>
+<PRE>ATTR_GEN_FOCUS_HELP, ATTR_GEN_FOCUS_HELP_LIB</PRE>
+<P>
+ATTR_GEN_FOCUS_HELP is currently unsupported. This help mechanism is a simple, scaled down version of the previously mentioned help system. A fixed area at the bottom of the screen on certain displays acts as a help text area. An object with ATTR_GEN_FOCUS_HELP indicates that this text area should display the its help text when this object gains the focus within the application. This field expects an optr pointing to the required text.</P>
+<P>
+ATTR_GEN_FOCUS_HELP_LIB is similar to ATTR_GEN_FOCUS_HELP but only applies to objects exported from a library(e.g., controllers).</P>
+
+
+
+<H2 CLASS="HeadingC">
+<A NAME="20719">
+ </A>
+Default Monikers</H2>
+<PRE>ATTR_GEN_DEFAULT_MONIKER, GenDefaultMonikerType</PRE>
+<P>
+ATTR_GEN_DEFAULT_MONIKER specifies a default moniker for this object. Default monikers are generally used for gstring monikers that occur several places within the system (i.e., they are stored outside of the application). ATTR_GEN_DEFAULT_MONIKER expects an argument of type <CODE>
+GenDefaultMonikerType</CODE>
+.</P>
+<PRE>typedef enum {
+	GDMT_LEVEL_0,
+	GDMT_LEVEL_1,
+	GDMT_LEVEL_2,
+	GDMT_LEVEL_3,
+	GDMT_HELP,
+	GDMT_HELP_PRIMARY
+} GenDefaultMonikerType;</PRE>
+<P>
+The GDMT_LEVEL monikers correspond to the gstring monikers used to indicate the current user level. GDMT_HELP corresponds to the default help trigger moniker. GDMT_HELP_PRIMARY corresponds to the special help trigger for a GenPrimary object.</P>
+
+
+<H2 CLASS="HeadingC">
+<A NAME="65875">
+ </A>
+Feature Links</H2>
+<PRE>ATTR_GEN_FEATURE_LINK</PRE>
+<P>
+This optional attribute indicates that a feature within a GenControl object maps to multiple generic trees within the child block. If a feature in a GenControl so marked is turned off, for example, the controller will remove the feature from the first generic tree associated with this feature and then will remove the feature from the link to the next generic tree. Controllers and features are discussed more fully in <A HREF="../../SysObjects/Controllers/index.htm">the Controllers chapter</A>.</P>
+
+<H2 CLASS="HeadingC">
+<A NAME="64105">
+ </A>
+Generic Paths</H2>
+<PRE>ATTR_GEN_PATH_DATA, MSG_GEN_PATH_SET, MSG_GEN_PATH_GET, GenFilePath</PRE>
+<P>
+<CODE>
+GenClass</CODE>
+<A NAME="IX_ATTR_GEN_PATH_DATA">
+ </A>
+ is able to keep track of file path information. <CODE>
+GenClass</CODE>
+ does not use this information itself, but maintains it so that various subclasses (e.g., the file selector and document control) will be able to use the same instance fields and messages.</P>
+<P>
+Because handlers for all these messages are implemented in <CODE>
+GenClass</CODE>
+, it is possible to store a path with any generic object, whether the particular object normally does anything with the file system or not.</P>
+<P>
+The path itself is stored in the object's vardata in the ATTR_GEN_PATH_DATA field. In the absence of such a field, <CODE>
+GenClass</CODE>
+ will use SP_TOP as the standard path. Subclasses can change this default by intercepting <CODE>
+MSG_META_INITIALIZE_VAR_DATA</CODE>
+, filling in the <CODE>
+GenFilePath</CODE>
+ structure after it has called the superclass (which will actually allocate the attribute).</P>
+<P>
+The ATTR_GEN_PATH_DATA field contains the following structure;</P>
+<PRE><A NAME="IX_GenFilePath"> </A>typedef struct {
+	DiskHandle 		GFP_disk;
+	PathName 		GFP_path;
+} GenFilePath;</PRE>
+<P>
+GFP_<CODE>
+disk</CODE>
+ stores the handle of the disk on which the path resides. This value may be initialized to a <CODE>
+StandardPath</CODE>
+ constant. GFP_<CODE>
+path</CODE>
+ stores the absolute path to the directory; this path may be a relative path if GFP_<CODE>
+disk</CODE>
+ is a <CODE>
+StandardPath</CODE>
+ directory.</P>
+<P>
+You can retrieve an object's current path with MSG_GEN_PATH_GET. You can alter an object's path with MSG_GEN_PATH_SET.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_PATH_SET">
+ </A>
+MSG_GEN_PATH_SET</H4>
+<PRE CLASS="syntax">Boolean 	MSG_GEN_PATH_SET(
+        char 		*path,
+        DiskHandle 		disk);</PRE>
+<P>
+This message sets the path associated with the object. Normally, a complete path name must be passed. Note that this path string should not include a drive specifier, as this is implied by the passed disk handle. If the passed <CODE>
+DiskHandle</CODE>
+ is actually a <CODE>
+StandardPath</CODE>
+ value, then the path string will be taken to be relative to this standard path.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Generic object which has an associated path.</P>
+<P CLASS="refField">
+Parameters:	<EM>path</EM> 	Null-terminated pathname; may not be in the same block as the object receiving this message. (If null, default handler will use root directory of disk handle or directory associated with standard path.)</P>
+<DL>
+<DT>
+<EM>disk</EM> </DT><DD>Disk handle of path, or <CODE>
+StandardPath</CODE>
+ constant.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Returns <EM>
+true</EM>
+ if error.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted. If the object is specifically grown, the message will be forwarded to the specific class after it has been acted on by <CODE>
+GenClass</CODE>
+.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_PATH_GET">
+ </A>
+MSG_GEN_PATH_GET</H4>
+<PRE CLASS="syntax">Boolean 	MSG_GEN_PATH_GET(
+        char 		*buffer,
+        word 		bufSize);</PRE>
+<P>
+This message returns a null-terminated complete path (no drive letter--drive is implied by the disk handle) for the object. Note that if the object is within a standard directory, the disk handle will be a <CODE>
+StandardPath</CODE>
+ constant and the path will appear relative.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Generic object which has an associated path.</P>
+<P CLASS="refField">
+Parameters:	<EM>buffer</EM> 	Pointer to character buffer which will be filled with return value.</P>
+<DL>
+<DT>
+<EM>bufSize</EM> </DT><DD>Size of the above buffer.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Returns <EM>
+true</EM>
+ if error (if the path won't fit in the passed buffer or is invalid).</P>
+<DL>
+<DT>
+<EM>buffer</EM> </DT><DD>Null-terminated pathname.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_PATH_GET_BLOCK">
+ </A>
+MSG_GEN_PATH_GET_BLOCK</H4>
+<PRE CLASS="syntax">@alias (MSG_GEN_PATH_GET) MemHandle 	MSG_GEN_PATH_GET_BLOCK(
+        char 		*buffer, 	/* This must be NULL */
+        word 		bufSize);</PRE>
+<P>
+This message returns the handle of a block containing the path.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Generic object which has an associated path.</P>
+<P CLASS="refField">
+Parameters:	<EM>buffer</EM> 	This must be NULL.</P>
+<DL>
+<DT>
+<EM>bufSize</EM> </DT><DD>This argument is not used.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Handle of block containing path.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_PATH_GET_DISK_HANDLE">
+ </A>
+MSG_GEN_PATH_GET_DISK_HANDLE</H4>
+<PRE CLASS="syntax">DiskHandle MSG_GEN_PATH_GET_DISK_HANDLE();</PRE>
+<P>
+This message returns the disk handle for the path bound to the object.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Generic object which has an associated path.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Disk handle associated with path, or <CODE>
+StandardPath</CODE>
+ if object is associated with a standard directory.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GenClass_13.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GenClass_13.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">6 Vardata</A> 
+<!-- to next --> | <A HREF="GenClass_15.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">6.2 Hints to the Specific UI</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

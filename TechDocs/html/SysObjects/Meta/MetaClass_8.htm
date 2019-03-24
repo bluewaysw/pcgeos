@@ -1,0 +1,184 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: MetaClass_8.htm,v 1.2 97/08/13 16:18:08 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Variable Data Messages</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">MetaClass</A>: 2.6 <A HREF="MetaClass_2.htm">Utility Messages</A>: 
+Variable Data Messages</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="MetaClass_2.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="MetaClass_7.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2.5 Event Messages</A> 
+<!-- to next --> | <A HREF="MetaClass_9.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2.7 Notification Messages</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+<A NAME="IX_Variable data">
+ </A>
+Variable data is instance data that can appear or not appear within the object's instance chunk. For information on variable data and how these three messages are used, see <A HREF="../../Programming/GOCLanguage/index.htm">the GEOS Programming chapter</A>.</P>
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_ADD_VAR_DATA">
+ </A>
+MSG_META_ADD_VAR_DATA</H4>
+<PRE CLASS="syntax">void	MSG_META_ADD_VAR_DATA(@stack
+        word	dataType,
+        word	dataSize,
+        word	*data)</PRE>
+<P>
+This message adds a variable data type to the recipient object's instance data. If the variable data field was already present, this will change its value. This is useful for adding hints to generic objects at run-time.</P>
+<P>
+If it is possible that you are adding the object's first/only field of 
+variable data, set the object's <CODE>OCF_VARDATA_RELOC</CODE> flag by means 
+of the 
+<A HREF="../../CRef/Routines/R_7c.htm#IX_ObjSetFlags()">ObjSetFlags()</A> 
+routine or 
+<A HREF="../../SysObjects/Meta/MetaClass_6.htm#IX_MSG_META_SET_FLAGS">MSG_META_SET_FLAGS</A>.</P>
+<P>
+Note that the object will be marked dirty even if nothing was changed.</P>
+<P>
+NOTE: The <EM>dataType</EM> should have VDF_SAVE_TO_STATE set as desired. VDF_EXTRA_DATA is ignored; it will be set correctly by this routine.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any object.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted; default <CODE>
+MetaClass</CODE>
+ handling performs the desired function.</P>
+<P CLASS="refField">
+Parameters:	<EM>dataType</EM> 	Data type (e.g. ATTR_PRINT_CONTROL_APP_UI).</P>
+<DL>
+<DT>
+<EM>dataSize</EM> </DT><DD>Size of data, if any.</DD>
+<DT>
+<EM>data</EM></DT><DD>If no extra data, NULL. If <EM>dataSize</EM> is non-zero, then this may be a pointer to data to initialize data with.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing. Object marked dirty even if data type already exists.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_DELETE_VAR_DATA">
+ </A>
+MSG_META_DELETE_VAR_DATA</H4>
+<PRE CLASS="syntax">Boolean	MSG_META_DELETE_VAR_DATA(
+        word	dataType);</PRE>
+<P>
+This message removes a particular variable data entry from the recipient object's instance data. This is useful for removing hints from generic objects at run-time.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any object.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted; default <CODE>
+MetaClass</CODE>
+ handling performs the desired function.</P>
+<P CLASS="refField">
+Parameters:	<EM>dataType</EM> 	Data type to delete. <CODE>
+VarDataFlags</CODE>
+ ignored.</P>
+<P CLASS="refField">
+Return:	Returns <CODE>
+false</CODE>
+ if data deleted, <CODE>
+true</CODE>
+ if data was not found. Object marked dirty if data type found and deleted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_INITIALIZE_VAR_DATA">
+ </A>
+MSG_META_INITIALIZE_VAR_DATA</H4>
+<PRE CLASS="syntax">word	MSG_META_INITIALIZE_VAR_DATA(
+        word	dataType);</PRE>
+<P>
+This message is sent to an object any time the <CODE>
+ObjVarDerefData()</CODE>
+ routine is called and the data type is not found. It should be subclassed by any object that defines a variable type that will be used with <CODE>
+ObjVarDerefData()</CODE>
+. The object must create and initialize the data and return its offset.</P>
+<P>
+Sent to an object having a variable data entry which code somewhere is attempting to access via <CODE>
+ObjVarDerefData()</CODE>
+. It is the object that defines the variable data entry type's responsibility to create the data entry and initialize it at this time, and to return a pointer to the extra data (if any), as returned by <CODE>
+ObjVarAddData()</CODE>
+.</P>
+<P CLASS="refField">
+Source:	<CODE>
+ObjVarDerefData()</CODE>
+ routine. Should not be used as a replacement for <CODE>
+ObjVarAddData()</CODE>
+, or <CODE>
+MSG_ADD_VAR_DATA_ENTRY</CODE>
+, but may be used any time code is ready to access a particular piece of variable data instance data, knows that the variable data has not yet been created, and wishes to ensure that it does exist.</P>
+<P CLASS="refField">
+Destination:	Any object stored in an LMem Object block.</P>
+<P CLASS="refField">
+Interception:	Required by any class which defines a variable data entry type that needs to be initialized before usage. Objects handling this message should first compare the passed data type against variable data types it understands, and pass any unknown types onto the superclass for handling.</P>
+<P CLASS="refField">
+Parameters:	Variable data type.</P>
+<P CLASS="refField">
+Return:	Offset to extra data created (or, if no extra data, the start of data entry plus the size of <CODE>
+VarDataEntry</CODE>
+). Normally, this would just be the offset returned by the call to <CODE>
+ObjVarAddData()</CODE>
+.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_GET_VAR_DATA">
+ </A>
+MSG_META_GET_VAR_DATA</H4>
+<PRE CLASS="syntax">word MSG_META_GET_VAR_DATA( /* returns size of data returned in buf;
+              * -1 if not found */</PRE>
+<PRE CLASS="syntax">        word 	dataType,
+        word 	bufSize,
+        void 	*buf);</PRE>
+<P>
+This message fetches variable data of a given type from an object.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any object.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted; default <CODE>
+MetaClass</CODE>
+ handling performs the desired function.</P>
+<P CLASS="refField">
+Parameters:	<EM>dataType</EM>	The variable data category to return.</P>
+<DL>
+<DT>
+<EM>bufSize</EM> </DT><DD>Size available to return data.</DD>
+<DT>
+<EM>buf</EM> </DT><DD>Pointer to buffer to hold returned data.</DD>
+</DL>
+<P CLASS="refField">
+Return:	The size of the data returned. If the vardata entry was not found, then message will return -1.</P>
+<DL>
+<DT>
+<EM>buf</EM> </DT><DD>Filled with vardata's data, if any.</DD>
+
+</DL>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="MetaClass_2.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="MetaClass_7.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2.5 Event Messages</A> 
+<!-- to next --> | <A HREF="MetaClass_9.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2.7 Notification Messages</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

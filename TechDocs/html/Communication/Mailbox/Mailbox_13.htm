@@ -1,0 +1,158 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Mailbox_13.htm,v 1.1 97/06/02 14:09:51 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Receiving and Processing Messages</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The Mailbox Library</A>: 6.3 <A HREF="Mailbox_10.htm">Application Responsibilities</A>: 
+Receiving and Processing Messages</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Mailbox_10.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Mailbox_12.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">6.2 Sending a Message</A> 
+<!-- to next --> | <A HREF="Mailbox_14.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">7 Examples of Mailbox Usage</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>MSG_META_MAILBOX_NOTIFY_MESSAGE_AVAILABLE, MailboxAcknowledgeMessageReceipt(), MailboxGetSubjectBlock(), MailboxGetSubjectLMem(), MailboxGetMessageFlags(), MailboxGetBodyFormat(), MailboxGetBodyRef(), MailboxDoneWithBody(), MailboxStealBody(), MailboxDeleteMessage()</PRE>
+<P>
+An application that uses the Inbox/Outbox technology must be able to handle incoming messages, as well as generate outgoing ones.</P>
+<P>
+The Mailbox holds incoming messages in its Inbox until an appropriate time to deliver them. For example, it may choose to wait until the user starts up the application, or until the delivery deadline is reached. In any event, when the Inbox library needs to deliver the message it sends MSG_META_MAILBOX_NOTIFY_MESSAGE_AVAILABLE to the application object of an appropriate application. This message has a single argument, a 32-bit <CODE>
+MailboxMessage</CODE>
+ token which uniquely identifies the message.</P>
+<P>
+If the application is going to handle the message, it must call the routine <CODE>
+MailboxAcknowledgeMessageReceipt()</CODE>
+. The routine is passed the <CODE>
+MailboxMessage</CODE>
+ token for the message. (If you do not acknowledge the receipt of the message, your application will be bothered by repeated notifications.)</P>
+<P>
+Once the application has been notified of an incoming message, it can call a number of routines to find out about the message. To find out the message's subject line, it should call either <CODE>
+MailboxGetSubjectLMem()</CODE>
+ or <CODE>
+MailboxGetSubjectBlock()</CODE>
+. Both of these routines return the subject text for the message.</P>
+<P>
+<CODE>
+MailboxGetSubjectBlock()</CODE>
+ is passed a single parameter, namely the <CODE>
+MailboxMessage</CODE>
+ token for the message. The routine allocates a global memory block, writes the subject line to that block (as a null-terminated string), and returns the handle of the block. If it fails, it returns zero and sets the thread's error value. (See <CODE>
+ThreadGetError()</CODE>
+.)</P>
+<P>
+<CODE>
+MailboxGetSubjectLMem()</CODE>
+ is very similar. It is passed two arguments: the <CODE>
+MailboxMessage</CODE>
+ token for the message, and the global memory handle of an LMem heap. The routine allocates a chunk in that LMem heap, writes the subject line to that chunk (again, as a null-terminated string), and returns the chunk handle of that chunk. Again, if the routine is unable to comply, it returns zero and sets the thread's error value.</P>
+<P>
+<CODE>
+MailboxGetMessageFlags()</CODE>
+ is passed the <CODE>
+MailboxMessage</CODE>
+ token for the message. It returns the <CODE>
+MailboxMessageFlags</CODE>
+ for that message. It is often used to find the message's priority.</P>
+<P>
+<CODE>
+MailboxGetBodyFormat()</CODE>
+ is passed the <CODE>
+MailboxMessage</CODE>
+ token for the message. It returns the <CODE>
+MailboxDataFormat</CODE>
+ value for the message's body. The application can use this to decide if the message is written in a format the application can understand.</P>
+<P>
+<CODE>
+MailboxGetBodyRef()</CODE>
+ is used to actually retrieve the data for the message. The routine is passed the following arguments:</P>
+<UL>
+<LI>
+The <CODE>
+MailboxMessage</CODE>
+ token for the message.</LI>
+<LI>
+A pointer to a data buffer.</LI>
+<LI>
+The size of the buffer, in bytes.</LI>
+</UL>
+<P>
+If the routine is successful, it returns <EM>
+true</EM>
+ and writes a reference to the message body in the passed buffer. This reference is in the same format that would be passed to <CODE>
+MailboxRegisterMessage()</CODE>
+, i.e. it varies according to the data driver. If the routine is unsuccessful, it returns <EM>
+false</EM>
+ and sets the thread's error value to an appropriate <CODE>
+MailboxError</CODE>
+ value.</P>
+<P>
+For every time the application successfully calls <CODE>
+MailboxGetBodyRef()</CODE>
+, it must call <CODE>
+MailboxDoneWithBody()</CODE>
+. This routine is passed three arguments:</P>
+<UL>
+<LI>
+The <CODE>
+MailboxMessage</CODE>
+ token for the message.</LI>
+<LI>
+A pointer to the data buffer passed to <CODE>
+MailboxGetBodyRef()</CODE>
+.</LI>
+<LI>
+The size of the buffer, in bytes.</LI>
+</UL>
+<P>
+The routine notifies the Mailbox library that the application is done with the message body for the time being. The mailbox library is thus free to close the file holding the data, or take some similar action. (The message body will <EM>
+not</EM>
+ be destroyed; it will still be available for future calls to <CODE>
+MailboxGetBodyRef()</CODE>
+.)</P>
+<P>
+An application can also get the message body by calling <CODE>
+MailboxStealBody()</CODE>
+. This is passed the same arguments, and returns the same values, as <CODE>
+MailboxGetBodyRef()</CODE>
+. However, if the routine is successful, the storage area containing the message body will be transferred to the ownership of the application, and the data driver will free any other storage it used to hold the message body. After a successful call to <CODE>
+MailboxStealBody()</CODE>
+, any future calls to <CODE>
+MailboxGetBodyRef()</CODE>
+ or <CODE>
+MailboxStealBody()</CODE>
+ will fail; as far as the Mailbox library is concerned, the message has no body any more. When the application is finished with the message, it must free the storage used for the message. In particular, if the data reside in a VM file, the application <EM>
+must</EM>
+ call <CODE>
+MailboxDoneWithVMFile()</CODE>
+ to notify the Mailbox library to free that file.</P>
+<P>
+When an application is done processing a message, it must call <CODE>
+MailboxDeleteMessage()</CODE>
+. This routine is passed the <CODE>
+MailboxMessage</CODE>
+ token for the message. It instructs the mailbox library to delete the message and any associated data. The <CODE>
+MailboxMessage</CODE>
+ token becomes invalid after this routine returns.</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Mailbox_10.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Mailbox_12.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">6.2 Sending a Message</A> 
+<!-- to next --> | <A HREF="Mailbox_14.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">7 Examples of Mailbox Usage</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

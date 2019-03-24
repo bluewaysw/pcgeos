@@ -1,0 +1,246 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Config_7.htm,v 1.1 97/06/02 15:41:38 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> PrefClass</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Config Library</A>: 4.1 <A HREF="Config_6.htm">Object Class Reference</A>: 
+<A NAME="IX_PrefClass">
+ </A>
+PrefClass</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Config_6.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Config_6.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">4 Object Class Reference</A> 
+<!-- to next --> | <A HREF="Config_8.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.2 PrefValueClass</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+<CODE>
+PrefClass</CODE>
+ defines several fields of instance data which will be used by all of its subclasses.</P>
+<P>
+There are several variable data fields which make sure that a given Preference gadget will not be usable by those without the proper privileges; other fields make sure that the gadgets will not appear to those users whose UI levels indicate that they would be confused by the presence of such an object. Keep in mind that if all gadgets in your module demand some privilege or User level, you should reflect this in the routine which provide Preferences module information about your module.</P>
+<P CLASS="figTitle">
+Code Display 22-4 PrefClass Instance Data</P>
+<PRE>@class PrefClass, GenClass, master, variant;</PRE>
+<PRE>@instance PrefAttributes <A NAME="IX_PI_attrs"> </A>PI_attrs = (PA_LOAD_IF_USABLE|PA_SAVE_IF_USABLE);</PRE>
+<PRE>typedef ByteFlags <A NAME="IX_PrefAttributes structure"> </A>PrefAttributes;
+#define <A NAME="IX_PA_&ldots;  (PrefAttributes structure)"> </A>PA_REBOOT_IF_CHANGED 0x80
+/* This bit signals that changes in the state of 
+ * this object requires a system reboot to take effect. */</PRE>
+<PRE>#define PA_LOAD_IF_USABLE 0x40
+ /* Load options only if this object is usable (this is ON by default). */</PRE>
+<PRE>#define PA_SAVE_IF_USABLE 0x20
+ /* Save options only if this object is usable (this is ON by default) */</PRE>
+<PRE>#define PA_SAVE_IF_ENABLED 0x10
+ /* Save options only if this object is enabled */</PRE>
+<PRE>#define PA_SAVE_IF_CHANGED 0x08
+ /* Save options only if this object has changed. */</PRE>
+<PRE>@vardata optr <A NAME="IX_ATTR_PREF_&ldots;"> </A>ATTR_PREF_REBOOT_STRING;
+/* This is the string passed to MSG_PREF_MGR_DO_REBOOT_DIALOG -- the
+ * string must be in a SHARABLE LMEM resource and is incorporated into the
+ * middle of another sentence. In English, the sentence is &quot;The system software
+ * will shut down and restart to change the &lt;reboot_string&gt;. Do you wish
+ * to proceed?&quot;
+ *
+ * If an object has its PA_REBOOT_IF_CHANGED attribute set, it will scan for
+ * this attribute, first in itself, then up the generic tree, until it
+ * finds one. */
+@reloc ATTR_PREF_REBOOT_STRING, 0, optr; </PRE>
+<PRE>@vardata PrefMgrFeatures ATTR_PREF_REQUIRED_FEATURES;
+/* features bits that must be set for this object to be usable. */</PRE>
+<PRE>@vardata PrefMgrFeatures ATTR_PREF_PROHIBITED_FEATURES;
+/* features bits that must not be set for this object to be usable. */</PRE>
+<PRE>@vardata UIInterfaceLevel ATTR_PREF_MIN_LEVEL;
+/* interface level below which this object will not be usable */</PRE>
+<PRE>@vardata UIInterfaceLevel ATTR_PREF_MAX_LEVEL;
+/* interface level above which this object will not be usable */</PRE>
+<P>
+In addition to the instance data fields, there are messages which allow for the dynamic retrieval and updating of these fields.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_PREF_SET_INIT_FILE_CATEGORY">
+ </A>
+MSG_PREF_SET_INIT_FILE_CATEGORY</H4>
+<PRE CLASS="syntax">void MSG_PREF_SET_INIT_FILE_CATEGORY(
+        const char *category);</PRE>
+<P>
+Pref objects automatically respond to this message by changing the value of the ATTR_GEN_INIT_FILE_CATEGORY variable data field. This is a utility message; similar functionality is available via MSG_META_ADD_VAR_DATA.</P>
+<P CLASS="refField">
+Source:	Anywhere</P>
+<P CLASS="refField">
+Destination:	Any <CODE>
+PrefClass</CODE>
+ object.</P>
+<P CLASS="refField">
+Parameters:	<EM>category</EM>	Null-terminated category string.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_PREF_HAS_STATE_CHANGED">
+ </A>
+MSG_PREF_HAS_STATE_CHANGED</H4>
+<PRE CLASS="syntax">Boolean MSG_PREF_HAS_STATE_CHANGED();</PRE>
+<P>
+This message determines whether the object or any of its children have changed since the last time options were loaded. This is used in conjunction with the PA_REBOOT_IF_CHANGED flag that can be set for an object--this flag signals that, if the object changes state, then GEOS should be restarted for the change to go into effect.</P>
+<P CLASS="refField">
+Source:	<CODE>
+PrefClass</CODE>
+ object sends this message to itself when handling <CODE>
+MSG_PREF_GET_REBOOT_INFO</CODE>
+.</P>
+<P CLASS="refField">
+Destination:	Self.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Should return <EM>
+true</EM>
+ (i.e. non-zero) if state has changed, <EM>
+false</EM>
+ (i.e. zero) otherwise.</P>
+<P CLASS="refField">
+Interception:	New <CODE>
+PrefClass</CODE>
+ subclasses will use this to compare the object's current state against the &quot;original&quot; state, assuming one was stored.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_PREF_GET_REBOOT_INFO">
+ </A>
+MSG_PREF_GET_REBOOT_INFO</H4>
+<PRE CLASS="syntax">optr MSG_PREF_GET_REBOOT_INFO();</PRE>
+<P>
+This message asks whether the system will need to reboot as a result of changes. If a reboot is necessary, the dialog will then notify the user of the reboot, and give the user a chance to abort (since the system reset may be a lengthy process on some systems). </P>
+<P CLASS="refField">
+Source:	PrefDialog sends this message to all children on an apply.</P>
+<P CLASS="refField">
+Destination:	Any Pref- object.</P>
+<P CLASS="refField">
+Interception:	Subclasses should check the PA_REBOOT_IF_CHANGED flag--if the flag is set, the object should compare its present value to its &quot;original&quot; value. If a reboot is never needed, then do nothing.<BR>
+If a reboot is necessary, the method should return the string to use when rebooting. The standard way to do this is via <CODE>
+MSG_PREF_GET_REBOOT_STRING</CODE>
+.<BR>
+If possible, developers should try to avoid situations where a system reset is necessary, and use mechanisms such as the General Change Notification instead.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Zero if no reboot needed; otherwise the OD of string to insert in the confirm-shutdown dialog box. The string will be inserted into a sentence; the string should describe what is changing. You may wish to use the value of ATTR_PREF_REBOOT_STRING.</P>
+<P CLASS="refField">
+See Also:	<CODE>
+MSG_PREF_GET_REBOOT_STRING</CODE>
+, ATTR_PREF_REBOOT_STRING.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_PREF_GET_REBOOT_STRING">
+ </A>
+MSG_PREF_GET_REBOOT_STRING</H4>
+<PRE CLASS="syntax">optr MSG_PREF_GET_REBOOT_STRING();</PRE>
+<P>
+This message should return the optr of a string in a sharable local memory resource. This string will display in the dialog box which asks the user if it is all right to shut down. If a given object doesn't know of a good string to supply, it should forward the message on to its parent in the generic tree. The default <CODE>
+PrefClass</CODE>
+ handler returns the value stored in ATTR_PREF_REBOOT_STRING.</P>
+<P CLASS="refField">
+Source:	Pref- object sends this message to itself.</P>
+<P CLASS="refField">
+Destination:	Any <CODE>
+PrefClass</CODE>
+ object.</P>
+<P CLASS="refField">
+Parameters:	Nothing.</P>
+<P CLASS="refField">
+Return:	Object Pointer of string (or NULL if not found).</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_PREF_INIT">
+ </A>
+MSG_PREF_INIT</H4>
+<PRE CLASS="syntax">void MSG_PREF_INIT(
+        PrefMgrFeatures 		features,
+        UIInterfaceLevel 		level);</PRE>
+<P>
+This message initializes the object. The object should perform any required set-up to appear on-screen. The PrefDialog object will send this object to all of its children when the dialog is first initiated.</P>
+<P CLASS="refField">
+Source:	Generic Parent</P>
+<P CLASS="refField">
+Destination:	Any Pref- object.</P>
+<P CLASS="refField">
+Parameters:	<EM>features</EM>	This structure tells you a bit what sorts of changes the user prepared to make.</P>
+<DL>
+<DT>
+<EM>level</EM></DT><DD>The user's User Level.</DD>
+</DL>
+<P CLASS="refField">
+Return:	None.</P>
+<P CLASS="refField">
+Interception:	Default behavior is to determine whether to make the object usable based on UI level and features (or will be, when implemented). Subclass should call superclass before handling, as subclass behavior may be different if the object is not usable.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_PREF_NOTIFY_DIALOG_CHANGE">
+ </A>
+MSG_PREF_NOTIFY_DIALOG_CHANGE</H4>
+<PRE CLASS="syntax">void MSG_PREF_NOTIFY_DIALOG_CHANGE(
+        PrefDialogChangeType 			type);</PRE>
+<P>
+This message goes out via PDGCNLT_DIALOG_CHANGE list bound to PrefDialog object telling interested parties of a change in the box's state. It is sent when the dialog box is being opened, closed, or destroyed.</P>
+<P CLASS="refField">
+Source:	PrefDialog object.</P>
+<P CLASS="refField">
+Destination:	Any Pref- object registered on PDCGCNLT_DIALOG_CHANGE.</P>
+<P CLASS="refField">
+Interception:	This message has no default handler; it must be intercepted to do anything useful.</P>
+<P CLASS="refField">
+Structures:	</P>
+<PRE>typedef enum {
+	<A NAME="IX_PDCT_&ldots;  (PrefDialogChangeType structure)"> </A>PDCT_OPEN,
+	PDCT_CLOSE,
+	PDCT_DESTROY,
+	PDCT_RESTART,
+	PDCT_SHUTDOWN
+} <A NAME="IX_PrefDialogChangeType structure"> </A>PrefDialogChangeType;</PRE>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_PREF_SET_ORIGINAL_STATE">
+ </A>
+MSG_PREF_SET_ORIGINAL_STATE</H4>
+<PRE CLASS="syntax">void MSG_PREF_SET_ORIGINAL_STATE();</PRE>
+<P>
+This message copies the object's current state to the &quot;original&quot; value field, which will be used on a <CODE>
+MSG_GEN_RESET</CODE>
+.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Subclasses should respond to this message by copying their current value to whatever instance field represents the &quot;original&quot; state of the object.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Config_6.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Config_6.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">4 Object Class Reference</A> 
+<!-- to next --> | <A HREF="Config_8.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.2 PrefValueClass</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

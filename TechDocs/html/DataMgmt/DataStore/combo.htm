@@ -1,0 +1,898 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+<!-- This page was automatically generated from a bunch of smaller pages. -->
+<META NAME="copyright" CONTENT="Copyright GEOWORKS">
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+<TITLE>DataStore Library</TITLE>
+</HEAD>
+<BODY BGCOLOR="#ffffdf">
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+<A NAME="index.htm"></A>
+
+
+<P>
+&nbsp;</P>
+
+<H1 CLASS="chapterTitle">
+
+DataStore Library</H1>
+<P>
+Personal Information Manager (PIM) applications such as address books and appointment calendars need fast, efficient data storage. Because these applications often share the same data, the data should be maintained on the system level and not by each application individually. 
+
+</P>
+<P>
+The DataStore Library provides a simple way for applications to store and access data in a centralized database. It shields programmers from low-level implementation of data storage.</P>
+<P>
+To understand how to use the DataStore Library, you need only a basic understanding of GEOS programming.</P>
+<P CLASS="sectionlinks">
+<STRONG>
+&nbsp;&nbsp;<A HREF="#DataStore_1.htm">1 Introduction</A><BR>
+&nbsp;&nbsp;<A HREF="#DataStore_2.htm">2 Creating a DataStore</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#DataStore_3.htm">2.1 Adding Fields</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#DataStore_4.htm">2.2 Adding Records</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#DataStore_5.htm">2.3 Deleting Records</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#DataStore_6.htm">2.4 Deleting Fields</A><BR>
+&nbsp;&nbsp;<A HREF="#DataStore_7.htm">3 Deleting a DataStore</A><BR>
+&nbsp;&nbsp;<A HREF="#DataStore_8.htm">4 Building an Index</A><BR>
+&nbsp;&nbsp;<A HREF="#DataStore_9.htm">5 String Search</A><BR>
+&nbsp;&nbsp;<A HREF="#DataStore_a.htm">6 Enumeration</A><BR>
+&nbsp;&nbsp;<A HREF="#DataStore_b.htm">7 Timestamping</A><BR>
+&nbsp;&nbsp;<A HREF="#DataStore_c.htm">8 Synchronization</A><BR>
+</STRONG>
+</P> <!-- end of sectionlinks blob -->
+
+<HR>
+<A NAME="DataStore_1.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">DataStore Library</A>: 1 
+<A NAME="DataStore_1.htm_45702">
+ </A>
+Introduction</H2>
+<P>
+The DataStore Library provides a system for storing and manipulating collections of structured data. Data reside in numbered records with type-defined fields; each collection of records is called a datastore. An application can access different datastores simultaneously; similarly, multiple applications can access a single datastore concurrently.</P>
+<P>
+The DataStore Manager manages synchronization by issuing &quot;session tokens&quot; whenever an application opens (or creates) a datastore. An application can have multiple sessions, each identified by a unique token.</P>
+<P>
+The DataStore Library contains routines for creating and accessing data on the file level, record level, and field level. All the routines return an error value which is useful for error checking. For a full list of routines and their parameter lists, see the C Reference Book (routines are listed alphabetically and all DataStore routines begin with &quot;DataStore&quot;).</P>
+<HR>
+<A NAME="DataStore_2.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">DataStore Library</A>: 2 
+<A NAME="DataStore_2.htm_68011">
+ </A>
+Creating a DataStore</H2>
+<PRE>DataStoreCreate()</PRE>
+<P>
+To create a new datastore, specify its attributes in a <CODE>
+DataStoreCreateParams</CODE>
+ structure and call <CODE>
+DataStoreCreate()</CODE>
+.</P>
+<PRE>typedef struct {
+	TCHAR	*DSCP_name;
+	DataStoreFlags	DSCP_flags;
+	FieldDescriptor	*DSCP_keyList;
+	word 	DSCP_keyCount;
+	optr	DSCP_notifObject;
+	DataStoreOpenFlags	DSCP_openFlags;
+} DataStoreCreateParams;</PRE>
+<DL>
+<DT>
+DSCP<CODE>
+_name</DT><DD>
+</CODE>
+Name of the datastore. Used when opening, deleting or renaming a datastore. Any legal filename is acceptable.</DD>
+<DT>
+DSCP<CODE>
+_flags</DT><DD>
+</CODE>
+Only the following flags may be passed:</DD>
+<UL>
+<LI>
+DSF_PRIVATE<BR>
+Restricts access to the datastore to the owner only (<EM>
+i.e.</EM>
+, the application that created the datastore).</LI>
+<LI>
+DSF_TIMESTAMP<BR>
+Creates a timestamp field and makes it the first field of the datastore. This field is updated whenver a record is modified.</LI>
+<LI>
+DSF_NO_PRIMARY_KEY<BR>
+Specifies that the datastore will contain no key field. When passing this flag, you must set DSCP<CODE>
+_keyCount</CODE>
+ to zero.</LI>
+</UL>
+<DT>
+DSCP<CODE>
+_keyList</DT><DD>
+</CODE>
+Pointer to an array of fields that make up the key. The term &quot;key field&quot; is not used in the relational database sense. In a datastore, the key field does not uniquely identify a record; it simply determines storage order of the records if no callback is passed in <CODE>
+DataStoreSaveRecord()</CODE>
+ (see &quot;Adding Records,&quot; <A HREF="#DataStore_4.htm_12958"> Adding Records</A>
+ for a complete discussion of storage order).</DD>
+<PRE>	typedef struct {
+		FieldData		FD_data;
+		TCHAR		*FD_name;
+	} FieldDescriptor;</PRE>
+<PRE>	typedef struct {
+		FieldType			FD_type;
+		FieldCategory			FD_category;
+		FieldFlags			CFD_flags;
+	} FieldData;</PRE>
+<DT>
+Fields of <CODE>
+FieldType</CODE>
+ DSFT_TIMESTAMP and DSFT_BINARY may not be part of the key and the only <CODE>
+FieldFlag</CODE>
+ which may be passed is FF_DESCENDING (default sort order is ascending).</DT>
+<DT>
+Once you create a datastore, you cannot redefine the key later (by adding, deleting or changing the key field(s)) nor can you add a key to a datastore that was created without one.</DT>
+<DT>
+DSCP<CODE>
+_keyCount</DT><DD>
+</CODE>
+Number of fields that make up the primary key.If you pass zero, then you must pass DSF_NO_PRIMARY_KEY in <CODE>
+DSCP_flags</CODE>
+.</DD>
+<DT>
+DSCP<CODE>
+_notifyObject</DT><DD>
+</CODE>
+Object to be notified when changes to the datastore occur. This object will receive MSG_META_NOTIFY_WITH_DATA_BLOCK which will pass a <CODE>
+DataStoreChangeNotification</CODE>
+ structure. See <A HREF="../../Kernel/GCN/index.htm">the GCN chapter</A>.<BR><BR>
+Passing NullOptr means no object will receive notification.</DD>
+<DT>
+DSCP<CODE>
+_openFlags</DT><DD>
+</CODE>
+Passing zero allows multiple applications to open the datastore simultaneously. Passing DSOF_EXCLUSIVE gives exclusive access to the calling application.</DD>
+</DL>
+<P CLASS="subsectionLink">
+<A HREF="#DataStore_3.htm">Adding Fields</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#DataStore_4.htm">Adding Records</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#DataStore_5.htm">Deleting Records</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#DataStore_6.htm">Deleting Fields</A></P>
+<HR>
+<A NAME="DataStore_3.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">DataStore Library</A>: 2.1 <A HREF="#DataStore_2.htm">Creating a DataStore</A>: 
+<A NAME="DataStore_3.htm_81832">
+ </A>
+Adding Fields</H3>
+<PRE>DataStoreAddField()</PRE>
+<P>
+Once you've created a new datastore, you can add (non-key) fields at any time with <CODE>
+DataStoreAddField()</CODE>
+. When adding fields, keep in mind:</P>
+<UL>
+<LI>
+The maximum size of a field name is MAX_FIELD_NAME_LENGTH or 40.</LI>
+<LI>
+When defining fields, note the difference between <CODE>
+FieldType</CODE>
+ and<CODE>
+ FieldCategory</CODE>
+.<CODE>
+ FieldType</CODE>
+ specifies the type of data stored in the field, such as DSFT_STRING; <CODE>
+FieldCategory</CODE>
+ defines what type of information that data represents, such as a phone number (FC_TELEPHONE). See the C Reference Book for a full list of <CODE>
+FieldTypes</CODE>
+ and <CODE>
+FieldCategories</CODE>
+.</LI>
+</UL>
+<P>
+The following code sample shows how to create a datastore that contains three fields, one of which is the key.</P>
+<P CLASS="figTitle">
+Code Display 9-1 Creating a New DataStore</P>
+<PRE>	/* 
+	 * When a new datastore is created, the DataStore Manager
+	 * opens a &quot;session&quot; and returns a &quot;session&quot; token
+	 */
+	word	dsToken;</PRE>
+<PRE>	/* 
+	 * DataStoreCreateParams contains information about
+	 * the new datastore, such as key field(s) and access level
+	 */
+	DataStoreCreateParams	params;</PRE>
+<PRE>	/*
+	 * FieldDescriptor contains information about
+	 * a field, such as its name and type
+	 */
+	FieldDescriptor	field;</PRE>
+<PRE>	/*
+	 * This example will be an &quot;Exchange Rate&quot; datastore with three fields
+	 */
+	static TCHAR dsName[] = &quot;Exchange Rates&quot;;
+	static TCHAR field1[] = &quot;country&quot;;
+	static TCHAR field2[] = &quot;currency&quot;;
+	static TCHAR field3[] = &quot;exchange rate&quot;;</PRE>
+<PRE>	/*
+	 * Define the &quot;country&quot; field; this will become the key field
+	 */
+	field.FD_name = field1;
+	field.FD_data.FD_type = DSFT_STRING;
+	field.FD_data.FD_category = FC_NAME;
+	field.FD_data.FD_flags = 0;	/* use ascending sort order */</PRE>
+<PRE>	/*
+	 * Set the parameters for the new DataStore file:
+	 *   - add a timestamp field (this becomes the first field)
+	 *   - define the key field (the key cannot be changed later)
+	 *   - designate which object is to receive notifications
+	 * 	when the DataStore is changed
+	 */
+	params.DSCP_name = dsName;
+	params.DSCP_flags = DSF_TIMESTAMP;
+	params.DSCP_keyList = &amp;field; /* &quot;country&quot; field defined above */
+	params.DSCP_keyCount = 1;
+	params.DSCP_notifObject = oself; /* &quot;oself&quot; refers to the object handling
+			this message; in this case, it is the process object */
+	params.DSCP_openFlags = 0; /* make the datastore sharable between apps */</PRE>
+<PRE>	/* 
+	 * Now create the new datastore file. If it is successfully created,
+	 * add the additional fields.
+	 */
+	if(DataStoreCreate(&amp;params, &amp;dsToken) == DSE_NO_ERROR)
+	{
+		/* 
+		 * DataStoreAddField() returns the FieldID of the newly
+		 * created field to the passed FieldID variable (i.e., fid).
+		 */</PRE>
+<PRE>		FieldID		fid;</PRE>
+<PRE>		/* add currency field */
+		field.FD_name = field2;
+		field.FD_data.FD_type = DSFT_STRING;
+		field.FD_data.FD_category = FC_NONE;
+		field.FD_data.FD_flags = 0;	/* use ascending sort order */
+		DataStoreAddField(dsToken, &amp;field, &amp;fid);</PRE>
+<PRE>		/* add exchange rate field */
+		field.FD_name = field3;
+		field.FD_data.FD_type = DSFT_FLOAT;
+		field.FD_data.FD_category = FC_NONE;
+		field.FD_data.FD_flags = 0;	/* use ascending sort order */
+		DataStoreAddField(dsToken, &amp;field, &amp;fid);
+	}</PRE>
+<P>
+Below is a diagram of the &quot;Exchange Rates&quot; datastore created in the above code example. The following section discusses how to add records to the datastore.</P>
+<P>
+Note that fields of type DSFT_FLOAT expect data of type <CODE>
+FloatNum</CODE>
+ (a special GEOS data type that differs from the standard C float type; see <A HREF="../../Libraries/Math/index.htm">the Math chapter</A>for additional information on <CODE>
+FloatNum</CODE>
+s). 
+<IMG SRC="DataStore_3_exchangeRates.gif">
+
+</P>
+<HR>
+<A NAME="DataStore_4.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">DataStore Library</A>: 2.2 <A HREF="#DataStore_2.htm">Creating a DataStore</A>: 
+<A NAME="DataStore_4.htm_12958">
+ </A>
+Adding Records</H3>
+<PRE>DataStoreOpen(), DataStoreNewRecord(), DataStoreSetField(), DataStoreSaveRecord()</PRE>
+<P>
+To manage synchronization between applications accessing the same datastore, the DataStore Manager creates a &quot;session&quot; each time an application opens a datastore with <CODE>
+DataStoreOpen()</CODE>
+. Each session has its own &quot;record buffer;&quot; to modify a record, you must load it into the record buffer first. The loaded record is called the &quot;current record.&quot; There can only be one record loaded in the buffer at a time. <CODE>
+DataStoreNewRecord()</CODE>
+ adds a new record and makes that record the &quot;current record.&quot;</P>
+<P>
+To write to a record, call <CODE>
+DataStoreSetField()</CODE>
+. When you write to a record, you are actually writing to a copy of the record loaded in the record buffer. Any changes made to this copy do not become permanent until you call <CODE>
+DataStoreSaveRecord()</CODE>
+. To cancel changes, call <CODE>
+DataStoreDiscardChanges()</CODE>
+. Both routines flush the current record from the buffer.</P>
+<P>
+Most routines that access fields (such as <CODE>
+DataStoreSetField()</CODE>
+) take both a <CODE>
+FieldID</CODE>
+ and a field name as parameters. You can reference the field by either parameter. To reference a field by its name, pass its name in the name parameter and zero in the <CODE>
+FieldID</CODE>
+ parameter. To reference a field by its <CODE>
+FieldID</CODE>
+, pass its <CODE>
+FieldID</CODE>
+ in the <CODE>
+FieldID</CODE>
+ parameter andNULL in the name parameter. Fields are numbered from zero. (There are routines for obtaining the <CODE>
+FieldID</CODE>
+ corresponding to a given field name and vice versa; see <CODE>
+DataStoreFieldNameToID()</CODE>
+ and <CODE>
+DataStoreFieldIDToName()</CODE>
+ in the C Reference Book.)</P>
+<P>
+The following code example shows how to open an existing datastore, add a new record, and write data to two of its fields.</P>
+<P CLASS="figTitle">
+Code Display 9-2 Adding a Record to a DataStore</P>
+<PRE>	/* Opening a datastore returns a token. */
+	word			dsToken;</PRE>
+<PRE>	/*
+	 * Saving changes to a record returns both the record's RecordNum
+	 * and RecordID
+	 */
+	RecordID			recordID;
+	RecordNum			recordNum;</PRE>
+<PRE>	/* 
+	 * Open the &quot;Exchange Rates&quot; datastore with sharable access
+	 * (i.e., no flag passed). &quot;Oself&quot; refers to the object which is to
+	 * receive change notifications; in this case, assume oself refers to
+	 * the process class.
+	 */
+	if(DataStoreOpen(&quot;Exchange Rates&quot;, oself, 0, &amp;dsToken) == DSE_NO_ERROR)
+	{
+		/* Add a new record. */
+		if(DataStoreNewRecord(dsToken) == DSDE_NO_ERROR)
+		{
+			/* 
+			 * Write data to the country and exchange rate fields.
+			 * You can refer to a field by its name or FieldID;
+			 * the examples below show both methods. 
+			 */
+			TCHAR			countryBuffer[] = &quot;Albania&quot;;</PRE>
+<PRE>			/* refer to a field by its name */
+			DataStoreSetField(dsToken, &quot;country&quot;, 0, countryBuffer,
+							strlen(countryBuffer));</PRE>
+<PRE>			FloatNum			rateBuffer = .9234;</PRE>
+<PRE>			/* refer to a field by its FieldID */
+			DataStoreSetField(dsToken, NULL, 3, &amp;rateBuffer,
+							sizeof(rateBuffer));</PRE>
+<PRE>			/* Save the record. */
+			DataStoreSaveRecord(dsToken, 0, 0, &amp;recordNum, &amp;recordID);
+		}
+		/* Close the datastore. */
+		DataStoreClose(dsToken);
+	}</PRE>
+<P>
+<CODE>
+DataStoreSaveRecord()</CODE>
+ writes the <CODE>
+RecordNum</CODE>
+ and <CODE>
+RecordID</CODE>
+ of the saved record to the passed variables. A record's <CODE>
+RecordNum</CODE>
+ is its relative place in the datastore; this value may change when records are added or deleted. A record's <CODE>
+RecordID</CODE>
+ is its unique identifier and does not change. <CODE>
+RecordNums</CODE>
+ are numbered from zero; <CODE>
+RecordIDs</CODE>
+ are numbered from one.</P>
+<P>
+You can use a callback function with <CODE>
+DataStoreSaveRecord()</CODE>
+ to specify where in the datastore the record is to be saved. The calling routine passes the record to be inserted (<EM>rec1</EM>) and a record from the datastore (<EM>rec2</EM>) to the callback; the callback decides which of the two records comes before the other. (The callback cannot modify the records, however.)</P>
+<P>
+The callback should return a value greater than zero if <EM>rec1</EM> comes before <EM>rec2</EM>; otherwise, a value less than zero. <A HREF="#DataStore_4.htm_15327"> Declaration of Callback Function in DataStoreSaveRecord()</A>
+ shows the declaration of the callback.</P>
+<P CLASS="figTitle">
+Code Display 9-3 <A NAME="DataStore_4.htm_15327">
+ </A>
+Declaration of Callback Function in DataStoreSaveRecord()</P>
+<PRE>sword SortCallback(RecordHeader *rec1, RecordHeader *rec2,
+						word dsToken, void *cbData);</PRE>
+<P>
+The actual data in the record follows the <CODE>
+RecordHeader</CODE>
+. Use <CODE>
+DataStoreGetFieldPtr()</CODE>
+ or <CODE>
+DataStoreFieldEnum()</CODE>
+ to access fields within the records.</P>
+<PRE>typedef struct {
+	RecordID	RH_uniqueID;
+	byte	RH_fieldCount; /* # of fields */
+	word	RH_size; /* # of bytes */
+} RecordHeader;</PRE>
+<P>
+If you do not specify a callback routine in <CODE>
+DataStoreSaveRecord()</CODE>
+, it will insert the record according to values in the key field(s). If two records have matching values in one key field, they will be inserted according to the first <EM>
+non-matching</EM>
+ key field value. Records with matching key field(s) values are stored in the order they are added. Records with empty key fields are inserted at the beginning of the file.</P>
+<P>
+If there is no callback or key, records are added to the end of the file. </P>
+<HR>
+<A NAME="DataStore_5.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">DataStore Library</A>: 2.3 <A HREF="#DataStore_2.htm">Creating a DataStore</A>: 
+<A NAME="DataStore_5.htm_25559">
+ </A>
+Deleting Records</H3>
+<PRE>DataStoreDeleteRecord(), DataStoreDeleteRecordNum()</PRE>
+<P>
+To delete a record by its <CODE>
+RecordID</CODE>
+, call <CODE>
+DataStoreDeleteRecord()</CODE>
+. To delete a record by its <STRONG CLASS="fileName">
+RecordNum</STRONG>
+, call <CODE>
+DataStoreDeleteRecordNum()</CODE>
+. When deleting records, remember that <CODE>
+RecordID</CODE>
+s number from one and stay constant but that <CODE>
+RecordNum</CODE>
+s (like array elements) number from zero and change (whenever records are added or deleted). Be sure to use the correct value with the appropriate routine.</P>
+<HR>
+<A NAME="DataStore_6.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">DataStore Library</A>: 2.4 <A HREF="#DataStore_2.htm">Creating a DataStore</A>: 
+<A NAME="DataStore_6.htm_68559">
+ </A>
+Deleting Fields</H3>
+<PRE>DataStoreGetNumFields(), DataStoreRemoveFieldFromRecord(), DataStoreDeleteField()</PRE>
+<P>
+To optimize storage, empty fields are not stored; thus, it is possible for a datastore to be defined with four fields but contain records with fewer than four fields.</P>
+<P>
+<CODE>
+DataStoreGetNumFields()</CODE>
+ returns the number of fields in the current record. <CODE>
+DataStoreRemoveFieldFromRecord()</CODE>
+ deletes a field from the current record. (Note that passing zero in the size parameter in <CODE>
+DataStoreSetField()</CODE>
+ will also cause the field to be removed from the record.)</P>
+<P>
+To delete a field from the datastore itself, call <CODE>
+DataStoreDeleteField()</CODE>
+.</P>
+<HR>
+<A NAME="DataStore_7.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">DataStore Library</A>: 3 
+<A NAME="DataStore_7.htm_71139">
+ </A>
+Deleting a DataStore</H2>
+<PRE>DataStoreDelete()</PRE>
+<P>
+To delete a datastore, call <CODE>
+DataStoreDelete()</CODE>
+. This routine will delete the entire file or return DSE_DATASTORE_IN_USE if the datastore is in use or DSE_DATASTORE_NOT_FOUND if the datastore does not exist.</P>
+<HR>
+<A NAME="DataStore_8.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">DataStore Library</A>: 4 
+<A NAME="DataStore_8.htm_41434">
+ </A>
+Building an Index</H2>
+<PRE>DataStoreBuildIndex()</PRE>
+<P>
+You can create a secondary index (<EM>
+i.e.</EM>
+, an index based on a non-key field) by calling <CODE>
+DataStoreBuildIndex()</CODE>
+. This routine builds an index based on a single field or on sort criteria specified in a callback function.</P>
+<P>
+<CODE>
+DataStoreBuildIndex()</CODE>
+ creates an array of <CODE>
+RecordNum</CODE>
+s (low word only) and stores the array in an LMem (local memory) block. The block contains an <CODE>
+IndexArrayBlockHeader</CODE>
+ which holds data about the index (the number of records in the index, the offset to the beginning of the array, etc.). Following the block header is space for writing your own data, which is followed by the index itself. There is no limit to how much data you can write but the amount of data you write naturally decreases the amount of space available for the index. If the LMem block is too big to be allocated, the routine will return DSSE_MEMORY_FULL.</P>
+<P>
+The following example shows how to build an index on a field and write data to the index's block header.</P>
+<P CLASS="figTitle">
+Code Display 9-4 Building a Secondary Index</P>
+<PRE>	/* index parameters */
+	DataStoreIndexCallbackParams	params;</PRE>
+<PRE>	/* Building an index returns the handle of the allocated block */
+	MemHandle	indexHandle;</PRE>
+<PRE>	/* sample data to be added to the index block */
+	TCHAR	indexData[]  = &quot;Index created 7/1/96.&quot;;</PRE>
+<PRE>	/*  Set up index parameters. */
+	params.DSICP_indexField = 2; /* field on which to build index */
+	params.DSICP_sortOrder = SO_DESCENDING; /* sort direction */
+	params.DSICP_cbData = NULL; /* data to be passed to the callback
+					function if a callback is being used */ </PRE>
+<PRE>	/*
+	 * Open the datastore. (In this example, assume that dsToken
+	 * has been declared as a global variable.)
+	 */
+	if(DataStoreOpen(&quot;Exchange Rates&quot;, oself, 0, &amp;dsToken) == DSE_NO_ERROR)
+	{
+		/* Build the index. */
+		if(DataStoreBuildIndex(dsToken, &amp;indexHandle,
+				sizeof(IndexArrayBlockHeader)+
+				LocalStringSize(indexData)+sizeof(TCHAR),
+				&amp;params, NULL) == DSSE_NO_ERROR)
+		{
+			/* get a pointer to the block header */
+			IndexArrayBlockHeader *pIndex;</PRE>
+<PRE>			/* lock the block down */
+			MemLock(indexHandle);</PRE>
+<PRE>			/*
+			 * dereference the handle to get a pointer
+			 * to the block header
+			 */
+			pIndex = MemDeref(indexHandle);</PRE>
+<PRE>			/* increment the pointer past the block header */
+			pIndex++;</PRE>
+<PRE>			/* now copy the sample data into the block */
+			strcpy((TCHAR *) pIndex,  indexData);</PRE>
+<PRE>			/* Now that we're through with the block,unlock it. */
+			MemUnlock(indexHandle);
+		}
+		/* Close the datastore. */
+		DataStoreClose(dsToken);
+	}</PRE>
+<P>
+You can also build an index based on a custom callback routine. The calling routine passes the <CODE>
+DataStoreCallbackParams</CODE>
+ to the callback; the callback decides which of the two records (<CODE>
+DSICP_rec1</CODE>
+ or <CODE>
+DSICP_rec2</CODE>
+) should go first. (If you use a callback, <CODE>
+DataStoreBuildIndex()</CODE>
+ will ignore 	DSICP<CODE>
+_indexField</CODE>
+ and DSICP<CODE>
+_sortOrder</CODE>
+.)</P>
+<DL>
+<DT>
+The callback should return:</DT><DD>
+-1 if <CODE>
+DSICP_rec1</CODE>
+ comes before <CODE>
+DSICP_rec2<BR>
+</CODE>
+1 if <CODE>
+DSICP_rec1</CODE>
+ comes after <CODE>
+DSICP_rec2</CODE>
+</DD>
+</DL>
+<P CLASS="figTitle">
+Code Display 9-5 Declaration of Callback Function in DataStoreBuildIndex()</P>
+<PRE>sword SortCallback(word dsToken, DataStoreIndexCallbackParams *params);</PRE>
+<P>
+<CODE>
+DataStoreBuildIndex()</CODE>
+ works on datastores of 4,000 records or less. If you call this routine on a datastore larger than 4,000 records, the routine will return DSSE_INDEX_RECORD_NUMBER_LIMIT_EXCEEDED.</P>
+<P>
+The application owns this index and is responsible for freeing the block. The DataStore Manager does not maintain the index in any way. Applications can synchronize a secondary index by rebuilding it whenever the application receives notification of a change that would affect the index.</P>
+<HR>
+<A NAME="DataStore_9.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">DataStore Library</A>: 5 
+<A NAME="DataStore_9.htm_40426">
+ </A>
+String Search</H2>
+<PRE>DataStoreStringSearch()</PRE>
+<P>
+To do a simple string search (on a specified field or field category), use <CODE>
+DataStoreSearchString()</CODE>
+. Starting at a specified record number, this routine searches through each record until it finds a match or until it runs out of records to search.</P>
+<P>
+<CODE>
+DataStoreSearchString()</CODE>
+ uses the following parameters:</P>
+<PRE>typedef struct {
+	SearchType	SP_searchType;
+	RecordNum	SP_startRecord;
+	dword	SP_maxRecords;
+	FieldID	SP_startField;
+	FieldCategory	SP_category;
+	TCHAR	*SP_searchString;
+	SearchFlags	SP_flags;
+} SearchParams;</PRE>
+<DL>
+<DT>
+SP<CODE>
+_searchType</DT><DD>
+</CODE>
+Possible flags:</DD>
+<UL>
+<LI>
+ST_ALL<BR>
+Search all fields of <CODE>
+FieldType</CODE>
+ DFST_STRING.</LI>
+<LI>
+ST_FIELD<BR>
+Search by <CODE>
+FieldID</CODE>
+. (Specify the <CODE>
+FieldID</CODE>
+ in <CODE>
+SP_startField</CODE>
+, explained below.)</LI>
+<LI>
+ST_CATEGORY<BR>
+Search by <CODE>
+FieldCategory</CODE>
+. (Specify the <CODE>
+FieldCategory</CODE>
+ in <CODE>
+SP_category</CODE>
+, explained below.)</LI>
+</UL>
+<DT>
+SP<CODE>
+_startRecord</DT><DD>
+</CODE>
+<CODE>
+RecordNum</CODE>
+ of record to begin search. This routine updates this field with the <CODE>
+RecordNum</CODE>
+ of the last record examined.</DD>
+<DT>
+SP<CODE>
+_maxRecords</DT><DD>
+</CODE>
+Maximum number of records to search. Allows the program to break out of the search if no matches are found. (The search can be continued by incrementing the value of<CODE>
+ SP_startRecord</CODE>
+.) Passing -1 causes the routine to search all records.</DD>
+<DT>
+SP<CODE>
+_startField</DT><DD>
+</CODE>
+<CODE>
+FieldID</CODE>
+ of field to search if <CODE>
+SP_searchType</CODE>
+ is set to ST_FIELD. If you specify a non-string field, the routine will return DSE_BAD_SEARCH_PARAMS.<BR>
+<BR>
+<CODE>
+FieldID</CODE>
+ of the field to <EM>
+begin</EM>
+ the search if <CODE>
+SP_searchType</CODE>
+ is set to ST_CATEGORY. If you specify a field that is not of the specified category, the routine will start with the next field it finds of the specified category.</DD>
+<DT>
+SP<CODE>
+_category</DT><DD>
+</CODE>
+<CODE>
+FieldCategory</CODE>
+ to search if <CODE>
+SP_searchTyp</CODE>
+e is set to ST_CATEGORY<CODE>
+ </CODE>
+(otherwise this parameter is ignored).</DD>
+<DT>
+SP<CODE>
+_searchString</DT><DD>
+</CODE>
+Null-terminated string to search.</DD>
+<DT>
+SP<CODE>
+_flags</DT><DD>
+</CODE>
+Possible flags:</DD>
+<UL>
+<LI>
+SF_BACKWARDS<BR>
+Search backwards through the records.</LI>
+<LI>
+SF_START_AT_END<BR>
+Begin search from first record (going forward) or from last record if SF_BACKWARDS is also passed. If set, <CODE>
+SP_startRecord</CODE>
+ is ignored.</LI>
+<LI>
+SF_IGNORE_CASE<BR>
+Ignore case when searching.</LI>
+<LI>
+SF_NO_WILDCARDS<BR>
+Ignore wild card characters.<BR>
+<BR>
+Many libraries including DataStore support the use of wild card characters for searching. See <A HREF="../../UI/Text/Text_28.htm#85133">the Text object chapter</A> for a discussion of wild card searching; also, see /Appl/Datastore/datastore.goc for a code example.</LI>
+<LI>
+SF_PARTIAL_WORD<BR>
+Treat search string as a substring. For example, if search string is &quot;den,&quot; return &quot;gardenia,&quot; &quot;dentist,&quot; and &quot;garden.&quot;</LI>
+</UL>
+</DL>
+<P>
+The following example shows how to set up a simple string search on a specified field.</P>
+<P CLASS="figTitle">
+Code Display 9-6 Searching a DataStore</P>
+<PRE>	/* search conditions */
+	SearchParams	params;</PRE>
+<PRE>	/*  Specify search parameters. */
+	params.SP_searchType = ST_FIELD; /* search by FieldID */
+	params.SP_startRecord = 0; /* start search at first record */
+	params.SP_maxRecords = -1; /* search all records until a match is found or 
+					there are no more records to search */
+	params.SP_startField = 1; /* search &quot;country&quot; field */
+	params.SP_searchString = &quot;Albania&quot;; /* string to search for */
+	params.SP_flags = SF_IGNORE_CASE; /* ignore case when searching */</PRE>
+<PRE>	/* Open the datastore. */
+	if(DataStoreOpen(&quot;Exchange Rates&quot;, oself, 0, &amp;dsToken) == DSE_NO_ERROR)
+	{
+		/* Do the search. */
+		if(DataStoreStringSearch(dsToken, &amp;params) == DSDE_NO_ERROR)
+		{
+			 /*
+			  * If a match is found, load the record and get the data
+			  * from the &quot;exchange rate&quot; field.
+			  * Note:  DataStoreStringSearch() returns the record
+			  * number of the last examined record in SP_startRecord.
+			  */
+			if(DataStoreLoadRecordNum(dsToken, params.SP_startRecord,
+							&amp;recordID) == DSDE_NO_ERROR)
+			{
+				/* variables used for retrieving field data */
+				FloatNum		rateBuffer, *pRateBuffer;
+				RecordID		recordID;
+				MemHandle		dummy;
+				word		size;</PRE>
+<PRE>				pRateBuffer = &amp;rateBuffer;
+				size = sizeof(rateBuffer);</PRE>
+<PRE>				DataStoreGetField(dsToken, &quot;exchange rate&quot;, 0,
+					(void **)&amp;pRateBuffer, &amp;size, &amp;dummy);
+				/*
+				  * Do something with the data then 
+				  * flush the record from the buffer.
+				  */
+				DataStoreDiscardRecord(dsToken);
+			}
+		DataStoreClose(dsToken);
+		}
+	}</PRE>
+<P>
+If the routine returns DSE_NO_MORE_RECORDS, it has reached the last record in the file (either the first or last record depending on the direction of the search). If the routine returns DSE_NO_MATCH_FOUND, it did not find a match within the set of records it searched. If it returns DSE_NO_ERROR, it writes the <CODE>
+RecordNum</CODE>
+ of the matching record in <CODE>
+SP_startRecord</CODE>
+.</P>
+<P>
+The DataStore Library does not implement global searches (<EM>
+i.e.</EM>
+, searches through multiple datastores), though it is possible to implement this type of search at the application level by opening each datastore file and calling <CODE>
+DataStoreStringSearch()</CODE>
+ on each one.</P>
+<HR>
+<A NAME="DataStore_a.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">DataStore Library</A>: 6 
+<A NAME="DataStore_a.htm_73123">
+ </A>
+Enumeration</H2>
+<PRE>DataStoreFieldEnum(), DataStoreRecordEnum()</PRE>
+<P>
+<CODE>
+DataStoreFieldEnum()</CODE>
+ enumerates through fields of a record. This routine uses a Boolean callback to determine whether to continue enumeration. If the callback returns TRUE, enumeration stops.</P>
+<P>
+<CODE>
+DataStoreRecordEnum()</CODE>
+ enumerates through records of a datastore in storage order, starting at the specified <CODE>
+RecordNum</CODE>
+ in the specified direction. This routine uses a Boolean callback routine to determine whether to continue enumeration. If the callback returns TRUE, enumeration ends; if FALSE, enumeration continues until the callback returns TRUE or until the routine reaches the last record.</P>
+<P>
+There are two <CODE>
+DataStoreRecordEnumFlags</CODE>
+ that can be passed in this routine:</P>
+<UL>
+<LI>
+DSREF_BACKWARDS<BR>
+Enumerate backwards through the datastore.</LI>
+<LI>
+DSREF_START_AT_END<BR>
+Enumerate from first record (going forward) or from last record if DSREF_BACKWARDS is also passed.</LI>
+</UL>
+<P>
+The following example enumerates through the a datastore looking for the maximum value in a particular field.</P>
+<P CLASS="figTitle">
+Code Display 9-7 Enumerating Through a Datastore</P>
+<PRE>	/* data to be passed to the callback routine */
+	FloatNum	enumData = 0;</PRE>
+<PRE>	/* record at which to start enumeration */
+	RecordNum	rec = 0;</PRE>
+<PRE>	/* 
+	 * Open the datastore. For this example, assume dsToken
+	 * is a global variable.
+	 */
+	if(DataStoreOpen(&quot;Exchange Rates&quot;, oself, 0, &amp;dsToken) == DSE_NO_ERROR)
+	{
+		/* 
+		 * Enumerate through the datastore starting at the first record
+		 * (so pass zero in the flags parameter);
+		 * find the maximum value of the &quot;exchange rate&quot; field.
+		 */
+		if(DataStoreRecordEnum(dsToken, &amp;rec, 0, &amp;enumData, EnumCallback)
+							== DSE_NO_MORE_RECORDS)
+		{
+			/* do something with the value */
+		}
+		DataStoreClose(dsToken);
+	}</PRE>
+<PRE>	/*
+	 * The callback compares the data in the &quot;exchange rate&quot; field to the value
+	 * passed in with enumData. If the field data is greater than that of
+	 * enumData, copy the field's data to enumData.
+	 */</PRE>
+<PRE>	Boolean EnumCallback(RecordHeader *record, void *enumData)
+	{
+		/* parameters for getting field data */
+		FloatNum	rateBuffer, *pRateBuffer;
+		FieldType	type;
+		word	size;</PRE>
+<PRE>		if(DataStoreGetFieldPtr(dsToken, record, 3, (void **)&amp;pRateBuffer,
+						&amp;type, &amp;size) == DSDE_NO_ERROR)
+		{
+			if(*pRateBuffer &gt; *((FloatNum *)enumData))
+			{
+				*((FloatNum *)enumData) = *pRateBuffer;
+			}
+		}
+		return FALSE; /* FALSE to continue enumeration */
+	}</PRE>
+<P>
+If the routine returns DSE_NO_MORE_RECORDS, it has reached the last record in the file. If it returns DSE_NO_ERROR, it writes the <CODE>
+RecordNum</CODE>
+ of the last record examined in the <EM>startRecord</EM> parameter.</P>
+<HR>
+<A NAME="DataStore_b.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">DataStore Library</A>: 7 
+<A NAME="DataStore_b.htm_10613">
+ </A>
+Timestamping</H2>
+<PRE>DataStoreGetTimeStamp(), DataStoreSetTimeStamp()</PRE>
+<P>
+Record timestamping is important for synchronization and reconciliation of data between devices; between a portable device and a desktop PC, for example. Passing the FT_TIMESTAMP flag when creating a new datastore makes the first field a timestamp field. The DataStore Manager updates this field when the record has been modified.</P>
+<P>
+You can read the data in the timestamp field by calling <CODE>
+DataStoreGetField()</CODE>
+ and passing zero for the <CODE>
+FieldID</CODE>
+ parameter and NULL for field name.</P>
+<P>
+To retrieve the time and date a datastore was last changed, call <CODE>
+DataStoreGetTimeStamp()</CODE>
+. To modify a datastore's timestamp manually, call <CODE>
+DataStoreSetTimeStamp()</CODE>
+.</P>
+<HR>
+<A NAME="DataStore_c.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">DataStore Library</A>: 8 
+<A NAME="DataStore_c.htm_88180">
+ </A>
+Synchronization</H2>
+<P>
+The DataStore Manager ensures synchronization between applications sharing the same datastore file by issuing a series of read and write locks. Routines that modify data request write locks while non-modifying routines request read locks. If the DataStore Manager cannot grant a lock because another session has locked the datastore, the routine will return DSE_DATASTORE_LOCKED.There can be up to thirty-two readers per datastore.</P>
+<HR>
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+</BODY>
+</HTML>

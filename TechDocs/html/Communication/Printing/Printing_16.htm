@@ -1,0 +1,130 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Printing_16.htm,v 1.1 97/06/02 14:12:54 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Printer Drivers</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The Spool Library</A>: 7.2 <A HREF="Printing_14.htm">Other Printing Components</A>: 
+<A NAME="58536">
+ </A>
+Printer Drivers</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Printing_14.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Printing_15.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">7.1 Spooler and Scheduling</A> 
+<!-- to next --> | <A HREF="Printing_17.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">7.3 Page Size Related Routines</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+Printer Drivers are very important but at the same time not something that any geode you write is going to interact with. Printer Drivers take care of translating the device-independent graphics commands into forms that individual models of printers can work with. Drivers also provide the Spooler with information about the printer and provide printer-specific UI to the Print Control.</P>
+<P>
+As long as a geode uses only device-independent graphics commands, that geode need not worry about printer drivers. In fact, the only geodes that require knowledge of printer drivers are those that use Raw Mode (see below) printing and access the printer drivers directly. To incorporate Raw Mode printing into a geode (normally a bad idea), keep reading. Whether or not the geode you're writing will interact with Printer Drivers, you might want to continue reading this section to find out what printer drivers do.</P>
+
+<H2 CLASS="HeadingC">
+<A NAME="60013">
+ </A>
+Dumb Printers</H2>
+<P>
+When dealing with a printer that has no page description language, the Spooler and Printer Driver have to be clever. First the Spooler allocates an offscreen bitmap and plays back the contents of the spool file into the bitmap. It does this through the <STRONG CLASS="fileName">
+vidmem</STRONG>
+ driver, which has the same interface as a video driver but draws to offscreen bitmaps instead of to a device. Once the bitmap is complete, the Spooler starts feeding the bitmap to the Printer Driver, which translates the bitmap into a series of commands to the printer. If (as is often the case) the printer doesn't have enough memory to absorb a whole page's worth of data at a time, the Printer Driver feeds in one horizontal band, or &quot;swath&quot; of the bitmap at a time. This also allows for better backgrounding: The driver can feed in a swath, then block and allow other threads to complete other tasks until the printer is ready for the next swath.</P>
+
+
+<H2 CLASS="HeadingC">
+<A NAME="95464">
+ </A>
+Smart Printers</H2>
+<P>
+When dealing with an &quot;intelligent&quot; printer, a printer that has its own page description language, the Spooler bypasses most of the work it has to do when dealing with dumb printers. Since an intelligent printer presumably has some commands with GEOS equivalents, the Spooler doesn't bother with creating a bitmap but just passes the GString on to the Printer Driver. The Printer Driver then builds a page description in the printer's native language based on the contents of the GString.</P>
+
+
+<H2 CLASS="HeadingC">
+<A NAME="79275">
+ </A>
+Raw Mode</H2>
+<P>
+If you want to use some printer-specific command that doesn't have an equivalent in the GEOS graphics system, you will use raw mode. Raw Mode printing expects that you know what sorts of commands the printer will be expecting. If you try to send PostScript commands to a printer that doesn't understand PostScript, probably the results won't be the desired output.
+
+</P>
+
+
+<H2 CLASS="HeadingC">
+<A NAME="71198">
+ </A>
+Printer Information and Manipulation</H2>
+<PRE>SpoolGetNumPrinters(), SpoolGetPrinterString(), SpoolGetPrinterInfo(), SpoolCreatePrinter(), SpoolDeletePrinter(), SpoolGetDefaultPrinter(), SpoolSetDefaultPrinter()</PRE>
+<P>
+If you want to find out something about a printer without accessing the printer driver directly, the spool library provides a number of utility routines that work with printer drivers.
+
+</P>
+<P>
+Most of these functions specify which of a user's printers they wish to work with by passing its printer number. The first installed printer will be printer number zero, the second printer will be number one, and so on. Use the <CODE>
+SpoolGetNumPrinters()</CODE>
+<A NAME="IX_SpoolGetNumPrinters()">
+ </A>
+ routine to find out how many printers have been installed. Once you have this number, you have an upper bound for printer numbers to test. There will always be fewer than MAXIMUM_NUMBER_OF_PRINTERS<A NAME="IX_MAXIMUM_NUMBER_OF_PRINTERS">
+ </A>
+ printers.</P>
+<P>
+<A NAME="IX_SpoolGetPrinterString()">
+ </A>
+The <CODE>
+SpoolGetPrinterString()</CODE>
+ and <CODE>
+SpoolGetPrinterInfo()</CODE>
+ routines return information about the printer associated with the passed printer number. <CODE>
+SpoolGetPrinterString()</CODE>
+ returns the a string containing the name of the printer, such as &quot;HP DeskJet on COM1.&quot; The printer string will be of length at most <A NAME="IX_MAXIMUM_PRINTER_NAME_LENGTH">
+ </A>
+MAXIMUM_PRINTER_NAME_LENGTH. <A NAME="IX_SpoolGetPrinterInfo()">
+ </A>
+<CODE>
+SpoolGetPrinterInfo()</CODE>
+ returns various pieces of information helpful to geodes that work with printers directly.</P>
+<P>
+The<CODE>
+ SpoolCreatePrinter()</CODE>
+ and <CODE>
+SpoolDeletePrinter()</CODE>
+ routines can install and uninstall printers, tasks probably best left to the Preferences Manager. <A NAME="IX_SpoolDeletePrinter()">
+ </A>
+The<CODE>
+ SpoolDeletePrinter()</CODE>
+ routine uninstalls the printer corresponding to the passed printer number. It is easy to use but not something that most geodes should be doing.<A NAME="IX_SpoolCreatePrinter()">
+ </A>
+ <CODE>
+SpoolCreatePrinter()</CODE>
+ installs a new printer, returning the new printer's printer number. Note that any geode calling this latter function is going to be expected to provide considerable information about the printer being installed. Again, this is not a routine that many geodes should be using.</P>
+<P>
+<CODE>
+SpoolGetDefaultPrinter()</CODE>
+<A NAME="IX_SpoolGetDefaultPrinter()">
+ </A>
+ returns the number of the system-default printer.<A NAME="IX_SpoolSetDefaultPrinter()">
+ </A>
+ <CODE>
+SpoolSetDefaultPrinter()</CODE>
+ makes the printer associated with the passed printer number the new system-default printer. Note that these routines are concerned with the system-default printer as opposed to the application-default printer. Most applications won't specify an application specific default printer. For these applications, the system-default printer will be the default. Of course, the user will still be allowed to select any printer, ignoring the default.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Printing_14.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Printing_15.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">7.1 Spooler and Scheduling</A> 
+<!-- to next --> | <A HREF="Printing_17.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">7.3 Page Size Related Routines</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

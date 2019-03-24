@@ -1,0 +1,148 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Environment_16.htm,v 1.1 97/06/02 15:07:46 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Creating GStrings Dynamically</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Graphics Environment</A>: 8.4 <A HREF="Environment_12.htm">Graphics Strings</A>: 
+Creating GStrings Dynamically</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Environment_12.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Environment_15.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">8.3 Declaring a GString Statically</A> 
+<!-- to next --> | <A HREF="Environment_17.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">8.5 Drawing and Scanning</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+Sometimes it comes in handy to be able to create GStrings &quot;on the fly.&quot; To add elements to a GString, issue normal kernel drawing commands, but use a GState which is associated with the GString.</P>
+<P>
+To create a new, empty GString ready for editing (i.e. with an attached GState), call<CODE>
+ GrCreateGString()</CODE>
+. At this point, you may draw to the GString using normal drawing commands. For an example of creating a GString in this manner, see <A HREF="Environment_16.htm#76851"> Creating a GString Dynamically</A>
+.</P>
+<P CLASS="figTitle">
+Code Display 23-6 <A NAME="76851">
+ </A>
+Creating a GString Dynamically</P>
+<PRE>#define LABEL_BOX    2
+#define LABEL_CIRCLE 3</PRE>
+<PRE>gstate = GrCreateGString(file, GST_VMEM, &amp;myVMBlock);</PRE>
+<PRE>GrSetLineColor(gstate, CF_INDEX, C_BLUE, 0, 0);
+GrDrawRect(gstate, 0, 0, 620, 500);</PRE>
+<PRE>GrLabel(gstate, LABEL_BOX);
+GrSetAreaColor(gstate, CF_INDEX, C_RED, 0, 0);
+GrFillRect(gstate, 10, 130, 610, 490);
+GrSetLineWidth(gstate, MakeWWFixed(2));</PRE>
+<PRE>GrLabel(gstate, LABEL_CIRCLE);
+GrSetAreaColor(gstate, CF_INDEX, C_RED, 0, 0);
+GrFillEllipse(gstate, 130, 10, 490, 370);
+GrDrawEllipse(gstate, 130, 10, 490, 370);</PRE>
+<PRE>GrEndGString(gstate);
+GrDestroyGString(gstate, 0, GSKT_LEAVE_DATA);</PRE>
+<P>
+Drawing to a GString in this manner is almost exactly like drawing in any other GEOS graphics environment. However, there are some important rules to keep in mind.</P>
+<UL>
+<LI>
+The GString must end with a GR_END_GSTRING element; when the GString interpreter encounters this element, it knows to stop drawing. When creating a GString dynamically, the normal way to assure this is to call <CODE>
+GrEndGString()</CODE>
+. (Actually, this rule is not strictly true--when you learn more about drawing GStrings, you will see that it is possible to stop GString drawing based on other cues. However, it's always safest to end the GString with a GR_END_GSTRING in case some other application tries to draw the same GString.)</LI>
+<LI>
+Remember that you are creating a data structure which will be used later. The only commands which will affect the GString's contents are the kernel graphics routines, and only those which actually draw something or change the drawing properties. When creating a GString, it is tempting to include constructions like the following:</LI>
+</UL>
+<PRE>if (redFlag)
+	{GrSetAreaColor(
+		gstate, C_RED, CF_INDEX, 0, 0);}
+else  {GrSetAreaColor(
+		gstate, C_BLUE,CF_INDEX, 0, 0);}
+GrFillRect(gstate, 0, 0, 72, 72);</PRE>
+<UL>
+<LI>
+You might be surprised when you found out that the following code fragments both drew rectangles which were the same color:</LI>
+</UL>
+<PRE>redFlag = FALSE; 
+GrDrawGString(			screenGState, 
+			myGString, 
+			0, 0, 0, elem);
+redFlag = TRUE; 
+GrDrawGString(			screenGState, 
+			myGString, 
+			0, 0, 0, elem);</PRE>
+<UL>
+<LI>
+The factor which would determine the color of the drawing in this example would be the value of redFlag when you were creating the GString, not when you were drawing it.</LI>
+<LI>
+Think carefully before making coordinate space transformations in GStrings. If you want to remove all transformation effects, you should always call <CODE>
+GrSetDefaultTransform()</CODE>
+, instead of <CODE>
+GrSetNullTransform()</CODE>
+. By using <CODE>
+GrSetDefaultTransform()</CODE>
+, an application that is including your GString can apply some other type of transformation and make that the default; your application will then appear transformed as intended. However, if you call <CODE>
+GrSetNullTransform()</CODE>
+, you ignore that default transform and will appear in a strange way.</LI>
+<LI>
+If you use <CODE>
+GrInitDefaultTransform()</CODE>
+, you should probably bracket its use with calls to <CODE>
+GrSaveTransform()</CODE>
+ and <CODE>
+GrRestoreTransform()</CODE>
+. This save/restore pair will also save the current default transformation, if there is one. By adding the save and restore, you will be preserving whatever default transform the application including yours has set up.</LI>
+<LI>
+If you think your Graphics String will never show up included in some other application, consider the following: The print-to-file feature creates a graphics string that can be imported into several other applications.</LI>
+<LI>
+If you think you have to use<CODE>
+ GrSetTransform()</CODE>
+, try replacing it with a <CODE>
+GrSetDefaultTransform()</CODE>
+/<CODE>
+GrApplyTransform()</CODE>
+ pair. This will most likely have the same effect, but will be more palatable to another application using the GString.</LI>
+<LI>
+If you are including some other externally-created Graphics String into your document, you probably want to bracket it with <CODE>
+GrSaveState()</CODE>
+ and <CODE>
+GrRestoreState()</CODE>
+.</LI>
+<LI>
+If you're creating a multi-page GString which might be printed, make sure that each page is independent. There should be nothing assumed about the GState at the beginning of any page--you should instead assume that each will begin with the default GState. This applies to transformations, drawing properties, the GState's path, and so on.<BR>
+Keep in mind that each page should be able to print by itself if extracted from a multi-page document.<BR>
+The following pseudocode is an example of a &quot;bad&quot; idea:</LI>
+</UL>
+<PRE>for(curPage=0;curPage &lt; numberOfPages; curPage++) {
+ /* { draw current page } */
+ GrNewPage();
+ GrApplyTranslation(0, pageHeight); }</PRE>
+<UL>
+<LI>
+The following pseudocode provides a &quot;better&quot; way to do the same thing:</LI>
+</UL>
+<PRE>for (curPage=0; curPage &lt; numberOfPages; curPage++) { GrSaveState();
+  GrApplyTranslation(0,curPage*pageHeight);
+  /* {draw current page} */
+ GrRestoreState();
+ GrNewPage(); }</PRE>
+<P>
+Probably the most important piece of advice is to think about how the Graphics String will be used. If it will be used only under certain well-controlled circumstances, the above concerns may not affect you.</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Environment_12.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Environment_15.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">8.3 Declaring a GString Statically</A> 
+<!-- to next --> | <A HREF="Environment_17.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">8.5 Drawing and Scanning</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

@@ -1,0 +1,94 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: FileSys_2.htm,v 1.2 97/09/05 10:38:43 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> File System Overview</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="sectionTitle">
+<A HREF="index.htm">The File System</A>: 2 
+File System Overview</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="FileSys_1.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1 Design Philosophy</A> 
+<!-- to next --> | <A HREF="FileSys_3.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3 Disks and Drives</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+The GEOS file system manages all access to files on any type of storage. Whenever a geode needs to access a data file, it calls a file system routine. The file system makes any necessary calls to the computer's DOS. Like much of the GEOS system, it is driver-based; this makes it easy to expand GEOS to accommodate new technologies.</P>
+<P>
+When a geode needs to access a file, it makes a call to the file system. The file system sends requests through the appropriate driver. For example, if the geode needs access to a file on a local hard or floppy disk drive, the file system will send commands through a DOS driver, which will in turn issue appropriate commands to the DOS itself. Similarly, if the file resides on a network drive, the file system will send commands through an appropriate network driver, which will translate them into corresponding commands to the network server. 
+<IMG SRC="FileSys_2_geodeRelations.gif">
+
+</P>
+<P>
+Every storage device is known as a <EM>
+drive.</EM>
+ A drive can be either fixed-media or movable-media. Fixed media drives are always associated with a specific storage medium; in effect, the drive is the same as the storage. The primary example of this is the conventional hard disk. Movable-media drives use a potentially unlimited number of storage objects. Examples include floppy disk drives, CD-ROM drives, and cartridge hard drives. </P>
+<P>
+<A NAME="IX_Volumes (file system)">
+ </A>
+One way of organizing storage objects is to divide them into <EM>
+volumes</EM>
+. Ordinarily, every disk (floppy or hard) is a single volume; however, hard disks are sometimes divided into several volumes. Network storage devices are frequently divided into several volumes. If a single drive is partitioned into several volumes, DOS and GEOS treat each volume as a separate drive. In this chapter, the words <EM>
+volume</EM>
+ and <EM>
+disk</EM>
+ will be used interchangeably.</P>
+<P>
+<A NAME="IX_Directories (file system)">
+ </A>
+Individual volumes are organized with <EM>
+directories.</EM>
+ A directory may contain several different files or directories. There is not usually a limit on the number of files a directory may contain; however, no two files or directories belonging to a given directory may have the same name.</P>
+<P>
+Every volume is organized in a <EM>
+directory tree</EM>
+. The topmost directory is known as the <EM>
+root</EM>
+; it is unnamed, since every volume contains exactly one root directory. The root may contain files or directories. Those directories may themselves contain files or directories, and so on. The total number of files is usually limited only by the size of the storage device.</P>
+<P>
+To specify a file, you need to specify three things: The volume the file resides on, the directory to which the file belongs, and the file's name. In most DOS environments, a volume is generally specified with a letter followed by a colon (for example, the first hard disk is generally specified as &quot;C:&quot;). For non-fixed media (e.g. floppy disks), the letter actually specifies the drive; the volume is presumed to be in that drive. In GEOS, volumes and drives have different identifying systems.<A NAME="IX_Drive number">
+ </A>
+ Every drive is identified by a <EM>
+drive number</EM>
+. This is a positive integer; the first drive has a number of zero, the second is drive one, and so on.<A NAME="IX_DiskHandle">
+ </A>
+ Every volume is identified by a token (the <EM>
+disk handle</EM>
+).</P>
+<P>
+Specifying the directory is a little trickier. There may be many directories with the same name on a given volume. For this reason, the directory is specified with a <EM>
+path.</EM>
+ The path begins with the root directory; the root is followed by the name of one of the directories belonging to the root; that directory is followed by the name of one of its subdirectories; and so on, until the desired directory is reached. Since all the directories belonging to a given directory must have unique names, the path is guaranteed to uniquely specify a directory on a volume. For example, you might specify a directory as &quot;\GEOWORKS\DOCUMENT\MEMOS&quot;; this would indicate a directory named &quot;MEMOS,&quot; which belongs to a directory named &quot;DOCUMENT,&quot; which in turn belongs to a directory named &quot;GEOWORKS&quot; at the root level.</P>
+<P>
+The file itself is identified by its name. Since its directory has been uniquely specified by the volume and path, the name is guaranteed to specify at most one file in that directory. Each disk-operating system has its own conventions about how file names can be formed; for example, MS-DOS requires file names to have a &quot;name&quot; portion of at most eight letters, followed by an &quot;extension&quot; of at most three letters (known as the &quot;FILENAME.EXT&quot; convention). 
+
+</P>
+<P>
+For convenience, most operating systems let you specify a &quot;working directory.&quot; This is a combination of a volume and a path. If you have a working directory, you can omit either the volume or the path from a file specification, and the volume and/or path of the working directory will be used. This is called a &quot;relative path,&quot; i.e. a path that is relative to the working directory instead of the root directory. (Note that if you specify a disk handle for any operation, you must pass an absolute path which begins at the root of that disk or standard path.) GEOS allows every thread to have its own working directory; each thread can also save paths on a stack, letting the thread switch directories easily. For more details, see <A HREF="FileSys_8.htm#33340"> Current Path and Directory Stack</A>
+.</P>
+<P>
+Some disk-operating systems, such as MS-DOS, allow a working directory for each drive. GEOS does not allow this; you may have only one working directory at a time, regardless of how many drives you have. If you need to switch back and forth between directories on different drives, you can use the directory stack (see <A HREF="FileSys_8.htm#33340"> Current Path and Directory Stack</A>
+).</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="FileSys_1.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1 Design Philosophy</A> 
+<!-- to next --> | <A HREF="FileSys_3.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3 Disks and Drives</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

@@ -1,0 +1,293 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Stream_9.htm,v 1.1 97/06/02 14:16:36 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Initializing a Serial Port</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Using Streams</A>: 2.1 <A HREF="Stream_8.htm">Using the Serial Ports</A>: 
+Initializing a Serial Port</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Stream_8.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Stream_8.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">2 Using the Serial Ports</A> 
+<!-- to next --> | <A HREF="Stream_a.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2.2 Communicating</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+Like the stream driver, the serial driver is not accessed directly from Goc code. Instead, a Goc application makes calls to the Stream Library, which passes the requests through to the Serial Driver's strategy routine. Each serial-port command must be passed the <CODE>
+GeodeHandle</CODE>
+ of the Serial Library; again, you can find this handle by calling <CODE>
+GeodeGetInfo()</CODE>
+.</P>
+<P>
+The serial driver uses two streams, one for data going out to the serial port (outgoing) and one for data coming in from the serial port (incoming). Your program is the writer of the outgoing and the reader of the incoming. (In both cases, the port acts as the opposite user.)</P>
+
+<H2 CLASS="HeadingC">
+Opening a Serial Port</H2>
+<PRE>SerialOpen()</PRE>
+<P>
+<A NAME="IX_DR_STREAM_OPEN:with serial port">
+ </A>
+<A NAME="IX_SerialOpen()">
+ </A>
+To open a serial port, call the routine <CODE>
+SerialOpen()</CODE>
+. This routine is passed the following arguments:</P>
+<UL>
+<LI>
+The <CODE>
+GeodeHandle</CODE>
+ of the serial-port driver.</LI>
+<LI>
+A member of the <CODE>
+SerialUnit</CODE>
+ enumerated type; this specifies which serial port is being opened. The type's members are SERIAL_COM1, SERIAL_COM2, and so on up to SERIAL_COM8.</LI>
+<LI>
+<A NAME="IX_StreamOpenFlags">
+ </A>
+<A NAME="IX_STREAM_OPEN_&ldots;">
+ </A>
+A member of the <CODE>
+StreamOpenFlags </CODE>
+enumerated type, indicating what to do if the requested serial port is busy (either STREAM_OPEN_NO_BLOCK, indicating that the routine should return an error immediately; or STREAM_OPEN_TIMEOUT, indicating that the routine should wait a specified number of clock ticks to see if the port will free up).</LI>
+<LI>
+The total size of the stream to be used as an input buffer, in bytes.</LI>
+<LI>
+The total size of the stream to be used as an output buffer, in bytes.</LI>
+<LI>
+The maximum number of ticks to wait for the serial port to become available (if STREAM_OPEN_TIMEOUT was passed).</LI>
+</UL>
+<P>
+<A NAME="IX_StreamError:with SerialOpen()">
+ </A>
+A flag is returned to indicate whether the serial port could be opened; if not, a value of type <CODE>
+StreamError</CODE>
+ will be returned to indicate the reason. Possible stream error values are STREAM_BUFFER_TOO_LARGE and STREAM_CANNOT_CREATE, and the additional values STREAM_NO_DEVICE (if the serial port does not exist) or STREAM_DEVICE_IN_USE (if the device is busy and the <CODE>
+StreamOpenFlags</CODE>
+ passed indicate not to wait).</P>
+<P>
+Note that when using the serial driver, you do not identify the stream by a stream token but rather by the serial port number, known as a <EM>
+unit number</EM>
+. When accessing a serial port, you simply pass the port's unit number along with either STREAM_READ (if reading from the stream) or STREAM_WRITE (if writing to the stream); because each port has two streams associated with it, you must specify both parameters. The serial driver will understand which stream you are accessing.</P>
+
+
+<H2 CLASS="HeadingC">
+Configuring a Serial Port</H2>
+<PRE>SerialSetFormat(), SerialGetFormat(),SerialSetModem(), SerialGetModem(), SerialSetFlowControl()</PRE>
+<P>
+<A NAME="IX_DR_SERIAL_SET_FORMAT">
+ </A>
+<A NAME="IX_SerialSetFormat()">
+ </A>
+Communication using a serial port requires that parity, speed, and flow control be properly set. To control these settings, call <CODE>
+SerialSetFormat()</CODE>
+, passing the following arguments:</P>
+<UL>
+<LI>
+The <CODE>
+GeodeHandle</CODE>
+ of the serial-port driver.</LI>
+<LI>
+The member of the <CODE>
+SerialUnit</CODE>
+ enumerated type.</LI>
+<LI>
+A one-byte record of type <CODE>
+SerialFormat</CODE>
+, specifying the parity, word length, and number of stop bits to be used on the serial line; this record is described below.</LI>
+<LI>
+<A NAME="IX_SM_&ldots; :with SerialSetFormat()">
+ </A>
+A member of the <CODE>
+SerialMode</CODE>
+ enumerated type, set to indicate the level of flow control: SM_COOKED to indicate XON/XOFF flow control with characters stripped to seven bits, SM_RARE to indicate XON/XOFF flow control but incoming characters left alone, or SM_RAW to indicate no flow control.</LI>
+<LI>
+The baud rate to use, a member of the enumerated type <CODE>
+SerialBauds</CODE>
+, which has the following members:</LI>
+</UL>
+<PRE>typedef	enum
+{
+	SERIAL_BAUD_115200				= 1,
+	SERIAL_BAUD_57600				= 2,
+	SERIAL_BAUD_38400				= 3,
+	SERIAL_BAUD_19200				= 6,
+	SERIAL_BAUD_14400				= 8,
+	SERIAL_BAUD_9600				= 12,
+	SERIAL_BAUD_7200				= 16,
+	SERIAL_BAUD_4800				= 24,
+	SERIAL_BAUD_3600				= 32,
+	SERIAL_BAUD_2400				= 48,
+	SERIAL_BAUD_2000				= 58,
+	SERIAL_BAUD_1800				= 64,
+	SERIAL_BAUD_1200				= 96,
+	SERIAL_BAUD_600				= 192,
+	SERIAL_BAUD_300				= 384
+} SerialBaud;</PRE>
+<P>
+<CODE>
+SerialFormat</CODE>
+ is a byte-sized record that specifies the parity, word-length, and number of stop bits for the serial line. The record has the following fields:</P>
+<DL>
+<DT>
+SERIAL_FORMAT_DLAB	</DT><DD>
+This is for internal use only; it must be set to zero.</DD>
+<DT>
+SERIAL_FORMAT_BREAK	</DT><DD>
+If set, this causes a BREAK condition to be asserted on the line. You must explicitly clear this bit again to resume normal operation.</DD>
+<DT>
+SERIAL_FORMAT_PARITY</DT><DD>
+This three-bit field holds the parity to expect on receive and use on transmit. It uses the <CODE>
+SerialParity</CODE>
+ enumerated type, which has the following members:</DD>
+<PRE>typedef		enum {
+	SERIAL_PARITY_NONE				= 0,
+	SERIAL_PARITY_ODD				= 1,
+	SERIAL_PARITY_EVEN				= 3,
+	SERIAL_PARITY_ONE				= 5,
+	SERIAL_PARITY_MARK				= 5,
+	SERIAL_PARITY_ZERO				= 7,
+	SERIAL_PARITY_SPACE				= 7
+} SerialParity;</PRE>
+<DT>
+SERIAL_FORMAT_EXTRA_STOP</DT><DD>
+If this is set, extra stop-bits will be sent. One stop bit is always sent. However, if you set this flag, an extra 1/2 stop bit will be sent if the word-length is 5 bits long; an extra 1 stop bit will be sent if the frame is 6, 7, or 8 bits long.</DD>
+<DT>
+SERIAL_FORMAT_LENGTH</DT><DD>
+This two-bit field holds the length of each data word, minus five (i.e. a five-bit word is represented with a zero, a six-bit word with a one).</DD>
+</DL>
+<P>
+<A NAME="IX_DR_SERIAL_GET_FORMAT">
+ </A>
+<A NAME="IX_SerialGetFormat()">
+ </A>
+To find out the current settings of a serial port, call <CODE>
+SerialGetFormat()</CODE>
+. This routine is passed five arguments:</P>
+<UL>
+<LI>
+The <CODE>
+GeodeHandle</CODE>
+ of the serial-port driver.</LI>
+<LI>
+The member of the <CODE>
+SerialUnit</CODE>
+ enumerated type.</LI>
+<LI>
+A pointer to a <CODE>
+SerialFormat</CODE>
+ variable. <CODE>
+SerialGetFormat()</CODE>
+ will write the format data to this variable.</LI>
+<LI>
+<A NAME="IX_SM_&ldots; :with SeriealGetFormat()">
+ </A>
+A pointer to a <CODE>
+SerialMode</CODE>
+ variable. <CODE>
+SerialGetFormat()</CODE>
+ will write the appropriate mode constant (SM_COOKED, XON/XOFF, or SM_RARE) to this variable.</LI>
+<LI>
+A pointer to a <CODE>
+SerialBaud</CODE>
+ variable. <CODE>
+SerialFormat()</CODE>
+ will write the appropriate constant to this variable.</LI>
+</UL>
+<P>
+As with other serial port routines, if the routine is successful, it will return zero; if it is unsuccessful, it will return an error code.</P>
+<P>
+<A NAME="IX_SerialSetModem()">
+ </A>
+If you are using a modem's hardware flow control, you will have to configure the modem appropriately. You can do this by calling <CODE>
+SerialSetModem()</CODE>
+. This routine is passed three arguments:</P>
+<UL>
+<LI>
+The <CODE>
+GeodeHandle</CODE>
+ of the serial-port driver.</LI>
+<LI>
+The member of the <CODE>
+SerialUnit</CODE>
+ enumerated type.</LI>
+<LI>
+A record of type <CODE>
+SerialModem</CODE>
+. This record has four fields: SERIAL_MODEM_OUT2, SERIAL_MODEM_OUT1, SERIAL_MODEM_RTS, and SERIAL_MODEM_DTR. Set these fields to indicate how the control-bits should be set.</LI>
+</UL>
+<P>
+<A NAME="IX_SerialGetModem()">
+ </A>
+To find out what flow control is being used, call <CODE>
+SerialGetModem()</CODE>
+. This routine is passed three arguments:</P>
+<UL>
+<LI>
+The <CODE>
+GeodeHandle</CODE>
+ of the serial-port driver.</LI>
+<LI>
+The member of the <CODE>
+SerialUnit</CODE>
+ enumerated type.</LI>
+<LI>
+A pointer to a record of type <CODE>
+SerialModem</CODE>
+. <CODE>
+SerialGetModem()</CODE>
+ will set this record's SERIAL_MODEM_OUT2, SERIAL_MODEM_OUT1, SERIAL_MODEM_RTS, and SERIAL_MODEM_DTR bits appropriately.</LI>
+</UL>
+<P>
+<A NAME="IX_SerialSetFlowControl()">
+ </A>
+You can also set the flow control without setting the other format options. Do this by calling <CODE>
+SerialSetFlowControl()</CODE>
+. This routine is passed the following arguments:</P>
+<UL>
+<LI>
+The <CODE>
+GeodeHandle</CODE>
+ of the serial-port driver.</LI>
+<LI>
+The member of the <CODE>
+SerialUnit</CODE>
+ enumerated type.</LI>
+<LI>
+A record of type <CODE>
+SerialModem</CODE>
+. This record has four fields: SERIAL_MODEM_OUT2, SERIAL_MODEM_OUT1, SERIAL_MODEM_RTS, and SERIAL_MODEM_DTR. Set these fields to indicate how the control-bits should be set.</LI>
+<LI>
+<A NAME="IX_SM_&ldots; :with SerialSetFlowControl()">
+ </A>
+A member of the <CODE>
+SerialMode</CODE>
+ enumerated type, set to indicate the level of flow control: SM_COOKED to indicate XON/XOFF flow control with characters stripped to seven bits, SM_RARE to indicate XON/XOFF flow control but incoming characters left alone, or SM_RAW to indicate no flow control.</LI>
+<LI>
+A record of type <CODE>
+SerialModemStatus</CODE>
+ to indicate which lines (chosen from DCD, DSR, and CTS) should be used to control outgoing data (if hardware flow control is selected). When one of the selected lines is de-asserted by the remote system, the serial driver will not transmit any more data until the state changes.</LI>
+</UL>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Stream_8.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Stream_8.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">2 Using the Serial Ports</A> 
+<!-- to next --> | <A HREF="Stream_a.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2.2 Communicating</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

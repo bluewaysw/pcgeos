@@ -1,0 +1,73 @@
+#!/usr/public/perl
+
+# extractIXInfo
+#
+# $Id: extractIXInfo,v 1.2 97/06/19 15:03:50 lawrence Exp $
+#
+# This script looks over the HTML files making up the GEOS SDK 
+# techdocs, and generates information which will be used to 
+# make an index, power search engines, and save the world.
+
+# Usage:
+#   cd <top of techdoc HTML tree>
+#   extractIXInfo > IXInfo
+
+# What it searches:
+# It searches */*/*.htm.
+
+# What it outputs:
+# It prints out a bunch of lines of the form
+# keyword	URL
+# where keyword is a search term,
+# where 	is a tab, and 
+# where URL     is a URL relative to the top of the techdoc HTML tree
+
+# What it looks for:
+# Anchors of the form <A NAME="IX_foo">.
+# There may be at most one of these per line.
+# 
+# Tricky bits:
+#   Because it's tough to have an anchor of the form
+#   <A NAME="" (quote mark)">, we're using &#34; to 
+#   represent quotes inside of the name.  When extracting index
+#   information, we want to turn the &#34; back into a ".
+#
+#   NAMES that have "..." in them don't seem to work, sometimes.
+#   So we're using &ldots; to represent "...".
+#
+#   NAMES that have "?" in them don't seem to work, sometimes.
+#   So we're using &qmark; to represent "?".
+#
+#   As a legacy from Frame, you can actually cram two search keys 
+#   into one anchor.  Anchors of the form 
+#   <A NAME="IX_foo[;bar] should generate two keys, "foo" and "bar".
+#   You can't cram any more than that.  IX_foo[;bar;garply] won't work.
+
+@ixInfo = `grep "<A NAME=.IX_" */*/*.htm` ;
+chop( @ixInfo );
+
+$numItems = @ixInfo;
+
+for ( $item = 0; $item < $numItems; $item++ ) {
+  $theFile = $ixInfo[$item];
+  $theFile =~ s/\.htm:.*/\.htm/ ;
+  $theName = $ixInfo[$item];
+  $theName =~ s/.*<A NAME="// ; $theName =~ s/">.*// ;
+  $theKey = $theName;  
+  $theKey =~ s/^IX_//;
+  $theKey =~ s/&#34;/"/g ;
+  $theKey =~ s/&ldots;/\.\.\./g ;
+
+  if ($theKey =~ /\[;.*\]/ ) {
+    $theOtherKey = $theKey;
+    $theOtherKey =~ s/.*\[;// ; $theOtherKey =~ s/\].*// ; 
+    $ixInfo[@ixInfo] = $ixInfo[$item] = $theOtherKey . "\t" . $theFile . "#" . $theName . "\n";
+    $theKey =~ s/\[;.*\].*// ; 
+  }
+
+  $ixInfo[$item] = $theKey . "\t" . $theFile . "#" . $theName . "\n";
+}
+
+print( sort @ixInfo ) ;
+
+

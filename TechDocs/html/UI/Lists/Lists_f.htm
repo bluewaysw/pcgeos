@@ -1,0 +1,303 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Lists_f.htm,v 1.3 97/08/26 10:12:43 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> DynamicList Basics</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The List Objects</A>: 4.2 <A HREF="Lists_d.htm">GenDynamicListClass</A>: 
+DynamicList Basics</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Lists_d.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Lists_e.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.1 DynamicList Instance Data</A> 
+<!-- to next --> | <A HREF="Lists_10.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.3 Altering Instance Data</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER, MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER_OPTR, MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT</PRE>
+<P>
+You will need to perform several preparatory steps in order to use a GenDynamicList object, even in its most basic form. The following steps are required for all dynamic lists.</P>
+<UL>
+<LI>
+Create a GenDynamicList object. You must include the number of items to appear in your list (or set them dynamically when this number is known) and a query message to handle the extraction and display of monikers from a list of data.</LI>
+<LI>
+Create a list of data to use as entries in the list. For simplicity, this can be a chunk of data containing a list of visual monikers, although the data may come from any source--as long as you provide the means to convert the data into monikers. </LI>
+<LI>
+Create a query message handler to search through the list of data. This handler should convert any data into a proper format (if necessary) and send the moniker to the dynamic list to display the item. You can convert the data into a proper format by using one of several messages provided with <CODE>
+GenDynamicListClass</CODE>
+. These messages may take text strings, visual monikers, or other forms of data to set the monikers for the dynamic list.</LI>
+</UL>
+<P CLASS="figTitle">
+Code Display 11-6 Creating a GenDynamicList object</P>
+<PRE>/* In the definition of your destination object's class, define a message based
+ * on the prototype GEN_DYNAMIC_LIST_QUERY. This prototype passes two arguments:
+ * list (the optr of the list sending info) and item (the selection enum). */</PRE>
+<PRE>@message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_QUERY_COLOR_MONIKER;</PRE>
+<PRE>/* Set up the selections, just as you would in a normal GenItemGroup. */</PRE>
+<PRE>typedef enum {
+    MC_RED, MC_YELLOW, MC_BLUE, MC_GREEN
+} MyColors;
+#define NUM_COLORS MC_GREEN+1</PRE>
+<PRE>/* In the object declaration, include normal instance data for a GenItemGroup,
+ * making sure to also fill in GDLI_numItems and GDLI_queryMsg with the proper
+ * information. Note that there are no generic children provided for this object.
+ * The list will retrieve and display monikers automatically through the query
+ * message as they are needed. */</PRE>
+<PRE>@object GenDynamicListClass MyList = {
+    /* Set the initial selection MC_BLUE (and the number of items selected to 1).*/</PRE>
+<PRE>    GIGI_selection = MC_BLUE;
+    GIGI_applyMsg = MSG_NOTIFY_COLOR_CHANGE;
+    GIGI_destination = process;</PRE>
+<PRE>    /* Set numItems to the total number of items to appear in this list. If you
+     * will not know this initially, make sure to set this instance data when you
+     * do know (with MSG_GEN_DYNAMIC_LIST_INITIALIZE). */</PRE>
+<PRE>    GDLI_numItems = NUM_COLORS;
+    GDLI_queryMsg = MSG_QUERY_COLOR_MONIKER;
+    HINT_ITEM_GROUP_SCROLLABLE;
+}</PRE>
+<P>
+When a dynamic list is first built, the specific UI will decide how many items within the scrolling list should be initially displayed. For each of these items, the dynamic list will send out a query message, passing the number (position) of the item to search for. The querying message will search through a list of data (either custom or pre-existing), extracting and converting the data into text, graphics strings, or visual monikers, etc.</P>
+<P>
+Finally, your query message handler should set each moniker in the list using one of the <CODE>
+MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER</CODE>
+ messages. There are three messages to set the moniker of a dynamic list entry:</P>
+<UL>
+<LI>
+<CODE>
+MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER<BR>
+</CODE>
+This is a general purpose moniker replacement message. It can take a variety of source types (optrs, fptrs, hptrs), data types (visMonikers, text strings, graphics strings, or even geode tokens), and (in the case of graphics strings) the height and width of the moniker. This message also provides a flag allowing a moniker entry to appear visually disabled (grayed out in OSF/Motif).</LI>
+<LI>
+<CODE>
+MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER_OPTR<BR>
+</CODE>
+This is a simplified version of the above message which takes a visual moniker and displays it within the dynamic list. The message's only arguments are the item in the list to update and the optr of the moniker for that item.</LI>
+<LI>
+<CODE>
+MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT<BR>
+</CODE>
+This is another simplified version of the first message which takes a text string and displays it within the dynamic list. The message's only arguments are the item in the list to update and a pointer to the text string to use.</LI>
+</UL>
+<P>
+The simpler messages are useful if your data is a list of complete visual moniker structures or is a list of text strings. If you need to retrieve special data (such as GStrings or geode tokens), or if you need to perform special operations on the moniker (such as bringing it up disabled), then you must use <CODE>
+MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER</CODE>
+.</P>
+<P>
+The data itself may be placed in several areas of your code. If the data is simple text strings, set up within an array, it may appear within the dynamic list's object block, its own resource block, or within the handler for the query message. If the data is visual monikers, the data must appear within a resource block. </P>
+<P>
+If the data is within a different block from the dynamic list, that block must be locked before its data can be accessed. Make sure to unlock the block after using the data.</P>
+<P CLASS="figTitle">
+Code Display 11-7 Creating the List of Data</P>
+<PRE>/* Create the list of data (in this case within its own data block). This list of
+ * data will be in form of text strings. */</PRE>
+<PRE>@start ItemText, data;</PRE>
+<PRE>@chunk char *listMonikers[NUM_COLORS] = {
+    &quot;Red&quot;, &quot;Yellow&quot;, &quot;Blue&quot;, &quot;Green&quot;
+};</PRE>
+<PRE>@end ItemText</PRE>
+<PRE>/* Create the query message handler. Each time the GenDynamicList needs to display
+ * an item, it will call this querying message with the number (position) of the
+ * item it needs to display. In this case, since the monikers are already in the
+ * form of text strings, you can use MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT
+ * to set the moniker of the list item using the text string.
+ * DEFINITION: void MSG_QUERY_COLOR_MONIKER(optr list, word item) */</PRE>
+<PRE>@method MyProcessClass, MSG_QUERY_COLOR_MONIKER {
+char *listString;
+    /* The method will retrieve the entry's text moniker from the array of
+     * text monikers in listMonikers. It locks itemText, extracts the
+     * text string, and uses the REPLACE_ITEM message to set the dynamic list
+     * entry. */</PRE>
+<PRE>    MemLock(HandleOf(@listMonikers));
+    listString = listMonikers[item];</PRE>
+<PRE>	/* Then send off the item string to the dynamic list
+	 * and unlock the data block. */
+    @call listObject::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, listString);
+    MemUnlock(HandleOf(@listMonikers));
+}</PRE>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER">
+ </A>
+MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER</H4>
+<PRE CLASS="syntax">void	MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(@stack
+        word			item,
+        word			flags,
+        word			height,
+        word			width,
+        word			length,
+        VisMonikerDataType			dataType,
+        VisMonikerSourceType			sourceType,
+        dword			source);</PRE>
+<P>
+This message sends a moniker to use for a particular list item and is usually sent in response to a moniker query by a dynamic list object. Within your query message handler (GDLI_<CODE>
+queryMsg</CODE>
+), you should access the data for the moniker to use and send off this message with the proper parameters. You may also use this message to change an item's moniker, guaranteeing that it is updated if currently visible.</P>
+<P>
+If you pass this message the flag RIMF_NOT_ENABLED, the moniker for the item will be disabled (usually grayed out).</P>
+<P>
+On the Nokia 9000i Communicator devices, you can use the routine
+<CODE>CreateVisMonikerLine()</CODE> to to arrange the line's contents 
+so that they will form columns when displayed with similarly arranged 
+lines.
+<P>
+This is an all-purpose message that allows many different source types and many ways to reference the data in these sources. If you are using lists of visual monikers or simple text strings and you do not to perform any fancy operations on this data, you may use <CODE>
+MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER_OPTR</CODE>
+ or <CODE>
+MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT</CODE>
+.</P>
+<P CLASS="refField">
+Source:	The object handling a dynamic list's query message.</P>
+<P CLASS="refField">
+Destination:	The GenDynamicList specified in the query message.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+item</EM>
+	The position of the item needing a moniker.</P>
+<DL>
+<DT>
+<EM>
+flags</EM>
+</DT><DD>RIMF_NOT_ENABLED if the item's moniker should be shown disabled.</DD>
+<DT>
+<EM>
+height</EM>
+</DT><DD>If the item is a GString, the height in points.</DD>
+<DT>
+<EM>
+width</EM>
+</DT><DD>If the item is a GString, the width in points.</DD>
+<DT>
+<EM>
+length</EM>
+</DT><DD>Size of moniker data, in bytes. This value is ignored for VMST_OPTR. If the dataType is VMDT_TEXT and length is zero, the text moniker is assumed to be null-terminated. If the dataType is VMDT_GSTRING and the length is zero, the GString is assumed to end with a GR_END_GSTRING element.</DD>
+<DT>
+<EM>
+dataType</EM>
+</DT><DD>The <CODE>
+VisMonikerDataType</CODE>
+ of the actual moniker.</DD>
+<DT>
+<EM>
+sourceType</EM>
+</DT><DD>The type of pointer referencing the moniker.</DD>
+<DT>
+<EM>
+source</EM>
+</DT><DD>A pointer to the moniker data.</DD>
+</DL>
+<P CLASS="refField">
+Structures:	The <CODE>
+VisMonikerDataType</CODE>
+ and <CODE>
+VisMonikerSourcetype</CODE>
+ are defined by <CODE>
+VisClass</CODE>
+. Their values are shown here for easy reference.</P>
+<PRE><A NAME="IX_VisMonikerDataType"> </A><A NAME="IX_VisMonikerDataType"> </A>typedef ByteEnum VisMonikerDataType;
+/*	VMDT_NULL
+ *	VMDT_VIS_MONIKER
+ *	VMDT_TEXT
+ *	VMDT_GSTRING
+ *	VMDT_TOKEN */</PRE>
+<PRE><A NAME="IX_VisMonikerSourceType"> </A><A NAME="IX_VisMonikerSourceType"> </A>typedef ByteEnum VisMonikerSourceType;
+/*	VMST_FPTR
+ *	VMST_OPTR
+ *	VMST_HPTR */</PRE>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER_OPTR">
+ </A>
+MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER_OPTR</H4>
+<PRE CLASS="syntax">void	MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER_OPTR(
+        word	item,
+        optr	moniker);</PRE>
+<P>
+This message is a simplified version of <CODE>
+MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER</CODE>
+. The moniker must be of type <CODE>
+VisMoniker</CODE>
+ and referenced by an optr. No special operations (such as marking the item disabled) are possible with this message. In those cases, use <CODE>
+MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER</CODE>
+.</P>
+<P CLASS="refField">
+Source:	The object handling a dynamic list's query message.</P>
+<P CLASS="refField">
+Destination:	The GenDynamicList object specified by the query message.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+item</EM>
+	The position of the item to display.</P>
+<DL>
+<DT>
+<EM>
+optr</EM>
+</DT><DD>The optr of the <CODE>
+VisMoniker</CODE>
+ to use.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT">
+ </A>
+MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT</H4>
+<PRE CLASS="syntax">void	MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(
+        word	item,
+        char	*text);</PRE>
+<P>
+This message is a simplified version of <CODE>
+MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER</CODE>
+. The moniker passed must be a null-terminated text string. No special operations (such as marking the item disabled) are possible with this message. In those cases, use <CODE>
+MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER</CODE>
+.<CODE>
+</CODE>
+</P>
+<P CLASS="refField">
+Source:	The object handling a dynamic list's query message.</P>
+<P CLASS="refField">
+Destination:	The GenDynamicList object specified by the query message.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+item</EM>
+	The position of the item to display.</P>
+<DL>
+<DT>
+<EM>
+text</EM>
+</DT><DD>A pointer to the null-terminated text string.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Lists_d.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Lists_e.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.1 DynamicList Instance Data</A> 
+<!-- to next --> | <A HREF="Lists_10.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.3 Altering Instance Data</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

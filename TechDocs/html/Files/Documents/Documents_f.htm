@@ -1,0 +1,434 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Documents_f.htm,v 1.1 97/06/02 14:44:25 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Working with DOS files</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Documents</A>: 4.3 <A HREF="Documents_c.htm">Advanced DC Usage</A>: 
+<A NAME="71063">
+ </A>
+Working with DOS files</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Documents_c.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Documents_e.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.2 Multiple Document Model</A> 
+<!-- to next --> | <A HREF="Documents_10.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.4 Special-Purpose Messages</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>MSG_META_DOC_OUTPUT_PHYSICAL_SAVE, MSG_GEN_DOCUMENT_PHYSICAL_SAVE, MSG_META_DOC_OUTPUT_PHYSICAL_UPDATE, MSG_GEN_DOCUMENT_PHYSICAL_UPDATE, MSG_META_DOC_OUTPUT_PHYSICAL_SAVE_AS_FILE_HANDLE, MSG_GEN_DOCUMENT_PHYSICAL_SAVE_AS_FILE_HANDLE, MSG_META_DOC_OUTPUT_PHYSICAL_REVERT, MSG_GEN_DOCUMENT_PHYSICAL_REVERT</PRE>
+<P>
+The document control can be used to handle DOS files. However, there are special issues to be aware of. When you use GEOS Virtual Memory files, the system takes care of swapping sections of the file in and out of memory as needed. You can use high-level commands to mark parts of the file as dirty, and when you need the document saved, only the dirty sections will be copied to the disk. The details of reading from and writing to the disk are transparent to the application.</P>
+<P>
+When you use DOS files, on the other hand, you have to take care of all of these details yourself. It is usually impractical to keep all of a document in memory at one time, so you have to have some way of managing the data (perhaps by creating a temporary VM file and copying the DOS file into that).</P>
+<P>
+For this reason, the document control sends out messages when it does many low-level things (such as save files). If the application needs to take special actions, it can define handlers for these messages. Most of these messages can be ignored if you are working with GEOS files. </P>
+<P>
+If you want to implement &quot;Save As&quot; and &quot;Revert&quot; for DOS files, you will have to do most of it by hand. If you leave &quot;Save As&quot; and &quot;Revert&quot; enabled, the Document Control will do some of the work for you. For example, when the user chooses &quot;Save As&quot;, the Document Control will first present a File Selector, letting the user choose a file name and location. The Document Control will then create the new file. After this it will send out MSG_META_DOC_OUTPUT_PHYSICAL_SAVE_AS_FILE_HANDLE and MSG_GEN_DOCUMENT_PHYSICAL_SAVE_AS_FILE_HANDLE, passing the handle of the newly-created file. The application is responsible for writing the current version of the document to the new file, and reverting the original file to its last-saved state. The Document Control will automatically close the original file and update all Document Control instance data as necessary.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_DOC_OUTPUT_PHYSICAL_SAVE">
+ </A>
+MSG_META_DOC_OUTPUT_PHYSICAL_SAVE</H4>
+<PRE CLASS="syntax">Boolean	MSG_META_DOC_OUTPUT_PHYSICAL_SAVE(
+        word *		error, 
+        optr 		document,
+        FileHandle 		file);</PRE>
+<P>
+If you need to take special steps to save a file, you should have a handler for either this message or <CODE>
+MSG_GEN_DOCUMENT_PHYSICAL_SAVE</CODE>
+. The handler should write the file completely to the disk. If an error occurs, return <EM>
+true</EM>
+ and write the error code in <EM>
+*error</EM>
+. (File access error codes are members of the <CODE>
+FileError</CODE>
+ enumerated type, defined in <STRONG CLASS="fileName">
+file.h</STRONG>
+.)</P>
+<P>
+If, for example, you copy a DOS file into a temporary VM file while you work on it, you would probably respond to this message by copying the data from the temporary file back to the DOS file.</P>
+<P CLASS="refField">
+Source:	The GenDocumentGroup object.</P>
+<P CLASS="refField">
+Destination:	Output of GenDocumentGroup (usually the Process object).</P>
+<P CLASS="refField">
+Parameters:	<EM>
+error	</EM>
+A pointer to a word in which an error should be returned.</P>
+<DL>
+<DT>
+<EM>
+document</EM>
+</DT><DD><EM>
+The optr of the appropriate document object.</EM>
+</DD>
+<DT>
+<EM>
+file</EM>
+</DT><DD>The FileHandle of the appropriate file.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	DOS-based applications must handle either this message or <CODE>
+MSG_GEN_DOCUMENT_PHYSICAL_SAVE</CODE>
+. Applications which use GEOS data files will generally not intercept this message.</P>
+<P CLASS="refField">
+Return:	<EM>
+true</EM>
+ if error occurs.</P>
+<DL>
+<DT>
+<EM>
+*error</EM>
+</DT><DD><CODE>
+FileError</CODE>
+ code (or zero if there is no error).</DD>
+
+
+</DL>
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_DOCUMENT_PHYSICAL_SAVE">
+ </A>
+MSG_GEN_DOCUMENT_PHYSICAL_SAVE</H4>
+<PRE CLASS="syntax">Boolean	MSG_GEN_DOCUMENT_PHYSICAL_SAVE(
+        word *	error); 		/* Error code from FileError type */</PRE>
+<P>
+This message is sent when the user saves a file. If you need to take special steps to save a file, you should have a handler for either this message or <CODE>
+MSG_META_DOC_OUTPUT_PHYSICAL_SAVE</CODE>
+. The handler should write the file completely to the disk. If an error occurs, return <EM>
+true</EM>
+ and write the error code in <EM>
+*error</EM>
+. (File access error codes are members of the <CODE>
+FileError</CODE>
+ enumerated type, defined in <STRONG CLASS="fileName">
+file.h</STRONG>
+.)</P>
+<P>
+If, for example, you copy a DOS file into a temporary VM file while you work on it, you would probably respond to this message by copying the data from the temporary file back to the DOS file.</P>
+<P CLASS="refField">
+Source:	The GenDocument object.</P>
+<P CLASS="refField">
+Destination:	The document object sends this message to itself.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+error	</EM>
+A pointer to a word in which an error should be returned.</P>
+<P CLASS="refField">
+Return:	<EM>
+true</EM>
+ if error occurs.</P>
+<DL>
+<DT>
+<EM>
+*error</EM>
+</DT><DD><CODE>
+FileError</CODE>
+ code (or zero if there is no error).</DD>
+</DL>
+<P CLASS="refField">
+Interception:	DOS-based applications must handle either this message or <CODE>
+MSG_META_DOC_OUTPUT_PHYSICAL_SAVE</CODE>
+. Applications which use GEOS data files will generally not intercept this message.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_DOC_OUTPUT_PHYSICAL_AUTO_SAVE">
+ </A>
+MSG_META_DOC_OUTPUT_PHYSICAL_UPDATE</H4>
+<PRE CLASS="syntax">Boolean	MSG_META_DOC_OUTPUT_PHYSICAL_UPDATE(occurred */
+        word *		error, 			/* Error code from FileError type */
+        optr 		document,			/* Pointer to document object */
+        FileHandle 		file);			/* Handle of DOS file */</PRE>
+<P>
+This message is sent when the file is auto-saved (if this is enabled), and when the document is detached as part of a GEOS shutdown. If you need to take special steps to save a file, you should have a handler for either this message or <CODE>
+MSG_GEN_DOCUMENT_PHYSICAL_UPDATE</CODE>
+. The handler should write the file completely to the disk. If an error occurs, return <EM>
+true</EM>
+ and write the error code in <EM>
+*error</EM>
+. (File access error codes are members of the <CODE>
+FileError</CODE>
+ enumerated type, defined in <STRONG CLASS="fileName">
+file.h</STRONG>
+.)</P>
+<P>
+If, for example, you copy a DOS file into a temporary VM file while you work on it, you would probably respond to this message by copying the data from the temporary file back to the DOS file.</P>
+<P CLASS="refField">
+Source:	The GenDocumentGroup object.</P>
+<P CLASS="refField">
+Destination:	Output of GenDocumentGroup (usually the Process object).</P>
+<P CLASS="refField">
+Parameters:	<EM>
+error	</EM>
+A pointer to a word in which an error should be returned.</P>
+<DL>
+<DT>
+<EM>
+document</EM>
+</DT><DD><EM>
+The optr of the appropriate document object.</EM>
+</DD>
+<DT>
+<EM>
+file</EM>
+</DT><DD>The FileHandle of the appropriate file.</DD>
+</DL>
+<P CLASS="refField">
+Return:	<EM>
+true</EM>
+ if error occurs.</P>
+<DL>
+<DT>
+<EM>
+*error</EM>
+</DT><DD><CODE>
+FileError</CODE>
+ code (or zero if there is no error).</DD>
+</DL>
+<P CLASS="refField">
+Interception:	DOS-based applications which will have auto-save capability must handle either this message or <CODE>
+MSG_GEN_DOCUMENT_PHYSICAL_UPDATE</CODE>
+. Applications which use GEOS data files will generally not intercept this message.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_DOCUMENT_PHYSICAL_AUTO_SAVE">
+ </A>
+MSG_GEN_DOCUMENT_PHYSICAL_UPDATE</H4>
+<PRE CLASS="syntax">Boolean	MSG_GEN_DOCUMENT_PHYSICAL_UPDATE(
+        word *	error); 		/* Error code from FileError type */</PRE>
+<P>
+This message is sent when the file is auto-saved (if this is enabled), and when the document is detached as part of a GEOS shutdown. If you need to take special steps to save a file, you should have a handler for either this message or <CODE>
+MSG_META_DOC_OUTPUT_PHYSICAL_UPDATE</CODE>
+. The handler should write the file completely to the disk. If an error occurs, return <EM>
+true</EM>
+ and write the error code in <EM>
+*error</EM>
+. (File access error codes are members of the <CODE>
+FileError</CODE>
+ enumerated type, defined in <STRONG CLASS="fileName">
+file.h</STRONG>
+.)</P>
+<P>
+If, for example, you copy a DOS file into a temporary VM file while you work on it, you would probably respond to this message by copying the data from the temporary file back to the DOS file.</P>
+<P CLASS="refField">
+Source:	A GenDocument object.</P>
+<P CLASS="refField">
+Destination:	The document object sends this message to itself.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+error	</EM>
+A pointer to a word in which an error should be returned.</P>
+<P CLASS="refField">
+Return:	<EM>
+true</EM>
+ if error occurs.</P>
+<DL>
+<DT>
+<EM>
+*error</EM>
+</DT><DD><CODE>
+FileError</CODE>
+ code (or zero if there is no error).</DD>
+</DL>
+<P CLASS="refField">
+Interception:	DOS-based applications which will have auto-save capability must handle either this message or <CODE>
+MSG_META_DOC_OUTPUT_PHYSICAL_UPDATE</CODE>
+. Applications which use GEOS data files will generally not intercept this message.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_DOC_OUTPUT_PHYSICAL_SAVE_AS_FILE_HANDLE">
+ </A>
+<A NAME="35277">
+ </A>
+MSG_META_DOC_OUTPUT_PHYSICAL_SAVE_AS_FILE_HANDLE</H4>
+<PRE CLASS="syntax">Boolean	MSG_META_DOC_OUTPUT_PHYSICAL_SAVE_AS_FILE_HANDLE(
+        word *		error,
+        optr		document,
+        FileHandle		file);</PRE>
+<P>
+This message is sent when the Document Control is ready to &quot;save-as&quot; a DOS file. The Document Control will have asked the user what the new file should be, and will have created an appropriate file. The handler for this message must write the current version of the document to the new file, and restore the original file to its last-saved state.</P>
+<P CLASS="refField">
+Source:	The GenDocumentGroup object.</P>
+<P CLASS="refField">
+Destination:	The output of GenDocumentGroup (usually the Process object).</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+error</CODE>
+	A pointer to a word in which an error code should be returned.</P>
+<DL>
+<DT>
+<EM>
+document</EM>
+</DT><DD><EM>
+The optr of the appropriate document object.</EM>
+</DD>
+<DT>
+<CODE>
+file</CODE>
+</DT><DD>The handle of the newly-opened file. The current version of the document should be saved to this file.</DD>
+</DL>
+<P CLASS="refField">
+Return:	<EM>
+true</EM>
+ if an error occurred.</P>
+<DL>
+<DT>
+<CODE>
+*file</CODE>
+</DT><DD>A member of the <CODE>
+FileError</CODE>
+ enumerated type (if an error occurred).</DD>
+</DL>
+<P CLASS="refField">
+Interception:	DOS-file applications must intercept this message (or MSG_GEN_DOCUMENT_PHYSICAL_SAVE_AS_FILE_HANDLE) if they wish to implement save-as/revert functionality. </P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="35277">
+ </A>
+<A NAME="IX_MSG_GEN_DOCUMENT_PHYSICAL_SAVE_AS_FILE_HANDLE">
+ </A>
+MSG_GEN_DOCUMENT_PHYSICAL_SAVE_AS_FILE_HANDLE</H4>
+<PRE CLASS="syntax">Boolean	MSG_GEN_DOCUMENT_PHYSICAL_SAVE_AS_FILE_HANDLE(
+        word *		error,
+        FileHandle		file);</PRE>
+<P>
+This message is sent when the Document Control is ready to &quot;save-as&quot; a DOS file. The Document Control will have asked the user what the new file should be, and will have created an appropriate file. The handler for this message must write the current version of the document to the new file, and restore the original file to its last-saved state.</P>
+<P CLASS="refField">
+Source:	A GenDocument.</P>
+<P CLASS="refField">
+Destination:	The GenDocument object sends this message to itself.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+error</CODE>
+	A pointer to a word in which an error code should be returned.</P>
+<DL>
+<DT>
+<CODE>
+file</CODE>
+</DT><DD>The handle of the newly-opened file. The current version of the document should be saved to this file.</DD>
+</DL>
+<P CLASS="refField">
+Return:	<EM>
+true</EM>
+ if an error occurred.</P>
+<DL>
+<DT>
+<CODE>
+*error</CODE>
+</DT><DD>A member of the <CODE>
+FileError</CODE>
+ enumerated type (if an error occurred).</DD>
+</DL>
+<P CLASS="refField">
+Interception:	DOS-file applications must intercept this message (or MSG_META_DOC_OUTPUT_PHYSICAL_SAVE_AS_FILE_HANDLE) if they wish to implement save-as/revert functionality. </P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_DOC_OUTPUT_PHYSICAL_REVERT">
+ </A>
+MSG_META_DOC_OUTPUT_PHYSICAL_REVERT</H4>
+<PRE CLASS="syntax">Boolean	MSG_META_DOC_OUTPUT_PHYSICAL_REVERT(
+        word *		error,
+        optr		document,
+        FileHandle		file);</PRE>
+<P>
+The Document Control sends this message to revert a DOS file to its last-saved state. The handler must restore the file to its condition as of the last time it was saved.</P>
+<P CLASS="refField">
+Source:	The GenDocumentGroup object.</P>
+<P CLASS="refField">
+Destination:	The output of GenDocumentGroup (usually the Process object).</P>
+<P CLASS="refField">
+Parameters:	<EM>
+error	</EM>
+A pointer to a word in which an error should be returned.</P>
+<DL>
+<DT>
+<EM>
+document</EM>
+</DT><DD><EM>
+The optr of the appropriate document object.</EM>
+</DD>
+<DT>
+<EM>
+file</EM>
+</DT><DD>The FileHandle of the appropriate file.</DD>
+</DL>
+<P CLASS="refField">
+Return:	<EM>
+true</EM>
+ if error occurs.</P>
+<DL>
+<DT>
+<EM>
+*error</EM>
+</DT><DD><CODE>
+FileError</CODE>
+ code (or zero if there is no error).</DD>
+</DL>
+<P CLASS="refField">
+Interception:	DOS-file applications must intercept this message (or MSG_GEN_DOCUMENT_PHYSICAL_REVERT) if they wish to implement save-as/revert functionality. </P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_DOCUMENT_PHYSICAL_REVERT">
+ </A>
+MSG_GEN_DOCUMENT_PHYSICAL_REVERT</H4>
+<PRE CLASS="syntax">Boolean	MSG_GEN_DOCUMENT_PHYSICAL_REVERT(
+        word *		error,
+        FileHandle		file);</PRE>
+<P>
+The Document Control sends this message to revert a DOS file to its last-saved state. The handler must restore the file to its condition as of the last time it was saved.</P>
+<P CLASS="refField">
+Source:	The GenDocumentGroup object.</P>
+<P CLASS="refField">
+Destination:	The output of GenDocumentGroup (usually the Process object).</P>
+<P CLASS="refField">
+Parameters:	<EM>
+error	</EM>
+A pointer to a word in which an error should be returned.</P>
+<DL>
+<DT>
+<EM>
+file</EM>
+</DT><DD>The FileHandle of the appropriate file.</DD>
+</DL>
+<P CLASS="refField">
+Return:	<EM>
+true</EM>
+ if error occurs.</P>
+<DL>
+<DT>
+<EM>
+*error</EM>
+</DT><DD><CODE>
+FileError</CODE>
+ code (or zero if there is no error).</DD>
+</DL>
+<P CLASS="refField">
+Interception:	DOS-file applications must intercept this message (or MSG_META_DOC_OUTPUT_PHYSICAL_REVERT) if they wish to implement save-as/revert functionality. </P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Documents_c.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Documents_e.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.2 Multiple Document Model</A> 
+<!-- to next --> | <A HREF="Documents_10.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.4 Special-Purpose Messages</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

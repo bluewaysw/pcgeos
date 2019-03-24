@@ -1,0 +1,265 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: TTools_b.htm,v 1.1 97/06/27 16:02:47 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Running PCCOM on the Target</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Using Tools</A>: 9.2 <A HREF="TTools_9.htm">pccom</A>: 
+Running PCCOM on the Target</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="TTools_9.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="TTools_a.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">9.1 PCCOM Background</A> 
+<!-- to next --> | <A HREF="TTools_c.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">9.3 File Transfer Protocol of PCCOM</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+PCCOM is a DOS program that monitors the serial port and responds to commands received on the line. All I/O is interrupt driven with XON/XOFF flow control active on the host machine and obeyed on the target machine.</P>
+<P>
+PCCOM uses the PTTY environment variable of DOS, if it exists. This variable contains communications settings detailing baud rate, COM port, and communications interrupt level. You can override the PTTY settings with command-line options to PCCOM when running it. The following command-line options are allowed:</P>
+<DL>
+<DT>
+/b:baud</DT><DD>Specify the baud used for file transfer and serial communications. The baud parameter may be one of the following values: 300, 1200, 2400, 9600, 19200, or 38400. Unambiguous abbreviations may be used (e.g. 9 for 9600 baud or 38 for 38400 baud). The default baud rate is 19200 bps.</DD>
+<DT>
+/c:port	Specify the COM port used for serial communications. The parameter may be one of 1, 2, 3, or 4. The COM ports for Zoomer are</DT><DD>
+COM 1		the built-in serial port (this is the default).<BR>
+COM 2		the infrared transceiver.</DD>
+<DT>
+/i:interrupt</DT><DD>Specify interrupts that should be ignored by PCCOM. This is useful if peripherals share an interrupt number that may confuse PCCOM. The interrupt parameter is one or more numbers of the interrupt(s) to be ignored, in hexadecimal.</DD>
+<DT>
+/I:irq</DT><DD>Specify the IRQ level for serial line communications. This parameter is rarely required. The irq parameter is the number of the IRQ level to be used.</DD>
+
+</DL>
+<H2 CLASS="HeadingC">
+Quitting PCCOM</H2>
+<P>
+PCCOM may be quit either directly or remotely. To quit PCCOM directly, simply hit the Enter key (or the q key) on the machine on which PCCOM is running. If it does not quit on the first keystroke, hit the key again.</P>
+<P>
+To quit PCCOM remotely, issue the quit escape sequence &lt;Esc&gt;EX through the serial line from the host machine. See below for a description of the commands that can be issued remotely.</P>
+
+
+<H2 CLASS="HeadingC">
+Remote PCCOM Commands</H2>
+<P>
+PCCOM doesn't care what machine originates a remote command; its sole purpose is to evaluate and execute commands received through the serial port it's monitoring. Thus, a command sent by one Zoomer to another will exact the same response as a command sent by a development host machine to a target development machine.</P>
+<P>
+On some computers (depending on BIOS), commands are copied from DOS to the serial port using the &quot;echo&quot; command. (If the computer executing remote commands has a different BIOS, you may get an error like &quot;write fault error writing to device com#&quot;; in this case, you must make sure that the characters sent to the serial port in the end are the same as those shown in the table below.) For example, to send the &quot;quit&quot; command to the remote machine, you could use the DOS command</P>
+<PRE>C:&gt;echo <EM>Esc</EM>EX &gt; com1</PRE>
+<P>
+where <CODE>
+Esc</CODE>
+ (in italics) represents the Escape character (0x1B).</P>
+<P>
+No matter what method you use to send the character sequences to the serial port, the following commands may be executed remotely. Sending and receiving files remotely is more involved and is therefore discussed in the next section; it is not complicated, however.</P>
+<P>
+All arguments to PCCOM remote commands must end with a delimiter character--an exlamation mark by default. Because of this, file operation commands will not work on files with exclamation points in their names by default. However, there is a PCCom command to use a different delimiter character. </P>
+<TABLE BORDER="1">
+<TR><TH>
+Command</TH><TH>Sequence</TH><TH>Description</TH></TR>
+<TR><TD>
+Send File</TD><TD>&lt;Esc&gt;XF&lt;Ctrl-A&gt;<BR>(&lt;Esc&gt;XF&lt;0x01&gt;)</TD><TD>
+Send a file from the host to the remote machine using the PCCOM file transfer protocol (see below). </TD></TR>
+<TR><TD>
+Get File</TD><TD>&lt;Esc&gt;XF&lt;Ctrl-D&gt;<BR>(&lt;Esc&gt;XF&lt;0x04&gt;)</TD><TD>
+	Retrieve a file from the remote machine using the PCCOM file transfer protocol (see below).</TD></TR>
+<TR><TD>
+Turn EchoBack On</TD><TD>&lt;Esc&gt;EBon!</TD><TD>Turn EchoBack on.All text displayed on the target machine will also display on the host machine. Carriage returns are marked by semicolon (&quot;;&quot;) characters.</TD></TR>
+<TR><TD>
+Turn EchoBack Off</TD><TD>&lt;Esc&gt;EBoff!</TD><TD>Turn EchoBack off.</TD></TR>
+<TR><TD>
+Display EchoBack State</TD><TD>&lt;Esc&gt;EB!</TD><TD>Display a string signalling whether EchoBack is turned on. If it's turned on, &quot;Echoback = off&quot; appears on the target machine. If it's turned on, &quot;Echoback = on&quot; appears.</TD></TR>
+<TR><TD>
+Turn Acknowledge On</TD><TD>&lt;Esc&gt;AKon!</TD><TD>Whenever a transaction is complete, the host will display &quot;Ack Received.&quot; or &quot;Nak Recieved.&quot; as appropriate.</TD></TR>
+<TR><TD>
+Turn Acknowledge Off</TD><TD>&lt;Esc&gt;AKoff!</TD><TD>Turn off acknowledgement.</TD></TR>
+<TR><TD>
+Display Acknowledge State</TD><TD>&lt;Esc&gt;AK!</TD><TD>Display a string signalling whether Acknowledge is turned on. If it's turned on, &quot;ACK/NAK = on&quot; appears on the target machine; otherwise &quot;ACK/NAK = off&quot; appears.</TD></TR>
+<TR><TD>
+Send Ack Signal</TD><TD>&lt;Esc&gt;ACK</TD><TD>Sends an Ack signal, just as is sent by the target machine when acknowledgements are turned on.</TD></TR>
+<TR><TD>
+Send NAK Signal</TD><TD>&lt;Esc&gt;NAK</TD><TD>Sends a NAK signal, just as is sent by the target machine when acknowledgements are turned on.</TD></TR>
+<TR><TD>
+Copy File</TD><TD>&lt;Esc&gt;CP<EM>src</EM>!<EM>dest</EM>!</TD><TD>
+Copy the file named in the src argument to the file named in the dest argument. File name arguments may be full or relative paths with or without drive letters. This is equivalent to the DOS COPY command.</TD></TR>
+<TR><TD>
+Move File</TD><TD>&lt;Esc&gt;MV<EM>src</EM>!<EM>dest</EM>!</TD><TD>
+Move the file named in the src argument to the file named in the dest argument. File name arguments may be full or relative paths; no drive letters are allowed. This is equivalent to the DOS MOVE command.</TD></TR>
+<TR><TD>
+Delete File</TD><TD>&lt;Esc&gt;RF<EM>file</EM>!</TD><TD>Remove the named file; the file argument may be a full path or a file in the current directory. This is equivalent to the DOS DEL command.</TD></TR>
+<TR><TD>
+Change Drive</TD><TD>&lt;Esc&gt;CD<EM>drive</EM>:!</TD><TD>
+Change the working volume to the drive named in the drive argument. This is equivalent to changing the drive in DOS by typing the drive letter followed by a colon (e.g. C:).</TD></TR>
+<TR><TD>
+Change Directory</TD><TD>&lt;Esc&gt;CD<EM>dir</EM>!</TD><TD>Change the working directory to that named. The dir argument may be a full or relative path; no drive letter is allowed. This is the equivalent of the DOS CD command.</TD></TR>
+<TR><TD>
+Show Current Path</TD><TD>&lt;Esc&gt;CD!</TD><TD>Print the current directory's path. This is equivalent to the DOS CD command with no arguments passed.	</TD></TR>
+<TR><TD>
+List Files in Dir</TD><TD>&lt;Esc&gt;LS</TD><TD>List files in the current working directory. This is equivalent to the DOS DIR command with no arguments.</TD></TR>
+<TR><TD>
+List Files with Details</TD><TD>&lt;Esc&gt;LM</TD><TD>List files in the current working directory, together with the file's DOS attributes, the long name of each GEOS file, and the release number associated with each GEOS file.<BR>
+The DOS attributes are shown with the following flags:<BR>
+a: 						archive<BR>
+d:						 sub directory<BR>
+v: 						volume file<BR>
+s: 						system<BR>
+h: 						hidden<BR>
+r: 						read only</TD></TR>
+<TR><TD>
+List Files, Full Details</TD><TD>&lt;Esc&gt;LL</TD><TD>List files in the current directory with all information returned by LM, described above, and the token of the creating geode and the document token. Tokens consist of four characters and a <CODE>
+ManufacturerID</CODE>
+--most <CODE>
+ManufacturerID</CODE>
+ values will appear as a number, but PCCom will translate those values that it knows about into a mnemonic code:<BR>
+GEO:						Geoworks<BR>
+APP:						Application Local<BR>
+PLM:						Palm Computing<BR>
+WIZ:						SchoolView<BR>
+CLB:						Creative Labs<BR>
+DSL:						DOS Launcher<BR>
+AOL: 						America Online<BR>
+ITU:						Intuit<BR>
+SDK:						Default SDK<BR>
+AGD:						Association of GEOS Developers</TD></TR>
+<TR><TD>
+Display Free Space</TD><TD>&lt;Esc&gt;FS<EM>d</EM>:!</TD><TD>Display the free space on the drive named by the <EM>
+d</EM>
+ argument.</TD></TR>
+<TR><TD></TD><TD>&lt;Esc&gt;FS!</TD><TD>Display the free space on the current drive.</TD></TR>
+<TR><TD>
+Display Drives</TD><TD>&lt;Esc&gt;AD</TD><TD>Display available drives. The target machine will display one line for each drive, showing the drive's letter and DOS name.</TD></TR>
+<TR><TD>
+Create Directory</TD><TD>&lt;Esc&gt;MD<EM>dir</EM>!</TD><TD>Create a new directory according to the <EM>
+dir</EM>
+ argument. The dir argument may be a full or relative path. This is the equivalent of the DOS MKDIR command.</TD></TR>
+<TR><TD>
+Delete Directory</TD><TD>&lt;Esc&gt;RD<EM>dir</EM>!</TD><TD>Remove the directory named in the <EM>
+dir</EM>
+ argument. The dir argument may be a full or relative path; this is equivalent to the DOS RMDIR and RD commands.</TD></TR>
+<TR><TD>
+Clear Screen</TD><TD>&lt;Esc&gt;cl</TD><TD>Clear the screen of the target machine. This is equivalent to the DOS CLS command.</TD></TR>
+<TR><TD>
+Display Delimiter</TD><TD>&lt;Esc&gt;DD</TD><TD>Displays the current delimiter character (`!' by default).</TD></TR>
+<TR><TD>
+Change Delimiter</TD><TD>&lt;Esc&gt;DX	&lt;char&gt;&lt;old delimiter&gt;</TD><TD>Use a different character as the delimiter. By default, the exclamation mark (`!') is the delimiter character. The character delimiter must lie between the ascii values of 0x21 (exclamation mark) and 0x7e (tilde).</TD></TR>
+<TR><TD>
+Exit PCCOM</TD><TD>&lt;Esc&gt;EX</TD><TD>Exit PCCOM on the remote machine.</TD></TR>
+</TABLE>
+
+<H2 CLASS="HeadingC">
+Sending and Receiving Files</H2>
+<P>
+If you are using the GEOS SDK, you will do most of your file sending and receiving using the programs PCS, PCSEND, and PCGET. These programs send commands to the serial port, and then follow them by either providing or receiving packaged file data. These three programs are detailed below; following them is a section of the file transfer protocol of PCCOM if you are writing your own remote-access program(s).</P>
+
+<H3 CLASS="HeadingD">
+PCGET</H3>
+<P>
+If PCCOM is running on the target machine, the PCGET program can be executed on the host to retrieve a file from the target. This simple program merely retrieves the file and copies it into the host's working directory under the same name.</P>
+<P>
+PCGET takes the following arguments; only the file name is required. The other arguments are optional and may be used to override the settings in the host machine's PTTY environment variable (see above, under &quot;Running PCCOM on the Target (or on the Zoomer)&quot;).</P>
+<PRE>pcget [/b:<EM>baud</EM>][/c:<EM>port</EM>][/I:<EM>irq</EM>] <EM>file</EM></PRE>
+<DL>
+<DT>
+/b:baud</DT><DD>Specify the baud used for file transfer. The baud parameter may be one of the following values: 300, 1200, 2400, 9600, 19200, or 38400. Unambiguous abbreviations may be used (e.g. 9 for 9600 baud or 38 for 38400 baud). The default baud rate is 19200 bps.</DD>
+<DT>
+/c:port	Specify the COM port used. The port parameter may be one of 1, 2, 3, or 4. The COM ports for Zoomer are</DT><DD>
+COM 1		the built-in serial port (this is the default),<BR>
+COM 2		the infrared transceiver.</DD>
+<DT>
+/I:irq</DT><DD>Specify the IRQ level for the transfer. This parameter is rarely required. The irq parameter is the number of the IRQ level to be used.</DD>
+<DT>
+file</DT><DD>Specify the file to be retrieved. The file parameter may be a full or a relative path or a simple file name. The file will be copied from the target to the host into the host's current working directory, with the same name.</DD>
+
+
+</DL>
+<H3 CLASS="HeadingD">
+PCSEND</H3>
+<P>
+If PCCOM is running on the target (remote) machine, PCSEND may be executed on the host machine to download a file to the target. PCSEND will only send a single file, though it may send the file to any directory on the target. To send multiple files, or to download specific geodes to their proper locations in the GEOS 2.0 directory tree, use the PCS program instead.</P>
+<P>
+The command line options of PCSEND are shown below. Only the file to be sent is required; if no other argument is passed, the file will be sent to the target's current working directory.</P>
+<PRE>pcsend [/b:<EM>baud</EM>][/c:<EM>port</EM>][/I:<EM>irq</EM>] <EM>file</EM> [/d:<EM>dest</EM>]</PRE>
+<DL>
+<DT>
+/b:baud</DT><DD>Specify the baud used for file transfer. The baud parameter may be one of the following values: 300, 1200, 2400, 9600, 19200, or 38400. Unambiguous abbreviations may be used (e.g. 9 for 9600 baud or 38 for 38400 baud). The default baud rate is 19200 bps.</DD>
+<DT>
+/c:port	Specify the COM port used. The port parameter may be one of 1, 2, 3, or 4. The COM ports for Zoomer are</DT><DD>
+COM 1		the built-in serial port (this is the default),<BR>
+COM 2		the infrared transceiver.</DD>
+<DT>
+/I:irq</DT><DD>Specify the IRQ level for the transfer. This parameter is rarely required. The irq parameter is the number of the IRQ level to be used.</DD>
+<DT>
+file</DT><DD>Specify the file to be sent. The file parameter may be a full or a relative path or a simple file name. The file will be downloaded to the target machine's current working directory, unless the /d parameter is also passed (see below).</DD>
+<DT>
+/d:dest</DT><DD>Specify a full or relative destination path for the file.</DD>
+
+
+</DL>
+<H3 CLASS="HeadingD">
+PCS</H3>
+<P>
+If PCCOM is running on the target machine, PCS may be executed on the host machine to send multiple files to predetermined directories on the target. PCS is most often used by GEOS developers using the GEOS development kit, when they are downloading their recently-compiled geodes to the target for debugging.</P>
+<P>
+The PCS program makes use of a list of constraints-tokens and their source and destination files and directories-located in the files ROOT_DIR\INCLUDE\PCS.PAT and ROOT_DIR\INCLUDE\SEND on the SDK host machine. (ROOT_DIR is a DOS environment variable set up by the SDK installation program indicating the top directory into which the SDK files were installed.) The format of these two files is described at the end of this section.</P>
+<P>
+The command-line parameters of PCS are shown below. Note that a file name is not used by PCS; instead, if no token or directory is given, PCS will download all appropriate files in the current working directory. As with PCSEND and PCGET, the baud, COM port, and IRQ level arguments are all optional and may be used to override the settings in the PTTY environment variable.</P>
+<PRE>pcs [/n][/S<EM>f</EM>][/t][/b:<EM>b</EM>][/c:<EM>p</EM>][/I:<EM>i</EM>][<EM>dir</EM>|<EM>file</EM>|<EM>token</EM>]</PRE>
+<DL>
+<DT>
+/n</DT><DD>If /n is specified, PCS will send non-EC geodes only. Without this argument, PCS will send only EC geodes.</DD>
+<DT>
+/Sf</DT><DD>Specify a file containing a list of files to be sent. The file argument is the name of the file.</DD>
+<DT>
+/t</DT><DD>If the /t argument is used anywhere on the command line, file names specified at the end of the command (see the last argument) will be interpreted as tokens. A token may equate to numerous files as defined in the SEND file.</DD>
+<DT>
+/b:b</DT><DD>Specify the baud used for file transfer. The baud parameter may be one of the following values: 300, 1200, 2400, 9600, 19200, or 38400. Unambiguous abbreviations may be used (e.g. 9 for 9600 baud or 38 for 38400 baud). The default baud rate is 19200 bps.</DD>
+<DT>
+/c:p	Specify the COM port used. The port parameter may be one of 1, 2, 3, or 4. The COM ports for Zoomer are</DT><DD>
+COM 1		the built-in serial port (this is the default),<BR>
+COM 2		the infrared transceiver.</DD>
+<DT>
+/I:i</DT><DD>Specify the IRQ level for the transfer. This parameter is rarely required. The irq parameter is the number of the IRQ level to be used.</DD>
+<DT>
+dir|file|token</DT><DD>
+Specify a directory containing the geodes to be downloaded, the files to be downloaded, or tokens to be interpreted. If no directory, file, or token is specified, PCS will download the appropriate files in the current working directory. If a directory is specified, PCS will download all the appropriate files in that directory. If file names are specified (multiple files and/or directories may be specified), all affected files will be send.</DD>
+</DL>
+<P>
+If the /t argument appears anywhere in the command line (see above), this set of arguments will be interpreted as tokens. See directly below for token use and interpretation.</P>
+<P>
+When using a token, PCS looks in the ROOT_DIR\INCLUDE\SEND file for the token to determine which files should be sent. Generally, all executables associated with an application, library, or mechanism are sent when the appropriate token is passed. Look in the SEND file to find out what the accepted tokens are and what they send.</P>
+<P>
+For example, if the SEND file contained the lines</P>
+<PRE>PC	DRIVER/VIDEO/DUMB/HGC/HGC					GEO</PRE>
+<PRE>PCB	DRIVER/VIDEO/DUMB/HGC/HGC					GEO</PRE>
+<PRE>PCB	DRIVER/MOUSE/LOGIBUS/LOGIBUS					GEO</PRE>
+<P>
+then typing</P>
+<PRE>pcs /t pc</PRE>
+<P>
+would send just the HGCEC.GEO file to the proper directory on the target. Typing</P>
+<PRE>pcs /t pcb</PRE>
+<P>
+would download both HGCEC.GEO and LOGIBUSE.GEO to their proper directories. A listing of all the supported tokens can be found in the SEND file.</P>
+
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="TTools_9.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="TTools_a.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">9.1 PCCOM Background</A> 
+<!-- to next --> | <A HREF="TTools_c.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">9.3 File Transfer Protocol of PCCOM</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

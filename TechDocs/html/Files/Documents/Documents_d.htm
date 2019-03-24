@@ -1,0 +1,264 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Documents_d.htm,v 1.1 97/06/02 14:44:14 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Document Protocols</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Documents</A>: 4.1 <A HREF="Documents_c.htm">Advanced DC Usage</A>: 
+<A NAME="82736">
+ </A>
+Document Protocols</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Documents_c.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Documents_c.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">4 Advanced DC Usage</A> 
+<!-- to next --> | <A HREF="Documents_e.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.2 Multiple Document Model</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>MSG_META_DOC_OUTPUT_OPEN_EARLIER_COMPATIBLE_DOCUMENT, MSG_META_DOC_OUTPUT_OPEN_EARLIER_INCOMPATIBLE_DOCUMENT, MSG_GEN_DOCUMENT_OPEN_EARLIER_COMPATIBLE_DOCUMENT, MSG_GEN_DOCUMENT_OPEN_EARLIER_INCOMPATIBLE_DOCUMENT</PRE>
+<P>
+One difficulty in upgrading software is that an obsolete program may have created many documents. If the new version can't read those documents, people who used the old version will be inconvenienced; however, if the new versions always use the same document formats as the old versions, options for improvement will be limited. Above all, if document formats change, the new version should detect this gracefully, without crashing or damaging the old file.</P>
+<P>
+The header for a GEOS Virtual Memory file contains two words for protocol numbers. The document control objects use the protocol numbers to insure that a document is compatible with the version of the application which is opening it. There are two parts to the protocol number: the <EM>
+major</EM>
+ protocol number, and the <EM>
+minor</EM>
+ protocol number. (If a document has a major protocol number of 3 and a minor number of 11, it is referred to has having protocol 3.11.) By convention, versions of an application with entirely compatible document formats will have the same major protocol number; if a new version of an application cannot read older documents without converting them in some way, it will have a higher major protocol number, and the minor number will be reset to zero.</P>
+<P>
+When the GenDocumentGroup object opens a file, it checks the major and minor protocol numbers. It will then take appropriate action:</P>
+<UL>
+<LI>
+If the document's major and minor protocol numbers match the protocol attributes of the GenDocumentGroup object, the document will be opened normally. </LI>
+<LI>
+If the document has a higher protocol number than the GenDocumentGroup (i.e. either the document has a higher major protocol number, or the document and the GenDocumentGroup have the same major protocol number and the document has a higher minor protocol number), the document control will display an appropriate alert box, after which it will close the file and delete the document object. (It will do all of this automatically, without any attention from the application.) </LI>
+<LI>
+If the document has lower major protocol number than the document control, the document control will send <CODE>
+MSG_META_DOC_OUTPUT_UPDATE_EARLIER_INCOMPATIBLE_DOCUMENT</CODE>
+ (and a corresponding <CODE>
+MSG_GEN_DOCUMENT_...</CODE>
+). If neither message is handled, or if a handler returns an error, the document control will display an alert box and will close the file and delete the document object. </LI>
+<LI>
+If the document has the same major but a lower minor protocol number than the GenDocumentGroup, the document control will send <CODE>
+MSG_META_DOC_OUTPUT_UPDATE_EARLIER_COMPATIBLE_DOCUMENT</CODE>
+ (and a corresponding <CODE>
+MSG_GEN_DOCUMENT_...</CODE>
+). After this, it will proceed normally, whether the messages were handled or not (since the document is presumed to be compatible). If a handler returns an error, it will close the file and free the document object.</LI>
+</UL>
+<P>
+Note that the document control will not change the file under any of these circumstances. In particular, if it opens an earlier document, it will not change the document's protocol number. If the application wishes to do this, it should do it explicitly (generally in the handlers for the &quot;<CODE>
+UPDATE_..._DOCUMENT</CODE>
+&quot; messages). The protocol numbers are among a file's extended attributes. For information about changing extended attributes, see <A HREF="../../Files/FileSys/FileSys_d.htm#49785">the File System chapter</A>.</P>
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_DOC_OUTPUT_UPDATE_EARLIER_COMPATIBLE_DOCUMENT">
+ </A>
+MSG_META_DOC_OUTPUT_UPDATE_EARLIER_COMPATIBLE_DOCUMENT</H4>
+<PRE CLASS="syntax">Boolean	MSG_META_DOC_OUTPUT_UPDATE_EARLIER_COMPATIBLE_DOCUMENT(
+        word *		error, 			/* Return error code from FileError */
+        optr 		document,			/* pointer to document object */
+        FileHandle 		file); 			/* handle of file opened */</PRE>
+<P>
+The GenDocumentGroup object sends this message to its output when the user tries to open a document with the same major protocol number as the document control and a lower minor protocol number. Applications will commonly respond to this message by changing the document's protocol number to bring it up-to-date. If the application can't use the document, it should return <EM>
+true</EM>
+ and set <EM>
+*error</EM>
+. (File access error codes are members of the <CODE>
+FileError</CODE>
+ enumerated type, defined in <STRONG CLASS="fileName">
+file.h</STRONG>
+.) With an error, the document control will close the document unchanged. If the application successfully updates the document, it should return zero and set <EM>
+*error</EM>
+ to zero.</P>
+<P CLASS="refField">
+Source:	The GenDocumentGroup object.</P>
+<P CLASS="refField">
+Destination:	Output of GenDocumentGroup (usually the Process object)</P>
+<P CLASS="refField">
+Parameters:	<EM>
+error	</EM>
+A pointer to a word in which an error should be returned.</P>
+<DL>
+<DT>
+<EM>
+document</EM>
+</DT><DD><EM>
+The optr of the appropriate document object.</EM>
+</DD>
+<DT>
+<EM>
+file</EM>
+</DT><DD>The FileHandle of the appropriate file.</DD>
+</DL>
+<P CLASS="refField">
+Return:	<EM>
+true</EM>
+ if error occurs.</P>
+<DL>
+<DT>
+<EM>
+*error</EM>
+</DT><DD><CODE>
+FileError</CODE>
+ code (or zero if there is no error).</DD>
+</DL>
+<P CLASS="refField">
+Interception:	You must write a handler for this message in whatever class will be receiving it (usually the process class).</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_DOCUMENT_UPDATE_EARLIER_COMPATIBLE_DOCUMENT">
+ </A>
+MSG_GEN_DOCUMENT_UPDATE_EARLIER_COMPATIBLE_DOCUMENT</H4>
+<PRE CLASS="syntax">Boolean	MSG_GEN_DOCUMENT_UPDATE_EARLIER_COMPATIBLE_DOCUMENT(
+        word *	error); /* Return error code from FileError type */</PRE>
+<P>
+The document object sends this message when the user tries to open a document with the same major protocol number as the document control and a lower minor protocol number. Applications will commonly respond to this message by changing the document's protocol number to bring it up-to-date. If the application can't use the document, it should return <EM>
+true</EM>
+ and put an error code in <EM>
+*error</EM>
+. (File access error codes are members of the <CODE>
+FileError</CODE>
+ enumerated type, defined in <STRONG CLASS="fileName">
+file.h</STRONG>
+.) With an error, the document control will close the document unchanged. If the application successfully updates the document, it should return zero and set <EM>
+*error</EM>
+ to zero.</P>
+<P CLASS="refField">
+Source:	A GenDocument object.</P>
+<P CLASS="refField">
+Destination:	The document object sends this message to itself.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+error	</EM>
+A pointer to a word in which an error should be returned.</P>
+<P CLASS="refField">
+Return:	<EM>
+true</EM>
+ if error occurs.</P>
+<DL>
+<DT>
+<EM>
+*error</EM>
+</DT><DD><CODE>
+FileError</CODE>
+ code (or zero if there is no error).</DD>
+
+
+</DL>
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_DOC_OUTPUT_UPDATE_EARLIER_INCOMPATIBLE_DOCUMENT">
+ </A>
+MSG_META_DOC_OUTPUT_UPDATE_EARLIER_INCOMPATIBLE_DOCUMENT</H4>
+<PRE CLASS="syntax">Boolean	MSG_META_DOC_OUTPUT_UPDATE_EARLIER_INCOMPATIBLE_DOCUMENT(
+        								/* Return true if error */
+        word *error, /* Return error code from FileError enum. type */
+        optr document, /* pointer to document object */
+        FileHandle file); /* handle of file opened */</PRE>
+<P>
+The GenDocumentGroup object sends this message to its output when the user tries to open a document with a lower major protocol number than the document control. Applications respond to the message by making any changes to the document necessary to make it compatible with the application. The application should also change the document's protocol numbers. If the application can't use the document, it should return <EM>
+true</EM>
+ and put an error code in <EM>
+*error</EM>
+. (File access error codes are members of the <CODE>
+FileError</CODE>
+ enumerated type, defined in <STRONG CLASS="fileName">
+file.h</STRONG>
+.) With an error, the document control will close the document unchanged. If the application successfully updates the document, it should return zero and set <EM>
+*error</EM>
+ to zero.</P>
+<P CLASS="refField">
+Source:	The GenDocumentGroup object.</P>
+<P CLASS="refField">
+Destination:	Output of GenDocumentGroup (usually the Process object).</P>
+<P CLASS="refField">
+Parameters:	<EM>
+error	</EM>
+A pointer to a word in which an error should be returned.</P>
+<DL>
+<DT>
+<EM>
+document</EM>
+</DT><DD><EM>
+The optr of the appropriate document object.</EM>
+</DD>
+<DT>
+<EM>
+file</EM>
+</DT><DD>The FileHandle of the appropriate file.</DD>
+</DL>
+<P CLASS="refField">
+Return:	<EM>
+true</EM>
+ if error occurs.</P>
+<DL>
+<DT>
+<EM>
+*error</EM>
+</DT><DD><CODE>
+FileError</CODE>
+ code (or zero if there is no error).</DD>
+</DL>
+<P CLASS="refField">
+Interception:	You must write a handler for this message in whatever class will be receiving it (usually the process class)</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_DOCUMENT_UPDATE_EARLIER_INCOMPATIBLE_DOCUMENT">
+ </A>
+MSG_GEN_DOCUMENT_UPDATE_EARLIER_INCOMPATIBLE_DOCUMENT</H4>
+<PRE CLASS="syntax">Boolean	MSG_GEN_DOCUMENT_UPDATE_EARLIER_INCOMPATIBLE_DOCUMENT(
+        word *	error); /* Return error code from FileError type */</PRE>
+<P>
+The document object sends this message when the user tries to open a document with a lower major protocol number than the document control. Applications respond to this message by making any changes to the document necessary to make it compatible with the application. The application should also change the document's protocol numbers. If the application can't use the document, it should return <EM>
+true</EM>
+ and put an error code in <EM>
+*error</EM>
+. (File access error codes are members of the <CODE>
+FileError</CODE>
+ enumerated type, defined in <STRONG CLASS="fileName">
+file.h</STRONG>
+.) With an error, the document control will close the document unchanged. If the application successfully updates the document, it should return zero and set <EM>
+*error</EM>
+ to zero.</P>
+<P CLASS="refField">
+Source:	A GenDocument object.</P>
+<P CLASS="refField">
+Destination:	The document object sends this message to itself.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+error	</EM>
+A pointer to a word in which an error should be returned.</P>
+<P CLASS="refField">
+Return:	<EM>
+true</EM>
+ if error occurs.</P>
+<DL>
+<DT>
+<EM>
+*error</EM>
+</DT><DD><CODE>
+FileError</CODE>
+ code (or zero if there is no error).</DD>
+
+</DL>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Documents_c.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Documents_c.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">4 Advanced DC Usage</A> 
+<!-- to next --> | <A HREF="Documents_e.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.2 Multiple Document Model</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

@@ -1,0 +1,112 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: MultiThread_11.htm,v 1.3 97/09/05 12:19:59 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Semaphores In GEOS</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Threads and Semaphores</A>: 5.2 <A HREF="MultiThread_f.htm">Synchronizing Threads</A>: 
+Semaphores In GEOS</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="MultiThread_f.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="MultiThread_10.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.1 Semaphores: The Concept</A> 
+<!-- to next --> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+GEOS contains several system resources that are protected by semaphores. Since application programs can access these resources only through library routines, the programmer does not need to be aware of these semaphores; the required operations are performed by the library routines. For system resources (e.g. files, memory, handles), GEOS defines semaphores and provides special routines to set and reset them. The chapter that describes each system resource explains how to use the special semaphores that protect the resource.</P>
+<P>
+The routines described in this section illustrate GEOS semaphores and can be used to create semaphores to protect resources defined within a multithreaded application. There are routines for each of the operations (initialization, P, and V), and there are special routines which simplify the use of a semaphore by multiple objects within the same thread.</P>
+<P>
+Note that it is possible to create a semaphore with a starting value greater than one. That is, you can create a semaphore that will allow more than one thread to grab it at once. Typically, if only one thread may grab the semaphore, the thread is called a &quot;mutual exclusion,&quot; or &quot;mutex,&quot; semaphore, because it is normally used to make sure two threads don't mutually grab a particular resource.</P>
+<P>
+Semaphores that can be grabbed by more than one thread are generally called &quot;scheduling semaphores&quot; because they allow easy manipulation of scheduled resources. The classic example of this is the &quot;producer-consumer problem&quot; wherein one thread produces buffers and another consumes them. Initially, no buffers exist, so the semaphore starts at zero. The consumer goes into a loop wherein it simply P's the semaphore (blocking until a buffer exists), takes the first buffer in the queue, processes the buffer, destroys the buffer, and then returns to the top of the loop. The producer, meanwhile, can produce any number of buffers, queue them, and V the semaphore once for each consumable buffer. The consumer thread will continue to process until all the buffers are consumed, and then it will block and wait for more buffers.</P>
+
+<H2 CLASS="HeadingCApp">
+Operations on a Semaphore</H2>
+<PRE>ThreadAllocSem(), ThreadPSem(), ThreadPTimedSem(), ThreadVSem(), ThreadFreeSem()</PRE>
+<P>
+<A NAME="IX_ThreadAllocSem()">
+ </A>
+To create a semaphore, simply call the routine <CODE>
+ThreadAllocSem()</CODE>
+, passing an initial value for the semaphore. This should normally be one to indicate the semaphore is unlocked. If you want the semaphore to be locked initially, pass an initial value of zero. In either case, the returned value will be the handle of the newly created semaphore. Use this handle with the routines described below.
+<IMG SRC="Multithread_11_sidebar.gif">
+
+</P>
+<P>
+<A NAME="IX_ThreadPSem()">
+ </A>
+Once a semaphore is created, a thread can lock it (i.e., perform the &quot;P&quot; operation) by calling the routine <CODE>
+ThreadPSem()</CODE>
+, passing the semaphore's handle as an argument. If the semaphore is unlocked, the thread locks it and proceeds; otherwise the thread waits in the semaphore's thread queue.</P>
+<P>
+<A NAME="IX_ThreadPTimedSem()">
+ </A>
+Another routine that performs the &quot;P&quot; operation is <CODE>
+ThreadPTimedSem()</CODE>
+. When calling this routine, pass as arguments the semaphore's handle and an integer representing a number of ticks. This integer is a time limit: If another thread has the semaphore locked and does not unlock it within the specified number of ticks, the routine will return with a flag indicating the lock was unsuccessful. Programs that use <CODE>
+ThreadPTimedSem()</CODE>
+ must check this flag and must not perform the protected operation if it is set. The most common use of this routine is with a time limit of zero, meaning that the semaphore should be locked only if it is available right away--if it is not available, the thread will continue with some other action.</P>
+<P>
+<A NAME="IX_ThreadVSem()">
+ </A>
+To release the semaphore (by performing the &quot;V&quot; operation), the thread calls <CODE>
+ThreadVSem()</CODE>
+, again passing the semaphore's handle. If there are other threads waiting for the semaphore, the one with the lowest current priority number takes over.</P>
+<P>
+<A NAME="IX_ThreadFreeSem()">
+ </A>
+When a semaphore is no longer needed, it can be destroyed by calling <CODE>
+ThreadFreeSem()</CODE>
+ with the semaphore's handle as an argument.</P>
+
+
+<H2 CLASS="HeadingCApp">
+Operations on a Thread Lock</H2>
+<PRE>ThreadAllocThreadLock(), ThreadGrabThreadLock(), ThreadReleaseThreadLock(), ThreadFreeThreadLock()</PRE>
+<P>
+At times it is convenient to have a program lock a semaphore that it has already locked. For example, one routine might lock a semaphore protecting a piece of memory and then call itself recursively. A thread lock is a semaphore that can be locked any number of times, as long as each lock is performed by the same thread. If another thread tries to grab the thread lock, it will wait until the first thread has performed the &quot;V&quot; operation once for each time it has run the &quot;P&quot; operation. It is possible to write reentrant routines using thread locks but not using regular semaphores.</P>
+<P>
+<A NAME="IX_ThreadAllocThreadLock()">
+ </A>
+A thread lock is initialized with the <CODE>
+ThreadAllocThreadLock()</CODE>
+ routine, which takes no arguments. A thread lock is always created unlocked. To perform the &quot;P&quot; and &quot;V&quot; operation on a thread lock, use <CODE>
+ThreadGrabThreadLock()</CODE>
+<A NAME="IX_ThreadGrabThreadLock()">
+ </A>
+ and<A NAME="IX_ThreadReleaseThreadLock()">
+ </A>
+ <CODE>
+ThreadReleaseThreadLock()</CODE>
+, respectively, and pass the semaphore's handle as an argument. These routines are analogous to<CODE>
+ ThreadPSem()</CODE>
+ and<CODE>
+ ThreadVSem()</CODE>
+ for semaphores. When a thread lock is no longer needed,<A NAME="IX_ThreadFreeThreadLock()">
+ </A>
+ it should be freed with a call to <CODE>ThreadFreeThreadLock()</CODE>.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="MultiThread_f.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="MultiThread_10.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.1 Semaphores: The Concept</A> 
+<!-- to next --> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

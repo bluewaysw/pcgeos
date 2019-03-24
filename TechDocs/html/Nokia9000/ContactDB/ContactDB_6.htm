@@ -1,0 +1,175 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: ContactDB_6.htm,v 1.4 97/08/21 14:31:41 cgroom Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Using a Dedicated Contact</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="sectionTitle">
+<A HREF="index.htm">Contacts</A>: 3 
+<A NAME="85958">
+ </A>
+Using a Dedicated Contact</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="ContactDB_5.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2 Choosing Contacts From a Log</A> 
+<!-- to next --> | <A HREF="ContactDB_7.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4 Logging Calls</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>ContactMatchName(), ContactEnsureField()</PRE>
+<A NAME="IX_ContactMatchName():description"> </A>
+<A NAME="IX_ContactEnsureField():description"> </A>
+<P>
+Perhaps you're writing a special-purpose application that is supposed to communicate with just one contact. Perhaps a carry-out restaurant chain has contracted you to write an application that the user can use to place an order over the phone. The program would only need to make contact with one place: the local restaurant's GSM phone number.</P>
+<P>
+In this case, you wouldn't want to provide any gadgetry for choosing a contact--your program is only interested in one dedicated contact. Still, it's worthwhile to store the contact in the Contact database--if the restaurant's phone number changes, the user can enter the corrected number using the Contact Manager built-in application. </P>
+<P>
+To find the Contact record for a particular contact, you will need to make sure that your <STRONG CLASS="fileName">
+.gp</STRONG>
+ file contains the following lines:</P>
+<PRE>library contdb
+library foamdb</PRE>
+<P>
+<A HREF="ContactDB_6.htm#33238"> Finding the "Stuckey's Snack Shack" Contact</A>
+, below, shows an example of how you could find a dedicated contact in the Contact database, and extract the phone number associated with that contact.</P>
+<P>
+To locate a dedicated contact and extract its phone number, carry out the following steps:</P>
+<OL>
+<LI>
+To get the <CODE>
+RecordID</CODE>
+ of the contact's record, call <CODE>
+ContactMatchName()</CODE>
+. This routine takes a search string (pass the contact's name), a <CODE>
+ContdbFieldType</CODE>
+ (pass CFT_NAME, since we're searching by name), a flag (pass a non-zero value to specify that you're only interested in one matching record), a pointer to a <CODE>
+FieldID</CODE>
+ buffer to fill in and a pointer to a word value to fill in. It returns the <CODE>
+RecordID</CODE>
+ of the contact (or -1 if the contact wasn't found). It also fills in the <CODE>
+FieldID</CODE>
+ buffer with the contact's name field <CODE>
+FieldID</CODE>
+ and fills in the word value with the number of matches found; neither of these values is important to our purpose.<BR>
+If the contact is not found, there are a couple of approaches the application can take:<BR>
+¸ Create a new record with the proper name and a guess at the phone number. The code example below illustrates this approach.<BR>
+¸ Signal to the user that an error has occured and halt the current operation.</LI>
+<LI FIXME_NumListOther>
+Get the Contact database's handle. To do this, call <CODE>
+ContactGetDBHandle()</CODE>
+. This routine takes no arguments and returns the database's handle.</LI>
+<LI FIXME_NumListOther>
+Get the record's handle by calling <CODE>
+FoamDBGetRecordFromID()</CODE>
+. This routine takes the Contact database's handle and the record's <CODE>
+RecordID</CODE>
+. It returns the record's memory handle.</LI>
+<LI FIXME_NumListOther>
+Get the <CODE>
+FieldID</CODE>
+ of the record's GSM phone number field. In the example below, we assume that the record has only one phone number field, and that this is the field we want. For a more rigorous approach, we could examine each field to make sure it was named &quot;Tel (GSM)&quot;. For an example of how one might examine all the fields of a record, see <A HREF="ContactDB_8.htm#53240"> To Get More Info on a Contact</A>
+.<BR>
+For our shortcut, we use the <CODE>
+ContactEnsureField()</CODE>
+ function. This function takes as arguments a record handle, a field name string (in our example, we pass a null optr to specify that we should use the default field name, and the <CODE>
+ContdbFieldType</CODE>
+ of the field to find ( pass CFT_PHONE). The function returns a <CODE>
+FieldID</CODE>
+.</LI>
+<LI FIXME_NumListOther>
+To extract the phone number data, call <CODE>
+FoamDBGetFieldData()</CODE>
+. Pass the database handle, the record handle, the <CODE>
+FieldID</CODE>
+, a buffer to write the name to, and the size of that buffer. The function fills in the buffer with the phone number string, and returns the length of that string. The returned string might not be null-terminated; thus you will either need to keep track of the returned string length, or else terminate the string.</LI>
+<LI FIXME_NumListOther>
+Now that you're done with the record, let the database know by calling <CODE>
+FoamDBDiscardRecord()</CODE>
+. This routine takes the Contact's database handle and the record's handle as arguments.</LI>
+<LI FIXME_NumListOther>
+Now that you're done with the database, release its handle by calling <CODE>
+ContactReleaseDBHandle()</CODE>
+.</LI>
+</OL>
+<P CLASS="figTitle">
+Code Display 4-3 <A NAME="33238">
+ </A>
+Finding the &quot;Stuckey's Snack Shack&quot; Contact</P>
+<PRE>TCHAR 		theName[]=		&quot;Stuckey's Snack Shack&quot;;
+TCHAR 		gsmNum[MAX_NUMBER_FIELD_DATA_LEN] = &quot;1.800.788.2539&quot;
+word 		gsmNumLen;
+FieldID 		theField;
+word		dummyNumMatches;
+RecordID		theRecordID;
+Memhandle 		theRecord;
+VMFileHandle 		CDBHandle;</PRE>
+<PRE>theRecordID = ContactMatchName(theName, CFT_NAME,1, &amp;theField, &amp;dummnyNumMatches);
+if ( theRecordID == LECI_INVALID_CONTACT_ID) { /* If we didn't find the record...*/
+  theRecord = ContactCreateRecordFromTemplate(); /* ... then we create it */
+
+  /* Fill in the name field; here @TelGSMStr is a chunk holding the string
+   * &quot;Tel(GSM)&quot; */
+  theField = ContactEnsureField( theRecord, NullOptr, CFT_NAME );
+  CDBHandle = ContactGetDBHandle();
+  FoamDBSetFieldData( CDBHandle, theRecord,theField, theName, sizeof(theName)-1 );
+  /* Fill in the fax field of new record with default GSM number string */
+  /* Fill in the name field; here @TelGSMStr is a chunk holding the string
+   * &quot;Tel(GSM)&quot; */
+  theField = ContactEnsureField( theRecord, @TelGSMStr, CFT_PHONE );
+  FoamDBSetFieldData( CDBHandle, theRecord, theField, gsmNum, 14 );
+
+  ContactReleaseDBHandle();
+  /* Save the newly created record to the Contact DB */
+  theRecordIIndex = ContactSaveRecord( theRecord );
+  theRecord = FoamDBGetVisibleRecord( CDBHandle, theRecordIndex );
+}</PRE>
+<PRE>else { /* If we successfully found the record, then get its handle */
+CDBHandle = ContactGetDBHandle();
+theRecord = FoamDBGetRecordFromID( CDBHandle, theRecordID);
+}</PRE>
+<PRE>/* Whether we found the record or just now created it, we now have 
+ * its handle and can extract the information that we want. */
+  /* Fill in the name field; here @TelGSMStr is a chunk holding the string
+   * &quot;Tel(GSM)&quot; */
+theField = ContactEnsureField( theRecord, @TelGSMStr, CFT_PHONE );
+/* Copy the fax number into our buffer */
+gsmNumLen = FoamDBGetFieldData( CDBHandle, theRecord, theField, gsmNum,
+						MAX_NUMBER_FIELD_DATA_LEN);
+gsmNum[gsmNumLen]= `\000`</PRE>
+<PRE>	/* If we need more information about the contact (e.g., street address,
+	 * fax number, etc.) this would be a good place to get it. */</PRE>
+<PRE>FoamDBDiscardRecord( CDBHandle, theRecord );
+ContactReleaseHandle();
+
+/* Do something clever with theName and gsmNum */</PRE>
+<P>
+To allow the user to edit the contact information for this single contact, use a <CODE>
+ContactEdit</CODE>
+ object. To specify the contact that the user will work with, you will need its handle. Pass the handle as an argument to the MSG_CONTACT_EDIT_DISPLAY_RECORD message. (Don't call <CODE>
+ContactSaveRecord()</CODE>
+, <CODE>
+FoamDBDeleteRecord()</CODE>
+, or <CODE>
+FoamDBDiscardRecord()</CODE>
+ when done with this handle; the controller will do so.)</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="ContactDB_5.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2 Choosing Contacts From a Log</A> 
+<!-- to next --> | <A HREF="ContactDB_7.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4 Logging Calls</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

@@ -1,0 +1,417 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: MetaClass_9.htm,v 1.1 97/06/02 16:21:16 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Notification Messages</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">MetaClass</A>: 2.7 <A HREF="MetaClass_2.htm">Utility Messages</A>: 
+Notification Messages</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="MetaClass_2.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="MetaClass_8.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2.6 Variable Data Messages</A> 
+<!-- to next --> | <A HREF="MetaClass_a.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2.8 Options Messages</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+<A NAME="IX_General change notification">
+ </A>
+These messages are used by the various notification mechanisms throughout the system.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_NOTIFY">
+ </A>
+MSG_META_NOTIFY</H4>
+<PRE CLASS="syntax">void	MSG_META_NOTIFY(
+        ManufacturerID manufID,
+        word	notificationType,
+        word 	data);</PRE>
+<P>
+This message notifies the recipient that some change or action has taken place. The object must have registered for the notification. The type of change that has occurred depends on the <CODE>
+notificationType</CODE>
+ argument.</P>
+<P>
+One word of notification data is allowed, but this should not reference a handle which must at some point be destroyed. See <CODE>
+MSG_META_NOTIFY_WITH_DATA_BLOCK</CODE>
+ for such requirements.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any object, or any of the <CODE>
+GCNListSend()</CODE>
+ routines.</P>
+<P CLASS="refField">
+Interception:	No general requirements, though particular notification types may place restrictions or requirements on such handling.</P>
+<P CLASS="refField">
+Parameters:	<EM>manufID</EM>	Manufacturer ID associated with notification type.</P>
+<DL>
+<DT>
+<EM>notificationType</EM></DT><DD>What sort of notification is being announced. This value depends on the Manufacturer ID for that notification list. A list of valid types for the Geoworks Manufacturer ID is indicated by the <CODE>
+GeoWorksNotificationType</CODE>
+ enumerated type. </DD>
+<DT>
+<EM>data</EM> </DT><DD>One word of data, which will be placed in a vardata field. If more than one word is necessary, use <CODE>
+MSG_META_NOTIFY_WITH_DATA_BLOCK</CODE>
+, below.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_NOTIFY_WITH_DATA_BLOCK">
+ </A>
+MSG_META_NOTIFY_WITH_DATA_BLOCK</H4>
+<PRE CLASS="syntax">void	MSG_META_NOTIFY_WITH_DATA_BLOCK(
+        ManufacturerID manufID,
+        word	notificationType,
+        MemHandle data);</PRE>
+<P>
+This message acts like <CODE>
+MSG_META_NOTIFY</CODE>
+, but it also carries a handle of a block of data. It is absolutely imperative that if this message is subclassed, the object call its superclass in the handler.</P>
+<P>
+The data block must be set up to use the Block &quot;reference count&quot; mechanism, i.e. be sharable and initialized with <CODE>
+MemInitRefCount()</CODE>
+. Details on the count are noted below.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any object, or any of the GCNListSend... routines</P>
+<P CLASS="refField">
+Interception:	Message <EM>
+must</EM>
+ eventually arrive at the <CODE>
+MetaClass</CODE>
+ handler, with the handle to the data block with the reference count intact, in order for the block to be freed when no longer referenced. Failure to do so will result in garbage being left on the heap, which will kill the system with repetitive occurrences.</P>
+<P CLASS="refField">
+Parameters:	<EM>manufID</EM> 	Manufacturer ID associated with notification type.</P>
+<DL>
+<DT>
+<EM>notificationType</EM> </DT><DD>What sort of notification is being announced.</DD>
+<DT>
+<EM>data</EM> </DT><DD>SHARABLE data block having a &quot;reference count&quot; initialized via <CODE>
+MemInitRefCount()</CODE>
+.</DD>
+</DL>
+<P>
+NOTE on data block reference counts:<BR>
+The reference count should hold the total number of references of this data block. This count should be incremented before sending a message holding a reference to this block (using <CODE>
+MemIncRefCount()</CODE>
+). Any messages passing such reference either must have a <CODE>
+MetaClass</CODE>
+ handler which decrements this count and frees the block if it reaches zero or must call <CODE>
+MemDecRefCount() </CODE>
+(which does exactly that). <CODE>
+GCNListSend()</CODE>
+ and similar functions add in the number of optrs in any list to which a message referring to this block is sent. Thus, when creating a block which will only be sent using <CODE>
+GCNListSend()</CODE>
+, this count should be initialized to zero. If the block is to be sent to one or more objects or <CODE>
+GCNListSend()</CODE>
+ calls, the calling routine should call <CODE>
+MemIncRefCount()</CODE>
+ before making the calls, being sure to call <CODE>
+MemIncRefCount()</CODE>
+ additionally for any objects that the message is sent to, and then call <CODE>
+MemDecRefCount ()</CODE>
+ after the calls, to balance the increment call at the start.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Warnings:	This message must eventually reach the default <CODE>
+MetaClass</CODE>
+ handler, so that the block can be freed when no longer referenced.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_GCN_LIST_ADD">
+ </A>
+MSG_META_GCN_LIST_ADD</H4>
+<PRE CLASS="syntax">Boolean	MSG_META_GCN_LIST_ADD(@stack
+        optr			dest,
+        word 		listType,
+        ManufacturerID 		listManuf);</PRE>
+<P>
+This message adds the passed object to a particular notification list. It returns <CODE>
+true</CODE>
+ if the object was successfully added, <CODE>
+false</CODE>
+ otherwise. This message is the equivalent of <CODE>
+GCNListAdd()</CODE>
+ for individual object GCN list.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Object providing GCN services.</P>
+<P CLASS="refField">
+Interception:	Unnecessary, as <CODE>
+MetaClass</CODE>
+ does the right thing.</P>
+<P CLASS="refField">
+Parameters:	<EM>dest</EM> 	Object to be added to list.</P>
+<DL>
+<DT>
+<EM>listType</EM> </DT><DD><CODE>
+GCNListType</CODE>
+ to add object to.</DD>
+<DT>
+<EM>listManuf</EM> </DT><DD>Manufacturer ID associated with GCN list.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Returns <EM>
+true</EM>
+ if optr added, <EM>
+false</EM>
+ otherwise.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_GCN_LIST_REMOVE">
+ </A>
+MSG_META_GCN_LIST_REMOVE</H4>
+<PRE CLASS="syntax">Boolean	MSG_META_GCN_LIST_REMOVE(@stack
+        optr	dest,
+        word	listType,
+        ManufacturerID listManuf);</PRE>
+<P>
+This message removes the passed object from a particular notification list. It returns <CODE>
+true</CODE>
+ if the object was successfully removed, <CODE>
+false</CODE>
+ otherwise. This message is the equivalent of <CODE>
+GCNListRemove()</CODE>
+ for an individual object's GCN list.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Object providing GCN services.</P>
+<P CLASS="refField">
+Interception:	Unnecessary, as <CODE>
+MetaClass</CODE>
+ does the right thing.</P>
+<P CLASS="refField">
+Parameters:	<EM>dest</EM> 	Object to be removed from list.</P>
+<DL>
+<DT>
+<EM>listType</EM> </DT><DD>Which list to remove object from.</DD>
+<DT>
+<EM>listManuf</EM></DT><DD>Manufacturer ID associated with GCN list.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Returns <CODE>
+true</CODE>
+ if optr found and removed, otherwise returns <CODE>
+false</CODE>
+.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_GCN_LIST_SEND">
+ </A>
+MSG_META_GCN_LIST_SEND</H4>
+<PRE CLASS="syntax">void	MSG_META_GCN_LIST_SEND(@stack
+        GCNListSendFlags 		flags,
+        EventHandle		event,
+        MemHandle 		block,
+        word		listType,
+        ManufacturerID 		listManuf);</PRE>
+<P>
+This message sends the given event to all objects in a particular notification list. The event will be freed after being sent. This message is the equivalent of <CODE>
+GCNListSend()</CODE>
+ for an individual object GCN list.</P>
+<P CLASS="refField">
+Parameters:	<EM>flags</EM>	Flags to pass on to GCNListSend().</P>
+<DL>
+<DT>
+<EM>event</EM> </DT><DD>Classed event to send to the list.</DD>
+<DT>
+<EM>block</EM> </DT><DD>Handle of extra data block, if used, else NULL. This block must have a reference count, which may be initialized with <CODE>
+MemInitRefCount() </CODE>
+and incremented for any new usage with <CODE>
+MemIncRefCount()</CODE>
+. Methods in which they are passed are considered such a new usage, and must have <CODE>
+MetaClass</CODE>
+ handlers which call <CODE>
+MemDecRefCount()</CODE>
+. </DD>
+<DT>
+<EM>listType</EM> </DT><DD>Which GCN list to send event to.</DD>
+<DT>
+<EM>listManuf</EM> </DT><DD>Manufacturer ID associated with GCN list.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Structures:	</P>
+<PRE><A NAME="IX_GCNLSF_&ldots;"> </A><A NAME="IX_GCNListSendFlags"> </A>typedef WordFlags GCNListSendFlags;
+/* These flags may be combined using | and &amp;:
+	GCNLSF_SET_STATUS,
+	GCNLSF_IGNORE_IF_STATUS_TRANSITIONING */</PRE>
+<DL>
+<DT>
+GCNLSF_SET_STATUS</DT><DD>
+Additionally saves the message as the list's current &quot;status.&quot; The &quot;status&quot; message is automatically sent to any object adding itself to the list at a later point in time.</DD>
+<DT>
+GCNLSF_IGNORE_IF_STATUS_TRANSITIONING</DT><DD>
+Optimization bit used to avoid lull in status when transitioning between two different sources--such as when the source is the current target object, and one has just lost, and another may soon gain, the exclusive. (The bit should be set only when sending the &quot;null,&quot; &quot;lost,&quot; or &quot;not selected&quot; status, as this is the event that should be discarded if another non-null status comes along shortly). Implementation is <EM>
+not</EM>
+ provided by the kernel primitive routines, which ignore this bit, but may be provided by objects managing their own GCN lists. GenApplication responds to this bit by delaying the request until after the UI and application queues have been cleared, and then only sets the status as indicated if no other status has been set since the first request. Other objects may use their own logic to implement this optimization as is appropriate. Mechanisms which can not tolerate the delayed status setting nature of this optimization, or require that all changes are registered, should not pass this bit set.</DD>
+
+
+</DL>
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_GCN_LIST_FIND_ITEM">
+ </A>
+MSG_META_GCN_LIST_FIND_ITEM</H4>
+<PRE CLASS="syntax">Boolean	MSG_META_GCN_LIST_FIND_ITEM(@stack
+        optr		dest,
+        word		listType,
+        ManufacturerID		listManuf);</PRE>
+<P>
+This message checks whether an object is on a particular GCN list.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any object providing GCN services.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+dest</EM>
+	Optr of object that we are checking.</P>
+<DL>
+<DT>
+<EM>
+listType</EM>
+</DT><DD><CODE>
+GCNListType</CODE>
+.</DD>
+<DT>
+<EM>
+listManuf</EM>
+</DT><DD><CODE>
+ManufacturerID</CODE>
+.</DD>
+</DL>
+<P CLASS="refField">
+Return:	<EM>
+true</EM>
+ if object is on the GCN list.</P>
+<P CLASS="refField">
+Interception:	Unnecessary.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_GCN_LIST_DESTROY">
+ </A>
+MSG_META_GCN_LIST_DESTROY</H4>
+<PRE CLASS="syntax">void	MSG_META_GCN_LIST_DESTROY();</PRE>
+<P>
+This message completely destroys the GCN setup for the caller. It frees all GCN lists, cached events, and overhead data storage. This should only be used when the object is being freed. You will likely never handle or call this message.</P>
+<P CLASS="refField">
+Source:	Object providing GCN services, often in handler for <CODE>
+MSG_META_FINAL_OBJ_FREE</CODE>
+.</P>
+<P CLASS="refField">
+Destination:	Self.</P>
+<P CLASS="refField">
+Interception:	Unnecessary, as <CODE>
+MetaClass</CODE>
+ does the right thing.</P>
+<P CLASS="refField">
+Parameters:	Nothing.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_NOTIFY_OBJ_BLOCK_INTERACTIBLE">
+ </A>
+MSG_META_NOTIFY_OBJ_BLOCK_INTERACTIBLE</H4>
+<PRE CLASS="syntax">void	MSG_META_NOTIFY_OBJ_BLOCK_INTERICTABLE(
+        MemHandle objBlock);</PRE>
+<P>
+This message is sent to an object block's output object when the block changes from being not in-use to being in-use. An object may handle this message to monitor changes of in-use status.</P>
+<P CLASS="refField">
+Source:	Kernel.</P>
+<P CLASS="refField">
+Destination:	Object which is set as the output of an object block resource either by <CODE>
+ObjBlockSetOutput()</CODE>
+, or by being pre-defined in an application resource.</P>
+<P CLASS="refField">
+Interception:	May be intercepted to learn about change in object block interactable status. No default handling is provided, though you may wish to pass the message onto the superclass in case it is interested in this data as well.</P>
+<P CLASS="refField">
+Parameters:	<EM>objBlock</EM> 	Handle of object block.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_NOTIFY_OBJ_BLOCK_NOT_INTERACTIBLE">
+ </A>
+MSG_META_NOTIFY_OBJ_BLOCK_NOT_INTERACTIBLE</H4>
+<PRE CLASS="syntax">void	MSG_META_NOTIFY_OBJ_BLOCK_NOT_INTERACTIBLE(
+        MemHandle objBlock);</PRE>
+<P>
+This message is sent to an object block's output object when the block changes from being not in-use to being in-use. An object may handle this message to monitor changes of in-use status.</P>
+<P CLASS="refField">
+Source:	Kernel.</P>
+<P CLASS="refField">
+Destination:	Object which is set as the output of an Object Block resource either by <CODE>
+ObjBlockSetOutput()</CODE>
+, or by being pre-defined in an application resource.</P>
+<P CLASS="refField">
+Interception:	May be intercepted to learn about change in object block interactable status. No default handling is provided, though you may wish to pass the message onto the superclass in case it is interested in this data as well.</P>
+<P CLASS="refField">
+Parameters:	<EM>objBlock</EM> 	Handle of object block.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_VM_FILE_DIRTY">
+ </A>
+MSG_META_VM_FILE_DIRTY</H4>
+<PRE CLASS="syntax">void	MSG_META_VM_FILE_DIRTY(
+        FileHandle file);</PRE>
+<P>
+<A NAME="IX_Virtual memory:notification">
+ </A>
+This message is sent to all processes that have a VM file open when a block in the file becomes marked dirty for the first time. This is useful if many processes may be sharing a VM file. The VM file must be marked VMA_NOTIFY_DIRTY in its attributes.</P>
+<P CLASS="refField">
+Source:	Kernel VM code.</P>
+<P CLASS="refField">
+Destination:	<CODE>
+ProcessClass</CODE>
+ object.</P>
+<P CLASS="refField">
+Interception:	May be intercepted at process to do whatever is desired on this occurrence of this event. Default behavior in <CODE>
+GenProcessClass</CODE>
+ sends notification to the current model <CODE>
+GenDocumentGroupClass</CODE>
+ object.</P>
+<P CLASS="refField">
+Parameters:	<EM>file</EM> 	Handle open to the VM file, from the receiving process's perspective.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="MetaClass_2.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="MetaClass_8.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2.6 Variable Data Messages</A> 
+<!-- to next --> | <A HREF="MetaClass_a.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2.8 Options Messages</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

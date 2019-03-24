@@ -1,0 +1,961 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Documents_12.htm,v 1.1 97/06/02 14:43:11 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Some Other Internal Messages</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Documents</A>: 4.6 <A HREF="Documents_c.htm">Advanced DC Usage</A>: 
+Some Other Internal Messages</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Documents_c.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Documents_11.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.5 Forcing Actions</A> 
+<!-- to next --> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>DocumentCommonParams, MSG_GEN_DOCUMENT_NEW, MSG_GEN_DOCUMENT_OPEN, MSG_GEN_DOCUMENT_CLOSE, MSG_GEN_DOCUMENT_QUICK_BACKUP, MSG_GEN_DOCUMENT_RECOVER_QUICK_BACKUP, MSG_GEN_DOCUMENT_SAVE, MSG_GEN_DOCUMENT_SAVE_AS, MSG_GEN_DOCUMENT_SAVE_AS_TEMPLATE, MSG_GEN_DOCUMENT_COPY_TO, MSG_GEN_DOCUMENT_REVERT, MSG_GEN_DOCUMENT_EDIT_USER_NOTES, MSG_GEN_DOCUMENT_CHANGE_TYPE, MSG_GEN_DOCUMENT_CHANGE_PASSWORD, MSG_GEN_DOCUMENT_RENAME, MSG_GEN_DOCUMENT_SET_EMPTY, MSG_GEN_DOCUMENT_CLEAR_EMPTY, MSG_GEN_DOCUMENT_SET_DEFAULT, MSG_GEN_DOCUMENT_CLEAR_DEFAULT, MSG_GEN_DOCUMENT_CLOSE_IF_CLEAN_UNNAMED, MSG_GEN_DOCUMENT_SEARCH_FOR_DOC, MSG_GEN_DOCUMENT_TEST_FOR_FILE, MSG_GEN_DOCUMENT_AUTO_SAVE, MSG_GEN_DOCUMENT_UPDATE, MSG_GEN_DOCUMENT_CHECK_FOR_MODIFICATIONS, MSG_GEN_DOCUMENT_CLOSE_FILE, MSG_GEN_DOCUMENT_REOPEN_FILE, MSG_GEN_DOCUMENT_GET_VARIABLE, MSG_GEN_DOCUMENT_REVERT_NO_PROMPT, MSG_GEN_DOCUMENT_FILE_CHANGED_REINITIALIZE_CREATED_UI, MSG_GEN_DOCUMENT_CLOSE_IF_OPEN_FOR_IACP_ONLY, MSG_GEN_DOCUMENT_MOVE_TO</PRE>
+<P>
+The following messages are for internal use by the Document Control objects only. The GenDocumentControl object sends each of these messages to an appropriate GenDocument object to instruct it to perform a certain action; no intervention by the application is necessary, or appropriate. However, some applications may wish to subclass one or more of these messages, simply to find out when the message is being sent (and thus when a particular action is being performed). Any application which does this must make sure to call the superclass without changing any of the arguments.</P>
+<P>
+Several of these messages pass, as an argument, a structure of type <CODE>
+DocumentCommonParams</CODE>
+. This structure contains information about the file associated with the document object. If you intercept any of these messages, you may wish to examine this structure. However, be sure that you do not alter any of its fields. The structure has the following definition:</P>
+<PRE><A NAME="16878"> </A>typedef struct {
+	FileLongName			DCP_name;</PRE>
+<PRE>	DiskHandle			DCP_diskHandle;</PRE>
+<PRE>	PathName			DCP_path;</PRE>
+<PRE>	GenDocumentAttrs			DCP_docAttrs;</PRE>
+<PRE>	DocumentOpenFlags			DCP_flags;</PRE>
+<PRE>	IACPConnection			DCP_connection;
+} DocumentCommonParams;</PRE>
+<DL>
+<DT>
+DCP<CODE>
+_name</CODE>
+</DT><DD>The name of the document in question.</DD>
+<DT>
+DCP<CODE>
+_diskHandle</DT><DD>
+</CODE>
+The dosk handle of the disk (or standard path) containing the document.</DD>
+<DT>
+DCP<CODE>
+_path</CODE>
+</DT><DD>The path to the document (relative to the disk handle in DCP<CODE>
+_diskHandle</CODE>
+).</DD>
+<DT>
+DCP<CODE>
+_docAttrs</DT><DD>
+</CODE>
+The <CODE>
+GenDocumentAttrs</CODE>
+ of the document in question.<CODE>
+</CODE>
+</DD>
+<DT>
+DCP<CODE>
+_flags</CODE>
+</DT><DD>The <CODE>
+DocumentOpenFlags</CODE>
+ of the document in question.<CODE>
+</CODE>
+</DD>
+<DT>
+DCP<CODE>
+_connection</DT><DD>
+</CODE>
+If the document is opened for an IACP connection, this field specifies the IACP connection that requestged the document be opened. If the user opened the document directly, this field will be zero. (This field is only set when the structure is passed with MSG_GEN_DOCUMENT_OPEN or MSG_GEN_DOCUMENT_SEARCH_FOR_DOC; otherwise, the field's value is undefined.)</DD>
+
+</DL>
+<H4 CLASS="RefETitle">
+MSG_GEN_DOCUMENT_NEW</H4>
+<PRE CLASS="syntax">Boolean	MSG_GEN_DOCUMENT_NEW(
+        word *			fileOrError,
+        DocumentCommonParams *			params);</PRE>
+<P>
+<A NAME="IX_MSG_GEN_DOCUMENT_NEW">
+ </A>
+The GenDocumentControl object sends this message to the GenDocument object to instruct it to create a new document.</P>
+<P CLASS="refField">
+Source:	The GenDocumentControl object.</P>
+<P CLASS="refField">
+Destination:	A GenDocument object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+params</CODE>
+	A pointer to a <CODE>
+DocumentCommonParams</CODE>
+ structure. This structure specifies the name and location for the file.</P>
+<P CLASS="refField">
+Return:	<EM>
+true</EM>
+ (i.e., non-zero) if error.</P>
+<DL>
+<DT>
+<CODE>
+*fileOrError</CODE>
+</DT><DD>If return value is <EM>
+false</EM>
+, this will be the file handle of the new document. If return value is <EM>
+true</EM>
+, this will be a member of the <CODE>
+FileError</CODE>
+ enumerated type.<CODE>
+</CODE>
+</DD>
+</DL>
+<P CLASS="refField">
+Interception:	This message is not normally intercepted. If you intercept it, be sure to send the message to the superclass with arguments unchanged.</P>
+<P CLASS="refField">
+Structures:	The <CODE>
+DocumentCommonParams</CODE>
+ structure (described on <A HREF="Documents_12.htm#16878"> typedef struct { FileLongName DCP_name;</A>
+).</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_GEN_DOCUMENT_OPEN</H4>
+<PRE CLASS="syntax">Boolean	MSG_GEN_DOCUMENT_OPEN(
+        word *			fileOrError,
+        DocumentCommonParams *			params);</PRE>
+<P>
+<A NAME="IX_MSG_GEN_DOCUMENT_OPEN">
+ </A>
+The GenDocumentControl object sends this message to the GenDocument object to instruct it to create a new document.</P>
+<P CLASS="refField">
+Source:	The GenDocumentControl object.</P>
+<P CLASS="refField">
+Destination:	A GenDocument object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+params</CODE>
+	A pointer to a <CODE>
+DocumentCommonParams</CODE>
+ structure. This structure specifies the name and location for the file.</P>
+<P CLASS="refField">
+Return:	<EM>
+true</EM>
+ (i.e., non-zero) if error.</P>
+<DL>
+<DT>
+<CODE>
+*fileOrError</CODE>
+</DT><DD>If return value is <EM>
+false</EM>
+, this will be the file handle of the new document. If return value is <EM>
+true</EM>
+, this will be a member of the <CODE>
+FileError</CODE>
+ enumerated type.<CODE>
+</CODE>
+</DD>
+</DL>
+<P CLASS="refField">
+Interception:	This message is not normally intercepted. If you intercept it, be sure to send the message to the superclass with arguments unchanged.</P>
+<P CLASS="refField">
+Structures:	The <CODE>
+DocumentCommonParams</CODE>
+ structure (described on <A HREF="Documents_12.htm#16878"> typedef struct { FileLongName DCP_name;</A>
+).</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_GEN_DOCUMENT_CLOSE</H4>
+<PRE CLASS="syntax">DocQuitStatus 				MSG_GEN_DOCUMENT_CLOSE(
+        IACPConnection		connection);</PRE>
+<P>
+<A NAME="IX_MSG_GEN_DOCUMENT_CLOSE">
+ </A>
+The GenDocumentControl object sends this message to the GenDocument object to instruct it to close a document.</P>
+<P CLASS="refField">
+Source:	The GenDocumentControl object.</P>
+<P CLASS="refField">
+Destination:	A GenDocument object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+IACPConnection </CODE>
+	The IACP connection requesting the close (or zero if the close was requested by a user).</P>
+<P CLASS="refField">
+Return:	A member of the <CODE>
+DocQuitStatus</CODE>
+ enumerated type (described below).</P>
+<P CLASS="refField">
+Interception:	This message is not normally intercepted. If you intercept it, be sure to send the message to the superclass with arguments unchanged.</P>
+<P CLASS="refField">
+Structures:	<A NAME="IX_DocQuitStatus">
+ </A>
+<A NAME="IX_DQS_&ldots;">
+ </A>
+The return value is a member of the <CODE>
+DocQuitStatus</CODE>
+ enumerated type. This type has the following members:</P>
+<DL>
+<DT>
+DQS_OK</DT><DD>The documentwas updated and closed successfully.</DD>
+<DT>
+DQS_CANCEL </DT><DD>The close operation was canceled before it could be completed.</DD>
+<DT>
+DQS_DELAYED</DT><DD>
+The close operation has been delayed.</DD>
+<DT>
+DQS_SAVE_ERROR</DT><DD>
+The handler was unable to update the file to the disk.</DD>
+
+
+</DL>
+<H4 CLASS="RefETitle">
+MSG_GEN_DOCUMENT_QUICK_BACKUP</H4>
+<PRE CLASS="syntax">void	MSG_GEN_DOCUMENT_QUICK_BACKUP();</PRE>
+<P>
+<A NAME="IX_MSG_GEN_DOCUMENT_QUICK_BACKUP">
+ </A>
+The GenDocumentControl object sends this message to the GenDocument object to instruct it to make a quick backup of a document.</P>
+<P CLASS="refField">
+Source:	The GenDocumentControl object.</P>
+<P CLASS="refField">
+Destination:	A GenDocument object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	This message is not normally intercepted. If you intercept it, be sure to send the message to the superclass with arguments unchanged.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_GEN_DOCUMENT_RECOVER_QUICK_BACKUP</H4>
+<PRE CLASS="syntax">void	MSG_GEN_DOCUMENT_RECOVER_QUICK_BACKUP();</PRE>
+<P>
+<A NAME="IX_MSG_GEN_DOCUMENT_RECOVER_QUICK_BACKUP">
+ </A>
+The GenDocumentControl object sends this message to the GenDocument object to instruct it to recover a document from a quick backup.</P>
+<P CLASS="refField">
+Source:	The GenDocumentControl object.</P>
+<P CLASS="refField">
+Destination:	A GenDocument object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	This message is not normally intercepted. If you intercept it, be sure to send the message to the superclass with arguments unchanged.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_GEN_DOCUMENT_SAVE</H4>
+<PRE CLASS="syntax">Boolean	MSG_GEN_DOCUMENT_SAVE();</PRE>
+<P>
+<A NAME="IX_MSG_GEN_DOCUMENT_SAVE">
+ </A>
+The GenDocumentControl object sends this message to the GenDocument object to instruct it to save a document.</P>
+<P CLASS="refField">
+Source:	The GenDocumentControl object.</P>
+<P CLASS="refField">
+Destination:	A GenDocument object.</P>
+<P CLASS="refField">
+Parameters:	Nothing.</P>
+<P CLASS="refField">
+Return:	<EM>
+true</EM>
+ if error.<EM>
+</EM>
+</P>
+<P CLASS="refField">
+Interception:	This message is not normally intercepted. If you intercept it, be sure to send the message to the superclass with arguments unchanged.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_GEN_DOCUMENT_SAVE_AS</H4>
+<PRE CLASS="syntax">Boolean MSG_GEN_DOCUMENT_SAVE_AS(
+        word *			fileOrError,
+        DocumentCommonParams *			params);</PRE>
+<P>
+<A NAME="IX_MSG_GEN_DOCUMENT_SAVE_AS">
+ </A>
+The Document Control object sends this message to a Document object to instruct it to &quot;Save As&quot; its document. The <CODE>
+DocumentCommonParams</CODE>
+ structure specifies the new name and location for the file.</P>
+<P CLASS="refField">
+Source:	The GenDocumentControl object.</P>
+<P CLASS="refField">
+Destination:	A GenDocument object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+fileOrError</CODE>
+	A pointer to a word-sized variable.</P>
+<DL>
+<DT>
+<CODE>
+params</CODE>
+</DT><DD>A pointer to a <CODE>
+DocumentCommonParams</CODE>
+ structure specifying the new name and location for the file.</DD>
+</DL>
+<P CLASS="refField">
+Return:	<EM>
+true</EM>
+ if an error occurred.</P>
+<DL>
+<DT>
+<CODE>
+*fileOrError</CODE>
+</DT><DD>If the routine returned <EM>
+false</EM>
+, this contains the file handle of the new file. If it returned <EM>
+true</EM>
+, this contains a <CODE>
+FileError</CODE>
+ code.<CODE>
+</CODE>
+</DD>
+</DL>
+<P CLASS="refField">
+Interception:	This message is not normally intercepted. If you intercept it, be sure to send the message to the superclass with arguments unchanged.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_GEN_DOCUMENT_SAVE_AS_TEMPLATE</H4>
+<PRE CLASS="syntax">Boolean MSG_GEN_DOCUMENT_SAVE_AS_TEMPLATE(
+        word *			fileOrError,
+        DocumentCommonParams *			params);</PRE>
+<P>
+<A NAME="IX_MSG_GEN_DOCUMENT_SAVE_AS_TEMPLATE">
+ </A>
+The Document Control object sends this message to a Document object to instruct it to save its document as a template. The <CODE>
+DocumentCommonParams</CODE>
+ structure specifies the name and location for the template.</P>
+<P CLASS="refField">
+Source:	The GenDocumentControl object.</P>
+<P CLASS="refField">
+Destination:	A GenDocument object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+fileOrError</CODE>
+	A pointer to a word-sized variable.</P>
+<DL>
+<DT>
+<CODE>
+params</CODE>
+</DT><DD>A pointer to a <CODE>
+DocumentCommonParams</CODE>
+ structure specifying the new name and location for the file.</DD>
+</DL>
+<P CLASS="refField">
+Return:	<EM>
+true</EM>
+ if an error occurred.</P>
+<DL>
+<DT>
+<CODE>
+*fileOrError</CODE>
+</DT><DD>If the routine returned <EM>
+false</EM>
+, this contains the file handle of the new file. If it returned <EM>
+true</EM>
+, this contains a <CODE>
+FileError</CODE>
+ code.<CODE>
+</CODE>
+</DD>
+</DL>
+<P CLASS="refField">
+Interception:	This message is not normally intercepted. If you intercept it, be sure to send the message to the superclass with arguments unchanged.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_GEN_DOCUMENT_COPY_TO</H4>
+<PRE CLASS="syntax">Boolean	MSG_GEN_DOCUMENT_COPY_TO(
+        DocumentCommonParams *			params);</PRE>
+<P>
+<A NAME="IX_MSG_GEN_DOCUMENT_COPY_TO">
+ </A>
+The GenDocumentControl object sends this message to the GenDocument object to instruct it to copy the current document to a new location, while keeping the original copy open. The <CODE>
+DocumentCommonParams</CODE>
+ structure specifies the name and location for the copy.</P>
+<P CLASS="refField">
+Source:	The GenDocumentControl object.</P>
+<P CLASS="refField">
+Destination:	A GenDocument object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+params</CODE>
+	A pointer to a <CODE>
+DocumentCommonParams</CODE>
+ structure specifying the new name and location for the file.</P>
+<P CLASS="refField">
+Return:	<EM>
+true</EM>
+ if error.<EM>
+</EM>
+</P>
+<P CLASS="refField">
+Interception:	This message is not normally intercepted. If you intercept it, be sure to send the message to the superclass with arguments unchanged.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_GEN_DOCUMENT_REVERT()</H4>
+<PRE CLASS="syntax">Boolean	MSG_GEN_DOCUMENT_REVERT();</PRE>
+<P>
+<A NAME="IX_MSG_GEN_DOCUMENT_REVERT">
+ </A>
+The GenDocumentControl object sends this message to the GenDocument object to instruct it to &quot;Revert&quot; its document.</P>
+<P CLASS="refField">
+Source:	The GenDocumentControl object.</P>
+<P CLASS="refField">
+Destination:	A GenDocument object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	<CODE>
+true</CODE>
+ if error.<CODE>
+</CODE>
+</P>
+<P CLASS="refField">
+Interception:	This message is not normally intercepted. If you intercept it, be sure to send the message to the superclass with arguments unchanged.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_GEN_DOCUMENT_EDIT_USER_NOTES</H4>
+<PRE CLASS="syntax">void	MSG_GEN_DOCUMENT_EDIT_USER_NOTES();</PRE>
+<P>
+<A NAME="IX_MSG_GEN_DOCUMENT_EDIT_USER_NOTES">
+ </A>
+The GenDocumentControl object sends this message to the GenDocument object to instruct it to perform an &quot;Edit User Notes&quot; operation.</P>
+<P CLASS="refField">
+Source:	The GenDocumentControl object.</P>
+<P CLASS="refField">
+Destination:	A GenDocument object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	This message is not normally intercepted. If you intercept it, be sure to send the message to the superclass with arguments unchanged.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_GEN_DOCUMENT_CHANGE_TYPE</H4>
+<PRE CLASS="syntax">void	MSG_GEN_DOCUMENT_CHANGE_TYPE(
+        GenDocumentType		type);</PRE>
+<P>
+<A NAME="IX_MSG_GEN_DOCUMENT_CHANGE_TYPE">
+ </A>
+The GenDocumentControl object sends this message to the GenDocument object to instruct it to change its document's type to the type specified in <CODE>
+type</CODE>
+.</P>
+<P CLASS="refField">
+Source:	The GenDocumentControl object.</P>
+<P CLASS="refField">
+Destination:	A GenDocument object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+type</CODE>
+	The new type of the document.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	This message is not normally intercepted. If you intercept it, be sure to send the message to the superclass with arguments unchanged.</P>
+<P CLASS="refField">
+Structures:	A member of the <CODE>
+GenDocumentType</CODE>
+ enumerated type. This type has the following members:</P>
+<DL>
+<DT>
+GDT_NORMAL</DT><DD>
+The document is a normal document.</DD>
+<DT>
+GDT_READ_ONLY</DT><DD>
+The document is available for read-only access.</DD>
+<DT>
+GDT_TEMPLATE</DT><DD>
+The document is a template.</DD>
+<DT>
+GDT_READ_ONLY_TEMPLATE</DT><DD>
+The document is a template, and is opened read-only.</DD>
+<DT>
+GDT_PUBLIC </DT><DD>The document is &quot;public&quot; (and thus is, by default, opened read-only).</DD>
+<DT>
+GDT_MULTI_USER</DT><DD>
+The document can be read by several users at once.</DD>
+
+
+</DL>
+<H4 CLASS="RefETitle">
+MSG_GEN_DOCUMENT_CHANGE_PASSWORD</H4>
+<PRE CLASS="syntax">void	MSG_GEN_DOCUMENT_CHANGE_PASSWORD(
+        char *		password);</PRE>
+<P>
+<A NAME="IX_MSG_GEN_DOCUMENT_CHANGE_PASSWORD">
+ </A>
+The GenDocumentControl object sends this message to the GenDocument object to instruct it to change the document's password.</P>
+<P CLASS="refField">
+Source:	The GenDocumentControl object.</P>
+<P CLASS="refField">
+Destination:	A GenDocument object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+password</CODE>
+	A pointer to a null-terminated string containing the document's new password.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	This message is not normally intercepted. If you intercept it, be sure to send the message to the superclass with arguments unchanged.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_GEN_DOCUMENT_RENAME</H4>
+<PRE CLASS="syntax">void	MSG_GEN_DOCUMENT_RENAME();</PRE>
+<P>
+<A NAME="IX_MSG_GEN_DOCUMENT_RENAME">
+ </A>
+The GenDocumentControl object sends this message to the GenDocument object to instruct it to rename its document.</P>
+<P CLASS="refField">
+Source:	The GenDocumentControl object.</P>
+<P CLASS="refField">
+Destination:	A GenDocument object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	This message is not normally intercepted. If you intercept it, be sure to send the message to the superclass with arguments unchanged.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_GEN_DOCUMENT_SET_EMPTY</H4>
+<PRE CLASS="syntax">void	MSG_GEN_DOCUMENT_SET_EMPTY();</PRE>
+<P>
+<A NAME="IX_MSG_GEN_DOCUMENT_SET_EMPTY">
+ </A>
+The GenDocumentControl object sends this message to the GenDocument object to instruct it to make its document the new model for &quot;empty&quot; documents.</P>
+<P CLASS="refField">
+Source:	The GenDocumentControl object.</P>
+<P CLASS="refField">
+Destination:	A GenDocument object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	This message is not normally intercepted. If you intercept it, be sure to send the message to the superclass with arguments unchanged.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_GEN_DOCUMENT_CLEAR_EMPTY</H4>
+<PRE CLASS="syntax">void	MSG_GEN_DOCUMENT_CLEAR_EMPTY();</PRE>
+<P>
+<A NAME="IX_MSG_GEN_DOCUMENT_CLEAR_EMPTY">
+ </A>
+The GenDocumentControl object sends this message to the GenDocument object to inform it that there is no longer a file to serve as the model for &quot;empty&quot; documents.</P>
+<P CLASS="refField">
+Source:	The GenDocumentControl object.</P>
+<P CLASS="refField">
+Destination:	A GenDocument object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	This message is not normally intercepted. If you intercept it, be sure to send the message to the superclass with arguments unchanged.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_GEN_DOCUMENT_SET_DEFAULT</H4>
+<PRE CLASS="syntax">void	MSG_GEN_DOCUMENT_SET_DEFAULT();</PRE>
+<P>
+<A NAME="IX_MSG_GEN_DOCUMENT_SET_DEFAULT">
+ </A>
+The GenDocumentControl object sends this message to the GenDocument object to instruct it to make its document the default document to open on startup.</P>
+<P CLASS="refField">
+Source:	The GenDocumentControl object.</P>
+<P CLASS="refField">
+Destination:	A GenDocument object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	This message is not normally intercepted. If you intercept it, be sure to send the message to the superclass with arguments unchanged.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_GEN_DOCUMENT_CLEAR_EMPTY</H4>
+<PRE CLASS="syntax">void	MSG_GEN_DOCUMENT_CLEAR_EMPTY();</PRE>
+<P>
+<A NAME="IX_MSG_GEN_DOCUMENT_CLEAR_EMPTY">
+ </A>
+The GenDocumentControl object sends this message to the GenDocument object to inform it that there is no longer a default file to open on startup.</P>
+<P CLASS="refField">
+Source:	The GenDocumentControl object.</P>
+<P CLASS="refField">
+Destination:	A GenDocument object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	This message is not normally intercepted. If you intercept it, be sure to send the message to the superclass with arguments unchanged.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_GEN_DOCUMENT_CLOSE_IF_CLEAN_UNNAMED</H4>
+<PRE CLASS="syntax">void	MSG_GEN_DOCUMENT_CLOSE_IF_CLEAN_UNNAMED();</PRE>
+<P>
+<A NAME="IX_MSG_GEN_DOCUMENT_CLOSE_IF_CLEAN_UNNAMED">
+ </A>
+The GenDocumentControl object sends this message to the GenDocument object to instruct it to close its document if the document has not been changed or saved since it was created.</P>
+<P CLASS="refField">
+Source:	The GenDocumentControl object.</P>
+<P CLASS="refField">
+Destination:	A GenDocument object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	This message is not normally intercepted. If you intercept it, be sure to send the message to the superclass with arguments unchanged.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_GEN_DOCUMENT_SEARCH_FOR_DOC</H4>
+<PRE CLASS="syntax">Boolean	MSG_GEN_DOCUMENT_SEARCH_FOR_DOC(
+        DocumentCommonParams *			params);</PRE>
+<P>
+<A NAME="IX_MSG_GEN_DOCUMENT_SEARCH_FOR_DOC">
+ </A>
+The GenDocumentControl object sends this message to the GenDocument object to check if it has the specified document open, and bring it to the front if that document exists.</P>
+<P CLASS="refField">
+Source:	The GenDocumentControl object.</P>
+<P CLASS="refField">
+Destination:	A GenDocument object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+params</CODE>
+	A <CODE>
+DocumentCommonParams</CODE>
+ structure specifying the document sought. The <CODE>
+DCP_connection</CODE>
+ field specifies the IACP connection looking for that document (or zero if the request came directly from the user).</P>
+<P CLASS="refField">
+Return:	<EM>
+true</EM>
+ if the Document object has that document open.<EM>
+</EM>
+</P>
+<P CLASS="refField">
+Interception:	This message is not normally intercepted. If you intercept it, be sure to send the message to the superclass with arguments unchanged.</P>
+<P CLASS="refField">
+Structures:	The <CODE>
+DocumentCommonParams</CODE>
+ structure (described on <A HREF="Documents_12.htm#16878"> typedef struct { FileLongName DCP_name;</A>
+).</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_GEN_DOCUMENT_TEST_FOR_FILE</H4>
+<PRE CLASS="syntax">Boolean	MSG_GEN_DOCUMENT_TEST_FOR_FILE(
+        FileHandle		file,
+        optr		*docFound);</PRE>
+<P>
+<A NAME="IX_MSG_GEN_DOCUMENT_TEST_FOR_FILE">
+ </A>
+The GenDocumentControl object sends this message to the GenDocument object to ask if that Document has the file with the specified handle open. If it does, the GenDocument is to write its optr to the passed variable.</P>
+<P CLASS="refField">
+Source:	The GenDocumentControl object.</P>
+<P CLASS="refField">
+Destination:	A GenDocument object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+file</CODE>
+	The FileHandle of the file being sought.</P>
+<DL>
+<DT>
+<CODE>
+docFound</CODE>
+</DT><DD>A pointer to an optr-sized variable.</DD>
+</DL>
+<P CLASS="refField">
+Return:	<CODE>
+true</CODE>
+ if the Document has the specified file open.</P>
+<DL>
+<DT>
+<CODE>
+*docFound</CODE>
+</DT><DD>The optr of the Document object, <EM>
+if</EM>
+ the Document has the specified file open; otherwise, this variable is left unchanged.<EM>
+</EM>
+</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	This message is not normally intercepted. If you intercept it, be sure to send the message to the superclass with arguments unchanged.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_GEN_DOCUMENT_AUTO_SAVE</H4>
+<PRE CLASS="syntax">void	MSG_GEN_DOCUMENT_</PRE>
+<P>
+<A NAME="IX_MSG_GEN_DOCUMENT_AUTO_SAVE">
+ </A>
+The GenDocumentControl object sends this message to the GenDocument object to instruct it to </P>
+<P CLASS="refField">
+Source:	The GenDocumentControl object.</P>
+<P CLASS="refField">
+Destination:	A GenDocument object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	This message is not normally intercepted. If you intercept it, be sure to send the message to the superclass with arguments unchanged.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_GEN_DOCUMENT_UPDATE</H4>
+<PRE CLASS="syntax">Boolean	MSG_GEN_DOCUMENT_UPDATE(
+        word *		error);</PRE>
+<P>
+<A NAME="IX_MSG_GEN_DOCUMENT_UPDATE">
+ </A>
+The GenDocumentControl object sends this message to the GenDocument object to instruct it to write changes in its document to the disk.</P>
+<P CLASS="refField">
+Source:	The GenDocumentControl object.</P>
+<P CLASS="refField">
+Destination:	A GenDocument object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+error</CODE>
+	A pointer to a word-sized variable.</P>
+<P CLASS="refField">
+Return:	<CODE>
+true </CODE>
+if an error occurred.</P>
+<DL>
+<DT>
+<CODE>
+*error</CODE>
+ </DT><DD>A <CODE>
+FileError</CODE>
+ code, or zero if no error occurred.<CODE>
+</CODE>
+</DD>
+</DL>
+<P CLASS="refField">
+Interception:	This message is not normally intercepted. If you intercept it, be sure to send the message to the superclass with arguments unchanged.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_GEN_DOCUMENT_CHECK_FOR_MODIFICATIONS</H4>
+<PRE CLASS="syntax">void	MSG_GEN_DOCUMENT_CHECK_FOR_MODIFICATIONS();</PRE>
+<P>
+<A NAME="IX_MSG_GEN_DOCUMENT_CHECK_FOR_MODIFICATIONS">
+ </A>
+The GenDocumentControl object sends this message to the GenDocument object to instruct it to check if its file has been modified on the disk.</P>
+<P CLASS="refField">
+Source:	The GenDocumentControl object.</P>
+<P CLASS="refField">
+Destination:	A GenDocument object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	This message is not normally intercepted. If you intercept it, be sure to send the message to the superclass with arguments unchanged.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_GEN_DOCUMENT_CLOSE_FILE</H4>
+<PRE CLASS="syntax">void	MSG_GEN_DOCUMENT_CLOSE_FILE(
+        IACPConnection		connection);</PRE>
+<P>
+<A NAME="IX_MSG_GEN_DOCUMENT_CLOSE_FILE">
+ </A>
+The GenDocumentControl object sends this message to the GenDocument object to instruct it to close its file, <EM>
+without</EM>
+ removing the document object itself. (This is done, e.g., when the Document performs a &quot;Move To&quot;; it must close the file, move it, and reopen it.)</P>
+<P CLASS="refField">
+Source:	The GenDocumentControl object.</P>
+<P CLASS="refField">
+Destination:	A GenDocument object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+connection</CODE>
+	The IACP connection requesting that the file be closed, or zero if the request came directly from the user.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	This message is not normally intercepted. If you intercept it, be sure to send the message to the superclass with arguments unchanged.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_GEN_DOCUMENT_REOPEN_FILE</H4>
+<PRE CLASS="syntax">void	MSG_GEN_DOCUMENT_REOPEN_FILE();</PRE>
+<P>
+<A NAME="IX_MSG_GEN_DOCUMENT_REOPEN_FILE">
+ </A>
+The GenDocumentControl object sends this message to the GenDocument object to instruct it to reopen its file (after having handled a MSG_GEN_DOCUMENT_CLOSE_FILE).</P>
+<P CLASS="refField">
+Source:	The GenDocumentControl object.</P>
+<P CLASS="refField">
+Destination:	A GenDocument object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	This message is not normally intercepted. If you intercept it, be sure to send the message to the superclass with arguments unchanged.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_GEN_DOCUMENT_GET_VARIABLE</H4>
+<PRE CLASS="syntax">void	MSG_GEN_DOCUMENT_GET_VARIABLE(
+        VisTextGraphic *		graphic,
+        char *		buffer);</PRE>
+<P>
+<A NAME="IX_MSG_GEN_DOCUMENT_GET_VARIABLE">
+ </A>
+The GenDocumentControl object sends this message to the GenDocument object to get information about a variable graphic. (This message is used by the text object to implement variable graphics.)</P>
+<P CLASS="refField">
+Source:	The GenDocumentControl object.</P>
+<P CLASS="refField">
+Destination:	A GenDocument object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+graphic</CODE>
+	A pointer to a <CODE>
+VisTextGraphic</CODE>
+ structure.</P>
+<DL>
+<DT>
+<CODE>
+char</CODE>
+</DT><DD>A pointer to a 100-byte buffer.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Both buffers filled in appropriately.</P>
+<P CLASS="refField">
+Interception:	This message is not normally intercepted. If you intercept it, be sure to send the message to the superclass with arguments unchanged.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_GEN_DOCUMENT_REVERT_NO_PROMPT</H4>
+<PRE CLASS="syntax">void	MSG_GEN_DOCUMENT_REVERT_NO_PROMPT();</PRE>
+<P>
+<A NAME="IX_MSG_GEN_DOCUMENT_REVERT_NO_PROMPT">
+ </A>
+The GenDocumentControl object sends this message to the GenDocument object to instruct it to &quot;Revert&quot; its document without prompting the user.</P>
+<P CLASS="refField">
+Source:	The GenDocumentControl object.</P>
+<P CLASS="refField">
+Destination:	A GenDocument object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	<CODE>
+true</CODE>
+ if error.<CODE>
+</CODE>
+</P>
+<P CLASS="refField">
+Interception:	This message is not normally intercepted. If you intercept it, be sure to send the message to the superclass with arguments unchanged.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_GEN_DOCUMENT_FILE_CHANGED_REINITIALIZE_CREATED_UI</H4>
+<PRE CLASS="syntax">void	MSG_GEN_DOCUMENT_FILE_CHANGED_REINITIALIZE_CREATED_UI();</PRE>
+<P>
+<A NAME="IX_MSG_GEN_DOCUMENT_FILE_CHANGED_REINITIALIZE_CREATED_UI">
+ </A>
+The GenDocumentControl object sends this message to the GenDocument object to inform it that its associated file has changed, and it should reinitialize its UI and reload any cached data.</P>
+<P CLASS="refField">
+Source:	The GenDocumentControl object.</P>
+<P CLASS="refField">
+Destination:	A GenDocument object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	This message is not normally intercepted. If you intercept it, be sure to send the message to the superclass with arguments unchanged.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_GEN_DOCUMENT_CLOSE_IF_OPEN_FOR_IACP_ONLY</H4>
+<PRE CLASS="syntax">void	MSG_GEN_DOCUMENT_CLOSE_IF_OPEN_FOR_IACP_ONLY()</PRE>
+<P>
+<A NAME="IX_MSG_GEN_DOCUMENT_CLOSE_IF_OPEN_FOR_IACP_ONLY">
+ </A>
+The GenDocumentControl object sends this message to the GenDocument object to instruct it to close its document if the document is open only for an application-mode IACP connection.</P>
+<P CLASS="refField">
+Source:	The GenDocumentControl object.</P>
+<P CLASS="refField">
+Destination:	A GenDocument object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	This message is not normally intercepted. If you intercept it, be sure to send the message to the superclass with arguments unchanged.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_GEN_DOCUMENT_MOVE_TO</H4>
+<PRE CLASS="syntax">Boolean	MSG_GEN_DOCUMENT_MOVE_TO(
+        DocumentCommonParams			params);</PRE>
+<P>
+<A NAME="IX_MSG_GEN_DOCUMENT_MOVE_TO">
+ </A>
+The GenDocumentControl object sends this message to the GenDocument object to instruct it to perform a &quot;Move To&quot; operation. The <CODE>
+DocumentCommonParams</CODE>
+ structure specifies the new name and location for the file.</P>
+<P CLASS="refField">
+Source:	The GenDocumentControl object.</P>
+<P CLASS="refField">
+Destination:	A GenDocument object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+params</CODE>
+	A pointer to a <CODE>
+DocumentCommonParams</CODE>
+ structure. This structure specifies the new name and location for the file.</P>
+<P CLASS="refField">
+Return:	<EM>
+true</EM>
+ (i.e. non-zero) if error.<EM>
+</EM>
+</P>
+<P CLASS="refField">
+Interception:	This message is not normally intercepted. If you intercept it, be sure to send the message to the superclass with arguments unchanged.</P>
+<P CLASS="refField">
+Structures:	The <CODE>
+DocumentCommonParams</CODE>
+ structure (described on <A HREF="Documents_12.htm#16878"> typedef struct { FileLongName DCP_name;</A>
+).</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Documents_c.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Documents_11.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.5 Forcing Actions</A> 
+<!-- to next --> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

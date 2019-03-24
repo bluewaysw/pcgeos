@@ -1,0 +1,106 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: VM_d.htm,v 1.1 97/06/02 15:55:05 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Accessing and Altering VM Blocks</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Virtual Memory</A>: 3.6 <A HREF="VM_7.htm">Using Virtual Memory</A>: 
+<A NAME="71741">
+ </A>
+Accessing and Altering VM Blocks</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VM_7.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VM_c.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.5 Attaching Memory Blocks</A> 
+<!-- to next --> | <A HREF="VM_e.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.7 VM Block Information</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>VMLock(), VMUnlock(), VMDirty(), VMFind(), VMModifyUserID(), VMPreserveBlocksHandle()</PRE>
+<P>
+Once you have opened a VM file and allocated blocks, you will need to access blocks. The VM library provides many routines for doing this.</P>
+<P>
+<A NAME="IX_VMLock()">
+ </A>
+If you need to access the data in a VM file, you can use the routine <CODE>
+VMLock()</CODE>
+. This routine moves a VM block onto the global heap. It does this by allocating a global memory block (if the VM block is not already associated with a memory block), reallocating the global block if it had been discarded, locking the memory block on the global heap, and copying the VM block into the global block, if necessary. (It will copy the VM block to memory only if necessary, i.e. if the memory block is newly-allocated, or had been discarded and reallocated.) <CODE>
+VMLock()</CODE>
+ takes three arguments: the handle of the VM file, the VMBlockHandle of the block to lock, and a pointer to a memHandle variable.<A NAME="IX_VMUnlock()">
+ </A>
+ It returns a pointer to the start of the block, and writes the global block's handle into the memHandle variable. You can now access the block the same way you would any other block, with one exception: When you are done with the block, you do not call <CODE>
+MemUnlock()</CODE>
+; instead, call the routine <CODE>
+VMUnlock()</CODE>
+, passing it the handle of the <EM>
+global memory</EM>
+ block (not the handle of the VM block). This will unlock the global block on the heap.</P>
+<P>
+If you alter the global memory block, you will need to notify the VM manager of this so it will know to copy the changes back to the VM file.<A NAME="IX_VMDirty()">
+ </A>
+ You do this by calling the routine <CODE>
+VMDirty()</CODE>
+. <CODE>
+VMDirty()</CODE>
+ takes one argument, the handle of the global memory block (<EM>
+not</EM>
+ the VM block). It is important to dirty the block while it is still locked on the heap; as soon as you unlock a clean block, the VM manager may choose to discard it. Dirty blocks are copied back to the VM file when it is updated. Note that if an object in a VM block is marked dirty (via <CODE>
+ObjMarkDirty()</CODE>
+), the block is automatically dirtied. Similarly, if you attach a global memory block to a VM block (via <CODE>
+VMAttach()</CODE>
+), the VM block is automatically dirtied.
+
+</P>
+<P>
+You can dynamically resize VM blocks. <A NAME="IX_VMLock()">
+ </A>
+To do this, lock the VM block with <CODE>
+VMLock()</CODE>
+; then resize the global memory block with <CODE>
+MemReAlloc()</CODE>
+. Be sure to mark the block dirty so the changes will be copied to the disk file. Note that although the global memory block will remain locked, it may move on the global heap when it is resized. You will therefore need to dereference the global memory handle (with <CODE>
+MemDeref()</CODE>
+) before accessing the memory.</P>
+<P>
+<A NAME="49253">
+ </A>
+You can locate VM blocks by their user ID numbers. <A NAME="IX_VMFind()">
+ </A>
+The routine <CODE>
+VMFind()</CODE>
+ takes three arguments: the VM file handle, a VM block handle, and the user ID for which to look. The routine looks through the block table, starting with the handle <EM>
+after</EM>
+ the one passed, until it finds a block with the specified user ID. If it does not find such a block, it returns a null handle; otherwise, it returns the block's VMBlockHandle. Thus, by passing in a block handle of zero, you will get the handle of the first block with the specified ID; by passing back in that block's handle, you will get the next block with that ID; and so on, until you get all the blocks (after which you will be returned a null handle). </P>
+<P>
+<A NAME="IX_VMModifyUserID()">
+ </A>
+You can change a block's user ID number by calling the routine <CODE>
+VMModifyUserID()</CODE>
+. This routine takes three arguments: the VM file handle, the VM block handle, and the new user ID number. Since user IDs are maintained in the block table, not in the blocks themselves, it doesn't matter whether the block is locked, or even whether it is associated with data in the file. (For example, a block allocated with a size of zero can have its user-ID changed.)</P>
+<P>
+<A NAME="IX_VMPreserveBlocksHandle()">
+ </A>
+Ordinarily, the VM manager can free any unlocked, clean global block if the space is needed. However, you can instruct the VM manager not to free the global block associated with a specific block by calling the routine <CODE>
+VMPreserveBlocksHandle()</CODE>
+. The routine takes two arguments, namely the VM file handle and the VM block handle. It sees to it that the specified VM block will remain attached to the same global block until the VM block is specifically detached (or reattached).</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VM_7.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VM_c.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.5 Attaching Memory Blocks</A> 
+<!-- to next --> | <A HREF="VM_e.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.7 VM Block Information</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

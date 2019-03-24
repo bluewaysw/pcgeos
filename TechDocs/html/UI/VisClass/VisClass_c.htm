@@ -1,0 +1,119 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: VisClass_c.htm,v 1.2 97/09/05 14:58:43 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Basic VisClass Rules</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">VisClass</A>: 4.1 <A HREF="VisClass_b.htm">Using VisClass</A>: 
+<A NAME="63423">
+ </A>
+Basic VisClass Rules</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VisClass_b.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VisClass_b.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">4 Using VisClass</A> 
+<!-- to next --> | <A HREF="VisClass_d.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.2 Drawing to the Screen</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+To use visible objects, you must subclass the Vis classes and create a visible object tree. Otherwise, the visible objects will not be able to display themselves or accept user input, the two things that make visible objects worthwhile.</P>
+<P>
+<A NAME="IX_VisClass:displaying">
+ </A>
+Nearly all visible objects you use will at least display themselves on the screen. Some may accept mouse or keyboard input; some may move themselves around the screen, resize themselves, or implement custom geometry management functions.</P>
+<P>
+For a subclass of <CODE>
+VisClass</CODE>
+ to display itself on the screen, it must handle the message <CODE>
+MSG_VIS_DRAW</CODE>
+. This message is sent to all visible objects in a given window when that window is subjected to an exposure event. In addition, the object must be part of a tree of visible objects, the top node of which is connected to a GenView or other windowed object. Displaying a basic visible object is discussed below.</P>
+<P>
+<A NAME="IX_VisClass:input">
+ </A>
+For a visible object to handle mouse input, it will need to handle a subset of the mouse event messages. Typically, a visible object will want to know when the mouse is clicked within the object's bounds (<CODE>
+MSG_META_START_SELECT</CODE>
+) and when the mouse button is released (<CODE>
+MSG_META_END_SELECT</CODE>
+). Other messages dealing with mouse motion or other mouse buttons may also be of interest to the object. In addition, visible objects may request and handle Ink input. Handling of these messages is discussed in <A HREF="VisClass_f.htm#65723"> Handling Input</A>
+.</P>
+<P>
+<A NAME="IX_VisClass:tree management">
+ </A>
+Most applications using visible object trees will add objects to and remove them from the trees. <CODE>
+MSG_VIS_ADD_CHILD</CODE>
+ and <CODE>
+MSG_VIS_REMOVE</CODE>
+ are the two messages used most often for tree management. When an object should be freed, it can be destroyed with <CODE>
+MSG_VIS_DESTROY</CODE>
+, which will remove it from the tree and then free it.</P>
+<P>
+<A NAME="IX_VisClass:geometry">
+ </A>
+Some applications will want to use the built-in geometry management features of GEOS. The geometry manager can automatically resize and reposition an entire visible object tree properly according to pre-set constraints. (The constraints can also be changed at run-time.) How the system manages visible object geometry is discussed in <A HREF="VisClass_e.htm#16842"> Geometry Management</A>
+.</P>
+<P>
+The geometry manager, though extremely useful for non-overlapping objects, may not be sufficient for all the needs of a complex application. For an object to determine its own size and position, it has to handle some of the messages sent out by the geometry manager. You can also manually set the size and position of each visible object. This is discussed in <A HREF="VisClass_e.htm#87564"> Positioning Visible Objects</A>
+.</P>
+<P>
+Often applications may need to change something about a visible object or the tree it's in. When this happens, the application must force a visual update by invalidating either the geometry or the image (or both) of the object and then calling <CODE>
+MGS_VIS_VUP_UPDATE_WIN_GROUP</CODE>
+. To mark any object invalid, the application must call <CODE>
+MSG_VIS_MARK_INVALID</CODE>
+.</P>
+<P>
+Many visible objects will have specific functions they perform. For example, if the user presses on a menu item labeled &quot;New Game&quot; or something similar, the visible object may return itself to its original location (as in the TicTac sample application). To get this type of functionality, you must define new messages for your subclass of <CODE>
+VisClass</CODE>
+ and have the object handle them. In the case of the TicTac game pieces, each piece handles the <CODE>
+MSG_PIECE_NEW_GAME</CODE>
+ message by resetting the object's position to its original position.</P>
+<P>
+<A NAME="IX_VisClass:tree management">
+ </A>
+Visible objects are maintained and managed in a tree structure. The tree has three basic elements: The root (topmost) node must be an object of <CODE>
+VisContentClass</CODE>
+. Any nodes in the middle of the tree, nodes that are allowed to have children, must be of <CODE>
+VisCompClass</CODE>
+. Any leaf nodes (guaranteed not to have children) may be of either <CODE>
+VisClass</CODE>
+ or <CODE>
+VisCompClass</CODE>
+. (Subclasses of the above classes may also be used.)</P>
+<P>
+The visible object tree is displayed normally through a GenView object. The output of the GenView must be tied directly to the top node of the visible object tree; this is why the visible tree must be headed by a VisContent--only the VisContent has the methods to handle GenView messages.
+<IMG SRC="VisClass_c_visAndGen.gif">
+
+</P>
+<P>
+The VisContent object may or may not do things other than manage the visible tree. For example, the content may draw some background graphics to the window before the other visible objects draw themselves, or it may implement some special geometry behavior to arrange its children.</P>
+<P>
+The VisContent can have children. These children can be either standard visible objects or <EM>
+composite</EM>
+ visible objects. Composites, like the content, are allowed to have children. For efficiency, standard visible objects can not have children. Therefore, only leaf objects in the tree may be of <CODE>
+VisClass</CODE>
+.</P>
+<P>
+The visible object tree may have any number of layers of composites. You should pay attention to the functions required in your application and fit the structure of the tree to the application's needs.</P>
+<P>
+These restrictions, combined with the link to the generic object tree through GenView, result in an object tree structure somewhat like that shown in the figure above. Of course, the actual generic and visible tree structure will vary from application to application. Also, note that the generic and visible sections are actually two different object trees; they are not connected through a parent-child relationship anywhere.</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VisClass_b.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VisClass_b.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">4 Using VisClass</A> 
+<!-- to next --> | <A HREF="VisClass_d.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.2 Drawing to the Screen</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

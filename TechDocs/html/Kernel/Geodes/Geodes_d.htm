@@ -1,0 +1,156 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Geodes_d.htm,v 1.1 97/06/02 15:30:02 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Managing the Token Database File</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Applications and Geodes</A>: 2.2 <A HREF="Geodes_b.htm">Creating Icons</A>: 
+Managing the Token Database File</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Geodes_b.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Geodes_c.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2.1 The Token Database</A> 
+<!-- to next --> | <A HREF="Geodes_e.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">3 Saving User Options</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>TokenDefineToken(), TokenGetTokenInfo(), TokenLookupMoniker(), TokenLoadMonikerBlock(), TokenLoadMonikerChunk(), TokenLoadMonikerBuffer(), TokenRemoveToken(), TokenLoadTokenBlock(), TokenLoadTokenChunk(), TokenLoadTokenBuffer(), TokenLockTokenMoniker(), TokenUnlockTokenMoniker(), TokenGetTokenStats(), TokenListTokens()</PRE>
+<P>
+In nearly all cases, you will create your application's icon with the icon tool and not worry about it again. However, the following routines allow you to add, change, access, and remove entries from the token database.</P>
+<P>
+<CODE>
+TokenLoadTokenBlock()</CODE>
+<A NAME="IX_TokenLoadTokenBlock()">
+ </A>
+, <A NAME="IX_TokenLoadTokenChunk()">
+ </A>
+<CODE>
+TokenLoadTokenChunk()</CODE>
+, and <CODE>
+TokenLoadTokenBuffer()</CODE>
+<A NAME="IX_TokenLoadTokenBuffer()">
+ </A>
+ load a <CODE>
+TokenEntry</CODE>
+ structure into memory (a newly allocated block, a newly allocated chunk, or a locked buffer). The <CODE>
+TokenEntry</CODE>
+ structure contains information about the token, the geode's release number, and the geode's protocol number. This structure does not actually contain the monikers used for the icon.</P>
+<P>
+<CODE>
+TokenLookupMoniker()</CODE>
+<A NAME="IX_TokenLookupMoniker()">
+ </A>
+ gets the specific moniker of a token entry given the display type (CGA, EGA, VGA, etc.), the entry's <CODE>
+GeodeToken</CODE>
+ structure, and search flags. If the moniker is found, the entry identifier (database group and ID numbers) of the moniker are returned. You can use these return values to lock the moniker into memory (see below).</P>
+<P>
+<CODE>
+TokenLockTokenMoniker()</CODE>
+<A NAME="IX_TokenLockTokenMoniker()">
+ </A>
+ locks a moniker into memory given its entry identifier. This routine returns a pointer to a locked block and the chunk handle of the chunk containing the locked moniker. A moniker should always be locked before it is drawn; this keeps it from moving in memory while it is being accessed. <A NAME="IX_TokenUnlockTokenMoniker()">
+ </A>
+The routine <CODE>
+TokenUnlockTokenMoniker()</CODE>
+ unlocks a previously locked moniker when given the moniker's segment address. This unlocks the entire block, not just the individual moniker.</P>
+<P>
+<CODE>
+TokenLoadMonikerBlock()</CODE>
+<A NAME="IX_TokenLockMonikerBlock()">
+ </A>
+, <A NAME="IX_TokenLoadMonikerChunk()">
+ </A>
+<CODE>
+TokenLoadMonikerChunk()</CODE>
+, and <CODE>
+TokenLoadMonikerBuffer()</CODE>
+<A NAME="IX_TokenLoadMonikerBuffer()">
+ </A>
+ load a specific moniker into memory from the token database file (into a newly allocated block, a newly allocated chunk, or a locked buffer). It takes the same parameters as <CODE>
+TokenLookupMoniker()</CODE>
+ but returns the handle and chunk handle of the loaded moniker. If using this routine, simply lock the memory block rather than using <CODE>
+TokenLockTokenMoniker()</CODE>
+.</P>
+<P>
+<CODE>
+TokenGetTokenInfo()</CODE>
+<A NAME="IX_TokenGetTokenInfo()">
+ </A>
+ finds a token when passed its <CODE>
+tokenchars</CODE>
+ and <CODE>
+tokenid</CODE>
+ and returns the token's flags. If no token exists with the passed characteristics, it will return an error flag.</P>
+<P>
+<CODE>
+TokenDefineToken()</CODE>
+<A NAME="IX_TokenDefineToken()">
+ </A>
+ adds a new token and its moniker list to the token database. If the given token already exists, the new one will replace the old one. The token identifier (<CODE>
+tokenchars</CODE>
+, <CODE>
+tokenid</CODE>
+), handle and chunk handle of the moniker list, and flags of the new token must be passed.</P>
+<P>
+<CODE>
+TokenRemoveToken()</CODE>
+<A NAME="IX_TokenRemoveToken()">
+ </A>
+ removes a given token and its moniker list from the token database file. It returns only a flag indicating whether the token was successfully removed or not.</P>
+<P>
+<CODE>
+TokenListTokens()</CODE>
+<A NAME="IX_TokenListTokens()">
+ </A>
+ returns a list of the tokens in the token database. It is passed three arguments:</P>
+<UL>
+<LI>
+A set of <CODE>
+TokenRangeFlags</CODE>
+, which specifies which tokens should be returned. The following flags are available:</LI>
+</UL>
+<DL>
+<DT>
+TRF_ONLY_GSTRING</DT><DD>
+Return only those tokens which are defined with a GString.</DD>
+<DT>
+TRF_ONLY_PASSED_MANUFID</DT><DD>
+Return only those tokens which match the passed manufacturer's ID.</DD>
+<UL>
+<LI>
+A number of bytes to reserve for a header.</LI>
+<LI>
+A manufacturer ID. This field is ignored if TRF_ONLY_PASSED_MANUFID was not passed.</LI>
+</UL>
+</DL>
+<P>
+<CODE>
+TokenListTokens()</CODE>
+ allocates a global memory block and copies all the specified tokens into that block. It leaves a blank space at the beginning of the block; this space is the size specified by the second argument. The rest of the block is an array of <CODE>
+GeodeToken</CODE>
+ structures. <CODE>
+TokenListTokens()</CODE>
+ returns a dword. The lower word of the return value is the handle of the global memory block; the upper word is the number of <CODE>
+GeodeToken</CODE>
+ structures in that block.</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Geodes_b.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Geodes_c.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2.1 The Token Database</A> 
+<!-- to next --> | <A HREF="Geodes_e.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">3 Saving User Options</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

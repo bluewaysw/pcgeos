@@ -1,0 +1,632 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: GOCLanguage_14.htm,v 1.1 97/06/02 15:59:57 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Sending Messages</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">GEOS Programming</A>: 4.5 <A HREF="GOCLanguage_f.htm">Using Classes and Objects</A>: 
+Sending Messages</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GOCLanguage_f.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GOCLanguage_13.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.4 Declaring Objects</A> 
+<!-- to next --> | <A HREF="GOCLanguage_15.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.6 Managing Objects</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>@send, @call, @callsuper, @record, @dispatch, @dispatchcall, TravelOption, ObjDuplicateMessage(), ObjFreeMessage(), ObjGetMessageInfo()</PRE>
+<P>
+Often you will have to send messages to objects throughout the system. You can send messages in several ways, but the two most basic and most frequently used involve the keywords <CODE>
+@call</CODE>
+ and <CODE>
+@send</CODE>
+.</P>
+<P>
+If a message is being sent across threads, you must be aware of synchronization issues. If the message does not cross thread boundaries, the kernel will link the code directly as if it were a function call. (This is an implementation difference only; you do not have to specify anything different in your code.)</P>
+<P>
+<A NAME="IX_@send[;send]">
+ </A>
+The <CODE>
+@send</CODE>
+ keyword causes the kernel to put the specified message into the recipient's event queue. Messages sent with <CODE>
+@send</CODE>
+ may not give return values and may not take pointers to locked memory as arguments. The sender then continues executing without ever knowing whether the message was properly handled or not.</P>
+<P>
+<A NAME="IX_@call[;call]">
+ </A>
+The <CODE>
+@call</CODE>
+ keyword is used when the message being sent must return information to the sender. It is also used when the message must be handled immediately, before the sender is allowed to continue executing. In essence, the sender is &quot;put to sleep&quot; until the message has been processed, at which time the sender is woken up and may continue executing. If the message sent with <CODE>
+@call</CODE>
+ is not handled (passed up the recipient's class tree and still not handled), it will return as if it had been; no error message will be returned.</P>
+<P>
+The formats for <CODE>
+@send</CODE>
+ and <CODE>
+@call</CODE>
+ are similar. Use them like function calls. Their format is given below:</P>
+<PRE>@send [,&lt;flags&gt;]+ \
+		&lt;obj&gt;::[{&lt;cast2&gt;}]&lt;msg&gt;(&lt;params&gt;*);</PRE>
+<PRE>&lt;ret&gt; = @call [,&lt;flags&gt;]+ [{&lt;cast&gt;}] &lt;obj&gt;::\
+			[{&lt;cast2&gt;}]&lt;msg&gt;(&lt;params&gt;*);</PRE>
+<DL>
+<DT>
+<STRONG>
+flags</STRONG>
+</DT><DD>This is a list of flags separated by the commas. The allowed flags are shown below.</DD>
+<DT>
+<STRONG>
+obj</STRONG>
+</DT><DD>This is the name of the object to which the message will be sent. It can also be an optr variable.</DD>
+<DT>
+<STRONG>
+msg</STRONG>
+</DT><DD>This is the name of the message being sent.</DD>
+<DT>
+<STRONG>
+params</STRONG>
+</DT><DD>This is a list of parameters, built exactly as it would be for a standard C function call.</DD>
+<DT>
+<STRONG>
+ret</STRONG>
+</DT><DD>This is a variable that will hold the return value, if any. Note that this is valid only with <CODE>
+@call</CODE>
+ because <CODE>
+@send</CODE>
+ does not return anything.</DD>
+<DT>
+<STRONG>
+cast</STRONG>
+</DT><DD>If a message name is put here, Goc will automatically cast the return type to whatever type is returned by <CODE>
+cast</CODE>
+.</DD>
+<DT>
+<STRONG>
+cast2</STRONG>
+</DT><DD>If a message name is put here, Goc will assume that the message is passed the same arguments as message <CODE>
+cast2</CODE>
+.</DD>
+</DL>
+<P>
+The flags allowed for these keywords are listed below. They are rarely used but are available.</P>
+<DL>
+<DT>
+<CODE>
+forceQueue</CODE>
+<A NAME="IX_forceQueue message flag">
+ </A>
+</DT><DD><A NAME="IX_Event queues:@call and @send flags">
+ </A>
+This flag will cause the message to be placed in the recipient's event queue, even if it could have been handled by a direct call. Do not use this flag with <CODE>
+@call</CODE>
+.</DD>
+<DT>
+<CODE>
+checkDuplicate</DT><DD>
+</CODE>
+<A NAME="IX_checkDuplicate message flag">
+ </A>
+This flag makes the kernel check if a message of the same name is already in the recipient's event queue. For this flag to work, <CODE>
+forceQueue</CODE>
+ must also be passed. Events are checked from first (next-to-be-processed) to last. If the message is a duplicate, it will be dropped; however the <EM>
+replace</EM>
+ flag, described below, can change this behavior.</DD>
+<DT>
+<CODE>
+checkLastOnly</DT><DD>
+</CODE>
+<A NAME="IX_checkLastOnly message flag">
+ </A>
+This flag works with <CODE>
+checkDuplicate</CODE>
+, causing it to check only the last message in the event queue.</DD>
+<DT>
+<CODE>
+replace</CODE>
+<A NAME="IX_replace message flag">
+ </A>
+</DT><DD>This flag modifies <CODE>
+checkDuplicate</CODE>
+ and <CODE>
+checkLastOnly</CODE>
+ by superseding the duplicate (old) event with the new one. The new event will be put in the duplicate's position in the event queue. If a duplicate is found but the <CODE>
+replace</CODE>
+ flag is not passed, the duplicate will be dropped.</DD>
+<DT>
+<CODE>
+insertAtFront</DT><DD>
+</CODE>
+<A NAME="IX_insertAtFront message flag">
+ </A>
+This puts the message at the front of the recipient's event queue.</DD>
+<DT>
+<CODE>
+canDiscardIfDesperate</DT><DD>
+</CODE>
+<A NAME="IX_canDiscardIfDesperate message flag">
+ </A>
+This flag indicates that this event may be discarded if the system is running extremely low on handles and requires more space immediately.</DD>
+</DL>
+<P>
+The <CODE>
+@call</CODE>
+ command can also be used within an expression in the same way a function call could. For example, the following conditional expression is valid:</P>
+<PRE>if (@call MyObj::MSG_MYOBJ_TEST()) {
+    /* conditional code */
+}</PRE>
+<P>
+The result of the message call will be evaluated in the if statement. Note that this may not be done with <CODE>
+@send</CODE>
+ because it returns nothing.</P>
+
+<H2 CLASS="HeadingC">
+Nested Message Calls
+
+</H2>
+<P>
+Because of the way Goc processes message calls, it is impossible to nest messages on a single line. For example, this call is illegal:</P>
+<PRE>@send Obj1::MSG_THATS_PASSED_AN_INT(\
+		@call Obj2::MSG_THAT_RETURNS_INT());</PRE>
+<P>
+Any such call will generate a compile-time error. Instead, you should use temporary variables to break this up into several lines, e.g.:</P>
+<PRE>int i;</PRE>
+<PRE>i = @call Obj2::MSG_THAT_RETURNS_INT();</PRE>
+<PRE>@send Obj2::MSG_THATS_PASSED_AN_INT(i);</PRE>
+
+
+<H2 CLASS="HeadingC">
+Sending a Message to an Object's Superclass</H2>
+<P>
+<A NAME="IX_@callsuper[;callsuper]">
+ </A>
+<A NAME="IX_Superclass:sending messages to">
+ </A>
+Often you may wish to send a message directly to an object's superclass to ensure that default behavior is implemented. Use the <CODE>
+@callsuper</CODE>
+ keyword with the following format:</P>
+<PRE>@callsuper &lt;obj&gt;::&lt;class&gt;::&lt;msg&gt;(&lt;pars&gt;*) [&lt;flgs&gt;+];</PRE>
+<DL>
+<DT>
+<STRONG>
+obj</STRONG>
+</DT><DD>This is the object to send the message to, as in <CODE>
+@call</CODE>
+ and <CODE>
+@send</CODE>
+. The object block must already be locked, and must be run by the current thread of execution. (Usually an object uses <CODE>
+@callsuper()</CODE>
+ to send a message to itself.)</DD>
+<DT>
+<STRONG>
+class</STRONG>
+</DT><DD>This is the class whose superclass should receive the message.</DD>
+<DT>
+<STRONG>
+msg</STRONG>
+</DT><DD>This is the message name.</DD>
+<DT>
+<STRONG>
+pars</STRONG>
+</DT><DD>This is the parameter list, same as <CODE>
+@call</CODE>
+ and <CODE>
+@send</CODE>
+.</DD>
+<DT>
+<STRONG>
+flgs</STRONG>
+</DT><DD>This is the flags list, same as <CODE>
+@call</CODE>
+ and <CODE>
+@send</CODE>
+.</DD>
+</DL>
+<P>
+When used on a line by itself (with no parameters or return values), <CODE>
+@callsuper()</CODE>
+ passes a received message on to the superclass. This is used quite often when a subclass wants to alter existing behavior rather than replace it.</P>
+
+
+<H2 CLASS="HeadingC">
+Encapsulating a Message</H2>
+<P>
+By encapsulating messages, you can set up events to be sent out at a later time. An encapsulated message can include the message to be sent, the object it should be sent to, and the parameters that should be passed. Using encapsulated messages can sometimes simplify coding.</P>
+<P>
+<A NAME="IX_@record[;record]">
+ </A>
+Messages can be encapsulated with the <CODE>
+@record</CODE>
+ keyword and later dispatched with <A NAME="IX_@dispatch[;dispatch]">
+ </A>
+<CODE>
+@dispatch</CODE>
+ and <A NAME="IX_@dispatchcall[;dispatchcall]">
+ </A>
+<CODE>
+@dispatchcall</CODE>
+. (Though the use of <CODE>
+@record</CODE>
+ does not necessitate a later <CODE>
+@dispatch</CODE>
+--there are other uses for an encapsulated event.) In addition, when the event is dispatched, you can override the values set in the encapsulated event to change the destination or the message. You can also cast the return value to another type if necessary. The formats of these three keywords are as follows:</P>
+<PRE>&lt;event&gt; = @record &lt;obj&gt;::[{&lt;cast&gt;}]&lt;msg&gt;(&lt;params&gt;*);</PRE>
+<DL>
+<DT>
+<STRONG>
+event</STRONG>
+</DT><DD>The handle of the recorded event, of type <CODE>
+EventHandle</CODE>
+.</DD>
+<DT>
+<STRONG>
+obj</STRONG>
+</DT><DD>The object set to receive the message when it is dispatched. This field may be set to <CODE>
+null</CODE>
+ if the destination is determined when the message is dispatched.</DD>
+<DT>
+<STRONG>
+cast</STRONG>
+</DT><DD>The name of a message; if this is present, the event will have the same argument types as the specified message.</DD>
+<DT>
+<STRONG>
+msg</STRONG>
+</DT><DD>The message set to be sent when the event is dispatched. This field may be set to <CODE>
+null</CODE>
+ if the message is determined when it is dispatched.</DD>
+<DT>
+<STRONG>
+params</STRONG>
+</DT><DD>The parameter list (same as in <CODE>
+@call</CODE>
+ and <CODE>
+@send</CODE>
+) that will be sent with the dispatched message.</DD>
+</DL>
+<P>
+<A NAME="IX_ObjGetMessageInfo()">
+ </A>
+<A NAME="IX_ObjDuplicateMessage()">
+ </A>
+<A NAME="IX_ObjFreeMessage()">
+ </A>
+You may create a copy of a recorded message by means of the <CODE>
+ObjDuplicateMessage()</CODE>
+ routine. To free it, call <CODE>
+ObjFreeMessage()</CODE>
+. To discover the Message and destination object associated with a recorded event, call <CODE>
+ObjGetMessageInfo()</CODE>
+.</P>
+<P>
+The <CODE>
+@dispatch</CODE>
+ keyword is used to dispatch an encapsulated event to its destination. This is similar to <CODE>
+@send</CODE>
+ in that it can have no return values. If the event has return values, use <CODE>
+@dispatchcall</CODE>
+ (below).</P>
+<PRE>@dispatch [noFree] \
+		&lt;nObj&gt;::[{&lt;cast&gt;}]&lt;nMsg&gt;::&lt;event&gt;;</PRE>
+<DL>
+<DT>
+<STRONG>
+noFree</STRONG>
+</DT><DD>This flag indicates that the event's handle should not be freed after the event has been dispatched. This is useful if the same encapsulated event is to be used more than once.</DD>
+<DT>
+<STRONG>
+nObj</STRONG>
+</DT><DD>This is an override destination. If the destination in the encapsulated event is null, then an object must be set here. Any object set will override that in the encapsulated message. If no override object is desired, set this to <CODE>
+null</CODE>
+.</DD>
+<DT>
+<STRONG>
+nMsg</STRONG>
+</DT><DD>This is an override message. If set, this message will be sent rather than that in the encapsulated event. If no override message is desired, set this to <CODE>
+null</CODE>
+. Any override will be sent with the same parameters as set in the encapsulated event.</DD>
+<DT>
+<STRONG>
+event</STRONG>
+</DT><DD>This is the handle of the encapsulated event. This may not be a classed event.</DD>
+</DL>
+<P>
+The <CODE>
+@dispatchcall</CODE>
+ keyword works exactly like the <CODE>
+@dispatch</CODE>
+ keyword above except that it allows the use of return values. The sender will be &quot;put to sleep&quot; if necessary while the recipient processes the message and will be &quot;woken up&quot; when the message returns.</P>
+<PRE>&lt;ret&gt; = @dispatchcall [noFree] [{&lt;cast&gt;}] &lt;nObj&gt;::\
+                                    &lt;nMsg&gt;::&lt;event&gt;;</PRE>
+<DL>
+<DT>
+<STRONG>
+ret</STRONG>
+</DT><DD>This is a variable that will contain the return value of the message.</DD>
+<DT>
+<STRONG>
+other parameters</DT><DD>
+</STRONG>
+All the other parameters are the same as those in <CODE>
+@dispatch</CODE>
+.</DD>
+
+
+</DL>
+<H2 CLASS="HeadingC">
+Using Expressions with Messages</H2>
+<P>
+All message-sending keywords described in the previous sections--<CODE>
+@call</CODE>
+, <CODE>
+@send</CODE>
+, <CODE>
+@record</CODE>
+, <CODE>
+@dispatch</CODE>
+, and <CODE>
+@dispatchcall</CODE>
+--can take expressions in place of a destination object's name. Additionally, the <CODE>
+@dispatch</CODE>
+ and <CODE>
+@dispatchcall</CODE>
+ keywords can take expressions in place of the message name. However, if an expression is used for the message, you must use a cast type to make sure Goc knows the return and parameter types. Note, however, that casts in this case use curly braces rather than parentheses.</P>
+
+
+<H2 CLASS="HeadingC">
+Casting Message Call and Return Types</H2>
+<P>
+Goc allows you to cast a message's pass and return values. This is best explained by example:</P>
+<PRE>{
+ int swapInt;
+ char c;</PRE>
+<PRE> c = @call {MSG_1} object:: {MSG_2} MSG_X(swapInt);</PRE>
+<PRE>}</PRE>
+<P>
+In this case, MSG_2 takes an integer argument and MSG_1 returns a char. The casts tell Goc how MSG_X will receive parameters and return results. Goc needs the casts in those cases where MSG_X doesn't appear explicitly (perhaps it has been stored as an integer), and thus Goc would not be able to parse the parameters or return values.</P>
+<P>
+When Goc tries to determine proper parameters and returns, it will look to the following sources when available. When trying to figure out parameters, it will look first for MSG_2, then MSG_X, and MSG_1 last. The first one Goc finds will determine the parameters.</P>
+<P>
+<CODE>
+@send</CODE>
+ and <CODE>
+@record</CODE>
+ don't support return values, but on a <CODE>
+@call</CODE>
+, Goc will figure out return values by looking at MSG_1, MSG_X, and finally MSG_2.</P>
+<P>
+ In this case, Goc will pass to fn's method like MSG_CAST_2 but will return values as MSG_CAST_1 does:</P>
+<PRE>Message fn = GetMessageToCall();
+c = @call {MSG_CAST_1} myObj:: {MSG_CAST_2} fn(x);</PRE>
+<P>
+ Now we pass to MSG_B like MSG_CAST_2, but return like MSG_B:</P>
+<PRE> c = @call myObj:: {MSG_CAST_2} MSG_B(swapInt);</PRE>
+
+
+<H2 CLASS="HeadingC">
+Classed Events and <A NAME="40477">
+ </A>
+Travel Options</H2>
+<PRE>MSG_META_SEND_CLASSED_EVENT, TravelOption</PRE>
+<P>
+<A NAME="IX_MSG_META_SEND_CLASSED_EVENT">
+ </A>
+<A NAME="IX_TravelOption">
+ </A>
+<A NAME="IX_GenTravelOption">
+ </A>
+<A NAME="IX_TO_&ldots;">
+ </A>
+You do not always need to specifically include an object as a destination for your message. In many cases, you may be able to generically address your message using a <EM>
+classed event</EM>
+. A classed event consists of a pre-defined <CODE>
+TravelOption</CODE>
+ enumerated type and an EventHandle recorded using the @record Goc construct. The event in this case does not contain a specific object, but rather an object class. </P>
+<P>
+The <CODE>
+TravelOption</CODE>
+ acts as a navigator, determining along what path the message should be delivered. The object class within the classed event acts as a filter, determining if the object sent the message is an object of that class. If the object first encountered along the path dictated by the <CODE>
+TravelOption</CODE>
+ is not a matching class, the classed event is passed to the next object on that path. When the class finally matches, the message will be handled by that object.</P>
+<P>
+The classed event is originally dispathed from the object by sending MSG_META_SEND_CLASSED_EVENT. This message is usually sent by an object to itself. The travel options available depend on the class(es) of the object receiving the message. That is, the object receiving the message must be a sub-class of one of the following:</P>
+<UL>
+<LI>
+<CODE>
+MetaClass</CODE>
+ (Usable by all GEOS object classes)</LI>
+</UL>
+<DL>
+<DT>
+TO_NULL</DT><DD>Indicates that no object is to receive the message. The default case in this case is to destroy the classed event that is dispatched,</DD>
+<DT>
+TO_SELF</DT><DD>Indicates that the message should be delivered to itself. If it is not handled there, it will be destroyed. </DD>
+<DT>
+TO_OBJ_BLOCK_OUTPUT</DT><DD>
+Each GEOS object block contains a default output stored in the object block header.This <CODE>
+TravelOption</CODE>
+ indicates that the message should be delivered to the object block's output optr.</DD>
+<DT>
+TO_PROCESS</DT><DD>Indicates that the message should be delivered to the application's <CODE>
+ProcessClass</CODE>
+ object. </DD>
+<UL>
+<LI>
+<CODE>
+GenClass</CODE>
+ (Usable by all generic objects)<BR>
+For a discussion of the Focus, Target and Model hierarchies, see <A HREF="../../SysObjects/Input/Input_11.htm#95885">the Input chapter</A>.</LI></UL>
+<DT>
+TO_GEN_PARENT</DT><DD>
+Indicates that the message should be delivered the object's generic parent.</DD>
+<DT>
+TO_FOCUS</DT><DD>Indicates that the message should be delivered along the object's focus hierarchy, following the focus links from child to child.</DD>
+<DT>
+TO_TARGET</DT><DD>Indicates that the message should be delivered along the object's target hierarchy, following the target links from child to child.</DD>
+<DT>
+TO_MODEL</DT><DD>Indicates that the message should be delivered along the object's model hierarchy, following the model links from child to child.</DD>
+<DT>
+TO_APP_FOCUS</DT><DD>
+	Indicates that the message should be delivered along the focus hierarchy, starting at the root GenApplication object and following the focus links from child to child.</DD>
+<DT>
+TO_APP_TARGET</DT><DD>
+	Indicates that the message should be delivered along the target hierarchy, starting at the root GenApplication object and following the target links from child to child.</DD>
+<DT>
+TO_APP_MODEL</DT><DD>
+	Indicates that the message should be delivered along the model hierarchy, starting at the root GenApplication object and following the model links from child to child.</DD>
+<DT>
+TO_SYS_FOCUS</DT><DD>
+	Indicates that the message should be delivered along the focus hierarchy, starting at the root GenSystem object and following the focus links from child to child.</DD>
+<DT>
+TO_SYS_TARGET</DT><DD>
+	Indicates that the message should be delivered along the target hierarchy, starting at the root GenSystem object and following the target links from child to child.</DD>
+<DT>
+TO_SYS_MODEL</DT><DD>
+	Indicates that the message should be delivered along the model hierarchy, starting at the root GenSystem object and following the model links from child to child.</DD>
+<UL>
+<LI>
+<CODE>
+VisClass</CODE>
+ (Usable by all visible objects)</LI>
+</UL>
+<DT>
+TO_VIS_PARENT</DT><DD>
+Indicates that the message should be delivered to the object's visible parent.</DD>
+<UL>
+<LI>
+<CODE>
+GenApplicationClass</CODE>
+ (Usable by all Application objects)</LI>
+</UL>
+<DT>
+TO_PRINT_CONTROL</DT><DD>
+Indicates that the object should be delivered to the application object's print control object.</DD>
+</DL>
+<P>
+To send a classed event, you must first record the event, specifying the message to send and the object class to handle the message. Then you must send MSG_META_SEND_CLASSED_EVENT--usually to yourself-- passing that handle and a <CODE>
+TravelOption</CODE>
+.</P>
+<PRE>&lt;event&gt; = @record &lt;objClass&gt;::&lt;msg&gt;</PRE>
+<PRE>@send self::MSG_META_SEND_CLASSED_EVENT(&lt;event&gt;, 
+						&lt;TravelOption&gt;);</PRE>
+<P CLASS="figTitle">
+Code Display 5-18 Sending a Classed Event</P>
+<PRE>/*
+ * First record the Classed event. In this case, we want an object of class 
+ * `MyFooClass' to handle MSG_FOO. We will send this classed event along the  
+ * target hierarchy. We want to begin the path at the application object, so we 
+ * will use the TO_APP_TARGET TravelOption.
+ */</PRE>
+<PRE>event = @record MyFooClass::MSG_FOO;</PRE>
+<PRE>/*
+ * Then dispatch the classed event using MSG_META_SEND_CLASSED_EVENT.
+ */</PRE>
+<PRE>@send self::MSG_META_SEND_CLASSED_EVENT(event, TO_APP_TARGET);</PRE>
+
+
+<H2 CLASS="HeadingC">
+Message Shortcuts</H2>
+<P>
+All messages, when received, contain three basic parameters: the message number (<CODE>
+message</CODE>
+), the optr of the recipient (<CODE>
+oself</CODE>
+), and a far pointer to the recipient's locked instance chunk (<CODE>
+pself</CODE>
+). This allows several shortcuts and shorthand formats for use within methods:</P>
+<PRE>@callsuper;</PRE>
+<P>
+When used in a method as above, the <CODE>
+@callsuper</CODE>
+ keyword passes the received message up to the object's superclass. Use this whenever subclassing a message when the default functionality must be preserved.</P>
+<PRE><A NAME="IX_self (messaging shortcut)"> </A>&lt;ret&gt; = @call self::&lt;msg&gt;(&lt;params&gt;*);</PRE>
+<P>
+Any object can send a message to itself using <CODE>
+@call</CODE>
+ and &quot;self&quot; as the destination. The remainder of the command is the same as a normal <CODE>
+@call</CODE>
+.</P>
+<PRE><A NAME="IX_process (messaging shortcut)"> </A>&lt;ret&gt; = @call process::&lt;msg&gt;(&lt;params&gt;*);</PRE>
+<P>
+Any object can send a message to its Process object with <CODE>
+@call</CODE>
+ and &quot;process&quot; as the destination. (The Process object is the object of class <CODE>
+ProcessClass</CODE>
+.) The remainder of the command is the same as a normal <CODE>
+@call</CODE>
+.</P>
+<PRE><A NAME="IX_application (messaging shortcut)"> </A>&lt;ret&gt; = @call application::&lt;msg&gt;(&lt;params&gt;*);</PRE>
+<P>
+Any object can send a message to its Application object (of class <CODE>
+GenApplicationClass</CODE>
+) with <CODE>
+@call</CODE>
+ and &quot;application&quot; as the destination. The remainder of the command is the same as a normal <CODE>
+@call</CODE>
+.</P>
+<PRE><A NAME="IX_@visParent (messaging shortcut)[;visParent (messaging shortcut)]"> </A>&lt;ret&gt; = @call @visParent::&lt;msg&gt;(&lt;params&gt;*);</PRE>
+<P>
+Any object in a visible tree can use <CODE>
+@visParent</CODE>
+ as the destination of an <CODE>
+@call</CODE>
+ command. The message will be sent to the object's parent in the visible object tree. The remainder of the command is the same as a normal <CODE>
+@call</CODE>
+.</P>
+<PRE><A NAME="IX_@genParent (messaging shortcut)[;genParent (messaging shortcut)]"> </A>&lt;ret&gt; = @call @genParent::&lt;msg&gt;(&lt;params&gt;*);</PRE>
+<P>
+Any object in a generic tree can use <CODE>
+@genParent</CODE>
+ as the destination of an <CODE>
+@call</CODE>
+ command. The message will be sent to the object's parent in the generic object tree. The remainder of the command is the same as a normal <CODE>
+@call</CODE>
+.</P>
+<PRE><A NAME="IX_@visChildren (messaging shortcut)[;visChildren (messaging shortcut)]"> </A>@send @visChildren::&lt;msg&gt;(&lt;params&gt;*);</PRE>
+<P>
+Any composite object in a visible object tree (therefore a subclass of <CODE>
+VisCompClass</CODE>
+) can send a message that will be dispatched at once to all of its children. Any message sent with <CODE>
+@visChildren</CODE>
+ as the destination must be dispatched with the <CODE>
+@send</CODE>
+ keyword and therefore can have no return value.</P>
+<PRE><A NAME="IX_@genChildren (messaging shortcut)[;genChildren (messaging shortcut)]"> </A>@send @genChildren::&lt;msg&gt;(&lt;params&gt;*);</PRE>
+<P>
+Any composite object in a generic object tree (therefore a subclass of <CODE>
+GenClass</CODE>
+) can send a message that will be dispatched at once to all of its children. Any message sent with <CODE>
+@genChildren</CODE>
+ as the destination must be dispatched with the <CODE>
+@send</CODE>
+ keyword and therefore can have no return value.</P>
+<P>
+<A NAME="IX_@:Goc object pointer shortcut">
+ </A>
+In addition to the above shortcuts, you may also pass the optr of an object using <CODE>
+@&lt;obj&gt;</CODE>
+, where <CODE>
+&lt;obj&gt;</CODE>
+ represents the name of the object. This syntax gets translated by Goc into <CODE>
+(optr)&amp;&lt;obj&gt;</CODE>
+; this is similar to using the ampersand (&amp;) to pass a pointer.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GOCLanguage_f.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GOCLanguage_13.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.4 Declaring Objects</A> 
+<!-- to next --> | <A HREF="GOCLanguage_15.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.6 Managing Objects</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

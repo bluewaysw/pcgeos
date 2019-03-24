@@ -1,0 +1,127 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Input_a.htm,v 1.2 97/09/05 14:05:56 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Setting the Pointer Image</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Input</A>: 2.4 <A HREF="Input_6.htm">Mouse Input</A>: 
+<A NAME="38997">
+ </A>
+Setting the Pointer Image</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Input_6.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Input_9.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2.3 Large Mouse Events</A> 
+<!-- to next --> | <A HREF="Input_b.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">3 Keyboard Input</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+<A NAME="IX_Bitmaps:mouse pointer image">
+ </A>
+<A NAME="IX_Mouse:pointer image">
+ </A>
+The GEOS User Interface uses several default settings for the mouse pointer, all defined by the Specific UI. </P>
+<P>
+Some applications will want to modify the mouse pointer's image in order to provide certain feedback to the user. For example, a chess game may set the pointer to an image of the piece being moved and then reset it to an arrow after the move is completed; a graphics application could set the pointer to an image of whatever tool is currently in use. Another time an application may change the mouse pointer is when a quick-transfer is in progress.</P>
+
+<H2 CLASS="HeadingC">
+Defining the Pointer Image</H2>
+<P>
+The pointer is defined as a bitmap 16 pixels on each side.<A NAME="IX_Hot spot (mouse pointer)">
+ </A>
+ It has a &quot;hot spot&quot; of five pixels that acts as the active point of the image. When the user clicks, the area affected is the hot spot, not the entire image. </P>
+<P>
+<A NAME="IX_PointerDef">
+ </A>
+The pointer is stored in a <CODE>
+PointerDef16</CODE>
+ structure. This structure defines the image bitmap, the horizontal and vertical offsets to the hot spot, and the definition of how the image should mix with the background. This definition is known as the pointer's mask.</P>
+<P>
+The definition of <CODE>
+PointerDef16</CODE>
+ is given below. When setting the pointer image, you will typically pass an optr (a combination handle and chunk handle) to a <CODE>
+PointerDef16</CODE>
+ structure; the structure can be set up in a sharable chunk beforehand, or it can be set in a local or global variable. Typically, you will set the entire pointer image in a resource chunk and compile it into your geode; this is much easier and faster to use than building it at run-time.</P>
+<PRE>typedef struct {
+	byte	   PD_width;
+	byte	   PD_height;
+	sbyte	   PD_hotX;
+	sbyte	   PD_hotY;
+	byte	   PD_mask[STANDARD_CURSOR_IMAGE_SIZE];
+	byte	   PD_image[STANDARD_CURSOR_IMAGE_SIZE];
+} PointerDef16;</PRE>
+<P>
+The <CODE>
+PD_hotX</CODE>
+ field defines the horizontal offset from the upper-left corner of the image to the center of the hot spot. Similarly, <CODE>
+PD_hotY</CODE>
+ defines the vertical offset from the upper-left corner to the hot spot. Both are in pixels and must be less than 16 (since the image is only 16 pixels in each dimension).</P>
+<P>
+<A NAME="IX_Inverse drawing:mouse pointer image">
+ </A>
+The <CODE>
+PD_mask</CODE>
+ field contains the 16 by 16 bitmap of the mask, while <CODE>
+PD_image</CODE>
+ holds the bitmap of the image. Both are stored as 32-byte arrays, two bytes per row. For example, if the first line of the image was all black and the second all white, the first four bytes of <CODE>
+PD_image</CODE>
+ would be 0xFF, 0xFF, 0x00, and 0x00.
+<IMG SRC="Input_a_mask.gif">
+
+</P>
+<P>
+Note that the block the pointer chunk is stored in must be declared sharable.
+<IMG SRC="Input_a_maskBits.gif">
+
+</P>
+
+
+<H2 CLASS="HeadingC">
+Setting the Pointer Image</H2>
+<P>
+You can set the pointer's image in three ways. First, you can send a message to the GenView to set the pointer image whenever the pointer is over the view's window (see <A HREF="../../UI/GenView/index.htm">the GenView chapter</A>). Second, you can set the pointer to a default image type during a quick-transfer operation (see <A HREF="../../SysObjects/Clipboard/index.htm">the Clipboard chapter</A>). Third, you can set the pointer image after handling a mouse event. Only the third option is discussed here.</P><P>
+An object may wish to set the pointer image while it is selected, while the pointer is over its bounds, or in any number of other situations. For example, a chess piece currently being moved may set the pointer's image to the shape of the piece so the user knows exactly what type of piece is being moved.</P>
+<P>
+Every mouse event you handle must return a <CODE>
+MouseReturnParams</CODE>
+ structure, defined in <A HREF="Input_7.htm#59095"> Return Values for Mouse Events</A>
+. Make sure to return the following to set the pointer image:</P>
+<UL>
+<LI>
+MRF_SET_POINTER_IMAGE in <CODE>
+flags<BR>
+</CODE>
+When the UI sees this flag in the returned structure, it looks for the address of a pointer definition in the <CODE>
+ptrImage</CODE>
+ field. If you do not return this flag, the UI will not try to set the pointer.</LI>
+<LI>
+The optr of the pointer image in <CODE>
+ptrImage<BR>
+</CODE>
+This field gives the handle and chunk handle of the <CODE>
+PointerDef</CODE>
+ structure that defines the pointer image to be set. The structure must be in a sharable block; most likely you will have it set in a geode resource.</LI>
+</UL>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Input_6.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Input_9.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2.3 Large Mouse Events</A> 
+<!-- to next --> | <A HREF="Input_b.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">3 Keyboard Input</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

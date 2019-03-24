@@ -1,0 +1,110 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Geodes_3.htm,v 1.1 97/06/02 15:29:17 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Launching an Application</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Applications and Geodes</A>: 1.2 <A HREF="Geodes_1.htm">Geodes</A>: 
+Launching an Application</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Geodes_1.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Geodes_2.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1.1 Geode Components and Structures</A> 
+<!-- to next --> | <A HREF="Geodes_4.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">1.3 Shutting Down an Application</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>GeodeLoad(), UserLoadApplication(), MSG_GEN_PROCESS_OPEN_APPLICATION</PRE>
+<P>
+<A NAME="IX_Applications:launching">
+ </A>
+An application is a geode with its GA_APPLICATION attribute set. This type of geode may be launched by the user through GeoManager or some other means provided by the system or another application. For the most part, the system will invoke and carry out the launch; your responsibilities are limited.</P>
+<P>
+An application may be loaded in essentially two ways: It may be launched, or it may be reloaded from a state file. In both cases, the kernel will load the proper resources and build out the UI properly according to the application.</P>
+<P>
+Most of the procedure of launching is handled within <CODE>
+GenProcessClass</CODE>
+, a subclass of <CODE>
+ProcessClass</CODE>
+. An application should define its own subclass of <CODE>
+GenProcessClass</CODE>
+ for its Process objects (event-driven threads not acting as Process objects should be subclassed from <CODE>
+ProcessClass</CODE>
+, not <CODE>
+GenProcessClass</CODE>
+). The launch procedure may be invoked by any thread and by any geode in either of the following ways:</P>
+<UL>
+<LI>
+<CODE>
+GeodeLoad()<BR>
+</CODE>
+<A NAME="IX_GeodeLoad()">
+ </A>
+This loads a geode from a given file and begins executing it based on the geode's type. <CODE>
+GeodeLoad()</CODE>
+ takes the name of the geode's file as well as a priority to set for the new geode's process thread, if it has one. <CODE>
+GeodeLoad()</CODE>
+ first creates the process thread of the application, then sends this thread a message. The process thread (a subclass of <CODE>
+GenProcessClass</CODE>
+) then creates a UI thread for the application.</LI>
+<LI>
+<CODE>
+UserLoadApplication()<BR>
+</CODE>
+<A NAME="IX_UserLoadApplication()">
+ </A>
+Used by most application launchers, this routine loads an application. (C programmers will generally use <CODE>
+MSG_GEN_PROCESS_OPEN_APPLICATION</CODE>
+<A NAME="IX_MSG_GEN_PROCESS_OPEN_APPLICATION">
+ </A>
+ instead.) This routine takes some additional parameters and can load a geode either in engine mode or from a state file as well as in the normal open mode (see below). The base functionality of opening and loading the geode is implemented in this routine by a call to <CODE>
+GeodeLoad()</CODE>
+. Note, however, that this routine may only open application geodes--geodes with the GA_APPLICATION attribute set.</LI>
+</UL>
+<P>
+Geodes may be launched in three modes:</P>
+<UL>
+<LI>
+<EM>
+Application</EM>
+ mode launches the geode, loads all its active resources, builds its UI gadgetry, and sets it usable. The geode must be an application--that is, it must have its GA_APPLICATION attribute set.</LI>
+<LI>
+<EM>
+Engine</EM>
+ mode launches the geode but leaves its UI objects unusable (it never brings them on-screen). Engine mode is useful if you need to launch an application to grab information from it. GeoManager uses engine mode to launch an application, extract its icon, and put the icon in the token database. For efficiency, the application is never set usable, so its UI is never built.</LI>
+<LI>
+<EM>
+Restore</EM>
+ mode launches the geode from a saved state file, loading in resources and merging them with the default resources. This mode is invoked automatically by the UI if it is restoring the system or the geode from saved state. This mode is handled automatically by <CODE>
+GenProcessClass</CODE>
+ (your Process object).</LI>
+</UL>
+<P>
+It is possible, however, for one application to launch another in a custom mode. If this is done, the application being launched is responsible for implementing the special mode.</P>
+<P>
+When the launch process has been initiated with the above routines, a thread is created for the application and its Process object is loaded immediately. Also loaded is the application's GenApplication object. The Application and Process objects interact with the User Interface to load the objects on the application's active list and set them all usable, bringing them up on-screen.</P>
+<P>
+Near the end of this procedure, just before the GenApplication is set usable, the Process object will receive a message based on the mode of launch. If the application must set up any special notification (such as for the quick-transfer mechanism) or must restore special state file data, it should intercept this message. Typically the message received will be <CODE>
+MSG_GEN_PROCESS_OPEN_APPLICATION</CODE>
+--two others are received (when restoring from state and when opening in engine mode), but they should not be intercepted.</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Geodes_1.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Geodes_2.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1.1 Geode Components and Structures</A> 
+<!-- to next --> | <A HREF="Geodes_4.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">1.3 Shutting Down an Application</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

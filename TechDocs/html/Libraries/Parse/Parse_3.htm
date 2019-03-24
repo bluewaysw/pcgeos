@@ -1,0 +1,224 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Parse_3.htm,v 1.1 97/06/02 15:42:42 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> The Parser</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Parse Library</A>: 1.2 <A HREF="Parse_1.htm">Parse Library Behavior</A>: 
+The Parser</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Parse_1.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Parse_2.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1.1 The Scanner</A> 
+<!-- to next --> | <A HREF="Parse_4.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">1.3 Evaluator</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+Applications will never call the scanner directly. Instead, if they access the parse library directly (instead of through the spreadsheet objects), they will call the parser and pass it a string, and the parser will in turn call the scanner to process the string into tokens. This section will not discuss how to call the parser, since few applications will need to do that; it will instead describe the general workings of the parser.</P>
+<P>
+The parser translates a well-formed string into a sequence of tokens. It calls the scanner to read tokens from the string. It then uses a context-free grammar to make sure the string is well formed. The context-free grammar is described below. The scanner outputs a sequence of parser tokens. The parser tokens are almost identical to the scanner tokens, with a few exceptions; those exceptions are noted below.</P>
+<P>
+The parser is passed a callback routine. The parser calls this routine when it needs information about a token; for example, if it encounters a function it does not recognize, it calls the callback to get a pointer to the function. The details of this are provided in the advanced section.</P>
+<P>
+If the parser is not passed a well-formed expression, or if it is unable to successfully parse the string for some other reason, it returns an error code. The error codes are described at length in the advanced section.</P>
+
+<H2 CLASS="HeadingC">
+The Parser's Grammar</H2>
+<P>
+The parser uses a context-free grammar to make sure the string is well-formed. The grammar is listed below. The basic units of the grammar are listed in ALL-CAPS; higher-level units are listed in <EM>
+italics</EM>
+. The string must parse to a well-formed <EM>
+expression</EM>
+.</P>
+<DL>
+<DT>
+<EM>
+expression</EM>
+:</DT><DD>'(' <EM>
+expression </EM>
+')<EM>
+'<BR>
+</EM>
+NEG_OP <EM>
+expression<BR>
+</EM>
+IDENTIFIER '(' <EM>
+function_args</EM>
+ ')'<BR>
+<EM>
+base_item more_expression</EM>
+</DD>
+<DT>
+<EM>
+more_expression</EM>
+:</DT><DD>
+&lt;empty&gt;<BR>
+PERCENT_OP <EM>
+more_expression<BR>
+</EM>
+BINARY_OP <EM>
+expression</EM>
+</DD>
+<DT>
+<EM>
+function_args</EM>
+:</DT><DD>
+&lt;empty&gt;<BR>
+<EM>
+arg_list</EM>
+</DD>
+<DT>
+<EM>
+arg_list</EM>
+:</DT><DD><EM>
+expression<BR>
+expression</EM>
+ ',' <EM>
+arg_list</EM>
+</DD>
+<DT>
+<EM>
+base_item</EM>
+:	NUMBER</DT><DD>
+STRING<BR>
+CELL_REF<BR>
+IDENTIFIER</DD>
+
+
+</DL>
+<H2 CLASS="HeadingC">
+<A NAME="82255">
+ </A>
+Parser Tokens</H2>
+<P>
+The parser does not return scanner tokens; instead, it returns a sequence of parser tokens. The parser tokens are almost directly analogous to the scanner tokens. However, a few additional token types are added. </P>
+<P>
+<A NAME="IX_PARSER_TOKEN_&ldots;">
+ </A>
+The parser tokens have the same structure as the scanner tokens. The first field is a constant specifying what type of token this is. The second field contains specific information about the token; this field may be blank. The parser has the following types of tokens:</P>
+<DL>
+<DT>
+PARSER_TOKEN_NUMBER</DT><DD>
+This is the same as the scanner NUMBER token.</DD>
+<DT>
+PARSER_TOKEN_STRING</DT><DD>
+This is the same as the scanner STRING token.</DD>
+<DT>
+PARSER_TOKEN_CELL</DT><DD>
+This is the same as the scanner CELL token.</DD>
+<DT>
+PARSER_TOKEN_END_OF_EXPRESSION</DT><DD>
+This is the same as the scanner END_OF_EXPRESSION token.</DD>
+<DT>
+PARSER_TOKEN_OPEN_PAREN</DT><DD>
+This usually replaces the scanner OPEN_PAREN token. However, it is not used if the parenthesis is delimiting function arguments; it is only used if the parenthesis is changing the order of evaluation.</DD>
+<DT>
+PARSER_TOKEN_CLOSE_PAREN</DT><DD>
+This usually replaces the scanner CLOSE_PAREN token. However, it is not used if the parenthesis is delimiting function arguments; it is only used if the parenthesis is changing the order of evaluation.</DD>
+<DT>
+PARSER_TOKEN_NAME</DT><DD>
+This replaces some occurrences of the scanner IDENTIFIER token; specifically, those where the identifier is not a function name. The data portion is the number for that name.</DD>
+<DT>
+PARSER_TOKEN_FUNCTION</DT><DD>
+This replaces some occurrences of the scanner IDENTIFIER token, specifically those in which the identifier is a function name. The data portion is the function ID number.</DD>
+<DT>
+PARSER_TOKEN_CLOSE_FUNCTION</DT><DD>
+This replaces some occurrences of the scanner CLOSE_PAREN token; specifically, those where the closing parenthesis delimits function arguments.</DD>
+<DT>
+PARSER_TOKEN_ARG_END</DT><DD>
+The parser inserts this token after every argument to a function call; thus, it replaces occurrences of SCANNER_TOKEN_LIST_SEPARATOR, and also occurs after the last argument to a function.</DD>
+<DT>
+PARSER_TOKEN_OPERATOR</DT><DD>
+This is the same as the parser's OPERATOR token. The data section is an operator constant, as described above in <A HREF="Parse_2.htm#84664"> Operators</A>
+. Note the parser replaces occurrences of OP_PERCENT_MODULO with either OP_PERCENT or OP_MODULO, as appropriate; similarly, it replaces OP_SUBTRACTION_NEGATION with either OP_SUBTRACTION or OP_NEGATION.<A NAME="marker=441851">
+ </A>
+</DD>
+</DL>
+<P>
+When the parser encounters an identifier that is in the appropriate place for a function name (that is, an identifier followed by a parenthesized argument list), it does not write an identifier token. Instead, it writes a &quot;function&quot; token, which has a one-word data section. This section is the function ID (described in <A HREF="Parse_6.htm#17673"> Parser Functions</A>
+). If the function's name is not one of a built-in function, it will call the application's callback routine to find out what the function's ID number is; the evaluator will pass this ID when it needs to have the function called.</P>
+<P>
+When the parser encounters an identifier, it asks its caller for an ID number for the identifier. It can then store the ID number instead of the entire string. The evaluator will use this ID number when requesting the value of the identifier. The formatter will use the ID number when requesting the original identifier string associated with the ID number.</P>
+<P>
+When the parser encounters a scanner parenthesis token, it does not necessarily translate it into a parser parenthesis token. This is because parentheses fulfill two separate roles: they specify the order of evaluation, and they delimit function arguments. When the parser encounters parenthesis tokens which specify order of evaluation, it translates them into parser parenthesis tokens. If, however, it encounters argument-delimiting parentheses, it does not need to translate them literally; after all, the presence of a function token implies that it will be followed by an argument list. Thus, the parser does not need to copy the parenthesis tokens. Instead, it copies the tokens of the argument list. When it reaches a list separator, it replaces that with an &quot;end-of-argument&quot; token; when it reaches the closing parenthesis for the function call, it replaces that with a &quot;close-function&quot; token.</P>
+
+
+<H2 CLASS="HeadingC">
+An Example of Scanning and Parsing</H2>
+<P>
+Suppose that you call the parser on the text string &quot;3 + SUM(6.5, 3 ^ (4 - 1), C5...F9)&quot;. The parser will evaluate the string, one token at a time. When it needs to process a token, it will call the scanner to return the next token in the string. It will then replace these tokens with parser tokens, and write out the sequence of tokens to its output buffer.</P>
+<P>
+For simplicity, this example treats the scanner as if it scanned the entire text stream at once, and returned the entire sequence of tokens to the scanner. In this case, the scanner would translate the text into the following sequence of tokens:</P>
+<PRE>Token		Data			Comment</PRE>
+<PRE>NUMBER		3.0			All numbers are floats</PRE>
+<PRE>OPERATOR		OP_ADDITION</PRE>
+<PRE>IDENTIFIER		&quot;SUM&quot;</PRE>
+<PRE>OPEN_PAREN					delimits function args</PRE>
+<PRE>NUMBER		6.5</PRE>
+<PRE>LIST_SEPARATOR</PRE>
+<PRE>NUMBER		3.0</PRE>
+<PRE>OPERATOR		OP_EXPONENTIATION</PRE>
+<PRE>OPEN_PAREN</PRE>
+<PRE>NUMBER		4.0</PRE>
+<PRE>OPERATOR		OP_SUBTRACTION_NEGATION
+					Parser figures out
+					which operator this is</PRE>
+<PRE>NUMBER		1.0</PRE>
+<PRE>CLOSE_PAREN</PRE>
+<PRE>LIST_SEPARATOR</PRE>
+<PRE>CELL		C5			Actually stored as
+		 			&quot;4,2&quot;; row index 4,
+					column index 2</PRE>
+<PRE>OPERATOR		OP_RANGE_SEPARATOR</PRE>
+<PRE>CELL		F9</PRE>
+<PRE>CLOSE_PAREN</PRE>
+<PRE>END_OF_EXPRESSION</PRE>
+<P>
+The parser reads these tokens, one at a time, and writes out an analogous sequence of parser tokens:</P>
+<PRE>Token		Data			Comment</PRE>
+<PRE>NUMBER		3.0			All numbers are floats</PRE>
+<PRE>OPERATOR		OP_ADDITION</PRE>
+<PRE>FUNCTION		FUNCTION_ID_SUM</PRE>
+<PRE>NUMBER		6.5</PRE>
+<PRE>END_OF_ARG</PRE>
+<PRE>NUMBER		3.0</PRE>
+<PRE>OPERATOR		OP_EXPONENTIATION</PRE>
+<PRE>OPEN_PAREN</PRE>
+<PRE>NUMBER		4.0</PRE>
+<PRE>OPERATOR		OP_SUBTRACTION</PRE>
+<PRE>NUMBER		1.0</PRE>
+<PRE>CLOSE_PAREN</PRE>
+<PRE>END_OF_ARG</PRE>
+<PRE>CELL		C5			Actually stored as
+		 			&quot;4,2&quot;; row index 4,
+					column index 2</PRE>
+<PRE>OPERATOR		OP_RANGE_SEPARATOR</PRE>
+<PRE>CELL		F9</PRE>
+<PRE>END_OF_ARG</PRE>
+<PRE>CLOSE_FUNCTION</PRE>
+<PRE>END_OF_EXPRESSION</PRE>
+<P>
+The application does not need to save the original text string. Instead, it can save the buffer containing the parser tokens, and use the formatter to translate the token sequence back into a character string.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Parse_1.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Parse_2.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1.1 The Scanner</A> 
+<!-- to next --> | <A HREF="Parse_4.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">1.3 Evaluator</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

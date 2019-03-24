@@ -1,0 +1,349 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Controllers_8.htm,v 1.2 97/09/05 13:57:12 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Using Tools</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Generic UI Controllers</A>: 3.2 <A HREF="Controllers_6.htm">Using Controllers</A>: 
+<A NAME="21343">
+ </A>
+Using Tools</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Controllers_6.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Controllers_7.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.1 Using a Basic GenControl Object</A> 
+<!-- to next --> | <A HREF="Controllers_9.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">4 Creating Your Own Controllers</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>HINT_GEN_CONTROL_TOOLBOX_ONLY, ATTR_GEN_CONTROL_REQUIRE_TOOLBOX_UI, ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI, ATTR_GEN_CONTROL_APP_TOOLBOX_UI</PRE>
+<P>
+A<A NAME="IX_tools">
+ </A>
+s stated earlier, any GenControl object can be manifested either as menus and menu items or as a set of tools. In fact, the controller can potentially have both its menu and its tools usable at once. Creating and using a toolbox or tool bar is a bit more complex than simply including the controller, however.</P>
+<P>
+You can add the use of tool bars and tool boxes to your application in two ways: First, you can simply add a GenToolControl object and associated GenToolGroups and let them do all the work for you. Second, you can interact directly with the controller object(s) to put up, take down, and otherwise manage the tools. In nearly all cases, the first is preferable.</P>
+<P>
+This section focuses on the use of a GenToolControl and GenToolGroup objects to manage and place your tools and toolboxes. If you want to manage tools without using a GenToolControl, you will have to know more about <CODE>
+GenControlClass</CODE>
+; see <A HREF="Controllers_9.htm#72863"> Creating Your Own Controllers</A>
+ for complete details.</P>
+
+<H2 CLASS="HeadingC">
+Components of Tool Management</H2>
+<P>
+Tools are most often represented by specific buttons or popup lists presented in various toolbars for easy use. They are functionally redundant to the menu features represented by the normal features of the controller, but the tools and menus can both be visible and usable at the same time.</P>
+<P>
+To provide and manage tools, you need to understand the following components:</P>
+<UL>
+<LI>
+Controller<BR>
+The controller is the same GenControl subclass object discussed and shown in the previous sections. You can set minimum and maximum tool sets just like setting minimum and maximum feature set.</LI>
+<LI>
+Tool Group<BR>
+Each controller object should have exactly one corresponding GenToolGroup object. The GenToolGroup manages the controller's tools and is, in turn, managed by the GenToolControl object (below).</LI>
+<LI>
+Tool Controller<BR>
+You should have exactly one GenToolControl object; this object is a controller that allows the user to turn on and off individual tools and entire tool sets. It also controls placement of each tool group--which tool bar the tool group appears in.</LI>
+<LI>
+Tool Bars and Tool Boxes<BR>
+You can have any number of tool bars and floating tool boxes. A tool bar or tool box is simply a GenInteraction set up properly and accessible by the user. Examples of tool bars are given in the next sections.</LI>
+<LI>
+Data Tables<BR>
+Because the GenToolControl needs to describe both the tool bars and the tool groups to the user, you must set up special data chunks containing tables of names for each tool bar and tool group you use.</LI>
+</UL>
+
+
+<H2 CLASS="HeadingC">
+Using a Basic Tool Box</H2>
+<P>
+<A NAME="IX_tool boxes">
+ </A>
+The most basic tool configuration includes a floating tool box in which the controllers' tools appear. To use a tool box, you only need to define a toolbox GenInteraction, add a GenToolControl object, and put them both in a menu. Typically, this will be an &quot;Options&quot; menu.
+<IMG SRC="Controllers_8_floatingBox.gif">
+
+</P>
+<P>
+<A HREF="Controllers_8.htm#53499"> Providing a Basic Tool Box</A>
+ shows the configuration required for providing a basic tool box as well as the controller's default menu. (You could prohibit the appearance of the menu by setting <CODE>
+ATTR_GEN_CONTROL_TOOLBOX_ONLY</CODE>
+ in the controller's instance data.) This example provides all the tools by setting the application's UI level in the GenApplication object. All the tools will then appear in the toolbox and its associated popups as shown in the figure above.</P>
+
+<H3 CLASS="HeadingD">
+Setting Up the Tool Box</H3>
+<P>
+The tool box must be a GenInteraction object; for a floating tool box (as opposed to a tool bar), set it to be a dialog box (GIV_DIALOG). It should also have a moniker and <CODE>
+HINT_TOOLBOX</CODE>
+. The tool box must also be given a name. This name is used by the GenToolControl to identify the tool box. The name is set in a separate chunk and is a simple character string.</P>
+<P>
+At startup, the GenToolGroup for the point size controller is set as a child of the floating tool box. The GenToolControl will move the GenToolGroup to other toolbars if possible; the tools must be set somewhere at startup, though, and the tool box is the logical starting point.</P>
+
+
+<H3 CLASS="HeadingD">
+Setting Up the Tool Controller</H3>
+<P>
+<A NAME="IX_GenToolControlClass:usage">
+ </A>
+The GenToolControl object will be of <CODE>
+GenToolControlClass</CODE>
+, as shown. It must at least have the <CODE>
+GTCI_toolboxList</CODE>
+ field set to the chunk handle of a table of tool locations. In this example, the only location available to tools is in the floating tool box; other locations may be specified as detailed in <A HREF="Controllers_8.htm#18765"> Tool Placement</A>
+ below.</P>
+<P>
+<A NAME="IX_TI_&ldots;  (ToolboxInfo)">
+ </A>
+<A NAME="IX_ToolboxInfo">
+ </A>
+The table must appear in its own chunk in the same resource block as the GenToolControl object. It is an array of <CODE>
+ToolboxInfo</CODE>
+ structures, each of which contains two optrs. The first is the optr of a tool location (typically a GenInteraction that may contain tools), and the second is the optr of the associated name. The structure of <CODE>
+ToolboxInfo</CODE>
+ is shown below:</P>
+<PRE>typedef struct {
+	optr	TI_object;		/* A GenInteraction that
+				 * can contain tools */
+	optr	TI_name;		/* The name chunk of the
+				 * TI_object object */
+} ToolboxInfo;</PRE>
+<P>
+The table is defined as shown in <A HREF="Controllers_8.htm#53499"> Providing a Basic Tool Box</A>
+. If you had other controllers to be managed by the tool control, you would add other entries separated by commas.</P>
+<P>
+The GenToolControl also has a tool group list indicating the name of each GenToolGroup. It is set up in a similar form to the tool box table.</P>
+<P CLASS="figTitle">
+Code Display 12-4 <A NAME="53499">
+ </A>
+Providing a Basic Tool Box</P>
+<PRE>/* This code display shows the entire psctext.goc file, with changes noted. All
+ * unchanged code has had its comments stripped. For descriptions, see earlier
+ * displays in this chapter. */</PRE>
+<PRE>@include &lt;stdapp.goh&gt;
+@include &lt;ui.goh&gt;
+@include &lt;Objects/Text/tCtrlC.goh&gt;</PRE>
+<PRE>@class	PSCTextProcessClass, GenProcessClass;
+@endc</PRE>
+<PRE>@classdecl PSCTextProcessClass, neverSaved;</PRE>
+<PRE>@start	AppResource;
+@object GenApplicationClass PSCTextApp = {
+    GI_visMoniker = &quot;Point Size Control Sample Application&quot;;
+    GI_comp = @PSCTPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS) = @PSCTPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS) =
+					 @PSCTSizeControl, @PSCTToolControl;
+}</PRE>
+<PRE>@end	AppResource</PRE>
+<PRE>@start	Interface;</PRE>
+<PRE>/*	GenPrimary Object
+ * Typically, an Options menu will be set up as a child of the Primary and
+ * the tool box and tool control will be children of that menu. */</PRE>
+<PRE>@object GenPrimaryClass PSCTPrimary = {
+    GI_comp =		@PSCTSizeControl, @PSCTopTextObj, @PSCBotTextObj, @PSCTOptionsMenu;
+    HINT_SIZE_WINDOW_AS_DESIRED;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+}</PRE>
+<PRE>/*	Options Menu
+ * This menu is the parent for both the Tool Box and the tool controller. */
+@object GenInteractionClass PSCTOptMenu = {
+    GI_comp = @PSCTToolBox, @PSCTToolControl;
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_OPTIONS_MENU);
+}</PRE>
+<PRE>/*	Tool Box Location Table
+ * The Tool Box Location Table is used by the GenToolControl object
+ * to associate tool locations with their names. The table is an array
+ * of ToolboxInfo structures. Multiple entries would be separated with
+ * commas. */</PRE>
+<PRE>@chunk ToolboxInfo PSCTToolboxList[] = {
+    {@PSCTToolBox, @PSCTToolBoxName}					/* The single tool location is the
+					 * floating tool box PSCTToolBox. */
+};</PRE>
+<PRE>/*	Tool Group Information Table
+ * The Tool Group Information Table is used by the GenToolControl to associate
+ * tool groups with their names. The table is an array of ToolGroupInfo structures.
+ * Multiple entries would be separated with commas. */</PRE>
+<PRE>@chunk ToolGroupInfo PSCTToolGroupTable[] = {
+    {@PSCTPointSizeToolGroup}
+};</PRE>
+<PRE>/*	Floating Tool Box
+ * The Tool Box object is a GenInteraction dialog box. All toolboxes must
+ * have HINT_TOOLBOX and may have any additional geometry hints you
+ * deem necessary. Because every controller's GenToolGroup object must
+ * be a child of some tool bar, the PSCTPointSizeToolGroup is set at
+ * startup as a child of this floating toolbox. */</PRE>
+<PRE>@object GenInteractionClass PSCTToolBox = {
+    GI_visMoniker = `T', &quot;Tools&quot;;
+    GI_comp = @PSCTPointSizeToolGroup;
+    GII_visibility = GIV_DIALOG;
+    HINT_TOOLBOX;
+    HINT_ALLOW_CHILDREN_TO_WRAP;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+}</PRE>
+<PRE>/* The Tool Box Name must be specified for the tool control object. It
+ * must be a character string, and there must be one for each entry in
+ * the Tool Location table. */
+@chunk char PSCTToolBoxName[] = &quot;Floating Tool Box&quot;;</PRE>
+<PRE>/*	GenToolControl Object
+ * The Tool Control object must have just the GTCI_toolboxList and
+ * GTCI_toolGroupList fields set; these contain lists of tool bars and
+ * tool groups along with their names. */</PRE>
+<PRE>@object GenToolControlClass PSCTToolControl = {
+    GTCI_toolboxList = @PSCTToolboxList;
+    GTCI_toolGroupList = @PSCTToolGroupTable;
+    HINT_SAME_CATEGORY_AS_PARENT;
+}</PRE>
+<PRE>/*	PointSizeControl			*/</PRE>
+<PRE>@object PointSizeControlClass PSCTSizeControl = {
+    GI_visMoniker = `z', &quot;Sizes&quot;;
+    GII_visibility = GIV_POPUP;
+}</PRE>
+<PRE>/*	GenToolGroup Object
+ * Each controller object has exactly one GenToolGroup object for managing
+ * its tools and for management by the GenToolControl. The Tool Group has
+ * a single instance field specifying the controller for which it works. */</PRE>
+<PRE>@object GenToolGroupClass PSCTPointSizeToolGroup = {
+    GTGI_controller = @PSCTSizeControl;
+}</PRE>
+<PRE>/*	GenText Objects			*/</PRE>
+<PRE>@object GenTextClass PSCTopTextObj = {
+    GI_attrs = @default | GA_TARGETABLE;
+    HINT_DEFAULT_FOCUS;
+    HINT_DEFAULT_TARGET;
+    ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ((VTDS_12 &lt;&lt; VTDCA_SIZE_OFFSET) |
+					VTDF_URW_ROMAN);
+}</PRE>
+<PRE>@object GenTextClass PSCBotTextObj = {
+ GI_attrs = @default | GA_TARGETABLE;
+ ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR =
+ ((VTDS_12 &lt;&lt; VTDCA_SIZE_OFFSET) | VTDF_URW_ROMAN);
+}
+@end Interface</PRE>
+
+
+
+<H2 CLASS="HeadingC">
+<A NAME="18765">
+ </A>
+Tool Placement</H2>
+<P>
+Tools are movable; this means that controller tools can appear in any GenInteraction you may specify in the Tool Location Table. For example, you may want the user to be able to specify where she or he wants the tools to appear: in the floating tool box, at the top of the primary window, at the left of the display, or between the text objects. To support these locations for the tools, all you need to do is set up empty GenInteraction objects in the appropriate locations and add entries to the Tool Location Table.
+<IMG SRC="Controllers_8_multToolbars.gif">
+
+</P>
+<P>
+The setup described above requires quite a few GenInteraction objects to be added to the application's generic tree. A line drawing of the geometry with all the empty GenInteractions is given in the figure above and the new generic tree of the application is shown in the figure below. The code representing this configuration is shown in <A HREF="Controllers_8.htm#33371"> Movable Tools</A>
+--pay particular attention to the Tool Location Table and to the fact that each GenInteraction must have the hint <CODE>
+HINT_TOOLBOX</CODE>
+ set in order to receive the tools.
+<IMG SRC="Controllers_8_toolbarObjTree.gif">
+
+</P>
+<P CLASS="figTitle">
+Code Display 12-5 <A NAME="33371">
+ </A>
+Movable Tools</P>
+<PRE>/* This code display builds on <A HREF="Controllers_8.htm#53499"> Providing a Basic Tool Box</A> to show how tools
+ * may be moved around your application's window by the user. Although this is
+ * not difficult to do from scratch, it is quite involved; if you want this
+ * functionality, it is best to include a GenToolControl object.
+ * This code display only shows those objects that are additional to or altered
+ * from the previous display. */</PRE>
+<PRE>/*	GenPrimary Object
+ * Two GenInteractions are made children of the Primary for geometry purposes.
+ * The first, LeftToolBar, is actually a tool bar; the second,
+ * TextAndToolInteraction, is a grouper interaction for geometry purposes. */</PRE>
+<PRE>@object GenPrimaryClass PSCTPrimary = {
+    GI_comp = @LeftToolBar, @PSCTSizeControl, @PSCTOptMenu,
+					@TextAndToolInteraction;
+    gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS) =
+					@PSCTSizeControl, @PSCTToolControl;
+    HINT_SIZE_WINDOW_AS_DESIRED;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}</PRE>
+<PRE>/*	Tool Location Table
+ * The Tool Location Table is updated with the new tool box information. Each of
+ * the new tool boxes is given a name, and each must appear in this table. 
+ * Note that the ToolGroup Information Table does not change. */</PRE>
+<PRE>@chunk ToolboxInfo PSCTToolboxList[] = {
+	{@PSCTToolBox, @PSCTToolBoxName},
+	{@LeftToolBar, @LeftToolBarName},
+	{@TopToolBar, @TopToolBarName},
+	{@MiddleToolBar, @MiddleToolBarName}
+};</PRE>
+<PRE>/*	TextAndToolInteraction Interaction
+ * This GenInteraction is used solely as a place holder grouping object to allow
+ * the LeftToolBar object to extend the full height of the Primary window. */
+@object GenInteractionClass TextAndToolInteraction = {
+    GI_comp = @TopToolBar, @PSCTopTextObj, @MiddleToolBar, @PSCBotTextObj;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}</PRE>
+<PRE>/*	New Tool Box Interactions
+ * These GenInteraction objects are all tool boxes that appear in the Tool Location
+ * Table. None actually has tools in it on startup; the tool controller allows the
+ * user to place the tools of each active controller in any of these tool boxes. */</PRE>
+<PRE>@object GenInteractionClass LeftToolBar = {
+    HINT_TOOLBOX;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_ALLOW_CHILDREN_TO_WRAP;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+@chunk char LeftToolBarName[] = &quot;Left of Text&quot;;</PRE>
+<PRE>@object GenInteractionClass TopToolBar = {
+    HINT_TOOLBOX;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_ALLOW_CHILDREN_TO_WRAP;
+}
+@chunk char TopToolBarName[] = &quot;Above Text&quot;;</PRE>
+<PRE>@object GenInteractionClass MiddleToolBar = {
+    HINT_TOOLBOX;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_ALLOW_CHILDREN_TO_WRAP;
+}
+@chunk char MiddleToolBarName[] = &quot;In Between Text&quot;;</PRE>
+
+
+<H2 CLASS="HeadingC">
+Adding Application-Specific UI to the Tool Box</H2>
+<PRE>ATTR_GEN_CONTROL_APP_TOOLBOX_UI</PRE>
+<P>
+Occasionally an application may want to add some additional UI gadgetry to <A NAME="IX_ATTR_GEN_CONTROL_APP_TOOLBOX_UI">
+ </A>
+a set of controller tools. <CODE>
+ATTR_GEN_CONTROL_APP_TOOLBOX_UI</CODE>
+ is analogous to <CODE>
+ATTR_GEN_CONTROL_APP_UI</CODE>
+, described in <A HREF="Controllers_7.htm#28396"> Adding Application-Specific UI Gadgetry</A>
+. This attribute specifies a generic object tree that can be attached to the controller's tools as if it were part of the controller normally. For an example of <CODE>
+ATTR_GEN_CONTROL_APP_UI</CODE>
+'s use, see<A NAME="marker=1172">
+ </A>
+ <A HREF="Controllers_7.htm#28396"> Adding Application-Specific UI Gadgetry</A>
+<A NAME="marker=1170">
+ </A>
+.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Controllers_6.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Controllers_7.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.1 Using a Basic GenControl Object</A> 
+<!-- to next --> | <A HREF="Controllers_9.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">4 Creating Your Own Controllers</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

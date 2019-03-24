@@ -1,0 +1,125 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Controllers_4.htm,v 1.1 97/06/02 16:10:54 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Using Controllers</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Generic UI Controllers</A>: 1.3 <A HREF="Controllers_1.htm">Controller Features and Functions</A>: 
+<A NAME="71374">
+ </A>
+Using Controllers</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Controllers_1.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Controllers_3.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1.2 How Controllers Work</A> 
+<!-- to next --> | <A HREF="Controllers_5.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">2 Standard Controllers</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+As stated above, for an application to use a controller (or several controllers), the application programmer needs to know very little about the controller itself. <A HREF="Controllers_4.htm#70215"> A Sample Controller Application (psctext.goc)</A>
+ shows the <EM>
+entire</EM>
+ code for the PSCText sample application; note that the programmer has to add no code (just object declarations) to create two editable text objects which can have selectable and settable point sizes.</P>
+<P>
+The application programmer must do two essential things to use a controller object: First, you must include and set up the controller properly. In the example application, the PSCTSizeControl object is a menu; it could easily have been set up as GIV_DIALOG (typically, though, this particular controller is implemented as a menu). Because <CODE>
+GenControlClass</CODE>
+ is a subclass of <CODE>
+GenInteractionClass</CODE>
+, you can set up the controller exactly like any other GenInteraction.</P>
+<P>
+Second, you must set up your data objects to interact with the controller. The data objects should be written for this automatically; for example, the GenText objects automatically send the proper notification to the GCN mechanism to ensure that all appropriate controllers are notified of all changes. Note, however, that the GenText objects have to be set targetable before the controller can operate on them. Some data objects will be set up to work with their controllers automatically; others may need to have certain attributes set. The GenText objects, for example, are not by default targetable; the controller, however, sends its messages to the application's target object. If the GenTexts are not targetable, they will never gain the application's target and therefore will never react to the controller's requests.</P>
+<P>
+To use a particular controller, you should learn about how that controller's data object needs to be set up. To help you with this, <A HREF="Controllers_5.htm#53611"> Standard Controllers</A>
+ lists the various controllers included in the system and where they are documented.</P>
+<P CLASS="figTitle">
+Code Display 12-1 <A NAME="70215">
+ </A>
+A S<A NAME="IX_PSCText Sample Application">
+ </A>
+ample Controller Application (psctext.goc)</P>
+<PRE>@include &lt;stdapp.goh&gt;
+@include &lt;ui.goh&gt;
+@include &lt;Objects/Text/tCtrlC.goh&gt;</PRE>
+<PRE>/* The PSCText application's process class runs the application's primary
+ * thread. For a description of GenProcessClass, see Hello World. */</PRE>
+<PRE>@class PSCTextProcessClass, GenProcessClass;
+@endc
+@classdecl PSCTextProcessClass;</PRE>
+<PRE>@start AppResource;
+    /* The PSCTextApp object defines the application object for the
+     * application. For full information, see Hello World.
+     * The controller is also placed on the application's self-load-options
+     * GCN list to ensure that it loads its options properly when returning
+     * from saved state. This is shown below in the second of the two
+     * GCN list declarations. */
+@object GenApplicationClass PSCTextApp = {
+    GI_visMoniker = &quot;Point Size Control Sample Application&quot;;
+    GI_comp = @PSCTPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @2PSCTPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) = @PSCTSizeControl;
+}</PRE>
+<PRE>@end AppResource</PRE>
+<PRE>@start Interface;</PRE>
+<PRE>/* The PSCTPrimary object serves as the primary window of this sample application.
+ * Its children are the Point Size Control object and the two GenText objects. */
+@object GenPrimaryClass PSCTPrimary = {
+    GI_comp = @PSCTSizeControl, @PSCTopTextObj, @PSCBotTextObj;
+    HINT_SIZE_WINDOW_AS_DESIRED;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+}</PRE>
+<PRE>/* The PSCTSizeControl object is the controller that provides all the point size
+ * functionality. It will automatically create a menu called &quot;Sizes&quot; (due to the
+ * GI_visMoniker) and all the entries of that menu.
+ * This controller will work on whichever of the two GenText objects
+ * (PSCGTopTextObj and PSCBotTextObj) is set the target; the controller's UI
+ * objects (the Sizes menu) send their messages directly to the target via the
+ * TravelOption TO_TARGET. If a point size is selected as the user's first action,
+ * it will work on PSCTopTextObj because that is set up as the default target. */
+@object PointSizeControlClass PSCTSizeControl = {
+    GI_visMoniker = 'z', &quot;Sizes&quot;;					/* Give the controller a name */
+    GII_visibility = GIV_POPUP;					/* Make the controller a menu */
+}</PRE>
+<PRE>/* These two GenText objects are simple; they use only the defaults plus the
+ * items shown here. Both must be set targetable (GA_TARGETABLE) to be included
+ * in the target hierarchy; this is necessary when using controllers because of
+ * the note in the above comment. The PSCTopTextObj is made the default focus
+ * (to get keyboard input) and the default target (for controller operation). */
+@object GenTextClass PSCTopTextObj = {
+    GI_attrs = @default | GA_TARGETABLE;
+	/* Initially, this text object uses the VisTextDefaultSize VTDS_12
+	 * (12 pts) and the VisTextDefaultFont VTDF_URW_ROMAN. You can use
+	 * the PointSizeControl object to change this point size. */
+    ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR =					((VTDS_12 &lt;&lt; VTDCA_SIZE_OFFSET) |
+					 VTDF_URW_ROMAN);
+	/* Set the font mapping to none to turn off the defaults. */
+    HINT_DEFAULT_FOCUS;
+    HINT_DEFAULT_TARGET;
+}</PRE>
+<PRE>@object GenTextClass PSCBotTextObj = {
+    GI_attrs = @default | GA_TARGETABLE;
+    ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR =					((VTDS_12 &lt;&lt; VTDCA_SIZE_OFFSET) |
+					 VTDF_URW_ROMAN);
+}
+@end Interface<A NAME="marker=1157"> </A></PRE>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Controllers_1.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Controllers_3.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1.2 How Controllers Work</A> 
+<!-- to next --> | <A HREF="Controllers_5.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">2 Standard Controllers</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

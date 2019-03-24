@@ -1,0 +1,281 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: R_76.htm,v 1.2 97/06/25 18:38:24 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE>GEOS C Routines: ObjCompProcessChildren() ...</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+<DIV>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="R_75.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">ObjCompFindChildByOptr() ...</A> 
+<!-- to next --> | <A HREF="R_77.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">ObjDeref() ...</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</DIV>
+<DIV>
+<A NAME="IX_ObjCompProcessChildren()">
+ </A>
+<H1 CLASS="refHeading">
+ObjCompProcessChildren()</H1>
+<PRE CLASS="syntax">Boolean	ObjCompProcessChildren(
+        optr		obj,				/* parent's optr */
+        optr		firstChild,				/* optr of first child to process */
+        ObjCompCallType		stdCallback,				/* standard callback type */
+        void 		* cbData,				/* data passed to callback */
+        word		masterOffset,				/* offset to master part */
+        word		compOffset,				/* offset to comp field */
+        word		linkOffset);				/* offset to link field */
+        Boolean _pascal (*callback) (optr parent, optr child, void *cbData));</PRE>
+<P>
+This routine performs a specific set of actions on all or some of an object's children. It is very rare that you will use this routine; typically, you should send a message to all of the parent's children. If, however, you use this routine, you must also write a callback routine that will be executed once for each affected child.</P>
+<P>
+<CODE>
+ObjCompProcessChildren()</CODE>
+ returns <CODE>
+true</CODE>
+ (nonzero) only if it was stopped before all children had been processed. The only two ways this could be returned is if an error occurs or if your callback returns <CODE>
+true</CODE>
+ when called.</P>
+<P>
+The parameters for this routine are</P>
+<DL>
+<DT>
+<CODE>
+obj</CODE>
+</DT><DD>The optr of the composite whose children are to be processed.</DD>
+<DT>
+<CODE>
+firstChild</CODE>
+</DT><DD>The optr of the first child to be processed. This routine will begin with the passed child and continue with all subsequent children. Pass the optr of the composite's first child--retrieved with the routine <CODE>
+<A HREF="../../CRef/Routines/R_74.htm#IX_ObjCompFindChildByNumber()">ObjCompFindChildByNumber()</A></CODE>
+--to process all children.</DD>
+<DT>
+<CODE>
+stdCallback</DT><DD>
+</CODE>
+A value of <CODE>
+ObjCompCallType</CODE>
+ indicating how the data in the buffer pointed to by <CODE>
+cbData</CODE>
+ will be passed to your callback routine. These values are detailed below.</DD>
+<DT>
+<CODE>
+cbData</CODE>
+</DT><DD>A pointer to a buffer in which data can be passed to your callback routine. This buffer can be altered by your callback.</DD>
+<DT>
+<CODE>
+masterOffset</DT><DD>
+</CODE>
+The offset within the parent's instance chunk to the master group's offset. (The value that would appear in the parent class' <CODE>
+Class_masterOffset</CODE>
+ field in its <CODE>
+ClassStruct</CODE>
+ structure.)</DD>
+<DT>
+<CODE>
+compOffset</CODE>
+</DT><DD>The offset within the parent's instance chunk to the composite field.</DD>
+<DT>
+<CODE>
+linkOffset</CODE>
+</DT><DD>The offset within the parent's instance chunk to the link field.</DD>
+<DT>
+<CODE>
+callback</DT><DD>
+</CODE>
+A pointer to the actual callback routine that will be executed once for each child. The callback should be in your geode's fixed memory. The parameters and return values for the callback routine are given below.</DD>
+</DL>
+<P>
+The callback routine takes three parameters and returns a boolean value. It must be declared _pascal. The three parameters to the callback are listed below:</P>
+<DL>
+<DT>
+<CODE>
+parent</CODE>
+</DT><DD>The optr of the parent composite.</DD>
+<DT>
+<CODE>
+child</CODE>
+</DT><DD>The optr of the current child being processed.</DD>
+<DT>
+<CODE>
+cbData</CODE>
+</DT><DD>A pointer to the buffer passed by the original caller of <CODE>
+ObjCompProcessChildren()</CODE>
+. What is actually in this buffer may depend on the value in the original <CODE>
+sdtCallback</CODE>
+ parameter; if the buffer is not saved and restored by <CODE>
+ObjCompProcessChildren()</CODE>
+ between children, each child may receive data altered by the previous child.</DD>
+</DL>
+<P>
+The callback routine can access and alter the buffer pointed to by <CODE>
+cbData</CODE>
+, or it can query the child or do anything else with the exception of destroying the child. It should return a Boolean value: <CODE>
+true</CODE>
+ if <CODE>
+ObjCompProcessChildren()</CODE>
+ should be aborted, <CODE>
+false</CODE>
+ if it should not.</P>
+<P>
+The values you can pass to <CODE>
+ObjCompProcessChildren()</CODE>
+ in <CODE>
+stdCallback</CODE>
+ are of type <CODE>
+ObjCompCallType</CODE>
+. You can use one of the following values to specify how the buffer in <CODE>
+cbData</CODE>
+ will be passed on to the next child's callback routine:</P>
+<DL>
+<DT>
+OCCT_SAVE_PARAMS_TEST_ABORT</DT><DD>
+Save the buffer passed in <CODE>
+cbData</CODE>
+ before calling each child; abort the routine if the callback returns <CODE>
+true</CODE>
+.</DD>
+<DT>
+OCCT_SAVE_PARAMS_DONT_TEST_ABORT</DT><DD>
+Save the buffer passed in <CODE>
+cbData</CODE>
+ before calling each child; do not check the return value of the callback before proceeding to the next child.</DD>
+<DT>
+OCCT_DONT_SAVE_PARAMS_TEST_ABORT</DT><DD>
+Do not save the buffer in <CODE>
+cbData</CODE>
+, and abort if the callback routine returns <CODE>
+true</CODE>
+.</DD>
+<DT>
+OCCT_DONT_SAVE_PARAMS_DONT_TEST_ABORT</DT><DD>
+Do not save the buffer in <CODE>
+cbData</CODE>
+, and do not check the callback routine's return value.</DD>
+<DT>
+OCCT_ABORT_AFTER_FIRST</DT><DD>
+Abort the processing after only one child (typically used to call the <EM>
+nth</EM>
+ child).</DD>
+<DT>
+OCCT_COUNT_CHILDREN</DT><DD>
+Counts the number of children rather than calling each.</DD>
+</DL>
+<P CLASS="refField"><STRONG>
+Include:</STRONG>	metaC.goh</P>
+<P CLASS="refField"><STRONG>
+See Also:</STRONG> <CODE>@send</CODE>,
+<CODE>@call</CODE>,
+<CODE>MSG_META_SEND_CLASSED_EVENT</CODE>.</P>
+</DIV>
+<DIV>
+<A NAME="IX_ObjCompRemoveChild()">
+ </A>
+<H1 CLASS="refHeading">
+ObjCompRemoveChild()</H1>
+<PRE CLASS="syntax">void	ObjCompRemoveChild(
+        optr	obj,		/* parent's optr */
+        optr	objToRemove		/* optr of child to be removed */
+        word	flags,		/* CompChildFlags */
+        word	masterOffset,		/* offset to master part */
+        word	compOffset,		/* offset to comp field in master part */
+        word	linkOffset);		/* offset to link field in master part */</PRE>
+<P>
+This routine removes the given child from the specified parent composite. The child will be removed entirely from the object tree, but it will not be detached or freed. The parameters of this routine are listed below:</P>
+<DL>
+<DT>
+<CODE>
+obj</CODE>
+</DT><DD>The optr of the parent composite.</DD>
+<DT>
+<CODE>
+objToRemove</DT><DD>
+</CODE>
+The optr of the child to be removed.</DD>
+<DT>
+<CODE>
+flags</CODE>
+</DT><DD>A record of <CODE>
+CompChildFlags</CODE>
+ indicating whether the parent and child should be marked dirty after the operation.</DD>
+<DT>
+<CODE>
+masterOffset</DT><DD>
+</CODE>
+The offset within the parent's instance chunk to the master group's offset. (The value that would appear in the parent class' <CODE>
+Class_masterOffset</CODE>
+ field in its <CODE>
+ClassStruct</CODE>
+ structure.)</DD>
+<DT>
+<CODE>
+compOffset</CODE>
+</DT><DD>The offset within the parent's instance chunk to the composite field.</DD>
+<DT>
+<CODE>
+linkOffset</CODE>
+</DT><DD>The offset within the parent's instance chunk to the link field.</DD>
+</DL>
+<P CLASS="refField"><STRONG>
+Include:</STRONG>	metaC.goh</P>
+</DIV>
+<DIV>
+<A NAME="IX_ObjDecInteractibleCount()">
+ </A>
+<H1 CLASS="refHeading">
+ObjDecInteractibleCount()</H1>
+<PRE CLASS="syntax">void	ObjDecInteractibleCount(
+        MemHandle mh);			/* subject object block */</PRE>
+<P>
+This routine decrements the given object block's interactable count. Do not decrement the interactable count without first incrementing it with <CODE>
+<A HREF="../../CRef/Routines/R_79.htm#IX_ObjIncInteractibleCount()">ObjIncInteractibleCount()</A></CODE>
+. Visible objects automatically decrement the interactable count in their <CODE>
+MSG_VIS_CLOSE</CODE>
+ handlers.</P>
+<P CLASS="refField"><STRONG>
+Include:</STRONG>	object.h</P>
+<P CLASS="refField"><STRONG>
+See Also:</STRONG> <CODE><A HREF="../../CRef/Routines/R_79.htm#IX_ObjIncInteractibleCount()">ObjIncInteractibleCount()</A></CODE>,
+<CODE>MSG_VIS_CLOSE</CODE>,
+<CODE><A HREF="../../CRef/Structs/S_2a.htm#IX_ObjLMemBlockHeader">ObjLMemBlockHeader</A></CODE>.</P>
+</DIV>
+<DIV>
+<A NAME="IX_ObjDecInUseCount()">
+ </A>
+<H1 CLASS="refHeading">
+ObjDecInUseCount()</H1>
+<PRE CLASS="syntax">void	ObjDecInUseCount(
+        MemHandle mh);		/* subject object block */</PRE>
+<P>
+This routine decrements the given object block's in-use count. When the in-use count reaches zero, the block may safely be freed. You should not decrement the in-use count of a block without first incrementing it at some point with <CODE>
+<A HREF="../../CRef/Routines/R_79.htm#IX_ObjIncInUseCount()">ObjIncInUseCount()</A></CODE>
+.</P>
+<P CLASS="refField"><STRONG>
+Warnings:</STRONG>	Do not decrement the in-use count without incrementing it first. An error will result.</P>
+<P CLASS="refField"><STRONG>
+Include:</STRONG>	object.h</P>
+<P CLASS="refField"><STRONG>
+See Also:</STRONG> <CODE><A HREF="../../CRef/Routines/R_79.htm#IX_ObjIncInUseCount()">ObjIncInUseCount()</A></CODE>,
+<CODE><A HREF="../../CRef/Routines/R_76.htm#IX_ObjDecInteractibleCount()">ObjDecInteractibleCount()</A></CODE>,
+<CODE><A HREF="../../CRef/Structs/S_2a.htm#IX_ObjLMemBlockHeader">ObjLMemBlockHeader</A></CODE>.</P>
+</DIV>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="R_75.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">ObjCompFindChildByOptr() ...</A> 
+<!-- to next --> | <A HREF="R_77.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">ObjDeref() ...</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

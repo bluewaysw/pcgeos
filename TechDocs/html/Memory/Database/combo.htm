@@ -1,0 +1,582 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+<!-- This page was automatically generated from a bunch of smaller pages. -->
+<META NAME="copyright" CONTENT="Copyright GEOWORKS">
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+<TITLE>Database</TITLE>
+</HEAD>
+<BODY BGCOLOR="#ffffdf">
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+<A NAME="index.htm"></A>
+
+
+
+<H1 CLASS="chapterTitle">
+
+<A NAME="index.htm_20518">
+ </A>
+Database 
+
+</H1>
+<P>
+<A NAME="index.htm_IX_db library">
+ </A>
+<A NAME="index.htm_26706">
+ </A>
+Some applications need to keep track of many small pieces of data. For example,
+ a database might use thousands of items of data, each of them only a paragraph long; in a spreadsheet, the data size might be only a few bytes. GEOS provides a Database (DB) library to make it easy to keep track of such data and store them conveniently in a GEOS Virtual Memory file.</P>
+<P>
+The DB library manages Local Memory heaps in a VM file and uses these heaps to store items. It lets the geode associate items into groups; these groups can grow indefinitely, unlike LMem heaps. </P>
+<P>
+
+</P>
+<P CLASS="sectionlinks">
+<STRONG>
+&nbsp;&nbsp;<A HREF="#Database_1.htm">1 Design Philosophy</A><BR>
+&nbsp;&nbsp;<A HREF="#Database_2.htm">2 Database Structure</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Database_3.htm">2.1 DB Items</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Database_4.htm">2.2 DB Groups</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Database_5.htm">2.3 Allocating Groups and Items</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Database_6.htm">2.4 Ungrouped DB Items</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Database_7.htm">2.5 The DB Map Item</A><BR>
+&nbsp;&nbsp;<A HREF="#Database_8.htm">3 Using Database Routines</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Database_9.htm">3.1 General Rules to Follow</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Database_a.htm">3.2 Allocating and Freeing Groups</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Database_b.htm">3.3 Allocating and Freeing Items</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Database_c.htm">3.4 Accessing DB Items</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Database_d.htm">3.5 Resizing DB Items</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Database_e.htm">3.6 Setting and Using the Map Item</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Database_f.htm">3.7 Routines for Ungrouped Items</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Database_10.htm">3.8 Other DB Utilities</A><BR>
+</STRONG>
+</P> <!-- end of sectionlinks blob -->
+
+<HR>
+<A NAME="Database_1.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Database</A>: 1 
+Design Philosophy</H2>
+<P>
+A database manager should be flexible, allowing applications to store a variety of data items. It should be efficient, with minimal overhead in data-access time as well as in memory usage (whether in main memory or in disk space). Ideally, it ought to insulate applications from the details of memory allocation and data referencing. The GEOS database manager meets all of these requirements and several more:</P>
+<UL>
+<LI>
+Flexible Data Formats<BR>
+The DB Manager does not care about the content of a DB item. Consequently, a DB item can be anything that can fit in an LMem chunk. An application can use one file to store many different sizes of database item.</LI>
+<LI>
+Speed and Efficiency<BR>
+The GEOS DB library uses the powerful GEOS memory management, Virtual Memory, and Local Memory routines. These enable it to store and access many database items with a minimal overhead in access time and storage space.</LI>
+<LI>
+Uniform Data-Access Format<BR>
+Database items are stored in standard GEOS Virtual Memory files. All of the file-access utilities (such as the document control objects) can work unchanged with database files. Furthermore, VM files can contain both ordinary VM blocks and DB items in any combination.</LI>
+<LI>
+Full Group Management<BR>
+Applications can divide DB items into groups. Access time is improved when items from the same group are accessed in succession. As an alternative, applications can let the DB manager create and assign groups for the items.</LI>
+<LI>
+Sharable Data<BR>
+Since DB items are stored in VM files, the files can be shared between applications. All of the standard VM synchronization routines work for DB files.</LI>
+</UL>
+<HR>
+<A NAME="Database_2.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Database</A>: 2 
+<A NAME="Database_2.htm_95153">
+ </A>
+Database Structure</H2>
+<P>
+The Database routines use a Database Manager to access and create DB items. These items are stored in a standard VM file. This chapter will sometimes refer to a &quot;Database File&quot;; this simply means a VM file which contains DB items.</P>
+<P CLASS="subsectionLink">
+<A HREF="#Database_3.htm">DB Items</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Database_4.htm">DB Groups</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Database_5.htm">Allocating Groups and Items</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Database_6.htm">Ungrouped DB Items</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Database_7.htm">The DB Map Item</A></P>
+<HR>
+<A NAME="Database_3.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Database</A>: 2.1 <A HREF="#Database_2.htm">Database Structure</A>: 
+DB Items</H3>
+<P>
+<A NAME="Database_3.htm_IX_Chunks:relation to db item blocks">
+ </A>
+<A NAME="Database_3.htm_IX_DB items">
+ </A>
+The basic unit of data is the <EM>
+item</EM>
+. Items are simply chunks in special LMem heaps which are managed by the DB Manager; these heaps are called <EM>
+item blocks</EM>
+. You will not need to use any of the LMem routines; the DB manager will create and destroy LMem heaps as necessary and will call the appropriate routines to lock DB items when needed.</P>
+<P>
+Each DB item in a DB file is uniquely identified by the combination of a <EM>
+group-handle</EM>
+ and an <EM>
+item-handle</EM>
+. Note that these handles are not the same as the item's LMem Heap handle and its chunk handle. You will not generally need to use the item's heap and chunk handles; the DB routines store and use these automatically. However, you can retrieve them if necessary (for example, if you want to use an LMem utility on a DB item).
+
+</P>
+<P>
+The DB Manager does not keep track of allocated items. Once you allocate an item, you must store the group- and item-handles. If you lose them, the item will remain in the file, but you will not be able to find it again. </P>
+<P>
+Since DB items are chunks, their addresses are somewhat volatile. If you allocate an item in a group, other items in that group may move even if they are locked. (See <A HREF="../../Memory/LMem/LMem_4.htm#56910">the Local Memory chapter</A>.)</P><HR>
+<A NAME="Database_4.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Database</A>: 2.2 <A HREF="#Database_2.htm">Database Structure</A>: 
+DB Groups</H3>
+<P>
+<A NAME="Database_4.htm_IX_DB groups">
+ </A>
+Each DB item is a member of a DB group. The DB group is a collection of VM blocks; the group comprises a single <EM>
+group block</EM>
+ and zero or more item blocks.</P>
+<P>
+The group block contains information about each item block and each item in the group. For each item block, it records the VM handle of the block and the number of DB items in the block. For each DB item, it records the VM handle of the item block in which the item is stored and the item's chunk handle within that item block. The item blocks are simply LMem heaps with a little extra information in the headers. </P>
+<P>
+The item's group-handle is simply the VM handle of the group block for that group. The item's item-handle is an offset into the group block; the information about the item is stored at that offset. When you lock an item, the DB manager looks in that location in the group block and reads the handles of the item block and the chunk associated with that item; it then locks the item block and returns the address of the chunk. (In assembly code, it returns the segment address and the chunk handle.) The relationship between the different blocks and handles is shown in the figure below.</P>
+<P>
+Whenever you access a DB item, the DB manager has to lock the block. If you access several items in a row, the overall access time is better if they belong to the same group since only one group block will need to be swapped in to memory. The items may also be in the same item-block since each item block contains items from only one group; again, this improves access time. Thus, it is a good idea to distribute items in groups according to the way they will be accessed; for example, an address-book database might group entries according to the first letter of the last name, thus speeding up alphabetical access. If you have no logical way to group items, see <A HREF="#Database_6.htm_59661"> Ungrouped DB Items</A>
+.
+<IMG SRC="Database_4_dereferencing.gif">
+
+</P>
+<HR>
+<A NAME="Database_5.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Database</A>: 2.3 <A HREF="#Database_2.htm">Database Structure</A>: 
+<A NAME="Database_5.htm_77062">
+ </A>
+Allocating Groups and Items</H3>
+<P>
+<A NAME="Database_5.htm_84249">
+ </A>
+When you need a new DB group, call the DB routine <CODE>
+DBGroupAlloc()</CODE>
+ (see <A HREF="#Database_a.htm_75339"> Allocating and Freeing Groups</A>
+). This routine creates and initializes a DB group block.</P>
+<P>
+When you allocate a DB item, you specify which group the item will go in. The DB manager sets up an entry for the item in the group block. It then decides which item block to put the item in. It tries to keep all the item blocks at the right size to optimize speed. If all of the group's item blocks are too full, it allocates a new item block and allocates the new item in that block. In either case, it returns the new item's item-handle.</P>
+<P>
+Once an item has been allocated, it will stay in the same item block (and have the same chunk handle) until it is freed or resized. If it is resized to a larger size, it may be moved to a different item block belonging to the same group.</P>
+<HR>
+<A NAME="Database_6.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Database</A>: 2.4 <A HREF="#Database_2.htm">Database Structure</A>: 
+<A NAME="Database_6.htm_59661">
+ </A>
+Ungrouped DB Items</H3>
+<P>
+Sometimes there is no natural way to group DB items. For these situations, the DB manager allows you to allocate <EM>
+ungrouped</EM>
+ items. These items actually belong to special groups which are automatically allocated by the DB manager. The DB manager tries to keep these groups at the right size for optimum efficiency.
+
+</P>
+<P>
+When you allocate an ungrouped item, the DB manager allocates an item in one of its &quot;ungrouped groups.&quot; If there are no such groups or if all of these groups have too many items already, the DB manager allocates a new &quot;ungrouped&quot; group.</P>
+<P>
+<A NAME="Database_6.htm_IX_DBGroupAndItem">
+ </A>
+For practical purposes, ungrouped DB items have a single, dword-sized handle. This &quot;handle&quot; is of type <CODE>
+DBGroupAndItem</CODE>
+. The upper word of this is the handle of the ungrouped group for this item; the lower word is the item's item-handle within that group. There are special versions of most database routines for use with ungrouped items. These routines take a <CODE>
+DBGroupAndItem</CODE>
+ argument instead of separate group-handle and item-handle arguments. These routines are discussed in <A HREF="#Database_f.htm_11201"> Routines for Ungrouped Items</A>
+. This section also describes macros which combine a group-handle and item-handle into a <CODE>
+DBGroupAndItem</CODE>
+ and which break a <CODE>
+DBGroupAndItem</CODE>
+ into its constituent parts.</P>
+<HR>
+<A NAME="Database_7.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Database</A>: 2.5 <A HREF="#Database_2.htm">Database Structure</A>: 
+<A NAME="Database_7.htm_34673">
+ </A>
+The DB Map Item</H3>
+<P>
+You can designate a &quot;map item&quot; for a VM file with the routine <CODE>
+DBSetMap()</CODE>
+. You can recover the map item's group and handle at will by calling <CODE>
+DBGetMap()</CODE>
+. This is entirely separate from the file's map block; indeed, a VM file can have both a map block and a map item, and they may be set, locked, and changed independently.</P>
+<P>
+The map routines are described in detail in <A HREF="#Database_e.htm_45059"> Setting and Using the Map Item</A>
+.</P>
+<HR>
+<A NAME="Database_8.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Database</A>: 3 
+Using Database Routines</H2>
+<P>
+GEOS provides a wide range of routines for working with databases. The routines all require that the calling thread have the VM file open. Most routines have to be passed the VMFileHandle of the appropriate VM file.</P>
+<P>
+Almost all DB routines come in two forms. The standard form takes, among its arguments, the group-handle and the item-handle of an item to be affected. The other form is designed for use with &quot;ungrouped&quot; items. This form takes, as an argument, the item's <CODE>
+DBGroupAndItem</CODE>
+ structure. </P>
+<P>
+In addition to the routines listed here, all of the VM chain routines can work on DB items. Simply cast the <CODE>
+DBGroupAndItem</CODE>
+ structure to type <CODE>
+VMChain</CODE>
+, and pass it in place of the chain argument(s). (<CODE>
+VMCopyVMChain()</CODE>
+ will allocate the duplicate item as &quot;ungrouped.&quot;) For more information about <CODE>
+VMChain</CODE>
+ routines, see <A HREF="../../Memory/VM/VM_14.htm#87156">the VM chapter</A>.</P><P CLASS="subsectionLink">
+<A HREF="#Database_9.htm">General Rules to Follow</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Database_a.htm">Allocating and Freeing Groups</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Database_b.htm">Allocating and Freeing Items</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Database_c.htm">Accessing DB Items</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Database_d.htm">Resizing DB Items</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Database_e.htm">Setting and Using the Map Item</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Database_f.htm">Routines for Ungrouped Items</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Database_10.htm">Other DB Utilities</A></P>
+<HR>
+<A NAME="Database_9.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Database</A>: 3.1 <A HREF="#Database_8.htm">Using Database Routines</A>: 
+General Rules to Follow</H3>
+<P>
+There are certain rules of &quot;memory etiquette&quot; you should follow when using DB files. For the most part, these rules are the same as the general rules of memory etiquette.</P>
+<P>
+First and foremost, try to keep as few blocks locked as possible, and keep them locked for as short a time as possible. You should not usually need to keep more than one item locked at a time. If you need another item, unlock the first one first, even if they're in the same item block. (This will cost very little time since the item block is unlikely to be swapped to disk right away.) The main reason you should have two or more items open at once is if you are directly comparing them or copying data from one to another. In this case, you should unlock each item as soon as you're done with it.</P>
+<P>
+Remember that items are implemented as chunks in LMem heaps. This means, for example, that when you allocate an item (or expand an existing one), the heap it resides in (i.e. the item block) may be compacted or moved on the global heap (even if it is locked). This will invalidate all pointers to items in that item block. As a general rule, you should not allocate (or expand) items if you have any items from that group locked. Do not allocate &quot;ungrouped&quot; items if you have any items from any of the &quot;ungrouped&quot; groups locked. If you must keep an item locked, keep track of the item's memory block and chunk handle so you can use <CODE>
+DBDeref()</CODE>
+ to get the address again.
+<IMG SRC="Database_9_invalidating.gif">
+
+</P>
+<P>
+Finally, try to keep the blocks small. Most of this is done for you. When you allocate an item, the DB manager will put it in an uncrowded item block. If all item blocks are too large, it will allocate a new one. However, you should keep items from getting too large. If individual items get into the multi-kilobyte range, you should consider storing them a different way; for example, you could make each f the larger items a VM block or a VM chain.</P>
+<HR>
+<A NAME="Database_a.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Database</A>: 3.2 <A HREF="#Database_8.htm">Using Database Routines</A>: 
+<A NAME="Database_a.htm_75339">
+ </A>
+Allocating and Freeing Groups</H3>
+<PRE>DBGroupAlloc(), DBGroupFree()</PRE>
+<P>
+You can improve DB access time by assigning items to groups such that items from the same group will generally be accessed together. This will cut down on the number of times group and item blocks will have to be swapped into memory.</P>
+<P>
+<A NAME="Database_a.htm_IX_DBGroupAlloc()">
+ </A>
+To allocate a group, call <CODE>
+DBGroupAlloc()</CODE>
+. This routine takes one argument, namely the handle of the VM file in which to create the group. It allocates the group and returns the group-handle (i.e., the VM handle of the group block). If it is unable to allocate the group, it will return a null handle.</P>
+<P>
+<A NAME="Database_a.htm_IX_DBGroupFree()">
+ </A>
+If you are done with a DB group, call <CODE>
+DBGroupFree()</CODE>
+. This routine frees the group's group block and all of its item blocks. Any attached global memory blocks will also be freed. Naturally, all items in the group will be freed as well. You can free a group even if some of its items are locked; those items will be freed immediately.</P>
+<HR>
+<A NAME="Database_b.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Database</A>: 3.3 <A HREF="#Database_8.htm">Using Database Routines</A>: 
+<A NAME="Database_b.htm_68088">
+ </A>
+Allocating and Freeing Items</H3>
+<PRE>DBAlloc(), DBFree()</PRE>
+<P>
+<A NAME="Database_b.htm_IX_DBAlloc()">
+ </A>
+To allocate a DB item, call <CODE>
+DBAlloc()</CODE>
+. This routine takes three arguments: the handle of the VM file, the DB Group in which to allocate the item, and the size of the item (in bytes). The routine will allocate an item in one of that group's item blocks (allocating a new item block if necessary); it returns the new item's item-handle.</P>
+<P>
+Remember that when you allocate a DB item, the DB manager allocates a chunk in an LMem heap (the item block). This can cause the item block to be compacted or resized; this will invalidate all pointers to items in that block. For this reason, you should not allocate items in a group while other items in that group are locked. Similarly, you should not allocate &quot;ungrouped&quot; items while any &quot;ungrouped&quot; items are locked. Instead, unlock the items, allocate the new one, and then lock the items again.</P>
+<P>
+<A NAME="Database_b.htm_IX_DBFree()">
+ </A>
+When you are done with an item, free it with <CODE>
+DBFree()</CODE>
+. This routine takes three arguments: the file handle, the group-handle, and the item-handle. It frees the item, making appropriate changes in the group block. If the item was the only one in its item block, that item block will be freed as well. <CODE>
+DBFree()</CODE>
+ does not return anything. Note that you should never free a locked item since the item-block's reference-count will not be decremented (and the block will never be unlocked). Always unlock an item before freeing it. (You need not, however, unlock items before freeing their <EM>
+group</EM>
+; when a group is freed, all of its items are automatically freed, whether they are locked or not.)
+
+</P>
+<HR>
+<A NAME="Database_c.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Database</A>: 3.4 <A HREF="#Database_8.htm">Using Database Routines</A>: 
+<A NAME="Database_c.htm_32208">
+ </A>
+Accessing DB Items</H3>
+<PRE>DBLock(), DBLockGetRef(), DBDeref(), DBUnlock(), DBDirty()</PRE>
+<P>
+<A NAME="Database_c.htm_IX_DBLock()">
+ </A>
+To access a database item, lock it with <CODE>
+DBLock()</CODE>
+. This routine takes three arguments: the handle of the VM file, the item's group-handle, and the item's item-handle. The routine locks the item-block on the global heap and returns the address of the element. If the block is already locked (generally because another item in the item-block is locked), it increments the lock count.</P>
+<P>
+In some circumstances it might be useful to know the global handle of the locked item-block and the chunk handle of the item. <A NAME="Database_c.htm_IX_DBLockGetRef()">
+ </A>
+For example, if you want to set up an item as a chunk array, you will need this information. For this reason, the library provides the routine <CODE>
+DBLockGetRef()</CODE>
+. This routine is just like <CODE>
+DBLock()</CODE>
+, except that it takes one additional argument: the address of a variable of type optr. <CODE>
+DBLockItemGetRef()</CODE>
+ writes global and chunk handles to the optr and returns the address of the locked DB item. You can now use any of the LMem routines on the item, simply by passing the optr.</P>
+<P>
+Note that the memory block attached to the item block may change each time the block is locked unless you have instructed the VM manager to preserve the handle (see <A HREF="../../Memory/VM/VM_d.htm#71741">the VM chapter</A>). The chunk handle will not change, even if the file is closed and reopened, unless the chunk is resized larger. (When an item is resized larger, the DB manager may choose to move the item to a different item-block, thus changing its chunk handle.) In general, if you will need this information you should get it each time you lock the item instead of trying to preserve it from one lock to the next.</P><P>
+<A NAME="Database_c.htm_IX_DBDeref()">
+ </A>
+If you have an optr to a <EM>
+locked</EM>
+ DB item, you can translate it to an address with the routine <CODE>
+DBDeref()</CODE>
+. This is useful if you have to keep one item locked while allocating or expanding another item in that group. Since the locked item might move as a result of the allocation, you can get the new address with <CODE>
+DBDeref()</CODE>
+. In general, however, you should unlock all items in a group before allocating or resizing one there. Note that <CODE>
+DBDeref</CODE>
+ is simply a synonym for <CODE>
+LMemDeref()</CODE>
+; the two routines are exactly the same.</P>
+<P>
+<A NAME="Database_c.htm_IX_DBUnlock()">
+ </A>
+When you are done accessing an item, call <CODE>
+DBUnlock()</CODE>
+. This routine takes one argument, the address of a locked item. The routine decrements the reference count of the item's item-block. If the reference count reaches zero, the routine unlocks the block. Thus, if you lock two different items in an item block, you should unlock each item separately. As noted above, you should always unlock an item before freeing it.</P>
+<P>
+<A NAME="Database_c.htm_IX_DBDirty()">
+ </A>
+If you change a DB item, you should mark the item's block as <EM>
+dirty</EM>
+ by calling <CODE>
+DBDirty()</CODE>
+. This ensures that the changes will be copied to the disk the next time the file is saved or updated. The routine takes one argument, a pointer to an address in an item block (generally the address of an item). It will dirty the item-block containing that item. As with VM blocks, you must dirty the item <EM>
+before</EM>
+ you unlock it, as the memory manager can discard any clean block from memory as soon as it is unlocked.</P>
+<HR>
+<A NAME="Database_d.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Database</A>: 3.5 <A HREF="#Database_8.htm">Using Database Routines</A>: 
+<A NAME="Database_d.htm_34536">
+ </A>
+Resizing DB Items</H3>
+<PRE>DBReAlloc(), DBInsertAt(), DBDeleteAt()</PRE>
+<P>
+Database items may be resized after allocation. They may be expanded either by having bytes added to the end or by having bytes inserted at a specified offset within the item. Similarly, items may be contracted by having bytes truncated or by having bytes deleted from the middle of the item. When an item is resized, the DB manager automatically dirties the item block (or blocks) affected.</P>
+<P>
+As noted above, when an item is expanded, its item block can be compacted or moved on the item heap (even if the item is locked). Thus, pointers to all items in that item block may be invalidated, even if they are locked. For that reason, you should unlock all items in the group before expanding any of them. If you must leave an item locked, be sure to get its new address with <CODE>
+DBDeref()</CODE>
+. If you <EM>
+decrease</EM>
+ an item's size, the item-block is guaranteed not to move or be compacted. Thus, you can safely contract locked items (or items in the same block as locked items).</P>
+<P>
+<A NAME="Database_d.htm_IX_DBReAlloc()">
+ </A>
+To set a new size for an item, call <CODE>
+DBReAlloc()</CODE>
+. This routine takes four arguments: the file handle, the group-handle, the item-handle, and the new size (in bytes). If the new size is smaller than the old, bytes will be truncated from the end of the item. If the new size is larger than the old, bytes will be added to the end of the item; these bytes will not be zero-initialized.</P>
+<P>
+<A NAME="Database_d.htm_IX_DBInsertAt()">
+ </A>
+To insert bytes in the middle of an item, call the routine <CODE>
+DBInsertAt()</CODE>
+. This routine takes five arguments: the file handle, the group-handle, the item-handle, the offset (within the item) at which to insert the bytes, and the number of bytes to insert. The new bytes will be inserted beginning at that offset; they will be zero-initialized. Thus, if you insert ten bytes beginning at offset 35, the new bytes will be at offsets 35-44; the byte which had been at offset 35 will be moved to offset 45. To insert bytes at the beginning of an item, pass an offset of zero.</P>
+<P>
+<A NAME="Database_d.htm_IX_DBDeleteAt()">
+ </A>
+To delete bytes from the middle of an item, call <CODE>
+DBDeleteAt()</CODE>
+. This routine takes five arguments: the file handle, the group-handle, the item-handle, the offset (within the item) of the first byte to delete, and the number of bytes to delete. The routine does not return anything.</P>
+<HR>
+<A NAME="Database_e.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Database</A>: 3.6 <A HREF="#Database_8.htm">Using Database Routines</A>: 
+<A NAME="Database_e.htm_45059">
+ </A>
+Setting and Using the Map Item</H3>
+<PRE>DBSetMap(), DBGetMap(), DBLockMap()</PRE>
+<P>
+<A NAME="Database_e.htm_IX_DBSetMap()">
+ </A>
+A VM file can have a <EM>
+map block</EM>
+ and a <EM>
+map item</EM>
+. The map can be retrieved with a special-purpose routine, even if you don't know its handle (or handles); thus, the map usually keeps track of the handles for the rest of the file. The map can be retrieved even if the file is closed and re-opened. To set a map block, use the routine <CODE>
+VMSetMap()</CODE>
+ (see <A HREF="../../Memory/VM/VM_11.htm#49125">the VM chapter</A>). To set a <EM>map item</EM>
+, use the routine <CODE>
+DBSetMap()</CODE>
+. <CODE>
+DBSetMap()</CODE>
+ takes three arguments: the file handle, the item's group-handle, and the item's item-handle. The routine sets the file's map item to the DB item specified. A VM file can have both a map block and a map item; these are set independently.</P>
+<P>
+<A NAME="Database_e.htm_IX_DBGetMap()">
+ </A>
+Once you have set a map item, you can retrieve its handles with the command <CODE>
+DBGetMap()</CODE>
+. This routine takes one argument, namely the file's handle. It returns a <CODE>
+DBGroupAndItem</CODE>
+ value containing the map item's handles. You can break this value into its constituent handles with <CODE>
+DBGroupFromGroupAndItem()</CODE>
+ and <CODE>
+DBItemFromGroupAndItem()</CODE>
+ (see <A HREF="#Database_f.htm_11201"> Routines for Ungrouped Items</A>
+). <A NAME="Database_e.htm_IX_DBLockMap()">
+ </A>
+You can also lock the map directly without knowing its handles by calling the routine <CODE>
+DBLockMap()</CODE>
+. This routine takes one argument, namely the file handle. It locks the map item and returns the map's address. When you are done with the map item, unlock it normally with a call to <CODE>
+DBUnlock()</CODE>
+.</P>
+<HR>
+<A NAME="Database_f.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Database</A>: 3.7 <A HREF="#Database_8.htm">Using Database Routines</A>: 
+<A NAME="Database_f.htm_11201">
+ </A>
+Routines for Ungrouped Items</H3>
+<PRE>DBAllocUngrouped(), DBFreeUngrouped(), DBLockUngrouped(), DBLockGetRefUngrouped(), DBReAllocUngrouped(), DBInsertAtUngrouped(), DBDeleteAtUngrouped(), DBSetMapUngrouped()</PRE>
+<P>
+Special routines are provided for working with ungrouped items. These routines are very similar to their standard counterparts. The routine <CODE>
+DBAllocUngrouped()</CODE>
+<A NAME="Database_f.htm_IX_DBAllocUngrouped()">
+ </A>
+ allocates an ungrouped item. It takes two arguments, the file handle and the size of the item to allocate. The DB manager allocates the item in one of the &quot;ungrouped&quot; groups and returns a <CODE>
+DBGroupAndItem</CODE>
+ value containing the group-handle and item-handle. You can break this value into its components by calling the macros described in <A HREF="#Database_f.htm_11201"> Routines for Ungrouped Items</A>
+, or you can pass this value directly to the other &quot;ungrouped&quot; routines.</P>
+<P>
+<A NAME="Database_f.htm_IX_DBLockGetRefUngrouped()">
+ </A>
+<A NAME="Database_f.htm_IX_DBLockGetRefUngrouped()">
+ </A>
+<A NAME="Database_f.htm_IX_DBSetMapUngrouped()">
+ </A>
+<A NAME="Database_f.htm_IX_DBDeleteAtUngrouped()">
+ </A>
+<A NAME="Database_f.htm_IX_DBInsertAtUngrouped()">
+ </A>
+<A NAME="Database_f.htm_IX_DBReAllocUngrouped()">
+ </A>
+<A NAME="Database_f.htm_IX_DBLockUngrouped()">
+ </A>
+<A NAME="Database_f.htm_IX_DBFreeUngrouped()">
+ </A>
+The rest of the routines listed above are exactly the same as their counterparts with one exception: whereas their counterparts take, among their arguments, the item's group-handle and item-handle, the ungrouped routines take a <CODE>
+DBGroupAndItem</CODE>
+ value. Each routine's other arguments are unchanged, as is the return value.</P>
+<P>
+These routines are provided as a convenience. If you allocate an ungrouped item, you are perfectly free to break the <CODE>
+DBGroupAndItem</CODE>
+ value into its component handles, and pass those handles to the standard DB routines. Conversely, if you allocate a normal &quot;grouped&quot; item, you are free to combine the two handles into a <CODE>
+DBGroupAndItem</CODE>
+ token and pass that token to the &quot;ungrouped&quot; routines.</P>
+<HR>
+<A NAME="Database_10.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Database</A>: 3.8 <A HREF="#Database_8.htm">Using Database Routines</A>: 
+<A NAME="Database_10.htm_77102">
+ </A>
+Other DB Utilities</H3>
+<PRE>DBCopyDBItem(), DBCopyDBItemUngrouped(), DBGroupFromGroupAndItem(), DBItemFromGroupAndItem(), DBCombineGroupAndItem()</PRE>
+<P>
+<A NAME="Database_10.htm_IX_DBCopyDBItem()">
+ </A>
+You can duplicate a DB item with the routine <CODE>
+DBCopyDBItem()</CODE>
+. This routine takes five arguments: the handle of the source file, the source item's group-handle, the source item's item-handle, the handle of the destination file (which may be the same as the source file), and the handle of the destination group. The routine will allocate a new item in the specified file and group. It will then lock both items and copy the data from the source item to the destination. Finally, it will unlock both items and return the item-handle of the duplicate item.</P>
+<P>
+<A NAME="Database_10.htm_IX_DBCopyDBItemUngrouped()">
+ </A>
+The routine <CODE>
+DBCopyDBItemUngrouped()</CODE>
+ is the same as <CODE>
+DBCopyDBItem()</CODE>
+, except that it allocates an ungrouped item in the specified file. It is passed the source file handle, the <CODE>
+DBGroupAndItem</CODE>
+ value for the source item, and the destination file handle. It allocates an ungrouped item and returns its<CODE>
+ DBGroupAndItem</CODE>
+ value.</P>
+<P>
+Remember, if you are allocating the duplicate in the same group as the source, you should only call this routine when the source item is unlocked (since its item-block may be compacted when the new item is allocated). If the destination is in another block, the source item may be locked or unlocked at your preference. If it is locked when you call <CODE>
+DBCopyDBItem()</CODE>
+, it will be locked when the routine returns.</P>
+<P>
+All of the VM chain utilities work on DB items as well as VM chains. The routines are described in <A HREF="../../Memory/VM/VM_14.htm#87156">the VM chapter</A>. To use a VM chain routine, pass the item's <CODE>DBGroupAndItem</CODE>
+ value. For example, <CODE>
+VMCopyVMChain()</CODE>
+ will allocate an &quot;ungrouped&quot; duplicate item in the specified file and return its <CODE>
+DBGroupAndItem</CODE>
+ value.</P>
+<P>
+<A NAME="Database_10.htm_IX_DBCombineGroupAndItem() macro">
+ </A>
+To build a <CODE>
+DBGroupAndItem</CODE>
+ value from the group-handle and item-handle, use the macro <CODE>
+DBCombineGroupAndItem()</CODE>
+. This macro takes the two handles and returns a <CODE>
+DBGroupAndItem</CODE>
+ value. To extract the component handles from a <CODE>
+DBGroupAndItem</CODE>
+ value, use the macros <CODE>
+DBGroupFromGroupAndItem()</CODE>
+<A NAME="Database_10.htm_IX_DBGroupFromGroupAndItem() macro">
+ </A>
+ and<A NAME="Database_10.htm_IX_DBItemFromGroupAndItem() macro">
+ </A>
+ <CODE>
+DBItemFromGroupAndItem()</CODE>
+. These macros are passed a <CODE>
+DBGroupAndItem</CODE>
+ value and return the appropriate component.</P>
+<P>
+&nbsp;</P>
+<HR>
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+</BODY>
+</HTML>

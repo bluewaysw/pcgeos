@@ -1,0 +1,199 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: TTools_15.htm,v 1.1 97/06/27 16:02:24 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Advanced pmake Techniques</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Using Tools</A>: 13.5 <A HREF="TTools_10.htm">pmake</A>: 
+Advanced pmake Techniques</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="TTools_10.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="TTools_14.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">13.4 Contents of a Makefile</A> 
+<!-- to next --> | <A HREF="TTools_16.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">13.6 The Way Things Work</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+This section is devoted to those facilities in <CODE>
+pmake</CODE>
+ that allow you to do a great deal in a makefile with very little work, as well as do some things you couldn't do in make without a great deal of work (and perhaps the use of other programs). The problem with these features is that they must be handled with care, or you will end up with a mess.</P>
+
+<H2 CLASS="HeadingC">
+<A NAME="60745">
+ </A>
+Search Paths</H2>
+<P>
+<A NAME="IX_Search paths in makefiles">
+ </A>
+The <CODE>
+pmake</CODE>
+ tool supports the dispersal of files into multiple directories by allowing you to specify places to look for sources with .PATH targets in the makefile. The directories you give as sources for these targets make up a &quot;search path.&quot; Only those files used exclusively as sources are actually sought on a search path, the assumption being that anything listed as a target in the makefile can be created by the makefile and thus should be in the current directory.</P>
+<P>
+<A NAME="IX_.PATH[;PATH]">
+ </A>
+There are two types of search paths in <CODE>
+pmake</CODE>
+: one is used for all types of files (including included makefiles) and is specified with a plain .PATH target (e.g. &quot;.PATH : RCS&quot;), while the other is specific to a certain type of file, as indicated by the file's suffix. A specific search path is indicated by immediately following the .PATH with the suffix of the file. For instance</P>
+<PRE>.PATH.H : \GEOSDEV\DEVEL\APPL\WORPRO \GEOSDEV\DEVEL</PRE>
+<P>
+would tell <CODE>
+pmake</CODE>
+ to look in the directories \GEOSDEV\DEVEL\APPL\WORPRO and \GEOSDEV\DEVEL for any files whose suffix is .H.</P>
+<P>
+The current directory is always consulted first to see if a file exists. Only if it cannot be found are the directories in the specific search path, followed by those in the general search path, consulted.</P>
+<P>
+A search path is also used when expanding wildcard characters. If the pattern has a recognizable suffix on it, the path for that suffix will be used for the expansion. Otherwise the default search path is employed.</P>
+<P>
+When a file is found in some directory other than the current one, all local variables that would have contained the target's name (.ALLSRC and .IMPSRC) will instead contain the path to the file, as found by <CODE>
+pmake</CODE>
+. Thus if you have a file ..\LIB\MUMBLE.C and a makefile</P>
+<PRE>.PATH.c : ..\LIB
+MUMBLE.EXE 			: MUMBLE.C
+	$(CCOM) -o $(.TARGET) $(.ALLSRC)</PRE>
+<P>
+the command executed to create MUMBLE.EXE would be &quot;bcc -o MUMBLE ..\LIB\MUMBLE.C&quot;</P>
+<P>
+If a file exists in two directories on the same search path, the file in the first directory on the path will be the one <CODE>
+pmake</CODE>
+ uses. So if you have a large system spread over many directories, it would behoove you to follow a naming convention that avoids such conflicts.</P>
+<P>
+Something you should know about the way search paths are implemented is that each directory is read, and its contents cached, exactly once--when it is first encountered--so any changes to the directories while <CODE>
+pmake</CODE>
+ is running will not be noted when searching for implicit sources, nor will they be found when <CODE>
+pmake</CODE>
+ attempts to discover when the file was last modified, unless the file was created in the current directory. </P>
+
+
+<H2 CLASS="HeadingC">
+<A NAME="42979">
+ </A>
+Conditional Statements</H2>
+<P>
+<A NAME="IX_Conditional statements in makefiles">
+ </A>
+<A NAME="IX_#endif makefile directive[;endif makefile directive]">
+ </A>
+<A NAME="IX_#else makefile directive[;else makefile directive]">
+ </A>
+<A NAME="IX_#elif makefile directive[;elif makefile directive]">
+ </A>
+<A NAME="IX_#if makefile directive[;if makefile directive]">
+ </A>
+Like a C compiler, <CODE>
+pmake</CODE>
+ allows you to configure the makefile using conditional statements. A conditional looks like this:</P>
+<PRE>#if <EM>&lt;Boolean expression&gt;
+&lt;lines&gt;
+</EM>#elif <EM>&lt;another Boolean expression&gt;
+&lt;more lines&gt;
+</EM>#else
+<EM>&lt;still more lines&gt;
+</EM>#endif</PRE>
+<P>
+They may be nested to a depth of 30 and may occur anywhere (except in a comment, of course). The &quot;#&quot; must be the very first character on the line.</P>
+<P>
+<A NAME="IX_<=:in makefiles">
+ </A>
+<A NAME="IX_<:in makefiles">
+ </A>
+<A NAME="IX_>=:in makefiles">
+ </A>
+<A NAME="IX_>:in makefiles">
+ </A>
+<A NAME="IX_!=:in makefiles">
+ </A>
+<A NAME="IX_==:in makefiles">
+ </A>
+<A NAME="IX_!:in makefiles">
+ </A>
+<A NAME="IX_||:in makefiles">
+ </A>
+<A NAME="IX_&&:in makefiles">
+ </A>
+Each Boolean expression is made up of terms that look like function calls, the standard C Boolean operators &amp;&amp;, ||, and !, and the standard relational operators ==, !=, &gt;, &gt;=, &lt;, and &lt;=, with == and != being overloaded to allow string comparisons as well. The &amp;&amp; operator represents logical AND; || is logical OR and ! is logical NOT. The arithmetic and string operators take precedence over all three of these operators, while NOT takes precedence over AND, which takes precedence over OR. This precedence may be overridden with parentheses, and an expression may be parenthesized to any level. Each Boolean term looks like a call on one of four functions:</P>
+<DL>
+<DT>
+<A NAME="IX_make() conditional">
+ </A>
+<STRONG>
+make</STRONG>
+ </DT><DD>The syntax is make(<EM>target</EM>) where <EM>target</EM> is a target in the makefile. This is <EM>
+true</EM>
+ if the given target was specified on the command line or as the source for a .MAIN target (note that the sources for .MAIN are only used if no targets were given on the command line).</DD>
+<DT>
+<STRONG>
+defined</STRONG>
+<A NAME="IX_defined() conditional">
+ </A>
+ </DT><DD>The syntax is defined(<EM>variable</EM>) and is true if <EM>variable</EM> is defined. Certain variables are defined in the system makefile that identify the system on which <CODE>
+pmake</CODE>
+ is being run.</DD>
+<DT>
+<STRONG>
+exists</STRONG>
+<A NAME="IX_exists()conditional">
+ </A>
+ </DT><DD>The syntax is exists(<EM>file</EM>) and is true if the file can be found on the global search path (i.e. that defined by .PATH targets, not by .PATH<EM>suffix</EM> targets).</DD>
+<DT>
+<STRONG>
+empty</STRONG>
+<A NAME="IX_empty() conditional">
+ </A>
+</DT><DD>This syntax is much like the others, except the string inside the parentheses is of the same form as you would put between parentheses when expanding a variable, complete with modifiers. The function returns true if the resulting string is empty. (Note: an undefined variable in this context will cause at the very least a warning message about a malformed conditional, and at the worst will cause the process to stop once it has read the makefile. If you want to check for a variable being defined or empty, use the expression </DD>
+<PRE>	!defined(<EM>var</EM>) || empty(var)</PRE>
+<DT>
+</DT><DD>as the definition of || will prevent the empty() from being evaluated and causing an error, if the variable is undefined). This can be used to see if a variable contains a given word, for example:</DD>
+<PRE>		#if !empty(<EM>var</EM>:M<EM>word</EM>)</PRE>
+</DL>
+<P>
+The arithmetic and string operators may only be used to test the value of a variable. The left-hand side must contain the variable expansion, while the right-hand side contains either a string, enclosed in double-quotes, or a number. The standard C numeric conventions (except for specifying an octal number) apply to both sides. For example, </P>
+<PRE>#if $(OS) == 4.3
+#if $(MACHINE) == &quot;sun3&quot;
+#if $(LOAD_ADDR) &lt; 0xc000</PRE>
+<P>
+are all valid conditionals. In addition, the numeric value of a variable can be tested as a Boolean as follows:</P>
+<PRE>#if $(LOAD)</PRE>
+<P>
+would see if LOAD contains a non-zero value and</P>
+<PRE>#if !$(LOAD)</PRE>
+<P>
+would test if LOAD contains a zero value.</P>
+<P>
+<A NAME="IX_#ifnmake makefile directive[;ifnmake makefile directive]">
+ </A>
+<A NAME="IX_#ifmake makefile directive[;ifmake makefile directive]">
+ </A>
+<A NAME="IX_#ifndef makefile directive[;ifndef makefile directive]">
+ </A>
+<A NAME="IX_#ifdef makefile directive[;ifdef makefile directive]">
+ </A>
+In addition to the bare #if, there are other forms that apply one of the first two functions to each term. They are as follows:</P>
+<PRE>ifdef		defined
+ifndef		!defined
+ifmake		make
+ifnmake		!make</PRE>
+<P>
+There are also the &quot;else if&quot; forms: elif, elifdef, elifndef, elifmake, and elifnmake.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="TTools_10.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="TTools_14.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">13.4 Contents of a Makefile</A> 
+<!-- to next --> | <A HREF="TTools_16.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">13.6 The Way Things Work</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

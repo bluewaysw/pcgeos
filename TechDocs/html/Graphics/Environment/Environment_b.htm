@@ -1,0 +1,114 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Environment_b.htm,v 1.2 97/09/05 10:57:51 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Device Coordinates</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Graphics Environment</A>: 5.4 <A HREF="Environment_7.htm">Coordinate Space</A>: 
+<A NAME="75207">
+ </A>
+Device Coordinates</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Environment_7.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Environment_a.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.3 Precise Coordinates</A> 
+<!-- to next --> | <A HREF="Environment_c.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5.5 Larger Document Spaces</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+Most programmers can work quite well within the document space regardless of how coordinates will correspond to device coordinates. However, some programmers might need to know about the device coordinates as well. The system provides clever algorithms for going from document to device space for all programmers, as well as routines to get device coordinate information from the device driver.</P>
+
+<H2 CLASS="HeadingC">
+What the System Draws on the Device</H2>
+<P>
+Consider a device whose pixels are exactly 1/72nd of an inch, such that no scaling is required to map document units to device units. The relationship of the coordinate systems is illustrated below. Note that a pixel falls between each pair of document units. This is a further demonstration of the concept that document coordinates specify a location in the document coordinate space, not a pixel.
+<IMG SRC="Environment_b_72dpiDevice.gif">
+
+</P>
+<P>
+ Next consider a device that has a resolution of 108 dpi, which is 1.5 times greater than our default 72 dpi. That is, there are 1.5x1.5 pixels on the device for each square document unit. The basic problem here is that the coordinates that are specified in document space map to non-integer pixels in device space. The graphics system would like the pixels to be half-filled along two edges of the rectangle (see the figure below). Unfortunately, a pixel must be either filled or empty, so the system needs a set of rules to follow in this situation. These rules are</P>
+<UL>
+<LI>
+If the midpoint of a pixel (i.e., the device coordinate of that pixel) falls inside the area's boundary, that pixel is filled. </LI>
+<LI>
+Conversely, if the midpoint of a pixel falls outside the area's border, the pixel is not filled.</LI>
+<LI>
+If the midpoint of the pixel falls exactly on the border of the area to be filled, the following rule is used: <BR>
+Pixels on the left or the top are not filled; <BR>
+Pixels on the right or the bottom are filled; <BR>
+Pixels in the left-bottom and top-right corners are not filled.</LI>
+</UL>
+<P>
+These rules might seem a little odd: Why not just fill all the pixels that would be touched by the area? One of the problems with this approach is that areas that did not overlap in the document space would overlap on the device. Or more specifically, they would overlap only on some devices (depending on the resolution), which is even worse. The rules have the property that adjoining areas in document space will not overlap in any device space. 
+<IMG SRC="Environment_b_XdpiDevice.gif">
+
+</P>
+<P>
+Our next set of potential problems comes with lines. Lines can be very thin and thus might be invisible on some low-resolution devices. If the graphics system used the rules for filled objects then some thin lines would be only partially drawn on low resolution devices. GEOS uses Bresenham's algorithm for drawing straight thin lines, ensuring that a continuous group of pixels will be turned on for a line (see the figure below). This continuity is insured due to the behavior of the algorithm:</P>
+<UL>
+<LI>
+If the line is more horizontal then vertical, exactly one pixel will be turned on in each column between the two endpoints.</LI>
+<LI>
+If the line is more vertical than horizontal, exactly one pixel will be turned on in each row.</LI>
+<LI>
+If the line is exactly 45 degrees, exactly one pixel will be turned on in each column and row.</LI>
+</UL>
+<P>
+Since ellipses and Bézier curves are drawn as polylines, Bresenham's algorithm will work with them.
+<IMG SRC="Environment_b_bresenham.gif">
+
+</P>
+
+
+<H2 CLASS="HeadingC">
+<A NAME="50069">
+ </A>
+Converting Between Doc and Device Coordinates</H2>
+<PRE>GrTransform(), GrUntransform(), GrTransformWWFixed(), GrUntransformWWFixed()</PRE>
+<P>
+Given a coordinate pair, at times it's convenient to know the corresponding device coordinates. Sometimes the reverse is true. Use these functions to convert a coordinate pair to device coordinates or vice versa. <CODE>
+GrTransform()</CODE>
+<A NAME="IX_GrTransform()">
+ </A>
+ takes a coordinate pair and returns device coordinates. <A NAME="IX_GrUntransform()">
+ </A>
+<CODE>
+GrUntransform()</CODE>
+ does the reverse. If you want to be able to get a more exact value for these coordinates you can use <CODE>
+GrTransformWWFixed()</CODE>
+<A NAME="IX_GrTransformWWFixed()">
+ </A>
+ and<A NAME="IX_GrUntransformWWFixed()">
+ </A>
+ <CODE>
+GrUntransformWWFixed()</CODE>
+. These return fixed point values so you can do other math on them before rounding off to get a whole number that the graphics system can use.</P>
+<P>
+To transform points through an arbitrary transformation instead of to device coordinates, use the <CODE>
+GrTransformByMatrix()</CODE>
+ or <CODE>
+GrUntransformByMatrix()</CODE>
+ routines, described previously.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Environment_7.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Environment_a.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.3 Precise Coordinates</A> 
+<!-- to next --> | <A HREF="Environment_c.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5.5 Larger Document Spaces</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

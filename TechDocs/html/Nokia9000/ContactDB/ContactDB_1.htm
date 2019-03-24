@@ -1,0 +1,177 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: ContactDB_1.htm,v 1.3 97/08/21 13:30:33 cgroom Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Setting up a Contact List</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="sectionTitle">
+<A HREF="index.htm">Contacts</A>: 1 
+<A NAME="65699">
+ </A>
+Setting up a Contact List</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> | <A HREF="ContactDB_2.htm"><IMG SRC="../../docImages/down.gif" BORDER="0" ALT="Down"></A> 
+<!-- to previous --> | <A HREF="index.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">Contacts</A> 
+<!-- to next --> | <A HREF="ContactDB_5.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2 Choosing Contacts From a Log</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>ContactListClass, CONTACT_LIST_NOTIFY_CONTACT_SELECTED_MSG, ContactGetDBHandle(), FoamDBGetRecordFromID(), FoamDBGetFieldData(), FoamDBDiscardRecord(), ContactReleaseDBHandle()</PRE>
+<P>
+To present the user with a list of Contacts, do the following:</P>
+<P>
+Make sure that your .gp file contains lines requiring the <STRONG CLASS="fileName">
+foamdb</STRONG>
+ and <STRONG CLASS="fileName">
+contdb</STRONG>
+ libraries:</P>
+<PRE>library contdb
+library foamdb</PRE>
+<P>
+In your source code, create a <CODE>
+ContactList</CODE>
+ object. The following <CODE>
+ContactList</CODE>
+ object declaration allows the user to pick a contact. If the contact has more than one GSM phone number, the controller will make the user choose one of the fields. </P>
+<UL>
+<LI>
+When the user chooses a contact, the ContactList will send a message to an object The <CODE>
+ContactList</CODE>
+'s <CODE>
+GCI_output</CODE>
+ and ATTR_CONTACT_LIST_NOTIFY_CONTACT_SELECTED_MSG specify the object and message. In the example below, the application's process object will handle a message. We will discuss the message in more detail below.</LI>
+<LI>
+To make the <CODE>
+ContactList</CODE>
+ SMS-specific, set its ATTR_CONTACT_LIST_CALL_TYPE to CCT_SMS as shown below; also, set the CLF_SELECT_CONTACT_NUMBER feature flag in ATTR_GEN_CONTROL_REQUIRE_UI.</LI>
+<LI>
+To include the <CODE>
+ContactList</CODE>
+'s Search bar, set the CLF_SEARCH feature flag in ATTR_GEN_CONTROL_REQUIRE_UI; to exclude the Search bar, exclude the UI.</LI>
+<LI>
+Optionally, you can use the standard Contact List bitmap by making your <CODE>
+ContactList</CODE>
+ a <CODE>
+ComplexMoniker</CODE>
+ and setting its <CODE>
+CMI_iconBitmap</CODE>
+ field to CMB_CONTACT_LIST.</LI>
+</UL>
+<P>
+Putting this together, we end up with the following:</P>
+<PRE>@object ContactListClass MyContactList = {
+  GI_visMoniker = &quot;I want to talk to...&quot;;
+  GCI_output = (TO_PROCESS);
+  ATTR_CONTACT_LIST_CALL_TYPE = CCT_SMS;
+  ATTR_GEN_CONTROL_REQUIRE_UI = CLF_SEARCH |
+                       CLF_SELECT_CONTACT_NUMBER ; 
+  HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+  ATTR_CONTACT_LIST_NOTIFY_CONTACT_SELECTED_MSG = 
+                        MSG_MYPROCESS_SEND_MESSAGE ;
+}</PRE>
+<P>
+With this configuration, the <CODE>
+ContactList</CODE>
+ will send a <CODE>
+MSG_MYPROCESS_SEND_MESSAGE</CODE>
+ message to your process object when the user chooses a contact. A sample handler for this message is shown below (<A HREF="ContactDB_1.htm#31767"> Handling the ContactList's "Selected" Message</A>
+). The message will conform to the prototype:</P>
+<PRE>@prototype void
+    CONTACT_LIST_NOTIFY_CONTACT_SELECTED_MSG(
+                                   dword recordID,
+                                   word fieldID);</PRE>
+<P>
+The message handler should carry out the following steps:</P>
+<OL>
+<LI>
+Get the Contact database's handle. To do this, call <CODE>
+ContactGetDBHandle()</CODE>
+. This routine takes no arguments, and returns the Contact database's handle.</LI>
+<LI FIXME_NumListOther>
+Get the handle of the record by calling <CODE>
+FoamDBGetRecordFromID()</CODE>
+. This routine takes the Contact's database handle and the record's <CODE>
+RecordID</CODE>
+ value. It allocates a block of memory to hold the record's data and returns the record's handle. </LI>
+<LI FIXME_NumListOther>
+To extract the contact's GSM phone number, call <CODE>
+FoamDBGetFieldData()</CODE>
+. Pass the database handle, the record handle, the <CODE>
+FieldID</CODE>
+ associated with the GSM number field (this number is supplied by the <CODE>
+ContactList</CODE>
+ when it sends this message), a buffer to write the name to, and the size of that buffer. The function fills in the buffer with the phone number string, and returns the length of that string. The returned string might not be null-terminated; thus you will either need to keep track of the returned string length, or else terminate the string.</LI>
+<LI FIXME_NumListOther>
+Now that you're done with the record, let the database know by calling <CODE>
+FoamDBDiscardRecord()</CODE>
+. This routine takes the Contact's database handle and the record's handle as arguments.</LI>
+<LI FIXME_NumListOther>
+Now that you're done with the database, release its handle by calling <CODE>
+ContactReleaseDBHandle()</CODE>
+.</LI>
+</OL>
+<P>
+The example below shows a way of carrying out the above set of steps.</P>
+<P CLASS="figTitle">
+Code Display 4-1 <A NAME="31767">
+ </A>
+Handling the ContactList's &quot;Selected&quot; Message</P>
+<PRE>@class MyProcessClass, GenProcessClass;
+	@message (CONTACT_LIST_NOTIFY_CONTACT_SELECTED_MSG)
+						MSG_MYPROCESS_SEND_MESSAGE;
+@endc</PRE>
+<PRE>@method MyProcessClass, MSG_MYPROCESS_SEND_MESSAGE {
+	TCHAR           theNumber[31];
+	TCHAR           theName[MAX_NAME_DATA_LEN+1];
+	word            numLen;
+	VMFileHandle    CDBHandle;
+	MemHandle       theRecord;</PRE>
+<PRE>		/* Get the Contact database's handle */
+	CDBHandle = ContactGetDBHandle();</PRE>
+<PRE>		/* Get the handle to the record we're interested in */
+	theRecord = FoamDBGetRecordFromID( CDBHandle, recordID );</PRE>
+<PRE>		/* Get the GSM phone number string; null-terminate it. */
+	FoamDBGetFieldData( CDBHandle, theRecord, fieldID, theNumber, 30);
+	theNumber[numLen] = `\000'; /* add null terminator */</PRE>
+<PRE>		/* We'll copy the name to theName buffer. */
+	ContactGetName(theRecord, theName);
+
+		/* If you need more information about the contact 
+		 * (e.g., business name, job title), this is a good place 
+		 * to retrieve it. */
+
+	/* Do what you like with theNumber and theName */</PRE>
+<PRE>		/* We're done with this record. */
+	FoamDBDiscardRecord(CDBHandle, theRecord );</PRE>
+<PRE>		/* We're done with the database. */
+	ContactReleaseDBHandle();
+}</PRE>
+<P CLASS="subsectionLink">
+<A HREF="ContactDB_2.htm">Multiple-Selection ContactLists</A></P>
+<P CLASS="subsectionLink">
+<A HREF="ContactDB_3.htm">Remembering the Search</A></P>
+<P CLASS="subsectionLink">
+<A HREF="ContactDB_4.htm">Detecting Unknown Phone Numbers</A></P>
+<P CLASS="subsectionLink">
+<A HREF="ContactDB_alternate.htm">Alternate Selection Messages</A></P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> | <A HREF="ContactDB_2.htm"><IMG SRC="../../docImages/down.gif" BORDER="0" ALT="Down"></A> 
+<!-- to previous --> | <A HREF="index.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">Contacts</A> 
+<!-- to next --> | <A HREF="ContactDB_5.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2 Choosing Contacts From a Log</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

@@ -1,0 +1,114 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: LMem_7.htm,v 1.1 97/06/02 15:52:44 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Creating a Local Heap</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Local Memory</A>: 3.1 <A HREF="LMem_6.htm">Using Local Memory Heaps</A>: 
+<A NAME="62735">
+ </A>
+Creating a Local Heap</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="LMem_6.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="LMem_6.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">3 Using Local Memory Heaps</A> 
+<!-- to next --> | <A HREF="LMem_8.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.2 Using Chunks</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>LMemInitHeap(), MemAllocLMem()</PRE>
+<P>
+Before you create a local heap, you must first allocate and lock a block on the global heap using <CODE>
+MemAlloc()</CODE>
+ and <CODE>
+MemLock()</CODE>
+. (Alternatively, you can allocate a fixed block.) Then, you must call <CODE>
+LMemInitHeap()</CODE>
+. (If you are creating a local heap to hold objects, you should use the <CODE>
+UserAllocObjBlock()</CODE>
+ routine instead; it's much simpler to use.)</P>
+<P>
+<CODE>
+LMemInitHeap()</CODE>
+<A NAME="IX_LMemInitHeap()">
+ </A>
+ creates and initializes a local memory heap. It must be passed several arguments:</P>
+<UL>
+<LI>
+The handle of a locked or fixed block which will contain the local memory heap. It may be moveable, discardable, both, or neither; it should <EM>
+not</EM>
+ have the flag HF_LMEM set. If the LMem heap will be resizable, the block may be of any size; the LMem routines will enlarge it if necessary. If the heap will not be resizable (i.e. LMF_NO_ENLARGE is passed), it must be created large enough to accommodate the heap.</LI>
+<LI>
+<A NAME="53143">
+ </A>
+The offset within the block where the local heap's handle table will begin. The local heap will fill the space to the end of the block; any data between the <CODE>
+LMemBlockHeader</CODE>
+ and the indicated offset will be zero-initialized. If an application will not need a fixed data space, it should specify an offset of zero; the handle table will then be put immediately after the <CODE>
+LMemBlockHeader</CODE>
+. If the created block will be an object block, then it will need room for an <CODE>
+ObjLMemBlockHeader</CODE>
+ structure. Often, when an application needs a fixed data space, it will define a special structure, the first element of which is an <CODE>
+LMemBlockHeader</CODE>
+, and will pass the size of that structure as the offset. It can then access the fixed data by using the fields of the structure. If the offset specified is less than the size of an <CODE>
+LMemBlockHeader</CODE>
+, <CODE>
+LMemInitHeap()</CODE>
+ will return an error.</LI>
+<LI>
+A member of the <CODE>
+LMemType</CODE>
+ enumerated type, specifying the type of block to be created (see <A HREF="LMem_5.htm#79694"> In addition to being used for general memory needs, local memory heaps perform many specific functions in the GEOS system. When an LMem heap is created, a member of the LMemType enumerated type is passed, indicating to what use the LMem heap wil</A>
+).</LI>
+<LI>
+A word of <CODE>
+LocalMemoryFlags</CODE>
+ for the heap. (See <A HREF="LMem_5.htm#60651"> When an LMem heap is allocated, certain flags are passed to indicate properties the heap should have. Some of these flags are passed only for system-created heaps. The flags are stored in a word-length record (LocalMemoryFlags); the record also </A>
+.)</LI>
+<LI>
+A word specifying the number of chunk handles to leave room for in the starter handle table. When these chunks have all been allocated, the local memory manager will expand the LMem handle table to create more chunk handles. No matter how big the starter handle table is, the heap will initially contain just one chunk (whose size is specified by the next argument). Applications should generally pass the constant STD_INIT_HANDLES.</LI>
+<LI>
+A word specifying the amount of space to be assigned to the chunk created when the heap is initialized. When more space is needed, the chunks will expand to the end of the block, and (if necessary) the block itself will be expanded. Applications should generally pass the constant STD_INIT_HEAP.</LI>
+</UL>
+<P>
+<CODE>
+LMemInitHeap()</CODE>
+ creates the <CODE>
+LMemBlockHeader</CODE>
+ and the chunk handle table. It also creates a single free chunk; more chunks will automatically be created as needed. It may resize the block passed (unless the flag LMF_NO_ENLARGE is passed); therefore, any pointers to the block may become invalid. It does not return anything.</P>
+<P>
+<A NAME="IX_MemAllocLMem()">
+ </A>
+If you want to create a memory block and initialize it as an LMem heap in one operation, call<CODE>
+ MemAllocLMem()</CODE>
+. This routine takes two arguments: a member of the <CODE>
+LMemType</CODE>
+ enumerated type, and the amount of space to leave for the header (again, a zero size indicates that the default header size should be used). <CODE>
+MemAllocLMem()</CODE>
+ allocates a movable, swapable block in the global heap, then initializes an LMem heap in that block. If you specify an <CODE>
+LMemType</CODE>
+ of LMEM_TYPE_OBJ_BLOCK, <CODE>
+MemAllocLMem()</CODE>
+ will pass the STD_LMEM_OBJECT_FLAGS flags; otherwise, it will pass a clear <CODE>
+LocalMemoryFlags</CODE>
+ record.</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="LMem_6.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="LMem_6.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">3 Using Local Memory Heaps</A> 
+<!-- to next --> | <A HREF="LMem_8.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.2 Using Chunks</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

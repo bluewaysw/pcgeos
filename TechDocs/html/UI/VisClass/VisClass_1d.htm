@@ -1,0 +1,113 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: VisClass_1d.htm,v 1.1 97/06/02 16:50:22 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Setting Up the Objects</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">VisClass</A>: 6.7 <A HREF="VisClass_16.htm">Visible Layers and 32-Bit Graphics</A>: 
+Setting Up the Objects</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VisClass_16.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VisClass_1c.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">6.6 Handling Mouse Events</A> 
+<!-- to next --> | <A HREF="VisClass_1e.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">7 VisClass Error Checking</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+<A NAME="IX_Objects:in 32 bits">
+ </A>
+Finally, you should be aware of what attributes to set in both the GenView and the VisContent objects of your visible tree to support the large document. You could easily find this out by looking through the various attributes of those classes (and you are encouraged to do so), but the following guide is provided for convenience:</P>
+<P>
+In the GenView object, set GVA_WINDOW_COORDINATE_MOUSE_EVENTS in the <CODE>
+GVI_attrs</CODE>
+ instance data field. This will pass mouse events in terms of offsets from the upper-left corner of the view window rather than in absolute document coordinates. <CODE>
+VisContentClass</CODE>
+ handles these events and automatically turns them into document coordinates.</P>
+<P>
+In the VisContent, set VCNA_WINDOW_COORDINATE_MOUSE_EVENTS and VCNA_LARGE_DOCUMENT_MODEL in the <CODE>
+VCNI_attrs</CODE>
+ field. The first of these tells the content that it will receive input events in window coordinates rather than in document coordinates. The second will have the effect of making the content object ignore its bounds field and geometry management. It will also tell the content that all its children are layer objects. Setting the large document model will cause the content to send all the following messages on to all its children rather than handle them directly: <CODE>
+MSG_VIS_DRAW</CODE>
+, <CODE>
+MSG_VIS_CONTENT_VIEW_ORIGIN_CHANGED</CODE>
+, <CODE>
+MSG_VIS_CONTENT_VIEW_SCALE_FACTOR_CHANGED</CODE>
+, and <CODE>
+MSG_VIS_CONTENT_VIEW_SIZE_CHANGED</CODE>
+.</P>
+<P>
+You do not have to create all the objects you may need; be aware that the Graphic Object Library provides its own layer object that supports a 32-bit graphic object layer. The spreadsheet object also exports its own layer object.</P>
+
+<H2 CLASS="HeadingC">
+Requirements of Layer Objects</H2>
+<P>
+Layer objects will need to handle <CODE>
+MSG_VIS_LAYER_SET_DOC_BOUNDS</CODE>
+, which will be sent to all layers when the document bounds change.</P>
+<P>
+In essence the layer object's job is to isolate its children and their children from the fact that they are in a 32-bit document rather than a 16-bit document. In order to do this, layer objects must do several things:</P>
+<UL>
+<LI>
+Store the translation<BR>
+This is a set of 32-bit translation offsets. These offsets represent the current location, if any, where the layer is being drawn in the 32-bit coordinate space.</LI>
+<LI>
+Intercept <CODE>
+MSG_VIS_DRAW<BR>
+</CODE>
+In its handler, the layer should apply any 32-bit translations (using <CODE>
+GrApplyTranslationDWord()</CODE>
+<A NAME="IX_GrApplyTranslationDWord():in MSG_VIS_DRAW">
+ </A>
+) on the GState provided by <CODE>
+MSG_VIS_DRAW</CODE>
+. It should then intelligently select which of its children are affected by the drawing event and pass the message on to them with the translated GState. The handler should then untranslate the GState before returning.</LI>
+<LI>
+Intercept <CODE>
+MSG_VIS_VUP_CREATE_GSTATE<BR>
+</CODE>
+In the handler, the layer must <EM>
+first</EM>
+ call its superclass (to create the GState normally), then apply the necessary translation using <CODE>
+GrApplyTranslationDWord()</CODE>
+. It can then return the translated GState.</LI>
+<LI>
+Intercept and handle large mouse events<BR>
+Each large mouse event that may be interesting to the layer must be handled by the layer object. This is to ensure that mouse events that occur when no object has the mouse grab get handled. If the layer has 16-bit visible children, it should translate the mouse event into small mouse events before passing it to its superclass. If the layer has 32-bit visible children, it should first translate both mouse coordinates and then decide which of its large children should receive the event.</LI>
+</UL>
+
+
+<H2 CLASS="HeadingC">
+Requirements of 32-bit Visible Objects</H2>
+<P>
+Large visible objects in the visible tree should be equipped to handle both large and small mouse events. This is because the parent object may have both 32-bit and 16-bit children. If it does, it will have to send out only small mouse events; otherwise, the 16-bit objects would be confused by the large mouse events.</P>
+
+
+<H2 CLASS="HeadingC">
+Requirements of 16-bit Visible Objects</H2>
+<P>
+Because 16-bit objects are the norm and not the exception, there are few requirements for them. However, 16-bit objects in 32-bit documents must do one thing: they must prevent the system from allowing the user to select the object and then drag-scroll too far. To prevent this from happening, the visible object must call <CODE>
+MSG_VIS_VUP_SET_MOUSE_INTERACTION_BOUNDS</CODE>
+ to set a temporary boundary on drag scrolling.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VisClass_16.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VisClass_1c.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">6.6 Handling Mouse Events</A> 
+<!-- to next --> | <A HREF="VisClass_1e.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">7 VisClass Error Checking</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

@@ -1,0 +1,159 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Clipboard_d.htm,v 1.1 97/06/02 16:09:55 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Handling Cut and Copy</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The Clipboard</A>: 3.4 <A HREF="Clipboard_9.htm">Using The Clipboard</A>: 
+Handling Cut and Copy</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Clipboard_9.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Clipboard_c.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.3 The GenEditControl</A> 
+<!-- to next --> | <A HREF="Clipboard_e.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.5 Handling Paste</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>MSG_META_CLIPBOARD_CUT, MSG_META_CLIPBOARD_COPY</PRE>
+<P>
+<A NAME="IX_MSG_META_CLIPBOARD_COPY">
+ </A>
+<A NAME="IX_MSG_META_CLIPBOARD_CUT">
+ </A>
+Cut and Copy are very similar in function; both put data onto the Clipboard. However, Cut causes the data to subsequently be deleted from the document, and Copy does not.</P>
+<P>
+When the user starts either of these operations, the object that handles them must go through a series of specific steps to load the data into the Clipboard's VM file. (For simplicity of example, this chapter will assume that the Process object will handle all Clipboard operations; this may not be the case in complex programs.)</P>
+<P>
+The steps are simple; each is enumerated below, and edited examples from the sample application ClipSamp are provided in <A HREF="Clipboard_d.htm#78234"> MSG_META_CLIPBOARD_CUT</A>
+ and <A HREF="Clipboard_d.htm#75773"> MSG_META_CLIPBOARD_COPY</A>
+. Note that these examples do not use the default text object handlers for copy and paste; they treat the entire text flow as the current selection.</P>
+<OL>
+<LI>
+Duplicate and attach the data<BR>
+You must create a duplicate of whatever data is being loaded into the Clipboard. This step includes allocating new VM blocks in the Transfer VM File with <CODE>
+VMAlloc()</CODE>
+. As an alternative, you may pre-duplicate the item in memory with <CODE>
+MemAlloc()</CODE>
+ and then simply attach them to the Transfer VM File with <CODE>
+VMAttach()</CODE>
+.</LI>
+<LI FIXME_NumListOther>
+Complete the transfer item's header<BR>
+Fill in all information fields in the transfer item's header block including formats, owner, and flags.</LI>
+<LI FIXME_NumListOther>
+Register the transfer item<BR>
+Once the data has been attached and the header completed, you must register the transfer with the Clipboard. The UI will then delete any old data in the Clipboard and replace it with your new transfer item. To register the transfer item, use <CODE>
+ClipboardRegisterItem()</CODE>
+.</LI>
+</OL>
+<P CLASS="figTitle">
+Code Display 7-7 <A NAME="78234">
+ </A>
+MSG_META_CLIPBOARD_CUT</P>
+<PRE>/* This is the same as MSG_META_CLIPBOARD_COPY except that after copying the
+ * data to the Clipboard, it deletes the data from the document.
+ *
+ * MSG_META_CLIPBOARD_CUT has no parameters and no return value. The strategy
+ * is as follows: First, copy the subject data into the Clipboard with
+ * MSG_META_CLIPBOARD_COPY. Then, delete the data (which, in this case, is a single
+ * memory block containing all the subject text). */</PRE>
+<PRE>@method ClipSampProcessClass, MSG_META_CLIPBOARD_CUT {
+	/* Use MSG_META_CLIPBOARD_COPY to copy the data to the clipboard. */
+    @call self::MSG_META_CLIPBOARD_COPY();</PRE>
+<PRE>	/* Delete the data. The data is contained entirely within a single memory
+	 * block and is just text. The block is referenced by the memory handle
+	 * textHandle. If textHandle is not null, then the block may be freed. */
+    if (textHandle) {					/* If textHandle is valid, */
+	MemFree(textHandle);				/* free the memory block */
+	textHandle = 0;				/* and zero the handle. */
+    }
+	/* Redraw the view area to reflect the deleted text. */
+    ResetViewArea();			/* Custom routine to redraw the view. */
+}</PRE>
+<P CLASS="figTitle">
+Code Display 7-8 <A NAME="75773">
+ </A>
+MSG_META_CLIPBOARD_COPY</P>
+<PRE>/* This message handler goes through all the steps necessary for a Copy operation
+ * that works with text data only.
+ * MSG_META_CLIPBOARD_COPY has no parameters and requires no return.
+ * 
+ * The strategy employed by this handler is as follows:
+ * First, allocate memory for and create the duplicate data block, filling in all
+ * the appropriate fields.
+ * Next, retrieve the Transfer VM File and attach the data block to the file.
+ * Next, allocate and construct the transfer item header VM block.
+ * Finally, register and lock in the transfer item to the Clipboard.
+ *
+ * A single global variable named textHandle refers to the block of text owned and
+ * used by the sample application. All other data structures are defined within the
+ * message handler. */</PRE>
+<PRE>@method ClipSampProcessClass, MSG_META_CLIPBOARD_COPY {
+    char			*textText;		/* temporary string for the text */
+    int			textLength;		/* length of string including null */
+    MemHandle			headerMemHandle;		/* handle of ClipboardItemHeader block */
+    VMFileHandle 			transferVMFile;		/* VM file handle of Transfer VM File */
+    VMBlockHandle 			dataVMBlock;		/* VM handle of attached data block */
+    VMBlockHandle 			headerVMBlock;		/* VM handle of attached header block */
+    ClipboardItemHeader 			*headerMem;		/* ClipboardItemHeader for the VM file */
+    optr			textObj;		/* temporary text object for transfer */</PRE>
+<PRE>    /* First, lock the text string into memory and get its length, adding one for
+     * the null character at the end. Then unlock the text string's block. */</PRE>
+<PRE>    textText = (char *) MemLock(textHandle);
+    textLength = (strlen(textText) + 1);
+    MemUnlock(textHandle);</PRE>
+<PRE>    /* Next, build the transfer item block by creating a temporary text object and
+     * copying our text into it. Other formats may simply copy the text directly
+     * into a VM block. */</PRE>
+<PRE>    textObj = TextAllocClipboardObject(ClipboardGetClipboardFile(), 0, 0);
+    @call textObj::MSG_VIS_TEXT_REPLACE_ALL_PTR((char *)MemLock(textHandle), 0);
+    MemUnlock(textHandle);
+    dataVMBlock = TextFinishedWithClipboardObject(
+					textObj, TCO_RETURN_TRANSFER_FORMAT);</PRE>
+<PRE>    /* Now get the transfer VM file. */
+    transferVMFile = ClipboardGetClipboardFile();</PRE>
+<PRE>    /* Now, allocate and fill in the transfer item header block. */</PRE>
+<PRE>    headerVMBlock = VMAlloc(				transferVMFile, 
+				sizeof(ClipboardItemHeader), 
+				MY_TRANSFER_ID);
+    headerMem = (ClipboardItemHeader *)VMLock(transferVMFile, headerVMBlock,
+							&amp;headerMemHandle);
+    headerMem-&gt;CIH_owner = (optr) (((dword)GeodeGetProcessHandle()&lt;&lt;16) | 0);
+    headerMem-&gt;CIH_flags = 0;					/* Normal transfer; no flags. */
+    (void) strcpy(headerMem-&gt;CIH_name, &quot;Sample Text&quot;);
+    headerMem-&gt;CIH_formatCount = 1;
+    headerMem-&gt;CIH_sourceID = 0;
+    headerMem-&gt;CIH_formats[0].CIFI_format =
+		FormatIDFromManufacturerAndType(MANUFACTURER_ID_ME, CIF_TEXT);
+    headerMem-&gt;CIH_formats[0].CIFI_vmChain =
+				VMCHAIN_MAKE_FROM_VM_BLOCK(dataVMBlock);
+    headerMem-&gt;CIH_formats[0].CIFI_extra1 = 0;
+    headerMem-&gt;CIH_formats[0].CIFI_extra2 = 0;
+    VMUnlock(headerMemHandle);</PRE>
+<PRE>    /* Now register the transfer item with the Clipboard. This will actually put
+     * the transfer item and its header into the Clipboard. */</PRE>
+<PRE>    ClipboardRegisterItem(BlockIDFromFileAndBlock(
+					transferVMFile, headerVMBlock),
+			0);
+}<A NAME="marker=631863"> </A><A NAME="marker=631864"> </A></PRE>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Clipboard_9.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Clipboard_c.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.3 The GenEditControl</A> 
+<!-- to next --> | <A HREF="Clipboard_e.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.5 Handling Paste</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

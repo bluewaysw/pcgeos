@@ -1,0 +1,381 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: VisClass_12.htm,v 1.2 97/09/05 14:57:58 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Adding and Removing</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">VisClass</A>: 5.2 <A HREF="VisClass_10.htm">Working with Visible Object Trees</A>: 
+Adding and Removing</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VisClass_10.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VisClass_11.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.1 Creating and Destroying</A> 
+<!-- to next --> | <A HREF="VisClass_13.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5.3 Getting Visible Tree Information</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>MSG_VIS_ADD_CHILD, MSG_VIS_REMOVE, MSG_VIS_REMOVE_CHILD, MSG_VIS_MOVE_CHILD, MSG_VIS_ADD_NON_DISCARDABLE_VM_CHILD, MSG_VIS_REMOVE_NON_DISCARDABLE_VM_CHILD, MSG_VIS_REMOVE_NON_DISCARDABLE</PRE>
+<P>
+Once you have objects instantiated, you can connect them together into an object tree. If you know the structure of your tree beforehand, you can create the tree explicitly in your <STRONG CLASS="fileName">
+.goc</STRONG>
+ file, just as you would create your generic object tree.</P>
+<P>
+For many purposes, however, a dynamic object tree is much more useful. To use it, you must be able to add and remove objects easily as well as move them within the tree easily.</P>
+
+<H2 CLASS="HeadingC">
+Adding and Removing Normally
+<IMG SRC="VisClass_12_addVisChild.gif">
+
+</H2>
+<P>
+To add an object to a branch of a visible tree, use the message <CODE>
+MSG_VIS_ADD_CHILD</CODE>
+. This message adds a visible object as the child of a composite; if the new child is a composite with its own children, the entire branch is added to the tree. You can add a child at any position in the composite's child list (e.g., as the first child, as the second child, as the last child, etc.), and you can mark the child dirty after addition if you want.</P>
+<P>
+For example, if you have a composite visible object with two children that is currently unattached to any visible tree, you can attach it to a tree with <CODE>
+MSG_VIS_ADD_CHILD</CODE>
+. The figure above shows this process and the line of code used to add the composite as the second child of an object in the tree.</P>
+<P>
+Note that the child in the example is added as child one. The child list of a composite is zero-based, so the first child is referred to as number zero, the second is number one, and so on. The last child may always be referred to as CCO_LAST; likewise, the first child may always be referred to as CCO_FIRST.</P>
+<P>
+To remove an object or branch from a visible tree, you can use either <CODE>
+MSG_VIS_REMOVE</CODE>
+ or <CODE>
+MSG_VIS_REMOVE_CHILD</CODE>
+. <CODE>
+MSG_VIS_DESTROY</CODE>
+ may also be used, but only if the entire branch should be destroyed after being removed from the tree. Both <CODE>
+MSG_VIS_REMOVE</CODE>
+ and <CODE>
+MSG_VIS_REMOVE_CHILD</CODE>
+ detach the object from the visible tree and visually update the parent immediately. <CODE>
+MSG_VIS_REMOVE</CODE>
+, however, should be sent directly to the object being removed, while <CODE>
+MSG_VIS_REMOVE_CHILD</CODE>
+ is sent to the parent of the object being removed. When removing a child from its parent, you can specify the child by position number (e.g., remove the last child or the first child).</P>
+<P>
+You can move a child within its child list with <CODE>
+MSG_VIS_MOVE_CHILD</CODE>
+. This message is sent to the parent and simply moves the child within the parent's child list. To move a child from one parent to another, you must first remove it and then add it to the other parent with <CODE>
+MSG_VIS_REMOVE_CHILD</CODE>
+ and <CODE>
+MSG_VIS_ADD_CHILD</CODE>
+. This message, as the others, will move the child's entire branch with it.</P>
+
+
+<H2 CLASS="HeadingC">
+Adding and Removing Objects Not Saved to Documents</H2>
+<P>
+<A NAME="IX_Documents:visible objects in;Objects:non-discardable">
+ </A>
+In many cases, you may save visible objects directly to VM documents using GenDocument objects and the document controllers. In cases like this, the objects you save to the file <EM>
+must not</EM>
+ be discarded by the UI if the visible object is taken off the tree or removed. These objects are known as &quot;non-discardable&quot; visible objects stored in a VM file, and unless they're handled specially, they can cause your documents to crash your application.</P>
+<P>
+Any top-level object you save directly to a file must be treated as non-discardable. That is, any object that gets dynamically added to or removed from a visible tree (such as a vis object that gets added as the child of a GenDocument when the document is opened) must be added, removed, and managed as a non-discardable object. There are three messages that deal specifically with non-discardable visible objects; these are detailed below and are <CODE>
+MSG_VIS_ADD_NON_DISCARDABLE_VM_CHILD</CODE>
+, <CODE>
+MSG_VIS_REMOVE_NON_DISCARDABLE_VM_CHILD</CODE>
+, and <CODE>
+MSG_VIS_REMOVE_NON_DISCARDABLE</CODE>
+.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_ADD_CHILD">
+ </A>
+<A NAME="93265">
+ </A>
+MSG_VIS_ADD_CHILD</H4>
+<PRE CLASS="syntax">void	MSG_VIS_ADD_CHILD(
+        optr		child,
+        CompChildFlags		flags);</PRE>
+<P>
+This message attaches the passed object as a child of the composite handling the message. If the parent is already opened and on the screen, you must invalidate the child with <CODE>
+MSG_VIS_MARK_INVALID</CODE>
+, passing the invalidation VOF_WINDOW_INVALID; the composite and child will be updated appropriately according to the <CODE>
+VisUpdateMode</CODE>
+ passed with the invalidation. If, however, the parent is not opened, the child will automatically be opened when the parent is opened.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible composite object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+child</CODE>
+	The optr of the visible object to be added as a child.</P>
+<DL>
+<DT>
+<CODE>
+flags</CODE>
+</DT><DD>A structure of <CODE>
+CompChildFlags</CODE>
+, described below.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	You should not subclass this message.</P>
+<P CLASS="refField">
+Structures:	The <CODE>
+CompChildFlags</CODE>
+ structure contains one one-bit flag and one 15-bit unsigned numerical field. These are described below and can be found in <STRONG CLASS="fileName">
+metaC.goh</STRONG>
+.</P>
+<PRE><A NAME="65063"> </A>typedef WordFlags <A NAME="IX_CompChildFlags"> </A>CompChildFlags;
+#define CCF_MARK_DIRTY					0x8000
+#define CCF_REFERENCE					0x7fff</PRE>
+<PRE>#define CCO_FIRST					0x0000
+#define CCO_LAST					0x7FFF</PRE>
+<PRE>#define CCF_REFERENCE_OFFSET					     0</PRE>
+<DL>
+<DT>
+CCF_MARK_DIRTY<A NAME="CCF_MARK_DIRTY">
+ </A>
+</DT><DD>If this flag is set, the object will be marked dirty when added to the tree.</DD>
+<DT>
+CCF_REFERENCE<A NAME="CCF_REFERENCE">
+ </A>
+</DT><DD>The zero-based position of the new child. Other children will be shuffled forward in the child list as necessary. If greater than the number of children, it will be taken to be CCO_LAST.</DD>
+<DT>
+Two special numbers may be used in the CCF_REFERENCE field:</DT>
+<DT>
+CCO_FIRST<A NAME="CCO_FIRST">
+ </A>
+</DT><DD>Add as the first child.</DD>
+<DT>
+CCO_LAST<A NAME="CCO_LAST">
+ </A>
+</DT><DD>Add as the last child.</DD>
+</DL>
+<P CLASS="refField">
+Warnings:	Do not pass the optr of an object that is already the child of another object. The results are unpredictable and will likely result in an error.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_REMOVE">
+ </A>
+<A NAME="64862">
+ </A>
+MSG_VIS_REMOVE</H4>
+<PRE CLASS="syntax">void	MSG_VIS_REMOVE(
+        VisUpdateMode updateMode);</PRE>
+<P>
+This is the high-level message that closes (if necessary) and removes a visible branch from the object tree. The parent of the branch is marked invalid for visual update according to the passed <CODE>
+VisUpdateMode</CODE>
+.</P>
+<P>
+Unlike <CODE>
+MSG_VIS_DESTROY</CODE>
+, this message does not destroy the visible branch but only unlinks it from the tree. This message may not be subclassed by any object. This message is useful for hiding visible branches which may be added again later with <CODE>
+MSG_VIS_ADD_CHILD</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible composite object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+updateMode</CODE>
+	The <CODE>
+VisUpdateMode</CODE>
+ used to update the composite from which the child is removed. VUM_MANUAL is not allowed.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Do not subclass this message.</P>
+<P CLASS="refField">
+Warnings:	This message will not allow VUM_MANUAL to be passed as the <CODE>
+updateMode</CODE>
+.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_REMOVE_CHILD">
+ </A>
+MSG_VIS_REMOVE_CHILD</H4>
+<PRE CLASS="syntax">void	MSG_VIS_REMOVE_CHILD(
+        optr		child,
+        CompChildFlags		flags);</PRE>
+<P>
+This message removes the specified child from the object tree. This message should be rarely used and used with care; it does not close the visible branch but simply removes it. Consider using the higher-level <CODE>
+MSG_VIS_REMOVE</CODE>
+ instead. Note that all grabs (focus, gadget, mouse, etc.) must be released by the child and all its children before the branch can be removed safely.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	The parent composite of the passed object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+child</CODE>
+	The optr of the child to be removed. If this optr is not among the recipient's children, an error will likely occur.</P>
+<DL>
+<DT>
+<CODE>
+flags</CODE>
+</DT><DD>The <CODE>
+CompChildFlags</CODE>
+ as described in <CODE>
+MSG_VIS_ADD_CHILD</CODE>
+ on <A HREF="VisClass_12.htm#65063"> typedef WordFlags CompChildFlags; #define CCF_MARK_DIRTY 0x8000 #define CCF_REFERENCE 0x7fff</A>
+.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	You should not subclass this message.</P>
+<P CLASS="refField">
+Warnings:	Most likely you should use <CODE>
+MSG_VIS_REMOVE</CODE>
+ instead of this message. <CODE>
+MSG_VIS_REMOVE</CODE>
+ takes care of extra bookkeeping automatically that can be difficult.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_MOVE_CHILD">
+ </A>
+MSG_VIS_MOVE_CHILD</H4>
+<PRE CLASS="syntax">void	MSG_VIS_MOVE_CHILD(
+        optr		child,
+        CompChildFlags		flags);</PRE>
+<P>
+This message moves a child of the recipient to another location among its siblings. It essentially removes the child from the branch and then re-adds it in the same manner as <CODE>
+MSG_VIS_ADD_CHILD</CODE>
+. This message does <EM>
+not</EM>
+ move the child from one parent to another; you must use a combination of <CODE>
+MSG_VIS_REMOVE</CODE>
+ and <CODE>
+MSG_VIS_ADD_CHILD</CODE>
+ to achieve that.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	The parent composite of the passed object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+child</CODE>
+	The optr of the child to be removed. If this optr is not among the recipient's children, an error will likely occur.</P>
+<DL>
+<DT>
+<CODE>
+flags</CODE>
+</DT><DD>The <CODE>
+CompChildFlags</CODE>
+ as described in <CODE>
+MSG_VIS_ADD_CHILD</CODE>
+ on <A HREF="VisClass_12.htm#65063"> typedef WordFlags CompChildFlags; #define CCF_MARK_DIRTY 0x8000 #define CCF_REFERENCE 0x7fff</A>
+.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	You should not subclass this message.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_VIS_ADD_NON_DISCARDABLE_VM_CHILD</H4>
+<PRE CLASS="syntax">void	MSG_VIS_ADD_NON_DISCARDABLE_VM_CHILD(
+        optr		child,
+        CompChildFlags		flags);</PRE>
+<P>
+This message performs exactly the same as <CODE>
+MSG_VIS_ADD_CHILD</CODE>
+ except that it also increments the object's in-use count so it will never be discarded. This is used on top objects in visible sub-trees that are saved to document files: The object is added as a non-discardable file when the document is opened, and it is removed as a non-discardable child (with <CODE>
+MSG_VIS_REMOVE_NON_DISCARDABLE_VM_CHILD</CODE>
+ or <CODE>
+MSG_VIS_REMOVE_NON_DISCARDABLE</CODE>
+) when the document is closed.</P>
+<P CLASS="refField">
+Source:	Unrestricted--typically a document object when opening the file.</P>
+<P CLASS="refField">
+Destination:	The new parent of the visible object being added to the tree.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+child</CODE>
+	The optr of the new child being added to the tree.</P>
+<DL>
+<DT>
+<CODE>
+flags</CODE>
+</DT><DD>A record of <CODE>
+CompChildFlags</CODE>
+ indicating where the child should be added. CCF_MARK_DIRTY is ignored in this record.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_VIS_REMOVE_NON_DISCARDABLE_VM_CHILD</H4>
+<PRE CLASS="syntax">void	MSG_VIS_REMOVE_NON_DISCARDABLE_VM_CHILD(
+        optr	child);</PRE>
+<P>
+This message performs exactly the same as <CODE>
+MSG_VIS_REMOVE_CHILD</CODE>
+ except that it is used with <CODE>
+MSG_VIS_ADD_NON_DISCARDABLE_VM_CHILD</CODE>
+ rather than with <CODE>
+MSG_VIS_ADD_CHILD</CODE>
+. This message decrements the in-use count before removing the child, thereby undoing the extra increment performed by <CODE>
+MSG_VIS_ADD_NON_DISCARDABLE_VM_CHILD</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted--typically a document object when closing the file.</P>
+<P CLASS="refField">
+Destination:	The parent of the visible object being removed from the tree.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+child</CODE>
+	The optr of the child being removed.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_VIS_REMOVE_NON_DISCARDABLE</H4>
+<PRE CLASS="syntax">void	MSG_VIS_REMOVE_NON_DISCARDABLE(
+        VisUpdateMode		updateMode)</PRE>
+<P>
+This message performs exactly the same as MSG_VIS_REMOVE except that it decrements the object's in-use count before removing it. This message should therefore be used in conjunction with the adding message MSG_VIS_ADD_NON_DISCARDABLE_VM_CHILD and should not be used with MSG_VIS_ADD_CHILD. Likewise, MSG_VIS_REMOVE should not be used with this MSG_VIS_ADD_NON_DISCARDABLE_VM_CHILD.</P>
+<P CLASS="refField">
+Source:	Unrestricted--typically a document object when closing the file.</P>
+<P CLASS="refField">
+Destination:	The visible object being removed from the tree.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+updateMode</CODE>
+	A <CODE>
+VisUpdateMode</CODE>
+ value indicating when the object should be visibly removed from the tree. VUM_MANUAL is not allowed.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VisClass_10.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VisClass_11.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.1 Creating and Destroying</A> 
+<!-- to next --> | <A HREF="VisClass_13.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5.3 Getting Visible Tree Information</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

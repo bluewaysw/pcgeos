@@ -1,0 +1,425 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Pen_2.htm,v 1.1 97/06/02 16:38:21 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Instance Data and Messages</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Pen Object Library</A>: 1.1 <A HREF="Pen_1.htm">The Ink Object</A>: 
+Instance Data and Messages</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Pen_1.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Pen_1.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">1 The Ink Object</A> 
+<!-- to next --> | <A HREF="Pen_3.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">1.2 Storing Ink to DB Items</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+<A NAME="IX_II_&ldots;">
+ </A>
+When setting up an Ink object, probably the only pieces of instance data the application will be concerned with will be <CODE>
+II_flags</CODE>
+, <CODE>
+II_dirtyOutput</CODE>
+, and <CODE>
+II_dirtyMsg</CODE>
+.</P>
+<P>
+Most of the flags are easy to understand, with the possible exceptions of the IF_HAS_TARGET and IF_DIRTY fields, which should not be set when creating the object in any case.</P>
+<P CLASS="figTitle">
+Code Display 21-1 InkClass Instance Data</P>
+<PRE>/* 	II_flags:
+ * 	<A NAME="IX_IF_&ldots;  (InkFlags)"> </A><A NAME="IX_InkFlags"> </A>This field holds flags governing the object's behavior:
+ *		IF_MOUSE_FLAGS, 	
+ * 		IF_SELECTING, 		
+ * 		IF_HAS_TARGET,
+ *		IF_HAS_SYS_TARGET,
+ *		IF_DIRTY,
+ *		IF_ONLY_CHILD_OF_CONTENT, 
+ *		IF_CONTROLLED, (Set if to be used with an InkControl)
+ *		IF_INVALIDATE_ERASURES,
+ * 		IF_HAS_UNDO */
+@instance 	InkFlags 			II_flags = IF_HAS_UNDO;</PRE>
+<PRE>/* <A NAME="IX_IT_&ldots;"> </A><A NAME="IX_InkTool"> </A>	II_tool:
+ * 	This field keeps track of how the user is interacting with the Ink. There
+ * 	are three possible tools: IT_PENCIL, IT_SELECTOR, and IT_ERASER. */
+@instance 	InkTool 		II_tool;</PRE>
+<PRE><A NAME="IX_Color:ink input in VisInk"> </A>/* 	II_penColor:
+ * 	The color to use when drawing ink. */
+@instance 	Color 		II_penColor = C_BLACK;</PRE>
+<PRE>/* 	II_segments:
+ * 	Do not set this field explicitly. This field is a handle to the chunk array
+ * 	containing the pen segments. The segments are stored as an array of Point
+ * 	structures. The stored coordinates are all positive; any x coordinate with
+ * 	its sign bit set belongs to the last point in a gesture. Thus, a small 
+ * 	cross shape centered at (72, 72) might be stored:
+ * 		(0x0048, 0x0046) 
+ * 		(0x8048, 0x004A) [note sign bit set in x coordinate]
+ * 		(0x0046, 0x0048)
+ * 		(0x804A, 0x0048)		 [sign bit set in x coordinate]	*/
+@instance 	ChunkHandle 		II_segments;</PRE>
+<PRE>/* 	II_dirtyMsg, II_dirtyOutput:
+ * 	Together, these fields form an Action Descriptor. When the Ink processes
+ * 	a point of pen information, erases anything, or handles an undo event the
+ * 	IF_DIRTY flag will be set. If the flag was not set already, then the Ink
+ *	will send the AD's message to the AD's object. The handler for this message
+ * 	should probably clear the IF_DIRTY bit. */
+@instance optr			II_dirtyOutput;
+@instance Message	 		II_dirtyMsg;</PRE>
+<PRE>@instance Rectangle 			II_selectBounds;			/* Internal */
+@instance GStateHandle			II_cachedGState;			/* Internal */
+@instance TimerHandle 			II_antTimer;			/* Internal */
+@instance word 			II_antTimerID;			/* Internal */
+@instance byte			II_antMask;			/* Internal */</PRE>
+<PRE>/*	ATTR_INK_STROKE_SIZE:
+ * 	Size of line used to draw ink. */
+@vardata    InkStrokeSize   ATTR_INK_STROKE_SIZE; </PRE>
+<PRE>typedef struct {
+	byte    ISS_width;
+	byte    ISS_height;
+} InkStrokeSize;</PRE>
+<PRE>/* 	ATTR_INK_MAX_POINTS: 
+ * 	Maximum number of points of ink data the object is prepared to store. */
+@vardata    word ATTR_INK_MAX_POINTS; </PRE>
+<P>
+Most of the Ink messages just change or retrieve the values of the instance fields. The exceptions are two messages which help those applications which need to save or transfer the Ink object's pen data. Use <CODE>
+MSG_INK_SAVE_TO_DB_ITEM</CODE>
+ to save the pen data to an arbitrary DB item. If the application changes this information and wishes to pass it back to the ink object, use <CODE>
+MSG_INK_LOAD_FROM_DB_ITEM</CODE>
+.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_INK_SET_TOOL">
+ </A>
+MSG_INK_SET_TOOL</H4>
+<PRE CLASS="syntax">void 	MSG_INK_SET_TOOL(
+        InkTool 	tool);</PRE>
+<P>
+This message allows the Ink to switch between pencil and eraser tools, changing the <CODE>
+II_tool</CODE>
+ field.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any Ink object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+tool</CODE>
+ 	A tool, either IT_PENCIL or IT_ERASER.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_INK_GET_TOOL">
+ </A>
+MSG_INK_GET_TOOL</H4>
+<PRE CLASS="syntax">InkTool 	MSG_INK_GET_TOOL();</PRE>
+<P>
+This message returns the Ink's present tool, as stored in <CODE>
+II_tool</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any Ink object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	The present tool, either IT_PENCIL or IT_ERASER.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_INK_SET_PEN_COLOR">
+ </A>
+MSG_INK_SET_PEN_COLOR</H4>
+<PRE CLASS="syntax">void 	MSG_INK_SET_PEN_COLOR(
+        Color 	clr);</PRE>
+<P>
+This message changes the color used to draw the ink, changing the value in <CODE>
+II_penColor</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any Ink object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+clr</CODE>
+	Index to a palette (e.g. C_RED).</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_INK_SET_DIRTY_AD">
+ </A>
+MSG_INK_SET_DIRTY_AD</H4>
+<PRE CLASS="syntax">void 	MSG_INK_SET_DIRTY_AD(
+        word	 method,
+        optr	 object);</PRE>
+<P>
+This message sets the Action Descriptor to be activated when the user dirties the object, changing the values in <CODE>
+II_dirtyMsg</CODE>
+ and <CODE>
+II_dirtyOutput</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any Ink object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+method</CODE>
+ 	The message to send when the object is dirty.</P>
+<DL>
+<DT>
+<EM>object</EM> </DT><DD>The object which should receive the above message.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_INK_SET_MAX_POINTS">
+ </A>
+MSG_INK_SET_MAX_POINTS</H4>
+<PRE CLASS="syntax">void MSG_INK_SET_MAX_POINTS(
+        word 	maxPoints);</PRE>
+<P>
+Set the maximum number of points of ink data the object is prepared to store. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any Ink object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+maxPoints</CODE>
+	The message to send when the object is dirty.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_INK_SET_FLAGS">
+ </A>
+MSG_INK_SET_FLAGS</H4>
+<PRE CLASS="syntax">void 	MSG_INK_SET_FLAGS(
+        InkFlags 	setFlags,
+        InkFlags 	clearFlags);</PRE>
+<P>
+This message changes the value of the <CODE>
+II_flags</CODE>
+ field. Note that something which sets the IF_DIRTY bit should probably also perform the action stored in the <CODE>
+II_dirtyMsg</CODE>
+ and <CODE>
+II_dirtyOutput </CODE>
+fields.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any Ink object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+setFlags</CODE>
+	The flags to turn on.</P>
+<DL>
+<DT>
+<CODE>
+clearFlags</CODE>
+ </DT><DD>The flags to turn off.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_INK_GET_FLAGS">
+ </A>
+MSG_INK_GET_FLAGS</H4>
+<PRE CLASS="syntax">InkFlags 	MSG_INK_GET_FLAGS();</PRE>
+<P>
+This message gets the value of the <CODE>
+II_flags</CODE>
+ field.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any Ink object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	The present value of the <CODE>
+II_flags</CODE>
+ field.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_INK_DELETE_LAST_GESTURE">
+ </A>
+MSG_INK_DELETE_LAST_GESTURE</H4>
+<PRE CLASS="syntax">int MSG_INK_DELETE_LAST_GESTURE();</PRE>
+<P>
+This message removes the last gesture stored by the ink object; if the object had no ink stored, then nothing happens. The message returns zero if nothing was deleted.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any Ink object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Zero if nothing deleted.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_INK_SET_STROKE_SIZE</H4>
+<PRE CLASS="syntax">void MSG_INK_SET_STROKE_SIZE(
+        byte 	width, 
+        byte 	height);</PRE>
+<P>
+Set the brush size to use when drawing ink.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any Ink object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+width</EM>
+	Brush width.</P>
+<DL>
+<DT>
+<EM>
+height</EM>
+</DT><DD>Brush height.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_INK_SAVE_TO_DB_ITEM">
+ </A>
+MSG_INK_SAVE_TO_DB_ITEM</H4>
+<PRE CLASS="syntax">void	MSG_INK_SAVE_TO_DB_ITEM(
+        DBReturn		* RetValue,
+        InkDBFrame		* ptr);</PRE>
+<P>
+This message saves the Ink's pen data into the passed DB item. The pen data will be stored compressed. Calling this message sets the object not dirty.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any Ink object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+ptr</CODE>
+	A pointer to an <CODE>
+InkDBFrame</CODE>
+ structure, shown below.</P>
+<DL>
+<DT>
+<CODE>
+RetValue</CODE>
+</DT><DD>A pointer to an empty <CODE>
+DBReturn</CODE>
+ structure, to be filled by the handler.</DD>
+</DL>
+<P CLASS="refField">
+Return:	The structure pointed to by <CODE>
+RetValue</CODE>
+ will contain the returned information.</P>
+<P CLASS="refField">
+Structures:	The <CODE>
+InkDBFrame</CODE>
+ and <CODE>
+DBReturn</CODE>
+ structures are defined below:</P>
+<PRE><A NAME="IX_IDBF_&ldots;"> </A><A NAME="IX_InkDBFrame"> </A>typedef struct {
+	Rectangle			IDBF_bounds;
+		/* The bounds of the Ink data */
+	VMFileHandle			IDBF_VMFile;
+		/* VM file to write to*/</PRE>
+<PRE>	DBGroupAndItem 			IDBF_DBGroupAndItem;
+		/* DB Item to save to 
+		 * (or NULL to create a new one) */</PRE>
+<PRE>	word 			IDBF_DBExtra;
+		/* Extra space to skip at start
+		 * of block */
+} InkDBFrame;</PRE>
+<PRE><A NAME="IX_DBR_&ldots;"> </A><A NAME="IX_DBReturn"> </A>typedef struct {
+	word		DBR_group;
+	word		DBR_item;
+	word		DBR_unused1;
+	word		DBR_unused2;
+} DBReturn;</PRE>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_INK_LOAD_FROM_DB_ITEM">
+ </A>
+MSG_INK_LOAD_FROM_DB_ITEM</H4>
+<PRE CLASS="syntax">void	MSG_INK_LOAD_FROM_DB_ITEM(
+        InkDBFrame 	*ptr);</PRE>
+<P>
+This message loads the compressed data into the Ink from the passed DB item. If a NULL handle is passed, then the Ink is cleared. This message marks the Ink as clean. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any Ink object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+ptr</CODE>
+ 	A pointer to an <CODE>
+InkDBFrame</CODE>
+ structure.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Structures:	For the <CODE>
+InkDBFrame</CODE>
+ structure, see <CODE>
+MSG_INK_SAVE_TO_DB_ITEM</CODE>
+.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Pen_1.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Pen_1.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">1 The Ink Object</A> 
+<!-- to next --> | <A HREF="Pen_3.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">1.2 Storing Ink to DB Items</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

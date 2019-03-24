@@ -1,0 +1,145 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Pen_3.htm,v 1.2 97/09/05 14:35:18 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Storing Ink to DB Items</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Pen Object Library</A>: 1.2 <A HREF="Pen_1.htm">The Ink Object</A>: 
+Storing Ink to DB Items</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Pen_1.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Pen_2.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1.1 Instance Data and Messages</A> 
+<!-- to next --> | <A HREF="Pen_4.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">2 Working with the Ink DB</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+Pen information comes in as a <CODE>
+MSG_META_NOTIFY_WITH_DATA_BLOCK</CODE>
+ of type NT_INK accompanied by an array containing the coordinates visited by the pen. The pen data keeps track of the coordinates of the pen input. Every time pen input comes in, the ink object notes the coordinates. The ink object is optimized to save space. For instance, the Ink object eliminates collinear points: if three pen events are collinear, it will not record the middle one, recognizing it as redundant.</P>
+<P>
+The non-redundant points are written out to the <CODE>
+II_segments</CODE>
+ field, a chunk array of Point structures. Note that the coordinates are unsigned. If a point's <EM>
+x</EM>
+ coordinate's sign bit is set, that does not mean that the <EM>
+x</EM>
+ coordinate is negative; if this sign bit is set this is a signal that this point is the last point of a gesture.
+<IMG SRC="Pen_3_typicalInk.gif">
+
+</P>
+<P>
+When writing pen data to a DB item, the Ink object does some more compression. Applications which work with the items used by <CODE>
+MSG_INK_SAVE_TO_DB_ITEM</CODE>
+ and <CODE>
+MSG_INK_LOAD_FROM_DB_ITEM</CODE>
+ must work with this compression. Since the user is dragging the pen around in a continuous gesture, the pen events tend to occur close together. Thus, it is nice to have a way to record a coordinate as a small offset from another coordinate. Since many strokes are almost horizontal or vertical, quite often the horizontal or vertical offset will be zero or one. </P>
+<P>
+To take advantage of these tendencies, the ink object stores pen input as a bitstream. Coordinates may be recorded either as absolute positions or as offsets from the last coordinate. 
+<IMG SRC="Pen_3_inkEncoding.gif">
+
+</P>
+<P>
+When writing out a gesture to a DB item, the first point will always be recorded as an absolute position. Thus, first the <EM>
+x</EM>
+ coordinate will be recorded, then the <EM>
+y</EM>
+ coordinate. Each coordinate will be marked as absolute by the 1011 bit pattern.</P>
+<P>
+For each subsequent pen point, the algorithm will first make sure that the new point is not collinear with the previous two. If it is, then the algorithm will make the incoming pen event overwrite the previous event's coordinates.</P>
+<P>
+For each event, the algorithm will first write out the <EM>
+x</EM>
+ coordinate, then the <EM>
+y</EM>
+ coordinate.</P>
+<UL>
+<LI>
+If the coordinate is at 0 or 1 offset from the previous coordinate, the algorithm will write out the appropriate two-bit code (00, 01, or 11).</LI>
+<LI>
+If the coordinate is at an offset from the previous coordinate between 2 and 8, then the algorithm will write out the appropriate 7 bit code (1000xxx for a positive offset, 1001xxx for a negative offset).</LI>
+<LI>
+If the coordinate is more than 8 points from the previous coordinate, the algorithm writes out 1011 followed by the absolute coordinate, represented as a 15 bit unsigned quantity.</LI>
+</UL>
+<P>
+When the input is finished, the algorithm writes a 1000000 bit pattern, signalling the end of the segment.</P>
+<P>
+Decompressing the data is a matter of traversing the bitstream and detecting the appropriate patterns.</P>
+<P>
+As an example of how the algorithm compresses pen input, suppose the Ink object were writing the following gesture to a DB item:</P>
+<PRE>(72, 71)
+(82, 74)
+(84, 74)
+(85, 72)</PRE>
+<P>
+The first coordinate is 72, so the algorithm will write out:<BR>
+<EM>
+1011</EM>
+ (signals absolute coordinate)<EM>
+ 000000001001000<BR>
+</EM>
+The second coordinate is 71, so after handling the second coordinate, the stream will be:<BR>
+1011 000000001001000 <EM>
+1011 000000001000111<BR>
+</EM>
+The <EM>
+x</EM>
+ coordinate of the second point is 82, which is 10 points away from the previous <EM>
+x</EM>
+ coordinate. Unfortunately, this is too far to express as a short offset, so the algorithm writes another absolute coordinate (the new part of the stream is shown in italics):<BR>
+1011 000000001001000 1011 000000001000111 <EM>
+1011 000000001010010</EM>
+ <BR>
+The <EM>
+y</EM>
+ coordinate of the second point is 74, at a positive 3 offset from the previous <EM>
+y</EM>
+ value, so the algorithm will write out the appropriate offset code instead of an absolute position code:<BR>
+...1011 000000001000111 1011 000000001010010 <EM>
+10 00 010</EM>
+ <BR>
+The third point's <EM>
+x</EM>
+ coordinate is 84, at a +2 offset from 82. The <EM>
+y</EM>
+ coordinate is 74, the same as the previous point's <EM>
+y</EM>
+ coordinate:<BR>
+...1011 000000001000111 1011 000000001010010 10 00 010 <EM>
+10 00 001 00</EM>
+ <BR>
+The last point's <EM>
+x</EM>
+ coordinate is one higher than the previous; its <EM>
+y</EM>
+ coordinate is two less.<BR>
+...1011 000000001010010 10 00 010 10 00 001 00 <EM>
+01 10 01 001</EM>
+ <BR>
+Since it has reached the end of the pen input (this was a suspiciously short gesture, a somewhat contrived example), the algorithm then writes an end-of-segment code:<BR>
+...1011 000000001010010 10 00 010 10 00 001 00 01 10 01 001 <EM>
+10 00 000</EM>
+ <BR>
+If the Ink object were holding more than one gesture of information, it would write the next gesture's elements starting after the end-of-segment code of the first.</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Pen_1.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Pen_2.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1.1 Instance Data and Messages</A> 
+<!-- to next --> | <A HREF="Pen_4.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">2 Working with the Ink DB</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

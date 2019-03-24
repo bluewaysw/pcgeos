@@ -1,0 +1,181 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: VM_9.htm,v 1.1 97/06/02 15:54:48 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Opening or Creating a VM File</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Virtual Memory</A>: 3.2 <A HREF="VM_7.htm">Using Virtual Memory</A>: 
+Opening or Creating a VM File</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VM_7.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VM_8.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.1 How to Use VM</A> 
+<!-- to next --> | <A HREF="VM_a.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.3 Changing VM File Attributes</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE><CODE>VMOpen(), VMOpenType, VMAccessFlags</CODE></PRE>
+<P>
+<A NAME="IX_VMOpen()">
+ </A>
+To create or open a VM file, call the routine <CODE>
+VMOpen()</CODE>
+. You may not need to open and create files directly; if you use the document control objects, they automatically create and open files as the user requests. (See <A HREF="../../Files/Documents/index.htm">the Document Objects chapter</A>.) <CODE>VMOpen()</STRONG>
+ looks for the file in the thread's working directory (unless a temporary file is being created, as described below). <CODE>
+VMOpen()</CODE>
+ takes four arguments and returns the file handle. The arguments are:</P>
+<UL>
+<LI>
+File name<BR>
+This argument is a pointer to a string of characters. This string is a relative or absolute path specifying the file to open; if a temporary file is being created, the string is the path of the directory in which to place that file, followed by fourteen null bytes (counting the string-ending null). The name of the temporary file is appended to the path.</LI>
+<LI>
+<CODE>
+VMAccessFlags<BR>
+</CODE>
+This argument is a set of flags which specifies how the file is accessed. The flags are described below.</LI>
+<LI>
+<CODE>
+VMOpenType</CODE>
+ enumerated type<BR>
+This argument specifies how the file should be opened. The <CODE>
+VMOpenType</CODE>
+ are described below.</LI>
+<LI>
+Compaction threshold<BR>
+This is the minimum percentage of a file which must be used for data at any given time. If the percentage drops below this threshold, the file is compacted. If you pass a threshold of zero, the system default threshold is used. The compaction threshold is set only when the file is created; this argument is ignored if an existing file is opened.</LI>
+</UL>
+<P>
+When you use <CODE>
+VMOpen()</CODE>
+, you must specify how the file should be opened. <A NAME="IX_VMO_&ldots;">
+ </A>
+<A NAME="IX_VMOpenType">
+ </A>
+You do this by passing a member of the <CODE>
+VMOpenType</CODE>
+ enumerated type. The types are as follows:</P>
+<DL>
+<DT>
+VMO_TEMP_FILE</DT><DD>
+If this is passed, the file will be a temporary data file. When you create a temporary file, you pass a directory path, not a file name. The path should be followed by fourteen null bytes, including the string's terminating null. The system will choose an appropriate file name and add it to the path string.</DD>
+<DT>
+VMO_CREATE_ONLY</DT><DD>
+If this is passed, the document will be created. If a document with the specified name already exists in the working directory, <CODE>
+VMOpen()</CODE>
+ will return an error condition.</DD>
+<DT>
+VMO_CREATE</DT><DD>
+If this is passed, the file will be created if it does not already exist; otherwise it will be opened.</DD>
+<DT>
+VMO_CREATE_TRUNCATE</DT><DD>
+If this is passed, the file will be created if it does not already exist; otherwise, it will be opened and truncated (all data blocks will be freed).</DD>
+<DT>
+VMO_OPEN</DT><DD>
+Open an existing file. If the file does not exist, return an error condition.<A NAME="marker=377556">
+ </A>
+</DD>
+<DT>
+VMO_NATIVE_WITH_EXT_ATTRS</DT><DD>
+The file will have a name compatible with the native filesystem, but it will have GEOS extended attributes. This flag can be combined with any of the other <CODE>
+VMOpenType</CODE>
+ values with a bit-wise <EM>
+or</EM>
+.</DD>
+</DL>
+<P>
+<A NAME="IX_VMAF_&ldots;">
+ </A>
+<A NAME="IX_VMAccessFlags">
+ </A>
+You also have to specify what type of access to the file you would like. You do this by passing a record of <CODE>
+VMAccessFlags</CODE>
+. This is a byte-length bitfield. The following flags are available:</P>
+<DL>
+<DT>
+VMAF_FORCE_READ_ONLY</DT><DD>
+If set, the file will be opened read-only, even if the default would be to open the file read/write. Blocks in read-only files cannot be dirtied, and changes in memory blocks will not be updated to the disk VM blocks.</DD>
+<DT>
+VMAF_FORCE_READ_WRITE</DT><DD>
+If set, the file will be opened for read/write access, even if the default would be to open the file for read-only access.</DD>
+<DT>
+VMAF_SHARED_MEMORY</DT><DD>
+If set, the VM manager should try to use shared memory when locking VM blocks; that is, the same memory block will be used for a given VM block no matter which thread locks the block.</DD>
+<DT>
+VMAF_FORCE_DENY_WRITE</DT><DD>
+If set, the file will be opened deny-write; that is, no other threads will be allowed to open the file for read/write access.</DD>
+<DT>
+VMAF_DISALLOW_SHARED_MULTIPLE</DT><DD>
+If this flag is set, files with the file attribute GFHF_SHARED_MULTIPLE cannot be opened.</DD>
+<DT>
+VMAF_USE_BLOCK_LEVEL_SYNCHRONIZATION</DT><DD>
+If set, the block-level synchronization mechanism of the VM manager is assumed to be sufficient; the more restrictive file-level synchronization is not used. This is primarily intended for system software. (See <A HREF="VM_12.htm#57104"> File-Access Synchronization</A>
+.)<A NAME="marker=377562">
+ </A>
+</DD>
+</DL>
+<P>
+If you open a file with VMAF_FORCE_READ_ONLY, it's generally a good idea to also open it with VMAF_FORCE_DENY_WRITE. When you open a file VMAF_FORCE_READ_ONLY, if the file is writable, and is located on a writable device which can be used by other machines (e.g. a network drive), the kernel will load the entire file into memory and make the blocks non-discardable (even when they are clean); this keeps the file you see consistent, even if another user changes the version of the file on the disk. However, this can cause problems if the machine has limited swap space. If the file is opened with VMAF_FORCE_DENY_WRITE, no other device will be allowed to change the file while you have it open, which means the kernel can just load and discard blocks as necessary.
+
+</P>
+<P>
+The routine <CODE>
+VMOpen()</CODE>
+ returns the file handle. If it cannot satisfy the request, it returns a null handle and sets the thread error word. The error word can be recovered with the <CODE>
+ThreadGetError()</CODE>
+ routine. The possible error conditions are:</P>
+<DL>
+<DT>
+VM_FILE_EXISTS</DT><DD>
+<CODE>
+VMOpen()</CODE>
+ was passed VMO_CREATE_ONLY, but the file already exists.</DD>
+<DT>
+VM_FILE_NOT_FOUND</DT><DD>
+<CODE>
+VMOpen()</CODE>
+ was passed VMO_OPEN, but the file does not exist.</DD>
+<DT>
+VM_SHARING_DENIED</DT><DD>
+The file was opened by another geode, and access was denied.</DD>
+<DT>
+VM_OPEN_INVALID_VM_FILE</DT><DD>
+<CODE>
+VMOpen()</CODE>
+ was instructed to open an invalid VM file (or a non-VM file).</DD>
+<DT>
+VM_CANNOT_CREATE</DT><DD>
+<CODE>
+VMOpen()</CODE>
+ cannot create the file (but it does not already exist).</DD>
+<DT>
+VM_TRUNCATE_FAILED</DT><DD>
+<CODE>
+VMOpen()</CODE>
+ was passed VMO_CREATE_TRUNCATE; the file exists but could not be truncated.</DD>
+<DT>
+VM_WRITE_PROTECTED</DT><DD>
+<CODE>
+VMOpen()</CODE>
+ was passed VMAF_FORCE_READ_WRITE, but the file or disk was write-protected.</DD>
+</DL>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VM_7.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VM_8.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.1 How to Use VM</A> 
+<!-- to next --> | <A HREF="VM_a.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.3 Changing VM File Attributes</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

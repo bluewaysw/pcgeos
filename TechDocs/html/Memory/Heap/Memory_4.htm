@@ -1,0 +1,238 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Memory_4.htm,v 1.1 97/06/02 15:51:13 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Main Memory</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Memory Management</A>: 2.2 <A HREF="Memory_2.htm">The Structure of Memory</A>: 
+Main Memory</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Memory_2.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Memory_3.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2.1 Expanded/Extended Memory</A> 
+<!-- to next --> | <A HREF="Memory_5.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">3 Using Global Memory</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+<A NAME="IX_Heap">
+ </A>
+Memory available to applications is organized in a data structure called the Global Heap. The size of the global heap may vary from machine to machine and can change from session to session, but during a single execution of GEOS, the heap size remains constant. Usually, the global heap occupies approximately 450K bytes of a 640K system.</P>
+<P>
+When an application requests memory, it is allocated a &quot;block&quot; on the heap. Blocks may be of almost any size but may not be larger than 64K. (However, the heap is most efficient when blocks are 2K-6K in size; see <A HREF="Memory_6.htm#65805"> Memory Etiquette</A>
+.) Every block is allocated a unique handle (described below) from the Handle Table; by calling a memory manager routine, the application can translate a handle to a conventional pointer.</P>
+<P>
+When GEOS shuts down, all the blocks on the global heap are freed, even if they are locked or fixed. If an application will need to store the data over a shutdown, it should make the block part of a VM file, which it can then reopen when it restores from state. The GEOS kernel attaches object blocks to system VM files and takes care of storing them to state and restoring them when GEOS restarts.</P>
+
+<H2 CLASS="HeadingC">
+Blocks and Handles</H2>
+<P>
+GEOS segments memory into blocks. A block is simply a number of contiguous bytes on the global heap in which code or data may be stored. Any given block may be of any size but must be less than 64K, due to the segmented addressing scheme used by the 80x86 processors. A block's size is determined when it is allocated--the process that requests the memory must specify the desired size.</P>
+<P>
+To facilitate efficient memory usage and to present all applications with enough memory to function, blocks are dynamic in nature. This means that unless a block is fixed or has been locked (see <A HREF="Memory_9.htm#19276"> Accessing Data in a Block</A>
+), there is no telling its precise address on the heap, or indeed whether it is on the heap at all. For this reason, applications are not given the address of an allocated block; rather, they are given the block's handle.</P>
+<P>
+Memory handles are indexes into the global handle table. Geodes may not access the table directly. When they want to access the memory indicated by a handle, they pass the handle to the memory manager and are returned the segment address of the block's current location on the heap.</P>
+<P>
+In addition to storing the actual address of the block, the handle table entry records the block's attributes, such as whether the block is discardable, swapable, or fixed. The memory manager uses all these attributes to manipulate the block.</P>
+
+
+<H2 CLASS="HeadingC">
+Enabling Block Access</H2>
+<P>
+Dynamic memory, while providing significant benefits, poses one major problem: What happens if a block is accessed while being moved, swapped, or discarded? GEOS responds to this problem with the implementation of a system for locking and unlocking blocks. When a block is locked on the heap, the Memory Manager may not move, swap, or discard it until it is unlocked. This locking mechanism allows applications to gain control over their memory during periods of access and relinquish it when it is not in active use. Applications, however, should not leave blocks locked for extended periods as this may interfere with heap compaction.</P>
+<P>
+When a process wants to use a block, it instructs the memory manager to lock the block by calling <CODE>
+MemLock()</CODE>
+ (see <A HREF="Memory_9.htm#70173"> MemLock() locks a block on the heap. It is passed the handle of the block; it returns a pointer to the start of the block on the heap. If the block has been discarded, MemLock() returns a null pointer.</A>
+). The application passes the handle of the block, and the memory manager locks the block and returns a pointer to the block's area in the global heap. While a block is unlocked, the memory manager can, depending on the block's category, move the block on the heap, swap it to disk or extended/expanded memory, or discard it altogether.</P>
+
+
+<H2 CLASS="HeadingC">
+Types of Blocks</H2>
+<P>
+When a geode requests memory, it may specify how that memory is to be treated by the memory manager. The memory request includes a set of <CODE>
+HeapFlags</CODE>
+ (see <A HREF="Memory_4.htm#85480"> HF_FIXED The block will not move from its place in the global heap until it is freed. If this flag is off, the memory manager may move the block when it is unlocked. If it is on, the block may not be locked. This flag cannot be changed after the</A>
+) which specifies how and when the block can be moved. Broadly speaking, memory blocks can be divided into four categories:</P>
+<UL>
+<LI>
+Fixed<BR>
+<A NAME="IX_Fixed memory">
+ </A>
+A fixed block has the flag HF_FIXED set to one, and HF_DISCARDABLE and HF_SWAPABLE set to zero. A fixed block is allocated on the global heap and stays exactly where it was created until it is freed. An application can therefore reference data within a fixed block with normal pointers; the application does not need to use the memory manager to translate a handle into a pointer. Accessing fixed blocks is very quick since the memory never needs to be read from disk and the handle does not need to be dereferenced. However, since the memory manager cannot relocate fixed blocks, they tend to degrade the memory manger's performance; therefore, applications should generally use small amounts of fixed memory. Note that if a fixed block is resized, it may be moved on the global heap; therefore, after resizing a fixed block, a geode should reset its pointers within the block by dereferencing the block handle.</LI>
+<LI>
+Moveable<BR>
+<A NAME="IX_Moveable memory">
+ </A>
+A moveable block has the flag HF_FIXED set to zero. When a moveable block is not in use (i.e. unlocked), the memory manager may move it within the global heap. This lets the memory manager keep the global heap compacted (see <A HREF="Memory_4.htm#42030"> Maximizing Free Space in Memory</A>
+). Accessing moveable blocks is slightly slower than accessing fixed blocks since the application needs to call the memory manager to lock the block and translate the memory handle to a pointer. In addition to being moveable, a block may also be swapable and/or discardable (as described below).</LI>
+<LI>
+Swapable<BR>
+<A NAME="IX_Swapable memory">
+ </A>
+A swapable block has the flag HF_FIXED set to zero and HF_SWAPABLE set to one. If a block is marked &quot;swapable,&quot; the memory manager has the option of swapping it out of main memory (either to the hard disk, or to extended or expanded memory) when it is unlocked. This keeps space on the global heap free for other requests. If an application tries to lock a block which has been swapped out of main memory, the memory manager will copy the entire block back to the global heap, then lock it normally. By using swapable memory, geodes can potentially use much more memory than the roughly 450K available in the global heap. However, accessing an unlocked swapable block can potentially be much slower than accessing a non-swapable block, as the block may have to be copied in from the disk.</LI>
+<LI>
+Discardable<BR>
+<A NAME="IX_Discardable memory">
+ </A>
+A discardable block has HF_FIXED set to zero and HF_DISCARDABLE set to one. Sometimes it doesn't make sense to copy a block to the disk. For example, many memory blocks contain code or unchanging data which is read in from the disk. It would make no sense to swap these blocks back to disk, since the data is already there. Instead, one can mark a block &quot;discardable.&quot; This indicates that when the block is unlocked, the memory manager can, at will, discard the block. If a process attempts to lock a block which has been discarded, the memory manager will return an error. The application can then &quot;re-allocate&quot; memory for that block (see <CODE>
+MemReAlloc()</CODE>
+ on <A HREF="Memory_7.htm#41911"> To change the size of a block, call the routine MemReAlloc(). This routine is also used to allocate memory for a block that has been discarded. The routine is passed the memory handle, the new size, and the HeapAllocFlags; it returns the block's</A>
+) and copy the data back from the disk. (The system takes care of reloading discarded code resources as necessary.) A block can be both discardable and swapable (indeed, discardable blocks are usually swapable). If a block has both HF_DISCARDABLE and HF_SWAPABLE set, the memory manager can either swap the block to extended/expanded memory or discard it; it will not swap the block to the disk.</LI>
+</UL>
+<P>
+Fixed blocks must be declared as such when they are allocated, and they remain so until they are freed. However, non-fixed blocks may become or cease to be discardable or swapable after they are created. To enable or disable these characteristics, call the routine <CODE>
+MemModifyFlags()</CODE>
+ (see <A HREF="Memory_c.htm#60044"> MemModifyFlags() is used to change a block's HeapFlags record. It takes three arguments: The handle of the block, the HeapFlags to turn on, and the HeapFlags to clear. It returns nothing. Not all HeapFlags can be changed after a block is created</A>
+).</P>
+
+
+<H2 CLASS="HeadingC">
+<A NAME="42030">
+ </A>
+Maximizing Free Space in Memory</H2>
+<P>
+Moveable, swapable, and discardable blocks are allocated from the top of the heap using a first-fit method. Fixed blocks are allocated from the bottom of the heap. If there is not enough contiguous free memory to satisfy an allocation request, the memory manager attempts to shuffle moveable blocks in order to place all free memory together in one large mass.</P>
+<P>
+This shuffling is called heap compaction. If the free space resulting from compaction still is not enough, blocks are discarded or swapped to liberate more free space, and the heap is again compacted. Because of the multitasking nature of GEOS, compaction occurs in the background and is invisible to both the user and applications. The memory manager will also periodically compact memory during periods of low activity; this helps insure that there will be memory instantly available for a sudden large demand (e.g. when an application is launched).</P>
+<P>
+The compaction is not arbitrary. The kernel decides which blocks to swap or discard based on recent usage patterns. This means, for example, that if you haven't used routines in a code resource for a while, that resource is more likely to be discarded than the resources you've accessed recently. (For this reason, geodes normally isolate their initialization code in one resource, which can be discarded later.)</P>
+<P>
+A block left locked for extended periods could interfere with heap compaction. Suppose, for example, that the moveable locked block in the middle of the heap were left locked during an application's entire execution. Essentially, this would cause the heap to be fractured into two subheaps, making compaction more difficult and possibly slowing the system down.
+
+</P>
+<P>
+All compaction, swapping, and discarding are functions of the Memory Manager. Applications need only indicate how much space is needed and when space can be freed. Applications may also resize blocks at will; if necessary, the memory manager will compact the heap to accommodate the request.</P>
+
+
+<H2 CLASS="HeadingC">
+Block Attributes</H2>
+<PRE>HeapAllocFlags, HeapFlags</PRE>
+<P>
+Blocks are allocated with certain flags that help the Memory Manager manipulate memory efficiently. These flags can be found in the GEOS file <STRONG CLASS="fileName">
+heap.h</STRONG>
+, which should be included in all applications that plan to allocate memory dynamically with the memory manager routines.</P>
+<P>
+The flags fall into two categories: those used when the block is allocated (stored in a record called <CODE>
+HeapAllocFlags</CODE>
+) and those used to describe the block as it is manipulated (stored in a record called <CODE>
+HeapFlags</CODE>
+).</P>
+<P>
+<A NAME="IX_HAF_&ldots;">
+ </A>
+<A NAME="IX_HeapAllocFlags">
+ </A>
+The <CODE>
+HeapAllocFlags</CODE>
+ record is used to determine what qualities the memory manager should give the block when it is first allocated. Some of these flags are also relevant when memory is being reallocated. These qualities include:</P>
+<DL>
+<DT>
+HAF_ZERO_INIT</DT><DD>
+Upon allocation, initialize data in block to zeros.</DD>
+<DT>
+HAF_LOCK</DT><DD>Upon allocation, the block should be locked on the global heap. Use <CODE>
+MemDeref()</CODE>
+ (<A HREF="Memory_c.htm#91285"> MemDeref() is passed the handle of a block on the global heap; it returns the block's address on the global heap. As noted above, this routine is useful when you allocate a fixed or locked block. If the block has been discarded, it returns a nul</A>
+) to get a pointer to the block.</DD>
+<DT>
+HAF_NO_ERR</DT><DD>
+Do not return error codes; system error if block cannot be allocated. Use of this flag is strongly discouraged.</DD>
+<DT>
+HAF_OBJECT_RESOURCE</DT><DD>
+This block is an object-block. This is set by the system <EM>
+only</EM>
+.</DD>
+<DT>
+HAF_UI</DT><DD>If both HAF_OBJECT_RESOURCE and HAF_UI are set, the memory manager will set the block to allow the application's UI thread to manipulate objects in the block. This is set by the system <EM>
+only</EM>
+.</DD>
+<DT>
+HAF_READ_ONLY</DT><DD>
+This block's data will not be modified.</DD>
+<DT>
+HAF_CODE</DT><DD>This block contains executable code.</DD>
+<DT>
+HAF_CONFORMING</DT><DD>
+If this block contains code, the code may be run by a less privileged entity. If the block contains data, the data may be accessed or altered by a less privileged entity.</DD>
+</DL>
+<P>
+<A NAME="IX_HF_&ldots;">
+ </A>
+<A NAME="IX_HeapFlags">
+ </A>
+Once a block is allocated, it has certain properties that govern how the Memory Manager manipulates it. These properties are determined by the <CODE>
+HeapFlags</CODE>
+. The <CODE>
+HeapFlags</CODE>
+ also contain data about whether the block has been swapped or discarded. These flags are stored in the block's handle-table entry, so they can be retrieved without locking the block. To retrieve the flags, call the routine <CODE>
+MemGetInfo()</CODE>
+ with the flag MGIT_FLAGS_AND_LOCK_COUNT. (See <CODE>
+MemGetInfo()</CODE>
+ on <A HREF="Memory_c.htm#19383"> MemGetInfo() is a general-purpose block information routine. It is passed two arguments: the handle of the block, and a member of the MemGetInfoType enumerated type. The return value is always word-length; however, its significance depends on th</A>
+.) Some of the flags can be changed after the block has been allocated; for details, see <CODE>
+MemModifyFlags()</CODE>
+ on <A HREF="Memory_c.htm#60044"> MemModifyFlags() is used to change a block's HeapFlags record. It takes three arguments: The handle of the block, the HeapFlags to turn on, and the HeapFlags to clear. It returns nothing. Not all HeapFlags can be changed after a block is created</A>
+. The flags include</P>
+<DL>
+<DT>
+HF_FIXED</DT><DD><A NAME="85480">
+ </A>
+The block will not move from its place in the global heap until it is freed. If this flag is <EM>
+off</EM>
+, the memory manager may move the block when it is unlocked. If it is <EM>
+on</EM>
+, the block may not be locked. This flag <EM>
+cannot</EM>
+ be changed after the block has been allocated.</DD>
+<DT>
+HF_SHARABLE</DT><DD>
+The block may be locked by geodes other than the owner. This flag can be changed with <CODE>
+MemModifyFlags()</CODE>
+.</DD>
+<DT>
+HF_DISCARDABLE</DT><DD>
+If the block is unlocked and space is needed, the memory manager may discard it. This flag can be changed with <CODE>
+MemModifyFlags()</CODE>
+.</DD>
+<DT>
+HF_SWAPABLE</DT><DD>
+If the block is unlocked and space is needed, it may be swapped to expanded or extended memory or to the hard disk. This flag can be changed with <CODE>
+MemModifyFlags()</CODE>
+.</DD>
+<DT>
+HF_LMEM</DT><DD>
+The block is a local-memory block, managed by the LMem module (see <A HREF="../../Memory/LMem/index.htm">the Local Memory chapter</A>). The flag is set automatically by <CODE>LMemInitHeap()</STRONG>
+. It can be changed with <CODE>
+MemModifyFlags()</CODE>
+; however, an application should not change this flag.</DD>
+<DT>
+HF_DISCARDED</DT><DD>
+The block has been discarded by the memory manager. Only the system can set or clear this flag.</DD>
+<DT>
+HF_SWAPPED</DT><DD>
+The block has been swapped to extended or expanded memory or to the hard disk. Only the system can set or clear this flag.</DD>
+
+</DL>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Memory_2.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Memory_3.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2.1 Expanded/Extended Memory</A> 
+<!-- to next --> | <A HREF="Memory_5.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">3 Using Global Memory</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

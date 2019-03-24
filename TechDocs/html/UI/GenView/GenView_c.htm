@@ -1,0 +1,209 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: GenView_c.htm,v 1.1 97/06/02 16:32:14 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Setting the Background Color</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">GenView</A>: 3.3 <A HREF="GenView_9.htm">Basic View Attributes</A>: 
+<A NAME="45449">
+ </A>
+Setting the Background Color</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GenView_9.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GenView_b.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.2 Dimensional Attributes</A> 
+<!-- to next --> | <A HREF="GenView_d.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.4 The GVI_increment Attribute</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>GVI_color, MSG_GEN_VIEW_SET_COLOR, MSG_GEN_VIEW_GET_COLOR, GVCD_INDEX, GVCD_RED, GVCD_FLAGS, GVCD_BLUE_AND_GREEN, GVCD_BLUE, GVCD_GREEN</PRE>
+<P>
+<A NAME="IX_Color:GenView background">
+ </A>
+<A NAME="IX_Color:view background color">
+ </A>
+A view can have its background color determined by an RGB value, a grayscale value, a CMY value, or as a 
+GEOS
+ color index.</P>
+<P>
+If a view is managing generic objects or is displaying text, it may be most appropriate for the view to appear with the same background color as its parent Primary window. To do this, set the view's <CODE>
+GVI_attrs</CODE>
+ field to the following:</P>
+<PRE>GVI_attrs = @default | GVA_SAME_COLOR_AS_PARENT_WIN;</PRE>
+<P>
+Otherwise, you will probably want to set the view to something other than the parent's color. To use a standard color index (16-color 
+EGA
+ set), set the <CODE>
+GVI_color</CODE>
+<A NAME="IX_GVI_color">
+ </A>
+ attribute as follows:</P>
+<PRE>GVI_color = {<EM>index</EM>, 0, 0, 0};
+	/* <EM>index</EM> is a GEOS color index, one
+	 * of the Color enumerated type. */</PRE>
+<P>
+There is no need to set any of the other color fields if you are using an index. The default background color is determined by the specific UI but is normally C_WHITE. (Color indexes are described in <A HREF="../../Graphics/Shapes/Shapes_11.htm">the Drawing Shapes chapter</A>.)</P><P>
+If you want to use the RGB scheme for setting the background color, you must know the structure used for defining the color. The view uses the structure <CODE>
+ColorQuad</CODE>
+<A NAME="IX_ColorQuad:with WinColorFlags">
+ </A>
+ to hold all four of the color data fields. This structure is defined as follows:</P>
+<PRE>typedef struct {
+    byte			CQ_redOrIndex;
+			/* color index or red value */
+    ColorFlag			CQ_info;
+    byte			CQ_green;		/* green value */
+    byte			CQ_blue;		/* blue value */
+} ColorQuad;</PRE>
+<P>
+When using a color index, you only need to set the <CODE>
+CQ_info</CODE>
+ field to the proper index and set the flags to zero. When using other types of value, however, you must set the <CODE>
+CQ_info</CODE>
+ byte to the type and the other fields to their proper values as shown below:</P>
+<PRE>GVI_color = { <EM>redVal</EM>,					/* red RGB value */
+              CF_RGB,					/* RGB flag */
+              <EM>greenVal</EM>,					/* green RGB value */
+              <EM>blueVal</EM> }					/* blue RGB value */</PRE>
+<P>
+<A NAME="IX_WinColorFlags">
+ </A>
+The <CODE>
+ColorFlag</CODE>
+ record determines how the color will appear on the screen. It record may have any of one the following values:</P>
+<DL>
+<DT>
+CF_INDEX</DT><DD>This flag indicates the color is a palette index, specified in the <CODE>
+CQ_redOrIndex</CODE>
+ field.</DD>
+<DT>
+CF_GRAY</DT><DD>This flag indicates the color will be set with a grayscale value as determined by the other three fields.</DD>
+<DT>
+CF_SAME</DT><DD>This flag indicates the color will not be changed (used for hatch patterns, for example).</DD>
+<DT>
+CF_CMY</DT><DD>This flag indicates the color is set with CMY values.</DD>
+<DT>
+CF_RGB</DT><DD>This flag indicates the colors are specified in RGB values in the other three color fields.</DD>
+</DL>
+<P>
+As an alternative, you may retrieve, set, or change the view's background color during execution with the messages <CODE>
+MSG_GEN_VIEW_SET_COLOR</CODE>
+ and <CODE>
+MSG_GEN_VIEW_GET_COLOR</CODE>
+. These messages are shown below. You may also use the macros referenced below to construct and extract color arguments.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VIEW_SET_COLOR">
+ </A>
+MSG_GEN_VIEW_SET_COLOR</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VIEW_SET_COLOR(
+        byte		indexOrRed,				/* color index or red value */
+        ColorFlag		flags,				/* color flags */
+        word		greenBlue);				/* green and blue values */</PRE>
+<P>
+This message sets the background color of the view. It will not affect the document or printing. The color may be specified either by standard GEOS color index or by RGB value.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenView object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+indexOrRed</CODE>
+	If specifying the color as an index, this is the index value. If specifying as an RGB value, this is the red component of the value.</P>
+<DL>
+<DT>
+<CODE>
+flags</CODE>
+</DT><DD>A record of <CODE>
+ColorFlag</CODE>
+. If specifying the color as an RGB value, set this to CF_RGB. If specifying the color as a palette index, set this to CF_INDEX.</DD>
+<DT>
+<CODE>
+greenBlue</CODE>
+</DT><DD>The green and blue components of the RGB value. If specifying color as an index, set this to zero. If specifying as an RGB value, combine the green and blue components into a single parameter with the macro GVC_GREEN_AND_BLUE.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VIEW_GET_COLOR">
+ </A>
+MSG_GEN_VIEW_GET_COLOR</H4>
+<PRE CLASS="syntax">dword	MSG_GEN_VIEW_GET_COLOR();</PRE>
+<P>
+This message returns all four fields of the view's background color in a single dword value.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenView object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	The four color specifier fields of the GenView's current background color. The individual values may be retrieved with the macros below.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+GVCD_INDEX</H4>
+<PRE CLASS="syntax">byte	<A NAME="IX_GVCD_INDEX() macro"> </A>GVCD_INDEX(val);
+        dword	val;</PRE>
+<P>
+This macro extracts the color index byte from the given dword value. It is intended for use when an index is used.</P>
+
+
+<H4 CLASS="RefETitle">
+GVCD_RED</H4>
+<PRE CLASS="syntax">byte	<A NAME="IX_GVCD_RED() macro"> </A>GVCD_RED(val)
+        dword	val;</PRE>
+<P>
+This macro extracts the red component byte from the given dword value. It is intended for use with RGB values.</P>
+
+
+<H4 CLASS="RefETitle">
+GVCD_FLAGS</H4>
+<PRE CLASS="syntax">byte	<A NAME="IX_GVCD_FLAGS() macro"> </A>GVCD_FLAGS(val)
+        dword	val;</PRE>
+<P>
+This macro extracts the color flags byte from the given dword.</P>
+
+
+<H4 CLASS="RefETitle">
+GVCD_GREEN</H4>
+<PRE CLASS="syntax">byte	<A NAME="IX_GVCD_GREEN() macro"> </A>GVCD_GREEN(val)
+        dword	val;</PRE>
+<P>
+This macro extracts the green component byte from the given dword.</P>
+
+
+<H4 CLASS="RefETitle">
+GVCD_BLUE</H4>
+<PRE CLASS="syntax">byte	<A NAME="IX_GVCD_BLUE() macro"> </A>GVCD_BLUE(val)
+        dword	val;</PRE>
+<P>
+This macro extracts the blue component byte from the given dword.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GenView_9.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GenView_b.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.2 Dimensional Attributes</A> 
+<!-- to next --> | <A HREF="GenView_d.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.4 The GVI_increment Attribute</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

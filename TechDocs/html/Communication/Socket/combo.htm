@@ -1,0 +1,1743 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+<!-- This page was automatically generated from a bunch of smaller pages. -->
+<META NAME="copyright" CONTENT="Copyright GEOWORKS">
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+<TITLE>Socket</TITLE>
+</HEAD>
+<BODY BGCOLOR="#ffffdf">
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+<A NAME="index.htm"></A>
+
+
+
+<H1 CLASS="chapterTitle">
+
+<A NAME="index.htm_36034">
+ </A>
+Socket</H1>
+<P>
+<A NAME="index.htm_IX_Socket">
+ </A>
+This chapter describes interactions with the Socket library, used for managing communications between threads -- threads on different machines or two GEOS threads on the same machine (via the &quot;loopback&quot; communication domain). It provides an API which is mostly independent of the medium used for inter-machine communication.</P>
+<P>
+It is common to spawn a separate thread to poll a socket for incoming data; See <A HREF="../../Kernel/MultiThread/index.htm">the Multithreading chapter</A> to learn about managing threads. Sample applications are located in APPL\SDK_C\MultThrd. Some socket operations require knowledge of the communications network used. 
+
+</P>
+<P CLASS="sectionlinks">
+<STRONG>
+&nbsp;&nbsp;<A HREF="#Socket_1.htm">1 Introduction</A><BR>
+&nbsp;&nbsp;<A HREF="#Socket_2.htm">2 Simple Example</A><BR>
+&nbsp;&nbsp;<A HREF="#Socket_3.htm">3 Addresses</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Socket_4.htm">3.1 Letting the User Choose an Address</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Socket_5.htm">3.2 Managing Addresses</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Socket_6.htm">3.3 Hardware Ports</A><BR>
+&nbsp;&nbsp;<A HREF="#Socket_7.htm">4 Making a Connection</A><BR>
+&nbsp;&nbsp;<A HREF="#Socket_8.htm">5 Accepting a Connection</A><BR>
+&nbsp;&nbsp;<A HREF="#Socket_9.htm">6 Loading on Connection</A><BR>
+&nbsp;&nbsp;<A HREF="#Socket_a.htm">7 Sending and Receiving Data</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Socket_b.htm">7.1 Urgent Data</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Socket_c.htm">7.2 SocketSend() and SocketRecv()</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Socket_d.htm">7.3 Options</A><BR>
+&nbsp;&nbsp;<A HREF="#Socket_e.htm">8 Closing the Connection</A><BR>
+&nbsp;&nbsp;<A HREF="#Socket_f.htm">9 Checking the Connection</A><BR>
+&nbsp;&nbsp;<A HREF="#Socket_10.htm">10 Domain-Specific Information</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Socket_11.htm">10.1 TCP/IP--GEOS Specific</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Socket_12.htm">10.2 TCP/IP--Standard</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Socket_13.htm">10.3 Loopback</A><BR>
+</STRONG>
+</P> <!-- end of sectionlinks blob -->
+
+<HR>
+<A NAME="Socket_1.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Socket</A>: 1 
+<A NAME="Socket_1.htm_74117">
+ </A>
+Introduction</H2>
+<P>
+<A NAME="Socket_1.htm_IX_Socket library">
+ </A>
+The Socket library manages communications both between machines and between threads on the same machine. It provides a level of abstraction above individual communication protocols (<EM>
+e.g.</EM>
+, IrLMP, TCP/IP). Programs using the Socket library can send and receive information packets without knowing much about the communications protocol by which those packets are being transmitted. Also, programs using the Socket library need not know about the hardware communication ports used -- whether communication is being carried out over an IR serial port, a modem, or a network connection -- the API is the same. </P>
+<P>
+<A NAME="Socket_1.htm_IX_SDT_&ldots;">
+ </A>
+<A NAME="Socket_1.htm_IX_SocketDeliveryType">
+ </A>
+The Socket library supports different &quot;delivery types&quot;-- different levels of reliability in transmitting data. There is a trade-off: the more reliable delivery types require more set-up work by the programs using them. The following delivery types are available:</P>
+<DL>
+<DT>
+<STRONG>
+Datagram</STRONG>
+</DT><DD>Unreliable transmission of discrete packets. Packets may arrive out of order or not at all. It is up to the data sender to determine if re-transmission is necessary. This is the least demanding delivery type to set up, because it doesn't require any two-way connection.</DD>
+<DT>
+<STRONG>
+Sequenced Packet</DT><DD>
+</STRONG>
+Sequenced Packet delivery means reliable transmission of discrete packets. The packets arrive in the order sent. The Socket library manages error checking and re-transmissions, as necessary. The program using a sequenced packet socket is responsible for establishing a two-way communications connection.</DD>
+<DT>
+<STRONG>
+Stream</STRONG>
+</DT><DD>Stream delivery means the reliable transmission of a stream of bytes, as opposed to other delivery types which require that data be broken up into packets. The Socket library manages a stream of bytes, breaking it up into packets, transmitting the packets, and reconstructing the byte stream from packets on the other side. The Socket library also manages error-checking and re-transmission, as necessary. The program using a stream socket is responsible for establishing a two-way communications connection.</DD>
+
+</DL>
+<H5 CLASS="HeadingD">
+Addresses</H5>
+<P>
+Each side of the connection is represented by an address. An address is made up of several parts:</P>
+<DL>
+<DT>
+<STRONG>
+Domain</STRONG>
+</DT><DD>The network over which the connection is being made. Domains include TCP/IP, IRLAP, and &quot;loopback&quot; (used for connections between two threads on the same machine).</DD>
+<DT>
+<STRONG>
+Address Data</DT><DD>
+</STRONG>
+This data identifies a machine on a network domain. The format of the address depends on the domain. In the case of TCP/IP, a sample address might be the string &quot;geoworks.com&quot;. IrLAP addresses are 32-bit numbers. If the domain is &quot;loopback&quot;, then no address information is necessary -- the sending and receiving machines are one and the same.</DD>
+<DT>
+<STRONG>
+Port</STRONG>
+</DT><DD>This token identifies one side of a connection within one machine. Ports allow multiple data sockets to operate over one connection. Thus, connecting to &quot;geoworks.com&quot;, one might send mail messages using port 25 and file-transfer commands via port 21. Port numbers are either 16-bit or 32-bit, depending on the domain.</DD>
+</DL>
+<P>
+The amount of overhead associated with sending and receiving data depends upon the devices involved, the domain, and the delivery type. When testing, experiment with different domains (if available), delivery types, and packet sizes to find a good balance of reliability and rapidity.</P>
+<P>
+For any domain, there may be more than one address format. For instance, the TCP/IP address &quot;geoworks.com&quot; is conveniently human-readable, but cannot be used at the socket level to actually make a connection. Instead, you must resolve &quot;geoworks.com&quot; to a 32-bit address number. All socket operations require &quot;primitive&quot; addresses -- addresses resolved to their simplest form. To resolve an address, call <CODE>
+SocketResolve()</CODE>
+. We will discuss the details of working with addresses in more detail below.</P>
+
+
+<H5 CLASS="HeadingD">
+Errors</H5>
+<P>
+Many of the Socket library routines return error values. Sometimes these error values are return values of routines; if you call a routine that can return an error value, be sure to check the return value and react appropriately to errors. Some routines don't return an error value directly, instead returning a flag to indicate that something has gone wrong. To find out exactly what went wrong, call <CODE>
+ThreadGetError()</CODE>
+. </P>
+<P>
+Those Socket library routines that return error values do not set the thread error value. Calling <CODE>
+ThreadGetError()</CODE>
+ after calling such a routine would not detect any error encountered by that routine.</P>
+<P>
+<CODE>
+ThreadGetError()</CODE>
+ returns a word-sized value. The low byte of this word is a <CODE>
+SocketError</CODE>
+ value; the high byte is a <CODE>
+SpecSocketDrError</CODE>
+ value. If the returned word is zero, that means that there was no error. </P>
+<P>
+<A NAME="Socket_1.htm_IX_SSDE_&ldots;">
+ </A>
+<A NAME="Socket_1.htm_IX_SpecSocketDrError values">
+ </A>
+In general, a <CODE>
+SpecSocketDrError</CODE>
+ value indicates a low-level error, and a <CODE>
+SocketError</CODE>
+ value indicates a high-level error. In many cases, there will be a <CODE>
+SocketError</CODE>
+ in the low byte, but the high byte will be clear -- there was no problem with the low-level communication medium, but a protocol exception may have occurred.</P>
+<P>
+In general, only the low byte (the <CODE>
+SocketError</CODE>
+ value) is useful in determining how to handle the exception. The high byte might affect what error message is displayed to the user. For example, it probably doesn't matter to your program whether the high byte was SSDE_LINE_BUSY or SSDE_NO_DIALTONE. In either case, it just means that communication could not be established. However, users might want to know the nature of the problem so that they can figure out how fix it.</P>
+<P>
+<A NAME="Socket_1.htm_IX_SocketError">
+ </A>
+<A NAME="Socket_1.htm_IX_SE_&ldots;">
+ </A>
+Some of the more common <CODE>
+SocketError</CODE>
+ values are listed below. In addition, certain routines may make use of other <CODE>
+SocketError</CODE>
+ values, which will be discussed with those routines.</P>
+<DL>
+<DT>
+SE_NORMAL</DT><DD>
+There is no error. SE_NORMAL is guaranteed to equal zero.</DD>
+<DT>
+SE_OUT_OF_MEMORY</DT><DD>
+The Socket library ran out of memory. Perhaps it was trying to receive or send a data packet that was too large.</DD>
+<DT>
+SE_SOCKET_IN_USE</DT><DD>
+The socket was busy doing something else. Perhaps you tried to connect it, but it was already connected.</DD>
+<DT>
+SE_SOCKET_BUSY</DT><DD>
+The socket was temporarily busy doing something else. Perhaps you should try again a few times.</DD>
+<DT>
+SE_MEDIUM_BUSY</DT><DD>
+The hardware port which would be used to carry out the requested operation was busy. You might wait for the hardware port to become free; you could call <CODE>
+SocketCheckMediumConnection()</CODE>
+ to see if the port is being used for a socket connection.</DD>
+<DT>
+SE_ALL_PORTS_BUSY</DT><DD>
+To carry out the requested operation, the Socket library tried to use a port number; however all port numbers were already busy. </DD>
+<DT>
+SE_SOCKET_NOT_BOUND</DT><DD>
+The socket was not bound (<EM>
+i.e.</EM>
+, associated with a port number), but needed to be bound to carry out the requested operation. To bind a socket, call <CODE>
+SocketBind()</CODE>
+.</DD>
+<DT>
+SE_SOCKET_NOT_LISTENING</DT><DD>
+The socket wasn't listening for incoming connections, and needed to be in this state to carry out the requested operation. To make a socket listen, call <CODE>
+SocketListen()</CODE>
+.</DD>
+<DT>
+SE_SOCKET_LISTENING</DT><DD>
+The socket was busy listening for incoming connections when you asked it to carry out another operation. Remember that you often want separate sockets to handle listening and data transfer.</DD>
+<DT>
+SE_SOCKET_NOT_CONNECTED</DT><DD>
+The socket was not connected, but a connection is required for the operation you requested. To connect the socket, call <CODE>
+SocketConnect()</CODE>
+.</DD>
+<DT>
+SE_SOCKET_CLOSED</DT><DD>
+The socket was closed, making the requested operation impossible.</DD>
+<DT>
+SE_CONNECTION_CLOSED</DT><DD>
+The other side of your socket's connection has closed that connection; to close up your side of the connection, call <CODE>
+SocketClose()</CODE>
+. </DD>
+<DT>
+SE_CONNECTION_FAILED</DT><DD>
+The connection was lost, probably due to some low-level link failure. There may have been a problem with the physical connection or with the domain-specific software.</DD>
+<DT>
+SE_CONNECTION_RESET</DT><DD>
+The connection was lost, probably due to this side of the connection intentially making a low-level disconnection; <EM>
+e.g.</EM>
+, the sort of disconnection that results from <CODE>
+SocketCloseDomainMedium()</CODE>
+ or the Socket's owning thread exiting.</DD>
+<DT>
+SE_TIMED_OUT</DT><DD>
+The Socket library was unable to carry out the requested operation before the time-out time was reached. Beware: Depending on the domain, for certain phases of certain operations, there may be low-level time-outs which can occur even if you have specified a longer or an infinite time-out. </DD>
+<DT>
+SE_CANT_LOAD_DRIVER</DT><DD>
+The Socket library was unable to load a driver necessary to carry out the requested operation.</DD>
+<DT>
+SE_UNKNOWN_DOMAIN</DT><DD>
+The Socket library didn't recognize the domain name.</DD>
+<DT>
+SE_DESTINATION_UNREACHABLE</DT><DD>
+The requested destination address was unreachable over the network.</DD>
+<DT>
+SE_LINK_FAILED</DT><DD>
+The low-level link used for this connection failed or could not be established. There may have been a problem with the physical connection or with the domain-specific software.</DD>
+<DT>
+SE_SYSTEM_SHUTDOWN</DT><DD>
+This error signals that GEOS is shutting down. Your program should probably either end its connections gracefully or attempt to delay the shutdown. Note that it is possible for a shutdown to occur without generating this signal.</DD>
+<DT>
+SE_INFO_NOT_AVAILABLE</DT><DD>
+The requested information was not available. </DD>
+<DT>
+SE_DOMAIN_REQUIRES_16BIT_PORTS</DT><DD>
+You tried to use a 32-bit port number in a domain that does not support them. Use MANUFACTURER_ID_SOCKET_16BIT_PORT as the <CODE>
+ManufacturerID</CODE>
+ of your port number.</DD>
+<DT>
+SE_INTERRUPT</DT><DD>
+The operation was stymied by <CODE>
+SocketInterrupt()</CODE>
+.</DD>
+<DT>
+SE_INTERNAL_ERROR</DT><DD>
+The Socket library did something wrong. You should take advantage of whatever developer support to which you have access. They will want a back-trace and other information necessary to duplicate the error.</DD>
+
+</DL>
+<HR>
+<A NAME="Socket_2.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Socket</A>: 2 
+<A NAME="Socket_2.htm_36532">
+ </A>
+Simple Example</H2>
+<P>
+The sample application Appl/SDK_C/Talk provides an example of a simple application using the Socket library.</P>
+<P>
+To understand how the program works, you should, of course, look at its source code. The following is a high-level overview of what the Talk example illustrates: a simple client-server connection in which the server awaits connections, the client connects, and then the two exchange data. Note: this application assumes that the host device (the client) has already connected to the server. Remote connections are usually made through PPP or Point-to-Point Protocol. See <CODE>
+SocketOpenDomainMedium()</CODE>
+ discussed in <A HREF="#Socket_6.htm_79399"> Hardware Ports</A>
+.</P>
+<P>
+The example performs the following steps:</P>
+<OL>
+<LI>
+<STRONG>
+Allocate memory in which to store data.<BR>
+</STRONG>
+When sending or receiving data, you need to provide a pointer to a buffer containing the data to be sent or received. Thus, the buffer should be in a block which can either be locked down as needed or is in fixed memory. Programs often spawn a separate thread to receive data from the socket; if this thread needs to lock down a memory block in which to store the data, then make sure that the thread can lock down the memory block. See <A HREF="../../Kernel/MultiThread/index.htm">the Multithreading chapter</A> to learn about managing threads.<BR>
+(If you follow the multi-threaded approach, be aware that when the Socket's owning thread exits, it frees the Socket. To allow a Socket to survive the exit of its thread, use <CODE>
+SocketSetIntSocketOption()</CODE>
+ to change its owning thread.)<BR>
+For this simple example, we're using a small buffer to handle the receipt of data, so we declare it as a global variable so it resides in the application's fixed memory:</LI>
+</OL>
+<PRE>char recvBuf[16];</PRE>
+<UL>
+<LI FIXME_NumListOther>
+<STRONG>
+Client Side: Make Sure Connected to Domain<BR>
+</STRONG>
+Depending on the nature of the device and application, you may need to make sure that the device is connected to the communication domain. In the Talk sample application, we make sure that the device is dialed in to an ISP: an <CODE>
+AccessPointControl</CODE>
+ object prompts the user to choose an ISP, and a call to <CODE>
+SocketOpenDomainMedium()</CODE>
+ opens a PPP connection to that ISP.</LI>
+<LI FIXME_NumListOther>
+<STRONG>
+Client Side: Get Address For Other Side of Connection.<BR>
+</STRONG>
+The Talk application allows the user to connect with another machine by specifying that machine's address. The Talk application creates a controller gadget by which the user can specify an address. <CODE>
+SocketGetAddressController()</CODE>
+ returns the controller class' pointer; <CODE>
+ObjInstantiate()</CODE>
+ creates an object of the class.<BR>
+The following code is called when the application opens. It creates the controller gadget, initializes its data, and places it in a dialog box.</LI>
+</UL>
+<PRE>ctrlClass = 
+  SocketGetAddressController(theAddress.SA_domain));</PRE>
+<PRE>ctrlOb = 
+  ObjInstantiate( 
+    HandleOf(GeodeGetOptrNS(@AddressDialog)),
+    ctrlClass);</PRE>
+<PRE>@call ctrlOb::MSG_SOCKET_ADDRESS_CONTROL_SET_ACTION(
+  ConstructOptr(0,TO_PROCESS), MSG_CTP_VALID);</PRE>
+<PRE>@call
+  GeodeGetOptrNS(@AddressDialog)::MSG_GEN_ADD_CHILD(
+    ctrlOb, CCO_FIRST);</PRE>
+<PRE>@call ctrlOb::MSG_GEN_SET_USABLE(VUM_NOW);</PRE>
+<P FIXME_BulListNoBul>
+	When the user enters an address, the following code is called. It gets the selected address from the address controller and packages it up into a form the Socket library can use.</P>
+<P FIXME_BulListNoBul>
+	<CODE>
+MSG_SOCKET_ADDRESS_CONTROL_GET_ADDRESSES</CODE>
+ returns a chunk with raw address data based on the address entered by the user. <CODE>
+SocketResolve()</CODE>
+ reduces this raw address data to a primitive form that can be used for making connections.</P>
+<PRE>adArray = @call ctrlOb::MSG_SOCKET_ADDRESS_CONTROL_GET_ADDRESSES();</PRE>
+<PRE>address1 = ChunkArrayElementToPtrHandles(
+  HandleOf(ctrlOb), adArray, 0,0);</PRE>
+<PRE>theAddress.SA_addressSize = 
+  SocketResolve(
+    theAddress.SA_domain, (byte *)&amp;address1[1],
+    address1-&gt;SACA_opaqueSize, addressBuffer,
+    MAX_ADDRESS_SIZE);</PRE>
+<PRE>LMemFreeHandles(HandleOf(ctrlOb), adArray);</PRE>
+<UL>
+<LI FIXME_NumListOther>
+<STRONG>
+Client Side: Create and Connect Socket.<BR>
+</STRONG>
+The Client side now creates a socket for its side of the connection and attempts to connect to the address extracted from the address controller. The socket will be of the stream delivery type. </LI>
+</UL>
+<PRE>dataSocket = SocketCreate(SDT_STREAM);</PRE>
+<PRE>SocketConnect(
+  dataSocket, (SocketAddress *) &amp;theAddress,
+  SOCKET_NO_TIMEOUT);</PRE>
+<UL>
+<LI FIXME_NumListOther>
+<STRONG>
+Server Side: Create Socket and Accept Connection(s)<BR>
+</STRONG>
+On the server side, the application spawns a separate thread to handle incoming connections.</LI>
+</UL>
+<P FIXME_BulListNoBul>
+	There are two &quot;sockets&quot; created on this, the server side of the connection. The first socket is bound to a particular port, and &quot;listens&quot; for incoming connections. It is possible to accept more than one connection over the listening socket--each accepted connection is represented by another socket to represent this side of the new particular connection.</P>
+<PRE>listenSocket = SocketCreate(SDT_STREAM);</PRE>
+<PRE>SocketBind(listenSocket, theAddress.SA_port, 0);</PRE>
+<PRE>SocketListen(listenSocket, 5);</PRE>
+<PRE>dataSocket = SocketAccept(
+  listenSocket, SOCKET_NO_TIMEOUT);</PRE>
+<UL>
+<LI FIXME_NumListOther>
+<STRONG>
+Either Side: Send Data<BR>
+</STRONG>
+In this example, the data to send is taken from a text object. The program loads the text into a block of memory, locks the block down to get a pointer to it, then transmits the data.</LI>
+</UL>
+<PRE>textBlock = @call
+  GeodeGetOptrNS(@InText)::
+  MSG_VIS_TEXT_GET_ALL_BLOCK(NullHandle);</PRE>
+<PRE>textPtr = MemLock(textBlock);</PRE>
+<PRE>textSize = LocalStringSize(textPtr);</PRE>
+<PRE>SocketSend(
+  dataSocket, textPtr, textSize, 0, 
+  (SocketAddress *)0);</PRE>
+<PRE>MemFree(textBlock);</PRE>
+<UL>
+<LI FIXME_NumListOther>
+<STRONG>
+Either Side: Wait For and Receive Data<BR>
+</STRONG>
+The application's listening thread waits for data to arrive and stores it away in a buffer when it does arrive. It processes the incoming data and gets ready for the next piece of data.</LI>
+</UL>
+<PRE>while ((
+  datasize = SocketRecv(
+    dataSocket, recvBuf, sizeof recvBuf, 
+    SOCKET_NO_TIMEOUT, 0, (SocketAddress *)0))
+  != 0)</PRE>
+<PRE>{ @call 
+  GeodeGetOptrNS(@OutText)::MSG_VIS_TEXT_APPEND_PTR(
+    recvBuf, datasize); }</PRE>
+<UL>
+<LI FIXME_NumListOther>
+<STRONG>
+Either Side: Close Connection<BR>
+</STRONG>
+The application has a Close button. When the user presses this button, the application shuts down its side of the connection. The <CODE>
+SocketCloseSend()</CODE>
+ routine partially shuts down the socket so that it can receive data, but cannot send it; also, the routine sends a signal to the other side that the connection is closing.</LI>
+</UL>
+<PRE>if (listenSocket) { 
+  SocketClose(listenSocket);
+  listenSocket = 0; }</PRE>
+<PRE>SocketCloseSend(dataSocket);</PRE>
+<UL>
+<LI FIXME_NumListOther>
+<STRONG>
+Either Side: Detect Closed Connection and Close Socket<BR>
+</STRONG>
+When receiving data, if either side seems to have received a zero-length packet, it checks to see if an exception has occurred, specifically to see if the connection has closed. (When <CODE>
+SocketRecv()</CODE>
+ detects an error, it sets the thread error value, which may be retrieved via <CODE>
+ThreadGetError()</CODE>
+.) If the connection has closed, then Talk closes the sockets on this side of the connection.</LI>
+</UL>
+<PRE>if (ThreadGetError() == SE_CONNECTION_CLOSED) { 
+  if (listenSocket) {
+    SocketClose(listenSocket);
+    listenSocket = 0; }
+  SocketClose(dataSocket); }</PRE>
+<UL>
+<LI FIXME_NumListOther>
+<STRONG>
+Both Sides: Sockets Freed When Thread Exits<BR>
+</STRONG>
+Lest you are worried about these Sockets you have created but not freed, know that they will be freed automatically when the owning thread exits. (To allow a Socket to survive its thread's exit, you must assign the Socket to a new thread.)</LI>
+</UL>
+<HR>
+<A NAME="Socket_3.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Socket</A>: 3 
+<A NAME="Socket_3.htm_40408">
+ </A>
+Addresses</H2>
+<P>
+<A NAME="Socket_3.htm_IX_SocketAddress">
+ </A>
+<A NAME="Socket_3.htm_IX_SA_&ldots;">
+ </A>
+In the example above, the application queried the user for a connection address. This is a fairly common case. However, some programs need to use hard-wired addresses. Perhaps you want to allow connections over all available domains. Thus, a few words about addresses may be in order.</P>
+<P>
+Addresses are usually represented via the <CODE>
+SocketAddress</CODE>
+ structure:</P>
+<PRE>typedef struct {
+	SocketPort 		SA_port;
+	word 		SA_domainSize;
+	char *		SA_domain;
+	word 		SA_addressSize;
+} SocketAddress;
+/* domain-specific address data here */</PRE>
+<DL>
+<DT>
+<STRONG>
+SA_port</STRONG>
+</DT><DD><A NAME="Socket_3.htm_SocketPort structure">
+ </A>
+Port numbers identify a particular line of communication within a machine. Port numbers may be 32-bit or 16-bit, depending on the domain. They are specified via the <CODE>
+SocketPort</CODE>
+ structure, made up of a 16-bit <CODE>
+ManufacturerID</CODE>
+ and 16-bit arbitrarily-chosen token number. If the domain uses 16-bit socket numbers, then use MANUFACTURER_ID_SOCKET_16BIT_PORT<A NAME="Socket_3.htm_MANUFACTURER_ID_SOCKET_16BIT_PORT">
+ </A>
+ as the <CODE>
+ManufacturerID</CODE>
+. If the domain allows 32-bit socket numbers, then you may use MANUFACTURER_ID_SOCKET_16BIT_PORT or some other <CODE>
+ManufacturerID</CODE>
+, probably your own ID or that of some standard service provider. This numbering scheme helps to avoid overlapping port numbers.</DD>
+<DT>
+<STRONG>
+SA_domain</STRONG>
+, <STRONG>
+SA_domainSize</DT><DD>
+</STRONG>
+The domain identifies the protocol of the network by which the addressed machine may be reached. The domain is specified by a string. In a <CODE>
+SocketAddress</CODE>
+ structure, <CODE>
+SA_domain</CODE>
+ is a pointer to the null-terminated domain name string and <CODE>
+SA_domainSize</CODE>
+ is the size of the buffer containing the domain name string.</DD>
+<DT>
+</DT><DD>Many communications protocols are hard-wired to work with a particular domain. To find out all domains available to the user's device, call <CODE>
+SocketGetDomain().</CODE>
+ (See <A HREF="#Socket_4.htm_41559"> Letting the User Choose an Address</A>
+.)</DD>
+<DT>
+<STRONG>
+SA_addressSize</STRONG>
+, <STRONG>
+Address Data</DT><DD>
+</STRONG>
+The format of the address data used to identify a machine within a domain depends on that domain. The <CODE>
+SA_addressSize</CODE>
+ field of the <CODE>
+SocketAddress</CODE>
+ structure contains the size of the address data. The buffer containing the address data should fall immediately after the <CODE>
+SocketAddress</CODE>
+ structure. Read the documentation for a given domain to find out the format for its addresses.<BR>
+You'll want to make sure that space for this data is, in fact, allocated at the end of the structure. If you declare a socket address, you will define a struct, probably based on <CODE>
+SocketAddress</CODE>
+, that has the fields of <CODE>
+SocketAddress</CODE>
+, but also has a buffer to hold the resolved address data. More likely than not, you won't need to declare or define such a structure -- you're more likely to use <CODE>
+SocketCreateResolvedAddress()</CODE>
+ or bypass the creation of this structure altogether.</DD>
+</DL>
+<P>
+Before using an address, make sure that it is in its primitive form. For instance, an IP address like &quot;geoworks.com&quot; is not in its primitive form -- the IP address must be translated into a four-byte number before it can be used. Use <CODE>
+SocketResolve()</CODE>
+ (described below) to transform an address into its primitive form. Note that the address passed to <CODE>
+SocketResolve()</CODE>
+ is not in a <CODE>
+SocketAddress</CODE>
+ structure.</P>
+<P CLASS="subsectionLink">
+<A HREF="#Socket_4.htm">Letting the User Choose an Address</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Socket_5.htm">Managing Addresses</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Socket_6.htm">Hardware Ports</A></P>
+<HR>
+<A NAME="Socket_4.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Socket</A>: 3.1 <A HREF="#Socket_3.htm">Addresses</A>: 
+<A NAME="Socket_4.htm_41559">
+ </A>
+Letting the User Choose an Address</H3>
+<PRE>SocketAddressControllerClass, SocketGetDomains(), SocketGetAddressController(), SocketCreateResolvedAddress(), SocketResolve(), SocketInterruptResolve()</PRE>
+<P>
+<A NAME="Socket_4.htm_IX_SocketGetDomains()">
+ </A>
+Given a domain, you can request the Socket library to provide UI gadgetry so that the user can choose an address within that domain. Many programs only support socket connections over one domain. However, if you need a list of all domains supported in the user's environment, call <CODE>
+SocketGetDomains()</CODE>
+.</P>
+<P>
+The <CODE>
+SocketGetDomains()</CODE>
+ routine takes the optr of a chunk array and fills in that array with elements. Each element contains a (non-null-terminated) string which is the name of a supported domain. This chunk array has a standard <CODE>
+ChunkArrayHeader</CODE>
+ header and variable-sized elements. </P>
+<P>
+If you want the routine to allocate the chunk array for you, pass an optr that contains a NullChunk (<EM>
+i.e.</EM>
+, a null ChunkHandle):</P>
+<PRE>MemHandle	myHandle;</PRE>
+<PRE>Optr	myOptr;</PRE>
+<PRE>myHandle = OptrToHandle(myHandle);</PRE>
+<PRE>myOptr = ConstructOptr(myHandle, NULL);</PRE>
+<P>
+For more information about working with chunk arrays, see <A HREF="../../Memory/LMem/index.htm">the Local Memory chapter</A>. In short, to manage the chunk array of domain names: </P><OL>
+<LI>
+Lock down the local memory heap with <CODE>
+MemLock()</CODE>
+.</LI>
+<LI FIXME_NumListOther>
+Use <CODE>
+LMemDerefHandles()</CODE>
+ to get a pointer to the chunk array.</LI>
+<LI FIXME_NumListOther>
+To get the number of domains, call <CODE>
+ChunkArrayGetCount()</CODE>
+.</LI>
+<LI FIXME_NumListOther>
+To get a pointer to the nth string in the chunk array, call <CODE>
+ChunkArrayElementToPtr()</CODE>
+ or <CODE>
+ChunkArrayElementToPtrHandles()</CODE>
+.</LI>
+<LI FIXME_NumListOther>
+When finished reading domain strings, call <CODE>
+MemUnlock()</CODE>
+ on the local memory heap.</LI>
+</OL>
+<P>
+<A NAME="Socket_4.htm_IX_SocketGetAddressController()">
+ </A>
+Given a domain name, you can create some UI gadgetry for choosing addresses within that domain. As shown in the Appl/SDK_C/Talk example, call <CODE>
+SocketGetAddressController()</CODE>
+ to get the class of an appropriate controller. This class is guaranteed to support the messages shown in <A HREF="#Socket_4.htm_68306"> SocketAddressControllerClass</A>
+.</P>
+<P CLASS="figTitle">
+Code Display 23-1 <A NAME="Socket_4.htm_68306">
+ </A>
+<A NAME="Socket_4.htm_IX_SocketAddressControllerClass">
+ </A>
+SocketAddressControllerClass</P>
+<PRE>/* Domain-specific subclasses of SocketAddressControllerClass all support 
+ * the following messages. MSG_SOCKET_ADDRESS_CONTROL_GET_ADDRESSES is probably 
+ * the most commonly used message. */</PRE>
+<PRE>/*
+ * Build the block of data that holds the addresses selected by the user
+ * to pass to the transport driver. If OK, returns ChunkArray of SACAddress
+ * structures in same block as controller. Else, returns 0.</PRE>
+<PRE> * As of this writing, all address controllers return at most one address 
+ * in the list of addresses. </PRE>
+<PRE> * The returned address(es) are not in its primitive form; use 
+ * SocketResolve() to transform the address into something usable.
+ */
+<A NAME="Socket_4.htm_IX_MSG_SOCKET_ADDRESS_CONTROL_&ldots;"> </A>@message word MSG_SOCKET_ADDRESS_CONTROL_GET_ADDRESSES();</PRE>
+<PRE><A NAME="Socket_4.htm_IX_SACAddress"> </A><A NAME="IX_SACA_opaqueSize"> </A>typedef struct {
+	word 		SACA_opaqueSize;
+	/* label byte 		SACA_opaque;    Pass this to SocketResolve */ 
+	/* after the opaque address, there is a null-terminated
+	 *  human-readable form of the address. */
+} SACAddress;</PRE>
+<PRE>/*
+ * Inform the subclass of the type of medium selected by the user
+ * so it can customize its appearance appropriately, should the controller
+ * handle media that have different ways of addressing.
+ */
+@message void MSG_SOCKET_ADDRESS_CONTROL_SET_MEDIUM (
+				MediumType mediumType);</PRE>
+<PRE>/*
+ * Set the current user-editable address to the passed address.
+ */
+@message void MSG_SOCKET_ADDRESS_CONTROL_SET_ADDRESSES(optr addr);</PRE>
+<PRE>/*
+ * Inform the controller of the message and destination object it should use to
+ * notify the invoker that a valid address exists.
+ */
+@message void MSG_SOCKET_ADDRESS_CONTROL_SET_ACTION (
+				optr dest,
+				word actionMsg);</PRE>
+<PRE>/*
+ * Let the containing dialog know whether the address we've got is a
+ * valid one, so it can decide whether to allow the user to send the
+ * message.
+ */
+@message void MSG_SOCKET_ADDRESS_CONTROL_SET_VALID_STATE(Boolean valid);</PRE>
+<P>
+<A NAME="Socket_4.htm_IX_SocketResolve()">
+ </A>
+You cannot use an address with Socket library routines unless that address is in its primitive form. This primitive form is created by taking a higher-level form of the address and passing it to the <CODE>
+SocketCreateResolvedAddress()</CODE>
+ routine or the <CODE>
+SocketResolve()</CODE>
+ routine. Exactly how the Socket library resolves the address depends upon the domain.</P>
+<P>
+Recall that addresses returned by the address controller are not in their primitive form. The primitive form of an address can be volatile: feel free to re-use them if making several connections over a short period of time, but re-resolve the address if it's been a long time since it was last resolved. Note that there can be a large overhead when it comes to resolving addresses. Also note that IRLAP numeric addresses are especially volatile, changing every time the protocol connection starts, <EM>
+i.e.,</EM>
+ every time the IRLAP driver is loaded, either for the first time or after more than a minute of inactivity.</P>
+<P>
+<A NAME="Socket_4.htm_IX_SocketCreateResolvedAddress()">
+ </A>
+The <CODE>
+SocketCreateResolvedAddress()</CODE>
+ routine takes a pointer to a domain name and raw address data and returns a buffer with a <CODE>
+SocketAddress</CODE>
+ structure and the address data. Depending on what you're going to use the address for, you may need to fill in the structure's <CODE>
+SA_port</CODE>
+ field. </P>
+<P>
+<CODE>
+SocketResolve()</CODE>
+ is the same as <CODE>
+SocketCreateResolvedAddress()</CODE>
+ except that <CODE>
+SocketResolve()</CODE>
+ takes a buffer to hold the resolved address data. If the buffer isn't big enough, <CODE>
+SocketResolve()</CODE>
+ returns SE_BUFFER_TOO_SMALL. Depending on the domain, calling <CODE>
+SocketResolve()</CODE>
+ on an address already in its primitive form may have undesired results. </P>
+<P>
+The resolution process may or may not require network access, depending on the domain and the input format. Depending on the domain, the addressing system may be volatile. Under these conditions, put off resolving the address as long as possible, until just before using the address; there will be less time for the address to go bad. If the network goes down, the Socket library might not be able to resolve addresses. In this case, <CODE>
+SocketCreateResolvedAddress()</CODE>
+ or <CODE>
+SocketResolve()</CODE>
+ returns SE_TEMPORARY_ERROR.</P>
+<P>
+<A NAME="Socket_4.htm_IX_SocketInterruptResolve()">
+ </A>
+If you wish to interrupt the resolution process (perhaps you allow the user to cancel the operation), use the <CODE>
+SocketInterruptResolve()</CODE>
+ function. This function attempts to halt the resolution process. It is, however, unreliable. It may not succeed in interrupting the resolution process; it may also interrupt other resolves happening at the same time.</P>
+<HR>
+<A NAME="Socket_5.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Socket</A>: 3.2 <A HREF="#Socket_3.htm">Addresses</A>: 
+<A NAME="Socket_5.htm_24992">
+ </A>
+Managing Addresses</H3>
+<PRE>SocketGetAddressSize(), SocketGetSocketName(), SocketGetPeerName()</PRE>
+<P>
+Most programs blindly use addresses supplied by the user or use only hard-wired addresses. Only a few programs need to access and manipulate addresses. The Socket library provides a few utility routines for this purpose.</P>
+<P>
+<A NAME="Socket_5.htm_IX_SocketGetAddressSize()">
+ </A>
+To find out the maximum address data size for a given domain, call <CODE>
+SocketGetAddressSize()</CODE>
+. This can be helpful when allocating memory to handle a full address, such as that returned by the <CODE>
+SocketGetSocketName()</CODE>
+ and <CODE>
+SocketGetPeerName()</CODE>
+ functions.</P>
+<P>
+<A NAME="Socket_5.htm_IX_SocketGetPeerName()">
+ </A>
+<A NAME="Socket_5.htm_IX_SocketGetSocketName()">
+ </A>
+If a socket is connected, call <CODE>
+SocketGetPeerName()</CODE>
+ to get the address of the socket at the other end of the connection. To find out the address used to represent the socket's own side of the connection, call <CODE>
+SocketGetSocketName()</CODE>
+.</P>
+<HR>
+<A NAME="Socket_6.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Socket</A>: 3.3 <A HREF="#Socket_3.htm">Addresses</A>: 
+<A NAME="Socket_6.htm_79399">
+ </A>
+Hardware Ports</H3>
+<PRE>SocketGetDomainMedia(), SocketGetAddressMedium(), SocketCheckMediumConnection(), SocketGetMediumAddress(), SocketOpenDomainMedium(), SocketCloseDomainMedium()</PRE>
+<P>
+<A NAME="Socket_6.htm_IX_SocketGetDomainMedia()">
+ </A>
+Most socket connections involve the use of some hardware &quot;port&quot; -- some physical connection to the outside world. To determine which sort of hardware ports the user's machine uses to connect to a given domain, call <CODE>
+SocketGetDomainMedia()</CODE>
+. This returns a chunk array of <CODE>
+MediumType</CODE>
+ structures. Given a choice of domains to make a given connection, consider which medium would be used to make the connection.</P>
+<P>
+<A NAME="Socket_6.htm_IX_SocketGetAddressMedium()">
+ </A>
+To find out which port the Socket library would use to connect to a given address, call <CODE>
+SocketGetAddressMedium()</CODE>
+. Depending on the medium, you might try to connect to the other site via some other domain or decide not to make the connection at all. </P>
+<P>
+<A NAME="Socket_6.htm_IX_SocketCheckMediumConnection()">
+ </A>
+To check a given hardware port is being used for an active connection, call <CODE>
+SocketCheckMediumConnection()</CODE>
+. If a point-to-point connection exists, this routine returns the address of the remote site. If there is a connection, but not a specific address, then the routine returns a null address. If there is no connection through the hardware port, the routine returns a <CODE>
+SocketError</CODE>
+ value.</P>
+<P>
+<A NAME="Socket_6.htm_IX_SocketGetMediumAddress()">
+ </A>
+To find out the address of the local machine on a connection over a particular medium, use the<CODE>
+ SocketGetMediumAddress()</CODE>
+ routine. This is the address another machine would use to connect to this machine via that medium.</P>
+<P>
+<A NAME="Socket_6.htm_IX_SocketOpenDomainMedium()">
+ </A>
+The <CODE>
+SocketOpenDomainMedium()</CODE>
+ routine opens a &quot;raw&quot; connection using the specified medium. Exactly what is meant by a &quot;raw&quot; connection depends upon the domain involved. In the case of TCP, this routine will dial the modem and create a PPP connection to the PPP server but will not send any TCP packets.</P>
+<P>
+<A NAME="Socket_6.htm_IX_SocketCloseDomainMedium()">
+ </A>
+It is possible to &quot;hang up&quot; a hardware port. Call <CODE>
+SocketCloseDomainMedium()</CODE>
+ to force a domain to close a medium. You may request that the medium only be closed if it is not being used (<EM>
+i.e.</EM>
+, there are no active connections using the medium). If any socket connections are using the port, they will receive the error SE_CONNECTION_RESET. Later, we will discuss orderly ways to close a connection, being careful to send proper notification to the other side of the connection. </P>
+<HR>
+<A NAME="Socket_7.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Socket</A>: 4 
+<A NAME="Socket_7.htm_58530">
+ </A>
+Making a Connection</H2>
+<PRE>SocketCreate(), SocketConnect(), SocketInterrupt()</PRE>
+<P>
+To make a connection, a program creates a socket and specifies an address to which to connect that socket.</P>
+<P>
+<A NAME="Socket_7.htm_IX_SocketCreate()">
+ </A>
+To create a new socket, call <CODE>
+SocketCreate()</CODE>
+. You must specify the socket's delivery type: datagram, sequential packet, or stream.</P>
+<P>
+Before sending or receiving data over a sequential packet or stream socket, you must &quot;connect&quot; it to the place it will be sending the data to or receiving it from. </P>
+<P>
+Depending on the medium and device, you may need to make sure that the device is connected to a network. For example, for a Nokia 9000i Communicator to make a TCP/IP connection, it must first have made a PPP connection. Use the <CODE>
+SocketOpenDomainMedium()</CODE>
+ routine to make the &quot;raw&quot; network connection.</P>
+<P>
+<A NAME="Socket_7.htm_IX_SocketConnect()">
+ </A>
+To make a connection, call <CODE>
+SocketConnect()</CODE>
+. Pass the socket created via <CODE>
+SocketCreate()</CODE>
+, the address to connect to, and a time-out value. If it returns SE_NORMAL, then the connection was established successfully. If it returns SE_CONNECTION_REFUSED, the remote site wasn't prepared to accept the connection. If it returns SE_CONNECTION_ERROR, the connection didn't go through for some miscellaneous reason. If it returns SE_NON_UNIQUE_CONNECTION, then the attempted connection would have been identical to another connection: same source address, source port, destination address, destination port, and delivery type. There would be no way to tell these connections apart. If you try to open the same connection from both sides simultaneously, they may both fail with SE_NON_UNIQUE_CONNECTION.</P>
+<P>
+To cancel the connection operation, call <CODE>
+SocketInterrupt()</CODE>
+.</P>
+<P>
+Datagram sockets cannot form a true connection -- they are unreliable. Sockets must be able to send and receive datagram packets without relying on a permanent connection. However, using <CODE>
+SocketConnect()</CODE>
+ with a datagram socket specifies a default destination address to use when sending packets.</P>
+<HR>
+<A NAME="Socket_8.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Socket</A>: 5 
+<A NAME="Socket_8.htm_56352">
+ </A>
+Accepting a Connection</H2>
+<PRE>SocketBind(), SocketBindInDomain(), SocketListen(), SocketAccept() </PRE>
+<P>
+There's a bit of work involved in setting up a program to receive connections from other sockets. The program must create a socket and associate it with a port. If there is to be a sequenced-packet or stream delivery connection, then the program needs to do some more work to listen for and accept these connections.</P>
+<P>
+If a program creates a socket that accepts connections, the program should probably spawn a separate thread for each accepted connection. If this is not practical, then see <CODE>
+SocketCheckReady()</CODE>
+ for a way to monitor several sockets with a single thread. </P>
+<P>
+Call <CODE>
+SocketCreate()</CODE>
+ to create a socket for this side of the connection. If the socket is to receive datagram packets, then it must be of type datagram. If the other socket in the connection will be a sequenced packet or stream delivery type, then the socket accepting the connection must be either sequenced packet or stream delivery type; however, the two sockets need not be of the same type.</P>
+<P>
+(If you follow the multi-threaded approach, be aware that when the Socket's owning thread exits, it frees the Socket. To allow a Socket to survive the exit of its thread, use <CODE>
+SocketSetIntSocketOption()</CODE>
+ to change its owning thread.)</P>
+<P>
+<A NAME="Socket_8.htm_IX_SocketBind()">
+ </A>
+<A NAME="Socket_8.htm_IX_SocketBindInDomain()">
+ </A>
+The other side of the connection attempts to hook up to a port number on this side of the connection. If a socket is to intercept connections to a certain port, it must somehow associate itself with that port. Use the <CODE>
+SocketBind()</CODE>
+ or <CODE>
+SocketBindInDomain()</CODE>
+ routines to associate a socket with a port number. <CODE>
+SocketBind()</CODE>
+ associates the socket with a port number. <CODE>
+SocketBindInDomain()</CODE>
+ associates the socket with a port number but only within a specific domain. </P>
+<P>
+For any given domain, normally only one socket on the machine may be bound to any port number. Thus, if you call <CODE>
+SocketBindInDomain()</CODE>
+ to bind socket A to port 3 in the TCP/IP domain, then:</P>
+<UL>
+<LI>
+<A NAME="Socket_8.htm_40983">
+ </A>
+You could use <CODE>
+SocketBindInDomain()</CODE>
+ to bind socket B to port 3 in the IRLAP domain, but </LI>
+<LI>
+You couldn't use <CODE>
+SocketBindInDomain()</CODE>
+ to bind socket C to port 3 in the TCP/IP domain, and </LI>
+<LI>
+You couldn't use <CODE>
+SocketBind()</CODE>
+ to bind socket D to port 3.</LI>
+</UL>
+<P>
+There are some ways around this restriction:</P>
+<UL>
+<LI>
+To force <CODE>
+SocketBind()</CODE>
+ or <CODE>
+SocketBindInDomain()</CODE>
+ to re-use some port that another socket has bound, then pass the SBF_REUSE_PORT flag. Otherwise, be prepared to receive SE_PORT_IN_USE or SE_BIND_CONFLICT. Even the SBF_REUSE_PORT flag won't allow you to use both <CODE>
+SocketBind()</CODE>
+ and <CODE>
+SocketBindInDomain()</CODE>
+ on a single port. E.g., in the example above, you could use <CODE>
+SocketBindInDomain()</CODE>
+ with SBF_REUSE_PORT to bind socket C to port 3 in the TCP/IP domain, but you could not use <CODE>
+SocketBind()</CODE>
+ with SBF_REUSE_PORT to bind socket D to port 3. You may not use SBF_REUSE_PORT with datagram-based sockets.</LI>
+<LI>
+If there are only non-datagram-based sockets bound to a port, you may bind a datagram-based socket to that port without setting SBF_REUSE_PORT. The reverse is also true. Recall that only a datagram socket can connect with another datagram socket; non-datagram sockets connect only with other non-datagram sockets.</LI>
+<LI>
+A given socket may only be bound to one port. Trying to bind it to another port results in SE_SOCKET_ALREADY_BOUND. Create another socket to bind to the other port. </LI>
+</UL>
+<P>
+Always check for bind conflicts. Bind conflicts may occur even though a program is well-behaved: other programs may have bound ports to a socket. For reasons described in <A HREF="#Socket_9.htm_61776"> Loading on Connection</A>
+, sometimes the Socket library itself may monitor a port.</P>
+<P>
+When setting up a sequenced packet or stream delivery connection, a bit more set-up work is necessary. These delivery types require a &quot;connection.&quot;</P>
+<P>
+<A NAME="Socket_8.htm_IX_SocketListen()">
+ </A>
+To listen for incoming sequenced packet or stream connections, call <CODE>
+SocketListen()</CODE>
+. The socket must be bound to a port before it can listen. To allow more than one connection through the port, specify the maximum number of connections as an argument to <CODE>
+SocketListen()</CODE>
+. The <CODE>
+SocketListen()</CODE>
+ routine causes a socket to listen for incoming connections. If another socket is listening at the port, <CODE>
+SocketListen()</CODE>
+ returns SE_PORT_ALREADY_LISTENING.</P>
+<P>
+<A NAME="Socket_8.htm_IX_SocketAccept()">
+ </A>
+To make a socket wait for and accept a connection, call <CODE>
+SocketAccept()</CODE>
+. The socket must be listening for connections (processed by <CODE>
+SocketListen()</CODE>
+). Because the thread blocks until a connection is made or <CODE>
+SocketAccept()</CODE>
+ times out, programs normally don't call this routine in their main execution thread. As in the Appl/SDK_C/Talk sample application, a separate thread handles accepting a connection and receiving data from the connection. </P>
+<P>
+If a connection is made, <CODE>
+SocketAccept()</CODE>
+ returns a <CODE>
+Socket</CODE>
+ used to represent the connection. Do not confuse this connected socket with the listening socket. You might be able to accept more connections from the listening socket. </P>
+<P>
+If <CODE>
+SocketAccept()</CODE>
+ returns SE_LISTEN_QUEUE_EMPTY, then there were no connections waiting to be accepted. </P>
+<HR>
+<A NAME="Socket_9.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Socket</A>: 6 
+<A NAME="Socket_9.htm_61776">
+ </A>
+Loading on Connection</H2>
+<PRE>SocketAddLoadOnMsg(), SocketAddLoadOnMsgInDomain(), SocketRemoveLoadOnMsg(), SocketRemoveLoadOnMsgInDomain()</PRE>
+<P>
+It's all very well that you can tell a running program to accept packets and connections over sockets. However, it seems unreasonable to ask the user to run these programs by hand any time there might be a pending connection.</P>
+<P>
+You can tell the Socket library to load a particular geode when it receives data on a particular port, or on a particular port via a particular domain. For an example, see the Appl/SDK_C/Talk sample application: if you run Talk and press the Autoload button, the Socket library knows to start up the Talk program because it senses that it is receiving an incoming Talk connection. </P>
+<P>
+When the program starts up, it should probably create a socket, bind it to the appropriate port, and make that socket listen. If the listening socket is then destroyed, then any unaccepted connections are canceled.</P>
+<P>
+The Socket library writes out an entry to the GEOS.INI file in the [socket] category and with key &quot;LoadOnMsg&quot;. The Socket library consults these GEOS.INI file entries when it starts up and will act accordingly when it receives packets.</P>
+<P>
+<A NAME="Socket_9.htm_IX_SocketAddLoadOnMsg()">
+ </A>
+<A NAME="Socket_9.htm_IX_SocketAddLoadOnMsgInDomain()">
+ </A>
+To make the Socket library load a program when receiving packets on a particular port, call <CODE>
+SocketAddLoadOnMsg()</CODE>
+. Specify the program by means of its path. To load a program when receiving packets on a particular port on a particular domain, call <CODE>
+SocketAddLoadOnMsgInDomain()</CODE>
+. </P>
+<P>
+<A NAME="Socket_9.htm_IX_SocketRemoveLoadOnMsg()">
+ </A>
+<A NAME="Socket_9.htm_IX_SocketRemoveLoadOnMsgInDomain()">
+ </A>
+To remove the entries from the GEOS.INI file and tell the Socket library not to try to load the program when receiving packets, call either <CODE>
+SocketRemoveLoadOnMsg()</CODE>
+ or <CODE>
+SocketRemoveLoadOnMsgInDomain()</CODE>
+.</P>
+<P>
+To listen for incoming data in this manner, the Socket library effectively binds a socket to monitor the port. Thus</P>
+<UL>
+<LI>
+<CODE>
+SocketAddLoadOnMsg()</CODE>
+ and <CODE>
+SocketAddLoadOnMsgInDomain()</CODE>
+ can run into bind conflicts just as <CODE>
+SocketBind()</CODE>
+ and <CODE>
+SocketBindInDomain()</CODE>
+ do.</LI>
+<LI>
+<CODE>
+SocketAddLoadOnMsg()</CODE>
+ interferes with <CODE>
+SocketAddLoadOnMsgInDomain()</CODE>
+ and <CODE>
+SocketBindInDomain()</CODE>
+ on the same port. </LI>
+<LI>
+<CODE>
+SocketAddLoadOnMsgInDomain()</CODE>
+ interferes with <CODE>
+SocketAddLoadOnMsg()</CODE>
+ and <CODE>
+SocketBind()</CODE>
+ on the same port.</LI>
+</UL>
+<HR>
+<A NAME="Socket_a.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Socket</A>: 7 
+<A NAME="Socket_a.htm_44902">
+ </A>
+Sending and Receiving Data</H2>
+<PRE>SocketSend(), SocketRecv(), SocketSetIntSocketOption(), SocketGetIntSocketOption(), SocketSetSocketOption(), SocketGetSocketOption()</PRE>
+<P>
+Once both sides of a socket communication are set up, they're ready to send data back and forth. The <CODE>
+SocketSend()</CODE>
+ and <CODE>
+SocketRecv()</CODE>
+ routines, described below, allow a socket to transmit and receive data, respectively.</P>
+<P>
+The amount of overhead associated with sending and receiving data depends on the devices involved, the domain, and the delivery type. Be certain that if just one byte of data is sent at a time, time performance will suffer. </P>
+<P>
+Whenever possible, the sender should gather up small pieces of data and send them in one large packet. The optimal size of a packet depends on the device, domain, and delivery type. When designing a communications protocol, it would be worthwhile to figure out which sorts of data may be combined into larger blocks. Note that in some domains, the driver will try to do this gathering of small blocks into large packets for you.</P>
+<P CLASS="subsectionLink">
+<A HREF="#Socket_b.htm">Urgent Data</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Socket_c.htm">SocketSend() and SocketRecv()</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Socket_d.htm">Options</A></P>
+<HR>
+<A NAME="Socket_b.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Socket</A>: 7.1 <A HREF="#Socket_a.htm">Sending and Receiving Data</A>: 
+<A NAME="Socket_b.htm_38819">
+ </A>
+Urgent Data</H3>
+<P>
+<A NAME="Socket_b.htm_IX_SSF_URGENT">
+ </A>
+<A NAME="Socket_b.htm_IX_SRF_URGENT">
+ </A>
+The Socket library supports the notion of urgent data. This allows a short packet of data to cut in front of other packets. To send a packet marked urgent, pass the SSF_URGENT flag to <CODE>
+SocketSend()</CODE>
+.</P>
+<P>
+In some domains, only one byte of data in a packet can be marked urgent. In such a domain, passing SSF_URGENT with a 32-byte packet to <CODE>
+SocketSend()</CODE>
+ results in two packets being sent: a 1-byte urgent packet and a 31-byte non-urgent packet. The data of the 1-byte urgent packet is the last byte of the original 32-byte packet. Check your domain documentation for size limits on urgent packets.</P>
+<P>
+Urgent data may be delivered out of order. It may arrive out of sync with non-urgent packets; it may arrive out of order with other urgent packets. There is no queue for urgent data. Each urgent data packet received causes the previous urgent data to be discarded.</P>
+<P>
+The <CODE>
+SocketRecv()</CODE>
+ routine, in charge of receiving incoming packets, may be instructed to receive only urgent data or only non-urgent data. If there is pending urgent data and <CODE>
+SocketRecv()</CODE>
+ is told to poll for normal data, it will return an error value, SE_URGENT, signalling that the program should call <CODE>
+SocketRecv()</CODE>
+ again, this time to receive urgent data. (If, instead, you call <CODE>
+SocketRecv()</CODE>
+ telling it to receive normal data again, it will return any pending normal data; it will not generate the SE_URGENT exception for the pending piece of urgent data -- unless <EM>
+another</EM>
+ piece of urgent data has arrived in the meantime.)</P>
+<P>
+Datagram connections do not support urgent data; <CODE>
+SocketRecv()</CODE>
+ generates an SE_URGENT error on a datagram connection, it's really generating a SE_EXCEPTION value. If you receive such an error, it is a sign that the network is having troubles and packets <EM>
+may</EM>
+ not be getting through.</P>
+<P>
+You may force incoming urgent data to be treated in the same manner as normal data by setting the socket's &quot;in-line&quot; option. See <A HREF="#Socket_d.htm_41687"> SO_INLINE: In-line urgent data To force urgent data to be treated the same as normal data. This allows you to poll for both urgent and normal data with a single SocketRecv() command. Of course, setting this option means that you will not receive</A>
+ for information about socket options.</P>
+<HR>
+<A NAME="Socket_c.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Socket</A>: 7.2 <A HREF="#Socket_a.htm">Sending and Receiving Data</A>: 
+<A NAME="Socket_c.htm_15666">
+ </A>
+SocketSend() and SocketRecv()</H3>
+<P>
+<A NAME="Socket_c.htm_IX_SocketSend()">
+ </A>
+The <CODE>
+SocketSend()</CODE>
+ routine sends data over a socket. It takes several arguments:</P>
+<DL>
+<DT>
+<STRONG>
+Socket</DT><DD>
+</STRONG>
+The socket through which to send data</DD>
+<DT>
+<STRONG>
+Buffer</DT><DD>
+</STRONG>
+A buffer containing the data to send</DD>
+<DT>
+<STRONG>
+Buffer Size</DT><DD>
+</STRONG>
+The size of the data buffer.</DD>
+<DT>
+<STRONG>
+Optional Address</DT><DD>
+</STRONG>
+Address to which to send data. If you pass an address here, make sure that you set the Address flag in the Flags field. If you don't set the Address flag, then this Optional Address argument may be a null pointer.</DD>
+<DT>
+</DT><DD>For sequenced packet or stream delivery type sockets, optional address is ignored.</DD>
+<DT>
+</DT><DD>For datagram delivery type sockets, specify the destination address of the packet in this parameter unless the socket has a default destination address as described below.</DD>
+<DT>
+</DT><DD>Datagram sockets can use the <CODE>
+SocketConnect()</CODE>
+ routine to specify a default destination address. If they have no default address, you must specify the destination address for the packet. If there is a default destination address and you pass this optional address, then the optional address overrides the default for this send.</DD>
+<DT>
+The following flags are available:</DT>
+<DT>
+<STRONG>
+SSF_ADDRESS</DT><DD>
+</STRONG>
+To pass an optional address.</DD>
+<DT>
+<STRONG>
+SSF_URGENT</DT><DD>
+</STRONG>
+To mark the data packet as urgent.</DD>
+<DT>
+<STRONG>
+SSF_OPEN_LINK</DT><DD>
+</STRONG>
+To open the link if it is closed or to close the current link if it is idle and open it to a different location. If you do not set this flag, the datagram will only be sent if the link is opened to the desired remote link address. </DD>
+</DL>
+<P>
+Note that in some domains, the driver may delay before sending small packets of data because it is waiting for more packets to combine into one large packet. In many cases, this leads to more efficient communication. You may turn off this behavior by setting the &quot;no delay&quot; option. See <A HREF="#Socket_d.htm_20519"> SO_NODELAY: No Delay for small packets To force a driver to send small packets without waiting for other packets to bundle together. Drivers often delay sending small packets, waiting for other packets to bundle together in one larger packet. Th</A>
+ for information about setting socket options.</P>
+<P>
+<A NAME="Socket_c.htm_IX_SocketRecv()">
+ </A>
+The <CODE>
+SocketRecv()</CODE>
+ routine receives data from the socket. After filling the passed buffer with data, the socket discards its copy of the received data to make room for the next piece of incoming data.</P>
+<P>
+Sequenced packet or datagram delivery sockets can only receive whole packets. If you grab data from the socket but don't grab all the data in the packet, the remaining data is lost. Thus, it's a good idea to establish a maximum packet size for sockets using these delivery types. If you're not sure how much room you'll need to receive a packet, call <CODE>
+SocketRecv()</CODE>
+ with the SRF_PEEK flag. This allows you to &quot;peek&quot; at the incoming data without causing the socket to discard its copy.</P>
+<P>
+The <CODE>
+SocketRecv()</CODE>
+ routine takes the following arguments:</P>
+<DL>
+<DT>
+<STRONG>
+Socket</DT><DD>
+</STRONG>
+The socket from which to grab the data.</DD>
+<DT>
+<STRONG>
+Buffer</DT><DD>
+</STRONG>
+Buffer to fill with data. </DD>
+<DT>
+<STRONG>
+Buffer Size</DT><DD>
+</STRONG>
+Size of the data buffer. A packet-based socket will not retain data that does not fit in the buffer. A stream socket, however, will.</DD>
+<DT>
+<STRONG>
+Time-out</DT><DD>
+</STRONG>
+The number of 1/60 second ticks to wait for incoming data. Pass SOCKET_NO_TIMEOUT to wait forever.</DD>
+<DT>
+<STRONG>
+Optional Address</DT><DD>
+</STRONG>
+If you pass the Address flag of the Flags argument, then pass an empty <CODE>
+SocketAddress</CODE>
+ buffer. (The buffer's <CODE>
+SA_domain</CODE>
+, <CODE>
+SA_domainSize</CODE>
+, and <CODE>
+SA_addressSize</CODE>
+ fields must be initialized.) Make sure the buffer has room for the address data after the <CODE>
+SocketAddress</CODE>
+ structure. Note that if either the domain name buffer or the address buffer isn't long enough to hold its string, the resulting truncated string isn't null-terminated.</DD>
+<DT>
+</DT><DD>If you do not set the Address flag, this Optional Address argument may be a null pointer.</DD>
+<DT>
+The following flags are available:</DT>
+<DT>
+<STRONG>
+SRF_ADDRESS</DT><DD>
+</STRONG>
+Return the source address in the Optional Address buffer.</DD>
+<DT>
+<STRONG>
+SRF_URGENT</DT><DD>
+</STRONG>
+Return the first packet which has been marked urgent. (See <A HREF="#Socket_b.htm_38819"> Urgent Data</A>
+.)</DD>
+<DT>
+<STRONG>
+SRF_PEEK</DT><DD>
+</STRONG>
+Force the socket to not discard the data received.</DD>
+</DL>
+<P>
+The <CODE>
+SocketRecv()</CODE>
+ routine returns the size of the received buffer. If this size is zero, there may be an error in the connection. Use <CODE>
+ThreadGetError()</CODE>
+ to check for an error. If <CODE>
+ThreadGetError()</CODE>
+ returns SE_NORMAL, then there was no error and you received a zero-length packet. For a datagram connection, an SE_EXCEPTION error indicates that the network is having problems and some datagrams <EM>
+may</EM>
+ not be getting through.</P>
+<HR>
+<A NAME="Socket_d.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Socket</A>: 7.3 <A HREF="#Socket_a.htm">Sending and Receiving Data</A>: 
+<A NAME="Socket_d.htm_85030">
+ </A>
+Options</H3>
+<P>
+<A NAME="Socket_d.htm_IX_SocketOption">
+ </A>
+<A NAME="Socket_d.htm_IX_SocketGetIntSocketOption">
+ </A>
+<A NAME="Socket_d.htm_IX_SO_&ldots;">
+ </A>
+<A NAME="Socket_d.htm_IX_SocketSetSocketOption()">
+ </A>
+<A NAME="Socket_d.htm_IX_SocketGetSocketOption()">
+ </A>
+To customize a socket's sending and receiving behavior, use <CODE>
+SocketSetIntSocketOption()</CODE>
+<A NAME="Socket_d.htm_IX_SocketSetIntSocketOption()">
+ </A>
+ (or <CODE>
+SocketSetSocketOption()</CODE>
+ if you are using Assembly language). The following options are available:</P>
+<P>
+<CODE>
+S</CODE>
+<STRONG>
+O_RECV_BUF</STRONG>
+: <STRONG>
+Receive Buffer</STRONG>
+ Size<BR>
+To change the size of the buffer used to hold incoming data.</P>
+<DL>
+<DT>
+<STRONG>
+SO_SEND_BUF</STRONG>
+: <STRONG>
+Send Buffer</STRONG>
+ Size</DT><DD>
+To change the size of the buffer used to hold outgoing data.</DD>
+<DT>
+<STRONG>
+SO_INLINE</STRONG>
+<A NAME="Socket_d.htm_41687">
+ </A>
+: <STRONG>
+In-line</STRONG>
+ urgent data</DT><DD>
+To force urgent data to be treated the same as normal data. This allows you to poll for both urgent and normal data with a single <CODE>
+SocketRecv()</CODE>
+ command. Of course, setting this option means that you will not receive urgent data as soon as possible.</DD>
+<DT>
+<STRONG>
+SO_NODELAY</STRONG>
+<A NAME="Socket_d.htm_20519">
+ </A>
+: <STRONG>
+No Delay</STRONG>
+ for small packets</DT><DD>
+To force a driver to send small packets without waiting for other packets to bundle together. Drivers often delay sending small packets, waiting for other packets to bundle together in one larger packet. This is oftentimes more efficient.</DD>
+<DT>
+<STRONG>
+SO_OWNER</STRONG>
+: <STRONG>
+Owning Thread</STRONG>
+ for socket</DT><DD>
+To specify a new owning thread for a socket. When the owning thread detaches from the Socket library (this happens automatically when the thread exits), the socket will be freed; any attempts to use the freed socket will result in errors. To make a socket survive its thread, you must assign it to a new thread. This option does not actually affect how the socket sends or receives data.</DD>
+</DL>
+<P>
+You may find out the current options for a socket by calling <CODE>
+SocketGetIntSocketOption()</CODE>
+ (<CODE>
+SocketGetSocketOption()</CODE>
+ if you're using Assembly language).</P>
+<HR>
+<A NAME="Socket_e.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Socket</A>: 8 
+<A NAME="Socket_e.htm_51705">
+ </A>
+Closing the Connection</H2>
+<PRE>SocketInterrupt(), SocketClose(), SocketCloseSend(), SocketReset(), SocketCloseDomainMedium()</PRE>
+<P>
+<A NAME="Socket_e.htm_IX_SocketInterrupt()">
+ </A>
+To halt either an accept or receive operation in progress, call <CODE>
+SocketInterrupt()</CODE>
+. If no such operation is in progress but the socket is listening or connected, the next such operation will be interrupted. Look out for the error SE_SOCKET_NOT_INTERRUPTIBLE; this signals that a non-interruptible operation is taking place on the socket.</P>
+<P>
+When it comes time to close the connection and/or free a socket, call <CODE>
+SocketClose()</CODE>
+ or <CODE>
+SocketCloseSend()</CODE>
+. </P>
+<P>
+<A NAME="Socket_e.htm_IX_SocketCloseSend()">
+ </A>
+<CODE>
+SocketCloseSend()</CODE>
+ works only with connected sockets. It partially shuts down the socket so that it can no longer send data; it can, however, still receive data. (Passing a partially closed socket to <CODE>
+SocketSend()</CODE>
+ results in an SE_SOCKET_CLOSED error.) <CODE>
+SocketCloseSend()</CODE>
+ sends an SE_CONNECTION_CLOSED exception packet to the other side of the connection to let it know that it's starting to shut itself down. Upon receipt of this exception packet, the other side of the connection will probably want to begin closing itself down as well.</P>
+<P>
+Not all domains support closing the &quot;send&quot; part of a socket. In this case, the routine will return SE_CLOSE_SEND_NOT_SUPPORTED and you must use <CODE>
+SocketClose()</CODE>
+ instead to close the connection and free the socket.</P>
+<P>
+<A NAME="Socket_e.htm_IX_SocketClose()">
+ </A>
+<CODE>
+SocketClose()</CODE>
+ closes the socket (shutting down both incoming and outgoing data) and frees it. This routine may be used on a socket in any state. You must use <CODE>
+SocketClose()</CODE>
+ to close (and free) a datagram socket.</P>
+<P>
+To close a connection with extreme prejudice, call <CODE>
+SocketReset()</CODE>
+. Use this routine with caution as it bypasses all normal protocol-level handshaking and unilaterally kills the connection. When using this routine, you should still call <CODE>
+SocketClose()</CODE>
+ to free the socket data structures and flush any unread data.</P>
+<P>
+The <CODE>
+SocketCloseDomainMedium()</CODE>
+ routine can close all connections over a given medium without sending any notifications. It effectively hangs up the connection. You pass a flag to specify whether the routine should only hang up if there are no active connections through the medium, or hang regardless. For more information about socket media and this routine, see <A HREF="#Socket_6.htm_79399"> Hardware Ports</A>
+.</P>
+<HR>
+<A NAME="Socket_f.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Socket</A>: 9 
+<A NAME="Socket_f.htm_59273">
+ </A>
+Checking the Connection</H2>
+<PRE>SocketCheckListen(), SocketCheckReady()</PRE>
+<P>
+The Socket library provides utility routines that query the status of a connection. This can be helpful when figuring out why a connection may not be working or confirming that a connection is working.</P>
+<P>
+<A NAME="Socket_f.htm_IX_SocketCheckListen()">
+ </A>
+Use <CODE>
+SocketCheckListen()</CODE>
+ on a port to find out the domain and medium for the first connection request on the port; that is, the first connection request which has not yet been accepted. Think of this as a limited form of &quot;caller ID&quot; -- a chance to find out about the incoming connection before accepting it. If <CODE>
+SocketCheckListen()</CODE>
+ returns SE_PORT_NOT_LISTENING, it means there is no socket that is bound to the port and listening.</P>
+<P>
+To &quot;peek&quot; at the next packet of incoming data, call <CODE>
+SocketRecv()</CODE>
+ and pass the SRF_PEEK flag. This allows you to get the size of the next packet of incoming data and to look at its contents without destroying it.</P>
+<P>
+<A NAME="Socket_f.htm_IX_SocketCheckReady()">
+ </A>
+To check one or more sockets to see if they have received data, received connection requests, or are ready to write, call <CODE>
+SocketCheckReady()</CODE>
+. It can check connections for incoming data or just incoming urgent data. </P>
+<P>
+For programs which need to poll many sockets, <CODE>
+SocketCheckReady()</CODE>
+ provides a tidy means to do this without spawning a thread for each socket.</P>
+<P>
+<A NAME="Socket_f.htm_IX_SocketCheckRequest">
+ </A>
+The <CODE>
+SocketCheckReady()</CODE>
+ routine takes an array of <CODE>
+SocketCheckRequest</CODE>
+ structures. Each one of these structures contains a socket and a condition. <CODE>
+SocketCheckReady()</CODE>
+ looks at each <CODE>
+SocketCheckRequest</CODE>
+ structure in the array and returns the index of the first structure whose socket meets the condition.</P>
+<P>
+Thus, to determine if a given socket is properly set up so that you can send data through it, pass <CODE>
+SocketCheckReady()</CODE>
+ a one-element array (represented in pseudo-code):</P>
+<PRE>{ mySocket, SC_WRITE, 0 }</PRE>
+<P>
+To check several sockets to see whether any of them had received any connection requests, pass to <CODE>
+SocketCheckReady()</CODE>
+ an array of the form (represented in pseudo-code):</P>
+<PRE>{ socket1, SC_ACCEPT, 0 },
+{ socket2, SC_ACCEPT, 0 },
+{ socket3, SC_ACCEPT, 0 }</PRE>
+<P>
+For any socket, you may check for one or more of the following conditions, as represented by <CODE>
+SocketCondition</CODE>
+<A NAME="Socket_f.htm_IX_SocketCondition">
+ </A>
+<A NAME="Socket_f.htm_IX_SC_&ldots;">
+ </A>
+ values:</P>
+<DL>
+<DT>
+<STRONG>
+SC_ACCEPT</DT><DD>
+</STRONG>
+If a socket is listening for a connection, this condition indicates that another socket is trying to connect to the listening socket.</DD>
+<DT>
+<STRONG>
+SC_READ</DT><DD>
+</STRONG>
+If a socket is connected, this condition indicates that a packet of data has come in and is ready to be read.</DD>
+<DT>
+<STRONG>
+SC_EXCEPTION</DT><DD>
+</STRONG>
+If a socket is connected, this condition indicates that the socket has discovered something wrong with its connection.</DD>
+<DT>
+<STRONG>
+SC_URGENT</DT><DD>
+</STRONG>
+If a socket is connected, this condition indicates that it has received a packet of data that was marked urgent.</DD>
+<DT>
+<STRONG>
+SC_WRITE</DT><DD>
+</STRONG>
+This condition indicates that data may be sent through the socket.</DD>
+</DL>
+<P>
+If you query a socket about a condition that does not apply to its current state (<EM>
+e.g.</EM>
+, ask a non-listening socket if it is ready to accept connections), then <CODE>
+SocketCheckReady()</CODE>
+ returns SE_IMPROPER_CONDITION.</P>
+<HR>
+<A NAME="Socket_10.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Socket</A>: 10 
+<A NAME="Socket_10.htm_24233">
+ </A>
+Domain-Specific Information</H2>
+<P>
+Some portions of the Socket library API are domain specific; depending on which domain you're using, the domain name, address formats, port numbering schemes, etc. may differ.The following sections describe information specific to particular domains. Not all domains are available on any given device.</P>
+<P CLASS="subsectionLink">
+<A HREF="#Socket_11.htm">TCP/IP--GEOS Specific</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Socket_12.htm">TCP/IP--Standard</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Socket_13.htm">Loopback</A></P>
+<HR>
+<A NAME="Socket_11.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Socket</A>: 10.1 <A HREF="#Socket_10.htm">Domain-Specific Information</A>: 
+<A NAME="Socket_11.htm_IX_TCP/IP:Socket domain">
+ </A>
+<A NAME="Socket_11.htm_77846">
+ </A>
+TCP/IP--GEOS Specific</H3>
+<P>
+The TCP/IP domain is a popular standard used for internet communications. The GEOS-specific version supports 32-bit port numbers. GEOS TCP/IP data may be transmitted via a regular TCP/IP network, though both the sending and receiving machines must support GEOS TCP/IP.</P>
+<DL>
+<DT>
+<STRONG>
+Domain Name:</DT><DD>
+</STRONG>
+&quot;TCPIP_GEOS<A NAME="Socket_11.htm_IX_TCPIP_GEOS">
+ </A>
+&quot;</DD>
+<DT>
+<STRONG>
+Port Numbers:</DT><DD>
+</STRONG>
+32-bit values.</DD>
+<DT>
+<STRONG>
+Opaque Address Format:</DT><DD>
+</STRONG>
+This address will be either a <CODE>
+TcpAccPntExtendedAddress</CODE>
+,a <CODE>
+TcpOnlyExtendedAddress</CODE>
+, or a <CODE>
+TcpNonAccPntExtendedAddress</CODE>
+.</DD>
+<DT>
+  <A NAME="Socket_11.htm_IX_TAPEA_&ldots;">
+ </A>
+  <A NAME="Socket_11.htm_IX_TcpAccPntExtendedAddress structure">
+ </A>
+TcpAccPntExtendedAddress: Use this structure when referring to an address identified by an access point ID number.</DT>
+<DT>
+   <A NAME="Socket_11.htm_IX_TOEA_&ldots;">
+ </A>
+ <A NAME="Socket_11.htm_IX_TcpOnlyExtendedAddress structure">
+ </A>
+TcpOnlyExtendedAddress: Use this structure to identify a TCP address by its address instead of by its ID.</DT>
+<DT>
+   <A NAME="Socket_11.htm_IX_TNAPEA_&ldots;">
+ </A>
+ <A NAME="Socket_11.htm_IX_TcpNonAccPntExtendedAddress structure">
+ </A>
+TcpNonAccPntExtendedAddress: Use this structure to identify a TCP address that is not a known access point. You will need to specify a link address (a phone number) as well as an IP address.</DT>
+<DT>
+Notes:</DT>
+<UL>
+<LI>
+<A NAME="Socket_11.htm_IX_PPP">
+ </A>
+On some devices (including the Nokia 9000i Communicator), you cannot make a TCP/IP connection or send packets until the device has a &quot;raw&quot; connection to the network--a PPP connection. Calling <CODE>
+SocketOpenDomainMedium()</CODE>
+<A NAME="Socket_11.htm_IX_SocketOpenDomainMedium():Creating PPP connections in TCP/IP domain">
+ </A>
+ with the TCP medium creates a PPP connection. The modem will dial, and the machine will connect to the PPP server, but no TCP level packets will be sent. If the PPP connection is already made, this routine will return SE_NORMAL, just as if the connection had been just now made. If the modem is already in use, an SE_MEDIUM_BUSY error will be returned. Use the <CODE>
+SocketCloseDomaninMedium()</CODE>
+ to hang up the phone when done.</LI>
+<LI>
+The Talk sample application shows how a device can make a raw PPP connection with the Internet Service Provider (ISP), getting the necessary information about the ISP from the built-in Access Point library. (Notice how the object AccpntControl is declared; notice the sample's TalkAddressClass handler for <CODE>
+MSG_GEN_GUP_INTERACTION_COMMAND</CODE>
+, which queries the AccessPointControl for the selected ISP and extracts the useful information about that ISP; finally, the MSG_CTP_CONNECT handler dials the phone to make the PPP connection.)</LI>
+</UL>
+</DL>
+<P CLASS="figTitle">
+Code Display 23-2 Making the Raw TCP/IP Connection</P>
+<P CLASS="figCaption">
+Here we see three snippets of code from the Talk sample application<BR>
+The AccessPointControl allows the user to choose an ISP:</P>
+<PRE>@chunk char accpntMkr[] = &quot;Access List&quot;;</PRE>
+<PRE>@object AccessPointControlClass AccpntControl = {
+	GI_states = GS_USABLE|GS_ENABLED;
+	HINT_ACCESS_POINT_CONTROL_MINIMIZE_SIZE;
+	ATTR_ACCESS_POINT_CONTROL_LIST_MONIKER = @accpntMkr; }</PRE>
+<P CLASS="figCaption">
+In @method TalkAddressClass, MSG_GEN_GUP_INTERACTION_COMMAND, we get information we'll need about the ISP</P>
+<PRE>point = @call \
+GeodeGetOptrNS(@AccpntControl)::MSG_ACCESS_POINT_CONTROL_GET_SELECTION();</PRE>
+<PRE>/* store link info into address buffer */
+rawAddress.UTA_link.TAPEA_linkSize = 3;
+rawAddress.UTA_link.TAPEA_linkType = LT_ID;
+rawAddress.UTA_link.TAPEA_accPntID = point;</PRE>
+<PRE>/* the text of the address follows the link info */
+alen = @call GeodeGetOptrNS(@IPText)::MSG_VIS_TEXT_GET_ALL_PTR( 
+						(char *)&amp;(rawAddress.UTA_ip[0]));</PRE>
+<PRE>if (alen &gt; MAX_IP_ADDR_STRING_LENGTH) FatalError(0);  /* too much text */</PRE>
+<PRE>/* resolve the raw address into a SocketAddress */
+theAddress.SA_addressSize = SocketResolve(theAddress.SA_domain,
+					(byte *)(&amp;rawAddress),
+					sizeof(TcpAccPntExtendedAddress)+alen,
+					(byte *)(&amp;addressBuffer),
+					MAX_ADDRESS_SIZE);</PRE>
+<P CLASS="figCaption">
+In MSG_CTP_CONNECT's handler, we make the PPP connection:</P>
+<PRE>rval = SocketOpenDomainMedium((SocketAddress *) &amp;theAddress, SOCKET_NO_TIMEOUT);</PRE>
+<UL>
+<LI>
+TCP/IP only supports one byte of urgent data in a packet. If you send a multi-byte packet marked urgent, it will be divided into two packets (on the receiving side). For example, a 32-byte packet marked urgent would be broken up into a 31-byte normal packet and a one-byte urgent packet.</LI>
+<P>
+	If you set the SSF_URGENT flag to <CODE>
+SocketSend()</CODE>
+ when sending a multi-byte packet, the last byte of the packet will be marked urgent.</P>
+<P>
+	Recall that you can set the in-line option to specify that urgent data should be treated as normal data. In this case, urgent data will be treated as a normal 1-byte packet.</P>
+<LI>
+<A NAME="Socket_11.htm_29792">
+ </A>
+If you're not familiar with TCP/IP, <EM>
+TCP/IP illustrated</EM>
+ by W. Richard Stevens provides a good introduction.<BR>
+<BR>
+The TCP/IP standard is defined in a number of RFCs. The RFCs listed below may be of interest. If you research these documents, note that the first is an index to the others.<BR>
+<BR>
+1720 	J. Postel, I. Architecture Board (IAB), &quot;INTERNET OFFICIAL PROTOCOL STANDARDS&quot;, 11/23/1994. (Obsoletes RFC1610) (Obsoleted by RFC1780) (STD 1)<BR>
+<BR>
+1700 	J. Reynolds, J. Postel, &quot;ASSIGNED NUMBERS&quot;, 10/20/1994. (Obsoletes RFC1340)<BR>
+<BR>
+1122 	R. Braden, &quot;Requirements for Internet hosts - communication layers&quot;, 10/01/1989.<BR>
+<BR>
+1123 	R. Braden, &quot;Requirements for Internet hosts - application and support&quot;, 10/01/1989.<BR>
+<BR>
+0791 	J. Postel, &quot;Internet Protocol&quot;, 09/01/1981. (Obsoletes RFC0760)<BR>
+<BR>
+0950 	J. Mogul, J. Postel, &quot;Internet standard subnetting procedure&quot;, 08/01/1985.<BR>
+<BR>
+0919 	J. Mogul, &quot;Broadcasting Internet datagrams&quot;, 10/01/1984.<BR>
+<BR>
+0922 	J. Mogul, &quot;Broadcasting Internet datagrams in the presence of subnets&quot;, 10/01/1984.<BR>
+<BR>
+0792 	J. Postel, &quot;Internet Control Message Protocol&quot;, 09/01/1981. (Obsoletes RFC0777)<BR>
+<BR>
+0768 	J. Postel, &quot;User Datagram Protocol&quot;, 08/28/1980.<BR>
+<BR>
+0793 	J. Postel, &quot;Transmission Control Protocol&quot;, 09/01/1981. (Updates RFC0761)<BR>
+<BR>
+1034 	P. Mockapetris, &quot;Domain names - concepts and facilities&quot;, 11/01/1987. (Obsoletes RFC0973) (Updated by RFC1101)<BR>
+<BR>
+1035 	P. Mockapetris, &quot;Domain names - implementation and specification&quot;, 11/01/1987. (Obsoletes RFC0973) (Updated by RFC1348)<BR>
+<BR>
+0974 	C. Partridge, &quot;Mail routing and the domain system&quot;, 01/01/1986.<BR>
+<BR>
+1531 	R. Droms, &quot;Dynamic Host Configuration Protocol&quot;, 10/07/1993. (Obsoleted by RFC1541)<BR>
+<BR>
+1533 	S. Alexander, R. Droms, &quot;DHCP Options and BOOTP Vendor Extensions&quot;, 10/08/1993. (Obsoletes RFC1497)<BR>
+<BR>
+1534 	R. Droms, &quot;Interoperation Between DHCP and BOOTP&quot;, 10/08/1993.<BR>
+<BR>
+1144 	V. Jacobson, &quot;Compressing TCP/IP headers for low-speed serial links&quot;, 02/01/1990. <BR>
+<BR>
+1547 	D. Perkins, &quot;Requirements for an Internet Standard Point-to-Point Protocol&quot;, 12/09/1993. <BR>
+<BR>
+1662 	W. Simpson, &quot;PPP in HDLC-like Framing&quot;, 07/21/1994. (Obsoletes RFC1549) <BR>
+<BR>
+1334 	B. Lloyd, W. Simpson, &quot;PPP Authentication Protocols&quot;, 10/20/1992. <BR>
+<BR>
+1661 	W. Simpson, &quot;The Point-to-Point Protocol (PPP)&quot;, 07/21/1994. (Obsoletes RFC1548)<BR>
+<BR>
+1570 	W. Simpson, &quot;PPP LCP Extensions&quot;, 01/11/1994. (Updates RFC1548) <BR>
+<BR>
+1663 	D. Rand, &quot;PPP Reliable Transmission&quot;, 07/21/1994.<BR>
+<BR>
+1332 PS   G. McGregor, &quot;The PPP Internet Protocol Control Protocol (IPCP)&quot;, 05/26/1992. (Obsoletes RFC1172) </LI>
+<LI>
+Some (16-bit) constants (defined in <STRONG CLASS="fileName">
+sockmisc.h</STRONG>
+) are available with the port numbers for common TCP services:</LI>
+</UL>
+<PRE>#define <A NAME="Socket_11.htm_IX_ECHO"> </A>ECHO            7  /* TCP/UDP */
+#define <A NAME="Socket_11.htm_IX_DISCARD"> </A>DISCARD         9  /* TCP/UDP */
+#define <A NAME="Socket_11.htm_IX_FTP_DATA"> </A>FTP_DATA        20 /* TCP */
+#define <A NAME="Socket_11.htm_IX_FTP"> </A>FTP             21 /* TCP */
+#define <A NAME="Socket_11.htm_IX_TELNET_SERVER"> </A>TELNET_SERVER   23 /* TCP */
+#define <A NAME="Socket_11.htm_IX_NAME_SERVER"> </A>NAME_SERVER     42 /* UDP */
+#define <A NAME="Socket_11.htm_IX_WHOIS"> </A>WHOIS           43 /* TCP */
+#define <A NAME="Socket_11.htm_IX_DOMAIN_SERVER"> </A>DOMAIN_SERVER   53 /* TCP/UDP */
+#define <A NAME="Socket_11.htm_IX_FINGER"> </A>FINGER          79 /* TCP */</PRE>
+<UL>
+<LI>
+The address data information with a <CODE>
+SocketAddress</CODE>
+ structure takes the following form for the TCP domain:</LI>
+<PRE>typedef struct {
+	word    <A NAME="Socket_11.htm_IX_TOEA_&ldots;"> </A>TOEA_linkSize; 				/* 0 */
+	byte    TOEA_ipAddr[4]; /* IP address */
+} <A NAME="Socket_11.htm_IX_TcpOnlyResolvedAddress"> </A>TcpOnlyResolvedAddress;</PRE>
+<P>
+	A variation on this structure is used for storing the address information for a TCP access point address. Along with the address information, there are three bytes of information about the nature of the link: the first of these bytes should have value LT_ID, so that the driver will know that the next two bytes represent a link ID; the other two bytes should be the access point's ID.</P>
+<PRE>typedef struct {
+	word	TAPRA_linkSize; /* 3 */
+	byte	TAPRA_linkType; /* LinkType (LT_ID) */
+	word	TAPRA_accPntID;
+	byte	 <A NAME="Socket_11.htm_IX_TAPRA_&ldots;"> </A>TAPRA_ipAddr[4]; /* IP address */
+} <A NAME="Socket_11.htm_IX_TcpAccPntResolvedAddress"> </A>TcpAccPntResolvedAddress;</PRE>
+</UL>
+<HR>
+<A NAME="Socket_12.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Socket</A>: 10.2 <A HREF="#Socket_10.htm">Domain-Specific Information</A>: 
+<A NAME="Socket_12.htm_85291">
+ </A>
+TCP/IP--Standard</H3>
+<P>
+This is the standard TCP/IP domain, popular protocol for internet communications. </P>
+<DL>
+<DT>
+<STRONG>
+Domain Name:</DT><DD>
+</STRONG>
+&quot;TCPIP&quot;</DD>
+<DT>
+<STRONG>
+Port Numbers:</DT><DD>
+</STRONG>
+16-bit values.</DD>
+<DT>
+<STRONG>
+Opaque Address Format:</DT><DD>
+</STRONG>
+This address will be either a <CODE>
+TcpAccPntExtendedAddress</CODE>
+,a <CODE>
+TcpOnlyExtendedAddress</CODE>
+, or a <CODE>
+TcpNonAccPntExtendedAddress</CODE>
+.</DD>
+<DT>
+    TcpAccPntExtendedAddress: Use this structure when referring to an address identified by an access point ID number.</DT>
+<DT>
+    TcpOnlyExtendedAddress: Use this structure to identify a TCP address by its address instead of by its ID.</DT>
+<DT>
+    TcpNonAccPntExtendedAddress: Use this structure to identify a TCP address that is not a known access point. You will need to specify a link address (a phone number) as well as an IP address.</DT>
+<DT>
+Notes:</DT>
+<UL>
+<LI>
+The notes for GEOS TCP/IP (starting on <A HREF="#Socket_11.htm_29792"> If you're not familiar with TCP/IP, TCP/IP illustrated by W. Richard Stevens provides a good introduction. The TCP/IP standard is defined in a number of RFCs. The RFCs listed below may be of interest. If you research these documents, note that t</A>
+) apply to the TCP/IP standard as well. </LI>
+<LI>
+You cannot use the sequential packets delivery type with standard TCP/IP.</LI>
+</UL>
+</DL>
+<HR>
+<A NAME="Socket_13.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Socket</A>: 10.3 <A HREF="#Socket_10.htm">Domain-Specific Information</A>: 
+<A NAME="Socket_13.htm_69212">
+ </A>
+Loopback</H3>
+<P>
+<A NAME="Socket_13.htm_Loopback Socket domain">
+ </A>
+The loopback domain can only be used for communications between sockets on the same machine.</P>
+<DL>
+<DT>
+<STRONG>
+Domain Name:</DT><DD>
+</STRONG>
+&quot;loopback&quot;</DD>
+<DT>
+<STRONG>
+Port Numbers:</DT><DD>
+</STRONG>
+32-bit values.</DD>
+<DT>
+<STRONG>
+Opaque Address Format:</DT><DD>
+</STRONG>
+There is no address data: The loopback domain is used for intra-machine communication.</DD>
+<DT>
+&nbsp;</DT>
+</DL>
+<HR>
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+</BODY>
+</HTML>

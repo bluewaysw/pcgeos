@@ -1,0 +1,104 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: VM_15.htm,v 1.2 97/09/05 13:07:29 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Structure of a VM Chain</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Virtual Memory</A>: 4.1 <A HREF="VM_14.htm">VM Chains</A>: 
+Structure of a VM Chain</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VM_14.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VM_14.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">4 VM Chains</A> 
+<!-- to next --> | <A HREF="VM_16.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.2 VM Chain Utilities</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+A VM chain is composed of two kinds of blocks: chain blocks (which are linked to at most one other block), and tree blocks (which may be linked to any number of other blocks). One block is the head of the chain; chain utility routines can be passed the handle of this block, and they will act on all the blocks in the chain. If a block is a &quot;leaf&quot; block, it should contain a null handle. An example of a VM chain with tree blocks is shown in the figure below.
+<IMG SRC="VM_15_vmChain.gif">
+
+</P>
+<P>
+Be warned that a VM chain must not contain any circuits. That is, by following links, you should not be able to go from any block back to itself; and there should not be two different routes from any one block to any other. If you create such a VM chain and pass it to a chain utility, the results are undefined. It is your responsibility to make sure no loops occur.
+
+</P>
+<P>
+A VM chain block is the same as any other VM block, with one exception: The block must begin with a <CODE>
+VMChainLink</CODE>
+ structure. This structure contains a single data field, <CODE>
+VMC_next</CODE>
+, which is the handle of the next block in the chain. If the block is in a chain but has no next link, <CODE>
+VMC_next</CODE>
+ is a null handle. This means, for example, that LMem heaps cannot belong to a VM chain (since LMem heaps must begin with an <CODE>
+LMemHeader</CODE>
+ structure). </P>
+<P>
+In addition to chain blocks, a VM chain may contain a tree block. A tree block may have several links to blocks. <A NAME="IX_VMCT_&ldots;">
+ </A>
+<A NAME="IX_VMChainTree">
+ </A>
+A tree block begins with a <CODE>
+VMChainTree</CODE>
+ structure. This structure has three fields:</P>
+<DL>
+<DT>
+<CODE>
+VMCT_meta</DT><DD>
+</CODE>
+This is a <CODE>
+VMChainLink</CODE>
+ structure. Every block in a VM chain, including a tree block, must begin with such a structure. However, to indicate that this is a tree block, the <CODE>
+VMC_next</CODE>
+ field must be set to the special value VM_CHAIN_TREE.</DD>
+<DT>
+<CODE>
+VMCT_offset</DT><DD>
+</CODE>
+This is the offset within the block to the first link. All data in the tree block must be placed between the <CODE>
+VMChainTree</CODE>
+ structure and the first link. If you do not put data in this block, set this field to <CODE>
+sizeof(VMChainTree)</CODE>
+.</DD>
+<DT>
+<CODE>
+VMCT_count</DT><DD>
+</CODE>
+This is the number of links in the tree block.<A NAME="marker=377655">
+ </A>
+
+<IMG SRC="VM_15_vmChainBlock.gif">
+
+</DD>
+</DL>
+<P>
+Any of the links may be a null handle. To delete the last link in the block, just decrement <CODE>
+VMCT_count</CODE>
+ (and, if you wish, resize the block). To delete a link in the midst of a block, just change the link to a null handle without decrementing <CODE>
+VMCT_count</CODE>
+. To add a new link to a VM tree block, you can either add the handle after the last link and increment <CODE>
+VMCT_count</CODE>
+; or you can replace a null handle (if there are any) with the new handle, without changing <CODE>
+VMCT_count</CODE>
+.</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VM_14.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VM_14.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">4 VM Chains</A> 
+<!-- to next --> | <A HREF="VM_16.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.2 VM Chain Utilities</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

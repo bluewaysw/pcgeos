@@ -1,0 +1,1549 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Text_15.htm,v 1.1 97/06/02 16:42:04 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> The Text</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The Text Objects</A>: 4.1 <A HREF="Text_14.htm">Text Object Chunks</A>: 
+<A NAME="60374">
+ </A>
+The Text</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Text_14.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Text_14.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">4 Text Object Chunks</A> 
+<!-- to next --> | <A HREF="Text_16.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.2 Lines and Fields</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+The most important data associated with a text object is the text itself. The text of all non-large Text Objects is stored within a single chunk; this chunk is located in the same resource as the object itself. Text objects contain an instance field with a ChunkHandle to this text chunk. (In GenText objects, this is the instance field GTXI_<CODE>
+text</CODE>
+; in VisText objects, this is VTI_<CODE>
+text</CODE>
+.)</P>
+<P>
+Unless your text object uses the complex large model, it stores all of its text within this chunk. You may set initial text for your text object to appear within its instance data. The text object library automatically handles keyboard input from the user and translates that into characters displayed within the text object, altering the contents of the text chunk at the same time. </P>
+<P>
+The text within the chunk is represented by a null-terminated character string. Each character of the text occupies a zero-based position within the text field. (The first character in the text field is at position zero.) These character positions are useful for setting character and paragraph attributes, marking the current selection, and marking the insertion point for new text.</P>
+<P>
+The text object library provides a number of operations that you can perform to alter the display of text. These messages may take text from a variety of sources and include it within your text object; alternatively, you may retrieve text from your object and send it to other objects or processes.</P>
+<P>
+Though the text within a non-large text object will always reside in a chunk (and may therefore be referenced with an optr) text may come from (and go to) several different sources. If you intend to retrieve text from or send text to a text object, you must know what type of source (or destination) you are dealing with.</P>
+<P>
+Typically, text outside of a text object will reside in one of the following six forms. The first two cases are the most common. </P>
+<UL>
+<LI>
+A pointer to null terminated text string.</LI>
+<LI>
+An optr to a chunk. (This is the same format the text object itself stores its text.)</LI>
+<LI>
+A handle of a global memory block.</LI>
+<LI>
+A handle of a VM block.</LI>
+<LI>
+A database item.</LI>
+<LI>
+A huge array.</LI>
+</UL>
+<P>
+For each operation on a text object, the text object library provides specific messages tailored to the format you are retrieving text from or transferring text to.</P>
+
+<H2 CLASS="HeadingC">
+Text Ranges</H2>
+<PRE>VisTextRange, MSG_VIS_TEXT_GET_RANGE, VisTextRangeContext, MSG_VIS_TEXT_GET_TEXT_SIZE</PRE>
+<P>
+<A NAME="IX_VTR_&ldots;">
+ </A>
+<A NAME="IX_VisTextRange">
+ </A>
+Frequently, your application may wish to specify a range of text to act on. This range specifies the starting and ending points within the text for the relevant operation. Each of these starting and ending points is a zero-based character position. </P>
+<PRE>typedef struct {
+    dword		VTR_start;
+			/* starting character position */
+    dword		VTR_end;
+			/* ending character position */
+} VisTextRange;</PRE>
+<P>
+To select a starting point at the first character, set VTR_<CODE>
+start</CODE>
+ to zero. To select an ending point at the last character, set <CODE>
+VTR_end</CODE>
+ to the special constant TEXT_ADDRESS_PAST_END.</P>
+<P>
+If you want to pass the current selection as a range in any message that demands a <CODE>
+VisTextRange</CODE>
+, pass VIS_TEXT_RANGE_SELECTION to indicate that the currently selected area should be used to specify the range. Note that for some operations (such as paragraph attribute changes) the affected area may be larger than the text selection. Pass VIS_TEXT_RANGE_PARAGRAPH_SELECTION if you want the currently selected area to be used after it has been adjusted to reflect its paragraph boundaries.</P>
+<P>
+You can use MSG_VIS_TEXT_GET_RANGE to return an actual <CODE>
+VisTextRange</CODE>
+ of the selection (or paragraph selection). Pass this message a <CODE>
+VisTextRangeContext</CODE>
+, which specifies whether the range will include just the selection or kick out the range to its paragraph boundaries.The <CODE>
+VisTextRange</CODE>
+ buffer that you also pass must be initially filled in (with VTR_<CODE>
+start</CODE>
+ as 0 and VTR_<CODE>
+end</CODE>
+ as TEXT_ADDRESS_PAST_END). </P>
+<PRE>typedef WordFlags VisTextRangeContext;
+#define VTRC_PARAGRAPH_CHANGE							0x8000
+#define VTRC_CHAR_ATTR_CHANGE							0x4000
+#define VTRC_PARA_ATTR_BORDER_CHANGE							0x2000</PRE>
+<P>
+MSG_VIS_TEXT_GET_TEXT_SIZE returns the total size of the text within the text object.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_GET_RANGE">
+ </A>
+MSG_VIS_TEXT_GET_RANGE</H4>
+<PRE CLASS="syntax">void	MSG_VIS_TEXT_GET_RANGE(
+        VisTextRange		*range,
+        word		context);</PRE>
+<P>
+This message fills in a <CODE>
+VisTextRange</CODE>
+ buffer based on the selection criteria passed in the <EM>
+context</EM>
+ argument. The context information specifies whether the range will be used for a character attribute change (in which case the normal selection positions will be used) or whether the range will be used for a paragraph attribute change (in which case the boundaries of the selection will be kicked out to paragraph boundaries).</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any text object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+range</EM>
+	<CODE>
+VisTextRange</CODE>
+ buffer to hold the range text positions returned from the message handler. This buffer must be initially filled inwith VTR_<CODE>
+start</CODE>
+ as 0 and VTR_<CODE>
+end</CODE>
+ as TEXT_ADDRESS_PAST_END. </P>
+<DL>
+<DT>
+<EM>
+context</EM>
+</DT><DD><CODE>
+VisTextRangeContext</CODE>
+.</DD>
+</DL>
+<P CLASS="refField">
+Return:	The <CODE>
+VisTextRange</CODE>
+ buffer filled in.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_GET_TEXT_SIZE">
+ </A>
+MSG_VIS_TEXT_GET_TEXT_SIZE</H4>
+<PRE CLASS="syntax">dword	MSG_VIS_TEXT_GET_TEXT_SIZE();</PRE>
+<P>
+This message returns the current size of text.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any text object.</P>
+<P CLASS="refField">
+Return:	The size of the text within the text object.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+
+<H2 CLASS="HeadingC">
+Replacing Text</H2>
+<PRE>MSG_VIS_TEXT_REPLACE_TEXT</PRE>
+<P>
+There are many messages provided in <CODE>
+VisTextClass</CODE>
+ to replace text within your Text Object. The most generic (and therefore versatile) of these messages is MSG_VIS_TEXT_REPLACE_TEXT. Simpler messages that you can use in special cases are documented in the following section (e.g. if you need to replace all of the text--or all of the text within a selection).</P>
+<P>
+You may replace any range of text displayed within a Text Object by sending MSG_VIS_TEXT_REPLACE_TEXT, passing a pointer to a <CODE>
+VisTextReplaceParameters</CODE>
+ structure. This structure must contain a range of text to replace and a <CODE>
+TextReference</CODE>
+ that defines how the replacement text is referenced and stored. The structure is shown below.</P>
+<PRE>typedef struct {
+    VisTextRange         VTRP_range;
+    dword                VTRP_insCount;
+    TextReference        VTRP_textReference;
+    VisTextReplaceFlags  VTRP_flags;
+} VisTextReplaceParameters;</PRE>
+<P>
+VTRP_<CODE>
+range </CODE>
+defines the range of text being replaced.</P>
+<P>
+VTRP_<CODE>
+insCount</CODE>
+ contains the number of characters in the replacement string buffer that is passed in VTRP_<CODE>
+textReference</CODE>
+. If you wish to have the Text object calculate this value itself dynamically, you may pass INSERT_COMPUTE_TEXT_LENGTH in the high word of this field (and zero in the low word).</P>
+<P>
+VTRP_<CODE>
+textReference</CODE>
+ contains a <CODE>
+TextReference</CODE>
+ structure. This structure is explained in more detail below.</P>
+<P>
+VTRP_<CODE>
+flags</CODE>
+ contains a bitfield of <CODE>
+VisTextReplaceFlags</CODE>
+. Valid flags are:</P>
+<DL>
+<DT>
+VTRF_FILTER</DT><DD>
+This flag indicates that the passed replacement string should be passed through the Text object's VTI_<CODE>
+filters</CODE>
+, if any, before it is inserted into the Text object.</DD>
+<DT>
+VTRF_KEYBOARD_INPUT</DT><DD>
+This flag indicates that the text being inserted is coming from the keyboard rather than from some other source. </DD>
+<DT>
+VTRF_USER_MODIFICATION</DT><DD>
+This flag indicates that the text being inserted is due to a user modification. (User modifications will mark the Text object dirty; text inserted due to an application-initiated action may not mark the Text object dirty.)</DD>
+<DT>
+VTRF_UNDO</DT><DD>
+This flag indicates that the text being inserted is due to an UNDO operation.</DD>
+<DT>
+VTRF_DO_NOT_SEND_CONTEXT_UPDATE</DT><DD>
+This flag is internally set. It speeds up context notifications during global replaces, ensuring that the context is only updated after the entire operation has finished. Do not set this flag yourself.</DD>
+</DL>
+<P>
+<A NAME="IX_TR_&ldots;  (TextReference structure)">
+ </A>
+<A NAME="IX_TextReference">
+ </A>
+The <CODE>
+TextReference</CODE>
+ structure is shown below:</P>
+<PRE>typedef struct {
+    TextReferenceType     TR_type;
+    TextReferenceUnion    TR_ref;
+} TextReference</PRE>
+<P>
+<A NAME="IX_TRT_&ldots;  (TextReferenceType type)">
+ </A>
+<A NAME="IX_TextReferenceType">
+ </A>
+The <CODE>
+TextReferenceType</CODE>
+ indicates what structure is referenced within the <CODE>
+TextReferenceUnion</CODE>
+. For each case, the reference is a structure of different arguments and size. These types are listed below, and correspond to teh indicated matching structure:</P>
+<DL>
+<DT CLASS="FIXME_WorListWide">
+	TRT_POINTER	/* TextReferencePointer */</DT><DD>
+TRT_SEGMENT_CHUNK		/* TextReferenceSegmentChunk */<BR>
+TRT_OPTR		/* TextReferenceBlockChunk */<BR>
+TRT_BLOCK		/* TextReferenceBlock */<BR>
+TRT_VM_BLOCK		/* TextReferenceVMBlock */<BR>
+TRT_DB_ITEM		/* TextReferenceDBItem */<BR>
+TRT_HUGE_ARRAY		/* TextReferenceHugeArray */</DD>
+</DL>
+<P>
+<A NAME="IX_TRU_&ldots;  (TextReferenceUnion)">
+ </A>
+<A NAME="IX_TextReferenceUnion">
+ </A>
+The <CODE>
+TextReferenceUnion</CODE>
+ may be any of the following:</P>
+<PRE>typedef union {
+    TextReferencePointer       TRU_pointer;
+    TextReferenceSegmentChunk  TRU_segChunk;
+    TextReferenceBlockChunk    TRU_blockChunk;
+    TextReferenceBlock         TRU_block;
+    TextReferenceVMBlock       TRU_vmBlock;
+    TextReferenceDBItem        TRU_dbItem;
+    TextReferenceHugeArray     TRU_hugeArray;
+} TextReferenceUnion;</PRE>
+<P>
+The formats of these individual reference structures are contained within the Structures Reference book.</P>
+
+<H4 CLASS="RefETitle">
+MSG_VIS_TEXT_REPLACE_TEXT</H4>
+<PRE CLASS="syntax">Boolean	MSG_VIS_TEXT_REPLACE_TEXT(
+        VisTextReplaceParameters				*params);</PRE>
+<P>
+<A NAME="IX_MSG_VIS_TEXT_REPLACE_TEXT">
+ </A>
+This message replaces the text string within a text object (either a VisText or a GenText object) with the text referenced within the passed structure. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenText or VisText object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+*params</EM>
+	A pointer to a <CODE>
+VisTextReplaceParameters</CODE>
+ structure.</P>
+<P CLASS="refField">
+Return:	<EM>
+true</EM>
+ if an error occurred; <EM>
+false</EM>
+ if the Text object's text is replaced. </P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+
+<H2 CLASS="HeadingC">
+Replacing Text All At Once</H2>
+<PRE>MSG_VIS_TEXT_REPLACE_ALL_PTR, MSG_VIS_TEXT_REPLACE_ALL_OPTR, MSG_VIS_TEXT_REPLACE_ALL_BLOCK, MSG_VIS_TEXT_REPLACE_ALL_VM_BLOCK, MSG_VIS_TEXT_REPLACE_ALL_DB_ITEM, MSG_VIS_TEXT_REPLACE_ALL_HUGE_ARRAY</PRE>
+<P>
+You may replace the text displayed within a Text Object all at once with the following messages. Any previous text within the text object will be replaced with new text. The new text may come from any of the formats previously described. The format of this source determines which message you should use to replace the text.</P>
+<P>
+<CODE>
+MSG_VIS_TEXT_REPLACE_ALL_PTR</CODE>
+ replaces the text with text referenced by a simple pointer to a text string.</P>
+<P>
+<CODE>
+MSG_VIS_TEXT_REPLACE_ALL_OPTR</CODE>
+ replaces the text with text referenced by an optr. (This is the format that non-large text objects store their text.)</P>
+<P>
+<CODE>
+MSG_VIS_TEXT_REPLACE_ALL_BLOCK</CODE>
+ replaces the text with text residing in a global memory block.</P>
+<P>
+<CODE>
+MSG_VIS_TEXT_REPLACE_ALL_VM_BLOCK</CODE>
+ replaces the text with text residing in a VM block. Text objects that use the large model usually store their text within a VM block, so this message is useful for transferring text from one VisText object to another, for example.</P>
+<P>
+<CODE>
+MSG_VIS_TEXT_REPLACE_ALL_DB_ITEM</CODE>
+ replaces the text with text from a database item.</P>
+<P>
+<CODE>
+MSG_VIS_TEXT_REPLACE_ALL_HUGE_ARRAY</CODE>
+ replaces the text with text from a huge array.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_REPLACE_ALL_PTR">
+ </A>
+MSG_VIS_TEXT_REPLACE_ALL_PTR</H4>
+<PRE CLASS="syntax">void	MSG_VIS_TEXT_REPLACE_ALL_PTR(
+        const char 		*text, 
+        word 		textLen);</PRE>
+<P>
+This message replaces the text string within a text object (either a VisText or a GenText object) with the text referenced by the passed pointer. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenText or VisText object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+text</EM>
+	A pointer to a text string.</P>
+<DL>
+<DT>
+<EM>
+textLen</EM>
+</DT><DD>The text length (in characters) or zero if null-terminated.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing. The Text object's text is replaced. </P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_REPLACE_ALL_OPTR">
+ </A>
+MSG_VIS_TEXT_REPLACE_ALL_OPTR</H4>
+<PRE CLASS="syntax">void	MSG_VIS_TEXT_REPLACE_ALL_OPTR(
+        optr o,
+        word textLen);</PRE>
+<P>
+This message replaces the text string within a text object (either a VisText or a GenText) with the text referenced by the passed optr. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenText or VisText object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+o</EM>
+	The optr of the chunk containing the text.</P>
+<DL>
+<DT>
+<EM>
+textLen</EM>
+</DT><DD>Length of the text string or zero if null-terminated.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing. The text object's text is replaced.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_REPLACE_ALL_BLOCK">
+ </A>
+MSG_VIS_TEXT_REPLACE_ALL_BLOCK</H4>
+<PRE CLASS="syntax">void	MSG_VIS_TEXT_REPLACE_ALL_BLOCK(
+        word block,
+        word textLen);</PRE>
+<P>
+This message replaces the text string within a text object (either a VisText or a GenText) with the text within the passed data block. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenText or VisText object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+block</EM>
+	The handle of the data block containing the text to use in the replacement operation.</P>
+<DL>
+<DT>
+<EM>
+textLen</EM>
+</DT><DD>The length of the text or zero if null-terminated.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing. The text object's text is replaced.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_REPLACE_ALL_VM_BLOCK">
+ </A>
+MSG_VIS_TEXT_REPLACE_ALL_VM_BLOCK</H4>
+<PRE CLASS="syntax">void	MSG_VIS_TEXT_REPLACE_ALL_VM_BLOCK(
+        VMFileHandle		file,
+        VMBlockHandle		block,
+        word 		textLen);</PRE>
+<P>
+This message replaces the text string within a text object (either a VisText or a GenText) with the text within the passed data block. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenText or VisText object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+file</EM>
+	The handle of the VM file containing the text.</P>
+<DL>
+<DT>
+<EM>
+block</EM>
+</DT><DD>The VM block handle of the block within the VM file.</DD>
+<DT>
+<EM>
+textLen</EM>
+</DT><DD>The length of the text or zero if null-terminated.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing. The text object's text is replaced.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_REPLACE_ALL_DB_ITEM">
+ </A>
+MSG_VIS_TEXT_REPLACE_ALL_DB_ITEM</H4>
+<PRE CLASS="syntax">void	MSG_VIS_TEXT_REPLACE_ALL_DB_ITEM(
+        VMFileHandle 		file,
+        DBGroup 		group,
+        DBItem		item);</PRE>
+<P>
+This message replaces the text string within a text object (either a VisText or a GenText) with the text within the passed database item. The text is assumed to be null-terminated.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenText or VisText object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+file</EM>
+	The handle of the database item's associated VM file.</P>
+<DL>
+<DT>
+<EM>
+group</EM>
+</DT><DD>The database group containing the text.</DD>
+<DT>
+<EM>
+item</EM>
+</DT><DD>The DB item containing the text.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing. The text object's text is replaced.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_REPLACE_ALL_HUGE_ARRAY">
+ </A>
+MSG_VIS_TEXT_REPLACE_ALL_HUGE_ARRAY</H4>
+<PRE CLASS="syntax">void	MSG_VIS_TEXT_REPLACE_ALL_HUGE_ARRAY(
+        VMFileHandle		file,
+        VMBlockHandle		hugeArrayBlock,
+        word		textLen);</PRE>
+<P>
+This message replaces the text string within a text object (either a VisText or a GenText) with the text within the passed HugeArray.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenText or VisText object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+file</EM>
+	The handle of the huge array's associated VM file.</P>
+<DL>
+<DT>
+<EM>
+hugeArrayBlock</EM>
+</DT><DD>The VM block handle of the huge array directory block.</DD>
+<DT>
+<EM>
+textLen</EM>
+</DT><DD>The length of the text or zero if null-terminated.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing. The text object's text is replaced.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+
+<H2 CLASS="HeadingC">
+Replacing the Text Within a Selection</H2>
+<PRE>MSG_VIS_TEXT_REPLACE_SELECTION_PTR, MSG_VIS_TEXT_REPLACE_SELECTION_OPTR, MSG_VIS_TEXT_REPLACE_SELECTION_BLOCK, MSG_VIS_TEXT_REPLACE_SELECTION_VM_BLOCK, MSG_VIS_TEXT_REPLACE_SELECTION_DB_ITEM, MSG_VIS_TEXT_REPLACE_SELECTION_HUGE_ARRAY</PRE>
+<P>
+The text object library automatically allows text selection. By using the mouse (or other device, depending on the specific UI), a user may select any section of text and perform operations on this selected text. The following messages replace any selected text with text from one of the described sources. What message you use depends on what type of source your text comes from.</P>
+<P>
+Note that if no text is selected, these messages will enter text at the current cursor position. This allows these messages either to replace selected text or to &quot;insert&quot; text if none is selected. You may override this insertion behavior by setting paragraph attributes. In those cases, text entered at the current position will overstrike current text.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_REPLACE_SELECTION_PTR">
+ </A>
+MSG_VIS_TEXT_REPLACE_SELECTION_PTR</H4>
+<PRE CLASS="syntax">void	MSG_VIS_TEXT_REPLACE_SELECTION_PTR(
+        const char		*text,
+        word		textLen);</PRE>
+<P>
+This message replaces the current selection within a text object with the text contained in the passed string pointer. If no text is currently selected, the text will be inserted at the current cursor position.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenText or VisText object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+text</EM>
+	The pointer to the character string.</P>
+<DL>
+<DT>
+<EM>
+textLen</EM>
+</DT><DD>The length of the text in characters or zero, if null-terminated.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_REPLACE_SELECTION_OPTR">
+ </A>
+MSG_VIS_TEXT_REPLACE_SELECTION_OPTR</H4>
+<PRE CLASS="syntax">void	MSG_VIS_TEXT_REPLACE_SELECTION_OPTR(
+        optr	o,
+        word	textLen);</PRE>
+<P>
+This message replaces the current selection within a text object with the text in the chunk specified by <CODE>
+o</CODE>
+. If no text is currently selected, the text will be inserted at the current cursor position.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenText or VisText object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+o</EM>
+	The optr of the text chunk.</P>
+<DL>
+<DT>
+<EM>
+textLen</EM>
+</DT><DD>The length of the text in characters or zero, if null-terminated.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_REPLACE_SELECTION_BLOCK">
+ </A>
+MSG_VIS_TEXT_REPLACE_SELECTION_BLOCK</H4>
+<PRE CLASS="syntax">void	MSG_VIS_TEXT_REPLACE_SELECTION_BLOCK(
+        word	block,
+        word	textLen);</PRE>
+<P>
+This message replaces the current selection within a text object with the text contained in the passed block. If no text is currently selected, the text will be inserted at the current cursor position.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenText or VisText object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+block</EM>
+	Handle of the text block.</P>
+<DL>
+<DT>
+<EM>
+textLen</EM>
+</DT><DD>The length of the text in characters or zero, if null-terminated.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_REPLACE_SELECTION_VM_BLOCK">
+ </A>
+MSG_VIS_TEXT_REPLACE_SELECTION_VM_BLOCK</H4>
+<PRE CLASS="syntax">void	MSG_VIS_TEXT_REPLACE_SELECTION_VM_BLOCK(
+        VMFileHandle		file,
+        VMBlockHandle		block,
+        word		textLen);</PRE>
+<P>
+This message replaces the current selection within a text object by the text contained in the passed VM block. If no text is currently selected, the text will be inserted at the current cursor position.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenText or VisText object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+file</EM>
+	Handle of the VM file containing the text.</P>
+<DL>
+<DT>
+<EM>
+block</EM>
+</DT><DD>Handle of the block within the VM file.</DD>
+<DT>
+<EM>
+textLen</EM>
+</DT><DD>The length of the text in characters or zero, if null-terminated.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_REPLACE_SELECTION_DB_ITEM">
+ </A>
+MSG_VIS_TEXT_REPLACE_SELECTION_DB_ITEM</H4>
+<PRE CLASS="syntax">void	MSG_VIS_TEXT_REPLACE_SELECTION_DB_ITEM(
+        VMFileHandle		file,
+        DBGroup		group,
+        DBItem		item);</PRE>
+<P>
+This message replaces the current selection within a text object with the text contained in the passed database item. If no text is currently selected, the text will be inserted at the current cursor position. The text is assumed to be null-terminated.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenText or VisText object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+file</EM>
+	The handle of the VM file containing the text.</P>
+<DL>
+<DT>
+<EM>
+group</EM>
+</DT><DD>The database group containing the text.</DD>
+<DT>
+<EM>
+item</EM>
+</DT><DD>The database item.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_REPLACE_SELECTION_HUGE_ARRAY">
+ </A>
+MSG_VIS_TEXT_REPLACE_SELECTION_HUGE_ARRAY</H4>
+<PRE CLASS="syntax">void	MSG_VIS_TEXT_REPLACE_SELECTION_HUGE_ARRAY(
+        VMFileHandle		file,
+        VMBlockHandle		hugeArrayBlock,
+        word		textLen);</PRE>
+<P>
+This message replaces the current selection within a text object with the text contained in the passed huge array. If no text is currently selected, the text will be inserted at the current cursor position.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenText or VisText object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+file</EM>
+	The VM file containing the huge array.</P>
+<DL>
+<DT>
+<EM>
+hugeArrayBlock</EM>
+</DT><DD>The VM block handle of the huge array directory block.</DD>
+<DT>
+<EM>
+textLen</EM>
+</DT><DD>The length of the text in characters or zero, if null-terminated.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+
+<H2 CLASS="HeadingC">
+Appending the Text</H2>
+<PRE>MSG_VIS_TEXT_APPEND_PTR, MSG_VIS_TEXT_APPEND_OPTR, MSG_VIS_TEXT_APPEND_BLOCK, MSG_VIS_TEXT_APPEND_VM_BLOCK, MSG_VIS_TEXT_APPEND_DB_ITEM, MSG_VIS_TEXT_APPEND_HUGE_ARRAY</PRE>
+<P>
+In many cases, you may not want to replace text but instead add it to the end of the current text. You may use any of the following messages to append text to your text object. Again, the new text may come from any of the formats previously described. The format of this source determines which message you should use to add the text.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_APPEND_PTR">
+ </A>
+MSG_VIS_TEXT_APPEND_PTR</H4>
+<PRE CLASS="syntax">void	MSG_VIS_TEXT_APPEND_PTR(
+        const char		*text,
+        word		textLen);</PRE>
+<P>
+This message appends text to a text object; the text is added at the end of the current text. None of the previous text is changed.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any VisText or GenText object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+text</EM>
+	The pointer to the character string.</P>
+<DL>
+<DT>
+<EM>
+textLen</EM>
+</DT><DD>The length of the text in characters or zero, if null-terminated.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_APPEND_OPTR">
+ </A>
+MSG_VIS_TEXT_APPEND_OPTR</H4>
+<PRE CLASS="syntax">void	MSG_VIS_TEXT_APPEND_OPTR(
+        optr	o,
+        word	textLen);</PRE>
+<P>
+This message adds text to a text object; the text is added at the end of the current text. None of the previous text is changed.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any VisText or GenText object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+o</EM>
+	The optr of the text chunk.</P>
+<DL>
+<DT>
+<EM>
+textLen</EM>
+</DT><DD>The length of the text in characters or zero, if null-terminated.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_APPEND_BLOCK">
+ </A>
+MSG_VIS_TEXT_APPEND_BLOCK</H4>
+<PRE CLASS="syntax">void	MSG_VIS_TEXT_APPEND_BLOCK(
+        word	block,
+        word	textLen);</PRE>
+<P>
+This message appends text to a text object; the text is added at the end of the current text. None of the previous text is changed.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any VisText or GenText object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+block</EM>
+	Handle of the text block.</P>
+<DL>
+<DT>
+<EM>
+textLen</EM>
+</DT><DD>The length of the text in characters or zero, if null-terminated.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_APPEND_VM_BLOCK">
+ </A>
+MSG_VIS_TEXT_APPEND_VM_BLOCK</H4>
+<PRE CLASS="syntax">void	MSG_VIS_TEXT_APPEND_VM_BLOCK(
+        VMFileHandle		file,
+        VMBlockHandle		block,
+        word		textLen);</PRE>
+<P>
+This message appends text to a text object; the text is added at the end of the current text. None of the previous text is changed.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any VisText or GenText object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+file</EM>
+	Handle of the VM file containing the text.</P>
+<DL>
+<DT>
+<EM>
+block</EM>
+</DT><DD>Handle of the block within the VM file.</DD>
+<DT>
+<EM>
+textLen</EM>
+</DT><DD>The length of the text in characters or zero, if null-terminated.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_APPEND_DB_ITEM">
+ </A>
+MSG_VIS_TEXT_APPEND_DB_ITEM</H4>
+<PRE CLASS="syntax">void	MSG_VIS_TEXT_APPEND_DB_ITEM(
+        VMFileHandle		file,
+        DBGroup		group,
+        DBItem		item);</PRE>
+<P>
+This message appends text to a text object; the text is added at the end of the current text. None of the previous text is changed. The text is assumed to be null-terminated.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any VisText or GenText object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+file</EM>
+	The handle of the VM file containing the text.</P>
+<DL>
+<DT>
+<EM>
+group</EM>
+</DT><DD>The database group containing the text.</DD>
+<DT>
+<EM>
+item</EM>
+</DT><DD>The database item.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_APPEND_HUGE_ARRAY">
+ </A>
+MSG_VIS_TEXT_APPEND_HUGE_ARRAY</H4>
+<PRE CLASS="syntax">void	MSG_VIS_TEXT_APPEND_HUGE_ARRAY(
+        VMFileHandle		file,
+        VMBlockHandle		hugeArrayBlock,
+        word		textLen);</PRE>
+<P>
+This message appends text to a text object; the text is added at the end of the current text. None of the previous text is changed.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any VisText or GenText object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+file</EM>
+	The VM file containing the huge array.</P>
+<DL>
+<DT>
+<EM>
+hugeArrayBlock</EM>
+</DT><DD>The block handle of the huge array.</DD>
+<DT>
+<EM>
+textLen</EM>
+</DT><DD>The length of the text in characters or zero, if null-terminated.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+
+<H2 CLASS="HeadingC">
+Retrieving the Text</H2>
+<PRE>MSG_VIS_TEXT_GET_ALL_PTR, MSG_VIS_TEXT_GET_ALL_OPTR, MSG_VIS_TEXT_GET_ALL_BLOCK, MSG_VIS_TEXT_GET_ALL_VM_BLOCK, MSG_VIS_TEXT_GET_ALL_DB_ITEM, MSG_VIS_TEXT_GET_ALL_HUGE_ARRAY</PRE>
+<P>
+You may also retrieve the text from your text object and place its text into any of the previously mentioned formats. The format of your destination determines which message you should use.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_GET_ALL_PTR">
+ </A>
+MSG_VIS_TEXT_GET_ALL_PTR</H4>
+<PRE CLASS="syntax">word	MSG_VIS_TEXT_GET_ALL_PTR(
+        const char		*text);</PRE>
+<P>
+This message retrieves the entire text of a text object and copies it to the buffer passed. The text within the text object is unchanged.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any VisText or GenText object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+text</EM>
+	The pointer to a locked or fixed buffer. The buffer must be large enough to accommodate all the text.</P>
+<P CLASS="refField">
+Return:	The length of the null-terminated string not counting the null character.</P>
+<DL>
+<DT>
+<CODE>
+text</CODE>
+</DT><DD>The buffer pointed to by <CODE>
+text</CODE>
+ will contain the null-terminated text of the text object.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_GET_ALL_OPTR">
+ </A>
+MSG_VIS_TEXT_GET_ALL_OPTR</H4>
+<PRE CLASS="syntax">word	MSG_VIS_TEXT_GET_ALL_OPTR(
+        optr	o);</PRE>
+<P>
+This message retrieves the entire text of a text object and copies it into the chunk specified by <CODE>
+o</CODE>
+. The text within the text object is unchanged. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any VisText or GenText object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+o</EM>
+	The optr of the chunk into which the text will be copied. Pass a valid memory handle with a null chunk handle to have the message allocate a new chunk.</P>
+<P CLASS="refField">
+Return:	The chunk handle of the resized (or new) chunk. The chunk will always exist upon return and will contain at least the terminating null character.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_GET_ALL_BLOCK">
+ </A>
+MSG_VIS_TEXT_GET_ALL_BLOCK</H4>
+<PRE CLASS="syntax">word	MSG_VIS_TEXT_GET_ALL_BLOCK(
+        word	block);</PRE>
+<P>
+This message retrieves the entire text of a text object and copies it into the passed data block.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any VisText or GenText object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+block</EM>
+	Handle of the memory block into which the text will be copied. Pass a null handle to have the message allocate a new block.</P>
+<P CLASS="refField">
+Return:	The handle of the resized (or new) block. The block will always exist upon return and will contain at least the terminating null character.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_GET_ALL_VM_BLOCK">
+ </A>
+MSG_VIS_TEXT_GET_ALL_VM_BLOCK</H4>
+<PRE CLASS="syntax">word	MSG_VIS_TEXT_GET_ALL_VM_BLOCK(
+        VMFileHandle		file,
+        VMBlockHandle		block);</PRE>
+<P>
+This message retrieves the entire text of a text object and copies it into the passed VM block.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any VisText or GenText object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+file</EM>
+	The VM file handle of the VM file.</P>
+<DL>
+<DT>
+<EM>
+block</EM>
+</DT><DD>The VM block handle of the VM block into which the text will be copied. Pass a null handle to have the message allocate a new VM block in the file.</DD>
+</DL>
+<P CLASS="refField">
+Return:	The VM block handle of the resized (or new) VM block. The VM block will always exist (assuming a valid VM file was passed), and it will contain at least the terminating null character.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_GET_ALL_DB_ITEM">
+ </A>
+MSG_VIS_TEXT_GET_ALL_DB_ITEM</H4>
+<PRE CLASS="syntax">DBGroupAndItem MSG_VIS_TEXT_GET_ALL_DB_ITEM(
+        VMFileHandle		file,
+        DBGroup		group,
+        DBItem		item);</PRE>
+<P>
+This message retrieves the entire text of a text object and copies it into the passed database item. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any VisText or GenText object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+file</EM>
+	The VM file handle of the VM file.</P>
+<DL>
+<DT>
+<EM>
+group</EM>
+</DT><DD>The database group number (may be DB_UNGROUPED--if so, a new group will be returned as part of the return value).</DD>
+<DT>
+<EM>
+item</EM>
+</DT><DD>The item number of the database item into which the text will be copied. Pass zero to allocate a new database item in the specified <CODE>
+group</CODE>
+.</DD>
+</DL>
+<P CLASS="refField">
+Return:	The <CODE>
+DBGroupAndItem</CODE>
+ representing the resized (or new) DB item into which the text was copied. The item will always exist (assuming a valid VM file was specified) upon return, and it will contain at least the terminating null character.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_GET_ALL_HUGE_ARRAY">
+ </A>
+MSG_VIS_TEXT_GET_ALL_HUGE_ARRAY</H4>
+<PRE CLASS="syntax">word	MSG_VIS_TEXT_GET_ALL_HUGE_ARRAY(
+        VMFileHandle		file,
+        VMBlockHandle		hugeArrayBlock);</PRE>
+<P>
+This message retrieves the entire text of a text object and copies it into the passed huge array block.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any VisText or GenText object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+file</EM>
+	The VM file handle of the VM file containing the huge array.</P>
+<DL>
+<DT>
+<EM>
+hugeArrayBlock</EM>
+</DT><DD>The VM block handle of the huge array. Pass a null handle to have the message allocate a new huge array.</DD>
+</DL>
+<P CLASS="refField">
+Return:	The VM block handle of the first block of the resized (or new) huge array. The huge array will always exist upon return (assuming a valid VM file was specified), and it will contain at least the terminating null character.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+
+<H2 CLASS="HeadingC">
+Retrieving the Text Within a Selection</H2>
+<PRE>MSG_VIS_TEXT_GET_SELECTION_PTR, MSG_VIS_TEXT_GET_SELECTION_OPTR, MSG_VIS_TEXT_GET_SELECTION_BLOCK, MSG_VIS_TEXT_GET_SELECTION_VM_BLOCK, MSG_VIS_TEXT_GET_SELECTION_DB_ITEM, MSG_VIS_TEXT_GET_SELECTION_HUGE_ARRAY</PRE>
+<P>
+To retrieve the text within the current selection, you may send any of the following messages to your text object. If no text is currently selected no text will be retrieved.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_GET_SELECTION_PTR">
+ </A>
+MSG_VIS_TEXT_GET_SELECTION_PTR</H4>
+<PRE CLASS="syntax">word	MSG_VIS_TEXT_GET_SELECTION_PTR(
+        const char		*text);</PRE>
+<P>
+This message retrieves the currently selected text and stores it in the character string referenced by the passed pointer. The text remains selected and intact in the original text object. The passed buffer must be large enough to accommodate the text.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any VisText or GenText object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+text</EM>
+	The pointer to the character string.</P>
+<P CLASS="refField">
+Return:	The length of the string not including the terminating null character.</P>
+<DL>
+<DT>
+<CODE>
+text</CODE>
+</DT><DD>The buffer pointed to by <CODE>
+text</CODE>
+ will contain the null-terminated character string.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_GET_SELECTION_OPTR">
+ </A>
+MSG_VIS_TEXT_GET_SELECTION_OPTR</H4>
+<PRE CLASS="syntax">word	MSG_VIS_TEXT_GET_SELECTION_OPTR(
+        optr	o);</PRE>
+<P>
+This message retrieves the currently selected text and copies it into the passed chunk. The text remains selected and intact in the original text object.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any VisText or GenText object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+o</EM>
+	The optr of the text chunk into which the text will be copied. Pass a valid memory handle and a null chunk handle to have the message allocate a new chunk in the give block.</P>
+<P CLASS="refField">
+Return:	The chunk handle of the resized (or new) chunk containing the text. The chunk will contain at least the terminating null character.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_GET_SELECTION_BLOCK">
+ </A>
+MSG_VIS_TEXT_GET_SELECTION_BLOCK</H4>
+<PRE CLASS="syntax">word	MSG_VIS_TEXT_GET_SELECTION_BLOCK(
+        word	block);</PRE>
+<P>
+This message retrieves the currently selected text and copies it into the passed data block. The text remains selected and intact in the original text object.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any VisText or GenText object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+block</EM>
+	Handle of the text block to place the text into. Pass a null handle to have the message allocate a new memory block.</P>
+<P CLASS="refField">
+Return:	The memory handle of the resized (or new) block containing the selected text. The block will contain at least the terminating null character.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_GET_SELECTION_VM_BLOCK">
+ </A>
+MSG_VIS_TEXT_GET_SELECTION_VM_BLOCK</H4>
+<PRE CLASS="syntax">word	MSG_VIS_TEXT_GET_SELECTION_VM_BLOCK(
+        VMFileHandle		file,
+        VMBlockHandle		block);</PRE>
+<P>
+This message retrieves the currently selected text and copies it into the passed VM block. The text remains selected and intact in the original text object.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any VisText or GenText object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+file</EM>
+	The VM file handle of the VM file.</P>
+<DL>
+<DT>
+<EM>
+block</EM>
+</DT><DD>The VM block handle of the VM block into which the text will be copied. Pass a null block handle to have the message allocate a new VM block in the file.</DD>
+</DL>
+<P CLASS="refField">
+Return:	The VM block handle of the resized (or new) VM block. The VM block will contain at least the terminating null character.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_GET_SELECTION_DB_ITEM">
+ </A>
+MSG_VIS_TEXT_GET_SELECTION_DB_ITEM</H4>
+<PRE CLASS="syntax">DBGroupAndItem MSG_VIS_TEXT_GET_SELECTION_DB_ITEM(
+        VMFileHandle		file,
+        DBGroup		group,
+        DBItem		item);</PRE>
+<P>
+This message retrieves the currently selected text and copies it into the given database item. The text remains selected and intact in the original text object.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any VisText or GenText object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+file</EM>
+	The VM file handle of the VM file.</P>
+<DL>
+<DT>
+<EM>
+group</EM>
+</DT><DD>The group number of the passed item (if DB_UNGROUPED, a group will be determined).</DD>
+<DT>
+<EM>
+item</EM>
+</DT><DD>The item number of the database item into which the text will be copied. Pass zero to have the message allocate a new database item in the specified group and file.</DD>
+</DL>
+<P CLASS="refField">
+Return:	The <CODE>
+DBGroupAndItem</CODE>
+ representing the resized (or new) database item. The item will contain at least the terminating null character.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_GET_SELECTION_HUGE_ARRAY">
+ </A>
+MSG_VIS_TEXT_GET_SELECTION_HUGE_ARRAY</H4>
+<PRE CLASS="syntax">word	MSG_VIS_TEXT_GET_SELECTION_HUGE_ARRAY(
+        VMFileHandle		file,
+        VMBlockHandle		hugeArrayBlock);</PRE>
+<P>
+This message retrieves the currently selected text and copies it into the passed huge array. The text remains selected and intact in the original text object.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any VisText or GenText object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+file</EM>
+	The VM file handle of the VM file.</P>
+<DL>
+<DT>
+<EM>
+hugeArrayBlock</EM>
+</DT><DD>The VM block handle of the huge array into which the text will be copied. Pass a null handle to have the message allocate a new huge array in the passed VM file.</DD>
+</DL>
+<P CLASS="refField">
+Return:	The VM block handle of the resized (or new) huge array block. The huge array will contain at least the terminating null character.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+
+<H2 CLASS="HeadingC">
+Other Operations on the Text</H2>
+<PRE>MSG_VIS_TEXT_DELETE_ALL, MSG_VIS_TEXT_DELETE_SELECTION</PRE>
+<P>
+To delete the entire contents of a text object, send it <CODE>
+MSG_VIS_TEXT_DELETE_ALL</CODE>
+. This message will also resize the text's chunk to its minimum size. To delete only the current selection, send the text object <CODE>
+MSG_VIS_TEXT_DELETE_SELECTION</CODE>
+. No text will be selected after this message is sent. </P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_DELETE_ALL">
+ </A>
+MSG_VIS_TEXT_DELETE_ALL</H4>
+<PRE CLASS="syntax">void	MSG_VIS_TEXT_DELETE_ALL();</PRE>
+<P>
+This message deletes the entire contents of a text object's text chunk. The chunk will be resized to zero.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any VisText or GenText object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_DELETE_SELECTION">
+ </A>
+MSG_VIS_TEXT_DELETE_SELECTION</H4>
+<PRE CLASS="syntax">void	MSG_VIS_TEXT_DELETE_SELECTION();</PRE>
+<P>
+This message deletes the currently selected text. The text after the deletion will be automatically repositioned, and the text chunk will be resized.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any VisText or GenText object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+
+<H2 CLASS="HeadingC">
+Marking the Text Selection</H2>
+<PRE>MSG_VIS_TEXT_GET_SELECTION_RANGE, MAG_VIS_TEXT_SELECT_RANGE, MSG_VIS_TEXT_SELECT_RANGE_SMALL, MSG_VIS_TEXT_SELECT_ALL, MSG_VIS_TEXT_SELECT_START, MSG_VIS_TEXT_SELECT_END, MSG_VIS_TEXT_SELECT_RELATIVE</PRE>
+<P>
+<CODE>
+MSG_VIS_TEXT_GET_SELECTION_RANGE</CODE>
+ returns the <CODE>
+VisTextRange</CODE>
+ of the current selection. </P>
+<P>
+MSG_VIS_TEXT_SELECT_RANGE selects the selected area of text to the passed range. This message can be used with both large and small model text objects.</P>
+<P>
+<CODE>
+MSG_VIS_TEXT_SELECT_RANGE_SMALL</CODE>
+ selects a range of text. The message must pass the <CODE>
+VisTextRange</CODE>
+ to &quot;select.&quot; This message only works with non-large text objects. Any previous selection will be deselected.</P>
+<P>
+<CODE>
+MSG_VIS_TEXT_SELECT_ALL</CODE>
+ selects the recipient's entire text.</P>
+<P>
+<CODE>
+MSG_VIS_TEXT_SELECT_START</CODE>
+ selects the start of the text with a <CODE>
+VisTextRange</CODE>
+ of zero length. This places the cursor at the beginning of the text object and deselects any previous selection.</P>
+<P>
+<CODE>
+MSG_VIS_TEXT_SELECT_END</CODE>
+ selects the end of the text with a <CODE>
+VisTextRange</CODE>
+ of zero length. This places the cursor at the end of the text object and deselects any previous selection.</P>
+<P>
+<CODE>
+MSG_VIS_TEXT_SELECT_RELATIVE</CODE>
+ moves the cursor from its current position to a new location relative to the old position. You may pass this message a relative selection range to move the cursor and select text at the new position.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_GET_SELECTION_RANGE">
+ </A>
+MSG_VIS_TEXT_GET_SELECTION_RANGE</H4>
+<PRE CLASS="syntax">void	MSG_VIS_TEXT_GET_SELECTION_RANGE(
+        VisTextRange		*vtr);</PRE>
+<P>
+This message returns the range of the text object's current selection. You must pass this message a <CODE>
+VisTextRange</CODE>
+ buffer for the message to fill in with the selection range.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any VisText or GenText object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+vtr</EM>
+	A pointer to a <CODE>
+VisTextRange</CODE>
+ structure to fill in with the selection range.</P>
+<P CLASS="refField">
+Return:	The <CODE>
+VisTextRange</CODE>
+ buffer will be filled in.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_SELECT_RANGE">
+ </A>
+MSG_VIS_TEXT_SELECT_RANGE</H4>
+<PRE CLASS="syntax">void	MSG_VIS_TEXT_SELECT_RANGE(@stack
+        dword	end
+        dword	start);</PRE>
+<P>
+This message creates a selection for a text object. The message must pass the starting and ending character positions to mark as the text object's selection. Any previous selection will be deselected. Note that this message uses dword offsets into the text, and can therefore be used with LARGE model text objects.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any VisText or GenText object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+start</EM>
+	The zero-based character position of the start of the selection.</P>
+<DL>
+<DT>
+<EM>
+end</EM>
+</DT><DD>The zero-based character position of the end of the selection. This must be equal to or larger than the start position.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_SELECT_RANGE_SMALL">
+ </A>
+MSG_VIS_TEXT_SELECT_RANGE_SMALL</H4>
+<PRE CLASS="syntax">void	MSG_VIS_TEXT_SELECT_RANGE_SMALL(
+        word	start,
+        word	end);</PRE>
+<P>
+This message creates a selection for a text object. The message must pass the starting and ending character positions to mark as the text object's selection. Any previous selection will be deselected.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any VisText or GenText object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+start</EM>
+	The zero-based character position of the start of the selection.</P>
+<DL>
+<DT>
+<EM>
+end</EM>
+</DT><DD>The zero-based character position of the end of the selection. This must be equal to or larger than the start position.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_SELECT_ALL">
+ </A>
+MSG_VIS_TEXT_SELECT_ALL</H4>
+<PRE CLASS="syntax">void	MSG_VIS_TEXT_SELECT_ALL();</PRE>
+<P>
+This message selects the entire text of a text object as its selection. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any VisText or GenText object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_SELECT_START">
+ </A>
+MSG_VIS_TEXT_SELECT_START</H4>
+<PRE CLASS="syntax">void	MSG_VIS_TEXT_SELECT_START();</PRE>
+<P>
+This message places the cursor at the start of the text. Any current selection will be deselected.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any VisText or GenText object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_SELECT_END">
+ </A>
+MSG_VIS_TEXT_SELECT_END</H4>
+<PRE CLASS="syntax">void	MSG_VIS_TEXT_SELECT_END();</PRE>
+<P>
+This message places the cursor at the end of the text. Any current selection will be deselected.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any VisText or GenText object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_SELECT_RELATIVE">
+ </A>
+MSG_VIS_TEXT_SELECT_RELATIVE</H4>
+<PRE CLASS="syntax">void	MSG_VIS_TEXT_SELECT_RELATIVE(
+        word	newStart,
+        word	newEnd);</PRE>
+<P>
+This message moves a selection from the current cursor position to a position relative to that position.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any VisText or GenText object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+newStart</EM>
+	The number of character positions from the current cursor position to start the new selection.</P>
+<DL>
+<DT>
+<EM>
+newEnd</EM>
+</DT><DD>number of character positions from the current cursor position to end the new selection. This value must be equal to or greater than <EM>
+newStart</EM>
+.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Text_14.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Text_14.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">4 Text Object Chunks</A> 
+<!-- to next --> | <A HREF="Text_16.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.2 Lines and Fields</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

@@ -1,0 +1,753 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: GOCLanguage_13.htm,v 1.2 97/08/18 14:33:43 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Declaring Objects</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">GEOS Programming</A>: 4.4 <A HREF="GOCLanguage_f.htm">Using Classes and Objects</A>: 
+<A NAME="87013">
+ </A>
+Declaring Objects</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GOCLanguage_f.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GOCLanguage_12.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.3 Defining Methods</A> 
+<!-- to next --> | <A HREF="GOCLanguage_14.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.5 Sending Messages</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+<A NAME="IX_Objects:goc syntax">
+ </A>
+In GEOS programs, you can instantiate objects in two ways: You can declare them in your source code with the <CODE>
+@object</CODE>
+ keyword, or you can instantiate them and fill in their instance data during execution. In most cases, you will probably do the former, especially with generic UI objects.</P>
+<P>
+Additionally, you can create resources and chunks with the <CODE>
+@start, @end</CODE>
+, <CODE>
+@header</CODE>
+, and <CODE>
+@chunk</CODE>
+ keywords. GEOS libraries also need an additional set of declarations in their definition (<STRONG CLASS="fileName">
+.goh</STRONG>
+) files; these declarations (<CODE>
+@deflib</CODE>
+ and <CODE>
+@endlib</CODE>
+) indicate that the code contained between them is part of the specified library.</P>
+
+<H2 CLASS="HeadingC">
+Defining Library Code</H2>
+<PRE>@deflib, @endlib</PRE>
+<P>
+<A NAME="IX_Libraries:@deflib in library header files">
+ </A>
+<A NAME="IX_Header files:goc library files">
+ </A>
+<A NAME="IX_@endlib[;endlib]">
+ </A>
+<A NAME="IX_@deflib[;deflib]">
+ </A>
+If your geode is a library, it will likely have a number of <STRONG CLASS="fileName">
+.goh</STRONG>
+ files. Each of these files contains some portion of the library's code and is included by applications that use the library. The library code must be delimited by the two keywords <CODE>
+@deflib</CODE>
+ and <CODE>
+@endlib</CODE>
+, which have the following formats:</P>
+<PRE>@deflib &lt;libname&gt;
+@endlib</PRE>
+<DL>
+<DT>
+<STRONG>
+libname</STRONG>
+</DT><DD>The permanent name of the library with the extender stripped off. For example, the UI library's name is ui.lib, and the format would then be</DD>
+<PRE>@deflib ui
+    /* library code here */
+@endlib</PRE>
+</DL>
+<P>
+Note that these two keywords are only necessary in files that define classes in the library. Files that have just code or data used in the library do not require them (though they are allowed).</P>
+
+
+<H2 CLASS="HeadingC">
+Declaring Segment Resources and Chunks</H2>
+<PRE>@start, @end, @header, @chunk, @gstring, @chunkArray, @elementArray, @extern</PRE>
+<P>
+<A NAME="IX_Resources:goc syntax">
+ </A>
+There are essentially three types of resources in GEOS: code resources containing routines and methods, object blocks containing object instance chunks (and often data chunks), and data resources containing only data chunks. Code resources are created automatically, and no declaration is required for them (unless you require special segments; then you should use the <EM>
+pragmas</EM>
+ appropriate for your C compiler).</P>
+<P>
+<A NAME="IX_@header[;header]">
+ </A>
+<A NAME="IX_@end[;end]">
+ </A>
+<A NAME="IX_@start[;start]">
+ </A>
+Object blocks or other LMem resources are declared with <CODE>
+@start</CODE>
+ and <CODE>
+@end</CODE>
+. You can set a special header on a local memory resource with the <CODE>
+@header</CODE>
+ keyword. These are described below, and an example of declaring the resource block is given in <A HREF="GOCLanguage_13.htm#91725"> Declaring Data Resources</A>
+. Note that the <CODE>
+@header</CODE>
+ keyword must come between the <CODE>
+@start</CODE>
+ and <CODE>
+@end</CODE>
+ delimiters.</P>
+<PRE>@start    &lt;segname&gt; [, &lt;flags&gt;];
+@header   &lt;type&gt; [= &lt;init&gt;];
+@end     &lt;segname&gt;</PRE>
+<DL>
+<DT>
+<STRONG>
+segname</STRONG>
+</DT><DD>This is the name of the resource segment.</DD>
+<DT>
+<STRONG>
+flags</STRONG>
+</DT><DD>These are optional flags that determine two characteristics of the resource. If the flag <A NAME="IX_data (@start flag)">
+ </A>
+<CODE>
+data</CODE>
+ is set, the block will be set to a data resource--the default is an object block. If the flag <CODE>
+notDetachable</CODE>
+<A NAME="IX_notDetachable (@start flag)">
+ </A>
+ is set, the resource block will never be saved to a state file.</DD>
+<DT>
+<STRONG>
+type</STRONG>
+</DT><DD>This is the name of a structure type that will act as the header structure for the resource block. It must be some permutation of either <CODE>
+LMemBlockHeader</CODE>
+ (for non object blocks) or <CODE>
+ObjLMemBlockHeader</CODE>
+ (for object blocks).</DD>
+<DT>
+<STRONG>
+init</STRONG>
+</DT><DD>This is an initializer for the new header type. Typically, some data fields will be added on to the end of one of the standard LMem block headers. These fields may be filled in with initializer data with this optional argument.</DD>
+</DL>
+<P>
+The resource elements (objects or chunks, for example) are also declared <A NAME="IX_Chunks:declaring with @chunk">
+ </A>
+<A NAME="IX_@chunk[;chunk]">
+ </A>
+within the <CODE>
+@start</CODE>
+ and <CODE>
+@end</CODE>
+ delimiters. The <CODE>
+@chunk</CODE>
+ keyword declares a data chunk and is shown below. For the <CODE>
+@object</CODE>
+ keyword, see the next section.</P>
+<PRE>@chunk    &lt;type&gt; &lt;name&gt; [= &lt;init&gt;];</PRE>
+<DL>
+<DT>
+<STRONG>
+type</STRONG>
+</DT><DD>This is the data type that will be held in the chunk.</DD>
+<DT>
+<STRONG>
+name</STRONG>
+</DT><DD>This is the name of the chunk. You may use this name as you would a variable name to reference the chunk.</DD>
+<DT>
+<STRONG>
+init</STRONG>
+</DT><DD>This is initializer data in the standard C format. If initializing a structure, make sure you put the data within curly braces.</DD>
+</DL>
+<P>
+<A NAME="Chunks">
+ </A>
+<A NAME="GStrings">
+ </A>
+<A NAME="@gstring[;gstring]">
+ </A>
+There is a special-case syntax for the declaration of a chunk which contains GString data. A GString is a stored series of graphics commands, discussed in detail in <A HREF="../../Graphics/Environment/Environment_15.htm">the Graphics Environment chapter</A>. Its syntax may be summarized:</P><PRE>@gstring &lt;name&gt; = { &lt;init&gt; };</PRE>
+<DL>
+<DT>
+<STRONG>
+name</STRONG>
+</DT><DD>This is the name of the chunk. You may use this name as you would a variable name to reference the chunk.</DD>
+<DT>
+<STRONG>
+init</STRONG>
+</DT><DD>The is the initializer data. It is a series of bytes. Normally, a GString's data set up in a <CODE>
+@gstring</CODE>
+ chunk is set up by means of the <CODE>
+GS...()</CODE>
+ macros.</DD>
+</DL>
+<A NAME="IX_Chunks:declaring with @chunkArray">
+ </A>
+<A NAME="IX_@chunkArray[;chunkArray]">
+ </A>
+<A NAME="IX_Chunks:declaring with @elementArray">
+ </A>
+<A NAME="IX_@elementArray[;elementArray]">
+ </A>
+<P>
+Two other types of resource elements may also be defined, both of which are 
+array types. The <CODE>
+@chunkArray</CODE>
+ keyword declares a chunk array structure, 
+and the <CODE>
+@elementArray</CODE>
+ keyword declares an element array structure. See <A HREF="../../Memory/LMem/index.htm">the Local Memory chapter</A>, for information on the structure and usage of chunk and element arrays. These static arrays must <EM>not</EM> appear 
+in a resource marked <CODE>data</CODE>; the resource may be marked 
+<CODE>notDetachable</CODE> or may be unmarked.  In the <CODE>.gp</CODE> file, 
+the resource should be marked <CODE>lmem</CODE>, optionally 
+<CODE>read-only</CODE>.
+The formats for the keywords are described below:</P>
+
+<PRE>@chunkArray &lt;stype&gt; &lt;aname&gt; = {&lt;init&gt;};</PRE>
+<PRE>@elementArray &lt;stype&gt; &lt;aname&gt; [ = {&lt;init&gt;} ];</PRE>
+<DL>
+<DT>
+<STRONG>
+stype</STRONG>
+</DT><DD>This is the type of structure stored in the array.</DD>
+<DT>
+<STRONG>
+aname</STRONG>
+</DT><DD>This is the name of the array.</DD>
+<DT>
+<STRONG>
+init</STRONG>
+</DT><DD>This is any initializer data. If there is no initializer data (i.e., you want to declare an empty chunk array), you'll want a code snippet like the following:</DD>
+<PRE>@chunk ChunkArrayHeader &lt;aname&gt; = {0,
+    sizeof(&lt;stype&gt;), 0, sizeof(ChunkArrayHeader) };</PRE>
+</DL>
+
+<P>Here is an example showing two statically declared chunk arrays:</P>
+<PRE>
+#define CELL_DATA_LENGTH 15
+
+typedef char CellDataStruct[CELL_DATA_LENGTH];
+
+@chunkArray CellDataStruct headerDataArray = {
+    "no", "Description",  "type", " $/lb"
+};
+
+@chunkArray CellDataStruct coffeeDataArray = {
+    "0", "House Blend",  "PEET", "$ 6.95",
+    "1", "Mocha-Java",   "PEET", "$10.75",
+    "2", "Garuda Blend", "PEET", "$ 9.25",
+    "3", "Italian Dark", "DARK", "$ 8.75",
+    "4", "French Roast", "DARK", "$ 8.75",
+    "5", "Sumatra",      "PACF", "$ 8.95",
+    "6", "Sulawesi-Kal", "PACF", "$11.55",
+    "7", "Java",         "PACF", "$ 8.75",
+    "8", "Aged Java",    "PACF", "$ 9.75",
+    "9", "Mexican",      "AMER", "$ 7.55"
+};
+
+</PRE>
+
+<P>
+One other keyword,<A NAME="IX_@extern[;extern]">
+ </A>
+ <A NAME="IX_Glue:externally declared chunks">
+ </A>
+<CODE>
+@extern</CODE>
+, allows you to use chunks from a different compilation session. The <CODE>
+@extern</CODE>
+ keyword can be used to reference remote (external) chunks, objects, and visual monikers. If the item referenced by <CODE>
+@extern</CODE>
+ is not actually defined anywhere, Glue will return an error when it tries to link the item. (Note also that Glue can not link through an external item; only one layer of external linkage is allowed. Thus, one object could not have an <CODE>
+@extern</CODE>
+ to a chunk that had an <CODE>
+@extern</CODE>
+ to a visMoniker.) Children in object trees may not be defined with <CODE>
+@extern</CODE>
+; Goc will produce an error in this case. The format of this keyword is as follows:</P>
+<PRE>@extern chunk &lt;cname&gt;;
+@extern object &lt;oname&gt;;
+@extern visMoniker &lt;vmname&gt;;</PRE>
+<DL>
+<DT>
+<STRONG>
+cname</STRONG>
+</DT><DD>This is the name of a chunk.</DD>
+<DT>
+<STRONG>
+oname</STRONG>
+</DT><DD>This is the name of an object.</DD>
+<DT>
+<STRONG>
+vmname</STRONG>
+</DT><DD>This is the name of a visMoniker chunk.</DD>
+</DL>
+<P CLASS="figTitle">
+Code Display 5-16 <A NAME="91725">
+ </A>
+Declaring Data Resources</P>
+<PRE>/* This example declares a data block with three different chunks in it and
+ * its own header type. */</PRE>
+<PRE>typedef struct {
+    LMemBlockHeader			MLMBH_meta;       /* basic header structure */
+    int			MLMBH_numEntries;  /* the number of entries in the block */
+} StudentBlockHeader;</PRE>
+<PRE>@start StudentBlock, data;					/* data flag indicates LMem block */
+@header StudentBlockHeader = 1;					/* initialize new header fields */</PRE>
+<PRE>/* The three chunks are defined below. Each represents a single field associated
+ * with a single student; that is why the header's MLMBH_numEntries field contains
+ * one (rather than three). */</PRE>
+<PRE>@chunk	char	firstName[] = &quot;John&quot;;
+@chunk	char	lastName[] = &quot;Student&quot;;
+@chunk	int	grade = 6;</PRE>
+<PRE>@end StudentBlock					/* end of resource block */</PRE>
+
+
+<H2 CLASS="HeadingC">
+<A NAME="72656">
+ </A>
+Declaring an Object</H2>
+<PRE>@object, @default, @specificUI, gcnList</PRE>
+<P>
+<A NAME="IX_Chunks:declaring with @object">
+ </A>
+The <A NAME="IX_@object[;object]">
+ </A>
+<CODE>
+@object</CODE>
+ keyword is much like the <CODE>
+@chunk</CODE>
+ keyword in its use. It allocates a chunk in a resource segment and fills it with initializer data. However, it also does much more in that it creates an object of a specified class and fills it with default data if no initializer data is specified.</P>
+<P>
+The <CODE>
+@object</CODE>
+ keyword, like <CODE>
+@chunk</CODE>
+, must be used between the delimiters <CODE>
+@start</CODE>
+ and <CODE>
+@end</CODE>
+ (see above). However, it must be used in an object block (it can not be used in a data resource segment). Its format is below, and several examples are shown in <A HREF="GOCLanguage_13.htm#99194"> Declaring Objects with @object</A>
+.</P>
+<PRE>@object   &lt;class&gt; &lt;name&gt; = &lt;flags&gt;* {
+    &lt;fieldName&gt; = &lt;init&gt;;*
+    &lt;varName&gt; [= &lt;init&gt;];*
+};</PRE>
+<DL>
+<DT>
+<STRONG>
+class</STRONG>
+</DT><DD>The class of the object. It must be a valid class defined either by GEOS or by your own code.</DD>
+<DT>
+<STRONG>
+name</STRONG>
+</DT><DD>The name of the object. The object's name will be used when sending messages to it.</DD>
+<DT>
+<STRONG>
+flags</STRONG>
+</DT><DD>Currently only one flag is allowed for objects:<A NAME="IX_ignoreDirty:object flag">
+ </A>
+ <CODE>
+ignoreDirty</CODE>
+. When set, it will cause the object to ignore when changes have been made to its instance data; this means it will always be restored from a state file in the same way as it is defined in the code file. This flag should <EM>
+not</EM>
+ be set for any generic objects.</DD>
+<DT>
+<STRONG>
+fieldName</STRONG>
+</DT><DD>The name of an instance data field defined for the class.</DD>
+<DT>
+<STRONG>
+varName</STRONG>
+</DT><DD>The name of a variable data instance field. If the variable data field has extra data, you can initialize it with the optional argument.</DD>
+<DT>
+<STRONG>
+init</STRONG>
+</DT><DD>This is initializer data for the instance data field. If you want default values in the field, you can either leave the field out of the <CODE>
+@object</CODE>
+ declaration or use the keyword <CODE>
+@default</CODE>
+ for the initializer. When declaring variable data, though, be aware that if the extra data is a structure, the initializer must be enclosed in curly braces.</DD>
+</DL>
+<P>
+GEOS supports special instance data fields as described in <A HREF="GOCLanguage_10.htm#87922"> Defining Instance Data Fields</A>
+. These are declared as normal fields and are described below. Also, generic hints are implemented as variable data, so they are added to an object in the same way as other variable data types.</P>
+
+<H3 CLASS="HeadingD">
+Object Trees</H3>
+<P>
+All objects declared in a static tree (e.g., your application's generic tree) should be in the same source file. If they are in different files, then they may be joined into a single tree only by dynamically adding objects from one file as children to objects of the other.</P>
+<P>
+Note that if one file contains a tree of objects, then you may incorporate the whole tree by simply dynamically adding the top object in the file to the main tree. You won't have to add each object individually.</P>
+<P>
+If an object declared in one source file will send a message to an object in another source file, you must include an <CODE>
+@extern</CODE>
+ line in the source file containing the sending object: </P>
+<PRE>@extern object ReceivingObjectName;</PRE>
+<P>
+The message itself should be sent in the following manner (with variations possible if you will be using <CODE>
+@call</CODE>
+, passing arguments, or what have you):</P>
+<PRE>optr ROOptr;
+ROOptr = GeodeGetOptrNS(@ReceivingObjectName);
+@send ROOptr::MSG_DO_SOMETHING(0, 0);</PRE>
+<P>
+<CODE>
+GeodeGetOptrNS()</CODE>
+<A NAME="IX_Multi-launchability:optrs and">
+ </A>
+<A NAME="IX_optr:and multiply launchable geodes">
+ </A>
+<A NAME="IX_GeodeGetOptrNS()">
+ </A>
+ returns the object pointer for the object. In the case of a multiply-launchable program, Goc has no way of knowing which program's @ReceivingObjectName should receive the message--by using <CODE>
+GeodeGetOptrNS()</CODE>
+, you ensure that the object getting the message will be in the same geode as the object calling the routine.</P>
+
+
+<H3 CLASS="HeadingD">
+<A NAME="92931">
+ </A>
+Declaring Children</H3>
+<P>
+If an object is to be part of an object tree, its class (or one of its superclasses) <EM>
+must</EM>
+ have at least an <CODE>
+@link</CODE>
+ instance data field as does <CODE>
+GenClass</CODE>
+. If the object is to be allowed to have children, it must also have a field of type <CODE>
+@composite</CODE>
+. These allow Goc to automatically and correctly link the tree together.</P>
+<P>
+As described in <A HREF="GOCLanguage_10.htm#87922"> Defining Instance Data Fields</A>
+, the <CODE>
+@composite</CODE>
+ field points to the first child of an object, and the <CODE>
+@link</CODE>
+ field points either to the object's next sibling or back to the parent if there is no next sibling. However, all child declaration is done completely in the composite field when using <CODE>
+@object</CODE>
+. The format is as follows:</P>
+<PRE>&lt;fname&gt; = &lt;childName&gt; [, &lt;childname&gt;]* ;</PRE>
+<DL>
+<DT>
+<STRONG>
+fname</STRONG>
+</DT><DD>This is the name of the field defined with <CODE>
+@composite</CODE>
+ in the class definition.</DD>
+<DT>
+<STRONG>
+childName</DT><DD>
+</STRONG>
+This is the name of an object to be a child of this object. The star symbol indicates that one or more children may be included in the declaration line--they should be separated by commas, and each child must also be declared with an <CODE>
+@object</CODE>
+ declaration.</DD>
+</DL>
+<P>
+There are many examples of this in the sample applications. Some simple examples are shown below.</P>
+<PRE>GI_comp = @TicTacPrimary;</PRE>
+<PRE>GI_comp = @TicTacView, @TicTacGameMenu;</PRE>
+<PRE>VCI_comp = @TTX1, @TTX2, @TTX3, @TTX4, @TTX5, @TTO1,
+		 @TTO2, @TTO3, @TTO4, @TTO5;</PRE>
+
+
+<H3 CLASS="HeadingD">
+Declaring Visual Monikers</H3>
+<P>
+<A NAME="IX_@visMoniker[;visMoniker]">
+ </A>
+For an object to have a visual moniker, it must have an instance data field of type <CODE>
+@visMoniker</CODE>
+ as <CODE>
+GenClass</CODE>
+ does (see <A HREF="GOCLanguage_10.htm#87922"> Defining Instance Data Fields</A>
+). If you are in fact working with GenClass' GI_visMoniker field, you might want to consult its description in <A HREF="../../SysObjects/Gen/index.htm">the GenClass chapter</A>.</P><P>
+<A NAME="IX_Visual monikers:goc syntax">
+ </A>
+Visual monikers may take many forms, and the declaration line changes depending on which form you are using. The form ranges from a simple text field to a complex list of possible monikers based on video resolution. Each of these forms and the declaration line for it is given below.</P>
+<P>
+The following form is used for simple text strings (shown with example):</P>
+<PRE>&lt;fname&gt; = &lt;string&gt;;
+GI_visMoniker = &quot;One&quot;;</PRE>
+<DL>
+<DT>
+<STRONG>
+fname</STRONG>
+</DT><DD>The name of the moniker's instance data field.</DD>
+<DT>
+<STRONG>
+string</STRONG>
+</DT><DD>A string of text enclosed in quotation marks. This string is the visual moniker for the object.</DD>
+</DL>
+<P>
+The following form is used for text strings that have a keyboard navigation character. A keyboard navigation character can be a character enclosed in single quotation marks, a numerical constant, or a text string representing some constant defined with <CODE>
+#define</CODE>
+. If it's a text string, the string is passed on for the C compiler to parse. The form is shown below with an example.</P>
+<PRE>&lt;fname&gt; = &lt;nav&gt;, &lt;string&gt;;
+GI_visMoniker = 'V', &quot;View&quot;;</PRE>
+<DL>
+<DT>
+<STRONG>
+fname</STRONG>
+</DT><DD>The name of the moniker's instance data field.</DD>
+<DT>
+<STRONG>
+nav</STRONG>
+</DT><DD>A keyboard navigation character represented as described above.</DD>
+<DT>
+<STRONG>
+string</STRONG>
+</DT><DD>A text string enclosed in quotation marks.</DD>
+</DL>
+<P>
+The following form is used when a list of monikers is required. Most frequently, this form is used when defining an application's icons; one moniker for each potential screen resolution will be included in the list. The form is shown below, along with an example.</P>
+<PRE>&lt;fname&gt; = list { &lt;nameList&gt; };
+GI_visMoniker = list {
+ @DocDirButtonSCMoniker,
+ @DocDirButtonSMMoniker,
+ @DocDirButtonSCGAMoniker
+}</PRE>
+<DL>
+<DT>
+<STRONG>
+fname</STRONG>
+</DT><DD>This is the name of the moniker's instance data field.</DD>
+<DT>
+<STRONG>
+nameList</STRONG>
+</DT><DD>This is a list of resource data chunk names separated by commas. Each chunk can be defined with the <CODE>
+@chunk</CODE>
+ or <CODE>
+@visMoniker</CODE>
+ keyword.</DD>
+</DL>
+<P>
+It is possible when declaring a list of visual monikers to have each moniker within a chunk or to declare each moniker with the <CODE>
+@visMoniker</CODE>
+ keyword. If used on its own line, this keyword takes the form</P>
+<PRE>@visMoniker &lt;fname&gt; = &lt;init&gt;;</PRE>
+<P>
+<A NAME="IX_@localize[;localize]">
+ </A>
+The fields are the name of the moniker (same as that specified in the moniker list) and the moniker data. The visual moniker will be put in its own chunk just as if the moniker had been declared with the <CODE>
+@chunk</CODE>
+ keyword, but using <CODE>
+@visMoniker</CODE>
+ often is clearer and easier.</P>
+<P>
+Visual monikers and strings presented by a program's UI are often accompanied by localization information. By placing a <CODE>
+@localize</CODE>
+ keyword after a <CODE>
+@visMoniker</CODE>
+ or <CODE>
+@chunk</CODE>
+ construction, you can provide instructions for whoever uses the ResEdit program to localize your program (i.e., to translate its strings into a foreign language). This keyword can use any syntax from the following list:</P>
+<PRE>@localize { &lt;string&gt; &lt;min&gt;-&lt;max&gt; };
+@localize { &lt;string&gt; &lt;length&gt; };
+@localize { &lt;string&gt; };
+@localize &lt;string&gt;; 
+@localize not;</PRE>
+<DL>
+<DT>
+<STRONG>
+string</STRONG>
+</DT><DD>A string of explanatory text. It should describe the moniker or chunk's contents.</DD>
+<DT>
+<STRONG>
+min</STRONG>
+</DT><DD>Minimum length of the moniker text or string.</DD>
+<DT>
+<STRONG>
+max</STRONG>
+</DT><DD>Maximum length of the moniker text or string.</DD>
+<DT>
+<STRONG>
+length</STRONG>
+</DT><DD>Length of the moniker text or string.</DD>
+<DT>
+<STRONG>
+not</STRONG>
+</DT><DD>Keyword specifying that the moniker or chunk is not localizable.</DD>
+
+
+</DL>
+<H3 CLASS="HeadingD">
+Declaring GCN List Assignments</H3>
+<P>
+GEOS<A NAME="IX_General change notification:goc syntax">
+ </A>
+ employs a &quot;General Change Notification&quot; (GCN) system which allows objects to register for notification of certain types of events. For example, some applications may want to notify for changes in the file system (file deletes, moves, copies, etc.); some objects may require notification each time the selection changes (e.g., a PointSizeControl object needs to know when the user changes a text selection). For further information, see <A HREF="../../Kernel/GCN/index.htm">the General Change Notification chapter</A>.</P><P>
+<A NAME="IX_gcnList() keyword">
+ </A>
+While many objects will add themselves to and remove themselves from GCN lists dynamically, others will need to be placed on certain GCN lists in their definitions. For this, the <CODE>
+gcnList</CODE>
+ keyword (the only one not preceded by the marker <CODE>
+@</CODE>
+) is used. Its format is shown below:</P>
+<PRE>gcnList(&lt;manufID&gt;, &lt;ltype&gt;) = &lt;oname&gt;,+;</PRE>
+<DL>
+<DT>
+<STRONG>
+manufID</STRONG>
+</DT><DD>This is the manufacturer ID of the manufacturer responsible for creating the particular list type. It is used to differentiate different manufacturers who may use the same list type enumerator. In many cases, this will be the type MANUFACTURER_ID_GEOWORKS.</DD>
+<DT>
+<STRONG>
+ltype</STRONG>
+</DT><DD>This is the name of the GCN list. Most that you will use are defined by GenApplication and begin GAGCNLT_.... All the list types are defined in the GenApplication chapter in the Objects book.</DD>
+<DT>
+<STRONG>
+oname</STRONG>
+</DT><DD>This is a list of objects that should be on the GCN list. The objects are separated by commas.</DD>
+
+
+</DL>
+<H3 CLASS="HeadingD">
+Declaring Keyboard Accelerators</H3>
+<P>
+<A NAME="IX_Keyboard accelerators:goc syntax">
+ </A>
+A keyboard accelerator acts as a &quot;hot key,&quot; invoking the object's default action when pressed. <A NAME="IX_@kbdAccelerator[kbdAccelerator]">
+ </A>
+The accelerator character is defined in an instance field declared with <CODE>
+@kbdAccelerator</CODE>
+ as shown in <A HREF="GOCLanguage_10.htm#87922"> Defining Instance Data Fields</A>
+. The form of declaration follows.</P>
+<PRE>&lt;fname&gt; = [@specificUI] &lt;mod&gt;* &lt;key&gt;;</PRE>
+<DL>
+<DT>
+<STRONG>
+fname</STRONG>
+</DT><DD>This is the name of the <CODE>
+@kbdAccelerator</CODE>
+ instance data field.</DD>
+<DT>
+<CODE>
+@specificUI</CODE>
+<A NAME="IX_@specificUI[;specificUI]">
+ </A>
+</DT><DD>This is a Goc keyword that, when used in this declaration, allows your program to use a key combination reserved for the specific UI. This can have undefined consequences and is strongly discouraged.</DD>
+<DT>
+<STRONG>
+mod</STRONG>
+</DT><DD>This is a modifier key. You may put any or all of the modifiers here, separated by spaces. The four modifiers are <A NAME="IX_alt (keyboard accelerator modifier)">
+ </A>
+<CODE>
+alt</CODE>
+, <A NAME="IX_control (keyboard accelerator modifier)">
+ </A>
+<CODE>
+control</CODE>
+, <CODE>
+ctrl</CODE>
+<A NAME="IX_ctrl (keyboard accelerator modifier)">
+ </A>
+, and <A NAME="IX_shift (keyboard accelerator modifier)">
+ </A>
+<CODE>
+shift</CODE>
+.</DD>
+<DT>
+<STRONG>
+key</STRONG>
+</DT><DD>This is either a character enclosed in single quotes (e.g., `k') or a numeric key constant (e.g., C_CTRL_A or 0x57).<A NAME="IX_Keyboard accelerators:goc syntax">
+ </A>
+</DD>
+
+
+</DL>
+<H3 CLASS="HeadingD">
+Using Default Values</H3>
+<P>
+Often an object will be declared with the default values of an instance data field. Other times, especially with generic UI object attributes, an object will have the default values with one or two modifications. In the first case, the instance data field does not need to be addressed at all; the default value will be used if no declaration is made.</P>
+<P>
+<A NAME="IX_@default[;default]">
+ </A>
+In the second case, however, you must use the <CODE>
+@default</CODE>
+ keyword to get the default values. If modifications are made and <CODE>
+@default</CODE>
+ is not used, all default values will be lost. This is normally used only with bitfield-type attributes, and modifications are made with bitwise operators. The use of <CODE>
+@default</CODE>
+ is shown below.</P>
+<PRE>&lt;fname&gt; = @default [&lt;op&gt; [~]&lt;attr&gt;]*;</PRE>
+<DL>
+<DT>
+<STRONG>
+fname</STRONG>
+</DT><DD>This is the name of the instance data field.</DD>
+<DT>
+<STRONG>
+op</STRONG>
+</DT><DD>This is a bitwise operator. If adding an attribute to the default, use the bitwise OR operator (|); if removing an attribute, use the bitwise AND operator (&amp;) with the inverse of the attribute (see below). One operator is required for each attribute added or removed. The priorities of the operators are the same as in the standard C programming language.</DD>
+<DT>
+<STRONG>
+~</STRONG>
+</DT><DD>This is the bitwise operator NOT. If removing an attribute using the bitwise AND operator, you should include the NOT symbol in front of the attribute.</DD>
+<DT>
+<STRONG>
+attr</STRONG>
+</DT><DD>This is the name of the attribute being added or removed.</DD>
+</DL>
+<P CLASS="figTitle">
+Code Display 5-17 <A NAME="99194">
+ </A>
+Declaring Objects with @object</P>
+<PRE>	/* This example shows the use of @start, @object, @visMoniker, and @end.
+	 * It is taken from the TicTac sample application. */</PRE>
+<PRE>@start AppResource;
+	/* The AppResource resource block contains the TicTacApp
+	 * object and its visual moniker chunk. */</PRE>
+<PRE>@object GenApplicationClass TicTacApp = {
+    GI_visMoniker = list { @TicTacTextMoniker };
+    GI_comp = @TicTacPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @TicTacPrimary;
+}</PRE>
+<PRE>@visMoniker TicTacTextMoniker = &quot;TicTacToe&quot;;
+@end AppResource</PRE>
+<PRE>@start Interface;
+	/* The Interface resource declares TicTac's primary window and other UI
+	 * gadgetry. Only the GenView from this application is shown. */
+@object GenViewClass TicTacView = {
+    GVI_content = @TicTacBoard;					/* A relocatable optr field */
+    GVI_docBounds = {0, 0, BOARD_WIDTH, BOARD_HEIGHT};
+					/* A Rectangle structure */
+    GVI_color = { C_BLUE, 0, 0, 0 };					/* A ColorQuad structure */
+    GVI_horizAttrs = @default | GVDA_NO_LARGER_THAN_CONTENT
+			    | GVDA_NO_SMALLER_THAN_CONTENT
+			    &amp; ~GVDA_SCROLLABLE;
+		/* The NO_LARGER and NO_SMALLER attributes are set in the
+		 * field, and SCROLLABLE is cleared. The SCROLLABLE attribute
+		 * is not set by default for the GenView; it is shown here
+		 * for illustration. */
+    GVI_vertAttrs = @default | GVDA_NO_LARGER_THAN_CONTENT
+			   | GVDA_NO_SMALLER_THAN_CONTENT;
+}</PRE>
+<PRE>@end Interface</PRE>
+
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GOCLanguage_f.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GOCLanguage_12.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.3 Defining Methods</A> 
+<!-- to next --> | <A HREF="GOCLanguage_14.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.5 Sending Messages</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

@@ -1,0 +1,240 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Geodes_1d.htm,v 1.1 97/06/02 15:29:00 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Being a Client</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Applications and Geodes</A>: 6.4 <A HREF="Geodes_19.htm">Inter-Application Communication</A>: 
+Being a Client</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Geodes_19.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Geodes_1c.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">6.3 Messages Across an IACP Link</A> 
+<!-- to next --> | <A HREF="Geodes_1e.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">6.5 Being a Server</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+Any object can register as a client for an IACP server list. When an object is a client, it can send messages to the server list, which will pass them along to the servers for that list.</P>
+
+<H2 CLASS="HeadingC">
+Registering as a Client</H2>
+<PRE>IACPConnect(), IACPCreateDefaultLaunchBlock()</PRE>
+<P>
+<A NAME="IX_IACPConnect()">
+ </A>
+To register as a client for a list, call the routine <CODE>
+IACPConnect()</CODE>
+. When you call this routine, you specify which server list you are interested in. If there is no such server list running, you can instruct the kernel to start up the server list, as well as one of the default applications for that list.</P>
+<P>
+<CODE>
+IACPConnect()</CODE>
+ is passed five arguments:</P>
+<UL>
+<LI>
+The <CODE>
+GeodeToken</CODE>
+ of the list for which you want to register.</LI>
+<LI>
+<A NAME="IX_IACPConnectFlags">
+ </A>
+<A NAME="IX_IACPF_&ldots;">
+ </A>
+A set of <CODE>
+IACPConnectFlags</CODE>
+. The following flags are available:</LI>
+</UL>
+<DL>
+<DT>
+IACPCF_OBEY_LAUNCH_MODEL</DT><DD>
+This indicates that GEOS should follow the launch model, which will specify whether the user should be presented a dialog box, asking the user whether an existing application should be used as the server, or a new application launched. If you set this flag, you must pass an <CODE>
+AppLaunchBlock</CODE>
+, with the ALB<CODE>
+_appMode</CODE>
+ field set to MSG_GEN_PROCESS_OPEN_APPLICATION; you must also set IACPCF_SERVER_MODE to IACPSM_USER_INTERACTIBLE.</DD>
+<DT>
+IACPCF_CLIENT_OD_SPECIFIED</DT><DD>
+This flag indicates that you will specify what object will be the new client. If you do not set this flag, the sending geode's Application object will be registered as the client.</DD>
+<DT>
+IACPCF_FIRST_ONLY</DT><DD>
+If you pass this flag, the client will be connected to only the first server on the server list. Any messages sent by the client to the server list will be passed only to that one server.</DD>
+<DT>
+IACPCF_SERVER_MODE</DT><DD>
+<A NAME="IX_IACPServerMode">
+ </A>
+<A NAME="IX_IACPSM_&ldots;">
+ </A>
+This field is three bits wide; it holds a member of the <CODE>
+IACPServerMode</CODE>
+ enumerated type. This type specifies how the client expects the server to behave. Currently, only two types are supported:</DD>
+<DT>
+IACPSM_NOT_USER_INTERACTIBLE</DT><DD>
+This is equal to zero. It indicates that the server object need not interact with the user.</DD>
+<DT>
+IACPSM_USER_INTERACTIBLE</DT><DD>
+This is equal to two. It indicates that the server should be able to interact with the user like any normal application.</DD>
+<UL>
+<LI>
+The <CODE>
+MemHandle</CODE>
+ of an <CODE>
+AppLaunchBlock</CODE>
+. If the server you specify is not running, GEOS will launch the application specified by the <CODE>
+AppLaunchBlock</CODE>
+. If you pass a null <CODE>
+MemHandle</CODE>
+, GEOS will return an error if no server is running.</LI>
+<LI>
+The optr of the client object. This is ignored if IACPCF_CLIENT_OD_SPECIFIED was not passed.</LI>
+<LI>
+A pointer to a word. <CODE>
+IACPConnect()</CODE>
+ will write the number of servers on the list to that word.</LI>
+</UL>
+</DL>
+<P>
+<CODE>
+IACPConnect()</CODE>
+ returns a word-sized <CODE>
+IACPConnection</CODE>
+ token. You will need to pass that token when you call another IACP routine to use the connection. It will also return the number of server objects on the list; it returns this value by writing it to the address indicated by the pointer passed.</P>
+<P>
+If the server list you indicate is not currently running, IACP may do one of two different things. If you pass a null handle as the third argument, <CODE>
+IACPConnect()</CODE>
+ will fail. It will return the error value IACP_NO_CONNECTION, and indicate that there are no servers on the specified list.</P>
+<P>
+If you pass an <CODE>
+AppLaunchBlock</CODE>
+, <CODE>
+IACPConnect()</CODE>
+ will examine that launch block to see what application should be launched to act as a server. The <CODE>
+AppLaunchBlock</CODE>
+ should specify the location and name of the application to open. If the ALB<CODE>
+_appRef.AIR_diskHandle</CODE>
+ field is non-zero, <CODE>
+IACPConnect()</CODE>
+ will look in the specified disk or standard path for an application with the right <CODE>
+GeodeToken</CODE>
+; otherwise, it will look in the standard places for an application.</P>
+<P>
+Note that if you pass a launch block to <CODE>
+IACPConnect()</CODE>
+, you may <EM>
+not</EM>
+ alter or free it afterwards. If the application is created, the block you pass will be its launch block; if not, the kernel will free the block automatically. In any event, the caller no longer has access to the block.</P>
+<P>
+If <CODE>
+IACPConnect()</CODE>
+ launches an application, the caller will block until that application has been created and registers for the server list. If the application does not register for that list, the caller will never unblock. You must therefore make sure that you are launching the right application for the list. Note that every application object will automatically register for the server list which shares its token.</P>
+<P>
+<A NAME="IX_IACPCreateDefaultLaunchBlock()">
+ </A>
+To create a launch block, you should call <CODE>
+IACPCreateDefaultLaunchBlock()</CODE>
+. This routine is passed a single argument, which specifies how the application will be opened. That argument must be MSG_GEN_PROCESS_OPEN_APPLICATION (the application will be opened as a standard, user-interactible application); MSG_GEN_PROCESS_OPEN_ENGINE (the application will be opened in engine mode, i.e. with no user interface); or MSG_GEN_PROCESS_OPEN_CUSTOM (which has an application-specified meaning).</P>
+<P>
+<CODE>
+IACPCreateDefaultLaunchBlock()</CODE>
+ allocates a launch block and sets up its fields appropriately. As created, the launch block will have the following characteristics:</P>
+<UL>
+<LI>
+The application's initial working directory (i.e. the launch block's ALB<CODE>
+_diskHandle</CODE>
+ field) will be SP_DOCUMENT.</LI>
+<LI>
+No application directory will be specified in the launch block (i.e. ALB<CODE>
+_appRef.</CODE>
+AIR<CODE>
+_diskHandle</CODE>
+ will be zero); <CODE>
+IACPConnect()</CODE>
+ will attempt to find the application on its own.</LI>
+<LI>
+No initial data file will be specified (i.e. ALB<CODE>
+_dataFile</CODE>
+ will be blank).</LI>
+<LI>
+The application will determine its own generic parent (i.e. ALB<CODE>
+_genParent</CODE>
+ will be null).</LI>
+<LI>
+No extra data word will be passed to the application (i.e. ALB<CODE>
+_extraData</CODE>
+ will be zero).</LI>
+<LI>
+There will be no output descriptor (i.e. ALB<CODE>
+_userLoadAckOutput</CODE>
+ and<CODE>
+ </CODE>
+ALB<CODE>
+_userLoadAckMessage</CODE>
+ will be null.)</LI>
+</UL>
+<P>
+<CODE>
+IACPCreateDefaultLaunchBlock()</CODE>
+ returns the handle of the newly-created launch block. Once the block is created, you can alter any of its fields before passing the launch block to <CODE>
+IACPConnect()</CODE>
+. (Once you pass the launch block to <CODE>
+IACPConnect()</CODE>
+, you may not alter it any more.)</P>
+<P>
+Often a client will want the server to open a specific document. For example, if a desktop-manager is implementing a &quot;print-file&quot; command, it will need to open a server application, instruct it to open the file to be printed, and then instruct it to print the file. To make the server open a document, pass the document's name in ALB<CODE>
+_dataFile</CODE>
+. The server will open the file when you register, and close it when you unregister.</P>
+
+
+<H2 CLASS="HeadingC">
+Unregistering as a Client</H2>
+<PRE>IACPShutdown(), IACPShutdownAll()</PRE>
+<P>
+<A NAME="IX_IACPShutdown()">
+ </A>
+If an application no longer needs to interact with a particular server list, it should call <CODE>
+IACPShutdown()</CODE>
+. This routine is also used by servers which wish to remove themselves from a server list. This section describes how the routine is used by clients; <A HREF="Geodes_1e.htm#52457"> Being a Server</A>
+ describes how it is used by servers.</P>
+<P>
+The routine is passed two arguments:</P>
+<UL>
+<LI>
+The <CODE>
+IACPConnection</CODE>
+ token for the link which is being shut down.</LI>
+<LI>
+An optr. This must be null if the routine is being called by a client.</LI>
+</UL>
+<P>
+<CODE>
+IACPShutdown()</CODE>
+ sends MSG_META_IACP_LOST_CONNECTION to all objects on the other side of the link; that is, if a client calls <CODE>
+IACPShutdown()</CODE>
+, all servers on the list will be sent this message.</P>
+<P>
+<CODE>
+IACPShutdownAll()</CODE>
+<A NAME="IX_IACPShutdownAll()">
+ </A>
+ closes all IACP links for the application which calls it. The Application object automatically calls this routine when the application is exiting.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Geodes_19.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Geodes_1c.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">6.3 Messages Across an IACP Link</A> 
+<!-- to next --> | <A HREF="Geodes_1e.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">6.5 Being a Server</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

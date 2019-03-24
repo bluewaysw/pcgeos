@@ -1,0 +1,458 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: VisClass_14.htm,v 1.1 97/06/02 16:49:32 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Sending Messages Through the Tree</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">VisClass</A>: 5.4 <A HREF="VisClass_10.htm">Working with Visible Object Trees</A>: 
+Sending Messages Through the Tree</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VisClass_10.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VisClass_13.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.3 Getting Visible Tree Information</A> 
+<!-- to next --> | <A HREF="VisClass_15.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5.5 Visible Object Window Operations</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+<A NAME="IX_Classed events:with visual objects">
+ </A>
+Often an object will need to contact its parent or children but will not know their precise optrs. Other times, you may need to send a message to a particular object in the tree but don't know where in the tree the object is. GEOS provides several ways to dispatch messages to parents and children and even to objects of a given class.</P>
+
+<H2 CLASS="HeadingC">
+Contacting Parents and Children Directly</H2>
+<PRE><A NAME="IX_@visParent (messaging shortcut)"> </A>@visParent, <A NAME="IX_@visChildren (messaging shortcut)"> </A>@visChildren, MSG_VIS_CALL_PARENT, MSG_VIS_SEND_TO_PARENT, MSG_VIS_SEND_TO_CHILDREN</PRE>
+<P>
+<A NAME="IX_Messages:calling parents;Messages:calling children">
+ </A>
+To send a given message to an object's parent (to check valid bounds, to check the parent's state, etc.), you can use the macro <CODE>
+@visParent</CODE>
+. To do this, substitute the macro in place of the destination object's name, as follows:</P>
+<PRE>kids = @call @visParent::MSG_VIS_COUNT_CHILDREN();</PRE>
+<P>
+The above call is more efficient than using two message calls for the same thing, as follows:</P>
+<PRE>myParent = @call self::MSG_VIS_FIND_PARENT();
+kids = @call myParent::MSG_VIS_COUNT_CHILDREN();</PRE>
+<P>
+Note that either <CODE>
+@call</CODE>
+ or <CODE>
+@send</CODE>
+ may be used with the <CODE>
+@visParent</CODE>
+ macro.</P>
+<P>
+A similar macro, <CODE>
+@visChildren</CODE>
+, is offered for sending messages to a composite's children. Note, however, that you can only use the <CODE>
+@send</CODE>
+ keyword to send messages with this macro; there is no way for a single call to collect return values from many different objects. So, if you need to pass pointers to your children, you will have to get each child's optr in turn and dispatch the message to it individually. (Recall that pointers should not be passed with <CODE>
+@send</CODE>
+ because they may be invalidated by the time the message is handled.) The format for using the <CODE>
+@visChildren</CODE>
+ macro is as follows:</P>
+<PRE>@send @visChildren::MSG_VIS_INVALIDATE();</PRE>
+<P>
+This usage is much more efficient than counting the composite's children and using a loop to get the child's optr and send the child the message.</P>
+<P>
+<A NAME="IX_Messages:recorded events">
+ </A>
+In addition to providing the above macros, <CODE>
+VisClass</CODE>
+ lets you pass recorded events to a visible object's parent or children. This can be useful, for example, if you need to send a message to another object's parent; you might otherwise first have to find the optr of the object's parent and then send the message directly. Instead, you can use the <CODE>
+VisClass</CODE>
+ messages <CODE>
+MSG_VIS_CALL_PARENT</CODE>
+ and <CODE>
+MSG_VIS_SEND_TO_PARENT</CODE>
+ to pass recorded (encapsulated) events to the recipient's parent.</P>
+<P>
+To send a recorded event to a visible object's children use the message <CODE>
+MSG_VIS_SEND_TO_CHILDREN</CODE>
+. The recorded event will not be allowed to return anything for the same reason the <CODE>
+@visChildren</CODE>
+ macro can not.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_CALL_PARENT">
+ </A>
+MSG_VIS_CALL_PARENT</H4>
+<PRE CLASS="syntax">void	MSG_VIS_CALL_PARENT(
+        EventHandle event);</PRE>
+<P>
+This message delivers the passed recorded event to the parent of the recipient object. It acts as a call, executing immediately even across threads. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+event</CODE>
+	The event handle of the prerecorded event to be delivered.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+<P CLASS="refField">
+Tips:	In Goc, an object should not send this message to itself; instead, it should use the <CODE>
+@visParent</CODE>
+ macro described above.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_SEND_TO_PARENT">
+ </A>
+MSG_VIS_SEND_TO_PARENT</H4>
+<PRE CLASS="syntax">void	MSG_VIS_SEND_TO_PARENT(
+        EventHandle event);</PRE>
+<P>
+This message delivers the passed recorded event to the parent of the recipient object. It acts as a send, allowing the caller to continue execution without waiting for the event to be handled.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+event</CODE>
+	The event handle of the recorded event to be delivered.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+<P CLASS="refField">
+Tips:	In Goc, an object should not send this message to itself; instead, it should use the <CODE>
+@visParent</CODE>
+ macro described above.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_SEND_TO_CHILDREN">
+ </A>
+MSG_VIS_SEND_TO_CHILDREN</H4>
+<PRE CLASS="syntax">void	MSG_VIS_SEND_TO_CHILDREN(
+        EventHandle event);</PRE>
+<P>
+This message delivers the passed recorded event to each of the recipient's children. It acts as a message send and can not return values; there is no way for a single message to call several objects and return values from each with a single call.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible composite object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+event</CODE>
+	The event handle of the recorded event to be delivered.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Structures:	In Goc, an object should not send this message to itself; instead, it should use the <CODE>
+@visChildren</CODE>
+ macro described above.</P>
+<P CLASS="refField">
+Warnings:	Do not pass pointers in the recorded event's parameters because the message may not be handled before the pointers are invalidated.</P>
+
+
+
+<H2 CLASS="HeadingC">
+Sending Classed Events Up the Tree</H2>
+<PRE>MSG_VIS_VUP_FIND_OBJECT_OF_CLASS, MSG_VIS_VUP_CALL_OBJECT_OF_CLASS, MSG_VIS_VUP_SEND_TO_OBJECT_OF_CLASS, MSG_VIS_VUP_TEST_FOR_OBJECT_OF_CLASS</PRE>
+<P>
+<CODE>
+VisClass</CODE>
+<A NAME="IX_Messages:classed events;Classes:sending messages to">
+ </A>
+ has several messages that automatically travel up the visible object tree until they get to an object that meets the proper criteria; they then deliver themselves to that object. This is accomplished by the default handler in <CODE>
+VisClass</CODE>
+ recognizing whether the given object meets the criteria; if it does not, the handler passes the message up to the object's parent.</P>
+<P>
+To find an object of a given class in the tree, use the message <CODE>
+MSG_VIS_VUP_FIND_OBJECT_OF_CLASS</CODE>
+. This message travels up the tree starting at the recipient until it reaches the first object of that class. So if you are looking for an object of <CODE>
+VisCompClass</CODE>
+, at the most the message will be passed up a single level.</P>
+<P>
+If you need to send a message to an object of a given class in the visible tree, you can either find it and send it the message or send the message directly with the visible upward messages <CODE>
+MSG_VIS_VUP_CALL_OBJECT_OF_CLASS</CODE>
+ and <CODE>
+MSG_VIS_VUP_SEND_TO_OBJECT_OF_CLASS</CODE>
+. These messages search up the tree in the same was as <CODE>
+MSG_VIS_VUP_FIND_OBJECT_OF_CLASS</CODE>
+, and they then deliver the passed event to the resulting object. </P>
+<P>
+To see simply whether an object of a given class exists in the visible tree, use <CODE>
+MSG_VIS_VUP_TEST_FOR_OBJECT_OF_CLASS</CODE>
+. This is useful if you are going to use <CODE>
+MSG_VIS_VUP_CALL_OBJECT_OF_CLASS</CODE>
+ (or its counterpart). If no object of the given class exists, you can skip sending the recorded message.</P>
+<P>
+To send classed messages to an object in the tree that is of a specific class, you can use <A NAME="IX_TravelOption">
+ </A>
+<CODE>
+TravelOption</CODE>
+ with certain <CODE>
+MetaClass</CODE>
+ messages. <CODE>
+VisClass</CODE>
+ defines a travel option <A NAME="IX_TO_VIS_PARENT">
+ </A>
+TO_VIS_PARENT, which sends the message to the first object up the tree that is of the specified class.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_VUP_FIND_OBJECT_OF_CLASS">
+ </A>
+MSG_VIS_VUP_FIND_OBJECT_OF_CLASS</H4>
+<PRE CLASS="syntax">optr	MSG_VIS_VUP_FIND_OBJECT_OF_CLASS(
+        ClassStruct *class);</PRE>
+<P>
+This message searches up the visible object tree until it encounters an object of the specified class. It then returns the optr of that object.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object--typically sent by a visible object to itself to find an object of the given class above it in the visible object tree.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+class</CODE>
+	A pointer to the <CODE>
+ClassStruct</CODE>
+ structure of the class to be searched for.</P>
+<P CLASS="refField">
+Return:	The optr of the object of the passed class. If multiple objects of this class exist in the tree, the first encountered will be returned. If no objects of this class are in the tree, a NullOptr will be returned.</P>
+<P CLASS="refField">
+Interception:	Unlikely--only objects that masquerade as objects of a different class would subclass this message. This practice is highly discouraged.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_VUP_TEST_FOR_OBJECT_OF_CLASS">
+ </A>
+MSG_VIS_VUP_TEST_FOR_OBJECT_OF_CLASS</H4>
+<PRE CLASS="syntax">Boolean	MSG_VIS_VUP_TEST_FOR_OBJECT_OF_CLASS(
+        ClassStruct *class);</PRE>
+<P>
+This message searches up the visible tree and determines whether an object of the given class is in the tree.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object--typically sent before <CODE>
+MSG_VIS_VUP_CALL_OBJECT_OF_CLASS</CODE>
+ or <CODE>
+MSG_VIS_VUP_SEND_TO_OBJECT_OF_CLASS</CODE>
+ to ensure that a recipient for the message exists.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+class</CODE>
+	A pointer to the <CODE>
+ClassStruct</CODE>
+ structure of the class to be searched for.</P>
+<P CLASS="refField">
+Return:	<CODE>
+True</CODE>
+ if the class is found; <CODE>
+false</CODE>
+ if it is not.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_VUP_CALL_OBJECT_OF_CLASS">
+ </A>
+MSG_VIS_VUP_CALL_OBJECT_OF_CLASS</H4>
+<PRE CLASS="syntax">void	MSG_VIS_VUP_CALL_OBJECT_OF_CLASS(
+        EventHandle event);</PRE>
+<P>
+This message searches up the visible tree until it encounters an object of the proper class for the recorded event. The class is specified within the passed <CODE>
+event</CODE>
+. When the first such object is found, it will be called with the classed event as if an <CODE>
+@call</CODE>
+ had been used with the event directly.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object--The passed event will be delivered to the first object of the appropriate class, not necessarily to the recipient of the <CODE>
+MSG_VIS_VUP_CALL_OBJECT_OF_CLASS</CODE>
+.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+event</CODE>
+	The event handle of a recorded event.</P>
+<P CLASS="refField">
+Return:	The classed event delivered by this message may return values as determined by the event. This message returns nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_VUP_SEND_TO_OBJECT_OF_CLASS">
+ </A>
+MSG_VIS_VUP_SEND_TO_OBJECT_OF_CLASS</H4>
+<PRE CLASS="syntax">void	MSG_VIS_VUP_SEND_TO_OBJECT_OF_CLASS(
+        EventHandle event);</PRE>
+<P>
+This message searches up the visible tree until it encounters an object of the proper class for the recorded event. The class is specified within the passed <CODE>
+event</CODE>
+. When the first such object is found, the message will be delivered to that object as if an <CODE>
+@send</CODE>
+ had been used with the event directly.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any visible object--The passed event will be delivered to the first object of the appropriate class, not necessarily to the object that received the <CODE>
+MSG_VIS_VUP_SEND_TO_OBJECT_OF_CLASS</CODE>
+.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+event</CODE>
+	The event handle of a recorded event.</P>
+<P CLASS="refField">
+Return:	Nothing. The recorded event may not return anything.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+<P CLASS="refField">
+Warnings:	The recorded event should not pass pointers among its parameters.</P>
+
+
+
+<H2 CLASS="HeadingC">
+Visible Upward Queries</H2>
+<PRE>MSG_VIS_VUP_QUERY</PRE>
+<P>
+<A NAME="IX_Messages:visible upward queries (VUP)">
+ </A>
+You can create your own messages that get passed up the visible tree by creating aliases of <CODE>
+MSG_VIS_VUP_QUERY</CODE>
+. <CODE>
+MSG_VIS_VUP_QUERY</CODE>
+, by itself, does nothing useful; it simply gets passed up the visible tree without ever being handled.</P>
+<P>
+You can create your own visible queries to return different types of values from objects higher up in the object tree. Take, for example, a music-teaching application which uses note objects as distant children of a sheet music object. If the note objects needed to know what key they were supposed to be in, they would query up the tree with a special upward query message. If we assume the sheet music object kept this information, it would want to respond to the query message with the appropriate value. Thus, the sheet music class would have a line similar to the following:</P>
+<PRE>@alias(MSG_VIS_VUP_QUERY)
+        MusicKeyType MSG_VIS_VUP_QUERY_MUSIC_KEY();</PRE>
+<P>
+This line creates an alias for the general-purpose upward query. The sheet music object should have a handler for <CODE>
+MSG_VIS_VUP_QUERY_MUSIC_KEY</CODE>
+ in which it figures out and returns the appropriate key. This type of upward query can be invaluable in many different situations.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_VUP_QUERY">
+ </A>
+MSG_VIS_VUP_QUERY</H4>
+<PRE CLASS="syntax">void	MSG_VIS_VUP_QUERY();</PRE>
+<P>
+This message simply queries up the tree until it is handled. It is extensible so visible objects can implement their own upward queries without adding handlers to every class in between it and the query handler.</P>
+<P>
+It is extremely rare that any object would send or handle <CODE>
+MSG_VIS_VUP_QUERY</CODE>
+ on its own; many classes, however, may alias this message and create their own versions of the upward query.</P>
+<P CLASS="refField">
+Source:	Unrestricted--see note above.</P>
+<P CLASS="refField">
+Destination:	Any visible object--see note above. Typically sent by a visible object either to itself or directly to its visible parent.</P>
+<P CLASS="refField">
+Parameters:	None--an alias of this message may have parameters.</P>
+<P CLASS="refField">
+Return:	Nothing--an alias of this message may have return values.</P>
+<P CLASS="refField">
+Interception:	<CODE>
+MSG_VIS_VUP_QUERY</CODE>
+ itself should not be intercepted. Its aliases, however, should be intercepted by the appropriate classes that will handle them.</P>
+
+
+
+<H2 CLASS="HeadingC">
+Sending Messages to Window Groups</H2>
+<PRE>MSG_VIS_VUP_CALL_WIN_GROUP, MSG_VIS_VUP_SEND_TO_WIN_GROUP</PRE>
+<P>
+<CODE>
+VisClass</CODE>
+<A NAME="IX_Windows:finding window groups">
+ </A>
+ offers two specific messages for contacting window group objects in a visible tree. These are similar to <CODE>
+MSG_VIS_VUP_CALL_OBJECT_OF_CLASS</CODE>
+ and <CODE>
+MSG_VIS_VUP_SEND_TO_OBJECT_OF_CLASS</CODE>
+, except they find the window group of the recipient and deliver the event to the window object. These two messages are detailed below.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_VUP_CALL_WIN_GROUP">
+ </A>
+MSG_VIS_VUP_CALL_WIN_GROUP</H4>
+<PRE CLASS="syntax">void	MSG_VIS_VUP_CALL_WIN_GROUP(
+        EventHandle event);</PRE>
+<P>
+This message searches up the visible object tree until it encounters a window group object. When the first window group is found, it will be called with the classed event as if an <CODE>
+@call</CODE>
+ had been used.</P>
+<P CLASS="refField">
+Source:	Unrestricted--typically sent by a visible object to itself to deliver the event to its window.</P>
+<P CLASS="refField">
+Destination:	Any visible object--the passed event will be delivered to a window object, not necessarily to the object that receives the <CODE>
+MSG_VIS_VUP_CALL_WIN_GROUP</CODE>
+.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+event</CODE>
+	The event handle of a recorded event to be delivered to the window object.</P>
+<P CLASS="refField">
+Return:	The passed event may return its own values, but <CODE>
+MSG_VIS_VUP_CALL_WIN_GROUP</CODE>
+ returns nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+<P CLASS="refField">
+See Also:	<CODE>
+MSG_VIS_VUP_CALL_OBJECT_OF_CLASS.</CODE>
+</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_VUP_SEND_TO_WIN_GROUP">
+ </A>
+MSG_VIS_VUP_SEND_TO_WIN_GROUP</H4>
+<PRE CLASS="syntax">void	MSG_VIS_VUP_SEND_TO_WIN_GROUP(
+        EventHandle event);</PRE>
+<P>
+This message searches up the visible object tree until it encounters a window group object. When the first window group is found, the passed event will be delivered to that object as if an <CODE>
+@send</CODE>
+ had been used directly.</P>
+<P CLASS="refField">
+Source:	Unrestricted--typically sent by a visible object to itself to deliver the event to its window.</P>
+<P CLASS="refField">
+Destination:	Any visible object--the passed event will be delivered to a window object, not necessarily to the object that receives the <CODE>
+MSG_VIS_VUP_CALL_WIN_GROUP</CODE>
+.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+event</CODE>
+	The event handle of a recorded event to be delivered to the window object.</P>
+<P CLASS="refField">
+Return:	Nothing. The recorded event may not return values.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+<P CLASS="refField">
+Warnings:	The recorded event may not pass pointers among its parameters.</P>
+<P CLASS="refField">
+See Also:	<CODE>
+MSG_VIS_VUP_SEND_TO_OBJECT_OF_CLASS.</CODE>
+</P>
+
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VisClass_10.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VisClass_13.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.3 Getting Visible Tree Information</A> 
+<!-- to next --> | <A HREF="VisClass_15.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5.5 Visible Object Window Operations</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

@@ -1,0 +1,101 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Memory_d.htm,v 1.1 97/06/02 15:51:54 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> The Reference Count</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Memory Management</A>: 3.8 <A HREF="Memory_5.htm">Using Global Memory</A>: 
+<A NAME="66200">
+ </A>
+The Reference Count</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Memory_5.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Memory_c.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.7 Retrieving Block Information</A> 
+<!-- to next --> | <A HREF="Memory_e.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">4 malloc()</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>MemInitRefCount(), MemIncRefCount(), MemDecRefCount()</PRE>
+<P>
+Sometimes several different threads will need to look at the same block of memory. For example, a single thread might need to send the same information to objects in several different threads. The simplest way to do that would be to write the information in a global memory block and pass the block's handle to the objects. However, it's a bad idea to allocate global blocks for longer than necessary, since this uses up handles. It therefore becomes important to free these blocks when everyone's done with them.</P>
+<P>
+GEOS provides a simple mechanism for managing this. Every block can have a <EM>
+reference count</EM>
+. When a reference count for a block reaches zero, the block is automatically freed. That way, for example, if an object needed to send the same information to five objects, it could write the data to a block, give that data block a reference count of five, and send the block's handle to the objects. Each object, when it finished accessing the data, would decrement the data block's reference count. When all five objects had decremented the reference count, the block would be freed.</P>
+<P>
+You must be careful about a few things while using the reference count mechanism. First of all, the reference count is kept in the HM<CODE>
+_otherInfo</CODE>
+ field of the block's handle table entry. For this reason, you must not use the reference count routines if you will be using HM<CODE>
+_otherInfo</CODE>
+ for any other purpose. In particular:
+
+</P>
+<UL>
+<LI>
+The block may not be an object block; the HM_otherInfo field for an object block stores the handle of the burden thread for that block.</LI>
+<LI>
+You may not use any of the data-access synchronization routines described in <A HREF="Memory_b.htm#68631"> Data-Access Synchronization</A>
+, since all of those routines store the semaphore in HM<CODE>
+_otherInfo</CODE>
+. You should generally use the reference count only for blocks that will not be changed until they are freed, so that data synchronization will not be an issue.</LI>
+</UL>
+<P>
+Once the reference count is decremented to zero, the block is <EM>
+immediately</EM>
+ freed. Once a block is freed, its handle may be used for something else. If you try to increment or decrement the reference count of the block, the results are undefined. For this reason, you should make sure that the reference count does not reach zero until all threads are done with the block. One way to arrange for this is to have a single thread do all the decrementing. For example, an object might set the reference count to five, and send the handle to five other objects. Each of these objects, when finished with the block, would send a message back to the first object, which would decrement the reference count. As an alternative, you could have each of the objects decrement the count itself when it was finished. In this case, the first object would have to assume that the block was freed as soon as it sent out all of the messages, since it would have no way of knowing when the other objects would be finished with the block.</P>
+<P>
+Finally, since the reference count is stored in HM<CODE>
+_otherInfo</CODE>
+, it has a maximum value of (2<small><sup>16</sup></small>-1). If you try to increment the reference count past this value, the results are undefined. This will not be a problem for most applications.</P>
+<P>
+<A NAME="IX_MemInitRefCount()">
+ </A>
+To set up a reference count for a block, call <CODE>
+MemInitRefCount()</CODE>
+. This routine takes two arguments: the handle of a global memory block, and the reference count for that block. The reference count must be greater than zero. <CODE>
+MemInitRefCount()</CODE>
+ sets the block's HM<CODE>
+_otherInfo</CODE>
+ field to the specified reference count. <CODE>
+MemInitRefCount()</CODE>
+ does not return anything.</P>
+<P>
+<A NAME="IX_MemIncRefCount()">
+ </A>
+To increment the reference count, call <CODE>
+MemIncRefCount()</CODE>
+. This routine is passed a single argument, namely the handle of the global memory block. The routine simply increments HM<CODE>
+_otherInfo</CODE>
+. It does not return anything.</P>
+<P>
+<A NAME="IX_MemDecRefCount()">
+ </A>
+To decrement the reference count, call <CODE>
+MemDecRefCount()</CODE>
+. This routine is passed the handle of a global memory block. It decrements the block's HM<CODE>
+_otherInfo</CODE>
+ field. If the field reaches zero, <CODE>
+MemDecRefCount()</CODE>
+ will immediately free the block. The routine does not return anything.</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Memory_5.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Memory_c.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.7 Retrieving Block Information</A> 
+<!-- to next --> | <A HREF="Memory_e.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">4 malloc()</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

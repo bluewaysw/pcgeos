@@ -1,0 +1,122 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Geodes_1.htm,v 1.1 97/06/02 15:27:46 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Geodes</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="sectionTitle">
+<A HREF="index.htm">Applications and Geodes</A>: 1 
+Geodes</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> | <A HREF="Geodes_2.htm"><IMG SRC="../../docImages/down.gif" BORDER="0" ALT="Down"></A> 
+<!-- to previous --> | <A HREF="index.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">Applications and Geodes</A> 
+<!-- to next --> | <A HREF="Geodes_b.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2 Creating Icons</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+<EM>
+Geode</EM>
+<A NAME="IX_Geodes">
+ </A>
+ is the term used to describe a GEOS executable. Just as DOS has executables (programs) that reside in files on a disk, so too does GEOS. GEOS executables normally have the filename extension .GEO.</P>
+<P>
+Each geode may have up to three different aspects:</P>
+<UL>
+<LI>
+<EM>
+process<BR>
+</EM>
+Most of your geodes will have this aspect. A geode that is a process has an initial event-driven thread started for it by the kernel. All applications and some libraries will have this aspect.</LI>
+<LI>
+<EM>
+library<BR>
+</EM>
+This aspect indicates that the geode exports <EM>
+entry points</EM>
+ for other geodes to use. Typically, these entry points describe where either object classes or code for routines is within the geode. A library has a special routine (the library's entry point) that is called by the system when the library or one of its clients is loaded or in the process of being unloaded.</LI>
+<LI>
+<EM>
+driver<BR>
+</EM>
+This aspect indicates that the geode hides the details of some device or similarly changeable thing from the system. A driver has a special structure that defines its type, and it has a single entry point called a <EM>
+strategy routine</EM>
+. All calls to the driver pass through this strategy routine.</LI>
+</UL>
+<P>
+A geode can have any combination of these aspects. For example, the print spooler is a process-library (and therefore provides routines for other geodes while also having a thread of its own), but the sound library is actually a library-driver since it manipulates the machine's sound hardware.</P>
+<P>
+Library and driver geodes that do not have the process aspect do not initially have event-driven threads. Therefore, typically they will not contain objects, just procedural code. They can contain objects, however, as any geode is free to create an event-driven thread for itself at any time. In fact, the parallel port driver does just that when it is printing to a port through DOS or BIOS.</P>
+<P>
+Geodes are loaded either with a call to the kernel routine <CODE>
+GeodeLoad()</CODE>
+ or as a side effect of a library's client being loaded (in that case, the library geode will be loaded as well). The generic UI supplies the special routine <CODE>
+UserLoadApplication()</CODE>
+, which you may use to load an application--a geode which has both a process aspect and its process class subclassed off of <CODE>
+GenProcessClass</CODE>
+ (and therefore can put generic UI objects on the screen).</P>
+<P>
+<A NAME="IX_Geodes:handles">
+ </A>
+Once a geode has been loaded, it is identified by its <EM>
+geode handle</EM>
+, which is the memory handle of the block that holds all the geode's system-administrative data. <A NAME="IX_Core block">
+ </A>
+This block is called the <EM>
+core block</EM>
+ and should not be accessed by anything other than the kernel. The geode handle is also used to determine the owner of a particular block in memory; when queried for the owner of a particular block, the kernel will return the geode handle of the geode that owns that block. A geode is the only entity that may own a system resource. If the geode is a process, the geode handle may also be known as a process handle.</P>
+<P>
+When a geode is loaded, its core block is connected to a linked list of the core blocks of other geodes running in the system. This linked list is chronological, with the first entry belonging to the first geode loaded and the last entry belonging to the most recent geode loaded. Each core block contains an entry for the handle of the next core block in the list; the kernel can follow these links to locate any geode in the system. (Only the kernel may do this.)</P>
+<P>
+After the core block is appended to the list, GEOS scans the list for other instances of the same core block. If the geode has been loaded more than once, it will have multiple instances in the list (one instance of the core block for each time the geode is loaded; each core block references the same copy of the geode, however). GEOS then copies the shared-resource handles from an existing core block (if found) into the new core block, thus reducing the amount of work required to load a particular geode multiple times (the shared resources do not need to be reloaded or recreated). Non-shared resource handles are not copied; the resources are loaded or constructed as necessary.</P>
+<P>
+Each geode's core block contains a reference count for that particular geode. When the geode is first loaded, the reference count is set to one. If the geode is a process, the act of initializing the process thread increments the reference count. Each time the geode is loaded again, the new core block will get its own reference count. If the geode is loaded implicitly (as a library, with <CODE>
+GeodeUseLibrary()</CODE>
+, or with <CODE>
+GeodeUseDriver()</CODE>
+), or if it spawns a new thread, it will receive yet another reference count.</P>
+<P>
+The reference count is decremented when a thread owned by the geode exits. If a client of a library geode exits, the library's reference count goes down by one.</P>
+<P>
+When a geode's reference count reaches zero, all the geode's non-sharable resources are freed along with all the file, event, and timer handles owned by the geode. If a sharable resource is co-owned by another instance of the geode, ownership is transferred to the geode's next-oldest instance. (Shared resources are always owned by the oldest instance of their geode.) Once the resources have been freed or transferred, the core block is removed from the linked list and is freed.</P>
+<P>
+To make sure no synchronization problems occur while updating the core block list (e.g. a geode is being loaded while it has just been freed), GEOS maintains an internal semaphore. The geode loading and freeing routines automatically maintain this semaphore.</P>
+<P CLASS="subsectionLink">
+<A HREF="Geodes_2.htm">Geode Components and Structures</A></P>
+<P CLASS="subsectionLink">
+<A HREF="Geodes_3.htm">Launching an Application</A></P>
+<P CLASS="subsectionLink">
+<A HREF="Geodes_4.htm">Shutting Down an Application</A></P>
+<P CLASS="subsectionLink">
+<A HREF="Geodes_5.htm">Saving and Restoring State</A></P>
+<P CLASS="subsectionLink">
+<A HREF="Geodes_6.htm">Using Other Geodes</A></P>
+<P CLASS="subsectionLink">
+<A HREF="Geodes_7.htm">Writing Your Own Libraries</A></P>
+<P CLASS="subsectionLink">
+<A HREF="Geodes_8.htm">Working with Geodes</A></P>
+<P CLASS="subsectionLink">
+<A HREF="Geodes_9.htm">Geode Protocols and Release Levels</A></P>
+<P CLASS="subsectionLink">
+<A HREF="Geodes_a.htm">Temporary Geode Memory</A></P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> | <A HREF="Geodes_2.htm"><IMG SRC="../../docImages/down.gif" BORDER="0" ALT="Down"></A> 
+<!-- to previous --> | <A HREF="index.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">Applications and Geodes</A> 
+<!-- to next --> | <A HREF="Geodes_b.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2 Creating Icons</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

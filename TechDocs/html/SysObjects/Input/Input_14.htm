@@ -1,0 +1,162 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Input_14.htm,v 1.1 97/06/02 16:18:26 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Using Focus</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Input</A>: 5.3 <A HREF="Input_11.htm">Input Hierarchies</A>: 
+<A NAME="53863">
+ </A>
+Using Focus</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Input_11.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Input_13.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.2 Common Hierarchy Basics</A> 
+<!-- to next --> | <A HREF="Input_15.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5.4 Using Target</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+<A NAME="IX_Focus">
+ </A>
+The specific UI handles most of the manipulation of the focus hierarchy. Most specific UIs interpret keyboard and mouse events and know when to switch the focus from one object to another. For example, in OSF/Motif, clicking on a window will switch the focus to that window from the previous focus window. Before the mouse is clicked, however, the focus exclusive of that window will not change. In other specific UIs which incorporate real-estate cursor behavior, merely moving the cursor over a window will transfer the focus to that window.</P>
+<P>
+By default, an application will come up with certain objects having the focus exclusive within their focus levels. This allows the user to immediately begin typing or operating on data. For an object to grab the default exclusive, it must first be focusable. A focusable object can be any child of a valid focus node. Valid nodes for the focus hierarchy are:</P>
+<DL>
+<DT>
+	GenSystem</DT><DD>
+GenField<BR>
+GenApplication<BR>
+GenPrimary<BR>
+GenDisplayControl<BR>
+GenDisplay<BR>
+GenView (with GVA_FOCUSABLE bit set)<BR>
+GenInteraction (independently displayable)<BR>
+VisContent</DD>
+</DL>
+<P>
+Note that a GenView must have the GVA_FOCUSABLE bit set in its GVI_<CODE>
+attrs</CODE>
+ field. If an object you need to act as a focus node is not in the above list (for example, a custom gadget), you must subclass the object and add instance fields and message handlers to handle focus functionality.</P>
+<P>
+<A NAME="IX_HINT_DEFAULT_FOCUS">
+ </A>
+If an independently displayable object is focusable, the focus will be given to the object which is visually &quot;on top&quot; of all other objects. For all other objects within a focus exclusive level, the focus will be granted to the object with <CODE>
+HINT_DEFAULT_FOCUS</CODE>
+ in its instance data. If no objects have this hint at a particular focus level, then the focus will be granted to the first focusable child.</P>
+
+<H2 CLASS="HeadingC">
+Grabbing and Releasing the Focus</H2>
+<P>
+<A NAME="IX_MSG_META_GRAB_FOCUS_EXCL">
+ </A>
+To grab the focus exclusive in its level, a node should send itself <CODE>
+MSG_META_GRAB_FOCUS_EXCL</CODE>
+. The default handler for this message grabs the focus exclusive for the object from its parent and forces any other object on the caller's level to give the focus up. The active exclusive will not be granted unless the caller is part of the active path after the grab.</P>
+<P>
+<A NAME="IX_MSG_META_RELEASE_FOCUS_EXCL">
+ </A>
+When another node grabs the focus exclusive, the node currently having the exclusive on that level must give it up. <CODE>
+MSG_META_RELEASE_FOCUS_EXCL</CODE>
+ releases the focus exclusive for the other node.</P>
+<P>
+Note that these messages only modify the exclusive at a single level. Therefore, they only affect the focus optr of the parent's node; further up the focus hierarchy there is no effect. Changing the focus exclusive of an object will only change the direction of the focus path if all parents of the new exclusive are also focus exclusives.</P>
+<P>
+<CODE>
+MSG_META_GET_FOCUS_EXCL</CODE>
+<A NAME="IX_MSG_META_GET_FOCUS_EXCL">
+ </A>
+ may be sent to any focusable composite node to get the optr of the node's child having the exclusive. This message may be used even on nodes in the inactive path.</P>
+
+
+<H2 CLASS="HeadingC">
+Gaining and Losing the Focus</H2>
+<P>
+<A NAME="IX_MSG_META_GAINED_FOCUS_EXCL">
+ </A>
+When an object gains the active focus exclusive and is a node in the active path, it receives <CODE>
+MSG_META_GAINED_FOCUS_EXCL</CODE>
+. This indicates to the object that it will receive all keyboard input as the active keyboard object. <A NAME="IX_MSG_META_LOST_FOCUS_EXCL">
+ </A>
+At some point later, when the object has lost the focus exclusive, it will receive <CODE>
+MSG_META_LOST_FOCUS_EXCL</CODE>
+.</P>
+
+
+<H2 CLASS="HeadingC">
+Sending Classed Events to the Focus</H2>
+<P>
+<A NAME="IX_MSG_META_SEND_CLASSED_EVENT:to focus">
+ </A>
+Frequently, you may wish to send messages to objects in the active Focus path. The easiest way to deliver a message to an object in the focus hierarchy is to use <CODE>
+MSG_META_SEND_CLASSED_EVENT</CODE>
+ with the <CODE>
+TravelOption</CODE>
+ TO_APP_FOCUS. To send a message to the leaf node of the active path, send this message with a null class. The message will be sent down the hierarchy until it reaches the leaf object, where it will be processed. (See <A HREF="Input_14.htm#72161"> Delivering Messages to the Focus</A>
+.)</P>
+<P>
+This approach is desirable over using <CODE>
+MSG_META_GET_FOCUS_EXCL</CODE>
+ to return an optr for later use, as the system may have corrupted the optr in the meantime. </P>
+<P CLASS="figTitle">
+Code Display 11-2 <A NAME="72161">
+ </A>
+Delivering Messages to the Focus</P>
+<PRE>@method MyProcessClass, MSG_SEND_MESSAGE_TO_FOCUS_INTERACTION {
+    EventHandle event;</PRE>
+<PRE>	/* The classed event is recorded to be handled by the first object of class
+	 * GenInteractionClass. */
+    event = @record GenInteractionClass::MSG_TEST_MESSAGE();</PRE>
+<PRE>	/* This message is then sent to the GenApplication object, from which it 
+	 * will travel down the focus hierarchy until handled at the
+	 * GenInteraction level. */
+    @call MyApplication::MSG_META_SEND_CLASSED_EVENT(event, TO_FOCUS);
+}</PRE>
+<PRE>/* You may also declare an object with the TravelOption TO_APP_FOCUS. This will
+ * send the message to the application object and then down the focus hierarchy. */</PRE>
+<PRE>@object GenTriggerClass MyFocusTrigger = {
+    GI_visMoniker = &quot;Send test message to the focus&quot;;
+    GTI_actionMsg = MSG_TEST_MESSAGE;
+    GTI_destination = (TO_APP_FOCUS);
+    ATTR_GEN_DESTINATION_CLASS = { (ClassStruc *)&amp;GenInteractionClass };
+}</PRE>
+<PRE>/* To send a message to the focus leaf node, use a null class. */
+@method MyProcessClass, MSG_SEND_TEST_TO_FOCUS_LEAF {
+    EventHandle event;</PRE>
+<PRE>	/* A classed event with the class of null is recorded. */
+    event = @record null::MSG_TEST_MESSAGE();</PRE>
+<PRE>	/* This event is sent to the GenApplication, where it will travel down the
+	 * focus hierarchy to the leaf object, where it will be handled. */
+    @call MyApplication::MSG_META_SEND_CLASSED_EVENT(event, TO_FOCUS);
+}</PRE>
+<PRE>/* As an alternative, an object could be set to deliver its message to the
+ * leaf focus node of the application. */
+@object GenTriggerClass MyFocusLeafTrigger = {
+    GI_visMoniker = &quot;Send test message to the focus leaf object&quot;;
+    GTI_actionMsg = MSG_TEST_MESSAGE;
+    GTI_destination = (TO_APP_FOCUS);
+    /* An ATTR_GEN_DESTINATION_CLASS of zero specifies a null class. */
+    ATTR_GEN_DESTINATION_CLASS = 0;
+}</PRE>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Input_11.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Input_13.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.2 Common Hierarchy Basics</A> 
+<!-- to next --> | <A HREF="Input_15.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5.4 Using Target</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

@@ -1,0 +1,227 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Math_b.htm,v 1.2 97/09/05 12:31:42 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> The Floating Point Stack</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The Math Library</A>: 4.2 <A HREF="Math_9.htm">Direct FP Operations</A>: 
+<A NAME="IX_Stack:Floating-Point">
+ </A>
+The Floating Point Stack</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Math_9.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Math_a.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.1 Floating Point Numbers</A> 
+<!-- to next --> | <A HREF="Math_c.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.3 Floating Point Math Routines</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+Floating Point (FP) numbers are placed and manipulated on an FP stack. Numbers can be rearranged, operated on, and removed from this stack through pushes, pops, and the use of special routines.</P>
+
+<H2 CLASS="HeadingCApp">
+Initialization of the FP Stack</H2>
+<PRE><A NAME="IX_FloatInit()"> </A>FloatInit(), <A NAME="IX_FloatExit()"> </A>FloatExit()</PRE>
+<P>
+Before performing any floating point operations, a thread needs to call <CODE>
+FloatInit()</CODE>
+ to create and initialize an FP stack. Each thread using floats must have its own unique FP stack. This call to <CODE>
+FloatInit()</CODE>
+ is automatically performed by any application that includes the Math Library.</P>
+<P>
+<CODE>
+FloatInit()</CODE>
+ creates a swapable block of memory for the thread, initializes various stack pointers, and stores the handle for the block in the thread's data structure. <CODE>
+FloatInit()</CODE>
+ must be passed the size of the stack to create (in bytes) and the type of stack (<CODE>
+FloatStackType</CODE>
+) to create. </P>
+<P>
+The default FP stack holds 25 FP elements (250 bytes). An FP stack must be able to hold at least 5 FP elements.</P>
+<P>
+The default floating point stack is FLOAT_STACK_GROW which instructs the system to increase the size of the stack whenever its bounds are reached. This is done automatically.</P>
+<P>
+Other <CODE>
+FloatStackType</CODE>
+ types are FLOAT_STACK_WRAP, which drops the FP numbers at the low end of the stack (effectively wrapping over that end) and FLOAT_STACK_ERROR which signals an error when the stack limit has been reached.</P>
+<P>
+<CODE>
+FloatExit()</CODE>
+ detaches the floating point stack for the current thread and frees its memory. <CODE>
+FloatExit()</CODE>
+ only frees the FP stack associated with the current thread; other FP stacks in other threads remain unaffected. As is the case with <CODE>
+FloatInit()</CODE>
+, the call to <CODE>
+FloatExit()</CODE>
+ is automatically performed by any application that includes the Math Library.</P>
+<P>
+If <CODE>
+FloatInit() </CODE>
+is called twice before calling <CODE>
+FloatExit()</CODE>
+, the data on the original floating point stack will be lost.</P>
+
+
+<H2 CLASS="HeadingCApp">
+Pushing and Popping on the FP Stack</H2>
+<PRE><A NAME="IX_FloatPushNumber()"> </A>FloatPushNumber(), <A NAME="IX_FloatPopNumber()"> </A>FloatPopNumber(), <A NAME="IX_FloatDepth()"> </A>FloatDepth()</PRE>
+<P>
+<CODE>
+FloatPushNumber() </CODE>
+pushes an FP number onto the top of the FP stack for the current thread from a passed buffer. The number must be already set up in 80 bit, FP format. The routine must be passed the pointer to the buffer storing the number.</P>
+<P>
+Similarly, <CODE>
+FloatPopNumber()</CODE>
+ pops an FP number from the top of the FP stack for the current thread into a passed buffer.</P>
+<P>
+<CODE>
+FloatDepth() </CODE>
+returns the number of FP numbers currently in place on the stack.</P>
+<P>
+Note: For clarity in diagrams within this chapter, stack locations will be numbered in order from the top position of the stack, S1 being first, S2 being second, etc. Variables will be numbered in the order they are pushed onto the stack, so that if X1, X2, and X3 are pushed onto the stack, the format illustrated below will result.
+<IMG SRC="Math_b_push.gif">
+
+</P>
+
+
+<H2 CLASS="HeadingCApp">
+FP Stack Manipulation</H2>
+<PRE><A NAME="IX_FloatRoll()"> </A>FloatRoll(), <A NAME="IX_FloatRollDown()"> </A>FloatRollDown(), <A NAME="IX_FloatRot()"> </A>FloatRot(), <A NAME="IX_FloatSwap()"> </A>FloatSwap()</PRE>
+<P>
+Besides basic pushing and popping, the Float Library also includes many other routines which manage FP numbers on the stack. Unless otherwise specified, an operation that pushes, pops, or extracts an FP number on the stack affects all other FP numbers below the position of the operation by shifting their location in the stack either up or down, in standard stack fashion. </P>
+<P>
+<CODE>
+FloatRoll() </CODE>
+pushes a selected FP number (S<EM>
+X</EM>
+) onto the top of the stack (S1), removing it from location SX in the process. <CODE>
+FloatRoll() </CODE>
+passed with a value of 3 would move the FP number in S3 onto the top of the stack, pushing the stack in the process. All FP numbers below the extracted number remain unaffected by this routine.
+<IMG SRC="Math_b_roll.gif">
+
+</P>
+<P>
+<CODE>
+FloatRollDown() </CODE>
+performs the inverse operation of <CODE>
+FloatRoll()</CODE>
+. popping the top stack value (S1) into the specified location on the stack (S<EM>
+X</EM>
+). <CODE>
+FloatRollDown() </CODE>
+passed with a value of 3 would move the FP number in S1 into location S3, shifting the stack in the process.
+<IMG SRC="Math_b_rolldown.gif">
+
+</P>
+<P>
+Both of these routines must be passed a stack location to move to or from.</P>
+<P>
+<CODE>
+FloatRot() </CODE>
+rotates the top three numbers on the stack, placing S3 onto the top of the stack. This is equivalent to a <CODE>
+FloatRoll() </CODE>
+passed with a value of 3. 
+<IMG SRC="Math_b_rot.gif">
+
+</P>
+<P>
+<CODE>
+FloatSwap() </CODE>
+exchanges S1 and S2.
+<IMG SRC="Math_b_swap.gif">
+
+</P>
+<P>
+Repetitious applications of these routines will return the stack to its former state.</P>
+
+
+<H2 CLASS="HeadingCApp">
+Copying and Deleting Numbers on the FP Stack</H2>
+<PRE><A NAME="IX_FloatPick()"> </A>FloatPick(), <A NAME="IX_FloatOver()"> </A>FloatOver(), <A NAME="IX_FloatDrop()"> </A>FloatDrop(), <A NAME="IX_FloatDup()"> </A>FloatDup()</PRE>
+<P>
+<CODE>
+FloatPick() </CODE>
+copies the contents of S<EM>
+X </EM>
+and pushes that value onto the FP stack. The entire stack is pushed in the process. <CODE>
+FloatPick() </CODE>
+passed with a value of 3 would copy the contents of S3 onto the FP stack.
+<IMG SRC="Math_b_drop.gif">
+
+</P>
+<P>
+<CODE>
+FloatOver() </CODE>
+copies S2 to the top of the stack, equivalent to a <CODE>
+FloatPick() </CODE>
+passed with a value of 2.</P>
+<P>
+<CODE>
+FloatDrop()</CODE>
+ drops (pops) the top number (S1) off the FP stack. This routine is different than <CODE>
+FloatPopNumber() </CODE>
+because the routine does not place the popped number into a memory address, and is therefore much faster.
+<IMG SRC="Math_b_pick.gif">
+
+</P>
+<P>
+<CODE>
+FloatDup()</CODE>
+ duplicates the value at S1, pushing it onto the top of the stack. The stack is pushed in the process.
+<IMG SRC="Math_b_dup.gif">
+
+</P>
+
+
+<H2 CLASS="HeadingCApp">
+Comparing Numbers on the FP Stack</H2>
+<PRE><A NAME="IX_FloatComp()"> </A>FloatComp(), <A NAME="IX_FloatCompESDI()"> </A>FloatCompESDI(), <A NAME="IX_FloatCompAndDrop()"> </A>FloatCompAndDrop()</PRE>
+<P>
+These routines essentially perform the same operation as the Assembly command <CODE>
+cmp</CODE>
+. <CODE>
+FloatComp()</CODE>
+ performs a compare of the top two FP numbers (S1 and S2) and sets the appropriate flags in the flags register. The two FP numbers remain on the stack.<CODE>
+ FloatCompESDI() </CODE>
+compares the contents of <CODE>
+es:[di]</CODE>
+ with the value in S1 (and the FP number in S1 remains on the stack). <CODE>
+FloatCompAndDrop() </CODE>
+performs a compare of S1 and S2 and drops both from the FP stack.</P>
+
+
+<H2 CLASS="HeadingCApp">
+Recovery of the FP Stack</H2>
+<PRE><A NAME="IX_FloatGetStackPointer()"> </A>FloatGetStackPointer(), <A NAME="IX_FloatSetStackPointer()"> </A>FloatSetStackPointer()</PRE>
+<P>
+<CODE>
+FloatGetStackPointer()</CODE>
+ returns the current stack pointer value of the FP stack. <CODE>
+FloatSetStackPointer() </CODE>
+sets the stack pointer to a previous position. This routine must be passed a value that is greater than or equal to the current value of the stack pointer. (I.e. you must be throwing something, or nothing, away.)</P>
+<P>
+These routines may be useful before the execution of involved routines that may push many numbers onto the stack. If an unrecoverable error is encountered, the programmer need not pop the intermediate values off the stack to return to the previous stack configuration. Only the stack pointer is saved; the state of the stack is not. If any numbers below the stack pointer are popped or altered, <CODE>
+FloatSetStackPointer()</CODE>
+ will not recover the previous state of the stack. </P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Math_9.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Math_a.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.1 Floating Point Numbers</A> 
+<!-- to next --> | <A HREF="Math_c.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.3 Floating Point Math Routines</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

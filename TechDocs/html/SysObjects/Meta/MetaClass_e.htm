@@ -1,0 +1,215 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: MetaClass_e.htm,v 1.1 97/06/02 16:21:39 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Window Messages</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">MetaClass</A>: 3.1 <A HREF="MetaClass_d.htm">Exported Message Ranges</A>: 
+Window Messages</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="MetaClass_d.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="MetaClass_d.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">3 Exported Message Ranges</A> 
+<!-- to next --> | <A HREF="MetaClass_f.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.2 Input Messages</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+<A NAME="IX_Windows:imported messages">
+ </A>
+Because many objects, both Generic UI objects and others, work together to control the behavior of the system windows, a number of messages have been set up in an exported range so that they may be shared among classes.</P>
+
+<H2 CLASS="HeadingC">
+Window Update Messages</H2>
+<P>
+The following messages are sent to objects responsible for updating views, and if you subclass content objects, you may wish to intercept these messages.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_EXPOSED">
+ </A>
+MSG_META_EXPOSED</H4>
+<PRE CLASS="syntax">@importMessage MetaWindowMessages, void MSG_META_EXPOSED(
+        WindowHandle win);</PRE>
+<P>
+This message is sent to a Window's exposure object any time a portion of the window is visible on screen, has become invalid, and needs to be redrawn. Correct response is to create a GState on the passed window, call <CODE>
+GrBeginUpdate()</CODE>
+ with it, redraw the window, and finish by calling <CODE>
+GrEndUpdate()</CODE>
+ and freeing the GState. Drawing will be clipped to the invalid area of the window at the time that <CODE>
+GrBeginUpdate()</CODE>
+ is called. Invalidations occurring during the redraw will result in the reduction in the size of the update region, and result in another <CODE>
+MSG_META_EXPOSED</CODE>
+ being generated, to repair the new &quot;invalid&quot; area.</P>
+<P CLASS="refField">
+Source:	Window system.</P>
+<P CLASS="refField">
+Destination:	Individual window's exposure object; View's output descriptor.</P>
+<P CLASS="refField">
+Interception:	Required, in order for window to be properly updated. Note that <CODE>
+VisContentClass</CODE>
+ provides default handler which creates GState, calls <CODE>
+GrBeginUpdate()</CODE>
+, calls <CODE>
+MSG_VIS_DRAW</CODE>
+ on itself, then calls <CODE>
+GrEndUpdate()</CODE>
+.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+win</CODE>
+	Window handle which may be passed to <CODE>
+GrCreateGState()</CODE>
+.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+
+<H2 CLASS="HeadingC">
+Messages Sent to Objects Further Up the Input Hierarchy</H2>
+<P>
+The following messages are part of the high level windowing mechanism. Most of these messages are passed around at the GenSystem level, and most object classes defined by applications will not intercept them. Instead, system objects will intercept these messages and pass appropriate messages on to application objects.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_WIN_CHANGE">
+ </A>
+MSG_META_WIN_CHANGE</H4>
+<PRE CLASS="syntax">@importMessage MetaWindowMessages, void 	MSG_META_WIN_CHANGE();</PRE>
+<P>
+Sent to the System Input Object (Normally the UI's GenSystem obj), when the pointer position, as passed to the window system in calls to <CODE>
+WinMovePtr()</CODE>
+, has possibly moved outside of the window that it was in. The object should respond by calling <CODE>
+WinChangeAck()</CODE>
+, which will cause enter and leave events to be generated for all windows affected by the pointer's change. </P>
+<P CLASS="refField">
+Source:	Window system (<CODE>
+WinMovePtr()</CODE>
+).</P>
+<P CLASS="refField">
+Destination:	System Input object (usually the GenSystem object).</P>
+<P CLASS="refField">
+Interception:	Must be handled via call to <CODE>
+WinChangeAck()</CODE>
+.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_IMPLIED_WIN_CHANGE">
+ </A>
+MSG_META_IMPLIED_WIN_CHANGE</H4>
+<PRE CLASS="syntax">@importMessage MetaWindowMessages, void 	MSG_META_IMPLIED_WIN_CHANGE(
+        optr 		inputObj,
+        WindowHandle 		ptrWin);</PRE>
+<P>
+Sent to the System Input Object (Normally the UI's GenSystem obj) in response to a call to <CODE>
+WinChangeAck()</CODE>
+, to inform it which window the mouse has moved into. The system input object is responsible for passing this message on to the Input object of affected geodes. </P>
+<P CLASS="refField">
+Source:	Window system (<CODE>
+WinChageAck()</CODE>
+).</P>
+<P CLASS="refField">
+Destination:	Initially System Input Object (usually the <CODE>
+GenSystemClass</CODE>
+ object), though is relayed on to Geode Input Object (usually a <CODE>
+GenApplicationClass</CODE>
+ object).</P>
+<P CLASS="refField">
+Interception:	May be intercepted to learn when an implied window change has occurred, but subclasses should not change any default functionality.</P>
+<P CLASS="refField">
+Parameters:	<EM>inputObj</EM>	Window which has implied grab (or zero if there is no implied grab).</P>
+<DL>
+<DT>
+<EM>ptrWin</EM></DT><DD>Window that pointer is in.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_RAW_UNIV_ENTER">
+ </A>
+MSG_META_RAW_UNIV_ENTER</H4>
+<PRE CLASS="syntax">@importMessage MetaWindowMessages, void 	MSG_META_RAW_UNIV_ENTER(
+        optr 		inputObj,
+        WindowHandle 		ptrWin);</PRE>
+<P>
+This message is generated by the window system whenever the mouse crosses into a window. This message is sent to the window's input object. This is sent whenever the mouse pointer crosses a window boundary, regardless of any existing window grab. </P>
+<P CLASS="refField">
+Source:	Window system (<CODE>
+WinChangeAck()</CODE>
+).</P>
+<P CLASS="refField">
+Destination:	Initially System input object (usually the <CODE>
+GenSystemClass</CODE>
+ object), though is relayed on to Geode Input Object (usually a <CODE>
+GenApplicationClass</CODE>
+ object), and finally onto individual Window's Input Object.</P>
+<P CLASS="refField">
+Interception:	May be intercepted to track current status of whether mouse is within window or not. Specific UIs rely on these messages to control auto-raise, click-to-raise arming, and correct implied and active mouse grab interaction behavior.</P>
+<P CLASS="refField">
+Parameters:	<EM>inputObj</EM> 	Input Object of window method refers to.</P>
+<DL>
+<DT>
+<EM>ptrWin</EM> </DT><DD>Window that method refers to.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_RAW_UNIV_LEAVE">
+ </A>
+MSG_META_RAW_UNIV_LEAVE</H4>
+<PRE CLASS="syntax">@importMessage MetaWindowMessages, void 	MSG_META_RAW_UNIV_LEAVE(
+        optr 		inputObj,
+        WindowHandle 		ptrWin);</PRE>
+<P>
+This message is generated by the window system whenever the mouse crosses out of a window. This message is sent to the window's input object. This is sent whenever the mouse pointer crosses a window boundary, regardless of any existing window grab. </P>
+<P CLASS="refField">
+Source:	Window system (<CODE>
+WinChangeAck()</CODE>
+).</P>
+<P CLASS="refField">
+Destination:	Initially System Input Object (usually the <CODE>
+GenSystemClass</CODE>
+ object), though is relayed on to Geode Input Object (usually a <CODE>
+GenApplicationClass</CODE>
+ object), and finally onto individual Window's Input Object.</P>
+<P CLASS="refField">
+Interception:	May be intercepted to track current status of whether mouse is within window or not. Specific UIs rely on these messages to control auto-raise, click-to-raise arming, and correct implied and active mouse grab interaction behavior.</P>
+<P CLASS="refField">
+Parameters:	<EM>inputObj</EM> 	Input Object of window method refers to.</P>
+<DL>
+<DT>
+<EM>ptrWin</EM> </DT><DD>Window that method refers to.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="MetaClass_d.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="MetaClass_d.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">3 Exported Message Ranges</A> 
+<!-- to next --> | <A HREF="MetaClass_f.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.2 Input Messages</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

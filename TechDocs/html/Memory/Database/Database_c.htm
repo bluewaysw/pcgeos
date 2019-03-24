@@ -1,0 +1,87 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Database_c.htm,v 1.1 97/06/06 14:22:02 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Accessing DB Items</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Database</A>: 3.4 <A HREF="Database_8.htm">Using Database Routines</A>: 
+<A NAME="32208">
+ </A>
+Accessing DB Items</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Database_8.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Database_b.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.3 Allocating and Freeing Items</A> 
+<!-- to next --> | <A HREF="Database_d.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.5 Resizing DB Items</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>DBLock(), DBLockGetRef(), DBDeref(), DBUnlock(), DBDirty()</PRE>
+<P>
+<A NAME="IX_DBLock()">
+ </A>
+To access a database item, lock it with <CODE>
+DBLock()</CODE>
+. This routine takes three arguments: the handle of the VM file, the item's group-handle, and the item's item-handle. The routine locks the item-block on the global heap and returns the address of the element. If the block is already locked (generally because another item in the item-block is locked), it increments the lock count.</P>
+<P>
+In some circumstances it might be useful to know the global handle of the locked item-block and the chunk handle of the item. <A NAME="IX_DBLockGetRef()">
+ </A>
+For example, if you want to set up an item as a chunk array, you will need this information. For this reason, the library provides the routine <CODE>
+DBLockGetRef()</CODE>
+. This routine is just like <CODE>
+DBLock()</CODE>
+, except that it takes one additional argument: the address of a variable of type optr. <CODE>
+DBLockItemGetRef()</CODE>
+ writes global and chunk handles to the optr and returns the address of the locked DB item. You can now use any of the LMem routines on the item, simply by passing the optr.</P>
+<P>
+Note that the memory block attached to the item block may change each time the block is locked unless you have instructed the VM manager to preserve the handle (see <A HREF="../../Memory/VM/VM_d.htm#71741">the VM chapter</A>). The chunk handle will not change, even if the file is closed and reopened, unless the chunk is resized larger. (When an item is resized larger, the DB manager may choose to move the item to a different item-block, thus changing its chunk handle.) In general, if you will need this information you should get it each time you lock the item instead of trying to preserve it from one lock to the next.</P><P>
+<A NAME="IX_DBDeref()">
+ </A>
+If you have an optr to a <EM>
+locked</EM>
+ DB item, you can translate it to an address with the routine <CODE>
+DBDeref()</CODE>
+. This is useful if you have to keep one item locked while allocating or expanding another item in that group. Since the locked item might move as a result of the allocation, you can get the new address with <CODE>
+DBDeref()</CODE>
+. In general, however, you should unlock all items in a group before allocating or resizing one there. Note that <CODE>
+DBDeref</CODE>
+ is simply a synonym for <CODE>
+LMemDeref()</CODE>
+; the two routines are exactly the same.</P>
+<P>
+<A NAME="IX_DBUnlock()">
+ </A>
+When you are done accessing an item, call <CODE>
+DBUnlock()</CODE>
+. This routine takes one argument, the address of a locked item. The routine decrements the reference count of the item's item-block. If the reference count reaches zero, the routine unlocks the block. Thus, if you lock two different items in an item block, you should unlock each item separately. As noted above, you should always unlock an item before freeing it.</P>
+<P>
+<A NAME="IX_DBDirty()">
+ </A>
+If you change a DB item, you should mark the item's block as <EM>
+dirty</EM>
+ by calling <CODE>
+DBDirty()</CODE>
+. This ensures that the changes will be copied to the disk the next time the file is saved or updated. The routine takes one argument, a pointer to an address in an item block (generally the address of an item). It will dirty the item-block containing that item. As with VM blocks, you must dirty the item <EM>
+before</EM>
+ you unlock it, as the memory manager can discard any clean block from memory as soon as it is unlocked.</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Database_8.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Database_b.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.3 Allocating and Freeing Items</A> 
+<!-- to next --> | <A HREF="Database_d.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.5 Resizing DB Items</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

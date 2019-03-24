@@ -1,0 +1,177 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: SMS_9.htm,v 1.1 97/06/05 12:41:32 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Receiving an SMS Message</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">SMS Guide</A>: 4.2 <A HREF="SMS_7.htm">Receiving an SMS Message</A>: 
+<A NAME="85024">
+ </A>
+Receiving an SMS Message</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="SMS_7.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="SMS_8.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.1 SM Receive and the Mailbox Library</A> 
+<!-- to next --> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+When the inbox receives a message that it determines is destined for a specific application, the mailbox will contact that application's process class with <EM>
+MSG_META_MAILBOX_NOTIFY_MESSAGE_AVAILABLE</EM>
+. This message passes a token identifer of the SMS message.</P>
+<P>
+If you wish your application to handle an SMS message, you will need to write a message handler for <EM>
+MSG_META_MAILBOX_NOTIFY_MESSAGE_AVAILABLE</EM>
+. It should perform the following steps:</P>
+<OL>
+<LI>
+Call <CODE>
+MailboxAcknowledgeReceipt()</CODE>
+ to inform the mailbox that we're handling the message. Pass the token identifer of the SMS message that was passed with <EM>
+MSG_META_MAILBOX_NOTIFY_MESSAGE_AVAILABLE</EM>
+. (See <A HREF="SMS_9.htm#37653"> Acknowledging Receipt of the Message</A>
+.)</LI>
+<LI FIXME_NumListOther>
+Retrieve the VM reference to the message with <CODE>
+MailboxGetBodyRef()</CODE>
+. (See <A HREF="SMS_9.htm#17710"> Retrieving the Text from the VM Block</A>
+.)</LI>
+<LI FIXME_NumListOther>
+Lock down the VM block and retrieve a pointer to the text.</LI>
+<LI FIXME_NumListOther>
+Copy the text to a local buffer.</LI>
+<LI FIXME_NumListOther>
+Unlock the VM block.</LI>
+<LI FIXME_NumListOther>
+Call <CODE>
+MailboxDoneWithBody()</CODE>
+ to instruct the mailbox to release the VM reference to the text. (See <A HREF="SMS_9.htm#11815"> Cleaning Up</A>
+.)</LI>
+<LI FIXME_NumListOther>
+Call <CODE>
+Mailbox DeleteMessage()</CODE>
+, passing the token referring to this message. </LI>
+</OL>
+<P>
+These specific steps are described in more detail below:</P>
+
+<H2 CLASS="HeadingC">
+<A NAME="37653">
+ </A>
+Acknowledging Receipt of the Message</H2>
+<PRE>MailboxAcknowledgeMessageReceipt()</PRE>
+<P>
+When your application receives an SMS message with <EM>
+MSG_META_MAILBOX_NOTIFY_MESSAGE_AVAILABLE</EM>
+, your first order of business should be informing the mailbox that you have the message. To do this, send the mailbox <CODE>
+MailboxAcknowledgeMessageReceipt()</CODE>
+, passing it the message token.</P>
+<P CLASS="figTitle">
+Code Display 3-6 Acknowledging Receipt of an SMS Message</P>
+<PRE>/*
+ * Each application which wishes to receive SMS messages should create a 
+ * MSG_META_MAILBOX_NOTIFY_MESSAGE_AVAILABLE handler in the app's main prcoess
+ * class.
+ */</PRE>
+<PRE>@method MyProcessClass, MSG_META_MAILBOX_NOTIFY_MESSAGE_AVAILABLE {</PRE>
+<PRE>    /*
+     * First we inform the mailbox that we've received the message. We pass the 
+     * `msg' token that was passed to this message in the first place.
+     */</PRE>
+<PRE>    MailboxAcknowledgeMessageReceipt(msg);</PRE>
+<PRE>    /* To be continued ... */</PRE>
+
+
+<H2 CLASS="HeadingC">
+<A NAME="17710">
+ </A>
+Retrieving the Text from the VM Block</H2>
+<PRE>MailboxGetBodyRef()</PRE>
+<P>
+As we indicated in<A HREF="SMS_6.htm#87685"> Storing the Text Within a VM File</A>
+, it is convenient for the SMS message itself to be wrapped in a small <CODE>
+VMChain</CODE>
+ structure. In the following section, we assume that is indeed what was done on the sending end. </P>
+<P>
+Use <CODE>
+MailboxGetBodyRef()</CODE>
+ to retrieve this reference to the actual text. Pass the message token, a pointer to a buffer to store the body reference, and the length of that buffer.</P>
+<P CLASS="figTitle">
+Code Display 3-7 Retrieving the Text</P>
+<PRE>    MailboxError 			errorCode;
+    VMAppTreeRef			vmRef;
+    word 			refSize;
+    MemHandle			handleToText;
+    TCHAR			smsText[FOAM_MAX_SMS_TEXT_SIZE+1];
+    char			*ptrToText;</PRE>
+<PRE>    /* 
+     * First, retrieve the reference to the body of the SMS text from the mailbox 
+     * library. Place that reference into our vmRef variable.
+     */</PRE>
+<PRE>    refSize = sizeof(VMTreeAppRef);
+    errorCode = MailboxGetBodyRef(msg, &amp;vmRef, &amp;refSize);</PRE>
+<PRE>    if (errorCode == ME_SUCCESS) {</PRE>
+<PRE>	/*
+	 * Lock the block and retrieve a pointer to the SMS text.
+	 */
+	ptrToText = (char *) VMLock(vmRef.VMTAR_vmFile,
+				 VMCHAIN_GET_VM_BLOCK(vmRef.VMTAR_vmChain),
+				 &amp;handleToText);</PRE>
+<PRE>	/*
+	 * Advance the pointer beyond the carriage return to get beyond the 
+	 * prefix. 
+	 */</PRE>
+<PRE>	while ( *ptrToText != `\r')
+	    ptrToText++;</PRE>
+<PRE>	/* Advance over the `\r' ...*/
+	    ptrToText++;</PRE>
+<PRE>	strcpy(smsText, ptrToText);</PRE>
+<PRE>	VMUnlock(handleToText);</PRE>
+<PRE>	/* To be continued ... */</PRE>
+
+
+<H2 CLASS="HeadingC">
+<A NAME="11815">
+ </A>
+Cleaning Up</H2>
+<PRE>MailboxDoneWithBody(), MailboxDeleteMessage()</PRE>
+<P>
+Finally, we need to notify the mailbox that it can delete both the text of the message (and the reference to that text) and the message itself. To perform each of these steps, call <CODE>
+MailboxDoneWithBody()</CODE>
+ and <CODE>
+MailboxDeleteMessage()</CODE>
+.</P>
+<P CLASS="figTitle">
+Code Display 3-8 Cleaning Up the Mailbox</P>
+<PRE>	/* Now remove the external text and the reference to that text. */</PRE>
+<PRE>	MailboxDoneWithBody(msg, &amp;vmRef, refSize)</PRE>
+<PRE>	/* 
+	 * Finally, delete the &quot;message&quot; including the message token and any 
+	 * information included with it.
+	 */</PRE>
+<PRE>	MailboxDeleteMessage(msg);</PRE>
+<PRE>    }</PRE>
+<PRE>}</PRE>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="SMS_7.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="SMS_8.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.1 SM Receive and the Mailbox Library</A> 
+<!-- to next --> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

@@ -1,0 +1,916 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+<!-- This page was automatically generated from a bunch of smaller pages. -->
+<META NAME="copyright" CONTENT="Copyright GEOWORKS">
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+<TITLE>Parse Library</TITLE>
+</HEAD>
+<BODY BGCOLOR="#ffffdf">
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+<A NAME="index.htm"></A>
+
+
+
+<H1 CLASS="chapterTitle">
+
+<A NAME="index.htm_97933">
+ </A>
+Parse Library
+
+</H1>
+<P>
+<A NAME="index.htm_IX_parse library">
+ </A>
+The Parse Library was originally created to provide a parser for a spreadsheet language. However, it will also fit the needs of a programmer who wants to implement a language based on mathematical expressions.</P>
+<P>
+The Parse Library takes an expression as text, converts it to an expression using tokens, and evaluates the expression. When finished, it converts the result back into text and returns it. The Parse Library recognizes a special grammar and set of expressions that include an interface to the Cell Library's data structures. Therefore, you can use the Cell and Parse Libraries together to form the basic underlying engine of a spreadsheet application.</P>
+<P>
+You may want to familiarize yourself with how compilers work before you read this section. In particular, you should understand how scanners use regular expressions to translate raw text into token streams; and you should be familiar with the parsing of context-free grammars. A good book to look at is <EM>
+Compilers: Principles, Techniques, and Tools</EM>
+ by Aho, Sethi, and Ullman (a.k.a. &quot;The Red Dragon Book&quot;).</P>
+<P CLASS="sectionlinks">
+<STRONG>
+&nbsp;&nbsp;<A HREF="#Parse_1.htm">1 Parse Library Behavior</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Parse_2.htm">1.1 The Scanner</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Parse_3.htm">1.2 The Parser</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Parse_4.htm">1.3 Evaluator</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Parse_5.htm">1.4 Formatter</A><BR>
+&nbsp;&nbsp;<A HREF="#Parse_6.htm">2 Parser Functions</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Parse_7.htm">2.1 Internal Functions</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Parse_8.htm">2.2 External Functions</A><BR>
+&nbsp;&nbsp;<A HREF="#Parse_9.htm">3 Coding with the Parse Library</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Parse_a.htm">3.1 Parsing a String</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Parse_b.htm">3.2 Evaluating a Token Sequence</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Parse_c.htm">3.3 Formatting a Token Sequence</A><BR>
+</STRONG>
+</P> <!-- end of sectionlinks blob -->
+
+<HR>
+<A NAME="Parse_1.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Parse Library</A>: 1 
+<A NAME="Parse_1.htm_20075">
+ </A>
+Parse Library Behavior</H2>
+<P>
+The Parse Library takes a string of characters and evaluates it. In many ways, it acts like a compiler; it translates a string into tokens, evaluates the tokens, and returns the result. It can also reverse the process, translating a sequence of tokens into the equivalent text string. Finally, it can simplify a string of tokens, performing arithmetic simplifications and calling functions. The parse library provides many useful functions; furthermore, applications can define their own functions.</P>
+<P>
+The different functions are separated into different parts of the parse library. The parse library contains the following basic sections:</P>
+<UL>
+<LI>
+Scanner<BR>
+The scanner reads a text string and converts it into a series of tokens. It does not keep track of the context of the tokens. Its behavior is partially determined by the localization settings; for example, it uses the localization setting to tell whether the decimal separator is a period, a comma, or some other character or string. It is called by the parser; it is not used independently.</LI>
+<LI>
+Parser<BR>
+The parser interprets the stream of tokens returned by the scanner. It initializes the scanner and uses it to read tokens from the input strings; it also makes sure that the string of tokens is legally formatted. It does not do any type-checking.</LI>
+<LI>
+Evaluator<BR>
+The evaluator simplifies a token string. It does this by replacing arithmetic expressions with their results, by making function calls, by reading current values of cells, and by replacing identifiers with their values. The result is another token string; usually this string consists of a single token (a number or string).</LI>
+<LI>
+Formatter<BR>
+The formatter translates a token string into a text string. It is used to display the evaluator's output. Its behavior is influenced by the localization settings.</LI>
+</UL>
+<P>
+For example, suppose an application used the parse library to evaluate the string &quot;(5*6)+SUM(A2:C6)&quot;. The following steps would be taken:</P>
+<OL>
+<LI>
+The parser would parse the string. It would do this by calling the scanner to read tokens from the string. It would then parse the token sequence to see that it evaluated to a well-formed expression. (It would not do any simplifying or type-checking.)</LI>
+<LI FIXME_NumListOther>
+The evaluator would simplify the expression. It would reduce the token sequence for &quot;(5*6)&quot; to the single token for &quot;30&quot;. It would then call the SUM function, passing it the specifier for the range of cells &quot;A2:C6&quot;. The SUM function would check the type of its arguments, then perform the appropriate action (in this case, adding the values of the cells together). The SUM function would return a value (e.g., it might return 999.9). The evaluator would thus be able to simplify the entire token sequence to the single token for the number 1029.9.</LI>
+<LI FIXME_NumListOther>
+When the application needed to display the result, it would call the formatter. The formatter would check the localization settings, finding out what the thousands separator and decimal point character are. It would create the string &quot;1,029.9&quot;.</LI>
+</OL>
+<P>
+Token strings are usually more compact than the corresponding text strings. There are several reasons for this; for example, cell references are much more compact, functions are specified by an ID number instead of a string, and white space is removed. When translated into a token string, it is only three bytes long: one token byte to specify that this is a number, and two data bytes to store the value of the number. For this reason, applications which use the parse library will generally not store the text entered by the user; instead, they can store the equivalent token string, and use the formatter to display the string when necessary.</P>
+<P>
+The parse library routines often need to request information from the calling application or instruct it to perform a task. For example, when the Parser encounters a name, it needs to get a name ID from the calling application. For this reason, every Parse Library routine is passed a callback routine. The library routine calls this callback routine when necessary, passing a code indicating what action the callback routine should take. The beginning section will just describe this in general terms; for example, &quot;the Evaluator uses the callback to find out the value of a cell.&quot; The advanced section provides a more detailed explanation.</P>
+<P CLASS="subsectionLink">
+<A HREF="#Parse_2.htm">The Scanner</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Parse_3.htm">The Parser</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Parse_4.htm">Evaluator</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Parse_5.htm">Formatter</A></P>
+<HR>
+<A NAME="Parse_2.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Parse Library</A>: 1.1 <A HREF="#Parse_1.htm">Parse Library Behavior</A>: 
+The Scanner</H3>
+<P>
+The scanner translates a text string into a sequence of tokens. The tokens can then be processed by the parser. Every token is associated with some data.</P>
+<P>
+The scanner can be treated as a part of the parser. It is never used independently; instead, the parser is called on to parse a string, and the parser calls the scanner to translate the string into tokens.</P>
+<P>
+The scanner does not keep track of tokens after it processes them. For this reason, it will not notice if, for example, parentheses are not balanced. It returns errors only if it is passed a string which does not scan as a sequence of tokens.</P>
+
+<H4 CLASS="HeadingC">
+Scanner Tokens</H4>
+<P>
+The scanner recognizes the tokens listed below. Note that applications will never directly encounter the scanner tokens; the tokens translates them into parser tokens before returning them. A complete list of parser tokens (with their names) is given in <A HREF="#Parse_3.htm_82255"> Parser Tokens</A>
+.</P>
+<DL>
+<DT>
+NUMBER</DT><DD>This is some kind of numerical constant. The format in the string is determined by the localization settings. The data section of the token is a floating-point number (even if the string contained an integer).</DD>
+<DT>
+STRING</DT><DD>This is a sequence of characters surrounded by &quot;double-quotes.&quot; All characters within double quotes are translated into their ASCII equivalents, with the exceptions noted below in <A HREF="#Parse_2.htm_61053"> Strings</A>
+. The data section is a pointer to the ASCII string specified.</DD>
+<DT>
+CELL</DT><DD>This is a reference to a cell in a database. The format is described in <A HREF="#Parse_2.htm_25231"> Cell References</A>
+.</DD>
+<DT>
+END_OF_EXPRESSION</DT><DD>
+The scanner returns this token when it has examined and translated an entire text string and reached its end.</DD>
+<DT>
+OPEN_PAREN</DT><DD>
+This is simply a left parenthesis character, i.e. &quot;(&quot;. There is no data section associated with this token.</DD>
+<DT>
+CLOSE_PAREN</DT><DD>
+This is simply a right parenthesis character, i.e. &quot;)&quot;. There is no data section associated with this token.</DD>
+<DT>
+OPERATOR</DT><DD>This is a unary or binary operator. The operators are described in <A HREF="#Parse_2.htm_84664"> Operators</A>
+. The data section specifies which operator was encountered.</DD>
+<DT>
+LIST_SEPARATOR</DT><DD>
+This is a comma, i.e. &quot;,&quot;. It is used to separate arguments to functions. There is no data section associated with this token.</DD>
+<DT>
+IDENTIFIER</DT><DD>This is a sequence of characters, not in quotation marks, which does not match the format for cell references. Identifiers may be functions (built-in or application-defined) or variables; see <A HREF="#Parse_2.htm_77135"> Identifiers</A>
+. The data section is a string containing the identifier.</DD>
+
+
+</DL>
+<H4 CLASS="HeadingC">
+<A NAME="Parse_2.htm_61053">
+ </A>
+Strings</H4>
+<P>
+The string passed to the scanner may, itself, contain strings. These inner strings are not further analyzed; rather, their contents are associated with the string token. Strings are delimited by double-quotes. All characters within the double-quotes are copied directly into the token's data, with the exception of the backslash, i.e. &quot;\&quot;. This character signals that the character (or characters) which immediately follow it are to be interpreted literally. Backslash-codes include the following:</P>
+<DL>
+<DT>
+\&quot;</DT><DD>This code represents a double-quote character (i.e. ASCII 0x22, or &quot;); it indicates that the double-quote should be copied into the string, instead of read as a string delimiter.</DD>
+<DT>
+\n</DT><DD>This code represents a newline control code (i.e. ASCII 0x0A, or control-J).</DD>
+<DT>
+\t</DT><DD>This code represents a hard-tab control code (i.e. ASCII 0x09, or control-I).</DD>
+<DT>
+\f</DT><DD>This code represents a form-feed control code (i.e. ASCII 0x0C, or control-L).</DD>
+<DT>
+\b</DT><DD>This code represents a backspace control code (i.e. ASCII 0x10, or control-H).</DD>
+<DT>
+\\</DT><DD>This code represents a backslash character (i.e. ASCII 0x5C, or &quot;\&quot;).</DD>
+<DT>
+\<EM>
+nnn</EM>
+</DT><DD>This code is a literal octal value. The backslash must be followed by three digits, making up an octal integer in the range 0-177o (i.e. 0-255). The byte specified is inserted directly into the string. Thus, for example, &quot;\134&quot; is functionally identical to &quot;\\&quot;.</DD>
+
+
+</DL>
+<H4 CLASS="HeadingC">
+<A NAME="Parse_2.htm_25231">
+ </A>
+Cell References</H4>
+<P>
+The parse library is often used in conjunction with cell files; for example, the spreadsheet objects use the two libraries together. For this reason, the scanner recognizes cell references. Cell references are described by the regular expression [A-Z]+[0-9]+; that is, one or more capital letters, followed by one or more digits. The capital letters indicate the cell's column. The first column (the column with index 0) is indicated by the letter A; column 1 is B, column 2 is C, and so on, up to column 25 (which is Z). Column 26 is AA, followed by AB, AC, and so on to AZ (column 51); this column is followed by BA, and so on, to the largest column, IV (column 255). The rows are indicated by number, with the first row having number 1.</P>
+<P>
+<A NAME="Parse_2.htm_IX_CellReference">
+ </A>
+The data portion of a cell reference token is a <CODE>
+CellReference</CODE>
+ structure. This structure records the row and column indices of the cell; the scanner translates the cell reference to these indices. For more information about the cell library, see <A HREF="../../DataMgmt/Cell/index.htm">the Cell Library chapter</A>.</P><P>
+When the evaluator needs to get the value of a cell, it calls a callback routine, passing the cell's <CODE>
+CellReference</CODE>
+ structure. The application is responsible for looking up the cell's value and returning it to the evaluator. If you manage a cell file with a Spreadsheet object, this work is done for you; the Spreadsheet will be called by the evaluator, returning the values of cells as needed. (The spreadsheet returns zero for empty or unallocated cells.)</P>
+<P>
+Note that while the cell library numbers both rows and columns starting from zero, the Parse library numbers rows starting from one. This is because historically, spreadsheets have had the first row be row number 1. Therefore, if the parser encounters a reference to cell A1, it will translate this into a cell reference which specifies row zero, column zero.</P>
+
+
+<H4 CLASS="HeadingC">
+<A NAME="Parse_2.htm_84664">
+ </A>
+Operators</H4>
+<P>
+The scanner recognizes a number of built-in operators. Neither the scanner nor the parser does any simplification or evaluation of operator expressions; this is done by the evaluator. All operators are represented by the token SCANNER_TOKEN_OPERATOR.<A NAME="Parse_2.htm_IX_OperatorType">
+ </A>
+ The token has a one-byte data section, which is a member of the enumerated type <CODE>
+OperatorType</CODE>
+; this value specifies which operator was encountered. This section begins with a listing of currently supported operators in order of precedence, from highest precedence to lowest; this is followed by a detailed description of the operators. All operators listed here will always be supported; other operators may be added in the future.</P>
+<P>
+Note that neither the scanner nor the parser does any evaluation of arguments. All type-checking is done at evaluation time. Thus, if parse the text &quot;(3 * &quot;HELLO&quot;)&quot;, the parser will not complain; the evaluator, however, will return a &quot;bad argument type&quot; error.</P>
+<P>
+<A NAME="Parse_2.htm_IX_OP_&ldots;  (OperatorType)">
+ </A>
+The figure below lists the operators in order of precedence. Highest-precedence operators are listed first. Operators with the same precedence are listed together; a blank line implies a drop in precedence. Operators of the same precedence level are grouped from left to right; that is, &quot;1 - 2 - 3&quot; is the same as &quot;(1 - 2) - 3&quot;.
+<IMG SRC="Parse_2_operators.gif">
+
+</P>
+<DL>
+<DT>
+:</DT><DD>This is a range separator. The range separator is a binary infix operator. The parser recognizes expressions of the format <EM>
+Cell1</EM>
+:<EM>
+Cell2</EM>
+ as describing a rectangular range of cells, with the two specified cells being diagonally opposite corners. The data portion of this token is the constant OP_RANGE_SEPARATOR.</DD>
+<DT>
+... </DT><DD>This is another range separator. It is functionally identical to the colon operator. The data portion of this token is the constant OP_RANGE_SEPARATOR. (The formatter will turn this back into a colon.)</DD>
+<DT>
+- </DT><DD>This can be either of two different operators. It can be a negation operator. This is a unary prefix operator which reverses the arithmetic sign of the operand. It can also be a subtraction operator. This is a binary infix operator. The parser determines which operator is represented. For example, in &quot;(-1)&quot;, the hyphen is a negation operator; in &quot;(1-2)&quot;, it is a subtraction operator. The data portion of this token is either OP_NEGATION or OP_SUBTRACTION; the scanner assigns the neutral OP_SUBTRACTION_NEGATION, and the parser decides (from context) which value is appropriate.</DD>
+<DT>
+%</DT><DD>This can be either of two operators. It can be a percent operator. This is a unary postfix operator which divides its operand by 100; that is, &quot;50%&quot; evaluates to 0.5. It can also be a modulo arithmetic operator. This is a binary infix operator which returns the remainder when its first operand is divided by its second operand; that is, &quot;11%4&quot; evaluates to 3.0. The parser determines which operator is represented. The data portion of this token is either OP_PERCENT or OP_MODULO; the scanner assigns the neutral OP_PERCENT_MODULO, and the parser decides (from context) which constant is appropriate.</DD>
+<DT>
+^</DT><DD>This is the exponentiation operator. It is a binary infix operator; it raises its first operand to the power of the second operand (e.g. &quot;2^3&quot; evaluates to 8.0). The data portion of this token is the constant OP_RANGE_EXPONENTIATION.</DD>
+<DT>
+* </DT><DD>This is the multiplication operator. It is a binary infix operator. It multiplies the two operands. The data portion of this token is the constant OP_MULTIPLICATION.</DD>
+<DT>
+/ </DT><DD>This is the division operator. It is a binary infix operator. It divides the first operand by the second. The data portion of this token is the constant OP_ DIVISION. The constant OP_DIVISION_GRAPHIC is functionally equivalent; however, the formatter will display the operator as &quot; &quot;.</DD>
+<DT>
++</DT><DD>This is the addition operator. It is a binary infix operator. It adds the two operands. The data portion of this token is the constant OP_RANGE_ADDITION.</DD>
+</DL>
+<P>
+<DL>
+Several Boolean operators are also provided. In every case, if a Boolean expression is true, it evaluates to 1.0; if it is false, it evaluates to 0.0. (There is no Boolean negation operator; however, there is a Boolean negation function, NOT, which returns 1.0 if its argument is zero, and otherwise returns zero.) Boolean operators may be used for numbers or strings. They work in the conventional way for numbers. Strings are &quot;equal&quot; if they are identical. One string is said to be &quot;less than&quot; another if it comes first in lexical order. The parse library uses localized string comparison routines to compare strings; thus, the local lexical ordering is automatically used. (For more information, see <A HREF="../../Programming/Localization/index.htm">the Localization chapter</A>.)</P><DT>
+=</DT><DD>This is the equality operator. It is a binary infix operator. An expression evaluates to 1.0 if both operands evaluate to identical values. The data portion of this token is the constant OP_EQUAL.</DD>
+<DT>
+&lt;&gt;</DT><DD>This is the inequality operator. It is a binary infix operator. An expression evaluates to 1.0 if the two operands evaluate to different values. The data portion of this token is OP_NOT_EQUAL. The constant OP_NOT_EQUAL_GRAPHIC is functionally equivalent; however, the formatter will display the operator as &quot; &quot;.</DD>
+<DT>
+&gt;</DT><DD>This is the &quot;greater-than&quot; operator. It is a binary infix operator. It returns 1.0 if the first operand evaluates to a larger number than the second operand. The data portion of this token is OP_GREATER_THAN.</DD>
+<DT>
+&lt;</DT><DD>This is the &quot;less-than&quot; operator. It is a binary infix operator. It returns 1.0 if the first operand evaluates to a smaller number than the second operand. The data portion of this token is OP_LESS_THAN.</DD>
+<DT>
+&gt;=</DT><DD>This is the &quot;greater-than-or-equal-to&quot; operator. It is a binary infix operator. It returns 1.0 if the first operator evaluates to a number that is greater than or equal to the value of the second operand. The data portion of this token is OP_GREATER_THAN_OR_EQUAL. The constant OP_GREATER_THAN_OR_EQUAL_GRAPHIC is functionally equivalent; however, the formatter will display the operator as &quot; &quot;.</DD>
+<DT>
+&lt;=</DT><DD>This is the &quot;less-than-or-equal-to&quot; operator. It is a binary infix operator. It returns 1.0 if the first operator evaluates to a number that is less than or equal to the value of the second operand. The data portion of this token is OP_LESS_THAN_OR_EQUAL. The constant OP_LESS_THAN_OR_EQUAL_GRAPHIC is functionally equivalent; however, the formatter will display the operator as &quot;£&quot;.</DD>
+</DL>
+<P>
+Some special-purpose operators are also provided:</P>
+<DL>
+<DT>
+&amp;</DT><DD>This is the &quot;string-concatenation&quot; operator. It is a binary infix operator. The arguments must be strings. The result is a single string, composed of all the characters of the first string (without its null terminator) followed by all the characters of the second string (with its null terminator); for example, (&quot;Franklin&quot; &amp; &quot;Poomm&quot;) evaluates to &quot;FranklinPoomm&quot;. The data portion of this token is OP_STRING_CONCAT.</DD>
+<DT>
+#</DT><DD>This is the &quot;range-intersection&quot; operator. It is a binary infix operator. Both arguments must be cell ranges. The result is the range of cells which falls in both of the operand cell ranges. Note that cell ranges must be rectangular; there is, therefore, no &quot;range-union&quot; operator. The data portion of this token is OP_RANGE_INTERSECTION.</DD>
+
+
+</DL>
+<H4 CLASS="HeadingC">
+<A NAME="Parse_2.htm_77135">
+ </A>
+Identifiers</H4>
+<P>
+Any unbroken alphanumeric character sequence which does not appear in quotes, and which is not in the format for a cell reference, is presumed to be an identifier. Identifiers serve two roles: they may be function names, or they may be labels.</P>
+<P>
+The scanner merely notes that an identifier has been found; it does not take any other action. The parser will find out what the identifier signifies. If the identifier's position indicates that it is a function (but the name is not that of a built-in function), the parser will prompt its caller for a pointer to a callback routine which will perform this function. If its position indicates that it is an identifier, the parser will request the value associated with the identifier; this may be a string, a number, or a cell reference.</P>
+
+<HR>
+<A NAME="Parse_3.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Parse Library</A>: 1.2 <A HREF="#Parse_1.htm">Parse Library Behavior</A>: 
+The Parser</H3>
+<P>
+Applications will never call the scanner directly. Instead, if they access the parse library directly (instead of through the spreadsheet objects), they will call the parser and pass it a string, and the parser will in turn call the scanner to process the string into tokens. This section will not discuss how to call the parser, since few applications will need to do that; it will instead describe the general workings of the parser.</P>
+<P>
+The parser translates a well-formed string into a sequence of tokens. It calls the scanner to read tokens from the string. It then uses a context-free grammar to make sure the string is well formed. The context-free grammar is described below. The scanner outputs a sequence of parser tokens. The parser tokens are almost identical to the scanner tokens, with a few exceptions; those exceptions are noted below.</P>
+<P>
+The parser is passed a callback routine. The parser calls this routine when it needs information about a token; for example, if it encounters a function it does not recognize, it calls the callback to get a pointer to the function. The details of this are provided in the advanced section.</P>
+<P>
+If the parser is not passed a well-formed expression, or if it is unable to successfully parse the string for some other reason, it returns an error code. The error codes are described at length in the advanced section.</P>
+
+<H4 CLASS="HeadingC">
+The Parser's Grammar</H4>
+<P>
+The parser uses a context-free grammar to make sure the string is well-formed. The grammar is listed below. The basic units of the grammar are listed in ALL-CAPS; higher-level units are listed in <EM>
+italics</EM>
+. The string must parse to a well-formed <EM>
+expression</EM>
+.</P>
+<DL>
+<DT>
+<EM>
+expression</EM>
+:</DT><DD>'(' <EM>
+expression </EM>
+')<EM>
+'<BR>
+</EM>
+NEG_OP <EM>
+expression<BR>
+</EM>
+IDENTIFIER '(' <EM>
+function_args</EM>
+ ')'<BR>
+<EM>
+base_item more_expression</EM>
+</DD>
+<DT>
+<EM>
+more_expression</EM>
+:</DT><DD>
+&lt;empty&gt;<BR>
+PERCENT_OP <EM>
+more_expression<BR>
+</EM>
+BINARY_OP <EM>
+expression</EM>
+</DD>
+<DT>
+<EM>
+function_args</EM>
+:</DT><DD>
+&lt;empty&gt;<BR>
+<EM>
+arg_list</EM>
+</DD>
+<DT>
+<EM>
+arg_list</EM>
+:</DT><DD><EM>
+expression<BR>
+expression</EM>
+ ',' <EM>
+arg_list</EM>
+</DD>
+<DT>
+<EM>
+base_item</EM>
+:	NUMBER</DT><DD>
+STRING<BR>
+CELL_REF<BR>
+IDENTIFIER</DD>
+
+
+</DL>
+<H4 CLASS="HeadingC">
+<A NAME="Parse_3.htm_82255">
+ </A>
+Parser Tokens</H4>
+<P>
+The parser does not return scanner tokens; instead, it returns a sequence of parser tokens. The parser tokens are almost directly analogous to the scanner tokens. However, a few additional token types are added. </P>
+<P>
+<A NAME="Parse_3.htm_IX_PARSER_TOKEN_&ldots;">
+ </A>
+The parser tokens have the same structure as the scanner tokens. The first field is a constant specifying what type of token this is. The second field contains specific information about the token; this field may be blank. The parser has the following types of tokens:</P>
+<DL>
+<DT>
+PARSER_TOKEN_NUMBER</DT><DD>
+This is the same as the scanner NUMBER token.</DD>
+<DT>
+PARSER_TOKEN_STRING</DT><DD>
+This is the same as the scanner STRING token.</DD>
+<DT>
+PARSER_TOKEN_CELL</DT><DD>
+This is the same as the scanner CELL token.</DD>
+<DT>
+PARSER_TOKEN_END_OF_EXPRESSION</DT><DD>
+This is the same as the scanner END_OF_EXPRESSION token.</DD>
+<DT>
+PARSER_TOKEN_OPEN_PAREN</DT><DD>
+This usually replaces the scanner OPEN_PAREN token. However, it is not used if the parenthesis is delimiting function arguments; it is only used if the parenthesis is changing the order of evaluation.</DD>
+<DT>
+PARSER_TOKEN_CLOSE_PAREN</DT><DD>
+This usually replaces the scanner CLOSE_PAREN token. However, it is not used if the parenthesis is delimiting function arguments; it is only used if the parenthesis is changing the order of evaluation.</DD>
+<DT>
+PARSER_TOKEN_NAME</DT><DD>
+This replaces some occurrences of the scanner IDENTIFIER token; specifically, those where the identifier is not a function name. The data portion is the number for that name.</DD>
+<DT>
+PARSER_TOKEN_FUNCTION</DT><DD>
+This replaces some occurrences of the scanner IDENTIFIER token, specifically those in which the identifier is a function name. The data portion is the function ID number.</DD>
+<DT>
+PARSER_TOKEN_CLOSE_FUNCTION</DT><DD>
+This replaces some occurrences of the scanner CLOSE_PAREN token; specifically, those where the closing parenthesis delimits function arguments.</DD>
+<DT>
+PARSER_TOKEN_ARG_END</DT><DD>
+The parser inserts this token after every argument to a function call; thus, it replaces occurrences of SCANNER_TOKEN_LIST_SEPARATOR, and also occurs after the last argument to a function.</DD>
+<DT>
+PARSER_TOKEN_OPERATOR</DT><DD>
+This is the same as the parser's OPERATOR token. The data section is an operator constant, as described above in <A HREF="#Parse_2.htm_84664"> Operators</A>
+. Note the parser replaces occurrences of OP_PERCENT_MODULO with either OP_PERCENT or OP_MODULO, as appropriate; similarly, it replaces OP_SUBTRACTION_NEGATION with either OP_SUBTRACTION or OP_NEGATION.<A NAME="Parse_3.htm_marker=441851">
+ </A>
+</DD>
+</DL>
+<P>
+When the parser encounters an identifier that is in the appropriate place for a function name (that is, an identifier followed by a parenthesized argument list), it does not write an identifier token. Instead, it writes a &quot;function&quot; token, which has a one-word data section. This section is the function ID (described in <A HREF="#Parse_6.htm_17673"> Parser Functions</A>
+). If the function's name is not one of a built-in function, it will call the application's callback routine to find out what the function's ID number is; the evaluator will pass this ID when it needs to have the function called.</P>
+<P>
+When the parser encounters an identifier, it asks its caller for an ID number for the identifier. It can then store the ID number instead of the entire string. The evaluator will use this ID number when requesting the value of the identifier. The formatter will use the ID number when requesting the original identifier string associated with the ID number.</P>
+<P>
+When the parser encounters a scanner parenthesis token, it does not necessarily translate it into a parser parenthesis token. This is because parentheses fulfill two separate roles: they specify the order of evaluation, and they delimit function arguments. When the parser encounters parenthesis tokens which specify order of evaluation, it translates them into parser parenthesis tokens. If, however, it encounters argument-delimiting parentheses, it does not need to translate them literally; after all, the presence of a function token implies that it will be followed by an argument list. Thus, the parser does not need to copy the parenthesis tokens. Instead, it copies the tokens of the argument list. When it reaches a list separator, it replaces that with an &quot;end-of-argument&quot; token; when it reaches the closing parenthesis for the function call, it replaces that with a &quot;close-function&quot; token.</P>
+
+
+<H4 CLASS="HeadingC">
+An Example of Scanning and Parsing</H4>
+<P>
+Suppose that you call the parser on the text string &quot;3 + SUM(6.5, 3 ^ (4 - 1), C5...F9)&quot;. The parser will evaluate the string, one token at a time. When it needs to process a token, it will call the scanner to return the next token in the string. It will then replace these tokens with parser tokens, and write out the sequence of tokens to its output buffer.</P>
+<P>
+For simplicity, this example treats the scanner as if it scanned the entire text stream at once, and returned the entire sequence of tokens to the scanner. In this case, the scanner would translate the text into the following sequence of tokens:</P>
+<PRE>Token		Data			Comment</PRE>
+<PRE>NUMBER		3.0			All numbers are floats</PRE>
+<PRE>OPERATOR		OP_ADDITION</PRE>
+<PRE>IDENTIFIER		&quot;SUM&quot;</PRE>
+<PRE>OPEN_PAREN					delimits function args</PRE>
+<PRE>NUMBER		6.5</PRE>
+<PRE>LIST_SEPARATOR</PRE>
+<PRE>NUMBER		3.0</PRE>
+<PRE>OPERATOR		OP_EXPONENTIATION</PRE>
+<PRE>OPEN_PAREN</PRE>
+<PRE>NUMBER		4.0</PRE>
+<PRE>OPERATOR		OP_SUBTRACTION_NEGATION
+					Parser figures out
+					which operator this is</PRE>
+<PRE>NUMBER		1.0</PRE>
+<PRE>CLOSE_PAREN</PRE>
+<PRE>LIST_SEPARATOR</PRE>
+<PRE>CELL		C5			Actually stored as
+		 			&quot;4,2&quot;; row index 4,
+					column index 2</PRE>
+<PRE>OPERATOR		OP_RANGE_SEPARATOR</PRE>
+<PRE>CELL		F9</PRE>
+<PRE>CLOSE_PAREN</PRE>
+<PRE>END_OF_EXPRESSION</PRE>
+<P>
+The parser reads these tokens, one at a time, and writes out an analogous sequence of parser tokens:</P>
+<PRE>Token		Data			Comment</PRE>
+<PRE>NUMBER		3.0			All numbers are floats</PRE>
+<PRE>OPERATOR		OP_ADDITION</PRE>
+<PRE>FUNCTION		FUNCTION_ID_SUM</PRE>
+<PRE>NUMBER		6.5</PRE>
+<PRE>END_OF_ARG</PRE>
+<PRE>NUMBER		3.0</PRE>
+<PRE>OPERATOR		OP_EXPONENTIATION</PRE>
+<PRE>OPEN_PAREN</PRE>
+<PRE>NUMBER		4.0</PRE>
+<PRE>OPERATOR		OP_SUBTRACTION</PRE>
+<PRE>NUMBER		1.0</PRE>
+<PRE>CLOSE_PAREN</PRE>
+<PRE>END_OF_ARG</PRE>
+<PRE>CELL		C5			Actually stored as
+		 			&quot;4,2&quot;; row index 4,
+					column index 2</PRE>
+<PRE>OPERATOR		OP_RANGE_SEPARATOR</PRE>
+<PRE>CELL		F9</PRE>
+<PRE>END_OF_ARG</PRE>
+<PRE>CLOSE_FUNCTION</PRE>
+<PRE>END_OF_EXPRESSION</PRE>
+<P>
+The application does not need to save the original text string. Instead, it can save the buffer containing the parser tokens, and use the formatter to translate the token sequence back into a character string.</P>
+
+<HR>
+<A NAME="Parse_4.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Parse Library</A>: 1.3 <A HREF="#Parse_1.htm">Parse Library Behavior</A>: 
+Evaluator</H3>
+<P>
+<A NAME="Parse_4.htm_IX_Evaluator (parse library)">
+ </A>
+The evaluator simplifies a token string returned by the parser. If the input token sequence was well-formed (as are all token sequences generated by the Parser), the evaluator will produce a token sequence consisting of two tokens: a single &quot;result&quot; token (which may be an error token), followed by the &quot;end-of-expression&quot; token. It does this by doing two main things: simplifying arithmetic expressions, and making function calls. </P>
+<P>
+The evaluator maintains two stacks, an Operator stack and an Argument stack. It reads the tokens from beginning to end. Each time it reads a token, it takes an action; this may involve pushing something onto a stack, or processing some of the tokens on the tops of the stacks.</P>
+<P>
+If an error occurs, the parser may take two different actions. Some errors are pushed on the argument stack; these may be handled by functions. For example, if the result of an expression is too large to be represented, the evaluator will just push PSEE_FLOAT_POS_INFINITY on the argument stack. Any function or operator which is passed an error code as an argument can either handle the error, propagate the error, or return a different error. For example, if the division operator is passed PSEE_FLOAT_POS_INFINITY as the divisor, it will simply return zero.</P>
+<P>
+The actual evaluation of tokens is straightforward. The evaluator pops the top token from the Operator stack. This is either a function or an operator. If the token is an operator, the evaluator pops either one or two arguments from the top of the argument stack, takes the appropriate action, and pushes the result on the argument stack. If the token is a function, the evaluator calls the function directly, passing it a pointer to the argument stack and the number of arguments to the function call. The function is responsible for popping off all of the arguments and pushing the return value on the argument stack.</P>
+<P>
+Special actions have to be taken if an operand or argument is a cell reference. If the cell is an argument to a function, or an operand (and the operator is not a range-separator or range-intersection), the evaluator will call its callback routine to get the value contained by the cell; this value will be put on the argument stack in place of the cell reference. If the operand is a range-separator or range-intersection, the cells or ranges will be combined into a single range, which is pushed on the Argument stack.</P>
+<P>
+The evaluator reads tokens, one at a time, from the buffer provided by the parser. For each token it takes an appropriate action:</P>
+<DL>
+<DT>
+OPEN_PAREN</DT><DD>
+Push an OPEN_PAREN token on the Operator stack.</DD>
+<DT>
+CLOSE_PAREN</DT><DD>
+Evaluate tokens from the Operator stack until an OPEN_PAREN reaches the top of the operator stack; then pop the OPEN_PAREN off the stack.</DD>
+<DT>
+OPERATOR</DT><DD>If the top token on the Operator stack is an OPERATOR of higher precedence than this OPERATOR, then evaluate top of Operator stack. Repeat until top of operator stack is either not an operator, or is an operator of lower precedence. Finally, push the operator token on the operator stack.</DD>
+<DT>
+FUNCTION</DT><DD>Push FUNCTION token on the Operator stack. The evaluator FUNCTION token contains the function ID and the number of arguments to the function (starting at zero).</DD>
+<DT>
+CLOSE_FUNCTION</DT><DD>
+Call function on top of Operator stack, passing it the pointer to the Argument stack and the number of arguments to the function call. (The arguments will be on the top of the argument stack.) The function should pop the arguments off the Argument stack, then push the return value (or error code) on the Argument stack.</DD>
+<DT>
+ARG_END</DT><DD>Evaluate the Operator stack until a FUNCTION token is at the top of the Operator stack; then increment the argument count of that function.</DD>
+<DT>
+NUMBER</DT><DD>Push number on Argument stack. (Actually, what is pushed is a reference to the thread's floating-point stack, which contains the number itself.)</DD>
+<DT>
+STRING</DT><DD>Push string on Argument stack.</DD>
+<DT>
+CELL_REF</DT><DD>Push the cell reference on the Argument stack.</DD>
+<DT>
+NAME</DT><DD>Call the callback function to find the value associated with the name; act on the value appropriately.</DD>
+<DT>
+END_OF_EXPRESSION</DT><DD>
+Evaluate the Operator stack until it is empty; the result will be on the top of the Argument stack.</DD>
+</DL>
+<HR>
+<A NAME="Parse_5.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Parse Library</A>: 1.4 <A HREF="#Parse_1.htm">Parse Library Behavior</A>: 
+Formatter</H3>
+<P>
+In order to display a token sequence, you must call the Formatter. The formatter is very straightforward. It is passed a buffer containing a token sequence; it returns a character array containing the result. The formatter makes use of the localization routines to format the result according to the local language and the user's Preferences settings.</P>
+<P>
+If the token sequence consists of an error token, the formatter will generate an appropriate error string.</P>
+<HR>
+<A NAME="Parse_6.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Parse Library</A>: 2 
+<A NAME="Parse_6.htm_17673">
+ </A>
+Parser Functions</H2>
+<P>
+The Parse library provides many built-in functions. Furthermore, each application can define its own functions. Every function is associated with a function ID number. Built-in functions have ID numbers assigned to them in the library code; application-defined functions are given ID numbers by the application. ID numbers are word-sized unsigned integers. All built-in (&quot;internal&quot;) functions have ID numbers which are less than the constant FUNCTION_ID_FIRST_EXTERNAL_FUNCTION_BASE; all application-defined (&quot;external&quot;) functions have ID numbers which are greater than this constant.</P>
+<P>
+When the Parser reads an identifier token whose position indicates that it is a function, it converts the identifier to a function token (containing a function ID). The parser first checks to see if the identifier is the name of a built-in function. If so, it looks up the function's ID number and stores it in the function token.</P>
+<P>
+If the identifier is not the name of a built-in function, the Parser calls the application's callback routine to get the function's ID number. The application must assign each function a word-sized ID which is greater than or equal to the constant FUNCTION_ID_FIRST_EXTERNAL_FUNCTION_BASE. This constant is defined as 0x8000.</P>
+<P>
+When the Evaluator needs to evaluate a function, it checks to see if the function is external or internal. If the function is internal, it looks up the functions address and calls it. If the function is external, it calls the application's callback routine and passes the function ID. In either case, it passes a pointer to the argument stack and the number of arguments. The function is responsible for popping all the arguments off the stack and pushing the result. It can also push an error message on the stack. All of this is discussed at length in the advanced section.</P>
+<P CLASS="subsectionLink">
+<A HREF="#Parse_7.htm">Internal Functions</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Parse_8.htm">External Functions</A></P>
+<HR>
+<A NAME="Parse_7.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Parse Library</A>: 2.1 <A HREF="#Parse_6.htm">Parser Functions</A>: 
+Internal Functions</H3>
+<P>
+<A NAME="Parse_7.htm_IX_Math:Parse Library Internal Functions">
+ </A>
+The Parse library provides many internal functions. Any application which uses the parse library automatically makes use of these functions. Some of these functions take a single argument; others take a set number of arguments or a variable number.</P>
+<P>
+A listing of currently available functions follows, along with a short description of each one, and a parenthetical description of the function's arguments.</P>
+<PRE><A NAME="Parse_7.htm_IX_ABS parse library internal function"> </A>ABS		Absolute value (One numeric argument)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_ACOS parse library internal function"> </A>ACOS		Arc-cosine (One numeric argument)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_ACOSH parse library internal function"> </A>ACOSH		Hyperbolic arc-cosine (One numeric
+		argument)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_AND parse library internal function"> </A>AND		Boolean AND (Either a list of numbers
+		or a cell range--there must be at least
+		two numbers)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_ASIN parse library internal function"> </A>ASIN		Arc-sine (One numeric argument)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_ASINH parse library internal function"> </A>ASINH		Hyperbolic arc-sine (One numeric
+		argument)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_ATAN parse library internal function"> </A>ATAN		Arc-tangent (One numeric argument)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_ATAN2 parse library internal function"> </A>ATAN2		Four-quadrant arc-tangent (XXX)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_ATANH parse library internal function"> </A>ATANH		Hyperbolic arc-tangent (One numeric
+		argument)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_AVG parse library internal function"> </A>AVG		Average of arguments (Either a list of
+		numbers 	or a cell range--there must be 
+		at least 	two numbers)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_CHAR parse library internal function"> </A>CHAR		Translates character-set code into
+		character (One Chars argument)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_CHOOSE parse library internal function"> </A>CHOOSE		Finds value in list at specified offset
+		(XXX)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_CLEAN parse library internal function"> </A>CLEAN		Removes control characters from a string
+		(One string argument)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_CODE parse library internal function"> </A>CODE		Translates character into character-set 
+		code (One string argument (first 
+		character will be converted))</PRE>
+<PRE><A NAME="Parse_7.htm_IX_COLS parse library internal function"> </A>COLS		Returns # of columns in range (XXX)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_COS parse library internal function"> </A>COS		Cosine (One numeric argument)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_COSH parse library internal function"> </A>COSH		Hyperbolic cosine (One numeric argument)</PRE>
+<PRE>COUNT		Returns number of items in list (Any
+		number of arguments)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_CTERM parse library internal function"> </A>CTERM		Returns time for an investment to reach
+		a specified value (XXX)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_DDB parse library internal function"> </A>DDB		Depreciation over a period (XXX)</PRE>
+<PRE>DEGREES		Converts radians to degrees (XXX)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_ERR parse library internal function"> </A>ERR		Returns error PSEE_GEN_ERR (XXX)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_EXACT parse library internal function"> </A>EXACT		Tests if two strings match (Two string
+		arguments)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_EXP parse library internal function"> </A>EXP		Exponentiation (One numeric argument)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_FACT parse library internal function"> </A>FACT		Factorial (XXX)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_FALSE:parse library internal function"> </A>FALSE		Returns false (0.0) (XXX)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_FIND parse library internal function"> </A>FIND		Returns position in string where 
+		substring first occurs (Three
+		arguments: string to find, string to
+		search, starting offset (0 to start
+		with the first character))</PRE>
+<PRE><A NAME="Parse_7.htm_IX_FV parse library internal function"> </A>FV		Future value of investment (XXX)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_HLOOKUP parse library internal function"> </A>HLOOKUP		Finds a value in a horizontal lookup 
+		table (XXX)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_IF parse library internal function"> </A>IF		IF(&lt;cond&gt;,x,y) = x if &lt;cond&gt; is true, 
+		else y (like C's &quot;&lt;cond&gt; ? x : y&quot;) (XXX)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_INDEX parse library internal function"> </A>INDEX		Finds value at specified offset in a 
+		range (XXX)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_INT parse library internal function"> </A>INT		Rounds to next lowest integer (One
+		numeric argument)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_IRR parse library internal function"> </A>IRR		Internal rate of return (XXX)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_ISERR parse library internal function"> </A>ISERR		True if argument is error (XXX)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_ISNUMBER parse library internal function"> </A>ISNUMBER		True if argument is number (XXX)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_ISSTRING parse library internal function"> </A>ISSTRING		True if argument is string (XXX)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_LEFT parse library internal function"> </A>LEFT		Returns first characters in string (Two
+		arguments: string, number of letters)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_LENGTH parse library internal function"> </A>LENGTH		Returns length of string (One string 
+		argument)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_LN parse library internal function"> </A>LN		Natural log (One numeric argument)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_LOG parse library internal function"> </A>LOG		Log to base 10 (One numeric argument)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_LOWER parse library internal function"> </A>LOWER		Converts string to all-lowercase (One
+		string argument)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_MAX parse library internal function"> </A>MAX		Returns largest of arguments (XXX)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_MID parse library internal function"> </A>MID		Returns characters from middle of
+		string (Three arguments: string, 
+		starting offset (0 is first character), 
+		desired string length)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_MIN parse library internal function"> </A>MIN		Returns smallest of arguments (XXX)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_MOD parse library internal function"> </A>MOD		Modulo arithmetic (XXX)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_N parse library internal function"> </A>N		Returns value of first cell in range
+		(XXX)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_NA parse library internal function"> </A>NA		Returns error PSEE_NA (XXX)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_NPV parse library internal function"> </A>NPV		Returns net present value of future 
+		cash flows (XXX)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_OR parse library internal function"> </A>OR		Boolean OR (XXX)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_PI parse library internal function"> </A>PI		Returns 3.1415926... (XXX)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_PMT parse library internal function"> </A>PMT		Calculates # of payments to pay off a 
+		debt (XXX)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_PRODUCT parse library internal function"> </A>PRODUCT		Returns product of arguments (XXX)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_PROPER parse library internal function"> </A>PROPER		Converts string to &quot;Proper 
+		Capitalization&quot; (One string argument)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_PV parse library internal function"> </A>PV		Calculates present value of an 
+		investment (XXX)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_RANDOM parse library internal function"> </A>RADIANS		Converts degrees to radians (XXX)</PRE>
+<PRE>RANDOM		Generates random number between 0 and 1 
+		(XXX)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_RANDOMN parse library internal function"> </A>RANDOMN		Generates random integer below a 
+		specified ceiling (XXX)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_RATE parse library internal function"> </A>RATE		Calculates interest rate needed for 
+		investment to reach specified value 
+		(XXX)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_REPEAT parse library internal function"> </A>REPEAT		Returns string made of repeated 
+		argument string (Two arguments: string
+		to repeat, number of times to repeat)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_REPLACE parse library internal function"> </A>REPLACE		Replaces characters in a string (Four
+		arguments: original string, offset of
+		first character to replace (0 is the
+		first character), number of characters
+		to replace, replacement string)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_RIGHT parse library internal function"> </A>RIGHT		Returns last characters in a string
+		(Two arguments: original string,
+		desired length of returned string)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_ROUND parse library internal function"> </A>ROUND		Rounds number to specified precision 
+		(XXX)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_ROWS parse library internal function"> </A>ROWS		Returns number of rows in range (XXX)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_SIN parse library internal function"> </A>SIN		Sine (One numeric argument)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_SINH parse library internal function"> </A>SINH		Hyperbolic-sine (One numeric argument)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_SLN parse library internal function"> </A>SLN		Calculates straight-line depreciation 
+		(XXX)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_SQRT parse library internal function"> </A>SQRT		Square-root (One numeric argument)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_STD parse library internal function"> </A>STD		Calculates standard deviation (XXX)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_STDP parse library internal function"> </A>STDP		Standard deviation of entire population 
+		(XXX)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_STRING parse library internal function"> </A>STRING		Converts number into string (Two
+		numeric arguments: number to convert,
+		number of decimal places (between 0 and 
+		DECIMAL_PRECISION))</PRE>
+<PRE><A NAME="Parse_7.htm_IX_SUM parse library internal function"> </A>SUM		Returns sum of arguments (XXX)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_SYD parse library internal function"> </A>SYD		Sum-of-years'-digits depreciation (XXX)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_TAN parse library internal function"> </A>TAN		Tangent (sine/cosine) (One numeric
+		argument)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_TANH parse library internal function"> </A>TANH		Hyperbolic tangent (sinh/cosh) (One
+		numeric argument)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_TERM parse library internal function"> </A>TERM		Returns number of payments needed to 
+		reach future value (XXX)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_TRIM parse library internal function"> </A>TRIM		Removes leading, trailing, and 
+		consecutive spaces from a string (One
+		string argument)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_TRUE parse library internal function"> </A>TRUE		Returns TRUE (1.0) (XXX)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_TRUNC parse library internal function"> </A>TRUNC		Removes fractional part; rounds towards
+		zero (One numeric argument)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_UPPER parse library internal function"> </A>UPPER		Converts all letters in string to
+		uppercase (One string argument)</PRE>
+<PRE><A NAME="Parse_7.htm_IX_VALUE parse library internal function"> </A>VALUE		Converts string to number (One string
+		argument)</PRE>
+<HR>
+<A NAME="Parse_8.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Parse Library</A>: 2.2 <A HREF="#Parse_6.htm">Parser Functions</A>: 
+External Functions</H3>
+<P>
+Applications which use the Parse library may write their own functions. Whenever the formatter encounters a function name which it does not recognize, it calls the application to get an ID for the function. When the evaluator needs to evaluate that function, it calls the application, passing the arguments and the function ID. The application should return a single value. If it cannot produce a value, it should return an error code. The error codes are described in <A HREF="#Parse_b.htm_26281"> Evaluating a Token Sequence</A>
+.</P>
+<HR>
+<A NAME="Parse_9.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Parse Library</A>: 3 
+<A NAME="Parse_9.htm_33788">
+ </A>
+Coding with the Parse Library</H2>
+<P>
+This section describes how to use the Parser directly, instead of using intermediaries (like the Spreadsheet library). Most applications will not need to use these routines.</P>
+<P CLASS="subsectionLink">
+<A HREF="#Parse_a.htm">Parsing a String</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Parse_b.htm">Evaluating a Token Sequence</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Parse_c.htm">Formatting a Token Sequence</A></P>
+<HR>
+<A NAME="Parse_a.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Parse Library</A>: 3.1 <A HREF="#Parse_9.htm">Coding with the Parse Library</A>: 
+Parsing a String</H3>
+<PRE>ParserParseString()</PRE>
+<P>
+<A NAME="Parse_a.htm_IX_ParserParseString()">
+ </A>
+To parse a string, call <CODE>
+ParserParseString()</CODE>
+. This routine takes four arguments: </P>
+<UL>
+<LI>
+a pointer to a null-terminated string</LI>
+<LI>
+a pointer to a buffer</LI>
+<LI>
+a pointer to a <CODE>
+CParserStruct </CODE>
+(This structure contains a pointer to a callback routine.)</LI>
+<LI>
+a <A NAME="Parse_a.htm_IX_ParserReturnStruct">
+ </A>
+pointer to a <CODE>
+CParserReturnStruct</CODE>
+</LI>
+</UL>
+<P>
+<CODE>
+ParserParseString()</CODE>
+ parses a string into a sequence of tokens and writes the tokens to the buffer. Whenever the parser encounters an identifier, it calls the callback routine and requests an ID number for the identifier. Similarly, when the parser encounters a function whose name it does not recognize, it calls the callback routine to get a function ID number. The ID numbers are stored in the token sequence. Note: it is best to parse strings that contain <EM>
+known</EM>
+ function names and identifiers.</P>
+<P>
+The Parser can return the following errors:</P>
+<DL>
+<DT>
+PSEE_BAD_NUMBER</DT><DD>
+The string contained a badly-formatted number.</DD>
+<DT>
+PSEE_BAD_CELL_REFERENCE</DT><DD>
+The string contained a badly-formatted cell reference.</DD>
+<DT>
+PSEE_NO_CLOSE_QUOTE</DT><DD>
+The string contained an opening quote with no matching closing quote.</DD>
+<DT>
+PSEE_COLUMN_TOO_LARGE</DT><DD>
+The string contained a cell whose column index was out of bounds (greater than 255).</DD>
+<DT>
+PSEE_ROW_TOO_LARGE </DT><DD>
+The string contained a cell whose row index was out of bounds.</DD>
+<DT>
+PSEE_ILLEGAL_TOKEN </DT><DD>
+The string contained a character sequence which was not a legal token.</DD>
+<DT>
+PSEE_TOO_MANY_TOKENS</DT><DD>
+The expression was too complex.</DD>
+<DT>
+PSEE_EXPECTED_OPEN_PAREN </DT><DD>
+A function call lacked an open-parenthesis.</DD>
+<DT>
+PSEE_EXPECTED_CLOSE_PAREN </DT><DD>
+A function call lacked a close-parenthesis.</DD>
+<DT>
+PSEE_BAD_EXPRESSION </DT><DD>
+The string contained a badly-formed expression.</DD>
+<DT>
+PSEE_EXPECTED_END_OF_EXPRESSION </DT><DD>
+An expression ended improperly.</DD>
+<DT>
+PSEE_MISSING_CLOSE_PAREN </DT><DD>
+Parentheses were mismatched.</DD>
+<DT>
+PSEE_UNKNOWN_IDENTIFIER </DT><DD>
+An identifier or external function name was encountered, and the callback routine would not provide an ID for it.</DD>
+<DT>
+PSEE_GENERAL</DT><DD>
+General parser error.</DD>
+</DL>
+<HR>
+<A NAME="Parse_b.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Parse Library</A>: 3.2 <A HREF="#Parse_9.htm">Coding with the Parse Library</A>: 
+<A NAME="Parse_b.htm_26281">
+ </A>
+Evaluating a Token Sequence</H3>
+<PRE>ParserEvalExpression()</PRE>
+<P>
+<A NAME="Parse_b.htm_IX_ParserEvalExpression()">
+ </A>
+To format an expression, call <CODE>
+ParserEvalExpression()</CODE>
+. This routine is passed a token sequence; it evaluates it and writes the resulting token sequence to a passed buffer. It calls a supplied callback routine to perform the following tasks:</P>
+<UL>
+<LI>
+Return the value of a specified cell</LI>
+<LI>
+Return the value associated with a given identifier, specified by ID number</LI>
+<LI>
+Evaluate an external function, given the arguments and the function ID number</LI>
+</UL>
+<P>
+The evaluator produces a sequence two tokens long, including the &quot;end-of-expression&quot; token. The first token might be an error token. Two errors are so serious that if they occur, the evaluation is immediately halted and the error is returned:</P>
+<DL>
+<DT>
+PSEE_OUT_OF_STACK_SPACE </DT><DD>
+The evaluator ran out of stack space. Evaluation was halted when this occurred.</DD>
+<DT>
+PSEE_NESTING_TOO_DEEP</DT><DD>
+The nesting grew too deep for the evaluator. Evaluation was halted when this occurred.</DD>
+</DL>
+<P>
+The following errors may be propagated; that is, if an expression returns an error, that error would be passed, as a value, to outer expressions. For example, if the evaluator were evaluating &quot;SUM(1, (PROD(1, 2, &quot;F. T. Poomm&quot;))&quot;, PROD would return PSEE_WRONG_TYPE, since it expects numeric arguments. SUM, in turn, would be passed two arguments: the number 1 and the error PSEE_WRONG_TYPE. That function might, in turn, propagate the error upward, return a different error, or return a non-error value. (SUM, as it happens, would propagate the error; that is, it would return PSEE_WRONG_TYPE.)</P>
+<DL>
+<DT>
+ PSEE_ROW_OUT_OF_RANGE </DT><DD>
+A cell's row index was out of range.</DD>
+<DT>
+PSEE_COLUMN_OUT_OF_RANGE </DT><DD>
+A cell's column index was out of range.</DD>
+<DT>
+PSEE_FUNCTION_NO_LONGER_EXISTS </DT><DD>
+The callback routine did not recognize the function ID for an external function.</DD>
+<DT>
+PSEE_BAD_ARG_COUNT </DT><DD>
+A function was passed the wrong number of arguments.</DD>
+<DT>
+PSEE_WRONG_TYPE </DT><DD>
+A function was passed an argument of the wrong type.</DD>
+<DT>
+PSEE_DIVIDE_BY_ZERO</DT><DD>
+A division by zero was attempted.</DD>
+<DT>
+PSEE_UNDEFINED_NAME</DT><DD>
+The callback would not provide a value for an identifier ID.</DD>
+<DT>
+PSEE_CIRCULAR_REF </DT><DD>
+A circular reference occurred. This error will only occur if it is returned by the callback routine.</DD>
+<DT>
+PSEE_CIRCULAR_DEP </DT><DD>
+The value is dependant on a cell whose value is PSEE_CIRCULAR_REF.</DD>
+<DT>
+PSEE_CIRC_NAME_REF</DT><DD>
+The expression uses a name which is defined circularly.</DD>
+<DT>
+PSEE_NUMBER_OUT_OF_RANGE </DT><DD>
+The result was a number which could not be expressed as a float.</DD>
+<DT>
+PSEE_GEN_ERR </DT><DD>
+General error; this is returned when no other error code is appropriate.</DD>
+<DT>
+PSEE_NA </DT><DD>The value for a cell was not available.</DD>
+<DT>
+PSEE_FLOAT_POS_INFINITY</DT><DD>
+A float routine returned the error FLOAT_POS_INFINITY.</DD>
+<DT>
+PSEE_FLOAT_NEG_INFINITY</DT><DD>
+A float routine returned the error FLOAT_NEG_INFINITY.</DD>
+<DT>
+PSEE_FLOAT_GEN_ERR</DT><DD>
+A float routine returned the error FLOAT_GEN_ERR.</DD>
+<DT>
+PSEE_TOO_MANY_DEPENDENCIES</DT><DD>
+The formula contained too many levels of dependency. This is generally returned by the callback routine; the Parse library routines do not return this error, they merely propagate it.</DD>
+</DL>
+<P>
+The application may also define its own error codes, beginning with the constant PSEE_FIRST_APPLICATION_ERROR. All internal functions, and all operators, always propagate application-defined errors.</P>
+<HR>
+<A NAME="Parse_c.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Parse Library</A>: 3.3 <A HREF="#Parse_9.htm">Coding with the Parse Library</A>: 
+Formatting a Token Sequence</H3>
+<PRE>ParserFormatExpression()</PRE>
+<P>
+<A NAME="Parse_c.htm_IX_ParserFormatExpression()">
+ </A>
+The routine <CODE>
+ParserFormatExpression()</CODE>
+ is passed a token buffer; it returns a character string. The formatter uses the localization routines to format numbers. The formatter also formats error codes as appropriate error messages. These error messages are stored in a localizable resource, so the formatter library will produce error messages in the appropriate language.</P>
+<P>
+If the formatter encounters a token ID or an external function ID, it will call the callback routine to find out what character sequence is associated with that ID number. If it encounters an application-defined error code, it will request an appropriate error string. Applications should store these error strings in localizable resources; this will simplify translating the application into another language.<A NAME="Parse_c.htm_marker=441766">
+ </A>
+</P>
+<HR>
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+</BODY>
+</HTML>

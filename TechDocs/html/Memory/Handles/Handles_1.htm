@@ -1,0 +1,61 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Handles_1.htm,v 1.1 97/06/02 15:50:09 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Design Philosophy</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="sectionTitle">
+<A HREF="index.htm">Handles</A>: 1 
+Design Philosophy</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="index.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">Handles</A> 
+<!-- to next --> | <A HREF="Handles_2.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2 The Global Handle Table</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+GEOS handles play many different roles. The most fundamental of these is memory access. GEOS moves memory in the global heap and swaps memory to the disk. This makes memory available as needed and means that the total memory being used by geodes can be many times larger than the physical memory in the computer; however, it means also that geodes need some way to keep track of their memory. In addition, the system needs to perform memory &quot;housekeeping,&quot; doing such things as freeing memory when the geode which owns it exits, making sure that memory is only locked by appropriate geodes, noting which memory sections can be swapped to the hard disk, etc. This means that the kernel needs to maintain a data area for each block of memory. Although the memory itself may move around, the data about the memory should remain in the same place so the kernel can access it.</P>
+<P>
+The solution to both difficulties is the <EM>
+handle table</EM>
+. The table contains entries for each block of memory. These entries keep track of the block, noting such information as where the block is in the global heap, whether it has been swapped to the disk, who its owner is, etc. The handle table does not move in memory. Each entry is referenced by a <EM>
+handle</EM>
+, which is simply the address of the table entry. When a geode needs access to a block, it can call a memory-management routine and pass the handle associated with that block. The memory manager dereferences the handle to find the data about the block and then takes any appropriate steps.</P>
+<P>
+The handle table is useful for many other things. Often a geode will need to perform an action on something which is managed by the kernel. For example, the kernel keeps track of the different disk volumes it has seen. A geode may need to access a disk but not want to keep track of the volume name; or it might want to find out details (such as the size available) of a given disk. Similarly, it might want to find out how large a file which it has opened has grown. All of this information is managed by the kernel, but applications may need to access it or change it. Therefore, each of these things is given an entry in the same handle table as the memory blocks; geodes can reference these things by their handles, the same way they do memory blocks.</P>
+<P>
+The handle mechanism is useful in other places. Sometimes a geode will want to subdivide a block of memory into smaller parcels (or <EM>
+chunks</EM>
+). GEOS provides a local memory library which implements this functionality. These chunks can be moved around within a block, so applications access them by handles. The handle in this case is an offset to a handle table within that block; dereferencing the handle gives the address of the chunk. Similar techniques are used to divide Virtual Memory files. The principle is the same as with global memory handles: an unchanging handle is used to find the address of a movable thing.</P>
+<P>
+There are certain things all handles have in common. They are all sixteen bits long, allowing them to fit in an 80x86 register. They also all specify addresses. The address is of an entry in a handle table; this entry contains information about the thing whose handle this is. However, handles can be divided into two basic groups:</P>
+<UL>
+<LI>
+Those in the global handle table.<BR>
+The global handle table is kept in main memory below the global heap. The table is never accessed directly by geodes. Instead, geodes pass the handle as an argument to kernel routines that access the handle table.</LI>
+<LI>
+Those in local handle tables. <BR>
+Such handles are offsets into handle tables which may be stored in memory blocks or VM files. These handles persist as long as the entity containing the handle table does.</LI>
+</UL>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="index.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">Handles</A> 
+<!-- to next --> | <A HREF="Handles_2.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2 The Global Handle Table</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

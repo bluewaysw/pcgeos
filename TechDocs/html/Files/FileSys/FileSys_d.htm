@@ -1,0 +1,545 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: FileSys_d.htm,v 1.1 97/06/02 14:46:24 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> GEOS Extended Attributes</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The File System</A>: 5.3 <A HREF="FileSys_a.htm">Files</A>: 
+<A NAME="49785">
+ </A>
+GEOS Extended Attributes</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="FileSys_a.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="FileSys_c.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.2 Files and File Handles</A> 
+<!-- to next --> | <A HREF="FileSys_e.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5.4 File Utilities</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>FileGetHandleExtAttributes(), FileGetPathExtAttributes(), FileSetHandleExtAttributes(), FileSetPathExtAttributes(), FileExtAttrDesc, FileDateAndTime, FileAttrs</PRE>
+<P>
+All GEOS files, whether they contain code or data, have special <EM>
+extended attributes</EM>
+. Geodes cannot look at these directly; instead, they make calls to the file system when they want to examine or change the attributes. There are many different extended attributes; however, they are all accessed and changed in a uniform way. Some of the extended attributes are also supported for non-GEOS files. The following extended attributes are currently available:</P>
+<PRE>FEA_MODIFICATION
+FEA_FILE_ATTR
+FEA_SIZE
+FEA_FILE_TYPE
+FEA_FLAGS
+FEA_RELEASE
+FEA_PROTOCOL
+FEA_TOKEN
+FEA_CREATOR
+FEA_USER_NOTES
+FEA_NOTICE
+FEA_CREATION
+FEA_PASSWORD
+FEA_CUSTOM
+FEA_NAME
+FEA_GEODE_ATTR
+FEA_PATH_INFO
+FEA_FILE_ID
+FEA_DESKTOP_INFO
+FEA_DRIVE_STATUS
+FEA_DISK
+FEA_DOS_NAME
+FEA_OWNER
+FEA_RIGHTS</PRE>
+<P>
+There are also two special constants, FEA_MULTIPLE and FEA_END_OF_LIST. These are also described below.</P>
+<P>
+<A NAME="IX_FileGetHandleExtAttributes()">
+ </A>
+There are two different routines to read a file's extended attributes: <CODE>
+FileGetHandleExtAttributes()</CODE>
+ and <CODE>
+FileGetPathExtAttributes()</CODE>
+. These routines are the same except in the way the file is specified: in one, the handle of an open file is passed, whereas in the other, the address of a path string is passed.</P>
+<P>
+<CODE>
+FileGetHandleExtAttributes()</CODE>
+ takes four arguments. The first is the handle of the file whose attributes are desired; this may be a VM file handle or a byte-file handle. The second is a constant specifying the attribute desired. All extended attributes which are currently supported are listed above; more may be added later. The third is a pointer to a buffer; the attribute's value will be written into that buffer. The fourth argument is the size of the buffer (in bytes). Before it returns, <CODE>
+FileGetHandleExtAttributes()</CODE>
+ will write the value of the attribute into the buffer. If successful, it will return zero; otherwise, it will return one of the following error codes:</P>
+<DL>
+<DT>
+ERROR_ATTR_NOT_SUPPORTED</DT><DD>
+The file system does not recognize the attribute constant passed.</DD>
+<DT>
+ERROR_ATTR_SIZE_MISMATCH</DT><DD>
+The buffer passed was too small for the attribute requested.</DD>
+<DT>
+ERROR_ATTR_NOT_FOUND</DT><DD>
+The file does not have a value set for that attribute. This is returned if you try to get certain extended attributes of a non-GEOS file.</DD>
+<DT>
+ERROR_ACCESS_DENIED</DT><DD>
+You do not have read-access to the file.</DD>
+</DL>
+<P>
+<CODE>
+FileGetHandleExtAttrs()</CODE>
+ can also fetch several attributes at once. For details on this, see the section on FEA_MULTIPLE (<A HREF="FileSys_d.htm#40864"> FEA_MULTIPLE</A>
+).</P>
+<P>
+<A NAME="IX_FileGetPathExtAttributes()">
+ </A>
+You can get a file's extended attributes without having it open by calling <CODE>
+FileGetPathExtAttributes()</CODE>
+. This routine takes a pointer to a null-terminated path string instead of a file handle. This makes it suitable for examining the attributes of an executable file or directory. Note that the file system will still have to open the file in order to get the attributes. If any geode (including the caller) has the file open with &quot;deny-read&quot; exclusive, the call will fail with error condition ERROR_ACCESS_DENIED. If it could not find the file specified, it will return ERROR_FILE_NOT_FOUND.</P>
+<P>
+<A NAME="IX_FileSetHandleExtAttributes()">
+ </A>
+To change one of a file's extended attributes, make a call either to <CODE>
+FileSetHandleExtAttributes()</CODE>
+ or<A NAME="IX_FileSetPathExtAttributes()">
+ </A>
+ to <CODE>
+FileSetPathExtAttributes</CODE>
+(). These routines take the same arguments as the <CODE>
+FileGet...()</CODE>
+ routines above; however, they copy the data from the buffer into the attribute, instead of vice versa. These routines return zero if the operation was successful. Otherwise, they return one of the following error codes:</P>
+<DL>
+<DT>
+ERROR_ATTR_NOT_SUPPORTED</DT><DD>
+The file system does not recognize the attribute constant passed. This is returned if you try to set an extended attribute for a non-GEOS file.</DD>
+<DT>
+ERROR_ATTR_SIZE_MISMATCH</DT><DD>
+The buffer passed was the wrong size for the attribute specified.</DD>
+<DT>
+ERROR_ACCESS_DENIED</DT><DD>
+<CODE>
+FileSetHandleExtAttributes()</CODE>
+ returns this if the caller does not have write-access to the file. <CODE>
+FileSetPathExtAttributes()</CODE>
+ returns this if any geode (including the caller) has the file open with &quot;deny-write&quot; exclusive access, or if the file is not writable.</DD>
+<DT>
+ERROR_CANNOT_BE_SET</DT><DD>
+The extended attribute cannot be changed. Such attributes as FEA_SIZE and FEA_NAME cannot be changed with the <CODE>
+FileSet...()</CODE>
+ routines.</DD>
+
+</DL>
+<H3 CLASS="HeadingD">
+<A NAME="40864">
+ </A>
+FEA_MULTIPLE</H3>
+<P>
+<A NAME="IX_FEA_MULTIPLE">
+ </A>
+By passing this extended attribute, you can get or set several extended attributes at once. This is also the only way to get, set, or create a custom attribute. If you pass this, the other arguments are slightly different. The first argument is still the file specifier (handle or path), and the second argument is FEA_MULTIPLE. <A NAME="IX_FEAD_&ldots;">
+ </A>
+<A NAME="IX_FileExtAttrDesc">
+ </A>
+However, the third argument is the base address of an array of <CODE>
+FileExtAttrDesc</CODE>
+ structures, and the fourth argument is the number of these structures in the array. The array has one element for each attribute you wish to get or set. Each <CODE>
+FileExtAttrDesc</CODE>
+ structure has the following fields:</P>
+<DL>
+<DT>
+<CODE>
+FEAD_attr</CODE>
+</DT><DD>This is the numerical constant for the attribute to be read or set. If a custom attribute is being set, this should be FEA_CUSTOM.</DD>
+<DT>
+<CODE>
+FEAD_value</DT><DD></CODE>
+If the attribute is being set, this is the address of the new value. If the attribute is being read, this is the address of the buffer into which to copy the value.</DD>
+<DT>
+<CODE>
+FEAD_size</CODE>
+</DT><DD>This is the size of the buffer or value pointed to by <CODE>
+FEAD_value</CODE>
+.</DD>
+<DT>
+<CODE>
+FEAD_name</DT><DD></CODE>
+If <CODE>
+FEAD_attr</CODE>
+ is set to FEA_CUSTOM, this is the address of a null-terminated string containing the custom attribute's name. If <CODE>
+FEAD_attr</CODE>
+ is set to anything else, this field is ignored.</DD>
+
+
+</DL>
+<H3 CLASS="HeadingD">
+FEA_CUSTOM</H3>
+<P>
+<A NAME="IX_FEA_CUSTOM">
+ </A>
+In addition to the system-defined extended attributes, any GEOS file may have any number of custom attributes. Each custom attribute is named by a null-terminated ASCII string. To create a custom attribute, call one of the <CODE>
+FileSet...()</CODE>
+ routines, specifying the new attribute with a <CODE>
+FileExtAttrDesc</CODE>
+ structure (as described immediately above). If you try to read a custom attribute which has not been defined for that file, the routine will fail with error condition ERROR_ATTR_NOT_FOUND.</P>
+<P>
+Note that not all file systems support the use of custom extended attributes; therefore, you should write your applications so they can perform correctly without using them.</P>
+
+
+<H3 CLASS="HeadingD">
+<A NAME="38588">
+ </A>
+FEA_MODIFICATION</H3>
+<P>
+<A NAME="IX_FEA_MODIFICATION">
+ </A>
+Every file has a &quot;last modified&quot; time. This is automatically updated whenever the file is written to. <A NAME="IX_FileDateAndTime">
+ </A>
+<A NAME="IX_FDAT_&ldots;">
+ </A>
+To find the modification time of a file, get the extended attribute FEA_MODIFICATION. The modification time is returned as a 32-bit <CODE>
+FileDateAndTime</CODE>
+ value. The value has the following fields, each of which is small enough to fit in a signed-byte variable:</P>
+<DL>
+<DT>
+FDAT_YEAR</DT><DD>This field records the year, counting from a base year of 1980. (The constant FDAT_BASE_YEAR is defined as 1980.) This field is at an offset of FDAT_YEAR_OFFSET bits from the low end of the value.</DD>
+<DT>
+FDAT_MONTH</DT><DD>
+This field records the month as an integer, with January being one. It is located at an offset of FDAT_MONTH_OFFSET.</DD>
+<DT>
+FDAT_DAY</DT><DD>This field records the day of the month. It is located at an offset of FDAT_DAY_OFFSET.</DD>
+<DT>
+FDAT_HOUR</DT><DD>This field records the hour on a 24-hour clock, with zero being the hour after midnight. It is located at an offset of FDAT_HOUR_OFFSET.</DD>
+<DT>
+FDAT_MINUTE</DT><DD>
+This field records the minute. It is located at an offset of FDAT_MINUTE_OFFSET.</DD>
+<DT>
+FDAT_2SECOND</DT><DD>
+This field records the second, divided by two; that is, a field value of 15 indicates the 30th second. (It is represented this way to let the second fit into 5 bits, thus letting the entire value fit into 32 bits.) It is located at an offset of FDAT_2SECOND_OFFSET.</DD>
+</DL>
+<P>
+<A NAME="IX_FDATExtract&ldots; () macros">
+ </A>
+The macros <CODE>
+FDATExtractYear()</CODE>
+, <CODE>
+...Month()</CODE>
+, <CODE>
+...Day()</CODE>
+, <CODE>
+...Hour()</CODE>
+, <CODE>
+...Minute()</CODE>
+, and <CODE>
+...2Second()</CODE>
+ all extract the specified field from a <CODE>
+FileDateAndTime</CODE>
+ value. The macro <CODE>
+FDATExtractSecond()</CODE>
+ extracts the FDAT_2SECOND field and doubles it before returning it. The <CODE>
+FDATExtractYearAD()</CODE>
+ extracts the year field and adds the base year, thus producing a word-sized year value.</P>
+
+
+<H3 CLASS="HeadingD">
+<A NAME="66195">
+ </A>
+FEA_FILE_ATTR</H3>
+<P>
+<A NAME="IX_FEA_FILE_ATTR">
+ </A>
+There are certain attributes which all files have. These attributes specify such things as whether the file is hidden, whether it is read-only, and several other things. To get these attributes, call an extended attribute routine with argument FEA_FILE_ATTRIBUTES. <A NAME="IX_FA_&ldots;">
+ </A>
+<A NAME="IX_FileAttrs">
+ </A>
+The attributes are passed or returned in a <CODE>
+FileAttrs</CODE>
+ record. This record has the following fields:</P>
+<DL>
+<DT>
+FA_ARCHIVE</DT><DD>
+This flag is set if the file requires backup. Backup programs typically clear this flag.</DD>
+<DT>
+FA_SUBDIR</DT><DD>This flag is set if the &quot;file&quot; is actually a directory. Geodes may not change this flag.</DD>
+<DT>
+FA_VOLUME</DT><DD>
+This flag is set if the &quot;file&quot; is actually the volume label. This flag will be <EM>
+off</EM>
+ for all files a geode will ever see. Geodes may not change this flag.</DD>
+<DT>
+FA_SYSTEM</DT><DD>This flag is set if the file is a system file. Geodes should not change this flag.</DD>
+<DT>
+FA_HIDDEN</DT><DD>This flag is set if the file is hidden from normal directory searches. For example, a GenFileSelector, by default, does not list files that have this flag set.</DD>
+<DT>
+FA_RDONLY</DT><DD>This flag is set if the file is read-only.</DD>
+</DL>
+<P>
+Many file systems (including DOS) require that files be closed when you set these attributes. For that reason, you cannot change these attributes with <CODE>
+FileSetHandleExtAttributes()</CODE>
+. You must use either <CODE>
+FileSetPathExtAttributes()</CODE>
+ or <CODE>
+FileSetAttributes()</CODE>
+ (described below in <A HREF="FileSys_10.htm#88250"> Getting and Setting Information about a Byte File</A>
+). If you try to set this field with <CODE>
+FileSetHandleExtAttributes()</CODE>
+, you will be returned ERROR_ATTR_CANNOT_BE_SET.</P>
+
+
+<H3 CLASS="HeadingD">
+FEA_SIZE</H3>
+<P>
+<A NAME="IX_FEA_SIZE">
+ </A>
+This attribute is simply the size of the file in bytes. It is dword-sized 
+(allowing for files as large as 4096 megabytes). The attribute can be read, but not directly changed.</P>
+
+
+<H3 CLASS="HeadingD">
+FEA_FILE_TYPE</H3>
+<P>
+<A NAME="IX_GFT_&ldots;">
+ </A>
+<A NAME="IX_GeosFileType">
+ </A>
+<A NAME="IX_FEA_FILE_TYPE">
+ </A>
+This attribute is a member of the <CODE>
+GeosFileType</CODE>
+ enumerated type and should not be altered. The type has the following values:</P>
+<DL>
+<DT>
+GFT_NOT_GEOS_FILE</DT><DD>
+The file is not a GEOS file. This constant is guaranteed to be equal to zero.</DD>
+<DT>
+GFT_EXECUTABLE</DT><DD>
+The file is executable; in other words, it is some kind of geode.</DD>
+<DT>
+GFT_VM</DT><DD>The file is a VM file.</DD>
+<DT>
+GFT_DATA</DT><DD>The file is a GEOS byte file (see below).</DD>
+<DT>
+GFT_DIRECTORY</DT><DD>
+The file is a GEOS directory.</DD>
+<DT>
+GFT_LINK</DT><DD>The file is a symbolic link (not yet implemented).</DD>
+
+
+</DL>
+<H3 CLASS="HeadingD">
+FEA_FLAGS</H3>
+<P>
+<A NAME="IX_GFHF_&ldots;">
+ </A>
+<A NAME="IX_GeosFileHeaderFlags">
+ </A>
+<A NAME="IX_FEA_FLAGS">
+ </A>
+This attribute is a word-sized flag field, named <CODE>
+GeosFileHeaderFlags</CODE>
+. The following flags are implemented:</P>
+<DL>
+<DT>
+GFHF_TEMPLATE</DT><DD>
+The file is a document template.</DD>
+<DT>
+GFHF_SHARED_SINGLE</DT><DD>
+The file can be opened for shared-single access.</DD>
+<DT>
+GFHF_SHARED_MULTIPLE</DT><DD>
+The file can be opened for shared-multiple access.</DD>
+</DL>
+<P>
+Shared-single and shared-multiple access are described in the VM chapter. For more details, see <A HREF="../../Memory/VM/index.htm">the VM chapter</A>.</P>
+
+<H3 CLASS="HeadingD">
+FEA_RELEASE</H3>
+<P>
+<A NAME="IX_Release number:in file">
+ </A>
+<A NAME="IX_FEA_RELEASE">
+ </A>
+This attribute is a <CODE>
+ReleaseNumber</CODE>
+ structure. Generally, only geodes have release numbers. The structure has the following fields:</P>
+<DL>
+<DT>
+<CODE>
+RN_major</CODE>
+</DT><DD>The file's major release number. An increase in the major release number generally indicates a change which is not downward-compatible.</DD>
+<DT>
+<CODE>
+RN_minor</CODE>
+</DT><DD>The file's minor release number. An increase in the minor release number generally indicates that the new version is compatible with previous versions.</DD>
+<DT>
+RN<CODE>
+_change </DT><DD>A field for use by individual manufacturers.</CODE>
+</DD>
+<DT>
+RN<CODE>
+_engineering </DT><DD>
+A field for use by individual manufacturers.</CODE>
+</DD>
+
+
+</DL>
+<H3 CLASS="HeadingD">
+<A NAME="47278">
+ </A>
+FEA_PROTOCOL</H3>
+<P>
+<A NAME="IX_FEA_PROTOCOL">
+ </A>
+This attribute contains the file's protocol numbers. A <CODE>
+ProtocolNumber</CODE>
+ structure is returned. For a discussion of file protocols, see <A HREF="../../Files/Documents/Documents_d.htm#82736">the Document Objects chapter</A>.</P>
+
+<H3 CLASS="HeadingD">
+FEA_TOKEN</H3>
+<P>
+<A NAME="IX_FEA_TOKEN">
+ </A>
+This attribute is the file's token. It consists of a <CODE>
+GeodeToken</CODE>
+ structure. For more information about tokens, see <A HREF="../../Kernel/Geodes/Geodes_b.htm">the Applications and Geodes chapter</A>.</P>
+
+<H3 CLASS="HeadingD">
+FEA_CREATOR</H3>
+<P>
+<A NAME="IX_Manufacturer ID:in file">
+ </A>
+<A NAME="IX_FEA_CREATOR">
+ </A>
+This attribute is the token of the document's creator. It consists of a <CODE>
+GeodeToken</CODE>
+ structure. For more information about tokens, see <A HREF="../../Kernel/Geodes/Geodes_b.htm">the Applications and Geodes chapter</A>.</P>
+
+<H3 CLASS="HeadingD">
+FEA_USER_NOTES</H3>
+<P>
+<A NAME="IX_User notes">
+ </A>
+<A NAME="IX_FEA_USER_NOTES">
+ </A>
+This attribute is a null-terminated string. It is displayed in the file's &quot;Info&quot; box. Users can edit this string with GeoManager.</P>
+
+
+<H3 CLASS="HeadingD">
+FEA_NOTICE</H3>
+<P>
+<A NAME="IX_FEA_NOTICE">
+ </A>
+This attribute contains the file's copyright notice.</P>
+
+
+<H3 CLASS="HeadingD">
+FEA_CREATION</H3>
+<P>
+<A NAME="IX_FEA_CREATION">
+ </A>
+This attribute is a <CODE>
+FileDateAndTime</CODE>
+ structure. It contains the time when the file was created.</P>
+
+
+<H3 CLASS="HeadingD">
+FEA_PASSWORD</H3>
+<P>
+<A NAME="IX_FEA_PASSWORD">
+ </A>
+This attribute contains the file's encrypted password, if any. </P>
+
+
+<H3 CLASS="HeadingD">
+FEA_NAME</H3>
+<P>
+<A NAME="IX_FEA_NAME">
+ </A>
+This attribute contains the file's virtual name. It is a null-terminated character string.</P>
+
+
+<H3 CLASS="HeadingD">
+FEA_GEODE_ATTR</H3>
+<P>
+This attribute contains information about the geode. If the file is not a geode, this field's value will be zero. If it is a geode, it will contain a record of <CODE>
+GeodeAttrs</CODE>
+. This record has the following fields:</P>
+<DL>
+<DT>
+GA_PROCESS </DT><DD>This geode has a process thread.</DD>
+<DT>
+GA_LIBRARY </DT><DD>This geode is a library.</DD>
+<DT>
+GA_DRIVER</DT><DD>This geode is a driver.</DD>
+<DT>
+GA_KEEP_FILE_OPEN</DT><DD>
+The GEOS kernel keeps this file open while GEOS is running.</DD>
+<DT>
+GA_SYSTEM </DT><DD>This file is part of the kernel.</DD>
+<DT>
+GA_MULTI_LAUNCHABLE</DT><DD>
+This geode can be loaded more than once simultaneously.</DD>
+<DT>
+GA_DRIVER_INITIALIZED</DT><DD>
+The geode is a driver which has been opened, loaded and initialized.</DD>
+<DT>
+GA_LIBRARY_INITIALIZED</DT><DD>
+The geode is a library which has been opened and loaded, and whose entry point has been called.</DD>
+<DT>
+GA_GEODE_INITIALIZED</DT><DD>
+The geode has been opened and completely initialized.</DD>
+<DT>
+GA_USES_COPROC</DT><DD>
+The geode uses a math coprocessor, if one is available.</DD>
+<DT>
+GA_REQUIRES_COPROC</DT><DD>
+The geode can only run if a math coprocessor or emulator is present.</DD>
+<DT>
+GA_HAS_GENERAL_CONSUMER_MODE</DT><DD>
+The geode is an application which can be run in GCM mode.</DD>
+<DT>
+GA_HAS_ENTRY_POINTS_IN_C</DT><DD>
+This geode is a library or driver which can be called from C code.</DD>
+
+
+</DL>
+<H3 CLASS="HeadingD">
+FEA_PATH_INFO</H3>
+<P>
+This field contains information about the file's path. It is for internal use by the kernel.</P>
+
+
+<H3 CLASS="HeadingD">
+FEA_FILE_ID</H3>
+<P>
+This field is for internal use by the kernel.</P>
+
+
+<H3 CLASS="HeadingD">
+FEA_DESKTOP_INFO</H3>
+<P>
+This field is for use by the desktop manager.</P>
+
+
+<H3 CLASS="HeadingD">
+FEA_DRIVE_STATUS</H3>
+<P>
+<A NAME="IX_FEA_DRIVE_STATUS">
+ </A>
+This attribute contains the <CODE>
+DriveExtendedStatus</CODE>
+ word for the drive containing the file. The <CODE>
+DriveExtendedStatus</CODE>
+ value is described in <A HREF="FileSys_4.htm#64044"> Accessing Drives</A>
+.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="FileSys_a.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="FileSys_c.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.2 Files and File Handles</A> 
+<!-- to next --> | <A HREF="FileSys_e.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5.4 File Utilities</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

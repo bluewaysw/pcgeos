@@ -1,0 +1,218 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: VM_19.htm,v 1.1 97/06/02 15:54:09 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Basic Huge Array Routines</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Virtual Memory</A>: 5.2 <A HREF="VM_17.htm">Huge Arrays</A>: 
+Basic Huge Array Routines</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VM_17.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VM_18.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.1 Structure of a Huge Array</A> 
+<!-- to next --> | <A HREF="VM_1a.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5.3 Huge Array Utilities</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>HugeArrayCreate(), HugeArrayDestroy(), HugeArrayResize(), HugeArrayLock(), HugeArrayUnlock(), HugeArrayDirty(), HugeArrayAppend(), Huge ArrayInsert(), HugeArrayReplace(), HugeArrayDelete(), HugeArrayGetCount()</PRE>
+<P>
+GEOS provides many routines for dealing with Huge Arrays. The basic routines are described in this section. Some additional routines which can help optimize your code are described in <A HREF="VM_1a.htm#26236"> Huge Array Utilities</A>
+.</P>
+<P>
+Note that you should never have more than one block of a Huge Array locked at a time. Furthermore, when you call any routine in this section (except <CODE>
+HugeArrayUnlock()</CODE>
+, <CODE>
+HugeArrayDirty()</CODE>
+, and <CODE>
+HugeArrayGetCount()</CODE>
+), you should not have <EM>
+any</EM>
+ blocks locked. The next section contains several routines which may be used while a block is locked. Also, if you use any VM chain routines on a Huge Array, you should make sure that no blocks are locked.
+
+</P>
+<P>
+<A NAME="IX_HugeArrayCreate()">
+ </A>
+To create a Huge Array, call <CODE>
+HugeArrayCreate()</CODE>
+. This routine allocates a directory block and initializes it. The routine takes three arguments:</P>
+<UL>
+<LI>
+The handle of the VM file in which to create the huge array. This argument is ignored if a default VM file has been set for this thread.</LI>
+<LI>
+The size of each element. A size of zero indicates that arguments will be variable-sized.</LI>
+<LI>
+The size to allocate for the directory block's header. If you want to have a fixed data area between the <CODE>
+HugeArrayDirectory</CODE>
+ structure and the chunk array of directory entries, you can pass an argument here. The size must be at least as large as <CODE>
+sizeof(HugeArrayDirectory)</CODE>
+. Alternatively, you can pass an argument of zero, indicating that there will be no extra data area, and the default header size should be used.</LI>
+</UL>
+<P>
+<CODE>
+HugeArrayCreate()</CODE>
+ returns the VM handle of the directory block. This is also the handle of the Huge Array itself; you will pass it as an argument to most of the other Huge Array routines.</P>
+<P>
+<A NAME="IX_HugeArrayDestroy()">
+ </A>
+When you are done with a Huge Array, destroy it by calling <CODE>
+HugeArrayDestroy()</CODE>
+. This routine frees all of the blocks in the Huge Array. It takes two arguments, namely the global handle of the VM file and the VM handle of the Huge Array. It does not return anything. You should make sure that none of the data blocks are locked when you call this since all of the VM chain links must be valid when this routine is called.
+
+</P>
+<P>
+<A NAME="IX_HugeArrayLock()">
+ </A>
+To access an element in the array, call <CODE>
+HugeArrayLock()</CODE>
+. This routine takes five arguments:</P>
+<UL>
+<LI>
+The global handle of the VM file which contains the Huge Array. </LI>
+<LI>
+The VM handle of the Huge Array.</LI>
+<LI>
+The (32-bit) index number of the element.</LI>
+<LI>
+A pointer to a pointer to an element.</LI>
+<LI>
+A pointer to a word-sized variable.</LI>
+</UL>
+<P>
+The routine figures out which block has the element specified (as described above). It then locks that block. It writes a pointer to that element in the location passed, and writes the size of the element in the variable pointed to by the other pointer (this is useful if the Huge Array has variable-sized elements). It returns a dword. The more significant word is the number of consecutive elements in that block, starting with the pointer returned; the less significant word is the number of elements in that block before (and including) the element specified. For example, suppose you lock element 1,000. Let's assume that this element is in block <EM>
+x</EM>
+; block <EM>
+x</EM>
+ has 50 elements, and element 1,000 in the huge array is the 30th element in block <EM>
+x</EM>
+. The routine would write a pointer to element 1,000 in the pointer passed; it would then return the dword 0x0015001e. The upper word (0x0015) indicates that element 1,000 is the first of the last 21 consecutive elements in the block; the lower word (0x001e) indicates that the element is the last of the first 30 consecutive elements. You thus know which other elements in the Huge Array are in this block and can be examined without further calls to <CODE>
+HugeArrayLock()</CODE>
+.</P>
+<P>
+<A NAME="IX_HugeArrayUnlock()">
+ </A>
+When you are done examining a block in the Huge Array, you should unlock the block with <CODE>
+HugeArrayUnlock()</CODE>
+. This routine takes only one argument, namely a pointer to any element in that block. It does not return anything. Note that you don't have to pass it the same pointer as the one you were given by <CODE>
+HugeArrayLock()</CODE>
+. Thus, you can get a pointer, increment it to work your way through the block, and unlock the block with whatever address you end up with.</P>
+<P>
+<A NAME="IX_HugeArrayDirty()">
+ </A>
+Whenever you insert or delete an element, the Huge Array routines automatically mark the relevant blocks as dirty. However, if you change an element, you need to dirty the block yourself or the changes won't be saved to the disk. To do this, call the routine <CODE>
+HugeArrayDirty()</CODE>
+. This routine takes one argument, namely a pointer to an element in a Huge Array. It dirties the data block containing that element. Naturally, if you change several elements in a block, you only need to call this routine once.</P>
+<P>
+<A NAME="IX_HugeArrayAppend()">
+ </A>
+If you want to add elements to the end of a Huge Array, call <CODE>
+HugeArrayAppend()</CODE>
+. If elements are of uniform size, you can add up to 
+2<small><sup>16</sup></small>
+elements with one call to this routine. You can also pass a pointer to a template element; it will copy the template into each new element it creates. This routine takes four arguments:</P>
+<UL>
+<LI>
+The global handle of the VM file containing the Huge Array. This argument is ignored if a default file has been set.</LI>
+<LI>
+The VM handle of the Huge Array.</LI>
+<LI>
+The number of elements to append, if the elements are of uniform size; or the size of the element to append, if elements are of variable size.</LI>
+<LI>
+An optional pointer to a buffer containing initialization data for the new element(s).</LI>
+</UL>
+<P>
+The routine returns the index of the new element. If several elements were created, it returns the index of the first of the new elements. This index is a dword.</P>
+<P>
+<A NAME="IX_HugeArrayInsert()">
+ </A>
+You can also insert one or more elements in the middle of a Huge Array. To do this, call the routine <CODE>
+HugeArrayInsert()</CODE>
+. As with <CODE>
+HugeArrayAppend()</CODE>
+, you can insert many uniform-sized elements at once, and you can pass a pointer to a template to initialize elements with. The routine takes five arguments:</P>
+<UL>
+<LI>
+The global handle of the VM file containing the Huge Array. This argument is ignored if a default file has been set.</LI>
+<LI>
+The VM handle of the Huge Array.</LI>
+<LI>
+The number of elements to insert, if the elements are of uniform size; or the size of the element to insert, if elements are of variable size.</LI>
+<LI>
+The index of the first of the new elements (the element that currently has that index will follow the inserted elements).</LI>
+<LI>
+A pointer to a template element to copy into each new element (pass a null pointer to leave the elements uninitialized).</LI>
+</UL>
+<P>
+It returns the index of the first of the new elements. Ordinarily, this will be the index you passed it; however, if you pass an index which is out of bounds, the new elements will be put at the end of the array, and the index returned will thus be different.</P>
+<P>
+<A NAME="IX_HugeArrayDelete()">
+ </A>
+To delete elements in a Huge Array, call <CODE>
+HugeArrayDelete()</CODE>
+. You can delete many elements (whether uniform-sized or variable-sized) with one call to <CODE>
+HugeArrayDelete()</CODE>
+. The routine takes four arguments:</P>
+<UL>
+<LI>
+The global handle of the VM file containing the Huge Array. This argument is ignored if a default file has been set.</LI>
+<LI>
+The VM handle of the Huge Array.</LI>
+<LI>
+The number of elements to delete.</LI>
+<LI>
+The index of the first element to delete.</LI>
+</UL>
+<P>
+<A NAME="IX_HugeArrayResize()">
+ </A>
+You can resize one of the elements by calling <CODE>
+HugeArrayResize()</CODE>
+. If you make the element smaller, then data at the end will be truncated. If you make the element larger, then the new data will be zero-initialized.</P>
+<P>
+<A NAME="IX_HugeArrayReplace()">
+ </A>
+You can erase or replace the data in one or more elements with a call to <CODE>
+HugeArrayReplace()</CODE>
+. This is also the only way to resize a variable-sized element. You can pass a pointer to a template to copy into the element or elements, or you can have the element(s) initialized with null bytes. The routine takes five arguments:</P>
+<UL>
+<LI>
+The global handle of the VM file containing the Huge Array. This argument is ignored if a default file has been set.</LI>
+<LI>
+The VM handle of the Huge Array.</LI>
+<LI>
+The number of elements to replace, if the elements are uniform-sized; or the new size for the element, if elements are variable-sized.</LI>
+<LI>
+The index of the first of the elements to replace.</LI>
+<LI>
+A pointer to a template element to copy into each new element (pass a null pointer to fill the elements with null bytes).</LI>
+</UL>
+<P>
+<A NAME="IX_HugeArrayGetCount()">
+ </A>
+You can find out the number of elements in a Huge Array with a call to <CODE>
+HugeArrayGetCount()</CODE>
+. This routine takes two arguments, namely the file handle and the handle of the Huge Array. The routine returns the number of elements in the array. Since array indices begin at zero, if <CODE>
+HugeArrayGetCount()</CODE>
+ returns <em>x</em>, the last element in the array has index 
+<em>x</em>-1.</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VM_17.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VM_18.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.1 Structure of a Huge Array</A> 
+<!-- to next --> | <A HREF="VM_1a.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5.3 Huge Array Utilities</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>
