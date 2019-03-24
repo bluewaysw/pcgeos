@@ -774,6 +774,8 @@ GeodeNotifyLibraries: PUSH AX ;adebh
 Depending on how you set up  your SWAT.RC file, you can customize your 
 Swat environment quite a bit.
 
+### Code Listing
+
 ---
 Code Display 4-1 MCHRT.GP
 ~~~

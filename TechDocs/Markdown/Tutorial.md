@@ -25,15 +25,15 @@
 	[4.6 Exploring With Swat](Tutorial/The_Primary_Window.md#46-exploring-with-swat)  
 	_[Code Listing](Tutorial/The_Primary_Window.md#code-listing)_  
 	
-**[5 Data Structures and UI Gadgetry](Tutorial/Data_Structures_and_UI_Gagetry.md)**  
-	[5.1 Editing the Application](Tutorial/Data_Structures_and_UI_Gagetry.md#51-editing-the-application)  
-	[5.2 The Application so Far](Tutorial/Data_Structures_and_UI_Gagetry.md#52-the-application-so-far)  
-	[5.3 MCHRT.GP Change](Tutorial/Data_Structures_and_UI_Gagetry.md#53-mchrtgp-change)  
-	[5.4 MCHRT.GOC: Data & Structures](Tutorial/Data_Structures_and_UI_Gagetry.md#54-mchrtgoc-data-structures)  
-	[5.5 MCHRT.GOC: New Objects](Tutorial/Data_Structures_and_UI_Gagetry.md#55-mchrtgoc-new-objects)  
-	[5.6 MCHRT.GOC: Procedural Code](Tutorial/Data_Structures_and_UI_Gagetry.md#56-mchrtgoc-procedural-code)  
-	[5.7 Swat: Breakpoints and More](Tutorial/Data_Structures_and_UI_Gagetry.md#57-swat-breakpoints-and-more)  
-	_[Code Listing](Tutorial/Data_Structures_and_UI_Gagetry.md#code-listing)_  
+**[5 Data Structures and UI](Tutorial/Data_Structures_and_UI.md)**  
+	[5.1 Editing the Application](Tutorial/Data_Structures_and_UI.md#51-editing-the-application)  
+	[5.2 The Application so Far](Tutorial/Data_Structures_and_UI.md#52-the-application-so-far)  
+	[5.3 MCHRT.GP Change](Tutorial/Data_Structures_and_UI.md#53-mchrtgp-change)  
+	[5.4 MCHRT.GOC: Data & Structures](Tutorial/Data_Structures_and_UI.md#54-mchrtgoc-data-structures)  
+	[5.5 MCHRT.GOC: New Objects](Tutorial/Data_Structures_and_UI.md#55-mchrtgoc-new-objects)  
+	[5.6 MCHRT.GOC: Procedural Code](Tutorial/Data_Structures_and_UI.md#56-mchrtgoc-procedural-code)  
+	[5.7 Swat: Breakpoints and More](Tutorial/Data_Structures_and_UI.md#57-swat-breakpoints-and-more)  
+	_[Code Listing](Tutorial/Data_Structures_and_UI.md#code-listing)_  
 	
 **[6 Views and Visual Objects](Tutorial/Views_and_Visual_Objects.md)**  
 	[6.1 Making the Changes](Tutorial/Views_and_Visual_Objects.md#61-making-the-changes)  

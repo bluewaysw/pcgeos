@@ -899,6 +899,8 @@ This message handler removes the document's chart object from the visual
 tree preparatory to storing it. The document takes care of all other UI chores 
 automatically.
 
+### Code Listing
+
 ---
 Code Display 5-1 MCHRT.GP
 ~~~

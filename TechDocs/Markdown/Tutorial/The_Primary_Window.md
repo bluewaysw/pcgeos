@@ -1000,6 +1000,8 @@ switch over to the window with your editor.
 
 Enter quit at the Swat prompt to exit Swat.
 
+### Code Listing
+
 ---
 Code Display 3-1 MCHRT.GP
 ~~~
