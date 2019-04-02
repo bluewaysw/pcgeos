@@ -134,31 +134,31 @@
       [6.6.4 Being a Client](Concepts/Applications_and_Geodes.md#664-being-a-client)  
       [6.6.5 Being a Server](Concepts/Applications_and_Geodes.md#665-being-a-server)  
 
-**[7 The Clipboard]()**  
-	7.1	Overview      [CClipb : 299
-      [7.1.1	Cut, Copy, and Paste      [CClipb : 300
-      [7.1.2	Quick-Transfer      [CClipb : 301
-	7.2	Transfer Data Structures      [CClipb : 302
-      [7.2.1	The Transfer VM File Format      [CClipb : 303
-      [7.2.2	ClipboardItemFormatInfo      [CClipb : 305
-      [7.2.3	Transfer Data Structures      [CClipb : 307
-      [7.2.4	Clipboard Item Formats      [CClipb : 308
-	7.3	Using The Clipboard      [CClipb : 309
-      [7.3.1	Registering with the Clipboard      [CClipb : 311
-      [7.3.2	Managing the Edit Menu      [CClipb : 311
-      [7.3.3	The GenEditControl      [CClipb : 314
-      [7.3.4	Handling Cut and Copy      [CClipb : 316
-      [7.3.5	Handling Paste      [CClipb : 319
-      [7.3.6	Unregistering with the Clipboard      [CClipb : 322
-      [7.3.7	Implementing Undo      [CClipb : 322
-      [7.3.8	Transfer File Information      [CClipb : 322
-      [7.3.9	Undoing a Clipboard Change      [CClipb : 323
-	7.4	Using Quick-Transfer      [CClipb : 323
-      [7.4.1	Supporting Quick-Transfer      [CClipb : 324
-      [7.4.2	Quick-Transfer Procedure      [CClipb : 325
-      [7.4.3	Quick-Transfer Data Structures      [CClipb : 326
-      [7.4.4	Source Object Responsibility      [CClipb : 327
-	7.5	Shutdown Issues      [CClipb : 331
+**[7 The Clipboard](Concepts/Clipboard.md)**  
+    [7.1 Overview](Concepts/Clipboard.md#71-overview)  
+      [7.1.1 Cut, Copy, and Paste](Concepts/Clipboard.md#711-cut-copy-and-paste)  
+      [7.1.2 Quick-Transfer](Concepts/Clipboard.md#712-quick-transfer)  
+    [7.2 Transfer Data Structures](Concepts/Clipboard.md#72-transfer-data-structure)  
+      [7.2.1 The Transfer VM File Format](Concepts/Clipboard.md#721-the-transfer-vm-file-format)  
+      [7.2.2 ClipboardItemFormatInfo](Concepts/Clipboard.md#722-clipboarditemformatinfo)  
+      [7.2.3 Transfer Data Structures](Concepts/Clipboard.md#723-transfer-data-structure)  
+      [7.2.4 Clipboard Item Formats](Concepts/Clipboard.md#724-clipboard-item-formats)  
+    [7.3 Using The Clipboard](Concepts/Clipboard.md#73-using-the-clipboard)  
+      [7.3.1 Registering with the Clipboard](Concepts/Clipboard.md#731-registring-with-the-clipboard)  
+      [7.3.2 Managing the Edit Menu](Concepts/Clipboard.md#732-managing-the-edit-menu)  
+      [7.3.3 The GenEditControl](Concepts/Clipboard.md#733-the-geneditcontrol)  
+      [7.3.4 Handling Cut and Copy](Concepts/Clipboard.md#734-handling-cut-and-copy)  
+      [7.3.5 Handling Paste](Concepts/Clipboard.md#735-handling-paste)  
+      [7.3.6 Unregistering with the Clipboard](Concepts/Clipboard.md#736-unregistring-with-the-clipboard)  
+      [7.3.7 Implementing Undo](Concepts/Clipboard.md#737-implementing-undo)  
+      [7.3.8 Transfer File Information](Concepts/Clipboard.md#738-transfer-file-information)  
+      [7.3.9 Undoing a Clipboard Change](Concepts/Clipboard.md#739-undoing-a-clipboard-change)  
+    [7.4 Using Quick-Transfer](Concepts/Clipboard.md#74-quick-transfer)  
+      [7.4.1 Supporting Quick-Transfer](Concepts/Clipboard.md#741-supporting-quick-transfer)  
+      [7.4.2 Quick-Transfer Procedure](Concepts/Clipboard.md#742-quick-transfer-procedure)  
+      [7.4.3 Quick-Transfer Data Structures](Concepts/Clipboard.md#743-quick-transfer-data-structure)  
+      [7.4.4 Source Object Responsibility](Concepts/Clipboard.md#744-source-object-resposibility)  
+    [7.5 Shutdown Issues](Concepts/Clipboard.md#75-shutdown-issues)  
 
 **[8 Localization]()**  
 	8.1	Localization Goals      [CLocal : 335
