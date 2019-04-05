@@ -160,39 +160,39 @@
       [7.4.4 Source Object Responsibility](Concepts/Clipboard.md#744-source-object-resposibility)  
     [7.5 Shutdown Issues](Concepts/Clipboard.md#75-shutdown-issues)  
 
-**[8 Localization]()**  
-	8.1	Localization Goals      [CLocal : 335
-	8.2	How To Use Localization      [CLocal : 337
-	8.3	Preparing for ResEdit      [CLocal : 337
-	8.4	International Formats      [CLocal : 340
-      [8.4.1	Number and Measure      [CLocal : 341
-      [8.4.2	Currency      [CLocal : 343
-      [8.4.3	Quotation Marks      [CLocal : 343
-      [8.4.4	Dates and Times      [CLocal : 344
-      [8.4.5	Filters for Formats      [CLocal : 346
-	8.5	Lexical Functions      [CLocal : 348
-      [8.5.1	Comparing Strings      [CLocal : 348
-      [8.5.2	String Length and Size      [CLocal : 349
-      [8.5.3	Casing      [CLocal : 349
-      [8.5.4	Character Categories      [CLocal : 349
-      [8.5.5	Lexical Values      [CLocal : 350
-      [8.5.6	DOS Text & Code Pages      [CLocal : 350
+**[8 Localization](Concepts/Localization.md)**  
+    [8.1 Localization Goals](Concepts/Localization.md#81-localization-goals)  
+    [8.2 How To Use Localization]()  
+    [8.3 Preparing for ResEdit]()  
+    [8.4 International Formats]()  
+      [8.4.1 Number and Measure]()  
+      [8.4.2 Currency]()  
+      [8.4.3 Quotation Marks]()  
+      [8.4.4 Dates and Times]()  
+      [8.4.5 Filters for Formats]()  
+    [8.5 Lexical Functions]()  
+      [8.5.1 Comparing Strings]()  
+      [8.5.2 String Length and Size]()  
+      [8.5.3 Casing]()  
+      [8.5.4 Character Categories]()  
+      [8.5.5 Lexical Values]()  
+      [8.5.6 DOS Text & Code Pages]()  
 
 **[9 General Change Notification]()**  
-	9.1	Design Goals      [CGCN : 355
-	9.2	The Mechanics of GCN      [CGCN : 356
-	9.3	System Notification      [CGCN : 357
-      [9.3.1	Registering for System Notification      [CGCN : 357
-      [9.3.2	Handling System Notification      [CGCN : 360
-      [9.3.3	Removal from a System List      [CGCN : 364
-	9.4	Application Local GCN Lists      [CGCN : 364
-      [9.4.1	Creating Types and Lists      [CGCN : 366
-      [9.4.2	Registering for Notification      [CGCN : 366
-      [9.4.3	Handling Application Notification      [CGCN : 368
-      [9.4.4	Removal from Application Lists      [CGCN : 371
+    [9.1 Design Goals]()  
+    [9.2 The Mechanics of GCN]()  
+    [9.3 System Notification]()  
+      [9.3.1 Registering for System Notification]()  
+      [9.3.2 Handling System Notification]()  
+      [9.3.3 Removal from a System List]()  
+    [9.4 Application Local GCN Lists]()  
+      [9.4.1 Creating Types and Lists]()  
+      [9.4.2 Registering for Notification]()  
+      [9.4.3 Handling Application Notification]()  
+      [9.4.4 Removal from Application Lists]()  
 
 **[10 The GEOS User Interface]()**  
-	10.1	The GUI      [CUIOver : 375
+    [10.1 The GUI]()  
 	10.2	The GEOS User Interface      [CUIOver : 376
 	10.3	Using the Generic Classes      [CUIOver : 378
       [10.3.1	The Generic Class Tree      [CUIOver : 380
