@@ -192,26 +192,26 @@
       [9.4.4 Removal from Application Lists](Concepts/cgcn.md#944-removal-from-application-lists)  
 
 **[10 The GEOS User Interface](Concepts/cuiover.md)**  
-    [10.1 The GUI]()  
-	10.2	The GEOS User Interface      [CUIOver : 376
-	10.3	Using the Generic Classes      [CUIOver : 378
-      [10.3.1	The Generic Class Tree      [CUIOver : 380
-      [10.3.2	Creating a Generic Object Tree      [CUIOver : 385
-	10.4	Using the Visible Classes      [CUIOver : 385
-      [10.4.1	Visible Objects and the GenView      [CUIOver : 386
-      [10.4.2	The Visible Object Document      [CUIOver : 386
-      [10.4.3	Visible Object Abilities      [CUIOver : 387
-      [10.4.4	The Vis Class Tree      [CUIOver : 388
-      [10.4.5	Creating a Visible Object Tree      [CUIOver : 389
-      [10.4.6	Working with Visible Object Trees      [CUIOver : 390
-	10.5	A UI Example      [CUIOver : 391
-      [10.5.1	What TicTac Illustrates      [CUIOver : 391
-      [10.5.2	What TicTac Does      [CUIOver : 392
-      [10.5.3	The Structure of TicTac      [CUIOver : 392
-      [10.5.4	TicTacBoard Specifics      [CUIOver : 400
-      [10.5.5	TicTacPiece Specifics      [CUIOver : 404
+    [10.1 The GUI](Concepts/cuiover.md#101-the-gui)  
+    [10.2 The GEOS User Interface](Concepts/cuiover.md#102-the-geos-user-interface)  
+    [10.3 Using the Generic Classes](Concepts/cuiover.md#103-using-the-generic-classes)  
+      [10.3.1 The Generic Class Tree](Concepts/cuiover.md#1031-the-generic-class-tree)  
+      [10.3.2 Creating a Generic Object Tree](Concepts/cuiover.md#1032-creating-a-generich-object-tree)  
+     [10.4 Using the Visible Classes](Concepts/cuiover.md#104-using-the-visible-classes)  
+      [10.4.1 Visible Objects and the GenView](Concepts/cuiover.md#1041-visible-objects-and-the-genview)  
+      [10.4.2 The Visible Object Document](Concepts/cuiover.md#1042-the-visible-object-document)  
+      [10.4.3 Visible Object Abilities](Concepts/cuiover.md#1043-visible-object-abilities)  
+      [10.4.4 The Vis Class Tree](Concepts/cuiover.md#1044-the-vis-class-tree)  
+      [10.4.5 Creating a Visible Object Tree](Concepts/cuiover.md#1045-creating-a-visible-object-tree)  
+      [10.4.6 Working with Visible Object Trees](Concepts/cuiover.md#1046-working-with-visible-object-trees)  
+    [10.5 A UI Example](Concepts/cuiover.md#105-a-ui-example)  
+      [10.5.1 What TicTac Illustrates](Concepts/cuiover.md#1051-what-tictac-illustrates)  
+      [10.5.2 What TicTac Does](Concepts/cuiover.md#1052-what-tictac-does)  
+      [10.5.3 The Structure of TicTac](Concepts/cuiover.md#1053-the-structure-of-tictac)  
+      [10.5.4 TicTacBoard Specifics](Concepts/cuiover.md#1054-tictacboard-specifics)  
+      [10.5.5 TicTacPiece Specifics](Concepts/cuiover.md#1055-tictacpiece-specifics)  
 
-**[11 Input]()**  
+**[11 Input](Concepts/cinput.md)**  
 	11.1	Input Flow      [CInput : 419
       [11.1.1	Devices and Drivers      [CInput : 421
       [11.1.2	Input Manager and GenSystem      [CInput : 422

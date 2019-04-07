@@ -811,7 +811,7 @@ calculates the proper offsets to individual instance data fields. However,
 understanding the underlying structures may help in understanding how the 
 object system of GEOS works.
 
-![](Art/Figure_5-1.png)
+![](Art/figure_5-1.png)
 
 **Figure 5-1** An Object Pointer  
 _The optr (below) references the beginning of 
@@ -853,7 +853,7 @@ instance data later. The combination of the class pointer and the various
 master offsets make up the object's "base structure." When a typical object is 
 instantiated, the base structure is all that is created.
 
-![](Art/Figure_5-2.png)
+![](Art/figure_5-2.png)
 
 **Figure 5-2** Object and Class Interaction  
 _The kernel uses pointers internal to classes to traverse the class tree to the 
@@ -880,7 +880,7 @@ regardless of their master groups. An object with two master groups and
 three variable data fields, for example, would look like Figure 5-4. Variable 
 data and its use are discussed in full in section 5.4.1.4.
 
-![](Art/Figure_5-3.png)
+![](Art/figure_5-3.png)
 
 **Figure 5-3** Structures of an Object  
 _All objects have class pointers, though only those with master classes in their 
@@ -906,13 +906,13 @@ parts represents the instance data for PieceClass only; the second master
 part represents the object's instance data for all of GamePcClass, 
 ChessClass, and RookClass.
 
-![](Art/Figure_5-4.png)
+![](Art/figure_5-4.png)
 
 **Figure 5-4** An Object with Vardata  
 _All vardata entries are stored at the end of the instance chunk, regardless of 
 the master group with which they are associated._
 
-![](Art/Figure_5-5.png)
+![](Art/figure_5-5.png)
 
 **Figure 5-5** Master Classes and Master Groups  
 _Each master class heads its own master group. The outlined classes are all 
@@ -961,13 +961,13 @@ methods, and the structure and size of its instance data. The code consists of
 methods (message handlers). A diagram of the data structure is given in 
 Figure 5-8; its components are detailed below.
 
-![](Art/Figure_5-6.png)
+![](Art/figure_5-6.png)
 
 **Figure 5-6** A Sample Instance Chunk  
 _The RookClass chunk has two master groups, each having an offset stored 
 after the class pointer._
 
-![](Art/Figure_5-7.png)
+![](Art/figure_5-7.png)
 
 **Figure 5-7** A Class Tree  
 _It is simple to find the root of any class tree by following Class_superClass 
@@ -1004,7 +1004,7 @@ master parts initialized and others uninitialized. If only one master part of
 the object had been initialized, the location of the instance data in the chunk 
 may be different than if all master parts had been initialized.
 
-![](Art/Figure_5-8.png)
+![](Art/figure_5-8.png)
 
 **Figure 5-8** The ClassStruct Structure  
 _This structure has two basic parts: The class information and the method 
@@ -1036,7 +1036,7 @@ data relocation table for each relocatable field in each particular
 variable-data type. Variable data (also called vardata) is described in full in 
 "Defining and Working With Variable Data Fields".
 
-![](Art/Figure_5-9.png)
+![](Art/figure_5-9.png)
 
 **Figure 5-9** Class_masterOffset  
 _The instance chunk holds an offset to the master group's instance data; this 
@@ -1214,7 +1214,7 @@ This means that the class tree of the GenInteraction object is only partially
 completed; before the GenInteraction is resolved, it looks like the simplified 
 diagram in Figure 5-10.
 
-![](Art/Figure_5-10.png)
+![](Art/figure_5-10.png)
 
 **Figure 5-10** A Variant Class Object  
 _A variant class always has the constant 0001h:0000h instead of a superclass 
@@ -1235,7 +1235,7 @@ to be complete; this only goes to GenClass. GenClass has a special value in
 its Class_superClass field, 0001h:0000h. This represents a reserved "pointer" 
 that indicates to the kernel that the class is a master class.
 
-![](Art/Figure_5-11.png)
+![](Art/figure_5-11.png)
 
 **Figure 5-11** A Resolved Variant Object  
 _The GenInteraction menu object has been resolved to belong to 
@@ -1268,7 +1268,7 @@ sample application. This trigger is the only child of the Game menu
 GenInteraction; it is shown in Figure 5-12. The code defining the trigger is 
 given in Code Display 5-4.
 
-![](Art/Figure_5-12.jpg)
+![](Art/figure_5-12.jpg)
 
 **Figure 5-12** TicTac's New Game Trigger  
 _This trigger is used as the in-depth example object. The mouse pointer in the 
@@ -1298,7 +1298,7 @@ holds the instance data for VisClass and OLButtonClass. The MetaClass
 instance data consists only of the object's class pointer and has no master 
 part.
 
-![](Art/Figure_5-13.png)
+![](Art/figure_5-13.png)
 
 **Figure 5-13** GenTrigger's Instance Chunk  
 _The TicTacNewTrigger trigger has a Gen and a Vis master part and no 
@@ -1322,7 +1322,7 @@ does), it will have a different class for each specific UI it encounters. For
 example, the OSF/Motif class is OLButtonClass; another specific UI will use 
 a different class for GenTriggers.
 
-![](Art/Figure_5-14.png)
+![](Art/figure_5-14.png)
 
 **Figure 5-14** TicTacNewTrigger's Class Tree  
 _TicTacNewTrigger is of GenTriggerClass, a subclass of GenClass. GenClass 
@@ -1344,7 +1344,7 @@ Because all classes have the same class structure, only GenTriggerClass
 will be examined here. The class structure and the instance chunk structure 
 are closely linked in several ways, as shown in Figure 5-15.
 
-![](Art/Figure_5-15.png)
+![](Art/figure_5-15.png)
 
 **Figure 5-15** GenTriggerClass Subclassed  
 _The class structure and instance structure are linked in several ways.
@@ -1801,7 +1801,7 @@ messages defined in the class' superclasses. However, the assignment scheme
 opens up the possibility that classes on the same level in the class tree could 
 have conflicting message numbers (see Figure 5-7).
 
-![](Art/Figure_5-16.png)
+![](Art/figure_5-16.png)
 
 **Figure 5-16** Conflicting Message Numbers  
 _Although no class' message numbers will ever conflict with its superclasses', 
@@ -2107,7 +2107,7 @@ entries." Each entry consists of a primary word and optional extra data. The
 primary word represents a data type defined by the keyword @vardata. This 
 type is created automatically by Goc when the @vardata keyword is used.
 
-![](Art/Figure_5-17.png)
+![](Art/figure_5-17.png)
 
 **Figure 5-17** Variable Data Storage  
 _The VarDataEntry structure contains a single variable data entry. If it has 
@@ -3812,7 +3812,7 @@ object or free its chunk or something similar).
 By using the above routines, you can fully manipulate any object tree and the 
 objects within it.
 
-![](Art/Figure_5-18.png)
+![](Art/figure_5-18.png)
 
 **Figure 5-18** Structure of an Object Tree  
 _An object's composite field points to its first child, and its link field points 

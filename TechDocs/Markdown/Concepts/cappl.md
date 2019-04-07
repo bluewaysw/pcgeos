@@ -1834,7 +1834,7 @@ The server should notify the client when the server is finished with that data;
 the client can then free the block. Similarly, if a server allocates a block to 
 pass information to a client, the server should free the block.
 
-![](Art/Figure_6-1.png)
+![](Art/figure_6-1.png)
 
 **Figure 6-1** IACP Clients and Servers  
 _A client can encapsulate a message, then use an IACP routine to instruct the 

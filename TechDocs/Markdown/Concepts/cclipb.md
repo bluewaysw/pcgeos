@@ -61,7 +61,7 @@ Cut. Copying, however, will not remove the selection from the document-it
 will simply create a copy of the selection and place it on the Clipboard, 
 removing whatever had previously been on the Clipboard.
 
-![](Art/Figure_7-1.png)
+![](Art/figure_7-1.png)
 
 **Figure 7-1** The Edit Menu  
 _The Edit menu of NotePad contains the Cut, Copy, and Paste items._
@@ -123,7 +123,7 @@ Figure 7-2. The quick-transfer mechanism uses the same file for its data
 transfer. Typically, this is a file designated and managed by the User 
 Interface.
 
-![](Art/Figure_7-2.png)
+![](Art/figure_7-2.png)
 
 **Figure 7-2** The Transfer VM File  
 _How the Transfer VM File is used by the Copy and Paste functions; its use 
@@ -237,7 +237,7 @@ manufacturer), and the other represents the actual format number. To
 combine these words into a ClipboardItemFormatID record, or to extract 
 either word from the record, use the macros shown after Code Display 7-2.
 
-![](Art/Figure_7-3.png)
+![](Art/figure_7-3.png)
 
 **Figure 7-3** Transfer VM File Structure  
 _The Transfer VM File contains two transfer items, one for the clipboard and 

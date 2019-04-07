@@ -48,7 +48,7 @@ event is detected, the GCN mechanism will search through the list of lists,
 seeing if a notification list is interested in a particular change, and send the 
 appropriate messages if the objects do indeed wish notification of the event. 
 
-![](Art/Figure_9-1.png)
+![](Art/figure_9-1.png)
 
 **Figure 9-1** A GCN List of Lists  
 _Organization of a GCN list of lists and several GCN lists._

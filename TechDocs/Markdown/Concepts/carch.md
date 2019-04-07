@@ -69,7 +69,7 @@ interface to physical devices such as video screens, printers, and file systems.
 For a diagram outlining these layers and some of the components within 
 them, see Figure 3-1.
 
-![](Art/Figure_3-1.png)
+![](Art/figure_3-1.png)
 
 **Figure 3-1** The Layers of GEOS  
 _GEOS contains several logical layers of abstraction, from device drivers to 
@@ -285,7 +285,7 @@ make sure the message is handled immediately. In this case, the message
 acts like a remote routine call, blocking the thread of the caller until the 
 message has been handled and the value returned.
 
-![](Art/Figure_3-2.png)
+![](Art/figure_3-2.png)
 
 **Figure 3-2** A Sample Counter Object  
 _This counter object handles three messages and maintains a single instance 
@@ -315,7 +315,7 @@ idea where to send the return message. This example assumes the Calculator
 object is used by only the one requestor and inherently knows the requestor's 
 optr.)
 
-![](Art/Figure_3-3.png)
+![](Art/figure_3-3.png)
 
 **Figure 3-3** Objects Using Messages  
 _The Requestor object sends MSG_DO_CALCULATION to the Calculator, 
@@ -364,7 +364,7 @@ value is retrieved with the use of a certain message. However, suppose we
 need a counter that does all those things and allows the counter to be set to 
 an arbitrary value with the use of a new message.
 
-![](Art/Figure_3-4.png)
+![](Art/figure_3-4.png)
 
 **Figure 3-4** A SampleSubclass  
 _CounterSetClass is a subclass of CounterClass, thereby inheriting the 
@@ -621,8 +621,8 @@ giving the menu a standard set of attributes. The UI will automatically
 build and manage this menu according to the UI specification in use at 
 the time.
 
-![](Art/Figure_3-5.png) 
-![](Art/Figure_3-5a.png)
+![](Art/figure_3-5.png) 
+![](Art/figure_3-5a.png)
 
 **Figure 3-5** Sample OSF/Motif Menus  
 The menu at right is a "standard" menu created 
@@ -707,8 +707,8 @@ user to switch to other applications but disallows interaction within the
 dialog's application (except for the dialog box); and non-modal, which 
 allows the user to switch to any other part of the system.
 
-![](Art/Figure_3-6.png) 
-![](Art/Figure_3-6a.png)
+![](Art/figure_3-6.png) 
+![](Art/figure_3-6a.png)
 
 **Figure 3-6** Sample OSF/Motif Dialog Boxes  
 The above dialog box is a standard, modal dialog. That to the right 

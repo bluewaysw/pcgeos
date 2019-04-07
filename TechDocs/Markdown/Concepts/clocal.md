@@ -52,9 +52,9 @@ to use. In those situations where you don't absolutely have to use
 localized code, usually it's easier to use the localized functions than to 
 write your own.
 
-![](Art/Figure_8-1.png)
-![](Art/Figure_8-1a.png)
-![](Art/Figure_8-1b.png)
+![](Art/figure_8-1.png)
+![](Art/figure_8-1a.png)
+![](Art/figure_8-1b.png)
 
 **Figure 8-1** International Formats  
 _International formats include variations in how numbers, times, 
@@ -106,8 +106,8 @@ which you may insure by using either the @chunk or @visMoniker
 keywords. Thus, your application icons are probably stored in the following 
 way:
 
-![](Art/Figure_8-2.png)
-![](Art/Figure_8-2a.png)
+![](Art/figure_8-2.png)
+![](Art/figure_8-2a.png)
 
 **Figure 8-2** Localizing Strings  
 _Some strings may get when translated. If your strings are too 
@@ -231,7 +231,7 @@ you may use it to do your own formatting. LocalSetNumericFormat()
 allows you to reset the user's preferences, though this is inadvisable as it 
 overrides and erases the user's original settings.
 
-![](Art/Figure_8-3.png)
+![](Art/figure_8-3.png)
 
 **Figure 8-3** Parts of a Number Format
 
@@ -303,7 +303,7 @@ traditionally, the only computer-generated quotation marks available are "
 and ", GEOS allows all geodes to use native quotation marks without 
 extraordinary effort.
 
-![](Art/Figure_8-4.png)
+![](Art/figure_8-4.png)
 
 **Figure 8-4** Parts of the Currency Format
 
