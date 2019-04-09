@@ -212,113 +212,113 @@
       [10.5.5 TicTacPiece Specifics](Concepts/cuiover.md#1055-tictacpiece-specifics)  
 
 **[11 Input](Concepts/cinput.md)**  
-	11.1	Input Flow      [CInput : 419
-      [11.1.1	Devices and Drivers      [CInput : 421
-      [11.1.2	Input Manager and GenSystem      [CInput : 422
-      [11.1.3	Input Events      [CInput : 422
-      [11.1.4	Input Hierarchies      [CInput : 423
-	11.2	Mouse Input      [CInput : 424
-      [11.2.1	Mouse Events      [CInput : 425
-      [11.2.2	Gaining the Mouse Grab      [CInput : 431
-      [11.2.3	Large Mouse Events      [CInput : 433
-      [11.2.4	Setting the Pointer Image      [CInput : 434
-	11.3	Keyboard Input      [CInput : 437
-      [11.3.1	Keyboard Input Flow      [CInput : 437
-      [11.3.2	Keyboard Events      [CInput : 438
-	11.4	Pen Input and Ink      [CInput : 442
-      [11.4.1	Ink Data Structures      [CInput : 443
-      [11.4.2	Ink Input Flow      [CInput : 444
-	11.5	Input Hierarchies      [CInput : 448
-      [11.5.1	The Three Hierarchies      [CInput : 449
-      [11.5.2	Common Hierarchy Basics      [CInput : 449
-      [11.5.3	Using Focus      [CInput : 453
-      [11.5.4	Using Target      [CInput : 456
-      [11.5.5	Using Model      [CInput : 460
-      [11.5.6	Extending the Hierarchies      [CInput : 462
+    [11.1 Input Flow](Concepts/cinput.md#111-input-flow)  
+      [11.1.1 Devices and Drivers](Concepts/cinput.md#1111-devices-and-drivers)  
+      [11.1.2 Input Manager and GenSystem](Concepts/cinput.md#1112-input-manager-and-gensystem)  
+      [11.1.3 Input Events](Concepts/cinput.md#1113-input-events)  
+      [11.1.4 Input Hierarchies](Concepts/cinput.md#1114-input-hierarchies)  
+    [11.2 Mouse Input](Concepts/cinput.md#112-mouse-input)  
+      [11.2.1 Mouse Events](Concepts/cinput.md#1121-mouse-events)  
+      [11.2.2 Gaining the Mouse Grab](Concepts/cinput.md#1122-gaining-the-mouse-grab)  
+      [11.2.3 Large Mouse Events](Concepts/cinput.md#1123-large-mouse-events)  
+      [11.2.4 Setting the Pointer Image](Concepts/cinput.md#1124-setting-the-pointer-image)  
+    [11.3 Keyboard Input](Concepts/cinput.md#113-keyboard-input)  
+      [11.3.1 Keyboard Input Flow](Concepts/cinput.md#1131-keyboard-input-flow)  
+      [11.3.2 Keyboard Events](Concepts/cinput.md#1132-keyboard-events)  
+    [11.4 Pen Input and Ink](Concepts/cinput.md#114-pen-input-and-ink)  
+      [11.4.1 Ink Data Structures](Concepts/cinput.md#1141-ink-data-flow)  
+      [11.4.2 Ink Input Flow](Concepts/cinput.md#1142-ink-input-flow)  
+    [11.5 Input Hierarchies](Concepts/cinput.md#115-input-hierarchies)  
+      [11.5.1 The Three Hierarchies](Concepts/cinput.md#1151-the-three-hierarchies)  
+      [11.5.2 Common Hierarchy Basics](Concepts/cinput.md#1152-common-hierarchy-basics)  
+      [11.5.3 Using Focus](Concepts/cinput.md#1153-using-focus)  
+      [11.5.4 Using Target](Concepts/cinput.md#1154-using-target)  
+      [11.5.5 Using Model](Concepts/cinput.md#1155-using-model)  
+      [11.5.6 Extending the Hierarchies](Concepts/cinput.md#1156-extending-the-hierarchies)  
 
 **[12 Managing UI Geometry]()**  
-	12.1	Geometry Manager Overview      [CGeom : 467
-      [12.1.1	Geometry Manager Features      [CGeom : 468
-      [12.1.2	How Geometry Is Managed      [CGeom : 469
-	12.2	Arranging Your Generic Objects      [CGeom : 472
-      [12.2.1	General Geometry Rules      [CGeom : 472
-      [12.2.2	Orienting Children      [CGeom : 474
-      [12.2.3	Justifying and Centering Children      [CGeom : 478
-      [12.2.4	Sizing Objects      [CGeom : 480
-      [12.2.5	Outlining the Composite      [CGeom : 487
-      [12.2.6	Using Monikers      [CGeom : 487
-      [12.2.7	Using Custom Child Spacing      [CGeom : 490
-      [12.2.8	Allowing Children to Wrap      [CGeom : 492
-      [12.2.9	Object Placement      [CGeom : 493
-	12.3	Positioning and Sizing Windows      [CGeom : 497
-      [12.3.1	Window Positioning      [CGeom : 499
-      [12.3.2	Determining Initial Size      [CGeom : 500
-      [12.3.3	On-Screen Behavior      [CGeom : 501
-      [12.3.4	Window Look and Feel      [CGeom : 502
+    [12.1 Geometry Manager Overview]()  
+      [12.1.1 Geometry Manager Features]()  
+      [12.1.2 How Geometry Is Managed]()  
+    [12.2 Arranging Your Generic Objects]()  
+      [12.2.1 General Geometry Rules]()  
+      [12.2.2 Orienting Children]()  
+      [12.2.3 Justifying and Centering Children]()  
+      [12.2.4 Sizing Objects]()  
+      [12.2.5 Outlining the Composite]()  
+      [12.2.6 Using Monikers]()  
+      [12.2.7 Using Custom Child Spacing]()  
+      [12.2.8 Allowing Children to Wrap]()  
+      [12.2.9 Object Placement]()  
+    [12.3 Positioning and Sizing Windows]()  
+      [12.3.1 Window Positioning]()  
+      [12.3.2 Determining Initial Size]()  
+      [12.3.3 On-Screen Behavior]()  
+      [12.3.4 Window Look and Feel ]()  
 
 **[13 Sound Library]()**  
-	13.1	Goals and Motives      [CSound : 505
-	13.2	Playing UI Sounds      [CSound : 505
-	13.3	Representing Tones      [CSound : 506
-	13.4	Single Notes      [CSound : 510
-	13.5	Declaring Music Buffers      [CSound : 513
-	13.6	Playing Music Buffers      [CSound : 516
-	13.7	Playing Very Large Music Buffers      [CSound : 518
-	13.8	Playing Sampled Sounds      [CSound : 518
-	13.9	Grabbing the Sound Exclusive      [CSound : 520
-	13.10	Simulating Musical Instruments      [CSound : 521
-      [13.10.1	Acoustics In Brief      [CSound : 521
-      [13.10.2	Simple Instrument Description      [CSound : 522
-      [13.10.3	Advanced Description      [CSound : 523
+    [13.1 Goals and Motives]()  
+    [13.2 Playing UI Sounds]()  
+    [13.3 Representing Tones]()  
+    [13.4 Single Notes]()  
+    [13.5 Declaring Music Buffers]()  
+    [13.6 Playing Music Buffers]()  
+    [13.7 Playing Very Large Music Buffers]()  
+    [13.8 Playing Sampled Sounds]()  
+    [13.9 Grabbing the Sound Exclusive]()  
+    [13.10 Simulating Musical Instruments]()  
+      [13.10.1 Acoustics In Brief]()  
+      [13.10.2 Simple Instrument Description]()  
+      [13.10.3 Advanced Description]()  
 
 **[14 Handles]()**  
-	14.1	Design Philosophy      [CHandle : 537
-	14.2	The Global Handle Table      [CHandle : 539
-	14.3	Local Handles      [CHandle : 539
+    [14.1 Design Philosophy]()  
+    [14.2 The Global Handle Table]()  
+    [14.3 Local Handles]()  
 
 **[15 Memory Management]()**  
-	15.1	Design Philosophy      [CMemory : 543
-	15.2	The Structure of Memory      [CMemory : 544
-      [15.2.1	Expanded/Extended Memory      [CMemory : 544
-      [15.2.2	Main Memory      [CMemory : 545
-	15.3	Using Global Memory      [CMemory : 552
-      [15.3.1	Memory Etiquette      [CMemory : 552
-      [15.3.2	Requesting Memory      [CMemory : 554
-      [15.3.3	Freeing Memory      [CMemory : 555
-      [15.3.4	Accessing Data in a Block      [CMemory : 555
-      [15.3.5	Accessing Data: An Example      [CMemory : 556
-      [15.3.6	Data-Access Synchronization      [CMemory : 558
-      [15.3.7	Retrieving Block Information      [CMemory : 561
-      [15.3.8	The Reference Count      [CMemory : 563
-	15.4	malloc()      [CMemory : 564
+    [15.1 Design Philosophy]()  
+    [15.2 The Structure of Memory]()  
+      [15.2.1 Expanded/Extended Memory]()  
+      [15.2.2 Main Memory]()  
+    [15.3 Using Global Memory]()  
+      [15.3.1 Memory Etiquette]()  
+      [15.3.2 Requesting Memory]()  
+      [15.3.3 Freeing Memory]()  
+      [15.3.4 Accessing Data in a Block]()  
+      [15.3.5 Accessing Data: An Example]()  
+      [15.3.6 Data-Access Synchronization]()  
+      [15.3.7 Retrieving Block Information]()  
+      [15.3.8 The Reference Count]()  
+    [15.4 malloc()]()  
 
 **[16 Local Memory]()**  
-	16.1	Design Philosophy      [CLMem : 569
-	16.2	Structure of a Local Memory Heap      [CLMem : 570
-      [16.2.1	The Local Heap      [CLMem : 571
-      [16.2.2	Chunks and Chunk Handles      [CLMem : 572
-      [16.2.3	Types of LMem Heaps      [CLMem : 573
-	16.3	Using Local Memory Heaps      [CLMem : 577
-      [16.3.1	Creating a Local Heap      [CLMem : 577
-      [16.3.2	Using Chunks      [CLMem : 579
-      [16.3.3	Contracting the LMem Heap      [CLMem : 581
-      [16.3.4	Example of LMem Usage      [CLMem : 581
-	16.4	Special LMem Uses      [CLMem : 583
-      [16.4.1	Chunk Arrays      [CLMem : 584
-      [16.4.2	Element Arrays      [CLMem : 595
-      [16.4.3	Name Arrays      [CLMem : 602
+    [16.1 Design Philosophy]()  
+    [16.2 Structure of a Local Memory Heap]()  
+      [16.2.1 The Local Heap]()  
+      [16.2.2 Chunks and Chunk Handles]()  
+      [16.2.3 Types of LMem Heaps]()  
+    [16.3 Using Local Memory Heaps]()  
+      [16.3.1 Creating a Local Heap]()  
+      [16.3.2 Using Chunks]()  
+      [16.3.3 Contracting the LMem Heap]()  
+      [16.3.4 Example of LMem Usage]()  
+    [16.4 Special LMem Uses]()  
+      [16.4.1 Chunk Arrays]()  
+      [16.4.2 Element Arrays]()  
+      [16.4.3 Name Arrays]()  
 
 **[17 File System]()**  
-	17.1	Design Philosophy      [CFile : 611
-	17.2	File System Overview      [CFile : 613
-	17.3	Disks and Drives      [CFile : 616
+    [17.1	Design Philosophy      [CFile : 611
+    [17.2	File System Overview      [CFile : 613
+    [17.3	Disks and Drives      [CFile : 616
       [17.3.1	Accessing Drives      [CFile : 616
       [17.3.2	Accessing Disks      [CFile : 619
-	17.4	Directories and Paths      [CFile : 631
+    [17.4	Directories and Paths      [CFile : 631
       [17.4.1	Standard Paths      [CFile : 632
       [17.4.2	Current Path and Directory Stack      [CFile : 636
       [17.4.3	Creating and Deleting Directories      [CFile : 639
-	17.5	Files      [CFile : 641
+    [17.5	Files      [CFile : 641
       [17.5.1	DOS Files and GEOS Files      [CFile : 641
       [17.5.2	Files and File Handles      [CFile : 643
       [17.5.3	GEOS Extended Attributes      [CFile : 643
@@ -327,13 +327,13 @@
       [17.5.6	Bytewise File Operations      [CFile : 661
 
 **[18 Virtual Memory]()**  
-	18.1	Design Philosophy      [CVM : 673
-	18.2	VM Structure      [CVM : 674
+    [18.1	Design Philosophy      [CVM : 673
+    [18.2	VM Structure      [CVM : 674
       [18.2.1	The VM Manager      [CVM : 675
       [18.2.2	VM Handles      [CVM : 676
       [18.2.3	Virtual Memory Blocks      [CVM : 677
       [18.2.4	VM File Attributes      [CVM : 681
-	18.3	Using Virtual Memory      [CVM : 683
+    [18.3	Using Virtual Memory      [CVM : 683
       [18.3.1	How to Use VM      [CVM : 683
       [18.3.2	Opening or Creating a VM File      [CVM : 684
       [18.3.3	Changing VM File Attributes      [CVM : 687
@@ -346,23 +346,23 @@
       [18.3.10	The VM File's Map Block      [CVM : 696
       [18.3.11	File-Access Synchronization      [CVM : 697
       [18.3.12	Other VM Utilities      [CVM : 699
-	18.4	VM Chains      [CVM : 700
+    [18.4	VM Chains      [CVM : 700
       [18.4.1	Structure of a VM Chain      [CVM : 701
       [18.4.2	VM Chain Utilities      [CVM : 703
-	18.5	Huge Arrays      [CVM : 705
+    [18.5	Huge Arrays      [CVM : 705
       [18.5.1	Structure of a Huge Array      [CVM : 706
       [18.5.2	Basic Huge Array Routines      [CVM : 708
       [18.5.3	Huge Array Utilities      [CVM : 713
 
 **[19 Database Library]()**  
-	19.1	Design Philosophy      [CDB : 719
-	19.2	Database Structure      [CDB : 720
+    [19.1	Design Philosophy      [CDB : 719
+    [19.2	Database Structure      [CDB : 720
       [19.2.1	DB Items      [CDB : 720
       [19.2.2	DB Groups      [CDB : 721
       [19.2.3	Allocating Groups and Items      [CDB : 722
       [19.2.4	Ungrouped DB Items      [CDB : 723
       [19.2.5	The DB Map Item      [CDB : 723
-	19.3	Using Database Routines      [CDB : 724
+    [19.3	Using Database Routines      [CDB : 724
       [19.3.1	General Rules to Follow      [CDB : 724
       [19.3.2	Allocating and Freeing Groups      [CDB : 725
       [19.3.3	Allocating and Freeing Items      [CDB : 725
@@ -371,65 +371,65 @@
       [19.3.6	Setting and Using the Map Item      [CDB : 728
       [19.3.7	Routines for Ungrouped Items      [CDB : 729
       [19.3.8	Other DB Utilities      [CDB : 730
-	19.4	The Cell Library      [CDB : 731
+    [19.4	The Cell Library      [CDB : 731
       [19.4.1	Structure and Design      [CDB : 732
       [19.4.2	Using the Cell Library      [CDB : 734
 
 **[20 Parse Library]()**  
-	20.1	Parse Library Behavior      [CParse : 743
+    [20.1	Parse Library Behavior      [CParse : 743
       [20.1.1	The Scanner      [CParse : 745
       [20.1.2	The Parser      [CParse : 753
       [20.1.3	Evaluator      [CParse : 759
       [20.1.4	Formatter      [CParse : 761
-	20.2	Parser Functions      [CParse : 761
+    [20.2	Parser Functions      [CParse : 761
       [20.2.1	Internal Functions      [CParse : 762
       [20.2.2	External Functions      [CParse : 765
-	20.3	Coding with the Parse Library      [CParse : 766
+    [20.3	Coding with the Parse Library      [CParse : 766
       [20.3.1	Parsing a String      [CParse : 766
       [20.3.2	Evaluating a Token Sequence      [CParse : 767
       [20.3.3	Formatting a Token Sequence      [CParse : 770
 
 **[21 Using Streams]()**  
-	21.1	Using Streams: The Basics      [CStream : 773
+    [21.1	Using Streams: The Basics      [CStream : 773
       [21.1.1	Initializing a Stream      [CStream : 775
       [21.1.2	Blocking on Read or Write      [CStream : 777
       [21.1.3	Writing Data to a Stream      [CStream : 778
       [21.1.4	Reading Data from a Stream      [CStream : 779
       [21.1.5	Shutting Down a Stream      [CStream : 781
       [21.1.6	Miscellaneous Functions      [CStream : 782
-	21.2	Using the Serial Ports      [CStream : 782
+    [21.2	Using the Serial Ports      [CStream : 782
       [21.2.1	Initializing a Serial Port      [CStream : 783
       [21.2.2	Communicating      [CStream : 787
       [21.2.3	Closing a Serial Port      [CStream : 788
-	21.3	Using the Parallel Ports      [CStream : 789
+    [21.3	Using the Parallel Ports      [CStream : 789
       [21.3.1	Initializing a Parallel Port      [CStream : 789
       [21.3.2	Communicating      [CStream : 790
       [21.3.3	Closing a Parallel Port      [CStream : 790
 
 **[22 PCCom Library]()**  
-	22.1	PCCom Library Abilities      [795
-	22.2	What To Do      [795
-	22.3	Staying Informed      [796
+    [22.1	PCCom Library Abilities      [795
+    [22.2	What To Do      [795
+    [22.3	Staying Informed      [796
 
 **[23 Graphics Environment]()**  
-	23.1	Graphics Road Map      [CGraph : 801
+    [23.1	Graphics Road Map      [CGraph : 801
       [23.1.1	Chapter Structure      [CGraph : 801
       [23.1.2	Vocabulary      [CGraph : 803
-	23.2	Graphics Goals      [CGraph : 806
-	23.3	Graphics Architecture      [CGraph : 807
-	23.4	How To Use Graphics      [CGraph : 808
-	23.5	Coordinate Space      [CGraph : 810
+    [23.2	Graphics Goals      [CGraph : 806
+    [23.3	Graphics Architecture      [CGraph : 807
+    [23.4	How To Use Graphics      [CGraph : 808
+    [23.5	Coordinate Space      [CGraph : 810
       [23.5.1	Standard Coordinate Space      [CGraph : 811
       [23.5.2	Coordinate Transformations      [CGraph : 812
       [23.5.3	Precise Coordinates      [CGraph : 818
       [23.5.4	Device Coordinates      [CGraph : 819
       [23.5.5	Larger Document Spaces      [CGraph : 823
       [23.5.6	Current Position      [CGraph : 824
-	23.6	Graphics State      [CGraph : 825
+    [23.6	Graphics State      [CGraph : 825
       [23.6.1	GState Contents      [CGraph : 826
       [23.6.2	Working with GStates      [CGraph : 827
-	23.7	Working With Bitmaps      [CGraph : 828
-	23.8	Graphics Strings      [CGraph : 832
+    [23.7	Working With Bitmaps      [CGraph : 828
+    [23.8	Graphics Strings      [CGraph : 832
       [23.8.1	Storage and Loading      [CGraph : 832
       [23.8.2	Special Drawing Commands      [CGraph : 834
       [23.8.3	Declaring a GString Statically      [CGraph : 836
@@ -437,18 +437,18 @@
       [23.8.5	Drawing and Scanning      [CGraph : 843
       [23.8.6	Editing GStrings Dynamically      [CGraph : 846
       [23.8.7	Parsing GStrings      [CGraph : 847
-	23.9	Graphics Paths      [CGraph : 849
-	23.10	Working With Video Drivers      [CGraph : 852
+    [23.9	Graphics Paths      [CGraph : 849
+    [23.10	Working With Video Drivers      [CGraph : 852
       [23.10.1	Kernel Routines      [CGraph : 852
       [23.10.2	Direct Calls to the Driver      [CGraph : 853
-	23.11	Windowing and Clipping      [CGraph : 854
+    [23.11	Windowing and Clipping      [CGraph : 854
       [23.11.1	Palettes      [CGraph : 854
       [23.11.2	Clipping      [CGraph : 854
       [23.11.3	Signalling Updates      [CGraph : 855
 
 **[24 Drawing Graphics]()**  
-	24.1	Drawing Goals      [CShapes : 859
-	24.2	Shapes      [CShapes : 859
+    [24.1	Drawing Goals      [CShapes : 859
+    [24.2	Shapes      [CShapes : 859
       [24.2.1	Dots      [CShapes : 860
       [24.2.2	Lines      [CShapes : 861
       [24.2.3	Rectangles      [CShapes : 862
@@ -462,7 +462,7 @@
       [24.2.11	Paths      [CShapes : 872
       [24.2.12	Regions      [CShapes : 873
       [24.2.13	Text      [CShapes : 876
-	24.3	Shape Attributes      [CShapes : 885
+    [24.3	Shape Attributes      [CShapes : 885
       [24.3.1	Color      [CShapes : 886
       [24.3.2	Patterns and Hatching      [CShapes : 891
       [24.3.3	Mix Mode      [CShapes : 895
@@ -470,50 +470,50 @@
       [24.3.5	Line-Specific Attributes      [CShapes : 899
 
 **[A Machine Architecture]()**  
-	A.1	History of the 80x86      [CHardw : 905
-	A.2	8086 Architecture Overview      [CHardw : 906
+    [A.1	History of the 80x86      [CHardw : 905
+    [A.2	8086 Architecture Overview      [CHardw : 906
       [A.2.1	Memory      [CHardw : 906
       [A.2.2	Registers      [CHardw : 908
       [A.2.3	The Prefetch Queue      [CHardw : 909
       [A.2.4	Inherent Optimizations      [CHardw : 910
 
 **[B Threads and Semaphores]()**  
-	B.1	Multitasking Goals      [CMultit : 913
-	B.2	Two Models of Multitasking      [CMultit : 914
+    [B.1	Multitasking Goals      [CMultit : 913
+    [B.2	Two Models of Multitasking      [CMultit : 914
       [B.2.1	Cooperative Multitasking      [CMultit : 914
       [B.2.2	Preemptive Multitasking      [CMultit : 915
-	B.3	GEOS Multitasking      [CMultit : 916
+    [B.3	GEOS Multitasking      [CMultit : 916
       [B.3.1	GEOS Threads      [CMultit : 917
       [B.3.2	Context Switches      [CMultit : 918
       [B.3.3	Thread Scheduling      [CMultit : 919
       [B.3.4	Applications and Threads      [CMultit : 920
-	B.4	Using Multiple Threads      [CMultit : 921
+    [B.4	Using Multiple Threads      [CMultit : 921
       [B.4.1	How GEOS Threads Are Created      [CMultit : 921
       [B.4.2	Managing Priority Values      [CMultit : 923
       [B.4.3	Handling Errors in a Thread      [CMultit : 924
       [B.4.4	When a Thread Is Finished      [CMultit : 925
-	B.5	Synchronizing Threads      [CMultit : 926
+    [B.5	Synchronizing Threads      [CMultit : 926
       [B.5.1	Semaphores: The Concept      [CMultit : 926
       [B.5.2	Semaphores In GEOS      [CMultit : 928
 
 **[C Libraries]()**  
-	C.1	Design Philosophy      [CLibr : 935
-	C.2	Library Basics      [CLibr : 936
-	C.3	The Library Entry Point      [CLibr : 937
-	C.4	Exported Routines and Classes      [CLibr : 940
-	C.5	Header Files      [CLibr : 941
-	C.6	Compiler Directives      [CLibr : 941
+    [C.1	Design Philosophy      [CLibr : 935
+    [C.2	Library Basics      [CLibr : 936
+    [C.3	The Library Entry Point      [CLibr : 937
+    [C.4	Exported Routines and Classes      [CLibr : 940
+    [C.5	Header Files      [CLibr : 941
+    [C.6	Compiler Directives      [CLibr : 941
 
 **[D The Math Library]()**  
-	D.1	Basic Math Functions      [CMath : 945
+    [D.1	Basic Math Functions      [CMath : 945
       [D.1.1	Algebraic Functions      [CMath : 947
       [D.1.2	Transcendental Functions      [CMath : 949
       [D.1.3	Random Number Generation      [CMath : 950
-	D.2	Conversions to Other Types      [CMath : 951
-	D.3	Float Formats      [CMath : 960
+    [D.2	Conversions to Other Types      [CMath : 951
+    [D.3	Float Formats      [CMath : 960
       [D.3.1	System-defined Formats      [CMath : 960
       [D.3.2	User-defined Formats      [CMath : 963
-	D.4	Direct FP Operations      [CMath : 964
+    [D.4	Direct FP Operations      [CMath : 964
       [D.4.1	Floating Point Numbers      [CMath : 965
       [D.4.2	The Floating Point Stack      [CMath : 966
       [D.4.3	Floating Point Math Routines      [CMath : 971
