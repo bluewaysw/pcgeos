@@ -1,0 +1,176 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: VM_1a.htm,v 1.2 97/08/08 16:45:20 nfiedler Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Huge Array Utilities</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Virtual Memory</A>: 5.3 <A HREF="VM_17.htm">Huge Arrays</A>: 
+<A NAME="26236">
+ </A>
+Huge Array Utilities</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VM_17.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VM_19.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.2 Basic Huge Array Routines</A> 
+<!-- to next --> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>HugeArrayNext(), HugeArrayPrev(), HugeArrayExpand(), HugeArrayContract(), HugeArrayEnum(), HugeArrayCompressBlocks(), ECCheckHugeArray()</PRE>
+<P>
+The routines in the other section may be all you will need for using Huge Arrays. However, you can improve access time by taking advantage of the structure of a Huge Array. As noted above, you can use any of the VM Chain routines on a Huge Array, as long as none of the blocks are locked. </P>
+<P>
+<A NAME="IX_HugeArrayNext()">
+ </A>
+If you have been accessing an element in a Huge Array and you want to move
+on to the next one, you can call the routine <CODE>HugeArrayNext()</CODE>.
+The routine takes a pointer to a pointer to the element. It changes that
+pointer to point to the next element in the array, which may be in a
+different block. If the routine changes blocks, it will unlock the old block
+and lock the next one. It returns the number of consecutive elements starting
+with the element we just advanced to. If we were at the last element in the
+Huge Array, it returns zero and the pointer will point to the last element.</P>
+<P>
+<A NAME="IX_HugeArrayPrev()">
+ </A>
+If you want to move to the previous element instead of the next one, call
+<CODE>HugeArrayPrev()</CODE>. It also takes a pointer to a pointer to an
+element. It changes that pointer to a pointer to the previous element; if
+this means switching blocks, it unlocks the current block and locks the
+previous one. It returns the number of elements which come before the
+newly-locked one in its block, counting the newly-locked element. If the
+pointer was pointing to the first element in the Huge Array, it returns
+zero and the pointer will point to the first element.</P>
+<P>
+<A NAME="IX_HugeArrayExpand()">
+ </A>
+If you have a block of the Huge Array locked and you want to insert an element or elements at an address in that block, call the routine <CODE>
+HugeArrayExpand()</CODE>
+. It takes three arguments:</P>
+<UL>
+<LI>
+A pointer to a pointer to the location where we you want to insert the elements. This element must be in a locked block.</LI>
+<LI>
+The number of elements to insert, if the elements are uniform-sized; or the size of the element to insert, if elements are variable-sized.</LI>
+<LI>
+A pointer to a template to copy into each new element. If you pass a null pointer, elements will not be initialized.</LI>
+</UL>
+<P>
+The routine inserts the elements, dirtying any appropriate blocks. It writes a pointer to the first new element into the pointer passed. Since the data block may be resized or divided to accommodate the request, this address may be different from the one you pass. The routine returns the number of consecutive elements beginning with the one whose address was written. If the new element is in a different block from the address passed, the old block will be unlocked, and the new one will be locked.</P>
+<P>
+<A NAME="IX_HugeArrayContract()">
+ </A>
+If you have a block of a Huge Array locked and you want to delete one or more elements starting with one within the block, you can call <CODE>
+HugeArrayContract()</CODE>
+. This routine takes two arguments:</P>
+<UL>
+<LI>
+A pointer to the first element to be deleted. The block with that element must be locked.</LI>
+<LI>
+The number of elements to delete. Not all of these elements need be in the same block as the first.</LI>
+</UL>
+<P>
+The routine deletes the elements, dirtying any appropriate blocks. It then changes the pointer to point to the first element after the deleted ones. If this element is in a different block, it will unlock the old block and lock the new one. It returns the number of consecutive elements following the one whose address was written.</P>
+<P>
+<A NAME="IX_HugeArrayEnum()">
+ </A>
+You may wish to perform the same operation on a number of consecutive elements of a Huge Array. <CODE>
+HugeArrayEnum()</CODE>
+ is a routine which lets you do this efficiently. <CODE>
+HugeArrayEnum()</CODE>
+ takes six arguments:</P>
+<UL>
+<LI>
+The VMFileHandle of the VM file containing the Huge Array.</LI>
+<LI>
+The VMBlockHandle of the Huge Array.</LI>
+<LI>
+The index of the first element to be enumerated (remember, the first element has index zero).</LI>
+<LI>
+The number of elements to enumerate, or -1 to enumerate to the end of the array.</LI>
+<LI>
+A void pointer; this pointer will be passed to the callback routine.</LI>
+<LI>
+A void pointer to a Boolean callback routine. This callback routine should take two arguments: a void pointer to an element and the void pointerthat was passed to <CODE>
+HugeArrayEnum()</CODE>
+. The callback routine can abort the enumeration by returning <EM>
+true</EM>
+ (<EM>
+i.e.</EM>
+, non-zero).</LI>
+</UL>
+<P>
+<CODE>
+HugeArrayEnum()</CODE>
+ calls the callback routine for every element, in order, from the first element. It passes the callback a pointer to the element and the pointer passed to <CODE>
+HugeArrayEnum()</CODE>
+. The callback routine may not do anything which would invalidate any pointers to the Huge Array; for example, it may not allocate, delete, or resize any of the elements. The callback routine should restrict itself to examining elements and altering them (<EM>
+without</EM>
+ resizing them). The callback routine can abort the enumeration by returning <EM>
+true</EM>
+ (<EM>
+i.e.</EM>
+, non-zero); if it does so, <CODE>
+HugeArrayEnum()</CODE>
+ will return <EM>
+true</EM>
+. If <CODE>
+HugeArrayEnum()</CODE>
+ finishes the enumeration without aborting, it returns <EM>
+false</EM>
+ (<EM>
+i.e.</EM>
+, zero).</P>
+<P>
+If the count is large enough to take <CODE>
+HugeArrayEnum()</CODE>
+ past the end of the array, <CODE>
+HugeArrayEnum()</CODE>
+ will simply enumerate up to the last element, then stop. For example, if you pass a start index of 9,000 and a count of 2,000, but the Huge Array has only 10,000 elements, <CODE>
+HugeArrayEnum()</CODE>
+ will enumerate up through the last element (with index 9,999) then stop. However, the starting index <EM>
+must</EM>
+ be the index of an element in the Huge Array. You can also pass a count of -1, indicatingg that <CODE>
+HugeArrayEnum()</CODE>
+ should enumerate through the last element of the array. Therefore, to enumerate the entire array, pass a starting element of zero and a count of -1.<A NAME="marker=377703">
+ </A>
+<A NAME="marker=377704">
+ </A>
+<A NAME="marker=377705">
+ </A>
+</P>
+<P>
+<A NAME="IX_HugeArrayCompressBlocks()">
+ </A>
+As noted above, most Huge Arrays contain a fair amount of unused space. This makes it much faster to add and remove elements, since blocks don't need to be resized very often. However, if you have a Huge Array that is not frequently changed, this is an inefficient use of space. You can free this space by calling <CODE>
+HugeArrayCompressBlocks()</CODE>
+. This routine is passed two arguments: the handle of the VM file, and the <CODE>
+VMBlockHandle</CODE>
+ of the Huge Array. The routine does not change any element in the Huge Array; it simply resizes the directory and data blocks to be no larger than necessary to hold their elements. The routine does not return anything.</P>
+<P>
+<A NAME="IX_ECCheckHugeArray()">
+ </A>
+If you want to verify (in error-checking code) that a given VM block is the directory block of a Huge Array, you can call <CODE>
+ECCheckHugeArray()</CODE>
+. This routine is passed the VM file and block handles of the block in question. If the block is the directory block of a Huge Array, the routine returns normally; otherwise it causes a fatal error. The routine should not, therefore, be used in non-EC code.</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VM_17.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VM_19.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.2 Basic Huge Array Routines</A> 
+<!-- to next --> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

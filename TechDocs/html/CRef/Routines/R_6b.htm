@@ -1,0 +1,221 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: R_6b.htm,v 1.2 97/06/25 18:36:10 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE>GEOS C Routines: MemAlloc() ...</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+<DIV>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="R_6a.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">MakeWWFixed() ...</A> 
+<!-- to next --> | <A HREF="R_6c.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">MemDowngradeExclLock() ...</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</DIV>
+<DIV>
+<A NAME="IX_MemAlloc()">
+ </A>
+<H1 CLASS="refHeading">
+MemAlloc()</H1>
+<PRE CLASS="syntax">MemHandle MemAlloc(
+        word		byteSize,				/* Size of block in bytes */
+        HeapFlags		hfFlags,				/* Type of block */
+        HeapAllocFlags		haFlags);				/* How to allocate block */</PRE>
+<P>
+This routine allocates a global memory block and creates an entry for it in the global handle table. The properties of the block are determined by the <CODE>
+HeapFlags</CODE>
+ record passed; the way the block should be allocated is determined by the <CODE>
+HeapAllocFlags</CODE>
+ record. Both sets of flags are described below. The routine returns the block's handle. If it could not allocate the block, it returns a null handle. The block allocated may be larger than the size requested, as the block size is rounded up to the next even paragraph (one paragraph equals sixteen bytes).</P>
+<P>
+<CODE>
+HeapFlags</CODE>
+ are stored in the block's handle table entry. They can be retrieved with the routine <CODE>
+<A HREF="../../CRef/Routines/R_6c.htm#IX_MemGetInfo()">MemGetInfo()</A></CODE>
+; some of them can be changed with the routine <CODE>
+<A HREF="../../CRef/Routines/R_6e.htm#IX_MemModifyFlags()">MemModifyFlags()</A></CODE>
+. The following flags are available:</P>
+<DL>
+<DT>
+HF_FIXED</DT><DD>
+The block will not move from its place in the global heap until it is freed. If this flag is off, the memory manager may move the block while it is unlocked. If the flag is on, the block may not be locked, and HF_DISCARDABLE and HF_SWAPABLE must be off.</DD>
+<DT>
+HF_SHARABLE</DT><DD>
+The block may be locked by threads belonging to geodes other than the block's owner.</DD>
+<DT>
+HF_DISCARDABLE</DT><DD>
+The block may be discarded when unlocked.</DD>
+<DT>
+HF_SWAPABLE</DT><DD>
+The block may be swapped to extended/expanded memory or to the disk swap space when it is unlocked.</DD>
+<DT>
+HF_LMEM</DT><DD>
+The block contains a local memory heap. This flag is set automatically by <CODE>
+<A HREF="../../CRef/Routines/R_64.htm#IX_LMemInitHeap()">LMemInitHeap()</A></CODE>
+ and <CODE>
+<A HREF="../../CRef/Routines/R_a1.htm#IX_VMAllocLMem()">VMAllocLMem()</A></CODE>
+; applications should not need to set this flag.</DD>
+<DT>
+HF_DISCARDED</DT><DD>
+The memory manager turns this bit on when it discards a block. The bit is turned off when the block is reallocated.</DD>
+<DT>
+HF_SWAPPED</DT><DD>
+The memory manager turns this bit on when it swaps a block to extended/expanded memory or to the disk swap space. It turns the bit off when it swaps the block back into the global heap.</DD>
+</DL>
+<P>
+<CODE>
+HeapAllocFlags</CODE>
+ indicate how the block should be allocated and initialized. They are not stored and can not be retrieved. Some of the flags can be passed with <CODE>
+<A HREF="../../CRef/Routines/R_6e.htm#IX_MemReAlloc()">MemReAlloc()</A></CODE>
+. The following flags are available:</P>
+<DL>
+<DT>
+HAF_ZERO_INIT</DT><DD>
+The memory manager should initialize the block to null bytes. This flag may be passed to <CODE>
+<A HREF="../../CRef/Routines/R_6e.htm#IX_MemReAlloc()">MemReAlloc()</A></CODE>
+ to cause new memory to be zero-initialized.</DD>
+<DT>
+HAF_LOCK</DT><DD>The memory manager should lock the block after allocating it. To get the block's address, call <CODE>
+<A HREF="../../CRef/Routines/R_6b.htm#IX_MemDeref()">MemDeref()</A></CODE>
+. This flag may be passed to <CODE>
+<A HREF="../../CRef/Routines/R_6e.htm#IX_MemReAlloc()">MemReAlloc()</A></CODE>
+.</DD>
+<DT>
+HAF_NO_ERR</DT><DD>
+The memory manager should not return errors. If it cannot allocate block, GEOS will crash. Use of this flag is strongly discouraged. This flag may be passed to <CODE>
+<A HREF="../../CRef/Routines/R_6e.htm#IX_MemReAlloc()">MemReAlloc()</A></CODE>
+.</DD>
+<DT>
+HAF_UI</DT><DD>If both HAF_OBJECT_RESOURCE and HAF_UI are set, this block will be run by the application's UI thread.</DD>
+<DT>
+HAF_READ_ONLY</DT><DD>
+The block's data will not be modified. Useful for the debugger.</DD>
+<DT>
+HAF_OBJECT_RESOURCE</DT><DD>
+This block will be an object block.</DD>
+<DT>
+HAF_CODE</DT><DD>This block contains executable code.</DD>
+<DT>
+HAF_CONFORMING</DT><DD>
+If the block contains code, the code may be run by a less privileged entity. If the block contains data, the data may be accessed or altered by a less privileged entity.</DD>
+</DL>
+<P>
+If necessary, this routine will automatically compact the heap to find enough space to allocated the desired sized block.</P>
+<P CLASS="refField"><STRONG>
+Include:</STRONG>	<STRONG CLASS="fileName">
+heap.h</STRONG>
+ </P>
+<P CLASS="refField"><STRONG>
+See Also:</STRONG> <CODE><A HREF="../../CRef/Routines/R_6b.htm#IX_MemAllocSetOwner()">MemAllocSetOwner()</A></CODE>,
+<CODE><A HREF="../../CRef/Routines/R_6e.htm#IX_MemReAlloc()">MemReAlloc()</A></CODE>,
+<CODE><A HREF="../../CRef/Routines/R_6b.htm#IX_MemDeref()">MemDeref()</A></CODE>.</P>
+</DIV>
+<DIV>
+<A NAME="IX_MemAllocLMem()">
+ </A>
+<H1 CLASS="refHeading">
+MemAllocLMem()</H1>
+<PRE CLASS="syntax">MemHandle MemAllocLMem(
+        LMemType		type,				/* type of LMem block */
+        word		headerSize);				/* size of header structure */</PRE>
+<P>
+This routine allocates and initializes a local memory block; it can be used to simplify this procedure from the two-step process of <CODE>
+<A HREF="../../CRef/Routines/R_6b.htm#IX_MemAlloc()">MemAlloc()</A></CODE>
+ followed by <CODE>
+<A HREF="../../CRef/Routines/R_64.htm#IX_LMemInitHeap()">LMemInitHeap()</A></CODE>
+. Pass an LMem type indicating what will be stored in the block, along with the size of the header structure to use. If the block is to have the standard header, pass zero in <CODE>
+headerSize</CODE>
+.</P>
+<P>
+This routine returns the handle of the unlocked, newly allocated block. The block will contain two LMem handles and 64 bytes allocated for the LMem heap.</P>
+<P CLASS="refField"><STRONG>
+Include:</STRONG>	lmem.h</P>
+<P CLASS="refField"><STRONG>
+See Also:</STRONG> <CODE><A HREF="../../CRef/Routines/R_64.htm#IX_LMemInitHeap()">LMemInitHeap()</A></CODE>.</P>
+</DIV>
+<DIV>
+<A NAME="IX_MemAllocSetOwner()">
+ </A>
+<H1 CLASS="refHeading">
+MemAllocSetOwner()</H1>
+<PRE CLASS="syntax">MemHandle MemAllocSetOwner(
+        GeodeHandle		owner,				/* Handle of block's owner */
+        word		byteSize,				/* Size of block in bytes */
+        HeapFlags		hfFlags,				/* Type of block */
+        HeapAllocFlags		haFlags);				/* How to allocate block */</PRE>
+<P>
+This routine is the same as <CODE>
+<A HREF="../../CRef/Routines/R_6b.htm#IX_MemAlloc()">MemAlloc()</A></CODE>
+ except that you can specify the owner of the global memory block created.</P>
+<P CLASS="refField"><STRONG>
+Include:</STRONG>	heap.h</P>
+<P CLASS="refField"><STRONG>
+See Also:</STRONG> <CODE><A HREF="../../CRef/Routines/R_6b.htm#IX_MemAlloc()">MemAlloc()</A></CODE>.</P>
+</DIV>
+<DIV>
+<A NAME="IX_MemDecRefCount()">
+ </A>
+<H1 CLASS="refHeading">
+MemDecRefCount()</H1>
+<PRE CLASS="syntax">void	MemDecRefCount(
+        MemHandle		mh);				/* handle of affected block */</PRE>
+<P>
+This routine decrements the reference count of a global memory block (the reference count is stored in HM<CODE>
+_otherInfo</CODE>
+). If the reference count reaches zero, <CODE>
+MemDecRefCount()</CODE>
+ will free the block.</P>
+<P CLASS="refField"><STRONG>
+Warnings:</STRONG>	This routine assumes that a reference count is stored in HM<CODE>
+_otherInfo</CODE>
+. You may only use this routine if the block has had a reference count set up with <CODE>
+<A HREF="../../CRef/Routines/R_6c.htm#IX_MemInitRefCount()">MemInitRefCount()</A></CODE>
+.</P>
+<P CLASS="refField"><STRONG>
+Include:</STRONG>	heap.h</P>
+</DIV>
+<DIV>
+<A NAME="IX_MemDeref()">
+ </A>
+<H1 CLASS="refHeading">
+MemDeref()</H1>
+<PRE CLASS="syntax">void	* MemDeref(
+        MemHandle		mh);		/* Handle of locked block to dereference */</PRE>
+<P>
+This routine takes one argument, the handle of a global memory block; it returns the address of the block on the global heap. If the block has been discarded, or if the handle is not a memory handle, it returns a null pointer. It gets this information by reading the block's handle table entry; it does not need to actually access the block.</P>
+<P>
+Note that if the handle is of an unlocked, moveable block, <CODE>
+MemDeref()</CODE>
+ will return the block's address with out any warning; however, the address will be unreliable, since the memory manager can move the block at any time.</P>
+<P CLASS="refField"><STRONG>
+Include:</STRONG>	heap.h</P>
+<P CLASS="refField"><STRONG>
+Tips and Tricks:</STRONG>	This is very useful when you allocate a fixed or locked block, and need to get the block's address without calling <CODE>
+<A HREF="../../CRef/Routines/R_6d.htm#IX_MemLock()">MemLock()</A></CODE>
+.</P>
+<P CLASS="refField"><STRONG>
+Warnings:</STRONG>	This routine, if given an unlocked, moveable block, will return the pointer without a warning, even though that block may move at any time.</P>
+<P CLASS="refField"><STRONG>
+See Also:</STRONG> <CODE><A HREF="../../CRef/Routines/R_6c.htm#IX_MemGetInfo()">MemGetInfo()</A></CODE>,
+<CODE><A HREF="../../CRef/Routines/R_6e.htm#IX_MemModifyFlags()">MemModifyFlags()</A></CODE>.</P>
+</DIV>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="R_6a.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">MakeWWFixed() ...</A> 
+<!-- to next --> | <A HREF="R_6c.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">MemDowngradeExclLock() ...</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

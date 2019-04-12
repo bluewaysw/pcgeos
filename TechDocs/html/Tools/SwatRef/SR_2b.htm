@@ -1,0 +1,206 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: SR_2b.htm,v 1.1 97/06/27 16:00:43 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE>Swat Command Reference: stream ...</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="SR_2a.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">stdpaths ...</A> 
+<!-- to next --> | <A HREF="SR_2c.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">symbolCompletion ...</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+
+
+<H1 CLASS="refHeading">
+<A NAME="IX_Files:manipulating host machine files with Swat">
+ </A>
+<A NAME="IX_stream Swat command">
+ </A>
+stream</H1>
+
+<PRE CLASS="syntax">stream open &lt;file&gt; (r|w|a|r+|w+)
+stream read (line|list|char) &lt;stream&gt;
+stream print &lt;list&gt; &lt;stream&gt;
+stream write &lt;string&gt; &lt;stream&gt;
+stream rewind &lt;stream&gt;
+stream seek (&lt;posn&gt;|+&lt;incr&gt;|-&lt;decr&gt;|end) &lt;stream&gt;
+stream state &lt;stream&gt;
+stream eof &lt;stream&gt;
+stream close &lt;stream&gt;
+stream flush &lt;stream&gt;
+stream watch &lt;stream&gt; &lt;what&gt; &lt;procName&gt;
+stream ignore &lt;stream&gt;</PRE>
+<P CLASS="refField"><STRONG>
+Examples:</STRONG>	</P>
+<DL>
+<DT>
+&quot;var s [stream open kmap.def w]&quot; </DT><DD>
+Open the file &quot;kmap.def&quot; for writing, creating it if it wasn't there before, and truncating any existing file.</DD>
+<DT>
+ &quot;stream write $line $s&quot; </DT><DD>
+Write the string in $line to the open stream.</DD>
+
+
+</DL>
+<P>
+This allows you to read, write, create, and otherwise manipulate files on the host machine from Swat.</P>
+
+<UL>
+<LI>
+Subcommands may be abbreviated uniquely. </LI>
+<LI>
+Streams are a precious resource, so you should be sure to always close them when you are done. This means stream access should usually be performed under the wings of a &quot;protect&quot; command so the stream gets closed even if the user types Ctrl+C. </LI>
+<LI>
+Swat's current directory changes as you change stack frames, with the directory always being the one that holds the executable file for the patient to which the function in the current frame belongs. If the &lt;file&gt; given to &quot;stream open&quot; isn't absolute, it will be affected by this. </LI>
+<LI>
+The global variable file-init-dir contains the absolute path of the directory in which Swat was started. It can be quite useful when forming the &lt;file&gt; argument to &quot;stream open&quot;.</LI>
+<LI>
+The second argument to &quot;stream open&quot; is the access mode of the file. The meanings of the 5 possible values are:</LI>
+<DL>
+<DT>
+           <STRONG>
+r</STRONG>
+ </DT><DD>read-only access. The &lt;file&gt; must already exist.</DD>
+<DT>
+          <STRONG>
+ w</STRONG>
+</DT><DD> write-only access. If &lt;file&gt; doesn't already exist, it will be created. If it does exist, it will be truncated.</DD>
+<DT>
+           <STRONG>
+a</STRONG>
+ </DT><DD>append mode. The file is opened for writing only. If &lt;file&gt; doesn't already exist, it will be created. If it does exist, writing will commence at its end.</DD>
+<DT>
+           <STRONG>
+r+</STRONG>
+ </DT><DD>read/write. The &lt;file&gt; must already exist. A single read/write position is maintained, and it starts out at the start of the file. </DD>
+<DT>
+          <STRONG>
+w+</STRONG>
+ </DT><DD>read/write. If &lt;file&gt; doesn't already exist, it will be created. If it does exist, it will be truncated. A single read/write position is maintained, and it starts out at the start of the file.</DD>
+</DL>
+<LI>
+&quot;stream read&quot; can read data from the stream in one of three formats:</LI>
+<DL>
+<DT>
+           <STRONG>
+line</STRONG>
+ </DT><DD>Returns all the characters from the current position up to the first newline or the end of the file, whichever comes first. The newline, if seen, is placed at the end of the string as \n. Any other non-printable characters or backslashes are similarly escaped.</DD>
+<DT>
+            <STRONG>
+list</STRONG>
+ </DT><DD>Reads a single list from the stream, following all the usual rules of Tcl list construction. If the character at the current read position is a left brace, this will read to the matching right brace, bringing in newlines and other whitespace. If there is whitespace at the initial read position, it is skipped. Standard Tcl comments before the start of the list are also skipped over (so if the first non-whitespace character encountered is #, the characters up to the following newline or end-of-file will also be skipped).</DD>
+<DT>
+            <STRONG>
+char</STRONG>
+ </DT><DD>This reads a single character from the stream. If the character isn't printable ASCII, it will be returned as one of the regular Tcl backslash escapes.</DD>
+</DL>
+<P>
+	 If there's nothing left to read, you will get an empty string back.</P>
+<LI>
+&quot;stream write&quot; writes the string exactly as given, without interpreting backslash escapes. If you want to include a newline or something of the sort in the string, you'll need to use the &quot;format&quot; command to generate the string, or place the whole thing in braces and have the newlines in there literally. </LI>
+<LI>
+While the syntax for &quot;stream print&quot; is the same as for &quot;stream write&quot;, there is a subtle difference between the two. &quot;stream write&quot; will write the string as it's given, while &quot;stream print&quot; is intended to write out data to be read back in by &quot;stream read list&quot;. Thus the command</LI>
+<PRE> stream write {foo biff} $s</PRE>
+<P>
+	 would write the string &quot;foo biff&quot; to the stream. In contrast,</P>
+<PRE> stream print {foo biff} $s</PRE>
+<P>
+	 would write &quot;{foo biff}&quot; followed by a newline.</P>
+<LI>
+To ensure that all data you have written has made it to disk, use the &quot;stream flush&quot; command. Nothing is returned. </LI>
+<LI>
+ &quot;stream rewind&quot; repositions the read/write position at the start of the stream. &quot;stream seek&quot; gives you finer control over the position. You can set the stream to an absolute position (obtained from a previous call to &quot;stream seek&quot;) by passing the byte number as a decimal number. You can also move forward or backward in the file a relative amount by specifying the number of bytes to move, preceded by a &quot;+&quot;, for forward, or a &quot;-&quot;, for backward. Finally, you can position the pointer at the end of the file by specifying a position of &quot;end&quot;. </LI>
+<LI>
+&quot;stream seek&quot; returns the new read/write position, so a call of &quot;stream seek +0 $s&quot; will get you the current position without changing anything. If the seek couldn't be performed, -1 is returned. </LI>
+<LI>
+&quot;stream state&quot; returns one of three strings: &quot;error&quot;, if there's been some error accessing the file, &quot;eof&quot; if the read/write position is at the end of the file, or &quot;ok&quot; if everything's fine. &quot;stream eof&quot; is a shortcut for figuring if you've reached the end of the file. </LI>
+<LI>
+&quot;stream close&quot; shuts down the stream. The stream token should never be used again. </LI>
+<LI>
+&quot;stream watch&quot; and &quot;stream ignore&quot; are valid only on UNIX and only make sense if the stream is open to a device or a socket. &quot;stream watch&quot; causes the procedure &lt;procName&gt; to be called whenever the stream is ready for the access indicated by &lt;what&gt;, which is a list of conditions chosen from the following set:</LI>
+<DL>
+<DT>
+           <STRONG>
+read</STRONG>
+</DT><DD> the stream has data that may be read.</DD>
+<DT>
+            <STRONG>
+write</STRONG>
+ </DT><DD>the stream has room for data to be written to it.</DD>
+</DL>
+<P>
+	 When the stream is ready, the procedure is called:</P>
+<PRE> &lt;procName&gt; &lt;stream&gt; &lt;what&gt;</PRE>
+<P>
+	 where &lt;what&gt; is the list of operations for which the stream is ready.</P>
+</UL>
+<P CLASS="refField"><STRONG>
+See Also:</STRONG> <A HREF="../../Tools/Tcl/TTCL_d.htm#IX_protect Tcl command">protect</A>,
+<A HREF="../../Tools/Tcl/TTCL_d.htm#IX_source Tcl command">source</A>,
+<A HREF="../../Tools/Tcl/TTCL_d.htm#IX_file Tcl command">file</A>.
+
+
+
+<H1 CLASS="refHeading">
+<A NAME="IX_Patients:switching">
+ </A>
+<A NAME="IX_Threads:switching">
+ </A>
+<A NAME="IX_switch Swat command:command reference">
+ </A>
+switch</H1>
+
+<PRE CLASS="syntax">switch &lt;thread-id&gt;
+switch [&lt;patient&gt;] [:&lt;thread-num&gt;]</PRE>
+<P CLASS="refField"><STRONG>
+Examples:</STRONG>	</P>
+<DL>
+<DT>
+&quot;switch 3730h&quot;</DT><DD>
+Switches swat's current thread to be the one whose handle ID is 3730h.</DD>
+<DT>
+ &quot;switch :1&quot;</DT><DD> Switches Swat's current thread to be thread number 1 for the current patient.</DD>
+<DT>
+ &quot;switch parallel:2&quot; </DT><DD>
+Switches Swat's current thread to be thread number 2 for the patient &quot;parallel&quot;</DD>
+<DT>
+ &quot;switch write&quot; </DT><DD>
+Switches Swat's current thread to be thread number 0 (the process thread) for the patient &quot;write&quot;</DD>
+<DT>
+ &quot;switch&quot;</DT><DD> Switches Swat's current thread to be the current thread on the PC.</DD>
+
+
+</DL>
+<P>
+Switches between applications/threads.</P>
+
+<UL>
+<LI>
+Takes a single argument of the form &lt;patient&gt;:&lt;thread-num&gt; or &lt;threadID&gt;. With the first form, :&lt;thread-num&gt; is optional -- if the patient has threads, the first thread is selected. To switch to another thread of the same patient, give just :&lt;thread-num&gt;. You can also switch to a patient/thread by specifying the thread handle ID. NOTE: The switch doesn't happen on the PC--just inside swat.</LI>
+<LI>
+If you don't give an argument, it switches to the actual current thread in the PC.</LI>
+</UL>
+
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="SR_2a.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">stdpaths ...</A> 
+<!-- to next --> | <A HREF="SR_2c.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">symbolCompletion ...</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

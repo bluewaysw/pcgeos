@@ -1,0 +1,233 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Socket_1.htm,v 1.1 97/06/02 14:14:27 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Introduction</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="sectionTitle">
+<A HREF="index.htm">Socket</A>: 1 
+<A NAME="74117">
+ </A>
+Introduction</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="index.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">Socket</A> 
+<!-- to next --> | <A HREF="Socket_2.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2 Simple Example</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+<A NAME="IX_Socket library">
+ </A>
+The Socket library manages communications both between machines and between threads on the same machine. It provides a level of abstraction above individual communication protocols (<EM>
+e.g.</EM>
+, IrLMP, TCP/IP). Programs using the Socket library can send and receive information packets without knowing much about the communications protocol by which those packets are being transmitted. Also, programs using the Socket library need not know about the hardware communication ports used -- whether communication is being carried out over an IR serial port, a modem, or a network connection -- the API is the same. </P>
+<P>
+<A NAME="IX_SDT_&ldots;">
+ </A>
+<A NAME="IX_SocketDeliveryType">
+ </A>
+The Socket library supports different &quot;delivery types&quot;-- different levels of reliability in transmitting data. There is a trade-off: the more reliable delivery types require more set-up work by the programs using them. The following delivery types are available:</P>
+<DL>
+<DT>
+<STRONG>
+Datagram</STRONG>
+</DT><DD>Unreliable transmission of discrete packets. Packets may arrive out of order or not at all. It is up to the data sender to determine if re-transmission is necessary. This is the least demanding delivery type to set up, because it doesn't require any two-way connection.</DD>
+<DT>
+<STRONG>
+Sequenced Packet</DT><DD>
+</STRONG>
+Sequenced Packet delivery means reliable transmission of discrete packets. The packets arrive in the order sent. The Socket library manages error checking and re-transmissions, as necessary. The program using a sequenced packet socket is responsible for establishing a two-way communications connection.</DD>
+<DT>
+<STRONG>
+Stream</STRONG>
+</DT><DD>Stream delivery means the reliable transmission of a stream of bytes, as opposed to other delivery types which require that data be broken up into packets. The Socket library manages a stream of bytes, breaking it up into packets, transmitting the packets, and reconstructing the byte stream from packets on the other side. The Socket library also manages error-checking and re-transmission, as necessary. The program using a stream socket is responsible for establishing a two-way communications connection.</DD>
+
+</DL>
+<H4 CLASS="HeadingD">
+Addresses</H4>
+<P>
+Each side of the connection is represented by an address. An address is made up of several parts:</P>
+<DL>
+<DT>
+<STRONG>
+Domain</STRONG>
+</DT><DD>The network over which the connection is being made. Domains include TCP/IP, IRLAP, and &quot;loopback&quot; (used for connections between two threads on the same machine).</DD>
+<DT>
+<STRONG>
+Address Data</DT><DD>
+</STRONG>
+This data identifies a machine on a network domain. The format of the address depends on the domain. In the case of TCP/IP, a sample address might be the string &quot;geoworks.com&quot;. IrLAP addresses are 32-bit numbers. If the domain is &quot;loopback&quot;, then no address information is necessary -- the sending and receiving machines are one and the same.</DD>
+<DT>
+<STRONG>
+Port</STRONG>
+</DT><DD>This token identifies one side of a connection within one machine. Ports allow multiple data sockets to operate over one connection. Thus, connecting to &quot;geoworks.com&quot;, one might send mail messages using port 25 and file-transfer commands via port 21. Port numbers are either 16-bit or 32-bit, depending on the domain.</DD>
+</DL>
+<P>
+The amount of overhead associated with sending and receiving data depends upon the devices involved, the domain, and the delivery type. When testing, experiment with different domains (if available), delivery types, and packet sizes to find a good balance of reliability and rapidity.</P>
+<P>
+For any domain, there may be more than one address format. For instance, the TCP/IP address &quot;geoworks.com&quot; is conveniently human-readable, but cannot be used at the socket level to actually make a connection. Instead, you must resolve &quot;geoworks.com&quot; to a 32-bit address number. All socket operations require &quot;primitive&quot; addresses -- addresses resolved to their simplest form. To resolve an address, call <CODE>
+SocketResolve()</CODE>
+. We will discuss the details of working with addresses in more detail below.</P>
+
+
+<H4 CLASS="HeadingD">
+Errors</H4>
+<P>
+Many of the Socket library routines return error values. Sometimes these error values are return values of routines; if you call a routine that can return an error value, be sure to check the return value and react appropriately to errors. Some routines don't return an error value directly, instead returning a flag to indicate that something has gone wrong. To find out exactly what went wrong, call <CODE>
+ThreadGetError()</CODE>
+. </P>
+<P>
+Those Socket library routines that return error values do not set the thread error value. Calling <CODE>
+ThreadGetError()</CODE>
+ after calling such a routine would not detect any error encountered by that routine.</P>
+<P>
+<CODE>
+ThreadGetError()</CODE>
+ returns a word-sized value. The low byte of this word is a <CODE>
+SocketError</CODE>
+ value; the high byte is a <CODE>
+SpecSocketDrError</CODE>
+ value. If the returned word is zero, that means that there was no error. </P>
+<P>
+<A NAME="IX_SSDE_&ldots;">
+ </A>
+<A NAME="IX_SpecSocketDrError values">
+ </A>
+In general, a <CODE>
+SpecSocketDrError</CODE>
+ value indicates a low-level error, and a <CODE>
+SocketError</CODE>
+ value indicates a high-level error. In many cases, there will be a <CODE>
+SocketError</CODE>
+ in the low byte, but the high byte will be clear -- there was no problem with the low-level communication medium, but a protocol exception may have occurred.</P>
+<P>
+In general, only the low byte (the <CODE>
+SocketError</CODE>
+ value) is useful in determining how to handle the exception. The high byte might affect what error message is displayed to the user. For example, it probably doesn't matter to your program whether the high byte was SSDE_LINE_BUSY or SSDE_NO_DIALTONE. In either case, it just means that communication could not be established. However, users might want to know the nature of the problem so that they can figure out how fix it.</P>
+<P>
+<A NAME="IX_SocketError">
+ </A>
+<A NAME="IX_SE_&ldots;">
+ </A>
+Some of the more common <CODE>
+SocketError</CODE>
+ values are listed below. In addition, certain routines may make use of other <CODE>
+SocketError</CODE>
+ values, which will be discussed with those routines.</P>
+<DL>
+<DT>
+SE_NORMAL</DT><DD>
+There is no error. SE_NORMAL is guaranteed to equal zero.</DD>
+<DT>
+SE_OUT_OF_MEMORY</DT><DD>
+The Socket library ran out of memory. Perhaps it was trying to receive or send a data packet that was too large.</DD>
+<DT>
+SE_SOCKET_IN_USE</DT><DD>
+The socket was busy doing something else. Perhaps you tried to connect it, but it was already connected.</DD>
+<DT>
+SE_SOCKET_BUSY</DT><DD>
+The socket was temporarily busy doing something else. Perhaps you should try again a few times.</DD>
+<DT>
+SE_MEDIUM_BUSY</DT><DD>
+The hardware port which would be used to carry out the requested operation was busy. You might wait for the hardware port to become free; you could call <CODE>
+SocketCheckMediumConnection()</CODE>
+ to see if the port is being used for a socket connection.</DD>
+<DT>
+SE_ALL_PORTS_BUSY</DT><DD>
+To carry out the requested operation, the Socket library tried to use a port number; however all port numbers were already busy. </DD>
+<DT>
+SE_SOCKET_NOT_BOUND</DT><DD>
+The socket was not bound (<EM>
+i.e.</EM>
+, associated with a port number), but needed to be bound to carry out the requested operation. To bind a socket, call <CODE>
+SocketBind()</CODE>
+.</DD>
+<DT>
+SE_SOCKET_NOT_LISTENING</DT><DD>
+The socket wasn't listening for incoming connections, and needed to be in this state to carry out the requested operation. To make a socket listen, call <CODE>
+SocketListen()</CODE>
+.</DD>
+<DT>
+SE_SOCKET_LISTENING</DT><DD>
+The socket was busy listening for incoming connections when you asked it to carry out another operation. Remember that you often want separate sockets to handle listening and data transfer.</DD>
+<DT>
+SE_SOCKET_NOT_CONNECTED</DT><DD>
+The socket was not connected, but a connection is required for the operation you requested. To connect the socket, call <CODE>
+SocketConnect()</CODE>
+.</DD>
+<DT>
+SE_SOCKET_CLOSED</DT><DD>
+The socket was closed, making the requested operation impossible.</DD>
+<DT>
+SE_CONNECTION_CLOSED</DT><DD>
+The other side of your socket's connection has closed that connection; to close up your side of the connection, call <CODE>
+SocketClose()</CODE>
+. </DD>
+<DT>
+SE_CONNECTION_FAILED</DT><DD>
+The connection was lost, probably due to some low-level link failure. There may have been a problem with the physical connection or with the domain-specific software.</DD>
+<DT>
+SE_CONNECTION_RESET</DT><DD>
+The connection was lost, probably due to this side of the connection intentially making a low-level disconnection; <EM>
+e.g.</EM>
+, the sort of disconnection that results from <CODE>
+SocketCloseDomainMedium()</CODE>
+ or the Socket's owning thread exiting.</DD>
+<DT>
+SE_TIMED_OUT</DT><DD>
+The Socket library was unable to carry out the requested operation before the time-out time was reached. Beware: Depending on the domain, for certain phases of certain operations, there may be low-level time-outs which can occur even if you have specified a longer or an infinite time-out. </DD>
+<DT>
+SE_CANT_LOAD_DRIVER</DT><DD>
+The Socket library was unable to load a driver necessary to carry out the requested operation.</DD>
+<DT>
+SE_UNKNOWN_DOMAIN</DT><DD>
+The Socket library didn't recognize the domain name.</DD>
+<DT>
+SE_DESTINATION_UNREACHABLE</DT><DD>
+The requested destination address was unreachable over the network.</DD>
+<DT>
+SE_LINK_FAILED</DT><DD>
+The low-level link used for this connection failed or could not be established. There may have been a problem with the physical connection or with the domain-specific software.</DD>
+<DT>
+SE_SYSTEM_SHUTDOWN</DT><DD>
+This error signals that GEOS is shutting down. Your program should probably either end its connections gracefully or attempt to delay the shutdown. Note that it is possible for a shutdown to occur without generating this signal.</DD>
+<DT>
+SE_INFO_NOT_AVAILABLE</DT><DD>
+The requested information was not available. </DD>
+<DT>
+SE_DOMAIN_REQUIRES_16BIT_PORTS</DT><DD>
+You tried to use a 32-bit port number in a domain that does not support them. Use MANUFACTURER_ID_SOCKET_16BIT_PORT as the <CODE>
+ManufacturerID</CODE>
+ of your port number.</DD>
+<DT>
+SE_INTERRUPT</DT><DD>
+The operation was stymied by <CODE>
+SocketInterrupt()</CODE>
+.</DD>
+<DT>
+SE_INTERNAL_ERROR</DT><DD>
+The Socket library did something wrong. You should take advantage of whatever developer support to which you have access. They will want a back-trace and other information necessary to duplicate the error.</DD>
+
+</DL>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="index.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">Socket</A> 
+<!-- to next --> | <A HREF="Socket_2.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2 Simple Example</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

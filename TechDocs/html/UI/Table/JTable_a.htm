@@ -1,0 +1,404 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: JTable_a.htm,v 1.2 97/09/05 14:42:08 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Editing Cells</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The Table Objects</A>: 4.3 <A HREF="JTable_7.htm">Using a Table Object</A>: 
+<A NAME="33610">
+ </A>
+Editing Cells</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="JTable_7.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="JTable_9.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.2 Selecting Cells</A> 
+<!-- to next --> | <A HREF="JTable_b.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.4 Dragging and Dropping</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>TableEditCellTextParams, MSG_TABLE_START_EDIT_CELL_TEXT, MSG_TABLE_DONE_EDIT_CELL_TEXT, MSG_TABLE_STOP_CELL_EDIT</PRE>
+<P>
+The <CODE>
+Table</CODE>
+ objects make it easy for the user to edit cells. If the column has TCF_DOUBLE_SELECT enabled, a user can edit a cell in the column just by double-clicking on it. When the user does this, the <CODE>
+Table</CODE>
+ object will take the following steps:</P>
+<OL>
+<LI>
+First, it sends itself <CODE>
+MSG_TABLE_START_EDIT_CELL_TEXT</CODE>
+. The default handler causes the <CODE>
+Table</CODE>
+ object to create a <CODE>
+VisText</CODE>
+ under the TableContent which the user can enter text in.</LI>
+<LI FIXME_NumListOther>
+When the user has finished entering the text, and closes the <CODE>
+VisText (by pressing </CODE>
+ENTER<CODE>
+)</CODE>
+, the <CODE>
+Table</CODE>
+ object sends itself <CODE>
+MSG_TABLE_DONE_EDIT_CELL_TEXT</CODE>
+, passing along the text that the user entered in the <CODE>
+VisText</CODE>
+. The application should store the text wherever it stores the <CODE>
+Table</CODE>
+'s data.<BR>
+If the user finishes editing by clicking in another cell, a <CODE>
+MSG_TABLE_STOP_CELL_EDIT</CODE>
+ is generated and the edit is cancelled. (If your program does not wish to cancel the edit under these circumstances, then intercept the message.)</LI>
+<LI FIXME_NumListOther>
+Finally, the <CODE>
+Table</CODE>
+ sends itself a <CODE>
+MSG_TABLE_QUERY_DRAW</CODE>
+ for the cell which was edited. The application should intercept this message and redraw the cell normally.</LI>
+</OL>
+<P>
+<A NAME="83564">
+ </A>
+Both <CODE>
+MSG_TABLE_START_EDIT_CELL_TEXT</CODE>
+ and <CODE>
+MSG_TABLE_DONE_EDIT_CELL_TEXT</CODE>
+ use a special structure, the <CODE>
+TableEditCellTextParams</CODE>
+ structure; the structure's fields have slightly different meanings for each message. This structure has the following definition:</P>
+<PRE>typedef struct {
+	TableCellRange			TECT_cells;
+	MemHandle			TECT_text;
+	word			TECT_length;
+} TableEditCellTextParams;</PRE>
+<DL>
+<DT>
+TECT<CODE>
+_cells</CODE>
+</DT><DD>This is a <CODE>
+TableCellRange</CODE>
+ structure (described on <A HREF="JTable_9.htm#54602"> A TableCellRange structure is used to specify a range of cells. It has the following definition:</A>
+), specifying what cells have been selected for editing. If a single cell has been selected for editing, TCR<CODE>
+_start</CODE>
+ will be the same as TCR<CODE>
+_end</CODE>
+.</DD>
+<DT>
+TECT<CODE>
+_text</CODE>
+</DT><DD>This is the handle of a global memory block, containing the text in the cell.</DD>
+<DT>
+TECT<CODE>
+_length</CODE>
+</DT><DD>This is the length of the string in TECT<CODE>
+_text</CODE>
+, or zero if the string is null-terminated.</DD>
+</DL>
+<P>
+<CODE>
+MSG_TABLE_START_EDIT_CELL_TEXT</CODE>
+ creates a VisText object (within the TableContent and over the cell to be edited) to allow the user to edit the cell's text. This message passes a set of <CODE>
+TableEditCellTextParams</CODE>
+ containing the cell range being edited (TECT<CODE>
+_cells</CODE>
+) and the initial text to display to the user (if any) in TECT<CODE>
+_text</CODE>
+ and TECT<CODE>
+_length</CODE>
+. This text object, which may be referenced via <CODE>
+TI_textObj</CODE>
+, can persist between edits. Thus, if you change its instance data, be aware that these changes may or may not linger in future edits. You may wish to update any changes in your <CODE>
+MSG_TABLE_START_EDIT_CELL_TEXT</CODE>
+ handler.</P>
+<P>
+The default handler clears both TECT<CODE>
+_text</CODE>
+ and TECT<CODE>
+_length</CODE>
+. Your application may subclass the message, and fill in these fields with default text for the <CODE>
+VisText</CODE>
+ (e.g., you may want to retrieve the text currently in the specified cell and display that to be edited). If TECT<CODE>
+_text</CODE>
+ contains a null handle, the <CODE>
+VisText</CODE>
+ will start out blank.
+<IMG SRC="JTable_a_editCell.gif">
+
+</P>
+<P>
+To provide this default text, allocate a global memory block, copy the string into the beginning of the block, and put the block's handle in TECT<CODE>
+_text</CODE>
+. (You should not store anything else in this block, because the block will be freed by the handler for MSG_TABLE_DONE_EDIT_CELL_TEXT.) If a valid handle was not passed in TECT<CODE>
+_text</CODE>
+, it allocates a global memory block for the <CODE>
+VisText</CODE>
+ to write to; otherwise, the <CODE>
+VisText</CODE>
+ will simply write to the block specified in TECT<CODE>
+_text</CODE>
+ (overwriting the original text).</P>
+<P CLASS="figTitle">
+Code Display 5-3 Handling MSG_TABLE_START_EDIT_CELL_TEXT</P>
+<PRE>@method CoffeeTableClass, MSG_TABLE_START_EDIT_CELL_TEXT
+{
+    char *cellData, *textPtr;
+    word cArrayIndex, size;</PRE>
+<PRE>    cArrayIndex = (params.TECT_cells.TCR_start.TCL_row * TABLE_COLS) +
+		params.TECT_cells.TCR_start.TCL_column;</PRE>
+<PRE>    /* The superclass will free this block that we allocate here. */</PRE>
+<PRE>    params.TECT_text = MemAlloc(CELL_DATA_LENGTH, HF_SWAPABLE, HAF_LOCK);
+    textPtr = MemDeref(params.TECT_text);</PRE>
+<PRE>    /* Retrieve the current data from the cell and stuff it in the memory block. */</PRE>
+<PRE>    pself = ObjDerefVis(oself);
+    MemLock(OptrToHandle(pself-&gt;CTI_chunkArray);</PRE>
+<PRE>    cellData = ChunkArrayElementToPtr((pself-&gt;CTI_chunkArray),
+				cArrayIndex, &amp;size);
+    strcpy(textPtr, cellData);</PRE>
+<PRE>    MemUnlock(OptrToHandle(pself-&gt;CTI_chunkArray));</PRE>
+<PRE>    params.TECT_length = 0;				/* Zero indicates null-termination. */</PRE>
+<PRE>    @callsuper();
+}</PRE>
+<P>
+When the user has finished entering text, the <CODE>
+VisText</CODE>
+ object sends the Table object MSG_TABLE_DONE_EDIT_CELL_TEXT. This message takes one argument, a <CODE>
+TableEditCellTextParams</CODE>
+ structure. The TECT<CODE>
+_text</CODE>
+ field will contain the handle of a global memory block, containing the text the user has entered.The application should intercept the message, so it can store the new text; afterwards, it should call the default handler, which will free the memory block specified by TECT<CODE>
+_text</CODE>
+ and perform other bookkeeping chores. The Table object will automatically send an appropriate <CODE>
+MSG_TABLE_QUERY_DRAW</CODE>
+, so the cell will be redrawn with the new contents.</P>
+<P>
+Note that the Table object supports allowing the user to edit several cells at once. If you choose to allow this, you must decide what the functionality is; that is, in your handler for MSG_TABLE_START_EDIT_CELL_TEXT, you must decide what cell's text to display in the <CODE>
+VisText</CODE>
+ (e.g. the first cell's text, or a composite of all the selected cells's text); and in your handler for MSG_TABLE_DONE_EDIT_CELL_TEXT, you must decide where and how to store the entered text (e.g. whether to overwrite all the edited cells with the same text, divide the entered text amongst the cells, etc.).</P>
+<P CLASS="figTitle">
+Code Display 5-4 Handling MSG_TABLE_DONE_EDIT_CELL_TEXT</P>
+<PRE>@method CoffeeTableClass, MSG_TABLE_DONE_EDIT_CELL_TEXT
+{
+    char *cellData, *textPtr;
+    word cArrayIndex, size;</PRE>
+<PRE>    cArrayIndex = (params.TECT_cells.TCR_start.TCL_row * TABLE_COLS) +
+		params.TECT_cells.TCR_start.TCL_column;</PRE>
+<PRE>    textPtr = MemLock(params.TECT_text);</PRE>
+<PRE>    /* Make sure we're null terminated ... */</PRE>
+<PRE>    textPtr[CELL_DATA_LENGTH -1]; = (char)0;</PRE>
+<PRE>    /* Lock down the cell and copy the string to it. */</PRE>
+<PRE>    MemLock(OptrToHandle(pself-&gt;CTI_chunkArray));</PRE>
+<PRE>    cellData = ChunkArrayElementToPtr((pself-&gt;CTI_chunkArray),
+		cArrayIndex, &amp;size);</PRE>
+<PRE>    strcpy(cellData, textPtr);
+    MemUnlock(OptrToHandle(pself-&gt;CTI_chunkArray));</PRE>
+<PRE>    @callsuper();
+}</PRE>
+
+<H4 CLASS="RefETitle">
+MSG_TABLE_START_EDIT_CELL_TEXT</H4>
+<PRE CLASS="syntax">void	MSG_TABLE_START_EDIT_CELL_TEXT(
+        TableEditCellTextParams			params);</PRE>
+<P>
+The <CODE>
+Table</CODE>
+ object sends itself this message when the user starts editing a cell. The default handler brings up a <CODE>
+VisText</CODE>
+ for the user to enter text. You should intercept this message, so you can look up and provide the cell's current contents; that way, the contents will be put in the <CODE>
+VisText</CODE>
+ for the user to edit.</P>
+<P CLASS="refField">
+Source:	Any <CODE>
+Table</CODE>
+ object.</P>
+<P CLASS="refField">
+Destination:	The <CODE>
+Table</CODE>
+ sends this message to itself.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+params.</CODE>
+TECT<CODE>
+_cells<BR>
+</CODE>
+This field specifies the cell or cells the user is editing.</P>
+<DL>
+<DT>
+<CODE>
+params.</CODE>
+TECT<CODE>
+_text</CODE>
+ </DT><DD>This field contains the handle of a global memory block, containing the text to be displayed in the <CODE>
+VisText</CODE>
+ when it is brought up. When this message is sent, <CODE>
+params.</CODE>
+TECT<CODE>
+_text</CODE>
+ contains a null handle; your subclass's handler may allocate a global memory block, copy the text into that block, and write the handle here. (Note that the <CODE>
+VisText</CODE>
+ will write to the block you specify, so it should not contain any other data.)</DD>
+<DT>
+<CODE>
+params.</CODE>
+TECT<CODE>
+_length</DT><DD>
+</CODE>
+This is the length (in bytes) of the string in the block specified by <CODE>
+params.</CODE>
+TECT<CODE>
+_text</CODE>
+. If this field is zero, the string is null-terminated.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing. (If <CODE>
+params.</CODE>
+TECT<CODE>
+_text</CODE>
+ contained a null handle, the default handler will allocate a block.)</P>
+<P CLASS="refField">
+Structures:	<CODE>
+TableEditCellTextParams</CODE>
+ (see <A HREF="JTable_a.htm#83564"> Both MSG_TABLE_START_EDIT_CELL_TEXT and MSG_TABLE_DONE_EDIT_CELL_TEXT use a special structure, the TableEditCellTextParams structure; the structure's fields have slightly different meanings for each message. This structure has the following defi</A>
+).</P>
+<P CLASS="refField">
+Interception:	You should intercept this message to provide the text for the <CODE>
+VisText</CODE>
+ to present for editing (which will usually be the current contents of the cell being edited). After this, you should call the default handler with <CODE>
+@callsuper</CODE>
+, so the <CODE>
+VisText</CODE>
+ can be created.</P>
+<P CLASS="refField">
+Warnings:	If you put a memory handle in <CODE>
+params.</CODE>
+TECT<CODE>
+_text</CODE>
+, that block will be written to by the <CODE>
+VisText</CODE>
+, and freed by the handler for MSG_TABLE_DONE_EDIT_CELL_TEXT; so make sure it doesn't contain any other data.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_TABLE_DONE_EDIT_CELL_TEXT</H4>
+<PRE CLASS="syntax">void	MSG_TABLE_DONE_EDIT_CELL_TEXT(
+        TableEditCellTextParams				params);</PRE>
+<P>
+The <CODE>
+VisText</CODE>
+ object sends this message to the Table object after the user has finished entering data. The application should intercept this message to copy data into its storage location; you should also make sure to call the default handler, which will remove the <CODE>
+VisText</CODE>
+ and perform other bookkeeping chores.</P>
+<P CLASS="refField">
+Source:	This message is sent by a <CODE>
+VisText</CODE>
+ object used by the <CODE>
+Table</CODE>
+ for text editing.</P>
+<P CLASS="refField">
+Destination:	The <CODE>
+VisText</CODE>
+ sends this message to its parent <CODE>
+Table</CODE>
+.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+params.</CODE>
+TECT<CODE>
+_cells<BR>
+</CODE>
+This field specifies the cell or cells the user has edited.</P>
+<DL>
+<DT>
+<CODE>
+params.</CODE>
+TECT<CODE>
+_text</CODE>
+ </DT><DD>This field contains the handle of a global memory block, containing the text the user entered in the <CODE>
+VisText</CODE>
+. The default handler will free this block.</DD>
+<DT>
+<CODE>
+params.</CODE>
+TECT<CODE>
+_length</DT><DD>
+</CODE>
+This is the length (in bytes) of the string in the block specified by <CODE>
+params.</CODE>
+TECT<CODE>
+_text</CODE>
+. If this field is zero, the string is null-terminated.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing. (The default handler will free the block specified by <CODE>
+params.</CODE>
+TECT<CODE>
+_text</CODE>
+.)</P>
+<P CLASS="refField">
+Structures:	<CODE>
+TableEditCellTextParams</CODE>
+ (see <A HREF="JTable_a.htm#83564"> Both MSG_TABLE_START_EDIT_CELL_TEXT and MSG_TABLE_DONE_EDIT_CELL_TEXT use a special structure, the TableEditCellTextParams structure; the structure's fields have slightly different meanings for each message. This structure has the following defi</A>
+).</P>
+<P CLASS="refField">
+Interception:	You should intercept this message, so you can copy the new data into your application's storage. Afterwards, you should make sure to call the default handler with <CODE>
+@callsuper</CODE>
+.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_TABLE_STOP_EDIT_CELL_TEXT</H4>
+<PRE CLASS="syntax">void	MSG_TABLE_STOP_EDIT_CELL_TEXT();</PRE>
+<P>
+The <CODE>
+VisText</CODE>
+ object sends this message to the Table if the user clicks outside the cell while editing data. This cancels the edit: the Table returns to its normal mode and the user's edits are discarded.</P>
+<P CLASS="refField">
+Source:	This message is sent by a <CODE>
+VisText</CODE>
+ object used by the <CODE>
+Table</CODE>
+ for text editing.</P>
+<P CLASS="refField">
+Destination:	The <CODE>
+VisText</CODE>
+ sends this message to its parent <CODE>
+Table</CODE>
+.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing. </P>
+<P CLASS="refField">
+Interception:	If your program wants to treat a tap outside the edited cell as a signal that the edit is finished, not cancelled, then get the (abandoned) text that the user was editing from the VisText child of the Table. The chunk handle of this VisText child is stored in TI_textObj.  You can build an optr to the VisText by using:</P>
+<PRE>textObj = ConstructOptr(OptrToHandle(@YourTable), </PRE>
+<PRE>                            pself-&gt;TI_textObj);</PRE>
+<P>
+	To retrieve the text, use:</P>
+<PRE>@call textObj::MSG_VIS_TEXT_GET_ALL_PTR(buffer);</PRE>
+<P>
+	where &quot;buffer&quot; has been declared as &quot;char buffer[]&quot;.</P>
+<P>
+	Once you've retrieved the text, the remainder of your method should just save away this data in whatever data structure you've built to hold your table's data -- just like in the method for <CODE>
+MSG_TABLE_DONE_EDIT_CELL_TEXT</CODE>
+.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="JTable_7.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="JTable_9.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.2 Selecting Cells</A> 
+<!-- to next --> | <A HREF="JTable_b.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.4 Dragging and Dropping</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

@@ -1,0 +1,386 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: ImportExport_6.htm,v 1.1 97/06/02 14:34:04 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> The ImportControl Object</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The Import/Export Library</A>: 2.2 <A HREF="ImportExport_4.htm">Using Impex</A>: 
+The ImportControl Object</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="ImportExport_4.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="ImportExport_5.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2.1 Common Impex Concepts</A> 
+<!-- to next --> | <A HREF="ImportExport_7.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2.3 The ExportControl Object</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+<A NAME="IX_ImportControlClass">
+ </A>
+Applications which use the Impex library will generally have a single ImportControl object. This object is usually a child of the File menu; however, applications may put it wherever they want. They should also place it on the application object's GAGCNLT_SELF_LOAD_OPTIONS General Change Notification list. Applications should disable this object (with MSG_GEN_SET_NOT_ENABLED) whenever they are not prepared to accept imported data; for example, some applications will choose to disable file importing whenever they are unable to open a new document.</P>
+<P>
+The ImportControl object is subclassed from <CODE>
+GenControlClass</CODE>
+ (by way of <CODE>
+ImportExportClass</CODE>
+, as noted above). It thus has all the functionality of that class. It also has a few instance data fields of its own; they are shown in <A HREF="ImportExport_6.htm#62707"> ImportControlClass Instance Data</A>
+.</P>
+<P CLASS="figTitle">
+Code Display 16-1 <A NAME="62707">
+ </A>
+ImportControlClass Instance Data</P>
+<PRE>/* ICI_attrs is a word-length record which stores attribute information for the
+ * ImportControl object. It has only one flag, ICA_IGNORE_INPUT. */
+    @instance ImportControlAttrs					ICI_attrs = 0;</PRE>
+<PRE>/* ICI_dataClasses is a word-length record which indicates what Metafile formats
+ * are supported by the application. The application must set this field. */
+    @instance ImpexDataClasses					ICI_dataClasses = 0;</PRE>
+<PRE>/* ICI_destination and ICI_message indicate what message should be sent when the
+ * ImportControl object has finished importing a file. The application must set
+ * these fields. The message must take a single argument, namely a pointer to an
+ * ImpexTranslationParams structure in ss:bp (on the stack). */
+    @instance optr					ICI_destination;
+    @instance word					ICI_message;</PRE>
+<PRE>/* Applications may wish to add their own UI objects to the Import dialog box.
+ * They can do so by defining a generic tree (the top object of which must be not
+ * &quot;usable&quot;), and putting an optr to the top object in ATTR_IMPORT_CONTROL_APP_UI.
+ */
+    @vardata optr 					ATTR_IMPORT_CONTROL_APP_UI;</PRE>
+<PRE>/* Controller features flags */
+typedef ByteFlags 			ImportControlFeatures;
+#define IMPORTCF_BASIC			0x01</PRE>
+<PRE>typedef	ByteFlags 			ImportControlToolboxFeatures;
+#define IMPORTCTF_DIALOG_BOX				0x01</PRE>
+
+<H2 CLASS="HeadingC">
+ICI_attrs</H2>
+<PRE>ImportControlAttrs, MSG_IMPORT_CONTROL_GET_ATTRS, MSG_IMPORT_CONTROL_SET_ATTRS</PRE>
+<P>
+ICI<A NAME="IX_ImportControlAttrs">
+ </A>
+<A NAME="IX_ICI_attrs">
+ </A>
+<CODE>
+_attrs</CODE>
+ is a word-length record of type <CODE>
+ImportControlAttrs</CODE>
+. This record contains only one flag:</P>
+<DL>
+<DT>
+ICA_IGNORE_INPUT</DT><DD>
+<A NAME="IX_ICA_IGNORE_INPUT">
+ </A>
+If this flag is on, the ImportControl will consume all input to the application while the import occurs. By default, this flag is off.</DD>
+</DL>
+<P>
+To find out the current setting of this field, send <CODE>
+MSG_IMPORT_CONTROL_GET_ATTRS</CODE>
+ to the ImportControl. To change this field, send MSG_IMPORT_CONTROL_SET_ATTRS to the ImportControl.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_IMPORT_CONTROL_GET_ATTRS">
+ </A>
+MSG_IMPORT_CONTROL_GET_ATTRS</H4>
+<PRE CLASS="syntax">ImportControlAttrs	 MSG_IMPORT_CONTROL_GET_ATTRS();</PRE>
+<P>
+This message retrieves the current setting of the ImportControl's ICI<CODE>
+_attrs</CODE>
+ field.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any ImportControl object.</P>
+<P CLASS="refField">
+Return:	The ImportControl's ICI<CODE>
+_attrs</CODE>
+ field.</P>
+<P CLASS="refField">
+Interception:	This message should not be intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_IMPORT_CONTROL_SET_ATTRS">
+ </A>
+MSG_IMPORT_CONTROL_SET_ATTRS</H4>
+<PRE CLASS="syntax">void	MSG_IMPORT_CONTROL_SET_ATTRS(
+        ImportControlAttrs		attrs);</PRE>
+<P>
+This message changes the current settings of an ImportControl's ICI<CODE>
+_attrs</CODE>
+ field. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any ImportControl object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+attrs</CODE>
+	The new settings for the ICI<CODE>
+_attrs</CODE>
+ field.</P>
+<P CLASS="refField">
+Interception:	This message should not be intercepted.</P>
+
+
+
+<H2 CLASS="HeadingC">
+ICI_dataClasses</H2>
+<PRE>MSG_IMPORT_CONTROL_GET_DATA_CLASSES, MSG_IMPORT_CONTROL_SET_DATA_CLASSES</PRE>
+<P>
+When you declare an Import object, you must specify what kind of Metafiles your application is prepared to accept. You do this by setting the value of the ICI<CODE>
+_dataClasses</CODE>
+ field. This field is a word-length record of type <CODE>
+ImpexDataClasses</CODE>
+ (described in <A HREF="ImportExport_5.htm#69269"> ImpexTranslationParams</A>
+). If (for example) only the IDC_TEXT bit is set, the ImportControl will use only those import libraries which produce text Metafile output. More than one bit may be set; when the ImportControl sends its notification, it will tell the application what type of data is being imported.</P>
+<P>
+To find out the current settings of the ICI<CODE>
+_dataClasses</CODE>
+ field, send MSG_IMPORT_CONTROL_GET_DATA_CLASSES. To change the settings of this field, send MSG_IMPORT_CONTROL_SET_DATA_CLASSES.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_IMPORT_CONTROL_GET_DATA_CLASSES">
+ </A>
+MSG_IMPORT_CONTROL_GET_DATA_CLASSES</H4>
+<PRE CLASS="syntax">ImpexDataClasses	 MSG_IMPORT_CONTROL_GET_DATA_CLASSES();</PRE>
+<P>
+This message retrieves the current setting of the ImportControl's ICI<CODE>
+_dataClasses</CODE>
+ field. This tells you what kind of data can be imported.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any ImportControl object.</P>
+<P CLASS="refField">
+Return:	The ImportControl's ICI<CODE>
+_dataClasses</CODE>
+ field.</P>
+<P CLASS="refField">
+Interception:	This message should not be intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_IMPORT_CONTROL_SET_DATA_CLASSES">
+ </A>
+MSG_IMPORT_CONTROL_SET_DATA_CLASSES</H4>
+<PRE CLASS="syntax">void	MSG_IMPORT_CONTROL_SET_DATA_CLASSES(
+        ImpexDataClasses 		dataClass);</PRE>
+<P>
+This message changes the current settings of an ImportControl's ICI<CODE>
+_dataClasses</CODE>
+ field. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any ImportControl object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+dataClass</CODE>
+	The new settings for the ICI<CODE>
+_dataClasses</CODE>
+ field.</P>
+<P CLASS="refField">
+Interception:	This message should not be intercepted.</P>
+
+
+
+<H2 CLASS="HeadingC">
+The ImportControl Action</H2>
+<PRE>MSG_IMPORT_CONTROL_GET_ACTION, MSG_IMPORT_CONTROL_SET_ACTION, ImpexImportExportCompleted()</PRE>
+<P>
+The ImportControl does most of its work transparently to the application. It interacts with the rest of the application only when the user has selected a file to import and the appropriate translation library has produced a VM chain. At this point the ImportControl sends a notification message to the application. The application responds by copying the data from the VM chain and sending back an acknowledgment message. The ImportControl can then destroy the temporary VM transfer file.</P>
+<P>
+<A NAME="IX_ICI_message">
+ </A>
+<A NAME="IX_ICI_destination">
+ </A>
+The application determines what message will be sent, and to what object, by setting the ICI<CODE>
+_destination</CODE>
+ and ICI<CODE>
+_message</CODE>
+ fields. Whatever object will receive the message should define an appropriate message. <A NAME="IX_ImpexTranslationParams:with import">
+ </A>
+The ImportControl will send this message with a single parameter: <CODE>
+itp</CODE>
+, a pointer to an <CODE>
+ImpexTranslationParams</CODE>
+ structure (see <A HREF="ImportExport_5.htm#69269"> ImpexTranslationParams</A>
+). The fields of the structure have the following meanings in this case:</P>
+<DL>
+<DT>
+<CODE>
+ITP_impexOD</DT><DD>
+</CODE>
+<A NAME="IX_ITP_&ldots; :with import">
+ </A>
+The object to which the application should send its acknowledgment message. In this case, it is the optr of the ImportControl.</DD>
+<DT>
+ITP<CODE>
+_returnMsg</DT><DD>
+</CODE>
+The acknowledgment message to send when the import has been completed. In this case, it is <CODE>
+MSG_IMPORT_CONTROL_IMPORT_COMPLETE.</CODE>
+</DD>
+<DT>
+ITP<CODE>
+_dataClass</DT><DD>
+</CODE>
+An <CODE>
+ImpexDataClasses</CODE>
+ record with one flag set. This flag indicates what type of Metafile has been prepared.</DD>
+<DT>
+ITP<CODE>
+_transferVMFile</DT><DD>
+</CODE>
+The <CODE>
+VMFileHandle</CODE>
+ of the temporary transfer file.</DD>
+<DT>
+ITP<CODE>
+_transferVMChain</DT><DD>
+</CODE>
+The <CODE>
+VMBlockHandle</CODE>
+ of the lead block in the VM chain containing the imported data.</DD>
+<DT>
+ITP<CODE>
+_internal</DT><DD>
+</CODE>
+For use by the ImportControl and should not be changed by the application.</DD>
+</DL>
+<P>
+The recipient of the message should take any appropriate action; usually this entails copying the data from the VM chain, as if it were pasting data from the Clipboard. When the application is finished, it should call <CODE>
+ImpexImportExportCompleted()</CODE>
+. This routine takes one parameter, namely the <CODE>
+itp</CODE>
+ pointer which was passed to the object. (The <CODE>
+ImpexTranslationParams</CODE>
+ structure should not have been changed.) <CODE>
+ImpexImportExportCompleted()</CODE>
+ reads the appropriate message and destination from the <CODE>
+ImpexTranslationParams</CODE>
+ and sends the proper acknowledgment message (which in this case is <CODE>
+MSG_IMPORT_CONTROL_IMPORT_COMPLETE</CODE>
+).</P>
+<P>
+Applications which use the object model of document control will often set ICI<CODE>
+_destination</CODE>
+ to TO_APP_TARGET; this will make it send its messages to the target object. The application can find out the ImportControl's action by sending it <CODE>
+MSG_IMPORT_CONTROL_GET_ACTION</CODE>
+. The application can change the ImportControl's action by sending it <CODE>
+MSG_IMPORT_CONTROL_SET_ACTION</CODE>
+. </P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_IMPORT_CONTROL_GET_ACTION">
+ </A>
+MSG_IMPORT_CONTROL_GET_ACTION</H4>
+<PRE CLASS="syntax">void	MSG_IMPORT_CONTROL_GET_ACTION(
+        ImpexAction *		retValue);</PRE>
+<P>
+This message retrieves the values of an ImportControl's ICI<CODE>
+_destination</CODE>
+ and ICI<CODE>
+_message</CODE>
+ fields. These fields indicate what action the ImportControl will take when it is finished preparing a file for import.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any ImportControl object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+retValue</CODE>
+	A pointer to an <CODE>
+ImpexAction</CODE>
+ structure.</P>
+<P CLASS="refField">
+Return:	The value of ICI<CODE>
+_message</CODE>
+ (i.e. the message sent by the ImportControl).</P>
+<DL>
+<DT>
+<CODE>
+recipient</CODE>
+</DT><DD>A pointer to an <CODE>
+ImpexAction</CODE>
+ structure describing the message sent.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	This message should not be intercepted.</P>
+<P CLASS="refField">
+Structures:	The message and recipient are written to an <CODE>
+ImpexAction</CODE>
+ structure:</P>
+<PRE>typedef struct {
+	word	message;		/* message sent */
+	word	unused;
+	optr	destOD;		/* Destination of message */
+} ImpexAction;</PRE>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_IMPORT_CONTROL_SET_ACTION">
+ </A>
+MSG_IMPORT_CONTROL_SET_ACTION</H4>
+<PRE CLASS="syntax">void	MSG_IMPORT_CONTROL_SET_ACTION(
+        optr	destOD,	/* Send messages to this object. */
+        word	ICImsg);	/* Send this message to the above recipient. */</PRE>
+<P>
+This message changes the values of an ImportControl's ICI<CODE>
+_destination</CODE>
+ and ICI<CODE>
+_message</CODE>
+ fields. These fields indicate what action the ImportControl will take when it is finished preparing a file for import.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any ImportControl object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+destOD</CODE>
+	Set ICI<CODE>
+_destination</CODE>
+ to this value. </P>
+<DL>
+<DT>
+<CODE>
+ICImsg</CODE>
+</DT><DD>Set ICI<CODE>
+_message</CODE>
+ to this value.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	This message should not be intercepted.<A NAME="marker=439340">
+ </A>
+</P>
+
+
+
+<H2 CLASS="HeadingC">
+Adding to the Import Dialog Box</H2>
+<P>
+<A NAME="IX_ATTR_IMPORT_CONTROL_APP_UI">
+ </A>
+When the user selects the &quot;Import&quot; trigger or tool, the Import controller brings up a dialog box. The application can, if it wishes, add UI objects to this box. It does so by defining a tree of generic objects (the top object of which must be set &quot;not usable&quot;). It must place an optr to the top object in the tree in ATTR_IMPORT_CONTROL_APP_UI. When the ImportControl builds the dialog box, it will add that optr as one of the children in the tree and set it &quot;usable&quot;.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="ImportExport_4.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="ImportExport_5.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2.1 Common Impex Concepts</A> 
+<!-- to next --> | <A HREF="ImportExport_7.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2.3 The ExportControl Object</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

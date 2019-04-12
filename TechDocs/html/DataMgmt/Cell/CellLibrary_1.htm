@@ -1,0 +1,82 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: CellLibrary_1.htm,v 1.2 97/09/05 10:28:07 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Structure and Design</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="sectionTitle">
+<A HREF="index.htm">Cell Library</A>: 1 
+<A NAME="99717">
+ </A>
+Structure and Design</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="index.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">Cell Library</A> 
+<!-- to next --> | <A HREF="CellLibrary_2.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2 Using the Cell Library</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+Most of the internal structure of a cell file is transparent to the geode which uses it. A geode can, for example, lock a cell with <CODE>
+CellLock()</CODE>
+, specifying the cell's row and column. The cell library will find the appropriate DB item and lock it, returning the locked item's address. For most operations, the geode does not need to know anything about the internal structure of the cell file. However, the internal structure does matter for some purposes. For this reason, we present a quick overview of the structure of a cell file.</P>
+<P>
+A cell file can contain up to 16,512 rows, numbered from zero to 16,511. 
+Of these 16,512 rows, the last 128 are &quot;scratch-pad&quot; rows. They are intended to be used for holding information or formulae that will not be displayed or associated with a specific cell. The scratch-pad rows are never shifted; if you create a cell in the first scratch-pad row, it will always stay in that row. All other rows are called &quot;visible&quot; rows. Visible rows can be shifted when rows are created or deleted. For example, if you insert a new row 10, all the cells in the old row 10 will now be in row 11, and so on. The first scratch-pad row will be unchanged. Be aware that the database will not delete cells from rows that are shifted off the spreadsheet. For example, if you insert a new row, the last visible row will be shifted off the spreadsheet; the references to cells in that row will be removed, but the cells themselves will stay as DB items in the file. This is not generally a problem, since few cell files will need to use the last visible rows. If you add a row that will cause cells to be shifted off, you should delete those cells first. </P>
+<P>
+The first row has an index number of zero. The last visible row has an index equal to the preprocessor constant LARGEST_VISIBLE_ROW<A NAME="IX_LARGEST_VISIBLE_ROW">
+ </A>
+. The first scratch-pad row has an index equal to (LARGEST_VISIBLE_ROW + 1). The last scratch-pad row has an index equal to LARGEST_ROW (which equals (LARGEST_VISIBLE_ROW + 128) or 16,511). The constants are all defined in <STRONG CLASS="fileName">
+cell.h</STRONG>
+.</P>
+<P>
+The basic data unit in a cell file is the <EM>
+cell</EM>
+. The cell library treats cells as opaque data structures; their internal structure is entirely up to the geode using them. Cells are stored as ungrouped DB items. This restricts cell size to the size of a DB item; that is, a cell can theoretically be as large as 64K, but in practice should not grow larger than around 8K (and ideally should be under a kilobyte in size). Remember, whenever a DB item is created or resized, pointers to all other items in the group are invalidated. Since cells are ungrouped items, whenever you create or resize a cell, you invalidate any pointers to all other ungrouped items in that VM file. In particular, you invalidate pointers to all other cells in that VM file (even if the cells belong to another cell file in the VM file).
+<IMG SRC="CellLibrary_1_sidebar.gif">
+
+
+<IMG SRC="CellLibrary_1_inserting.gif">
+
+</P>
+<P>
+Cells are grouped into <EM>
+rows</EM>
+. A row can have up to 256 cells, numbered from zero to 255. Within a row, cells are identified by their column index. The column index can fit into an <EM>
+unsigned</EM>
+ byte variable. The cell library creates a <EM>
+column array</EM>
+ for every row which contains cells. The column array contains one entry for each cell in the row. A row often contains just a few widely scattered elements. For this reason, the column array is implemented as a <EM>
+sparse array</EM>
+. Each cell in the row has an entry consisting of two parts, namely the cell's column number and its <CODE>
+DBGroupAndItem</CODE>
+ structure. The advantage of this arrangement is that the column array need only contain entries for those cells which exist in the row (instead of maintaining entries for the blank spaces between cells). The disadvantage is that when you lock a cell, the cell manager has to make a search through the column array to find its reference; however, this is generally a small cost.</P>
+<P>
+The column arrays themselves belong to <EM>
+row blocks</EM>
+. Each row block is an LMem heap stored in the VM file, and each of its column arrays is a chunk in that heap. Row blocks contain up to 32 rows. These rows are sequential; that is, any existing rows from row zero to row 31 will always belong to the same row block, and none of them will ever be in the same row block as row 32. Since the row blocks and column arrays are not kept in DB items, they can be accessed and altered without causing any locked items to move. To keep track of the row blocks, you must have a <CODE>
+CellFunctionParameters</CODE>
+ structure for each cell file. That structure need not be kept in the VM file (although it often is); rather, you must pass the address of the structure to any cell library routine you call.</P>
+<P>
+Owing to the structure of a cell file, some actions are faster than others. The essential thing to remember is that cells are grouped together in rows, which are themselves grouped together to form a cell file. This means that you can access several cells belonging to the same row faster than you could access cells belonging to different rows. Similarly, if you insert a cell, it is much more efficient to shift the rest of the row over (which involves accessing only that one row) than to shift the rest of the column down (which involves accessing every visible row). Similarly, you can access groups of cells faster if they belong to the same row block.</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="index.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">Cell Library</A> 
+<!-- to next --> | <A HREF="CellLibrary_2.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2 Using the Cell Library</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

@@ -1,0 +1,156 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Geodes_2.htm,v 1.1 97/06/02 15:29:11 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Geode Components and Structures</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Applications and Geodes</A>: 1.1 <A HREF="Geodes_1.htm">Geodes</A>: 
+Geode Components and Structures</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Geodes_1.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Geodes_1.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">1 Geodes</A> 
+<!-- to next --> | <A HREF="Geodes_3.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">1.2 Launching an Application</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+A geode is simply a special type of GEOS file. It has a special file header that gets loaded in as the geode's core block. This file header contains the geode's type, attributes, release and protocol levels, and many other pieces of information necessary for GEOS to work with the geode. You never will have to know the exact structure of this header as the kernel provides routines necessary to access important portions of it.</P>
+<P>
+Several important items contained in the header are listed below.</P>
+<UL>
+<LI>
+Core Block Handle<BR>
+The core block contains its own memory handle, filled in when the geode is loaded into memory.</LI>
+<LI>
+Geode Attributes<BR>
+Each geode has a record of type <CODE>
+GeodeAttrs</CODE>
+. The geode attributes are described below in <A HREF="Geodes_2.htm#32508"> Geode Attributes</A>
+.</LI>
+<LI>
+Release and Protocol Levels<BR>
+Each geode can have release and protocol levels associated with it to ensure compatibility between different versions. Release and protocol levels are discussed in <A HREF="Geodes_9.htm#74509"> Protocol Numbers</A>
+.</LI>
+<LI>
+Geode Name<BR>
+Each geode has a geode name and extension specified in the geode parameters (<STRONG CLASS="fileName">
+.gp</STRONG>
+) file.</LI>
+<LI>
+Geode Token<BR>
+Every geode has a token associated with it in the token database. The token describes the geode's icon and is a structure of type <CODE>
+GeodeToken</CODE>
+. Tokens and icons are discussed in <A HREF="Geodes_b.htm#46120"> Creating Icons</A>
+.</LI>
+<LI>
+Geode Reference Count<BR>
+The geode's reference count is stored in the core block. See above for a discussion of the reference count and how it's managed.</LI>
+<LI>
+Geode File Handle<BR>
+The file handle of the geode identifies the open GEO file so the kernel can locate, load, and access its various resources.</LI>
+<LI>
+Geode Process Handle<BR>
+Each geode that has a parent process will have the handle of the process in its core block. This is the handle of the parent process' core block. (The parent process is the owner of the thread that loaded the geode. It is notified when the geode exits, if the exiting geode is a process.)</LI>
+<LI>
+Handle of the Next Geode<BR>
+Because geode core blocks are stored in a linked list, each core block must contain a reference to the next geode in the list.</LI>
+<LI>
+Handle of Private Data Space<BR>
+Each geode that is not the kernel can have a &quot;private data space.&quot; This private data space is discussed in <A HREF="Geodes_a.htm#50456"> Temporary Geode Memory</A>
+.</LI>
+<LI>
+Resource, Library, and Driver Information<BR>
+Each geode that imports or exports library or driver information must keep the import and export specifics available. Additionally, each geode must keep track of the resources it owns. All this information is stored in tables referenced from within the core block.</LI>
+</UL>
+
+<H2 CLASS="HeadingC">
+<A NAME="32508">
+ </A>
+Geode Attributes</H2>
+<P>
+<A NAME="IX_GeodeAttrs">
+ </A>
+Each geode has in its core block a record of type <CODE>
+GeodeAttrs</CODE>
+. This record defines several things about the geode, including which aspects it uses and which of its aspects have been initialized. The <CODE>
+GeodeAttrs</CODE>
+ record contains one bit for each of the following attributes.</P>
+<DL>
+<DT>
+GA_PROCESS</DT><DD>
+<A NAME="IX_GA_&ldots;  (GeodeAttrs)">
+ </A>
+This geode has a process aspect and therefore an initial event-driven thread.</DD>
+<DT>
+GA_LIBRARY<A NAME="IX_Libraries:geode attribute">
+ </A>
+</DT><DD>This geode has a library aspect and therefore exports routines (and possibly object classes).</DD>
+<DT>
+GA_DRIVER<A NAME="IX_Drivers:geode attribute">
+ </A>
+</DT><DD>This geode has a driver aspect and therefore has a driver table, in which the strategy routine is specified.</DD>
+<DT>
+GA_KEEP_FILE_OPEN</DT><DD>
+This geode must have its .GEO file kept open because its resources may be discardable or are initially discarded.</DD>
+<DT>
+GA_SYSTEM</DT><DD>This geode is a privileged geode and is almost certainly a system-used driver. These geodes have special exit requirements.</DD>
+<DT>
+GA_MULTI_LAUNCHABLE</DT><DD>
+This geode may be loaded more than once and therefore may have more than one instance of its core block in memory.</DD>
+<DT>
+GA_APPLICATION</DT><DD>
+This geode is a user-launchable application.</DD>
+<DT>
+GA_DRIVER_INITIALIZED</DT><DD>
+This flag is set if the geode has had its driver aspect initialized (if the driver's strategy routine has been initialized). This flag will be set dynamically by the kernel.</DD>
+<DT>
+GA_LIBRARY_INITIALIZED</DT><DD>
+This flag is set if the geode has had its library aspect initialized (if the library's entry routine has been called). This flag will be set dynamically by the kernel.</DD>
+<DT>
+GA_GEODE_INITIALIZED</DT><DD>
+This flag is set if all aspects of the geode have been initialized.</DD>
+<DT>
+GA_USES_COPROC</DT><DD>
+This geode uses a math coprocessor if one is available.</DD>
+<DT>
+GA_REQUIRES_COPROC</DT><DD>
+This geode requires the presence of a math coprocessor or a coprocessor emulator.</DD>
+<DT>
+GA_HAS_GENERAL_CONSUMER_MODE</DT><DD>
+This geode may be run in the General Consumer (appliance) Mode.</DD>
+<DT>
+GA_ENTRY_POINTS_IN_C</DT><DD>
+This geode has its library entry routine in C rather than assembly language.</DD>
+
+
+</DL>
+<H2 CLASS="HeadingC">
+Geode Token</H2>
+<P>
+As stated above, every geode is associated with a token in the token database. This token is defined by the use of a <CODE>
+GeodeToken</CODE>
+ structure. This structure and its uses are discussed in <A HREF="Geodes_b.htm#46120"> Creating Icons</A>
+.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Geodes_1.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Geodes_1.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">1 Geodes</A> 
+<!-- to next --> | <A HREF="Geodes_3.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">1.2 Launching an Application</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

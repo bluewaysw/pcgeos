@@ -1,0 +1,106 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Clipboard_5.htm,v 1.2 97/09/05 13:53:48 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> The Transfer VM File Format</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The Clipboard</A>: 2.1 <A HREF="Clipboard_4.htm">Transfer Data Structures</A>: 
+The Transfer VM File Format</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Clipboard_4.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Clipboard_4.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">2 Transfer Data Structures</A> 
+<!-- to next --> | <A HREF="Clipboard_6.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2.2 ClipboardItemFormatInfo</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+<A NAME="IX_Transfer VM file">
+ </A>
+The Transfer VM File is a normal VM file, managed by the UI. It contains several components, each of which is accessed through special routines that take care of nearly all the synchronization issues involved with the Clipboard and quick-transfer mechanisms. Because both the Clipboard and the quick-transfer mechanism use this file and its data structures, these structures are detailed here; the following section (<A HREF="Clipboard_9.htm#50504"> Using The Clipboard</A>
+) details how to use them for either the Clipboard or the quick-transfer mechanism.</P>
+<P>
+The Transfer VM File has one header block for the Clipboard transfer item and another for the quick-transfer transfer item. These headers have the same structure, and they contain all the information necessary to work with the file's contents. They contain pointers to and information about each format available for both the Clipboard and the quick-transfer functions. The transfer item's header is shown in <A HREF="Clipboard_5.htm#64319"> ClipboardItemHeader</A>
+.</P>
+<P CLASS="figTitle">
+Code Display 7-1 <A NAME="IX_CIH_&ldots;">
+ </A>
+<A NAME="64319">
+ </A>
+<A NAME="IX_ClipboardItemHeader">
+ </A>
+ClipboardItemHeader</P>
+<PRE>/* The ClipboardItemHeader structure details what formats, if any, exist in the
+ * Transfer VM File for both the Clipboard and quick-transfer mechanisms.*/</PRE>
+<PRE>typedef struct {</PRE>
+<PRE>	    /* The CIH_owner field is the optr of the object that put
+	     * the current transfer item into the Transfer VM File. */
+    optr			CIH_owner;</PRE>
+<PRE>	    /* The CIH_flags field determines whether the transfer item is used by
+	     * the quick transfer mechanism or by the normal Clipboard. If this
+	     * field is equal to the constant CIF_QUICK, then the transfer item
+	     * belongs to the quick transfer mechanism. If it is any other value,
+	     * the transfer item belongs to the normal Clipboard. */
+    ClipboardItemFlags			CIH_flags;
+	<A NAME="IX_ClipboardItemFlags"> </A><A NAME="IX_CIF_QUICK"> </A>/* The ClipboardItemFlags type has one predefined value:
+	 *	CIF_QUICK		0x4000
+	 * If this flag does not apply, use TIF_NORMAL, which is 0x0000. */</PRE>
+<PRE>	    /* <A NAME="IX_ClipboardItemNameBuffer"> </A>The CIH_name field is a 33-character buffer that should contain a
+	     * null-terminated character string representing the name of the given
+	     * transfer item. */
+    ClipboardItemNameBuffer 			CIH_name;</PRE>
+<PRE>	    /* The CIH_formatCount field indicates the number of formats of the
+	     * transfer item currently available. For example, this field would be
+	     * 2 if CIF_TEXT and CIF_GRAPHICS_STRING formats were supported and
+	     * available in the Transfer VM File. */
+    word			CIH_formatCount;</PRE>
+<PRE>	    /* The CIH_sourceID field contains information about the source
+	     * document of the transfer. Typically, this will be the optr of the
+	     * parent GenDocument object. */
+    dword			CIH_sourceID;</PRE>
+<PRE>	    /* The CIH_formats field is actually an array of ten
+	     * ClipboardFormatInfo structures, each of which contains the
+	     * important details about a specific format of the transfer item. */
+    FormatArray			CIH_formats;</PRE>
+<PRE>	    /* This field is reserved and should not be used. */
+    dword			CIH_reserved;
+} ClipboardItemHeader<A NAME="marker=631792"> </A>;</PRE>
+<PRE>/* The FormatArray type is an array of ClipboardItemFormatInfo structures. The
+ * definition of this field is shown here: */</PRE>
+<PRE><A NAME="IX_FormatArray"> </A>typedef	ClipboardItemFormatInfo			FormatArray[CLIPBOARD_MAX_FORMATS];
+	/* CLIPBOARD_MAX_FORMATS is a constant defining the maximum number of
+	 * formats allowed for any given transfer item. It is defined as 10. */</PRE>
+<P>
+The rest of the Transfer VM File consists of VM blocks containing the data that is to be transferred. Each format supported will have its own VM block or series of VM blocks, pointed to by the <CODE>
+ClipboardItemFormatInfo</CODE>
+ structure in the item's header.</P>
+<P>
+The Transfer VM File actually contains two transfer items: One for the Clipboard and one for the quick-transfer mechanism (see the figure below). When calling <CODE>
+ClipboardQueryItem()</CODE>
+, the requesting geode must specify which item it wants. See <A HREF="Clipboard_9.htm#50504"> Using The Clipboard</A>
+ and <A HREF="Clipboard_13.htm#60205"> Using Quick-Transfer</A>
+.
+<IMG SRC="Clipboard_5_vmFileStruct.gif">
+
+</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Clipboard_4.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Clipboard_4.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">2 Transfer Data Structures</A> 
+<!-- to next --> | <A HREF="Clipboard_6.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2.2 ClipboardItemFormatInfo</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

@@ -1,0 +1,220 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Values_9.htm,v 1.1 97/06/02 16:48:26 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Sending an Action</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">GenValue</A>: 3.6 <A HREF="Values_3.htm">GenValue Basics</A>: 
+Sending an Action</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Values_3.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Values_8.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.5 Display Formats</A> 
+<!-- to next --> | <A HREF="Values_a.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">4 Supplemental Usage</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>GVLI_applyMsg, GVLI_destination, HINT_VALUE_NAVIGATE_TO_NEXT_FIELD_ON_RETURN_PRESS, HINT_VALUE_CUSTOM_RETURN_PRESS, MSG_GEN_VALUE_GET_APPLY_MSG, MSG_GEN_VALUE_SET_APPLY_MSG, MSG_GEN_VALUE_GET_DESTINATION, MSG_GEN_VALUE_SET_DESTINATION</PRE>
+<P>
+GVLI_<A NAME="IX_GVLI_applyMsg">
+ </A>
+<CODE>
+applyMsg</CODE>
+ sets the message for the GenValue to send out whenever it has been modified and needs to apply its changes. Whenever a GenValue receives <CODE>
+MSG_GEN_APPLY,</CODE>
+ <CODE>
+i</CODE>
+t will check whether its GVSF_MODIFIED flag has been set; if it has, it will send out its apply message. If a GenValue is operating in immediate mode, these actions will happen immediately, resulting in an immediate action.</P>
+<P>
+GVLI_<A NAME="IX_GVLI_destination">
+ </A>
+<CODE>
+destination</CODE>
+ specifies the destination object (or process) to send the GVLI_<CODE>
+applyMsg</CODE>
+ to. (This may also be a <CODE>
+TravelOption</CODE>
+, such as TO_APP_TARGET.)</P>
+<P CLASS="figTitle">
+Code Display 8-8 Sending an Apply Message</P>
+<PRE>@object GenValueClass MyValue = {
+    GI_visMoniker = &quot;My Value&quot;;
+    GVLI_value = MakeWWFixed(1.0);
+    GVLI_applyMsg = MSG_MY_VALUE_DOUBLE_VALUE;
+    GVLI_destination = process;
+}</PRE>
+<PRE>/* Retrieve the current value. This value will be a fixed point dword. */</PRE>
+<PRE>@method MyValueProcessClass, MSG_MY_VALUE_DOUBLE_VALUE {
+    WWFixedAsDWord	curValue;</PRE>
+<PRE>    curValue = @call MyValue::MSG_GEN_VALUE_GET_VALUE();
+    curValue = curValue*2;
+    @call MyValue::MSG_GEN_VALUE_SET_VALUE(curValue, 0);
+}</PRE>
+<P>
+A GenValue's changes are typically applied when the user hits the Return key and the GenValue has the focus. You can change this behavior, though, with the following hints: <CODE>
+HINT_VALUE_CUSTOM_RETURN_PRESS</CODE>
+ allows a textually-oriented GenValue to send the specified message to the destination object when the Return key is pressed. <CODE>
+HINT_VALUE_NAVIGATE_TO_NEXT_FIELD_ON_RETURN_PRESS</CODE>
+ instructs the GenValue to navigate (via the UI) to the next textually-activated object (as the tab key works in many situations).</P>
+<P>
+To change a GenValue's apply message or destination, send it <CODE>
+MSG_GEN_VALUE_SET_APPLY_MSG</CODE>
+ or <CODE>
+MSG_GEN_VALUE_SET_DESTINATION</CODE>
+, respectively. Use <CODE>
+MSG_GEN_VALUE_GET_APPLY_MSG</CODE>
+ or <CODE>
+MSG_GEN_VALUE_GET_DESTINATION</CODE>
+ to return the current apply message or destination.</P>
+<P>
+The apply message should be defined on the prototype <CODE>
+GEN_VALUE_APPLY_MSG</CODE>
+, whose values are shown below.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_GEN_VALUE_APPLY_MSG">
+ </A>
+GEN_VALUE_APPLY_MSG</H4>
+<PRE CLASS="syntax">void	GEN_VALUE_APPLY_MSG(
+        WWFixedAsDWord		value,
+        word		stateFlags);</PRE>
+<P>
+This prototype defines the message sent out when the GenValue is &quot;applied.&quot; The output of the GenValue should handle a message with these parameters.</P>
+<P CLASS="refField">
+Source:	GenValue, when &quot;applied.&quot;</P>
+<P CLASS="refField">
+Destination:	The GenValue's output (<CODE>
+GVLI_destination</CODE>
+) object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+value</CODE>
+	The current value of the GenValue.</P>
+<DL>
+<DT>
+<CODE>
+stateFlags</CODE>
+</DT><DD>The <CODE>
+GenValueStateFlags</CODE>
+ stored in <CODE>
+GVLI_stateFlags</CODE>
+.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	The destination object should handle the apply message with this format.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VALUE_GET_APPLY_MSG">
+ </A>
+MSG_GEN_VALUE_GET_APPLY_MSG</H4>
+<PRE CLASS="syntax">Message	MSG_GEN_VALUE_GET_APPLY_MSG();</PRE>
+<P>
+This message returns the GenValue's GVLI_<CODE>
+applyMsg</CODE>
+. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenValue object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	The apply message of the GenValue.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VALUE_SET_APPLY_MSG">
+ </A>
+MSG_GEN_VALUE_SET_APPLY_MSG</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VALUE_SET_APPLY_MSG(
+        Message		message);</PRE>
+<P>
+This message sets the apply message (in GVLI_<CODE>
+applyMsg</CODE>
+) for a GenValue.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenValue object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+message</EM>
+	The apply message to set for the GenValue.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VALUE_GET_DESTINATION">
+ </A>
+MSG_GEN_VALUE_GET_DESTINATION</H4>
+<PRE CLASS="syntax">optr	MSG_GEN_VALUE_GET_DESTINATION();</PRE>
+<P>
+This message returns the current destination object (or process) that the GenValue sends its apply messages to.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenValue object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	The destination optr (GVLI_<CODE>
+destination</CODE>
+) of the GenValue.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VALUE_SET_DESTINATION">
+ </A>
+MSG_GEN_VALUE_SET_DESTINATION</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VALUE_SET_DESTINATION(
+        optr	dest);</PRE>
+<P>
+This message sets the <CODE>
+GVLI_destination</CODE>
+ field of the range to the passed optr. The object can be a pointer to a specific object in the system (i.e. the GenProcess object) or can be a pointer to a generic location in the system (i.e. a <CODE>
+TravelOption</CODE>
+). </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenValue object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+dest</EM>
+	The optr of the new destination object.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Values_3.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Values_8.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.5 Display Formats</A> 
+<!-- to next --> | <A HREF="Values_a.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">4 Supplemental Usage</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

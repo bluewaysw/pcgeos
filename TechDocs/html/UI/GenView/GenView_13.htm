@@ -1,0 +1,273 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: GenView_13.htm,v 1.1 97/06/02 16:30:10 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Document Scaling</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">GenView</A>: 4.5 <A HREF="GenView_e.htm">Advanced Concepts and Uses</A>: 
+<A NAME="80749">
+ </A>
+Document Scaling</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GenView_e.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GenView_12.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.4 Document and View Size</A> 
+<!-- to next --> | <A HREF="GenView_14.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.6 Children of the View</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>GVI_scaleFactor, MSG_GEN_VIEW_GET_SCALE_FACTOR, MSG_GEN_VIEW_SET_SCALE_FACTOR, MSG_GEN_VIEW_SCALE_LOW, ATTR_GEN_VIEW_PAGE_SIZE, ATTR_GEN_VIEW_SCALE_TO_FIT_BASED_ON_X, ATTR_GEN_VIEW_SCALE_TO_FIT_BOTH_DIMENSIONS</PRE>
+<P>
+Many applications implement scaling to allow users to view and modify their documents at various scale factors. This scaling behavior, apart from the implementation of the view menu, is almost entirely internal to the view. The application simply needs to instruct the view in what scale factor to use; the view will provide the proper geometry and math involved in displaying, scrolling, and resizing your document.</P>
+<P>
+Every view has a scale factor stored as a <CODE>
+PointWWFixed</CODE>
+ structure in the <CODE>
+GVI_scaleFactor</CODE>
+<A NAME="IX_GVI_scaleFactor">
+ </A>
+ instance field. The default scale factor is one, or 100 percent. A scale factor of two means that your document will appear twice as large to the user (200 percent normal size). You can set the scale factor in your Goc code and change it with <CODE>
+MSG_GEN_VIEW_SET_SCALE_FACTOR</CODE>
+.</P>
+<P>
+The <CODE>
+PointWWFixed</CODE>
+ structure contains two fields, each of which is a <CODE>
+WWFixed</CODE>
+ structure. Both <CODE>
+WWFixed</CODE>
+ and <CODE>
+PointWWFixed</CODE>
+ are shown below.</P>
+<PRE><A NAME="IX_PF_&ldots;"> </A><A NAME="IX_WWF_&ldots;"> </A><A NAME="IX_PointWWFixed"> </A><A NAME="IX_WWFixed"> </A>typedef struct {
+	word		WWF_frac;		/* 16 bits decimal */
+	word		WWF_int;		/* 16 bits integral */
+} WWFixed;</PRE>
+<PRE>typedef struct {
+	WWFixed		PF_x;		/* x scale factor */
+	WWFixed		PF_y;		/* y scale factor */
+} PointWWFixed;</PRE>
+<P>
+A scale factor of 2.5 (250%) in both dimensions would be declared as follows:</P>
+<PRE>GVI_scaleFactor = {{5, 2}, {5, 2}};</PRE>
+<P>
+A scale factor of 100% in the horizontal and 250% in the vertical would be declared as follows:</P>
+<PRE>GVI_scaleFactor = {{0, 1}, {5, 2}};</PRE>
+<P>
+To change the scale factor at run-time (for example, when a user clicks on a Zoom button), send <CODE>
+MSG_GEN_VIEW_SET_SCALE_FACTOR</CODE>
+ to the view, passing the proper scale factors. Additionally, you may choose a point on the screen around which to scale. You may also retrieve the current scale factor of a view with the message <CODE>
+MSG_GEN_VIEW_GET_SCALE_FACTOR</CODE>
+. Note that the GenViewControl has many interactive scaling and zoom features and tools available.</P>
+<P>
+Another way to ensure a certain point is on the screen after scaling is to force it there by causing the view to scroll after scaling. You can suspend the window update, scale the view, then cause the view to scroll with a <CODE>
+MSG_GEN_VIEW_MAKE_RECT_VISIBLE</CODE>
+. When you then unsuspend the window update, the view will draw with the proper point in the proper place. See <A HREF="GenView_15.htm#24925"> Scrolling</A>
+ for an in-depth discussion of scrolling the view.</P>
+<P>
+In addition to the dynamic scaling described above, you can have your view scale itself automatically to fit the entire document in its window. To do so, set the <CODE>
+GVI_attrs</CODE>
+ flag GVA_SCALE_TO_FIT. This will cause the view to scale itself so the entire document fits vertically in the view; the horizontal scale factor will change to correspond with the new vertical scale factor. You can alter this behavior with three different vardata attributes:</P>
+<DL>
+<DT>
+<CODE>
+ATTR_GEN_VIEW_PAGE_SIZE</DT><DD>
+</CODE>
+<A NAME="IX_ATTR_GEN_VIEW_PAGE_SIZE">
+ </A>
+This attribute takes an argument of type <CODE>
+XYSize</CODE>
+ (shown below). The view will scale itself to fit this page size rather than its entire document size.</DD>
+<PRE><A NAME="IX_XYS_&ldots;"> </A><A NAME="IX_XYSize"> </A>typedef struct {
+    word		XYS_width;		/* width of page */
+    word		XYS_height;		/* height of page */
+} XYSize;</PRE>
+<DT>
+<CODE>
+ATTR_GEN_VIEW_SCALE_TO_FIT_BASED_ON_X</DT><DD>
+</CODE>
+<A NAME="IX_ATTR_GEN_VIEW_SCALE_TO_FIT_BASED_ON_X">
+ </A>
+This attribute causes the view to scale itself based on the horizontal size rather than the vertical size. The vertical scale factor will follow the horizontal scale factor.</DD>
+<DT>
+<CODE>
+ATTR_GEN_VIEW_SCALE_TO_FIT_BOTH_DIMENSIONS</DT><DD>
+</CODE>
+<A NAME="IX_ATTR_GEN_VIEW_SCALE_TO_FIT_BOTH_DIMENSIONS">
+ </A>
+This attribute causes the view to scale both dimensions independently when scaling to fit. The horizontal and vertical scale factors may end up different.</DD>
+
+</DL>
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VIEW_SET_SCALE_FACTOR">
+ </A>
+MSG_GEN_VIEW_SET_SCALE_FACTOR</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VIEW_SET_SCALE_FACTOR(@stack
+        sdword	yOrigin,			/* New Y origin coordinate after scaling */
+        sdword	xOrigin,			/* New X origin coordinate after scaling */
+        ScaleViewType scaleType,				/* Determines Positioning after scaling */
+        WWFixedAsDWord yScaleFactor,						/* New scale factor on Y axis */
+        WWFixedAsDWord xScaleFactor);						/* New scale factor on X axis */</PRE>
+<P>
+This message changes the view's scale factor, causing it to redraw at the new scale. The view will continue to display your document at the new scale until it is either shut down or instructed to change the scale factor again.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenView object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+yOrigin</CODE>
+	New vertical origin of the view window after scaling, if SVT_AROUND_POINT is passed in <CODE>
+scaleType</CODE>
+. Ignored otherwise.</P>
+<DL>
+<DT>
+<CODE>
+xOrigin</CODE>
+</DT><DD>New horizontal origin of the view window after scaling, if SVT_AROUND_POINT is passed in <CODE>
+scaleType</CODE>
+. Ignored otherwise.</DD>
+<DT>
+<CODE>
+scaleType</CODE>
+</DT><DD>A value of <CODE>
+ScaleViewType</CODE>
+ indicating how the view is to react after scaling. The three allowable values are described below, under &quot;Structures.&quot;</DD>
+<DT>
+<CODE>
+yScaleFactor</CODE>
+</DT><DD>The new vertical scale factor. To create a <CODE>
+WWFixedAsDWord</CODE>
+ structure, use the macro <CODE>
+MakeWWFixed()</CODE>
+.</DD>
+<DT>
+<CODE>
+xScaleFactor</CODE>
+</DT><DD>The new horizontal scale factor. To create a <CODE>
+WWFixedAsDWord</CODE>
+ structure, use the macro <CODE>
+MakeWWFixed()</CODE>
+.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted. If you want to alter scaling behavior, you may intercept this message to change the parameters. Be sure to call the superclass at the end of the handler.</P>
+<P CLASS="refField">
+Structures:	The type <CODE>
+ScaleViewType</CODE>
+ defines the way the view will be scaled. It is an enumerated type with three possible values:</P>
+<DL>
+<DT>
+SVT_AROUND_UPPER_LEFT</DT><DD>
+Scale the view around the upper-left corner, and keep the origin the same before and after scaling. The <CODE>
+xOrigin</CODE>
+ and <CODE>
+yOrigin</CODE>
+ parameters will be ignored.</DD>
+<DT>
+SVT_AROUND_CENTER</DT><DD>
+Scale the view around its center, keeping the point that is central in the view before scaling in the center after scaling. The <CODE>
+xOrigin</CODE>
+ and <CODE>
+yOrigin</CODE>
+ parameters will be ignored.</DD>
+<DT>
+SVT_AROUND_POINT</DT><DD>
+Scale the view around the document point whose coordinates are provided in <EM>
+yOrigin</EM>
+ and <EM>
+xOrigin</EM>
+, making sure the new coordinates are set as the view's new origin.</DD>
+
+
+</DL>
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VIEW_GET_SCALE_FACTOR">
+ </A>
+MSG_GEN_VIEW_GET_SCALE_FACTOR</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VIEW_GET_SCALE_FACTOR(
+        GetScaleParams *retValue);</PRE>
+<P>
+This message returns the current scale factors of the view.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenView object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+retValue</CODE>
+	A pointer to an empty <CODE>
+GetScaleParams</CODE>
+ structure to be filled in by the method.</P>
+<P CLASS="refField">
+Return:	The structure pointed to by <CODE>
+retValue</CODE>
+ will be filled with the current scale factor of the view.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+<P CLASS="refField">
+Structures:	<A NAME="IX_GSP_&ldots;">
+ </A>
+<A NAME="IX_GetScaleParams">
+ </A>
+The <CODE>
+GetScaleParams</CODE>
+ structure is made up of two <CODE>
+WWFixedAsDWord</CODE>
+ values. The high word of each represents the fractional (decimal) portion of the scale factor, and the low word represents the integral portion. The <CODE>
+GetScaleParams</CODE>
+ structure definition is shown below:</P>
+<PRE>typedef struct {
+	WWFixedAsDWord			GSP_yScaleFactor;			/* y */
+	WWFixedAsDWord			GSP_xScaleFactor;			/* x */
+} GetScaleParams;</PRE>
+
+
+<H4 CLASS="RefETitle">
+MSG_GEN_VIEW_SCALE_LOW</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VIEW_SCALE_LOW(@stack
+        sdword		yOrigin,
+        sdword		xOrigin,
+        ScaleViewType		scaleType,
+        WWFixedAsDWord		yScaleFactor,
+        WWFixedAsDWord		xScaleFactor);</PRE>
+<P>
+This low-level message is similar to <CODE>
+MSG_GEN_VIEW_SET_SCALE_FACTOR</CODE>
+ except that it does not propagate to linked views. It is generally encapsulated by the GenView when another scaling message is received, then dispatched to linked views later.</P>
+<P CLASS="refField">
+Source:	Sent by the GenView to itself.</P>
+<P CLASS="refField">
+Destination:	Any GenView object.</P>
+<P CLASS="refField">
+Parameters:	See <CODE>
+MSG_GEN_VIEW_SET_SET_SCALE_FACTOR</CODE>
+.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Should not be intercepted.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GenView_e.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GenView_12.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.4 Document and View Size</A> 
+<!-- to next --> | <A HREF="GenView_14.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.6 Children of the View</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

@@ -1,0 +1,141 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Environment_13.htm,v 1.2 97/09/05 10:56:48 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Storage and Loading</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Graphics Environment</A>: 8.1 <A HREF="Environment_12.htm">Graphics Strings</A>: 
+Storage and Loading</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Environment_12.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Environment_12.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">8 Graphics Strings</A> 
+<!-- to next --> | <A HREF="Environment_14.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">8.2 Special Drawing Commands</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>GrCreateGString(), GrDestroyGString(), GrLoadGString(), GrEditGString(), GrCopyGString(), GrGetGStringHandle(), GrSetVMFile()</PRE>
+<P>
+GStrings may reside an a number of types of memory areas. Depending on the GString's storage, you will have to do different things to load it. One common case we have already discussed to some extent is when the GString is part of a visual moniker. In this case, the gstring will be stored in the <CODE>
+gstring</CODE>
+ field of the <CODE>
+@visMoniker</CODE>
+'s implied structure. In this case the UI will do all loading and drawing of the GString.</P>
+<P>
+The GString data itself consists of a string of byte-length number values. The graphics system knows how to parse these numbers to determine the intended drawing commands. You need not know the details of the format used--there are routines by which you may build and alter GStrings using common kernel graphics routines; however, macros and constants have been set up so that you may work with the data directly.</P>
+<P>
+GString data may be stored in any of the following structures (corresponding to the values of the <A NAME="IX_GST_&ldots;">
+ </A>
+<A NAME="IX_GStringType">
+ </A>
+<CODE>
+GStringType</CODE>
+ enumerated type):</P>
+<DL>
+<DT>
+<STRONG>
+Chunk</STRONG>
+</DT><DD>This is the storage structure of choice for GStrings which will be used as monikers.</DD>
+<DT>
+<STRONG>
+VM Block</STRONG>
+ </DT><DD>Virtual memory is normally used to store GStrings which may grow very large. GStrings residing in virtual memory may be dynamically edited.</DD>
+<DT>
+<STRONG>
+Pointer-Referenced Memory</DT><DD>
+</STRONG>
+You may refer to GStrings by means of a pointer. However, this will only work for reading operations (i.e. you may not change the GString). This is the ideal way to reference a GString which is statically declared in a code resource.</DD>
+<DT>
+<STRONG>
+Stream</STRONG>
+</DT><DD>Streams are not actually used to store data--they are used to transmit it between threads or devices. If you write a GString to a stream, it is assumed that some other application, perhaps on another device, will be reading the GString.</DD>
+</DL>
+<P>
+Note that a GString stored in a Stream, VM block, or in memory referenced only by a pointer is not quite ready to be drawn, only GStrings stored in a chunk may be drawn. Fortunately there is a routine which can load any type of GString into local memory so that it may be drawn.</P>
+<P>
+If you are editing or creating the GString dynamically, it will have a GState associated with it. Any drawing commands made using this GState will be appended to the GString. This GState will not be stored with the GString; it is instead stored with the other GStates. You may destroy the GState when done editing, and hook up a new one if starting some other edit; this will not affect the GString's storage.
+<IMG SRC="Environment_13_gstateGString.gif">
+
+</P>
+<P>
+<A NAME="IX_GrCreateGString()">
+ </A>
+To dynamically create an empty GString, call the <CODE>
+GrCreateGString() </CODE>
+routine. You must decide where you want the GString to be stored--either in a chunk, a VM block, or a stream. If you wish to store the GString in a chunk or VM block, a memory unit of the appropriate type will be allocated for you. This routines will return the GState by which the GString may be edited and the chunk or VM block created.</P>
+<P>
+The <A NAME="IX_GrDestroyGString()">
+ </A>
+<CODE>
+GrDestroyGString()</CODE>
+ routine allows you to free up the GState handle associated with your GString You may also destroy the GString's data if you wish; specify exactly what you want to destroy by means of the <CODE>
+GStringKillType</CODE>
+<A NAME="IX_GSKT_&ldots;">
+ </A>
+<A NAME="IX_GStringKillType">
+ </A>
+ argument. In addition, you may destroy another GState. You must pass the global handle of the GString to destroy--this will be the handle returned by <CODE>
+GrCreateGString()</CODE>
+, <CODE>
+GrEditGString()</CODE>
+, or <CODE>
+GrLoadGString()</CODE>
+.</P>
+<P>
+The <A NAME="IX_GrLoadGString()">
+ </A>
+<CODE>
+GrLoadGString()</CODE>
+ command loads a GString into a global memory block so that it may be drawn. Actually, it doesn't load the entire GString into memory, but does initialize the data structure so that it may be referenced through the global memory handle which the routine returns.</P>
+<P>
+The <A NAME="IX_GrEditGString()">
+ </A>
+<CODE>
+GrEditGString()</CODE>
+ command is very much like <CODE>
+GrCreateGString()</CODE>
+, except that instead of creating a new GString, it allows you to dynamically edit an existing GString. This command loads a VM-based GString into a special data structure. Like <CODE>
+GrCreateGString()</CODE>
+, it returns a GState to which you may make drawing commands. You may insert or delete drawing commands while in this mode, all using kernel drawing routines. For more information about using this routine, see <A HREF="Environment_18.htm#19740"> Editing GStrings Dynamically</A>
+.</P>
+<P>
+The <A NAME="IX_GrCopyGString()">
+ </A>
+<CODE>
+GrCopyGString()</CODE>
+ command copies the contents of one GString to another. At first you might think that you could do this by allocating the target GString with <CODE>
+GrCreateGString()</CODE>
+, then drawing the source GString to the provided GState. However, the GState may only have one GString associated with it, whether that GString is being used as a source or target.</P>
+<P>
+To find the handle of the GString data associated with a GState, call <CODE>
+GrGetGStringHandle()</CODE>
+<A NAME="IX_GrGetGStringHandle()">
+ </A>
+. To update the VM file associated with a GString (perhaps after calling <CODE>
+VMSave()</CODE>
+), use <A NAME="IX_GrSetVMFile():with GStrings">
+ </A>
+<CODE>
+GrSetVMFile()</CODE>
+.</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Environment_12.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Environment_12.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">8 Graphics Strings</A> 
+<!-- to next --> | <A HREF="Environment_14.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">8.2 Special Drawing Commands</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

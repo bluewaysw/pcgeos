@@ -1,0 +1,254 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Geodes_1e.htm,v 1.1 97/06/02 15:29:06 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Being a Server</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Applications and Geodes</A>: 6.5 <A HREF="Geodes_19.htm">Inter-Application Communication</A>: 
+<A NAME="52457">
+ </A>
+Being a Server</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Geodes_19.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Geodes_1d.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">6.4 Being a Client</A> 
+<!-- to next --> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+Every time an application is launched, its Application object automatically registers as a server for the server list that shares its <CODE>
+GeodeToken</CODE>
+. The Application class has default handlers for all the notification messages IACP sends to the server objects.</P>
+<P>
+If you wish, you can have another object act as a server. However, if you do this, you will have to do more of the work yourself. While the notification messages are defined for <CODE>
+MetaClass</CODE>
+, and thus can be handled by any class of object, <CODE>
+MetaClass</CODE>
+ does not come with handlers for these messages; if the server is not subclassed from <CODE>
+GenApplicationClass</CODE>
+, you will have to write the handlers yourself. This is discussed below.</P>
+
+<H2 CLASS="HeadingC">
+Registering and Unregistering a Server</H2>
+<PRE>IACPRegisterServer(), IACPUnregisterServer(), IACPGetServerNumber()</PRE>
+<P>
+You will not generally need to register and unregister a server object explicitly. As noted above, when an application is launched, the application object is automatically registered as a server for the list with its <CODE>
+GeodeToken</CODE>
+; when the application exits, the Application object is automatically unregistered from that list.</P>
+<P>
+However, you may wish to explicitly register an object as a server. For example, you might want your application object to be a server on a list with a different <CODE>
+GeodeToken</CODE>
+; or you might want to register a non-Application object as a server. In this case, you will need to explicitly register and unregister the object.</P>
+<P>
+<A NAME="IX_IACPRegisterServer()">
+ </A>
+To register an object as a server, call <CODE>
+IACPRegisterServer()</CODE>
+. This routine is passed the following arguments:</P>
+<UL>
+<LI>
+The <CODE>
+GeodeToken</CODE>
+ of the list for which you are registering as a server.</LI>
+<LI>
+The optr of the object which is registering as a server. This object must be able to handle the MSG_META_IACP... messages appropriately (this is built into <CODE>
+GenApplicationClass</CODE>
+).</LI>
+<LI>
+<A NAME="IX_IACPSM_&ldots; :with IACPRegisterServer()">
+ </A>
+A member of the <CODE>
+IACPServerMode</CODE>
+ enumerated type. This type specifies how the client expects the server to behave. Currently, only two types are supported:</LI>
+</UL>
+<DL>
+<DT>
+    IACPSM_NOT_USER_INTERACTIBLE</DT><DD>
+This is equal to zero. It indicates that the server object will not interact directly with users.</DD>
+<DT>
+    IACPSM_USER_INTERACTIBLE</DT><DD>
+This is equal to two. It indicates that the server will be able to interact with the user like any normal application.</DD>
+<UL>
+<LI>
+<A NAME="IX_IACPServerFlags:with IACPRegisterServer()">
+ </A>
+A set of <CODE>
+IACPServerFlags</CODE>
+. Currently, only two flags are supported: IACPSF_MULTIPLE_INSTANCES indicates that multiple copies of the application might be running at once (Every multi-launchable application should set this flag.); IACPSF_MAILBOX_DONT_ASK_USER asks the Mailbox library not to notify the user of new messages for this application.</LI>
+</UL>
+</DL>
+<P>
+<CODE>
+IACPRegisterServer()</CODE>
+ registers the object as a server for the appropriate list; it creates the server list if necessary.</P>
+<P>
+<A NAME="IX_IACPUnregisterServer()">
+ </A>
+To unregister an object as a server, call <CODE>
+IACPUnregisterServer()</CODE>
+. This routine is passed two arguments: the <CODE>
+GeodeToken</CODE>
+ of the server list, and the optr of the server. The object will be removed immediately from the server list. Note, however, that the server list might have already dispatched some messages to the server being removed; these messages might be waiting on the server object's queue, and thus the server object might get some IACP messages even after it calls <CODE>
+IACPUnregisterServer()</CODE>
+. One way to deal with this is to have the server object send itself a message, via the queue, immediately after it calls <CODE>
+IACPUnregisterServer()</CODE>
+. When the object receives this message, it will know that it has no more IACP messages on its queue.</P>
+<P>
+<A NAME="IX_IACPGetServerNumber()">
+ </A>
+Every server object on a given server list has a unique <EM>
+server number</EM>
+. This server number will not change while the server is attached to the list. A server object can find out its server number by calling <CODE>
+IACPGetServerNumber()</CODE>
+. This routine takes two arguments: the <CODE>
+IACPConnection </CODE>
+and the optr to the server object. It returns the object's server number.</P>
+
+
+<H2 CLASS="HeadingC">
+Non-Application Servers and Clients</H2>
+<PRE>MSG_META_IACP_PROCESS_MESSAGE, IACPProcessMessage(), MSG_META_IACP_NEW_CONNECTION, MSG_META_IACP_LOST_CONNECTION</PRE>
+<P>
+Every server and client object must be able to handle certain messages. <CODE>
+GenApplicationClass</CODE>
+ comes with handlers for these messages, so you need not write them yourself. However, if you will be using some other kind of object as the server, you must handle the messages yourself. You may also choose to have your application object subclass any of these messages; in that case, you should generally have your handler use <CODE>
+@callsuper</CODE>
+.</P>
+<P>
+When a server or client sends an IACP message, the kernel passes the encapsulated message to each object on the other side of the link. It does this by sending the message MSG_META_IACP_PROCESS_MESSAGE to each object. This message comes with three arguments:</P>
+<DL>
+<DT>
+<CODE>
+msgToSend</CODE>
+ </DT><DD>The <CODE>
+EventHandle</CODE>
+ of the encapsulated message.</DD>
+<DT>
+<CODE>
+topt</CODE>
+</DT><DD>The <CODE>
+TravelOption</CODE>
+ for that message.</DD>
+<DT>
+<CODE>
+completionMsg</DT><DD>
+</CODE>
+The<CODE>
+ EventHandle</CODE>
+ of any message to be sent after <CODE>
+msgToSend</CODE>
+ has been dispatched. (This field may be set to zero, indicating that there is no completion message.)</DD>
+</DL>
+<P>
+The recipient of MSG_META_IACP_PROCESS_MESSAGE should call <CODE>
+IACPProcessMessage()</CODE>
+. This routine is passed four arguments: the optr of the object calling the routine, and the three arguments passed with MSG_META_IACP_PROCESS_MESSAGE. <CODE>
+IACPProcessMessage()</CODE>
+ dispatches both encapsulated messages properly.</P>
+<P>
+Remember, if the client or server is subclassed from <CODE>
+GenApplicationClass</CODE>
+, all of this is done for you. You need only write a handler for the message if the client or server object is not from a subclass of <CODE>
+GenApplicationClass</CODE>
+.</P>
+<P>
+Whenever a client registers on an IACP list, the kernel sends MSG_META_IACP_NEW_CONNECTION to all servers on that list. This message comes with three arguments:</P>
+<DL>
+<DT>
+<CODE>
+appLaunchBlock</DT><DD>
+</CODE>
+This is the handle of the <CODE>
+AppLaunchBlock</CODE>
+ which the server passed to <CODE>
+IACPConnect()</CODE>
+.</DD>
+<DT>
+<CODE>
+justLaunched</DT><DD>
+</CODE>
+This is a Boolean value. If the server's application has just been launched specifically to be a server, this will be <EM>
+true</EM>
+ (i.e. non-zero).</DD>
+<DT>
+<CODE>
+IACPConnection</DT><DD>
+</CODE>
+This is the token for the IACP connection.</DD>
+</DL>
+<P>
+When an object (either client or server) removes itself from an IACP connection, the kernel sends MSG_META_IACP_LOST_CONNECTION to all objects on the other side of the link. This message has two parameters: </P>
+<DL>
+<DT>
+<CODE>
+connection</CODE>
+</DT><DD>The token for the IACP list.</DD>
+<DT>
+<CODE>
+serverNum</CODE>
+</DT><DD>If a server removed itself from the list (and this message is being sent to clients), this field will have the number of the server that removed itself. If a client removed itself from the list, this field will be zero.</DD>
+</DL>
+<P>
+Whenever a new client is attached to a server list, MSG_META_IACP_NEW_CONNECTION is sent to every server object. This message comes with three arguments:</P>
+<DL>
+<DT>
+<CODE>
+appLaunchBlock</DT><DD>
+</CODE>
+This is the handle of the application's launch block. The default <CODE>
+GenApplicationClass</CODE>
+ handler examines the launch block to see if the application should open a document.</DD>
+<DT>
+<CODE>
+justLaunched</DT><DD>
+</CODE>
+If the application was just launched specifically to be a server, this field will be <CODE>
+true</CODE>
+ (i.e. non-zero).</DD>
+<DT>
+<CODE>
+connection</CODE>
+</DT><DD>This is the token for the IACP connection.</DD>
+</DL>
+<P>
+When a client is removed from a server list, every server object is sent <CODE>
+MSG_META_IACP_LOST_CONNECTION</CODE>
+. Similarly, when a server is removed, every client object is sent <CODE>
+MSG_META_IACP_LOST_CONNECTION</CODE>
+. The message comes with two arguments:</P>
+<DL>
+<DT>
+<CODE>
+IACPConnection</DT><DD>
+</CODE>
+This is the token for the IACP connection.</DD>
+<DT>
+<CODE>
+serverNum</CODE>
+</DT><DD>If a server left the list (and the message is being sent to clients), this argument will hold its <CODE>
+serverNum</CODE>
+. If a client left the list (and the message is being sent to servers), this argument will be set to zero.</DD>
+
+</DL>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Geodes_19.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Geodes_1d.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">6.4 Being a Client</A> 
+<!-- to next --> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

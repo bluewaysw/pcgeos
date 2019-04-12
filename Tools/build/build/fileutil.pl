@@ -32,16 +32,16 @@
 #	CopyFile(<file>, <destination>)
 #		Copy the file to destination.
 #	Dosify(<filename>)
-#		Convert a filename that may have more than eight characters 
+#		Convert a filename that may have more than eight characters
 #		before the period because of added ec characters to 8.3 format.
 #	GEOSToDOSFileName(<filename>)
-#		Convert a potentially long GEOS file name to an approximation 
+#		Convert a potentially long GEOS file name to an approximation
 #		of its DOS file name.
 #	GEOSToDOSPathName(<filename>)
-#		Convert potentially long GEOS directory names in a path to 
+#		Convert potentially long GEOS directory names in a path to
 #		their DOS directory names.
 #	BuildDestTreePath()
-#		If destination path has not been explicitly defined, set it 
+#		If destination path has not been explicitly defined, set it
 #		based on the build variables.  Create the path if it doesn't
 #		exist.
 #	AbbrevPath()
@@ -174,18 +174,23 @@ sub MakePath {
     local($passedpath)=@_;
 
     if ( &IsUnix() ) {		# Unix system
-	$passedpath =~ s|^/||;	# Cut off the starting slash.
+	#$passedpath =~ s|^/||;	# Cut off the starting slash.
+
+        $passedpath = substr($passedpath, length($var{desttree}));
+        $path = $dosPath = $var{desttree};
     } else {			# Win32 system
 	$path = $dosPath = substr($passedpath, 0, 3); # Drive & leading slash
 	$passedpath = substr($passedpath, 3); # Rest of the path
     }
+
+    print "MakePath $passedpath $var{desttree}\n";
 
     foreach $directory (split('/', "$passedpath")) {
 
 	# We presume that if the DOS name of the directory matches, it is
 	# a match.
 
-	$dosdirectory = &GEOSToDOSFileName($directory); 
+	$dosdirectory = &GEOSToDOSFileName($directory);
 	if ( ! -d "$path$dosdirectory" ) {
 	    &MakeDir("$path$directory");
 	}
@@ -193,7 +198,7 @@ sub MakePath {
 	$dosPath .= "$dosdirectory/";
     }
     return "$dosPath";
-}    
+}
 
 
 ##############################################################################
@@ -201,7 +206,7 @@ sub MakePath {
 ##############################################################################
 #
 # SYNOPSIS:	Send specified file to destination.
-# PASS:		<file> = path of file within an Installed tree. 
+# PASS:		<file> = path of file within an Installed tree.
 #               <destination> = where to put its
 # CALLED BY:	various
 # RETURN:	nothing
@@ -241,7 +246,7 @@ sub SendFile{
 #
 ##############################################################################
 sub FindInstalledFile {
-    
+
     local($file, $sourcedir, $filewithpath);
 
     $file="@_";
@@ -262,7 +267,7 @@ sub FindInstalledFile {
 #	FindInstalledDir
 ##############################################################################
 #
-# SYNOPSIS:	Look for dir in the source directories, copied from 
+# SYNOPSIS:	Look for dir in the source directories, copied from
 #               FindInstalledPath.
 # PASS:		<dir> = path of dir within an Installed tree.
 # CALLED BY:	various
@@ -275,7 +280,7 @@ sub FindInstalledFile {
 #
 ##############################################################################
 sub FindInstalledDir {
-    
+
     local($file, $sourcedir, $filewithpath);
 
     $file="@_";
@@ -327,8 +332,8 @@ sub CopyFile {
 	$filename =~ s|.*/([^/]+)$|$1|;
 	$to =~ s|$filename$||;
     }
-    
-    # 
+
+    #
     # ugly hack to deal with a few specific files that need to begine with @
     # we need to do this because perforce will not handle filenames with @
     #
@@ -338,7 +343,7 @@ sub CopyFile {
     if ((uc $filename) eq (uc "nd_dire.000")) {
 	$filename = "\@$filename";
     }
-    
+
     $filename = &Dosify("$filename");
 
     # Report to user what's goin' on.
@@ -353,7 +358,7 @@ sub CopyFile {
 	print("     to $to$filename\n\n");
     }
 
-    # Check if file of the same name exists in the destination path. If we 
+    # Check if file of the same name exists in the destination path. If we
     # find one, then we change the last letter of the file name to "0" before
     # the copy operation.
     if ( -e "$to$filename" && !"var{syntaxtest}" ) {
@@ -403,7 +408,7 @@ sub CopyFile {
 #	Dosify
 ##############################################################################
 #
-# SYNOPSIS:	Convert a filename that may have more than eight characters 
+# SYNOPSIS:	Convert a filename that may have more than eight characters
 #               before the period because of added ec characters to 8.3 format.
 # PASS:		<filename> = filename to convert
 # CALLED BY:	various
@@ -438,12 +443,12 @@ sub Dosify {
 
 	    substr($newname, 7, 1) = "e";
 	    &DebugPrint("dosify", "Correcting for EC: $newname");
-	} 
+	}
     } else {
-	
+
 	# If there are no '.'s in the name, we'll just take the first
 	# eleven letters and make that our 8.3
-	
+
 	if ( length($name) > 8 ) {
 	    $namepreflen = 8;
 	    $newname = substr($name,0,8).".".substr($name,8,3);
@@ -476,12 +481,12 @@ sub Dosify {
 #
 ##############################################################################
 sub GEOSToDOSFileName{
- 
+
     local ($longname, $dosname, $beforedot, $afterdot, $afterdot2);
 
     $longname="@_";
     ($beforedot, $afterdot, $afterdot2) = split('\.', "$longname");
-    if ("$beforedot" && !"$afterdot2" && 
+    if ("$beforedot" && !"$afterdot2" &&
 	length($beforedot) <= 8 && length($afterdot) <=3 ) {
 
 	$dosname = $longname;
@@ -520,13 +525,17 @@ sub GEOSToDOSFileName{
 #
 ##############################################################################
 sub GEOSToDOSPathName{
-    
+
     local($directory);
     local($path)="";
     local($fullpath) = @_;
 
     if ( &IsUnix() ) {		# Unix system
-	$fullpath =~ s|^/||;    # Cut off starting slash.
+
+        $fullpath = substr($fullpath, length($var{desttree}));
+        $path = $var{desttree};
+        $fullpath =~ s|^/||;    # Cut off starting slash.
+
     } else {			# Win32 system
 	$path = substr($fullpath, 0, 2); # Drive letter and colon
 	$fullpath = substr($fullpath, 3); # Path w/o leading slash
@@ -536,7 +545,7 @@ sub GEOSToDOSPathName{
 
     foreach $directory (split('/', "$fullpath")) {
 	$path .= "/";
-	$path .= &GEOSToDOSFileName("$directory"); 
+	$path .= &GEOSToDOSFileName("$directory");
     }
     return "$path";
 }
@@ -546,7 +555,7 @@ sub GEOSToDOSPathName{
 #	BuildDestTreePath
 ##############################################################################
 #
-# SYNOPSIS:	If destination path has not been explicitly defined, set it 
+# SYNOPSIS:	If destination path has not been explicitly defined, set it
 #               based on the build variables.  Create the path if it doesn't
 #               exist.
 # PASS:		nothing
@@ -643,7 +652,7 @@ sub AbbrevPath {
     local($path)="@_";
     $path =~ s|staff/pcgeos|<s/p>|;
     $path =~ s/Installed/<i>/;
-    $path =~ s|n/nevada/demos|<d>|;	
+    $path =~ s|n/nevada/demos|<d>|;
     return $path;
 }
 
@@ -683,7 +692,7 @@ sub ReplaceProductDir {
     $makefile=&FindInstalledFile("$pathwithoutfile/Makefile");
 
     if ( ! "$makefile" ) {
-	
+
 	# Back up another directory.
 
 	$pathwithoutfile =~ s|/[^/]*$||;
@@ -695,7 +704,7 @@ sub ReplaceProductDir {
 	    # No Makefile found. If the original directory +
 	    # productdir has the file, that means the original
 	    # directory does not contain product sub-directory because
-	    # there cannot be sub-directories in a product directory. 
+	    # there cannot be sub-directories in a product directory.
 
 	    if ( &FindInstalledFile("$pathwithoutfileorig/$productdir/$file") ){
 		$pathwithoutfile=$pathwithoutfileorig;
@@ -718,10 +727,10 @@ sub ReplaceProductDir {
 # SYNOPSIS:	Convert a text file to DOS format.
 # PASS:		Unix2Dos(filename)
 #               filename - name of the file
-# CALLED BY:	
+# CALLED BY:
 # RETURN:	1 on success
 #               0 on failure
-# SIDE EFFECTS:	
+# SIDE EFFECTS:
 #               The file is changed to DOS format.
 # STRATEGY:
 #
@@ -746,9 +755,9 @@ sub Unix2Dos {
     if ( &Debug("syscalls") ){
 	print "SYS: Unix2Dos($inFile)\n\n";
     }
-    
+
     if ( ! $var{"syntaxtest"} ){
-	
+
 	# Open the input and output files.
 	#
 	open(UNIXFILE, "<$inFile") || goto errorExit;
@@ -767,7 +776,7 @@ sub Unix2Dos {
 
 	    # Don't dosify a file which is already in DOS format.
 	    #
-	    if ( ! /\r\n/ ){	
+	    if ( ! /\r\n/ ){
 		s/\n/\r\n/;
 	    }
 	    if ( !(print DOSFILE) ){
@@ -824,7 +833,7 @@ sub MkDir {
     if ( &Debug("syscalls") ){
 	print "SYS: mkdir($_[0], 0777)\n\n";
     }
-    
+
     if ( ! $var{"syntaxtest"} ){
 	$ok = mkdir($_[0], 0777);
     }
@@ -869,9 +878,9 @@ sub Copy {
 
 	    #
 	    # In synchronization process, we don't want to fail
-	    for (; (! ($ok = copy(@_))) ; 
+	    for (; (! ($ok = copy(@_))) ;
 		 sleep 1) {print ".";}
-		
+
 	} else {
 	    $ok = copy(@_);
 	}
@@ -921,8 +930,8 @@ sub RmTree {
 }
 
 #
-# The following routines are resedit specific routines. 
-# 
+# The following routines are resedit specific routines.
+#
 
 ##############################################################################
 #	GetVMFile
@@ -934,13 +943,13 @@ sub RmTree {
 # RETURN:	.vm filename corresponding to the sourceFile
 # SIDE EFFECTS:	none
 #
-# STRATEGY:	
+# STRATEGY:
 #
 # REVISION HISTORY:
 #	Name		Date		Description
 #	----		----		-----------
 #       kliu     	1/10/98   	Initial Revision
-#	
+#
 ##############################################################################
 
 sub GetVMFile {
@@ -952,7 +961,7 @@ sub GetVMFile {
 	    if ($sourceFile =~ /ec\.geo/) {
 		# watch out for some test apps.
 		($vmFile = $sourceFile) =~ s/ec\.geo/\.vm/;
-	    } else { 
+	    } else {
 		($vmFile = $sourceFile) =~ s/\.geo/\.vm/;
 	    }
 	} else  {
@@ -963,8 +972,8 @@ sub GetVMFile {
 	}
     }
     return "";
-}	
-    
+}
+
 ##############################################################################
 #	SetReseditIni
 ##############################################################################
@@ -975,13 +984,13 @@ sub GetVMFile {
 # RETURN:	nothing
 # SIDE EFFECTS:	none
 #
-# STRATEGY:	
+# STRATEGY:
 #
 # REVISION HISTORY:
 #	Name		Date		Description
 #	----		----		-----------
 #       kliu     	1/10/98   	Initial Revision
-#	
+#
 ##############################################################################
 sub SetReseditIni {
     my ($no_of_lines);
@@ -999,20 +1008,20 @@ sub SetReseditIni {
 # RETURN:	no. of lines in the geos.ini
 # SIDE EFFECTS:	data of the file is read into $lines array
 #
-# STRATEGY:	
+# STRATEGY:
 
 #
 # REVISION HISTORY:
 #	Name		Date		Description
 #	----		----		-----------
 #       kliu     	1/10/98   	Initial Revision
-#	
+#
 ##############################################################################
 sub ReadIniFile {
 
     my($count) = 0;
     my($file) = "$var{reseditpath}\\geos.ini";
-    
+
     open(INI, "<$file") || die "can't open $file\n";
 
     while(<INI>) {
@@ -1020,7 +1029,7 @@ sub ReadIniFile {
     }
 
     close(INI);
-    return $count; 
+    return $count;
 }
 
 ##############################################################################
@@ -1029,19 +1038,19 @@ sub ReadIniFile {
 #
 # SYNOPSIS:	Scan the $lines array and modify it to update its information
 #               as provided by gbuild and write the data back to geos.ini
-#               
+#
 # PASS:		no. of lines in the geos.ini
 # CALLED BY:	SetReseditIni
 # RETURN:	nothing
 # SIDE EFFECTS:	Updated information in $lines are written back to geos.ini
 #
-# STRATEGY:	
+# STRATEGY:
 #
 # REVISION HISTORY:
 #	Name		Date		Description
 #	----		----		-----------
 #       kliu     	1/10/98   	Initial Revision
-#	
+#
 ##############################################################################
 sub ScanLines {
 
@@ -1054,12 +1063,12 @@ sub ScanLines {
     for ($i=0; $i < $count; $i++) {
 
 	$line = $lines[$i];
-	
+
 	if ($line =~ /^\s*$/) {
 	    # We are skipping a blank line
 	} elsif ($line =~ /^\[resedit\]/) {
 	    $catFound = 1;
-	} elsif ($catFound && ($line =~ /^([^=]+)\s*=/)) { 
+	} elsif ($catFound && ($line =~ /^([^=]+)\s*=/)) {
 
 	    $key = $1;
 	    $key =~ s/\s*$//;
@@ -1102,13 +1111,13 @@ sub ScanLines {
 	    # We have reached the next category after resedit
 	    last;
 	}
-	
+
     }
-    # 
+    #
     #  At this point, the @lines array should have the right data, write that back to the file
-    
+
     open(INI, ">$file");
-    
+
     for ($i=0; $i < $count; $i++) {
 	print INI $lines[$i];
     }
@@ -1126,18 +1135,18 @@ sub ScanLines {
 # RETURN:	Action code
 # SIDE EFFECTS:	none
 #
-# STRATEGY:	
+# STRATEGY:
 #
 # REVISION HISTORY:
 #	Name		Date		Description
 #	----		----		-----------
 #       kliu     	1/10/98   	Initial Revision
-#	
+#
 ##############################################################################
 sub MapActionCode {
     #
     # We need to map the action to corresponding code
-    # for resedit to process. (kinda hack) 
+    # for resedit to process. (kinda hack)
 
     if ($var{action} =~ /create_trans_files/i) {
 	return 0;
@@ -1164,13 +1173,13 @@ sub MapActionCode {
 # RETURN:	nothing
 # SIDE EFFECTS:	File truncated to zero length
 #
-# STRATEGY:	
+# STRATEGY:
 #
 # REVISION HISTORY:
 #	Name		Date		Description
 #	----		----		-----------
 #       kliu     	1/10/98   	Initial Revision
-#	
+#
 ##############################################################################
 sub TruncateToZero {
 
@@ -1196,13 +1205,13 @@ sub TruncateToZero {
 # RETURN:	nothing
 # SIDE EFFECTS:	none
 #
-# STRATEGY:	
+# STRATEGY:
 #
 # REVISION HISTORY:
 #	Name		Date		Description
 #	----		----		-----------
 #       kliu     	4/13/98   	Initial Revision
-#	
+#
 ##############################################################################
 sub SendGeodeStubIfNecessary {
 
@@ -1216,29 +1225,29 @@ sub SendGeodeStubIfNecessary {
 	@stubOptions=grep(/^MAKESTUB/, @mediaOptions);
 	($stubOption)=@stubOptions;
 	if ( "$stubOption" ) {
-	    
+
 	    # We need to make a stub.
 	    # If we have MAKESTUB=<mediaType>, use that media type.
-	    
+
 	    ($stubOption, $stubDest) = split(/=/, $stubOption);
 	    if ( "$stubDest" ) {
-		
+
 		# Put specified media type as first priority.
-		@line=($stubDest, @line); 
+		@line=($stubDest, @line);
 	    }
-	    
+
 	    # Remove XIP media from the running.
-	    
+
 	    @line=grep(!/^XIP/ && !/^MAKESTUB/, @line);
-	    
+
 	    # Choose the media type and destination path for the stub.
-	    
+
 	    ($mediaType,@mediaOptions)=&ChooseMedia(@line);
 	    $destPath=&BuildDestPath($mediaType, @mediaOptions);
 	    $dosDestPath=&MakePath($destPath);
-	    
+
 	    # Send the geode and stubify it.
-	    
+
 	    &SendFile($sourceFile, $dosDestPath);
 	    (my $geodeName=$sourceFile)=~s|.*/([^/]*)$|$1|;
 	    $geodeName = &Dosify($geodeName);
@@ -1256,15 +1265,15 @@ sub SendGeodeStubIfNecessary {
 # CALLED BY:	SendFileTree
 # RETURN:	nothing
 #
-# STRATEGY:	
+# STRATEGY:
 #
 # REVISION HISTORY:
 #	Name		Date		Description
 #	----		----		-----------
 #       kliu     	1/10/98   	Initial Revision
-#	
+#
 ##############################################################################
-sub  ClearSrcSyncFiles 
+sub  ClearSrcSyncFiles
 {
     my($filename) = @_;
 
@@ -1286,13 +1295,13 @@ sub  ClearSrcSyncFiles
 # CALLED BY:    SendFileTree
 # RETURN:       nothing
 #
-# STRATEGY:	
+# STRATEGY:
 #
 # REVISION HISTORY:
 #	Name		Date		Description
 #	----		----		-----------
 #       kliu     	1/10/98   	Initial Revision
-#	
+#
 ##############################################################################
 sub ClearDestSyncFiles {
 
@@ -1303,10 +1312,10 @@ sub ClearDestSyncFiles {
     if (! $files_to_delete) { return }
 
     @files_found = glob("$var{desttrans}/*.*");
-    
+
     #
     # scalar(@files) could be more than $files_to_delete, because the Resedit
-    # must not have deleted the .geo. But anyhow leave that for Resedit to do 
+    # must not have deleted the .geo. But anyhow leave that for Resedit to do
     # for synchronization reason.
 
     for ($i=0; $i < $files_to_delete; $i += unlink @files_found) {}
@@ -1317,34 +1326,34 @@ sub ClearDestSyncFiles {
 #	Member
 ##############################################################################
 #
-# SYNOPSIS:	Utility to check whether a particular item is a member of 
+# SYNOPSIS:	Utility to check whether a particular item is a member of
 #               a list.
 # PASS:		item
 # CALLED BY:	GLOBAL
 # RETURN:	1 if exists, 0 if not
 # SIDE EFFECTS:	none
 #
-# STRATEGY:	
+# STRATEGY:
 #
 # REVISION HISTORY:
 #	Name		Date		Description
 #	----		----		-----------
 #       kliu     	1/10/98   	Initial Revision
-#	
+#
 ##############################################################################
 sub Member {
 
     #
     # simple memeber function to check whether
-    # an elemen is a member of a list 
+    # an elemen is a member of a list
 
     my($item, @list) = @_;
-    
+
     foreach $curItem (@list) {
 	return 1 if ($item =~ /^$curItem$/i);  # exact match
     }
     return 0;
-}		     
+}
 
 ##############################################################################
 #	PrintReseditErrorsAndWarnings
@@ -1356,26 +1365,23 @@ sub Member {
 # CALLED BY:	Main in build.pl
 # RETURN:	nothing
 #
-# STRATEGY:	
+# STRATEGY:
 #
 # REVISION HISTORY:
 #	Name		Date		Description
 #	----		----		-----------
 #       kliu     	1/14/98   	Initial Revision
-#	
+#
 ##############################################################################
 sub PrintReseditErrorsAndWarnings {
-    
+
     if (-s "$var{logdir}/error\.log") {
 	print "\nErrors were produced while using ResEdit.\n";
 	print "Check $var{logdir}/error\.log for details.\n";
     }
-    
+
     if (-s "$var{logdir}/warning\.log") {
 	print "\nWarnings were produced while using ResEdit.\n";
 	print "Check $var{logdir}/warning\.log for details.\n";
     }
 }
-
-    
-    

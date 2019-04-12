@@ -1,0 +1,154 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: GCN_a.htm,v 1.1 97/06/02 15:27:33 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Handling Application Notification</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">General Change Notification</A>: 4.3 <A HREF="GCN_7.htm">Application Local GCN Lists</A>: 
+Handling Application Notification</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GCN_7.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GCN_9.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.2 Registering for Notification</A> 
+<!-- to next --> | <A HREF="GCN_b.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.4 Removal from Application Lists</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>MSG_META_NOTIFY, MSG_META_NOTIFY_WITH_DATA_BLOCK, MSG_META_GCN_LIST_SEND</PRE>
+<P>
+<A NAME="IX_MSG_META_NOTIFY_WITH_DATA_BLOCK">
+ </A>
+<A NAME="IX_MSG_META_NOTIFY">
+ </A>
+When a change occurs in the application that needs to send out notification, you must set up the notification message and send it to the interested list. You may attach a data block to this notification for use by the objects on the notification list. To send out these notifications, you should use <CODE>
+MSG_META_NOTIFY</CODE>
+ or <CODE>
+MSG_META_NOTIFY_WITH_DATA_BLOCK</CODE>
+ (when passing data). </P>
+<P>
+In the simplest case without the need to pass data, you should encapsulate <CODE>
+MSG_META_NOTIFY</CODE>
+ with the particular Notification ID (notification type and Manufacturer ID) that should be notified. You should then send <CODE>
+MSG_GEN_PROCESS_SEND_TO_APP_GCN_LIST </CODE>
+to your application object with this event and the particular GCN list interested in this change. (Note that you will have to keep track of which lists are interested in which notification types.) Make sure that you perform a send (not a call) when using this message as the message may cross threads.</P>
+<P CLASS="figTitle">
+Code Display 9-5 Using MSG_META_NOTIFY</P>
+<PRE>@method MyProcessClass, MSG_SEND_CUSTOM_NOTIFICATION {</PRE>
+<PRE>    MessageHandle event;</PRE>
+<PRE>/* First encapsulate the MSG_META_NOTIFY with the type of list and manufacturer ID
+ * interested in the change. Since this message is being recorded for no class in
+ * particular, use NullClass.*/</PRE>
+<PRE>    event = @record (optr) NullClass::MSG_META_NOTIFY(
+	MANUFACTURER_ID_<EM>yourCompanyName</EM>,
+	<EM>yourCompanyName</EM>_NT_CUSTOM_TYPE_ONE);</PRE>
+<PRE>/* Then send this MSG_META_NOTIFY using MSG_META_GCN_LIST_SEND. You must make sure
+ * to pass the particular GCN list interested in the changes encapsulated in the
+ * above message. */</PRE>
+<PRE>    @send MyProcess::MSG_GEN_PROCESS_SEND_TO_APP_GCN_LIST (
+	(word) 0, 			/* GCNListSendFlags */
+	event,			/* Handle to MSG_NOTIFY event above. */
+	0,			/* No data passed, so no data block. */
+	/* Pass the list interested in NT_CUSTOM_TYPE_ONE notification types. */
+	<EM>yourCompanyName_</EM>GAGCNLT_APP_CUSTOM_LIST_ONE,
+	/* Pass your manufacturer ID. */
+	MANUFACTURER_ID_<EM>yourCompanyName</EM>);
+}</PRE>
+<P>
+If instead you need to pass a data block along with the notification, you should use <CODE>
+MSG_META_NOTIFY_WITH_DATA_BLOCK</CODE>
+. You should set up the structure to pass beforehand. You must also make sure to add a reference count to the data block equal to the number of <EM>
+lists</EM>
+ (not objects) you wish to send the notification. To do this, call <CODE>
+MemInitRefCount()</CODE>
+ with the data block and the total number of lists you are sending the notification to. (In most cases, you will only send notification to one list, although, of course, that list may have several objects.) </P>
+<P CLASS="figTitle">
+Code Display 9-6 MSG_META_NOTIFY_WITH_DATA_BLOCK</P>
+<PRE>@method MyProcessClass, MSG_SEND_CUSTOM_NOTIFICATION {</PRE>
+<PRE>    typedef struct {
+	int number;
+	char letterToLookFor;
+    } MyDataStructure;</PRE>
+<PRE>    MemHandle myDataBlock;
+    MyDataStructure *myDataPtr;
+    MessageHandle event;</PRE>
+<PRE>/* Allocate and lock down a block for the data structure. This will be passed
+ * along with the notification. NOTE: data blocks must be sharable! */</PRE>
+<PRE>    myDataBlock = MemAlloc(sizeof(MyDataStructure), (HF_DYNAMIC | HF_SHARABLE),
+			 HAF_STANDARD);</PRE>
+<PRE>    myDataPtr = MemLock(myDataBlock);</PRE>
+<PRE>/* Load up the structure with pertinent information. */
+    myDataPtr-&gt;count = 200;
+    myDataPtr-&gt;letterToLookFor = `z';</PRE>
+<PRE>/* Unlock it and set its reference count to 1 as we are only sending this to one
+ * list. */
+    MemUnlock(myDataBlock);
+    MemInitRefCount(myDataBlock, (word) 1);</PRE>
+<PRE>/* Now encapsulate a MSG_META_NOTIFY_WITH_DATA_BLOCK message. Since it is being
+ * recorded for no particular class, use NullClass as its class type. */</PRE>
+<PRE>    event = @record (optr) NullClass::MSG_META_NOTIFY_WITH_DATA_BLOCK(
+			MANUFACTURER_ID_<EM>yourCompanyName</EM>,				/* Manufacturer ID */
+			NT_CUSTOM_TYPE_ONE,				/* List type. */
+			myDataBlock);				/* handle of data block */</PRE>
+<PRE>/* Finally, send the message off to our process. The GCNListSendFlags depend on
+ * the situation. */</PRE>
+<PRE>    @send MyProcess::MSG_GEN_PROCESS_SEND_TO_APP_GCN_LIST(
+			(word) 0,			/* GCNListSendFlags */
+			event,			/* Handle to message */
+			myDataBlock,			/* Handle of data block */
+	/* Pass the type of list interested in NT_CUSTOM_TYPE_ONE notification. */
+			GAGCNLT_APP_CUSTOM_LIST_ONE,
+			MANUFACTURER_ID_<EM>yourCompanyName</EM>);</PRE>
+<PRE>/* All done! myDataBlock will be MemFree()'d automatically. */
+}</PRE>
+<P>
+The object or process originally requesting notification of the change will want to provide a handler for the <CODE>
+MSG_META_NOTIFY</CODE>
+ or <CODE>
+MSG_META_NOTIFY_WITH_DATA_BLOCK</CODE>
+. If additional data about the change is passed in a data block, the process should access that information with <CODE>
+MemLock() </CODE>
+and<CODE>
+ MemUnlock()</CODE>
+. You should always call the process's superclass in your message handler, to make sure that the global heap block will be automatically freed by <CODE>
+MetaClass</CODE>
+. Therefore, do not free a notification data block manually in a notification handler.
+
+</P>
+<P CLASS="figTitle">
+Code Display 9-7 Intercepting an Application Notification Change</P>
+<PRE>/* Code to implement when MyObjectClass receives MSG_META_NOTIFY with a certain
+ * notification type. */</PRE>
+<PRE>@method MyObjectClass, MSG_META_NOTIFY {</PRE>
+<PRE>    MyDataStructure myData;				/* Stores the passed data block. */</PRE>
+<PRE>/* Lock the data structure. */</PRE>
+<PRE>    myData = MemLock(data);</PRE>
+<PRE>/* Check the notification type and implement the changes you wish to occur in
+ * response to the previous event. */</PRE>
+<PRE>    if ((notificationType == <EM>yourCompanyName_</EM>NT_CUSTOM_TYPE_ONE) &amp; 
+	(manufID == MANUFACTURER_ID_<EM>yourCompanyName</EM>)){
+	/* Code to implement for your object. */
+    }</PRE>
+<PRE>    MemUnlock(data);</PRE>
+<PRE>    @callsuper;				/* Important! Frees data block. */
+}</PRE>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GCN_7.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GCN_9.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.2 Registering for Notification</A> 
+<!-- to next --> | <A HREF="GCN_b.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.4 Removal from Application Lists</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

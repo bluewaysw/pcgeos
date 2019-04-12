@@ -1,0 +1,209 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: JTable_d.htm,v 1.2 97/09/05 14:42:23 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Handling Locator Searches</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The Table Objects</A>: 4.6 <A HREF="JTable_7.htm">Using a Table Object</A>: 
+<A NAME="14433">
+ </A>
+Handling Locator Searches</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="JTable_7.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="JTable_c.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.5 Custom Scrolling Behavior</A> 
+<!-- to next --> | <A HREF="JTable_e.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.7 Table Headings</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>MSG_TABLE_CHAR_LOCATE, MSG_TABLE_STRING_LOCATE</PRE>
+<P>
+The Table object may wish to respond to searches on its data. For this purpose, the Table object is designed to interact with a <CODE>
+LocatorClass</CODE>
+ object; the Locator object is a UI object that the user uses to initiate searches on the Table. The Locator object implements this search by sending the Table object one of two messages. You must intercept these messages to provide searching behavior. <CODE>
+TableClass</CODE>
+ provides no default searching behavior.</P>
+<P>
+The Locator object is discussed in detail in <A HREF="JTable_13.htm#60877"> LocatorClass</A>
+; however, some background on how the Locator works is illustrative to providing the Table`s searching behavior.</P>
+<P>
+The Locator object can be in one of two modes: <EM>
+index</EM>
+ mode or <EM>
+text</EM>
+ <EM>
+search</EM>
+ mode. The Locator object will appear and act differently depending on which mode it is in.</P>
+<P>
+When the Locator object is in index mode, it takes the form of an action bar, shown below.
+<IMG SRC="JTable_d_indexLocator.gif">
+
+</P>
+<P>
+Tapping on one of the Locator's dyad buttons (`AB', `EF', etc.) will send the Table object <CODE>
+MSG_TABLE_CHAR_LOCATE</CODE>
+, passing it the letter to search. Repeatedly clicking on a dyad button will cycle through the two letters to perform the search. For example, clicking once on the `AB' dyad button will send the Table <CODE>
+MSG_TABLE_CHAR_LOCATE</CODE>
+ with the character `A.' Clicking again on that button will send the Table <CODE>
+MSG_TABLE_CHAR_LOCATE </CODE>
+with the character `B.' Clicking yet again on that button will send the Table <CODE>
+MSG_TABLE_CHAR_LOCATE</CODE>
+ with the character `C.'</P>
+<P>
+If you have a Locator linked to your Table, you will want to intercept <CODE>
+MSG_TABLE_CHAR_LOCATE</CODE>
+ to make sure that you can implement searching behavior in index mode.</P>
+<P>
+When the Locator object is in text search mode, the action bar &quot;morphs&quot; into a text search entry field shown below.
+<IMG SRC="JTable_d_searchLocator.gif">
+
+</P>
+<P>
+Entering text into the text search field of the Locator will send the linked Table object <CODE>
+MSG_TABLE_STRING_LOCATE</CODE>
+ after each keystroke, passing it the current contents of the text entry field. You will want to intercept this message to provide your searching method for when the Locator object is in text mode.</P>
+<P>
+You may find it convenient to write a generic searching routine that your message handlers for both <CODE>
+MSG_TABLE_CHAR_LOCATE</CODE>
+ and <CODE>
+MSG_TABLE_STRING_LOCATE</CODE>
+ may call. This searching routine will likely want to perform a case-insensitive search on your Table. You may want to use a routine such as <CODE>
+LocalCmpStringsNoCase()</CODE>
+ for this purpose. Note that you must still provide separate message handlers for each of these messages even if you provide a generic searching routine.</P>
+<P CLASS="figTitle">
+Code Display 5-6 Implementing a Search</P>
+<PRE>/* This code implements a single character search initiated by a Locator object. */</PRE>
+<PRE>@method MyTableClass, MSG_TABLE_CHAR_LOCATE
+{
+    char *data;			/* Pointer to the table data array. */
+    word index =0;			/* A linear index into the Table data array. */</PRE>
+<PRE>    /* We'll want to send MSG_TABLE_SET_CURRENT_SELECTION, so we'll want
+     * to pass a TableCellRange.
+     */
+    TableCellRange	selection;</PRE>
+<PRE>    Boolean searchResult;			/* Reports the success or failure of the search. */</PRE>
+<PRE>    /* We initialize the selection to start searching from the beginning of the
+     * Table. */
+    selection.TCR_start.TCL_row					= 0;
+    selection.TCR_start.TCL_column					= 0;
+    selection.TCR_end.TCL_row					= 0;
+    selection.TCR_end.TCL_column					= 0;</PRE>
+<PRE>    /* Lock down our data block. */
+    MemLock(OptrToHandle(@cellDataArray));</PRE>
+<PRE>    /* Perform a case-insensitive search on the data in the array. We do this by 
+     * searching linearly, multiplying by the total number of columns in the 
+     * Table, so that we only search the first column. (We could have also 
+     * performed our search cell by cell in a linear fashion; in that case we 
+     * would not have multiplied the index by TABLE_COLS in the `step' section of 
+     * the while statement.) The data in this case is assumed to be stored in a      * linear chunk array. */</PRE>
+<PRE>    do {
+	data = ChunkArrayElementToPtr(@cellDataArray, index, 1);
+    } while(
+	(LocalCmpStringsNoCase(data, searchText, 1)) &amp;&amp;
+	((++index * TABLE_COLS) &lt; (TABLE_COLS * TABLEROWS)));</PRE>
+<PRE>    /* We've finished searching; we can free the data block. */</PRE>
+<PRE>    MemUnlock(OptrToHandle(@cellDataArray));</PRE>
+<PRE>    /* Determine if search found a match. */
+    if (index &gt;= (TABLE_COLS * TABLE_ROWS))
+    {
+	searchResult = TRUE;			/* Indicates no match was found. */
+    }
+    else
+    {
+	/* If successful, set selection to &quot;current&quot; index cell. */
+	selection-&gt;TCR_start.TCL_row 				= index / TABLE_COLS;
+	selection-&gt;TCR_start.TCL_column 				= index % TABLE_COLS;
+	selection-&gt;TCR_end.TCL_row				= selection-&gt;TCR_start.TCL_row;
+	selection-&gt;TCR_end.TCL_column				= selection-&gt;TCR_start.TCL_column;</PRE>
+<PRE>	@call self::MSG_TABLE_SET_CURRENT_SELECTION(selection);</PRE>
+<PRE>	searchResult = FALSE;			/* Indicates that we found a match. */
+    }</PRE>
+<PRE>    return(searchResult);				/* We don't call the superclass. Default behavior 
+				 * is to return TRUE indicating no matches were
+				 * found. */
+}</PRE>
+
+<H4 CLASS="RefETitle">
+MSG_TABLE_CHAR_LOCATE</H4>
+<PRE CLASS="syntax">Boolean	MSG_TABLE_CHAR_LOCATE(
+        char		searchChar);</PRE>
+<P>
+This message is sent to the <CODE>
+TableClass</CODE>
+ object by the Locator object instructs a Locator object (in index mode) to locate the entered character within the <CODE>
+TableClass</CODE>
+ object that is in the Locator's LI_<CODE>
+destination</CODE>
+ field. It does this by sending the Table object <CODE>
+MSG_TABLE_CHAR_LOCATE</CODE>
+, passing it the search character. You will want to intercept that message within your subclass of <CODE>
+TableClass</CODE>
+ to implement your search criteria.</P>
+<P>
+When in index mode, this message is sent with a single index letter (e.g. `A', or `B' in the &quot;AB&quot; dyad) of the tapped dyad button. Repeatedly tapping on a dyad button will cycle through the indexed letters, sending out this message a separate time for each tap (first with `A,' then with `B,' and then with `A' again). For this reason, make sure that code that implements this message is not run under the UI thread. (Doing so may result in bothersome screen &quot;glitches&quot; as the Table scrolls first to the `A' entries, then to the `B' entries, etc.</P>
+<P CLASS="refField">
+Source:	The Locator object.</P>
+<P CLASS="refField">
+Destination:	The Locator's linked Table object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+searchChar</EM>
+	Character to search. Passed from one of the Locator's dyad buttons.</P>
+<P CLASS="refField">
+Return:	Non-zero if the search failed. Note that if you do not write a search method for <CODE>
+TableClass</CODE>
+, this message will always return non-zero.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_TABLE_STRING_LOCATE</H4>
+<PRE CLASS="syntax">Boolean	MSG_TABLE_STRING_LOCATE(
+        char		*text);</PRE>
+<P>
+This message instructs a Locator object (in text mode) to locate the entered string within the <CODE>
+TableClass</CODE>
+ object that is in the Locator's LI_<CODE>
+destination</CODE>
+ field. It does this by sending the Table object <CODE>
+MSG_TABLE_STRING_LOCATE</CODE>
+, passing it the pointer to the search string. You will want to intercept that message within your subclass of <CODE>
+TableClass</CODE>
+ to implement your search criteria.</P>
+<P>
+The Locator object enters text search mode whenever the user types a printable character on the keyboard; in that case, the <CODE>
+locateString</CODE>
+ contains the character typed and a search (with this message) is performed. I.e. a search is performed after each successive character is entered. If the search is unsuccessful, the character will not appear.</P>
+<P CLASS="refField">
+Source:	The Locator object.</P>
+<P CLASS="refField">
+Destination:	A Locator object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+text</EM>
+	Pointer to the null-terminated search string to pass to <CODE>
+MSG_TABLE_STRING_LOCATE</CODE>
+.</P>
+<P CLASS="refField">
+Return:	Non-zero if the search failed. Note that if you do not write a search method for TableClass, this message will always return non-zero.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="JTable_7.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="JTable_c.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.5 Custom Scrolling Behavior</A> 
+<!-- to next --> | <A HREF="JTable_e.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.7 Table Headings</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

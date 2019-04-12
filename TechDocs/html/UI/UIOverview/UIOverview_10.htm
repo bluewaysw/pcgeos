@@ -1,0 +1,273 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: UIOverview_10.htm,v 1.2 97/09/05 14:51:16 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> The Structure of TicTac</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">UI Overview</A>: 5.3 <A HREF="UIOverview_d.htm">A UI Example</A>: 
+The Structure of TicTac</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="UIOverview_d.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="UIOverview_f.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.2 What TicTac Does</A> 
+<!-- to next --> | <A HREF="UIOverview_11.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5.4 TicTacBoard Specifics</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+The TicTac sample application is coded in two files: The first, <STRONG CLASS="fileName">
+tictac.gp</STRONG>
+, is the geode parameters file. The other, <STRONG CLASS="fileName">
+tictac.goc</STRONG>
+, contains all the code for objects in the application. The geode parameters file is similar to other <STRONG CLASS="fileName">
+.gp</STRONG>
+ files and is not discussed in this section.</P>
+<P>
+The application uses two different object trees, one for its generic UI and one for the game board and game pieces. The first consists of generic UI objects and the second of objects subclassed off <CODE>
+VisClass</CODE>
+ and <CODE>
+VisContentClass</CODE>
+. The two object trees are diagrammed and described below.</P>
+
+<H2 CLASS="HeadingC">
+TicTac's Generic Tree</H2>
+<P>
+The TicTac application begins with two standard generic objects common to all applications: GenApplication and GenPrimary. These two objects are described in detail in other sections and are not covered here, though their definitions are shown in <A HREF="UIOverview_10.htm#56907"> TicTacApp and TicTacPrimary</A>
+.</P>
+<P>
+The primary object, TicTacPrimary, has two children. One, TicTacGameMenu, implements the game menu; the other, TicTacView, provides the window through with the user can interact with the visible tree.
+<IMG SRC="UIOverview_10_tictacTree.gif">
+
+</P>
+<P CLASS="figTitle">
+Code Display 6-1 <A NAME="56907">
+ </A>
+TicTacApp and TicTacPrimary</P>
+<PRE>@start AppResource;
+    /* The AppResource resource block contains the TicTacApp object only. This
+     * object is in its own resource for performance purposes. */</PRE>
+<PRE>@object GenApplicationClass TicTacApp = {
+    GI_visMoniker = list { TicTacTextMoniker }
+    GI_comp = TicTacPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS) = TicTacPrimary;
+}</PRE>
+<PRE>@visMoniker TicTacTextMoniker = &quot;TicTacToe&quot;;</PRE>
+<PRE>@end AppResource</PRE>
+<PRE>@start Interface;</PRE>
+<PRE>    /* This is the Primary window of the application. It is not minimizable
+     * (since no icon is defined for it). It has two children: The View
+     * object and the Menu object. */
+@object GenPrimaryClass TicTacPrimary = {
+    GI_comp = TicTacView, TicTacGameMenu;
+    ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;
+    HINT_SIZE_WINDOW_AS_DESIRED;
+}</PRE>
+
+<H3 CLASS="HeadingD">
+TicTacGameMenu</H3>
+<P>
+This object is a standard GenInteraction object set up as a menu. The code for the entire menu (including the TicTacNewTrigger) is shown in <A HREF="UIOverview_10.htm#39579"> The TicTac Game Menu</A>
+ and is heavily commented as to how each attribute is used.</P>
+<P>
+The New Game trigger may be invoked at any time except when a piece is being moved. When a piece is being moved, that piece object has the &quot;mouse grab,&quot; meaning that it will receive all mouse and pointer events until it releases the grab. When an object has the mouse grab, no mouse events may be sent to another object, and therefore the menu object can not be clicked on while the piece has the grab.</P>
+<P>
+When the user presses the New Game trigger, the trigger sends its message, <CODE>
+MSG_TICTAC_NEW_GAME</CODE>
+, to the TicTacBoard object. The TicTacBoard object is the top object in the visible tree and, upon receipt of this message, resets the game board and notifies all the piece objects of the reset. This process is described below in <A HREF="UIOverview_11.htm#31265"> TicTacBoard Specifics</A>
+.</P>
+<P CLASS="figTitle">
+Code Display 6-2 <A NAME="39579">
+ </A>
+The TicTac Game Menu</P>
+<PRE>/* The TicTacGameMenu object is the only menu of this application. Its only child
+ * and only menu entry is the TicTacNewTrigger object. */</PRE>
+<PRE>@start Interface;			/* In the same resource block as TicTacPrimary. */</PRE>
+<PRE>@object GenInteractionClass TicTacGameMenu = {
+    GI_visMoniker = &quot;Game&quot;;					/* The name of the menu. */
+    GI_comp = @TicTacNewTrigger;					/* The only menu item. */
+    GII_visibility = GIV_POPUP;					/* This attribute indicates that this
+					 * interaction is a menu rather than
+					 * a dialog. */
+}</PRE>
+<PRE>@object GenTriggerClass TicTacNewTrigger = {
+    GI_visMoniker = &quot;New Game&quot;;					/* The name of the menu item. */
+    GTI_destination = @TicTacBoard;					/* The object to receive the &quot;New Game&quot;
+					 * message: the game board object. */
+    GTI_actionMsg = MSG_TICTAC_NEW_GAME;					/* The message to be sent when the trigger
+					 * is pressed. */
+}</PRE>
+<PRE>@end Interface			/* End of the Interface resource block */</PRE>
+
+
+<H3 CLASS="HeadingD">
+TicTacView</H3>
+<P>
+The TicTacView object is a standard GenView set up to run the TicTacBoard object. The code for TicTacView is shown in <A HREF="UIOverview_10.htm#61520"> The TicTacView Object</A>
+ and is heavily commented to show what each of the view's attributes is used for.</P>
+<P>
+TicTacView's content object is TicTacBoard, the game board object. This means that any appropriate input events as well as all messages sent out by the view will be passed directly to the TicTacBoard object. The sizing attributes and the fact that the view is not marked GVDA_SCROLLABLE in either dimension makes sure the view sizes exactly to the game board's bounds.</P>
+<P>
+A GenView object is necessary in every case where a visible object tree is used. The view not only displays the visible tree but also handles all clipping, scaling, scrolling, and sizing if any is desired (none is used in TicTac). It also takes and passes on any appropriate mouse or keyboard input events. Additionally, it interacts directly with its content object (in this case TicTacBoard) to determine proper geometry and sizing behavior of the content and the view.</P>
+<P>
+This view also provides the background color of the game board, dark blue.</P>
+<P CLASS="figTitle">
+Code Display 6-3 <A NAME="61520">
+ </A>
+The TicTacView Object</P>
+<PRE>    /* This object provides the window through which the user interacts with the
+     * visible object tree. This object communicates with the game board object (a
+     * subclass of VisContentClass) to coordinate drawing, clipping, sizing, and
+     * even input handling. */</PRE>
+<PRE>@start Interface;			/* In the same resource block as TicTacPrimary. */</PRE>
+<PRE>@object GenViewClass TicTacView = {
+    GVI_content = @TicTacBoard;				/* The content object of this view is the
+				 * TicTacBoard object, the root object of the
+				 * visible object tree. */</PRE>
+<PRE>    GVI_color = { C_BLUE, 0, 0, 0 };					/* The background color of this view
+					 * should be dark blue. */</PRE>
+<PRE>    /* The horizontal attributes of this view set it to the same
+     * size as the game board, and the view is not scrollable. */</PRE>
+<PRE>    GVI_horizAttrs = @default				| GVDA_NO_LARGER_THAN_CONTENT
+				| GVDA_NO_SMALLER_THAN_CONTENT;</PRE>
+<PRE>    /* The vertical attributes of this view set it to the same size
+     * as the game board, and the view is not scrollable. */
+
+    GVI_vertAttrs = @default			|	 GVDA_NO_LARGER_THAN_CONTENT
+				| GVDA_NO_SMALLER_THAN_CONTENT
+				| GVDA_KEEP_ASPECT_RATIO;</PRE>
+<PRE>    /* The user won't need to type anything, so there's no need for
+     * a floating keyboard. */
+    ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
+}
+@end Interface			/* End of the Interface resource block */</PRE>
+
+
+
+<H2 CLASS="HeadingC">
+TicTac's Visible Tree</H2>
+<P>
+The visible tree contains eleven objects. One acts as TicTacView's content and is of <CODE>
+TicTacBoardClass</CODE>
+, a subclass of <CODE>
+VisContentClass</CODE>
+. The other ten are all game pieces of class <CODE>
+TicTacPieceClass</CODE>
+, a subclass of <CODE>
+VisClass</CODE>
+. Both the class definitions and the object definitions are given in <A HREF="UIOverview_10.htm#27823"> TicTacBoardClass and TicTacPieceClass</A>
+.
+<IMG SRC="UIOverview_10_gameBoard.gif">
+
+</P>
+<P>
+All eleven of the visible objects remain on the screen and in the view during their entire existence. The game board and all its pieces are shown in the figure above; this illustration represents the basic configuration of the game board when the application first starts or when the user presses the &quot;New Game&quot; trigger in the &quot;Game&quot; menu.</P>
+<P>
+The TicTacBoard object draws the border around the board and makes sure the view window sizes itself to the same size as the board. The board is 180 points (2.5 inches) in height and 270 points (3.75 inches) in width; these numbers are stored as the constants BOARD_HEIGHT and BOARD_WIDTH. TicTacBoard also draws the playing field--this consists of the four white lines on the left side of the game board. TicTacBoard's other main function is to ensure that all the children (game pieces) behave properly; it makes sure the child's bounds are on the game board when the piece is moved, and it notifies the game pieces when they must draw themselves due to a view exposure. Finally, TicTacBoard receives the &quot;New Game&quot; message from the Game menu; it then redraws the game board and notifies each of the game pieces that they should return to their initial locations.</P>
+<P>
+Each of the game piece objects knows about its location and status. Each piece knows its initial location, current location, and proposed location (during a move). Every game piece is an instance of <CODE>
+TicTacPieceClass</CODE>
+. This class is shown in <A HREF="UIOverview_10.htm#27823"> TicTacBoardClass and TicTacPieceClass</A>
+; it contains a number of instance data fields for these locations. It also has an instance data field indicating what type of piece (i.e. &quot;box&quot; or &quot;ring&quot;) the object is.</P>
+<P>
+The &quot;box&quot; objects are designated by having the value TTPT_BOX in their <CODE>
+TTP_pieceType</CODE>
+ fields; the &quot;ring&quot; objects have TTPT_RING in that field. Both types of objects act and react in the same way to various events; the only difference is in their shape and color.</P>
+<P CLASS="figTitle">
+Code Display 6-4 <A NAME="27823">
+ </A>
+TicTacBoardClass and TicTacPieceClass</P>
+<PRE>/* The TicTacPieceTypes enumerated type lists the different types of game pieces a
+ * particular piece object can be. In this game, a piece is either a &quot;box&quot; (gray
+ * square) or a &quot;ring&quot; (light gray circle).									*/</PRE>
+<PRE>typedef ByteEnum TicTacPieceTypes;
+#define TTPT_BOX 0
+#define TTPT_RING 1</PRE>
+<PRE>/***********************************************************************
+ * TicTacBoardClass
+ * This class is a subclass of VisContentClass and provides the game board
+ * for this application. It also manages all the children (piece objects).
+ * Because it is a subclass of VisContentClass, it inherits all the instance
+ * data fields and messages of that class.
+ ***********************************************************************/</PRE>
+<PRE>@class TicTacBoardClass, VisContentClass;					/* this class is a subclass
+					 * of VisContentClass */</PRE>
+<PRE>    /* Message definitions for this class */
+    @message void MSG_TICTAC_NEW_GAME();
+	/* This message is sent by the New Game trigger in the Game menu
+	 * when the user wants to reset the game. It is sent directly to
+	 * the game board object and causes the board object first to
+	 * send the &quot;new game&quot; message to each of its children and then
+	 * to redraw the game board.							*/</PRE>
+<PRE>    @message Boolean MSG_TICTAC_VALIDATE_BOUNDS(word bottom, word right,
+					    word top, word left);
+	/* This message is sent by a game piece that is being moved by the
+	 * user and is about to be set down. The four parameters are the
+	 * proposed new bounds of the moved piece; if they are within the
+	 * game board's limit, this message returns TRUE. If they are at
+	 * all outside the game board, this message returns FALSE.	*/</PRE>
+<PRE>@endc</PRE>
+<PRE>/* Declare the class in memory so the method table will be built. */
+@classdecl TicTacBoardClass;</PRE>
+<PRE>/***********************************************************************
+ * TicTacPieceClass
+ * This class is a subclass of VisClass and provides all the functions
+ * necessary for a game piece in this game. Because it is a subclass of
+ * VisClass, it inherits all the instance data fields and messages of
+ * that class.
+ ***********************************************************************/</PRE>
+<PRE>@class TicTacPieceClass, VisClass;					/* this class is a subclass
+					 * of VisClass */</PRE>
+<PRE>	/* The instance data fields of this class: */
+    @instance TicTacPieceTypes TTP_pieceType;
+	/* TTP_pieceType defines whether the object of this class is
+	 * a &quot;box&quot; or a &quot;ring.&quot;							*/</PRE>
+<PRE>    @instance int TTP_vertPos;
+	/* TTP_vertPos indicates the current y position of
+	 * the piece. This does not indicate the piece's actual
+	 * bounds but rather where its moving outline appears.							*/</PRE>
+<PRE>    @instance int TTP_horizPos;
+	/* TTP_horizPos indicates the current x position of
+	 * the piece. This does not indicate the piece's actual
+	 * bounds but rather where its moving outline appears.							*/</PRE>
+<PRE>    @instance int TTP_origVertPos;
+	/* TTP_origVertPos indicates the y position where this
+	 * piece should return when the New Game trigger is pushed
+	 * and the piece goes back to its original location.							*/</PRE>
+<PRE>    @instance int TTP_origHorizPos;
+	/* TTP_origHorizPos indicates the x position where this
+	 * piece should return when the New Game trigger is pushed
+	 * and the piece goes back to its original location.							*/</PRE>
+<PRE>    @instance Boolean TTP_dragging;
+	/* A flag indicating whether the user is in the process of dragging
+	 * the game piece around the board. */</PRE>
+<PRE>	/* Message definitions unique to this class. */
+    @message void MSG_PIECE_NEW_GAME();
+	/* This message notifies the piece object that the user has pushed *
+	 * the New Game trigger and that the piece should return to its *
+	 * original position on the board (the TTP_orig(Horiz/Vert)Pos *
+	 * fields).							*/
+@endc</PRE>
+<PRE>/* Declare the class in memory so the method table will be built. */
+@classdecl TicTacPieceClass;</PRE>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="UIOverview_d.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="UIOverview_f.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.2 What TicTac Does</A> 
+<!-- to next --> | <A HREF="UIOverview_11.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5.4 TicTacBoard Specifics</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

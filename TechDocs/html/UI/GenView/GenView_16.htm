@@ -1,0 +1,443 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: GenView_16.htm,v 1.2 97/09/05 14:20:04 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Monitoring Input</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">GenView</A>: 4.8 <A HREF="GenView_e.htm">Advanced Concepts and Uses</A>: 
+Monitoring Input</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GenView_e.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GenView_15.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.7 Scrolling</A> 
+<!-- to next --> | <A HREF="GenView_17.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.9 Linking Views</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+Often, applications will want to receive input--keyboard, mouse, or pen events--through the view. While keyboard events are fairly straightforward, receiving mouse and pen events can be somewhat more complicated. Depending on the types of events you choose to receive, however, input handling can be quite simple.</P>
+
+<H2 CLASS="HeadingC">
+Mouse Events</H2>
+<P>
+<A NAME="IX_Mouse:filtering with GenView">
+ </A>
+Many applications will want to receive mouse events through the view. By default, the view's content will receive all pointer events, whether or not a mouse button has been pressed. However, you can determine which types of events you want to receive by setting the appropriate attributes in the <CODE>
+GVI_attrs</CODE>
+ field:</P>
+<UL>
+<LI>
+GVA_DONT_SEND_PTR_EVENTS<BR>
+This overrides the default and ensures that no mouse (pointer) events are passed on to the content. This is used for optimization when your content will not interact with the user directly.</LI>
+<LI>
+GVA_WINDOW_COORDINATE_MOUSE_EVENTS<BR>
+This changes the format of the mouse event as received by the content object and is used with large documents. See below for more information about handling input to large documents.</LI>
+</UL>
+<P>
+Both of the above attributes may be set either in your geode's Goc code or with <CODE>
+MSG_GEN_VIEW_SET_ATTRS</CODE>
+. To retrieve which attributes are set, use <CODE>
+MSG_GEN_VIEW_GET_ATTRS</CODE>
+. Due to overhead incurred by passing input events, you should only set the attributes you need. (See <A HREF="GenView_a.htm#65491"> The GVI_attrs Attribute</A>
+ for more detail on these messages.)</P>
+
+<H3 CLASS="HeadingD">
+Handling 32-Bit Input Events</H3>
+<P>
+<A NAME="IX_Large document model:handling mouse events">
+ </A>
+Because normal pointer events use the standard GEOS 16-bit coordinate system, large documents must be able to translate these 16-bit events into 32-bit coordinates. The GenView makes this easy for you.</P>
+<P>
+First, set the attribute GVA_WINDOW_COORDINATE_MOUSE_EVENTS in the <CODE>
+GVI_attrs</CODE>
+ record. This will change the format of pointer data passed from the view to the content object. The new format will contain offset coordinates describing the pointer's position relative to the view's screen origin (in screen coordinates).</P>
+<P>
+When you receive one of these events (called &quot;large&quot; mouse events), you can apply the simple formula shown in the figure below to get 32-bit document coordinates. Once you have the coordinates of the pointer event, you can deal with it appropriately.</P>
+<P>
+To keep track of the view's origin and scale factor, you should intercept the messages <CODE>
+MSG_META_CONTENT_VIEW_ORIGIN_CHANGED</CODE>
+ and <CODE>
+MSG_META_CONTENT_VIEW_SCALE_FACTOR_CHANGED</CODE>
+<IMG SRC="GenView_16_eventCoordEqn.gif">
+
+</P>
+
+
+<H3 CLASS="HeadingD">
+Losing Mouse Grabs</H3>
+<P>
+During certain operations--for example, quick-transfers--your geode will have the mouse grab. When it loses the grab, it will be notified with a <CODE>
+MSG_META_CONTENT_LOST_GADGET_EXCLUSIVE</CODE>
+.</P>
+
+
+<H3 CLASS="HeadingD">
+Supporting Quick-Transfer</H3>
+<PRE>MSG_GEN_VIEW_ALLOW_GLOBAL_TRANSFER</PRE>
+<P>
+<A NAME="IX_Quick-transfer:MSG_GEN_VIEW_ALLOW_GLOBAL_TRANSFER">
+ </A>
+When using a view and supporting the quick-transfer mechanism, the view will grab the mouse when a quick-transfer operation is invoked. Conclusion of the quick-transfer operation, requires, however, that other objects know when the mouse crosses their bounds; otherwise, no other object in the system could ever become a destination for the transfer.</P>
+<P>
+To relinquish the mouse grab while continuing the transfer operation, you must send <CODE>
+MSG_GEN_VIEW_ALLOW_GLOBAL_TRANSFER</CODE>
+ to the view. The view will then let other objects get pointer events, thus letting them know when they become a potential destination for the transfer.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VIEW_ALLOW_GLOBAL_TRANSFER">
+ </A>
+MSG_GEN_VIEW_ALLOW_GLOBAL_TRANSFER</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VIEW_ALLOW_GLOBAL_TRANSFER();</PRE>
+<P>
+This message indicates to the view that it should relinquish the mouse grab to allow a quick-transfer operation to continue. Pointer events will then be sent to other objects in the system, allowing them to accept or reject the transfer.</P>
+<P CLASS="refField">
+Source:	The object with the mouse grab in the view.</P>
+<P CLASS="refField">
+Destination:	The GenView displaying the caller object.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+
+
+<H2 CLASS="HeadingC">
+Keyboard Events</H2>
+<P>
+By default, all keyboard events not handled by the Specific UI library are passed through to the content when the view has the keyboard focus. Only views with the GVA_FOCUSABLE flags set in <CODE>
+GVI_attrs</CODE>
+ will ever gain the focus (this is the default). Many character strokes are used for keyboard navigation or as mnemonics or accelerators and will therefore be intercepted by the Specific UI. Those that aren't will be passed on to your content.</P>
+<P>
+You can set up your content to receive all keyboard events before the Specific UI has a chance to intercept them. This can have unpredictable results, however, and should be avoided unless absolutely necessary. To set up your content in this manner, set the flag GVA_SEND_ALL_KBD_CHARS in the view's <CODE>
+GVI_attrs</CODE>
+ field. If you handle keyboard events before passing them on, you must be sure to pass every unused <CODE>
+MSG_META_KBD_CHAR</CODE>
+ on to the UI in the form of <CODE>
+MSG_META_VUP_KBD_CHAR</CODE>
+. If you do not, undesirable synchronization problems could result.</P>
+<P>
+You can indicate that you do not want to receive keyboard releases by setting the attribute GVA_DONT_SEND_KBD_RELEASES in the <CODE>
+GVI_attrs</CODE>
+ record. This is provided as an optimization to improve keyboard response in applications. Most applications need to know when a key has been pressed but do not care when it has been released.</P>
+<P>
+A better way to handle accelerator characters that don't appear in your UI objects is to subclass <CODE>
+GenViewClass</CODE>
+ and intercept <CODE>
+MSG_META_KBD_CHAR</CODE>
+; in the handler, take the characters you want and then call the superclass with <CODE>
+@callsuper()</CODE>
+ to make sure unused events get passed on. As an alternative, you can subclass <CODE>
+GenApplicationClass</CODE>
+ and change the handler for <CODE>
+MSG_META_VUP_KBD_CHAR</CODE>
+; in the method, take the events you want and then call the superclass with <CODE>
+@callsuper()</CODE>
+.</P>
+
+
+<H2 CLASS="HeadingC">
+Pen Input and Ink</H2>
+<PRE>GVI_inkType, MSG_GEN_VIEW_SET_INK_TYPE, MSG_GEN_VIEW_SET_EXTENDED_INK_TYPE, MSG_GEN_VIEW_RESET_EXTENDED_INK_TYPE, ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT</PRE>
+<P>
+<A NAME="IX_Mouse:ink input as mouse event">
+ </A>
+<A NAME="IX_Ink:view issues">
+ </A>
+It is suggested that you read <A HREF="../../SysObjects/Input/index.htm">the Input chapter</A>, before working with Ink in the view. The GenView accepts Ink input events and can pass them to the content either as ink or as mouse events. How the view determines which type of events are desired is mandated by the value of the instance field <CODE>GVI_inkType</EM>
+.</P>
+<P>
+In addition, some views that get the focus do not accept text input. By default on many pen systems, focusable GenViews will cause an on-screen keyboard to come up on the assumption that the user may wish to enter text to objects within the view. <CODE>
+ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT</CODE>
+ allows you to specify that your view does not accept text input and therefore should not cause a floating keyboard to come up. Non-textual keyboard events (e.g. up-arrow used for scrolling) will still be transmitted to the GenView.</P>
+<P>
+<A NAME="IX_GVIT_&ldots;">
+ </A>
+<A NAME="IX_GVI_inkType">
+ </A>
+The <CODE>
+GVI_inkType</CODE>
+ field will contain one of the following values (each is an enumeration of <CODE>
+GenViewInkType</CODE>
+):</P>
+<DL>
+<DT>
+GVIT_PRESSES_ARE_NOT_INK</DT><DD>
+Mouse press events are not Ink input, and Ink input is not expected by the content. This is the default for views.</DD>
+<DT>
+GVIT_INK_WITH_STANDARD_OVERRIDE</DT><DD>
+Mouse press events are considered and expected to be Ink events, but they can be overridden by the user in the normal way.</DD>
+<DT>
+GVIT_PRESSES_ARE_INK</DT><DD>
+Mouse press events are considered and expected to be Ink.</DD>
+<DT>
+GVIT_QUERY_OUTPUT</DT><DD>
+This value indicates that the content will expect Ink events only in certain contexts. Note that if this attribute is set, the content <EM>
+must</EM>
+ handle the <CODE>
+MSG_META_QUERY_IF_PRESS_IS_INK</CODE>
+ message.</DD>
+</DL>
+<P>
+The <CODE>
+GVI_inkType</CODE>
+ field may be set either in your Goc code or with the message <CODE>
+MSG_GEN_VIEW_SET_INK_TYPE</CODE>
+, shown below.</P>
+<P>
+Applications that handle Ink input can also set extended information about the Ink. The type of extended information you can set includes the color of the Ink as it's drawn, the thickness of the Ink brush, etc. Use the messages <CODE>
+MSG_GEN_VIEW_SET_EXTENDED_INK_TYPE</CODE>
+ and <CODE>
+MSG_GEN_VIEW_RESET_EXTENDED_INK_TYPE</CODE>
+, shown below.</P>
+<P>
+<A NAME="IX_InkDestinationInfoParams">
+ </A>
+You can also pre-set the extended Ink information with the vardata attribute <CODE>
+ATTR_GEN_VIEW_INK_DESTINATION_INFO</CODE>
+<A NAME="IX_ATTR_GEN_VIEW_INK_DESTINATION_INFO">
+ </A>
+. This attribute has an extra data structure of type <CODE>
+InkDestinationInfoParams</CODE>
+, shown below.</P>
+<PRE>typedef struct {
+	optr		IDIP_dest;
+				/* destination object
+				 * for Ink output. */
+	word		IDIP_brushSize;
+				/* Size of Ink brush. 
+				 * High byte is x size,
+				 * Low byte is y size. */
+	byte		IDIP_color;		/* Color of Ink */
+	Boolean		IDIP_createGState;
+					/* Boolean indicating
+					 * if the Ink should
+					 * have its own
+					 * GState. */
+} InkDestinationInfoParams;</PRE>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VIEW_SET_INK_TYPE">
+ </A>
+MSG_GEN_VIEW_SET_INK_TYPE</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VIEW_SET_INK_TYPE(
+        GenViewInkType inkType);				/* value of GenViewInkType */</PRE>
+<P>
+This message sets the type of Ink input expected by the view's content.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenView object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+inkType</CODE>
+	The type of Ink input expected.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VIEW_SET_EXTENDED_INK_TYPE">
+ </A>
+MSG_GEN_VIEW_SET_EXTENDED_INK_TYPE</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VIEW_SET_EXTENDED_INK_TYPE(@stack
+        Boolean createGState,
+        Color	inkColor,
+        word	brushSize,
+        optr	destObj);</PRE>
+<P>
+<A NAME="IX_Color:ink input">
+ </A>
+This message sets the extended Ink type for the GenView. The extended Ink type is stored in the vardata <CODE>
+ATTR_GEN_VIEW_INK_DESTINATION_INFO</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenView object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+createGState</CODE>
+	A boolean specifying whether the view should create a new GState for the Ink or not.</P>
+<DL>
+<DT>
+<CODE>
+inkColor</CODE>
+</DT><DD>A palette index to use as the color of the Ink.</DD>
+<DT>
+<CODE>
+brushSize</CODE>
+</DT><DD>The brush size, in points, to be used for the Ink.</DD>
+<DT>
+<CODE>
+destObj</CODE>
+</DT><DD>The optr of the destination object for Ink input to this view. After the Ink is collected, it will be sent to this object.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VIEW_RESET_EXTENDED_INK_TYPE">
+ </A>
+MSG_GEN_VIEW_RESET_EXTENDED_INK_TYPE</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VIEW_RESET_EXTENDED_INK_TYPE();</PRE>
+<P>
+This message resets the extended Ink type to default values.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenView object.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+
+<H2 CLASS="HeadingC">
+Target and Focus</H2>
+<PRE>MSG_GEN_VIEW_UPDATE_CONTENT_TARGET_INFO</PRE>
+<P>
+Some applications may draw some portion of their documents differently if they have the target or focus. The view will pass along the following target/focus messages: <CODE>
+MSG_META_CONTENT_ENTER</CODE>
+, <CODE>
+MSG_META_CONTENT_LEAVE</CODE>
+, <CODE>
+MSG_META_RAW_UNIV_ENTER</CODE>
+, <CODE>
+MSG_META_RAW_UNIV_LEAVE</CODE>
+, and <CODE>
+MSG_META_CONTENT_VIEW_LOST_GADGET_EXCLUSIVE</CODE>
+.</P>
+<P>
+If you want your geode to be able to grab the focus, you must set the GVA_FOCUSABLE attribute in the <CODE>
+GVI_attrs</CODE>
+ record.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VIEW_UPDATE_CONTENT_TARGET_INFO">
+ </A>
+MSG_GEN_VIEW_UPDATE_CONTENT_TARGET_INFO</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VIEW_UPDATE_CONTENT_TARGET_INFO(
+        ViewTargetInfo *targetInfo);</PRE>
+<P>
+This message is sent to the view from <CODE>
+VisContentClass</CODE>
+ contents whenever target information within the view changes. This is done so that <CODE>
+MSG_META_GET_TARGET_EXCL</CODE>
+ may be used to retrieve target information about the portion of the target hierarchy which is within the content itself. (The UI can't directly call objects running in other threads, so this message is required to update it with the latest information.)</P>
+<P CLASS="refField">
+Source:	A VisContent within the view.</P>
+<P CLASS="refField">
+Destination:	The GenView associated with the caller.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+targetInfo</CODE>
+	A pointer to a <CODE>
+ViewTargetInfo</CODE>
+ structure, shown below.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Structures:	The <CODE>
+ViewTargetInfo</CODE>
+ structure has two fields, as shown:</P>
+<PRE><A NAME="IX_TargetReference"> </A>typedef struct {
+<A NAME="IX_TR_&ldots;  (TargetReference structure)"> </A>	optr		TR_object;		/* optr of object */
+	ClassStruct		*TR_class;		/* class of object */
+} TargetReference;</PRE>
+<PRE><A NAME="IX_ViewTargetInfo"> </A>typedef struct {
+<A NAME="IX_VTI_&ldots;  (ViewTargetInfo)"> </A>	TargetReference			VTI_target;
+	TargetReference			VTI_content;
+} ViewTargetInfo;</PRE>
+<P>
+The <CODE>
+VTI_target</CODE>
+ field contains the optr and class pointer of the object in the view that currently has the target exclusive. The <CODE>
+VTI_content</CODE>
+ field contains the optr and class pointer of the view's content object.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+
+<H2 CLASS="HeadingC">
+Setting the Pointer Image</H2>
+<PRE>MSG_GEN_VIEW_SET_PTR_IMAGE</PRE>
+<P>
+<A NAME="IX_Mouse:setting pointer image">
+ </A>
+If you want to change the pointer's image while it is over your view or while the view has the focus, use <CODE>
+MSG_GEN_VIEW_SET_PTR_IMAGE</CODE>
+. To use this message, you must create the new pointer image in a sharable memory block, lock the block, and pass the pointer to the locked block. To reset your request (return to the default pointer), send the same message with the pointer zeroed. The pointer image structure is detailed in <A HREF="../../SysObjects/Input/Input_a.htm#38997">the Input chapter</A>.</P>
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_VIEW_SET_PTR_IMAGE">
+ </A>
+MSG_GEN_VIEW_SET_PTR_IMAGE</H4>
+<PRE CLASS="syntax">void	MSG_GEN_VIEW_SET_PTR_IMAGE(
+        optr		pointerDef;					/* Optr of pointer definition */
+        PtrImageLevel		level);					/* Image level of pointer */</PRE>
+<P>
+This message causes the view to set the pointer image to a custom image whenever the pointer is over the view.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenView object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+pointerDef</CODE>
+	The optr of a chunk containing the <CODE>
+PointerDef32</CODE>
+ structure of the new pointer definition for the GenView (this chunk must be in a sharable memory block). Pass NullOptr for no image request. Pass the handle portion of the optr as a NullHandle and the chunk portion of the optr as a <CODE>
+PtrImageValue</CODE>
+ value (see below).</P>
+<DL>
+<DT>
+<CODE>
+level</CODE>
+</DT><DD>A value of <CODE>
+PtrImageLevel</CODE>
+. This should be either PIL_GADGET, to allow individual gadgets within the view to set the pointer, or PIL_WINDOW, to set the background cursor of the view. Note that if PIV_UPDATE is passed in <CODE>
+pointerDef</CODE>
+, the level parameter is not used.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Structures:	<CODE>
+PointerDef16</CODE>
+ has the following structure (see the appropriate reference entry for a full description):</P>
+<PRE><A NAME="IX_PD_&ldots;  (PointerDef16)"> </A><A NAME="IX_PointerDef"> </A>typedef struct {
+    byte		PD_width;
+    byte		PD_height
+    sbyte		PD_hotX;
+    sbyte		PD_hotY;
+    byte		PD_mask[STANDARD_CURSOR_IMAGE_SIZE];
+    byte		PD_image[STANDARD_CURSOR_IMAGE_SIZE];
+} PointerDef16;</PRE>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GenView_e.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GenView_15.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.7 Scrolling</A> 
+<!-- to next --> | <A HREF="GenView_17.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.9 Linking Views</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

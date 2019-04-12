@@ -1,0 +1,104 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Stream_2.htm,v 1.1 97/06/02 14:16:03 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Initializing a Stream</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Using Streams</A>: 1.1 <A HREF="Stream_1.htm">Using Streams: The Basics</A>: 
+<A NAME="85445">
+ </A>
+Initializing a Stream</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Stream_1.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Stream_1.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">1 Using Streams: The Basics</A> 
+<!-- to next --> | <A HREF="Stream_3.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">1.2 Blocking on Read or Write</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+A stream is essentially a first-in-first-out data buffer, in which the writer is different from the reader. When the writer writes data to the stream, the kernel stores it in the buffer; when the reader requests information from the stream, the kernel retrieves the oldest data not yet read. The data is stored in a memory block; this block may be either fixed or movable. If it is movable, both the reader and the writer must lock the block before calling any stream routines.</P>
+<P>
+Note that the kernel does not enforce who is the reader or writer to a stream. Any geode may call the appropriate stream library routine, passing in the token for a stream, and read or write data. However, in practice, only those threads with a legitimate interest in a stream will know the stream's token.</P>
+<P>
+The serial and parallel drivers are built on top of the stream driver. There are separate routines to access the serial and parallel ports; these routines are discussed in <A HREF="Stream_8.htm#49334"> Using the Serial Ports</A>
+ for the serial driver and <A HREF="Stream_c.htm#42952"> Using the Parallel Ports</A>
+ for the parallel driver.</P>
+
+<H2 CLASS="HeadingC">
+Creating a Stream<A NAME="67491">
+ </A>
+</H2>
+<PRE>StreamOpen()</PRE>
+<P>
+<A NAME="IX_DR_STREAM_CREATE">
+ </A>
+<A NAME="IX_StreamOpen()">
+ </A>
+To create and initialize a new stream, call the routine <CODE>
+StreamOpen()</CODE>
+. This routine takes five arguments:</P>
+<UL>
+<LI>
+The handle of the stream driver.</LI>
+<LI>
+The size of the stream buffer, in bytes. This may not be larger than 32767.</LI>
+<LI>
+The <CODE>
+GeodeHandle</CODE>
+ of the geode that will own this stream. When this geode exits, the stream will be freed; however, you should call <CODE>
+StreamClose()</CODE>
+ before this happens.</LI>
+<LI>
+A set of <CODE>
+HeapFlags</CODE>
+. The routine will have to allocate a block to hold the stream. The <CODE>
+HeapFlags</CODE>
+ specify whether that block will be fixed or movable. If it is fixed, this argument should contain the flag HF_FIXED; otherwise it should be blank.</LI>
+<LI>
+<A NAME="IX_StreamToken:with StreamOpen()">
+ </A>
+The pointer to a <CODE>
+StreamToken</CODE>
+ variable. <CODE>
+StreamOpen()</CODE>
+ will create the stream and write its token to this variable. You will need this token whenever you access the stream, for reading or writing.</LI>
+</UL>
+<P>
+If the creation is successful, <CODE>
+StreamOpen()</CODE>
+ will return zero and store the stream's token in the <CODE>
+StreamToken</CODE>
+ variable. You must see to it that both the reader and the writer have this token. If the stream cannot be created, the strategy routine will set an error flag and return either STREAM_CANNOT_ALLOC (if the memory for the stream's buffer cannot be allocated) or STREAM_BUFFER_TOO_LARGE (if the requested stream size was greater than 32767).</P>
+
+
+<H2 CLASS="HeadingC">
+Assigning Readers and Writers</H2>
+<P>
+Once a stream is created, you must make sure that both ends will be managed--a stream that has only a writer or only a reader is not a useful stream.</P>
+<P>
+When communicating with a device such as a serial or parallel port, the port is considered to be the entity on the other end. However, if two threads are communicating via a stream, you must make sure the other thread can gain access to the stream. The best way to do this is to set up a message that will be sent by the creator to the other geode. This message should contain as an argument the token of the stream and probably the direction of the stream (whether the creator will be reading or writing).</P>
+<P>
+Once both geodes have the stream's token, each can access the stream normally. The next several sections explain how to access a stream for writing and reading.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Stream_1.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Stream_1.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">1 Using Streams: The Basics</A> 
+<!-- to next --> | <A HREF="Stream_3.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">1.2 Blocking on Read or Write</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

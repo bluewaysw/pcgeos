@@ -1,0 +1,85 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: VM_18.htm,v 1.2 97/09/05 13:07:37 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Structure of a Huge Array</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Virtual Memory</A>: 5.1 <A HREF="VM_17.htm">Huge Arrays</A>: 
+Structure of a Huge Array</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VM_17.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VM_17.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">5 Huge Arrays</A> 
+<!-- to next --> | <A HREF="VM_19.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5.2 Basic Huge Array Routines</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+The huge array has two different type of blocks: a single directory block, and zero or more data blocks. The blocks are linked together in a simple (i.e., non-branching) VM chain. The directory block is the head of the chain. A Huge Array is identified by the handles of the VM file containing the array and the directory block at the head of the array.</P>
+<P>
+<A NAME="IX_HugeArrayDirectory">
+ </A>
+The directory block is a special kind of LMem block. It contains a header structure of type <CODE>
+HugeArrayDirectory</CODE>
+ (which begins with an <CODE>
+LMemBlockHeader</CODE>
+ structure), followed by an optional fixed data area, which is followed by a chunk array. <A NAME="IX_HugeArrayDirEntry">
+ </A>
+The chunk array is an array of <CODE>
+HugeArrayDirEntry</CODE>
+ structures. There is one such structure for each data block; the structure contains the handle of the data block, the size of the block, and the index number of the last element in the block.</P>
+<P>
+Each data block is also a special LMem block. It contains a <CODE>
+HugeArrayBlock</CODE>
+ structure (which begins with an <CODE>
+LMemBlockHeader</CODE>
+ structure) and is followed by a chunk array of elements. If the Huge Array has variable-sized elements, so will each data block's chunk array.
+
+</P>
+<P>
+When you want to look up a specific element, the Huge Array routines lock the directory block. They then read through the directory chunk array until they find the block which contains the specified element. At this point, the routine knows both which data block contains the element and which element it is in that block's chunk array. (For example, if you look up element 1,000, the Huge Array routine might find out that block <EM>
+x</EM>
+ ends with element 950 and block <EM>
+y</EM>
+ ends with element 1,020. The routine thus knows that element 1,000 in the Huge Array is in the chunk array in block <EM>
+y</EM>
+, and its element number is 50 in that block's array.)</P>
+<P>
+The routine then unlocks the directory block, and locks the data block containing that element. It returns a pointer to that element. It also returns the number of elements occurring before and after that element in that chunk array. The calling geode can access all the elements in that block without further calls to Huge Array routines.</P>
+<P>
+When you insert or delete an element, the Huge Array routines look up the element index as described above. They then call the appropriate chunk array routine to insert or delete the element in that data block. They then go through the directory and adjust the element numbers throughout. If inserting an element in a data block would bring the block's size above some system-defined threshold, the Huge Array routine automatically divides the data block.</P>
+<P>
+When the VM routines resize an element block, they automatically make the block larger than necessary. This leaves extra space for future insertions in that block, so the block won't have to be resized the next time an element is added. This improves efficiency, since you may often be adding several elements to the same block. However, this also means that most Huge Arrays have a fair amount of unused space. If you won't be adding elements to a Huge Array for a while, you should compact the Huge Array with <CODE>
+HugeArrayCompressBlocks</CODE>
+ (see <A HREF="VM_1a.htm#26236"> Huge Array Utilities</A>
+).</P>
+<P>
+Ordinarily, VM Chains may not contain LMem heaps. Huge Arrays are an exception. The reason LMem blocks cannot belong to VM chains is simple. Each block in a VM chain begins with the handle of the next block in the chain (or VM_CHAIN_TREE if it is a tree block). However, each LMem heap has to begin with an <CODE>
+LMemBlockHeader</CODE>
+ structure, the first word of which is the global handle of the memory block. In order for these blocks to serve as both, special actions have to be taken. When a Huge Array block is unlocked, its first word is the handle of the next block in the chain. It is thus a VM chain block and not a valid LMem heap. When the Huge Array routine needs to access the block, it locks the block and copies the block's global handle into the first word, storing the chain link in another word. This makes the block a valid LMem heap, but it (temporarily) invalidates the VM chain.
+<IMG SRC="VM_18_HArray.gif">
+
+</P>
+<P>
+Although VM chain utilities work on Huge Arrays, you must be sure that the Huge Array is a valid VM chain when you call the utility. In practice, this means you cannot use a VM chain utility when any block in the chain is locked or while any thread might be accessing the array. If more than one thread might be using the array, you should not use the chain utilities.</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VM_17.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VM_17.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">5 Huge Arrays</A> 
+<!-- to next --> | <A HREF="VM_19.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5.2 Basic Huge Array Routines</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

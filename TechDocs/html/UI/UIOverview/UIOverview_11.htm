@@ -1,0 +1,175 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: UIOverview_11.htm,v 1.1 97/06/02 16:46:03 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> TicTacBoard Specifics</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">UI Overview</A>: 5.4 <A HREF="UIOverview_d.htm">A UI Example</A>: 
+<A NAME="31265">
+ </A>
+TicTacBoard Specifics</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="UIOverview_d.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="UIOverview_10.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.3 The Structure of TicTac</A> 
+<!-- to next --> | <A HREF="UIOverview_12.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5.5 TicTacPiece Specifics</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+The TicTacBoard object, being of a subclass of <CODE>
+VisContentClass</CODE>
+, handles many messages specific to content objects. However, only three messages are handled specifically by <CODE>
+TicTacBoardClass</CODE>
+. These messages are</P>
+<DL>
+<DT>
+<CODE>
+MSG_VIS_DRAW</DT><DD>
+</CODE>
+This message notifies the object it must draw itself and any accompanying graphics. TicTacBoard responds by drawing the game board (the border and crossed lines) and by passing the <CODE>
+MSG_VIS_DRAW</CODE>
+ on to all of its children.</DD>
+<DT>
+<CODE>
+MSG_TICTAC_NEW_GAME</DT><DD>
+</CODE>
+This message is sent by the New Game trigger in the Game menu. TicTacBoard responds by sending another new game message, <CODE>
+MSG_PIECE_NEW_GAME</CODE>
+, to each of its children. Each child will position itself and draw itself properly; TicTacBoard will then redraw the game board by sending itself a <CODE>
+MSG_VIS_DRAW</CODE>
+.</DD>
+<DT>
+<CODE>
+MSG_TICTAC_VALIDATE_BOUNDS</DT><DD>
+</CODE>
+This message is sent by a game piece object when it is being moved. TicTacBoard checks the parameters passed and determines whether they are on the game board or not; if they are it returns TRUE, and if they aren't it returns FALSE.</DD>
+</DL>
+<P>
+Each of the methods for the above messages is shown in <A HREF="UIOverview_11.htm#94090"> Methods of TicTacBoardClass</A>
+. Each is heavily commented and explains the theory behind the method.</P>
+<P CLASS="figTitle">
+Code Display 6-5 <A NAME="94090">
+ </A>
+Methods of TicTacBoardClass</P>
+<PRE>/***********************************************************************
+ *
+ * MESSAGE:		MSG_TICTAC_NEW_GAME for TicTacBoardClass
+ *
+ * DESCRIPTION:		This method notifies each of the visible children that
+ * 		a new game is beginning; they should take their places,
+ * 		and then the board object will redraw itself
+ *
+ * PARAMETERS:
+ * 	void ()
+ *
+ ***********************************************************************/</PRE>
+<PRE>@method TicTacBoardClass, MSG_TICTAC_NEW_GAME {
+    WindowHandle win;				/* the window to draw to			*/
+    GStateHandle gstate;				/* the gstate of the window */</PRE>
+<PRE>	/* First notify all the children (game pieces)
+	 * that a new game is beginning.						*/</PRE>
+<PRE>    @send @visChildren::MSG_PIECE_NEW_GAME();</PRE>
+<PRE>	/* Now initiate a new gstate for the view window.
+	 * Get the window handle from the view, and then
+	 * create a new gstate for it.						*/</PRE>
+<PRE>    win = @call TicTacView::MSG_GEN_VIEW_GET_WINDOW();
+    gstate = GrCreateState(win);</PRE>
+<PRE>	/* Invalidate the game board rectangle in the document.
+	 * This will cause the view object to generate a
+	 * MSG_META_EXPOSED for the rectangle, causing MSG_VIS_DRAW
+	 * to be sent to this object (TicTacBoard).						*/</PRE>
+<PRE>    GrInvalRect(gstate, 0, 0, BOARD_WIDTH, BOARD_HEIGHT);</PRE>
+<PRE>	/* Now destroy the temporary gstate. This is important
+	 * to keep too many gstate handles from being locked
+	 * and slowing down the system.						*/</PRE>
+<PRE>    GrDestroyState(gstate);
+}</PRE>
+<PRE>/***********************************************************************
+ *
+ * MESSAGE:		MSG_VIS_DRAW for TicTacBoardClass
+ *
+ * DESCRIPTION:		This method draws the board's outline and the
+ *		lines of the playing field. It is sent each time
+ *		a portion of the view window becomes invalid (such
+ *		as when the primary is moved).
+ * PARAMETERS:
+ *	void (word drawFlags, GStateHandle gstate)
+ *		gstate is the handle of the graphics state associated
+ *		with the exposed portion of the view window
+ ***********************************************************************/</PRE>
+<PRE>@method TicTacBoardClass, MSG_VIS_DRAW {
+	/* Set up the graphic state properly. The board
+	 * lines are to be white and three points thick.						*/</PRE>
+<PRE>    GrSetLineColor(gstate, CF_INDEX, C_WHITE, 0, 0);
+    GrSetLineWidth(gstate, 3);</PRE>
+<PRE>	/* Now draw the border of the game board. It is a
+	 * rectangle that outlines the entire board.						*/</PRE>
+<PRE>    GrDrawRect(gstate, 0, 0, BOARD_WIDTH, BOARD_HEIGHT);</PRE>
+<PRE>	/* Set and draw the Tic Tac Toe playing field. The
+	 * lines are now set to 4 points thickness, and the
+	 * lines are drawn with HLine and VLine graphics
+	 * commands. Ideally, preset constants would be used.*/</PRE>
+<PRE>    GrSetLineWidth(gstate, 4);
+    GrDrawHLine(gstate, 5, 60, 175);
+    GrDrawHLine(gstate, 5, 120, 175);
+    GrDrawVLine(gstate, 60, 5, 175);
+    GrDrawVLine(gstate, 120, 5, 175);</PRE>
+<PRE>	/* When the MSG_VIS_DRAW is received by the game board,
+	 * it must pass it on to its visible children. It must
+	 * also pass on the parameters of the message as passed
+	 * to ensure all drawing is done properly.						*/</PRE>
+<PRE>    @send @visChildren::MSG_VIS_DRAW(drawFlags, gstate);
+}</PRE>
+<PRE>
+
+
+
+/***********************************************************************
+ *
+ * MESSAGE:		MSG_TICTAC_VALIDATE_BOUNDS for TicTacBoardClass
+ *
+ * DESCRIPTION:		This method checks to see if the bounds passed
+ *		are on the game board. This is invoked when a game
+ *		piece is in motion and receives an END_SELECT message
+ *		indicating it is being put down. The piece must
+ *		determine whether the suggested bounds are on the
+ *		game board; the piece should always query the board
+ *		object rather than check directly; if the board were
+ *		resizable, the piece could be incorrect sometimes.
+ *
+ * STRATEGY:		Check the four bounds against the board's edges. If
+ *		all four are on the board, return TRUE. If any one
+ *		of the four is off the board, return FALSE.
+ * PARAMETERS:
+ *	void (word bottom, word right, word top, word left)
+ ***********************************************************************/</PRE>
+<PRE>@method TicTacBoardClass, MSG_TICTAC_VALIDATE_BOUNDS {
+    if (((bottom &lt; BOARD_HEIGHT) &amp;&amp; (top &gt; 0))
+			&amp;&amp; ((right &lt; BOARD_WIDTH) &amp;&amp; (left &gt;= 0))) {
+	return(TRUE);
+    } else {
+	return(FALSE);
+    }
+}</PRE>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="UIOverview_d.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="UIOverview_10.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.3 The Structure of TicTac</A> 
+<!-- to next --> | <A HREF="UIOverview_12.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5.5 TicTacPiece Specifics</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

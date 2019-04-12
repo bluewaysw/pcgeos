@@ -1,0 +1,137 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Mailbox_16.htm,v 1.1 97/06/02 14:10:09 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Sending and Receiving an Address Book Page</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The Mailbox Library</A>: 7.2 <A HREF="Mailbox_14.htm">Examples of Mailbox Usage</A>: 
+Sending and Receiving an Address Book Page</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Mailbox_14.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Mailbox_15.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">7.1 An Incoming Pager Email Message</A> 
+<!-- to next --> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+This transmission is about as complex as it gets. In it, a user on one GEOS machine transmits an address book page to another user, on another GEOS machine. The transaction is broken into four parts, involving both machines.</P>
+
+<H2 CLASS="HeadingC">
+Message Set-Up</H2>
+<P>
+First, the user selects the page he or she wishes to send. The user selects the means of transport from a Send menu or set of send tools (depending on the system and how the application is set up). The act of going to the page causes the application to notify the message-send controller of the context in which the application finds itself. It is this context that determines what type of data will be placed, by default, in the message body.</P>
+<P>
+The message controller will bring up a dialog displaying the UI for setting transport options, including the address to which the message is to be sent. This UI is obtained by calling the transport driver.</P>
+<P>
+When the user has chosen the address, the controller will send off a MSG_META_MAILBOX_CREATE_MESSAGE to its output, including the 16-bit token bound to the &quot;Current Page&quot; string in the message controller's table.</P>
+<P>
+Having received the message, it becomes the application's responsibility to determine in what formats it can provide the data to be sent. It calls the message controller back, passing an array of data format descriptors that the controller then passes to the transport driver, to see which format it prefers. There will be transport drivers, like the one that uses the Socket library, where any data format will do, so long as the data driver supports the READ_NEXT_BLOCK and WRITE_NEXT_BLOCK calls. Other transport drivers will be more closely coupled with a data driver. For example, the Fax transport driver will require additional information about the fax being sent and will insist on a particular data driver being used.</P>
+<P>
+The transport driver will select one (or none) of the formats and return it to the controller, which will return it to the application. If the transport driver indicates none of the formats is acceptable, the message controller will inform the user that the selected object (page, document, whatever) cannot be sent via the selected medium. The transaction will then be at an end.</P>
+<P>
+Each data format descriptor consists of two 32-bit tokens (composed of the driver's manufacturer ID combined with a 16-bit constant). One token indicates the underlying storage format and refers to a single well-defined data driver. The other token defines the way data are stored in that underlying storage format. From an application's point of view, each data format token can only be used with one particular storage type token. Passing both allows things like the pager driver, described earlier, to be more flexible in how a message is stored. Such flexibility is not needed for the application; as far as it is concerned, a particular data driver is always associated with a particular data format.</P>
+<P>
+If the Mailbox library is asked to load a data driver using a storage type descriptor with which it is not familiar, it will search the appropriate directory, loading each driver it's not seen before and asking it for its storage type token. This allows the work for a non-standard driver to be delayed as long as possible.</P>
+<P>
+For argument's sake, let's say the transport driver indicated that its preferred format is that of a HugeArray with variable-sized elements. The application will ask the Mailbox library for a VM file to use, then convert the page into such an array, presumably placing each field of the address page into its own array element. Any references between the pieces are stored as indices into the array. For example, if the page is made up of the individual entries within the address card, plus a header that contains the names for each entry and a pointer to the entry data, the header must store the array index of the entry data, not a VM block + offset or even a DB group &amp; item. Avoiding reference to individual VM blocks allows the data to be transmitted and stored in arbitrary VM blocks of a data file on the remote side. </P>
+<P>
+The application would then pass a data format descriptor for an address book page stored in a HugeArray, and a storage type descriptor of a VM tree (HugeArrays are based on VM trees).</P>
+<P>
+(If the data are just a stream, without internal pointers to different parts of it, the data can be put into a straight VM chain, rather than a HugeArray. For example, an application that sends just text across would have no need of a HugeArray, but could simply use a VM chain of the text blocks. It would then pass a data format descriptor indicating the thing is an address book page in a VM chain, but the storage type descriptor would still be for a VM tree.)</P>
+<P>
+The matter of which VM file should be used bears a little bit of discussion, as well. If the data that make up the body of a message are already present in the application's document, by all means pass the address to them and mark the body data as volatile (you may not be about to free them, but you also can't guarantee the Mailbox library that they'll be around when the message needs to be sent). If you need to perform any conversion, however, you should use the Mailbox library's utility routines to obtain an appropriate VM file. Then you don't need to mark the body as volatile and the Mailbox library is saved the trouble and time of copying them into its own VM file for safekeeping.</P>
+
+
+<H2 CLASS="HeadingC">
+Registering the Message</H2>
+<P>
+Having created the appropriate HugeArray, the application then calls the message controller back to finally register the message with the Mailbox library.</P>
+<P>
+The controller will determine the time bounds, and the transport driver. It will call the address controller to fetch the block of data to be stored in the transport descriptor. The application provides the following information in its call to the message controller:</P>
+<UL>
+<LI>
+The destination is another copy of the same application (thus, it passes its own token).</LI>
+<LI>
+The user should be notified of the arrival of the message, when appropriate. (The message is travelling First-Class.)</LI>
+<LI>
+The storage format is a VM tree.</LI>
+<LI>
+The data format is an address book page in a HugeArray.</LI>
+<LI>
+The location of the data (the VM file &amp; block handle of the HugeArray).</LI>
+<LI>
+The message data are not volatile, as they are stored in a VM file provided by the Mailbox library.</LI>
+<LI>
+The subject line, which is something like &quot;Address book entry for <EM>
+name</EM>
+&quot;, where <EM>
+name</EM>
+ is the Name field of the entry.</LI>
+</UL>
+<P>
+As for any registered message, the Mailbox library will call the data driver, passing it the HugeArray's address and the data-is-volatile flag. The VM tree data driver will copy the array to a private VM file and return that file's name &amp; block handle for storing in the message descriptor.</P>
+<P>
+After the controller method returns, the application must remember to call the Mailbox library to tell it the application is done using the VM file in which it stored the message body. It must wait until after the message is registered to do this.</P>
+
+
+<H2 CLASS="HeadingC">
+Transmitting the Message</H2>
+<P>
+Once the message is in the Mailbox library's Outbox, it still needs to be sent to the destination computer. When the message is safely in the outbox, the Mailbox library will put up a confirmation box that allows the user to send the message now or later. Assuming the user chooses to delay the message, the user will (at some point in the future) bring up the outbox control panel and choose to see the messages destined for InfraRed (if InfraRed is the only transport with messages stored for it, InfraRed will be brought up automatically). The user will then click the Beam All trigger in the main control panel. This will prompt the Mailbox library to load the InfraRed transport driver and tell it to create a connection to the address stored in the message.</P>
+<P>
+If the connection is successful, the Mailbox library will instruct the transport driver to send each message in turn, passing in the message descriptor. The transport driver, having connected to the well-known mailbox port on the remote machine, will send across the message descriptor, indicating the data format and the destination application, followed by the blocks of the message. The data blocks are obtained by calling the data driver for the message.</P>
+<P>
+On the receiving side, the receipt of the first bytes of the connection request will cause the socket driver for the InfraRed medium to be loaded. When the link is established and an attempt is made to connect to the mailbox socket, the InfraRed transport driver will be loaded to handle the connection. The transport driver will receive each block from the Socket library. The first block will allow it to load the appropriate data driver, which it will use to store the subsequent blocks. If it is unable to load the requisite data driver, it will reject the message and the sending user will be told why.</P>
+<P>
+When all the data blocks have been received, the data driver will be told the message is complete, at which point it will attempt to write the data to disk (it may also have been writing it to disk block by block, or in batches of blocks if the message is particularly large; the driver is allowed to return an error from any block write call and the transport driver will call the data driver to delete what it had received so far and will discard any remaining blocks in this message as they are received, eventually returning an error to the sending transport driver). If this write fails (due to lack of disk space, for example), the receiving transport driver will return an error, which will be returned back to the Mailbox library on the sending machine. The user will be notified and the message will remain in the outbox.</P>
+<P>
+Following the commitment of the message data, the destination machine's transport driver will store the message in the inbox. Again, if the descriptor cannot be committed to disk, an error will propagate back to the sending Mailbox library. Only when the message descriptor is safely stored will the remote transport driver indicate the message has been successfully transmitted.</P>
+<P>
+When the receiving machine has accepted the message, the sending machine will delete the message from its outbox, freeing the message data, etc.</P>
+
+
+<H2 CLASS="HeadingC">
+Delivering the Message</H2>
+<P>
+Once the message is stored in the inbox, it progresses exactly as for the Email message, except it's the Address Book application that will receive the data.</P>
+<P>
+Depending on the priority of the message, the Mailbox library will, sooner or later, notify the user that the message has arrived. If the user chooses not to store the card right then, he will be asked again when the Address Book is next launched or another message arrives for it.</P>
+<P>
+When the user gives the go-ahead for delivering the message, the application is notified, via IACP. When the application has acknowledged receipt of the message, the descriptor is removed from the inbox (though not from the file).</P>
+<P>
+The application will call the Mailbox library to obtain the data format of the message body. If it can accept that format, the application will call the library again, telling it to ask the data driver for the appropriate reference to the data.</P>
+<P>
+Armed with this reference, the application can then act on the message. The message body should be treated as read-only and not be modified by the application in any way.</P>
+<P>
+When it's done with the message, it calls the library again to say it's done with the message (this call is passed on to the data driver to do with as it sees fit). </P>
+<P>
+If the application has no further use for the message descriptor, it will call the Mailbox library to say the message should be deleted.</P>
+<P>
+If the application is unable to understand the data format of the message body, it is responsible for informing the user and deleting the message.</P>
+<P>
+In this case, the Address Book will learn the data are a HugeArray-based address book page, which it understands. It will ask for and receive the VM file and block handle of the HugeArray, extract the relevant pieces and merge them into the address book. In all likelihood, the application will want to confirm with the user that she really wants to do this (especially if it will be overwriting an existing entry) and to do it in the current document. If the user indicates she would rather place the record in another document, the application is free to open the other document; the Mailbox library sets no time limits on how long an application may keep a delivered message active.</P>
+<P>
+Having applied the change (or not), the Address Book will tell the library it's done with the data and to delete the message.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Mailbox_14.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Mailbox_15.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">7.1 An Incoming Pager Email Message</A> 
+<!-- to next --> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

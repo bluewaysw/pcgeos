@@ -1,0 +1,137 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: TTCL_10.htm,v 1.1 97/06/27 16:01:33 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Examples</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Tool Command Language</A>: 6.2 <A HREF="TTCL_e.htm">Coding</A>: 
+Examples</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="TTCL_e.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="TTCL_f.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">6.1 Swat Data Structure Commands</A> 
+<!-- to next --> | <A HREF="TTCL_11.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">7 Using a New Command</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+This section will contain a few examples of Tcl code for Swat commands, showing the use of some of included Tcl commands. A good way to view the code for a particular procedure is to type:</P>
+<PRE>info body &lt;procname&gt;</PRE>
+<P>
+on the Swat command line. This will print out the body of the given &lt;<EM>procname</EM>&gt; . One thing to watch out for, however, is the case when a procedure has not been loaded into Swat yet (i.e. it has not been used yet). If this is the case, Swat will have no information about the procedure and will thus print nothing. The command must be loaded into Swat either with the <CODE>
+load</CODE>
+ command, or by just typing the command name which will usually autoload the command. (See <A HREF="TTCL_11.htm#14348"> Using a New Command</A>
+.) Then the<CODE>
+ info body &lt;procname&gt;</CODE>
+ command can be used.</P>
+<P>
+Some code examples:</P>
+
+<P CLASS="figCaption">
+<A NAME="63244">
+ </A>
+The <A NAME="IX_whatat Swat command:Tcl source">
+ </A>
+Whatat Command</P>
+<PRE>[<A NAME="IX_defcommand Swat command:in example"> </A>defcommand whatat {addr} output
+{Given an address, print the name of the variable at that address}
+{
+ <A NAME="IX_var Tcl command:in example"> </A>var a [<A NAME="IX_symbol Tcl structure:in example"> </A>sym faddr var $addr]
+	<A NAME="IX_if Tcl command:in example"> </A>if {[<A NAME="IX_null Swat command:in example"> </A>null $a]}{
+	 <A NAME="IX_echo Swat command:in example"> </A>echo *nil*
+	} else {
+	 echo [sym name $a]
+ }
+}]</PRE>
+<P CLASS="figCaption">
+This example shows the code of the <CODE>
+whatat</CODE>
+ command. Note the use of the <CODE>
+sym</CODE>
+ (an abbreviation for <CODE>
+symbol</CODE>
+) command to find the address of the given variable <EM CLASS="CodeArgsAsTyped">&lt;addr&gt;</EM> of class <EM CLASS="CodeArgsAsTyped">&lt;var&gt;</EM>.</P>
+<P CLASS="figCaption">
+<A NAME="IX_bytes Swat command:Tcl source">
+ </A>
+The Bytes Command</P>
+<PRE CLASS="SwatDisplay">1	<A NAME="IX_var Tcl command:in example"> </A>var addr [<A NAME="IX_get-address Swat command:in example"> </A>get-address $addr ds:si]
+2	var base [<A NAME="IX_index Tcl command:in example"> </A>index [addr-parse $addr] 1]
+3	<A NAME="IX_echo Swat command:in example"> </A>echo {Addr: +0 +1 +2 +3 +4 +5 +6 +7 +8 +9 +a +b +c +d +e +f}
+4	#fetch the bytes themselves
+5	var bytes [<A NAME="IX_value Swat command:in example"> </A>value fetch $addr [<A NAME="IX_Arrays in Swat:in example"> </A><A NAME="IX_type Tcl structure:in example"> </A>type make array $num [type byte]]]
+6	#
+	# $s is the index of the first byte to display on this row, $e is the
+	# index of the last one. $e can get &gt; $num. The loop handles this case.
+	#
+	var s 0 e [<A NAME="IX_expr Tcl command:in example"> </A>expr 16-($base&amp;0xf)-1]
+	#
+	# $pre can only be non-zero for the first line, so set it once here.
+	# We'll set it to zero when done with the first line.
+	# $post can be non-zero only for the last line, but we can't just
+	# set it to zero and let the loop handle it, as the first may be the
+	# last, so...
+	#
+	var pre [expr 16-($e-$s)-1]
+	if {$e &gt; $num} {
+	var post [expr $e-($num-1)]
+	} else {
+	var post 0
+	} 
+
+	[<A NAME="IX_for Tcl command:in example"> </A>for {var start [expr {$base&amp;~0xf}]}
+	{$s &lt; $num}
+	{var start [expr $start+16]}
+	{
+28	#extract the bytes we want
+29	var bs [<A NAME="IX_range Tcl command:in example"> </A>range $bytes $s $e]
+
+30	echo [<A NAME="IX_format Tcl command:in example"> </A>format {%04xh: %*s%s%*s &quot;%*s%s%*s&quot;} $start
+	[expr $pre*3] {}
+	[<A NAME="IX_map Swat command:in example"> </A>map i $bs {format %02x $i}]
+	[expr $post*3] {}
+	$pre {}
+	[<A NAME="IX_mapconcat Swat command:in example"> </A>mapconcat i $bs {
+	if {$i &gt;= 32 &amp;&amp; $i &lt; 127} {
+	format %c $i
+	} else {
+	format .
+	}
+	}]
+	$post {}]
+	var s [expr $e+1] e [expr $e+16] pre 0
+	if {$e &gt;= $num} {
+	var post [expr $e-($num-1)]
+	}
+	}]
+	<A NAME="IX_set-address Swat command:in example"> </A>set-address $addr+$num-1
+	<A NAME="IX_set-repeat Swat command:in example"> </A>set-repeat [format {$0 {%s} $2} $addr+$num]</PRE>
+<P CLASS="figCaption">
+This example shows the code for the <CODE>
+bytes</CODE>
+ commands. Notice the use of the <CODE>
+type</CODE>
+ command on the fifth line, and the <CODE>
+range</CODE>
+ command on the twenty-ninth line.</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="TTCL_e.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="TTCL_f.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">6.1 Swat Data Structure Commands</A> 
+<!-- to next --> | <A HREF="TTCL_11.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">7 Using a New Command</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

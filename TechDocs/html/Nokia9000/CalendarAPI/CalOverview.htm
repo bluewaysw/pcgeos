@@ -1,0 +1,281 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: CalOverview.htm,v 1.4 97/08/21 16:15:48 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE>Overview</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+<H1 CLASS="sectionTitle">
+<A HREF="index.htm">Calendar API</A>: 1
+Overview</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child -->
+<!-- to previous --> | <A HREF="index.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">Introduction</A>
+<!-- to next --> | <A HREF="CalSamplesTop.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: "> 2 Examples</A>
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+
+
+<!-- Content starts here... -->
+
+<H2>Functionality</H2>
+<PRE>
+<A HREF="CalReference.htm#IX_MSG_CALENDAR_ADD_EVENT">MSG_CALENDAR_ADD_EVENT</A>
+<A HREF="CalReference.htm#IX_MSG_CALENDAR_GET_EVENT_BY_ID">MSG_CALENDAR_GET_EVENT_BY_ID</A>
+<A HREF="CalReference.htm#IX_MSG_CALENDAR_MODIFY_EVENT_BY_ID">MSG_CALENDAR_MODIFY_EVENT_BY_ID</A>
+<A HREF="CalReference.htm#IX_MSG_CALENDAR_DELETE_EVENT_BY_ID">MSG_CALENDAR_DELETE_EVENT_BY_ID</A>
+<A HREF="CalReference.htm#IX_MSG_CALENDAR_CHECK_IF_EVENT_EXISTS">MSG_CALENDAR_CHECK_IF_EVENT_EXISTS</A>
+</PRE>
+
+<P>
+These five messages correspond to the operations you can perform on the
+user's calendar database: add an event, get an event you added, modify an
+event you added, delete an event you added, and search for the existence of
+any event within a specified time interval.
+
+<P>
+Because these messages are sent via IACP to the Calendar application, they
+cannot directly return status values.  In each case, you specify a callback
+message and an object to receive it; status values and requested
+information (if any) are processed by your callback method.
+
+<H2>Callback Prototypes</H2>
+<DL>
+<DT><A HREF="CalReference.htm#IX_CALENDAR_ADD_EVENT_CALLBACK_MSG">
+<CODE>CALENDAR_ADD_EVENT_CALLBACK_MSG</CODE></A></DT>
+<DD>
+Prototype of the callback message for <CODE>MSG_CALENDAR_ADD_EVENT</CODE>;
+passes status value and the assigned event ID.
+</DD>
+
+<P>
+<DT><A HREF="CalReference.htm#IX_CALENDAR_GET_EVENT_CALLBACK_MSG">
+<CODE>CALENDAR_GET_EVENT_CALLBACK_MSG</CODE></A></DT>
+<DD>
+Prototype of the callback message for
+<CODE>MSG_CALENDAR_GET_EVENT_BY_ID</CODE>; passes status value and handle to
+a <CODE>CalendarReturnedEventStruct</CODE>.
+</DD>
+
+<P>
+<DT><A HREF="CalReference.htm#IX_CALENDAR_ACCESS_EVENT_COMMON_CALLBACK_MSG">
+<CODE>CALENDAR_ACCESS_EVENT_COMMON_CALLBACK_MSG</CODE></A></DT>
+<DD>
+Prototype of the callback message for <CODE>MSG_CALENDAR_MODIFY_EVENT_BY_ID,
+MSG_CALENDAR_DELETE_EVENT_BY_ID,</CODE> and
+<CODE>MSG_CALENDAR_CHECK_IF_EVENT_EXISTS</CODE>; passes status value.
+</DD>
+</DL>
+
+<H2>Event Types</H2>
+
+<DL>
+<DT>Ordinary</DT>
+<DD>
+Ordinary events have a start date, start time, end date, end time, an
+optional alarm at or before the start time, and a text description.
+
+<P>
+Only the start date is mandatory; if no start time
+(<CODE>CAL_NO_TIME</CODE>) is specified, the event is listed as a daily
+reminder (before the time-ordered list for its day).  If only a start date
+and time are specified (the end date and time are <CODE>CAL_NO_DATE</CODE>
+and <CODE>CAL_NO_TIME</CODE>), the event is listed at the start time without
+an associated interval.  If an end time is also specified, the event is
+shown spanning a time interval on a single day; if both an end date and time
+are specified, the event is shown spanning the entire interval
+from the start date and time until the end date and time.
+
+<P>
+If you specify a start time and an end date, you must also specify an
+end time; if the end time (or date and time) is specified, it must be
+later than the start time.
+
+<P>
+If you specify a start date and no start time (a daily reminder), do not
+specify an end time; specify an end date if you wish to have a multi-day
+daily reminder.  Do not use the <CODE>CEPS_reserveWholeDay</CODE> parameter
+to create a multi-day daily reminder; if you omit the start and end times,
+you will instead create a multi-day event (see below) with the default start
+and end times of 00:00 and 23:59.
+
+<P>
+<TABLE BORDER=2 CELLPADDING=4>
+<CAPTION>Result of Specifying Start and End Parameters</CAPTION>
+<TR ALIGN=CENTER>
+<TH COLSPAN=2>Start Param Specified
+<TH COLSPAN=2>End Param Specified
+<TH ROWSPAN=2>Result
+
+<TR ALIGN=CENTER>
+<TH>Date
+<TH>Time
+<TH>Date
+<TH>Time
+
+<TR ALIGN=CENTER>
+<TD>Yes<TD>No<TD>No<TD>No<TD ALIGN=LEFT>Daily reminder, listed at beginning of day.
+
+<TR ALIGN=CENTER>
+<TD>Yes<TD>No<TD>Yes<TD>No<TD ALIGN=LEFT>Multi-day daily reminder, listed at 
+the beginning of each day.
+
+<TR ALIGN=CENTER>
+<TD>Yes<TD>No<TD>*<TD>Yes<TD ALIGN=LEFT>Not defined.  Typically creates a daily
+reminder.
+
+<TR ALIGN=CENTER>
+<TD>Yes<TD>Yes<TD>No<TD>No<TD ALIGN=LEFT>Event listed (at the start time)
+with no interval.
+
+<TR ALIGN=CENTER>
+<TD>Yes<TD>Yes<TD>No<TD>Yes<TD ALIGN=LEFT>Event spanning a time interval on
+one day.
+
+<TR ALIGN=CENTER>
+<TD>Yes<TD>Yes<TD>Yes<TD>Yes<TD ALIGN=LEFT>Event (possibly) spanning
+multiple days.
+
+<TR ALIGN=CENTER>
+<TD>Yes<TD>Yes<TD>Yes<TD>No<TD ALIGN=LEFT>Not allowed.
+
+<TR ALIGN=LEFT>
+<TD COLSPAN=5> * = Doesn't matter<BR>
+"No" = CAL_NO_DATE or CAL_NO_TIME was specified
+</TABLE>
+</DD>
+
+<P>
+<DT>Multi-day</DT>
+<DD>
+Multi-day events are ordinary events that have a start and end time for each
+day in their date range, as opposed to being one continuous event spanning
+multiple days.  The start and end time is the same for each day.  Specify a
+multi-day event by including a non-zero value (the number of days) for
+<CODE>CEPS_reserveWholeDay</CODE> in <CODE>CalendarEventParamStruct</CODE>;
+also specify the start and end time (which will apply to each day) and the
+start day.  The end day value is ignored when
+<CODE>CEPS_reserveWholeDay</CODE> is non-zero.  If you omit the start or end
+time (using <CODE>CAL_NO_TIME</CODE>), it defaults to 00:00 (start time) or
+23:59 (end time).
+</DD>
+
+<P>
+<DT>To-do List</DT>
+<DD>
+To-do list events all appear in one list; they are not tied to any specific
+day.  Each to-do event has a status (high priority, normal, or completed)
+and a text description.  Specify a to-do list event by setting the start
+date to <CODE>CAL_NO_DATE</CODE> and the start time to the event's status.
+</DD>
+
+<P>
+<DT>Repeating</DT>
+<DD>
+Repeating events automatically recur according to a specified pattern
+(daily, monthly, etc.).  This API currently does not support repeating
+events; the error <CODE>CEE_EVENT_NOT_SUPPORTED</CODE> will be returned if
+you specify a non-zero <CODE>CEPS_repeatInfo</CODE> field when adding or
+modifying event, or if you attempt to get, modify, or delete a repeating
+event.  Also, <CODE>MSG_CALENDAR_CHECK_IF_EVENT_EXISTS</CODE> will not check
+for repeating events in the specified range.
+</DD>
+</DL>
+
+<H2>Alarms</H2> 
+The Calendar application displays a note and (optionally) sounds a tone when
+an event's alarm is due; this occurs at or before the event's start time.
+(Daily reminders cannot have an associated alarm.)
+You can set an alarm for an event by specifying a non-zero
+<CODE><A HREF="CalReference.htm#IX_CalendarAlarmStruct">CalendarAlarmStruct</A></CODE>
+field in the event's parameter structure, <CODE>CalendarEventParamStruct</CODE>.
+<CODE>CalendarAlarmStruct</CODE> is actually a <CODE>WordFlag</CODE> that
+encodes whether an alarm is set and how long before the event's start
+time it should sound.  On the Nokia 9000i Communicator, this time must be
+specified in minutes.
+
+<P>
+Alarms use the RTCM (Real-Time Clock Manager) library, which allows them to
+activate when Calendar is not running or when the device is sleeping.
+
+<H2>Checking the Calendar Version</H2>
+Only versions of the Nokia 9000i Communicator manufactured after February
+1997 have the calendar geode that supports this API.  Your application can
+check the software version by looking for the INI file settting:
+<PRE>
+[Calendar]
+calApi = True
+</PRE>
+
+<P>
+See <A HREF="../../Kernel/Geodes/Geodes_10.htm">GEOS .INI Files</A> for more
+information on INI files; also see this <A HREF="CalSamplesTop.htm#iniFile">example</A>.
+
+<H2>Data Types</H2>
+
+The following types are defined in 
+<STRONG CLASS="fileName">calendar.goh</STRONG>: 
+
+<P>
+structures:
+<PRE>
+<A HREF="CalReference.htm#IX_CalendarEventParamStruct">CalendarEventParamStruct</A>
+<A HREF="CalReference.htm#IX_CalendarReturnedEventStruct">CalendarReturnedEventStruct</A>
+<A HREF="CalReference.htm#IX_CalendarEventRepeatInfo">CalendarEventRepeatInfo</A>
+<A HREF="CalReference.htm#IX_CalendarEventRepeatDurationData">CalendarEventRepeatDurationData</A>
+</PRE>
+
+WordFlags:
+<PRE>
+<A HREF="CalReference.htm#IX_CalendarAlarmStruct">CalendarAlarmStruct</A>
+<A HREF="CalReference.htm#CalendarEventRepeatLength">CalendarEventRepeatLength</A>
+</PRE>
+
+ByteEnums:
+<PRE>
+<A HREF="CalReference.htm#IX_CalendarEventDescType">CalendarEventDescType</A>
+<A HREF="CalReference.htm#CalendarAlarmIntervalType">CalendarAlarmIntervalType</A>
+<A HREF="CalReference.htm#IX_CalendarEventRepeatDuration">CalendarEventRepeatDuration</A>
+<A HREF="CalReference.htm#CalendarEventRepeatLengthUnitType">CalendarEventRepeatLengthUnitType</A>
+<A HREF="CalReference.htm#CalendarEventRepeatWeekday">CalendarEventRepeatWeekday</A>
+<A HREF="CalReference.htm#CalendarEventRepeatIntervalType">CalendarEventRepeatIntervalType</A>
+<A HREF="CalReference.htm#IX_CalendarEventRepeatInterval">CalendarEventRepeatInterval</A>
+</PRE>
+
+enums:
+<PRE>
+<A HREF="CalReference.htm#IX_CalendarEventError">CalendarEventError</A>
+<A HREF="CalReference.htm#CalendarToDoItemStatus">CalendarToDoItemStatus</A>
+</PRE>
+
+<H2>Internal Messages</H2>
+
+The following messages defined in 
+<STRONG CLASS="fileName">calendar.goh</STRONG> are intended for internal use
+only.  Do not use them in your applications.
+<PRE>
+MSG_CALENDAR_REQUEST_SEARCH
+MSG_CALENDAR_DELETE_EVENTS_BEFORE_DATE
+MSG_CALENDAR_GET_NEXT_EVENT_ID
+MSG_CALENDAR_SET_NEXT_EVENT_ID
+</PRE>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child -->
+<!-- to previous --> | <A HREF="index.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">Introduction</A>
+<!-- to next --> | <A HREF="CalSamplesTop.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: "> 2 Examples</A>
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

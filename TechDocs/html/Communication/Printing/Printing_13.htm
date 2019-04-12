@@ -1,0 +1,350 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Printing_13.htm,v 1.1 97/06/02 14:12:26 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Page Size Control</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="sectionTitle">
+<A HREF="index.htm">The Spool Library</A>: 6 
+<A NAME="69555">
+ </A>
+Page Size Control</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Printing_f.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5 Print Control Messages</A> 
+<!-- to next --> | <A HREF="Printing_14.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">7 Other Printing Components</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>MSG_PRINT_REPORT_PAGE_SIZE, SpoolSetDocSize(), MSG_PZC_GET_PAGE_SIZE, MSG_PZC_SET_PAGE_SIZE, </PRE>
+<P>
+<A NAME="IX_PageSizeControlClass">
+ </A>
+Thanks to the Spooler, applications don't need to worry about what page size the user is working with. If a document is bigger than a printer's paper, then the Spooler will automatically tile the job onto as may sheets of paper as necessary. However, some applications will need to make the user decide on a page size. Page layout programs need to know what size page the user is working with. Spreadsheet programs need to make sure that cells aren't split in half by a page break.</P>
+<P>
+Applications which ask the user to select a page size should incorporate a PageSizeControl into their generic tree. This generic control object provides a dialog box containing page setup choices for the user.</P>
+<P>
+This dialog box contains UI allowing the user to specify what sort of paper the document is to be printed to: envelope, labels, or regular paper. The user may then specify a set of dimensions within that type; paper would have choices including letter sized, legal sized, and A4. The user can even set up a set of custom page dimensions.</P>
+<P>
+<A NAME="IX_SpoolSetDocSize()">
+ </A>
+Most applications which include a PageSizeControl will probably keep track of their own page size. In this case, use <CODE>
+SpoolSetDocSize()</CODE>
+ to update the PageSizeControl's UI when changing the page size. When the user changes the paper size in the PageSizeControl, the control's output will receive a <CODE>
+MSG_PRINT_REPORT_PAGE_SIZE</CODE>
+.</P>
+<P>
+Applications which do not keep track of the page size but want to include a PageSizeControl may do so. However, these applications will probably need to find out the page size at a specific time, not just receive notification every time the user changes the page size. This doesn't really fit the normal controller model, and in fact such applications are asking the PageSizeControl to act not like a controller, but like an ordinary piece of UI gadgetry. Setting the PZCA_ACT_LIKE_GADGET flag in the PageSizeControl's <CODE>
+PZCI_attrs</CODE>
+ instance field will make the PageSizeControl act like a gadget.</P>
+<P>
+If the PageSizeControl is to act as a controller, it must appear on the GenApplication's GAGCNLT_SELF_LOAD_OPTIONS GCN list, as does the PrintControl.</P>
+<P>
+No matter how an application interacts with its PageSizeControl, it will work with the <CODE>
+PageSizeReport</CODE>
+ structure.</P>
+<PRE><A NAME="IX_PSR_&ldots;"> </A><A NAME="IX_PageSizeReport"> </A>typedef struct {
+	dword 			PSR_width;
+	dword 			PSR_height;
+	PageLayout 			PSR_layout;
+	PCMarginParams 			PSR_margins;
+} PageSizeReport;</PRE>
+<PRE><A NAME="IX_PageLayout"> </A>typedef WordFlags PageLayout;
+<A NAME="IX_PT_&ldots;  (PageType type)"> </A><A NAME="IX_PageType"> </A>typedef enum {
+	PT_PAPER,
+	PT_UNUSED1, /* Unused type */
+	PT_ENVELOPE,
+	PT_UNUSED2, /* Unused type */
+	PT_LABEL
+} PageType;</PRE>
+<PRE>/* Specifying a PageLayout is accomplished by 
+ * OR-ing together the parts of the layout.
+ * Exactly what those parts are depends on the 
+ * PageType: */</PRE>
+<PRE>/* Paper Layouts: 
+ * 	(PT_PAPER | (PO_<EM>orient</EM> &lt;&lt; 3) ) */
+<A NAME="IX_PO_&ldots;"> </A><A NAME="IX_PaperOrientation"> </A>typedef ByteEnum 				PaperOrientation;
+#define PO_PORTRAIT 					0x00
+#define PO_LANDSCAPE 					0x01</PRE>
+<PRE><A NAME="IX_PLP_&ldots;"> </A><A NAME="IX_PageLayoutPapers"> </A>typedef WordFlags 				PageLayoutPaper;
+#define PLP_ORIENTATION 					0x0008
+#define PLP_TYPE 					0x0004 /* PT_PAPER */</PRE>
+<PRE>/* Envelope Layouts: 
+ * (PT_ENVELOPE | (EP_<EM>path</EM> &lt;&lt; 5) | (EO_<EM>ori</EM> &lt;&lt; 3)) */
+<A NAME="IX_EP_&ldots;"> </A><A NAME="IX_EnvelopePath"> </A>typedef ByteEnum 				EnvelopePath;
+#define EP_LEFT 					0x00
+#define EP_CENTER 					0x01
+#define EP_RIGHT 					0x02</PRE>
+<PRE><A NAME="IX_EO_&ldots;"> </A><A NAME="IX_EnvelopeOrientation"> </A>typedef ByteEnum 				EnvelopeOrientation;
+#define EO_PORTAIT_LEFT 					0x00
+#define EO_PORTAIT_RIGHT 					0x01
+#define EO_LANDSCAPE_UP 					0x02
+#define EO_LANDSCAPE_DOWN 					0x03</PRE>
+<PRE><A NAME="IX_PLE_&ldots;"> </A><A NAME="IX_PageLayoutEnvelope"> </A>typedef WordFlags 				PageLayoutEnvelope;
+#define PLE_PATH 					0x0040
+#define PLE_ORIENTATION 					0x0010
+#define PLE_TYPE 					0x0004 /*PT_ENVELOPE*/</PRE>
+<PRE>/* Label Layouts:
+ * 	(PT_LABEL | (rows &lt;&lt;8) | (cols &lt;&lt; 3)) */
+<A NAME="IX_PLL_&ldots;"> </A><A NAME="IX_PageLayoutLabel"> </A>typedef WordFlags 				PageLayoutLabel;
+#define PLL_ROWS 					0x7e00 /* # rows */
+#define PLL_COLUMNS 					0x01f8 /* # cols */
+#define 	PLL_TYPE 				0x0004 /* PT_LABEL */</PRE>
+<P CLASS="figTitle">
+Code Display 14-3 PageSizeControl Features</P>
+<PRE><A NAME="IX_PSIZECF_&ldots;"> </A><A NAME="IX_PageSizeControlFeatures"> </A>typedef ByteFlags 	PageSizeControlFeatures;
+/* The following flags may be combined with | and &amp;:
+	PSIZECF_MARGINS, 			( Set margin sizes )
+	PSIZECF_CUSTOM_SIZE,			( Custom dimension ranges )
+	PSIZECF_LAYOUT,
+	PSIZECF_SIZE_LIST,
+	PSIZECF_PAGE_TYPE 			( Choice of standard dimensions ) */</PRE>
+<PRE>#define PSIZEC_DEFAULT_FEATURES (PSIZECF_PAGE_TYPE | PSIZECF_SIZE_LIST | \
+		 		PSIZECF_LAYOUT | PSIZECF_CUSTOM_SIZE) </PRE>
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_PRINT_REPORT_PAGE_SIZE">
+ </A>
+MSG_PRINT_REPORT_PAGE_SIZE</H5>
+<PRE CLASS="syntax">void	MSG_PRINT_REPORT_PAGE_SIZE(
+        PageSizeReport *psr);</PRE>
+<P>
+The page size control's output object should have a handler for this message. The control will send this message whenever the user has changed the page size. The handler may wish to change the bounds of some appropriate object, store the new bounds somewhere, or take some other action.</P>
+<P CLASS="refField">
+Source:	PageSizeControl object.</P>
+<P CLASS="refField">
+Destination:	The <CODE>
+GCI_output</CODE>
+ object.</P>
+<P CLASS="refField">
+Parameters:	<EM>psr</EM> 	A pointer to a <CODE>
+PageSizeReport</CODE>
+ structure containing the page type and size.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	The handler for this message should store the page size information. It may set the bounds of one or more visual objects.</P>
+<P>
+&nbsp;</P>
+<P>
+In addition to the standard set of generic Control instance data, the Page Size control includes some of its own. This data, as you might expect, is largely concerned with paper size and setup. The fields are listed in <A HREF="Printing_13.htm#54994"> Page Size Control Instance Data</A>
+.
+
+</P>
+<P>
+<CODE>
+PageSizeControls</CODE>
+ use the <CODE>
+PageLayout</CODE>
+ data structure to hold and pass layout information such as page orientation. One part of this structure gives the type of page being described: paper, envelope, or label. The other parts of the structure have different meanings depending on the type of page. For paper, the layout keeps track of the orientation. For envelopes, the structure contains both path and orientation information. For labels, this structure keeps track of how many labels are on the sheet in each direction; these numbers are bounded by MAXIMUM_LABELS_ACROSS and MAXIMUM_LABELS_DOWN.</P>
+<P CLASS="figTitle">
+Code Display 14-4 <A NAME="54994">
+ </A>
+Page Size Control Instance Data</P>
+<PRE>@instance PageSizeControlAttrs				PZCI_attrs = 0;
+	/* Possible attributes:
+	 * PZCA_ACT_LIKE_GADGET
+	 * PZCA_PAPER_SIZE
+	 * PZCA_INITIALIZE				*/</PRE>
+<PRE>	/* Current page dimensions and type/layout */
+@instance dword 			PZCI_width = 0;
+@instance dword 			PZCI_height = 0;
+@instance PageLayout 			PZCI_layout = 0;
+@instance PCMarginParams			PZCI_margins = { 0, 0, 0, 0 };</PRE>
+<PRE>/* The following vardata field is internal: */
+@vardata <A NAME="IX_PageSizeControlMaxDimensions"> </A>PageSizeControlMaxDimensions <A NAME="IX_TEMP_PAGE_SIZE_CONTROL_MAX_DIMENSIONS"> </A>TEMP_PAGE_SIZE_CONTROL_MAX_DIMENSIONS;</PRE>
+<PRE>/* Its structure is defined: 
+typedef struct {
+ 	dword <A NAME="IX_PZCMD_&ldots;"> </A>PZCMD_width; ( maximum width )
+ 	dword PZCMD_height; ( maximum height )
+} PageSizeControlMaxDimensions; */</PRE>
+<PRE>
+/* Attribute to allow applications to be made aware of every change made
+ * to gadgetry in the PageSizeControl. This is especially useful for applications
+ * that want to add UI that will be dependent upon the state of this
+ * controller. No effort is made to eliminate the redundant output of data. */</PRE>
+<PRE>@vardata <A NAME="IX_PageSizeControlChanges"> </A>PageSizeControlChanges <A NAME="IX_ATTR_PAGE_SIZE_CONTROL_UI_CHANGES"> </A>ATTR_PAGE_SIZE_CONTROL_UI_CHANGES;</PRE>
+<PRE>/* This field has structure:
+	typedef struct {
+	 optr <A NAME="IX_PSCC_&ldots;"> </A>PSCC_destination; ( destination for message )
+	 Message PSCC_message; ( message to be sent )
+	} <A NAME="IX_PageSizeControlChanges"> </A>PageSizeControlChanges; */</PRE>
+<PRE>The message should follow the prototype: */
+@prototype void PAGE_SIZE_UI_CHANGES_MSG(PageSizeReport _far *psr )</PRE>
+<DL>
+<DT>
+<CODE>
+PZCI_width</CODE>
+<A NAME="IX_PZCI_&ldots;">
+ </A>
+, <CODE>
+PZCI_height</DT><DD>
+</CODE>
+	These integers represent the current page dimensions, measured in points. Note that these values may never go outside the bounds described by the constants MINIMUM_PAGE_WIDTH_VALUE<A NAME="IX_MINIMUM_PAGE_&ldots;">
+ </A>
+, MINIMUM_PAGE_HEIGHT_VALUE, MAXIMUM_PAGE_WIDTH_VALUE<A NAME="IX_MAXIMUM_PAGE_&ldots;">
+ </A>
+, and MAXIMUM_PAGE_HEIGHT_VALUE.</DD>
+<DT>
+<CODE>
+PZCI_layout</CODE>
+	</DT><DD>
+This field contains a <CODE>
+PageLayout</CODE>
+ structure describing the current page layout settings.</DD>
+<DT>
+<CODE>
+PZCI_margins</DT><DD>
+</CODE>
+This field contains the page's margins.</DD>
+</DL>
+<P>
+The following messages allow applications to work with a PageSizeControl directly, like a regular UI gadget. There is one message which the PageSizeControl will send to its output, and several that any object may send to the controller.</P>
+<P>
+Note that these messages are only useful if the PageSizeControl is operating in gadget mode (i.e. if its PZCA_ACT_LIKE_GADGET bit is set). Otherwise, the control's default behavior would override that requested by these messages. </P>
+<P>
+<A NAME="IX_PZCA_&ldots;">
+ </A>
+<A NAME="IX_PageSizeControlAttrs">
+ </A>
+The <CODE>
+PageSizeControlAttrs</CODE>
+ record has the following flags:</P>
+<DL>
+<DT>
+PZCA_ACT_LIKE_GADGET</DT><DD>
+The PageSizeControl object will act like any other generic gadget and will not respond to normal controller notifications.</DD>
+<DT>
+PZCA_PAPER_SIZE</DT><DD>
+The PageSizeControl object will display paper sizes instead of document sizes. Setting this would be very rare for applications.</DD>
+<DT>
+PZCA_INITIALIZE</DT><DD>
+The PageSizeControl object will be initialized to system default values if PZCA_ACT_LIKE_GADGET is also set.</DD>
+<DT>
+PZCA_LOAD_SAVE_OPTIONS</DT><DD>
+Allow the controller to load and save the user's options.</DD>
+
+
+</DL>
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_PZC_GET_PAGE_SIZE">
+ </A>
+MSG_PZC_GET_PAGE_SIZE</H5>
+<PRE CLASS="syntax">void	MSG_PZC_GET_PAGE_SIZE(
+        PageSizeReport		*psr);</PRE>
+<P>
+This message returns the present page size in terms of width, height, and layout, stored in a <CODE>
+PageSizeReport</CODE>
+. Note that the PageSizeControl will be sending out a <CODE>
+MSG_PRINT_REPORT_PAGE_SIZE</CODE>
+ every time the user applies changes to these values. </P>
+<P>
+Only send this message if the PageSizeControl is operating in gadget mode.</P>
+<P CLASS="refField">
+Source:	Unrestricted, as long as the PageSizeControl is in gadget mode.</P>
+<P CLASS="refField">
+Destination:	PageSizeControl object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+psr</CODE>
+	A pointer to a <CODE>
+PageSizeReport</CODE>
+ structure in which the page size will be returned.</P>
+<P CLASS="refField">
+Return:	The <CODE>
+PageSizeReport</CODE>
+ structure pointed to by <CODE>
+psr</CODE>
+ will be filled with the page information.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_PZC_SET_PAGE_SIZE">
+ </A>
+MSG_PZC_SET_PAGE_SIZE</H5>
+<PRE CLASS="syntax">void 	MSG_PZC_SET_PAGE_SIZE(
+        PageSizeReport *	psr);		</PRE>
+<P>
+This message changes the current page size. It takes a <CODE>
+PageSizeReport</CODE>
+ data structure containing the new dimensions and layout. The Apply trigger of a Page Size Control normally sends this message, passing the present user page size as arguments.</P>
+<P>
+Only send this message if the PageSizeControl is operating in gadget mode.</P>
+<P CLASS="refField">
+Source:	Unrestricted, as long as the PageSizeControl is in gadget mode.</P>
+<P CLASS="refField">
+Destination:	PageSizeControl object.</P>
+<P CLASS="refField">
+Parameters:	<EM>psr</EM>	A pointer to a <CODE>
+PageSizeReport</CODE>
+ structure containing page information.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely.<A NAME="marker=461169">
+ </A>
+</P>
+
+
+<H5 CLASS="RefETitle">
+MSG_PZC_SET_MAXIMUM_HEIGHT</H5>
+<PRE CLASS="syntax">void MSG_PZC_SET_MAXIMUM_HEIGHT(
+        dword height);</PRE>
+<P>
+Set the maximum height for a page.</P>
+<P CLASS="refField">
+Source:	Anything.</P>
+<P CLASS="refField">
+Destination:	PageSizeControl object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+height</EM>
+	Height, in points.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally should not be intercepted.</P>
+
+
+<H5 CLASS="RefETitle">
+MSG_PZC_SET_MAXIMUM_WIDTH</H5>
+<PRE CLASS="syntax">void MSG_PZC_SET_MAXIMUM_WIDTH(
+        dword width);</PRE>
+<P>
+Set the maximum width for a page.</P>
+<P CLASS="refField">
+Source:	Anything.</P>
+<P CLASS="refField">
+Destination:	PageSizeControl object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+width</EM>
+	Width, in points.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally should not be intercepted.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Printing_f.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5 Print Control Messages</A> 
+<!-- to next --> | <A HREF="Printing_14.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">7 Other Printing Components</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

@@ -1,0 +1,86 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: GOCLanguage_e.htm,v 1.1 97/06/02 16:01:33 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> The GEOS Message System</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">GEOS Programming</A>: 3.3 <A HREF="GOCLanguage_b.htm">The GEOS Object System</A>: 
+<A NAME="57260">
+ </A>
+The GEOS Message System</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GOCLanguage_b.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GOCLanguage_d.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.2 Object Structures</A> 
+<!-- to next --> | <A HREF="GOCLanguage_f.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">4 Using Classes and Objects</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+<A NAME="IX_Messages">
+ </A>
+Because objects are independent entities, they must have some means of communicating with other objects in the system. As shown in the example of the calculator and requestor objects in <A HREF="../../Intro/Overview/index.htm">the Overview chapter</A>, communication is implemented through the use of messages and methods.</P>
+<H2 CLASS="HeadingC">
+The Messaging Process</H2>
+<P>
+When an object needs to notify another object of some event, retrieve data from another object, or send data to another object, it sends a message to that object. Sending a message is similar to calling a function in C in that the message can take parameters (including pointers) and give return values. However, messages are also quite different from function calls in the multithreaded environment of GEOS.</P>
+<P>
+<A NAME="IX_Threads:event queues">
+ </A>
+Each object block in the system is associated with a single thread of execution. Each thread that runs objects (some run only procedural code) has an <EM>
+event queue</EM>
+, a queue in which messages are stored until they can be handled. Every message sent to an object from another thread gets put in the object's thread's event queue. (Messages sent between objects within the same thread are not handled via the queue unless forced that way.) Thus, a single thread's event queue can have messages for many different objects. For most single-thread applications, the programmer will not have to worry about synchronization issues.</P>
+<P>
+<A NAME="IX_Messages:calling">
+ </A>
+The sender of a message has to be aware of synchronization issues raised by having multiple threads in the system. Essentially, you can send a message two ways: The first, &quot;calling&quot; the message, allows the use of return values and acts almost exactly like a function call in C. This places the message in the recipient's event queue and then halts the sender until the return values are received. The sender &quot;goes to sleep&quot; until the message has been processed and is then awoken by the kernel, thus ensuring the message is handled before the sender executes another line of code. The call option should also be used when passing pointers; otherwise, the item pointed to may move before the message can be handled, invalidating the pointer.</P>
+<P>
+<A NAME="IX_Messages:sending">
+ </A>
+The second, &quot;sending&quot; the message, is used primarily when synchronization is not an issue. For example, if the message merely notifies the recipient of some condition or event, or if it sends data with no expectation of a return value, the send option can be used. Essentially, the sender will send off the message and then forget about it, continuing on with its own business. (The exception to this is an object sending a message to another object in the same thread; then the message is handled immediately, as if it had been called.)</P>
+<P>
+When an object sends a message, the message actually first gets passed to the kernel (this is all automatic). The kernel will put the message into the proper thread's event queue and, if necessary, put the sender's thread temporarily to sleep. When the recipient's thread is ready to handle the message, the kernel pulls it from the event queue.</P>
+<P>
+The kernel then locates and loads the recipient object into memory (if necessary). The recipient's object block will be loaded and locked, and the object will be locked while processing the event. (Note, however, that it is possible for the object to move if the recipient makes a call to <CODE>
+LMemAlloc()</CODE>
+ or does something else that can cause shuffling of the object chunks.) The kernel will follow the object's class pointer to its class and will scan the method table. If the class can handle the message, the proper method code will be executed. If the class can not handle the message, the kernel will follow the superclass pointer and check the method table there. The message will continue up the class tree like this until either it is handled or it reaches the root and returns unprocessed.</P>
+<P>
+After the method code has been executed, the kernel collects any return values and wakes up the caller thread again if necessary. To the caller, it's as if the message were handled instantaneously (with the call option). Senders are never blocked; only messages called (with the call option) may block the caller's thread. If a message is sent to an object in the same thread, however, it will be executed as a call and will be handled immediately, unless the sender explicitly states that it should go through the message queue.</P>
+<P>
+<A NAME="IX_Deadlock">
+ </A>
+Be careful, though, if you are writing code in multiple threads (for example, if you subclass UI objects and write new method code for them). You have to make sure that two threads never call each other; this can lead to deadlock if the calls happen to overlap. The easiest way to deal with this is to have one thread always send a message requesting a return message with any needed return values. The other thread will then send off a return message with the data. For example, a UI object may require information from an application's object. The UI object sends <CODE>
+MSG_REQUEST_INFORMATION</CODE>
+ (or something similar). The application's object then receives that message and responds with a <CODE>
+MSG_RETURNING_REQUESTED_INFORMATION</CODE>
+ (or something similar). With this scheme, the application's object is free to use call whenever it wants, but the UI object must always use send.</P>
+
+
+<H2 CLASS="HeadingC">
+Message Structures and Conventions</H2>
+<P>
+A message is simply a 16-bit number determined at compile time. Specifically, it is an enumerated type--this ensures that no two messages in the same class can have the same number.</P>
+<P>
+An event is an opaque structure containing the message number and information about the recipient, the sender, parameters, and return values. When an object sends a message, the kernel automatically builds out the event structure (generally stored in the handle table for speed and efficiency). You will never have to know the structure of an event.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GOCLanguage_b.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GOCLanguage_d.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.2 Object Structures</A> 
+<!-- to next --> | <A HREF="GOCLanguage_f.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">4 Using Classes and Objects</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

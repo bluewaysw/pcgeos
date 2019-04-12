@@ -1,0 +1,365 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: HelloWorld_b.htm,v 1.1 97/06/02 15:19:15 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Code and Message Handlers</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Hello World</A>: 4.4 <A HREF="HelloWorld_7.htm">The Source File and Source Code</A>: 
+Code and Message Handlers</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="HelloWorld_7.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="HelloWorld_a.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.3 UI Objects</A> 
+<!-- to next --> | <A HREF="HelloWorld_c.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">5 Exercises and Suggestions</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+One of the first things a C programmer might notice when looking at the Hello World program is that it has no <CODE>
+main()</CODE>
+ routine. This illustrates the primary distinction between an object-oriented system and a system that emulates object-orientedness.</P>
+<P>
+Applications in GEOS consist of a Process object and, optionally, other objects in the same or different threads. The Process object of an application is <A NAME="IX_event-driven">
+ </A>
+<EM>
+event-driven</EM>
+. This means that until it receives a message, it does nothing; when it receives a message, however, it will automatically be woken up with the instruction pointer pointing at the proper routine's entry point.</P>
+<P>
+<CODE>
+GenProcessClass</CODE>
+, the superclass of every Process object, handles many messages that most applications may never need to know about. For example, when the program is first launched, the Process object will receive a series of messages from the UI and the kernel telling it how it should start up. It automatically responds by setting up the proper message queues and executing the proper code. These are things you, as the programmer, do not need to know about to create a working GEOS application (though they are documented in <A HREF="../../Kernel/Geodes/index.htm">the Geodes chapter</A>).</P><P>
+Throughout the program's life, then, the Process object will receive and respond to messages as they are received. Each message has at most one corresponding method; if no method exists for a message, the message is ignored.</P>
+<P>
+The Hello World Process object can handle six different messages, each of which is sent by a UI object. It also uses one routine defined internally and not available for use by other objects. Of the six messages it handles, three are specific to Hello World and three are universal to all applications using a GenView object: <CODE>
+MSG_META_EXPOSED</CODE>
+, <CODE>
+MSG_META_CONTENT_VIEW_WIN_OPENED</CODE>
+, and MSG_META_CONTENT_VIEW_WIN_CLOSED are sent by the view, and <CODE>
+MSG_HELLO_CHANGE_TO_BLUE</CODE>
+, <CODE>
+MSG_HELLO_CHANGE_TO_GOLD</CODE>
+, and <CODE>
+MSG_HELLO_REDRAW_DOCUMENT</CODE>
+ are defined specific to <CODE>
+HelloProcessClass</CODE>
+ and are sent by the triggers.</P>
+<P>
+The function <CODE>
+HelloDrawText()</CODE>
+ is internal to Hello World and is called by the <CODE>
+MSG_META_EXPOSED</CODE>
+ handler. It is declared before the handler to satisfy normal C constraints.</P>
+<P>
+Additionally, two constants are defined to determine the document size. These constants, along with the declaration of <CODE>
+HelloDrawText()</CODE>
+, are shown in <A HREF="HelloWorld_b.htm#81870"> Constant and Routine Definition</A>
+.</P>
+<P CLASS="figTitle">
+Code Display 2-8 <A NAME="81870">
+ </A>
+Constant and Routine Definition</P>
+<P CLASS="figCaption">
+This display is part of hello3.goc and follows the previous display directly.</P>
+<PRE>/*************************************************************************
+ *			Code for HelloProcessClass
+ * Now that all the UI gadgetry has been defined, we must provide the
+ * methods and routines used by the application. For simplicity, all
+ * messages will be handled by the HelloProcessClass object.
+ *************************************************************************/</PRE>
+<PRE>/* Define constants used by the color-setting methods. Each of these
+ * is a document size parameter in points. Therefore, the document is
+ * 8.5 inches wide by 11 inches tall (one point is 1/72 of an inch). */
+#define HORIZ_DOC_SIZE			(72*17/2)
+#define VERT_DOC_SIZE			(72*11)</PRE>
+<PRE>/* Declare that we will use the function HelloDrawText(), and define its
+ * return and parameter values. It has no return value and has one parameter:
+ * a graphics state handle called &quot;gstate.&quot; */
+void HelloDrawText(GStateHandle gstate);</PRE>
+<PRE>/* The following constants are used by HelloDrawText(). */</PRE>
+<PRE>#define TEXT_POINT_SIZE			 48	/* point size */
+#define TEXT_X_POSITION			 30	/* x position, in document coords. */
+#define TEXT_Y_POSITION			100	/* y position, in document coords. */</PRE>
+
+<H2 CLASS="HeadingC">
+Handling the Window Messages</H2>
+<P>
+As stated earlier, the <CODE>
+winHan</CODE>
+ global variable contains the window handle of the view's window. To set the variable, Hello World must intercept and handle the message <CODE>
+MSG_META_CONTENT_VIEW_WIN_OPENED</CODE>
+. This message passes the window handle, which <CODE>
+HelloProcessClass</CODE>
+ simply stuffs into its <CODE>
+winHan</CODE>
+ variable.</P>
+<P>
+When the view window is destroyed, the application must make sure it forgets its window handle. Otherwise, we could try to draw to a nonexistent window, which is an error. This will not be a problem for Hello World because the only time the view can be destroyed is when the application is being shut down. For completeness, however, Hello World handles <CODE>
+MSG_META_CONTENT_VIEW_WIN_CLOSED</CODE>
+ and sets <CODE>
+winHan</CODE>
+ to zero.</P>
+<P>
+Both of the methods for the above messages are shown in <A HREF="HelloWorld_b.htm#62383"> Messages from the View</A>
+.</P>
+<P CLASS="figTitle">
+Code Display 2-9 <A NAME="62383">
+ </A>
+Messages from the View</P>
+<P CLASS="figCaption">
+This display is part of hello3.goc and follows the previous display directly.</P>
+<PRE>/* NOTE:
+ * Because these are simple methods, the structure and syntax of methods are not
+ * handled here. See the handler for MSG_META_EXPOSED, later in this chapter. */</PRE>
+<PRE>/***********************************************************************
+ * MSG_META_CONTENT_VIEW_WIN_OPENED for HelloProcessClass
+ ***********************************************************************
+ * SYNOPSIS:		Record the handle of the view window when the view
+ *		creates it. This allows us to more-easily update the
+ *		document when the user changes the text color.
+ * PARAMETERS:		void (	word viewWidth,
+ *			word viewHeight,
+ *			WindowHandle viewWin)
+ * SIDE EFFECTS: winHan is set to viewWindow
+ ***********************************************************************/</PRE>
+<PRE>@method HelloProcessClass, MSG_META_CONTENT_VIEW_WIN_OPENED {
+	/* Get the window handle of the View. We need this handle in order to
+	 * force a window invalidation, causing the View to send a MSG_META_EXPOSED
+	 * to the Process object and thereby forcing a redraw of the window. */
+    winHan = viewWindow;
+}</PRE>
+<PRE>/***********************************************************************
+ * MSG_META_CONTENT_VIEW_WIN_CLOSED for HelloProcessClass
+ ***********************************************************************
+ * SYNOPSIS:		Take note that the view is now closed, so we don't
+ *		try and draw to it or invalidate it any more (at
+ *		least until it reopens)
+ * PARAMETERS:		void (WindowHandle viewWindow)
+ * SIDE EFFECTS:		winHan is set to 0
+ *
+ ***********************************************************************/</PRE>
+<PRE>@method HelloProcessClass, MSG_META_CONTENT_VIEW_WIN_CLOSED {
+	/* Set our window handle variable to zero. */
+    winHan = 0;
+}</PRE>
+
+
+<H2 CLASS="HeadingC">
+Handling MSG_META_EXPOSED</H2>
+<P>
+As discussed in our HelloView object declaration (see <A HREF="HelloWorld_a.htm#64685"> Hello World's Primary and View Objects</A>
+), the view will send a <CODE>
+MSG_META_EXPOSED</CODE>
+ to the Hello World Process object. Receipt of this message indicates that part of the scrollable view window has become invalid and must be redrawn.</P>
+<P>
+Therefore, the class of the Hello World Process object (<CODE>
+HelloProcessClass</CODE>
+) must know how to draw the document in response to this message. Note that this message did not have to be defined specifically in the earlier definition of <CODE>
+HelloProcessClass</CODE>
+--this is because the message is already defined for <CODE>
+MetaClass</CODE>
+, the superclass of all GEOS classes.</P>
+<P>
+<A HREF="HelloWorld_b.htm#54035"> MSG_META_EXPOSED Handler</A>
+ shows the method that handles <CODE>
+MSG_META_EXPOSED</CODE>
+ for <CODE>
+HelloProcessClass</CODE>
+. Notice that the method calls the <CODE>
+HelloDrawText()</CODE>
+ routine rather than drawing the text directly. While this may appear inefficient at first (and is for such a small, simple application), there are two main reasons why this is done:</P>
+<P>
+First, it takes advantage of the GEOS single imaging model. The method simply creates the proper <CODE>
+GState</CODE>
+ for drawing to the view window, then calls the drawing routine. A similar message for printing (i.e. when the user clicks on a &quot;Print&quot; trigger, a print message may be sent to the Process object) can use the same drawing routine--its handler would simply set up a <CODE>
+GState</CODE>
+ for drawing to a Spool file and then call the drawing routine. Thus, one function is used for two purposes, cutting down code size.</P>
+<P>
+Second, it allows more modularity in the testing of your code. If you need to make sure, for example, that the message is being received and handled, but you don't (yet) care if the drawing is done properly, you can set up <CODE>
+HelloDrawText()</CODE>
+ as a dummy function. This would allow you to ensure the message is handled properly without having to debug all the drawing code.</P>
+<P CLASS="figTitle">
+Code Display 2-10 <A NAME="54035">
+ </A>
+MSG_META_EXPOSED Handler</P>
+<P CLASS="figCaption">
+This display is part of hello3.goc and follows the previous display directly.</P>
+<PRE>/***********************************************************************
+ * MSG_META_EXPOSED for HelloProcessClass
+ ***********************************************************************
+ * SYNOPSIS:		Redraw the recently-exposed portion of the View
+ * PARAMETERS:		void (WindowHandle win)
+ * SIDE EFFECTS:		The invalid region of the window is cleared out
+ *
+ * STRATEGY:		This message is sent by the windowing system when a
+ *		portion of the GenView has become invalid, either
+ *		because a window that was obscuring it has been moved,
+ *		or because some called GrInvalRect.
+ *
+ *		We redraw the entire document, after telling the
+ *		graphics system we're drawing to the invalid portion
+ *		of the window.
+ *
+ ***********************************************************************/</PRE>
+<PRE>/* The method is declared with the goc keyword @method. This is followed by
+ * the name of the class that knows how to handle the message (in this case,
+ * the class is HelloProcessClass). Finally, the name of the message that
+ * invokes this method is specified. Other items may also be specified (such
+ * as a routine name that can be used instead of a message), but these are not
+ * required. */
+@method HelloProcessClass, MSG_META_EXPOSED {</PRE>
+<PRE>    /* The local variable gstate will hold a GState handle. We will do
+     * our drawing to this gstate. */
+    GStateHandle gstate;</PRE>
+<PRE>    /* Get a new, default graphics state that we can use while drawing.
+     * We must allocate a new graphics state for the View window using
+     * the kernel routine GrCreateState(). We pass the window handle of
+     * the View window, which we received in a parameter called &quot;win&quot;. */</PRE>
+<PRE>    gstate = GrCreateState(win);</PRE>
+<PRE>    /* Next, start a window update. This tells the windowing system that
+     * we are in the process of drawing to this window. This is very
+     * important--it ensures the window will be in a consistent state while
+     * we're drawing. Specifically, it locks in the invalidated region to
+     * which we'll be drawing; this makes sure that other threads drawing
+     * to this window will not have any effect on our GState. A window
+     * update is started by calling the kernel routine GrBeginUpdate()
+     * with the GState handle. */</PRE>
+<PRE>    GrBeginUpdate(gstate);</PRE>
+<PRE>    /* If we had background graphics to draw, we could call the appropriate
+     * graphics routines now. But we don't. */</PRE>
+<PRE>    /* Draw our text into the window (pass the GState). This is done here
+     * by calling the function HelloDrawText(), which knows how to draw
+     * the appropriate document. (See below.) */</PRE>
+<PRE>    HelloDrawText(gstate);				/* Special Hello World routine (below). */</PRE>
+<PRE>    /* Now end the window update (unlock the GState and its window)
+     * with the routine GrEndUpdate(), and free the GState handle by calling
+     * the kernel routine GrDestroyState(). */</PRE>
+<PRE>    GrEndUpdate(gstate);				/* Signal that we are done with 
+				 * the window update. */
+    GrDestroyState(gstate);				/* Destroy the temporary GState. */
+}</PRE>
+<PRE>/***********************************************************************
+ * MSG_HELLO_REDRAW_DOCUMENT for HelloProcessClass
+ ***********************************************************************
+ * SYNOPSIS:		Force the document to be redrawn by marking the
+ *		entire document area in the view as invalid.
+ * PARAMETERS:		void (void)
+ * SIDE EFFECTS:		Any drawing to the document area between this
+ *		message and the MSG_META_EXPOSED that it generates
+ *		will not show up, as the entire window will be invalid.
+ *
+ ***********************************************************************/</PRE>
+<PRE>@method HelloProcessClass, MSG_HELLO_REDRAW_DOCUMENT
+{</PRE>
+<PRE>    /* Now create a temporary GState to use for window invalidation
+     * if the window handle is valid, then redraw the window. */
+    if (winHan != 0) {
+	GStateHandle gstate = GrCreateState(winHan);
+	/* Call GrInvalRect using the GState. Invalidate the entire
+	 * document. This will cause the View to redraw itself and send
+	 * a MSG_META_EXPOSED to the Process object. */
+	GrInvalRect(gstate, 0, 0, HORIZ_DOC_SIZE, VERT_DOC_SIZE);
+	GrDestroyState(gstate);				/* Free the GState. */
+    }
+}</PRE>
+<PRE>/***********************************************************************
+ * HelloDrawText
+ ***********************************************************************
+ * SYNOPSIS:		Draw a single line of text onto the document. Note
+ *		that it has no concept of the screen or the view --
+ *		it is given a graphics state and draws through it.
+ * CALLED BY:		(INTERNAL) HelloProcess::MSG_META_EXPOSED
+ * RETURN:		nothing
+ * SIDE EFFECTS:		attributes in the gstate are altered
+ *
+ * STRATEGY:		We separate the drawing from the exposure handler
+ *		so the same routine can be used for both window
+ *		refresh and for printing.
+ *
+ *		Set the font, point size and color, then draw the text.
+ *
+ ***********************************************************************/</PRE>
+<PRE>/* Functions are declared as they would be in C. Parameters are defined using
+ * the ANSI calling convention: The type of the parameter is given, followed
+ * by the parameter name. Multiple parameters are separated by commas. This
+ * function has a single parameter. */</PRE>
+<PRE>void HelloDrawText(GStateHandle gstate) {</PRE>
+<PRE>    /* First change some of the default GState values such as the font
+     * and point size. This is done with the routine GrSetFont(). */
+    GrSetFont(gstate, FID_DTC_URW_ROMAN, MakeWWFixed(TEXT_POINT_SIZE));</PRE>
+<PRE>    /* Set the text color to the value in helloTextColor by calling the
+     * graphics routine GrSetTextColor(). */
+    GrSetTextColor(gstate, CF_INDEX, helloTextColor, 0, 0);</PRE>
+<PRE>    /* Draw the text onto the document by using the GrDrawText() routine. */
+    GrDrawText(gstate, TEXT_X_POSITION, TEXT_Y_POSITION,
+			&quot;Welcome to GEOS!&quot;, 0);
+}</PRE>
+
+
+<H2 CLASS="HeadingC">
+Handling Messages from the Triggers</H2>
+<P>
+When the user clicks on one of the two triggers in the Color dialog box, the pressed trigger sends off a message to the Hello World Process object. The Blue trigger sends <CODE>
+MSG_HELLO_CHANGE_TO_BLUE</CODE>
+, and the Gold trigger sends <CODE>
+MSG_HELLO_CHANGE_TO_GOLD</CODE>
+. The Process object must be able to handle both of these messages.</P>
+<P>
+The methods that handle these messages are similar. Each sets the global variable <CODE>
+helloTextColor</CODE>
+, and each forces the view window to redraw itself (by sending <CODE>
+MSG_HELLO_REDRAW_DOCUMENT</CODE>
+ to the Process) so the color is changed on the screen as well as in our variable. <A HREF="HelloWorld_b.htm#65734"> Handlers for MSG_HELLO_ </A>
+ shows the code and comments of both these methods.</P>
+<P CLASS="figTitle">
+Code Display 2-11 <A NAME="65734">
+ </A>
+Handlers for MSG_HELLO_...</P>
+<P CLASS="figCaption">
+This display is part of hello3.goc and follows the previous display directly.</P>
+<PRE>/***********************************************************************
+ * MSG_HELLO_CHANGE_TO_BLUE for HelloProcessClass
+ ***********************************************************************
+ * SYNOPSIS:		Set the text color to dark blue and redraw the text.
+ * PARAMETERS:		void (void)
+ * SIDE EFFECTS:		helloTextColor is set to C_BLUE
+ *
+ ***********************************************************************/</PRE>
+<PRE>@method HelloProcessClass, MSG_HELLO_CHANGE_TO_BLUE {
+    helloTextColor = C_BLUE;				/* Set the helloTextColor variable to blue. */
+    @call self::MSG_HELLO_REDRAW_DOCUMENT();
+}</PRE>
+<PRE>/***********************************************************************
+ * MSG_HELLO_CHANGE_TO_GOLD for HelloProcessClass
+ ***********************************************************************
+ * SYNOPSIS:		Set the text color to yellow and redraw the text.
+ * PARAMETERS:		void (void)
+ * SIDE EFFECTS:		helloTextColor is set to C_YELLOW
+ *
+ ***********************************************************************/</PRE>
+<PRE>@method HelloProcessClass, MSG_HELLO_CHANGE_TO_GOLD
+{
+    helloTextColor = C_YELLOW; /* Set the helloTextColor variable to gold. */
+    @call self::MSG_HELLO_REDRAW_DOCUMENT();
+}</PRE>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="HelloWorld_7.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="HelloWorld_a.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.3 UI Objects</A> 
+<!-- to next --> | <A HREF="HelloWorld_c.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">5 Exercises and Suggestions</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

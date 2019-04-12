@@ -1,0 +1,279 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: GenClass_11.htm,v 1.3 97/08/05 15:24:02 nfiedler Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:isv-feedback@geoworks.com">
+
+<TITLE> Manipulating Children Directly</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">GenClass</A>: 5.2 <A HREF="GenClass_f.htm">Generic Trees</A>: 
+Manipulating Children Directly</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GenClass_f.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GenClass_10.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.1 Child/Parent Searches</A> 
+<!-- to next --> | <A HREF="GenClass_12.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5.3 Branch Construction/Destruction</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>MSG_GEN_ADD_CHILD, MSG_GEN_REMOVE, MSG_GEN_REMOVE_CHILD, MSG_GEN_MOVE_CHILD, MSG_GEN_ADD_CHILD_UPWARD_LINK_ONLY</PRE>
+<P>
+The following messages create, move, and remove objects set up directly in your <CODE>
+.goc</CODE>
+ file or created with <CODE>
+ObjInstantiate()</CODE>
+, <CODE>
+ObjInstantiateForThread() </CODE>
+or <CODE>
+ObjDuplicateResource()</CODE>
+. These objects may have children, in which case those children will travel with their parent (and be moved and destroyed with the parent).</P>
+<P>
+When adding or removing children, you typically have to use a <CODE>
+CompChildFlags</CODE>
+ record. This record has two fields, one of which is a dirty flag; the other is a position number indicating a child's position. The record has the following structure:</P>
+<PRE>typedef WordFlags CompChildFlags;
+#define CCF_MARK_DIRTY				0x8000 /* high bit */
+#define CCF_REFERENCE				0x7FFF /* low 15 bits */</PRE>
+<PRE>#define CCF_REFERENCE_OFFSET					0</PRE>
+<PRE><A NAME="IX_CCO_&ldots;"> </A>/* The CCF_REFERENCE field may have any integral
+ * number or may be set to one of the following
+ * constants:
+ *	CCO_FIRST			first child's position
+ *	CCO_LAST			last child's position */</PRE>
+<P>
+<A NAME="IX_CCF_&ldots;">
+ </A>
+<A NAME="IX_CompChildFlags">
+ </A>
+The <CODE>
+CompChildFlags</CODE>
+ fields are</P>
+<DL>
+<DT>
+CCF_MARK_DIRTY</DT><DD>
+If set, this flag indicates that the operation in progress should mark the affected objects dirty. Any objects marked dirty will be saved to the state file upon shutdown.</DD>
+<DT>
+CCF_REFERENCE</DT><DD>
+This field consists of the lower 15 bits of the word and is a zero-based integer representing the position of the child in its parent's child list. This number cannot be greater than 32767 (0x7fff hex). If the number given is greater than the number of current children, the child will be assumed to be last. For example, a CCF_REFERENCE of four would specify the fifth child of the parent object, or the last child if there are fewer than five children currently. When specifying a position for CCF_REFERENCE, use the CCF_REFERENCE_OFFSET (using the shift operator).</DD>
+</DL>
+<P>
+CCO_FIRST and CCO_LAST specify either the first or last child of the parent, respectively. There is no need to use the CCF_REFERENCE_OFFSET in these cases.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_ADD_CHILD">
+ </A>
+MSG_GEN_ADD_CHILD</H4>
+<PRE CLASS="syntax">void	MSG_GEN_ADD_CHILD(
+        optr		child,
+        CompChildFlags		flags);</PRE>
+<P>
+This message adds the passed object as a child of the recipient. The child object must not be GS_USABLE before being added to the generic tree. Make sure not to add a child that is already a child of some other parent. It is also illegal to add an object that is already a child of the parent. If necessary, check first if the specific child currently exists using <CODE>
+MSG_GEN_FIND_CHILD</CODE>
+.</P>
+<P>
+In most cases a routine that adds a new child will follow three phases: checking whether the child exists, adding the child, and setting the child GS_USABLE.</P>
+<P>
+The child object, if already specifically initialized, must be unbuilt before being added to the parent. This ensures that the object will be built out correctly. The internal keyboard search path attribute, GA_KBD_SEARCH_PATH, is also cleared and reset for the child.</P>
+<P>
+Pass this message the optr of the child object to add, along with the <CODE>
+CompChildFlags</CODE>
+ to use. If CCF_MARK_DIRTY is specified, the new linkage will be saved to state when the application is detached. You must pass a CCF_REFERENCE in <CODE>
+CompChildFlags</CODE>
+ to specify the position to add the child. The special constants CCO_FIRST and CCO_LAST, which are special cases of CCF_REFERENCE, will add the object as the first or last child of the parent, respectively.</P>
+<P>
+Note that the object must currently exist. <CODE>
+MSG_GEN_ADD_CHILD</CODE>
+ merely sets up the correct linkage and reconfigures your UI. Note also that successive additions of children using the flag CCO_FIRST will result in a &quot;reverse order&quot; of children (the last added will be the first child, the first added will be the last).</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any generic object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+child</EM>
+	The optr of the object to add to the current object's children. This child must not be usable.</P>
+<DL>
+<DT>
+<EM>
+flags</EM>
+</DT><DD><CODE>
+CompChildFlags</CODE>
+ to use when adding the child.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	Generally not intercepted. Custom gadgets may intercept to supplement or supersede default functionality.</P>
+<P CLASS="figTitle">
+Code Display 2-20 ObjDuplicateResource() with MSG_GEN_ADD_CHILD</P>
+<PRE>/* This method duplicates a pre-instantiated version of MyMenu.
+ * A duplicated object block may also be added using MSG_GEN_ADD_CHILD.*/</PRE>
+<PRE>@method MyProcessClass, MSG_DUPLICATE_MY_MENU {
+    MemHandle newBlock;				/* The handle of the Duplicate block. */
+    optr newMenu;				/* The optr of the new menu. */
+    GeodeHandle procHan;				/* The geode handle of the process. */</PRE>
+<PRE>    procHan = GeodeGetProcessHandle();
+    newBlock = ObjDuplicateResource(OptrToHandle(@MyMenu), procHan, -1);
+			/* Pass the handle of MyMenu's resource as well as the
+			 * GeodeHandle of the process. Leave the burden thread 
+			 * the same.*/</PRE>
+<PRE>	/* The new optr is created from the newly created block. */
+    newMenu = ConstructOptr(newBlock, OptrToChunk(MyMenu));</PRE>
+<PRE>	/* Add the duplicated object tree (MyMenu) as the
+	 * first child of MyPrimary. */
+    @call @MyPrimary::MSG_GEN_ADD_CHILD(newMenu, (CCF_MARK_DIRTY | CCO_FIRST));</PRE>
+<PRE>	/* Then set it usable. Remember, you cannot add a child
+	 * that is already GS_USABLE. */
+    @call @newMenu::MSG_GEN_SET_USABLE(VUM_NOW);
+}</PRE>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_ADD_CHILD_UPWARD_LINK_ONLY">
+ </A>
+MSG_GEN_ADD_CHILD_UPWARD_LINK_ONLY</H4>
+<PRE CLASS="syntax">void	MSG_GEN_ADD_CHILD_UPWARD_LINK_ONLY(
+        optr		child);</PRE>
+<P>
+This message sets a parent link to a passed child object without adding a composite link from the parent to the child. This is a &quot;one way&quot; link in that the parent does not have knowledge of its new child. Therefore, it must be used with caution. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any generic object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+child</EM>
+	optr of the child to add with an upward link.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted. </P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_REMOVE">
+ </A>
+MSG_GEN_REMOVE</H4>
+<PRE CLASS="syntax">void 	MSG_GEN_REMOVE(
+        VisUpdateMode 		updateMode,
+        CompChildFlags 		flags) </PRE>
+<P>
+This message removes the receiving object from the generic tree. The object to be removed need not be set not usable. Note that all objects below this object will also be removed.</P>
+<P CLASS="refField">
+Source:	Anyone.</P>
+<P CLASS="refField">
+Destination:	Any generic object.</P>
+<P CLASS="refField">
+Parameters:	<EM>updateMode</EM> 	Visual update mode. VUM_MANUAL is not allowed.</P>
+<DL>
+<DT>
+<EM>flags</EM> </DT><DD>Set CCF_MARK_DIRTY to mark links dirty.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted. </P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_REMOVE_CHILD">
+ </A>
+MSG_GEN_REMOVE_CHILD</H4>
+<PRE CLASS="syntax">void	MSG_GEN_REMOVE_CHILD(
+        optr		child,
+        CompChildFlags		flags);</PRE>
+<P>
+This message removes the passed object from the recipient. A child must be marked not GS_USABLE in order to be removed. The child must currently exist, so your routine should check this using <CODE>
+MSG_GEN_FIND_CHILD</CODE>
+. </P>
+<P>
+Pass this message the optr of the child object to be removed along with a word of <CODE>
+CompChildFlags</CODE>
+. If CCF_MARK_DIRTY is specified, the updated linkage will be saved to state when the application is detached.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any generic object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+child</EM>
+	The optr of child to remove. This child must be non-usable in order to be removed. The child must also exist as a child of the recipient.</P>
+<DL>
+<DT>
+<EM>
+flags</EM>
+</DT><DD><CODE>
+CompChildFlags</CODE>
+ to use when removing the child.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	Generally not intercepted. Custom gadgets may intercept to supplement or supersede default functionality.</P>
+<P CLASS="figTitle">
+Code Display 2-21 MSG_GEN_REMOVE_CHILD</P>
+<PRE>/* This sample method removes the MyChild object from its parent, MyParent. */
+@method MyProcessClass, MSG_REMOVE_MY_CHILD {
+	/* If the child currently exists, mark it not usable and remove it. */
+    if (@call @MyParent::MSG_GEN_FIND_CHILD(@MyChild) != -1) {
+	@call @MyChild::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	@call @MyParent::MSG_GEN_REMOVE_CHILD(@MyChild, CCF_MARK_DIRTY);
+    }
+}</PRE>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_MOVE_CHILD">
+ </A>
+MSG_GEN_MOVE_CHILD</H4>
+<PRE CLASS="syntax">void	MSG_GEN_MOVE_CHILD(
+        optr		child,
+        CompChildFlags		flags);</PRE>
+<P>
+This message moves the given object from the location it currently occupies among its siblings to another location among its siblings. The object will still remain a child of the same parent. </P>
+<P>
+Pass this message the optr of the child to move along with a word of <CODE>
+CompChildFlags</CODE>
+. If you pass the flag CCF_MARK_DIRTY, the new linkage will be saved to state when the application is detached. You must also pass a CCF_REFERENCE so the object will be moved to the position specified. CCO_FIRST and CCO_LAST will move the object to the first or last position, respectively.</P>
+<P>
+If no flags are specified, the object will be moved to the parent object's first position without marking the linkages dirty. Note that for successive moves of children this will result in a &quot;reverse order&quot; of the children.</P>
+<P>
+Note that this message only moves a child among its siblings. To move an object from one parent of the generic tree to another (different) parent, you must use <CODE>
+MSG_GEN_REMOVE </CODE>
+(or<CODE>
+ MSG_GEN_REMOVE_CHILD</CODE>
+) and <CODE>
+MSG_GEN_ADD_CHILD</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any generic object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+child</EM>
+	The optr of the child to move.</P>
+<DL>
+<DT>
+<EM>
+flags</EM>
+</DT><DD><CODE>
+CompChildFlags</CODE>
+ to use when moving the child.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GenClass_f.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GenClass_10.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.1 Child/Parent Searches</A> 
+<!-- to next --> | <A HREF="GenClass_12.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5.3 Branch Construction/Destruction</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

@@ -1,0 +1,169 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Controllers_7.htm,v 1.1 97/06/02 16:11:12 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Using a Basic GenControl Object</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Generic UI Controllers</A>: 3.1 <A HREF="Controllers_6.htm">Using Controllers</A>: 
+Using a Basic GenControl Object</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Controllers_6.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Controllers_6.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">3 Using Controllers</A> 
+<!-- to next --> | <A HREF="Controllers_8.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.2 Using Tools</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+To use a typical controller, you have to set up its instance data appropriately and set up the generic tree properly. This section describes the basics of <CODE>
+GenControlClass</CODE>
+ instance data; for full information on <CODE>
+GenControlClass</CODE>
+, see <A HREF="Controllers_9.htm#72863"> Creating Your Own Controllers</A>
+.</P>
+<P>
+Every controller has a default set of features and a default set of tools. When you use a controller in your application, you can use the default configuration, the configuration appropriate to the application's user level, or a specific configuration. Most applications will want to use the second option; the controller queries the GenApplication object for its <CODE>
+GAI_appFeatures</CODE>
+ record and determines from that which of its features and tools should be active.</P>
+<P>
+Controllers can be manifested in any way the specific UI determines appropriate; three main ways, however, are menus or submenus, floating tool boxes (dialogs), and groupings along a tool bar in a window. These three modes correspond to the three manifestations of a typical GenInteraction object: GIV_POPUP (menus), GIV_DIALOG (dialogs and tool boxes), and GIV_SUB_GROUP (groupings of other generic objects). If you use a GenToolControl, you can let the user decide how the controller is displayed; otherwise, you will have to set it manually (as in the samples previously).</P>
+<P>
+Every controller also has two sets of UI objects: The first set represents the UI objects used for menu entries (when the controller is in GIV_POPUP mode). The second set represents the tools that appear in a tool box (GIV_DIALOG mode) or tool bar (GIV_SUB_GROUP mode). Tools are almost always functionally redundant to the &quot;menu&quot; feature set. Because the tool and the menu UI resources contain different objects, the UI objects can exist in any combination of interactable states--for example, a particular feature could be in the menu only, in the tool box only, in both, or in neither. The feature can not, however, be in both a tool bar and a tool box at the same time because the set of tools can be grouped in only one location.</P>
+
+<H2 CLASS="HeadingC">
+<A NAME="82039">
+ </A>
+Using Normal Features</H2>
+<PRE>ATTR_GEN_CONTROL_REQUIRE_UI, ATTR_GEN_CONTROL_PROHIBIT_UI</PRE>
+<P>
+<CODE>
+GenControlClass</CODE>
+ has no controller features of its own; instead, each controller class must define the features it supports in both the menu implementation and the tool implementation. Any controller object is free to determine which of the features it will support and which it will not.</P>
+<P>
+<A NAME="IX_ATTR_GEN_CONTROL_REQUIRE_UI">
+ </A>
+To set individual features on or off for a controller object in your application, use the vardata fields <CODE>
+ATTR_GEN_CONTROL_REQUIRE_UI</CODE>
+ and <CODE>
+ATTR_GEN_CONTROL_PROHIBIT_UI</CODE>
+<A NAME="IX_ATTR_GEN_CONTROL_PROHIBIT_UI">
+ </A>
+; these specify which features will be on and which will be off. For listings of a controller class' features, you must see the description of the individual class.</P>
+<P>
+The example in <A HREF="Controllers_7.htm#85619"> Declaring a Controller's Features</A>
+ extends the example from earlier in the chapter to turn on only the 10-, 12-, and 24-point as well as the &quot;Larger&quot; and &quot;Smaller&quot; features. It turns off all other features.</P>
+<P CLASS="figTitle">
+Code Display 12-2 <A NAME="85619">
+ </A>
+Declaring a Controller's Features</P>
+<PRE>/* This example is based on that of <A HREF="Controllers_4.htm#70215"> A Sample Controller Application (psctext.goc)</A>. It shows what
+ * would change in order to turn on only the 10-, 12-, and 24-point as well as the
+ * &quot;Larger&quot; and &quot;Smaller&quot; features. Note that only the Controller object must
+ * be altered. */</PRE>
+<PRE>@object PointSizeControlClass PSCTSizeControl = {
+    GI_visMoniker = 'z', &quot;Sizes&quot;;					/* Give the controller a name */
+    GII_visibility = GIV_POPUP;					/* Make the controller a menu */
+	/* The following attribute defines which of the controller's
+	 * features are to be supported. These menu items will appear
+	 * in the controller's Size menu. */
+    ATTR_GEN_CONTROL_REQUIRE_UI = (PSCF_10 | PSCF_12 | PSCF_24 |
+				PSCF_SMALLER | PSCF_LARGER);
+	/* The following attribute defines which of the controller's
+	 * features will not be supported. These menu items will not
+	 * appear in the controller's Size menu. */
+    ATTR_GEN_CONTROL_PROHIBIT_UI = (PSCF_14 | PSCF_18 | PSCF_36 | PSCF_54 |
+				 PSCF_72 | PSCF_CUSTOM_SIZE);
+}</PRE>
+
+
+<H2 CLASS="HeadingC">
+<A NAME="28396">
+ </A>
+Adding Application-Specific UI Gadgetry</H2>
+<PRE>ATTR_GEN_CONTROL_APP_UI, ATTR_GEN_CONTROL_APP_TOOLBOX_UI</PRE>
+<P>
+Occasionally, an application will want to add its own UI gadgetry to a controller. This is not the same as changing the controller's functionality--to do that, you would need to subclass the controller class. Rather, this entails simply specifying a group of generic UI objects (e.g. a GenInteraction and some GenTriggers) that will be included with the controller's UI objects.</P>
+<P>
+<A NAME="IX_ATTR_GEN_CONTROL_APP_UI">
+ </A>
+The <CODE>
+GenControlClass</CODE>
+ vardata attribute <CODE>
+ATTR_GEN_CONTROL_APP_UI</CODE>
+ allows you to specify a generic tree that will be added as a child of the controller. The top node of this tree must be an object that can be a child of a GenInteraction object--typically, it will be a GenInteraction, a GenTrigger, or a GenValue.</P>
+<P>
+For example, if you wanted the sample application to have two extra triggers added to the Size menu, you would use <CODE>
+ATTR_GEN_CONTROL_APP_UI</CODE>
+ as shown in <A HREF="Controllers_7.htm#17356"> Adding UI to a Controller</A>
+. This example adds two triggers that turn the bottom GenText object on and off. (Of course, you would not likely put such functionality in the Size menu; this is given for illustration.)</P>
+<P>
+This attribute has no effect on the tools managed by the controller, only on its features. To add application-specific tools to a controller, you must use <CODE>
+ATTR_GEN_CONTROL_APP_TOOLBOX_UI</CODE>
+<A NAME="IX_ATTR_GEN_CONTROL_APP_TOOLBOX_UI">
+ </A>
+.</P>
+<P CLASS="figTitle">
+Code Display 12-3 <A NAME="17356">
+ </A>
+Adding UI to a Controller</P>
+<PRE>/* This display shows the modified PointSizeControl object and the additional
+ * UI gadgetry required to add two triggers to it. Although the triggers are
+ * shown here in the same resource block as the controller, they do not have to
+ * be. They do, however, have to be run by the same thread as the controller. */</PRE>
+<PRE>@object PointSizeControlClass PSCTSizeControl = {
+    GI_visMoniker = 'z', &quot;Sizes&quot;;					/* Give the controller a name */
+    GII_visibility = GIV_POPUP;					/* Make the controller a menu */
+	/* The following attribute specifies the top object of a generic
+	 * tree to be included with the controller's UI. This attribute does
+	 * not affect the toolbar implementation of the controller. */
+    ATTR_GEN_CONTROL_APP_UI = (@PSCTSpecialTrigs);						/* must be an optr */
+}</PRE>
+<PRE>/* This GenInteraction and its children (the two GenTriggers) will be included in
+ * the controller's default representation (typically a menu). The GenInteraction
+ * will appear as a submenu in OSF/Motif. All of the objects must be set not
+ * usable (~GS_USABLE); they will be made usable by the controller when it becomes
+ * usable. */</PRE>
+<PRE>@object GenInteractionClass PSCTSpecialTrigs = {
+    GI_comp = @PSCTEnableTrig, @PSCTDisableTrig;
+    GI_states = @default &amp; ~GS_USABLE;
+    GII_visibility = GIV_POPUP;					/* Appear as a submenu-type item */
+}</PRE>
+<PRE>/* The triggers set the bottom GenText object usable or not usable. The instance
+ * data of the triggers is unimportant for this example, but it is shown here
+ * to complete the example. */</PRE>
+<PRE>@object GenTriggerClass PSCTEnableTrig = {
+    GI_visMoniker = &quot;Use Two Text Fields&quot;;
+    GI_states = @default &amp; ~GS_USABLE;
+    GTI_actionMsg = MSG_GEN_SET_USABLE;
+    GTI_destination = PSCBotTextObj;
+    ATTR_GEN_TRIGGER_ACTION_DATA = (VUM_NOW);
+}</PRE>
+<PRE>@object GenTriggerClass PSCTDisableTrig = {
+    GI_visMoniker = &quot;Use One Text Field&quot;;
+    GI_states = @default &amp; ~GS_USABLE;
+    GTI_actionMsg = MSG_GEN_SET_NOT_USABLE;
+    GTI_destination = PSCBotTextObj;
+    ATTR_GEN_TRIGGER_ACTION_DATA = (VUM_NOW);
+}</PRE>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Controllers_6.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Controllers_6.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">3 Using Controllers</A> 
+<!-- to next --> | <A HREF="Controllers_8.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.2 Using Tools</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

@@ -1,0 +1,1015 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+<!-- This page was automatically generated from a bunch of smaller pages. -->
+<META NAME="copyright" CONTENT="Copyright GEOWORKS">
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+<TITLE>Window Objects</TITLE>
+</HEAD>
+<BODY BGCOLOR="#ffffdf">
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+<A NAME="index.htm"></A>
+
+
+
+<H1 CLASS="chapterTitle">
+
+<A NAME="index.htm_97933">
+ </A>
+Window Objects
+
+</H1>
+<P>
+Applications communicate with users through a &quot;user interface.&quot; The system needs a way of grouping the user-interface components together. For this reason, most applications will have a GenPrimary object. This object serves as the top-level object in the user interface tree. </P>
+<P>
+<CODE>
+GenPrimaryClass</CODE>
+<A NAME="index.htm_IX_GenDisplayClass">
+ </A>
+<A NAME="index.htm_IX_GenPrimaryClass">
+ </A>
+ is a subclass of <CODE>
+GenDisplayClass</CODE>
+. The GenDisplay object, like the GenPrimary object, manages other pieces of the user interface (menus, triggers, text objects, etc.). Furthermore, the GenDisplay object is a great boon to applications that need to perform several tasks at once (as, for example, a word processor which can have several files open at once). An application can have several GenDisplay objects, all of them children of a GenDisplayGroup object. Collectively, displays and primaries are called <EM>
+windows</EM>
+. All windows have certain functionality in common; that functionality can vary according to the specific UI.</P>
+<P>
+The Document Control objects can be set to create GenDisplay objects when files are opened and to attach them automatically to a GenDisplayGroup. This enormously simplifies managing multiple documents. See <A HREF="../../Files/Documents">the Documents chapter</A> for information on the Document Control objects.</P><P>
+These objects are very simple to use. In particular, the GenPrimary is very easy to declare and use. Although all applications use the GenPrimary, many will not need the GenDisplay. However, because <CODE>
+GenPrimaryClass</CODE>
+ is a subclass of <CODE>
+GenDisplayClass</CODE>
+, this chapter begins with an overview of <CODE>
+GenDisplayClass</CODE>
+, then continues with a full discussion of <CODE>
+GenPrimaryClass</CODE>
+, and concludes with advanced information about <CODE>
+GenDisplayClass</CODE>
+. Before reading this chapter, you should be familiar with the use and creation of generic user interface objects. 
+
+</P>
+<P CLASS="sectionlinks">
+<STRONG>
+&nbsp;&nbsp;<A HREF="#Windows_1.htm">1 A First Look at GenDisplay</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Windows_2.htm">1.1 GenDisplay Object Structure</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Windows_3.htm">1.2 Minimizing and Maximizing</A><BR>
+&nbsp;&nbsp;<A HREF="#Windows_4.htm">2 Using the GenPrimary</A><BR>
+&nbsp;&nbsp;<A HREF="#Windows_5.htm">3 Using Multiple Displays</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Windows_6.htm">3.1 GenDisplayGroup</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Windows_7.htm">3.2 GenDisplayControl</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Windows_8.htm">3.3 Using GenDisplayClass Objects</A><BR>
+</STRONG>
+</P> <!-- end of sectionlinks blob -->
+
+<HR>
+<A NAME="Windows_1.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Window Objects</A>: 1 
+<A NAME="Windows_1.htm_43164">
+ </A>
+A First Look at GenDisplay</H2>
+<P>
+Not all applications will need to use GenDisplay objects. However, almost all applications will have a GenPrimary object. Since <CODE>
+GenPrimaryClass</CODE>
+ is a subclass of <CODE>
+GenDisplayClass</CODE>
+, programmers should be acquainted with <CODE>
+GenDisplayClass</CODE>
+. </P>
+<P>
+This section describes the data fields of <CODE>
+GenDisplayClass</CODE>
+ and certain useful messages. It does not have all the information you will need to create these objects. If you will be using GenDisplay objects in your application, you will have to read <A HREF="#Windows_5.htm_47058"> Using Multiple Displays</A>
+.</P>
+<P CLASS="subsectionLink">
+<A HREF="#Windows_2.htm">GenDisplay Object Structure</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Windows_3.htm">Minimizing and Maximizing</A></P>
+<HR>
+<A NAME="Windows_2.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Window Objects</A>: 1.1 <A HREF="#Windows_1.htm">A First Look at GenDisplay</A>: 
+GenDisplay Object Structure</H3>
+<P>
+The GenDisplay object is a subclass of <CODE>
+GenClass</CODE>
+ and therefore inherits all the data fields and attributes of that class. It has few data fields that are set by the application; these fields are listed in <A HREF="#Windows_2.htm_34967"> Instance Data of GenDisplayClass</A>
+.</P>
+<P CLASS="figTitle">
+Code Display 4-1 <A NAME="Windows_2.htm_34967">
+ </A>
+Instance Data of GenDisplayClass</P>
+<PRE>/* There are only two instance fields specifically defined for GenDisplayClass.
+ * Also, an instance field for GenClass, GI_attrs, has different defaults in
+ * GenDisplayClass. */</PRE>
+<PRE>/* GDI_attributes is a one-byte field for attributes flags. There is only one flag
+ * defined for this field, namely GDA_USER_DISMISSABLE, which is on by default. */
+    @instance GenDisplayAttrs				GDI_attributes = GDA_USER_DISMISSABLE;</PRE>
+<PRE>/* The GenDisplay object has a datum for an optr to a document object. If a
+ * Document Control is used to create display objects, it will associate each
+ * display with a document object; each will have an optr to the other. */
+    @instance optr				GDI_document;</PRE>
+<PRE>/* The default setting of GI_attrs is different in GenDisplayClass than it is in 
+ * GenClass: */
+    @default GI_attrs = 			(@default 
+			 | GA_TARGETABLE
+			 | GA_KBD_SEARCH_PATH);</PRE>
+<PRE>/* The following hints specify whether the display should be minimized or
+ * maximized when it is built, and its appearance when minimized. */
+    @vardata void <A NAME="Windows_2.htm_IX_HINT_DISPLAY_&ldots;"> </A>HINT_DISPLAY_MINIMIZED_ON_STARTUP;
+    @vardata void HINT_DISPLAY_NOT_MINIMIZED_ON_STARTUP;
+    @vardata void HINT_DISPLAY_MAXIMIZED_ON_STARTUP;
+    @vardata void HINT_DISPLAY_NOT_MAXIMIZED_ON_STARTUP;
+    @vardata void HINT_DISPLAY_USE_APPLICATION_MONIKER_WHEN_MINIMIZED;</PRE>
+<PRE>/* The following hints and attributes indicate whether the user should be able to
+ * minimize, maximize, or resize the window. */
+    @vardata void <A NAME="Windows_2.htm_IX_ATTR_GEN_DISPLAY_&ldots;"> </A>ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;
+    @vardata void ATTR_GEN_DISPLAY_NOT_MAXIMIZABLE;
+    @vardata void HINT_DISPLAY_NOT_RESIZABLE;</PRE>
+<PRE>/* ATTR_GEN_DISPLAY_NOT_RESTORABLE indicates that the user should not be able to
+ * de-maximize the display once it is maximized. */
+    @vardata void ATTR_GEN_DISPLAY_NOT_RESTORABLE;</PRE>
+<PRE>/* ATTR_GEN_DISPLAY_TRAVELING_OBJECTS is the ChunkHandle of a list of &quot;traveling
+ * objects;&quot; these objects are made the children of whichever GenDisplay is on top
+ * in a given display region (see <A HREF="#Windows_8.htm_18187"> Traveling Objects</A>).*/
+    @vardata ChunkHandle ATTR_GEN_DISPLAY_TRAVELING_OBJECTS;</PRE>
+<PRE>/* The following hints and attributes specify whether the display's menu bar 
+ * appears and whether it appears as a &quot;popped out&quot; floating menu. */
+    @vardata void HINT_DISPLAY_MENU_BAR_HIDDEN_ON_STARTUP;
+    @vardata void <A NAME="Windows_2.htm_IX_TEMP_GEN_DISPLAY_MENU_BAR_HIDDEN"> </A>TEMP_GEN_DISPLAY_MENU_BAR_HIDDEN;
+    @vardata void ATTR_GEN_DISPLAY_MENU_BAR_POPPED_OUT;
+    @vardata void HINT_DISPLAY_USE_APPLICATION_MONIKER_WHEN_MENU_BAR_POPPED_OUT;</PRE>
+<PRE>/* The GenDisplay uses the following vardata fields to store its
+ * minimized/maximized state across a shutdown. You should not access these
+ * fields. If you want to find out if a GenDisplay is minimized or maximized, send
+ * it MSG_GEN_DISPLAY_GET_MINIMIZED or MSG_GEN_DISPLAY_GET_MAXIMIZED. */
+    @vardata		void ATTR_GEN_DISPLAY_MINIMIZED_STATE;
+    @vardata		void ATTR_GEN_DISPLAY_MAXIMIZED_STATE;</PRE>
+<PRE>/* HINT_DISPLAY_DEFAULT_ACTION_IS_NAVIGATE_TO_NEXT_FIELD specifies the default 
+ * action for the GenDisplay. */
+    @vardata void HINT_DISPLAY_DEFAULT_ACTION_IS_NAVIGATE_TO_NEXT_FIELD;</PRE>
+
+<H4 CLASS="HeadingC">
+The GDI_attributes Field</H4>
+<PRE>MSG_GEN_DISPLAY_GET_ATTRS, MSG_GEN_DISPLAY_SET_ATTRS</PRE>
+<P>
+<A NAME="Windows_2.htm_IX_GDI_attributes">
+ </A>
+The GenDisplay object has a one-byte record called <CODE>
+GDI_attributes</CODE>
+ to store attribute flags. There is only one attribute flag, namely GDA_USER_DISMISSABLE<A NAME="Windows_2.htm_IX_GDA_USER_DISMISSABLE">
+ </A>
+. If this attribute is set, the user can dismiss a display through the UI (without choosing a command in the application). Details of this depend on the specific UI; for example, in OSF/Motif, the user could dismiss a display by double-clicking the &quot;Control button.&quot;</P>
+
+<H6 CLASS="RefETitle">
+<A NAME="Windows_2.htm_IX_MSG_GEN_DISPLAY_GET_ATTRS">
+ </A>
+MSG_GEN_DISPLAY_GET_ATTRS</H6>
+<PRE CLASS="syntax">GenDisplayAttrs 	MSG_GEN_DISPLAY_GET_ATTRS();</PRE>
+<P>
+This message retrieves the GDI<CODE>
+_attributes</CODE>
+ field from the destination object.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenDisplay or GenPrimary object.</P>
+<P CLASS="refField">
+Return:	A <CODE>
+GenDisplayAttrs</CODE>
+ record. The only flag defined is GDA_USER_DISMISSABLE.</P>
+<P CLASS="refField">
+Interception:	This message is not normally intercepted.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Windows_2.htm_IX_MSG_GEN_DISPLAY_SET_ATTRS">
+ </A>
+MSG_GEN_DISPLAY_SET_ATTRS</H6>
+<PRE CLASS="syntax">void	MSG_GEN_DISPLAY_SET_ATTRS(
+        GenDisplayAttrs		attrs);</PRE>
+<P>
+This message changes the <CODE>
+GenDisplayAttrs</CODE>
+ field of the destination object. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenDisplay or GenPrimary object<CODE>
+.</CODE>
+</P>
+<P CLASS="refField">
+Parameters:	<EM>
+attrs</EM>
+	Field of <CODE>
+GenDisplayAttrs</CODE>
+ flags. There is only one flag defined, namely GDA_USER_DISMISSABLE.</P>
+<P CLASS="refField">
+Interception:	This message is not normally intercepted.</P>
+
+
+
+<H4 CLASS="HeadingC">
+The GDI_document Field</H4>
+<P>
+<A NAME="Windows_2.htm_IX_GDI_document">
+ </A>
+Applications often use the Document Control objects to manage files. With this mechanism, every file is associated with a document object. Often, each file will have its own GenDisplay object as well. In this case, GDI<CODE>
+_document</CODE>
+ will contain an optr to the GenDocument object associated with this GenDisplay. For more information on this, see <A HREF="#Windows_5.htm_47058"> Using Multiple Displays</A>
+. The Document Control objects create and destroy the GenDisplays automatically, and set this field accordingly. The GenDisplay object uses this field only when the display is closed; see <A HREF="#Windows_8.htm_98120"> Closing GenDisplays</A>
+. To retrieve the value of this field, send MSG_GEN_DISPLAY_GET_DOCUMENT to the display (see <A HREF="#Windows_8.htm_67217"> Messages sent to GenDisplays</A>
+).</P>
+
+<HR>
+<A NAME="Windows_3.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Window Objects</A>: 1.2 <A HREF="#Windows_1.htm">A First Look at GenDisplay</A>: 
+Minimizing and Maximizing</H3>
+<PRE>MSG_GEN_DISPLAY_SET_MINIMIZED, MSG_GEN_DISPLAY_SET_NOT_MINIMIZED, MSG_GEN_DISPLAY_GET_MINIMIZED, MSG_GEN_DISPLAY_SET_MAXIMIZED, MSG_GEN_DISPLAY_SET_NOT_MAXIMIZED, MSG_GEN_DISPLAY_GET_MAXIMIZED, HINT_DISPLAY_MINIMIZED_ON_STARTUP, HINT_DISPLAY_NOT_MINIMIZED_ON_STARTUP, HINT_DISPLAY_MAXIMIZED_ON_STARTUP, HINT_DISPLAY_NOT_MAXIMIZED_ON_STARTUP, ATTR_GEN_DISPLAY_NOT_MINIMIZABLE, HINT_DISPLAY_NOT_MAXIMIZABLE, ATTR_GEN_DISPLAY_NOT_RESTORABLE,
+HINT_DISPLAY_DEFAULT_ACTION_IS_NAVIGATE_TO_NEXT_FIELD</PRE>
+<P>
+<A NAME="Windows_3.htm_IX_Windows:maximizing">
+ </A>
+<A NAME="Windows_3.htm_IX_Windows:minimizing">
+ </A>
+Windows (i.e. displays and &quot;primary&quot; windows) can be resized by the user. How resizing is done depends on the specific UI; for example, in OSF/Motif, a user resizes a window by dragging its edge. Most specific UIs also allow the user to &quot;minimize&quot; or &quot;maximize&quot; a window. When a window is maximized, it is expanded to fill all available space; that is, a primary window will fill the screen, while a GenDisplay will fill the display area. Windows can also be &quot;minimized.&quot; A window's behavior when it is minimized depends on the specific UI. For example, in OSF/Motif, a minimized Primary is displayed as an icon at the bottom of the screen; a minimized Display is removed from the display area, but stays in the display control's display list.</P>
+<P>
+Most of the mechanics of minimizing and maximizing windows is taken care of by the specific UI. For example, OSF/Motif provides minimize and maximize buttons on all Displays and Primaries which do not specifically disable the functionality. However, an application can send messages to Primary and Display objects to change their minimized/maximized state, or to find out what the current state is.</P>
+<P>
+If you do not wish to have a window be minimizable, you can set the vardata flag ATTR_GEN_DISPLAY_NOT_MINIMIZABLE. Similarly, if you do not wish the window to be maximizable, you can set the flag ATTR_GEN_DISPLAY_NOT_MAXIMIZABLE. These instruct the specific UI not to provide the controls for minimizing and maximizing. </P>
+<P>
+You can find out whether a window is currently minimized by sending it MSG_GEN_DISPLAY_GET_MINIMIZED. Similarly, you can find out whether the window is maximized by sending MSG_GEN_DISPLAY_GET_MAXIMIZED.</P>
+<P>
+If a GenDisplay or GenPrimary has the vardata <CODE>
+HINT_DISPLAY_MINIMIZED_ON_STARTUP</CODE>
+, the object will be created in its minimized state. Similarly, if you set HINT_DISPLAY_NOT_MINIMIZED_ON_STARTUP, the display will be created in its non-minimized form. If you set HINT_DISPLAY_MAXIMIZED_ON_STARTUP, the specific UI will create the object in its maximized state; correspondingly, if you set HINT_DISPLAY_NOT_MAXIMIZED_ON_STARTUP, the specific UI will create the display in a non-maximized state. As with all hints, the specific UI may ignore these directives. If you set conflicting hints (for example, both <CODE>
+HINT_DISPLAY_MINIMIZED_ON_STARTUP</CODE>
+ and HINT_DISPLAY_MAXIMIZED_ON_STARTUP), the results are undefined.</P>
+<P>
+Most displays which can be maximized can also be &quot;restored&quot;; that is, a control is provided which de-maximizes the object, restoring it to the size it was before it was maximized. If the object has the attribute ATTR_GEN_DISPLAY_NOT_RESTORABLE, this control will not be provided; once a display is maximized, the user will not be able to un-maximize it. This hint is generally set only for GenDisplay objects that are maximized on startup.</P>
+<P>
+If you do not want a user to be able to resize a GenDisplay or GenPrimary, set the vardata HINT_DISPLAY_NOT_RESIZABLE. The specific UI will not provide the means for the user to resize the window. This hint will not prevent the user from minimizing or maximizing the display.</P>
+<P>
+If you want the user to be able to navigate from GenDisplays using TAB navigation, add <CODE>
+HINT_DISPLAY_DEFAULT_ACTION_IS_NAVIGATE_TO_NEXT_FIELD</CODE>
+ to the object's instance data.</P>
+
+<H6 CLASS="RefETitle">
+<A NAME="Windows_3.htm_IX_MSG_GEN_DISPLAY_SET_MINIMIZED">
+ </A>
+MSG_GEN_DISPLAY_SET_MINIMIZED</H6>
+<PRE CLASS="syntax">void	MSG_GEN_DISPLAY_SET_MINIMIZED();</PRE>
+<P>
+This message instructs a display or primary object to minimize itself. The result depends on the specific UI. Primary windows are usually iconified; display windows might be iconified or temporarily removed. If the window is already minimized, the message has no effect.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenDisplay or GenPrimary object<CODE>
+.</CODE>
+</P>
+<P CLASS="refField">
+Interception:	You should not change the behavior of this message. You may intercept this message to find out when a window is being minimized; however, you should make sure to pass this message on to the superclass.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Windows_3.htm_IX_MSG_GEN_DISPLAY_SET_MAXIMIZED">
+ </A>
+MSG_GEN_DISPLAY_SET_MAXIMIZED</H6>
+<PRE CLASS="syntax">void	MSG_GEN_DISPLAY_SET_MAXIMIZED();</PRE>
+<P>
+This message instructs a display or primary object to maximize itself. If the window is already maximized, the message has no effect.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenDisplay or GenPrimary object<CODE>
+.</CODE>
+</P>
+<P CLASS="refField">
+Interception:	You should not change the behavior of this message. You may intercept this message to find out when a window is being maximized; however, you should make sure to pass this message on to the superclass.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Windows_3.htm_IX_MSG_GEN_DISPLAY_SET_NOT_MINIMIZED">
+ </A>
+MSG_GEN_DISPLAY_SET_NOT_MINIMIZED</H6>
+<PRE CLASS="syntax">void	MSG_GEN_DISPLAY_SET_NOT_MINIMIZED();</PRE>
+<P>
+This message instructs a display or primary object to de-minimize itself. It will generally be restored to its position and configuration as of the time it was minimized. If the window is not minimized, the message has no effect.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenDisplay or GenPrimary object<CODE>
+.</CODE>
+</P>
+<P CLASS="refField">
+Interception:	You should not change the behavior of this message. You may intercept this message to find out when a window is being de-minimized; however, you should make sure to pass this message on to the superclass.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Windows_3.htm_IX_MSG_GEN_DISPLAY_SET_NOT_MAXIMIZED">
+ </A>
+MSG_GEN_DISPLAY_SET_NOT_MAXIMIZED</H6>
+<PRE CLASS="syntax">void	MSG_GEN_DISPLAY_SET_NOT_MAXIMIZED();</PRE>
+<P>
+This message instructs a display or primary object to de-maximize itself. It will generally be restored to its position and configuration as of the time it was maximized. If the window is not maximized, the message has no effect.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenDisplay or GenPrimary object<CODE>
+.</CODE>
+</P>
+<P CLASS="refField">
+Interception:	You should not change the behavior of this message. You may intercept this message to find out when a window is being de-maximized; however, you should make sure to pass this message on to the superclass.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Windows_3.htm_IX_MSG_GEN_DISPLAY_GET_MINIMIZED">
+ </A>
+MSG_GEN_DISPLAY_GET_MINIMIZED</H6>
+<PRE CLASS="syntax">Boolean	MSG_GEN_DISPLAY_GET_MINIMIZED();</PRE>
+<P>
+This message indicates whether the recipient is minimized.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenDisplay or GenPrimary object<CODE>
+.</CODE>
+</P>
+<P CLASS="refField">
+Return:	Returns <EM>
+true</EM>
+ (i.e. non-zero) if recipient is minimized; otherwise, it returns <EM>
+false</EM>
+ (i.e. zero).</P>
+<P CLASS="refField">
+Interception:	You should not intercept this message.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Windows_3.htm_IX_MSG_GEN_DISPLAY_GET_MAXIMIZED">
+ </A>
+MSG_GEN_DISPLAY_GET_MAXIMIZED</H6>
+<PRE CLASS="syntax">Boolean	MSG_GEN_DISPLAY_GET_MAXIMIZED();</PRE>
+<P>
+This message indicates whether the recipient is maximized.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GenDisplay or GenPrimary object<CODE>
+.</CODE>
+</P>
+<P CLASS="refField">
+Return:	Returns <EM>
+true</EM>
+ (i.e. non-zero) if recipient is maximized; otherwise, it returns <EM>
+false</EM>
+ (i.e. zero).</P>
+<P CLASS="refField">
+Interception:	You should not intercept this message.</P>
+
+<HR>
+<A NAME="Windows_4.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Window Objects</A>: 2 
+Using the GenPrimary</H2>
+<PRE>MSG_GEN_PRIMARY_GET_LONG_TERM_MONIKER, MSG_GEN_PRIMARY_USE_LONG_TERM_MONIKER, MSG_GEN_PRIMARY_REPLACE_LONG_TERM_MONIKER, HINT_PRIMARY_FULL_SCREEN, HINT_PRIMARY_NO_FILE_MENU, HINT_PRIMARY_NO_EXPRESS_MENU, HINT_PRIMARY_OPEN_ICON_BOUNDS, HINT_PRIMARY_NO_HELP_BUTTON</PRE>
+<P>
+Almost every application will have a single GenPrimary object. GEOS uses the GenPrimary to create and manage the primary window of an application. A few applications may have several GenPrimary objects; a very few will have no GenPrimary at all. (Applications with no GenPrimary generally do not have any user interface; they often are intended to work with other applications, communicating via streams.)</P>
+<P>
+The structure of the GenPrimary object is almost the same as that of GenDisplay. The instance data definitions for <CODE>
+GenPrimaryClass</CODE>
+ are shown in <A HREF="#Windows_4.htm_51117"> Instance data for GenPrimaryClass</A>
+ below.</P>
+<P CLASS="figTitle">
+Code Display 4-2 <A NAME="Windows_4.htm_51117">
+ </A>
+Instance data for GenPrimaryClass</P>
+<PRE>/* There is only one instance field specifically defined for GenPrimaryClass. */</PRE>
+<PRE>/* A GenPrimary object can have a long moniker, which is displayed at the top of
+ * the window. The moniker is stored in a chunk in the object block containing the
+ * GenPrimary; the attribute GPI_longTermMoniker contains the handle of this
+ * chunk. The long-term moniker is described below.*/
+    @instance ChunkHandle				GPI_longTermMoniker;</PRE>
+<PRE>/* GenPrimaryClass also modifies the default GI_attrs settings. */
+    @default GI_attrs = @default | GA_TARGETABLE;</PRE>
+<PRE>/* HINT_PRIMARY_FULL_SCREEN indicates that the primary object should be sized to
+ * fill a large portion of the screen. If this hint is not present, the Primary
+ * will be just large enough to accommodate its children.*/
+    @vardata void 			HINT_PRIMARY_FULL_SCREEN;</PRE>
+<PRE>/* Ordinarily, every Primary window is created with a File menu. You can suppress
+ * this by including HINT_PRIMARY_NO_FILE_MENU. */
+    @vardata void 			HINT_PRIMARY_NO_FILE_MENU;</PRE>
+<PRE>/* Also by default, any launched Primary window gets added to the Express Menu. If 
+ * you wish to suppress this behavior, add HINT_PRIMARY_NO_EXPRESS_MENU. */
+    @vardata void			HINT_PRIMARY_NO_EXPRESS_MENU;</PRE>
+<PRE>/* If a primary object is minimizable, the location of the minimized primary is
+ * stored in the vardata field HHINT_PRIMARY_OPEN_ICON_BOUNDS.
+ */
+    @vardata Rectangle			<A NAME="Windows_4.htm_IX_HINT_PRIMARY_OPEN_ICON_BOUNDS"> </A>HINT_PRIMARY_OPEN_ICON_BOUNDS</PRE>
+<PRE>/* By default, all primary windows have a &quot;help&quot; button; when the user clicks on
+ * it, the window's help text is brought up. If you don't want the primary to
+ * provide help text, you can use the hint HINT_PRIMARY_NO_HELP_BUTTON.
+ */
+    @vardata void 		<A NAME="Windows_4.htm_IX_HINT_PRIMARY_NO_HELP_BUTTON"> </A>HINT_PRIMARY_NO_HELP_BUTTON;</PRE>
+<P>
+When a Primary window is created, it is usually sized to contain all of its components. However, you can suggest that it be sized to fill almost all the screen by setting the hint <A NAME="Windows_4.htm_IX_HINT_PRIMARY_FULL_SCREEN">
+ </A>
+<CODE>
+HINT_PRIMARY_FULL_SCREEN</CODE>
+. This hint says that the Primary should be sized to fill a large portion of the screen, though not all of it. (For example, OSF/Motif sets the Primary to fill the whole screen except for a narrow space for icons at the bottom.) If this hint is not present, the Primary will be just large enough to accommodate its children.</P>
+<P>
+A GenPrimary normally creates a File menu within its menu bar. To suppress creation of this file menu, add <A NAME="Windows_4.htm_IX_HINT_PRIMARY_NO_FILE_MENU">
+ </A>
+<CODE>
+HINT_PRIMARY_NO_FILE_MENU</CODE>
+. GenPrimarys, by default, are also added to the list of active applications within the system's express menu. Add <CODE>
+HINT_PRIMARY_NO_EXPRESS_MENU</CODE>
+<A NAME="Windows_4.htm_IX_HINT_PRIMARY_NO_EXPRESS_MENU">
+ </A>
+ if you wish to avoid adding the launched GenPrimary to the express menu.</P>
+<P>
+When a Primary is minimized, it is displayed as an icon with a caption beneath it. The icon and caption will be taken from the Primary's moniker list (GI<CODE>
+_visMoniker</CODE>
+). If the Primary lacks either a text moniker or a graphic moniker, the missing moniker will be read from the Application object's GI<CODE>
+_visMoniker</CODE>
+ field. Most applications will not set GI<CODE>
+_visMoniker</CODE>
+ in the Primary object, since it would usually mean duplicating the monikers already in the Application object. However, some applications will set this (e.g. because they have several Primary objects and want each one to have a different icon when minimized).</P>
+<P>
+When the Primary is expanded from a minimized state, its minimized location is stored in the hint HINT_PRIMARY_OPEN_ICON_BOUNDS. The next time the Primary is minimized, it will be returned to that location.</P>
+<P>
+<CODE>
+GPI_longTermMoniker</CODE>
+<A NAME="Windows_4.htm_IX_Monikers:long term moniker">
+ </A>
+<A NAME="Windows_4.htm_IX_GPI_longTermMoniker">
+ </A>
+ contains a secondary moniker for the Primary object. This moniker is displayed along with the Primary moniker, in a way which depends on the specific UI. (In OSF/Motif, the Primary's text monikers are shown in its title bar: first the text moniker from GI<CODE>
+_visMoniker</CODE>
+, then a dash, then the moniker from <CODE>
+GPI_longTermMoniker</CODE>
+.) If the GenPrimary has a GenDisplayGroup as a child, the GenDisplayGroup will automatically set this field to contain the moniker of the top-most GenDisplay. The application can override this by sending the Primary MSG_GEN_PRIMARY_USE_LONG_TERM_MONIKER, described below.</P>
+<P>
+Most Primary objects will have help text; under most specific UIs, the Primary will have a &quot;help&quot; button to bring up this text. If you don't want to provide help text, you should set the hint <CODE>
+HINT_PRIMARY_NO_HELP_BUTTON</CODE>
+.</P>
+
+<H6 CLASS="RefETitle">
+<A NAME="Windows_4.htm_IX_MSG_GEN_PRIMARY_GET_LONG_TERM_MONIKER">
+ </A>
+MSG_GEN_PRIMARY_GET_LONG_TERM_MONIKER</H6>
+<PRE CLASS="syntax">ChunkHandle 	MSG_GEN_PRIMARY_GET_LONG_TERM_MONIKER();</PRE>
+<P>
+Use this message to find out the moniker of a GenPrimary object. The message returns the chunk handle of the moniker; the moniker is in the same block as the GenPrimary object.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	GenPrimary.</P>
+<P CLASS="refField">
+Return:	Returns the chunk handle of the primary's long-term moniker. The chunk is in the same object block as the GenPrimary.</P>
+<P CLASS="refField">
+Interception:	This message is not ordinarily intercepted.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Windows_4.htm_IX_MSG_GEN_PRIMARY_USE_LONG_TERM_MONIKER">
+ </A>
+MSG_GEN_PRIMARY_USE_LONG_TERM_MONIKER</H6>
+<PRE CLASS="syntax">void 	MSG_GEN_PRIMARY_USE_LONG_TERM_MONIKER(
+        ChunkHandle		moniker);			/* must be in same object block as
+					 * primary */</PRE>
+<P>
+This message instructs a primary window to change its long-term moniker. The new long-term moniker must already be in a chunk in the same object block as the Primary. The chunk containing the obsolete long-term moniker will not be freed; you must do this manually.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	GenPrimary.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+moniker</EM>
+	ChunkHandle of chunk in same object block as the GenPrimary. The chunk should contain the new long-term moniker.</P>
+<P CLASS="refField">
+Interception:	This message is not ordinarily intercepted.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Windows_4.htm_IX_MSG_GEN_PRIMARY_REPLACE_LONG_TERM_MONIKER">
+ </A>
+MSG_GEN_PRIMARY_REPLACE_LONG_TERM_MONIKER</H6>
+<PRE CLASS="syntax">void	MSG_GEN_PRIMARY_REPLACE_LONG_TERM_MONIKER(@stack
+        VisUpdateMode 		updateMode,
+        word 		height, 
+        word 		width, 
+        word 		length,
+        VisMonikerDataType 		dataType,
+        VisMonikerSourceType 		sourceType,
+        dword 		source);</PRE>
+<P>
+This message is used to replace a primary's long term moniker with a new one. This message's arguments are precisely like those to the message <CODE>
+MSG_GEN_REPLACE_VIS_MONIKER</CODE>
+. Note that a long term moniker is ordinarily a simple text string. For more information, see <A HREF="../../SysObjects/Gen/GenClass_d.htm#97676">the GenClass chapter</A>.</P><P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	GenPrimary.</P>
+<P CLASS="refField">
+Parameters:		The parameters are the same as those for <CODE>
+MSG_GEN_REPLACE_VIS_MONIKER</CODE>
+.</P>
+<P CLASS="refField">
+Return:	Returns the chunk handle of the new long-term moniker. The moniker will be allocated in the Primary's object block.</P>
+<P CLASS="refField">
+Interception:	This message is not ordinarily intercepted.<A NAME="Windows_4.htm_marker=235723">
+ </A>
+</P>
+
+<HR>
+<A NAME="Windows_5.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Window Objects</A>: 3 
+<A NAME="Windows_5.htm_47058">
+ </A>
+Using Multiple Displays</H2>
+<P>
+Many applications will need to have several similar user interface areas. For example, a word processor might have several documents open at once; each of these would need its own text area. GEOS provides a facility for this. </P>
+<P>
+An application can have several GenDisplay objects, each of which must be a child of a GenDisplayGroup object. The user can then switch back and forth between the displays using the GenDisplayControl (which is usually a child of a &quot;Window&quot; menu). The switching is transparent to the application.</P>
+<P>
+If the application uses one display for each document, it should use the Document Control objects to create the displays. The Document Control can automatically duplicate a resource containing a generic object tree headed by a GenDisplay and make that GenDisplay a child of the GenDisplayGroup each time a document is opened or created. For details, see <A HREF="../../Files/Documents/index.htm">the Documents Objects chapter</A>.</P><P CLASS="subsectionLink">
+<A HREF="#Windows_6.htm">GenDisplayGroup</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Windows_7.htm">GenDisplayControl</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Windows_8.htm">Using GenDisplayClass Objects</A></P>
+<HR>
+<A NAME="Windows_6.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Window Objects</A>: 3.1 <A HREF="#Windows_5.htm">Using Multiple Displays</A>: 
+GenDisplayGroup</H3>
+<P>
+<A NAME="Windows_6.htm_IX_GenDisplayGroupClass">
+ </A>
+If an application uses GenDisplay objects, it must have a GenDisplayGroup object. This object makes sure there is space in the GenPrimary for the displays.</P>
+<P>
+The GenDisplayGroup must be either a child of the GenPrimary (in which case the specific UI will decide where to put the display area) or a child of a <CODE>
+GenInteraction</CODE>
+ which is a child of the GenPrimary (if the application wants the display area in a specific part of the GenPrimary). The GenDisplayGroup should be run by the UI thread.</P>
+<P>
+<CODE>
+GenDisplayGroupClass</CODE>
+ has no instance data which may be set or examined by the application. However, <CODE>
+GenDisplayGroupClass</CODE>
+ is a subclass of <CODE>
+GenClass</CODE>
+, and inherits all of its instance data. When you declare a GenDisplayGroup, you may specify its <CODE>
+GenClass</CODE>
+ instance data normally; you may also include any of the hints described in the following sections.</P>
+
+<H4 CLASS="HeadingC">
+The GenDisplayGroup Instance Data</H4>
+<PRE>HINT_DISPLAY_GROUP_SEPARATE_MENUS, HINT_DISPLAY_GROUP_ARRANGE_TILED, HINT_DISPLAY_GROUP_FULL_SIZED_ON_STARTUP, HINT_DISPLAY_GROUP_OVERLAPPING_ON_STARTUP, HINT_DISPLAY_GROUP_FULL_SIZED_IF_TRANSPARENT_DOC_CTRL_MODE, HINT_DISPLAY_GROUP_TILE_HORIZONTALLY, HINT_DISPLAY_GROUP_TILE_VERTICALLY, HINT_DISPLAY_GROUP_SIZE_INDEPENDENTLY_OF_DISPLAYS</PRE>
+<P>
+GenDisplayGroupClass is a subclass of GenClass. Other than vardata, this class adds no other instance data. There are several hints defined for <CODE>
+GenDisplayGroupClass</CODE>
+. Most of these hints specify how displays should be arranged on startup.</P>
+<P CLASS="figTitle">
+Code Display 4-3 GenDisplayGroup Instance Data</P>
+<PRE>/* GenDisplayGroupClass adds no instance fields. It does modify the default 
+ * GI_attrs settings, however. */
+    @default GI_attrs = @default | GA_TARGETABLE;</PRE>
+<PRE>/* This hint allows each GenDisplay to contain its own menu bar. */
+    @vardata void			HINT_DISPLAY_GROUP_SEPARATE_MENUS;</PRE>
+<PRE>/* These hints specify how a GenDisplayGroup will arrange its GenDisplays. */
+    @vardata void			HINT_DISPLAY_GROUP_ARRANGE_TILED;
+    @vardata void			HINT_DISPLAY_GROUP_FULL_SIZED_ON_STARTUP;
+    @vardata void			HINT_DISPLAY_GROUP_OVERLAPPING_ON_STARTUP;
+    @vardata void			HINT_DISPLAY_GROUP_FULL_SIZED_IF_TRANSPARENT_DOC_CTRL_MODE;
+    @vardata void			HINT_DISPLAY_GROUP_TILE_HORIZONTALLY;
+    @vardata void			HINT_DISPLAY_GROUP_TILE_VERTICALLY;
+    @vardata void			HINT_DISPLAY_GROUP_SIZE_INDEPENDENTLY_OF_DISPLAYS;</PRE>
+<PRE>/* These attributes affect the availability of overlapping and 
+ * full-sized states. */
+    @vardata void			ATTR_GEN_DISPLAY_GROUP_NO_FULL_SIZED;
+    @vardata void			ATTR_GEN_DISPLAY_GROUP_NO_OVERLAPPING;
+    @vardata void			ATTR_GEN_DISPLAY_OVERLAPPING_STATE;</PRE>
+<P>
+In some specific UIs (such as OSF/Motif), menus which are children of a GenDisplay object may appear in two ways: they may be drawn on the Primary's menu bar (the default in OSF/Motif), or they may appear in a menu bar on the display itself. <A NAME="Windows_6.htm_IX_HINT_DISPLAY_GROUP_SEPARATE_MENUS">
+ </A>
+HINT_DISPLAY_GROUP_SEPARATE_MENUS indicates that each display should be given its own menu bar (if the specific UI permits this).</P>
+<P>
+There are several hints which specify how the displays should be configured when the GenDisplayGroup is built.</P>
+<P>
+HINT_DISPLAY_GROUP_FULL_SIZED_ON_STARTUP<A NAME="Windows_6.htm_IX_HINT_DISPLAY_GROUP_FULL_SIZED_ON_STARTUP">
+ </A>
+ indicates that the GenDisplayGroup should be in full-size mode on startup; that is, all of its children should be maximized.</P>
+<P>
+HINT_DISPLAY_GROUP_OVERLAPPING_ON_STARTUP<A NAME="Windows_6.htm_IX_HINT_DISPLAY_GROUP_OVERLAPPING_ON_STARTUP">
+ </A>
+ indicates that the GenDisplayGroup should be in overlapping mode on startup; that is, its children should be non-maximized.</P>
+<P>
+<CODE>
+HINT_DISPLAY_GROUP_FULL_SIZED_IF_TRANSPARENT_DOC_CTRL_MODE</CODE>
+ forces a GenDisplayGroup to start full-sized if the application is in &quot;transparent document control&quot; mode, which is set by the user level of the application. This hint overrides <CODE>
+HINT_DISPLAY_GROUP_OVERLAPPING_ON_STARTUP</CODE>
+, if present.</P>
+<P>
+HINT_DISPLAY_GROUP_ARRANGE_TILED<A NAME="Windows_6.htm_IX_HINT_DISPLAY_GROUP_ARRANGE_TILED">
+ </A>
+ indicates that the GenDisplayGroup should be in overlapping mode on startup, and further that the displays should be tiled; that is, they should be non-maximized and arranged in a non-overlapping way to fill the display area.</P>
+<P>
+You can specify a preference for how the displays should be tiled by setting HINT_DISPLAY_GROUP_TILE_HORIZONTALLY<A NAME="Windows_6.htm_IX_HINT_DISPLAY_GROUP_TILE_HORIZONTALLY">
+ </A>
+ or HINT_DISPLAY_GROUP_TILE_VERTICALLY<A NAME="Windows_6.htm_IX_HINT_DISPLAY_GROUP_TILE_VERTICALLY">
+ </A>
+. HINT_DISPLAY_GROUP_TILE_HORIZONTALLY indicates that you want tiled displays to be arranged horizontally, with each display tall enough to fill the display area. Similarly, HINT_DISPLAY_GROUP_TILE_VERTICALLY indicates that you want tiled displays to be arranged vertically, with each display wide enough to fill the display area. If both hints are set, the result varies depending on the specific UI.</P>
+<P>
+<CODE>
+HINT_DISPLAY_GROUP_SIZE_INDEPENDENTLY_OF_DISPLAYS</CODE>
+ sizes a GenDisplayGroup by what its parent wants rather than what any of its children GenDisplays want. This may improve geometry performance in a complex GenPrimary/GenDisplay combination.</P>
+
+
+<H4 CLASS="HeadingC">
+Arranging Displays in the Display Group</H4>
+<PRE>MSG_GEN_DISPLAY_GROUP_SET_OVERLAPPING, MSG_GEN_DISPLAY_GROUP_SET_FULL_SIZED, MSG_GEN_DISPLAY_GROUP_GET_FULL_SIZED, MSG_GEN_DISPLAY_GROUP_TILE_DISPLAYS, ATTR_GEN_DISPLAY_GROUP_NO_FULL_SIZED, ATTR_GEN_DISPLAY_GROUP_NO_OVERLAPPING, ATTR_GEN_DISPLAY_GROUP_OVERLAPPING_STATE</PRE>
+<P>
+The GenDisplayGroup can be in &quot;full-sized&quot; or &quot;overlapping&quot; mode. If the GenDisplayGroup is in &quot;full-size&quot; mode, all of its children are maximized (except any displays which are set &quot;non-maximizable&quot;). If it is not in full-sized mode, it is said to be in &quot;overlapping&quot; mode; that is, none of its children are maximized. When a user maximizes any display which belongs to a GenDisplayGroup, the GenDisplayGroup automatically goes into &quot;full-size&quot; mode and maximizes all of its children.</P>
+<P>
+If you include <A NAME="Windows_6.htm_IX_ATTR_GEN_DISPLAY_GROUP_NO_FULL_SIZED">
+ </A>
+ATTR_GEN_DISPLAY_GROUP_NO_FULL_SIZED, the GenDisplayControl will not be able to go into full-size mode; it will always be in overlapping mode. Similarly, if set ATTR_GEN_DISPLAY_GROUP_NO_OVERLAPPING<A NAME="Windows_6.htm_IX_ATTR_GEN_DISPLAY_GROUP_NO_OVERLAPPING">
+ </A>
+, the GenDisplayControl will not be able to go into overlapping mode; it will always be in full-sized mode, and all displays will always be maximized. Naturally, you may not include both of these attributes at once; if you do, results are undefined.</P>
+<P>
+Messages are provided which switch the GenDisplayGroup into one or another of these modes. You might not need to use any of these messages. If you use a GenDisplayControl object, the user will be able to switch from overlapping to full-size and also to tile the displays by using that object. However, you can also send the following messages directly.</P>
+<P>
+You can set a GenDisplayGroup to full-sized mode by sending it the message MSG_GEN_DISPLAY_GROUP_SET_FULL_SIZED. This message causes the GenDisplayGroup to maximize every one of its children. Children which cannot be maximized will be unaffected. The window layering and focus/target settings are not changed.</P>
+<P>
+You can set a GenDisplayGroup to overlapping mode by sending it the message MSG_GEN_DISPLAY_GROUP_SET_OVERLAPPING. This message causes a GenDisplayGroup object to de-maximize all of its children. Children which are not restorable will be unaffected. The window layering and focus/target settings are not changed.</P>
+<P>
+You can find out whether a GenDisplayGroup object is in full-sized mode by sending it <CODE>
+MSG_GEN_DISPLAY_GROUP_GET_FULL_SIZED</CODE>
+. If the GenDisplayGroup is in full-sized mode, this message will return <EM>
+true</EM>
+.</P>
+<P>
+You can also put a GenDisplayGroup into &quot;tiled&quot; mode. This is a special case of overlapping mode. When a GenDisplayGroup is put in tiled mode, it first puts itself in overlapping mode. It then attempts to arrange and resize its display children so they fill the display area without overlapping. To put a GenDisplayGroup into tiled mode, send it the message <CODE>
+MSG_GEN_DISPLAY_GROUP_TILE_DISPLAYS</CODE>
+.</P>
+<P>
+The GenDisplayGroup keeps track of its overlapping state across shutdowns. It does this by setting ATTR_GEN_DISPLAY_GROUP_OVERLAPPING_STATE. Applications may not set or change this attribute directly.</P>
+
+<H6 CLASS="RefETitle">
+<A NAME="Windows_6.htm_IX_MSG_GEN_DISPLAY_GROUP_SET_FULL_SIZED">
+ </A>
+MSG_GEN_DISPLAY_GROUP_SET_FULL_SIZED</H6>
+<PRE CLASS="syntax">void	MSG_GEN_DISPLAY_GROUP_SET_FULL_SIZED();</PRE>
+<P>
+This message instructs a GenDisplayGroup to put itself in &quot;full-sized&quot; mode; that is, all of its maximizable children will be maximized. This message is ignored if the GenDisplayGroup has the vardata attribute ATTR_GEN_DISPLAY_GROUP_NO_FULL_SIZED.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	GenDisplayGroup.</P>
+<P CLASS="refField">
+Interception:	Not generally intercepted.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Windows_6.htm_IX_MSG_GEN_DISPLAY_GROUP_SET_OVERLAPPING">
+ </A>
+MSG_GEN_DISPLAY_GROUP_SET_OVERLAPPING</H6>
+<PRE CLASS="syntax">void	MSG_GEN_DISPLAY_GROUP_SET_OVERLAPPING();</PRE>
+<P>
+This message instructs a GenDisplayGroup to put itself in &quot;overlapping&quot; mode. This message is ignored if the GenDisplayGroup has the vardata attribute ATTR_GEN_DISPLAY_GROUP_NO_OVERLAPPING.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	GenDisplayGroup.</P>
+<P CLASS="refField">
+Interception:	Not generally intercepted.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Windows_6.htm_IX_MSG_GEN_DISPLAY_GROUP_GET_FULL_SIZED">
+ </A>
+MSG_GEN_DISPLAY_GROUP_GET_FULL_SIZED</H6>
+<PRE CLASS="syntax">Boolean	MSG_GEN_DISPLAY_GROUP_GET_FULL_SIZED();</PRE>
+<P>
+This message finds out whether a GenDisplayGroup is in &quot;full-sized&quot; mode.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	GenDisplayGroup.</P>
+<P CLASS="refField">
+Return:	Returns <EM>
+true</EM>
+ (i.e. non-zero) if the GenDisplayGroup is in full-sized mode; otherwise, it returns <EM>
+false</EM>
+ (i.e. zero).</P>
+<P CLASS="refField">
+Interception:	Not generally intercepted.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Windows_6.htm_IX_MSG_GEN_DISPLAY_GROUP_TILE_DISPLAYS">
+ </A>
+MSG_GEN_DISPLAY_GROUP_TILE_DISPLAYS</H6>
+<PRE CLASS="syntax">void	MSG_GEN_DISPLAY_GROUP_TILE_DISPLAYS;</PRE>
+<P>
+This message instructs a GenDisplayGroup to put itself in &quot;tiled&quot; mode. That is, it should first put itself in &quot;overlapping&quot; mode; it should then arrange and resize the displays so they fill the display area without overlapping. The message is ignored if the GenDisplayGroup has the vardata attribute ATTR_GEN_DISPLAY_GROUP_NO_OVERLAPPING.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	GenDisplayGroup.</P>
+<P CLASS="refField">
+Interception:	Not generally intercepted.</P>
+
+
+
+<H4 CLASS="HeadingC">
+Selecting a Display</H4>
+<PRE>MSG_GEN_DISPLAY_GROUP_SELECT_DISPLAY</PRE>
+<P>
+Ordinarily, the user switches from one display to another in one of two ways. The user may use the specific UI's way of switching displays (e.g. clicking on the display); or he may use the GenDisplayControl (described below) to switch displays. The application can also force the Display Group to bring a certain display to the top by sending it <CODE>
+MSG_GEN_DISPLAY_GROUP_SELECT_DISPLAY</CODE>
+. However, this is not usually done; applications should generally let the user switch displays with the GenDisplayControl.</P>
+
+<H6 CLASS="RefETitle">
+<A NAME="Windows_6.htm_IX_MSG_GEN_DISPLAY_GROUP_SELECT_DISPLAY">
+ </A>
+MSG_GEN_DISPLAY_GROUP_SELECT_DISPLAY</H6>
+<PRE CLASS="syntax">void	MSG_GEN_DISPLAY_GROUP_SELECT_DISPLAY(
+        word	displayNum);</PRE>
+<P>
+This message instructs a display group to select a certain display, bringing it to the top and making it the focus. Applications should not ordinarily need to send this.</P>
+<P CLASS="refField">
+Source:	Usually GenDisplayControl or its associated objects; however, any object can send this.</P>
+<P CLASS="refField">
+Destination:	GenDisplayGroup.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+displayNum</EM>
+	The display to select. This is an integer specifying the position of the desired display among the GenDisplayGroup's children; that is, its first child is number zero, its next child is number one, and so on.</P>
+<P CLASS="refField">
+Interception:	This message is not ordinarily intercepted.</P>
+<P CLASS="refField">
+Tips:	You can find a display's position number by sending <CODE>
+MSG_GEN_FIND_CHILD</CODE>
+ to the GenDisplayGroup, passing the optr of the desired display. See <A HREF="../../SysObjects/Gen/GenClass_10.htm#40962">the GenClass chapter</A>.</P>
+
+<HR>
+<A NAME="Windows_7.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Window Objects</A>: 3.2 <A HREF="#Windows_5.htm">Using Multiple Displays</A>: 
+GenDisplayControl</H3>
+<P>
+The GenDisplayGroup object does half the job of managing display objects: it creates a space for the displays and manages them as its children. However, the display group does very little interaction with the user. Instead, the user works mainly with the GenDisplayControl object.</P>
+<P>
+The GenDisplayControl is usually a child of a &quot;Window&quot; GenInteraction, which is itself a child of the primary. <CODE>
+GenDisplayControlClass</CODE>
+ is a subclass of <CODE>
+GenControlClass</CODE>
+, and it has all the functionality of that class. For more information, see <A HREF="../../SysObjects/Controllers/index.htm">the GenControlClass chapter</A>.</P><P>
+<CODE>
+GenDisplayControlClass</CODE>
+ is based very closely on <CODE>
+GenControlClass</CODE>
+. The differences between it and <CODE>
+GenControlClass</CODE>
+ are shown below in <A HREF="#Windows_7.htm_53179"> Instance Data of GenDisplayControlClass</A>
+.</P>
+<P CLASS="figTitle">
+Code Display 4-4 <A NAME="Windows_7.htm_53179">
+ </A>
+Instance Data of GenDisplayControlClass</P>
+<PRE>/* GDCII_attrs is a byte-length flag field. There is currently only one flag,
+ * namely GDCA_MAXIMIZED_NAME_ON_PRIMARY; this specifies that if the active
+ * display is maximized, its name should be shown as the primary's long-term 
+ * moniker. */
+    @instance 		GenDisplayControlAttributes				GDCII_attrs =
+						(GDCA_MAXIMIZED_NAME_ON_PRIMARY);</PRE>
+<PRE>@default		GI_states = @default | GS_ENABLED;
+@default 		GCI_output = {TO_APP_TARGET};</PRE>
+<PRE><A NAME="Windows_7.htm_IX_GDCF_&ldots;  (GDCFeatures)"> </A><A NAME="IX_GDCFeatures"> </A>typedef WordFlags GDCFeatures;
+#define GDCF_OVERLAPPING_MAXIMIZED					0x0004
+#define GDCF_TILE					0x0002
+#define GDCF_DISPLAY_LIST					0x0001</PRE>
+<PRE><A NAME="Windows_7.htm_IX_GDCTF_&ldots;"> </A><A NAME="IX_GDCToolboxFeatures"> </A>typedef WordFlags GDCToolboxFeatures;
+#define GDCTF_OVERLAPPING_MAXIMIZED					0x0004
+#define GDCTF_TILE					0x0002
+#define GDCTF_DISPLAY_LIST					0x0001</PRE>
+<PRE>#define GDC_DEFAULT_FEATURES 				(GDCF_OVERLAPPING_MAXIMIZED | GDCF_TILE 
+				| GDCF_DISPLAY_LIST)</PRE>
+<PRE>#define GDC_DEFAULT_TOOLBOX_FEATURES (GDCF_DISPLAY_LIST)</PRE>
+<PRE>/* A GenDisplayControl also features a single hint which affects the display of 
+ * the features list. */
+    @vardata void <A NAME="Windows_7.htm_IX_HINT_DISPLAY_CONTROL_NO_FEATURES_IF_TRANSPARENT_DOC_CTRL_MODE"> </A>HINT_DISPLAY_CONTROL_NO_FEATURES_IF_TRANSPARENT_DOC_CTRL_MODE;</PRE>
+<P>
+<A NAME="Windows_7.htm_IX_GenDisplayControlAttributes">
+ </A>
+The GDCII<CODE>
+_attrs</CODE>
+ field contains a set of <CODE>
+GenDisplayControlAttributes</CODE>
+. There is currently only one flag defined among these attributes:</P>
+<DL>
+<DT>
+<CODE>
+GDCA_MAXIMIZED_NAME_ON_PRIMARY</DT><DD>
+</CODE>
+<A NAME="Windows_7.htm_IX_GDCA_MAXIMIZED_NAME_ON_PRIMARY">
+ </A>
+If this attribute is set and the active display is maximized, the name of the selected display will be shown in the long term moniker of the GenPrimary.</DD>
+</DL>
+<P>
+<CODE>
+HINT_DISPLAY_CONTROL_NO_FEATURES_IF_TRANSPARENT_DOC_CTRL_MODE</CODE>
+ suppresses display of the features list if the application is running in &quot;transparent document control&quot; mode, as selected by the user level of the application.</P>
+<HR>
+<A NAME="Windows_8.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Window Objects</A>: 3.3 <A HREF="#Windows_5.htm">Using Multiple Displays</A>: 
+Using GenDisplayClass Objects</H3>
+<P>
+All GenDisplay objects must be children of a GenDisplayGroup object. GenDisplay objects can be created in several ways: an application can declare them in its code; it can instantiate them at run-time and make them children of the GenDisplayGroup; or, if the application uses the Document Control objects, it can have the Document Control create a new display automatically whenever a document is opened. (For details about using a Document Control to create GenDisplay objects, see <A HREF="../../Files/Documents/index.htm">the Documents Objects chapter</A>.)</P>
+<H4 CLASS="HeadingC">
+<A NAME="Windows_8.htm_98120">
+ </A>
+Closing GenDisplays</H4>
+<PRE>MSG_GEN_DISPLAY_CLOSE</PRE>
+<P>
+Most specific UIs provide a way for the user to close windows. For example, OSF/Motif lets a user close a window by double-clicking the control button. When the user uses the specific UI's close mechanism, the Display or Primary is sent MSG_GEN_DISPLAY_CLOSE. </P>
+<P>
+<CODE>
+GenDisplayClass</CODE>
+ does only one thing when it receives MSG_GEN_DISPLAY_CLOSE: it sends MSG_GEN_DOCUMENT_CLOSE to the document specified by GDI<CODE>
+_document</CODE>
+. The <CODE>
+GenDisplayClass</CODE>
+ handler for MSG_GEN_DISPLAY_CLOSE does not, in fact, destroy the display. If the display is linked to a GenDocument, the GenDocument will respond to MSG_GEN_DOCUMENT_CLOSE by closing the application and removing the GenDisplay. Otherwise, you will have to remove the GenDisplay yourself by writing a handler for MSG_GEN_DISPLAY_CLOSE.</P>
+<P>
+The <CODE>
+GenPrimaryClass</CODE>
+ handler for MSG_GEN_DISPLAY_CLOSE closes the application. If you want to add to or replace this behavior, you may have your Primary subclass this message.</P>
+
+<H6 CLASS="RefETitle">
+<A NAME="Windows_8.htm_IX_MSG_GEN_DISPLAY_CLOSE">
+ </A>
+MSG_GEN_DISPLAY_CLOSE</H6>
+<PRE CLASS="syntax">void	MSG_GEN_DISPLAY_CLOSE();</PRE>
+<P>
+This message is sent to a Display to close it. The system sends it when the user uses the specific UI's way of closing a window. The <CODE>
+GenDisplayClass</CODE>
+ handler does nothing but send a MSG_GEN_DOCUMENT_CLOSE to the Document object specified in GDI<CODE>
+_document</CODE>
+. The <CODE>
+GenPrimaryClass</CODE>
+ handler closes the application.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	GenDisplay.</P>
+<P CLASS="refField">
+Interception:	If the Display is not associated with a GenDocument, you will need to subclass this message for it to have any effect at all. If the display is associated with a GenDocument object, you should probably subclass your Document object's <CODE>
+MSG_GEN_DOCUMENT_CLOSE</CODE>
+ instead. Primary objects may subclass this message if they want to alter or replace the default behavior (of closing the application).</P>
+
+
+
+<H4 CLASS="HeadingC">
+Menu Bar PopOuts</H4>
+<PRE>ATTR_GEN_DISPLAY_MENU_BAR_POPPED_OUT</PRE>
+<P>
+Some objects contain the ability to &quot;pop out&quot; of their sub-group locations and become floating dialog boxes.The menu bar of a GenDisplay is one such GenInteraction. If the menu bar of a GenDisplay is currently in the &quot;popped-out&quot; state, it will contain the vardata entry ATTR_GEN_DISPLAY_MENU_BAR_POPPED_OUT.</P>
+
+
+<H4 CLASS="HeadingC">
+<A NAME="Windows_8.htm_67217">
+ </A>
+Messages sent to GenDisplays</H4>
+<PRE>MSG_GEN_DISPLAY_UPDATE_FROM_DOCUMENT, MSG_GEN_DISPLAY_GET_DOCUMENT</PRE>
+<P>
+Many of the messages which can be sent to GenDisplay objects have already been discussed above in <A HREF="#Windows_1.htm_43164"> A First Look at GenDisplay</A>
+. However, there are a few messages which are ordinarily sent to Displays but not to Primaries. These messages are discussed here.</P>
+<P>
+GenDisplay objects often work in close conjunction with the Document Control objects. It is common for every open document to have its own GenDisplay object as well as its own GenDocument. The two objects work in conjunction, sending messages back and forth to communicate. You can send or intercept these messages yourself to add functionality.</P>
+<P>
+When the document object changes in certain significant ways, the Display has to be brought into accord with it. For example, if the name of the file changes, the GenDisplay's moniker will have to be changed to reflect this. Whenever a significant change takes place, the Document Control objects send a MSG_GEN_DISPLAY_UPDATE_FROM_DOCUMENT to the appropriate Display. The Display then requests all necessary information from the GenDocument and makes any necessary changes to its own instance data. You can force this updating by sending the message directly to the Display. You can also subclass this message if you want to add special updating behavior; however, you should be sure to pass this message to the superclass' handler.</P>
+<P>
+You can find out which Document object is associated with a given Display by sending <CODE>
+MSG_GEN_DISPLAY_GET_DOCUMENT</CODE>
+ to the Display. The message will return an optr to the corresponding Document object.</P>
+
+<H6 CLASS="RefETitle">
+<A NAME="Windows_8.htm_IX_MSG_GEN_DISPLAY_UPDATE_FROM_DOCUMENT">
+ </A>
+MSG_GEN_DISPLAY_UPDATE_FROM_DOCUMENT</H6>
+<PRE CLASS="syntax">void	MSG_GEN_DISPLAY_UPDATE_FROM_DOCUMENT();</PRE>
+<P>
+This message instructs a GenDisplay to update its instance data from its associated GenDocument object (if any). This message is ordinarily sent by the Document Control objects.</P>
+<P CLASS="refField">
+Source:	Unrestricted--ordinarily sent only by Document Control objects.</P>
+<P CLASS="refField">
+Destination:	<CODE>
+GenDisplay.</CODE>
+</P>
+<P CLASS="refField">
+Interception:	Normally not intercepted. If you subclass this message to add special updating behavior, be sure to end with an <STRONG>@callsuper</STRONG>.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Windows_8.htm_IX_MSG_GEN_DISPLAY_GET_DOCUMENT">
+ </A>
+MSG_GEN_DISPLAY_GET_DOCUMENT</H6>
+<PRE CLASS="syntax">optr	MSG_GEN_DISPLAY_GET_DOCUMENT();</PRE>
+<P>
+This message returns the optr of the GenDocument associated with a given GenDisplay. This is equal to the value of the GenDisplay's GDI<CODE>
+_document</CODE>
+ field.</P>
+<P CLASS="refField">
+Source:	Unrestricted--ordinarily sent only by Document Control objects.</P>
+<P CLASS="refField">
+Destination:	<CODE>
+GenDisplay.</CODE>
+</P>
+<P CLASS="refField">
+Interception:	Normally not intercepted. </P>
+
+
+
+<H4 CLASS="HeadingC">
+<A NAME="Windows_8.htm_18187">
+ </A>
+Traveling Objects</H4>
+<PRE>ATTR_GEN_DISPLAY_TRAVELLING_OBJECTS</PRE>
+<P>
+<A NAME="Windows_8.htm_IX_Traveling objects">
+ </A>
+If you use multiple GenDisplay objects, it is sometimes useful to set up a group of &quot;traveling objects.&quot; Traveling objects are children of whichever display is active. When a different GenDisplay is brought to the top, all traveling objects will be set &quot;not usable&quot; and removed from the Generic tree. They will then be added as children of the new top display and set &quot;usable.&quot; (Any children of the traveling objects will naturally move with them.) Traveling objects are most commonly Toolbox Interactions, but they can be any kind of generic object.</P>
+<P>
+Traveling objects can only be used under certain circumstances. Every display must belong to its own object block, and all of these object blocks must be copies of the same original. This is because the traveling objects are added as children to a specified chunk in whichever object block contains the new top display. If you want to use traveling objects, you should declare a special &quot;template&quot; object block which contains a GenDisplay and its children. Whenever you need to create a GenDisplay, you should duplicate this object block. The traveling objects should be in another resource altogether. If you use the Document Control objects to create displays, the objects will use this technique, duplicating an object block for each new display; this will let you use traveling objects.</P>
+<P>
+Every traveling object is indicated by a <CODE>
+TravelingObjectReference</CODE>
+ structure (see <A HREF="#Windows_8.htm_58380"> TravelingObjectReference</A>
+). To attach traveling objects to the active display, create a chunk which contains a list of <CODE>
+TravelingObjectReference</CODE>
+ structures; this chunk must be in the same object block as the active display. Then set the Display's ATTR_GEN_DISPLAY_TRAVELING_OBJECTS to the ChunkHandle of the list. The list will automatically be moved to the block of the active display whenever the traveling objects are moved.</P>
+<P CLASS="figTitle">
+Code Display 4-5 <A NAME="Windows_8.htm_58380">
+ </A>
+TravelingObjectReference</P>
+<PRE>typedef struct {
+    optr		TIR_travelingObject;			/* optr to traveling object whose
+					 * reference this is */</PRE>
+<PRE>    ChunkHandle		TIR_parent;			/* Chunk Handle of object in Display's
+					 * block that will be the parent of this
+					 * object */</PRE>
+<PRE>    word		TIR_compChildFlags;			/* CompChildFlags to use when
+					 * adding the traveling object */
+} TravelingObjectReference;</PRE>
+<P>
+<A NAME="Windows_8.htm_IX_TravelingObjectReference">
+ </A>
+The TravelingObjectReference structure has the following three fields:</P>
+<DL>
+<DT>
+TIR<A NAME="Windows_8.htm_IX_TIR_&ldots;">
+ </A>
+<CODE>
+_travelingObject</DT><DD>
+</CODE>
+This field is an optr to the traveling object whose reference this is.</DD>
+<DT>
+TIR<CODE>
+_parent</CODE>
+</DT><DD>This field holds the chunk handle of an object in the display block. When the traveling object is added to a display block, it will be made a child of the object whose chunk handle this is.</DD>
+<DT>
+TIR<CODE>
+_compChildFlags</DT><DD>
+</CODE>
+This is the set of <CODE>
+CompChildFlags</CODE>
+ which will be used when attaching this object to its new parent.</DD>
+
+</DL>
+<HR>
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+</BODY>
+</HTML>

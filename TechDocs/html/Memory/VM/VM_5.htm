@@ -1,0 +1,132 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: VM_5.htm,v 1.2 97/09/05 13:07:57 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Virtual Memory Blocks</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Virtual Memory</A>: 2.3 <A HREF="VM_2.htm">VM Structure</A>: 
+<A NAME="42800">
+ </A>
+Virtual Memory Blocks</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VM_2.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VM_4.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2.2 VM Handles</A> 
+<!-- to next --> | <A HREF="VM_6.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2.4 VM File Attributes</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+Most file systems treat files as a string of bytes. A user can read a file sequentially or can start reading at a specified distance into the file. This makes it difficult to work with large files. Reading an entire large file into memory may be impractical, and it may be difficult to access different parts of the file at once.</P>
+<P>
+For this reason, GEOS divides its Virtual Memory files into VM blocks. This division is entirely internal to GEOS. When the file is written to disk, it is still a sequence of bytes, and other operating systems can copy the file normally. However, GEOS geodes can access the file much more conveniently by specifying the blocks they wish to access.</P>
+
+<H2 CLASS="HeadingC">
+The Nature of VM Blocks</H2>
+<P>
+A VM block is a sequence of bytes in a VM file. It must be small enough to fit in a global memory block (i.e. 64K or less, preferably 2K-6K). It may move about in the file; for this reason, it is accessed by a VM block handle. Blocks are either <EM>
+free</EM>
+ or <EM>
+used</EM>
+. A used block has an entry in the block table and also a space allocated in the file. (This could be a block of free space, which will be freed the next time the file is compacted.) A free block has a slot in the file's handle table but no space in the file; it is available if a thread needs to allocate a block. </P>
+<P>
+Blocks persist after a file has been closed and GEOS has been shut down. A given block is always accessed by the same block handle. There are utilities to copy blocks within a VM file or between files. Blocks in a VM file are in no particular order. If an application wants to set up a sequence of blocks, it can create a VM Chain, in which the first word of each block is the handle of the next block in the chain. However, even chained blocks will probably not be in order in the actual file.</P>
+<P>
+Each VM block can be assigned a &quot;user ID&quot; number. You can request the handles of the VM blocks with any given ID number. You do not have to assign ID numbers to blocks, but it is sometimes convenient. The ID numbers are stored in the handles' entries in the block table, not in the blocks themselves; this makes it easy to find a block with a specified user ID. User IDs can be changed at will with the routine <CODE>
+VMModifyUserID()</CODE>
+. Note that all user IDs from 0xff00 to 0xffff are reserved for system use. You can find a block with a specific user ID by calling <CODE>
+VMFind()</CODE>
+; see <A HREF="VM_d.htm#49253"> You can locate VM blocks by their user ID numbers. The routine VMFind() takes three arguments: the VM file handle, a VM block handle, and the user ID for which to look. The routine looks through the block table, starting with the handle after th</A>
+.</P>
+
+
+<H2 CLASS="HeadingC">
+Creating and Using VM Blocks</H2>
+<P>
+There are two ways you can create a VM block. The first is to request a VM block: You specify the size of the block, the block is created, and you are returned the handle. This is the method ordinarily used. The second method is to attach memory to a block: You create a global memory block, and instruct the VM manager to add it to the VM file. There are sometimes advantages to this technique; for example, you can create an LMem heap, and then attach it to the VM file; it will then be saved with the file. You can also attach a memory block to an existing VM block; this will destroy whatever used to be in the VM block and replace it with the contents of the new block.
+
+</P>
+<P>
+You can dynamically resize a VM block by locking it into memory, resizing the memory block, and saving it back to the disk.</P>
+<P>
+These techniques are described in detail in <A HREF="VM_b.htm#97342"> Creating and Freeing Blocks</A>
+ and <A HREF="VM_c.htm#75170"> Attaching Memory Blocks</A>
+.</P>
+
+
+<H2 CLASS="HeadingC">
+<A NAME="58484">
+ </A>
+File Compaction
+<IMG SRC="VM_5_compaction.gif">
+
+</H2>
+<P>
+When a VM block is freed, the VM manager will note that there is empty space in the file. It will use that space when new blocks are allocated. However, since new blocks will probably not fit exactly in the spaces left by freed blocks, some space may be wasted. </P>
+<P>
+In time, the percentage of wasted file space can grow unacceptably large. To prevent this, the Virtual Memory manager periodically compacts the files. When the ratio of data to free space drops below a certain threshold, the Virtual Memory manager copies the data in the file over the free space. While a file is being compacted, any requests for access to the file will block until compaction is finished. Note that the format of the data is not changed; the free space between data blocks is simply removed.</P>
+<P>
+When a geode creates a VM file, it can specify a &quot;compaction threshold.&quot; When the percentage of used space drops below this threshold, the VM manager will automatically compact the file without any attention from the application. The geode should take care in setting the threshold. If the threshold is too low, the file may grow unacceptably large before it is compacted; on the other hand, if the threshold is too high, the VM manager might spend too much time compacting the file for relatively low gains. The application can specify a threshold of zero; this will cause the system default threshold to be used.</P>
+<P>
+Note that if a file is in &quot;backup mode,&quot; the file will be compacted only on calls to <CODE>
+VMSave()</CODE>
+, <CODE>
+VMSaveAs()</CODE>
+, or <CODE>
+VMRevert()</CODE>
+. If the file is not in backup mode, it can be compacted on any call to <CODE>
+VMUpdate()</CODE>
+. </P>
+
+
+<H2 CLASS="HeadingC">
+File Updating and Backup</H2>
+<P>
+When a block is locked into memory, the VM manager copies the data from the disk block to the global memory block. When the block is unlocked, the VM manager assumes that it can discard the memory block, since the data is already on the disk in the VM block.</P>
+<P>
+If you alter the data in a block, you must notify the VM manager of this fact. You do this by marking the block as <EM>
+dirty</EM>
+. When a block has been marked dirty, the VM manager knows that the version in memory is more up-to-date than the version in the disk file. If the flag VMA_SYNC_UPDATE is <EM>
+off</EM>
+ (the default), the block will be written back to the file as soon as possible. If the attribute is <EM>
+on</EM>
+, the block will not be copied back to the disk file until <CODE>
+VMUpdate()</CODE>
+ is called; until then, the block will be copied to the disk swap space if memory is needed. The next time you lock the block, you will be given the new, changed version.</P>
+<P>
+When you want to write the dirty blocks to the disk, you can instruct the VM manager to <EM>
+update</EM>
+ the file. This copies all the dirtied blocks back to the disk and marks all blocks as <EM>
+clean</EM>
+. The VM manager also automatically updates the file when it is closed. The updating routines check if the file is currently clean; thus, very little time is lost if you try to update a clean file.</P>
+<P>
+The VM manager can be instructed to notify all users of a file when the file changes from clean to dirty. This has two main uses: it helps maintain data synchronization if many geodes are using the same file, and it lets the document control objects know when to enable the &quot;Save&quot; and &quot;Revert&quot; triggers. (See <A HREF="../../Files/Documents/index.htm">the Documents Objects chapter</A>.)</P><P>
+The VM manager can be instructed to maintain a backup of a file. If it is so instructed, it will not overwrite the original block when it updates it; instead, it will keep a copy of the original block as well as a copy of the new version. This is transparent to the application. When the VM Manager is instructed to <EM>
+save</EM>
+ the file, it deletes all the backup blocks. If it is instructed to <EM>
+revert</EM>
+ the file to its last-saved version, it replaces the new version of the changed blocks with the backup versions, thus restoring the file to its condition as of the last time it was saved. If the VM manager is instructed to <EM>
+&quot;save-as&quot;</EM>
+ the file, it will create a new file, which does not contain the backup blocks; that is, it contains the file as it currently exists. It will then revert the original file to its last-saved version and close it.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VM_2.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VM_4.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2.2 VM Handles</A> 
+<!-- to next --> | <A HREF="VM_6.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2.4 VM File Attributes</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

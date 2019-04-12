@@ -1,0 +1,132 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Overview_1d.htm,v 1.1 97/06/02 15:20:48 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Memory</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Overview</A>: 6.1 <A HREF="Overview_1c.htm">System Services</A>: 
+Memory</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Overview_1c.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Overview_1c.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">6 System Services</A> 
+<!-- to next --> | <A HREF="Overview_1e.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">6.2 Virtual Memory</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+GEOS uses all RAM available to the system, even expanded and extended memory. Memory is managed by the kernel and is accessed in the segmented scheme implemented by the 8086 processor. (The protected mode of the more advanced processors is not supported in the Version 2.0 system software but is expected to be in future releases.)</P>
+<P>
+The GEOS Memory Manager is sophisticated. It uses dynamic allocation and access of blocks on a global heap to provide high performance, optimized to run very efficiently even on systems with only 640 K.</P>
+
+<H2 CLASS="HeadingC">
+Handles</H2>
+<P>
+GEOS maintains control of all the memory, objects, and other entities in the system through the <EM>
+Handle Table</EM>
+. The Handle Table is a section of memory set aside for kernel use, and it contains a number of entries, each 16 bytes that can contain various information about many different items in the system. These entries are accessed by <EM>
+handles</EM>
+, 16-bit offsets into the Handle Table. Applications and libraries may use handles but may not access the contents of a handle table entry. The data structure is opaque to all but the kernel.</P>
+<P>
+Handles are used for many different things. They can reference threads, memory blocks, VM blocks, or files; they can represent data structures such as timers, queues, semaphores, or events (messages); and they can be used by the kernel for optimization (such as when several words of data are passed with a message).</P>
+<P>
+Through the Preferences application, a user can set the number of handles in the Handle Table. However, the size of the table does not change during a single execution of GEOS. Applications and libraries may allocate handles dynamically for most of the above-mentioned purposes (e.g. memory and file reference).</P>
+
+
+<H2 CLASS="HeadingC">
+The Global Heap</H2>
+<P>
+A certain amount of memory is set aside for the file system (DOS, typically), the GEOS kernel (approximately 64 K), and any TSRs the user may have running on his system. Above this is the GEOS handle table. All RAM left (up to 1 megabyte) after these requirements are satisfied is used for the <EM>
+global heap</EM>
+ (RAM over 1 megabyte is used as preferred swap space). The global heap is the space available to all the applications running in the system.</P>
+<P>
+Applications allocate dynamic <EM>
+blocks</EM>
+ of memory on the heap. Blocks may be of arbitrary size between 16 bytes and 64 K. Each block is designated a handle, an offset into the handle table where information about the block (such as size and location) is stored. Because blocks may be shuffled in the heap by the Memory Manager, applications must use handles as indirect references to the blocks; applications should not save pointers to specific locations in memory.</P>
+<P>
+GEOS uses four basic types of blocks:</P>
+<UL>
+<LI>
+Fixed<BR>
+A fixed block will never move or swap out to disk. Having many fixed blocks can seriously degrade system performance. Fixed blocks are generally used for an application's global variables and primary code.</LI>
+<LI>
+Moveable<BR>
+Moveable blocks may be shuffled around the heap. Moveable blocks may also be designated discardable and/or swapable (below). These blocks must be locked into memory before they can be accessed (see below).</LI>
+<LI>
+Discardable<BR>
+Discardable blocks may be flushed whenever the Memory Manager requires more memory.</LI>
+<LI>
+Swapable<BR>
+Swapable blocks may be swapped at any time by the Memory Manager. When a subsequent access is made to a swapped block, the Memory Manager will automatically read the block back into memory.</LI>
+</UL>
+
+
+<H2 CLASS="HeadingC">
+Allocating Memory</H2>
+<P>
+The GEOS kernel provides several routines to allocate memory. Some memory is allocated automatically, such as memory for code resources as they are loaded in. Other memory, however, must be allocated as it is needed during execution--for example, as the user types more and more text into a word processor. There are three basic ways to allocate memory on the heap:</P>
+<UL>
+<LI>
+<CODE>
+MemAlloc()<BR>
+</CODE>
+This routine allocates a new block on the heap for an application's use.</LI>
+<LI>
+<CODE>
+MemReAlloc()<BR>
+</CODE>
+This routine reallocates a given block; this is useful for adding memory to a block already allocated.</LI>
+<LI>
+<CODE>
+malloc()<BR>
+</CODE>
+Although use of <CODE>
+malloc()</CODE>
+ may help in porting previous C code to GEOS, it is discouraged. The <CODE>
+malloc() </CODE>
+routine will allocate small amounts of memory within a fixed resource. Extensive use of <CODE>
+malloc()</CODE>
+ leads to large, fixed blocks on the heap, degrading system performance.</LI>
+</UL>
+<P>
+When an application is done with a memory block, it can free the block with the routine <CODE>
+MemFree()</CODE>
+. This will allow the Memory Manager to free up that memory space and re-use the block's handle if required.</P>
+
+
+<H2 CLASS="HeadingC">
+Accessing Memory</H2>
+<P>
+If a block is allocated as fixed, an application can use a far pointer to access any byte within the block. However, because fixed blocks are not always allocated in the same portion of memory each time an application is loaded, applications should <EM>
+not</EM>
+ save pointers as state information.</P>
+<P>
+Non-fixed blocks, however, can not be accessed by far pointers without locking them into their position in memory. <CODE>
+MemLock()</CODE>
+ will take a block's handle and lock the block, thereby assuring that the Memory Manager will not move it in the middle of an access. <CODE>
+MemLock()</CODE>
+ provides its caller with a far pointer to the block. When access to the block is finished, the thread that locked the block must call <CODE>
+MemUnlock()</CODE>
+, which marks the block as unlocked so it may once again be moved or swapped.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Overview_1c.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Overview_1c.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">6 System Services</A> 
+<!-- to next --> | <A HREF="Overview_1e.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">6.2 Virtual Memory</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

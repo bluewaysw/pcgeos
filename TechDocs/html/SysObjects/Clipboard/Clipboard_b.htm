@@ -1,0 +1,143 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Clipboard_b.htm,v 1.1 97/06/02 16:09:44 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Managing the Edit Menu</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The Clipboard</A>: 3.2 <A HREF="Clipboard_9.htm">Using The Clipboard</A>: 
+Managing the Edit Menu</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Clipboard_9.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Clipboard_a.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.1 Registering with the Clipboard</A> 
+<!-- to next --> | <A HREF="Clipboard_c.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.3 The GenEditControl</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>MSG_META_CLIPBOARD_NOTIFY_NORMAL_TRANSFER_ITEM_CHANGED, ClipboardTestItemFormat()</PRE>
+<P>
+The Edit menu is simply a normal menu with several standard triggers. Most applications will simply include a GenEditControl object in their UI, add a menu GenInteraction of type GIGT_EDIT_MENU, and leave the Edit menu construction up to them (see <A HREF="Clipboard_c.htm#41638"> The GenEditControl</A>
+). Some, however, may want to create their own menu and triggers. A sample of this type of setup is shown in <A HREF="Clipboard_b.htm#79634"> A Sample Edit Menu</A>
+.</P>
+<P CLASS="figTitle">
+Code Display 7-4 <A NAME="79634">
+ </A>
+A Sample Edit Menu</P>
+<PRE>/* Other objects, including a GenPrimary as the parent of the GenInteraction, are
+ * left out for clarity. */</PRE>
+<PRE>/* The GenInteraction is the menu in which the three triggers will appear. */
+@object GenInteractionClass EditMenu = {
+    GI_visMoniker = `E', &quot;Edit&quot;;
+    GI_comp = EditCut, EditCopy, EditPaste;
+    GII_visibility = GIV_POPUP;
+}</PRE>
+<PRE>/* The Cut trigger sends a MSG_META_CLIPBOARD_CUT to the Process
+ * object when pressed. */
+@object GenTriggerClass EditCut = {
+    GI_visMoniker = `t', &quot;Cut&quot;;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_META_CLIPBOARD_CUT;
+}</PRE>
+<PRE>/* The Copy trigger sends a MSG_META_CLIPBOARD_COPY to the
+ * Process object when pressed. */
+@object GenTriggerClass EditCopy = {
+    GI_visMoniker = `C', &quot;Copy&quot;;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_META_CLIPBOARD_COPY;
+}</PRE>
+<PRE>/* the Paste trigger is set up initially disabled. It sends a
+ * MSG_META_CLIPBOARD_PASTE to the Process object when pressed. */</PRE>
+<PRE>@object GenTriggerClass EditPaste = {
+    GI_visMoniker = `P', &quot;Paste&quot;;
+    GTI_destination = process;
+    GTI_actionMsg = MSG_META_CLIPBOARD_PASTE;
+    GI_states = @default &amp; ~GS_ENABLED;
+}</PRE>
+<P>
+Some Edit menus may also contain other triggers such as &quot;Delete Event,&quot; or &quot;Remove Item.&quot; These triggers, however, are not standard and must be implemented exclusively by the application.</P>
+<P>
+Two main rules govern the maintenance of the Edit menu:</P>
+<UL>
+<LI>
+The <EM>
+Cut</EM>
+ and <EM>
+Copy</EM>
+ triggers are enabled only when some data is selected that may be cut or copied from the document into the Clipboard.</LI>
+<LI>
+The <EM>
+Paste</EM>
+ trigger is enabled only when data in a pasteable format exists in the Clipboard's Transfer VM File.</LI>
+</UL>
+<P>
+The first rule must be implemented entirely by the application; the Clipboard will not enable or disable the Copy or Cut triggers. The second rule, however, requires that the application be notified whenever the Clipboard's contents change--it is possible, for example, for the application to copy data to the Clipboard, enable its Paste trigger, and have another application then also copy some custom data to the Clipboard. In this case, the original application must disable its Paste trigger if it can not read the data.</P>
+<P>
+Whenever the Clipboard's contents change, the UI will send notification to all objects that have registered with it. The notification will be in the message <CODE>
+MSG_META_CLIPBOARD_NOTIFY_NORMAL_TRANSFER_ITEM_CHANGED</CODE>
+<A NAME="IX_MSG_META_CLIPBOARD_NOTIFY_NORMAL_TRANSFER_ITEM_CHANGED">
+ </A>
+. Use of this message can be found in the ClipSamp sample application.</P>
+<P CLASS="figTitle">
+Code Display 7-5 <A NAME="50658">
+ </A>
+Handling Clipboard Changes</P>
+<PRE>/* MSG_META_CLIPBOARD_NOTIFY_NORMAL_TRANSFER_ITEM_CHANGED is sent with no
+ * parameters and requires no return value. */</PRE>
+<PRE>/* The strategy of this message is to first check whether the CIF_TEXT format, the
+ * only format supported by this sample application, is available on the Clipboard.
+ * If so, the Paste trigger is enabled; if not, the Paste trigger is disabled. */</PRE>
+<PRE>@method MyClipProcessClass, MSG_META_CLIPBOARD_NOTIFY_NORMAL_TRANSFER_ITEM_CHANGED
+{
+    ClipboardQueryArgs			query;			/* A structure of arguments */
+    Boolean			endisable = FALSE;			/* The trigger is disabled */</PRE>
+<PRE>    /* Call ClipboardQueryItem() to gain exclusive access to and information about
+     * the current transfer item. Pass it zero indicating we're checking the
+     * normal transfer item (not the quick-transfer item) and the empty arguments
+     * structure. */
+    ClipboardQueryItem(TIF_NORMAL, &amp;query);</PRE>
+<PRE>    /* If there are any formats, then test if CIF_TEXT is one of them. The routine
+     * ClipboardTestItemFormat() tests a format against all those available and
+     * returns true if it is supported, false if it is not. Use the macro
+     * FormatIDFromManufacturerAndType to create the format argument. If CIF_TEXT
+     * is not supported, then the enDisable argument is set to TRUE. */</PRE>
+<PRE>    if (query.CQA_numFormats) {
+	if (ClipboardTestItemFormat(query.CQA_header,
+		FormatIDFromManufacturerAndType(MANUFACTURER_ID_ME, CIF_TEXT))) {
+	    endisable = TRUE;
+	}
+    }</PRE>
+<PRE>    /* Because we've found out what we need to know, restore the Clipboard with a
+     * call to ClipboardDoneWithItem(). This routine takes the transfer item's
+     * header and returns nothing; it also relinquishes our exclusive
+     * access to the Clipboard and is therefore very important. */</PRE>
+<PRE>    ClipboardDoneWithItem(query.CQA_header);</PRE>
+<PRE>    /* Now, if endisable is true, set the Paste trigger enabled. If endisable is
+     * false, set it disabled. These operations are accomplished by sending the
+     * appropriate message to the trigger object. */</PRE>
+<PRE>    if (endisable) {
+	@call EditPaste::MSG_GEN_SET_ENABLED(VUM_NOW);
+    } else {
+	@call EditPaste::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    }
+}</PRE>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Clipboard_9.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Clipboard_a.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.1 Registering with the Clipboard</A> 
+<!-- to next --> | <A HREF="Clipboard_c.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.3 The GenEditControl</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

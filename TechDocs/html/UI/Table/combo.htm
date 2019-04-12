@@ -1,0 +1,3155 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+<!-- This page was automatically generated from a bunch of smaller pages. -->
+<META NAME="copyright" CONTENT="Copyright GEOWORKS">
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+<TITLE>The Table Objects</TITLE>
+</HEAD>
+<BODY BGCOLOR="#ffffdf">
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+<A NAME="index.htm"></A>
+
+
+
+<H1 CLASS="chapterTitle">
+
+<A NAME="index.htm_26023">
+ </A>
+The Table Objects
+
+</H1>
+<P>
+The Table Library allows you to easily create dynamic scrolling tables. By using objects from <CODE>
+TableClass</CODE>
+, you can create tables with certain characteristics; in particular, tables with many rows, with the data organized by column. For example, you could use <CODE>
+TableClass</CODE>
+ to present a phone number list. One column might have a person's name, the next the phone number, the next the fax number, and so on. Each row would have the same basic format, though it would have different contents. The <CODE>
+Table</CODE>
+ is designed primarily for text tables, though it can display anything you wish to draw.</P>
+<P>
+You can give each column its own characteristics. Users may begin entering data directly into the Table; the <CODE>
+TableClass</CODE>
+ object will automatically present a VisText to let the user enter text, then send a message to itself to replace the cell's contents with the new text; you can subclass that message if you need to check the text the user has entered or perform some operation on the new data.</P>
+<P>
+The Table object does not actually <EM>
+store</EM>
+ data; it rather helps you organize data stored elsewhere, and helps you display that data in a tabular format. It also makes it much easier for a user to edit the data.</P>
+<P CLASS="sectionlinks">
+<STRONG>
+&nbsp;&nbsp;<A HREF="#JTable_1.htm">1 Table Objects</A><BR>
+&nbsp;&nbsp;<A HREF="#JTable_2.htm">2 TableClass Overview</A><BR>
+&nbsp;&nbsp;<A HREF="#JTable_3.htm">3 TableClass Instance Data</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#JTable_4.htm">3.1 Table Attributes</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#JTable_5.htm">3.2 Defining Columns</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#JTable_6.htm">3.3 Working with Rows</A><BR>
+&nbsp;&nbsp;<A HREF="#JTable_7.htm">4 Using a Table Object</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#JTable_8.htm">4.1 Drawing Cells</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#JTable_9.htm">4.2 Selecting Cells</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#JTable_a.htm">4.3 Editing Cells</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#JTable_b.htm">4.4 Dragging and Dropping</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#JTable_c.htm">4.5 Custom Scrolling Behavior</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#JTable_d.htm">4.6 Handling Locator Searches</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#JTable_e.htm">4.7 Table Headings</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#JTable_f.htm">4.8 Changing Column Definitions</A><BR>
+&nbsp;&nbsp;<A HREF="#JTable_10.htm">5 TableContentClass</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#JTable_11.htm">5.1 TableContent Instance Data</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#JTable_12.htm">5.2 Altering TableContent Instance Data</A><BR>
+&nbsp;&nbsp;<A HREF="#JTable_13.htm">6 LocatorClass</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#JTable_14.htm">6.1 Index Mode</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#JTable_15.htm">6.2 Text Mode</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#JTable_16.htm">6.3 LocatorClass Instance Data</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#JTable_17.htm">6.4 Locator Actions</A><BR>
+</STRONG>
+</P> <!-- end of sectionlinks blob -->
+
+<HR>
+<A NAME="JTable_1.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">The Table Objects</A>: 1 
+<A NAME="JTable_1.htm_55626">
+ </A>
+Table Objects</H2>
+<P>
+There are a number of Table objects available for you to use:</P>
+<UL>
+<LI>
+<CODE>
+TableViewClass<BR>
+</CODE>
+This subclass of GenViewClass acts as a holder for your table. Its <CODE>
+GVI_content</CODE>
+ should be a TableContent. Specify the main table in the view with the <CODE>
+TVI_mainTable</CODE>
+ instance data field.</LI>
+<LI>
+<CODE>
+TableContentClass<BR>
+</CODE>
+This subclass of <CODE>
+VisContentClass</CODE>
+ acts as an interface between the TableView object and the Table children.</LI>
+<LI>
+<CODE>
+TableClass<BR>
+</CODE>
+This subclass of <CODE>
+VisCompClass</CODE>
+ contains all the main Table functionality. This is where the bulk of the Table object functionality is located. You will typically subclass this object to add your own features.</LI>
+<LI>
+<CODE>
+LocatorClass<BR>
+</CODE>
+This subclass of <CODE>
+TableClass</CODE>
+ isn't really a Table at all. The Locator is a utility object that interacts with the Table to provide Table searching. You typically don't subclass this object; just include one in your application.</LI>
+</UL>
+<HR>
+<A NAME="JTable_2.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">The Table Objects</A>: 2 
+TableClass Overview</H2>
+<P>
+<CODE>
+TableClass</CODE>
+ implements a scrolling table. The table should be composed of one or more different columns, and one or more similar rows. Typically, each column would be a different category, and each row would have an entry for every different category.</P>
+<P>
+<CODE>
+TableClass</CODE>
+ is a subclass of <CODE>
+VisCompClass</CODE>
+. This means that you can group tables together or with other Vis objects. (You can put titles on a scrolling table by grouping two different Table objects together; this is discussed in <A HREF="#JTable_e.htm_35718"> Table Headings</A>
+.)</P>
+<P>
+<CODE>
+TableClass</CODE>
+ supports the following features:</P>
+<UL>
+<LI>
+Redrawing:<BR>
+<CODE>
+TableClass</CODE>
+ sends itself messages to instruct itself to redraw cells as needed; you can intercept these messages if you wish to change how cells are drawn. You can instruct a <CODE>
+Table</CODE>
+ object to redraw a range of cells; it will automatically send the appropriate messages to instruct itself to redraw just those cells currently visible on-screen.</LI>
+<LI>
+Pointer Events:<BR>
+The <CODE>
+TableClass</CODE>
+ object intercepts pointer events and sends itself appropriate MSG_TABLE_SELECT messages. Applications can subclass these messages if they want to take special actions when cells are selected. When you instantiate a <CODE>
+Table</CODE>
+ object, you specify (by column) what combination of pointer events should act as a selection. <CODE>
+TableClass</CODE>
+ can identify start-select, end-select, double-clicking, clicking and holding, and reselecting (i.e. clicking on an already-selected cell).</LI>
+<LI>
+Selecting Cells<BR>
+When cells are selected, a <CODE>
+Table</CODE>
+ object sends itself a MSG_TABLE_SELECT message. You can subclass this message if you wish. If you do not subclass this message, <CODE>
+TableClass</CODE>
+ can handle the selection in a number of different ways: it can select a single cell, a whole row, a rectangular region, etc. The table also lets you specify how selections should be identified (e.g. drawn in reverse video, surrounded by a solid box, etc.).</LI>
+<LI>
+Scrolling:<BR>
+If the <CODE>
+Table</CODE>
+ object contains more rows than can be shown on-screen, it will automatically scroll as needed. You can instruct the <CODE>
+Table</CODE>
+ to scroll up or down by sending it messages. You can also set a flag, instructing the <CODE>
+Table</CODE>
+ to scroll automatically when it receives certain pointer events (e.g. when the pointer is dragged off the top or bottom of the table). The <CODE>
+Table</CODE>
+ can also be set to scroll when certain keys are pressed.</LI>
+<LI>
+Editing:<BR>
+The table can automatically create a <CODE>
+VisText</CODE>
+ object when the user wants to edit the text in a cell. You can send messages to instruct it to create that <CODE>
+VisText</CODE>
+; you can also subclass messages to set the default contents of the <CODE>
+VisText</CODE>
+, or to process the text entered by the user before it's entered in the cell. This is discussed in <A HREF="#JTable_a.htm_33610"> Editing Cells</A>
+.</LI>
+<LI>
+Drag-Drop:<BR>
+The <CODE>
+Table</CODE>
+ implements a quick-copy, drag-and-drop mechanism. When you activate quick-copy mode, the user can drag a cell to a new location. At this time, the <CODE>
+Table</CODE>
+ sends itself a message; you can intercept this message, and take an appropriate action (such as copying the data from the source cell over the destination cell). This is discussed in <A HREF="#JTable_b.htm_58099"> Dragging and Dropping</A>
+.</LI>
+</UL>
+<P>
+There is one function the <CODE>
+Table</CODE>
+ object does <EM>
+not</EM>
+ perform. It does not <EM>
+store</EM>
+ the data contained in the cells. When it needs to know the contents of a cell, it requests that information; when the user changes a cell, it informs you. You, however, must store the information yourself.
+<IMG SRC="JTable_2_aTable.gif">
+
+</P>
+<P>
+For example, whenever the <CODE>
+Table</CODE>
+ object needs to draw a cell, it sends itself <CODE>
+MSG_TABLE_QUERY_DRAW</CODE>
+, specifying which cell needs to be drawn. You should intercept this message; your handler should look up the data stored in that cell, and draw its contents. Similarly, when a user edits a cell, you first tell the <CODE>
+Table</CODE>
+ object what the <EM>
+current</EM>
+ contents of the cell are (by intercepting <CODE>
+MSG_TABLE_START_EDIT_CELL_TEXT</CODE>
+). The <CODE>
+Table</CODE>
+ then brings up a <CODE>
+VisText</CODE>
+ which contains the current contents of the cell. The user can edit or change this text. When the user is finished, the <CODE>
+Table</CODE>
+ object informs the application (via <CODE>
+MSG_TABLE_DONE_EDIT_CELL_TEXT</CODE>
+) what the cell's new contents are. The application should intercept the message and store the new contents.</P>
+<P>
+Since the <CODE>
+Table</CODE>
+ refers to its cells by row and column numbers, you may wish to store its data in a GEOS <EM>
+cell file</EM>
+. A cell file is a GEOS VM file which uses special structures and routines to organize DB items so they can be accessed by row and column numbers, instead of by group and item handles. For more information about cell files, consult the &quot;Database&quot; chapter of the Concepts book provided with the SDK.</P>
+<HR>
+<A NAME="JTable_3.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">The Table Objects</A>: 3 
+TableClass Instance Data</H2>
+<P>
+<CODE>
+TableClass</CODE>
+ is a subclass of <CODE>
+VisCompClass</CODE>
+. This lets you group Tables together with other Tables and other Vis objects. Note, however, that you are not permitted to add children to a <CODE>
+Table</CODE>
+ object. When <CODE>
+TableClass</CODE>
+ creates a <CODE>
+VisText</CODE>
+ object to let users enter data, it makes that <CODE>
+VisText</CODE>
+ a child of the <CODE>
+Table</CODE>
+; if you try to add children to the <CODE>
+TableClass</CODE>
+, you will interfere with that process, and cause many unpredictable problems.</P>
+<P>
+This section describes the instance data fields defined for <CODE>
+TableClass</CODE>
+. It also describes how to set, examine, and change those fields which are of interest to the application. </P>
+<P>
+The <CODE>
+TableClass</CODE>
+ has the following instance data:</P>
+<P CLASS="figTitle">
+Code Display 5-1 TableClass Instance Data</P>
+<PRE>/* TI_rows specifies the number of rows in the table object. This field can be set 
+ * dynamically with MSG_TABLE_SET_ROW_COUNT. This height includes the row 
+ * separators.
+ */
+    @instance		word		TI_rows;</PRE>
+<PRE>/* TI_columns specifies the total number of columns in the table. All columns must 
+ * be visible at once (the table does not scroll horizontally). You must set this 
+ * field in your source file; it cannot currently be set at run-time.
+ */
+    @instance		word		TI_columns;</PRE>
+<PRE>/* TI_visibleRows contains the number of rows currently displayed. You must set 
+ * this field in your source file; it cannot currently be set at run-time.
+ */
+    @instance		word		TI_visibleRows;</PRE>
+<PRE>/* TI_topRow contains the row number of the first visible row. This is maintained 
+ * automatically by the Table object; applications should not set this field.
+ */
+    @instance		word		TI_topRow;</PRE>
+<PRE>/* TI_tableFlags contains a record of TableFlags. This record is described below 
+ * in <A HREF="#JTable_4.htm_64956"> Table Attributes</A>. 
+ */
+    @instance		TableFlags		TI_tableFlags;</PRE>
+<PRE>/* TI_rowFlags contains a record of TableRowFlags. This record is described below 
+ * in <A HREF="#JTable_6.htm_97804"> Working with Rows</A>.
+ */
+    @instance		TableRowFlags		TI_rowFlags;</PRE>
+<PRE>/* TI_columnDefinitions contains the chunk handle of a list of column definitions.
+ * Column definitions are discussed in <A HREF="#JTable_5.htm_59451"> Defining Columns</A>.
+ */
+    @instance		ChunkHandle		TI_columnDefinitions;</PRE>
+<PRE>/* TI_rowHeight specifies the height of each row in &quot;points&quot; (72 points = 1 inch). 
+ * You must set this in your source code; there is no way to change this 
+ * dynamically.
+ */
+    @instance		word		TI_rowHeight;</PRE>
+<PRE>/* This field specifies the Table object's TableBorderFlags, which specify the 
+ * border and bounds for the Table object. TableBorderFlags are described 
+ * below in <A HREF="#JTable_4.htm_64956"> Table Attributes</A>.
+ */
+    @instance		TableBorderFlags			TI_borderFlags;</PRE>
+<PRE>/* The following instance data fields are for internal use by the Table object. 
+ * You should not set, inspect, or change any of these fields, either in your
+ * source code or at run-time.
+ */</PRE>
+<PRE>    @instance		TableCellLocation			TI_currentSelectionStart = 
+	{ T_NONE_SELECTED, T_NONE_SELECTED };</PRE>
+<PRE>    @instance		TableCellLocation			TI_currentSelectionEnd = 
+	{ T_NONE_SELECTED, T_NONE_SELECTED };</PRE>
+<PRE>    @instance		TableCellLocation			TI_lastSelectionStart = 
+	{ T_NONE_SELECTED, T_NONE_SELECTED };</PRE>
+<PRE>    @instance		TableCellLocation			TI_lastSelectionEnd = 
+	{ T_NONE_SELECTED, T_NONE_SELECTED };</PRE>
+<PRE>    @instance		Rectangle			TI_bounds = {0, 0, 0, 0};</PRE>
+<PRE>    @instance		TableRangeInversionType			TI_tableRangeInversion;</PRE>
+<PRE>    @instance		TableCellLocation			TI_lastCell = {
+			T_NONE_SELECTED, 
+			T_NONE_SELECTED};</PRE>
+<PRE>    @instance		TableSelectionDrawStyleType 			TI_selectionDrawStyle;</PRE>
+<PRE>    @instance		TablePrivateFlags			TI_privateFlags;</PRE>
+<PRE>    @instance		ChunkHandle			TI_textObj;</PRE>
+<P CLASS="subsectionLink">
+<A HREF="#JTable_4.htm">Table Attributes</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#JTable_5.htm">Defining Columns</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#JTable_6.htm">Working with Rows</A></P>
+<HR>
+<A NAME="JTable_4.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The Table Objects</A>: 3.1 <A HREF="#JTable_3.htm">TableClass Instance Data</A>: 
+<A NAME="JTable_4.htm_64956">
+ </A>
+Table Attributes</H3>
+<PRE>TableFlags, TableBorderFlags, MSG_TABLE_SET_FLAGS, MSG_TABLE_GET_FLAGS, MSG_TABLE_SET_BORDER_FLAGS, MSG_TABLE_GET_BORDER_FLAGS</PRE>
+<P>
+There are a few attributes which apply to the entire <CODE>
+Table</CODE>
+. Ordinarily, you would set these up when you define the <CODE>
+Table</CODE>
+, and leave them unchanged; however, you can get or change these attributes at will, by sending messages.</P>
+<P>
+<A NAME="JTable_4.htm_33796">
+ </A>
+Every <CODE>
+Table</CODE>
+ has a record of <CODE>
+TableFlags</CODE>
+, stored in the instance data field TI<CODE>
+_tableFlags</CODE>
+. This record contains the following flags:</P>
+<DL>
+<DT>
+TF_MAIN_TABLE</DT><DD>
+This flag indicates that this Table is the main (primary) table below the TableContent object. A Table marked with this flag will be the one that is sent scroll messages from the TableView. This is important if you use a separate <CODE>
+TableClass</CODE>
+ object to contain headers for your table. (See <A HREF="#JTable_e.htm_35718"> Table Headings</A>
+.)</DD>
+<DT>
+TF_INTERNAL_DRAG_DROP</DT><DD>
+This flag should not be modified; it is internally managed. If this flag is set, this indicates that the Table is in drag-and-drop mode from one location in the Table to another location within that same Table; this lets the user copy one cell to another.The user does this by start-selecting the cell he or she wants to copy, and dragging (&quot;hold-selecting&quot;) the pointer to the new location, then releasing the pointer (&quot;end-selecting&quot;); the cell's contents will be copied to the new location. If TF_EXIT_DRAG_DROP_UPON_COMPLETION is set, the <CODE>
+Table</CODE>
+ will automatically clear TF_INTERNAL_DRAG_DROP after every drag-drop operation. (See <A HREF="#JTable_b.htm_58099"> Dragging and Dropping</A>
+.)</DD>
+<DT>
+TF_EXTERNAL_DRAG_DROP</DT><DD>
+This flag should not be modified; it is internally managed. If this flag is set, this indicates that the Table is in drag-and-drop mode from a location outside the Table to another location within the Table.</DD>
+<DT>
+TF_ENABLE_AUTO_SCROLLING</DT><DD>
+If this flag is set, the <CODE>
+Table</CODE>
+ will automatically scroll whenever the user clicks the pointer inside the <CODE>
+Table</CODE>
+ and drags it across the top or bottom boundary. This flag does not affect any other scrolling behavior you may have added to your Table (such as scroll buttons in the parent TableView).</DD>
+<DT>
+TF_SELECTION_ALWAYS_VISIBLE</DT><DD>
+If this flag is set, a Table's selection will always remain visible when scrolling. Any scrolling that might move the current selection off-screen will result in the movement of the selection (row by row) to stay visible. In other words, this flag does not ensure that the current selection remains visible; it only ensures that a selection bar exists on-screen.</DD>
+<DT>
+TF_FIXED_SELECTION</DT><DD>
+This flag is currently unsupported.</DD>
+<DT>
+TF_EXIT_DRAG_DROP_UPON_COMPLETION</DT><DD>
+If this flag is set, when the user finishes a drag-and-drop operation, the <CODE>
+Table</CODE>
+ will automatically leave drag-and-drop mode, clearing TF_INTERNAL_DRAG_DROP. (See <A HREF="#JTable_b.htm_58099"> Dragging and Dropping</A>
+.) If you do not set this flag, once you begin a drag and drop operation, you will need to manually exit drag and drop by clearing the TF_INTERNAL_DRAG_DROP flag yourself. (This is not recommended.)</DD>
+<DT>
+TF_TARGETABLE</DT><DD>
+If this flag is set, the Table object will grab the target whenever it receives a <CODE>
+MSG_META_START_SELECT</CODE>
+. Unless your Table is display-only, you will probably always want this flag set.</DD>
+<DT>
+TF_NOTIFY_SELECTION_CHANGED</DT><DD>
+If this flag is set, the Table object will send itself <CODE>
+MSG_TABLE_NOTIFY_SELECTION_CHANGED</CODE>
+ whenever the stored selection value changes. If you wish to have that message sent (and intercept it) you must set this flag.</DD>
+</DL>
+<P>
+You may set these bits in TI<CODE>
+_tableFlags</CODE>
+ when you define the table object in your source file. If you wish to change the <CODE>
+TableFlags</CODE>
+ record of an existing <CODE>
+Table</CODE>
+ object, you must do this by sending the object <CODE>
+MSG_TABLE_SET_FLAGS</CODE>
+, not by editing TI<CODE>
+_tableFlags</CODE>
+ directly. You can find out the current settings of <CODE>
+TI_tableFlags</CODE>
+ by sending <CODE>
+MSG_TABLE_GET_FLAGS</CODE>
+ to the <CODE>
+Table</CODE>
+ object.</P>
+<P>
+<A NAME="JTable_4.htm_71402">
+ </A>
+Each table object also has a record of <CODE>
+TableBorderFlags</CODE>
+, stored in the instance data field TI<CODE>
+_borderFlags</CODE>
+. This record specifies what borders should be drawn around the <CODE>
+Table</CODE>
+. This record has the following flags:</P>
+<DL>
+<DT>
+TBF_BOX_BORDERS</DT><DD>
+If this flag is set, a box will be drawn around the entire portion of the <CODE>
+Table</CODE>
+ visible on-screen. Setting this flag is equivalent to setting TBF_TOP_BORDER, TBF_BOTTOM_BORDER, TBF_LEFT_BORDER, and TBF_RIGHT_BORDER.</DD>
+<DT>
+TBF_TOP_BORDER</DT><DD>
+If this flag is set, a line will be drawn at the top border of the portion of the <CODE>
+Table</CODE>
+ visible on-screen.</DD>
+<DT>
+TBF_BOTTOM_BORDER</DT><DD>
+If this flag is set, a line will be drawn at the bottom border of the portion of the <CODE>
+Table</CODE>
+ visible on-screen.</DD>
+<DT>
+TBF_LEFT_BORDER</DT><DD>
+If this flag is set, a line will be drawn at the left border of the portion of the <CODE>
+Table</CODE>
+ visible on-screen.</DD>
+<DT>
+TBF_RIGHT_BORDER</DT><DD>
+If this flag is set, a line will be drawn at the right border of the portion of the <CODE>
+Table</CODE>
+ visible on-screen.</DD>
+<DT>
+TBF_BOX_MARGINS</DT><DD>
+If this flag is set, margins will be added around the entire portion of the <CODE>
+Table</CODE>
+ visible on-screen. Setting this flag is equivalent to setting TBF_TOP_MARGIN, TBF_BOTTOM_MARGIN, TBF_LEFT_MARGIN, and TBF_RIGHT_MARGIN.</DD>
+<DT>
+TBF_TOP_MARGIN</DT><DD>
+If this flag is set, a margin will be added along the top border of the portion of the <CODE>
+Table</CODE>
+ visible on-screen.</DD>
+<DT>
+TBF_BOTTOM_MARGIN</DT><DD>
+If this flag is set, a margin will be added along the bottom border of the portion of the <CODE>
+Table</CODE>
+ visible on-screen.</DD>
+<DT>
+TBF_LEFT_MARGIN</DT><DD>
+If this flag is set, a margin will be added along the left border of the portion of the <CODE>
+Table</CODE>
+ visible on-screen.</DD>
+<DT>
+TBF_RIGHT_MARGIN</DT><DD>
+If this flag is set, a margin will be added along the right border of the portion of the <CODE>
+Table</CODE>
+ visible on-screen.</DD>
+</DL>
+<P>
+To find out what <CODE>
+TableBorderFlags</CODE>
+ are currently set, send MSG_TABLE_GET_BORDER_FLAGS to the <CODE>
+Table</CODE>
+. As with <CODE>
+TableFlags</CODE>
+, you may set the instance field TI<CODE>
+_borderFlags</CODE>
+ in your source file, but you may not alter it directly at run-time; instead, you can set the field indirectly, by sending <CODE>
+MSG_TABLE_SET_BORDER_FLAGS</CODE>
+ to the <CODE>
+Table</CODE>
+ object.</P>
+
+<H6 CLASS="RefETitle">
+MSG_TABLE_GET_FLAGS</H6>
+<PRE CLASS="syntax">TableFlags 	MSG_TABLE_GET_FLAGS();</PRE>
+<P>
+This message returns the current <CODE>
+TableFlags</CODE>
+ settings in the recipient's TI<CODE>
+_tableFlags</CODE>
+ field. To change this field, send <CODE>
+MSG_TABLE_SET_FLAGS</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any <CODE>
+TableClass</CODE>
+ object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	The <CODE>
+TableFlags</CODE>
+ record currently stored in the <CODE>
+Table</CODE>
+ object's TI<CODE>
+_tableFlags</CODE>
+ field.</P>
+<P CLASS="refField">
+Structures:	The <CODE>
+TableFlags</CODE>
+ record (see <A HREF="#JTable_4.htm_33796"> Every Table has a record of TableFlags, stored in the instance data field TI_tableFlags. This record contains the following flags:</A>
+).</P>
+
+
+<H6 CLASS="RefETitle">
+MSG_TABLE_SET_FLAGS</H6>
+<PRE CLASS="syntax">void	MSG_TABLE_SET_FLAGS(
+        TableFlags		setTableFlags,
+        TableFlags		unsetTableFlags);</PRE>
+<P>
+This message alters the <CODE>
+TableFlags</CODE>
+ settings in the recipient's TI<CODE>
+_tableFlags</CODE>
+ field. To find out what the current settings are, send <CODE>
+MSG_TABLE_GET_FLAGS</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any <CODE>
+TableClass</CODE>
+ object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+setTableFlags	</CODE>
+All the flags in this record will be turned <EM>
+on</EM>
+.</P>
+<DL>
+<DT>
+<CODE>
+unsetTableFlags</CODE>
+</DT><DD>All the flags in this record will be turned <EM>
+off</EM>
+.<EM>
+</EM>
+</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Structures:	The <CODE>
+TableFlags</CODE>
+ record (see <A HREF="#JTable_4.htm_33796"> Every Table has a record of TableFlags, stored in the instance data field TI_tableFlags. This record contains the following flags:</A>
+).</P>
+
+
+<H6 CLASS="RefETitle">
+MSG_TABLE_GET_BORDER_FLAGS</H6>
+<PRE CLASS="syntax">TableBorderFlags 	MSG_TABLE_GET_BORDER_FLAGS();</PRE>
+<P>
+This message returns the current <CODE>
+TableBorderFlags</CODE>
+ settings in the recipient's TI<CODE>
+_borderFlags</CODE>
+ field. To change this field, send <CODE>
+MSG_TABLE_SET_BORDER_FLAGS</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any <CODE>
+TableClass</CODE>
+ object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	The <CODE>
+TableBorderFlags</CODE>
+ record currently stored in the <CODE>
+Table</CODE>
+ object's TI<CODE>
+_borderFlags</CODE>
+ field.</P>
+<P CLASS="refField">
+Structures:	The <CODE>
+TableBorderFlags</CODE>
+ record (see <A HREF="#JTable_4.htm_71402"> Each table object also has a record of TableBorderFlags, stored in the instance data field TI_borderFlags. This record specifies what borders should be drawn around the Table. This record has the following flags:</A>
+).</P>
+
+
+<H6 CLASS="RefETitle">
+MSG_TABLE_SET_BORDER_FLAGS</H6>
+<PRE CLASS="syntax">void	MSG_TABLE_SET_BORDER_FLAGS(
+        TableBorderFlags		borderFlags);</PRE>
+<P>
+This message alters the <CODE>
+TableBorderFlags</CODE>
+ settings in the recipient's TI<CODE>
+_borderFlags</CODE>
+ field. To find out what the current settings are, send <CODE>
+MSG_TABLE_GET_FLAGS</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any <CODE>
+TableClass</CODE>
+ object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+borderFlags</CODE>
+	The current value in TI<CODE>
+_borderFlags</CODE>
+ will be replaced by the value in this record.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Structures:	The <CODE>
+TableBorderFlags</CODE>
+ record (see <A HREF="#JTable_4.htm_71402"> Each table object also has a record of TableBorderFlags, stored in the instance data field TI_borderFlags. This record specifies what borders should be drawn around the Table. This record has the following flags:</A>
+).</P>
+
+<HR>
+<A NAME="JTable_5.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The Table Objects</A>: 3.2 <A HREF="#JTable_3.htm">TableClass Instance Data</A>: 
+<A NAME="JTable_5.htm_59451">
+ </A>
+Defining Columns</H3>
+<PRE>TableColumnDefinition, TableColumnFlags, TableRangeInversionType, MSG_GEN_TABLE_GET_COLUMN_COUNT</PRE>
+<P>
+When you create a <CODE>
+Table</CODE>
+ object, you must specify what columns the <CODE>
+Table</CODE>
+ has. Typically, each column will represent a different kind of data, and can be of a different length. When you define a <CODE>
+Table</CODE>
+ object, you specify how many columns the table will have; this number is fixed for the table, and cannot be changed later. (It is possible to have your Table switch the column definitions that they use, although it will take a fair amount of work on your part; that is discussed in<A HREF="#JTable_f.htm_91726"> Changing Column Definitions</A>
+.) You can find out how many columns a table has by sending it <CODE>
+MSG_TABLE_GET_COLUMN_COUNT</CODE>
+.</P>
+<P>
+Each column has its own definition--stored in the Table's TI_<CODE>
+columnDefinitions</CODE>
+ array--specified by a <CODE>
+TableColumnDefinition</CODE>
+ structure that cannot be changed later. This structure has the following definition:</P>
+<PRE><A NAME="JTable_5.htm_21376"> </A>typedef struct {
+	TableColumnFlags			TCD_flags;
+	word			TCD_width;
+} TableColumnDefinition;</PRE>
+<DL>
+<DT>
+TCD<CODE>
+_flags</CODE>
+</DT><DD>This is a <CODE>
+TableColumnFlags</CODE>
+ record (described on <A HREF="#JTable_5.htm_38024"> The TableColumnFlags record has the following flags:</A>
+ below).<CODE>
+</CODE>
+</DD>
+<DT>
+TCD<CODE>
+_width</CODE>
+</DT><DD>This is the width of the column in points (72 points = 1 inch, so 28.3 points ª 1 centimeter).</DD>
+</DL>
+<P>
+<A NAME="JTable_5.htm_38024">
+ </A>
+The <CODE>
+TableColumnFlags</CODE>
+ record has the following flags:</P>
+<DL>
+<DT>
+TCF_DRAW_RIGHT_SEPARATOR</DT><DD>
+If this flag is set, the column will have a solid line drawn on its right border (separating it from the next column to its right). This right-separator will not be drawn if the column is the last (right-most) column in the Table.</DD>
+<DT>
+TCF_START_SELECT</DT><DD>
+If this flag is set, then if the user performs a &quot;start-select&quot; anywhere in the column, the <CODE>
+Table</CODE>
+ object will send itself MSG_TABLE_SELECT.</DD>
+<DT>
+TCF_END_SELECT</DT><DD>
+If this flag is set, then if the user performs an &quot;end-select&quot; anywhere in the column, the <CODE>
+Table</CODE>
+ object will send itself MSG_TABLE_SELECT.</DD>
+<DT>
+TCF_DRAG_SELECT</DT><DD>
+If this flag is set, then if the user performs a pointer drag that crosses cell boundaries within the column, or enters or leaves the column, the <CODE>
+Table</CODE>
+ object will send itself MSG_TABLE_SELECT.</DD>
+<DT>
+TCF_DOUBLE_SELECT</DT><DD>
+If this flag is set, then if the user double-clicks anywhere in the column, the <CODE>
+Table</CODE>
+ object will present a <CODE>
+VisText</CODE>
+, allowing the user to edit the contents of the cell. (See <A HREF="#JTable_a.htm_33610"> Editing Cells</A>
+.)</DD>
+<DT>
+TCF_RESELECT</DT><DD>
+If this flag is set, then if the user performs a &quot;start-select&quot; in the column on a cell that is already in a range of selected cells, the <CODE>
+Table</CODE>
+ object will send itself MSG_TABLE_SELECT.</DD>
+<DT>
+TCF_HOLD_SELECT</DT><DD>
+If this flag is set, then if the user performs a &quot;start-select&quot; in the column on a cell and holds for a certain period of time, the Table will send itself MSG_TABLE_SELECT. This flag also sets the TF_INTERNAL_DRAG_DROP flag.</DD>
+<DT>
+TCF_TRIT</DT><DD>This is a three-bit field. The value in this field is a member of the <CODE>
+TableRangeInversionType</CODE>
+ enumerated type; it specifies how the <CODE>
+Table</CODE>
+ should display selected cells in this column.</DD>
+</DL>
+<P>
+<CODE>
+TableRangeInversionType</CODE>
+ specifies which cells should be drawn as highlighted when the user performs a selection action. Note that each column has its own <CODE>
+TableRangeInversionType</CODE>
+ value. If a selection action crosses from one column into another, the <CODE>
+Table</CODE>
+ uses the <CODE>
+TableRangeInversionType</CODE>
+ of the last column the pointer was in. <CODE>
+TableRangeInversionType</CODE>
+ has the following values:</P>
+<DL>
+<DT>
+TRIT_CELL</DT><DD>When the user selects a cell in this column, highlight just that cell.</DD>
+<DT>
+TRIT_ROW</DT><DD>When the user selects a cell in this column, highlight the entire row containing that cell.</DD>
+<DT>
+TRIT_COLUMN</DT><DD>
+When the user selects a cell in this column, highlight the entire visible portion of this column (i.e. every cell in this column that is (at least partially) visible on-screen).</DD>
+<DT>
+TRIT_MULTI_ROW</DT><DD>
+Highlight the area bounded by the two cells in which the selection started and ended. The selection is made row by row as if all cells were in a single sequence with the last (right-most) cell of one row being followed by the first (left-most) cell of the next row. (One can think of this selection being analogous to a text selection across several lines.)</DD>
+<DT>
+TRIT_RECTANGLE</DT><DD>
+Highlight all the cells in the rectangle pointed by the start-select cell and the end-select cell.</DD>
+<DT>
+TRIT_MULTI_ROW_FULL</DT><DD>
+Highlight the row in which the user start-selects, and all rows through which the user drags the selection pointer.</DD>
+<DT>
+TRIT_MULTI_COL_FULL</DT><DD>
+Highlight the first column in which the user start-selects, and all columns through which the user drags the selection pointer.</DD>
+<DT>
+TRIT_NONE</DT><DD>This indicates that the <CODE>
+Table</CODE>
+ should not highlight any selections.</DD>
+</DL>
+<P>
+When you create a <CODE>
+Table</CODE>
+, you must specify how many columns the table has, and what the characteristics of each column are. You specify the number of columns the <CODE>
+Table</CODE>
+ has by setting TI<CODE>
+_columns</CODE>
+ to that number. You cannot change the number of columns in the <CODE>
+Table</CODE>
+ after the <CODE>
+Table</CODE>
+ has been created. To find out how many columns a <CODE>
+Table</CODE>
+ has, send it <CODE>
+MSG_TABLE_GET_COLUMN_COUNT</CODE>
+.</P>
+<P>
+To specify the attributes of each column, you must create a chunk in the same object block as the <CODE>
+Table</CODE>
+. That chunk must contain an array of <CODE>
+TableColumnDefinition</CODE>
+ structures, one for each column in the <CODE>
+Table</CODE>
+. The structures should be in the same order as the columns (i.e. the left-most column would be the first structure in the array). </P>
+
+<H6 CLASS="RefETitle">
+MSG_GEN_TABLE_GET_COLUMN_COUNT</H6>
+<PRE CLASS="syntax">word	MSG_GEN_TABLE_GET_COLUMN_COUNT();</PRE>
+<P>
+This message returns the number of columns in a <CODE>
+Table</CODE>
+ object.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any <CODE>
+Table</CODE>
+ object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	The number of columns in the <CODE>
+Table</CODE>
+.</P>
+
+<HR>
+<A NAME="JTable_6.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The Table Objects</A>: 3.3 <A HREF="#JTable_3.htm">TableClass Instance Data</A>: 
+<A NAME="JTable_6.htm_97804">
+ </A>
+Working with Rows</H3>
+<PRE>TableRowFlags, MSG_TABLE_GET_ROW_FLAGS, MSG_TABLE_SET_ROW_FLAGS, MSG_TABLE_GET_ROW_COUNT, MSG_TABLE_SET_ROW_COUNT</PRE>
+<P>
+In a <CODE>
+Table</CODE>
+ object, rows and columns are fundamentally different. Each column has its own properties; columns are generally used to display different kinds of information. Rows, on the other hand, are similar throughout a <CODE>
+Table</CODE>
+. Each row may contain different data, but all rows have the same basic structure throughout a given <CODE>
+Table</CODE>
+.</P>
+<P>
+This has some consequences. For example, all columns are usually displayed; the <CODE>
+Table</CODE>
+ should be wide enough to display all visible columns at once.</P>
+<P>
+All the rows, on the other hand, are generally <EM>
+not</EM>
+ displayed at once. The <CODE>
+Table</CODE>
+ will display as many rows as it has room for; the user can scroll the table to see other rows. Also, while there are row properties (defined in <CODE>
+TableRowFlags</CODE>
+) that are similar in nature to the column properties defined in <CODE>
+TableColumnFlags</CODE>
+, you cannot set these properties individually for a row; all rows must have the same <CODE>
+TableRowFlags</CODE>
+.</P>
+<P>
+The instance data field TI<CODE>
+_rowFlags</CODE>
+ specifies what <CODE>
+TableRowFlags</CODE>
+ will be used for every row in the table. <CODE>
+TableRowFlags</CODE>
+ is a word-sized record with the following field:</P>
+<DL>
+<DT>
+TRF_DRAW_ROW_SEPARATOR</DT><DD>
+<A NAME="JTable_6.htm_35922">
+ </A>
+If this field is set, the <CODE>
+Table</CODE>
+ will draw a line below each column separating the rows. No line will be drawn below the Table's last row.</DD>
+</DL>
+<P>
+To find out how TI<CODE>
+_rowFlags</CODE>
+ is set, send <CODE>
+MSG_TABLE_GET_ROW_FLAGS</CODE>
+ to the <CODE>
+Table</CODE>
+. To change the settings in this field, send MSG_TABLE_SET_ROW_FLAGS.</P>
+<P>
+To find out how many rows a table has, send it <CODE>
+MSG_TABLE_GET_ROW_COUNT</CODE>
+. You can also add or remove rows at will by sending MSG_TABLE_SET_ROW_COUNT. This message adds rows to, or removes them from, the end of the <CODE>
+Table</CODE>
+.</P>
+
+<H6 CLASS="RefETitle">
+MSG_TABLE_GET_ROW_FLAGS</H6>
+<PRE CLASS="syntax">TableRowFlags MSG_TABLE_GET_ROW_FLAGS();</PRE>
+<P>
+This message returns the current settings of a <CODE>
+Table</CODE>
+ object's TI<CODE>
+_rowFlags</CODE>
+ field. This field holds the <CODE>
+TableRowFlags</CODE>
+ used for every row in the <CODE>
+Table</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any <CODE>
+TableClass</CODE>
+ object.</P>
+<P CLASS="refField">
+Parameters:	Nothing.</P>
+<P CLASS="refField">
+Return:	The <CODE>
+TableRowFlags</CODE>
+ used for all rows in the <CODE>
+Table</CODE>
+.</P>
+<P CLASS="refField">
+Structures:	<CODE>
+TableRowFlags</CODE>
+ (described on <A HREF="#JTable_6.htm_35922"> TRF_DRAW_ROW_SEPARATOR If this field is set, the Table will draw a line below each column separating the rows. No line will be drawn below the Table's last row.</A>
+).</P>
+
+
+<H6 CLASS="RefETitle">
+MSG_TABLE_SET_ROW_FLAGS</H6>
+<PRE CLASS="syntax">void	MSG_TABLE_SET_ROW_FLAGS(
+        TableRowFlags		flags);</PRE>
+<P>
+This message changes current settings of a <CODE>
+Table</CODE>
+ object's TI<CODE>
+_rowFlags</CODE>
+ field. This field holds the <CODE>
+TableRowFlags</CODE>
+ used for every row in the <CODE>
+Table</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any <CODE>
+TableClass</CODE>
+ object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+flags</CODE>
+	This is the new set of <CODE>
+TableRowFlags</CODE>
+ to be used for every row in the <CODE>
+Table</CODE>
+.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Structures:	<CODE>
+TableRowFlags</CODE>
+ (described on <A HREF="#JTable_6.htm_35922"> TRF_DRAW_ROW_SEPARATOR If this field is set, the Table will draw a line below each column separating the rows. No line will be drawn below the Table's last row.</A>
+).</P>
+
+
+<H6 CLASS="RefETitle">
+MSG_TABLE_GET_ROW_COUNT</H6>
+<PRE CLASS="syntax">word	MSG_TABLE_GET_ROW_COUNT();</PRE>
+<P>
+This message returns the total number of rows in a <CODE>
+Table</CODE>
+ object.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any <CODE>
+TableClass</CODE>
+ object.</P>
+<P CLASS="refField">
+Parameters:	Nothing.</P>
+<P CLASS="refField">
+Return:	The number of rows in the <CODE>
+Table</CODE>
+.</P>
+
+
+<H6 CLASS="RefETitle">
+MSG_TABLE_SET_ROW_COUNT</H6>
+<PRE CLASS="syntax">void	MSG_TABLE_SET_ROW_COUNT(
+        word	rowCount);</PRE>
+<P>
+This message changes the <CODE>
+Table</CODE>
+ object's total number of rows. If the new row count is smaller than the old one, the last rows will be truncated.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any <CODE>
+TableClass</CODE>
+ object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+rowCount</CODE>
+	The new number of rows the <CODE>
+Table</CODE>
+ should contain. Rows are added and removed at the end of the <CODE>
+Table</CODE>
+.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+<HR>
+<A NAME="JTable_7.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">The Table Objects</A>: 4 
+Using a Table Object</H2>
+<P>
+The Table object is designed to be easy to use. You cannot use a <CODE>
+TableClass</CODE>
+ object directly; you will need to define a subclass of <CODE>
+TableClass</CODE>
+ in order to intercept certain required messages. You will also need to set a few instance fields when you define the Table in your source code.</P>
+<P>
+The Table object must appear within a TableContent object. If it is within a regular VisContent, crashes may result.</P>
+<P>
+When you create a Table object, you will need to set the following instance data fields (the other fields may be left with there default values):</P>
+<DL>
+<DT>
+TI<CODE>
+_rows</CODE>
+</DT><DD>This is the number of rows in the <CODE>
+Table</CODE>
+. You may set this field to zero. (You can add and remove rows at run-time.) For more information, see <A HREF="#JTable_6.htm_97804"> Working with Rows</A>
+.</DD>
+<DT>
+TI<CODE>
+_columns </CODE>
+</DT><DD>This is the number of columns in the <CODE>
+Table</CODE>
+. This must be at least one. You cannot currently add or remove columns at run-time. For more information, see <A HREF="#JTable_5.htm_59451"> Defining Columns</A>
+.</DD>
+<DT>
+TI<CODE>
+_visibleRows</DT><DD>
+</CODE>
+This is the number of rows visible on-screen at any one time; thus, this field, together with TI<CODE>
+_rowHeight</CODE>
+, define the height of a <CODE>
+Table</CODE>
+ object. This field must be at least 1.</DD>
+<DT>
+TI<CODE>
+_columnDefinitions</DT><DD>
+</CODE>
+This is the handle of a chunk containing an array of <CODE>
+TableColumnDefinition</CODE>
+ structures, which specify the properties of the <CODE>
+Table</CODE>
+'s columns. For more information, see <A HREF="#JTable_5.htm_59451"> Defining Columns</A>
+.</DD>
+<DT>
+TI<CODE>
+_rowHeight</CODE>
+</DT><DD>
+This is the height of a row in points (72 points = 1 inch, so 28.3 points ª 1 centimeter). This must be larger than zero.</DD>
+</DL>
+<P>
+In order to use a <CODE>
+TableClass</CODE>
+ object, you must define handlers for a few messages. As a general rule, your handlers should call the <CODE>
+TableClass</CODE>
+ handlers after they take their actions; in some cases, your handlers's main role is to add extra data to the message, which will be interpreted by the default handler. </P>
+<P>
+You should define handlers for the following tasks:</P>
+<UL>
+<LI>
+You must define a handler for <CODE>
+MSG_TABLE_QUERY_DRAW</CODE>
+, which redraws a specified cell to a GState. (The <CODE>
+TableClass</CODE>
+ object doesn't actually know what the contents of the cells are; it relies on your subclass's code to draw the cells.) For more information, see <A HREF="#JTable_8.htm_58532"> Drawing Cells</A>
+.</LI>
+<LI>
+You may wish to define a handler for <CODE>
+MSG_TABLE_SELECT</CODE>
+. This will let you know when the user has selected a cell; you can perform appropriate actions, and decide whether to call the default handler (which highlights the selection and performs other selection actions). For more information, see <A HREF="#JTable_9.htm_63407"> Selecting Cells</A>
+.</LI>
+<LI>
+You should provide handlers for <CODE>
+MSG_TABLE_START_EDIT_CELL_TEXT</CODE>
+ and <CODE>
+MSG_TABLE_DONE_EDIT_CELL_TEXT</CODE>
+. These messages let the user edit the text in <CODE>
+Table</CODE>
+ cells. By subclassing the messages, you can provide the current cell contents for the user to edit, and store the user's text after he or she has finished entering it. For more information, see <A HREF="#JTable_a.htm_33610"> Editing Cells</A>
+.</LI>
+<LI>
+The <CODE>
+Table</CODE>
+ object supports drag-and-drop copying. However, it does not actually know what the cells contain, so it can't perform the copying itself. Instead, when the user performs a drag-and-drop operation, the <CODE>
+Table</CODE>
+ object sends <CODE>
+MSG_TABLE_DRAG_DROP_COMPLETE</CODE>
+; the application should intercept the message, and do any appropriate copying of data. For more information, see <A HREF="#JTable_b.htm_58099"> Dragging and Dropping</A>
+.</LI>
+<LI>
+You may want to implement your own custom scrolling behavior. (<CODE>
+TableClass</CODE>
+ supports auto-scrolling with the addition of the TF_ENABLE_AUTO_SCROLLING flag; auto scrolling does not, however, provide any visual UI (such as scroll buttons) to enable scrolling.) If you want custom scrolling behavior, you will need to implement scroll buttons in your TableView and appropriate messages to your Table object (such as <CODE>
+MSG_TABLE_SCROLL_SINGLE_UP</CODE>
+ and <CODE>
+MSG_TABLE_SCROLL_SINGLE_DOWN)</CODE>
+. For more information, see <A HREF="#JTable_c.htm_13991"> Custom Scrolling Behavior</A>
+.</LI>
+<LI>
+If you link a Locator object to your Table (see <A HREF="#JTable_13.htm_60877"> LocatorClass</A>
+) you will want to intercept <CODE>
+MSG_TABLE_CHAR_LOCATE</CODE>
+ and <CODE>
+MSG_TABLE_STRING_LOCATE</CODE>
+ to implement your own search methods. For more information, see <A HREF="#JTable_d.htm_14433"> Handling Locator Searches</A>
+.</LI>
+<LI>
+If you want to change your column definitions dynamically, you will need to define additional column definitions and switch which ones you use under the Table. There is no API currently for this behavior; you will need to write the messages and handle them yourself. This is discussed in <A HREF="#JTable_f.htm_91726"> Changing Column Definitions</A>
+.</LI>
+</UL>
+<P CLASS="subsectionLink">
+<A HREF="#JTable_8.htm">Drawing Cells</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#JTable_9.htm">Selecting Cells</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#JTable_a.htm">Editing Cells</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#JTable_b.htm">Dragging and Dropping</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#JTable_c.htm">Custom Scrolling Behavior</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#JTable_d.htm">Handling Locator Searches</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#JTable_e.htm">Table Headings</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#JTable_f.htm">Changing Column Definitions</A></P>
+<HR>
+<A NAME="JTable_8.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The Table Objects</A>: 4.1 <A HREF="#JTable_7.htm">Using a Table Object</A>: 
+<A NAME="JTable_8.htm_58532">
+ </A>
+Drawing Cells</H3>
+<PRE>MSG_TABLE_QUERY_DRAW, MSG_TABLE_REDRAW_TABLE, MSG_TABLE_REDRAW_ROW, MSG_TABLE_REDRAW_COLUMN, MSG_TABLE_REDRAW_CELL, MSG_TABLE_REDRAW_RANGE</PRE>
+<P>
+The <CODE>
+Table</CODE>
+ object does not actually store the contents of any of the cells. Instead, it helps the application manage and display its data. This means that whenever the <CODE>
+Table</CODE>
+ needs to draw a cell (e.g. when the <CODE>
+Table</CODE>
+ scrolls, or when a cell is covered and then exposed), it has to ask the application to draw it.</P>
+<P>
+Whenever the <CODE>
+Table</CODE>
+ object needs to draw a cell, it sends itself <CODE>
+MSG_TABLE_QUERY_DRAW</CODE>
+, once for each cell that needs to be redrawn. This message is designed to be subclassed; if you do not subclass it, the default handler will not do anything, and the cell will not be drawn.</P>
+<P>
+The message comes with two arguments:</P>
+<UL>
+<LI>
+A <CODE>
+TableCellLocation</CODE>
+ structure, specifying which cell needs to be redrawn.</LI>
+<LI>
+A <CODE>
+GStateHandle</CODE>
+. The GState's clipping region is set to the current cell's boundaries; the current position in the GState is the upper-left corner of the cell.</LI>
+</UL>
+<P>
+You should intercept this message and take whatever actions are necessary to draw the contents of the cell. Ordinarily, this means calling a routine such as <CODE>
+GrDrawTextAtCP()</CODE>
+. The default handler doesn't do anything, so you need not call the superclass. You should <EM>
+not</EM>
+ free the passed GState.</P>
+<P>
+For efficiency reasons, the <CODE>
+Table</CODE>
+ object actually uses the same GState for several cells that all need to be redrawn at once. For example, suppose the <CODE>
+Table</CODE>
+ needs to redraw cells (10, 0), (10, 1), (10, 2), and (10, 3). The table will take the following steps: </P>
+<OL>
+<LI>
+First, the <CODE>
+Table</CODE>
+ creates a GState.</LI>
+<LI>
+The <CODE>
+Table</CODE>
+ sets the GState's clipping region to the boundaries of cell (10, 0), and puts the current position in the upper-left corner of that cell. </LI>
+<LI>
+The <CODE>
+Table</CODE>
+ sends itself MSG_TABLE_QUERY_DRAW, specifying that cell (10, 0) needs to be redrawn.</LI>
+<LI>
+The application intercepts this message, drawing the contents of cell (10, 0) to the passed GState.</LI>
+<LI>
+The <CODE>
+Table</CODE>
+ changes the GState's clipping region to the boundaries of cell (10, 1), and moves the current position to the upper-left corner of that cell.</LI>
+<LI>
+The <CODE>
+Table</CODE>
+ sends itself MSG_TABLE_QUERY_DRAW, specifying that cell (10, 1) needs to be redrawn.</LI>
+<LI>
+The application intercepts this message, drawing the contents of cell (10, 1) to the passed GState.</LI>
+<LI>
+The <CODE>
+Table</CODE>
+ repeats steps 5-7 for cells (10, 2) and (10, 3).</LI>
+<LI>
+Finally, the <CODE>
+Table</CODE>
+ frees the GState.</LI>
+</OL>
+<P CLASS="figTitle">
+Code Display 5-2 Handling MSG_TABLE_QUERY_DRAW</P>
+<PRE>/* For simplicity, we previously defined an instance field to hold the optr of the 
+ * chunk array we are using. We will lock down that data using that instance 
+ * field. CoffeeTableClass is a subclass of TableClass. */</PRE>
+<PRE>@method CoffeeTableClass, MSG_TABLE_QUERY_DRAW
+{
+    char *data;
+    word cArrayIndex, size;</PRE>
+<PRE>    cArrayIndex = (location.TCL_row * TABLE_COLS) + location.TCL_column;</PRE>
+<PRE>    MemLock(OptrToHandle(pself-&gt;CTI_chunkArray));</PRE>
+<PRE>    data = ChunkArrayElementToPtr((pself-&gt;CTI_chunkArray),
+				cArrayIndex, &amp;size);</PRE>
+<PRE>    GrDrawTextAtCP(gstate, data, 0);</PRE>
+<PRE>    MemUnlock(OptrToHandle(pself-&gt;CTI_chunkArray);
+}</PRE>
+<P>
+<A NAME="JTable_8.htm_90904">
+ </A>
+The <CODE>
+Table</CODE>
+ automatically sends <CODE>
+MSG_TABLE_QUERY_DRAW</CODE>
+ when it knows a part of the <CODE>
+Table</CODE>
+ may be inaccurate, e.g. when the user has edited a cell. You can also instruct the <CODE>
+Table</CODE>
+ to redraw part or all of itself by sending it one of the <CODE>
+MSG_TABLE_REDRAW...</CODE>
+ messages. These messages instruct the <CODE>
+Table</CODE>
+ to send out appropriate <CODE>
+MSG_TABLE_QUERY_DRAW</CODE>
+ messages for one or more visible cells. There are five <CODE>
+MSG_TABLE_REDRAW...</CODE>
+ messages:</P>
+<DL>
+<DT>
+<CODE>
+MSG_TABLE_REDRAW_TABLE</DT><DD>
+</CODE>
+This instructs the <CODE>
+Table</CODE>
+ to redraw all cells visible on-screen.</DD>
+<DT>
+<CODE>
+MSG_TABLE_REDRAW_ROW</DT><DD>
+</CODE>
+This instructs the <CODE>
+Table</CODE>
+ to redraw a specified row, if it's on-screen.</DD>
+<DT>
+<CODE>
+MSG_TABLE_REDRAW_COLUMN</DT><DD>
+</CODE>
+This instructs the <CODE>
+Table</CODE>
+ to redraw those cells in a specified column which are on-screen.</DD>
+<DT>
+<CODE>
+MSG_TABLE_REDRAW_CELL</DT><DD>
+</CODE>
+This instructs the <CODE>
+Table</CODE>
+ to redraw a specified cell, if it's on-screen.</DD>
+<DT>
+<CODE>
+MSG_TABLE_REDRAW_RANGE</DT><DD>
+</CODE>
+This instructs the <CODE>
+Table</CODE>
+ to redraw the portion of a specified range of cells that is visible on-screen.</DD>
+
+</DL>
+<H6 CLASS="RefETitle">
+MSG_TABLE_QUERY_DRAW</H6>
+<PRE CLASS="syntax">void	MSG_TABLE_QUERY_DRAW(
+        TableCellLocation		location,
+        GStateHandle		gstate);</PRE>
+<P>
+The <CODE>
+Table</CODE>
+ object sends itself this message whenever a cell needs to be redrawn. The default handler does nothing; when you use a <CODE>
+Table</CODE>
+ object, you must subclass this message to draw the cell.</P>
+<P CLASS="refField">
+Source:	A <CODE>
+TableClass</CODE>
+ object.</P>
+<P CLASS="refField">
+Destination:	The <CODE>
+Table</CODE>
+ sends this message to itself.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+location</CODE>
+	The cell which needs to be redrawn.</P>
+<DL>
+<DT>
+<CODE>
+gstate</CODE>
+</DT><DD>A <CODE>
+GStateHandle</CODE>
+ specifying a GState you should draw to. The GState's clipping region is set to the cell boundaries; the current position (CP) is the upper-left corner of the cell.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing. (You should <EM>
+not</EM>
+ free the GState.)</P>
+<P CLASS="refField">
+Structures:	<CODE>
+TableCellLocation</CODE>
+ (see <A HREF="#JTable_9.htm_51177"> A TableCellLocation structure is used to specify a cell within the Table. It has the following definition:</A>
+).</P>
+<P CLASS="refField">
+Interception:	This message must be intercepted; your handler must draw the cell's contents. You need not call the superclass's handler (which does nothing).</P>
+
+
+<H6 CLASS="RefETitle">
+MSG_TABLE_REDRAW_TABLE</H6>
+<PRE CLASS="syntax">void	MSG_TABLE_REDRAW_TABLE();</PRE>
+<P>
+This message instructs the <CODE>
+Table</CODE>
+ to redraw the entire portion of the <CODE>
+Table</CODE>
+ visible on-screen (creating a GState, sending out appropriate <CODE>
+MSG_TABLE_QUERY_DRAW</CODE>
+ messages, etc.).</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any <CODE>
+TableClass</CODE>
+ object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H6 CLASS="RefETitle">
+MSG_TABLE_REDRAW_ROW</H6>
+<PRE CLASS="syntax">void	MSG_TABLE_REDRAW_ROW(
+        word	row);</PRE>
+<P>
+This message instructs the <CODE>
+Table</CODE>
+ to redraw a specified row, if it's visible on-screen (creating a GState, sending out appropriate <CODE>
+MSG_TABLE_QUERY_DRAW</CODE>
+ messages, etc.).</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any <CODE>
+TableClass</CODE>
+ object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+row</CODE>
+	The index of the row to redraw. (The first row has index 0.)<CODE>
+</CODE>
+</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H6 CLASS="RefETitle">
+MSG_TABLE_REDRAW_COLUMN</H6>
+<PRE CLASS="syntax">void	MSG_TABLE_REDRAW_COLUMN(
+        word	column);</PRE>
+<P>
+This message instructs the <CODE>
+Table</CODE>
+ to redraw those cells in a specified column that are visible on-screen (creating a GState, sending out appropriate <CODE>
+MSG_TABLE_QUERY_DRAW</CODE>
+ messages, etc.).</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any <CODE>
+TableClass</CODE>
+ object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+column</CODE>
+	The index of the column to redraw. (The first column has index 0.)</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H6 CLASS="RefETitle">
+MSG_TABLE_REDRAW_CELL</H6>
+<PRE CLASS="syntax">void	MSG_TABLE_REDRAW_CELL(
+        TableCellLocation		location);</PRE>
+<P>
+This message instructs the <CODE>
+Table</CODE>
+ to redraw a specified cell if it is visible on-screen (creating a GState, sending out appropriate <CODE>
+MSG_TABLE_QUERY_DRAW</CODE>
+ messages, etc.).</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any <CODE>
+TableClass</CODE>
+ object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+location</CODE>
+	The cell to redraw.<CODE>
+</CODE>
+</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Structures:	The cell is specified with a <CODE>
+TableCellLocation</CODE>
+ structure (described on <A HREF="#JTable_9.htm_51177"> A TableCellLocation structure is used to specify a cell within the Table. It has the following definition:</A>
+).<CODE>
+</CODE>
+</P>
+
+
+<H6 CLASS="RefETitle">
+MSG_TABLE_REDRAW_RANGE</H6>
+<PRE CLASS="syntax">void	MSG_TABLE_REDRAW_RANGE(
+        TableCellRange		cellRange);</PRE>
+<P>
+This message instructs the <CODE>
+Table</CODE>
+ to redraw a range of cells (creating a GState, sending out appropriate <CODE>
+MSG_TABLE_QUERY_DRAW</CODE>
+ messages, etc.).</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any <CODE>
+TableClass</CODE>
+ object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+cellRange</CODE>
+	The range of cells to redraw.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Structures:	The cell range to redraw is specified with a <CODE>
+TableCellRange</CODE>
+ structure (described on <A HREF="#JTable_9.htm_54602"> A TableCellRange structure is used to specify a range of cells. It has the following definition:</A>
+).<CODE>
+</CODE>
+</P>
+
+<HR>
+<A NAME="JTable_9.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The Table Objects</A>: 4.2 <A HREF="#JTable_7.htm">Using a Table Object</A>: 
+<A NAME="JTable_9.htm_63407">
+ </A>
+Selecting Cells</H3>
+<PRE>TableCellLocation, CellRange, MSG_TABLE_SELECT, MSG_TABLE_GET_CURRENT_SELECTION, MSG_TABLE_SET_CURRENT_SELECTION. MSG_TABLE_SET_ROW_RANGE_SELECTION</PRE>
+<P>
+You can configure under what circumstances a <CODE>
+Table</CODE>
+ object will select a cell by setting the <CODE>
+TableColumnFlags</CODE>
+ for the various columns in the table. The <CODE>
+TableColumnFlags</CODE>
+ determine what will constitute a &quot;selection event&quot;, and what cells will be selected. When a selection event occurs, the <CODE>
+Table</CODE>
+ object will send itself MSG_TABLE_SELECT. This message passes two arguments:</P>
+<UL>
+<LI>
+A <CODE>
+TableCellLocation</CODE>
+ structure (described below). This structure specifies which cell was selected. If more than one cell was selected, this will specify the cell where the selection action <EM>
+began</EM>
+.</LI>
+<LI>
+A <CODE>
+TableColumnFlags</CODE>
+ record. This record specifies two things. It specifies what pointer event or events caused the selection; and it specifies, in its TCF_TRIT field, which cells should be highlighted as selected.</LI>
+</UL>
+<P>
+<A NAME="JTable_9.htm_51177">
+ </A>
+A <CODE>
+TableCellLocation</CODE>
+ structure is used to specify a cell within the <CODE>
+Table</CODE>
+. It has the following definition:</P>
+<PRE>typedef struct {
+	word	TCL_row;
+	word	TCL_column;
+} TableCellLocation;</PRE>
+<DL>
+<DT>
+TCL<CODE>
+_row</CODE>
+</DT><DD>This is the cell's row. (The first row is row number zero, as always.)</DD>
+<DT>
+TCL<CODE>
+_column</CODE>
+</DT><DD>This is the cell's column. (The first column is column number zero, as always.)</DD>
+</DL>
+<P>
+The default handler for this message causes an area of the table to be highlighted. The area is determined by the TCF_TRIT field of the <CODE>
+TableColumnFlags</CODE>
+ record passed with the message. If you wish, you may intercept the message before it is handled by the default handler, and change the TCF_TRIT field in the passed <CODE>
+TableColumnFlags</CODE>
+; this will change which cells will be highlighted by the default handler. For example, if you change the TCF_TRIT field to contain TRIT_NONE, then the default handler will not highlight any rows.
+<IMG SRC="JTable_9_selectCell.gif">
+
+</P>
+<P>
+You can find out what cells, if any, are currently selected by sending MSG_TABLE_GET_CURRENT_SELECTION to the <CODE>
+Table</CODE>
+ object. This message takes one argument, a pointer to a <CODE>
+TableCellRange</CODE>
+ structure. The handler will fill in this structure with the currently selected range.</P>
+<P>
+<A NAME="JTable_9.htm_54602">
+ </A>
+A <CODE>
+TableCellRange</CODE>
+ structure is used to specify a range of cells. It has the following definition:</P>
+<PRE>typedef struct {
+	TableCellLocation				TCR_start;
+	TableCellLocation				TCR_end;
+} TableCellRange;</PRE>
+<DL>
+<DT>
+TCR<CODE>
+_start</CODE>
+</DT><DD>This <CODE>
+TableCellLocation</CODE>
+ specifies the first cell in the selected range. (The <CODE>
+TableCellLocation</CODE>
+ structure is described on <A HREF="#JTable_9.htm_51177"> A TableCellLocation structure is used to specify a cell within the Table. It has the following definition:</A>
+.)<CODE>
+</CODE>
+</DD>
+<DT>
+TCR<CODE>
+_end</CODE>
+</DT><DD>This <CODE>
+TableCellLocation</CODE>
+ specifies the last cell in the selected range. (Note that this cell may be higher up in the <CODE>
+Table</CODE>
+ then TCR<CODE>
+_start</CODE>
+; the same range is defined, whichever order TCR<CODE>
+_start</CODE>
+ and TCR<CODE>
+_end</CODE>
+ appear in.)</DD>
+</DL>
+<P>
+Note that a <CODE>
+TableCellRange</CODE>
+ forms a rectangle. You can change the selected cells at any time by sending <CODE>
+MSG_TABLE_SET_CURRENT_SELECTION</CODE>
+. This message is passed one argument, a <CODE>
+TableCellRange</CODE>
+ structure; that structure specifies what the current selection should be. The <CODE>
+Table</CODE>
+ object responds by changing the current selection but does not send a <CODE>
+MSG_TABLE_SELECT</CODE>
+. To cancel the current selection (and leave the <CODE>
+Table</CODE>
+ with nothing selected), send <CODE>
+MSG_TABLE_SET_CURRENT_SELECTION</CODE>
+, and put the constant T_NONE_SELECTED in the TCR<CODE>
+_start.</CODE>
+TCL<CODE>
+_column</CODE>
+ field of the passed <CODE>
+TableCellRange</CODE>
+ structure. (If you do this, the other fields of the <CODE>
+TableCellRange</CODE>
+ will be ignored.) Again, <CODE>
+MSG_TABLE_SELECT</CODE>
+ is not sent in this case.</P>
+
+<H6 CLASS="RefETitle">
+MSG_TABLE_SELECT</H6>
+<PRE CLASS="syntax">void	MSG_TABLE_SELECT(
+        TableCellLocation		location,
+        TableColumnFlags		tableColumnFlags);</PRE>
+<P>
+The <CODE>
+Table</CODE>
+ object sends this message to itself when the user selects one or more cells with a pointer object. (I.e. this message is generated through use of the pointer for Table selection, not when the selection changes through other means.) The <CODE>
+TableColumnFlags</CODE>
+ of the various columns determine whether a particular mouse action is interpreted as a selection. If it is, the <CODE>
+Table</CODE>
+ object sends itself this message, instructing itself to highlight the appropriate cells.</P>
+<P CLASS="refField">
+Source:	A <CODE>
+TableClass</CODE>
+ object.</P>
+<P CLASS="refField">
+Destination:	The <CODE>
+Table</CODE>
+ object sends this message to itself.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+location</CODE>
+	This is the selected cell; that is, the cell in which the pointer was when the column's selection criteria were met.</P>
+<DL>
+<DT>
+<CODE>
+tableColumnFlags</CODE>
+</DT><DD>This is a record of <CODE>
+TableColumnFlags</CODE>
+. The flags specify two things: They specify what criteria were used to determine that a selection had happened; and they specify (in the TCF_TRIT field) which cells should be highlighted.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Structures:	<CODE>
+TableCellLocation</CODE>
+ (see <A HREF="#JTable_9.htm_51177"> A TableCellLocation structure is used to specify a cell within the Table. It has the following definition:</A>
+) and <CODE>
+TableColumnFlags</CODE>
+ (see <A HREF="#JTable_5.htm_38024"> The TableColumnFlags record has the following flags:</A>
+).</P>
+<P CLASS="refField">
+Interception:	You may intercept this. If you intercept this message, you can change which cells will be highlighted by changing the <CODE>
+tableColumnFlags.</CODE>
+TCF_TRIT field.</P>
+
+
+<H6 CLASS="RefETitle">
+MSG_TABLE_GET_CURRENT_SELECTION</H6>
+<PRE CLASS="syntax">void	MSG_TABLE_GET_CURRENT_SELECTION(
+        TableCellRange *		cellRange);</PRE>
+<P>
+This message retrieves what cells are currently selected within a Table object</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any <CODE>
+TableClass</CODE>
+ object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+cellRange</CODE>
+	A pointer to a <CODE>
+TableCellRange</CODE>
+ structure.</P>
+<P CLASS="refField">
+Return:	<CODE>
+*cellRange</CODE>
+ will specify the first and last selected cells.</P>
+<P CLASS="refField">
+Structures:	<CODE>
+TableCellRange</CODE>
+ (described on <A HREF="#JTable_9.htm_54602"> A TableCellRange structure is used to specify a range of cells. It has the following definition:</A>
+).</P>
+
+
+<H6 CLASS="RefETitle">
+MSG_TABLE_SET_CURRENT_SELECTION</H6>
+<PRE CLASS="syntax">void	MSG_TABLE_SET_CURRENT_SELECTION(
+        TableCellRange		cellRange);</PRE>
+<P>
+This message changes what cells are currently selected within a Table object.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any <CODE>
+TableClass</CODE>
+ object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+cellRange</CODE>
+	A pointer to a <CODE>
+TableCellRange</CODE>
+ structure, specifying what cells should be selected. (If <CODE>
+cellRange.</CODE>
+TCR<CODE>
+_start.</CODE>
+TCL<CODE>
+_column</CODE>
+ = T_NONE_SELECTED, no cells will be selected.)</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Structures:	<CODE>
+TableCellRange</CODE>
+ (described on <A HREF="#JTable_9.htm_54602"> A TableCellRange structure is used to specify a range of cells. It has the following definition:</A>
+).</P>
+
+<HR>
+<A NAME="JTable_a.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The Table Objects</A>: 4.3 <A HREF="#JTable_7.htm">Using a Table Object</A>: 
+<A NAME="JTable_a.htm_33610">
+ </A>
+Editing Cells</H3>
+<PRE>TableEditCellTextParams, MSG_TABLE_START_EDIT_CELL_TEXT, MSG_TABLE_DONE_EDIT_CELL_TEXT, MSG_TABLE_STOP_CELL_EDIT</PRE>
+<P>
+The <CODE>
+Table</CODE>
+ objects make it easy for the user to edit cells. If the column has TCF_DOUBLE_SELECT enabled, a user can edit a cell in the column just by double-clicking on it. When the user does this, the <CODE>
+Table</CODE>
+ object will take the following steps:</P>
+<OL>
+<LI>
+First, it sends itself <CODE>
+MSG_TABLE_START_EDIT_CELL_TEXT</CODE>
+. The default handler causes the <CODE>
+Table</CODE>
+ object to create a <CODE>
+VisText</CODE>
+ under the TableContent which the user can enter text in.</LI>
+<LI FIXME_NumListOther>
+When the user has finished entering the text, and closes the <CODE>
+VisText (by pressing </CODE>
+ENTER<CODE>
+)</CODE>
+, the <CODE>
+Table</CODE>
+ object sends itself <CODE>
+MSG_TABLE_DONE_EDIT_CELL_TEXT</CODE>
+, passing along the text that the user entered in the <CODE>
+VisText</CODE>
+. The application should store the text wherever it stores the <CODE>
+Table</CODE>
+'s data.<BR>
+If the user finishes editing by clicking in another cell, a <CODE>
+MSG_TABLE_STOP_CELL_EDIT</CODE>
+ is generated and the edit is cancelled. (If your program does not wish to cancel the edit under these circumstances, then intercept the message.)</LI>
+<LI FIXME_NumListOther>
+Finally, the <CODE>
+Table</CODE>
+ sends itself a <CODE>
+MSG_TABLE_QUERY_DRAW</CODE>
+ for the cell which was edited. The application should intercept this message and redraw the cell normally.</LI>
+</OL>
+<P>
+<A NAME="JTable_a.htm_83564">
+ </A>
+Both <CODE>
+MSG_TABLE_START_EDIT_CELL_TEXT</CODE>
+ and <CODE>
+MSG_TABLE_DONE_EDIT_CELL_TEXT</CODE>
+ use a special structure, the <CODE>
+TableEditCellTextParams</CODE>
+ structure; the structure's fields have slightly different meanings for each message. This structure has the following definition:</P>
+<PRE>typedef struct {
+	TableCellRange			TECT_cells;
+	MemHandle			TECT_text;
+	word			TECT_length;
+} TableEditCellTextParams;</PRE>
+<DL>
+<DT>
+TECT<CODE>
+_cells</CODE>
+</DT><DD>This is a <CODE>
+TableCellRange</CODE>
+ structure (described on <A HREF="#JTable_9.htm_54602"> A TableCellRange structure is used to specify a range of cells. It has the following definition:</A>
+), specifying what cells have been selected for editing. If a single cell has been selected for editing, TCR<CODE>
+_start</CODE>
+ will be the same as TCR<CODE>
+_end</CODE>
+.</DD>
+<DT>
+TECT<CODE>
+_text</CODE>
+</DT><DD>This is the handle of a global memory block, containing the text in the cell.</DD>
+<DT>
+TECT<CODE>
+_length</CODE>
+</DT><DD>This is the length of the string in TECT<CODE>
+_text</CODE>
+, or zero if the string is null-terminated.</DD>
+</DL>
+<P>
+<CODE>
+MSG_TABLE_START_EDIT_CELL_TEXT</CODE>
+ creates a VisText object (within the TableContent and over the cell to be edited) to allow the user to edit the cell's text. This message passes a set of <CODE>
+TableEditCellTextParams</CODE>
+ containing the cell range being edited (TECT<CODE>
+_cells</CODE>
+) and the initial text to display to the user (if any) in TECT<CODE>
+_text</CODE>
+ and TECT<CODE>
+_length</CODE>
+. This text object, which may be referenced via <CODE>
+TI_textObj</CODE>
+, can persist between edits. Thus, if you change its instance data, be aware that these changes may or may not linger in future edits. You may wish to update any changes in your <CODE>
+MSG_TABLE_START_EDIT_CELL_TEXT</CODE>
+ handler.</P>
+<P>
+The default handler clears both TECT<CODE>
+_text</CODE>
+ and TECT<CODE>
+_length</CODE>
+. Your application may subclass the message, and fill in these fields with default text for the <CODE>
+VisText</CODE>
+ (e.g., you may want to retrieve the text currently in the specified cell and display that to be edited). If TECT<CODE>
+_text</CODE>
+ contains a null handle, the <CODE>
+VisText</CODE>
+ will start out blank.
+<IMG SRC="JTable_a_editCell.gif">
+
+</P>
+<P>
+To provide this default text, allocate a global memory block, copy the string into the beginning of the block, and put the block's handle in TECT<CODE>
+_text</CODE>
+. (You should not store anything else in this block, because the block will be freed by the handler for MSG_TABLE_DONE_EDIT_CELL_TEXT.) If a valid handle was not passed in TECT<CODE>
+_text</CODE>
+, it allocates a global memory block for the <CODE>
+VisText</CODE>
+ to write to; otherwise, the <CODE>
+VisText</CODE>
+ will simply write to the block specified in TECT<CODE>
+_text</CODE>
+ (overwriting the original text).</P>
+<P CLASS="figTitle">
+Code Display 5-3 Handling MSG_TABLE_START_EDIT_CELL_TEXT</P>
+<PRE>@method CoffeeTableClass, MSG_TABLE_START_EDIT_CELL_TEXT
+{
+    char *cellData, *textPtr;
+    word cArrayIndex, size;</PRE>
+<PRE>    cArrayIndex = (params.TECT_cells.TCR_start.TCL_row * TABLE_COLS) +
+		params.TECT_cells.TCR_start.TCL_column;</PRE>
+<PRE>    /* The superclass will free this block that we allocate here. */</PRE>
+<PRE>    params.TECT_text = MemAlloc(CELL_DATA_LENGTH, HF_SWAPABLE, HAF_LOCK);
+    textPtr = MemDeref(params.TECT_text);</PRE>
+<PRE>    /* Retrieve the current data from the cell and stuff it in the memory block. */</PRE>
+<PRE>    pself = ObjDerefVis(oself);
+    MemLock(OptrToHandle(pself-&gt;CTI_chunkArray);</PRE>
+<PRE>    cellData = ChunkArrayElementToPtr((pself-&gt;CTI_chunkArray),
+				cArrayIndex, &amp;size);
+    strcpy(textPtr, cellData);</PRE>
+<PRE>    MemUnlock(OptrToHandle(pself-&gt;CTI_chunkArray));</PRE>
+<PRE>    params.TECT_length = 0;				/* Zero indicates null-termination. */</PRE>
+<PRE>    @callsuper();
+}</PRE>
+<P>
+When the user has finished entering text, the <CODE>
+VisText</CODE>
+ object sends the Table object MSG_TABLE_DONE_EDIT_CELL_TEXT. This message takes one argument, a <CODE>
+TableEditCellTextParams</CODE>
+ structure. The TECT<CODE>
+_text</CODE>
+ field will contain the handle of a global memory block, containing the text the user has entered.The application should intercept the message, so it can store the new text; afterwards, it should call the default handler, which will free the memory block specified by TECT<CODE>
+_text</CODE>
+ and perform other bookkeeping chores. The Table object will automatically send an appropriate <CODE>
+MSG_TABLE_QUERY_DRAW</CODE>
+, so the cell will be redrawn with the new contents.</P>
+<P>
+Note that the Table object supports allowing the user to edit several cells at once. If you choose to allow this, you must decide what the functionality is; that is, in your handler for MSG_TABLE_START_EDIT_CELL_TEXT, you must decide what cell's text to display in the <CODE>
+VisText</CODE>
+ (e.g. the first cell's text, or a composite of all the selected cells's text); and in your handler for MSG_TABLE_DONE_EDIT_CELL_TEXT, you must decide where and how to store the entered text (e.g. whether to overwrite all the edited cells with the same text, divide the entered text amongst the cells, etc.).</P>
+<P CLASS="figTitle">
+Code Display 5-4 Handling MSG_TABLE_DONE_EDIT_CELL_TEXT</P>
+<PRE>@method CoffeeTableClass, MSG_TABLE_DONE_EDIT_CELL_TEXT
+{
+    char *cellData, *textPtr;
+    word cArrayIndex, size;</PRE>
+<PRE>    cArrayIndex = (params.TECT_cells.TCR_start.TCL_row * TABLE_COLS) +
+		params.TECT_cells.TCR_start.TCL_column;</PRE>
+<PRE>    textPtr = MemLock(params.TECT_text);</PRE>
+<PRE>    /* Make sure we're null terminated ... */</PRE>
+<PRE>    textPtr[CELL_DATA_LENGTH -1]; = (char)0;</PRE>
+<PRE>    /* Lock down the cell and copy the string to it. */</PRE>
+<PRE>    MemLock(OptrToHandle(pself-&gt;CTI_chunkArray));</PRE>
+<PRE>    cellData = ChunkArrayElementToPtr((pself-&gt;CTI_chunkArray),
+		cArrayIndex, &amp;size);</PRE>
+<PRE>    strcpy(cellData, textPtr);
+    MemUnlock(OptrToHandle(pself-&gt;CTI_chunkArray));</PRE>
+<PRE>    @callsuper();
+}</PRE>
+
+<H6 CLASS="RefETitle">
+MSG_TABLE_START_EDIT_CELL_TEXT</H6>
+<PRE CLASS="syntax">void	MSG_TABLE_START_EDIT_CELL_TEXT(
+        TableEditCellTextParams			params);</PRE>
+<P>
+The <CODE>
+Table</CODE>
+ object sends itself this message when the user starts editing a cell. The default handler brings up a <CODE>
+VisText</CODE>
+ for the user to enter text. You should intercept this message, so you can look up and provide the cell's current contents; that way, the contents will be put in the <CODE>
+VisText</CODE>
+ for the user to edit.</P>
+<P CLASS="refField">
+Source:	Any <CODE>
+Table</CODE>
+ object.</P>
+<P CLASS="refField">
+Destination:	The <CODE>
+Table</CODE>
+ sends this message to itself.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+params.</CODE>
+TECT<CODE>
+_cells<BR>
+</CODE>
+This field specifies the cell or cells the user is editing.</P>
+<DL>
+<DT>
+<CODE>
+params.</CODE>
+TECT<CODE>
+_text</CODE>
+ </DT><DD>This field contains the handle of a global memory block, containing the text to be displayed in the <CODE>
+VisText</CODE>
+ when it is brought up. When this message is sent, <CODE>
+params.</CODE>
+TECT<CODE>
+_text</CODE>
+ contains a null handle; your subclass's handler may allocate a global memory block, copy the text into that block, and write the handle here. (Note that the <CODE>
+VisText</CODE>
+ will write to the block you specify, so it should not contain any other data.)</DD>
+<DT>
+<CODE>
+params.</CODE>
+TECT<CODE>
+_length</DT><DD>
+</CODE>
+This is the length (in bytes) of the string in the block specified by <CODE>
+params.</CODE>
+TECT<CODE>
+_text</CODE>
+. If this field is zero, the string is null-terminated.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing. (If <CODE>
+params.</CODE>
+TECT<CODE>
+_text</CODE>
+ contained a null handle, the default handler will allocate a block.)</P>
+<P CLASS="refField">
+Structures:	<CODE>
+TableEditCellTextParams</CODE>
+ (see <A HREF="#JTable_a.htm_83564"> Both MSG_TABLE_START_EDIT_CELL_TEXT and MSG_TABLE_DONE_EDIT_CELL_TEXT use a special structure, the TableEditCellTextParams structure; the structure's fields have slightly different meanings for each message. This structure has the following defi</A>
+).</P>
+<P CLASS="refField">
+Interception:	You should intercept this message to provide the text for the <CODE>
+VisText</CODE>
+ to present for editing (which will usually be the current contents of the cell being edited). After this, you should call the default handler with <CODE>
+@callsuper</CODE>
+, so the <CODE>
+VisText</CODE>
+ can be created.</P>
+<P CLASS="refField">
+Warnings:	If you put a memory handle in <CODE>
+params.</CODE>
+TECT<CODE>
+_text</CODE>
+, that block will be written to by the <CODE>
+VisText</CODE>
+, and freed by the handler for MSG_TABLE_DONE_EDIT_CELL_TEXT; so make sure it doesn't contain any other data.</P>
+
+
+<H6 CLASS="RefETitle">
+MSG_TABLE_DONE_EDIT_CELL_TEXT</H6>
+<PRE CLASS="syntax">void	MSG_TABLE_DONE_EDIT_CELL_TEXT(
+        TableEditCellTextParams				params);</PRE>
+<P>
+The <CODE>
+VisText</CODE>
+ object sends this message to the Table object after the user has finished entering data. The application should intercept this message to copy data into its storage location; you should also make sure to call the default handler, which will remove the <CODE>
+VisText</CODE>
+ and perform other bookkeeping chores.</P>
+<P CLASS="refField">
+Source:	This message is sent by a <CODE>
+VisText</CODE>
+ object used by the <CODE>
+Table</CODE>
+ for text editing.</P>
+<P CLASS="refField">
+Destination:	The <CODE>
+VisText</CODE>
+ sends this message to its parent <CODE>
+Table</CODE>
+.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+params.</CODE>
+TECT<CODE>
+_cells<BR>
+</CODE>
+This field specifies the cell or cells the user has edited.</P>
+<DL>
+<DT>
+<CODE>
+params.</CODE>
+TECT<CODE>
+_text</CODE>
+ </DT><DD>This field contains the handle of a global memory block, containing the text the user entered in the <CODE>
+VisText</CODE>
+. The default handler will free this block.</DD>
+<DT>
+<CODE>
+params.</CODE>
+TECT<CODE>
+_length</DT><DD>
+</CODE>
+This is the length (in bytes) of the string in the block specified by <CODE>
+params.</CODE>
+TECT<CODE>
+_text</CODE>
+. If this field is zero, the string is null-terminated.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing. (The default handler will free the block specified by <CODE>
+params.</CODE>
+TECT<CODE>
+_text</CODE>
+.)</P>
+<P CLASS="refField">
+Structures:	<CODE>
+TableEditCellTextParams</CODE>
+ (see <A HREF="#JTable_a.htm_83564"> Both MSG_TABLE_START_EDIT_CELL_TEXT and MSG_TABLE_DONE_EDIT_CELL_TEXT use a special structure, the TableEditCellTextParams structure; the structure's fields have slightly different meanings for each message. This structure has the following defi</A>
+).</P>
+<P CLASS="refField">
+Interception:	You should intercept this message, so you can copy the new data into your application's storage. Afterwards, you should make sure to call the default handler with <CODE>
+@callsuper</CODE>
+.</P>
+
+
+<H6 CLASS="RefETitle">
+MSG_TABLE_STOP_EDIT_CELL_TEXT</H6>
+<PRE CLASS="syntax">void	MSG_TABLE_STOP_EDIT_CELL_TEXT();</PRE>
+<P>
+The <CODE>
+VisText</CODE>
+ object sends this message to the Table if the user clicks outside the cell while editing data. This cancels the edit: the Table returns to its normal mode and the user's edits are discarded.</P>
+<P CLASS="refField">
+Source:	This message is sent by a <CODE>
+VisText</CODE>
+ object used by the <CODE>
+Table</CODE>
+ for text editing.</P>
+<P CLASS="refField">
+Destination:	The <CODE>
+VisText</CODE>
+ sends this message to its parent <CODE>
+Table</CODE>
+.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing. </P>
+<P CLASS="refField">
+Interception:	If your program wants to treat a tap outside the edited cell as a signal that the edit is finished, not cancelled, then get the (abandoned) text that the user was editing from the VisText child of the Table. The chunk handle of this VisText child is stored in TI_textObj.  You can build an optr to the VisText by using:</P>
+<PRE>textObj = ConstructOptr(OptrToHandle(@YourTable), </PRE>
+<PRE>                            pself-&gt;TI_textObj);</PRE>
+<P>
+	To retrieve the text, use:</P>
+<PRE>@call textObj::MSG_VIS_TEXT_GET_ALL_PTR(buffer);</PRE>
+<P>
+	where &quot;buffer&quot; has been declared as &quot;char buffer[]&quot;.</P>
+<P>
+	Once you've retrieved the text, the remainder of your method should just save away this data in whatever data structure you've built to hold your table's data -- just like in the method for <CODE>
+MSG_TABLE_DONE_EDIT_CELL_TEXT</CODE>
+.</P>
+
+<HR>
+<A NAME="JTable_b.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The Table Objects</A>: 4.4 <A HREF="#JTable_7.htm">Using a Table Object</A>: 
+<A NAME="JTable_b.htm_58099">
+ </A>
+Dragging and Dropping</H3>
+<PRE>TableDragDropCompleteParams, TableDragDropCell, TableDragDropFlags, MSG_TABLE_DRAG_DROP_COMPLETE</PRE>
+<P>
+The <CODE>
+Table</CODE>
+ object supports the standard GEOS drag-drop functionality. It allows the user to select one or more cells, then drag their contents to other cells in the <CODE>
+Table</CODE>
+. However, the <CODE>
+Table</CODE>
+ object does not actually keep track of the contents of the cells. Instead, it detects which cells the user dragged and where the user dropped them, and it notifies the application with <CODE>
+MSG_TABLE_DRAG_DROP_COMPLETE</CODE>
+. The application should intercept this message and use this information to copy data to its appropriate places in its storage.</P>
+<P>
+The <CODE>
+Table</CODE>
+ is put in drag-and-drop mode when the <CODE>
+TableFlags</CODE>
+ bit TF_INTERNAL_DRAG_DROP is set (for example through the sending of <CODE>
+MSG_TABLE_SET_FLAGS</CODE>
+). If the Table's column flags contain TCF_HOLD_SELECT, holding for the specified period of time to initiate a &quot;hold&quot; will also set the TF_INTERNAL_DRAG_DROP flag. When the <CODE>
+Table</CODE>
+ is in drag-and-drop mode, the user can copy a cell's contents to another cell by clicking on one cell, dragging the pointer to the other cell, and releasing. If the <CODE>
+TableFlags</CODE>
+ bit TF_EXIT_DRAG_DROP_UPON_COMPLETION is set, the <CODE>
+Table</CODE>
+ will automatically clear TF_INTERNAL_DRAG_DROP after every drag-and-drop.
+<IMG SRC="JTable_b_dragDrop.gif">
+
+</P>
+<P>
+<A NAME="JTable_b.htm_43447">
+ </A>
+The <CODE>
+Table</CODE>
+ object sends <CODE>
+MSG_TABLE_DRAG_DROP_COMPLETE</CODE>
+ when the user finishes a drag-and-drop operation. This message passes one argument, a <CODE>
+TableDragDropCompleteParams</CODE>
+ structure. This structure has the following definition:</P>
+<PRE>typedef struct {
+	TableDragDropCell				TDDCP_dragDrop;
+	TableDragDropFlags				TDDCP_flags;
+} TableDragDropCompleteParams;</PRE>
+<DL>
+<DT>
+TDDCP<CODE>
+_dragDrop</DT><DD>
+</CODE>
+This structure specifies which cells are being copied, and where they will be copied to. The <CODE>
+TableDragDropCell</CODE>
+ structure is described below.</DD>
+<DT>
+TDDCP<CODE>
+_flags </CODE>
+</DT><DD>This field is a record of <CODE>
+TableDragDropFlags</CODE>
+ flags, described below.</DD>
+</DL>
+<P>
+The cells being dragged, and the location to which they are being dropped, are specified with a <CODE>
+TableDragDropCell</CODE>
+ structure. This structure has the following definition:</P>
+<PRE>typedef struct {
+	TableCellRange			TDDC_from;
+	TableCellRange			TDDC_to;
+} TableDragDropCell;</PRE>
+<DL>
+<DT>
+TDDC<CODE>
+_from</CODE>
+</DT><DD>The cell or cells being dragged.</DD>
+<DT>
+TDDC<CODE>
+_to</CODE>
+</DT><DD>The cell or cells on which TDDC<CODE>
+_from</CODE>
+ is being dropped.</DD>
+</DL>
+<P>
+When <CODE>
+MSG_TABLE_DRAG_DROP_COMPLETE</CODE>
+ is sent, the TDDCP<CODE>
+_flags</CODE>
+ field of the passed <CODE>
+TableDragDropCompleteParams</CODE>
+ is blank. If you intercept this message, you can change this field, setting any <CODE>
+TableDragDropFlags</CODE>
+ bits in this field. Currently, only one flag is defined:</P>
+<DL>
+<DT>
+TDDF_DONT_RESCAN_CELLS</DT><DD>
+If this flag is clear, the <CODE>
+Table</CODE>
+ will redraw all visible cells after a drag-drop operation. If it is set, it will not redraw any cells. (You may wish to set this flag, then force redrawing of a few affected cells with an appropriate <CODE>
+MSG_TABLE_REDRAW...</CODE>
+ message; these messages are described on <A HREF="#JTable_8.htm_90904"> The Table automatically sends MSG_TABLE_QUERY_DRAW when it knows a part of the Table may be inaccurate, e.g. when the user has edited a cell. You can also instruct the Table to redraw part or all of itself by sending it one of the MSG_TABLE_REDR</A>
+.)</DD>
+</DL>
+<P>
+You should intercept the message, and perform any appropriate data operations, e.g. copying the data from the &quot;dragged&quot; cell to the location where it was &quot;dropped&quot;.</P>
+<P>
+If the TF_EXIT_DRAG_DROP_UPON_COMPLETION flag is set, drag and drop mode will be exited upon receipt of <CODE>
+MSG_TABLE_DRAG_DROP_COMPLETE</CODE>
+. Otherwise, you will need to determine when you wish to exit drag and drop mode and clear the TF_INTERNAL_DRAG_DROP flag manually by sending the Table <CODE>
+MSG_TABLE_SET_FLAGS</CODE>
+. (You might wish to do this if you want to drag and drop to multiple locations, for example.) Because you are modifying an internal flag in this process, this approach is highly discouraged.</P>
+<P CLASS="figTitle">
+Code Display 5-5 Implementing Drag and Drop Mode</P>
+<PRE>/* This message is sent to the Table whenever it completes a drag and drop 
+ * operation (by releasing the pen). In your handler, determine the starting and 
+ * ending point of the operation and copy the data from one location to the other. 
+ */</PRE>
+<PRE>@method CoffeeTableClass, MSG_TABLE_DRAG_DROP_COMPLETE
+{
+    char *fromData, *toData;
+    word fromIndex, toIndex, size;</PRE>
+<PRE>    /* We are storing our data in a chunk array (not shown). We obtain a 
+     * linear index into this data based on the cell row and column. */</PRE>
+<PRE>    fromIndex = 
+	(cellFromTo.TDDCP_dragDrop.TDDC_from.TCR_start.TCL_row * TABLE_COLS) +
+	cellFromTo.TDDCP_dragDrop.TDDC_from.TCR_start.TCL_column;</PRE>
+<PRE>    toIndex = 
+	(cellFromTo.TDDCP_dragDrop.TDDC_to.TCR_start.TCL_row * TABLE_COLS) +
+	cellFromTo.TDDCP_dragDrop.TDDC_to.TCR_start.TCL_column;</PRE>
+<PRE>    /* Check if this drag and drop is from within the same Table. */</PRE>
+<PRE>    if (pself-&gt;TI_tableFlags &amp; TF_INTERNAL_DRAG_DROP) {</PRE>
+<PRE>	MemLock(OptrToHandle(pself-&gt;CTI_chunkArray);</PRE>
+<PRE>	fromData = ChunkArrayElementToPtr((pself-&gt;CTI_chunkArray),
+					fromIndex, &amp;size);
+	toData = ChunkArrayElementToPtr((pself-&gt;CTI_chunkArray),
+					toIndex, &amp;Size);</PRE>
+<PRE>    	/* Copy the actual data. *
+	strcpy(toData, fromData);</PRE>
+<PRE>	MemUnlock(OptrToHandle(pself-&gt;CTI_chunkArray));
+    }</PRE>
+<PRE>    /* Call the superclass. This will also exit the Table from drag and drop mode 
+     * if the TF_EXIT_DRAG_DROP_UPON_COMPLETION flag is set. */</PRE>
+<PRE>    @callsuper();
+}</PRE>
+
+<H6 CLASS="RefETitle">
+MSG_TABLE_DRAG_DROP_COMPLETE</H6>
+<PRE CLASS="syntax">void	MSG_TABLE_DRAG_DROP_COMPLETE(
+        TableDragDropCompleteParams					cellFromTo);</PRE>
+<P>
+The <CODE>
+Table</CODE>
+ object sends this message to itself when the user has finished performing a drag-and-drop operation. Application writers who wish to perform operations on the data being dragged and dropped must intercept this message.</P>
+<P CLASS="refField">
+Source:	A <CODE>
+TableClass</CODE>
+ object.</P>
+<P CLASS="refField">
+Destination:	The <CODE>
+Table</CODE>
+ object sends this message to itself.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+cellFromTo.</CODE>
+TDDCP<CODE>
+_dragDrop<BR>
+</CODE>
+This field specifies what cells are being dragged, and where they are being dropped.</P>
+<DL>
+<DT>
+<CODE>
+cellFromTo.TDDCP_flags</DT><DD>
+</CODE>
+This field is initially blank. If you intercept the message, you can change the flags before calling the default handler.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Structures:	The arguments are passed in a <CODE>
+TableDragDropCompleteParams</CODE>
+ structure (described on <A HREF="#JTable_b.htm_43447"> The Table object sends MSG_TABLE_DRAG_DROP_COMPLETE when the user finishes a drag-and-drop operation. This message passes one argument, a TableDragDropCompleteParams structure. This structure has the following definition:</A>
+).</P>
+<P CLASS="refField">
+Interception:	Must intercept to perform data operations necessary to implement the drag-and-drop. Afterwards, make sure to call the default handler with <CODE>
+@callsuper</CODE>
+. The default handler will cause the entire visible portion of the <CODE>
+Table</CODE>
+ to be redrawn, unless you have set the TDDF_DONT_RESCAN_CELLS bit in <CODE>
+cellFromTo.TDDCP_flags</CODE>
+.</P>
+
+<HR>
+<A NAME="JTable_c.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The Table Objects</A>: 4.5 <A HREF="#JTable_7.htm">Using a Table Object</A>: 
+<A NAME="JTable_c.htm_13991">
+ </A>
+Custom Scrolling Behavior</H3>
+<PRE>MSG_TABLE_SCROLL, MSG_TABLE_SCROLL_TO_ROW, MSG_TABLE_SCROLL_SINGLE_UP, MSG_TABLE_SCROLL_SINGLE_DOWN</PRE>
+<P>
+Auto-scrolling (enabled by adding the TF_ENABLE_AUTO_SCROLLING to TI_<CODE>
+tableFlags</CODE>
+) allows the user to scroll within a Table by clicking within a Table and dragging above or below the current Table bounds. The Table will scroll in the direction that the pen was dragged. Auto-scrolling does not provide any UI to scroll the Table, however. If you want scroll buttons, for example, you will need to take the following steps:</P>
+<UL>
+<LI>
+Make sure you've declared a <CODE>
+TableViewClass</CODE>
+ object. Set its <CODE>
+TVI_mainTable</CODE>
+ field to the Table you wish to scroll.</LI>
+<LI>
+Mark the Table that you want scrolling to occur with the TF_MAIN_TABLE flag.</LI>
+</UL>
+<P>
+<CODE>
+MSG_TABLE_SCROLL</CODE>
+ is a generic scrolling message that implements a particular scroll operation (passed in the message's <CODE>
+TableScrollType</CODE>
+ parameter). Possible Table scroll types are:</P>
+<DL>
+<DT>
+	TST_SCROLL_PAGE_UP</DT><DD>
+TST_SCROLL_PAGE_DOWN<BR>
+TST_SCROLL_UP	<BR>
+TST_SCROLL_DOWN<BR>
+TST_SCROLL_TOP<BR>
+TST_SCROLL_DOWN</DD>
+</DL>
+<P>
+&nbsp;</P>
+<P>
+TST_SCROLL_UP scrolls the Table up one row. Similarly, TST_SCROLL_DOWN scrolls the Table down one row.</P>
+<P>
+You may send <CODE>
+MSG_TABLE_SCROLL_TO_ROW</CODE>
+ if you want the Table to scroll to a particular (zero-based) row. The Table will scroll so as to make that row the first visible row, if possible. <CODE>
+MSG_TABLE_SCROLL_SINGLE_UP</CODE>
+ scrolls the Table up one row. Similarly, <CODE>
+MSG_TABLE_SCROLL_SINGLE_DOWN</CODE>
+ scrolls the Table down one row.</P>
+<HR>
+<A NAME="JTable_d.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The Table Objects</A>: 4.6 <A HREF="#JTable_7.htm">Using a Table Object</A>: 
+<A NAME="JTable_d.htm_14433">
+ </A>
+Handling Locator Searches</H3>
+<PRE>MSG_TABLE_CHAR_LOCATE, MSG_TABLE_STRING_LOCATE</PRE>
+<P>
+The Table object may wish to respond to searches on its data. For this purpose, the Table object is designed to interact with a <CODE>
+LocatorClass</CODE>
+ object; the Locator object is a UI object that the user uses to initiate searches on the Table. The Locator object implements this search by sending the Table object one of two messages. You must intercept these messages to provide searching behavior. <CODE>
+TableClass</CODE>
+ provides no default searching behavior.</P>
+<P>
+The Locator object is discussed in detail in <A HREF="#JTable_13.htm_60877"> LocatorClass</A>
+; however, some background on how the Locator works is illustrative to providing the Table`s searching behavior.</P>
+<P>
+The Locator object can be in one of two modes: <EM>
+index</EM>
+ mode or <EM>
+text</EM>
+ <EM>
+search</EM>
+ mode. The Locator object will appear and act differently depending on which mode it is in.</P>
+<P>
+When the Locator object is in index mode, it takes the form of an action bar, shown below.
+<IMG SRC="JTable_d_indexLocator.gif">
+
+</P>
+<P>
+Tapping on one of the Locator's dyad buttons (`AB', `EF', etc.) will send the Table object <CODE>
+MSG_TABLE_CHAR_LOCATE</CODE>
+, passing it the letter to search. Repeatedly clicking on a dyad button will cycle through the two letters to perform the search. For example, clicking once on the `AB' dyad button will send the Table <CODE>
+MSG_TABLE_CHAR_LOCATE</CODE>
+ with the character `A.' Clicking again on that button will send the Table <CODE>
+MSG_TABLE_CHAR_LOCATE </CODE>
+with the character `B.' Clicking yet again on that button will send the Table <CODE>
+MSG_TABLE_CHAR_LOCATE</CODE>
+ with the character `C.'</P>
+<P>
+If you have a Locator linked to your Table, you will want to intercept <CODE>
+MSG_TABLE_CHAR_LOCATE</CODE>
+ to make sure that you can implement searching behavior in index mode.</P>
+<P>
+When the Locator object is in text search mode, the action bar &quot;morphs&quot; into a text search entry field shown below.
+<IMG SRC="JTable_d_searchLocator.gif">
+
+</P>
+<P>
+Entering text into the text search field of the Locator will send the linked Table object <CODE>
+MSG_TABLE_STRING_LOCATE</CODE>
+ after each keystroke, passing it the current contents of the text entry field. You will want to intercept this message to provide your searching method for when the Locator object is in text mode.</P>
+<P>
+You may find it convenient to write a generic searching routine that your message handlers for both <CODE>
+MSG_TABLE_CHAR_LOCATE</CODE>
+ and <CODE>
+MSG_TABLE_STRING_LOCATE</CODE>
+ may call. This searching routine will likely want to perform a case-insensitive search on your Table. You may want to use a routine such as <CODE>
+LocalCmpStringsNoCase()</CODE>
+ for this purpose. Note that you must still provide separate message handlers for each of these messages even if you provide a generic searching routine.</P>
+<P CLASS="figTitle">
+Code Display 5-6 Implementing a Search</P>
+<PRE>/* This code implements a single character search initiated by a Locator object. */</PRE>
+<PRE>@method MyTableClass, MSG_TABLE_CHAR_LOCATE
+{
+    char *data;			/* Pointer to the table data array. */
+    word index =0;			/* A linear index into the Table data array. */</PRE>
+<PRE>    /* We'll want to send MSG_TABLE_SET_CURRENT_SELECTION, so we'll want
+     * to pass a TableCellRange.
+     */
+    TableCellRange	selection;</PRE>
+<PRE>    Boolean searchResult;			/* Reports the success or failure of the search. */</PRE>
+<PRE>    /* We initialize the selection to start searching from the beginning of the
+     * Table. */
+    selection.TCR_start.TCL_row					= 0;
+    selection.TCR_start.TCL_column					= 0;
+    selection.TCR_end.TCL_row					= 0;
+    selection.TCR_end.TCL_column					= 0;</PRE>
+<PRE>    /* Lock down our data block. */
+    MemLock(OptrToHandle(@cellDataArray));</PRE>
+<PRE>    /* Perform a case-insensitive search on the data in the array. We do this by 
+     * searching linearly, multiplying by the total number of columns in the 
+     * Table, so that we only search the first column. (We could have also 
+     * performed our search cell by cell in a linear fashion; in that case we 
+     * would not have multiplied the index by TABLE_COLS in the `step' section of 
+     * the while statement.) The data in this case is assumed to be stored in a      * linear chunk array. */</PRE>
+<PRE>    do {
+	data = ChunkArrayElementToPtr(@cellDataArray, index, 1);
+    } while(
+	(LocalCmpStringsNoCase(data, searchText, 1)) &amp;&amp;
+	((++index * TABLE_COLS) &lt; (TABLE_COLS * TABLEROWS)));</PRE>
+<PRE>    /* We've finished searching; we can free the data block. */</PRE>
+<PRE>    MemUnlock(OptrToHandle(@cellDataArray));</PRE>
+<PRE>    /* Determine if search found a match. */
+    if (index &gt;= (TABLE_COLS * TABLE_ROWS))
+    {
+	searchResult = TRUE;			/* Indicates no match was found. */
+    }
+    else
+    {
+	/* If successful, set selection to &quot;current&quot; index cell. */
+	selection-&gt;TCR_start.TCL_row 				= index / TABLE_COLS;
+	selection-&gt;TCR_start.TCL_column 				= index % TABLE_COLS;
+	selection-&gt;TCR_end.TCL_row				= selection-&gt;TCR_start.TCL_row;
+	selection-&gt;TCR_end.TCL_column				= selection-&gt;TCR_start.TCL_column;</PRE>
+<PRE>	@call self::MSG_TABLE_SET_CURRENT_SELECTION(selection);</PRE>
+<PRE>	searchResult = FALSE;			/* Indicates that we found a match. */
+    }</PRE>
+<PRE>    return(searchResult);				/* We don't call the superclass. Default behavior 
+				 * is to return TRUE indicating no matches were
+				 * found. */
+}</PRE>
+
+<H6 CLASS="RefETitle">
+MSG_TABLE_CHAR_LOCATE</H6>
+<PRE CLASS="syntax">Boolean	MSG_TABLE_CHAR_LOCATE(
+        char		searchChar);</PRE>
+<P>
+This message is sent to the <CODE>
+TableClass</CODE>
+ object by the Locator object instructs a Locator object (in index mode) to locate the entered character within the <CODE>
+TableClass</CODE>
+ object that is in the Locator's LI_<CODE>
+destination</CODE>
+ field. It does this by sending the Table object <CODE>
+MSG_TABLE_CHAR_LOCATE</CODE>
+, passing it the search character. You will want to intercept that message within your subclass of <CODE>
+TableClass</CODE>
+ to implement your search criteria.</P>
+<P>
+When in index mode, this message is sent with a single index letter (e.g. `A', or `B' in the &quot;AB&quot; dyad) of the tapped dyad button. Repeatedly tapping on a dyad button will cycle through the indexed letters, sending out this message a separate time for each tap (first with `A,' then with `B,' and then with `A' again). For this reason, make sure that code that implements this message is not run under the UI thread. (Doing so may result in bothersome screen &quot;glitches&quot; as the Table scrolls first to the `A' entries, then to the `B' entries, etc.</P>
+<P CLASS="refField">
+Source:	The Locator object.</P>
+<P CLASS="refField">
+Destination:	The Locator's linked Table object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+searchChar</EM>
+	Character to search. Passed from one of the Locator's dyad buttons.</P>
+<P CLASS="refField">
+Return:	Non-zero if the search failed. Note that if you do not write a search method for <CODE>
+TableClass</CODE>
+, this message will always return non-zero.</P>
+
+
+<H6 CLASS="RefETitle">
+MSG_TABLE_STRING_LOCATE</H6>
+<PRE CLASS="syntax">Boolean	MSG_TABLE_STRING_LOCATE(
+        char		*text);</PRE>
+<P>
+This message instructs a Locator object (in text mode) to locate the entered string within the <CODE>
+TableClass</CODE>
+ object that is in the Locator's LI_<CODE>
+destination</CODE>
+ field. It does this by sending the Table object <CODE>
+MSG_TABLE_STRING_LOCATE</CODE>
+, passing it the pointer to the search string. You will want to intercept that message within your subclass of <CODE>
+TableClass</CODE>
+ to implement your search criteria.</P>
+<P>
+The Locator object enters text search mode whenever the user types a printable character on the keyboard; in that case, the <CODE>
+locateString</CODE>
+ contains the character typed and a search (with this message) is performed. I.e. a search is performed after each successive character is entered. If the search is unsuccessful, the character will not appear.</P>
+<P CLASS="refField">
+Source:	The Locator object.</P>
+<P CLASS="refField">
+Destination:	A Locator object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+text</EM>
+	Pointer to the null-terminated search string to pass to <CODE>
+MSG_TABLE_STRING_LOCATE</CODE>
+.</P>
+<P CLASS="refField">
+Return:	Non-zero if the search failed. Note that if you do not write a search method for TableClass, this message will always return non-zero.</P>
+
+<HR>
+<A NAME="JTable_e.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The Table Objects</A>: 4.7 <A HREF="#JTable_7.htm">Using a Table Object</A>: 
+<A NAME="JTable_e.htm_35718">
+ </A>
+Table Headings</H3>
+<P>
+<CODE>
+TableClass</CODE>
+ does not automatically support the drawing of <CODE>
+Table</CODE>
+ headings. However, it is easy to implement this yourself.</P>
+<P>
+To create a <CODE>
+Table</CODE>
+ with headings, simply create two different <CODE>
+Table</CODE>
+ objects: one for the body of the <CODE>
+Table</CODE>
+, and one for the headings. Make sure the two Tables have the same left and right margins, and make sure their columns are of the same width; but other than that, you can set up the two tables completely differently. For example, the upper <CODE>
+Table</CODE>
+ (which would have only one line) might well not be user-editable or selectable.</P>
+<P>
+Group the two Tables below the single <CODE>
+TableContent </CODE>
+object. Once you've set up the two Tables, you may want to experiment with headings and borders to get the look you want. Notice that the two <CODE>
+Table</CODE>
+s scroll independently. This means that when a user scrolls the lower <CODE>
+Table</CODE>
+, the same headings will always be visible at the top of the columns. You will want to add the TF_MAIN_TABLE flag to your main Table object so that it does not attempt to scroll the heading table.</P>
+<P CLASS="figTitle">
+Code Display 5-7 Adding a Header Table</P>
+<PRE>/* A Header is simply a Table, though it is usually only one row. */</PRE>
+<PRE>@object CoffeeTableClass, CoffeeTableHeader = {
+    TI_rows = 1;			/* Because this is a header, only one row is needed. */
+    TI_columns = MY_TABLE_COLS;				/* Make sure you have the same number of columns 
+				 * as in the main table. */
+    TI_visibleRows = 1;
+    TI_rowHeight = 18;			/* Your row height may be different than the row height 
+			 * of the main table. */
+    TI_columnDefinitions = @CoffeeTableHeaderColumnDefs;
+    TI_borderFlags = TBF_BOX_BORDERS;
+    CTI_chunkArray = @CoffeeTableHeaderDataArray;
+}</PRE>
+<PRE>/* The column definition widths should match those of the main table. Headers 
+ * should not contain any TableColumnFlags, however. Set these to zero. */</PRE>
+<PRE>@chunk TableColumnDefinition CoffeeTableHeaderColumnDefs[] = {
+    0, 25,
+    0, 100,
+    0, 45,
+    0, 70};</PRE>
+<PRE>/* The Table header data array contains the strings to display in the Table 
+ * header. */</PRE>
+<PRE>@chunkArray CellDataStruct CoffeeTableHeaderDataArray = {
+    &quot;#&quot;,&quot;Description&quot;,&quot;Type&quot;,&quot;$/lb.&quot;
+};</PRE>
+<HR>
+<A NAME="JTable_f.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The Table Objects</A>: 4.8 <A HREF="#JTable_7.htm">Using a Table Object</A>: 
+<A NAME="JTable_f.htm_91726">
+ </A>
+Changing Column Definitions</H3>
+<P>
+You may wish in exceptional circumstances to display different columns than the ones you statically define using TI_<CODE>
+columnDefinitions</CODE>
+. In that case, you may want to define alternate column definitions and switch which ones you use at appropriate times in your application. There is a fair amount of overhead in doing this yourself--there currently exists no API to take care of this behavior--so you should make sure you want to take that approach.
+<IMG SRC="JTable_f_changeColDefns.gif">
+
+</P>
+<P>
+The following steps are recommended to get this behavior:</P>
+<UL>
+<LI>
+Define separate column definitions for each group of columns you want displayed. Each column definition should reside in its own separate chunk. Make sure that each set of column definitions resides within the resource block of the table object. (Because <CODE>
+TI_columnDefinitions</CODE>
+ is a chunk handle, it cannot reference chunks outside of the resource.)</LI>
+<LI>
+Create an instance field in your Table subclass to index which column definitions you are currently using. You will use this instance field to determine what chunk array of data to use.</LI>
+<LI>
+Create separate chunk arrays to hold your individual sets of data and an instance field to hold the correct pointer to that chunk array. Alternatively, you could have one chunk array hold both sets of data and define an offset into the second set of data.</LI>
+<LI>
+Define a message in your Table subclass to change the column definitions, passing it an index number of the column definitions you want to use. Set TI_<CODE>
+columnDefinitions</CODE>
+ to the appropriate column definitions in your handler for this message. Also change your index number to indicate the new column definitions being used and the pointer to the chunk array of data.</LI>
+<LI>
+Redraw the Table by sending <CODE>
+MSG_TABLE_REDRAW_TABLE</CODE>
+ from this handler. This will dispatch <CODE>
+MSG_TABLE_QUERY_DRAW</CODE>
+ to each of the affected cells.</LI>
+<LI>
+Handle <CODE>
+MSG_TABLE_QUERY_DRAW</CODE>
+ as usual.</LI>
+</UL>
+<P CLASS="figTitle">
+Code Display 5-8 Dynamically Changing Column Definitions</P>
+<PRE>/* First, make sure you create a message to change the column definitions and an 
+ * instance field to indicate which column definitions we are using. */</PRE>
+<PRE>@class MyTableClass, TableClass;</PRE>
+<PRE>    @message void MSG_MY_TABLE_CHANGE_COLUMN_DEFINITIONS(int columnIndex);</PRE>
+<PRE>    @instance int 			MTI_columnIndex = 0;
+    @instance optr			MTI_chunkArray = NullOptr;</PRE>
+<PRE>@endc;</PRE>
+<PRE>@classdecl MyTableClass;</PRE>
+<PRE>/* Define your column definitions. Make sure that each set of column definitions 
+ * adds up to 240 pixels across. Note that if you want headers for each of these 
+ * column definitions, you will need to handle that yourself.*/</PRE>
+<PRE>#define MY_COLUMN_FLAGS (TCF_START_SELECT | TCF_DOUBLE_SELECT | TCF_DRAG_SELECT | 
+			TCF_HOLD_SELECT | TRIT_CELL )</PRE>
+<PRE>@chunk TableColumnDefinition ColumnSet1[] = {
+    MY_COLUMN_FLAGS, 25,
+    MY_COLUMN_FLAGS, 100,
+    MY_COLUMN_FLAGS, 45,
+    MY_COLUMN_FLAGS, 70};</PRE>
+<PRE>@chunk TableColumnDefinition ColumnSet2[] = {
+    MY_COLUMN_FLAGS, 25,
+    MY_COLUMN_FLAGS, 100,
+    MY_COLUMN_FLAGS, 115};</PRE>
+<PRE>/* Define our cell data in two separate chunk arrays. */</PRE>
+<PRE>@chunkArray CellDataStruct myMainData = {
+    &quot;0&quot;,&quot;Viennese&quot;,&quot;DARK&quot;, &quot;$ 8.75&quot;,
+    &quot;1&quot;,&quot;Italian&quot;,&quot;DARK&quot;,&quot;$ 8.75&quot;,
+    &quot;2&quot;,&quot;French&quot;,&quot;DARK&quot;,&quot;$ 9.25&quot;,
+    &quot;3&quot;,&quot;Sumatra&quot;,&quot;RICH&quot;,&quot;$ 8.95&quot;};</PRE>
+<PRE>@chunkArray CellDataStruct mySecondaryData = {
+    &quot;0&quot;,&quot;Mr. Cringle&quot;,&quot;1412 Dowdy Ln.&quot;,
+    &quot;1&quot;,&quot;Ms. Holworth&quot;,&quot;23 Abercrombie&quot;,
+    &quot;2&quot;,&quot;Jeeves&quot;,&quot;10 Downing St.&quot;,
+    &quot;3&quot;,&quot;Kahlia&quot;,&quot;345 Cedar St.&quot;};</PRE>
+<PRE>/* Define your method for MSG_MY_TABLE_CHANGE_COLUMN_DEFINITIONS. */</PRE>
+<PRE>@method MyTableClass, MSG_MY_TABLE_CHANGE_COLUMN_DEFINITIONS
+{
+    switch(columnIndex) {
+	case COLUMN_SET_1:
+	    pself-&gt;TI_columnDefinitions = OptrToHandle(@ColumnSet1);
+	    pself-&gt;MTI_chunkArray = @myMaindata;
+	    break;
+	case COLUMN_SET_2:
+	    pself-&gt;TI_columnDefinitions = OptrToHandle(@ColumnSet2);
+	    pself-&gt;MTI_chunkArray = @mySecondaryData;
+	    break;
+	default:
+	    break;
+    }</PRE>
+<PRE>    pself-&gt;MTI_columnIndex = columnIndex;</PRE>
+<PRE>    @call self::MSG_TABLE_REDRAW_TABLE;
+}</PRE>
+<PRE>/* Handle MSG_TABLE_QUERY_DRAW. Because we set up the MTI_chunkArray instance 
+ * field in MSG_MY_TABLE_CHANGE_COLUMN_DEFINITIONS, nothing special is done here. 
+ */</PRE>
+<PRE>@method MyTableClass, MSG_TABLE_QUERY_DRAW
+{
+    char *data;
+    word cArrayIndex, offset, size;</PRE>
+<PRE>    cArrayIndex = (location.TCL_row * TABLE_COLS) + location.TCL_column;</PRE>
+<PRE>    MemLock(OptrToHandle(pself-&gt;MTI_chunkArray));</PRE>
+<PRE>    data = ChunkArrayElementToPtr((pself-&gt;MTI_chunkArray),
+				cArrayIndex, &amp;size);</PRE>
+<PRE>    GrDrawTextAtCP(gstate, data, 0);</PRE>
+<PRE>    MemUnlock(OptrToHandle(pself-&gt;MTI_chunkArray);
+}</PRE>
+<HR>
+<A NAME="JTable_10.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">The Table Objects</A>: 5 
+TableContentClass</H2>
+<P>
+A <CODE>
+TableContentClass</CODE>
+ object manages <CODE>
+TableClass</CODE>
+ objects. The TableContent is a visual grouping object (subclassed off of <CODE>
+VisContentClass</CODE>
+) and therefore manages the visual implementation of its children. A TableContent object will contain just two types of children: usually a single <CODE>
+TableClass</CODE>
+ object, possibly an additional <CODE>
+TableClass</CODE>
+ object acting as a set of headings, and a <CODE>
+LocatorClass</CODE>
+ object. (<CODE>
+LocatorClass</CODE>
+ is discussed later in the chapter.) </P>
+<P>
+The TableContent object manages the dispatch of keyboard events to its Table anTableView object, and acts as the bridge between the generic and visual object hierarchies. The hierarchy of this arrangement is shown below:
+<IMG SRC="JTable_10_objTree.gif">
+
+</P>
+<P CLASS="subsectionLink">
+<A HREF="#JTable_11.htm">TableContent Instance Data</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#JTable_12.htm">Altering TableContent Instance Data</A></P>
+<HR>
+<A NAME="JTable_11.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The Table Objects</A>: 5.1 <A HREF="#JTable_10.htm">TableContentClass</A>: 
+TableContent Instance Data</H3>
+<P>
+<CODE>
+TableContentClass</CODE>
+ is a subclass of <CODE>
+VisContentClass</CODE>
+. As such, it inherits instance data and messages from that class. This section describes the instance data fields defined for <CODE>
+TableContentClass</CODE>
+. It also describes how to set, examine and change those fields which are of interest to developers.</P>
+<P CLASS="figTitle">
+Code Display 5-9 TableContentClass instance data</P>
+<PRE>/*
+ * TableContentClass is a subclass of VisContentClass. 
+ */</PRE>
+<PRE>@default 		VCI_geoAttrs = 		(@default | VCGA_ORIENT_CHILDREN_VERTICALLY);</PRE>
+<PRE>@instance 		byte		TCI_kbdSend = 255;</PRE>
+<PRE>@instance 		optr		TCI_exclDestination = NullOptr;</PRE>
+<PRE>@instance		word		TCI_childSpacing = 0;</PRE>
+<PRE>@instance 		word		TCI_childWrapSpacing = 0;</PRE>
+<P>
+TCI_<CODE>
+kbdSend</CODE>
+ is an internal field that determines whether keyboard messages will be sent to the TableContent's complement of children. (This is the default behavior.) If you want to send any keyboard events to any of the TableContent's children, this flag must be &quot;on.&quot; You should not set or modify this flag directly; it should only be altered by sending the TableContent object MSG_TABLE_CONTENT_KBD_SEND_TO_CHILDREN_ON and MSG_TABLE_CONTENT_KBD_SEND_TO_CHILDREN_OFF.</P>
+<P>
+TCI_<CODE>
+exclDestination</CODE>
+ is an internal field that determines which specific child object is sent keyboard messages. If TCI_<CODE>
+exclDestination</CODE>
+ is non-null, then keyboard messages will not be broadcast to all of the TableContent's children, but only to that specific object. This destination should only be altered by sending the TableContent <CODE>
+MSG_TABLE_CONTENT_GRAB_KBD_EXCLUSIVE</CODE>
+ or <CODE>
+MSG_TABLE_CONTENT_RELEASE_KBD_EXCLUSIVE</CODE>
+ (to set the output to null); the field should not be set or modified directly. </P>
+<P>
+TCI_<CODE>
+childSpacing</CODE>
+ sets the child spacing (in points) for the Table and Locator children of this TableContent object. You should not need to manipulate this field.</P>
+<P>
+TCI_<CODE>
+childWrapSpacing</CODE>
+ sets the child spacing for children that are forced to wrap (in points) for the children of the TableContent object. You should not need to manipulate this field.</P>
+<HR>
+<A NAME="JTable_12.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The Table Objects</A>: 5.2 <A HREF="#JTable_10.htm">TableContentClass</A>: 
+Altering TableContent Instance Data</H3>
+<PRE>MSG_TABLE_CONTENT_KBD_SEND_TO_CHILDREN_ON, MSG_TABLE_CONTENT_KBD_SEND_TO_CHILDREN_OFF, MSG_TABLE_CONTENT_GRAB_KBD_EXCLUSIVE, MSG_TABLE_CONTENT_RELEASE_KBD_EXCLUSIVE</PRE>
+<P>
+By default, the TableContent broadcasts keyboard events to its children. If this behavior is not desired, you can send the TableContent <CODE>
+MSG_TABLE_CONTENT_KBD_SEND_TO_CHILDREN_OFF</CODE>
+. Sending the TableContent <CODE>
+MSG_TABLE_CONTENT_KBD_SEND_TO_CHILDREN_ON</CODE>
+ turns keyboard event broadcasting back on.</P>
+<P>
+Keyboard event broadcasting must be on for any child object to receive any keyboard events, even if a child object attempts to grabs the keyboard exclusive on its own. A TableContent's child can grab the keyboard exclusive by sending <CODE>
+MSG_TABLE_CONTENT_GRAB_KBD_EXCLUSIVE</CODE>
+ to its parent TableContent object, passing it the optr of the child object (usually itself) which should be given the keyboard exclusive. If keyboard event broadcasting is not on, or if another child object already has the exclusive, the grab will not be successful.</P>
+<P>
+The child object should also make sure to send its parent <CODE>
+MSG_TABLE_CONTENT_RELEASE_KBD_EXCLUSIVE</CODE>
+ when it can release the keyboard exclusive.</P>
+
+<H6 CLASS="RefETitle">
+MSG_TABLE_CONTENT_KBD_SEND_TO_CHILDREN_ON</H6>
+<PRE CLASS="syntax">Boolean	MSG_TABLE_CONTENT_KBD_SEND_TO_CHILDREN_ON();</PRE>
+<P>
+This message instructs the TableContent object to allow keyboard messages to be sent to its children. (This must be enabled if any child object is to grab the keyboard exclusive.) It does this by modifying the TableContent's TCI_<CODE>
+kbdSend</CODE>
+ instance field. Do not modify this field yourself. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	A TableContent object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	<EM>
+true </EM>
+(non-zero<EM>
+) </EM>
+if the TableContent object was not able to turn on keyboard dispatching to its children; <EM>
+false</EM>
+ (zero) otherwise. </P>
+
+
+<H6 CLASS="RefETitle">
+MSG_TABLE_CONTENT_KBD_SEND_TO_CHILDREN_OFF</H6>
+<PRE CLASS="syntax">Boolean	MSG_TABLE_CONTENT_KBD_SEND_TO_CHILDREN_OFF();</PRE>
+<P>
+This message instructs the TableContent object to disallow keyboard messages to be sent to its children. (If any child object currently has the keyboard exclusive, this message will not succeed in turning off keyboard event broadcasting.) The TableContent modifies this behavior by modifying the TableContent's TCI_<CODE>
+kbdSend</CODE>
+ instance field. Do not modify this field yourself. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	A TableContent object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	<EM>
+true</EM>
+ (non-zero) if the TableContent object was not able to turn off keyboard dispatching to its children; <EM>
+false</EM>
+ (zero) otherwise. </P>
+
+
+<H6 CLASS="RefETitle">
+MSG_TABLE_CONTENT_GRAB_KBD_EXCLUSIVE</H6>
+<PRE CLASS="syntax">Boolean	MSG_TABLE_CONTENT_GRAB_KBD_EXCLUSIVE(
+        optr		obj);</PRE>
+<P>
+This message instructs the TableContent object to give the keyboard grab to the child object whose optr is passed in the message. It does this by modifying the TableContent's TCI_<CODE>
+exclDestination </CODE>
+modify this field yourself. Keyboard event broadcasting must be &quot;on&quot; for this grab to succeed.</P>
+<P CLASS="refField">
+Source:	One of the TableContent's children</P>
+<P CLASS="refField">
+Destination:	A TableContent object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+obj</EM>
+	Object to receive the TableContent's keyboard exclusive.</P>
+<P CLASS="refField">
+Return:	<EM>
+true </EM>
+(non-zero)<EM>
+ </EM>
+if the child object was not able to grab the TableContent's keyboard exclusive; <EM>
+false</EM>
+ (zero) otherwise. </P>
+
+
+<H6 CLASS="RefETitle">
+MSG_TABLE_CONTENT_RELEASE_KBD_EXCLUSIVE</H6>
+<PRE CLASS="syntax">Boolean	MSG_TABLE_CONTENT_RELEASE_KBD_EXCLUSIVE(
+        optr		obj);</PRE>
+<P>
+This message instructs the TableContent object to release the keyboard grab from the child object whose optr is passed in the message. Only a child object which currently has the grab can release it. It does this by modifying the TableContent's TCI<CODE>
+_exclDestination </CODE>
+instance field, setting it to null. Do not modify this field yourself. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	A TableContent object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+obj</EM>
+	Object releasing the TableContent's keyboard exclusive.</P>
+<P CLASS="refField">
+Return:	<EM>
+true</EM>
+ (non-zero) if the child object was not able to release the TableContent's keyboard exclusive; <EM>
+false</EM>
+ (zero) otherwise. </P>
+
+<HR>
+<A NAME="JTable_13.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">The Table Objects</A>: 6 
+<A NAME="JTable_13.htm_60877">
+ </A>
+LocatorClass</H2>
+<P>
+The <CODE>
+LocatorClass</CODE>
+ is a subclass of the <CODE>
+TableClass</CODE>
+. Locator objects do not, however, behave like other Table objects. The Locator object is a specific object designed to be used in tandem with a linked Table object. An action taken on the Locator object will perform a searching action on the linked Table object. In most cases, you will simply want to include a Locator object in your application and link it to your Table. (You implement the actual searching algorithms in your Table object.) You do not need to subclass or add any behavior to the Locator object.</P>
+<P>
+Each Table-Locator pair is placed within a parent TableContent. In the current version of GEOS, multiple tables may not appear under a TableContent (excepting, of course, that <CODE>
+LocatorClass</CODE>
+ is actually a subclass of <CODE>
+TableClass</CODE>
+ itself). The following information mirrors information appearing in <A HREF="#JTable_d.htm_14433"> Handling Locator Searches</A>
+. Consult that section for information about implementing a search within your Table object. The information provided here is solely for completeness' sake.</P>
+<P CLASS="subsectionLink">
+<A HREF="#JTable_14.htm">Index Mode</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#JTable_15.htm">Text Mode</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#JTable_16.htm">LocatorClass Instance Data</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#JTable_17.htm">Locator Actions</A></P>
+<HR>
+<A NAME="JTable_14.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The Table Objects</A>: 6.1 <A HREF="#JTable_13.htm">LocatorClass</A>: 
+Index Mode</H3>
+<PRE>MSG_LOCATOR_DO_CHAR_LOCATE</PRE>
+<P>
+The Locator object can be in one of two modes: <EM>
+index</EM>
+ mode or <EM>
+text</EM>
+ <EM>
+search</EM>
+ mode. The Locator object will appear and act differently depending on it operating mode.</P>
+<P>
+When the Locator object is in index mode, it takes the form of an action bar, shown below:
+
+</P>
+<P>
+Tapping on one of the Locator's dyad buttons (`AB', `EF', etc.) sends <CODE>
+MSG_LOCATOR_DO_CHAR_LOCATE</CODE>
+ to the Locator object itself. The Locator responds to this request by sending <CODE>
+MSG_TABLE_CHAR_LOCATE</CODE>
+ to its linked Table. Intercept that message in <CODE>
+TableClass</CODE>
+ to provide your searching behavior.</P>
+<P>
+Repeatedly clicking on a dyad button will cycle through the two letters of the dyad to perform the search. For example, clicking once on the `AB' dyad button will send the aforementioned messages with a character argument of `A.' Clicking again on that button will send these messages with an argument of `B' and clicking yet again on that button will send these messages with an argument of `A' again.</P>
+<P>
+You will probably not want to implement any searching behavior in your Locator object; it is sufficient merely to include the Locator object and intercept <CODE>
+MSG_TABLE_CHAR_LOCATE</CODE>
+ in the Table object itself. This is discussed in<A HREF="#JTable_d.htm_14433"> Handling Locator Searches</A>
+.</P>
+
+<H6 CLASS="RefETitle">
+MSG_LOCATOR_DO_CHAR_LOCATE</H6>
+<PRE CLASS="syntax">Boolean	MSG_LOCATOR_DO_CHAR_LOCATE(
+        char		searchChar);</PRE>
+<P>
+This message instructs a Locator object (in index mode) to locate the entered character within the <CODE>
+TableClass</CODE>
+ object that is in the Locator's LI_<CODE>
+destination</CODE>
+ field. It does this by sending the Table object <CODE>
+MSG_TABLE_CHAR_LOCATE</CODE>
+, passing it the search character. You will want to intercept that message within your subclass of <CODE>
+TableClass</CODE>
+ to implement your search criteria.</P>
+<P>
+When in index mode, this message is sent with a single index letter (e.g. `A', or `B' in the &quot;AB&quot; dyad) of the tapped dyad button. Repeatedly tapping on a dyad button will cycle through the indexed letters, sending out this message a separate time for each tap (first with `A,' then with `B,' and then with `A' again). For this reason, make sure that code that implements this message is not run under the UI thread. (Doing so may result in bothersome screen &quot;glitches&quot; as the Table scrolls first to the `A' entries, then to the `B' entries, etc.</P>
+<P CLASS="refField">
+Source:	The Locator object.</P>
+<P CLASS="refField">
+Destination:	A Locator object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+searchChar</EM>
+	Character to pass to <CODE>
+MSG_TABLE_CHAR_LOCATE</CODE>
+.</P>
+<P CLASS="refField">
+Return:	Non-zero if the search failed. Note that if you do not write a search method for TableClass, this message will always return non-zero.</P>
+
+<HR>
+<A NAME="JTable_15.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The Table Objects</A>: 6.2 <A HREF="#JTable_13.htm">LocatorClass</A>: 
+Text Mode</H3>
+<PRE>MSG_LOCATOR_DO_STRING_LOCATE</PRE>
+<P>
+When the Locator object is in text search mode, the action bar &quot;morphs&quot; into a text search entry field shown below:
+
+</P>
+<P>
+Entering text into the text search field will send <CODE>
+MSG_LOCATOR_DO_STRING_LOCATE</CODE>
+ to itself. The Locator responds to this message by immediately sending its linked Table <CODE>
+MSG_TABLE_STRING_LOCATE</CODE>
+. Repeatedly entering valid characters will match succeeding characters.</P>
+<P>
+For example, typing `B' in a Table object will send <CODE>
+MSG_TABLE_STRING_LOCATE</CODE>
+ to the Table with the string &quot;B.&quot; Typing `e' after that letter will send <CODE>
+MSG_TABLE_STRING_LOCATE</CODE>
+ passing the string &quot;Be.&quot; Whenever the Table can no longer find a match for its character string, <CODE>
+MSG_TABLE_STRING_LOCATE</CODE>
+ will return TRUE (an error condition) and the character will not be allowed into the text entry field. You can complete a text mode search and return to index mode by pressing ENTER.</P>
+
+<H6 CLASS="RefETitle">
+MSG_LOCATOR_DO_STRING_LOCATE</H6>
+<PRE CLASS="syntax">Boolean	MSG_LOCATOR_DO_STRING_LOCATE(
+        char		*locateString);</PRE>
+<P>
+This message instructs a Locator object (in text mode) to locate the entered string within the <CODE>
+TableClass</CODE>
+ object that is in the Locator's LI_<CODE>
+destination</CODE>
+ field. It does this by sending the Table object <CODE>
+MSG_TABLE_STRING_LOCATE</CODE>
+, passing it the pointer to the search string. You will want to intercept that message within your subclass of <CODE>
+TableClass</CODE>
+ to implement your search criteria.</P>
+<P>
+The Locator object enters text search mode whenever the user types a printable character on the keyboard; in that case, the <CODE>
+locateString</CODE>
+ contains the character typed and a search (with this message) is performed. I.e. a search is performed after each successive character is entered. If the search is unsuccessful, the character will not appear.</P>
+<P CLASS="refField">
+Source:	The Locator object.</P>
+<P CLASS="refField">
+Destination:	A Locator object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+locateString</EM>
+	Pointer to the null-terminated search string to pass to <CODE>
+MSG_TABLE_STRING_LOCATE</CODE>
+.</P>
+<P CLASS="refField">
+Return:	Non-zero if the search failed. Note that if you do not write a search method for TableClass, this message will always return non-zero.</P>
+
+<HR>
+<A NAME="JTable_16.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The Table Objects</A>: 6.3 <A HREF="#JTable_13.htm">LocatorClass</A>: 
+LocatorClass Instance Data</H3>
+<P>
+<CODE>
+LocatorClass</CODE>
+ contains a number of instance fields that are usually not accessed directly. In most cases, these instance fields are maintained by the system. In some cases, you can send messages to alter these instance fields.</P>
+<P CLASS="figTitle">
+Code Display 5-10 LocatorClass Instance Data</P>
+<PRE>/*
+ * LocatorClass is a subclass of TableClass. Do not treat it as a 
+ * normal subclass of TableClass, however. Many of the instance fields of 
+ * TableClass undergo special treatment in LocatorClass (especially the column 
+ * definitions). All of the Locator object's instance fields (except 
+ * LI_destination) are internal and maintained by the Locator object itself.
+ */</PRE>
+<PRE>@instance 		LocatorStateFlags			LI_state;</PRE>
+<PRE>@instance 		ChunkHandle			LI_actionBarColDefsHandle = 0;</PRE>
+<PRE>@instance 		ChunkHandle			LI_textSearchColDefsHandle = 0;</PRE>
+<PRE>@instance 		TableCellLocation			LI_selectionStart = 0;</PRE>
+<PRE>@instance 		LocatorSelections			LI_selections = 0;</PRE>
+<PRE>@instance 		optr			LI_destination = 0;</PRE>
+<P>
+LI_<CODE>
+state</CODE>
+ is an internal field that is maintained by the <CODE>
+LocatorClass</CODE>
+ object. This field determines whether the Locator has been initialized, and the status of its current state (<CODE>
+index</CODE>
+ or<CODE>
+ text search</CODE>
+). Do not alter this field.</P>
+<P>
+LI_<CODE>
+actionBarColDefsHandle</CODE>
+ is an internal field; this field contains the chunk handle of the column definitions for the Locator object when it is in <EM>
+index</EM>
+ mode. Note that the Locator object contains two separate column definitions, unusual for normal Table objects. Do not alter this field.</P>
+<P>
+LI<CODE>
+_textSearchColDefsHandle</CODE>
+ is an internal field; this field contains the chunk handle of the column definitions for the Locator object when it is in <EM>
+text search </EM>
+mode. Do not alter this field.</P>
+<P>
+LI<CODE>
+_selectionStart</CODE>
+ and LI_<CODE>
+selections</CODE>
+ are internal fields that manage information about the dyad button's states. Do not alter this field.</P>
+<P>
+LI_<CODE>
+destination</CODE>
+ contains the optr of the object to receive messages (e.g., <CODE>
+MSG_LOCATOR_DO_STRING_LOCATE</CODE>
+) sent out by this Locator object. This is usually the sibling Table object that searches are performed on. This field should be set statically.</P>
+<HR>
+<A NAME="JTable_17.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The Table Objects</A>: 6.4 <A HREF="#JTable_13.htm">LocatorClass</A>: 
+Locator Actions</H3>
+<PRE>MSG_LOCATOR_CHANGE_TO_ACTION_BAR, MSG_LOCATOR_CHANGE_TO_TEXT_SEARCH, MSG_LOCATOR_DO_STRING_LOCATE, MSG_LOCATOR_DO_CHAR_LOCATE</PRE>
+<P>
+Each time the Locator object changes its mode (<CODE>
+index</CODE>
+ or <CODE>
+text search</CODE>
+) it will send itself either <CODE>
+MSG_LOCATOR_CHANGE_TO_ACTION_BAR</CODE>
+ (if it is changing to index mode) or <CODE>
+MSG_LOCATOR_CHANGE_TO_TEXT_SEARCH</CODE>
+.</P>
+<P>
+For example, if the Locator is in text search mode, it is desirable to revert to index mode whenever it loses the focus (and loses keyboard input). If the Locator is in text search mode and does lose the focus, the Locator's superclass (<CODE>
+TableClass</CODE>
+) senses this, sending <CODE>
+MSG_TABLE_STOP_EDIT_CELL_TEXT </CODE>
+to itself. In the handler for that message, the Locator sends itself <CODE>
+MSG_LOCATOR_CHANGE_TO_ACTION_BAR</CODE>
+.</P>
+
+<H6 CLASS="RefETitle">
+MSG_LOCATOR_CHANGE_TO_ACTION_BAR</H6>
+<PRE CLASS="syntax">void	MSG_LOCATOR_CHANGE_TO_ACTION_BAR();</PRE>
+<P>
+This message instructs the Locator object to appear as an &quot;action bar&quot; with a row of dyad buttons (&quot;AB&quot;, &quot;CD&quot;, etc.). This <EM>
+index</EM>
+ mode is distinct from the Locator's other mode, that of a text search field. When the Locator object is in index mode, tapping (once) on a dyad button will send MSG_LOCATOR_DO_STRING_LOCATE with the first letter of the dyad tapped on (e.g. &quot;A&quot; in the `AB' dyad; &quot;E&quot; in the `EF' dyad). Repeatedly tapping on that dyad button will send <CODE>
+MSG_LOCATOR_DO_STRING_LOCATE</CODE>
+ with the succeeding characters. The Locator object automatically &quot;wraps&quot; when it performs a search with its second character. I.e. after `B' is sent in the `AB dyad, `A' is sent again.</P>
+<P CLASS="refField">
+Source:	The Locator object sends this message to itself. </P>
+<P CLASS="refField">
+Destination:	A Locator object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	May intercept to receive notification when the Locator object is switching into <EM>
+index</EM>
+ mode. Make sure to pass this message on to the superclass, however.</P>
+
+
+<H6 CLASS="RefETitle">
+MSG_LOCATOR_CHANGE_TO_TEXT_SEARCH</H6>
+<PRE CLASS="syntax">void	MSG_LOCATOR_CHANGE_TO_TEXT_SEARCH();</PRE>
+<P>
+This message instructs the Locator object to appear as a text search field. When the Locator object is in <EM>
+text</EM>
+ <EM>
+search</EM>
+ mode any characters entered into the device will appear within the Locator's text search field. Pressing RETURN will send the text string to the Table with MSG_LOCATOR_DO_STRING_LOCATE.</P>
+<P CLASS="refField">
+Source:	The Locator object.</P>
+<P CLASS="refField">
+Destination:	A Locator object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	May intercept to receive notification when the Locator is switching into <EM>
+text search</EM>
+ mode. Make sure to pass this message on to the superclass, however.</P>
+
+<HR>
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+</BODY>
+</HTML>

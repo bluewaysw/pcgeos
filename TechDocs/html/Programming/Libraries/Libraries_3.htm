@@ -1,0 +1,138 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Libraries_3.htm,v 1.2 97/08/14 15:06:21 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> The Library Entry Point</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="sectionTitle">
+<A HREF="index.htm">Libraries</A>: 3 
+<A NAME="37345">
+ </A>
+The Library Entry Point</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Libraries_2.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2 Library Basics</A> 
+<!-- to next --> | <A HREF="Libraries_4.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4 Exported Routines and Classes</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>LibraryEntry(), LibraryCallType</PRE>
+<P>
+A library may need to do bookkeeping when it is launched, when a client is attached, or at other times. For this reason, some libraries will have an entry point routine. The entry point routine is called by the kernel; it should never be called by other geodes. Some of the calls are made in the kernel thread, while others are made by a geode's thread. All of the calls are made automatically by the kernel.</P>
+<P>
+An entry point routine must take two arguments. The format of an entry point is shown in <A HREF="Libraries_3.htm#95977"> A Library Entry Point</A>
+.</P>
+<P CLASS="figTitle">
+
+
+Code Display C-1 <A NAME="95977">
+ </A>
+A Library Entry Point</P>
+<PRE>Boolean _pascal
+	LibraryEntry(LibraryCallType				ty,
+			GeodeHandle		client);</PRE>
+<P>
+When the kernel calls the entry point routine, it passes the following arguments:</P>
+<UL>
+<LI>
+A member of the <CODE>
+LibraryCallType</CODE>
+ enumerated type. This specifies why the kernel is calling the routine. This type is described below.</LI>
+<LI>
+A geode handle. This parameter is valid only if certain <CODE>
+LibraryCallType</CODE>
+ values are passed.</LI>
+</UL>
+<P>
+The entry point should return <EM>
+true</EM>
+ if an error occurs; otherwise it should return <EM>
+false</EM>
+ (i.e. zero).</P>
+<P>
+<CODE>
+LibraryCallType</CODE>
+ contains the following members:</P>
+<DL>
+<DT>
+LCT_ATTACH</DT><DD>
+This is passed when the library has just been launched. The <EM>
+client</EM>
+ parameter is undefined. The call is made in the application's thread.</DD>
+<DT>
+LCT_DETACH</DT><DD>
+This is passed when the library is about to be unloaded. The <EM>
+client</EM>
+ parameter is undefined. The call is made in the application's thread.</DD>
+<DT>
+LCT_NEW_CLIENT</DT><DD>
+A thread has just called <CODE>
+GeodeUseLibrary()</CODE>
+, or a geode which depends on the library is being launched. The <EM>
+client</EM>
+ parameter contains the <CODE>
+GeodeHandle</CODE>
+ of the new client. The call is made in the kernel thread.</DD>
+<DT>
+LCT_NEW_CLIENT_THREAD</DT><DD>
+A geode which depends on the library has just spawned a new thread. The <EM>
+client</EM>
+ parameter contains the <CODE>
+GeodeHandle</CODE>
+ of the thread's owner. The call is made in the new thread.</DD>
+<DT>
+LCT_CLIENT_THREAD_EXIT</DT><DD>
+A thread which uses the library is being destroyed. The <EM>
+client</EM>
+ parameter contains the <CODE>
+GeodeHandle</CODE>
+ of the thread's owner. The call is made in the soon-to-be destroyed thread.</DD>
+<DT>
+LCT_CLIENT_EXIT</DT><DD>
+A client loaded this library with <CODE>
+GeodeUseLibrary()</CODE>
+ has just called <CODE>
+GeodeFreeLibrary()</CODE>
+. The <EM>
+client</EM>
+ parameter contains the <CODE>
+GeodeHandle</CODE>
+ of the former client. The call is made in the kernel thread.</DD>
+</DL>
+<P>
+Sometimes a single action can prompt several calls to the entry point, each with a different <CODE>
+LibraryCallType</CODE>
+ value. For example, suppose FooWrite is launched. This application's <STRONG CLASS="fileName">
+.gp</STRONG>
+ file specifies that it uses the BarObj library. At the time FooWrite is launched, BarObj has not been loaded. The kernel will automatically launch BarObj and immediately call the entry point with parameter LCT_ATTACH. The kernel will then call the entry point again with parameter LCT_NEW_CLIENT, passing FooWrite's <CODE>
+GeodeHandle</CODE>
+. It will then call the entry point once for each FooWrite thread, passing LCT_NEW_CLIENT_THREAD; it will make these calls as each thread is started.</P>
+<P>
+Some libraries will not need to take any actions when the entry point is called; these libraries need not have an entry point routine. On the other hand, some libraries will need to do bookkeeping chores. This is left entirely to the library's discretion.</P>
+<P>
+The entry point should take care not to perform any actions with side effects outside the library. If the entry point allocates memory, it should make sure to make the library's geode the block's owner. Similarly, the entry point should not change the working directory; instead, it should use <CODE>
+FilePushDir()</CODE>
+ and <CODE>
+FilePopDir()</CODE>
+ to make temporary changes to the working directory.</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Libraries_2.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">2 Library Basics</A> 
+<!-- to next --> | <A HREF="Libraries_4.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4 Exported Routines and Classes</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

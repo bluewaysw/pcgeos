@@ -1,0 +1,353 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Input_7.htm,v 1.1 97/06/02 16:19:08 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Mouse Events</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Input</A>: 2.1 <A HREF="Input_6.htm">Mouse Input</A>: 
+Mouse Events</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Input_6.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Input_6.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">2 Mouse Input</A> 
+<!-- to next --> | <A HREF="Input_8.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2.2 Gaining the Mouse Grab</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+Each time the user moves the mouse or clicks a mouse button, GEOS generates a mouse event and passes it to the proper object. Mouse events are actually <CODE>
+MetaClass</CODE>
+ messages that any object may intercept. Default handlers for these messages typically do nothing, so if you do not handle a particular event, it will likely be ignored.</P>
+<P>
+GEOS uses three basic types of mouse events: button, pointer, and drag events. Button events indicate when the user has either pressed or released any mouse button (double-clicks are considered Button events). Pointer events indicate that the mouse has been moved. Drag events indicate the user has clicked and dragged the mouse. All of these types pass information about the mouse context and the operations currently in progress.</P>
+<P>
+The Input Manager checks both the button state and the mouse movement before deciding on an event's type. For example, ifthe user clicks twice quickly, the Input Manager decides whether the user intended a double-click or a click-move-click. Objects receiving the events do not have to differentiate between the two; the events automatically contain the required information.</P>
+<P>
+Pointer events are fairly straightforward; when the mouse is moved, the Input Manager generates the proper <CODE>
+MSG_META_MOUSE_PTR</CODE>
+ indicating the move. This message also indicates the state of the mouse buttons and keyboard modifier keys.</P>
+<P>
+Button events are quite a bit more complex. With each button press or release, the Input Manager generates a <CODE>
+MSG_META_MOUSE_BUTTON</CODE>
+ which gets translated into the proper press/release/drag event before being passed on to the application. The final message generated depends on which button was pressed, whether large graphics coordinates are being used, and whether the event is being sent pre-passive or post-passive.</P>
+<P>
+<A NAME="IX_MSG_META_START_&ldots;">
+ </A>
+Among Button events, there are two basic types: the press and the release. All press events are of the form <CODE>
+MSG_META_START_...</CODE>
+, <A NAME="IX_MSG_META_END_&ldots;">
+ </A>
+and all release events are of the form <CODE>
+MSG_META_END_...</CODE>
+. The last portion of the message name is the function of the button pressed or released. The various buttons are referred to by their meaning to the Specific UI, as follows:</P>
+<DL>
+<DT>
+<A NAME="IX_MSG_META_LARGE_&ldots;">
+ </A>
+<A NAME="IX_MSG_META_DRAG_&ldots;">
+ </A>
+<CODE>
+SELECT</CODE>
+</DT><DD>The button used for making selections. In OSF/Motif and many other Specific UIs, this is the left mouse button.</DD>
+<DT>
+<CODE>
+MOVE_COPY</CODE>
+</DT><DD>The button used for quick-copies and quick-moves of data. In OSF/Motif, this is the right mouse button. For single-button mice, a key sequence plus a mouse click is often used.</DD>
+<DT>
+<CODE>
+FEATURES</CODE>
+</DT><DD>The button used to bring up a &quot;features&quot; pop-up menu or dialog box. In some Specific UIs, this is the middle or the right mouse button. For single- or two-button mice, a key sequence plus a mouse click is often used.</DD>
+<DT>
+<CODE>
+OTHER</CODE>
+</DT><DD>Any button not designated one of the three categories above. This category can also be used to indicate when the user presses more than one button at a time.</DD>
+</DL>
+<P>
+A press event indicates the user pressed down on the particular button. A release event indicates the user released the button. If the user presses a button and moves the mouse, a drag event will be sent after the initial press event. If the user double-clicks, a special flag will be sent with a single press event; it is up to the application to handle double-clicks differently.</P>
+<P>
+Drag events are of the form <CODE>
+MSG_META_DRAG_...</CODE>
+, similar to Button events. Each of the above button types has a corresponding drag message. If the user presses a mouse button and quickly moves the mouse more than a specified distance, or if he holds a particular mouse button down more than a specified time, the Input Manager will send a drag event after the press event. A single release event signifies the user released the mouse button, just as with normal presses.</P>
+<P>
+There is also a complete set of events used for large documents. If an object has large bounds, or if a GenView is set up to display a large content, large mouse events will be generated instead of normal mouse events. Large events take the form <CODE>
+MSG_META_LARGE_...</CODE>
+. For example, the large version of <CODE>
+MSG_META_MOUSE_PTR</CODE>
+ is <CODE>
+MSG_META_LARGE_PTR</CODE>
+.</P>
+<P>
+Below are listed all the standard mouse events your objects may be interested in handling. Most objects will be interested in only a small subset of these.</P>
+<DL>
+<DT>
+<EM>
+MSG_META_MOUSE_PTR</DT><DD>
+</EM>
+<A NAME="IX_MSG_META_PTR">
+ </A>
+The standard Pointer event, generated whenever the mouse moves without a button down.</DD>
+<DT>
+<EM>
+MSG_META_START_SELECT</DT><DD>
+</EM>
+Generated when the user presses the select button.</DD>
+<DT>
+<CODE>
+MSG_META_END_SELECT </DT><DD>
+</CODE>
+<EM>
+Generated when the user releases the select button.</EM>
+</DD>
+<DT>
+<CODE>
+MSG_META_START_MOVE_COPY</DT><DD>
+</CODE>
+Generated when the user presses the move/copy button.</DD>
+<DT>
+<CODE>
+MSG_META_END_MOVE_COPY</DT><DD>
+</CODE>
+Generated when the user releases the move/copy button.</DD>
+<DT>
+<CODE>
+MSG_META_START_FEATURES</DT><DD>
+</CODE>
+Generated when the user presses the features button.</DD>
+<DT>
+<CODE>
+MSG_META_END_FEATURES</DT><DD>
+</CODE>
+Generated when the user releases the features button.</DD>
+<DT>
+<CODE>
+MSG_META_START_OTHER</DT><DD>
+</CODE>
+Generated when the user presses a button combination not recognized as select, move/copy, or features.</DD>
+<DT>
+<CODE>
+MSG_META_END_OTHER</DT><DD>
+</CODE>
+Generated at the release of the combination that generated the <CODE>
+MSG_META_START_OTHER</CODE>
+.</DD>
+<DT>
+<CODE>
+MSG_META_DRAG_SELECT</DT><DD>
+</CODE>
+Generated between a press and release of the select button if the user holds the button down or if the user moves the mouse.</DD>
+<DT>
+<CODE>
+MSG_META_DRAG_MOVE_COPY</DT><DD>
+</CODE>
+Generated between a press and release of the move/copy button if the user holds the button down or if the user moves the mouse.</DD>
+<DT>
+<CODE>
+MSG_META_DRAG_FEATURES</DT><DD>
+</CODE>
+Generated between a press and release of the features button if the user holds the button down or if the user moves the mouse.</DD>
+<DT>
+<CODE>
+MSG_META_DRAG_OTHER</DT><DD>
+</CODE>
+Generated between a press and release of a button not specified above if the user holds it down or if the user moves the mouse.</DD>
+</DL>
+<P>
+Listed below are the large equivalents of the above messages.</P>
+<DL>
+<DT>
+</DT><DD><CODE>
+MSG_META_LARGE_PTR<BR>
+MSG_META_LARGE_START_SELECT<BR>
+MSG_META_LARGE_END_SELECT<BR>
+MSG_META_LARGE_START_MOVE_COPY<BR>
+MSG_META_LARGE_END_MOVE_COPY<BR>
+MSG_META_LARGE_START_FEATURES<BR>
+MSG_META_LARGE_END_FEATURES<BR>
+MSG_META_LARGE_START_OTHER<BR>
+MSG_META_LARGE_END_OTHER<BR>
+MSG_META_LARGE_DRAG_SELECT<BR>
+MSG_META_LARGE_DRAG_MOVE_COPY<BR>
+MSG_META_LARGE_DRAG_FEATURES<BR>
+MSG_META_LARGE_DRAG_OTHER</CODE>
+<A NAME="36249">
+ </A>
+ </DD>
+</DL>
+<P>
+All the normal (as opposed to large) mouse events pass and return the same values. Each event differs based on the message itself; an object knows that <CODE>
+MSG_META_START_SELECT</CODE>
+ is inherently different from <CODE>
+MSG_META_START_MOVE_COPY</CODE>
+, even though they may pass the exact same values.</P>
+
+<H2 CLASS="HeadingC">
+Structure of Mouse Events</H2>
+<P>
+Each mouse event passes three items of data and one pointer to a return structure. The three parameters are listed below; the fourth, the return structure, is detailed in the next section.</P>
+<DL>
+<DT>
+<CODE>
+xPosition</CODE>
+</DT><DD>The horizontal position of the pointer in document coordinates in the window when the event was generated.</DD>
+<DT>
+<CODE>
+yPosition</CODE>
+</DT><DD>The vertical position of the pointer in document coordinates in the window when the event was generated.</DD>
+<DT>
+<CODE>
+inputState</CODE>
+</DT><DD>A word of flags indicating the state of the mouse buttons and the UI functions (such as quick-transfer) that were active when the event was generated.</DD>
+</DL>
+<P>
+<A NAME="IX_ButtonInfo">
+ </A>
+The first two indicate the position of the mouse in the document. The third, <CODE>
+inputState</CODE>
+, consists of two bytes of flags. The first byte indicates the type of Button event and the state of the mouse buttons during the event. It is a record of type <CODE>
+ButtonInfo</CODE>
+ and has seven flags:</P>
+<DL>
+<DT>
+BI_PRESS<A NAME="IX_BI_&ldots;">
+ </A>
+</DT><DD>Set if this is a press event rather than a release or drag.</DD>
+<DT>
+BI_DOUBLE_PRESS</DT><DD>
+Set if this is actually a double-press (GEOS automatically detects double presses).</DD>
+<DT>
+BI_B3_DOWN</DT><DD>Set if button number three is being held down.</DD>
+<DT>
+BI_B2_DOWN</DT><DD>Set if button number two is being held down.</DD>
+<DT>
+BI_B1_DOWN</DT><DD>Set if button number one is being held down.</DD>
+<DT>
+BI_B0_DOWN</DT><DD>Set if button number zero is being held down.</DD>
+<DT>
+BI_BUTTON</DT><DD>Set if this is a Button event, clear if a Pointer event.</DD>
+</DL>
+<P>
+<A NAME="IX_UIFunctionsActive">
+ </A>
+The second byte of <CODE>
+inputState</CODE>
+ is a record of <CODE>
+UIFunctionsActive</CODE>
+, which describes which of several UI functions are currently underway. The flags set in this byte are used primarily by the UI, and you will probably not have to check them. The flags allowed, however, are listed below.</P>
+<DL>
+<DT>
+UIFA_SELECT</DT><DD>
+<A NAME="IX_UIFA_&ldots;">
+ </A>
+Set if the basic mouse function is underway.</DD>
+<DT>
+UIFA_MOVE_COPY</DT><DD>
+Set if a move/copy (quick-transfer) operation is underway.</DD>
+<DT>
+UIFA_FEATURES</DT><DD>
+Set if the features popup menu or dialog is open.</DD>
+<DT>
+UIFA_CONSTRAIN</DT><DD>
+Set if a modifier key set as a &quot;constraint&quot; key is pressed (e.g., the user holds the Shift key while grabbing an object control point).</DD>
+<DT>
+UIFA_ADJUST</DT><DD>
+This is the same bit as UIFA_MOVE and UIFA_POPUP, below. When UIFA_SELECT is also set, this flag indicates that the select event should act as a toggle event.</DD>
+<DT>
+UIFA_EXTEND</DT><DD>
+This is the same bit as UIFA_COPY and UIFA_PAN, below. When UIFA_SELECT is also set, this flag indicates that the select event should extend any selection already made (add the area/objects to the current selection).</DD>
+<DT>
+UIFA_MOVE</DT><DD>This is the same bit as UIFA_ADJUST and UIFA_POPUP. When UIFA_MOVE_COPY is also set, this flag indicates that the operation should be considered a move rather than a copy.</DD>
+<DT>
+UIFA_COPY</DT><DD>This is the same bit as UIFA_EXTEND and UIFA_PAN. When UIFA_MOVE_COPY is also set, this flag indicates the operation should be considered a copy rather than a move.</DD>
+<DT>
+UIFA_POPUP</DT><DD>This is the same bit as UIFA_ADJUST and UIFA_MOVE, above. When UIFA_FEATURES is also set, this flag indicates the &quot;features&quot; button brings up a popup menu or dialog box.</DD>
+<DT>
+UIFA_PAN</DT><DD>This is the same bit as UIFA_EXTEND and UIFA_COPY, above. When UIFA_FEATURES is also set, this flag indicates the &quot;features&quot; button has initiated pan-style scrolling.</DD>
+
+
+</DL>
+<H2 CLASS="HeadingC">
+<A NAME="59095">
+ </A>
+Return Values for Mouse Events</H2>
+<P>
+<A NAME="IX_MouseReturnParams">
+ </A>
+One of the parameters of every mouse event is a pointer to a <CODE>
+MouseReturnParams</CODE>
+ structure. This structure is passed empty; it is up to the event handler to fill it with the proper return values. The <CODE>
+MouseReturnParams</CODE>
+ structure's definition is given below:</P>
+<PRE>typedef struct {
+    word                unused;  /* for alignment */
+    MouseReturnFlags    flags;
+    optr                ptrImage;
+} MouseReturnParams;</PRE>
+<P>
+<A NAME="IX_MouseReturnFlags">
+ </A>
+Every time you handle a mouse event, you must fill in the <CODE>
+flags</CODE>
+ field. This describes how the event was handled so the UI knows whether to pass it on to another object, change the pointer image, or treat the event as having been handled. The flags you can return are</P>
+<DL>
+<DT>
+MRF_PROCESSED</DT><DD>
+<A NAME="IX_MRF_&ldots;">
+ </A>
+The event was handled. If you do not set this flag upon return, the window will think the event was not handled and may pass it on to another child.</DD>
+<DT>
+MRF_REPLAY</DT><DD>
+The event may or may not have been handled, but it should be rebroadcast as if it had not been. This is used primarily when an object gives up the mouse grab because the mouse has strayed outside its bounds.</DD>
+<DT>
+MRF_PREVENT_PASS_THROUGH</DT><DD>
+The event should <EM>
+not</EM>
+ be passed through to the active or implied grab object. This is set only by pre-passive handlers which want to filter the event and keep the active or implied grabs from receiving it.</DD>
+<DT>
+MRF_SET_POINTER_IMAGE</DT><DD>
+The pointer should be set to a new image. If this flag is returned, you must also return an optr in the <CODE>
+ptrImage</CODE>
+ field (see below).</DD>
+<DT>
+MRF_CLEAR_POINTER_IMAGE</DT><DD>
+The pointer image will be reset to the default. See <A HREF="Input_a.htm#38997"> Setting the Pointer Image</A>
+.</DD>
+</DL>
+<P>
+If you return MRF_SET_POINTER_IMAGE, you must specify the new image to be set. An object may want to set the pointer to a new image when it is over the object's bounds or during a drag operation. For example, if the user selects a drawing tool, the tool might set the pointer to cross-hairs instead of the default arrow.</P>
+<P>
+To set the pointer's image, you must return the handle and chunk handle of a chunk containing a <CODE>
+PointerDef</CODE>
+ structure. Return it in the form of an optr in the <CODE>
+ptrImage</CODE>
+ field of the return structure. For full information on <CODE>
+PointerDef</CODE>
+ and defining pointer images, see <A HREF="Input_a.htm#38997"> Setting the Pointer Image</A>
+.</P>
+<P>
+If you are not setting the pointer image, return a NullOptr in <CODE>
+ptrImage</CODE>
+. You do not have to return anything in the <CODE>
+unused</CODE>
+ field.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Input_6.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Input_6.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">2 Mouse Input</A> 
+<!-- to next --> | <A HREF="Input_8.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2.2 Gaining the Mouse Grab</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

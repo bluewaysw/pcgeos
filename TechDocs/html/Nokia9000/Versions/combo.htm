@@ -1,0 +1,371 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+<!-- This page was automatically generated from a bunch of smaller pages. -->
+<META NAME="copyright" CONTENT="Copyright GEOWORKS">
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+<TITLE>Versions</TITLE>
+</HEAD>
+<BODY BGCOLOR="#ffffdf">
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+<A NAME="index.htm"></A>
+
+
+
+<H1 CLASS="chapterTitle">
+
+	Versions
+
+</H1>
+<P>
+This chapter discusses various new API features that have been added in recent versions of the Nokia 9000i Communicator. </P>
+
+<P CLASS="sectionlinks">
+<STRONG>
+&nbsp;&nbsp;<A HREF="#Update_1.htm">1 Software Version Number</A><BR>
+&nbsp;&nbsp;<A HREF="#Update_2.htm">2 User's Name</A><BR>
+&nbsp;&nbsp;<A HREF="#Update_3.htm">3 IMEI Code Number</A><BR>
+&nbsp;&nbsp;<A HREF="#Update_4.htm">4 New SMS Header</A><BR>
+&nbsp;&nbsp;<A HREF="#Update_5.htm">5 New Standard Monikers, Bitmaps</A><BR>
+&nbsp;&nbsp;<A HREF="#Update_6.htm">6 Non-exclusive Lists</A><BR>
+&nbsp;&nbsp;<A HREF="#Update_7.htm">7 Incremental Searches</A><BR>
+&nbsp;&nbsp;<A HREF="#Update_8.htm">8 Contact's URL and Password</A><BR>
+&nbsp;&nbsp;<A HREF="#Update_9.htm">9 ContactList Searches</A><BR>
+&nbsp;&nbsp;<A HREF="#Update_a.htm">10 Unknown Phone Numbers</A><BR>
+<!-- &nbsp;&nbsp;<A HREF="#Update_b.htm">11 Detecting Hardware Type</A><BR> -->
+</STRONG>
+</P> <!-- end of sectionlinks blob -->
+
+<HR>
+<A NAME="Update_1.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Versions</A>: 1 
+<A NAME="Update_1.htm_74262">
+ </A>
+Software Version Number</H2>
+<P>
+The INI file contains the version number.  The [ui] category's <EM>
+productName</EM>
+ field will be one of the following strings:</P>
+<UL>
+<LI>
+Responder Build 3.8.8   (original release, does not support features described in this document)</LI>
+<LI>
+Responder Build 4.3.7   (update)</LI>
+<LI>
+Responder Build 4.8.?   (later update) </LI>
+</UL>
+<P>
+There is also a software serial number, in the <EM>
+swSerialNumber</EM>
+ field. This field has the format: 000000/00/AAABBCCDDLLLFKK/0</P>
+<DL>
+<DT>
+<STRONG>
+AAA</STRONG>
+: 	hardware version</DT><DD>
+1st digit: hardware major protocol (2)<BR>
+2nd digit: hardware minor protocol (a)<BR>
+3rd digit: hardware variant number (0)</DD>
+<DT>
+	This is not the actual hardware version, but rather</DT><DD>
+which version the software was compiled for.  All<BR>
+released images are for 2.10.0 (&quot;2a0&quot; hex). </DD>
+<DT>
+<STRONG>
+BB</STRONG>
+: </DT><DD>build major number (03,04)</DD>
+<DT>
+<STRONG>
+CC</STRONG>
+: </DT><DD>build minor number (08,03)</DD>
+<DT>
+<STRONG>
+DD</STRONG>
+: 	build variant number (08,07)</DT><DD>
+Same as for productName, but padded with extra zeros.</DD>
+<DT>
+<STRONG>
+LLL</STRONG>
+: </DT><DD>localization country code (044 = English, 033 = French, 049 = German)</DD>
+<DT>
+<STRONG>
+F</STRONG>
+:   </DT><DD>0=all current releases 1=certain future releases</DD>
+<DT>
+<STRONG>
+KK</STRONG>
+: </DT><DD>keyboard mapping version (01 = English, 02 = French, 03 = German, 04 = Scandinavian)</DD>
+</DL>
+<P>
+Use one of the the <CODE>
+IniFileReadString...()</CODE>
+ routines to find out the value of these INI file fields.</P>
+<P CLASS="figTitle">
+Code Display 13-1 Getting the Software Version Number</P>
+<PRE>@start StringRes;
+  @chunk TCHAR UICategory[] = &quot;ui&quot;;
+  @chunk TCHAR SWSerialNumber[] = &quot;swSerialNumber&quot;;
+@end StringRes;</PRE>
+<PRE>...</PRE>
+<PRE>@method TestProcessClass, MSG_TEST_PROCESS_GET_VERSION
+{
+    TCHAR version[28] = &quot;&quot;;
+    TCHAR *category;
+    TCHAR *key;
+    word  value;</PRE>
+<PRE>    MemLock( OptrToHandle( @UICategory ) );
+    category = (TCHAR *) LMemDeref( @UICategory );
+    key = (TCHAR *) LMemDeref( @SWSerialNumber );</PRE>
+<PRE>    /*
+     * Extract the information you want from version string.
+     */</PRE>
+<PRE>    MemUnlock( OptrToHandle( @UICategory ) );
+}</PRE>
+<HR>
+<A NAME="Update_2.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Versions</A>: 2 
+<A NAME="Update_2.htm_74817">
+ </A>
+User's Name</H2>
+<P>
+The ContDB library has a new function, <CODE>
+ContactGetUserName()</CODE>
+, which returns the user's name.</P>
+<HR>
+<A NAME="Update_3.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Versions</A>: 3 
+<A NAME="Update_3.htm_78371">
+ </A>
+IMEI Code Number</H2>
+<P>
+To read the phone's IMEI number, you will need to use the <CODE>
+EciImeiGet()</CODE>
+ function, provided by the eci library.  This function takes one parameter, a pointer to a buffer to fill with the code number string.  The buffer must be at least 17 bytes long, to hold the null-terminated 16-character code string.  The function returns zero if the IMEI code was read succesfully, non-zero otherwise.</P>
+<P CLASS="figTitle">
+Code Display 13-2 Reading the IMEI Code</P>
+<PRE>@include &lt;eci.goh&gt;</PRE>
+<PRE>...</PRE>
+<PRE>@method TestProcessClass, MSG_TEST_PROCESS_GET_IMEI
+{
+    TCHAR imei[17] = &quot;&quot;;</PRE>
+<PRE>    if ( EciGetImei( imei) == 0)
+    {
+      /*
+       * We got IMEI code, do any check you want.
+       */
+    }</PRE>
+<PRE>    else
+    {
+      /*
+       * For some reason query failed.
+       */
+    }
+}</PRE>
+<HR>
+<A NAME="Update_4.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Versions</A>: 4 
+New SMS Header</H2>
+<P>
+In addition to the old way to send messages to application using their <CODE>
+GeodeToken</CODE>
+ in front of the actual data, a new user data header is now introduced. Otherwise sending and receiving messages has not changed. The new header adopts the concept from Narrow Band Socket specification.</P>
+<P>
+The new header format is //SCKddoo or //SCKLddddoooo where dd (and dddd) represent &quot;destination port&quot; and oo (and oooo) represent &quot;originator port&quot;. Both these headers are terminated with space character.These ports are ascii coded hexadecimal numbers.</P>
+<P>
+Short header covers ports from 0 to 255 (00 to FF in hex) and the longer form from 0 to 65535 (0000 to FFFF in hex).</P>
+<P>
+The range of port numbers is divided to reserved port address range and to dynamic and/or private port address range. Usage of port address range 0 to 49151 is restricted and assignment of a port in this range requires contacting port address assignment authority. The reserved port address range is further divided to ports for &quot;well-known protocols&quot; (range 0 to 239 and 256 to 1024) and to registered ports (range 1025 to 49151). Nokia has reserved ports 5500 to 5599 for company-specific protocols. Port addresses in the dynamic address range 240 to 255 or in the dynamic and/or private address range 49152 to 65535 may be used freely by any vendor.</P>
+<P>
+In order to receive these messages application must register themselves to SMS receive application. This can be done using smreg library. This library offers functions for registering and unregistering.</P>
+<P>
+<CODE>
+SMRegRegisterApplication()</CODE>
+ takes there parameters: <CODE>
+GeodeToken</CODE>
+ of your application, a pointer to buffer containing &quot;port numbers&quot; you register for and number of messages you are registering. Port numbers must be ASCII coded hexadecimal numbers.</P>
+<P CLASS="figTitle">
+Code Display 13-3 Registering to receive &quot;destination port&quot; SMS Messages </P>
+<PRE>@method TestProcessClass,  MSG_TEST_PROCESS_REGISTER
+{
+    GeodeToken appl;
+    TCHAR messageProtocol[5];
+    word protocol;</PRE>
+<PRE>/* We register ourselves to listen port 43962 that is ABBA in hex.  */
+    protocol = 43962;
+    appl.GT_chars[0] = `T';
+    appl.GT_chars[1] = `E';
+    appl.GT_chars[2] = `S';
+    appl.GT_chars[3] = `T';
+    appl.GT_manufID = 11;</PRE>
+<PRE>/* Let's ask smreg library to convert 43962 to ascii coded hex for us. */
+    SMRegIntegerToHex( protocol, messageProtocol, 
+                         SMRITH_NULL_TERMINATE |SMRITH_WORD_LENGTH);</PRE>
+<PRE>/* Now we have messageProtocol = &quot;ABBA&quot; */
+    SMRegRegisterApplication( appl, messageProtocol, 1);
+}</PRE>
+<P>
+You can register more than one port by calling the function:</P>
+<PRE>SMRegRegisterApplication( appl, &quot;ABBADADA0055&quot;, 3); </PRE>
+<P>
+Then you will receive messages ABBA, DADA and 55.</P>
+<P>
+The function returns a <CODE>
+SMRegResult</CODE>
+ value: SMRR_OK if your registration was succesful; otherwise it will be SMRR_FAIL.</P>
+<P>
+<CODE>
+SMRegIntegerToHex()</CODE>
+ function converts passed decimal integers to ascii coded hexadecimal strings. You pass a word containing integer to be converted, a character pointer where the result is stored and flags how the conversion is done. You can convert either byte length integers i.e. 0 to 255 and the result is two characters to word length i.e. 0 to 65535 and the result is four characters. By default the destination string is not null terminated, but if you pass flag SMRITH_NULL_TERMINATE null is added at the end of the string.</P>
+<P>
+If you want to stop receiving messages you can unregister yourself. This can be done using <CODE>
+SMRegUnregisterApplication()</CODE>
+ function. The parameters are identical to SMRegRegisterApplication. In addition SMMR_OK and SMRR_FAIL, this unregister function may return SMRR_APPLICATION_NOT_REGISTERED to indicate that you were not registered to listen this message.</P>
+<P>
+The message routing table is stored to .INI file. You may freely modify it yourself, but it is not recommended. More than one application may want to listen same messages, so writing .INI file direct may cause problems to other applications. The category is <EM>
+SMSRouteTable</EM>
+ and port numbers represent keys underneath.</P>
+<P CLASS="figTitle">
+Code Display 13-4 INI file: SMSRouteTable example</P>
+<P CLASS="figCaption">
+Here TEST application wants to receive messages 00F0 and ABBA and TES2 wants to receive message ABBA.</P>
+<PRE>[SMSRouteTable]
+00F0 = &quot;TEST&quot;,11
+ABBA = { &quot;TEST&quot;,11
+          &quot;TES2&quot;,11 }</PRE>
+<HR>
+<A NAME="Update_5.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Versions</A>: 5 
+<A NAME="Update_5.htm_18220">
+ </A>
+New Standard Monikers, Bitmaps</H2>
+<P>
+There are new ComplexMonikerType values and a new ComplexMonikerBitmap:</P>
+<UL>
+<LI>
+CMT_MENU    Useful for &quot;Menu&quot; buttons.</LI>
+<LI>
+CMT_SEARCH</LI>
+<LI>
+CMB_SEARCH</LI>
+</UL>
+<HR>
+<A NAME="Update_6.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Versions</A>: 6 
+<A NAME="Update_6.htm_60110">
+ </A>
+Non-exclusive Lists</H2>
+<P>
+GenItemGroups may now be of type GIGBT_NON_EXCLUSIVE, allowing the user to select more than one item at a time. </P>
+<P>
+<CODE>
+GenItemGroupClass</CODE>
+ now has two new messages which allow you to get and set which item has the &quot;focus&quot;--which single item the user currently has highlighted, as opposed to the selected items: </P>
+<UL>
+<LI>
+MSG_GEN_ITEM_GROUP_GET_FOCUS_ITEM</LI>
+<LI>
+MSG_GEN_ITEM_GROUP_SET_FOCUS_ITEM</LI>
+</UL>
+
+<H5 CLASS="HeadingD">
+ContactLists:</H5>
+<P>
+If you are using a ContactList (from the Contact DB library), youmay set it up for multiple selections by giving it a ATTR_CONTACT_LIST_NON_EXCLUSIVE_LIST variable data field.  To find out which records are selected in such a list, use <CODE>
+MSG_CONTACT_LIST_GET_IDS_OF_SELECTED_RECORDS.</CODE>
+</P>
+
+<HR>
+<A NAME="Update_7.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Versions</A>: 7 
+<A NAME="Update_7.htm_84077">
+ </A>
+Incremental Searches</H2>
+<P>
+To allow the user to narrow the choices shown in a list when they type into a text entry, use two new classes in the Foam library: FilterListClass and FilterTextClass.  Their API may be found in the include file foam.goh.</P>
+<P>
+These classes are only available after Build 4. Check the &quot;<CODE>
+F</CODE>
+&quot; field of the version number, as described above.</P>
+<HR>
+<A NAME="Update_8.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Versions</A>: 8 
+<A NAME="Update_8.htm_99749">
+ </A>
+Contact's URL and Password</H2>
+<P>
+The Contact DB Library has four new ContactFieldType values:
+CFT_TEL_FAX,
+CFT_TEL_DATA,
+CFT_URL and CFT_PASSWORD.</P>
+<P>
+These values are only available after Build 4. Check the &quot;<CODE>
+F</CODE>
+&quot; field of the version number, as described above.</P>
+<HR>
+<A NAME="Update_9.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Versions</A>: 9 
+<A NAME="Update_9.htm_36246">
+ </A>
+ContactList Searches</H2>
+<P>
+Normally, a ContactList will lose track of the user's current search if the focus moves to another object.  To force the list to remember the current search, send it a MSG_CONTACT_LIST_PRESERVE_SEARCH_ON_NEXT_LOST_FOCUS before it loses the focus.</P>
+<P>
+This message is only available after Build 4. Check the &quot;<CODE>
+F</CODE>
+&quot; field of the version number, as described above.</P>
+<HR>
+<A NAME="Update_a.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Versions</A>: 10 
+<A NAME="Update_a.htm_25122">
+ </A>
+Unknown Phone Numbers</H2>
+<P>
+If the user enters a valid phone number in the search box of aContactList, but that number is not found, an application mayrequest that the ContactList send out a notification using a new variable data field.</P>
+<P>
+Give the ContactList a ATTR_CONTACT_LIST_NOTIFY_NUMBER_ENTERED_MSG variable data field.  This field's data is a message.</P>
+<P>
+The message should have parameters:</P>
+<PRE>  void MSG_MY_CL_NOTIFY( MemHandle phNumber = cx);</PRE>
+<P>
+The passed block contains the phone number string. The message's recipient is responsible for freeing the passed block.</P>
+<P>
+When using the Contact Log library to log a contact, if you don't know the phone number, you can pass LEF_WILDCARD_NUMBER to <CODE>
+LogAddEntry() </CODE>
+to specify that this call's number should match any phone number.</P>
+<P>
+&nbsp;</P>
+<HR>
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+</BODY>
+</HTML>

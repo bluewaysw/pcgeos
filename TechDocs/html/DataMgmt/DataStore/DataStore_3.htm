@@ -1,0 +1,144 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: DataStore_3.htm,v 1.3 97/09/05 10:33:11 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Adding Fields</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">DataStore Library</A>: 2.1 <A HREF="DataStore_2.htm">Creating a DataStore</A>: 
+<A NAME="81832">
+ </A>
+Adding Fields</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="DataStore_2.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="DataStore_2.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">2 Creating a DataStore</A> 
+<!-- to next --> | <A HREF="DataStore_4.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2.2 Adding Records</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>DataStoreAddField()</PRE>
+<P>
+Once you've created a new datastore, you can add (non-key) fields at any time with <CODE>
+DataStoreAddField()</CODE>
+. When adding fields, keep in mind:</P>
+<UL>
+<LI>
+The maximum size of a field name is MAX_FIELD_NAME_LENGTH or 40.</LI>
+<LI>
+When defining fields, note the difference between <CODE>
+FieldType</CODE>
+ and<CODE>
+ FieldCategory</CODE>
+.<CODE>
+ FieldType</CODE>
+ specifies the type of data stored in the field, such as DSFT_STRING; <CODE>
+FieldCategory</CODE>
+ defines what type of information that data represents, such as a phone number (FC_TELEPHONE). See the C Reference Book for a full list of <CODE>
+FieldTypes</CODE>
+ and <CODE>
+FieldCategories</CODE>
+.</LI>
+</UL>
+<P>
+The following code sample shows how to create a datastore that contains three fields, one of which is the key.</P>
+<P CLASS="figTitle">
+Code Display 9-1 Creating a New DataStore</P>
+<PRE>	/* 
+	 * When a new datastore is created, the DataStore Manager
+	 * opens a &quot;session&quot; and returns a &quot;session&quot; token
+	 */
+	word	dsToken;</PRE>
+<PRE>	/* 
+	 * DataStoreCreateParams contains information about
+	 * the new datastore, such as key field(s) and access level
+	 */
+	DataStoreCreateParams	params;</PRE>
+<PRE>	/*
+	 * FieldDescriptor contains information about
+	 * a field, such as its name and type
+	 */
+	FieldDescriptor	field;</PRE>
+<PRE>	/*
+	 * This example will be an &quot;Exchange Rate&quot; datastore with three fields
+	 */
+	static TCHAR dsName[] = &quot;Exchange Rates&quot;;
+	static TCHAR field1[] = &quot;country&quot;;
+	static TCHAR field2[] = &quot;currency&quot;;
+	static TCHAR field3[] = &quot;exchange rate&quot;;</PRE>
+<PRE>	/*
+	 * Define the &quot;country&quot; field; this will become the key field
+	 */
+	field.FD_name = field1;
+	field.FD_data.FD_type = DSFT_STRING;
+	field.FD_data.FD_category = FC_NAME;
+	field.FD_data.FD_flags = 0;	/* use ascending sort order */</PRE>
+<PRE>	/*
+	 * Set the parameters for the new DataStore file:
+	 *   - add a timestamp field (this becomes the first field)
+	 *   - define the key field (the key cannot be changed later)
+	 *   - designate which object is to receive notifications
+	 * 	when the DataStore is changed
+	 */
+	params.DSCP_name = dsName;
+	params.DSCP_flags = DSF_TIMESTAMP;
+	params.DSCP_keyList = &amp;field; /* &quot;country&quot; field defined above */
+	params.DSCP_keyCount = 1;
+	params.DSCP_notifObject = oself; /* &quot;oself&quot; refers to the object handling
+			this message; in this case, it is the process object */
+	params.DSCP_openFlags = 0; /* make the datastore sharable between apps */</PRE>
+<PRE>	/* 
+	 * Now create the new datastore file. If it is successfully created,
+	 * add the additional fields.
+	 */
+	if(DataStoreCreate(&amp;params, &amp;dsToken) == DSE_NO_ERROR)
+	{
+		/* 
+		 * DataStoreAddField() returns the FieldID of the newly
+		 * created field to the passed FieldID variable (i.e., fid).
+		 */</PRE>
+<PRE>		FieldID		fid;</PRE>
+<PRE>		/* add currency field */
+		field.FD_name = field2;
+		field.FD_data.FD_type = DSFT_STRING;
+		field.FD_data.FD_category = FC_NONE;
+		field.FD_data.FD_flags = 0;	/* use ascending sort order */
+		DataStoreAddField(dsToken, &amp;field, &amp;fid);</PRE>
+<PRE>		/* add exchange rate field */
+		field.FD_name = field3;
+		field.FD_data.FD_type = DSFT_FLOAT;
+		field.FD_data.FD_category = FC_NONE;
+		field.FD_data.FD_flags = 0;	/* use ascending sort order */
+		DataStoreAddField(dsToken, &amp;field, &amp;fid);
+	}</PRE>
+<P>
+Below is a diagram of the &quot;Exchange Rates&quot; datastore created in the above code example. The following section discusses how to add records to the datastore.</P>
+<P>
+Note that fields of type DSFT_FLOAT expect data of type <CODE>
+FloatNum</CODE>
+ (a special GEOS data type that differs from the standard C float type; see <A HREF="../../Libraries/Math/index.htm">the Math chapter</A>for additional information on <CODE>
+FloatNum</CODE>
+s). 
+<IMG SRC="DataStore_3_exchangeRates.gif">
+
+</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="DataStore_2.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="DataStore_2.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">2 Creating a DataStore</A> 
+<!-- to next --> | <A HREF="DataStore_4.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2.2 Adding Records</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

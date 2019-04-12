@@ -1,0 +1,99 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: MultiThread_10.htm,v 1.1 97/06/02 15:31:39 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Semaphores: The Concept</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Threads and Semaphores</A>: 5.1 <A HREF="MultiThread_f.htm">Synchronizing Threads</A>: 
+Semaphores: The Concept</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="MultiThread_f.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="MultiThread_f.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">5 Synchronizing Threads</A> 
+<!-- to next --> | <A HREF="MultiThread_11.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5.2 Semaphores In GEOS</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+<A NAME="IX_Semaphores:threads">
+ </A>
+A semaphore is a data structure on which three basic operations are performed. These operations allow threads to avoid conflicting with other threads. Think of a semaphore as a flag which programs can set to indicate that some resource is locked. Anyone else who wants to use the resource must wait in line until whoever set the flag resets it. The three basic operations on a semaphore are initialize, set, and reset.</P>
+
+<H2 CLASS="HeadingCApp">
+Initialize</H2>
+<P>
+The &quot;initialize&quot; operation creates a semaphore and gives it a name. In its initial state, the semaphore is &quot;unlocked,&quot; meaning the first process that attempts to access it will succeed right away. A semaphore must be initialized before it can be used, although the initialization can be handled by the operating system so that it is transparent to the programmer.</P>
+
+
+<H2 CLASS="HeadingCApp">
+Set (the &quot;P&quot; Operation)</H2>
+<P>
+The &quot;P&quot; operation is what a program performs in order to make sure it is allowed to proceed. For example, if the program is about to access shared data, it performs the &quot;P&quot; operation on the semaphore protecting that data to make sure no other program is accessing it.</P>
+<P>
+If the semaphore is unlocked and a thread performs the &quot;P&quot; operation on it, the thread simply marks the semaphore locked and proceeds normally. If the semaphore is locked, a thread performing the &quot;P&quot; operation will <EM>
+block</EM>
+. This means the thread will stop running and will wait in the thread queue associated with the semaphore. When its turn to perform the protected operation arrives, the thread will proceed.</P>
+
+
+<H2 CLASS="HeadingCApp">
+Reset (the &quot;V&quot; Operation)</H2>
+<P>
+When a thread has finished a protected operation, it performs the &quot;V&quot; operation to unlock the semaphore. If there are other threads in the queue for this semaphore, one of them is restarted and takes over, keeping the semaphore locked. Thus only one thread at a time runs the protected operation. If a thread performs the &quot;V&quot; operation on a semaphore and there are no other threads waiting in the semaphore's queue, the thread simply marks the semaphore unlocked and proceeds.</P>
+<P>
+Programs must always reset a semaphore when they are done with it. If you fail to reset a semaphore, other threads may wait forever.</P>
+<P>
+Because only one thread at a time is performing the protected operation and this thread is responsible for unlocking the semaphore, it is sometimes said to &quot;have&quot; the semaphore. The &quot;P&quot; and &quot;V&quot; operations are often referred to as &quot;grabbing&quot; and &quot;releasing&quot; a semaphore, respectively.</P>
+
+
+<H2 CLASS="HeadingCApp">
+The Dreaded Deadlock Problem</H2>
+<P>
+<A NAME="IX_Deadlock">
+ </A>
+When semaphores are not used carefully, they can cause programs to stop running entirely. Suppose Thread A tries to grab a semaphore which Thread B has locked. Thread A stops running until Thread B releases the semaphore. Thread B then tries to grab a second semaphore, which Thread A has previously locked. Thread B waits for Thread A to release the second semaphore, but Thread A is waiting for Thread B to release the first semaphore. Neither thread will ever wake up. This situation is called &quot;deadlock.&quot;</P>
+<P>
+To avoid deadlock, follow these guidelines:
+
+</P>
+<UL>
+<LI>
+When possible, avoid having a thread attempt to lock one semaphore while it already has another one locked.</LI>
+<LI>
+When two or more semaphores may be locked by the same thread at the same time, they should always be used in the same order. Semaphores are often arranged in a hierarchy, with the coarsest (the one controlling access to the most resources) at the top and the finest at the bottom. Any thread grabbing multiple semaphores in this hierarchy must always grab from top to bottom; that is, no thread should grab a semaphore &quot;above&quot; one it already has locked.</LI>
+<LI>
+In certain situations, a semaphore is used &quot;between&quot; two threads. One thread needs to wait until another performs a specific action. The first thread is said to &quot;block&quot; on the second. Of course, two threads must never block on each other. To ensure this situation never arises, only one of the threads should use the <CODE>
+@call</CODE>
+ keyword when sending messages to the other; the other should always use <CODE>
+@send</CODE>
+ and, when getting return information, have some sort of notification message sent in response.</LI>
+<LI>
+When using the GEOS messaging system to send a message with <CODE>
+@call</CODE>
+ to an object in another thread, the sending thread automatically blocks on the receiving thread. Since a number of user interface objects must be sent messages with <CODE>
+@call</CODE>
+, the application thread sometimes blocks on the user interface thread. To avoid deadlock, code that runs in the user interface thread must never send messages with <CODE>
+@call</CODE>
+ to objects in the application thread. (This is a particular example of the above rule being implemented.)</LI>
+</UL>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="MultiThread_f.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="MultiThread_f.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">5 Synchronizing Threads</A> 
+<!-- to next --> | <A HREF="MultiThread_11.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5.2 Semaphores In GEOS</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

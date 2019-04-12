@@ -1,0 +1,429 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: VisContent_5.htm,v 1.1 97/06/02 16:53:26 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Fields That Affect Input Events</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">VisContent</A>: 1.4 <A HREF="VisContent_1.htm">VisContent Instance Data</A>: 
+Fields That Affect Input Events</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VisContent_1.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VisContent_4.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1.3 Fields That Affect the Document</A> 
+<!-- to next --> | <A HREF="VisContent_6.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">2 Basic VisContent Usage</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+<A NAME="IX_Input:with VisContents">
+ </A>
+One of the main features of <CODE>
+VisContentClass</CODE>
+ is its ability to handle, manage, and pass on input events sent through the GenView. The content has a large amount of functionality built into it to provide these features.</P>
+
+<H2 CLASS="HeadingC">
+Mouse and Keyboard Grabs</H2>
+<PRE>VCNI_prePassiveMouseGrabList, VCNI_impliedMouseGrab, VCNI_activeMouseGrab, VCNI_postPassiveMouseGrabList, VCNI_kbdGrab, MSG_VIS_CONTENT_UNWANTED_MOUSE_EVENT, MSG_VIS_CONTENT_UNWANTED_KBD_EVENT, MSG_VIS_CONTENT_TEST_IF_ACTIVE_OR_IMPLIED_WIN</PRE>
+<P>
+<CODE>
+VisContentClass</CODE>
+<A NAME="IX_Keyboard:grabbing">
+ </A>
+<A NAME="IX_Mouse:grabbing">
+ </A>
+, as the head of the visible tree displayed in the view, keeps track of which object in its tree has each different type of input grab. With this information, the content can simply pass the input event directly to the object that has the grab. It can also easily send the event to both the prepassive and postpassive grab objects, if any.</P>
+<P>
+<DL>
+To do this, it uses five instance fields that applications can not directly access. These fields are altered by the messages that allow an object to gain and release the subject grab. (These messages are all detailed in <A HREF="../../UI/VisClass/VisClass_f.htm#65723">the VisClass chapter</A>.) The instance fields are listed below:</P><DT>
+<CODE>
+VCNI_prePassiveMouseGrabList</DT><DD>
+</CODE>
+<A NAME="IX_VCNI_prePassiveMouseGrabList">
+ </A>
+This field is a pointer to a chunkarray containing the list of objects that currently have the prepassive mouse grab.</DD>
+<DT>
+<CODE>
+VCNI_impliedMouseGrab</DT><DD>
+</CODE>
+<A NAME="IX_VCNI_impliedMouseGrab">
+ </A>
+This field is a <CODE>
+VisMouseGrab</CODE>
+ (described below) structure that contains details about the object which has the implied mouse grab.</DD>
+<DT>
+<CODE>
+VCNI_activeMouseGrab</DT><DD>
+</CODE>
+<A NAME="IX_VCNI_activeMouseGrab">
+ </A>
+This field is a <CODE>
+VisMouseGrab</CODE>
+ (described below) structure that contains details about the object which has the active mouse grab.</DD>
+<DT>
+<CODE>
+VCNI_postPassiveMouseGrabList</DT><DD>
+</CODE>
+<A NAME="IX_VCNI_postPassiveMouseGrabList">
+ </A>
+This field is a pointer to a chunkarray containing the list of objects that currently have the postpassive mouse grab.</DD>
+<DT>
+<CODE>
+VCNI_kbdGrab</DT><DD>
+</CODE>
+<A NAME="IX_VCNI_kbdGrab">
+ </A>
+This field is a <CODE>
+KbdGrab</CODE>
+ structure that contains details about the object which currently has the keyboard grab.</DD>
+</DL>
+<P>
+You will probably not ever have to know the structure of these fields, how to set them, or the information they contain. However the two structures <CODE>
+VisMouseGrab</CODE>
+ and <CODE>
+KbdGrab</CODE>
+ are shown in <A HREF="VisContent_5.htm#35365"> Grab Data Structures</A>
+ for your information.</P>
+<P CLASS="figTitle">
+Code Display 17-2 <A NAME="35365">
+ </A>
+Grab Data Structures</P>
+<PRE>/* These structures are obscure, and you will likely never have to use them. */</PRE>
+<PRE><A NAME="IX_VMG_&ldots;"> </A><A NAME="IX_VisMouseGrab"> </A>/* The VisMouseGrab structure contains information about the object that
+ * currently has the mouse grab. */</PRE>
+<PRE>typedef struct {
+    optr		VMG_object;		/* The optr of the object that has the grab.
+				 * If no object has the grab, this is zero. */
+    WindowHandle		VMG_gWin;		/* The window handle of the window with the object
+				 * having the grab, if it's different from
+				 * the content's window. If it's in the content's
+				 * window, this field contains zero.	*/
+    PointDWord		VMG_translation;		/* The 32-bit translation applied to mouse events
+				 * if the large document model is in use. This is
+				 * set with a previous message call. */
+    VisInputFlowGrabFlags VMG_flags; /* A record of VisInputFlowGrabFlags,
+				   * described below. */
+    byte		VMG_unused;		/* Reserved byte. */
+} VisMouseGrab;</PRE>
+<PRE>/* The VisInputFlowGrabFlags determine the type and context of the grab. These
+ * flags are not listed here for simplicity. You do not have to know these flags;
+ * they are set with MSG_VIS_VUP_ALTER_INPUT_FLOW. */</PRE>
+<PRE><A NAME="IX_KG_&ldots;"> </A><A NAME="IX_KbdGrab"> </A>/* The KbdGrab structure contains information about the object that currently
+ * has the keyboard grab. */</PRE>
+<PRE>typedef struct {
+    optr		KG_OD;		/* The optr of the object that has the
+				 * keyboard grab. */
+    word		KG_unused;		/* Reserved word. */
+} KbdGrab;</PRE>
+<P>
+In addition, the VisContent has the following messages that are affected by the input grab fields:</P>
+<DL>
+<DT>
+<CODE>
+MSG_VIS_CONTENT_TEST_IF_ACTIVE_OR_IMPLIED_WIN</DT><DD>
+</CODE>
+This message returns <CODE>
+true</CODE>
+ if the passed window handle is the same as the active or implied window currently translating mouse events. It returns <CODE>
+false</CODE>
+ otherwise. This is used by specific UI objects.</DD>
+<DT>
+<CODE>
+MSG_VIS_CONTENT_UNWANTED_MOUSE_EVENT</DT><DD>
+</CODE>
+This message is sent by the content to itself if a mouse event has arrived and there is no implied or active grab in the content's visible tree. The default reaction is to beep if the event is a button press. It's highly unlikely that you'll send or intercept this message.</DD>
+<DT>
+<CODE>
+MSG_VIS_CONTENT_UNWANTED_KBD_EVENT</DT><DD>
+</CODE>
+This message is sent by the content to itself if a keyboard event has arrived and there is no keyboard grab set up. It is highly unlikely that you will ever send or intercept this message.</DD>
+
+</DL>
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_CONTENT_TEST_IF_ACTIVE_OR_IMPLIED_WIN">
+ </A>
+MSG_VIS_CONTENT_TEST_IF_ACTIVE_OR_IMPLIED_WIN</H4>
+<PRE CLASS="syntax">Boolean	MSG_VIS_CONTENT_TEST_IF_ACTIVE_OR_IMPLIED_WIN(
+        WindowHandle window);</PRE>
+<P>
+This message checks to see if the passed window handle is the same as the window of the object having either the implied or active mouse grab. This is typically used by objects in a Specific UI library to determine if the mouse event was actually within the window or directly on the window's border.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any VisContent object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+window</CODE>
+	The window handle to be checked.</P>
+<P CLASS="refField">
+Return:	<CODE>
+True</CODE>
+ if the window handle is the same as either the active or the implied window, <CODE>
+false</CODE>
+ otherwise.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_CONTENT_UNWANTED_MOUSE_EVENT">
+ </A>
+MSG_VIS_CONTENT_UNWANTED_MOUSE_EVENT</H4>
+<PRE CLASS="syntax">void	MSG_VIS_CONTENT_UNWANTED_MOUSE_EVENT(
+        VisMouseGrab *mouseGrab,
+        word	inputState);</PRE>
+<P>
+This message is received by the content if a mouse event was received and there was no active or implied grab. This is most frequently encountered when the user presses a mouse button outside a modal dialog box. The default action of this handler is to beep (on presses only, not releases) and get rid of the event as if it had been handled.</P>
+<P CLASS="refField">
+Source:	Input flow mechanism.</P>
+<P CLASS="refField">
+Destination:	The affected VisContent object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+mouseGrab</CODE>
+	A pointer to the appropriate <CODE>
+VisMouseGrab</CODE>
+ structure.</P>
+<DL>
+<DT>
+<CODE>
+inputState</CODE>
+</DT><DD>Same as passed with the actual event.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_CONTENT_NOTIFY_ACTIVE_MOUSE_GRAB_WIN_CHANGED">
+ </A>
+MSG_VIS_CONTENT_NOTIFY_ACTIVE_MOUSE_GRAB_WIN_CHANGED</H4>
+<PRE CLASS="syntax">void 	MSG_VIS_CONTENT_NOTIFY_ACTIVE_MOUSE_GRAB_WIN_CHANGED();</PRE>
+<P>
+A message we send ourselves from within our <CODE>
+MSG_VIS_VUP_ALTER_INPUT_FLOW</CODE>
+ handler in the case that <CODE>
+VCNI_activeMouseGrab</CODE>
+.<CODE>
+VMG_gWin</CODE>
+ changes.  Used by the specific UI's implementation of <CODE>
+GenApplicationClass</CODE>
+ to keep track of the currently active window within the application.</P>
+<P CLASS="refField">
+Source:	See above.</P>
+<P CLASS="refField">
+Destination:	Self.</P>
+<P CLASS="refField">
+Parameters:	None</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Intercepted by specific UI's implementation of GenApplication for the purpose of finding out a change in the active window within the application has occurred.  It will in turn update the window system so that mouse grabs and pointer image changes work properly.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_CONTENT_UNWANTED_KBD_EVENT">
+ </A>
+MSG_VIS_CONTENT_UNWANTED_KBD_EVENT</H4>
+<PRE CLASS="syntax">void	MSG_VIS_CONTENT_UNWANTED_KBD_EVENT(
+        word	character,
+        word	flags,
+        word	state);</PRE>
+<P>
+This message will be received by the content if a keyboard event was sent and there was no keyboard grab set up. The default action of the content is to beep (on presses only, not releases) and return as if the event had been processed.</P>
+<P CLASS="refField">
+Source:	Input flow mechanism.</P>
+<P CLASS="refField">
+Destination:	The affected VisContent object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+character</CODE>
+	The keyboard character pressed.</P>
+<DL>
+<DT>
+<CODE>
+flags</CODE>
+</DT><DD>A word of flags: The low byte is a <CODE>
+CharFlags</CODE>
+ record, and the high byte is a <CODE>
+ShiftState</CODE>
+ record. Both are the same as passed with the original <CODE>
+MSG_META_KBD_CHAR</CODE>
+.</DD>
+<DT>
+<CODE>
+state</CODE>
+</DT><DD>A word containing two values: The low byte is a record of <CODE>
+ToggleState</CODE>
+, and the high byte is the scan code. Both are the same as passed with the original <CODE>
+MSG_META_KBD_CHAR</CODE>
+.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+
+<H2 CLASS="HeadingC">
+Focus and Target</H2>
+<PRE>VCNI_focusExcl, VCNI_targetExcl, MSG_META_CONTENT_APPLY_DEFAULT_FOCUS</PRE>
+<P>
+<A NAME="IX_VCNI_targetExcl">
+ </A>
+<A NAME="IX_VCNI_focusExcl">
+ </A>
+In addition to keeping track of which of its children have the mouse and keyboard grabs, the content also keeps track of which objects have the focus and target input exclusives. Both <CODE>
+VCNI_focusExcl</CODE>
+ and <CODE>
+VCNI_targetExcl</CODE>
+ contain a structure of type <CODE>
+FTVMCGrab</CODE>
+ that describes the object that has the subject exclusive. The messages sent by the GenView that set these fields are described in <A HREF="VisContent_8.htm#94321"> Messages Received from the View</A>
+.</P>
+
+
+<H2 CLASS="HeadingC">
+Input Flow Control</H2>
+<PRE>VCNI_holdUpInputQueue, VCNI_holdUpInputCount, VCNI_holdUpInputFlags, MSG_VIS_CONTENT_HOLD_UP_INPUT_FLOW, MSG_VIS_CONTENT_RESUME_INPUT_FLOW, MSG_VIS_CONTENT_DISABLE_HOLD_UP, MSG_VIS_CONTENT_ENABLE_HOLD_UP</PRE>
+<P>
+GEOS<A NAME="IX_Input:holding up">
+ </A>
+ allows a visible tree to hold up input--that is, input will be stored elsewhere while the visible tree is doing something else. This can be useful if complex tree operations are going on and you don't want input to go to the wrong object.</P>
+<P>
+<CODE>
+VisContentClass</CODE>
+ provides three instance fields that define the input holdup mechanism. These three fields are</P>
+<DL>
+<DT>
+<CODE>
+VCNI_holdUpInputQueue</DT><DD>
+</CODE>
+<A NAME="IX_VCNI_holdUpInputQueue">
+ </A>
+This field contains the queue handle of the queue where held-up input will be temporarily stored. Input events will go into this event queue until they are allowed to be handled again; then they will be sent to their proper recipients.</DD>
+<DT>
+<CODE>
+VCNI_holdUpInputCount</DT><DD>
+</CODE>
+<A NAME="IX_VCNI_holdUpInputCount">
+ </A>
+This field contains a count of the number of objects that have requested that input be held up. If this count is positive, input will be held up and input events will go into the hold-up queue.</DD>
+<DT>
+<CODE>
+VCNI_holdUpInputFlags</DT><DD>
+</CODE>
+<A NAME="IX_VCNI_holdUpInputFlags">
+ </A>
+This field contains a record of flags which determine the state of the hold-up mechanism. The following two flags are allowed:</DD>
+<DT>
+	HUIF_FLUSHING_QUEUE</DT><DD>
+This flag indicates that the hold-up queue is currently being flushed.</DD>
+<DT>
+	HUIF_HOLD_UP_MODE_DISABLED</DT><DD>
+This flag forces input events to flow normally. It is used primarily by GEOS to ensure that the user can interact with a system-modal dialog box.</DD>
+</DL>
+<P>
+<CODE>
+VisContentClass</CODE>
+ has four messages that it sends to itself to set the state of information hold-up. These messages are detailed below.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_CONTENT_HOLD_UP_INPUT_FLOW">
+ </A>
+MSG_VIS_CONTENT_HOLD_UP_INPUT_FLOW</H4>
+<PRE CLASS="syntax">void	MSG_VIS_CONTENT_HOLD_UP_INPUT_FLOW();</PRE>
+<P>
+This message increments the count in <CODE>
+VCNI_holdUpInputCount</CODE>
+. If this count is nonzero and HUIF_HOLD_UP_MODE_DISABLED is clear, subsequent input events will be sent into the hold-up queue until either the flag is set or the count once more drops to zero.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any VisContent object.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+<P CLASS="refField">
+Warnings:	Do not forget to resume input with a later use of the message <CODE>
+MSG_VIS_CONTENT_RESUME_INPUT_FLOW</CODE>
+.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_CONTENT_RESUME_INPUT_FLOW">
+ </A>
+MSG_VIS_CONTENT_RESUME_INPUT_FLOW</H4>
+<PRE CLASS="syntax">void	MSG_VIS_CONTENT_RESUME_INPUT_FLOW();</PRE>
+<P>
+This message decrements the count in <CODE>
+VCNI_holdUpInputCount</CODE>
+. If the count becomes zero with this call, the hold-up event queue is flushed and all the events in it are &quot;played back.&quot; If the count goes below zero, GEOS will give an error. Therefore, do not use this message unless it is preceded with a <CODE>
+MSG_VIS_CONTENT_HOLD_UP_INPUT_FLOW</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any VisContent object.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+<P CLASS="refField">
+Warnings:	If this message is used without first holding up input with <CODE>
+MSG_VIS_CONTENT_HOLD_UP_INPUT_FLOW</CODE>
+, an error will be the likely result. The error condition is the <CODE>
+VCNI_holdUpInputCount</CODE>
+ field going below zero.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_CONTENT_DISABLE_HOLDUP">
+ </A>
+MSG_VIS_CONTENT_DISABLE_HOLD_UP</H4>
+<PRE CLASS="syntax">void	MSG_VIS_CONTENT_DISABLE_HOLD_UP();</PRE>
+<P>
+This message sets the HUIF_HOLD_UP_MODE_DISABLED flag, forcing all input events to flow normally until the flag is cleared. In essence, it turns off the hold-up mechanism.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any VisContent object.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_CONTENT_ENABLE_HOLDUP">
+ </A>
+MSG_VIS_CONTENT_ENABLE_HOLD_UP</H4>
+<PRE CLASS="syntax">void	MSG_VIS_CONTENT_ENABLE_HOLD_UP();</PRE>
+<P>
+This message clears the HUIF_HOLD_UP_MODE_DISABLED flag, allowing input events to be held up in the hold-up event queue.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any VisContent object.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="VisContent_1.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="VisContent_4.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1.3 Fields That Affect the Document</A> 
+<!-- to next --> | <A HREF="VisContent_6.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">2 Basic VisContent Usage</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

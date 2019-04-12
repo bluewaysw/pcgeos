@@ -1,0 +1,155 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: GCN_4.htm,v 1.1 97/06/02 15:27:07 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Registering for System Notification</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">General Change Notification</A>: 3.1 <A HREF="GCN_3.htm">System Notification</A>: 
+<A NAME="42042">
+ </A>
+Registering for System Notification</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GCN_3.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GCN_3.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">3 System Notification</A> 
+<!-- to next --> | <A HREF="GCN_5.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.2 Handling System Notification</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+Whenever an object or process needs to be notified of some system change, it must call the routine <CODE>
+GCNListAdd() </CODE>
+to add itself to the list for that particular change.<A NAME="IX_GCNListAdd()">
+ </A>
+ <CODE>
+GCNListAdd</CODE>
+() finds the appropriate general change notification list--creating a new one if none currently exists--and adds the optr of the new object to the end of that list. You may add the optr to the GCN list at any time during the process' or object's life, but it is usually convenient for a process to be added in its <CODE>
+MSG_GEN_PROCESS_OPEN_APPLICATION </CODE>
+or for an object that is on the active list to be added in its <CODE>
+MSG_META_ATTACH </CODE>
+handler. </P>
+<P>
+Each optr in a GCN list should have a notification ID attached to it. (The combination of a manufacturer ID and a notification type comprises an element's specific notification ID.) <CODE>
+GCNListAdd() </CODE>
+must be passed the optr of the object to add, along with a notification ID. For each separate notification ID, a separate GCN list is needed and will be created automatically. </P>
+<P>
+<A NAME="IX_GCNSLT_&ldots;">
+ </A>
+<A NAME="IX_GCNStandardListType">
+ </A>
+The GCN routines use a word of data, <CODE>
+GCNStandardListType</CODE>
+, to represent the notification type. The currently recognized <CODE>
+GCNStandardListType</CODE>
+ types for MANUFACTURER_ID_GEOWORKS are</P>
+<UL>
+<LI>
+GCNSLT_FILE_SYSTEM<BR>
+This <CODE>
+GCNStandardListType</CODE>
+ is used for notification of a file system change. Parties on this list will receive the system messages <CODE>
+MSG_NOTIFY_FILE_CHANGE</CODE>
+ and <CODE>
+MSG_NOTIFY_DRIVE_CHANGE</CODE>
+.</LI>
+<LI>
+GCNSLT_APPLICATION<BR>
+This <CODE>
+GCNStandardListType</CODE>
+ is used for notification of a starting or exiting application. Parties on this list will receive the system messages MSG_NOTIFY_APP_STARTED and <CODE>
+MSG_NOTIFY_APP_EXITED</CODE>
+.</LI>
+<LI>
+GCNSLT_DATE_TIME<BR>
+This <CODE>
+GCNStandardListType</CODE>
+ is used for notification of a date/time change in the system's internal clock.<CODE>
+ </CODE>
+Note that this will not tell you about timer ticks--the only time changes that will come up are those resulting from system restarts and time changes by the user. Parties on this list will receive the system message <CODE>
+MSG_NOTIFY_DATE_TIME_CHANGE.</CODE>
+ This message does not pass any further information, so your message handler should be able to take care of any changes by itself (such as calling the internal clock for an updated value).</LI>
+<LI>
+GCNSLT_DICTIONARY<BR>
+This <CODE>
+GCNStandardListType</CODE>
+ is used for notification of a user dictionary change. Parties on this list will receive the system message <CODE>
+MSG_NOTIFY_USER_DICT_CHANGE.</CODE>
+</LI>
+<LI>
+GCNSLT_KEYBOARD_OBJECTS<BR>
+This list is used for notification when the user has chosen a different keyboard layout. Parties on this list will receive the system message MSG_NOTIFY_KEYBOARD_LAYOUT_CHANGE.</LI>
+<LI>
+GCNSLT_EXPRESS_MENU_CHANGE<BR>
+This <CODE>
+GCNStandardListType</CODE>
+ notifies various system utilities that an express menu has been created or destroyed. The recipient receives the optr of the Express Menu Control. This list should be used in conjunction with the GCNSLT_EXPRESS_MENU_OBJECTS list. Objects on this list receive MSG_NOTIFY_EXPRESS_MENU_CHANGE, which itself passes a <CODE>
+GCNExpressMenuNotificationType</CODE>
+ (either GCNEMNT_CREATED or GCNEMNT_DESTROYED) and the optr of the Express Menu Control affected. </LI>
+<LI>
+GCNSLT_INSTALLED_PRINTERS<BR>
+This list notifies objects when a printer is either installed or removed. The recipient of MSG_PRINTER_INSTALLED_REMOVED might want to call <CODE>
+SpoolGetNumPrinters() </CODE>
+to learn if any printer or fax drivers are currently installed.</LI>
+<LI>
+GCNSLT_SHUTDOWN_CONTROL<BR>
+This <CODE>
+GCNStandardListType</CODE>
+ is used for system shutdown control. <A NAME="IX_GCNShutdownControlType">
+ </A>
+Parties on a list of this type will receive the system message MSG_META_CONFIRM_SHUTDOWN which itself passes a <CODE>
+GCNShutdownControlType</CODE>
+ (either GCNSCT_SUSPEND, GCNSCT_SHUTDOWN, or GCNSCT_UNSUSPEND). Shutdown Control is documented in <A HREF="../../Kernel/Geodes/Geodes_15.htm#59499">the Applications and Geodes chapter</A>.</LI><LI>
+GCNSLT_TRANSFER_NOTIFICATION<BR>
+This list notifies objects that a transfer item within the clipboard has changed (or been freed). Parties on this list will receive the system message MSG_META_CLIPBOARD_<BR>
+NOTIFY_NORMAL_TRANSFER_ITEM_CHANGED and MSG_META_CLIPBOARD_NOTIFY_TRANSFER_ITEM_FREED.</LI>
+<LI>
+GCNSLT_EXPRESS_MENU_OBJECTS<BR>
+This list contains all Express Menu Control objects in the system. Typically this list is used to add a control panel item or a DOS task list item to all express menu Control objects. This can be done by sending MSG_EXPRESS_MENU_CONTROL_CREATE_ITEM to the GCN list with <CODE>
+GCNListSend()</CODE>
+.</LI>
+<LI>
+GCNSLT_TRANSPARENT_DETACH<BR>
+This list contains all application objects that may be transparently detached if the system runs short of heap space, in least recently used (LRU) order. This list should only be used if transparent launch mode is in use.</LI>
+<LI>
+GCNSLT_TRANSPARENT_DETACH_DA<BR>
+This list contains a list of transparently detachable desk accessories if the system runs short of heap space. This list should only be used if transparent launch mode is in use. Objects should not be detached unless all detachable, full-screen applications have been detached.</LI>
+<LI>
+GCNSLT_REMOVABLE_DISK<BR>
+This list is used to store all application and document control objects that originate from a removable drive. If the disk they originate on is removed, they will be notified to shut themselves down with MSG_META_DISK_REMOVED.<A NAME="marker=345060">
+ </A>
+</LI>
+</UL>
+<P>
+These pre-defined notification types are intended only for use with MANUFACTURER_ID_GEOWORKS. Other manufacturers wishing to intercept their own system changes must define their own change types under their respective manufacturer IDs if they are unable to use MANUFACTURER_ID_GEOWORKS.</P>
+<P CLASS="figTitle">
+Code Display 9-1 Adding a Process Object to a GCN List</P>
+<PRE>@method MyProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION {
+    optr			myThread;</PRE>
+<PRE>    @callsuper;			/* Do default MSG_GEN_PROCESS_OPEN_APPLICATION */</PRE>
+<PRE>/* Casts the return value for the process handle into an optr */</PRE>
+<PRE>    myThread = ConstructOptr(GeodeGetProcessHandle(), NullChunk);</PRE>
+<PRE>/* myThread (the process) is added to notification of file changes */
+
+    GCNListAdd(myThread, MANUFACTURER_ID_GEOWORKS, GCNSLT_FILE_SYSTEM);
+}</PRE>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GCN_3.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GCN_3.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">3 System Notification</A> 
+<!-- to next --> | <A HREF="GCN_5.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.2 Handling System Notification</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

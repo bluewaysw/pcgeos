@@ -1,0 +1,767 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Controllers_b.htm,v 1.1 97/06/02 16:11:31 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Subclassing GenControlClass</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Generic UI Controllers</A>: 4.2 <A HREF="Controllers_9.htm">Creating Your Own Controllers</A>: 
+Subclassing GenControlClass</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Controllers_9.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Controllers_a.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.1 GenControlClass Instance Data</A> 
+<!-- to next --> | <A HREF="Controllers_c.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.3 Advanced GenControlClass Usage</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+When creating your own controller, you must subclass <CODE>
+GenControlClass</CODE>
+. You must also follow the steps outlined below (each is described in more detail throughout this section):</P>
+<OL>
+<LI>
+Define the features and tool records<BR>
+You must define records and flags for the entire feature set and tool set of the controller. Each bit in one of these records corresponds to a single feature or tool of the controller; by turning these bits on and off, the controller manages which features and tools are available to the user. See <A HREF="Controllers_b.htm#71634"> Defining a Controller's Feature and Tool Sets</A>
+.</LI>
+<LI FIXME_NumListOther>
+Define the default UI configuration<BR>
+Define a resource block containing the objects that will be the controller's default UI representation (typically a menu structure). See <A HREF="Controllers_b.htm#15150"> Defining the Default UI and Tool Configurations</A>
+.</LI>
+<LI FIXME_NumListOther>
+Define the tool configuration<BR>
+Define a resource block containing generic UI objects that will make up the controller's tool set. See <A HREF="Controllers_b.htm#15150"> Defining the Default UI and Tool Configurations</A>
+.</LI>
+<LI FIXME_NumListOther>
+Handle <CODE>
+MSG_GEN_CONTROL_GET_INFO<BR>
+</CODE>
+Every controller <EM>
+must</EM>
+ handle this message and return critical information about the controller, its features, and its tools. This is the most involved step of creating a controller. See <A HREF="Controllers_b.htm#66462"> Mandatory Message Handling</A>
+.</LI>
+<LI FIXME_NumListOther>
+Intercept appropriate <CODE>
+GenControlClass</CODE>
+ messages<BR>
+Different controller classes will intercept different <CODE>
+GenControlClass</CODE>
+ messages depending on how much additional functionality they require. Most controllers will intercept <CODE>
+MSG_GEN_CONTROL_UPDATE_UI</CODE>
+.</LI>
+<LI FIXME_NumListOther>
+Define and handle controller-specific messages<BR>
+Some controllers will set up their features and tools so that the messages they generate require some translation. For example, if a controller has one feature that sets a value based on all the other values, that feature may send a &quot;set&quot; message to the controller, which will determine the appropriate value to set. The controller will then pass the result on to the output object.</LI>
+</OL>
+
+<H2 CLASS="HeadingC">
+<A NAME="71634">
+ </A>
+Defining a Controller's Feature and Tool Sets</H2>
+<P>
+E<A NAME="IX_controllers:feature and tool sets">
+ </A>
+very controller must have a definition of all its features and tools. This definition typically resides in the controller class header file (in this case, <STRONG CLASS="fileName">
+psCtrl.goh</STRONG>
+). Applications that use the controller must be able to turn on and off individual tools and features. These definitions take the form of records in which each bit represents a particular feature or tool. No controller may have more than sixteen features or tools; the controller has just one word representing which features and tools are &quot;on.&quot;</P>
+<P>
+To define the feature set of your controller class, define a record type of type <CODE>
+WordFlags</CODE>
+ and one flag for each feature. The record type you define may be named anything; typically, however, its name will consist of the acronym of the controller class with the suffix &quot;Features.&quot; For example, the features type and flags of <CODE>
+PointSizeControlClass</CODE>
+ are shown below:</P>
+<PRE><A NAME="IX_controllers:feature record"> </A>typedef WordFlags PSCFeatures;
+#define PSCF_10				0x0400
+#define PSCF_12				0x0200
+#define PSCF_14				0x0100
+#define PSCF_18				0x0080
+#define PSCF_24				0x0040
+#define PSCF_36				0x0020
+#define PSCF_54				0x0010
+#define PSCF_72				0x0008
+#define PSCF_SMALLER				0x0004
+#define PSCF_LARGER				0x0002
+#define PSCF_CUSTOM_SIZE 0x0001</PRE>
+<P>
+Each of the flags represents one feature of the controller. For example, the PSCF_10 flag represents the &quot;10 Point&quot; trigger in the Sizes menu, and the PSCF_SMALLER flag represents the &quot;Smaller&quot; trigger. When a flag is set, the feature it represents is turned on; when clear, its feature is off.</P>
+<P>
+Each controller class must create a similar record type and flags for its tool set. Because the tools are independent of the default features, two different sets of flags must be defined. An example (the <CODE>
+PSCToolboxFeatures</CODE>
+ record of <CODE>
+PointSizeControlClass</CODE>
+) follows.</P>
+<PRE><A NAME="IX_controllers:tool feature record"> </A>typedef WordFlags PSCToolboxFeatures;</PRE>
+<PRE>#define PSCTF_9				0x0400
+#define PSCTF_10				0x0200
+#define PSCTF_12				0x0100
+#define PSCTF_14				0x0080
+#define PSCTF_18				0x0040
+#define PSCTF_24				0x0020
+#define PSCTF_36				0x0010
+#define PSCTF_54				0x0008
+#define PSCTF_72				0x0004
+#define PSCTF_SMALLER				0x0002
+#define PSCTF_LARGER				0x0001</PRE>
+<P>
+After you have defined your controller class' feature and tool sets, you should define the controller's default feature and tool sets. The definitions for <CODE>
+PointSizeControlClass</CODE>
+ are shown below:</P>
+<PRE>#define PSC_DEFAULT_FEATURES					(PSCF_9 | PSCF_10 |
+		PSCF_12 | PSCF_14 | PSCF_18 | PSCF_24 |
+		PSCF_36 | PSCF_72 | PSCF_CUSTOM_SIZE |
+		PSCF_SMALLER | PSCF_LARGER)</PRE>
+<PRE>#define PSC_DEFAULT_TOOLBOX_FEATURES (PSCTF_9 |
+		PSCTF_10 | PSCTF_12 | PSCTF_14 |
+		PSCTF_18 | PSCTF_24 | PSCTF_36 |
+		PSCTF_72 | PSCTF_SMALLER | PSCTF_LARGER)</PRE>
+<P>
+These values and flags will be used in your handler for the controller message <CODE>
+MSG_GEN_CONTROL_GET_INFO</CODE>
+.</P>
+
+
+<H2 CLASS="HeadingC">
+<A NAME="15150">
+ </A>
+Defining the Default UI and Tool Configurations</H2>
+<P>
+<A NAME="IX_controllers:resource blocks">
+ </A>
+After you have determined which features and tools your controller class will support, you must create the UI objects that correspond to them. To do this, declare two separate resource segments--one to contain the feature objects and the other to contain the tool objects. Then declare a third that contains just chunks with text strings in it.</P>
+<P>
+Both resources should be defined <CODE>
+notDetachable</CODE>
+, meaning that the feature and tool objects will not be saved to a state file. In the global parameters file for your controller, each resource must be declared with the <CODE>
+ui-object</CODE>
+, <CODE>
+read-only</CODE>
+, and <CODE>
+shared</CODE>
+ flags as below:</P>
+<PRE>resource SIZECTRLUI ui-object read-only shared
+resource SIZECTRLTOOLUI ui-object read-only shared
+resource CONTROLSTRINGS lmem read-only shared</PRE>
+<P>
+The UI resources typically contain list objects and their corresponding items. As an alternative, they can contain triggers and dialogs. These objects are declared as a standard object resource with generic objects, as shown in <A HREF="Controllers_b.htm#43813"> Controller UI Resources</A>
+. All these objects must be set not usable (~GS_USABLE).</P>
+<P CLASS="figTitle">
+Code Display 12-7 <A NAME="43813">
+ </A>
+Controller UI Resources</P>
+<PRE>/* This display contains only code that appears in the psCtrl.goc file. The first
+ * elements of the file are other included files, followed by a class declaration
+ * statement. The two UI resources are shown after that, simplified somewhat;
+ * Only redundant objects are left out of the display. */</PRE>
+<PRE>/* Include the controller class definition and declare the class structure. */
+@include &lt;psCtrl.goh&gt;
+@classdecl PointSizeControlClass;</PRE>
+<PRE>@start	SizeCtrlUI, notDetachable;</PRE>
+<PRE>/* Define the features UI resource. This resource can contain any objects that may
+ * typically appear in a menu (e.g. GenInteractions, GenTriggers, and list
+ * objects). This example shows a single list object and a few of its entries. */</PRE>
+<PRE>@object GenItemGroupClass SizesList = {
+    GI_states = @default &amp; ~GS_USABLE;					/* Set the list not usable */
+	/* The children of the list are defined below. Each entry in the
+	 * list will appear as a single menu item. */
+    GI_comp =		@Size10Entry, @Size12Entry, @Size14Entry, @Size18Entry,
+		@Size24Entry, @Size36Entry, @Size54Entry, @Size72Entry;
+	/* The &quot;apply&quot; message will be sent to the destination specified
+	 * in the GIGI_destination field. */
+    GIGI_applyMsg = MSG_PSC_SET_POINT_SIZE_FROM_LIST;
+	/* The destination is defined as the TravelOption TO_OBJ_BLOCK_OUTPUT.
+	 * This will send the apply message to the controller's output object. */
+    GIGI_destination = (TO_OBJ_BLOCK_OUTPUT);
+}</PRE>
+<PRE>/* An example of a GenItem for the above list. all the other children are similar
+ * with different monikers and identifiers. The identifiers in this case are
+ * equivalent to the point size setting for the feature. */
+@object GenItemClass Size10Entry = {
+    GI_visMoniker = `1', &quot;1. 10 point&quot;;
+    GII_identifier = 10;
+}</PRE>
+<PRE>/* A GenTrigger. Shown below is the &quot;Smaller&quot; menu entry of the Point Size
+ * controller. Another trigger (&quot;Larger&quot;) and a GenInteraction (the &quot;Custom
+ * Size&quot; entry) are also declared. These objects do not have to be declared
+ * as children of any object; they will automatically, like the list above,
+ * be designated as children of the controller when it is initialized.
+ * Note that all of these objects must also be set not usable. */
+@object GenTriggerClass SmallerTrigger = {
+    GI_states = @default &amp; ~GS_USABLE;
+    GI_visMoniker = `S', &quot;Smaller&quot;;
+    GI_kbdAccelerator = control `9';
+    GTI_actionMsg = MSG_PSC_SMALLER_POINT_SIZE;
+    GTI_destination = (TO_OBJ_BLOCK_OUTPUT);
+}</PRE>
+<PRE>@end	SizeCtrlUI</PRE>
+<PRE>/* Define the Tools UI resource. This follows exactly the same rules as the
+ * Features UI resource above, but it represents the UI gadgetry that will appear
+ * in the controller's tool boxes rather than its default menus. */</PRE>
+<PRE>@start	SizeCtrlToolUI, notDetachable;</PRE>
+<PRE>@object GenItemGroupClass SizesToolList = {
+    /* Same as SizesList above, but with the following hints applied: */
+    HINT_ITEM_GROUP_MINIMIZE_SIZE;
+    HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+}</PRE>
+<PRE>/* The list entry items have the exact configuration as above but different
+ * names that reflect their tool usage.
+ * The only objects allowed as tools for the Point Size controller are the
+ * point size list entries, the larger trigger, and the smaller trigger. The
+ * &quot;Custom Size&quot; entry is not allowed in the tool box as a matter of style. */</PRE>
+<PRE>@object GenTriggerClass SmallerToolTrigger = {
+    GI_states = @default &amp; ~GS_USABLE;
+    GI_visMoniker = &quot;S&quot;;
+	/* The moniker of a tool is typically a graphic. The moniker
+	 * specified here is text for simplicity. */
+    GTI_actionMsg = MSG_PSC_SMALLER_POINT_SIZE;
+    GTI_destination = TO_OBJ_BLOCK_OUTPUT;
+}</PRE>
+<PRE>@end	SizeCtrlToolUI</PRE>
+<PRE>@start	ControlStrings;</PRE>
+<PRE>/* In addition to the above two resources, you must also create a third that
+ * contains name strings for the various tools and features. These name strings
+ * will be used by the GenToolControl to identify the feature type in its
+ * dialog box. */
+@chunk char		PSCName[] = &quot;Point Size&quot;;
+@chunk char		Size10Name[] = &quot;10 Point&quot;;
+@chunk char		Size12Name[] = &quot;12 Point&quot;;
+    /* The rest of the point sizes are similar */
+@chunk char		SmallerName[] = &quot;Smaller Point Size&quot;;
+@chunk char		LargerName[] = &quot;Larger Point Size&quot;;
+@chunk char		CustomSizeName[] = &quot;Custom Point Size&quot;;</PRE>
+<PRE>@end	ControlStrings</PRE>
+
+
+<H2 CLASS="HeadingC">
+<A NAME="66462">
+ </A>
+Mandatory Message Handling</H2>
+<PRE><A NAME="IX_MSG_GEN_CONTROL_GET_INFO"> </A>MSG_GEN_CONTROL_GET_INFO, GenControlBuildInfo</PRE>
+<P>
+<A NAME="IX_controllers:message handling">
+ </A>
+Every controller must handle <CODE>
+MSG_GEN_CONTROL_GET_INFO</CODE>
+. This message is sent to the controller in several circumstances, and it must return critical information about the controller's state and configuration.<A NAME="IX_GenControlBuildInfo">
+ </A>
+ It takes a pointer to an empty <CODE>
+GenControlBuildInfo</CODE>
+ structure and must fill in all the structure's fields before returning. This structure is shown in <A HREF="Controllers_b.htm#94389"> MSG_GEN_CONTROL_GET_INFO Handler</A>
+ with a description of each of its fields following.</P>
+<P CLASS="figTitle">
+Code Display 12-8 The GenControlBuildInfo Structure</P>
+<PRE><A NAME="IX_GCBI_&ldots;"> </A>/* This structure must be filled and returned by the controller class. It details
+ * general information as well as specific information about the controller, the
+ * controller's features, and the controller's tools. */</PRE>
+<PRE>typedef struct {
+    GenControlBuildFlags				GCBI_flags;
+    const char				*GCBI_initFileKey;
+    const GCNListType				*GCBI_gcnList;
+    word				GCBI_gcnCount;
+    const NotificationType				*GCBI_notificationList;
+    word				GCBI_notificationCount;
+    optr				GCBI_controllerName;</PRE>
+<PRE>    MemHandle				GCBI_dupBlock;
+    const GenControlChildInfo				*GCBI_childList;
+    word				GCBI_childCount;
+    const GenControlFeaturesInfo				*GCBI_featuresList;
+    word				GCBI_featuresCount;
+    WordFlags				GCBI_features;</PRE>
+<PRE>    MemHandle				GCBI_toolBlock;
+    const GenControlChildInfo				*GCBI_toolList;
+    word				GCBI_toolCount;
+    const GenControlFeaturesInfo				*GCBI_toolFeaturesList;
+    word				GCBI_toolFeaturesCount;
+    WordFlags				GCBI_toolFeatures;</PRE>
+<PRE>    char				*GCBI_helpContext;
+    byte				GCBI_reserved[8];
+} GenControlBuildInfo;</PRE>
+<P>
+The following fields define general information about the controller.</P>
+<DL>
+<DT>
+<CODE>
+GCBI_flags</CODE>
+</DT><DD>A record of <CODE>
+GenControlBuildFlags</CODE>
+. These flags affect several UI-related and object storage related functions, and they are detailed on <A HREF="Controllers_b.htm#37978"> GenControlBuildFlags</A>
+.</DD>
+<DT>
+<CODE>
+GCBI_initFileKey</DT><DD>
+</CODE>
+A pointer to a text string indicating the controller's key in the GEOS.INI file. Controller options will be saved under this key.</DD>
+<DT>
+<CODE>
+GCBI_gcnList</DT><DD>
+</CODE>
+A pointer to a list of GCN list types. Objects of this controller class will be added to these GCN lists and will receive notification from them. GCN lists are detailed in <A HREF="../../Kernel/GCN/index.htm">the GCN chapter</A>.</DT><P CLASS="WorList">
+<CODE>
+GCBI_gcnCount<BR>
+</CODE>
+The length of the list pointed to by <CODE>
+GCBI_gcnList</CODE>
+ above. This length should be the number of lists specified.</P>
+<DT>
+<CODE>
+GCBI_notificationList<BR>
+</CODE>
+A pointer to a list of notification types supported by the controller.</DD>
+<DT>
+<CODE>
+GCBI_notificationCount</DT><DD>
+</CODE>
+The size of the list pointed to by <CODE>
+GCBI_notificationList</CODE>
+ above.</DD>
+<DT>
+<CODE>
+GCBI_controllerName</DT><DD>
+</CODE>
+The optr of a chunk containing the text string that serves as the controller's name. This name string is displayed by the GenToolControl in its dialog box to identify the controller.</DD>
+</DL>
+<P>
+The following fields define information about the controller's features. These fields will be filled dependent on the features set in the object's instance data and the UI level of the controller.</P>
+<DL>
+<DT>
+<CODE>
+GCBI_dupBlock</DT><DD>
+</CODE>
+The handle of the resource block containing the controller's feature generic objects. In the example, this would contain the handle of the <CODE>
+SizeCtrlUI</CODE>
+ resource.</DD>
+<DT>
+<CODE>
+GCBI_childList</DT><DD>
+</CODE>
+A pointer to a list of <CODE>
+GenControlChildInfo</CODE>
+ structures; each of these structures details which features are set and which should always be set for each of the controller's children. This structure is shown below:</DD>
+<PRE>	typedef struct {
+	    ChunkHandle			GCCI_object;
+	    WordFlags			GCCI_featureMask;
+	    GenControlChildFlags GCCI_flags;
+	} <A NAME="IX_GenControlChildInfo"> </A>GenControlChildInfo;</PRE>
+<DT>
+</DT><DD>Each structure contains the chunk handle of the given child in t he resource block, a feature mask indicating which features are possibly supported by the child, and a record indicating whether the child is a feature or not and whether the child is always added to the controller's UI. More specific information is shown on <A HREF="Controllers_b.htm#91928"> GenControlChildInfo</A>
+.</DD>
+<DT>
+<CODE>
+GCBI_childCount</DT><DD>
+</CODE>
+The number of children specified in <CODE>
+GCBI_childList</CODE>
+ above.</DD>
+<DT>
+<CODE>
+GCBI_featuresList</DT><DD>
+</CODE>
+A pointer to a list of <CODE>
+GenControlFeaturesInfo</CODE>
+ structures, one for each child. These structures define the following:</DD>
+<PRE>	typedef struct {
+	    ChunkHandle			GCFI_object;
+	    optr			GCFI_name;
+	    GenControlFeatureFlags GCFI_flags;
+	} <A NAME="IX_GenControlFeaturesInfo"> </A>GenControlFeaturesInfo;</PRE>
+<DT>
+</DT><DD>The three fields are the chunk handle of the child; the optr of the child's name string, as defined in the name string resource; and a record of <CODE>
+GenControlFeatureFlags</CODE>
+. This structure and its fields are described more fully on <A HREF="Controllers_b.htm#84223"> GenControlFeaturesInfo</A>
+.</DD>
+<DT>
+<CODE>
+GCBI_featuresCount</DT><DD>
+</CODE>
+The number of <CODE>
+GenControlFeaturesInfo</CODE>
+ structures listed in <CODE>
+GCBI_featuresList</CODE>
+ above.</DD>
+<DT>
+<CODE>
+GCBI_features</DT><DD>
+</CODE>
+A features mask describing the features supported by the current UI level as specified in the GenApplication's <CODE>
+GAI_appFeatures</CODE>
+ field.</DD>
+</DL>
+<P>
+The following fields describe information about the controller's tools and their configuration.</P>
+<DL>
+<DT>
+<CODE>
+GCBI_toolBlock</DT><DD>
+</CODE>
+The handle of the resource block containing the controller's tool generic objects. In the example, this would contain the handle of the <CODE>
+SizeCtrlToolUI</CODE>
+ resource.</DD>
+<DT>
+<CODE>
+GCBI_toolList</DT><DD>
+</CODE>
+A pointer to a list of <CODE>
+GenControlChildInfo</CODE>
+ structures; each of these structures details which tools are set and which should always be set for each of the controller's children. This structure is shown below:</DD>
+<PRE>	typedef struct {
+	    ChunkHandle			GCCI_object;
+	    WordFlags			GCCI_featureMask;
+	    GenControlChildFlags GCCI_flags;
+	} <A NAME="IX_GenControlChildInfo"> </A>GenControlChildInfo;</PRE>
+<DT>
+</DT><DD>Each structure contains the chunk handle of the given child in t he resource block, a feature mask indicating which tools are possibly supported by the child, and a record indicating whether the child is a tool or not (e.g. a list) and whether the child is always added to the controller's tool box UI. More specific information is shown on <A HREF="Controllers_b.htm#91928"> GenControlChildInfo</A>
+.</DD>
+<DT>
+<CODE>
+GCBI_toolCount</DT><DD>
+</CODE>
+The number of children specified in <CODE>
+GCBI_toolList</CODE>
+ above.</DD>
+<DT>
+<CODE>
+GCBI_toolFeaturesList</DT><DD>
+</CODE>
+A pointer to a list of <CODE>
+GenControlFeaturesInfo</CODE>
+ structures, one for each child. These structures define the following:</DD>
+<PRE>	typedef struct {
+	    ChunkHandle			GCFI_object;
+	    optr			GCFI_name;
+	    byte			GCFI_flags;
+				/* GenControlFeatureFlags */
+	} <A NAME="IX_GenControlFeaturesInfo"> </A>GenControlFeaturesInfo;</PRE>
+<DT>
+</DT><DD>The three fields are the chunk handle of the child; the optr of the child's name string, as defined in the name string resource; and a record of <CODE>
+GenControlFeatureFlags</CODE>
+. This structure and its fields are described more fully on <A HREF="Controllers_b.htm#84223"> GenControlFeaturesInfo</A>
+.</DD>
+<DT>
+<CODE>
+GCBI_toolFeaturesCount</DT><DD>
+</CODE>
+The number of <CODE>
+GenControlFeaturesInfo</CODE>
+ structures in the list pointed to by <CODE>
+GCBI_toolFeaturesList</CODE>
+ above.</DD>
+<DT>
+<CODE>
+GCBI_toolFeatures</DT><DD>
+</CODE>
+A tools mask describing the tools supported for the UI level specified in the GenApplication's <CODE>
+GAI_appFeatures</CODE>
+ field.</DD>
+</DL>
+<P>
+The following field is used by controllers that offer their own help files and help text.</P>
+<DL>
+<DT>
+<CODE>
+GCBI_helpContext</DT><DD>
+</CODE>
+A pointer to a character string giving the name of the controller's help context. If this is a non-null pointer, then the controller will automatically add <CODE>
+ATTR_GEN_HELP_CONTEXT</CODE>
+ to itself with the specified string.</DD>
+</DL>
+<P>
+The structure also has eight bytes that are reserved for the use of GenControlClass, in the <CODE>
+GCBI_reserved</CODE>
+ field.</P>
+
+<H3 CLASS="HeadingD">
+<A NAME="37978">
+ </A>
+GenControlBuildFlags</H3>
+<P>
+<A NAME="IX_GCBF_&ldots;">
+ </A>
+<A NAME="IX_GenControlBuildFlags">
+ </A>
+This flags record defines several UI-related things about the controller object. <A NAME="IX_GenControlBuildFlags">
+ </A>
+Set them appropriate to your controller. The flags are</P>
+<DL>
+<DT>
+GCBF_SUSPEND_ON_APPLY</DT><DD>
+Causes <CODE>
+MSG_META_SUSPEND</CODE>
+ to be sent on feature activation and <CODE>
+MSG_META_UNSUSPEND</CODE>
+ afterward. This is often set by controllers.</DD>
+<DT>
+GCBF_USE_GEN_DESTROY</DT><DD>
+Ensures that unused objects can not be freed with <CODE>
+LMemFree()</CODE>
+. Not often set by controllers.</DD>
+<DT>
+GCBF_SPECIFIC_UI</DT><DD>
+Indicates that the controller may be implemented in the specific UI and therefore some special action must be taken. Very rarely set by controllers.</DD>
+<DT>
+GCBF_CUSTOM_ENABLE_DISABLE</DT><DD>
+Indicates that the controller uses a custom enable/disable mechanism rather than responding to GCN notifications.</DD>
+<DT>
+GCBF_ALWAYS_UPDATE</DT><DD>
+Indicates that the controller should always undergo visual updates even if it appears unnecessary. Not often set by controllers.</DD>
+<DT>
+GCBF_EXPAND_TOOL_WIDTH_TO_FIT_PARENT</DT><DD>
+Indicates that the tool width should be expanded to take full advantage of all the space available in the parent composite.</DD>
+<DT>
+GCBF_ALWAYS_INTERACTABLE</DT><DD>
+Indicates that the controller should always be on its appropriate GCN lists, even if no part of it is visible. This flag requires GCBF_IS_ON_ACTIVE_LIST.</DD>
+<DT>
+GCBF_ALWAYS_ON_GCN_LIST</DT><DD>
+Indicates that the controller should constantly be on the GCN lists rather than periodically adding and removing itself as is done in some optimization code. Not often set by controllers. This flag requires GCBF_IS_ON_ACTIVE_LIST.</DD>
+<DT>
+GCBF_MANUALLY_REMOVE_FROM_ACTIVE_LIST</DT><DD>
+Indicates that the controller should not remove itself from the active list in its default detach handler.</DD>
+<DT>
+GCBF_IS_ON_ACTIVE_LIST</DT><DD>
+<A NAME="IX_Active list:GenControlBuildFlags relating to">
+ </A>
+Indicates that the controller is on the active list in its <STRONG CLASS="fileName">
+.goh</STRONG>
+ file definition.</DD>
+<DT>
+GCBF_IS_ON_START_LOAD_OPTIONS_LIST</DT><DD>
+Indicates this controller must be on the startup load options list.</DD>
+<DT>
+GCBF_NOT_REQUIRED_TO_BE_ON_SELF_LOAD_OPTIONS_LIST</DT><DD>
+Indicates this controller is not required to be on any options-load list.</DD>
+
+
+</DL>
+<H3 CLASS="HeadingD">
+<A NAME="91928">
+ </A>
+GenControlChildInfo</H3>
+<P>
+<A NAME="IX_GCCI_&ldots;">
+ </A>
+<A NAME="IX_GenControlChildInfo">
+ </A>
+The <CODE>
+GenControlChildInfo</CODE>
+ structure defines the features or tools appropriate to each object in a controller's UI resources. It has the following structure, and its fields are described below:</P>
+<PRE>typedef struct {
+	ChunkHandle				GCCI_object;
+	WordFlags				GCCI_featureMask;
+	GenControlChildFlags				GCCI_flags;
+} <A NAME="IX_GenControlChildInfo"> </A>GenControlChildInfo;</PRE>
+<DL>
+<DT>
+<CODE>
+GCCI_object</CODE>
+</DT><DD>The chunk handle of the object in the appropriate resource.</DD>
+<DT>
+<CODE>
+GCCI_featureMask</DT><DD>
+</CODE>
+The feature mask representing the feature set represented by the object.</DD>
+<DT>
+<CODE>
+GCCI_flags</CODE>
+</DT><DD>A record of <CODE>
+GenControlChildFlags</CODE>
+, the flags of which are described below.</DD>
+</DL>
+<P>
+<A NAME="IX_GCCF_&ldots;  (GenControlChildFlags)">
+ </A>
+The <A NAME="IX_GenControlChildFlags">
+ </A>
+<CODE>
+GenControlChildFlags</CODE>
+ flags are</P>
+<DL>
+<DT>
+GCCF_NOTIFY_WHEN_ADDING</DT><DD>
+This flag indicates that the child will be notified before the feature is added and set usable with <CODE>
+MSG_GEN_CONTROL_NOTIFY_ADDING_FEATURE</CODE>
+.</DD>
+<DT>
+GCCF_ALWAYS_ADD</DT><DD>
+This flag indicates that the child object should always be added to the controller's UI, even if it is not specified.</DD>
+<DT>
+GCCF_IS_DIRECTLY_A_FEATURE</DT><DD>
+This flag indicates that the child is a feature in itself and thus on the feature list. This is typically set for most objects. (It is not set, for example, for list objects, whose children are the actual features.)</DD>
+
+
+</DL>
+<H3 CLASS="HeadingD">
+<A NAME="84223">
+ </A>
+GenControlFeaturesInfo</H3>
+<P>
+<A NAME="IX_GCFI_&ldots;">
+ </A>
+<A NAME="IX_GenControlFeaturesInfo">
+ </A>
+The <CODE>
+GenControlFeaturesInfo</CODE>
+ structure describes each UI feature's name and certain flags. The structure is defined below, and its fields are described following:</P>
+<PRE>typedef struct {
+	ChunkHandle				GCFI_object;
+	optr				GCFI_name;
+	GenControlFeatureFlags				GCFI_flags;
+} <A NAME="IX_GenControlFeaturesInfo"> </A>GenControlFeaturesInfo;</PRE>
+<DL>
+<DT>
+<CODE>
+GCFI_object</CODE>
+</DT><DD>The chunk handle of the child in the appropriate resource block.</DD>
+<DT>
+<CODE>
+GCFI_name</CODE>
+</DT><DD>The optr of the chunk containing the object's name. This name is used by the GenToolControl to represent the particular feature or tool in its dialog box.</DD>
+<DT>
+<CODE>
+GCFI_flags</CODE>
+</DT><DD>A record of <CODE>
+GenControlFeatureFlags</CODE>
+, reserved.</DD>
+
+</DL>
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_CONTROL_GET_INFO">
+ </A>
+MSG_GEN_CONTROL_GET_INFO</H4>
+<PRE CLASS="syntax">void	MSG_GEN_CONTROL_GET_INFO(
+        GenControlBuildInfo *info);</PRE>
+<P>
+This message must be handled by all controllers. It takes an empty <CODE>
+GenControlBuildInfo</CODE>
+ structure and fills it; this message is called in several circumstances by different objects and controller methods.</P>
+<P CLASS="refField">
+Source:	Unrestricted--typically generated in <CODE>
+GenControlClass</CODE>
+ methods.</P>
+<P CLASS="refField">
+Destination:	Any controller object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+info</CODE>
+	A pointer to an empty <CODE>
+GenControlBuildInfo</CODE>
+ structure.</P>
+<P CLASS="refField">
+Return:	The <CODE>
+GenControlBuildInfo</CODE>
+ structure filled with the appropriate controller information.</P>
+<P CLASS="refField">
+Interception:	Every controller class <EM>
+must</EM>
+ intercept this message. There is no need to call the superclass anywhere in the handler.</P>
+<P CLASS="figTitle">
+Code Display 12-9 <A NAME="94389">
+ </A>
+MSG_GEN_CONTROL_GET_INFO Handler</P>
+<PRE>/* This method is a sample of how to handle MSG_GEN_CONTROL_GET_INFO. It is
+ * specific to UICTextStyleControlClass. To handle this message, it is easiest to
+ * set up a number of static local variables with the base information and set
+ * the structure to these variables. */</PRE>
+<PRE>/* Handler for MSG_GEN_CONTROL_GET_INFO
+ * void (GenControlBuildInfo *info);					*/</PRE>
+<PRE>@method UICTextStyleControlClass, MSG_GEN_CONTROL_GET_INFO {</PRE>
+<PRE>	/* General information constants */</PRE>
+<PRE> static const char TSC_IniFileKey[] = &quot;textStyleControl&quot;;</PRE>
+<PRE> static const GCNListType TSC_gcnList[] = {
+ 	{MANUFACTURER_ID_GEOWORKS, GAGCNLT_APP_TARGET_NOTIFY_TEXT_CHAR_ATTR_CHANGE}
+ }; </PRE>
+<PRE> static const NotificationType TSC_notifyTypeList[] = {
+ 	{MANUFACTURER_ID_GEOWORKS, GWNT_TEXT_CHAR_ATTR_CHANGE}
+ };</PRE>
+<PRE>	/* Features information constants */</PRE>
+<PRE>    static const <A NAME="IX_GenControlChildInfo:example"> </A>GenControlChildInfo TSC_childList[] = {
+	{@PlainTextList, TSCF_PLAIN, GCCF_IS_DIRECTLY_A_FEATURE},
+	{@TextStyleList, TSCF_BOLD|TSCF_ITALIC|TSCF_UNDERLINE|TSCF_STRIKE_THRU| 
+	 TSCF_SUBSCRIPT|TSCF_SUPERSCRIPT, 0}</PRE>
+<PRE>    };</PRE>
+<PRE>	/* The order of this list is actually backwards from the
+	 * record it reflects. */
+    static const <A NAME="IX_GenControlFeaturesInfo:example"> </A>GenControlFeaturesInfo TSC_featuresList[] = {
+	 {@SuperscriptEntry, @SuperscriptName, 0},
+ 	{@SubscriptEntry, @SubscriptName, 0},
+ 	{@StrikeThruEntry, @StrikeThruName, 0},
+ 	{@UnderlineEntry, @UnderlineName, 0},
+ 	{@ItalicEntry, @ItalicName, 0},
+ 	{@BoldEntry, @BoldName, 0},
+ 	{@PlainTextList, @PlainTextName, 0}
+    };</PRE>
+<PRE>	/* Tools information constants */</PRE>
+<PRE>    static const GenControlChildInfo TSC_toolList[] = {
+ 	{@PlainTextToolList, TSCTF_PLAIN, GCCF_IS_DIRECTLY_A_FEATURE},
+ 	{@TextStyleToolList, TSCTF_BOLD|TSCTF_ITALIC|TSCTF_UNDERLINE|
+	 TSCTF_STRIKE_THRU|TSCTF_SUBSCRIPT|TSCTF_SUPERSCRIPT, 0} };
+    };</PRE>
+<PRE>    static const GenControlFeaturesInfo TSC_toolFeaturesList[] = {
+ 	{@SuperscriptToolEntry, @SuperscriptName, 0},
+ 	{@SubscriptToolEntry, @SubscriptName, 0},
+ 	{@StrikeThruToolEntry, @StrikeThruName, 0},
+ 	{@UnderlineToolEntry, @UnderlineName, 0},
+ 	{@ItalicToolEntry, @ItalicName, 0},
+ 	{@BoldToolEntry, @BoldName, 0},
+ 	{@PlainTextToolList, @PlainTextName, 0}
+    };</PRE>
+<PRE>	/* Our constant for the GenControlBuildInfo structure.
+	 * Fields with a marker to the left of their names are
+	 * filled in dynamically by the handler following the
+	 * constant definition. */
+    static const <A NAME="IX_GenControlBuildInfo:example"> </A>GenControlBuildInfo TSC_dupInfo = {
+	GCBF_SUSPEND_ON_APPLY, 					/* GCBI_flags */
+ 	TSC_IniFileKey, 					/* GCBI_initFileKey */
+ 	TSC_gcnList, 					/* GCBI_gcnList */
+ 	ARRAY_LEN(TSC_gcnList,GCNListType), 					/* GCBI_gcnCount */
+ 	TSC_notifyTypeList, 					/* GCBI_notificationList */
+ 	ARRAY_LEN(TSC_notifyTypeList, NotificationType), 
+						/* GCBI_notificationCount */
+ 	@TSCName, 					/* GCBI_controllerName */ 
+
+ 	/* ## */ NullHandle, 					/* GCBI_dupBlock */
+ 	TSC_childList, 					/* GCBI_childList */
+ 	ARRAY_LEN(TSC_childList, GenControlChildInfo),
+ 						/* GCBI_childCount */
+ 	TSC_featuresList, 					/* GCBI_featuresList */
+ 	ARRAY_LEN(TSC_featuresList, GenControlFeaturesInfo),
+ 						/* GCBI_featuresCount */
+ 	TSC_DEFAULT_FEATURES, 					/* GCBI_features */
+ 	/* ## */ NullHandle, 					/* GCBI_toolBlock */
+ 	TSC_toolList, 					/* GCBI_toolList */
+ 	ARRAY_LEN(TSC_toolList, GenControlChildInfo),
+ 						/* GCBI_toolCount */
+ 	TSC_toolFeaturesList, 					/* GCBI_toolFeaturesList */
+ 	ARRAY_LEN(TSC_toolFeaturesList, GenControlFeaturesInfo),
+ 						/* GCBI_toolFeaturesCount */
+ 	TSC_DEFAULT_TOOLBOX_FEATURES 					/* GCBI_toolFeatures */
+    };</PRE>
+<PRE>	/* Here is the code that fills in the above missing fields and
+	 * returns the proper structure. */</PRE>
+<PRE>    /* Copy the structure containing most of the correct information. */
+    memcpy(info, MemLockFixedOrMovable(&amp;TSC_dupInfo), sizeof(GenControlBuildInfo));
+    MemUnlockFixedOrMovable(&amp;TSC_dupInfo);</PRE>
+<PRE>    /* Fill the remaining fields in manually. */
+    info-&gt;GCBI_dupBlock = HandleOf(@PlainTextList);
+    info-&gt;GCBI_toolBlock = HandleOf(@PlainTextToolList); 
+}<A NAME="marker=1174"> </A></PRE>
+
+
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Controllers_9.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Controllers_a.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.1 GenControlClass Instance Data</A> 
+<!-- to next --> | <A HREF="Controllers_c.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.3 Advanced GenControlClass Usage</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

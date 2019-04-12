@@ -1,0 +1,480 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: GenProcess_1.htm,v 1.1 97/06/02 16:17:42 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Starting and Stopping</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="sectionTitle">
+<A HREF="index.htm">The GenProcess Object</A>: 1 
+Starting and Stopping</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="index.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">The GenProcess Object</A> 
+<!-- to next --> | <A HREF="GenProcess_2.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2 Undo Mechanism</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+For information about the steps involved in stopping, starting, or restoring an application (and to get context information about the messages described below), see <A HREF="../../Programming/GOCLanguage/index.htm">the GEOS Programming chapter</A>.</P><P>
+<A NAME="IX_AppAttachFlags">
+ </A>
+<A NAME="IX_AAF_&ldots;">
+ </A>
+Many of the following messages need <CODE>
+AppAttachFlags</CODE>
+ to tell them how the process is attaching:</P>
+<PRE>typedef WordFlags AppAttachFlags;
+#define AAF_RESTORING_FROM_STATE						0x8000
+#define AAF_STATE_FILE_PASSED						0x4000
+#define AAF_DATA_FILE_PASSED						0x2000
+#define AAF_RESTORING_FROM_QUIT						0x1000</PRE>
+<UL>
+<LI>
+AAF_RESTORING_FROM_STATE indicates that the application is coming up from a previous state, either by re-launching using a state file, or re-entering application mode from engine mode in the same session. The UI trees will be in whatever state they were left in, which may be different than the statically declared UI tree, depending on what occurred in the application when the state file was written out (for example, a dialog box may have been on-screen). If this flag is <EM>
+false</EM>
+, the application is starting up fresh. If this flag is <EM>
+true</EM>
+, the UI does not call MSG_META_LOAD_OPTIONS and ignores any &quot;ON_STARTUP&quot; hints or attributes.</LI>
+<LI>
+AAF_STATE_FILE_PASSED indicates that the application is restoring from the state file passed in an <CODE>
+AppLaunchBlock</CODE>
+, presumably passed as an argument in the message also. If this flag is set, AAF_RESTORING_FROM_STATE will also be set.</LI>
+<LI>
+AAF_DATA_FILE_PASSED indicates that the passed <CODE>
+AppLaunchBlock</CODE>
+ contains the name of a data file that should be opened.</LI>
+<LI>
+AAF_RESTORING_FROM_QUIT indicates that the application was in the process of quitting, reached engine mode, and is now being started back up into application mode. If set, will also be set, and we will be brought up in whatever state we originally entered engine mode.</LI>
+</UL>
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_PROCESS_RESTORE_FROM_STATE">
+ </A>
+MSG_GEN_PROCESS_RESTORE_FROM_STATE</H5>
+<PRE CLASS="syntax">void 	MSG_GEN_PROCESS_RESTORE_FROM_STATE(
+        AppAttachFlags 		attachFlags,
+        MemHandle 		launchBlock,
+        MemHandle 		extraState);</PRE>
+<P>
+This message is sent by the User Interface when an application is being loaded from a state file. This is sent to the process itself from <CODE>
+MSG_META_ATTACH</CODE>
+, whenever the application is being invoked as in <CODE>
+MSG_GEN_PROCESS_RESTORE_FROM_STATE</CODE>
+ mode. Data passed is the same as that in <CODE>
+MSG_META_ATTACH</CODE>
+. The default handler fetches the application mode message, either <CODE>
+MSG_GEN_PROCESS_OPEN_APPLICATION</CODE>
+ or <CODE>
+MSG_GEN_PROCESS_OPEN_ENGINE</CODE>
+, as saved in the application object, and sends that message to the process.</P>
+<P>
+Note that the blocks passed need not be freed, as this is done by the caller upon return.</P>
+<P CLASS="refField">
+Source:	Default <CODE>
+GenProcessClass</CODE>
+ handler for <CODE>
+MSG_META_ATTACH.</CODE>
+</P>
+<P CLASS="refField">
+Destination:	Self.</P>
+<P CLASS="refField">
+Interception:	Intercepted generally only so that application can retrieve previously saved data out of the state block passed.</P>
+<P CLASS="refField">
+Parameters:	<EM>attachFlags</EM> 	Flags with information about the state and data files.</P>
+<DL>
+<DT>
+<EM>launchBlock</EM></DT><DD>Handle of <CODE>
+AppLaunchBlock</CODE>
+, or zero if none. This block contains the name of any document file passed into the application on invocation.</DD>
+<DT>
+<EM>extraState</EM> </DT><DD>Handle of extra state block, or zero if none. This is the same block as returned from <CODE>
+MSG_GEN_PROCESS_CLOSE_APPLICATION</CODE>
+ or <CODE>
+MSG_GEN_PROCESS_CLOSE_ENGINE</CODE>
+, in some previous <CODE>
+MSG_META_DETACH</CODE>
+. Process objects often use this extra block to save global variables to state files.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_PROCESS_OPEN_APPLICATION">
+ </A>
+MSG_GEN_PROCESS_OPEN_APPLICATION</H5>
+<PRE CLASS="syntax">void	MSG_GEN_PROCESS_OPEN_APPLICATION(
+        AppAttachFlags		attachFlags,
+        MemHandle		launchBlock,
+        MemHandle 		extraState);</PRE>
+<P>
+This message is sent by the User Interface when an application is being loaded from its resource blocks. Applications will often intercept this message to set up certain things before being put on-screen. This is the handler in which, for example, you would register for certain notifications such as the quick-transfer notification.</P>
+<P>
+This is sent to the process itself from <CODE>
+MSG_META_ATTACH</CODE>
+, whenever the application is being restored to application mode (as opposed to engine mode), or whenever it is being invoked as in application mode. Data passed is the same as that in <CODE>
+MSG_META_ATTACH</CODE>
+. The default handler sets the GenApplication object GS_USABLE, and brings the UI up on screen.</P>
+<P>
+This message may be intercepted to open up any data file passed, before the UI for the application is actually set GS_USABLE. Note that the blocks passed need not be freed, as this is done by the caller upon return.</P>
+<P>
+If you intercept this message and need to send MSG_META_QUIT from within the handler, make sure to either send the quit after calling the superclass, or send the quit via MSG_META_FLUSH_INPUT_QUEUE. (If this is not done, the system will think that an IACP connection is open, aborting the quit.)</P>
+<P CLASS="refField">
+Source:	 <CODE>
+GenProcessClass</CODE>
+ default handler for <CODE>
+MSG_META_ATTACH</CODE>
+ only.</P>
+<P CLASS="refField">
+Destination:	Same object.</P>
+<P CLASS="refField">
+Interception:	Frequently intercepted by an application's own process class to find out when an application is first coming alive in the system. You <EM>
+must</EM>
+ pass this message on to the superclass, or the application will never come up. Be aware that the entire UI tree for the application is the equivalent of not usable (~GS_USABLE) before the superclass is called, and is usable and up on screen visually after it is called. Thus, it is best to do non-UI related things, and changing of generic attributes and hints <EM>
+before</EM>
+ calling the superclass. You must wait until <EM>
+after</EM>
+ calling the superclass to perform any operations which require that objects be fully usable (e.g. bringing up a dialog box). Make sure that if you send MSG_META_QUIT from within your handler that you follow the guidelines mentioned above.</P>
+<P CLASS="refField">
+Parameters:	<EM>attachFlags</EM> 	State information about the state and data files.</P>
+<DL>
+<DT>
+<EM>launchBlock</EM> </DT><DD>Handle of <CODE>
+AppLaunchBlock</CODE>
+, or zero if none. This block contains the name of any document file passed into the application on invocation.</DD>
+<DT>
+<EM>extraState</EM> </DT><DD>Handle of extra state block, or zero if none. This is the same block as returned from <CODE>
+MSG_GEN_PROCESS_CLOSE_APPLICATION</CODE>
+ or <CODE>
+MSG_GEN_PROCESS_CLOSE_ENGINE</CODE>
+, in some previous <CODE>
+MSG_META_DETACH</CODE>
+.<BR>
+Is freed by caller--subclasses should not free the extra state block.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_PROCESS_CLOSE_APPLICATION">
+ </A>
+MSG_GEN_PROCESS_CLOSE_APPLICATION</H5>
+<PRE CLASS="syntax">MemHandle MSG_GEN_PROCESS_CLOSE_APPLICATION();</PRE>
+<P>
+This message is sent by the User Interface whenever the application is being shut down (during a detach) and it had been launched in application (as opposed to engine) mode.</P>
+<P CLASS="refField">
+Source:	<CODE>
+GenProcessClass</CODE>
+ default handler for <CODE>
+MSG_META_DETACH</CODE>
+ only</P>
+<P CLASS="refField">
+Destination:	Self</P>
+<P CLASS="refField">
+Interception:	Convenient place for code that needs to be executed before application exits, for non-engine mode cases. Superclass must be called.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Handle of block to save (or NULL for none). Process objects often save global variables to a state file in an extra block. This is the handle of that block.</P>
+
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_PROCESS_OPEN_ENGINE">
+ </A>
+MSG_GEN_PROCESS_OPEN_ENGINE</H5>
+<PRE CLASS="syntax">void 	MSG_GEN_PROCESS_OPEN_ENGINE(
+        AppAttachFlags 		attachFlags,
+        MemHandle 		launchBlock);</PRE>
+<P>
+This is sent to the process itself from <CODE>
+MSG_META_ATTACH</CODE>
+, whenever the application is being restored to engine mode, or whenever it is being invoked as in engine mode. Data passed is the same as that in <CODE>
+MSG_META_ATTACH</CODE>
+. There is no default handler.</P>
+<P>
+This message may be intercepted to open up any data file passed, before any engine commands are delivered to the process. Note that the blocks passed need not be freed, as this is done by the caller upon return.</P>
+<P CLASS="refField">
+Source:	<CODE>
+GenProcessClass</CODE>
+ default handler for <CODE>
+MSG_META_ATTACH</CODE>
+ only.</P>
+<P CLASS="refField">
+Destination:	Self.</P>
+<P CLASS="refField">
+Interception:	Generally unnecessary, though can be intercepted if notification of going into this mode is necessary.</P>
+<P CLASS="refField">
+Parameters:	<EM>attachFlags</EM> 	State of state and data files.</P>
+<DL>
+<DT>
+<EM>launchBlock</EM> </DT><DD>Handle of <CODE>
+AppLaunchBlock</CODE>
+, or NULL if none. This block contains the name of any document file passed into the application on invocation.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_PROCESS_CLOSE_ENGINE">
+ </A>
+MSG_GEN_PROCESS_CLOSE_ENGINE</H5>
+<PRE CLASS="syntax">void 	MSG_GEN_PROCESS_CLOSE_ENGINE();</PRE>
+<P>
+This message is sent by the User Interface whenever the application is being shut down (during a detach) and it had been launched in &quot;engine&quot; mode.</P>
+<P CLASS="refField">
+Source:	<CODE>
+GenProcessClass</CODE>
+ default handler for <CODE>
+MSG_META_DETACH</CODE>
+ only.</P>
+<P CLASS="refField">
+Destination:	Self.</P>
+<P CLASS="refField">
+Interception:	Convenient place for code that needs to be executed before the application exits, for engine mode cases. Superclass must be called.</P>
+
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_PROCESS_CLOSE_CUSTOM">
+ </A>
+MSG_GEN_PROCESS_CLOSE_CUSTOM</H5>
+<PRE CLASS="syntax">MemHandle MSG_GEN_PROCESS_CLOSE_CUSTOM();</PRE>
+<P>
+This message is sent by the User Interface whenever the application is being shut down (during a detach) and it had been launched in some custom mode (not application or engine) that <CODE>
+GenProcessClass</CODE>
+ doesn't know about.</P>
+<P CLASS="refField">
+Source:	Subclass of <CODE>
+GenProcessClass</CODE>
+.</P>
+<P CLASS="refField">
+Destination:	Self.</P>
+<P CLASS="refField">
+Interception:	Convenient place for code that needs to be executed before the application exits, for custom mode cases. Superclass must be called.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Handle of block to save (or NULL for none).</P>
+
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_PROCESS_ATTACH_TO_PASSED_STATE_FILE">
+ </A>
+MSG_GEN_PROCESS_ATTACH_TO_PASSED_STATE_FILE</H5>
+<PRE CLASS="syntax">MemHandle 	MSG_GEN_PROCESS_ATTACH_TO_STATE_FILE(
+        AppAttachFlags		attachFlags,
+        MemHandle		launchBlock);</PRE>
+<P>
+This message is sent by the User Interface whenever the application is being attached to a state file. This message is sent when either restoring from state or detaching. May be subclassed to provide forced state behavior.</P>
+<P CLASS="refField">
+Source:	<CODE>
+GenProcessClass</CODE>
+ default handler for <CODE>
+MSG_META_ATTACH</CODE>
+.</P>
+<P CLASS="refField">
+Destination:	Self.</P>
+<P CLASS="refField">
+Interception:	May be intercepted to force use of a particular state file (by changing the name of the state file to use before calling superclass).</P>
+<P CLASS="refField">
+Parameters:	<EM>attachFlags</EM> 	<CODE>
+AppAttachMode</CODE>
+ (matches that in <CODE>
+AppLaunchBlock</CODE>
+).</P>
+<DL>
+<DT>
+<EM>launchBlock</EM> </DT><DD>Block of structure <CODE>
+AppLaunchBlock</CODE>
+.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Handle of extra block of state data (zero for none).</P>
+
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_PROCESS_CREATE_NEW_STATE_FILE">
+ </A>
+MSG_GEN_PROCESS_CREATE_NEW_STATE_FILE</H5>
+<PRE CLASS="syntax">word MSG_GEN_PROCESS_CREATE_NEW_STATE_FILE(
+         MemHandle appInstanceReference);</PRE>
+<P>
+This replaces <CODE>
+MSG_GEN_PROCESS_ATTACHED_TO_PASSED_STATE_FILE</CODE>
+ if no state file had been specified in that message. This message's default handler will create a new state file and attach it normally. Can be subclassed to provide forced state file usage (e.g. use a different naming scheme).</P>
+<P CLASS="refField">
+Source:	<CODE>
+GenProcessClass</CODE>
+ default handler for MSG_META_DETACH, if not quitting.</P>
+<P CLASS="refField">
+Destination:	Self.</P>
+<P CLASS="refField">
+Interception:	May be intercepted to change name of state file to create.</P>
+<P CLASS="refField">
+Parameters:	<EM>appInstanceReference</EM> <BR>
+Block handle to block of structure <CODE>
+AppInstanceReference</CODE>
+.</P>
+<P CLASS="refField">
+Return:	VM file handle (NULL if you want no state file).</P>
+
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_PROCESS_DETACH_FROM_STATE_FILE">
+ </A>
+MSG_GEN_PROCESS_DETACH_FROM_STATE_FILE</H5>
+<PRE CLASS="syntax">void 	MSG_GEN_PROCESS_DETACH_FROM_STATE_FILE(
+        MemHandle 		extraState,
+        word 		appStates);</PRE>
+<P>
+This message is sent by the User Interface when the application is detaching or quitting (may or may not be attached to a state file) and the detach is nearly complete.</P>
+<P CLASS="refField">
+Source:	<CODE>
+GenProcessClass</CODE>
+ default handler for <CODE>
+MSG_META_DETACH</CODE>
+, if not quitting.</P>
+<P CLASS="refField">
+Destination:	Self.</P>
+<P CLASS="refField">
+Interception:	Not generally done. Default behavior is what you want.</P>
+<P CLASS="refField">
+Parameters:	<EM>extraState</EM> 	Block handle of extra block to be saved (as returned from <CODE>
+MSG_GEN_PROCESS_CLOSE_APPLICATION</CODE>
+, <CODE>
+MSG_GEN_PROCESS_CLOSE_ENGINE</CODE>
+ or <CODE>
+MSG_GEN_PROCESS_CLOSE_CUSTOM</CODE>
+). If the block is not transferred to the state file), it must be freed (if non-zero) by the handler for this message.</P>
+<DL>
+<DT>
+<EM>appStates</EM> </DT><DD><CODE>
+ApplicationStates</CODE>
+ record with information about the application state.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_PROCESS_INSTALL_TOKEN">
+ </A>
+MSG_GEN_PROCESS_INSTALL_TOKEN</H5>
+<PRE CLASS="syntax">void 	MSG_GEN_PROCESS_INSTALL_TOKEN();</PRE>
+<P>
+This message is sent by the desktop to a process to get that process to install its token and moniker lists into the token database.</P>
+<P CLASS="refField">
+Source:	Generally whatever geode launched this application in engine mode (e.g. GeoManager).</P>
+<P CLASS="refField">
+Destination:	<CODE>
+GenProcessClass</CODE>
+ object of any geode launched in engine mode.</P>
+<P CLASS="refField">
+Interception:	May be intercepted to install additional tokens. Default behavior installs only application icon.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_PROCESS_GET_PARENT_FIELD">
+ </A>
+MSG_GEN_PROCESS_GET_PARENT_FIELD</H5>
+<PRE CLASS="syntax">optr 	MSG_GEN_PROCESS_GET_PARENT_FIELD();</PRE>
+<P>
+This message is sent by process-libraries (such as the Spool Object Library) to find out which field object is its parent. This message will return the field of the first client of the library.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	<CODE>
+GenProcessClass</CODE>
+ object.</P>
+<P CLASS="refField">
+Interception:	Not necessary, as default behavior implements utility.</P>
+<P CLASS="refField">
+Parameters:	Nothing.</P>
+<P CLASS="refField">
+Return:	Parent field.</P>
+
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_PROCESS_SEND_TO_APP_GCN_LIST">
+ </A>
+MSG_GEN_PROCESS_SEND_TO_APP_GCN_LIST</H5>
+<PRE CLASS="syntax">void	MSG_GEN_PROCESS_SEND_TO_APP_GCN_LIST(@stack
+        word		sendFlags,
+        EventHandle 		event,
+        MemHandle 		block,
+        word		manufListType,
+        ManufacturerID 		manufID);</PRE>
+<P>
+This message sends the specified event to all the objects registered with the passed GCN list. This message should be subclassed by UI Controller objects.</P>
+<P>
+The handler here merely sends the request on to GenApplication using <CODE>
+MSG_META_GCN_LIST_SEND</CODE>
+. Controllers should use this message, however, over direct communication with the application object, to ensure orderly updating of the list status event. One such failure case which is fixed is two target text objects, one run by the process thread in a view, the other a GenText run by the UI thread. If the GenText has the target and the user clicks quickly on view then GenText, the GenText may process both messages about the target being lost and gained before the process text object receives its gained and lost pair. If both objects sent <CODE>
+MSG_META_GCN_LIST_SEND</CODE>
+ directly to the GenApplication object, the GenText's status would be wiped out by the subsequent reporting by the process text object. This problem is avoided by having both process and UI objects call here to pass status update info. This works because target changes start out ordered in the UI thread, and that order is passed on to the process thread in either of the two cases.</P>
+<P CLASS="refField">
+Source:	Any object wishing to update an application GCN list. Don't use queue-order altering message flags such as MF_PLACE_IN_FRONT when sending this message. As a convention must be established for the flag MF_FORCE_QUEUE in order to ensure orderly results, the convention in use is this: Don't pass it. <BR>
+A typical call should use only the MF_STACK, MF_FIXUP_DS, and/or MF_FIXUP_ES flags, if needed. </P>
+<P CLASS="refField">
+Destination:	<CODE>
+GenProcessClass</CODE>
+ (application process) only.</P>
+<P CLASS="refField">
+Interception:	Should not generally be intercepted, as <CODE>
+GenProcessClass</CODE>
+ provides correct behavior. If intercepted and not sent onto superclass, event passed must be destroyed and data block reference count decremented, to avoid leaving obsolete data on the heap.</P>
+<P CLASS="refField">
+Parameters:	<EM>sendFlags</EM> 	Flags to pass on to <CODE>
+GCNListSend()</CODE>
+.</P>
+<DL>
+<DT>
+<EM>event</EM> </DT><DD>Classed event to pass on to the list.</DD>
+<DT>
+<EM>block</EM> </DT><DD>Handle of extra data block, if used (otherwise NULL). Blocks of this type must have a reference count, which may be initialized with <CODE>
+MemInitRefCount()</CODE>
+ and be incremented for any new usage with <CODE>
+MemIncRefCount()</CODE>
+. Methods in which they are passed are considered such a new usage, and must have <CODE>
+MetaClass</CODE>
+ handlers which call <CODE>
+MemDerefCount()</CODE>
+. Current messages supported are <CODE>
+MSG_META_NOTIFY_WITH_DATA_BLOCK</CODE>
+ and <CODE>
+MSG_NOTIFY_FILE_CHANGE</CODE>
+.</DD>
+<DT>
+<EM>manufListType</EM></DT><DD>This may be a <CODE>
+GCNStandardListType</CODE>
+ or any other word which acts as a GCN list ID.</DD>
+<DT>
+<EM>manufID</EM></DT><DD>Manufacturer ID, which helps identify the GCN list.</DD>
+
+</DL>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="index.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">The GenProcess Object</A> 
+<!-- to next --> | <A HREF="GenProcess_2.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2 Undo Mechanism</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

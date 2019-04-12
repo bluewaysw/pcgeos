@@ -1,0 +1,111 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Input_16.htm,v 1.1 97/06/02 16:18:36 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Using Model</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Input</A>: 5.5 <A HREF="Input_11.htm">Input Hierarchies</A>: 
+<A NAME="76447">
+ </A>
+Using Model</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Input_11.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Input_15.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.4 Using Target</A> 
+<!-- to next --> | <A HREF="Input_17.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5.6 Extending the Hierarchies</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+<A NAME="IX_Model">
+ </A>
+In some cases, you may need to send or receive information from some object other than the focus or target. The Model hierarchy is provided as an alternative. In most cases, the model provides a means of pointing to data selections other than that pointed to by the Target hierarchy. Only use it if the target hierarchy cannot serve your needs.</P>
+<P>
+The model of an application is used to identify objects that represent the actual data that can be selected by the user. Typically, these selections are either secondary selections or are not visible. The selections are frequently operated on with the use of menus, dialog boxes, or other UI gadgetry. Only one object at each model level may have the model &quot;exclusive,&quot; and for an object to &quot;have the Model&quot; of an application, that object must have a continuous path of model exclusives up to the application object.</P>
+<P>
+Only GenSystem, GenApplication, and the document control objects can be directly used in the Model hierarchy without any modifications. To use other objects in the Model hierarchy, you must first subclass those objects' classes and add an instance field and several message handlers pertaining to the Model hierarchy. Any object which is a valid target node can be subclassed in this manner.</P>
+<P>
+By default, an application will come up with certain objects having the model exclusive within their model levels. This allows the user to immediately begin operating on data. For an object to grab the default exclusive, it must first be modelable. Only objects which are modelable may have the model exclusive. A modelable object can be any child of a valid model node. Valid nodes for the Model hierarchy are the same as for the Target hierarchy. However, a document control object must also be set GDCA_MODELABLE to grab the model exclusive. Remember that just because an object is a valid node does not mean it can exhibit the behavior of the Model hierarchy; you must subclass most objects for this to occur.</P>
+<P>
+<A NAME="IX_HINT_DEFAULT_MODEL">
+ </A>
+For objects within a model level, the model will be granted first to any object with <CODE>
+HINT_DEFAULT_MODEL</CODE>
+ in its instance data. If no object has this hint at a particular model level, then the model will be granted to the first modelable object at that level.</P>
+<P>
+<A NAME="IX_MSG_META_SEND_CLASSED_EVENT:to model">
+ </A>
+The easiest way to deliver a message to an object in the active Model hierarchy is to use <CODE>
+MSG_META_SEND_CLASSED_EVENT</CODE>
+ with the <CODE>
+TravelOption</CODE>
+ TO_MODEL. To send a message to the leaf node in the Model hierarchy, send this message with a class of null. The message will be sent down the hierarchy until it reaches the leaf object, where it will be processed.</P>
+<P>
+This approach is desirable over using <CODE>
+MSG_META_GET_MODEL_EXCL</CODE>
+ to return an optr for later use as the system may have corrupted the optr in the meantime.</P>
+
+<H2 CLASS="HeadingC">
+Changing the Model Exclusive</H2>
+<P>
+<A NAME="IX_MSG_META_GRAB_MODEL_EXCL">
+ </A>
+To modify the Model hierarchy, use <CODE>
+MSG_META_GRAB_MODEL_EXCL</CODE>
+. <A NAME="IX_MSG_META_RELEASE_MODEL_EXCL">
+ </A>
+To remove the model exclusive from an object without setting it to another object, use <CODE>
+MSG_META_RELEASE_MODEL_EXCL</CODE>
+. Note that these messages only modify the model exclusive of a single object. Therefore, they only affect the model pointer of the parent; further up the Model hierarchy there is no effect. Changing the model exclusive of an object will only change the direction of the model path if all ancestors of the new model exclusive are also model exclusives.</P>
+<P>
+<A NAME="IX_MSG_META_GET_MODEL_EXCL">
+ </A>
+To check which model exclusive a composite points to, send it a <CODE>
+MSG_META_GET_MODEL_EXCL</CODE>
+. This message will return the optr of the model child. The returned object may not have the model properties, though, for the reasons above. Never send a message directly to the object returned by this method as it may have been changed in the meantime. Use <CODE>
+MSG_META_SEND_CLASSED_EVENT</CODE>
+ with the <CODE>
+TravelOption</CODE>
+ TO_MODEL instead.</P>
+
+
+<H2 CLASS="HeadingC">
+Intercepting the Model</H2>
+<P>
+Your application may also wish to be notified when an object either gains or loses its model properties. <A NAME="IX_MSG_META_GAINED_MODEL_EXCL">
+ </A>
+Whenever an object in GEOS gains the model of the application--not just the model exclusive--it sends a <CODE>
+MSG_META_GAINED_MODEL_EXCL</CODE>
+ to that object.<A NAME="IX_MSG_META_LOST_MODEL_EXCL">
+ </A>
+ Similarly, if an object loses the model of an application--not just the model exclusive--the system sends a <CODE>
+MSG_META_LOST_MODEL_EXCL</CODE>
+ to that object.</P>
+<P>
+If your application needs to know when an object either gains or loses its model properties, intercept <CODE>
+MSG_META_GAINED_MODEL_EXCL</CODE>
+ and <CODE>
+MSG_META_LOST_MODEL_EXCL</CODE>
+. Be sure to pass these messages on to the superclass, however, to perform necessary default functionality. Within your message handlers for these messages, you may add whatever additional behavior you require.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Input_11.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Input_15.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">5.4 Using Target</A> 
+<!-- to next --> | <A HREF="Input_17.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5.6 Extending the Hierarchies</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

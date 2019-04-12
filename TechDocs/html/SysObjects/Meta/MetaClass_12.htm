@@ -1,0 +1,286 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: MetaClass_12.htm,v 1.1 97/06/02 16:20:13 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> IACP Meta Messages</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">MetaClass</A>: 3.5 <A HREF="MetaClass_d.htm">Exported Message Ranges</A>: 
+IACP Meta Messages</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="MetaClass_d.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="MetaClass_11.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.4 Standard GCN Messages</A> 
+<!-- to next --> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+IACP is fully discussed in <A HREF="../../Kernel/Geodes/index.htm">the Applications and Geodes chapter</A>.</P>
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_IACP_PROCESS_MESSAGE">
+ </A>
+MSG_META_IACP_PROCESS_MESSAGE</H4>
+<PRE CLASS="syntax">@importMessage MetaIACPMessages, void MSG_META_IACP_PROCESS_MESSAGE(
+        EventHandle		msgToSend,
+        TravelOption		topt,
+        EventHandle		completionMsg);</PRE>
+<P>
+This message dispatches an IACP message to its proper destination, sending a completion message back when that has finished.</P>
+<P CLASS="refField">
+Source:	<CODE>
+IACPSendMessage()</CODE>
+.</P>
+<P CLASS="refField">
+Destination:	Any object registered as an IACP server, or the GenApplication object of a geode that is a client of such a server.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+msgToSend</EM>
+	EventHandle of recorded message that the other side of the connection is actually sending.</P>
+<DL>
+<DT>
+<EM>
+topt</EM>
+</DT><DD><CODE>
+TravelOption</CODE>
+ (or -1 if <EM>
+msgToSend</EM>
+ should be dispatched via <CODE>
+MessageDispatch() o</CODE>
+r delivered via MSG_META_SEND_TO_CLASSED_EVENT.</DD>
+<DT>
+<EM>
+completionMsg</EM>
+</DT><DD><CODE>
+EventHandle</CODE>
+ of recorded message to send when the message in <EM>
+msgToSend</EM>
+ has been handled. If null, then no completion message will be sent.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	if you have an object other than the GenApplication object that is an IACP server, you will need to intercept this message. You do not want to pass it on to the superclass in this case; usually, you will just want to call<CODE>
+ IACPProcessMessage()</CODE>
+.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_IACP_NEW_CONNECTION">
+ </A>
+MSG_META_IACP_NEW_CONNECTION</H4>
+<PRE CLASS="syntax">@importMessage MetaIACPMessages, void MSG_META_IACP_NEW_CONNECTION(
+        MemHandle		appLaunchBlock,
+        Boolean		justLaunched,
+        IACPConnection		connection);</PRE>
+<P>
+This message informs servers that a new client has connected to the server.</P>
+<P CLASS="refField">
+Source:	<CODE>
+IACPConnect()</CODE>
+.</P>
+<P CLASS="refField">
+Destination:	Any object registered as an IACP server.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+appLaunchBlock</EM>
+	Handle of <CODE>
+AppLaunchBlock</CODE>
+ passed to <CODE>
+IACPConnect()</CODE>
+. Do not free this block.</P>
+<DL>
+<DT>
+<EM>
+justLaunched</EM>
+</DT><DD><EM>
+true</EM>
+ if the recipient was just launched (i.e. it received the <CODE>
+AppLaunchBlock</CODE>
+ in its MSG_META_ATTACH call).</DD>
+<DT>
+<EM>
+connection</EM>
+</DT><DD><CODE>
+IACPConnection</CODE>
+ that is now open.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	Must intercept if you want to do anything about receiving the new client; there is not default handler for this message. If you do not intercept this message, no harm is done.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_IACP_LOST_CONNECTION">
+ </A>
+MSG_META_IACP_LOST_CONNECTION</H4>
+<PRE CLASS="syntax">@importMessage MetaIACPMessages, void MSG_META_IACP_LOST_CONNECTION(
+        IACPConnection		connection,
+        word		serverNum);</PRE>
+<P>
+This message informs a server (or client) that one of its clients (or servers) has shut down.</P>
+<P CLASS="refField">
+Source:	<CODE>
+IACPShutdown()</CODE>
+.</P>
+<P CLASS="refField">
+Destination:	Any object registered as an IACP server, or the GenApplication object of a geode who is a client of such.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+connection</EM>
+	<CODE>
+IACPConnection</CODE>
+ being closed.</P>
+<DL>
+<DT>
+<EM>
+serverNum</EM>
+</DT><DD>Server number that shut down, or 0 if this was a client that shut down (and thus it is a server being notified through this message).</DD>
+</DL>
+<P CLASS="refField">
+Interception:	Must be intercepted to provide custom behavior upon losing a connection, as there is no default handler for this message. <CODE>
+IACPLostConnection()</CODE>
+ is a good routine for servers to call to ensure that connections don't linger after a client has shut down its end.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_IACP_SHUTDOWN_CONNECTION">
+ </A>
+MSG_META_IACP_SHUTDOWN_CONNECTION</H4>
+<PRE CLASS="syntax">@importMessage MetaIACPMessages, void MSG_META_IACP_SHUTDOWN_CONNECTION(
+        IACPConnection		connection);</PRE>
+<P>
+This message shuts down the appropriate side of the indicated connection.</P>
+<P CLASS="refField">
+Source:	<CODE>
+IACPLostConnection()</CODE>
+, though after a delay.</P>
+<P CLASS="refField">
+Destination:	Any IACP server object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+connection</EM>
+	<CODE>
+IACPConnection</CODE>
+ to shutdown.</P>
+<P CLASS="refField">
+Interception:	Must be intercepted to finish the work of a call to <CODE>
+IACPLostConnection()</CODE>
+. Call<CODE>
+ IACPShutdownConnection()</CODE>
+ to get default handling of this message.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_IACP_DOC_OPEN_ACK">
+ </A>
+MSG_META_IACP_DOC_OPEN_ACK</H4>
+<PRE CLASS="syntax"><CODE>@importMessage MetaIACPMessages, void</CODE> MSG_META_IACP_DOC_OPEN_ACK(
+        IACPDocOpenAckParams			*params);</PRE>
+<P>
+This message is sent when a document has been opened; the document must have previously been passed in the <CODE>
+AppLaunchBlock</CODE>
+ when the IACP connection was made. The optr of the GenDocument object managing the document is passed so that messages can be sent to it explicitly, though these messages must always be sent via IACP (with a <CODE>
+TravelOption</CODE>
+ of -1) to allow the application to exit at any time.</P>
+<P CLASS="refField">
+Source:	GenDocumentGroup.</P>
+<P CLASS="refField">
+Destination:	IACP client (usually the GenApplication object of the client application).</P>
+<P CLASS="refField">
+Parameters:	<EM>
+params</EM>
+	Pointer to an <CODE>
+IACPDocOpenAckParams</CODE>
+ structure.</P>
+<P CLASS="refField">
+Structures:	</P>
+<PRE>typedef struct {
+	optr			IDOAP_docObj;
+	IACPConnection			IDOAP_connection;
+	word			IDOAP_serverNum;
+} IACPDocOpenAckParams;</PRE>
+<P>
+IDOAP_<CODE>
+docObj</CODE>
+ stores the optr of the document object managing the document.</P>
+<P>
+IDOAP_<CODE>
+connection</CODE>
+ stores the <CODE>
+IACPConnection</CODE>
+ over which the open request was received.</P>
+<P>
+IDOAP_<CODE>
+serverNum</CODE>
+ stores the server number of the GenApplication object acting as the document object's server, or zero if the connection is through some other object.</P>
+<P CLASS="refField">
+Interception:	No default handler is defined. You must intercept this message to provide custom behavior.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_IACP_DOC_CLOSE_ACK">
+ </A>
+MSG_META_IACP_DOC_CLOSE_ACK</H4>
+<PRE CLASS="syntax">@importMessage MetaIACPMessages, void MSG_META_IACP_DOC_CLOSE_ACK(
+        IACPDocCloseAckParams				*params);</PRE>
+<P>
+This message acts as the acknowledgment sent by a GenDocument object after it successfully processes MSG_GEN_DOCUMENT_CLOSE. Documents opened via IACP always operate in transparent mode; i.e. if you close a dirty file, it will be saved. If you don't want this behavior, you will have to send a message to revert the document.</P>
+<P CLASS="refField">
+Source:	GenDocument object.</P>
+<P CLASS="refField">
+Destination:	IACP client.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+params</EM>
+	Pointer to a <CODE>
+IACPDocCloseAckParams</CODE>
+ structure.</P>
+<P CLASS="refField">
+Structures:	</P>
+<PRE>typedef struct {
+	optr			IDCAP_docObj;
+	IACPConnection			IDCAP_connection;
+	word			IDCAP_serverNum;
+	word			IDCAP_status;
+} IACPDocCloseAckParams;</PRE>
+<P>
+IDCAP_<CODE>
+docObj</CODE>
+ stores the optr of the document object that was managing the document.</P>
+<P>
+IDCAP_<CODE>
+connection</CODE>
+ stores the <CODE>
+IACPConnection</CODE>
+ over which the close request was received.</P>
+<P>
+IDCAP_<CODE>
+serverNum</CODE>
+ stores the server number of the GenApplication object acting as the document object's server, or zero if the connection is through some other object.</P>
+<P>
+IDCAP_<CODE>
+status</CODE>
+ stores the <CODE>
+DocQuitStatus</CODE>
+ of the close operation.</P>
+<P CLASS="refField">
+Interception:	No default handler is defined. You must intercept this message to provide custom behavior.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="MetaClass_d.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="MetaClass_11.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.4 Standard GCN Messages</A> 
+<!-- to next --> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

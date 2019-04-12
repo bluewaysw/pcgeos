@@ -1,0 +1,199 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Shapes_12.htm,v 1.2 97/09/05 11:48:17 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Patterns and Hatching</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Drawing Graphics</A>: 3.2 <A HREF="Shapes_10.htm">Shape Attributes</A>: 
+Patterns and Hatching</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Shapes_10.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Shapes_11.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.1 Color</A> 
+<!-- to next --> | <A HREF="Shapes_13.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.3 Mix Mode</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>GrSetAreaPattern(), GrSetAreaPatternCustom(), GrSetTextPattern(), GrSetTextPatternCustom(), GrGetAreaPattern(), GrGetTextPattern()</PRE>
+<P>
+Fill patterns allow the application to tile an area with a repeating pattern of bits or lines helpful for suggesting textures. The graphics system supports two types of fill patterns. Bitmap patterns, familiar to most computer users, tile the filled area with a repeated bitmap. Hatch patterns fill the area with a repeated sequence of lines. Hatch patterns are defined in terms of families of parallel lines. <A NAME="IX_PatternType">
+ </A>
+Patterns are referenced by a <CODE>
+PatternType</CODE>
+ and an index, stored in a <A NAME="IX_GraphicPattern">
+ </A>
+<CODE>
+GraphicPattern</CODE>
+ structure. The pattern types are</P>
+<DL>
+<DT>
+PT_SOLID<A NAME="IX_PT_&ldots;  (PatternType type)">
+ </A>
+<STRONG>
+</DT><DD></STRONG>
+The lack of a pattern. Fills the area solid. This is the default. </DD>
+<DT>
+PT_SYSTEM_HATCH</DT><DD>
+System-defined hatch pattern. These patterns are unchangeable and are available to all geodes.</DD>
+<DT>
+PT_SYSTEM_BITMAP</DT><DD>
+System-defined tile bitmap pattern. These patterns are unchangeable and available to all geodes.</DD>
+<DT>
+PT_USER_HATCH</DT><DD>
+User-defined hatch pattern. These patterns are available to all geodes.</DD>
+<DT>
+PT_USER_BITMAP</DT><DD>
+User-defined tile bitmap pattern. These patterns are available to all geodes.</DD>
+<DT>
+PT_CUSTOM_HATCH</DT><DD>
+Application-defined hatch pattern. These patterns are application-specific.</DD>
+<DT>
+PT_CUSTOM_BITMAP</DT><DD>
+Application-defined tile bitmap pattern. These patterns are application-specific.</DD>
+</DL>
+<P>
+<A NAME="IX_GrSetAreaPattern()">
+ </A>
+Use <CODE>
+GrSetAreaPattern()</CODE>
+ and<A NAME="IX_GrSetTextPattern()">
+ </A>
+ <CODE>
+GrSetTextPattern()</CODE>
+ to use patterns defined outside the application (system- and user-defined patterns). To use the system's brick hatch pattern, for example, pass the <A NAME="IX_PatternType">
+ </A>
+<CODE>
+PatternType</CODE>
+ PT_SYSTEM_HATCH<A NAME="IX_PT_SYSTEM_HATCH">
+ </A>
+ and the <A NAME="IX_SystemHatch">
+ </A>
+<CODE>
+SystemHatch</CODE>
+ <A NAME="IX_SH_&ldots;  (SystemHatch type)">
+ </A>
+SH_BRICK. To use a user-defined bitmap pattern, pass <CODE>
+PatternType</CODE>
+ PT_USER_BITMAP and the number of the pattern. If you pass an invalid pattern (requesting a user hatch pattern when the user hasn't defined one, for instance), the area or text will be filled solid.</P>
+<P>
+Applications may define their own patterns. Before adding custom patterns to an application, consider whether such an action is really necessary. Remember that the user may define his own patterns. The data associated with any application custom pattern may be at most 16Kbytes. 
+
+</P>
+<P>
+Hatch patterns are defined in terms of families of lines. The pattern designer specifies a series of families; each family consists of a set of equidistant parallel lines. Thus, by defining one family of lines, one could cover a surface with one set of parallel lines. By asking for two families, the region could be filled with a grid. 
+<IMG SRC="Shapes_12_customHatch.gif">
+
+</P>
+<P>
+<A NAME="IX_HatchLine">
+ </A>
+For each line family, the application must supply certain information. Your application will work with the <CODE>
+HatchLine</CODE>
+ data type to specify</P>
+<UL>
+<LI>
+Origin<BR>
+Since each line family is drawn as a set of equidistant parallel lines, the origin might seem useless. Who cares where the lines start, since they fill the available space? In fact, the origin will only be meaningful if your hatch pattern contains more than one line family. The origin allows you to draw one line family at an offset from another. In the case of the example presented in the figure above, the third line family needed an origin offset from that of the first two families, since none of the lines of the third family pass through the point used as the origin by the first two families.</LI>
+<LI>
+Delta offset between lines of the family<BR>
+Each family has a horizontal and vertical offset. When drawing the pattern, the first line will be drawn starting at the origin. The second line will be drawn at a perpendicular distance equal to the passed y offset. The second line may also be drawn at a parallel offset, but this will only affect dotted lines.</LI>
+<LI>
+Angle at which to draw the lines<BR>
+Remember that angles are measured in degrees measured counterclockwise from the positive x axis. </LI>
+<LI>
+Color<BR>
+You may draw the lines using the default color (area color if pattern is filling an area; text if rendering text), or you may draw using a specific color.</LI>
+<LI>
+Dashes<BR>
+You may draw the lines using a custom dash pattern. See the Line Style attribute, below, to learn how to set up a dash pattern.</LI>
+</UL>
+<P>
+Custom bitmap patterns are defined in terms of simple bitmaps. To find out the structure of a bitmap, see <A HREF="../../CRef/Structs/S_2.htm#72157">the struct's documentation</A>.</P><P>
+<A NAME="IX_GrSetCustomAreaPattern()">
+ </A>
+To use a custom pattern, call <CODE>
+GrSetCustomAreaPattern()</CODE>
+ or <CODE>
+GrSetCustomTextPattern()</CODE>
+<A NAME="IX_GrSetCustomTextPattern()">
+ </A>
+. Along with the usual information, you must include a pointer to a memory location which marks the beginning of some structures holding the pattern data. The commands and structures are detailed in the reference manual. For an example of some code using a custom hatch pattern, see <A HREF="Shapes_12.htm#37201"> Hatch Pattern Data</A>
+.</P>
+<P CLASS="figTitle">
+Code Display 24-2 <A NAME="37201">
+ </A>
+Hatch Pattern Data</P>
+<PRE>/* This example shows how to implement the pattern illustrated in the figure above. */</PRE>
+<PRE>	/* ... */
+	GrSetPatternCustom(myGState, gp, hexHatchPatt);
+	/* ... */</PRE>
+<PRE>GraphicPattern 	gp = {PT_CUSTOM_HATCH, 0};</PRE>
+<PRE><A NAME="IX_HatchPattern"> </A>static HatchPattern 	hexHatchPatt = { 3 };					/* Three HatchLine structures
+						 * must follow */</PRE>
+<PRE>static HatchLine line1 = { 			{MakeWWFixed(0) , MakeWWFixed(0)},			/* Origin */
+		 	MakeWWFixed(0),			/* Delta X 
+						 *  dashes will be in alignment */
+			MakeWWFixed(20.7846097),			/* Delta Y
+						 *  lines will be 12*sqrt(3)
+						 *  apart */
+			MakeWWFixed(0),			/* Angle */
+			(dword) (CF_SAME&lt;&lt;16),			/* Color 
+						 *  will use default color */
+			1			/* Number of dashes 
+						 *  one HatchDash pattern 
+						 *  must follow */
+		};</PRE>
+<PRE><A NAME="IX_HatchDash"> </A>static HatchDash dash1 = {			{12, 0},			/* On for 12 points */
+			{24, 0}};			/* ...and Off for 24 points */</PRE>
+<PRE>static HatchLine line2 = { 			{MakeWWFixed(0), MakeWWFixed(0)},			/* Origin */
+		 	MakeWWFixed(0),			/* Delta X */
+			MakeWWFixed(20.7846097),			/* Delta Y*/
+			{120,0},			/* Angle */
+			(dword) (CF_SAME&lt;&lt;16),			/* Color */
+			1			/* Number of dashes */
+		};</PRE>
+<PRE>static HatchDash dash 2 = {			{12, 0},			/* On for 12 points */
+			{24, 0}};			/* ...and Off for 24 points */</PRE>
+<PRE>static HatchLine line3 = { 			{{12,0} , MakeWWFixed(0)},			/* Origin */
+						 *  this line family will be at
+						 *  a 12 pt. horizontal offset
+						 *  from the other two families.
+		 	MakeWWFixed(0),			/* Delta X */
+			MakeWWFixed(20.7846097),			/* Delta Y*/
+			{60,0},			/* Angle */
+			(dword) (CF_SAME&lt;&lt;16),			/* Color */
+			1			/* Number of dashes */
+		};</PRE>
+<PRE>static HatchDash dash3 = {			{12, 0},			/* On for 12 points */
+			{24, 0}};			/* ...and Off for 24 points */</PRE>
+<P>
+To find out the current area or text pattern, call <A NAME="IX_GrGetAreaPattern()">
+ </A>
+<CODE>
+GrGetAreaPattern()</CODE>
+ or <CODE>
+GrGetTextPattern()</CODE>
+<A NAME="IX_GrGetTextPattern()">
+ </A>
+.</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Shapes_10.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Shapes_11.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3.1 Color</A> 
+<!-- to next --> | <A HREF="Shapes_13.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.3 Mix Mode</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

@@ -1,0 +1,482 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: CalSamplesTop.htm,v 1.3 97/08/01 16:33:08 mevissen Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE>Examples</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+<H1 CLASS="sectionTitle">
+<A HREF="index.htm">Calendar API</A>: 2
+Examples</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child -->
+<!-- to previous --> | <A HREF="CalOverview.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: "> 1 Overview</A>
+<!-- to next --> | <A HREF="CalReference.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: "> 3 Reference</A>
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+
+Most of these examples are from the 
+<STRONG CLASS="fileName">CalApi</STRONG> sample application.
+
+<A NAME="iniFile">
+ </A>
+<H2>Checking the Version of Calendar</H2>
+
+Calendar API routines are only supported by later versions of the Calendar
+application.  These versions will have the following INI file setting:
+
+<PRE>
+[Calendar]
+calApi = True
+</PRE>
+
+This setting can be checked as follows:
+
+<TABLE BORDER=2 CELLPADDING=10><TR><TD>
+<PRE>
+    #include &lt;initfile.h&gt;
+    Boolean calapi;
+
+    if ( InitFileReadBoolean( "Calendar", "calApi", &amp;calapi ) ) {
+
+/* entry was not found */
+
+        FoamDisplayWarning( @CantRunCalApi );
+        @send application::MSG_META_QUIT();
+    }
+    else {
+        if ( calapi == FALSE ) {
+
+/* entry has wrong value */
+
+            FoamDisplayWarning( @NoCalApiSupport );
+            @send application::MSG_META_QUIT();
+        }
+    }
+</PRE>
+</TABLE>
+
+<H2>Specifying an Ordinary Event</H2>
+
+This is an example of filling a
+<CODE>CalendarEventParamStruct</CODE> with parameters to specify an event
+with a start date, start time, optional end date, optional end time, and an
+alarm.
+<P>
+<TABLE BORDER=2 CELLPADDING=10><TR><TD>
+<PRE>
+@include &lt;calendar.goh&gt;
+#include &lt;timedate.h&gt;      /* definition of TimerDateAndTime */
+
+/* Declare event_g as a Calendar event param structure */
+
+    CalendarEventParamStruct event_g;
+
+/* Other variables in this example */
+
+    TimerDateAndTime date, time;
+    Boolean          boolEndDate, boolEndTime;
+    word             alarmMinutes;
+    TCHAR            *eventText_g;
+
+/* Fill the start date and time.  (Assume the variables "date" and "time"
+ * have already been filled.)  Variables are cast as dwords to prevent
+ * bit-shifting off the left of a too-small word. 
+ */
+
+    event_g.CEPS_startDateTime =
+        ( (dword)date.TDAT_year    &lt;&lt; FDAT_YEAR_OFFSET   ) |
+        ( (dword)date.TDAT_month   &lt;&lt; FDAT_MONTH_OFFSET  ) |
+        ( (dword)date.TDAT_day     &lt;&lt; FDAT_DAY_OFFSET    ) |
+        ( (dword)time.TDAT_hours   &lt;&lt; FDAT_HOUR_OFFSET   ) |
+        ( (dword)time.TDAT_minutes &lt;&lt; FDAT_MINUTE_OFFSET );
+
+/* Fill the end date and time.  (Assume the variables "date", "time", and 
+ * "boolEndXxxx" have already been filled.)  Variables are cast as dwords to
+ * prevent bit-shifting off the left of a too-small word.  Use CAL_NO_XXXX
+ * if a value is not specified.
+ */
+
+    if (boolEndDate) {
+        event_g.CEPS_endDateTime =
+            ( (dword)date.TDAT_year  &lt;&lt; FDAT_YEAR_OFFSET  ) |
+            ( (dword)date.TDAT_month &lt;&lt; FDAT_MONTH_OFFSET ) |
+            ( (dword)date.TDAT_day   &lt;&lt; FDAT_DAY_OFFSET   );
+    }
+    else {
+        event_g.CEPS_endDateTime = (dword)CAL_NO_DATE &lt;&lt; FDAT_DAY_OFFSET;
+    }
+
+    if (boolEndTime) {
+        event_g.CEPS_endDateTime |=
+            ( (dword)time.TDAT_hours   &lt;&lt; FDAT_HOUR_OFFSET   ) |
+            ( (dword)time.TDAT_minutes &lt;&lt; FDAT_MINUTE_OFFSET );
+    }
+    else {
+        event_g.CEPS_endDateTime |= (dword)CAL_NO_TIME &lt;&lt; FDAT_2SECOND_OFFSET;
+    }
+
+/* The event will not be a multi-day event */
+
+    event_g.CEPS_reserveWholeDay = 0;
+
+/*
+ * The alarm will go off "alarmMinutes" minutes before event time.
+ * Mask with CAS_INTERVAL to ensure alarmMinutes is in range.
+ */
+
+    event_g.CEPS_alarm = 
+          CAS_HAS_ALARM |
+        ( CAIT_MINUTES &lt;&lt; CAS_TYPE_OFFSET ) |
+        ( CAS_INTERVAL & ( alarmMinutes &lt;&lt; CAS_INTERVAL_OFFSET ));
+
+/* Event has a text description */
+
+    event_g.CEPS_eventType = CEDT_GEOS_TEXT;
+
+/* Event is not repeating */
+
+    event_g.CEPS_repeatInfo = 0;
+
+/* Assume event text is already pointed to by eventText_g */
+
+    event_g.CEPS_dataLength = LocalStringSize( eventText_g );
+    event_g.CEPS_data = eventText_g;
+</PRE>
+</TABLE>
+<H2>Specifying a To-do Event</H2>
+
+To specify a to-do list event, the start date is set to
+<CODE>CAL_NO_DATE</CODE> and the to-do priority is set in the start time
+field.
+<P>
+<TABLE BORDER=2 CELLPADDING=10><TR><TD>
+<PRE>
+@include &lt;calendar.goh&gt;
+
+/* Declare event_g as a Calendar event param structure */
+
+    CalendarEventParamStruct event_g;
+
+/* Other variables in this example */
+
+    word     myPriority;
+    TCHAR    *eventText_g;
+
+/* "myPriority" can be in the range [0-2] here, corresponding to 
+ * CTDIS_HIGH_PRIORITY, CTDIS_NORMAL_PRIORITY, and CTDIS_COMPLETED. 
+ */
+
+    event_g.CEPS_startDateTime = 
+        ((dword)CAL_NO_DATE &lt;&lt; FDAT_DAY_OFFSET) | 
+        ((dword)(myPriority + CTDIS_HIGH_PRIORITY)  &lt;&lt; FDAT_2SECOND_OFFSET);
+
+/* Assume the to-do text is already pointed to by eventText_g */
+
+    event_g.CEPS_dataLength = LocalStringSize( eventText_g );
+    event_g.CEPS_data = eventText_g;
+
+/* This parameter must be zero, otherwise the error CEE_EVENT_NOT_SUPPORTED 
+ * will be generated.
+ */
+    event_g.CEPS_repeatInfo = 0;
+</PRE>
+</TABLE>
+<P>
+Other parameters in <CODE>CalendarEventParamStruct</CODE> will be ignored.
+
+<H2>Adding an Event</H2>
+
+To add an event, send <CODE>MSG_CALENDAR_ADD_EVENT</CODE> to the Calendar
+application's process object via IACP.  The error code and assigned event ID
+can be checked in your callback method
+(<CODE>MSG_CALAPI_PROCESS_ADD_EVENT_CALLBACK</CODE> here); see examples
+of callbacks below.
+<P>
+<TABLE BORDER=2 CELLPADDING=10><TR><TD>
+<PRE>
+      /*
+       * serverGeodeToken    - token of the calendar app
+       * connectionFlags     - optional flags for connection
+       * iacpConnectionToken - token for this IACP connection
+       * serverCount         - the number of running servers
+       * hMsgToSend          - handle of the recorded message
+       * hLaunchBlock        - handle of launch block
+       * pLaunchBlock        - pointer to launch block
+       */
+    GeodeToken	     serverGeodeToken = CALENDAR_TOKEN;
+    IACPConnectFlags connectionFlags  = 0;
+    IACPConnection   iacpConnectionToken;
+    word	     serverCount;
+    EventHandle      hMsgToSend;
+    MemHandle        hLaunchBlock;
+    AppLaunchBlock * pLaunchBlock;
+
+      /*
+       * Make a launch block so that server (calendar app) is
+       * launched if not running already.
+       */
+    hLaunchBlock = IACPCreateDefaultLaunchBlock(
+        MSG_GEN_PROCESS_OPEN_APPLICATION );
+
+      /*
+       * Make sure it does not bring up the calendar on top of us.
+       * Otherwise, the user can interact with it and produce
+       * unwanted side-effects.
+       */
+    pLaunchBlock = MemLock( hLaunchBlock );
+    pLaunchBlock-&gt;ALB_launchFlags |=
+	( ALF_OPEN_IN_BACK | ALF_DO_NOT_OPEN_ON_TOP );
+    MemUnlock( hLaunchBlock );
+
+      /*
+       * Connect to the Calendar IACP server.
+       */
+    iacpConnectionToken = IACPConnect( &amp;serverGeodeToken,
+                                       connectionFlags,
+                                       hLaunchBlock,
+                                       NullOptr,
+                                       &amp;serverCount );
+
+    if ( iacpConnectionToken != IACP_NO_CONNECTION ) {
+
+          /*
+           * Record the ADD_EVENT message for transmittal via IACP.
+           */
+
+        hMsgToSend = @record null::MSG_CALENDAR_ADD_EVENT(
+                &amp;event_g;
+                ConstructOptr( GeodeGetProcessHandle(), NullChunk ),
+                MSG_CALAPI_PROCESS_ADD_EVENT_CALLBACK );
+
+          /*
+           * Send the recorded message to the Calendar process obj 
+           * using IACPSendMessage.
+           */
+
+        IACPSendMessage( iacpConnectionToken,
+                         hMsgToSend,
+                         TO_PROCESS,
+                         NULL,
+                         IACPS_CLIENT );
+          /*
+           * Shut down the IACP connection and return the error value.
+           */
+
+        IACPShutdown( iacpConnectionToken, NullOptr );
+        return( CAE_NO_ERROR );
+    }
+    else {
+          /*
+           * Return an error as something went wrong
+           * trying to connect to the calendar app.
+           */
+        return( CAE_CANNOT_CONNECT_CALENDAR );
+    }
+</PRE>
+</TABLE>
+<H2>Getting an Event</H2>
+
+To retrieve event parameters from an event you added (perhaps to check for
+any changes made by the user), send
+<CODE>MSG_CALENDAR_GET_EVENT_BY_ID</CODE> via IACP and inspect the returned
+memory block in your callback method.  Send the IACP message as above,
+replacing the ADD_EVENT request with a GET_EVENT one; the
+<CODE>eventID</CODE> is the one returned to your ADD_EVENT callback.
+<P>
+<TABLE BORDER=2 CELLPADDING=10><TR><TD>
+<PRE>
+        hMsgToSend = @record MSG_CALENDAR_GET_EVENT_BY_ID(
+                eventID,
+                GeodeGetProcessHandle(),
+                ConstructOptr( GeodeGetProcessHandle(), NullChunk ),
+                MSG_CALAPI_PROCESS_GET_EVENT_CALLBACK );
+</PRE>
+</TABLE>
+<P>
+In your callback method (the last parameter above), extract the information
+you are interested in.  See the sample application <STRONG
+CLASS="fileName">CalApi</STRONG> for the complete method; excerpts are shown
+below.
+<P>
+<TABLE BORDER=2 CELLPADDING=10><TR><TD>
+<PRE>
+/* In your class declaration: */
+
+    @message (CALENDAR_GET_EVENT_CALLBACK_MSG)
+                         MSG_CALAPI_PROCESS_GET_EVENT_CALLBACK;;
+
+/********************************************************************
+ *		MSG_CALAPI_PROCESS_GET_EVENT_CALLBACK
+ ********************************************************************
+ * SYNOPSIS:	 Callback from Calendar IACP server on result of
+ *               MSG_CALENDAR_GET_EVENT_BY_ID.
+ * PARAMETERS:	 CalendarEventError error
+ *               MemHandle          eventBlock
+ * RETURN:       void
+ *
+ * STRATEGY:  Check status value; successful if CEE_NORMAL
+ *            If successful,
+ *               Lock and dereference returned global block
+ *               Calculate pointer to event text (it follows
+ *                   the returned event structure)
+ *               Extract information from structure
+ *               Free the global memory block!
+ *
+ *******************************************************************/
+@method CalApiProcessClass, MSG_CALAPI_PROCESS_GET_EVENT_CALLBACK
+{
+      /*
+       * eventData     - pointer to the returned event data
+       * eventTextData - pointer to the event description
+       * dateTime      - dateTime structure used to display event info
+       * tempStr       - used to convert event info into strings
+       * alarmType     - used to convert alarm info into alarm setting
+       */
+    CalendarReturnedEventStruct * eventData;
+    TCHAR *                       eventTextData;
+    TimerDateAndTime              dateTime;
+    TCHAR                         tempStr[MAX_EVENT_TEXT_LENGTH];
+    CalApiAlarmType               alarmType;
+
+      /*
+       * If there are no errors in getting the event,
+       * we lock down the returned structure and dereference
+       * the event text description.
+       */
+    if ( CEE_NORMAL == error ) {
+	eventData = MemLock( eventBlock );
+	eventTextData = (TCHAR*)((TCHAR*)eventData +
+                        sizeof( CalendarReturnedEventStruct ) );
+          /*
+           * Convert the start date/time into strings.
+           * First turn the FileDateAndTime into a TimerDateAndTime.
+           * Then use LocalFormatDateTime to turn that into a string.
+           * Don't forget to handle the case where the date or
+           * time isn't specified (i.e. equals -1).
+           */
+        dateTime.TDAT_year = FDATExtractYear( eventData-&gt;CRES_startDateTime ) +
+                             FDAT_BASE_YEAR;
+        dateTime.TDAT_month = FDATExtractMonth( eventData-&gt;CRES_startDateTime );
+        dateTime.TDAT_day = FDATExtractDay( eventData-&gt;CRES_startDateTime );
+        dateTime.TDAT_hours = FDATExtractHour( eventData-&gt;CRES_startDateTime );
+        dateTime.TDAT_minutes = FDATExtractMinute(
+            eventData-&gt;CRES_startDateTime );
+        if ( ( eventData-&gt;CRES_startDateTime & 0x0000ffff ) == CAL_NO_DATE ) {
+            strcpy( tempStr, "NO_DATE" );
+        }
+        else {
+            LocalFormatDateTime( tempStr, DTF_SHORT, &amp;dateTime );
+        }
+
+        if ( ( eventData-&gt;CRES_startDateTime & 0xffff0000 ) == 
+          (dword)CAL_NO_TIME &lt;&lt; 16 ) {
+            strcpy( tempStr, "NO_TIME" );
+        }
+        else {
+            LocalFormatDateTime( tempStr, DTF_HM_24HOUR, &amp;dateTime );
+        }
+       
+     /* Perform any other processing; display information... */
+
+          /*
+           * Free the event data block.
+           */
+	MemFree( eventBlock );
+    }
+    else {
+        /* Error handling for error != CEE_NORMAL ... */
+    }
+} /* MSG_CALAPI_PROCESS_GET_EVENT_CALLBACK */
+</PRE>
+</TABLE>
+<H2>Checking for Events</H2>
+
+To check for events in a given time range, pass the start and end times with
+<CODE>MSG_CALENDAR_CHECK_IF_EVENT_EXISTS</CODE> via IACP (as in the example
+above).  Use your callback to interpret the returned status code.
+
+<TABLE BORDER=2 CELLPADDING=10><TR><TD>
+<PRE>
+/* Check for events overlapping the range 12:15 PM June 9, 1997 until
+   9:15 AM June 10, 1997  */
+
+/* Note that constants are specified as Long literals. */
+
+    FileDateAndTime          startDateTime_g =
+        ( ( ( 1997L - FDAT_BASE_YEAR ) &lt;&lt; FDAT_YEAR_OFFSET ) |
+          ( 6L    &lt;&lt; FDAT_MONTH_OFFSET  ) |
+          ( 9L    &lt;&lt; FDAT_DAY_OFFSET    ) |
+          ( 12L   &lt;&lt; FDAT_HOUR_OFFSET   ) |
+          ( 15L   &lt;&lt; FDAT_MINUTE_OFFSET ) );
+
+    FileDateAndTime          endDateTime_g =
+        ( ( ( 1997L - FDAT_BASE_YEAR ) &lt;&lt; FDAT_YEAR_OFFSET ) |
+          ( 6L    &lt;&lt; FDAT_MONTH_OFFSET  ) |
+          ( 10L   &lt;&lt; FDAT_DAY_OFFSET    ) |
+          ( 9L    &lt;&lt; FDAT_HOUR_OFFSET   ) |
+          ( 15L   &lt;&lt; FDAT_MINUTE_OFFSET ) );
+
+    hMsgToSend = @record null::MSG_CALENDAR_CHECK_IF_EVENT_EXISTS(
+            startDateTime_g,
+            endDateTime_g,
+            ConstructOptr( GeodeGetProcessHandle(), NullChunk ),
+            MSG_CALAPI_PROCESS_CHECK_IF_EVENT_EXISTS_CALLBACK );
+</PRE>
+</TABLE>
+<P>
+<TABLE BORDER=2 CELLPADDING=10><TR><TD>
+<PRE>
+/* In CalApiProcessClass, declare the method: */
+
+    @message (CALENDAR_ACCESS_EVENT_COMMON_CALLBACK_MSG)
+                  MSG_CALAPI_PROCESS_CHECK_IF_EVENT_EXISTS_CALLBACK;
+ 
+/********************************************************************
+ *            MSG_CALAPI_PROCESS_CHECK_IF_EVENT_EXISTS_CALLBACK
+ ********************************************************************
+ * SYNOPSIS:     Callback from Calendar IACP server on result of
+ *               MSG_CALENDAR_CHECK_IF_EVENT_EXISTS.
+ * PARAMETERS:   CalendarEventError error
+ * RETURN:       void
+ * STRATEGY:     If an event existed, CEE_NORMAL is returned;
+ *               otherwise, we get CEE_EVENT_NOT_FOUND.
+ *******************************************************************/
+@method CalApiProcessClass, MSG_CALAPI_PROCESS_CHECK_IF_EVENT_EXISTS_CALLBACK
+{
+    if (error == CEE_NORMAL) {
+ 
+  /* At least one event in search range... */
+
+    } else if (error == CEE_EVENT_NOT_FOUND) {
+
+  /* No events overlap search range...*/
+
+    } else {
+
+  /* A processing error occurred... */
+
+    }
+} /* MSG_CALAPI_PROCESS_CHECK_IF_EVENT_EXISTS_CALLBACK */
+</PRE>
+</TABLE>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child -->
+<!-- to previous --> | <A HREF="CalOverview.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: "> 1 Overview</A>
+<!-- to next --> | <A HREF="CalReference.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: "> 3 Reference</A>
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

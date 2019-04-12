@@ -1,0 +1,252 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Documents_10.htm,v 1.1 97/06/02 14:42:58 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Special-Purpose Messages</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Documents</A>: 4.4 <A HREF="Documents_c.htm">Advanced DC Usage</A>: 
+Special-Purpose Messages</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Documents_c.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Documents_f.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.3 Working with DOS files</A> 
+<!-- to next --> | <A HREF="Documents_11.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.5 Forcing Actions</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+In addition to the basic messages discussed above, there are messages the document control sends out which do not ordinarily need to be handled. Some of these messages have been discussed above; most of the rest are described here.</P>
+
+<H2 CLASS="HeadingC">
+Caching Data in Memory</H2>
+<PRE>MSG_META_DOC_OUTPUT_WRITE_CACHED_DATA_TO_FILE, MSG_GEN_DOCUMENT_WRITE_CACHED_DATA_TO_FILE, MSG_META_DOC_OUTPUT_READ_CACHED_DATA_FROM_FILE, MSG_GEN_DOCUMENT_READ_CACHED_DATA_FROM_FILE</PRE>
+<P>
+Sometimes an application will want to keep frequently-accessed data in memory. For example, if you are managing Virtual Memory files, you may want to copy the map block to a fixed memory block instead of locking the block every time you need to read or change it. This is known as <EM>
+caching</EM>
+ data.</P>
+<P>
+If you cache data, you must make sure that the application's version of the data is consistent with the disk file. The document control helps keep track of this. Whenever the file (or the state) is saved, the document control will first send a message instructing the application to write the cache to the file, then it will save the file. Similarly, when the file is opened or GEOS is restarted from state, the document control will send a message instructing the application to reload the cached data from the file.</P>
+<P>
+There is one special concern. The user cannot save a file unless it has been marked dirty; also, the document control does not send <CODE>
+MSG_..._WRITE_CACHED_DATA_TO_FILE</CODE>
+ to documents which are not dirty. Therefore, if you change the data cache without actually altering the file, you should send a <CODE>
+MSG_GEN_DOCUMENT_GROUP_MARK_DIRTY</CODE>
+ to the GenDocumentGroup.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_DOC_OUTPUT_READ_CACHED_DATA_FROM_FILE">
+ </A>
+MSG_META_DOC_OUTPUT_READ_CACHED_DATA_FROM_FILE</H4>
+<PRE CLASS="syntax">void	MSG_META_DOC_OUTPUT_READ_CACHED_DATA_FROM_FILE(
+        optr 		document,			/* optr of document object */
+        FileHandle 		file);			/* FileHandle of associated file */</PRE>
+<P>
+The GenDocumentGroup sends this message when the document needs to read cached data. In particular, it sends this when a document is opened, when a document is reverted to its last-saved state, and when a document is re-opened as GEOS restores from state. If the application maintains a data cache, it should read the data from the file at this point. If the document does not cache data, it can ignore this message.</P>
+<P>
+Note that if the document control notices that the file has changed on disk, it will not send this message; it will, however, send a <CODE>
+MSG_META_DOC_OUTPUT_DOCUMENT_HAS_CHANGED</CODE>
+. The handler for that message should reread the cache or call the handler for this message.</P>
+<P CLASS="refField">
+Source:	The GenDocumentGroup object.</P>
+<P CLASS="refField">
+Destination:	Output of GenDocumentGroup (usually the Process object).</P>
+<P CLASS="refField">
+Parameters:	<EM>
+document</EM>
+	<EM>
+The optr of the appropriate document object.</EM>
+</P>
+<DL>
+<DT>
+<EM>
+file</EM>
+</DT><DD>The FileHandle of the appropriate file.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	You must write a handler for this message in whatever class will be receiving it (usually the process class).</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_DOCUMENT_READ_CACHED_DATA_FROM_FILE">
+ </A>
+MSG_GEN_DOCUMENT_READ_CACHED_DATA_FROM_FILE</H4>
+<PRE CLASS="syntax">void	MSG_GEN_DOCUMENT_READ_CACHED_DATA_FROM_FILE();</PRE>
+<P>
+The document object<CODE>
+ </CODE>
+sends this message to itself when the document needs to read cached data. In particular, it sends this when a document is opened, when a document is reverted to its last-saved state, and when a document is re-opened as GEOS restores from state. If the application maintains a data cache, it should read the data from the file at this point. If the document does not cache data, it can ignore this message.</P>
+<P>
+Note that if the document control notices that the file has changed on disk, it will not send this message; it will, however, send a <CODE>
+MSG_GEN_DOCUMENT_DOCUMENT_HAS_CHANGED</CODE>
+. The handler for that message should reread the cache or call the handler for this message.</P>
+<P CLASS="refField">
+Source:	A GenDocument object.</P>
+<P CLASS="refField">
+Destination:	The document object sends this message to itself.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_DOC_OUTPUT_WRITE_CACHED_DATA_TO_FILE">
+ </A>
+MSG_META_DOC_OUTPUT_WRITE_CACHED_DATA_TO_FILE</H4>
+<PRE CLASS="syntax">void	MSG_META_DOC_OUTPUT_WRITE_CACHED_DATA_TO_FILE(
+        optr 		document,			/* optr of document object */
+        FileHandle 		file);			/* FileHandle of associated file */</PRE>
+<P>
+The GenDocumentGroup object sends this message when the document needs to write cached data back to the file. In particular, it sends this message just before a document is saved, auto-saved, or &quot;Saved As,&quot; and before the document is closed as GEOS shuts down. The document should write its cached data back to the file. If the document does not cache data, it can ignore this message.</P>
+<P CLASS="refField">
+Warnings:	This message will not be sent if the document is clean. Therefore, if you change the data cache without changing the file, you should send a <CODE>
+MSG_GEN_DOCUMENT_GROUP_MARK_DIRTY_BY_FILE</CODE>
+ to the GenDocumentGroup object.</P>
+<P CLASS="refField">
+Source:	The GenDocumentGroup object.</P>
+<P CLASS="refField">
+Destination:	Output of GenDocumentGroup (usually the Process object)</P>
+<P CLASS="refField">
+Parameters:	<EM>
+document</EM>
+	<EM>
+The optr of the appropriate document object.</EM>
+</P>
+<DL>
+<DT>
+<EM>
+file</EM>
+</DT><DD>The FileHandle of the appropriate file.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	You must write a handler for this message in whatever class will be receiving it (usually the process class).</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_DOCUMENT_WRITE_CACHED_DATA_TO_FILE">
+ </A>
+MSG_GEN_DOCUMENT_WRITE_CACHED_DATA_TO_FILE</H4>
+<PRE CLASS="syntax">void	MSG_META_DOC_OUTPUT_WRITE_CACHED_DATA_TO_FILE();</PRE>
+<P>
+The document object sends this message to itself when the document needs to write cached data back to the file. In particular, it sends this message just before a document is saved, auto-saved, or &quot;Saved As,&quot; and before the document is closed as GEOS shuts down. The document should write its cached data back to the file. If the document does not cache data, it can ignore this message.</P>
+<P CLASS="refField">
+Warnings:	This message will not be sent if the document is clean. Therefore, if you change the data cache without changing the file, you should send a <CODE>
+MSG_GEN_DOCUMENT_GROUP_MARK_DIRTY_BY_FILE</CODE>
+ to the GenDocumentGroup object.</P>
+<P CLASS="refField">
+Source:	A GenDocument object.</P>
+<P CLASS="refField">
+Destination:	The document object sends this message to itself.</P>
+
+
+
+<H2 CLASS="HeadingC">
+Other Messages To Know About</H2>
+<P>
+There are a few other messages which are worth knowing about. These messages alert the application to special situations. Most applications can ignore these messages; however, for a few, these messages should be handled.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_DOC_OUTPUT_SAVE_AS_COMPLETED">
+ </A>
+MSG_META_DOC_OUTPUT_SAVE_AS_COMPLETED</H4>
+<PRE CLASS="syntax">void	MSG_META_DOC_OUTPUT_SAVE_AS_COMPLETED(
+        optr 		document,			/* optr of document object */
+        FileHandle 		file);			/* FileHandle of associated file */</PRE>
+<P>
+The GenDocumentGroup object sends this message when a &quot;Save As&quot; operation has been successfully completed.</P>
+<P CLASS="refField">
+Source:	The GenDocumentGroup object.</P>
+<P CLASS="refField">
+Destination:	Output of GenDocumentGroup (usually the Process object).</P>
+<P CLASS="refField">
+Parameters:	<EM>
+document</EM>
+	<EM>
+The optr of the appropriate document object.</EM>
+</P>
+<DL>
+<DT>
+<EM>
+file</EM>
+</DT><DD>The FileHandle of the appropriate file.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	You must write a handler for this message in whatever class will be receiving it (usually the process class).</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_DOCUMENT_SAVE_AS_COMPLETED">
+ </A>
+MSG_GEN_DOCUMENT_SAVE_AS_COMPLETED</H4>
+<PRE CLASS="syntax">void	MSG_GEN_DOCUMENT_SAVE_AS_COMPLETED();</PRE>
+<P>
+The document object sends this message to itself when a &quot;Save As&quot; operation has been successfully completed. </P>
+<P CLASS="refField">
+Source:	A GenDocument object.</P>
+<P CLASS="refField">
+Destination:	The document object sends this message to itself.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_DOC_OUTPUT_HAS_CHANGED">
+ </A>
+<A NAME="59034">
+ </A>
+MSG_META_DOC_OUTPUT_DOCUMENT_HAS_CHANGED</H4>
+<PRE CLASS="syntax">void	MSG_META_DOC_OUTPUT_DOCUMENT_HAS_CHANGED(
+        optr 		document,			/* optr of document object */
+        FileHandle 		file);			/* FileHandle of associated file */</PRE>
+<P>
+If the GDGA_AUTOMATIC_CHANGE_NOTIFICATION attribute of the GenDocumentGroup object is set to on, a timer will periodically check to see if any open documents have been changed by another application. If they have, the GenDocumentGroup object will send this message out. The application should respond by redisplaying the data on the screen and rereading any cached data from the file.</P>
+<P CLASS="refField">
+Source:	The GenDocumentGroup object.</P>
+<P CLASS="refField">
+Destination:	Output of GenDocumentGroup (usually the Process object).</P>
+<P CLASS="refField">
+Parameters:	<EM>
+document</EM>
+	<EM>
+The optr of the appropriate document object.</EM>
+</P>
+<DL>
+<DT>
+<EM>
+file</EM>
+</DT><DD>The FileHandle of the appropriate file.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	You must write a handler for this message in whatever class will be receiving it (usually the process class).</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_DOCUMENT_DOCUMENT_HAS_CHANGED">
+ </A>
+<A NAME="98137">
+ </A>
+MSG_GEN_DOCUMENT_DOCUMENT_HAS_CHANGED</H4>
+<PRE CLASS="syntax">void	MSG_GEN_DOCUMENT_DOCUMENT_HAS_CHANGED();</PRE>
+<P>
+If the GDGA_AUTOMATIC_CHANGE_NOTIFICATION attribute of the GenDocumentGroup object is set to on, a timer will periodically check to see if any open documents have been changed by another application. If they have, the document object will send this message out. The application should respond by redisplaying the data on the screen and rereading any cached data from the file.</P>
+<P CLASS="refField">
+Source:	A GenDocument object.</P>
+<P CLASS="refField">
+Destination:	The document object sends this message to itself.</P>
+
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Documents_c.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Documents_f.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.3 Working with DOS files</A> 
+<!-- to next --> | <A HREF="Documents_11.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.5 Forcing Actions</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

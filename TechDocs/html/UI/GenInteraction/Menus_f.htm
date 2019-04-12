@@ -1,0 +1,158 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Menus_f.htm,v 1.1 97/06/06 14:46:41 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Initiating Interactions</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Menus and Dialog Boxes</A>: 4.1 <A HREF="Menus_e.htm">Supplemental Usage</A>: 
+Initiating Interactions</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Menus_e.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Menus_e.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">4 Supplemental Usage</A> 
+<!-- to next --> | <A HREF="Menus_10.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.2 Dismissing Interactions</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>MSG_GEN_INTERACTION_INITIATE, MSG_GEN_INTERACTION_INITIATE_NO_DISTURB, MSG_GEN_INTERACTION_DISABLE_DISCARDING</PRE>
+<P>
+For the most part, the Specific UI decides in what way Interactions should be initiated. For example, a popup built as a menu will create a menu title which, when activated, brings down the menu. A dialog box will create an activation trigger within the UI that, when activated, brings the dialog box on-screen. (Notice that it is meaningless to &quot;initiate&quot; a sub-group Interaction as these objects are not independently-displayable.)</P>
+<P>
+You may wish to modify this behavior, either to prevent the user from directly initiating an Interaction, or to add additional ways to bring these Interactions on-screen. </P>
+<P>
+Although in most cases the user is responsible for activating menus (by activating the menu title), an application may manually open a menu with <CODE>
+MSG_GEN_INTERACTION_INITIATE</CODE>
+.</P>
+<P>
+A GIV_DIALOG Interaction may be initiated in several ways:</P>
+<UL>
+<LI>
+In the default case, the specific UI will create an activation trigger whose sole function is to bring up the dialog box. The trigger will appear as a child of the dialog's parent, in the spot within the UI that the dialog would normally reside were it not independently displayable.</LI>
+<LI>
+A dialog box may be set GIA_NOT_USER_INITIATABLE to prevent the building of the default trigger. Any Interaction set non-user initiatable should be sent a <CODE>
+MSG_GEN_INTERACTION_INITIATE</CODE>
+ or a <CODE>
+MSG_GEN_INTERACTION_INITIATE_NO_DISTURB</CODE>
+ to bring the dialog on-screen. You may also put Interactions on the GAGCNLT_WINDOWS GCN list to automatically bring them on-screen when an application is launched. Any Interaction must be fully usable and enabled to be brought up in such a manner. Note: If a dialog box is also marked GIA_INITIATED_VIA_USER_DO_DIALOG, it should be initiated with <CODE>
+UserDoDialog()</CODE>
+, <EM>
+not</EM>
+ MSG_GEN_INTERACTION_INITIATE. These methods are exclusive.</LI>
+<LI>
+A dialog box may be brought up with <CODE>
+UserDoDialog()</CODE>
+ if it is set GIA_INITIATED_VIA_USER_DO_DIALOG. This routine is useful when you wish to block the calling thread until the user responds to the dialog box. A dialog box initiated via <CODE>
+UserDoDialog()</CODE>
+ should also be marked GIA_NOT_USER_INITIATABLE. Note that this dialog box may only be brought up with <CODE>
+UserDoDialog()</CODE>
+; it cannot be brought up with MSG_GEN_INTERACTION_INITIATE.</LI>
+</UL>
+<P>
+Within most specific UIs a trigger will appear whose sole function is to initiate the dialog. Activating the trigger will bring the dialog box on-screen. You can prevent the display of this default trigger by setting the Interaction GIA_NOT_USER_INITIATABLE in its <CODE>
+GII_attrs</CODE>
+ instance field. (See <A HREF="Menus_a.htm#79428"> GenInteraction Attributes</A>
+). 
+
+</P>
+<P>
+Your GenInteraction subclass may intercept <CODE>
+MSG_GEN_INTERACTION_INITIATE</CODE>
+ to determine when a dialog is being brought on-screen and then perform any needed actions at that time. This is useful if you need to update the UI objects within the dialog before building its visual implementation. You should always call the superclass <EM>
+after</EM>
+ setting any of this initial data to avoid unnecessary visual updates of the dialog box. <CODE>
+MSG_GEN_INTERACTION_INITIATE_NO_DISTURB</CODE>
+ may also be subclassed, but there is little need to intercept it.</P>
+<P>
+GenInteraction dialog boxes may be marked <CODE>
+HINT_INTERACTION_DISCARD_WHEN_CLOSED</CODE>
+.This hint informs the system to discard the dialog box's object block when it is no longer being used, but there is a timing problem if the dialog box needs to be initialized before it is brough on-screen. (The system will think it is off-screen and discard it before initialization is complete.) </P>
+<P>
+In that case, send the dialog box <CODE>
+MSG_GEN_INTERACTION_DISABLE_DISCARDING</CODE>
+ to ensure that the dialog box doesn't get discarded between the time that the initialization is performed and the time when the dialog box appears on-screen.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_INTERACTION_INITIATE">
+ </A>
+MSG_GEN_INTERACTION_INITIATE</H4>
+<PRE CLASS="syntax">void	MSG_GEN_INTERACTION_INITIATE();</PRE>
+<P>
+This message brings an Interaction on-screen, giving it focus and target if possible. The Interaction must be both within the generic tree and set GS_USABLE before receiving this message. The Interaction must also be fully usable and enabled before it can be initiated. Interactions marked GIA_INITIATED_VIA_USER_DO_DIALOG should not be sent this message. To initiate those dialogs, you must use <CODE>
+UserDoDialog()</CODE>
+. (See <A HREF="Menus_13.htm#75893"> Thread Blocking Routines</A>
+.)</P>
+<P>
+You may intercept this message to determine when a dialog is coming on-screen. This is useful if you need to set up UI gadgetry in the dialog to show some initial status. The gadgetry should be set up before calling the superclass to avoid unnecessary visual updating of the object. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GS_USABLE GenInteraction, though usually only meaningful for GIV_DIALOG interactions.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	May be intercepted to find out when an Interaction is appearing on-screen. This is useful for cases in which the UI gadgetry of a dialog box needs to be set up before being visually built. The superclass should be called after setting up the UI to avoid unnecessary visual changes once the interaction is on-screen.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_INTERACTION_INITIATE_NO_DISTURB">
+ </A>
+MSG_GEN_INTERACTION_INITIATE_NO_DISTURB</H4>
+<PRE CLASS="syntax">void	MSG_GEN_INTERACTION_INITIATE_NO_DISTURB();</PRE>
+<P>
+This message brings an Interaction on-screen but does not give the dialog the focus or target. This message may place the dialog behind other windows. The Interaction must be both within the generic tree and set GS_USABLE before receiving this message. The Interaction must also be fully usable and enabled before it can be initiated. Interactions marked GIA_INITIATED_VIA_USER_DO_DIALOG should not be sent this message. To initiate those dialogs, you must use <CODE>
+UserDoDialog()</CODE>
+. (See <A HREF="Menus_13.htm#75893"> Thread Blocking Routines</A>
+.)</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GS_USABLE GenInteraction, though usually only meaningful for GIV_DIALOG Interactions. Not allowed for GIA_MODAL or GIA_INITIATED_VIA_USER_DO_DIALOG Interactions.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	May be intercepted to find out when an Interaction is appearing on-screen. This is useful for cases in which the UI gadgetry of a dialog box needs to be set up before being visually built. The superclass should be called after setting up the UI to avoid unnecessary visual changes once the interaction is on-screen.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_GEN_INTERACTION_DISABLE_DISCARDING</H4>
+<PRE CLASS="syntax">void	MSG_GEN_INTERACTION_DISABLE_DISCARDING();</PRE>
+<P>
+This message informs a Interaction with <CODE>
+HINT_INTERACTION_DISCARD_WHEN_CLOSED</CODE>
+ that it should not be discarded until it has been brought on-screen. This message is used to ensure that a dialog box that needs initialization is not discarded between the time that initialization commences and the time that the dialog finally appears on-screen.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any GIV_DIALOG GenInteraction that is marked <CODE>
+HINT_INTERACTION_DISCARD_WHEN_CLOSED</CODE>
+ and needs initialization.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Menus_e.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Menus_e.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">4 Supplemental Usage</A> 
+<!-- to next --> | <A HREF="Menus_10.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.2 Dismissing Interactions</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

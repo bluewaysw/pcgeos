@@ -1,0 +1,122 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Environment_19.htm,v 1.1 97/06/02 15:08:01 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Parsing GStrings</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Graphics Environment</A>: 8.7 <A HREF="Environment_12.htm">Graphics Strings</A>: 
+Parsing GStrings</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Environment_12.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Environment_18.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">8.6 Editing GStrings Dynamically</A> 
+<!-- to next --> | <A HREF="Environment_1a.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">9 Graphics Paths</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>GrGetGStringElement(), GrParseGString()</PRE>
+<P>
+For complicated GString operations, you may find the following advanced routines helpful.</P>
+<P>
+<CODE>
+GrGetGStringElement()</CODE>
+<A NAME="IX_GrGetGStringElement()">
+ </A>
+ returns the raw data associated with the current GString element. To understand this stream of bytes, you must know what sorts of data are associated with each kind of GString element. For example <CODE>
+GrGetGStringElement ()</CODE>
+ might return GR_DRAW_RECT with the following buffer of bytes:</P>
+<PRE>GR_DRAW_RECT, 0x00, 0x48, 0x00, 0x24, 
+0x00, 0x90, 0x00, 0x84</PRE>
+<P>
+You must know enough about GString element structures to know that this will draw a rectangle with bounds {72, 36, 144, 108}. To find out this sort of information, examine the GS...() macros, or search <STRONG CLASS="fileName">
+gstring.h</STRONG>
+ for macros containing the appropriate <CODE>
+GStringElement</CODE>
+ value.</P>
+<P CLASS="figTitle">
+Code Display 23-9 GrGetGStringElement() In Action</P>
+<PRE>/* Our application allows for a second kind of spline, a B-spline. This spline
+ * looks similar to a regular Bézier spline, but is somewhat different and uses
+ * a different mathematical formula. When this app creates a GString, it will 
+ * output Bézier splines in the normal way.</PRE>
+<PRE> * When outputting a B-spline to a GString, it outputs the GString element for a
+ * regular spline. That way, other applications will be able to draw the GString
+ * mostly correctly. However, all B-spline elements will be preceded by a 
+ * GString comment 'B''s''p''l'.:</PRE>
+<PRE> *	GSComment(4), 'B','s','p','l',
+ *	GSDrawSpline(...), ...</PRE>
+<PRE> * The following snippet of code will be used when this application draws a 
+ * GString. It will look for the significant comments. When it finds them, it will
+ * know that the following GR_DRAW_SPLINE element should actually be treated 
+ * differently. */</PRE>
+<PRE>	for (	gsr = GrDrawGString(gstate, gstring, 0, 0, GSC_MISC, gse);
+		gsr == GSRT_MISC;
+		gsr = GrDrawGString(gstate, gstring, 0, 0, GSC_MISC, gse) )
+			{byte canonicalBuffer[] = {GR_COMMENT,'B','s','p','l'};
+			 byte buffer[20];
+			 int eSize;</PRE>
+<PRE>			  GrGetGStringElement(gstate, gstring, 
+				sizeof(buffer),&amp;buffer, &amp;eSize);</PRE>
+<PRE>			 /* First check to see if this is the 
+			  * comment we're looking for: */
+			if (strncmp(buffer, canonicalBuffer, 5)) {
+				 /* Skip ahead to the GrDrawSpline element */
+				GrSetGStringPos(gstring, GSSPT_SKIP_1, 0);
+				GrGetGStringElement(gstate, gstring, 
+					sizeof(buffer), &amp;buffer, &amp;eSize);
+				 /* Draw spline using our routine */
+				MyDrawBSpline(gstate, buffer+3, 
+					(eSize-3)/sizeof(Point))
+				 /* Advance GString so kernel won't draw a
+				  * Bézier spline over our B-spline. */
+				GrSetGStringPos(gstring, GSSPT_SKIP_1, 0) }
+		}</PRE>
+<P>
+The <A NAME="IX_GrParseGString()">
+ </A>
+<CODE>
+GrParseGString()</CODE>
+ command calls a callback routine on all elements of a GString which match some criterion. The routine may save information about the elements, draw to a GState, or something completely different. <CODE>
+GrParseGString()</CODE>
+ takes the following arguments:</P>
+<UL>
+<LI>
+GString to parse.</LI>
+<LI>
+GState handle. <CODE>
+GrParseGString()</CODE>
+ itself will do nothing with this handle, and passing a NULL handle is permitted. However, this GState will be passed to the callback routine. If your callback routine will draw, it is thus convenient to pass a properly initialized GState to <CODE>
+GrParseGString()</CODE>
+ which the callback routine may then draw to.</LI>
+<LI>
+A record of type <CODE>
+GSControl</CODE>
+. This will determine which elements will be passed on to the callback routine. If you set GSC_OUTPUT, the callback routine will be called only for those GString elements which draw something. If you set GSC_ONE, the callback routine will be called upon all of the GString elements.</LI>
+<LI>
+Far pointer to the callback routine itself.</LI>
+</UL>
+<P>
+The callback routine is passed a pointer to the GString element and the handle of the GState that was passed to <CODE>
+GrParseGString()</CODE>
+.</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Environment_12.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Environment_18.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">8.6 Editing GStrings Dynamically</A> 
+<!-- to next --> | <A HREF="Environment_1a.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">9 Graphics Paths</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

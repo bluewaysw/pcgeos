@@ -1,0 +1,827 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+<!-- This page was automatically generated from a bunch of smaller pages. -->
+<META NAME="copyright" CONTENT="Copyright GEOWORKS">
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+<TITLE>The Mailbox Library</TITLE>
+</HEAD>
+<BODY BGCOLOR="#ffffdf">
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+<A NAME="index.htm"></A>
+
+
+
+<H1 CLASS="chapterTitle">
+
+<A NAME="index.htm_20494">
+ </A>
+The Mailbox Library
+
+</H1>
+<P>
+One of the most important functions of a portable computing device is to exchange information with other devices. A portable computer might use a number of different physical means to transmit and receive information; it might also use a variety of communication protocols (some of which may not be invented yet!).</P>
+<P>
+GEOS helps to insulate an application from the physical details of transmitting and receiving information. It does this with its Mailbox library, and associated drivers. The library lets each application transmit and receive information in more or less the same way, no matter how it uses the information, and no matter what it does with the information once it receives it (or how it assembles the information before transmitting it).</P>
+<P>
+The Mailbox API relies heavily on a basic understanding of VMChain structures and routines. Please consult the Virtual Memory chapter of the Concepts book for more information.</P>
+<P>
+NOTE: This is a preliminary document. Please consult the Mailbox definition files (<STRONG CLASS="fileName">
+mailbox.def </STRONG>
+or <STRONG CLASS="fileName">
+mailbox.goh</STRONG>
+) for current and complete information.</P>
+<P CLASS="sectionlinks">
+<STRONG>
+&nbsp;&nbsp;<A HREF="#Mailbox_1.htm">1 Design Philosophy</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Mailbox_2.htm">1.1 Mailbox Overview</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Mailbox_3.htm">1.2 Transport Driver Overview</A><BR>
+&nbsp;&nbsp;<A HREF="#Mailbox_4.htm">2 Inbox/Outbox Structure</A><BR>
+&nbsp;&nbsp;<A HREF="#Mailbox_5.htm">3 Mailbox Structures &amp; Utilities</A><BR>
+&nbsp;&nbsp;<A HREF="#Mailbox_6.htm">4 Data Formats</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Mailbox_7.htm">4.1 GMDFID_STREAM_GSTRING</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Mailbox_8.htm">4.2 GMDFID_VM_GSTRING</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Mailbox_9.htm">4.3 GMDFID_TRANSFER_ITEM</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Mailbox_a.htm">4.4 GMDFID_TEXT_CHAIN</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Mailbox_b.htm">4.5 GMDFID_TEXT_FILE</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Mailbox_c.htm">4.6 GMDFID_DOCUMENT</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Mailbox_d.htm">4.7 GMDFID_INK</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Mailbox_e.htm">4.8 GMDFID_VM_COMPOSITE</A><BR>
+&nbsp;&nbsp;<A HREF="#Mailbox_f.htm">5 Data Drivers</A><BR>
+&nbsp;&nbsp;<A HREF="#Mailbox_10.htm">6 Application Responsibilities</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Mailbox_11.htm">6.1 Providing a User-Interface</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Mailbox_12.htm">6.2 Sending a Message</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Mailbox_13.htm">6.3 Receiving and Processing Messages</A><BR>
+&nbsp;&nbsp;<A HREF="#Mailbox_14.htm">7 Examples of Mailbox Usage</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Mailbox_15.htm">7.1 An Incoming Pager Email Message</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Mailbox_16.htm">7.2 Sending and Receiving an Address Book Page</A><BR>
+</STRONG>
+</P> <!-- end of sectionlinks blob -->
+
+<HR>
+<A NAME="Mailbox_1.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">The Mailbox Library</A>: 1 
+Design Philosophy</H2>
+<P>
+The purpose of the Mailbox library is to let applications send and receive information to and from other computers, through a variety of communications media. It insulates the application as much as possible from the mechanics of transmitting and receiving the information.</P>
+<P>
+An application might need to transmit information over several different kinds of connection. For example, it might send information over a modem or through a direct connection. It might need to use the same device in very different ways; for example, it might fax a document through a modem, or copy a file to a server through that same modem.</P>
+<P>
+The Mailbox library helps to insulate applications from the details of the hardware and communication protocols. It does this by dividing up the communications tasks.</P>
+<P CLASS="subsectionLink">
+<A HREF="#Mailbox_2.htm">Mailbox Overview</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Mailbox_3.htm">Transport Driver Overview</A></P>
+<HR>
+<A NAME="Mailbox_2.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The Mailbox Library</A>: 1.1 <A HREF="#Mailbox_1.htm">Design Philosophy</A>: 
+Mailbox Overview</H3>
+<P>
+The Mailbox library implements an Inbox/Outbox system. This lets the user select an appropriate device through which to transport the information; it also lets the user select a delivery time (though most applications will always designate messages for immediate delivery, so it is possible that the first release of the Inbox/Outbox system will not support applications setting an early-bound for delivery time). (Most applications will do this by including the Mailbox Library's MailboxSendControl device, which the user can use to create an outgoing message.)</P>
+<P>
+The application must, when requested, package up information in a format acceptable to a transport driver being used. (Most applications will only need to support one or a few different data formats, such as GStrings or raw text in a VM Chain.) It then <EM>
+registers</EM>
+ this message with the Mailbox library.</P>
+<P>
+The Mailbox library stores messages that have not yet been transmitted in its <EM>
+outbox</EM>
+. Messages are held in the outbox until the hardware connection necessary for transmission is available. For example, if the transport driver needed a direct serial link, the message would stay in the outbox until that link was available. An application can also specify that a message not be delivered until a specific time. In this case, the message will automatically remain in the outbox until that time. While a message is in the outbox, the device's user can examine information about the message, and (if he or she chooses) delay or cancel its delivery.</P>
+<P>
+When the time comes to send the message, the Mailbox library activates the appropriate data and transport drivers. This activation is transparent to an application developer. It is helpful to understand how a transport driver operates, however.</P>
+<HR>
+<A NAME="Mailbox_3.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The Mailbox Library</A>: 1.2 <A HREF="#Mailbox_1.htm">Design Philosophy</A>: 
+Transport Driver Overview</H3>
+<P>
+The transport driver handles actually sending a message of the device. It interacts with the actual hardware used for sending the message. This document does not attempt to discuss creating transport drivers in detail.</P>
+<P>
+Messages are received much the way they are delivered. The transport driver receives a message, registers it with the Mailbox library, and passes its data, block by block, to the appropriate data driver. The data driver translates this message into its own data format. The Mailbox library stores the message in its <EM>
+inbox</EM>
+ until it can deliver the message. When the appropriate time for delivery is reached, the Mailbox library starts up an appropriate application (if it is not already running) and passes the message to the application. The application must notify the Mailbox library when it has finished with the message.</P>
+<P>
+A user or application can address a message to the local machine. In this case, the message will not be sent to the transport driver; the Mailbox library will deliver the message simply by moving it from the machine's outbox to its inbox.</P>
+<HR>
+<A NAME="Mailbox_4.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">The Mailbox Library</A>: 2 
+Inbox/Outbox Structure</H2>
+<P>
+The Mailbox library interacts directly with applications. It also manages drivers, which provide information about data formats, and also interact with the hardware links to the outside world. Thus, to support a new hardware device or data format, you just need to write a new driver.</P>
+<P>
+The responsibilities of the Inbox/Outbox system are divided among four different agents:
+<IMG SRC="Mailbox4.gif">
+
+</P>
+<UL>
+<LI>
+The application packages outgoing data, and handles incoming data addressed to that application. It provides data in a format acceptable to the transport driver, and receives information in such a format. It generally uses the MailboxSendControl controller to let the user control the sending of messages.</LI>
+<LI>
+The data driver describes how the information is stored; it thus lets the application know (indirectly) both how to assemble data for transport. (It is only concerned with the gross structure of the message, e.g. whether it's stored in a VM chain or a plain-text file. The structure above that level is opaque to the data driver.) It stores the message until the message is ready for transport. It also translates outgoing messages into a format appropriate for the transport driver, and translates incoming messages from such a format into its own internal format.</LI>
+<LI>
+The transport driver interacts with the actual hardware device used to transmit or receive the data. It receives outgoingmessage data from the data driver, and sends it over the device; it receives incoming messages, and sends them to the appropriate data driver. In some cases, it may translate the message's data; for example, a fax transport driver might read a message containing a GString, and translate that into a standard fax format readable by a (non-GEOS) fax machine.</LI>
+<LI>
+The Mailbox library manages the interaction between the other agents. It keeps track of messages that have been designated for transport at another time, and messages that have been received by the computer but not yet delivered to any application. It loads the appropriate drivers and applications when they are needed. It also provides UI, letting the user set options about how to handle outgoing and incoming messages.</LI>
+</UL>
+<HR>
+<A NAME="Mailbox_5.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">The Mailbox Library</A>: 3 
+Mailbox Structures &amp; Utilities</H2>
+<PRE>MailboxGetVMFile(), MailboxMessageFlags, MailboxMessagePriority, MailboxDeliveryVerb</PRE>
+<P>
+There are a few data types that are used at various parts of the message-transmission and reception process. There are also a few concepts related to these types that need to be discussed first.</P>
+<P>
+First of all, we need to distinguish between two basic data types: <EM>
+data format types</EM>
+, and <EM>
+data storage types</EM>
+.</P>
+<P>
+Every message has two data tokens associated with it. One is the data format type, and the other is the data storage type. The data storage type describes the gross structure of the message data. Every data driver can accept one data storage type. For example, the GEOS system includes data drivers for messages whose bodies are stored in VM trees, and messages whose bodies are stored in byte-files. The data driver is not concerned with the message on a lower level. If you send a message in a VM tree, the data drivers at both machines will make sure that the message arives in a valid VM tree (which may mean fixing up the VM handles that make up the links in the tree), but they won't care about the data inside the blocks of the tree.</P>
+<P>
+On a higherlevel, every message has its own data format type. This type describes how the data is actually stored in the underlying structure. For example, a message might be stored as a GString in a VM chain. In this case, the message's data storage type would be &quot;VM tree&quot; (a VM chain is a special kind of VM tree), and the data format type would be &quot;VM Gstring&quot;.</P>
+<P>
+Every data format type implies a particular data storage type; all messages with data format type <EM>
+a</EM>
+ will necessarily use data storage type <EM>
+x</EM>
+. The converse, however, is not necessarily true. For example, all messages with data format type &quot;VM GString&quot; have data storage type &quot;VM tree&quot;; as do all messages with data format &quot;VM composite&quot;.</P>
+<P>
+When an application passes a message to a data driver, it may designate the message body as either &quot;volatile&quot; or &quot;non-volatile&quot;. If the data is marked &quot;volatile&quot;, the application may alter or destroy the data as soon as it has registered the message. That is, when the application registers the message, the appropriate Data Driver copies all the message's information out of the passed message before execution returns to the application. You should pass &quot;volatile&quot; if, for example, you are passing a pointer to a VM file used by the application.</P>
+<P>
+If you designate the data as <EM>
+non-volatile</EM>
+, you are not allowed to alter or delete the data in the message. If you ask it to, the data driver will take care of freeing the storage used for the message when it is done with it. Every data driver has its own conventions about what applications should do with non-volatile messages after sending them.</P>
+<P>
+For example, if you send a message through the VM tree data driver, you should write non-volatile messages to a special VM file created by the routine <CODE>
+MailboxGetVMFile()</CODE>
+. This routine is passed a single argument, the number of blocks you expect to allocate in the VM block. The routine returns the handle of a VM file. You can write the message in this file, and register the message (designated &quot;non-volatile&quot;). The data driver will then take care of freeing the file's storage when the message has been safely delivered.</P>
+<P>
+Each message is associated with a set of <CODE>
+MailboxMessageFlags</CODE>
+. These are a byte-length record. This record has the following flags:</P>
+<DL>
+<DT>
+MMF_BODY_DATA_VOLATILE</DT><DD>
+As discussed above, this flag indicates that the data in the message must be copied immediately, as it is subject to change or freeing without further notice.</DD>
+<DT>
+MMF_SEND_WITHOUT_QUERY</DT><DD>
+This flag indicates that the message should be sent without asking the user for permission.</DD>
+<DT>
+MMF_PRIORITY</DT><DD>
+This is a member of the <CODE>
+MailboxMessagePriority</CODE>
+ enumerated type, discussed below.</DD>
+<DT>
+MMF_VERB</DT><DD>This is a member of the <CODE>
+MailboxDeliveryVerb</CODE>
+ enumerated type, discussed below.</DD>
+</DL>
+<P>
+Every message can be assigned a priority. This priority is represented by a member of the <CODE>
+MailboxMessagePriority</CODE>
+ enumerated type. The priority affects how the Mailbox library will handle the message at both the sending and the receiving end. This type has the following values:</P>
+<DL>
+<DT>
+MMF_EMERGENCY</DT><DD>
+The recipient user should be notified immediately, and not allowed to do anything before he or she receives the message.</DD>
+<DT>
+MMP_URGENT</DT><DD>
+The user should be notified immediately, and told there is an urgent message awaiting. The user does not, however, have to read the message right away.</DD>
+<DT>
+MMP_FIRST_CLASS</DT><DD>
+The user should be notified on the next periodic check of the Inbox. There are no other constraints on when the user should read the message.</DD>
+<DT>
+MMP_THIRD_CLASS</DT><DD>
+The Inbox should not notify the user of the message's arrival; instead, the appropriate application should notify the user, if appropriate. For outgoing messages, the user must explicitly request that the message be sent; it will not happen automatically once a connection is made.</DD>
+</DL>
+<P>
+Every message has a &quot;delivery verb&quot; associated with it. This is useful in notifying the user of the message's arrival. Each delivery verb is represented by a member of the <CODE>
+MailboxDeliveryVerb</CODE>
+ enumerated type. This type has the following members:</P>
+<DL>
+<DT>
+MDV_DELIVER</DT><DD>
+This is the default verb.</DD>
+<DT>
+MDV_VIEW</DT><DD>The message is some sort of image that can be viewed, e.g. a received fax.</DD>
+<DT>
+MDV_PLAY</DT><DD>The message is some kind of continuous message with a definite starting point and ending point, e.g. a voice recording or MPEG movie.</DD>
+<DT>
+MDV_ACCEPT</DT><DD>
+Another generic verb.</DD>
+<DT>
+MDV_READ</DT><DD>The message is mainly textual, and can be read (e.g. an old-fashioned EMail message).</DD>
+<DT>
+MDV_FILE</DT><DD>The message is, or contains, one or more units that should be stored in a document that can contain many such units (e.g. an address-book card).</DD>
+</DL>
+<HR>
+<A NAME="Mailbox_6.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">The Mailbox Library</A>: 4 
+Data Formats</H2>
+<P>
+An application is largely insulated from the details of transmitting a message. It needs merely to write the message's data in a format which the chosen data driver can understand; the data driver will then translate this into an appropriate format for transmission.</P>
+<P>
+GEOS provides two data drivers. These drivers use the data transport formats &quot;File Data&quot; and &quot;VM tree data&quot;. Each data-format type provided by GEOS is built on top of one of these formats.</P>
+<P>
+There are a few concerns in common to each data driver.</P>
+<P>
+Every data driver will have its own format for accepting the data. In each case, the data driver is passed a pointer to a &quot;data block&quot; which tells it where the rest of the message is. Thus, every data driver is called in the same way: it is passed a single far pointer to some data block. How that data block stores the location of the message will vary from one data storage format to another.</P>
+<P>
+GEOS will almost certainly define the following different data format types. An application should, if possible, support as many of these data types as is feasible. Each format is uniquely identified by a member of the <CODE>
+GeoworksMailboxDataFormatID</CODE>
+ enumerated type. (The following sections will be expanded when the Inbox/Outbox suite is completed.)</P>
+<P CLASS="subsectionLink">
+<A HREF="#Mailbox_7.htm">GMDFID_STREAM_GSTRING</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Mailbox_8.htm">GMDFID_VM_GSTRING</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Mailbox_9.htm">GMDFID_TRANSFER_ITEM</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Mailbox_a.htm">GMDFID_TEXT_CHAIN</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Mailbox_b.htm">GMDFID_TEXT_FILE</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Mailbox_c.htm">GMDFID_DOCUMENT</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Mailbox_d.htm">GMDFID_INK</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Mailbox_e.htm">GMDFID_VM_COMPOSITE</A></P>
+<HR>
+<A NAME="Mailbox_7.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The Mailbox Library</A>: 4.1 <A HREF="#Mailbox_6.htm">Data Formats</A>: 
+GMDFID_STREAM_GSTRING</H3>
+<P>
+In this data type, the message is stored as a GString written to a byte file. This is useful for printing and faxing messages. Applications should make every effort to support this data type. These messages are handled by the GEOS file data driver.</P>
+<HR>
+<A NAME="Mailbox_8.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The Mailbox Library</A>: 4.2 <A HREF="#Mailbox_6.htm">Data Formats</A>: 
+GMDFID_VM_GSTRING</H3>
+<P>
+This is much like STREAM_GSTRING, except that the message is stored in a GString written to a VM Chain. These messages are handled by the GEOS VM-tree data driver.</P>
+<HR>
+<A NAME="Mailbox_9.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The Mailbox Library</A>: 4.3 <A HREF="#Mailbox_6.htm">Data Formats</A>: 
+GMDFID_TRANSFER_ITEM</H3>
+<P>
+This format is used when the user wishes to send the contents of the clipboard as a message. These messages are handled by the GEOS VM-tree data driver.</P>
+<HR>
+<A NAME="Mailbox_a.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The Mailbox Library</A>: 4.4 <A HREF="#Mailbox_6.htm">Data Formats</A>: 
+GMDFID_TEXT_CHAIN</H3>
+<P>
+The message is plain text, written to a VM chain. These messages are handled by the GEOS VM-tree data driver.</P>
+<HR>
+<A NAME="Mailbox_b.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The Mailbox Library</A>: 4.5 <A HREF="#Mailbox_6.htm">Data Formats</A>: 
+GMDFID_TEXT_FILE</H3>
+<P>
+The message is plain text, written to a byte file. These messages are handled by the GEOS file data driver.</P>
+<HR>
+<A NAME="Mailbox_c.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The Mailbox Library</A>: 4.6 <A HREF="#Mailbox_6.htm">Data Formats</A>: 
+GMDFID_DOCUMENT</H3>
+<P>
+The message is written to some kind of GEOS document with extended attributes and a full GEOS filename. The document's internal format is opaque to the data and transport drivers. These messages are handled by the GEOS file data driver.</P>
+<HR>
+<A NAME="Mailbox_d.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The Mailbox Library</A>: 4.7 <A HREF="#Mailbox_6.htm">Data Formats</A>: 
+GMDFID_INK</H3>
+<P>
+The message is stored as GEOS ink. These messages are handled by the GEOS VM-tree data driver.</P>
+<HR>
+<A NAME="Mailbox_e.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The Mailbox Library</A>: 4.8 <A HREF="#Mailbox_6.htm">Data Formats</A>: 
+GMDFID_VM_COMPOSITE</H3>
+<P>
+The message is passed as a VM tree. The first block of the tree holds an array of pointers to blocks that head up other VM-based data formats, followed by an array of <CODE>
+MailboxDataFormat</CODE>
+ tokens which identifies the format of each chain. These messages are handled by the GEOS VM-tree data driver.</P>
+<HR>
+<A NAME="Mailbox_f.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">The Mailbox Library</A>: 5 
+Data Drivers</H2>
+<P>
+A data driver specifies how the data in a transmitted message is arranged. An application that sends a message must provide it in the format required by the data driver. The data driver then translates the message into an appropriate format for the transport driver. When the transport driver receives a message, it determines which data driver can interpret the message, and then calls theMailbox library.</P>
+<P>
+There are a number of default GEOS data types, and developers may write other data drivers of their own to support new data types.</P>
+<P>
+A data driver has to perform a few different tasks:</P>
+<UL>
+<LI>
+When an application sends a message, the Mailbox library hands the message to the data driver. If the message-data is volatile, the data driver must copy the message's data to a safe place, so the application can free the storage it used to create the message. It gives the Mailbox library an opaque token to identify the message; the mailbox library will use this token when it requests the message for delivery.</LI>
+<LI>
+When the Mailbox library requests it, it must provide message data (one &quot;block&quot; at a time) in a format appropriate for the transport driver.</LI>
+<LI>
+When the Mailbox library receives a message in the driver's format, it must be able to handle data, one &quot;block&quot; at a time, provided by the transport driver in that driver's format; it must be able to assemble this into a message in the data driver's format. (As when transmitting a message, the data driver will give the Mailbox library an opaque token to identify this message.)</LI>
+<LI>
+When it delivers a message, it must provide a reference to the received message in a format the receiving application will be able to understand.</LI>
+<LI>
+The data driver must be able to provide, on request, the size of any message (outgoing or incoming) it's holding.</LI>
+<LI>
+When the Mailbox library informs the data driver that a message has been handled (i.e. an outgoing message has been transmitted, or an incoming message has been deleted by the destination application), the data driver must free its copy of the message, reclaiming the space that message was using.</LI>
+</UL>
+<HR>
+<A NAME="Mailbox_10.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">The Mailbox Library</A>: 6 
+Application Responsibilities</H2>
+<P>
+The application is insulated from most of the mundane responsibilities of transmitting and receiving data. Its behavior is event-driven. It has to know how to respond to a variety of requests from the Mailbox library; however, it generally does not have to initiate action on its own.</P>
+<P>
+There are a number of specific tasks an application must perform:</P>
+<UL>
+<LI>
+It must provide the right UI (usually in the form of controllers) for using the Inbox/Outbox functionality. It can do this by including the appropriate controllers.</LI>
+<LI>
+It must package data into an acceptable format. When the user selects data to transmit (which could be a small message or an entire document), it must format the data appropriately.</LI>
+<LI>
+It must be able to handle incoming messages. This consists of notifying the user that new data has been received, incorporating the data into the document (or adding a new document containing the data), delete the message it's been sent, and notify the Mailbox library that it has received the data.</LI>
+</UL>
+<P CLASS="subsectionLink">
+<A HREF="#Mailbox_11.htm">Providing a User-Interface</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Mailbox_12.htm">Sending a Message</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Mailbox_13.htm">Receiving and Processing Messages</A></P>
+<HR>
+<A NAME="Mailbox_11.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The Mailbox Library</A>: 6.1 <A HREF="#Mailbox_10.htm">Application Responsibilities</A>: 
+Providing a User-Interface</H3>
+<P>
+To use the Mailbox library, an application will usually want to include a MailboxSendControl object in its UI. (Of course, you can create your own UI, but the MailboxSendControl is a convenient package.) Although most applications will use the UI provided by this controller other may want to use the </P>
+<P>
+The settings of the MailboxSendControl will determine what formats the application can use when it sends data. There are a number of standard data types specified by the MailboxSendControl. If you wish to support a new format for transporting data, you must subclass the MailboxSendControl object and add any tools necessary for that new data type. If you wish to provide extra, application specific functionality, you must add tools to the controller yourself. For example, if you are writing a form-collection application, you might wish to add an icon that selects the certain fields of each form, assembles them into a message, and transmits them.</P>
+<HR>
+<A NAME="Mailbox_12.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The Mailbox Library</A>: 6.2 <A HREF="#Mailbox_10.htm">Application Responsibilities</A>: 
+Sending a Message</H3>
+<P>
+A user will generally send a message by using the application's MailboxSendControl object. This object lets the user send the selected material in the application. It lets the user select such things as the message's destination, transmission time, subject line, etc.</P>
+<P>
+Once the user has selected the message, the MailboxSendControl sends the message MSG_META_MAILBOX_CREATE_MESSAGE to its output object (generally the application object). This message instructs the object to create an appropriate message. </P>
+<P>
+When the application has been notified that it should create a message, it should then determine what data type the message will need. It does this by sending MSG_MAILBOX_SEND_CONTROL_CHOOSE_FORMAT to its MailboxSendControl. It can find out other information about the message to be sent by sending other messages to the MailboxSendControl.</P>
+<P>
+The MailboxSendControl informs the application what data type it should use. The application must determine what data to send (generally the current selection); it then assembles this data into the format requested by the send control object. Finally, it registers the message by sending MSG_MAILBOX_SEND_CONTROL_REGISTER_MESSAGE to its MailboxSendControl. This message instructs the MailboxSendControl to register the message with the Mailbox library.</P>
+
+<H6 CLASS="RefETitle">
+MSG_META_MAILBOX_CREATE_MESSAGE()</H6>
+<PRE CLASS="syntax">MetaMailboxMessage void MSG_META_MAILBOX_CREATE_MESSAGE(
+        optr		sendControl,
+        word		transHandle);</PRE>
+<P>
+This message informs the output of a MailboxSendControl that it should create the body of the message. It is the obligation of that object to notify the controller that it has accomplished this task with MSG_MAILBOX_SEND_CONTROL_REGISTER_MESSAGE.</P>
+
+
+<H6 CLASS="RefETitle">
+MSG_MAILBOX_SEND_CONTROL_REGISTER_MESSAGE</H6>
+<PRE CLASS="syntax">MailboxMessage 	MSG_MAILBOX_SEND_CONTROL_REGISTER_MESSAGE(
+        word		TransID,
+        MailboxStorage		bodyStorage,
+        MailboxDataFormat		bodyFormat,
+        const void *		bodyRef,
+        unsigned word		bodyRefLen,
+        MailboxMessageFlags		flags,
+        const char *		subject,
+        const GeodeToken *		destApp)</PRE>
+<P>
+When an application wishes to send a message, it does this by <EM>
+registering</EM>
+ a message with the Mailbox library. The Mailbox library then loads the appropriate data and transport drivers to actually deliver the message. The application registers a message by sending MSG_MAILBOX_SEND_CONTROL_REGISTER_MESSAGE to its MailboxSendControl object.</P>
+<P CLASS="refField">
+Source:	The recipient of MSG_META_MAILBOX_CREATE_MESSAGE. Generally sent by the Application object.</P>
+<P CLASS="refField">
+Destination:	The application's MailboxSendControl.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+TransID</CODE>
+	This is the token the MailboxSendControl passed with its <CODE>
+MSG_META_MAILBOX_CREATE_MESSAGE</CODE>
+.<CODE>
+</CODE>
+</P>
+<DL>
+<DT>
+<CODE>
+bodyStorage</CODE>
+</DT><DD>The 32-bit token (of type <CODE>
+MailboxStorage</CODE>
+) identifying the data driver which should be used. (The message will be passed in a format appropriate to that data driver.)</DD>
+<DT>
+<CODE>
+bodyFormat</DT><DD></CODE>
+The 32-bit token (of type <CODE>
+MailboxDataFormat</CODE>
+) identifying the kind of data in the message body. Each format token implies a particular storage type. </DD>
+<DT>
+<CODE>
+bodyRef</CODE>
+</DT><DD>A pointer to the beginning of a data block. This block instructs the data driver where the message body is. (Each data driver may have its own conventions for interpreting the data in this block.)</DD>
+<DT>
+<CODE>
+bodyRefLen</CODE>
+</DT><DD>The number of bytes at <CODE>
+*bodyRef</CODE>
+.</DD>
+<DT>
+<CODE>
+flags</CODE>
+</DT><DD>A word of <CODE>
+MailboxMessageFlags</CODE>
+.</DD>
+<DT>
+<CODE>
+subject</CODE>
+</DT><DD>A pointer to a null-terminated string containing the subject or summary line describing the message. (The string may contain newline characters.)</DD>
+<DT>
+<CODE>
+destApp</CODE>
+</DT><DD>the <CODE>
+GeodeToken</CODE>
+ of the application which will receive the message (on whichever machine receives the message). If this is a generic token, the recipient machine's Mailbox library will automatically convert it to the token of whichever application will actually receive the message.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	If you define a subclass of the MailboxSendControl, you may wish to intercept this message to add functionality.</P>
+
+
+<H6 CLASS="RefETitle">
+MSG_META_MAILBOX_MESSAGE_REGISTERED</H6>
+<PRE CLASS="syntax">MetaMailboxMessage void MSG_META_MAILBOX_MESSAGE_REGISTERED(
+        MemHamdle		args);</PRE>
+<P>
+This message is sent by the MailboxSendControl once it has attempted (via <CODE>
+MailboxRegisterMessage()</CODE>
+) to register the message. The controller may call <CODE>
+MailboxDoneWithVMFile()</CODE>
+(or any other cleanup procedures) in response to this message. &lt;</P>
+
+<HR>
+<A NAME="Mailbox_13.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The Mailbox Library</A>: 6.3 <A HREF="#Mailbox_10.htm">Application Responsibilities</A>: 
+Receiving and Processing Messages</H3>
+<PRE>MSG_META_MAILBOX_NOTIFY_MESSAGE_AVAILABLE, MailboxAcknowledgeMessageReceipt(), MailboxGetSubjectBlock(), MailboxGetSubjectLMem(), MailboxGetMessageFlags(), MailboxGetBodyFormat(), MailboxGetBodyRef(), MailboxDoneWithBody(), MailboxStealBody(), MailboxDeleteMessage()</PRE>
+<P>
+An application that uses the Inbox/Outbox technology must be able to handle incoming messages, as well as generate outgoing ones.</P>
+<P>
+The Mailbox holds incoming messages in its Inbox until an appropriate time to deliver them. For example, it may choose to wait until the user starts up the application, or until the delivery deadline is reached. In any event, when the Inbox library needs to deliver the message it sends MSG_META_MAILBOX_NOTIFY_MESSAGE_AVAILABLE to the application object of an appropriate application. This message has a single argument, a 32-bit <CODE>
+MailboxMessage</CODE>
+ token which uniquely identifies the message.</P>
+<P>
+If the application is going to handle the message, it must call the routine <CODE>
+MailboxAcknowledgeMessageReceipt()</CODE>
+. The routine is passed the <CODE>
+MailboxMessage</CODE>
+ token for the message. (If you do not acknowledge the receipt of the message, your application will be bothered by repeated notifications.)</P>
+<P>
+Once the application has been notified of an incoming message, it can call a number of routines to find out about the message. To find out the message's subject line, it should call either <CODE>
+MailboxGetSubjectLMem()</CODE>
+ or <CODE>
+MailboxGetSubjectBlock()</CODE>
+. Both of these routines return the subject text for the message.</P>
+<P>
+<CODE>
+MailboxGetSubjectBlock()</CODE>
+ is passed a single parameter, namely the <CODE>
+MailboxMessage</CODE>
+ token for the message. The routine allocates a global memory block, writes the subject line to that block (as a null-terminated string), and returns the handle of the block. If it fails, it returns zero and sets the thread's error value. (See <CODE>
+ThreadGetError()</CODE>
+.)</P>
+<P>
+<CODE>
+MailboxGetSubjectLMem()</CODE>
+ is very similar. It is passed two arguments: the <CODE>
+MailboxMessage</CODE>
+ token for the message, and the global memory handle of an LMem heap. The routine allocates a chunk in that LMem heap, writes the subject line to that chunk (again, as a null-terminated string), and returns the chunk handle of that chunk. Again, if the routine is unable to comply, it returns zero and sets the thread's error value.</P>
+<P>
+<CODE>
+MailboxGetMessageFlags()</CODE>
+ is passed the <CODE>
+MailboxMessage</CODE>
+ token for the message. It returns the <CODE>
+MailboxMessageFlags</CODE>
+ for that message. It is often used to find the message's priority.</P>
+<P>
+<CODE>
+MailboxGetBodyFormat()</CODE>
+ is passed the <CODE>
+MailboxMessage</CODE>
+ token for the message. It returns the <CODE>
+MailboxDataFormat</CODE>
+ value for the message's body. The application can use this to decide if the message is written in a format the application can understand.</P>
+<P>
+<CODE>
+MailboxGetBodyRef()</CODE>
+ is used to actually retrieve the data for the message. The routine is passed the following arguments:</P>
+<UL>
+<LI>
+The <CODE>
+MailboxMessage</CODE>
+ token for the message.</LI>
+<LI>
+A pointer to a data buffer.</LI>
+<LI>
+The size of the buffer, in bytes.</LI>
+</UL>
+<P>
+If the routine is successful, it returns <EM>
+true</EM>
+ and writes a reference to the message body in the passed buffer. This reference is in the same format that would be passed to <CODE>
+MailboxRegisterMessage()</CODE>
+, i.e. it varies according to the data driver. If the routine is unsuccessful, it returns <EM>
+false</EM>
+ and sets the thread's error value to an appropriate <CODE>
+MailboxError</CODE>
+ value.</P>
+<P>
+For every time the application successfully calls <CODE>
+MailboxGetBodyRef()</CODE>
+, it must call <CODE>
+MailboxDoneWithBody()</CODE>
+. This routine is passed three arguments:</P>
+<UL>
+<LI>
+The <CODE>
+MailboxMessage</CODE>
+ token for the message.</LI>
+<LI>
+A pointer to the data buffer passed to <CODE>
+MailboxGetBodyRef()</CODE>
+.</LI>
+<LI>
+The size of the buffer, in bytes.</LI>
+</UL>
+<P>
+The routine notifies the Mailbox library that the application is done with the message body for the time being. The mailbox library is thus free to close the file holding the data, or take some similar action. (The message body will <EM>
+not</EM>
+ be destroyed; it will still be available for future calls to <CODE>
+MailboxGetBodyRef()</CODE>
+.)</P>
+<P>
+An application can also get the message body by calling <CODE>
+MailboxStealBody()</CODE>
+. This is passed the same arguments, and returns the same values, as <CODE>
+MailboxGetBodyRef()</CODE>
+. However, if the routine is successful, the storage area containing the message body will be transferred to the ownership of the application, and the data driver will free any other storage it used to hold the message body. After a successful call to <CODE>
+MailboxStealBody()</CODE>
+, any future calls to <CODE>
+MailboxGetBodyRef()</CODE>
+ or <CODE>
+MailboxStealBody()</CODE>
+ will fail; as far as the Mailbox library is concerned, the message has no body any more. When the application is finished with the message, it must free the storage used for the message. In particular, if the data reside in a VM file, the application <EM>
+must</EM>
+ call <CODE>
+MailboxDoneWithVMFile()</CODE>
+ to notify the Mailbox library to free that file.</P>
+<P>
+When an application is done processing a message, it must call <CODE>
+MailboxDeleteMessage()</CODE>
+. This routine is passed the <CODE>
+MailboxMessage</CODE>
+ token for the message. It instructs the mailbox library to delete the message and any associated data. The <CODE>
+MailboxMessage</CODE>
+ token becomes invalid after this routine returns.</P>
+<HR>
+<A NAME="Mailbox_14.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">The Mailbox Library</A>: 7 
+Examples of Mailbox Usage</H2>
+<P>
+It may be helpful to go through a step-by-step example of how a message might be sent, illustrating the function of the transport driver, and how much is done for you. The Mailbox library can be used for a great many different applications, so it's hard to describe a &quot;typical&quot; mailbox transaction; but there are certain elements most mailbox transactions have in common.</P>
+<P>
+We present several different examples of how the Mailbox library might be used. Note that in the following discussion, the behavior of the transport driver (which is opaque to an application developer) is discussed. Unless you are writing a transport driver yourself, you will not need to worry about this.</P>
+<P CLASS="subsectionLink">
+<A HREF="#Mailbox_15.htm">An Incoming Pager Email Message</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Mailbox_16.htm">Sending and Receiving an Address Book Page</A></P>
+<HR>
+<A NAME="Mailbox_15.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The Mailbox Library</A>: 7.1 <A HREF="#Mailbox_14.htm">Examples of Mailbox Usage</A>: 
+An Incoming Pager Email Message</H3>
+<P>
+In this example, we consider a device that's receiving an Email message. The message was generated by some central server, which need not have been running any variety of GEOS, as long as the message conformed to the transport driver's expectations for the message format.</P>
+
+<H4 CLASS="HeadingC">
+Arrival of The Message</H4>
+<P>
+The message is received via a wireless pager card that's plugged into the device. The transport driver for the card, which was loaded when the card was inserted, periodically polls the card to see if new messages have arrived. On the next poll, it finds that there is indeed a new message. It extracts enough of the message to determine it's something for the Email application to see.</P>
+<P>
+Armed with that, it calls the Mailbox library to register a message, specifying:</P>
+<UL>
+<LI>
+The destination is the Email application (whose token it knows, in the same way it knows the message is for the Email application).</LI>
+<LI>
+The transport mechanism is LOCAL (i.e. the message is destined for an application on this machine).</LI>
+<LI>
+The user should be notified of the arrival of the message, when appropriate. (The priority may be extracted from the pager card's data structure, allowing some Email to be treated as urgent, while other is treated as junk mail)</LI>
+<LI>
+The user should not be asked whether the message should be delivered when the connection is available (i.e. when the application is loaded). That is, when the application is loaded, the message will automatically be presented.</LI>
+<LI>
+The delivery-verb of choice is &quot;Read&quot;; this is used when presenting the message to the user.</LI>
+<LI>
+The storage format token is that for the data driver located on the pager card's file-system.</LI>
+<LI>
+The data format is one the Email application expects. Note that in this case, the pager card data driver will end up converting from the format in which the message is stored on the card to a VM- or file-based format of some sort. In effect, the data driver is pretending the data are stored in the format appropriate to the data format token the pager driver has claimed they're in, when in fact they're in a very different format within the card's own memory.</LI>
+<LI>
+The address of the data (a reference to the data on the card). This address is specific to the passed data driver. When registering a message, you must know the type of address the data driver you're specifying expects (and, of course, provide an address of data in that format).</LI>
+<LI>
+The message data are not volatile, as far as the pager driver is concerned. (Data are volatile if they are in danger of deletion as soon as the Mailbox library returns from the store-message call. The indication of volatility is passed to the data driver so it knows if it should copy the data to a safer location.)</LI>
+<LI>
+The subject line, which it has extracted from the message.</LI>
+<LI>
+A starting time-bound of the current time. This allows the message to be delivered immediately, if the Email application is currently loaded.</LI>
+<LI>
+An ending time-bound of one day from now. When the ending bound time is reached, the application will automatically be loaded and the message presented. The choice of an ending bound is peculiar to the card and what the driver writer thinks is a reasonable deadline for the user to view the message. It may also be intuited from something in the Email message itself, such as a special header in the message.</LI>
+</UL>
+<P>
+If the card will delete the message after a certain time, the pager driver will want to set an ending time-bound well before that deletion is scheduled to occur. If the card may delete the message after a while to free up space, as happens in the EMBARC card, the driver may well want to set an ending time-bound of, say, one day from when the message was received. The driver could also set the ending bound to match the starting bound, thus forcing the Email application to be loaded. The final choice, of course, is to set no ending bound.</P>
+<P>
+For its part, the Mailbox library will load the data driver and call it, passing the data address the library was given and allowing the driver to copy the data (if required) and return its own version of the &quot;opaque&quot; data. (The message body is &quot;opaque&quot; to the Mailbox library, in that it never looks into this data for information; instead, it passes the data to the various drivers and applications, which may interpret and manipulate the data.) For example, the file data driver might well copy the file, whose name was passed, into a spool directory for safekeeping, returning the shorter name back to the Mailbox library as the opaque data to store with the message. The rest of the data will be copied into the message descriptor, after checking to make sure it's reasonable, and the descriptor will be placed at the head of the inbox queue.</P>
+<P>
+Assuming the message is given standard First-Class priority and that the Email application isn't currently running in the foreground, the Mailbox library will catch the existence of the new message at its next (user-settable) check interval and will notify the user of its arrival. If the message has a higher priority, the user may be notified immediately, and may be forced to deal with the message immediately, as well. If the Email application is the foreground application, and has told the system it will take care of notifications itself, the message is immediately given to the application, which will presumably notify the user in its own way.</P>
+
+
+<H4 CLASS="HeadingC">
+Delivery of The Message</H4>
+<P>
+When the delivery box is presented to the user, the user can decide how to proceed with the message.</P>
+<P>
+If the user says to send it, the Mailbox library will establish an IACP connection to the application that is to receive the message and send it an appropriate notification. When the application acknowledges receipt of the message, the message is removed from the Mailbox library's &quot;inbox&quot; and any list displaying the message is updated appropriately.</P>
+<P>
+In essence, the Mailbox library will use IACP to send a MSG_META_MAILBOX_NOTIFY_MESSAGE_AVAILABLE to the application object, passing the token for the message.</P>
+<P>
+Using the message token, the application calls the Mailbox library to acknowledge receipt of the message. This acknowledgment will remove the message from the inbox, but will not delete the message descriptor.</P>
+<P>
+The application will then call the Mailbox library back to fetch the body of the message, its subject, time stamp, etc. When the user deletes the message, the Email application will notify the library that it is done with the message. This call will cause the message data and the message descriptor to both be deleted.</P>
+
+<HR>
+<A NAME="Mailbox_16.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The Mailbox Library</A>: 7.2 <A HREF="#Mailbox_14.htm">Examples of Mailbox Usage</A>: 
+Sending and Receiving an Address Book Page</H3>
+<P>
+This transmission is about as complex as it gets. In it, a user on one GEOS machine transmits an address book page to another user, on another GEOS machine. The transaction is broken into four parts, involving both machines.</P>
+
+<H4 CLASS="HeadingC">
+Message Set-Up</H4>
+<P>
+First, the user selects the page he or she wishes to send. The user selects the means of transport from a Send menu or set of send tools (depending on the system and how the application is set up). The act of going to the page causes the application to notify the message-send controller of the context in which the application finds itself. It is this context that determines what type of data will be placed, by default, in the message body.</P>
+<P>
+The message controller will bring up a dialog displaying the UI for setting transport options, including the address to which the message is to be sent. This UI is obtained by calling the transport driver.</P>
+<P>
+When the user has chosen the address, the controller will send off a MSG_META_MAILBOX_CREATE_MESSAGE to its output, including the 16-bit token bound to the &quot;Current Page&quot; string in the message controller's table.</P>
+<P>
+Having received the message, it becomes the application's responsibility to determine in what formats it can provide the data to be sent. It calls the message controller back, passing an array of data format descriptors that the controller then passes to the transport driver, to see which format it prefers. There will be transport drivers, like the one that uses the Socket library, where any data format will do, so long as the data driver supports the READ_NEXT_BLOCK and WRITE_NEXT_BLOCK calls. Other transport drivers will be more closely coupled with a data driver. For example, the Fax transport driver will require additional information about the fax being sent and will insist on a particular data driver being used.</P>
+<P>
+The transport driver will select one (or none) of the formats and return it to the controller, which will return it to the application. If the transport driver indicates none of the formats is acceptable, the message controller will inform the user that the selected object (page, document, whatever) cannot be sent via the selected medium. The transaction will then be at an end.</P>
+<P>
+Each data format descriptor consists of two 32-bit tokens (composed of the driver's manufacturer ID combined with a 16-bit constant). One token indicates the underlying storage format and refers to a single well-defined data driver. The other token defines the way data are stored in that underlying storage format. From an application's point of view, each data format token can only be used with one particular storage type token. Passing both allows things like the pager driver, described earlier, to be more flexible in how a message is stored. Such flexibility is not needed for the application; as far as it is concerned, a particular data driver is always associated with a particular data format.</P>
+<P>
+If the Mailbox library is asked to load a data driver using a storage type descriptor with which it is not familiar, it will search the appropriate directory, loading each driver it's not seen before and asking it for its storage type token. This allows the work for a non-standard driver to be delayed as long as possible.</P>
+<P>
+For argument's sake, let's say the transport driver indicated that its preferred format is that of a HugeArray with variable-sized elements. The application will ask the Mailbox library for a VM file to use, then convert the page into such an array, presumably placing each field of the address page into its own array element. Any references between the pieces are stored as indices into the array. For example, if the page is made up of the individual entries within the address card, plus a header that contains the names for each entry and a pointer to the entry data, the header must store the array index of the entry data, not a VM block + offset or even a DB group &amp; item. Avoiding reference to individual VM blocks allows the data to be transmitted and stored in arbitrary VM blocks of a data file on the remote side. </P>
+<P>
+The application would then pass a data format descriptor for an address book page stored in a HugeArray, and a storage type descriptor of a VM tree (HugeArrays are based on VM trees).</P>
+<P>
+(If the data are just a stream, without internal pointers to different parts of it, the data can be put into a straight VM chain, rather than a HugeArray. For example, an application that sends just text across would have no need of a HugeArray, but could simply use a VM chain of the text blocks. It would then pass a data format descriptor indicating the thing is an address book page in a VM chain, but the storage type descriptor would still be for a VM tree.)</P>
+<P>
+The matter of which VM file should be used bears a little bit of discussion, as well. If the data that make up the body of a message are already present in the application's document, by all means pass the address to them and mark the body data as volatile (you may not be about to free them, but you also can't guarantee the Mailbox library that they'll be around when the message needs to be sent). If you need to perform any conversion, however, you should use the Mailbox library's utility routines to obtain an appropriate VM file. Then you don't need to mark the body as volatile and the Mailbox library is saved the trouble and time of copying them into its own VM file for safekeeping.</P>
+
+
+<H4 CLASS="HeadingC">
+Registering the Message</H4>
+<P>
+Having created the appropriate HugeArray, the application then calls the message controller back to finally register the message with the Mailbox library.</P>
+<P>
+The controller will determine the time bounds, and the transport driver. It will call the address controller to fetch the block of data to be stored in the transport descriptor. The application provides the following information in its call to the message controller:</P>
+<UL>
+<LI>
+The destination is another copy of the same application (thus, it passes its own token).</LI>
+<LI>
+The user should be notified of the arrival of the message, when appropriate. (The message is travelling First-Class.)</LI>
+<LI>
+The storage format is a VM tree.</LI>
+<LI>
+The data format is an address book page in a HugeArray.</LI>
+<LI>
+The location of the data (the VM file &amp; block handle of the HugeArray).</LI>
+<LI>
+The message data are not volatile, as they are stored in a VM file provided by the Mailbox library.</LI>
+<LI>
+The subject line, which is something like &quot;Address book entry for <EM>
+name</EM>
+&quot;, where <EM>
+name</EM>
+ is the Name field of the entry.</LI>
+</UL>
+<P>
+As for any registered message, the Mailbox library will call the data driver, passing it the HugeArray's address and the data-is-volatile flag. The VM tree data driver will copy the array to a private VM file and return that file's name &amp; block handle for storing in the message descriptor.</P>
+<P>
+After the controller method returns, the application must remember to call the Mailbox library to tell it the application is done using the VM file in which it stored the message body. It must wait until after the message is registered to do this.</P>
+
+
+<H4 CLASS="HeadingC">
+Transmitting the Message</H4>
+<P>
+Once the message is in the Mailbox library's Outbox, it still needs to be sent to the destination computer. When the message is safely in the outbox, the Mailbox library will put up a confirmation box that allows the user to send the message now or later. Assuming the user chooses to delay the message, the user will (at some point in the future) bring up the outbox control panel and choose to see the messages destined for InfraRed (if InfraRed is the only transport with messages stored for it, InfraRed will be brought up automatically). The user will then click the Beam All trigger in the main control panel. This will prompt the Mailbox library to load the InfraRed transport driver and tell it to create a connection to the address stored in the message.</P>
+<P>
+If the connection is successful, the Mailbox library will instruct the transport driver to send each message in turn, passing in the message descriptor. The transport driver, having connected to the well-known mailbox port on the remote machine, will send across the message descriptor, indicating the data format and the destination application, followed by the blocks of the message. The data blocks are obtained by calling the data driver for the message.</P>
+<P>
+On the receiving side, the receipt of the first bytes of the connection request will cause the socket driver for the InfraRed medium to be loaded. When the link is established and an attempt is made to connect to the mailbox socket, the InfraRed transport driver will be loaded to handle the connection. The transport driver will receive each block from the Socket library. The first block will allow it to load the appropriate data driver, which it will use to store the subsequent blocks. If it is unable to load the requisite data driver, it will reject the message and the sending user will be told why.</P>
+<P>
+When all the data blocks have been received, the data driver will be told the message is complete, at which point it will attempt to write the data to disk (it may also have been writing it to disk block by block, or in batches of blocks if the message is particularly large; the driver is allowed to return an error from any block write call and the transport driver will call the data driver to delete what it had received so far and will discard any remaining blocks in this message as they are received, eventually returning an error to the sending transport driver). If this write fails (due to lack of disk space, for example), the receiving transport driver will return an error, which will be returned back to the Mailbox library on the sending machine. The user will be notified and the message will remain in the outbox.</P>
+<P>
+Following the commitment of the message data, the destination machine's transport driver will store the message in the inbox. Again, if the descriptor cannot be committed to disk, an error will propagate back to the sending Mailbox library. Only when the message descriptor is safely stored will the remote transport driver indicate the message has been successfully transmitted.</P>
+<P>
+When the receiving machine has accepted the message, the sending machine will delete the message from its outbox, freeing the message data, etc.</P>
+
+
+<H4 CLASS="HeadingC">
+Delivering the Message</H4>
+<P>
+Once the message is stored in the inbox, it progresses exactly as for the Email message, except it's the Address Book application that will receive the data.</P>
+<P>
+Depending on the priority of the message, the Mailbox library will, sooner or later, notify the user that the message has arrived. If the user chooses not to store the card right then, he will be asked again when the Address Book is next launched or another message arrives for it.</P>
+<P>
+When the user gives the go-ahead for delivering the message, the application is notified, via IACP. When the application has acknowledged receipt of the message, the descriptor is removed from the inbox (though not from the file).</P>
+<P>
+The application will call the Mailbox library to obtain the data format of the message body. If it can accept that format, the application will call the library again, telling it to ask the data driver for the appropriate reference to the data.</P>
+<P>
+Armed with this reference, the application can then act on the message. The message body should be treated as read-only and not be modified by the application in any way.</P>
+<P>
+When it's done with the message, it calls the library again to say it's done with the message (this call is passed on to the data driver to do with as it sees fit). </P>
+<P>
+If the application has no further use for the message descriptor, it will call the Mailbox library to say the message should be deleted.</P>
+<P>
+If the application is unable to understand the data format of the message body, it is responsible for informing the user and deleting the message.</P>
+<P>
+In this case, the Address Book will learn the data are a HugeArray-based address book page, which it understands. It will ask for and receive the VM file and block handle of the HugeArray, extract the relevant pieces and merge them into the address book. In all likelihood, the application will want to confirm with the user that she really wants to do this (especially if it will be overwriting an existing entry) and to do it in the current document. If the user indicates she would rather place the record in another document, the application is free to open the other document; the Mailbox library sets no time limits on how long an application may keep a delivered message active.</P>
+<P>
+Having applied the change (or not), the Address Book will tell the library it's done with the data and to delete the message.</P>
+
+<HR>
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+</BODY>
+</HTML>

@@ -1,0 +1,271 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: HelloWorld_a.htm,v 1.2 97/09/05 11:57:56 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> UI Objects</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Hello World</A>: 4.3 <A HREF="HelloWorld_7.htm">The Source File and Source Code</A>: 
+UI Objects</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="HelloWorld_7.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="HelloWorld_9.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.2 The Process Object</A> 
+<!-- to next --> | <A HREF="HelloWorld_b.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.4 Code and Message Handlers</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+As stated earlier, the bulk of the Hello World application consists of User Interface objects. These objects are defined just after the Process object in your application's code, and they are given certain attributes and instance data. Once they have been defined, in general you will not have to bother with them again.</P>
+<P>
+UI objects are arranged into resources. Each resource is allocated a block on the global heap when the program is launched; therefore, resources should be kept to reasonable sizes (2K-6K) whenever possible.
+
+</P>
+<P>
+The application object resides within its own resource so the application takes up very little memory when iconified (minimized). Menus for complex applications are usually put in a menu resource. Most other UI gadgetry is put in a resource called &quot;Interface&quot; (though this name is not required).</P>
+
+<H2 CLASS="HeadingC">
+The Application Object</H2>
+<P>
+Every application must have an application object, an instance of the class <CODE>
+GenApplicationClass</CODE>
+. The application object handles and manages many application-related things such as dispatching input sent by the input manager to the application. The application object must be the top-level generic object in every application. The name of the application object is also stated in the geode parameters file line <CODE>
+appobj</CODE>
+ (see <A HREF="HelloWorld_6.htm#77512"> The Hello World Parameters File</A>
+).</P>
+<P>
+<A HREF="HelloWorld_a.htm#74228"> Hello World's Application Object</A>
+ shows Hello World's application object definition. The comments in the code are extensive and explain the purpose of each line.</P>
+<P CLASS="figTitle">
+Code Display 2-4 <A NAME="74228">
+ </A>
+Hello World's Application Object</P>
+<P CLASS="figCaption">
+This display is part of hello3.goc and follows the previous display directly.</P>
+<PRE>/*
+ *			Application Object
+ * The very top-level generic object of an application MUST be a GenApplication
+ * object. The hello3.gp file contains an &quot;appobj&quot; statement which indicates
+ * that this &quot;HelloApp&quot; object is in fact the top-level UI object.
+ * This object should be in its own resource so it takes up very little memory
+ * when minimized. Note that the name of the resource may be whatever you choose;
+ * it does not have to be AppResource.
+ */</PRE>
+<PRE>@start	AppResource;			/* Begin definition of objects in AppResource. */</PRE>
+<PRE>@object GenApplicationClass HelloApp = {
+    GI_comp = @HelloPrimary;
+			/* The GI_comp attribute lists the generic children
+			 * of the object. The HelloApp object has just one
+			 * child, the primary window of the application. */</PRE>
+<PRE>    gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS) = @HelloPrimary; 
+			/* This GCN list determines which of the application's
+			 * window objects must be made visible when the
+			 * application first starts up. */
+}</PRE>
+<PRE>@end	AppResource			/* End definition of objects in AppResource. */</PRE>
+
+
+<H2 CLASS="HeadingC">
+The Primary Window and the View Window</H2>
+<P>
+Every application must have a primary window object of class <CODE>
+GenPrimaryClass</CODE>
+. This object will draw and manage the primary window and will work with the UI and the geometry manager to arrange all the children of the window properly. It will also automatically put up the system-controlled gadgets (such as the system window menu, the minimize/maximize buttons, and the Express menu).</P>
+<P>
+The Hello World primary window has only two children, one of which is a menu. The other is the view object, which occupies the remaining space within the primary. The view object, as stated earlier, automatically handles all scrolling and clipping of documents. Its scrollable area is eight and a half inches by eleven inches. A description of what the view window does and how it interacts with the Process object to draw the text is given in <A HREF="HelloWorld_4.htm#62864"> The Scrolling View and Drawing the Text</A>
+.
+<IMG SRC="HelloWorld_a_primary.gif">
+
+</P>
+<P>
+<A HREF="HelloWorld_a.htm#64685"> Hello World's Primary and View Objects</A>
+ shows the definition and attributes of each of these two objects. See the illustration above for a diagram of the two objects implemented under the OSF/Motif specification.</P>
+<P CLASS="figTitle">
+Code Display 2-5 <A NAME="64685">
+ </A>
+Hello World's Primary and View Objects</P>
+<P CLASS="figCaption">
+This display is part of hello3.goc and directly follows the previous display.</P>
+<PRE>@start	Interface;		/* This resource is for miscellaneous UI objects. */</PRE>
+<PRE>@object GenPrimaryClass HelloPrimary = {
+    GI_visMoniker = &quot;Hello World Sample Application&quot;;
+			/* This title will appear at the top of the primary
+			 * window as the name of the application. */</PRE>
+<PRE>    GI_comp = @HelloView, @HelloMenu;
+			/* This window has two children, the GenView object
+			 * and the GenInteraction menu object. */</PRE>
+<PRE>    /* For simplicity, this application is not given an icon. Therefore, we must
+     * prevent the user from being able to minimize the application. This is
+     * done by applying the following attribute to the GenPrimary object. Note that
+     * GenPrimaryClass is a subclass of GenDisplayClass, in which this attribute
+     * is actually defined. */</PRE>
+<PRE>    ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;</PRE>
+<PRE>    /* The following hint allows the primary window object to size itself
+     * according to its children (the view object). */
+    HINT_SIZE_WINDOW_AS_DESIRED;</PRE>
+<PRE>   /*
+    * When the specific UI permits, let's not show the menu bar on
+    * startup. Some applications would find the extra space this leaves
+    * helpful, in particular on the small screens of pen-based devices,
+    * though for this simple application it doesn't really matter.
+    */
+    ATTR_GEN_DISPLAY_MENU_BAR_POPPED_OUT;
+    HINT_DISPLAY_MENU_BAR_HIDDEN_ON_STARTUP;
+}</PRE>
+<PRE>/*		GenView object
+ * This GenView object creates a window where the application can display portions
+ * of a document as necessary. We want it to be scrollable, so the specific UI
+ * (OSF/Motif) will create scroll bars which the user can interact with. Whenever a
+ * portion of the window needs to be redrawn, the GenView object will invalidate
+ * a portion of the window, causing a MSG_META_EXPOSED to be sent to the
+ * application. The application will draw the document into the window. The
+ * window keeps track of a mask which is used to clip the application's
+ * drawing operations so only the invalid portion of the window is drawn. */</PRE>
+<PRE>@object GenViewClass HelloView = {
+    GVI_horizAttrs = @default | GVDA_SCROLLABLE | GVDA_NO_LARGER_THAN_CONTENT;
+				/* This makes the View scrollable in the
+				 * horizontal dimension and keeps it from
+				 * growing larger than our document. */</PRE>
+<PRE>    GVI_vertAttrs = @default | GVDA_SCROLLABLE | GVDA_NO_LARGER_THAN_CONTENT;
+				/* This makes the View scrollable in the
+				 * vertical dimension and keeps it from
+				 * growing larger than our document. */</PRE>
+<PRE>    GVI_docBounds = { 0, 0, 72*17/2, 72*11 };
+				/* This sets the document size (scrollable
+				 * bounds) of the GenView. */</PRE>
+<PRE>    GVI_content = process;				/* This sets the output of the View--where it will
+				 * send its MSG_META_EXPOSEDs--to be the
+				 * application's Process object. */</PRE>
+<PRE> /*
+  * This view will not take text input, so specify that no floating
+  * keyboard should come up. Otherwise, we would get a floating
+  * keyboard by default on pen-based systems.
+  */
+ ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
+}</PRE>
+<PRE>@end	Interface		/* End definition of objects in this resource. */</PRE>
+
+
+<H2 CLASS="HeadingC">
+The Hello World Menu</H2>
+<P>
+The Hello World program has one menu, called &quot;Menu&quot;, located in the primary window's menu bar. Menus are instances of <CODE>
+GenInteractionClass</CODE>
+ with the GIV_POPUP attribute set in the <CODE>
+GII_visibility</CODE>
+ field. The moniker of the menu object appears on the menu bar (see <A HREF="HelloWorld_a.htm#68616"> The Hello World Menu</A>
+ for the definition of Hello World's menu).</P>
+<P>
+The menu should have one child for each of its entries. In Hello World, the only child is the dialog box, whose moniker appears as the text of the menu item that brings up the box.</P>
+<P CLASS="figTitle">
+Code Display 2-6 <A NAME="68616">
+ </A>
+The Hello World Menu</P>
+<P CLASS="figCaption">
+/This display is part of hello3.goc and follows the previous display directly.</P>
+<PRE>/*			HelloMenu Menu
+ * Menus are of GenInteractionClass. The moniker of a menu is used to show the menu
+ * on the primary's menu bar (thus, &quot;Menu&quot; will show up in Hello World's menu bar).
+ * Each of the menu's children (in the GI_comp field) will be an entry or a
+ * collection of entries in the menu. To separate a menu from a dialog
+ * box GenInteraction, you must apply the visibility GIV_POPUP. A dialog box will
+ * have the visibility GIV_DIALOG. */</PRE>
+<PRE>@start MenuResource;</PRE>
+<PRE>@object GenInteractionClass HelloMenu = {
+    GI_visMoniker = 'M', &quot;Menu&quot;;				/* The moniker of the menu is used in
+				 * the primary window's menu bar. */</PRE>
+<PRE>    GI_comp = @HelloColorBox;				/* The only child of the menu (the only
+				 * item in the menu) is the dialog box. */</PRE>
+<PRE>    GII_visibility = GIV_POPUP;				/* This attribute designates the GenInteraction
+				 * as a menu or a submenu. */
+}</PRE>
+<PRE>@end MenuResource;</PRE>
+
+
+<H2 CLASS="HeadingC">
+The Dialog Box and Its Triggers</H2>
+<P>
+<A HREF="HelloWorld_a.htm#11604"> The Hello World Dialog Box and Its Triggers</A>
+ shows the code for the dialog box and its triggers.</P>
+<P>
+Dialog boxes in GEOS may be of <CODE>
+GenInteractionClass</CODE>
+, or dialogs may be called up and instantiated during execution with kernel routines. Hello World uses a GenInteraction in order to have a &quot;floating&quot; dialog box that may be retained and moved around the screen.
+<IMG SRC="HelloWorld_a_interactions.gif">
+
+</P>
+<P>
+When a dialog box is brought up by a menu item, the moniker of the dialog box object will be used as the text of the menu item. Thus, the word &quot;Color&quot; will appear both at the top of the dialog box and in the menu.</P>
+<P>
+Children of a dialog box are arranged by the geometry manager. In general, children will be arranged top to bottom (or left to right, depending on the specific UI) as they are defined. Thus, the two triggers will appear &quot;Blue&quot; first and &quot;Gold&quot; second (on bottom). The dialog box will automatically size itself to fit all its children properly. Dialog boxes, unlike windows, are generally not resizable.</P>
+<P>
+Each of the triggers will appear as a simple button big enough to hold its moniker. Each trigger, when pressed, sends a specified message to a specified object. The Blue trigger sends <CODE>
+MSG_HELLO_CHANGE_TO_BLUE</CODE>
+ to the application's Process object, and the Gold trigger sends the message <CODE>
+MSG_HELLO_CHANGE_TO_GOLD</CODE>
+ to the Process object. These messages are placed in the Process object's message queue and require no return values.</P>
+<P CLASS="figTitle">
+Code Display 2-7 <A NAME="11604">
+ </A>
+The Hello World Dialog Box and Its Triggers</P>
+<P CLASS="figCaption">
+This display is part of hello3.goc and follows the previous display directly.</P>
+<PRE>/*			HelloColorBox Dialog Box
+ * Dialog boxes are of GenInteractionClass. The moniker of the dialog box will
+ * appear at the top as the box's title. Additionally, if the GenInteraction
+ * is a child of a menu interaction, the moniker will also serve as the text that
+ * appears in the menu item that brings up the dialog box. The dialog will
+ * automatically size itself to be large enough to hold all its children. Thus,
+ * this dialog will be small (with just two children, each a trigger with a short
+ * moniker). */</PRE>
+<PRE>@object GenInteractionClass HelloColorBox = {
+    GI_visMoniker = 'C', &quot;Color&quot;;				/* The moniker will be displayed both as the
+				 * dialog's title and as the menu item that
+				 * brings the dialog up. */</PRE>
+<PRE>    GI_comp = @HelloBlueTrigger, @HelloGoldTrigger;
+				/* The two triggers are the only gadgets
+				 * in the dialog box. */</PRE>
+<PRE>    GII_visibility = GIV_DIALOG;				/* In order for this interaction to be
+				 * a dialog box, this attribute must be set. */
+} </PRE>
+<PRE>/*			GenTriggers
+ * Buttons are implemented by GenTriggerClass. When a trigger is pushed by the user
+ * (clicked on with the mouse), it will send the specified message to the specified
+ * output object. In both cases below, the trigger will send an application-defined
+ * message to the application's Process object. A trigger's moniker is displayed
+ * within the trigger. In this case, both are text, but any graphics could be used
+ * instead to create graphical triggers easily. (E.g. a blue flag and a gold flag
+ * rather than the words &quot;Blue&quot; and &quot;Gold.&quot;) */</PRE>
+<PRE>@object GenTriggerClass HelloBlueTrigger = {
+    GI_visMoniker = 'B', &quot;Blue&quot;;				/* The 'B' indicates the keyboard navigation
+				 * character for this trigger. */
+    GTI_destination = process;				/* Send the message to the Process object. */
+    GTI_actionMsg = MSG_HELLO_CHANGE_TO_BLUE;	/* Send this message. */
+}</PRE>
+<PRE>@object GenTriggerClass HelloGoldTrigger = {
+    GI_visMoniker = 'G', &quot;Gold&quot;;				/* The 'G' indicates the keyboard navigation
+				 * character for this trigger. */
+    GTI_destination = process;				/* Send the message to the Process object. */
+    GTI_actionMsg = MSG_HELLO_CHANGE_TO_GOLD;	/* Send this message. */
+}</PRE>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="HelloWorld_7.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="HelloWorld_9.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.2 The Process Object</A> 
+<!-- to next --> | <A HREF="HelloWorld_b.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.4 Code and Message Handlers</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

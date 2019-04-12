@@ -1,0 +1,424 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Text_17.htm,v 1.2 97/09/05 14:46:02 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Character Runs</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The Text Objects</A>: 4.3 <A HREF="Text_14.htm">Text Object Chunks</A>: 
+<A NAME="91955">
+ </A>
+Character Runs</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Text_14.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Text_16.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.2 Lines and Fields</A> 
+<!-- to next --> | <A HREF="Text_18.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.4 Paragraph Runs</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+<A NAME="IX_Character runs">
+ </A>
+The character attributes of your text object may be singular or multiple. Singular character attributes have one common set of character attributes for use by all characters within a text object. Multiple character attributes store their characteristics in &quot;runs&quot; which allow separate characters in the same object to show different character attributes.</P>
+
+<H2 CLASS="HeadingC">
+Singular Character Attributes</H2>
+<P>
+In many cases, your text object will need only one set of attributes for all characters. In those cases, the text object's character attributes instance field (VTI_<CODE>
+charAttrRuns</CODE>
+ for VisText, <CODE>
+ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR</CODE>
+ or <CODE>
+ATTR_GEN_TEXT_CHAR_ATTR</CODE>
+ for GenText) will store a single set of attributes. This word of data will contain either a 16-bit record or a ChunkHandle to a <CODE>
+VisTextCharAttr</CODE>
+ structure. Those attributes will be exhibited by all characters in that text object.</P>
+<P>
+Unless your <CODE>
+VisTextStorageFlags</CODE>
+ specify VTSF_MULTIPLE_CHAR_ATTRS, your character attributes will be singular. (For GenText, this field is set automatically if using the singular attributes shown above.) All text within the text object will exhibit the same characteristics; also, any changes to the character attributes will affect every character in the entire text. If you need your text object to allow different characters to show different attributes (such as in a word processor), see <A HREF="Text_17.htm#97656"> Multiple Character Attributes</A>
+.</P>
+<P>
+If your character attributes are singular, you have two choices: use a default set of characteristics or use a more complex (and complete) set of characteristics. For most simple generic text objects, the default set offers enough variety to accomplish most goals. If you need other character styles not offered in the default set, you will have to use the complete set of character attributes.</P>
+<P>
+To use the default character attributes with a VisText, specify VTSF_DEFAULT_CHAR_ATTRS in your <CODE>
+VisTextStorageFlags</CODE>
+. The default set uses the <CODE>
+VisTextDefaultCharAttr</CODE>
+ record to store the character's attributes. This record offers a simple collection of character fonts, point sizes, and other attributes (see below). If you need other character styles not found in this record, you should not set VTSF_DEFAULT_CHAR_ATTRS. The text object will automatically use the <CODE>
+VisTextCharAttr</CODE>
+ structure.</P>
+<P>
+By default, text objects using the default character attributes will be set to a font of VTDF_BERKELEY, a point size of VTDS_12, and a text color of C_BLACK.</P>
+<P>
+If you do not use the default character attributes record, you must use the <CODE>
+VisTextCharAttr</CODE>
+ structure to store your text object's character attributes. (In this case, do not set the VTSF_DEFAULT_CHAR_ATTRS flag in <CODE>
+VisTextStorageFlags</CODE>
+.) The text object's character attributes instance field will contain a ChunkHandle to this structure instead of the <CODE>
+VisTextDefaultCharAttr</CODE>
+ record (see <A HREF="Text_17.htm#95235"> Setting Character Attributes</A>
+).</P>
+<P CLASS="figTitle">
+Code Display 10-16 <A NAME="95235">
+ </A>
+Setting Character Attributes</P>
+<PRE>/* This example shows how to set the default character attributes. */</PRE>
+<PRE>@object GenTextClass MyTextObject = {
+    GTXI_text = &quot;&quot;;
+    ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = (VTDCA_UNDERLINE |
+				(VTDS_18 &lt;&lt; VTDCA_SIZE_OFFSET) | VTDF_BERKELEY);
+		/* This sets the default character attributes record (of type
+		 * VisTextDefaultCharAttr) to use underlined Berkeley font in
+		 * point size 18. */
+}</PRE>
+<PRE>/* This example shows how to use non-default singular character attributes. */</PRE>
+<PRE>@object GenTextClass MyTextObject = {
+    GTXI_text = &quot;&quot;;
+    ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @MyTextCharAttrs;
+		/* This is a chunk handle to the chunk holding the text
+		 * attributes (of type VisTextCharAttr). */
+}</PRE>
+<PRE>@chunk VisTextCharAttr MyCharAttrs = 
+    CHAR_ATTR_FONT_SIZE_STYLE(FID_DTC_URW_ROMAN, 32, TS_UNDERLINE);
+		/* This chunk holds the record that will determine the character
+		 * attributes of all the GenText's text. The text will be
+		 * 32-point Roman, underlined. */</PRE>
+
+
+<H2 CLASS="HeadingC">
+<A NAME="97656">
+ </A>
+Multiple Character Attributes</H2>
+<P>
+To allow a VisText object to exhibit multiple character attributes, you should set VTSF_MULTIPLE_CHAR_ATTRS and clear VTSF_DEFAULT_CHAR_ATTR flag in the object's <CODE>
+VisTextStorageFlags</CODE>
+ (stored in <CODE>
+VTI_storageFlags</CODE>
+). For GenText, you should set <CODE>
+ATTR_GEN_TEXT_MULTIPLE_CHAR_ATTR_RUNS</CODE>
+. Any multiple character attribute object will not be able to use any of the default character attributes of type <CODE>
+VisTextDefaultCharAttr</CODE>
+.</P>
+<P>
+Multiple character attributes allow your object's individual characters to exhibit different attributes. One character may be bold and italic; another may be underlined and in a different font. Any character may exhibit any of the attributes allowed within the <CODE>
+VisTextCharAttr</CODE>
+ structure.</P>
+<P>
+Multiple attributes are stored as lists of <CODE>
+VisTextCharAttr</CODE>
+<IMG SRC="Text_17_charRunExample.gif">
+
+</P>
+<P>
+Character attributes are specified by &quot;runs.&quot; Each character run is used until another run is encountered, at which point the new character attributes are used. Runs are defined by a character position within a chunk array and an associated token element. At the character position, the token corresponds to a <CODE>
+VisTextCharAttr</CODE>
+ element. The character attributes specified in this <CODE>
+VisTextCharAttr</CODE>
+ structure are used until the character position of the next <CODE>
+VisTextCharAttr</CODE>
+ token.</P>
+<P>
+If, for example, a GenText object contains the text &quot;Initial Text Here&quot; with the word &quot;Text&quot; underlined, the chunk array of elements would look as shown in the figure above.
+<IMG SRC="Text_17_styleRunStructure.gif">
+
+</P>
+<P CLASS="figTitle">
+Code Display 10-17 Setting Multiple Character Attribute Runs</P>
+<PRE>@object GenTextClass MultipleCharAttrsObject = {
+    ATTR_GEN_TEXT_MULTIPLE_CHAR_ATTR_RUNS = (ChunkHandle) @MyMultCharAttrs;
+    GTXI_text = &quot;Initial Text Here&quot;;
+}
+#define MCA_PLAIN			0
+#define MCA_UNDERLINE			1</PRE>
+<PRE>@CHAR_ATTR_ELEMENT_ARRAY_HEADER CharAttrElements = {
+    CHAR_ATTR_FONT_SIZE_STYLE(FID_DTC_URW_ROMAN, 12, 0),								 /* Element 0 */
+    CHAR_ATTR_FONT_SIZE_STYLE(FID_DTC_URW_ROMAN, 12, TS_UNDERLINE)	/* Element 1 */
+};</PRE>
+<PRE>@RUN_ARRAY_HEADER(CharAttrElements) MyMultCharAttrs = {
+    TRAE_ABS(0, MCA_PLAIN),					/* Element 0 */
+    TRAE_ABS(8, MCA_UNDERLINE),					/* Element 1 */
+    TRAE_END
+};</PRE>
+
+
+<H2 CLASS="HeadingC">
+Changing Character Attributes</H2>
+<PRE>MSG_VIS_TEXT_GET_CHAR_ATTR,VisTextCharAttrFlags, VisTextCharAttrDiffs, VisTextGetAttrFlags, MSG_VIS_TEXT_SET_CHAR_ATTR_BY_DEFAULT, MSG_VIS_TEXT_SET_CHAR_ATTR, MSG_VIS_TEXT_SET_FONT_ID, MSG_VIS_TEXT_SET_POINT_SIZE, MSG_VIS_TEXT_SET_TEXT_STYLE</PRE>
+<P>
+There may be cases in which you would like to change the attributes exhibited by certain characters in your Text object. In most cases, you can do this most easily by including one of the controllers mentioned at the end of this chapter. The controllers leave any underlying work up to the specific controller implementation.</P>
+<P>
+If you wish to manually change these character attributes, however, there are several messages to retrieve and set character attributes.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_GET_CHAR_ATTR">
+ </A>
+MSG_VIS_TEXT_GET_CHAR_ATTR</H4>
+<PRE CLASS="syntax">word 	MSG_VIS_TEXT_GET_CHAR_ATTR(@stack
+        VisTextGetAttrFlags 			flags,
+        VisTextCharAttrDiffs 			*diffs,
+        VisTextCharAttr 			*attrs,
+        dword 			rangeEnd,
+        dword 			rangeStart);</PRE>
+<P>
+This message returns a buffer filled in with the <CODE>
+VisTextCharAttr</CODE>
+ attributes of the given range of text. If VTGAF_MERGE_WITH_PASSED is passed in the <CODE>
+VisTextGetAttrFlags</CODE>
+, then the passed <CODE>
+VisTextCharAttr</CODE>
+ structure will be compared with the range of text that this message is sent to (and any differences will be pointed out in the passed <EM>
+diffs</EM>
+ buffer.(If this flag is not passed, any information initially in that buffer will be ignored.)</P>
+<P>
+Over the passed range, different characters may exhibit different attributes; a pointer to a <CODE>
+VisTextCharAttrDiffs</CODE>
+ structure is also passed to store information about attributes that are different across the range of text.</P>
+<P>
+<CODE>
+VisTextCharAttrDiffs</CODE>
+ contains a list of <CODE>
+VisTextCharAttrFlags</CODE>
+ specifying what attributes are multiply present. The structure also contains the bitfields of the <CODE>
+TextStyle</CODE>
+ and <CODE>
+VisTextExtendedStyles</CODE>
+ present over the range of text. Any attribute differences will produce a mention in one of these records; you can think of this process as XORing the attribute bitfields together.</P>
+<DL>
+<DT>
+Possible <CODE>
+VisTextCharAttrFlags</CODE>
+:</DT><DD>
+VTCAF_MULTIPLE_FONT_IDS<BR>
+VTCAF_MULTIPLE_POINT_SIZES<BR>
+VTCAF_MULTIPLE_COLORS<BR>
+VTCAF_MULTIPLE_GRAY_SCREENS<BR>
+VTCAF_MULTIPLE_PATTERNS<BR>
+VTCAF_MULTIPLE_TRACK_KERNINGS<BR>
+VTCAF_MULTIPLE_FONT_WEIGHTS<BR>
+VTCAF_MULTIPLE_FONT_WIDTHS<BR>
+VTCAF_MULTIPLE_BG_COLORS<BR>
+VTCAF_MULTIPLE_BG_GRAY_SCREENS<BR>
+VTCAF_MULTIPLE_BG_PATTERNS<BR>
+VTCAF_MULTIPLE_STYLES</DD>
+</DL>
+<P CLASS="refField">
+Structures:	</P>
+<PRE>typedef struct {
+	VisTextCharAttrFlags 				VTCAD_diffs;
+	VisTextExtendedStyles 				VTCAD_extendedStyles;
+	TextStyle 				VTCAD_textStyles;
+	byte 				VTCAD_unused;
+} VisTextCharAttrDiffs;</PRE>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any text object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+flags</EM>
+	VTGAF_MERGE_WITH_PASSED to merge the retrieved text attributes with the text in the passed range.</P>
+<DL>
+<DT>
+<EM>
+diffs</EM>
+</DT><DD>Pointer to a <CODE>
+VisTextCharAttrDiffs</CODE>
+ structure to store attribute differences.</DD>
+<DT>
+<EM>
+attrs</EM>
+</DT><DD>Pointer to a <CODE>
+VisTextCharAttr</CODE>
+ buffer to store the retrieved character attributes. If VTGAF_MERGE_WITH_PASSED is passed in flags, this buffer initially contains attributes to match against the retrieved attributes.</DD>
+<DT>
+<EM>
+rangeEnd</EM>
+</DT><DD>End of the range (character position).</DD>
+<DT>
+<EM>
+rangeStart</EM>
+</DT><DD>Beginning of the range (character position).</DD>
+</DL>
+<P CLASS="refField">
+Return:	The token of the specific character attribute run (word value) if the text object is storing runs of <CODE>
+VisTextCharAttr</CODE>
+ structures. The <EM>
+attrs</EM>
+ and <EM>
+diffs</EM>
+ buffers are also filled with their relevant information.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_SET_CHAR_ATTR_BY_DEFAULT">
+ </A>
+MSG_VIS_TEXT_SET_CHAR_ATTR_BY_DEFAULT</H4>
+<PRE CLASS="syntax">void	MSG_VIS_TEXT_SET_CHAR_ATTR_BY_DEFAULT(@stack
+        VisTextDefaultCharAttr 				defCharAttrs,
+        dword 				rangeEnd,
+        dword 				rangeStart);</PRE>
+<P>
+This message sets the character attributes passed in <CODE>
+VisTextDefaultCharAttr</CODE>
+ over the specified range of the text object. If the text object is not in &quot;default&quot; character attribute mode (i.e. it is storing runs of <CODE>
+VisTextCharAttr</CODE>
+ structures) it will translate the default attributes into their matching <CODE>
+VisTextCharAttr</CODE>
+ attributes.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any Text object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+defCharAttrs</EM>
+	<CODE>
+VisTextDefaultCharAttr</CODE>
+ record to set over the passed range of text.</P>
+<DL>
+<DT>
+<EM>
+rangeEnd</EM>
+</DT><DD>End of the range (Character position).</DD>
+<DT>
+<EM>
+rangeStart</EM>
+</DT><DD>Start of the range (Character position).</DD>
+</DL>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_SET_CHAR_ATTR">
+ </A>
+MSG_VIS_TEXT_SET_CHAR_ATTR</H4>
+<PRE CLASS="syntax">void	MSG_VIS_TEXT_SET_CHAR_ATTR(@stack
+        VisTextCharAttr 		*attrs,
+        dword 		rangeEnd,
+        dword 		rangeStart);</PRE>
+<P>
+This message sets the character attributes passed in the <CODE>
+VisTextCharAttr</CODE>
+ buffer over the specified range of the text object. If the text object is in &quot;default&quot; character attribute mode, it will force the text object to begin storing runs of <CODE>
+VisTextCharAttr</CODE>
+ structures.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any Text object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+attrs</EM>
+	Pointer to a <CODE>
+VisTextCharAttr</CODE>
+ buffer.</P>
+<DL>
+<DT>
+<EM>
+rangeEnd</EM>
+</DT><DD>End of the range (Character position).</DD>
+<DT>
+<EM>
+rangeStart</EM>
+</DT><DD>Start of the range (Character position).</DD>
+</DL>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_SET_FONT_ID">
+ </A>
+MSG_VIS_TEXT_SET_FONT_ID</H4>
+<PRE CLASS="syntax">@importMessage MetaTextMessages, void MSG_VIS_TEXT_SET_FONT_ID(@stack
+        FontID 		fid,
+        dword 		rangeEnd,
+        dword 		rangeStart);</PRE>
+<P>
+This message sets the passed <CODE>
+FontID</CODE>
+ over the specified range of the text object. If the text object currently displays its values in &quot;default&quot; character attributes, it will force the text object to use character attribute runs to store its <CODE>
+VisTextCharAttr</CODE>
+ structures.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any Text object.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_SET_POINT_SIZE">
+ </A>
+MSG_VIS_TEXT_SET_POINT_SIZE</H4>
+<PRE CLASS="syntax">@importMessage MetaTextMessages, void MSG_VIS_TEXT_SET_POINT_SIZE(@stack
+        WWFixed 		pointSize,
+        dword 		rangeEnd,
+        dword 		rangeStart);</PRE>
+<P>
+This message sets the passed point size over the specified range of the text object. If the text object currently displays its values in &quot;default&quot; character attributes, it will force the text object to use character attribute runs to store its <CODE>
+VisTextCharAttr</CODE>
+ structures.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any Text object.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_VIS_TEXT_SET_TEXT_STYLE">
+ </A>
+MSG_VIS_TEXT_SET_TEXT_STYLE</H4>
+<PRE CLASS="syntax">@importMessage MetaTextMessages, void MSG_VIS_TEXT_SET_TEXT_STYLE(@stack
+        word 		extBitsToClear, 
+        word 		extBitsToSet,
+        word 		styleBitsToClear, 
+        word 		styleBitsToSet,
+        dword 		rangeEnd,
+        dword 		rangeStart);</PRE>
+<P>
+This message sets the passed text styles over the specified range of the text object. You must specify the specific style bits to set and clear, both for the VTCA_<CODE>
+styles</CODE>
+ and the VTCA_<CODE>
+extendedStyles</CODE>
+ entries.</P>
+<P>
+If the text object currently displays its values in &quot;default&quot; character attributes, it will force the text object to use character attribute runs to store its <CODE>
+VisTextCharAttr</CODE>
+ structures.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any Text object.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Text_14.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Text_16.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.2 Lines and Fields</A> 
+<!-- to next --> | <A HREF="Text_18.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.4 Paragraph Runs</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

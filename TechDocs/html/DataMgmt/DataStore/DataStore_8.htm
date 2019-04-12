@@ -1,0 +1,137 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: DataStore_8.htm,v 1.1 97/06/02 14:33:12 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Building an Index</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="sectionTitle">
+<A HREF="index.htm">DataStore Library</A>: 4 
+<A NAME="41434">
+ </A>
+Building an Index</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="DataStore_7.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3 Deleting a DataStore</A> 
+<!-- to next --> | <A HREF="DataStore_9.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5 String Search</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>DataStoreBuildIndex()</PRE>
+<P>
+You can create a secondary index (<EM>
+i.e.</EM>
+, an index based on a non-key field) by calling <CODE>
+DataStoreBuildIndex()</CODE>
+. This routine builds an index based on a single field or on sort criteria specified in a callback function.</P>
+<P>
+<CODE>
+DataStoreBuildIndex()</CODE>
+ creates an array of <CODE>
+RecordNum</CODE>
+s (low word only) and stores the array in an LMem (local memory) block. The block contains an <CODE>
+IndexArrayBlockHeader</CODE>
+ which holds data about the index (the number of records in the index, the offset to the beginning of the array, etc.). Following the block header is space for writing your own data, which is followed by the index itself. There is no limit to how much data you can write but the amount of data you write naturally decreases the amount of space available for the index. If the LMem block is too big to be allocated, the routine will return DSSE_MEMORY_FULL.</P>
+<P>
+The following example shows how to build an index on a field and write data to the index's block header.</P>
+<P CLASS="figTitle">
+Code Display 9-4 Building a Secondary Index</P>
+<PRE>	/* index parameters */
+	DataStoreIndexCallbackParams	params;</PRE>
+<PRE>	/* Building an index returns the handle of the allocated block */
+	MemHandle	indexHandle;</PRE>
+<PRE>	/* sample data to be added to the index block */
+	TCHAR	indexData[]  = &quot;Index created 7/1/96.&quot;;</PRE>
+<PRE>	/*  Set up index parameters. */
+	params.DSICP_indexField = 2; /* field on which to build index */
+	params.DSICP_sortOrder = SO_DESCENDING; /* sort direction */
+	params.DSICP_cbData = NULL; /* data to be passed to the callback
+					function if a callback is being used */ </PRE>
+<PRE>	/*
+	 * Open the datastore. (In this example, assume that dsToken
+	 * has been declared as a global variable.)
+	 */
+	if(DataStoreOpen(&quot;Exchange Rates&quot;, oself, 0, &amp;dsToken) == DSE_NO_ERROR)
+	{
+		/* Build the index. */
+		if(DataStoreBuildIndex(dsToken, &amp;indexHandle,
+				sizeof(IndexArrayBlockHeader)+
+				LocalStringSize(indexData)+sizeof(TCHAR),
+				&amp;params, NULL) == DSSE_NO_ERROR)
+		{
+			/* get a pointer to the block header */
+			IndexArrayBlockHeader *pIndex;</PRE>
+<PRE>			/* lock the block down */
+			MemLock(indexHandle);</PRE>
+<PRE>			/*
+			 * dereference the handle to get a pointer
+			 * to the block header
+			 */
+			pIndex = MemDeref(indexHandle);</PRE>
+<PRE>			/* increment the pointer past the block header */
+			pIndex++;</PRE>
+<PRE>			/* now copy the sample data into the block */
+			strcpy((TCHAR *) pIndex,  indexData);</PRE>
+<PRE>			/* Now that we're through with the block,unlock it. */
+			MemUnlock(indexHandle);
+		}
+		/* Close the datastore. */
+		DataStoreClose(dsToken);
+	}</PRE>
+<P>
+You can also build an index based on a custom callback routine. The calling routine passes the <CODE>
+DataStoreCallbackParams</CODE>
+ to the callback; the callback decides which of the two records (<CODE>
+DSICP_rec1</CODE>
+ or <CODE>
+DSICP_rec2</CODE>
+) should go first. (If you use a callback, <CODE>
+DataStoreBuildIndex()</CODE>
+ will ignore 	DSICP<CODE>
+_indexField</CODE>
+ and DSICP<CODE>
+_sortOrder</CODE>
+.)</P>
+<DL>
+<DT>
+The callback should return:</DT><DD>
+-1 if <CODE>
+DSICP_rec1</CODE>
+ comes before <CODE>
+DSICP_rec2<BR>
+</CODE>
+1 if <CODE>
+DSICP_rec1</CODE>
+ comes after <CODE>
+DSICP_rec2</CODE>
+</DD>
+</DL>
+<P CLASS="figTitle">
+Code Display 9-5 Declaration of Callback Function in DataStoreBuildIndex()</P>
+<PRE>sword SortCallback(word dsToken, DataStoreIndexCallbackParams *params);</PRE>
+<P>
+<CODE>
+DataStoreBuildIndex()</CODE>
+ works on datastores of 4,000 records or less. If you call this routine on a datastore larger than 4,000 records, the routine will return DSSE_INDEX_RECORD_NUMBER_LIMIT_EXCEEDED.</P>
+<P>
+The application owns this index and is responsible for freeing the block. The DataStore Manager does not maintain the index in any way. Applications can synchronize a secondary index by rebuilding it whenever the application receives notification of a change that would affect the index.</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="DataStore_7.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3 Deleting a DataStore</A> 
+<!-- to next --> | <A HREF="DataStore_9.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5 String Search</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

@@ -1,0 +1,104 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Update_4.htm,v 1.1 97/06/05 12:42:45 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> New SMS Header</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="sectionTitle">
+<A HREF="index.htm">Versions</A>: 4 
+New SMS Header</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Update_3.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3 IMEI Code Number</A> 
+<!-- to next --> | <A HREF="Update_5.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5 New Standard Monikers, Bitmaps</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+In addition to the old way to send messages to application using their <CODE>
+GeodeToken</CODE>
+ in front of the actual data, a new user data header is now introduced. Otherwise sending and receiving messages has not changed. The new header adopts the concept from Narrow Band Socket specification.</P>
+<P>
+The new header format is //SCKddoo or //SCKLddddoooo where dd (and dddd) represent &quot;destination port&quot; and oo (and oooo) represent &quot;originator port&quot;. Both these headers are terminated with space character.These ports are ascii coded hexadecimal numbers.</P>
+<P>
+Short header covers ports from 0 to 255 (00 to FF in hex) and the longer form from 0 to 65535 (0000 to FFFF in hex).</P>
+<P>
+The range of port numbers is divided to reserved port address range and to dynamic and/or private port address range. Usage of port address range 0 to 49151 is restricted and assignment of a port in this range requires contacting port address assignment authority. The reserved port address range is further divided to ports for &quot;well-known protocols&quot; (range 0 to 239 and 256 to 1024) and to registered ports (range 1025 to 49151). Nokia has reserved ports 5500 to 5599 for company-specific protocols. Port addresses in the dynamic address range 240 to 255 or in the dynamic and/or private address range 49152 to 65535 may be used freely by any vendor.</P>
+<P>
+In order to receive these messages application must register themselves to SMS receive application. This can be done using smreg library. This library offers functions for registering and unregistering.</P>
+<P>
+<CODE>
+SMRegRegisterApplication()</CODE>
+ takes there parameters: <CODE>
+GeodeToken</CODE>
+ of your application, a pointer to buffer containing &quot;port numbers&quot; you register for and number of messages you are registering. Port numbers must be ASCII coded hexadecimal numbers.</P>
+<P CLASS="figTitle">
+Code Display 13-3 Registering to receive &quot;destination port&quot; SMS Messages </P>
+<PRE>@method TestProcessClass,  MSG_TEST_PROCESS_REGISTER
+{
+    GeodeToken appl;
+    TCHAR messageProtocol[5];
+    word protocol;</PRE>
+<PRE>/* We register ourselves to listen port 43962 that is ABBA in hex.  */
+    protocol = 43962;
+    appl.GT_chars[0] = `T';
+    appl.GT_chars[1] = `E';
+    appl.GT_chars[2] = `S';
+    appl.GT_chars[3] = `T';
+    appl.GT_manufID = 11;</PRE>
+<PRE>/* Let's ask smreg library to convert 43962 to ascii coded hex for us. */
+    SMRegIntegerToHex( protocol, messageProtocol, 
+                         SMRITH_NULL_TERMINATE |SMRITH_WORD_LENGTH);</PRE>
+<PRE>/* Now we have messageProtocol = &quot;ABBA&quot; */
+    SMRegRegisterApplication( appl, messageProtocol, 1);
+}</PRE>
+<P>
+You can register more than one port by calling the function:</P>
+<PRE>SMRegRegisterApplication( appl, &quot;ABBADADA0055&quot;, 3); </PRE>
+<P>
+Then you will receive messages ABBA, DADA and 55.</P>
+<P>
+The function returns a <CODE>
+SMRegResult</CODE>
+ value: SMRR_OK if your registration was succesful; otherwise it will be SMRR_FAIL.</P>
+<P>
+<CODE>
+SMRegIntegerToHex()</CODE>
+ function converts passed decimal integers to ascii coded hexadecimal strings. You pass a word containing integer to be converted, a character pointer where the result is stored and flags how the conversion is done. You can convert either byte length integers i.e. 0 to 255 and the result is two characters to word length i.e. 0 to 65535 and the result is four characters. By default the destination string is not null terminated, but if you pass flag SMRITH_NULL_TERMINATE null is added at the end of the string.</P>
+<P>
+If you want to stop receiving messages you can unregister yourself. This can be done using <CODE>
+SMRegUnregisterApplication()</CODE>
+ function. The parameters are identical to SMRegRegisterApplication. In addition SMMR_OK and SMRR_FAIL, this unregister function may return SMRR_APPLICATION_NOT_REGISTERED to indicate that you were not registered to listen this message.</P>
+<P>
+The message routing table is stored to .INI file. You may freely modify it yourself, but it is not recommended. More than one application may want to listen same messages, so writing .INI file direct may cause problems to other applications. The category is <EM>
+SMSRouteTable</EM>
+ and port numbers represent keys underneath.</P>
+<P CLASS="figTitle">
+Code Display 13-4 INI file: SMSRouteTable example</P>
+<P CLASS="figCaption">
+Here TEST application wants to receive messages 00F0 and ABBA and TES2 wants to receive message ABBA.</P>
+<PRE>[SMSRouteTable]
+00F0 = &quot;TEST&quot;,11
+ABBA = { &quot;TEST&quot;,11
+          &quot;TES2&quot;,11 }</PRE>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Update_3.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3 IMEI Code Number</A> 
+<!-- to next --> | <A HREF="Update_5.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5 New Standard Monikers, Bitmaps</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

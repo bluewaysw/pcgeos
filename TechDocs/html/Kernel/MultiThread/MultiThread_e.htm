@@ -1,0 +1,81 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: MultiThread_e.htm,v 1.2 97/08/12 10:55:55 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> When a Thread Is Finished</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Threads and Semaphores</A>: 4.4 <A HREF="MultiThread_a.htm">Using Multiple Threads</A>: 
+When a Thread Is Finished</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="MultiThread_a.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="MultiThread_d.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.3 Handling Errors in a Thread</A> 
+<!-- to next --> | <A HREF="MultiThread_f.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">5 Synchronizing Threads</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>ThreadDestroy()</PRE>
+<P>
+Whenever an application creates an additional thread with <CODE>
+MSG_PROCESS_CREATE_EVENT_THREAD</CODE>
+ or <CODE>
+ThreadCreate()</CODE>
+, it must be sure that the thread exits when it is finished. Simply exiting the application may not eliminate any additional threads, and these threads can cause GEOS to hang when shutting down the system.</P>
+<P>
+When a thread exits, it should first release any semaphores or thread locks it has locked and free any memory or other resources that are no longer needed. Resources in memory do not have to be freed in the same thread that allocated them, but you should be sure that they are freed before the application exits.</P>
+<P>
+<A NAME="IX_ThreadDestroy()">
+ </A>
+A procedural thread exits by calling <CODE>
+ThreadDestroy()</CODE>
+ with three arguments: an error code, an optr, and a word of data.  When the thread exits, it sends (as its last act) a <CODE>
+MSG_PROCESS_NOTIFY_THREAD_EXIT</CODE>
+ to the application's primary thread and a <CODE>
+MSG_META_ACK</CODE>
+ to the object descriptor passed. (<CODE>ThreadDestroy()</CODE>'s word of 
+data argument will be passed as the lower word of MSG_META_ACK's optr argument.) Each message has the error code as an argument. In designing a multi-threaded application, you can create methods for <CODE>
+MSG_PROCESS_NOTIFY_THREAD_EXIT</CODE>
+ (in your primary thread's class) or <CODE>
+MSG_META_ACK</CODE>
+ (in any class) for communication among threads, and you may use the error code for any data you choose. The convention is that an error code of zero represents successful completion of a thread's task.</P>
+<P>
+An event-driven thread should not call <CODE>
+ThreadDestroy()</CODE>
+ directly because its event queue must be removed from the system cleanly. Instead, send a <CODE>
+MSG_META_DETACH</CODE>
+ to the thread, passing the same arguments as for <CODE>
+ThreadDestroy()</CODE>
+. The handler for <CODE>
+MSG_META_DETACH</CODE>
+ in <CODE>
+MetaClass</CODE>
+ cleanly removes the event queue and terminates the thread, sending the same messages as described above. You may write a special handler for <CODE>
+MSG_META_DETACH</CODE>
+ when you subclass<CODE>
+ ProcessClass</CODE>
+, but be sure to end the handler with<CODE>
+ </CODE>
+<CODE>
+@callsuper()</CODE>
+ so the thread exits properly.</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="MultiThread_a.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="MultiThread_d.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.3 Handling Errors in a Thread</A> 
+<!-- to next --> | <A HREF="MultiThread_f.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">5 Synchronizing Threads</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

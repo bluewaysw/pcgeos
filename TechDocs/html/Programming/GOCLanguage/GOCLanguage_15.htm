@@ -1,0 +1,551 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: GOCLanguage_15.htm,v 1.2 97/09/05 13:43:51 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Managing Objects</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">GEOS Programming</A>: 4.6 <A HREF="GOCLanguage_f.htm">Using Classes and Objects</A>: 
+<A NAME="54024">
+ </A>
+Managing Objects</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GOCLanguage_f.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GOCLanguage_14.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.5 Sending Messages</A> 
+<!-- to next --> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+<A NAME="IX_Objects:goc syntax">
+ </A>
+In addition to knowing how to declare objects and classes, you need to know how to manage objects during execution. This includes instantiating new objects, deleting objects, saving object state, and moving objects around object trees.</P>
+<P>
+Both the kernel and <CODE>
+MetaClass</CODE>
+ (the topmost class in any class hierarchy) have routines and methods to create, manage, and destroy objects. You will probably not have to or want to use all these routines and methods, but understanding what they do and how they work can help you understand the object system as a whole.</P>
+
+<H2 CLASS="HeadingC">
+Creating New Objects</H2>
+<PRE>ObjDuplicateResource(), ObjInstantiate(), MSG_META_INITIALIZE, MSG_GEN_COPY_TREE</PRE>
+<P>
+<A NAME="IX_Objects:creating">
+ </A>
+You can introduce objects to the system in four basic ways. Each of these has benefits and drawbacks, and each has an appropriate place and time for use. It is unlikely, however, that you will use all four different means.</P>
+
+<H3 CLASS="HeadingD">
+Storing Objects in a Resource Block</H3>
+<P>
+This is a common and simple way to introduce objects to the system. The Hello World sample application uses this method of creating and loading objects. Resource blocks are contained in your geode's executable file (the <STRONG CLASS="fileName">
+.geo</STRONG>
+ file) and are automatically loaded when accessed. These resources may also be tagged for saving to state files automatically.</P>
+<P>
+Setting up an object resource is simply a matter of defining the resource and using the <CODE>
+@object</CODE>
+ keyword to define each object in the resource. The object resource block is automatically created and put in your executable file. Each object defined with <CODE>
+@object</CODE>
+ is allocated a chunk and a chunk handle within the resource block. Because both the chunk handle and the handle of the resource block are known, accessing individual objects in the resource is simple. In essence, when you set up an object resource, you don't need to worry about bringing the objects into the system or shutting them down.</P>
+<P>
+Using a resource for objects has limitations. Objects loaded from resources are always loaded with the same characteristics. This can be a problem if you need to have several different copies of a certain set of objects, and each copy can be changed. In this case, you would duplicate the resource (see below) before accessing the objects within it.</P>
+<P>
+For an example of objects defined by means of declaring them with the <CODE>
+@object</CODE>
+ keyword within an object resource, see <A HREF="GOCLanguage_13.htm#99194"> Declaring Objects with @object</A>
+.</P>
+<P>
+To define an object resource, you must know what objects you'll require before your geode is launched. Some complex programs will dynamically instantiate individual objects or entire trees without knowing previously what objects will be required. To do this, you'll need to use <CODE>
+ObjInstantiate()</CODE>
+ (see below) for instantiating individual objects.</P>
+
+
+<H3 CLASS="HeadingD">
+Duplicating an Object Block Resource</H3>
+<P>
+This is another common method employed by both the User Interface and applications. It provides the simplicity of the object resource model (above) while allowing you to have several different copies of the resource. Thus, it's perfect if you want to use templates for your object blocks (this is what the Document Control object does, as shown in the Tutorial application (see APPL\TUTORIAL\MCHRT4\MCHRT.GOC)).</P>
+<P>
+<A NAME="IX_Object blocks">
+ </A>
+First, you must set up an object resource in your code file with <CODE>
+@start</CODE>
+, <CODE>
+@end</CODE>
+, and <CODE>
+@object</CODE>
+. In the <STRONG CLASS="fileName">
+.gp</STRONG>
+ file, mark the resource <EM>
+discard-only</EM>
+. The objects in such a &quot;template&quot; resource should not be linked to any object outside the block. Generic object branches created in this manner should have their topmost object marked as not usable (~GS_USABLE); this is because it is illegal for a generic object to be usable without having a generic parent. Instead of accessing these objects directly, you should duplicate the resource block. (A resource can not be both duplicated and used directly.) <A NAME="IX_ObjDuplicateResource()">
+ </A>
+This is done with <CODE>
+ObjDuplicateResource()</CODE>
+, which allocates a new block on the heap, sets it up properly, and copies the resource directly into it.</P>
+<P>
+You are returned a handle to the new object block, which you can then modify any way you like. Because all the chunk handles of all the objects will be the same as in the source block, you can easily access any object in the duplicate. Once copied, the duplicate objects may be added to your generic tree and then set GS_USABLE. And, by using <CODE>
+ObjDuplicateResource()</CODE>
+ more than once on the same resource, you can have several different, possibly modified versions of the resource at once.</P>
+<P>
+As with using resource blocks, however, you must know the configuration of all your template objects beforehand. You may still need to add new objects to the resource or dynamically create other objects. This is the primary drawback of this method.</P>
+<P>
+Additionally, if you duplicate resource blocks, you should also free them when they're not needed any more. Generic objects in the block should be set not usable and then removed from the tree before the resource is freed. Freeing should be done by sending <CODE>
+MSG_META_BLOCK_FREE</CODE>
+ to any object in the block or by calling <CODE>
+ObjFreeObjBlock()</CODE>
+. Use of the kernel routine <CODE>
+ObjFreeDuplicate()</CODE>
+ is not recommended as it requires all objects in the block to be thoroughly clean of any ties to the system. (<CODE>
+MSG_META_BLOCK_FREE</CODE>
+ and <CODE>
+ObjFreeObjBlock()</CODE>
+ ensure that the objects have had adequate time to relinquish these ties first.)</P>
+
+
+<H3 CLASS="HeadingD">
+Instantiating an Individual Object</H3>
+<P>
+The most complex of these three options, this can provide the flexibility needed for all cases. The actual act of instantiating an object is not difficult or very complex. However, it is time and labor intensive and requires several steps that are not necessary when using object resources. In addition, cleaning up after objects created in this manner is more complex.</P>
+<P>
+To create a new object on the fly, you first must set up a place to put it. To do this, allocate a memory block on the global heap (you can instead use an existing object block, of course) and set it up with the proper flags and header to be an object block. There is no need to lock the chosen block on the heap. The block is now set up to receive the new object.</P>
+<P>
+<A NAME="IX_ObjInstantiate()">
+ </A>
+To actually create the new object, call the kernel routine <CODE>
+ObjInstantiate()</CODE>
+. This will lock the block on the heap, create a chunk in the object block and zero the instance chunk. If the object is of a class with master parts, the instance chunk will remain uninitialized until the first time a class in the master group receives any message. If the class is a direct descendant of <CODE>
+MetaClass</CODE>
+, the instance chunk will be immediately initialized to default values with <CODE>
+MSG_META_INITIALIZE</CODE>
+. If you want to change or add to the default data of this type of object, subclass <CODE>
+MSG_META_INITIALIZE</CODE>
+; be sure to call the superclass first. To initialize any master group of an object, send it a classed event that will be handled by a class in that master level.
+
+</P>
+<P>
+After calling <CODE>
+ObjInstantiate()</CODE>
+, the block will be automatically unlocked. An example of instantiating a new object is shown in <A HREF="GOCLanguage_15.htm#91091"> Instantiating an Object</A>
+. Generic objects created this way may then be added to a generic tree and set usable. They may be destroyed using <CODE>
+MSG_GEN_DESTROY</CODE>
+.</P>
+<P CLASS="figTitle">
+Code Display 5-19 <A NAME="91091">
+ </A>
+Instantiating an Object</P>
+<PRE>/* This sample of code belongs to a sample GenInteraction object (the object would
+ * have to be a subclass of GenInteractionClass). It does several things:
+ *	1.	It instantiates a new GenTrigger object. The new
+ *		GenTrigger will be added to the same object block
+ *		containing the GenInteraction handling the message.
+ *	2.	It adds the new GenTrigger as a child of the
+ *		SampInteraction (the handling object).
+ *	3.	It sets the GenTrigger usable and enabled. */</PRE>
+<PRE>@method SampInteractionClass, MSG_SAMP_INTERACTION_CREATE_TRIGGER {
+    optr 		newTrig;</PRE>
+<PRE>    newTrig = ObjInstantiate(OptrToHandle(oself),
+				(ClassStruct *)&amp;GenTriggerClass);
+	/* The two parameters are the handle of an object block and the
+	 * pointer to a class definition. The object block is the same
+	 * one containing the GenInteraction, whose optr is contained in
+	 * the standard oself parameter. The class structure pointer points
+	 * to the class definition of GenTriggerClass. */</PRE>
+<PRE>	/* Now set the trigger as the last child of the GenInteraction. */
+    @call self::MSG_GEN_ADD_CHILD(newTrig, (CCF_MARK_DIRTY | CCF_LAST);</PRE>
+<PRE>	/* Now set the trigger usable and enabled. */
+    @call newTrig::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    @call newTrig::MSG_GEN_SET_ENABLED(VUM_NOW);
+}</PRE>
+
+
+<H3 CLASS="HeadingD">
+Copying a Generic Tree</H3>
+<P>
+<A NAME="IX_MSG_GEN_COPY_TREE">
+ </A>
+The fourth way to create new objects is by using the message <CODE>
+MSG_GEN_COPY_TREE</CODE>
+. This, when sent to a generic object in a generic tree, copies an entire generic tree below and including the object into another, pre-existing object block.</P>
+<P>
+This is an easy way to copy generic trees, one of the more common purposes of creating new objects. However, it only works with the generic objects (with a superclass <CODE>
+GenClass</CODE>
+). Trees created using <CODE>
+MSG_GEN_COPY_TREE</CODE>
+ can be destroyed with <CODE>
+MSG_GEN_DESTROY</CODE>
+.</P>
+<P>
+For an example of <CODE>
+MSG_GEN_COPY_TREE</CODE>
+ use, see the SDK_C\GENTREE sample application.</P>
+
+
+
+<H2 CLASS="HeadingC">
+Working With Object Blocks</H2>
+<PRE>ObjIncInUseCount(), ObjDecInUseCount(), ObjLockObjBlock(), ObjFreeObjBlock(), ObjFreeDuplicate(), ObjTestIfObjBlockRunByCurThread(), ObjBlockSetOutput(), ObjBlockGetOutput()</PRE>
+<P>
+Once you have an object block created, either with <CODE>
+ObjDuplicateResource()</CODE>
+ or with the memory routines, there are several things you can do with it. It may be treated as a normal memory block, but there are also several routines for use specifically with object blocks:</P>
+<P>
+<CODE>
+ObjIncInUseCount()</CODE>
+<A NAME="IX_ObjIncInUseCount()">
+ </A>
+ and <A NAME="IX_ObjDecInUseCount()">
+ </A>
+<CODE>
+ObjDecInUseCount()</CODE>
+ increment and decrement an object block's in-use count (used to ensure the block can't be freed while an object is still receiving messages). <A NAME="IX_ObjLockObjBlock()">
+ </A>
+<CODE>
+ObjLockObjBlock()</CODE>
+ locks the object block on the global heap. <A NAME="IX_ObjFreeObjBlock()">
+ </A>
+<CODE>
+ObjFreeObjBlock()</CODE>
+ frees any object block. <A NAME="IX_ObjFreeDuplicate()">
+ </A>
+<CODE>
+ObjFreeDuplicate()</CODE>
+ is the low-level routine which frees an object block created with <CODE>
+ObjDuplicateResource()</CODE>
+. <CODE>
+ObjTestIfObjBlockRunByCurThread()</CODE>
+<A NAME="IX_ObjTestIfObjBlockRunByCurThread()">
+ </A>
+ returns a Boolean value indicating whether the calling thread runs a given object block. <CODE>
+ObjBlockSetOutput()</CODE>
+<A NAME="IX_ObjBlockSetOutput()">
+ </A>
+ and <A NAME="IX_ObjBlockGetOutput()">
+ </A>
+<CODE>
+ObjBlockGetOutput()</CODE>
+ set and return the optr of the object set to receive output messages (i.e., messages sent with travel option TO_OBJ_BLOCK_OUTPUT) from all the objects within the object block.</P>
+
+
+<H2 CLASS="HeadingC">
+Working With Individual Objects</H2>
+<PRE>ObjIsObjectInClass(), ObjIsClassADescendant(), ObjGetFlags(), ObjGetFlagsHandles(), ObjSetFlags(), ObjSetFlagsHandles(), ObjDoRelocation(), ObjDoUnRelocation(), ObjResizeMaster(), ObjInitializeMaster(), ObjInitializePart()</PRE>
+<P>
+The kernel supplies several routines for working with and modifying individual object chunks and object data. These are all described fully in the Routine Reference Book; most are not commonly used by applications.</P>
+<P>
+<CODE>
+ObjIsObjectInClass()</CODE>
+<A NAME="IX_ObjIsObjectInClass()">
+ </A>
+ takes a class and an optr and returns whether the object is a member of the class. <A NAME="IX_ObjIsClassADescendant()">
+ </A>
+A related message, <CODE>
+ObjIsClassADescendant()</CODE>
+ determines whether a given class is a subclass of another. <A NAME="IX_ObjGetFlags()">
+ </A>
+<CODE>
+ObjGetFlags()</CODE>
+ returns the object flags for a given object instance chunk; <A NAME="IX_ObjSetFlags()">
+ </A>
+<CODE>
+ObjSetFlags()</CODE>
+ sets the flags to passed values. <A NAME="IX_ObjGetFlagsHandles()">
+ </A>
+<A NAME="IX_ObjSetFlagsHandles()">
+ </A>
+<CODE>
+ObjGetFlagsHandles()</CODE>
+ and <CODE>
+ObjSetFlagsHandles()</CODE>
+ refer to objects by means of handles instead of optrs. <CODE>
+ObjDoRelocation()</CODE>
+<A NAME="IX_Relocatable data:kernel routines">
+ </A>
+<A NAME="IX_ObjDoRelocation()">
+ </A>
+ processes any passed instance data fields in the object declared as relocatable; <A NAME="IX_ObjDoUnRelocation()">
+ </A>
+<CODE>
+ObjDoUnRelocation()</CODE>
+ returns the passed relocatable fields to their index values.</P>
+<P>
+<CODE>
+ObjInitializeMaster()</CODE>
+<A NAME="IX_ObjInitializeMaster()">
+ </A>
+ causes the system to build out a particular master group's instance data for an object. <A NAME="IX_ObjInitializePart()">
+ </A>
+<CODE>
+ObjInitializePart()</CODE>
+ causes the system to build all master groups above and including the passed level. (This will also resolve variant classes.) <A NAME="IX_ObjResizeMaster()">
+ </A>
+<CODE>
+ObjResizeMaster()</CODE>
+ resizes a given master part of the instance chunk, causing the chunk to be resized.</P>
+
+
+<H2 CLASS="HeadingC">
+<A NAME="95668">
+ </A>
+Managing Object Trees</H2>
+<PRE>ObjLinkFindParent(), ObjCompAddChild(), ObjCompRemoveChild(), ObjCompMoveChild(), ObjCompFindChildByOptr(), ObjCompFindChildByNumber(), ObjCompProcessChildren()</PRE>
+<P>
+Many objects will be part of object trees. Nearly all generic UI and visible objects exist as members of trees for organizational purposes. Object trees can be useful, powerful, and convenient mechanisms for organizing your objects.</P>
+<P>
+An object tree is made up of &quot;composite&quot; objects--objects which may or may not have children. The distinguishing characteristic of a composite object is that it has one instance data field declared with the <CODE>
+@composite</CODE>
+ keyword and another declared with the <CODE>
+@link</CODE>
+ keyword. The <CODE>
+@composite</CODE>
+ field contains a pointer to the object's first child in the tree, and the <CODE>
+@link</CODE>
+ field contains a pointer to the object's next sibling. </P>
+<P>
+If you set up an object resource block containing composite objects, it's very easy to set up an object tree. Your generic UI objects are declared in a tree with the GenApplication object at its head. Additionally, it's easy to alter an object tree once it's been created. The kernel provides several routines, and <CODE>
+MetaClass</CODE>
+ uses several messages for adding, removing, and moving objects to, from, and within trees.</P>
+<UL>
+<LI>
+<CODE>
+ObjLinkFindParent()<BR>
+</CODE>
+<A NAME="IX_ObjLinkFindParent()">
+ </A>
+This routine finds the optr of the calling object's direct parent. The kernel traverses the link fields until it returns to the parent object.</LI>
+<LI>
+<CODE>
+ObjCompFindChildByOptr()<BR>
+</CODE>
+<A NAME="IX_ObjCompFindChildByOptr()">
+ </A>
+This routine returns the number of the child (first, second, third, etc.) whose optr is passed. The child must exist and must be a child of the calling object.</LI>
+<LI>
+<CODE>
+ObjCompFindChildByNumber()<BR>
+</CODE>
+<A NAME="IX_ObjCompFindChildByNumber()">
+ </A>
+This routine returns the optr of the child whose number (first, second, etc.) is passed.</LI>
+<LI>
+<CODE>
+ObjCompAddChild()<BR>
+</CODE>
+<A NAME="IX_ObjCompAddChild()">
+ </A>
+This routine takes an object's optr and adds it to the caller's list of children. Depending on the flags passed, the child may be inserted in any child position (first, second, etc.).</LI>
+<LI>
+<CODE>
+ObjCompMoveChild()<BR>
+</CODE>
+<A NAME="IX_ObjCompMoveChild()">
+ </A>
+This routine takes a child object and moves it to a new position. However, it will still remain a child of the calling object. If you want to move the child to be a child of a different object, you must first remove it from the tree altogether and then add it to the other parent.</LI>
+<LI>
+<CODE>
+ObjCompRemoveChild()<BR>
+</CODE>
+<A NAME="IX_ObjCompRemoveChild()">
+ </A>
+This routine removes a child object from the object tree.</LI>
+<LI>
+<CODE>
+ObjCompProcessChildren()<BR>
+</CODE>
+<A NAME="IX_ObjCompProcessChildren()">
+ </A>
+This routine calls a callback routine for each child of the calling object in turn. The callback routine may do virtually anything (except destroy the object or free its chunk or something similar).</LI>
+</UL>
+<P>
+By using the above routines, you can fully manipulate any object tree and the objects within it.
+<IMG SRC="GOCLanguage_15_objTree.gif">
+
+</P>
+
+
+<H2 CLASS="HeadingC">
+<A NAME="57162">
+ </A>
+Detaching and Destroying Objects</H2>
+<PRE>MSG_META_DETACH, MSG_META_DETACH_COMPLETE, MSG_META_ACK, MSG_META_OBJ_FLUSH_INPUT_QUEUE, MSG_META_OBJ_FREE, MSG_META_FINAL_OBJ_FREE, ObjInitDetach(), ObjIncDetach(), ObjEnableDetach(), ObjFreeChunk(), ObjFreeChunkHandles()</PRE>
+<P>
+<A NAME="IX_Objects:detaching">
+ </A>
+While creating objects is actually quite simple, detaching and destroying them can be quite involved. For this reason, GEOS does most of the work for you, and in most cases you won't have to worry about what happens when your application is shut down or saved to a state file. However, if you instantiate individual objects of your own classes, you should be very careful about how your objects are detached from the system and destroyed.
+
+</P>
+<P>
+Detaching objects involves severing all of the object's ties with the rest of the system. Destruction of an object entails actually removing the object's instance chunk and related structures, making sure that it has handled all its waiting messages.</P>
+<P>
+Throughout its life, an object is likely to become involved with a number of other things--other objects, drivers, files, streams, the memory manager, the kernel--and each of these things may send the object messages from time to time. The task, when detaching an object from the system, is to sever all the object's ties with the outside world, to make sure that no other entity will ever try to contact the object again.</P>
+<P>
+<A NAME="IX_Active list:and detaching">
+ </A>
+To those unfamiliar with these problems, they can be overwhelming. However, GEOS takes care of them for you in most situations. All generic and visible objects, all objects in object trees, and all objects that maintain an &quot;active list&quot; will automatically (in nearly all cases) have the detach functionality built in by <CODE>
+MetaClass</CODE>
+.</P>
+
+<H3 CLASS="HeadingD">
+The Detach Sequence</H3>
+<P>
+<A NAME="IX_MSG_META_DETACH">
+ </A>
+When an object receives <CODE>
+MSG_META_DETACH</CODE>
+, it begins the detach sequence to sever all its ties with other entities in the system. It must first notify all its children and all the objects on its various notification lists that it will be going away (most often, all its children, by association, will also be detached). It then must clear its message queues. Finally, it must acknowledge its detachment to the object that originally sent <CODE>
+MSG_META_DETACH</CODE>
+. Each of these phases is described in detail below and is implemented by <CODE>
+MetaClass</CODE>
+. You have to do none of this work unless your object is truly a special case.</P>
+<P>
+Detaching in conjunction with destruction is somewhat intricate because not only must the object notify all other interested parties, but it must also receive acknowledgment of the notice. Otherwise, the notification and some other message could be sent at the same time, and the object could be destroyed before the notification can be handled. (Destruction is discussed in the following section.)</P>
+<P>
+Because any object may be put in the position of being detached and then immediately destroyed, it must send out notification and then wait until all the notices have been acknowledged before continuing with other tasks. The kernel and <CODE>
+MetaClass</CODE>
+ implement a mechanism for this using four kernel routines. Again, you do not need to do this since all classes have <CODE>
+MetaClass</CODE>
+ as their root.</P>
+<P>
+<A NAME="IX_ObjInitDetach()">
+ </A>
+First the object being detached (in its <CODE>
+MSG_META_DETACH</CODE>
+ handler) calls the routine <CODE>
+ObjInitDetach()</CODE>
+. This tells the kernel that the object is initiating a detach sequence and that the acknowledgment mechanism must be set up. The kernel will allocate a variable data entry to hold a count of the number of notices sent and acknowledgments received.</P>
+<P>
+<A NAME="IX_ObjIncDetach()">
+ </A>
+After this, the object must send a <CODE>
+MSG_META_DETACH</CODE>
+ or its equivalent to each of its children and each of the objects on its &quot;active list.&quot; With each notice sent, the object <EM>
+must</EM>
+ call <CODE>
+ObjIncDetach()</CODE>
+, which increments the notice count.</P>
+<P>
+<A NAME="IX_ObjEnableDetach()">
+ </A>
+After sending all the notices, the object then calls the kernel routine <CODE>
+ObjEnableDetach()</CODE>
+. This notifies the kernel that all the notices have been sent and that the object is waiting for the acknowledgments.</P>
+<P>
+<A NAME="IX_MSG_META_ACK">
+ </A>
+Acknowledgment comes in the form of <CODE>
+MSG_META_ACK</CODE>
+ and is received by the object being detached. <CODE>
+MSG_META_ACK</CODE>
+ is handled by <CODE>
+MetaClass</CODE>
+ and will decrement the notice count, essentially saying there are one fewer notices left to be received. <A NAME="IX_MSG_META_DETACH_COMPLETE">
+ </A>
+When the final <CODE>
+MSG_META_ACK</CODE>
+ is received (setting the notice count to zero) and <CODE>
+ObjEnableDetach()</CODE>
+ has <EM>
+also</EM>
+ been called, the kernel will automatically send a <CODE>
+MSG_META_DETACH_COMPLETE</CODE>
+ to the object. This assures the object that it will never receive another message from another entity in the system.</P>
+<P>
+The final step in the detach sequence is acknowledging that the object has been detached. In its <CODE>
+MSG_META_DETACH_COMPLETE</CODE>
+ handler, the object should send a <CODE>
+MSG_META_ACK</CODE>
+ to the object that originated the detach sequence. This will allow that object to continue with its detach sequence if it was involved in one; without this step, only leaves of object trees could ever be detached. This final step is provided in default handlers in <CODE>
+MetaClass</CODE>
+ and is inherited by all objects.</P>
+<P>
+<A NAME="IX_ObjFreeChunkHandles()">
+ </A>
+<A NAME="IX_ObjFreeChunk()">
+ </A>
+To free a chunk, perhaps a chunk used to store an object, use the <CODE>
+ObjFreeChunk()</CODE>
+ routine. Normally this will free the chunk; however if the chunk is storing an object from a resource, the chunk will instead be dirtied and resized to zero. To free a chunk referenced by handles, call <CODE>
+ObjFreeChunkHandles()</CODE>
+ instead.</P>
+
+
+<H3 CLASS="HeadingD">
+The Destruction Sequence</H3>
+<P>
+<A NAME="IX_Objects:destruction">
+ </A>
+<A NAME="IX_MSG_META_OBJ_FREE">
+ </A>
+The destruction sequence must be initiated from outside and will begin when the object receives a <CODE>
+MSG_META_OBJ_FREE</CODE>
+. Often, the <CODE>
+MSG_META_OBJ_FREE</CODE>
+ will be sent by the object to itself.</P>
+<P>
+The destruction sequence consists of three steps: First, the object must clear out its message queues; even though it is detached and can not receive new messages, there may be some left over in the queue (an error if it occurs). Second, it must finish executing its code and working with its instance data. Third, it must free its instance chunk. Each of these steps is described below.</P>
+<P>
+Even though the object has notified the rest of the system that it is going away, it still must flush its message queues of any unhandled messages. These messages could have been received between the time the original <CODE>
+MSG_META_OBJ_FREE</CODE>
+ was received and notification was sent out (due to interrupts or context switching). <A NAME="IX_MSG_META_OBJ_FLUSH_INPUT_QUEUE">
+ </A>
+To clear its message queues, the object must send itself a <CODE>
+MSG_META_OBJ_FLUSH_INPUT_QUEUE</CODE>
+, which will ensure that any messages in the queues are handled appropriately before the object shuts down. This step is handled automatically by the <CODE>
+MSG_META_OBJ_FREE</CODE>
+ handler in <CODE>
+MetaClass</CODE>
+. You should never have to send this message, and indeed its use is discouraged.</P>
+<P>
+To the outside world, the second and third steps seem like a single step. However, <CODE>
+MSG_META_OBJ_FREE</CODE>
+ can not simply free the instance chunk after the queues are cleared; it must be able to access the instance chunk until all the method code has been executed. <A NAME="IX_MSG_META_FINAL_OBJ_FREE">
+ </A>
+So, <CODE>
+MSG_META_OBJ_FREE</CODE>
+ sends the final message to the object, <CODE>
+MSG_META_FINAL_OBJ_FREE</CODE>
+, and then exits. <CODE>
+MSG_META_FINAL_OBJ_FREE</CODE>
+ waits a short while and then frees the object's chunk. This ensures that <CODE>
+MSG_META_OBJ_FREE</CODE>
+ has finished and the chunk is not being used by any code.</P>
+
+
+<H3 CLASS="HeadingD">
+Possible Pitfalls</H3>
+<P>
+If you're not careful, you can cause the detach mechanism to fail by instantiating an object on the fly and saving that object's optr. If the object is then detached and you don't account for the saved optr, you could later send a message to a nonexistent object. This has undefined results and can be nearly impossible to track down.</P>
+<P>
+Note that objects created within resources and by <CODE>
+ObjDuplicateResource()</CODE>
+ will almost always automatically be taken care of by the detach mechanism. Objects you create with <CODE>
+ObjInstantiate()</CODE>
+ are the ones to be careful with.</P>
+
+
+
+<H2 CLASS="HeadingC">
+<A NAME="73804">
+ </A>
+Saving Object State</H2>
+<PRE>ObjSaveBlock(), ObjMarkDirty(), ObjMapSavedToState(), ObjMapStateToSaved()</PRE>
+<P>
+Object state saving is almost entirely contained within the system. For the most part, only UI objects are saved to state files; however, you can mark other object blocks for saving. State saving is described in full in <A HREF="../../Kernel/Geodes/Geodes_5.htm#76203">the Applications and Geodes chapter</A>.</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GOCLanguage_f.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GOCLanguage_14.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.5 Sending Messages</A> 
+<!-- to next --> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

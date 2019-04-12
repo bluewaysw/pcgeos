@@ -1,0 +1,233 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Geodes_6.htm,v 1.1 97/06/02 15:29:30 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Using Other Geodes</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Applications and Geodes</A>: 1.5 <A HREF="Geodes_1.htm">Geodes</A>: 
+Using Other Geodes</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Geodes_1.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Geodes_5.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1.4 Saving and Restoring State</A> 
+<!-- to next --> | <A HREF="Geodes_7.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">1.6 Writing Your Own Libraries</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+Often, geodes will have to use other geodes. For example, a communications program will use the Serial Driver, and a draw application will use the Graphic Object Library. Normally, this is taken care of by the compiler and the linker when you include a library or driver in your <STRONG CLASS="fileName">
+.goc</STRONG>
+ and <STRONG CLASS="fileName">
+.gp</STRONG>
+ files.</P>
+<P>
+Other times, however, an application will have to load libraries or drivers on the fly and then free them some time later. This section describes how to load, use, and free libraries and drivers.</P>
+
+<H2 CLASS="HeadingC">
+Using Libraries</H2>
+<PRE>GeodeUseLibrary(), GeodeFreeLibrary()</PRE>
+<P>
+<A NAME="IX_Libraries:loading dynamically">
+ </A>
+Libraries are always referenced by their file names or by their geode handles. It's easiest, however, to use the file name of the library when loading it--the system will locate the library for you. It's unusual to need to load a library for use with your geode; in almost all cases it's easiest to include the library in your<STRONG CLASS="fileName">
+ .goc</STRONG>
+ and<STRONG CLASS="fileName">
+ .gp</STRONG>
+ files and have the system load and link the library automatically. (To do this, include the library's interface definition file in your code file and list the library's geode name in your geode parameters file.)</P>
+<P>
+<A NAME="IX_GeodeUseLibrary()">
+ </A>
+If you need to load a library dynamically, though, use <CODE>
+GeodeUseLibrary()</CODE>
+. This routine takes the protocol numbers expected of the library (see <A HREF="Geodes_9.htm#74509"> Protocol Numbers</A>
+) and the library geode's filename. It will locate and load the library if not already loaded. If the library is already loaded, it will increment the library's reference count. <A NAME="IX_GeodeFreeLibrary()">
+ </A>
+When you are done using a library loaded with <CODE>
+GeodeUseLibrary()</CODE>
+, you must free the library's instance with <CODE>
+GeodeFreeLibrary()</CODE>
+.</P>
+
+
+<H2 CLASS="HeadingC">
+Using Drivers</H2>
+<PRE>GeodeUseDriver(), GeodeInfoDriver(), GeodeGetDefaultDriver(), GeodeSetDefaultDriver(), GeodeFreeDriver()</PRE>
+<P>
+<A NAME="IX_Drivers">
+ </A>
+Drivers are referenced by either their permanent names or their geode handles. Most drivers used by applications will be loaded automatically by the kernel; the application must have the driver's permanent name specified in its<STRONG CLASS="fileName">
+ .gp</STRONG>
+ file. Should an application need to use a driver not included in its parameters file, however, it can do so with the routines described below.</P>
+<P>
+<A NAME="IX_GeodeUseDriver()">
+ </A>
+When you need to use a driver, the <CODE>
+GeodeUseDriver()</CODE>
+ routine will locate and load it, adding it to the active geodes list. You must pass the desired driver geode's filename as well as the expected protocol levels of the driver. The routine will return the driver's geode handle. <A NAME="IX_GeodeFreeDriver()">
+ </A>
+If you load a driver dynamically, you must free it with <CODE>
+GeodeFreeDriver()</CODE>
+ when your geode shuts down or otherwise finishes using the driver.</P>
+<P>
+<A NAME="IX_GeodeInfoDriver()">
+ </A>
+If you know a driver's geode handle, you can easily retrieve information about it with the routine <CODE>
+GeodeInfoDriver()</CODE>
+.<A NAME="IX_DriverInfoStruct">
+ </A>
+ This returns a structure of type <CODE>
+DriverInfoStruct</CODE>
+, which contains the driver's type (<CODE>
+DriverType</CODE>
+), the driver's attributes, and a far pointer to the driver's strategy routine. Many driver types have an expanded information structure, of which <CODE>
+DriverInfoStruct</CODE>
+ is just the first field. Video driver information structures, for example, also contain dimensions and color capabilities (among other things) of the particular devices they drive. The driver information structure is shown below.</P>
+<PRE>typedef struct {
+    void			(*DIS_strategy)();
+    DriverAttrs			DIS_driverAttributes;
+    DriverType			DIS_driverType;
+} DriverInfoStruct;</PRE>
+<P>
+<A NAME="IX_DIS_&ldots;  (DriverInfoStruct structure)">
+ </A>
+The <CODE>
+DIS_strategy</CODE>
+ field of the structure contains a pointer to the driver's strategy routine in fixed memory. After the driver has been loaded, its strategy routine is called directly with a driver function name.</P>
+<P>
+<A NAME="IX_DriverAttrs">
+ </A>
+The <CODE>
+DIS_driverAttributes</CODE>
+ is an attribute record of type <CODE>
+DriverAttrs</CODE>
+, the flags of which are shown below:</P>
+<DL>
+<DT>
+DA_FILE_SYSTEM</DT><DD>
+<A NAME="IX_DA_&ldots;">
+ </A>
+This flag indicates that the driver is used for file access.</DD>
+<DT>
+DA_CHARACTER</DT><DD>
+This flag indicates that the driver is used for a character-oriented device.</DD>
+<DT>
+DA_HAS_EXTENDED_INFO</DT><DD>
+This flag indicates that the driver has a <CODE>
+DriverExtendedInfo</CODE>
+ structure.</DD>
+</DL>
+<P>
+The <CODE>
+DIS_driverType</CODE>
+ contains the type of driver described by the information structure. The types that may be specified in this field are listed below:</P>
+<DL>
+<DT>
+DRIVER_TYPE_VIDEO</DT><DD>
+<A NAME="IX_DRIVER_TYPE_&ldots;">
+ </A>
+This is used for video drivers.</DD>
+<DT>
+DRIVER_TYPE_INPUT</DT><DD>
+This is used for input (mouse, keyboard, pen, etc.) drivers.</DD>
+<DT>
+DRIVER_TYPE_MASS_STORAGE</DT><DD>
+This is used for storage device drivers.</DD>
+<DT>
+DRIVER_TYPE_STREAM</DT><DD>
+This is used for stream and port (parallel, serial) drivers.</DD>
+<DT>
+DRIVER_TYPE_FONT</DT><DD>
+This is used for font rasterizing drivers.</DD>
+<DT>
+DRIVER_TYPE_OUTPUT</DT><DD>
+This is used for output drivers other than video and printer drivers.</DD>
+<DT>
+DRIVER_TYPE_LOCALIZATION</DT><DD>
+This is used for drivers that facilitate internationalization.</DD>
+<DT>
+DRIVER_TYPE_FILE_SYSTEM</DT><DD>
+This is used for file system drivers.</DD>
+<DT>
+DRIVER_TYPE_PRINTER</DT><DD>
+This is used for printer drivers.</DD>
+<DT>
+DRIVER_TYPE_SWAP</DT><DD>
+This is used for the system's memory-swapping drivers.</DD>
+<DT>
+DRIVER_TYPE_POWER_MANAGEMENT</DT><DD>
+This is used for devices that have power management systems.</DD>
+<DT>
+DRIVER_TYPE_TASK_SWITCH</DT><DD>
+This is used for devices or systems that have task switchers.</DD>
+<DT>
+DRIVER_TYPE_NETWORK</DT><DD>
+This is used for special networks that require driver functionality.</DD>
+</DL>
+<P>
+When you want a driver to perform one of its functions, you must call its strategy routine. The strategy routine typically takes a number of parameters, one of which is the function the driver should perform. The <CODE>
+DriverInfoStruct</CODE>
+ contains a far pointer to the strategy routine; your application should store this far pointer and call it directly any time one of the driver's functions is needed. However, because the driver may be put in a different location each time it's loaded, you should not save the pointer in a state file. Note that this scheme of accessing drivers directly can only be implemented in assembly language. Some drivers may provide library interfaces as well as their standard driver interface; this allows routines to be written in C. </P>
+<P>
+GEOS<A NAME="IX_GeodeDefaultDriverType">
+ </A>
+ maintains default drivers for the entire system. The types of default drivers are described by <CODE>
+GeodeDefaultDriverType</CODE>
+; all the types are shown below. They are called default drivers because the default for each category of driver used by the system is stored in the GEOS.INI file. GEOS will, upon startup, load in the default driver of each category.</P>
+<DL>
+<DT>
+GDDT_FILE_SYSTEM</DT><DD>
+GEOS<A NAME="IX_GDDT_&ldots;">
+ </A>
+ may use several file system drivers during execution. A file system driver allows GEOS to work on a given DOS (or substitute file access system). The primary driver is considered the default driver.</DD>
+<DT>
+GDDT_KEYBOARD</DT><DD>
+The system may only use one keyboard driver during execution; typically, keyboards can differ from country to country. Not all systems will have a keyboard.</DD>
+<DT>
+GDDT_MOUSE</DT><DD>
+The mouse should be usable when the system comes up on the screen; the user does not have to manually load a mouse driver with each execution of GEOS. Not all systems will have a mouse.</DD>
+<DT>
+GDDT_VIDEO</DT><DD>
+GEOS must know what type of video driver to use prior to attempting to display itself.</DD>
+<DT>
+GDDT_MEMORY_VIDEO</DT><DD>
+The Vidmem driver is a video driver that draws to memory (i.e. to bitmaps). It is used primarily for printing but also for editing bitmaps.</DD>
+<DT>
+GDDT_POWER_MANAGEMENT</DT><DD>
+A few machines use hardware power management systems (most notably some palmtops and some notebook and laptop machines). In order for GEOS to handle the power management hardware properly, it must load the driver on startup. (Most machines will not use this type of driver.)</DD>
+<DT>
+GDDT_TASK</DT><DD>Some systems will use a task switcher; in order for GEOS to be a task in one of these, it must have a default task driver.</DD>
+</DL>
+<P>
+<A NAME="IX_GeodeGetDefaultDriver()">
+ </A>
+To retrieve the default that GEOS is using, call the routine <CODE>
+GeodeGetDefaultDriver()</CODE>
+ with the appropriate driver type (a member of the type <CODE>
+GeodeDefaultDriverType</CODE>
+). This routine will return the geode handle of the default driver of that type. <A NAME="IX_GeodeSetDefaultDriver()">
+ </A>
+To set a new default driver for a specified driver type, use <CODE>
+GeodeSetDefaultDriver()</CODE>
+. This routine takes a geode handle and a driver type and sets the system default for that type. Typically, system defaults will be set only by the Preferences Manager application.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Geodes_1.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Geodes_5.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1.4 Saving and Restoring State</A> 
+<!-- to next --> | <A HREF="Geodes_7.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">1.6 Writing Your Own Libraries</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

@@ -1,0 +1,274 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Config_14.htm,v 1.2 97/09/05 12:22:56 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> PrefTocListClass</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Config Library</A>: 4.14 <A HREF="Config_6.htm">Object Class Reference</A>: 
+<A NAME="IX_PrefTocListClass">
+ </A>
+PrefTocListClass</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Config_6.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Config_13.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.13 PrefTriggerClass</A> 
+<!-- to next --> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+<CODE>
+PrefTocListClass</CODE>
+ allows users to choose a device driver by selecting the appropriate device name. It is assumed that each driver can control one or more types of devices. When you set up each driver, you will set up strings to describe which devices that driver can control.
+<IMG SRC="Config_14_TocList.gif">
+
+</P>
+<P>
+This class is a fully functional subclass of <CODE>
+PrefDynamicListClass</CODE>
+ (i.e. it handles those messages one must intercept to create a viable Preferences dynamic list class). It can be used to scan a list of files (not necessarily device drivers), as long as all of those files are in the same directory and have the same characters in their token. 
+
+</P>
+<P CLASS="figTitle">
+Code Display 22-13 PrefTocListClass Instance Data</P>
+<PRE>@class PrefTocListClass, PrefDynamicListClass; </PRE>
+<PRE>@instance TocUpdateCategoryFlags <A NAME="IX_PTLI_&ldots;"> </A>PTLI_flags = 0;</PRE>
+<PRE>
+typedef WordFlags <A NAME="IX_TocUpdateCategoryFlags structure"> </A>TocUpdateCategoryFlags;
+#define <A NAME="IX_TUCF_&ldots;  (TocUpdateCategoryFlags structure)"> </A>TUCF_EXTENDED_DEVICE_DRIVERS 0x8000
+/* Files being enumerated are assumed to be extended device drivers. */</PRE>
+<PRE>#define TUCF_CUSTOM_FILES 0x4000
+/* The TUCP_fileArrayElementSize field will be used when creating the files array.
+ * Otherwise, each element of the files array will be of size TocFileStruct. 
+ * NOTE: If this flag is used, the data structure used for each file
+ * element MUST contain TocFileStruct as its first element. */</PRE>
+<PRE>#define TUCF_ADD_CALLBACK 0x2000
+/* TUCP_addCallback contains a fptr to a callback
+ * routine that will be called when a file is added to the files array. */</PRE>
+<PRE>#define TUCF_DIRECTORY_NOT_FOUND 0x1000
+/* Don't actually scan the directory, because it doesn't exist.
+ * Just create the category, and leave it empty. */</PRE>
+<PRE>@instance TocCategoryStruct PTLI_tocInfo = {&quot;&quot;, 0, 0};</PRE>
+<PRE>typedef struct {
+	TokenChars 		<A NAME="IX_TCS_&ldots;  (TocCategoryStruct structure)"> </A>TCS_tokenChars;
+	DBGroupAndItem 		TCS_files; 		/* file name array */
+	DBGroupAndItem 		TCS_devices; 		/* device name array--only if
+					 * TCF_EXTENDED_DEVICE_DRIVERS is set. */
+} <A NAME="IX_TocCategoryStruct structure"> </A>TocCategoryStruct;</PRE>
+<PRE>@vardata PrefTocExtraEntry <A NAME="IX_ATTR_PREF_TOC_LIST_&ldots;"> </A>ATTR_PREF_TOC_LIST_EXTRA_ENTRY_1; 
+@vardata PrefTocExtraEntry ATTR_PREF_TOC_LIST_EXTRA_ENTRY_2;</PRE>
+<PRE>typedef struct {
+	ChunkHandle 		<A NAME="IX_PTEE_&ldots;  (PrefTocExtraEntry structure)"> </A>PTEE_item;
+	/* lptr of item name. For device lists, this is 
+	 * the device. For others, this is the file name */</PRE>
+<PRE>	ChunkHandle 		PTEE_driver;
+	/* Driver name (for device lists ONLY) */</PRE>
+<PRE>	word 		PTEE_info;
+	/* Extra word of information */
+} <A NAME="IX_PrefTocExtraEntry structure"> </A>PrefTocExtraEntry;</PRE>
+<PRE>@vardata char ATTR_PREF_TOC_LIST_INFO_KEY[];
+/* This key is used to write the &quot;info&quot; word for device lists */</PRE>
+<P>
+Use <A NAME="IX_ATTR_GEN_PATH_DATA:with PrefTocListClass">
+ </A>
+ATTR_GEN_PATH_DATA to tell the PrefTocList object in which directory to look for the device drivers. The PrefTocList will store the list of device drivers and device names in DB items referenced in the <CODE>
+PTLI_tocInfo</CODE>
+ field's <CODE>
+TCS_files</CODE>
+ and <CODE>
+TCS_devices</CODE>
+ slots--it will do this automatically, so if you wish the default behavior, leave these as zero when declaring the object. If you will write your own handlers for keeping track of driver information, you may wish to work with these fields as there are some routines which have been set up to work with them.</P>
+<P CLASS="figTitle">
+Code Display 22-14 PrefTocList Framework</P>
+<PRE>@object PrefTocListClass MyPrefToc = {
+	PTLI_flags		= @default | TUCF_EXTENDED_DEVICE_DRIVERS;
+	PTLI_tocInfo		= {&quot;<EM>TOKN</EM>&quot;, 0, 0};
+	HINT_ITEM_GROUP_SCROLLABLE;
+	ATTR_GEN_INIT_FILE_KEY = &quot;<EM>keyName</EM>&quot;;
+	ATTR_GEN_PATH_DATA = { <EM>file path containing drivers</EM> };
+}</PRE>
+<P>
+The following routines are rather esoteric. You should only use them if you wish to subclass <CODE>
+PrefTocListClass</CODE>
+' behavior and wish to continue using its existing data structures.</P>
+<DL>
+<DT>
+<CODE>
+TocSortedNameArrayAdd()</DT><DD>
+</CODE>
+<A NAME="IX_TocSortedNameArrayAdd()">
+ </A>
+Use this routine to add a new name to a sorted array. The new name will be inserted in its correct place in the alphabetically sorted array.</DD>
+<DT>
+<CODE>
+TocSortedNameArrayFind()</DT><DD>
+</CODE>
+<A NAME="IX_TocSortedNameArrayFind()">
+ </A>
+This routine determines whether a given name is in the TOC List's sorted name array, and will return the position of the name's element if found.</DD>
+<DT>
+<CODE>
+TocFindCategory()</DT><DD>
+</CODE>
+<A NAME="IX_TocFindCategory()">
+ </A>
+Use this routine to find a category in the Toc file. The <CODE>
+TCS_tokenChars</CODE>
+ field of the passed <CODE>
+TocCategoryStruct</CODE>
+ should already be filled in; this routine will fill in the other fields.</DD>
+<DT>
+<CODE>
+TocNameArrayFind()</DT><DD>
+</CODE>
+<A NAME="IX_TocNameArrayFind()">
+ </A>
+Use this routine to get back the token associated with a name in the name array. If the name is not found, the routine will return CA_NULL_ELEMENT.</DD>
+<DT>
+<CODE>
+TocNameArrayGetElement()</DT><DD>
+</CODE>
+<A NAME="IX_TocNameArrayGetElement()">
+ </A>
+This routine takes a name array and a token and returns information about the name array element with the given token.</DD>
+<DT>
+<CODE>
+TocUpdateCategory()</DT><DD>
+</CODE>
+<A NAME="IX_TocUpdateCategory()">
+ </A>
+This complicated routine will update a category using a callback routine which you must write. It updates the file lists by scanning the current directory.</DD>
+<DT>
+<CODE>
+TocNameArrayAdd()</DT><DD>
+</CODE>
+<A NAME="IX_TocNameArrayAdd()">
+ </A>
+Use this routine to add an element to a Toc name array.</DD>
+<DT>
+<CODE>
+TocDBLock()</DT><DD>
+</CODE>
+<A NAME="IX_TocDBLock()">
+ </A>
+Use this routine to lock one of the name arrays.</DD>
+<DT>
+<CODE>
+TocDBLockGetRef()</DT><DD>
+</CODE>
+<A NAME="IX_TocDBLockGetRef()">
+ </A>
+This C-only routine does the same thing as <CODE>
+TocDBLock()</CODE>
+ and also returns the DB item's pointer and optr.</DD>
+<DT>
+<CODE>
+TocGetFileHandle()</DT><DD>
+</CODE>
+<A NAME="IX_TocGetFileHandle()">
+ </A>
+Use this routine to get the handle of the file in which all Toc device driver information is stored.</DD>
+
+</DL>
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_PREF_TOC_LIST_GET_SELECTED_ITEM_INFO">
+ </A>
+MSG_PREF_TOC_LIST_GET_SELECTED_ITEM_INFO</H4>
+<PRE CLASS="syntax">Boolean MSG_PREF_TOC_LIST_GET_SELECTED_ITEM_INFO(
+        word 		*infoPtr);</PRE>
+<P>
+This message returns the information word about the currently selected item. This message can only be used with PrefTocList objects that have the TCF_EXTENDED_DEVICE_DRIVERS flag set.</P>
+<P CLASS="refField">
+Parameters:	<EM>infoPtr</EM>	Pointer to a word in which to return the info word.</P>
+<P CLASS="refField">
+Return:	Returns <EM>
+false</EM>
+ (i.e. zero) if item was found, returns <EM>
+true</EM>
+ (i.e. non-zero) if item was not found.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_PREF_TOC_LIST_GET_SELECTED_DRIVER_NAME">
+ </A>
+MSG_PREF_TOC_LIST_GET_SELECTED_DRIVER_NAME</H4>
+<PRE CLASS="syntax">word MSG_PREF_TOC_LIST_GET_SELECTED_DRIVER_NAME(
+        char 		*buf,
+        word 		bufSize);</PRE>
+<P>
+This message returns the name of the driver for the selected device. This message may only be used if TCF_EXTENDED_DEVICE_DRIVERS is set. </P>
+<P CLASS="refField">
+Parameters:	<EM>buf</EM>	Pointer to buffer to fill with the driver name.</P>
+<DL>
+<DT>
+<EM>bufSize</EM></DT><DD>The size of <EM>buf</EM>.</DD>
+</DL>
+<P CLASS="refField">
+Return:	If the device name fits in <EM>buf</EM>, then <EM>buf</EM> is filled and the message returns the size of the device name. If the device name doesn't fit, then the message will return zero.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_PREF_TOC_LIST_GET_SELECTED_ITEM_PATH">
+ </A>
+MSG_PREF_TOC_LIST_GET_SELECTED_ITEM_PATH</H4>
+<PRE CLASS="syntax">void MSG_PREF_TOC_LIST_GET_SELECTED_ITEM_PATH(
+        TocItemPath 		*data);</PRE>
+<P>
+This message returns the absolute path of the selected driver or file.</P>
+<P CLASS="refField">
+Structures:	</P>
+<PRE>typedef struct {
+  word 			<A NAME="IX_TIP_&ldots;  (TocItemPath structure)"> </A>TIP_disk; /* disk handle */</PRE>
+<PRE>  MemHandle 			TIP_pathBlock; 
+	/* Handle of block holding path (locked) */</PRE>
+<PRE>  char 			*TIP_path; 
+	/* Locked null-terminated absolute path */</PRE>
+<PRE>} <A NAME="IX_TocItemPath structure"> </A>TocItemPath;</PRE>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_PREF_TOC_LIST_CHECK_DEVICE_AVAILABLE">
+ </A>
+MSG_PREF_TOC_LIST_CHECK_DEVICE_AVAILABLE</H4>
+<PRE CLASS="syntax">Boolean MSG_PREF_TOC_LIST_CHECK_DEVICE_AVAILABLE(
+        word 		*retvalPtr);</PRE>
+<P>
+This message determines if the device selected by the list is available in the machine. This message may only be called for PrefTocList objects that have the TCF_EXTENDED_DEVICE_DRIVERS flag set.</P>
+<P CLASS="refField">
+Parameters:	<EM>retValPtr</EM>	Pointer to a word which will be filled with the return value.</P>
+<P CLASS="refField">
+Return:	Returns <EM>
+true</EM>
+ (i.e. non-zero if the device is available; if the driver is a video driver, *<EM>retValPtr</EM> is set to the device's <CODE>
+DisplayType</CODE>
+. If the device is not available, returns <EM>
+false</EM>
+ (i.e. zero); <EM>retValPtr</EM> is zero of the device doesn't exist; otherwise it will be the value of the appropriate <CODE>
+GeodeLoadError</CODE>
+ plus one. </P>
+<DL>
+<DT>
+&nbsp;</DT>
+
+</DL>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Config_6.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Config_13.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.13 PrefTriggerClass</A> 
+<!-- to next --> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

@@ -1,0 +1,189 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Modem_4.htm,v 1.1 97/06/05 12:40:59 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Receiving Data</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="sectionTitle">
+<A HREF="index.htm">Modem Connections</A>: 4 
+<A NAME="29679">
+ </A>
+Receiving Data</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Modem_3.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3 Sending Data</A> 
+<!-- to next --> | <A HREF="Modem_5.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5 Disconnecting</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+When the modem driver receives notification that data has arrived on the port, it sends a pre-registered message to a specified object. (You specify both the object and the message when you call <CODE>
+ModemConnect()</CODE>
+.) </P>
+<P>
+In the MTalk example, the driver sends MSG_MTALK_PROCESS_READ_DATA to the process object when data has arrived on the port. The handler for this message is shown in <A HREF="Modem_4.htm#24855"> Receiving Data Over A Serial Connection</A>
+.</P>
+<P>
+To receive data, MTalk does the following:</P>
+<UL>
+<LI>
+checks to make sure the connection is still open</LI>
+<LI>
+locks the input buffer down (to get a pointer to the text)</LI>
+<LI>
+calls <CODE>
+ModemReceive()</CODE>
+ (defined in modem.goc) to read incoming data</LI>
+<LI>
+displays read data</LI>
+<LI>
+unlocks the block</LI>
+</UL>
+<P CLASS="figTitle">
+Code Display 9-3 <A NAME="24855">
+ </A>
+Receiving Data Over A Serial Connection</P>
+<PRE>@method MTalkProcessClass, MSG_MTALK_PROCESS_READ_DATA
+{
+	/*
+	 * recvDataSize - Amout of data actually read in.
+	 * recvDataPtr - Pointer to data to read in.
+	 * retVal - Return value of ModemReceive().
+	 */
+    word		revDataSize;
+    char *		recvDataPtr;
+    StreamError		retVal;</PRE>
+<PRE>	/*
+	 * Check to see if connection is still open. Because of message queueing
+	 * delays, we may have received this data notification after the connection
+	 * has been closed.
+	 *
+	 * ConnectionOpen - global flag that keeps track of whether
+	 * the connection is open or closed.
+	 */
+    if ( ConnectionOpen == FALSE )
+    {
+	return;
+    }</PRE>
+<PRE>	/*
+	 * Lock the input buffer down on the heap, and obtain a pointer to it.
+	 * (Note: This buffer is a memory block that was allocated in the
+	 * &quot;Connecting&quot; example.)
+	 */
+    recvDataPtr = MemLock( recvBuffer );</PRE>
+<PRE>	/*
+	 * A NULL pointer means that the memory manager has gone ahead
+	 * and discarded the buffer block since the last time it was
+	 * unlocked.  So we need to reallocate it here.  Note that the
+	 * MemHandle is still in use; it just isn't bound to any block of memory.
+	 */
+    if ( recvDataPtr == NULL )
+    {
+	    /*
+	     * Reallocate the block, locking it immediately,
+	     * so it doesn't get discarded again. If the block cannot
+	     * be re-allocated, memory must be low so close the connection.
+	     */
+	if (( MemReAlloc( recvBuffer, RECV_BUFFER_SIZE, HAF_LOCK ) == NullHandle)
+	{
+		@send self::MSG_MTALK_PROCESS_CLOSE();
+		return;
+	}</PRE>
+<PRE>	    /*
+	     * After re-allocating the locked block, dereference its handle
+	     * to obtain a pointer to it.
+	     */
+	recvDataPtr = MemDeref( recvBuffer );
+    }</PRE>
+<PRE>	/*
+	 * Read available data up to the size of our buffer then display it.
+	 */
+	if ( ModemReceive( RECV_BUFFER_SIZE, (byte*)recvDataPtr, &amp;recvDataSize )
+							== STREAM_NO_ERROR )
+	{
+	    @call MTalkOutText::MSG_VIS_TEXT_APPEND_PTR( recvDataPtr, 
+						     recvDataSize );
+	}</PRE>
+<PRE>	/*
+	 * If the read data filled the entire buffer, there's a good
+	 * chance more data is available so send the message through the
+	 * process object's queue again.  (We do not want to keep reading
+	 * in a loop in case the other side dumped a very large stream
+	 * of data; this would keep the process object from handling
+	 * other messages in its queue.)
+	 */</PRE>
+<PRE>    if ( RECV_BUFFER_SIZE == recvDataSize ) {
+	@send ,forceQueue self::MSG_MTALK_PROCESS_READ_DATA();
+    }</PRE>
+<PRE>	/*
+	 * Once all the data has been read, unlock the buffer block.
+	 */
+    MemUnlock( recvBuffer );</PRE>
+<PRE>} /* end of MSG_MTALK_PROCESS_READ_DATA */</PRE>
+<P>
+Like <CODE>
+ModemSend()</CODE>
+, <CODE>
+ModemReceive()</CODE>
+ calls a VirtualSerial routine, <CODE>
+VirtualSerialRead()</CODE>
+, to read incoming data. Because no blocking is specified, <CODE>
+VirtualSerialRead()</CODE>
+ reads only data that is currently available in the stream. (If you want the routine to block until there is enough data in the stream to fill the entire buffer, pass STREAM_BLOCK in <CODE>
+VirtualSerialRead()</CODE>
+.)</P>
+<P>
+<CODE>
+ModemReceive()</CODE>
+ takes three arguments:</P>
+<DL>
+<DT>
+<EM>recvBufLength</DT><DD>
+</EM>Size of allocated buffer (in bytes).</DD>
+<DT>
+<EM>recvBuf</DT><DD>
+</EM>Byte pointer to the buffer.</DD>
+<DT>
+<EM>bytesReceived</DT><DD>
+</EM>Word pointer. <CODE>
+ModemReceive()</CODE>
+ writes the number of bytes actually read in to this parameter.</DD>
+</DL>
+<P>
+<CODE>
+ModemReceive()</CODE>
+ returns a <CODE>
+StreamError</CODE>
+ value:</P>
+<DL>
+<DT>
+STREAM_NO_ERROR</DT><DD>
+if it successfully reads the data. </DD>
+<DT>
+STREAM_CLOSED</DT><DD>
+if the stream is not open.</DD>
+<DT>
+STREAM_SHORT_READ_WRITE</DT><DD>
+if the required amount of data was not available and STREAM_NO_BLOCK was specified.</DD>
+</DL>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Modem_3.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">3 Sending Data</A> 
+<!-- to next --> | <A HREF="Modem_5.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">5 Disconnecting</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

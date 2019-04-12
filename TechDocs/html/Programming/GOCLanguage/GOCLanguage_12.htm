@@ -1,0 +1,301 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: GOCLanguage_12.htm,v 1.1 97/06/02 15:59:43 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Defining Methods</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">GEOS Programming</A>: 4.3 <A HREF="GOCLanguage_f.htm">Using Classes and Objects</A>: 
+Defining Methods</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GOCLanguage_f.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GOCLanguage_11.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.2 Non-relocatable Data</A> 
+<!-- to next --> | <A HREF="GOCLanguage_13.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.4 Declaring Objects</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>@method, @extern</PRE>
+<P>
+<A NAME="IX_Methods:goc syntax">
+ </A>
+Methods are the routines executed when an object receives a message. Each class understands a certain set of messages; each of these has a place in the class' method table and corresponds to one method.</P>
+<P>
+<A NAME="IX_@method[;method]">
+ </A>
+Although methods are class-specific, they are not defined between the <CODE>
+@class</CODE>
+ and <CODE>
+@endc</CODE>
+ of class definition. Instead, their declaration line links them to a single class and to a specific message. Goc, Glue, and GEOS build each class' method table automatically; you do not have to create the table yourself.</P>
+<P>
+<A NAME="28438">
+ </A>
+To define a method, use the <CODE>
+@method</CODE>
+ keyword. This has the following structure:</P>
+<PRE>@method    [&lt;hname&gt;,] &lt;cname&gt;[, &lt;mname&gt;]+;</PRE>
+<DL>
+<DT>
+<STRONG>
+hname</STRONG>
+</DT><DD>The handler name, if any. If you wish to use the method as a function, it must have a handler name. If you do not provide a handler name, Goc will create one for you. This name is useful for setting breakpoints when debugging. If you do not provide a name, Goc constructs the name by concatenating the class name (with the -Class suffix, if any, removed) with the message name (with the MSG_- prefix, if any, removed). For example, Goc would call <CODE>
+MyClass</CODE>
+' handler for <CODE>
+MSG_DO_SOMETHING</CODE>
+ &quot;MyDO_SOMETHING&quot;.</DD>
+<DT>
+<STRONG>
+cname</STRONG>
+</DT><DD>The name of the class to which this method belongs. Each method may belong to only one class.</DD>
+<DT>
+<STRONG>
+mname</STRONG>
+</DT><DD>The name of the message that invokes this method. The plus symbol indicates that one method may be invoked by more than one message as long as they all have the <EM>
+same</EM>
+ parameters and return values. At least one message must be specified. </DD>
+<DT>
+</DT><DD><A NAME="IX__reloc[;reloc]">
+ </A>
+There is a special Goc keyword, <CODE>
+_reloc</CODE>
+, used in place of a message name when writing a method for <CODE>
+MSG_META_RELOC</CODE>
+ and <CODE>
+MSG_META_UNRELOC</CODE>
+. A method handling <CODE>
+_reloc</CODE>
+ will handle both <CODE>
+MSG_META_RELOC</CODE>
+ and <CODE>
+MSG_META_UNRELOC</CODE>
+; the method code can check the value of its message argument to find out which message is being handled.</DD>
+</DL>
+<P>
+Note that the name of the method (the handler name) is optional. Parameters and return values are not put in the method declaration--these are defined with <CODE>
+@message</CODE>
+ as discussed in <A HREF="GOCLanguage_e.htm#57260"> The GEOS Message System</A>
+.</P>
+<P>
+If you will wish to call the method as a routine occasionally, your compiler will probably require that you provide a prototype for the routine. If your <CODE>
+@message</CODE>
+ declaration looks like</P>
+<PRE>@message word MSG_MC_DO_SOMETHING(word thing);</PRE>
+<P>
+and your <CODE>
+@method</CODE>
+ declaration looks like</P>
+<PRE>@method DoSomething, MyClass, MSG_MC_DO_SOMETHING {
+/* Code Here */ }</PRE>
+<P>
+Then your protoype should look like</P>
+<PRE>extern word _pascal DoSomething(optr oself,
+					  MyMessages message,
+					  word thing);</PRE>
+<P>
+The name of the type <CODE>
+MyMessages</CODE>
+ is constructed automatically by taking the name of the class, removing the &quot;Class&quot; suffix, and replacing said suffix with &quot;Messages&quot;.</P>
+<P>
+<A NAME="IX_@extern:with methods[;extern:with methods]">
+ </A>
+Normally, all of a class' methods will be coded in the same code file in which the class is declared with <CODE>
+@classdecl</CODE>
+. If, however, you find you need to declare a class' methods in a different file, you can use the <CODE>
+@extern</CODE>
+ keyword to indicate a method is defined and/or used in a different object file. Goc will give no error if <CODE>
+@extern</CODE>
+ is used and the method exists nowhere; Glue, however, will give a linking error in such a case. There is no such requirement, however, if you are putting only the class definition (the definitions between <CODE>
+@class</CODE>
+ and <CODE>
+@endc</CODE>
+) in a different file. In this case, you can put the class definition in a <STRONG CLASS="fileName">
+.goh</STRONG>
+ header file and the method code in the same <STRONG CLASS="fileName">
+.goc</STRONG>
+ file as the <CODE>
+@classdecl</CODE>
+ statement; you must <CODE>
+@include</CODE>
+ the <STRONG CLASS="fileName">
+.goh</STRONG>
+ file, but you won't need to use the <CODE>
+@extern</CODE>
+ directive (as long as the method code is in the same file as the <CODE>
+@classdecl</CODE>
+ directive).</P>
+<P>
+The format for using <CODE>
+@extern</CODE>
+ is as follows:</P>
+<PRE>/* In the file in which the class is declared with  * @classdecl:
+ */
+    @extern method &lt;cname&gt;, &lt;mname&gt;+;</PRE>
+<PRE>/* In the file containing the method code: */
+    @extern method &lt;cname&gt;, &lt;mname&gt;+ {
+        ...method code goes here...
+    }</PRE>
+<DL>
+<DT>
+<STRONG>
+cname</STRONG>
+</DT><DD>The name of the class for which the method is defined.</DD>
+<DT>
+<STRONG>
+mname</STRONG>
+</DT><DD>The name of the message which invokes the method. Note that external method definitions, like normal method definitions, can handle more than one message.</DD>
+</DL>
+<P>
+Three parameters are passed automatically with messages and do not have to be declared in the <CODE>
+@message</CODE>
+ definition. They are important to know when writing methods, however, because they can greatly simplify your code. These are standard parameters for all classes except <CODE>
+ProcessClass</CODE>
+ and its subclasses below:</P>
+<DL>
+<DT>
+<STRONG>
+pself</STRONG>
+</DT><DD><A NAME="IX_ObjDerefGen():with pself">
+ </A>
+<A NAME="IX_ObjDerefVis():with pself">
+ </A>
+<A NAME="IX_pself">
+ </A>
+A far pointer to the object's instance data. <EM>pself</EM> points to the master group for the class for which the handler is defined. Note that this pointer may be invalidated by message calls so it is preferable to use the GOC directive, <CODE>
+@self</CODE>
+, instead. Unlike <EM>pself</EM>, <CODE>
+@self</CODE>
+ is always valid.</DD>
+<DT>
+<STRONG>
+oself</STRONG>
+</DT><DD><A NAME="IX_oself">
+ </A>
+An optr to the object's instance data. It contains the global memory handle and chunk handle of the instance chunk. This can be used for routines that act on the object's instance data.</DD>
+<DT>
+<STRONG>
+message</STRONG>
+</DT><DD><A NAME="IX_message (method parameter)">
+ </A>
+The message number of the message being handled.</DD>
+</DL>
+<P>
+<A NAME="IX_ProcessClass:oself and pself">
+ </A>
+As mentioned, <CODE>
+ProcessClass</CODE>
+ is a special type of class. It has no true instance data because it uses the standard PC structure of an application (idata, udata, etc.). It only has one standard parameter to each of its methods: the message that was sent to it. This is because the &quot;instance data&quot; of <CODE>
+ProcessClass</CODE>
+ includes all the global variables of your program. They are accessed automatically, no <EM>oself</EM> or <CODE>
+@self</CODE>
+ is required.</P>
+<P CLASS="figTitle">
+Code Display 5-14 <A NAME="36801">
+ </A>
+A Class Definition</P>
+<PRE>/* The class ValClass defines four messages that invoke four different methods. The
+ * entire class is shown in this example; it will function properly if coded this
+ * way. Note that the methods have the class name in their declaration line
+ * and thus do not appear within the class definition. */</PRE>
+<PRE>@class ValClass, MetaClass;</PRE>
+<PRE>@instance int value;			/* instance data value: an uninitialized integer */</PRE>
+<PRE>	/* message declarations 
+	 * All four messages will be handled by this class. They return
+	 * the types shown and take the parameters defined. */
+@message int MSG_VAL_GET_VALUE();
+@message void MSG_VAL_SET_VALUE(int newValue);
+@message void MSG_VAL_NEGATE_VALUE();
+@message Boolean MSG_VAL_IS_VALUE_BIGGER_THAN(int newValue);</PRE>
+<PRE>@endc
+@classdecl ValClass;			/* the class structure must be put in memory */</PRE>
+<PRE>	/* Method Declarations
+	 * Each of the four methods is a single line of code. Note that the
+	 * parameters are automatically defined in the message definition and do
+	 * not need to be restated in the method definition. The same is true of
+	 * the return type. Note also that the class and message names appear in
+	 * the @method line. */</PRE>
+<PRE>@method	ValGetValue, MyClass, MSG_VAL_GET_VALUE {
+    return(@self-&gt;value);
+}</PRE>
+<PRE>@method	ValSetValue, MyClass, MSG_VAL_SET_VALUE {
+    @self-&gt;value = newValue;
+}</PRE>
+<PRE>@method	ValNegateVal, MyClass, MSG_VAL_NEGATE_VALUE {
+    @self-&gt;value *= -1;
+}</PRE>
+<PRE>@method	 ValClass, MSG_VAL_IS_VALUE_BIGGER_THAN {
+	/* This handler's name will automatically be created to be
+	 * ValVAL_IS_VALUE_BIGGER_THAN. You can use this name as a
+	 * C function call from within the same thread. */
+    return(@self-&gt;value &gt; newValue);
+}</PRE>
+<P>
+You may sometimes wish to call a method with normal C call-and-return conventions, rather than by sending a message. To do so, you will have to declare the method as a routine as well as a method. The declaration should have the following format:</P>
+<PRE>extern &lt;type&gt; _pascal &lt;MethodName&gt;(
+	optr					oself,
+	&lt;TruncatedClassName&gt;Messages					message,
+	&lt;type1&gt;					&lt;arg1&gt;,
+	&lt;type2&gt;					&lt;arg2&gt;)</PRE>
+<DL>
+<DT>
+<STRONG>
+type</STRONG>
+</DT><DD>This is the type returned by the method. It may be any data type.</DD>
+<DT>
+<STRONG>
+MethodName</DT><DD>
+</STRONG>
+This is the name of the method. If you will be calling a method as a routine, you must give the method a name when you declare it (see <A HREF="GOCLanguage_12.htm#28438"> To define a method, use the @method keyword. This has the following structure:</A>
+). Use the same name here.</DD>
+<DT>
+<STRONG>
+TruncatedClassName</DT><DD>
+</STRONG>
+This is the name of the class, without the word &quot;Class&quot;. The type of this argument is the truncated class name followed (with no space) by the word &quot;Messages&quot;. Thus, for &quot;HelloCounterClass&quot;, the truncated class name would be &quot;HelloCounter&quot;, and the type of this field would be &quot;HelloCounterMessages&quot;.</DD>
+<DT>
+<STRONG>
+type</STRONG>
+<EM>
+n</EM>
+<STRONG>
+, arg</STRONG>
+<EM>
+n</EM>
+ </DT><DD>Use these fields to declare each of the arguments passed to the message. Be sure to use exactly the same arguments, and in the same order, as in the message declaration.</DD>
+</DL>
+<P CLASS="figTitle">
+Code Display 5-15 Declaring a Method As a Routine</P>
+<PRE>@message int MSG_HELLO_COUNTER_RECALCULATE_VALUE( \
+				HelloPriority 		priority, \
+				word 		randomDatum, \
+				char 		aLetter);</PRE>
+<PRE>extern int _pascal HelloCounterRecalculateValue(
+			optr			oself,
+			HelloCounterMessages			message,
+			HelloPriority			priority,
+			word			randomDatum,
+			char			aLetter);</PRE>
+<PRE>@method	HelloCounterRecalculate, HelloCounterClass, \ 
+		MSG_HELLO_COUNTER_RECALCULATE_VALUE {</PRE>
+<PRE>	/* method code goes here... */</PRE>
+<PRE>}</PRE>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="GOCLanguage_f.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="GOCLanguage_11.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.2 Non-relocatable Data</A> 
+<!-- to next --> | <A HREF="GOCLanguage_13.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">4.4 Declaring Objects</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

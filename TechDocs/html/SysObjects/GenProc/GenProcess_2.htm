@@ -1,0 +1,329 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: GenProcess_2.htm,v 1.1 97/06/02 16:17:47 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Undo Mechanism</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="sectionTitle">
+<A HREF="index.htm">The GenProcess Object</A>: 2 
+Undo Mechanism</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> | <A HREF="GenProcess_3.htm"><IMG SRC="../../docImages/down.gif" BORDER="0" ALT="Down"></A> 
+<!-- to previous --> | <A HREF="GenProcess_1.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1 Starting and Stopping</A> 
+<!-- to next --> | <A HREF="GenProcess_3.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">2.1 Undo Mechanism</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+<A NAME="IX_Undo">
+ </A>
+<A NAME="IX_Clipboard:undo chains">
+ </A>
+The Undo mechanism is implemented at the GenProcess level; this allows the undo mechanism to be applicable to any application or process. In general, Undo allows a process, usually within an application, but possibly within a library, to reverse changes made in the state of other objects. GEOS allows an almost unlimited number of stored and reversible Undo actions; the practical limit is somewhere around 100 actions.</P>
+<P>
+<A NAME="IX_AddUndoActionStruct">
+ </A>
+<A NAME="IX_AUAS_&ldots;">
+ </A>
+Undo actions are stored within undo <EM>
+chains</EM>
+. These chains allow queued actions to be undone in reverse order. Each element in an undo chain is made up of an <CODE>
+UndoActionStruct</CODE>
+. These structures are usually added with an <CODE>
+AddUndoActionStruct</CODE>
+. This structure has several elements:</P>
+<PRE>typedef struct {
+	UndoActionStruct				AUAS_data;
+	optr				AUAS_output;
+	AddUndoActionFlags				AUAS_flags;
+} AddUndoActionStruct</PRE>
+<P>
+A chain of undo actions is stored for each object. If you want your object to recognize undo-able actions, you must add the undo actions yourself and intercept MSG_META_UNDO when those actions are played back. The object should be able to understand the data within the <CODE>
+UndoActionStruct</CODE>
+ to perform the Undo action.</P>
+<P>
+<A NAME="IX_AddUndoActionFlags">
+ </A>
+<A NAME="IX_AUAF_&ldots;">
+ </A>
+There are two <CODE>
+AddUndoActionFlags</CODE>
+ which affect when and how undo notification occurs. If AUAF_NOTIFY_BEFORE_FREEING or AUAF_NOTIFY_IF_FREED_WITHOUT_BEING_PLAYED_BACK is set in the <CODE>
+AddUndoActionFlags</CODE>
+, it not only receives MSG_META_UNDO but also receives MSG_META_UNDO_FREEING_ACTION when the undo mechanism frees the action. You can check the flags in the <CODE>
+AddUndoActionStruct</CODE>
+ passed with this message to decide what action to take.</P>
+<P>
+The object wishing to register an action for undo sends the process MSG_GEN_PROCESS_UNDO_START_CHAIN. For each action in this undo chain (there may be multiple actions in a single chain) send MSG_GEN_PROCESS_UNDO_ADD_ACTION; pass this message the <CODE>
+AddUndoActionStruct</CODE>
+ action of the action to add. Finally, send MSG_GEN_PROCESS_UNDO_END_CHAIN to mark the end of this undo chain. Undo chains may be nested within each other.</P>
+<P>
+The messages following this section also describe supplemental behavior that you may find useful. In addition to these messages, <CODE>
+GenProcessClass</CODE>
+ also provides the following routines:</P>
+<P>
+<CODE>
+GenProcessUndoGetFile() </CODE>
+returns a file handle of a Huge Array or DB item to hold undo information. Use this routine to get a file to put such undo information into.</P>
+<P>
+<CODE>
+GenProcessUndoCheckIfIgnoring()</CODE>
+ allows an application or library to check whether an application is ignoring undo information; in this case, it can avoid creating unnecessary undo information.</P>
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_PROCESS_UNDO_START_CHAIN">
+ </A>
+MSG_GEN_PROCESS_UNDO_START_CHAIN</H5>
+<PRE CLASS="syntax">void 	MSG_GEN_PROCESS_UNDO_START_CHAIN(@stack
+        optr 	title,
+        optr 	owner);</PRE>
+<P>
+This message notifies the process of the start of an undo-able action. Note that all this message does is increment a count--a new undo chain is created when the count goes from zero to one. This allows a function to perform a number of undo-able actions and have them all grouped as a single undo-able action.</P>
+<P CLASS="refField">
+Source:	Any object wanting to register an action for undo.</P>
+<P CLASS="refField">
+Destination:	<CODE>
+GenProcessClass</CODE>
+ only.</P>
+<P CLASS="refField">
+Interception:	In general, should not be intercepted.</P>
+<P CLASS="refField">
+Parameters:	<EM>title</EM> 	The null-terminated title of this action. If NULL, then the title of the undo action will be the title passed with the next UNDO_START_CHAIN.</P>
+<DL>
+<DT>
+<EM>owner</EM> </DT><DD>The object which owns this action.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_PROCESS_UNDO_END_CHAIN">
+ </A>
+MSG_GEN_PROCESS_UNDO_END_CHAIN</H5>
+<PRE CLASS="syntax">void 	MSG_GEN_PROCESS_UNDO_END_CHAIN(
+        BooleanWord 		flushChainIfEmpty);</PRE>
+<P>
+This message notifies the process of the end of an undo-able action. Note that all this message does is decrement a count--the current undo chain is terminated when the count goes from one to zero. This allows a function to perform a number of undo-able actions and have them all grouped as a single undo-able action.</P>
+<P CLASS="refField">
+Source:	Any object wanting to register an action for undo.</P>
+<P CLASS="refField">
+Destination:	<CODE>
+GenProcessClass</CODE>
+ only.</P>
+<P CLASS="refField">
+Interception:	In general, should not be intercepted.</P>
+<P CLASS="refField">
+Parameters:	<EM>flushChainIfEmpty</EM> <BR>
+Non-zero if you want to delete the chain if it has no actions; zero if the chain is OK without actions (actions will be added later).</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_PROCESS_UNDO_ABORT_CHAIN">
+ </A>
+MSG_GEN_PROCESS_UNDO_ABORT_CHAIN</H5>
+<PRE CLASS="syntax">void	MSG_GEN_PROCESS_UNDO_ABORT_CHAIN();</PRE>
+<P>
+This message aborts the current undo chain, destroying all actions in place on the current chain, and instructs the undo mechanism to ignore any undo information until the current undo chain is ended. This latter behavior is needed because the current chain may be nested within several chains, so we must ignore undo chain actions until the outermost chain is ended.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	GenProcess object.</P>
+<P CLASS="refField">
+Interception:	Do not intercept.</P>
+
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_PROCESS_UNDO_ADD_ACTION">
+ </A>
+MSG_GEN_PROCESS_UNDO_ADD_ACTION</H5>
+<PRE CLASS="syntax">VMChain 	MSG_GEN_PROCESS_UNDO_ADD_ACTION(
+        AddUndoActionStruct 	*data);</PRE>
+<P>
+This message adds a new undo action to the current undo chain.</P>
+<P CLASS="refField">
+Source:	Any object wanting to register an action for undo.</P>
+<P CLASS="refField">
+Destination:	<CODE>
+GenProcessClass</CODE>
+.</P>
+<P CLASS="refField">
+Interception:	In general, should not be intercepted.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+data</CODE>
+	Structure containing information which may be used to undo action.</P>
+<P CLASS="refField">
+Return:	Will return NULL if we are ignoring undo messages. <BR>
+If the value passed in <CODE>
+UAS_datatype</CODE>
+ was UADT_PTR or UADT_VMCHAIN, then will return a VMChain or DBItem which may be used to undo the action. If neither of the above cases is true, return value is meaningless.</P>
+
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_PROCESS_UNDO_GET_FILE">
+ </A>
+MSG_GEN_PROCESS_UNDO_GET_FILE</H5>
+<PRE CLASS="syntax">VMFileHandle MSG_GEN_PROCESS_UNDO_GET_FILE();</PRE>
+<P>
+This message returns a VM file handle to store undo actions. This message is useful to access undo data in either a huge array or DB item. You may also use <CODE>
+GenProcessUndoGetFile() </CODE>
+to retrieve this file instead.</P>
+<P CLASS="refField">
+Source:	Any object wanting to access the undo file.</P>
+<P CLASS="refField">
+Interception:	Should not be intercepted.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	File handle of VM file with undo information.</P>
+
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_PROCESS_UNDO_FLUSH_ACTIONS">
+ </A>
+MSG_GEN_PROCESS_UNDO_FLUSH_ACTIONS</H5>
+<PRE CLASS="syntax">void 	MSG_GEN_PROCESS_UNDO_FLUSH_ACTIONS();</PRE>
+<P>
+This message flushes the current undo chain (frees all undo actions, notifies edit control that there is no undo item).</P>
+<P CLASS="refField">
+Source:	Any object using undo.</P>
+<P CLASS="refField">
+Interception:	Should not be intercepted.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_PROCESS_UNDO_SET_CONTEXT">
+ </A>
+MSG_GEN_PROCESS_UNDO_SET_CONTEXT</H5>
+<PRE CLASS="syntax">dword 	MSG_GEN_PROCESS_UNDO_SET_CONTEXT(
+        dword 	context);</PRE>
+<P>
+This message sets the current undo context. This allows the application to have separate undo chains associated with various documents or modes. This should be sent out before any other undo related messages. The document control automatically takes care of this when a document gets the model exclusive.</P>
+<P>
+Passing NULL_UNDO_CONTEXT as the new context will trigger some zealous EC code if any other undo messages are sent while the context is null.</P>
+<P CLASS="refField">
+Source:	Any object using undo.</P>
+<P CLASS="refField">
+Interception:	Generally, should not be intercepted. Applications wanting to override the default behavior should at least flush out the current undo actions, as they will probably not be valid in the new context.</P>
+<P CLASS="refField">
+Parameters:	<EM>context</EM> 	New context (this has no meaning to the undo mechanism--it's just a value).</P>
+<P CLASS="refField">
+Return:	Old context.</P>
+<P CLASS="refField">
+Structures:	</P>
+<PRE>#define NULL_UNDO_CONTEXT 0</PRE>
+
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_PROCESS_UNDO_GET_CONTEXT">
+ </A>
+MSG_GEN_PROCESS_UNDO_GET_CONTEXT</H5>
+<PRE CLASS="syntax">dword 	MSG_GEN_PROCESS_UNDO_GET_CONTEXT();</PRE>
+<P>
+This message gets the current undo context.</P>
+<P CLASS="refField">
+Source:	Any object using undo.</P>
+<P CLASS="refField">
+Interception:	Generally, should not be intercepted.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Current context.</P>
+
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_PROCESS_UNDO_PLAYBACK_CHAIN">
+ </A>
+MSG_GEN_PROCESS_UNDO_PLAYBACK_CHAIN</H5>
+<PRE CLASS="syntax">void 	MSG_GEN_PROCESS_UNDO_PLAYBACK_CHAIN();</PRE>
+<P>
+This message plays back the current undo chain, one action at a time. It simultaneously creates a &quot;redo&quot; chain, so the undone action can be redone.</P>
+<P CLASS="refField">
+Source:	Edit control.</P>
+<P CLASS="refField">
+Interception:	Generally, should not be intercepted.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_PROCESS_UNDO_IGNORE_ACTIONS">
+ </A>
+MSG_GEN_PROCESS_UNDO_IGNORE_ACTIONS</H5>
+<PRE CLASS="syntax">void 	MSG_GEN_PROCESS_UNDO_IGNORE_ACTIONS(
+        Boolean		flushActions);</PRE>
+<P>
+This message causes a process to reject any undo messages.</P>
+<P CLASS="refField">
+Source:	Edit control.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+flushActions</EM>
+	<EM>
+true</EM>
+ to flush the queue.</P>
+<P CLASS="refField">
+Interception:	Generally, should not be intercepted.</P>
+
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_PROCESS_UNDO_ACCEPT_ACTIONS">
+ </A>
+MSG_GEN_PROCESS_UNDO_ACCEPT_ACTIONS</H5>
+<PRE CLASS="syntax">void 	MSG_GEN_PROCESS_UNDO_ACCEPT_ACTIONS();</PRE>
+<P>
+This message causes a process to accept undo messages again.</P>
+<P CLASS="refField">
+Source:	Edit control.</P>
+<P CLASS="refField">
+Interception:	Generally, should not be intercepted.</P>
+
+
+<H5 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_PROCESS_UNDO_CHECK_IF_IGNORING">
+ </A>
+MSG_GEN_PROCESS_UNDO_CHECK_IF_IGNORING</H5>
+<PRE CLASS="syntax">Boolean 	MSG_GEN_PROCESS_UNDO_CHECK_IF_IGNORING();</PRE>
+<P>
+This message checks to see if the system is currently ignoring undo actions.</P>
+<P CLASS="refField">
+Source:	Edit control.</P>
+<P CLASS="refField">
+Interception:	Generally, should not be intercepted.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Will return <EM>
+true</EM>
+ if ignoring actions.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> | <A HREF="GenProcess_3.htm"><IMG SRC="../../docImages/down.gif" BORDER="0" ALT="Down"></A> 
+<!-- to previous --> | <A HREF="GenProcess_1.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1 Starting and Stopping</A> 
+<!-- to next --> | <A HREF="GenProcess_3.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">2.1 Undo Mechanism</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

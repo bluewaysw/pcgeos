@@ -1,0 +1,384 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Application_7.htm,v 1.1 97/06/02 16:15:27 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Application Features and Levels</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The Application Object</A>: 1.6 <A HREF="Application_1.htm">GenApplication Basics</A>: 
+Application Features and Levels</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Application_1.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Application_6.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1.5 ApplicationStates</A> 
+<!-- to next --> | <A HREF="Application_8.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">1.7 IACP</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>GAI_appFeatures, GAI_appLevel, MSG_GEN_APPLICATION_GET_APP_FEATURES, MSG_GEN_APPLICATION_SET_APP_FEATURES, MSG_GEN_APPLICATION_SET_APP_LEVEL, MSG_GEN_APPLICATION_UPDATE_APP_FEATURES, MSG_GEN_APPLICATION_UPDATE_FEATURES_VIA_TABLE, GenAppUsabilityTupleFlags, GenAppUsabilityTuple, GenAppUsabilityCommands</PRE>
+<P>
+A GenApplication may store a word of features (<CODE>
+GAI_appFeatures</CODE>
+); these features correspond to groups of UI objects. Depending on a certain feature being set or not set, certain groups of UI objects may or may not appear, allowing you to customize your application for different users or criteria. It is up to your application to define both the features and the objects that these features correspond to.</P>
+<P>
+ GAI_<CODE>
+appFeatures</CODE>
+ is a word-length bitfield. Each bit corresponds to a certain group of features which you define. You may thus have up to 16 different feature groups for any application. (Note that each feature group may include several UI objects.) In general, you group these features together so that they correspond to a specific <CODE>
+UIInterfaceLevel</CODE>
+. If the application appears at a different User Interface level, the makeup of the UI will be different.</P>
+<P>
+An application's user interface level is stored in the GenApplication's GAI_<CODE>
+appLevel</CODE>
+ instance data entry. Each <CODE>
+UIInterfaceLevel</CODE>
+ corresponds to a certain group of features. Changing the UI level changes the group of features that may be displayed.</P>
+<P>
+The features represented in the bitfield may be represented in hints added to GenControl objects. Most often, the controllers and the application will adjust their menus, tools, and other UI gadgetry to conform to the features specified in this record. </P>
+<P CLASS="figTitle">
+Code Display 3-5 Setting Up Features</P>
+<PRE>/* Features are stored in a word-length bitfield. */</PRE>
+<PRE>typedef WordFlags MyFeatures;</PRE>
+<PRE>@define MF_EDIT_FEATURES				(0x8000)
+@define MF_PASTE_FEATURES				(0x4000)
+@define MF_FORMAT_FEATURES				(0x2000)</PRE>
+<PRE>/* We might want to group certain features together based on the level of 
+ * expertise of the user. In this example, if the user level is &quot;intermediate&quot; 
+ * (which we will define later), we allow features for editing and pasting to the 
+ * UI. If the user level is &quot;advanced&quot; we allow the intermediate features and also 
+ * allow formatting features. */</PRE>
+<PRE>@define INTRODUCTORY_FEATURES				(0)</PRE>
+<PRE>@define INTERMEDIATE_FEATURES				(@MF_EDIT_FEATURES | @MF_PASTE_FEATURES)</PRE>
+<PRE>@define ADVANCED_FEATURES				(@INTERMEDIATE_FEATURES | @MF_FORMAT_FEATURES)</PRE>
+<P>
+MSG_GEN_APPLICATION_GET_APP_FEATURES returns the current application features and <CODE>
+UIInterfaceLevel</CODE>
+ in use by an application. </P>
+<P>
+You may set the application's GAI_<CODE>
+appFeatures</CODE>
+ by sending it MSG_GEN_APPLICATION_SET_APP_FEATURES. You may also change the application's user level by sending it MSG_GEN_APPLICATION_SET_APP_LEVEL. Each of these messages in turn generates a MSG_GEN_APPLICATION_UPDATE_APP_FEATURES. </P>
+<P>
+This message is meant to be sub-classed so that you can alter the behavior for different features. In most cases, however, you will simply handle this message, fill in relevant parameters, and send the GenApplication MSG_GEN_APPLICATION_UPDATE_FEATURES_VIA_TABLE--the message which performs the actual work done in changing the UI. This message expects a number of arguments. </P>
+<P>
+The most important argument is the table of <CODE>
+GenAppUsabilityTuple</CODE>
+ entries that correspond to each feature. These entries define what sort of UI change is required, and what object is required to change.You must set up this table beforehand.</P>
+<P>
+The types of usability commands available (in the bit positions set aside with GAUTF_COMMAND in the tuple's <CODE>
+GenAppUsabilityTupleFlags</CODE>
+) are:</P>
+<UL>
+<LI>
+GAUC_USABILITY<BR>
+If set, the object should be made GS_USABLE if the feature is on. This is the default behavior.</LI>
+<LI>
+GAUC_RECALC_CONTROLLER<BR>
+If set, the controller needs to have its features recalculated. The particular feature bits are stored with the controller itself; the application knows nothing more about the controller's features other than that they need to be changed.</LI>
+<LI>
+GAUC_REPARENT<BR>
+If set, the object needs to be relocated to another part of the UI, underneath a different parent. This parent is passed in the <EM>
+reparentObject</EM>
+ entry for MSG_GEN_APPLICATION_UPDATE_FEATURES_VIA_TABLE. Only one object may be re-parented for each application.</LI>
+<LI>
+GAUC_POPUP<BR>
+If set, the object should be made a popup menu. Note that this allows a sub-group to become a menu without having to use GAUC_REPARENT.</LI>
+<LI>
+GAUC_TOOLBAR<BR>
+If set, the object is a GenBoolean that corresponds to a toolbar state. Turning the feature on or off forces the GenBoolean to send an apply in addition to other behavior.</LI>
+<LI>
+GAUC_RESTART<BR>
+If set, the object needs to be &quot;kick started&quot; by first setting it GS_NOT_USABLE and then GS_USABLE.</LI>
+</UL>
+<P>
+Because each feature may have multiple objects affected, the <CODE>
+GenAppUsabilityTupleFlags</CODE>
+ entry GAUTF_END_OF_LIST indicates that there are no more commands for that feature. The flag GAUTF_OFF_IF_BIT_IS_ON indicates that a given command should be reversed for the object. (I.e. if the feature is on, the object should be removed, not added.)</P>
+<P CLASS="figTitle">
+Code Display 3-6 Setting Up the GenAppUsabilityTuple Tables</P>
+<PRE>/* Each GenAppUsabilityTuple will refer to a specific set of features. */</PRE>
+<PRE>/* 
+ * Since GUAC_USABILITY is the default setting (and is zero) setting any other 
+ * flags either supersedes or complements this behavior. In this case, setting the 
+ * EditToolEntry as a GUAC_TOOLBAR command supersedes the GUAC_USABILITY command. 
+ * Setting the GUATF_END_OF_LIST flag for the EditTrigger does not alter the 
+ * GUAC_USABILITY command, which is still implicit.
+ */</PRE>
+<PRE>static const GenAppUsabilityTuple editFeaturesList [] =
+{
+	{GUAC_TOOLBAR,			@EditToolEntry 		},
+	{GUATF_END_OF_LIST			@EditTrigger		}
+};</PRE>
+<PRE>static const GenAppUsabilityTuple pasteFeaturesList [] =
+{
+	{GUAC_END_OF_LIST,			@PasteTrigger		}
+};</PRE>
+<PRE>static const GenAppUsabilityTuple formatFeaturesList [] =
+{
+	{
+	GAUTF_END_OF_LIST | GUAC_RECALC_CONTROLLER,
+	@FeatureController
+	}
+};</PRE>
+<PRE>/* After each feature's GenAppUsabilityTuple is set up, you should set up a table 
+ * of these structures to pass to relevant messages. */</PRE>
+<PRE>static const GenAppUsabilityTuple * const usabilityTable [] =
+{
+	editFeaturesList,
+	pasteFeaturesList,
+	formatFeaturesList
+};</PRE>
+<PRE>/* 
+ * Within your code, decide where you wish to set the application features 
+ * (usually within some sort of User level dialog box that passes a selection of 
+ * feature bits) and send either MSG_GEN_APPLICATION_SET_APP_FEATURES or
+ * MSG_GEN_APPLICATION_SET_APP_LEVEL with the proper feature bits set.
+ */</PRE>
+<PRE>@method MyLevelApplicationClass, MSG_MY_APPLICATION_SET_USER_LEVEL
+{
+   @call oself::MSG_GEN_APPLICATION_SET_APP_FEATURES(selection);
+}</PRE>
+<PRE>/* 
+ * Then intercept MSG_GEN_APPLICATION_UPDATE_APP_FEATURES and set up the correct 
+ * parameters for MSG_GEN_APPLICATION_UPDATE_FEATURES_VIA_TABLE. 
+ */</PRE>
+<PRE>@method MyLevelApplicationClass, MSG_GEN_APPLICATION_UPDATE_APP_FEATURES
+{
+    @call oself::MSG_GEN_APPLICATION_UPDATE_FEATURES_VIA_TABLE(
+	NullOptr,
+	@ObjectToReparent,			/* if any */
+	levelTable,			/* if any */
+	sizeof(usabilityTable) / sizeof(usabilityTable [0]),
+	usabilityTable,
+	appOpeningFlag,
+	oldLevel,
+	level,
+	featuresChanged,
+	featuresOn);
+}</PRE>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_APPLICATION_GET_APP_FEATURES">
+ </A>
+MSG_GEN_APPLICATION_GET_APP_FEATURES</H4>
+<PRE CLASS="syntax">dword	MSG_GEN_APPLICATION_GET_APP_FEATURES();</PRE>
+<P>
+This message retrieves the set of features set for the application.</P>
+<P CLASS="refField">
+Source:	Unrestricted--typically a GenControl object finding out the application's UI level.</P>
+<P CLASS="refField">
+Destination:	The GenApplication running the controller.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	A dword containing the word of features stored in <CODE>
+GAI_appFeatures</CODE>
+ and the <CODE>
+UIInterfaceLevel</CODE>
+ for the application. The features are stored in the high word; the interface level is stored in the low word.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_GEN_APPLICATION_SET_APP_FEATURES">
+ </A>
+MSG_GEN_APPLICATION_SET_APP_FEATURES</H4>
+<PRE CLASS="syntax">void	MSG_GEN_APPLICATION_SET_APP_FEATURES(
+        word	features);</PRE>
+<P>
+This message sets a new set of features into the GenApplication's <CODE>
+GAI_appFeatures</CODE>
+ record. This message in turn generates a MSG_GEN_APPLICATION_UPDATE_APP_FEATURES for your application object to intercept. (The message handler for that message must in turn send MSG_GEN_APPLICATION_UPDATE_FEATURES_VIA_TABLE to activate the UI changes specified in the features list.)</P>
+<P CLASS="refField">
+Source:	Unrestricted--typically a system function.</P>
+<P CLASS="refField">
+Destination:	The GenApplication having its features set.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+features</CODE>
+	The new word-sized record of application features to set.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_GEN_APPLICATION_UPDATE_APP_FEATURES</H4>
+<PRE CLASS="syntax">void	MSG_GEN_APPLICATION_UPDATE_APP_FEATURES(@stack
+        optr		unReparentObject,
+        optr		reparentObject,
+        GenAppUsabilityTuple		*levelTable,
+        word		tableLength,
+        void		*table,
+        word		appOpeningFlag,
+        UIInterfaceLevel		oldLevel,
+        UIInterfaceLevel		level,
+        word		featuresChanged,
+        word		featuresOn);</PRE>
+<P>
+This message is sent by the application to itself when it is told to change either its features or its <CODE>
+UIInterfacelevel</CODE>
+. This message is passed a number of parameters, most of which should simply be passed to MSG_GEN_APPLICATION_UPDATE_FEATURES_VIA_TABLE. If you have reparent objects (or un-reparent objects), you must set them up here.</P>
+<P CLASS="refField">
+Source:	Sent by an application object to itself in response to a MSG_GEN_APPLICATION_SET_APP_FEATURES or MSG_GEN_APPLICATION_SET_APP_LEVEL.</P>
+<P CLASS="refField">
+Destination:	The GenApplication object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+unReparentObject</EM>
+	The optr of the object to be unreparented. If a null optr is passed, the object will by default be moved up and added as the next sibling of its current parent.</P>
+<DL>
+<DT>
+<EM>
+reparentObject</EM>
+</DT><DD>The optr of the object to be reparented to another UI location. You must supply this object if you have a <CODE>
+GenAppUsabilityTuple</CODE>
+ entry that contains a GAUC_REPARENT entry.</DD>
+<DT>
+<EM>
+levelTable</EM>
+</DT><DD>This table contains the GenAppUsabilityTuples corresponding to objects that contain their <EM>
+own</EM>
+ features and that must be notified when the user level changes. This is so that those objects can generate their own feature updates. Typically, controllers are included among these objects.</DD>
+<DT>
+<EM>
+tableLength</EM>
+</DT><DD>The number of table entries in <EM>
+table</EM>
+.</DD>
+<DT>
+<EM>
+table</EM>
+</DT><DD>Table of <CODE>
+GenAppUsabilityTuple</CODE>
+ entries that must be updated when the user level changes. This table is usually set up as global data and maps each user level feature to a <CODE>
+GenAppUsabilityTuple</CODE>
+.</DD>
+<DT>
+<EM>
+appOpeningFlag</EM>
+</DT><DD>Set if the application is starting.</DD>
+<DT>
+<EM>
+oldLevel</EM>
+</DT><DD>The previous <CODE>
+UIInterfaceLevel</CODE>
+.</DD>
+<DT>
+<EM>
+level</EM>
+</DT><DD>The new <CODE>
+UIInterfaceLevel</CODE>
+.</DD>
+<DT>
+<EM>
+featuresChanged</EM>
+</DT><DD>The set of features changed (deleted).</DD>
+<DT>
+<EM>
+featuresOn</EM>
+</DT><DD>The set of features to set on.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	To set an application's features, you must intercept this message and send MSG_GEN_APPLICATION_UPDATE_FEATURES_VIA_TABLE; there is no default message handler. This message is provided as a convenient point to intercept and change features before executing the changes.</P>
+
+
+<H4 CLASS="RefETitle">
+MSG_GEN_APPLICATION_UPDATE_FEATURES_VIA_TABLE</H4>
+<PRE CLASS="syntax">void	MSG_GEN_APPLICATION_UPDATE_FEATURES_VIA_TABLE(
+        optr		unReparentObject,
+        optr		reparentObject,
+        GenAppUsabilityTuple		*levelTable,
+        word		tableLength,
+        void		*table,
+        word		appOpeningFlag,
+        UIInterfaceLevel		oldLevel,
+        UIInterfaceLevel		level,
+        word		featuresChanged,
+        word		featuresOn);</PRE>
+<P>
+This message is called to update the application's features to reflect a new set of features to </P>
+<P CLASS="refField">
+Source:	Typically, your message handler for MSG_GEN_APPLICATION_UPDATE_APP_FEATURES.</P>
+<P CLASS="refField">
+Destination:	The GenApplication object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+unReparentObject</EM>
+	The optr of the object to be unreparented. If a null optr is passed, the object will by default be moved up and added as the next sibling of its current parent.</P>
+<DL>
+<DT>
+<EM>
+reparentObject</EM>
+</DT><DD>The optr of the object to be reparented to another UI location. You must supply this object if you have a <CODE>
+GenAppUsabilityTuple</CODE>
+ entry that contains a GAUC_REPARENT entry.</DD>
+<DT>
+<EM>
+levelTable</EM>
+</DT><DD>This table contains the GenAppUsabilityTuples corresponding to objects that contain their <EM>
+own</EM>
+ features and that must be notified when the user level changes. This is so that those objects can generate their own feature updates. Typically, controllers are included among these objects.</DD>
+<DT>
+<EM>
+tableLength</EM>
+</DT><DD>The number of table entries in <EM>
+table</EM>
+.</DD>
+<DT>
+<EM>
+table</EM>
+</DT><DD>Table of <CODE>
+GenAppUsabilityTuple</CODE>
+ entries that must be updated when the user level changes. This table is usually set up as global data and maps each user level feature to a <CODE>
+GenAppUsabilityTuple</CODE>
+.</DD>
+<DT>
+<EM>
+appOpeningFlag</EM>
+</DT><DD>Set if the application is starting.</DD>
+<DT>
+<EM>
+oldLevel</EM>
+</DT><DD>The previous <CODE>
+UIInterfaceLevel</CODE>
+.</DD>
+<DT>
+<EM>
+level</EM>
+</DT><DD>The new <CODE>
+UIInterfaceLevel</CODE>
+.</DD>
+<DT>
+<EM>
+featuresChanged</EM>
+</DT><DD>The set of features changed (deleted).</DD>
+<DT>
+<EM>
+featuresOn</EM>
+</DT><DD>The set of features to set on.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	Generally not intercepted. Intercept MSG_GEN_APPLICATION_UPDATE_APP_FEATURES instead.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Application_1.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Application_6.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1.5 ApplicationStates</A> 
+<!-- to next --> | <A HREF="Application_8.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">1.7 IACP</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

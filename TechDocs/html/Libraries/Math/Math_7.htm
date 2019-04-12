@@ -1,0 +1,145 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Math_7.htm,v 1.1 97/06/02 15:30:51 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> System-defined Formats</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The Math Library</A>: 3.1 <A HREF="Math_6.htm">Float Formats</A>: 
+System-defined Formats</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Math_6.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Math_6.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">3 Float Formats</A> 
+<!-- to next --> | <A HREF="Math_8.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.2 User-defined Formats</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+A system-defined FP format is stored within a <A NAME="IX_FormatParams">
+ </A>
+<CODE>
+FormatParams</CODE>
+ structure. This structure defines whether the FP number is a number to be converted into numerical text or a date-time. These format parameters are stored within arrays managed by the format control code. </P>
+<P CLASS="figTitle">
+
+
+Code Display D-6 System-defined Float Formats</P>
+<PRE>/*
+ * System-defined float formats are stored in an array that is maintained and 
+ * accessed by the float controller code. Each element is made up of a 
+ * FormatParams structure.
+ */</PRE>
+<PRE>typedef struct {
+	/*
+	 * The FloatFloatToAsciiParams_Union stores either a
+	 * FloatFloatToAsciiParams structure if the number is a `pure' FP number,
+	 * or a FloatFloatToDateTimeParams structure if the number is a date-time. 
+	 * In this way, it is essentially the same as the FFA_stackFrame discussed
+	 * earlier.
+	 */
+	FloatFloatToAsciiParams_Union				FP_params;</PRE>
+<PRE>	/*
+	 * FP_formatName stores the name of this formatting option that will be 
+	 * displayed in the float controller's dynamic list. This name is loaded 
+	 * from the optr given in FP_nameHan and FP_nameOff.(The table where these 
+	 * strings are kept is within a localizable resource and therefore will
+	 * have different text under different country setups.)
+	 */
+	char				FP_formatName[FORMAT_NAME_LENGTH+1];
+	word				FP_nameHan;		/* MemHandle */
+	word				FP_nameOff;		/* ChunkHandle */</PRE>
+<PRE>	/*
+	 * FP_listEntryNum stores the zero-based position of this FormatParams 
+	 * entry within the table.
+	 */
+	word				FP_listEntryNum;</PRE>
+<PRE>	/*
+	 * FP_signature is an internal field used for error-checking.
+	 */
+	word				FP_signature;
+} FormatParams;</PRE>
+<P>
+An application will never need to access this table of formats directly. GEOS contains several routines (in <STRONG CLASS="fileName">
+math.goh</STRONG>
+) that can access this table and add, delete and modify table entries. Usually, it is easiest to include a Float Format controller in your application if you intend to allow the user to change float formats with these routines.</P>
+<P>
+There are many system-defined float formatting options. These formats are identified by <A NAME="IX_FormatIdType">
+ </A>
+<CODE>
+FormatIdType</CODE>
+ enumerations. Each type corresponds to a <CODE>
+FormatParams</CODE>
+ structure. </P>
+<P>
+Each <CODE>
+FormatIdType</CODE>
+ enumeration is a direct offset into the float format lookup table. To distinguish between system-defined and user-defined formats, the high bit of a <CODE>
+FormatIdType</CODE>
+ is set to indicate that the format is system-defined. Thus, 8000h refers to the first system-defined format, 8000h + (size(<CODE>
+FormatParams</CODE>
+)) refers to the second system-defined format, etc.</P>
+<P>
+The format strings themselves are stored within a localizable resource, so that they may appear in a manner relevant to the particular country involved. For example, an FP number of 12.0 using the <CODE>
+FormatIdType</CODE>
+ FORMAT_ID_CURRENCY might appear in the U.S. as $12.00, but will appear as £12.00 in Great Britain.</P>
+<P CLASS="figTitle">
+
+
+Code Display D-7 Float Format IDs</P>
+<PRE>typedef	enum {
+	FORMAT_ID_GENERAL	 	 	 		= 0x8000,
+	FORMAT_ID_FIXED		 	 		= 0x8061,
+	FORMAT_ID_FIXED_WITH_COMMAS	 	 			= 0x80c2,
+	FORMAT_ID_FIXED_INTEGER	 				= 0x8123,
+	FORMAT_ID_CURRENCY		 	 		= 0x8184,
+	FORMAT_ID_CURRENCY_WITH_COMMAS 	 				= 0x81e5,
+	FORMAT_ID_CURRENCY_INTEGER 	 				= 0x8246,
+	FORMAT_ID_PERCENTAGE 	 	 			= 0x82a7,
+	FORMAT_ID_PERCENTAGE_INTEGER 	 				= 0x8308,
+	FORMAT_ID_THOUSANDS 	 	 			= 0x8369,
+	FORMAT_ID_MILLIONS 	 	 			= 0x83ca,
+	FORMAT_ID_SCIENTIFIC 	 	 			= 0x842b,</PRE>
+<PRE>	FORMAT_ID_DATE_LONG 	 	 			= 0x848c,
+	FORMAT_ID_DATE_LONG_CONDENSED 	 				= 0x84ed,
+	FORMAT_ID_DATE_LONG_NO_WKDAY 					= 0x854e,
+	FORMAT_ID_DATE_LONG_NO_WKDAY_CONDENSED 					= 0x85af,
+	FORMAT_ID_DATE_SHORT 	 	 			= 0x8610,
+	FORMAT_ID_DATE_SHORT_ZERO_PADDED 					= 0x8671,
+	FORMAT_ID_DATE_LONG_MD 	 	 			= 0x86d2,
+	FORMAT_ID_DATE_LONG_MD_NO_WKDAY 					= 0x8733,
+	FORMAT_ID_DATE_SHORT_MD 					= 0x8794,
+	FORMAT_ID_DATE_LONG_MY 	 	 			= 0x87f5,
+	FORMAT_ID_DATE_SHORT_MY 	 				= 0x8856,
+	FORMAT_ID_DATE_YEAR 	 	 			= 0x88b7,
+	FORMAT_ID_DATE_MONTH 	 	 			= 0x8918,
+	FORMAT_ID_DATE_DAY 	 				= 0x8979,
+	FORMAT_ID_DATE_WEEKDAY 	 				= 0x89da,
+	FORMAT_ID_TIME_HMS			 		= 0x8a3b,
+	FORMAT_ID_TIME_HM					= 0x8a9c,
+	FORMAT_ID_TIME_H					= 0x8afd,
+	FORMAT_ID_TIME_MS			 		= 0x8b5e,
+	FORMAT_ID_TIME_HMS_24HR		 			= 0x8bbf,
+	FORMAT_ID_TIME_HM_24HR		 			= 0x8c20,</PRE>
+<PRE>	FORMAT_ID_INDETERMINATE 	 				= 0xffff
+} FormatIdType;</PRE>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Math_6.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Math_6.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">3 Float Formats</A> 
+<!-- to next --> | <A HREF="Math_8.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.2 User-defined Formats</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

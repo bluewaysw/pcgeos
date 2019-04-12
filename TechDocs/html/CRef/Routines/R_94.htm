@@ -1,0 +1,219 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: R_94.htm,v 1.2 97/06/25 18:44:20 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE>GEOS C Routines: SysShutdown() ...</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+<DIV>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="R_93.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">SysGetPenMode() ...</A> 
+<!-- to next --> | <A HREF="R_95.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">TextSearchInString() ...</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</DIV>
+<DIV>
+<A NAME="IX_SysShutdown()">
+ </A>
+<A NAME="IX_SysShutdownType">
+ </A>
+<A NAME="IX_SST_&ldots;  (SysShutdownType)">
+ </A>
+<H1 CLASS="refHeading">
+SysShutdown()</H1>
+<PRE CLASS="syntax">Boolean	SysShutdown(
+        SysShutdownType type,
+        ...);</PRE>
+<P>
+This routine causes the system to shut down, exiting to the native operating system (typically DOS). It takes variable parameters depending on the first parameter. The first parameter is the type of shutdown requested, and it determines the calling format of the routine. <CODE>
+SysShutdown()</CODE>
+ returns a Boolean value dependent on the type of shutdown.</P>
+<P>
+The parameters and calling format for this routine depend on the value in the <CODE>
+type</CODE>
+ parameter. The possible values (<CODE>
+SysShutdownType</CODE>
+) are listed below with the associated parameter and return information.</P>
+<DL>
+<DT CLASS="FIXME_WorListWide">
+SST_CLEAN</DT><DD>Shut down all applications cleanly, allowing any that wish to to abort the shutdown. The routine will return <CODE>
+true</CODE>
+ if a system shutdown is already in progress at the time of the call. This type of shutdown will send <CODE>
+MSG_META_CONFIRM_SHUTDOWN</CODE>
+ to all objects registered on the MANUFACTURER_ID_GEOWORKS:GCNSLT_SHUTDOWN_CONTROL GCN list (but only if the shutdown is not cancelled). Each object on that list must return an acknowledgment of the shutdown. The parameter format and parameters are</DD>
+<PRE>Boolean SysShutdown(
+	SysShutdownType			type,
+	optr			notificationOD,
+	Message			msg);</PRE>
+<DT>
+<CODE>
+notificationOD</DT><DD>
+</CODE>
+The optr of an object which will receive the message passed in <CODE>
+msg</CODE>
+ after the shutdown has been acknowledged. Pass a null optr to use the default notification (<CODE>
+MSG_META_DETACH</CODE>
+ sent to the UI).</DD>
+<DT>
+<CODE>
+msg</CODE>
+</DT><DD>The message to be sent to the object in <CODE>
+notificationOD</CODE>
+.</DD>
+<DT CLASS="FIXME_WorListWide">
+SST_CLEAN_FORCED</DT><DD>
+Shut down all applications cleanly without the possibility of cancellation. This type takes no additional parameters and does not allow other geodes to abort the shutdown. It will return, but the return value will be meaningless.</DD>
+<DT CLASS="FIXME_WorListWide">
+SST_DIRTY</DT><DD>Attempt to exit device drivers and close all files without shutting down applications. Does not return. The parameters of this type are</DD>
+<PRE>Boolean SysShutdown{
+	SysShutdownType			type,		/* SST_DIRTY */
+	const char			* reason);</PRE>
+<DT CLASS="FIXME_WorListWide">
+</DT><DD>The <CODE>
+reason</CODE>
+ parameter is a pointer to a text string presented to the user as a reason for the dirty shutdown. The string is null-terminated. Pass -1 if no reason is to be given.</DD>
+<DT CLASS="FIXME_WorListWide">
+SST_PANIC</DT><DD>Exit system device drivers (GA_SYSTEM) without exiting applications or closing files. This can be bad for the system and should be used only in emergency situations. This type of shutdown takes no additional parameters and does not return.</DD>
+<DT CLASS="FIXME_WorListWide">
+SST_REBOOT</DT><DD>
+This is used by GEOS when the user hits <CODE>
+Ctrl-Alt-Del</CODE>
+. Applications should not call it.</DD>
+<DT CLASS="FIXME_WorListWide">
+SST_RESTART</DT><DD>
+This is like SST_CLEAN_FORCED above, but it reloads GEOS after shutting down rather than exit completely. It takes no additional parameters; it will return TRUE if the system could not be restarted, FALSE if the shutdown has been initiated.</DD>
+<DT CLASS="FIXME_WorListWide">
+SST_FINAL</DT><DD>Perform the final phase of a shutdown. This routine is called <CODE>
+only</CODE>
+ by the UI when the SST_CLEAN_FORCED shutdown is complete. This type does not return, and it takes one additional parameter. The calling format and parameters of this type are</DD>
+<PRE>Boolean SysShutdown(
+	SysShutdownType			type,
+	const char			* reason);</PRE>
+<DT CLASS="FIXME_WorListWide">
+</DT><DD>The <CODE>
+reason</CODE>
+ parameter is a character string explaining the reason (typically an error) for the final shutdown.</DD>
+<DT CLASS="FIXME_WorListWide">
+SST_SUSPEND</DT><DD>
+Suspend system operation in preparation for task switching, and broadcast <CODE>
+MSG_META_CONFIRM_SHUTDOWN</CODE>
+ to all objects on the MANUFACTURER_ID_GEOWORKS:GCNSLT_SHUTDOWN_CONTROL GCN list (see <CODE>
+MetaClass</CODE>
+). All notified objects must return acknowledgment of the shutdown. This type of <CODE>
+SysShutdown()</CODE>
+ returns <CODE>
+true</CODE>
+ if another system shutdown is already in progress. It takes two additional parameters:</DD>
+<PRE>Boolean SysShutdown(
+	SysShutdownType			type,
+	optr			notificationOD,
+	Message			msg);</PRE>
+<DT>
+<CODE>
+notificationOD</DT><DD>
+</CODE>
+The optr of an object which will receive the message passed in <CODE>
+msg</CODE>
+ after the shutdown has been acknowledged. Pass a null optr to use the default notification (<CODE>
+MSG_META_DETACH</CODE>
+ sent to the UI), though this is not usually the intent of the call.</DD>
+<DT>
+<CODE>
+msg</CODE>
+</DT><DD>The message to be sent to the object in <CODE>
+notificationOD</CODE>
+.</DD>
+<DT CLASS="FIXME_WorListWide">
+SST_CONFIRM_START</DT><DD>
+Called by the recipient of <CODE>
+MSG_META_CONFIRM_SHUTDOWN</CODE>
+; this allows shutdown confirmation dialog boxes to be presented in order to the user. The caller of this type will be blocked until all previous callers have finished their confirmation procedure. When <CODE>
+SysShutdown()</CODE>
+ returns, the caller may present its confirmation dialog and continue or abort the shutdown. If <CODE>
+SysShutdown()</CODE>
+ returns <CODE>
+true</CODE>
+ from a call with this type, the caller should <EM>
+not</EM>
+ present the confirmation dialog to the user and need not call <CODE>
+SysShutdown()</CODE>
+ with SST_CONFIRM_END; another thread has already cancelled the shutdown. This type takes no additional parameters.</DD>
+<DT CLASS="FIXME_WorListWide">
+SST_CONFIRM_END</DT><DD>
+The counterpart of SST_CONFIRM_START, this ends the confirmation sequence in an object's <CODE>
+MSG_META_CONFIRM_SHUTDOWN</CODE>
+ handler. It takes one additional parameter and returns nothing. The calling format is shown below:</DD>
+<PRE>void	SysShutdown(
+	SysShutdownType			type,
+	Boolean			confirm);</PRE>
+<DT CLASS="FIXME_WorListWide">
+</DT><DD>The <CODE>
+confirm</CODE>
+ parameter should be TRUE if the shutdown is to be continued, FALSE if the shutdown should be aborted.</DD>
+</DL>
+<P CLASS="refField"><STRONG>
+Include:</STRONG>	<STRONG CLASS="fileName">
+system.h</STRONG>
+ </P>
+<P CLASS="refField"><STRONG>
+Warnings:</STRONG>	Most applications should not call <CODE>
+SysShutdown()</CODE>
+. Any that do should do so with extreme care.</P>
+</DIV>
+<DIV>
+<A NAME="IX_SysStatistics()">
+ </A>
+<A NAME="IX_Performance:SysStatistics()">
+ </A>
+<H1 CLASS="refHeading">
+SysStatistics()</H1>
+<PRE CLASS="syntax">void	SysStatistics(
+        SysStats * stats);			/* returned statistics */</PRE>
+<P>
+This routine returns system performance statistics. Pass it a pointer to an empty <CODE>
+SysStats</CODE>
+ structure; the routine will fill in the appropriate fields. <CODE>
+SysStats</CODE>
+ has the following structure:</P>
+<PRE>typedef struct {
+    dword			SS_idleCount;
+    SysSwapInfo			SS_swapOuts;
+    SysSwapInfo			SS_swapIns;
+    word			SS_contextSwitches;
+    word			SS_interrupts;
+    word			SS_runQueue;
+} SysStats;</PRE>
+<P CLASS="refField"><STRONG>
+Include:</STRONG>	<STRONG CLASS="fileName">
+sysstats.h</STRONG>
+ </P>
+</DIV>
+<DIV>
+<A NAME="IX_SysUnlockBIOS()">
+ </A>
+<H1 CLASS="refHeading">
+SysUnlockBIOS()</H1>
+<PRE CLASS="syntax">void	SysUnlockBIOS(void);</PRE>
+<P>
+&nbsp;</P>
+</DIV>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="R_93.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">SysGetPenMode() ...</A> 
+<!-- to next --> | <A HREF="R_95.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">TextSearchInString() ...</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

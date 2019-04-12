@@ -1,0 +1,953 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+<!-- This page was automatically generated from a bunch of smaller pages. -->
+<META NAME="copyright" CONTENT="Copyright GEOWORKS">
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+<TITLE>Pen Object Library</TITLE>
+</HEAD>
+<BODY BGCOLOR="#ffffdf">
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+<A NAME="index.htm"></A>
+
+
+
+<H1 CLASS="chapterTitle">
+
+<A NAME="index.htm_97933">
+ </A>
+Pen Object Library
+
+</H1>
+<P>
+<A NAME="index.htm_IX_InkClass">
+ </A>
+<A NAME="index.htm_IX_pen library">
+ </A>
+The Pen Library provides routines and object classes which work together to form the backbone of a note-book style database storing pen input. </P>
+<P>
+An Ink object is a visual object and may be used by any application that wants to work with pen input. Though any targetable object may accept ink (see <A HREF="../../SysObjects/Input/index.htm">the Input chapter</A>), <CODE>InkClass</STRONG>
+ has many optimizations for working with ink. </P>
+<P>
+The Ink Database routines provide a front end to the standard GEOS Database (DB) library routines well suited for storing and organizing several small pieces of information. These routines allow the storage of notes within a hierarchical arrangement of folders. Each note may contain one or more pages of textual or ink information.</P>
+<P>
+<P CLASS="sectionlinks">
+<STRONG>
+&nbsp;&nbsp;<A HREF="#Pen_1.htm">1 The Ink Object</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Pen_2.htm">1.1 Instance Data and Messages</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Pen_3.htm">1.2 Storing Ink to DB Items</A><BR>
+&nbsp;&nbsp;<A HREF="#Pen_4.htm">2 Working with the Ink DB</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Pen_5.htm">2.1 Getting Started</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Pen_6.htm">2.2 Displaying the Data</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Pen_7.htm">2.3 Titles and Keywords</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Pen_8.htm">2.4 Navigating the Folder Tree</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Pen_9.htm">2.5 Managing Notes and Folders</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Pen_a.htm">2.6 Manipulating Notes</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#Pen_b.htm">2.7 Searching and Traversing the Tree</A><BR>
+&nbsp;&nbsp;<A HREF="#Pen_c.htm">3 InkControlClass</A><BR>
+</STRONG>
+</P> <!-- end of sectionlinks blob -->
+
+<HR>
+<A NAME="Pen_1.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Pen Object Library</A>: 1 
+The Ink Object</H2>
+<P>
+<CODE>
+InkClass</CODE>
+ provides methods for storing multiple pen inputs in a compact form. It automatically handles all queries about pen input. It handles display, with the power to display the ink in any color, and it allows the use of standard or custom background pictures.</P>
+<P>
+To change the way the Ink class (or any other appropriate class) handles ink, the messages to subclass are <CODE>
+MSG_META_NOTIFY_WITH_DATA_BLOCK</CODE>
+ (with the notification type MANUFACTURER_ID_GEOWORKS, NT_INK), <CODE>
+MSG_META_QUERY_IF_PRESS_IS_INK</CODE>
+, and <CODE>
+MSG_VIS_QUERY_IF_OBJECT_HANDLES_INK</CODE>
+.</P>
+<P CLASS="subsectionLink">
+<A HREF="#Pen_2.htm">Instance Data and Messages</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Pen_3.htm">Storing Ink to DB Items</A></P>
+<HR>
+<A NAME="Pen_2.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Pen Object Library</A>: 1.1 <A HREF="#Pen_1.htm">The Ink Object</A>: 
+Instance Data and Messages</H3>
+<P>
+<A NAME="Pen_2.htm_IX_II_&ldots;">
+ </A>
+When setting up an Ink object, probably the only pieces of instance data the application will be concerned with will be <CODE>
+II_flags</CODE>
+, <CODE>
+II_dirtyOutput</CODE>
+, and <CODE>
+II_dirtyMsg</CODE>
+.</P>
+<P>
+Most of the flags are easy to understand, with the possible exceptions of the IF_HAS_TARGET and IF_DIRTY fields, which should not be set when creating the object in any case.</P>
+<P CLASS="figTitle">
+Code Display 21-1 InkClass Instance Data</P>
+<PRE>/* 	II_flags:
+ * 	<A NAME="Pen_2.htm_IX_IF_&ldots;  (InkFlags)"> </A><A NAME="IX_InkFlags"> </A>This field holds flags governing the object's behavior:
+ *		IF_MOUSE_FLAGS, 	
+ * 		IF_SELECTING, 		
+ * 		IF_HAS_TARGET,
+ *		IF_HAS_SYS_TARGET,
+ *		IF_DIRTY,
+ *		IF_ONLY_CHILD_OF_CONTENT, 
+ *		IF_CONTROLLED, (Set if to be used with an InkControl)
+ *		IF_INVALIDATE_ERASURES,
+ * 		IF_HAS_UNDO */
+@instance 	InkFlags 			II_flags = IF_HAS_UNDO;</PRE>
+<PRE>/* <A NAME="Pen_2.htm_IX_IT_&ldots;"> </A><A NAME="IX_InkTool"> </A>	II_tool:
+ * 	This field keeps track of how the user is interacting with the Ink. There
+ * 	are three possible tools: IT_PENCIL, IT_SELECTOR, and IT_ERASER. */
+@instance 	InkTool 		II_tool;</PRE>
+<PRE><A NAME="Pen_2.htm_IX_Color:ink input in VisInk"> </A>/* 	II_penColor:
+ * 	The color to use when drawing ink. */
+@instance 	Color 		II_penColor = C_BLACK;</PRE>
+<PRE>/* 	II_segments:
+ * 	Do not set this field explicitly. This field is a handle to the chunk array
+ * 	containing the pen segments. The segments are stored as an array of Point
+ * 	structures. The stored coordinates are all positive; any x coordinate with
+ * 	its sign bit set belongs to the last point in a gesture. Thus, a small 
+ * 	cross shape centered at (72, 72) might be stored:
+ * 		(0x0048, 0x0046) 
+ * 		(0x8048, 0x004A) [note sign bit set in x coordinate]
+ * 		(0x0046, 0x0048)
+ * 		(0x804A, 0x0048)		 [sign bit set in x coordinate]	*/
+@instance 	ChunkHandle 		II_segments;</PRE>
+<PRE>/* 	II_dirtyMsg, II_dirtyOutput:
+ * 	Together, these fields form an Action Descriptor. When the Ink processes
+ * 	a point of pen information, erases anything, or handles an undo event the
+ * 	IF_DIRTY flag will be set. If the flag was not set already, then the Ink
+ *	will send the AD's message to the AD's object. The handler for this message
+ * 	should probably clear the IF_DIRTY bit. */
+@instance optr			II_dirtyOutput;
+@instance Message	 		II_dirtyMsg;</PRE>
+<PRE>@instance Rectangle 			II_selectBounds;			/* Internal */
+@instance GStateHandle			II_cachedGState;			/* Internal */
+@instance TimerHandle 			II_antTimer;			/* Internal */
+@instance word 			II_antTimerID;			/* Internal */
+@instance byte			II_antMask;			/* Internal */</PRE>
+<PRE>/*	ATTR_INK_STROKE_SIZE:
+ * 	Size of line used to draw ink. */
+@vardata    InkStrokeSize   ATTR_INK_STROKE_SIZE; </PRE>
+<PRE>typedef struct {
+	byte    ISS_width;
+	byte    ISS_height;
+} InkStrokeSize;</PRE>
+<PRE>/* 	ATTR_INK_MAX_POINTS: 
+ * 	Maximum number of points of ink data the object is prepared to store. */
+@vardata    word ATTR_INK_MAX_POINTS; </PRE>
+<P>
+Most of the Ink messages just change or retrieve the values of the instance fields. The exceptions are two messages which help those applications which need to save or transfer the Ink object's pen data. Use <CODE>
+MSG_INK_SAVE_TO_DB_ITEM</CODE>
+ to save the pen data to an arbitrary DB item. If the application changes this information and wishes to pass it back to the ink object, use <CODE>
+MSG_INK_LOAD_FROM_DB_ITEM</CODE>
+.</P>
+
+<H6 CLASS="RefETitle">
+<A NAME="Pen_2.htm_IX_MSG_INK_SET_TOOL">
+ </A>
+MSG_INK_SET_TOOL</H6>
+<PRE CLASS="syntax">void 	MSG_INK_SET_TOOL(
+        InkTool 	tool);</PRE>
+<P>
+This message allows the Ink to switch between pencil and eraser tools, changing the <CODE>
+II_tool</CODE>
+ field.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any Ink object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+tool</CODE>
+ 	A tool, either IT_PENCIL or IT_ERASER.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Pen_2.htm_IX_MSG_INK_GET_TOOL">
+ </A>
+MSG_INK_GET_TOOL</H6>
+<PRE CLASS="syntax">InkTool 	MSG_INK_GET_TOOL();</PRE>
+<P>
+This message returns the Ink's present tool, as stored in <CODE>
+II_tool</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any Ink object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	The present tool, either IT_PENCIL or IT_ERASER.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Pen_2.htm_IX_MSG_INK_SET_PEN_COLOR">
+ </A>
+MSG_INK_SET_PEN_COLOR</H6>
+<PRE CLASS="syntax">void 	MSG_INK_SET_PEN_COLOR(
+        Color 	clr);</PRE>
+<P>
+This message changes the color used to draw the ink, changing the value in <CODE>
+II_penColor</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any Ink object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+clr</CODE>
+	Index to a palette (e.g. C_RED).</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Pen_2.htm_IX_MSG_INK_SET_DIRTY_AD">
+ </A>
+MSG_INK_SET_DIRTY_AD</H6>
+<PRE CLASS="syntax">void 	MSG_INK_SET_DIRTY_AD(
+        word	 method,
+        optr	 object);</PRE>
+<P>
+This message sets the Action Descriptor to be activated when the user dirties the object, changing the values in <CODE>
+II_dirtyMsg</CODE>
+ and <CODE>
+II_dirtyOutput</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any Ink object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+method</CODE>
+ 	The message to send when the object is dirty.</P>
+<DL>
+<DT>
+<EM>object</EM> </DT><DD>The object which should receive the above message.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Pen_2.htm_IX_MSG_INK_SET_MAX_POINTS">
+ </A>
+MSG_INK_SET_MAX_POINTS</H6>
+<PRE CLASS="syntax">void MSG_INK_SET_MAX_POINTS(
+        word 	maxPoints);</PRE>
+<P>
+Set the maximum number of points of ink data the object is prepared to store. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any Ink object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+maxPoints</CODE>
+	The message to send when the object is dirty.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Pen_2.htm_IX_MSG_INK_SET_FLAGS">
+ </A>
+MSG_INK_SET_FLAGS</H6>
+<PRE CLASS="syntax">void 	MSG_INK_SET_FLAGS(
+        InkFlags 	setFlags,
+        InkFlags 	clearFlags);</PRE>
+<P>
+This message changes the value of the <CODE>
+II_flags</CODE>
+ field. Note that something which sets the IF_DIRTY bit should probably also perform the action stored in the <CODE>
+II_dirtyMsg</CODE>
+ and <CODE>
+II_dirtyOutput </CODE>
+fields.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any Ink object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+setFlags</CODE>
+	The flags to turn on.</P>
+<DL>
+<DT>
+<CODE>
+clearFlags</CODE>
+ </DT><DD>The flags to turn off.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Pen_2.htm_IX_MSG_INK_GET_FLAGS">
+ </A>
+MSG_INK_GET_FLAGS</H6>
+<PRE CLASS="syntax">InkFlags 	MSG_INK_GET_FLAGS();</PRE>
+<P>
+This message gets the value of the <CODE>
+II_flags</CODE>
+ field.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any Ink object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	The present value of the <CODE>
+II_flags</CODE>
+ field.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Pen_2.htm_IX_MSG_INK_DELETE_LAST_GESTURE">
+ </A>
+MSG_INK_DELETE_LAST_GESTURE</H6>
+<PRE CLASS="syntax">int MSG_INK_DELETE_LAST_GESTURE();</PRE>
+<P>
+This message removes the last gesture stored by the ink object; if the object had no ink stored, then nothing happens. The message returns zero if nothing was deleted.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any Ink object.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Zero if nothing deleted.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H6 CLASS="RefETitle">
+MSG_INK_SET_STROKE_SIZE</H6>
+<PRE CLASS="syntax">void MSG_INK_SET_STROKE_SIZE(
+        byte 	width, 
+        byte 	height);</PRE>
+<P>
+Set the brush size to use when drawing ink.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any Ink object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+width</EM>
+	Brush width.</P>
+<DL>
+<DT>
+<EM>
+height</EM>
+</DT><DD>Brush height.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Pen_2.htm_IX_MSG_INK_SAVE_TO_DB_ITEM">
+ </A>
+MSG_INK_SAVE_TO_DB_ITEM</H6>
+<PRE CLASS="syntax">void	MSG_INK_SAVE_TO_DB_ITEM(
+        DBReturn		* RetValue,
+        InkDBFrame		* ptr);</PRE>
+<P>
+This message saves the Ink's pen data into the passed DB item. The pen data will be stored compressed. Calling this message sets the object not dirty.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any Ink object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+ptr</CODE>
+	A pointer to an <CODE>
+InkDBFrame</CODE>
+ structure, shown below.</P>
+<DL>
+<DT>
+<CODE>
+RetValue</CODE>
+</DT><DD>A pointer to an empty <CODE>
+DBReturn</CODE>
+ structure, to be filled by the handler.</DD>
+</DL>
+<P CLASS="refField">
+Return:	The structure pointed to by <CODE>
+RetValue</CODE>
+ will contain the returned information.</P>
+<P CLASS="refField">
+Structures:	The <CODE>
+InkDBFrame</CODE>
+ and <CODE>
+DBReturn</CODE>
+ structures are defined below:</P>
+<PRE><A NAME="Pen_2.htm_IX_IDBF_&ldots;"> </A><A NAME="IX_InkDBFrame"> </A>typedef struct {
+	Rectangle			IDBF_bounds;
+		/* The bounds of the Ink data */
+	VMFileHandle			IDBF_VMFile;
+		/* VM file to write to*/</PRE>
+<PRE>	DBGroupAndItem 			IDBF_DBGroupAndItem;
+		/* DB Item to save to 
+		 * (or NULL to create a new one) */</PRE>
+<PRE>	word 			IDBF_DBExtra;
+		/* Extra space to skip at start
+		 * of block */
+} InkDBFrame;</PRE>
+<PRE><A NAME="Pen_2.htm_IX_DBR_&ldots;"> </A><A NAME="IX_DBReturn"> </A>typedef struct {
+	word		DBR_group;
+	word		DBR_item;
+	word		DBR_unused1;
+	word		DBR_unused2;
+} DBReturn;</PRE>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="Pen_2.htm_IX_MSG_INK_LOAD_FROM_DB_ITEM">
+ </A>
+MSG_INK_LOAD_FROM_DB_ITEM</H6>
+<PRE CLASS="syntax">void	MSG_INK_LOAD_FROM_DB_ITEM(
+        InkDBFrame 	*ptr);</PRE>
+<P>
+This message loads the compressed data into the Ink from the passed DB item. If a NULL handle is passed, then the Ink is cleared. This message marks the Ink as clean. </P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any Ink object.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+ptr</CODE>
+ 	A pointer to an <CODE>
+InkDBFrame</CODE>
+ structure.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Structures:	For the <CODE>
+InkDBFrame</CODE>
+ structure, see <CODE>
+MSG_INK_SAVE_TO_DB_ITEM</CODE>
+.</P>
+<P CLASS="refField">
+Interception:	Unlikely.</P>
+
+<HR>
+<A NAME="Pen_3.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Pen Object Library</A>: 1.2 <A HREF="#Pen_1.htm">The Ink Object</A>: 
+Storing Ink to DB Items</H3>
+<P>
+Pen information comes in as a <CODE>
+MSG_META_NOTIFY_WITH_DATA_BLOCK</CODE>
+ of type NT_INK accompanied by an array containing the coordinates visited by the pen. The pen data keeps track of the coordinates of the pen input. Every time pen input comes in, the ink object notes the coordinates. The ink object is optimized to save space. For instance, the Ink object eliminates collinear points: if three pen events are collinear, it will not record the middle one, recognizing it as redundant.</P>
+<P>
+The non-redundant points are written out to the <CODE>
+II_segments</CODE>
+ field, a chunk array of Point structures. Note that the coordinates are unsigned. If a point's <EM>
+x</EM>
+ coordinate's sign bit is set, that does not mean that the <EM>
+x</EM>
+ coordinate is negative; if this sign bit is set this is a signal that this point is the last point of a gesture.
+<IMG SRC="Pen.3.typicalInk.gif">
+
+</P>
+<P>
+When writing pen data to a DB item, the Ink object does some more compression. Applications which work with the items used by <CODE>
+MSG_INK_SAVE_TO_DB_ITEM</CODE>
+ and <CODE>
+MSG_INK_LOAD_FROM_DB_ITEM</CODE>
+ must work with this compression. Since the user is dragging the pen around in a continuous gesture, the pen events tend to occur close together. Thus, it is nice to have a way to record a coordinate as a small offset from another coordinate. Since many strokes are almost horizontal or vertical, quite often the horizontal or vertical offset will be zero or one. </P>
+<P>
+To take advantage of these tendencies, the ink object stores pen input as a bitstream. Coordinates may be recorded either as absolute positions or as offsets from the last coordinate. 
+<IMG SRC="Pen.3.inkEncoding.gif">
+
+</P>
+<P>
+When writing out a gesture to a DB item, the first point will always be recorded as an absolute position. Thus, first the <EM>
+x</EM>
+ coordinate will be recorded, then the <EM>
+y</EM>
+ coordinate. Each coordinate will be marked as absolute by the 1011 bit pattern.</P>
+<P>
+For each subsequent pen point, the algorithm will first make sure that the new point is not collinear with the previous two. If it is, then the algorithm will make the incoming pen event overwrite the previous event's coordinates.</P>
+<P>
+For each event, the algorithm will first write out the <EM>
+x</EM>
+ coordinate, then the <EM>
+y</EM>
+ coordinate.</P>
+<UL>
+<LI>
+If the coordinate is at 0 or 1 offset from the previous coordinate, the algorithm will write out the appropriate two-bit code (00, 01, or 11).</LI>
+<LI>
+If the coordinate is at an offset from the previous coordinate between 2 and 8, then the algorithm will write out the appropriate 7 bit code (1000xxx for a positive offset, 1001xxx for a negative offset).</LI>
+<LI>
+If the coordinate is more than 8 points from the previous coordinate, the algorithm writes out 1011 followed by the absolute coordinate, represented as a 15 bit unsigned quantity.</LI>
+</UL>
+<P>
+When the input is finished, the algorithm writes a 1000000 bit pattern, signalling the end of the segment.</P>
+<P>
+Decompressing the data is a matter of traversing the bitstream and detecting the appropriate patterns.</P>
+<P>
+As an example of how the algorithm compresses pen input, suppose the Ink object were writing the following gesture to a DB item:</P>
+<PRE>(72, 71)
+(82, 74)
+(84, 74)
+(85, 72)</PRE>
+<P>
+The first coordinate is 72, so the algorithm will write out:<BR>
+<EM>
+1011</EM>
+ (signals absolute coordinate)<EM>
+ 000000001001000<BR>
+</EM>
+The second coordinate is 71, so after handling the second coordinate, the stream will be:<BR>
+1011 000000001001000 <EM>
+1011 000000001000111<BR>
+</EM>
+The <EM>
+x</EM>
+ coordinate of the second point is 82, which is 10 points away from the previous <EM>
+x</EM>
+ coordinate. Unfortunately, this is too far to express as a short offset, so the algorithm writes another absolute coordinate (the new part of the stream is shown in italics):<BR>
+1011 000000001001000 1011 000000001000111 <EM>
+1011 000000001010010</EM>
+ <BR>
+The <EM>
+y</EM>
+ coordinate of the second point is 74, at a positive 3 offset from the previous <EM>
+y</EM>
+ value, so the algorithm will write out the appropriate offset code instead of an absolute position code:<BR>
+...1011 000000001000111 1011 000000001010010 <EM>
+10 00 010</EM>
+ <BR>
+The third point's <EM>
+x</EM>
+ coordinate is 84, at a +2 offset from 82. The <EM>
+y</EM>
+ coordinate is 74, the same as the previous point's <EM>
+y</EM>
+ coordinate:<BR>
+...1011 000000001000111 1011 000000001010010 10 00 010 <EM>
+10 00 001 00</EM>
+ <BR>
+The last point's <EM>
+x</EM>
+ coordinate is one higher than the previous; its <EM>
+y</EM>
+ coordinate is two less.<BR>
+...1011 000000001010010 10 00 010 10 00 001 00 <EM>
+01 10 01 001</EM>
+ <BR>
+Since it has reached the end of the pen input (this was a suspiciously short gesture, a somewhat contrived example), the algorithm then writes an end-of-segment code:<BR>
+...1011 000000001010010 10 00 010 10 00 001 00 01 10 01 001 <EM>
+10 00 000</EM>
+ <BR>
+If the Ink object were holding more than one gesture of information, it would write the next gesture's elements starting after the end-of-segment code of the first.</P>
+<HR>
+<A NAME="Pen_4.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Pen Object Library</A>: 2 
+Working with the Ink DB</H2>
+<P>
+The Ink Database provides a simplified, specialized API to the database library. It allows the user to organize pieces of information on notes stored in a hierarchy of folders. Each note may have one or more pages, with each page corresponding to the contents of an ink or text object. The data stored in each page is a DB item returned by <CODE>
+MSG_INK_SAVE_TO_DB_ITEM</CODE>
+ (for Ink objects) or <CODE>
+MSG_VIS_TEXT_GET_ALL_DB_ITEM</CODE>
+ (for Text objects).</P>
+<P>
+Notes and folders are specified by means of a dword identifier. This identifier has nothing to do with where the note's (or folder's) data is stored, or where it appears in the folder tree. Applications should use the <CODE>
+InkLoadPage()</CODE>
+ and <CODE>
+InkSavePage()</CODE>
+ routines to work with a note's data, and use the routines described below to determine where a note or folder appears in the folder tree.</P>
+<P CLASS="subsectionLink">
+<A HREF="#Pen_5.htm">Getting Started</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Pen_6.htm">Displaying the Data</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Pen_7.htm">Titles and Keywords</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Pen_8.htm">Navigating the Folder Tree</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Pen_9.htm">Managing Notes and Folders</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Pen_a.htm">Manipulating Notes</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#Pen_b.htm">Searching and Traversing the Tree</A></P>
+<HR>
+<A NAME="Pen_5.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Pen Object Library</A>: 2.1 <A HREF="#Pen_4.htm">Working with the Ink DB</A>: 
+Getting Started</H3>
+<PRE>InkDBInit()</PRE>
+<P>
+<A NAME="Pen_5.htm_IX_InkDBInit()">
+ </A>
+To create an Ink Database, an application needs a file handle, perhaps the file holding a GenDocument's data. Before calling any other Ink Database functions, call <CODE>
+InkDBInit()</CODE>
+ to set up the file correctly; this routine should be called exactly once per Ink DB. If the database is part of a GenDocument, then this routine should be called within the <CODE>
+MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE</CODE>
+. Other routines (described below) which might be appropriate when first setting up an Ink Database include <CODE>
+InkSetDocPageInfo()</CODE>
+ and<CODE>
+ InkSetDocGString()</CODE>
+.</P>
+<HR>
+<A NAME="Pen_6.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Pen Object Library</A>: 2.2 <A HREF="#Pen_4.htm">Working with the Ink DB</A>: 
+Displaying the Data</H3>
+<PRE>InkNoteLoadPage(), InkNoteSavePage(), InkGetDocPageInfo(), InkSetDocPageInfo(), InkSetDocGString(), InkGetDocGString(), InkNoteGetNoteType()</PRE>
+<P>
+<A NAME="Pen_6.htm_IX_InkNoteLoadPage()">
+ </A>
+Assuming that the application is using text and ink objects to display the information held in the Ink DB, use <CODE>
+InkNoteLoadPage()</CODE>
+ and <CODE>
+InkNoteSavePage()</CODE>
+<A NAME="Pen_6.htm_IX_InkNoteSavePage()">
+ </A>
+ to transfer information between the Ink object and the Ink DB. <CODE>
+InkNoteLoadPage() </CODE>
+loads an ink or text object with the data stored within the passed note.<A NAME="Pen_6.htm_IX_InkNoteGetNoteType()">
+ </A>
+ Use <CODE>
+InkNoteGetNoteType()</CODE>
+ to determine what sort of data is stored within the note. Once the user has made changes, those changes should be stored to the database. Call <CODE>
+InkNoteSavePage()</CODE>
+ to write the changes. </P>
+<P>
+To find out the document size associated with an Ink Database, call <CODE>
+InkGetDocPageInfo()</CODE>
+<A NAME="Pen_6.htm_IX_InkGetDocPageInfo()">
+ </A>
+. To change the page size, call <CODE>
+InkSetDocPageInfo()</CODE>
+<A NAME="Pen_6.htm_IX_InkSetDocPageInfo()">
+ </A>
+.</P>
+<P>
+<A NAME="Pen_6.htm_IX_InkSetDocGString()">
+ </A>
+The Ink DB routines support the notion of a background picture for ink information. There is one background picture for the entire database. To set the background picture, use <CODE>
+InkSetDocGString()</CODE>
+. <A NAME="Pen_6.htm_IX_InkGetDocGString()">
+ </A>
+To find out the current background picture, call<CODE>
+ InkGetDocGString()</CODE>
+.</P>
+<P>
+The background GString is stored in VM; call <CODE>
+GrLoadGString()</CODE>
+ and <CODE>
+GrDrawGString()</CODE>
+ to draw it.</P>
+<HR>
+<A NAME="Pen_7.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Pen Object Library</A>: 2.3 <A HREF="#Pen_4.htm">Working with the Ink DB</A>: 
+Titles and Keywords</H3>
+<PRE>InkNoteSetKeywords(), InkNoteSetKeywordsFromTextObject(), InkNoteGetKeywords(), InkNoteSendKeywordsToTextObject(), InkGetTitle(), InkSendTitleToTextObject(), InkFolderSetTitle(), InkFolderSetTitleFromTextObject(), InkNoteSetTitle(), InkNoteSetTitleFromTextObject()</PRE>
+<P>
+Each note may have two text strings which are helpful for identification: a title and a set of keywords. These words may be used as the fields for a computed search if the application supports these; regardless, the user will certainly find these fields useful for organizing notes.</P>
+<P>
+<A NAME="Pen_7.htm_IX_InkNoteSetTitle()">
+ </A>
+To set a note's title, call <CODE>
+InkNoteSetTitle()</CODE>
+. There is a corresponding <CODE>
+InkFolderSetTitle()</CODE>
+<A NAME="Pen_7.htm_IX_InkFolderSetTitle()">
+ </A>
+ for setting the title of a folder. <A NAME="Pen_7.htm_IX_InkNoteSetTitleFromTextObject()">
+ </A>
+Since applications may wish to set the titles of these items based upon the user's entry in a text object, there are two routines <CODE>
+InkNoteSetTitleFromTextObject()</CODE>
+ and <CODE>
+InkFolderSetTitleFromTextObject()</CODE>
+<A NAME="Pen_7.htm_IX_InkFolderSetTitleFromTextObject()">
+ </A>
+ which take an item's name from a text object.<A NAME="Pen_7.htm_IX_InkGetTitle()">
+ </A>
+ <CODE>
+InkGetTitle()</CODE>
+ gets any item's title, and <CODE>
+InkSendTitleToTextObject()</CODE>
+<A NAME="Pen_7.htm_IX_InkSendTitleToTextObject()">
+ </A>
+ is a specialized function used to update the passed text object's text to hold the item's title. The maximum length of any title should be <A NAME="Pen_7.htm_IX_INK_DB_MAX_TITLE_SIZE">
+ </A>
+INK_DB_MAX_TITLE_SIZE.</P>
+<P>
+<A NAME="Pen_7.htm_IX_InkNoteSetKeywords()">
+ </A>
+Notes may have keywords: words which should not appear in the title but which are still useful for searches. Folders do not have keywords. To set a note's keywords, use <CODE>
+InkNoteSetKeywords()</CODE>
+;<A NAME="Pen_7.htm_IX_InkNoteSetKeywordsFromTextObject()">
+ </A>
+ to use the contents of a text object as the keywords, use <CODE>
+InkNoteSetKeywordsFromTextObject()</CODE>
+. <A NAME="Pen_7.htm_IX_InkNoteGetKeywords()">
+ </A>
+To retrieve the keywords, call <CODE>
+InkNoteGetKeywords()</CODE>
+. <CODE>
+InkNoteSendKeywordsToTextObject()</CODE>
+<A NAME="Pen_7.htm_IX_InkNoteSendKeywordsToTextObject()">
+ </A>
+ replaces a text object's text with the passed note's keywords. The maximum length of any keyword should be INK_DB_MAX_NOTE_KEYWORDS_SIZE<A NAME="Pen_7.htm_IX_INK_DB_MAX_NOTE_KEYWORDS_SIZE">
+ </A>
+.</P>
+<HR>
+<A NAME="Pen_8.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Pen Object Library</A>: 2.4 <A HREF="#Pen_4.htm">Working with the Ink DB</A>: 
+Navigating the Folder Tree</H3>
+<PRE>InkDBGetDisplayInfo(), InkDBSetDisplayInfo(), InkDBGetHeadFolder(), InkGetParentFolder(), InkFolderGetContents(), InkFolderGetNumChildren(), InkFolderDisplayChildInList(), InkFolderGetChildInfo(), InkFolderGetChildNumber(), InkNoteGetNumPages()</PRE>
+<P>
+Assuming the application allows the existence of more than one folder, it must allow some way to move around within the folder tree. If the application allows the user to change the structure of the folder tree, then it will need UI which allows the user to navigate an arbitrary tree. There are routines to find out and change which page is being displayed. For those applications which will need to get information about the folder tree, there are routines to get information about the folder tree.</P>
+<P>
+To find the application's current location within the DB, call <CODE>
+InkDBGetDisplayInfo()</CODE>
+<A NAME="Pen_8.htm_IX_InkDBGetDisplayInfo()">
+ </A>
+. This routine returns the current folder ID, the note ID if any is selected, and the page number within the note.<A NAME="Pen_8.htm_IX_InkDBSetDisplayInfo()">
+ </A>
+ To go to a different location, call <CODE>
+InkDBSetDisplayInfo()</CODE>
+. To use this routine, the application must pass a folder ID, along with a valid note ID and page number if a note is to be selected. </P>
+<P>
+<A NAME="Pen_8.htm_IX_InkDBGetHeadFolder()">
+ </A>
+Chances are the user will be maneuvering within the folder tree. To get the ID of the root folder, use <CODE>
+InkDBGetHeadFolder()</CODE>
+. <A NAME="Pen_8.htm_IX_InkGetParentFolder()">
+ </A>
+To find the parent folder of the passed parent or note, call <CODE>
+InkGetParentFolder()</CODE>
+. <CODE>
+InkFolderGetContents()</CODE>
+<A NAME="Pen_8.htm_IX_InkFolderGetContents()">
+ </A>
+ returns two chunk arrays, one containing the double word identifiers of all the folder's subfolders, the other containing the identifiers of the folder's child notes.<A NAME="Pen_8.htm_IX_InkFolderGetNumChildren()">
+ </A>
+ <CODE>
+InkFolderGetNumChildren()</CODE>
+ returns the number of subfolders and notes within a folder. </P>
+<P>
+To display a note or folder's name in a GenDynamicList, use <CODE>
+InkFolderDisplayChildInList()</CODE>
+<A NAME="Pen_8.htm_IX_InkFolderDisplayChildInList()">
+ </A>
+. This routine comes in handy when constructing UI for navigating the folder tree. To copy the icon and folder or note name of a folder or note into the visual moniker of an entry in a list, call <CODE>
+InkNoteCopyMoniker()</CODE>
+<A NAME="Pen_8.htm_IX_InkNoteCopyMoniker()">
+ </A>
+.</P>
+<P>
+<A NAME="Pen_8.htm_IX_InkFolderGetChildInfo()">
+ </A>
+To get information about a folder's child, call <CODE>
+InkFolderGetChildInfo()</CODE>
+. This routine returns a bit specifying whether the child is a folder or note, along with the child's ID number.<A NAME="Pen_8.htm_IX_InkFolderGetChildNumber()">
+ </A>
+ The <CODE>
+InkFolderGetChildNumber()</CODE>
+ routine returns the passed child's place number within the folder.</P>
+<HR>
+<A NAME="Pen_9.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Pen Object Library</A>: 2.5 <A HREF="#Pen_4.htm">Working with the Ink DB</A>: 
+Managing Notes and Folders</H3>
+<PRE>InkFolderCreateSubFolder(), InkFolderMove(), InkFolderDelete(), InkNoteCreate(), InkNoteDelete(), InkNoteMove(), InkNoteCreatePage()</PRE>
+<P>
+Some Ink DB applications might just create a hierarchy of notes and not allow the user to move or change notes. Applications that will move notes and folders should use the following functions to make changes.</P>
+<P>
+<A NAME="Pen_9.htm_IX_InkFolderCreateSubFolder()">
+ </A>
+The <CODE>
+InkFolderCreateSubFolder()</CODE>
+ routine creates a new folder as a child of the passed existing folder.<A NAME="Pen_9.htm_IX_InkFolderMove()">
+ </A>
+ Use <CODE>
+InkFolderMove()</CODE>
+ to move a folder to a new parent folder.<A NAME="Pen_9.htm_IX_InkNoteMove()">
+ </A>
+ <CODE>
+InkNoteMove()</CODE>
+ similarly moves a note to a new parent folder.<A NAME="Pen_9.htm_IX_InkFolderDelete()">
+ </A>
+ <CODE>
+InkFolderDelete()</CODE>
+ deletes a folder and all subfolders and notes that folder contained.<A NAME="Pen_9.htm_IX_InkNoteCreate()">
+ </A>
+ <CODE>
+InkNoteCreate()</CODE>
+ creates a new note.<A NAME="Pen_9.htm_IX_InkNoteDelete()">
+ </A>
+<CODE>
+ InkNoteDelete()</CODE>
+ deletes a note.<A NAME="Pen_9.htm_IX_InkNoteCreatePage()">
+ </A>
+ <CODE>
+InkNoteCreatePage()</CODE>
+ adds a new page to a note.</P>
+<HR>
+<A NAME="Pen_a.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Pen Object Library</A>: 2.6 <A HREF="#Pen_4.htm">Working with the Ink DB</A>: 
+Manipulating Notes</H3>
+<PRE>InkNoteGetPages(), InkNoteGetNumPages(), InkNoteSetModificationDate(), InkNoteGetModificationDate(), InkNoteGetCreationDate(), InkNoteSetNoteType(), InkNoteGetNoteType()</PRE>
+<P>
+Normally, the note will store information supplied by an Ink or Text object. However, applications may work with a note's information directly. Call <CODE>
+InkNoteGetPages()</CODE>
+<A NAME="Pen_a.htm_IX_InkNoteGetPages()">
+ </A>
+ to get the DB item in which the note's information is stored. The DB item contains a chunk array; each entry of the array contains the information for one page (the DB item associated with an Ink or Text object). To find out how many pages there are in a given note, call <CODE>
+InkNoteGetNumPages()</CODE>
+<A NAME="Pen_a.htm_IX_InkNoteGetNumPages()">
+ </A>
+.</P>
+<P>
+<A NAME="Pen_a.htm_IX_InkNoteSetNoteType()">
+ </A>
+The note will be expecting either text or ink; call <CODE>
+InkNoteSetNoteType()</CODE>
+ to specify what sort of data will be coming in. The note type is specified by means of a <A NAME="Pen_a.htm_IX_NT_&ldots;  (NoteType type)">
+ </A>
+<A NAME="Pen_a.htm_IX_NoteType">
+ </A>
+<CODE>
+NoteType</CODE>
+ value: NT_INK or NT_TEXT. To find out a note's type, call <A NAME="Pen_a.htm_IX_InkNoteGetNoteType()">
+ </A>
+<CODE>
+InkNoteGetNoteType()</CODE>
+.</P>
+<P>
+When writing changes, you may wish to update the note's modification date. <A NAME="Pen_a.htm_IX_InkNoteSetModificationDate()">
+ </A>
+Call <CODE>
+InkNoteSetModificationDate()</CODE>
+ to update this information. <A NAME="Pen_a.htm_IX_InkNoteGetModificationDate()">
+ </A>
+To find out the date last modified, call <CODE>
+InkNoteGetModificationDate()</CODE>
+. <A NAME="Pen_a.htm_IX_InkNoteGetCreationDate()">
+ </A>
+To find out the date the note was created, call <CODE>
+InkNoteGetCreationDate()</CODE>
+.</P>
+<HR>
+<A NAME="Pen_b.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Pen Object Library</A>: 2.7 <A HREF="#Pen_4.htm">Working with the Ink DB</A>: 
+Searching and Traversing the Tree</H3>
+<PRE>InkNoteFindByTitle(), InkNoteFindByKeywords(), InkFolderDepthFirstTraverse()</PRE>
+<P>
+Sometimes the user will remember what a note is called, but has lost it in the tree of folders. Sometimes the user will want to find all notes which contain a certain keyword.<A NAME="Pen_b.htm_IX_InkNoteFindByTitle()">
+ </A>
+ Use <CODE>
+InkNoteFindByTitle()</CODE>
+ to get a buffer containing IDs of all notes whose titles match the passed string. <CODE>
+InkNoteFindByKeywords()</CODE>
+<A NAME="Pen_b.htm_IX_InkNoteFindByKeywords()">
+ </A>
+ similarly returns a buffer containing the IDs of all notes with matching keywords.</P>
+<P>
+<A NAME="Pen_b.htm_IX_InkFolderDepthFirstTraverse()">
+ </A>
+For more complicated commands, <CODE>
+InkFolderDepthFirstTraverse()</CODE>
+ allows the application to perform a depth-first traversal of the folder tree, calling the passed routine with all encountered folders.</P>
+<HR>
+<A NAME="Pen_c.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Pen Object Library</A>: 3 
+InkControlClass</H2>
+<P>
+<CODE>
+InkControlClass</CODE>
+<A NAME="Pen_c.htm_IX_InkControlClass">
+ </A>
+, a subclass of <CODE>
+GenControlClass</CODE>
+, provides a menu which allows the user to select an Ink tool for use with an Ink object.</P>
+<P CLASS="figTitle">
+Code Display 21-2 InkControlClass Features</P>
+<PRE><A NAME="Pen_c.htm_IX_ICF_&ldots;  (InkControlFeatures)"> </A><A NAME="IX_InkControlFeatures"> </A>typedef ByteFlags 	InkControlFeatures;
+/* These features may be combined using | and &amp;:
+	ICF_PENCIL_TOOL,
+	ICF_ERASER_TOOL 
+	ICF_SELECTION_TOOL */</PRE>
+<PRE><A NAME="Pen_c.htm_IX_ICTF_&ldots;"> </A><A NAME="IX_InkControlToolboxFeatures"> </A>typedef ByteFlags 	InkControlToolboxFeatures;
+/* These features may be combined using | and &amp;:
+	ICTF_PENCIL_TOOL,
+	ICTF_ERASER_TOOL 
+	ICTF_SELECTION_TOOL */</PRE>
+<PRE>#define <A NAME="Pen_c.htm_IX_IC_DEFAULT_FEATURES"> </A>IC_DEFAULT_FEATURES 					(ICF_PENCIL_TOOL | ICF_ERASER_TOOL | \
+					 ICF_SELECTION_TOOL)
+#define <A NAME="Pen_c.htm_IX_IC_DEFAULT_TOOLBOX_FEATURES"> </A>IC_DEFAULT_TOOLBOX_FEATURES 					(ICTF_PENCIL_TOOL | ICTF_ERASER_TOOL | \
+					 ICTF_SELECTION_TOOL)</PRE>
+<PRE>/* Add this controller to the application's self-load options GCN list. */<A NAME="Pen_c.htm_marker=826403"> </A><A NAME="marker=826402"> </A><A NAME="marker=826473"> </A></PRE>
+<HR>
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+</BODY>
+</HTML>

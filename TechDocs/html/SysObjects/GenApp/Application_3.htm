@@ -1,0 +1,475 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Application_3.htm,v 1.1 97/06/02 16:15:08 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Application GCN Lists</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The Application Object</A>: 1.2 <A HREF="Application_1.htm">GenApplication Basics</A>: 
+Application GCN Lists</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Application_1.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Application_2.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1.1 Instance Data</A> 
+<!-- to next --> | <A HREF="Application_4.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">1.3 Application Instance Reference</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+The GCN mechanism is fully discussed in <A HREF="../../Kernel/GCN/index.htm">the General Change Mechanism chapter</A>. </P><P>
+Your application may use application GCN lists to notify objects of certain events. For example, it is essential that any windowed objects that you wish to appear upon startup (including your GenPrimary) are added to the GAGCNLT_WINDOWS GCN list. </P>
+<P>
+<A NAME="IX_GAGCNLT_&ldots;">
+ </A>
+GenApplication uses its own GCN list types. The four most often used, and the four you will likely use in most of your applications, are listed below. The others can be found in the file <STRONG CLASS="fileName">
+geoworks.def</STRONG>
+ and following this short list. Note that all of these GCN list types correspond to the manufacturer ID MANUFACTURER_ID_GEOWORKS.</P>
+<UL>
+<LI>
+MGCNLT_ACTIVE_LIST<BR>
+<A NAME="IX_MGCNLT_ACTIVE_LIST">
+ </A>
+<A NAME="IX_Active list">
+ </A>
+This GCN list keeps a record of all objects that need to be built upon application startup. Objects on this list will receive several system attach and detach messages. Several types of GenControl objects need to be on this list to function properly. In that case, these controllers must also appear on either the GAGCNLT_SELF_LOAD_OPTIONS or GAGCNLT_STARTUP_LOAD_OPTIONS lists as well. Objects that do not need to receive attach notification (but do need to receive detach notification) may be added dynamically to this list.</LI>
+<LI>
+GAGCNLT_WINDOWS<BR>
+<A NAME="IX_Windows:notification list">
+ </A>
+This GCN list keeps a record of windowed objects. All windowed objects that should be visible on startup must be added to this list. Any time a windowed object is visually initialized, it will be added to this list. It will not be removed until the object is visually closed. This is used to save window state across shutdown.</LI>
+<LI>
+GAGCNLT_SELF_LOAD_OPTIONS<BR>
+<A NAME="IX_Initialization file:notification lists">
+ </A>
+This GCN list contains a record of all objects that save options upon receiving <CODE>
+MSG_META_SAVE_OPTIONS</CODE>
+. These objects will self-load their options; objects on this list will not receive <CODE>
+MSG_META_LOAD_OPTIONS</CODE>
+ automatically. If they need to do so, they should be added to the <CODE>
+GAGCNLT_STARTUP_LOAD_OPTIONS</CODE>
+ list instead. Objects on this list will be sent <CODE>
+MSG_META_SAVE_OPTIONS</CODE>
+ when the GenApplication receives <CODE>
+MSG_META_SAVE_OPTIONS</CODE>
+.</LI>
+<LI>
+GAGCNLT_STARTUP_LOAD_OPTIONS<BR>
+This GCN list contains a record of all objects that should both load their options upon startup and save their options upon receiving <CODE>
+MSG_META_SAVE_OPTIONS</CODE>
+. Objects on this list will receive <CODE>
+MSG_META_LOAD_OPTIONS</CODE>
+ when they are first loaded.</LI>
+</UL>
+<P CLASS="figTitle">
+Code Display 3-4 Sample GenApplication with Controllers</P>
+<PRE>/* This application includes six controllers. One, the TabControl, must receive 
+ * MSG_META_ATTACH to work properly and is placed on the GCN active list. Another
+ * controller, the GenViewController, must receive MSG_META_LOAD_OPTIONS at
+ * startup and is therefore placed on the STARTUP_LOAD_OPTIONS list. All other
+ * controllers are placed on the SELF_LOAD_OPTIONS list. Note that controllers
+ * placed on the active list still need to be placed on one options list. */</PRE>
+<PRE>@object GenApplicationClass MyApplication = {
+    GI_comp = @MyPrimary;
+	/* Windows GCN list. */
+    gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS) = @MyPrimary;
+	/* Active GCN list. All objects that should receive
+	 * MSG_META_ATTACH should be on this list. These controllers
+	 * should also be added to the appropriate LOAD_OPTIONS list. */
+    gcnList(MANUFACTURER_ID_GEOWORKS, MGCNLT_ACTIVE_LIST) = @MyTabControl,
+			@MyToolControl;
+	/* Startup Load Options GCN list. This list must include
+	 * all objects that should receive MSG_META_LOAD_OPTIONS
+	 * at attach time. */
+    gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_STARTUP_LOAD_OPTIONS) =
+			@MyGenViewControl;
+	/* Self Load Options GCN list. All objects that save
+	 * options and are not on the Startup Load Options list
+	 * should appear here. */
+    gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS) = @MyTabControl,
+			@MyToolControl, @MyEditControl, @MyCharControl, 
+			@MyParaControl;
+}</PRE>
+<P>
+The other GenApplication-defined GCN lists are listed below with comments about their functions. Other GCN list types are also declared by other classes (e.g. <CODE>
+MetaClass</CODE>
+).</P>
+<DL>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_GEN_CONTROL_NOTIFY_STATUS_CHANGE</DT><DD>
+<A NAME="IX_GenToolControlClass: notification list">
+ </A>
+Keeps the GenToolControl up-to-date on the status of all the GenControl objects. The data block passed with this list is of type <CODE>
+NotifyGenControlStatusChange</CODE>
+.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_SELECT_STATE_CHANGE</DT><DD>
+<A NAME="IX_Target selections: notification list">
+ </A>
+Notifies objects of changes in the selection state. The data block passed with this list is of type <CODE>
+NotifySelectStateChange</CODE>
+.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_EDIT_CONTROL_NOTIFY_UNDO_STATE_CHANGE</DT><DD>
+<A NAME="IX_Undo: notification list">
+ </A>
+Notifies objects of changes in the state of the undo item. The data block passed with this list is of type <CODE>
+NotifyUndoStateChange</CODE>
+.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_TEXT_CHAR_ATTR_CHANGE</DT><DD>
+<A NAME="IX_Text: notification lists">
+ </A>
+Notifies objects of changes in the text character attributes.The data block passed with this list is of type <CODE>
+VisTextNotifyCharAttrChange</CODE>
+.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_TEXT_PARA_ATTR_CHANGE</DT><DD>
+Notifies objects of changes in the text paragraph attributes. The data block passed with this list is of type <CODE>
+VisTextNotifyParaAttrChange</CODE>
+.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_TEXT_TYPE_CHANGE</DT><DD>
+Notifies objects of changes in the text type change.The data block passed with this list is of type <CODE>
+VisTextNotifyTypeChange</CODE>
+.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_TEXT_SELECTION_CHANGE</DT><DD>
+Notifies objects of changes in the text selection. The data block passed with this list is of type <CODE>
+VisTextNotifySelectionChange</CODE>
+.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_TEXT_COUNT_CHANGE</DT><DD>
+Notifies objects of changes in the text count. The data block passed with this list is of type <CODE>
+VisTextNotifyCountChange</CODE>
+.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_STYLE_TEXT_CHANGE</DT><DD>
+Notifies objects of possible changes in the style. The data block passed with this list is of type <CODE>
+NotifyStyleChange</CODE>
+.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_STYLE_SHEET_TEXT_CHANGE</DT><DD>
+Notifies objects of possible changes in the style sheet.The data block passed with this list is of type <CODE>
+NotifyStyleSheetChange</CODE>
+.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_TEXT_STYLE_CHANGE</DT><DD>
+Notifies objects of changes in the current text style. The data block passed with this list is of type <CODE>
+NotifyTextStyleChange</CODE>
+.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_FONT_CHANGE</DT><DD>
+<A NAME="IX_Text Attributes: notification lists">
+ </A>
+Notifies objects of changes in the font. The data block passed with this list is of type <CODE>
+NotifyFontChange</CODE>
+.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_POINT_SIZE_CHANGE</DT><DD>
+Notifies objects of changes in text point size. The data block passed with this list is of type <CODE>
+NotifyPointSizeChange</CODE>
+.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_FONT_ATTR_CHANGE</DT><DD>
+Notifies objects of changes in the font attributes. The data block passed with this list is of type <CODE>
+NotifyFontAttrChange</CODE>
+.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_JUSTIFICATION_CHANGE</DT><DD>
+Notifies objects of changes in the paragraph justification. The data block passed with this list is of type <CODE>
+NotifyJustificationChange</CODE>
+.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_TEXT_FG_COLOR_CHANGE</DT><DD>
+Notifies objects of changes in the text foreground (character) color. The data block passed with this list is of type <CODE>
+NotifyColorChange</CODE>
+.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_TEXT_BG_COLOR_CHANGE</DT><DD>
+Notifies objects of changes in the text background color. The data block passed with this list is of type <CODE>
+NotifyColorChange</CODE>
+.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_PARA_COLOR_CHANGE</DT><DD>
+Notifies objects of changes in the text paragraph color.The data block passed with this list is of type <CODE>
+NotifyColorChange</CODE>
+.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_BORDER_COLOR_CHANGE</DT><DD>
+Notifies objects of changes in text border color. The data block passed with this list is of type <CODE>
+NotifyColorChange</CODE>
+.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_SEARCH_SPELL_CHANGE</DT><DD>
+Notifies objects of changes in the search/spell objects.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_SEARCH_REPLACE_CHANGE</DT><DD>
+Notifies objects of changes in the search-and-replace mechanism.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_CHART_TYPE_CHANGE</DT><DD>
+<A NAME="IX_Charts: notification lists">
+ </A>
+Notifies objects of changes in chart type.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_CHART_GROUP_FLAGS</DT><DD>
+Notifies objects of changes in chart group flags.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_CHART_AXIS_ATTRIBUTES</DT><DD>
+Notifies objects of changes in chart axis attributes.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_CHART_MARKER_SHAPE</DT><DD>
+Notifies objects of changes in the chart marker shape.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_GROBJ_CURRENT_TOOL_CHANGE</DT><DD>
+<A NAME="IX_GrObjs: notification lists">
+ </A>
+Notifies objects of changes in the selected GrObj tool.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_GROBJ_BODY_SELECTION_STATE_CHANGE</DT><DD>
+Notifies objects of changes in the GrObj body selection state.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_GROBJ_AREA_ATTR_CHANGE</DT><DD>
+Notifies objects of changes in the GrObj area attributes.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_GROBJ_LINE_ATTR_CHANGE</DT><DD>
+Notifies objects of changes in the GrObj line attributes.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_GROBJ_TEXT_ATTR_CHANGE</DT><DD>
+Notifies objects of changes in the GrObj text attributes.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_STYLE_GROBJ_CHANGE</DT><DD>
+Notifies objects of changes in style changes relating to the GrObj.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_STYLE_SHEET_GROBJ_CHANGE</DT><DD>
+Notifies objects of changes in the style sheet.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_RULER_TYPE_CHANGE</DT><DD>
+<A NAME="IX_Rulers: notification lists">
+ </A>
+Notifies objects of changes in ruler type.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_RULER_GRID_CHANGE</DT><DD>
+Notifies objects of changes in the ruler grid.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_TEXT_RULER_OBJECTS</DT><DD>
+<A NAME="IX_Text rulers: notification list">
+ </A>
+Notifies objects of changes in the active ruler.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_BITMAP_CURRENT_TOOL_CHANGE</DT><DD>
+<A NAME="IX_Bitmaps: notification lists">
+ </A>
+Notifies objects of changes in the selected bitmap tool.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_BITMAP_CURRENT_FORMAT_CHANGE</DT><DD>
+Notifies objects of changes in the current bitmap format.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_FLAT_FILE_FIELD_PROPERTIES_STATUS_CHANGE</DT><DD>
+<A NAME="IX_Flatfile: notification lists">
+ </A>
+Notifies objects of changes in the flatfile database properties status.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_FLAT_FILE_FIELD_LIST_CHANGE</DT><DD>
+Notifies objects of changes in the flatfile field list.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_FLAT_FILE_RCP_STATUS_CHANGE</DT><DD>
+Notifies objects of changes in flatfile status.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_FLAT_FILE_FIELD_APPEARANCE_CHANGE</DT><DD>
+Notifies objects that a field within the flat file has changed its appearance.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_NOTIFY_DOC_SIZE_CHANGE</DT><DD>
+<A NAME="IX_Spool Library: notification lists">
+ </A>
+Notifies objects of changes in document size. The data block passed with this list is of type <CODE>
+NotifyPageSetupChange</CODE>
+.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_NOTIFY_PAPER_SIZE_CHANGE</DT><DD>
+Notifies objects of changes in chosen paper size. The data block passed with this list is of type <CODE>
+NotifyPageSetupChange</CODE>
+.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_VIEW_STATE_CHANGE</DT><DD>
+<A NAME="IX_GenViewControlClass: notification lists">
+ </A>
+Notifies objects of changes in of view state. The data block passed with this list is of type <CODE>
+NotifyViewStateChange</CODE>
+.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_CONTROLLED_GEN_VIEW_OBJECTS</DT><DD>
+A list of GenView objects controlled by the GenViewControl. (These GenViews will have ATTR_GEN_VIEW_INTERACT_WITH_CONTROLLER set in their instance data.)</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_INK_STATE_CHANGE</DT><DD>
+<A NAME="IX_Ink: notification lists">
+ </A>
+Notifies objects of changes in Ink state.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_CONTROLLED_INK_OBJECTS</DT><DD>
+A list of Ink objects controlled by the InkControl.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_PAGE_STATE_CHANGE</DT><DD>
+<A NAME="IX_GenDisplayControlClass: notification lists">
+ </A>
+Notifies objects of changes in page state. The data block passed with this list is of type <CODE>
+NotifyPageStateChange</CODE>
+.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_DOCUMENT_CHANGE</DT><DD>
+Notifies objects of changes in a document. The data block passed with this list is of type <CODE>
+NotifyPageStateChange</CODE>
+.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_DISPLAY_CHANGE</DT><DD>
+Notifies objects of changes in a display. The data block passed with this list is of type <CODE>
+NotifyDisplayChange</CODE>
+.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_DISPLAY_LIST_CHANGE</DT><DD>
+Notifies objects of changes in the display list. The data block passed with this list is of type <CODE>
+NotifyColorChange</CODE>
+.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_SPLINE_MARKER_SHAPE</DT><DD>
+<A NAME="IX_Splines: notification lists">
+ </A>
+Notifies objects of changes in a spline marker shape.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_SPLINE_POINT</DT><DD>
+Notifies objects of changes in spline points.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_SPLINE_POLYLINE</DT><DD>
+Notifies objects of changes in spline polylines.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_SPLINE_SMOOTHNESS</DT><DD>
+Notifies objects of changes in spline smoothness.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_SPLINE_OPEN_CLOSE_CHANGE</DT><DD>
+Notifies objects of changes in a spline's open/close state.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_SPREADSHEET_ACTIVE_CELL_CHANGE</DT><DD>
+<A NAME="IX_Spreadsheets: notification lists">
+ </A>
+Notifies objects of changes in the spreadsheet's active cell range. The data block passed with this list is of type <CODE>
+NotifySSheetActiveCellChanged</CODE>
+.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_SPREADSHEET_EDIT_BAR_CHANGE</DT><DD>
+Notifies objects of changes in the spreadsheet's edit bar. The data block passed with this list is of type <CODE>
+NotifySSheetEditBarChanged</CODE>
+.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_SPREADSHEET_SELECTION_CHANGE</DT><DD>
+Notifies objects of changes in the spreadsheet's selection. The data block passed with this list is of type <CODE>
+NotifySSheetSelectionChanged</CODE>
+.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_SPREADSHEET_CELL_WIDTH_HEIGHT_CHANGE</DT><DD>
+Notifies objects of changes in the spreadsheet's cell width or height. The data block passed with this list is of type <CODE>
+NotifySSheetCellWidthHeightChang</CODE>
+e.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_SPREADSHEET_DOC_ATTR_CHANGE</DT><DD>
+Notifies objects of changes in the spreadsheet's document attributes. The data block passed with this list is of type <CODE>
+NotifySSheetDocAttrChange</CODE>
+.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_SPREADSHEET_CELL_ATTR_CHANGE</DT><DD>
+Notifies objects of changes in the spreadsheet's cell attributes. The data block passed with this list is of type <CODE>
+NotifySSheetCellAttrChange</CODE>
+.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_SPREADSHEET_CELL_NOTES_CHANGE</DT><DD>
+Notifies objects of changes in the notes of a cell within a spreadsheet.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_SPREADSHEET_DATA_RANGE_CHANGE</DT><DD>
+Notifies objects of changes in the spreadsheet's data range selection. The data block passed with this list is of type <CODE>
+NotifySSheetDataRangeChange</CODE>
+.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_TEXT_NAME_CHANGE</DT><DD>
+<A NAME="IX_Text Names: notification list">
+ </A>
+Notifies objects of changes in a text object's names run. The data block passed with this list is of type <CODE>
+VisTextNotifyNameChange.</CODE>
+</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_FLOAT_FORMAT_CHANGE</DT><DD>
+<A NAME="IX_Floating-Point Formats: notification list">
+ </A>
+Notifies objects of changes in a particular float format within the float format controller.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_DISPLAY_OBJECTS_WITH_RULERS</DT><DD>
+<A NAME="IX_Rulers: notification lists">
+ </A>
+A list of GenDisplay objects that have rulers.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_APP_CHANGE</DT><DD>
+<A NAME="IX_ImpexMapControl: notification lists">
+ </A>
+Notifies objects of changes in an application.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_LIBRARY_CHANGE</DT><DD>
+Notifies objects of changes in a library.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_APP_TARGET_NOTIFY_CARD_BACK_CHANGE</DT><DD>
+<A NAME="IX_Card Library: notification list">
+ </A>
+Notifies objects that a card back has changed.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_NOTIFY_FOCUS_TEXT_OBJECT</DT><DD>
+Notifies objects that a an editable text object has a gained the focus. This list is used by the floating keyboard to determine when it should be enabled or not.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_NOTIFY_TEXT_CONTEXT</DT><DD>
+Notifies objects that a the selection or data in a focused text object has changed, if that text object has text contexts turned on. This list is used by hand-writing recognition.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_NOTIFY_HELP_CONTEXT_CHANGE</DT><DD>
+Notifies objects that a help context has changed.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_FLOAT_FORMAT_INIT</DT><DD>
+Notifies the float controller that it should re-initialize itself. This normally sent to the controller when the target document has changed.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_ALWAYS_INTERACTABLE_WINDOWS</DT><DD>
+This list stores windows that should always remain interactable, even if modal windows are on-screen. Objects on this list will get messages even if GenInteractions invoked by <CODE>
+UserDoDialog()</CODE>
+ are on-screen. These objects also receive MSG_META_CHECK_IF_INTERACTABLE_OBJECT to allow them to specify objects under them (such as objects in the child blocks) that should also receive messages.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_USER_DO_DIALOGS</DT><DD>
+This list stores all dialog boxes initiated via <CODE>
+UserDoDialog()</CODE>
+.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_MODAL_WIN_CHANGE</DT><DD>
+Notifies objects that modal window changes have occurred within the application.</DD>
+<DT CLASS="FIXME_WorListWide">
+GACGNLT_APP_TARGET_NOTIFY_SPREADSHEET_NAME_CHANGE</DT><DD>
+Notifies objects that a spreadsheet's name has changed.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_CONTROLLERS_WITHIN_USER_DO_DIALOGS</DT><DD>
+This list stores objects (usually controllers) that will appear within the context of <CODE>
+UserDoDialog()</CODE>
+ but will not be within the same block as the dialog box. Objects on this list will receive MSG_META_CHECK_IF_INTERACTABLE_OBJECT.</DD>
+<DT CLASS="FIXME_WorListWide">
+GAGCNLT_FOCUS_WINDOW_KBD_STATUS</DT><DD>
+Notifies floating keyboards when windows gain the focus on pen systems.</DD>
+</DL>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Application_1.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Application_2.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">1.1 Instance Data</A> 
+<!-- to next --> | <A HREF="Application_4.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">1.3 Application Instance Reference</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

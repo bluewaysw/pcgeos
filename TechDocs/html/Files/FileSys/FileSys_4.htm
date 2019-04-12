@@ -1,0 +1,199 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: FileSys_4.htm,v 1.1 97/06/02 14:44:53 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Accessing Drives</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The File System</A>: 3.1 <A HREF="FileSys_3.htm">Disks and Drives</A>: 
+<A NAME="64044">
+ </A>
+Accessing Drives</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="FileSys_3.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="FileSys_3.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">3 Disks and Drives</A> 
+<!-- to next --> | <A HREF="FileSys_5.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.2 Accessing Disks</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>DriveGetStatus(), DriveGetExtStatus(), DriveGetDefaultMedia(), DriveTestMediaSupport(), DriveGetName(), DriveStatus, DriveType, MediaType</PRE>
+<P>
+Most systems running GEOS have access to a number of different drives. With the exception of network drives, the drives available will usually not change during an execution of GEOS, although the volumes mounted on the drives can change. Every drive is accessed by its <EM>
+drive number</EM>
+. This token is a byte-length integer value.</P>
+<P>
+When you wish to open a file, you must specify its volume, not its drive. This is because the volume mounted on a drive can change frequently and without warning. </P>
+<P>
+GEOS<A NAME="IX_DriveGetStatus()">
+ </A>
+ provides routines to get information about a drive. To get general information about a drive, call the routine <CODE>
+DriveGetStatus()</CODE>
+. <A NAME="IX_DS_&ldots;  (DriveStatus)">
+ </A>
+<A NAME="IX_DriveStatus">
+ </A>
+This routine takes the drive number and returns a word-length set of <CODE>
+DriveStatus</CODE>
+ flags (defined in <STRONG CLASS="fileName">
+drive.h</STRONG>
+). If an error condition exists, such as the drive you request not existing, it returns zero. The following flags may be returned:</P>
+<DL>
+<DT>
+DS_PRESENT</DT><DD>
+This flag is set if the physical drive exists, regardless of whether the drive contains a disk.</DD>
+<DT>
+DS_MEDIA_REMOVABLE</DT><DD>
+This flag is set if the disk can be removed from the drive.</DD>
+<DT>
+DS_NETWORK</DT><DD>
+This flag is set if the drive is accessed over a network (or via network protocols), which means the drive cannot be formatted or copied.</DD>
+<DT>
+DS_TYPE</DT><DD>This is a mask for the lowest four bits of the field. These bits contain a member of the <CODE>
+DriveType</CODE>
+ enumerated type.</DD>
+</DL>
+<P>
+<A NAME="IX_DRIVE_&ldots;">
+ </A>
+<A NAME="IX_DriveType">
+ </A>
+The lowest four bits of the word contains a member of the <CODE>
+DriveType</CODE>
+ enumerated type. The field can be accessed by masking out all the bits except for those set in DS_TYPE. <CODE>
+DriveType</CODE>
+ comprises the following values:</P>
+<DL>
+<DT>
+DRIVE_5_25</DT><DD>Drive uses 5.25-inch floppy disks.</DD>
+<DT>
+DRIVE_3_5</DT><DD>Drive uses 3.5-inch floppy disks.</DD>
+<DT>
+DRIVE_FIXED</DT><DD>
+Drive uses some kind of fixed disk (e.g. a hard drive).</DD>
+<DT>
+DRIVE_RAM</DT><DD>Drive is chip-based (either RAM or ROM).</DD>
+<DT>
+DRIVE_CD_ROM</DT><DD>
+Drive uses read-only optical disks.</DD>
+<DT>
+DRIVE_8</DT><DD>Drive uses 8-inch floppy disks.</DD>
+<DT>
+DRIVE_UNKNOWN</DT><DD>
+Drive type is unknown.</DD>
+</DL>
+<P>
+<CODE>
+DriveGetStatus()</CODE>
+ returns the information most often needed about a drive. However, you may sometimes need more obscure information.<A NAME="IX_DriveGetExtStatus()">
+ </A>
+ For this reason, GEOS provides the routine <CODE>
+DriveGetExtStatus()</CODE>
+. Like <CODE>
+DriveGetStatus()</CODE>
+, it takes the drive number as an argument and returns a word of flags; however, it returns additional flags. The flags returned by <CODE>
+DriveGetStatus()</CODE>
+ are set in the lower byte of the returned word; special additional flags are set in the upper byte. Like <CODE>
+DriveGetStatus()</CODE>
+, <CODE>
+DriveGetExtStatus()</CODE>
+ returns zero if the drive specified is invalid. The following flags are defined for the upper byte:</P>
+<DL>
+<DT>
+DES_LOCAL_ONLY</DT><DD>
+<A NAME="IX_DES_&ldots;">
+ </A>
+This flag is set if the device cannot be viewed over a network.</DD>
+<DT>
+DES_READ_ONLY</DT><DD>
+This flag is set if the device is read only, i.e. no data can ever be written to a volume mounted on it (e.g., a CD-ROM drive).</DD>
+<DT>
+DES_FORMATTABLE</DT><DD>
+This flag is set if disks can be formatted in the drive.</DD>
+<DT>
+DES_ALIAS</DT><DD>This flag is set if the drive is actually an alias for a path on another drive.</DD>
+<DT>
+DES_BUSY</DT><DD>This flag is set if the drive will be busy for an extended period of time (e.g., if a disk is being formatted).</DD>
+</DL>
+<P>
+Many disk drives can take a variety of disks. For example, high-density 3.5-inch drives can read and write to either 720K disks or 1.44M disks. Every drive has a &quot;default&quot; media type. When you format a disk in that drive, it will, by default, be formatted to the default size.<A NAME="IX_DriveGetDefaultMedia()">
+ </A>
+ To find out the default disk type, call the routine <CODE>
+DriveGetDefaultMedia()</CODE>
+. This routine takes one argument, namely the drive number.<A NAME="IX_MediaType">
+ </A>
+ It returns a member of the <CODE>
+MediaType</CODE>
+ enumerated type. <CODE>
+MediaType</CODE>
+ has the following possible values:</P>
+<DL>
+<DT>
+MEDIA_160K, MEDIA_180K, MEDIA_320K, MEDIA_360K</DT><DD>
+<A NAME="IX_MEDIA_&ldots;">
+ </A>
+<A NAME="17696">
+ </A>
+These are all sizes used by 5.25-inch disks.</DD>
+<DT>
+MEDIA_720K</DT><DD>
+This is the size of a regular 3.5-inch disk.</DD>
+<DT>
+MEDIA_1M2</DT><DD>
+This is the size of a high-density 5.25-inch disk.</DD>
+<DT>
+MEDIA_1M44</DT><DD>
+This is the size of a high-density 3.5-inch disk.</DD>
+<DT>
+MEDIA_2M88</DT><DD>
+This is the size of an ultra-high-density 3.5-inch disk.</DD>
+<DT>
+MEDIA_FIXED_DISK</DT><DD>
+This is returned for all fixed disks.</DD>
+<DT>
+MEDIA_CUSTOM</DT><DD>
+This is returned if none of the other values is appropriate. For example, it is returned for CD-ROM drives.</DD>
+<DT>
+MEDIA_NONEXISTENT</DT><DD>
+This is returned if the drive specified does not contain a disk. This value is defined to be equal to zero.</DD>
+</DL>
+<P>
+<A NAME="IX_DriveTestMediaSupport()">
+ </A>
+If you want to find out if a drive can accommodate a certain kind of disk, call the routine <CODE>
+DriveTestMediaSupport()</CODE>
+. This Boolean routine takes two arguments: a drive number and a member of the <CODE>
+MediaType</CODE>
+ enumerated type. If the drive supports that medium, the routine returns <EM>
+true</EM>
+ (i.e. non-zero); otherwise, it returns <EM>
+false</EM>
+ (i.e. zero).</P>
+<P>
+<A NAME="IX_DriveGetName()">
+ </A>
+To find out the name of a given drive, call <CODE>
+DriveGetName()</CODE>
+. This routine is passed three arguments: a drive number, a pointer to a character buffer, and the size of that buffer. <CODE>
+DriveGetName()</CODE>
+ writes the drive's name to the buffer as a null-terminated string; it returns a pointer to that trailing null. If the buffer was not large enough, or the drive does not exist, it returns a null pointer.</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="FileSys_3.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="FileSys_3.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">3 Disks and Drives</A> 
+<!-- to next --> | <A HREF="FileSys_5.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.2 Accessing Disks</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

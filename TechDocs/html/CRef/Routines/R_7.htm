@@ -1,0 +1,272 @@
+<HTML>
+<HEAD>
+
+<!-- $Id: R_7.htm,v 1.6 97/08/12 15:06:01 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> --><LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE>GEOS C Routines: ChunkArrayElementToPtr() ...</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+<DIV>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->|<A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --><!-- to previous --> | <A HREF="R_6.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">ChunkArrayDelete() ...</A>
+<!-- to next --> | <A HREF="R_8.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">ChunkArrayGetCountHandles() ...</A>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</DIV>
+
+<DIV>
+<HR>
+<P>
+<H1 CLASS="refHeading"><A NAME="IX_ChunkArrayElementToPtr()">ChunkArrayElementToPtr()</A>
+</H1>
+<PRE>
+void *  ChunkArrayElementToPtr(
+        optr           array,                                  /* optr to chunk array */
+        word           elementNumber,                                  /* Element to get address of */
+        void *         elementSize);                                   /* Write element's size here */
+
+</PRE>
+<P>
+This routine translates the index of an element into the element's
+address. The routine is passed an optr to the chunk array, the
+index of the element in question, and a pointer to a word-sized
+variable. It returns a pointer to the element. If the elements
+in the array are of variable size, it writes the size of the element
+to the variable pointed to by the <EM>elementSize</EM> pointer.
+If the elements are of uniform size, it does not do this.</P>
+<P>
+If the array index is out of bounds, the routine returns a pointer
+to the last element in the array. The routine will also do this
+if you pass the constant CA_LAST_ELEMENT.</P>
+<P CLASS="refField">
+<STRONG>Include:</STRONG> <STRONG>chunkarr.h</STRONG></P>
+<P CLASS="refField">
+<STRONG>Tips and Tricks:</STRONG> If you are not interested in
+the element's size, pass a null pointer as the third argument.</P>
+<P CLASS="refField">
+<STRONG>Be Sure To:</STRONG> Lock the LMem heap's block on the
+global heap (unless it is fixed).</P>
+<P CLASS="refField">
+<STRONG>Warnings:</STRONG> The error-checking version fatal-errors
+if passed the index CA_NULL_ELEMENT (i.e. 0xffff, or -1).</P></DIV><DIV>
+<H1 CLASS="refHeading"><A NAME="IX_ChunkArrayElementToPtrHandles()">ChunkArrayElementToPtrHandles()</A>
+</H1>
+<PRE>
+void *  ChunkArrayElementToPtrHandles(
+        Memhandle              mh,                                     /* Handle of LMem heap's block */
+        ChunkHandle            chunk,                                  /* Handle of chunk array */
+        word           elementNumber,                                  /* Element to get address of */
+        void *         elementSize);                                   /* Write element's size here */
+
+</PRE>
+<P>
+This routine is just like <A HREF="../../CRef/Routines/R_7.htm#IX_ChunkArrayElementToPtr()">ChunkArrayElementToPtr()</A>
+, except that the chunk array is specified with its global and
+chunk handles, instead of with an optr.</P>
+<P CLASS="refField">
+<STRONG>Include:</STRONG> <STRONG>chunkarr.h</STRONG></P>
+<P CLASS="refField">
+<STRONG>Tips and Tricks:</STRONG> If you are not interested in
+the element's size, pass a null pointer as the fourth argument.</P>
+<P CLASS="refField">
+<STRONG>Be Sure To:</STRONG> Lock the LMem heap's block on the
+global heap (unless it is fixed).</P>
+<P CLASS="refField">
+<STRONG>See Also:</STRONG> <A HREF="../../CRef/Routines/R_8.htm#IX_ChunkArrayPtrToElement()">ChunkArrayPtrToElement()</A>.</P>
+<P CLASS="refField">
+<STRONG>Warnings:</STRONG> The error-checking version fatal-errors
+if passed the index CA_NULL_ELEMENT (i.e. 0xffff, or -1).</P></DIV><DIV>
+<H1 CLASS="refHeading"><A NAME="IX_ChunkArrayEnum()">ChunkArrayEnum()</A>
+</H1>
+<PRE>
+Boolean ChunkArrayEnum(
+        optr           array,                  /* optr to chunk array */
+        void *         enumData,                       /* This is passed to callback routine */
+        Boolean _pascal (*callback) (void *element, void *enumData));
+        /* callback called for each element; returns TRUE to stop */
+
+</PRE>
+<P>
+This routine lets you apply a procedure to every element in a
+chunk array. The routine is passed an optr to the chunk array,
+a pointer (which is passed to the callback routine), and a pointer
+to a Boolean callback routine. The callback routine, in turn,
+is called once for each element in the array, and is passed two
+arguments: a pointer to an element and the pointer which was passed
+to <CODE>ChunkArrayEnum()</CODE> . If the callback routine ever
+returns <EM>true</EM> for an element, <CODE>ChunkArrayEnum()</CODE>
+will stop with that element and return <EM>true</EM> . If it enumerates
+every element without being aborted, it returns <EM>false</EM>.</P>
+
+<P>
+The callback routine can call such routines as 
+<A HREF="../../CRef/Routines/R_5.htm#IX_ChunkArrayAppend()">ChunkArrayAppend()</A>,
+<A HREF="../../CRef/Routines/R_8.htm#IX_ChunkArrayInsertAt()">ChunkArrayInsertAt(),</A> 
+and <A HREF="../../CRef/Routines/R_6.htm#IX_ChunkArrayDelete()">ChunkArrayDelete()</A>
+. <CODE>ChunkArrayEnum()</CODE> will see to it that every element
+is enumerated exactly once. The callback routine can even make
+a nested call to <CODE>ChunkArrayEnum()</CODE> ; the nested call
+will be completed for every element before the outer call goes
+to the next element. The callback routine should be declared _pascal.</P>
+
+<A NAME="IX_CHUNK_ARRAY_ENUM_INSERT_OR_DELETE_RUN_BY_MULTIPLE_THREADS"></A>
+<P>You can get into trouble if more than one thread of execution 
+is accessing a single ChunkArray and one or both of these threads 
+is using one of the ChunkArrayEnum...() routines.  The error-checking 
+version of the kernel detects this situation and generates a 
+CHUNK_ARRAY_ENUM_INSERT_OR_DELETE_RUN_BY_MULTIPLE_THREADS warning 
+if it detects such.  If your code is getting this warning, you should 
+add some synchronization between threads.  While one thread is enumerating 
+through chunks in the chunk array, the other should do nothing to 
+enumerate the same array, nor alter the array in any way.</P>
+
+<P CLASS="refField">
+<STRONG>Include:</STRONG> <STRONG>chunkarr.h</STRONG></P>
+<P CLASS="refField">
+<STRONG>Be Sure To:</STRONG> Lock the LMem heap's block on the
+global heap (unless it is fixed).</P></DIV>
+
+<DIV> 
+<H1 CLASS="refHeading"><A NAME="IX_ChunkArrayEnumHandles()">ChunkArrayEnumHandles()</A>
+</H1>
+<PRE>
+Boolean ChunkArrayEnumHandles(
+        MemHandle              mh,                     /* Handle of LMem heap's block */
+        ChunkHandle            ch,                     /* Handle of chunk array */
+        void *         enumData,                       /* Buffer used by callback routine */
+        Boolean _pascal (*callback) (void *element, void *enumData));
+        /* callback called for each element; returns TRUE to stop */
+
+</PRE>
+<P>
+This routine is exactly like <A HREF="../../CRef/Routines/R_7.htm#IX_ChunkArrayEnum()">ChunkArrayEnum()</A>
+, except that the chunk array is specified by its global and chunk
+handles (instead of with an optr). </P>
+
+<P>You can get into trouble if more than one thread of execution 
+is accessing a single ChunkArray and one or both of these threads 
+is using one of the ChunkArrayEnum...() routines.  The error-checking 
+version of the kernel detects this situation and generates a 
+CHUNK_ARRAY_ENUM_INSERT_OR_DELETE_RUN_BY_MULTIPLE_THREADS warning 
+if it detects such.  If your code is getting this warning, you should 
+add some synchronization between threads.  While one thread is enumerating 
+through chunks in the chunk array, the other should do nothing to 
+enumerate the same array, nor alter the array in any way.</P>
+
+<P CLASS="refField">
+<STRONG>Include:</STRONG> <STRONG>chunkarr.h</STRONG></P></DIV>
+
+<DIV> 
+<H1 CLASS="refHeading"><A NAME="IX_ChunkArrayEnumRange()">ChunkArrayEnumRange()</A>
+</H1>
+<PRE>
+Boolean         ChunkArrayEnumRange(
+        optr   array,  /* optr to chunk array */
+        word   startElement,   /* Start enumeration with this element */
+        word   count,  /* Process this many elements */
+        void * enumData,       /* This is passed to the callback routine */
+        Boolean _pascal (*callback)            /* Return TRUE to halt enumeration */
+               (void *element, void *enumData));
+
+</PRE>
+<P>
+This routine is exactly like <A HREF="../../CRef/Routines/R_7.htm#IX_ChunkArrayEnum()">ChunkArrayEnum()</A>
+(described above), except that it acts on a limited portion of
+the array. It is passed two additional arguments: the index of
+the starting element, and the number of elements to process. It
+will begin the enumeration with the element specified (remember,
+the first element in a chunk array has an index of zero). If the
+count passed would take the enumeration past the end of the array,
+<CODE>ChunkArrayEnumRange()</CODE> will automatically stop with
+the last element. You can instruct <CODE>ChunkArrayEnumRange()</CODE>
+to process all elements by passing a <CODE>count</CODE> of CA_LAST_ELEMENT.</P>
+
+<P>You can get into trouble if more than one thread of execution 
+is accessing a single ChunkArray and one or both of these threads 
+is using one of the ChunkArrayEnum...() routines.  The error-checking 
+version of the kernel detects this situation and generates a 
+CHUNK_ARRAY_ENUM_INSERT_OR_DELETE_RUN_BY_MULTIPLE_THREADS warning 
+if it detects such.  If your code is getting this warning, you should 
+add some synchronization between threads.  While one thread is enumerating 
+through chunks in the chunk array, the other should do nothing to 
+enumerate the same array, nor alter the array in any way.</P>
+
+<P CLASS="refField">
+<STRONG>Include:</STRONG> <STRONG>chunkarr.h</STRONG></P>
+<P CLASS="refField">
+<STRONG>Warnings:</STRONG> The start element must be within the
+bounds of the array.</P>
+<P CLASS="refField">
+<STRONG>See Also:</STRONG> <A HREF="../../CRef/Routines/R_7.htm#IX_ChunkArrayEnum()">ChunkArrayEnum()</A>.</P></DIV>
+
+<DIV>
+<H1 CLASS="refHeading"><A NAME="IX_ChunkArrayEnumRangeHandles()">ChunkArrayEnumRangeHandles()</A>
+</H1>
+<PRE>
+Boolean         ChunkArrayEnumRangeHandles(
+        MemHandle      mh,     /* Handle of LMem heap's block */
+        ChunkHandle    ch,     /* Handle of chunk array */
+        word   startElement,   /* Start enumeration with this element */
+        word   count,  /* Process this many elements */
+        void * enumData,       /* This is passed to the callback routine */
+        Boolean _pascal (*callback)            /* Return TRUE to halt enumeration */
+               (void *element, void *enumData));
+
+</PRE>
+<P>
+This routine is exactly like <A HREF="../../CRef/Routines/R_7.htm#IX_ChunkArrayEnumRange()">ChunkArrayEnumRange()</A>
+, except that the chunk array is specified by its global and chunk
+handles (instead of with an optr).</P>
+
+<P>You can get into trouble if more than one thread of execution 
+is accessing a single ChunkArray and one or both of these threads 
+is using one of the ChunkArrayEnum...() routines.  The error-checking 
+version of the kernel detects this situation and generates a 
+CHUNK_ARRAY_ENUM_INSERT_OR_DELETE_RUN_BY_MULTIPLE_THREADS warning 
+if it detects such.  If your code is getting this warning, you should 
+add some synchronization between threads.  While one thread is enumerating 
+through chunks in the chunk array, the other should do nothing to 
+enumerate the same array, nor alter the array in any way.</P>
+</DIV>
+
+<DIV> 
+<H1 CLASS="refHeading"><A NAME="IX_ChunkArrayGetCount()">ChunkArrayGetCount()</A>
+</H1>
+<PRE>
+word    ChunkArrayGetCount(
+        optr   array);                         /* optr of chunk array */
+
+</PRE>
+<P>
+This routine returns the number of elements in the specified chunk
+array.</P>
+<P CLASS="refField">
+<STRONG>Include:</STRONG> <STRONG>chunkarr.h</STRONG></P>
+<P CLASS="refField">
+<STRONG>Tips and Tricks:</STRONG> It is usually faster to examine
+the CAH<CODE> _count</CODE> field of the <CODE>ChunkArrayHeader</CODE>
+. This field is the first word of the <CODE>ChunkArrayHeader</CODE>
+(and therefore of the chunk). It contains the number of elements
+in the chunk array.</P>
+<P CLASS="refField">
+<STRONG>Be Sure To:</STRONG> Lock the LMem heap's block on the
+global heap (unless it is fixed).</P>
+<P CLASS="refField">
+<STRONG>See Also:</STRONG> <A HREF="../../CRef/Structs/S_6.htm#IX_ChunkArrayHeader">ChunkArrayHeader</A>.</P></DIV>
+<HR>
+<P>
+<!-- This blob is a bunch of standard links: up, back, index, etc. --><!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A><!-- up to parent -->|
+<A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A><!-- down to first child -->
+<!-- to previous --> | <A HREF="R_6.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">ChunkArrayDelete() ...</A>
+<!-- to next --> | <A HREF="R_8.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">ChunkArrayGetCountHandles() ...</A>
+<HR>
+<P>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+
+</BODY>
+</HTML>

@@ -1,0 +1,331 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+<!-- This page was automatically generated from a bunch of smaller pages. -->
+<META NAME="copyright" CONTENT="Copyright GEOWORKS">
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+<TITLE>Fax Sending</TITLE>
+</HEAD>
+<BODY BGCOLOR="#ffffdf">
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+<A NAME="index.htm"></A>
+
+
+
+<H1 CLASS="chapterTitle">
+
+<A NAME="index.htm_26023">
+ </A>
+Fax Sending
+
+</H1>
+<P>
+This chapter describes how an application can use the fax libraries and 
+Mailbox library to compose and send a fax. Most GEOS devices, including 
+the Nokia 9000i Communicator, come with an application that composes and 
+sends simple fax documents; this chapter will show you how you can write 
+a program that composes a custom fax using graphics commands.</P>
+
+<P>
+This chapter assumes that you know the basics of GEOS programming. It also assumes that you know how to draw the image that you want to fax, given a GState to draw to. (Most visible objects draw themselves when sent a <CODE>
+MSG_VIS_DRAW</CODE>
+; documentation of kernel drawing commands may be found in 
+
+</P>
+<P>
+A PrintControl object provides the API for drawing the contents of the fax; while this chapter will tell you what you need to know for simple faxes, more information about the PrintControl is available in <A HREF="../../Communication/Printing/index.htm"></A>.</P><P>
+Sending a fax may be broken down into the following tasks:</P>
+<UL>
+<LI>
+Finding out where to send the fax; and </LI>
+<LI>
+Drawing the contents of the fax.</LI>
+</UL>
+<P>
+Ideally, these tasks are carried out using standard object classes that conform to the device's look and feel.</P>
+<P CLASS="sectionlinks">
+<STRONG>
+&nbsp;&nbsp;<A HREF="#FaxSend_1.htm">1 Destination Phone Number</A><BR>
+&nbsp;&nbsp;<A HREF="#FaxSend_2.htm">2 Drawing the Contents</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#FaxSend_3.htm">2.1 Declaring the Objects</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#FaxSend_4.htm">2.2 Supplying the Document's Name</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#FaxSend_5.htm">2.3 Supplying the Fax's Contents</A><BR>
+</STRONG>
+</P> <!-- end of sectionlinks blob -->
+
+<HR>
+<A NAME="FaxSend_1.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Fax Sending</A>: 1 
+<A NAME="FaxSend_1.htm_81499">
+ </A>
+Destination Phone Number</H2>
+<P>
+To prompt the user for the fax's destination phone number while employing the device's standard look and feel, we will use the Mailbox library and its fax adjuncts. Specifically, we will use a <CODE>
+MailboxSendControl</CODE>
+ object, configured for use with fax.</P>
+<P>
+Make sure the following lines appear in the application's .gp file:</P>
+<PRE>library mailbox   # Defines MailboxSendControlClass
+library spool     # Defines PrintControlClass</PRE>
+<P>
+We will use a <CODE>
+MailboxSendControl</CODE>
+ object to provide the UI that prompts the user for a phone number. When it comes time to draw the contents of our fax, we'll also need a <CODE>
+PrintControl</CODE>
+ object. </P>
+<P>
+We make sure that these controller objects are added to the correct GCN lists in the declaration of our application's Application object:</P>
+<P CLASS="figTitle">
+Code Display 4-1 <A NAME="FaxSend_1.htm_25429">
+ </A>
+Adding the Fax Controls to the Proper GCN Lists</P>
+<P CLASS="figCaption">
+In the declaration of the application's Application object, we make sure that the MailboxSendControl and PrintControl objects are placed on the proper GCN lists.</P>
+<PRE>@object ... MyApp = {
+    ...
+    gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS) =
+				... @MyPrintControl, @MySendControl;
+    gcnList(MANUFACTURER_ID_GEOWORKS, MGCNLT_ACTIVE_LIST) = ... @MySendControl;
+    gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_MAILBOX_SEND_CONTROL) =
+							... @MySendControl;
+    ATTR_GEN_APPLICATION_PRINT_CONTROL = @MyPrintControl;
+}</PRE>
+<P>
+We make sure that the <CODE>
+MailboxSendControl</CODE>
+ will be visible to the user; the straightforward way to do this is to add it to the application's generic UI tree. For example:</P>
+<PRE>@object GenPrimaryClass MyPrimary = {</PRE>
+<PRE>    GI_comp  = ..., @MySendControl;</PRE>
+<PRE>}</PRE>
+<P>
+Finally, we're ready to declare the <CODE>
+MailboxSendControl</CODE>
+ object itself:</P>
+<P CLASS="figTitle">
+Code Display 4-2 <A NAME="FaxSend_1.htm_25475">
+ </A>
+MailboxSendControl Object Ready for Fax</P>
+<PRE>@object MailboxSendControlClass MySendControl = {
+    GI_visMoniker = &quot;Send&quot;;
+    GII_visibility = GIV_POPUP;
+    GCI_output = process;
+    MSCI_defBodyType = MOT_SELECTION;</PRE>
+<PRE>    ATTR_MAILBOX_SEND_CONTROL_SEND_SELECTION;
+    ATTR_GEN_INIT_FILE_CATEGORY = &quot;fax&quot; ;</PRE>
+<PRE>    ATTR_MAILBOX_SEND_CONTROL_SINGLE_TRANSPORT = {
+    {GMID_CELL_MODEM, MANUFACTURER_ID_GEOWORKS},
+    {GMTID_FAX_SEND, MANUFACTURER_ID_GEOWORKS},0};</PRE>
+<PRE>    ATTR_MAILBOX_SEND_CONTROL_TRANSPORT_HINT_OPTR =  {
+      {GMTID_FAX_SEND, MANUFACTURER_ID_GEOWORKS}, 0,
+      @MyPrintControl};
+}</PRE>
+<P>
+(If your application is to run on the Nokia 9000i Communicator, use ComplexMonikerClass to give your <CODE>
+MailboxSendControl</CODE>
+ the standard Nokia 9000i Communicator look and feel. In the example above, you would replace</P>
+<PRE>@object MailboxSendControlClass MySendControl = {
+    GI_visMoniker = &quot;Send&quot;;</PRE>
+<P>
+...with...</P>
+<PRE>@object ComplexMonikerClass MySendControl = {
+    ComplexMoniker = MailboxSendControlClass;
+    CMI_topText = CMT_SELECT_RECEIVER;</PRE>
+<PRE>    HINT_SEEK_REPLY_BAR; /* make this button 0 */
+    HINT_SEEK_SLOT = 0;</PRE>
+<P>
+)</P>
+<P>
+<CODE>
+ATTR_MAILBOX_SEND_CONTROL_TRANSPORT_HINT_OPTR</CODE>
+ tells the <CODE>
+MailboxSendControl</CODE>
+ that when it comes time to send a fax, it should look to the <CODE>
+MyPrintControl</CODE>
+ object to provide the data. The FaxSendTD Mailbox transport driver knows how to interact with PrintControl objects; we will add code to our program to work with the PrintControl to draw our fax contents.</P>
+<P>
+ATTR_GEN_INIT_FILE_CATEGORY tells the send control where to find the user's faxing preferences within the INI file--the &quot;fax&quot; category.</P>
+<P>
+<CODE>
+ATTR_MAILBOX_SEND_CONTROL_SINGLE_TRANSPORT</CODE>
+ specifies that this <CODE>
+MailboxSendControl</CODE>
+ only sends data by fax. To allow your application to send data in additional ways, get rid of this ATTR.</P>
+<P>
+The <CODE>
+MailboxSendControl</CODE>
+ would ask the user what data they wish to send: the current selection, current page, all pages. In most fax programs, we don't want to give the user that choice. In our example, we use the <CODE>
+ATTR_MAILBOX_SEND_CONTROL_SEND_SELECTION</CODE>
+ vardata field to prevent the controller from presenting the user with this choice--the <CODE>
+MailboxSendControl</CODE>
+ will always try to send the &quot;current selection,&quot; though our program ignores any idea of selection. </P>
+<HR>
+<A NAME="FaxSend_2.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Fax Sending</A>: 2 
+<A NAME="FaxSend_2.htm_15824">
+ </A>
+Drawing the Contents</H2>
+<P>
+We have configured the <CODE>
+MailboxSendControl</CODE>
+ so that when the user has specified a recipient for the fax, the control will query a <CODE>
+PrintControl</CODE>
+ object for the fax's contents.</P>
+<P CLASS="subsectionLink">
+<A HREF="#FaxSend_3.htm">Declaring the Objects</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#FaxSend_4.htm">Supplying the Document's Name</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#FaxSend_5.htm">Supplying the Fax's Contents</A></P>
+<HR>
+<A NAME="FaxSend_3.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Fax Sending</A>: 2.1 <A HREF="#FaxSend_2.htm">Drawing the Contents</A>: 
+<A NAME="FaxSend_3.htm_73830">
+ </A>
+Declaring the Objects</H3>
+<P>
+Again, make sure the following line is in the application's .gp file:</P>
+<PRE>library spool    # Defines PrintControlClass</PRE>
+<P>
+In the previous section, we saw that the <CODE>
+PrintControl</CODE>
+ object needed to appear on certain GCN lists and in the <CODE>
+MailboxSendControl</CODE>
+'s <CODE>
+ATTR_MAILBOX_SEND_CONTROL_TRANSPORT_HINT_OPTR</CODE>
+ field. (See <A HREF="#FaxSend_1.htm_25429"> Adding the Fax Controls to the Proper GCN Lists</A>
+ and <A HREF="#FaxSend_1.htm_25475"> MailboxSendControl Object Ready for Fax</A>
+.)</P>
+<P>
+Assuming that the <CODE>
+PrintControl</CODE>
+ won't be used for anything else, the following declaration will suffice:</P>
+<PRE>@object PrintControlClass MyPrintControl = {
+    GI_states = @default &amp; ~GS_ENABLED;
+    PCI_docNameOutput = process;
+    PCI_output = process;
+}</PRE>
+<P>
+Here we have turned off the GS_ENABLED flag because the <CODE>
+PrintControl</CODE>
+'s UI will never appear in the application; it isn't part of the application's generic UI tree. (To include the PrintControl's UI in your application, leave it enabled, add it to the generic UI tree, and see <A HREF="../../Communication/Printing/index.htm">the Printing chapter</A> for more information.)</P>
+<P>
+The <CODE>
+PCI_output</CODE>
+ line specifies that the application's process object will be responsible for drawing the fax's contents. The <CODE>
+PCI_docNameOutput</CODE>
+ line specifies that the application's process will be responsible for providing the fax's name.</P>
+<HR>
+<A NAME="FaxSend_4.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Fax Sending</A>: 2.2 <A HREF="#FaxSend_2.htm">Drawing the Contents</A>: 
+<A NAME="FaxSend_4.htm_16974">
+ </A>
+Supplying the Document's Name</H3>
+<P>
+The process object (or whatever object is specified in the <CODE>
+PrintControl</CODE>
+'s <CODE>
+PCI_docNameOutput</CODE>
+ field) must supply the fax's name when queried. (On the Nokia 9000i Communicator, this name is not especially important; this is just a required part of the <CODE>
+PrintControl</CODE>
+'s API.) The name need not be unique.</P>
+<P>
+To fulfill its responsibility, the object must handle <CODE>
+MSG_PRINT_GET_DOC_NAME</CODE>
+, responding by sending <CODE>
+MSG_PRINT_CONTROL_SET_DOC_NAME</CODE>
+. If the message is not handled in this manner, the fax will never be sent.</P>
+<P>
+The following is an acceptable handler:</P>
+<P CLASS="figTitle">
+Code Display 4-3 Handling MSG_PRINT_CONTROL_SET_DOC_NAME for faxing</P>
+<P CLASS="figCaption">
+The printCtrlOD value is an argument to the message.</P>
+<PRE>@method MyProcessClass, MSG_PRINT_GET_DOC_NAME {
+    @send printCtrlOD::MSG_PRINT_CONTROL_SET_DOC_NAME(&quot;Good Morning&quot;);
+}</PRE>
+<HR>
+<A NAME="FaxSend_5.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">Fax Sending</A>: 2.3 <A HREF="#FaxSend_2.htm">Drawing the Contents</A>: 
+<A NAME="FaxSend_5.htm_78210">
+ </A>
+Supplying the Fax's Contents</H3>
+<P>
+The process object (or whatever object is specified in the <CODE>
+PrintControl</CODE>
+'s <CODE>
+PCI_output</CODE>
+ field) describes the fax's contents in the method for the imported message <CODE>
+MSG_PRINT_START_PRINTING</CODE>
+. It will receive this message after the user has specified a recipient for the fax. This message is defined:</P>
+<PRE>void MSG_PRINT_START_PRINTING( \
+			optr 			printCtrlOD , \
+			GStateHandle 			gstate );</PRE>
+<P>
+There are some things that the handler for this message must do:</P>
+<UL>
+<LI>
+It should draw the fax's contents.</LI>
+<LI>
+After drawing the fax's contents, it should call <CODE>
+GrNewPage()</CODE>
+ to generate a form feed. (It should also call <CODE>
+GrNewPage()</CODE>
+ between the pages of a multi-page fax, of course.)</LI>
+<LI>
+It should send the <CODE>
+PrintControl</CODE>
+ <CODE>
+MSG_PRINT_CONTROL_PRINTING_COMPLETED</CODE>
+.</LI>
+</UL>
+<P>
+There are many things that the handler for this message may do. For information about some of them, see <A HREF="../../Communication/Printing/index.htm">thePrinting chapter</A>. (If you read that chapter, you might think it's important that the print job's page range is also determined; this is not important for faxing.)</P>
+<P>
+The following example shows a handler that draws a fax's contents to contain some text and a rectangle:</P>
+<P CLASS="figTitle">
+Code Display 4-4 Handling MSG_PRINT_START_PRINTING when faxing</P>
+<PRE>@method MyProcessClass, MSG_PRINT_START_PRINTING {
+/* We draw the contents of the fax. */
+    GrDrawText(gstate, 20,40, &quot;Good Morning&quot;, 0);
+    GrDrawRect(gstate, 10,30, 110,55);</PRE>
+<PRE>/* Make sure that our last drawing command is a form-feed */
+    GrNewPage(gstate, PEC_FORM_FEED);</PRE>
+<PRE>/* Let the PrintControl know we're done */
+    @send printCtrlOD::MSG_PRINT_CONTROL_PRINTING_COMPLETED();
+}</PRE>
+<P>
+In the example, we draw the fax's contents with a couple of kernel graphics commands. We might just have easily passed gstate as the graphic state argument to some Visible object's <CODE>
+MSG_VIS_DRAW</CODE>
+ message (also passing the <CODE>
+DrawFlag</CODE>
+ DF_PRINT).</P>
+<P>
+We also need to tell the <CODE>
+PrintControl</CODE>
+ how many pages we're printing. The first page that we draw on is page one. If there is a separate cover page, that will be page zero. To specify how many pages there are to print, we call MSG_PRINT_CONTROL_SET_SELECTED_PAGE_RANGE, and then MSG_PRINT_CONTROL_SET_SELECTED_PAGE_RANGE, passing the number of pages to print as that message's second argument.</P>
+<P>
+It is possible that the fax cover page will appear on the same page on which drawing starts. To find out how much vertical space this cover page will take up on the first page, call the PrintControl with <CODE>
+MSG_PRINT_GET_FIRST_PAGE_OFFSET</CODE>
+; the return value will be the height of the cover page. (To properly follow naming conventions, this message should be called <CODE>
+MSG_PRINT_CONTROL_GET_FIRST_PAGE_OFFSET</CODE>
+; as of this writing it has not yet had its name fixed.)</P>
+<HR>
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+</BODY>
+</HTML>

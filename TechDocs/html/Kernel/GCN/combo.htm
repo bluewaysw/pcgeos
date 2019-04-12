@@ -1,0 +1,760 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+<!-- This page was automatically generated from a bunch of smaller pages. -->
+<META NAME="copyright" CONTENT="Copyright GEOWORKS">
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+<TITLE>General Change Notification</TITLE>
+</HEAD>
+<BODY BGCOLOR="#ffffdf">
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+<A NAME="index.htm"></A>
+
+
+
+<H1 CLASS="chapterTitle">
+
+<A NAME="index.htm_97933">
+ </A>
+General Change Notification
+
+</H1>
+<P>
+<A NAME="index.htm_IX_General change notification">
+ </A>
+In a multitasking environment, threads may need to know of condition changes that might affect them. In most cases where shared resources or multiple threads of execution exist, processes and objects must be sure of the integrity of data that they depend on and must be sent notice when that data changes.</P>
+<P>
+In GEOS, this functionality is provided through the General Change Notification (GCN) mechanism. Although one could set up messages between processes and objects manually, the GCN mechanism eliminates the need to keep track of all processes that depend on the particular change and to keep track of all messages sent out to the various processes and objects.</P>
+<P CLASS="sectionlinks">
+<STRONG>
+&nbsp;&nbsp;<A HREF="#GCN_1.htm">1 Design Goals</A><BR>
+&nbsp;&nbsp;<A HREF="#GCN_2.htm">2 The Mechanics of GCN</A><BR>
+&nbsp;&nbsp;<A HREF="#GCN_3.htm">3 System Notification</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#GCN_4.htm">3.1 Registering for System Notification</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#GCN_5.htm">3.2 Handling System Notification</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#GCN_6.htm">3.3 Removal from a System List</A><BR>
+&nbsp;&nbsp;<A HREF="#GCN_7.htm">4 Application Local GCN Lists</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#GCN_8.htm">4.1 Creating Types and Lists</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#GCN_9.htm">4.2 Registering for Notification</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#GCN_a.htm">4.3 Handling Application Notification</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#GCN_b.htm">4.4 Removal from Application Lists</A><BR>
+</STRONG>
+</P> <!-- end of sectionlinks blob -->
+
+<HR>
+<A NAME="GCN_1.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">General Change Notification</A>: 1 
+Design Goals</H2>
+<P>
+General Change Notification allows you to keep track of both system and application events. Objects or processes interested in a particular change may request the GCN mechanism to notify them when that change occurs. That change may be system-wide (such as a file system change) or application-specific (such as a text style change within a word processor). The GCN mechanism allows objects or processes to sign up for such notification and intercept messages sent by the system (or the application) so that you may respond to different changes on a case by case basis.</P>
+<P>
+The manners in which you sign up for these two types of notification differ although the functionality of the notification process is similar. The most straightforward way is to use a <CODE>
+gcnList</CODE>
+ field in an application's application object; this is the usual approach used to add an application's GenPrimary object to the application's window list. We will assume that you know how to add an object to a GCN list in this manner, as it is shown in most if not all of the sample applications.</P>
+<P>
+You can also sign up for system-wide notification through the use of certain routines and intercept system messages when the change occurs. Other objects may sign up for application-specific notification supported by <CODE>
+GenApplicationClass</CODE>
+. These application specific notifications should only be sent to the GenApplication object.</P>
+<HR>
+<A NAME="GCN_2.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">General Change Notification</A>: 2 
+The Mechanics of GCN</H2>
+<P>
+The basic GCN functionality manages lists of objects that are interested in specific changes. For each particular change that needs to be monitored, a separate list is needed. A completely separate &quot;list of lists&quot; containing an inventory of all GCN lists is also created. This will serve as the &quot;search&quot; table, while the particular GCN list will serve as the &quot;messaging&quot; list. When an event is detected, the GCN mechanism will search through the list of lists, seeing if a notification list is interested in a particular change, and send the appropriate messages if the objects do indeed wish notification of the event. 
+<IMG SRC="GCN_2_lists.gif">
+
+</P>
+<P>
+There are several reasons why you would want to use GCN:</P>
+<UL>
+<LI>
+Ease of use<BR>
+The GCN mechanism eliminates the need to monitor and dispatch messages relating to system changes.</LI>
+<LI>
+Commonality<BR>
+The GCN mechanism provides a common platform for communication between applications in certain cases.</LI>
+<LI>
+The system expects you to<BR>
+Many messages sent by the system expect a GCN mechanism to intercept them. Although you can intercept these messages manually, it is easier to take advantage of GCN's built-in functions.</LI>
+</UL>
+<HR>
+<A NAME="GCN_3.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">General Change Notification</A>: 3 
+System Notification</H2>
+<PRE><CODE>GCNListAdd(), GCNListSend()</CODE></PRE>
+<P>
+The system provides several lists for common system changes which might affect your application. After signing up on one of these lists (for example, the file change list) you will be notified by the kernel whenever the specified change occurs. In most cases, all you need to do is register for notification with <CODE>
+GCNListAdd()</CODE>
+ and intercept the kernel's notification message.</P>
+<P>
+The GCN mechanism performs its functions through a common series of steps. These steps are:</P>
+<OL>
+<LI>
+The object registers for notification with<CODE>
+ GCNListAdd().</CODE>
+</LI>
+<LI FIXME_NumListOther>
+The change occurs.</LI>
+<LI FIXME_NumListOther>
+The GCN mechanism is informed of the change by the acting party (in most cases this is the system itself, although a library may also send notifications). Applications do not send notifications at the system level.</LI>
+<LI FIXME_NumListOther>
+The GCN mechanism dispatches notification messages to all interested parties with <CODE>
+GCNListSend()</CODE>
+.</LI>
+<LI FIXME_NumListOther>
+The object is informed of the change.<BR>
+If you need to perform some work related to this change, you should have a message handler to intercept the system messages.</LI>
+</OL>
+<P CLASS="subsectionLink">
+<A HREF="#GCN_4.htm">Registering for System Notification</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#GCN_5.htm">Handling System Notification</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#GCN_6.htm">Removal from a System List</A></P>
+<HR>
+<A NAME="GCN_4.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">General Change Notification</A>: 3.1 <A HREF="#GCN_3.htm">System Notification</A>: 
+<A NAME="GCN_4.htm_42042">
+ </A>
+Registering for System Notification</H3>
+<P>
+Whenever an object or process needs to be notified of some system change, it must call the routine <CODE>
+GCNListAdd() </CODE>
+to add itself to the list for that particular change.<A NAME="GCN_4.htm_IX_GCNListAdd()">
+ </A>
+ <CODE>
+GCNListAdd</CODE>
+() finds the appropriate general change notification list--creating a new one if none currently exists--and adds the optr of the new object to the end of that list. You may add the optr to the GCN list at any time during the process' or object's life, but it is usually convenient for a process to be added in its <CODE>
+MSG_GEN_PROCESS_OPEN_APPLICATION </CODE>
+or for an object that is on the active list to be added in its <CODE>
+MSG_META_ATTACH </CODE>
+handler. </P>
+<P>
+Each optr in a GCN list should have a notification ID attached to it. (The combination of a manufacturer ID and a notification type comprises an element's specific notification ID.) <CODE>
+GCNListAdd() </CODE>
+must be passed the optr of the object to add, along with a notification ID. For each separate notification ID, a separate GCN list is needed and will be created automatically. </P>
+<P>
+<A NAME="GCN_4.htm_IX_GCNSLT_&ldots;">
+ </A>
+<A NAME="GCN_4.htm_IX_GCNStandardListType">
+ </A>
+The GCN routines use a word of data, <CODE>
+GCNStandardListType</CODE>
+, to represent the notification type. The currently recognized <CODE>
+GCNStandardListType</CODE>
+ types for MANUFACTURER_ID_GEOWORKS are</P>
+<UL>
+<LI>
+GCNSLT_FILE_SYSTEM<BR>
+This <CODE>
+GCNStandardListType</CODE>
+ is used for notification of a file system change. Parties on this list will receive the system messages <CODE>
+MSG_NOTIFY_FILE_CHANGE</CODE>
+ and <CODE>
+MSG_NOTIFY_DRIVE_CHANGE</CODE>
+.</LI>
+<LI>
+GCNSLT_APPLICATION<BR>
+This <CODE>
+GCNStandardListType</CODE>
+ is used for notification of a starting or exiting application. Parties on this list will receive the system messages MSG_NOTIFY_APP_STARTED and <CODE>
+MSG_NOTIFY_APP_EXITED</CODE>
+.</LI>
+<LI>
+GCNSLT_DATE_TIME<BR>
+This <CODE>
+GCNStandardListType</CODE>
+ is used for notification of a date/time change in the system's internal clock.<CODE>
+ </CODE>
+Note that this will not tell you about timer ticks--the only time changes that will come up are those resulting from system restarts and time changes by the user. Parties on this list will receive the system message <CODE>
+MSG_NOTIFY_DATE_TIME_CHANGE.</CODE>
+ This message does not pass any further information, so your message handler should be able to take care of any changes by itself (such as calling the internal clock for an updated value).</LI>
+<LI>
+GCNSLT_DICTIONARY<BR>
+This <CODE>
+GCNStandardListType</CODE>
+ is used for notification of a user dictionary change. Parties on this list will receive the system message <CODE>
+MSG_NOTIFY_USER_DICT_CHANGE.</CODE>
+</LI>
+<LI>
+GCNSLT_KEYBOARD_OBJECTS<BR>
+This list is used for notification when the user has chosen a different keyboard layout. Parties on this list will receive the system message MSG_NOTIFY_KEYBOARD_LAYOUT_CHANGE.</LI>
+<LI>
+GCNSLT_EXPRESS_MENU_CHANGE<BR>
+This <CODE>
+GCNStandardListType</CODE>
+ notifies various system utilities that an express menu has been created or destroyed. The recipient receives the optr of the Express Menu Control. This list should be used in conjunction with the GCNSLT_EXPRESS_MENU_OBJECTS list. Objects on this list receive MSG_NOTIFY_EXPRESS_MENU_CHANGE, which itself passes a <CODE>
+GCNExpressMenuNotificationType</CODE>
+ (either GCNEMNT_CREATED or GCNEMNT_DESTROYED) and the optr of the Express Menu Control affected. </LI>
+<LI>
+GCNSLT_INSTALLED_PRINTERS<BR>
+This list notifies objects when a printer is either installed or removed. The recipient of MSG_PRINTER_INSTALLED_REMOVED might want to call <CODE>
+SpoolGetNumPrinters() </CODE>
+to learn if any printer or fax drivers are currently installed.</LI>
+<LI>
+GCNSLT_SHUTDOWN_CONTROL<BR>
+This <CODE>
+GCNStandardListType</CODE>
+ is used for system shutdown control. <A NAME="GCN_4.htm_IX_GCNShutdownControlType">
+ </A>
+Parties on a list of this type will receive the system message MSG_META_CONFIRM_SHUTDOWN which itself passes a <CODE>
+GCNShutdownControlType</CODE>
+ (either GCNSCT_SUSPEND, GCNSCT_SHUTDOWN, or GCNSCT_UNSUSPEND). Shutdown Control is documented in <A HREF="../../Kernel/Geodes/Geodes_15.htm#59499">the Applications and Geodes chapter</A>.</LI><LI>
+GCNSLT_TRANSFER_NOTIFICATION<BR>
+This list notifies objects that a transfer item within the clipboard has changed (or been freed). Parties on this list will receive the system message MSG_META_CLIPBOARD_<BR>
+NOTIFY_NORMAL_TRANSFER_ITEM_CHANGED and MSG_META_CLIPBOARD_NOTIFY_TRANSFER_ITEM_FREED.</LI>
+<LI>
+GCNSLT_EXPRESS_MENU_OBJECTS<BR>
+This list contains all Express Menu Control objects in the system. Typically this list is used to add a control panel item or a DOS task list item to all express menu Control objects. This can be done by sending MSG_EXPRESS_MENU_CONTROL_CREATE_ITEM to the GCN list with <CODE>
+GCNListSend()</CODE>
+.</LI>
+<LI>
+GCNSLT_TRANSPARENT_DETACH<BR>
+This list contains all application objects that may be transparently detached if the system runs short of heap space, in least recently used (LRU) order. This list should only be used if transparent launch mode is in use.</LI>
+<LI>
+GCNSLT_TRANSPARENT_DETACH_DA<BR>
+This list contains a list of transparently detachable desk accessories if the system runs short of heap space. This list should only be used if transparent launch mode is in use. Objects should not be detached unless all detachable, full-screen applications have been detached.</LI>
+<LI>
+GCNSLT_REMOVABLE_DISK<BR>
+This list is used to store all application and document control objects that originate from a removable drive. If the disk they originate on is removed, they will be notified to shut themselves down with MSG_META_DISK_REMOVED.<A NAME="GCN_4.htm_marker=345060">
+ </A>
+</LI>
+</UL>
+<P>
+These pre-defined notification types are intended only for use with MANUFACTURER_ID_GEOWORKS. Other manufacturers wishing to intercept their own system changes must define their own change types under their respective manufacturer IDs if they are unable to use MANUFACTURER_ID_GEOWORKS.</P>
+<P CLASS="figTitle">
+Code Display 9-1 Adding a Process Object to a GCN List</P>
+<PRE>@method MyProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION {
+    optr			myThread;</PRE>
+<PRE>    @callsuper;			/* Do default MSG_GEN_PROCESS_OPEN_APPLICATION */</PRE>
+<PRE>/* Casts the return value for the process handle into an optr */</PRE>
+<PRE>    myThread = ConstructOptr(GeodeGetProcessHandle(), NullChunk);</PRE>
+<PRE>/* myThread (the process) is added to notification of file changes */
+
+    GCNListAdd(myThread, MANUFACTURER_ID_GEOWORKS, GCNSLT_FILE_SYSTEM);
+}</PRE>
+<HR>
+<A NAME="GCN_5.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">General Change Notification</A>: 3.2 <A HREF="#GCN_3.htm">System Notification</A>: 
+Handling System Notification</H3>
+<PRE>MSG_NOTIFY_FILE_CHANGE, MSG_NOTIFY_DRIVE_CHANGE, MSG_NOTIFY_APP_STARTED, MSG_NOTIFY_APP_EXITED, MSG_NOTIFY_USER_DICT_CHANGE, MSG_NOTIFY_EXPRESS_MENU_CHANGE</PRE>
+<P>
+<A NAME="GCN_5.htm_IX_GCNListSend()">
+ </A>
+When an identified change occurs, either the system (or a library) will call the routine <CODE>
+GCNListSend()</CODE>
+, passing it the appropriate notification message. This routine scans the list of all GCN lists and dispatches notification to all appropriate objects that had requested knowledge of the specified change. If any additional information relating to the change cannot be included in the message, the system allows <CODE>
+GCNListSend() </CODE>
+to pass data in a global heap block. For example, additional information about a file change (name of file, etc.) must be passed in a global heap block.</P>
+<P>
+The object or process originally requesting notification of the change should be required to handle the appropriate message. If additional data about the change is passed in a global heap block, the process should access that information with <CODE>
+MemLock() </CODE>
+and<CODE>
+ MemUnlock()</CODE>
+. You should always call the process's superclass in your message handler to make sure that the global heap block will be automatically freed by <CODE>
+MetaClass</CODE>
+. Therefore, do not free a global heap block manually in a notification handler.
+
+</P>
+<P>
+The system provides several messages which you may want to handle. These messages provide notification of file system changes, application start-up or shut-down, system clock changes, etc. These messages are mentioned with the list they correspond to in <A HREF="#GCN_4.htm_42042"> Registering for System Notification</A>
+. Messages which require more detailed explanation are also mentioned below.</P>
+<P>
+<A NAME="GCN_5.htm_IX_MSG_META_NOTIFY_FILE_CHANGE">
+ </A>
+The kernel sends <CODE>
+MSG_NOTIFY_FILE_CHANGE</CODE>
+ whenever a change to the file system occurs. All objects signed up on the GCN list GCNSLT_FILE_CHANGE will receive this message.</P>
+<P>
+<CODE>
+MSG_NOTIFY_FILE_CHANGE</CODE>
+ passes a <CODE>
+FileChangeNotificationType</CODE>
+ specifying the change that occurred. Some types indicate the presence of a data block (of type <CODE>
+FileChangeNotificationData) </CODE>
+containing, if applicable, the name of the file changed, the disk handle of the file changed, and the ID of the affected file. </P>
+<P>
+The notification type should be one of the following:</P>
+<DL>
+<DT>
+FCNT_CREATE</DT><DD>
+This type indicates that a file or directory was created. FCND_<CODE>
+id</CODE>
+ stores the ID of the containing directory; FCND_<CODE>
+name</CODE>
+ contains the name of the new file or directory that was created.</DD>
+<DT>
+FCNT_RENAME</DT><DD>
+This type indicates that a file or directory was renamed. FCND_<CODE>
+id</CODE>
+ stores the ID of the file or directory that was renamed; FCND_<CODE>
+name</CODE>
+ contains its new name.</DD>
+<DT>
+FCNT_OPEN</DT><DD>
+This type indicates that a file was opened. FCND_<CODE>
+id</CODE>
+ stores the ID of the file. FCND_<CODE>
+name</CODE>
+ is undefined, and may or may not be present. (You can check the size of the block to see if it is indeed present.) This notification type is generated after a call to <CODE>
+FileEnableOpenCloseNotification()</CODE>
+.</DD>
+<DT>
+FCNT_DELETE</DT><DD>
+This type indicates that a file or directory was deleted. FCND_<CODE>
+id</CODE>
+ stores the ID of the file or directory that was deleted. FCND_<CODE>
+name</CODE>
+ is undefined and may or may not be present.</DD>
+<DT>
+FCNT_CONTENTS</DT><DD>
+This type indicates that a file's contents have changed. FCND_<CODE>
+id</CODE>
+ stores the ID of the file. FCND_<CODE>
+name</CODE>
+ is undefined and may or may not be present. This notification type is generated after a call to <CODE>
+FileCommit()</CODE>
+ or <CODE>
+FileClose() </CODE>
+that results in a file modification.</DD>
+<DT>
+FCNT_ATTRIBUTES</DT><DD>
+This type indicates that a file's attributes have changed. FCND_<CODE>
+id</CODE>
+ stores the ID of the file. FCND_<CODE>
+name</CODE>
+ is undefined and may or may not be present. This notification type is generated upon completion of all changes in a <CODE>
+FileSetAttributes()</CODE>
+, <CODE>
+FileSetHandleExtAttributes()</CODE>
+, or <CODE>
+FileSetPathExtAttributes()</CODE>
+ call.</DD>
+<DT>
+FCNT_DISK_FORMAT</DT><DD>
+This type indicates that a disk has been formatted. Both FCND_<CODE>
+id</CODE>
+ and FCND_<CODE>
+name</CODE>
+ are undefined and may not be present.</DD>
+<DT>
+FCNT_CLOSE</DT><DD>
+This type indicates that a file has been closed. FCND<CODE>
+_id</CODE>
+ stores the identifier of the file. FCND<CODE>
+_name</CODE>
+ is undefined and may not be present. This notification type is generated only after a call to <CODE>
+FileEnableOpenCloseNotification()</CODE>
+.</DD>
+<DT>
+FCNT_BATCH</DT><DD>
+This type indicates that this file change notification is actually a group of notifications batched together. In this case, MSG_NOTIFY_FILE_CHANGE passes the MemHandle of a <CODE>
+FileChangeBatchNotificationData</CODE>
+ block instead. This data block stores a batch of <CODE>
+FileChangeBatchNotificationItem</CODE>
+ structures, each referring to an operation (with its own notification type, disk handle, file name, and file ID). Note that in this batched case, you must assume that all file names and file IDs that are optional (i.e. are undefined) are not present.</DD>
+<DT>
+FCNT_ADD_SP_DIRECTORY</DT><DD>
+<A NAME="GCN_5.htm_IX_StandardPath:associated FileChangeNotificationType types">
+ </A>
+<A NAME="GCN_5.htm_IX_Standard paths:FCNT_ADD_SP_DIRECTORY">
+ </A>
+This type indicates that a directory has been added as a <CODE>
+StandardPath</CODE>
+. FCND_<CODE>
+disk</CODE>
+ contains the <CODE>
+StandardPath</CODE>
+ that was added. This notification type is generated after a call to <CODE>
+FileAddStandardPathDirectory()</CODE>
+.</DD>
+<DT>
+FCNT_DELETE_SP_DIRECTORY</DT><DD>
+<A NAME="GCN_5.htm_IX_Standard paths:FCNT_DELETE_SP_DIRECTORY">
+ </A>
+This type indicates that a directory has been deleted as a <CODE>
+StandardPath</CODE>
+. FCND_<CODE>
+disk</CODE>
+ contains the <CODE>
+StandardPath</CODE>
+ that was deleted. This notification type is generated after a call to <CODE>
+FileDeleteStandardPathDirectory()</CODE>
+.</DD>
+</DL>
+<P>
+You may access this data (after locking the block) and perform whatever actions you need within your message handler.</P>
+<P>
+<A NAME="GCN_5.htm_IX_MSG_META_NOTIFY_DRIVE_CHANGE">
+ </A>
+The kernel also sends MSG_NOTIFY_DRIVE_CHANGE to GCN lists of type GCNSLT_FILE_CHANGE. This message passes a <CODE>
+GCNDriveChangeNotificationType</CODE>
+ specifying whether a drive is being created or destroyed and the ID of the affected drive.</P>
+<P>
+<A NAME="GCN_5.htm_IX_MSG_META_NOTIFY_APP_STARTED">
+ </A>
+The kernel sends <CODE>
+MSG_NOTIFY_APP_STARTED</CODE>
+ whenever any application starts up within the system and <CODE>
+MSG_NOTIFY_APP_EXITED</CODE>
+ whenever an application shuts down. All objects signed up on the GCN list GCNSLT_APPLICATION will receive these messages after the change occurs. <CODE>
+MSG_NOTIFY_APP_STARTED</CODE>
+ passes the MemHandle of the application starting up, which you may access to perform any required actions. In a similar manner, <CODE>
+MSG_NOTIFY_APP_EXITED</CODE>
+<A NAME="GCN_5.htm_IX_MSG_META_NOTIFY_APP_EXITED">
+ </A>
+ passes the MemHandle of the application shutting down.</P>
+<P>
+<A NAME="GCN_5.htm_IX_MSG_META_NOTIFY_USER_DICT_CHANGE">
+ </A>
+The kernel sends <CODE>
+MSG_NOTIFY_USER_DICT_CHANGE</CODE>
+ whenever the system changes the current user dictionary in use. All objects signed up for the GCN list GCNSLT_USER_DICT_CHANGE will receive this message after the change occurs. <CODE>
+MSG_NOTIFY_USER_DICT_CHANGED</CODE>
+ passes the MemHandle of the Spell Box causing the change and the MemHandle of the user dictionary being changed, both of which you may access in your message handler.</P>
+<HR>
+<A NAME="GCN_6.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">General Change Notification</A>: 3.3 <A HREF="#GCN_3.htm">System Notification</A>: 
+Removal from a System List</H3>
+<P>
+<A NAME="GCN_6.htm_IX_GCNListRemove()">
+ </A>
+You should use<CODE>
+ GCNListRemove() </CODE>
+to remove an object from a system GCN list. You must pass the notification ID (<CODE>
+GCNStandardListType </CODE>
+and Manufacturer ID) and the optr of the object to be removed. The optr of the object in question will only be removed from the list of the particular change specified. If the optr is on several GCN lists, those other lists will remain unchanged. </P>
+<P>
+An object or process in the course of dying must remove itself from all GCN lists that it is currently on. You should therefore keep track of all GCN lists you add a particular object to. It is usually convenient for a process to remove itself from these lists within its <CODE>
+MSG_GEN_PROCESS_CLOSE_APPLICATION</CODE>
+ message handler or for an object to remove itself in its <CODE>
+MSG_META_DETACH</CODE>
+ handler.</P>
+<P CLASS="figTitle">
+Code Display 9-2 Removing a Process from a GCN list</P>
+<PRE>@method MyProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION {
+	optr 		myThread;
+	myThread = ConstructOptr(GeodeGetProcessHandle(), NullChunk);
+	GCNListRemove(myThread, MANUFACTURER_ID_GEOWORKS, GCNSLT_FILE_CHANGE);
+	@callsuper;
+}</PRE>
+<HR>
+<A NAME="GCN_7.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">General Change Notification</A>: 4 
+Application Local GCN Lists</H2>
+<P>
+The GCN mechanism not only allows you to keep track of system changes but also allows you to keep track of changes within a specific application. These application-specific GCN lists operate in slightly different manners than the system-wide application lists. There are an extensive number of pre-defined application lists for MANUFACTURER_ID_GEOWORKS. You may use these if you like, but in most cases you will want to create your own list and notification types for your application.</P>
+<P>
+The GenControl objects make extensive use of these types of GCN lists when implementing changes. For a complete discussion of using these lists within the context of a GenControl, see <A HREF="../../SysObjects/Controllers/index.htm">the Controllers chapter</A>.</P><P>
+If you will be creating custom GenControl objects or just wish to set up a notification system within your application, you will want to create your own application GCN lists when using this mechanism. To do this, you must follow a few preliminary steps:</P>
+<UL>
+<LI>
+Create a new list of type <EM>
+YourCompanyName</EM>
+<CODE>
+GenAppGCNListTypes</CODE>
+ within an appropriate <STRONG CLASS="fileName">
+yourCompanyName.h</STRONG>
+ file.</LI>
+<LI>
+Create an GCN notification type of <EM>
+YourCompanyName</EM>
+<CODE>
+NotificationTypes</CODE>
+ for the above list type within the <STRONG CLASS="fileName">
+yourCompanyName.h</STRONG>
+ file.</LI>
+</UL>
+<P>
+The GCN mechanism in this case performs its functions through a common series of steps. These steps are similar to the steps needed for system-wide notification:</P>
+<OL>
+<LI>
+The object registers for notification with <CODE>
+MSG_META_GCN_LIST_ADD</CODE>
+.</LI>
+<LI FIXME_NumListOther>
+The change occurs within your application and invokes your own custom method. Because the change occurs within your application, you are responsible for detecting the change and sending out notification yourself.</LI>
+<LI FIXME_NumListOther>
+Record the notification event with <CODE>
+MSG_META_NOTIFY</CODE>
+ or <CODE>
+MSG_META_NOTIFY_WITH_DATA_BLOCK</CODE>
+, the notification list type to use, and the data block to pass (if applicable).</LI>
+<LI FIXME_NumListOther>
+Use <CODE>
+MSG_GEN_PROCESS_SEND_TO_APP_GCN_LIST </CODE>
+to pass the event. You may have to pass some <CODE>
+GCNListSendFlags</CODE>
+ with this message. This message acts as a dispatch routine, sending all interested parties the recorded event <CODE>
+MSG_META_NOTIFY</CODE>
+.</LI>
+<LI FIXME_NumListOther>
+The object is informed of the change with <CODE>
+MSG_META_NOTIFY</CODE>
+ or <CODE>
+MSG_META_NOTIFY_WITH_DATA_BLOCK</CODE>
+. If you need to perform some work related to this change, you should have a message handler to intercept these messages.</LI>
+</OL>
+<P CLASS="subsectionLink">
+<A HREF="#GCN_8.htm">Creating Types and Lists</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#GCN_9.htm">Registering for Notification</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#GCN_a.htm">Handling Application Notification</A></P>
+<P CLASS="subsectionLink">
+<A HREF="#GCN_b.htm">Removal from Application Lists</A></P>
+<HR>
+<A NAME="GCN_8.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">General Change Notification</A>: 4.1 <A HREF="#GCN_7.htm">Application Local GCN Lists</A>: 
+Creating Types and Lists</H3>
+<P>
+It is a relatively simple matter to create your own notification types. Within an appropriate company-specific file merely create your own types and lists. (For example, all Geoworks application-local lists are within the file <STRONG CLASS="fileName">
+geoworks.h</STRONG>
+.)</P>
+<P CLASS="figTitle">
+Code Display 9-3 Creating New Notification Types and Lists</P>
+<PRE>/* These types should be placed within an appropriate <EM>yourCompanyName</EM>.h file. */</PRE>
+<PRE>/* First create a group of Notification types to use for your MANUFACTURER_ID. */</PRE>
+<PRE>typedef enum {
+    &lt;<EM>yourCompanyName</EM>&gt;_NT_CUSTOM_NOTIFICATION_NUMBER_ONE
+    &lt;<EM>yourCompanyName</EM>&gt;_NT_CUSTOM_NOTIFICATION_NUMBER_TWO
+    ...
+} &lt;<EM>yourCompanyName</EM>&gt;NotificationTypes;</PRE>
+<PRE>/* Then create whatever Notification list types you need. These list types
+ * usually correspond one-to-one to the types enumerated above. It is possible,
+ * however, for several lists to be interested in a single notification type. */</PRE>
+<PRE>typedef enum {
+    &lt;<EM>yourCompanyName</EM>&gt;_GAGCNLT_CUSTOM_LIST_TYPE_ONE
+    &lt;<EM>yourCompanyName</EM>&gt;_GAGCNLT_CUSTOM_LIST_TYPE_TWO
+    ...
+} &lt;<EM>yourCompanyName</EM>&gt;GenAppGCNListTypes;</PRE>
+<HR>
+<A NAME="GCN_9.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">General Change Notification</A>: 4.2 <A HREF="#GCN_7.htm">Application Local GCN Lists</A>: 
+Registering for Notification</H3>
+<P>
+<CODE>
+MSG_META_GCN_LIST_ADD</CODE>
+ </P>
+<P>
+<A NAME="GCN_9.htm_IX_MSG_META_GCN_LIST_ADD">
+ </A>
+Registering for application notification is simple once you have created your own custom notification lists. Whenever an object or process needs to be notified of an application change, you should call <CODE>
+MSG_META_GCN_LIST_ADD</CODE>
+ to add that object or process to the list interested in that particular change. <CODE>
+MSG_META_GCN_LIST_ADD</CODE>
+ finds the appropriate custom GCN list and adds the optr of the new object to the end of that list. (If no space for the list currently exists because it is empty, the message will allocate space for the list automatically.) You may add the interested optr at any time during the process' or object's life, but it is usually convenient for a process to be added in its <CODE>
+MSG_GEN_PROCESS_OPEN_APPLICATION </CODE>
+or for an object to be added in its <CODE>
+MSG_META_ATTACH </CODE>
+handler. </P>
+<P>
+Each optr in a GCN list should have a notification ID attached to it. The combination of a manufacturer ID and a notification type comprises an element's specific notification ID. <CODE>
+MSG_META_GCN_LIST_ADD</CODE>
+ must pass the optr of the object to add, along with a notification ID. For each separate notification ID, a separate GCN list is needed and will be created automatically. </P>
+<P>
+Geoworks has several pre-defined GCN lists of type <CODE>
+GeoWorksGenAppGCNListType</CODE>
+ for use by applications. You will probably have only limited use for these; these list types are used mostly by the UI controllers. For information on these types and how the various classes use them, see <A HREF="../../SysObjects/Controllers/index.htm">the Controllers chapter</A>.</P><P CLASS="figTitle">
+Code Display 9-4 Adding Yourself to a Custom GCN List</P>
+<PRE>@method MyProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION {</PRE>
+<PRE>    @callsuper;			/* Do default MSG_GEN_PROCESS_OPEN_APPLICATION */</PRE>
+<PRE>    myThread = ConstructOptr(GeodeGetProcessHandle(), NullChunk);</PRE>
+<PRE>/* myThread (the process) is added to notification of TYPE_ONE changes */
+
+    @call MyApplication::MSG_META_GCN_LIST_ADD(myThread,
+	<EM>yourCompanyName</EM>_GAGCNLT_CUSTOM_LIST_TYPE_ONE,
+	MANUFACTURER_ID_<EM>yourCompanyName</EM>);
+}</PRE>
+<HR>
+<A NAME="GCN_a.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">General Change Notification</A>: 4.3 <A HREF="#GCN_7.htm">Application Local GCN Lists</A>: 
+Handling Application Notification</H3>
+<PRE>MSG_META_NOTIFY, MSG_META_NOTIFY_WITH_DATA_BLOCK, MSG_META_GCN_LIST_SEND</PRE>
+<P>
+<A NAME="GCN_a.htm_IX_MSG_META_NOTIFY_WITH_DATA_BLOCK">
+ </A>
+<A NAME="GCN_a.htm_IX_MSG_META_NOTIFY">
+ </A>
+When a change occurs in the application that needs to send out notification, you must set up the notification message and send it to the interested list. You may attach a data block to this notification for use by the objects on the notification list. To send out these notifications, you should use <CODE>
+MSG_META_NOTIFY</CODE>
+ or <CODE>
+MSG_META_NOTIFY_WITH_DATA_BLOCK</CODE>
+ (when passing data). </P>
+<P>
+In the simplest case without the need to pass data, you should encapsulate <CODE>
+MSG_META_NOTIFY</CODE>
+ with the particular Notification ID (notification type and Manufacturer ID) that should be notified. You should then send <CODE>
+MSG_GEN_PROCESS_SEND_TO_APP_GCN_LIST </CODE>
+to your application object with this event and the particular GCN list interested in this change. (Note that you will have to keep track of which lists are interested in which notification types.) Make sure that you perform a send (not a call) when using this message as the message may cross threads.</P>
+<P CLASS="figTitle">
+Code Display 9-5 Using MSG_META_NOTIFY</P>
+<PRE>@method MyProcessClass, MSG_SEND_CUSTOM_NOTIFICATION {</PRE>
+<PRE>    MessageHandle event;</PRE>
+<PRE>/* First encapsulate the MSG_META_NOTIFY with the type of list and manufacturer ID
+ * interested in the change. Since this message is being recorded for no class in
+ * particular, use NullClass.*/</PRE>
+<PRE>    event = @record (optr) NullClass::MSG_META_NOTIFY(
+	MANUFACTURER_ID_<EM>yourCompanyName</EM>,
+	<EM>yourCompanyName</EM>_NT_CUSTOM_TYPE_ONE);</PRE>
+<PRE>/* Then send this MSG_META_NOTIFY using MSG_META_GCN_LIST_SEND. You must make sure
+ * to pass the particular GCN list interested in the changes encapsulated in the
+ * above message. */</PRE>
+<PRE>    @send MyProcess::MSG_GEN_PROCESS_SEND_TO_APP_GCN_LIST (
+	(word) 0, 			/* GCNListSendFlags */
+	event,			/* Handle to MSG_NOTIFY event above. */
+	0,			/* No data passed, so no data block. */
+	/* Pass the list interested in NT_CUSTOM_TYPE_ONE notification types. */
+	<EM>yourCompanyName_</EM>GAGCNLT_APP_CUSTOM_LIST_ONE,
+	/* Pass your manufacturer ID. */
+	MANUFACTURER_ID_<EM>yourCompanyName</EM>);
+}</PRE>
+<P>
+If instead you need to pass a data block along with the notification, you should use <CODE>
+MSG_META_NOTIFY_WITH_DATA_BLOCK</CODE>
+. You should set up the structure to pass beforehand. You must also make sure to add a reference count to the data block equal to the number of <EM>
+lists</EM>
+ (not objects) you wish to send the notification. To do this, call <CODE>
+MemInitRefCount()</CODE>
+ with the data block and the total number of lists you are sending the notification to. (In most cases, you will only send notification to one list, although, of course, that list may have several objects.) </P>
+<P CLASS="figTitle">
+Code Display 9-6 MSG_META_NOTIFY_WITH_DATA_BLOCK</P>
+<PRE>@method MyProcessClass, MSG_SEND_CUSTOM_NOTIFICATION {</PRE>
+<PRE>    typedef struct {
+	int number;
+	char letterToLookFor;
+    } MyDataStructure;</PRE>
+<PRE>    MemHandle myDataBlock;
+    MyDataStructure *myDataPtr;
+    MessageHandle event;</PRE>
+<PRE>/* Allocate and lock down a block for the data structure. This will be passed
+ * along with the notification. NOTE: data blocks must be sharable! */</PRE>
+<PRE>    myDataBlock = MemAlloc(sizeof(MyDataStructure), (HF_DYNAMIC | HF_SHARABLE),
+			 HAF_STANDARD);</PRE>
+<PRE>    myDataPtr = MemLock(myDataBlock);</PRE>
+<PRE>/* Load up the structure with pertinent information. */
+    myDataPtr-&gt;count = 200;
+    myDataPtr-&gt;letterToLookFor = `z';</PRE>
+<PRE>/* Unlock it and set its reference count to 1 as we are only sending this to one
+ * list. */
+    MemUnlock(myDataBlock);
+    MemInitRefCount(myDataBlock, (word) 1);</PRE>
+<PRE>/* Now encapsulate a MSG_META_NOTIFY_WITH_DATA_BLOCK message. Since it is being
+ * recorded for no particular class, use NullClass as its class type. */</PRE>
+<PRE>    event = @record (optr) NullClass::MSG_META_NOTIFY_WITH_DATA_BLOCK(
+			MANUFACTURER_ID_<EM>yourCompanyName</EM>,				/* Manufacturer ID */
+			NT_CUSTOM_TYPE_ONE,				/* List type. */
+			myDataBlock);				/* handle of data block */</PRE>
+<PRE>/* Finally, send the message off to our process. The GCNListSendFlags depend on
+ * the situation. */</PRE>
+<PRE>    @send MyProcess::MSG_GEN_PROCESS_SEND_TO_APP_GCN_LIST(
+			(word) 0,			/* GCNListSendFlags */
+			event,			/* Handle to message */
+			myDataBlock,			/* Handle of data block */
+	/* Pass the type of list interested in NT_CUSTOM_TYPE_ONE notification. */
+			GAGCNLT_APP_CUSTOM_LIST_ONE,
+			MANUFACTURER_ID_<EM>yourCompanyName</EM>);</PRE>
+<PRE>/* All done! myDataBlock will be MemFree()'d automatically. */
+}</PRE>
+<P>
+The object or process originally requesting notification of the change will want to provide a handler for the <CODE>
+MSG_META_NOTIFY</CODE>
+ or <CODE>
+MSG_META_NOTIFY_WITH_DATA_BLOCK</CODE>
+. If additional data about the change is passed in a data block, the process should access that information with <CODE>
+MemLock() </CODE>
+and<CODE>
+ MemUnlock()</CODE>
+. You should always call the process's superclass in your message handler, to make sure that the global heap block will be automatically freed by <CODE>
+MetaClass</CODE>
+. Therefore, do not free a notification data block manually in a notification handler.
+
+</P>
+<P CLASS="figTitle">
+Code Display 9-7 Intercepting an Application Notification Change</P>
+<PRE>/* Code to implement when MyObjectClass receives MSG_META_NOTIFY with a certain
+ * notification type. */</PRE>
+<PRE>@method MyObjectClass, MSG_META_NOTIFY {</PRE>
+<PRE>    MyDataStructure myData;				/* Stores the passed data block. */</PRE>
+<PRE>/* Lock the data structure. */</PRE>
+<PRE>    myData = MemLock(data);</PRE>
+<PRE>/* Check the notification type and implement the changes you wish to occur in
+ * response to the previous event. */</PRE>
+<PRE>    if ((notificationType == <EM>yourCompanyName_</EM>NT_CUSTOM_TYPE_ONE) &amp; 
+	(manufID == MANUFACTURER_ID_<EM>yourCompanyName</EM>)){
+	/* Code to implement for your object. */
+    }</PRE>
+<PRE>    MemUnlock(data);</PRE>
+<PRE>    @callsuper;				/* Important! Frees data block. */
+}</PRE>
+<HR>
+<A NAME="GCN_b.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">General Change Notification</A>: 4.4 <A HREF="#GCN_7.htm">Application Local GCN Lists</A>: 
+Removal from Application Lists</H3>
+<P>
+<A NAME="GCN_b.htm_IX_MSG_META_GCN_LIST_REMOVE">
+ </A>
+You should use <CODE>
+MSG_META_GCN_LIST_REMOVE</CODE>
+ to remove an object from an application GCN list. You must pass the routine the notification ID (<EM>
+yourCompanyName</EM>
+<CODE>
+AppGCNListTypes</CODE>
+ and Manufacturer ID) and the optr of the object to remove. Note that the optr of the object in question will only be removed from the list of the particular change specified. If the optr is on several GCN lists, those other lists will remain unchanged. </P>
+<P>
+An object or process in the course of dying must remove itself from all GCN lists that it is currently on, both from the system and from an application. You should therefore keep track of all GCN lists you add a particular object to. It is usually convenient for a process to remove itself from these lists within its <CODE>
+MSG_GEN_PROCESS_CLOSE_APPLICATION</CODE>
+ message handler or for an object to remove itself at <CODE>
+MSG_META_DETACH</CODE>
+ time.
+
+</P>
+<P CLASS="figTitle">
+Code Display 9-8 Removing from an Application GCN List</P>
+<PRE>@method MyProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION {</PRE>
+<PRE>    @send MyApplication::MSG_META_GCN_LIST_REMOVE(
+			MyObject,			/* optr to remove from list. */
+			<EM>yourCompanyName_</EM>NT_CUSTOM_LIST_ONE,
+					/* list to remove object from. */
+		/* Manufacturer ID of list to remove object from. */
+			MANUFACTURER_ID_<EM>yourCompanyName</EM>);</PRE>
+<PRE>    @callsuper;
+}<A NAME="GCN_b.htm_marker=345084"> </A></PRE>
+<HR>
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+</BODY>
+</HTML>

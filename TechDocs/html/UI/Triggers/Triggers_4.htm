@@ -1,0 +1,105 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Triggers_4.htm,v 1.1 97/06/02 16:45:11 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Passing Data with a GenTrigger</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">GenTrigger</A>: 3.1 <A HREF="Triggers_3.htm">Supplemental GenTrigger Usage</A>: 
+Passing Data with a GenTrigger</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Triggers_3.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Triggers_3.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">3 Supplemental GenTrigger Usage</A> 
+<!-- to next --> | <A HREF="Triggers_5.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.2 Interaction Commands</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>ATTR_GEN_TRIGGER_ACTION_DATA, ATTR_GEN_TRIGGER_ACTION_TWO_WORDS, ATTR_GEN_TRIGGER_ACTION_THREE_WORDS</PRE>
+<P>
+A GenTrigger may pass data along with its message. Use ATTR_GEN_TRIGGER_ACTION_DATA<A NAME="IX_ATTR_GEN_TRIGGER_ACTION_DATA">
+ </A>
+ to assign a word of data that you wish to pass with the particular message. If you need to pass more than a single word of data, you will have to use <CODE>
+@vardataAlias</CODE>
+; this Goc keyword allows ATTR_GEN_TRIGGER_ACTION_DATA to pass a structure instead of a single word.</P>
+<P>
+Several ATTR_GEN_TRIGGER_ACTION_DATA aliases already exist for your use. <A NAME="IX_ATTR_GEN_TRIGGER_ACTION_TWO_WORDS">
+ </A>
+ATTR_GEN_TRIGGER_ACTION_TWO_WORDS and ATTR_GEN_TRIGGER_ACTION_THREE_WORDS<A NAME="IX_ATTR_GEN_TRIGGER_ACTION_THREE_WORDS">
+ </A>
+ allow you to pass two or three words of data along with the trigger's message<A NAME="IX_ATTR_GEN_TRIGGER_ACTION_OPTR_AND_WORD">
+ </A>
+.</P>
+<P>
+If you need to pass more than three words of data with a message, you will need to use the stack to pass arguments. To do so, use the <CODE>
+@stack</CODE>
+ parameter within your message definition; because of the implementation of the stack, make sure to set up your structure to pass its arguments <EM>
+in reverse order</EM>
+.</P>
+<P CLASS="figTitle">
+Code Display 5-3 Passing Data from a GenTrigger</P>
+<PRE>/* In a class declaration, you should define a message that passes data. */</PRE>
+<PRE>@class MyProcessClass, GenProcessClass;
+@message void MSG_SET_MY_DATA(int myData);
+@endc;</PRE>
+<PRE>@object GenTriggerClass MyHundredTrigger = {
+	/* This trigger will pass 100 to the method for MSG_SET_MY_DATA. */
+    GI_visMoniker = &quot;Set My Data to 100&quot;;
+    GTI_actionMsg = MSG_SET_MY_DATA;
+    GTI_destination = process;
+    ATTR_GEN_TRIGGER_ACTION_DATA = 100;					/* This object's data is 100. */
+}</PRE>
+<PRE>@object GenTriggerClass MyTenTrigger = {
+	/* This trigger will pass `10' to the method for MSG_SET_MY_DATA.*/
+    GI_visMoniker = &quot;Set My Data to 10&quot;;
+    GTI_actionMsg = MSG_SET_MY_DATA;
+    GTI_destination = process;
+    ATTR_GEN_TRIGGER_ACTION_DATA = 10;					/* This object's data is 10. */
+}</PRE>
+<PRE>@method MyProcessClass, MSG_SET_MY_DATA {
+	/* This message passes one parameter (the integer myData). Goc knows
+	 * that the data is located within the ATTR_GEN_TRIGGER_ACTION_DATA
+	 * field. */
+    UpdateDisplay(myData);				/* Use that data for your own purposes. */
+}</PRE>
+<PRE>/* The following examples show how to pass longer structures than the above. */</PRE>
+<PRE>	/* Define the message. */
+@message void MSG_CUSTOM_MESSAGE(@stack char name[10], optr arg1, int arg2);
+	/* Define the structure you wish to pass with the message. If the
+	 * message will pass parameters on the stack (as in this case), you
+	 * must define your structure to pass its elements in reverse order. */
+typedef struct { 
+    int		MS_arg2;
+    optr		MS_arg1;
+    char		MS_name[10]
+} MyStruct;</PRE>
+<PRE>	/* Use @vardataAlias to define your own attribute (ATTR_MY_STRUCT_TO_PASS)
+	 * to store the custom structure. */
+@vardataAlias (ATTR_GEN_TRIGGER_ACTION_DATA) MyStruct ATTR_MY_STRUCT_TO_PASS;</PRE>
+<PRE>	/* Declare your object and set the arguments to pass. */
+@object GenTriggerClass MyTrigger = {
+    GI_visMoniker = &quot;Custom Trigger&quot;;
+    GTI_actionMsg = MSG_CUSTOM_MESSAGE;
+    GTI_destination = process;
+    ATTR_MY_STRUCT_TO_PASS = { 100, @ListObject, &quot;Zow!&quot; }
+}</PRE>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Triggers_3.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Triggers_3.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">3 Supplemental GenTrigger Usage</A> 
+<!-- to next --> | <A HREF="Triggers_5.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">3.2 Interaction Commands</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

@@ -1,0 +1,866 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: MetaClass_3.htm,v 1.2 97/08/19 10:21:15 nfiedler Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Object Creation and Destruction</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">MetaClass</A>: 2.1 <A HREF="MetaClass_2.htm">Utility Messages</A>: 
+Object Creation and Destruction</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="MetaClass_2.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="MetaClass_2.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">2 Utility Messages</A> 
+<!-- to next --> | <A HREF="MetaClass_4.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2.2 Class Messages</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+<A NAME="IX_Threads:creation and destruction messages">
+ </A>
+<A NAME="IX_Objects:destroying">
+ </A>
+<A NAME="IX_Objects:creating">
+ </A>
+These messages handle creation, destruction, and initialization of all objects. The function and use of many of these messages are given in <A HREF="../../Programming/GOCLanguage/index.htm"></A>.</P>
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_INITIALIZE">
+ </A>
+MSG_META_INITIALIZE</H4>
+<PRE CLASS="syntax">void	MSG_META_INITIALIZE();</PRE>
+<P>
+<A NAME="IX_Instance data:initializing">
+ </A>
+Every object class should provide a handler for this message which should call the superclass and then perform any initialization of the instance data required. This message is not delivered to statically declared objects because they are already initialized.</P>
+<P>
+Note that <CODE>
+GenClass</CODE>
+ and <CODE>
+VisClass</CODE>
+ have a default handler that sets up the Gen and Vis parts automatically. </P>
+<P>
+This message is not delivered to objects whose only master part is <CODE>
+MetaClass</CODE>
+ itself. </P>
+<P CLASS="refField">
+Source:	Object system itself, often in the middle of attempting to deliver another message to an object that hasn't yet been initialized.</P>
+<P CLASS="refField">
+Destination:	Object whose instance data is not yet initialized.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Any class wishing to have default instance data values other than all zeros should intercept this message to fill in the initial values for its instance data. For classes other than master classes, standard procedure is to call the superclass first, then perform any additional instance data initialization necessary. Master classes should <EM>
+not</EM>
+ call the superclass, as <CODE>
+MSG_META_INITIALIZE</CODE>
+ is unique among messages in that it is sent only to classes within the particular master group that needs to be initialized. Handlers of <CODE>
+MSG_META_INITIALIZE</CODE>
+ should limit their activities to just stuffing instance data--specifically, object messaging is not allowed (though scanning vardata is OK). Object classes that inherit instance data (all but <CODE>
+MetaClass</CODE>
+) should call <CODE>
+MSG_META_INITIALIZE</CODE>
+ on their superclass to initialize that portion of their instance data. In addition, they must initialize their own portion of the instance data (start by assuming it's all zeros). The order won't matter, so long as the handler doesn't depend on the inherited instance data having any particular value. When in doubt, call the superclass first.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_ATTACH">
+ </A>
+MSG_META_ATTACH</H4>
+<PRE CLASS="syntax">void 	MSG_META_ATTACH();</PRE>
+<P>
+<A NAME="IX_Active list:MSG_META_ATTACH">
+ </A>
+This message is used for two different purposes: It can be sent to any geode that has a process aspect when the geode is first loaded. It can also be sent in the object world to notify objects on an &quot;active list&quot; that the application has been brought back up from a state file. As the method is used for different purposes, the data passed varies based on usage. Because of this difference in parameters, normally C applications will use one of the aliases for this message (<CODE>
+MSG_META_ATTACH_PROCESS</CODE>
+,<CODE>
+ MSG_META_ATTACH_THREAD</CODE>
+, <CODE>
+MSG_META_ATTACH_GENPROCESSCLASS</CODE>
+, <CODE>
+MSG_META_ATTACH_OBJECT,</CODE>
+ and<CODE>
+ MSG_META_ATTACH_GENAPPLICATION</CODE>
+, each described below.)</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_ATTACH_PROCESS">
+ </A>
+MSG_META_ATTACH_PROCESS</H4>
+<PRE CLASS="syntax">@alias (MSG_META_ATTACH)
+ void 	MSG_META_ATTACH_PROCESS(
+        word 	value1,
+        word 	value2);</PRE>
+<P>
+<A NAME="IX_ProcessClass:attaching">
+ </A>
+<A NAME="IX_Geodes:attaching">
+ </A>
+This message is sent to any geode which has a process when the geode is first loaded. By default, the handler for this message does nothing.</P>
+<P CLASS="refField">
+Source:	<CODE>
+GeodeLoad()</CODE>
+ kernel routine.</P>
+<P CLASS="refField">
+Destination:	Newly created Process object (but not GenProcess object).</P>
+<P CLASS="refField">
+Parameters:	<EM>value1</EM>	Upper half of <CODE>
+GeodeLoad()</CODE>
+ <EM>appInfo</EM> argument.</P>
+<DL>
+<DT>
+<EM>value2</EM></DT><DD>Lower half of <CODE>
+GeodeLoad()</CODE>
+ <EM>appInfo</EM> argument.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	No default handling provided, so if you are spawning an extra process and that process needs to do some initialization, then intercept this message.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_ATTACH_GENPROCESSCLASS">
+ </A>
+MSG_META_ATTACH_GENPROCESSCLASS</H4>
+<PRE CLASS="syntax">@alias (MSG_META_ATTACH)
+ void 	MSG_META_ATTACH_GENPROCESSCLASS(
+        MemHandle appLaunchBlock);</PRE>
+<P>
+<A NAME="IX_GenProcessClass:attaching">
+ </A>
+This message is sent to the GenProcess object when the geode is first loaded. By default, the handler for this message calls <CODE>
+MSG_PROCESS_STARTUP_UI_THREAD</CODE>
+, which checks to see if there are any resources of the application which are marked as &quot;ui-object&quot; (they are marked this way in the <STRONG CLASS="fileName">
+.gp</STRONG>
+ file), that is, to be run by a UI thread. If so, it then calls <CODE>
+MSG_PROCESS_CREATE_UI_THREAD</CODE>
+ to create that thread, then marks the &quot;ui-object&quot; blocks as run by that thread.</P>
+<P>
+The handler next calls one of the following messages:</P>
+<DL>
+<DT>
+<CODE>
+MSG_GEN_PROCESS_OPEN_APPLICATION</DT><DD>
+</CODE>
+For applications which are being started up regularly (that is, not restoring from a state file) and will appear on screen.</DD>
+<DT>
+<CODE>
+MSG_GEN_PROCESS_OPEN_ENGINE</DT><DD>
+</CODE>
+For those applications that will operate in engine mode (i.e. non-visual).</DD>
+<DT>
+<CODE>
+MSG_GEN_PROCESS_RESTORE_FROM_STATE</DT><DD>
+</CODE>
+For applications which are restoring from state. This is the case for applications that were running at the previous shutdown.</DD>
+</DL>
+<P CLASS="refField">
+Source:	<CODE>
+GeodeLoad()</CODE>
+ kernel routine.</P>
+<P CLASS="refField">
+Destination:	Newly created <CODE>
+GenProcessClass</CODE>
+ (or subclass thereof) object.</P>
+<P CLASS="refField">
+Parameters:	<EM>appLaunchBlock</EM>	Block handle to block of structure <CODE>
+AppLaunchBlock</CODE>
+.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<DL>
+<DT>
+Note that the passed <CODE>
+AppLaunchBlock</CODE>
+ is destroyed.</DT>
+</DL>
+<P CLASS="refField">
+Interception:	No default handling provided, so if you are spawning an extra process and that process needs to do some initialization, then intercept this message.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_ATTACH_GENAPPLICATION">
+ </A>
+MSG_META_ATTACH_GENAPPLICATION</H4>
+<PRE CLASS="syntax">@alias (MSG_META_ATTACH)
+ void 	MSG_META_ATTACH_PROCESS(
+        MemHandle 	bh1,
+        MemHandle 	bh2);</PRE>
+<P>
+<A NAME="IX_GenApplicationClass:attaching">
+ </A>
+This message is sent to the GenApplication object by <CODE>
+GenProcessClass</CODE>
+ when the application starts up (either for the first time, or when being restored from a state file).</P>
+<P CLASS="refField">
+Source:	GenProcess object.</P>
+<P CLASS="refField">
+Destination:	GenApplication object.</P>
+<P CLASS="refField">
+Parameters:	<EM>bh1</EM>	Block handle to block containing <CODE>
+AppLaunchBlock</CODE>
+ parameters.</P>
+<DL>
+<DT>
+<EM>bh2</EM></DT><DD>Extra state block from state file, or NULL if none. This is the same block as returned from <CODE>
+MSG_GEN_PROCESS_CLOSE_APPLICATION</CODE>
+ in some previous detach operation.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<DL>
+<DT>
+Note that the <CODE>
+AppLaunchBlock</CODE>
+ is destroyed.</DT>
+</DL>
+<P CLASS="refField">
+Interception:	Not generally required, since the default handler broadcasts the message out to everything on the application's active lists. This act causes the interface for the application to come up on screen.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_ATTACH_OBJECT">
+ </A>
+MSG_META_ATTACH_OBJECT</H4>
+<PRE CLASS="syntax">@alias (MSG_META_ATTACH)
+ void 	MSG_META_ATTACH_OBJECT(
+        word	 	flags,
+        MemHandle 		appLaunchBlock,
+        MemHandle 		extraState);</PRE>
+<P>
+<A NAME="IX_Active list:MSG_META_ATTACH_OBJECT">
+ </A>
+This message is sent to any object on the GenApplication object's active lists, or on one of those object's active lists. Note that this will not happen until the GenApplication is set usable by the GenProcess object.</P>
+<P CLASS="refField">
+Source:	<CODE>
+GenApplicationClass</CODE>
+ object.</P>
+<P CLASS="refField">
+Destination:	Any object.</P>
+<P CLASS="refField">
+Parameters:	<EM>flags</EM>	Flags providing state information.</P>
+<DL>
+<DT>
+<EM>appLaunchBlock</EM></DT><DD>Handle of <CODE>
+AppLaunchBlock</CODE>
+, or NULL if none.</DD>
+<DT>
+<EM>extraState</EM> </DT><DD>Handle of extra state block, or NULL if none. This is the same block as returned from <CODE>
+MSG_GEN_PROCESS_CLOSE_APPLICATION</CODE>
+, in some previous detach.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Standard UI objects defined as needing to be placed on an active list will intercept this message to do whatever it is that they needed to do when the application is first loaded. Objects intercepting this message should call the superclass, in case it expects to receive this notification itself.</P>
+<P CLASS="refField">
+Warnings:	If the specific UI uses this mechanism, then the <CODE>
+GenProcessClass</CODE>
+ will have already destroyed the <CODE>
+AppLaunchBlock</CODE>
+ and extra state block by the time the <CODE>
+MSG_META_ATTACH</CODE>
+ is sent to objects on its active list.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_ATTACH_THREAD">
+ </A>
+MSG_META_ATTACH_THREAD</H4>
+<PRE CLASS="syntax">@alias (MSG_META_ATTACH)
+ void 	MSG_META_ATTACH_THREAD();</PRE>
+<P>
+This message is sent to any thread spawned by <CODE>
+MSG_PROCESS_CREATE_EVENT_THREAD</CODE>
+.</P>
+<P CLASS="refField">
+Source:	Kernel.</P>
+<P CLASS="refField">
+Destination:	Newly created thread, specifically the class designated to handle the thread's messages (a subclass of <CODE>
+ProcessClass</CODE>
+).</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	No default handling provided, so if you are spawning an extra process and that process needs to do some initialization, then intercept this message.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_APP_STARTUP">
+ </A>
+MSG_META_APP_STARTUP</H4>
+<PRE CLASS="syntax">void	MSG_META_APP_STARTUP(
+        MemHandle		appLaunchBlock);</PRE>
+<P>
+This message is related to MSG_META_ATTACH; the message is sent by the generic UI to the GenApplication object before it sends MSG_META_ATTACH to it. MSG_META_ATTACH is only sent when the application is becoming available to the user; if an application should be opened as a server without presenting any UI to the user, MSG_META_APP_STARTUP will be the only message sent to the application object upon start-up.</P>
+<P>
+The default handler for this message will pass it on to all members of the MGCNLT_APP_STARTUP list.</P>
+<P CLASS="refField">
+Source:	<CODE>
+GenProcessClass</CODE>
+; forwarded by <CODE>
+GenApplicationClass</CODE>
+ to other objects. This message is sent upon application start-up before the UI for an application has been attached.</P>
+<P CLASS="refField">
+Destination:	Any object that needs to be notified when the application is launched, regardless of whether the user will be interacting with the application.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+appLaunchBlock</EM>
+	Handle of an <CODE>
+AppLaunchBlock</CODE>
+.</P>
+<P CLASS="refField">
+Return:	The <CODE>
+AppLaunchBlock</CODE>
+ is preserved.</P>
+<P CLASS="refField">
+Interception:	Usually intercepted by any object on the MGCNLT_APP_STARTUP list.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_UPDATE_WINDOW">
+ </A>
+MSG_META_UPDATE_WINDOW</H4>
+<PRE CLASS="syntax">void	MSG_META_UPDATE_WINDOW(
+        UpdateWindowFlags		updateFlags,
+        VisUpdateMode		updateMode);</PRE>
+<P>
+This message is sent as part of the system's window update mechanism. Typically, this message is sent to windowed objects on the GAGNLT_WINDOWS list when the GenApplication object becomes GS_USABLE. </P>
+<P>
+The message passes a bitfield of <CODE>
+UpdateWindowFlags</CODE>
+. These flags determine the type of action prompting the window update.</P>
+<DL>
+<DT>
+UWF_ATTACHING</DT><DD>
+If set, the message is being sent because the application is attaching.</DD>
+<DT>
+UWF_DETACHING</DT><DD>
+If set, the message is being sent because the application is detaching.</DD>
+<DT>
+UWF_RESTORING_FROM_STATE</DT><DD>
+If set, the application is restoring from state. This flag will only be set if UWF_ATTACHING is also set.</DD>
+<DT>
+UWF_FROM_WINDOWS_LIST</DT><DD>
+If set, the message is being sent because the object is on the GAGCNLT_WINDOWS list, and not because it was later built on demand. This flag will only be set if UWF_ATTACHING is also set. </DD>
+</DL>
+<P CLASS="refField">
+Source:	Window update mechanism.</P>
+<P CLASS="refField">
+Destination:	Entries on the Application's GAGCNLT_WINDOWS list.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+updateFlags</EM>
+	<CODE>
+UpdateWindowFlags</CODE>
+.</P>
+<DL>
+<DT>
+<EM>
+updateMode</EM>
+</DT><DD><CODE>
+VisUpdateMode</CODE>
+.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_DETACH">
+ </A>
+MSG_META_DETACH</H4>
+<PRE CLASS="syntax">void	MSG_META_DETACH(
+        word	callerID,
+        optr	caller);</PRE>
+<P>
+<A NAME="IX_Active list:MSG_META_DETACH">
+ </A>
+This message severs the links between an object and the rest of the system. The exact way this is handled depends on the object being detached. For full information on detaching objects, see <A HREF="../../Programming/GOCLanguage/index.htm">the GEOS Programming chapter</A>.</P><P>
+The &quot;state&quot; of the object is left intact, in case an image of the object needs to be saved away in a state file for later re-creation. <CODE>
+MSG_META_DETACH</CODE>
+ sent to an application's process will start the process by which it is detached from the system, and then exited. <CODE>
+MSG_META_DETACH</CODE>
+ is asynchronous, in that it need not complete its job immediately upon being called. Rather, it may take as much time, invoking and waiting for the completion of subsidiary detaches (say of child objects needing to perform special actions to detach, or of threads created earlier), before it responds with <CODE>
+MSG_META_ACK</CODE>
+ to let its caller know that the detach has completed.</P>
+<P CLASS="refField">
+Source:	Kernel, other objects relaying detach message.</P>
+<P CLASS="refField">
+Destination:	GenProcess, GenApplication, objects on active lists.</P>
+<P CLASS="refField">
+Parameters:	<CODE>callerID</CODE>
+A number of your choosing. This number will be passed back to
+<EM>caller</EM> in MSG_META_ACK in the <EM>callID</EM> parameter.
+</P>
+<DL>
+<DT>
+<EM>caller</EM> </DT><DD>Object which should be sent a <CODE>
+MSG_META_ACK</CODE>
+ when detaching object has finished.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	Intercepted as a means of finding out that the application is shutting down. Call the superclass in case it needs such notification.<BR>
+If you create additional threads, or object classes which need to be notified when the application is about to be exited, you may need to extend the detach mechanism by intercepting <CODE>
+MSG_META_DETACH</CODE>
+ in a subclass of an object already receiving that message, such as GenApplication, GenControl, GenInteraction dialogs, etc. You must make sure that all objects you've sent <CODE>
+MSG_META_DETACH</CODE>
+ to have responded with a <CODE>
+MSG_META_ACK</CODE>
+ before your object can reply with <CODE>
+MSG_META_ACK</CODE>
+. Remember that your superclass may be sending <CODE>
+MSG_META_DETACH</CODE>
+. The kernel provides some default behavior in <CODE>
+MetaClass</CODE>
+, and some utility routines, to make this a simpler task. The default handler for <CODE>
+MSG_META_DETACH</CODE>
+, for instance, at a leaf object (one which doesn't propagate the <CODE>
+MSG_META_DETACH</CODE>
+), performs the required response (sending a <CODE>
+MSG_META_ACK</CODE>
+). Thus, leaf objects can just intercept <CODE>
+MSG_META_DETACH</CODE>
+ for notification purposes, then call the superclass, and worry no more. The utility routines<CODE>
+ ObjInitDetach()</CODE>
+ and <CODE>
+ObjEnableDetach()</CODE>
+ work in conjunction with a default <CODE>
+MSG_META_ACK</CODE>
+ handler in <CODE>
+MetaClass</CODE>
+ to keep track of how many outstanding acknowledgments are being waited for, and call <CODE>
+MSG_META_DETACH_COMPLETE</CODE>
+ on your object once all acknowledgments have returned (the count reaches zero). The default handler for <CODE>
+MSG_META_DETACH_COMPLETE</CODE>
+ then generates the acknowledgment response required of your object to complete its detach. You may optionally call the superclass before sending the detach message to your children and dependents, depending on which order you want things to detach in. The call to the superclass must happen between the <CODE>
+ObjInitDetach()</CODE>
+ and <CODE>
+ObjEnableDetach()</CODE>
+, however.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_DETACH_COMPLETE">
+ </A>
+MSG_META_DETACH_COMPLETE</H4>
+<PRE CLASS="syntax">void	MSG_META_DETACH_COMPLETE();</PRE>
+<P>
+This message is sent to an object being detached when all of its children and active participants have acknowledged the detach. For full information on detaching objects, see <A HREF="../../Programming/GOCLanguage/index.htm">the GEOS Programming chapter</A>.</P><P>
+<CODE>
+MSG_META_DETACH_COMPLETE</CODE>
+ is sent to the object which called <CODE>
+ObjInitDetach()</CODE>
+. This will happen when as many acknowledgments have been received as <CODE>
+ObjIncDetach()</CODE>
+ was called, and <CODE>
+ObjEnableDetach()</CODE>
+ was called. The <CODE>
+MetaClass</CODE>
+ handler for this message sends <CODE>
+MSG_META_ACK</CODE>
+ to the OD passed to the <CODE>
+ObjInitDetach()</CODE>
+ call. This message is provided so that an object will know when all of its children have detached. Note that this message is received only if <CODE>
+ObjInitDetach()</CODE>
+ has been called for this object. Note also that your superclass may call <CODE>
+ObjInitDetach()</CODE>
+ without your knowing.</P>
+<P CLASS="refField">
+Source:	<CODE>
+MetaClass</CODE>
+ handler for <CODE>
+MSG_META_ACK</CODE>
+, if detach count has dropped to zero (i.e. no outstanding requests), for objects that are detach nodes only (make use of <CODE>
+ObjInitDetach()</CODE>
+ or <CODE>
+ObjEnableDetach()</CODE>
+).</P>
+<P CLASS="refField">
+Destination:	Self.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Interception:	This is a handy message to intercept when using the <CODE>
+ObjInitDetach()</CODE>
+ mechanism and need to know when all objects asked to detach have responded. Calling the superclass at this point in time will cause an <CODE>
+MSG_META_ACK</CODE>
+ to go back to whatever object sent the <CODE>
+MSG_META_DETACH</CODE>
+ to this object originally. There is no requirement to call the superclass at this time, and in fact this is a way to prolong the detach cycle for this object-- by simply starting up another <CODE>
+ObjInitDetach()</CODE>
+ sequence, for instance.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_DETACH_ABORT">
+ </A>
+MSG_META_DETACH_ABORT</H4>
+<PRE CLASS="syntax">void	MSG_META_DETACH_ABORT();</PRE>
+<P>
+This message causes a detach to be aborted. This can cause some very complex synchronization problems and should not be used lightly. You will find very little call to use it.</P>
+<P CLASS="refField">
+Source:	Renegade object on active list, after having received <CODE>
+MSG_META_DETACH</CODE>
+, as an alternative to replying with <CODE>
+MSG_META_ACK</CODE>
+.</P>
+<P CLASS="refField">
+Destination:	The optr passed in <CODE>
+MSG_META_DETACH</CODE>
+.</P>
+<P CLASS="refField">
+Interception:	Handled by GenField to deal with applications that refuse to die, and GenSystem for Fields that have problem applications. Other than that, any detach node wishing to provide this service will have to figure out a way to do it itself.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_APP_SHUTDOWN">
+ </A>
+MSG_META_APP_SHUTDOWN</H4>
+<PRE CLASS="syntax">void	MSG_META_APP_SHUTDOWN(
+        word		callerID,
+        optr		ackOD);</PRE>
+<P>
+This message is the complement to MSG_META_APP_STARTUP. This message is sent to objects on the MGCNLT_APP_STARTUP list before an application exits but after the UI for the application is detached. Essentially, it operates in the same manner as MSG_META_DETACH except that the receiving object sends MSG_META_SHUTDOWN_ACK when its shutdown is complete.</P>
+<P CLASS="refField">
+Source:	Sent by <CODE>
+GenProcessClass</CODE>
+ after detaching the UI but before exiting the application; if the UI was never attached (i.e. it handled MSG_META_APP_STARTUP but not MSG_META_ATTACH) the UI will obviously not be detached.</P>
+<P CLASS="refField">
+Destination:	Any object that needs to be notified when the application is about to exit.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+callerID</EM>
+	Word of data for caller's use.</P>
+<DL>
+<DT>
+<EM>
+ackOD</EM>
+</DT><DD>Optr of object to be sent MSG_META_SHUTDOWN_ACK.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	Usually intercepted by objects on the MGCNLT_APP_STARTUP list.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_SHUTDOWN_COMPLETE">
+ </A>
+MSG_META_SHUTDOWN_COMPLETE</H4>
+<PRE CLASS="syntax">void	MSG_META_SHUTDOWN_COMPLETE();</PRE>
+<P>
+This message is sent to the object that initiated the detach sequence after it has received MSG_META_SHUTDOWN_ACK for each <CODE>
+ObjIncDetach()</CODE>
+ that was previously called. This message is only sent if <CODE>
+ObjInitDetach() </CODE>
+was previously called passing the message MSG_META_APP_SHUTDOWN.</P>
+<P>
+The default handler for this message sends MSG_META_SHUTDOWN_ACK to the object passed in the original <CODE>
+ObjInitDetach()</CODE>
+ call.</P>
+<P CLASS="refField">
+Source:	<CODE>
+MetaClass</CODE>
+ handler for MSG_META_SHUTDOWN_ACK if detach count reaches zero (i.e. no outstanding requests), for objects that are shutdown nodes only (i.e. make use of <CODE>
+ObjInitDetach()</CODE>
+.)</P>
+<P CLASS="refField">
+Destination:	The object sends this message to itself.</P>
+<P CLASS="refField">
+Interception:	Intercept if you are using the<CODE>
+ ObjInitDetach()</CODE>
+ mechanism and need to be notified when all objects have been notified of the detach.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_SHUTDOWN_ACK">
+ </A>
+MSG_META_SHUTDOWN_ACK</H4>
+<PRE CLASS="syntax">void	MSG_META_SHUTDOWN_ACK(
+        word		callerID,
+        optr		ackOD);</PRE>
+<P>
+This message is sent back in response to a MSG_META_APP_SHUTDOWN. This message serves to notify the object the object has fulfilled the request.</P>
+<P CLASS="refField">
+Source:	Object having received MSG_META_APP_SHUTDOWN. The default handler will dispatch MSG_META_SHUTDOWN_ACK after <CODE>
+MetaClass</CODE>
+ has processed MSG_META_APP_SHUTDOWN. (You could, of course, intercept MSG_META_APP_SHUTDOWN and send MSG_META_SHUTDOWN_ACK yourself in your handler.)</P>
+<P CLASS="refField">
+Destination:	Optr passed in MSG_META_APP_SHUTDOWN.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+callerID</EM>
+	Data passed in MSG_META_APP_SHUTDOWN.</P>
+<DL>
+<DT>
+<EM>
+ackOD</EM>
+</DT><DD>Object which has completed shutting down.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	<CODE>
+MetaClass</CODE>
+ provides default handling for this message when using the <CODE>
+ObjInitDetach()</CODE>
+ mechanism. Objects not using this mechanism will want to intercept this message if there is a need to know when the object has completed shutting down.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_ACK">
+ </A>
+MSG_META_ACK</H4>
+<PRE CLASS="syntax">void	MSG_META_ACK(
+        word	callerID,
+        optr	caller);</PRE>
+<P>
+This message acknowledges a detach message. It is sent by objects that have been notified of another object's detach. The default handler for <CODE>
+MSG_META_DETACH</CODE>
+ simply sends <CODE>
+MSG_META_ACK</CODE>
+ back to the object that sent the detach message.</P>
+<P CLASS="refField">
+Source:	Object having received <CODE>
+MSG_META_DETACH</CODE>
+ (default handler in <CODE>
+MetaClass</CODE>
+ will reflexively respond to any <CODE>
+MSG_META_DETACH</CODE>
+ with a <CODE>
+MSG_META_ACK</CODE>
+, though you can change this behavior either by using <CODE>
+ObjInitDetach()</CODE>
+ or by not letting the message get to the <CODE>
+MetaClass</CODE>
+ handler, and responding yourself with a <CODE>
+MSG_META_ACK</CODE>
+ sometime later).</P>
+<P CLASS="refField">
+Destination:	The optr passed in <CODE>
+MSG_META_DETACH.</CODE>
+</P>
+<P CLASS="refField">
+Interception:	<CODE>
+MetaClass</CODE>
+ provides default handling of this message, for objects using the <CODE>
+ObjInitDetach()</CODE>
+ mechanism. Objects <EM>
+not</EM>
+ using this mechanism will want to intercept this if there is a need to know when the object asked to detach earlier has completed its detach.<BR>
+<CODE>
+MSG_META_ACK</CODE>
+ is normally inherited from <CODE>
+MetaClass</CODE>
+ which calls <CODE>
+ObjEnableDetach()</CODE>
+. This routine decrements the detach count, and when that count reaches zero, sends a <CODE>
+MSG_META_DETACH_COMPLETE</CODE>
+ to the object itself.</P>
+<P CLASS="refField">
+Warnings:	If you are expecting a <CODE>
+MSG_META_ACK</CODE>
+ back from anything, make sure you are using the mechanism initiated with <CODE>
+ObjInitDetach()</CODE>
+ yourself, or you should handle <CODE>
+MSG_META_ACK</CODE>
+ to prevent <CODE>
+MetaClass</CODE>
+ from assuming you <EM>
+are</EM>
+ using such a mechanism.</P>
+<P CLASS="refField">
+Parameters:	<EM>callerID</EM> 	data passed to <CODE>
+MSG_META_ACK</CODE>
+</P>
+<DL>
+<DT>
+<EM>caller</EM> </DT><DD>object which has completed detaching</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_BLOCK_FREE">
+ </A>
+MSG_META_BLOCK_FREE</H4>
+<PRE CLASS="syntax">void	MSG_META_BLOCK_FREE();</PRE>
+<P>
+This message initiates a sequence which will free an entire object block when received by any object within that block. The block will be freed when its in-use count reaches zero and the message queues for the block have been cleared.</P>
+<P>
+This is a fairly low-level operation, and should be performed only after the objects in the block have been removed from any tree(s) they are attached to, and are otherwise &quot;shut down.&quot; For generic objects, this generally means first calling <CODE>
+MSG_GEN_SET_NOT_USABLE</CODE>
+, then <CODE>
+MSG_GEN_REMOVE_CHILD</CODE>
+ before using this message. For Visible objects, <CODE>
+MSG_VIS_REMOVE</CODE>
+ will both visually shut down the visible tree, and then remove it from its parent.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any object within a block that is ready to have a low-level delete performed on it (i.e. isn't on screen, isn't linked to objects in other blocks, etc.).</P>
+<P CLASS="refField">
+Interception:	Unnecessary, as <CODE>
+MetaClass</CODE>
+ does the right thing.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_OBJ_FREE">
+ </A>
+MSG_META_OBJ_FREE</H4>
+<PRE CLASS="syntax">void	MSG_META_OBJ_FREE();</PRE>
+<P>
+This message initiates a sequence which will free an object. The object will be freed after its message queues have been flushed.</P>
+<P>
+This is a fairly low-level operation, and should be performed only after the object has been removed from any tree it is attached to and is otherwise &quot;shut down.&quot; Consider using <CODE>
+MSG_GEN_DESTROY</CODE>
+ for generic objects, <CODE>
+MSG_VIS_DESTROY</CODE>
+ for visible ones.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any object within a block that is ready to have a low-level delete performed on it (i.e. isn't on screen, isn't linked to objects in other blocks, etc.).</P>
+<P CLASS="refField">
+Interception:	Unnecessary, as <CODE>
+MetaClass</CODE>
+ does the right thing.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_DEC_BLOCK_REF_COUNT">
+ </A>
+MSG_META_DEC_BLOCK_REF_COUNT</H4>
+<PRE CLASS="syntax">void	MSG_META_DEC_BLOCK_REF_COUNT(
+        MemHandle		block1,
+        MemHandle		block2);</PRE>
+<P>
+This message is a utility message to call <CODE>
+MemDecRefCount()</CODE>
+ on one or two memory handles. </P>
+<P>
+This message is useful for IACP, which initializes the reference count to the number of servers returned by <CODE>
+IACPConnect()</CODE>
+ and records this message as the message to be returned. After each server has processed its information, the reference count will return to zero and the handles will be freed.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	Any object.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+block1</EM>
+	Handle of a block whose reference count should be decremented, or 0 if none.</P>
+<DL>
+<DT>
+<EM>
+block2</EM>
+</DT><DD>Handle of a block whose reference count should be decremented, or 0 if none.</DD>
+</DL>
+<P CLASS="refField">
+Interception:	Generally not intercepted.</P>
+
+
+<H4 CLASS="RefETitle">
+<A NAME="IX_MSG_META_OBJ_FLUSH_INPUT_QUEUE">
+ </A>
+MSG_META_OBJ_FLUSH_INPUT_QUEUE</H4>
+<PRE CLASS="syntax">void	MSG_META_OBJ_FLUSH_INPUT_QUEUE(
+        EventHandle event,
+        ObjFlushInputQueueNextStop nextStop,
+        MemHandle 	objBlock);</PRE>
+<P>
+This message clears out the message queues associated with an object. This is rarely, if ever called from within an application, and there is little call to subclass it.</P>
+<P>
+This queue-flushing mechanism is used in the Window, Object, and Object Block death mechanisms. Objects that implement their own &quot;hold up input&quot; queues must redirect this message through that queue, so that it is flushed as well.</P>
+<P CLASS="refField">
+Source:	Kernel (<CODE>
+WinClose()</CODE>
+,<CODE>
+ WinSetInfo()</CODE>
+, <CODE>
+ObjFreeObjBlock()</CODE>
+, <CODE>
+MSG_META_OBJ_FREE</CODE>
+, or <CODE>
+MSG_META_BLOCK_FREE).</CODE>
+</P>
+<P CLASS="refField">
+Destination:	Should first be sent to the Kernel's Input Manager (See the routine <CODE>
+ImInfoInputProcess()</CODE>
+). The message is then relayed first to the System Input Object (usually the <CODE>
+GenSystemClass</CODE>
+ object), then to the Geode Input Object (usually a <CODE>
+GenApplicationClass</CODE>
+ object), and finally to the owning process, which dispatches the passed event.</P>
+<P CLASS="refField">
+Parameters:	<EM>event</EM> 	Event to dispatch upon conclusion of flush.</P>
+<DL>
+<DT>
+<EM>objBlock</EM> </DT><DD>Block Handle that flushing is being performed for (generally the handle of the destination object in the above event). This is the block from which the &quot;OWNING GEODE&quot;, as referenced in the <CODE>
+ObjFlushInputQueueNextStop</CODE>
+ enumerated type, is determined.</DD>
+<DT>
+nextStop </DT><DD><CODE>
+ObjFlushInputQueueNextStop</CODE>
+ (Zero should be passed in call to first object, from there is sequenced by default <CODE>
+MetaClass</CODE>
+ handler)</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+<P CLASS="refField">
+Structures:	</P>
+<PRE><A NAME="IX_OFIQNS_&ldots;"> </A><A NAME="IX_ObjFlushInputQueueNextStop"> </A>typedef enum {
+	OFIQNS_SYSTEM_INPUT_OBJ,
+	OFIQNS_INPUT_OBJ_OF_OWNING_GEODE,
+	OFIQNS_PROCESS_OF_OWNING_GEODE,
+	OFIQNS_DISPATCH
+} ObjFlushInputQueueNextStop;</PRE>
+<P CLASS="refField">
+Interception:	Default <CODE>
+MetaClass</CODE>
+ handler implements relay of message from one object to the next, and dispatches the passed event. <EM>
+Must</EM>
+ be intercepted by any input-flow controlling objects (System object, VisContent) which implement &quot;hold-up&quot; queues that hold up input-related messages. The handlers in such cases should pipe this method through the hold-up queue as it does with the other messages, and finish up when it comes out by sending this message, with all data intact, to the superclass for continued default processing.</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="MetaClass_2.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="MetaClass_2.htm"><IMG SRC="../../docImages/prevUp.gif" BORDER="0" ALT="Prev: ">2 Utility Messages</A> 
+<!-- to next --> | <A HREF="MetaClass_4.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">2.2 Class Messages</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

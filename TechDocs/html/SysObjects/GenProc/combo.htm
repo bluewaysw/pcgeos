@@ -1,0 +1,1094 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+<!-- This page was automatically generated from a bunch of smaller pages. -->
+<META NAME="copyright" CONTENT="Copyright GEOWORKS">
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+<TITLE>The GenProcess Object</TITLE>
+</HEAD>
+<BODY BGCOLOR="#ffffdf">
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+<A NAME="index.htm"></A>
+
+
+
+<H1 CLASS="chapterTitle">
+
+The GenProcess Object</H1>
+<P>
+<CODE>
+GenProcessClass</CODE>
+<A NAME="index.htm_IX_GenProcessClass">
+ </A>
+ is the class that you will use to define the Process object of your applications. This class includes some functionality for opening and closing geodes as well as saving to and restoring from state files. Typically, your application will define its own subclass of <CODE>
+GenProcessClass</CODE>
+; this subclass will be used as your Process object and will receive all messages destined for the Process.</P>
+<P>
+In this subclass you can alter the <CODE>
+GenProcessClass</CODE>
+, <CODE>
+ProcessClass</CODE>
+, or <CODE>
+MetaClass</CODE>
+ messages you need. More often, however, the subclass will be used to define new messages that are application-global or that should be handled by your Process object.</P>
+<P CLASS="sectionlinks">
+<STRONG>
+&nbsp;&nbsp;<A HREF="#GenProcess_1.htm">1 Starting and Stopping</A><BR>
+&nbsp;&nbsp;<A HREF="#GenProcess_2.htm">2 Undo Mechanism</A><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#GenProcess_3.htm">2.1 Undo Mechanism</A><BR>
+</STRONG>
+</P> <!-- end of sectionlinks blob -->
+
+<HR>
+<A NAME="GenProcess_1.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">The GenProcess Object</A>: 1 
+Starting and Stopping</H2>
+<P>
+For information about the steps involved in stopping, starting, or restoring an application (and to get context information about the messages described below), see <A HREF="../../Programming/GOCLanguage/index.htm">the GEOS Programming chapter</A>.</P><P>
+<A NAME="GenProcess_1.htm_IX_AppAttachFlags">
+ </A>
+<A NAME="GenProcess_1.htm_IX_AAF_&ldots;">
+ </A>
+Many of the following messages need <CODE>
+AppAttachFlags</CODE>
+ to tell them how the process is attaching:</P>
+<PRE>typedef WordFlags AppAttachFlags;
+#define AAF_RESTORING_FROM_STATE						0x8000
+#define AAF_STATE_FILE_PASSED						0x4000
+#define AAF_DATA_FILE_PASSED						0x2000
+#define AAF_RESTORING_FROM_QUIT						0x1000</PRE>
+<UL>
+<LI>
+AAF_RESTORING_FROM_STATE indicates that the application is coming up from a previous state, either by re-launching using a state file, or re-entering application mode from engine mode in the same session. The UI trees will be in whatever state they were left in, which may be different than the statically declared UI tree, depending on what occurred in the application when the state file was written out (for example, a dialog box may have been on-screen). If this flag is <EM>
+false</EM>
+, the application is starting up fresh. If this flag is <EM>
+true</EM>
+, the UI does not call MSG_META_LOAD_OPTIONS and ignores any &quot;ON_STARTUP&quot; hints or attributes.</LI>
+<LI>
+AAF_STATE_FILE_PASSED indicates that the application is restoring from the state file passed in an <CODE>
+AppLaunchBlock</CODE>
+, presumably passed as an argument in the message also. If this flag is set, AAF_RESTORING_FROM_STATE will also be set.</LI>
+<LI>
+AAF_DATA_FILE_PASSED indicates that the passed <CODE>
+AppLaunchBlock</CODE>
+ contains the name of a data file that should be opened.</LI>
+<LI>
+AAF_RESTORING_FROM_QUIT indicates that the application was in the process of quitting, reached engine mode, and is now being started back up into application mode. If set, will also be set, and we will be brought up in whatever state we originally entered engine mode.</LI>
+</UL>
+
+<H6 CLASS="RefETitle">
+<A NAME="GenProcess_1.htm_IX_MSG_GEN_PROCESS_RESTORE_FROM_STATE">
+ </A>
+MSG_GEN_PROCESS_RESTORE_FROM_STATE</H6>
+<PRE CLASS="syntax">void 	MSG_GEN_PROCESS_RESTORE_FROM_STATE(
+        AppAttachFlags 		attachFlags,
+        MemHandle 		launchBlock,
+        MemHandle 		extraState);</PRE>
+<P>
+This message is sent by the User Interface when an application is being loaded from a state file. This is sent to the process itself from <CODE>
+MSG_META_ATTACH</CODE>
+, whenever the application is being invoked as in <CODE>
+MSG_GEN_PROCESS_RESTORE_FROM_STATE</CODE>
+ mode. Data passed is the same as that in <CODE>
+MSG_META_ATTACH</CODE>
+. The default handler fetches the application mode message, either <CODE>
+MSG_GEN_PROCESS_OPEN_APPLICATION</CODE>
+ or <CODE>
+MSG_GEN_PROCESS_OPEN_ENGINE</CODE>
+, as saved in the application object, and sends that message to the process.</P>
+<P>
+Note that the blocks passed need not be freed, as this is done by the caller upon return.</P>
+<P CLASS="refField">
+Source:	Default <CODE>
+GenProcessClass</CODE>
+ handler for <CODE>
+MSG_META_ATTACH.</CODE>
+</P>
+<P CLASS="refField">
+Destination:	Self.</P>
+<P CLASS="refField">
+Interception:	Intercepted generally only so that application can retrieve previously saved data out of the state block passed.</P>
+<P CLASS="refField">
+Parameters:	<EM>attachFlags</EM> 	Flags with information about the state and data files.</P>
+<DL>
+<DT>
+<EM>launchBlock</EM></DT><DD>Handle of <CODE>
+AppLaunchBlock</CODE>
+, or zero if none. This block contains the name of any document file passed into the application on invocation.</DD>
+<DT>
+<EM>extraState</EM> </DT><DD>Handle of extra state block, or zero if none. This is the same block as returned from <CODE>
+MSG_GEN_PROCESS_CLOSE_APPLICATION</CODE>
+ or <CODE>
+MSG_GEN_PROCESS_CLOSE_ENGINE</CODE>
+, in some previous <CODE>
+MSG_META_DETACH</CODE>
+. Process objects often use this extra block to save global variables to state files.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="GenProcess_1.htm_IX_MSG_GEN_PROCESS_OPEN_APPLICATION">
+ </A>
+MSG_GEN_PROCESS_OPEN_APPLICATION</H6>
+<PRE CLASS="syntax">void	MSG_GEN_PROCESS_OPEN_APPLICATION(
+        AppAttachFlags		attachFlags,
+        MemHandle		launchBlock,
+        MemHandle 		extraState);</PRE>
+<P>
+This message is sent by the User Interface when an application is being loaded from its resource blocks. Applications will often intercept this message to set up certain things before being put on-screen. This is the handler in which, for example, you would register for certain notifications such as the quick-transfer notification.</P>
+<P>
+This is sent to the process itself from <CODE>
+MSG_META_ATTACH</CODE>
+, whenever the application is being restored to application mode (as opposed to engine mode), or whenever it is being invoked as in application mode. Data passed is the same as that in <CODE>
+MSG_META_ATTACH</CODE>
+. The default handler sets the GenApplication object GS_USABLE, and brings the UI up on screen.</P>
+<P>
+This message may be intercepted to open up any data file passed, before the UI for the application is actually set GS_USABLE. Note that the blocks passed need not be freed, as this is done by the caller upon return.</P>
+<P>
+If you intercept this message and need to send MSG_META_QUIT from within the handler, make sure to either send the quit after calling the superclass, or send the quit via MSG_META_FLUSH_INPUT_QUEUE. (If this is not done, the system will think that an IACP connection is open, aborting the quit.)</P>
+<P CLASS="refField">
+Source:	 <CODE>
+GenProcessClass</CODE>
+ default handler for <CODE>
+MSG_META_ATTACH</CODE>
+ only.</P>
+<P CLASS="refField">
+Destination:	Same object.</P>
+<P CLASS="refField">
+Interception:	Frequently intercepted by an application's own process class to find out when an application is first coming alive in the system. You <EM>
+must</EM>
+ pass this message on to the superclass, or the application will never come up. Be aware that the entire UI tree for the application is the equivalent of not usable (~GS_USABLE) before the superclass is called, and is usable and up on screen visually after it is called. Thus, it is best to do non-UI related things, and changing of generic attributes and hints <EM>
+before</EM>
+ calling the superclass. You must wait until <EM>
+after</EM>
+ calling the superclass to perform any operations which require that objects be fully usable (e.g. bringing up a dialog box). Make sure that if you send MSG_META_QUIT from within your handler that you follow the guidelines mentioned above.</P>
+<P CLASS="refField">
+Parameters:	<EM>attachFlags</EM> 	State information about the state and data files.</P>
+<DL>
+<DT>
+<EM>launchBlock</EM> </DT><DD>Handle of <CODE>
+AppLaunchBlock</CODE>
+, or zero if none. This block contains the name of any document file passed into the application on invocation.</DD>
+<DT>
+<EM>extraState</EM> </DT><DD>Handle of extra state block, or zero if none. This is the same block as returned from <CODE>
+MSG_GEN_PROCESS_CLOSE_APPLICATION</CODE>
+ or <CODE>
+MSG_GEN_PROCESS_CLOSE_ENGINE</CODE>
+, in some previous <CODE>
+MSG_META_DETACH</CODE>
+.<BR>
+Is freed by caller--subclasses should not free the extra state block.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="GenProcess_1.htm_IX_MSG_GEN_PROCESS_CLOSE_APPLICATION">
+ </A>
+MSG_GEN_PROCESS_CLOSE_APPLICATION</H6>
+<PRE CLASS="syntax">MemHandle MSG_GEN_PROCESS_CLOSE_APPLICATION();</PRE>
+<P>
+This message is sent by the User Interface whenever the application is being shut down (during a detach) and it had been launched in application (as opposed to engine) mode.</P>
+<P CLASS="refField">
+Source:	<CODE>
+GenProcessClass</CODE>
+ default handler for <CODE>
+MSG_META_DETACH</CODE>
+ only</P>
+<P CLASS="refField">
+Destination:	Self</P>
+<P CLASS="refField">
+Interception:	Convenient place for code that needs to be executed before application exits, for non-engine mode cases. Superclass must be called.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Handle of block to save (or NULL for none). Process objects often save global variables to a state file in an extra block. This is the handle of that block.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="GenProcess_1.htm_IX_MSG_GEN_PROCESS_OPEN_ENGINE">
+ </A>
+MSG_GEN_PROCESS_OPEN_ENGINE</H6>
+<PRE CLASS="syntax">void 	MSG_GEN_PROCESS_OPEN_ENGINE(
+        AppAttachFlags 		attachFlags,
+        MemHandle 		launchBlock);</PRE>
+<P>
+This is sent to the process itself from <CODE>
+MSG_META_ATTACH</CODE>
+, whenever the application is being restored to engine mode, or whenever it is being invoked as in engine mode. Data passed is the same as that in <CODE>
+MSG_META_ATTACH</CODE>
+. There is no default handler.</P>
+<P>
+This message may be intercepted to open up any data file passed, before any engine commands are delivered to the process. Note that the blocks passed need not be freed, as this is done by the caller upon return.</P>
+<P CLASS="refField">
+Source:	<CODE>
+GenProcessClass</CODE>
+ default handler for <CODE>
+MSG_META_ATTACH</CODE>
+ only.</P>
+<P CLASS="refField">
+Destination:	Self.</P>
+<P CLASS="refField">
+Interception:	Generally unnecessary, though can be intercepted if notification of going into this mode is necessary.</P>
+<P CLASS="refField">
+Parameters:	<EM>attachFlags</EM> 	State of state and data files.</P>
+<DL>
+<DT>
+<EM>launchBlock</EM> </DT><DD>Handle of <CODE>
+AppLaunchBlock</CODE>
+, or NULL if none. This block contains the name of any document file passed into the application on invocation.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="GenProcess_1.htm_IX_MSG_GEN_PROCESS_CLOSE_ENGINE">
+ </A>
+MSG_GEN_PROCESS_CLOSE_ENGINE</H6>
+<PRE CLASS="syntax">void 	MSG_GEN_PROCESS_CLOSE_ENGINE();</PRE>
+<P>
+This message is sent by the User Interface whenever the application is being shut down (during a detach) and it had been launched in &quot;engine&quot; mode.</P>
+<P CLASS="refField">
+Source:	<CODE>
+GenProcessClass</CODE>
+ default handler for <CODE>
+MSG_META_DETACH</CODE>
+ only.</P>
+<P CLASS="refField">
+Destination:	Self.</P>
+<P CLASS="refField">
+Interception:	Convenient place for code that needs to be executed before the application exits, for engine mode cases. Superclass must be called.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="GenProcess_1.htm_IX_MSG_GEN_PROCESS_CLOSE_CUSTOM">
+ </A>
+MSG_GEN_PROCESS_CLOSE_CUSTOM</H6>
+<PRE CLASS="syntax">MemHandle MSG_GEN_PROCESS_CLOSE_CUSTOM();</PRE>
+<P>
+This message is sent by the User Interface whenever the application is being shut down (during a detach) and it had been launched in some custom mode (not application or engine) that <CODE>
+GenProcessClass</CODE>
+ doesn't know about.</P>
+<P CLASS="refField">
+Source:	Subclass of <CODE>
+GenProcessClass</CODE>
+.</P>
+<P CLASS="refField">
+Destination:	Self.</P>
+<P CLASS="refField">
+Interception:	Convenient place for code that needs to be executed before the application exits, for custom mode cases. Superclass must be called.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Handle of block to save (or NULL for none).</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="GenProcess_1.htm_IX_MSG_GEN_PROCESS_ATTACH_TO_PASSED_STATE_FILE">
+ </A>
+MSG_GEN_PROCESS_ATTACH_TO_PASSED_STATE_FILE</H6>
+<PRE CLASS="syntax">MemHandle 	MSG_GEN_PROCESS_ATTACH_TO_STATE_FILE(
+        AppAttachFlags		attachFlags,
+        MemHandle		launchBlock);</PRE>
+<P>
+This message is sent by the User Interface whenever the application is being attached to a state file. This message is sent when either restoring from state or detaching. May be subclassed to provide forced state behavior.</P>
+<P CLASS="refField">
+Source:	<CODE>
+GenProcessClass</CODE>
+ default handler for <CODE>
+MSG_META_ATTACH</CODE>
+.</P>
+<P CLASS="refField">
+Destination:	Self.</P>
+<P CLASS="refField">
+Interception:	May be intercepted to force use of a particular state file (by changing the name of the state file to use before calling superclass).</P>
+<P CLASS="refField">
+Parameters:	<EM>attachFlags</EM> 	<CODE>
+AppAttachMode</CODE>
+ (matches that in <CODE>
+AppLaunchBlock</CODE>
+).</P>
+<DL>
+<DT>
+<EM>launchBlock</EM> </DT><DD>Block of structure <CODE>
+AppLaunchBlock</CODE>
+.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Handle of extra block of state data (zero for none).</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="GenProcess_1.htm_IX_MSG_GEN_PROCESS_CREATE_NEW_STATE_FILE">
+ </A>
+MSG_GEN_PROCESS_CREATE_NEW_STATE_FILE</H6>
+<PRE CLASS="syntax">word MSG_GEN_PROCESS_CREATE_NEW_STATE_FILE(
+         MemHandle appInstanceReference);</PRE>
+<P>
+This replaces <CODE>
+MSG_GEN_PROCESS_ATTACHED_TO_PASSED_STATE_FILE</CODE>
+ if no state file had been specified in that message. This message's default handler will create a new state file and attach it normally. Can be subclassed to provide forced state file usage (e.g. use a different naming scheme).</P>
+<P CLASS="refField">
+Source:	<CODE>
+GenProcessClass</CODE>
+ default handler for MSG_META_DETACH, if not quitting.</P>
+<P CLASS="refField">
+Destination:	Self.</P>
+<P CLASS="refField">
+Interception:	May be intercepted to change name of state file to create.</P>
+<P CLASS="refField">
+Parameters:	<EM>appInstanceReference</EM> <BR>
+Block handle to block of structure <CODE>
+AppInstanceReference</CODE>
+.</P>
+<P CLASS="refField">
+Return:	VM file handle (NULL if you want no state file).</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="GenProcess_1.htm_IX_MSG_GEN_PROCESS_DETACH_FROM_STATE_FILE">
+ </A>
+MSG_GEN_PROCESS_DETACH_FROM_STATE_FILE</H6>
+<PRE CLASS="syntax">void 	MSG_GEN_PROCESS_DETACH_FROM_STATE_FILE(
+        MemHandle 		extraState,
+        word 		appStates);</PRE>
+<P>
+This message is sent by the User Interface when the application is detaching or quitting (may or may not be attached to a state file) and the detach is nearly complete.</P>
+<P CLASS="refField">
+Source:	<CODE>
+GenProcessClass</CODE>
+ default handler for <CODE>
+MSG_META_DETACH</CODE>
+, if not quitting.</P>
+<P CLASS="refField">
+Destination:	Self.</P>
+<P CLASS="refField">
+Interception:	Not generally done. Default behavior is what you want.</P>
+<P CLASS="refField">
+Parameters:	<EM>extraState</EM> 	Block handle of extra block to be saved (as returned from <CODE>
+MSG_GEN_PROCESS_CLOSE_APPLICATION</CODE>
+, <CODE>
+MSG_GEN_PROCESS_CLOSE_ENGINE</CODE>
+ or <CODE>
+MSG_GEN_PROCESS_CLOSE_CUSTOM</CODE>
+). If the block is not transferred to the state file), it must be freed (if non-zero) by the handler for this message.</P>
+<DL>
+<DT>
+<EM>appStates</EM> </DT><DD><CODE>
+ApplicationStates</CODE>
+ record with information about the application state.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="GenProcess_1.htm_IX_MSG_GEN_PROCESS_INSTALL_TOKEN">
+ </A>
+MSG_GEN_PROCESS_INSTALL_TOKEN</H6>
+<PRE CLASS="syntax">void 	MSG_GEN_PROCESS_INSTALL_TOKEN();</PRE>
+<P>
+This message is sent by the desktop to a process to get that process to install its token and moniker lists into the token database.</P>
+<P CLASS="refField">
+Source:	Generally whatever geode launched this application in engine mode (e.g. GeoManager).</P>
+<P CLASS="refField">
+Destination:	<CODE>
+GenProcessClass</CODE>
+ object of any geode launched in engine mode.</P>
+<P CLASS="refField">
+Interception:	May be intercepted to install additional tokens. Default behavior installs only application icon.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="GenProcess_1.htm_IX_MSG_GEN_PROCESS_GET_PARENT_FIELD">
+ </A>
+MSG_GEN_PROCESS_GET_PARENT_FIELD</H6>
+<PRE CLASS="syntax">optr 	MSG_GEN_PROCESS_GET_PARENT_FIELD();</PRE>
+<P>
+This message is sent by process-libraries (such as the Spool Object Library) to find out which field object is its parent. This message will return the field of the first client of the library.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	<CODE>
+GenProcessClass</CODE>
+ object.</P>
+<P CLASS="refField">
+Interception:	Not necessary, as default behavior implements utility.</P>
+<P CLASS="refField">
+Parameters:	Nothing.</P>
+<P CLASS="refField">
+Return:	Parent field.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="GenProcess_1.htm_IX_MSG_GEN_PROCESS_SEND_TO_APP_GCN_LIST">
+ </A>
+MSG_GEN_PROCESS_SEND_TO_APP_GCN_LIST</H6>
+<PRE CLASS="syntax">void	MSG_GEN_PROCESS_SEND_TO_APP_GCN_LIST(@stack
+        word		sendFlags,
+        EventHandle 		event,
+        MemHandle 		block,
+        word		manufListType,
+        ManufacturerID 		manufID);</PRE>
+<P>
+This message sends the specified event to all the objects registered with the passed GCN list. This message should be subclassed by UI Controller objects.</P>
+<P>
+The handler here merely sends the request on to GenApplication using <CODE>
+MSG_META_GCN_LIST_SEND</CODE>
+. Controllers should use this message, however, over direct communication with the application object, to ensure orderly updating of the list status event. One such failure case which is fixed is two target text objects, one run by the process thread in a view, the other a GenText run by the UI thread. If the GenText has the target and the user clicks quickly on view then GenText, the GenText may process both messages about the target being lost and gained before the process text object receives its gained and lost pair. If both objects sent <CODE>
+MSG_META_GCN_LIST_SEND</CODE>
+ directly to the GenApplication object, the GenText's status would be wiped out by the subsequent reporting by the process text object. This problem is avoided by having both process and UI objects call here to pass status update info. This works because target changes start out ordered in the UI thread, and that order is passed on to the process thread in either of the two cases.</P>
+<P CLASS="refField">
+Source:	Any object wishing to update an application GCN list. Don't use queue-order altering message flags such as MF_PLACE_IN_FRONT when sending this message. As a convention must be established for the flag MF_FORCE_QUEUE in order to ensure orderly results, the convention in use is this: Don't pass it. <BR>
+A typical call should use only the MF_STACK, MF_FIXUP_DS, and/or MF_FIXUP_ES flags, if needed. </P>
+<P CLASS="refField">
+Destination:	<CODE>
+GenProcessClass</CODE>
+ (application process) only.</P>
+<P CLASS="refField">
+Interception:	Should not generally be intercepted, as <CODE>
+GenProcessClass</CODE>
+ provides correct behavior. If intercepted and not sent onto superclass, event passed must be destroyed and data block reference count decremented, to avoid leaving obsolete data on the heap.</P>
+<P CLASS="refField">
+Parameters:	<EM>sendFlags</EM> 	Flags to pass on to <CODE>
+GCNListSend()</CODE>
+.</P>
+<DL>
+<DT>
+<EM>event</EM> </DT><DD>Classed event to pass on to the list.</DD>
+<DT>
+<EM>block</EM> </DT><DD>Handle of extra data block, if used (otherwise NULL). Blocks of this type must have a reference count, which may be initialized with <CODE>
+MemInitRefCount()</CODE>
+ and be incremented for any new usage with <CODE>
+MemIncRefCount()</CODE>
+. Methods in which they are passed are considered such a new usage, and must have <CODE>
+MetaClass</CODE>
+ handlers which call <CODE>
+MemDerefCount()</CODE>
+. Current messages supported are <CODE>
+MSG_META_NOTIFY_WITH_DATA_BLOCK</CODE>
+ and <CODE>
+MSG_NOTIFY_FILE_CHANGE</CODE>
+.</DD>
+<DT>
+<EM>manufListType</EM></DT><DD>This may be a <CODE>
+GCNStandardListType</CODE>
+ or any other word which acts as a GCN list ID.</DD>
+<DT>
+<EM>manufID</EM></DT><DD>Manufacturer ID, which helps identify the GCN list.</DD>
+
+</DL>
+<HR>
+<A NAME="GenProcess_2.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">The GenProcess Object</A>: 2 
+Undo Mechanism</H2>
+<P>
+<A NAME="GenProcess_2.htm_IX_Undo">
+ </A>
+<A NAME="GenProcess_2.htm_IX_Clipboard:undo chains">
+ </A>
+The Undo mechanism is implemented at the GenProcess level; this allows the undo mechanism to be applicable to any application or process. In general, Undo allows a process, usually within an application, but possibly within a library, to reverse changes made in the state of other objects. GEOS allows an almost unlimited number of stored and reversible Undo actions; the practical limit is somewhere around 100 actions.</P>
+<P>
+<A NAME="GenProcess_2.htm_IX_AddUndoActionStruct">
+ </A>
+<A NAME="GenProcess_2.htm_IX_AUAS_&ldots;">
+ </A>
+Undo actions are stored within undo <EM>
+chains</EM>
+. These chains allow queued actions to be undone in reverse order. Each element in an undo chain is made up of an <CODE>
+UndoActionStruct</CODE>
+. These structures are usually added with an <CODE>
+AddUndoActionStruct</CODE>
+. This structure has several elements:</P>
+<PRE>typedef struct {
+	UndoActionStruct				AUAS_data;
+	optr				AUAS_output;
+	AddUndoActionFlags				AUAS_flags;
+} AddUndoActionStruct</PRE>
+<P>
+A chain of undo actions is stored for each object. If you want your object to recognize undo-able actions, you must add the undo actions yourself and intercept MSG_META_UNDO when those actions are played back. The object should be able to understand the data within the <CODE>
+UndoActionStruct</CODE>
+ to perform the Undo action.</P>
+<P>
+<A NAME="GenProcess_2.htm_IX_AddUndoActionFlags">
+ </A>
+<A NAME="GenProcess_2.htm_IX_AUAF_&ldots;">
+ </A>
+There are two <CODE>
+AddUndoActionFlags</CODE>
+ which affect when and how undo notification occurs. If AUAF_NOTIFY_BEFORE_FREEING or AUAF_NOTIFY_IF_FREED_WITHOUT_BEING_PLAYED_BACK is set in the <CODE>
+AddUndoActionFlags</CODE>
+, it not only receives MSG_META_UNDO but also receives MSG_META_UNDO_FREEING_ACTION when the undo mechanism frees the action. You can check the flags in the <CODE>
+AddUndoActionStruct</CODE>
+ passed with this message to decide what action to take.</P>
+<P>
+The object wishing to register an action for undo sends the process MSG_GEN_PROCESS_UNDO_START_CHAIN. For each action in this undo chain (there may be multiple actions in a single chain) send MSG_GEN_PROCESS_UNDO_ADD_ACTION; pass this message the <CODE>
+AddUndoActionStruct</CODE>
+ action of the action to add. Finally, send MSG_GEN_PROCESS_UNDO_END_CHAIN to mark the end of this undo chain. Undo chains may be nested within each other.</P>
+<P>
+The messages following this section also describe supplemental behavior that you may find useful. In addition to these messages, <CODE>
+GenProcessClass</CODE>
+ also provides the following routines:</P>
+<P>
+<CODE>
+GenProcessUndoGetFile() </CODE>
+returns a file handle of a Huge Array or DB item to hold undo information. Use this routine to get a file to put such undo information into.</P>
+<P>
+<CODE>
+GenProcessUndoCheckIfIgnoring()</CODE>
+ allows an application or library to check whether an application is ignoring undo information; in this case, it can avoid creating unnecessary undo information.</P>
+
+<H6 CLASS="RefETitle">
+<A NAME="GenProcess_2.htm_IX_MSG_GEN_PROCESS_UNDO_START_CHAIN">
+ </A>
+MSG_GEN_PROCESS_UNDO_START_CHAIN</H6>
+<PRE CLASS="syntax">void 	MSG_GEN_PROCESS_UNDO_START_CHAIN(@stack
+        optr 	title,
+        optr 	owner);</PRE>
+<P>
+This message notifies the process of the start of an undo-able action. Note that all this message does is increment a count--a new undo chain is created when the count goes from zero to one. This allows a function to perform a number of undo-able actions and have them all grouped as a single undo-able action.</P>
+<P CLASS="refField">
+Source:	Any object wanting to register an action for undo.</P>
+<P CLASS="refField">
+Destination:	<CODE>
+GenProcessClass</CODE>
+ only.</P>
+<P CLASS="refField">
+Interception:	In general, should not be intercepted.</P>
+<P CLASS="refField">
+Parameters:	<EM>title</EM> 	The null-terminated title of this action. If NULL, then the title of the undo action will be the title passed with the next UNDO_START_CHAIN.</P>
+<DL>
+<DT>
+<EM>owner</EM> </DT><DD>The object which owns this action.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="GenProcess_2.htm_IX_MSG_GEN_PROCESS_UNDO_END_CHAIN">
+ </A>
+MSG_GEN_PROCESS_UNDO_END_CHAIN</H6>
+<PRE CLASS="syntax">void 	MSG_GEN_PROCESS_UNDO_END_CHAIN(
+        BooleanWord 		flushChainIfEmpty);</PRE>
+<P>
+This message notifies the process of the end of an undo-able action. Note that all this message does is decrement a count--the current undo chain is terminated when the count goes from one to zero. This allows a function to perform a number of undo-able actions and have them all grouped as a single undo-able action.</P>
+<P CLASS="refField">
+Source:	Any object wanting to register an action for undo.</P>
+<P CLASS="refField">
+Destination:	<CODE>
+GenProcessClass</CODE>
+ only.</P>
+<P CLASS="refField">
+Interception:	In general, should not be intercepted.</P>
+<P CLASS="refField">
+Parameters:	<EM>flushChainIfEmpty</EM> <BR>
+Non-zero if you want to delete the chain if it has no actions; zero if the chain is OK without actions (actions will be added later).</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="GenProcess_2.htm_IX_MSG_GEN_PROCESS_UNDO_ABORT_CHAIN">
+ </A>
+MSG_GEN_PROCESS_UNDO_ABORT_CHAIN</H6>
+<PRE CLASS="syntax">void	MSG_GEN_PROCESS_UNDO_ABORT_CHAIN();</PRE>
+<P>
+This message aborts the current undo chain, destroying all actions in place on the current chain, and instructs the undo mechanism to ignore any undo information until the current undo chain is ended. This latter behavior is needed because the current chain may be nested within several chains, so we must ignore undo chain actions until the outermost chain is ended.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	GenProcess object.</P>
+<P CLASS="refField">
+Interception:	Do not intercept.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="GenProcess_2.htm_IX_MSG_GEN_PROCESS_UNDO_ADD_ACTION">
+ </A>
+MSG_GEN_PROCESS_UNDO_ADD_ACTION</H6>
+<PRE CLASS="syntax">VMChain 	MSG_GEN_PROCESS_UNDO_ADD_ACTION(
+        AddUndoActionStruct 	*data);</PRE>
+<P>
+This message adds a new undo action to the current undo chain.</P>
+<P CLASS="refField">
+Source:	Any object wanting to register an action for undo.</P>
+<P CLASS="refField">
+Destination:	<CODE>
+GenProcessClass</CODE>
+.</P>
+<P CLASS="refField">
+Interception:	In general, should not be intercepted.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+data</CODE>
+	Structure containing information which may be used to undo action.</P>
+<P CLASS="refField">
+Return:	Will return NULL if we are ignoring undo messages. <BR>
+If the value passed in <CODE>
+UAS_datatype</CODE>
+ was UADT_PTR or UADT_VMCHAIN, then will return a VMChain or DBItem which may be used to undo the action. If neither of the above cases is true, return value is meaningless.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="GenProcess_2.htm_IX_MSG_GEN_PROCESS_UNDO_GET_FILE">
+ </A>
+MSG_GEN_PROCESS_UNDO_GET_FILE</H6>
+<PRE CLASS="syntax">VMFileHandle MSG_GEN_PROCESS_UNDO_GET_FILE();</PRE>
+<P>
+This message returns a VM file handle to store undo actions. This message is useful to access undo data in either a huge array or DB item. You may also use <CODE>
+GenProcessUndoGetFile() </CODE>
+to retrieve this file instead.</P>
+<P CLASS="refField">
+Source:	Any object wanting to access the undo file.</P>
+<P CLASS="refField">
+Interception:	Should not be intercepted.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	File handle of VM file with undo information.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="GenProcess_2.htm_IX_MSG_GEN_PROCESS_UNDO_FLUSH_ACTIONS">
+ </A>
+MSG_GEN_PROCESS_UNDO_FLUSH_ACTIONS</H6>
+<PRE CLASS="syntax">void 	MSG_GEN_PROCESS_UNDO_FLUSH_ACTIONS();</PRE>
+<P>
+This message flushes the current undo chain (frees all undo actions, notifies edit control that there is no undo item).</P>
+<P CLASS="refField">
+Source:	Any object using undo.</P>
+<P CLASS="refField">
+Interception:	Should not be intercepted.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="GenProcess_2.htm_IX_MSG_GEN_PROCESS_UNDO_SET_CONTEXT">
+ </A>
+MSG_GEN_PROCESS_UNDO_SET_CONTEXT</H6>
+<PRE CLASS="syntax">dword 	MSG_GEN_PROCESS_UNDO_SET_CONTEXT(
+        dword 	context);</PRE>
+<P>
+This message sets the current undo context. This allows the application to have separate undo chains associated with various documents or modes. This should be sent out before any other undo related messages. The document control automatically takes care of this when a document gets the model exclusive.</P>
+<P>
+Passing NULL_UNDO_CONTEXT as the new context will trigger some zealous EC code if any other undo messages are sent while the context is null.</P>
+<P CLASS="refField">
+Source:	Any object using undo.</P>
+<P CLASS="refField">
+Interception:	Generally, should not be intercepted. Applications wanting to override the default behavior should at least flush out the current undo actions, as they will probably not be valid in the new context.</P>
+<P CLASS="refField">
+Parameters:	<EM>context</EM> 	New context (this has no meaning to the undo mechanism--it's just a value).</P>
+<P CLASS="refField">
+Return:	Old context.</P>
+<P CLASS="refField">
+Structures:	</P>
+<PRE>#define NULL_UNDO_CONTEXT 0</PRE>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="GenProcess_2.htm_IX_MSG_GEN_PROCESS_UNDO_GET_CONTEXT">
+ </A>
+MSG_GEN_PROCESS_UNDO_GET_CONTEXT</H6>
+<PRE CLASS="syntax">dword 	MSG_GEN_PROCESS_UNDO_GET_CONTEXT();</PRE>
+<P>
+This message gets the current undo context.</P>
+<P CLASS="refField">
+Source:	Any object using undo.</P>
+<P CLASS="refField">
+Interception:	Generally, should not be intercepted.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Current context.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="GenProcess_2.htm_IX_MSG_GEN_PROCESS_UNDO_PLAYBACK_CHAIN">
+ </A>
+MSG_GEN_PROCESS_UNDO_PLAYBACK_CHAIN</H6>
+<PRE CLASS="syntax">void 	MSG_GEN_PROCESS_UNDO_PLAYBACK_CHAIN();</PRE>
+<P>
+This message plays back the current undo chain, one action at a time. It simultaneously creates a &quot;redo&quot; chain, so the undone action can be redone.</P>
+<P CLASS="refField">
+Source:	Edit control.</P>
+<P CLASS="refField">
+Interception:	Generally, should not be intercepted.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="GenProcess_2.htm_IX_MSG_GEN_PROCESS_UNDO_IGNORE_ACTIONS">
+ </A>
+MSG_GEN_PROCESS_UNDO_IGNORE_ACTIONS</H6>
+<PRE CLASS="syntax">void 	MSG_GEN_PROCESS_UNDO_IGNORE_ACTIONS(
+        Boolean		flushActions);</PRE>
+<P>
+This message causes a process to reject any undo messages.</P>
+<P CLASS="refField">
+Source:	Edit control.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+flushActions</EM>
+	<EM>
+true</EM>
+ to flush the queue.</P>
+<P CLASS="refField">
+Interception:	Generally, should not be intercepted.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="GenProcess_2.htm_IX_MSG_GEN_PROCESS_UNDO_ACCEPT_ACTIONS">
+ </A>
+MSG_GEN_PROCESS_UNDO_ACCEPT_ACTIONS</H6>
+<PRE CLASS="syntax">void 	MSG_GEN_PROCESS_UNDO_ACCEPT_ACTIONS();</PRE>
+<P>
+This message causes a process to accept undo messages again.</P>
+<P CLASS="refField">
+Source:	Edit control.</P>
+<P CLASS="refField">
+Interception:	Generally, should not be intercepted.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="GenProcess_2.htm_IX_MSG_GEN_PROCESS_UNDO_CHECK_IF_IGNORING">
+ </A>
+MSG_GEN_PROCESS_UNDO_CHECK_IF_IGNORING</H6>
+<PRE CLASS="syntax">Boolean 	MSG_GEN_PROCESS_UNDO_CHECK_IF_IGNORING();</PRE>
+<P>
+This message checks to see if the system is currently ignoring undo actions.</P>
+<P CLASS="refField">
+Source:	Edit control.</P>
+<P CLASS="refField">
+Interception:	Generally, should not be intercepted.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Will return <EM>
+true</EM>
+ if ignoring actions.</P>
+
+<HR>
+<A NAME="GenProcess_3.htm"></A>
+
+
+<H3 CLASS="subsectionTitle">
+<A HREF="#index.htm">The GenProcess Object</A>: 2.1 <A HREF="#GenProcess_2.htm">Undo Mechanism</A>: 
+Undo Mechanism</H3>
+<P>
+<A NAME="GenProcess_3.htm_IX_Undo">
+ </A>
+<A NAME="GenProcess_3.htm_IX_Clipboard:undo chains">
+ </A>
+The Undo mechanism is implemented at the GenProcess level; this allows the undo mechanism to be applicable to any application or process. In general, Undo allows a process, usually within an application, but possibly within a library, to reverse changes made in the state of other objects. GEOS allows an almost unlimited number of stored and reversible Undo actions; the practical limit is somewhere around 100 actions.</P>
+<P>
+<A NAME="GenProcess_3.htm_IX_AddUndoActionStruct">
+ </A>
+<A NAME="GenProcess_3.htm_IX_AUAS_&ldots;">
+ </A>
+Undo actions are stored within undo <EM>
+chains</EM>
+. These chains allow queued actions to be undone in reverse order. Each element in an undo chain is made up of an <CODE>
+UndoActionStruct</CODE>
+. These structures are usually added with an <CODE>
+AddUndoActionStruct</CODE>
+. This structure has several elements:</P>
+<PRE>typedef struct {
+	UndoActionStruct				AUAS_data;
+	optr				AUAS_output;
+	AddUndoActionFlags				AUAS_flags;
+} AddUndoActionStruct</PRE>
+<P>
+A chain of undo actions is stored for each object. If you want your object to recognize undo-able actions, you must add the undo actions yourself and intercept MSG_META_UNDO when those actions are played back. The object should be able to understand the data within the <CODE>
+UndoActionStruct</CODE>
+ to perform the Undo action.</P>
+<P>
+<A NAME="GenProcess_3.htm_IX_AddUndoActionFlags">
+ </A>
+<A NAME="GenProcess_3.htm_IX_AUAF_&ldots;">
+ </A>
+There are two <CODE>
+AddUndoActionFlags</CODE>
+ which affect when and how undo notification occurs. If AUAF_NOTIFY_BEFORE_FREEING or AUAF_NOTIFY_IF_FREED_WITHOUT_BEING_PLAYED_BACK is set in the <CODE>
+AddUndoActionFlags</CODE>
+, it not only receives MSG_META_UNDO but also receives MSG_META_UNDO_FREEING_ACTION when the undo mechanism frees the action. You can check the flags in the <CODE>
+AddUndoActionStruct</CODE>
+ passed with this message to decide what action to take.</P>
+<P>
+The object wishing to register an action for undo sends the process MSG_GEN_PROCESS_UNDO_START_CHAIN. For each action in this undo chain (there may be multiple actions in a single chain) send MSG_GEN_PROCESS_UNDO_ADD_ACTION; pass this message the <CODE>
+AddUndoActionStruct</CODE>
+ action of the action to add. Finally, send MSG_GEN_PROCESS_UNDO_END_CHAIN to mark the end of this undo chain. Undo chains may be nested within each other.</P>
+<P>
+The messages following this section also describe supplemental behavior that you may find useful. In addition to these messages, <CODE>
+GenProcessClass</CODE>
+ also provides the following routines:</P>
+<P>
+<CODE>
+GenProcessUndoGetFile() </CODE>
+returns a file handle of a Huge Array or DB item to hold undo information. Use this routine to get a file to put such undo information into.</P>
+<P>
+<CODE>
+GenProcessUndoCheckIfIgnoring()</CODE>
+ allows an application or library to check whether an application is ignoring undo information; in this case, it can avoid creating unnecessary undo information.</P>
+
+<H6 CLASS="RefETitle">
+<A NAME="GenProcess_3.htm_IX_MSG_GEN_PROCESS_UNDO_START_CHAIN">
+ </A>
+MSG_GEN_PROCESS_UNDO_START_CHAIN</H6>
+<PRE CLASS="syntax">void 	MSG_GEN_PROCESS_UNDO_START_CHAIN(@stack
+        optr 	title,
+        optr 	owner);</PRE>
+<P>
+This message notifies the process of the start of an undo-able action. Note that all this message does is increment a count--a new undo chain is created when the count goes from zero to one. This allows a function to perform a number of undo-able actions and have them all grouped as a single undo-able action.</P>
+<P CLASS="refField">
+Source:	Any object wanting to register an action for undo.</P>
+<P CLASS="refField">
+Destination:	<CODE>
+GenProcessClass</CODE>
+ only.</P>
+<P CLASS="refField">
+Interception:	In general, should not be intercepted.</P>
+<P CLASS="refField">
+Parameters:	<EM>title</EM> 	The null-terminated title of this action. If NULL, then the title of the undo action will be the title passed with the next UNDO_START_CHAIN.</P>
+<DL>
+<DT>
+<EM>owner</EM> </DT><DD>The object which owns this action.</DD>
+</DL>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="GenProcess_3.htm_IX_MSG_GEN_PROCESS_UNDO_END_CHAIN">
+ </A>
+MSG_GEN_PROCESS_UNDO_END_CHAIN</H6>
+<PRE CLASS="syntax">void 	MSG_GEN_PROCESS_UNDO_END_CHAIN(
+        BooleanWord 		flushChainIfEmpty);</PRE>
+<P>
+This message notifies the process of the end of an undo-able action. Note that all this message does is decrement a count--the current undo chain is terminated when the count goes from one to zero. This allows a function to perform a number of undo-able actions and have them all grouped as a single undo-able action.</P>
+<P CLASS="refField">
+Source:	Any object wanting to register an action for undo.</P>
+<P CLASS="refField">
+Destination:	<CODE>
+GenProcessClass</CODE>
+ only.</P>
+<P CLASS="refField">
+Interception:	In general, should not be intercepted.</P>
+<P CLASS="refField">
+Parameters:	<EM>flushChainIfEmpty</EM> <BR>
+Non-zero if you want to delete the chain if it has no actions; zero if the chain is OK without actions (actions will be added later).</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="GenProcess_3.htm_IX_MSG_GEN_PROCESS_UNDO_ABORT_CHAIN">
+ </A>
+MSG_GEN_PROCESS_UNDO_ABORT_CHAIN</H6>
+<PRE CLASS="syntax">void	MSG_GEN_PROCESS_UNDO_ABORT_CHAIN();</PRE>
+<P>
+This message aborts the current undo chain, destroying all actions in place on the current chain, and instructs the undo mechanism to ignore any undo information until the current undo chain is ended. This latter behavior is needed because the current chain may be nested within several chains, so we must ignore undo chain actions until the outermost chain is ended.</P>
+<P CLASS="refField">
+Source:	Unrestricted.</P>
+<P CLASS="refField">
+Destination:	GenProcess object.</P>
+<P CLASS="refField">
+Interception:	Do not intercept.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="GenProcess_3.htm_IX_MSG_GEN_PROCESS_UNDO_ADD_ACTION">
+ </A>
+MSG_GEN_PROCESS_UNDO_ADD_ACTION</H6>
+<PRE CLASS="syntax">VMChain 	MSG_GEN_PROCESS_UNDO_ADD_ACTION(
+        AddUndoActionStruct 	*data);</PRE>
+<P>
+This message adds a new undo action to the current undo chain.</P>
+<P CLASS="refField">
+Source:	Any object wanting to register an action for undo.</P>
+<P CLASS="refField">
+Destination:	<CODE>
+GenProcessClass</CODE>
+.</P>
+<P CLASS="refField">
+Interception:	In general, should not be intercepted.</P>
+<P CLASS="refField">
+Parameters:	<CODE>
+data</CODE>
+	Structure containing information which may be used to undo action.</P>
+<P CLASS="refField">
+Return:	Will return NULL if we are ignoring undo messages. <BR>
+If the value passed in <CODE>
+UAS_datatype</CODE>
+ was UADT_PTR or UADT_VMCHAIN, then will return a VMChain or DBItem which may be used to undo the action. If neither of the above cases is true, return value is meaningless.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="GenProcess_3.htm_IX_MSG_GEN_PROCESS_UNDO_GET_FILE">
+ </A>
+MSG_GEN_PROCESS_UNDO_GET_FILE</H6>
+<PRE CLASS="syntax">VMFileHandle MSG_GEN_PROCESS_UNDO_GET_FILE();</PRE>
+<P>
+This message returns a VM file handle to store undo actions. This message is useful to access undo data in either a huge array or DB item. You may also use <CODE>
+GenProcessUndoGetFile() </CODE>
+to retrieve this file instead.</P>
+<P CLASS="refField">
+Source:	Any object wanting to access the undo file.</P>
+<P CLASS="refField">
+Interception:	Should not be intercepted.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	File handle of VM file with undo information.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="GenProcess_3.htm_IX_MSG_GEN_PROCESS_UNDO_FLUSH_ACTIONS">
+ </A>
+MSG_GEN_PROCESS_UNDO_FLUSH_ACTIONS</H6>
+<PRE CLASS="syntax">void 	MSG_GEN_PROCESS_UNDO_FLUSH_ACTIONS();</PRE>
+<P>
+This message flushes the current undo chain (frees all undo actions, notifies edit control that there is no undo item).</P>
+<P CLASS="refField">
+Source:	Any object using undo.</P>
+<P CLASS="refField">
+Interception:	Should not be intercepted.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="GenProcess_3.htm_IX_MSG_GEN_PROCESS_UNDO_SET_CONTEXT">
+ </A>
+MSG_GEN_PROCESS_UNDO_SET_CONTEXT</H6>
+<PRE CLASS="syntax">dword 	MSG_GEN_PROCESS_UNDO_SET_CONTEXT(
+        dword 	context);</PRE>
+<P>
+This message sets the current undo context. This allows the application to have separate undo chains associated with various documents or modes. This should be sent out before any other undo related messages. The document control automatically takes care of this when a document gets the model exclusive.</P>
+<P>
+Passing NULL_UNDO_CONTEXT as the new context will trigger some zealous EC code if any other undo messages are sent while the context is null.</P>
+<P CLASS="refField">
+Source:	Any object using undo.</P>
+<P CLASS="refField">
+Interception:	Generally, should not be intercepted. Applications wanting to override the default behavior should at least flush out the current undo actions, as they will probably not be valid in the new context.</P>
+<P CLASS="refField">
+Parameters:	<EM>context</EM> 	New context (this has no meaning to the undo mechanism--it's just a value).</P>
+<P CLASS="refField">
+Return:	Old context.</P>
+<P CLASS="refField">
+Structures:	</P>
+<PRE>#define NULL_UNDO_CONTEXT 0</PRE>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="GenProcess_3.htm_IX_MSG_GEN_PROCESS_UNDO_GET_CONTEXT">
+ </A>
+MSG_GEN_PROCESS_UNDO_GET_CONTEXT</H6>
+<PRE CLASS="syntax">dword 	MSG_GEN_PROCESS_UNDO_GET_CONTEXT();</PRE>
+<P>
+This message gets the current undo context.</P>
+<P CLASS="refField">
+Source:	Any object using undo.</P>
+<P CLASS="refField">
+Interception:	Generally, should not be intercepted.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Current context.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="GenProcess_3.htm_IX_MSG_GEN_PROCESS_UNDO_PLAYBACK_CHAIN">
+ </A>
+MSG_GEN_PROCESS_UNDO_PLAYBACK_CHAIN</H6>
+<PRE CLASS="syntax">void 	MSG_GEN_PROCESS_UNDO_PLAYBACK_CHAIN();</PRE>
+<P>
+This message plays back the current undo chain, one action at a time. It simultaneously creates a &quot;redo&quot; chain, so the undone action can be redone.</P>
+<P CLASS="refField">
+Source:	Edit control.</P>
+<P CLASS="refField">
+Interception:	Generally, should not be intercepted.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Nothing.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="GenProcess_3.htm_IX_MSG_GEN_PROCESS_UNDO_IGNORE_ACTIONS">
+ </A>
+MSG_GEN_PROCESS_UNDO_IGNORE_ACTIONS</H6>
+<PRE CLASS="syntax">void 	MSG_GEN_PROCESS_UNDO_IGNORE_ACTIONS(
+        Boolean		flushActions);</PRE>
+<P>
+This message causes a process to reject any undo messages.</P>
+<P CLASS="refField">
+Source:	Edit control.</P>
+<P CLASS="refField">
+Parameters:	<EM>
+flushActions</EM>
+	<EM>
+true</EM>
+ to flush the queue.</P>
+<P CLASS="refField">
+Interception:	Generally, should not be intercepted.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="GenProcess_3.htm_IX_MSG_GEN_PROCESS_UNDO_ACCEPT_ACTIONS">
+ </A>
+MSG_GEN_PROCESS_UNDO_ACCEPT_ACTIONS</H6>
+<PRE CLASS="syntax">void 	MSG_GEN_PROCESS_UNDO_ACCEPT_ACTIONS();</PRE>
+<P>
+This message causes a process to accept undo messages again.</P>
+<P CLASS="refField">
+Source:	Edit control.</P>
+<P CLASS="refField">
+Interception:	Generally, should not be intercepted.</P>
+
+
+<H6 CLASS="RefETitle">
+<A NAME="GenProcess_3.htm_IX_MSG_GEN_PROCESS_UNDO_CHECK_IF_IGNORING">
+ </A>
+MSG_GEN_PROCESS_UNDO_CHECK_IF_IGNORING</H6>
+<PRE CLASS="syntax">Boolean 	MSG_GEN_PROCESS_UNDO_CHECK_IF_IGNORING();</PRE>
+<P>
+This message checks to see if the system is currently ignoring undo actions.</P>
+<P CLASS="refField">
+Source:	Edit control.</P>
+<P CLASS="refField">
+Interception:	Generally, should not be intercepted.</P>
+<P CLASS="refField">
+Parameters:	None.</P>
+<P CLASS="refField">
+Return:	Will return <EM>
+true</EM>
+ if ignoring actions.</P>
+
+<HR>
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+</BODY>
+</HTML>

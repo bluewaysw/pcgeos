@@ -1,0 +1,196 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Input_10.htm,v 1.1 97/06/02 16:18:08 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Ink Input Flow</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">Input</A>: 4.2 <A HREF="Input_e.htm">Pen Input and Ink</A>: 
+Ink Input Flow</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Input_e.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Input_f.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.1 Ink Data Structures</A> 
+<!-- to next --> | <A HREF="Input_11.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">5 Input Hierarchies</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<P>
+When the Input Manager receives a Button event, it checks to see if that event should be treated as Ink input. It first holds up input, putting the Button event in the holdup queue, and then it queries the appropriate application with <CODE>
+MSG_META_QUERY_IF_PRESS_IS_INK</CODE>
+. Typically the application will pass the message down its object tree to the appropriate visible or generic object that should initially have received the Button event.</P>
+
+<H2 CLASS="HeadingC">
+Determining if a Press Is Ink</H2>
+<P>
+<A NAME="IX_GenViewClass:and ink input">
+ </A>
+<A NAME="IX_MSG_META_QUERY_IF_PRESS_IS_INK">
+ </A>
+It is up to the application or its visible object to determine whether the input should be treated as Ink. If you don't ever handle Ink, you do not need to do anything different. If any of your objects handles Ink, however, you should set up your GenView to pass Ink events on to its content. Depending how you set up your GenView, you may or may not have to write a handler for <CODE>
+MSG_META_QUERY_IF_PRESS_IS_INK</CODE>
+. The context and details of this message are described below.</P>
+<P>
+<A NAME="IX_GVIT_&ldots;">
+ </A>
+<A NAME="IX_GenViewInkType">
+ </A>
+To set up your GenView for passing Ink input, set the proper flag in its <CODE>
+GVI_inkType</CODE>
+<DL>
+ instance field. The possible flags are detailed in full in <A HREF="../../UI/GenView/index.htm">the GenView chapter</A> but are reviewed below for convenience.</P><DT>
+GVIT_PRESSES_ARE_NOT_INK</DT><DD>
+Objects running under this GenView never handle Ink input. This flag is set as the default. Your objects will not have to handle <CODE>
+MSG_META_QUERY_IF_PRESS_IS_INK</CODE>
+ or <CODE>
+MSG_VIS_QUERY_IF_OBJECT_HANDLES_INK</CODE>
+.</DD>
+<DT>
+GVIT_PRESSES_ARE_INK</DT><DD>
+Objects running under this GenView always want Ink input. Your objects will not have to handle the message <CODE>
+MSG_META_QUERY_IF_PRESS_IS_INK</CODE>
+, but they will have to handle <CODE>
+MSG_VIS_QUERY_IF_OBJECT_HANDLES_INK</CODE>
+.</DD>
+<DT>
+GVIT_INK_WITH_STANDARD_OVERRIDE</DT><DD>
+Objects running under this GenView want Ink, but the user can override it to give mouse events. Your objects will not have to handle <CODE>
+MSG_META_QUERY_IF_PRESS_IS_INK</CODE>
+, but they will have to handle <CODE>
+MSG_VIS_QUERY_IF_OBJECT_HANDLES_INK</CODE>
+.</DD>
+<DT>
+GVIT_QUERY_OUTPUT</DT><DD>
+The Objects running under this GenView want Ink input, but only under certain circumstances. Your objects will have to handle both <CODE>
+MSG_META_QUERY_IF_PRESS_IS_INK</CODE>
+ and <CODE>
+MSG_VIS_QUERY_IF_OBJECT_HANDLES_INK</CODE>
+. Note that this option may cause the UI to query across threads, something that could cause performance lags on a busy system. Therefore, whenever possible, you should set one of the other three flags.</DD>
+</DL>
+<P>
+Depending on how you set up your GenView, you may need to subclass <CODE>
+MSG_META_QUERY_IF_PRESS_IS_INK</CODE>
+ (see above). This message is sent by the Input Manager to see if the object clicked on can handle Ink input. Objects that handle Ink should return IRV_DESIRES_INK. (There is an analogous <CODE>
+MSG_META_LARGE_QUERY_IF_PRESS_IS_INK</CODE>
+ for objects and contents using large documents.)</P>
+<P>
+<A NAME="IX_MSG_GEN_APPLICATION_INK_QUERY_REPLY">
+ </A>
+If the application sends the query message to a Process object acting as a view's content, the Process object should <EM>
+not</EM>
+ return a value. Instead, it should respond by sending <CODE>
+MSG_GEN_APPLICATION_INK_QUERY_REPLY</CODE>
+ to its GenApplication object; the application object will then pass the appropriate value on to the Input Manager.</P>
+<P>
+Some objects may want both Ink and mouse input; the VisText object is a good example of this--it accepts Ink for handwriting recognition and mouse events for cursor movement and text selection. GEOS uses a convention for objects that want both types of input: quick-clicks and click-and-holds in the object are mouse events, but click-and-drags are Ink events.</P>
+<P>
+To use both pen and mouse input, your object should return IRV_INK_WITH_STANDARD_OVERRIDE instead of IRV_DESIRES_INK in its <CODE>
+MSG_META_QUERY_IF_PRESS_IS_INK</CODE>
+ handler. (Or if all objects running in the same GenView want this behavior, you can simply set the GenView's GVIT_INK_WITH_STANDARD_OVERRIDE flag.)</P>
+
+
+<H2 CLASS="HeadingC">
+Controlling the Ink</H2>
+<P>
+When an object requests Ink input by returning IRV_DESIRES_INK or IRV_INK_WITH_STANDARD_OVERRIDE, it must also specify the eventual destination of the Ink data block. Additionally, it can set any characteristics in a GState for the Ink--clipping area, drawing color, etc.</P>
+<P>
+These specifics are set in an <CODE>
+InkDestinationInfo</CODE>
+ structure set up by your <CODE>
+MSG_META_QUERY_IF_PRESS_IS_INK</CODE>
+ handler (through a call to <CODE>
+UserCreateInkDestinationInfo()</CODE>
+); the handler for the routine returns the handle of a block containing the structure. Certain default values and behavior are implemented if you return a null handle or if you set the GenView flags to avoid the query (GVIT_PRESSES_ARE_INK or GVIT_INK_WITH_STANDARD_OVERRIDE).</P>
+<P>
+If you choose not to set any of these specifics, Ink will have the following default behaviors:</P>
+<UL>
+<LI>
+The destination of the Ink will be the object that would have received the initial click event (typically the implied mouse grab) or the object that fielded the <CODE>
+MSG_META_QUERY_IF_PRESS_IS_INK</CODE>
+.</LI>
+<LI>
+The Ink will not be clipped; the user may draw over the entire screen, overlapping generic objects and other windows. (All the Ink will still be sent to the same destination, however.)</LI>
+<LI>
+The Ink will be drawn in a standard color and brush thickness.</LI>
+</UL>
+<P>
+<A NAME="IX_InkDestinationInfo">
+ </A>
+All of the above behavior can be changed in the <CODE>
+InkDestinationInfo</CODE>
+ structure. <A NAME="IX_UserCreateInkDestinationInfo()">
+ </A>
+The structure should be created automatically with the routine <CODE>
+UserCreateInkDestinationInfo()</CODE>
+; you can then pass the block handle of this structure blindly to routines that demand an <CODE>
+InkDestinationInfo</CODE>
+ structure. Among the four fields of the structure, the following need to be passed to<CODE>
+ UserCreateInkDestinationInfo()</CODE>
+:</P>
+<DL>
+<DT>
+<CODE>
+dest</CODE>
+</DT><DD>The optr of the object that will receive the Ink data block after all the Ink has been collected. An object may use this field to force the destination of the Ink to be any particular object.</DD>
+<DT>
+<EM>
+gs</EM>
+<CODE>
+</DT><DD></CODE>
+The handle of a Graphic State (GState) containing clipping, color, or other information about how the Ink should be drawn on the screen. To use the default values, set this to zero. This will allow the user to draw Ink all over the screen. See <A HREF="../../Graphics/Environment/index.htm">the Graphics Environment chapter</A> for full information on GStates.</DD>
+<DT>
+<CODE>
+brushSize</DT><DD>
+</CODE>
+The thickness of the brush used when drawing the Ink on the screen. This is the same as the brush thickness for polylines; see <A HREF="../../Graphics/Shapes/index.htm">the Drawing Shapes chapter</A> for more information on brush thickness.</DD>
+<DT>
+<EM>
+callback</EM>
+</DT><DD>Virtual fptr to a callback routine to determine whether a stroke is a gesture or not. This callback routine will be passed to <CODE>
+ProcCallFixedOrMovable()</CODE>
+.</DD>
+
+
+</DL>
+<H2 CLASS="HeadingC">
+How Ink Is Stored and Passed On</H2>
+<P>
+When the user presses the pen to the screen and the input is determined to be Ink, the Input Manager generates a mouse button press event and begins storing up the subsequent mouse events. The UI then determines whether that press event should be treated as Ink or not (the default behavior is to treat them as normal mouse events).</P>
+<P>
+If the events should not be treated as Ink, they are passed on as normal mouse events. If they are to be treated as Ink, they are stored and are <EM>
+not</EM>
+ passed on. Instead, the UI stores them up in a special data block until the Ink input is stopped. Ink input is stopped when the user removes the pen from the screen for a user-specified amount of time. This amount of time is specified in the GEOS.INI file in the [system] category under the key <EM>
+inkTimeout</EM>
+. </P>
+<P>
+<A NAME="IX_MSG_VIS_QUERY_IF_OBJECT_HANDLES_INK">
+ </A>
+After the user finishes entering the Ink input, the Input Manager determines which object will receive the data block (it may not be the original object that received the initial press). It first queries the original object with <CODE>
+MSG_VIS_QUERY_IF_OBJECT_HANDLES_INK</CODE>
+. Any object handling Ink input must subclass this message and make sure that the top Ink point is not above its upper bound; it should then return its upper bound and its optr. GEOS provides a routine that does just this; if your object will always handle Ink input, you can set this routine up as the method to be used as follows:</P>
+<PRE>@method VisObjectHandlesInkReply, YourClassName,
+                MSG_VIS_QUERY_IF_OBJECT_HANDLES_INK;</PRE>
+<P>
+If the object handles Ink, the Input Manager sends the entire data block off to the GenSystem object using <CODE>
+MSG_META_NOTIFY_WITH_DATA_BLOCK</CODE>
+ with the identifier NT_INK. (For information on this and other notification messages, see <A HREF="../../Kernel/GCN/index.htm">the General Change Notification chapter</A>.)</P>
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Input_e.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Input_f.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.1 Ink Data Structures</A> 
+<!-- to next --> | <A HREF="Input_11.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">5 Input Hierarchies</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>

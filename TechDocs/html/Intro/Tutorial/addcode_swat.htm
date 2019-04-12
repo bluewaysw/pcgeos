@@ -1,0 +1,620 @@
+<HTML>
+<HEAD>
+
+<!-- $Id: addcode_swat.htm,v 1.3 97/08/25 17:56:45 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com"> 
+<TITLE>Tutorial Part 3: Adding Procedural Code</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+<A NAME="BM97933"></A>
+<H1 CLASS="chapterTitle">Tutorial Part 3: Adding Procedural Code</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top --> |&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child -->| <A HREF="addcode_source.htm"><IMG SRC="../../docImages/down.gif" ALT="Down" BORDER="0"></A>
+<!-- to previous -->| <A HREF="tutorial.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">Tutorial Part 2: A New Application</A>
+<!-- to next --> | <A HREF="addcode_source.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">Source Code With Changes</A>
+<HR>
+
+<P>
+In this chapter, you'll add some procedural code to your Tutorial
+application which will draw a string of text to the viewing
+window. You'll explore the application's new code using Swat and
+learn how to set breakpoints and step through code.</P>
+<P CLASS="sectionLinks">
+<STRONG>&nbsp;&nbsp;<A HREF="#1"><B>1 Adding Code</B></A>
+<BR>
+&nbsp;&nbsp;<A HREF="#2"><B>2 TUTORIAL.GP Changes</B></A>
+<BR>
+&nbsp;&nbsp;<A HREF="#3"><B>3 TUTORIAL.GOC Changes</B></A>
+<BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#4"><B>3.1 Subclassing the View</B></A>
+<BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#5"><B>3.2 Adding Scrolling Behavior</B></A>
+<BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#6"><B>3.3 Drawing the Content</B></A>
+<BR>
+&nbsp;&nbsp;<A HREF="#7"><B>4 Swat: Setting Breakpoints</B></A>
+<BR>
+&nbsp;&nbsp;<A HREF="#8"><B>5 Swat: Backtraces</B></A>
+<BR>
+&nbsp;&nbsp;<A HREF="#9"><B>6 Exercises Left for the Reader</B></A>
+<BR>
+&nbsp;&nbsp;<A HREF="addcode_source.htm"><B>7 Source Code</B></A><BR>
+<!-- end of sectionlinks blob --> </STRONG>
+<HR>
+<A NAME="1"></A>
+
+
+<H2 CLASS="sectionTitle">
+1: Adding Code</H2>
+<P>
+At <A HREF="addcode_source.htm">the end of this chapter</A> you will find a complete code listing for this application. Pieces of code which have been added or changed since the previous chapter are in bold. Follow these steps to edit, re-compile and run your new application.</P>
+<OL>
+<LI>
+Add the new pieces of code using your favorite text editor. 
+If you don't want to type it the source code by hand, follow the links to the revised <A HREF = "addcode_source.htm#gp">Tutorial.gp</A> and <A HREF = "addcode_source.htm#goc">Tutorial.goc</A>, then copy and paste the new code into <STRONG CLASS = "filename">tutorial.gp</STRONG> and <STRONG CLASS = "filename">tutorial.goc</STRONG>.</LI>
+<A NAME="IX_exit Swat command:in Tutorial example"> </A>
+<LI>
+In your Swat window, type <CODE>
+exit tutorial</CODE>
+ to exit the earlier version of the application; (remember to use <CODE>
+Ctrl+C</CODE>
+ to gain control back in your Swat window).</LI>
+<LI>
+In your command window, type <CODE>
+pmake</CODE>
+ to compile the application (make sure you are still in your proper working directory). You may recall that in the previous chapter, you also had to use <CODE>
+mkmf</CODE>
+ to create a makefile and a dependencies file. Those files will still work; we need only re-compile using <CODE>
+pmake</CODE>
+.</LI>
+<LI>
+Once you've successfully compiled, type <CODE>
+send tutorial</CODE>
+ in your Swat window to send the newly compiled version to the emulator.</LI>
+<LI>
+Type <CODE>
+run tutorial</CODE>
+ in the Swat window to run the new version of the application on the emulator.</LI>
+</OL>
+<P>
+Your code now lets your application have graphics in its view and allows the user to press the scroll buttons to scroll the view (see the image below).  You have the beginnings of a typical GEOS application which displays its contents in a <CODE>
+GenView</CODE>
+ object. (To learn more about views and displaying visual objects, see the <STRONG CLASS="fileName">
+\PCGEOS\APPL\SDK_C\VIEW\ </STRONG>
+and <STRONG CLASS="fileName">
+\PCGEOS\APPL\SDK_C\VIS\</STRONG>
+ sample applications.)<P>
+
+<CENTER>
+<TABLE WIDTH = 646 BORDER = 2><TR><TD>
+<IMG SRC = "tuto2.gif" WIDTH = 642 HEIGHT = 202 ALT = "Image of N9000 screen
+with text running across screen.">
+<BR>
+<STRONG>Figure 1:</STRONG> <EM>&quot;Tutorial&quot; application with added code.
+<P>
+This is how your application will look after you type in the additional pieces of code. Notice that the main window is no longer blank; it now contains a string of text and a scrolling bar. </EM>
+
+</TD></TR></TABLE>
+</CENTER>
+<P>
+The next sections take a closer look at the code you've just added.</P>
+<HR>
+<A NAME="2"></A>
+
+
+<H2 CLASS="sectionTitle">
+2: TUTORIAL.GP Changes</H2>
+
+<A NAME="IX_export .gp file keyword:in Tutorial example"> </A>
+<P>
+You added one line to your <STRONG CLASS="fileName">
+<A HREF="addcode_source.htm#gp">TUTORIAL.GP</A></STRONG>
+ file.</P>
+<PRE>export TutorialViewClass</PRE>
+<P>
+<CODE>
+TutorialViewClass</CODE>
+ is a new class that you'll define in your <STRONG CLASS="fileName">
+<A HREF="addcode_source.htm#goc">TUTORIAL.GOC</A></STRONG>
+ file. Whenever you define a new class (with the exception of your process class), you'll need to <CODE>
+export</CODE>
+ it in the .GP file so that Glue knows about the class when it builds the application.</P>
+<HR>
+<A NAME="3"></A>
+
+
+<H2 CLASS="sectionTitle">
+3: TUTORIAL.GOC Changes</H2>
+<P>
+
+The changes to <STRONG CLASS="fileName">TUTORIAL.GOC</STRONG>
+include:
+<UL>
+<LI>
+adding a new subclass of <CODE>GenViewClass</CODE> called <CODE>
+TutorialViewClass</CODE>
+ so that you can add scrolling behavior to the view window;</LI>
+<LI>
+intercepting the message <CODE>MSG_META_KBD_CHAR</CODE> in <CODE> TutorialViewClass</CODE>
+ so that the user can scroll the window by pressing the arrow and PageUp/Down keys; and</LI>
+<LI>
+intercepting <CODE>
+MSG_META_EXPOSED</CODE>
+ so that the system knows how to redraw the window's contents whenever the contents change due to the user pressing the scroll button.</LI>
+</UL>
+<A NAME="IX_Messages"> </A>
+<P>
+Before we look at the new pieces of code, let's discuss what we mean by messages. A message is simply a set of procedural code that gets called when a specific event occurs. For example, when the user presses a button, the system sends out a specific message to a specific object; by sending out a message, the system is calling the handler or method for that message.</P>
+<P>
+A new class inherits the behavior and characteristics 
+(messages and instance data) of its parent class. To add custom behavior to objects of your new class, either define your own message(s) for your new class or intercept inherited messages (which is what you're doing with your Tutorial application). To intercept a message, you simply write your own handler for it and the system will call that piece of code that when the message is sent.</P>
+<P>
+Note that by Geoworks' naming conventions, all messages begin with &quot;MSG_&quot; followed by the name of the message's class. For example, <CODE>
+MSG_META_EXPOSED</CODE>
+ and <CODE>
+MSG_META_KBD_CHAR</CODE>
+ are both defined for <CODE>
+MetaClass</CODE>. </P>
+
+<A NAME="4"></A>
+
+
+<H3 CLASS="subsectionTitle">
+3.1: <A HREF="#3">TUTORIAL.GOC Changes</A>: 
+Subclassing the View</H3>
+<P>
+
+<A NAME="4_@class:in Tutorial example[;class:in Tutorial example]"> </A>
+<A NAME="4_@endc:in Tutorial example[;endc:in Tutorial example]"> </A>
+<A NAME="4_@classdecl:in Tutorial example[;classdecl:in Tutorial example]"> </A>
+The first step is to create a new subclass of <CODE>
+GenViewClass.</CODE>
+</P>
+<PRE>@class TutorialViewClass, GenViewClass;
+@endc;
+@classdecl TutorialViewClass;</PRE>
+<P>
+You use the <CODE>
+@class</CODE>
+ and <CODE>
+@endc</CODE>
+ keywords to define your new class and the <CODE>
+@classdecl</CODE>
+ keyword to declare it.</P>
+<PRE>@object TutorialViewClass TutorialView = { ... </PRE>
+<P>
+Next, you declare <CODE>
+TutorialView</CODE>
+ as an object of your new subclass, <CODE>
+TutorialViewClass</CODE>
+ (instead of <CODE>
+GenViewClass</CODE>).</P>
+<PRE>	GVI_horizAttrs  = @default |
+		GVDA_SCROLLABLE |
+		GVDA_NO_LARGER_THAN_CONTENT;
+	GVI_vertAttrs  = @default |
+		GVDA_SCROLLABLE |
+		GVDA_NO_LARGER_THAN_CONTENT;</PRE>
+<P>
+Setting the <CODE>
+GVDA_SCROLLABLE</CODE>
+ flag in the view's <CODE>
+GVI_...Attrs</CODE>
+ fields mkaes the content scrollable. </P>
+<A NAME="IX_GVI_docBounds:in Tutorial example"> </A>
+<PRE>	GVI_docBounds = { 0, 0, 1000, 1000 };</PRE>
+<P>
+The <CODE>GVI_docBounds</CODE>
+ field sets the dimensions of the scrollable area. The first two coordinates are the top and left bounds; the last two coordinates are the right and bottom bounds.</P>
+
+<A NAME="5"></A>
+
+
+<H3 CLASS="subsectionTitle">
+3.2: <A HREF="#3">TUTORIAL.GOC Changes</A>: 
+Adding Scrolling Behavior</H3>
+<P>
+To add scrolling behavior, <CODE>TutorialViewClass</CODE> needs to intercept <CODE>MSG_META_KBD_CHAR</CODE>. </P>
+<PRE>@method TutorialProcessClass, MSG_META_KBD_CHAR {
+...
+}</PRE>
+<P>
+The method for this message is straightforward. It tests to make sure the key pressed is either an arrow or PageUp or PageDown key. It then takes the key press value and handles it through a switch statement.</P>
+
+<A NAME="5_@send:in Tutorial example"> </A>
+<PRE>@send self::MSG_GEN_VIEW_SCROLL...();</PRE>
+<P>
+Notice the syntax for sending a message programmatically. The <CODE>
+@send </CODE>
+keyword causes the system to place the message in the recipient's event queue. In this case, the recipient object is the calling object. In other words, <CODE>
+TutorialView</CODE> is sending a message to itself. The keyword for sending a message to yourself is, appropriately enough, <CODE>
+self</CODE>; if you were sending the message to another object, you would use the name of the recipient object instead. 
+(<CODE>@send</CODE>
+ is used when the message does not return a value; if the message returns a value or needs immediate handling, you would use the keyword <CODE>
+@call</CODE>. For more information on sending messages, see <A HREF="../../Programming/GOCLanguage/index.htm">the GEOS Programming chapter</A>.)</P>
+
+<A NAME="6"></A>
+
+
+<H3 CLASS="subsectionTitle">
+3.3: <A HREF="#3">TUTORIAL.GOC Changes</A>: 
+Drawing the Content</H3>
+<P>
+<A NAME="IX_@method:in Tutorial example[;method:in Tutorial example]">
+ </A>
+<A NAME="IX_Messages:intercepting">
+ </A>
+<A NAME="IX_Intercepting messages">
+ </A>
+<A NAME="IX_Methods">
+ </A>
+To specify how the system should draw the content in your view, you need to intercept <CODE>MSG_META_EXPOSED</CODE>. </P>
+<PRE>@method TutorialProcessClass, MSG_META_EXPOSED {</PRE>
+<P>
+According to <A HREF="../../SysObjects/Meta/MetaClass_e.htm#IX_MSG_META_EXPOSED">its documentation</A>, 
+<CODE>MSG_META_EXPOSED</CODE>
+ takes one argument: the window handle of the window to draw to. In this case, that window is the view.</P>
+<P>
+
+<A NAME="6_GrCreateState():in Tutorial example"> </A>
+<A NAME="6_GrBeginUpdate():in Tutorial example"> </A>
+<A NAME="6_GrEndUpdate():in Tutorial example"> </A>
+<A NAME="6_GrDestroyState():in Tutorial example"> </A>
+<A NAME="6_GStateHandle:in Tutorial example"> </A>
+<A NAME="6_GStates:in Tutorial example"> </A>
+When you draw the contents of a view, you need to create a graphics data structure called a <CODE>
+GState</CODE>. A <CODE>
+GState</CODE>
+ contains information about a window's graphics state or &quot;gstate;&quot; for example, its current drawing color, its current drawing font, etc.</P>
+<PRE>	gstate = GrCreateState( win );</PRE>
+<P>
+Once you've created a <CODE>
+GState</CODE>, you can begin drawing. The following code begins updating the view, then calls <CODE>
+TutorialDraw()</CODE>
+ to draw some text to the view, then ends the update and destroys the <CODE>
+GState</CODE>
+:</P>
+<PRE>	GrBeginUpdate( gstate );
+	TutorialDraw( gstate );
+	GrEndUpdate( gstate );
+	GrDestroyState( gstate );</PRE>
+<P>
+<A NAME="IX_Graphics:in Tutorial example">
+ </A>
+<A NAME="IX_Drawing:in Tutorial example">
+ </A>
+<A NAME="IX_GStates:in Tutorial example">
+ </A>
+<A NAME="IX_GStateHandle:in Tutorial example">
+ </A>
+All drawing routines (those starting with <CODE>Gr..()</CODE>) take a <CODE>GStateHandle</CODE> as an argument.</P>
+<HR>
+<A NAME="7"></A>
+
+
+<H2 CLASS="sectionTitle">
+4: Swat: Setting Breakpoints</H2>
+<P>
+Now that your application has some procedural code, you can use Swat to set breakpoints and step through the code line by line. By now, you should have Tutorial running on the emulator. Type <CODE>
+Ctrl-C</CODE>
+ to regain control in the Swat window. After halting the target emulator you should see the following:</P>
+<PRE>GEOS Halted
+Stopped in DOSIdleHook, address 2522h:109dh
+DOSIdleHook+16: INT 40 (28h)
+(geos:0) 5 =&gt;</PRE>
+<P>
+Before setting a breakpoint in your code, you need to switch to your application's thread so that Swat will recognize your application's variable, class and function names. To do this, enter the name of your application's thread: <CODE>
+tutorial</CODE>
+. </P>
+<PRE>(geos:0) 5 =&gt; <STRONG>tutorial
+</STRONG>[tutorial:0] 6 =&gt;</PRE>
+<P>
+<A NAME="IX_methods Swat command:in Tutorial exercise"> </A>
+<A NAME="IX_Function names:for methods">
+ </A>
+<A NAME="IX_Methods:constructing function names from">
+ </A>
+Next, you're going to set a breakpoint in the method for <CODE>
+TutorialProcessClass</CODE>'
+<CODE>MSG_META_EXPOSED</CODE>.
+The easiest way to set a breakpoint in a method is to first use the <CODE>
+methods</CODE>
+ command which lists all methods for a class; the <CODE>
+-p</CODE>
+ argument specifies the process class.</P>
+<PRE>[tutorial:0] 6 =&gt; <STRONG>methods -p</STRONG></PRE>
+<PRE>  MSG_GEN_PROCESS_CLOSE_APPLICATION     (@2), TUTORIALPROCESSGEN_PROCESS_CLOSE_A
+PPLICATION
+                     MSG_META_EXPOSED     (@4), TUTORIALPROCESSMETA_EXPOSED</PRE>
+<A NAME="IX_Breakpoints:stop in Swat command"> </A>
+<A NAME="IX_stop Swat command:in Tutorial example"> </A>
+<P>
+Now that you have a list of all the methods for the process class, you can refer to a particular message using the shortcuts Swat gives you. To set a breakpoint, you use the commands <CODE>
+stop</CODE>
+ or <CODE>
+brk</CODE>.</P>
+<PRE>[tutorial:0] 7 =&gt; <STRONG>stop @4
+</STRONG>brk5
+[tutorial:0] 8 =&gt;</PRE>
+<P>
+&quot;brk5&quot; indicates that you've sucessfully set the breakpoint. Swat should now halt whenever this routine is called. The number &quot;5&quot; indicates that this is your fifth breakpoint; you will be able to manipulate this breakpoint later by referring to it by this number. (Swat automatically sets breakpoints 1 through 4; we'll look at those <A HREF="#8">later</A>.)</P>
+<P>
+To test the breakpoint, continue by typing <CODE>
+c</CODE>
+ in the Swat window, then scroll the view on the target emulator. The system will tell the process object that it needs to redraw its content, and this should trigger your breakpoint:</P>
+<PRE>[tutorial:0] 8 =&gt; <STRONG>c
+</STRONG>Breakpoint 5
+Stopped in TUTORIALPROCESSMETA_EXPOSED, line 382, &quot;c:/pcgeos/Appl/Tutorial/TUTORIAL.
+GOC&quot;
+    gstate = GrCreateState( win );
+(tutorial:0) 9 =&gt;</PRE>
+<P>
+Swat tells you it broke at Breakpoint 5. (This information is useful when you've set several breakpoints.) Swat also shows you which statement in the program is about to be executed: <CODE>
+gstate = GrCreateState( win )</CODE>
+.</P>
+<P>
+<A NAME="IX_source code:viewing area in Swat">
+ </A>
+<A NAME="IX_srcwin Swat command:in Tutorial example">
+ </A>
+Next, you'll use the <CODE>
+srcwin</CODE>
+ command to display your source code.</P>
+<PRE>(tutorial:0) 9 =&gt; <STRONG>srcwin 15
+</STRONG>(tutorial:0) 10 =&gt;</PRE>
+<P>
+At this point, the bottom fifteen lines of your Swat window should display the source code; the highlighted line is the line about to be executed on the emulator. To the left side of the source code are line numbers.</P>
+<P>
+<A NAME="IX_Breakpoints:setting with mouse">
+ </A>
+To move around the source code file, use the <CODE>
+Page Up</CODE>
+, <CODE>
+Page Down</CODE>
+,<CODE>
+ left arrow</CODE>
+, and <CODE>
+right arrow</CODE>
+keys. You can even set (and unset) breakpoints by clicking on the line numbers with the mouse.</P>
+<P>
+<A NAME="IX_sstep Swat command:in Tutorial example">
+ </A>
+Next you'll use the source-stepper command <CODE>
+sstep</CODE>
+ to step through your source code line by line. At each line of code, you can step to the next line, step into a routine being called, or finish the routine.</P>
+<PRE>(tutorial:0) 10 =&gt; <STRONG>sstep
+</STRONG>Stepping in c:/pcgeos/Appl/Tutorial/TUTORIAL.GOC...
+  382:    gstate = GrCreateState( win );</PRE>
+<P>
+You are about to execute the <CODE>
+GrCreateState()</CODE>
+ command. Press the <CODE>
+n</CODE>
+ key.</P>
+<PRE>  391:    GrBeginUpdate( gstate );</PRE>
+<P>
+Notice that the highlight in the srcwin has moved to <CODE>
+GrBeginUpdate()</CODE>
+, the next line to be executed. Let's continue for another few steps and then get out of sstep mode. Press <CODE>
+n</CODE>
+ three times to step through three more lines of code, then press <CODE>
+q</CODE>
+ or the <CODE>
+space bar</CODE>
+ to quit out of sstep mode.</P>
+<PRE>  399:    TutorialDraw( gstate );
+  405:    GrEndUpdate( gstate );
+  406:    GrDestroyState( gstate );
+(tutorial:0) 11 =&gt;</PRE>
+<P>
+To display a list of the variables local to a routine, use the <CODE>
+locals</CODE>
+ command. To get a continuous display of local variables, use the <CODE>
+localwin</CODE>
+ command (for example, <CODE>
+localwin 15</CODE>). You can use the <CODE>
+print</CODE>
+ command to learn the value of any variable, and you can change the value of a variable using the assign command.</P>
+<HR>
+<A NAME="8"></A>
+
+
+<H2 CLASS="sectionTitle">
+5: <A NAME="IX_where Swat command:in Tutorial example">
+ </A>
+Swat: Backtraces</H2>
+<P>
+<A NAME="IX_Backtraces">
+ </A>
+Backtraces are useful when you're figuring out where your program crashed. Though your program hasn't crashed, it's useful to test the <CODE>
+where</CODE>
+ Swat command.</P>
+<PRE>(tutorial:0) 11 =&gt; <STRONG>where</STRONG>
+* 1:  far TUTORIALPROCESSMETA_EXPOSED(win = 52d0h), TUTORIAL.GOC:406
+  3: call tutorial:0{TutorialProcessClass}MSG_META_EXPOSED(52d0h 0000h 0000h 0000h) (@
+5, ^l52f0h:0000h)
+------------------------------------------------------------------------------
+The event queue for &quot;tutorial:0&quot; currently holds:
+send tutorial:0{TutorialProcessClass}MSG_META_MOUSE_PTR(00d9h 0095h 0100h 0000h) (@6,
+^l5370h:0000h)
+send tutorial:0{TutorialProcessClass}MSG_META_KBD_CHAR(ff91h 0001h 5000h 0000h) (@7, ^
+l5370h:0000h)
+===================================================================================</PRE>
+<P>
+From the first line, you can see that this thread is executing <CODE>
+TUTORIALPROCESSMETA_EXPOSED()</CODE>
+. The next line tells you that it is doing so to handle a <CODE>
+MSG_META_EXPOSED</CODE>
+ which was sent to the <CODE>
+process </CODE>
+object.</P>
+<P>
+<A NAME="IX_frame Swat command:in Tutorial example">
+ </A>
+The asterisk at line 1 indicates the current frame that Swat is examining. To examine another frame of the backtrace, use the <CODE>
+frame</CODE>
+ command.</P>
+<PRE>(tutorial:0) 12 =&gt; <STRONG>frame 3
+</STRONG>CallCHandler+4: MOV BX, WORD SS:[12h]
+(tutorial:0) 13 =&gt; </PRE>
+<P>
+At this point, the srcwin goes blank because Swat has switched to another level of examination for which you don't have source code. Note that <CODE>
+frame</CODE>
+ doesn't change which code the target is executing, just which level Swat is looking at. If you use the <CODE>
+where</CODE>
+ command again, you can see that the asterisk has moved to the second line. Type <CODE>
+c</CODE>
+ to allow the program to continue; execution will then halt again since you still have a breakpoint set in <CODE>
+MSG_META_EXPOSED</CODE>.</P>
+<PRE>(tutorial:0) 16 =&gt; <STRONG>c
+</STRONG>Breakpoint 5
+Stopped in TUTORIALPROCESSMETA_EXPOSED, line 382, &quot;c:/pcgeos/Appl/SDK_C/TUTORIAL/TUTORIAL.
+GOC&quot;
+    gstate = GrCreateState( win );
+(tutorial:0) 17 =&gt;</PRE>
+<P>
+<A NAME="IX_Breakpoints:listing">
+ </A>
+<A NAME="IX_brk Tcl structure:brk list in Tutorial example">
+ </A>
+It would be nice to disable this breakpoint temporarily since you don't need it right now. Before you do that, use the <CODE>
+brk list</CODE>
+ command to get a list of the current set of breakpoints:</P>
+<PRE>(tutorial:0) 17 =&gt; <STRONG>brk list
+</STRONG>Num S Address                        Patient    Command/Condition
+1   E loader::kcode::LoaderError     all        echo Loader death due to [penum
+LoaderStrings [read-reg ax]]
+                                                  expr 1
+2   E geos::kcode::FatalError        all
+                                                  why
+                                                  assign {word
+ [address-kernel-internal errorFlag]} 0
+                                                  expr 1
+3   E geos::kcode::WarningNotice     all        why-warning
+4   E geos::kcode::CWARNINGNOTICE    all        why-warning
+5   E &lt;T::TUTORIALPROCESSMETA_EXPOSED+4 all        halt
+(tutorial:0) 18 =&gt;</PRE>
+<P>
+For each listed breakpoint, Swat displays where they break and what Swat commands which will be executed when the breakpoint is hit. The first breakpoint prints out an error message whenever you enter a routine called <CODE>
+LoaderError()</CODE>
+. The second breakpoint stops when execution has entered the GEOS kernel routine <CODE>
+FatalError()</CODE>
+ and executes the <CODE>
+why</CODE>
+ Swat command. <CODE>
+Why</CODE>
+ returns an exiting error code and a string that pertains to the cause of the crash. Breakpoints 3 and 4 won't halt execution but will execute the <CODE>
+why-warning</CODE>
+ Swat command, which echoes a warning message to the Swat screen. Swat sets these four breakpoints automatically. The fifth breakpoint is the one you set. It causes the system to halt when execution is at the specified address.</P>
+<P>
+<A NAME="IX_brk Tcl structure:brk disable in Tutorial example">
+ </A>
+<A NAME="IX_brk Tcl structure:brk delete in Tutorial example">
+ </A>
+<A NAME="IX_Breakpoints:disabling">
+ </A>
+<A NAME="IX_Breakpoints:deleting">
+ </A>
+You can delete and disable breakpoints by using the<CODE>
+ brk delete</CODE>
+ and <CODE>
+brk disable</CODE>
+ commands.</P>
+<PRE>(tutorial:0) 18 =&gt; <STRONG>brk disable 5</STRONG></PRE>
+<P>
+Once you've disabled breakpoint 5, you can re-enable it by typing <CODE>
+en 5</CODE>
+ (&quot;en&quot; being short for &quot;enable&quot;).</P>
+<P>
+Other Swat commands you might want to try:</P>
+<DL>
+<DT>
+<STRONG>
+objwatch</STRONG></DT><DD>
+ shows you all messages sent to an object.</DD>
+<DT>
+<STRONG>
+help</STRONG></DT><DD>
+ presents an interactive menu for retrieving help on all of the Swat commands.</DD>
+<DT>
+<STRONG>
+alias</STRONG>
+</DT><DD>
+ allows you to set up aliases for simple Swat commands.</DD>
+<DT>
+<STRONG>
+save</STRONG></DT><DD>
+ saves the last 1000 lines of your Swat session to a text file. If you're encountering a crash bug in your program and enter a question to one of the GEOS development forums, you will often be asked to provide a backtrace of the crash. Use the <CODE>
+where</CODE>
+ command to generate the backtrace and the <CODE>
+save</CODE>
+ command to save it out.</DD>
+</DL>
+<HR>
+<A NAME="9"></A>
+
+
+<H2 CLASS="sectionTitle">
+6: Exercises Left for the Reader</H2>
+<P>
+The Tutorial sample application that you created in this Tutorial is very basic but should help introduce you to the basics of GOC and the SDK Tools. To continue learning more about the language and the tools, we encourage you to compile, run and Swat through any of the other sample applications on the SDK and/or try some of the following exercises:</P>
+<UL>
+
+<A NAME="IX_ComplexMonikerClass:in Tutorial exercise"> </A>
+<LI>
+Add a trigger that changes the size of the font or the angle of the text; use a <CODE>
+ComplexMoniker</CODE>
+ object to build the trigger rather than a <CODE>
+GenTriggerClass</CODE>
+ object. (See <A HREF="../../Nokia9000/UI/9000UI_4">the Communicator 
+UI chapter</A> for more information on <CODE>
+ComplexMonikerClass</CODE>.)</LI>
+<A NAME="IX_VisContentClass:in Tutorial exercise"> </A>
+<LI>
+Change the content object from the <CODE>
+process</CODE>
+ object to a <CODE>
+VisContent</CODE>
+ object. Do this by creating a separate resource for the <CODE>
+VisContent</CODE>
+ object and have the <CODE>
+GenView</CODE>
+ object point to this new object.(See the <STRONG CLASS="fileName">
+\PCGEOS\APPL\SDK_C\VIS\</STRONG>
+ sample applications for reference.) Then intercept <CODE>
+MSG_VIS_DRAW </CODE>
+for the new content object and perform the drawing there.</LI>
+<A NAME="IX_VisClass:in Tutorial exercise"> </A>
+<LI>
+Make the text string a <CODE>
+VisClass</CODE>
+ object and add it as a child of the <CODE>
+VisContent</CODE>
+ you created in the previous step. Have this <CODE>
+Vis</CODE>
+ object intercept <CODE>
+MSG_VIS_DRAW</CODE>
+ and perform the drawing there.</LI>
+</UL>
+<P>
+This tutorial and the exercises mentioned above should give you an introduction to the power and flexibility of GEOS. As you continue exploring the API and the tools, don't forget to take advantage of the many resources at hand: the SDK comes with a complete set of documentation and our web site features a searchable knowledgebase, an FAQ, and other self-help resources. Check out the <A HREF="http://www.geoworks.com/DevRel">Geoworks Developer Relations home page</A>.</P>
+<HR>
+<P>
+<!-- up to top --> |&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent --> | <A HREF="../../index.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child -->| <A HREF="addcode_source.htm"><IMG SRC="../../docImages/down.gif" ALT="Down" BORDER="0"></A>
+<!-- to previous -->| <A HREF="index.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">Tutorial Part 2: A New Application</A>
+<!-- to next --> | <A HREF="addcode_source.htm"><IMG SRC="../../docImages/next.gif" BORDER="0" ALT="Next: ">Source Code With Changes</A>
+
+</BODY>
+</HTML>
+
+
+
+

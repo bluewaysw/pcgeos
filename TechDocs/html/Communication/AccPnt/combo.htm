@@ -1,0 +1,286 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+<!-- This page was automatically generated from a bunch of smaller pages. -->
+<META NAME="copyright" CONTENT="Copyright GEOWORKS">
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+<TITLE>Access Point</TITLE>
+</HEAD>
+<BODY BGCOLOR="#ffffdf">
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+<A NAME="index.htm"></A>
+
+
+<H1 CLASS="chapterTitle">
+
+	Access Point</H1>
+<P>
+<A NAME="index.htm_IX_Socket">
+ </A>
+The Access Point library acts as a sort of special address book--it keeps track of phone numbers and other information about Internet Service Providers. It can also store information about Terminal and Telnet access points. The library provides UI gadgetry by which the user may choose and edit access point entries; the library also provides routines by which programs may do the same.</P>
+<P>
+
+</P>
+<P CLASS="sectionlinks">
+<STRONG>
+&nbsp;&nbsp;<A HREF="#AccPnt_1.htm">1 Access Points</A><BR>
+&nbsp;&nbsp;<A HREF="#AccPnt_2.htm">2 Letting The User Choose</A><BR>
+&nbsp;&nbsp; &nbsp;&nbsp; <A HREF="#AccPnt_multiple.htm">2.1 Multiple-Selection Access Point Controllers</A><BR>
+&nbsp;&nbsp;<A HREF="#AccPnt_3.htm">3 Searching For an Access Point</A><BR>
+&nbsp;&nbsp;<A HREF="#AccPnt_4.htm">4 Locking and Unlocking</A><BR>
+&nbsp;&nbsp;<A HREF="#AccPnt_5.htm">5 Adding an Access Point</A><BR>
+&nbsp;&nbsp;<A HREF="#AccPnt_6.htm">6 Deleting an Access Point</A><BR>
+</STRONG>
+</P> <!-- end of sectionlinks blob -->
+<HR>
+<A NAME="AccPnt_1.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Access Point</A>: 1 
+<A NAME="AccPnt_1.htm_74117">
+ </A>
+Access Points</H2>
+<P>
+Access points, loosely defined, are collections of data useful for making communications connections. The Access Point library keeps track of access points by storing their information in the .INI file.</P>
+<P>
+The library defines a few kinds of access points, identified by the <CODE>
+AccessPointType</CODE>
+ enumerated type:</P>
+<DL>
+<DT>
+APT_INTERNET</DT><DD>
+This access point holds data useful for connecting to an ISP. Applications making a PPP connection can use this information to make the connection.</DD>
+<DT>
+APT_TERMINAL</DT><DD>
+This access point holds data useful for connecting to a dialup terminal.</DD>
+<DT>
+APT_TELNET</DT><DD>
+This access point holds data useful for making a telnet connection.</DD>
+</DL>
+<P>
+For each access point, the AccessPoint library may keep track of any number of properties. While you may store all sorts of information about any access point, there are a number of standard properties, enumerated as <CODE>
+AccessPointStandardProperty</CODE>
+ values, including name, phone number, user ID, address, and password.</P>
+<P>
+Access points are referenced by word-length ID numbers.</P>
+<HR>
+<A NAME="AccPnt_2.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Access Point</A>: 2 
+<A NAME="AccPnt_2.htm_93716">
+ </A>
+Letting The User Choose</H2>
+<P>
+The Talk sample application shows how an application can use an AccpntControl object to provide UI for picking an access point. This example is discussed in <A HREF="../../Communication/Socket/index.htm">the Socket library documentation</A>. The application also shows how to use the selected access point (in this case, an ISP) to establish a PPP connection; this part of the application is discussed further in the Socket chapter.</P><P>
+In this example, the controller is declared:</P>
+<PRE>			@chunk char accpntMkr[] = &quot;Access List&quot;;</PRE>
+<PRE>			@object AccessPointControlClass AccpntControl = {
+			    GI_states = GS_USABLE | GS_ENABLED;
+			    ATTR_ACCESS_POINT_CONTROL_LIST_MONIKER = @accpntMkr;
+			    HINT_ACCESS_POINT_CONTROL_MINIMIZE_SIZE;
+			}</PRE>
+<P>
+To present the user with a different type of access points (telnet connections, for example) set the type in the <CODE>
+APCI_type</CODE>
+ instance data field:</P>
+<PRE>@object AccessPointControlClass AccpntControl = {
+    ...
+    APCI_type = APT_TELNET;
+}</PRE>
+<P>
+You may wish to set up your program's UI such that there is a gadget which will not be enabled (will be grayed out) if there are no access points of the proper type defined. To do this, turn off the object's GS_ENABLED flag in its declaration, and use the object's optr as the value of the <CODE>
+APCI_enableDisable</CODE>
+ instance field:</P>
+<PRE>@object ... MyObject = {
+    ...
+    GI_states = @default &amp; ~GS_ENABLED;
+}</PRE>
+<PRE>@object AccessPointControlClass AccpntControl = {
+    ...
+    APCI_enableDisable = @MyObject;
+}</PRE>
+<P>
+To find out the ID number of the controller's currently selected access point, use <CODE>
+MSG_ACCESS_POINT_CONTROL_GET_SELECTION</CODE>
+.</P>
+<P>
+To find out when the user has selected an access point (changed their selection), you have to be a bit trickier.</P>
+<UL>
+<LI>
+Subclass <CODE>
+AccessPointControlClass</CODE>
+.</LI>
+<LI>
+Write a method for your subclass, intercepting MSG_ACCESS_POINT_CONTROL_UPDATE_SELECTION. Be sure to use @callsuper to invoke the default handler for this message.</LI>
+<LI>
+Use an object of your subclass instead of a regular AccessPointControl object.</LI>
+</UL>
+<P>
+While the application is using the selected access point, it can &quot;lock&quot; the access point to prevent the access point's parameters from being modified while it's in use. (See <A HREF="#AccPnt_4.htm_16958"> Locking and Unlocking</A>
+.)</P>
+
+<P>
+<A HREF="#AccPnt_multiple.htm">Multiple-Selection Access Point Controllers</A>
+</P>
+
+<HR>
+<A NAME="AccPnt_multiple.htm"></A>
+<H3 CLASS="subsectionTitle"><A HREF="#index.htm">Access Point</A>: 2 <A HREF = "AccPnt_2.htm">Letting The User Choose</A>: 2.1 Multiple-Selection Access Point Controllers</H3>
+
+
+<P>
+<P>
+Recent versions of the Access Point library support controllers which allow the user to select more than one access point at a time. This feature is available on devices with version numbers &quot;Responder Build 4....&quot; and higher. See <A HREF="../../Nokia9000/Versions/Update_1.htm">Software Version Number</A>
+ for information about finding out the software version of the user's device.)</P>
+<P>
+To create such an <CODE>AccpntControl</CODE> object, give it the hint <CODE>HINT_ACCESS_POINT_CONTROL_MULTISELECTABLE</CODE>. To get a list of the currently selected access points, use <CODE>MSG_ACCESS_POINT_CONTROL_GET_MULTIPLE_SELECTIONS</CODE>. The prototype for this message is:
+<P CLASS="syntax">
+<PRE>
+@message word MSG_ACCESS_POINT_CONTROL_GET_MULTIPLE_SELECTIONS(
+                          word    *buffer,
+                          word     maxIDs);
+</PRE>
+</P>
+<DL>
+<DT><STRONG>buffer</STRONG></DT>
+<DD>A buffer in which to store the IDs of the currently selected access point entries.</DD>
+<DT><STRONG>maxIDs</STRONG></DT>
+<DD>The number of selections to place in <EM>buffer</EM>. Use <A NAME = "IX_MSG_ACCESS_POINT_CONTROL_GET_NUM_SELECTIONS"> <CODE>MSG_ACCESS_POINT_CONTROL_GET_NUM_SELECTIONS</CODE> to get the number of currently selected entries.
+</DL>
+
+
+
+
+<HR>
+<A NAME="AccPnt_3.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Access Point</A>: 3 
+<A NAME="AccPnt_3.htm_24960">
+ </A>
+Searching For an Access Point</H2>
+<P>
+Perhaps instead of allowing the user to choose an access point, the program should use a known access point. The following code example shows how a program might search for an access point, given its type and name.</P>
+<P CLASS="figTitle">
+Code Display 23-1 Searching for an Access Point</P>
+<PRE>@start  TemplateStringsResource, data;
+    @chunk  TCHAR TargetName[] = &quot;Stuckeys Sales Server&quot;;
+@end    TemplateStringsResource;</PRE>
+<PRE>@method TemplateProcessClass, MSG_TP_SEND {
+    MemHandle     aBlock;
+    ChunkHandle   theList;  /* Chunk Array of entry IDs of access points */
+    word          theID = ACCESS_POINT_INVALID_ID ;</PRE>
+<PRE>    aBlock = MemAllocLMem( LMEM_TYPE_GENERAL, 0 );
+    MemLock( aBlock );
+    theList = AccessPointGetEntries( aBlock , 0, APT_INTERNET );</PRE>
+<PRE>    ChunkArrayEnumHandles( aBlock, theList, &amp;theID, FunkyCallback);</PRE>
+<PRE>    MemUnlock( aBlock );
+    MemFree(aBlock);</PRE>
+<PRE>    if (theID == ACCESS_POINT_INVALID_ID ) {
+      /* didn't find the access point--deal with it */
+    } else {
+      /* found the access point--use it */
+    }
+}</PRE>
+<PRE>Boolean _pascal FunkyCallback( void *el, void *retVal ) {
+    char nomen[128];
+    int  nomenSize;
+    int  cmpResult;
+    char *accessPointName;</PRE>
+<PRE>    AccessPointGetStringPropertyBuffer( *((word *)el), APSP_NAME, 
+                                           nomen, &amp;nomenSize );</PRE>
+<PRE>    MemLock( OptrToHandle(@TargetName) );
+    cmpResult = LocalCmpStrings( LMemDeref( @TargetName ) , nomen, 0);
+    MemUnlock( OptrToHandle(@TargetName) );</PRE>
+<PRE>    if (cmpResult) return(FALSE); 					/* if they don't match, return FALSE so 
+					   we can keep searching. */	
+
+    *(word *)retVal = *(word *)el;					/* We found a match. grab its ID */
+    return(TRUE);				 	/* ...and we can stop searching now. */
+}</PRE>
+<P>
+The <CODE>
+AccessPointGetEntries()</CODE>
+ routine returns a chunk array containing a list of access point IDs. </P>
+<P>
+We then use the <CODE>
+ChunkArrayEnumHandles()</CODE>
+ routine to call a callback routine to examine each ID in turn. There are many other ways we could have cycled through these entries--see the documentation of chunk arrays in <A HREF="../../Memory/LMem/index.htm">the Local Memory chapter</A> to find out which is best for your purpose.</P>
+<P>
+Given an access point's ID number, we find out the name associated with that ID by calling <CODE>
+AccessPointGetStringPropertyBuffer()</CODE>
+. To specify that we're interested in the name, we pass APSP_NAME; we could also have passed some other <CODE>
+AccessPointStandardProperty</CODE>
+ value, or even a pointer to a string to search for the value of some custom property.</P>
+<P>
+While the application is using the selected access point, it can &quot;lock&quot; the access point to prevent the access point's parameters from being modified while it's in use. (See <A HREF="#AccPnt_4.htm_16958"> Locking and Unlocking</A>
+.)</P>
+<HR>
+<A NAME="AccPnt_4.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Access Point</A>: 4 
+<A NAME="AccPnt_4.htm_16958">
+ </A>
+Locking and Unlocking</H2>
+<P>
+If something were to alter an access point's parameters while your application was using that access point, bad things might happen. To prevent anything from changing the access point's parameters, use the <CODE>
+AccessPointLock()</CODE>
+ routine. When done using the access point, use the <CODE>
+AccessPointUnlock()</CODE>
+ routine to unlock it. To check whether or not an access point is being used for a connection, use the routine <A HREF = "../../CRef/Routines/R_2.htm#IX_AccessPointInUse()"><CODE>AccessPointInUse()</CODE></A>.
+
+</P>
+<HR>
+<A NAME="AccPnt_5.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Access Point</A>: 5 
+<A NAME="AccPnt_5.htm_13964">
+ </A>
+Adding an Access Point</H2>
+<P>
+To add a new access point:</P>
+<UL>
+<LI>
+Use the <CODE>
+AccessPointCreateEntry()</CODE>
+ routine to create the access point. To create an internet access point, use the syntax:</LI>
+</UL>
+<PRE>newID = AccessPointCreateEntry( 0, APT_INTERNET );</PRE>
+<UL>
+<LI>
+Using the ID returned by <CODE>
+AccessPointCreateEntry()</CODE>
+, set the appropriate properties for the access point.</LI>
+</UL>
+<HR>
+<A NAME="AccPnt_6.htm"></A>
+
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Access Point</A>: 6 
+<A NAME="AccPnt_6.htm_74294">
+ </A>
+Deleting an Access Point</H2>
+<P>
+To delete an existing access point:</P>
+<UL>
+<LI>
+Call <CODE>
+AccessPointDestroyEntry()</CODE>
+. </LI>
+</UL>
+<P>
+&nbsp;</P>
+<HR>
+This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
+</BODY>
+</HTML>

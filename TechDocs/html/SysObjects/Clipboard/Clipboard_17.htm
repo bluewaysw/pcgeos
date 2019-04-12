@@ -1,0 +1,192 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+
+<!-- $Id: Clipboard_17.htm,v 1.1 97/06/02 16:08:42 lawrence Exp $ -->
+<META NAME="copyright" CONTENT="Copyright 1997 GEOWORKS">
+<!-- <META NAME="description" CONTENT=""> -->
+<!-- <META NAME="keywords" CONTENT=""> -->
+<LINK REL="STYLESHEET" HREF="../../docHelpers/style.css">
+<LINK REV="MADE" HREF="mailto:doc-feedback@geoworks.com">
+
+<TITLE> Source Object Responsibility</TITLE></HEAD>
+<BODY BGCOLOR="#ffffff">
+
+
+<H1 CLASS="subsectionTitle">
+<A HREF="index.htm">The Clipboard</A>: 4.4 <A HREF="Clipboard_13.htm">Using Quick-Transfer</A>: 
+Source Object Responsibility</H1>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Clipboard_13.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Clipboard_16.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.3 Quick-Transfer Data Structures</A> 
+<!-- to next --> | <A HREF="Clipboard_18.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">5 Shutdown Issues</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+<PRE>MSG_META_START_MOVE_COPY, ClipboardStartQuickTransfer(), 
+MSG_META_CLIPBOARD_NOTIFY_QUICK_TRANSFER_FEEDBACK
+</PRE>
+<P>
+<A NAME="IX_MSG_META_START_MOVE_COPY:signalling quick-transfer">
+ </A>
+When the user presses the move/copy button, the UI sends a <CODE>
+MSG_META_START_MOVE_COPY</CODE>
+ to the object under the mouse pointer. The selected object can be either a gadget run in the UI thread (such as a GenText object) or a process-run visible object within a view.</P>
+<P>
+If the object is a process-run visible object in a view, both the application object and the object under the mouse pointer will receive the notification message. If the object is UI-run, only it will receive the message.</P>
+<P>
+Receipt of this message tells an object to begin a quick-transfer operation. This operation consists of several steps:</P>
+<OL>
+<LI>
+Grab the mouse to track it so you can find out when it leaves your object's bounds. (When it leaves, your object is no longer the destination.) Note that only objects need to grab the mouse; if a process is the content of the view, it does not have to.</LI>
+<LI FIXME_NumListOther>
+Provide feedback to the quick-transfer mechanism immediately.</LI>
+<LI FIXME_NumListOther>
+Build and register the transfer item.</LI>
+<LI FIXME_NumListOther>
+Continue providing feedback as long as the mouse is in your bounds.</LI>
+<LI FIXME_NumListOther>
+If desired, provide visual feedback to the user as the type of operation changes when the user moves the mouse pointer.</LI>
+</OL>
+<P>
+The reason for providing feedback to the quick-transfer mechanism is simple: to indicate to the user what is going on. By giving information to the quick-transfer mechanism, objects allow the user to be informed immediately what type of operation is in progress--a move, a copy, or nothing at all.</P>
+<P>
+<A NAME="IX_ClipboardStartQuickTransfer()">
+ </A>
+Immediately after your object has grabbed the mouse, it should call the routine <CODE>
+ClipboardStartQuickTransfer()</CODE>
+. This routine allows the object not only to indicate which type of operation is in progress but also to attach a special graphical region to the cursor (though not required). This allows the application to provide additional information to the user as to what is going on (e.g. GeoManager attaches an image when a file transfer is initiated).</P>
+<P>
+You must also indicate to <CODE>
+ClipboardStartQuickTransfer()</CODE>
+ the object that will receive notification when the transfer has concluded. This is important because when a quick-move has been completed, the source object must ensure that the original copy of the item (usually the source object itself) is deleted.</P>
+<P>
+After calling <CODE>
+ClipboardStartQuickTransfer()</CODE>
+, the source object should duplicate and register the transfer item with the Transfer VM File. To do this, register the item as you normally would for a cut or copy operation (see <A HREF="Clipboard_a.htm#46425"> Registering with the Clipboard</A>
+); however, be sure to use the flag CIF_QUICK to ensure that the normal Clipboard data remains unaffected.</P>
+<P>
+<A NAME="IX_MSG_META_CLIPBOARD_NOTIFY_QUICK_TRANSFER_FEEDBACK">
+ </A>
+Once the transfer item has been registered, the source object becomes a potential destination and should act as such. However, you may wish to continue to provide source-related visual feedback to the user as long as the quick-transfer is going on: During a quick-transfer, the source will receive <CODE>
+MSG_META_CLIPBOARD_NOTIFY_QUICK_TRANSFER_FEEDBACK</CODE>
+
+ 
+each time the mode of the quick-transfer changes. This message will tell the source object what the current mode of transfer is in order for the source to give extra visual feedback to the user. This behavior is not required of the source object but can be beneficial to your application. It is also supplemental to the destination-related feedback that must be provided.</P>
+
+<H2 CLASS="HeadingC">
+Responsibilities of a Potential Destination</H2>
+<PRE>ClipboardGetQuickTransferStatus(), ClipboardSetQuickTransferFeedback(), MSG_VIS_VUP_ALLOW_GLOBAL_TRANSFER, MSG_GEN_VIEW_ALLOW_GLOBAL_TRANSFER</PRE>
+<P>
+All objects that can potentially receive a transfer item are considered potential destinations during a quick-transfer operation. During the operation, the user will likely move the mouse pointer across the screen, entering and leaving several different potential destinations.</P>
+<P>
+When the mouse first moves over the object, the object will receive a <CODE>
+MSG_META_PTR</CODE>
+. When your object receives this message, it must provide immediate feedback to the transfer mechanism to indicate whether a move, a copy, or no operation is to be performed (the object should provide this feedback with the understanding that the operation type is what would happen if the transfer were to conclude at that moment).</P>
+<P>
+<A NAME="IX_ClipboardGetQuickTransferStatus()">
+ </A>
+When the first <CODE>
+MSG_META_PTR</CODE>
+ is received, the object should call the routine <CODE>
+ClipboardGetQuickTransferStatus()</CODE>
+. This routine returns whether a quick-transfer is in progress; if so, the object should acquire a mouse grab in order to provide feedback until the mouse pointer leaves its bounds.</P>
+<P>
+The object should then check the quick-transfer Clipboard for supported formats. This is done just as with the Clipboard--with the routine <CODE>
+ClipboardQueryItem()</CODE>
+. If no supported formats are available, the object should provide the &quot;no operation&quot; feedback. However, if one or more is available, the object should determine whether the operation is a move or copy (call <CODE>
+ClipboardGetItemInfo()</CODE>
+) and act accordingly.</P>
+<P>
+<A NAME="IX_ClipboardSetQuickTransferFeedback()">
+ </A>
+To provide feedback, the object must call <CODE>
+ClipboardSetQuickTransferFeedback()</CODE>
+ in its method for <CODE>
+MSG_META_PTR</CODE>
+.<A NAME="IX_ClipboardQuickTransferFeedback">
+ </A>
+ This routine sets the mode of the transfer to one of the enumerated type <CODE>
+ClipboardQuickTransferFeedback</CODE>
+. If the format is not supported, <CODE>
+ClipboardSetQuickTransferFeedback()</CODE>
+ is passed CQTF_CLEAR.</P>
+<P>
+When the mouse has left an object's bounds, the object must relinquish its mouse grab. Either a <CODE>
+MSG_META_CONTENT_LOST_GADGET_EXCLUSIVE</CODE>
+ or a <CODE>
+MSG_META_PTR</CODE>
+ with the UIFA_IN flag cleared will indicate this situation to the object. The former occurs when the mouse has moved onto a window or other object that is obscuring your object, and the latter is a result of the mouse moving outside of your bounds altogether.</P>
+<P>
+At this point, the object must do two things: Reset the mouse cursor and re-transmit the last mouse pointer event.</P>
+<P>
+<A NAME="IX_CQTF_CLEAR">
+ </A>
+To reset the mouse pointer, call <CODE>
+ClipboardSetQuickTransferFeedback()</CODE>
+ and pass it CQTF_CLEAR. This will set the default cursor. To re-send the last pointer event received (you must do this because the last one occurred outside your object's bounds and might have been within another object's bounds), you simply have to return the flag MRF_REPLAY when releasing the mouse grab.</P>
+<P>
+If the source object wishes a quick transfer to be able to be carried outside its view, it must send <CODE>
+MSG_VIS_VUP_ALLOW_GLOBAL_TRANSFER</CODE>
+ to itself. Process objects acting as a content must send <CODE>
+MSG_GEN_VIEW_ALLOW_GLOBAL_TRANSFER</CODE>
+ to the GenView.</P>
+<P>
+The object then becomes oblivious to future quick-transfer events until the pointer returns to its window (or unless it was registered for notification of quick-transfer conclusion).</P>
+
+
+<H2 CLASS="HeadingC">
+Responsibilities of the Destination Object</H2>
+<PRE>MSG_META_END_MOVE_COPY, ClipboardEndQuickTransfer()</PRE>
+<P>
+<A NAME="IX_MSG_META_END_MOVE_COPY:signalling quick-transfer">
+ </A>
+If, when the mouse pointer is within your object's bounds, the user releases the Move/Copy button, your object becomes the true destination of the transfer. You will be notified by a <CODE>
+MSG_META_END_MOVE_COPY</CODE>
+.</P>
+<P>
+Upon receipt of this message, the object should first determine the move/copy/no-operation behavior as above, with one exception: If either of the flags CQNF_MOVE or CQNF_COPY is set for the transfer item, then the user has overridden the normal behavior and the destination object should respond with the appropriate operation.</P>
+<P>
+After determining the proper action, the object should retrieve the transfer item (as it would from the Clipboard), passing one of CQNF_MOVE, CQNF_COPY, or CQNF_NO_OPERATION. This flag will cause the proper notification to be sent to the transfer's source and allow it to complete its actions properly. <A NAME="IX_ClipboardEndQuickTransfer()">
+ </A>
+To finish the transfer, the object should call <CODE>
+ClipboardEndQuickTransfer()</CODE>
+.</P>
+
+
+<H2 CLASS="HeadingC">
+Getting More Information</H2>
+<P>
+<A NAME="IX_ClipboardGetQuickItemInfo()">
+ </A>
+In addition to the routines above, you can use one other to retrieve information about a quick-transfer item. <CODE>
+ClipboardGetQuickItemInfo()</CODE>
+ returns a set of handles for the transfer VM file and the file's header block.</P>
+
+
+<H2 CLASS="HeadingC">
+When the Transfer Is Concluded</H2>
+<PRE>MSG_META_CLIPBOARD_NOTIFY_QUICK_TRANSFER_CONCLUDED</PRE>
+<P>
+<A NAME="IX_MSG_META_CLIPBOARD_NOTIFY_QUICK_TRANSFER_CONCLUDED">
+ </A>
+After the transfer has concluded, the original source of the transfer will receive <CODE>
+MSG_META_CLIPBOARD_NOTIFY_QUICK_TRANSFER_CONCLUDED</CODE>
+ if it requested notification when it registered the original transfer. This message will be accompanied by a <CODE>
+ClipboardQuickNotifyFlags</CODE>
+ record indicating what type of operation the transfer ended up being. The source object should then follow the rules of quick transfer and act appropriately (e.g. delete the source object on a quick-move operation).<A NAME="marker=631903">
+ </A>
+</P>
+
+<HR>
+<!-- This blob is a bunch of standard links: up, back, index, etc. -->
+<!-- up to top -->|&nbsp;<A HREF="../../index.htm"><IMG SRC="../../docImages/upTop.gif" ALT="Up: " BORDER="0">GEOS SDK TechDocs</A>
+<!-- up to parent -->| <A HREF="Clipboard_13.htm"><IMG SRC="../../docImages/up.gif" ALT="Up" BORDER="0"></A>
+<!-- down to first child --> 
+<!-- to previous --> | <A HREF="Clipboard_16.htm"><IMG SRC="../../docImages/prev.gif" BORDER="0" ALT="Prev: ">4.3 Quick-Transfer Data Structures</A> 
+<!-- to next --> | <A HREF="Clipboard_18.htm"><IMG SRC="../../docImages/nextUp.gif" BORDER="0" ALT="Next: ">5 Shutdown Issues</A> 
+<HR>
+<!-- That blob was a bunch of standard links: up, back, index, etc. -->
+</BODY>
+</HTML>
