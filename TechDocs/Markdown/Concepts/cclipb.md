@@ -1333,4 +1333,4 @@ Additionally, any application that registers with the Clipboard must
 un-register when it is shutting down. This is done with the routine 
 ClipboardRemoveFromNotificationList().
 
-[Applications and Geodes](cappl.md) <-- &nbsp;&nbsp; [table of contents](../Concepts.md) &nbsp;&nbsp; --> [Localization](clocal.md)
+[Applications and Geodes](cappl.md) <-- &nbsp;&nbsp; [table of contents](../concepts.md) &nbsp;&nbsp; --> [Localization](clocal.md)

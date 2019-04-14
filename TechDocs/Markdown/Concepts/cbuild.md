@@ -262,4 +262,4 @@ Because GEOS is multithreaded, any application can create new threads
 for itself at any time. The issues and procedures of multiple threads are 
 described in "Threads and Semaphores," Appendix B.
 
-[Introduction](cintro.md) <-- &nbsp;&nbsp; [table of contents](../Concepts.md) &nbsp;&nbsp; --> [System Architecture](carch.md)
+[Introduction](cintro.md) <-- &nbsp;&nbsp; [table of contents](../concepts.md) &nbsp;&nbsp; --> [System Architecture](carch.md)

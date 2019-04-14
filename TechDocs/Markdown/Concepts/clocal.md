@@ -602,4 +602,4 @@ values are enumerated in the DosCodePage type. To find out whether the
 user's environment supports a specific code page, call 
 LocalIsCodePageSupported().
 
-[The Clipboard](cclipb.md) <-- &nbsp;&nbsp; [table of contents](../Concepts.md) &nbsp;&nbsp; --> [General Change Notification](cgcn.md)
+[The Clipboard](cclipb.md) <-- &nbsp;&nbsp; [table of contents](../concepts.md) &nbsp;&nbsp; --> [General Change Notification](cgcn.md)

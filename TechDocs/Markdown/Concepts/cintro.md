@@ -512,4 +512,4 @@ there, you should read about the Generic UI objects, with focus on
 GenInteraction, GenTrigger, GenPrimary, and GenView. These will build on 
 the introduction you gained from the first chapters of the Concepts Book.
 
- &nbsp;&nbsp; [table of contents](../Concepts.md) &nbsp;&nbsp; --> [Building Your Application](cbuild.md)
+ &nbsp;&nbsp; [table of contents](../concepts.md) &nbsp;&nbsp; --> [Building Your Application](cbuild.md)

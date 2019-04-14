@@ -1650,4 +1650,4 @@ Code Display 10-6 Methods for TicTacPieceClass
 }
 ~~~
 
-[General Change Notification](cgcn.md) <-- &nbsp;&nbsp; [table of contents](../Concepts.md) &nbsp;&nbsp; --> [Input](cinput.md)
+[General Change Notification](cgcn.md) <-- &nbsp;&nbsp; [table of contents](../concepts.md) &nbsp;&nbsp; --> [Input](cinput.md)

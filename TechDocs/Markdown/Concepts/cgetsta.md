@@ -1244,4 +1244,4 @@ If you are new to GEOS programming, you should work through the Tutorial;
 otherwise, you will likely be overwhelmed by the complexity and depth of the 
 system and not know where to begin.
 
-[System Architecture](carch.md) <-- &nbsp;&nbsp; [table of contents](../Concepts.md) &nbsp;&nbsp; --> [Geos Programming](ccoding.md)
+[System Architecture](carch.md) <-- &nbsp;&nbsp; [table of contents](../concepts.md) &nbsp;&nbsp; --> [Geos Programming](ccoding.md)

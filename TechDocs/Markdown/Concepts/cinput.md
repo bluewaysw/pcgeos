@@ -53,7 +53,7 @@ object, its GenPrimary window, and finally through the appropriate GenView
 or GenDisplay. These window objects will pass the event on to a visible tree 
 (through a VisContent), which will handle the events.
 
-![](Art/figure_11-1)
+![](Art/figure_11-1.png)
 
 Figure 11-1 Input Flow  
 _A device driver translates input signals and passes raw events to the Input 
@@ -1802,4 +1802,4 @@ the same name. If no further travel is possible, the method should pass the
 event on to the superclass for handling. TO_MODEL requests should only 
 travel down the Model hierarchy if it exists and the next optr is non-null.
 
-[The GEOS User Interface](cuiover.md) <-- &nbsp;&nbsp; [table of contents](../Concepts.md) &nbsp;&nbsp; --> [Managing UI Geometry](cgeom.md)
+[The GEOS User Interface](cuiover.md) <-- &nbsp;&nbsp; [table of contents](../concepts.md) &nbsp;&nbsp; --> [Managing UI Geometry](cgeom.md)

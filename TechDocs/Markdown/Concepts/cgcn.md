@@ -707,4 +707,4 @@ Code Display 9-8 Removing from an Application GCN List
 }
 ~~~
 
-[Localization](clocal.md) <-- &nbsp;&nbsp; [table of contents](../Concepts.md) &nbsp;&nbsp; --> [The Geos User Interface](cuiover.md)
+[Localization](clocal.md) <-- &nbsp;&nbsp; [table of contents](../concepts.md) &nbsp;&nbsp; --> [The Geos User Interface](cuiover.md)

@@ -1471,4 +1471,4 @@ system driver.
 GEOS uses a combination of outline and bitmap fonts. Different font 
 engines are supported through font rasterizers.
 
-[Building Your Application](cbuild.md) <-- &nbsp;&nbsp; [table of contents](../Concepts.md) &nbsp;&nbsp; --> [First Steps: Hello World](cgetsta.md)
+[Building Your Application](cbuild.md) <-- &nbsp;&nbsp; [table of contents](../concepts.md) &nbsp;&nbsp; --> [First Steps: Hello World](cgetsta.md)

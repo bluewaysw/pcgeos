@@ -2294,4 +2294,4 @@ this argument will hold its serverNum. If a client left the list
 (and the message is being sent to servers), this argument will 
 be set to zero.
 
-[GEOS Programming](ccoding.md) <-- &nbsp;&nbsp; [table of contents](../Concepts.md) &nbsp;&nbsp; --> [The Clipboard](cclipb.md)
+[GEOS Programming](ccoding.md) <-- &nbsp;&nbsp; [table of contents](../concepts.md) &nbsp;&nbsp; --> [The Clipboard](cclipb.md)
