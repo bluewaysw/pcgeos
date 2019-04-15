@@ -74,7 +74,7 @@ As you gain familiarity with Swat while using Swat with the sample
 applications and with your own programs, you will discover your own 
 preferred methods of debugging.
 
-###3.1	DOS Command Line Options
+### 3.1 DOS Command Line Options
 
 To use Swat, you must have the pccom tool running on the target machine. 
 You may then invoke Swat on the development machine. Swat takes the 
@@ -121,7 +121,7 @@ specify a fifth directory in which to look for geodes. You may specify absolute
 pathnames in this file; if you give relative paths, they will be assumed to start 
 at the directory specified with your ROOT_DIR variable.
 
-### 3.2	Notation
+### 3.2 Notation
 
 The rest of this chapter is devoted to interacting with Swat once you have it running. Most of this is done by means of commands typed at a prompt. Some Swat commands may have subcommands, some may have flag options, and 
 some combine the two. Others may have special options; all, however, are 
@@ -153,7 +153,7 @@ or more repetitions of the construct may be used. For example, `unalias
 <word>*` can be the `unalias` command by itself, or it can be followed by 
 a list of words to be unaliased.
 
-### 3.3	Address Expressions
+### 3.3 Address Expressions
 
 Address expressions are used as arguments to any Swat command that 
 accesses memory. For example, the `pobject` command takes an address 
@@ -252,7 +252,7 @@ Much of the time the type of data stored at the address given by the address exp
 
 the data at `ds:14h` will be treated as a double word.
 
-### 3.4	On-line Help
+### 3.4 On-line Help
 
 Swat provides on-line help, both for looking up Swat topics and GEOS 
 reference material.
@@ -275,7 +275,7 @@ command.
 To get information about a GEOS topic, use the doc functions.
 
 ----------
-####apropos
+#### apropos
 
 	apropos [<string>]
 
@@ -283,7 +283,7 @@ The **apropos** command searches the list of commands and command help for
 all entries containing <string>. It lists each command and its synopsis. The string may actually be a partial word.
 
 ----------
-####doc, doc-next, doc-previous
+#### doc, doc-next, doc-previous
 	doc [<keyword>]
 	doc-next
 	doc-previous
@@ -296,13 +296,13 @@ others, use the **doc-next** and **doc-previous** command. The documentation wil
 arrow keys.
 
 ----------
-####help
+#### help
 
 	help [<command>]
 
 There are two different ways to use the **help** command. The first is to enter the interactive help mode using the **help** command with no arguments, and the second is to use the help command with a particular command as an argument.
 
-####Interactive help mode
+#### Interactive help mode
 The interactive help mode consists of a tree of commands and topics 
 identified by different numbers. If one of the numbers is typed, 
 information about that particular topic or command is displayed. Some 
@@ -362,7 +362,7 @@ fast help on a particular command. (See Swat Display 3-2.)
 
 
 
-### 3.5	Essential Commands
+### 3.5 Essential Commands
 
 This section covers the function and usage of some of the most important 
 Swat commands. These commands fall into the following command groups:
@@ -1413,7 +1413,7 @@ display mode.
 **Ctrl-u**	Control-u (up) displays ten of the preceding memory elements in the 
 current display mode.
 
-###3.5.5	Other Important Commands
+### 3.5.5 Other Important Commands
 
 	alias, mwatch, objwatch, save, switch, sym-default, why
 
@@ -1580,7 +1580,7 @@ The **why** command prints the error code for an occurrence of a fatal error.
 This command is useful because it can give a good idea of why GEOS crashed.
 
 
-###3.6	Additional Features
+### 3.6 Additional Features
 
 This section covers the features of Swat that make it easier to use when 
 debugging an application.
