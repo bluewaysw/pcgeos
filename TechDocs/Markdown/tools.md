@@ -11,21 +11,20 @@
 [2.6 Sample Esp Programs](Tools/tconfig.md#26-sample-esp-programs)
 
 **[3 Swat Introduction](Tools/tswatcm.md)**  
-[3.1 DOS Command Line Options](tools/tswatcm.md#31-dos-command-line-options)  
-[3.2 Notation](tools/tswatcm.md#32-notation)  
-[3.3 Address Expressions](tools/tswatcm.md#33-address-expressions)  
-[3.4 On-line Help](tools/tswatcm.md#34-on-line-help)  
-[3.5 Essential Commands](tools/tswatcm.md#35-essential-commands)  
-[3.5.1 Cycle of Development](tools/tswatcm.md#351-cycle-of-development)  
-[3.5.2 Attaching and Detaching](tools/tswatcm.md#352-attaching-and-detaching)  
-[3.5.3 Breakpoints and Code Stepping](tools/tswatcm.md#353-breakpoints-and-code-stepping)  
-[3.5.4 Examining and Modifying Memory](tools/tswatcm.md#354-examining-and-modifying-memory)  
-[3.5.5 Other Important Commands](tools/tswatcm.md#355-other-importand-commands)  
-[3.6 Additional Features](tools/tswatcm.md#36-additional-features)  
+[3.1 DOS Command Line Options](Tools/tswatcm.md#31-dos-command-line-options)  
+[3.2 Notation](Tools/tswatcm.md#32-notation)  
+[3.3 Address Expressions](Tools/tswatcm.md#33-address-expressions)  
+[3.4 On-line Help](Tools/tswatcm.md#34-on-line-help)  
+[3.5 Essential Commands](Tools/tswatcm.md#35-essential-commands)  
+[3.5.1 Cycle of Development](Tools/tswatcm.md#351-cycle-of-development)  
+[3.5.2 Attaching and Detaching](Tools/tswatcm.md#352-attaching-and-detaching)  
+[3.5.3 Breakpoints and Code Stepping](Tools/tswatcm.md#353-breakpoints-and-code-stepping)  
+[3.5.4 Examining and Modifying Memory](Tools/tswatcm.md#354-examining-and-modifying-memory)  
+[3.5.5 Other Important Commands](Tools/tswatcm.md#355-other-important-commands)  
+[3.6 Additional Features](Tools/tswatcm.md#36-additional-features)  
 
-4 	Swat Reference 	73
-
-	4.1	Notation					 TSwtA-I : 75
+**[4 Swat Reference](Tools/tswta_i.md)**  
+[4.1 Notation](Tools/tswta_i.md#41-notation)  
 
 	4.2	Swat Reference					 TSwtA-I : 76
 
