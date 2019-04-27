@@ -625,10 +625,10 @@ the time.
 ![](Art/figure_3-5a.png)
 
 **Figure 3-5** Sample OSF/Motif Menus  
-The menu at right is a "standard" menu created 
+_The menu at right is a "standard" menu created 
 almost entirely by the UI. The menu above shows 
 cascading menus as well as lists. Items followed by 
-ellipses bring up dialog boxes.
+ellipses bring up dialog boxes._
 
 
 + Cascading or nested menus  
@@ -711,9 +711,9 @@ allows the user to switch to any other part of the system.
 ![](Art/figure_3-6a.png)
 
 **Figure 3-6** Sample OSF/Motif Dialog Boxes  
-The above dialog box is a standard, modal dialog. That to the right 
+_The above dialog box is a standard, modal dialog. That to the right 
 demonstrates the concept of the standard response triggers and automatic 
-geometry management (the box is sized to fit all the objects).
+geometry management (the box is sized to fit all the objects)._
 
 + Standard dialog types  
 To increase the amount of standardization across all applications, GEOS 

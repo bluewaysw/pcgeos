@@ -256,25 +256,25 @@
       [12.3.3 On-Screen Behavior](Concepts/cgeom.md#1233-on-screen-behavior)  
       [12.3.4 Window Look and Feel](Concepts/cgeom.md#1234-window-look-and-feel)  
 
-**[13 Sound Library]()**  
-    [13.1 Goals and Motives]()  
-    [13.2 Playing UI Sounds]()  
-    [13.3 Representing Tones]()  
-    [13.4 Single Notes]()  
-    [13.5 Declaring Music Buffers]()  
-    [13.6 Playing Music Buffers]()  
-    [13.7 Playing Very Large Music Buffers]()  
-    [13.8 Playing Sampled Sounds]()  
-    [13.9 Grabbing the Sound Exclusive]()  
-    [13.10 Simulating Musical Instruments]()  
-      [13.10.1 Acoustics In Brief]()  
-      [13.10.2 Simple Instrument Description]()  
-      [13.10.3 Advanced Description]()  
+**[13 Sound Library](Concepts/csound.md)**  
+    [13.1 Goals and Motives](Concepts/csound.md#131-goal-and-motives)  
+    [13.2 Playing UI Sounds](Concepts/csound.md#132-playing-ui-sounds)  
+    [13.3 Representing Tones](Concepts/csound.md#133-representing-tones)  
+    [13.4 Single Notes](Concepts/csound.md#134-single-notes)  
+    [13.5 Declaring Music Buffers](Concepts/csound.md#135-declaring-music-buffers)  
+    [13.6 Playing Music Buffers](Concepts/csound.md#136-playing-music-buffers)  
+    [13.7 Playing Very Large Music Buffers](Concepts/csound.md#137-playing-music-buffers)  
+    [13.8 Playing Sampled Sounds](Concepts/csound.md#138-playing-sampled-sounds)  
+    [13.9 Grabbing the Sound Exclusive](Concepts/csound.md#139-grabbing-the-sound-exclusive)  
+    [13.10 Simulating Musical Instruments](Concepts/csound.md#1310-simulating-musical-instruments)  
+      [13.10.1 Acoustics In Brief](Concepts/csound.md#13101-acoustics-in-brief)  
+      [13.10.2 Simple Instrument Description](Concepts/csound.md#13102-simple-instrument-description)  
+      [13.10.3 Advanced Description](Concepts/csound.md#13103-advanced-description)  
 
-**[14 Handles]()**  
-    [14.1 Design Philosophy]()  
-    [14.2 The Global Handle Table]()  
-    [14.3 Local Handles]()  
+**[14 Handles](Concepts/chandle.md)**  
+    [14.1 Design Philosophy](Concepts/chandle.md#141-design-philosophy)  
+    [14.2 The Global Handle Table](Concepts/chandle.md#142-the-global-handle-table)  
+    [14.3 Local Handles](Concepts/chandle.md#143-local-memory)  
 
 **[15 Memory Management]()**  
     [15.1 Design Philosophy]()  
@@ -309,22 +309,22 @@
       [16.4.3 Name Arrays]()  
 
 **[17 File System]()**  
-    [17.1	Design Philosophy      [CFile : 611
-    [17.2	File System Overview      [CFile : 613
-    [17.3	Disks and Drives      [CFile : 616
-      [17.3.1	Accessing Drives      [CFile : 616
-      [17.3.2	Accessing Disks      [CFile : 619
-    [17.4	Directories and Paths      [CFile : 631
-      [17.4.1	Standard Paths      [CFile : 632
-      [17.4.2	Current Path and Directory Stack      [CFile : 636
-      [17.4.3	Creating and Deleting Directories      [CFile : 639
-    [17.5	Files      [CFile : 641
-      [17.5.1	DOS Files and GEOS Files      [CFile : 641
-      [17.5.2	Files and File Handles      [CFile : 643
-      [17.5.3	GEOS Extended Attributes      [CFile : 643
-      [17.5.4	File Utilities      [CFile : 653
-      [17.5.5	FileEnum()      [CFile : 655
-      [17.5.6	Bytewise File Operations      [CFile : 661
+    [17.1 Design Philosophy]()  
+    [17.2 File System Overview]()  
+    [17.3 Disks and Drives]()  
+      [17.3.1 Accessing Drives]()  
+      [17.3.2 Accessing Disks]()  
+    [17.4 Directories and Paths]()  
+      [17.4.1 Standard Paths]()  
+      [17.4.2 Current Path and Directory Stack]()  
+      [17.4.3 Creating and Deleting Directories]()  
+    [17.5 Files]()  
+      [17.5.1 DOS Files and GEOS Files]()  
+      [17.5.2 Files and File Handles]()  
+      [17.5.3 GEOS Extended Attributes]()  
+      [17.5.4 File Utilities]()  
+      [17.5.5 FileEnum()]()  
+      [17.5.6 Bytewise File Operations]()  
 
 **[18 Virtual Memory]()**  
     [18.1	Design Philosophy      [CVM : 673

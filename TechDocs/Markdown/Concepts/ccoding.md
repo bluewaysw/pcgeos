@@ -90,7 +90,7 @@ typedef ByteFlags MyFlag;
  * at a time as shown in the following examples. */
 
     ...
-    MyFlag		myFlagsRecord;		/* Set up a variable of the flag record type */
+    MyFlag	myFlagsRecord;	/* Set up a variable of the flag record type */
 
 	/* Set the second and fourth flag. */
     myFlagsRecord = MF_SECOND_FLAG | MF_FOURTH_FLAG;
@@ -269,8 +269,8 @@ GEOS math routines.
 	/* BBFixed
 	 * One byte integer, one byte fraction */
 typedef struct {
-    byte		BBF_frac;		/* fractional portion */
-    byte		BBF_int;		/* integral portion */
+    byte		BBF_frac;	/* fractional portion */
+    byte		BBF_int;	/* integral portion */
 } BBFixed;
 
 	/* BBFixedAsWord
@@ -281,15 +281,15 @@ typedef word		BBFixedAsWord;
 	/* WBFixed
 	 * One word integer, one byte fraction */
 typedef struct {
-    byte		WBF_frac;		/* fractional portion */
-    word		WBF_int;		/* integral portion */
+    byte		WBF_frac;	/* fractional portion */
+    word		WBF_int;	/* integral portion */
 } WBFixed;
 
 	/* WWFixed
 	 * One word integer, one word fraction */
 typedef struct {
-    word		WWF_frac;		/* fractional portion */
-    word		WWF_int;		/* integral portion */
+    word		WWF_frac;	/* fractional portion */
+    word		WWF_int;	/* integral portion */
 } WWFixed;
 
 	/* WWFixedAsDWord
@@ -300,8 +300,8 @@ typedef dword		WWFixedAsDWord;
 	/* DWFixed
 	 * two words (one dword) integer, one word fraction */
 typedef struct {
-    word		DWF_frac;		/* fractional portion */
-    sdword		DWF_int;		/* integral portion */
+    word		DWF_frac;	/* fractional portion */
+    sdword		DWF_int;	/* integral portion */
 } DWFixed;
 
 /* Three-byte structure
@@ -309,8 +309,8 @@ typedef struct {
  * optimize and avoid using a 32-bit value. */
 
 typedef struct {
-    word		WAAH_low;		/* the low 16 bits */
-    byte		WAAH_high;		/* the high 8 bits */
+    word		WAAH_low;	/* the low 16 bits */
+    byte		WAAH_high;	/* the high 8 bits */
 } WordAndAHalf;
 ~~~
 
@@ -454,8 +454,8 @@ though they are very similar. Some examples of simple Goc macros follow
 below:
 
 ~~~
-@define mlply(val1,val2)			val1 * val2
-@define defChunk(a)				@chunk char a[] = "text"
+@define mlply(val1,val2)		val1 * val2
+@define defChunk(a)			@chunk char a[] = "text"
 ~~~
 
 When using Goc macros in your code, you must preface them with the "@" Goc 
@@ -526,7 +526,7 @@ routines are declared with Pascal's calling conventions.
 extern int
 SomeRoutineCalledViaAPointer(int anArg, int anotherArg, const char *someText);
 
-int (*funcPtr) (int, int, const char *);		/* A function pointer */
+int (*funcPtr) (int, int, const char *);	/* A function pointer */
 
 funcPtr = SomeRoutineCalledViaAPointer;
 
@@ -536,8 +536,8 @@ funcPtr = SomeRoutineCalledViaAPointer;
  * resource:
  */
 
-ProcCallFixedOrMovable_cdecl(funcPtr,			/* The pointer to the routine */
-				1, 2, "Franklin T. Poomm");
+ProcCallFixedOrMovable_cdecl(funcPtr,		/* The pointer to the routine */
+			1, 2, "Franklin T. Poomm");
 ~~~
 
 ### 5.3 The GEOS Object System
@@ -1283,7 +1283,7 @@ Code Display 5-4 TicTac's New Game Trigger
 
 @object GenTriggerClass TicTacNewTrigger = {
     GI_visMoniker = "New Game";
-    GTI_destination = TicTacBoard;					/* Send the action message to the
+    GTI_destination = TicTacBoard;			/* Send the action message to the
 					 * TicTac game board object. */
     GTI_actionMsg = MSG_TICTAC_NEW_GAME; 	/* The action message. */
 }
