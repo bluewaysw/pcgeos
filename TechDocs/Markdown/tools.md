@@ -25,8 +25,8 @@
 
 **[4 Swat Reference](Tools/tswta_i.md)**  
 [4.1 Notation](Tools/tswta_i.md#41-notation)  
-
-	4.2	Swat Reference					 TSwtA-I : 76
+[4.2 Swat Reference A-I](Tools/tswta_i.md#42-swat-reference)  
+[4.3 Swat Reference J-Z](Tools/tswtj_z.md)
 
 5 	Tool Command Language 	263
 
