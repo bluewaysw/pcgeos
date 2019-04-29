@@ -6,7 +6,7 @@ This chapter details how your software layout should look after installation. Th
 
 The installation program will install a large number of tool files, debugging files, and sample applications on to the development machine. These are arranged in the directory of your choice (with name specified in the ROOT_DIR environment variable). Most developers will use \PCGEOS as the root directory of their development tree, and this is the name assumed throughout this section.
 
-**\PCGEOS**	This directory is the root of the development tree. It does not contain any files, but all the development files are in subdirectories of this root. The first two levels of the PCGEOS directory tree are shown in Figure 2-1.
+**\PCGEOS**	This directory is the root of the development tree. It does not contain any files, but all the development files are in subdirectories of this root.
 
 **\PCGEOS\LIBRARY**
 This directory houses a number of subdirectories, each of which contains the executable and symbolic information files for a GEOS library. Some of the library directories contain subdirectories. For example, the MATH directory contains a subdirectory COMPILER that contains files for different C compilers. For the most part, you will not need to look in these subdirectories unless you need to re-download the geodes.
@@ -334,4 +334,4 @@ HELP
 OBJ  
 AVOID
 
-[Welcome](twelcome.md) <-- &nbsp;&nbsp; [table of contents](../tools.md) &nbsp;&nbsp; --> [Swat Introduction](tswatcm.md)
+[Welcome](twelcome.md) <-- &nbsp;&nbsp; [Table of Contents](../tools.md) &nbsp;&nbsp; --> [Swat Introduction](tswatcm.md)
