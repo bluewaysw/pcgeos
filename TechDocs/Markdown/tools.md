@@ -28,53 +28,31 @@
 [4.2 Swat Reference A-I](Tools/tswta_i.md#42-swat-reference)  
 [4.3 Swat Reference J-Z](Tools/tswtj_z.md)
 
-5 	Tool Command Language 	263
+**[5 Tool Command Language](Tools/ttcl.md)**  
+[5.1 Using This Chapter](Tools/ttcl.md#51-using-this-chapter)  
+[5.2 Copyright Information](Tools/ttcl.md#52-copyright-information)  
+[5.3 Background and Description](Tools/ttcl.md#53-background-and-description)  
+[5.4 Syntax and Structure](Tools/ttcl.md#54-syntax-and-structure)  
+[5.4.1 Basic Command Syntax](Tools/ttcl.md#541-basic-command-syntax)  
+[5.4.2 Expressions](Tools/ttcl.md#542-expressions)  
+[5.4.3 Lists](Tools/ttcl.md#543-lists)  
+[5.4.4 Command Results](Tools/ttcl.md#544-command-results)  
+[5.4.5 Procedures](Tools/ttcl.md#545-procedures)  
+[5.4.6 Variables](Tools/ttcl.md#546-variables)  
+[5.5 Commands](Tools/ttcl.md#55-commands)  
+[5.5.1 Notation](Tools/ttcl.md#551-notation)  
+[5.5.2 Built-in Commands](Tools/ttcl.md#552-built-in-commands)  
+[5.6 Coding](Tools/ttcl.md#56-coding)  
+[5.6.1 Swat Data Structure Commands](Tools/ttcl.md#561-swat-data-structure-commands)  
+[5.6.2 Examples](Tools/ttcl.md#562-examples)  
+[5.7 Using a New Command](Tools/ttcl.md#57-using-a-new-command)  
+[5.7.1 Compilation](Tools/ttcl.md#571-compilation)  
+[5.7.2 Autoloading](Tools/ttcl.md#572-autoloading)  
+[5.7.3 Explicit Loading](Tools/ttcl.md#573-explicit-loading)
 
-	5.1	Using This Chapter					 TTCL : 265
-
-	5.2	Copyright Information					 TTCL : 266
-
-	5.3	Background and Description					 TTCL : 266
-
-	5.4	Syntax and Structure					 TTCL : 267
-
-	5.4.1	Basic Command Syntax				TTCL : 268
-
-	5.4.2	Expressions				TTCL : 273
-
-	5.4.3	Lists				TTCL : 275
-
-	5.4.4	Command Results				TTCL : 275
-
-	5.4.5	Procedures				TTCL : 276
-
-	5.4.6	Variables				TTCL : 277
-
-	5.5	Commands					 TTCL : 277
-
-	5.5.1	Notation				TTCL : 277
-
-	5.5.2	Built-in Commands				TTCL : 278
-
-	5.6	Coding					 TTCL : 302
-
-	5.6.1	Swat Data Structure Commands				TTCL : 303
-
-	5.6.2	Examples				TTCL : 328
-
-	5.7	Using a New Command					 TTCL : 330
-
-	5.7.1	Compilation				TTCL : 331
-
-	5.7.2	Autoloading				TTCL : 331
-
-	5.7.3	Explicit Loading				TTCL : 331
-
-6 	Debug Utility 	333
-
-	6.1	Changing Platforms					 TDebug : 335
-
-	6.2	Switching Kernels					 TDebug : 336
+**[6 Debug Utility](Tools/tdebug.md)**  
+[6.1 Changing Platforms](Tools/tdebug.md#61-changing-platforms)  
+[6.2 Switching Kernels](Tools/tdebug.md#62-switching-kernels)
 
 7 	Icon Editor 	337
 
