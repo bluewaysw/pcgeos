@@ -11,71 +11,48 @@
 [2.6 Sample Esp Programs](Tools/tconfig.md#26-sample-esp-programs)
 
 **[3 Swat Introduction](Tools/tswatcm.md)**  
-[3.1 DOS Command Line Options](tools/tswatcm.md#31-dos-command-line-options)  
-[3.2 Notation](tools/tswatcm.md#32-notation)  
-[3.3 Address Expressions](tools/tswatcm.md#33-address-expressions)  
-[3.4 On-line Help](tools/tswatcm.md#34-on-line-help)  
-[3.5 Essential Commands](tools/tswatcm.md#35-essential-commands)  
-[3.5.1 Cycle of Development](tools/tswatcm.md#351-cycle-of-development)  
-[3.5.2 Attaching and Detaching](tools/tswatcm.md#352-attaching-and-detaching)  
-[3.5.3 Breakpoints and Code Stepping](tools/tswatcm.md#353-breakpoints-and-code-stepping)  
-[3.5.4 Examining and Modifying Memory](tools/tswatcm.md#354-examining-and-modifying-memory)  
-[3.5.5 Other Important Commands](tools/tswatcm.md#355-other-importand-commands)  
-[3.6 Additional Features](tools/tswatcm.md#36-additional-features)  
+[3.1 DOS Command Line Options](Tools/tswatcm.md#31-dos-command-line-options)  
+[3.2 Notation](Tools/tswatcm.md#32-notation)  
+[3.3 Address Expressions](Tools/tswatcm.md#33-address-expressions)  
+[3.4 On-line Help](Tools/tswatcm.md#34-on-line-help)  
+[3.5 Essential Commands](Tools/tswatcm.md#35-essential-commands)  
+[3.5.1 Cycle of Development](Tools/tswatcm.md#351-cycle-of-development)  
+[3.5.2 Attaching and Detaching](Tools/tswatcm.md#352-attaching-and-detaching)  
+[3.5.3 Breakpoints and Code Stepping](Tools/tswatcm.md#353-breakpoints-and-code-stepping)  
+[3.5.4 Examining and Modifying Memory](Tools/tswatcm.md#354-examining-and-modifying-memory)  
+[3.5.5 Other Important Commands](Tools/tswatcm.md#355-other-important-commands)  
+[3.6 Additional Features](Tools/tswatcm.md#36-additional-features)  
 
-4 	Swat Reference 	73
+**[4 Swat Reference](Tools/tswta_i.md)**  
+[4.1 Notation](Tools/tswta_i.md#41-notation)  
+[4.2 Swat Reference A-I](Tools/tswta_i.md#42-swat-reference)  
+[4.3 Swat Reference J-Z](Tools/tswtj_z.md)
 
-	4.1	Notation					 TSwtA-I : 75
+**[5 Tool Command Language](Tools/ttcl.md)**  
+[5.1 Using This Chapter](Tools/ttcl.md#51-using-this-chapter)  
+[5.2 Copyright Information](Tools/ttcl.md#52-copyright-information)  
+[5.3 Background and Description](Tools/ttcl.md#53-background-and-description)  
+[5.4 Syntax and Structure](Tools/ttcl.md#54-syntax-and-structure)  
+[5.4.1 Basic Command Syntax](Tools/ttcl.md#541-basic-command-syntax)  
+[5.4.2 Expressions](Tools/ttcl.md#542-expressions)  
+[5.4.3 Lists](Tools/ttcl.md#543-lists)  
+[5.4.4 Command Results](Tools/ttcl.md#544-command-results)  
+[5.4.5 Procedures](Tools/ttcl.md#545-procedures)  
+[5.4.6 Variables](Tools/ttcl.md#546-variables)  
+[5.5 Commands](Tools/ttcl.md#55-commands)  
+[5.5.1 Notation](Tools/ttcl.md#551-notation)  
+[5.5.2 Built-in Commands](Tools/ttcl.md#552-built-in-commands)  
+[5.6 Coding](Tools/ttcl.md#56-coding)  
+[5.6.1 Swat Data Structure Commands](Tools/ttcl.md#561-swat-data-structure-commands)  
+[5.6.2 Examples](Tools/ttcl.md#562-examples)  
+[5.7 Using a New Command](Tools/ttcl.md#57-using-a-new-command)  
+[5.7.1 Compilation](Tools/ttcl.md#571-compilation)  
+[5.7.2 Autoloading](Tools/ttcl.md#572-autoloading)  
+[5.7.3 Explicit Loading](Tools/ttcl.md#573-explicit-loading)
 
-	4.2	Swat Reference					 TSwtA-I : 76
-
-5 	Tool Command Language 	263
-
-	5.1	Using This Chapter					 TTCL : 265
-
-	5.2	Copyright Information					 TTCL : 266
-
-	5.3	Background and Description					 TTCL : 266
-
-	5.4	Syntax and Structure					 TTCL : 267
-
-	5.4.1	Basic Command Syntax				TTCL : 268
-
-	5.4.2	Expressions				TTCL : 273
-
-	5.4.3	Lists				TTCL : 275
-
-	5.4.4	Command Results				TTCL : 275
-
-	5.4.5	Procedures				TTCL : 276
-
-	5.4.6	Variables				TTCL : 277
-
-	5.5	Commands					 TTCL : 277
-
-	5.5.1	Notation				TTCL : 277
-
-	5.5.2	Built-in Commands				TTCL : 278
-
-	5.6	Coding					 TTCL : 302
-
-	5.6.1	Swat Data Structure Commands				TTCL : 303
-
-	5.6.2	Examples				TTCL : 328
-
-	5.7	Using a New Command					 TTCL : 330
-
-	5.7.1	Compilation				TTCL : 331
-
-	5.7.2	Autoloading				TTCL : 331
-
-	5.7.3	Explicit Loading				TTCL : 331
-
-6 	Debug Utility 	333
-
-	6.1	Changing Platforms					 TDebug : 335
-
-	6.2	Switching Kernels					 TDebug : 336
+**[6 Debug Utility](Tools/tdebug.md)**  
+[6.1 Changing Platforms](Tools/tdebug.md#61-changing-platforms)  
+[6.2 Switching Kernels](Tools/tdebug.md#62-switching-kernels)
 
 7 	Icon Editor 	337
 

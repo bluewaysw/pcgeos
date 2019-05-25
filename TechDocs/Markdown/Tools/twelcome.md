@@ -35,4 +35,4 @@ A reference section detailing the
 command-line usage and options of all 
 the tools.
 
-[table of contents](../tools.md) &nbsp;&nbsp; --> [System Configuration](tconfig.md)
+[Table of Contents](../tools.md) &nbsp;&nbsp; --> [System Configuration](tconfig.md)
