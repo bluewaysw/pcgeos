@@ -21,7 +21,7 @@ List of Figures	35
 [2.2.2 Vardata](Objects/ogen.md#222-vardata)  
 [2.3 GenClass Basics](Objects/ogen.md#23-genclass-basics)  
 [2.3.1 Visual Monikers](Objects/ogen.md#231-visual-monikers)  
-[2.3.2 Composite Link](Objects/ogen.md#232-composite-link)  
+[2.3.2 Composite Links](Objects/ogen.md#232-composite-links)  
 [2.3.3 Keyboard Accelerators](Objects/ogen.md#233-keyboard-accelerators)  
 [2.3.4 Attributes](Objects/ogen.md#234-attributes)  
 [2.3.5 States](Objects/ogen.md#235-states)  
