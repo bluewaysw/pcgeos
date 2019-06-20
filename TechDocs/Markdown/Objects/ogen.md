@@ -2609,7 +2609,7 @@ also have been created through **ObjInstantiate()** or with
 **ObjDuplicateResource()** (see above). Use MSG_GEN_REMOVE (or 
 MSG_GEN_REMOVE_CHILD) to remove a child added in this manner.
 
-### 2.5.1 Child/Parent Searches
+### 2.5.1 Child-Parent Searches
 
 	MSG_GEN_FIND_CHILD, MSG_GEN_FIND_CHILD_AT_POSITION, 
 	MSG_GEN_FIND_PARENT, MSG_GEN_COUNT_CHILDREN
@@ -2946,7 +2946,7 @@ MSG_GEN_ADD_CHILD.
 
 **Interception:** Generally not intercepted.
 
-### 2.5.3 Branch Construction/Destruction
+### 2.5.3 Branch Construction-Destruction
 
 	MSG_GEN_COPY_TREE, MSG_GEN_DESTROY, 
 	MSG_GEN_DESTROY_AND_FREE_BLOCK, 
@@ -3275,7 +3275,7 @@ entries through special kernel routines and messages. For generic objects,
 most vardata is either in the form of attributes (beginning with ATTR\_) or 
 hints (beginning with HINT_).
 
-### 2.6.1 Optional Attributes (ATTRs)
+### 2.6.1 Optional Attributes-ATTRs
 
 Vardata attribute entries begin with the form ATTR_*attributename* (as in 
 ATTR_GEN_DESTINATION_CLASS). You can initialize this data within your 
