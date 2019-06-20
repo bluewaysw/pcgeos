@@ -1174,7 +1174,8 @@ For information on manipulating visual monikers dynamically using
 **GenClass** messages, see "Managing Visual Monikers" below.
 
 ### 2.3.2 Composite Links
-**Composite links form the connections between parent objects and child 
+
+Composite links form the connections between parent objects and child 
 objects within a generic tree (see "The GEOS User Interface," Chapter 10 of 
 the Concepts Book). These links are set up using the *GI_comp* and *GI_link* 
 instance fields. The *GI_comp* field points to an object's first child. The *GI_link* 
