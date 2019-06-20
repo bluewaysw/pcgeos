@@ -5640,3 +5640,4 @@ WCT_KEEP_VISIBLE_WITH_MARGIN
 
 **Interception:** Generally not intercepted.
 
+[System Classes](osyscla.md) <-- [Table of Contents](../objects.md) &nbsp;&nbsp; --> [GenApplication](ogenapp.md)
