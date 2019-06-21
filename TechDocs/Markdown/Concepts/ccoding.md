@@ -814,11 +814,9 @@ object system of GEOS works.
 ![](Art/figure_5-1.png)
 
 **Figure 5-1** An Object Pointer  
-_The optr (below) references the beginning of 
-the object block through its global handle. The 
-chunk handle consists of an offset into the 
-chunk handle table, where an offset to the 
-object's instance data is stored._
+_The optr (below) references the beginning of the object block through its 
+global handle. The chunk handle consists of an offset into the chunk handle 
+table, where an offset to the object's instance data is stored._
 
 Instance data within an instance chunk is stored in "master parts" or "master 
 groups." A master group is simply a number of instance data fields grouped 
@@ -2437,8 +2435,8 @@ after defining the instance field itself as shown in Code Display 5-13.
 ---
 Code Display 5-13 Use of the @noreloc Keyword
 ~~~
-	@instance optr MCI_ruler;			/* Normally MCI_ruler would be reloc- */
-	@noreloc MCI_ruler;				/* -but now it isn't. */
+	@instance optr MCI_ruler;  /* Normally MCI_ruler would be reloc- */
+	@noreloc MCI_ruler;        /* -but now it isn't. */
 ~~~
 
 #### 5.4.3 Defining Methods
@@ -2500,8 +2498,8 @@ and your @method declaration looks like
 Then your protoype should look like
 
 extern word _pascal DoSomething(optr oself,
-					  MyMessages message,
-					  word thing);
+			MyMessages message,
+			word thing);
 ~~~
 
 The name of the type MyMessages is constructed automatically by taking 
@@ -2622,10 +2620,10 @@ have the following format:
 
 ~~~
 extern <type> _pascal <MethodName>(
-	optr					oself,
-	<TruncatedClassName>Messages					message,
-	<type1>					<arg1>,
-	<type2>					<arg2>)
+	optr				oself,
+	<TruncatedClassName>Messages	message,
+	<type1>				<arg1>,
+	<type2>				<arg2>)
 ~~~
 
 **type** This is the type returned by the method. It may be any data type.
@@ -2650,23 +2648,22 @@ the same order, as in the message declaration.
 ---
 Code Display 5-15 Declaring a Method As a Routine
 ~~~
-@message int MSG_HELLO_COUNTER_RECALCULATE_VALUE( \
-				HelloPriority 		priority, \
-				word 		randomDatum, \
-				char 		aLetter);
+@message int MSG_HELLO_COUNTER_RECALCULATE_VALUE(
+		HelloPriority 	priority, 
+		word 		randomDatum, 
+		char 		aLetter);
 
 extern int _pascal HelloCounterRecalculateValue(
-			optr			oself,
-			HelloCounterMessages			message,
-			HelloPriority			priority,
-			word			randomDatum,
-			char			aLetter);
+		optr			oself,
+		HelloCounterMessages	message,
+		HelloPriority		priority,
+		word			randomDatum,
+		char			aLetter);
 
-@method	HelloCounterRecalculate, HelloCounterClass, \ 
+@method	HelloCounterRecalculate, HelloCounterClass, 
 		MSG_HELLO_COUNTER_RECALCULATE_VALUE {
 
 	/* method code goes here... */
-
 }
 ~~~
 
@@ -2774,8 +2771,7 @@ Two other types of resource elements may also be defined, both of which are
 array types. The @chunkArray keyword defines a chunk array structure, 
 and the @elementArray keyword defines an element array structure. See 
 "Local Memory," Chapter 16, for information on the structure and usage of 
-chunk and element arrays. The formats for the keywords are described 
-below:
+chunk and element arrays. The formats for the keywords are described below:
 
 ~~~
 @chunkArray <stype> <aname> [= {<init>}];
@@ -3356,8 +3352,7 @@ destination. This is similar to @send in that it can have no return values. If
 the event has return values, use @dispatchcall (below).
 
 ~~~
-@dispatch [noFree] \
-		<nObj>::[{<cast>}]<nMsg>::<event>;
+@dispatch [noFree] <nObj>::[{<cast>}]<nMsg>::<event>;
 ~~~
 
 **noFree** This flag indicates that the event's handle should not be freed 
@@ -3382,8 +3377,7 @@ to sleep" if necessary while the recipient processes the message and will be
 "woken up" when the message returns.
 
 ~~~
-<ret> = @dispatchcall [noFree] [{<cast>}] <nObj>::\
-                                    <nMsg>::<event>;
+<ret> = @dispatchcall [noFree] [{<cast>}] <nObj>::<nMsg>::<event>;
 ~~~
 
 **ret** This is a variable that will contain the return value of the 
