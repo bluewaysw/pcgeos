@@ -9,7 +9,7 @@ GEOS provides a memory manager.
 This chapter describes the memory management system used by GEOS. It 
 also describes the routines applications can use to get raw memory. Before 
 you read this chapter, you should be familiar with the use of handles (see 
-"Handles," Chapter 14).
+["Handles", Chapter 14](chandle.md)).
 
 ### 15.1 Design Philosophy
 
@@ -22,25 +22,25 @@ providing comprehensive memory management.
 The GEOS memory management system is designed to meet rigorous 
 demands. Some of the requirements are
 
-+ Independence of memory location
++ Independence of memory location  
 Ideally, an application should not have to keep track of the address of 
 each of its data items; rather, the memory management system should 
 allow the application to reference its memory virtually.
 
-+ Hardware independence
++ Hardware independence  
 Applications are much easier to write and maintain if they can ignore 
 hardware specifics. An application should be able to specify its memory 
 requirements in generic terms ("I need a package this big which behaves 
 in this way") and let the memory manager worry about where it comes 
 from.
 
-+ Efficient use of memory
++ Efficient use of memory  
 A good operating system should be able to rearrange memory in order to 
 gather as much space as possible. It should also be able to discard certain 
 data or copy it to mass-storage devices (like a hard disk) if more memory 
 is needed.
 
-+ Management of Shared Data
++ Management of Shared Data  
 Applications should be able to share common data or code. In a 
 multitasking system, proper synchronization of shared resources is 
 essential to maintain data integrity.
@@ -549,17 +549,17 @@ char 	charArray[50], *blockBaseAddress;
 /* First, we allocate a block of the desired size. Since we'll use the block right
  * away, we allocate the block already locked.
  */
-myBlockhandle = MemAlloc(			/* MemAlloc returns the block handle */
-			2048,		/* Allocate 2K of memory */
-			HF_SWAPABLE,		/* HeapFlags: Make block swapable */
-			HAF_ZERO_INIT|HAF_LOCK);		/* HeapAllocFlags: Initialize
+myBlockhandle = MemAlloc(        /* MemAlloc returns the block handle */
+		2048,                    /* Allocate 2K of memory */
+		HF_SWAPABLE,             /* HeapFlags: Make block swapable */
+		HAF_ZERO_INIT|HAF_LOCK); /* HeapAllocFlags: Initialize
 						 * the memory to zero & lock it */
 
 
 /* The block is already locked on the global heap. However, we do not have the
  * block's address; we just have its handle. Therefore, we need to call a routine
  * to dereference the handle. */
-blockBaseAddress = (char *) MemDeref(myBlockHandle);		/* Returns a ptr to base of
+blockBaseAddress = (char *) MemDeref(myBlockHandle); /* Returns a ptr to base of
 						 * block */
 
 /* Enter some data in the block */
@@ -914,3 +914,5 @@ along with the size; this makes realloc() function like malloc().
 When you are done with memory allocated by malloc-family routines, you 
 should call free() to free the memory for other malloc() calls. As with 
 realloc(), you must pass the same pointer that you were originally given.
+
+[Handles](chandle.md) <-- &nbsp;&nbsp; [table of contents](../concepts.md) &nbsp;&nbsp; --> [Local Memory](clmem.md)

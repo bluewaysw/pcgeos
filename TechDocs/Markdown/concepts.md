@@ -327,67 +327,67 @@
       [17.5.6 Bytewise File Operations]()  
 
 **[18 Virtual Memory]()**  
-    [18.1	Design Philosophy      [CVM : 673
-    [18.2	VM Structure      [CVM : 674
-      [18.2.1	The VM Manager      [CVM : 675
-      [18.2.2	VM Handles      [CVM : 676
-      [18.2.3	Virtual Memory Blocks      [CVM : 677
-      [18.2.4	VM File Attributes      [CVM : 681
-    [18.3	Using Virtual Memory      [CVM : 683
-      [18.3.1	How to Use VM      [CVM : 683
-      [18.3.2	Opening or Creating a VM File      [CVM : 684
-      [18.3.3	Changing VM File Attributes      [CVM : 687
-      [18.3.4	Creating and Freeing Blocks      [CVM : 687
-      [18.3.5	Attaching Memory Blocks      [CVM : 689
-      [18.3.6	Accessing and Altering VM Blocks      [CVM : 690
-      [18.3.7	VM Block Information      [CVM : 692
-      [18.3.8	Updating and Saving Files      [CVM : 693
-      [18.3.9	Closing Files      [CVM : 695
-      [18.3.10	The VM File's Map Block      [CVM : 696
-      [18.3.11	File-Access Synchronization      [CVM : 697
-      [18.3.12	Other VM Utilities      [CVM : 699
-    [18.4	VM Chains      [CVM : 700
-      [18.4.1	Structure of a VM Chain      [CVM : 701
-      [18.4.2	VM Chain Utilities      [CVM : 703
-    [18.5	Huge Arrays      [CVM : 705
-      [18.5.1	Structure of a Huge Array      [CVM : 706
-      [18.5.2	Basic Huge Array Routines      [CVM : 708
-      [18.5.3	Huge Array Utilities      [CVM : 713
+    [18.1 Design Philosophy]()  
+    [18.2 VM Structure]()  
+      [18.2.1 The VM Manager]()  
+      [18.2.2 VM Handles]()  
+      [18.2.3 Virtual Memory Blocks]()  
+      [18.2.4 VM File Attributes]()  
+    [18.3 Using Virtual Memory]()  
+      [18.3.1 How to Use VM]()  
+      [18.3.2 Opening or Creating a VM File]()  
+      [18.3.3 Changing VM File Attributes]()  
+      [18.3.4 Creating and Freeing Blocks]()  
+      [18.3.5 Attaching Memory Blocks]()  
+      [18.3.6 Accessing and Altering VM Blocks]()  
+      [18.3.7 VM Block Information]()  
+      [18.3.8 Updating and Saving Files]()  
+      [18.3.9 Closing Files]()  
+      [18.3.10 The VM File's Map Block]()  
+      [18.3.11 File-Access Synchronization]()  
+      [18.3.12 Other VM Utilities]()  
+    [18.4 VM Chains]()  
+      [18.4.1 Structure of a VM Chain]()  
+      [18.4.2 VM Chain Utilities]()  
+    [18.5 Huge Arrays]()  
+      [18.5.1 Structure of a Huge Array]()  
+      [18.5.2 Basic Huge Array Routines]()  
+      [18.5.3 Huge Array Utilities]()  
 
 **[19 Database Library]()**  
-    [19.1	Design Philosophy      [CDB : 719
-    [19.2	Database Structure      [CDB : 720
-      [19.2.1	DB Items      [CDB : 720
-      [19.2.2	DB Groups      [CDB : 721
-      [19.2.3	Allocating Groups and Items      [CDB : 722
-      [19.2.4	Ungrouped DB Items      [CDB : 723
-      [19.2.5	The DB Map Item      [CDB : 723
-    [19.3	Using Database Routines      [CDB : 724
-      [19.3.1	General Rules to Follow      [CDB : 724
-      [19.3.2	Allocating and Freeing Groups      [CDB : 725
-      [19.3.3	Allocating and Freeing Items      [CDB : 725
-      [19.3.4	Accessing DB Items      [CDB : 726
-      [19.3.5	Resizing DB Items      [CDB : 727
-      [19.3.6	Setting and Using the Map Item      [CDB : 728
-      [19.3.7	Routines for Ungrouped Items      [CDB : 729
-      [19.3.8	Other DB Utilities      [CDB : 730
-    [19.4	The Cell Library      [CDB : 731
-      [19.4.1	Structure and Design      [CDB : 732
-      [19.4.2	Using the Cell Library      [CDB : 734
+    [19.1 Design Philosophy]()  
+    [19.2 Database Structure]()  
+      [19.2.1 DB Items]()  
+      [19.2.2 DB Groups]()  
+      [19.2.3 Allocating Groups and Items]()  
+      [19.2.4 Ungrouped DB Items]()  
+      [19.2.5 The DB Map Item]()  
+    [19.3 Using Database Routines]()  
+      [19.3.1 General Rules to Follow]()  
+      [19.3.2 Allocating and Freeing Groups]()  
+      [19.3.3 Allocating and Freeing Items]()  
+      [19.3.4 Accessing DB Items]()  
+      [19.3.5 Resizing DB Items]()  
+      [19.3.6 Setting and Using the Map Item]()  
+      [19.3.7 Routines for Ungrouped Items]()  
+      [19.3.8 Other DB Utilities]()  
+    [19.4 The Cell Library]()  
+      [19.4.1 Structure and Design]()  
+      [19.4.2 Using the Cell Library]()  
 
 **[20 Parse Library]()**  
-    [20.1	Parse Library Behavior      [CParse : 743
-      [20.1.1	The Scanner      [CParse : 745
-      [20.1.2	The Parser      [CParse : 753
-      [20.1.3	Evaluator      [CParse : 759
-      [20.1.4	Formatter      [CParse : 761
-    [20.2	Parser Functions      [CParse : 761
-      [20.2.1	Internal Functions      [CParse : 762
-      [20.2.2	External Functions      [CParse : 765
-    [20.3	Coding with the Parse Library      [CParse : 766
-      [20.3.1	Parsing a String      [CParse : 766
-      [20.3.2	Evaluating a Token Sequence      [CParse : 767
-      [20.3.3	Formatting a Token Sequence      [CParse : 770
+    [20.1 Parse Library Behavior]()  
+      [20.1.1 The Scanner]()  
+      [20.1.2 The Parser]()  
+      [20.1.3 Evaluator]()  
+      [20.1.4 Formatter]()  
+    [20.2 Parser Functions]()  
+      [20.2.1 Internal Functions]()  
+      [20.2.2 External Functions]()  
+    [20.3 Coding with the Parse Library]()  
+      [20.3.1 Parsing a String]()  
+      [20.3.2 Evaluating a Token Sequence]()  
+      [20.3.3 Formatting a Token Sequence]()  
 
 **[21 Using Streams]()**  
     [21.1	Using Streams: The Basics      [CStream : 773
