@@ -48,88 +48,51 @@ List of Figures	35
 [2.12 Navigation Methods](Objects/ogen.md#212-navigation-methods)  
 [2.13 Window Positions and Sizes](Objects/ogen.md#213-window-positions-and-sizes)
 
-3	GenApplication	279
+**[3 GenApplication](Objects/ogenapp.md)**  
+[3.1 GenApplication Basics](Objects/ogenapp.md#31-genapplication-basics)  
+[3.1.1 Instance Data](Objects/ogenapp.md#311-instance-data)  
+[3.1.2 Application GCN Lists](Objects/ogenapp.md#312-application-gcn-lists)  
+[3.1.3 Application Instance Reference](Objects/ogenapp.md#313-application-instance-reference)  
+[3.1.4 Attach and Launch Flags](Objects/ogenapp.md#314-attach-and-launch-flags)  
+[3.1.5 ApplicationStates](Objects/ogenapp.md#315-applicationstates)  
+[3.1.6 Application Features and Levels](Objects/ogenapp.md#316-application-features-and-levels)  
+[3.1.7 IACP](Objects/ogenapp.md#317-iacp)  
+[3.2 Advanced GenApplication Usage](Objects/ogenapp.md#32-advanced-genapplication-usage)  
+[3.2.1	An Application's Life Cycle](Objects/ogenapp.md#321-an-application's-life-cycle)  
+[3.2.2	Application Busy States](Objects/ogenapp.md#322-application-busy-states)  
+[3.2.3	The GenApplication's Moniker](Objects/ogenapp.md#323-the-genapplication's-moniker)  
+[3.2.4	Measurement Type](Objects/ogenapp.md#324-measurement-type)  
+[3.2.5	Interaction with the UI](Objects/ogenapp.md#325-interaction-with-the-ui)
 
-	3.1	GenApplication Basics					 OGenApp : 281
+**[4 GenDisplay / GenPrimary](Objects/ogendis.md)**  
+[4.1 A First Look at GenDisplay](Objects/ogendis.md#41-a-first-look-at-gendisplay)  
+[4.1.1 GenDisplay Object Structure](Objects/ogendis.md#411-gendisplay-object-structure)  
+[4.1.2 Minimizing and Maximizing](Objects/ogendis.md#412-minimizing-and-maximizing)  
+[4.2 Using the GenPrimary](Objects/ogendis.md#42-using-the-genprimary)  
+[4.3 Using Multiple Displays](Objects/ogendis.md#43-using-multiple-displays)  
+[4.3.1 GenDisplayGroup](Objects/ogendis.md#431-gendisplaygroup)  
+[4.3.2 GenDisplayControl](Objects/ogendis.md#432-gendisplaycontrol)  
+[4.3.3 Using GenDisplayClass Objects](Objects/ogendis.md#433-using-gendisplayclass)
 
-		3.1.1	Instance Data				OGenApp : 282
+**[5 GenTrigger](Objects/ogentrg.md)**  
+[5.1 GenTrigger Overview](Objects/ogentrg.md#51-gentrigger-overview)  
+[5.2 GenTrigger Usage](Objects/ogentrg.md#52-gentrigger-usage)  
+[5.3 Supplemental GenTrigger Usage](Objects/ogentrg.md#53-supplemental-gentrigger-usage)  
+[5.3.1 Passing Data with a GenTrigger](Objects/ogentrg.md#531-passing-data-with-a-gentrigger)  
+[5.3.2 Interaction Commands](Objects/ogentrg.md#532-interaction-commands)  
+[5.3.3 Interpreting Double Clicks](Objects/ogentrg.md#533-interpreting-double-clicks)  
+[5.3.4 Initiating an Action](Objects/ogentrg.md#534-initiating-an-action)  
+[5.3.5 Setting a Trigger As the Default](Objects/ogentrg.md#535-setting-a-trigger-as-the-default)  
+[5.3.6 Manipulating Instance Data](Objects/ogentrg.md#536-manipulating-instance-data)  
+[5.3.7 Other Hints](Objects/ogentrg.md#537-other-hints)  
+[5.4 Customizations](Objects/ogentrg.md#54-customizations)
 
-		3.1.2	Application GCN Lists				OGenApp : 285
+**[6 GenGlyph](Objects/ogengly.md)**  
+[6.1 GenGlyph Features](Objects/ogengly.md#61-genglyph-features)  
+[6.2 GenGlyph Basics](Objects/ogengly.md#62-genglyph-basics)  
+[6.3 Modifying a GenGlyph](Objects/ogengly.md#63-modifying-a-genglyph)
 
-		3.1.3	Application Instance Reference				OGenApp : 293
-
-		3.1.4	Attach and Launch Flags				OGenApp : 295
-
-		3.1.5	ApplicationStates				OGenApp : 298
-
-		3.1.6	Application Features and Levels				OGenApp : 302
-
-		3.1.7	IACP				OGenApp : 310
-
-	3.2	Advanced GenApplication Usage					 OGenApp : 315
-
-		3.2.1	An Application's Life Cycle				OGenApp : 315
-
-		3.2.2	Application Busy States				OGenApp : 315
-
-		3.2.3	The GenApplication's Moniker				OGenApp : 319
-
-		3.2.4	Measurement Type				OGenApp : 320
-
-		3.2.5	Interaction with the UI				OGenApp : 321
-
-4	GenDisplay / GenPrimary	331
-
-	4.1	A First Look at GenDisplay					 OGenDis : 333
-
-		4.1.1	GenDisplay Object Structure				OGenDis : 334
-
-		4.1.2	Minimizing and Maximizing				OGenDis : 337
-
-	4.2	Using the GenPrimary					 OGenDis : 340
-
-	4.3	Using Multiple Displays					 OGenDis : 344
-
-		4.3.1	GenDisplayGroup				OGenDis : 345
-
-		4.3.2	GenDisplayControl				OGenDis : 351
-
-		4.3.3	Using GenDisplayClass Objects				OGenDis : 352
-
-5	GenTrigger	359
-
-	5.1	GenTrigger Overview					 OGenTrg : 361
-
-	5.2	GenTrigger Usage					 OGenTrg : 363
-
-	5.3	Supplemental GenTrigger Usage					 OGenTrg : 365
-
-		5.3.1	Passing Data with a GenTrigger				OGenTrg : 365
-
-		5.3.2	Interaction Commands				OGenTrg : 367
-
-		5.3.3	Interpreting Double-Clicks				OGenTrg : 369
-
-		5.3.4	Initiating an Action				OGenTrg : 370
-
-		5.3.5	Setting a Trigger As the Default				OGenTrg : 371
-
-		5.3.6	Manipulating Instance Data				OGenTrg : 372
-
-		5.3.7	Other Hints				OGenTrg : 374
-
-	5.4	Customizations					 OGenTrg : 374
-
-6	GenGlyph	377
-
-	6.1	GenGlyph Features					 OGenGly : 379
-
-	6.2	GenGlyph Basics					 OGenGly : 380
-
-	6.3	Modifying a GenGlyph					 OGenGly : 381
-
-7	GenInteraction	385
-
+**[7 GenInteraction](Objects/ogenint.md)**  
 	7.1	GenInteraction Features					 OGenInt : 387
 
 		7.1.1	Sub-Group Interactions				OGenInt : 388
