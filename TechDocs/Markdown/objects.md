@@ -1,9 +1,4 @@
 ### Objects
-
-List of C Examples	27
-
-List of Figures	35
-
 **[1 System Classes](Objects/osyscla.md)**  
 [1.1 MetaClass](Objects/osyscla.md#11-metaclass)  
 [1.1.1 Special Messages](Objects/osyscla.md#111-special-messages)  
@@ -93,155 +88,83 @@ List of Figures	35
 [6.3 Modifying a GenGlyph](Objects/ogengly.md#63-modifying-a-genglyph)
 
 **[7 GenInteraction](Objects/ogenint.md)**  
-	7.1	GenInteraction Features					 OGenInt : 387
-
-		7.1.1	Sub-Group Interactions				OGenInt : 388
-
-		7.1.2	Popup Interactions (Menus)				OGenInt : 389
-
-		7.1.3	Dialog Boxes				OGenInt : 389
-
-		7.1.4	PopOuts				OGenInt : 391
-
-	7.2	GenInteraction Instance Data					 OGenInt : 392
-
-		7.2.1	GenInteraction Visibility				OGenInt : 396
-
-		7.2.2	Standard Interactions (Menus)				OGenInt : 398
-
-		7.2.3	GenInteraction Types				OGenInt : 399
-
-		7.2.4	GenInteraction Attributes				OGenInt : 402
-
-	7.3	GenInteraction Usage					 OGenInt : 405
-
-		7.3.1	Visibilities				OGenInt : 405
-
-		7.3.2	Types				OGenInt : 413
-
-	7.4	Supplemental Usage					 OGenInt : 435
-
-		7.4.1	Initiating Interactions				OGenInt : 436
-
-		7.4.2	Dismissing Interactions				OGenInt : 439
-
-		7.4.3	Modality for Dialogs				OGenInt : 439
-
-		7.4.4	Managing Input				OGenInt : 441
-
-		7.4.5	Thread Blocking Routines				OGenInt : 442
-
-	7.5	Interaction Commands					 OGenInt : 450
-
-		7.5.1	InteractionCommand Types				OGenInt : 451
-
-		7.5.2	Dialog Control				OGenInt : 453
-
-		7.5.3	Standard Response Triggers				OGenInt : 455
-
-		7.5.4	Replacing Default Triggers				OGenInt : 457
-
-		7.5.5	Triggers Completing Interactions				OGenInt : 459
-
-8	GenValue	461
-
-	8.1	GenValue Features					 OGenVal : 463
-
-	8.2	GenValue Instance Data					 OGenVal : 465
-
-	8.3	GenValue Basics					 OGenVal : 470
-
-		8.3.1	The Value				OGenVal : 470
-
-		8.3.2	The Minimum and Maximum				OGenVal : 473
-
-		8.3.3	The Increment				OGenVal : 475
-
-		8.3.4	GenValue States				OGenVal : 477
-
-		8.3.5	Display Formats				OGenVal : 480
-
-		8.3.6	Sending an Action				OGenVal : 484
-
-	8.4	Supplemental Usage					 OGenVal : 487
-
-		8.4.1	Adjusting the Value Indirectly				OGenVal : 488
-
-		8.4.2	Status Messages				OGenVal : 490
-
-		8.4.3	Retrieving Text				OGenVal : 491
-
-		8.4.4	Using Value Ratios				OGenVal : 495
-
-		8.4.5	Text Filters for the GenValue				OGenVal : 496
-
-		8.4.6	Using Ranges in GenValues				OGenVal : 497
-
-Volume 2
-
-9	GenView	499
-
-	9.1	GenView Overview					 OGenVew : 501
-
-		9.1.1	GenView Model				OGenVew : 501
-
-		9.1.2	View Features and Goals				OGenVew : 502
-
-		9.1.3	The GenViewControl Object				OGenVew : 505
-
-	9.2	Getting Started: View Basics					 OGenVew : 505
-
-		9.2.1	Graphics System Review				OGenVew : 505
-
-		9.2.2	Defining the Basic View				OGenVew : 507
-
-		9.2.3	Handling View Messages				OGenVew : 509
-
-	9.3	Basic View Attributes					 OGenVew : 510
-
-		9.3.1	The GVI_attrs Attribute				OGenVew : 512
-
-		9.3.2	Dimensional Attributes				OGenVew : 516
-
-		9.3.3	Setting the Background Color				OGenVew : 519
-
-		9.3.4	The GVI_increment Attribute				OGenVew : 523
-
-	9.4	Advanced Concepts and Uses					 OGenVew : 524
-
-		9.4.1	The Life of a View				OGenVew : 525
-
-		9.4.2	Documents in a View				OGenVew : 527
-
-		9.4.3	Drawing the Document				OGenVew : 534
-
-		9.4.4	Document and View Size				OGenVew : 535
-
-		9.4.5	Document Scaling				OGenVew : 538
-
-		9.4.6	Children of the View				OGenVew : 542
-
-		9.4.7	Scrolling				OGenVew : 543
-
-		9.4.8	Monitoring Input				OGenVew : 560
-
-		9.4.9	Linking Views				OGenVew : 569
-
-		9.4.10	Setting the Content				OGenVew : 572
-
-		9.4.11	Internal Utilities				OGenVew : 573
-
-	9.5	The GenViewControl					 OGenVew : 574
-
-		9.5.1	GenViewControl Instance Data				OGenVew : 576
-
-		9.5.2	Notification Received				OGenVew : 577
-
-		9.5.3	GenViewControl Example				OGenVew : 578
-
-		9.5.4	Messages Handled				OGenVew : 580
-
-10	The Text Objects	583
+[7.1 GenInteraction Features](Objects/ogenint.md#71-geninteraction-features)  
+[7.1.1 Sub-Group Interactions](Objects/ogenint.md#711-sub-group-interactions)  
+[7.1.2 Popup Interactions (Menus)](Objects/ogenint.md#712-popup-interactions-(menus))  
+[7.1.3 Dialog Boxes](Objects/ogenint.md#713-dialog-boxes)  
+[7.1.4 PopOuts](Objects/ogenint.md#714-popouts)  
+[7.2 GenInteraction Instance Data](Objects/ogenint.md#72-geninteraction-instance-data)  
+[7.2.1 GenInteraction Visibility](Objects/ogenint.md#721-geninteraction-visibility)  
+[7.2.2 Standard Interactions (Menus)](Objects/ogenint.md#722-standard-interactions-(menus))  
+[7.2.3 GenInteraction Types](Objects/ogenint.md#723-geninteraction-types)  
+[7.2.4 GenInteraction Attributes](Objects/ogenint.md#724-geninteraction-attributes)  
+[7.3 GenInteraction Usage](Objects/ogenint.md#73-geninteraction-usage)  
+[7.3.1 Visibilities](Objects/ogenint.md#731-visibilities)  
+[7.3.2 Types](Objects/ogenint.md#732-types)  
+[7.4 Supplemental Usage](Objects/ogenint.md#74-supplemental-usage)  
+[7.4.1 Initiating Interactions](Objects/ogenint.md#741-initiating-interactions)  
+[7.4.2 Dismissing Interactions](Objects/ogenint.md#742-dismissing-interactions)  
+[7.4.3 Modality for Dialogs](Objects/ogenint.md#743-modality-for-dialogs)  
+[7.4.4 Managing Input](Objects/ogenint.md#744-managing-input)  
+[7.4.5 Thread Blocking Routines](Objects/ogenint.md#745-thread-blocking-routines)  
+[7.5 Interaction Commands](Objects/ogenint.md#75-interaction-commands)  
+[7.5.1 InteractionCommand Types](Objects/ogenint.md#751-interactioncommand-types)  
+[7.5.2 Dialog Control](Objects/ogenint.md#752-dialog-control)  
+[7.5.3 Standard Response Triggers](Objects/ogenint.md#753-standard-response-triggers)  
+[7.5.4 Replacing Default Triggers](Objects/ogenint.md#754-replacing-default-triggers)  
+[7.5.5 Triggers Completing Interactions](Objects/ogenint.md#755-triggers-completing-interactions)
+
+**[8 GenValue](Objects/ogenval.md)**  
+[8.1 GenValue Features](Objects/ogenval.md#81-genvalue-features)  
+[8.2 GenValue Instance Data](Objects/ogenval.md#82-genvalue-instance-data)  
+[8.3 GenValue Basics](Objects/ogenval.md#83-genvalue-basics)  
+[8.3.1 The Value](Objects/ogenval.md#831-the-value)  
+[8.3.2 The Minimum and Maximum](Objects/ogenval.md#832-the-minimum-and-maximum)  
+[8.3.3 The Increment](Objects/ogenval.md#833-the-increment)  
+[8.3.4 GenValue States](Objects/ogenval.md#834-genvalue-states)  
+[8.3.5 Display Formats](Objects/ogenval.md#835-display-formats)  
+[8.3.6 Sending an Action](Objects/ogenval.md#836-sending-an-action)  
+[8.4 Supplemental Usage](Objects/ogenval.md#84-supplemental-usage)  
+[8.4.1 Adjusting the Value Indirectly](Objects/ogenval.md#841-adjusting-the-value-indirectly)  
+[8.4.2 Status Messages](Objects/ogenval.md#842-status-messages)  
+[8.4.3 Retrieving Text](Objects/ogenval.md#843-retrieving-text)  
+[8.4.4 Using Value Ratios](Objects/ogenval.md#844-using-value-ratios)  
+[8.4.5 Text Filters for the GenValue](Objects/ogenval.md#845-text-filters-for-the-genvalue)  
+[8.4.6 Using Ranges in GenValues](Objects/ogenval.md#846-using-ranges-in-genvalues)
+
+**[9 GenView](Objects/ogenvew.md)**  
+[9.1 GenView Overview](Objects/ogenvew.md#91-genview-overview)  
+[9.1.1 GenView Model](Objects/ogenvew.md#911-genview-model)  
+[9.1.2 View Features and Goals](Objects/ogenvew.md#912-view-features-and-goals)  
+[9.1.3 The GenViewControl Objec](Objects/ogenvew.md#913-the-genviewcontrol-object)  
+[9.2 Getting Started: View Basics](Objects/ogenvew.md#92-getting-started:-view-basics)  
+[9.2.1 Graphics System Review](Objects/ogenvew.md#921-graphics-system-review)  
+[9.2.2 Defining the Basic View](Objects/ogenvew.md#922-defining-the-basic-view)  
+[9.2.3 Handling View Messages](Objects/ogenvew.md#923-handling-view-messages)  
+[9.3 Basic View Attributes](Objects/ogenvew.md#93-basic-view-attributes)  
+[9.3.1 The GVI_attrs Attribute](Objects/ogenvew.md#931-the-gvi_attrs-attribute)  
+[9.3.2 Dimensional Attributes](Objects/ogenvew.md#932-dimensional-attributes)  
+[9.3.3 Setting the Background Color](Objects/ogenvew.md#933-setting-the-background-color)  
+[9.3.4 The GVI_increment Attribute](Objects/ogenvew.md#934-the-gvi_increment-attribute)  
+[9.4 Advanced Concepts and Uses](Objects/ogenvew.md#94-advanced-concepts-and-uses)  
+[9.4.1 The Life of a View](Objects/ogenvew.md#941-the-life-of-a-view)  
+[9.4.2 Documents in a View](Objects/ogenvew.md#942-documents-in-a-view)  
+[9.4.3 Drawing the Document](Objects/ogenvew.md#943-drawing-the-document)  
+[9.4.4 Document and View Size](Objects/ogenvew.md#944-document-and-view-size)  
+[9.4.5 Document Scaling](Objects/ogenvew.md#945-document-scaling)  
+[9.4.6 Children of the View](Objects/ogenvew.md#946-children-of-the-view)  
+[9.4.7 Scrolling](Objects/ogenvew.md#947-scrolling)  
+[9.4.8 Monitoring Input](Objects/ogenvew.md#948-monitoring-input)  
+[9.4.9 Linking Views](Objects/ogenvew.md#949-linking-views)  
+[9.4.10 Setting the Content](Objects/ogenvew.md#9410-setting-the-content)  
+[9.4.11 Internal Utilities](Objects/ogenvew.md#9411-internal-utilities)  
+[9.5 The GenViewControl](Objects/ogenvew.md#95-the-genviewcontrol)  
+[9.5.1 GenViewControl Instance Data](Objects/ogenvew.md#951-genviewcontrol-instance-data)  
+[9.5.2 Notification Received](Objects/ogenvew.md#952-notification-received)  
+[9.5.3 GenViewControl Example](Objects/ogenvew.md#953-genviewcontrol-example)  
+[9.5.4 Messages Handled](Objects/ogenvew.md#954-messages-handled)
+
+**[10 The Text Objects](Objects/otext.md)**  
 
 	10.1	The Text Objects					 OText : 587
 
