@@ -165,169 +165,90 @@
 [9.5.4 Messages Handled](Objects/ogenvew.md#954-messages-handled)
 
 **[10 The Text Objects](Objects/otext.md)**  
-
-	10.1	The Text Objects					 OText : 587
-
-		10.1.1	Which Object Should I Use?				OText : 588
-
-		10.1.2	How this Chapter is Organized				OText : 589
-
-	10.2	General Text Features					 OText : 589
-
-		10.2.1	Input Management and Filters				OText : 590
-
-		10.2.2	Text Flow Through Regions				OText : 590
-
-		10.2.3	Style Sheets				OText : 591
-
-		10.2.4	Undo				OText : 592
-
-		10.2.5	General Import and Export				OText : 592
-
-		10.2.6	Geometry Management				OText : 592
-
-		10.2.7	Embedded Graphics and Characters				OText : 593
-
-		10.2.8	Search and Replace				OText : 593
-
-		10.2.9	Spell-Checking				OText : 593
-
-		10.2.10	Printing				OText : 594
-
-		10.2.11	Text Controller Objects				OText : 594
-
-	10.3	The Text Object Library					 OText : 595
-
-		10.3.1	Character Attribute Definitions				OText : 595
-
-		10.3.2	Paragraph Attribute Definitions				OText : 600
-
-		10.3.3	Storage Flags				OText : 611
-
-	10.4	Text Object Chunks					 OText : 613
-
-		10.4.1	The Text				OText : 614
-
-		10.4.2	Lines and Fields				OText : 638
-
-		10.4.3	Character Runs				OText : 638
-
-		10.4.4	Paragraph Runs				OText : 646
-
-	10.5	Using VisText					 OText : 653
-
-		10.5.1	VisText Features				OText : 658
-
-		10.5.2	VisText States				OText : 659
-
-		10.5.3	VisText VM File Storage				OText : 663
-
-		10.5.4	Text Filters				OText : 666
-
-		10.5.5	Key Functions				OText : 669
-
-		10.5.6	Setting Text Confines				OText : 671
-
-		10.5.7	Output Messages				OText : 673
-
-		10.5.8	Getting Geometry Information				OText : 678
-
-	10.6	Using GenText					 OText : 680
-
-		10.6.1	GenText Instance Data				OText : 681
-
-		10.6.2	GenText Basics				OText : 687
-
-	10.7	The Controllers					 OText : 696
-
-		10.7.1	Character Attribute Controllers				OText : 696
-
-		10.7.2	Paragraph Attribute Controllers				OText : 700
-
-		10.7.3	Search and Replace and Spell-Checking				
-OText : 706
-
-11	The List Objects	717
-
-	11.1	List Object Features					 OGenLst : 719
-
-	11.2	Common Behavior					 OGenLst : 721
-
-		11.2.1	Applying the Action				OGenLst : 721
-
-		11.2.2	State Information				OGenLst : 723
-
-	11.3	GenItemGroups					 OGenLst : 723
-
-		11.3.1	GenItemGroup Instance Data				OGenLst : 724
-
-		11.3.2	GenItem Instance Data				OGenLst : 727
-
-		11.3.3	GenItemGroup Basics				OGenLst : 728
-
-		11.3.4	Working with Items				OGenLst : 747
-
-		11.3.5	Scrolling GenItemGroups				OGenLst : 751
-
-		11.3.6	GenItemGroup Links				OGenLst : 752
-
-		11.3.7	Limitations of the GenItemGroup				OGenLst : 753
-
-	11.4	GenDynamicListClass					 OGenLst : 753
-
-		11.4.1	DynamicList Instance Data				OGenLst : 754
-
-		11.4.2	DynamicList Basics				OGenLst : 756
-
-		11.4.3	Altering Instance Data				OGenLst : 762
-
-	11.5	GenBooleanGroups					 OGenLst : 765
-
-		11.5.1	GenBooleanGroup Instance Data				OGenLst : 766
-
-		11.5.2	GenBooleanGroup Usage				OGenLst : 768
-
-		11.5.3	Altering Instance Data				OGenLst : 774
-
-12	Generic UI Controllers	785
-
-	12.1	Controller Features and Functions					 OGenCtl : 787
-
-		12.1.1	Controller Features				OGenCtl : 788
-
-		12.1.2	How Controllers Work				OGenCtl : 789
-
-		12.1.3	Using Controllers				OGenCtl : 791
-
-	12.2	Standard Controllers					 OGenCtl : 794
-
-	12.3	Using Controllers					 OGenCtl : 796
-
-		12.3.1	Using a Basic GenControl Object				OGenCtl : 797
-
-		12.3.2	Using Tools				OGenCtl : 801
-
-	12.4	Creating Your Own Controllers					 OGenCtl : 810
-
-		12.4.1	GenControlClass Instance Data				OGenCtl : 811
-
-		12.4.2	Subclassing GenControlClass				OGenCtl : 812
-
-		12.4.3	Advanced GenControlClass Usage				OGenCtl : 827
-
-	12.5	GenToolControlClass					 OGenCtl : 840
-
-	12.6	GenToolGroupClass					 OGenCtl : 842
-
-	12.7	Other Controllers					 OGenCtl : 843
-
-		12.7.1	ColorSelectorClass				OGenCtl : 844
-
-		12.7.2	GenPageControlClass				OGenCtl : 853
-
-		12.7.3	The Float Format Controller				OGenCtl : 855
-
-13	GenDocument	861
+[10.1 The Text Objects](Objects/otext.md#101-the-text-objects)  
+[10.1.1 Which Object Should I Use?](Objects/otext.md#1011-which-object-should-i-use?)  
+[10.1.2 How this Chapter is Organized](Objects/otext.md#1012-how-this-chapter-is-organized)  
+[10.2 General Text Features](Objects/otext.md#102-general-text-features)  
+[10.2.1 Input Management and Filters](Objects/otext.md#1021-input-management-and-filters)  
+[10.2.2 Text Flow Through Regions](Objects/otext.md#1022-text-flow-through-regions)  
+[10.2.3 Style Sheets](Objects/otext.md#1023-style-sheets)  
+[10.2.4 Undo](Objects/otext.md#1024-undo)  
+[10.2.5 General Import and Export](Objects/otext.md#1025-general-import-and-export)  
+[10.2.6 Geometry Management](Objects/otext.md#1026-geometry-management)  
+[10.2.7 Embedded Graphics and Characters](Objects/otext.md#1027-embedded-graphics-and-characters)  
+[10.2.8 Search and Replace](Objects/otext.md#1028-search-and-replace)  
+[10.2.9 Spell-Checking](Objects/otext.md#1029-spell-checking)  
+[10.2.10 Printing](Objects/otext.md#10210-printing)  
+[10.2.11 Text Controller Objects](Objects/otext.md#10211-text-controller-objects)  
+[10.3 The Text Object Library](Objects/otext.md#103-the-text-object-library)  
+[10.3.1 Character Attribute Definitions](Objects/otext.md#1031-character-attribute-definitions)  
+[10.3.2 Paragraph Attribute Definitions](Objects/otext.md#1032-paragraph-attribute-definitions)  
+[10.3.3 Storage Flags](Objects/otext.md#1033-storage-flags)  
+[10.4 Text Object Chunks](Objects/otext.md#104-text-object-chunks)  
+[10.4.1 The Text](Objects/otext.md#1041-the-text)  
+[10.4.2 Lines and Fields](Objects/otext.md#1042-lines-and-fields)  
+[10.4.3 Character Runs](Objects/otext.md#1043-character-runs)  
+[10.4.4 Paragraph Runs](Objects/otext.md#1044-paragraph-runs)  
+[10.5 Using VisText](Objects/otext.md#105-using-vistext)  
+[10.5.1 VisText Features](Objects/otext.md#1051-vistext-features)  
+[10.5.2 VisText States](Objects/otext.md#1052-vistext-states)  
+[10.5.3 VisText VM File Storage](Objects/otext.md#1053-vistext-vm-file-storage)  
+[10.5.4 Text Filters](Objects/otext.md#1054-text-filters)  
+[10.5.5 Key Functions](Objects/otext.md#1055-key-functions)  
+[10.5.6 Setting Text Confines](Objects/otext.md#1056-setting-text-confines)  
+[10.5.7 Output Messages](Objects/otext.md#1057-output-messages)  
+[10.5.8 Getting Geometry Information](Objects/otext.md#1058-getting-geometry-information)  
+[10.6 Using GenText](Objects/otext.md#106-using-gentext)  
+[10.6.1 GenText Instance Data](Objects/otext.md#1061-gentext-instance-data)  
+[10.6.2 GenText Basics](Objects/otext.md#1062-gentext-basics)  
+[10.7 The Controllers](Objects/otext.md#107-the-controllers)  
+[10.7.1 Character Attribute Controllers](Objects/otext.md#1071-character-attribute-controllers)  
+[10.7.2 Paragraph Attribute Controllers](Objects/otext.md#1072-paragraph-attribute-controllers)  
+[10.7.3 Search and Replace and Spell-Checking](Objects/otext.md#1073-search-and-replace-and-spell-checking)
+
+**[11 The List Objects](Objects/ogenlst.md)**  
+[11.1 List Object Features](Objects/ogenlst.md#111-list-object-features)  
+[11.2 Common Behavior](Objects/ogenlst.md#112-common-behavior)  
+[11.2.1 Applying the Action](Objects/ogenlst.md#1121-applying-the-action)  
+[11.2.2 State Information](Objects/ogenlst.md#1122-state-information)  
+[11.3 GenItemGroups](Objects/ogenlst.md#113-genitemgroups)  
+[11.3.1 GenItemGroup Instance Data](Objects/ogenlst.md#1131-genitemgroup-instance-data)  
+[11.3.2 GenItem Instance Data](Objects/ogenlst.md#1132-genitem-instance-data)  
+[11.3.3 GenItemGroup Basics](Objects/ogenlst.md#1133-genitemgroup-basics)  
+[11.3.4 Working with Items](Objects/ogenlst.md#1134-working-with-items)  
+[11.3.5 Scrolling GenItemGroups](Objects/ogenlst.md#1135-scrolling-genitemgroups)  
+[11.3.6 GenItemGroup Links](Objects/ogenlst.md#1136-genitemgroup-links)  
+[11.3.7 Limitations of the GenItemGroup](Objects/ogenlst.md#1137-limitations-of-the-genitemgroup)  
+[11.4 GenDynamicListClass](Objects/ogenlst.md#114-gendynamiclistclass)  
+[11.4.1 DynamicList Instance Data](Objects/ogenlst.md#1141-dynamiclist-instance-data)  
+[11.4.2 DynamicList Basics](Objects/ogenlst.md#1142-dynamiclist-basics)  
+[11.4.3 Altering Instance Data](Objects/ogenlst.md#1143-altering-instance-data)  
+[11.5 GenBooleanGroups](Objects/ogenlst.md#115-genbooleangroups)  
+[11.5.1 GenBooleanGroup Instance Data](Objects/ogenlst.md#1151-genbooleangroup-instance-data)  
+[11.5.2 GenBooleanGroup Usage](Objects/ogenlst.md#1152-genbooleangroup-usage)  
+[11.5.3 Altering Instance Data](Objects/ogenlst.md#1153-altering-instance-data)
+
+**[12 Generic UI Controllers](Objects/ogenctl.md#12-generic-ui-controllers)**  
+[12.1 Controller Features and Functions](Objects/ogenctl.md#121-controller-features-and-functions)  
+[12.1.1 Controller Features](Objects/ogenctl.md#1211-controller-features)  
+[12.1.2 How Controllers Work](Objects/ogenctl.md#1212-how-controllers-work)  
+[12.1.3 Using Controllers](Objects/ogenctl.md#1213-using-controllers)  
+[12.2 Standard Controllers](Objects/ogenctl.md#122-standard-controllers)  
+[12.3 Using Controllers](Objects/ogenctl.md#123-using-controllers)  
+[12.3.1 Using a Basic GenControl Object](Objects/ogenctl.md#1231-using-a-basic-gencontrol-object)  
+[12.3.2 Using Tools](Objects/ogenctl.md#1232-using-tools)  
+[12.4 Creating Your Own Controllers](Objects/ogenctl.md#124-creating-your-own-controllers)  
+[12.4.1 GenControlClass Instance Data](Objects/ogenctl.md#1241-gencontrolclass-instance-data)  
+[12.4.2 Subclassing GenControlClass](Objects/ogenctl.md#1242-subclassing-gencontrolclass)  
+[12.4.3 Advanced GenControlClass Usage](Objects/ogenctl.md#1243-advanced-gencontrolclass)  
+[12.5 GenToolControlClass](Objects/ogenctl.md#125-gentoolcontrolclass)  
+[12.6 GenToolGroupClass](Objects/ogenctl.md#126-gentoolgroupclass)  
+[12.7 Other Controllers](Objects/ogenctl.md#127-other-controllers)  
+[12.7.1 ColorSelectorClass](Objects/ogenctl.md#1271-colorselectorclass)  
+[12.7.2 GenPageControlClass](Objects/ogenctl.md#1272-genpagecontrolclass)  
+[12.7.3 The Float Format Controller](Objects/ogenctl.md#1273-the-float-format-controller)
+
+**[13 GenDocument](Objects/ogendoc.md#13-gendocument)**  
 
 	13.1	Document Control Overview					 OGenDoc : 863
 
