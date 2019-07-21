@@ -292,39 +292,39 @@
       [15.3.8 The Reference Count](Concepts/cmemory.md#1538-the-reference-count)  
     [15.4 malloc()](Concepts/cmemory.md#154-malloc)  
 
-**[16 Local Memory]()**  
-    [16.1 Design Philosophy]()  
-    [16.2 Structure of a Local Memory Heap]()  
-      [16.2.1 The Local Heap]()  
-      [16.2.2 Chunks and Chunk Handles]()  
-      [16.2.3 Types of LMem Heaps]()  
-    [16.3 Using Local Memory Heaps]()  
-      [16.3.1 Creating a Local Heap]()  
-      [16.3.2 Using Chunks]()  
-      [16.3.3 Contracting the LMem Heap]()  
-      [16.3.4 Example of LMem Usage]()  
-    [16.4 Special LMem Uses]()  
-      [16.4.1 Chunk Arrays]()  
-      [16.4.2 Element Arrays]()  
-      [16.4.3 Name Arrays]()  
+**[16 Local Memory](Concepts/clmem.md)**  
+    [16.1 Design Philosophy](Concepts/clmem.md#161-design-philosophy)  
+    [16.2 Structure of a Local Memory Heap](Concepts/clmem.md#162-structure-of-a-local-memory-heap)  
+      [16.2.1 The Local Heap](Concepts/clmem.md#1621-the-local-heap)  
+      [16.2.2 Chunks and Chunk Handles](Concepts/clmem.md#1622-chunks-and-chunk-handles)  
+      [16.2.3 Types of LMem Heaps](Concepts/clmem.md#1623-types-of-lmem-heaps)  
+    [16.3 Using Local Memory Heaps](Concepts/clmem.md#163-using-local-heaps)  
+      [16.3.1 Creating a Local Heap](Concepts/clmem.md#1631-creating-a-local-heap)  
+      [16.3.2 Using Chunks](Concepts/clmem.md#1632-using-chunks)  
+      [16.3.3 Contracting the LMem Heap](Concepts/clmem.md#1633-contracting-the-lmem-heap)  
+      [16.3.4 Example of LMem Usage](Concepts/clmem.md#1634-example-of-lmem-usage)  
+    [16.4 Special LMem Uses](Concepts/clmem.md#164-special-lmem-uses)  
+      [16.4.1 Chunk Arrays](Concepts/clmem.md#1641-chunk-arrays)  
+      [16.4.2 Element Arrays](Concepts/clmem.md#1642-element-arrays)  
+      [16.4.3 Name Arrays](Concepts/clmem.md#1643-name-arrays)  
 
-**[17 File System]()**  
-    [17.1 Design Philosophy]()  
-    [17.2 File System Overview]()  
-    [17.3 Disks and Drives]()  
-      [17.3.1 Accessing Drives]()  
-      [17.3.2 Accessing Disks]()  
-    [17.4 Directories and Paths]()  
-      [17.4.1 Standard Paths]()  
-      [17.4.2 Current Path and Directory Stack]()  
-      [17.4.3 Creating and Deleting Directories]()  
-    [17.5 Files]()  
-      [17.5.1 DOS Files and GEOS Files]()  
-      [17.5.2 Files and File Handles]()  
-      [17.5.3 GEOS Extended Attributes]()  
-      [17.5.4 File Utilities]()  
-      [17.5.5 FileEnum()]()  
-      [17.5.6 Bytewise File Operations]()  
+**[17 File System](Concepts/cfile.md)**  
+    [17.1 Design Philosophy](Concepts/cfile.md#171-design-philosophy)  
+    [17.2 File System Overview](Concepts/cfile.md#172-file-system-overview)  
+    [17.3 Disks and Drives](Concepts/cfile.md#173-disks-and-drives)  
+      [17.3.1 Accessing Drives](Concepts/cfile.md#1731-accessing-drives)  
+      [17.3.2 Accessing Disks](Concepts/cfile.md#1732-accessing-disks)  
+    [17.4 Directories and Paths](Concepts/cfile.md#174-directories-and-paths)  
+      [17.4.1 Standard Paths](Concepts/cfile.md#1741-standard-paths)  
+      [17.4.2 Current Path and Directory Stack](Concepts/cfile.md#1742-current-path-and-directory-stack)  
+      [17.4.3 Creating and Deleting Directories](Concepts/cfile.md#1743-creating-and-deleting-directories)  
+    [17.5 Files](Concepts/cfile.md#175-files)  
+      [17.5.1 DOS Files and GEOS Files](Concepts/cfile.md#1751-dos-files-and-geos-files)  
+      [17.5.2 Files and File Handles](Concepts/cfile.md#1752-files-and-file-handles)  
+      [17.5.3 GEOS Extended Attributes](Concepts/cfile.md#1753-geos-extended-attributes)  
+      [17.5.4 File Utilities](Concepts/cfile.md#1754-file-utilities)  
+      [17.5.5 FileEnum()](Concepts/cfile.md#1755-fileenum)  
+      [17.5.6 Bytewise File Operations](Concepts/cfile.md#1756-bytewise-file-operations)  
 
 **[18 Virtual Memory]()**  
     [18.1 Design Philosophy]()  
@@ -390,131 +390,131 @@
       [20.3.3 Formatting a Token Sequence]()  
 
 **[21 Using Streams]()**  
-    [21.1	Using Streams: The Basics      [CStream : 773
-      [21.1.1	Initializing a Stream      [CStream : 775
-      [21.1.2	Blocking on Read or Write      [CStream : 777
-      [21.1.3	Writing Data to a Stream      [CStream : 778
-      [21.1.4	Reading Data from a Stream      [CStream : 779
-      [21.1.5	Shutting Down a Stream      [CStream : 781
-      [21.1.6	Miscellaneous Functions      [CStream : 782
-    [21.2	Using the Serial Ports      [CStream : 782
-      [21.2.1	Initializing a Serial Port      [CStream : 783
-      [21.2.2	Communicating      [CStream : 787
-      [21.2.3	Closing a Serial Port      [CStream : 788
-    [21.3	Using the Parallel Ports      [CStream : 789
-      [21.3.1	Initializing a Parallel Port      [CStream : 789
-      [21.3.2	Communicating      [CStream : 790
-      [21.3.3	Closing a Parallel Port      [CStream : 790
+    [21.1 Using Streams: The Basics]()  
+      [21.1.1 Initializing a Stream]()  
+      [21.1.2 Blocking on Read or Write]()  
+      [21.1.3 Writing Data to a Stream]()  
+      [21.1.4 Reading Data from a Stream]()  
+      [21.1.5 Shutting Down a Stream]()  
+      [21.1.6 Miscellaneous Functions]()  
+    [21.2 Using the Serial Ports]()  
+      [21.2.1 Initializing a Serial Port]()  
+      [21.2.2 Communicating]()  
+      [21.2.3 Closing a Serial Port]()  
+    [21.3 Using the Parallel Ports]()  
+      [21.3.1 Initializing a Parallel Port]()  
+      [21.3.2 Communicating]()  
+      [21.3.3 Closing a Parallel Port]()  
 
 **[22 PCCom Library]()**  
-    [22.1	PCCom Library Abilities      [795
-    [22.2	What To Do      [795
-    [22.3	Staying Informed      [796
+    [22.1 PCCom Library Abilities]()  
+    [22.2 What To Do]()  
+    [22.3 Staying Informed]()  
 
 **[23 Graphics Environment]()**  
-    [23.1	Graphics Road Map      [CGraph : 801
-      [23.1.1	Chapter Structure      [CGraph : 801
-      [23.1.2	Vocabulary      [CGraph : 803
-    [23.2	Graphics Goals      [CGraph : 806
-    [23.3	Graphics Architecture      [CGraph : 807
-    [23.4	How To Use Graphics      [CGraph : 808
-    [23.5	Coordinate Space      [CGraph : 810
-      [23.5.1	Standard Coordinate Space      [CGraph : 811
-      [23.5.2	Coordinate Transformations      [CGraph : 812
-      [23.5.3	Precise Coordinates      [CGraph : 818
-      [23.5.4	Device Coordinates      [CGraph : 819
-      [23.5.5	Larger Document Spaces      [CGraph : 823
-      [23.5.6	Current Position      [CGraph : 824
-    [23.6	Graphics State      [CGraph : 825
-      [23.6.1	GState Contents      [CGraph : 826
-      [23.6.2	Working with GStates      [CGraph : 827
-    [23.7	Working With Bitmaps      [CGraph : 828
-    [23.8	Graphics Strings      [CGraph : 832
-      [23.8.1	Storage and Loading      [CGraph : 832
-      [23.8.2	Special Drawing Commands      [CGraph : 834
-      [23.8.3	Declaring a GString Statically      [CGraph : 836
-      [23.8.4	Creating GStrings Dynamically      [CGraph : 840
-      [23.8.5	Drawing and Scanning      [CGraph : 843
-      [23.8.6	Editing GStrings Dynamically      [CGraph : 846
-      [23.8.7	Parsing GStrings      [CGraph : 847
-    [23.9	Graphics Paths      [CGraph : 849
-    [23.10	Working With Video Drivers      [CGraph : 852
-      [23.10.1	Kernel Routines      [CGraph : 852
-      [23.10.2	Direct Calls to the Driver      [CGraph : 853
-    [23.11	Windowing and Clipping      [CGraph : 854
-      [23.11.1	Palettes      [CGraph : 854
-      [23.11.2	Clipping      [CGraph : 854
-      [23.11.3	Signalling Updates      [CGraph : 855
+    [23.1 Graphics Road Map]()  
+      [23.1.1 Chapter Structure]()  
+      [23.1.2 Vocabulary]()  
+    [23.2 Graphics Goals]()  
+    [23.3 Graphics Architecture]()  
+    [23.4 How To Use Graphics]()  
+    [23.5 Coordinate Space]()  
+      [23.5.1 Standard Coordinate Space]()  
+      [23.5.2 Coordinate Transformations]()  
+      [23.5.3 Precise Coordinates]()  
+      [23.5.4 Device Coordinates]()  
+      [23.5.5 Larger Document Spaces]()  
+      [23.5.6 Current Position]()  
+    [23.6 Graphics State]()  
+      [23.6.1 GState Contents]()  
+      [23.6.2 Working with GStates]()  
+    [23.7 Working With Bitmaps]()  
+    [23.8 Graphics Strings]()  
+      [23.8.1 Storage and Loading]()  
+      [23.8.2 Special Drawing Commands]()  
+      [23.8.3 Declaring a GString Statically]()  
+      [23.8.4 Creating GStrings Dynamically]()  
+      [23.8.5 Drawing and Scanning]()  
+      [23.8.6 Editing GStrings Dynamically]()  
+      [23.8.7 Parsing GStrings]()  
+    [23.9 Graphics Paths]()  
+    [23.10 Working With Video Drivers]()  
+      [23.10.1 Kernel Routines]()  
+      [23.10.2 Direct Calls to the Driver]()  
+    [23.11 Windowing and Clipping]()  
+      [23.11.1 Palettes]()  
+      [23.11.2 Clipping]()  
+      [23.11.3 Signalling Updates]()  
 
 **[24 Drawing Graphics]()**  
-    [24.1	Drawing Goals      [CShapes : 859
-    [24.2	Shapes      [CShapes : 859
-      [24.2.1	Dots      [CShapes : 860
-      [24.2.2	Lines      [CShapes : 861
-      [24.2.3	Rectangles      [CShapes : 862
-      [24.2.4	Ellipses      [CShapes : 862
-      [24.2.5	Elliptical Arcs      [CShapes : 863
-      [24.2.6	Three-Point Arcs      [CShapes : 864
-      [24.2.7	Rounded Rectangles      [CShapes : 865
-      [24.2.8	Polylines and Polygons      [CShapes : 866
-      [24.2.9	B\E9zier Curves and Splines      [CShapes : 867
-      [24.2.10	Drawing Bitmaps      [CShapes : 870
-      [24.2.11	Paths      [CShapes : 872
-      [24.2.12	Regions      [CShapes : 873
-      [24.2.13	Text      [CShapes : 876
-    [24.3	Shape Attributes      [CShapes : 885
-      [24.3.1	Color      [CShapes : 886
-      [24.3.2	Patterns and Hatching      [CShapes : 891
-      [24.3.3	Mix Mode      [CShapes : 895
-      [24.3.4	Masks      [CShapes : 897
-      [24.3.5	Line-Specific Attributes      [CShapes : 899
+    [24.1 Drawing Goals]()  
+    [24.2 Shapes]()  
+      [24.2.1 Dots]()  
+      [24.2.2 Lines]()  
+      [24.2.3 Rectangles]()  
+      [24.2.4 Ellipses]()  
+      [24.2.5 Elliptical Arcs]()  
+      [24.2.6 Three-Point Arcs]()  
+      [24.2.7 Rounded Rectangles]()  
+      [24.2.8 Polylines and Polygons]()  
+      [24.2.9 Bezier Curves and Splines]()  
+      [24.2.10 Drawing Bitmaps]()  
+      [24.2.11 Paths]()  
+      [24.2.12 Regions]()  
+      [24.2.13 Text]()  
+    [24.3 Shape Attributes]()  
+      [24.3.1 Color]()  
+      [24.3.2 Patterns and Hatching]()  
+      [24.3.3 Mix Mode]()  
+      [24.3.4 Masks]()  
+      [24.3.5 Line-Specific Attributes]()  
 
 **[A Machine Architecture]()**  
-    [A.1	History of the 80x86      [CHardw : 905
-    [A.2	8086 Architecture Overview      [CHardw : 906
-      [A.2.1	Memory      [CHardw : 906
-      [A.2.2	Registers      [CHardw : 908
-      [A.2.3	The Prefetch Queue      [CHardw : 909
-      [A.2.4	Inherent Optimizations      [CHardw : 910
+    [A.1 History of the 80x86]()  
+    [A.2 8086 Architecture Overview]()  
+      [A.2.1 Memory]()  
+      [A.2.2 Registers]()  
+      [A.2.3 The Prefetch Queue]()  
+      [A.2.4 Inherent Optimizations]()  
 
 **[B Threads and Semaphores]()**  
-    [B.1	Multitasking Goals      [CMultit : 913
-    [B.2	Two Models of Multitasking      [CMultit : 914
-      [B.2.1	Cooperative Multitasking      [CMultit : 914
-      [B.2.2	Preemptive Multitasking      [CMultit : 915
-    [B.3	GEOS Multitasking      [CMultit : 916
-      [B.3.1	GEOS Threads      [CMultit : 917
-      [B.3.2	Context Switches      [CMultit : 918
-      [B.3.3	Thread Scheduling      [CMultit : 919
-      [B.3.4	Applications and Threads      [CMultit : 920
-    [B.4	Using Multiple Threads      [CMultit : 921
-      [B.4.1	How GEOS Threads Are Created      [CMultit : 921
-      [B.4.2	Managing Priority Values      [CMultit : 923
-      [B.4.3	Handling Errors in a Thread      [CMultit : 924
-      [B.4.4	When a Thread Is Finished      [CMultit : 925
-    [B.5	Synchronizing Threads      [CMultit : 926
-      [B.5.1	Semaphores: The Concept      [CMultit : 926
-      [B.5.2	Semaphores In GEOS      [CMultit : 928
+    [B.1 Multitasking Goals]()  
+    [B.2 Two Models of Multitasking]()  
+      [B.2.1 Cooperative Multitasking]()  
+      [B.2.2 Preemptive Multitasking]()  
+    [B.3 GEOS Multitasking]()  
+      [B.3.1 GEOS Threads]()  
+      [B.3.2 Context Switches]()  
+      [B.3.3 Thread Scheduling]()  
+      [B.3.4 Applications and Threads]()  
+    [B.4 Using Multiple Threads]()  
+      [B.4.1 How GEOS Threads Are Created]()  
+      [B.4.2 Managing Priority Values]()  
+      [B.4.3 Handling Errors in a Thread]()  
+      [B.4.4 When a Thread Is Finished]()  
+    [B.5 Synchronizing Threads]()  
+      [B.5.1 Semaphores: The Concept]()  
+      [B.5.2 Semaphores In GEOS]()  
 
 **[C Libraries]()**  
-    [C.1	Design Philosophy      [CLibr : 935
-    [C.2	Library Basics      [CLibr : 936
-    [C.3	The Library Entry Point      [CLibr : 937
-    [C.4	Exported Routines and Classes      [CLibr : 940
-    [C.5	Header Files      [CLibr : 941
-    [C.6	Compiler Directives      [CLibr : 941
+    [C.1 Design Philosophy]()  
+    [C.2 Library Basics]()  
+    [C.3 The Library Entry Point]()  
+    [C.4 Exported Routines and Classes]()  
+    [C.5 Header Files]()  
+    [C.6 Compiler Directives]()  
 
 **[D The Math Library]()**  
-    [D.1	Basic Math Functions      [CMath : 945
-      [D.1.1	Algebraic Functions      [CMath : 947
-      [D.1.2	Transcendental Functions      [CMath : 949
-      [D.1.3	Random Number Generation      [CMath : 950
-    [D.2	Conversions to Other Types      [CMath : 951
-    [D.3	Float Formats      [CMath : 960
-      [D.3.1	System-defined Formats      [CMath : 960
-      [D.3.2	User-defined Formats      [CMath : 963
-    [D.4	Direct FP Operations      [CMath : 964
-      [D.4.1	Floating Point Numbers      [CMath : 965
-      [D.4.2	The Floating Point Stack      [CMath : 966
-      [D.4.3	Floating Point Math Routines      [CMath : 971
+    [D.1 Basic Math Functions]()  
+      [D.1.1 Algebraic Functions]()  
+      [D.1.2 Transcendental Functions]()  
+      [D.1.3 Random Number Generation]()  
+    [D.2 Conversions to Other Types]()  
+    [D.3 Float Formats]()  
+      [D.3.1 System-defined Formats]()  
+      [D.3.2 User-defined Formats]()  
+    [D.4 Direct FP Operations]()  
+      [D.4.1 Floating Point Numbers]()  
+      [D.4.2 The Floating Point Stack]()  
+      [D.4.3 Floating Point Math Routines]()  
 
