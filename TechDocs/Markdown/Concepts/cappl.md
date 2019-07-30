@@ -153,12 +153,12 @@ is loaded into memory.
 
 + Geode Attributes  
 Each geode has a record of type GeodeAttrs. The geode attributes are 
-described below in section 6.1.1.1 on page 245.
+described below in [section 6.1.1.1](#6111-geode-attributes).
 
 + Release and Protocol Levels  
 Each geode can have release and protocol levels associated with it to 
 ensure compatibility between different versions. Release and protocol 
-levels are discussed in section 6.1.8.2 on page 262.
+levels are discussed in [section 6.1.8.2](#6182-protocol-numbers).
 
 + Geode Name
 Each geode has a geode name and extension specified in the geode 

@@ -4,7 +4,7 @@ This chapter describes the structure of GEOS and the various system
 components and services used by applications. Nearly all programmers will 
 want at least to browse this chapter before continuing with GEOS application 
 development. The structures and architectures of the 8088 and 80x86 
-processors are reviewed in Appendix A.
+processors are reviewed in [Appendix A](chardw.md).
 
 ### 3.1 GEOS Overview
 
