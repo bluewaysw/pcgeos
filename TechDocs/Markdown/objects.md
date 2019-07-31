@@ -249,158 +249,85 @@
 [12.7.3 The Float Format Controller](Objects/ogenctl.md#1273-the-float-format-controller)
 
 **[13 GenDocument](Objects/ogendoc.md#13-gendocument)**  
-
-	13.1	Document Control Overview					 OGenDoc : 863
-
-		13.1.1	The Document Control Objects				OGenDoc : 864
-
-		13.1.2	Document Control Interaction				OGenDoc : 866
-
-		13.1.3	Document Control Models				OGenDoc : 867
-
-	13.2	Document Control Data Fields					 OGenDoc : 870
-
-		13.2.1	GenDocumentControl Data				OGenDoc : 870
-
-		13.2.2	GenDocumentGroup Data				OGenDoc : 885
-
-		13.2.3	GenDocument Attributes				OGenDoc : 896
-
-	13.3	Basic DC Messages					 OGenDoc : 904
-
-		13.3.1	Other Document Group Messages				OGenDoc : 904
-
-		13.3.2	From the Doc Control Objects				OGenDoc : 907
-
-	13.4	Advanced DC Usage					 OGenDoc : 916
-
-		13.4.1	Document Protocols				OGenDoc : 916
-
-		13.4.2	Multiple Document Model				OGenDoc : 920
-
-		13.4.3	Working with DOS files				OGenDoc : 921
-
-		13.4.4	Special-Purpose Messages				OGenDoc : 928
-
-		13.4.5	Forcing Actions				OGenDoc : 932
-
-14	GenFile Selector	937
-
-	14.1	File Selector Overview					 OGenFil : 939
-
-	14.2	File Selector Basics					 OGenFil : 941
-
-		14.2.1	Setting Up the File Selector				OGenFil : 942
-
-		14.2.2	Supporting the File Selector				OGenFil : 943
-
-		14.2.3	Messages to Handle				OGenFil : 944
-
-		14.2.4	Some Common Customizations				OGenFil : 949
-
-	14.3	File Selector Instance Data					 OGenFil : 951
-
-		14.3.1	The GFSI_attrs Field				OGenFil : 955
-
-		14.3.2	The GFSI_fileCriteria Field				OGenFil : 957
-
-		14.3.3	Matching a File's Token				OGenFil : 959
-
-		14.3.4	Matching a File's Creator App				OGenFil : 962
-
-		14.3.5	Matching a File's Geode Attributes				OGenFil : 964
-
-		14.3.6	Masking File Names				OGenFil : 967
-
-		14.3.7	Matching a File's File Attributes				OGenFil : 969
-
-		14.3.8	Searching Via Callback Routine				OGenFil : 972
-
-		14.3.9	Resetting a Filter				OGenFil : 977
-
-	14.4	File Selector Use					 OGenFil : 977
-
-		14.4.1	When a User Selects a File				OGenFil : 977
-
-		14.4.2	The Current Selection				OGenFil : 979
-
-		14.4.3	Rescanning Directories				OGenFil : 987
-
-		14.4.4	Setting Scalable UI Data				OGenFil : 989
-
-Volume 3
-
-15	Help Object Library	991
-
-	15.1	What Is Help?					 OHelp : 993
-
-		15.1.1	Normal Help				OHelp : 994
-
-		15.1.2	First Aid				OHelp : 995
-
-		15.1.3	Simple Help				OHelp : 996
-
-	15.2	Adding Help to Your Application					 OHelp : 996
-
-		15.2.1	Help Contexts and Help Triggers				OHelp : 997
-
-		15.2.2	Adding Default Normal Help				OHelp : 999
-
-		15.2.3	Bringing Up Help on the Fly				OHelp : 1000
-
-	15.3	Customizing Help					 OHelp : 1001
-
-		15.3.1	Bringing Up Initial Help				OHelp : 1002
-
-		15.3.2	Adding the HelpControl				OHelp : 1002
-
-		15.3.3	Sizing the Help Dialog Box				OHelp : 1004
-
-		15.3.4	Managing Help Types				OHelp : 1004
-
-		15.3.5	Managing Help Files				OHelp : 1005
-
-		15.3.6	Customizing the Pointer Image				OHelp : 1007
-
-		15.3.7	Changing the Help Features				OHelp : 1007
-
-	15.4	Creating Help Files					 OHelp : 1007
-
-		15.4.1	Enabling the Help Editor				OHelp : 1008
-
-		15.4.2	Organizing and Writing the Text				OHelp : 1008
-
-		15.4.3	Defining Files and Contexts				OHelp : 1011
-
-		15.4.4	Using Hyperlinks				OHelp : 1013
-
-		15.4.5	Generating the Help Files				OHelp : 1013
-
-	15.5	HelpControlClass Reference					 OHelp : 1014
-
-16	Impex Library	1019
-
-	16.1	Impex Basics					 OImpex : 1022
-
-		16.1.1	The Impex Objects				OImpex : 1022
-
-		16.1.2	How the Impex Objects Work				OImpex : 1023
-
-	16.2	Using Impex					 OImpex : 1025
-
-		16.2.1	Common Impex Concepts				OImpex : 1025
-
-		16.2.2	The ImportControl Object				OImpex : 1028
-
-		16.2.3	The ExportControl Object				OImpex : 1034
-
-	16.3	Writing Translation Libraries					 OImpex : 1040
-
-		16.3.1	How Translation Libraries Work				OImpex : 1041
-
-		16.3.2	Intermediate Formats				OImpex : 1042
-
-17	The Spool Library	1045
+[13.1 Document Control Overview](Objects/ogendoc.md#131-document-control-overview)  
+[13.1.1 The Document Control Objects](Objects/ogendoc.md#1311-the-document-control-objects)  
+[13.1.2 Document Control Interaction](Objects/ogendoc.md#1312-document-control-interaction)  
+[13.1.3 Document Control Models](Objects/ogendoc.md#1313-document-control-models)  
+[13.2 Document Control Data Fields](Objects/ogendoc.md#132-document-control-data-fields)  
+[13.2.1 GenDocumentControl Data](Objects/ogendoc.md#1321-gendocumentcontrol-data)  
+[13.2.2 GenDocumentGroup Data](Objects/ogendoc.md#1322-gendocumentgroup-data)  
+[13.2.3 GenDocument Attributes](Objects/ogendoc.md#1323-gendocument-attributes)  
+[13.3 Basic DC Messages](Objects/ogendoc.md#133-basic-dc-messages)  
+[13.3.1 Other Document Group Messages](Objects/ogendoc.md#1331-other-document-group-messages)  
+[13.3.2 From the Doc Control Objects](Objects/ogendoc.md#1332-from-the-doc-control-objects)  
+[13.4 Advanced DC Usage](Objects/ogendoc.md#134-advanced-dc-usage)  
+[13.4.1 Document Protocols](Objects/ogendoc.md#1341-document-protocols)  
+[13.4.2 Multiple Document Model](Objects/ogendoc.md#1342-multiple-document-model)  
+[13.4.3 Working with DOS files](Objects/ogendoc.md#133-working-with-dos-files)  
+[13.4.4 Special-Purpose Messages](Objects/ogendoc.md#1344-special-purpose-messages)  
+[13.4.5 Forcing Actions](Objects/ogendoc.md#1345-forcing-actions)
+
+**[14 GenFile Selector](Objects/ogenfil.md#14-genfile-selector)**  
+[14.1 File Selector Overview](Objects/ogenfil.md#141-file-selector-overview)  
+[14.2 File Selector Basics](Objects/ogenfil.md#142-file-selector-basics)  
+[14.2.1 Setting Up the File Selector](Objects/ogenfil.md#1421-setting-up-the-file-selector)  
+[14.2.2 Supporting the File Selector](Objects/ogenfil.md#1422-supporting-the-file-selector)  
+[14.2.3 Messages to Handle](Objects/ogenfil.md#1423-messages-to-handle)  
+[14.2.4 Some Common Customizations](Objects/ogenfil.md#1424-some-common-customizations)  
+[14.3 File Selector Instance Data](Objects/ogenfil.md#143-file-selector-instance-data)  
+[14.3.1 The GFSI_attrs Field](Objects/ogenfil.md#1431-the-gfsi_attrs-field)  
+[14.3.2 The GFSI_fileCriteria Field](Objects/ogenfil.md#1432-the-gfsi_filecriteria-field)  
+[14.3.3 Matching a File Token](Objects/ogenfil.md#1433-matching-a-file-token)  
+[14.3.4 Matching a File Creator App](Objects/ogenfil.md#1434-matching-a-file-creator-app)  
+[14.3.5 Matching File Geode Attributes](Objects/ogenfil.md#1435-matching-file-geode-attributes)  
+[14.3.6 Masking File Names](Objects/ogenfil.md#1436-masking-file-names)  
+[14.3.7 Matching File Attributes](Objects/ogenfil.md#1437-matching-file-attributes)  
+[14.3.8 Searching Via Callback Routine](Objects/ogenfil.md#1438-searching-via-callback-routine)  
+[14.3.9 Resetting a Filter](Objects/ogenfil.md#1439-resetting-a-filter)  
+[14.4	File Selector Use](Objects/ogenfil.md#144-file-selector-use)  
+[14.4.1 When a User Selects a File](Objects/ogenfil.md#1441-when-a-user-selects-a-file)  
+[14.4.2 The Current Selection](Objects/ogenfil.md#1442-the-current-selection)  
+[14.4.3 Rescanning Directories](Objects/ogenfil.md#1443-rescanning-directories)  
+[14.4.4 Setting Scalable UI Data](Objects/ogenfil.md#1444-setting-scalable-ui-data)
+
+**[15 Help Object Library](Objects/ohelp.md#15-help-object-library)**  
+[15.1 What Is Help?](Objects/ohelp.md#151-what-is-help?)  
+[15.1.1 Normal Help](Objects/ohelp.md#1511-normal-help)  
+[15.1.2 First Aid](Objects/ohelp.md#1512-first-aid)  
+[15.1.3 Simple Help](Objects/ohelp.md#1513-simple-help)  
+[15.2 Adding Help to Your Application](Objects/ohelp.md#152-adding-help-to-your-application)  
+[15.2.1 Help Contexts and Help Triggers](Objects/ohelp.md#1521-help-contexts-and-help-triggers)  
+[15.2.2 Adding Default Normal Help](Objects/ohelp.md#1522-adding-default-normal-help)  
+[15.2.3 Bringing Up Help on the Fly](Objects/ohelp.md#1523-bringing-up-help-on-the-fly)  
+[15.3 Customizing Help](Objects/ohelp.md#153-customizing-help)  
+[15.3.1 Bringing Up Initial Help](Objects/ohelp.md#1531-bringing-up-initial-help)  
+[15.3.2 Adding the HelpControl](Objects/ohelp.md#1532-adding-the-helpcontrol)  
+[15.3.3 Sizing the Help Dialog Box](Objects/ohelp.md#1533-sizing-the-help-dialog-box)  
+[15.3.4 Managing Help Types](Objects/ohelp.md#1534-managing-help-types)  
+[15.3.5 Managing Help Files](Objects/ohelp.md#1535-managing-help-files)  
+[15.3.6 Customizing the Pointer Image](Objects/ohelp.md#1536-customizing-the-pointer-image)  
+[15.3.7 Changing the Help Features](Objects/ohelp.md#1537-changing-the-help-features)  
+[15.4 Creating Help Files](Objects/ohelp.md#154-creating-help-files)  
+[15.4.1 Enabling the Help Editor](Objects/ohelp.md#1541-enabling-the-help-editor)  
+[15.4.2 Organizing and Writing the Text](Objects/ohelp.md#1542-organizing-and-writing-the-text)  
+[15.4.3 Defining Files and Contexts](Objects/ohelp.md#1543-defining-files-and-contexts)  
+[15.4.4 Using Hyperlinks](Objects/ohelp.md#1544-using-hyperlinks)  
+[15.4.5 Generating the Help Files](Objects/ohelp.md#1545-generating-the-help-files)  
+[15.5 HelpControlClass Reference](Objects/ohelp.md#155-helpcontrolclass-reference)  
+
+**[16 Impex Library](Objects/oimpex.md#16-impex-library)**  
+[16.1 Impex Basics](Objects/oimpex.md#161-impex-basics)  
+[16.1.1 The Impex Objects](Objects/oimpex.md#1611-the-impex-objects)  
+[16.1.2 How the Impex Objects Work](Objects/oimpex.md#1612-how-the-impex-objects-work)  
+[16.2 Using Impex](Objects/oimpex.md#162-using-impex)  
+[16.2.1 Common Impex Concepts](Objects/oimpex.md#1621-common-impex-concepts)  
+[16.2.2 The ImportControl Object](Objects/oimpex.md#1622-the-importcontrol-object)  
+[16.2.3 The ExportControl Object](Objects/oimpex.md#1623-the-exportcontrol-object)  
+[16.3 Writing Translation Libraries](Objects/oimpex.md#163-writing-translation-libraries)  
+[16.3.1 How Translation Libraries Work](Objects/oimpex.md#1631-how-translation-libraries-work)  
+[16.3.2 Intermediate Formats](Objects/oimpex.md#1632-intermediate-formats)  
+
+[17	The Spool Library](Objects/oprint.md#17-the-spool-library)  
 
 	17.1	Introduction to Printing					 OPrint : 1047
 
