@@ -469,15 +469,15 @@
       [24.3.4 Masks](Concepts/cshapes.md#2436-masks)  
       [24.3.5 Line-Specific Attributes](Concepts/cshapes.md#2435-line-specific-attributes)  
 
-**[A Machine Architecture]()**  
-    [A.1 History of the 80x86]()  
-    [A.2 8086 Architecture Overview]()  
-      [A.2.1 Memory]()  
-      [A.2.2 Registers]()  
-      [A.2.3 The Prefetch Queue]()  
-      [A.2.4 Inherent Optimizations]()  
+**[A Machine Architecture](Concepts/chardw.md)**  
+    [A.1 History of the 80x86](Concepts/chardw.md#a1-history-of-the-80x86)  
+    [A.2 8086 Architecture Overview](Concepts/chardw.md#a2-8086-architecture-overview)  
+      [A.2.1 Memory](Concepts/chardw.md#a21-memory)  
+      [A.2.2 Registers](Concepts/chardw.md#a22-registers)  
+      [A.2.3 The Prefetch Queue](Concepts/chardw.md#a23-the-prefetch-queue)  
+      [A.2.4 Inherent Optimizations](Concepts/chardw.md#a24-inherent-optimizations)  
 
-**[B Threads and Semaphores]()**  
+**[B Threads and Semaphores](Concepts/cmultit.md)**  
     [B.1 Multitasking Goals]()  
     [B.2 Two Models of Multitasking]()  
       [B.2.1 Cooperative Multitasking]()  
