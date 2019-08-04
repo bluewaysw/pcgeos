@@ -1,196 +1,14 @@
-Advanced Topic
-
-Most applications 
-won't create custom 
-patterns.
-Figure 24-2 Line
-
-A line is defined by its endpoints.
-Figure 24-10 Splines and Bézier Curves
-
-Curves and a spline, shown here with control points.
-Figure 24-5 Elliptical Arc
-
-On the left is an arc shown with its defining ellipse. On the right are the effects 
-of drawing an arc, filling an arc as a pie, and filling an arc as a chord.
-Figure 24-25 Drawing with Masks
-
-Before drawing the rectangles, the dark line was present. The line shows 
-through both the light and dark rectangles. Each rectangle is drawn with a 
-50% mask.
-Figure 24-3 Rectangle
-Figure 24-4 Ellipse
-
-An ellipse with its bounding rectangle.
-Figure 24-7 Advantages of the Three-point Arc
-
-The elliptical arc doesn't start quite where the line leaves off, perhaps due to 
-a poorly calculated angle. The three-point arc, defined in terms of its 
-endpoints, is certain to have an endpoint in common with the line.
-Figure 24-6 Three-point Arcs
-Advanced Topic
-
-You don't need to 
-know the math 
-behind splines to 
-draw them.
-Figure 24-17 Complicated Region Example
-
-This example shows how a rather unlikely region might be defined. This 
-region is set up to draw an up-pointing stylized arrow. The base of the arrow 
-will be six inches down from the coordinates passed to the region drawing 
-command (432 points). The coordinate of the top of the arrow will be the first 
-parameter. The arrow's horizontal position is determined by the second 
-parameter. Remember that the coordinate 5000h is not absolute but 
-corresponds to the first parameter, and all coordinates between 4000h and 
-5FFFh will be relative to this coordinate.
-0, 4FFFh, 12, 433h, /* bounds */
-4FFFh, EOREGREC,
-5000h, 6, 7, EOREGREC,
-5001h, 5, 8, EOREGREC,
-5002h, 4, 9, EOREGREC,
-5003h, 3, 10, EOREGREC,
-5004h, 2, 11, EOREGREC,
-5005h, 1, 12, EOREGREC,
-5007h, EOREGREC,
-432, 3, 6, 7, 10, EOREGREC, 
-EOREGREC
-Thanks to use of parameters, top 
-of region is at variable height. 
-However, if parameter 1 is more 
-than (432-7), the rows will be out 
-of order, and thus drawing this 
-region will result in an error.
-Figure 24-19 Common Font Metrics
-Figure 24-20 Character Metrics
-
-Unlike most characters, this font's "j" has a negative "Minimum X," meaning 
-it extends backwards into the space allotted to the previous character.
-Figure 24-23 Mix Modes
-Figure 24-18 TextMode and Drawing Position
-Figure 24-15 Path Intersection and Union
-
-When drawing a path formed by union or intersection, both paths are drawn, 
-perhaps not what was expected. The effects of a union or intersection aren't 
-apparent unless the paths are filled (or used to define clip regions).
-Advanced Topic
-Figure 24-9 Polylines, Polygons, and Fill Rules
-
-Polylines can't be filled. Polygons can be drawn as with polylines, or filled 
-using one of two "fill rules." In the polygon shown, the odd/even fill results in 
-a "cavern", or hollow area. The winding rule fills in this cavern.
-Equation 24-1 Bézier Curve Equations
-
-Coordinates of the points of a Bézier curve can be expressed by parametric 
-equations. The equation for both x and y is given in two forms here, one a 
-rearrangement of the other.
-P0 , P3: Anchor Points				P1 , P2: Control Points
-S : a point on the curve				t : 0 £ t £ 1
-Px , Py : X, Y coordinate of point P
-Figure 24-12 Bitmap
-
-A possible representation of a bitmap data structure and how that bitmap 
-might be drawn.
-Figure 24-0
-
-Display 24-0
-
-SwatDisplay 24-0
-
-Table 24-0
-Figure 24-8 Rounded Rectangle
-
-Pictured here is a rounded rectangle, with detail showing the circle whose 
-radius defines the rounded rectangle's corner curvature.
-Figure 24-13 GrDrawImage()
-
-GrDrawImage() is non-WYSIWYG; the output depends on the resolution.
-Figure 24-14 Path Direction for Winding Fills
-
-The path should be counterclockwise overall, with clockwise concavities.
-Table 24-1 Convenient Color Indexes
-
-Constant Name			Index	RED	GREEN	BLUE
-
-C_BLACK			0x00	0x00	0x00	0x00
-C_BLUE			0x01	0x00	0x00	0xAA
-C_GREEN			0x02	0x00	0xAA	0x00
-C_CYAN			0x03	0x00	0xAA	0xAA
-C_RED			0x04	0xAA	0x00	0x00
-C_VIOLET			0x05	0xAA	0x00	0xAA
-C_BROWN			0x06	0xAA	0x55	0x00
-C_LIGHT_GRAY			0x07	0xAA	0xAA	0xAA
-C_DARKK_GRAY			0x08	0x55	0x55	0x55
-C_LIGHT_BLUE			0x09	0x55	0x55	0xFF
-C_LIGHT_GREEN			0x0A	0x55	0xFF	0x55
-C_LIGHT_CYAN			0x0B	0x55	0xFF	0xFF
-C_LIGHT_RED			0x0C	0xFF	0x55	0x55
-C_LIGHT_VIOLET			0x0D	0xFF	0x55	0xFF
-C_YELLOW			0x0E	0xFF	0xFF	0x55
-C_WHITE			0x0F	0xFF	0xFF	0xFF
-
-These are the first 16 members of the Color enumerated type. For a full list 
-of available Color values, see the Routines reference or color.h.
-Figure 24-21 Dithering
-
-Here the system wants to display the rectangle with a light gray. On a black 
-and white system, it would simulate the gray by setting some pixels black and 
-others white.
-Figure 24-26 LineStyles
-Table 24-2 Arrays for System Line Styles
-
-Name			#pairs	on/off pairs
-
-LS_DASHED			1	4 4
-LS_DOTTED			1	1 2
-LS_DASHDOT			2	4 4 1 4
-LS_DASHDDOT			3	4 4 1 4 1 4
-Figure 24-16 Sample Region
-0, 0, 15, 10,
-1,  EOREGREC,
-3,  8, 13, EOREGREC,
-8,  2, 13, EOREGREC,
-9,  2, 9, 10, 13, EOREGREC,
-EOREGEC
-Figure 24-11 Levels of Smoothness
-Figure 24-22 Custom Hatch Patterns
-
-This simple hatch pattern is made up of three line families. The 
-measurements used to compute the 120° family are illustrated to the right. 
-Full measurements are shown below.
-
-Origin		DeltaX, DeltaY			Angle	numDash; Dashes
-
-(0, 0)		0, 12*sqrt(3)			0	1; 12, 24
-
-(0, 0)		0, 12*sqrt(3)			120	1; 12, 24
-
-(12, 0)		0, 12*sqrt(3)			60	1; 12, 24
-Figure 24-24 Masks as Repeating Patterns
-
-A drawing mask is a monochrome bitmap. It is repeated to cover an area.
-Advanced Topic
-
-Parameters, while 
-powerful, are not 
-used by many 
-programmers.
-Figure 24-1 Point
-
-A point is defined by its coordinates.
-24Drawing Graphics
-
-SOURCES:  color.h
+## 24 Drawing Graphics
 
 This chapter describes the commands used to draw things on a display. 
-"Graphics Environment," Chapter 23, explains how to set up the display 
+["Graphics Environment," Chapter 23](cgraph.md), explains how to set up the display 
 necessary to use these commands.
 
 You must have read the previous chapter; in particular, you should be 
 familiar with GStates. To use certain commands, you should also be familiar 
 with the GEOS fixed point number formats.
 
-	24.1	Drawing Goals
+### 24.1 Drawing Goals
 
 The graphics system has a set of graphic commands capable of describing 
 anything that might ever be drawn; at the same time, the command set 
@@ -202,7 +20,7 @@ graphics commands whether you are drawing to a display, describing a
 GString (which can be sent to a printer), drawing to a bitmap, or describing 
 a path. This simplifies graphics programming a great deal.
 
-	24.2	Shapes
+### 24.2 Shapes
 
 Depending on how much experience you have with the GEOS graphics 
 system, you may have some idea already about what sorts of shapes can be 
@@ -230,7 +48,7 @@ these routines to draw the outline of any conceivable two-dimensional shape.
 To create a precise, filled shape, use these routines to describe a path and 
 then fill the path.
 
-	24.2.1	Dots
+#### 24.2.1 Dots
 
 GrDrawPoint(), GrDrawPointAtCP()
 
@@ -239,10 +57,14 @@ The point's position is defined by a standard coordinate pair. Points are
 drawn using line attributes. After drawing a point, the pen position will be 
 at the point's coordinates.
 
-GrDrawPoint() draws a point at the passed coordinate pair. 
+![](Art/figure_24-1.png)  
+**Figure 24-1** Point  
+_A point is defined by its coordinates._
+
+GrDrawPoint() draws a point at the passed coordinate pair.  
 GrDrawPointAtCP() draws a point at the current pen position.
 
-	24.2.2	Lines
+#### 24.2.2 Lines
 
 GrDrawLine(), GrDrawLineTo(), GrDrawRelLineTo(), 
 GrDrawHLine(), GrDrawHLineTo(), GrDrawVLine(), 
@@ -251,6 +73,10 @@ GrDrawVLineTo()
 A line is simply a line segment that connects two points. Lines are drawn 
 using the current line attributes stored with the GState. The new pen 
 position becomes the last passed coordinate pair.
+
+![](Art/figure_24-2.png)  
+**Figure 24-2** Line  
+_A line is defined by its endpoints._
 
 GrDrawLine() draws a line between points. GrDrawLineTo() draws a line 
 from the current pen position to the passed point. GrDrawHLine() draws a 
@@ -267,13 +93,16 @@ GrDrawRelLineTo() draws a line from the current pen position to the point
 at the specified x and y offset from the starting position. This routine takes 
 very precise coordinates, and is useful for describing paths.
 
-	24.2.3	Rectangles
+#### 24.2.3 Rectangles
 
 GrDrawRect(), GrDrawRectTo(), GrFillRect(), GrFillRectTo()
 
 Rectangles are defined by four coordinates which can be thought of as either 
 defining the rectangle's left, top, right, and bottom bounds or as specifying 
 two opposite corners of the rectangle.
+
+![](Art/figure_24-3.png)  
+**Figure 24-3** Rectangle
 
 GrDrawRect() draws the outline of a rectangle using the passed 
 coordinates. GrDrawRectTo() draws the outline of a rectangle using the 
@@ -287,7 +116,7 @@ you want a bordered rectangle, call GrFillRect() and follow it with
 GrDrawRect(). Note that if the order of these operations if reversed, the fill 
 may obscure the draw.
 
-	24.2.4	Ellipses
+#### 24.2.4 Ellipses
 
 GrDrawEllipse(), GrFillEllipse()
 
@@ -295,11 +124,15 @@ Ellipses are defined by their bounding rectangles. The pen position becomes
 the first coordinate pair passed. Circles are ellipses with heights equal to 
 their widths.
 
+![](Art/figure_24-4.png)  
+**Figure 24-4** Ellipse  
+_An ellipse with its bounding rectangle._
+
 GrDrawEllipse() draws the outline of an ellipse using the current line 
 drawing attributes. GrFillEllipse() fills the ellipse's area using the current 
 area attributes.
 
-	24.2.5	Elliptical Arcs
+#### 24.2.5 Elliptical Arcs
 
 GrDrawArc(), GrFillArc()
 
@@ -308,13 +141,16 @@ angle at which to start drawing the arc, and the angle at which to stop
 drawing. Angles are counted in degrees counter-clockwise with 0° 
 corresponding to the positive x axis (i.e., "3 o'clock").
 
+![](Art/figure_24-5.png)  
+**Figure 24-5** Elliptical Arc
+
 GrDrawArc() draws the outline of an elliptical arc, a curved line. It does so 
 using the GState's current line attributes. GrFillArc() fills the arc. There 
 are two ways to fill an arc: you can fill in the wedge described by the arc, or 
 you can fill just the region between the arc and its chord; set the style with 
 an ArcCloseType value. 
 
-	24.2.6	Three-Point Arcs
+#### 24.2.6 Three-Point Arcs
 
 GrDrawArc3Point(), GrDrawArc3PointTo(), GrFillArc3Point(), 
 GrFillArc3PointTo(), GrDrawRelArc3PointTo()
@@ -323,6 +159,9 @@ The graphics system allows another way to specify arcs. Given two endpoints
 and one arbitrary point, there is a unique circular arc which has those 
 endpoints and passes through that arbitrary point. The closer the arbitrary 
 point is to the line connecting the endpoints, the shallower the described arc.
+
+![](Art/figure_24-6.png)  
+**Figure 24-6** Three-point Arcs
 
 GrDrawArc3Point() draws the three-point arc corresponding to the passed 
 points. The second endpoint passed becomes the new pen position. 
@@ -347,7 +186,13 @@ cases whether an arc is supposed to be connected to something else. Because
 three-point arcs include their endpoints with their definition, there is no such 
 ambiguity (see Figure 24-7).
 
-	24.2.7	Rounded Rectangles
+![](Art/figure_24-7.png)  
+**Figure 24-7** Advantages of the Three-point Arc  
+_The elliptical arc doesn't start quite where the line leaves off, perhaps due to 
+a poorly calculated angle. The three-point arc, defined in terms of its 
+endpoints, is certain to have an endpoint in common with the line._
+
+#### 24.2.7 Rounded Rectangles
 
 GrDrawRoundRect(), GrDrawRoundRectTo(), GrFillRoundRect(), 
 GrFillRoundRectTo()
@@ -356,6 +201,11 @@ Rounded rectangles are defined in terms of their bounding rectangle and the
 radius of the circle used to compute the rounded corners. The smaller the 
 corner circle is, the sharper the rectangle's corners will be. A larger corner 
 circle results in a more rounded corner with more area taken away.
+
+![](Art/figure_24-8.png)  
+**Figure 24-8** Rounded Rectangle  
+_Pictured here is a rounded rectangle, with detail showing the circle whose 
+radius defines the rounded rectangle's corner curvature._
 
 GrDrawRoundRect() draws the outline of a rounded rectangle with the 
 passed bounding rectangle and corner circle dimensions. The drawing 
@@ -368,7 +218,7 @@ rectangle with passed bounding rectangle and corner radius using the
 current area attributes. GrFillRoundRectTo() fills a rounded rectangle 
 that has the current position as one corner of the bounding rectangle.
 
-	24.2.8	Polylines and Polygons
+#### 24.2.8 Polylines and Polygons
 
 GrDrawPolyline(), GrDrawPolygon(), GrFillPolygon(), 
 GrBrushPolyline(), GrTestPointInPolygon()
@@ -376,6 +226,12 @@ GrBrushPolyline(), GrTestPointInPolygon()
 Polylines and polygons are drawings made up of chains of connected lines. 
 They are defined as lists of points, or corners. After drawing a polyline or 
 polygon, the pen position will be at the last point of the shape.
+
+![](Art/figure_24-9.png)  
+**Figure 24-9** Polylines, Polygons, and Fill Rules  
+_Polylines can't be filled. Polygons can be drawn as with polylines, or filled 
+using one of two "fill rules." In the polygon shown, the odd/even fill results in 
+a "cavern", or hollow area. The winding rule fills in this cavern._
 
 GrDrawPolyline() draws a polyline using the current line attributes. 
 GrDrawPolygon() draws a polygon using the current line attributes. 
@@ -411,7 +267,7 @@ where speed is a top priority.
 To find out whether a given point falls within a polygon, call 
 GrTestPointInPolygon().
 
-	24.2.9	Bézier Curves and Splines
+#### 24.2.9 Bézier Curves and Splines
 
 GrDrawCurve(), GrDrawCurveTo(), GrDrawSpline(), 
 GrDrawSplineTo(), GrDrawRelCurveTo()
@@ -422,6 +278,10 @@ There are other ways to define curves to computers, but the Bézier was
 chosen for the GEOS kernel because it is used in many standard font 
 description formats. Splines, as implemented in GEOS, are created by 
 drawing curves in sequence.
+
+![](Art/figure_24-10.png)  
+**Figure 24-10** Splines and Bézier Curves  
+_Curves and a spline, shown here with control points._
 
 Bézier curves are defined in terms of four points. Two of these points are the 
 endpoints, known as anchor points. The other two points are known as 
@@ -453,6 +313,12 @@ GrDrawSplineTo() uses the current position as the first anchor point, for
 this function the array should start with the first control point, and there 
 should be 3n points passed.
 
+![](Art/equation_24-1.png)  
+**Equation 24-1** Bézier Curve Equations  
+_Coordinates of the points of a Bézier curve can be expressed by parametric 
+equations. The equation for both x and y is given in two forms here, one a 
+rearrangement of the other._
+
 For most programmers, that's probably enough to know. Those programmers 
 who want to know more and don't mind a bit of math may feel free to continue 
 this section.
@@ -475,7 +341,10 @@ We call smooth splines with smooth derivatives "very smooth," and this
 condition is analogous to  continuity in functions. Smooth splines with 
 non-smooth derivatives are called "semi smooth", analogous to  continuity.
 
-	24.2.10	Drawing Bitmaps
+![](Art/figure_24-11.png)  
+**Figure 24-11** Levels of Smoothness
+
+#### 24.2.10 Drawing Bitmaps
 
 GrDrawBitmap(), GrDrawBitmapAtCP, GrFillBitmap(), 
 GrFillBitmapAtCP(), GrDrawHugeBitmap(), 
@@ -492,8 +361,12 @@ large bitmap and want to manage its storage, you may provide a routine to
 pass in part of the bitmap at a time. If the bitmap is stored in a huge array 
 (true of all bitmaps created with GrCreateBitmap()) use 
 GrDrawHugeBitmap() instead of GrDrawBitmap(), and it will manage 
-memory for you. GrDrawBitmapAtCP() draws a bitmap at the current 
-position. 
+memory for you. GrDrawBitmapAtCP() draws a bitmap at the current position.
+
+![](Art/figure_24-12.png)  
+**Figure 24-12** Bitmap  
+_A possible representation of a bitmap data structure and how that bitmap 
+might be drawn._
 
 If you just want to draw a monochrome bitmap, consider using the 
 GrFillBitmap() command. This routine treats the bitmap like a mask, 
@@ -521,16 +394,24 @@ same as normal scaling: The bitmap's resolution is still ignored, but each
 pixel of the bitmap will receive a square of pixels on the display. 
 GrDrawHugeImage() draws the image of a bitmap stored in a HugeArray.
 
+![](Art/figure_24-13.png)  
+**Figure 24-13** GrDrawImage()  
+_GrDrawImage() is non-WYSIWYG; the output depends on the resolution._
+
 The image-drawing routines take an ImageFlags structure which holds a 
 flag to specify whether borders should be drawn between the pixels of the 
 bitmap and a bit size field which specifies the magnification to use.
 
-	24.2.11	Paths
+#### 24.2.11 Paths
 
 GrDrawPath(), GrFillPath()
 
 This section will address only the subject of drawing paths. To find out how 
 to create, combine, and modify paths, see section 23.9 of chapter 23.
+
+![](Art/figure_24-14.png)  
+**Figure 24-14** Path Direction for Winding Fills  
+_The path should be counterclockwise overall, with clockwise concavities._
 
 GrDrawPath() draws a path using the current line attributes. 
 GrFillPath() fills a path using the current area attributes. GrFillPath() 
@@ -547,7 +428,13 @@ When you define a path by combining two other paths, the result might not
 be exactly what you would expect. See Figure 24-15 for an example of path 
 intersection and union.
 
-	24.2.12	Regions
+![](Art/figure_24-15.png)  
+**Figure 24-15** Path Intersection and Union  
+_When drawing a path formed by union or intersection, both paths are drawn, 
+perhaps not what was expected. The effects of a union or intersection aren't 
+apparent unless the paths are filled (or used to define clip regions)._
+
+#### 24.2.12 Regions
 
 GrGetPathRegion(), GrDrawRegion(), GrDrawRegionAtCP(), 
 GrMoveReg(), GrGetPtrRegBounds(), GrTestPointInReg(), 
@@ -613,6 +500,9 @@ used to define it. Those rows which are the same as the rows beneath them
 have no entry in this structure. Notice that rows four through seven, being 
 the same as row eight, have no entries.
 
+![](Art/figure_24-16.png)  
+**Figure 24-16** Sample Region
+
 It is possible to customize a region by taking advantage of a feature of the 
 coordinate system. Graphics routines take word-sized (16-bit) coordinate 
 arguments. Normal coordinates only require 15 bits. When working with 
@@ -645,11 +535,13 @@ with parameter zero equal to 72, then that drawing would take place at the
 coordinate 72. The coordinate 4FFFh would be interpreted as 71. Use the 
 following constants to clarify parameterized coordinates:
 
+~~~
 /* Constants for DrawRegion */
 #define PARAM_0 0x5000
 #define PARAM_1 0x7000
 #define PARAM_2 0x9000
 #define PARAM_3 0xb000
+~~~
 
 Some or all coordinates of a region description may incorporate parameters. 
 Note that the region code doesn't check regions for correctness. If the bounds 
@@ -658,14 +550,25 @@ of a region are set incorrectly, the rows are given out of order, or an incorrec
 Figure 24-17 shows a complicated region which uses parametrized 
 coordinates.
 
-	24.2.13	Text
+#### 24.2.13 Text
 
 Programs normally display text with UI gadgetry such as GenText, VisText, 
 and GenGlyph objects. For those times when a geode will display text as part 
 of a graphical display, sometimes it's best to display text using direct calls to 
 the graphics system.
 
-	24.2.13.1	Displaying Text
+![](Art/figure_24-17.png)  
+**Figure 24-17** Complicated Region Example  
+_This example shows how a rather unlikely region might be defined. This 
+region is set up to draw an up-pointing stylized arrow. The base of the arrow 
+will be six inches down from the coordinates passed to the region drawing 
+command (432 points). The coordinate of the top of the arrow will be the first 
+parameter. The arrow's horizontal position is determined by the second 
+parameter. Remember that the coordinate 5000h is not absolute but 
+corresponds to the first parameter, and all coordinates between 4000h and 
+5FFFh will be relative to this coordinate._
+
+##### 24.2.13.1 Displaying Text
 
 GrDrawText(), GrDrawTextAtCP(), GrDrawChar(), 
 GrDrawCharAtCP(), GrDrawTextField()
@@ -683,7 +586,7 @@ GrDrawCharAtCP() draw a single character, which should not be a
 non-printing character. GrDrawTextField() draws a field of text-however, 
 this routine is only available in Assembly language. 
 
-	24.2.13.2	Special Text Attributes
+##### 24.2.13.2 Special Text Attributes
 
 GrGetTextStyle(), GrSetTextStyle(), GrGetTextMode(), 
 GrSetTextMode(), GrGetTextSpacePad(), GrSetTextSpacePad(), 
@@ -712,6 +615,9 @@ to be reset. The information is stored in a TextMode record. Note that if you
 will be drawing characters of more than one size or font, and if you want 
 those characters to line up by baseline, you should use GrSetTextMode() to 
 use the TM_DRAW_BASE text mode.
+
+![](Art/figure_24-18.png)  
+**Figure 24-18** TextMode and Drawing Position
 
 GrSetTextSpacePad() sets the special amount used to pad space 
 characters; GrGetTextSpacePad() retrieves the current space padding.
@@ -768,7 +674,7 @@ offset sub- or superscript characters; the low byte is the percentage of font
 size to use for the sub- or superscript character 0x0064 (decimal 100) would 
 be full-sized with no displacement.
 
-	24.2.13.3	Accessing Available Fonts
+##### 24.2.13.3 Accessing Available Fonts
 
 GrEnumFonts(), GrCheckFontAvail(), 
 GrFindNearestPointsize(), GrGetDefFontID(), GrGetFontName()
@@ -826,7 +732,7 @@ GrGetFontName(). If the font isn't available, this function will return false;
 otherwise it will fill a passed buffer with the name of the font. The passed 
 buffer should be FID_NAME_LEN bytes long.
 
-	24.2.13.4	Text Metrics
+##### 24.2.13.4 Text Metrics
 
 GrTextWidth(), GrTextWidthWBFixed(), GrCharWidth(), 
 GrFontMetrics(), GrCharMetrics()
@@ -843,7 +749,11 @@ GrTextWidth() takes track kerning and pairwise kerning into account.
 GrFontMetrics() returns information pertaining to a font (see 
 Figure 24-19). The meanings of these metrics are listed below:
 
-Height	The height of the "font box." This is how much vertical space 
+![](Art/figure_24-19.png)  
+**Figure 24-19** Common Font Metrics
+
+**Height**  
+The height of the "font box." This is how much vertical space 
 should be allocated for a line of text. Note that when the text is 
 drawn, some characters may go beyond these bounds. Though 
 the height is still the vertical distance to set aside for a line of 
@@ -851,7 +761,7 @@ text, applications should be prepared for characters to have a
 vertical height equal to the maximum adjusted height, 
 discussed below.
 
-Maximum Adjusted Height
+**Maximum Adjusted Height**  
 The maximum height required to draw the character. Some 
 fonts contain characters that are meant to go beyond the 
 normal vertical boundaries, perhaps extending into the space 
@@ -859,59 +769,67 @@ occupied by text on the next or previous line. This metric is the
 minimum height to guarantee being able to display such a 
 character.
 
-Above Box	Normally the top of the font box, the uppermost limit of a font, 
+**Above Box**  
+Normally the top of the font box, the uppermost limit of a font, 
 is 3/4 of the font's height above the baseline. For those fonts 
 which do not follow this rule, the Above Box metric is the 
 number of points by which the true font box extends beyond the 
 normal font box.
 
-Below Box	Normally, the bottom of the font box, the bottommost limit of a 
+**Below Box**  
+Normally, the bottom of the font box, the bottommost limit of a 
 font, is 1/4 of the font's height below the baseline. For those 
 fonts which do not follow this rule, the Below Box metric is the 
 number of points by which the true font box extends below the 
 normal font box.
 
-Mean	The height of a typical lower case character. This metric is 
+**Mean**  
+The height of a typical lower case character. This metric is 
 sometimes called the "x height," since this will be the height of 
 a lower case "x."
 
-Descent	How far descending characters (like "y" and "j") extend below 
+**Descent**  
+How far descending characters (like "y" and "j") extend below 
 the baseline.
 
-Baseline	The vertical position of the bottoms of nondescending 
+**Baseline**  
+The vertical position of the bottoms of nondescending 
 characters. The number referred to as the "baseline" is the 
 distance between the baseline and the top of accent marks. 
 This corresponds to the text mode TM_DRAW_BASE. 
 
-Accent	How much space to leave for accent marks. This distance is 
+**Accent**  
+How much space to leave for accent marks. This distance is 
 measured from the top of the accent mark area to the ascent 
 height. This corresponds to the text mode TM_DRAW_ACCENT. 
 
-Ascent	Height of capital letters (and some tall lower-case letters, such 
-as "f").
+**Ascent**  
+Height of capital letters (and some tall lower-case letters, such as "f").
 
-Underline Position
+**Underline Position**  
 The distance from the top of the accent line to the top of the 
 underline.
 
-Underline Thickness
+**Underline Thickness**  
 The width of the underline.
 
-Strikethrough Position
+**Strikethrough Position**  
 The vertical position of the line used for "strikethrough" text.
 
-Average Width
+**Average Width**  
 The average character width. This figure is normally computed 
 as a weighted average width of lower-case characters, said 
 average weighted based on the frequency distribution of the 
 characters.
 
-Maximum Width
+**Maximum Width**  
 Width of the font's widest character.
 
-Leading	The height of the vertical gap between lines of text.
+**Leading**  
+The height of the vertical gap between lines of text.
 
-Kern Count	The number of specially kerned pairs in the font. Many fonts 
+**Kern Count**  
+The number of specially kerned pairs in the font. Many fonts 
 allow certain pairs of characters to have special spacing, known 
 as "pair kerning." For example many fonts try to squish "To" so 
 that the "T" and "o" are closer together than normal leading 
@@ -920,23 +838,30 @@ kerned pair just has strange spacing (e.g. "To" vs. "To"); a
 ligature is a pair of characters which have been combined into 
 one (e.g. "¿" and "æ").
 
-Driver	The font driver associated with the font, specified by a member 
+**Driver**  
+The font driver associated with the font, specified by a member 
 of the FontMaker enumerated type.
 
-First Character
+**First Character**  
 The Char value of the first defined, drawable character.
 
-Last Character
+**Last Character**  
 The Char value of the last defined, drawable character.
 
-Default Character
+**Default Character**  
 The Char value of the drawable character which will be drawn 
 as a substitute for any undrawable characters. 
 
 The GrCharMetrics() routine returns useful measurements for a character. 
 For each of a font's characters, you may request the following information:
 
-Width	While not a metric returned by the GrCharMetrics() routine, 
+![](Art/figure_24-20.png)  
+**Figure 24-20** Character Metrics  
+_Unlike most characters, this font's "j" has a negative "Minimum X," meaning 
+it extends backwards into the space allotted to the previous character._
+
+**Width**  
+While not a metric returned by the GrCharMetrics() routine, 
 the character width is very important. It determines how much 
 space to allow for the character. The metrics that follow don't 
 affect how much space to allow; instead, they give the bounds 
@@ -944,28 +869,28 @@ of the area that will be drawn to. As shown in Figure 24-19,
 characters are free to draw beyond the area set aside for them 
 by the width, into the space of the previous or next character.
 
-Minimum X
+**Minimum X**  
 The character's leftmost bound. If this value is positive, it 
 means that the character will have some extra space before it. 
 If the value is negative, the character may infringe on the space 
 of the previous character. This metric is also called the "left side 
 bearing."
 
-Minimum Y
+**Minimum Y**  
 The character's bottommost bound. This is the character's 
 "descent," the amount it hangs below the baseline.
 
-Maximum X
+**Maximum X**  
 The character's rightmost drawing bound. This value should be 
 greater than the Minimum X. Do not confuse this metric with 
 the character's width. 
 
-Maximum Y
+**Maximum Y**  
 The character's topmost bound. This is the distance the 
 character extends above the baseline. It is sometimes called the 
 character's "ascent."
 
-	24.3	Shape Attributes
+### 24.3 Shape Attributes
 
 GrSetAreaAttr(), GrSetLineAttr(), GrSetTextAttr()
 
@@ -980,7 +905,7 @@ areas at once, call GrSetAreaAttr(). Call GrSetLineAttr() to set all
 attributes to use when drawing lines. Use GrSetTextAttr() to set all 
 text-rendering attributes.
 
-	24.3.1	Color
+#### 24.3.1 Color
 
 If your geode displays graphics, you can probably make its graphical display 
 more effective by using color. Your geode can have as much control over color 
@@ -1002,8 +927,9 @@ the maximum (255), the result will be white.
 The data structure used to store color information is known as the 
 ColorQuad, shown in Code Display 24-1.
 
+---
 Code Display 24-1 Color Data Structures
-
+~~~
 typedef struct {
 	/* The ColorQuad data structure is used to represents a color. There are
 	 * many ways to describe a color. The CQ_info field determines how the
@@ -1051,10 +977,9 @@ typedef ByteEnum 	ColorFlag;
  * To use a custom brown:						{ 150, CF_RGB, 90, 0}
  * To use a 75% Gray (75% *256 = 192):						{ 192, CF_GRAY, 0, 0}
  */
+~~~
 
-
-
-	24.3.1.1	Using Available Colors
+##### 24.3.1.1 Using Available Colors
 
 GrGetAreaColor(), GrSetAreaColor(), GrGetLineColor(), 
 GrSetLineColor(), GrGetTextColor(), GrSetTextColor()
@@ -1070,6 +995,28 @@ GrSetAreaColor() routine sets the color to be used when filling areas.
 GrSetTextColor() sets the color to be used when rendering text. 
 GrGetLineColor(), GrGetAreaColor(), and GrGetTextColor() return 
 the color values and flags stored with the GState.
+
+|Constant Name |Index |RED   |GREEN |BLUE  |
+|:-------------|:-----|:-----|:-----|:-----|
+|C_BLACK       |0x00  |0x00  |0x00  |0x00  |
+|C_BLUE        |0x01  |0x00  |0x00  |0xAA  |
+|C_GREEN       |0x02  |0x00  |0xAA  |0x00  |
+|C_CYAN        |0x03  |0x00  |0xAA  |0xAA  |
+|C_RED         |0x04  |0xAA  |0x00  |0x00  |
+|C_VIOLET      |0x05  |0xAA  |0x00  |0xAA  |
+|C_BROWN       |0x06  |0xAA  |0x55  |0x00  |
+|C_LIGHT_GRAY  |0x07  |0xAA  |0xAA  |0xAA  |
+|C_DARKK_GRAY  |0x08  |0x55  |0x55  |0x55  |
+|C_LIGHT_BLUE  |0x09  |0x55  |0x55  |0xFF  |
+|C_LIGHT_GREEN |0x0A  |0x55  |0xFF  |0x55  |
+|C_LIGHT_CYAN  |0x0B  |0x55  |0xFF  |0xFF  |
+|C_LIGHT_RED   |0x0C  |0xFF  |0x55  |0x55  |
+|C_LIGHT_VIOLET|0x0D  |0xFF  |0x55  |0xFF  |
+|C_YELLOW      |0x0E  |0xFF  |0xFF  |0x55  |
+|C_WHITE       |0x0F  |0xFF  |0xFF  |0xFF  |
+**Table 24-1** Convenient Color Indexes
+_These are the first 16 members of the Color enumerated type. For a full list 
+of available Color values, see the Routines reference or color.h._
 
 The default system palette includes several colors whose indexes have been 
 set up so they may be referenced by descriptive constant names. The 
@@ -1090,7 +1037,7 @@ palette indexes instead of RGB values, it is possible to change the RGB value
 of palette entry 02 so that the C_GREEN constant actually refers to, for 
 example, a shade of magenta.
 
-	24.3.1.2	When the Color Isn't in the Palette
+##### 24.3.1.2 When the Color Isn't in the Palette
 
 GrSetLineColorMap(), GrSetAreaColorMap(), 
 GrSetTextColorMap(), GrGetLineColorMap(), 
@@ -1106,6 +1053,12 @@ available colors and dither them together in an attempt to form a mixture
 which will appear to be the correct color overall when seen from a distance. 
 (See Figure 24-21.)
 
+![](Art/figure_24-21.png)  
+**Figure 24-21** Dithering  
+_Here the system wants to display the rectangle with a light gray. On a black 
+and white system, it would simulate the gray by setting some pixels black and 
+others white._
+
 GrSetLineColorMap(), GrSetAreaColorMap(), and 
 GrSetTextColorMap() set the color mapping to use when drawing with an 
 unavailable color. GrGetLineColorMap(), GrGetAreaColorMap(), and 
@@ -1119,7 +1072,7 @@ use the GrMapColorIndex() routine to find the RGB value associated with
 an index. The GrMapColorRGB() routine returns the index and true RGB 
 color of the palette entry that most closely matches the values passed.
 
-	24.3.1.3	Custom Palettes
+##### 24.3.1.3 Custom Palettes
 
 GrCreatePalette(), GrDestroyPalette(), GrSetPaletteEntry(), 
 GrSetPalette(), GrGetPalette()
@@ -1161,7 +1114,7 @@ array with 256 entries (one for each color), each entry consisting of three
 bytes. The first byte of each entry is the color's red component, the second is 
 the color's green component, and the third is the color's blue component.
 
-	24.3.2	Patterns and Hatching
+#### 24.3.2 Patterns and Hatching
 
 GrSetAreaPattern(), GrSetAreaPatternCustom(), 
 GrSetTextPattern(), GrSetTextPatternCustom(), 
@@ -1175,29 +1128,30 @@ a repeated sequence of lines. Hatch patterns are defined in terms of families
 of parallel lines. Patterns are referenced by a PatternType and an index, 
 stored in a GraphicPattern structure. The pattern types are
 
-PT_SOLID	The lack of a pattern. Fills the area solid. This is the default. 
+PT_SOLID  
+The lack of a pattern. Fills the area solid. This is the default. 
 
-PT_SYSTEM_HATCH
+PT_SYSTEM_HATCH  
 System-defined hatch pattern. These patterns are 
 unchangeable and are available to all geodes.
 
-PT_SYSTEM_BITMAP
+PT_SYSTEM_BITMAP  
 System-defined tile bitmap pattern. These patterns are 
 unchangeable and available to all geodes.
 
-PT_USER_HATCH
+PT_USER_HATCH  
 User-defined hatch pattern. These patterns are available to all 
 geodes.
 
-PT_USER_BITMAP
+PT_USER_BITMAP  
 User-defined tile bitmap pattern. These patterns are available 
 to all geodes.
 
-PT_CUSTOM_HATCH
+PT_CUSTOM_HATCH  
 Application-defined hatch pattern. These patterns are 
 application-specific.
 
-PT_CUSTOM_BITMAP
+PT_CUSTOM_BITMAP  
 Application-defined tile bitmap pattern. These patterns are 
 application-specific.
 
@@ -1219,12 +1173,23 @@ specifies a series of families; each family consists of a set of equidistant
 parallel lines. Thus, by defining one family of lines, one could cover a surface 
 with one set of parallel lines. By asking for two families, the region could be 
 filled with a grid. For an example of a possible custom hatch pattern, see 
-Figure 24-22. 
+Figure 24-22.
+
+![](Art/figure_24-22.png)  
+**Figure 24-22** Custom Hatch Patterns  
+_This simple hatch pattern is made up of three line families. The 
+measurements used to compute the 120° family are illustrated to the right. 
+Full measurements are shown below._
+|Origin |DeltaX, DeltaY |Angle |numDash; Dashes |
+|:------|:--------------|:-----|:---------------|
+|(0, 0) |0, 12*sqrt(3)  |0     |1; 12, 24       |
+|(0, 0) |0, 12*sqrt(3)  |120   |1; 12, 24       |
+|(12, 0)|0, 12*sqrt(3)  |60    |1; 12, 24       |
 
 For each line family, the application must supply certain information. Your 
 application will work with the HatchLine data type to specify
 
-u	Origin
++ Origin  
 Since each line family is drawn as a set of equidistant parallel lines, the 
 origin might seem useless. Who cares where the lines start, since they fill 
 the available space? In fact, the origin will only be meaningful if your 
@@ -1235,23 +1200,23 @@ offset from that of the first two families, since none of the lines of the
 third family pass through the point used as the origin by the first two 
 families.
 
-u	Delta offset between lines of the family
++ Delta offset between lines of the family  
 Each family has a horizontal and vertical offset. When drawing the 
 pattern, the first line will be drawn starting at the origin. The second line 
 will be drawn at a perpendicular distance equal to the passed y offset. 
 The second line may also be drawn at a parallel offset, but this will only 
 affect dotted lines.
 
-u	Angle at which to draw the lines
++ Angle at which to draw the lines  
 Remember that angles are measured in degrees measured 
 counterclockwise from the positive x axis. 
 
-u	Color
++ Color  
 You may draw the lines using the default color (area color if pattern is 
 filling an area; text if rendering text), or you may draw using a specific 
 color.
 
-u	Dashes
++ Dashes  
 You may draw the lines using a custom dash pattern. See the Line Style 
 attribute, below, to learn how to set up a dash pattern.
 
@@ -1266,67 +1231,65 @@ structures holding the pattern data. The commands and structures are
 detailed in the reference manual. For an example of some code using a 
 custom hatch pattern, see Code Display 24-2.
 
+---
 Code Display 24-2 Hatch Pattern Data
-
+~~~
 /* This example shows how to implement the pattern illustrated in Figure 24-22 */
 
-	/* ... */
-	GrSetPatternCustom(myGState, gp, hexHatchPatt);
-	/* ... */
+    /* ... */
+    GrSetPatternCustom(myGState, gp, hexHatchPatt);
+    /* ... */
 
 GraphicPattern 	gp = {PT_CUSTOM_HATCH, 0};
 
-static HatchPattern 	hexHatchPatt = { 3 };					/* Three HatchLine structures
-						 * must follow */
+static HatchPattern hexHatchPatt = { 3 }; /* Three HatchLine structures must follow */
 
-static HatchLine line1 = { 			{MakeWWFixed(0) , MakeWWFixed(0)},			/* Origin */
-		 	MakeWWFixed(0),			/* Delta X 
-						 *  dashes will be in alignment */
-			MakeWWFixed(20.7846097),			/* Delta Y
-						 *  lines will be 12*sqrt(3)
-						 *  apart */
-			MakeWWFixed(0),			/* Angle */
-			(dword) (CF_SAME<<16),			/* Color 
-						 *  will use default color */
-			1			/* Number of dashes 
-						 *  one HatchDash pattern 
-						 *  must follow */
-		};
+static HatchLine line1 = {
+    {MakeWWFixed(0) , MakeWWFixed(0)},    /* Origin */
+    MakeWWFixed(0),                       /* Delta X dashes will be in alignment */
+    MakeWWFixed(20.7846097),              /* Delta Y lines will be 12*sqrt(3) apart */
+    MakeWWFixed(0),                       /* Angle */
+    (dword) (CF_SAME<<16),                /* Color will use default color */
+    1                                     /* Number of dashes one HatchDash pattern must follow */
+};
 
-static HatchDash dash1 = {			{12, 0},			/* On for 12 points */
-			{24, 0}};			/* ...and Off for 24 points */
+static HatchDash dash1 = {
+    {12, 0},                              /* On for 12 points */
+    {24, 0} };                            /* ...and Off for 24 points */
 
-static HatchLine line2 = { 			{MakeWWFixed(0), MakeWWFixed(0)},			/* Origin */
-		 	MakeWWFixed(0),			/* Delta X */
-			MakeWWFixed(20.7846097),			/* Delta Y*/
-			{120,0},			/* Angle */
-			(dword) (CF_SAME<<16),			/* Color */
-			1			/* Number of dashes */
-		};
+static HatchLine line2 = {
+    {MakeWWFixed(0), MakeWWFixed(0)},     /* Origin */
+    MakeWWFixed(0),                       /* Delta X */
+    MakeWWFixed(20.7846097),              /* Delta Y*/
+    {120,0},                              /* Angle */
+    (dword) (CF_SAME<<16),                /* Color */
+    1                                     /* Number of dashes */
+};
 
-static HatchDash dash 2 = {			{12, 0},			/* On for 12 points */
-			{24, 0}};			/* ...and Off for 24 points */
+static HatchDash dash 2 = {
+    {12, 0},                              /* On for 12 points */
+    {24, 0} };                            /* ...and Off for 24 points */
 
-static HatchLine line3 = { 			{{12,0} , MakeWWFixed(0)},			/* Origin */
-						 *  this line family will be at
-						 *  a 12 pt. horizontal offset
-						 *  from the other two families.
-		 	MakeWWFixed(0),			/* Delta X */
-			MakeWWFixed(20.7846097),			/* Delta Y*/
-			{60,0},			/* Angle */
-			(dword) (CF_SAME<<16),			/* Color */
-			1			/* Number of dashes */
-		};
+static HatchLine line3 = {
+    {{12,0} , MakeWWFixed(0)},            /* Origin this line family will be at
+                                           * a 12 pt. horizontal offset
+                                           * from the other two families. */
+    MakeWWFixed(0),                       /* Delta X */
+    MakeWWFixed(20.7846097),              /* Delta Y*/
+    {60,0},                               /* Angle */
+    (dword) (CF_SAME<<16),                /* Color */
+    1                                     /* Number of dashes */
+};
 
-static HatchDash dash3 = {			{12, 0},			/* On for 12 points */
-			{24, 0}};			/* ...and Off for 24 points */
-
-
+static HatchDash dash3 = {
+    {12, 0},                              /* On for 12 points */
+    {24, 0} };                            /* ...and Off for 24 points */
+~~~
 
 To find out the current area or text pattern, call GrGetAreaPattern() or 
 GrGetTextPattern().
 
-	24.3.3	Mix Mode
+#### 24.3.3 Mix Mode
 
 GrGetMixMode(), GrSetMixMode()
 
@@ -1337,37 +1300,48 @@ MM_COPY, since the new drawing is copied directly onto the graphics space.
 
 There are many other mix modes available (see Figure 24-23): 
 
-MM_COPY	MM_COPY is the most common mix mode as well as the default. 
+![](Art/figure_24-23.png)  
+**Figure 24-23** Mix Modes
+
+MM_COPY  
+MM_COPY is the most common mix mode as well as the default. 
 It draws the new drawing on top of the old as though the new 
 drawing where on opaque paper-nothing of the old drawing 
 shows through the region defined by the new drawing.
 
-MM_CLEAR	The region defined by the new drawing is blanked out. The 
+MM_CLEAR  
+The region defined by the new drawing is blanked out. The 
 color of the new drawing does not matter.
 
-MM_SET	The region defined by the new drawing is washed black. The 
+MM_SET  
+The region defined by the new drawing is washed black. The 
 color of the new drawing does not matter.
 
-MM_INVERT	The region defined by the new drawing is inverted. The color 
+MM_INVERT  
+The region defined by the new drawing is inverted. The color 
 value displayed will be the logical inverse of the old color. The 
 color of the new drawing does not matter.
 
-MM_NOP	The old drawing remains; nothing is drawn of the new drawing. 
+MM_NOP  
+The old drawing remains; nothing is drawn of the new drawing. 
 Just about the only thing likely to change is that the pen 
 position will be updated.
 
-MM_XOR	The color value to display is calculated by taking the bitwise 
+MM_XOR  
+The color value to display is calculated by taking the bitwise 
 XOR of the new and old colors. If painting in white, this acts as 
 a sort of reverse paint. Note that this bitwise XOR is applied to 
 the index numbers of the colors, not to their RGB values.
 
-MM_OR	The color value to display is calculated by taking the bitwise OR 
+MM_OR  
+The color value to display is calculated by taking the bitwise OR 
 of the new and old colors. On a monochrome display, this 
 corresponds to drawing on a clear plastic overlay. The OR 
 operation is applied to the indexes of the colors as opposed to 
 their RGB values.
 
-MM_AND	The color value to display is calculated by taking the bitwise 
+MM_AND  
+The color value to display is calculated by taking the bitwise 
 AND of the new and old colors. Where either drawing is blank, 
 the result will be blank. On a monochrome display, this results 
 in a "clipping" effect. The AND operation is applied to the 
@@ -1392,7 +1366,7 @@ overwrite whatever was underneath. When drawing a checkerboard with
 individual black squares, the background would show through no matter 
 what background because there's nothing drawn between the squares.
 
-	24.3.4	Masks
+#### 24.3.4 Masks
 
 GrSetAreaMaskSys(), GrSetAreaMaskCustom(), GrGetAreaMask(), 
 GrSetLineMaskSys(), GrSetLineMaskCustom(), GrGetLineMask(), 
@@ -1404,7 +1378,11 @@ tiled. The graphics system provides a number of standard mask patterns,
 including 65 percentage masks (for achieving, e.g., a 50% fill) and several 
 shape patterns. It's simple to ask that the inverse of a system pattern be used 
 instead of the pattern itself. The program may also specify and use custom 
-draw masks by setting an 8 byte array. 
+draw masks by setting an 8 byte array.
+
+![](Art/figure_24-24.png)  
+**Figure 24-24** Masks as Repeating Patterns  
+_A drawing mask is a monochrome bitmap. It is repeated to cover an area._
 
 The GrSetAreaMaskSys() routine specifies one of the standard draw 
 masks to use when filling areas. GrSetAreaMaskCustom() allows the 
@@ -1415,8 +1393,7 @@ top to bottom. GrGetAreaMask() returns the current area mask.
 There are similar routines which set the drawing mask to use when drawing 
 lines: GrSetLineMaskSys(), GrSetLineMaskCustom(), and 
 GrGetLineMask(). To work with the drawing mask used when rendering 
-text, use GrSetTextMaskSys(), GrSetTextMaskCustom(), and 
-GrGetTextMask().
+text, use GrSetTextMaskSys(), GrSetTextMaskCustom(), and GrGetTextMask().
 
 For the most part, it's probably not a good idea to use masks when drawing 
 text, since the pixelated nature of the mask is likely to make the text less 
@@ -1427,6 +1404,12 @@ Since several of the masks are associated with a fill percentage, some
 programmers may confuse masks with gray-scale fills. Grays should be 
 implemented with colors, by drawing in a color with equal red, green, and 
 blue values.
+
+![](Art/figure_24-25.png)  
+**Figure 24-25** Drawing with Masks  
+_Before drawing the rectangles, the dark line was present. The line shows 
+through both the light and dark rectangles. Each rectangle is drawn with a 
+50% mask._
 
 When you are building a document image, do not use draw masks just to 
 achieve a lighter color. That is, if you are not making use of the "mask" 
@@ -1445,7 +1428,7 @@ fill and 25 to a 100% fill. Several SDM_- constants have been set up with the
 more commonly used system draw patterns. For a list of constants, see the 
 Routines manual.
 
-	24.3.5	Line-Specific Attributes
+#### 24.3.5 Line-Specific Attributes
 
 GrGetLineWidth(), GrSetLineWidth(), GrGetLineJoin(), 
 GrSetLineJoin(), GrGetLineEnd(), GrSetLineEnd(), 
@@ -1465,11 +1448,21 @@ be changed or retrieved with the GrSetLineStyle() and GrGetLineStyle()
 routines. Lines can be drawn using any of a number of standard system 
 LineStyles or by defining a custom dot pattern.
 
+![](Art/figure_24-26.png)  
+**Figure 24-26** LineStyles
+
 Custom dot patterns are defined in terms of arrays of pairs of bytes. The first 
 byte of each pair gives the distance that the line should be drawn with the 
 pen down, the second number the distance with the pen up. The array as a 
-whole is stored in a DashPairArray. Dash lengths will scale with the line 
-width.
+whole is stored in a DashPairArray. Dash lengths will scale with the line width.
+
+|Name        |#pairs |on/off pairs |
+|:-----------|:------|:------------|
+|LS_DASHED   |1      |4 4          |
+|LS_DOTTED   |1      |1 2          |
+|LS_DASHDOT	 |2      |4 4 1 4      |
+|LS_DASHDDOT |3      |4 4 1 4 1 4  |
+**Table 24-2** Arrays for System Line Styles
 
 Line joins govern the behavior of angles and corners. Using the appropriate 
 line join style, a geode can specify that angles should be blunt, pointed, or 

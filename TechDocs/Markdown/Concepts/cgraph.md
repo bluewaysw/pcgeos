@@ -194,8 +194,7 @@ window outside the region will be clipped (see Figure 23-1).
 Programs can reduce the clipping areas of any of their 
 associated windows.
 
-![](Art/figure_23-1.png)
-
+![](Art/figure_23-1.png)  
 **Figure 23-1** Clipping  
 _Clipping is the process of determining what needs to be drawn. 
 If something appears outside the bounds of its window or is 
@@ -286,8 +285,7 @@ transformations to the coordinate space dealing with scaling, rotation, etc. It
 transforms complicated drawing commands into simpler ones supported by 
 the video drivers. (See Figure 23-2.)
 
-![](Art/figure_23-2.png)
-
+![](Art/figure_23-2.png)  
 **Figure 23-2** Graphics System Architecture
 
 The video driver can render these simplified commands directly on the 
@@ -394,8 +392,7 @@ Figure 23-3). The graphics system will then convert this information to
 device coordinates: coordinates set up for the specific display device, using a 
 grid of pixels.
 
-![](Art/figure_23-3.png)
-
+![](Art/figure_23-3.png)  
 **Figure 23-3** Coordinate Spaces  
 _At any one time, the graphics system keeps track of several coordinate spaces. 
 You only have to worry about the coordinate spaces for the GState you are 
@@ -444,8 +441,7 @@ several of these changes at once (see Figure 23-4). These transformations
 affect structures in the GState, and new transformations can be combined 
 with or replace a GState's current transformation.
 
-![](Art/figure_23-4.png)
-
+![](Art/figure_23-4.png)  
 **Figure 23-4** Effects of Simple Transformations
 
 These transformations apply to the coordinate space, not to individual 
@@ -457,8 +453,7 @@ desired center of scaling or rotation, apply the scaling or rotation, draw the
 object at the translated origin, then change the coordinates back. For an 
 example of this sort of operation, see Figure 23-5.
 
-![](Art/figure_23-5.png)
-
+![](Art/figure_23-5.png)  
 **Figure 23-5** Rotating an Object About Its Center  
 _Remember that transformations apply to the whole coordinate space, their 
 effects based around the origin. Thus, to draw a rotated shape at certain 
@@ -483,8 +478,7 @@ with any other kind of transformation. If you make your transformations in
 the wrong order, you may not get what you expected (for an example, see 
 Figure 23-6).
 
-![](Art/figure_23-6.png)
-
+![](Art/figure_23-6.png)  
 **Figure 23-6** Ordering Transformation Combinations  
 _When combining translations with other transformations, remember that the 
 order of the transformations becomes important. The drawing on the left was 
@@ -564,8 +558,7 @@ matrix with a rotation matrix creates a matrix which represents a combined
 scaling and rotation. The six variable matrix elements are stored in a 
 TransMatrix structure.
 
-![](Art/equation_23-1.png)
-
+![](Art/equation_23-1.png)  
 **Equation 23-1** Transformation Matrices  
 _The left hand side shows the new coordinate pair resulting from applying the 
 transformation to the old coordinates. The right hand side of the equation 
@@ -579,8 +572,7 @@ requested transformation change and multiplies this matrix by the old
 transformation matrix. To combine these matrices, GEOS multiplies them 
 together to get the cross-product (See Equation 23-2).
 
-![](Art/equation_23-2.png)
-
+![](Art/equation_23-2.png)  
 **Equation 23-2** Combining Transformations  
 _Transformations are combined by taking the cross product of their matrices. 
 In cases where order is important, the leftmost factor represents the more 
@@ -594,8 +586,7 @@ the simple transformations. To replace the GState's current transformation
 matrix with the matrix of your choice, use GrSetTransform(). To find out 
 the current transformation, call GrGetTransform().
 
-![](Art/equation_23-3.png)
-
+![](Art/equation_23-3.png)  
 **Equation 23-3** Matrices for Standard Transformations
 
 GrTransformByMatrix() returns the results of transforming a passed 
@@ -654,8 +645,7 @@ each pair of document units. This is a further demonstration of the concept
 that document coordinates specify a location in the document coordinate 
 space, not a pixel.
 
-![](Art/figure_23-7.png)
-
+![](Art/figure_23-7.png)  
 **Figure 23-7** Document and Device Coordinates  
 _When using a device with 72dpi resolution, it's pretty simple to figure out what 
 will be drawn to the device._
@@ -681,8 +671,7 @@ Pixels on the left or the top are not filled;
 Pixels on the right or the bottom are filled; 
 Pixels in the left-bottom and top-right corners are not filled.
 
-![](Art/figure_23-8.png)
-
+![](Art/figure_23-8.png)  
 **Figure 23-8** Different Device Coordinates  
 _When using a device with a resolution that is not a multiple of 72dpi, GEOS 
 has to decide which borderline pixels have to be filled._
@@ -711,8 +700,7 @@ turned on in each row.
 + If the line is exactly 45 degrees, exactly one pixel will be turned on in each 
 column and row.
 
-![](Art/figure_23-9.png)
-
+![](Art/figure_23-9.png)  
 **Figure 23-9** Drawing Thin Lines  
 _If the thin line were drawn as if it were a skinny filled polygon, there would be 
 gaps as shown to the left. Using Bresenham's line algorithm, GEOS eliminates 
@@ -785,8 +773,7 @@ make the jumps necessary to access far away portions of the graphics space.
 Since a coordinate can now be in a much larger area than before, all routines 
 that deal with a point's position have 32-bit equivalents.
 
-![](Art/figure_23-10.png)
-
+![](Art/figure_23-10.png)  
 **Figure 23-10** Thirty-two Bit Graphics Spaces  
 _When drawing in a 32-bit space, remember that the drawing commands are 
 only prepared to draw in a sixteen-bit subspace. In the figure, rectangle A isn't 
@@ -1149,8 +1136,7 @@ is instead stored with the other GStates. You may destroy the GState when
 done editing, and hook up a new one if starting some other edit; this will not 
 affect the GString's storage.
 
-![](Art/figure_23-11.png)
-
+![](Art/figure_23-11.png)  
 **Figure 23-11** GStrings and Associated GStates  
 _The GString's data may reside in a variety of places. In addition to this data, 
 many GString operations will involve a GState. This special GState may be 
@@ -1791,7 +1777,6 @@ Code Display 23-9 GrGetGStringElement() In Action
 		}
 ~~~
 
-
 The GrParseGString() command calls a callback routine on all elements of 
 a GString which match some criterion. The routine may save information 
 about the elements, draw to a GState, or something completely different. 
@@ -1832,16 +1817,14 @@ drawing commands.
 Paths don't have to be continuous. An unconnected path is said to be made 
 up of more than one path element.
 
-![](Art/figure_23-12.png)
-
+![](Art/figure_23-12.png)  
 **Figure 23-12** Graphics Paths
 
 Paths can be created by taking the intersection or union of two or more paths. 
 In this case, the paths which are combined to make the resulting path are 
 called sub-paths. (See Figure 23-13).
 
-![](Art/figure_23-13.png)
-
+![](Art/figure_23-13.png)  
 **Figure 23-13** Combining Paths
 
 Paths are normally used to describe regions. However, regions are basically 
@@ -1857,8 +1840,7 @@ path with a window's clipping region to further restrict the clipping area.
 Thus it is possible to clip to an ellipse or to a Bézier curve, or even to use text 
 as a clipping region.
 
-![](Art/figure_23-14.png)
-
+![](Art/figure_23-14.png)  
 **Figure 23-14** Geode-Defined Clipping Paths  
 _It is possible to clip using paths incorporating text, splines, and other
 elements._
