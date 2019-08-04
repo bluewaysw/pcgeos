@@ -1479,3 +1479,5 @@ even with the end of the line, or square and extending past the mathematical
 end of the line.
 
 To set all of the line-drawing attributes at once, call GrSetLineAttr().
+
+[Graphics Environment](cgraph.md) <-- &nbsp;&nbsp; [table of contents](../concepts.md) &nbsp;&nbsp; --> [Machine Architecture](chardw.md)
