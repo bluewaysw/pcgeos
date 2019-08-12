@@ -327,219 +327,117 @@
 [16.3.1 How Translation Libraries Work](Objects/oimpex.md#1631-how-translation-libraries-work)  
 [16.3.2 Intermediate Formats](Objects/oimpex.md#1632-intermediate-formats)  
 
-[17	The Spool Library](Objects/oprint.md#17-the-spool-library)  
-
-	17.1	Introduction to Printing					 OPrint : 1047
-
-	17.2	Simple Printing Example					 OPrint : 1049
-
-	17.3	How Jobs Get Printed					 OPrint : 1052
-
-		17.3.1	Printing System Components				OPrint : 1052
-
-		17.3.2	Chronology				OPrint : 1053
-
-	17.4	Print Control Instance Data					 OPrint : 1056
-
-		17.4.1	Alerting the GenApplication				OPrint : 1058
-
-		17.4.2	Attributes				OPrint : 1058
-
-		17.4.3	Page Range Information				OPrint : 1061
-
-		17.4.4	Document Size				OPrint : 1063
-
-		17.4.5	Print Output Object				OPrint : 1069
-
-		17.4.6	Document Name Output				OPrint : 1073
-
-		17.4.7	The Default Printer				OPrint : 1074
-
-		17.4.8	Adding UI Gadgetry				OPrint : 1075
-
-	17.5	Print Control Messages					 OPrint : 1076
-
-		17.5.1	Common Response Messages				OPrint : 1076
-
-		17.5.2	Flow of Control Messages				OPrint : 1077
-
-		17.5.3	Working with Instance Data				OPrint : 1081
-
-	17.6	Page Size Control					 OPrint : 1087
-
-	17.7	Other Printing Components					 OPrint : 1094
-
-		17.7.1	Spooler and Scheduling				OPrint : 1094
-
-		17.7.2	Printer Drivers				OPrint : 1096
-
-		17.7.3	Page Size Related Routines				OPrint : 1098
-
-	17.8	Debugging Tips					 OPrint : 1099
-
-18	Graphic Object Library	1101
-
-	18.1	Setting Up the Objects					 OGrObj : 1103
-
-		18.1.1	Initializing the Objects				OGrObj : 1106
-
-		18.1.2	GrObj in a GenDocument				OGrObj : 1106
-
-	18.2	Managing a Graphic Layer					 OGrObj : 1107
-
-		18.2.1	Selection				OGrObj : 1108
-
-		18.2.2	Creating GrObjs				OGrObj : 1109
-
-		18.2.3	Action Notification				OGrObj : 1110
-
-		18.2.4	Locks and Forbidding Actions				OGrObj : 1111
-
-		18.2.5	Wrapping				OGrObj : 1113
-
-		18.2.6	Cut, Paste, and Transfer Items				OGrObj : 1114
-
-	18.3	GrObj Controllers					 OGrObj : 1115
-
-		18.3.1	GrObjToolControl				OGrObj : 1115
-
-		18.3.2	GrObjStyleSheetControl				OGrObj : 1117
-
-		18.3.3	GrObjAreaColorSelector				OGrObj : 1117
-
-		18.3.4	GrObjAreaAttrControl				OGrObj : 1117
-
-		18.3.5	GrObjLineColorSelector				OGrObj : 1118
-
-		18.3.6	GrObjLineAttrControl				OGrObj : 1119
-
-		18.3.7	GrObjNudgeControl				OGrObj : 1119
-
-		18.3.8	GrObjDepthControl				OGrObj : 1120
-
-		18.3.9	GrObjArcControl				OGrObj : 1121
-
-		18.3.10	GrObjHandleControl				OGrObj : 1121
-
-		18.3.11	GrObjRotateControl				OGrObj : 1122
-
-		18.3.12	GrObjFlipControl				OGrObj : 1122
-
-		18.3.13	GrObjSkewControl				OGrObj : 1123
-
-		18.3.14	GrObjAlignToGridControl				OGrObj : 1123
-
-		18.3.15	GrObjGroupControl				OGrObj : 1124
-
-		18.3.16	GrObjAlignDistributeControl				OGrObj : 1124
-
-		18.3.17	GrObjLocksControl				OGrObj : 1125
-
-		18.3.18	GrObjConvertControl				OGrObj : 1126
-
-		18.3.19	GrObjDefaultAttributesControl				OGrObj : 1126
-
-		18.3.20	GrObjObscureAttrControl				OGrObj : 1126
-
-		18.3.21	GrObjInstructionControl				OGrObj : 1127
-
-		18.3.22	GrObjGradientFillControl				OGrObj : 1128
-
-		18.3.23	GrObjBackgroundColorSelector				OGrObj : 1128
-
-		18.3.24	Gradient Color Selectors				OGrObj : 1128
-
-		18.3.25	Paste Inside Controls				OGrObj : 1128
-
-		18.3.26	Controls From Other Libraries				OGrObj : 1129
-
-	18.4	GrObj Body					 OGrObj : 1130
-
-		18.4.1	GrObjBody Instance Data				OGrObj : 1130
-
-		18.4.2	GrObjBody Messages				OGrObj : 1132
-
-	18.5	GrObjHead					 OGrObj : 1141
-
-	18.6	GrObjAttributeManager					 OGrObj : 1143
-
-	18.7	Graphic Objects					 OGrObj : 1146
-
-		18.7.1	GrObj Instance Data				OGrObj : 1146
-
-		18.7.2	GrObj Messages				OGrObj : 1148
-
-		18.7.3	Shape Classes				OGrObj : 1170
-
-		18.7.4	GroupClass				OGrObj : 1171
-
-		18.7.5	PointerClass				OGrObj : 1172
-
-		18.7.6	GrObjVisGuardian Classes				OGrObj : 1172
-
-19	Ruler Object Library	1175
-
-	19.1	Ruler Features					 ORuler : 1177
-
-	19.2	Ruler Setup					 ORuler : 1178
-
-	19.3	VisRuler Instance Data					 ORuler : 1180
-
-	19.4	Managing Rulers					 ORuler : 1189
-
-		19.4.1	RulerShowControl				ORuler : 1190
-
-		19.4.2	Mouse Tracking				ORuler : 1191
-
-		19.4.3	Grid Spacing and Constraint				ORuler : 1192
-
-		19.4.4	Guide Constraints and Guidelines				ORuler : 1196
-
-		19.4.5	Other Mouse Constraints				ORuler : 1200
-
-		19.4.6	Esoteric Messages				ORuler : 1203
-
-20	Spreadsheet Objects	1207
-
-	20.1	Spreadsheet Overview					 OSsheet : 1209
-
-		20.1.1	Quick Look at the Objects				OSsheet : 1210
-
-		20.1.2	Managing Cell Files				OSsheet : 1211
-
-		20.1.3	Parsing Expressions				OSsheet : 1212
-
-	20.2	The Spreadsheet Objects					 OSsheet : 1213
-
-		20.2.1	SpreadsheetClass				OSsheet : 1213
-
-		20.2.2	Spreadsheet Rulers				OSsheet : 1224
-
-		20.2.3	The Spreadsheet Controller				OSsheet : 1225
-
-	20.3	Basic Use					 OSsheet : 1225
-
-		20.3.1	Declaring the Objects				OSsheet : 1226
-
-		20.3.2	Working with Files				OSsheet : 1230
-
-		20.3.3	Interacting with the Edit Bar				OSsheet : 1234
-
-	20.4	Other Spreadsheet Controllers					 OSsheet : 1235
-
-		20.4.1	The SSEditControl				OSsheet : 1236
-
-		20.4.2	Notes and SSNoteControlClass				OSsheet : 1236
-
-		20.4.3	Row and Column Size				OSsheet : 1236
-
-		20.4.4	Sorting and SSSortControlClass				OSsheet : 1237
-
-		20.4.5	Defining and Using Names				OSsheet : 1237
-
-		20.4.6	Headers and Footers				OSsheet : 1237
-
-21	Pen Object Library	1239
+**[17	The Spool Library](Objects/oprint.md#17-the-spool-library)**  
+[17.1 Introduction to Printing](Objects/oprint.md#171-introduction-to-printing)  
+[17.2 Simple Printing Example](Objects/oprint.md#172-simple-printing-example)  
+[17.3 How Jobs Get Printed](Objects/oprint.md#173-how-jobs-get-printed)  
+[17.3.1 Printing System Components](Objects/oprint.md#1731-printing-system-components)  
+[17.3.2 Chronology](Objects/oprint.md#1732-chronology)  
+[17.4 Print Control Instance Data](Objects/oprint.md#174-print-control-instance-data)  
+[17.4.1 Alerting the GenApplication](Objects/oprint.md#1741-alerting-the-genapplication)  
+[17.4.2 Attributes](Objects/oprint.md#1742-attributes)  
+[17.4.3 Page Range Information](Objects/oprint.md#1743-print-range-information)  
+[17.4.4 Document Size](Objects/oprint.md#1744-document-size)  
+[17.4.5 Print Output Object](Objects/oprint.md#1745-print-output-object)  
+[17.4.6 Document Name Output](Objects/oprint.md#1746-document-name-output)  
+[17.4.7 The Default Printer](Objects/oprint.md#1747-the-default-printer)  
+[17.4.8 Adding UI Gadgetry](Objects/oprint.md#1748-adding-ui-gadgetry)  
+[17.5 Print Control Messages](Objects/oprint.md#175-print-control-messages)  
+[17.5.1 Common Response Messages](Objects/oprint.md#1751-common-response-messages)  
+[17.5.2 Flow of Control Messages](Objects/oprint.md#1752-flow-control-messages)  
+[17.5.3 Working with Instance Data](Objects/oprint.md#1753-working-with-instance-data)  
+[17.6 Page Size Control](Objects/oprint.md#176-page-size-control)  
+[17.7 Other Printing Components](Objects/oprint.md#177-other-printing-components)  
+[17.7.1 Spooler and Scheduling](Objects/oprint.md#1771-spooler-and-scheduling)  
+[17.7.2 Printer Drivers](Objects/oprint.md#1772-printer-drivers)  
+[17.7.3 Page Size Related Routines](Objects/oprint.md#1773-page-size-related-routines)  
+[17.8 Debugging Tips](Objects/oprint.md#178-debugging-tips)
+
+**[18 Graphic Object Library](Objects/ogrobj.md#18-graphic-object-library)**  
+[18.1 Setting Up the Objects](Objects/ogrobj.md#181-setting-up-the-objects)  
+[18.1.1 Initializing the Objects](Objects/ogrobj.md#1811-initializing-the-objects)  
+[18.1.2 GrObj in a GenDocument](Objects/ogrobj.md#1812-grobj-in-a-gendocument)  
+[18.2 Managing a Graphic Layer](Objects/ogrobj.md#182-managing-a-graphic-layer)  
+[18.2.1 Selection](Objects/ogrobj.md#1821-selection)  
+[18.2.2 Creating GrObjs](Objects/ogrobj.md#1822-creating-grobjs)  
+[18.2.3 Action Notification](Objects/ogrobj.md#1823-action-notification)  
+[18.2.4 Locks and Forbidding Actions](Objects/ogrobj.md#1824-locks-and-forbidding-actions)  
+[18.2.5 Wrapping](Objects/ogrobj.md#1825-wrapping)  
+[18.2.6 Cut, Paste, and Transfer Items](Objects/ogrobj.md#1826-cut,-paste,-and-transfer-items)  
+[18.3 GrObj Controllers](Objects/ogrobj.md#183-grobj-controllers)  
+[18.3.1 GrObjToolControl](Objects/ogrobj.md#1831-grobjtoolcontrol)  
+[18.3.2 GrObjStyleSheetControl](Objects/ogrobj.md#1832grobjstylesheetcontrol)  
+[18.3.3 GrObjAreaColorSelector](Objects/ogrobj.md#1833-grobjareacolorselector)  
+[18.3.4 GrObjAreaAttrControl](Objects/ogrobj.md#1834-grobjareaattrcontrol)  
+[18.3.5 GrObjLineColorSelector](Objects/ogrobj.md#1835-grobjlinecolorselector)  
+[18.3.6 GrObjLineAttrControl](Objects/ogrobj.md#1836-grobjlineattrcontrol)  
+[18.3.7 GrObjNudgeControl](Objects/ogrobj.md#1837-grobjnudgecontrol)  
+[18.3.8 GrObjDepthControl](Objects/ogrobj.md#1838-grobjdepthcontrol)  
+[18.3.9 GrObjArcControl](Objects/ogrobj.md#1839-grobjarccontrol)  
+[18.3.10 GrObjHandleControl](Objects/ogrobj.md#18310-grobjhandlecontrol)  
+[18.3.11 GrObjRotateControl](Objects/ogrobj.md#18311-grobjrotatecontrol)  
+[18.3.12 GrObjFlipControl](Objects/ogrobj.md#18312-grobjflipcontrol)  
+[18.3.13 GrObjSkewControl](Objects/ogrobj.md#18313-grobjskewcontrol)  
+[18.3.14 GrObjAlignToGridControl](Objects/ogrobj.md#18314-grobjaligntogridcontrol)  
+[18.3.15 GrObjGroupControl](Objects/ogrobj.md#18315-grobjgroupcontrol)  
+[18.3.16 GrObjAlignDistributeControl](Objects/ogrobj.md#18316-grobjaligndistributecontrol)  
+[18.3.17 GrObjLocksControl](Objects/ogrobj.md#18317-grobjlockscontrol)  
+[18.3.18 GrObjConvertControl](Objects/ogrobj.md#18318-grobjconvertcontrol)  
+[18.3.19 GrObjDefaultAttributesControl](Objects/ogrobj.md#18319-grobjdefaultattributescontrol)  
+[18.3.20 GrObjObscureAttrControl](Objects/ogrobj.md#18320-grobjobscureattrcontrol)  
+[18.3.21 GrObjInstructionControl](Objects/ogrobj.md#18321-grobjinstructioncontrol)  
+[18.3.22 GrObjGradientFillControl](Objects/ogrobj.md#18322-grobjgradientfillcontrol)  
+[18.3.23 GrObjBackgroundColorSelector](Objects/ogrobj.md#18323-grobjbackgroundcolorselector)  
+[18.3.24 Gradient Color Selectors](Objects/ogrobj.md#18324-gradient-color-selectors)  
+[18.3.25 Paste Inside Controls](Objects/ogrobj.md#18325-paste-inside-controls)  
+[18.3.26 Controls From Other Libraries](Objects/ogrobj.md#18326-controls-from-other-libraries)  
+[18.4 GrObj Body](Objects/ogrobj.md#184-grobj-body)  
+[18.4.1 GrObjBody Instance Data](Objects/ogrobj.md#1841-grobj-body-instance-data)  
+[18.4.2 GrObjBody Messages](Objects/ogrobj.md#1842-grobj-body-messages)  
+[18.5 GrObjHead](Objects/ogrobj.md#185-grobjhead)  
+[18.6 GrObjAttributeManager](Objects/ogrobj.md#186-grobjattributemanager)  
+[18.7 Graphic Objects](Objects/ogrobj.md#187-graphic-objects)  
+[18.7.1 GrObj Instance Data](Objects/ogrobj.md#1871-grobj-instance-data)  
+[18.7.2 GrObj Messages](Objects/ogrobj.md#1872-grobj-messages)  
+[18.7.3 Shape Classes](Objects/ogrobj.md#1873-shape-classes)  
+[18.7.4 GroupClass](Objects/ogrobj.md#1874-groupclass)  
+[18.7.5 PointerClass](Objects/ogrobj.md#1875-pointerclass)  
+[18.7.6 GrObjVisGuardian Classes](Objects/ogrobj.md#1876-grobjvisguardian-classes)
+
+**[19 Ruler Object Library](Objects/oruler.md#19-ruler-object-library)**  
+[19.1 Ruler Features](Objects/oruler.md#191-ruler-features)  
+[19.2 Ruler Setup](Objects/oruler.md#192-ruler-setup)  
+[19.3 VisRuler Instance Data](Objects/oruler.md#193-visruler-instance-data)  
+[19.4 Managing Rulers](Objects/oruler.md#194-managing-rulers)  
+[19.4.1 RulerShowControl](Objects/oruler.md#1941-rulershowcontrol)  
+[19.4.2 Mouse Tracking](Objects/oruler.md#1942-mouse-tracking)  
+[19.4.3 Grid Spacing and Constraint](Objects/oruler.md#1943-grid-spacing-and-constraint)  
+[19.4.4 Guide Constraints and Guidelines](Objects/oruler.md#1944-guide-constraint-and-guidelines)  
+[19.4.5 Other Mouse Constraints](Objects/oruler.md#1945-other-mouse-constraints)  
+[19.4.6 Esoteric Messages](Objects/oruler.md#1946-esoteric-messages)
+
+**[20	Spreadsheet Objects](Objects/ossheet.md#20-spreadsheet-objects)**  
+[20.1 Spreadsheet Overview](Objects/ossheet.md#201-spreadsheet-overview)  
+[20.1.1 Quick Look at the Objects](Objects/ossheet.md#2011-quick-look-at-the-objects)  
+[20.1.2 Managing Cell Files](Objects/ossheet.md#2012-managing-cell-files)  
+[20.1.3 Parsing Expressions](Objects/ossheet.md#2013-parsing-expressions)  
+[20.2 The Spreadsheet Objects](Objects/ossheet.md#202-the-spreadsheet-objects)  
+[20.2.1 SpreadsheetClass](Objects/ossheet.md#2021-spreadsheetclass)  
+[20.2.2 Spreadsheet Rulers](Objects/ossheet.md#2022-spreadsheet-rulers)  
+[20.2.3 The Spreadsheet Controller](Objects/ossheet.md#2023-the-spreadsheet-controller)  
+[20.3 Basic Use](Objects/ossheet.md#203-basic-use)  
+[20.3.1 Declaring the Objects](Objects/ossheet.md#2031-declaring-the-objects)  
+[20.3.2 Working with Files](Objects/ossheet.md#2032-working-with-files)  
+[20.3.3 Interacting with the Edit Bar](Objects/ossheet.md#2033-interacting-with-the-edit-bar)  
+[20.4 Other Spreadsheet Controllers](Objects/ossheet.md#204-other-spreadsheet-controllers)  
+[20.4.1 The SSEditControl](Objects/ossheet.md#2041-the-sseditcontrol)  
+[20.4.2 Notes and SSNoteControlClass](Objects/ossheet.md#2042-notes-and-ssnotecontrolclass)  
+[20.4.3 Row and Column Size](Objects/ossheet.md#2043-row-and-column-size)  
+[20.4.4 Sorting and SSSortControlClass](Objects/ossheet.md#2044-sorting-and-sssortcontrolclass)  
+[20.4.5 Defining and Using Names](Objects/ossheet.md#2045-defining_and_using_names)  
+[20.4.6 Headers and Footers](Objects/ossheet.md#2046-headers-and-footers)
+
+**[21 Pen Object Library](Objects/open.md#21-pen-object-library)**  
 
 	21.1	The Ink Object					 OPen : 1241
 
