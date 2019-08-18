@@ -12,7 +12,7 @@ imaging code, as will any geodes that print.
 This, the first chapter of the Imaging Section, explains the thinking behind 
 the graphics system and the work you'll have to get done ahead of time to set 
 up the space you're going to be drawing to. For actual drawing commands, 
-see "Drawing Graphics," Chapter 24.
+see ["Drawing Graphics," Chapter 24](cshapes.md).
 
 Before reading this chapter, you should be familiar with the basics of the 
 generic UI and messaging. You may also want to review high school geometry.
@@ -33,18 +33,18 @@ definitions for terms that will be used throughout.
 This chapter is divided into sections. Which sections you'll want to read 
 depend on what you're interested in.
 
-1. Road Map	  
+1. **Road Map	  
 You're reading the road map now.
 
-2. Goals  
+2. **Goals**  
 This section goes into the design philosophy behind the GEOS 
 graphics system.
 
-3. Architecture  
+3. **Architecture**  
 The Graphics Architecture section describes the basics behind 
 how the graphics system works.
 
-4. How to Use Graphics  
+4. **How to Use Graphics**  
 This section is for programmers new to GEOS who know what 
 sort of graphics they want their geode to have but don't know 
 how to get it. This section discusses the different contexts in 
@@ -53,39 +53,39 @@ those contexts. After going through the section, you may wish
 to return to this road map to find out where to read more about 
 whatever sort of graphics you'll be working with.
 
-5. Coordinate Space  
+5. **Coordinate Space**  
 The GEOS graphics system describes locations and distances 
 using a rectangular grid coordinate system. This section 
 explains how to work with and manipulate this space.
 
-6. Graphics State  
+6. **Graphics State**  
 This section describes the GState, a data structure used in 
 many contexts and for many purposes throughout the graphics 
 system.
 
-7. Bitmaps  
+7. **Bitmaps**  
 It is possible to specify an image by using a data structure in 
 which an array of color values is used to represent a 
 rectangular area of the screen. This section describes how such 
 a data structure can be manipulated.
 
-8. Graphics Strings and Metafiles  
+8. **Graphics Strings and Metafiles**  
 This section describes how to create and draw Graphics 
 Strings, also known as GStrings. (See the Vocabulary section, 
 below, for a simple definition of GString.)
 
-9. Graphics Paths  
+9. **Graphics Paths**  
 The graphics system allows you to specify an arbitrary area of 
 the display which can be used in powerful graphics operations. 
 This section explains how to set up a path, a data structure 
 describing the outline of the area you want to specify.
 
-10. Video Drivers  
+10. **Video Drivers**  
 Most programmers can safely skip this section, but video game 
 writers might want to read it. This section includes some 
 advanced techniques for getting faster drawing rates.
 
-11. Windowing and Clipping  
+11. **Windowing and Clipping**  
 This section explains some of the work the graphics system 
 does to maintain windows in a Graphical User Interface. 
 Included is an in-depth look at clipping, along with some 
@@ -308,7 +308,7 @@ information about specific characters.
 
 When looking at the source code of sample applications, it's usually not too 
 hard to pick out the commands that do the actual drawing. Commands with 
-names like GrDraw-() generally are self-explanatory. It's not so easy to 
+names like **GrDraw...()** generally are self-explanatory. It's not so easy to 
 pick out the commands that set up an area in which the drawing will take 
 place. Part of the problem is that there are many ways to display graphics; 
 each is well suited for different tasks. This section of the chapter provides 
@@ -317,11 +317,11 @@ which situations are appropriate for each.
 
 When possible, the best way to learn how to perform a graphics action is to 
 look at code which performs a similar action. The sample program presented 
-in "First Steps: Hello World," Chapter 4 shows a simple graphics 
+in ["First Steps: Hello World," Chapter 4](cgetsta.md) shows a simple graphics 
 environment sufficient for many geodes. If you only need to change what is 
 being displayed (as opposed to how it is displayed), you can work straight 
 from the example, drawing different shapes using commands found in 
-"Drawing Graphics," Chapter 24. Most basic graphics techniques are used in 
+["Drawing Graphics," Chapter 24](cshapes.md). Most basic graphics techniques are used in 
 one sample program or another. By combining and adapting code from the 
 sample programs, you can take care of most simple graphics needs.
 
@@ -331,7 +331,7 @@ consider when deciding what sort of graphics environment to set up.
 + Sometimes the only graphics commands in a geode will be those used to 
 define that geode's program icon. This is a common enough case that 
 instructions for setting up your geode's icon are in the program topics 
-section, section 6.2 of chapter 6.
+section, [section 6.2 of chapter 6](cappl.md#62-creating-incons).
 
 + Will existing generic UI gadgetry be sufficient for everything you want to 
 display? If you're writing a utility, it might be. If you're writing an arcade 
@@ -349,7 +349,7 @@ ready to find out which pieces of graphics machinery are right for you.
 
 For custom graphics that will appear in a view, the content object of the 
 GenView must be prepared to issue graphics commands. A common tactic is 
-to create a subclass of VisContentClass and let an object of this subclass act 
+to create a subclass of **VisContentClass** and let an object of this subclass act 
 as the content for a view. The subclass would very likely have a specialized 
 MSG_VIS_DRAW. The Process object is another popular choice for the view's 
 output descriptor. In this case, the process must be prepared to intercept any 
@@ -357,14 +357,14 @@ messages the view is likely to send, with MSG_META_EXPOSED and
 MSG_VIS_DRAW of the most interest. Whichever object, process or content, is 
 the content of a view can respond to MSG_META_EXPOSED or 
 MSG_VIS_DRAW by calling kernel graphics routines. For more information on 
-how to use these objects, see "GenView," Chapter 9 of the Object Reference 
-Book.
+how to use these objects, see ["GenView," Chapter 9](../Objects/ogenvew.md) 
+of the Object Reference Book.
 
 Geodes that wish to allow the user to edit graphical elements would do well 
 to incorporate a Graphic Object into their hierarchies. These objects have 
 considerable power and include UI to allow the user to work graphics within 
-them. See "Graphic Object Library," Chapter 18 of the Object Reference Book 
-for more information about these object classes.
+them. See ["Graphic Object Library," Chapter 18](../Objects/cgrobj.md) of the 
+Object Reference Book for more information about these object classes.
 
 As you learn more advanced graphics concepts you may discover shortcuts. 
 As you get deeper into graphics, you should keep a cardinal rule in mind. Any 
@@ -411,27 +411,27 @@ MAX_COORD. Note that if you're going to be printing your document, you
 should restrict yourself to coordinates between -4096 to +4096 to account for 
 scaling to draw on high resolution printers. It is possible to define a 32-bit 
 coordinate space, which gives more room but costs speed and memory. For 
-details about 32-bit spaces, see section 23.5.5 on page 823.
+details about 32-bit spaces, see [section 23.5.5](#2355-larger-document-spaces).
 
 Whenever you draw something, you must specify the coordinates where that 
 thing will be drawn. The coordinates you pass specify where in the coordinate 
 plane that thing will be drawn; the plane, in turn, may be translated, scaled, 
-and/or rotated from the standard window coordinate system (see section 
-23.5.2 on page 812).
+and/or rotated from the standard window coordinate system (see [section 
+23.5.2](#2352-coordinate-transformations)).
 
 The system also maintains a device coordinate system, with a device pixel 
 defined as the unit of the grid. This is the type of coordinate system most 
 programmers are used to, but it is certainly not device independent. The 
 graphics system will do all the worrying about device coordinates so your 
-program doesn't have to. (Note, however, that GrDrawImage(), 
-GrDrawHugeImage(), and GrBrushPolyline() are more 
-device-dependant than most routines; see section 24.2.10 of chapter 24 and 
-section 24.2.8 of chapter 24 for information on these routines).
+program doesn't have to. (Note, however, that **GrDrawImage()**, 
+**GrDrawHugeImage()**, and **GrBrushPolyline()** are more device-dependant than most 
+routines; see section [24.2.10 of chapter 24](cshapes.md#24210-drawing-bitmaps) and 
+[section 24.2.8 of chapter 24](2428-polylines-and-polygons) for information on these routines).
 
 Standard GEOS coordinates depart from the device model, taking an 
 approach closer to a pure mathematical Cartesian plane. Programmers used 
 to working with device-based coordinates are especially encouraged to read 
-section 23.5.4 on page 819 to learn about some of the differences. 
+[section 23.5.4](#2354-device-coordinates) to learn about some of the differences. 
 
 #### 23.5.2 Coordinate Transformations
 
@@ -496,26 +496,26 @@ GrRestoreTransform()
 If you find yourself using transformations at all, they will probably all be 
 rotations, scalings, and translations. The GEOS graphics system includes 
 commands to apply these kinds of transformations to your coordinate system, 
-taking the form GrApplyTransformation(). These commands work with a 
+taking the form **GrApplyTransformation()**. These commands work with a 
 transformation data structure associated with the Graphics State, so 
 everything drawn in that Graphics State will be suitably transformed. 
 Figure 23-4 illustrates the effects of these transformations.
 
-GrApplyRotation() rotates the coordinate space, turning it 
+**GrApplyRotation()** rotates the coordinate space, turning it 
 counterclockwise around the origin. All objects drawn after the rotation will 
 appear as if someone had turned their drawing surface to a new angle. With 
 a 90° rotation, a shape centered at  would draw as if centered at. 
 Anything drawn centered at the origin would not change position but would 
 be drawn with the new orientation. 
 
-GrApplyScale() resizes the coordinate space; this is useful for zooming in 
+**GrApplyScale()** resizes the coordinate space; this is useful for zooming in 
 and out. After applying a scale to double the size of everything in the x and y 
 directions, everything will be drawn twice as big, centered twice as far away 
 from the origin. Applying a negative scale causes objects to be drawn with the 
 scale suggested by the magnitude of the scaling factor but "flipped over" to 
 the other side of the coordinate axes.
 
-GrApplyTranslation() causes the coordinate system to be shifted over. 
+**GrApplyTranslation()** causes the coordinate system to be shifted over. 
 After a translation, everything will be drawn at a new position, with no 
 change in orientation or size. 
 
@@ -524,20 +524,20 @@ transformation: rotate the other way, translate in the opposite direction, or
 scale with the inverse factor. 
 
 To undo the effects of all prior transformations, return to the default 
-transformation matrix using the GrSetDefaultTransform() command. The 
-routine GrSetNullTransform() sets the Graphics State transformation to 
+transformation matrix using the **GrSetDefaultTransform()** command. The 
+routine **GrSetNullTransform()** sets the Graphics State transformation to 
 the null transform-nullifying not only your transformations, but any the 
 system may have imposed as well. For the most part, you should avoid using 
-the GrSetNullTransform() command and use the 
-GrSetDefaultTransform() instead. You can change the default 
-transformation matrix using GrInitDefaultTransform(), but this is 
+the **GrSetNullTransform()** command and use the 
+**GrSetDefaultTransform()** instead. You can change the default 
+transformation matrix using **GrInitDefaultTransform()**, but this is 
 generally a bad idea since the windowing system works with the default 
 transformation, and if a geode begins making capricious changes, this can 
 produce strange images. 
 
 There are "push" and "pop" operations for transformations. To keep a record 
-of the GState's current transformation, call GrSaveTransform(). To restore 
-the saved transformation, call GrRestoreTransform().
+of the GState's current transformation, call **GrSaveTransform()**. To restore 
+the saved transformation, call **GrRestoreTransform()**.
 
 ##### 23.5.2.2 Complicated Transformations
 
@@ -556,7 +556,7 @@ transformations. The constants (0, 0, and 1 respectively) allow these
 transformation matrices to be composed. For example, multiplying a scaling 
 matrix with a rotation matrix creates a matrix which represents a combined 
 scaling and rotation. The six variable matrix elements are stored in a 
-TransMatrix structure.
+**TransMatrix** structure.
 
 ![](Art/equation_23-1.png)  
 **Equation 23-1** Transformation Matrices  
@@ -581,17 +581,17 @@ recent transformation._
 If you know that there's a particular combination of transformations you're 
 going to be using a lot, you can do some math in advance to compute your own 
 transformation matrix, then apply the raw matrix as a transformation using 
-GrApplyTransform(). Equation 23-3 shows the matrices corresponding to 
+**GrApplyTransform()**. Equation 23-3 shows the matrices corresponding to 
 the simple transformations. To replace the GState's current transformation 
-matrix with the matrix of your choice, use GrSetTransform(). To find out 
-the current transformation, call GrGetTransform().
+matrix with the matrix of your choice, use **GrSetTransform()**. To find out 
+the current transformation, call **GrGetTransform()**.
 
 ![](Art/equation_23-3.png)  
 **Equation 23-3** Matrices for Standard Transformations
 
-GrTransformByMatrix() returns the results of transforming a passed 
+**GrTransformByMatrix()** returns the results of transforming a passed 
 coordinate pair using an arbitrary transformation matrix. 
-GrUntransformByMatrix() performs the reverse operation, returning the 
+**GrUntransformByMatrix()** performs the reverse operation, returning the 
 coordinates which would have transformed to the passed coordinates.
 
 Sometimes you have to be careful about the order in which these 
@@ -619,9 +619,9 @@ approach is limited and may result in confusing code.
 Another way to make precise drawings is to use the graphics commands 
 which have been specially set up to take more precise coordinates. These 
 commands will not be described in detail here, but keep them in mind when 
-planning ultra-high resolution applications. GrRelMoveTo(), 
-GrDrawRelLineTo(), GrDrawRelCurveTo(), and 
-GrDrawRelArc3PointTo() take WWFixed coordinates, and are thus 
+planning ultra-high resolution applications. G**rRelMoveTo()**, 
+**GrDrawRelLineTo()**, **GrDrawRelCurveTo()**, and 
+**GrDrawRelArc3PointTo()** take **WWFixed** coordinates, and are thus 
 accurate to a fraction of a point. To draw a precise outline, use these 
 commands to draw the components of the outline. To fill an area, use the 
 precise drawing commands to describe the path forming the outline of the 
@@ -716,17 +716,17 @@ GrUntransformWWFixed()
 
 Given a coordinate pair, at times it's convenient to know the corresponding 
 device coordinates. Sometimes the reverse is true. Use these functions to 
-convert a coordinate pair to device coordinates or vice versa. GrTransform() 
-takes a coordinate pair and returns device coordinates. GrUntransform() 
+convert a coordinate pair to device coordinates or vice versa. **GrTransform()** 
+takes a coordinate pair and returns device coordinates. **GrUntransform()** 
 does the reverse. If you want to be able to get a more exact value for these 
-coordinates you can use GrTransformWWFixed() and 
-GrUntransformWWFixed(). These return fixed point values so you can do 
+coordinates you can use **GrTransformWWFixed()** and 
+**GrUntransformWWFixed()**. These return fixed point values so you can do 
 other math on them before rounding off to get a whole number that the 
 graphics system can use.
 
 To transform points through an arbitrary transformation instead of to device 
-coordinates, use the GrTransformByMatrix() or 
-GrUntransformByMatrix() routines, described previously.
+coordinates, use the **GrTransformByMatrix()** or 
+**GrUntransformByMatrix()** routines, described previously.
 
 #### 23.5.5 Larger Document Spaces
 
@@ -767,8 +767,8 @@ you'll probably want to do so in a 32-bit content.
 The standard graphics commands can only draw to one 16 bit space at a time. 
 You will need to translate the coordinate space to choose which 16-bit portion 
 of the 32-bit space you want to draw to. To do so you need to use some special 
-translation functions. GrApplyDWordTranslation() corresponds to the 
-GrApplyTranslation() function normally used.You can use this routine to 
+translation functions. **GrApplyDWordTranslation()** corresponds to the 
+**GrApplyTranslation()** function normally used.You can use this routine to 
 make the jumps necessary to access far away portions of the graphics space. 
 Since a coordinate can now be in a much larger area than before, all routines 
 that deal with a point's position have 32-bit equivalents.
@@ -782,10 +782,10 @@ again before drawing this rectangle. Rectangle B is not only partially out of
 reach of the origin, it's too big to fit inside of a 16-bit space. In order to draw 
 this rectangle, you would have to divide it into two pieces._
 
-GrTransformDWord() and GrUntransformDWord() take the place of 
-GrTransform() and GrUntransform(). GrTransformDWFixed() and 
-GrUntransformDWFixed() take the place of GrTransformWWFixed() 
-and GrUntransformWWFixed(), with two words in the integer part of the 
+**GrTransformDWord()** and **GrUntransformDWord()** take the place of 
+**GrTransform()** and **GrUntransform()**. **GrTransformDWFixed()** and 
+**GrUntransformDWFixed()** take the place of **GrTransformWWFixed()** 
+and **GrUntransformWWFixed()**, with two words in the integer part of the 
 number instead of one.
 
 #### 23.5.6 Current Position
@@ -802,15 +802,15 @@ work with the pen position, so you could then draw a line from the current
 position to (30, 30). The line would extend from (20, 20) to (30, 30), and the 
 pen would then be at (30, 30). 
 
-Calling GrMoveTo() moves the pen position to coordinates of your choice. 
-GrRelMoveTo() moves the pen to a location relative to its present position. 
-GrRelMoveTo() takes coordinates accurate to a fraction of a point, allowing 
-for very precise placement. Call GrGetCurPos() to get the current position, 
-GrGetCurPosWWFixed() to do so with greater accuracy.
+Calling **GrMoveTo()** moves the pen position to coordinates of your choice. 
+**GrRelMoveTo()** moves the pen to a location relative to its present position. 
+**GrRelMoveTo()** takes coordinates accurate to a fraction of a point, allowing 
+for very precise placement. Call **GrGetCurPos()** to get the current position, 
+**GrGetCurPosWWFixed()** to do so with greater accuracy.
 
 There are some guidelines to follow when figuring out where your pen 
 position is going to end up after a draw operation. If you call the 
-GrDrawLineTo() procedure, the pen will end up at the point drawn to. If 
+**GrDrawLineTo()** procedure, the pen will end up at the point drawn to. If 
 you call any draw/fill procedure that takes two points as arguments, the pen 
 position usually ends up at the second point passed; if it does not, the 
 reference entry will note where the pen position ends. When text draws at the 
@@ -911,37 +911,37 @@ Many drawing routines are called by MSG_VIS_DRAW. This message provides
 a GState, and all routines in the handlers for this message should use the 
 provided GState. Creating a new GState under these circumstances is 
 unnecessary and wasteful. However, sometimes you will need to create a 
-GState. GrCreateState() creates a GState with the default characteristics. 
+GState. **GrCreateState()** creates a GState with the default characteristics. 
 You must specify the window with which the GState will be associated.
 
 Commands which change drawing attributes or the current position change 
 the GState. 
 
-GrDestroyState() is used to get rid of a GState, freeing the memory to be 
+**GrDestroyState()** is used to get rid of a GState, freeing the memory to be 
 used by other things. If GStates are created but not destroyed, eventually 
-they will take too much memory. Normally, for each call to GrCreateState() 
-there is a corresponding GrDestroyState(). MSG_VIS_DRAW handlers don't 
+they will take too much memory. Normally, for each call to **GrCreateState()** 
+there is a corresponding **GrDestroyState()**. MSG_VIS_DRAW handlers don't 
 need to destroy the passed GState. Graphics states are cached so that 
-GrCreateState() and GrDestroyState() don't normally need to call 
-MemAlloc() or MemFree(). When GStates are freed, their space is added to 
+**GrCreateState()** and **GrDestroyState()** don't normally need to call 
+**MemAlloc()** or **MemFree()**. When GStates are freed, their space is added to 
 the cache. When the memory manager needs to find space on the heap, it 
 flushes the cache.
 
-A geode is most likely to call GrCreateState() when about to draw a piece 
+A geode is most likely to call **GrCreateState()** when about to draw a piece 
 of geode-defined UI. Other than that, you'll probably be using GStates 
 provided to you by the system. You might want to create a GState if you 
 wanted to calculate something (perhaps the length, in inches, of a text string) 
 when you had no appropriate GState.
 
-GrSaveState() provides a sort of "push" operation that works with GStates. 
-When you call certain functions, like GrSetAreaColor(), new values will 
+**GrSaveState()** provides a sort of "push" operation that works with GStates. 
+When you call certain functions, like **GrSetAreaColor()**, new values will 
 wipe out the values of the old GState. But if you've previously called 
-GrSaveState(), then any time you call GrRestoreState() on your saved 
+**GrSaveState()**, then any time you call **GrRestoreState()** on your saved 
 state, it will come back and displace the current state. Your application can 
 save a GState to save a commonly used clipping region, which could then be 
 restored by restoring the state instead of repeating all the operations needed 
-to duplicate the region. GrSaveTransform() and GrRestoreTransform() 
-are optimizations of GrSaveState() and GrRestoreState(), but they only 
+to duplicate the region. **GrSaveTransform()** and **GrRestoreTransform()** 
+are optimizations of **GrSaveState()** and **GrRestoreState()**, but they only 
 preserve the GState's transformation.
 
 ### 23.7 Working With Bitmaps
@@ -962,21 +962,21 @@ support. It has kernel routines to create, modify, and draw bitmaps.
 There are three main ways to create a bitmap for an application to use. One 
 often used is to embed the data of a desired bitmap directly into a graphics 
 string. This is the way normally used for defining system icons. The other 
-common way is to call the kernel graphics routine GrCreateBitmap(). 
+common way is to call the kernel graphics routine **GrCreateBitmap()**. 
 Another way to create a bitmap, not used so often, is to manipulate memory 
 directly: The formats used for describing bitmaps are public, and though it 
-would be easier in most cases to work through GrCreateBitmap(), those 
+would be easier in most cases to work through **GrCreateBitmap()**, those 
 with specialized needs might want to create their bitmap data structures 
 from scratch.
 
-The GrCreateBitmap() routine creates an offscreen bitmap and returns a 
+The **GrCreateBitmap()** routine creates an offscreen bitmap and returns a 
 Graphics State which can be drawn to; changes to this Graphics State 
 become changes to the offscreen bitmap. For example, calling 
-GrDrawLine() and passing the Graphics State provided with such a bitmap 
+**GrDrawLine()** and passing the Graphics State provided with such a bitmap 
 would result in a bitmap depicting a line. To display this bitmap, call the 
-GrFillBitmap(), GrDrawHugeBitmap(), GrDrawImage(), or 
-GrDrawHugeImage() commands in another graphics space (see section 
-24.2.10 of chapter 24).
+**GrFillBitmap()**, **GrDrawHugeBitmap()**, **GrDrawImage()**, or 
+**GrDrawHugeImage()** commands in another graphics space (see [section 
+24.2.10 of chapter 24](cshapes.md#24210-drawing-bitmaps)).
 
 When creating a bitmap, you must make choices about what sort of bitmap 
 you want. Depending on your choices, GEOS will be able to use a variety of 
@@ -998,33 +998,33 @@ horizontal and vertical resolution. They are very useful for working with
 bitmaps that may have been captured on other systems or for working with 
 display devices.
 
-The GrDestroyBitmap() routine destroys some or all of the information 
+The **GrDestroyBitmap()** routine destroys some or all of the information 
 associated with a bitmap. You may use this function to free all memory taken 
 up by the bitmap. You may also use this function to free only the GState 
-associated with a bitmap by GrCreateBitmap(), but leave the bitmap's data 
-alone; the BMDestroy argument will determine exactly what is destroyed. 
+associated with a bitmap by **GrCreateBitmap()**, but leave the bitmap's data 
+alone; the **BMDestroy** argument will determine exactly what is destroyed. 
 This usage comes in handy for those times when a bitmap will not be 
 changing, but will be drawn. Large bitmaps are stored in HugeArrays so they 
 won't take up inordinate amounts of RAM; of course it's always wise to free 
 the memory associated with a bitmap when that bitmap is no longer needed.
 
 If you have freed the GState associated with a huge bitmap using 
-GrDestroyBitmap() but want to make changes to the bitmap, all is not lost. 
-Call GrEditBitmap() to associate a new GState with the bitmap. Be careful, 
+**GrDestroyBitmap()** but want to make changes to the bitmap, all is not lost. 
+Call **GrEditBitmap()** to associate a new GState with the bitmap. Be careful, 
 however; the bitmap will not recall anything about the old GState, so you 
 must set up colors, patterns, and other such information again. To update the 
-VM file used to store a bitmap (if any), call GrSetVMFile().
+VM file used to store a bitmap (if any), call **GrSetVMFile()**.
 
-GrClearBitmap() clears the data from a bitmap.
+**GrClearBitmap()** clears the data from a bitmap.
 
-GrGetPoint() can retrieve information from a bitmap, returning its color 
+**GrGetPoint()** can retrieve information from a bitmap, returning its color 
 value for some location. It works with all sorts of display areas, not just 
 bitmaps. It is mentioned here because of its usefulness for those who wish to 
 be able to exercise effects on their bitmaps.
 
-GrSetBitmapMode() gives you control over how drawing commands will 
+**GrSetBitmapMode()** gives you control over how drawing commands will 
 affect the bitmap. If your bitmap has a mask, use this routine to switch 
-between editing the mask and the bitmap itself; the BitmapMode argument 
+between editing the mask and the bitmap itself; the **BitmapMode** argument 
 will specify what is to be edited.
 
 This routine also gives you control over how monochrome bitmaps should 
@@ -1033,7 +1033,7 @@ system tries to approximate the color using dithering. It turns some pixels on
 and some pixels off in an attempt to simulate the color's brightness. A 
 crimson area would appear with most pixels black, and thus rather dark. A 
 pink area on the other hand would have mostly white pixels, and thus appear 
-light. GrSetBitmapMode() can change which strategy GEOS will use when 
+light. **GrSetBitmapMode()** can change which strategy GEOS will use when 
 deciding which pixels to turn on. If you wish to use "dispersed" dithering, the 
 pixels turned on will be spread out evenly, resulting in a smooth gray. 
 However, some output devices (notably certain printers) have trouble 
@@ -1054,19 +1054,19 @@ RGB bitmaps are looking somewhat washed out, you might set up a table so
 that reds would be boosted. RGBT_red[1] might be 16, RGBT_red[2] 23, so 
 that the device would use more than the standard amount of the red component. 
 
-GrGetBitmapMode() returns the current bitmap editing mode.
+**GrGetBitmapMode()** returns the current bitmap editing mode.
 
-GrSetBitmapRes() works with complex bitmaps, changing their resolution. 
+**GrSetBitmapRes()** works with complex bitmaps, changing their resolution. 
 Because simple bitmaps are assumed to be 72 dpi, their resolution cannot be 
-changed unless they are turned into complex bitmaps. GrGetBitmapRes() 
+changed unless they are turned into complex bitmaps. **GrGetBitmapRes()** 
 returns the resolution associated with a complex bitmap.
 
-GrGetBitmapSize() returns a bitmap's size in points. This function might 
+**GrGetBitmapSize()** returns a bitmap's size in points. This function might 
 be useful for quickly determining how much space to set aside when 
-displaying the bitmap. GrGetHugeBitmapSize() retrieves the size of a 
+displaying the bitmap. **GrGetHugeBitmapSize()** retrieves the size of a 
 bitmap stored in a HugeArray.
 
-Use GrCompactBitmap() and GrUncompactBitmap() to compact and 
+Use **GrCompactBitmap()** and **GrUncompactBitmap()** to compact and 
 uncompact bitmaps. Compacted bitmaps take up less memory; uncompacted 
 bitmaps draw more quickly. Note that the bitmap drawing routines can 
 handle compacted and uncompacted bitmaps. These functions are here to aid 
@@ -1090,7 +1090,7 @@ GStrings may reside an a number of types of memory areas. Depending on
 the GString's storage, you will have to do different things to load it. One 
 common case we have already discussed to some extent is when the GString 
 is part of a visual moniker. In this case, the gstring will be stored in the 
-gstring field of the @visMoniker's implied structure. In this case the UI will 
+gstring field of the **@visMoniker**'s implied structure. In this case the UI will 
 do all loading and drawing of the GString.
 
 The GString data itself consists of a string of byte-length number values. The 
@@ -1143,43 +1143,43 @@ many GString operations will involve a GState. This special GState may be
 used to edit the contents of the GString. Don't confuse the GString's handle 
 with that of its associated data. _
 
-To dynamically create an empty GString, call the GrCreateGString() 
+To dynamically create an empty GString, call the **GrCreateGString()** 
 routine. You must decide where you want the GString to be stored-either in 
 a chunk, a VM block, or a stream. If you wish to store the GString in a chunk 
 or VM block, a memory unit of the appropriate type will be allocated for you. 
 This routines will return the GState by which the GString may be edited and 
 the chunk or VM block created.
 
-The GrDestroyGString() routine allows you to free up the GState handle 
+The **GrDestroyGString()** routine allows you to free up the GState handle 
 associated with your GString You may also destroy the GString's data if you 
 wish; specify exactly what you want to destroy by means of the 
 GStringKillType argument. In addition, you may destroy another GState. 
 You must pass the global handle of the GString to destroy-this will be the 
-handle returned by GrCreateGString(), GrEditGString(), or GrLoadGString().
+handle returned by **GrCreateGString()**, **GrEditGString()**, or **GrLoadGString()**.
 
-The GrLoadGString() command loads a GString into a global memory 
+The **GrLoadGString()** command loads a GString into a global memory 
 block so that it may be drawn. Actually, it doesn't load the entire GString into 
 memory, but does initialize the data structure so that it may be referenced 
 through the global memory handle which the routine returns.
 
-The GrEditGString() command is very much like GrCreateGString(), 
+The **GrEditGString()** command is very much like **GrCreateGString()**, 
 except that instead of creating a new GString, it allows you to dynamically 
 edit an existing GString. This command loads a VM-based GString into a 
-special data structure. Like GrCreateGString(), it returns a GState to 
+special data structure. Like **GrCreateGString()**, it returns a GState to 
 which you may make drawing commands. You may insert or delete drawing 
 commands while in this mode, all using kernel drawing routines. For more 
-information about using this routine, see "Editing GStrings Dynamically" on 
-page 846.
+information about using this routine, see ["Editing GStrings Dynamically"]
+(#2386-editing-gstrings-dynamically).
 
-The GrCopyGString() command copies the contents of one GString to 
+The **GrCopyGString()** command copies the contents of one GString to 
 another. At first you might think that you could do this by allocating the 
-target GString with GrCreateGString(), then drawing the source GString 
+target GString with **GrCreateGString()**, then drawing the source GString 
 to the provided GState. However, the GState may only have one GString 
 associated with it, whether that GString is being used as a source or target.
 
 To find the handle of the GString data associated with a GState, call 
-GrGetGStringHandle(). To update the VM file associated with a GString 
-(perhaps after calling VMSave()), use GrSetVMFile().
+**GrGetGStringHandle()**. To update the VM file associated with a GString 
+(perhaps after calling **VMSave()**), use **GrSetVMFile()**.
 
 #### 23.8.2 Special Drawing Commands
 
@@ -1191,20 +1191,20 @@ used when drawing to any graphics space, are normally only used when
 describing GStrings. Most of these commands have no visible effect, but only 
 serve to provide the GString with certain control codes.
 
-The most commonly used of these routines is GrEndGString(). This signals 
+The most commonly used of these routines is **GrEndGString()**. This signals 
 that you are done describing the GString, writing a GR_END_GSTRING to the 
 GString. This routine will let you know if there was an error while creating 
 the GString (if the storage device ran out of space). Its macro equivalent is 
-GSEndString().
+**GSEndString()**.
 
-The GrNewPage() routine signals that the GString is about to start 
+The **GrNewPage()** routine signals that the GString is about to start 
 describing another page. GStrings are used to describe things to be sent to 
 the printer, and unsurprisingly, this routine is often used in that context. An 
 example of a prototype multi-page printing loop is shown inCode 
-Display 23-1. Whether or not it is drawing to a GString, GrNewPage() 
+Display 23-1. Whether or not it is drawing to a GString, **GrNewPage()** 
 causes the GState to revert to the default. When calling this routine, specify 
 whether or not a form-feed signal should be generated by means of the 
-PageEndCommand argument.
+**PageEndCommand** argument.
 
 ---
 Code Display 23-1 Multi-Page Printing Loop
@@ -1223,7 +1223,7 @@ for (curPage=0; curPage < numberOfPages; curPage++) {
 	GrNewPage(gstate, PEC_NO_FORM_FEED );}
 ~~~
 
-The GrLabel() routine inserts a special element into the GString. This 
+The **GrLabel()** routine inserts a special element into the GString. This 
 element does not draw anything. However, these GString labels, as they are 
 called, are often used like labels in code. By using GString drawing routines 
 with a certain option (described below), you may "jump" to this label and 
@@ -1231,7 +1231,7 @@ start drawing from that point in the GString. Alternately, you could start at
 some other part of the GString and automatically draw until you 
 encountered that label.
 
-The GrComment() routine inserts an arbitrary-length string of bytes into 
+The **GrComment()** routine inserts an arbitrary-length string of bytes into 
 the GString which the GString interpreter will ignore when drawing the 
 GString. You might use this to store anything from custom drawing 
 commands which only your geode has to be able to understand to a series of 
@@ -1247,18 +1247,18 @@ static const byte MyGString[] = {
 	GSEndString()};
 ~~~
 
-The GrNullOp() routine draws nothing and does nothing other than take up 
+The **GrNullOp()** routine draws nothing and does nothing other than take up 
 space in the GString (a single-byte element of value GR_NOP). You might use 
 it as a placeholder in the GString.
 
-The GrEscape() writes an escape code with accompanying data to the 
+The **GrEscape()** writes an escape code with accompanying data to the 
 GString. Most geodes do not use this functionality; you might use it to embed 
 special information in a TransferItemFormat based on GStrings.
 
 Depending on what the system will do with your GString, the bounds of the 
 GString may be used for many purposes. Normally the system determines 
 the bounds of a GString by traversing the whole GString and finding out how 
-much space it needs to draw. The GrSetGStringBounds() allows you to 
+much space it needs to draw. The **GrSetGStringBounds()** allows you to 
 optimize this, setting up a special GString element whose data contains the 
 bounds of the GString. You should call this routine early on in your GString 
 definition so that the system won't have to traverse very much of your 
@@ -1269,7 +1269,7 @@ GString to discover the special element.
 For most programmers, the first encounter with GStrings (often, in fact, their 
 first encounter with any sort of graphics mechanism) is with a program icon. 
 Often this program icon consists of one or more GStrings, each of which 
-contains a bitmap. These monikers are often set up using the @visMoniker 
+contains a bitmap. These monikers are often set up using the **@visMoniker** 
 keyword. This automatically stores the GString to a chunk. For an example 
 of a GString stored this way, see the appSMMoniker GString in Code 
 Display 23-3.
@@ -1349,7 +1349,7 @@ Notice that this example uses macros to set up the data for the GString. We
 could have just written the GString data as a series of numbers, as shown in 
 Code Display 23-4, but the macros are usually easier to read. Each macro's 
 name, you will notice, is taken from the corresponding graphics command 
-name. Thus the GSFillBitmap() macro corresponds to the GrFillBitmap() 
+name. Thus the **GSFillBitmap()** macro corresponds to the **GrFillBitmap()** 
 routine. There are no GSGet-() macros; GStrings have no return values or 
 conditional statements, and thus have no use for retrieving this sort of 
 information.
@@ -1376,7 +1376,7 @@ Just as all monikers are not GStrings, not all GStrings need be declared as
 monikers. See Code Display 23-5 for an example of a statically declared 
 GString taken from the Moniker sample application; here the declared 
 GString is eventually used as a moniker, but could just as well have been 
-passed to GrDrawGString() and drawn to an arbitrary graphics space.
+passed to **GrDrawGString()** and drawn to an arbitrary graphics space.
 
 ---
 Code Display 23-5 Statically Declared GString
@@ -1414,7 +1414,7 @@ elements to a GString, issue normal kernel drawing commands, but use a
 GState which is associated with the GString.
 
 To create a new, empty GString ready for editing (i.e. with an attached 
-GState), call GrCreateGString(). At this point, you may draw to the 
+GState), call **GrCreateGString()**. At this point, you may draw to the 
 GString using normal drawing commands. For an example of creating a 
 GString in this manner, see Code Display 23-6.
 
@@ -1450,7 +1450,7 @@ to keep in mind.
 + The GString must end with a GR_END_GSTRING element; when the 
 GString interpreter encounters this element, it knows to stop drawing. 
 When creating a GString dynamically, the normal way to assure this is 
-to call GrEndGString(). (Actually, this rule is not strictly true-when 
+to call **GrEndGString()**. (Actually, this rule is not strictly true-when 
 you learn more about drawing GStrings, you will see that it is possible to 
 stop GString drawing based on other cues. However, it's always safest to 
 end the GString with a GR_END_GSTRING in case some other application 
@@ -1491,16 +1491,16 @@ GString, not when you were drawing it.
 
 + Think carefully before making coordinate space transformations in 
 GStrings. If you want to remove all transformation effects, you should 
-always call GrSetDefaultTransform(), instead of 
-GrSetNullTransform(). By using GrSetDefaultTransform(), an 
+always call **GrSetDefaultTransform()**, instead of 
+**GrSetNullTransform()**. By using **GrSetDefaultTransform()**, an 
 application that is including your GString can apply some other type of 
 transformation and make that the default; your application will then 
 appear transformed as intended. However, if you call 
-GrSetNullTransform(), you ignore that default transform and will 
+**GrSetNullTransform()**, you ignore that default transform and will 
 appear in a strange way.
 
-+ If you use GrInitDefaultTransform(), you should probably bracket its 
-use with calls to GrSaveTransform() and GrRestoreTransform(). 
++ If you use **GrInitDefaultTransform()**, you should probably bracket its 
+use with calls to **GrSaveTransform()** and **GrRestoreTransform()**. 
 This save/restore pair will also save the current default transformation, 
 if there is one. By adding the save and restore, you will be preserving 
 whatever default transform the application including yours has set up.
@@ -1509,14 +1509,14 @@ whatever default transform the application including yours has set up.
 other application, consider the following: The print-to-file feature creates 
 a graphics string that can be imported into several other applications.
 
-+ If you think you have to use GrSetTransform(), try replacing it with a 
-GrSetDefaultTransform()/GrApplyTransform() pair. This will most 
++ If you think you have to use **GrSetTransform()**, try replacing it with a 
+**GrSetDefaultTransform()**/**GrApplyTransform()** pair. This will most 
 likely have the same effect, but will be more palatable to another 
 application using the GString.
 
 + If you are including some other externally-created Graphics String into 
-your document, you probably want to bracket it with GrSaveState() and 
-GrRestoreState().
+your document, you probably want to bracket it with **GrSaveState()** and 
+**GrRestoreState()**.
 
 + If you're creating a multi-page GString which might be printed, make 
 sure that each page is independent. There should be nothing assumed 
@@ -1559,10 +1559,10 @@ probably know that you pass a GString to a PrintControl object to describe
 print jobs.
 
 There is also a kernel graphics routine for drawing GStrings directly. The 
-GrDrawGString() command draws a GString, or a part thereof. Remember 
+**GrDrawGString()** command draws a GString, or a part thereof. Remember 
 that the GString must be loaded for drawing; you must call 
-GrLoadGString() if you have not done so already (or if you have destroyed 
-the GString since you last called GrLoadGString()).
+**GrLoadGString()** if you have not done so already (or if you have destroyed 
+the GString since you last called **GrLoadGString()**).
 
 ---
 Code Display 23-7 GrDrawGString() in Action
@@ -1603,62 +1603,62 @@ Code Display 23-7 GrDrawGString() in Action
 	FileDelete(fileString);
 ~~~
 
-The GrDrawGString() routine has several arguments. A simple usage of 
+The **GrDrawGString()** routine has several arguments. A simple usage of 
 the routine is shown in Code Display 23-7. To take advantage 
-of some of the more powerful features of GrDrawGString(), you should 
+of some of the more powerful features of **GrDrawGString()**, you should 
 know what the purpose of the arguments.
 
 + You must provide a GState to draw to. You may wish to call 
-GrSaveState() on the GState before drawing the GString (and call 
-GrRestoreState() afterwards). If you will draw anything else to this 
-GState after the GString, you must call GrDestroyGString() on the 
+**GrSaveState()** on the GState before drawing the GString (and call 
+**GrRestoreState()** afterwards). If you will draw anything else to this 
+GState after the GString, you must call **GrDestroyGString()** on the 
 GString, and pass this GState's handle as the gstate argument so that 
-GrDestroyGString() can clean up the GState.
+**GrDestroyGString()** can clean up the GState.
 
 + You must provide a GString to draw. The GString must be properly 
-loaded (probably by means of GrLoadGString()).
+loaded (probably by means of **GrLoadGString()**).
 
 + You can provide a pair of coordinates at which to draw the GString. The 
 graphics system will translate the coordinate system by these 
 coordinates before carrying out the graphics commands stored in the 
 GString.
 
-+ You can provide a GSControl argument which requests that the system 
++ You can provide a **GSControl** argument which requests that the system 
 stop drawing the GString when it encounters a certain type of GString 
 element. If the GString interpreter encounters one of these elements, it 
 will immediately stop drawing. The GString will remember where it 
-stopped drawing. If you call GrDrawGString() with that same GString, 
+stopped drawing. If you call **GrDrawGString()** with that same GString, 
 it will continue drawing where you left off. Note that any time a 
-GString-traversing function such as GrDrawGString() returns, it 
-returns a GSRetType value which makes it clear exactly why it stopped 
+GString-traversing function such as **GrDrawGString()** returns, it 
+returns a **GSRetType** value which makes it clear exactly why it stopped 
 traversing the GString.
 
-+ You must provide a pointer to an empty GStringElement structure. 
-GrDrawGString() will return a value here when it is finished drawing. 
++ You must provide a pointer to an empty **GStringElement** structure. 
+**GrDrawGString()** will return a value here when it is finished drawing. 
 If the GString has stopped drawing partway through due to a passed 
 GSControl, the returned GStringElement value will tell you what sort 
 of command was responsible for halting drawing. For instance, if you had 
-instructed GrDrawGString() to halt on an `output' element 
-(GrDraw-() or GrFill-() commands), then when GrDrawGString() 
+instructed **GrDrawGString()** to halt on an `output' element 
+(GrDraw-() or GrFill-() commands), then when **GrDrawGString()** 
 returns, you would check the value returned to see what sort of output 
 element was present.
 
 Note that those last two arguments aren't very useful except when used in 
 conjunction with some other GString routines which we will get to later.
 
-The GrDrawGStringAtCP() routine functions in much the same way as 
-GrDrawGString(), except that the current pen position will be used in the 
+The **GrDrawGStringAtCP()** routine functions in much the same way as 
+**GrDrawGString()**, except that the current pen position will be used in the 
 place of passed coordinate arguments.
 
-The GrSetGStringPos() routine allows you to skip any number of GString 
+The **GrSetGStringPos()** routine allows you to skip any number of GString 
 elements, or go back to the beginning or end of the GString. You specify 
 whether you want to skip to the beginning, end, or ahead by a few steps; this 
-is specified by the GStringSetPosType argument. This routine is useful 
+is specified by the **GStringSetPosType** argument. This routine is useful 
 both when drawing and editing GStrings. Note that you may also use this 
 routine to jump backwards in a GString, but this only works with VM-based 
 GStrings. The GString must be loaded for drawing or editing, and you will 
-pass in the GString's global handle, as supplied by GrLoadGString() or 
-GrEditGString().
+pass in the GString's global handle, as supplied by **GrLoadGString()** or 
+**GrEditGString()**.
 
 ---
 Code Display 23-8 GrSetGStringPos() In Action
@@ -1677,13 +1677,13 @@ Code Display 23-8 GrSetGStringPos() In Action
 
 Because a GString remembers its place when you stop drawing partway 
 through, if you wish to `reset' the GString position, you should use 
-GrSetGStringPos() to set it back to the beginning.
+**GrSetGStringPos()** to set it back to the beginning.
 
 Occasionally you may be curious to know how much space is necessary to 
-draw a GString. The GrGetGStringBounds() routine determines this, 
+draw a GString. The **GrGetGStringBounds()** routine determines this, 
 returning the coordinates describing the GString's bounding rectangle. If the 
 GString may have very large bounds, you should use the 
-GrGetGStringBoundsDWord() routine instead.
+**GrGetGStringBoundsDWord()** routine instead.
 
 #### 23.8.6 Editing GStrings Dynamically
 
@@ -1694,15 +1694,15 @@ might create a sort of template GString and want to fill in some parts at a
 later time. If you will draw several similar GStrings, it might be nice to use 
 a single GString, but change only certain parts before drawing each time.
 
-GrEditGString() allows you to edit an existing GString. It only works with 
-VM-based GStrings. Calling GrEditGString() allocates a new GState and 
+**GrEditGString()** allows you to edit an existing GString. It only works with 
+VM-based GStrings. Calling **GrEditGString()** allocates a new GState and 
 associates it with the GString. Any drawing commands to this GState will be 
-appended to the GString. You may use GrDrawGString() (along with 
-appropriate GSControl values) and GrSetGStringPos() to change position 
+appended to the GString. You may use **GrDrawGString()** (along with 
+appropriate GSControl values) and **GrSetGStringPos()** to change position 
 within the GString, allowing you to insert new commands into the middle of 
 the GString.
 
-The GrDeleteGStringElement() routine allows you to delete any number 
+The **GrDeleteGStringElement()** routine allows you to delete any number 
 of GString elements. The elements deleted will be taken starting at your 
 position in the GString. This command only works while editing the GString, 
 and you must pass the GString's editing GState handle to this routine.
@@ -1714,10 +1714,10 @@ GrGetGStringElement(), GrParseGString()
 For complicated GString operations, you may find the following advanced 
 routines helpful.
 
-GrGetGStringElement() returns the raw data associated with the current 
+**GrGetGStringElement()** returns the raw data associated with the current 
 GString element. To understand this stream of bytes, you must know what 
 sorts of data are associated with each kind of GString element. For example 
-GrGetGStringElement () might return GR_DRAW_RECT with the following 
+**GrGetGStringElement()** might return GR_DRAW_RECT with the following 
 buffer of bytes:
 
 ~~~
@@ -1728,7 +1728,7 @@ GR_DRAW_RECT, 0x00, 0x48, 0x00, 0x24,
 You must know enough about GString element structures to know that this 
 will draw a rectangle with bounds {72, 36, 144, 108}. To find out this sort of 
 information, examine the GS-() macros, or search gstring.h for macros 
-containing the appropriate GStringElement value.
+containing the appropriate **GStringElement** value.
 
 ---
 Code Display 23-9 GrGetGStringElement() In Action
@@ -1777,20 +1777,20 @@ Code Display 23-9 GrGetGStringElement() In Action
 		}
 ~~~
 
-The GrParseGString() command calls a callback routine on all elements of 
+The **GrParseGString()** command calls a callback routine on all elements of 
 a GString which match some criterion. The routine may save information 
 about the elements, draw to a GState, or something completely different. 
-GrParseGString() takes the following arguments:
+**GrParseGString()** takes the following arguments:
 
 + GString to parse.
 
-+ GState handle. GrParseGString() itself will do nothing with this 
++ GState handle. **GrParseGString()** itself will do nothing with this 
 handle, and passing a NULL handle is permitted. However, this GState 
 will be passed to the callback routine. If your callback routine will draw, 
 it is thus convenient to pass a properly initialized GState to 
-GrParseGString() which the callback routine may then draw to.
+**GrParseGString()** which the callback routine may then draw to.
 
-+ A record of type GSControl. This will determine which elements will be 
++ A record of type **GSControl**. This will determine which elements will be 
 passed on to the callback routine. If you set GSC_OUTPUT, the callback 
 routine will be called only for those GString elements which draw 
 something. If you set GSC_ONE, the callback routine will be called upon 
@@ -1799,7 +1799,7 @@ all of the GString elements.
 + Far pointer to the callback routine itself.
 
 The callback routine is passed a pointer to the GString element and the 
-handle of the GState that was passed to GrParseGString().
+handle of the GState that was passed to **GrParseGString()**.
 
 ### 23.9 Graphics Paths
 
@@ -1850,8 +1850,8 @@ If the path is to be filled using the winding rule, it is important that all edg
 go the correct direction. The winding rule algorithm assumes that the region 
 is described by edges that go around it counterclockwise. Edges going 
 clockwise describe hollows. The odd/even fill rule will work independently of 
-path direction. See section 24.2.11 of chapter 24 for more information about 
-winding rules.
+path direction. See section [24.2.11 of chapter 24](cshapes.md#24211-paths) for more 
+information about winding rules.
 
 Both the winding and odd/even fill rules demand closed path elements. If any 
 path elements are not filled, the routine will treat them as if they were, 
@@ -1864,40 +1864,39 @@ regions described by the paths should be combined, whether the intersection
 or union should be taken. Any number of paths can be combined in this 
 manner.
 
-GrBeginPath() signals that the geode is about to start describing a path. All 
+**GrBeginPath()** signals that the geode is about to start describing a path. All 
 drawing commands directed at the GState will go into constructing the path 
-until GrEndPath() is called. GrBeginPath() is also the routine used to 
-combine a path with an existing path. Calling GrBeginPath() when already 
+until **GrEndPath()** is called. **GrBeginPath()** is also the routine used to 
+combine a path with an existing path. Calling **GrBeginPath()** when already 
 constructing a path signals that further graphics commands should describe 
 a new path to be combined with the existing one. The new path can either 
 replace the existing one or combine to find the intersection or the union.
 
-GrCloseSubPath() closes the current path element, adding a straight line 
+**GrCloseSubPath()** closes the current path element, adding a straight line 
 segment from the current position to the starting point if necessary.
 
- GrGetPathBounds() returns the bounding coordinates of a rectangle that 
-completely encloses the current path. GrTestPointInPath() tests whether 
-a passed point falls within the current path. GrGetPathPoints() returns all 
-the points along a path in the order visited. GrGetPathRegion() returns 
-the region defined by the path. GrGetPathBoundsDWord() returns the 
+**GrGetPathBounds()** returns the bounding coordinates of a rectangle that 
+completely encloses the current path. **GrTestPointInPath()** tests whether 
+a passed point falls within the current path. **GrGetPathPoints()** returns all 
+the points along a path in the order visited. **GrGetPathRegion()** returns 
+the region defined by the path. **GrGetPathBoundsDWord()** returns the 
 bounds of the path and works in a 32-bit graphics space. If you just want to 
-know whether or not a given path exists, then call GrTestPath(), passing 
-the GetPathType GPT_CURRENT.
+know whether or not a given path exists, then call **GrTestPath()**, passing 
+the **GetPathType** GPT_CURRENT.
 
-GrSetStrokePath() replaces the current path with the one that would 
+**GrSetStrokePath()** replaces the current path with the one that would 
 result from "stroking" (drawing) the current path with the current line 
 attributes. For example, if the current line style is a dotted line, the result 
 will most likely be a set of many skinny regions. At this time, stroke paths 
 cannot be used for clipping purposes. However, geodes can still draw and fill 
 these paths.
 
-Paths can be drawn or filled using the GrDrawPath() and GrFillPath() 
-commands. For more information about these routines, see section 24.2.11 of 
-chapter 24.
+Paths can be drawn or filled using the **GrDrawPath()** and **GrFillPath()** 
+commands. For more information about these routines, see section [24.2.11 of 
+chapter 24](cshapes.md#24211-paths).
 
-GrGetPath() retrieves the handle of a block containing the path's data. You 
-may pass this handle to GrSetPath() and thus copy a path to another 
-GState.
+**GrGetPath()** retrieves the handle of a block containing the path's data. You 
+may pass this handle to **GrSetPath()** and thus copy a path to another GState.
 
 ### 23.10 Working With Video Drivers
 
@@ -1916,47 +1915,47 @@ device coordinates correspond to a set of standard GEOS coordinates or vice
 versa.
 
 It is possible to update part of a drawing without exposing the whole window. 
-Calling GrInvalRect() causes a passed rectangular area to be updated; the 
-area outside the rectangle will be unaffected. GrInvalRectDWord() works 
+Calling **GrInvalRect()** causes a passed rectangular area to be updated; the 
+area outside the rectangle will be unaffected. **GrInvalRectDWord()** works 
 the same way, but for large coordinate spaces.
 
 Programs can also seize exclusive access to a video driver by calling the 
-GrGrabExclusive() command, which allows only the passed GState to alter 
+**GrGrabExclusive()** command, which allows only the passed GState to alter 
 what is shown on the screen. This routine is useful for programs such as 
 screen dumps who want to accomplish something concerning the screen 
 without worrying that programs in other threads will change the screen in 
-the meantime. GrReleaseExclusive() ends the exclusive access to the 
+the meantime. **GrReleaseExclusive()** ends the exclusive access to the 
 screen so that other GStates can update.
 
 To find out if the video exclusive is presently grabbed, call 
-GrGetExclusive(). This will return the handle of the GState presently in 
+**GrGetExclusive()**. This will return the handle of the GState presently in 
 possession of the exclusive, or zero if there is no such GState.
 
-GrBitBlt() is an advanced function used to quickly copy or move data within 
+**GrBitBlt()** is an advanced function used to quickly copy or move data within 
 video memory. Effectively, it can copy or move a rectangular part of the 
 document space to another part of that space-the passed BLTMode will 
 determine whether the area is copied or moved. This might be used in an 
 arcade game or animation program to move simple pictures around the 
 screen very quickly. Pass this function the source and destination rectangles, 
-and whether you are copying or moving the block. After calling GrBitBlt(), 
+and whether you are copying or moving the block. After calling **GrBitBlt()**, 
 the changes have been made to video memory but have not actually been 
 drawn to the screen. Make sure that the affected areas are redrawn by 
 invalidating the appropriate area. If speed is a concern, and if you're using 
-GrBitBlt() it probably is, you'll probably want to restrict the clipping area 
+**GrBitBlt()** it probably is, you'll probably want to restrict the clipping area 
 when the drawing is refreshed.
 
-GrGetBitmap() basically returns a dump of an arbitrary display area. It is 
+G**rGetBitmap()** basically returns a dump of an arbitrary display area. It is 
 an advanced function and should be used with some caution. If asked to 
-dump an area from a GState being displayed to screen, GrGetBitmap() 
+dump an area from a GState being displayed to screen, **GrGetBitmap()** 
 won't check to see if the dumped area is obscured by another window, and so 
 your dump might include a picture of that other window. However, if you're 
 working with some sort of offscreen bitmap, this function provides a way to 
 look at large portions of it a time. Note that to look at smaller areas, you 
-might prefer to use GrGetPoint(), an optimized, easier to use function to 
+might prefer to use **GrGetPoint()**, an optimized, easier to use function to 
 find out the color of a pixel.
 
 At some times, it may prove useful to know what window, if any, is associated 
-with a GState. To find out, call GrGetWinHandle().
+with a GState. To find out, call **GrGetWinHandle()**.
 
 #### 23.10.2 Direct Calls to the Driver
 
@@ -1973,10 +1972,9 @@ mechanisms associated with windows in GEOS.
 #### 23.11.1 Palettes
 
 Each window has a color palette associated with it. For more information 
-about manipulating palettes, see section 24.3.1.3 of chapter 24. The system 
-will use the palette of whatever window is active. As a result, if two windows 
-have different palettes, when one window is active, the other's colors will be 
-distorted.
+about manipulating palettes, see [section 24.3.1.3 of chapter 24](cshapes.md#24313-color). 
+The system will use the palette of whatever window is active. As a result, if two windows 
+have different palettes, when one window is active, the other's colors will be distorted.
 
 #### 23.11.2 Clipping
 
@@ -2013,26 +2011,26 @@ graphics system to combine a window's clipping path with a geode's path
 chosen to restrict the clipping region. Thus the geode can define its restricted 
 clipping area without knowing anything about the window's present status.
 
-GrSetClipPath() sets the geode-defined path to use when restricting the 
-window's clip path. GrSetClipRect() is an optimization of 
-GrSetClipPath() to handle the most common case in which the new path 
+**GrSetClipPath()** sets the geode-defined path to use when restricting the 
+window's clip path. **GrSetClipRect()** is an optimization of 
+**GrSetClipPath()** to handle the most common case in which the new path 
 element is a rectangle. 
 
-GrGetClipRegion() returns the Region data structure corresponding to 
-the current clip path. GrGetMaskBounds() and 
-GrGetMaskBoundsDWord() return the bounds of the current clipping 
-path.To find out whether there is a clip path at all, just call GrTestPath() 
+**GrGetClipRegion()** returns the **Region** data structure corresponding to 
+the current clip path. **GrGetMaskBounds()** and 
+**GrGetMaskBoundsDWord()** return the bounds of the current clipping 
+path.To find out whether there is a clip path at all, just call **GrTestPath()** 
 and pass GPT_CLIP.
 
-GrTestRectInMask() determines whether a rectangular area lies fully, 
+**GrTestRectInMask()** determines whether a rectangular area lies fully, 
 partially, or not at all within the clipping area. This routine is useful for 
 optimizing redraws.
 
-GrSetWinClipRect() and GrSetWinClipPath() set the clipping path 
+**GrSetWinClipRect()** and **GrSetWinClipPath()** set the clipping path 
 associated with the window; you should never have occasion to use it. 
-GrGetWinBounds() and GrGetWinBoundsDWord() return the bounds of 
+**GrGetWinBounds()** and **GrGetWinBoundsDWord()** return the bounds of 
 the window clipping path. To find out whether there is a window clipping 
-path at all, call GrTestPath() and pass GPT_WIN_CLIP.
+path at all, call **GrTestPath()** and pass GPT_WIN_CLIP.
 
 #### 23.11.3 Signalling Updates
 
@@ -2040,8 +2038,8 @@ GrBeginUpdate(), GrEndUpdate()
 
 The kernel provides two messages by which the geode may signal that it is 
 updating the contents of a window. When updating a region (as when 
-handling a MSG_META_EXPOSED), the geode should call GrBeginUpdate() 
-after creating the GState, and call GrEndUpdate() before destroying the 
+handling a MSG_META_EXPOSED), the geode should call **GrBeginUpdate()** 
+after creating the GState, and call **GrEndUpdate()** before destroying the 
 GState.
 
 This causes the system to store the GState for future comparisons during 
@@ -2053,4 +2051,4 @@ Note that you only need call these routines when performing a requested
 update; if you are drawing to a window without being asked to do so, you need 
 not call these routines.
 
-[PCCOM Library](cpccom.md) <-- &nbsp;&nbsp; [table of contents](../concepts.md) &nbsp;&nbsp; --> [Drawing Graphics](cchapes.md)
+[PCCOM Library](cpccom.md) <-- &nbsp;&nbsp; [table of contents](../concepts.md) &nbsp;&nbsp; --> [Drawing Graphics](cshapes.md)

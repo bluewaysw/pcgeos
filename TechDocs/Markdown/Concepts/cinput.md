@@ -67,10 +67,10 @@ handle mouse, pen, or keyboard events in custom visible objects and can
 ignore them in all other cases.
 
 Input events take the form of standard GEOS messages. These messages are 
-defined by the UI but are actually part of MetaClass (they are allocated in 
-MetaClass and exported to the UI). The reference entries for these events 
-can therefore be found under MetaClass (see "System Classes," Chapter 1 of 
-the Object Reference Book).
+defined by the UI but are actually part of **MetaClass** (they are allocated in 
+**MetaClass** and exported to the UI). The reference entries for these events 
+can therefore be found under **MetaClass** (see ["System Classes," Chapter 1 of 
+the Object Reference Book](../Objects/osyscla.md)).
 
 Input events give information about the type of event (e.g. a mouse event), 
 the action taking place (e.g. the right mouse button was pressed), and 
@@ -150,7 +150,7 @@ Pen input comes in the form of a special data structure called Ink. Ink input
 is instigated in the same manner as button events, but it is handled in a 
 completely separate manner. An object expecting Ink input must be aware 
 when Ink events are being passed as opposed to normal mouse events. 
-Special flags are used for this; see section 11.4 on page 442.
+Special flags are used for this; see [section 11.4](#114-pen-input-and-ink).
 
 #### 11.1.4 Input Hierarchies
 
@@ -164,7 +164,7 @@ node, where it will be handled or ignored.
 To simplify and shorten this process, the UI maintains several special 
 hierarchical input flow channels where special input should always flow. 
 These hierarchies include the focus, the target, and the model. All three are 
-described in full in section 11.5 on page 448.
+described in full in [section 11.5](#115-input-hierarchies).
 
 The Focus is the object that should receive all keyboard events. For example, 
 a modal dialog box always has the focus; if the user presses Enter, the dialog 
@@ -172,7 +172,7 @@ box will take its default action. A text object into which the user is typing ha
 the focus as long as the user does not click outside its bounds.
 
 The Target is what is selected by the user: the object on which actions should 
-be performed. Controller objects (of GenControlClass) typically operate on 
+be performed. Controller objects (of **GenControlClass**) typically operate on 
 the target. An example is a text object with selected text. When you set the 
 text's style using a menu item (a style control object), that menu item sends 
 its message to the current target object. The text object, set as the current 
@@ -197,7 +197,7 @@ preferred input tool for a GUI. Therefore, most applications will in some way
 accept and handle mouse input directly.
 
 Typically, you will handle mouse input if you are using visible objects 
-(VisClass, etc.) that will react to the mouse. If you are using only generic 
+(**VisClass**, etc.) that will react to the mouse. If you are using only generic 
 objects in your application, you will not need to handle mouse events.
 
 Mouse input comes in the form of pointer and button events. Each event 
@@ -227,7 +227,7 @@ VisContent to handle these special cases.
 
 Each time the user moves the mouse or clicks a mouse button, GEOS 
 generates a mouse event and passes it to the proper object. Mouse events are 
-actually MetaClass messages that any object may intercept. Default 
+actually **MetaClass** messages that any object may intercept. Default 
 handlers for these messages typically do nothing, so if you do not handle a 
 particular event, it will likely be ignored.
 
@@ -399,7 +399,7 @@ the event was generated.
 The first two indicate the position of the mouse in the document. The third, 
 inputState, consists of two bytes of flags. The first byte indicates the type of 
 button event and the state of the mouse buttons during the event. It is a 
-record of type ButtonInfo and has seven flags:
+record of type **ButtonInfo** and has seven flags:
 
 BI_PRESS  
 Set if this is a press event rather than a release or drag.
@@ -423,7 +423,7 @@ Set if button number zero is being held down.
 BI_BUTTON  
 Set if this is a button event, clear if a pointer event.
 
-The second byte of inputState is a record of UIFunctionsActive, which 
+The second byte of inputState is a record of **UIFunctionsActive**, which 
 describes which of several UI functions are currently underway. The flags set 
 in this byte are used primarily by the UI, and you will probably not have to 
 check them. The flags allowed, however, are listed below.
@@ -475,9 +475,9 @@ When UIFA_FEATURES is also set, this flag indicates the
 ##### 11.2.1.2 Return Values for Mouse Events
 
 One of the parameters of every mouse event is a pointer to a 
-MouseReturnParams structure. This structure is passed empty; it is up to 
+**MouseReturnParams** structure. This structure is passed empty; it is up to 
 the event handler to fill it with the proper return values. The 
-MouseReturnParams structure's definition is given below:
+**MouseReturnParams** structure's definition is given below:
 
 ~~~
 typedef struct {
@@ -525,9 +525,9 @@ selects a drawing tool, the tool might set the pointer to cross-hairs instead of
 the default arrow.
 
 To set the pointer's image, you must return the handle and chunk handle of 
-a chunk containing a PointerDef structure. Return it in the form of an optr 
+a chunk containing a **PointerDef** structure. Return it in the form of an optr 
 in the ptrImage field of the return structure. For full information on 
-PointerDef and defining pointer images, see section 11.2.4 on page 434.
+**PointerDef** and defining pointer images, see [section 11.2.4](#1124-setting-the-pointer-image).
 
 If you are not setting the pointer image, return a NullOptr in ptrImage. You 
 do not have to return anything in the unused field.
@@ -554,7 +554,7 @@ release the grab, it must send itself MSG_VIS_RELEASE_MOUSE.
 
 The TicTac sample application shows an example of visible objects grabbing 
 the mouse and handling several mouse events. This sample application is 
-described in detail in "The GEOS User Interface," Chapter 10.
+described in detail in ["The GEOS User Interface," Chapter 10](cuiover.md).
 
 There are two other types of mouse grabs besides the active grab. With very 
 rare exceptions, application programmers can ignore these. They are the 
@@ -614,7 +614,7 @@ flags as passed by their normal counterparts.
 Large mouse messages take the form MSG_META_LARGE_-. There is one 
 large mouse event for each of the normal pointer, button, and drag events; 
 note, however, that no large events exist for pre-passive or post-passive 
-grabs. For the full list of large mouse events, see page 428.
+grabs. For the full list of large mouse events, see section [11.2.1."Mouse Events"](#1121-mouse-events).
 
 One special note about large events: Any object that handles large mouse 
 events should also be prepared to handle normal mouse events. The visible 
@@ -624,7 +624,7 @@ the normal event. If the large object should handle the normal event and
 doesn't, the event will be lost or passed on to another child.
 
 For full information on handling large mouse events within a visible object 
-tree, see "VisClass," Chapter 23 of the Object Reference Book. (This 
+tree, see ["VisClass," Chapter 23 of the Object Reference Book](../Objects/ovis.md). (This 
 information also applies to Process objects acting as the contents of 
 GenViews.)
 
@@ -647,15 +647,15 @@ of five pixels that acts as the active point of the image. When the user clicks,
 the area affected is the hot spot, not the entire image. See Figure 11-2 for a 
 diagram of the pointer and the hot spot.
 
-The pointer is stored in a PointerDef16 structure. This structure defines 
+The pointer is stored in a **PointerDef16** structure. This structure defines 
 the image bitmap, the horizontal and vertical offsets to the hot spot, and the 
 definition of how the image should mix with the background. This definition 
 is known as the pointer's mask; how it affects the image is shown in 
 Table 11-1.
 
-The definition of PointerDef16 is given below. When setting the pointer 
+The definition of **PointerDef16** is given below. When setting the pointer 
 image, you will typically pass an optr (a combination handle and chunk 
-handle) to a PointerDef16 structure; the structure can be set up in a 
+handle) to a **PointerDef16** structure; the structure can be set up in a 
 sharable chunk beforehand, or it can be set in a local or global variable. 
 Typically, you will set the entire pointer image in a resource chunk and 
 compile it into your geode; this is much easier and faster to use than building 
@@ -708,20 +708,22 @@ always drawn black._
 
 You can set the pointer's image in three ways. First, you can send a message 
 to the GenView to set the pointer image whenever the pointer is over the 
-view's window (see "GenView," Chapter 9 of the Object Reference Book). 
+view's window (see ["GenView," Chapter 9 of the Object Reference Book]
+(../Objects.ogenvew.md)). 
 Second, you can set the pointer to a default image type during a 
-quick-transfer operation (see "The Clipboard," Chapter 7). Third, you can set 
-the pointer image after handling a mouse event. Only the third option is 
-discussed here.
+quick-transfer operation (see ["The Clipboard," Chapter 7](cclipb.md)). 
+Third, you can set the pointer image after handling a mouse event. Only 
+the third option is discussed here.
 
 An object may wish to set the pointer image while it is selected, while the 
 pointer is over its bounds, or in any number of other situations. For example, 
 a chess piece currently being moved may set the pointer's image to the shape 
 of the piece so the user knows exactly what type of piece is being moved.
 
-Every mouse event you handle must return a MouseReturnParams 
-structure, defined in "Return Values for Mouse Events" on page 430. Make 
-sure to return the following to set the pointer image:
+Every mouse event you handle must return a **MouseReturnParams** 
+structure, defined in ["Return Values for Mouse Events"]
+(#11212-return-values-for-mouse-events). Make sure to return the following 
+to set the pointer image:
 
 + MRF_SET_POINTER_IMAGE in flags  
 When the UI sees this flag in the returned structure, it looks for the 
@@ -729,7 +731,7 @@ address of a pointer definition in the ptrImage field. If you do not return
 this flag, the UI will not try to set the pointer.
 
 + The optr of the pointer image in ptrImage  
-This field gives the handle and chunk handle of the PointerDef 
+This field gives the handle and chunk handle of the **PointerDef** 
 structure that defines the pointer image to be set. The structure must be 
 in a sharable block; most likely you will have it set in a geode resource.
 
@@ -756,15 +758,15 @@ at any node below it where the event should be handled.
 
 Unlike with mouse input, there is no "implied grab" for keyboard input. 
 Keyboard input is always passed to the object that has the focus (for 
-information on the Focus hierarchy, see section 11.5.3 on page 453). 
+information on the Focus hierarchy, see [section 11.5.3](#1153-using-focus)). 
 Therefore the focus is the keyboard's "active grab."
 
 Objects can, however, set up passive grabs as they can with mouse input. A 
 pre-passive grab allows the visible object to receive keyboard events before 
 the focus object gets them. A post-passive grab delivers events to the visible 
 object after they have been sent to the focus. For more information about 
-gaining and releasing the passive keyboard grabs, see "VisClass," Chapter 23 
-of the Object Reference Book.
+gaining and releasing the passive keyboard grabs, see ["VisClass," Chapter 23 
+of the Object Reference Book](../Object/ovis.md).
 
 If you intercept keyboard events, you must be sure to return any events that 
 you don't use. For example, if you only want to detect when the user hits the 
@@ -824,18 +826,18 @@ The character value determined by the keyboard driver and
 Input Manager.
 
 flags  
-A word value: The high byte is a record of ShiftState detailing 
+A word value: The high byte is a record of **ShiftState** detailing 
 the modifier keys pressed, and the low byte is a record of 
-CharFlags giving information about the type of character 
+**CharFlags** giving information about the type of character 
 passed. Both of these records are detailed below.
 
 state  
 A word value: The high byte is the scan code of the key pressed 
 (without modifiers), and the low byte is a record of 
-ToggleState detailing the state of the toggle keys. 
-ToggleState is detailed below.
+**ToggleState** detailing the state of the toggle keys. 
+**ToggleState** is detailed below.
 
-Three different records of flags define the keyboard event. The ShiftState 
+Three different records of flags define the keyboard event. The **ShiftState** 
 record describes which modifier keys are pressed and has the following flags:
 
 SS_LALT  
@@ -862,7 +864,7 @@ The first joystick-style "fire button" (if any) is pressed.
 SS_FIRE_BUTTON_2  
 The second joystick-style "fire button" (if any) is pressed.
 
-The ToggleState record describes which toggle keys are currently active. It 
+The **ToggleState** record describes which toggle keys are currently active. It 
 has the following flags.
 
 TS_CAPSLOCK  
@@ -874,12 +876,12 @@ The Num Lock is set.
 TS_SCROLLLOCK  
 The Scroll Lock is set.
 
-The CharFlags record contains several flags indicating whether this event 
+The **CharFlags** record contains several flags indicating whether this event 
 is a first press, a release, a repeat press, or an extended or temporary 
 character. Its flags are listed below.
 
 CF_STATE_KEY  
-Set if either a ShiftState key or a ToggleState key is being 
+Set if either a **ShiftState** key or a **ToggleState** key is being 
 pressed along with the passed character.
 
 CF_EXTENDED  
@@ -973,8 +975,8 @@ has some Ink handling and handwriting recognition built into it.)
 The Pen Library exports InkClass, a visible object class which accepts and 
 stores pen input. It stores the ink compactly. The ink object allows the pen to 
 act as an eraser, removing part or all of a pen stroke, perhaps splitting some 
-strokes in two. See "Pen Object Library," Chapter 21 of the Object Reference 
-Book for more information.
+strokes in two. See ["Pen Object Library," Chapter 21 of the Object Reference 
+Book](../Objects/open.md) for more information.
 
 If GEOS is running on a pen-based system, it will set a particular flag in its 
 private data. It will also install a special input monitor to alter the events the 
@@ -994,12 +996,12 @@ application with MSG_META_NOTIFY_WITH_DATA_BLOCK. (This is a general
 change notification message.) The type of the data block passed is NT_INK, 
 the manufacturer ID is MANUFACTURER_ID_GEOWORKS.
 
-The data block is headed by an InkHeader structure (defined below). The 
+The data block is headed by an **InkHeader** structure (defined below). The 
 header is followed by a list of points, all in screen coordinates (not points as 
 with normal graphics commands). The block will contain as many points as 
 are registered during the Ink input sequence.
 
-The InkHeader structure has the following format:
+The **InkHeader** structure has the following format:
 
 ~~~
 typedef struct {
@@ -1029,7 +1031,7 @@ Internal data; do not use.
 
 IH_data  
 Actually a label indicating the beginning of the list of points. 
-Following this label will be a number of Point structures, each 
+Following this label will be a number of **Point** structures, each 
 one detailing a single Ink point.
 
 #### 11.4.2 Ink Input Flow
@@ -1053,8 +1055,8 @@ message are described below.
 
 To set up your GenView for passing Ink input, set the proper flag in its 
 GVI_inkType instance field. The possible flags are detailed in full in 
-"GenView," Chapter 9 of the Object Reference Book but are reviewed below 
-for convenience.
+["GenView," Chapter 9 of the Object Reference Book](../Objects/ogenvew.md) but 
+are reviewed below for convenience.
 
 GVIT_PRESSES_ARE_NOT_INK  
 Objects running under this GenView never handle Ink input. 
@@ -1115,9 +1117,9 @@ IRV_INK_WITH_STANDARD_OVERRIDE, it must also specify the eventual
 destination of the Ink data block. Additionally, it can set any characteristics 
 in a GState for the Ink-clipping area, drawing color, etc.
 
-These specifics are set in an InkDestinationInfo structure set up by your 
+These specifics are set in an **InkDestinationInfo** structure set up by your 
 MSG_META_QUERY_IF_PRESS_IS_INK handler (through a call to 
-UserCreateInkDestinationInfo()); the handler for the routine returns the 
+**UserCreateInkDestinationInfo()**); the handler for the routine returns the 
 handle of a block containing the structure. Certain default values and 
 behavior are implemented if you return a null handle or if you set the 
 GenView flags to avoid the query (GVIT_PRESSES_ARE_INK or 
@@ -1136,12 +1138,12 @@ sent to the same destination, however.)
 
 + The Ink will be drawn in a standard color and brush thickness.
 
-All of the above behavior can be changed in the InkDestinationInfo 
+All of the above behavior can be changed in the **InkDestinationInfo** 
 structure. The structure should be created automatically with the routine 
-UserCreateInkDestinationInfo(); you can then pass the block handle of 
-this structure blindly to routines that demand an InkDestinationInfo 
+**UserCreateInkDestinationInfo()**; you can then pass the block handle of 
+this structure blindly to routines that demand an **InkDestinationInfo** 
 structure. Among the four fields of the structure, the following need to be 
-passed to UserCreateInkDestinationInfo():
+passed to **UserCreateInkDestinationInfo()**:
 
 dest  
 The optr of the object that will receive the Ink data block after 
@@ -1153,14 +1155,14 @@ The handle of a Graphic State (GState) containing clipping,
 color, or other information about how the Ink should be drawn 
 on the screen. To use the default values, set this to zero. This 
 will allow the user to draw Ink all over the screen. See 
-"Graphics Environment," Chapter 23 of the Object Reference 
-Book for full information on GStates.
+["Graphics Environment," Chapter 23 of the Object Reference 
+Book](../Objects/ovis.md) for full information on GStates.
 
 brushSize  
 The thickness of the brush used when drawing the Ink on the 
 screen. This is the same as the brush thickness for polylines; 
-see "Drawing Graphics," Chapter 24 of the Object Reference 
-Book for more information on brush thickness.
+see ["Drawing Graphics," Chapter 24 of the Object Reference 
+Book](../Objects/oviscmp.md) for more information on brush thickness.
 
 callback  
 Virtual fptr to a callback routine to determine whether a stroke 
@@ -1198,7 +1200,7 @@ input, you can set this routine up as the method to be used as follows:
 If the object handles Ink, the Input Manager sends the entire data block off 
 to the GenSystem object using MSG_META_NOTIFY_WITH_DATA_BLOCK 
 with the identifier NT_INK. (For information on this and other notification 
-messages, see "General Change Notification," Chapter 9.)
+messages, see ["General Change Notification," Chapter 9](cgcn.md).)
 
 ### 11.5 Input Hierarchies
 
@@ -1244,7 +1246,7 @@ keyboard input. Essentially, the focus object has the active keyboard
 grab. The text objects (VisText and GenText) manage the focus 
 automatically; if you use only these objects for keyboard input, you will 
 not need to understand the focus. The Focus hierarchy is described in full 
-in section 11.5.3 on page 453.
+in [section 11.5.3](#1153-using-focus).
 
 + Target  
 The Target hierarchy designates the active view, window, and visible 
@@ -1254,7 +1256,7 @@ dialog selections. For example, a graphic object selected becomes the
 target object of the application; when the user selects "Rotate" or some 
 other menu function, the menu sends its message to the selected object 
 via the target hierarchy. The Target hierarchy is described in full in 
-section 11.5.4 on page 456.
+[section 11.5.4](#1154-using-target).
 
 + Model  
 The Model hierarchy designates the model of the data the user can 
@@ -1262,7 +1264,7 @@ manipulate. This is provided for highly complex applications that need to
 extend the Target hierarchy for more specific handling of selections. It 
 extends from the GenSystem through the GenApplication and the 
 document control objects. The Model hierarchy is described in full in 
-section 11.5.5 on page 460.
+[section 11.5.5](#1155-using-model).
 
 #### 11.5.2 Common Hierarchy Basics
 
@@ -1346,7 +1348,7 @@ active path.
 
 ##### 11.5.2.2 Modifying the Active Path
 
-Each of the three hierarchies has messages understood by MetaClass that 
+Each of the three hierarchies has messages understood by **MetaClass** that 
 alter the hierarchy's active path. The Specific UI takes care of most of the 
 modifications to the active path, however, so simple applications will not 
 need to bother with it.
@@ -1382,9 +1384,9 @@ exclusive at its level. The striped path is the active path; the shaded paths ar
 all inactive paths._
 
 To pass events to the active member of a specific hierarchy, you should use a 
-TravelOption with MSG_META_SEND_CLASSED_EVENT. TravelOption is 
+**TravelOption** with MSG_META_SEND_CLASSED_EVENT. **TravelOption** is 
 a type which describes the destination for the specified event. There are three 
-types of TravelOption for each hierarchy:
+types of **TravelOption** for each hierarchy:
 
 + Direct  
 The "direct" travel options are TO_FOCUS, TO_TARGET, and TO_MODEL. 
@@ -1480,7 +1482,7 @@ MSG_META_LOST_FOCUS_EXCL.
 
 Frequently, you may wish to send messages to objects in the active Focus 
 path. The easiest way to deliver a message to an object in the focus hierarchy 
-is to use MSG_META_SEND_CLASSED_EVENT with the TravelOption 
+is to use MSG_META_SEND_CLASSED_EVENT with the **TravelOption** 
 TO_APP_FOCUS. To send a message to the leaf node of the active path, send 
 this message with a null class. The message will be sent down the hierarchy 
 until it reaches the leaf object, where it will be processed. (See Code 
@@ -1622,7 +1624,7 @@ MSG_META_LOST_TARGET_EXCL.
 Frequently, you may wish to send messages to objects in the active Target 
 path. The easiest way to deliver a message to an object in the target 
 hierarchy is to use MSG_META_SEND_CLASSED_EVENT with the 
-TravelOption TO_TARGET. To send a message to the leaf node of the active 
+**TravelOption** TO_TARGET. To send a message to the leaf node of the active 
 path, send this message with a null class. The message will be sent down the 
 hierarchy until it reaches the leaf object, where it will be processed. (See 
 Code Display 11-3.)
@@ -1723,7 +1725,7 @@ modelable object at that level.
 
 The easiest way to deliver a message to an object in the active Model 
 hierarchy is to use MSG_META_SEND_CLASSED_EVENT with the 
-TravelOption TO_MODEL. To send a message to the leaf node in the Model 
+**TravelOption** TO_MODEL. To send a message to the leaf node in the Model 
 hierarchy, send this message with a class of null. The message will be sent 
 down the hierarchy until it reaches the leaf object, where it will be processed.
 
@@ -1747,7 +1749,7 @@ MSG_META_GET_MODEL_EXCL. This message will return the optr of the
 model child. The returned object may not have the model properties, though, 
 for the reasons above. Never send a message directly to the object returned 
 by this method as it may have been changed in the meantime. Use 
-MSG_META_SEND_CLASSED_EVENT with the TravelOption TO_MODEL 
+MSG_META_SEND_CLASSED_EVENT with the **TravelOption** TO_MODEL 
 instead.
 
 ##### 11.5.5.2 Intercepting the Model
@@ -1773,7 +1775,7 @@ not active nodes by default. If custom objects wish to use the hierarchies, you
 will need to add instance data and message handlers for their classes. The 
 following steps must be taken to add a new node in a hierarchy:
 
-1. Add a hierarchical instance field of type HierarchicalGrab.
+1. Add a hierarchical instance field of type **HierarchicalGrab**.
 
 2. Add a handler for MSG_META_MUP_ALTER_FTVMC_EXCL. This method 
 alters the custom instance field for the grab and release messages for all 
@@ -1781,10 +1783,10 @@ hierarchies. You must call the superclass in your handler.
 
 3. Add methods to handle the GAINED and LOST messages pertaining to the 
 particular hierarchy you are extending. These methods should call 
-FlowUpdateHierarchicalGrab(). You can also add behavior exhibited 
+**FlowUpdateHierarchicalGrab()**. You can also add behavior exhibited 
 when the object gains or loses the exclusive. Depending on what you are 
 subclassing, your default behavior may already take care of this. For 
-instance subclasses of VisClass automatically handle losing and gaining 
+instance subclasses of **VisClass** automatically handle losing and gaining 
 the target exclusive.
 
 4. Add a method to handle the GET message for the particular hierarchy 

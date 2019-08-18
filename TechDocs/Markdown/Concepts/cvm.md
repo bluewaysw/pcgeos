@@ -13,10 +13,10 @@ cumbersome stream of data. By using virtual memory files, applications can
 break files down into smaller, more manageable blocks which the memory 
 manager can handle more efficiently.
 
-Before you read this chapter, you should have read "Handles," Chapter 14, 
-and "Memory Management," Chapter 15. You should also be familiar with 
-the GEOS file system; you should have at least skimmed "File System," 
-Chapter 17, although you need not have read it in depth.
+Before you read this chapter, you should have read ["Handles," Chapter 14](chandle.md), 
+and ["Memory Management," Chapter 15](cmemory.md). You should also be familiar with 
+the GEOS file system; you should have at least skimmed ["File System," 
+Chapter 17](cfile.md), although you need not have read it in depth.
 
 ### 18.1 Design Philosophy
 
@@ -73,15 +73,15 @@ of a VM File Header, a collection of VM blocks, and a special structure called
 a VM Header. The VM File Header is a standard GEOS file header, containing 
 the file's extended attributes and system bookkeeping information. Geodes 
 may not access it directly; instead, they can make calls to the extended 
-attributes routines to access data in the header. (See section 17.5.3 of chapter 
-17.) The VM blocks and the VM Header do not occupy fixed places in the file. 
-In particular, the VM Header does not necessarily come before all the blocks. 
-Instead, the VM File Header stores the offset within the file to the VM 
-Header, and the VM Header stores information about the blocks (such as 
-their locations in the file). Furthermore, the blocks in a VM file are arranged 
-in no particular order; they are not necessarily arranged in the order they 
-were created, or in any other sequence. See Figure 18-1 below for a diagram 
-of a VM file.
+attributes routines to access data in the header. ([See section 17.5.3 of chapter 
+17](cfile.md#1753-geos-extended-attributes).) The VM blocks and the VM Header 
+do not occupy fixed places in the file. In particular, the VM Header does not 
+necessarily come before all the blocks. Instead, the VM File Header stores the 
+offset within the file to the VM Header, and the VM Header stores information 
+about the blocks (such as their locations in the file). Furthermore, the blocks 
+in a VM file are arranged in no particular order; they are not necessarily 
+arranged in the order they were created, or in any other sequence. See Figure 18-1 
+below for a diagram of a VM file.
 
 The VM Header maintains all the bookkeeping information about the VM file. 
 For example, it contains the VM Block Table. The block table is much like the 
@@ -89,8 +89,7 @@ global handle table. Block handles are offsets into the block handle table; a
 block's entry in the table contains information about the block, such as the 
 block's location in the file. Usually, the Block Table contains entries for blocks 
 that haven't been created yet; when all of these handles have been used, the 
-VM Manager expands the block table. For details, see section 18.2.3 on page 
-677.
+VM Manager expands the block table. For details, see [section 18.2.3](#1822-vm-handles).
 
 #### 18.2.1 The VM Manager
 
@@ -118,7 +117,7 @@ important not to get them confused.
 
 + File Handles
 When you open or create a VM file, it is assigned a file handle, as 
-discussed in "File System," Chapter 17. Whenever you call a VM routine, 
+discussed in ["File System," Chapter 17](cfile.md). Whenever you call a VM routine, 
 you must specify the VM file by passing this handle. The file handle can 
 change each time the file is opened. Furthermore, if two different 
 network users have the same VM file open at the same time, each user 
@@ -152,7 +151,7 @@ its own chunk handle table. Also, the Database and Cell libraries have
 been designed to let the VM file efficiently manipulate small pieces of 
 data. These libraries are based on the LMem library. Each item of data 
 has its own DB handle as well as a VM Block handle. Database items are 
-discussed in depth in "Database Library," Chapter 19.
+discussed in depth in ["Database Library," Chapter 19](cdb.md).
 
 #### 18.2.3 Virtual Memory Blocks
 
@@ -192,9 +191,9 @@ handles of the VM blocks with any given ID number. You do not have to assign
 ID numbers to blocks, but it is sometimes convenient. The ID numbers are 
 stored in the handles' entries in the block table, not in the blocks themselves; 
 this makes it easy to find a block with a specified user ID. User IDs can be 
-changed at will with the routine VMModifyUserID(). Note that all user IDs 
+changed at will with the routine **VMModifyUserID()**. Note that all user IDs 
 from 0xff00 to 0xffff are reserved for system use. You can find a block with a 
-specific user ID by calling VMFind(); see page 691.
+specific user ID by calling **VMFind()**.
 
 ##### 18.2.3.2 Creating and Using VM Blocks
 
@@ -222,8 +221,8 @@ file now contains a lot of unused space._
 You can dynamically resize a VM block by locking it into memory, resizing the 
 memory block, and saving it back to the disk.
 
-These techniques are described in detail in "Creating and Freeing Blocks" on 
-page 687 and "Attaching Memory Blocks" on page 689.
+These techniques are described in detail in ["Creating and Freeing Blocks"]
+(#1834-creating-and-freeing-blocks) and ["Attaching Memory Blocks"](#1835-attaching-memory-blocks).
 
 ##### 18.2.3.3 File Compaction
 
@@ -246,10 +245,9 @@ In time, the percentage of wasted file space can grow unacceptably large. To
 prevent this, the Virtual Memory manager periodically compacts the files. 
 When the ratio of data to free space drops below a certain threshold, the 
 Virtual Memory manager copies the data in the file over the free space (see 
-Figure 18-3 on page l 679). While a file is being compacted, any requests for 
-access to the file will block until compaction is finished. Note that the format 
-of the data is not changed; the free space between data blocks is simply 
-removed.
+Figure 18-3). While a file is being compacted, any requests for access to the 
+file will block until compaction is finished. Note that the format of the 
+data is not changed; the free space between data blocks is simply removed.
 
 When a geode creates a VM file, it can specify a "compression threshold." 
 When the percentage of used space drops below this threshold, the VM 
@@ -262,8 +260,8 @@ application can specify a threshold of zero; this will cause the system default
 threshold to be used.
 
 Note that if a file is in "backup mode," the file will be compacted only on calls 
-to VMSave(), VMSaveAs(), or VMRevert(). If the file is not in backup 
-mode, it can be compacted on any call to VMUpdate(). 
+to **VMSave()**, **VMSaveAs()**, or **VMRevert()**. If the file is not in backup 
+mode, it can be compacted on any call to **VMUpdate()**. 
 
 ##### 18.2.3.4 File Updating and Backup
 
@@ -278,7 +276,7 @@ dirty, the VM manager knows that the version in memory is more up-to-date
 than the version in the disk file. If the flag VMA_SYNC_UPDATE is off (the 
 default), the block will be written back to the file as soon as possible. If the 
 attribute is on, the block will not be copied back to the disk file until 
-VMUpdate() is called; until then, the block will be copied to the disk swap 
+**VMUpdate()** is called; until then, the block will be copied to the disk swap 
 space if memory is needed. The next time you lock the block, you will be given 
 the new, changed version.
 
@@ -292,7 +290,7 @@ The VM manager can be instructed to notify all users of a file when the file
 changes from clean to dirty. This has two main uses: it helps maintain data 
 synchronization if many geodes are using the same file, and it lets the 
 document control objects know when to enable the "Save" and "Revert" 
-triggers. (See "GenDocument," Chapter 13 of the Object Reference Book.)
+triggers. (See ["GenDocument," Chapter 13 of the Object Reference Book]().)
 
 The VM manager can be instructed to maintain a backup of a file. If it is so 
 instructed, it will not overwrite the original block when it updates it; instead, 
@@ -311,15 +309,15 @@ its last-saved version and close it.
 VMAttributes
 
 Each VM file has a set of attributes which determine how the VM Manager 
-treats the file. These attributes are specified by a set of VMAttributes flags. 
+treats the file. These attributes are specified by a set of **VMAttributes** flags. 
 When a VM file is created, all of these attributes are off; after a file has been 
-created, you can change the attributes with VMSetAttributes() (see section 
-18.3.3 on page 687). The following flags are available:
+created, you can change the attributes with **VMSetAttributes()** (see [section 
+18.3.3](#1833-changing-vm-file-attributes)). The following flags are available:
 
 VMA_SYNC_UPDATE  
 Allow synchronous updates only. Instructs VM Manager to 
 update the file only when you call un updating routine 
-(VMUpdate(), VMSave(), etc.). This attribute is off by default 
+(**VMUpdate()**, **VMSave()**, etc.). This attribute is off by default 
 (indicating that the VM manager should feel free to update 
 blocks whenever they are unlocked). You should set this 
 attribute if the file might not be in a consistent state every time 
@@ -338,7 +336,7 @@ If this attribute is set, the VM Manager will notify all threads
 which have the VM file open when the file changes from clean 
 to dirty. It notifies threads by sending a MSG_VM_FILE_DIRTY 
 to each process that has the file open. (This message is defined 
-for MetaClass, so any object can handle it.)
+for **MetaClass**, so any object can handle it.)
 
 VMA_NO_DISCARD_IF_IN_USE  
 If this attribute is set, the VM manager will not discard LMem 
@@ -351,12 +349,12 @@ using an object in the block.
 VMA_COMPACT_OBJ_BLOCK  
 If set, the VM manager will unrelocate generic-object blocks 
 before writing them. It does this by calling 
-CompactObjBlock(). This allows a VM file to contain generic 
+**CompactObjBlock()**. This allows a VM file to contain generic 
 object blocks.
 
 VMA_SINGLE_THREAD_ACCESS  
 Set this if only a single thread will be accessing the file. This 
-allows optimizations in VMLock().
+allows optimizations in **VMLock()**.
 
 VMA_OBJECT_ATTRS  
 This is not, strictly speaking, a VM attribute. Rather, it is a 
@@ -380,21 +378,21 @@ described in greater detail in the following sections.
 
 + Open (or create) the VM file
 Before you perform any actions on a VM file, you must open it with 
-VMOpen(). This routine can be used to open an existing VM file or create 
+**VMOpen()**. This routine can be used to open an existing VM file or create 
 a new one. If you use the document control objects, they will open and 
 create files automatically. Once you have created a VM file, you may want 
-to change its attributes with VMSetAttributes().
+to change its attributes with **VMSetAttributes()**.
 
 + Bring a VM block into the global memory heap
 After you open a VM file, you can bring blocks from the file into memory 
-with VMLock(). You can also create new blocks with VMAlloc() and 
-VMAttach().
+with **VMLock()**. You can also create new blocks with **VMAlloc()** and 
+**VMAttach()**.
 
 + Access the data
 Once a VM block has been brought into memory, you can access it the way 
 you would any other memory block. When you are done with the data, 
-you should unlock it with VMUnlock(). If you change the memory, you 
-should mark it dirty with VMDirty() before unlocking it. This ensures 
+you should unlock it with **VMUnlock()**. If you change the memory, you 
+should mark it dirty with **VMDirty()** before unlocking it. This ensures 
 that the new version of the block will be written to the disk.
 
 + Update the VM file
@@ -403,19 +401,19 @@ to the disk. (If asynchronous update is allowed, the VM file manager will
 try to update blocks whenever they are unlocked.)
 
 + Close the VM file
-Use VMClose() when you are done with the file. It will update the file 
+Use **VMClose()** when you are done with the file. It will update the file 
 and close it.
 
 #### 18.3.2 Opening or Creating a VM File
 
 VMOpen(), VMOpenTypes, VMAccessFlags
 
-To create or open a VM file, call the routine VMOpen(). You may not need to 
+To create or open a VM file, call the routine **VMOpen()**. You may not need to 
 open and create files directly; if you use the document control objects, they 
 automatically create and open files as the user requests. (See 
-"GenDocument," Chapter 13 of the Object Reference Book.) VMOpen() looks 
+["GenDocument," Chapter 13 of the Object Reference Book]().) **VMOpen()** looks 
 for the file in the thread's working directory (unless a temporary file is being 
-created, as described below). VMOpen() takes four arguments and returns 
+created, as described below). **VMOpen()** takes four arguments and returns 
 the file handle. The arguments are:
 
 + File name
@@ -425,13 +423,13 @@ being created, the string is the path of the directory in which to place that
 file, followed by fourteen null bytes (counting the string-ending null). The 
 name of the temporary file is appended to the path.
 
-+ VMAccessFlags
++ **VMAccessFlags**
 This argument is a set of flags which specifies how the file is accessed. 
 The flags are described below.
 
-+ VMOpenTypes enumerated type
++ **VMOpenTypes** enumerated type
 This argument specifies how the file should be opened. The 
-VMOpenTypes are described below.
+**VMOpenTypes** are described below.
 
 + Compression threshold
 This is the minimum percentage of a file which must be used for data at 
@@ -440,8 +438,8 @@ compacted. If you pass a threshold of zero, the system default threshold
 is used. The compression threshold is set only when the file is created; 
 this argument is ignored if an existing file is opened.
 
-When you use VMOpen(), you must specify how the file should be opened. 
-You do this by passing a member of the VMOpenTypes enumerated type. 
+When you use **VMOpen()**, you must specify how the file should be opened. 
+You do this by passing a member of the **VMOpenTypes** enumerated type. 
 The types are as follows:
 
 VMO_TEMP_FILE  
@@ -454,7 +452,7 @@ an appropriate file name and add it to the path string.
 VMO_CREATE_ONLY  
 If this is passed, the document will be created. If a document 
 with the specified name already exists in the working directory, 
-VMOpen() will return an error condition.
+**VMOpen()** will return an error condition.
 
 VMO_CREATE  
 If this is passed, the file will be created if it does not already 
@@ -472,7 +470,7 @@ condition.
 VMO_NATIVE_WITH_EXT_ATTRS  
 The file will have a name compatible with the native 
 filesystem, but it will have GEOS extended attributes. This flag 
-can be combined with any of the other VMOpenType values 
+can be combined with any of the other **VMOpenType** values 
 with a bit-wise or.
 
 You also have to specify what type of access to the file you would like. You do 
@@ -506,8 +504,8 @@ VMAF_USE_BLOCK_LEVEL_SYNCHRONIZATION
 If set, the block-level synchronization mechanism of the VM 
 manager is assumed to be sufficient; the more restrictive 
 file-level synchronization is not used. This is primarily 
-intended for system software. (See "File-Access 
-Synchronization" on page 697.)
+intended for system software. (See ["File-Access 
+Synchronization"](#18311-file-access-synchronization).)
 
 If you open a file with VMAF_FORCE_READ_ONLY, it's generally a good idea 
 to also open it with VMAF_FORCE_DENY_WRITE. When you open a file 
@@ -521,56 +519,56 @@ with VMAF_FORCE_DENY_WRITE, no other device will be allowed to change
 the file while you have it open, which means the kernel can just load and 
 discard blocks as necessary.
 
-The routine VMOpen() returns the file handle. If it cannot satisfy the 
+The routine **VMOpen()** returns the file handle. If it cannot satisfy the 
 request, it returns a null handle and sets the thread error word. The error 
-word can be recovered with the ThreadGetError() routine. The possible 
+word can be recovered with the **ThreadGetError()** routine. The possible 
 error conditions are:
 
 VM_FILE_EXISTS  
-VMOpen() was passed VMO_CREATE_ONLY, but the file 
+**VMOpen()** was passed VMO_CREATE_ONLY, but the file 
 already exists.
 
 VM_FILE_NOT_FOUND  
-VMOpen() was passed VMO_OPEN, but the file does not exist.
+**VMOpen()** was passed VMO_OPEN, but the file does not exist.
 
 VM_SHARING_DENIED  
 The file was opened by another geode, and access was denied.
 
 VM_OPEN_INVALID_VM_FILE  
-VMOpen() was instructed to open an invalid VM file (or a 
+**VMOpen()** was instructed to open an invalid VM file (or a 
 non-VM file).
 
 VM_CANNOT_CREATE  
-VMOpen() cannot create the file (but it does not already exist).
+**VMOpen()** cannot create the file (but it does not already exist).
 
 VM_TRUNCATE_FAILED  
-VMOpen() was passed VMO_CREATE_TRUNCATE; the file 
+**VMOpen()** was passed VMO_CREATE_TRUNCATE; the file 
 exists but could not be truncated.
 
 VM_WRITE_PROTECTED  
-VMOpen() was passed VMAF_FORCE_READ_WRITE, but the 
+**VMOpen()** was passed VMAF_FORCE_READ_WRITE, but the 
 file or disk was write-protected.
 
 #### 18.3.3 Changing VM File Attributes
 
 VMGetAttributes(), VMSetAttributes()
 
-When a VM file is created, it is given a set of VMAttributes (see page 681). 
-These attributes can be examined with the routine VMGetAttributes(). The 
+When a VM file is created, it is given a set of **VMAttributes**. 
+These attributes can be examined with the routine **VMGetAttributes()**. The 
 routine takes one argument, namely the handle of the VM file (which is 
-overridden if a default VM file is set). It returns the VMAttributes flags.
+overridden if a default VM file is set). It returns the **VMAttributes** flags.
 
-You can change the attributes by calling VMSetAttributes(). This routine 
+You can change the attributes by calling **VMSetAttributes()**. This routine 
 takes three arguments: the file handle (which may be overridden), a set of 
 bits which should be turned on, and a set of bits which should be turned off. 
-It returns the new VMAttributes flags.
+It returns the new **VMAttributes** flags.
 
 #### 18.3.4 Creating and Freeing Blocks
 
 VMAlloc(), VMAllocLMem(), VMFree()
 
 Once you have created a VM file, you have to allocate blocks in order to write 
-data to the file. The usual way to do this is with VMAlloc(). This routine 
+data to the file. The usual way to do this is with **VMAlloc()**. This routine 
 takes three word-sized arguments:
 
 + The file handle
@@ -579,32 +577,32 @@ This argument is overridden if a default VM file is set.
 + A user-ID number
 This can be any word of data the application wants to associate with the 
 VM block. The application can locate blocks with a given user ID by using 
-VMFind() (see page 691).
+**VMFind()**.
 
 + The number of bytes in the block
 This may be zero, in which case no memory is allocated; a memory block 
-must be specifically attached with VMAttach() (see "Attaching Memory 
-Blocks" on page 689).
+must be specifically attached with **VMAttach()** (see ["Attaching Memory 
+Blocks"](#1835-attaching-memory-blocks)).
 
 The routine returns the handle of the VM block. Before you can use the block, 
-you have to lock it with VMLock(). The block is marked dirty when it is 
+you have to lock it with **VMLock()**. The block is marked dirty when it is 
 allocated.
 
 There is a routine to allocate a block and initialize it as an LMem heap. This 
 is useful if you are storing object blocks in a VM file. The routine, 
-VMAllocLMem(), takes three arguments:
+**VMAllocLMem()**, takes three arguments:
 
 + The VM file handle
 This is overridden if a default VM file is set.
 
-+ A member of the LMemTypes enumerated type
-This specifies what kind of heap the LMem heap will be. (See section 
-16.2.3 of chapter 16.)
++ A member of the **LMemTypes** enumerated type
+This specifies what kind of heap the LMem heap will be. (See [section 
+16.2.3](clmem.md#1623-types-of-lmem-heaps).)
 
 + The size of the block header
 Use this if you want to store extra data in the LMem block header. To use 
-the standard LMem header, pass an argument of zero. (See section 16.3.1 
-of chapter 16.)
+the standard LMem header, pass an argument of zero. (See [section 16.3.1 
+of chapter 16](clmem.md#1631-creating-a-local-heap).)
 
 The routine creates a VM block and allocates a global memory block to go 
 with it. It initializes the heap in the global block and marks the block as dirty. 
@@ -616,25 +614,25 @@ There are two other ways to create LMem blocks in a VM file; these ways give
 you more control of the block's initialization. You can allocate a VM block 
 normally, lock that block, then get the handle of the associated memory block 
 and initialize an LMem heap in it; or you can allocate an LMem heap 
-normally, and attach that memory block to the VM file using VMAttach(). 
-For more details on LMem heaps, see "Local Memory," Chapter 16.
+normally, and attach that memory block to the VM file using **VMAttach()**. 
+For more details on LMem heaps, see ["Local Memory," Chapter 16](clmem.md).
 
-To free a VM block, call VMFree(). This routine is passed two arguments: the 
+To free a VM block, call **VMFree()**. This routine is passed two arguments: the 
 VM file handle, and the VM block handle. The handle will immediately be 
 freed, even if it is locked. Any associated memory will also be freed. If you 
 want to keep the memory, detach the global memory block from the file (with 
-VMDetach()) before you free the block.
+**VMDetach()**) before you free the block.
 
 #### 18.3.5 Attaching Memory Blocks
 
 VMAttach(), VMDetach()
 
-When you use VMAlloc(), the VM manager allocates a global memory block 
+When you use **VMAlloc()**, the VM manager allocates a global memory block 
 and attaches it to a VM block. However, sometimes you want to allocate the 
 block yourself, or you may have an existing memory block which you want to 
-copy into the VM file. To do this, you call the routine VMAttach().
+copy into the VM file. To do this, you call the routine **VMAttach()**.
 
-VMAttach() takes three arguments:
+**VMAttach()** takes three arguments:
 
 + The VM file handle
 The handle of the file to attach.
@@ -650,20 +648,20 @@ The memory block must be swappable. After the block is attached, the
 VM manager may discard or free it, as with any other global blocks used 
 by the VM file.
 
-VMAttach() attaches the global memory block to the VM block. The VM 
+**VMAttach()** attaches the global memory block to the VM block. The VM 
 Manager becomes the owner of the memory block. The next time the file is 
-updated, the memory block will be copied to the file. VMAttach() returns the 
+updated, the memory block will be copied to the file. **VMAttach()** returns the 
 handle of the VM block. If it could not perform the attach, it returns a null 
 handle and leaves the global memory block unchanged.
 
 You can also detach the global memory block from a VM block. The routine 
-VMDetach() disassociates a global memory block from its VM block. The 
+**VMDetach()** disassociates a global memory block from its VM block. The 
 routine takes three arguments: the VM file handle; the VM block handle; and 
-the GeodeHandle of the geode which will be made the owner of the memory 
-block. (Passing a null GeodeHandle will make the calling geode the block's 
+the **GeodeHandle** of the geode which will be made the owner of the memory 
+block. (Passing a null **GeodeHandle** will make the calling geode the block's 
 owner.) The VM manager disassociates the memory block from the VM block, 
 changes the memory block's owner, marks it "non-discardable," and returns 
-its handle. If the VM block is not currently in memory, VMDetach() will 
+its handle. If the VM block is not currently in memory, **VMDetach()** will 
 automatically allocate a memory block, copy the VM block's data into it, and 
 return the memory block's handle. If the VM block was dirty, the block will be 
 updated to the file before it is detached. The next time the VM block is locked, 
@@ -677,41 +675,41 @@ VMModifyUserID(), VMPreserveBlocksHandle()
 Once you have opened a VM file and allocated blocks, you will need to access 
 blocks. The VM library provides many routines for doing this.
 
-If you need to access the data in a VM file, you can use the routine VMLock(). 
+If you need to access the data in a VM file, you can use the routine **VMLock()**. 
 This routine moves a VM block onto the global heap. It does this by allocating 
 a global memory block (if the VM block is not already associated with a 
 memory block), reallocating the global block if it had been discarded, locking 
 the memory block on the global heap, and copying the VM block into the 
 global block, if necessary. (It will copy the VM block to memory only if 
 necessary, i.e. if the memory block is newly-allocated, or had been discarded 
-and reallocated.) VMLock() takes three arguments: the handle of the VM 
+and reallocated.) **VMLock()** takes three arguments: the handle of the VM 
 file, the VMBlockHandle of the block to lock, and a pointer to a memHandle 
 variable. It returns a pointer to the start of the block, and writes the global 
 block's handle into the memHandle variable. You can now access the block 
 the same way you would any other block, with one exception: When you are 
-done with the block, you do not call MemUnlock(); instead, call the routine 
-VMUnlock(), passing it the handle of the global memory block (not the 
+done with the block, you do not call **MemUnlock()**; instead, call the routine 
+**VMUnlock()**, passing it the handle of the global memory block (not the 
 handle of the VM block). This will unlock the global block on the heap.
 
 If you alter the global memory block, you will need to notify the VM manager 
 of this so it will know to copy the changes back to the VM file. You do this by 
-calling the routine VMDirty(). VMDirty() takes one argument, the handle 
+calling the routine **VMDirty()**. **VMDirty()** takes one argument, the handle 
 of the global memory block (not the VM block). It is important to dirty the 
 block while it is still locked on the heap; as soon as you unlock a clean block, 
 the VM manager may choose to discard it. Dirty blocks are copied back to the 
 VM file when it is updated. Note that if an object in a VM block is marked 
-dirty (via ObjMarkDirty()), the block is automatically dirtied. Similarly, if 
+dirty (via **ObjMarkDirty()**), the block is automatically dirtied. Similarly, if 
 you attach a global memory block to a VM block (via VMAttach()), the VM 
 block is automatically dirtied.
 
 You can dynamically resize VM blocks. To do this, lock the VM block with 
-VMLock(); then resize the global memory block with MemReAlloc(). Be 
+**VMLock()**; then resize the global memory block with **MemReAlloc()**. Be 
 sure to mark the block dirty so the changes will be copied to the disk file. Note 
 that although the global memory block will remain locked, it may move on 
 the global heap when it is resized. You will therefore need to dereference the 
-global memory handle (with MemDeref()) before accessing the memory.
+global memory handle (with **MemDeref()**) before accessing the memory.
 
-You can locate VM blocks by their user ID numbers. The routine VMFind() 
+You can locate VM blocks by their user ID numbers. The routine **VMFind()** 
 takes three arguments: the VM file handle, a VM block handle, and the user 
 ID for which to look. The routine looks through the block table, starting with 
 the handle after the one passed, until it finds a block with the specified user 
@@ -722,7 +720,7 @@ back in that block's handle, you will get the next block with that ID; and so
 on, until you get all the blocks (after which you will be returned a null handle). 
 
 You can change a block's user ID number by calling the routine 
-VMModifyUserID(). This routine takes three arguments: the VM file 
+**VMModifyUserID()**. This routine takes three arguments: the VM file 
 handle, the VM block handle, and the new user ID number. Since user IDs are 
 maintained in the block table, not in the blocks themselves, it doesn't matter 
 whether the block is locked, or even whether it is associated with data in the 
@@ -732,7 +730,7 @@ changed.)
 Ordinarily, the VM manager can free any unlocked, clean global block if the 
 space is needed. However, you can instruct the VM manager not to free the 
 global block associated with a specific block by calling the routine 
-VMPreserveBlocksHandle(). The routine takes two arguments, namely 
+**VMPreserveBlocksHandle()**. The routine takes two arguments, namely 
 the VM file handle and the VM block handle. It sees to it that the specified VM 
 block will remain attached to the same global block until the VM block is 
 specifically detached (or reattached).
@@ -744,30 +742,30 @@ VMVMBlockToMemBlock(), VMMemBlockToVMBlock(), VMInfo()
 Several utilities are provided to give you information about VM blocks.
 
 If you know the handle of a VM block, you can find out the handle of the 
-associated global block by calling the routine VMVMBlockToMemBlock(). 
+associated global block by calling the routine **VMVMBlockToMemBlock()**. 
 This routine takes two arguments, namely the VM file handle and the VM 
 block handle. It returns the global memory handle of the associated block; 
 however, note the caveats regarding global handles in the above section. If 
 the VM block is not currently associated with a global memory block, the 
 routine will allocate a memory block, copy the VM block into it, and return its 
 handle. If the VM handle is not associated with any data in the file and is not 
-attached to a global memory block, VMVMBlockToMemBlock() returns a 
+attached to a global memory block, **VMVMBlockToMemBlock()** returns a 
 null handle.
 
 Conversely, if you know the handle of a global memory block and want to find 
 out the VM file and block to which it is attached, call the routine 
-VMMemBlockToVMBlock(). This routine takes two arguments: the global 
-memory handle, and a pointer to a VMFileHandle variable. It returns the 
+**VMMemBlockToVMBlock()**. This routine takes two arguments: the global 
+memory handle, and a pointer to a **VMFileHandle** variable. It returns the 
 VM block handle of the associated VM block, and writes the handle of the VM 
 file to the address passed. If the global memory block is not attached to a VM 
 file, it returns null handles.
 
-The Boolean routine VMInfo() is an omnibus information routine. It takes 
+The Boolean routine **VMInfo()** is an omnibus information routine. It takes 
 three arguments: the handle of a VM file, the handle of a VM block, and a 
-pointer to a VMInfoStruct structure (described below in Code Display 18-1). 
+pointer to a **VMInfoStruct** structure (described below in Code Display 18-1). 
 If the VM block is free, out of range, or otherwise invalid, it returns false; 
 otherwise, it returns true (i.e. non-zero) and fills in the fields of the 
-VMInfoStruct.
+**VMInfoStruct**.
 
 ---
 Code Display 18-1 VMInfoStruct
@@ -798,11 +796,11 @@ back over their attached VM blocks, then marks all blocks as clean. If you use
 the document control objects, they will take care of updating and saving the 
 file. However, you may need to call the updating routines specifically.
 
-The routine VMUpdate() instructs the VM manager to write all dirty blocks 
+The routine **VMUpdate()** instructs the VM manager to write all dirty blocks 
 to the disk. It takes one argument, the VM file handle (which is overridden if 
 a thread file has been set). It returns zero if the update proceeded normally; 
-otherwise, it returns either one of the FileErrors or one of the three 
-VMUpdate() status codes:
+otherwise, it returns either one of the **FileErrors** or one of the three 
+**VMUpdate()** status codes:
 
 VM_UPDATE_NOTHING_DIRTY  
 All blocks were clean, so the VM disk file was not changed.
@@ -815,20 +813,20 @@ VM_UPDATE_BLOCK_WAS_LOCKED
 Some of the VM blocks were locked by another thread, so they 
 could not be updated to the disk.
 
-VMUpdate() is optimized for updating clean files; thus, it costs very little 
-time to call VMUpdate() when you are not sure if the file is dirty. If a file is 
-auto-saved, VMUpdate() is used.
+**VMUpdate()** is optimized for updating clean files; thus, it costs very little 
+time to call **VMUpdate()** when you are not sure if the file is dirty. If a file is 
+auto-saved, **VMUpdate()** is used.
 
 A VM file can maintain backup copies of updated blocks. If so, updating the 
 file will write changes to the disk, but will not alter those backup blocks. To 
-finalize the changes, call the routine VMSave(). This routine updates the 
+finalize the changes, call the routine **VMSave()**. This routine updates the 
 file, then deletes all the backup blocks and compacts the file. (See 
-Figure 18-4.) If the file does not have backup capability, VMSave() acts the 
-same as VMUpdate().
+Figure 18-4.) If the file does not have backup capability, **VMSave()** acts the 
+same as **VMUpdate()**.
 
 If a file has the backup capability, you cannot directly access the backup 
 blocks. However, you can instruct the VM manager to restore the file to its 
-last-saved state. The command VMRevert() causes the VM manager to 
+last-saved state. The command **VMRevert()** causes the VM manager to 
 check the VM file for blocks which have backups. It then deletes the 
 non-backup block, and changes the backup block into a regular block. It also 
 discards all blocks in memory that were attached to the blocks which just 
@@ -838,7 +836,7 @@ The routine may not be used on files which do not have the flag VMA_BACKUP set.
 ![](Art/figure_18-4.png)
 
 **Figure 18-4** Saving a backup-enabled VM file  
-1. _This is the file when VMSave() is called. Backup blocks are noted with an 
+1. _This is the file when **VMSave()** is called. Backup blocks are noted with an 
 apostrophe._
 2. _The file is updated (all dirty blocks are written to the disk). This may cause 
 more backup blocks to be created._
@@ -846,14 +844,14 @@ more backup blocks to be created._
 4. _The file is always compacted at the end of a save, whether or not it has 
 fallen below the compression threshold._
 
-You can save a file under a new name with the routine VMSaveAs(). If the 
+You can save a file under a new name with the routine **VMSaveAs()**. If the 
 file has backup capability, the old file will be restored to its last-saved 
-condition (as if VMRevert() had been called); otherwise, the old file will be 
+condition (as if **VMRevert()** had been called); otherwise, the old file will be 
 left in the file's current state. The routine is passed the name of the new file. 
-VMSaveAs() copies all the blocks from the old file to the new one. If a block 
+**VMSaveAs()** copies all the blocks from the old file to the new one. If a block 
 has a backup copy, the more recent version is copied. The new file will thus 
 have the file in its current state; block handles will be preserved. After the 
-new file has been created, if the file has backup-capability, VMSaveAs() 
+new file has been created, if the file has backup-capability, **VMSaveAs()** 
 reverts the original file to its last-saved state. It then closes the old file and 
 returns the handle of the new file. 
 
@@ -863,31 +861,31 @@ up a file menu with appropriate commands ("Save," "Save As," etc.), and will
 call the appropriate routines whenever the user chooses a command.
 
 If you need to find out whether a file is dirty, call the routine 
-VMGetDirtyState(). This routine returns a two-byte value. The more 
+**VMGetDirtyState()**. This routine returns a two-byte value. The more 
 significant byte is non-zero if any blocks have been dirtied since the last 
 update or auto-save. The less significant byte is non-zero if any blocks have 
 been dirtied since the last save, save-as, or revert action. If the file does not 
 have backup-capability, both bytes will always be equal. Note that 
-VMUpdate() is optimized for clean files, so it is generally faster to call 
-VMUpdate() even if the file might be clean, rather than checking the 
-dirty-state with VMGetDirtyState(). 
+**VMUpdate()** is optimized for clean files, so it is generally faster to call 
+**VMUpdate()** even if the file might be clean, rather than checking the 
+dirty-state with **VMGetDirtyState()**. 
 
 #### 18.3.9 Closing Files
 
 VMClose()
 
 When you are done with a VM file for the time being, you should close it with 
-VMClose(). This routine updates all the dirty blocks, frees all the global 
+**VMClose()**. This routine updates all the dirty blocks, frees all the global 
 memory blocks attached to the file, and closes the file (thus freeing its 
 handle). The routine is passed two arguments. The first is the handle of the 
 file to close. The second is a Boolean value, noErrorFlag. If this flag is true, 
-VMClose() will not return error conditions; if it could not successfully close 
+**VMClose()** will not return error conditions; if it could not successfully close 
 the file, it will fatal-error.
 
-If noErrorFlag is false, VMClose() will update the file and close it. If the file 
+If noErrorFlag is false, **VMClose()** will update the file and close it. If the file 
 could not be updated, it will return an error condition. Be warned, however, 
-that if for some reason VMClose() could not finish updating a file (for 
-example, because the disk ran out of space), VMClose() will return an error 
+that if for some reason **VMClose()** could not finish updating a file (for 
+example, because the disk ran out of space), **VMClose()** will return an error 
 message, but will close the file and free the memory anyway. Thus, the most 
 recent changes will be lost. For this reason, it is usually safer to first update 
 the file (and handle any error messages returned) and then close it.
@@ -911,7 +909,7 @@ block when you need it. The usual way to do this is with a map block.
 A map block is just like any other VM block. Like other blocks, it can be a 
 standard block, an LMem heap, etc. It is different in only one way: the VM 
 manager keeps track of its handle. By calling the routine 
-VMGetMapBlock(), you can get the VM handle of the map block. You can 
+**VMGetMapBlock()**, you can get the VM handle of the map block. You can 
 then look inside the map block to get information about the other blocks.
 
 Note that the structure of the VM map block is entirely the concern of the 
@@ -919,12 +917,13 @@ creating geode. The VM manager neither requires nor specifies any internal
 structure or information content.
 
 To create a map block, allocate a VM block through any of the normal 
-techniques, then pass its VM handle as an argument to VMSetMapBlock(). 
+techniques, then pass its VM handle as an argument to **VMSetMapBlock()**. 
 That block will be the new map block. If there already was a map block, the 
 old block will become an ordinary VM block.
 
 In addition to setting a map block, you can set a map database item with the 
-command DBSetMap(). For details, see section 19.2.5 of chapter 19.
+command **DBSetMap()**. For details, see [section 19.2.5 of chapter 19]
+(cdb.md#1925-the-db-map-item).
 
 #### 18.3.11 File-Access Synchronization
 
@@ -938,10 +937,11 @@ different ways shared-access can be handled.
 A VM file can be one of three different types: standard, "public," and 
 "shared-multiple." By default, all new VM files are standard. The file's type is 
 one of its extended attributes, and can be changed with the routine 
-FileSetHandleExtendedAttributes() (see section 17.5.3 of chapter 17). 
+**FileSetHandleExtendedAttributes()** (see [section 17.5.3 of chapter 17]
+(cfile.md#1753-geos-extended-attributes)). 
 The document control automatically lets the user select what kind of file to 
-create, and changes its type accordingly. (See "GenDocument," Chapter 13 of 
-the Object Reference Book.)
+create, and changes its type accordingly. (See ["GenDocument," Chapter 13 of 
+the Object Reference Book](../Objects/ogendoc.md).)
 
 Only one geode may write to a standard GEOS VM file at a time. If a geode 
 has the file open for read/write access, no other geode will be allowed to open 
@@ -950,7 +950,7 @@ allowed to open it for read-only access, but not for read-write access. If a fil
 is opened for read-only access, blocks cannot be dirtied or updated. If a geode 
 tries to open a file for writing when the file is already open, or if the geode 
 tries to open it for reading when the file has already been opened for writing, 
-VMOpen() will return an error.
+**VMOpen()** will return an error.
 
 In general, when a file is opened, it is by default opened for read-write access. 
 For example, the document control objects present a dialog box which lets the 
@@ -970,15 +970,15 @@ users might be writing records to the database at the same time. For this
 reason, GEOS lets you create "shared-multiple" files. Several geodes can have 
 a "shared-multiple" file open at once. However, a geode cannot access the file 
 whenever it wants. Instead, it must get the file's semaphore to access the 
-file's data. When it needs to access the file, it calls VMGrabExclusive(). 
+file's data. When it needs to access the file, it calls **VMGrabExclusive()**. 
 This routine takes four arguments:
 
 + The handle of the VM file
 
 + A timeout value
-If a timeout value is passed, VMGrabExclusive() will give up trying to 
+If a timeout value is passed, **VMGrabExclusive()** will give up trying to 
 get the semaphore after a specified number of seconds has passed. If a 
-timeout value of zero is passed, VMGrabExclusive() will block until it 
+timeout value of zero is passed, **VMGrabExclusive()** will block until it 
 can get the file's semaphore.
 
 + A member of the VMOperations enumerated type
@@ -986,10 +986,10 @@ This specifies the kind of operation to be performed on the locked file. The
 VMOperations values are described below.
 
 + A pointer to a word-length variable.
-If this call to VMGrabExclusive() fails and times out, the operation 
+If this call to **VMGrabExclusive()** fails and times out, the operation 
 currently being performed will be written here.
 
-The routine returns a member of the VMStartExclusiveReturnValue 
+The routine returns a member of the **VMStartExclusiveReturnValue** 
 enumerated type. The following return values are possible:
 
 VMSERV_NO_CHANGES  
@@ -1002,13 +1002,13 @@ had access to it; the thread should take appropriate actions
 (such as re-reading any cached data).
 
 VMSERV_TIMEOUT  
-This call to VMGrabExclusive() failed and timed out without 
+This call to **VMGrabExclusive()** failed and timed out without 
 getting access to the file.
 
-When a geode calls VMGrabExclusive(), it must pass a member of the 
-VMOperations enumerated type. Most of the values are used internally by 
+When a geode calls **VMGrabExclusive()**, it must pass a member of the 
+**VMOperations** enumerated type. Most of the values are used internally by 
 the system; while a geode should never pass these values, they may be 
-returned by VMGrabExclusive() if the call times out. The following values 
+returned by **VMGrabExclusive()** if the call times out. The following values 
 are defined in vm.h:
 
 VMO_READ  
@@ -1038,7 +1038,7 @@ with numbers in this range (perhaps by defining an enumerated type whose
 starting value is VMO_FIRST_APP_CODE).
 
 When a thread is done accessing a file, it should release its exclusive access 
-by calling VMReleaseExclusive(). The routine takes one argument, 
+by calling **VMReleaseExclusive()**. The routine takes one argument, 
 namely the file handle. It does not return anything.
 
 #### 18.3.12 Other VM Utilities
@@ -1046,17 +1046,17 @@ namely the file handle. It does not return anything.
 VMCopyVMBlock(), VMSetReloc()
 
 If you would like to duplicate a VM block, or copy it to another file, call 
-VMCopyVMBlock(). This routine is passed three arguments:
+**VMCopyVMBlock()**. This routine is passed three arguments:
 
-+ The VMFileHandle of the file containing the source block.
++ The **VMFileHandle** of the file containing the source block.
 
-+ The VMBlockHandle of the source block.
++ The **VMBlockHandle** of the source block.
 
-+ The VMFileHandle of the destination file (which may be the same as 
++ The **VMFileHandle** of the destination file (which may be the same as 
 the source file).
 
 The routine makes a complete duplicate of the source block, copying it to the 
-source file. It returns the VMBlockHandle of the duplicate block. Note that 
+source file. It returns the **VMBlockHandle** of the duplicate block. Note that 
 the duplicate block will almost certainly have a different block handle than 
 the source block. If the block contains a copy of its own handle, you should 
 update it accordingly.
@@ -1084,7 +1084,7 @@ object, not by the VM manager.
 VMRT_UNRELOCATE_FROM_RESOURCE). This is called by the 
 unrelocating object, not by the VM manager.
 
-Using the routine VMSetReloc(), you can instruct the VM manager to call 
+Using the routine **VMSetReloc()**, you can instruct the VM manager to call 
 your relocation routine whenever appropriate.
 
 ### 18.4 VM Chains
@@ -1127,28 +1127,28 @@ you create such a VM chain and pass it to a chain utility, the results are
 undefined. It is your responsibility to make sure no loops occur.
 
 A VM chain block is the same as any other VM block, with one exception: The 
-block must begin with a VMChain structure. This structure contains a 
+block must begin with a **VMChain** structure. This structure contains a 
 single data field, VMC_next, which is the handle of the next block in the chain. 
 If the block is in a chain but has no next link, VMC_next is a null handle. This 
 means, for example, that LMem heaps cannot belong to a VM chain (since 
-LMem heaps must begin with an LMemHeader structure). 
+LMem heaps must begin with an **LMemHeader** structure). 
 
 In addition to chain blocks, a VM chain may contain a tree block. A tree block 
 may have several links to blocks. The structure of a tree block is shown in 
-Figure 18-6. A tree block begins with a VMChainTree structure. This 
+Figure 18-6. A tree block begins with a **VMChainTree** structure. This 
 structure has three fields:
 
 VMCT_meta  
-This is a VMChain structure. Every block in a VM chain, 
+This is a **VMChain** structure. Every block in a VM chain, 
 including a tree block, must begin with such a structure. 
 However, to indicate that this is a tree block, the VMC_next field 
 must be set to the special value VM_CHAIN_TREE.
 
 VMCT_offset  
 This is the offset within the block to the first link. All data in 
-the tree block must be placed between the VMChainTree 
+the tree block must be placed between the **VMChainTree** 
 structure and the first link. If you will not put data in this 
-block, set this field to sizeof(VMChainTree).
+block, set this field to sizeof(**VMChainTree**).
 
 VMCT_count  
 This is the number of links in the tree block.
@@ -1184,8 +1184,8 @@ there is a lot, you can store it in a VM chain of any length. Whichever way you
 store the data, you can use the same chain utilities to manipulate it.
 
 The routines all take, as an argument, a dword-sized structure called a 
-VMChain. This structure identifies the chain or DB item. It is two words in 
-length. If it refers to a DB item, it will be the item's DBGroupAndItem 
+**VMChain**. This structure identifies the chain or DB item. It is two words in 
+length. If it refers to a DB item, it will be the item's **DBGroupAndItem** 
 structure. If it refers to a VM chain, the less significant two bytes will be null, 
 and the more significant two bytes will be the VM handle of the head of the 
 chain. Note that none of the blocks in the VM chain need be locked when the 
@@ -1195,40 +1195,40 @@ passed to one of these routines. However, the VM file containing the structure
 must be open.
 
 If you want to free an entire VM chain at once, call the routine 
-VMFreeVMChain(). This routine takes two arguments, namely the VM file 
-handle and the VMChain structure. It frees every block in the VM chain, and 
+**VMFreeVMChain()**. This routine takes two arguments, namely the VM file 
+handle and the **VMChain** structure. It frees every block in the VM chain, and 
 returns nothing.
 
 You can compare two different VM chains, whether in the same or in different 
-files, by calling VMCompareVMChains(). This Boolean routine takes four 
+files, by calling **VMCompareVMChains()**. This Boolean routine takes four 
 arguments, namely the handles of the two files (which may be the same) and 
-the VMChain structures of the two chains or items. The geode must have 
+the **VMChain** structures of the two chains or items. The geode must have 
 both files open when it calls this routine. The routine returns true (i.e. 
 non-zero) if the two chains are identical (i.e. the trees have the same 
 structures, and all data bytes are identical). Note that if the chains contain 
 tree blocks which are identical except in the order of their links, the chains 
 will not be considered identical and the routine will return false (i.e. zero).
 
-You can make a copy of a VM chain with the routine VMCopyVMChain(). 
+You can make a copy of a VM chain with the routine **VMCopyVMChain()**. 
 This routine copies the entire chain to a specified file, which may be the same 
 as the source file. The blocks in the duplicate chain will have the same user 
 ID numbers as the corresponding original blocks. The routine takes three 
-arguments: the handle of the source file, the VMChain of the source chain or 
+arguments: the handle of the source file, the **VMChain** of the source chain or 
 item, and the handle of the destination file. It copies the chain or item and 
-returns the VMChain handle of the duplicate structure. As noted, if this 
-structure is a VM chain, the less significant word of the VMChain will be 
+returns the **VMChain** handle of the duplicate structure. As noted, if this 
+structure is a VM chain, the less significant word of the **VMChain** will be 
 null, and the more significant word will be the VM handle of the head of the 
 chain. The geode must have both files open when it calls this routine.
 
-Several utilities are provided for working with VMChain structures. They 
+Several utilities are provided for working with **VMChain** structures. They 
 are implemented as preprocessor macros, so they are very fast. The macro 
-VMCHAIN_IS_DBITEM() is passed a VMChain structure. It returns non-zero 
+VMCHAIN_IS_DBITEM() is passed a **VMChain** structure. It returns non-zero 
 if the structure identifies a DB item (i.e. if the less significant word is 
 non-zero); it returns zero if the structure identifies a VM chain. The macro 
-VMCHAIN_GET_VM_BLOCK() is passed a VMChain structure which 
+VMCHAIN_GET_VM_BLOCK() is passed a **VMChain** structure which 
 identifies a VM chain. It returns the VM handle (i.e. the more significant word 
 of the structure). Finally, the macro VMCHAIN_MAKE_FROM_VM_BLOCK() 
-takes a VMBlockHandle value and casts it to type VMChain.
+takes a **VMBlockHandle** value and casts it to type **VMChain**.
 
 ### 18.5 Huge Arrays
 
@@ -1259,7 +1259,7 @@ thus, you can often make many array accesses with a single Huge Array
 lookup command.) There is also a certain amount of memory overhead for 
 Huge Arrays. Thus, if you are confident that the array size will be small 
 enough for a single block, you are generally better off with a Chunk Array 
-(see section 16.4.1 of chapter 16).
+(see [section 16.4.1 of chapter 16](lmem.md#1641-chunk-arrays)).
 
 Huge arrays may have fixed-size or variable-sized elements. If elements are 
 variable-sized, there is a slight increase in memory overhead, but no 
@@ -1274,15 +1274,15 @@ Figure 18-7 below.) A Huge Array is identified by the handles of the VM file
 containing the array and the directory block at the head of the array.
 
 The directory block is a special kind of LMem block. It contains a header 
-structure of type HugeArrayDirectory (which begins with an 
-LMemBlockHeader structure), followed by an optional fixed data area, 
+structure of type **HugeArrayDirectory** (which begins with an 
+**LMemBlockHeader** structure), followed by an optional fixed data area, 
 which is followed by a chunk array. The chunk array is an array of 
-HugeArrayDirEntry structures. There is one such structure for each data 
+**HugeArrayDirEntry** structures. There is one such structure for each data 
 block; the structure contains the handle of the data block, the size of the 
 block, and the index number of the last element in the block.
 
 Each data block is also a special LMem block. It contains a 
-HugeArrayBlock structure (which begins with an LMemBlockHeader 
+**HugeArrayBlock** structure (which begins with an **LMemBlockHeader** 
 structure) and is followed by a chunk array of elements. If the Huge Array 
 has variable-sized elements, so will each data block's chunk array.
 
@@ -1325,13 +1325,13 @@ added. This improves efficiency, since you may often be adding several
 elements to the same block. However, this also means that most Huge Arrays 
 have a fair amount of unused space. If you won't be adding elements to a 
 Huge Array for a while, you should compact the Huge Array with 
-HugeArrayCompressBlocks (see section 18.5.3 on page 713).
+**HugeArrayCompressBlocks** (see [section 18.5.3](#1853-huge-array-utilities)).
 
 Ordinarily, VM Chains may not contain LMem heaps. Huge Arrays are an 
 exception. The reason LMem blocks cannot belong to VM chains is simple. 
 Each block in a VM chain begins with the handle of the next block in the chain 
 (or VM_CHAIN_TREE if it is a tree block). However, each LMem heap has to 
-begin with an LMemBlockHeader structure, the first word of which is the 
+begin with an **LMemBlockHeader** structure, the first word of which is the 
 global handle of the memory block. In order for these blocks to serve as both, 
 special actions have to be taken. When a Huge Array block is unlocked, its 
 first word is the handle of the next block in the chain. It is thus a VM chain 
@@ -1359,13 +1359,13 @@ help optimize your code are described in "Huge Array Utilities" on page 713.
 
 Note that you should never have more than one block of a Huge Array locked 
 at a time. Furthermore, when you call any routine in this section (except 
-HugeArrayUnlock(), HugeArrayDirty(), and HugeArrayGetCount()), 
+**HugeArrayUnlock()**, **HugeArrayDirty()**, and **HugeArrayGetCount()**), 
 you should not have any blocks locked. The next section contains several 
 routines which may be used while a block is locked. Also, if you use any VM 
 chain routines on a Huge Array, you should make sure that no blocks are 
 locked.
 
-To create a Huge Array, call HugeArrayCreate(). This routine allocates a 
+To create a Huge Array, call **HugeArrayCreate()**. This routine allocates a 
 directory block and initializes it. The routine takes three arguments:
 
 + The handle of the VM file in which to create the huge array. This 
@@ -1375,24 +1375,24 @@ argument is ignored if a default VM file has been set for this thread.
 variable-sized.
 
 + The size to allocate for the directory block's header. If you want to have a 
-fixed data area between the HugeArrayDirectory structure and the 
+fixed data area between the **HugeArrayDirectory** structure and the 
 chunk array of directory entries, you can pass an argument here. The size 
-must be at least as large as sizeof(HugeArrayDirectory). 
+must be at least as large as sizeof(**HugeArrayDirectory**). 
 Alternatively, you can pass an argument of zero, indicating that there 
 will be no extra data area, and the default header size should be used.
 
-HugeArrayCreate() returns the VM handle of the directory block. This is 
+**HugeArrayCreate()** returns the VM handle of the directory block. This is 
 also the handle of the Huge Array itself; you will pass it as an argument to 
 most of the other Huge Array routines.
 
 When you are done with a Huge Array, destroy it by calling 
-HugeArrayDestroy(). This routine frees all of the blocks in the Huge Array. 
+**HugeArrayDestroy()**. This routine frees all of the blocks in the Huge Array. 
 It takes two arguments, namely the global handle of the VM file and the VM 
 handle of the Huge Array. It does not return anything. You should make sure 
 that none of the data blocks are locked when you call this since all of the VM 
 chain links must be valid when this routine is called.
 
-To access an element in the array, call HugeArrayLock(). This routine 
+To access an element in the array, call **HugeArrayLock()**. This routine 
 takes four arguments:
 
 + The global handle of the VM file which contains the Huge Array. 
@@ -1417,26 +1417,26 @@ element 1,000 is the first of the last 21 consecutive elements in the block; the
 lower word (0x001e) indicates that the element is the last of the first 30 
 consecutive elements. You thus know which other elements in the Huge 
 Array are in this block and can be examined without further calls to 
-HugeArrayLock().
+**HugeArrayLock()**.
 
 When you are done examining a block in the Huge Array, you should unlock 
-the block with HugeArrayUnlock(). This routine takes only one argument, 
+the block with **HugeArrayUnlock()**. This routine takes only one argument, 
 namely a pointer to any element in that block. It does not return anything. 
 Note that you don't have to pass it the same pointer as the one you were given 
-by HugeArrayLock(). Thus, you can get a pointer, increment it to work your 
+by **HugeArrayLock()**. Thus, you can get a pointer, increment it to work your 
 way through the block, and unlock the block with whatever address you end 
 up with.
 
 Whenever you insert or delete an element, the Huge Array routines 
 automatically mark the relevant blocks as dirty. However, if you change an 
 element, you need to dirty the block yourself or the changes won't be saved to 
-the disk. To do this, call the routine HugeArrayDirty(). This routine takes 
+the disk. To do this, call the routine **HugeArrayDirty()**. This routine takes 
 one argument, namely a pointer to an element in a Huge Array. It dirties the 
 data block containing that element. Naturally, if you change several 
 elements in a block, you only need to call this routine once.
 
 If you want to add elements to the end of a Huge Array, call 
-HugeArrayAppend(). If elements are of uniform size, you can add up to 
+**HugeArrayAppend()**. If elements are of uniform size, you can add up to 
 elements with one call to this routine. You can also pass a pointer to a 
 template element; it will copy the template into each new element it creates. 
 This routine takes four arguments:
@@ -1457,8 +1457,8 @@ created, it returns the index of the first of the new elements. This index is a
 dword.
 
 You can also insert one or more elements in the middle of a Huge Array. To 
-do this, call the routine HugeArrayInsert(). As with 
-HugeArrayAppend(), you can insert many uniform-sized elements at once, 
+do this, call the routine **HugeArrayInsert()**. As with 
+**HugeArrayAppend()**, you can insert many uniform-sized elements at once, 
 and you can pass a pointer to a template to initialize elements with. The 
 routine takes five arguments:
 
@@ -1481,9 +1481,9 @@ the index you passed it; however, if you pass an index which is out of bounds,
 the new elements will be put at the end of the array, and the index returned 
 will thus be different.
 
-To delete elements in a Huge Array, call HugeArrayDelete(). You can delete 
+To delete elements in a Huge Array, call **HugeArrayDelete()**. You can delete 
 many elements (whether uniform-sized or variable-sized) with one call to 
-HugeArrayDelete(). The routine takes four arguments:
+**HugeArrayDelete()**. The routine takes four arguments:
 
 + The global handle of the VM file containing the Huge Array. This 
 argument is ignored if a default file has been set.
@@ -1495,7 +1495,7 @@ argument is ignored if a default file has been set.
 + The index of the first element to delete.
 
 You can erase or replace the data in one or more elements with a call to 
-HugeArrayReplace(). This is also the only way to resize a variable-sized 
+**HugeArrayReplace()**. This is also the only way to resize a variable-sized 
 element. You can pass a pointer to a template to copy into the element or 
 elements, or you can have the element(s) initialized with null bytes. The 
 routine takes five arguments:
@@ -1514,10 +1514,10 @@ the new size for the element, if elements are variable-sized.
 null pointer to fill the elements with null bytes).
 
 You can find out the number of elements in a Huge Array with a call to 
-HugeArrayGetCount(). This routine takes two arguments, namely the file 
+**HugeArrayGetCount()**. This routine takes two arguments, namely the file 
 handle and the handle of the Huge Array. The routine returns the number of 
 elements in the array. Since array indices begin at zero, if 
-HugeArrayGetCount() returns, the last element in the array has index.
+**HugeArrayGetCount()** returns, the last element in the array has index [x-1].
 
 #### 18.5.3 Huge Array Utilities
 
@@ -1531,7 +1531,7 @@ structure of a Huge Array. As noted above, you can use any of the VM Chain
 routines on a Huge Array, as long as none of the blocks are locked. 
 
 If you have been accessing an element in a Huge Array and you want to move 
-on to the next one, you can call the routine HugeArrayNext(). The routine 
+on to the next one, you can call the routine **HugeArrayNext()**. The routine 
 takes a pointer to a pointer to the element. It changes that pointer to point to 
 the next element in the array, which may be in a different block. If the routine 
 changes blocks, it will unlock the old block and lock the new one. It returns 
@@ -1540,7 +1540,7 @@ advanced to. If we were at the last element in the Huge Array, it unlocks the
 block, writes a null pointer to the address, and returns zero.
 
 If you want to move to the previous element instead of the next one, call 
-HugeArrayPrev(). It also takes a pointer to a pointer to an element. It 
+**HugeArrayPrev()**. It also takes a pointer to a pointer to an element. It 
 changes that pointer to a pointer to the previous element; if this means 
 switching blocks, it unlocks the current block and locks the previous one. It 
 returns the number of consecutive elements ending with the one we just 
@@ -1549,7 +1549,7 @@ unlocks the block, writes a null pointer to the address, and returns zero.
 
 If you have a block of the Huge Array locked and you want to insert an 
 element or elements at an address in that block, call the routine 
-HugeArrayExpand(). It takes three arguments:
+**HugeArrayExpand()**. It takes three arguments:
 
 + A pointer to a pointer to the location where we you want to insert the 
 elements. This element must be in a locked block.
@@ -1570,7 +1570,7 @@ will be unlocked, and the new one will be locked.
 
 If you have a block of a Huge Array locked and you want to delete one or more 
 elements starting with one within the block, you can call 
-HugeArrayContract(). This routine takes two arguments:
+**HugeArrayContract()**. This routine takes two arguments:
 
 + A pointer to the first element to be deleted. The block with that element 
 must be locked.
@@ -1585,8 +1585,8 @@ one. It returns the number of consecutive elements following the one whose
 address was written.
 
 You may wish to perform the same operation on a number of consecutive 
-elements of a Huge Array. HugeArrayEnum() is a routine which lets you do 
-this efficiently. HugeArrayEnum() takes six arguments:
+elements of a Huge Array. **HugeArrayEnum()** is a routine which lets you do 
+this efficiently. **HugeArrayEnum()** takes six arguments:
 
 + The VMFileHandle of the VM file containing the Huge Array.
 
@@ -1602,27 +1602,27 @@ the array.
 
 + A pointer to a Boolean callback routine. This callback routine should take 
 two arguments: a void pointer to an element, and the void pointer which 
-was passed to HugeArrayEnum(). The callback routine can abort the 
+was passed to **HugeArrayEnum()**. The callback routine can abort the 
 enumeration by returning true (i.e. non-zero).
 
-HugeArrayEnum() calls the callback routine for every element, in order, 
+**HugeArrayEnum()** calls the callback routine for every element, in order, 
 from the first element. It passes the callback a pointer to the element and the 
-pointer passed to HugeArrayEnum(). The callback routine may not do 
+pointer passed to **HugeArrayEnum()**. The callback routine may not do 
 anything which would invalidate any pointers to the Huge Array; for 
 example, it may not allocate, delete, or resize any of the elements. The 
 callback routine should restrict itself to examining elements and altering 
 them (without resizing them). The callback routine can abort the 
 enumeration by returning true (i.e. non-zero); if it does so, 
-HugeArrayEnum() will return true. If HugeArrayEnum() finishes the 
+HugeArrayEnum() will return true. If **HugeArrayEnum()** finishes the 
 enumeration without aborting, it returns false (i.e. zero).
 
-If the count is large enough to take HugeArrayEnum() past the end of the 
-array, HugeArrayEnum() will simply enumerate up to the last element, 
+If the count is large enough to take **HugeArrayEnum()** past the end of the 
+array, **HugeArrayEnum()** will simply enumerate up to the last element, 
 then stop. For example, if you pass a start index of 9,000 and a count of 2,000, 
-but the Huge Array has only 10,000 elements, HugeArrayEnum() will 
+but the Huge Array has only 10,000 elements, **HugeArrayEnum()** will 
 enumerate up through the last element (with index 9,999) then stop. 
 However, the starting index must be the index of an element in the Huge 
-Array. You can also pass a count of -1, indicating that HugeArrayEnum() 
+Array. You can also pass a count of -1, indicating that **HugeArrayEnum()** 
 should enumerate through the last element of the array. Therefore, to 
 enumerate the entire array, pass a starting element of zero and a count of -1.
 
@@ -1630,14 +1630,14 @@ As noted above, most Huge Arrays contain a fair amount of unused space.
 This makes it much faster to add and remove elements, since blocks don't 
 need to be resized very often. However, if you have a Huge Array that is not 
 frequently changed, this is an inefficient use of space. You can free this space 
-by calling HugeArrayCompressBlocks(). This routine is passed two 
-arguments: the handle of the VM file, and the VMBlockHandle of the Huge 
+by calling **HugeArrayCompressBlocks()**. This routine is passed two 
+arguments: the handle of the VM file, and the **VMBlockHandle** of the Huge 
 Array. The routine does not change any element in the Huge Array; it simply 
 resizes the directory and data blocks to be no larger than necessary to hold 
 their elements. The routine does not return anything.
 
 If you want to verify (in error-checking code) that a given VM block is the 
-directory block of a Huge Array, you can call ECCheckHugeArray(). This 
+directory block of a Huge Array, you can call **ECCheckHugeArray()**. This 
 routine is passed the VM file and block handles of the block in question. If the 
 block is the directory block of a Huge Array, the routine returns normally; 
 otherwise it causes a fatal error. The routine should not, therefore, be used 

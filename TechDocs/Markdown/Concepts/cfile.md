@@ -25,9 +25,9 @@ control and file-selector objects can let the user select and open files
 transparently to the application. Many applications will never need to 
 negotiate the directory structure.
 
-Before reading this section, you should have read "System Architecture," 
-Chapter 3, and "First Steps: Hello World," Chapter 4. You should also be 
-familiar with GEOS handles (discussed in "Handles," Chapter 14).
+Before reading this section, you should have read ["System Architecture", 
+Chapter 3](carch.md), and ["First Steps: Hello World", Chapter 4](cgetsta.md). 
+You should also be familiar with GEOS handles (discussed in ["Handles", Chapter 14](chandle.md)).
 
 ### 17.1 Design Philosophy
 
@@ -171,14 +171,14 @@ directory instead of the root directory. (Note that if you specify a disk handle
 for any operation, you must pass an absolute path which begins at the root of 
 that disk or standard path.) GEOS allows every thread to have its own 
 working directory; each thread can also save paths on a stack, letting the 
-thread switch directories easily. For more details, see section 17.4.2 on page 
-636.
+thread switch directories easily. For more details, see [section 17.4.2]
+(#1742-current-path-and-directory-stack).
 
 Some disk-operating systems, such as MS-DOS, allow a working directory for 
 each drive. GEOS does not allow this; you may have only one working 
 directory at a time, regardless of how many drives you have. If you need to 
 switch back and forth between directories on different drives, you can use the 
-directory stack (see section 17.4.2 on page 636).
+directory stack (see [section 17.4.2](#1742-current-path-and-directory-stack)).
 
 ### 17.3 Disks and Drives
 
@@ -215,8 +215,8 @@ is because the volume mounted on a drive can change frequently and without
 warning. 
 
 GEOS provides routines to get information about a drive. To get general 
-information about a drive, call the routine DriveGetStatus(). This routine 
-takes the drive number and returns a word-length set of DriveStatus flags 
+information about a drive, call the routine **DriveGetStatus()**. This routine 
+takes the drive number and returns a word-length set of **DriveStatus** flags 
 (defined in drive.h). If an error condition exists, such as the drive you 
 request not existing, it returns zero. The following flags may be returned:
 
@@ -234,11 +234,11 @@ or copied.
 
 DS_TYPE  
 This is a mask for the lowest four bits of the field. These bits 
-contain a member of the DriveType enumerated type.
+contain a member of the **DriveType** enumerated type.
 
 The lowest four bits of the word contains a member of the DriveType 
 enumerated type. The field can be accessed by masking out all the bits except 
-for those set in DS_TYPE. DriveType comprises the following values:
+for those set in DS_TYPE. **DriveType** comprises the following values:
 
 DRIVE_5_25  
 Drive uses 5.25-inch floppy disks.
@@ -261,14 +261,14 @@ Drive uses 8-inch floppy disks.
 DRIVE_UNKNOWN  
 Drive type is unknown.
 
-DriveGetStatus() returns the information most often needed about a drive. 
+**DriveGetStatus()** returns the information most often needed about a drive. 
 However, you may sometimes need more obscure information. For this 
-reason, GEOS provides the routine DriveGetExtStatus(). Like 
+reason, GEOS provides the routine **DriveGetExtStatus()**. Like 
 DriveGetStatus(), it takes the drive number as an argument and returns a 
 word of flags; however, it returns additional flags. The flags returned by 
-DriveGetStatus() are set in the lower byte of the returned word; special 
-additional flags are set in the upper byte. Like DriveGetStatus(), 
-DriveGetExtStatus() returns zero if the drive specified is invalid. The 
+**DriveGetStatus()** are set in the lower byte of the returned word; special 
+additional flags are set in the upper byte. Like **DriveGetStatus()**, 
+**DriveGetExtStatus()** returns zero if the drive specified is invalid. The 
 following flags are defined for the upper byte:
 
 DES_LOCAL_ONLY  
@@ -293,9 +293,9 @@ Many disk drives can take a variety of disks. For example, high-density
 3.5-inch drives can read and write to either 720K disks or 1.44M disks. Every 
 drive has a "default" media type. When you format a disk in that drive, it will, 
 by default, be formatted to the default size. To find out the default disk type, 
-call the routine DriveGetDefaultMedia(). This routine takes one 
-argument, namely the drive number. It returns a member of the MediaType 
-enumerated type. MediaType has the following possible values:
+call the routine **DriveGetDefaultMedia()**. This routine takes one 
+argument, namely the drive number. It returns a member of the **MediaType** 
+enumerated type. **MediaType** has the following possible values:
 
 MEDIA_160K, MEDIA_180K, MEDIA_320K, MEDIA_360K  
 These are all sizes used by 5.25-inch disks.
@@ -324,14 +324,14 @@ This is returned if the drive specified does not contain a disk.
 This value is defined to be equal to zero.
 
 If you want to find out if a drive can accommodate a certain kind of disk, call 
-the routine DriveTestMediaSupport(). This Boolean routine takes two 
-arguments: a drive number and a member of the MediaType enumerated 
+the routine **DriveTestMediaSupport()**. This Boolean routine takes two 
+arguments: a drive number and a member of the **MediaType** enumerated 
 type. If the drive supports that medium, the routine returns true (i.e. 
 non-zero); otherwise, it returns false (i.e. zero).
 
-To find out the name of a given drive, call DriveGetName(). This routine is 
+To find out the name of a given drive, call **DriveGetName()**. This routine is 
 passed three arguments: a drive number, a pointer to a character buffer, and 
-the size of that buffer. DriveGetName() writes the drive's name to the 
+the size of that buffer. **DriveGetName()** writes the drive's name to the 
 buffer as a null-terminated string; it returns a pointer to that trailing null. If 
 the buffer was not large enough, or the drive does not exist, it returns a null 
 pointer.
@@ -363,11 +363,11 @@ does not change its handle; it just brings GEOS's information about the disk
 up-to-date.
 
 Note that the disk handle is not a reference to the global handle table; thus, 
-Swat commands like phandle will not work with disk handles. Disk handles 
+Swat commands like **phandle** will not work with disk handles. Disk handles 
 should always be treated as opaque 16-bit tokens.
 
 You can specifically instruct the system to register a disk by calling the 
-routine DiskRegisterDisk(). The routine is passed a single argument, 
+routine **DiskRegisterDisk()**. The routine is passed a single argument, 
 namely the drive number. If the disk has an entry in the disk table, the 
 routine will not reregister the disk; it will just return the disk's handle. If the 
 disk has no entry in the table, the system will create an entry and register 
@@ -382,8 +382,8 @@ disk is inserted, the system will choose an arbitrary label for the volume (e.g.
 label is used by the system and discarded when the session ends. Ordinarily, 
 the system will present an alert box to inform the user about the temporary 
 label. You can suppress this notification by calling the system routine 
-DiskRegisterDiskSilently(). This routine has the same arguments and 
-return values as DiskRegisterDisk().
+**DiskRegisterDiskSilently()**. This routine has the same arguments and 
+return values as **DiskRegisterDisk()**.
 
 ##### 17.3.2.2 Getting Information about a Disk
 
@@ -395,20 +395,20 @@ DiskForEach(), DiskInfoStruct, DiskFindResult
 GEOS provides many routines to get information about disks. If geodes call 
 disk routines at all, they are most likely to call these. Most of these routines 
 are passed the handle of the disk. If you know the disk's volume label and 
-need to find out its handle, call the routine DiskFind() (described below). If 
+need to find out its handle, call the routine **DiskFind()** (described below). If 
 you know the disk is currently in a drive and you need to find out its handle, 
-register the disk (see "Registering Disks" on page 620). Note that any routine 
-which is passed a disk handle can be passed a standard path constant; in this 
-case, the routine will give you information about the disk containing the 
-geos.ini file.
+register the disk (see ["Registering Disks"](#17321-registering-disks)). Note 
+that any routine which is passed a disk handle can be passed a standard path 
+constant; in this case, the routine will give you information about the disk 
+containing the geos.ini file.
 
-The basic disk-information routine is DiskGetVolumeInfo(). This returns 
+The basic disk-information routine is **DiskGetVolumeInfo()**. This returns 
 information about the size of the disk and the amount of free space available. 
 The routine is passed two arguments: the disk handle and a pointer to a 
-DiskInfoStruct structure (shown below). The routine fills in the fields of the 
-DiskInfoStruct structure and returns zero if it was successful. If it fails for 
+**DiskInfoStruct** structure (shown below). The routine fills in the fields of the 
+**DiskInfoStruct** structure and returns zero if it was successful. If it fails for 
 any reason, it returns an error value and sets the thread's error value (which 
-can be recovered with ThreadGetError()). The usual error value returned 
+can be recovered with **ThreadGetError()**). The usual error value returned 
 is the constant ERROR_INVALID_VOLUME.
 
 ---
@@ -426,12 +426,12 @@ typedef struct {
 } DiskInfoStruct;
 ~~~
 
-If you just want to know a disk's name, call DiskGetVolumeName(). This 
+If you just want to know a disk's name, call **DiskGetVolumeName()**. This 
 routine takes two arguments: the disk handle and the address of a character 
 buffer. (The buffer must be at least VOLUME_NAME_LENGTH_ZT characters 
 long.) It writes the volume name to the buffer as a null-terminated string, 
 and it returns the buffer's address. If the volume is unnamed, 
-DiskGetVolumeName() writes the temporary volume name.
+**DiskGetVolumeName()** writes the temporary volume name.
 
 Note that all the routines which return a volume's name will return the 
 temporary name if the volume is unnamed. For this reason, if you want to 
@@ -441,7 +441,7 @@ handle. If the volume does not have a permanent label, the routine returns
 true; otherwise, it returns false.
 
 If you want to know how much free space is available on a disk, call the 
-routine DiskGetVolumeFreeSpace(). The routine is passed the disk 
+routine **DiskGetVolumeFreeSpace()**. The routine is passed the disk 
 handle; it returns (as a dword) the number of free bytes available. If the 
 volume is currently read-only (e.g. a floppy disk with the write-protect tab 
 set), it returns the amount of space that would be available if the volume 
@@ -450,16 +450,16 @@ CD-ROM disk), the routine will return zero. It will also return zero if an error
 condition occurs; in this case, it will also set the thread's error value.
 
 If you want to know what drive a volume is associated with, call 
-DiskGetDrive(). This routine takes one argument, namely the volume's 
+**DiskGetDrive()**. This routine takes one argument, namely the volume's 
 disk handle. It returns the number of the drive which had that disk. Note 
 that it will return this value even if that drive is no longer usable.
 
 If you know the label of a volume which has been registered and you need to 
-find out its handle, call the routine DiskFind(). The routine takes two 
+find out its handle, call the routine **DiskFind()**. The routine takes two 
 arguments: the address of a null-terminated string containing the volume 
-name and a pointer to a variable of the DiskFindResult enumerated type. 
+name and a pointer to a variable of the **DiskFindResult** enumerated type. 
 It will return the disk's handle; if no disk with the specified name has been 
-registered, it will return a null handle. DiskFindResult has the following 
+registered, it will return a null handle. **DiskFindResult** has the following 
 possible values:
 
 DFR_UNIQUE  
@@ -470,40 +470,40 @@ DFR_NOT_UNIQUE
 Two or more volumes with the specified label have been 
 registered. The handle of an arbitrary one of these volumes was 
 returned. If you want to find the handles of all of these disks, 
-call DiskForEach(), described below.
+call **DiskForEach()**, described below.
 
 DFR_NOT_FOUND  
 No disk with the specified label has been registered. A null 
 handle was returned.
 
 To check if a volume is writable, call the Boolean routine 
-DiskCheckWritable(). The routine takes one argument, the disk's handle. 
+**DiskCheckWritable()**. The routine takes one argument, the disk's handle. 
 If the disk is writable, the routine returns true (i.e. non-zero). If the disk is 
 non-writable, the routine returns false (i.e. zero). 
 
-To see if a disk is being used by any threads, call DiskCheckInUse(). The 
+To see if a disk is being used by any threads, call **DiskCheckInUse()**. The 
 routine takes one argument: the disk's handle. It returns true (i.e. non-zero) 
 if a file on the disk is open or if any thread has a directory on that disk in its 
-directory stack (see section 17.4.2 on page 636). If neither condition applies, 
-the routine returns false (i.e. zero).
+directory stack (see [section 17.4.2](#1742-current-path-and-directory-stack)). 
+If neither condition applies, the routine returns false (i.e. zero).
 
-If you want to perform an action on every disk, call DiskForEach(). This 
+If you want to perform an action on every disk, call **DiskForEach()**. This 
 routine takes one argument, a pointer to a Boolean callback routine. The 
 callback routine should take a single argument, the handle of a disk. 
-DiskForEach() calls the callback routine once for every registered disk. It 
+**DiskForEach()** calls the callback routine once for every registered disk. It 
 passes the disk handle to the callback routine, which can take any action it 
 wants; for example, it could call one of the other disk-information routines. 
-The callback routine can make DiskForEach() halt prematurely by 
+The callback routine can make **DiskForEach()** halt prematurely by 
 returning a non-zero value. If the callback routine forced an early halt, 
-DiskForEach() returns the last disk handle which had been passed to the 
+**DiskForEach()** returns the last disk handle which had been passed to the 
 callback routine; otherwise it returns a null handle. This routine is 
 commonly called to look for a specific disk. To do this, simply have the 
 callback routine check each disk to see if it is the one sought; if it is, simply 
-return true, and DiskForEach() will return that disk's handle.
+return true, and **DiskForEach()** will return that disk's handle.
 
-DiskForEach() does not need to examine the actual disks; it works from the 
+**DiskForEach()** does not need to examine the actual disks; it works from the 
 information the file-system stores about all registered disks. This means that 
-DiskForEach() will not have to prompt the user to insert any disks. Of 
+**DiskForEach()** will not have to prompt the user to insert any disks. Of 
 course, the callback routine may need to examine the disks, in which case the 
 user will be prompted when necessary.
 
@@ -519,45 +519,45 @@ since the application can use the standard path constant in the place of a disk
 handle. If the file is not in a standard path, the application will need some 
 way of figuring out the disk's handle on restart.
 
-For this reason, GEOS provides DiskSave() and DiskRestore(). 
-DiskSave() saves information about a disk in an opaque data structure. 
-DiskRestore() reads such a data buffer and returns the handle of the disk 
+For this reason, GEOS provides **DiskSave()** and **DiskRestore()**. 
+**DiskSave()** saves information about a disk in an opaque data structure. 
+**DiskRestore()** reads such a data buffer and returns the handle of the disk 
 described; it even arranges to prompt the user if the disk has not been 
 registered yet.
 
-To save a disk handle, call DiskSave(). This routine takes three arguments:
+To save a disk handle, call **DiskSave()**. This routine takes three arguments:
 
 + The disk handle. 
 This may be a standard path.
 
 + A pointer to a buffer. 
-DiskSave() will write opaque data to that buffer; you will need to pass 
-that data to DiskRestore() to restore the handle.
+**DiskSave()** will write opaque data to that buffer; you will need to pass 
+that data to **DiskRestore()** to restore the handle.
 
 + A pointer to an integer. 
-When you call DiskSave(), that integer should contain the size of the 
-buffer (in bytes). When DiskSave() exits, the integer will contain the 
+When you call **DiskSave()**, that integer should contain the size of the 
+buffer (in bytes). When **DiskSave()** exits, the integer will contain the 
 size of the buffer needed or used (as described below).
 
-If DiskSave() was successful, it will return true. The integer parameter will 
+If **DiskSave()** was successful, it will return true. The integer parameter will 
 contain the size of the buffer actually needed; for example, if the buffer had 
-been 100 bytes long and DiskSave() returns 60, you can safely free the last 
-40 bytes in the buffer. If DiskSave() failed, it will return false. If it failed 
+been 100 bytes long and **DiskSave()** returns 60, you can safely free the last 
+40 bytes in the buffer. If **DiskSave()** failed, it will return false. If it failed 
 because the buffer was too small, it will write the size needed into the integer 
-passed; simply call DiskSave() again with a large enough buffer. If 
-DiskSave() failed for some other reason (e.g. the disk belongs to a drive 
+passed; simply call **DiskSave()** again with a large enough buffer. If 
+**DiskSave()** failed for some other reason (e.g. the disk belongs to a drive 
 which no longer exists), it will write a zero value to the integer.
 
-To restore a disk, call DiskRestore(). This routine takes two arguments:
+To restore a disk, call **DiskRestore()**. This routine takes two arguments:
 
-+ A pointer to the opaque data structure written by DiskSave().
++ A pointer to the opaque data structure written by **DiskSave()**.
 
 + A pointer to a callback routine. The callback routine is called if the user 
 must be prompted to insert the disk. If you pass a null function pointer, 
-DiskRestore() will fail in this situation.
+**DiskRestore()** will fail in this situation.
 
 If the disk in question has already been registered or is currently in its drive, 
-DiskRestore() will return its handle. If the disk is not registered and is not 
+**DiskRestore()** will return its handle. If the disk is not registered and is not 
 in any drive, DiskRestore() will call the callback routine. The callback 
 routine should accept the following four arguments:
 
@@ -566,7 +566,7 @@ according to the DOS convention (e.g. "C:").
 
 + A pointer to a null-terminated string containing the disk volume label.
 
-+ The DiskRestoreError (see below) which would be returned if the 
++ The **DiskRestoreError** (see below) which would be returned if the 
 callback routine hadn't been called.
 
 + A pointer to a pointer to the opaque data structure. If the callback routine 
@@ -577,16 +577,16 @@ structure to move, both of those pointers will be invalidated.
 
 If the callback routine believes the user inserted the correct disk, it should 
 return DRE_DISK_IN_DRIVE. Otherwise, it should return a 
-DiskRestoreError constant. In this case, DiskRestore() will fail and set 
+**DiskRestoreError** constant. In this case, **DiskRestore()** will fail and set 
 the thread's error value to the constant specified. If the callback routine 
 returns an error, that error will generally be 
 DRE_USER_CANCELLED_RESTORE.
 
-If DiskRestore() is successful, it will return the disk handle; this may be 
+If **DiskRestore()** is successful, it will return the disk handle; this may be 
 different from the disk's handle in the previous execution. You may now free 
-the data buffer, if you like. If DiskRestore() fails, it will return a null handle 
+the data buffer, if you like. If **DiskRestore()** fails, it will return a null handle 
 and set the thread's error value. There are several different 
-DiskRestoreError values; they are listed below.
+**DiskRestoreError** values; they are listed below.
 
 DRE_DRIVE_NO_LONGER_EXISTS  
 The disk had last been used in a drive which is no longer 
@@ -599,10 +599,10 @@ doesn't contain the disk.
 
 DRE_USER_CANCELLED_RESTORE  
 A callback routine was called and returned this value to 
-DiskRestore().
+**DiskRestore()**.
 
 DRE_COULDNT_CREATE_NEW_DISK_HANDLE  
-DiskRestore() found the disk in the drive but was for some 
+**DiskRestore()** found the disk in the drive but was for some 
 reason unable to create the disk handle.
 
 DRE_REMOVABLE_DRIVE_IS_BUSY  
@@ -625,7 +625,7 @@ appropriate labels.
 **Changing a Volume Name**
 
 If you want to set or change a volume's name, you should call 
-DiskSetVolumeName(). This routine takes two arguments: the volume's 
+**DiskSetVolumeName()**. This routine takes two arguments: the volume's 
 handle and the address of a null-terminated string (containing the new 
 volume name). If it is able to change the volume's name, it returns zero; 
 otherwise, it returns an error code. It sets or clears the thread's error value 
@@ -644,17 +644,17 @@ only happens with network drives.
 
 **Formatting a Disk**
 
-If a geode needs to format a disk, it can call the routine DiskFormat(). This 
+If a geode needs to format a disk, it can call the routine **DiskFormat()**. This 
 routine can do either low-level or high-level ("soft") formats. The routine does 
 not interact with the user interface; instead, it calls a callback routine, which 
-can arrange any such interaction. DiskFormat() takes seven arguments:
+can arrange any such interaction. **DiskFormat()** takes seven arguments:
 
 + The number of the drive containing the disk to be formatted.
 
 + The address of a null-terminated string containing the disk's new volume 
 name.
 
-+ A member of the MediaType enumerated type (see page 618).
++ A member of the **MediaType** enumerated type (see ["Accessing Drives"](#17431-accessing-drives)).
 
 + Flags indicating how the format should be done. The following flags are 
 available:
@@ -674,7 +674,7 @@ DFF_CALLBACK_CYL_HEAD are passed, results are undefined.
 DFF_FORCE_ERASE  
 A "hard format" should be done; that is, the sectors should be 
 rewritten and initialized to zeros. If this flag is not set, 
-DiskFormat() will do a "soft format" if possible; it will check 
+**DiskFormat()** will do a "soft format" if possible; it will check 
 the sectors and write a blank file allocation table, but it will not 
 necessarily erase the data from the disk.
 
@@ -686,13 +686,13 @@ the disk will be written here.
 
 + The address of a Boolean callback routine, as described above. The 
 routine should be passed either the current cylinder and head or the 
-percentage formatted, depending on the flag passed to DiskFormat(). It 
+percentage formatted, depending on the flag passed to **DiskFormat()**. It 
 should return true to abort the format, or false (i.e. zero) to continue with 
 the format. If neither DFF_CALLBACK_PERCENT_DONE nor 
 DFF_CALLBACK_CYL_HEAD is passed, the callback routine will never be 
 called, so this argument may be a null pointer.
 
-DiskFormat() returns a member of the FormatError enumerated type. If 
+**DiskFormat()** returns a member of the **FormatError** enumerated type. If 
 the format was successful, it will return the constant FMT_DONE (which is 
 guaranteed to equal zero). Otherwise, it will return one of the following 
 constants:
@@ -719,7 +719,7 @@ FMT_ERR_DISK_UNAVAILABLE
 
 **Copying Disks**
 
-GEOS provides a routine for copying disks. This routine, DiskCopy(), 
+GEOS provides a routine for copying disks. This routine, **DiskCopy()**, 
 maintains a balance between the two goals of limiting memory usage and 
 minimizing disk swapping. It will reformat the destination disk if necessary. 
 The routine does a sector-for-sector copy; therefore, the destination disk must 
@@ -727,7 +727,7 @@ either be of exactly the same type as the source disk (i.e., same medium and
 size), or it must be reformatable to be the same size. For this reason, neither 
 the source nor the destination may be a fixed disk.
 
-DiskCopy() does not interact with the user directly, even though the user 
+**DiskCopy()** does not interact with the user directly, even though the user 
 may have to swap disks. Instead, it calls a callback routine whenever 
 interaction with the user may be necessary. The routine takes the following 
 arguments:
@@ -738,15 +738,15 @@ arguments:
 source drive.
 
 + The address of a Boolean callback routine. The routine must take three 
-arguments: a member of the DiskCopyCallback enumerated type 
+arguments: a member of the **DiskCopyCallback** enumerated type 
 (described below), a disk handle, and a word-sized parameter holding any 
 other appropriate information. The routine should return non-zero to 
 abort the copy; otherwise, it should return zero.
 
 The callback routine is called under a variety of circumstances. When it is 
-called, the first argument passed is a member of the DiskCopyCallback 
+called, the first argument passed is a member of the **DiskCopyCallback** 
 enumerated type, which specifies both why the callback routine was called 
-and what the other arguments signify. DiskCopyCallback contains the 
+and what the other arguments signify. **DiskCopyCallback** contains the 
 following types:
 
 CALLBACK_GET_SOURCE_DISK  
@@ -776,20 +776,20 @@ As in the other cases, the callback routine can abort the format
 by returning non-zero.
 
 CALLBACK_REPORT_FORMAT_PERCT  
-If the destination disk needs to be formatted, DiskCopy() will 
+If the destination disk needs to be formatted, **DiskCopy()** will 
 periodically call the callback routine with this parameter. In 
 this case, the second argument will be meaningless; the third 
 parameter will be the percentage of the destination disk which 
 has been formatted.
 
 CALLBACK_REPORT_COPY_PERCT  
-While the copy is taking place, DiskCopy() will periodically 
+While the copy is taking place, **DiskCopy()** will periodically 
 call the callback routine with this parameter. In this case, the 
 second parameter will be meaningless; the third parameter 
 will be the percentage of the copy which has been completed.
 
-If the copy was successful, DiskCopy() returns zero. Otherwise, it returns a 
-member of the DiskCopyError enumerated type, which has the following 
+If the copy was successful, **DiskCopy()** returns zero. Otherwise, it returns a 
+member of the **DiskCopyError** enumerated type, which has the following 
 members:
 
 ERR_DISKCOPY_INSUFFICIENT_MEM  
@@ -875,7 +875,7 @@ create data files, and needs to be able to find them later.
 The solution to this is to use standard paths. There are a number of standard 
 directories GEOS uses. Each one of these has a constant associated with it. 
 The constants are treated as special disk handles. For example, the routine 
-FileSetCurrentPath() (described in section 17.4.2 on page 636) takes two 
+**FileSetCurrentPath()** (described in [section 17.4.2](#1742-current-path-and-directory-stack)) takes two 
 arguments, a disk handle and a path string. If the disk handle passed is the 
 constant SP_DOCUMENT and the string passed is "Memos", the routine will 
 look in the standard document path for a directory called "Memos" and will 
@@ -1042,7 +1042,7 @@ Every thread has a current path. When the thread opens a file, it can pass
 just the name of the file; the file system combines this name with the current 
 path to find the file. The path is a combination of a disk handle and a 
 directory sequence. To set the thread's current path, call the routine 
-FileSetCurrentPath(), which takes two arguments: a disk handle and a 
+**FileSetCurrentPath()**, which takes two arguments: a disk handle and a 
 pointer to a null-terminated string. The string should contain a sequence of 
 directories specified in the normal DOS convention. To change to a standard 
 path, pass the path constant as the disk handle and a null string (i.e. a 
@@ -1050,7 +1050,7 @@ pointer to a null byte). To change to a subdirectory of a standard path, pass
 the path constant as the disk handle and a pointer to a relative or absolute 
 path specification; for example, to change to the HELLO directory in 
 PRIVDATA, pass the disk handle constant SP_PRIVATE_DATA and a pointer to 
-the string "HELLO". FileSetCurrentPath() returns the handle of the disk. 
+the string "HELLO". **FileSetCurrentPath()** returns the handle of the disk. 
 If you change to a standard path, it returns the path constant; if you change 
 to a directory within a standard path, it returns the constant of the closest 
 standard path. In the event of error, it returns a null handle and sets the 
@@ -1058,14 +1058,14 @@ thread's error value. The error most commonly returned is
 ERROR_PATH_NOT_FOUND, indicating that the specified directory could not 
 be found or does not exist.
 
-To find out the current path, call the routine FileGetCurrentPath(). This 
+To find out the current path, call the routine **FileGetCurrentPath()**. This 
 routine takes two arguments: the address of a character buffer and the size 
 of the buffer. It returns the handle of the current path's disk and writes the 
 path (without drive specifier) to the buffer, truncating the path if the buffer 
 is too small. If the directory is a standard path or a subdirectory of one, 
-FileGetCurrentPath() will return the disk-handle constant for that path 
+**FileGetCurrentPath()** will return the disk-handle constant for that path 
 and will write an absolute path to the buffer. If you want a full path, use 
-FileConstructFullPath() below.
+**FileConstructFullPath()** below.
 
 To translate a standard path into a full path, call FileConstructFullPath(), 
 which takes five arguments:
@@ -1091,7 +1091,7 @@ The routine writes the full path to the buffer and returns the disk handle. If
 it is unable to construct a full path, it returns a null handle.
 
 To find the standard path to a given location, call the routine 
-FileParseStandardPath(). This routine is passed two arguments:
+**FileParseStandardPath()**. This routine is passed two arguments:
 
 + The handle of the disk. Passing a null disk handle indicates that the path 
 string contains a drive specifier.
@@ -1099,7 +1099,7 @@ string contains a drive specifier.
 + A pointer to a pointer to a path string. This path should begin at the root 
 of the disk specified.
 
-FileParseStandardPath() returns the standard path constant. It also 
+**FileParseStandardPath()** returns the standard path constant. It also 
 updates the pointer to point to the remaining portion of the path. For 
 example, if you pass a pointer to a pointer to the string 
 "\GEOWORKS\DOCUMENT\MEMOS\APRIL", the pointer would be updated 
@@ -1110,11 +1110,11 @@ not be changed.
 
 Because each standard path is made up of one or more directories (possibly 
 on different devices), it can be hard to know just where a file is. For that 
-reason, GEOS provides FileResolveStandardPath(). This routine is 
+reason, GEOS provides **FileResolveStandardPath()**. This routine is 
 passed a relative path to a file; it then constructs the full path of the file, 
 starting from the root of the disk (not from a standard path); it also returns 
 the handle of the actual disk containing the file. 
-FileResolveStandardPath() is passed four arguments:
+**FileResolveStandardPath()** is passed four arguments:
 
 + A pointer to a pointer to a character buffer. The full path will be written 
 to that buffer, and the pointer will be updated to point to the null 
@@ -1125,28 +1125,28 @@ terminator.
 + A pointer to a relative path string. This path is relative to the current 
 working directory, which is usually a standard path.
 
-+ A set of FileResolveStandardPathFlags.
++ A set of **FileResolveStandardPathFlags**.
 
-FileResolveStandardPath() writes the full, absolute path to the buffer 
+**FileResolveStandardPath()** writes the full, absolute path to the buffer 
 specified. It also returns the handle of the disk containing that file. If it 
 cannot find the file specified, it returns a null handle. There are two 
-FileResolveStandardPathFlags available:
+**FileResolveStandardPathFlags** available:
 
 FRSPF_ADD_DRIVE_NAME  
 The path string written to the buffer should begin with the 
 drive name (e.g., "C:\GEOWORKS\DOCUMENT\MEMOS").
 
 FRSPF_RETURN_FIRST_DIR  
-FileResolveStandardPath() should not check whether the 
+**FileResolveStandardPath()** should not check whether the 
 passed path actually exists; instead, it should assume that the 
 path exists in the first directory comprising the standard path, 
 and return accordingly.
 
 In addition to having a current path, every thread has a directory stack. The 
 stack is used for switching paths quickly. You can at any time push the 
-current path onto the stack by calling FilePushDir(). This routine pushes 
+current path onto the stack by calling **FilePushDir()**. This routine pushes 
 the directory on the directory stack and returns nothing. You can change the 
-current path to the one on top of the directory stack by calling FilePopDir(). 
+current path to the one on top of the directory stack by calling **FilePopDir()**. 
 This pops the top directory off the stack and makes it the current path. (If the 
 directory stack is empty, the result is undefined.) These routines are very 
 useful when you write subroutines which may need to change the current 
@@ -1161,7 +1161,7 @@ This path may be either relative or absolute.
 
 FileCreateDir(), FileDeleteDir()
 
-You can create directories with FileCreateDir(). The routine takes a single 
+You can create directories with **FileCreateDir()**. The routine takes a single 
 argument, namely the address of a character string. If the string is simply a 
 directory name, it will attempt to create that directory at the current 
 location. If the string is a relative path, it will create the directory at the end 
@@ -1171,7 +1171,7 @@ location. If there is, it will create the directory "September" inside the
 directory "Memos". If the string is an absolute path (i.e. there is a backslash 
 before the first directory name), it will behave the same way, but it will start 
 with the root directory. The routine returns zero if it was successful. If it was 
-unsuccessful, it will return one of the following members of the FileError type:
+unsuccessful, it will return one of the following members of the **FileError** type:
 
 ERROR_INVALID_NAME  
 The name passed was inappropriate for directories on that device.
@@ -1186,7 +1186,7 @@ specified location.
 
 ERROR_PATH_NOT_FOUND  
 The path string was in some way invalid; for example, it might 
-have instructed FileCreateDir() to create the directory inside 
+have instructed **FileCreateDir()** to create the directory inside 
 of a directory which does not exist.
 
 ERROR_ACCESS_DENIED  
@@ -1202,15 +1202,15 @@ The validation of the disk in that drive was aborted by the user.
 Note that the directory name can be any acceptable GEOS file name; that is, 
 it may be up to 32 characters long and can contain any characters other than 
 backslashes, colons, asterisks, or question marks. For further information 
-about GEOS file names, see section 17.5.1 on page 641.
+about GEOS file names, see [section 17.5.1](#1751-dos-files-and-geos-files).
 
-You can delete directories with FileDeleteDir(). This routine takes a single 
+You can delete directories with **FileDeleteDir()**. This routine takes a single 
 argument, namely the address of a character string. This string can specify 
-a relative or absolute path, as with FileCreateDir(). It attempts to delete 
+a relative or absolute path, as with **FileCreateDir()**. It attempts to delete 
 the directory specified. (Note that you are not allowed to delete your current 
 directory or a non-empty directory.) If it successfully removes the directory, it 
 returns zero. Otherwise, it returns one of the following members of the 
-FileError type:
+**FileError** type:
 
 ERROR_PATH_NOT_FOUND  
 The directory specified could not be found or does not exist.
@@ -1269,14 +1269,14 @@ different devices exactly as if they were ordinary DOS files. Nevertheless,
 when a system is running GEOS, the files have added functionality. GEOS 
 data files have special extended attributes, which keep track of such things as 
 the file's tokens, protocol numbers, etc. For more information about extended 
-attributes, see section 17.5.3 on page 643.
+attributes, see [section 17.5.3](#1753-geos-extended-attributes).
 
 Most GEOS data files are Virtual Memory files. VM files can automatically 
 back up data; they allow their users to insert data at any point in the file, and 
 when the file's user needs access to data the VM manager automatically 
 allocates memory and swaps the data into it. These files are created and 
-accessed using special VM routines; for more information, see "Virtual 
-Memory," Chapter 18. Note that you can have a GEOS file hold raw data 
+accessed using special VM routines; for more information, see ["Virtual 
+Memory", Chapter 18](cvm.md). Note that you can have a GEOS file hold raw data 
 instead of having VM capability. Such a file is known as a "byte" file since it 
 is treated as a sequence of bytes with no structure except what is specifically 
 added by the file's creator. All of the routines for working with DOS files can 
@@ -1324,16 +1324,16 @@ global handle associated with that file. Whenever you need to perform an
 action on a file you have opened, you specify the file by passing its handle. 
 Note that there may be several handles which all refer to the same file. If 
 more than one thread will need to use the same handle, they may 
-synchronize their access by using HandleP() and HandleV(); for details, 
-see section 15.3.6 of chapter 15. The Virtual Memory routines include 
-data-access synchronization routines for use with VM files; for details, see 
-"Virtual Memory," Chapter 18.
+synchronize their access by using **HandleP()** and **HandleV()**; for details, 
+see [section 15.3.6 of chapter 15](cmemory.md#1536-data-access-synchronization). 
+The Virtual Memory routines include data-access synchronization routines for use 
+with VM files; for details, see ["Virtual Memory", Chapter 18](cvm.md).
 
 It is sometimes useful to have two different handles which indicate the same 
-file. GEOS provides the routine FileDuplicateHandle(). This routine takes 
+file. GEOS provides the routine **FileDuplicateHandle()**. This routine takes 
 one argument, namely the handle of an open file. It creates and returns 
 another handle which indicates the same file. You will have to close both 
-handles to close the file. FileDuplicateHandle() works on any type of file 
+handles to close the file. **FileDuplicateHandle()** works on any type of file 
 handle; that is, it can be used on the handles of DOS files, GEOS byte files, or 
 VM files. Note that the duplicate handle will have the same read/write 
 position as the original.
@@ -1381,19 +1381,19 @@ There are also two special constants, FEA_MULTIPLE and
 FEA_END_OF_LIST. These are also described below.
 
 There are two different routines to read a file's extended attributes: 
-FileGetHandleExtAttributes() and FileGetPathExtAttributes(). 
+**FileGetHandleExtAttributes()** and **FileGetPathExtAttributes()**. 
 These routines are the same except in the way the file is specified: in one, the 
 handle of an open file is passed, whereas in the other, the address of a path 
 string is passed.
 
-FileGetHandleExtAttributes() takes four arguments. The first is the 
+**FileGetHandleExtAttributes()** takes four arguments. The first is the 
 handle of the file whose attributes are desired; this may be a VM file handle 
 or a byte-file handle. The second is a constant specifying the attribute 
 desired. All extended attributes which are currently supported are listed 
 above; more may be added later. The third is a pointer to a buffer; the 
 attribute's value will be written into that buffer. The fourth argument is the 
 size of the buffer (in bytes). Before it returns, 
-FileGetHandleExtAttributes() will write the value of the attribute into 
+**FileGetHandleExtAttributes()** will write the value of the attribute into 
 the buffer. If successful, it will return zero; otherwise, it will return one of the 
 following error codes:
 
@@ -1411,11 +1411,12 @@ non-GEOS file.
 ERROR_ACCESS_DENIED  
 You do not have read-access to the file.
 
-FileGetHandleExtAttrs() can also fetch several attributes at once. For 
-details on this, see the section on FEA_MULTIPLE (page 646).
+**FileGetHandleExtAttrs()** can also fetch several attributes at once. For 
+details on this, see the section on FEA_MULTIPLE (see
+["GEOS Extended Attributes"](#1753-geos-extended-attributes)).
 
 You can get a file's extended attributes without having it open by calling 
-FileGetPathExtAttributes(). This routine takes a pointer to a 
+**FileGetPathExtAttributes()**. This routine takes a pointer to a 
 null-terminated path string instead of a file handle. This makes it suitable 
 for examining the attributes of an executable file or directory. Note that the 
 file system will still have to open the file in order to get the attributes. If any 
@@ -1424,8 +1425,8 @@ call will fail with error condition ERROR_ACCESS_DENIED. If it could not find
 the file specified, it will return ERROR_FILE_NOT_FOUND.
 
 To change one of a file's extended attributes, make a call either to 
-FileSetHandleExtAttributes() or to FileSetPathExtAttributes(). These 
-routines take the same arguments as the FileGet-() routines above; 
+**FileSetHandleExtAttributes()** or to **FileSetPathExtAttributes()**. These 
+routines take the same arguments as the **FileGet...()** routines above; 
 however, they copy the data from the buffer into the attribute, instead of vice 
 versa. These routines return zero if the operation was successful. Otherwise, 
 they return one of the following error codes:
@@ -1439,15 +1440,15 @@ ERROR_ATTR_SIZE_MISMATCH
 The buffer passed was the wrong size for the attribute specified.
 
 ERROR_ACCESS_DENIED  
-FileSetHandleExtAttributes() returns this if the caller does 
-not have write-access to the file. FileSetPathExtAttributes() 
+**FileSetHandleExtAttributes()** returns this if the caller does 
+not have write-access to the file. **FileSetPathExtAttributes()** 
 returns this if any geode (including the caller) has the file open 
 with "deny-write" exclusive access, or if the file is not writable.
 
 ERROR_CANNOT_BE_SET  
 The extended attribute cannot be changed. Such attributes as 
 FEA_SIZE and FEA_NAME cannot be changed with the 
-FileSet-() routines.
+**FileSet...()** routines.
 
 **FEA_MULTIPLE**
 
@@ -1456,9 +1457,9 @@ attributes at once. This is also the only way to get, set, or create a custom
 attribute. If you pass this, the other arguments are slightly different. The 
 first argument is still the file specifier (handle or path), and the second 
 argument is FEA_MULTIPLE. However, the third argument is the base 
-address of an array of FileExtAttrDesc structures, and the fourth 
+address of an array of **FileExtAttrDesc** structures, and the fourth 
 argument is the number of these structures in the array. The array has one 
-element for each attribute you wish to get or set. Each FileExtAttrDesc 
+element for each attribute you wish to get or set. Each **FileExtAttrDesc** 
 structure has the following fields:
 
 FEAD_attr  
@@ -1483,7 +1484,7 @@ If FEAD_attr is set to anything else, this field is ignored.
 In addition to the system-defined extended attributes, any GEOS file may 
 have any number of custom attributes. Each custom attribute is named by a 
 null-terminated ASCII string. To create a custom attribute, call one of the 
-FileSet-() routines, specifying the new attribute with a FileExtAttrDesc 
+**FileSet...()** routines, specifying the new attribute with a **FileExtAttrDesc** 
 structure (as described immediately above). If you try to read a custom 
 attribute which has not been defined for that file, the routine will fail with 
 error condition ERROR_ATTR_NOT_FOUND.
@@ -1530,11 +1531,11 @@ way to let the second fit into 5 bits, thus letting the entire value
 fit into 32 bits.) It is located at an offset of 
 FDAT_2SECOND_OFFSET.
 
-The macros FDATExtractYear(), -Month(), -Day(), -Hour(), 
--Minute(), and -2Second() all extract the specified field from a 
-FileDateAndTime value. The macro FDATExtractSecond() extracts the 
+The macros **FDATExtractYear()**, **...Month()**, **...Day()**, **...Hour()**, 
+**...Minute()**, and **...2Second()** all extract the specified field from a 
+FileDateAndTime value. The macro **FDATExtractSecond()** extracts the 
 FDAT_2SECOND field and doubles it before returning it. The 
-FDATExtractYearAD() extracts the year field and adds the base year, thus 
+**FDATExtractYearAD()** extracts the year field and adds the base year, thus 
 producing a word-sized year value.
 
 **FEA_FILE_ATTR**
@@ -1543,7 +1544,7 @@ There are certain attributes which all files have. These attributes specify
 such things as whether the file is hidden, whether it is read-only, and several 
 other things. To get these attributes, call an extended attribute routine with 
 argument FEA_FILE_ATTRIBUTES. The attributes are passed or returned in 
-a FileAttrs record. This record has the following fields:
+a **FileAttrs** record. This record has the following fields:
 
 FA_ARCHIVE  
 This flag is set if the file requires backup. Backup programs 
@@ -1572,10 +1573,10 @@ This flag is set if the file is read-only.
 
 Many file systems (including DOS) require that files be closed when you set 
 these attributes. For that reason, you cannot change these attributes with 
-FileSetHandleExtAttributes(). You must use either 
-FileSetPathExtAttributes() or FileSetAttributes() (described below in 
-section 17.5.6.3). If you try to set this field with 
-FileSetHandleExtAttributes(), you will be returned ERROR_ATTR_CANNOT_BE_SET.
+**FileSetHandleExtAttributes()**. You must use either 
+**FileSetPathExtAttributes()** or **FileSetAttributes()** (described below in 
+[section 17.5.6.3](#17563#getting-and-setting-information-about-a-byte-file)). If you try to set this field with 
+**FileSetHandleExtAttributes()**, you will be returned ERROR_ATTR_CANNOT_BE_SET.
 
 **FEA_SIZE**
 
@@ -1585,7 +1586,7 @@ but not directly changed.
 
 **FEA_FILE_TYPE**
 
-This attribute is a member of the GeosFileType enumerated type and 
+This attribute is a member of the **GeosFileType** enumerated type and 
 should not be altered. The type has the following values:
 
 GFT_NOT_GEOS_FILE  
@@ -1609,7 +1610,7 @@ The file is a symbolic link (not yet implemented).
 
 **FEA_FLAGS**
 
-This attribute is a word-sized flag field, named GeosFileHeaderFlags. The 
+This attribute is a word-sized flag field, named **GeosFileHeaderFlags**. The 
 following flags are implemented:
 
 GFHF_TEMPLATE  
@@ -1622,11 +1623,11 @@ GFHF_SHARED_MULTIPLE
 The file can be opened for shared-multiple access.
 
 Shared-single and shared-multiple access are described in the VM chapter. 
-For more details, see "Virtual Memory," Chapter 18.
+For more details, see ["Virtual Memory," Chapter 18](cvm.md).
 
 **FEA_RELEASE**
 
-This attribute is a ReleaseNumber structure. Generally, only geodes have 
+This attribute is a **ReleaseNumber** structure. Generally, only geodes have 
 release numbers. The structure has the following fields:
 
 RN_major  
@@ -1647,20 +1648,20 @@ A field for use by individual manufacturers.
 
 **FEA_PROTOCOL**
 
-This attribute contains the file's protocol numbers. A ProtocolNumber 
-structure is returned. For a discussion of file protocols, see section 13.4.1 of 
-"GenDocument," Chapter 13 of the Object Reference Book.
+This attribute contains the file's protocol numbers. A **ProtocolNumber** structure is returned. 
+For a discussion of file protocols, see [section 13.4.1 of "GenDocument," Chapter 13 of 
+the Object Reference Book](../Objects/ogendoc.md#1341-document-protocols).
 
 **FEA_TOKEN**
 
-This attribute is the file's token. It consists of a GeodeToken structure. For 
-more information about tokens, see "Applications and Geodes," Chapter 6.
+This attribute is the file's token. It consists of a **GeodeToken** structure. For 
+more information about tokens, see ["Applications and Geodes", Chapter 6](cappl.md).
 
 **FEA_CREATOR**
 
 This attribute is the token of the document's creator. It consists of a 
-GeodeToken structure. For more information about tokens, see 
-"Applications and Geodes," Chapter 6.
+**GeodeToken** structure. For more information about tokens, see 
+["Applications and Geodes", Chapter 6](cappl.md).
 
 **FEA_USER_NOTES**
 
@@ -1673,7 +1674,7 @@ This attribute contains the file's copyright notice.
 
 **FEA_CREATION**
 
-This attribute is a FileDateAndTime structure. It contains the time when 
+This attribute is a **FileDateAndTime** structure. It contains the time when 
 the file was created.
 
 **FEA_PASSWORD**
@@ -1689,7 +1690,7 @@ character string.
 
 This attribute contains information about the geode. If the file is not a geode, 
 this field's value will be zero. If it is a geode, it will contain a record of 
-GeodeAttrs. This record has the following fields:
+**GeodeAttrs**. This record has the following fields:
 
 GA_PROCESS  
 This geode has a process thread.
@@ -1749,9 +1750,9 @@ This field is for use by the desktop manager.
 
 **FEA_DRIVE_STATUS**
 
-This attribute contains the DriveExtendedStatus word for the drive 
-containing the file. The DriveExtendedStatus value is described in section 
-17.3.1 on page 616.
+This attribute contains the **DriveExtendedStatus** word for the drive 
+containing the file. The **DriveExtendedStatus** value is described in [section 
+17.3.1](#1731-accessing-drives).
 
 #### 17.5.4 File Utilities
 
@@ -1763,10 +1764,10 @@ handled by desktop management programs like GeoManager. However,
 other geodes may need to perform these actions themselves. For example, if 
 you use a temporary file, you may wish to delete it when you're done. The 
 GEOS file system provides routines for these situations. One file utility, 
-FileEnum(), is elaborate enough to be treated in its own section; for details, 
-see section 17.5.5 on page 655.
+**FileEnum()**, is elaborate enough to be treated in its own section; for details, 
+see [section 17.5.5](#1755-fileenum).
 
-To delete a file, call FileDelete(). This routine takes one argument, namely 
+To delete a file, call **FileDelete()**. This routine takes one argument, namely 
 the address of a path string. If it can delete the file, it returns zero; otherwise, 
 it returns an error code. Common error conditions include the following:
 
@@ -1783,12 +1784,12 @@ read-only volume.
 ERROR_FILE_IN_USE  
 Some geode has that file open.
 
-To change a file's name, call FileRename(). This routine takes two 
+To change a file's name, call **FileRename()**. This routine takes two 
 arguments: a pointer to the path string specifying the file, and a pointer to a 
-string specifying the new name for the file. If successful, FileRename() 
+string specifying the new name for the file. If successful, **FileRename()** 
 returns zero; otherwise, it returns one of the above error codes.
 
-To make a copy of a file, call FileCopy(). This routine takes four arguments: 
+To make a copy of a file, call **FileCopy()**. This routine takes four arguments: 
 the handles of the source and destination disks (which may be the same), and 
 the addresses of source and destination path strings. Passing a disk handle 
 of zero indicates the current path's disk. Each string specifies a path relative 
@@ -1796,9 +1797,9 @@ to the location specified by the corresponding disk handle. If the handle is a
 disk handle, the path is relative to that disk's root. If the disk handle is a 
 standard path constant, the path string is relative to that standard path. If 
 the disk handle is null, the path is relative to the current working directory. 
-FileCopy() will make a copy of the file in the specified location with the 
+**FileCopy()** will make a copy of the file in the specified location with the 
 specified name. If a file with that name and location already exists, it will be 
-overwritten. FileCopy() returns zero if successful. Otherwise it returns one 
+overwritten. **FileCopy()** returns zero if successful. Otherwise it returns one 
 of the following error codes:
 
 ERROR_FILE_NOT_FOUND  
@@ -1821,7 +1822,7 @@ destination disk will be left unchanged (i.e. a partial copy of the
 file will not be made).
 
 To move a file from one directory to another, either on the same disk or on 
-different disks, call FileMove(). This routine takes four arguments: the 
+different disks, call **FileMove()**. This routine takes four arguments: the 
 handles of the source and destination disks (which may be the same), and 
 pointers to source and destination path strings. Passing a null disk handle 
 indicates the current working directory. Each string specifies a path relative 
@@ -1829,14 +1830,14 @@ to the location specified by the corresponding disk handle. If the handle is a
 disk handle, the path is relative to that disk's root. If the disk handle is a 
 standard path constant, the path string is relative to that standard path. If 
 the disk handle is null, the path is relative to the current working directory. 
-If the copy is successful, FileMove() will return zero; otherwise, it will 
+If the copy is successful, **FileMove()** will return zero; otherwise, it will 
 return one of the above error codes.
 
 If you want to find out the handle of the disk containing an open file, call 
-FileGetDiskHandle(). This routine is passed the file handle; it returns the 
-disk handle. This is useful if the geode has to prepare for a shutdown; it can 
-get the disk handle with FileGetDiskHandle(), then save that handle with 
-DiskSave() (see "Saving and Restoring a Disk Handle" on page 624). With 
+**FileGetDiskHandle()**. This routine is passed the file handle; it returns the disk 
+handle. This is useful if the geode has to prepare for a shutdown; it can get the 
+disk handle with **FileGetDiskHandle()**, then save that handle with **DiskSave()** (see 
+["Saving and Restoring a Disk Handle"](17323-saving-and-restoring-a-disk-handle)). With 
 this information (and the file name), the geode will be able to reopen the file 
 when it restarts.
 
@@ -1849,96 +1850,96 @@ FileEnumCallbackData
 
 You may sometimes need to perform an action on every file that matches 
 certain criteria. For these situations, the file system provides the routine 
-FileEnum(). FileEnum() can be called in two ways. The usual way is to 
-have FileEnum() provide certain information about every file in a directory 
-(or every file of a given type); when called, FileEnum() will allocate a buffer 
+**FileEnum()**. **FileEnum()** can be called in two ways. The usual way is to 
+have **FileEnum()** provide certain information about every file in a directory 
+(or every file of a given type); when called, **FileEnum()** will allocate a buffer 
 and fill it with data structures, one for each matching file. Less commonly, 
-you can have FileEnum() call a callback routine for every file which matches 
+you can have **FileEnum()** call a callback routine for every file which matches 
 certain criteria; this callback routine can take a broader range of actions.
 
-You should not often need to use the FileEnum() routine. The most common 
+You should not often need to use the **FileEnum()** routine. The most common 
 time that applications would need this functionality is when they present a 
 list of the files in a directory to the user. The GenFileSelector object provides 
-this functionality, making all necessary calls to FileEnum() transparently 
+this functionality, making all necessary calls to **FileEnum()** transparently 
 to both the user and the geode. Note that the document control objects 
 automatically create and manipulate a file selector when appropriate. For 
-further information, see "GenFile Selector," Chapter 14 of the Object 
-Reference Book and "GenDocument," Chapter 13 of the Object Reference 
-Book.
+further information, see ["GenFile Selector", Chapter 14 of the Object 
+Reference Book](../Objects/ogenfil.md) and ["GenDocument", Chapter 13 of the 
+Object Reference Book](../Objects/ogendoc.md).
 
-FileEnum() takes the following arguments:
+**FileEnum()** takes the following arguments:
 
-+ A pointer to a FileEnumParams structure (see below). The data in this 
-structure will tell FileEnum() what to do.
++ A pointer to a **FileEnumParams** structure (see below). The data in this 
+structure will tell **FileEnum()** what to do.
 
-+ A pointer to a MemHandle variable. FileEnum() will allocate a memory 
++ A pointer to a MemHandle variable. **FileEnum()** will allocate a memory 
 block to hold information about the files, and will write the block's handle 
 to this location.
 
-+ A pointer to a word variable. If FileEnum() was unable to fit information 
++ A pointer to a word variable. If **FileEnum()** was unable to fit information 
 about all the files into the block passed, it will write the number of files 
 not handled into this variable.
 
-FileEnum() returns the number of files which were returned in the buffer.
+**FileEnum()** returns the number of files which were returned in the buffer.
 
-The FileEnumParams structure specifies how FileEnum() should 
+The **FileEnumParams** structure specifies how **FileEnum()** should 
 perform. The structure is defined as follows. A summary of each field's role 
-follows; for full details, see the reference entry for FileEnum().
+follows; for full details, see the reference entry for **FileEnum()**.
 
 ~~~
 typedef struct _FileEnumParams {
-	FileEnumSearchFlags 				FEP_searchFlags;
-	FileExtAttrDesc *				FEP_returnAttrs;
-	word 				FEP_returnSize;
-	FileExtAttrDesc *				FEP_matchAttrs;
-	word 				FEP_bufSize;
-	word 				FEP_skipCount;
+	FileEnumSearchFlags  FEP_searchFlags;
+	FileExtAttrDesc *    FEP_returnAttrs;
+	word                 FEP_returnSize;
+	FileExtAttrDesc *    FEP_matchAttrs;
+	word                 FEP_bufSize;
+	word                 FEP_skipCount;
 	word _pascal (*FEP_callback) 
-		(struct _FileEnumParams *					params,
-		 FileEnumCallbackData *					fecd,
-		 word 					frame);
-	FileExtAttrDesc *				FEP_callbackAttrs;
-	dword 				FEP_cbData1;
-	dword 				FEP_cbData2;
-	word 				FEP_headerSize;
+		(struct _FileEnumParams * params,
+		 FileEnumCallbackData * fecd,
+		 word frame);
+	FileExtAttrDesc *    FEP_callbackAttrs;
+	dword                FEP_cbData1;
+	dword                FEP_cbData2;
+	word                 FEP_headerSize;
 } FileEnumParams;
 ~~~
 
 FEP_searchFlags  
 This is a byte-length flag field. The flags are of type 
-FileEnumSearchFlags (described below). These flags specify 
+**FileEnumSearchFlags** (described below). These flags specify 
 which files at the current location will be examined by 
-FileEnum(). They also specify such things as whether a 
+**FileEnum()**. They also specify such things as whether a 
 callback routine should be used.
 
 FEP_returnAttrs  
 This field specifies what information is wanted about the files. 
-It is a pointer to an array of FileExtAttrDesc structures (see 
-page 646). The attributes will be written to the return buffer; 
-each file will have an entry, containing all the attributes 
-requested for that file. You can also request certain return 
-values by setting FEP_returnAttrs to equal a member of the 
-FileEnumStandardReturnType (again, by casting the 
-FileEnumStandardReturnType value to type void *). The 
-FileEnumStandardReturnType enumerated type is 
+It is a pointer to an array of **FileExtAttrDesc** structures (see 
+["GEOS Extended Attributes"](#1753-geos-extended-attributes)). 
+The attributes will be written to the return buffer; each file 
+will have an entry, containing all the attributes requested for 
+that file. You can also request certain return values by setting 
+FEP_returnAttrs to equal a member of the **FileEnumStandardReturnType** 
+(again, by casting the **FileEnumStandardReturnType** value to type void *). 
+The **FileEnumStandardReturnType** enumerated type is 
 described later in this section.
 
 FEP_returnSize  
 This is the size of each entry in the returned buffer. If a 
-standard return type or an array of FileExtAttrDesc 
+standard return type or an array of **FileExtAttrDesc** 
 structures was passed, each entry in the returned buffer will 
 contain all the extended attribute information requested for 
 that file.
 
 FEP_matchAttrs  
-This field specifies which files should be enumerated by 
-FileEnum(). It is a pointer to an array of FileExtAttrDesc 
-structures (see page 646). These structures specify values for 
-certain extended attributes. Only those files whose extended 
-attributes match these will be enumerated. If you do not want 
-to filter out any files in the working directory, or if you will use 
-the callback routine to filter the files, pass a null pointer in this 
-field.
+This field specifies which files should be enumerated by **FileEnum()**. 
+It is a pointer to an array of **FileExtAttrDesc** structures (see 
+["GEOS Extended Attributes"](#1753-geos-extended-attributes)). 
+These structures specify values for certain extended attributes. 
+Only those files whose extended attributes match these will be 
+enumerated. If you do not want to filter out any files in the working 
+directory, or if you will use the callback routine to filter the files, 
+pass a null pointer in this field.
 
 FEP_bufsize	This field specifies the maximum number of entries to be 
 returned in the buffer. If you do not want to set a limit, pass the 
@@ -1949,11 +1950,11 @@ FEP_skipCount
 This field contains the number of matching files to be ignored 
 before the first one is processed. It is often used in conjunction 
 with FEP_bufSize to examine many files a few at a time. Each 
-time FileEnum() is called, you can enumerate a certain 
+time **FileEnum()** is called, you can enumerate a certain 
 number of files; by adjusting the skip count each time, you can 
 start each enumeration where the previous one ended. In this 
 way you could walk through all the matching files in the 
-directory. Note that if the FileEnumSearchFlags bit 
+directory. Note that if the **FileEnumSearchFlags** bit 
 FESF_REAL_SKIP is set (in FEP_searchFlags), the first files in 
 the directory will be skipped before they are tested to see if they 
 match. This is faster, since the match condition won't have to 
@@ -1966,23 +1967,24 @@ arbitrary criteria. The callback routine is called for any files
 which match all the above criteria. It can then decide whether 
 to enumerate the file however it wishes. The callback routine 
 should be declared _pascal. If the file should be accepted by 
-FileEnum(), the callback should return true; otherwise it 
-should return false. You can also instruct FileEnum() to use 
+**FileEnum()**, the callback should return true; otherwise it 
+should return false. You can also instruct **FileEnum()** to use 
 one of the standard callback routines by passing a member of 
-the FileEnumStandardCallback enumerated type. In this 
-case, FEP_callbackAttrs is ignored; FileEnum() will 
+the **FileEnumStandardCallback** enumerated type. In this 
+case, FEP_callbackAttrs is ignored; **FileEnum()** will 
 automatically pass the appropriate information to the callback 
 routine. (Note that if the FESF_CALLBACK bit of the 
 FEP_searchFlags field is not set, the FEP_callback field is 
 ignored.) The callback routine may not call any routines which 
-are in movable memory at the time FileEnum() is called, 
+are in movable memory at the time **FileEnum()** is called, 
 except for routines which are in the same resource as the 
 callback routine.
 
 FEP_callbackAttrs  
 This field specifies what additional attributes should be read 
 for the callback routine. This field is a pointer to an array of 
-FileExtAttrDesc structures (see page 646). The array will be 
+**FileExtAttrDesc** structures (see ["GEOS Extended Attributes"]
+(#1753-geos-extended-attributes)). The array will be 
 filled in with the appropriate information for each file before 
 the callback routine is called. Note that if the FESF_CALLBACK 
 bit of the FEP_searchFlags is not set, the FEP_callbackAttrs is 
@@ -1991,86 +1993,85 @@ callback routine, set this field to be a null pointer.
 
 FEP_cbData1, FEP_cbData2  
 These are dword-length fields. Their contents are ignored by 
-FileEnum(); they are used to pass information to the callback 
+**FileEnum()**; they are used to pass information to the callback 
 routine. If you do not call a standard callback routine, you may 
 use these fields any way you wish.
 
 FEP_headerSize  
-If the flag FESF_LEAVE_HEADER is set, FileEnum() will leave 
+If the flag FESF_LEAVE_HEADER is set, **FileEnum()** will leave 
 an empty header space at the beginning of the return buffer. 
 The size of the header is specified by this field. If the flag 
 FESF_LEAVE_HEADER is clear, this field is ignored.
 
-The first field of the FileEnumParams structure, FEP_searchFlags, is a 
-word-length record containing FileEnumSearchFlags. The following flags 
+The first field of the **FileEnumParams** structure, FEP_searchFlags, is a 
+word-length record containing **FileEnumSearchFlags**. The following flags 
 are available:
 
 FESF_DIRS  
-Directories should be examined by FileEnum().
+Directories should be examined by **FileEnum()**.
 
 FESF_NON_GEOS  
-Non-GEOS files should be examined by FileEnum().
+Non-GEOS files should be examined by **FileEnum()**.
 
 FESF_GEOS_EXECS  
-GEOS executable files should be examined by FileEnum().
+GEOS executable files should be examined by **FileEnum()**.
 
 FESF_GEOS_NON_EXECS  
 GEOS non-executable files (e.g., VM files) should be examined 
-by FileEnum().
+by **FileEnum()**.
 
 FESF_REAL_SKIP  
 If a skip count of n is specified, the first n files will be skipped 
 regardless of whether they matched the attributes passed. In 
-this case, FileEnum() will return the number of files passed 
+this case, **FileEnum()** will return the number of files passed 
 through in order to get enough files to fill the buffer; the return 
 value can thus be the real-skip count for the next pass.
 
 FESF_CALLBACK  
-FileEnum() should call a callback routine to determine 
+**FileEnum()** should call a callback routine to determine 
 whether a file should be accepted.
 
 FESF_LOCK_CB_DATA  
-This flag indicates that the FileEnumParams fields 
+This flag indicates that the **FileEnumParams** fields 
 FEP_callback1 and FEP_callback2 are far pointers to movable 
-memory that must be locked before FileEnum() is called.
+memory that must be locked before **FileEnum()** is called.
 
 FESF_LEAVE_HEADER  
-If set, FileEnum() should leave an empty header space at the 
+If set, **FileEnum()** should leave an empty header space at the 
 start of the return buffer. The size of this buffer is specified by 
 the FEP_headerSize field.
 
 You can specify precisely which data you want about each file and in which 
 arrangement it should be returned. However, for most purposes, you can get 
 enough information by requesting one of the standard return types. If you 
-pass a member of FileEnumStandardReturnType in FEP_returnAttrs, 
+pass a member of **FileEnumStandardReturnType** in FEP_returnAttrs, 
 FileEnum() will write an array of structures to the return buffer; each file 
 will have one such structure. The structures are shown below in Code 
-Display 17-2 on page l 660. FileEnumStandardReturnType has the 
-following values:
+Display 17-2. **FileEnumStandardReturnType** has the following values:
 
 FESRT_COUNT_ONLY  
-FileEnum() will not allocate any memory or return data about 
+**FileEnum()** will not allocate any memory or return data about 
 files; instead, it will simply return the number of files which 
 match the specified criteria.
 
 FESRT_DOS_INFO  
-FileEnum() will return an array of FEDosInfo structures. 
+**FileEnum()** will return an array of **FEDosInfo** structures. 
 These structures contain basic information about the file: its 
 virtual name, size, modification date, DOS attributes, and path 
 information (as a DirPathInfo record).
 
 FESRT_NAME  
-FileEnum() will return an array of FileLongName strings, 
+**FileEnum()** will return an array of FileLongName strings, 
 each one of which is FILE_LONGNAME_BUFFER_SIZE 
 characters long; every one of these will contain a file's virtual 
 name followed by a null terminator.
 
 FESRT_NAME_AND_ATTR  
-FileEnum() will return an array of FENameAndAttr 
+**FileEnum()** will return an array of FENameAndAttr 
 structures, each one of which contains a file's DOS attributes 
 and virtual name.
 
-The FEDosInfo structure includes a word-sized record which describes the 
+The **FEDosInfo** structure includes a word-sized record which describes the 
 file's position relative to the standard paths. It contains the following fields:
 
 DPI_EXISTS_LOCALLY  
@@ -2084,7 +2085,7 @@ DPI_ENTRY_NUMBER_IN_PATH_OFFSET.
 DPI_STD_PATH  
 This is the mask for an eight-bit field whose offset is 
 DPI_STD_PATH_OFFSET. If the file is in a standard path, this 
-field will contain a StandardPath constant for a standard 
+field will contain a **StandardPath** constant for a standard 
 path containing the file. This need not be the "closest" standard 
 path; for example, if the file is in the "World" directory, this 
 constant might nevertheless be SP_TOP.
@@ -2096,25 +2097,24 @@ Code Display 17-2 Standard FileEnum() Return Structures
  * instruct FileEnum() to return any arbitrary extended attribute information.
  */
 
-typedef struct {			/* These are returned if you specify FESRT_DOS_INFO */
-    FileAttrs 		FEDI_attributes;			/* File's DOS attributes; 
-					 * see section 17.5.6.3 on page 668 */
-    FileDateAndTime 		FEDI_modTimeDate			/* Last modification time; see page 647 */
-    dword 		FEDI_fileSize;			/* Size of file (in bytes) */
-    FileLongName		FEDI_name;			/* File's virtual name; null-terminated */
-    DirPathInfo 		FEDI_pathInfo;			/* PathInfo structure, described above */
+typedef struct {    /* These are returned if you specify FESRT_DOS_INFO */
+    FileAttrs          FEDI_attributes;     /* File's DOS attributes; 
+                                             * see section 17.5.6.3 */
+    FileDateAndTime    FEDI_modTimeDate     /* Last modification time; see "GEOS Extended Attributes" */
+    dword              FEDI_fileSize;       /* Size of file (in bytes) */
+    FileLongName       FEDI_name;           /* File's virtual name; null-terminated */
+    DirPathInfo        FEDI_pathInfo;       /* PathInfo structure, described above */
 } FEDosInfo;
 
-typedef struct{ 			/* These are returned if you specify FESRT_NAME_AND_ATTR 
-*/
-    FileAttrs 		FENAA_attributes;			/* File's DOS attributes; 
-					 * see section 17.5.6.3 on page 668 */
-    FileLongName 		FENAA_name;			/* File's virtual name; null-terminated */
+typedef struct{                             /* These are returned if you specify FESRT_NAME_AND_ATTR */
+    FileAttrs          FENAA_attributes;    /* File's DOS attributes; 
+                                             * see section 17.5.6.3 */
+    FileLongName       FENAA_name;          /* File's virtual name; null-terminated */
 } FENameAndAttr;
 ~~~
 
 There is currently one standard callback routine provided. This routine, 
-FileEnumWildcard(), rejects all files whose names don't match a wildcard 
+**FileEnumWildcard()**, rejects all files whose names don't match a wildcard 
 string. To call this routine, set FEP_callback as follows:
 
 ~~~
@@ -2125,7 +2125,7 @@ FEP_cbData1 should be a pointer to a null-terminated wildcard string. In this
 string, "*" denotes a sequence of zero or more of any character, and "?" 
 denotes any one character; all other characters represent themselves. If a 
 file's virtual name matches the wildcard string, information about it will be 
-returned by FileEnum(). If the lowest byte of FEP_cbData2 is non-zero, the 
+returned by **FileEnum()**. If the lowest byte of FEP_cbData2 is non-zero, the 
 comparison will be case-insensitive; otherwise, it will be case-sensitive. (The 
 other bytes of FEP_cbData2 are ignored.) This is different from standard DOS 
 wildcarding; for example, the name "doc*." matches any file that begins with 
@@ -2150,20 +2150,20 @@ FileClose(), FileAccessFlags
 
 The GEOS file system provides several routines for opening files for byte-level 
 access. If you are working with GEOS Virtual Memory files, you should use 
-the appropriate VM routines to open and close the files (see "Virtual Memory," 
-Chapter 18). You should use the byte-level routines only if you are working 
+the appropriate VM routines to open and close the files (see ["Virtual Memory", 
+Chapter 18](cvm.md)). You should use the byte-level routines only if you are working 
 with DOS files or with GEOS byte files. You may occasionally want to read a 
 VM file or an executable file as a string of bytes. In this rare case, you must 
 use the routines in this section. Note, however, that you should not change 
 the VM file with these routines; it is safe only to open it for read-only access.
 
-To open a file, call FileOpen(). This routine takes two arguments: a set of 
-FileAccessFlags and a pointer to a null-terminated string. The string 
+To open a file, call **FileOpen()**. This routine takes two arguments: a set of 
+**FileAccessFlags** and a pointer to a null-terminated string. The string 
 should specify the name of the file (either the virtual name or the native 
 name may be used). It may simply be a file name, or it may be a relative or 
-absolute path. The FileAccessFlags record specifies two things: what kind 
+absolute path. The **FileAccessFlags** record specifies two things: what kind 
 of access the caller wants, and what type of access is permitted to other 
-geodes. A set of FileAccessFlags is thus a bit-wise OR of two different 
+geodes. A set of **FileAccessFlags** is thus a bit-wise OR of two different 
 values. The first specifies what kind of access the calling geode wants and has 
 the following values:
 
@@ -2196,7 +2196,7 @@ FILE_DENY_NONE
 Other geodes may open the file for any kind of access.
 
 Two flags, one from each of these sets of values, are combined to make up a 
-proper FileAccessFlags value. For example, to open the file for read-only 
+proper **FileAccessFlags** value. For example, to open the file for read-only 
 access while prohibiting other geodes from writing to the file, you would pass 
 the flags FILE_ACCESS_R and FILE_DENY_W as follows:
 
@@ -2204,7 +2204,7 @@ the flags FILE_ACCESS_R and FILE_DENY_W as follows:
 myHandle = FileOpen("MyFile", (FILE_ACCESS_R | FILE_DENY_W));
 ~~~
 
-If successful, FileOpen() returns the file's handle. If it is unsuccessful, it 
+If successful, **FileOpen()** returns the file's handle. If it is unsuccessful, it 
 returns a null handle and sets the thread's error value. The following error 
 values are commonly returned:
 
@@ -2218,7 +2218,7 @@ included a directory which did not exist.
 
 ERROR_TOO_MANY_OPEN_FILES  
 There is a limit to how many files may be open at once. If this 
-limit is reached, FileOpen() will fail until a file is closed.
+limit is reached, **FileOpen()** will fail until a file is closed.
 
 ERROR_ACCESS_DENIED  
 Either the caller requested access which could not be granted 
@@ -2233,15 +2233,15 @@ The caller requested write or read-write access to a file in a
 write-protected volume.
 
 Note that if you use the document control objects, they automatically make 
-all appropriate calls to FileOpen() when the user requests it; you will 
+all appropriate calls to **FileOpen()** when the user requests it; you will 
 automatically be passed the file's handle.
 
-FileOpen() can only be called if the file already exists. In order to create a 
-byte file, you must call FileCreate(). FileCreate() takes four arguments: a 
-set of FileCreateFlags, a set of FileAccessFlags, a set of FileAttrs, and a 
-pointer to a string containing a name for the file. As with FileOpen(), the 
+**FileOpen()** can only be called if the file already exists. In order to create a 
+byte file, you must call **FileCreate()**. **FileCreate()** takes four arguments: a 
+set of **FileCreateFlags**, a set of **FileAccessFlags**, a set of **FileAttrs**, and a 
+pointer to a string containing a name for the file. As with **FileOpen()**, the 
 name may be a name alone or a relative or absolute path. The 
-FileCreateFlags specifies whether the file should be created if it already 
+**FileCreateFlags** specifies whether the file should be created if it already 
 exists. The following flags are available:
 
 FILE_CREATE_TRUNCATE  
@@ -2260,32 +2260,32 @@ This flag is combined with one of the above flags if the file
 should be created in the device's native format; e.g. if it should 
 be a DOS file instead of a GEOS file. The name passed must be 
 an acceptable native file name. If a GEOS file with the specified 
-name already exists, FileCreate() will fail with error 
+name already exists, **FileCreate()** will fail with error 
 condition ERROR_FILE_FORMAT_MISMATCH.
 
 The first three flags (FILE_CREATE_-) are mutually exclusive; exactly one of 
-them must be passed to FileCreate(). That flag may or may not be combined 
+them must be passed to **FileCreate()**. That flag may or may not be combined 
 with FCF_NATIVE.
 
-The FileAccessFlags are the same as described in FileOpen(). Note, 
+The **FileAccessFlags** are the same as described in **FileOpen()**. Note, 
 however, that you must request either write access or read/write access when 
-you use FileCreate().
+you use **FileCreate()**.
 
 Every file has a set of attributes. These record certain information about the 
 file. If you create a file, you will need to specify values for these attributes. 
 The attributes are described above in the section on "FEA_FILE_ATTR" on 
-page 648.
+["GEOS Extended Attributes"](#1753-geos-extended-attributes).
 
-If FileCreate() is successful, it will open the file and return its handle. If it 
+If **FileCreate()** is successful, it will open the file and return its handle. If it 
 fails, it will return a null handle and set the thread's error value. It may 
-return any of the FileOpen() errors. It may also return the following errors:
+return any of the **FileOpen()** errors. It may also return the following errors:
 
 ERROR_FILE_EXISTS  
-Returned if FileCreate() was called with FILE_CREATE_ONLY 
+Returned if **FileCreate()** was called with FILE_CREATE_ONLY 
 and a file with the specified name already exists.
 
 ERROR_FORMAT_MISMATCH  
-Returned if FileCreate() was called with 
+Returned if **FileCreate()** was called with 
 FILE_CREATE_TRUNCATE or FILE_CREATE_NO_TRUNCATE 
 and a file exists in a different format than desired; i.e. you 
 passed FCF_NATIVE and the file already exists in the GEOS 
@@ -2294,34 +2294,34 @@ format, or vice versa.
 It is often useful to create temporary files which are not seen by the user. In 
 these cases, you generally don't care about the file's name since you will most 
 likely be deleting the file on exit. For these situations GEOS provides the 
-routine FileCreateTempFile(). FileCreateTempFile() is passed a 
+routine **FileCreateTempFile()**. **FileCreateTempFile()** is passed a 
 directory; it chooses a unique name for the file. This routine takes two 
 arguments:
 
-+ A set of FileAttrs, as described above.
++ A set of **FileAttrs**, as described above.
 
 + A pointer to a null-terminated string specifying the path for the 
 temporary file. This path may be relative or absolute. To create the 
 temporary file in the current directory, pass the string "." This string 
 should contain fourteen extra null bytes at the end, as 
-FileCreateTempFile() will write the name of the temporary file at the 
+**FileCreateTempFile()** will write the name of the temporary file at the 
 end of the string. Temporary files are typically created in 
 SP_WASTE_BASKET.
 
-If successful, FileCreateTempFile() will open the temporary file and return 
+If successful, **FileCreateTempFile()** will open the temporary file and return 
 its handle. It will also write the file's name to the end of the string passed. 
 You will need to know the name to delete the file. The name is also useful if 
 GEOS shuts down while a temporary file is open; the geode will need to know 
 the temporary file's name in order to reopen it.
 
-When you are done with a file, you should close it by calling FileClose(). This 
+When you are done with a file, you should close it by calling **FileClose()**. This 
 releases any restrictions you may have placed on the file and allows the file 
 to be moved or deleted. It is passed two arguments: the file handle and a 
 Boolean value which should be set to true (i.e. non-zero) if the geode cannot 
-handle error messages; it will cause FileClose() to fatal-error if it cannot 
+handle error messages; it will cause **FileClose()** to fatal-error if it cannot 
 successfully close the file. (This should only be used during development; the 
 flag should never be passed in a finished program.) The routine returns zero 
-if successful; otherwise, it returns a FileError value.
+if successful; otherwise, it returns a **FileError** value.
 
 ##### 17.5.6.2 Reading From and Writing To Files
 
@@ -2332,8 +2332,8 @@ byte-file. You can copy data from the file into memory; you can copy data from
 memory into the file, overwriting the file's contents; you can write data to the 
 end of a file; and you can cut data from the end of the file. If you want to 
 perform more elaborate manipulations on a byte-file, you may wish to create 
-a temporary VM file and copy the data there (see "Virtual Memory," 
-Chapter 18).
+a temporary VM file and copy the data there (see ["Virtual Memory", 
+Chapter 18](cvm.md)).
 
 Every file handle has a file position associated with it. All read and write 
 operations begin at that position; they may also change the position. The first 
@@ -2341,33 +2341,33 @@ byte in a file is considered to be at position zero. If the file is a GEOS byte 
 position zero is immediately after the GEOS header; thus, the header cannot 
 be accessed or altered via the read and write operations.
 
-To read data from a file, call FileRead(). This routine takes four arguments. 
+To read data from a file, call **FileRead()**. This routine takes four arguments. 
 The first is the file's handle. The second is a Boolean indicating whether the 
 caller can handle errors. (This is true if the geode cannot handle error 
-messages; it will cause FileRead() to fatal-error if it cannot successfully 
+messages; it will cause **FileRead()** to fatal-error if it cannot successfully 
 read the data. This should only be used during development; the flag should 
 never be passed in a finished program.) The third is the number of bytes to 
-read. The fourth is the address of a buffer. FileRead() will copy the 
+read. The fourth is the address of a buffer. **FileRead()** will copy the 
 requested number of bytes from the file to the buffer. It will return the 
 number of bytes actually read. This may be less than the number requested, 
 if the end of file is reached; in this case, the thread's error value will be set to 
-ERROR_SHORT_READ_WRITE. If FileRead() was unable to gain access to 
+ERROR_SHORT_READ_WRITE. If **FileRead()** was unable to gain access to 
 the file, it will return -1 and set the thread's error value to 
 ERROR_ACCESS_DENIED. In any event, the file position will be incremented 
 by the number of bytes read; thus, it will point to the first byte after the data 
 read.
 
-To write data to a file, call FileWrite(). This routine takes four arguments. 
+To write data to a file, call **FileWrite()**. This routine takes four arguments. 
 The first is the file's handle. The second is a Boolean indicating whether the 
 caller can handle errors. The third is the number of bytes to write. The fourth 
-is the address of a buffer in memory. FileWrite() will copy the specified 
+is the address of a buffer in memory. **FileWrite()** will copy the specified 
 number of bytes from the buffer to the file, starting at the current position 
 and expanding the file as necessary. It will also increment the current 
 position by the number of bytes written. If the current position is not at the 
-end of the file, FileWrite() will overwrite the file's existing data. FileWrite() 
+end of the file, **FileWrite()** will overwrite the file's existing data. **FileWrite()** 
 returns the number of bytes written. This may be less than the number 
 requested, if the disk ran out of space; in this case, the thread's error value 
-will be set to ERROR_SHORT_READ_WRITE. If FileWrite() could not get 
+will be set to ERROR_SHORT_READ_WRITE. If **FileWrite()** could not get 
 access to the file (as, for example, if the geode had read-only access to the file), 
 it will return -1 and set the thread's error value to ERROR_ACCESS_DENIED. 
 
@@ -2381,14 +2381,14 @@ When you write changes to a file, either the GEOS file system or the
 underlying DOS may choose to cache those changes to save time. All cached 
 changes will be written to the disk when the file is closed. However, you can 
 force the cached changes to be written immediately by calling 
-FileCommit(). This routine takes two arguments. The first is the file's 
+**FileCommit()**. This routine takes two arguments. The first is the file's 
 handle. The second is a Boolean indicating whether the caller can handle 
 errors. The routine returns zero if the operation was successful; otherwise it 
 returns an error code.
 
-To change the current file position, call FilePos(). This routine takes three 
+To change the current file position, call **FilePos()**. This routine takes three 
 arguments. The first is the file handle. The second is a member of the 
-FilePosMode enumerated type; this value indicates how the new position is 
+**FilePosMode** enumerated type; this value indicates how the new position is 
 specified. The third argument is a number of bytes; it specifies how far the 
 file position will be moved. FilePosMode has the following possible values:
 
@@ -2407,9 +2407,9 @@ The file position is set to a specified number of bytes before the
 end of the file. Passing this mode with an offset of zero will set 
 the file position to the end of the file.
 
-FilePos() returns a 32-bit integer. This integer specifies the file position 
+**FilePos()** returns a 32-bit integer. This integer specifies the file position 
 after the move (relative to the start of the file). To find out the current file 
-position without changing it, call FilePos() with mode FILE_POS_RELATIVE 
+position without changing it, call **FilePos()** with mode FILE_POS_RELATIVE 
 and offset zero.
 
 ##### 17.5.6.3 Getting and Setting Information about a Byte File
@@ -2419,54 +2419,54 @@ FileGetAttributes(), FileSetAttributes()
 
 GEOS provides several routines to get information about files. To get 
 information about a GEOS file, you would ordinarily use one of the extended 
-attributes routines (see section 17.5.3 on page 643). These routines are 
-ordinarily used for non-GEOS files. Nevertheless, all of the following routines 
-can be used on GEOS files.
+attributes routines (see [section 17.5.3](#1753-geos-extended-attributes)). 
+These routines are ordinarily used for non-GEOS files. Nevertheless, all of 
+the following routines can be used on GEOS files.
 
-FileGetDateAndTime() and FileSetDateAndTime() are used to get and 
+**FileGetDateAndTime()** and **FileSetDateAndTime()** are used to get and 
 set the file's modification time. To access a GEOS file's modification time, you 
 would ordinarily call an extended attribute routine, passing 
 FEA_MODIFICATION. However, special-purpose routines are provided 
 specifically for changing a file's modification time. Note that these routines 
 may be used for GEOS or non-GEOS files. Similarly, you can change the 
 FEA_MODIFICATION attribute even for non-GEOS files. To find out the 
-modification time, call FileGetDateAndTime(). This routine is passed the 
-file's handle and returns a FileDateAndTime value (as described above on 
-page 647). To change the modification time, call FileSetDateAndTime(). 
-This routine is passed the file's handle and a FileDateAndTime value. If 
-successful, it returns zero; otherwise, it returns an error code. You must have 
-write permission to change the modification time; otherwise, 
-FileSetDateAndTime() will fail with condition ERROR_ACCESS_DENIED.
+modification time, call **FileGetDateAndTime()**. This routine is passed the file's 
+handle and returns a **FileDateAndTime** value (as described above on 
+["GEOS Extended Attributes"](#1753-geos-extended-attributes)). To change 
+the modification time, call **FileSetDateAndTime()**. This routine is passed the 
+file's handle and a **FileDateAndTime** value. If successful, it returns zero; otherwise, 
+it returns an error code. You must have write permission to change the modification 
+time; otherwise, **FileSetDateAndTime()** will fail with condition ERROR_ACCESS_DENIED.
 
-To find out a DOS file's attributes, call FileGetAttributes(). This routine is 
-passed a file's path. It returns the file's FileAttrs record (as described on 
-page 648). To change the file's attributes, call FileSetAttributes(). This 
-routine takes two arguments: the address of a null-terminated path string 
-and a FileAttrs record. It returns zero if it was successful; otherwise, it 
-returns an error condition. Note that a file's attributes cannot be changed if 
-the file is open.
+To find out a DOS file's attributes, call **FileGetAttributes()**. This routine is 
+passed a file's path. It returns the file's **FileAttrs** record (as described on 
+["GEOS Extended Attributes"](#1753-geos-extended-attributes)). To change the file's 
+attributes, call **FileSetAttributes()**. This routine takes two arguments: the address 
+of a null-terminated path string and a **FileAttrs** record. It returns zero if it was 
+successful; otherwise, it returns an error condition. Note that a file's attributes 
+cannot be changed if the file is open.
 
 ##### 17.5.6.4 Data-Access Synchronization
 
 FileLockRecord(), FileUnlockRecord()
 
-GEOS provides routines to help threads synchronize file access. This 
-functionality is very elaborate for VM files. For byte files it is less so. Several 
-threads can synchronize their access to a single handle by using HandleP() 
-and HandleV(), described in section 15.3.6 of chapter 15. If they want to use 
-the file at the same time, they should use FileLockRecord() and 
-FileUnlockRecord().
+GEOS provides routines to help threads synchronize file access. This functionality 
+is very elaborate for VM files. For byte files it is less so. Several threads can 
+synchronize their access to a single handle by using **HandleP()** and **HandleV()**, 
+described in [section 15.3.6 of chapter 15](cmemory.md#1536-data-access-synchronization). 
+If they want to use the file at the same time, they should use **FileLockRecord()** and 
+**FileUnlockRecord()**.
 
-FileLockRecord() takes three arguments: the file handle, a dword 
+**FileLockRecord()** takes three arguments: the file handle, a dword 
 specifying the start of the region to be locked, and a dword specifying the 
 length (in bytes) of the region to be locked. If there are no locks on any part 
-of that region, FileLockRecord() returns zero; otherwise, it returns the 
+of that region, **FileLockRecord()** returns zero; otherwise, it returns the 
 error code ERROR_ALREADY_LOCKED. Note that there is nothing to stop 
 another thread or geode from reading or writing to that region. The lock 
-simply prevents anyone from locking that region with FileLockRecord(). 
+simply prevents anyone from locking that region with **FileLockRecord()**. 
 The file's users have to remember to lock any part of the file before accessing it.
 
-To release a lock on a part of a file, call FileUnlockRecord(). This routine 
-takes the same arguments as FileLockRecord().
+To release a lock on a part of a file, call **FileUnlockRecord()**. This routine 
+takes the same arguments as **FileLockRecord()**.
 
 [Local Memory](clmem.md) <-- &nbsp;&nbsp; [table of contents](../concepts.md) &nbsp;&nbsp; --> [Virtual Memory](cvm.md)

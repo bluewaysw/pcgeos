@@ -50,7 +50,7 @@ advantage of the memory manager without trying; for example, the memory
 manager swaps methods into memory when messages need to be handled. 
 Applications can also request memory at run-time, either by requesting raw 
 memory from the memory manager, or by creating Virtual Memory files 
-through the VM library (see "Virtual Memory," Chapter 18).
+through the VM library (see ["Virtual Memory", Chapter 18](cvm.md)).
 
 ### 15.2 The Structure of Memory
 
@@ -65,7 +65,7 @@ memory in segments of at most 64K. Each segment may be subdivided and
 parceled out to fill memory requests from applications. Sometimes an 
 application will need a seemingly contiguous section of memory which is 
 larger than 64K; in these situations, it should use the HugeArray routines 
-(see section 18.4 of chapter 18).
+(see [section 18.4 of chapter 18](cvm.md#184-vm-chains)).
 
 #### 15.2.1 Expanded/Extended Memory
 
@@ -86,9 +86,9 @@ approximately 450K bytes of a 640K system.
 
 When an application requests memory, it is allocated a "block" on the heap. 
 Blocks may be of almost any size but may not be larger than 64K. (However, 
-the heap is most efficient when blocks are 2K-6K in size; see "Memory 
-Etiquette".) Every block is allocated a unique handle (described 
-below) from the Handle Table; by calling a memory manager routine, the 
+the heap is most efficient when blocks are 2K-6K in size; see ["Memory 
+Etiquette"](#1531-memory-etiquette).) Every block is allocated a unique handle 
+(described below) from the Handle Table; by calling a memory manager routine, the 
 application can translate a handle to a conventional pointer.
 
 When GEOS shuts down, all the blocks on the global heap are freed, even if 
@@ -137,7 +137,7 @@ Applications, however, should not leave blocks locked for extended periods as
 this may interfere with heap compaction.
 
 When a process wants to use a block, it instructs the memory manager to lock 
-the block by calling MemLock() (see page 556). The application passes the 
+the block by calling **MemLock()**. The application passes the 
 handle of the block, and the memory manager locks the block and returns a 
 pointer to the block's area in the global heap. While a block is unlocked, the 
 memory manager can, depending on the block's category, move the block on 
@@ -148,7 +148,7 @@ altogether.
 
 When a geode requests memory, it may specify how that memory is to be 
 treated by the memory manager. The memory request includes a set of 
-HeapFlags (see page 551) which specifies how and when the block can be 
+**HeapFlags** which specifies how and when the block can be 
 moved. Broadly speaking, memory blocks can be divided into four categories:
 
 + Fixed  
@@ -170,8 +170,8 @@ reset its pointers within the block by dereferencing the block handle.
 A moveable block has the flag HF_FIXED set to zero. When a moveable 
 block is not in use (i.e. unlocked), the memory manager may move it 
 within the global heap. This lets the memory manager keep the global 
-heap compacted (see section 15.2.2.4 on page 548). Accessing moveable 
-blocks is slightly slower than accessing fixed blocks since the application 
+heap compacted (see [section 15.2.2.4](#15224-maximizing-free-space-in-memory)). 
+Accessing moveable blocks is slightly slower than accessing fixed blocks since the application 
 needs to call the memory manager to lock the block and translate the 
 memory handle to a pointer. In addition to being moveable, a block may 
 also be swapable and/or discardable (as described below).
@@ -200,7 +200,7 @@ to disk, since the data is already there. Instead, one can mark a block
 memory manager can, at will, discard the block. If a process attempts to 
 lock a block which has been discarded, the memory manager will return 
 an error. The application can then "re-allocate" memory for that block 
-(see MemReAlloc() on page 554) and copy the data back from the disk. 
+(see **MemReAlloc()**) and copy the data back from the disk. 
 (The system takes care of reloading discarded code resources as 
 necessary.) A block can be both discardable and swapable (indeed, 
 discardable blocks are usually swapable). If a block has both 
@@ -211,8 +211,7 @@ not swap the block to the disk.
 Fixed blocks must be declared as such when they are allocated, and they 
 remain so until they are freed. However, non-fixed blocks may become or 
 cease to be discardable or swapable after they are created. To enable or 
-disable these characteristics, call the routine MemModifyFlags() (see page 
-562).
+disable these characteristics, call the routine **MemModifyFlags()**.
 
 ##### 15.2.2.4 Maximizing Free Space in Memory
 
@@ -268,10 +267,10 @@ heap.h, which should be included in all applications that plan to allocate
 memory dynamically with the memory manager routines.
 
 The flags fall into two categories: those used when the block is allocated 
-(stored in a record called HeapAllocFlags) and those used to describe the 
-block as it is manipulated (stored in a record called HeapFlags).
+(stored in a record called **HeapAllocFlags**) and those used to describe the 
+block as it is manipulated (stored in a record called **HeapFlags**).
 
-The HeapAllocFlags record is used to determine what qualities the memory 
+The **HeapAllocFlags** record is used to determine what qualities the memory 
 manager should give the block when it is first allocated. Some of these flags 
 are also relevant when memory is being reallocated. These qualities include:
 
@@ -280,7 +279,7 @@ Upon allocation, initialize data in block to zeros.
 
 HAF_LOCK  
 Upon allocation, the block should be locked on the global heap. 
-Use MemDeref() (page 561) to get a pointer to the block.
+Use **MemDeref()** to get a pointer to the block.
 
 HAF_NO_ERR  
 Do not return error codes; system error if block cannot be 
@@ -308,13 +307,12 @@ accessed or altered by a less privileged entity.
 
 Once a block is allocated, it has certain properties that govern how the 
 Memory Manager manipulates it. These properties are determined by the 
-HeapFlags. The HeapFlags also contain data about whether the block has 
+**HeapFlags**. The **HeapFlags** also contain data about whether the block has 
 been swapped or discarded. These flags are stored in the block's handle-table 
 entry, so they can be retrieved without locking the block. To retrieve the flags, 
-call the routine MemGetInfo() with the flag 
-MGIT_FLAGS_AND_LOCK_COUNT. (See MemGetInfo() on page 562.) Some 
-of the flags can be changed after the block has been allocated; for details, see 
-MemModifyFlags() on page 562. The flags include
+call the routine **MemGetInfo()** with the flag MGIT_FLAGS_AND_LOCK_COUNT. 
+(See **MemGetInfo()**) Some of the flags can be changed after the block has 
+been allocated; for details, see **MemModifyFlags()**. The flags include
 
 HF_FIXED  
 The block will not move from its place in the global heap until 
@@ -325,23 +323,23 @@ allocated.
 
 HF_SHARABLE  
 The block may be locked by geodes other than the owner. This 
-flag can be changed with MemModifyFlags().
+flag can be changed with **MemModifyFlags()**.
 
 HF_DISCARDABLE  
 If the block is unlocked and space is needed, the memory 
 manager may discard it. This flag can be changed with 
-MemModifyFlags().
+**MemModifyFlags()**.
 
 HF_SWAPABLE  
 If the block is unlocked and space is needed, it may be swapped 
 to expanded or extended memory or to the hard disk. This flag 
-can be changed with MemModifyFlags().
+can be changed with **MemModifyFlags()**.
 
 HF_LMEM  
 The block is a local-memory block, managed by the LMem 
-module (see "Local Memory," Chapter 16). The flag is set 
-automatically by LMemInitHeap(). It can be changed with 
-MemModifyFlags(); however, an application should not 
+module (see ["Local Memory", Chapter 16](cvm.md)). The flag is set 
+automatically by **LMemInitHeap()**. It can be changed with 
+**MemModifyFlags()**; however, an application should not 
 change this flag.
 
 HF_DISCARDED  
@@ -364,7 +362,7 @@ routines in order to use VM files.
 If you will be storing small pieces of information in a block, you should create 
 a local memory heap (a special kind of memory block). LMem heaps are also 
 useful for storing arrays of information or for storing objects. For more 
-information, see "Local Memory," Chapter 16.
+information, see ["Local Memory," Chapter 16](clmem.md).
 
 #### 15.3.1 Memory Etiquette
 
@@ -407,7 +405,7 @@ blocks you will have to keep locked at a time.
 
 In the same vein, try to keep the amount of memory you have on the global 
 heap to a minimum. You should declare all of your non-fixed memory as 
-swappable and/or discardable. Remember, you can use MemModifyFlags() 
+swappable and/or discardable. Remember, you can use **MemModifyFlags()** 
 to change these characteristics; during a timing-critical period, you could 
 have a block set as non-swappable, and then make it swappable again as soon 
 as timing becomes less important. If you use Virtual Memory files, the VM 
@@ -416,12 +414,12 @@ Manager does much of this for you.
 Try to keep your memory blocks small. Although memory blocks can, in 
 principle, grow to 64K, the memory manager is best suited for dealing with 
 blocks in the 2K-6K range. If you need a contiguous data space which grows 
-beyond 8K in size, you should use the Huge Array mechanism (see section 
-18.4 of chapter 18), which automatically (and almost transparently) divides 
+beyond 8K in size, you should use the Huge Array mechanism (see [section 
+18.4 of chapter 18](cvm.md#184-vm-chains)), which automatically (and almost transparently) divides 
 a large data space across several smaller memory blocks. If you use many 
 small data items, you should use the Database library, which automatically 
 distributes data items among different memory blocks, keeping each block 
-near the optimum size. (See "Database Library," Chapter 19).
+near the optimum size. (See ["Database Library", Chapter 19](cdb.md)).
 
 #### 15.3.2 Requesting Memory
 
@@ -431,15 +429,15 @@ When you need a block of raw memory, you must use one of the kernel's
 memory allocation routines. You also must use kernel memory routines to 
 change the size of a block or to reallocate space for a discarded block.
 
-MemAlloc() creates a block and assigns a handle to it. The routine must be 
+**MemAlloc()** creates a block and assigns a handle to it. The routine must be 
 passed the size (in bytes) of the block to be allocated, along with the 
-HeapAllocFlags and HeapFlags for that block. MemAlloc() will set the 
+**HeapAllocFlags** and **HeapFlags** for that block. **MemAlloc()** will set the 
 block's owner as the owner of the thread that called it. It will return the 
 handle of the newly-allocated block. 
 
-MemAllocSetOwner() is the same as MemAlloc(), except that the caller 
+**MemAllocSetOwner()** is the same as **MemAlloc()**, except that the caller 
 explicitly sets the owner of the new block by passing the handle of the owning 
-geode. Like MemAlloc(), it returns the handle of the new block. This is 
+geode. Like **MemAlloc()**, it returns the handle of the new block. This is 
 commonly used by drivers and shared libraries, which allocate memory 
 owned by the geode which calls them. When the block's owner exits, the block 
 will be freed, even if the block's creator is still running.
@@ -447,17 +445,17 @@ will be freed, even if the block's creator is still running.
 If you request a fixed block or pass the flag HAF_LOCK, the block will be 
 allocated locked on the heap. However, the routine will still return just the 
 memory handle. To translate this handle to a pointer, call the routine 
-MemDeref(). MemDeref() is passed a block's handle and returns a pointer 
+**MemDeref()**. **MemDeref()** is passed a block's handle and returns a pointer 
 to the block (or a null pointer if the block has been discarded).
 
-To change the size of a block, call the routine MemReAlloc(). This routine is 
+To change the size of a block, call the routine **MemReAlloc()**. This routine is 
 also used to allocate memory for a block that has been discarded. The routine 
-is passed the memory handle, the new size, and the HeapAllocFlags; it 
+is passed the memory handle, the new size, and the **HeapAllocFlags**; it 
 returns the block's memory handle. You can reallocate a fixed or locked block; 
 however, the block may be moved on the global heap to satisfy the request. 
-(This is the only way a fixed block can move.) As with MemAlloc(), you can 
+(This is the only way a fixed block can move.) As with **MemAlloc()**, you can 
 request that the memory manager lock the block after reallocating it; you will 
-then have to call MemDeref() to get the address of the block. Note that if the 
+then have to call **MemDeref()** to get the address of the block. Note that if the 
 new size is smaller than the original size, the routine is guaranteed to 
 succeed, and the block will not move from its current position. Reallocating a 
 block to zero bytes discards the block but preserves its handle; the block can 
@@ -477,7 +475,7 @@ space in the global handle table; if blocks are not freed, the handle table may
 fill up, causing a system error. Furthermore, non-swapable, non-discardable 
 blocks take up space in the global heap until they are freed.
 
-To free a block, call MemFree() and pass the handle of the block to be freed. 
+To free a block, call **MemFree()** and pass the handle of the block to be freed. 
 The block will be freed even if it is locked. Therefore, if the block can be used 
 by other threads, you should make sure no other thread has locked the block 
 before you free it.
@@ -485,7 +483,7 @@ before you free it.
 You can also set a reference count for a block. When a block's reference count 
 drops to zero, the memory manager will automatically free it. This is useful 
 if several threads will be accessing the same block. For more information, see 
-"The Reference Count" on page 563.
+["The Reference Count"](#1538-the-reference-count).
 
 When a geode exits, all blocks owned by it are automatically freed.
 
@@ -510,25 +508,25 @@ The memory manager can only move the block when the lock count is zero.
 
 One warning about locking blocks: Do not try to lock a block which was 
 allocated as fixed. Attempting to do so will result in a system error. If you 
-need to translate a fixed-block handle to a pointer, call MemDeref().
+need to translate a fixed-block handle to a pointer, call **MemDeref()**.
 
-MemLock() locks a block on the heap. It is passed the handle of the block; it 
+**MemLock()** locks a block on the heap. It is passed the handle of the block; it 
 returns a pointer to the start of the block on the heap. If the block has been 
-discarded, MemLock() returns a null pointer.
+discarded, **MemLock()** returns a null pointer.
 
 Immediately after you are done using a block, you should unlock it by calling 
-MemUnlock(). It is better to lock and unlock the same block several times 
+**MemUnlock()**. It is better to lock and unlock the same block several times 
 than to retain control of it for an extended period, as locked blocks degrade 
 the performance of the heap compaction mechanism. To unlock a block, call 
-MemUnlock(), passing the handle of the block to be unlocked. 
-MemUnlock() decrements the lock count.
+**MemUnlock()**, passing the handle of the block to be unlocked. 
+**MemUnlock()** decrements the lock count.
 
 A block may be locked by any of the threads run by its creator; if the block is 
 sharable, it may be run by any other thread as well. There is nothing in the 
-MemLock() routine to prevent different threads from locking a block at the 
+**MemLock()** routine to prevent different threads from locking a block at the 
 same time, causing potential synchronization problems. For this reason, if 
 threads will be sharing a block, they should use the synchronization routines 
-(see section 15.3.6 on page 558).
+(see [section 15.3.6](#1536-data-access-synchronization)).
 
 #### 15.3.5 Accessing Data: An Example
 
@@ -602,7 +600,7 @@ use the block; when it is done, it should release the block's semaphore so
 other applications can use the block.
 
 Note that use of semaphores is entirely voluntary by each application. Even 
-if thread A has the semaphore on a block, thread B can call MemLock() on 
+if thread A has the semaphore on a block, thread B can call **MemLock()** on 
 the block and start changing it. However, all threads using shared blocks 
 ought to use the semaphore routines to prevent confusion.
 
@@ -618,12 +616,12 @@ routines, you must not alter that word. None of these routines is used to
 access object blocks; instead, special object-block locking routines are 
 provided.
 
-Most geodes should use MemThreadGrab(), MemThreadGrabNB(), and 
-MemThreadRelease() to access sharable blocks. These routines provide 
+Most geodes should use **MemThreadGrab()**, **MemThreadGrabNB()**, and 
+**MemThreadRelease()** to access sharable blocks. These routines provide 
 the maximum protection against deadlock in exchange for a slightly slower 
 execution. 
 
-MemThreadGrab() gives the thread the semaphore for the block in 
+**MemThreadGrab()** gives the thread the semaphore for the block in 
 question and locks the block. It is passed the handle of the block and returns 
 the block's address on the global heap. If no thread has the block's 
 semaphore, it gives the semaphore to the calling thread. If the calling thread 
@@ -631,41 +629,41 @@ already has the semaphore, a "semaphore count" is incremented; the thread
 will not release the semaphore until it has been released as many times as it 
 has been grabbed. (For example, two different objects run by the same thread 
 could each grab the semaphore; the semaphore would not be released until 
-each object called MemThreadRelease().) If another thread has the 
-semaphore, MemThreadGrab() blocks until it can get the semaphore; it 
+each object called **MemThreadRelease()**.) If another thread has the 
+semaphore, **MemThreadGrab()** blocks until it can get the semaphore; it 
 then increments the semaphore, locks the block, and returns the address.
 
-MemThreadGrabNB() is the same as MemThreadGrab(), except that it 
-never blocks. If you call MemThreadGrabNB() while another thread has 
+**MemThreadGrabNB()** is the same as **MemThreadGrab()**, except that it 
+never blocks. If you call **MemThreadGrabNB()** while another thread has 
 the semaphore, the routine will immediately return an error. 
-MemThreadGrabNB() takes the handle of the block; it increments the 
+**MemThreadGrabNB()** takes the handle of the block; it increments the 
 semaphore, locks the block, and returns the block's address on the heap.
 
-MemThreadRelease() releases a block grabbed by either 
-MemThreadGrab() or MemThreadGrabNB(). It is passed the block's 
+**MemThreadRelease()** releases a block grabbed by either 
+**MemThreadGrab()** or **MemThreadGrabNB()**. It is passed the block's 
 handle. It unlocks the block and decrements the block's semaphore. 
 
 One common situation is that several threads may need to read a block but 
 only once in a while will an application need to write to the block. In this case, 
 there is no synchronization problem in having several readers at once; 
 however, if any thread is writing, no other thread should be reading or 
-writing. For this situation, GEOS provides this set of MemLock routines: 
-MemLockShared(), MemUnlockShared(), MemLockExcl(), and 
-MemUnlockExcl(). 
+writing. For this situation, GEOS provides this set of **MemLock** routines: 
+**MemLockShared()**, **MemUnlockShared()**, **MemLockExcl()**, and 
+**MemUnlockExcl()**. 
 
 These routines, like the others, maintain a queue of threads which have 
 requested thread access. The difference is that any number of readers can 
 have access at once. When a thread wants read access, it calls 
-MemLockShared(). If the queue is empty and the block is unlocked or 
+**MemLockShared()**. If the queue is empty and the block is unlocked or 
 locked for reading, the routine returns and the thread is given shared access; 
 otherwise, the thread is blocked, and the request goes on the queue. When a 
-routine is finished reading the block, it should call MemUnlockShared().
+routine is finished reading the block, it should call **MemUnlockShared()**.
 
-When a routine needs to write to a block, it should call MemLockExcl(). If 
+When a routine needs to write to a block, it should call **MemLockExcl()**. If 
 nobody has locked the block (and thus the queue is empty), the thread will 
 immediately be given exclusive access; otherwise, the thread will block, and 
 the request will go on the queue. When the thread no longer needs write 
-access, it should call MemUnlockExcl().
+access, it should call **MemUnlockExcl()**.
 
 When all threads with access to a block have released their locks, the queued 
 thread with the highest priority will be awakened and given the lock on the 
@@ -675,10 +673,10 @@ locks.
 
 A thread can change its lock from shared to exclusive or vice versa. If a 
 thread has an exclusive lock on a block, it can change the lock to shared by 
-calling MemDowngradeExclLock(). This routine takes one argument, 
+calling **MemDowngradeExclLock()**. This routine takes one argument, 
 namely the block's global handle. It changes the lock to "shared" and wakes 
 up all sleeping threads which are waiting for shared access. For convenience, 
-MemDowngradeExclLock() returns the address of the block; however, the 
+**MemDowngradeExclLock()** returns the address of the block; however, the 
 block is guaranteed not to move.
 
 If a thread has shared access and wants exclusive access, it can call 
@@ -697,39 +695,39 @@ a great danger of deadlock. If (for example) a thread requests exclusive access
 to a block when it already has access, the thread will deadlock: it will block 
 until the threads with access all release the block, but it can't release its own 
 lock because it is blocked. If you may need to have multiple locks on a block, 
-use the MemThread routines, which check for these situations.
+use the **MemThread** routines, which check for these situations.
 
 There are other sets of routines which can be used to access a block's 
 semaphore. As noted, a block should be accessed via just one set of routines. 
 These routines provide less protection against deadlock than the 
 MemThread routines do; however, they have a slightly faster response time.
 
-A more primitive group of routines is HandleP(), HandleV(), 
-MemPLock(), and MemUnlockV(). These routines function much like the 
-MemThread routines. HandleP() grabs the block's semaphore and returns; 
+A more primitive group of routines is **HandleP()**, **HandleV()**, 
+**MemPLock()**, and **MemUnlockV()**. These routines function much like the 
+**MemThread** routines. **HandleP()** grabs the block's semaphore and returns; 
 it does not lock the block. This makes it very useful for working with fixed 
-blocks (which cannot be locked). HandleV() releases the block's semaphore 
-and returns; it does not unlock the block. Note, however, that HandleP() will 
+blocks (which cannot be locked). **HandleV()** releases the block's semaphore 
+and returns; it does not unlock the block. Note, however, that **HandleP()** will 
 block if any thread controls the semaphore, even the thread that called 
-HandleP(). If a thread calls HandleP() while it controls the semaphore, it 
+**HandleP()**. If a thread calls **HandleP()** while it controls the semaphore, it 
 will block until the semaphore is released, but it can't release the semaphore 
 because it has blocked. Thus, the thread will deadlock, and no other thread 
-will be able to get the semaphore. Therefore, a thread should use HandleP() 
+will be able to get the semaphore. Therefore, a thread should use **HandleP()** 
 only if it is very confident that it will never try to double-set the semaphore.
 
 Usually, when a thread grabs a block's semaphore, it needs to have the block 
 locked on the heap. For this reason, GEOS provides the routines 
-MemPLock() and MemUnlockV(). MemPLock() simply calls HandleP() 
-and then calls MemLock(). MemUnlockV(), correspondingly, calls 
-MemUnlock() and then calls HandleV(). These routines are completely 
-compatible with HandleP() and HandleV(); for example, a thread could 
-grab and lock a block with MemPLock(), then unlock it with MemUnlock() 
-and release it with HandleV().
+**MemPLock()** and **MemUnlockV()**. **MemPLock()** simply calls **HandleP()** 
+and then calls **MemLock()**. **MemUnlockV()**, correspondingly, calls 
+**MemUnlock(** and then calls **HandleV()**. These routines are completely 
+compatible with **HandleP()** and **HandleV()**; for example, a thread could 
+grab and lock a block with **MemPLock()**, then unlock it with **MemUnlock()** 
+and release it with **HandleV()**.
 
-HandleP() and HandleV() are general-purpose handle routines. They can 
+**HandleP()** and **HandleV()** are general-purpose handle routines. They can 
 be called on any type of global handle. For example, if two threads need to 
 synchronize their access to a file, they can lock and unlock the file handle 
-with HandleP() and HandleV(). However, they are most commonly used 
+with **HandleP()** and **HandleV()**. However, they are most commonly used 
 with memory blocks.
 
 #### 15.3.7 Retrieving Block Information
@@ -748,7 +746,7 @@ returns a null pointer.
 **MemGetInfo()** is a general-purpose block information routine. It is passed 
 two arguments: the handle of the block, and a member of the 
 MemGetInfoType enumerated type. The return value is always 
-word-length; however, its significance depends on the MemGetInfoType 
+word-length; however, its significance depends on the **MemGetInfoType** 
 value passed:
 
 MGIT_SIZE  
@@ -756,12 +754,12 @@ Returns the size of the memory block (in bytes).
 
 MGIT_FLAGS_AND_LOCK_COUNT  
 Upper byte is the number of locks on the block; lower eight bits 
-are the block's HeapFlags record (see page 551).
+are the block's [HeapFlags record](#15225-block-attributes).
 
 MGIT_OWNER_OR_VM_FILE_HANDLE  
 If the block is attached to a GEOS Virtual Memory file, 
-MemGetInfo() returns the VM file handle. Otherwise, it 
-returns the GeodeHandle of the owning thread.
+**MemGetInfo()** returns the VM file handle. Otherwise, it 
+returns the **GeodeHandle** of the owning thread.
 
 MGIT_ADDRESS  
 Returns the block's segment address, if it is on the global heap; 
@@ -779,9 +777,9 @@ MGIT_EXEC_THREAD
 This is useful for object blocks only. Returns the handle of the 
 thread executing methods for objects in the block.
 
-**MemModifyFlags()** is used to change a block's HeapFlags record. It takes 
-three arguments: The handle of the block, the HeapFlags to turn on, and the 
-HeapFlags to clear. It returns nothing. Not all HeapFlags can be changed 
+**MemModifyFlags()** is used to change a block's **HeapFlags** record. It takes 
+three arguments: The handle of the block, the **HeapFlags** to turn on, and the 
+**HeapFlags** to clear. It returns nothing. Not all **HeapFlags** can be changed 
 after a block is created; only HF_SHARABLE, HF_DISCARDABLE, 
 HF_SWAPABLE, and HF_LMEM can be so changed. 
 
@@ -844,19 +842,19 @@ maximum value of . If you try to increment the reference count past
 this value, the results are undefined. This will not be a problem for most 
 applications.
 
-To set up a reference count for a block, call MemInitRefCount(). This 
+To set up a reference count for a block, call **MemInitRefCount()**. This 
 routine takes two arguments: the handle of a global memory block, and the 
 reference count for that block. The reference count must be greater than zero. 
-MemInitRefCount() sets the block's HM_otherInfo field to the specified 
-reference count. MemInitRefCount() does not return anything.
+**MemInitRefCount()** sets the block's HM_otherInfo field to the specified 
+reference count. **MemInitRefCount()** does not return anything.
 
-To increment the reference count, call MemIncRefCount(). This routine is 
+To increment the reference count, call **MemIncRefCount()**. This routine is 
 passed a single argument, namely the handle of the global memory block. 
 The routine simply increments HM_otherInfo. It does not return anything.
 
-To decrement the reference count, call MemDecRefCount(). This routine is 
+To decrement the reference count, call **MemDecRefCount()**. This routine is 
 passed the handle of a global memory block. It decrements the block's 
-HM_otherInfo field. If the field reaches zero, MemDecRefCount() will 
+HM_otherInfo field. If the field reaches zero, **MemDecRefCount()** will 
 immediately free the block. The routine does not return anything.
 
 ### 15.4 malloc()
@@ -876,43 +874,43 @@ fills up, the manager can allocate another fixed block for these requests.
 
 However, there are some problems with this. The main problem is that fixed 
 blocks degrade the memory manager's performance. The more a geode uses 
-malloc(), the more memory is tied up in fixed blocks. And, as always, 
+**malloc()**, the more memory is tied up in fixed blocks. And, as always, 
 contiguous memory is limited to 64K by the 80x86 segmented addressing 
 scheme.
 
 Most of the time, geodes should use other types of memory allocation. For 
-allocating small chunks of data, applications should use LMem routines or 
+allocating small chunks of data, applications should use **LMem** routines or 
 techniques built on top of them (database items, chunk arrays, etc.); for 
 larger chunks of memory, applications should use memory manager routines 
-or HugeArrays. However, to help writers port C code to GEOS, malloc() and 
+or HugeArrays. However, to help writers port C code to GEOS, **malloc()** and 
 its relatives are available.
 
-To get a stretch of contiguous memory, use the routines malloc() or calloc(). 
-malloc() takes one argument, a size in bytes; it returns a void pointer to that 
-many bytes of fixed memory. calloc() takes two arguments: a number of 
+To get a stretch of contiguous memory, use the routines **malloc()** or **calloc()**. 
+**malloc()** takes one argument, a size in bytes; it returns a void pointer to that 
+many bytes of fixed memory. **calloc()** takes two arguments: a number of 
 structures, and the size of each such structure. It allocates enough memory 
 for that many structures and returns a void pointer to the memory. Both 
-malloc() and calloc() zero-initialize the memory when they allocate it.
+**malloc()** and **calloc()** zero-initialize the memory when they allocate it.
 
-If a routine wants to change the size of memory allocated with malloc() or 
-calloc() it can use realloc(). realloc() takes two arguments: a pointer to a 
-piece of memory allocated with malloc() or calloc(), and a new size in bytes. 
+If a routine wants to change the size of memory allocated with **malloc()** or 
+**calloc()** it can use **realloc()**. **realloc()** takes two arguments: a pointer to a 
+piece of memory allocated with **malloc()** or **calloc()**, and a new size in bytes. 
 It returns a void pointer to the memory, which may have been moved to 
 satisfy the request. If it could not satisfy the request, it returns a null pointer, 
 and the original memory is untouched. Note that the pointer you pass 
-realloc() must be the same pointer that was returned by malloc/calloc; if 
+**realloc()** must be the same pointer that was returned by **malloc/calloc**; if 
 (for example) you allocate 100 bytes and are returned 008Bh:30h, and try to 
-resize it by passing 008Bh:40h to realloc(), inappropriate memory will be 
+resize it by passing 008Bh:40h to **realloc()**, inappropriate memory will be 
 affected, and the results are undefined.
 
-If you decrease the size of a memory section with realloc(), the routine is 
+If you decrease the size of a memory section with **realloc()**, the routine is 
 guaranteed to succeed. If you increase the size, it may fail; if it does succeed, 
 the new memory will not be zero-initialized. Reallocating a block down to 
-zero memory is the same as freeing it. You can pass a null pointer to realloc() 
-along with the size; this makes realloc() function like malloc(). 
+zero memory is the same as freeing it. You can pass a null pointer to **realloc()** 
+along with the size; this makes **realloc()** function like **malloc()**. 
 
-When you are done with memory allocated by malloc-family routines, you 
-should call free() to free the memory for other malloc() calls. As with 
-realloc(), you must pass the same pointer that you were originally given.
+When you are done with memory allocated by **malloc**-family routines, you 
+should call **free()** to free the memory for other **malloc()** calls. As with 
+**realloc()**, you must pass the same pointer that you were originally given.
 
 [Handles](chandle.md) <-- &nbsp;&nbsp; [table of contents](../concepts.md) &nbsp;&nbsp; --> [Local Memory](clmem.md)

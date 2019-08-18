@@ -15,9 +15,9 @@ attributes and hints to fine-tune your UI's appearance.
 
 Before reading this chapter, you should be familiar with the GEOS User 
 Interface in general and the generic UI in specific. For most of this chapter, 
-"First Steps: Hello World," Chapter 4, will be sufficient background 
-information; for other sections, you should at least read "The GEOS User 
-Interface," Chapter 10.
+["First Steps: Hello World," Chapter 4](cgetsta.md), will be sufficient background 
+information; for other sections, you should at least read ["The GEOS User 
+Interface," Chapter 10](cuiover.md).
 
 ### 12.1 Geometry Manager Overview
 
@@ -35,17 +35,17 @@ With this feature, a specific UI library can set up the UI geometry as it wants.
 Your first interaction with the geometry manager will be when you build a 
 generic object tree for your UI. Most hints applied to an object are signals to 
 the geometry manager about how the object should be positioned, sized, or 
-otherwise placed on the screen. These hints are all defined in GenClass, the 
+otherwise placed on the screen. These hints are all defined in **GenClass**, the 
 topmost generic object class, so they are available (though not necessarily 
 useful) to all types of generic objects.
 
 This chapter first describes the features of the geometry manager and how 
 the mechanism fits into the GEOS system as a whole (later in this section). 
 Then it discusses how to manage generic UI objects (using a dialog box as an 
-example) in section 12.2 on page 472. For the hints you can apply to window 
-objects, see section 12.3 on page 497. For descriptions of managing the 
-geometry of visible object trees and composites, see "VisClass," Chapter 23 of 
-the Object Reference Book.
+example) in [section 12.2](#122-arranging-your-generic-objects). For the hints 
+you can apply to window objects, see [section 12.3](#123-positioning-and-sizing-windows). 
+For descriptions of managing the geometry of visible object trees and composites, see 
+["VisClass," Chapter 23 of the Object Reference Book](../Objects/oviscla.md).
 
 #### 12.1.1 Geometry Manager Features
 
@@ -255,17 +255,17 @@ control less strictly how the object works.
 As stated above, the structure of your application's generic object tree 
 determines how the generic UI objects will be organized. A simple example of 
 a generic tree including a menu, a dialog box, and a GenView can be found in 
-"First Steps: Hello World," Chapter 4.
+["First Steps: Hello World," Chapter 4](cgetsta.md).
 
 ##### 12.2.1.2 How Hints Work
 
 Nearly all geometry of generic UI objects is determined by hints. You can 
 position, size, and limit generic objects with different hints. All these hints 
-are defined in GenClass; inheritance allows all generic objects to have them, 
+are defined in **GenClass**; inheritance allows all generic objects to have them, 
 though not all hints are applicable to all generic objects.
 
-Hints are described in detail in "GenClass," Chapter 2 of the Object 
-Reference Book, but the basics are reviewed here for convenience. Hints are 
+Hints are described in detail in ["GenClass," Chapter 2 of the Object Reference 
+Book](../Objects/ogen.md), but the basics are reviewed here for convenience. Hints are 
 implemented as variable data entries; each hint is a different variable-data 
 type. Hints therefore take up instance data space in an object only when the 
 object has that hint.
@@ -481,7 +481,7 @@ center line of the composite, you might want to full-justify the children. To do
 this, you will want to give the composite an orientation first (either vertical 
 or horizontal). The composite may also require a special sizing hint to expand 
 its bounds-see HINT_EXPAND_WIDTH_TO_FIT_PARENT and the other 
-sizing hints in section 12.2.4 on page 480.
+sizing hints in [section 12.2.4](#1224-sizing-objects).
 
 If the full justification hint is in the same dimension as the orientation of the 
 composite (e.g., HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY and 
@@ -493,7 +493,7 @@ calculate the spacing as if there were one more child than there actually is;
 it will then put half the extra space on either end of the children. 
 HINT_DONT_INCLUDE_ENDS_IN_CHILD_SPACING performs the default 
 calculations. Examples of various full justification are shown in Figure 12-5. 
-See Code Display 12-3 on page l 483 for the code required to implement this 
+See Code Display 12-3 for the code required to implement this 
 full justification behavior.
 
 Typically, full justification is not implemented by default. Some specific UIs 
@@ -658,7 +658,7 @@ being too large). This is primarily used with window objects
 (you will likely never use it for anything other than a 
 GenPrimary, GenDisplay, or GenView), and it is effective only 
 for when the object is first displayed. This hint takes an 
-argument of type CompSizeHintArgs, a structure that 
+argument of type **CompSizeHintArgs**, a structure that 
 defines a suggested width, height, and the number of children 
 the object has. 
 
@@ -668,21 +668,20 @@ sizing restrictions (such as children growing too large for the
 window) may override this hint occasionally. This hint can 
 often be used for optimization to inhibit excessive geometry 
 recalculations while on-screen. This hint takes the same 
-parameters as HINT_INITIAL_SIZE, of type 
-CompSizeHintArgs.
+parameters as HINT_INITIAL_SIZE, of type **CompSizeHintArgs**.
 
 HINT_MAXIMUM_SIZE  
 This hint sets a desired maximum size for the object. Other 
 geometry restrictions may override this hint when necessary. 
 This hint is useful for GenText and GenView objects. It takes 
 the same parameters as HINT_INITIAL_SIZE, of type 
-CompSizeHintArgs.
+**CompSizeHintArgs**.
 
 HINT_MINIMUM_SIZE  
 This hint sets a desired minimum size for the object. Other 
 geometry restrictions may override this hint when necessary. 
 The hint takes the same parameters as HINT_INITIAL_SIZE, of 
-type CompSizeHintArgs.
+type **CompSizeHintArgs**.
 
 The following examples show different ways to set the initial size of an object. 
 The third argument of the hint is the number of children in a particular line 
@@ -749,11 +748,10 @@ HINT_DO_NOT_USE_MONIKER, HINT_CENTER_MONIKER,
 HINT_PLACE_MONIKER_ALONG_LARGER_DIMENSION, 
 HINT_ALIGN_LEFT_MONIKER_EDGE_WITH_CHILD
 
-Monikers are extremely useful and dynamic-see "GenClass," Chapter 2 of 
-the Object Reference Book, for full information on creating, manipulating, 
+Monikers are extremely useful and dynamic-see ["GenClass," Chapter 2 of the 
+Object Reference Book](../Objects/ogen.md), for full information on creating, manipulating, 
 and using visual monikers. Monikers may be created or changed at run-time 
-(often causing geometry updates), and all generic objects may be given 
-monikers.
+(often causing geometry updates), and all generic objects may be given monikers.
 
 If you place a composite object's moniker to one side of its children, the 
 geometry manager will ensure extra space in the composite gets allotted for 
@@ -832,11 +830,11 @@ HINT_MINIMIZE_CHILD_SPACING
 Normally, spacing of children within a composite is left entirely up to the 
 specific UI. You can customize spacing, however, by using the hint 
 HINT_CUSTOM_CHILD_SPACING. This hint takes a single argument of type 
-SpecSizeSpec, described below.
+**SpecSizeSpec**, described below.
 
 The SpecSizeSpec structure defines both the spacing between children and 
 how the spacing is determined. It exists as a record with two fields: The first 
-field is a constant of type SpecSizeTypes, used to interpret the second field. 
+field is a constant of type **SpecSizeTypes**, used to interpret the second field. 
 The second field is data based on the type specified in the first field.
 
 The different types allowable in the first field are
@@ -882,7 +880,7 @@ other, for example, you would specify the hint as follows:
 ~~~
 
 HINT_CUSTOM_CHILD_SPACING_IF_LIMITED_SPACE also takes a 
-SpecSizeSpec to suggest a custom amount of spacing, but only implements 
+**SpecSizeSpec** to suggest a custom amount of spacing, but only implements 
 this custom spacing if the specific UI determines that the children are 
 already too tightly arranged. This hint may or may not be helpful, as the 
 specific UI often allocates a minimum amount of spacing independent of this 
@@ -958,9 +956,9 @@ them will have a reply bar. A reply bar usually has triggers in it for "Apply,"
 "Cancel," and perhaps other functions (such as "Reset").
 
 Note that many special dialog box types can have their reply bars built 
-automatically according to the specific UI. See "GenInteraction," Chapter 7 of 
-the Object Reference Book, for full information on reply bars. If you want to 
-create your own, however, you can with the hints in this section.
+automatically according to the specific UI. See ["GenInteraction," Chapter 7 of the 
+Object Reference Book](../Objects/ogenint.md), for full information on reply bars. If 
+you want to create your own, however, you can with the hints in this section.
 
 Although you have to declare each of the triggers that will appear in the reply 
 bar, you can use HINT_MAKE_REPLY_BAR to set up the geometry appropriate 
@@ -1064,10 +1062,10 @@ positions. Primary and display objects extend by default to the right edge of
 the screen and to the top edge of the icon area at the bottom of the screen. 
 Other windows are usually only as large as required by their children.
 
-The SpecSizeWinPair structure is often used when specifying window sizes 
+The **SpecSizeWinPair** structure is often used when specifying window sizes 
 and positions. There are several hints which signal that a window should be 
 positioned or sized depending on the position or size of another window, the 
-size of the screen, or other conditions. The SpecSizeWinSpec structure 
+size of the screen, or other conditions. The **SpecSizeWinSpec** structure 
 allows you to specify an offset from another window, either by a number of 
 points (remember that there are 72 points per inch), or by means of a ratio. 
 
@@ -1084,7 +1082,7 @@ typedef WordFlags SpecWinSizeSpec;
 #define SWSS_FRACTION 				0x03ff
 ~~~
 
-The SpecSizeWinPair structure allows you to set up separate parameters 
+The **SpecSizeWinPair** structure allows you to set up separate parameters 
 for the x and y coordinates. For each coordinate, use the SWSS_RATIO flag to 
 signal whether you are giving coordinates by means of a ratio instead of a 
 constant. If you are using a ratio, use the SWSS_FRACTION, 
@@ -1117,7 +1115,7 @@ and one:
 ~~~
 
 To specify a constant offset, just use that offset, not setting the SWSS_RATIO 
-flag. Not all windows will use the SpecWinSizePair structure.
+flag. Not all windows will use the **SpecWinSizePair** structure.
 
 #### 12.3.1 Window Positioning
 
@@ -1126,7 +1124,7 @@ HINT_POSITION_WINDOW_AT_MOUSE, HINT_STAGGER_WINDOW,
 HINT_CENTER_WINDOW, HINT_TILE_WINDOW, 
 HINT_WINDOW_NO_CONSTRAINTS
 
-GenClass has a number of hints used by the window classes to determine 
+**GenClass** has a number of hints used by the window classes to determine 
 where the window appears initially and how the window is allowed to move 
 about the screen. Specific UIs can override these hints when necessary or 
 when they conflict with the UI's specifications. These hints are listed below.
@@ -1135,7 +1133,7 @@ HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT
 This hint suggests an initial position for the window based on 
 its parent window's size and relative to the upper-left corner of 
 the parent window. The suggested position is specified as a 
-fraction of the parent window's size in a SpecWinSizePair 
+fraction of the parent window's size in a **SpecWinSizePair** 
 structure. This structure consists of two fields, the X position 
 and the Y position of the new window's origin. Predetermined 
 fraction values are names PCT_xx, where xx is a multiple of five 
@@ -1180,7 +1178,7 @@ HINT_SIZE_WINDOW_AS_RATIO_OF_PARENT,
 HINT_SIZE_WINDOW_AS_RATIO_OF_FIELD, 
 HINT_USE_INITIAL_BOUNDS_WHEN_RESTORED
 
-GenClass has a number of hints used by the window classes to determine 
+**GenClass** has a number of hints used by the window classes to determine 
 the size of the window object initially and how the window is allowed to be 
 resized on the screen. Specific UIs can override these hints when necessary 
 or when they conflict with the UI's specifications. These hints are listed 
@@ -1203,14 +1201,14 @@ combined size of its children.
 
 HINT_SIZE_WINDOW_AS_RATIO_OF_PARENT  
 This hint sizes the window to a ratio of its parent window. It 
-takes a single parameter of type SpecWinSizePair, described 
+takes a single parameter of type **SpecWinSizePair**, described 
 under HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT. 
 Instead of coordinates, however, the ratios in the structure are 
 width and height.
 
 HINT_SIZE_WINDOW_AS_RATIO_OF_FIELD  
 This hint sizes the window to a ratio of the field window's size. 
-It takes a SpecWinSizePair parameter indicating the ratio. 
+It takes a **SpecWinSizePair** parameter indicating the ratio. 
 See above.
 
 HINT_USE_INITIAL_BOUND_WHEN_RESTORED  

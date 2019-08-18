@@ -9,11 +9,10 @@ indirectly certain structures which are maintained as internal to the kernel.
 This chapter is an overview of the use of handles in GEOS. Before you read 
 this chapter, you should be familiar with PC architecture; in particular, you 
 should understand the segment:offset scheme of addressing memory 
-(discussed in section A.2.1 of Appendix A). This section sketches some basic 
+(discussed in [section A.2.1 of Appendix A](chardw.md). This section sketches some basic 
 principles of memory usage and data manipulation. These topics are covered 
 in greater detail in other chapters in this book, particularly in the chapters 
-on Memory Management ("Memory Management," Chapter 15) and Local 
-Memory management ("Local Memory," Chapter 16).
+on ["Memory Management," Chapter 15](cmemory.md) and ["Local Memory," Chapter 16](clmem.md).
 
 ### 14.1 Design Philosophy
 
@@ -96,9 +95,9 @@ session.
 
 Sometimes several threads will be using the same global handle, and they 
 will need to synchronize their access to it. They can arrange this by using the 
-HandleP() and HandleV() routines. These routines are most often used to 
+**HandleP()** and **HandleV()** routines. These routines are most often used to 
 synchronize access to a global memory block; for this reason, they are 
-documented in section 15.3.6 of "Memory Management," Chapter 15.
+documented in [section 15.3.6 of "Memory Management," Chapter 15](cmemory.md#1536-memory-management).
 
 ### 14.3 Local Handles
 
@@ -106,13 +105,11 @@ Many handles are not kept in the global handle table. For example, a block
 of memory may be declared as a "local-memory (LMem) heap." An LMem 
 heap can contain many different chunks of data; the LMem manager moves 
 these chunks around to make room for new ones. Each chunk is referenced 
-via a chunk handle. (For more details about LMem heaps, see "Local 
-Memory," Chapter 16.)
+via a chunk handle. (For more details about LMem heaps, see ["Local Memory," Chapter 16](clmem.md).)
 
 Local handle tables are useful when a handle needs to persist across GEOS 
 shutdowns. For example, data in VM files is accessed by its block handle. 
-These handles therefore need to remain the same every time the file is 
-opened.
+These handles therefore need to remain the same every time the file is opened.
 
 Some local handle tables are intended to be directly accessible to geodes. For 
 example, LMem Chunk handles are simply offsets into the block containing 
@@ -121,10 +118,10 @@ value, which is the offset to the chunk. This scheme is part of the LMem API.
 Geodes which are written in assembly generally look up chunk handles 
 themselves, instead of calling a system routine to translate the chunk handle 
 into an address. (Goc code generally dereferences a chunk handle with a call 
-to LMemDeref().) Some other local handle tables are intended to be opaque 
+to **LMemDeref()**.) Some other local handle tables are intended to be opaque 
 to geodes. For example, applications treat VM block handles as opaque 16-bit 
 tokens; to dereference a VM handle, a geode must pass it to an appropriate 
-system routine (such as VMLock()).
+system routine (such as **VMLock()**).
 
 Local handles are used by many different libraries; among them are the 
 LMem, VM, Database, and Cell libraries. The details differ with each library; 

@@ -18,7 +18,7 @@ You will need to know the information in this appendix if you will be
 writing a multi-threaded application. The information in the appendix is 
 not essential if your application will be single-threaded or if you will use 
 the standard GEOS dual-thread architecture. For a dual-thread 
-application, be careful not to send a message with @call from an object run 
+application, be careful not to send a message with **@call** from an object run 
 by a user interface thread to an object run by any other thread of the 
 application.
 
@@ -184,8 +184,8 @@ message handler from the object's class definition.
 
 Messages can also be sent to the thread itself rather than to an object 
 created by the thread. When the thread is created, it is assigned a 
-class-normally a subclass of ProcessClass (for non-application threads) 
-or GenProcessClass (for application threads)-to determine the handlers 
+class-normally a subclass of **ProcessClass** (for non-application threads) 
+or **GenProcessClass** (for application threads)-to determine the handlers 
 to use when messages are sent directly to the thread. In this sense, the 
 thread can be considered an instance of the given class.
 
@@ -313,11 +313,11 @@ handle messages sent to certain objects or to run procedural code.
 ##### B.4.1.1 The Application's Primary Thread
 
 The application's primary thread is created automatically by GEOS when 
-the application is launched. (See "Applications and Geodes," Chapter 6 for 
-information on launching applications.) For example, if a user 
+the application is launched. (See ["Applications and Geodes", Chapter 6](cappl.md) 
+for information on launching applications.) For example, if a user 
 double-clicks on your application's icon in a GeoManager window, 
-GeoManager calls the library routine UserLoadApplication(), specifying 
-the geode file and certain other parameters. This calls the GeodeLoad() 
+GeoManager calls the library routine **UserLoadApplication()**, specifying 
+the geode file and certain other parameters. This calls the **GeodeLoad()** 
 routine in the GEOS kernel.
 
 If the program is written using the single-thread model, GEOS creates an 
@@ -338,23 +338,23 @@ ThreadAttachToQueue()
 To create an event-driven thread (one that handles messages sent to 
 certain objects), send a MSG_PROCESS_CREATE_EVENT_THREAD to your 
 application's primary thread, passing as arguments the object class for the 
-new thread (a sublass of ProcessClass) and the stack size for the new 
+new thread (a sublass of **ProcessClass**) and the stack size for the new 
 thread (1 K bytes is usually a good value, or around 3 K bytes for threads 
 that will handle keyboard navigation or manage a text object). This 
-message is detailed in "System Classes," Chapter 1 of the Object Reference 
-Book.
+message is detailed in ["System Classes", Chapter 1 of the Object Reference 
+Book](../Objects/osyscla.md).
 
 GEOS will create the new thread, give it an event queue, and send it a 
 MSG_META_ATTACH. Initially, the thread will handle only messages sent 
 to the thread itself. If the thread creates any new objects, however, it will 
 handle messages sent to those objects as well. To control the behavior of the 
-new thread, define a subclass of ProcessClass and a new handler for 
+new thread, define a subclass of **ProcessClass** and a new handler for 
 MSG_META_ATTACH. The new handler can create objects or perform 
 whatever task is needed. Be sure to start your new handler with 
-@callsuper() so that the predefined initializations are done as well.
+**@callsuper()** so that the predefined initializations are done as well.
 
 If you have a thread that you want attached to a different event queue, you 
-can use ThreadAttachToQueue(). This routine is not widely used except 
+can use **ThreadAttachToQueue()**. This routine is not widely used except 
 when applications are shutting down and objects need to continue handling 
 messages while not returning anything. It's unlikely you will ever use this 
 routine.
@@ -364,7 +364,7 @@ routine.
 ThreadCreate()
 
 To create a thread to run procedural code, first load the initial function into 
-fixed memory. Then call the system routine ThreadCreate(), passing the 
+fixed memory. Then call the system routine **ThreadCreate()**, passing the 
 following arguments: The base priority for the new thread, an optional 
 sixteen-bit argument to pass to the new thread, the entry point for the code, 
 the amount of stack space GEOS should allocate for the new thread, and the 
@@ -379,10 +379,10 @@ given the thread's handle. The handle is provided by the routines that
 create threads, and it can be provided by one thread to another in a 
 message. The following system routines relate to the priority of a thread:
 
-ThreadGetInfo() returns information about a thread. When calling 
-ThreadGetInfo(), pass the handle of the thread in question and a value 
-of the type ThreadGetInfoType (see below). If zero is passed as the 
-thread handle, ThreadGetInfo() returns information on whatever thread 
+**ThreadGetInfo()** returns information about a thread. When calling 
+**ThreadGetInfo()**, pass the handle of the thread in question and a value 
+of the type **ThreadGetInfoType** (see below). If zero is passed as the 
+thread handle, **ThreadGetInfo()** returns information on whatever thread 
 executed the call.
 
 ThreadGetInfoType is an enumerated type with three possible values:
@@ -401,7 +401,7 @@ This requests the handle of the event queue for an
 event-driven thread. It returns a zero handle if the thread is 
 not event-driven.
 
-ThreadModify() changes the priority of a thread. The arguments to pass 
+**ThreadModify()** changes the priority of a thread. The arguments to pass 
 include the handle of the thread to modify (zero for the thread executing 
 the call), a new base priority for the thread, and two flags: One that 
 indicates whether to change the thread's base priority and one that 
@@ -440,7 +440,7 @@ ThreadHandleException(), ThreadException
 
 Some threads in GEOS will want to handle certain errors in special ways. 
 The errors a particular thread can intercept and handle are listed in an 
-enumerated type called ThreadException, the elements of which are 
+enumerated type called **ThreadException**, the elements of which are 
 shown below:
 
 + TE_DIVIDE_BY_ZERO
@@ -456,11 +456,11 @@ shown below:
 + TE_BREAKPOINT
 
 A thread can handle a particular exception by setting up a special handler 
-routine and calling ThreadHandleException() when one of these 
+routine and calling **ThreadHandleException()** when one of these 
 exceptions occurs. This is useful if a number of objects are run by the same 
 thread and all should handle a particular exception in the same way; the 
 routine can be thread-specific rather than object-specific. 
-ThreadHandleException() must be passed the thread's handle, the 
+**ThreadHandleException()** must be passed the thread's handle, the 
 exception type, and a pointer to the handler routine's entry point.
 
 #### B.4.4 When a Thread Is Finished
@@ -468,7 +468,7 @@ exception type, and a pointer to the handler routine's entry point.
 ThreadDestroy()
 
 Whenever an application creates an additional thread with 
-MSG_PROCESS_CREATE_EVENT_THREAD or ThreadCreate(), it must be 
+MSG_PROCESS_CREATE_EVENT_THREAD or **ThreadCreate()**, it must be 
 sure that the thread exits when it is finished. Simply exiting the 
 application may not eliminate any additional threads, and these threads 
 can cause GEOS to hang when shutting down the system.
@@ -479,7 +479,7 @@ needed. Resources in memory do not have to be freed in the same thread
 that allocated them, but you should be sure that they are freed before the 
 application exits.
 
-A procedural thread exits by calling ThreadDestroy() with two 
+A procedural thread exits by calling **ThreadDestroy()** with two 
 arguments: an error code and an optr. When the thread exits, it sends (as 
 its last act) a MSG_PROCESS_NOTIFY_THREAD_EXIT to the application's 
 primary thread and a MSG_META_ACK to the object descriptor passed. 
@@ -490,14 +490,14 @@ MSG_META_ACK (in any class) for communication among threads, and you
 may use the error code for any data you choose. The convention is that an 
 error code of zero represents successful completion of a thread's task.
 
-An event-driven thread should not call ThreadDestroy() directly because 
+An event-driven thread should not call **ThreadDestroy()** directly because 
 its event queue must be removed from the system cleanly. Instead, send a 
 MSG_META_DETACH to the thread, passing the same arguments as for 
-ThreadDestroy(). The handler for MSG_META_DETACH in MetaClass 
+**ThreadDestroy()**. The handler for MSG_META_DETACH in **MetaClass** 
 cleanly removes the event queue and terminates the thread, sending the 
 same messages as described above. You may write a special handler for 
-MSG_META_DETACH when you subclass ProcessClass, but be sure to end 
-the handler with @callsuper() so the thread exits properly.
+MSG_META_DETACH when you subclass **ProcessClass**, but be sure to end 
+the handler with **@callsuper()** so the thread exits properly.
 
 ### B.5 Synchronizing Threads
 
@@ -584,17 +584,17 @@ semaphore "above" one it already has locked.
 thread needs to wait until another performs a specific action. The first 
 thread is said to "block" on the second. Of course, two threads must 
 never block on each other. To ensure this situation never arises, only 
-one of the threads should use the @call keyword when sending 
-messages to the other; the other should always use @send and, when 
+one of the threads should use the **@call** keyword when sending 
+messages to the other; the other should always use **@send** and, when 
 getting return information, have some sort of notification message sent 
 in response.
 
-+ When using the GEOS messaging system to send a message with @call 
++ When using the GEOS messaging system to send a message with **@call** 
 to an object in another thread, the sending thread automatically blocks 
 on the receiving thread. Since a number of user interface objects must 
-be sent messages with @call, the application thread sometimes blocks 
+be sent messages with **@call**, the application thread sometimes blocks 
 on the user interface thread. To avoid deadlock, code that runs in the 
-user interface thread must never send messages with @call to objects 
+user interface thread must never send messages with **@call** to objects 
 in the application thread. (This is a particular example of the above 
 rule being implemented.)
 
@@ -640,7 +640,7 @@ block and wait for more buffers.
 ThreadAllocSem(), ThreadPSem(), ThreadPTimedSem(), 
 ThreadVSem(), ThreadFreeSem()
 
-To create a semaphore, simply call the routine ThreadAllocSem(), 
+To create a semaphore, simply call the routine **ThreadAllocSem()**, 
 passing an initial value for the semaphore. This should normally be one to 
 indicate the semaphore is unlocked. If you want the semaphore to be locked 
 initially, pass an initial value of zero. In either case, the returned value will 
@@ -648,28 +648,28 @@ be the handle of the newly created semaphore. Use this handle with the
 routines described below.
 
 Once a semaphore is created, a thread can lock it (i.e., perform the "P" 
-operation) by calling the routine ThreadPSem(), passing the semaphore's 
+operation) by calling the routine **ThreadPSem()**, passing the semaphore's 
 handle as an argument. If the semaphore is unlocked, the thread locks it 
 and proceeds; otherwise the thread waits in the semaphore's thread queue.
 
-Another routine that performs the "P" operation is ThreadPTimedSem(). 
+Another routine that performs the "P" operation is **ThreadPTimedSem()**. 
 When calling this routine, pass as arguments the semaphore's handle and 
 an integer representing a number of ticks. This integer is a time limit: If 
 another thread has the semaphore locked and does not unlock it within the 
 specified number of ticks, the routine will return with a flag indicating the 
-lock was unsuccessful. Programs that use ThreadPTimedSem() must 
+lock was unsuccessful. Programs that use **ThreadPTimedSem()** must 
 check this flag and must not perform the protected operation if it is set. The 
 most common use of this routine is with a time limit of zero, meaning that 
 the semaphore should be locked only if it is available right away-if it is 
 not available, the thread will continue with some other action.
 
 To release the semaphore (by performing the "V" operation), the thread 
-calls ThreadVSem(), again passing the semaphore's handle. If there are 
+calls **ThreadVSem()**, again passing the semaphore's handle. If there are 
 other threads waiting for the semaphore, the one with the lowest current 
 priority number takes over.
 
 When a semaphore is no longer needed, it can be destroyed by calling 
-ThreadFreeSem() with the semaphore's handle as an argument.
+**ThreadFreeSem()** with the semaphore's handle as an argument.
 
 ##### B.5.2.2 Operations on a Thread Lock
 
@@ -685,13 +685,13 @@ lock, it will wait until the first thread has performed the "V" operation once
 for each time it has run the "P" operation. It is possible to write reentrant 
 routines using thread locks but not using regular semaphores.
 
-A thread lock is initialized with the ThreadAllocThreadLock() routine, 
+A thread lock is initialized with the **ThreadAllocThreadLock()** routine, 
 which takes no arguments. A thread lock is always created unlocked. To 
 perform the "P" and "V" operation on a thread lock, use 
-ThreadGrabThreadLock() and ThreadReleaseThreadLock(), 
+**ThreadGrabThreadLock()** and **ThreadReleaseThreadLock()**, 
 respectively, and pass the semaphore's handle as an argument. These 
-routines are analogous to ThreadPSem() and ThreadVSem() for 
+routines are analogous to **ThreadPSem()** and **ThreadVSem()** for 
 semaphores. When a thread lock is no longer needed, it should be freed 
-with a call to ThreadFreeThreadLock().
+with a call to **ThreadFreeThreadLock()**.
 
 [Machine Architecture](chardw.md) <-- &nbsp;&nbsp; [table of contents](../concepts.md) &nbsp;&nbsp; --> [Libraries](clibr.md)

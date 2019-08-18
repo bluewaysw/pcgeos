@@ -13,9 +13,9 @@ are special LMem chunks which are stored in a special type of LMem heap
 (called an object block). Most of the routines which work on chunks can also 
 be used on objects.
 
-Before you read this chapter, you should be familiar with the use of handles 
-in GEOS and with the 80x86's segment:offset memory referencing. You should 
-also be familiar with the global memory manager (see "Memory Management," Chapter 15).
+Before you read this chapter, you should be familiar with the use of handles in 
+GEOS and with the 80x86's segment:offset memory referencing. You should also be 
+familiar with the global memory manager (see ["Memory Management", Chapter 15](cmemory.md)).
 
 ### 16.1 Design Philosophy
 
@@ -53,9 +53,10 @@ makes it easy to add or delete objects dynamically.
 
 A local memory heap looks and acts much like the global heap. However, it is 
 contained entirely within a single memory block. This block is initialized 
-with a 16-byte LMemBlockHeader (described on page 577), a local memory 
-handle table, and a local memory heap. Optionally, a space for data may be 
-allocated between the header and the handle table.
+with a 16-byte **LMemBlockHeader** (described in "Using Local Memory Heaps"]
+(#163-using-local-memory-heaps)), a local memory handle table, and a local 
+memory heap. Optionally, a space for data may be allocated between the header 
+and the handle table.
 
 Each allocated section of memory within a local heap is called a chunk, and 
 the handles of these chunks are called chunk handles. See Figure 16-1 
@@ -97,7 +98,7 @@ initialize an LMem heap, you can specify that it should never be resized; this
 is advisable if the heap is in a fixed block.
 
 A virtual-memory file block may contain an LMem heap. For details on this, 
-see "Virtual Memory," Chapter 18.
+see ["Virtual Memory," Chapter 18](cvm.md).
 
 #### 16.2.2 Chunks and Chunk Handles
 
@@ -107,7 +108,7 @@ containing the local memory heap; thus, the segment address of the locked
 heap, combined with the chunk handle, make up a pointer to a location 
 within the local memory heap's chunk handle table. That location contains 
 another offset which, when combined with the segment address of the block, 
-composes a far-pointer to the actual chunk. Figure 16-2 on page l 573 shows 
+composes a far-pointer to the actual chunk. Figure 16-2 shows 
 the use of a chunk handle to access a chunk.
 
 Chunks are movable within the local heap; whenever a chunk is created or 
@@ -127,7 +128,7 @@ Objects are special kinds of LMem chunks. An optr is simply the global
 memory handle of an LMem heap followed by the chunk handle of an object. 
 For this reason, many LMem routines come in two formats: one which is 
 passed an optr, and one which is passed the global and chunk handles. There 
-is also a macro, ConstructOptr(), which is passed a memory handle and a 
+is also a macro, **ConstructOptr()**, which is passed a memory handle and a 
 chunk handle and returns an optr constructed from the two.
 
 ![](Art/figure_16-2.png)
@@ -144,7 +145,7 @@ LMemType, LMemFlags
 
 In addition to being used for general memory needs, local memory heaps 
 perform many specific functions in the GEOS system. When an LMem heap 
-is created, a member of the LMemType enumerated type is passed, 
+is created, a member of the **LMemType** enumerated type is passed, 
 indicating to what use the LMem heap will be put. Several types are 
 available:
 
@@ -173,17 +174,17 @@ A GState is an LMem heap. The GState information is in the
 header, and the application clip-rectangle is stored in a chunk. 
 Applications do not directly create GState blocks; rather, they 
 call a GState creation routine, which creates the block. (See 
-"Graphics Environment," Chapter 23.)
+["Graphics Environment," Chapter 23](cgraph.md).)
 
 LMEM_TYPE_FONT_BLOCK  
 Font blocks are stored as LMem heaps. Applications do not 
 create font blocks directly.
 
 LMEM_TYPE_GSTRING  
-Whenever a GString is created or loaded, a GString LMem 
-heap is created, and elements are added as chunks. The heap 
-is created automatically by the GString routines; applications 
-should not create GString blocks. (See section 23.8 of chapter 23.)
+Whenever a GString is created or loaded, a GString LMem heap is created, 
+and elements are added as chunks. The heap is created automatically by 
+the GString routines; applications should not create GString blocks. 
+(See [section 23.8 of chapter 23](cgraph.md#238-graphics-strings).)
 
 LMEM_TYPE_DB_ITEMS  
 The Virtual Memory mechanism provides routines to create 
@@ -192,14 +193,14 @@ dynamically allocated and are saved with the VM file. These
 items are stored in special database LMem heaps, which are 
 created in special database blocks in the VM file. Applications 
 do not directly allocate DB blocks; rather, they call DB routines, 
-which see to it that the blocks are created. (See "Database 
-Library," Chapter 19.)
+which see to it that the blocks are created. (See ["Database 
+Library," Chapter 19](cdb.md).)
 
 When an LMem heap is allocated, certain flags are passed to indicate 
 properties the heap should have. Some of these flags are passed only for 
 system-created heaps. The flags are stored in a word-length record 
-(LocalMemoryFlags); the record also contains flags indicating the current 
-state of the heap. The LocalMemoryFlags are listed below:
+(**LocalMemoryFlags**); the record also contains flags indicating the current 
+state of the heap. The **LocalMemoryFlags** are listed below:
 
 LMF_HAS_FLAGS  
 Set if the block has a chunk containing only flags. This flag is 
@@ -217,7 +218,7 @@ file.
 
 LMF_DUPLICATED  
 Set if block is an object block created by the 
-ObjDuplicateResource() routine. This flag should not be set 
+**ObjDuplicateResource()** routine. This flag should not be set 
 by applications.
 
 LMF_RELOCATED  
@@ -244,11 +245,11 @@ by applications.
 
 LMF_NO_HANDLES  
 Set if block does not use chunk handles. A block can be set to 
-simulate the C malloc() routine; in this case, chunks are not 
+simulate the C **malloc()** routine; in this case, chunks are not 
 relocated after being created, so chunk handles are not needed. 
-Ordinarily, these blocks are created by the malloc() routine, 
-not by applications. (See the discussion of malloc() in section 
-15.4 of chapter 15.)
+Ordinarily, these blocks are created by the **malloc()** routine, 
+not by applications. (See the discussion of **malloc()** in [section 
+15.4 of chapter 15](cmemory.md#154-malloc).)
 
 LMF_NO_ENLARGE  
 Indicates that the local-memory routines should not enlarge 
@@ -261,7 +262,7 @@ Set if local memory routines should return errors when
 allocation requests cannot be fulfilled. If the flag is not set, 
 allocation routines will fatal-error if they cannot comply with 
 requests. This flag is generally clear for expandable LMem 
-blocks, since many system routines (such as ObjInstantiate()) 
+blocks, since many system routines (such as **ObjInstantiate()**) 
 are optimized in such a way that they cannot deal with LMem 
 allocation errors.
 
@@ -269,7 +270,7 @@ LMF_DEATH_COUNT
 This field occupies the least significant three bits of the flag 
 field. It means nothing if the value is zero. If it is non-zero, it 
 indicates the number of remove-block messages left which 
-must hit BlockDeathCommon before it will free the block. 
+must hit **BlockDeathCommon** before it will free the block. 
 This flag is used by the handlers for MSG_FREE_DUPLICATE 
 and MSG_REMOVE_BLOCK.
 
@@ -289,18 +290,18 @@ such as chunk arrays or database blocks. However, even if you use these
 mechanisms, you should be familiar with this section; this will help you 
 understand how the other mechanisms work.
 
-Remember that every local memory heap resides in a global memory block. 
-All the rules for using memory blocks apply. (See "Memory Etiquette")
+Remember that every local memory heap resides in a global memory block. All the 
+rules for using memory blocks apply. (See ["Memory Etiquette"](cmemory.md#1531-memory-etiquette))
 
 #### 16.3.1 Creating a Local Heap
 
 LMemInitHeap(), MemAllocLMem()
 
 Before you create a local heap, you must first allocate and lock a block on the 
-global heap using MemAlloc() and MemLock(). (Alternatively, you can 
-allocate a fixed block.) Then, you must call LMemInitHeap().
+global heap using **MemAlloc()** and **MemLock()**. (Alternatively, you can 
+allocate a fixed block.) Then, you must call **LMemInitHeap()**.
 
-LMemInitHeap() creates and initializes a local memory heap. It must be 
+**LMemInitHeap()** creates and initializes a local memory heap. It must be 
 passed several arguments:
 
 + The handle of a locked or fixed block which will contain the local memory 
@@ -312,20 +313,20 @@ created large enough to accommodate the heap.
 
 + The offset within the block where the local heap's handle table will begin. 
 The local heap will fill the space to the end of the block; any data between 
-the LMemBlockHeader and the indicated offset will be zero-initialized. 
+the **LMemBlockHeader** and the indicated offset will be zero-initialized. 
 If an application will not need a fixed data space, it should specify an 
 offset of zero; the handle table will then be put immediately after the 
-LMemBlockHeader. Often, when an application needs a fixed data 
+**LMemBlockHeader**. Often, when an application needs a fixed data 
 space, it will define a special structure, the first element of which is an 
-LMemBlockHeader, and will pass the size of that structure as the 
+**LMemBlockHeader**, and will pass the size of that structure as the 
 offset. It can then access the fixed data by using the fields of the 
 structure. If the offset specified is non-zero but is less than the size of an 
-LMemBlockHeader, LMemInitHeap() will return an error.
+**LMemBlockHeader**, LMemInitHeap() will return an error.
 
 + A member of the LMemType enumerated type, specifying the type of 
-block to be created (see page 573).
+block to be created (see ["Types of LMem Heaps"](#1623-types-of-lmem-heaps)).
 
-+ A word of LocalMemoryFlags for the heap. (See page 575.)
++ A word of LocalMemoryFlags for the heap. (See ["Types of LMem Heaps"](#1623-types-of-lmem-heaps))
 
 + A word specifying the number of chunk handles to leave room for in the 
 starter handle table. When these chunks have all been allocated, the 
@@ -341,21 +342,21 @@ chunks will expand to the end of the block, and (if necessary) the block
 itself will be expanded. Applications should generally pass the constant 
 STD_LMEM_INIT_HEAP.
 
-LMemInitHeap() creates the LMemBlockHeader and the chunk handle 
+**LMemInitHeap()** creates the **LMemBlockHeader** and the chunk handle 
 table. It also creates a single free chunk; more chunks will automatically be 
 created as needed. It may resize the block passed (unless the flag 
 LMF_NO_ENLARGE is passed); therefore, any pointers to the block may 
 become invalid. It does not return anything.
 
 If you want to create a memory block and initialize it as an LMem heap in 
-one operation, call MemAllocLMem(). This routine takes two arguments: a 
-member of the LMemType enumerated type, and the amount of space to 
+one operation, call **MemAllocLMem()**. This routine takes two arguments: a 
+member of the **LMemType** enumerated type, and the amount of space to 
 leave for the header (again, a zero size indicates that the default header size 
-should be used). MemAllocLMem() allocates a movable, swapable block in 
+should be used). **MemAllocLMem()** allocates a movable, swapable block in 
 the global heap, then initializes an LMem heap in that block. If you specify 
-an LMemType of LMEM_TYPE_OBJ_BLOCK, MemAllocLMem() will pass 
+an **LMemType** of LMEM_TYPE_OBJ_BLOCK, **MemAllocLMem()** will pass 
 the STD_LMEM_OBJECT_FLAGS flags; otherwise, it will pass a clear 
-LocalMemoryFlags record.
+**LocalMemoryFlags** record.
 
 #### 16.3.2 Using Chunks
 
@@ -369,9 +370,9 @@ Once a local heap has been initialized, you can allocate, use, and free chunks
 at will. Chunks can only be manipulated while the block containing the 
 LMem heap is fixed or locked on the global heap.
 
-LMemAlloc() allocates a new chunk on the local heap. It is passed the 
+**LMemAlloc()** allocates a new chunk on the local heap. It is passed the 
 handle of the block containing the heap and the size of the chunk needed. 
-LMemAlloc() returns the handle of the new chunk (which must then be 
+**LMemAlloc()** returns the handle of the new chunk (which must then be 
 dereferenced before the chunk is used). The size requested will be rounded 
 up as necessary to ensure that the chunks are dword-aligned. An additional 
 two bytes will be allocated to store the size of the chunk; these bytes will be 
@@ -390,28 +391,28 @@ identical. Indeed, in assembly there is only a single version of each routine;
 the only difference is in how the C routines take their parameters.
 
 Once you have allocated a chunk, you must dereference its chunk handle in 
-order to use it. You can do this with LMemDeref(). This routine takes a 
+order to use it. You can do this with **LMemDeref()**. This routine takes a 
 singe parameter, namely the optr. It returns a pointer to the data portion of 
 the chunk (after the size word). This pointer will remain valid until the block 
 is unlocked or until a routine is called which can cause block resizing or heap 
-compaction (e.g. LMemAlloc()). Since these routines can invalidate 
+compaction (e.g. **LMemAlloc()**). Since these routines can invalidate 
 chunk-pointers, it is important that data-synchronization routines be used if 
 more than one thread is accessing the heap; otherwise, one thread may cause 
 the heap to be shuffled while another thread is trying to read from it. The 
 version which takes handles is named LMemDerefHandles().
 
 When you are done using a chunk of memory, you should free it with 
-LMemFree(). This routine is passed an optr; it does not return anything. It 
+**LMemFree()**. This routine is passed an optr; it does not return anything. It 
 does not resize the block or shuffle chunks; therefore, pointers to other 
-chunks will not be invalidated by LMemFree(). The version which takes 
-handles is named LMemFreeHandles().
+chunks will not be invalidated by **LMemFree()**. The version which takes 
+handles is named **LMemFreeHandles()**.
 
 You can find out the size of any chunk by calling the routine 
-LMemGetChunkSize(). This routine is passed an optr; it returns the size 
+**LMemGetChunkSize()**. This routine is passed an optr; it returns the size 
 of the chunk in bytes (not counting the chunk's size word). The version which 
-takes handles is named LMemGetChunkSizeHandles().
+takes handles is named **LMemGetChunkSizeHandles()**.
 
-Chunks can be resized after creation. The Boolean routine LMemReAlloc() 
+Chunks can be resized after creation. The Boolean routine **LMemReAlloc()** 
 takes two arguments, namely an optr and the new size of the chunk. If the 
 new size is larger than the old one, bytes will be added to the end of the 
 chunk; chunks may be shuffled and the block may be resized, so all pointers 
@@ -420,21 +421,21 @@ new chunk size is smaller than the old one, the chunk will be truncated;
 pointers to chunks will not be invalidated. This routine will fail only if the 
 LMem heap ran out of space and could not be resized. In this case, it will 
 return non-zero without changing the chunk. If it succeeds, it returns zero. 
-The version which takes handles is called LMemReAllocHandles().
+The version which takes handles is called **LMemReAllocHandles()**.
 
 You can add bytes inside a chunk with the Boolean routine 
-LMemInsertAt(). This routine takes three arguments: the optr, an offset 
+**LMemInsertAt()**. This routine takes three arguments: the optr, an offset 
 within the chunk, and the number of bytes to add. The new space is added 
 beginning at the specified offset; it is initialized to zeros. This may cause 
 chunks to be shuffled and/or the block to be expanded; pointers to chunks are 
 therefore invalidated. Note that it is your responsibility to make sure that 
 the offset within the chunk really is in the chunk; otherwise, results are 
-undefined. If LMemInsertAt() fails (because the LMem heap ran out of 
+undefined. If **LMemInsertAt()** fails (because the LMem heap ran out of 
 space and could not be expanded), it returns non-zero without changing the 
 chunk; otherwise it returns zero. The version which takes handles is named 
-LMemInsertAtHandles().
+**LMemInsertAtHandles()**.
 
-You can delete bytes within a chunk with the routine LMemDeleteAt(). 
+You can delete bytes within a chunk with the routine **LMemDeleteAt()**. 
 This routine takes three arguments: the optr, the offset within the chunk of 
 the first byte to be deleted, and the number of bytes to delete. This routine 
 does not invalidate pointers to chunks. The routine does not return anything. 
@@ -442,7 +443,7 @@ Note that it is your responsibility to make sure that all the bytes to be delete
 are within the chunk, i.e. that the offset and number of bytes passed do not 
 specify bytes that are beyond the end of the chunk. If you fail to do this, 
 results are undefined. The version which takes handles is named 
-LMemDeleteAtHandles().
+**LMemDeleteAtHandles()**.
 
 #### 16.3.3 Contracting the LMem Heap
 
@@ -451,7 +452,7 @@ LMemContract()
 The local memory manager routines ordinarily take care of heap compaction. 
 However, you can also order compaction at will.
 
-The routine LMemContract() compacts the heap and then frees all the 
+The routine **LMemContract()** compacts the heap and then frees all the 
 unused heap space (by truncating the block with the LMem heap). The 
 routine takes one argument, namely the handle of the (locked or fixed) block 
 containing the LMem heap. It shuffles all the chunks, thus invalidating 
@@ -586,8 +587,8 @@ The chunk array is implemented on top of the LMem routines. The entire
 array is a single chunk in a local memory heap (hence the name). It therefore 
 has a maximum total size of somewhat less than 64K, and memory efficiency 
 drops significantly if it is larger than roughly 6K. If you need a larger array, 
-you should use a Huge Array (see section 18.5 of chapter 18). If you will be 
-using the chunk array routines, you should include chunkarr.h.
+you should use a Huge Array (see [section 18.5 of chapter 18](cvm.md#195-huge-arrays)). 
+If you will be using the chunk array routines, you should include chunkarr.h.
 
 ##### 16.4.1.1 Structure of the Chunk Array
 
@@ -596,7 +597,7 @@ with a special header structure which specifies certain characteristics of the
 chunk array: the number of elements in the array, the size of each element 
 (or zero for variable sized arrays), the offset from the start of the chunk to the 
 first element, and the offset from the first element to the end of the array. The 
-header is a structure of type ChunkArrayHeader; an application can 
+header is a structure of type **ChunkArrayHeader**; an application can 
 examine the fields of this structure directly or by using chunk array routines. 
 The creating application can request that the chunk array contain some 
 blank space between the header and the first element; it can use that space 
@@ -604,8 +605,8 @@ however it likes.
 
 Elements can be referenced by index number. The first element has index 
 number zero. You can translate element numbers to pointers, and vice versa, 
-by calling ChunkArrayElementToPtr() and 
-ChunkArrayPtrToElement() (see section 16.4.1.3 on page 587).
+by calling **ChunkArrayElementToPtr()** and 
+**ChunkArrayPtrToElement()** (see [section 16.4.1.3](#16413-adding-removing-and-accessing-elements)).
 
 A uniform-size chunk array has a simple structure. After the header (and the 
 extra space, if any) come the elements. They follow one after another, with no 
@@ -658,37 +659,37 @@ the heap the same way you would any general LMem heap. The heap should
 probably be left resizable, since that way it will be able to grow to 
 accommodate the chunk array.
 
-Once you have created the heap, use the routine ChunkArrayCreate() to 
+Once you have created the heap, use the routine **ChunkArrayCreate()** to 
 create the chunk array. This routine will allocate a chunk for the chunk 
 array, initialize the array, and return the chunk handle. Since the routine 
 allocates a chunk, it can cause chunk shuffling or heap resizing; thus, all 
 pointers to the heap are invalidated. 
 
-ChunkArrayCreate() takes three arguments:
+**ChunkArrayCreate()** takes three arguments:
 
 + The handle of a locked block containing the LMem heap;
 
 + The size of each element, or zero if the elements are variable-size; and
 
 + The size of the header for the chunk array. If you pass zero, the routine 
-will automatically leave enough space for a ChunkArrayHeader 
+will automatically leave enough space for a **ChunkArrayHeader** 
 structure; if you pass a non-zero argument, it must be larger than the 
-size of a ChunkArrayHeader. If you will need a data space at the start 
+size of a **ChunkArrayHeader**. If you will need a data space at the start 
 of the array, it is a good idea to define a structure, the first element of 
-which is a ChunkArrayHeader, and use that structure to access the 
+which is a **ChunkArrayHeader**, and use that structure to access the 
 fixed data area; you can then pass the size of that structure as this 
 argument.
 
 There is another version of this routine which creates a chunk array in an 
-existing chunk. This routine, ChunkArrayCreateAt(), takes three 
+existing chunk. This routine, **ChunkArrayCreateAt()*, takes three 
 arguments, namely an optr indicating the chunk, the size of each element, 
 and the size of the header. It allocates a chunk array in that chunk, resizing 
 it if necessary, and returns the chunk's handle. Any data in the chunk may 
 be overwritten (except for whatever data falls in the header area after the 
-ChunkArrayHeader). The version which takes handles is called 
-ChunkArrayCreateAtHandles().
+**ChunkArrayHeader**). The version which takes handles is called 
+**ChunkArrayCreateAtHandles()**.
 
-When you are done with a chunk array, you can free it with LMemFree() the 
+When you are done with a chunk array, you can free it with **LMemFree()** the 
 way you would any other chunk.
 
 ##### 16.4.1.3 Adding, Removing, and Accessing Elements
@@ -718,8 +719,8 @@ in two formats: one in which the chunk is specified with an optr, and one in
 which it is specified with the global memory handle and the chunk handle.
 
 Adding elements to a chunk array is easy. To add an element to the end of a 
-chunk array, use the routine ChunkArrayAppend(). This routine 
-automatically updates the ChunkArrayHeader (and the lookup-table, if 
+chunk array, use the routine **ChunkArrayAppend()**. This routine 
+automatically updates the **ChunkArrayHeader** (and the lookup-table, if 
 elements are variable-sized). The routine takes two arguments, namely the 
 optr and the size of the new element. If the array elements are uniform-sized, 
 the size argument is ignored. The routine will resize the chunk to 
@@ -727,38 +728,38 @@ accommodate the new element, update its header table (and lookup table if
 necessary), and return a pointer to the element. Since the chunk is resized, 
 all other chunk pointers (and pointers within the chunk array) are 
 invalidated. The version which takes handles is named 
-ChunkArrayAppendHandles().
+**ChunkArrayAppendHandles()**.
 
 You can also add an element within the middle of an array. The routine 
-ChunkArrayInsertAt() takes three arguments, namely the optr, a pointer 
+**ChunkArrayInsertAt()** takes three arguments, namely the optr, a pointer 
 to the location at which to insert the element, and the size of the element 
 (ignored for uniform-sized arrays). The routine will insert the appropriate 
 number of bytes at that location in the chunk, update the header and 
 lookup-table, and return a pointer to the new element. Pointers to chunks are 
 invalidated. The version which takes the chunk handle, 
-ChunkArrayInsertAtHandle(), is slightly unusual in that it is passed the 
+**ChunkArrayInsertAtHandle()**, is slightly unusual in that it is passed the 
 chunk handle but not the global memory handle; the routine gets the 
 segment address of the chunk from the passed pointers.
 
-When you are done with an element, free it with ChunkArrayDelete(). 
+When you are done with an element, free it with **ChunkArrayDelete()**. 
 This routine takes two arguments, namely the optr and a pointer to the 
 element to be deleted. It shrinks the chunk; thus, it is guaranteed not to 
 shuffle chunks, so chunk pointers remain valid (though pointers to elements 
 within the chunk array will be invalidated if the elements come after the 
-deleted element). Again, the handle version, ChunkArrayDeleteHandle(), 
+deleted element). Again, the handle version, **ChunkArrayDeleteHandle()**, 
 is passed the chunk handle but not the global handle.
 
 If you need to delete several consecutive elements, call 
-ChunkArrayDeleteRange(). This routine takes three arguments: the optr 
+**ChunkArrayDeleteRange()**. This routine takes three arguments: the optr 
 to the chunk array, the index of the first element to delete, and the number 
 of elements to delete. The specified elements will be deleted. As with 
-ChunkArrayDelete(), the global and local heaps will not be shuffled. The 
-handle version, ChunkArrayDeleteRangeHandles(), is passed the global 
+**ChunkArrayDelete()**, the global and local heaps will not be shuffled. The 
+handle version, **ChunkArrayDeleteRangeHandles()**, is passed the global 
 handle of the LMem heap and the chunk handle of the chunk array instead 
 of the optr to the chunk array.
 
 Elements in variable-sized arrays can be resized after creation with the 
-routine ChunkArrayElementResize(). This routine takes three 
+routine **ChunkArrayElementResize()**. This routine takes three 
 arguments: the optr, the element number, and the new size. The routine 
 resizes the element and updates the lookup table. If the new size is larger 
 than the old, null bytes will be added to the end of the element; chunks may 
@@ -766,34 +767,34 @@ be shuffled, so all chunk pointers are invalidated. If the new size is smaller
 than the old, the element will be truncated. This is guaranteed not to shuffle 
 chunks, so pointers to chunks remain valid, though pointers within the array 
 may be invalidated. The version which takes handles, 
-ChunkArrayElementResizeHandles(), is passed both the global memory 
+**ChunkArrayElementResizeHandles()**, is passed both the global memory 
 handle and the chunk handle.
 
 If you have the index of an element and you want to access that element, use 
-the routine ChunkArrayElementToPtr(). It takes three arguments: the 
+the routine **ChunkArrayElementToPtr()**. It takes three arguments: the 
 optr, the element number, and a pointer to a word-length variable. The 
 routine writes the size of the element in the variable and returns a pointer to 
 the element. (If you are not interested in the element's size, pass a null 
 pointer.) It does not change the chunk in any way, so no pointers are 
 invalidated. If you pass an index which is out-of-bounds, 
-ChunkArrayElementToPtr() will treat it as the index of the last element. 
+**ChunkArrayElementToPtr()** will treat it as the index of the last element. 
 (The constant CA_LAST_ELEMENT is often used for this purpose.) However, 
 the error-checking version will always fatal-error if passed the index 
 CA_NULL_ELEMENT (i.e. 0xffff). The version which takes handles is named 
-ChunkArrayElementToPtrHandles().
+**ChunkArrayElementToPtrHandles()**.
 
 If you know the address of an element and you need to find out its index, use 
-the routine ChunkArrayPtrToElement(). This routine takes two 
+the routine **ChunkArrayPtrToElement()**. This routine takes two 
 arguments, namely the optr and a pointer to the element. It returns the index 
 number of the element. The version which takes the chunk handle, 
 ChunkArrayPtrToElementHandle(), is passed the chunk handle and the 
 pointer but not the global memory handle.
 
 You can copy an element to a specified location with the routine 
-ChunkArrayGetElement(). This routine takes three arguments: the optr, 
+**ChunkArrayGetElement()**. This routine takes three arguments: the optr, 
 the element number, and a pointer to a buffer big enough to hold the entire 
 element. The routine will copy the element to the specified buffer. The 
-version which takes handles is called ChunkArrayGetElementHandles().
+version which takes handles is called **ChunkArrayGetElementHandles()**.
 
 ##### 16.4.1.4 Chunk Array Utilities
 
@@ -804,31 +805,31 @@ ChunkArrayEnumRange(), ChunkArrayEnumRangeHandles(),
 ChunkArraySort(), ArrayQuickSort()
 
 To find out how many elements are in a chunk array, use the routine 
-ChunkArrayGetCount(). This routine takes one argument, namely the 
+**ChunkArrayGetCount()**. This routine takes one argument, namely the 
 optr. It returns the number of elements in the array. It does not change the 
 array; no pointers are invalidated. The version which takes handles is named 
-ChunkArrayGetCountHandles().
+**ChunkArrayGetCountHandles()**.
 
 If you want to delete all elements in the array but you don't want to free the 
-array itself, use the routine ChunkArrayZero(). This routine takes one 
+array itself, use the routine **ChunkArrayZero()**. This routine takes one 
 argument, namely the optr. It does not return anything. This routine deletes 
 all the elements in the array, updates the header and lookup tables, and 
 resizes the chunk. Since the chunk is truncated, no chunks are swapped, so 
 no chunk pointers are invalidated (though pointers to elements are, 
 naturally, invalidated). The version which takes handles is named 
-ChunkArrayZeroHandles().
+**ChunkArrayZeroHandles()**.
 
 If you want to apply a function to every element in the array, use 
-ChunkArrayEnum(). This routine is passed three arguments:
+**ChunkArrayEnum()**. This routine is passed three arguments:
 
 + The optr.
 
 + A pointer to a Boolean callback routine. This routine will be called for 
 each element in succession. This routine must be declared _pascal. If the 
-callback routine ever returns true, ChunkArrayEnum() will 
+callback routine ever returns true, **ChunkArrayEnum()** will 
 immediately return with value true (without checking any more 
 elements). If the callback routine returns false for every element, 
-ChunkArrayEnum() will return with value false. 
+**ChunkArrayEnum()** will return with value false. 
 
 + A pointer which is passed to the callback routine.
 
@@ -838,37 +839,37 @@ The callback routine should be written to take two arguments:
 
 + The pointer passed to ChunkArrayEnum()
 
-ChunkArrayEnum() can be used for many different purposes, depending 
+**ChunkArrayEnum()** can be used for many different purposes, depending 
 on the nature of the callback routine. For example, it can perform some 
 action on every element (in which case it ought always to return false); it can 
 analyze the data in the various elements; it can check to see if any element 
 meets some criterion. If it needs to write its results, it might do so at the 
-location indicated by the pointer. ChunkArrayEnum() will not cause heap 
+location indicated by the pointer. **ChunkArrayEnum()** will not cause heap 
 shuffling unless the callback routine causes it; thus, if the callback routine 
 avoids shuffling the heap, it can (for example) be passed a pointer to a chunk 
 in the same LMem heap as the chunk array. The version which is passed 
-handles is named ChunkArrayEnumHandles().
+handles is named **ChunkArrayEnumHandles()**.
 
-There is another version of ChunkArrayEnum() which acts on a range of 
-elements. This routine is called ChunkArrayEnumRange(). This routine 
-takes the same arguments as ChunkArrayEnum(), plus two more: a start 
+There is another version of **ChunkArrayEnum()** which acts on a range of 
+elements. This routine is called **ChunkArrayEnumRange()**. This routine 
+takes the same arguments as **ChunkArrayEnum()**, plus two more: a start 
 index, and a number of elements to enumerate. 
-ChunkArrayEnumRange() calls the callback routine for the element with 
+**ChunkArrayEnumRange()** calls the callback routine for the element with 
 the specified index, and for every element thereafter until it has processed 
 the specified number of elements. You can have it enumerate to the end of the 
 chunk array by passing a count of 0xffff.
 
 The chunk array library also provides a sorting routine, 
-ChunkArraySort(). This routine performs a modified Quicksort on the 
+**ChunkArraySort()**. This routine performs a modified Quicksort on the 
 array, using insertion sorts for subarrays below a certain size. This gives the 
-sort a performance of . The sort routine takes three arguments: the 
+sort a performance of O (nlog n). The sort routine takes three arguments: the 
 chunk array's optr, a pointer to a comparison function, and a word of data 
 which is passed to the comparison function.
 
 Whenever the sort routine needs to decide which of two elements comes first, 
 it calls the comparison routine. The comparison routine takes two 
 arguments, namely the optr and the word of data passed to 
-ChunkArraySort(). It returns a signed word with the following 
+**ChunkArraySort()**. It returns a signed word with the following 
 significance: If the first of the elements should come first in the sorted array, 
 it returns a negative number; if the first element ought to come after the 
 second, it should return a positive number; and if it doesn't matter which 
@@ -876,22 +877,22 @@ comes first, it should return zero. You can write a general-purpose
 comparison routine which can compare based on any of several parts of the 
 element, and you can use the data word to instruct it which part to sort on; 
 or you can use the data word to tell it to sort in ascending or descending order. 
-ChunkArraySort() does not cause heap shuffling as long as the comparison 
+**ChunkArraySort()** does not cause heap shuffling as long as the comparison 
 routine does not. The routine which takes handles is called 
-ChunkArraySortHandles().
+**ChunkArraySortHandles()**.
 
-ChunkArraySort() is based on a more general array sorting routine, 
-ArrayQuickSort(). ChunkArraySort() reads data about the array from 
-the array header and passes the information to ArrayQuickSort(). You can 
-call ArrayQuickSort() directly for arrays which are not chunk arrays, 
-provided all elements are of uniform size. ArrayQuickSort() takes five 
+**ChunkArraySort()** is based on a more general array sorting routine, 
+**ArrayQuickSort()**. **ChunkArraySort()** reads data about the array from 
+the array header and passes the information to **ArrayQuickSort()**. You can 
+call **ArrayQuickSort()** directly for arrays which are not chunk arrays, 
+provided all elements are of uniform size. **ArrayQuickSort()** takes five 
 arguments: a pointer to an array (which should be locked or fixed in memory), 
 the number of elements in the array, the size of each element, a pointer to a 
 callback routine (which has exactly the same format as the 
-ChunkArraySort() callback routine), and a data word to pass to that 
+**ChunkArraySort()** callback routine), and a data word to pass to that 
 callback routine. It does not return anything. 
 
-Note that ChunkArraySort() is currently implemented only for chunk 
+Note that **ChunkArraySort()** is currently implemented only for chunk 
 arrays with fixed-sized elements.
 
 ##### 16.4.1.5 Example of Chunk Array Usage
@@ -1076,25 +1077,25 @@ access one in a chunk array.
 ElementArrayCreate(), ElementArrayCreateAt(), 
 ElementArrayCreateAtHandles(), ElementArrayHeader
 
-To create an element array, call the routine ElementArrayCreate(). Like 
-ChunkArrayCreate(), it takes three arguments: the LMem heap's handle, 
+To create an element array, call the routine **ElementArrayCreate()**. Like 
+**ChunkArrayCreate()**, it takes three arguments: the LMem heap's handle, 
 the size of each element (or 0 for variable-sized elements), and the size to 
 leave for the array header. The routine allocates a chunk in the LMem heap 
 and initializes it as an element array. There is one significant difference: 
-Element arrays begin with an ElementArrayHeader, a structure whose 
-first component is a ChunkArrayHeader. If you are allocating free space 
+Element arrays begin with an **ElementArrayHeader**, a structure whose 
+first component is a **ChunkArrayHeader**. If you are allocating free space 
 between the header and the array, make sure to leave enough room for an 
-ElementArrayHeader. If you do not need to allocate free space, you can 
-pass a header size of zero, as with ChunkArrayCreate().
+**ElementArrayHeader**. If you do not need to allocate free space, you can 
+pass a header size of zero, as with **ChunkArrayCreate()**.
 
-There is another version of this routine, ElementArrayCreateAt(), which 
+There is another version of this routine, **ElementArrayCreateAt()**, which 
 creates the element array in a pre-existing chunk. This routine takes three 
 arguments: an optr indicating the chunk, the size of each element, and the 
 size of the header. It creates the element array in the specified chunk, 
 resizing it if necessary. Any data in the chunk may be overwritten (except for 
-whatever data falls in the header area after the ElementArrayHeader). 
+whatever data falls in the header area after the **ElementArrayHeader**). 
 There is also a version which takes handles instead of an optr; it is called 
-ElementArrayCreateAtHandles().
+**ElementArrayCreateAtHandles()**.
 
 The routine returns the handle of the newly-created element array. It can 
 cause heap compaction or resizing; therefore, all pointers to the heap are 
@@ -1112,10 +1113,10 @@ one to a chunk array. To add an element to a chunk array, you merely call the
 append routine, then write the element into the allocated space. If you want 
 to add an element to an element array, you must first write out the data for 
 the element in a buffer. You then pass the address of this data to 
-ElementArrayAddElement(), which compares your new element with the 
+**ElementArrayAddElement()**, which compares your new element with the 
 elements already in the array, and copies it into the array if necessary.
 
-ElementArrayAddElement() takes four arguments:
+**ElementArrayAddElement()** takes four arguments:
 
 + An optr indicating the element array;
 
@@ -1129,7 +1130,7 @@ to do a byte-wise comparison;
 You may have your own criteria for deciding whether an element should be 
 copied into an array. For example, elements in the array may have three data 
 fields; perhaps you count two elements as matching if the first two data fields 
-match. For this reason, ElementArrayAddElement() lets you specify your 
+match. For this reason, **ElementArrayAddElement()** lets you specify your 
 own comparison routine. The callback routine should be a Boolean routine, 
 declared _pascal, which takes three arguments:
 
@@ -1137,14 +1138,14 @@ declared _pascal, which takes three arguments:
 
 + The address of an element in the array to compare the new element to; 
 
-+ The callback data dword passed to ElementArrayAddElement().
++ The callback data dword passed to **ElementArrayAddElement()**.
 
-ElementArrayAddElement() calls the callback routine to compare the 
+**ElementArrayAddElement()** calls the callback routine to compare the 
 new element to each element in the array. If the callback routine ever returns 
-true, ElementArrayAddElement() has found a matching element in the 
+true, **ElementArrayAddElement()** has found a matching element in the 
 array; it will increment that element's reference count and return its index. 
 If the callback routine returns false for every element, 
-ElementArrayAddElement() copies the new element into the array and 
+**ElementArrayAddElement()** copies the new element into the array and 
 gives it a reference count of 1. It returns the element's index; the element will 
 keep that index until it is freed. Note that there is no way to specify where in 
 an element array a new element should be added. If there are free spaces in 
@@ -1152,20 +1153,19 @@ the array, the new element will be created in the first free space; otherwise,
 it will be appended to the end of the array.
 
 If you want to do a bytewise comparison, pass in a null pointer as the callback 
-routine. ElementArrayAddElement() will then do a bytewise comparison 
+routine. **ElementArrayAddElement()** will then do a bytewise comparison 
 of the elements, treating two elements as equal only if every byte matches. 
 The bytewise comparison is implemented as a machine-language string 
 instruction; it is therefore very fast. 
 
 If you know that the element you want to add is already in the array, call 
-ElementArrayAddReference(). This routine simply increments the 
+**ElementArrayAddReference()**. This routine simply increments the 
 reference count of a specified element; it does no comparisons. It is therefore 
-much faster than ElementArrayAddElement().
+much faster than **ElementArrayAddElement()**.
 
 Both of these routines have counterparts which are passed handles instead 
 of an optr; these counterparts are named 
-ElementArrayAddElementHandles() and 
-ElementArrayAddReferenceHandles().
+**ElementArrayAddElementHandles()** and **ElementArrayAddReferenceHandles()**.
 
 ##### 16.4.2.3 Accessing Elements in an Element Array
 
@@ -1174,10 +1174,10 @@ ElementArrayElementChangedHandles()
 
 Elements in element arrays are accessed in almost the same way as elements 
 in chunk arrays. There is one major difference. Each element in an element 
-array begins with a RefElementHeader structure, which contains the 
+array begins with a **RefElementHeader** structure, which contains the 
 element's reference count. For this reason, it is a good idea to declare special 
 structures for your elements and have the first component of that structure 
-be the RefElementHeader structure (as in the code sample below).
+be the **RefElementHeader** structure (as in the code sample below).
 
 ---
 Code Display 16-3 Structure for Element Array Elements
@@ -1203,10 +1203,10 @@ typedef struct {
 
 Note that if you change an element, this may make it identical to another 
 element in the element array; in this case, the two could be combined into 
-one. To check for this situation, call ElementArrayElementChanged(). 
+one. To check for this situation, call **ElementArrayElementChanged()**. 
 This routine takes four arguments: the optr to the element array, the token 
 for the element changed, a callback comparison routine, and a dword of data 
-which is passed to the callback routine. ElementArrayElementChanged() 
+which is passed to the callback routine. **ElementArrayElementChanged()** 
 checks to see if the element is identical to any other element in the array. It 
 calls the comparison routine to compare elements. (You can force a bytewise 
 comparison by passing a null function pointer.) If it matches another 
@@ -1215,7 +1215,7 @@ deleted, and the matching element will have its reference count increased
 appropriately. The matching element's token will be returned; you will have 
 to change any references to the old element appropriately. If no match is 
 found, the token which was passed will be returned. The version which takes 
-handles is called ElementArrayElementChangedHandles().
+handles is called **ElementArrayElementChangedHandles()**.
 
 ##### 16.4.2.4 Removing An Element From An Element Array
 
@@ -1224,7 +1224,7 @@ ElementArrayRemoveReferenceHandles(),
 ElementArrayDelete(), ElementArrayDeleteHandles()
 
 When you want to remove an element from an element array, you should 
-ordinarily call ElementArrayRemoveReference(). This routine 
+ordinarily call **ElementArrayRemoveReference()**. This routine 
 decrements the element's reference count; it does not, however, delete the 
 element unless the reference count reaches zero (i.e. the last reference to the 
 element has been deleted). 
@@ -1242,13 +1242,13 @@ resized to zero; that way the index numbers of following elements are
 preserved.
 
 If you want to delete an element regardless of its reference count, call 
-ElementArrayDelete(). This routine takes two arguments, namely the optr 
+**ElementArrayDelete()**. This routine takes two arguments, namely the optr 
 indicating the array and the index of the element to be deleted. It does not 
 take a callback routine; perform any necessary bookkeeping before you call it.
 
 Both of these routines have counterparts which take handles; these 
-counterparts are named ElementArrayRemoveReferenceHandles() and 
-ElementArrayDeleteHandles().
+counterparts are named **ElementArrayRemoveReferenceHandles()** and 
+**ElementArrayDeleteHandles()**.
 
 ##### 16.4.2.5 The "Used Index" and Other Index Systems
 
@@ -1267,47 +1267,47 @@ besides the one used by the element array routines. GEOS provides routines
 with this functionality.
 
 To find out the number of elements in an element array, call 
-ElementArrayGetUsedCount(). This routine can return either the 
+**ElementArrayGetUsedCount()**. This routine can return either the 
 number of elements in use or the number of "in use" elements which satisfy 
 any arbitrary criteria. The routine takes three arguments: the optr to the 
 element array, a dword of data which is passed to a callback routine, and a 
 pointer to a Boolean callback routine. That callback routine should itself take 
 two arguments: a pointer to an element, and the dword passed to 
-ElementArrayGetUsedCount(). The callback routine is called once for 
+**ElementArrayGetUsedCount()**. The callback routine is called once for 
 each "in use" element. The callback should return true if the element should 
 be counted; otherwise, it should return false. For example, the callback 
 routine might return true if the element is longer than 10 bytes; in this case, 
-ElementArrayGetUsedCount() would return the number of elements 
+**ElementArrayGetUsedCount()** would return the number of elements 
 which are longer than 10 bytes. To have every used element counted, pass a 
 null function pointer. The version of this routine which takes handles is 
-called ElementArrayGetUsedCountHandles().
+called **ElementArrayGetUsedCountHandles()**.
 
 If you use a different indexing scheme, you will need a way to translate the 
 index into the normal element array token. To do this, call the routine 
-ElementArrayUsedIndexToToken(). This routine takes four arguments: 
+**ElementArrayUsedIndexToToken()**. This routine takes four arguments: 
 the optr of the element array, the index count, a dword (which is passed to 
 the callback routine), and a callback routine. The callback routine is of the 
 same format as the callback routine passed to 
-ElementArrayGetUsedCount(); it should return true if the element meets 
-some criterion. ElementArrayUsedIndexToToken() translates the index 
+**ElementArrayGetUsedCount()**; it should return true if the element meets 
+some criterion. **ElementArrayUsedIndexToToken()** translates the index 
 passed into the element array's token for that element. For example, if the 
 callback routine returns true for elements which are longer than 10 bytes, 
-and you pass an index of five, ElementArrayUsedIndexToToken() will 
+and you pass an index of five, **ElementArrayUsedIndexToToken()** will 
 return the token for the sixth element in the element array which is longer 
 than 10 bytes. (Remember, all indexes are zero-based.) Again, passing a null 
 function pointer makes the routine count all "in-use" elements. The version 
 which takes the element array's handles is called 
-ElementArrayUsedIndexToTokenHandles().
+**ElementArrayUsedIndexToTokenHandles()**.
 
 To translate a token back into this kind of index, call 
-ElementArrayTokenToUsedIndex(). This routine takes four arguments: 
+**ElementArrayTokenToUsedIndex()**. This routine takes four arguments: 
 the optr to the element array, an element token, a callback routine (as with 
 the other routines in this section), and a dword which is passed along to the 
 callback routine. The routine finds the element whose token was passed and 
 returns the index it would have under the indexing system defined by the 
 callback routine. Again, passing a null function pointer makes the routine 
 count every "in-use" element. The routine which takes handles is called 
-ElementArrayTokenToUsedIndexHandles().
+**ElementArrayTokenToUsedIndexHandles()**.
 
 #### 16.4.3 Name Arrays
 
@@ -1316,7 +1316,7 @@ The chunk array library includes one example of an elaboration on these
 structures: the name array. The name array is a special kind of element array 
 in which elements can be accessed by a "name" label as well as by a token. 
 Elements in a name array are of variable size. Each element is divided into 
-three sections: The first is the RefElementHeader; every element in an 
+three sections: The first is the **RefElementHeader**; every element in an 
 element array must begin with one of these (and the name array is a kind of 
 element array). The second is the data section. The data section is the same 
 size for every element in a given name array; this size may be anything from 
@@ -1325,7 +1325,7 @@ The data section is followed by a "name" section. This section contains a
 sequence of bytes of any length up to a maximum of 
 NAME_ARRAY_MAX_NAME_SIZE (256 bytes). The name may contain nulls 
 and need not be null terminated. You can translate a name into the element's 
-token by calling NameArrayFind() (described below).
+token by calling **NameArrayFind()** (described below).
 
 Note that creating elements in a name array, as in any element array, 
 requires a search through all elements; it thus takes linear time. 
@@ -1341,7 +1341,7 @@ NameArrayCreateAtHandles(), NameArrayAdd(),
 NameArrayAddHandles(), NameArrayHeader, NameArrayAddFlags
 
 Creating a name array is much like creating an element array. Every name 
-array must begin with a NameArrayHeader. This structure has the 
+array must begin with a **NameArrayHeader**. This structure has the 
 following definition:
 
 ~~~
@@ -1354,11 +1354,11 @@ typedef struct {
 This structure contains one new field, namely NAH_datasize. This field 
 specifies the size of the data area of each element; the name area is of 
 variable size. You may examine this field at will, but you may not change it. 
-You may set up a fixed data area between the NameArrayHeader and the 
+You may set up a fixed data area between the **NameArrayHeader** and the 
 elements. The usual way to do this is to define a structure whose first element 
-is a NameArrayHeader structure.
+is a **NameArrayHeader** structure.
 
-To create a name array, call the routine NameArrayCreate(). This routine 
+To create a name array, call the routine **NameArrayCreate()**. This routine 
 is passed three arguments:
 
 + The global handle of an LMem heap. The name array will be created in 
@@ -1366,12 +1366,12 @@ this block.
 
 + The size of the data area in each element. The total size of the element 
 will vary, depending on the size of the name. Remember, there is a three 
-byte RefElementHeader at the start of every element (before the data 
+byte **RefElementHeader** at the start of every element (before the data 
 section).
 
 + The size of the header structure for the name array. If you will not need 
 a fixed data area, you can pass a size of zero, and enough space will 
-automatically be left for a NameArrayHeader.
+automatically be left for a **NameArrayHeader**.
 
 The routine allocates a chunk in the specified heap, initializes a name array 
 in that chunk, and returns the chunk's handle. If it fails for any reason, it 
@@ -1379,17 +1379,17 @@ returns a null chunk handle. Since the routine allocates a chunk, all pointers
 to the LMem heap are invalidated.
 
 If you want to create a name array in a specific chunk, call 
-NameArrayCreateAt(). This routine is almost the same as 
-NameArrayCreate(). However, instead of being passed a memory handle, 
-NameArrayCreateAt() is passed an optr to a chunk. The name array will 
+**NameArrayCreateAt()**. This routine is almost the same as 
+**NameArrayCreate()**. However, instead of being passed a memory handle, 
+**NameArrayCreateAt()** is passed an optr to a chunk. The name array will 
 be created in that chunk. Any data in that chunk (outside of the fixed data 
 area) will be destroyed. Note that if the chunk is too small for the name array, 
-NameArrayCreateAt() will resize it; thus, pointers to the LMem heap may 
+**NameArrayCreateAt()** will resize it; thus, pointers to the LMem heap may 
 be invalidated. There is a version of this routine which takes the chunk's 
 global and chunk handles instead of its optr; this routine is called 
-NameArrayCreateAtHandles().
+**NameArrayCreateAtHandles()**.
 
-To create an element, call NameArrayAdd(). This routine creates an 
+To create an element, call **NameArrayAdd()**. This routine creates an 
 element and copies the data and name into it. The routine takes five 
 arguments:
 
@@ -1401,7 +1401,7 @@ arguments:
 the name. If you pass a length of zero, bytes will be copied until a null 
 byte is reached (the null will not be copied).
 
-+ A word-length set of NameArrayAddFlags. Only one flag is currently 
++ A word-length set of **NameArrayAddFlags**. Only one flag is currently 
 defined, namely NAAF_SET_DATA_ON_REPLACE. This flag is described 
 below.
 
@@ -1409,17 +1409,17 @@ below.
 element. (The length of the data portion was specified when the name 
 array was created.)
 
-NameArrayAdd() allocates the element, copies in the data and name, and 
+**NameArrayAdd()** allocates the element, copies in the data and name, and 
 returns the element's token. If an element with the specified name already 
-exists, NameArrayAdd() will not create a duplicate. Instead, if the flag 
-NAAF_SET_DATA_ON_REPLACE was passed, NameArrayAdd() will copy 
+exists, **NameArrayAdd()** will not create a duplicate. Instead, if the flag 
+NAAF_SET_DATA_ON_REPLACE was passed, **NameArrayAdd()** will copy 
 the new data section into the existing element; if the flag was not passed, it 
 will leave the existing element unchanged. In either case, it will return the 
 existing element's token and increment its reference count. If an element is 
 added, the name array may have to be resized; therefore, pointers into the 
 chunk array will be invalidated. There is a version in which the name array 
 is specified by its global and chunk handles; this version is called 
-NameArrayAddHandles().
+**NameArrayAddHandles()**.
 
 ---
 Code Display 16-4 Allocating a Name Array
@@ -1461,7 +1461,7 @@ Name array routines can be accessed with all the routines used for accessing
 element arrays. However, a few special purpose routines are also provided.
 
 If you know the name of an element and want a copy of its data, call 
-NameArrayFind(). This routine is passed four arguments:
+**NameArrayFind()**. This routine is passed four arguments:
 
 + The optr to the name array.
 
@@ -1475,14 +1475,14 @@ name).
 + A pointer to a return buffer. The data portion of the element will be 
 copied to this location.
 
-NameArrayFind() will do a linear search through the elements. If it finds 
+**NameArrayFind()** will do a linear search through the elements. If it finds 
 one with the name specified, it will return that element's token and copy the 
 data portion into the return buffer. If there is no element with the specified 
-name, NameArrayFind() will return the constant CA_NULL_ELEMENT. 
-The routine NameArrayFindHandles() is identical, except that the name 
+name, **NameArrayFind()** will return the constant CA_NULL_ELEMENT. 
+The routine **NameArrayFindHandles()** is identical, except that the name 
 array is specified by its global and chunk handles.
 
-To change an element's name, call NameArrayChangeName(). This 
+To change an element's name, call **NameArrayChangeName()**. This 
 routine is passed four arguments:
 
 + The optr to the name array.
@@ -1495,9 +1495,9 @@ routine is passed four arguments:
 considered to be null terminated (the trailing null is not part of the 
 name).
 
-NameArrayChangeName() changes the element's name. If the new name 
+**NameArrayChangeName()** changes the element's name. If the new name 
 is longer than the old, the element will have to be resized; this will invalidate 
-pointers within that block. NameArrayChangeNameHandles() is 
+pointers within that block. **NameArrayChangeNameHandles()** is 
 identical, except that the name array is specified by its global and chunk handles.
 
 [Memory Management](cmemory.md) <-- &nbsp;&nbsp; [table of contents](../concepts.md) &nbsp;&nbsp; --> [File System](cfile.md)

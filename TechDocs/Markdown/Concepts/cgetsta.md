@@ -23,21 +23,21 @@ The Parameters file, as stated above, provides the Glue linker with
 necessary information. It details specifics about the geode being compiled 
 that will be necessary for dynamically linking at runtime. Each geode 
 may have only one Parameters file. The Parameters file for Hello World 
-is detailed in section 4.3 on page 114. Full reference information for this 
-file type can be found in the Routines reference book.
+is detailed in [section 4.3](#43-geode-parameters-file). Full reference 
+information for this file type can be found in the Routines reference book.
 
 + Source File (.goc)  
 The Source file contains a combination of GEOS UI code and standard C 
 code. Many source code files can be used for a single geode; this can help 
 you organize your application's functionality into manageable groups of 
 routines and objects. An introduction to the basics of the source file is 
-given in section 4.4 on page 116.
+given in [section 4.4](#44-the-source-file-and-source-code).
 
 + C Header File (.h)  
 C Header files may be used to hold definitions of data structures, classes, 
 macros, routines, and other items. There are several standard GEOS 
 header files you must include in your geode for it to compile properly. 
-These are outlined in section 4.4 on page 116.
+These are outlined in [section 4.4](#44-the-source-file-and-source-code).
 
 + GEOS Header File (.goh)  
 This file is essentially the same as the C header files described above. It 
@@ -46,7 +46,7 @@ variables. The primary difference between these files and the C header
 files is that .goh files must be included before the geode is run through 
 the Goc preprocessor. C header files do not have to go through the Goc 
 preprocessor. Simple geodes might have none of their own header files. 
-These files are also described in section 4.4 on page 116.
+These files are also described in [section 4.4](#44-the-source-file-and-source-code).
 
 ### 4.2 Hello World
 
@@ -101,14 +101,14 @@ The code for Hello World, as you will see, is quite simple. It consists mainly
 of User Interface gadgetry and uses just a few message handlers.
 
 The main component of the application is the Process object, an instance of 
-HelloProcessClass (a subclass of GenProcessClass). This object makes 
+HelloProcessClass (a subclass of **GenProcessClass**). This object makes 
 all drawing and color changes by handling messages sent from the window 
 manager and the triggers in the dialog box. The Process object basically 
 manages the application, keeping track of the relevant data and interacting 
 with the UI gadgetry. (See Figure 4-2 for an illustration of the Hello World 
 application's structure.)
 
-The Process object is event-driven, meaning it has no main() routine run 
+The Process object is event-driven, meaning it has no **main()** routine run 
 when the program is launched. Instead, the program does nothing until an 
 event occurs (such as the view window sending MSG_META_EXPOSED when 
 first opened). When the event (message) is received, the Process object 
@@ -135,8 +135,8 @@ The triggers within the dialog, however, request actions that must be carried
 out by the application (changing the color to blue and gold, respectively). 
 Although the application does not have to instantiate, draw, or otherwise 
 modify the trigger objects, it must handle messages sent out by them when 
-they are pressed by the user. This is discussed below, under "Changing the 
-Text Color."
+they are pressed by the user. This is discussed below, under ["Changing the 
+Text Color"](#4223-changing-the-text-color).
 
 ##### 4.2.2.2 The Scrolling View and Drawing the Text
 
@@ -145,7 +145,7 @@ Hello World application. This includes implementation of the system menus
 for the primary window and the scrolling functionality of the scrollable View 
 window.
 
-The view object (of GenViewClass) is powerful and provides a lot of what 
+The view object (of **GenViewClass**) is powerful and provides a lot of what 
 most applications need. It automatically handles all window resizes and 
 scrolls, and it will cause proper redrawing when another object (such as a 
 pinned menu) is moved across it. The only thing it does not do is actually 
@@ -187,7 +187,7 @@ This will cause the View window to generate a new MSG_META_EXPOSED
 that will force the redrawing of the text in the new color. The window handle 
 is cached in winHan for just this purpose; when the text color changes, we 
 must invalidate the window so the UI will redraw its contents. We invalidate 
-the window by calling the special graphics routine GrInvalRect(), passing 
+the window by calling the special graphics routine **GrInvalRect()**, passing 
 the window's handle. We get the window handle when the view first creates 
 the window-it will send out a MSG_META_CONTENT_VIEW_WIN_OPENED. 
 When the window closes, the view will send 
@@ -221,14 +221,14 @@ application's name (Hello), then has the superclass' name
 delineate the portions of the name. C_BLUE is a good example; 
 it is a set value that does not change. The structure of the name 
 should reflect the use of the constant. (In this case, the 
-enumerated type Color is reflected in the C_ portion of the 
+enumerated type **Color** is reflected in the C_ portion of the 
 constant's name.)
 
 **Routines** Kernel and UI routines, as well as method names, should have 
 each portion capitalized. They should begin with some 
 abbreviation relating to the module they belong to. For 
-example, GrCreateState() is a graphics system routine, as is 
-GrInvalRect().
+example, **GrCreateState()** is a graphics system routine, as is 
+**GrInvalRect()**.
 
 **Messages** Message names should be all uppercase and begin with MSG_. 
 Each portion of the name should be separated with 
@@ -245,7 +245,7 @@ HelloView is a good example.
 all-caps acronym for the class name with an I tacked on for 
 "instance." The second portion is like a variable name, and the 
 two portions are separated by an underscore. For example, 
-GI_visMoniker is a field of GenClass (hence the GI_), and 
+GI_visMoniker is a field of **GenClass** (hence the GI_), and 
 visMoniker is the variable name of the field.
 
 ### 4.3 Geode Parameters File
@@ -402,9 +402,9 @@ following inclusions is required of every GEOS application:
 
 Other inclusions may be required for more complex applications and 
 libraries, and these inclusions will be listed in the topics that require them. 
-Goc accepts both the standard C #include for .h files and the GEOS 
-@include for .goh files. The difference between them is that .h files may not 
-include Goc constructs (e.g. @object) whereas .goh files can.
+Goc accepts both the standard C **#include** for .h files and the GEOS 
+**@include** for .goh files. The difference between them is that .h files may not 
+include Goc constructs (e.g. **@object**) whereas .goh files can.
 
 After the inclusions are listed, you should declare any global variables used 
 throughout your application. Be aware that global variables, though 
@@ -466,8 +466,8 @@ WindowHandle	winHan;
 
 Every GEOS application has an object called the Process object. This object is 
 run by the application's primary thread and is an instance of a subclass of 
-GenProcessClass. Because the Process is an event-driven object, there is no 
-main() routine that is executed when the program is launched. Instead, the 
+**GenProcessClass**. Because the Process is an event-driven object, there is no 
+**main()** routine that is executed when the program is launched. Instead, the 
 object will wait until it receives messages (events), at which time it will 
 execute the proper methods.
 
@@ -555,11 +555,11 @@ put in a resource called "Interface" (though this name is not required).
 ##### 4.4.3.1 The Application Object
 
 Every application must have an application object, an instance of the class 
-GenApplicationClass. The application object handles and manages many 
+**GenApplicationClass**. The application object handles and manages many 
 application-related things such as dispatching input sent by the input 
 manager to the application. The application object must be the top-level 
 generic object in every application. The name of the application object is also 
-stated in the geode parameters file line appobj (see Code Display 4-1).
+stated in the geode parameters file line **appobj** (see Code Display 4-1).
 
 ![](Art/figure_4-3.png)
 
@@ -606,7 +606,7 @@ This display is part of hello3.goc and follows the previous display directly.
 ##### 4.4.3.2 The Primary Window and the View Window
 
 Every application must have a primary window object of class 
-GenPrimaryClass. This object will draw and manage the primary window 
+**GenPrimaryClass**. This object will draw and manage the primary window 
 and will work with the UI and the geometry manager to arrange all the 
 children of the window properly. It will also automatically put up the 
 system-controlled gadgets (such as the system window menu, the 
@@ -617,7 +617,8 @@ menu. The other is the view object, which occupies the remaining space
 within the primary. The view object, as stated earlier, automatically handles 
 all scrolling and clipping of documents. Its scrollable area is eight and a half 
 inches by eleven inches. A description of what the view window does and how 
-it interacts with the Process object to draw the text is given in section 4.2.2.2.
+it interacts with the Process object to draw the text is given in [section 4.2.2.2]
+(#4222-the-scrolling-view-and-drawing-the-text).
 
 ![](Art/figure_4-4.png)
 
@@ -712,7 +713,7 @@ This display is part of hello3.goc and directly follows the previous display.
 ##### 4.4.3.3 The Hello World Menu
 
 The Hello World program has one menu, called "Menu" and located in the 
-primary window's menu bar. Menus are instances of GenInteractionClass 
+primary window's menu bar. Menus are instances of **GenInteractionClass** 
 with the GIV_POPUP attribute set in the GII_visibility field. The moniker of 
 the menu object appears on the menu bar (see Code Display 4-6 for the 
 definition of Hello World's menu).
@@ -750,7 +751,7 @@ This display is part of hello3.goc and follows the previous display directly.
 
 Code Display 4-7 shows the code for the dialog box and its triggers.
 
-Dialog boxes in GEOS may be of GenInteractionClass, or dialogs may be 
+Dialog boxes in GEOS may be of **GenInteractionClass**, or dialogs may be 
 called up and instantiated during execution with kernel routines. Hello 
 World uses a GenInteraction in order to have a "floating" dialog box that may 
 be retained and moved around the screen.
@@ -845,14 +846,14 @@ event-driven. This means that until it receives a message, it does nothing;
 when it receives a message, however, it will automatically be woken up with 
 the instruction pointer pointing at the proper routine's entry point.
 
-GenProcessClass, the superclass of every Process object, handles many 
+**GenProcessClass**, the superclass of every Process object, handles many 
 messages that most applications may never need to know about. For 
 example, when the program is first launched, the Process object will receive 
 a series of messages from the UI and the kernel telling it how it should start 
 up. It automatically responds by setting up the proper message queues and 
 executing the proper code. These are things you, as the programmer, do not 
 need to know about to create a working GEOS application (though they are 
-documented in "Applications and Geodes," Chapter 6).
+documented in ["Applications and Geodes," Chapter 6](cappl.md)).
 
 Throughout the program's life, then, the Process object will receive and 
 respond to messages as they are received. Each message has at most one 
@@ -981,7 +982,7 @@ Therefore, the class of the Hello World Process object (HelloProcessClass)
 must know how to draw the document in response to this message. Note that 
 this message did not have to be defined specifically in the earlier definition of 
 HelloProcessClass-this is because the message is already defined for 
-MetaClass, the superclass of all GEOS classes.
+**MetaClass**, the superclass of all GEOS classes.
 
 Code Display 4-10 shows the method that handles MSG_META_EXPOSED for 
 HelloProcessClass. Notice that the method calls the HelloDrawText() 
@@ -990,10 +991,10 @@ inefficient at first (and is for such a small, simple application), there are tw
 main reasons why this is done:
 
 First, it takes advantage of the GEOS single imaging model. The method 
-simply creates the proper GState for drawing to the view window, then calls 
+simply creates the proper **GState** for drawing to the view window, then calls 
 the drawing routine. A similar message for printing (i.e. when the user clicks 
 on a "Print" trigger, a print message may be sent to the Process object) can 
-use the same drawing routine-its handler would simply set up a GState for 
+use the same drawing routine-its handler would simply set up a **GState** for 
 drawing to a Spool file and then call the drawing routine. Thus, one function 
 is used for two purposes, cutting down code size.
 
@@ -1198,8 +1199,8 @@ time modifying the Hello World program to get used to the programming
 environment and the Goc UI definition syntax. Some things you might try are 
 outlined below-some are extremely easy; some are more difficult. Some will 
 require you to read other chapters in this and the User Interface manual. In 
-any case, you should go on to read "GEOS Programming," Chapter 5, to 
-understand the various keywords and constructs of the Goc programming 
+any case, you should go on to read ["GEOS Programming", Chapter 5](ccoding.md), 
+to understand the various keywords and constructs of the Goc programming 
 language.
 
 Some simple UI exercises you can incorporate into the Hello World program 
@@ -1220,7 +1221,7 @@ text. This exercise will help you get used to the GEOS coordinate space.
 box that lets the user specify the scale. Most likely you will create a 
 number of GenTriggers that apply a pre-specified scale; each of these 
 triggers will send MSG_GEN_VIEW_SET_SCALE_FACTOR to HelloView. 
-You may even try using a GenViewControlClass object.
+You may even try using a **GenViewControlClass** object.
 
 + Add background graphics to get used to the coordinate system. Perhaps 
 draw a colored rectangle behind the text that changes colors to be the 
@@ -1228,8 +1229,8 @@ inverse of the text (i.e. when the text turns blue, the rectangle turns
 yellow).
 
 + Add printing. This is not nearly as difficult as you might think. To do this, 
-you should read "The Spool Library," Chapter 17 of the Object Reference 
-Book, about the spooler and the spool control object. This exercise 
+you should read ["The Spool Library," Chapter 17 of the Object Reference 
+Book](../Objects/oprint.md), about the spooler and the spool control object. This exercise 
 essentially consists of adding a trigger to invoke printing and a message 
 handler for the printing message. This handler will create a printing 
 GState and call the drawing routine. Instead of drawing to the screen, it 

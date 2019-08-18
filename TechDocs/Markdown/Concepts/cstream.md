@@ -13,10 +13,10 @@ programs that will use these ports must do so via this mechanism; however,
 libraries exist to handle some of the more common uses for port 
 communications. If you wish to monitor a serial line for pccom 
 communications from another machine, you will be working with the PCCom 
-library and should read "PCCom Library," Chapter 22. Programs do not need 
+library and should read ["PCCom Library," Chapter 22](cpccom.md). Programs do not need 
 to access the serial or parallel ports in order to print because the spooler does 
-it for them. For more information about the spooler and printing, see "The 
-Spool Library," Chapter 17 of the Object Reference Book. 
+it for them. For more information about the spooler and printing, see ["The 
+Spool Library," Chapter 17 of the Object Reference Book](../Objects/oprint.md). 
 
 This chapter may be read with only a general understanding of GEOS and 
 Object Assembly. Messaging is used heavily in informing the application 
@@ -48,7 +48,7 @@ use. The specific steps involved in this process are
 
 1.	Get the handle of the stream driver.
 You will need to get this handle to use most of the stream-library 
-routines. You can get this handle by calling GeodeGetInfo().
+routines. You can get this handle by calling **GeodeGetInfo()**.
 
 2.	Create the stream.
 You must create each stream you plan on using. When a stream is 
@@ -95,35 +95,36 @@ threads with a legitimate interest in a stream will know the stream's token.
 
 The serial and parallel drivers are built on top of the stream driver. There are 
 separate routines to access the serial and parallel ports; these routines are 
-discussed in "Using the Serial Ports" on page 782 for the serial driver and 
-"Using the Parallel Ports" on page 789 for the parallel driver.
+discussed in ["Using the Serial Ports"](#212-using-the-serial-ports) for the serial 
+driver and ["Using the Parallel Ports"](#213-using-the-parallel-ports) for the 
+parallel driver.
 
 #### 21.1.1.1 Creating a Stream
 
 StreamOpen()
 
-To create and initialize a new stream, call the routine StreamOpen(). This 
+To create and initialize a new stream, call the routine **StreamOpen()**. This 
 routine takes five arguments:
 
 + The handle of the stream driver.
 
 + The size of the stream buffer, in bytes. This may not be larger than 32767.
 
-+ The GeodeHandle of the geode that will own this stream. When this 
++ The **GeodeHandle** of the geode that will own this stream. When this 
 geode exits, the stream will be freed; however, you should call 
-StreamClose() before this happens.
+**StreamClose()** before this happens.
 
-+ A set of HeapFlags. The routine will have to allocate a block to hold the 
-stream. The HeapFlags specify whether that block will be fixed or 
++ A set of **HeapFlags**. The routine will have to allocate a block to hold the 
+stream. The **HeapFlags** specify whether that block will be fixed or 
 movable. If it is fixed, this argument should contain the flag HF_FIXED; 
 otherwise it should be blank.
 
-+ The pointer to a StreamToken variable. StreamOpen() will create the 
++ The pointer to a **StreamToken** variable. **StreamOpen()** will create the 
 stream and write its token to this variable. You will need this token 
 whenever you access the stream, for reading or writing.
 
-If the creation is successful, StreamOpen() will return zero and store the 
-stream's token in the StreamToken variable. You must see to it that both 
+If the creation is successful, **StreamOpen()** will return zero and store the 
+stream's token in the **StreamToken** variable. You must see to it that both 
 the reader and the writer have this token. If the stream cannot be created, 
 the strategy routine will set an error flag and return either 
 STREAM_CANNOT_ALLOC (if the memory for the stream's buffer cannot be 
@@ -172,7 +173,7 @@ return an appropriate error code. This requires a little more work by the
 calling thread, as it cannot assume that all the data is always read or written; 
 however, it avoids the risk of deadlock.
 
-All read and write routines are passed a member of the StreamBlocker 
+All read and write routines are passed a member of the **StreamBlocker** 
 enumerated type. This type has two members: STREAM_BLOCK, indicating 
 that the calling thread should block in the situations described above; and 
 STREAM_NO_BLOCK, indicating that the routine should immediately return 
@@ -180,7 +181,7 @@ with an error if enough space is not available. A single thread may, if it
 wishes, pass STREAM_BLOCK sometimes and STREAM_NO_BLOCK sometimes.
 
 If a stream routine returns an error, the error will be a member of the 
-StreamError enumerated type. The possible error values are described in 
+**StreamError** enumerated type. The possible error values are described in 
 the section for each routine.
 
 #### 21.1.3 Writing Data to a Stream
@@ -190,11 +191,11 @@ StreamWrite(), StreamWriteByte()
 To write data into a stream, call the routine StreamWrite(). This routine 
 takes six arguments:
 
-+ The GeodeHandle of the stream driver.
++ The **GeodeHandle** of the stream driver.
 
-+ The StreamToken of the stream.
++ The **StreamToken** of the stream.
 
-+ A member of the StreamBlocker enumerated type, as described in 
++ A member of the **StreamBlocker** enumerated type, as described in 
 [section 21.1.2](#2112-blocking-on-read-or-write).
 
 + The amount of data to be written, in bytes.
@@ -202,13 +203,13 @@ takes six arguments:
 + A pointer to a data buffer; the data will be copied from that buffer to the 
 stream.
 
-+ A pointer to an integer. StreamWrite() will write the number of bytes 
++ A pointer to an integer. **StreamWrite()** will write the number of bytes 
 actually copied to that integer.
 
-If all the data was written successfully, StreamWrite() will return zero and 
+If all the data was written successfully, **StreamWrite()** will return zero and 
 write the number of bytes written (i.e. the size of the data buffer passed) to 
 the integer pointed to by the sixth argument. If it could not successfully write 
-all the data, it will return one of the following StreamError values:
+all the data, it will return one of the following **StreamError** values:
 
 **STREAM_WOULD_BLOCK**  
 STREAM_BLOCK had been passed, and there was no room to 
@@ -232,7 +233,7 @@ The stream has already been closed. The sixth argument will
 be set to zero.
 
 You may often want to write a single byte to the stream. There is a special 
-routine to do this, StreamWriteByte(). This routine takes four arguments:
+routine to do this, **StreamWriteByte()**. This routine takes four arguments:
 
 + The GeodeHandle of the stream driver.
 
@@ -243,7 +244,7 @@ routine to do this, StreamWriteByte(). This routine takes four arguments:
 
 + The byte to be written.
 
-If the byte is written successfully, StreamWriteByte() will return zero. 
+If the byte is written successfully, **StreamWriteByte()** will return zero. 
 Otherwise, it will return one of the following error values:
 
 **STREAM_WOULD_BLOCK**  
@@ -261,14 +262,14 @@ The stream has already been closed.
 
 StreamRead(), StreamReadByte()
 
-To write data into a stream, call the routine StreamRead(). This routine 
+To write data into a stream, call the routine **StreamRead()**. This routine 
 takes six arguments:
 
-+ The GeodeHandle of the stream driver.
++ The **GeodeHandle** of the stream driver.
 
-+ The StreamToken of the stream.
++ The **StreamToken** of the stream.
 
-+ A member of the StreamBlocker enumerated type, as described in 
++ A member of the **StreamBlocker** enumerated type, as described in 
 [section 21.1.2](#2112-blocking-on-read-or-write).
 
 + The amount of data to be read, in bytes.
@@ -276,14 +277,14 @@ takes six arguments:
 + A pointer to a data buffer; the data will be read from the stream into that 
 buffer.
 
-+ A pointer to an integer. StreamRead() will write the number of bytes 
++ A pointer to an integer. **StreamRead()** will write the number of bytes 
 actually read to that integer.
 
 If the requested amount of data was read successfully, StreamRead() will 
 return zero and write the number of bytes read (i.e. the size of the data buffer 
 passed) to the integer pointed to by the sixth argument. If it could not 
 successfully read the requested amount of data, it will return one of the 
-following StreamError values:
+following **StreamError** values:
 
 **STREAM_WOULD_BLOCK**  
 STREAM_BLOCK had been passed, and there was no data 
@@ -302,11 +303,11 @@ permitted while this is happening. The sixth argument will be
 set to zero.
 
 You may often want to read a single byte from the stream. There is a special 
-routine to do this, StreamReadByte(). This routine takes four arguments:
+routine to do this, **StreamReadByte()**. This routine takes four arguments:
 
-+ The GeodeHandle of the stream driver.
++ The **GeodeHandle** of the stream driver.
 
-+ The StreamToken of the stream.
++ The **StreamToken** of the stream.
 
 + A member of the StreamBlocker enumerated type, as described in 
 [section 21.1.2](#2112-blocking-on-read-or-write).
@@ -314,7 +315,7 @@ routine to do this, StreamReadByte(). This routine takes four arguments:
 + A pointer to a byte-sized variable; the data byte read will be written to 
 this variable.
 
-If the byte is written successfully, StreamReadByte() will return zero. 
+If the byte is written successfully, **StreamReadByte()** will return zero. 
 Otherwise, it will return one of the following error values:
 
 **STREAM_WOULD_BLOCK**  
@@ -330,25 +331,25 @@ permitted while this is happening.
 StreamClose()
 
 Either the writer or the reader can instigate stream shutdown by calling 
-StreamClose(). When one of the two calls this routine, the shut-down 
+**StreamClose()**. When one of the two calls this routine, the shut-down 
 process is started; it will not be completed until the other calls the routine.
 
-If the writer calls StreamClose(), it may specify that the data already in the 
+If the writer calls **StreamClose()**, it may specify that the data already in the 
 buffer be flushed (immediately cleared), or that it linger. If you specify that 
 the data should linger, the data will be preserved as long as the reader has 
 the stream open. The reader can continue to read data normally until it runs 
 out of data. The last read-operation will most likely return 
 STREAM_SHORT_READ_WRITE; after that, all attempts to read data will 
 generate the error STREAM_CLOSING. At that point, the reader should call 
-StreamClose(). (If the data was flushed by the writer, the next read attempt 
+**StreamClose()**. (If the data was flushed by the writer, the next read attempt 
 will return STREAM_CLOSING.)
 
 To shut down the stream, call the routine StreamClose(). This routine is 
 passed the following arguments:
 
-+ The GeodeHandle of the stream driver.
++ The **GeodeHandle** of the stream driver.
 
-+ The StreamToken of the stream.
++ The **StreamToken** of the stream.
 
 + A Boolean value saying whether the data in the stream should be kept 
 until it's read; false (i.e. zero) indicates it should be flushed.
@@ -361,33 +362,33 @@ you do not have to coordinate the closure of a stream.
 StreamFlush(), StreamQuery()
 
 To flush all the pending (written but unread) data from a stream, call the 
-routine StreamFlush(). This routine is passed two arguments:
+routine **StreamFlush()**. This routine is passed two arguments:
 
-+ The GeodeHandle of the stream driver.
++ The **GeodeHandle** of the stream driver.
 
-+ The StreamToken of the stream.
++ The **StreamToken** of the stream.
 
 To find out how much free space is available in a stream, or how much data 
-is waiting to be read, call StreamQuery(). This routine is passed four 
+is waiting to be read, call **StreamQuery()**. This routine is passed four 
 arguments:
 
-+ The GeodeHandle of the stream driver.
++ The **GeodeHandle** of the stream driver.
 
-+ The StreamToken of the stream.
++ The **StreamToken** of the stream.
 
-+ A member of the StreamRoles enumerated type. The only appropriate 
++ A member of the **StreamRoles** enumerated type. The only appropriate 
 values here are STREAM_ROLES_WRITER (to find the amount of free 
 space available for writing) or STREAM_ROLES_READER (to find the 
 amount of data waiting to be read).
 
 + A pointer to an integer variable.
 
-If the call is successful, StreamQuery() returns zero and writes its return 
+If the call is successful, **StreamQuery()** returns zero and writes its return 
 value to the fourth argument. If you pass STREAM_ROLES_WRITER, 
-StreamQuery() writes the number of bytes of free space available in the 
-stream buffer. If you pass STREAM_ROLES_READER, StreamQuery() 
+**StreamQuery()** writes the number of bytes of free space available in the 
+stream buffer. If you pass STREAM_ROLES_READER, **StreamQuery()** 
 returns the number of bytes of data waiting to be read. If the call is 
-unsuccessful, StreamQuery() returns a StreamError.
+unsuccessful, **StreamQuery()** returns a **StreamError**.
 
 ### 21.2 Using the Serial Ports
 
@@ -402,8 +403,8 @@ data from those streams.
 Like the stream driver, the serial driver is not accessed directly from Goc 
 code. Instead, a Goc application makes calls to the Stream Library, which 
 passes the requests through to the Serial Driver's strategy routine. Each 
-serial-port command must be passed the GeodeHandle of the Serial 
-Library; again, you can find this handle by calling GeodeGetInfo().
+serial-port command must be passed the **GeodeHandle** of the Serial 
+Library; again, you can find this handle by calling **GeodeGetInfo()**.
 
 The serial driver uses two streams, one for data going out to the serial port 
 (outgoing) and one for data coming in from the serial port (incoming). Your 
@@ -414,16 +415,16 @@ cases, the port acts as the opposite user.)
 
 SerialOpen()
 
-To open a serial port, call the routine SerialOpen(). This routine is passed 
+To open a serial port, call the routine **SerialOpen()**. This routine is passed 
 the following arguments:
 
-+ The GeodeHandle of the serial-port driver.
++ The **GeodeHandle** of the serial-port driver.
 
-+ A member of the SerialUnit enumerated type; this specifies which serial 
++ A member of the **SerialUnit** enumerated type; this specifies which serial 
 port is being opened. The type's members are SERIAL_COM1, 
 SERIAL_COM2, and so on up to SERIAL_COM8.
 
-+ A member of the StreamOpenFlags enumerated type, indicating what 
++ A member of the **StreamOpenFlags** enumerated type, indicating what 
 to do if the requested serial port is busy (either 
 STREAM_OPEN_NO_BLOCK, indicating that the routine should return an 
 error immediately; or STREAM_OPEN_TIMEOUT, indicating that the 
@@ -438,11 +439,11 @@ free up).
 available (if STREAM_OPEN_TIMEOUT was passed).
 
 A flag is returned to indicate whether the serial port could be opened; if not, 
-a value of type StreamError will be returned to indicate the reason. 
+a value of type **StreamError** will be returned to indicate the reason. 
 Possible stream error values are STREAM_BUFFER_TOO_LARGE and 
 STREAM_CANNOT_CREATE, and the additional values STREAM_NO_DEVICE 
 (if the serial port does not exist) or STREAM_DEVICE_IN_USE (if the device is 
-busy and the StreamOpenFlags passed indicate not to wait).
+busy and the **StreamOpenFlags** passed indicate not to wait).
 
 Note that when using the serial driver, you do not identify the stream by a 
 stream token but rather by the serial port number, known as a unit number. 
@@ -458,24 +459,24 @@ SerialSetFormat(), SerialGetFormat(),SerialSetModem(),
 SerialGetModem(), SerialSetFlowControl()
 
 Communication using a serial port requires that parity, speed, and flow 
-control be properly set. To control these settings, call SerialSetFormat(), 
+control be properly set. To control these settings, call **SerialSetFormat()**, 
 passing the following arguments:
 
-+ The GeodeHandle of the serial-port driver.
++ The **GeodeHandle** of the serial-port driver.
 
-+ The member of the SerialUnit enumerated type.
++ The member of the **SerialUnit** enumerated type.
 
-+ A one-byte record of type SerialFormat, specifying the parity, word 
++ A one-byte record of type **SerialFormat**, specifying the parity, word 
 length, and number of stop bits to be used on the serial line; this record 
 is described below.
 
-+ A member of the SerialMode enumerated type, set to indicate the level 
++ A member of the **SerialMode** enumerated type, set to indicate the level 
 of flow control: SM_COOKED to indicate XON/XOFF flow control with 
 characters stripped to seven bits, SM_RARE to indicate XON/XOFF flow 
 control but incoming characters left alone, or SM_RAW to indicate no flow 
 control.
 
-+ The baud rate to use, a member of the enumerated type SerialBauds, 
++ The baud rate to use, a member of the enumerated type **SerialBauds**, 
 which has the following members:
 
 ~~~
@@ -499,7 +500,7 @@ typedef	enum
 } SerialBaud;
 ~~~
 
-SerialFormat is a byte-sized record that specifies the parity, word-length, 
+**SerialFormat** is a byte-sized record that specifies the parity, word-length, 
 and number of stop bits for the serial line. The record has the following fields:
 
 **SERIAL_FORMAT_DLAB**  
@@ -512,7 +513,7 @@ operation.
 
 **SERIAL_FORMAT_PARITY**  
 This three-bit field holds the parity to expect on receive and use 
-on transmit. It uses the SerialParity enumerated type, which 
+on transmit. It uses the **SerialParity** enumerated type, which 
 has the following members:
 
 ~~~
@@ -538,70 +539,70 @@ This two-bit field holds the length of each data word, minus five
 (i.e. a five-bit word is represented with a zero, a six-bit word 
 with a one).
 
-To find out the current settings of a serial port, call SerialGetFormat(). 
+To find out the current settings of a serial port, call **SerialGetFormat()**. 
 This routine is passed five arguments:
 
-+ The GeodeHandle of the serial-port driver.
++ The **GeodeHandle** of the serial-port driver.
 
-+ The member of the SerialUnit enumerated type.
++ The member of the **SerialUnit** enumerated type.
 
-+ A pointer to a SerialFormat variable. SerialGetFormat() will write 
++ A pointer to a **SerialFormat** variable. **SerialGetFormat()** will write 
 the format data to this variable.
 
-+ A pointer to a SerialMode variable. SerialGetFormat() will write the 
++ A pointer to a **SerialMode** variable. **SerialGetFormat()** will write the 
 appropriate mode constant (SM_COOKED, XON/XOFF, or SM_RARE) to 
 this variable.
 
-+ A pointer to a SerialBaud variable. SerialFormat() will write the 
++ A pointer to a **SerialBaud** variable. **SerialFormat()** will write the 
 appropriate constant to this variable.
 
 As with other serial port routines, if the routine is successful, it will return 
 zero; if it is unsuccessful, it will return an error code.
 
 If you are using a modem's hardware flow control, you will have to configure 
-the modem appropriately. You can do this by calling SerialSetModem(). 
+the modem appropriately. You can do this by calling **SerialSetModem()**. 
 This routine is passed three arguments:
 
-+ The GeodeHandle of the serial-port driver.
++ The **GeodeHandle** of the serial-port driver.
 
-+ The member of the SerialUnit enumerated type.
++ The member of the **SerialUnit** enumerated type.
 
-+ A record of type SerialModem. This record has four fields: 
++ A record of type **SerialModem**. This record has four fields: 
 SERIAL_MODEM_OUT2, SERIAL_MODEM_OUT1, SERIAL_MODEM_RTS, 
 and SERIAL_MODEM_DTR. Set these fields to indicate how the 
 control-bits should be set.
 
-To find out what flow control is being used, call SerialGetModem(). This 
+To find out what flow control is being used, call **SerialGetModem()**. This 
 routine is passed three arguments:
 
-+ The GeodeHandle of the serial-port driver.
++ The **GeodeHandle** of the serial-port driver.
 
-+ The member of the SerialUnit enumerated type.
++ The member of the **SerialUnit** enumerated type.
 
-+ A pointer to a record of type SerialModem. SerialGetModem() will set 
++ A pointer to a record of type **SerialModem**. **SerialGetModem()** will set 
 this record's SERIAL_MODEM_OUT2, SERIAL_MODEM_OUT1, 
 SERIAL_MODEM_RTS, and SERIAL_MODEM_DTR bits appropriately.
 
 You can also set the flow control without setting the other format options. Do 
-this by calling SerialSetFlowControl(). This routine is passed the 
+this by calling **SerialSetFlowControl()**. This routine is passed the 
 following arguments:
 
-+ The GeodeHandle of the serial-port driver.
++ The **GeodeHandle** of the serial-port driver.
 
-+ The member of the SerialUnit enumerated type.
++ The member of the **SerialUnit** enumerated type.
 
-+ A record of type SerialModem. This record has four fields: 
++ A record of type **SerialModem**. This record has four fields: 
 SERIAL_MODEM_OUT2, SERIAL_MODEM_OUT1, SERIAL_MODEM_RTS, 
 and SERIAL_MODEM_DTR. Set these fields to indicate how the 
 control-bits should be set.
 
-+ A member of the SerialMode enumerated type, set to indicate the level 
++ A member of the **SerialMode** enumerated type, set to indicate the level 
 of flow control: SM_COOKED to indicate XON/XOFF flow control with 
 characters stripped to seven bits, SM_RARE to indicate XON/XOFF flow 
 control but incoming characters left alone, or SM_RAW to indicate no flow 
 control.
 
-+ A record of type SerialModemStatus to indicate which lines (chosen 
++ A record of type **SerialModemStatus** to indicate which lines (chosen 
 from DCD, DSR, and CTS) should be used to control outgoing data (if 
 hardware flow control is selected). When one of the selected lines is 
 de-asserted by the remote system, the serial driver will not transmit any 
@@ -616,31 +617,31 @@ Communicating with a serial port is very much like using any other stream.
 Special versions of the stream routines are provided, but they function just 
 like their stream counterparts.
 
-To read data from a serial port, call SerialRead() or SerialReadByte(). 
-These routines take the same arguments as their Stream-() counterparts, 
+To read data from a serial port, call **SerialRead()** or **SerialReadByte()**. 
+These routines take the same arguments as their **Stream-()** counterparts, 
 except that each one must be passed the handle of the Serial Driver, not the 
-Stream Driver, and each routine is passed the SerialUnit for the 
+Stream Driver, and each routine is passed the **SerialUnit** for the 
 appropriate port, instead of being passed a stream token. These routines 
-behave exactly like their Stream-() counterparts.
+behave exactly like their **Stream-()** counterparts.
 
-To write data to a serial port, call SerialWrite() or SerialWriteByte(). 
-Again, these routines behave like their Stream-() counterparts, and take 
+To write data to a serial port, call **SerialWrite()** or **SerialWriteByte()**. 
+Again, these routines behave like their **Stream-()** counterparts, and take 
 similar arguments.
 
-To find out if you can read or write data to the port, call SerialQuery(). 
-Again, this routine behaves like its Stream-() equivalent. To flush any data 
-from the input or output stream, call SerialFlush().
+To find out if you can read or write data to the port, call **SerialQuery()**. 
+Again, this routine behaves like its **Stream-()** equivalent. To flush any data 
+from the input or output stream, call **SerialFlush()**.
 
 #### 21.2.3 Closing a Serial Port
 
 SerialClose(), SerialCloseWithoutReset()
 
-To close a serial port, call the routine SerialClose(). This routine is passed 
+To close a serial port, call the routine **SerialClose()**. This routine is passed 
 three arguments:
 
-+ The GeodeHandle of the serial-port driver.
++ The **GeodeHandle** of the serial-port driver.
 
-+ The member of the SerialUnit enumerated type.
++ The member of the **SerialUnit** enumerated type.
 
 + Either STREAM_LINGER (to instruct the kernel to close the port after all 
 outgoing data in the buffer has been sent), or STREAM_DISCARD (to 
@@ -651,8 +652,8 @@ not. However, if STREAM_LINGER is specified, the port may not be re-opened
 until all the data in the Serial Port's buffer has been dealt with.
 
 You can also instruct the serial driver to close the stream to a port, without 
-actually resetting the port. Do this by calling SerialCloseWithoutReset(). 
-This routine is passed the same arguments as SerialClose().
+actually resetting the port. Do this by calling **SerialCloseWithoutReset()**. 
+This routine is passed the same arguments as **SerialClose()**.
 
 ### 21.3 Using the Parallel Ports
 
@@ -670,16 +671,16 @@ any and all parallel port use.
 
 ParallelOpen()
 
-To open a parallel port, call the routine ParallelOpen(). This routine is 
+To open a parallel port, call the routine **ParallelOpen()**. This routine is 
 passed the following arguments:
 
-+ The GeodeHandle of the parallel-port driver.
++ The **GeodeHandle** of the parallel-port driver.
 
-+ A member of the ParallelUnit enumerated type; this specifies which 
++ A member of the **ParallelUnit** enumerated type; this specifies which 
 parallel port is being opened. The type's members are PARALLEL_LPT1, 
 PARALLEL_LPT2, PARALLEL_LPT3, and PARALLEL_COM4.
 
-+ A member of the StreamOpenFlags enumerated type, indicating what 
++ A member of the **StreamOpenFlags** enumerated type, indicating what 
 to do if the requested parallel port is busy (either 
 STREAM_OPEN_NO_BLOCK, indicating that the routine should return an 
 error immediately; or STREAM_OPEN_TIMEOUT, indicating that the 
@@ -687,7 +688,7 @@ routine should wait a specified number of clock ticks to see if the port will
 free up).
 
 + The unit number of the parallel port in question-this is a value of type 
-ParallelPortNums.
+**ParallelPortNums**.
 
 + The total size of the stream to be used as an output buffer, in bytes.
 
@@ -695,11 +696,11 @@ ParallelPortNums.
 available (if STREAM_OPEN_TIMEOUT was passed).
 
 A flag is returned to indicate whether the parallel port could be opened; if not, 
-a value of type StreamError will be returned to indicate the reason. 
+a value of type **StreamError** will be returned to indicate the reason. 
 Possible stream error values are STREAM_BUFFER_TOO_LARGE and 
 STREAM_CANNOT_CREATE, and the additional values STREAM_NO_DEVICE 
 (if the parallel port does not exist) or STREAM_DEVICE_IN_USE (if the device 
-is busy and the StreamOpenFlags passed indicate not to wait (or not to 
+is busy and the **StreamOpenFlags** passed indicate not to wait (or not to 
 wait any longer)).
 
 Note that when using the parallel driver, you do not identify the stream by a 
@@ -718,23 +719,23 @@ will place the device on-line.
 ParallelWrite(), ParallelWriteByte()
 
 Writing to a parallel port is much like writing to any other stream. To write 
-data, call ParallelWrite() or ParallelWriteByte(). These routines take the 
-same arguments as their Stream-() components, except that each one must 
+data, call **ParallelWrite()** or **ParallelWriteByte()**. These routines take the 
+same arguments as their **Stream-()** components, except that each one must 
 be passed the handle of the Parallel Driver, not the Stream Driver, and each 
-routine is passed the ParallelUnit for the appropriate port, instead of being 
-passed a stream token. These routines behave exactly like their Stream-() 
+routine is passed the **ParallelUnit** for the appropriate port, instead of being 
+passed a stream token. These routines behave exactly like their **Stream-()** 
 counterparts.
 
 #### 21.3.3 Closing a Parallel Port
 
 ParallelClose()
 
-To close a parallel port, ParallelClose(). This routine takes the following 
+To close a parallel port, **ParallelClose()**. This routine takes the following 
 arguments:
 
-+ The GeodeHandle of the parallel-port driver.
++ The **GeodeHandle** of the parallel-port driver.
 
-+ The member of the ParallelUnit enumerated type.
++ The member of the **ParallelUnit** enumerated type.
 
 + Either STREAM_LINGER (to instruct the kernel to close the port after all 
 outgoing data in the buffer has been sent), or STREAM_DISCARD (to 

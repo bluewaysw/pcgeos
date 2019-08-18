@@ -134,14 +134,14 @@ their names) is given in [section 20.1.2.2](#20112-strings).
 |Token             |Description|
 |:-----------------|-----------|
 |NUMBER            |This is some kind of numerical constant. The format in the string is determined by the localization settings. The data section of the token is a floating-point number (even if the string contained an integer).|
-|STRING            |This is a sequence of characters surrounded by "double-quotes." All characters within double quotes are translated into their ASCII equivalents, with the exceptions noted below in section 20.1.1.2 on page 747. The data section is a pointer to the ASCII string specified.|
-|CELL              |This is a reference to a cell in a database. The format is described in section 20.1.1.3 on page 748.        |
+|STRING            |This is a sequence of characters surrounded by "double-quotes." All characters within double quotes are translated into their ASCII equivalents, with the exceptions noted below in [section 20.1.1.2](#20112-strings). The data section is a pointer to the ASCII string specified.|
+|CELL              |This is a reference to a cell in a database. The format is described in [section 20.1.1.3](#20113-cell-references). |
 |END_OF_EXPRESSION |The scanner returns this token when it has examined and translated an entire text string and reached its end.|
 |OPEN_PAREN        |This is simply a left parenthesis character, i.e. "(". There is no data section associated with this token.  |
 |CLOSE_PAREN       |This is simply a right parenthesis character, i.e. ")". There is no data section associated with this token. |
-|OPERATOR          |This is a unary or binary operator. The operators are described in section 20.1.1.4 on page 748. The data section specifies which operator was encountered.|
+|OPERATOR          |This is a unary or binary operator. The operators are described in [section 20.1.1.4](#20114-operators). The data section specifies which operator was encountered.|
 |LIST_SEPARATOR    |This is a comma, i.e. ",". It is used to separate arguments to functions. There is no data section associated with this token.|
-|IDENTIFIER        |This is a sequence of characters, not in quotation marks, which does not match the format for cell references. Identifiers may be functions (built-in or application-defined) or variables; see section 20.1.1.5 on page 752. The data section is a string containing the identifier.|
+|IDENTIFIER        |This is a sequence of characters, not in quotation marks, which does not match the format for cell references. Identifiers may be functions (built-in or application-defined) or variables; see [section 20.1.1.5](#20115-identifiers). The data section is a string containing the identifier.|
 
 ##### 20.1.1.2 Strings
 
@@ -176,14 +176,14 @@ followed by AB, AC, and so on to AZ (column 51); this column is followed by
 BA, and so on, to the largest column, IV (column 255). The rows are indicated 
 by number, with the first row having number 1.
 
-The data portion of a cell reference token is a CellReference structure. This 
+The data portion of a cell reference token is a **CellReference** structure. This 
 structure records the row and column indices of the cell; the scanner 
 translates the cell reference to these indices. For more information about the 
 cell library, see the Cell Library section in "Database Library," Chapter 19 of 
 the Concepts Book.
 
 When the evaluator needs to get the value of a cell, it calls a callback routine, 
-passing the cell's CellReference structure. The application is responsible 
+passing the cell's **CellReference** structure. The application is responsible 
 for looking up the cell's value and returning it to the evaluator. If you manage 
 a cell file with a Spreadsheet object, this work is done for you; the 
 Spreadsheet will be called by the evaluator, returning the values of cells as 
@@ -201,7 +201,7 @@ The scanner recognizes a number of built-in operators. Neither the scanner
 nor the parser does any simplification or evaluation of operator expressions; 
 this is done by the evaluator. All operators are represented by the token 
 SCANNER_TOKEN_OPERATOR. The token has a one-byte data section, which 
-is a member of the enumerated type OperatorType; this value specifies 
+is a member of the enumerated type **OperatorType**; this value specifies 
 which operator was encountered. This section begins with a listing of 
 currently supported operators in order of precedence, from highest 
 precedence to lowest; this is followed by a detailed description of the 
@@ -530,24 +530,24 @@ sequence of parser tokens:
 
 |Token          |Data                   |Comment                               |
 |:--------------|:----------------------|:-------------------------------------|
-|NUMBER         |3.0                    |All numbers are floats
+|NUMBER         |3.0                    |All numbers are floats                |
 |OPERATOR       |OP_ADDITION            |
-|FUNCTION       |FUNCTION_ID_SUM
-|NUMBER         |6.5
+|FUNCTION       |FUNCTION_ID_SUM        |
+|NUMBER         |6.5                    |
+|END_OF_ARG     |                       |
+|NUMBER         |3.0                    |
+|OPERATOR       |OP_EXPONENTIATION      |
+|OPEN_PAREN     |                       |
+|NUMBER         |4.0                    |
+|OPERATOR       |OP_SUBTRACTION         |
+|NUMBER         |1.0                    |
+|CLOSE_PAREN    |
 |END_OF_ARG     |
-|NUMBER         |3.0
-|OPERATOR       |OP_EXPONENTIATION
-|OPEN_PAREN
-|NUMBER         |4.0
-|OPERATOR       |OP_SUBTRACTION
-|NUMBER         |1.0
-|CLOSE_PAREN
-|END_OF_ARG
 |CELL           |C5                     |Actually stored as "4,2"; row index 4, column index 2
-|OPERATOR       |		OP_RANGE_SEPARATOR
+|OPERATOR       |OP_RANGE_SEPARATOR     |
 |CELL           |F9
-|END_OF_ARG
-|CLOSE_FUNCTION
+|END_OF_ARG     |
+|CLOSE_FUNCTION |
 |END_OF_EXPRESSION
 
 The application does not need to save the original text string. Instead, it can 
@@ -806,10 +806,10 @@ to use these routines.
 
 ParserParseString()
 
-To parse a string, all you do is call ParserParseString(). This routine takes 
+To parse a string, all you do is call **ParserParseString()**. This routine takes 
 three arguments: A pointer to a null-terminated string, a pointer to a buffer, 
-and a pointer to a ParserReturnStruct. This structure contains a pointer 
-to a callback routine. ParserParseString() parses the string into a 
+and a pointer to a **ParserReturnStruct**. This structure contains a pointer 
+to a callback routine. **ParserParseString()** parses the string into a 
 sequence of tokens and writes the tokens to the buffer. Whenever the parser 
 encounters an identifier, it calls the callback routine and requests an ID 
 number for the identifier. Similarly, when the parser encounters a function 
@@ -867,7 +867,7 @@ General parser error.
 
 ParserEvalExpression()
 
-To format an expression, call ParserEvalExpression(). This routine is 
+To format an expression, call **ParserEvalExpression()**. This routine is 
 passed a token sequence; it evaluates it and writes the result, another token 
 sequence, to a passed buffer. It calls a supplied callback routine to perform 
 the following tasks:
@@ -964,7 +964,7 @@ operators, always propagate application-defined errors.
 
 ParserFormatExpression()
 
-The routine ParserFormatExpression() is passed a token buffer; it 
+The routine **ParserFormatExpression()** is passed a token buffer; it 
 returns a character string. The formatter uses the localization routines to 
 format numbers. The formatter also formats error codes as appropriate error 
 messages. These error messages are stored in a localizable resource, so the 

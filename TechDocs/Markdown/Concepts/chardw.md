@@ -1,9 +1,3 @@
-
-Table A-0
-
-
-
-
 ## A Machine Architecture
 
 The GEOS operating system is state-of-the art technology based on the 

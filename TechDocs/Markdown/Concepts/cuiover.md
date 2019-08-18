@@ -14,7 +14,7 @@ run with several different look-and-feel specifications.
 
 This chapter will provide an overview of the specifics of the GEOS User 
 Interface. For a general overview of the UI and a high-level description of its 
-components, see "System Architecture," Chapter 3.
+components, see ["System Architecture", Chapter 3](carch.md).
 
 ### 10.1 The GUI
 
@@ -68,15 +68,15 @@ the screen is determined by GEOS. Visible objects provide more
 application-specific functionality and offer complete display control to the 
 application.
 
-Generic object classes are all based on the class GenClass. Applications will 
-never use any objects of GenClass, but they will use many objects of its 
+Generic object classes are all based on the class **GenClass**. Applications will 
+never use any objects of **GenClass**, but they will use many objects of its 
 subclasses. A list of these subclasses is shown in Figure 10-1, and each of 
-these classes is described in "Using the Generic Classes" on page 378.
+these classes is described in ["Using the Generic Classes"](#103-using-the-generic-class).
 
-Visible object classes are subclassed from VisClass. VisClass may be used 
-often by applications, as will its subclasses. The subclasses of VisClass are 
-shown in Figure 10-2, and each is described in "Using the Visible Classes" on 
-page 385.
+Visible object classes are subclassed from **VisClass**. **VisClass** may be used 
+often by applications, as will its subclasses. The subclasses of **VisClass** are 
+shown in Figure 10-2, and each is described in ["Using the Visible Classes"]
+(104-using-the-visible-classes).
 
 ![](Art/figure_10-1.png)
 
@@ -141,13 +141,13 @@ implementations that may or may not be implemented by the GUI in use.
 
 The way the generic object gets translated by GEOS into a visible 
 representation is a complicated process. All generic classes are subclasses of 
-GenClass, which is defined as a variant class. This means that GenClass 
+**GenClass**, which is defined as a variant class. This means that **GenClass** 
 has no defined superclass, that the superclass can be changed from time to 
 time. The superclass is determined when the object is instantiated and 
-resolved-when its visual representation is called for. (See "GEOS 
-Programming," Chapter 5.)
+resolved-when its visual representation is called for. (See ["GEOS 
+Programming", Chapter 5](ccoding.md).)
 
-The specific UI library contains objects subclassed off VisClass. These 
+The specific UI library contains objects subclassed off **VisClass**. These 
 objects know how to handle input events and have very specific 
 representation on the screen. These specific UI classes connect to the generic 
 classes through the master/variant mechanism; in this way, the superclass of 
@@ -165,8 +165,8 @@ different GUIs.
 #### 10.3.1 The Generic Class Tree
 
 Generic objects have a tremendous amount of built-in functionality. Much of 
-this is built into GenClass, the topmost class in the generic class tree. For 
-full details on GenClass and the other generic classes, see the Object 
+this is built into **GenClass**, the topmost class in the generic class tree. For 
+full details on **GenClass** and the other generic classes, see the Object 
 Reference Book.
 
 Among the features offered by all generic classes are
@@ -211,13 +211,13 @@ Note that every one of these classes may be subclassed to add, change, or
 remove functionality. Changing or removing functions from a generic class is 
 not encouraged, however, as it can cause a specific UI library to give 
 unpredictable results. For a diagram of all the generic classes in their class 
-hierarchy, see Figure 10-1 on page l 377.
+hierarchy, see Figure 10-1.
 
 ##### 10.3.1.1 GenClass
 
-GenClass provides the functionality basic to all generic objects. GenClass 
+**GenClass** provides the functionality basic to all generic objects. **GenClass** 
 is not used directly by any applications and has no visible representation. 
-Rather, all generic classes are subclassed off GenClass. GenClass provides 
+Rather, all generic classes are subclassed off **GenClass**. **GenClass** provides 
 instance fields common to all of its subclasses. Instance fields of special 
 interest include
 
@@ -234,18 +234,18 @@ a generic tree.
 object handles busy states when an application is waiting for a routine to 
 finish.
 
-GenClass also implements scores of hints that can affect UI geometry, visual 
+**GenClass** also implements scores of hints that can affect UI geometry, visual 
 representation, data structures, and functions.
 
 ##### 10.3.1.2 GenApplicationClass
 
-GenApplicationClass provides the basic functionality to open and close 
+**GenApplicationClass** provides the basic functionality to open and close 
 applications within GEOS. An object of this class serves as the top object in 
 any application for GEOS.
 
 ##### 10.3.1.3 GenPrimaryClass
 
-GenPrimaryClass is a subclass of GenDisplayClass. The GenPrimary is 
+**GenPrimaryClass** is a subclass of **GenDisplayClass**. The GenPrimary is 
 the chief UI grouping object of an application, and it usually appears as the 
 application's primary window. An application's GenPrimary object manages 
 all controls and output areas that are invoked when an application is first 
@@ -280,7 +280,7 @@ visible objects.
 
 ##### 10.3.1.7 List Classes
 
-Together, GenBoolean, GenBooleanGroup, GenItem, GenItemGroup, and 
+Together, GenBoolean, GenBooleanGroup, GenItem, **GenItemGroup**, and 
 GenDynamicList provide many different types of lists. List objects may be 
 used to create lists that are dynamic or static; scrollable or not; exclusive, 
 non-exclusive, or otherwise. List objects may appear within menus or dialog 
@@ -295,7 +295,7 @@ their maximum and minimum values set by the application.
 
 ##### 10.3.1.9 GenTextClass
 
-GenTextClass is tremendously versatile and can be used for text displays or 
+**GenTextClass** is tremendously versatile and can be used for text displays or 
 text-edit fields. The GenText is used by nearly every application that either 
 displays text or requires text input. It is so versatile and powerful that it can 
 provide the power of an entire word processor without any additional code in 
@@ -309,8 +309,8 @@ allow the user to set all these features.
 
 ##### 10.3.1.10 Document and Document Control Classes
 
-Together, GenDocumentClass, GenDocumentGroupClass, and 
-GenDocumentControlClass provide all the functions necessary to create, 
+Together, **GenDocumentClass**, **GenDocumentGroupClass**, and 
+**GenDocumentControlClass** provide all the functions necessary to create, 
 save, open, and edit document files. These classes provide not only the UI 
 menus and tools (the File menu) but also the functions for managing the 
 document files. Applications that use these classes never have to call routines 
@@ -336,8 +336,8 @@ want to use these objects.
 
 ##### 10.3.1.12 GenControlClass and UI Controllers
 
-GenControlClass is used to create UI controller objects. Applications will 
-most likely not use GenControlClass directly, though some object libraries 
+**GenControlClass** is used to create UI controller objects. Applications will 
+most likely not use **GenControlClass** directly, though some object libraries 
 might. For example, the Text Library uses controller objects for font control, 
 point size control, and style control, among other things. Any application that 
 uses the Text Library can include the font controller object; the user will then 
@@ -345,15 +345,15 @@ be able to select and apply fonts without the application having to do any
 work to support it.
 
 The UI and various libraries provide many controllers you can use 
-immediately. Some examples are the GenEditControlClass, which creates 
-and maintains the Edit menu and tools; ColorSelectorClass, which creates 
+immediately. Some examples are the **GenEditControlClass**, which creates 
+and maintains the Edit menu and tools; **ColorSelectorClass**, which creates 
 and displays UI gadgetry to set color information; and 
-GenViewControlClass, which creates and maintains a View menu 
+**GenViewControlClass**, which creates and maintains a View menu 
 allowing the user to set scaling and scrolling behavior.
 
 ##### 10.3.1.13 GenToolControlClass
 
-GenToolControlClass lets the user select which of an application's tools 
+**GenToolControlClass** lets the user select which of an application's tools 
 are available and where they should be placed (in a toolbox, in a menu, etc.). 
 Tools are provided by UI controllers. Typically, an application that uses 
 controllers will provide several tool areas and a GenToolControl; the 
@@ -374,7 +374,7 @@ labeling areas or items on the screen.
 
 ##### 10.3.1.16 GenContentClass
 
-GenContentClass is used with a GenView to display other generic UI 
+**GenContentClass** is used with a GenView to display other generic UI 
 objects within a scrollable window. The GenContent is rarely used because 
 having some of an application's UI objects not visible can confuse some users. 
 More often, a GenDocument is used as the view's content; 
@@ -385,8 +385,8 @@ GenDocumentClass is subclassed from the GenContent.
 You don't have to understand all the generic object classes to create a 
 complete generic object tree for your application. For insight into and an 
 example of creating a generic tree (including the primary window, a menu, a 
-dialog box, and a scrolling view window), see "First Steps: Hello World," 
-Chapter 4.
+dialog box, and a scrolling view window), see ["First Steps: Hello World", 
+Chapter 4](cgetsta.md).
 
 ### 10.4 Using the Visible Classes
 
@@ -425,7 +425,7 @@ redrawing.
 Visible objects exist in an object tree and draw themselves in the GEOS 
 graphic space. Every visible object knows where in the graphic coordinate 
 space it sits and how big it is. The top object of the object tree, the VisContent, 
-manages the entire tree. Composite objects (of class VisCompClass) can be 
+manages the entire tree. Composite objects (of class **VisCompClass**) can be 
 used as organizational objects that control other objects.
 
 Using the VisContent, the VisComposite, and the standard Vis objects, you 
@@ -435,8 +435,8 @@ are based on these three building blocks.)
 
 Every visible object knows what its bounds are; that is, each object knows 
 exactly how big it is and where it sits in the graphics document. The bounds 
-are always rectangular in the base VisClass format, though a subclass of 
-VisClass could easily be created to handle more complex shapes. Bounds are 
+are always rectangular in the base **VisClass** format, though a subclass of 
+**VisClass** could easily be created to handle more complex shapes. Bounds are 
 in the standard graphics coordinates (i.e. 16-bit numbers based on a 72 dpi 
 grid). Vis objects may also exist in large documents (32-bit coordinates), but 
 the objects must handle the majority of the extra coordinate manipulation on 
@@ -452,7 +452,7 @@ normal graphics commands to draw anything wherever it wants (not just
 within its bounds).
 
 For examples of visible objects that know their bounds and that handle 
-MSG_VIS_DRAW, see "A UI Example" on page 391.
+MSG_VIS_DRAW, see ["A UI Example"](105-a-ui-example).
 
 #### 10.4.3 Visible Object Abilities
 
@@ -467,7 +467,7 @@ moving itself in the document space or resizing itself.
 + Ability to Draw Themselves
 Every visible object is responsible for drawing itself. When it receives a 
 drawing message (MSG_VIS_DRAW), it must recognize the context of the 
-message and draw itself appropriately. VisClass does not have a default 
+message and draw itself appropriately. **VisClass** does not have a default 
 handler for MSG_VIS_DRAW; each subclass must handle this message 
 itself.
 
@@ -507,10 +507,10 @@ ignored.
 #### 10.4.4 The Vis Class Tree
 
 There are four base visible classes on which the other object libraries are 
-founded. VisClass is the most basic and at the root of the visible class tree. 
+founded. **VisClass** is the most basic and at the root of the visible class tree. 
 Under it are VisComp and VisText. VisContent is a subclass of VisComp.
 
-VisTextClass is special in that it is rarely subclassed as it already contains 
+**VisTextClass** is special in that it is rarely subclassed as it already contains 
 nearly all the functionality an application will need from a visible text object.
 
 The other three classes are typically subclassed by applications. None of the 
@@ -518,20 +518,20 @@ three can draw itself; instead, the subclass must handle MSG_VIS_DRAW, the
 message that indicates the object must draw itself. The three different 
 classes are used as follows:
 
-+ VisClass
-VisClass is the head of the visible class tree and therefore is the most 
-broad-based in functionality. VisClass objects can not have children and 
++ **VisClass**
+**VisClass** is the head of the visible class tree and therefore is the most 
+broad-based in functionality. **VisClass** objects can not have children and 
 therefore can only exist as the leaves of the object tree.
 
-+ VisCompClass
-VisCompClass provides a composite VisClass object. Essentially, this 
-class is the same as VisClass except that it can have children. It also 
++ **VisCompClass**
+**VisCompClass** provides a composite **VisClass** object. Essentially, this 
+class is the same as **VisClass** except that it can have children. It also 
 includes several special geometry options that allow it to manage and 
 place its children as well as set their bounds.
 
-+ VisContentClass
-VisContentClass is used only as the content of a GenView. It is a 
-subclass of VisCompClass and therefore can have children and manage 
++ **VisContentClass**
+**VisContentClass** is used only as the content of a **GenView**. It is a 
+subclass of **VisCompClass** and therefore can have children and manage 
 them with the same geometry features available to VisComp. In addition, 
 the VisContent interacts with the GenView to handle input and drawing. 
 The content can interact with the view to determine sizing behavior as 
@@ -544,22 +544,22 @@ run-time. As stated earlier, the visible tree is linked to the generic UI object
 tree through the GenView object. Without a view object, you will not be able 
 to display your visible objects.
 
-The visible object tree must have a VisContentClass object (or a subclass of 
-VisContentClass) as its root object. If another class is chosen for the 
+The visible object tree must have a **VisContentClass** object (or a subclass of 
+**VisContentClass**) as its root object. If another class is chosen for the 
 topmost object, that class will have to handle all the messages that would 
 normally be received by a content; otherwise, results are unpredictable and 
 your application will likely not function the way you expect.
 
 VisContent objects are rarely, if ever, used lower in the visible tree than as 
-the top node. For levels further down in the tree, you can use VisCompClass 
-(or, again, a subclass of VisCompClass). VisComp allows the object to have 
+the top node. For levels further down in the tree, you can use **VisCompClass** 
+(or, again, a subclass of **VisCompClass**). VisComp allows the object to have 
 children and does not incur the same amount of overhead associated with a 
 VisContent. Any object in the visible tree that may have children must be a 
-"composite" object, or a subclass of VisCompClass.
+"composite" object, or a subclass of **VisCompClass**.
 
-Leaf nodes of the visible tree can be direct subclasses of VisClass. Objects of 
-VisClass can not have children, but they have all the attributes and instance 
-data you need for a leaf node. You must subclass VisClass, however, if your 
+Leaf nodes of the visible tree can be direct subclasses of **VisClass**. Objects of 
+**VisClass** can not have children, but they have all the attributes and instance 
+data you need for a leaf node. You must subclass **VisClass**, however, if your 
 object is ever to be shown on the screen: Since visible objects can have any 
 application-defined visible representation, you must write the 
 MSG_VIS_DRAW handler yourself; this can be done only in a subclass.
@@ -579,10 +579,10 @@ be able to find and contact that parent. Likewise, a parent that must notify
 all its children to redraw themselves must be able to quickly send out the 
 notification.
 
-An object can send a message to its parent by simply specifying @visParent 
+An object can send a message to its parent by simply specifying **@visParent** 
 as the message recipient. That same object could also contact all its children 
-by specifying the recipient as @visChildren. The message sent (only with 
-@send since there are multiple destinations) will go to each of the object's 
+by specifying the recipient as **@visChildren**. The message sent (only with 
+**@send** since there are multiple destinations) will go to each of the object's 
 children.
 
 If you need more complicated message passing, you can build this into your 
@@ -591,13 +591,13 @@ children or of its parent; it can then send the message appropriately. Each
 recipient can handle it in the same manner, forwarding it on to the next layer 
 of the tree.
 
-VisClass also employs several messages known as "visual upward queries," 
+**VisClass** also employs several messages known as "visual upward queries," 
 or "VUP" messages. These travel up the visible tree until they encounter an 
 object of the proper class, where they will be handled.
 
 #### 10.4.6.2 Altering the Tree
 
-VisClass and VisCompClass can handle messages that retrieve various 
+**VisClass** and **VisCompClass** can handle messages that retrieve various 
 information about the visible tree. They also have messages for altering the 
 visible tree's structure.
 
@@ -613,9 +613,9 @@ visible world works and about how to manage visible objects in an
 application. It is simple but illustrates the following concepts:
 
 + Drawing Visible Objects
-Every visible object must be able to draw itself. VisClass does not have 
+Every visible object must be able to draw itself. **VisClass** does not have 
 any inherent code to make visible objects visible; instead, subclasses of 
-VisClass must handle MSG_VIS_DRAW.
+**VisClass** must handle MSG_VIS_DRAW.
 
 + Changing an Object's Position
 The pieces of the TicTac game allow the user to move them around the 
@@ -667,7 +667,7 @@ is not discussed in this section.
 
 The application uses two different object trees, one for its generic UI and one 
 for the game board and game pieces. The first consists of generic UI objects 
-and the second of objects subclassed off VisClass and VisContentClass. 
+and the second of objects subclassed off **VisClass** and **VisContentClass**. 
 The two object trees are diagrammed in Figure 10-3 and are described below.
 
 #### 10.5.3.1 TicTac's Generic Tree
@@ -734,7 +734,7 @@ When the user presses the New Game trigger, the trigger sends its message,
 MSG_TICTAC_NEW_GAME, to the TicTacBoard object. The TicTacBoard 
 object is the top object in the visible tree and, upon receipt of this message, 
 resets the game board and notifies all the piece objects of the reset. This 
-process is described below in "TicTacBoard Specifics" on page 400.
+process is described below in ["TicTacBoard Specifics"](1054-tictacboard-specifics).
 
 ---
 Code Display 10-2 The TicTac Game Menu
@@ -827,8 +827,8 @@ Code Display 10-3 The TicTacView Object
 ##### 10.5.3.2 TicTac's Visible Tree
 
 The visible tree contains eleven objects. One acts as TicTacView's content and 
-is of TicTacBoardClass, a subclass of VisContentClass. The other ten are 
-all game pieces of class TicTacPieceClass, a subclass of VisClass. Both the 
+is of TicTacBoardClass, a subclass of **VisContentClass**. The other ten are 
+all game pieces of class TicTacPieceClass, a subclass of **VisClass**. Both the 
 class definitions and the object definitions are given in Code Display 10-4.
 
 ![](Art/figure_10-4.png)
@@ -965,7 +965,7 @@ typedef ByteEnum TicTacPieceTypes;
 
 #### 10.5.4 TicTacBoard Specifics
 
-The TicTacBoard object, being of a subclass of VisContentClass, handles 
+The TicTacBoard object, being of a subclass of **VisContentClass**, handles 
 many messages specific to content objects. However, only three messages are 
 handled specifically by TicTacBoardClass. These messages are
 
@@ -1132,7 +1132,7 @@ MSG_VIS_DRAW
 This message notifies the object that it must draw itself and 
 any accompanying graphics. The game piece responds by 
 drawing the proper shape in the proper color in the proper 
-place. Since every VisClass object inherently knows its 
+place. Since every **VisClass** object inherently knows its 
 location and bounds, the object already knows where and how 
 big the shape should appear. Whether a gray box or circle is 
 drawn depends on the TTP_pieceType instance data field.
@@ -1144,7 +1144,7 @@ under the pointer. The UI objects then pass the message down
 the object tree until it gets handled. The progression sends the 
 message to TicTacApp, which passes it to TicTacPrimary, which 
 passes it to TicTacView, which passes it to TicTacBoard, which 
-(by letting the default VisContentClass method handle it) 
+(by letting the default **VisContentClass** method handle it) 
 passes it to the proper game piece object (if any) under the 
 pointer. The game piece responds by grabbing the mouse and 
 all subsequent pointer events.

@@ -25,10 +25,10 @@ a path. This simplifies graphics programming a great deal.
 Depending on how much experience you have with the GEOS graphics 
 system, you may have some idea already about what sorts of shapes can be 
 drawn and the ways to draw them. Most of these commands have names like 
-GrDrawShape() or GrFillShape() (e.g. GrDrawRect(), GrFillEllipse()). 
-Normally, a command of the form GrDrawShape() draws the outline of a 
-shape, while GrFillShape() fills in the interior of the shape. Commands 
-with names like GrSetAttribute() (e.g. GrSetAreaColor()) change the 
+**GrDrawShape()** or **GrFillShape()** (e.g. **GrDrawRect()**, **GrFillEllipse()**). 
+Normally, a command of the form **GrDrawShape()** draws the outline of a 
+shape, while **GrFillShape()** fills in the interior of the shape. Commands 
+with names like **GrSetAttribute()** (e.g. **GrSetAreaColor()**) change the 
 color, fill pattern, and other attributes of shapes to be drawn. Most of these 
 commands are passed a GState. The drawing commands are also passed 
 coordinates at which to draw.
@@ -42,8 +42,8 @@ Most of these routines work with standard coordinates, measured in
 typographer's points. For geodes that need to make drawings which are 
 precise to a fraction of a point, four routines have been set up to use 
 WWFixed coordinates, and are thus accurate to a fraction of a point. These 
-routines are GrDrawRelLineTo(), GrRelMoveTo(), 
-GrDrawRelCurveTo(), and GrDrawRelArc3PointTo(). Geodes may use 
+routines are **GrDrawRelLineTo()**, **GrRelMoveTo()**, 
+**GrDrawRelCurveTo()**, and **GrDrawRelArc3PointTo()**. Geodes may use 
 these routines to draw the outline of any conceivable two-dimensional shape. 
 To create a precise, filled shape, use these routines to describe a path and 
 then fill the path.
@@ -61,8 +61,8 @@ at the point's coordinates.
 **Figure 24-1** Point  
 _A point is defined by its coordinates._
 
-GrDrawPoint() draws a point at the passed coordinate pair.  
-GrDrawPointAtCP() draws a point at the current pen position.
+**GrDrawPoint()** draws a point at the passed coordinate pair.  
+**GrDrawPointAtCP()** draws a point at the current pen position.
 
 #### 24.2.2 Lines
 
@@ -78,18 +78,18 @@ position becomes the last passed coordinate pair.
 **Figure 24-2** Line  
 _A line is defined by its endpoints._
 
-GrDrawLine() draws a line between points. GrDrawLineTo() draws a line 
-from the current pen position to the passed point. GrDrawHLine() draws a 
+**GrDrawLine()** draws a line between points. **GrDrawLineTo()** draws a line 
+from the current pen position to the passed point. **GrDrawHLine()** draws a 
 horizontal line between two points. These two points share the same y 
-coordinate (thus the line is horizontal). GrDrawHLineTo() draws a 
+coordinate (thus the line is horizontal). **GrDrawHLineTo()** draws a 
 horizontal line from the current pen position to a passed x coordinate. 
-GrDrawVLine() draws a vertical line between two points which share a 
-common x coordinate. GrDrawVLineTo() draws a vertical line from the 
-current pen position to a passed y coordinate. The GrDrawH-() and 
-GrDrawV-() routines save space compared to GrDrawLine() or 
-GrDrawLineTo(), since fewer coordinates are necessary to define the line.
+**GrDrawVLine()** draws a vertical line between two points which share a 
+common x coordinate. **GrDrawVLineTo()** draws a vertical line from the 
+current pen position to a passed y coordinate. The **GrDrawH...()** and 
+**GrDrawV...()** routines save space compared to **GrDrawLine()** or 
+**GrDrawLineTo()**, since fewer coordinates are necessary to define the line.
 
-GrDrawRelLineTo() draws a line from the current pen position to the point 
+**GrDrawRelLineTo()** draws a line from the current pen position to the point 
 at the specified x and y offset from the starting position. This routine takes 
 very precise coordinates, and is useful for describing paths.
 
@@ -104,16 +104,16 @@ two opposite corners of the rectangle.
 ![](Art/figure_24-3.png)  
 **Figure 24-3** Rectangle
 
-GrDrawRect() draws the outline of a rectangle using the passed 
-coordinates. GrDrawRectTo() draws the outline of a rectangle using the 
+**GrDrawRect()** draws the outline of a rectangle using the passed 
+coordinates. **GrDrawRectTo()** draws the outline of a rectangle using the 
 current pen position as one of the defining points; the pen position is 
 unchanged by this operation. These functions draw the rectangle outline 
-using the current line attributes. GrFillRect() draws a filled rectangle 
-defined by the passed coordinates. GrFillRectTo() fills a rectangle of which 
-the pen position is one corner. GrFillRect() and GrFillRectTo() use the 
+using the current line attributes. **GrFillRect()** draws a filled rectangle 
+defined by the passed coordinates. **GrFillRectTo()** fills a rectangle of which 
+the pen position is one corner. **GrFillRect()** and **GrFillRectTo()** use the 
 GState's area attributes. They do not draw a border around the rectangle; if 
-you want a bordered rectangle, call GrFillRect() and follow it with 
-GrDrawRect(). Note that if the order of these operations if reversed, the fill 
+you want a bordered rectangle, call **GrFillRect()** and follow it with 
+**GrDrawRect()**. Note that if the order of these operations if reversed, the fill 
 may obscure the draw.
 
 #### 24.2.4 Ellipses
@@ -128,8 +128,8 @@ their widths.
 **Figure 24-4** Ellipse  
 _An ellipse with its bounding rectangle._
 
-GrDrawEllipse() draws the outline of an ellipse using the current line 
-drawing attributes. GrFillEllipse() fills the ellipse's area using the current 
+**GrDrawEllipse()** draws the outline of an ellipse using the current line 
+drawing attributes. **GrFillEllipse()** fills the ellipse's area using the current 
 area attributes.
 
 #### 24.2.5 Elliptical Arcs
@@ -144,11 +144,11 @@ corresponding to the positive x axis (i.e., "3 o'clock").
 ![](Art/figure_24-5.png)  
 **Figure 24-5** Elliptical Arc
 
-GrDrawArc() draws the outline of an elliptical arc, a curved line. It does so 
-using the GState's current line attributes. GrFillArc() fills the arc. There 
+**GrDrawArc()** draws the outline of an elliptical arc, a curved line. It does so 
+using the GState's current line attributes. **GrFillArc()** fills the arc. There 
 are two ways to fill an arc: you can fill in the wedge described by the arc, or 
 you can fill just the region between the arc and its chord; set the style with 
-an ArcCloseType value. 
+an **ArcCloseType** value. 
 
 #### 24.2.6 Three-Point Arcs
 
@@ -163,17 +163,17 @@ point is to the line connecting the endpoints, the shallower the described arc.
 ![](Art/figure_24-6.png)  
 **Figure 24-6** Three-point Arcs
 
-GrDrawArc3Point() draws the three-point arc corresponding to the passed 
+**GrDrawArc3Point()** draws the three-point arc corresponding to the passed 
 points. The second endpoint passed becomes the new pen position. 
-GrDrawArc3PointTo() draws a three-point arc using the present pen 
+**GrDrawArc3PointTo()** draws a three-point arc using the present pen 
 position as one of the endpoints; the other endpoint becomes the new pen 
-position. GrFillArc3Point() fills a three-point arc. GrFillArc3PointTo() 
+position. **GrFillArc3Point()** fills a three-point arc. **GrFillArc3PointTo()** 
 fills an arc that has the present pen position as an endpoint.
 
-The GrDrawRelArc3PointTo() routine draws a three-point arc where the 
+The **GrDrawRelArc3PointTo()** routine draws a three-point arc where the 
 pen position is the first point and the other two points are specified as offsets 
 from that position. This routine takes WWFixed coordinates for precision 
-drawing. GrFillRelArc3PointTo() fills a three-point arc where the pen 
+drawing. **GrFillRelArc3PointTo()** fills a three-point arc where the pen 
 position is the first point and the other two points are specified as offsets from 
 that position.
 
@@ -207,15 +207,15 @@ circle results in a more rounded corner with more area taken away.
 _Pictured here is a rounded rectangle, with detail showing the circle whose 
 radius defines the rounded rectangle's corner curvature._
 
-GrDrawRoundRect() draws the outline of a rounded rectangle with the 
+**GrDrawRoundRect()** draws the outline of a rounded rectangle with the 
 passed bounding rectangle and corner circle dimensions. The drawing 
-position is set to the first passed coordinate pair. GrDrawRoundRectTo() 
+position is set to the first passed coordinate pair. **GrDrawRoundRectTo()** 
 draws the outline of the rounded rectangle for which the current position is 
 one corner of the bounding rectangle. The current position is unaffected by 
-this operation. GrDrawRoundRect() and GrDrawRoundRectTo() use 
-the current line drawing attributes. GrFillRoundRect() fills a rounded 
+this operation. **GrDrawRoundRect()** and **GrDrawRoundRectTo()** use 
+the current line drawing attributes. **GrFillRoundRect()** fills a rounded 
 rectangle with passed bounding rectangle and corner radius using the 
-current area attributes. GrFillRoundRectTo() fills a rounded rectangle 
+current area attributes. **GrFillRoundRectTo()** fills a rounded rectangle 
 that has the current position as one corner of the bounding rectangle.
 
 #### 24.2.8 Polylines and Polygons
@@ -233,14 +233,14 @@ _Polylines can't be filled. Polygons can be drawn as with polylines, or filled
 using one of two "fill rules." In the polygon shown, the odd/even fill results in 
 a "cavern", or hollow area. The winding rule fills in this cavern._
 
-GrDrawPolyline() draws a polyline using the current line attributes. 
-GrDrawPolygon() draws a polygon using the current line attributes. 
+**GrDrawPolyline()** draws a polyline using the current line attributes. 
+**GrDrawPolygon()** draws a polygon using the current line attributes. 
 
-To draw a closed figure with GrDrawPolyline(), the first and last point 
-must have the same coordinates. GrDrawPolygon() draws figures as closed 
+To draw a closed figure with **GrDrawPolyline()**, the first and last point 
+must have the same coordinates. **GrDrawPolygon()** draws figures as closed 
 automatically; having the same beginning and ending point is unnecessary.
 
-GrFillPolygon() fills the interior of a polygon. It does so using the current 
+**GrFillPolygon()** fills the interior of a polygon. It does so using the current 
 area attributes. It also uses a fill rule, describing how the polygon should be 
 filled. The odd/even fill rule decides whether a point is within a polygon by 
 seeing how many times a ray drawn from the point to the exterior of the 
@@ -253,7 +253,7 @@ if it crosses the ray right to left, the accumulator is decremented. Those
 points for which the ray's accumulator is non-zero are considered inside the 
 region.
 
-GrBrushPolyline() is an optimized routine. It provides a fast, simple way 
+**GrBrushPolyline()** is an optimized routine. It provides a fast, simple way 
 to draw thick polylines. Instead of specifying a line width in points, the caller 
 passes the dimensions of a rectangle of pixels. This rectangle will be used as 
 a sort of brush, dragged along the course of the polyline. The result is a 
@@ -265,7 +265,7 @@ software, this routine provides the "ink" feedback for pen-based systems,
 where speed is a top priority.
 
 To find out whether a given point falls within a polygon, call 
-GrTestPointInPolygon().
+**GrTestPointInPolygon()**.
 
 #### 24.2.9 Bézier Curves and Splines
 
@@ -294,19 +294,19 @@ anchor point. A control point at zero distance from its anchor point won't
 affect the curve; if both control points are at zero distance from their anchors, 
 the result will be a straight line segment.
 
-GrDrawCurve() draws a Bézier curve. It takes four points as arguments, 
+**GrDrawCurve()** draws a Bézier curve. It takes four points as arguments, 
 using the first and last as anchor points and the middle two as control points. 
-GrDrawCurveTo() draws a curve but uses the current pen position as the 
+**GrDrawCurveTo()** draws a curve but uses the current pen position as the 
 first anchor point, setting the pen position to the second anchor point after 
 drawing. 
 
 It would be possible to draw splines by drawing a number of curves which 
 had common endpoints, but the graphics system provides the 
-GrDrawSpline() routine by which a spline with an arbitrary number of 
-spline segments may be drawn with one call. GrDrawSplineTo() draws a 
+**GrDrawSpline()** routine by which a spline with an arbitrary number of 
+spline segments may be drawn with one call. **GrDrawSplineTo()** draws a 
 spline with the current position as the first anchor point. The spline drawing 
 routines require the application to set up an array of points. When calling 
-GrDrawSpline(), these points should be in the order: anchor, control, 
+**GrDrawSpline()**, these points should be in the order: anchor, control, 
 control, anchor, control, control,..., anchor. The total number of points should 
 be equal to 3n+1, where n is equal to the number of spline segments. Since 
 GrDrawSplineTo() uses the current position as the first anchor point, for 
@@ -351,17 +351,17 @@ GrFillBitmapAtCP(), GrDrawHugeBitmap(),
 GrDrawHugeBitmapAtCP(), GrDrawImage()
 
 In this section only drawing bitmaps will be discussed. For information on 
-creating and modifying bitmaps, see section 23.7 of chapter 23.
+creating and modifying bitmaps, see [section 23.7 of chapter 23](cgraph.md#237-working-with-bitmaps).
 
-GrDrawBitmap() draws a bitmap. This routine is very versatile. It can 
+**GrDrawBitmap()** draws a bitmap. This routine is very versatile. It can 
 draw simple and complex bitmaps. It can draw compacted or uncompacted 
 bitmaps, can use a bitmap-specific palette, handles strange resolutions 
 intelligently, and generally does the right thing. If you're working with a 
 large bitmap and want to manage its storage, you may provide a routine to 
 pass in part of the bitmap at a time. If the bitmap is stored in a huge array 
-(true of all bitmaps created with GrCreateBitmap()) use 
-GrDrawHugeBitmap() instead of GrDrawBitmap(), and it will manage 
-memory for you. GrDrawBitmapAtCP() draws a bitmap at the current position.
+(true of all bitmaps created with **GrCreateBitmap()**) use 
+**GrDrawHugeBitmap()** instead of **GrDrawBitmap()**, and it will manage 
+memory for you. **GrDrawBitmapAtCP()** draws a bitmap at the current position.
 
 ![](Art/figure_24-12.png)  
 **Figure 24-12** Bitmap  
@@ -369,36 +369,36 @@ _A possible representation of a bitmap data structure and how that bitmap
 might be drawn._
 
 If you just want to draw a monochrome bitmap, consider using the 
-GrFillBitmap() command. This routine treats the bitmap like a mask, 
+**GrFillBitmap()** command. This routine treats the bitmap like a mask, 
 coloring the "on" pixels with the present area color, and leaving the "off" 
 pixels alone so that whatever is underneath the bitmap can show through. 
-This routine is heavily optimized and very fast. GrFillBitmapAtCP() works 
+This routine is heavily optimized and very fast. **GrFillBitmapAtCP()** works 
 the same way, filling the bitmap at the current position.
 
-Use GrDrawHugeBitmap() to draw a bitmap that has been stored in a 
+Use **GrDrawHugeBitmap()** to draw a bitmap that has been stored in a 
 HugeArray data structure. Remember that any bitmaps created by 
-GrCreateBitmap() are stored in a HugeArray. GrDrawHugeBitmap() 
+**GrCreateBitmap()** are stored in a HugeArray. **GrDrawHugeBitmap()** 
 will automatically take care of memory management. 
-GrDrawHugeBitmapAtCP() works the same way, drawing the bitmap at 
-the current position. GrFillHugeBitmap() and 
-GrFillHugeBitmapAtCP() fill huge bitmaps.
+**GrDrawHugeBitmapAtCP()** works the same way, drawing the bitmap at 
+the current position. **GrFillHugeBitmap()** and 
+**GrFillHugeBitmapAtCP()** fill huge bitmaps.
 
-GrDrawImage() is less adaptable but faster than GrDrawBitmap(). 
-GrDrawImage() has its own kind of scaling which doesn't work in the 
+**GrDrawImage()** is less adaptable but faster than **GrDrawBitmap()**. 
+**GrDrawImage()** has its own kind of scaling which doesn't work in the 
 standard GEOS fashion. This routine ignores the resolutions of both device 
 and bitmap and displays the bitmap so that each pixel of the bitmap 
 corresponds to one pixel of the display. If the coordinate system has been 
-scaled or rotated, GrDrawImage() will ignore the scale and rotation when 
+scaled or rotated, **GrDrawImage()** will ignore the scale and rotation when 
 drawing the bitmap. The bitmap may be magnified, but this is not quite the 
 same as normal scaling: The bitmap's resolution is still ignored, but each 
 pixel of the bitmap will receive a square of pixels on the display. 
-GrDrawHugeImage() draws the image of a bitmap stored in a HugeArray.
+**GrDrawHugeImage()** draws the image of a bitmap stored in a **HugeArray**.
 
 ![](Art/figure_24-13.png)  
 **Figure 24-13** GrDrawImage()  
 _GrDrawImage() is non-WYSIWYG; the output depends on the resolution._
 
-The image-drawing routines take an ImageFlags structure which holds a 
+The image-drawing routines take an **ImageFlags** structure which holds a 
 flag to specify whether borders should be drawn between the pixels of the 
 bitmap and a bit size field which specifies the magnification to use.
 
@@ -407,14 +407,14 @@ bitmap and a bit size field which specifies the magnification to use.
 GrDrawPath(), GrFillPath()
 
 This section will address only the subject of drawing paths. To find out how 
-to create, combine, and modify paths, see section 23.9 of chapter 23.
+to create, combine, and modify paths, see [section 23.9 of chapter 23](cgraph.md#239-graphics-paths).
 
 ![](Art/figure_24-14.png)  
 **Figure 24-14** Path Direction for Winding Fills  
 _The path should be counterclockwise overall, with clockwise concavities._
 
-GrDrawPath() draws a path using the current line attributes. 
-GrFillPath() fills a path using the current area attributes. GrFillPath() 
+**GrDrawPath()** draws a path using the current line attributes. 
+**GrFillPath()** fills a path using the current area attributes. **GrFillPath()** 
 can fill the path using either an odd/even or winding fill rule. If the path is to 
 be filled using the winding fill rule, the path must have been defined so that 
 the segments forming the border of each region go around the region so that 
@@ -422,7 +422,7 @@ the interior of the region is to the left. That is, on convex parts of the borde
 edges should be in the counterclockwise direction. On concave parts of the 
 border edges should go clockwise. For an illustration of a path following this 
 rule, see Figure 24-14. The fill rule is specified by means of a 
-RegionFillRule value, which may be one of ODD_EVEN or WINDING.
+**RegionFillRule** value, which may be one of ODD_EVEN or WINDING.
 
 When you define a path by combining two other paths, the result might not 
 be exactly what you would expect. See Figure 24-15 for an example of path 
@@ -446,22 +446,22 @@ large, blobby areas which are relatively free of detail. They are used by the
 system to describe many "filled shapes."
 
 While it is possible to define a region directly, writers familiar with paths 
-may define a path and then call the GrGetPathRegion() routine. To find out 
+may define a path and then call the **GrGetPathRegion()** routine. To find out 
 how to define a region directly, see below.
 
-GrDrawRegion() draws a region at the passed position using the current 
-area drawing attributes. GrDrawRegionAtCP() draws a region at the 
+**GrDrawRegion()** draws a region at the passed position using the current 
+area drawing attributes. **GrDrawRegionAtCP()** draws a region at the 
 current pen position. 
 
-GrMoveReg() changes the coordinates stored within a region data structure 
+**GrMoveReg()** changes the coordinates stored within a region data structure 
 by the specified x and y offsets.
 
-GrGetPtrRegBounds() returns the coordinates of the passed region's 
+**GrGetPtrRegBounds()** returns the coordinates of the passed region's 
 bounding rectangle.
 
-GrTestPointInReg() sees if the passed point falls within a region. 
-GrTestRectInReg() tests to see whether the passed rectangle falls entirely 
-or partially within a region; it returns a value of type TestRectReturnType 
+**GrTestPointInReg()** sees if the passed point falls within a region. 
+**GrTestRectInReg()** tests to see whether the passed rectangle falls entirely 
+or partially within a region; it returns a value of type **TestRectReturnType** 
 specifying the degree of overlap. These two functions are very useful when 
 using regions for clipping purposes; if a given point or rectangle is discovered 
 to be outside the clipping region, there's no need to draw the point or 
@@ -573,17 +573,17 @@ corresponds to the first parameter, and all coordinates between 4000h and
 GrDrawText(), GrDrawTextAtCP(), GrDrawChar(), 
 GrDrawCharAtCP(), GrDrawTextField()
 
-There are several functions that display text. The GrDrawText() routine 
+There are several functions that display text. The **GrDrawText()** routine 
 displays a text string. The passed y position, adjusted by the text mode (see 
 below), determines the vertical position. The passed x position determines 
 where the text will start printing, as normal. 
 
-GrDrawText() draws a text string at the desired position using the GState's 
+**GrDrawText()** draws a text string at the desired position using the GState's 
 current text attributes. This text string should contain no carriage returns, 
-line feeds, tabs, or other non-printing characters. GrDrawTextAtCP() 
-draws a text string at the current position. GrDrawChar() and 
-GrDrawCharAtCP() draw a single character, which should not be a 
-non-printing character. GrDrawTextField() draws a field of text-however, 
+line feeds, tabs, or other non-printing characters. **GrDrawTextAtCP()** 
+draws a text string at the current position. **GrDrawChar()** and 
+**GrDrawCharAtCP()** draw a single character, which should not be a 
+non-printing character. **GrDrawTextField()** draws a field of text-however, 
 this routine is only available in Assembly language. 
 
 ##### 24.2.13.2 Special Text Attributes
@@ -600,63 +600,63 @@ Applications can display text in a number of ways. Thus the GState has
 many attributes it keeps track of solely for drawing text.
 
 Text style is a collective set of attributes (bold, italic, etc.) that affects how the 
-text is drawn by the graphics system. GrGetTextStyle() gets the current 
-text style, and GrSetTextStyle() allows a new style to be specified. Styles 
-are expressed as a TextStyle record. Note that some complicated styles 
+text is drawn by the graphics system. **GrGetTextStyle()** gets the current 
+text style, and **GrSetTextStyle()** allows a new style to be specified. Styles 
+are expressed as a **TextStyle** record. Note that some complicated styles 
 which are offered by the text objects are not available here: these styles are 
 available only from the text objects; if you wish to offer these styles without 
 using a text object, you'll have to do the artwork yourself.
 
 Depending on the text mode attribute, text may either be drawn from the 
 bottom of the font box, top of the font box, baseline, or accent line. 
-GrGetTextMode() gets the text mode, returning information about which 
-offset to use when drawing text. GrSetTextMode() allows this information 
+**GrGetTextMode()** gets the text mode, returning information about which 
+offset to use when drawing text. **GrSetTextMode()** allows this information 
 to be reset. The information is stored in a TextMode record. Note that if you 
 will be drawing characters of more than one size or font, and if you want 
-those characters to line up by baseline, you should use GrSetTextMode() to 
+those characters to line up by baseline, you should use **GrSetTextMode()** to 
 use the TM_DRAW_BASE text mode.
 
 ![](Art/figure_24-18.png)  
 **Figure 24-18** TextMode and Drawing Position
 
-GrSetTextSpacePad() sets the special amount used to pad space 
-characters; GrGetTextSpacePad() retrieves the current space padding.
+**GrSetTextSpacePad()** sets the special amount used to pad space 
+characters; **GrGetTextSpacePad()** retrieves the current space padding.
 
-GrGetFont() returns the current font and type size. The font is identified by 
-its fontID; the default font has the ID DEFAULT_FONT_ID and size 
+**GrGetFont()** returns the current font and type size. The font is identified by 
+its **fontID**; the default font has the ID DEFAULT_FONT_ID and size 
 DEFAULT_FONT_SIZE; these are the values which new GStates will start 
-with. GrSetFont() sets a new font to use. The font's point size may be 
+with. **GrSetFont()** sets a new font to use. The font's point size may be 
 between MIN_POINT_SIZE and MAX_POINT_SIZE.
 
 Track kerning adjusts the space between characters. A negative kerning 
 value means that characters will be drawn closer together. A large negative 
 kerning value can make characters draw overlapped. A positive kerning 
 value causes characters to draw with more space between them. 
-GrGetTrackKern() returns the present track kerning value. 
-GrSetTrackKern() changes this value. The kerning value must be between 
+**GrGetTrackKern()** returns the present track kerning value. 
+**GrSetTrackKern()** changes this value. The kerning value must be between 
 MIN_TRACK_KERNING and MAX_TRACK_KERNING; values greater than 
 MAX_TRACK_KERNING will be replaced by MAX_TRACK_KERNING, values 
 less that MIN_TRACK_KERNING will result in MIN_TRACK_KERNING being 
 used. The kerning value will be multiplied as a percentage by the font size to 
 get a number of points to use for kerning; if this multiplied value is greater 
-than the BBFixed (byte-byte fixed point) number MAX_KERN_VALUE or less 
+than the **BBFixed** (byte-byte fixed point) number MAX_KERN_VALUE or less 
 than MIN_KERN_VALUE then it will be adjusted to fall at the end of this 
 range.
 
 A font's weight determines its boldness. For many fonts, there will be only 
 two weights defined: plain and bold. However, some fonts allow for finer 
 control of weight. To find out the current font weight, call 
-GrGetFontWeight(). To use a different font weight, call 
-GrSetFontWeight(). Some useful weight values are stored in the 
-FontWeight enumerated type. The weight should definitely be between 
+**GrGetFontWeight()**. To use a different font weight, call 
+**GrSetFontWeight()**. Some useful weight values are stored in the 
+**FontWeight** enumerated type. The weight should definitely be between 
 FW_MINIMUM and FW_MAXIMUM.
 
 To make characters draw wider or narrower, adjust the font width. Some 
 fonts come in wide or narrow versions. If the font does not support the 
 requested width, GEOS will simulate the width as best it can. The 
-GrGetFontWidth() routine retrieves the current width; 
-GrSetFontWidth() changes it. Some helpful width values are stored in the 
-FontWidth enumerated type. The width should definitely be between 
+**GrGetFontWidth()** routine retrieves the current width; 
+**GrSetFontWidth()** changes it. Some helpful width values are stored in the 
+**FontWidth** enumerated type. The width should definitely be between 
 FWI_MINIMUM and FWI_MAXIMUM.
 
 Geodes can control how text will be drawn in superscript and subscript 
@@ -666,9 +666,9 @@ super- and subscript attributes available, including values for footnote
 numbers, and chemical inferiors. Typesetting enthusiasts who wish to adjust 
 the width of these characters differently than the height (as in some standard 
 super- and sub- script layouts) should work with the font width. Use 
-GrGetSuperscriptAttr() and GrGetSubscriptAttr() to find out what the 
-present values are. Use GrSetSuperScriptAttr() and 
-GrSetSuperScriptAttr() to change these values. Each of these routines 
+**GrGetSuperscriptAttr()** and **GrGetSubscriptAttr()** to find out what the 
+present values are. Use **GrSetSuperScriptAttr()** and 
+**GrSetSuperScriptAttr()** to change these values. Each of these routines 
 works with a word sized value: the top byte is a percentage of the font size to 
 offset sub- or superscript characters; the low byte is the percentage of font 
 size to use for the sub- or superscript character 0x0064 (decimal 100) would 
@@ -680,11 +680,11 @@ GrEnumFonts(), GrCheckFontAvail(),
 GrFindNearestPointsize(), GrGetDefFontID(), GrGetFontName()
 
 To find out which fonts are available in the user's environment, use the 
-GrEnumFonts() command. You specify what sorts of fonts you're interested 
+**GrEnumFonts()** command. You specify what sorts of fonts you're interested 
 in by setting a number of flags, and the routine will fill a buffer with the 
-available fonts with their FontIDs and names.
+available fonts with their **FontIDs** and names.
 
-The FontEnumFlags record determines which fonts will be returned. At 
+The **FontEnumFlags** record determines which fonts will be returned. At 
 least one of the FEF_OUTLINES and FEF_BITMAPS flags must be set to 
 determine whether outline, bitmap, or both kinds of fonts should be 
 returned.Keep in mind that only outline fonts will result in true WYSIWYG 
@@ -693,17 +693,17 @@ fonts to appear in lexical order. The FEF_DOWNCASE flag requests that the
 font names appear all in lowercase.
 
 The FEF_FAMILY flag asks that the search be limited to a font family. To 
-specify what sort of family you want, use the FontFamily enumerated type.
+specify what sort of family you want, use the **FontFamily** enumerated type.
 
-GrEnumFonts() ignores the FEF__STRING flag; other routines will use this 
-flag to find out whether the font is specified by a FontID or its ASCII name.
+**GrEnumFonts()** ignores the FEF__STRING flag; other routines will use this 
+flag to find out whether the font is specified by a **FontID** or its ASCII name.
 
 The other flags narrow the search: if you set the FEF_FIXED_WIDTH flag, 
 then only fixed-width fonts will be returned. If you set the FEF_USEFUL flag, 
 only those fonts marked as "useful" will be returned.
 
-The font information will be returned as an array of FontEnumStruct 
-structures. Each of these structures will contain a FontID and the ASCII 
+The font information will be returned as an array of **FontEnumStruct** 
+structures. Each of these structures will contain a **FontID** and the ASCII 
 name of the associated font.
 
 There may be up to MAX_FONTS available on the system. If you're not 
@@ -711,24 +711,24 @@ prepared to handle an array large enough to hold this many fonts, be sure to
 pass an argument specifying how large an array is being provided.
 
 To find out if a given font is available in the user's environment, call either 
-GrCheckFontAvailID() or GrCheckFontAvailName(), depending on 
-whether the font is being identified by its FontID or its ASCII name. If 
-programming in assembly language, use the GrCheckFontAvail() routine 
+**GrCheckFontAvailID()** or **GrCheckFontAvailName()**, depending on 
+whether the font is being identified by its **FontID** or its ASCII name. If 
+programming in assembly language, use the **GrCheckFontAvail()** routine 
 no matter how you're identifying the font. You may narrow the search by 
-passing the appropriate FontEnumFlags. Make sure that the FEF_STRING 
+passing the appropriate **FontEnumFlags**. Make sure that the FEF_STRING 
 bit is clear when searching by ID and set when searching by name.
 
 Some fonts are available only in certain sizes and styles. Bitmap fonts are 
-examples of this. The GrFindNearestPointsize() routine takes a typeface, 
+examples of this. The **GrFindNearestPointsize()** routine takes a typeface, 
 size, and style set. It returns the closest available size and style (or returns 
 FID_INVALID if the passed font isn't available).
 
 To get the font which the Generic UI will use by default, call 
-GrGetDefFontID(). This also returns the font size to use, useful if you wish 
+**GrGetDefFontID()**. This also returns the font size to use, useful if you wish 
 to respect the user's choice of type size.
 
-To find out the ASCII name of a string for which you have the FontID, call 
-GrGetFontName(). If the font isn't available, this function will return false; 
+To find out the ASCII name of a string for which you have the **FontID**, call 
+**GrGetFontName()**. If the font isn't available, this function will return false; 
 otherwise it will fill a passed buffer with the name of the font. The passed 
 buffer should be FID_NAME_LEN bytes long.
 
@@ -739,14 +739,14 @@ GrFontMetrics(), GrCharMetrics()
 
 From time to time it may become important to know something about the size 
 of a letter to be drawn. The graphics system has several routines for 
-retrieving this information. GrTextWidth() returns the width, in points, of 
-a string. GrTextWidthWBFixed() does the same thing, but returns a more 
-accurate figure, including a fractional part. GrCharWidth() returns the 
+retrieving this information. **GrTextWidth()** returns the width, in points, of 
+a string. **GrTextWidthWBFixed()** does the same thing, but returns a more 
+accurate figure, including a fractional part. **GrCharWidth()** returns the 
 width of a single character. Note that the width of a text string will normally 
 be different than the sum of the widths of the component characters. 
-GrTextWidth() takes track kerning and pairwise kerning into account.
+**GrTextWidth()** takes track kerning and pairwise kerning into account.
 
-GrFontMetrics() returns information pertaining to a font (see 
+**GrFontMetrics()** returns information pertaining to a font (see 
 Figure 24-19). The meanings of these metrics are listed below:
 
 ![](Art/figure_24-19.png)  
@@ -840,19 +840,19 @@ one (e.g. "¿" and "æ").
 
 **Driver**  
 The font driver associated with the font, specified by a member 
-of the FontMaker enumerated type.
+of the **FontMaker** enumerated type.
 
 **First Character**  
-The Char value of the first defined, drawable character.
+The **Char** value of the first defined, drawable character.
 
 **Last Character**  
-The Char value of the last defined, drawable character.
+The **Char** value of the last defined, drawable character.
 
 **Default Character**  
 The Char value of the drawable character which will be drawn 
 as a substitute for any undrawable characters. 
 
-The GrCharMetrics() routine returns useful measurements for a character. 
+The **GrCharMetrics()** routine returns useful measurements for a character. 
 For each of a font's characters, you may request the following information:
 
 ![](Art/figure_24-20.png)  
@@ -861,7 +861,7 @@ _Unlike most characters, this font's "j" has a negative "Minimum X," meaning
 it extends backwards into the space allotted to the previous character._
 
 **Width**  
-While not a metric returned by the GrCharMetrics() routine, 
+While not a metric returned by the **GrCharMetrics()** routine, 
 the character width is very important. It determines how much 
 space to allow for the character. The metrics that follow don't 
 affect how much space to allow; instead, they give the bounds 
@@ -901,8 +901,8 @@ the shape of what you're drawing but will affect its appearance.
 
 The following sections will explain how each of these attributes may be set 
 individually. Note that if you wish to set all attributes to use when filling 
-areas at once, call GrSetAreaAttr(). Call GrSetLineAttr() to set all 
-attributes to use when drawing lines. Use GrSetTextAttr() to set all 
+areas at once, call **GrSetAreaAttr()**. Call **GrSetLineAttr()** to set all 
+attributes to use when drawing lines. Use **GrSetTextAttr()** to set all 
 text-rendering attributes.
 
 #### 24.3.1 Color
@@ -925,7 +925,7 @@ If all components are zero, the result will be black. If all components are at
 the maximum (255), the result will be white.
 
 The data structure used to store color information is known as the 
-ColorQuad, shown in Code Display 24-1.
+**ColorQuad**, shown in Code Display 24-1.
 
 ---
 Code Display 24-1 Color Data Structures
@@ -972,10 +972,10 @@ typedef ByteEnum 	ColorFlag;
 		/* Color Set using RGB values */
 
 /* Sample Colors:
- * To use the system palette's light green:						{ C_LIGHT_GREEN, CF_INDEX, 0, 0}
- * To use the 40th color in the palette:						{ 40, CF_INDEX, 0, 0}
- * To use a custom brown:						{ 150, CF_RGB, 90, 0}
- * To use a 75% Gray (75% *256 = 192):						{ 192, CF_GRAY, 0, 0}
+ * To use the system palette's light green:    { C_LIGHT_GREEN, CF_INDEX, 0, 0}
+ * To use the 40th color in the palette:       { 40, CF_INDEX, 0, 0}
+ * To use a custom brown:                      { 150, CF_RGB, 90, 0}
+ * To use a 75% Gray (75% *256 = 192):         { 192, CF_GRAY, 0, 0}
  */
 ~~~
 
@@ -990,10 +990,10 @@ specified in terms of its palette index or its RGB value. The data specifying
 which color to use is stored in the GState, with separate color fields to keep 
 track of how to draw lines, areas, and text.
 
-GrSetLineColor() changes the color used when drawing lines. The 
-GrSetAreaColor() routine sets the color to be used when filling areas. 
-GrSetTextColor() sets the color to be used when rendering text. 
-GrGetLineColor(), GrGetAreaColor(), and GrGetTextColor() return 
+**GrSetLineColor()** changes the color used when drawing lines. The 
+**GrSetAreaColor()** routine sets the color to be used when filling areas. 
+**GrSetTextColor()** sets the color to be used when rendering text. 
+**GrGetLineColor()**, **GrGetAreaColor()**, and **GrGetTextColor()** return 
 the color values and flags stored with the GState.
 
 |Constant Name |Index |RED   |GREEN |BLUE  |
@@ -1020,7 +1020,7 @@ of available Color values, see the Routines reference or color.h._
 
 The default system palette includes several colors whose indexes have been 
 set up so they may be referenced by descriptive constant names. The 
-constants are members of the enumerated type Color, the most common 
+constants are members of the enumerated type **Color**, the most common 
 shown in Table 24-1. Thus, instead of having to remember that the index 02 
 means green, the constant C_GREEN can be passed to the appropriate color 
 setting command.
@@ -1059,17 +1059,17 @@ _Here the system wants to display the rectangle with a light gray. On a black
 and white system, it would simulate the gray by setting some pixels black and 
 others white._
 
-GrSetLineColorMap(), GrSetAreaColorMap(), and 
-GrSetTextColorMap() set the color mapping to use when drawing with an 
-unavailable color. GrGetLineColorMap(), GrGetAreaColorMap(), and 
-GrGetTextColorMap() return the current color mapping modes. The geode 
+**GrSetLineColorMap()**, **GrSetAreaColorMap()**, and 
+**GrSetTextColorMap()** set the color mapping to use when drawing with an 
+unavailable color. **GrGetLineColorMap()**, **GrGetAreaColorMap()**, and 
+**GrGetTextColorMap()** return the current color mapping modes. The geode 
 may draw either in the closest available color, or using a dithering of the 
 closest colors. Often it's a good idea to have text map to solid colors since its 
 detailed nature doesn't go too well with dithering. 
 
 When a geode wants to learn more about which colors are available, it can 
-use the GrMapColorIndex() routine to find the RGB value associated with 
-an index. The GrMapColorRGB() routine returns the index and true RGB 
+use the **GrMapColorIndex()** routine to find the RGB value associated with 
+an index. The **GrMapColorRGB()** routine returns the index and true RGB 
 color of the palette entry that most closely matches the values passed.
 
 ##### 24.3.1.3 Custom Palettes
@@ -1094,20 +1094,20 @@ if you give a window a special palette, that may make inactive windows look
 different. To avoid this, try to avoid changing palette entries 0-15, as the UI 
 uses these (These are the entries representing C_RED, etc.).
 
-GrCreatePalette() creates a custom palette and associates it with your 
+**GrCreatePalette()** creates a custom palette and associates it with your 
 graphic state's associated window. The custom palette starts with all entries 
 having their original RGB values from the default palette. 
-GrSetPaletteEntry() takes a palette entry and sets it to a new RGB value. 
-GrSetPalette() allows you to specify new values for several palette entries 
-at a time. GrSetPalette() can also set an entry back to its default value. 
-GrDestroyPalette() destroys the custom palette, freeing the memory used 
+**GrSetPaletteEntry()** takes a palette entry and sets it to a new RGB value. 
+**GrSetPalette()** allows you to specify new values for several palette entries 
+at a time. **GrSetPalette()** can also set an entry back to its default value. 
+G**rDestroyPalette()** destroys the custom palette, freeing the memory used 
 for it. 
 
 Given a choice of palette entries to change, you might choose one of the 
 C_UNUSED_- entries.
 
-Call GrGetPalette() to get a handle to a memory block containing the 
-palette data. Depending on the GetPalType passed, you will either get the 
+Call **GrGetPalette()** to get a handle to a memory block containing the 
+palette data. Depending on the **GetPalType** passed, you will either get the 
 palette information for your current palette or the default palette. This 
 routine returns the handle of a memory block. The memory block contains an 
 array with 256 entries (one for each color), each entry consisting of three 
@@ -1125,8 +1125,8 @@ bits or lines helpful for suggesting textures. The graphics system supports
 two types of fill patterns. Bitmap patterns, familiar to most computer users, 
 tile the filled area with a repeated bitmap. Hatch patterns fill the area with 
 a repeated sequence of lines. Hatch patterns are defined in terms of families 
-of parallel lines. Patterns are referenced by a PatternType and an index, 
-stored in a GraphicPattern structure. The pattern types are
+of parallel lines. Patterns are referenced by a **PatternType** and an index, 
+stored in a **GraphicPattern** structure. The pattern types are
 
 PT_SOLID  
 The lack of a pattern. Fills the area solid. This is the default. 
@@ -1155,11 +1155,11 @@ PT_CUSTOM_BITMAP
 Application-defined tile bitmap pattern. These patterns are 
 application-specific.
 
-Use GrSetAreaPattern() and GrSetTextPattern() to use patterns defined 
+Use **GrSetAreaPattern()** and **GrSetTextPattern()** to use patterns defined 
 outside the application (system- and user-defined patterns). To use the 
-system's brick hatch pattern, for example, pass the PatternType 
-PT_SYSTEM_HATCH and the SystemHatch SH_BRICK. To use a user-defined 
-bitmap pattern, pass PatternType PT_USER_BITMAP and the number of the 
+system's brick hatch pattern, for example, pass the **PatternType** 
+PT_SYSTEM_HATCH and the **SystemHatch** SH_BRICK. To use a user-defined 
+bitmap pattern, pass **PatternType** PT_USER_BITMAP and the number of the 
 pattern. If you pass an invalid pattern (requesting a user hatch pattern when 
 the user hasn't defined one, for instance), the area or text will be filled solid.
 
@@ -1187,7 +1187,7 @@ Full measurements are shown below._
 |(12, 0)|0, 12*sqrt(3)  |60    |1; 12, 24       |
 
 For each line family, the application must supply certain information. Your 
-application will work with the HatchLine data type to specify
+application will work with the **HatchLine** data type to specify
 
 + Origin  
 Since each line family is drawn as a set of equidistant parallel lines, the 
@@ -1221,11 +1221,10 @@ You may draw the lines using a custom dash pattern. See the Line Style
 attribute, below, to learn how to set up a dash pattern.
 
 Custom bitmap patterns are defined in terms of simple bitmaps. To find out 
-the structure of a bitmap, see Bitmap on page n 454 of the Routine 
-Reference.
+the structure of a bitmap, see Bitmap on the Routine Reference.
 
-To use a custom pattern, call GrSetCustomAreaPattern() or 
-GrSetCustomTextPattern(). Along with the usual information, you must 
+To use a custom pattern, call **GrSetCustomAreaPattern()** or 
+**GrSetCustomTextPattern()**. Along with the usual information, you must 
 include a pointer to a memory location which marks the beginning of some 
 structures holding the pattern data. The commands and structures are 
 detailed in the reference manual. For an example of some code using a 
@@ -1347,7 +1346,7 @@ the result will be blank. On a monochrome display, this results
 in a "clipping" effect. The AND operation is applied to the 
 indexes of the colors.
 
-GrGetMixMode() returns the current drawing mode. GrSetMixMode() 
+**GrGetMixMode()** returns the current drawing mode. **GrSetMixMode()** 
 tells the system to use a new mode.
 
 Note that the drawing modes that use logical operators to compute the color 
@@ -1384,16 +1383,16 @@ draw masks by setting an 8 byte array.
 **Figure 24-24** Masks as Repeating Patterns  
 _A drawing mask is a monochrome bitmap. It is repeated to cover an area._
 
-The GrSetAreaMaskSys() routine specifies one of the standard draw 
-masks to use when filling areas. GrSetAreaMaskCustom() allows the 
+The **GrSetAreaMaskSys()** routine specifies one of the standard draw 
+masks to use when filling areas. **GrSetAreaMaskCustom()** allows the 
 program to specify a custom mask by passing a pointer to an 8 byte. Each 
 byte of the buffer represents one row of the mask; the rows are ordered from 
-top to bottom. GrGetAreaMask() returns the current area mask.
+top to bottom. **GrGetAreaMask()** returns the current area mask.
 
 There are similar routines which set the drawing mask to use when drawing 
-lines: GrSetLineMaskSys(), GrSetLineMaskCustom(), and 
-GrGetLineMask(). To work with the drawing mask used when rendering 
-text, use GrSetTextMaskSys(), GrSetTextMaskCustom(), and GrGetTextMask().
+lines: **GrSetLineMaskSys()**, **GrSetLineMaskCustom()**, and 
+**GrGetLineMask()**. To work with the drawing mask used when rendering 
+text, use **GrSetTextMaskSys()**, **GrSetTextMaskCustom()**, and **GrGetTextMask()**.
 
 For the most part, it's probably not a good idea to use masks when drawing 
 text, since the pixelated nature of the mask is likely to make the text less 
@@ -1421,7 +1420,7 @@ longer than drawing a bitmap of the same size.
 When constructing or interpreting system draw mask values, first remember 
 that if the SDM_INVERSE flag is set, then the inverse of the mask will be used 
 instead of the mask itself. The remaining bits should be a 
-SystemDrawMask value, a value between zero and SDM_0. Draw mask 
+**SystemDrawMask** value, a value between zero and SDM_0. Draw mask 
 values between zero and 24 are various graphic draw mask patterns. Values 
 between 25 and 89 are percentage fill masks, 89 corresponding to the empty 
 fill and 25 to a 100% fill. Several SDM_- constants have been set up with the 
@@ -1436,17 +1435,17 @@ GrSetMiterLimit(), GrGetLineStyle(), GrSetLineStyle(),
 GrSetLineAttr()
 
 Line attributes determine characteristics of lines drawn with the 
-GrDraw-() routines. They do not affect anything drawn with the 
-GrFill-() routines.
+**GrDraw...()** routines. They do not affect anything drawn with the 
+**GrFill...()** routines.
 
 You may work with the width used when drawing lines by means of the 
-GrGetLineWidth() and GrSetLineWidth() routines.
+**GrGetLineWidth()** and **GrSetLineWidth()** routines.
 
 The graphics system makes it easy to draw dotted lines. The line style 
 attribute controls the "dottedness" with which lines should be drawn; it may 
-be changed or retrieved with the GrSetLineStyle() and GrGetLineStyle() 
+be changed or retrieved with the **GrSetLineStyle()** and **GrGetLineStyle()** 
 routines. Lines can be drawn using any of a number of standard system 
-LineStyles or by defining a custom dot pattern.
+**LineStyles** or by defining a custom dot pattern.
 
 ![](Art/figure_24-26.png)  
 **Figure 24-26** LineStyles
@@ -1454,7 +1453,7 @@ LineStyles or by defining a custom dot pattern.
 Custom dot patterns are defined in terms of arrays of pairs of bytes. The first 
 byte of each pair gives the distance that the line should be drawn with the 
 pen down, the second number the distance with the pen up. The array as a 
-whole is stored in a DashPairArray. Dash lengths will scale with the line width.
+whole is stored in a **DashPairArray**. Dash lengths will scale with the line width.
 
 |Name        |#pairs |on/off pairs |
 |:-----------|:------|:------------|
@@ -1466,18 +1465,18 @@ whole is stored in a DashPairArray. Dash lengths will scale with the line width.
 
 Line joins govern the behavior of angles and corners. Using the appropriate 
 line join style, a geode can specify that angles should be blunt, pointed, or 
-rounded. GrGetLineJoin() returns the current line join drawing technique, 
-while GrSetLineJoin() sets a new line join to use. The join is specified by a 
-member of the LineJoin enumerated type. The miter limit governs the 
-maximum length of mitererd joins; use GrSetMiterLimit() and 
-GrGetMiterLimit() to work with this value.
+rounded. **GrGetLineJoin()** returns the current line join drawing technique, 
+while **GrSetLineJoin()** sets a new line join to use. The join is specified by a 
+member of the **LineJoin** enumerated type. The miter limit governs the 
+maximum length of mitererd joins; use **GrSetMiterLimit()** and 
+**GrGetMiterLimit()** to work with this value.
 
-The GrSetLineEnd() and GrGetLineEnd() routines set and retrieve the 
+The **GrSetLineEnd()** and **GrGetLineEnd()** routines set and retrieve the 
 style with which the graphics system will draw the ends of line segments. 
 The ending style is one of the LineEnd values. It may be round, square and 
 even with the end of the line, or square and extending past the mathematical 
 end of the line.
 
-To set all of the line-drawing attributes at once, call GrSetLineAttr().
+To set all of the line-drawing attributes at once, call **GrSetLineAttr()**.
 
 [Graphics Environment](cgraph.md) <-- &nbsp;&nbsp; [table of contents](../concepts.md) &nbsp;&nbsp; --> [Machine Architecture](chardw.md)
