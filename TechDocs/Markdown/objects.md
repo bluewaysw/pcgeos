@@ -438,141 +438,76 @@
 [20.4.6 Headers and Footers](Objects/ossheet.md#2046-headers-and-footers)
 
 **[21 Pen Object Library](Objects/open.md#21-pen-object-library)**  
-
-	21.1	The Ink Object					 OPen : 1241
-
-		21.1.1	Instance Data and Messages				OPen : 1242
-
-		21.1.2	Storing Ink to DB Items				OPen : 1247
-
-	21.2	Working with the Ink DB					 OPen : 1250
-
-		21.2.1	Getting Started				OPen : 1250
-
-		21.2.2	Displaying the Data				OPen : 1251
-
-		21.2.3	Titles and Keywords				OPen : 1251
-
-		21.2.4	Navigating the Folder Tree				OPen : 1252
-
-		21.2.5	Managing Notes and Folders				OPen : 1253
-
-		21.2.6	Manipulating Notes				OPen : 1254
-
-		21.2.7	Searching and Traversing the Tree				OPen : 1255
-
-	21.3	InkControlClass					 OPen : 1255
-
-22	Config Library	1257
-
-	22.1	Providing the UI					 OConfig : 1260
-
-		22.1.1	Designing the UI Tree.				OConfig : 1260
-
-		22.1.2	UI Fetch Routine				OConfig : 1263
-
-	22.2	Module Information Routine					 OConfig : 1264
-
-	22.3	Important Messages					 OConfig : 1267
-
-	22.4	Object Class Reference					 OConfig : 1269
-
-		22.4.1	PrefClass				OConfig : 1269
-
-		22.4.2	PrefValueClass				OConfig : 1274
-
-		22.4.3	PrefItemGroupClass				OConfig : 1275
-
-		22.4.4	PrefStringItemClass				OConfig : 1279
-
-		22.4.5	PrefBooleanGroupClass				OConfig : 1280
-
-		22.4.6	PrefDynamicListClass				OConfig : 1280
-
-		22.4.7	TitledGlyphClass				OConfig : 1282
-
-		22.4.8	PrefInteractionClass				OConfig : 1282
-
-		22.4.9	PrefDialogClass				OConfig : 1283
-
-		22.4.10	PrefTextClass				OConfig : 1284
-
-		22.4.11	PrefControlClass				OConfig : 1285
-
-		22.4.12	PrefTimeDateControlClass				OConfig : 1285
-
-		22.4.13	PrefTriggerClass				OConfig : 1285
-
-		22.4.14	PrefTocListClass				OConfig : 1286
-
-23	VisClass	1291
-
-	23.1	Introduction to VisClass					 OVis : 1293
-
-	23.2	The Visible Class Tree					 OVis : 1297
-
-	23.3	VisClass Instance Data					 OVis : 1297
-
-		23.3.1	VI_bounds				OVis : 1300
-
-		23.3.2	VI_typeFlags				OVis : 1300
-
-		23.3.3	VI_attrs				OVis : 1304
-
-		23.3.4	VI_optFlags				OVis : 1306
-
-		23.3.5	VI_geoAttrs				OVis : 1308
-
-		23.3.6	VI_specAttrs				OVis : 1311
-
-		23.3.7	VI_link				OVis : 1312
-
-	23.4	Using VisClass					 OVis : 1312
-
-		23.4.1	Basic VisClass Rules				OVis : 1313
-
-		23.4.2	Drawing to the Screen				OVis : 1315
-
-		23.4.3	Positioning Visible Objects				OVis : 1338
-
-		23.4.4	Handling Input				OVis : 1351
-
-	23.5	Working with Visible Object Trees					 OVis : 1373
-
-		23.5.1	Creating and Destroying				OVis : 1373
-
-		23.5.2	Adding and Removing				OVis : 1374
-
-		23.5.3	Getting Visible Tree Information				OVis : 1381
-
-		23.5.4	Sending Messages Through the Tree				OVis : 1383
-
-		23.5.5	Visible Object Window Operations				OVis : 1391
-
-	23.6	Visible Layers and 32-Bit Graphics					 OVis : 1393
-
-		23.6.1	Using Visible Document Layers				OVis : 1395
-
-		23.6.2	Using 16-Bit Drawing Commands				OVis : 1396
-
-		23.6.3	The 16-Bit Limit on Visual Bounds				OVis : 1397
-
-		23.6.4	Handling MSG_VIS_DRAW				OVis : 1398
-
-		23.6.5	Managing 32-Bit Geometry				OVis : 1398
-
-		23.6.6	Handling Mouse Events				OVis : 1398
-
-		23.6.7	Setting Up the Objects				OVis : 1399
-
-	23.7	VisClass Error Checking					 OVis : 1401
-
-	23.8	Creating Specific UIs					 OVis : 1403
-
-	23.9	Basic Summary					 OVis : 1403
-
-24	VisComp	1405
-
+[21.1 The Ink Object](Objects/open.md#211-the-ink-object)  
+[21.1.1 Instance Data and Messages](Objects/open.md#2111-instance-data-and-messages)  
+[21.1.2 Storing Ink to DB Items](Objects/open.md#2112-storing-ink-to-db-items)  
+[21.2 Working with the Ink DB](Objects/open.md#212-working-with-the-ink-db)  
+[21.2.1 Getting Started](Objects/open.md#2121-getting-started)  
+[21.2.2 Displaying the Data](Objects/open.md#2122-displaying-the-data)  
+[21.2.3 Titles and Keywords](Objects/open.md#2123-titles-and-keywords)  
+[21.2.4 Navigating the Folder Tree](Objects/open.md#2124-navigating-the-folder-tree)  
+[21.2.5 Managing Notes and Folders](Objects/open.md#2125-managing-notes-and-folders)  
+[21.2.6 Manipulating Notes](Objects/open.md#2126-manipulating-notes)  
+[21.2.7 Searching and Traversing the Tree](Objects/open.md#2127-searching-and-traversing-the-tree)  
+[21.3 InkControlClass](Objects/open.md#213-inkcontrolclass)
+
+**[22 Config Library](Objects/oconfig.md#22-config-library)**  
+[22.1 Providing the UI](Objects/oconfig.md#221-providing-the-ui)  
+[22.1.1 Designing the UI Tree](Objects/oconfig.md#2211-designing-the-ui-tree)  
+[22.1.2 UI Fetch Routine](Objects/oconfig.md#2212-ui-fetch-routine)  
+[22.2 Module Information Routine](Objects/oconfig.md#222-module-information-routine)  
+[22.3 Important Messages](Objects/oconfig.md#223-important-messages)  
+[22.4 Object Class Reference](Objects/oconfig.md#224-object-class-reference)  
+[22.4.1 PrefClass](Objects/oconfig.md#2241-prefclass)  
+[22.4.2 PrefValueClass](Objects/oconfig.md#2242-prefvalueclass)  
+[22.4.3 PrefItemGroupClass](Objects/oconfig.md#2243-prefitemgroupclass)  
+[22.4.4 PrefStringItemClass](Objects/oconfig.md#224-prefitemstringclass)  
+[22.4.5 PrefBooleanGroupClass](Objects/oconfig.md#2245-prefbooliangroupclass)  
+[22.4.6 PrefDynamicListClass](Objects/oconfig.md#2246-prefdynamiclistclass)  
+[22.4.7 TitledGlyphClass](Objects/oconfig.md#2247-titledglyphclass)  
+[22.4.8 PrefInteractionClass](Objects/oconfig.md#2248-prefinteractionclass)  
+[22.4.9 PrefDialogClass](Objects/oconfig.md#2249-prefdialogclass)  
+[22.4.10 PrefTextClass](Objects/oconfig.md#22410-preftextclass)  
+[22.4.11 PrefControlClass](Objects/oconfig.md#22411-prefcontrolclass)  
+[22.4.12 PrefTimeDateControlClass](Objects/oconfig.md#22412-preftimedatecontrolclass)  
+[22.4.13 PrefTriggerClass](Objects/oconfig.md#22413-preftriggerclass)  
+[22.4.14 PrefTocListClass](Objects/oconfig.md#22414-preftoclistclass)
+
+**[23 VisClass](Objects/ovis.md#23-visclass)**  
+[23.1 Introduction to VisClass](Objects/ovis.md#231-introduction-to-visclass)  
+[23.2 The Visible Class Tree](Objects/ovis.md#232-the-visible-class-tree)  
+[23.3 VisClass Instance Data](Objects/ovis.md#233-visclass-instance-data)  
+[23.3.1 VI_bounds](Objects/ovis.md#2331-vi_bounds)  
+[23.3.2 VI_typeFlags](Objects/ovis.md#2332-vi_typeflags)  
+[23.3.3 VI_attrs](Objects/ovis.md#2333-vi_attrs)  
+[23.3.4 VI_optFlags](Objects/ovis.md#2334-vi_optflags)  
+[23.3.5 VI_geoAttrs](Objects/ovis.md#2335-vi_geoattrs)  
+[23.3.6 VI_specAttrs](Objects/ovis.md#2336-vi_specattrs)  
+[23.3.7 VI_link](Objects/ovis.md#2337-vi_link)  
+[23.4 Using VisClass](Objects/ovis.md#234-using-visclass)  
+[23.4.1 Basic VisClass Rules](Objects/ovis.md#2341-basic-visclass-rules)  
+[23.4.2 Drawing to the Screen](Objects/ovis.md#2342-drawing-to-the-screen)  
+[23.4.3 Positioning Visible Objects](Objects/ovis.md#2343-positioning-visible-objects)  
+[23.4.4 Handling Input](Objects/ovis.md#2344-handling-input)  
+[23.5 Working with Visible Object Trees](Objects/ovis.md#235-working-with-visible-object-trees)  
+[23.5.1 Creating and Destroying](Objects/ovis.md#2351-creating-and-destroying)  
+[23.5.2 Adding and Removing](Objects/ovis.md#2352-adding-and-removing)  
+[23.5.3 Getting Visible Tree Information](Objects/ovis.md#2353-getting-visible-tree-information)  
+[23.5.4 Sending Messages Through the Tree](Objects/ovis.md#2354-sending-messages-through-the-tree)  
+[23.5.5 Visible Object Window Operations](Objects/ovis.md#2355-visible-object-window-operations)  
+[23.6 Visible Layers and 32-Bit Graphics](Objects/ovis.md#236-visible-layers-and-32-bit-graphics)  
+[23.6.1 Using Visible Document Layers](Objects/ovis.md#2361-using-visible-document-layers)  
+[23.6.2 Using 16-Bit Drawing Commands](Objects/ovis.md#2362-using16-bit-drawing-commands)  
+[23.6.3 The 16-Bit Limit on Visual Bounds](Objects/ovis.md#2363-the-16-bit-limit-on-visual-bounds)  
+[23.6.4 Handling MSG_VIS_DRAW](Objects/ovis.md#2364-handling-msg_vis_draw)  
+[23.6.5 Managing 32-Bit Geometry](Objects/ovis.md#2365-managing-32-bit-geometry)  
+[23.6.6 Handling Mouse Events](Objects/ovis.md#2366-handling-mouse-events)  
+[23.6.7 Setting Up the Objects](Objects/ovis.md#2367-setting-up-the-objects)  
+[23.7 VisClass Error Checking](Objects/ovis.md#237-visclass-error-checking)  
+[23.8 Creating Specific UIs](Objects/ovis.md#238-creating-specific-uis)  
+[23.9 Basic Summary](Objects/ovis.md#239-basic-summary)
+
+**[24 VisComp](Objects/oviscmp.md#24-viscmp)**  
 	24.1	VisCompClass Features					 OVisCmp : 1407
 
 	24.2	VisCompClass Instance Data					 OVisCmp : 1408
