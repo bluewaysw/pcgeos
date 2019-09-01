@@ -507,69 +507,39 @@
 [23.8 Creating Specific UIs](Objects/ovis.md#238-creating-specific-uis)  
 [23.9 Basic Summary](Objects/ovis.md#239-basic-summary)
 
-**[24 VisComp](Objects/oviscmp.md#24-viscmp)**  
-	24.1	VisCompClass Features					 OVisCmp : 1407
+**[24 VisComp](Objects/oviscmp.md#24-viscomp)**  
+[24.1 VisCompClass Features](Objects/oviscmp.md#241-viscompclass-features)  
+[24.2 VisCompClass Instance Data](Objects/oviscmp.md#242-viscompclass-instance-data)  
+[24.2.1 VCI_comp](Objects/oviscmp.md#2421-vci_comp)  
+[24.2.2 VCI_gadgetExcl](Objects/oviscmp.md#2422-vci_gadgetexcl)  
+[24.2.3 VCI_window](Objects/oviscmp.md#2423-vci_window)  
+[24.2.4 VCI_geoAttrs](Objects/oviscmp.md#2424-vci_geoattrs)  
+[24.2.5 VCI_geoDimensionAttrs](Objects/oviscmp.md#2425-vci_geodimensionattrs)  
+[24.2.6 Managing Instance Data](Objects/oviscmp.md#2426-managing-instance-data)  
+[24.3 Using VisCompClass](Objects/oviscmp.md#243-using-viscompclass)  
+[24.3.1 Managing Geometry](Objects/oviscmp.md#2431-managing-geometry)  
+[24.3.2 Managing Graphic Windows](Objects/oviscmp.md#2432-managing-graphic-windows)
 
-	24.2	VisCompClass Instance Data					 OVisCmp : 1408
+**[25 VisContent](Objects/oviscnt.md#25-viscontent)**  
+[25.1 VisContent Instance Data](Objects/oviscnt.md#251-viscontent-instance-data)  
+[25.1.1 The VCNI_attrs Field](Objects/oviscnt.md#2511-the-vcni_attrs-field)  
+[25.1.2 Fields That Affect the View](Objects/oviscnt.md#2512-fields-that-affect-the-view)  
+[25.1.3 Fields That Affect the Document](Objects/oviscnt.md#2513-fields-that-affect-the-document)  
+[25.1.4 Fields That Affect Input Events](Objects/oviscnt.md#2514-fields-that-affect-input-events)  
+[25.2 Basic VisContent Usage](Objects/oviscnt.md#252-basic-viscontent-usage)  
+[25.2.1 Setting Up Sizing Behavior](Objects/oviscnt.md#2521-setting-up-sizing-behavior)  
+[25.2.2 Messages Received from the View](Objects/oviscnt.md#2522-messages-received-from-the-view)
 
-		24.2.1	VCI_comp				OVisCmp : 1410
+**[26 Generic System Classes](Objects/osysobj.md#26-generic-system-classes)**  
+[26.1 The System Objects](Objects/osysobj.md#261-the-system-objects)  
+[26.2 The GenSystem Object](Objects/osysobj.md#262-the-gensystem-object)  
+[26.2.1 GenSystem Features](Objects/osysobj.md#2621-gensystem-features)  
+[26.2.2 GenSystem Instance Data](Objects/osysobj.md#2622-gensystem-instance-data)  
+[26.2.3 GenSystem Basics](Objects/osysobj.md#2623-gensystem-basics)  
+[26.2.4 Advanced GenSystem Usage](Objects/osysobj.md#2624-advanced-gensystem-usage)  
+[26.3 The GenScreen Object](Objects/osysobj.md#263-the-genscreen-object)  
+[26.3.1 GenScreen Instance Data](Objects/osysobj.md#2631-genscreen-instance-data)  
+[26.4 GenField Objects](Objects/osysobj.md#264-genfield-objects)  
+[26.4.1 GenField Features](Objects/osysobj.md#2641-genfield-features)  
+[26.4.2 GenField Instance Data](Objects/osysobj.md#2642-genfield-instance-data)
 
-		24.2.2	VCI_gadgetExcl				OVisCmp : 1410
-
-		24.2.3	VCI_window				OVisCmp : 1411
-
-		24.2.4	VCI_geoAttrs				OVisCmp : 1412
-
-		24.2.5	VCI_geoDimensionAttrs				OVisCmp : 1413
-
-		24.2.6	Managing Instance Data				OVisCmp : 1415
-
-	24.3	Using VisCompClass					 OVisCmp : 1416
-
-		24.3.1	Managing Geometry				OVisCmp : 1417
-
-		24.3.2	Managing Graphic Windows				OVisCmp : 1420
-
-25	VisContent	1423
-
-	25.1	VisContent Instance Data					 OVisCnt : 1425
-
-		25.1.1	The VCNI_attrs Field				OVisCnt : 1427
-
-		25.1.2	Fields That Affect the View				OVisCnt : 1429
-
-		25.1.3	Fields That Affect the Document				OVisCnt : 1431
-
-		25.1.4	Fields That Affect Input Events				OVisCnt : 1433
-
-	25.2	Basic VisContent Usage					 OVisCnt : 1440
-
-		25.2.1	Setting Up Sizing Behavior				OVisCnt : 1441
-
-		25.2.2	Messages Received from the View				OVisCnt : 1443
-
-26	Generic System Classes	1451
-
-	26.1	The System Objects					 OSysObj : 1453
-
-	26.2	The GenSystem Object					 OSysObj : 1455
-
-		26.2.1	GenSystem Features				OSysObj : 1455
-
-		26.2.2	GenSystem Instance Data				OSysObj : 1455
-
-		26.2.3	GenSystem Basics				OSysObj : 1457
-
-		26.2.4	Advanced GenSystem Usage				OSysObj : 1458
-
-	26.3	The GenScreen Object					 OSysObj : 1461
-
-		26.3.1	GenScreen Instance Data				OSysObj : 1462
-
-	26.4	GenField Objects					 OSysObj : 1462
-
-		26.4.1	GenField Features				OSysObj : 1462
-
-		26.4.2	GenField Instance Data				OSysObj : 1463
-
-Index	IX-1
