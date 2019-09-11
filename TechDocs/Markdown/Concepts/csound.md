@@ -28,18 +28,18 @@ use other routines to completely specify the sound's pitch and duration.
 UserStandardSound()
 
 When a program needs to create a UI-related sound, it should call the routine 
-UserStandardSound(). This routine plays a sound, silencing any other 
+**UserStandardSound()**. This routine plays a sound, silencing any other 
 sounds which may have been playing. The program may specify either a 
 system-standard sound, a custom sound, or a sequence of custom sounds.
 
 Note that if the user has disabled UI sound (via the Preference Manager 
-application), UserStandardSound() will not play the sound. The sound will 
+application), **UserStandardSound()** will not play the sound. The sound will 
 be played at a high priority-the UI sound will take over the speakers in spite 
 of any sound that some other program is generating.
 
-To play one of the standard UI sounds, call UserStandardSound() with a 
-single argument-a member of the StandardSoundType enumerated type. 
-StandardSoundType has the following members:
+To play one of the standard UI sounds, call **UserStandardSound()** with a 
+single argument-a member of the **StandardSoundType** enumerated type. 
+**StandardSoundType** has the following members:
 
 SST_ERROR  
 The sound produced when an error box appears. 
@@ -111,7 +111,7 @@ extends from about 20Hz-20,000Hz). Thus, keep in mind that if you can't
 hear a note, the problem may not be that you've set the volume too low.
 
 Duration may be specified in a number of units, by means of the 
-SoundStreamDeltaTimeType enumerated type. 
+**SoundStreamDeltaTimeType** enumerated type. 
 
 ~~~
 #define SSDTT_MSEC 8
@@ -182,8 +182,8 @@ Some sound devices emulate musical instruments. You may ask that notes be
 played using one of these instruments or even define your own instrument. 
 You will specify what sort of instrument you wish to use by means of a 
 segment:offset pointer. If the segment is non-null, the pointer should point to 
-the instrument's data (for information about setting up this data, see section 
-13.10.3 on page 523); if the segment is NULL, then the "offset" will be 
+the instrument's data (for information about setting up this data, see [section 
+13.10.3](#13103-advanced-description)); if the segment is NULL, then the "offset" will be 
 interpreted as a standard instrument value. The standard instrument 
 "patches" are listed in sound.h; they have names like 
 IP_ACOUSTIC_GRAND_PIANO and IP_ELECTRIC_SNARE.
@@ -201,7 +201,7 @@ SoundAllocMusicNote(), SoundPlayMusicNote(),
 SoundStopMusicNote(), SoundReallocMusicNote(), 
 SoundFreeMusicNote()
 
-The simplest way to play a note is by using UserStandardSound() with the 
+The simplest way to play a note is by using **UserStandardSound()** with the 
 SST_CUSTOM_NOTE sound type. In this mode, the routine takes a frequency 
 and a duration in ticks. The sound will be played immediately, played using 
 the instrument patch IP_REED_ORGAN if the sound device supports 
@@ -213,14 +213,14 @@ reed organ, you will create and play a custom note.
 
 The task of playing a custom note breaks down as follows:
 
-1. Allocate the note with SoundAllocMusicNote().
+1. Allocate the note with **SoundAllocMusicNote()**.
 
-2. Play it with SoundPlayMusicNote() or UserStandardSound().
+2. Play it with **SoundPlayMusicNote()** or **UserStandardSound()**.
 
-3. Free it with SoundStopMusicNote() and SoundFreeMusicNote().
+3. Free it with **SoundStopMusicNote()** and **SoundFreeMusicNote()**.
 
 First, you must set up the data structure containing the note's data. 
-SoundAllocMusicNote() takes a frequency, a duration, a volume, and an 
+**SoundAllocMusicNote()** takes a frequency, a duration, a volume, and an 
 instrument and returns the handle to a data structure which the sound 
 library will understand. See Code Display 13-1 for an example. 
 
@@ -246,14 +246,13 @@ SoundAllocMusicNote( IP_ELECTRIC_PIANO_1, 0, /* As if on piano */
 				&SubliminalTone);
 ~~~
 
-
-There are two ways to play a note. The first is to call UserStandardSound() 
+There are two ways to play a note. The first is to call **UserStandardSound()** 
 with the SST_CUSTOM_SOUNDS sound type, passing the handle returned by 
-SoundAllocMusicNote(). The other is to call SoundPlayMusicNote(), 
-supplying the proper tempo and priority level. UserStandardSound() uses 
+**SoundAllocMusicNote()**. The other is to call **SoundPlayMusicNote()**, 
+supplying the proper tempo and priority level. **UserStandardSound()** uses 
 a tempo of 8 millisecond per one-hundred-and-twenty-eighth note; this is 
 somewhat fast; tempo-based notes are not normally used with 
-UserStandardSound().
+**UserStandardSound()**.
 
 When playing a note or sound buffer, you must provide a sound priority level. 
 Sounds may interrupt one another, so if you ask to play a sound more 
@@ -299,15 +298,15 @@ SoundPlayMusicNote(BigBlatt, SP_STANDARD + SP_IMMEDIATE, 8, EOSF_UNLOCK);
 
 
 You may stop a note from playing at any time by invoking 
-SoundStopMusicNote(). 
+**SoundStopMusicNote()**. 
 
-To free the note's data structure, call SoundFreeMusicNote(). You should 
+To free the note's data structure, call **SoundFreeMusicNote()**. You should 
 make sure that the note has stopped playing first (call 
-SoundStopMusicNote() if you are not sure).
+**SoundStopMusicNote()** if you are not sure).
 
 To change any of the characteristics of a note, call 
-SoundReallocMusicNote(). You should make sure that the note has 
-stopped playing first (call SoundStopMusicNote() if you are not sure).
+**SoundReallocMusicNote()**. You should make sure that the note has 
+stopped playing first (call **SoundStopMusicNote()** if you are not sure).
 
 ---
 Code Display 13-3 Stopping and Freeing a Note
@@ -329,7 +328,7 @@ information for several voices. If you are familiar with constructing MIDI
 streams, you will find that setting up GEOS music buffers is a similar process.
 
 Sound buffers are made up of events and timer ticks. The various event types 
-are defined in the enumerated type SoundStreamEvent-each event is 
+are defined in the enumerated type **SoundStreamEvent**-each event is 
 signalled by one of the values listed below and includes one or more words of 
 data describing the event specifics:  
 
@@ -364,7 +363,7 @@ that a standard instrument is being used).
 number and meaning of data words will depend on the event.
 
 Time is expressed as a unit and a duration. The unit is one of the 
-SoundStreamDeltaTimeType values; the duration specifies how many of 
+**SoundStreamDeltaTimeType** values; the duration specifies how many of 
 these units should be allowed to pass.
 
 ---
@@ -481,21 +480,21 @@ SoundStopMusic(), SoundReallocMusic(), SoundFreeMusic()
 
 If your sound buffer is stored in a movable resource, and you only want that 
 resource to be locked down while the music is playing, call 
-SoundInitMusic() and pass the handle of a block containing the music. The 
+**SoundInitMusic()** and pass the handle of a block containing the music. The 
 block should contain a SimpleSoundHeader structure which specifies the 
 number of voices in the buffer, followed by a music buffer as described above.
 
 If your sound buffer is in fixed or locked memory, you must allocate space in 
-the area accessible to the sound library by calling SoundAllocMusic(). This 
+the area accessible to the sound library by calling **SoundAllocMusic()**. This 
 returns a handle to a sound block which you will be passing to other sound 
 routines. You may pass a flag requesting that the data from which the sound 
 was allocated be automatically unlocked and/or freed. Note that since sound 
 buffers often become rather large, it is normally a bad idea to leave them in 
 fixed memory, and normally inadvisable to make them fixed for very long. If 
-you use SoundAllocMusic(), the sound buffer will have to remain locked for 
+you use **SoundAllocMusic()**, the sound buffer will have to remain locked for 
 as long as the music is playing.
 
-To play the sound, call SoundPlayMusic(). You must provide the handle 
+To play the sound, call **SoundPlayMusic()**. You must provide the handle 
 returned from the sound allocation, a tempo, and a priority. 
 
 ---
@@ -513,17 +512,17 @@ SoundPlayMusic(theSong, SP_STANDARD, 125, EOSF_UNLOCK);
 UserStandardSound(SST_CUSTOM_SOUND, MySongResource, 33);
 ~~~
 
-To stop playing the sound, call SoundStopMusic(). This routine will not 
+To stop playing the sound, call **SoundStopMusic()**. This routine will not 
 affect songs which are not playing.
 
 To free up the sound handle and data associated with the sound, call 
-SoundFreeMusic(). You should never free a sound which is playing; if you 
-think that a sound may be playing, call SoundStopMusic() before freeing it.
+**SoundFreeMusic()**. You should never free a sound which is playing; if you 
+think that a sound may be playing, call **SoundStopMusic()** before freeing it.
 
 To reuse a sound handle with a new sound buffer, call 
-SoundReallocMusic(). The number of voices may not be changed by 
+**SoundReallocMusic()**. The number of voices may not be changed by 
 reallocation. You should never reallocate a sound which is playing; if you 
-think that a sound may be playing, call SoundStopMusic().
+think that a sound may be playing, call **SoundStopMusic()**.
 
 ---
 Code Display 13-6 Stopping and Freeing a Sound
@@ -556,13 +555,13 @@ would play 4K of it at a time to a music stream, which would concatenate the
 music together. Normally, these "music stream" commands are the best to 
 use when playing a music buffer whose sound resides on a disk. To allocate a 
 special stream which will accept music data, call 
-SoundAllocMusicStream(). To play music into the stream, call 
-SoundPlayToMusicStream(), passing a pointer to the buffer of music to 
+**SoundAllocMusicStream()**. To play music into the stream, call 
+**SoundPlayToMusicStream()**, passing a pointer to the buffer of music to 
 play. To stop the passage of music through the stream and flush the buffer, 
-call SoundStopMusicStream(). To free up the music stream, call 
-SoundFreeMusicStream(). Make sure that there is no music playing 
+call **SoundStopMusicStream()**. To free up the music stream, call 
+**SoundFreeMusicStream()**. Make sure that there is no music playing 
 through the stream when you free it; be sure to call 
-SoundStopMusicStream() if you are not otherwise sure.
+**SoundStopMusicStream()** if you are not otherwise sure.
 
 ### 13.8 Playing Sampled Sounds
 
@@ -579,13 +578,13 @@ same stream.
 
 4. Disable the DAC stream when you're finished with it.
 
-To allocate a DAC stream, call SoundAllocSampleStream(). This will 
+To allocate a DAC stream, call **SoundAllocSampleStream()**. This will 
 return a memory handle which you will use to identify the sound stream as 
 you manipulate it with other routines.
 
 When you are ready to start playing sounds to the stream, call 
-SoundEnableSampleStream(). This routine grabs access to a physical 
-DAC player device. Note that you will specify a SoundPriority for the 
+**SoundEnableSampleStream()**. This routine grabs access to a physical 
+DAC player device. Note that you will specify a **SoundPriority** for the 
 stream, and that you will not be able to change this priority from sample to 
 sample. Also note that if a sound is playing on the stream and you queue 
 another sound to the stream, then the second sound will be queued behind 
@@ -620,13 +619,13 @@ by calling SoundDisableSampleStream().
 
 If you wish to enable a new DAC stream with the same sound token, but with 
 a different SoundPriority, you may do so using 
-SoundEnableSampleStream() (You should call 
-SoundDisableSampleStream() on the token before enabling it in this 
-way). You should eventually call SoundDisableSampleStream() again in 
+**SoundEnableSampleStream()** (You should call 
+**SoundDisableSampleStream()** on the token before enabling it in this 
+way). You should eventually call **SoundDisableSampleStream()** again in 
 this case.
 
 Once the DAC stream has been disabled, you may free up the sound token by 
-calling SoundFreeSampleStream(). You should call this with all sound 
+calling **SoundFreeSampleStream()**. You should call this with all sound 
 tokens before your application exits.
 
 ### 13.9 Grabbing the Sound Exclusive
@@ -645,27 +644,26 @@ However, if your application will be creating some sound so important that
 no other application should be allowed to interrupt it, you may grab exclusive 
 access to the sound routines. 
 
-SoundGetExclusive() grabs a semaphore associated with the sound library 
+**SoundGetExclusive()** grabs a semaphore associated with the sound library 
 (performs a "P" operation). Your thread thus makes it known that it wants 
 sole access to the sound library, and will wait, if necessary, for any other 
 thread which has grabbed sole access to finish. It will then grab exclusive 
 access to the sound library's low level routines. Until you release the 
-exclusive, no other thread will be able to use the SoundAllocMusic(), 
-SoundAllocMusicStream(), SoundAllocMusicNote(), 
-SoundPlayMusic(), SoundPlayToMusicStream(), SoundStopMusic(), 
-SoundStopMusicStream(), SoundReallocMusic(), 
-SoundReallocMusicNote(), SoundAllocSampleStream(), 
-SoundEnableSampleStream(), or SoundPlayToSampleStream() 
-routines.
+exclusive, no other thread will be able to use the **SoundAllocMusic()**, 
+**SoundAllocMusicStream()**, **SoundAllocMusicNote()**, 
+**SoundPlayMusic()**, **SoundPlayToMusicStream()**, **SoundStopMusic()**, 
+**SoundStopMusicStream()**, **SoundReallocMusic()**, 
+**SoundReallocMusicNote()**, **SoundAllocSampleStream()**, 
+**SoundEnableSampleStream()**, or **SoundPlayToSampleStream()** routines.
 
-The SoundGetExclusiveNB() routine also locks the sound library for 
+The **SoundGetExclusiveNB()** routine also locks the sound library for 
 exclusive access. However, if any other thread has already grabbed the 
-exclusive, SoundGetExclusiveNB() won't wait; it will just grab the 
+exclusive, **SoundGetExclusiveNB()** won't wait; it will just grab the 
 exclusive away anyhow. 
 
-To release the exclusive, call SoundReleaseExclusive(). This will allow 
+To release the exclusive, call **SoundReleaseExclusive()**. This will allow 
 sounds to enter the queue and will allow another thread which has called 
-SoundGetExclusive() to grab the exclusive.
+**SoundGetExclusive()** to grab the exclusive.
 
 ### 13.10 Simulating Musical Instruments
 
@@ -675,7 +673,7 @@ instrument format the user's sound driver expects. You will then pass a
 pointer to the appropriate data structure.
 
 To find out what sort of data structure the sound driver expects, call 
-SoundSynthDriverInfo() and note the value returned at the format 
+**SoundSynthDriverInfo()** and note the value returned at the format 
 pointer argument.
 
 #### 13.10.1 Acoustics In Brief
@@ -1023,7 +1021,7 @@ low release rate.
 Most natural sounds correspond to a sine wave. However, you may 
 request another type of wave.
 
-Wave Type	There are four choices of wave:
+**Wave Type** There are four choices of wave:
 
 + Sine wave. The standard y = sin(x) curve.
 

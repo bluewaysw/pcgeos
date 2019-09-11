@@ -7,8 +7,8 @@ in the Goc preprocessor.
 
 This chapter will not endeavor to teach C or object-oriented programming 
 concepts-you should be familiar with both before continuing. Additionally, 
-you should have read both "System Architecture," Chapter 3 and "First 
-Steps: Hello World," Chapter 4.
+you should have read both ["System Architecture," Chapter 3](carch.md) and 
+["First Steps: Hello World," Chapter 4](cgetsta.md).
 
 ### 5.1 Basic Data Types and Structures
 
@@ -56,7 +56,7 @@ Creating and working with flag records is shown in Code Display 5-1.
 
 There are two basic enumerated types: The standard enumerated type 
 supported by your C compiler uses word-sized values. GEOS also allows 
-byte-sized enumerated types with the ByteEnum type. Use of this type is 
+byte-sized enumerated types with the **ByteEnum** type. Use of this type is 
 shown in Code Display 5-1.
 
 **Table 5-2** Flag Records and ByteEnum  
@@ -122,8 +122,8 @@ GEOS pointers are all far pointers; that is, they are 32-bit addresses that
 reference specific locations in memory. They are normal C pointers and can 
 be used as such. Two other pointer types are also used by GEOS: Object 
 pointers (optrs) and segment pointers. Object pointers are described below; 
-segment pointers are 16-bit addresses described in "Memory Management," 
-Chapter 15.
+segment pointers are 16-bit addresses described in ["Memory Management", 
+Chapter 15](cmemory.md).
 
 ##### 5.1.2.1 Handles
 
@@ -137,7 +137,7 @@ be accessed or altered except by the kernel. Other handle types are managed
 in other tables by the kernel.
 
 Handles are used for the following primary purposes. For a full description 
-of how handles are used, see "Handles," Chapter 14.
+of how handles are used, see ["Handles", Chapter 14](chandle.md).
 
 + Memory reference  
 Entries for memory handles contain pointers to memory blocks; when the 
@@ -166,7 +166,7 @@ optimized temporary storage. (For example, when passing parameters on
 the stack with messages, the kernel will occasionally use handles for 
 storing the parameters.)
 
-The NullHandle value (zero) is used to indicate a null handle.
+The **NullHandle** value (zero) is used to indicate a null handle.
 
 There are over a dozen different types of handles that can be used by any sort 
 of geode. These are listed in Table 5-3, along with a brief description of each. 
@@ -205,13 +205,13 @@ referenced by a combination of two handles: The MemHandle handle locates
 the local memory heap, and the ChunkHandle locates the chunk within the 
 block. (The ChunkHandle type is not shown in Table 5-3 because it is not a 
 normal handle and must be used with a MemHandle.) A null chunk handle 
-value is specified by NullChunk.
+value is specified by **NullChunk**.
 
 Objects are referenced in the same way as chunks, but the handle and chunk 
 handle are combined into a single structure called an Object Pointer, or optr. 
 Each optr uniquely identifies a particular object in the system. Note that 
 optrs are often used to reference non-object chunks and data structures. A 
-null value is specified by NullOptr.
+null value is specified by **NullOptr**.
 
 GEOS provides several macros, all defined in geos.h, for creating and parsing 
 optrs.
@@ -245,7 +245,7 @@ type "word").
 GEOS automatically loads code resources when needed. However, when you 
 call routines through pointers, you must take special measures to see to it 
 that the routine is properly loaded into memory. This is discussed below in 
-section 5.2.4 on page 152.
+[section 5.2.4](#534-using-routine-pointers-in-goc).
 
 #### 5.1.3 Fixed Point Structures
 
@@ -314,28 +314,26 @@ typedef struct {
 } WordAndAHalf;
 ~~~
 
-Three special macros are also available to work with the WWFixed type. 
+Three special macros are also available to work with the **WWFixed** type. 
 These are listed below:
 
 + **MakeWWFixed**  
-This macro creates a WWFixed structure from a given floating-point 
+This macro creates a **WWFixed** structure from a given floating-point 
 number or dword number.
 
 + **WWFixedToFrac**  
-This macro produces the fractional portion of a WWFixed structure.
+This macro produces the fractional portion of a **WWFixed** structure.
 
 + **WWFixedToInt**  
-This macro produces the integral portion of a WWFixed structure.
+This macro produces the integral portion of a **WWFixed** structure.
 
-Two other macros are provided for use with WWFixedAsDword structures:
+Two other macros are provided for use with **WWFixedAsDword** structures:
 
 + **IntegerOf()**  
-This macro returns the integral portion of a WWFixedAsDword 
-structure.
+This macro returns the integral portion of a **WWFixedAsDword** structure.
 
 + **FractionOf()**  
-This macro returns the fractional portion of a WWFixedAsDword 
-structure.
+This macro returns the fractional portion of a **WWFixedAsDword** structure.
 
 ### 5.2 Goc and C
 
@@ -367,53 +365,53 @@ The rule of thumb is that if a header file contains any Goc code or includes a
 contain simple standard C code; if you are not sure, then, you can make all 
 your header files .goh.
 
-Standard C programs use the #include directive to include header (.h) files. 
+Standard C programs use the **#include** directive to include header (.h) files. 
 When using Goc, you can use this directive in standard .c and .h files; when 
-including .goh files in .goc files, though, you have to use the @include 
+including .goh files in .goc files, though, you have to use the **@include** 
 directive, which is Goc-specific. It has the same syntax as #include.
 
-An example of using @include comes from the Hello World application, 
+An example of using **@include** comes from the Hello World application, 
 which includes the stdapp.goh file. (All GEOS applications will need to 
-include this file to compile properly; it must be @included before any 
-standard C headers are #included.) The line from Hello World is
+include this file to compile properly; it must be **@included** before any 
+standard C headers are **#included**.) The line from Hello World is
 
 ~~~
 @include <stdapp.goh>
 ~~~
 
 The syntax of this directive, as stated above, is the same as for the C 
-directive #include. One exception is that the @include directive will include a file 
+directive **#include*. One exception is that the **@include* directive will include a file 
 just once, even if it is included by an included file-there is no need to 
 conditionally include a file (checking first to make sure it hasn't already been 
 included).
 
 If you will be including a Goc file in many different applications, or if it is very 
-long and elaborate, it is a good idea to put the keyword @optimize at the top 
+long and elaborate, it is a good idea to put the keyword **@optimize** at the top 
 of the file. This instructs the Goc preprocessor to generate a special 
 stripped-down version of the file with a .poh suffix. The compiler will then 
 automatically keep the .poh file up to date, and use it in compilations instead 
 of the .goh file. The .poh file contains all the data of the .goh file, but is 
 somewhat faster to compile into an application; thus, by using the 
-@optimize keyword, you incur a longer compilation whenever you make a 
+**@optimize** keyword, you incur a longer compilation whenever you make a 
 change to the .goh file, but a shorter compilation time when the .goh file is 
 unchanged since the last compilation. You may choose to leave the 
-@optimize directive out while the header is being developed, then put it in 
+**@optimize** directive out while the header is being developed, then put it in 
 when the header is fairly stable.
 
 #### 5.2.2 Conditional Code in Goc
 
 @if, @ifdef, @ifndef, @endif
 
-Many C programs use the directives #if, #ifdef, #ifndef, and #endif to 
+Many C programs use the directives **#if**, **#ifdef**, **#ifndef**, and **#endif** to 
 define conditional code-code that should be compiled into the program only 
 if certain conditions are met. When working with standard C code in your 
 GEOS applications, you should still use these directives; when working with 
 Goc code, however (in .goh and .goc files), you should use the Goc directives 
-@if, @ifdef, @ifndef, and @endif.
+**@if**, **@ifdef**, **@ifndef**, and **@endif**.
 
 Goc conditionals are more limited than C conditionals. Conditional 
 expressions may be based on numbers, names of macros, and the Boolean 
-operators OR (||) and AND (&&). Some examples of Goc conditional 
+operators OR (**||**) and AND (**&&**). Some examples of Goc conditional 
 expressions are shown below:
 
 ~~~
@@ -440,13 +438,13 @@ expressions are shown below:
 @define
 
 The C programming language allows definition and use of macros, and most 
-programmers use macros extensively. You can use the #define directive in 
+programmers use macros extensively. You can use the **#define** directive in 
 standard C code in your GEOS programs to define macros that use only 
 standard C code.
 
-Similarly, you can use the @define Goc directive to create macros in Goc. 
-(Macros must be defined with @define; otherwise, the Goc processor will skip 
-the #define directive and process the macro as if it were standard code to be 
+Similarly, you can use the **@define** Goc directive to create macros in Goc. 
+(Macros must be defined with **@define**; otherwise, the Goc processor will skip 
+the **#define** directive and process the macro as if it were standard code to be 
 processed normally.)
 
 Macros in Goc have a somewhat different syntax than standard C macros 
@@ -493,7 +491,7 @@ to it that the resource is loaded into memory when it is called. However, if you
 call a routine with a routine-pointer, GEOS cannot take these precautions. 
 Accordingly, when you are calling a routine with a pointer, you must either 
 see to it that the resource is loaded, or use one of the two 
-ProcCallFixedOrMovable routines to instruct the kernel to lock the 
+**ProcCallFixedOrMovable** routines to instruct the kernel to lock the 
 appropriate resource.
 
 If you know the routine is in a resource which is locked or fixed in memory, 
@@ -502,8 +500,8 @@ This is usually because the calling routine is in the same resource as the
 routine or routines which may be called. 
 
 If you are not sure that the resource is loaded, you should call the routine 
-with either ProcCallFixedOrMovable_cdecl() or 
-ProcCallFixedOrMovable_pascal(). Each of these routines is passed the 
+with either **ProcCallFixedOrMovable_cdecl()** or 
+**ProcCallFixedOrMovable_pascal()**. Each of these routines is passed the 
 following arguments:
 
 + A pointer to the routine to be called
@@ -514,10 +512,10 @@ routine expects.
 Both routines return whatever the called routine returns.
 
 If the routine to be called was defined with standard C calling conventions 
-(the default), you should use ProcCallFixedOrMovable_cdecl(). If the 
-routine was declared with the keyword _pascal, it uses Pascal's calling 
+(the default), you should use **ProcCallFixedOrMovable_cdecl()**. If the 
+routine was declared with the keyword **_pascal**, it uses Pascal's calling 
 conventions; you must then use the routine 
-ProcCallFixedOrMovable_pascal(). Most kernel and system-library 
+**ProcCallFixedOrMovable_pascal()**. Most kernel and system-library 
 routines are declared with Pascal's calling conventions.
 
 ---
@@ -564,7 +562,7 @@ Messaging Terms.
 A chunk is a small section of memory located in a Local 
 Memory Heap. Object instance data is stored in a chunk, one 
 chunk per object. Local Memory and chunks are described fully 
-in "Local Memory," Chapter 16.
+in ["Local Memory", Chapter 16](clmem.md).
 
 **fptr**  
 An fptr is a "far pointer"-a 32-bit pointer to a specific location 
@@ -572,8 +570,8 @@ of memory. It is a standard C pointer.
 
 **handle**  
 A handle is a 16-bit index into a Handle Table and is used to 
-reference memory blocks. For more information, see "Handles," 
-Chapter 14.
+reference memory blocks. For more information, see ["Handles", 
+Chapter 14](chandle.md).
 
 **object block**  
 An object block is a specific type of Local Memory block that 
@@ -760,12 +758,12 @@ interconnected, they are stored in different places.
 An object's instance data is stored in an instance chunk. This instance chunk 
 is sometimes referred to as the object itself, but this isn't quite accurate-the 
 instance chunk contains only the object's data along with a pointer to its class 
-structure. The structure of the instance chunk is given in section 5.3.2.1 on 
-page 159.
+structure. The structure of the instance chunk is given in [section 5.3.2.1]
+(#5321-instance-chunk-structures).
 
 An object's class structure contains all the code for the class. Since the class 
 code may be accessed by many objects, the class definition resides in a geode's 
-fixed memory resource. Every class (except the root, MetaClass) has a 
+fixed memory resource. Every class (except the root, **MetaClass**) has a 
 pointer to its superclass so it can inherit that class' methods and structures.
 
 All objects of a given class use the same code-the class' code-for their 
@@ -773,13 +771,13 @@ functions. They dynamically access this code so the code blocks need to be in
 memory only once, no matter how many objects are actively using them. 
 Additionally, each class dynamically accesses its superclass' code, so any 
 class may be accessed by all the objects of the subclasses as well. Class 
-structures are shown in section 5.3.2.3 on page 164.
+structures are shown in [section 5.3.2.3](#5323-master-classes).
 
 ##### 5.3.2.1 Instance Chunk Structures
 
 Each object's instance data is stored in a Local Memory chunk. Several 
 chunks are stored in one memory block, called a local memory heap. (See 
-"Local Memory," Chapter 16.) This local memory heap, containing objects, is 
+["Local Memory", Chapter 16.](clmem.md)) This local memory heap, containing objects, is 
 known as an object block.
 
 Each object block has a special header type that distinguishes it from normal 
@@ -814,16 +812,14 @@ object system of GEOS works.
 ![](Art/figure_5-1.png)
 
 **Figure 5-1** An Object Pointer  
-_The optr (below) references the beginning of 
-the object block through its global handle. The 
-chunk handle consists of an offset into the 
-chunk handle table, where an offset to the 
-object's instance data is stored._
+_The optr (below) references the beginning of the object block through its 
+global handle. The chunk handle consists of an offset into the chunk handle 
+table, where an offset to the object's instance data is stored._
 
 Instance data within an instance chunk is stored in "master parts" or "master 
 groups." A master group is simply a number of instance data fields grouped 
 according to their appropriate master class levels. Master classes are 
-detailed in section 5.3.2.2.
+detailed in [section 5.3.2.2](#5322-master-classes).
 
 A class designated as a master class resembles a normal class in all respects 
 save one: it determines how instance data is grouped in a chunk. Each 
@@ -835,9 +831,9 @@ accessed via a special offset stored within the chunk.
 
 Sample instance chunks are shown in Figure 5-3. The first four bytes of an 
 object's chunk contain a pointer to the object's class structure. The class 
-structure (described in section 5.3.2.3 on page 164) resides in fixed memory. 
-(A variant-class object has a slightly different structure; this is detailed in 
-section 5.3.2.4.)
+structure (described in [section 5.3.2.3](#5323-class-structure-and-class-trees)) 
+resides in fixed memory. (A variant-class object has a slightly different structure; 
+this is detailed in [section 5.3.2.4](#5324-variant-classes).)
 
 An object that has no master classes in its class ancestry (unusual) has its 
 instance data directly following its class pointer. Objects belonging to master 
@@ -865,7 +861,7 @@ group receives its first message, the entire master part of the chunk is
 allocated and initialized. This means that an object's chunk remains as small 
 as possible until it absolutely must grow larger. Some classes even detect 
 when a master part of the object will no longer be needed and actually remove 
-(shrink to zero) the unwanted instance data from the chunk (GenClass does 
+(shrink to zero) the unwanted instance data from the chunk (**GenClass** does 
 this by shrinking the Vis master part to zero size when a gadget is taken off 
 the screen).
 
@@ -876,9 +872,9 @@ vardata)-if an object has the hint, it appears in its instance chunk, if the
 object does not have the hint, the chunk does not have unused space in it.
 
 Vardata entries are stored all together at the end of the instance chunk, 
-regardless of their master groups. An object with two master groups and 
-three variable data fields, for example, would look like Figure 5-4. Variable 
-data and its use are discussed in full in section 5.4.1.4.
+regardless of their master groups. An object with two master groups and three 
+variable data fields, for example, would look like Figure 5-4. Variable data and 
+its use are discussed in full in [section 5.4.1.4](#5414-defining-and-working-with-variable-data-fields).
 
 ![](Art/figure_5-3.png)
 
@@ -918,8 +914,8 @@ the master group with which they are associated._
 _Each master class heads its own master group. The outlined classes are all 
 in the same master group._
 
-The functionality of master classes is required to implement GEOS variant 
-classes (see section 5.3.2.4). A variant class allows a single class 
+The functionality of master classes is required to implement GEOS variant classes 
+(see [section 5.3.2.4](#5324-variant-classes)). A variant class allows a single class 
 to have a version of "multiple inheritance" in that it can have different 
 superclasses depending on the system context.
 
@@ -956,7 +952,7 @@ travel up an object's class tree to access any appropriate code. See Figure 5-7
 for a simplified illustration of how these pointers are followed by the kernel.
 
 A class is a combination of data structure and code. The data structure 
-(ClassStruct) contains information about the class, its superclass, its 
+(**ClassStruct**) contains information about the class, its superclass, its 
 methods, and the structure and size of its instance data. The code consists of 
 methods (message handlers). A diagram of the data structure is given in 
 Figure 5-8; its components are detailed below.
@@ -977,18 +973,17 @@ recognize a message, the kernel looks in the superclass._
 **Class_superClass**
 
 Every class has as its first four bytes a pointer to its superclass. This points 
-to the superclass' ClassStruct structure in all cases except two: The root of 
+to the superclass' **ClassStruct** structure in all cases except two: The root of 
 any class tree has a null superclass pointer, indicating that the root has no 
 superclass. Variant classes have the integer 1 (one) always, indicating that 
 the superclass is determined in a special manner. For more information on 
-variant classes, see section 5.3.2.4.
+variant classes, see [section 5.3.2.4](#5324-variant-classes).
 
 Class trees are constructed when classes are defined; a new class is created 
 as the subclass of some existing class, and its Class_superClass pointer is 
 automatically set to point to the superclass. There is no need to point down 
 the tree; messages are always passed to superclasses and never to 
-subclasses. An example of the use of Class_superClass is shown in 
-Figure 5-7.
+subclasses. An example of the use of Class_superClass is shown in Figure 5-7.
 
 **Class_masterOffset**
 
@@ -1034,7 +1029,7 @@ relocation information. The relocation information contains the type of
 relocation to be done for each data type. There is one entry in the variable 
 data relocation table for each relocatable field in each particular 
 variable-data type. Variable data (also called vardata) is described in full in 
-"Defining and Working With Variable Data Fields".
+["Defining and Working With Variable Data Fields"](#5414-defining-and-working-with-variable-data-fields).
 
 ![](Art/figure_5-9.png)
 
@@ -1049,14 +1044,14 @@ for the non-variable data instance fields of the class. The relocation
 information contains the type of relocation done for each relocatable instance 
 field (other than variable-data entries). A relocatable instance field is one 
 which must be updated when the object is loaded-pointers, offsets, etc. The 
-entry in the relocation table is defined with the @reloc keyword, described 
-on page 202.
+entry in the relocation table is defined with the **@reloc** keyword, described 
+in ["Non-relocatable Data"](#542-non-relocatable-data).
 
 **Class_flags**
 
 Class_flags contains seven flags (shown below) that determine the 
 characteristics of the class. Declarers for these flags are used in the 
-@classdecl declaration (see section 5.4.1 on page 184).
+**@classdecl** declaration (see [section 5.4.1](#541-defining-a-new-class-or-subclass)).
 
 CLASSF_HAS_DEFAULT  
 This flag indicates that the class has a special default method 
@@ -1142,7 +1137,7 @@ A variant class is one which has no set superclass. The variant's superclass
 is determined at run-time based on context and other criteria. Note that 
 objects may not be variant-only classes may be variant. An object always 
 has a specific class to which it belongs, and its class pointer always points to 
-that class' ClassStruct structure. In addition, every variant class must also 
+that class' **ClassStruct** structure. In addition, every variant class must also 
 be a master class.
 
 A variant class, however, may have different superclasses at different times. 
@@ -1151,13 +1146,13 @@ inherit the instance data and functions of different classes depending on its
 attributes and desired features. Note, however, that a variant class may have 
 only one superclass at any given moment.
 
-The most visible example of a variant class is GenClass and how a generic 
+The most visible example of a variant class is **GenClass** and how a generic 
 object is resolved into its specific UI's appropriate representation. Each 
 generic object (for example, a GenTrigger), is a subclass of the master class 
-GenClass. All the instance data belonging to GenTriggerClass and 
-GenClass, therefore, is stored in the Gen master part of the instance chunk.
+**GenClass**. All the instance data belonging to **GenTriggerClass** and 
+**GenClass**, therefore, is stored in the Gen master part of the instance chunk.
 
-GenClass, however, is a variant class, meaning that it does not know its 
+**GenClass**, however, is a variant class, meaning that it does not know its 
 superclass when the object is instantiated. Each generic object's class will be 
 linked directly to another class provided by the specific UI in use: the specific 
 UI's class provides the visual representation while the generic UI class 
@@ -1170,35 +1165,35 @@ on the screen: the kernel sees that the object has no superclass and looks into
 its instance data and class structure. The kernel then determines what the 
 appropriate specific UI class will be for the object's class and provides the 
 superclass link necessary. It also then initializes the superclass' master part 
-of the object (in this case, the master part belonging to VisClass), updating 
+of the object (in this case, the master part belonging to **VisClass**), updating 
 all the master part offsets in the instance chunk's master offset fields.
 
-You can see from the above discussion that GenClass must know at least 
+You can see from the above discussion that **GenClass** must know at least 
 something about its potential superclasses. In fact, all variant classes must 
 know at least the topmost class of all its potential superclasses. The 
-definition of GenClass is
+definition of **GenClass** is
 
 ~~~
 @class GenClass, VisClass, master, variant;
 ~~~
 
-The @class keyword declares the new class, GenClass. GenClass is to be a 
+The **@class** keyword declares the new class, **GenClass**. **GenClass** is to be a 
 variant class and therefore must also be a master class. All the superclasses 
-of GenClass will be related to VisClass; this means that all specific UI 
+of **GenClass** will be related to **VisClass**; this means that all specific UI 
 classes which may act as Gen's superclass must be subclassed from 
-VisClass. (Another way of looking at the definition is that GenClass is an 
-eventual subclass of VisClass-you have no way of knowing beforehand how 
+**VisClass**. (Another way of looking at the definition is that **GenClass** is an 
+eventual subclass of **VisClass**-you have no way of knowing beforehand how 
 many class layers may be between the two, however.)
 
 The variant must specify an eventual superclass so the kernel knows how 
 many master offset fields it must allocate when an instance of the variant is 
-created. For example, a GenTrigger has two master groups: that of 
-GenClass, and that of VisClass. Because the GenClass master group is 
-necessarily below the VisClass master group in the class hierarchy (after the 
-superclass link has been resolved), the GenClass master offset in the 
-instance chunk must be after the VisClass master offset. If the definition did 
-not specify VisClass as an eventual superclass, no master offset field would 
-be allocated for it, and the Class_masterOffset field of GenClass' Class 
+created. For example, a **GenTrigger** has two master groups: that of 
+GenClass, and that of **VisClass**. Because the **GenClass** master group is 
+necessarily below the **VisClass** master group in the class hierarchy (after the 
+superclass link has been resolved), the **GenClass** master offset in the 
+instance chunk must be after the **VisClass** master offset. If the definition did 
+not specify **VisClass** as an eventual superclass, no master offset field would 
+be allocated for it, and the Class_masterOffset field of **GenClass**' Class 
 structure would not be able to hold any particular value.
 
 As stated at the beginning of this section, there are no "variant objects." 
@@ -1208,8 +1203,8 @@ superclasses due to the way the superclass of each variant is resolved. One
 example of this is the generic-to-specific mapping of the GenInteraction 
 object.
 
-All GenInteractions are of class GenInteractionClass; this never changes. 
-GenInteractionClass, however, is a subclass of GenClass, a variant class. 
+All GenInteractions are of class **GenInteractionClass**; this never changes. 
+**GenInteractionClass**, however, is a subclass of **GenClass**, a variant class. 
 This means that the class tree of the GenInteraction object is only partially 
 completed; before the GenInteraction is resolved, it looks like the simplified 
 diagram in Figure 5-10.
@@ -1227,11 +1222,11 @@ The GenInteraction object may be resolved into one of several different
 specific UI classes. For example, the motif.geo library has several classes for 
 GenInteractions; among them are the classes that implement menus, dialog 
 boxes, and grouping interactions. These classes are all specialized subclasses 
-of VisClass, the eventual superclass of GenClass.
+of **VisClass**, the eventual superclass of **GenClass**.
 
 Notice from Figure 5-10 that the class tree of the GenInteraction is not 
-complete. A class tree must have links all the way back to MetaClass for it 
-to be complete; this only goes to GenClass. GenClass has a special value in 
+complete. A class tree must have links all the way back to **MetaClass** for it 
+to be complete; this only goes to **GenClass**. **GenClass** has a special value in 
 its Class_superClass field, 0001h:0000h. This represents a reserved "pointer" 
 that indicates to the kernel that the class is a master class.
 
@@ -1243,16 +1238,16 @@ OLMenuWinClass, thus completing the object's class tree as shown._
 
 The superclass of the variant can be different for every instance because the 
 superclass pointer is actually stored in the object's instance chunk rather 
-than in the class' ClassStruct structure. This also allows a class tree to have 
+than in the class' **ClassStruct** structure. This also allows a class tree to have 
 more than one variant class in its hierarchy; for example, one variant could 
 be resolved to be the subclass of another variant. The tree must always be 
-headed by MetaClass.
+headed by **MetaClass**.
 
 As shown in Figure 5-10, the superclass pointer for the variant is stored in 
 the variant's master group instance data. Not all master groups have 
 superclass pointers; only those for variant classes. After the GenInteraction 
 is resolved, the pointer (the first four bytes of the Gen master part) points to 
-the proper superclass for this object (in this case, OLMenuWinClass). The 
+the proper superclass for this object (in this case, **OLMenuWinClass**). The 
 object, with its full class tree, is shown in Figure 5-11.
 
 ##### 5.3.2.5 An In-Depth Example
@@ -1293,8 +1288,8 @@ Code Display 5-4 TicTac's New Game Trigger
 
 The GenTrigger object has two master parts, just like the GenInteraction 
 object shown in "Variant Classes": the Gen master part holds the 
-instance data for GenClass and GenTriggerClass. The Vis master part 
-holds the instance data for VisClass and OLButtonClass. The MetaClass 
+instance data for **GenClass** and **GenTriggerClass**. The Vis master part 
+holds the instance data for **VisClass** and **OLButtonClass**. The **MetaClass** 
 instance data consists only of the object's class pointer and has no master 
 part.
 
@@ -1312,14 +1307,14 @@ the offsets are the master parts themselves, and if the trigger had any
 variable data, it would appear at the end of the chunk.
 
 Each master part has the master class' instance fields first, followed by those 
-of its subclasses. All the fields that belong to VisClass begin VI_-, all those 
-that belong to OLButtonClass begin OLBI_-, etc.
+of its subclasses. All the fields that belong to **VisClass** begin VI_-, all those 
+that belong to **OLButtonClass** begin OLBI_-, etc.
 
 Notice also the first four bytes of the Gen master part: they contain a pointer 
 to the "superclass" of GenClass for the trigger. Although the trigger typically 
 does not have different forms in any given specific UI (as the GenInteraction 
 does), it will have a different class for each specific UI it encounters. For 
-example, the OSF/Motif class is OLButtonClass; another specific UI will use 
+example, the OSF/Motif class is **OLButtonClass**; another specific UI will use 
 a different class for GenTriggers.
 
 ![](Art/figure_5-14.png)
@@ -1332,15 +1327,15 @@ subclassed off VisClass, which is subclassed off MetaClass._
 **The GenTrigger's Full Class Tree**
 
 Figure 5-14 shows TicTacNewTrigger's full class tree in a simplified diagram. 
-Since GenClass is a variant, it has a superclass pointer of 0001h:0000h. This 
+Since **GenClass** is a variant, it has a superclass pointer of 0001h:0000h. This 
 special value (with an illegal segment address) indicates to the kernel that 
-this object's GenClass superclass is stored in the instance chunk itself. The 
+this object's **GenClass** superclass is stored in the instance chunk itself. The 
 superclass is stored in the first four bytes of the Gen master part, as shown 
 in the previous section.
 
 **GenTriggerClass' ClassStruct Structure**
 
-Because all classes have the same class structure, only GenTriggerClass 
+Because all classes have the same class structure, only **GenTriggerClass** 
 will be examined here. The class structure and the instance chunk structure 
 are closely linked in several ways, as shown in Figure 5-15.
 
@@ -1352,7 +1347,7 @@ Advanced Topic_
 
 As shown in the diagram, the instance chunk points directly to the class. The 
 class points to its superclass, thereby providing inheritance of all the 
-methods and structures of classes higher in the class tree such as GenClass.
+methods and structures of classes higher in the class tree such as **GenClass**.
 
 The class structure contains some information about the instance chunk's 
 format, specifically Class_masterOffset and Class_instanceSize. 
@@ -1362,11 +1357,11 @@ master part so the kernel can quickly allocate the needed space when the
 master part is initialized.
 
 The method table resides at the end of the class, and it has entries for each 
-message handled by the class. GenTriggerClass handles seven messages 
+message handled by the class. **GenTriggerClass** handles seven messages 
 (stored in Class_methodCount); any message received by this trigger and not 
-recognized by GenTriggerClass is passed up the class tree for handling. 
+recognized by **GenTriggerClass** is passed up the class tree for handling. 
 Thus, a MSG_GEN_SET_NOT_ENABLED sent to the trigger will be passed on 
-to GenClass and will be handled there.
+to **GenClass** and will be handled there.
 
 The method table has two parts: The first part is a listing of message 
 numbers, and the second part is a listing of pointers to the method code. 
@@ -1380,7 +1375,7 @@ as if that code were a function called by the object's code.
 Most aspects of messages and messaging are described in the following 
 section. This section, however, describes how the kernel finds and executes 
 the code when a message is sent to the GenTrigger. The message is 
-MSG_GEN_SET_USABLE (handled by GenClass).
+MSG_GEN_SET_USABLE (handled by **GenClass**).
 
 Messages are sent directly to an object using its optr. That is, when you send 
 a message to this particular GenTrigger, you send it directly to 
@@ -1391,12 +1386,12 @@ the handler.
 
 When MSG_GEN_SET_USABLE is sent to the TicTacNewTrigger, for example, 
 the kernel looks in the object's instance chunk for its class pointer. It follows 
-this pointer and then looks in GenTriggerClass' ClassStruct structure. It 
+this pointer and then looks in **GenTriggerClass**' **ClassStruct** structure. It 
 scans the first part of the class' method table for MSG_GEN_SET_USABLE. If 
 the message is not there (and it isn't), the kernel will then follow the class' 
-Class_superClass pointer and look in GenClass' ClassStruct structure. It 
-then scans the first part of GenClass' method table for the message. 
-GenClass has an entry for MSG_GEN_SET_USABLE, and therefore the 
+Class_superClass pointer and look in **GenClass**' **ClassStruct** structure. It 
+then scans the first part of **GenClass**' method table for the message. 
+**GenClass** has an entry for MSG_GEN_SET_USABLE, and therefore the 
 kernel checks the second part of the method table for the code pointer. It 
 follows this pointer to the method's entry point and begins executing the code 
 there.
@@ -1455,7 +1450,7 @@ kernel pulls it from the event queue.
 The kernel then locates and loads the recipient object into memory (if 
 necessary). The recipient's object block will be loaded and locked, and the 
 object will be locked while processing the event. (Note, however, that it is 
-possible for the object to move if the recipient makes a call to LMemAlloc() 
+possible for the object to move if the recipient makes a call to **LMemAlloc()** 
 or does something else that can cause shuffling of the object chunks.) The 
 kernel will follow the object's class pointer to its class and will scan the 
 method table. If the class can handle the message, the proper method code 
@@ -1502,7 +1497,7 @@ You will never have to know the structure of an event.
 The previous sections dealt with the internals of the GEOS object system. 
 This section describes how you can create classes and objects and manage 
 them during execution using Goc keywords and kernel routines. Almost all 
-Goc keywords begin with "@" (one notable exception is gcnList).
+Goc keywords begin with "@" (one notable exception is **gcnList**).
 
 All the most useful keywords available in Goc are shown in Code Display 5-5. 
 This display is for initial reference; all the keywords are detailed in depth in 
@@ -1591,9 +1586,9 @@ gcnList(<manufID>, <ltype>) = <oname> [, <oname>]*;
 
 @class, @classdecl, @endc, @default, @uses
 
-You can create new classes in GEOS by using the Goc keywords @class and 
-@endc. These frame the class definition as shown in Code Display 5-6; the 
-@endc keyword takes no parameters, but @class takes the following 
+You can create new classes in GEOS by using the Goc keywords **@class** and 
+**@endc**. These frame the class definition as shown in Code Display 5-6; the 
+**@endc** keyword takes no parameters, but **@class** takes the following 
 parameters:
 
 ~~~
@@ -1609,10 +1604,10 @@ parameters:
 **variant** When included, this word makes the new class a variant class. 
 All variant classes must also be declared master classes.
 
-Every class must have a class structure (ClassStruct) in memory. This is 
+Every class must have a class structure (**ClassStruct**) in memory. This is 
 created and filled automatically by Goc and the kernel; however, you must 
-use the @classdecl keyword to make sure the structure gets built. Only one 
-@classdecl statement may be used for each class, however-Goc will give an 
+use the **@classdecl** keyword to make sure the structure gets built. Only one 
+**@classdecl** statement may be used for each class, however-Goc will give an 
 error if the class is declared twice. This is also shown in Code Display 5-6, 
 and its parameters are as follows:
 
@@ -1625,8 +1620,8 @@ and its parameters are as follows:
 **cflags** These are optional flags, described below.
 
 The optional flags that can be used with a class declaration determine how 
-objects of the class get shut down (see "Class_flags" on page 169). The flags 
-you can use with @classdecl are
+objects of the class get shut down (see ["Class_flags"]
+(#5323-class-structure-and-class-trees)). The flags you can use with **@classdecl** are
 
 _neverSaved_  
 This flag indicates that objects of this class will neither be 
@@ -1641,7 +1636,7 @@ will never be saved to a state file and must be re-initialized
 each time they are loaded. If you want an object simply to 
 revert to its default configuration each time it is loaded, use the 
 flag ignoreDirty instead in the object's declaration (see 
-@object, below).
+**@object**, below).
 
 In addition, any variant class can have a default superclass. The variant is 
 resolved at compile-time to have the default superclass as its superclass. To 
@@ -1659,7 +1654,7 @@ example, GenClass would be specified as "Gen.")
 
 Sometimes a variant class will know that it will be the subclass of a specific 
 class, though it doesn't know (at compile time) just how that ancestry will be 
-traced. You can use the @uses directive to let the compiler know this; that 
+traced. You can use the **@uses** directive to let the compiler know this; that 
 way, the variant class can define handlers for the "used" class. For example, 
 if you know that variant class MyVariantClass will always be resolved as a 
 descendant of MyAncestorClass, you can put the directive
@@ -1710,16 +1705,16 @@ Code Display 5-6 Defining Classes
 @message, @stack, @reserveMessages, @exportMessages, 
 @importMessage, @alias, @prototype
 
-As discussed in section 5.3.3 on page 180, messages are simply 16-bit 
+As discussed in [section 5.3.3](#533-the-geos-message-system), messages are simply 16-bit 
 numbers allocated as an enumerated type. When a new class is defined, a 
 constant is automatically created representing the first message number for 
 the class. This constant is then used as the first number in the enumeration 
 of messages.
 
-The constant is built off the class' superclass. MetaClass has the first 16384 
+The constant is built off the class' superclass. **MetaClass** has the first 16384 
 messages reserved for its use. Each master level gets 8192, and the first 
 master class of a level gets 2048 of these. All other classes are allocated 512 
-message spots. Thus, a master class subclassed directly off MetaClass would 
+message spots. Thus, a master class subclassed directly off **MetaClass** would 
 have 2048 messages beginning with number #16384 (since the numbering is 
 zero-based). A subclass of this would have 512 messages beginning with 
 number #18432.
@@ -1728,15 +1723,15 @@ This numbering scheme ensures that no two classes at different levels in the
 class hierarchy will have the same message number. Specifically, a class will 
 never have the same message number as one of its sub- or superclasses.
 
-New messages must be defined in the class definition between the @class 
-and @endc keywords (see above). They are defined much like normal 
+New messages must be defined in the class definition between the **@class** 
+and **@endc** keywords (see above). They are defined much like normal 
 function calls and follow the normal C calling conventions (see Code 
 Display 5-7 for examples). If your class uses messages from its superclass, 
 you do not have to declare these messages in your class definition-they are 
 inherited automatically. This is true even if you are subclassing the method 
 to alter its functionality.
 
-To define a new message, use the @message keyword. This keyword takes 
+To define a new message, use the **@message** keyword. This keyword takes 
 the following parameters:
 
 ~~~
@@ -1764,7 +1759,7 @@ if the function is called with arguments.
 
 **Messages for Use with Assembly Code**
 
-The @stack keyword indicates that parameters are passed on the stack; it 
+The **@stack** keyword indicates that parameters are passed on the stack; it 
 is important to note that because of calling conventions, parameters passed 
 on the stack must be listed in the message definition in reverse order from the 
 way the handler pops them from the stack. This keyword is used only when 
@@ -1776,7 +1771,7 @@ shown below:
 ~~~
 
 All the parameters shown in the formats are the same as in the normal 
-@message format.
+**@message** format.
 
 ---
 Code Display 5-7 Defining Messages
@@ -1822,15 +1817,15 @@ Goc therefore allows a class to export a range of message numbers which
 subclasses can import and create specific definitions for. This allows you 
 greater control over what aspects of the class you can define.
 
-To export a range of messages, use the @exportMessages keyword. This will 
+To export a range of messages, use the **@exportMessages** keyword. This will 
 set aside several message numbers which can then be imported by subclasses 
-using the @importMessage keyword.
+using the **@importMessage** keyword.
 
 Another potential problem is upgrading your program from release to 
 release. If you create classes that may grow in the future, you may want to 
 reserve a number of message spots to ensure that those spots can be filled in 
 later. Nothing is done with the spots; they are simply place holders for future 
-upgrades. You can use the @reserveMessages keyword to reserve a range 
+upgrades. You can use the **@reserveMessages** keyword to reserve a range 
 of any size. The parameters of these three keywords are shown below:
 
 ~~~
@@ -1845,7 +1840,7 @@ of any size. The parameters of these three keywords are shown below:
 importing messages to ensure that the proper numbers are used.
 
 **messageDef** This is a standard message definition line, the same as would 
-be found with the @message keyword (though @message is left out).
+be found with the **@message** keyword (though **@message** is left out).
 
 Note that you do not need to reserve messages for upgrades; any class can 
 always have messages tacked on to the end of its class definition. If you want 
@@ -1854,18 +1849,18 @@ you expect additions to be made.
 
 **Aliasing Messages**
 
-The @alias keyword allows a single message to have more than one 
-pass/return format. The @prototype keyword allows quick, clean, and 
+The **@alias** keyword allows a single message to have more than one 
+pass/return format. The **@prototype** keyword allows quick, clean, and 
 convenient repetition of a single format for many different messages; it also 
 allows a class to create a prototype so users of a message can have their own 
 messages with the same format.
 
-@alias is used when a single method takes conditional parameters. For 
+**@alias** is used when a single method takes conditional parameters. For 
 example, a method may take a word value in a certain case and a dword value 
 in another (dependent upon a passed flag). Each condition must be accounted 
 for in its own message format. Rather than create a message and a method 
 for each case, you can create a single assembly-language method for all the 
-different pass/return formats; then, you can use @alias to make several 
+different pass/return formats; then, you can use **@alias** to make several 
 messages refer to the same method, each using a different format.
 
 ~~~
@@ -1877,13 +1872,12 @@ different pass/return values but will invoke the same method
 code and will have the same message number.
 
 **msgDef** The new message definition. It follows the same format as 
-messages defined with the @message keyword (with 
-@message left off).
+messages defined with the **@message** keyword (with **@message** left off).
 
 In addition, if you have a single pass/return format for many messages, you 
-can use the @prototype keyword as coding shorthand. For example, if an 
+can use the **@prototype** keyword as coding shorthand. For example, if an 
 object has ten messages that all take two parameters and return a single 
-value, you can set up the format with the @prototype keyword and then use 
+value, you can set up the format with the **@prototype** keyword and then use 
 a simpler format for definition of your messages. An example is shown in 
 Code Display 5-8, and the parameters of this keyword are shown below.
 
@@ -1895,7 +1889,7 @@ Code Display 5-8, and the parameters of this keyword are shown below.
 name, use something like "MY_PROTOTYPE" that you can 
 insert later into the definitions of your real messages. All other 
 parts of the message definition are the same as would be 
-declared with @message (with @message left off).
+declared with **@message** (with **@message** left off).
 
 ---
 Code Display 5-8 Aliasing Messages
@@ -1933,18 +1927,19 @@ Code Display 5-8 Aliasing Messages
 @instance, @composite, @link, @visMoniker, @kbdAccelerator, 
 @activeList
 
-Instance data fields are all defined with the @instance keyword. Other 
-keywords may be included in the @instance declaration for special types of 
-data. All instance data definitions must appear between the class' @class 
-and @endc keywords (see above under class definition).
+Instance data fields are all defined with the **@instance** keyword. Other 
+keywords may be included in the **@instance** declaration for special types of 
+data. All instance data definitions must appear between the class' **@class** 
+and **@endc** keywords (see above under class definition).
 
-The @instance keyword is used to define normal instance data. If you have 
+The **@instance** keyword is used to define normal instance data. If you have 
 data that must be added or removed dynamically (such as hints), use the 
-@vardata keyword, described in section 5.4.1.4 on page 195. Also, if you have 
+**@vardata** keyword, described in [section 5.4.1.4]
+(#5414-defining-and-working-with-variable-data-fields). Also, if you have 
 data that requires relocation (such as pointers to fixed data) when the object 
-is loaded, use the @reloc keyword.
+is loaded, use the **@reloc** keyword.
 
-The format of the @instance keyword is as follows:
+The format of the **@instance** keyword is as follows:
 
 ~~~
 @instance    <insType>    <iname> = <default>;
@@ -1960,7 +1955,7 @@ an object of this class is instantiated. The value must, of course,
 be appropriate for the data type.
 
 Goc has several special types of instance data fields that you can declare 
-along with @instance to make object definition easier. The format for using 
+along with **@instance** to make object definition easier. The format for using 
 one of the special types is shown below (with examples in Code Display 5-9). 
 Each of the types is also described below.
 
@@ -1976,35 +1971,35 @@ defines the special type of this field.
 The special types are given here:
 
 **@composite** This field is used when objects of the class being defined are 
-allowed to have children. The @composite field will actually 
+allowed to have children. The **@composite** field will actually 
 contain an optr to the first child object in an object tree. Since 
-most objects in object trees are subclassed from VisClass or 
-GenClass, you will most likely never use the @composite 
-keyword. Both VisCompClass and GenClass have 
-@composite fields predefined. The @composite type has a 
+most objects in object trees are subclassed from **VisClass** or 
+**GenClass**, you will most likely never use the **@composite** 
+keyword. Both **VisCompClass** and **GenClass** have 
+**@composite** fields predefined. The **@composite** type has a 
 special format, shown below:
 
 ~~~
 @instance  @composite <iname> = <linkName>;
 ~~~
 where iname is the name of the instance field and linkName is 
-the name of the field designated as @link (below). Note that 
-there must be a @link field in every class that has a 
-@composite field. See section 5.4.6.4 on page 232 for more 
-information on object trees and the composite and link fields.
+the name of the field designated as **@link** (below). Note that 
+there must be a **@link** field in every class that has a 
+**@composite** field. See [section 5.4.6.4](#5464-managing-object-trees) for 
+more information on object trees and the composite and link fields.
 
 **@link** This field is used by objects that can be children in an object 
-tree. Where the @composite field points to the first child, the 
-@link field points to the next sibling. If there is no next sibling, 
+tree. Where the **@composite** field points to the first child, the 
+**@link** field points to the next sibling. If there is no next sibling, 
 this field will point back to the parent object. Since most objects 
-in object trees are subclassed from VisClass or GenClass, you 
-will most likely never use the @link keyword. Both VisClass 
-and GenClass have @link fields predefined.
+in object trees are subclassed from **VisClass** or **GenClass**, you 
+will most likely never use the **@link** keyword. Both **VisClass** 
+and **GenClass** have **@link** fields predefined.
 
 **@visMoniker**  
 This field is designated as holding a pointer to a visual moniker 
-chunk for the object. It is used in GenClass-see "GenClass," 
-Chapter 2 of the Objects Book for information on the 
+chunk for the object. It is used in **GenClass**-see ["GenClass," 
+Chapter 2 of the Objects Book](../Objects/ogen.md) for information on the 
 GI_visMoniker field. The moniker or moniker list must be in the 
 same resource as the generic object using that moniker since 
 only the chunk's handle is stored. A moniker list can store full 
@@ -2018,7 +2013,7 @@ be.
 This field contains a character sequence that, when typed by 
 the user, causes the object to execute its default operation. For 
 example, a keyboard accelerator could invoke a trigger 
-implemented as a menu item. It is used in GenClass only.
+implemented as a menu item. It is used in **GenClass** only.
 
 ---
 Code Display 5-9 Declaring Instance Data Fields
@@ -2048,7 +2043,7 @@ Code Display 5-9 Declaring Instance Data Fields
 Recall that when defining an instance data field you can set up a default 
 value for that field. When creating a subclass, you may wish to specify that 
 the subclass should have a different default value for a given field than the 
-superclass does. Use the @default keyword to do this:
+superclass does. Use the **@default** keyword to do this:
 
 ~~~
 @default <iname> = <default>;
@@ -2058,7 +2053,7 @@ superclass does. Use the @default keyword to do this:
 
 **default** The new default value of the instance field if it is not filled in 
 when an object of this class is instantiated. The value must, of 
-course, be appropriate for the data type. You may use @default 
+course, be appropriate for the data type. You may use **@default** 
 as part of this value; this @default will be treated as the value 
 of the superclass. (If this seems confusing, try looking at the 
 example.)
@@ -2096,7 +2091,7 @@ class to have more or less instance data than other objects in the class. One
 example of variable data is the use of hints in generic UI objects. Because 
 each object in a given class may or may not have hints, the objects can 
 actually have different instance sizes. Variable data instance fields are 
-defined with the use of the @vardata keyword.
+defined with the use of the **@vardata** keyword.
 
 Using variable data, however, is somewhat more complex than using 
 standard instance data. You must use special kernel routines or messages to 
@@ -2104,8 +2099,8 @@ get a pointer to the data; then you can use the pointer to access the field.
 
 Variable data is stored together at the end of the instance chunk in "data 
 entries." Each entry consists of a primary word and optional extra data. The 
-primary word represents a data type defined by the keyword @vardata. This 
-type is created automatically by Goc when the @vardata keyword is used.
+primary word represents a data type defined by the keyword **@vardata**. This 
+type is created automatically by Goc when the **@vardata** keyword is used.
 
 ![](Art/figure_5-17.png)
 
@@ -2125,12 +2120,12 @@ the instance chunk). Thus, when a master part of an object is destroyed, the
 variable data entries associated with that master class will also be destroyed. 
 For example, when a UI object is set not usable (taken off the screen), its Vis 
 master part is removed from the instance chunk; any variable data entries 
-associated with VisClass will also be destroyed.
+associated with **VisClass** will also be destroyed.
 
 Variable data may also be tagged for saving to the state file. That is, you can 
 set up individual data entries to be saved to a state file and to be reinstated 
 when the object is loaded from the state file. For more information about 
-state saving, see section 5.4.6.6.
+state saving, see [section 5.4.6.6](#5466-saving-object-state).
 
 Variable data may be defined in an object's declaration in your .goc file or 
 may be added and removed during execution. This gives the potential for 
@@ -2139,7 +2134,7 @@ however, temporary data used in this manner should be kept small to avoid
 slowing down the system-constantly resizing instance chunks to add and 
 remove vardata fields makes more work for the memory manager.
 
-To define a variable data type in a given class, use the @vardata keyword as 
+To define a variable data type in a given class, use the **@vardata** keyword as 
 follows (an example is given in Code Display 5-11):
 
 ~~~
@@ -2173,14 +2168,14 @@ Code Display 5-10 Examples of Instance Data Declarations
 Some vardata types may have varying amounts of extra data. For example, 
 one type may have either a word or a dword of extra data. To allow this, you 
 can set up an alias with the new type attached using the keyword 
-@vardataAlias:
+**@vardataAlias**:
 
 ~~~
 @vardataAlias  (<origName>) <newType> <newName>;
 ~~~
 
 **origName** This is the name of the original variable data field already 
-defined with @vardata.
+defined with **@vardata**.
 
 **newType** This is the data type of the new variable data field, a standard 
 C or GEOS data type.
@@ -2189,7 +2184,7 @@ newName	This is the name of the new variable data field. In essence, the
 original and new fields will have the same data type word but 
 will have different extra data size.
 
-As noted earlier and as shown in Figure 5-17 on page l 196, the data type 
+As noted earlier and as shown in Figure 5-17, the data type 
 field in the data entry has two flags associated with it. These flags are each 
 one bit:
 
@@ -2236,34 +2231,34 @@ called from within the object containing the variable data entries; since
 variable data is instance data, it is against OOP doctrine for one object to 
 alter another object's variable data directly.
 
-Instead, MetaClass provides vardata messages that can be sent by one 
+Instead, **MetaClass** provides vardata messages that can be sent by one 
 object to another to add, remove, change, or retrieve vardata entries of 
-another object. The kernel routines and MetaClass messages are outlined 
+another object. The kernel routines and **MetaClass** messages are outlined 
 below:
 
-+ ObjVarAddData()
++ **ObjVarAddData()**
 This routine adds an new entry for the passed data type or replaces the 
 extra data associated with a particular data type entry.
 
-+ ObjVarDeleteData()
++ **ObjVarDeleteData()**
 This routine deletes the entry for a particular data type when passed the 
 data type.
 
-+ ObjVarDeleteDataAt()
++ **ObjVarDeleteDataAt()**
 This routine deletes a particular data entry when passed the entry's 
-pointer as returned by ObjVarAddData(), ObjVarFindData(), or 
-ObjVarDerefData().
+pointer as returned by **ObjVarAddData()**, **ObjVarFindData()**, or 
+**ObjVarDerefData()**.
 
-+ ObjVarScanData()
++ **ObjVarScanData()**
 This routine causes the kernel to scan all data entries in an object's 
 variable data and call any "handler routines" listed for them. This 
 process is described below.
 
-+ ObjVarFindData()
++ **ObjVarFindData()**
 This routine searches for and returns (if possible) a pointer to a data 
 entry of the passed data type.
 
-+ ObjVarDerefData()
++ **ObjVarDerefData()**
 This routine returns a pointer to a data entry when passed the object's 
 optr and the data type. If the entry does not exist, this routine will call 
 on the object to create and initialize the entry. Such variable data then 
@@ -2271,10 +2266,10 @@ behaves much like instance data. The object containing the vardata is
 responsible for creating the entry and then initializing it upon receipt of 
 a MSG_META_INITIALIZE_VAR_DATA, described below.
 
-+ ObjVarDeleteDataRange()
++ **ObjVarDeleteDataRange()**
 This routine deletes all data entries with types in the passed range.
 
-+ ObjVarCopyDataRange()
++ **ObjVarCopyDataRange()**
 This routine copies all data entries within the passed range from one 
 object's instance chunk to another`s. If any entries are copied, the 
 destination object will be marked dirty for saving. This routine must be 
@@ -2313,13 +2308,13 @@ nothing with certain hints; these specific UIs do not have handlers for those
 hints.
 
 Handlers are associated with data types through the use of a 
-VarDataCHandler table. This is a table that you set up in your .goc file 
-that contains pairings of routine names with @vardata field names. An 
-example of the VarDataCHandler table is shown in Code Display 5-12.
+**VarDataCHandler** table. This is a table that you set up in your .goc file 
+that contains pairings of routine names with **@vardata** field names. An 
+example of the **VarDataCHandler** table is shown in Code Display 5-12.
 
 A handler is simply a normal C routine or function and is defined as such. The 
-handler should be declared as an _pascal routine.The table pairs the 
-handler with the @vardata data type, and when ObjVarScanData() is 
+handler should be declared as an **_pascal** routine.The table pairs the 
+handler with the **@vardata** data type, and when **ObjVarScanData()** is 
 called, all handlers for all data types are called in order. This is true for the 
 object's class and all its superclasses since variable data is inherited just as 
 normal instance data is. The handler can do almost anything appropriate 
@@ -2379,9 +2374,9 @@ is loaded and resolved since the global memory handle can't be known at
 compile-time.
 
 For some special instance fields, this happens automatically. For example, 
-the @composite and @link fields as well as optrs are automatically 
+the **@composite** and **@link** fields as well as optrs are automatically 
 resolved. However, if you add your own instance fields requiring relocation, 
-you will have to set them up with the @reloc keyword. This is true for both 
+you will have to set them up with the **@reloc** keyword. This is true for both 
 static and variable data.
 
 This keyword uses two formats. The first listed here is for normal, static 
@@ -2430,15 +2425,15 @@ may be one of optr, ptr, or handle.
 @noreloc
 
 To force an instance data field which would normally be relocatable (e.g., an 
-optr) to not be relocatable, use the @noreloc keyword. Use this keyword 
+optr) to not be relocatable, use the **@noreloc** keyword. Use this keyword 
 together with the name of the field to be marked non-relocatable directly 
 after defining the instance field itself as shown in Code Display 5-13.
 
 ---
 Code Display 5-13 Use of the @noreloc Keyword
 ~~~
-	@instance optr MCI_ruler;			/* Normally MCI_ruler would be reloc- */
-	@noreloc MCI_ruler;				/* -but now it isn't. */
+	@instance optr MCI_ruler;  /* Normally MCI_ruler would be reloc- */
+	@noreloc MCI_ruler;        /* -but now it isn't. */
 ~~~
 
 #### 5.4.3 Defining Methods
@@ -2449,12 +2444,12 @@ Methods are the routines executed when an object receives a message. Each
 class understands a certain set of messages; each of these has a place in the 
 class' method table and corresponds to one method.
 
-Although methods are class-specific, they are not defined between the @class 
-and @endc of class definition. Instead, their declaration line links them to a 
+Although methods are class-specific, they are not defined between the **@class** 
+and **@endc** of class definition. Instead, their declaration line links them to a 
 single class and to a specific message. Goc, Glue, and GEOS build each class' 
 method table automatically; you do not have to create the table yourself.
 
-To define a method, use the @method keyword. This has the following 
+To define a method, use the **@method** keyword. This has the following 
 structure:
 
 ~~~
@@ -2481,17 +2476,17 @@ return values. At least one message must be specified.
 
 Note that the name of the method (the handler name) is optional. Parameters 
 and return values are not put in the method declaration-these are defined 
-with @message as discussed in section 5.3.3 on page 180.
+with **@message** as discussed in [section 5.3.3](#533-the-geos-message-system).
 
 If you will wish to call the method as a routine occasionally, your compiler 
 will probably require that you provide a prototype for the routine. If your 
-@message declaration looks like
+**@message** declaration looks like
 
 ~~~
 @message word MSG_MC_DO_SOMETHING(word thing);
 ~~~
 
-and your @method declaration looks like
+and your **@method** declaration looks like
 
 ~~~
 @method DoSomething, MyClass, MSG_MC_DO_SOMETHING {
@@ -2500,8 +2495,8 @@ and your @method declaration looks like
 Then your protoype should look like
 
 extern word _pascal DoSomething(optr oself,
-					  MyMessages message,
-					  word thing);
+			MyMessages message,
+			word thing);
 ~~~
 
 The name of the type MyMessages is constructed automatically by taking 
@@ -2509,19 +2504,19 @@ the name of the class, removing the "Class" suffix, and replacing said suffix
 with "Messages".
 
 Normally, all of a class' methods will be coded in the same code file in which 
-the class is declared with @classdecl. If, however, you find you need to 
-declare a class' methods in a different file, you can use the @extern keyword 
+the class is declared with **@classdecl**. If, however, you find you need to 
+declare a class' methods in a different file, you can use the **@extern** keyword 
 to indicate a method is defined and/or used in a different object file. Goc will 
-give no error if @extern is used and the method exists nowhere; Glue, 
+give no error if **@extern** is used and the method exists nowhere; Glue, 
 however, will give a linking error in such a case. There is no such 
 requirement, however, if you are putting only the class definition (the 
-definitions between @class and @endc) in a different file. In this case, you 
+definitions between **@class** and **@endc**) in a different file. In this case, you 
 can put the class definition in a .goh header file and the method code in the 
-same .goc file as the @classdecl statement; you must @include the .goh 
-file, but you won't need to use the @extern directive (as long as the method 
-code is in the same file as the @classdecl directive).
+same .goc file as the **@classdecl** statement; you must **@include** the .goh 
+file, but you won't need to use the **@extern** directive (as long as the method 
+code is in the same file as the **@classdecl** directive).
 
-The format for using @extern is as follows:
+The format for using **@extern** is as follows:
 
 ~~~
 /* In the file in which the class is declared with 
@@ -2542,9 +2537,9 @@ external method definitions, like normal method definitions,
 can handle more than one message.
 
 Three parameters are passed automatically with messages and do not have 
-to be declared in the @message definition. They are important to know when 
+to be declared in the **@message** definition. They are important to know when 
 writing methods, however, because they can greatly simplify your code. 
-These are standard parameters for all classes except ProcessClass and its 
+These are standard parameters for all classes except **ProcessClass** and its 
 subclasses below:
 
 **pself** A far pointer to the object's instance data. pself points to the 
@@ -2558,11 +2553,11 @@ can be used for routines that act on the object's instance data.
 
 **message** The message number of the message being handled.
 
-As mentioned, ProcessClass is a special type of class. It has no true instance 
+As mentioned, **ProcessClass** is a special type of class. It has no true instance 
 data because it uses the standard PC structure of an application (idata, 
 udata, etc.). It only has one standard parameter to each of its methods: the 
 message that was sent to it. This is because the "instance data" of 
-ProcessClass includes all the global variables of your program. Because 
+**ProcessClass** includes all the global variables of your program. Because 
 they are accessed automatically, no oself or pself is required.
 
 ---
@@ -2622,18 +2617,19 @@ have the following format:
 
 ~~~
 extern <type> _pascal <MethodName>(
-	optr					oself,
-	<TruncatedClassName>Messages					message,
-	<type1>					<arg1>,
-	<type2>					<arg2>)
+	optr				oself,
+	<TruncatedClassName>Messages	message,
+	<type1>				<arg1>,
+	<type2>				<arg2>)
 ~~~
 
-**type** This is the type returned by the method. It may be any data type.
+**type**  
+ This is the type returned by the method. It may be any data type.
 
 **MethodName**  
 This is the name of the method. If you will be calling a method 
-as a routine, you must give the method a name when you 
-declare it (see page 204). Use the same name here.
+as a routine, you must give the method a name when you declare it 
+(see ["Defining Methods"](#543-defining-methods)). Use the same name here.
 
 **TruncatedClassName**  
 This is the name of the class, without the word "Class". The 
@@ -2650,37 +2646,36 @@ the same order, as in the message declaration.
 ---
 Code Display 5-15 Declaring a Method As a Routine
 ~~~
-@message int MSG_HELLO_COUNTER_RECALCULATE_VALUE( \
-				HelloPriority 		priority, \
-				word 		randomDatum, \
-				char 		aLetter);
+@message int MSG_HELLO_COUNTER_RECALCULATE_VALUE(
+		HelloPriority 	priority, 
+		word 		randomDatum, 
+		char 		aLetter);
 
 extern int _pascal HelloCounterRecalculateValue(
-			optr			oself,
-			HelloCounterMessages			message,
-			HelloPriority			priority,
-			word			randomDatum,
-			char			aLetter);
+		optr			oself,
+		HelloCounterMessages	message,
+		HelloPriority		priority,
+		word			randomDatum,
+		char			aLetter);
 
-@method	HelloCounterRecalculate, HelloCounterClass, \ 
+@method	HelloCounterRecalculate, HelloCounterClass, 
 		MSG_HELLO_COUNTER_RECALCULATE_VALUE {
 
 	/* method code goes here... */
-
 }
 ~~~
 
 #### 5.4.4 Declaring Objects
 
 In GEOS programs, you can instantiate objects in two ways: You can declare 
-them in your source code with the @object keyword, or you can instantiate 
+them in your source code with the **@object** keyword, or you can instantiate 
 them and fill in their instance data during execution. In most cases, you will 
 probably do the former, especially with generic UI objects.
 
-Additionally, you can create resources and chunks with the @start, @end, 
-@header, and @chunk keywords. GEOS libraries also need an additional set 
-of declarations in their definition (.goh) files; these declarations (@deflib 
-and @endlib) indicate that the code contained between them is part of the 
+Additionally, you can create resources and chunks with the **@start**, **@end**, 
+**@header**, and **@chunk** keywords. GEOS libraries also need an additional set 
+of declarations in their definition (.goh) files; these declarations (**@deflib** 
+and **@endlib**) indicate that the code contained between them is part of the 
 specified library.
 
 ##### 5.4.4.1 Defining Library Code
@@ -2690,7 +2685,7 @@ specified library.
 If your geode is a library, it will likely have a number of .goh files. Each of 
 these files contains some portion of the library's code and is included by 
 applications that use the library. The library code must be delimited by the 
-two keywords @deflib and @endlib, which have the following formats:
+two keywords **@deflib** and **@endlib**, which have the following formats:
 
 ~~~
 @deflib <libname>
@@ -2723,11 +2718,11 @@ chunks. Code resources are created automatically, and no declaration is
 required for them (unless you require special segments; then you should use 
 the pragmas appropriate for your C compiler).
 
-Object blocks or other LMem resources are declared with @start and @end. 
-You can set a special header on a local memory resource with the @header 
+Object blocks or other LMem resources are declared with **@start** and **@end**. 
+You can set a special header on a local memory resource with the **@header** 
 keyword. These are described below, and an example of declaring the 
-resource block is given in Code Display 5-16. Note that the @header 
-keyword must come between the @start and @end delimiters.
+resource block is given in Code Display 5-16. Note that the **@header** 
+keyword must come between the **@start** and **@end** delimiters.
 
 ~~~
 @start    <segname> [, <flags>];
@@ -2745,8 +2740,8 @@ a state file.
 
 **type** This is the name of a structure type that will act as the header 
 structure for the resource block. It must be some permutation 
-of either LMemBlockHeader (for non object blocks) or 
-ObjLMemBlockHeader (for object blocks).
+of either **LMemBlockHeader** (for non object blocks) or 
+**ObjLMemBlockHeader** (for object blocks).
 
 **init** This is an initializer for the new header type. Typically, some 
 data fields will be added on to the end of one of the standard 
@@ -2754,8 +2749,8 @@ LMem block headers. These fields may be filled in with
 initializer data with this optional argument.
 
 The resource elements (objects or chunks, for example) are also declared 
-within the @start and @end delimiters. The @chunk keyword declares a 
-data chunk and is shown below. For the @object keyword, see the next 
+within the **@start** and **@end** delimiters. The **@chunk** keyword declares a 
+data chunk and is shown below. For the **@object** keyword, see the next 
 section.
 
 ~~~
@@ -2771,11 +2766,10 @@ would a variable name to reference the chunk.
 a structure, make sure you put the data within curly braces.
 
 Two other types of resource elements may also be defined, both of which are 
-array types. The @chunkArray keyword defines a chunk array structure, 
-and the @elementArray keyword defines an element array structure. See 
-"Local Memory," Chapter 16, for information on the structure and usage of 
-chunk and element arrays. The formats for the keywords are described 
-below:
+array types. The **@chunkArray** keyword defines a chunk array structure, 
+and the **@elementArray** keyword defines an element array structure. See 
+["Local Memory", Chapter 16](clmem.md), for information on the structure and usage of 
+chunk and element arrays. The formats for the keywords are described below:
 
 ~~~
 @chunkArray <stype> <aname> [= {<init>}];
@@ -2789,14 +2783,14 @@ below:
 
 **init** This is any initializer data. Initializer data is optional.
 
-One other keyword, @extern, allows you to use chunks from a different 
-compilation session. The @extern keyword can be used to reference remote 
+One other keyword, **@extern**, allows you to use chunks from a different 
+compilation session. The **@extern** keyword can be used to reference remote 
 (external) chunks, objects, and visual monikers. If the item referenced by 
-@extern is not actually defined anywhere, Glue will return an error when it 
+**@extern** is not actually defined anywhere, Glue will return an error when it 
 tries to link the item. (Note also that Glue can not link through an external 
 item; only one layer of external linkage is allowed. Thus, one object could not 
-have an @extern to a chunk that had an @extern to a visMoniker.) Children 
-in object trees may not be defined with @extern; Goc will produce an error 
+have an **@extern** to a chunk that had an **@extern** to a visMoniker.) Children 
+in object trees may not be defined with **@extern**; Goc will produce an error 
 in this case. The format of this keyword is as follows:
 
 ~~~
@@ -2841,13 +2835,13 @@ typedef struct {
 
 @object, @default, @specificUI, gcnList
 
-The @object keyword is much like the @chunk keyword in its use. It 
+The **@object** keyword is much like the **@chunk** keyword in its use. It 
 allocates a chunk in a resource segment and fills it with initializer data. 
 However, it also does much more in that it creates an object of a specified 
 class and fills it with default data if no initializer data is specified.
 
-The @object keyword, like @chunk, must be used between the delimiters 
-@start and @end (see above). However, it must be used in an object block (it 
+The **@object** keyword, like **@chunk**, must be used between the delimiters 
+**@start** and **@end** (see above). However, it must be used in an object block (it 
 can not be used in a data resource segment). Its format is below, and several 
 examples are shown in Code Display 5-17.
 
@@ -2878,15 +2872,15 @@ argument.
 
 **init** This is initializer data for the instance data field. If you want 
 default values in the field, you can either leave the field out of 
-the @object declaration or use the keyword @default for the 
+the **@object** declaration or use the keyword **@default** for the 
 initializer. When declaring variable data, though, be aware 
 that if the extra data is a structure, the initializer must be 
 enclosed in curly braces.
 
-GEOS supports special instance data fields as described in section 5.4.1.2. 
-These are declared as normal fields and are described below. Also, 
-generic hints are implemented as variable data, so they are added to an 
-object in the same way as other variable data types.
+GEOS supports special instance data fields as described in [section 5.4.1.2]
+(#5412-defining-instance-data-fields). These are declared as normal fields and 
+are described below. Also, generic hints are implemented as variable data, so 
+they are added to an object in the same way as other variable data types.
 
 **Object Trees**
 
@@ -2900,7 +2894,7 @@ whole tree by simply dynamically adding the top object in the file to the main
 tree. You won't have to add each object individually.
 
 If an object declared in one source file will send a message to an object in 
-another source file, you must include an @extern line in the source file 
+another source file, you must include an **@extern** line in the source file 
 containing the sending object: 
 
 ~~~
@@ -2919,16 +2913,16 @@ ROOptr = GeodeGetOptrNS(@ReceivingObjectName);
 **Declaring Children**
 
 If an object is to be part of an object tree, its class (or one of its superclasses) 
-must have at least an @link instance data field as does GenClass. If the 
+must have at least an **@link** instance data field as does **GenClass**. If the 
 object is to be allowed to have children, it must also have a field of type 
-@composite. These allow Goc to automatically and correctly link the tree 
+**@composite**. These allow Goc to automatically and correctly link the tree 
 together.
 
-As described in section 5.4.1.2, the @composite field points to 
-the first child of an object, and the @link field points either to the object's 
-next sibling or back to the parent if there is no next sibling. However, all child 
-declaration is done completely in the composite field when using @object. 
-The format is as follows:
+As described in [section 5.4.1.2](#5412-defining-instance-data-fields), the 
+**@composite** field points to the first child of an object, and the **@link** 
+field points either to the object's next sibling or back to the parent if 
+there is no next sibling. However, all child declaration is done completely 
+in the composite field when using **@object**. The format is as follows:
 
 ~~~
 <fname> = <childName> [, <childname>]* ;
@@ -2941,7 +2935,7 @@ class definition.
 This is the name of an object to be a child of this object. The star 
 symbol indicates that one or more children may be included in 
 the declaration line-they should be separated by commas, and 
-each child must also be declared with an @object declaration.
+each child must also be declared with an **@object** declaration.
 
 There are many examples of this in the sample applications. Some simple 
 examples are shown below.
@@ -2958,9 +2952,10 @@ VCI_comp = @TTX1, @TTX2, @TTX3, @TTX4, @TTX5, @TTO1,
 **Declaring Visual Monikers**
 
 For an object to have a visual moniker, it must have an instance data field of 
-type @visMoniker as GenClass does (see section 5.4.1.2 on page 192). If you 
-are in fact working with GenClass' GI_visMoniker field, you might want to 
-consult its description in "GenClass," Chapter 2 of the Objects Book.
+type **@visMoniker** as GenClass does (see [section 5.4.1.2]
+(#5412-defining-instance-data-fields)). If you are in fact working with GenClass' 
+GI_visMoniker field, you might want to consult its description in ["GenClass", 
+Chapter 2 of the Objects Book](../Objects/ogen.md).
 
 Visual monikers may take many forms, and the declaration line changes 
 depending on which form you are using. The form ranges from a simple text 
@@ -2982,7 +2977,7 @@ visual moniker for the object.
 The following form is used for text strings that have a keyboard navigation 
 character. A keyboard navigation character can be a character enclosed in 
 single quotation marks, a numerical constant, or a text string representing 
-some constant defined with #define. If it's a text string, the string is passed 
+some constant defined with **#define**. If it's a text string, the string is passed 
 on for the C compiler to parse. The form is shown below with an example.
 
 ~~~
@@ -3013,11 +3008,11 @@ GI_visMoniker = list {
 **fname** This is the name of the moniker's instance data field.
 
 **nameList** This is a list of resource data chunk names separated by 
-commas. Each chunk can be defined with the @chunk or 
-@visMoniker keyword.
+commas. Each chunk can be defined with the **@chunk** or 
+**@visMoniker** keyword.
 
 It is possible when declaring a list of visual monikers to have each moniker 
-within a chunk or to declare each moniker with the @visMoniker keyword. 
+within a chunk or to declare each moniker with the **@visMoniker** keyword. 
 If used on its own line, this keyword takes the form
 
 ~~~
@@ -3026,8 +3021,8 @@ If used on its own line, this keyword takes the form
 
 The fields are the name of the moniker (same as that specified in the moniker 
 list) and the moniker data. The visual moniker will be put in its own chunk 
-just as if the moniker had been declared with the @chunk keyword, but 
-using @visMoniker often is clearer and easier.
+just as if the moniker had been declared with the **@chunk** keyword, but 
+using **@visMoniker** often is clearer and easier.
 
 **Declaring GCN List Assignments**
 
@@ -3036,12 +3031,12 @@ objects to register for notification of certain types of events. For example,
 some applications may want to notify for changes in the file system (file 
 deletes, moves, copies, etc.); some objects may require notification each time 
 the selection changes (e.g., a PointSizeControl object needs to know when the 
-user changes a text selection). For further information, see "General Change 
-Notification," Chapter 9.
+user changes a text selection). For further information, see ["General Change 
+Notification", Chapter 9](cgcn.md).
 
 While many objects will add themselves to and remove themselves from GCN 
 lists dynamically, others will need to be placed on certain GCN lists in their 
-definitions. For this, the gcnList keyword (the only one not preceded by the 
+definitions. For this, the **gcnList** keyword (the only one not preceded by the 
 marker @) is used. Its format is shown below:
 
 ~~~
@@ -3066,14 +3061,14 @@ objects are separated by commas.
 
 A keyboard accelerator acts as a "hot key," invoking the object's default action 
 when pressed. The accelerator character is defined in an instance field 
-declared with @kbdAccelerator as shown in section 5.4.1.2 on page 192. 
+declared with **@kbdAccelerator** as shown in [section 5.4.1.2](#5412-defining-instance-data-fields). 
 The form of declaration follows.
 
 ~~~
 <fname> = [@specificUI] <mod>* <key>;
 ~~~
 
-**fname** This is the name of the @kbdAccelerator instance data field.
+**fname** This is the name of the **@kbdAccelerator** instance data field.
 
 **@specificUI** This is a Goc keyword that, when used in this declaration, 
 allows your program to use a key combination reserved for the 
@@ -3095,11 +3090,11 @@ have the default values with one or two modifications. In the first case, the
 instance data field does not need to be addressed at all; the default value will 
 be used if no declaration is made.
 
-In the second case, however, you must use the @default keyword to get the 
-default values. If modifications are made and @default is not used, all 
+In the second case, however, you must use the **@default** keyword to get the 
+default values. If modifications are made and **@default** is not used, all 
 default values will be lost. This is normally used only with bitfield-type 
 attributes, and modifications are made with bitwise operators. The use of 
-@default is shown below.
+**@default** is shown below.
 
 ~~~
 <fname> = @default [<op> [~]<attr>]*;
@@ -3167,7 +3162,7 @@ Code Display 5-17 Declaring Objects with @object
 
 Often you will have to send messages to objects throughout the system. You 
 can send messages in several ways, but the two most basic and most 
-frequently used involve the keywords @call and @send.
+frequently used involve the keywords **@call** and **@send**.
 
 If a message is being sent across threads, you must be aware of 
 synchronization issues. If the message does not cross thread boundaries, the 
@@ -3175,21 +3170,21 @@ kernel will link the code directly as if it were a function call. (This is an
 implementation difference only; you do not have to specify anything different 
 in your code.)
 
-The @send keyword causes the kernel to put the specified message into the 
-recipient's event queue. Messages sent with @send may not give return 
+The **@send** keyword causes the kernel to put the specified message into the 
+recipient's event queue. Messages sent with **@send** may not give return 
 values and may not take pointers to locked memory as arguments. The 
 sender then continues executing without ever knowing whether the message 
 was properly handled or not.
 
-The @call keyword is used when the message being sent must return 
+The **@call** keyword is used when the message being sent must return 
 information to the sender. It is also used when the message must be handled 
 immediately, before the sender is allowed to continue executing. In essence, 
 the sender is "put to sleep" until the message has been processed, at which 
 time the sender is woken up and may continue executing. If the message sent 
-with @call is not handled (passed up the recipient's class tree and still not 
+with **@call** is not handled (passed up the recipient's class tree and still not 
 handled), it will return as if it had been; no error message will be returned.
 
-The formats for @send and @call are similar. Use them like function calls. 
+The formats for **@send** and **@call** are similar. Use them like function calls. 
 Their format is given below:
 
 ~~~
@@ -3212,21 +3207,21 @@ It can also be an optr variable.
 standard C function call.
 
 **ret** This is a variable that will hold the return value, if any. Note 
-that this is valid only with @call because @send does not 
+that this is valid only with **@call** because **@send** does not 
 return anything.
 
 **cast** If a message name is put here, Goc will automatically cast the 
-return type to whatever type is returned by cast.
+return type to whatever type is returned by **cast**.
 
 **cast2** If a message name is put here, Goc will assume that the 
-message is passed the same arguments as message cast2.
+message is passed the same arguments as message **cast2**.
 
 The flags allowed for these keywords are listed below. They are rarely used 
 but are available.
 
 **forceQueue** This flag will cause the message to be placed in the recipient's 
 event queue, even if it could have been handled by a direct call. 
-Do not use this flag with @call.
+Do not use this flag with **@call**.
 
 **checkDuplicate**  
 This flag makes the kernel check if a message of the same name 
@@ -3253,7 +3248,7 @@ This flag indicates that this event may be discarded if the
 system is running extremely low on handles and requires more 
 space immediately.
 
-The @call command can also be used within an expression in the same way 
+The **@call** command can also be used within an expression in the same way 
 a function call could. For example, the following conditional expression is 
 valid:
 
@@ -3264,7 +3259,7 @@ if (@call MyObj::MSG_MYOBJ_TEST()) {
 ~~~
 
 The result of the message call will be evaluated in the if statement. Note that 
-this may not be done with @send because it returns nothing.
+this may not be done with **@send** because it returns nothing.
 
 **Nested Message Calls**
 
@@ -3290,15 +3285,15 @@ i = @call Obj2::MSG_THAT_RETURNS_INT();
 **Sending a Message to an Object's Superclass**
 
 Often you may wish to send a message directly to an object's superclass to 
-ensure that default behavior is implemented. Use the @callsuper keyword 
+ensure that default behavior is implemented. Use the **@callsuper** keyword 
 with the following format:
 
 ~~~
 @callsuper <obj>::<class>::<msg>(<pars>*) [<flgs>+];
 ~~~
 
-**obj** This is the object to send the message to, as in @call and 
-@send. The object block must already be locked, and must be 
+**obj** This is the object to send the message to, as in **@call** and 
+**@send**. The object block must already be locked, and must be 
 run by the current thread of execution. (Usually an object uses 
 @callsuper() to send a message to itself.)
 
@@ -3306,12 +3301,12 @@ run by the current thread of execution. (Usually an object uses
 
 **msg** This is the message name.
 
-**pars** This is the parameter list, same as @call and @send.
+**pars** This is the parameter list, same as **@call** and **@send**.
 
-**flgs** This is the flags list, same as @call and @send.
+**flgs** This is the flags list, same as **@call** and **@send**.
 
 When used on a line by itself (with no parameters or return values), 
-@callsuper() passes a received message on to the superclass. This is used 
+**@callsuper()** passes a received message on to the superclass. This is used 
 quite often when a subclass wants to alter existing behavior rather than 
 replace it.
 
@@ -3322,9 +3317,9 @@ time. An encapsulated message can include the message to be sent, the object
 it should be sent to, and the parameters that should be passed. Using 
 encapsulated messages can sometimes simplify coding.
 
-Messages can be encapsulated with the @record keyword and later 
-dispatched with @dispatch and @dispatchcall. (Though the use of 
-@record does not necessitate a later @dispatch-instead, the recorded 
+Messages can be encapsulated with the **@record** keyword and later 
+dispatched with **@dispatch** and **@dispatchcall**. (Though the use of 
+**@record** does not necessitate a later **@dispatch**-instead, the recorded 
 event can be passed as a parameter to another class for dispatching.) In 
 addition, when the event is dispatched, you can override the values set in the 
 encapsulated event to change the destination or the message. You can also 
@@ -3335,7 +3330,7 @@ keywords are as follows:
 <event> = @record <obj>::[{<cast>}]<msg>(<params>*);
 ~~~
 
-**event** The handle of the recorded event, of type EventHandle.
+**event** The handle of the recorded event, of type **EventHandle**.
 
 **obj** The object set to receive the message when it is dispatched. 
 This field may be set to null if the destination is determined 
@@ -3348,16 +3343,15 @@ the same argument types as the specified message.
 field may be set to null if the message is determined when it is 
 dispatched.
 
-**params** The parameter list (same as in @call and @send) that will be 
+**params** The parameter list (same as in **@call** and **@send**) that will be 
 sent with the dispatched message.
 
-The @dispatch keyword is used to dispatch an encapsulated event to its 
-destination. This is similar to @send in that it can have no return values. If 
-the event has return values, use @dispatchcall (below).
+The **@dispatch** keyword is used to dispatch an encapsulated event to its 
+destination. This is similar to **@send** in that it can have no return values. If 
+the event has return values, use **@dispatchcall** (below).
 
 ~~~
-@dispatch [noFree] \
-		<nObj>::[{<cast>}]<nMsg>::<event>;
+@dispatch [noFree] <nObj>::[{<cast>}]<nMsg>::<event>;
 ~~~
 
 **noFree** This flag indicates that the event's handle should not be freed 
@@ -3376,28 +3370,27 @@ with the same parameters as set in the encapsulated event.
 
 **event** This is the handle of the encapsulated event.
 
-The @dispatchcall keyword works exactly like the @dispatch keyword 
+The **@dispatchcall** keyword works exactly like the **@dispatch** keyword 
 above except that it allows the use of return values. The sender will be "put 
 to sleep" if necessary while the recipient processes the message and will be 
 "woken up" when the message returns.
 
 ~~~
-<ret> = @dispatchcall [noFree] [{<cast>}] <nObj>::\
-                                    <nMsg>::<event>;
+<ret> = @dispatchcall [noFree] [{<cast>}] <nObj>::<nMsg>::<event>;
 ~~~
 
 **ret** This is a variable that will contain the return value of the 
 message.
 
 **other parameters**  
-All the other parameters are the same as those in @dispatch.
+All the other parameters are the same as those in **@dispatch**.
 
 **Using Expressions with Messages**
 
-All message-sending keywords described in the previous sections-@call, 
-@send, @record, @dispatch, and @dispatchcall-can take expressions in 
-place of a destination object's name. Additionally, the @dispatch and 
-@dispatchcall keywords can take expressions in place of the message name. 
+All message-sending keywords described in the previous sections-**@call**, 
+**@send**, **@record**, **@dispatch**, and **@dispatchcall**-can take expressions in 
+place of a destination object's name. Additionally, the **@dispatch** and 
+**@dispatchcall** keywords can take expressions in place of the message name. 
 However, if an expression is used for the message, you must use a cast type 
 to make sure Goc knows the return and parameter types. Note, however, that 
 casts in this case use curly braces rather than parentheses.
@@ -3427,7 +3420,7 @@ the following sources when available. When trying to figure out parameters,
 it will look first for MSG_2, then MSG_X, and MSG_1 last. The first one Goc 
 finds will determine the parameters.
 
-@send and @record don't support return values, but on a @call, Goc will 
+**@send** and **@record** don't support return values, but on a **@call**, Goc will 
 figure out return values by looking at MSG_1, MSG_X, and finally MSG_2.
 
 In this case, Goc will pass to fn's method like MSG_CAST_2 but will return 
@@ -3455,7 +3448,7 @@ shorthand formats for use within methods:
 @callsuper;
 ~~~
 
-When used in a method as above, the @callsuper keyword passes the 
+When used in a method as above, the **@callsuper** keyword passes the 
 received message up to the object's superclass. Use this whenever 
 subclassing a message when the default functionality must be preserved.
 
@@ -3463,49 +3456,49 @@ subclassing a message when the default functionality must be preserved.
 <ret> = @call self::<msg>(<params>*);
 ~~~
 
-Any object can send a message to itself using @call and "self" as the 
-destination. The remainder of the command is the same as a normal @call.
+Any object can send a message to itself using **@call** and "self" as the 
+destination. The remainder of the command is the same as a normal **@call**.
 
 ~~~
 <ret> = @call process::<msg>(<params>*);
 ~~~
 
-Any object can send a message to its Process object with @call and "process" 
-as the destination. (The Process object is the object of class ProcessClass.) 
-The remainder of the command is the same as a normal @call.
+Any object can send a message to its Process object with **@call** and "process" 
+as the destination. (The Process object is the object of class **ProcessClass**.) 
+The remainder of the command is the same as a normal **@call**.
 
 ~~~
 <ret> = @call application::<msg>(<params>*);
 ~~~
 
 Any object can send a message to its Application object (of class 
-GenApplicationClass) with @call and "application" as the destination. The 
-remainder of the command is the same as a normal @call.
+**GenApplicationClass**) with **@call** and "application" as the destination. The 
+remainder of the command is the same as a normal **@call**.
 
 ~~~
 <ret> = @call @visParent::<msg>(<params>*);
 ~~~
 
-Any object in a visible tree can use @visParent as the destination of an 
-@call command. The message will be sent to the object's parent in the visible 
-object tree. The remainder of the command is the same as a normal @call.
+Any object in a visible tree can use **@visParent** as the destination of an 
+**@call** command. The message will be sent to the object's parent in the visible 
+object tree. The remainder of the command is the same as a normal **@call**.
 
 ~~~
 <ret> = @call @genParent::<msg>(<params>*);
 ~~~
 
-Any object in a generic tree can use @genParent as the destination of an 
-@call command. The message will be sent to the object's parent in the generic 
-object tree. The remainder of the command is the same as a normal @call.
+Any object in a generic tree can use **@genParent** as the destination of an 
+**@call** command. The message will be sent to the object's parent in the generic 
+object tree. The remainder of the command is the same as a normal **@call**.
 
 ~~~
 @send @visChildren::<msg>(<params>*);
 ~~~
 
 Any composite object in a visible object tree (therefore a subclass of 
-VisCompClass) can send a message that will be dispatched at once to all of 
-its children. Any message sent with @visChildren as the destination must 
-be dispatched with the @send keyword and therefore can have no return 
+**VisCompClass**) can send a message that will be dispatched at once to all of 
+its children. Any message sent with **@visChildren** as the destination must 
+be dispatched with the **@send** keyword and therefore can have no return 
 value.
 
 ~~~
@@ -3513,12 +3506,12 @@ value.
 ~~~
 
 Any composite object in a generic object tree (therefore a subclass of 
-GenClass) can send a message that will be dispatched at once to all of its 
-children. Any message sent with @genChildren as the destination must be 
-dispatched with the @send keyword and therefore can have no return value.
+**GenClass**) can send a message that will be dispatched at once to all of its 
+children. Any message sent with **@genChildren** as the destination must be 
+dispatched with the **@send** keyword and therefore can have no return value.
 
 In addition to the above shortcuts, you may also pass the optr of an object 
-using @<obj>, where <obj> represents the name of the object. This syntax 
+using **@<obj>**, where <obj> represents the name of the object. This syntax 
 gets translated by Goc into (optr)&<obj>; this is similar to using the 
 ampersand (&) to pass a pointer.
 
@@ -3529,7 +3522,7 @@ how to manage objects during execution. This includes instantiating new
 objects, deleting objects, saving object state, and moving objects around 
 object trees.
 
-Both the kernel and MetaClass (the topmost class in any class hierarchy) 
+Both the kernel and **MetaClass** (the topmost class in any class hierarchy) 
 have routines and methods to create, manage, and destroy objects. You will 
 probably not have to or want to use all these routines and methods, but 
 understanding what they do and how they work can help you understand the 
@@ -3553,9 +3546,9 @@ objects. Resource blocks are contained in your geode's executable file (the
 also be tagged for saving to state files automatically.
 
 Setting up an object resource is simply a matter of defining the resource and 
-using the @object keyword to define each object in the resource. The object 
+using the **@object** keyword to define each object in the resource. The object 
 resource block is automatically created and put in your executable file. Each 
-object defined with @object is allocated a chunk and a chunk handle within 
+object defined with **@object** is allocated a chunk and a chunk handle within 
 the resource block. Because both the chunk handle and the handle of the 
 resource block are known, accessing individual objects in the resource is 
 simple. In essence, when you set up an object resource, you don't need to 
@@ -3568,12 +3561,12 @@ can be changed. In this case, you would duplicate the resource (see below)
 before accessing the objects within it.
 
 For an example of objects defined by means of declaring them with the 
-@object keyword within an object resource, see Code Display 5-17.
+**@object** keyword within an object resource, see Code Display 5-17.
 
 To define an object resource, you must know what objects you'll require before 
 your geode is launched. Some complex programs will dynamically instantiate 
 individual objects or entire trees without knowing previously what objects 
-will be required. To do this, you'll need to use ObjInstantiate() (see below) 
+will be required. To do this, you'll need to use **ObjInstantiate()** (see below) 
 for instantiating individual objects.
 
 **Duplicating an Object Block Resource**
@@ -3585,14 +3578,14 @@ perfect if you want to use templates for your object blocks (this is what the
 Document Control object does, as shown in the Tutorial application (see 
 APPL\TUTORIAL\MCHRT4\MCHRT.GOC)).
 
-First, you must set up an object resource in your code file with @start, @end, 
-and @object. The objects in such a "template" resource should not be linked 
+First, you must set up an object resource in your code file with **@start**, **@end**, 
+and **@object**. The objects in such a "template" resource should not be linked 
 to any object outside the block. Generic object branches created in this 
 manner should have their topmost object marked as not usable 
 (~GS_USABLE); this is because it is illegal for a generic object to be usable 
 without having a generic parent. Instead of accessing these objects directly, 
 you should duplicate the resource block. (A resource can not be both 
-duplicated and used directly.) This is done with ObjDuplicateResource(), 
+duplicated and used directly.) This is done with **ObjDuplicateResource()**, 
 which allocates a new block on the heap, sets it up properly, and copies the 
 resource directly into it.
 
@@ -3600,7 +3593,7 @@ You are returned a handle to the new object block, which you can then modify
 any way you like. Because all the chunk handles of all the objects will be the 
 same as in the source block, you can easily access any object in the duplicate. 
 Once copied, the duplicate objects may be added to your generic tree and then 
-set GS_USABLE. And, by using ObjDuplicateResource() more than once on 
+set GS_USABLE. And, by using **ObjDuplicateResource()** more than once on 
 the same resource, you can have several different, possibly modified versions 
 of the resource at once.
 
@@ -3613,10 +3606,10 @@ Additionally, if you duplicate resource blocks, you should also free them when
 they're not needed any more. Generic objects in the block should be set not 
 usable and then removed from the tree before the resource is freed. Freeing 
 should be done by sending MSG_META_BLOCK_FREE to any object in the 
-block or by calling ObjFreeObjBlock(). Use of the kernel routine 
-ObjFreeDuplicate() is not recommended as it requires all objects in the 
+block or by calling **ObjFreeObjBlock()**. Use of the kernel routine 
+**ObjFreeDuplicate()** is not recommended as it requires all objects in the 
 block to be thoroughly clean of any ties to the system. 
-(MSG_META_BLOCK_FREE and ObjFreeObjBlock() ensure that the objects 
+(MSG_META_BLOCK_FREE and **ObjFreeObjBlock()** ensure that the objects 
 have had adequate time to relinquish these ties first.)
 
 **Instantiating an Individual Object**
@@ -3631,20 +3624,20 @@ To create a new object on the fly, you first must set up a place to put it. To d
 this, allocate a memory block on the global heap (you can instead use an 
 existing object block, of course) and set it up with the proper flags and header 
 to be an object block. Then, lock the chosen block on the heap with 
-ObjLockObjBlock(). The block is now set up to receive the new object.
+**ObjLockObjBlock()**. The block is now set up to receive the new object.
 
-To actually create the new object, call the kernel routine ObjInstantiate(). 
+To actually create the new object, call the kernel routine **ObjInstantiate()**. 
 This will create a chunk in the object block and zero the instance chunk. If 
 the object is of a class with master parts, the instance chunk will remain 
 uninitialized until the first time a class in the master group receives any 
-message. If the class is a direct descendant of MetaClass, the instance chunk 
+message. If the class is a direct descendant of **MetaClass**, the instance chunk 
 will be immediately initialized to default values with 
 MSG_META_INITIALIZE. If you want to change or add to the default data of 
 this type of object, subclass MSG_META_INITIALIZE; be sure to call the 
 superclass first. To initialize any master group of an object, send it a classed 
 event that will be handled by a class in that master level.
 
-After calling ObjInstantiate(), unlock the object block with MemUnlock(). 
+After calling **ObjInstantiate()**, unlock the object block with **MemUnlock()**. 
 An example of instantiating a new object is shown in Code Display 5-18. 
 Generic objects created this way may then be added to a generic tree and set 
 usable. They may be destroyed using MSG_GEN_DESTROY.
@@ -3697,7 +3690,7 @@ pre-existing object block.
 
 This is an easy way to copy generic trees, one of the more common purposes 
 of creating new objects. However, it only works with the generic objects (with 
-a superclass GenClass). Trees created using MSG_GEN_COPY_TREE can be 
+a superclass **GenClass**). Trees created using MSG_GEN_COPY_TREE can be 
 destroyed with MSG_GEN_DESTROY.
 
 For an example of MSG_GEN_COPY_TREE use, see the SDK_C\GENTREE 
@@ -3711,19 +3704,19 @@ ObjTestIfObjBlockRunByCurThread(), ObjBlockSetOutput(),
 ObjBlockGetOutput()
 
 Once you have an object block created, either with 
-ObjDuplicateResource() or with the memory routines, there are several 
+**ObjDuplicateResource()** or with the memory routines, there are several 
 things you can do with it. It may be treated as a normal memory block, but 
 there are also several routines for use specifically with object blocks:
 
-ObjIncInUseCount() and ObjDecInUseCount() increment and 
+**ObjIncInUseCount()** and **ObjDecInUseCount()** increment and 
 decrement an object block's in-use count (used to ensure the block can't be 
-freed while an object is still receiving messages). ObjLockObjBlock() locks 
-the object block on the global heap. ObjFreeObjBlock() frees any object 
-block. ObjFreeDuplicate() is the low-level routine which frees an object 
-block created with ObjDuplicateResource(). 
-ObjTestIfObjBlockRunByCurThread() returns a Boolean value 
+freed while an object is still receiving messages). **ObjLockObjBlock()** locks 
+the object block on the global heap. **ObjFreeObjBlock()** frees any object 
+block. **ObjFreeDuplicate()** is the low-level routine which frees an object 
+block created with **ObjDuplicateResource()**. 
+**ObjTestIfObjBlockRunByCurThread()** returns a Boolean value 
 indicating whether the calling thread runs a given object block. 
-ObjBlockSetOutput() and ObjBlockGetOutput() set and return the optr 
+**ObjBlockSetOutput()** and **ObjBlockGetOutput()** set and return the optr 
 of the object set to receive output messages (i.e., messages sent with travel 
 option TO_OBJ_BLOCK_OUTPUT) from all the objects within the object block.
 
@@ -3737,17 +3730,17 @@ The kernel supplies several routines for working with and modifying
 individual object chunks and object data. These are all described fully in the 
 Routine Reference Book; most are not commonly used by applications.
 
-ObjIsObjectInClass() takes a class and an optr and returns whether the 
-object is a member of the class. ObjGetFlags() returns the object flags for a 
-given object instance chunk; ObjSetFlags() sets the flags to passed values. 
-ObjDoRelocation() processes any passed instance data fields in the object 
-declared as relocatable; ObjDoUnRelocation() returns the passed 
+**ObjIsObjectInClass()** takes a class and an optr and returns whether the 
+object is a member of the class. **ObjGetFlags()** returns the object flags for a 
+given object instance chunk; **ObjSetFlags()** sets the flags to passed values. 
+**ObjDoRelocation()** processes any passed instance data fields in the object 
+declared as relocatable; **ObjDoUnRelocation()** returns the passed 
 relocatable fields to their index values.
 
-ObjInitializeMaster() causes the system to build out a particular master 
-group's instance data for an object. ObjInitializePart() causes the system 
+**ObjInitializeMaster()** causes the system to build out a particular master 
+group's instance data for an object. **ObjInitializePart()** causes the system 
 to build all master groups above and including the passed level. (This will 
-also resolve variant classes.) ObjResizeMaster() resizes a given master 
+also resolve variant classes.) **ObjResizeMaster()** resizes a given master 
 part of the instance chunk, causing the chunk to be resized.
 
 ##### 5.4.6.4 Managing Object Trees
@@ -3764,9 +3757,9 @@ objects.
 
 An object tree is made up of "composite" objects-objects which may or may 
 not have children. The distinguishing characteristic of a composite object is 
-that it has one instance data field declared with the @composite keyword 
-and another declared with the @link keyword. The @composite field 
-contains a pointer to the object's first child in the tree, and the @link field 
+that it has one instance data field declared with the **@composite** keyword 
+and another declared with the **@link** keyword. The **@composite** field 
+contains a pointer to the object's first child in the tree, and the **@link** field 
 contains a pointer to the object's next sibling. This representation is shown 
 in Figure 5-18.
 
@@ -3774,37 +3767,37 @@ If you set up an object resource block containing composite objects, it's very
 easy to set up an object tree. Your generic UI objects are declared in a tree 
 with the GenApplication object at its head. Additionally, it's easy to alter an 
 object tree once it's been created. The kernel provides several routines, and 
-MetaClass uses several messages for adding, removing, and moving objects 
+**MetaClass** uses several messages for adding, removing, and moving objects 
 to, from, and within trees.
 
-+ ObjLinkFindParent()
++ **ObjLinkFindParent()**
 This routine finds the optr of the calling object's direct parent. The kernel 
 traverses the link fields until it returns to the parent object.
 
-+ ObjCompFindChildByOptr()
++ **ObjCompFindChildByOptr()**
 This routine returns the number of the child (first, second, third, etc.) 
 whose optr is passed. The child must exist and must be a child of the 
 calling object.
 
-+ ObjCompFindChildByNumber()
++ **ObjCompFindChildByNumber()**
 This routine returns the optr of the child whose number (first, second, 
 etc.) is passed.
 
-+ ObjCompAddChild()
++ **ObjCompAddChild()**
 This routine takes an object's optr and adds it to the caller's list of 
 children. Depending on the flags passed, the child may be inserted in any 
 child position (first, second, etc.).
 
-+ ObjCompMoveChild()
++ **ObjCompMoveChild()**
 This routine takes a child object and moves it to a new position. However, 
 it will still remain a child of the calling object. If you want to move the 
 child to be a child of a different object, you must first remove it from the 
 tree altogether and then add it to the other parent.
 
-+ ObjCompRemoveChild()
++ **ObjCompRemoveChild()**
 This routine removes a child object from the object tree.
 
-+ ObjCompProcessChildren()
++ **ObjCompProcessChildren()**
 This routine calls a callback routine for each child of the calling object in 
 turn. The callback routine may do virtually anything (except destroy the 
 object or free its chunk or something similar).
@@ -3849,7 +3842,7 @@ To those unfamiliar with these problems, they can be overwhelming.
 However, GEOS takes care of them for you in most situations. All generic and 
 visible objects, all objects in object trees, and all objects that maintain an 
 active list will automatically (in nearly all cases) have the detach 
-functionality built in by MetaClass.
+functionality built in by **MetaClass**.
 
 **The Detach Sequence**
 
@@ -3859,7 +3852,7 @@ its children and all the objects on its various notification lists that it will 
 going away (most often, all its children, by association, will also be detached). 
 It then must clear its message queues. Finally, it must acknowledge its 
 detachment to the object that originally sent MSG_META_DETACH. Each of 
-these phases is described in detail below and is implemented by MetaClass. 
+these phases is described in detail below and is implemented by **MetaClass**. 
 You have to do none of this work unless your object is truly a special case.
 
 Detaching in conjunction with destruction is somewhat intricate because not 
@@ -3872,30 +3865,30 @@ the following section.)
 Because any object may be put in the position of being detached and then 
 immediately destroyed, it must send out notification and then wait until all 
 the notices have been acknowledged before continuing with other tasks. The 
-kernel and MetaClass implement a mechanism for this using four kernel 
-routines. Again, you do not need to do this since all classes have MetaClass 
+kernel and **MetaClass** implement a mechanism for this using four kernel 
+routines. Again, you do not need to do this since all classes have **MetaClass** 
 as their root.
 
 First the object being detached (in its MSG_META_DETACH handler) calls the 
-routine ObjInitDetach(). This tells the kernel that the object is initiating a 
+routine **ObjInitDetach()**. This tells the kernel that the object is initiating a 
 detach sequence and that the acknowledgment mechanism must be set up. 
 The kernel will allocate a variable data entry to hold a count of the number 
 of notices sent and acknowledgments received.
 
 After this, the object must send a MSG_META_DETACH or its equivalent to 
 each of its children and each of the objects on its active list. With each notice 
-sent, the object must call ObjIncDetach(), which increments the notice 
+sent, the object must call **ObjIncDetach()**, which increments the notice 
 count.
 
 After sending all the notices, the object then calls the kernel routine 
-ObjEnableDetach(). This notifies the kernel that all the notices have been 
+**ObjEnableDetach()**. This notifies the kernel that all the notices have been 
 sent and that the object is waiting for the acknowledgments.
 
 Acknowledgment comes in the form of MSG_META_ACK and is received by 
-the object being detached. MSG_META_ACK is handled by MetaClass and 
+the object being detached. MSG_META_ACK is handled by **MetaClass** and 
 will decrement the notice count, essentially saying there are one fewer 
 notices left to be received. When the final MSG_META_ACK is received 
-(setting the notice count to zero) and ObjEnableDetach() has also been 
+(setting the notice count to zero) and **ObjEnableDetach()** has also been 
 called, the kernel will automatically send a 
 MSG_META_DETACH_COMPLETE to the object. This assures the object that 
 it will never receive another message from another entity in the system.
@@ -3905,7 +3898,7 @@ been detached. In its MSG_META_DETACH_COMPLETE handler, the object
 should send a MSG_META_ACK to the object that originated the detach 
 sequence. This will allow that object to continue with its detach sequence if 
 it was involved in one; without this step, only leaves of object trees could ever 
-be detached. This final step is provided in default handlers in MetaClass 
+be detached. This final step is provided in default handlers in **MetaClass** 
 and is inherited by all objects.
 
 **The Destruction Sequence**
@@ -3928,7 +3921,7 @@ interrupts or context switching). To clear its message queues, the object must
 send itself a MSG_META_OBJ_FLUSH_INPUT_QUEUE, which will ensure that 
 any messages in the queues are handled appropriately before the object 
 shuts down. This step is handled automatically by the 
-MSG_META_OBJ_FREE handler in MetaClass. You should never have to 
+MSG_META_OBJ_FREE handler in **MetaClass**. You should never have to 
 send this message, and indeed its use is discouraged.
 
 To the outside world, the second and third steps seem like a single step. 
@@ -3949,8 +3942,8 @@ a message to a nonexistent object. This has undefined results and can be
 nearly impossible to track down.
 
 Note that objects created within resources and by 
-ObjDuplicateResource() will almost always automatically be taken care of 
-by the detach mechanism. Objects you create with ObjInstantiate() are the 
+**ObjDuplicateResource()** will almost always automatically be taken care of 
+by the detach mechanism. Objects you create with **ObjInstantiate()** are the 
 ones to be careful with.
 
 #### 5.4.6.6 Saving Object State
@@ -3960,7 +3953,7 @@ ObjMapStateToSaved()
 
 Object state saving is almost entirely contained within the system. For the 
 most part, only UI objects are saved to state files; however, you can mark 
-other object blocks for saving. State saving is described in full in section 6.1.4 
-of chapter 6.
+other object blocks for saving. State saving is described in full in [section 6.1.4 
+of chapter 6](cappl.md#614-saving-and-restoring-state).
 
 [Frist Steps: Hello World](cgetsta.md) <-- &nbsp;&nbsp; [table of contents](../concepts.md) &nbsp;&nbsp; --> [Applications and Geodes](cappl.md)

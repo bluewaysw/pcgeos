@@ -61,8 +61,7 @@ Cut. Copying, however, will not remove the selection from the document-it
 will simply create a copy of the selection and place it on the Clipboard, 
 removing whatever had previously been on the Clipboard.
 
-![](Art/figure_7-1.png)
-
+![](Art/figure_7-1.png)  
 **Figure 7-1** The Edit Menu  
 _The Edit menu of NotePad contains the Cut, Copy, and Paste items._
 
@@ -123,8 +122,7 @@ Figure 7-2. The quick-transfer mechanism uses the same file for its data
 transfer. Typically, this is a file designated and managed by the User 
 Interface.
 
-![](Art/figure_7-2.png)
-
+![](Art/figure_7-2.png)  
 **Figure 7-2** The Transfer VM File  
 _How the Transfer VM File is used by the Copy and Paste functions; its use 
 for quick-transfer is similar._
@@ -136,14 +134,13 @@ format for quick-transfer of files between disks and directories.
 
 #### 7.2.1 The Transfer VM File Format
 
-The Transfer VM File is a normal VM file, managed by the UI. It contains 
-several components, each of which is accessed through special routines that 
-take care of nearly all the synchronization issues involved with the Clipboard 
-and quick-transfer mechanisms. Because both the Clipboard and the 
-quick-transfer mechanism use this file and its data structures, these 
-structures are detailed here; the following section ("Using The Clipboard" on 
-page 309) details how to use them for either the Clipboard or the 
-quick-transfer mechanism.
+The Transfer VM File is a normal VM file, managed by the UI. It contains several 
+components, each of which is accessed through special routines that take care of 
+nearly all the synchronization issues involved with the Clipboard and quick-transfer 
+mechanisms. Because both the Clipboard and the quick-transfer mechanism use this 
+file and its data structures, these structures are detailed here; the following 
+section (["Using The Clipboard"](#73-using-the-clipboard)) details how to use them 
+for either the Clipboard or the quick-transfer mechanism.
 
 The Transfer VM File has one header block for the Clipboard transfer item 
 and another for the quick-transfer transfer item. These headers have the 
@@ -162,38 +159,38 @@ typedef struct {
 
 	    /* The CIH_owner field is the optr of the object that put
 	     * the current transfer item into the Transfer VM File. */
-    optr			CIH_owner;
+    optr		CIH_owner;
 
 	    /* The CIH_flags field determines whether the transfer item is used by
 	     * the quick transfer mechanism or by the normal Clipboard. If this
 	     * field is equal to the constant CIF_QUICK, then the transfer item
 	     * belongs to the quick transfer mechanism. If it is any other value,
 	     * the transfer item belongs to the normal Clipboard. */
-    ClipboardItemFlags			CIH_flags;
+    ClipboardItemFlags		CIH_flags;
 	/* The ClipboardItemFlags type has one predefined value:
-	 *	CIF_QUICK		0x4000
+	 *	CIF_QUICK	0x4000
 	 * If this flag does not apply, use TIF_NORMAL, which is 0x0000. */
 
 	    /* The CIH_name field is a 33-character buffer that should contain a
 	     * null-terminated character string representing the name of the given
 	     * transfer item. */
-    ClipboardItemNameBuffer 			CIH_name;
+    ClipboardItemNameBuffer 		CIH_name;
 
 	    /* The CIH_formatCount field indicates the number of formats of the
 	     * transfer item currently available. For example, this field would be
 	     * 2 if CIF_TEXT and CIF_GRAPHICS_STRING formats were supported and
 	     * available in the Transfer VM File. */
-    word			CIH_formatCount;
+    word		CIH_formatCount;
 
 	    /* The CIH_sourceID field contains information about the source
 	     * document of the transfer. Typically, this will be the optr of the
 	     * parent GenDocument object. */
-    dword			CIH_sourceID;
+    dword		CIH_sourceID;
 
 	    /* The CIH_formats field is actually an array of ten
 	     * ClipboardFormatInfo structures, each of which contains the
 	     * important details about a specific format of the transfer item. */
-    FormatArray			CIH_formats;
+    FormatArray		CIH_formats;
 
 	    /* This field is reserved and should not be used. */
     dword			CIH_reserved;
@@ -202,7 +199,7 @@ typedef struct {
 /* The FormatArray type is an array of ClipboardItemFormatInfo structures. The
  * definition of this field is shown here: */
 
-typedef	ClipboardItemFormatInfo			FormatArray[CLIPBOARD_MAX_FORMATS];
+typedef	ClipboardItemFormatInfo		FormatArray[CLIPBOARD_MAX_FORMATS];
 	/* CLIPBOARD_MAX_FORMATS is a constant defining the maximum number of
 	 * formats allowed for any given transfer item. It is defined as 10. */
 ~~~
@@ -210,13 +207,13 @@ typedef	ClipboardItemFormatInfo			FormatArray[CLIPBOARD_MAX_FORMATS];
 
 The rest of the Transfer VM File consists of VM blocks containing the data 
 that is to be transferred. Each format supported will have its own VM block 
-or series of VM blocks, pointed to by the ClipboardItemFormatInfo 
+or series of VM blocks, pointed to by the **ClipboardItemFormatInfo** 
 structure in the item's header.
 
 The Transfer VM File actually contains two transfer items: One for the 
 Clipboard and one for the quick-transfer mechanism (see Figure 7-3). When 
-calling ClipboardQueryItem(), the requesting geode must specify which 
-item it wants. See section 7.3 on page 309 and section 7.4 on page 323.
+calling **ClipboardQueryItem()**, the requesting geode must specify which 
+item it wants. See [section 7.3](#73-using-the-clipboard) and [section 7.4](#74-using-quick-transfer).
 
 #### 7.2.2 ClipboardItemFormatInfo
 
@@ -224,9 +221,9 @@ This structure contains information about a specific format of the transfer
 item. The Transfer VM File will support up to ten formats of a given item at 
 once (for both the Clipboard and quick-transfer); each of these formats is 
 stored in its own VM block or VM chain and is represented in the header by a 
-ClipboardItemFormatInfo structure in the array CIH_formats.
+**ClipboardItemFormatInfo** structure in the array CIH_formats.
 
-The ClipboardItemFormatInfo structure contains other information 
+The **ClipboardItemFormatInfo** structure contains other information 
 about the specific format as well as space for two extra words of data. The 
 structure is shown in Code Display 7-2.
 
@@ -234,11 +231,10 @@ Each element in the CIH_formats array contains two items: One word
 represents the manufacturer ID of the geode responsible for the format 
 (useful if a custom format is used within several applications from a single 
 manufacturer), and the other represents the actual format number. To 
-combine these words into a ClipboardItemFormatID record, or to extract 
+combine these words into a **ClipboardItemFormatID** record, or to extract 
 either word from the record, use the macros shown after Code Display 7-2.
 
-![](Art/figure_7-3.png)
-
+![](Art/figure_7-3.png)  
 **Figure 7-3** Transfer VM File Structure  
 _The Transfer VM File contains two transfer items, one for the clipboard and 
 one for the quick-transfer mechanism. Both can store multiple formats of 
@@ -251,40 +247,39 @@ Code Display 7-2 ClipboardItemFormatInfo
  * format of the transfer item. */
 
 typedef struct {
-		/* CIFI_format contains a format ID as well as the
-		 * manufacturer ID of the geode responsible for the format. */
-	ClipboardItemFormatID	 		CIFI_format;
+	/* CIFI_format contains a format ID as well as the
+	 * manufacturer ID of the geode responsible for the format. */
+	ClipboardItemFormatID	 CIFI_format;
 
-		/* CIFI_extra1 and CIFI_extra2 are extra words provided for
-		 * format-specific use. */
-	word		CIFI_extra1;
-	word		CIFI_extra2;
+	/* CIFI_extra1 and CIFI_extra2 are extra words provided for
+	 * format-specific use. */
+	word	CIFI_extra1;
+	word	CIFI_extra2;
 
-		/* CIFI_vmChain is a VM handle pointing to the first block in the
-		 * specific format. */
-	VMChain		CIFI_vmChain;
+	/* CIFI_vmChain is a VM handle pointing to the first block in the
+	 * specific format. */
+	VMChain	CIFI_vmChain;
 
-		/* CIFI_renderer contains the token of the geode that created
-		 * the format. */
-	GeodeToken		CIFI_renderer;
+	/* CIFI_renderer contains the token of the geode that created
+	 * the format. */
+	GeodeToken	CIFI_renderer;
 } ClipboardItemFormatInfo;
 ~~~
 
-
-Below are the macros for use with a ClipboardItemFormatID structure.
+Below are the macros for use with a **ClipboardItemFormatID** structure.
 
 **FormatIDFromManufacturerAndType**
 ~~~
-ClipboardItemFormatID FormatIDFromManufacturerAndType(man, typ);
+**ClipboardItemFormatID** FormatIDFromManufacturerAndType(man, typ);
       ManufacturerID man; 
       word           typ;
 ~~~
-This macro creates a ClipboardItemFormatID dword value from the given 
+This macro creates a **ClipboardItemFormatID** dword value from the given 
 manufacturer ID and format ID.
 
 **ManufacturerFromFormatID**
 ~~~
-ManufacturerID ManufacturerFromFormatID(type);
+**ManufacturerID** ManufacturerFromFormatID(type);
 	ClipboardItemFormatID type;
 ~~~
 This macro extracts the manufacturer ID from the given clipboard format ID 
@@ -301,15 +296,15 @@ manufacturer value.
 #### 7.2.3 Transfer Data Structures
 
 Two structures are used with specific routines when dealing with the transfer 
-mechanisms. The ClipboardQueryArgs structure is returned by 
-ClipboardQueryItem(), and the ClipboardRequestArgs structure is 
-returned by ClipboardRequestItemFormat(). Both routines are used 
+mechanisms. The **ClipboardQueryArgs** structure is returned by 
+**ClipboardQueryItem()**, and the **ClipboardRequestArgs** structure is 
+returned by **ClipboardRequestItemFormat()**. Both routines are used 
 during a Paste operation, and both structures are shown in Code Display 7-3.
 
-Note that the CQA_header field is of type TransferBlockID. This type is a 
+Note that the CQA_header field is of type **TransferBlockID**. This type is a 
 dword made up of two word-sized components: a VM file handle and a VM 
 block handle. The three macros listed after Code Display 7-3 can be used to 
-create the TransferBlockID argument and extract either of the components 
+create the **TransferBlockID** argument and extract either of the components 
 from the whole.
 
 ---
@@ -336,40 +331,39 @@ typedef struct {
 } ClipboardRequestArgs;
 ~~~
 
-Below are the macros for use with the TransferBlockID structure.
+Below are the macros for use with the **TransferBlockID** structure.
 
 **BlockIDFromFileAndBlock**
 ~~~
-TransferBlockID BlockIDFromFileAndBlock(f, b);
+**TransferBlockID** BlockIDFromFileAndBlock(f, b);
 	VMFileHandle  f;
 	VMBlockHandle b;
 ~~~
-This macro creates a TransferBlockID value from the given file and block 
+This macro creates a **TransferBlockID** value from the given file and block 
 handles.
 
 **FileFromTransferBlockID**
 ~~~
-VMFileHandle FileFromTransferBlockID(id);
+**VMFileHandle** FileFromTransferBlockID(id);
 	TransferBlockID	id;
 ~~~
-This macro extracts the file handle from the given TransferBlockID value.
+This macro extracts the file handle from the given **TransferBlockID** value.
 
 **BlockFromTransferBlockID**
 ~~~
-VMBlockHandle BlockFromTransferBlockID(id);
+**VMBlockHandle** BlockFromTransferBlockID(id);
 	TransferBlockID	 id;
 ~~~
-This macro extracts the block handle from the given TransferBlockID 
-value.
+This macro extracts the block handle from the given **TransferBlockID** value.
 
 #### 7.2.4 Clipboard Item Formats
 
 There are several built-in transfer formats that many GEOS applications 
 may support; each of these types is an enumeration of 
-ClipboardItemFormat. Additionally, custom formats can be defined to 
+**ClipboardItemFormat**. Additionally, custom formats can be defined to 
 allow special data structures to be cut, copied, pasted, or quick-transferred 
 without translation into text or graphics strings. The Transfer VM File may 
-contain up to ten formats of a given transfer item. ClipboardItemFormat 
+contain up to ten formats of a given transfer item. **ClipboardItemFormat** 
 is shown below.
 
 ~~~
@@ -388,14 +382,14 @@ typedef enum /* word */ {
 ~~~
 
 A transfer item of CIF_TEXT format is headed by a 
-TextTransferBlockHeader structure. The text follows this header in the 
+**TextTransferBlockHeader** structure. The text follows this header in the 
 VM chain. A transfer item of CIF_GRAPHICS_STRING format is simply the 
 entire GString stored in the transfer VM file in the VM chain.
 
 Because every format identifier has two components, it is highly unlikely 
 that two different designers will create overlapping custom formats.
 
-The format is defined as a ClipboardItemFormatID type, which is a dword 
+The format is defined as a **ClipboardItemFormatID** type, which is a dword 
 composed of two word-sized pieces. The first piece is a constant representing 
 the format ID number (such as CIF_TEXT or CIF_GRAPHICS_STRING). The 
 second piece is a constant representing the Manufacturer ID number of the 
@@ -452,10 +446,10 @@ exclusive access so other threads can continue to use it.
 
 For operations that involve changing the transfer item (cut and copy, for 
 example), you must register your new transfer item with 
-ClipboardRegisterItem(), which also allows other threads to use the file. 
+**ClipboardRegisterItem()**, which also allows other threads to use the file. 
 For operations that involve looking at but not changing the transfer item, you 
-should use ClipboardQueryItem(). Since you have no changes to register, 
-you must later use ClipboardDoneWithItem() to give up your exclusive 
+should use **ClipboardQueryItem()**. Since you have no changes to register, 
+you must later use **ClipboardDoneWithItem()** to give up your exclusive 
 access to the transfer VM file.
 
 #### 7.3.1 Registering with the Clipboard
@@ -468,12 +462,12 @@ therefore provides notification for this case. Because the Clipboard does not
 know which geodes are interested in its contents, however, applications must 
 register when they first start up.
 
-Calling ClipboardAddToNotificationList() allows an application to add 
+Calling **ClipboardAddToNotificationList()** allows an application to add 
 an object to the list of those notified of changes to the Clipboard. This routine 
 should be called by whichever object is going to be handling the Cut, Copy, 
 and Paste operations, typically in the object's MSG_META_INITIALIZE 
 handler. If the object handling the Clipboard operations is the application's 
-Process object, however, it may call ClipboardAddToNotificationList() in 
+Process object, however, it may call **ClipboardAddToNotificationList()** in 
 its MSG_GEN_PROCESS_OPEN_APPLICATION handler.
 
 #### 7.3.2 Managing the Edit Menu
@@ -484,9 +478,9 @@ ClipboardTestItemFormat()
 The Edit menu is simply a normal menu with several standard triggers. Most 
 applications will simply include a GenEditControl object in their UI, add a 
 menu GenInteraction of type GIGT_EDIT_MENU, and leave the Edit menu 
-construction up to them (see section 7.3.3 on page 314). Some, however, may 
-want to create their own menu and triggers. A sample of this type of setup is 
-shown in Code Display 7-4.
+construction up to them (see [section 7.3.3](#733-the-geneditcontrol)). Some, 
+however, may want to create their own menu and triggers. A sample of this type 
+of setup is shown in Code Display 7-4.
 
 ---
 Code Display 7-4 A Sample Edit Menu
@@ -581,10 +575,10 @@ Code Display 7-5 Handling Clipboard Changes
      * is not supported, then the enDisable argument is set to TRUE. */
 
     if (query.CQA_numFormats) {
-	if (ClipboardTestItemFormat(query.CQA_header,
-		FormatIDFromManufacturerAndType(MANUFACTURER_ID_ME, CIF_TEXT))) {
-	    endisable = TRUE;
-	}
+		if (ClipboardTestItemFormat(query.CQA_header,
+			FormatIDFromManufacturerAndType(MANUFACTURER_ID_ME, CIF_TEXT))) {
+	   		endisable = TRUE;
+		}
     }
 
     /* Because we've found out what we need to know, restore the Clipboard with a
@@ -599,9 +593,9 @@ Code Display 7-5 Handling Clipboard Changes
      * appropriate message to the trigger object. */
 
     if (endisable) {
-	@call EditPaste::MSG_GEN_SET_ENABLED(VUM_NOW);
+		@call EditPaste::MSG_GEN_SET_ENABLED(VUM_NOW);
     } else {
-	@call EditPaste::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		@call EditPaste::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
     }
 }
 ~~~
@@ -609,9 +603,9 @@ Code Display 7-5 Handling Clipboard Changes
 #### 7.3.3 The GenEditControl
 
 As stated above, most applications will simply let a GenEditControl object 
-create and maintain their Edit menu. GenEditControlClass is a subclass 
-of GenControlClass (see "Generic UI Controllers," Chapter 12 of the Object 
-Reference Book for usage of controllers in general).
+create and maintain their Edit menu. **GenEditControlClass** is a subclass 
+of GenControlClass (see ["Generic UI Controllers," Chapter 12 of the Object 
+Reference Book](../Objects/ogenctrl.md) for usage of controllers in general).
 
 The GenEditControl object can provide triggers and/or tools for Undo, Cut, 
 Copy, Paste, Select All, and Delete operations. These operations must all be 
@@ -620,7 +614,7 @@ GenEditControl; using this controller, however, simplifies your UI
 programming and allows the Edit tools to be used by the GenToolControl.
 
 The features of the GenEditControl are listed below (they are flags of the 
-GECFeatures record type):
+**GECFeatures** record type):
 
 **GECF_UNDO**  
 This feature adds an "Undo" trigger to the Edit menu. It sends 
@@ -722,9 +716,9 @@ selection.
 1. Duplicate and attach the data  
 You must create a duplicate of whatever data is being loaded into the 
 Clipboard. This step includes allocating new VM blocks in the Transfer 
-VM File with VMAlloc(). As an alternative, you may pre-duplicate the 
-item in memory with MemAlloc() and then simply attach them to the 
-Transfer VM File with VMAttach().
+VM File with **VMAlloc()**. As an alternative, you may pre-duplicate the 
+item in memory with **MemAlloc()** and then simply attach them to the 
+Transfer VM File with **VMAttach()**.
 
 2. Complete the transfer item's header  
 Fill in all information fields in the transfer item's header block including 
@@ -734,7 +728,7 @@ formats, owner, and flags.
 Once the data has been attached and the header completed, you must 
 register the transfer with the Clipboard. The UI will then delete any old 
 data in the Clipboard and replace it with your new transfer item. To 
-register the transfer item, use ClipboardRegisterItem().
+register the transfer item, use **ClipboardRegisterItem()**.
 
 ---
 Code Display 7-7 MSG_META_CLIPBOARD_CUT
@@ -855,8 +849,8 @@ Display 7-9.
 
 1. Query the Clipboard  
 First, you must make sure that you have exclusive access to the clipboard 
-item. To this end call ClipboardQueryItem(). You should also call 
-ClipboardRequestItemFormat() to make sure that the present 
+item. To this end call **ClipboardQueryItem()**. You should also call 
+**ClipboardRequestItemFormat()** to make sure that the present 
 clipboard item is pasteable.
 
 2. Allocate memory if necessary  
@@ -867,11 +861,11 @@ thread at any time.
 
 3. Lock the Transfer VM File and grab the transfer item  
 Lock the Transfer VM File with a call to 
-ClipboardRequestItemFormat(). Finally, copy the transfer item into 
+**ClipboardRequestItemFormat()**. Finally, copy the transfer item into 
 your pre-allocated memory.
 
 4. Unlock the Transfer VM File  
-By calling ClipboardDoneWithItem(), relinquish your exclusive 
+By calling **ClipboardDoneWithItem()**, relinquish your exclusive 
 access to the Transfer VM File and to the clipboard item itself. The Paste 
 operation can then be completed entirely by your application by 
 assimilating the pasted data and displaying it properly.
@@ -957,7 +951,7 @@ must "unregister" when they are shutting down. Otherwise, the Clipboard
 will attempt to send a message to a defunct object, and this can cause 
 problems for the operating system. Therefore, in your 
 MSG_GEN_PROCESS_CLOSE_APPLICATION handler you should make a call 
-to the routine ClipboardRemoveFromNotificationList(), which removes 
+to the routine **ClipboardRemoveFromNotificationList()**, which removes 
 the passed object from the notification list.
 
 #### 7.3.7 Implementing Undo
@@ -967,8 +961,8 @@ is due to the fact that operations that may be undone are typically very
 application-specific. The text objects and the Ink object are the only 
 exceptions to this; they provide their own Undo functions in response to 
 MSG_META_UNDO. For more information on Undo and how it works in 
-GEOS, see "UI Messages" on page 88 of "System Classes," Chapter 1 of the 
-Object Reference Book.
+GEOS, see ["UI Messages" of "System Classes," Chapter 1 of the 
+Object Reference Book](../Objects/osyscla.md#1133-ui-messages).
 
 #### 7.3.8 Transfer File Information
 
@@ -982,16 +976,16 @@ transfer files in use.
 **ClipboardTestItemFormat()**  
 Given a transfer format, test if the selected transfer item 
 supports that format. Before using this routine, you must first 
-call ClipboardQueryItem() to get the transfer item header.
+call **ClipboardQueryItem()** to get the transfer item header.
 
 **ClipboardEnumItemFormats()**  
 Return a list of supported transfer formats for the selected 
 transfer item. Before using this routine, you must first call 
-ClipboardQueryItem() to get the transfer item header.
+**ClipboardQueryItem()** to get the transfer item header.
 
 **ClipboardGetItemInfo()**  
 Return the source identifier for the transfer item. Before using 
-this routine, you must first call ClipboardQueryItem() to get 
+this routine, you must first call **ClipboardQueryItem()** to get 
 the transfer item header.
 
 **ClipboardGetNormalItemInfo()**  
@@ -1010,7 +1004,7 @@ typically used when copying, cutting, and pasting).
 
 ClipboardUnregisterItem()
 
-Using ClipboardUnregisterItem(), you can revert one level of clipboard 
+Using **ClipboardUnregisterItem()**, you can revert one level of clipboard 
 changes. Note that this works for only one level; there is no way to back out 
 more than one change to the clipboard. This routine can not "undo" itself; 
 that is, calling this routine twice in a row will leave the clipboard in a state 
@@ -1089,7 +1083,7 @@ MSG_META_START_MOVE_COPY to the object under the pointer image.
 
 2. The source object builds the transfer item  
 The object under the pointer image then becomes the "source" of the 
-quick-transfer. It first calls ClipboardStartQuickTransfer() to 
+quick-transfer. It first calls **ClipboardStartQuickTransfer()** to 
 initiate the quick-transfer mechanism. It then builds the transfer item 
 just as it would if the user had clicked on the Copy trigger in the Edit 
 menu. It then logs the transfer item with the quick-transfer mechanism.
@@ -1099,7 +1093,7 @@ Immediately after logging the transfer item, the source object becomes a
 potential destination of the quick-transfer. It must immediately provide 
 feedback to the UI indicating whether it can accept the transfer item and 
 whether the operation would be a move or a copy. The feedback is 
-provided by calling ClipboardSetQuickTransferFeedback(). If the 
+provided by calling **ClipboardSetQuickTransferFeedback()**. If the 
 source object is a visible object in a GenView, it must also send the 
 message MSG_VIS_VUP_ALLOW_GLOBAL_TRANSFER to itself to allow 
 the pointer events to be sent to other objects in other windows (because 
@@ -1112,9 +1106,9 @@ is a potential destination and as such must provide feedback similar to
 that described in (3) above until the pointer moves outside of its bounds. 
 Each object that receives a MSG_META_PTR should check if a quick 
 transfer is in progress by either checking the passed event flags or by 
-calling ClipboardGetQuickTransferStatus(). The object should, in 
+calling **ClipboardGetQuickTransferStatus()**. The object should, in 
 response, provide feedback as to whether it can accept the transfer item 
-or not. It calls ClipboardSetQuickTransferFeedback() with the 
+or not. It calls **ClipboardSetQuickTransferFeedback()** with the 
 proper feedback signal.
 
 5. The user finishes the transfer  
@@ -1127,10 +1121,10 @@ If the transfer item is in a receivable format, the destination will retrieve
 the item from the Transfer VM File just as if the user had selected the 
 Paste trigger from the Edit menu (except the quick-transfer transfer 
 item is received, not the Clipboard transfer item). The object first checks 
-if it can take the item by calling ClipboardGetQuickItemInfo() on the 
-transfer item. If it can handle the item, it calls ClipboardQueryItem(), 
+if it can take the item by calling **ClipboardGetQuickItemInfo()** on the 
+transfer item. If it can handle the item, it calls **ClipboardQueryItem()**, 
 grabs the transfer item, and finally calls 
-ClipboardEndQuickTransfer().
+**ClipboardEndQuickTransfer()**.
 
 7. The UI informs the source of the outcome  
 After the transfer has been completed by the destination, the UI will send 
@@ -1185,7 +1179,7 @@ quick-transfer mechanism, objects allow the user to be informed immediately
 what type of operation is in progress-a move, a copy, or nothing at all.
 
 Immediately after your object has grabbed the mouse, it should call the 
-routine ClipboardStartQuickTransfer(). This routine allows the object 
+routine **ClipboardStartQuickTransfer()**. This routine allows the object 
 not only to indicate which type of operation is in progress but also to attach 
 a special graphical region to the cursor (though not required). This allows the 
 application to provide additional information to the user as to what is going 
@@ -1197,11 +1191,11 @@ because when a quick-move has been completed, the source object must
 ensure that the original copy of the item (usually the source object itself) is 
 deleted.
 
-After calling ClipboardStartQuickTransfer(), the source object should 
+After calling **ClipboardStartQuickTransfer()**, the source object should 
 duplicate and register the transfer item with the Transfer VM File. To do this, 
 register the item as you normally would for a cut or copy operation (see 
-section 7.3.1 on page 311); however, be sure to use the flag CIF_QUICK to 
-ensure that the normal Clipboard data remains unaffected.
+[section 7.3.1](#731-registering-with-the-clipboard)); however, be sure to use 
+the flag CIF_QUICK to ensure that the normal Clipboard data remains unaffected.
 
 Once the transfer item has been registered, the source object becomes a 
 potential destination and should act as such. However, you may wish to 
@@ -1234,22 +1228,22 @@ feedback with the understanding that the operation type is what would
 happen if the transfer were to conclude at that moment).
 
 When the first MSG_META_PTR is received, the object should call the routine 
-ClipboardGetQuickTransferStatus(). This routine returns whether a 
+**ClipboardGetQuickTransferStatus()**. This routine returns whether a 
 quick-transfer is in progress; if so, the object should acquire a mouse grab in 
 order to provide feedback until the mouse pointer leaves its bounds.
 
 The object should then check the quick-transfer Clipboard for supported 
 formats. This is done just as with the Clipboard-with the routine 
-ClipboardQueryItem(). If no supported formats are available, the object 
+**ClipboardQueryItem()**. If no supported formats are available, the object 
 should provide the "no operation" feedback. However, if one or more is 
 available, the object should determine whether the operation is a move or 
-copy (call ClipboardGetItemInfo()) and act accordingly.
+copy (call **ClipboardGetItemInfo()**) and act accordingly.
 
 To provide feedback, the object must call 
-ClipboardSetQuickTransferFeedback() in its method for 
+**ClipboardSetQuickTransferFeedback()** in its method for 
 MSG_META_PTR. This routine sets the mode of the transfer to one of the 
-enumerated type ClipboardQuickTransferFeedback. If the format is not 
-supported, ClipboardSetQuickTransferFeedback() is passed 
+enumerated type **ClipboardQuickTransferFeedback**. If the format is not 
+supported, **ClipboardSetQuickTransferFeedback()** is passed 
 CQTF_CLEAR.
 
 When the mouse has left an object's bounds, the object must relinquish its 
@@ -1262,7 +1256,7 @@ mouse moving outside of your bounds altogether.
 At this point, the object must do two things: Reset the mouse cursor and 
 re-transmit the last mouse pointer event.
 
-To reset the mouse pointer, call ClipboardSetQuickTransferFeedback() 
+To reset the mouse pointer, call **ClipboardSetQuickTransferFeedback()** 
 and pass it CQTF_CLEAR. This will set the default cursor. To re-send the last 
 pointer event received (you must do this because the last one occurred 
 outside your object's bounds and might have been within another object's 
@@ -1297,12 +1291,12 @@ item (as it would from the Clipboard), passing one of CQNF_MOVE,
 CQNF_COPY, or CQNF_NO_OPERATION. This flag will cause the proper 
 notification to be sent to the transfer's source and allow it to complete its 
 actions properly. To finish the transfer, the object should call 
-ClipboardEndQuickTransfer().
+**ClipboardEndQuickTransfer()**.
 
 ##### 7.4.4.3 Getting More Information
 
 In addition to the routines above, you can use one other to retrieve 
-information about a quick-transfer item. ClipboardGetQuickItemInfo() 
+information about a quick-transfer item. **ClipboardGetQuickItemInfo()** 
 returns a set of handles for the transfer VM file and the file's header block.
 
 ##### 7.4.4.4 When the Transfer Is Concluded
@@ -1312,7 +1306,7 @@ MSG_META_CLIPBOARD_NOTIFY_QUICK_TRANSFER_CONCLUDED
 After the transfer has concluded, the original source of the transfer will 
 receive MSG_META_CLIPBOARD_NOTIFY_QUICK_TRANSFER_CONCLUDED 
 if it requested notification when it registered the original transfer. This 
-message will be accompanied by a ClipboardQuickNotifyFlags record 
+message will be accompanied by a **ClipboardQuickNotifyFlags** record 
 indicating what type of operation the transfer ended up being. The source 
 object should then follow the rules of quick transfer and act appropriately 
 (e.g. delete the source object on a quick-move operation).
@@ -1326,11 +1320,11 @@ ClipboardRemoveFromNotificationList()
 It is possible for a quick-transfer source object to shut down (be destroyed) 
 before the completion of a quick-transfer operation. If the object registered to 
 be notified of transfer completion, it must un-register as it is shutting down. 
-This is done with ClipboardClearQuickTransferNotification() or 
-ClipboardAbortQuickTransfer().
+This is done with **ClipboardClearQuickTransferNotification()** or 
+**ClipboardAbortQuickTransfer()**.
 
 Additionally, any application that registers with the Clipboard must 
 un-register when it is shutting down. This is done with the routine 
-ClipboardRemoveFromNotificationList().
+**ClipboardRemoveFromNotificationList()**.
 
 [Applications and Geodes](cappl.md) <-- &nbsp;&nbsp; [table of contents](../concepts.md) &nbsp;&nbsp; --> [Localization](clocal.md)

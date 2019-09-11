@@ -4,7 +4,7 @@ This chapter describes the structure of GEOS and the various system
 components and services used by applications. Nearly all programmers will 
 want at least to browse this chapter before continuing with GEOS application 
 development. The structures and architectures of the 8088 and 80x86 
-processors are reviewed in Appendix A.
+processors are reviewed in [Appendix A](chardw.md).
 
 ### 3.1 GEOS Overview
 
@@ -175,7 +175,7 @@ how it is implemented in GEOS. If you are familiar with OOP concepts, you
 may skip this section; because terminology can differ from system to system, 
 however, you will probably want to at least skim the rest of the section. (A 
 full discussion of GEOS messaging and object manipulation can be found in 
-section 5.4 of chapter 5.)
+[section 5.4 of chapter 5](ccoding.md#54-using-classes-and-objects).)
 
 Object-Oriented Programming is simply a way to organize code and data 
 differently from traditional procedural programming. Anything done with 
@@ -335,10 +335,10 @@ objects with similar data structures and methods to use common code.
 The class is actually where the functionality of objects is defined. Every 
 object is simply an instance of a class, a manifestation of the instance data 
 and methods defined for the class. For example, the Counter object of 
-"Objects, Messages, and Methods" on page 69 could be an instance of a class 
-called CounterClass. Other counters sharing the same characteristics 
-would also be instances of CounterClass, each having its own value in its 
-own instance data field.
+["Objects, Messages, and Methods"](#331-objects-messages-and-methods) 
+could be an instance of a class called CounterClass. Other counters 
+sharing the same characteristics would also be instances of CounterClass, 
+each having its own value in its own instance data field.
 
 A main benefit of the implementation of classes in GEOS is that objects can 
 be created and destroyed during execution. Class definitions are stored 
@@ -514,8 +514,8 @@ require a given amount of memory.
 
 The Generic UI Library contains a number of object classes that implement 
 nearly all the UI functions an application will ever need. For a full description 
-of the API of each of these classes, see the Objects Book. Some of the more 
-common implementations (e.g. menus, dialog boxes, and scrolling views) of 
+of the API of each of these classes, see the [Objects Book](../objects.md). Some of 
+the more common implementations (e.g. menus, dialog boxes, and scrolling views) of 
 these objects are outlined in the sections below.
 
 #### 3.5.2 The Scalable User Interface
@@ -737,8 +737,8 @@ Most applications will use at least one view. Its power and flexibility give
 programmers the opportunity to concentrate on their own application's 
 functionality without having to worry about display issues such as scaling, 
 clipping, and scrolling-they are all handled automatically. Some of the 
-features of a view are listed below (see "GenView," Chapter 9 of the Object 
-Reference Book for more detailed information):
+features of a view are listed below (see ["GenView," Chapter 9 of the Object 
+Reference Book](../Objects/ogenvew.md) for more detailed information):
 
 + Automatic clipping and updating  
 When an application uses a GenView, the programmer can forget the 
@@ -818,7 +818,7 @@ GenDynamicList objects can be used to provide several different types and
 styles of lists. Lists may appear within menus or dialog boxes. The actual 
 visual implementation of a list depends on the specific UI in use; however, 
 there are several basic types of lists available (for complete information, see 
-"The List Objects," Chapter 11 of the Object Reference Book):
+["The List Objects", Chapter 11 of the Object Reference Book](../Objects/ogenlst.md)):
 
 + Dynamic lists  
 Lists can be either static (a set number of elements) or dynamic (a 
@@ -849,7 +849,7 @@ The GenText object provides a full-featured word processing object. It can
 be used for every text function from displaying a word to implementing a 
 simple yet full-featured word processor. It supports multiple styles and 
 paragraph attributes, character and paragraph spacing, and all the other 
-features supported in the Text Library (see section 3.6.6 on page 98.)
+features supported in the Text Library (see [section 3.6.6](#366-text).)
 
 + Triggers  
 The GenTrigger object implements all the functionality of a simple 
@@ -1053,13 +1053,13 @@ This routine reallocates a given block; this is useful for adding memory
 to a block already allocated.
 
 + **malloc()**  
-Although use of malloc() may help in porting previous C code to GEOS, 
-it is discouraged. The malloc() routine will allocate small amounts of 
-memory within a fixed resource. Extensive use of malloc() leads to large, 
+Although use of **malloc()** may help in porting previous C code to GEOS, 
+it is discouraged. The **malloc()** routine will allocate small amounts of 
+memory within a fixed resource. Extensive use of **malloc()** leads to large, 
 fixed blocks on the heap, degrading system performance.
 
 When an application is done with a memory block, it can free the block with 
-the routine MemFree(). This will allow the Memory Manager to free up that 
+the routine **MemFree()**. This will allow the Memory Manager to free up that 
 memory space and re-use the block's handle if required.
 
 ##### 3.6.1.4 Accessing Memory
@@ -1070,11 +1070,11 @@ allocated in the same portion of memory each time an application is loaded,
 applications should not save pointers as state information.
 
 Non-fixed blocks, however, can not be accessed by far pointers without 
-locking them into their position in memory. MemLock() will take a block's 
+locking them into their position in memory. **MemLock()** will take a block's 
 handle and lock the block, thereby assuring that the Memory Manager will 
-not move it in the middle of an access. MemLock() provides its caller with a 
+not move it in the middle of an access. **MemLock()** provides its caller with a 
 far pointer to the block. When access to the block is finished, the thread that 
-locked the block must call MemUnlock(), which marks the block as 
+locked the block must call **MemUnlock()**, which marks the block as 
 unlocked so it may once again be moved or swapped.
 
 #### 3.6.2 Virtual Memory
@@ -1084,7 +1084,7 @@ memory block swapping and data file storage. Virtual memory (VM) can be
 thought of as a disk-based heap-a VM file is segmented into blocks, each of 
 which is designated a VM handle analogous to a global memory handle. When 
 a VM block is required by an application, it is locked into memory from the 
-file with a call to the kernel routine VMLock(), which loads the VM block into 
+file with a call to the kernel routine **VMLock()**, which loads the VM block into 
 memory and locks it on the global heap.
 
 VM is extremely useful for data file storage; indeed, the Document Control 
@@ -1176,7 +1176,7 @@ in the coordinate space, line and fill attributes, clipping paths, text
 attributes, and other items.
 
 Graphics commands are issued relative to a particular GState. For example, 
-the command GrDrawEllipse() must be passed a GState so the kernel 
+the command **GrDrawEllipse()** must be passed a GState so the kernel 
 knows exactly how to draw the ellipse; if the current GState is rotated 45 
 degrees and has green as its current line color, a green-outlined ellipse will 
 be drawn rotated 45 degrees.
@@ -1299,8 +1299,8 @@ The Text Object automatically supports the quick-transfer mechanism of
 the UI and handles the cut, copy, and paste commands of the Edit menu.
 
 + Many other powerful features  
-For full feature listings and how to use the text object, see "The Text 
-Objects," Chapter 10 of the Object Reference Book.
+For full feature listings and how to use the text object, see ["The Text 
+Objects," Chapter 10 of the Object Reference Book](../Objects/otext.md).
 
 #### 3.6.7 Print Spooler and Printing
 

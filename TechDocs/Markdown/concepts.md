@@ -276,245 +276,245 @@
     [14.2 The Global Handle Table](Concepts/chandle.md#142-the-global-handle-table)  
     [14.3 Local Handles](Concepts/chandle.md#143-local-memory)  
 
-**[15 Memory Management]()**  
-    [15.1 Design Philosophy]()  
-    [15.2 The Structure of Memory]()  
-      [15.2.1 Expanded/Extended Memory]()  
-      [15.2.2 Main Memory]()  
-    [15.3 Using Global Memory]()  
-      [15.3.1 Memory Etiquette]()  
-      [15.3.2 Requesting Memory]()  
-      [15.3.3 Freeing Memory]()  
-      [15.3.4 Accessing Data in a Block]()  
-      [15.3.5 Accessing Data: An Example]()  
-      [15.3.6 Data-Access Synchronization]()  
-      [15.3.7 Retrieving Block Information]()  
-      [15.3.8 The Reference Count]()  
-    [15.4 malloc()]()  
+**[15 Memory Management](Concepts/cmemory.md)**  
+    [15.1 Design Philosophy](Concepts/cmemory.md#151-design-philosophy)  
+    [15.2 The Structure of Memory](Concepts/cmemory.md#152-the-strcture-of-memory)  
+      [15.2.1 Expanded/Extended Memory](Concepts/cmemory.md#1521-expandextended-memory)  
+      [15.2.2 Main Memory](Concepts/cmemory.md#1522-main-memory)  
+    [15.3 Using Global Memory](Concepts/cmemory.md#153-using-global-memory)  
+      [15.3.1 Memory Etiquette](Concepts/cmemory.md#1531-memory-eticuette)  
+      [15.3.2 Requesting Memory](Concepts/cmemory.md#1532-requesting-memory)  
+      [15.3.3 Freeing Memory](Concepts/cmemory.md#1533-freeing-memory)  
+      [15.3.4 Accessing Data in a Block](Concepts/cmemory.md#1534-accessing-data-in-a-block)  
+      [15.3.5 Accessing Data: An Example](Concepts/cmemory.md#1535-accessing-data-an-example)  
+      [15.3.6 Data-Access Synchronization](Concepts/cmemory.md#1536-data-access-sycronization)  
+      [15.3.7 Retrieving Block Information](Concepts/cmemory.md#1537-retrieving-block-information)  
+      [15.3.8 The Reference Count](Concepts/cmemory.md#1538-the-reference-count)  
+    [15.4 malloc()](Concepts/cmemory.md#154-malloc)  
 
-**[16 Local Memory]()**  
-    [16.1 Design Philosophy]()  
-    [16.2 Structure of a Local Memory Heap]()  
-      [16.2.1 The Local Heap]()  
-      [16.2.2 Chunks and Chunk Handles]()  
-      [16.2.3 Types of LMem Heaps]()  
-    [16.3 Using Local Memory Heaps]()  
-      [16.3.1 Creating a Local Heap]()  
-      [16.3.2 Using Chunks]()  
-      [16.3.3 Contracting the LMem Heap]()  
-      [16.3.4 Example of LMem Usage]()  
-    [16.4 Special LMem Uses]()  
-      [16.4.1 Chunk Arrays]()  
-      [16.4.2 Element Arrays]()  
-      [16.4.3 Name Arrays]()  
+**[16 Local Memory](Concepts/clmem.md)**  
+    [16.1 Design Philosophy](Concepts/clmem.md#161-design-philosophy)  
+    [16.2 Structure of a Local Memory Heap](Concepts/clmem.md#162-structure-of-a-local-memory-heap)  
+      [16.2.1 The Local Heap](Concepts/clmem.md#1621-the-local-heap)  
+      [16.2.2 Chunks and Chunk Handles](Concepts/clmem.md#1622-chunks-and-chunk-handles)  
+      [16.2.3 Types of LMem Heaps](Concepts/clmem.md#1623-types-of-lmem-heaps)  
+    [16.3 Using Local Memory Heaps](Concepts/clmem.md#163-using-local-heaps)  
+      [16.3.1 Creating a Local Heap](Concepts/clmem.md#1631-creating-a-local-heap)  
+      [16.3.2 Using Chunks](Concepts/clmem.md#1632-using-chunks)  
+      [16.3.3 Contracting the LMem Heap](Concepts/clmem.md#1633-contracting-the-lmem-heap)  
+      [16.3.4 Example of LMem Usage](Concepts/clmem.md#1634-example-of-lmem-usage)  
+    [16.4 Special LMem Uses](Concepts/clmem.md#164-special-lmem-uses)  
+      [16.4.1 Chunk Arrays](Concepts/clmem.md#1641-chunk-arrays)  
+      [16.4.2 Element Arrays](Concepts/clmem.md#1642-element-arrays)  
+      [16.4.3 Name Arrays](Concepts/clmem.md#1643-name-arrays)  
 
-**[17 File System]()**  
-    [17.1 Design Philosophy]()  
-    [17.2 File System Overview]()  
-    [17.3 Disks and Drives]()  
-      [17.3.1 Accessing Drives]()  
-      [17.3.2 Accessing Disks]()  
-    [17.4 Directories and Paths]()  
-      [17.4.1 Standard Paths]()  
-      [17.4.2 Current Path and Directory Stack]()  
-      [17.4.3 Creating and Deleting Directories]()  
-    [17.5 Files]()  
-      [17.5.1 DOS Files and GEOS Files]()  
-      [17.5.2 Files and File Handles]()  
-      [17.5.3 GEOS Extended Attributes]()  
-      [17.5.4 File Utilities]()  
-      [17.5.5 FileEnum()]()  
-      [17.5.6 Bytewise File Operations]()  
+**[17 File System](Concepts/cfile.md)**  
+    [17.1 Design Philosophy](Concepts/cfile.md#171-design-philosophy)  
+    [17.2 File System Overview](Concepts/cfile.md#172-file-system-overview)  
+    [17.3 Disks and Drives](Concepts/cfile.md#173-disks-and-drives)  
+      [17.3.1 Accessing Drives](Concepts/cfile.md#1731-accessing-drives)  
+      [17.3.2 Accessing Disks](Concepts/cfile.md#1732-accessing-disks)  
+    [17.4 Directories and Paths](Concepts/cfile.md#174-directories-and-paths)  
+      [17.4.1 Standard Paths](Concepts/cfile.md#1741-standard-paths)  
+      [17.4.2 Current Path and Directory Stack](Concepts/cfile.md#1742-current-path-and-directory-stack)  
+      [17.4.3 Creating and Deleting Directories](Concepts/cfile.md#1743-creating-and-deleting-directories)  
+    [17.5 Files](Concepts/cfile.md#175-files)  
+      [17.5.1 DOS Files and GEOS Files](Concepts/cfile.md#1751-dos-files-and-geos-files)  
+      [17.5.2 Files and File Handles](Concepts/cfile.md#1752-files-and-file-handles)  
+      [17.5.3 GEOS Extended Attributes](Concepts/cfile.md#1753-geos-extended-attributes)  
+      [17.5.4 File Utilities](Concepts/cfile.md#1754-file-utilities)  
+      [17.5.5 FileEnum()](Concepts/cfile.md#1755-fileenum)  
+      [17.5.6 Bytewise File Operations](Concepts/cfile.md#1756-bytewise-file-operations)  
 
-**[18 Virtual Memory]()**  
-    [18.1	Design Philosophy      [CVM : 673
-    [18.2	VM Structure      [CVM : 674
-      [18.2.1	The VM Manager      [CVM : 675
-      [18.2.2	VM Handles      [CVM : 676
-      [18.2.3	Virtual Memory Blocks      [CVM : 677
-      [18.2.4	VM File Attributes      [CVM : 681
-    [18.3	Using Virtual Memory      [CVM : 683
-      [18.3.1	How to Use VM      [CVM : 683
-      [18.3.2	Opening or Creating a VM File      [CVM : 684
-      [18.3.3	Changing VM File Attributes      [CVM : 687
-      [18.3.4	Creating and Freeing Blocks      [CVM : 687
-      [18.3.5	Attaching Memory Blocks      [CVM : 689
-      [18.3.6	Accessing and Altering VM Blocks      [CVM : 690
-      [18.3.7	VM Block Information      [CVM : 692
-      [18.3.8	Updating and Saving Files      [CVM : 693
-      [18.3.9	Closing Files      [CVM : 695
-      [18.3.10	The VM File's Map Block      [CVM : 696
-      [18.3.11	File-Access Synchronization      [CVM : 697
-      [18.3.12	Other VM Utilities      [CVM : 699
-    [18.4	VM Chains      [CVM : 700
-      [18.4.1	Structure of a VM Chain      [CVM : 701
-      [18.4.2	VM Chain Utilities      [CVM : 703
-    [18.5	Huge Arrays      [CVM : 705
-      [18.5.1	Structure of a Huge Array      [CVM : 706
-      [18.5.2	Basic Huge Array Routines      [CVM : 708
-      [18.5.3	Huge Array Utilities      [CVM : 713
+**[18 Virtual Memory](Concepts/cvm.md)**  
+    [18.1 Design Philosophy](Concepts/cvm.md#181-design-philosophy)  
+    [18.2 VM Structure](Concepts/cvm.md#182-vm-structure)  
+      [18.2.1 The VM Manager](Concepts/cvm.md#1821-the-vm-manager)  
+      [18.2.2 VM Handles](Concepts/cvm.md#1822-vm-handles)  
+      [18.2.3 Virtual Memory Blocks](Concepts/cvm.md#1823-virtual-memory-blocks)  
+      [18.2.4 VM File Attributes](Concepts/cvm.md#1824-vm-file-attributes)  
+    [18.3 Using Virtual Memory](Concepts/cvm.md#183-using-virtual-memory)  
+      [18.3.1 How to Use VM](Concepts/cvm.md#1831-how-to-use-mv)  
+      [18.3.2 Opening or Creating a VM File](Concepts/cvm.md#1832-opening-or-create-a-vm-file)  
+      [18.3.3 Changing VM File Attributes](Concepts/cvm.md#1833-changing-vm-file-attributes)  
+      [18.3.4 Creating and Freeing Blocks](Concepts/cvm.md#1834-creating-and-freeing-blocks)  
+      [18.3.5 Attaching Memory Blocks](Concepts/cvm.md#1835-attaching-memory-blocks)  
+      [18.3.6 Accessing and Altering VM Blocks](Concepts/cvm.md#1836-accessing-and-altering-mv-blocks)  
+      [18.3.7 VM Block Information](Concepts/cvm.md#1837-vm-block-information)  
+      [18.3.8 Updating and Saving Files](Concepts/cvm.md#1838-updating-and-saving-files)  
+      [18.3.9 Closing Files](Concepts/cvm.md#1839-closing-files)  
+      [18.3.10 The VM File's Map Block](Concepts/cvm.md#18310-the-vm-files-map-block)  
+      [18.3.11 File-Access Synchronization](Concepts/cvm.md#18311-file-access-synchonization)  
+      [18.3.12 Other VM Utilities](Concepts/cvm.md#18312-other-vm-utilities)  
+    [18.4 VM Chains](Concepts/cvm.md#184-vm-chains)  
+      [18.4.1 Structure of a VM Chain](Concepts/cvm.md#1841-structure-of-a-vm-chain)  
+      [18.4.2 VM Chain Utilities](Concepts/cvm.md#1842-vm-chain-utilities)  
+    [18.5 Huge Arrays](Concepts/cvm.md#185-huge-arrays)  
+      [18.5.1 Structure of a Huge Array](Concepts/cvm.md#1851-structure-of-a-huge-array)  
+      [18.5.2 Basic Huge Array Routines](Concepts/cvm.md#1852-basic-huge-array-routines)  
+      [18.5.3 Huge Array Utilities](Concepts/cvm.md#1853-huge-array-utilities)  
 
-**[19 Database Library]()**  
-    [19.1	Design Philosophy      [CDB : 719
-    [19.2	Database Structure      [CDB : 720
-      [19.2.1	DB Items      [CDB : 720
-      [19.2.2	DB Groups      [CDB : 721
-      [19.2.3	Allocating Groups and Items      [CDB : 722
-      [19.2.4	Ungrouped DB Items      [CDB : 723
-      [19.2.5	The DB Map Item      [CDB : 723
-    [19.3	Using Database Routines      [CDB : 724
-      [19.3.1	General Rules to Follow      [CDB : 724
-      [19.3.2	Allocating and Freeing Groups      [CDB : 725
-      [19.3.3	Allocating and Freeing Items      [CDB : 725
-      [19.3.4	Accessing DB Items      [CDB : 726
-      [19.3.5	Resizing DB Items      [CDB : 727
-      [19.3.6	Setting and Using the Map Item      [CDB : 728
-      [19.3.7	Routines for Ungrouped Items      [CDB : 729
-      [19.3.8	Other DB Utilities      [CDB : 730
-    [19.4	The Cell Library      [CDB : 731
-      [19.4.1	Structure and Design      [CDB : 732
-      [19.4.2	Using the Cell Library      [CDB : 734
+**[19 Database Library](Concepts/cdb.md)**  
+    [19.1 Design Philosophy](Concepts/cdb.md#191-design-philosophy)  
+    [19.2 Database Structure](Concepts/cdb.md#192-database-structure)  
+      [19.2.1 DB Items](Concepts/cdb.md#1921-db-items)  
+      [19.2.2 DB Groups](Concepts/cdb.md#1922-db-groups)  
+      [19.2.3 Allocating Groups and Items](Concepts/cdb.md#1923-allocating-groups-and-items)  
+      [19.2.4 Ungrouped DB Items](Concepts/cdb.md#1924-ungrouped-db-items)  
+      [19.2.5 The DB Map Item](Concepts/cdb.md#1925-the-db-map-item)  
+    [19.3 Using Database Routines](Concepts/cdb.md#193-using-database-routines)  
+      [19.3.1 General Rules to Follow](Concepts/cdb.md#1931-general-rules-to-follow)  
+      [19.3.2 Allocating and Freeing Groups](Concepts/cdb.md#1932-allocating-and-freeing-groups)  
+      [19.3.3 Allocating and Freeing Items](Concepts/cdb.md#1933-allocating-and-freeing-items)  
+      [19.3.4 Accessing DB Items](Concepts/cdb.md#1934-accessing-db-items)  
+      [19.3.5 Resizing DB Items](Concepts/cdb.md#1935-resizing-db-items)  
+      [19.3.6 Setting and Using the Map Item](Concepts/cdb.md#1936-setting-and-using-ungrouped-items)  
+      [19.3.7 Routines for Ungrouped Items](Concepts/cdb.md#1937-routines-for-ungrouped-items)  
+      [19.3.8 Other DB Utilities](Concepts/cdb.md#1938-other-db-utilities)  
+    [19.4 The Cell Library](Concepts/cdb.md#194-the-cell-library)  
+      [19.4.1 Structure and Design](Concepts/cdb.md#1941-structure-and-design)  
+      [19.4.2 Using the Cell Library](Concepts/cdb.md#1942-using-the-cell-library)  
 
-**[20 Parse Library]()**  
-    [20.1	Parse Library Behavior      [CParse : 743
-      [20.1.1	The Scanner      [CParse : 745
-      [20.1.2	The Parser      [CParse : 753
-      [20.1.3	Evaluator      [CParse : 759
-      [20.1.4	Formatter      [CParse : 761
-    [20.2	Parser Functions      [CParse : 761
-      [20.2.1	Internal Functions      [CParse : 762
-      [20.2.2	External Functions      [CParse : 765
-    [20.3	Coding with the Parse Library      [CParse : 766
-      [20.3.1	Parsing a String      [CParse : 766
-      [20.3.2	Evaluating a Token Sequence      [CParse : 767
-      [20.3.3	Formatting a Token Sequence      [CParse : 770
+**[20 Parse Library](Concepts/cparse.md)**  
+    [20.1 Parse Library Behavior](Concepts/cparse.md#201-parse-library-behavior)  
+      [20.1.1 The Scanner](Concepts/cparse.md#2011-the-scanner)  
+      [20.1.2 The Parser](Concepts/cparse.md#2012-the-parser)  
+      [20.1.3 Evaluator](Concepts/cparse.md#2013-evaluator)  
+      [20.1.4 Formatter](Concepts/cparse.md#2014-formatter)  
+    [20.2 Parser Functions](Concepts/cparse.md#202-parser-functions)  
+      [20.2.1 Internal Functions](Concepts/cparse.md#2021-internal-functions)  
+      [20.2.2 External Functions](Concepts/cparse.md#2022-external-functions)  
+    [20.3 Coding with the Parse Library](Concepts/cparse.md#203-coding-with-the-parse-library)  
+      [20.3.1 Parsing a String](Concepts/cparse.md#2031-parsing-a-string)  
+      [20.3.2 Evaluating a Token Sequence](Concepts/cparse.md#2032-evaluating-a-token-sequence)  
+      [20.3.3 Formatting a Token Sequence](Concepts/cparse.md#2033-formatting-a-token-sequence)  
 
-**[21 Using Streams]()**  
-    [21.1	Using Streams: The Basics      [CStream : 773
-      [21.1.1	Initializing a Stream      [CStream : 775
-      [21.1.2	Blocking on Read or Write      [CStream : 777
-      [21.1.3	Writing Data to a Stream      [CStream : 778
-      [21.1.4	Reading Data from a Stream      [CStream : 779
-      [21.1.5	Shutting Down a Stream      [CStream : 781
-      [21.1.6	Miscellaneous Functions      [CStream : 782
-    [21.2	Using the Serial Ports      [CStream : 782
-      [21.2.1	Initializing a Serial Port      [CStream : 783
-      [21.2.2	Communicating      [CStream : 787
-      [21.2.3	Closing a Serial Port      [CStream : 788
-    [21.3	Using the Parallel Ports      [CStream : 789
-      [21.3.1	Initializing a Parallel Port      [CStream : 789
-      [21.3.2	Communicating      [CStream : 790
-      [21.3.3	Closing a Parallel Port      [CStream : 790
+**[21 Using Streams](Concepts/cstream.md)**  
+    [21.1 Using Streams: The Basics](Concepts/cstream.md#211-using-streams-the-basics)  
+      [21.1.1 Initializing a Stream](Concepts/cstream.md#2111-initializing-a-stream)  
+      [21.1.2 Blocking on Read or Write](Concepts/cstream.md#2112-blocking-on-read-or-write)  
+      [21.1.3 Writing Data to a Stream](Concepts/cstream.md#21)  
+      [21.1.4 Reading Data from a Stream](Concepts/cstream.md#21)  
+      [21.1.5 Shutting Down a Stream](Concepts/cstream.md#21)  
+      [21.1.6 Miscellaneous Functions](Concepts/cstream.md#21)  
+    [21.2 Using the Serial Ports](Concepts/cstream.md#21)  
+      [21.2.1 Initializing a Serial Port](Concepts/cstream.md#21)  
+      [21.2.2 Communicating](Concepts/cstream.md#21)  
+      [21.2.3 Closing a Serial Port](Concepts/cstream.md#21)  
+    [21.3 Using the Parallel Ports](Concepts/cstream.md#21)  
+      [21.3.1 Initializing a Parallel Port](Concepts/cstream.md#21)  
+      [21.3.2 Communicating](Concepts/cstream.md#21)  
+      [21.3.3 Closing a Parallel Port](Concepts/cstream.md#21)  
 
-**[22 PCCom Library]()**  
-    [22.1	PCCom Library Abilities      [795
-    [22.2	What To Do      [795
-    [22.3	Staying Informed      [796
+**[22 PCCom Library](Concepts/cpccom.md)**  
+    [22.1 PCCom Library Abilities](Concepts/cpccom.md#221-pccom-library-abilities)  
+    [22.2 What To Do](Concepts/cpccom.md#222-what-to-do)  
+    [22.3 Staying Informed](Concepts/cpccom.md#223-staying-informed)  
 
-**[23 Graphics Environment]()**  
-    [23.1	Graphics Road Map      [CGraph : 801
-      [23.1.1	Chapter Structure      [CGraph : 801
-      [23.1.2	Vocabulary      [CGraph : 803
-    [23.2	Graphics Goals      [CGraph : 806
-    [23.3	Graphics Architecture      [CGraph : 807
-    [23.4	How To Use Graphics      [CGraph : 808
-    [23.5	Coordinate Space      [CGraph : 810
-      [23.5.1	Standard Coordinate Space      [CGraph : 811
-      [23.5.2	Coordinate Transformations      [CGraph : 812
-      [23.5.3	Precise Coordinates      [CGraph : 818
-      [23.5.4	Device Coordinates      [CGraph : 819
-      [23.5.5	Larger Document Spaces      [CGraph : 823
-      [23.5.6	Current Position      [CGraph : 824
-    [23.6	Graphics State      [CGraph : 825
-      [23.6.1	GState Contents      [CGraph : 826
-      [23.6.2	Working with GStates      [CGraph : 827
-    [23.7	Working With Bitmaps      [CGraph : 828
-    [23.8	Graphics Strings      [CGraph : 832
-      [23.8.1	Storage and Loading      [CGraph : 832
-      [23.8.2	Special Drawing Commands      [CGraph : 834
-      [23.8.3	Declaring a GString Statically      [CGraph : 836
-      [23.8.4	Creating GStrings Dynamically      [CGraph : 840
-      [23.8.5	Drawing and Scanning      [CGraph : 843
-      [23.8.6	Editing GStrings Dynamically      [CGraph : 846
-      [23.8.7	Parsing GStrings      [CGraph : 847
-    [23.9	Graphics Paths      [CGraph : 849
-    [23.10	Working With Video Drivers      [CGraph : 852
-      [23.10.1	Kernel Routines      [CGraph : 852
-      [23.10.2	Direct Calls to the Driver      [CGraph : 853
-    [23.11	Windowing and Clipping      [CGraph : 854
-      [23.11.1	Palettes      [CGraph : 854
-      [23.11.2	Clipping      [CGraph : 854
-      [23.11.3	Signalling Updates      [CGraph : 855
+**[23 Graphics Environment](Concepts/cgraph.md)**  
+    [23.1 Graphics Road Map](Concepts/cgraph.md#231-graphics-road-map)  
+      [23.1.1 Chapter Structure](Concepts/cgraph.md#2311-chapter-structure)  
+      [23.1.2 Vocabulary](Concepts/cgraph.md#3212-vocabulary)  
+    [23.2 Graphics Goals](Concepts/cgraph.md#322-graphics-goals)  
+    [23.3 Graphics Architecture](Concepts/cgraph.md#233-graphics-architecture)  
+    [23.4 How To Use Graphics](Concepts/cgraph.md#234-how-to-use-graphics)  
+    [23.5 Coordinate Space](Concepts/cgraph.md#235-coordinate-space)  
+      [23.5.1 Standard Coordinate Space](Concepts/cgraph.md#2351-standard-coordinate-space)  
+      [23.5.2 Coordinate Transformations](Concepts/cgraph.md#2352-coordinate-transformations)  
+      [23.5.3 Precise Coordinates](Concepts/cgraph.md#2353-precise-coordinates)  
+      [23.5.4 Device Coordinates](Concepts/cgraph.md#2354-device-coordinates)  
+      [23.5.5 Larger Document Spaces](Concepts/cgraph.md#2355-larger-document-spaces)  
+      [23.5.6 Current Position](Concepts/cgraph.md#2356-current-position)  
+    [23.6 Graphics State](Concepts/cgraph.md#236-graphics-state)  
+      [23.6.1 GState Contents](Concepts/cgraph.md#2361-gstate-contents)  
+      [23.6.2 Working with GStates](Concepts/cgraph.md#2362)  
+    [23.7 Working With Bitmaps](Concepts/cgraph.md#237-working-with-bitmaps)  
+    [23.8 Graphics Strings](Concepts/cgraph.md#238-graphics-strings)  
+      [23.8.1 Storage and Loading](Concepts/cgraph.md#2381-storage-and-loading)  
+      [23.8.2 Special Drawing Commands](Concepts/cgraph.md#2382-special-drawing-commands)  
+      [23.8.3 Declaring a GString Statically](Concepts/cgraph.md#2383-declaring-a-gstring-statically)  
+      [23.8.4 Creating GStrings Dynamically](Concepts/cgraph.md#2384-creating-gstrings-dymanically)  
+      [23.8.5 Drawing and Scanning](Concepts/cgraph.md#2385-drawing-and-scanning)  
+      [23.8.6 Editing GStrings Dynamically](Concepts/cgraph.md#2386-editing-gstrings-dynamically)  
+      [23.8.7 Parsing GStrings](Concepts/cgraph.md#2387-parsing-gstrings)  
+    [23.9 Graphics Paths](Concepts/cgraph.md#239-graphics-paths)  
+    [23.10 Working With Video Drivers](Concepts/cgraph.md#2310-working-with-video-drivers)  
+      [23.10.1 Kernel Routines](Concepts/cgraph.md#23101-kernel-routines)  
+      [23.10.2 Direct Calls to the Driver](Concepts/cgraph.md#23102-direct-calls-to-the-driver)  
+    [23.11 Windowing and Clipping](Concepts/cgraph.md#2311-windowing-and-clipping)  
+      [23.11.1 Palettes](Concepts/cgraph.md#23111-palettes)  
+      [23.11.2 Clipping](Concepts/cgraph.md#23112-clipping)  
+      [23.11.3 Signalling Updates](Concepts/cgraph.md#23113-signalling-updates)  
 
-**[24 Drawing Graphics]()**  
-    [24.1	Drawing Goals      [CShapes : 859
-    [24.2	Shapes      [CShapes : 859
-      [24.2.1	Dots      [CShapes : 860
-      [24.2.2	Lines      [CShapes : 861
-      [24.2.3	Rectangles      [CShapes : 862
-      [24.2.4	Ellipses      [CShapes : 862
-      [24.2.5	Elliptical Arcs      [CShapes : 863
-      [24.2.6	Three-Point Arcs      [CShapes : 864
-      [24.2.7	Rounded Rectangles      [CShapes : 865
-      [24.2.8	Polylines and Polygons      [CShapes : 866
-      [24.2.9	B\E9zier Curves and Splines      [CShapes : 867
-      [24.2.10	Drawing Bitmaps      [CShapes : 870
-      [24.2.11	Paths      [CShapes : 872
-      [24.2.12	Regions      [CShapes : 873
-      [24.2.13	Text      [CShapes : 876
-    [24.3	Shape Attributes      [CShapes : 885
-      [24.3.1	Color      [CShapes : 886
-      [24.3.2	Patterns and Hatching      [CShapes : 891
-      [24.3.3	Mix Mode      [CShapes : 895
-      [24.3.4	Masks      [CShapes : 897
-      [24.3.5	Line-Specific Attributes      [CShapes : 899
+**[24 Drawing Graphics](Concepts/cshapes.md)**  
+    [24.1 Drawing Goals](Concepts/cshapes.md#241-drawing-goals)  
+    [24.2 Shapes](Concepts/cshapes.md#242-shapes)  
+      [24.2.1 Dots](Concepts/cshapes.md#2421-dots)  
+      [24.2.2 Lines](Concepts/cshapes.md#2422-lines)  
+      [24.2.3 Rectangles](Concepts/cshapes.md#2423-rectangles)  
+      [24.2.4 Ellipses](Concepts/cshapes.md#2424-ellipses)  
+      [24.2.5 Elliptical Arcs](Concepts/cshapes.md#2425-elliptical-arcs)  
+      [24.2.6 Three-Point Arcs](Concepts/cshapes.md#2426-three-point-arcs)  
+      [24.2.7 Rounded Rectangles](Concepts/cshapes.md#2427-rounded-rectangles)  
+      [24.2.8 Polylines and Polygons](Concepts/cshapes.md#2428-polylines-and-polygons)  
+      [24.2.9 Bezier Curves and Splines](Concepts/cshapes.md#2429-bezier-curves-and-splines)  
+      [24.2.10 Drawing Bitmaps](Concepts/cshapes.md#24210-drawing-bitmaps)  
+      [24.2.11 Paths](Concepts/cshapes.md#24211-paths)  
+      [24.2.12 Regions](Concepts/cshapes.md#24212-regions)  
+      [24.2.13 Text](Concepts/cshapes.md#24213-text)  
+    [24.3 Shape Attributes](Concepts/cshapes.md#243-shape-attributes)  
+      [24.3.1 Color](Concepts/cshapes.md#2431-color)  
+      [24.3.2 Patterns and Hatching](Concepts/cshapes.md#2432-patterns-and-hatching)  
+      [24.3.3 Mix Mode](Concepts/cshapes.md#2433-mix-mode)  
+      [24.3.4 Masks](Concepts/cshapes.md#2436-masks)  
+      [24.3.5 Line-Specific Attributes](Concepts/cshapes.md#2435-line-specific-attributes)  
 
-**[A Machine Architecture]()**  
-    [A.1	History of the 80x86      [CHardw : 905
-    [A.2	8086 Architecture Overview      [CHardw : 906
-      [A.2.1	Memory      [CHardw : 906
-      [A.2.2	Registers      [CHardw : 908
-      [A.2.3	The Prefetch Queue      [CHardw : 909
-      [A.2.4	Inherent Optimizations      [CHardw : 910
+**[A Machine Architecture](Concepts/chardw.md)**  
+    [A.1 History of the 80x86](Concepts/chardw.md#a1-history-of-the-80x86)  
+    [A.2 8086 Architecture Overview](Concepts/chardw.md#a2-8086-architecture-overview)  
+      [A.2.1 Memory](Concepts/chardw.md#a21-memory)  
+      [A.2.2 Registers](Concepts/chardw.md#a22-registers)  
+      [A.2.3 The Prefetch Queue](Concepts/chardw.md#a23-the-prefetch-queue)  
+      [A.2.4 Inherent Optimizations](Concepts/chardw.md#a24-inherent-optimizations)  
 
-**[B Threads and Semaphores]()**  
-    [B.1	Multitasking Goals      [CMultit : 913
-    [B.2	Two Models of Multitasking      [CMultit : 914
-      [B.2.1	Cooperative Multitasking      [CMultit : 914
-      [B.2.2	Preemptive Multitasking      [CMultit : 915
-    [B.3	GEOS Multitasking      [CMultit : 916
-      [B.3.1	GEOS Threads      [CMultit : 917
-      [B.3.2	Context Switches      [CMultit : 918
-      [B.3.3	Thread Scheduling      [CMultit : 919
-      [B.3.4	Applications and Threads      [CMultit : 920
-    [B.4	Using Multiple Threads      [CMultit : 921
-      [B.4.1	How GEOS Threads Are Created      [CMultit : 921
-      [B.4.2	Managing Priority Values      [CMultit : 923
-      [B.4.3	Handling Errors in a Thread      [CMultit : 924
-      [B.4.4	When a Thread Is Finished      [CMultit : 925
-    [B.5	Synchronizing Threads      [CMultit : 926
-      [B.5.1	Semaphores: The Concept      [CMultit : 926
-      [B.5.2	Semaphores In GEOS      [CMultit : 928
+**[B Threads and Semaphores](Concepts/cmultit.md)**  
+    [B.1 Multitasking Goals](Concepts/cmultit.md#b1-multitasking-goals)  
+    [B.2 Two Models of Multitasking](Concepts/cmultit.md#b2-two-models-of-multitasking)  
+      [B.2.1 Cooperative Multitasking](Concepts/cmultit.md#b21-cooperative-multitasking)  
+      [B.2.2 Preemptive Multitasking](Concepts/cmultit.md#b22-preemtive-multitasking)  
+    [B.3 GEOS Multitasking](Concepts/cmultit.md#b3-geos-multitasking)  
+      [B.3.1 GEOS Threads](Concepts/cmultit.md#b31-geos-threads)  
+      [B.3.2 Context Switches](Concepts/cmultit.md#b32-context-switches)  
+      [B.3.3 Thread Scheduling](Concepts/cmultit.md#b33-thread-scheduling)  
+      [B.3.4 Applications and Threads](Concepts/cmultit.md#b34-application-and-threads)  
+    [B.4 Using Multiple Threads](Concepts/cmultit.md#b4-using-multiple-threads)  
+      [B.4.1 How GEOS Threads Are Created](Concepts/cmultit.md#b41-how-geos-threads-are-created)  
+      [B.4.2 Managing Priority Values](Concepts/cmultit.md#b42-managing-priority-values)  
+      [B.4.3 Handling Errors in a Thread](Concepts/cmultit.md#b43-handling-errors-in-a-thread)  
+      [B.4.4 When a Thread Is Finished](Concepts/cmultit.md#b44-when-a-thread-is-finished)  
+    [B.5 Synchronizing Threads](Concepts/cmultit.md#b5-synchronizing-threads)  
+      [B.5.1 Semaphores: The Concept](Concepts/cmultit.md#b51-semaphores-the-concept)  
+      [B.5.2 Semaphores In GEOS](Concepts/cmultit.md#b52-semaphores-in-geos)  
 
-**[C Libraries]()**  
-    [C.1	Design Philosophy      [CLibr : 935
-    [C.2	Library Basics      [CLibr : 936
-    [C.3	The Library Entry Point      [CLibr : 937
-    [C.4	Exported Routines and Classes      [CLibr : 940
-    [C.5	Header Files      [CLibr : 941
-    [C.6	Compiler Directives      [CLibr : 941
+**[C Libraries](Concepts/clibr.md)**  
+    [C.1 Design Philosophy](Concepts/clibr.md#c1-desing-philosophy)  
+    [C.2 Library Basics](Concepts/clibr.md#c2-library-basics)  
+    [C.3 The Library Entry Point](Concepts/clibr.md#c3-the-entry-point)  
+    [C.4 Exported Routines and Classes](Concepts/clibr.md#c4-exported-routines-and-classes)  
+    [C.5 Header Files](Concepts/clibr.md#c5-header-files)  
+    [C.6 Compiler Directives](Concepts/clibr.md#c6-compiler-directives)  
 
-**[D The Math Library]()**  
-    [D.1	Basic Math Functions      [CMath : 945
-      [D.1.1	Algebraic Functions      [CMath : 947
-      [D.1.2	Transcendental Functions      [CMath : 949
-      [D.1.3	Random Number Generation      [CMath : 950
-    [D.2	Conversions to Other Types      [CMath : 951
-    [D.3	Float Formats      [CMath : 960
-      [D.3.1	System-defined Formats      [CMath : 960
-      [D.3.2	User-defined Formats      [CMath : 963
-    [D.4	Direct FP Operations      [CMath : 964
-      [D.4.1	Floating Point Numbers      [CMath : 965
-      [D.4.2	The Floating Point Stack      [CMath : 966
-      [D.4.3	Floating Point Math Routines      [CMath : 971
+**[D The Math Library](Concepts/cmath.md)**  
+    [D.1 Basic Math Functions](Concepts/cmath.md#d1-basic-math-functions)  
+      [D.1.1 Algebraic Functions](Concepts/cmath.md#d11-algebraic-function)  
+      [D.1.2 Transcendental Functions](Concepts/cmath.md#d12-transcendental-functions)  
+      [D.1.3 Random Number Generation](Concepts/cmath.md#d13-random-number-generation)  
+    [D.2 Conversions to Other Types](Concepts/cmath.md#d2-conversions-to-other-types)  
+    [D.3 Float Formats](Concepts/cmath.md#d3-float-formats)  
+      [D.3.1 System-defined Formats](Concepts/cmath.md#d31-system-defined-formats)  
+      [D.3.2 User-defined Formats](Concepts/cmath.md#d32-user-defined-formats)  
+    [D.4 Direct FP Operations](Concepts/cmath.md#d4-direct-fp-operations)  
+      [D.4.1 Floating Point Numbers](Concepts/cmath.md#d41-floating-point-numbers)  
+      [D.4.2 The Floating Point Stack](Concepts/cmath.md#d42-the-floating-point-stack)  
+      [D.4.3 Floating Point Math Routines](Concepts/cmath.md#d43-floating-point-math-routines)  
 

@@ -76,12 +76,12 @@ just procedural code. They can contain objects, however, as any geode is free
 to create an event-driven thread for itself at any time. In fact, the parallel 
 port driver does just that when it is printing to a port through DOS or BIOS.
 
-Geodes are loaded either with a call to the kernel routine GeodeLoad() or 
+Geodes are loaded either with a call to the kernel routine **GeodeLoad()** or 
 as a side effect of a library's client being loaded (in that case, the library geode 
 will be loaded as well). The generic UI supplies the special routine 
-UserLoadApplication(), which you may use to load an application-a 
+**UserLoadApplication()**, which you may use to load an application-a 
 geode which has both a process aspect and its process class subclassed off of 
-GenProcessClass (and therefore can put generic UI objects on the screen).
+**GenProcessClass** (and therefore can put generic UI objects on the screen).
 
 Once a geode has been loaded, it is identified by its geode handle, which is the 
 memory handle of the block that holds all the geode's system-administrative 
@@ -116,7 +116,7 @@ When the geode is first loaded, the reference count is set to one. If the geode
 is a process, the act of initializing the process thread increments the 
 reference count. Each time the geode is loaded again, the new core block will 
 get its own reference count. If the geode is loaded implicitly (as a library, with 
-GeodeUseLibrary(), or with GeodeUseDriver()), or if it spawns a new 
+**GeodeUseLibrary()**, or with **GeodeUseDriver()**), or if it spawns a new 
 thread, it will receive yet another reference count.
 
 The reference count is decremented when a thread owned by the geode exits. 
@@ -152,13 +152,13 @@ The core block contains its own memory handle, filled in when the geode
 is loaded into memory.
 
 + Geode Attributes  
-Each geode has a record of type GeodeAttrs. The geode attributes are 
-described below in section 6.1.1.1 on page 245.
+Each geode has a record of type **GeodeAttrs**. The geode attributes are 
+described below in [section 6.1.1.1](#6111-geode-attributes).
 
 + Release and Protocol Levels  
 Each geode can have release and protocol levels associated with it to 
 ensure compatibility between different versions. Release and protocol 
-levels are discussed in section 6.1.8.2 on page 262.
+levels are discussed in [section 6.1.8.2](#6182-protocol-numbers).
 
 + Geode Name
 Each geode has a geode name and extension specified in the geode 
@@ -166,8 +166,8 @@ parameters (.gp) file.
 
 + Geode Token  
 Every geode has a token associated with it in the token database. The 
-token describes the geode's icon and is a structure of type GeodeToken. 
-Tokens and icons are discussed in section 6.2 on page 265.
+token describes the geode's icon and is a structure of type **GeodeToken**. 
+Tokens and icons are discussed in [section 6.2](#62-creating-icons).
 
 + Geode Reference Count  
 The geode's reference count is stored in the core block. See above for a 
@@ -189,7 +189,7 @@ contain a reference to the next geode in the list.
 
 + Handle of Private Data Space  
 Each geode that is not the kernel can have a "private data space." This 
-private data space is discussed in section 6.1.9 on page 264.
+private data space is discussed in [section 6.1.9](#619-temporary-geode-memory).
 
 + Resource, Library, and Driver Information  
 Each geode that imports or exports library or driver information must 
@@ -199,9 +199,9 @@ tables referenced from within the core block.
 
 ##### 6.1.1.1 Geode Attributes
 
-Each geode has in its core block a record of type GeodeAttrs. This record 
+Each geode has in its core block a record of type **GeodeAttrs**. This record 
 defines several things about the geode, including which aspects it uses and 
-which of its aspects have been initialized. The GeodeAttrs record contains 
+which of its aspects have been initialized. The **GeodeAttrs** record contains 
 one bit for each of the following attributes.
 
 GA_PROCESS  
@@ -263,8 +263,8 @@ assembly language.
 ##### 6.1.1.2 Geode Token
 
 As stated above, every geode is associated with a token in the token database. 
-This token is defined by the use of a GeodeToken structure. This structure 
-and its uses are discussed in section 6.2.
+This token is defined by the use of a **GeodeToken** structure. This structure 
+and its uses are discussed in [section 6.2](#62-creating-icons).
 
 #### 6.1.2 Launching an Application
 
@@ -281,22 +281,21 @@ An application may be loaded in essentially two ways: It may be launched, or
 it may be reloaded from a state file. In both cases, the kernel will load the 
 proper resources and build out the UI properly according to the application.
 
-Most of the procedure of launching is handled within GenProcessClass, a 
-subclass of ProcessClass. An application should define its own subclass of 
-GenProcessClass for its Process objects (event-driven threads not acting as 
-Process objects should be subclassed from ProcessClass, not 
-GenProcessClass). The launch procedure may be invoked by any thread 
+Most of the procedure of launching is handled within **GenProcessClass**, a 
+subclass of **ProcessClass**. An application should define its own subclass of 
+**GenProcessClass** for its Process objects (event-driven threads not acting as 
+Process objects should be subclassed from **ProcessClass**, not 
+**GenProcessClass**). The launch procedure may be invoked by any thread 
 and by any geode in either of the following ways:
 
 + **GeodeLoad()**  
 This loads a geode from a given file and begins executing it based on the 
-geode's type. GeodeLoad() takes the name of the geode's file as well as 
+geode's type. **GeodeLoad()** takes the name of the geode's file as well as 
 a priority to set for the new geode's process thread, if it has one. 
-GeodeLoad() first creates the process thread of the application, then 
+**GeodeLoad()** first creates the process thread of the application, then 
 sends this thread a message. The process thread (a subclass of 
-GenProcessClass) then creates a UI thread for the application.
-
-	**GeodeLoad()** will have to create two threads for the application: one for 
+**GenProcessClass**) then creates a UI thread for the application.  
+**GeodeLoad()** will have to create two threads for the application: one for 
 the process and one for the UI of the geode.
 
 + **UserLoadApplication()**  
@@ -306,7 +305,7 @@ MSG_GEN_PROCESS_OPEN_APPLICATION instead.) This routine takes
 some additional parameters and can load a geode either in engine mode 
 or from a state file as well as in the normal open mode (see below). The 
 base functionality of opening and loading the geode is implemented in 
-this routine by a call to GeodeLoad(). Note, however, that this routine 
+this routine by a call to **GeodeLoad()**. Note, however, that this routine 
 may only open application geodes-geodes with the GA_APPLICATION 
 attribute set.
 
@@ -327,7 +326,7 @@ so its UI is never built.
 resources and merging them with the default resources. This mode is 
 invoked automatically by the UI if it is restoring the system or the geode 
 from saved state. This mode is handled automatically by 
-GenProcessClass (your Process object).
+**GenProcessClass** (your Process object).
 
 It is possible, however, for one application to launch another in a custom 
 mode. If this is done, the application being launched is responsible for 
@@ -358,8 +357,8 @@ Just as loading an application is handled almost entirely by the system and
 GEOS classes, application shutdown is also fairly automatic. If the 
 application intercepted MSG_GEN_PROCESS_OPEN_APPLICATION for its 
 own purposes on startup, it likely has to do a little cleanup; otherwise, it 
-won't have to worry about shutting down. (See "Saving and Restoring State" 
-on page 250 for special information on using this message.)
+won't have to worry about shutting down. (See ["Saving and Restoring State"](#614-saving-and-restoring-state) 
+for special information on using this message.)
 
 Any object in the system may cause an application to shut down. Usually, 
 shutdown occurs either when the system is being exited (when a user exits to 
@@ -383,8 +382,8 @@ queues before shutting down to avoid synchronization problems. You should
 not subclass the MSG_META_DETACH handler unless you have special needs 
 for cleaning up or sending special detach messages to other objects or geodes. 
 If you do subclass it, you must call the superclass at the end of your handler. 
-Otherwise, the application will not finish detaching (see section 5.4.6.5 of 
-chapter 5).
+Otherwise, the application will not finish detaching (see [section 5.4.6.5 of 
+chapter 5](ccoding.md#5465-detaching-and-destroying-objects)).
 
 Instead of intercepting MSG_META_DETACH, though, the application may 
 intercept the mode-specific message it will also receive. Depending on the 
@@ -397,10 +396,9 @@ MSG_GEN_PROCESS_CLOSE_APPLICATION is used.
 When the system shuts down or task-switches, a different type of shutdown 
 occurs. Applications (or other objects interested in this event) must register 
 for notification on the notification list GCNSLT_SHUTDOWN_CONTROL 
-(notification lists are described in "General Change Notification," Chapter 9). 
+(notification lists are described in ["General Change Notification," Chapter 9](cgcn.md)). 
 When the system shuts down or task-switches, the object will then receive a 
-MSG_META_CONFIRM_SHUTDOWN, at which time the object must call 
-SysShutdown().
+MSG_META_CONFIRM_SHUTDOWN, at which time the object must call **SysShutdown()**.
 
 #### 6.1.4 Saving and Restoring State
 
@@ -415,14 +413,14 @@ object blocks and data for saving to a state file.
 The state file for an application is a VM file containing object blocks. Only 
 object blocks may be saved to the state file, though you can save LMem data 
 by setting up object blocks with only data chunks in them. (Create the blocks 
-with MemAllocLMem(), passing type LMEM_TYPE_OBJ_BLOCK, then 
-simply use LMemAlloc() to allocate data chunks.) You can also save an extra 
+with **MemAllocLMem()**, passing type LMEM_TYPE_OBJ_BLOCK, then 
+simply use **LMemAlloc()** to allocate data chunks.) You can also save an extra 
 data block to the state file using MSG_GEN_PROCESS_CLOSE_APPLICATION 
 and MSG_GEN_PROCESS_OPEN_APPLICATION. In the close message, you 
 can return the handle of an extra block to be saved to the state file; in the 
 open message, the handle of the extra block is given to you, and you can 
 restore this data as necessary. See the reference information for these 
-messages under GenProcessClass for more information.
+messages under **GenProcessClass** for more information.
 
 When a state file is saved, the system recognizes and saves only the dirty 
 (modified) objects and chunks. Later, when state is restored, the system 
@@ -432,9 +430,9 @@ in the state that was saved.
 For individual objects or entire object blocks to be saved to the state file, they 
 must be marked dirty. Generic objects automatically mark themselves dirty 
 at the appropriate times, so you don't have to worry about them. To mark 
-other objects dirty, use the routine ObjMarkDirty(). Each object which has 
+other objects dirty, use the routine **ObjMarkDirty()**. Each object which has 
 been marked dirty will be saved to a state file when appropriate. If you want 
-to save an entire object block to the state file, you can call ObjSaveBlock() 
+to save an entire object block to the state file, you can call **ObjSaveBlock()** 
 on the block; the system will save the entire block, not just the dirty chunks.
 
 State files are dealt with at only two times: First, when the system starts up, 
@@ -474,7 +472,7 @@ will create or modify its state file as appropriate.
 The state of an application (how it was launched) is reflected in the 
 GAI_states field of the GenApplication object. To retrieve the application's 
 state, send it MSG_GEN_APPLICATION_GET_STATE. It will return a value of 
-ApplicationStates. The most frequent use of this message is by 
+**ApplicationStates**. The most frequent use of this message is by 
 applications that need to know whether a "quit" is underway when their 
 receive the MSG_GEN_PROCESS_CLOSE_APPLICATION message; the process 
 object will query the GenApplication and see if it is in the AS_QUITTING 
@@ -482,16 +480,16 @@ state.
 
 In addition to the above state-saving functionality, the kernel provides two 
 routines that translate handles between the state file and memory. 
-ObjMapSavedToState() takes the memory handle of an object block and 
+**ObjMapSavedToState()** takes the memory handle of an object block and 
 returns its corresponding state file VM block handle. 
-ObjMapStateToSaved() takes the state file VM block handle and returns 
+**ObjMapStateToSaved()** takes the state file VM block handle and returns 
 the corresponding memory block handle, if any.
 
 If your application's documents are VM files, it is a very simple matter to save 
 document state. In fact, if you use the GenDocument and document control 
 objects, they will take care of document state saving for you. Be sure that the 
-VM file has the VMA_BACKUP flag set in its VMAttributes; then you can 
-simply call VMUpdate() on the document file. (Note-do not use VMSave() 
+VM file has the VMA_BACKUP flag set in its **VMAttributes**; then you can 
+simply call **VMUpdate()** on the document file. (Note-do not use **VMSave()** 
 instead; it will erase the backup and lock in the user's changes to the 
 document.) If you are not using GEOS VM files, it is up to you how and if you 
 will save the document's state.
@@ -519,19 +517,18 @@ your .goc and .gp files and have the system load and link the library
 automatically. (To do this, include the library's interface definition file in your 
 code file and list the library's geode name in your geode parameters file.)
 
-If you need to load a library dynamically, though, use GeodeUseLibrary(). 
-This routine takes the protocol numbers expected of the library (see section 
-6.1.8.2 on page 262) and the library geode's filename. It will locate and load 
+If you need to load a library dynamically, though, use **GeodeUseLibrary()**. 
+This routine takes the protocol numbers expected of the library (see [section 
+6.1.8.2](#6182-protocol-numbers)) and the library geode's filename. It will locate and load 
 the library if not already loaded. If the library is already loaded, it will 
 increment the library's reference count. When you are done using a library 
-loaded with GeodeUseLibrary(), you must free the library's instance with 
-GeodeFreeLibrary().
+loaded with **GeodeUseLibrary()**, you must free the library's instance with 
+**GeodeFreeLibrary()**.
 
 ##### 6.1.5.2 Using Drivers
 
 GeodeUseDriver(), GeodeInfoDriver(), 
-GeodeGetDefaultDriver(), GeodeSetDefaultDriver(), 
-GeodeFreeDriver()
+GeodeGetDefaultDriver(), GeodeSetDefaultDriver(), GeodeFreeDriver()
 
 Drivers are referenced by either their permanent names or their geode 
 handles. Most drivers used by applications will be loaded automatically by 
@@ -539,16 +536,16 @@ the kernel; the application must have the driver's permanent name specified
 in its .gp file. Should an application need to use a driver not included in its 
 parameters file, however, it can do so with the routines described below.
 
-When you need to use a driver, the GeodeUseDriver() routine will locate 
+When you need to use a driver, the **GeodeUseDriver()** routine will locate 
 and load it, adding it to the active geodes list. You must pass the desired 
 driver geode's filename as well as the expected protocol levels of the driver. 
 The routine will return the driver's geode handle. If you load a driver 
-dynamically, you must free it with GeodeFreeDriver() when your geode 
+dynamically, you must free it with **GeodeFreeDriver()** when your geode 
 shuts down or otherwise finishes using the driver.
 
 If you know a driver's geode handle, you can easily retrieve information 
-about it with the routine GeodeInfoDriver(). This returns a structure of 
-type DriverInfoStruct, which contains the driver's type (DriverType), the 
+about it with the routine **GeodeInfoDriver()**. This returns a structure of 
+type **DriverInfoStruct**, which contains the driver's type (**DriverType**), the 
 driver's attributes, and a far pointer to the driver's strategy routine. Many 
 driver types have an expanded information structure, of which 
 DriverInfoStruct is just the first field. Video driver information structures, 
@@ -558,9 +555,9 @@ is shown below.
 
 ~~~
 typedef struct {
-    void			(*DIS_strategy)();
-    DriverAttrs			DIS_driverAttributes;
-    DriverType			DIS_driverType;
+    void         (*DIS_strategy)();
+    DriverAttrs  DIS_driverAttributes;
+    DriverType   DIS_driverType;
 } DriverInfoStruct;
 ~~~
 
@@ -568,7 +565,7 @@ The DIS_strategy field of the structure contains a pointer to the driver's
 strategy routine in fixed memory. After the driver has been loaded, its 
 strategy routine is called directly with a driver function name.
 
-The DIS_driverAttributes is an attribute record of type DriverAttrs, the 
+The DIS_driverAttributes is an attribute record of type **DriverAttrs**, the 
 flags of which are shown below:
 
 DA_FILE_SYSTEM  
@@ -579,8 +576,7 @@ This flag indicates that the driver is used for a
 character-oriented device.
 
 DA_HAS_EXTENDED_INFO  
-This flag indicates that the driver has a DriverExtendedInfo 
-structure.
+This flag indicates that the driver has a **DriverExtendedInfo** structure.
 
 The DIS_driverType contains the type of driver described by the information 
 structure. The types that may be specified in this field are listed below:
@@ -629,7 +625,7 @@ functionality.
 When you want a driver to perform one of its functions, you must call its 
 strategy routine. The strategy routine typically takes a number of 
 parameters, one of which is the function the driver should perform. The 
-DriverInfoStruct contains a far pointer to the strategy routine; your 
+**DriverInfoStruct** contains a far pointer to the strategy routine; your 
 application should store this far pointer and call it directly any time one of 
 the driver's functions is needed. However, because the driver may be put in 
 a different location each time it's loaded, you should not save the pointer in a 
@@ -639,7 +635,7 @@ interfaces as well as their standard driver interface; this allows routines to
 be written in C. 
 
 GEOS maintains default drivers for the entire system. The types of default 
-drivers are described by GeodeDefaultDriverType; all the types are shown 
+drivers are described by **GeodeDefaultDriverType**; all the types are shown 
 below. They are called default drivers because the default for each category 
 of driver used by the system is stored in the GEOS.INI file. GEOS will, upon 
 startup, load in the default driver of each category.
@@ -682,10 +678,10 @@ Some systems will use a task switcher; in order for GEOS to be
 a task in one of these, it must have a default task driver.
 
 To retrieve the default that GEOS is using, call the routine 
-GeodeGetDefaultDriver() with the appropriate driver type (a member of 
-the type GeodeDefaultDriverType). This routine will return the geode 
+**GeodeGetDefaultDriver()** with the appropriate driver type (a member of 
+the type **GeodeDefaultDriverType**). This routine will return the geode 
 handle of the default driver of that type. To set a new default driver for a 
-specified driver type, use GeodeSetDefaultDriver(). This routine takes a 
+specified driver type, use **GeodeSetDefaultDriver()**. This routine takes a 
 geode handle and a driver type and sets the system default for that type. 
 Typically, system defaults will be set only by the Preferences Manager 
 application.
@@ -758,7 +754,7 @@ following sections.
 GeodeGetAppObject()
 
 GEOS offers a routine for retrieving the optr of an application's 
-GenApplication object. GeodeGetAppObject() takes the process handle of 
+GenApplication object. **GeodeGetAppObject()** takes the process handle of 
 the Process object of the application. It returns the optr of the application's 
 GenApplication object.
 
@@ -779,20 +775,19 @@ should be placed. This routine may only be used on open geode files, and it
 returns the base offset and size of the resource. You will probably not need to 
 use this routine.
 
-**GeodeGetInfo()** takes a geode handle, a GeodeGetInfoType parameter, 
+**GeodeGetInfo()** takes a geode handle, a **GeodeGetInfoType** parameter, 
 and a buffer appropriate for the return information. It returns the 
-appropriate values as specified in the GeodeGetInfoType parameter. (This 
+appropriate values as specified in the **GeodeGetInfoType** parameter. (This 
 parameter specifies what type of information is sought about the geode; the 
 routine can return the geode's attributes, geode type, release level, protocol, 
-token ID, or permanent name.) The possible values of GeodeGetInfoType 
+token ID, or permanent name.) The possible values of **GeodeGetInfoType** 
 are shown below:
 
 GGIT_ATTRIBUTES  
 This indicates the geode's attributes should be returned.
 
 GGIT_TYPE  
-This indicates the geode's type should be returned (type 
-GeodeType).
+This indicates the geode's type should be returned (type **GeodeType**).
 
 GGIT_GEODE_RELEASE  
 This indicates the geode's release numbers should be returned.
@@ -840,10 +835,10 @@ each thread and application.
 **GeodeFlushQueue()** flushes all events from one queue and synchronously 
 places them all in another queue (events may not simply be tossed out).
 
-**QueueGetMessage()** combined with ObjDispatchMessage() removes the 
+**QueueGetMessage()** combined with **ObjDispatchMessage()** removes the 
 first event from the given event queue and handles it via a callback routine. 
 A far pointer to the callback routine in memory must be passed. Typically 
-these will be used only by the assembly ObjMessage() routine used by the 
+these will be used only by the assembly **ObjMessage()** routine used by the 
 kernel; some other applications of this routine may be used, though. For 
 example, the sound driver uses a note queue unassociated with objects and 
 messages. The callback routine therefore gets the "event" (note) and pretends 
@@ -862,11 +857,11 @@ Tools," Chapter 10 of the Tools Reference Manual.
 
 ##### 6.1.8.1 Release Numbers
 
-The release number is a ReleaseNumber structure which consists of four 
+The release number is a **ReleaseNumber** structure which consists of four 
 components: The RN_major and RN_minor numbers are the most significant. 
 The RN_change and RN_engineering numbers are less significant and are 
 used primarily to indicate non-released or running upgrade types of changes 
-to the geode. The ReleaseNumber of a geode or VM file is stored in the file's 
+to the geode. The **ReleaseNumber** of a geode or VM file is stored in the file's 
 FEA_RELEASE extended attribute, and its structure is shown below:
 
 ~~~
@@ -884,17 +879,17 @@ checking or any other validation of files, though they are used during
 installation procedures.
 
 To retrieve the release number of a given geode, use the routine 
-GeodeGetInfo(). Release levels should be set at compile time and are not 
+**GeodeGetInfo()**. Release levels should be set at compile time and are not 
 changeable at run-time.
 
 ##### 6.1.8.2 Protocol Numbers
 
-The protocol number is a structure of type ProtocolNumber stored in the 
+The protocol number is a structure of type **ProtocolNumber** stored in the 
 file's FEA_PROTOCOL extended attribute. Each GEOS geode and data file has 
 a protocol level associated with it. The protocol level is used for compatibility 
 checking for both geodes and documents.
 
-The ProtocolNumber structure consists of two parts, the major protocol 
+The **ProtocolNumber** structure consists of two parts, the major protocol 
 and the minor protocol. This structure is shown below:
 
 ~~~
@@ -934,8 +929,8 @@ documents are not loaded by old applications or vice versa (unless you take
 the necessary conversion steps). When opening a document, you can check its 
 protocol by checking the document file's extended attribute FEA_PROTOCOL. 
 If the protocol level needs to be changed (after conversions have been done, 
-of course), you can change them by setting FEA_PROTOCOL. (See "File 
-System," Chapter 17.)
+of course), you can change them by setting FEA_PROTOCOL. (See ["File 
+System", Chapter 17](cfile.md).)
 
 A few examples of when minor and major protocols should be incremented 
 follow. Keep in mind that this list is by no means exhaustive.
@@ -973,15 +968,15 @@ Every geode in the system has a "private data" area, a space set aside in its
 core block. This private data is used primarily by library geodes, when each 
 of the library's clients uses its own copy of a particular data structure that 
 gets manipulated by the library. The private data mechanism is used in the 
-GEOS implementation of malloc(), for example (though you need not know 
-this to use malloc()).
+GEOS implementation of **malloc()**, for example (though you need not know 
+this to use **malloc()**).
 
 Private memory may be allocated, written to, read from, and freed by the 
 library. The library does not have to allocate a block for each geode and 
-maintain its own handle table; the use of the GeodePriv-() routines 
+maintain its own handle table; the use of the **GeodePriv-()** routines 
 automatically manages this.
 
-GeodePrivAlloc() reserves a given number of contiguous words for the 
+**GeodePrivAlloc()** reserves a given number of contiguous words for the 
 library within the private data of all geodes in the system. The memory space 
 is reserved but is not actually allocated for a given geode until it is used 
 (written to); this is done for optimization purposes. This routine will return 
@@ -989,12 +984,12 @@ a tag pointing to where the reserved words begin. This tag is used when
 reading, writing, or freeing the private data. If the memory could not be 
 allocated, the routine will return zero.
 
-GeodePrivWrite() and GeodePrivRead() write to and read from the 
+**GeodePrivWrite()** and **GeodePrivRead()** write to and read from the 
 private data space. They take similar parameters: a geode handle, the tag as 
-returned by GeodePrivAlloc(), the total number of words to be written or 
-read, and a pointer to a locked or fixed buffer. In GeodePrivWrite(), the 
+returned by **GeodePrivAlloc()**, the total number of words to be written or 
+read, and a pointer to a locked or fixed buffer. In **GeodePrivWrite()**, the 
 buffer will be passed containing the words to be written; in 
-GeodePrivRead(), the buffer will be passed empty and returned containing 
+**GeodePrivRead()**, the buffer will be passed empty and returned containing 
 the words read.
 
 Typically, the geode handle passed will be zero; this indicates that the current 
@@ -1005,9 +1000,9 @@ private data affected. Thus, a library can use the same code to store different
 data for each geode that uses it; neither the library nor the geode needs to 
 know that other geodes are also using the same routines.
 
-GeodePrivFree() frees a given number of words from all geodes' private 
+**GeodePrivFree()** frees a given number of words from all geodes' private 
 data. It needs to be passed only the number of words to be freed and the tag 
-as returned by GeodePrivAlloc().
+as returned by **GeodePrivAlloc()**.
 
 ### 6.2 Creating Icons
 
@@ -1039,7 +1034,7 @@ database file exists on a network drive and may be supplemented with a local
 token database. By default, if a shared database file exists, it will be opened 
 read-only in addition to the read/write local file. You can open and close only 
 the local database file, however, with the routines 
-TokenOpenLocalTokenDB() and TokenCloseLocalTokenDB().
+**TokenOpenLocalTokenDB()** and **TokenCloseLocalTokenDB()**.
 
 Every GEOS file has a token. The token is an index into the token database. 
 When GeoManager scans a directory, it grabs the token from each file and 
@@ -1056,14 +1051,14 @@ default DOS icon (of which there are two: one for executables and one for
 non-executables).
 
 The index into the token database consists of two parts and is of type 
-GeodeToken. This structure contains four text characters as well as the 
+**GeodeToken**. This structure contains four text characters as well as the 
 manufacturer ID number of the geode's manufacturer. The structure's 
 definition is shown below:
 
 ~~~
 typedef struct {
-    TokenChars				GT_chars;
-    ManufacturerID				GT_manufID;
+    TokenChars      GT_chars;
+    ManufacturerID  GT_manufID;
 } GeodeToken;
 
 typedef char TokenChars[TOKEN_CHARS_LENGTH];
@@ -1074,17 +1069,16 @@ header by the Glue linker, which takes the values from the geode's geode
 parameters (.gp) file. The two fields used from the .gp file are tokenchars for 
 the four characters and tokenid for the manufacturer ID.
 
-A GeodeToken structure in the token database file can also be filled in when 
+A **GeodeToken** structure in the token database file can also be filled in when 
 GeoManager scans a directory. If the header of a particular application's .geo 
 file does not have a recognized token, GeoManager will launch the 
 application in "engine" mode, loading its GenApplication object. It will 
 request that the application object then install its icon into the token 
-database file (GenApplicationClass knows how to do this).
+database file (**GenApplicationClass** knows how to do this).
 
 The token database file contains one entry for each token that has been 
 installed. Each time a new token and icon is encountered, a new entry is 
-added by the UI. This happens automatically when GeoManager scans a 
-directory.
+added by the UI. This happens automatically when GeoManager scans a directory.
 
 ### 6.2.2 Managing the Token Database File
 
@@ -1100,20 +1094,20 @@ In nearly all cases, you will create your application's icon with the icon tool
 and not worry about it again. However, the following routines allow you to 
 add, change, access, and remove entries from the token database.
 
-TokenLoadTokenBlock(), TokenLoadTokenChunk(), and 
-TokenLoadTokenBuffer() load a TokenEntry structure into memory (a 
+**TokenLoadTokenBlock()**, **TokenLoadTokenChunk()**, and 
+**TokenLoadTokenBuffer()** load a **TokenEntry** structure into memory (a 
 newly allocated block, a newly allocated chunk, or a locked buffer). The 
 TokenEntry structure contains information about the token, the geode's 
 release number, and the geode's protocol number. This structure does not 
 actually contain the monikers used for the icon.
 
-TokenLookupMoniker() gets the specific moniker of a token entry given 
-the display type (CGA, EGA, VGA, etc.), the entry's GeodeToken structure, 
+**TokenLookupMoniker()** gets the specific moniker of a token entry given 
+the display type (CGA, EGA, VGA, etc.), the entry's **GeodeToken** structure, 
 and search flags. If the moniker is found, the entry identifier (database group 
 and ID numbers) of the moniker are returned. You can use these return 
 values to lock the moniker into memory (see below).
 
-TokenLockTokenMoniker() locks a moniker into memory given its entry 
+**TokenLockTokenMoniker()** locks a moniker into memory given its entry 
 identifier. This routine returns a pointer to a locked block and the chunk 
 handle of the chunk containing the locked moniker. A moniker should always 
 be locked before it is drawn; this keeps it from moving in memory while it is 
@@ -1121,28 +1115,28 @@ being accessed. The routine TokenUnlockTokenMoniker() unlocks a
 previously locked moniker when given the moniker's segment address. This 
 unlocks the entire block, not just the individual moniker.
 
-TokenLoadMonikerBlock(), TokenLoadMonikerChunk(), and 
-TokenLoadMonikerBuffer() load a specific moniker into memory from the 
+**TokenLoadMonikerBlock()**, **TokenLoadMonikerChunk()**, and 
+**TokenLoadMonikerBuffer()** load a specific moniker into memory from the 
 token database file (into a newly allocated block, a newly allocated chunk, or 
-a locked buffer). It takes the same parameters as TokenLookupMoniker() 
+a locked buffer). It takes the same parameters as **TokenLookupMoniker()** 
 but returns the handle and chunk handle of the loaded moniker. If using this 
 routine, simply lock the memory block rather than using 
-TokenLockTokenMoniker().
+**TokenLockTokenMoniker()**.
 
-TokenGetTokenInfo() finds a token when passed its tokenchars and 
+**TokenGetTokenInfo()** finds a token when passed its tokenchars and 
 tokenid and returns the token's flags. If no token exists with the passed 
 characteristics, it will return an error flag.
 
-TokenDefineToken() adds a new token and its moniker list to the token 
+**TokenDefineToken()** adds a new token and its moniker list to the token 
 database. If the given token already exists, the new one will replace the old 
 one. The token identifier (tokenchars, tokenid), handle and chunk handle of 
 the moniker list, and flags of the new token must be passed.
 
-TokenRemoveToken() removes a given token and its moniker list from the 
+**TokenRemoveToken()** removes a given token and its moniker list from the 
 token database file. It returns only a flag indicating whether the token was 
 successfully removed or not.
 
-TokenListTokens() returns a list of the tokens in the token database. It is 
+**TokenListTokens()** returns a list of the tokens in the token database. It is 
 passed three arguments:
 
 + A set of TokenRangeFlags, which specifies which tokens should be 
@@ -1160,12 +1154,12 @@ manufacturer's ID.
 + A manufacturer ID. This field is ignored if TRF_ONLY_PASSED_MANUFID 
 was not passed.
 
-TokenListTokens() allocates a global memory block and copies all the 
+**TokenListTokens()** allocates a global memory block and copies all the 
 specified tokens into that block. It leaves a blank space at the beginning of 
 the block; this space is the size specified by the second argument. The rest of 
-the block is an array of GeodeToken structures. TokenListTokens() 
+the block is an array of **GeodeToken** structures. **TokenListTokens()** 
 returns a dword. The lower word of the return value is the handle of the 
-global memory block; the upper word is the number of GeodeToken 
+global memory block; the upper word is the number of **GeodeToken** 
 structures in that block.
 
 ### 6.3 Saving User Options
@@ -1294,8 +1288,8 @@ closing braces so GEOS doesn't mistake them for the blob delimiters.
 
 Comments may be added to the INI file by putting a semicolon at the 
 beginning of the line. The file has several standard categories and keys that 
-can be set within them. These are detailed in "The INI File," Chapter 9 of the 
-Tools Reference Manual.
+can be set within them. These are detailed in ["The INI File," Chapter 9 of the 
+Tools Reference Manual](../Tools/tini.md).
 
 ---
 Code Display 6-3 Example GEOS.INI File Entries
@@ -1366,16 +1360,16 @@ the file, another reverts it from the last save, the third checks the time the
 file was last modified, and the fourth commits any pending INI file changes 
 to disk.
 
-To save the local GEOS.INI, use the routine InitFileSave(); this saves the 
+To save the local GEOS.INI, use the routine **InitFileSave()**; this saves the 
 changes to the backup file. It requires no parameters and returns an error 
-flag if the file could not be saved. InitFileRevert() reverts the GEOS.INI file 
+flag if the file could not be saved. **InitFileRevert()** reverts the GEOS.INI file 
 to its state the last time it was backed up. This routine takes no parameters, 
 and it returns an error flag if the revert can not be accomplished.
 
-InitFileGetTimeLastModified() returns the system counter's value stored 
+**InitFileGetTimeLastModified()** returns the system counter's value stored 
 the last time GEOS.INI was modified.
 
-InitFileCommit() takes all the changes made since the file was last 
+**InitFileCommit()** takes all the changes made since the file was last 
 modified and flushes them to disk. This commits all the changes and should 
 be used only from the kernel. It should not be used by applications.
 
@@ -1398,24 +1392,24 @@ passed. The key name is also specified as a null-terminated character string;
 again, a pointer to the string is passed. The third parameter is specific to the 
 routine and contains the value to which the key will be set.
 
-InitFileWriteData() writes a number of bytes into the INI buffer, and it 
+**InitFileWriteData()** writes a number of bytes into the INI buffer, and it 
 takes four parameters. The additional parameter is the size of the data. The 
 data will be converted into ASCII hexadecimal when the file is saved and will 
 be converted back when the key is read.
 
-InitFileWriteString() takes a pointer to the null-terminated character 
+**InitFileWriteString()** takes a pointer to the null-terminated character 
 string to be written. If the character string contains carriage returns or line 
 feeds, it will automatically be converted into a blob.
 
-InitFileWriteStringSection() writes a new string section (a portion of a 
+**InitFileWriteStringSection()** writes a new string section (a portion of a 
 blob) into the specified entry. The specified entry must be a blob already, and 
 the string section will be appended to the blob. A string section is a line of a 
 blob delineated by line feeds or carriage returns.
 
-InitFileWriteInteger() takes as its third argument the integer to be 
+**InitFileWriteInteger()** takes as its third argument the integer to be 
 written.
 
-InitFileWriteBoolean() takes a Boolean value. A zero value represents 
+**InitFileWriteBoolean()** takes a Boolean value. A zero value represents 
 false, and any nonzero value represents true. When looking at the INI file 
 with a text editor, the Boolean value will appear as a text string of either 
 "true" or "false"; it will, however, be interpreted as a Boolean rather than a 
@@ -1431,7 +1425,7 @@ InitFileReadStringSectionBlock(), InitFileReadInteger(),
 InitFileReadBoolean()
 
 When you want to check what a key is set to in the INI file, you should use 
-one of the InitFileRead-() routines. These search the local INI file first and 
+one of the **InitFileRead-()** routines. These search the local INI file first and 
 then each of the additional INI files in the order they were loaded. They will 
 return the first occurrence of a given key, so if the key exists in both your local 
 INI file and another INI file, these routines will return only the local value.
@@ -1442,38 +1436,38 @@ a pointer to the string is passed. The second is the key of the entry. This, too
 is stored as a null-terminated ASCII string, and a pointer to the string is 
 passed.
 
-InitFileReadBoolean() returns the Boolean value of the given key. If the 
+**InitFileReadBoolean()** returns the Boolean value of the given key. If the 
 key is set "false," a value of zero (FALSE) will be returned. If the key is set 
 "true," a nonzero value will be returned (-1, the constant TRUE).
 
-InitFileReadInteger() returns the integer value of the given key.
+**InitFileReadInteger()** returns the integer value of the given key.
 
-InitFileReadDataBuffer() and InitFileReadDataBlock() both return 
+**InitFileReadDataBuffer()** and **InitFileReadDataBlock()** both return 
 the data bytes stored in the given key. The first, however, takes the address 
 of a buffer already allocated and puts the data into the buffer. The second 
 allocates a new block on the heap and puts the data into it. If you don't know 
-the size of the data, you should use InitFileReadDataBlock().
+the size of the data, you should use **InitFileReadDataBlock()**.
 
-InitFileReadStringBuffer() and InitFileReadStringBlock() both 
+**InitFileReadStringBuffer()** and **InitFileReadStringBlock()** both 
 return the null-terminated string stored in the given key. In both cases, curly 
 braces will be stripped off of blobs and backslash characters will be removed 
 if appropriate. The first, however, takes the address of a buffer already 
 allocated and puts the string in the buffer. The second allocates a new block 
 on the heap and returns the string in it. If you don't know the approximate 
-size of the string, use InitFileReadStringBlock().
+size of the string, use **InitFileReadStringBlock()**.
 
-InitFileReadStringSectionBuffer() and its counterpart 
-InitFileReadStringSectionBlock() both return a null-terminated section 
+**InitFileReadStringSectionBuffer()** and its counterpart 
+**InitFileReadStringSectionBlock()** both return a null-terminated section 
 of the string stored in the given key. A string section is defined as any number 
 of contiguous printable ASCII characters and is delimited by carriage returns 
 or line feeds. These routines take the number of the string section desired 
-and return the section (if it exists). InitFileReadStringSectionBuffer() 
+and return the section (if it exists). **InitFileReadStringSectionBuffer()** 
 takes the address of a buffer already allocated on the heap and returns the 
-string section in the buffer. InitFileReadStringSectionBlock() allocates a 
+string section in the buffer. **InitFileReadStringSectionBlock()** allocates a 
 new block on the heap and returns the string section in it. You should use this 
 routine if you don't know the approximate size of the string section.
 
-InitFileEnumStringSection() enumerates the specified blob, executing a 
+**InitFileEnumStringSection()** enumerates the specified blob, executing a 
 specified callback routine on each string section within the blob.
 
 ##### 6.3.2.5 Deleting Items from the INI File
@@ -1482,14 +1476,14 @@ InitFileDeleteEntry(), InitFileDeleteCategory(),
 InitFileDeleteStringSection()
 
 Besides reading and writing data, you can delete categories and keys that 
-were previously entered. InitFileDeleteEntry() takes pointers to both the 
+were previously entered. **InitFileDeleteEntry()** takes pointers to both the 
 null-terminated category name and the null-terminated key name and 
-deletes the entry. InitFileDeleteCategory() takes only a pointer to the 
+deletes the entry. **InitFileDeleteCategory()** takes only a pointer to the 
 null-terminated category name and deletes the entire category, including all 
 the keys stored under it.
 
 In addition, you can delete a single string section from a specified blob. 
-InitFileDeleteStringSection() takes the category and key names of the 
+**InitFileDeleteStringSection()** takes the category and key names of the 
 blob as well as the index of the string section, and it deletes the string section. 
 If the string section does not exist or if either the key or category can not be 
 found, the routine will return an error flag.
@@ -1506,9 +1500,9 @@ execute a DOS-based program.
 TimerGetDateAndTime(), TimerSetDateAndTime()
 
 The system clock reflects the current date and time of day. 
-TimerGetDateAndTime() takes a pointer to a TimerDateAndTime 
+**TimerGetDateAndTime()** takes a pointer to a **TimerDateAndTime** 
 structure and fills it with the current year, month, day, day of week, hour, 
-minute, and second. TimerSetDateAndTime() sets the current date and 
+minute, and second. **TimerSetDateAndTime()** sets the current date and 
 time to the values in the passed structure. It is unusual for any application 
 other than the Preferences Manager to change the system clock.
 
@@ -1548,13 +1542,13 @@ thing, GEOS will wake up when the real-time timer goes off. (All other
 timers are ignored under these conditions.)
 
 All timers except sleep timers are created and started with the routine 
-TimerStart(), and continual timers can be destroyed with TimerStop(). 
-TimerStop() may also be used to prematurely stop a one-shot timer, though 
+**TimerStart()**, and continual timers can be destroyed with **TimerStop()**. 
+**TimerStop()** may also be used to prematurely stop a one-shot timer, though 
 if the one-shot sent a message, the message could be in the recipient's queue 
-even after TimerStop() was called. Sleep timers are created and started 
-with TimerSleep(), and they do not need to be stopped.
+even after **TimerStop()** was called. Sleep timers are created and started 
+with **TimerSleep()**, and they do not need to be stopped.
 
-An additional routine, TimerGetCount(), returns the current system 
+An additional routine, **TimerGetCount()**, returns the current system 
 counter. The system counter contains the number of ticks counted since 
 GEOS was started.
 
@@ -1566,13 +1560,13 @@ SysGetPenMode(), SysGetDosEnvironment()
 Occasionally, a geode will need to query the kernel about the state or 
 configuration of the system. GEOS offers five routines for this:
 
-SysStatistics() returns a structure of type SysStats. This structure 
+**SysStatistics()** returns a structure of type **SysStats**. This structure 
 contains information about how busy the CPU is, how much swap activity is 
 going on, how many context switches occurred in the last second, how many 
 interrupts occurred in the last second, and how many runnable threads exist. 
 You can not set or otherwise alter this structure.
 
-SysGetInfo() returns a particular statistic about the current system status. 
+**SysGetInfo()** returns a particular statistic about the current system status. 
 It can return a number of different statistics including the CPU speed, the 
 total number of handles in the handle table, the total heap size, the total 
 number of geodes running, and the size of the largest free block on the heap. 
@@ -1580,15 +1574,15 @@ Most of the information your application can request with this routine can be
 garnered from the Perf performance meter; it is easiest to use Perf when 
 debugging, though a few geodes will need to know this information.
 
-SysGetConfig() returns information about the current system's 
+**SysGetConfig()** returns information about the current system's 
 configuration including the processor type and machine type. It also returns 
 flags about the particular session of GEOS including whether this session was 
 started with Swat, whether a coprocessor exists, and other information.
 
-SysGetPenMode() returns TRUE if GEOS is currently running on a 
+**SysGetPenMode()** returns TRUE if GEOS is currently running on a 
 pen-based machine.
 
-SysGetDosEnvironment() returns the value of a DOS environment 
+**SysGetDosEnvironment()** returns the value of a DOS environment 
 variable. It is passed a string representing the variable name and returns a 
 string representing the value.
 
@@ -1596,32 +1590,32 @@ string representing the value.
 
 DosExec(), SysShutdown()
 
-There are two ways for a geode to shut down GEOS. The first, DosExec(), 
+There are two ways for a geode to shut down GEOS. The first, **DosExec()**, 
 shuts the system down to run a program under DOS, returning after the DOS 
 program has finished-unless a task-switch driver is in use, in which case 
 the system will create a new task and cause the task-switcher to switch to 
-the new task. The second, SysShutdown(), forces the system to shut itself 
+the new task. The second, **SysShutdown()**, forces the system to shut itself 
 down completely. Neither of these routines is commonly used by anything 
 other than the kernel, GeoManager, special "launcher" programs, or the UI. 
 Their use by other libraries or applications is discouraged unless absolutely 
 necessary.
 
-DosExec() takes several parameters including the pathname of the DOS 
+**DosExec()** takes several parameters including the pathname of the DOS 
 program to be run, arguments for the program, an optional disk handle of the 
 disk that contains the program to be run, the optional directory and disk 
 handle in which the program should be executed, and a record of 
 DosExecFlags. If the return value is nonzero, an error occurred in loading 
-the DOS program, and you can use ThreadGetError() to check what error 
-occurred. Note that DosExec() always returns. Applications should not rely 
-on DosExec() shutting the system down; if a task switcher is present, GEOS 
+the DOS program, and you can use **ThreadGetError()** to check what error 
+occurred. Note that **DosExec()** always returns. Applications should not rely 
+on **DosExec()** shutting the system down; if a task switcher is present, GEOS 
 will be swapped out rather than shut down.
 
-SysShutdown() causes GEOS to exit in one of several ways. This routine 
+**SysShutdown()** causes GEOS to exit in one of several ways. This routine 
 should be passed a shutdown mode. If the mode is SST_CLEAN, 
 SST_RESTART, SST_SUSPEND, or SST_CLEAN_FORCED, the routine will 
 return; otherwise, it will not return and the shutdown will commence. If 
-SST_CLEAN is passed, the shutdown may be aborted after SysShutdown() 
-returns. You can have SysShutdown() cause GEOS to reboot itself after 
+SST_CLEAN is passed, the shutdown may be aborted after **SysShutdown()** 
+returns. You can have **SysShutdown()** cause GEOS to reboot itself after 
 shutting down (as the Preferences Manager application does for certain 
 preferences settings), but this starts GEOS fresh. This routine is very rarely 
 used by anything other than the UI, the kernel, or the Preferences Manager 
@@ -1630,9 +1624,9 @@ application.
 If something else (typically the UI or task switcher) shuts the system down, 
 objects that register for shutdown notification will receive 
 MSG_META_CONFIRM_SHUTDOWN. The application should call 
-SysShutdown() with the mode SST_CONFIRM_START; this allows the object 
+**SysShutdown()** with the mode SST_CONFIRM_START; this allows the object 
 to have exclusive rights for asking the user to confirm the shutdown (when 
-the object is finished with the user interaction, it can call SysShutdown() 
+the object is finished with the user interaction, it can call **SysShutdown()** 
 with SST_CONFIRM_END to release exclusive access). This is useful if your 
 application or library has an ongoing operation and wants to verify the 
 shutdown with the user.
@@ -1674,13 +1668,13 @@ the line will be left out.
 
 EC_ERROR  
 This macro halts the execution of the EC version of a program 
-by calling FatalError() with a specified error code. The call to 
-FatalError() will not be included in the non-EC version.
+by calling **FatalError()** with a specified error code. The call to 
+**FatalError()** will not be included in the non-EC version.
 
 EC_ERROR_IF  
 This macro works like EC_ERROR, above, but it also allows you 
-to set a condition for whether FatalError() will be called. If 
-the condition is met, FatalError() will be called.
+to set a condition for whether **FatalError()** will be called. If 
+the condition is met, **FatalError()** will be called.
 
 NEC  
 This macro adds the specified line of code to the non-EC version 
@@ -1689,8 +1683,8 @@ macro.)
 
 EC_BOUNDS  
 This macro checks the validity of a specified address (pointer) 
-by calling the ECCheckBounds() routine. If the pointer is out 
-of bounds, ECCheckBounds() will call FatalError(). This 
+by calling the **ECCheckBounds()** routine. If the pointer is out 
+of bounds, **ECCheckBounds()** will call **FatalError()**. This 
 macro may only add the bounds check to the EC version.
 
 An example of use of these macros is shown in Code Display 6-4.
@@ -1702,26 +1696,25 @@ Code Display 6-4 EC Macros
  * line shown below exists within a particular function or method. */
 
 /* The EC macro adds a line of code to the EC version. Its format is
- *	EC(line)		where line is the line of code to be added.
+ *   EC(line)           where line is the line of code to be added.
  * Note that the NEC macro is similar. */
-    EC( @call MyErrorDialogBox::MSG_MY_ERR_PRINT_ERROR(); )
-    NEC( @call MyErrorDialogBox::MSG_MY_ERR_PRINT_NO_ERROR(); )
+     EC( @call MyErrorDialogBox::MSG_MY_ERR_PRINT_ERROR(); )
+     NEC( @call MyErrorDialogBox::MSG_MY_ERR_PRINT_NO_ERROR(); )
 
 /* The EC_ERROR macro adds a call to FatalError() to the EC version. Its format is
- *	EC_ERROR(code)		where code is the error code to be called. */
-    EC_ERROR(ERROR_ATTR_NOT_FOUND)
+ *   EC_ERROR(code)     where code is the error code to be called. */
+     EC_ERROR(ERROR_ATTR_NOT_FOUND)
 
 /* The EC_ERROR_If macro is similar to EC_ERROR but is conditional. Its format is
- *	EC_ERROR_IF(test, code)			where test is a Boolean value and code is the
+ *   EC_ERROR_IF(test, code)      where test is a Boolean value and code is the
  * error code to be called. */
-    lockVariable = MyAppCheckIfLocked();					/* TRUE if inaccessible. */
-    EC_ERROR_IF(lockVariable, ERROR_ACCESS_DENIED)						/* Error if inaccessible. */
+     lockVariable = MyAppCheckIfLocked();                 /* TRUE if inaccessible. */
+     EC_ERROR_IF(lockVariable, ERROR_ACCESS_DENIED)       /* Error if inaccessible. */
 
-/* The EC_BOUNDS macro adds a call to ECCheckBounds() to the EC version.
- * Its format is
- *	EC_BOUNDS(addr)		where addr is the address to be checked. */
-    myPointer = MyAppGetMyPointer();
-    EC_BOUNDS(myPointer)
+/* The EC_BOUNDS macro adds a call to ECCheckBounds() to the EC version. Its format is
+ *   EC_BOUNDS(addr)              where addr is the address to be checked. */
+     myPointer = MyAppGetMyPointer();
+     EC_BOUNDS(myPointer)
 ~~~
 
 #### 6.5.2	Special EC Routines
@@ -1732,10 +1725,10 @@ CFatalError(), CWarningNotice()
 While using Swat and the EC version, you can set and retrieve the current 
 level of error checking employed. The level is set with a record of flags, each 
 of which determines whether a certain type of checking is turned on. This 
-record is of type ErrorCheckingFlags. You can retrieve it with 
-SysGetECLevel() and set it with SysSetECLevel().
+record is of type **ErrorCheckingFlags**. You can retrieve it with 
+**SysGetECLevel()** and set it with **SysSetECLevel()**.
 
-SysNotify() puts up the standard error dialog box-white with a black 
+**SysNotify()** puts up the standard error dialog box-white with a black 
 frame. This routine is available in both the EC and the non-EC versions of the 
 kernel. This is the box used by the kernel to present unrecoverable errors to 
 the user. You can also call it up and allow the user any of five options: retry, 
@@ -1744,11 +1737,11 @@ but it can be used for other user notification as well. (Note that with the "exi
 and "reboot" options, this routine will not return. Note also that only certain 
 combinations of the five options are supported.)
 
-The CFatalError() and CWarningNotice() routines provide run-time and 
-compile-time error or warning messages. The CFatalError() routine calls 
-the kernel's FatalError function, which puts up an error dialog box and, in 
+The **CFatalError()** and **CWarningNotice()** routines provide run-time and 
+compile-time error or warning messages. The **CFatalError()** routine calls 
+the kernel's **FatalError** function, which puts up an error dialog box and, in 
 Swat, causes Swat to hit a breakpoint so you can debug the error. 
-CWarningNotice() may be put in error-checking code to make the compiler 
+**CWarningNotice()** may be put in error-checking code to make the compiler 
 put up a compile-time warning note.
 
 ### 6.6 Inter-Application Communication
@@ -1790,7 +1783,7 @@ the application is running. Often, all you will know is something like, "I want
 to send a message to SpiffyWrite".
 
 GEOS uses a client-server model of inter-application communication. Every 
-GeodeToken corresponds to a server. Whenever an application is launched, 
+**GeodeToken** corresponds to a server. Whenever an application is launched, 
 GEOS checks to see if there is a server-list corresponding to the application's 
 token. If there is, GEOS adds the app's Application object to the server-list; if 
 there is not, GEOS creates a server-list and adds the Application object to 
@@ -1799,7 +1792,7 @@ that list.
 For example, suppose the user launches a single copy of SpiffyWrite; this 
 application has a manufacturer-ID of MANUFACTURER_ID_SPIFFYWARE, 
 and the token characters "SWRI". GEOS will check if there's a server-list for 
-that GeodeToken. Let us suppose there isn't such a list; GEOS will 
+that **GeodeToken**. Let us suppose there isn't such a list; GEOS will 
 automatically create one, and add SpiffyWrite's Application object to that 
 list. The Application object is now said to be a server for the list.
 
@@ -1846,13 +1839,13 @@ copies of SpiffyWrite were running at once, each of their Application objects
 would be a server for the same server-list. Furthermore, any object can make 
 itself a server for any list. All servers will receive copies of every message 
 sent to the server list. To distinguish between different servers for a list, 
-every server for a list is assigned a distinct ServerNumber. If it chooses to, 
+every server for a list is assigned a distinct **ServerNumber**. If it chooses to, 
 a client can specify that a message be sent only to the server with a specific 
 number.
 
 #### 6.6.2 GenApplicationClass Behavior
 
-GenApplicationClass is built to support IACP automatically. If a server or 
+**GenApplicationClass** is built to support IACP automatically. If a server or 
 client object is subclassed from GenApplicationClass, most of the work of 
 supporting IACP is done transparently to the application writer. The 
 following capabilities are built in:
@@ -1880,7 +1873,7 @@ automatically dispatches the message to the appropriate location.
 + An Application object will refuse to quit as long as any client has an open 
 IACP connection to it. (It can, however, be forcibly detached; this happens 
 when the system is shut down, as noted below.). In such a case, the 
-Application object will automatically call IACPShutdownAll() to shut 
+Application object will automatically call **IACPShutdownAll()** to shut 
 down all IACP links it has open, whether it is a client or a server on those 
 links.
 
@@ -1888,14 +1881,14 @@ links.
 MSG_META_IACP_LOST_CONNECTION to all objects on the other side of 
 the link. When an Application object receives this message, it waits until 
 all remaining messages from the link have been handled; it then calls 
-IACPShutdown() for that connection. It also forwards this message to 
+**IACPShutdown()** for that connection. It also forwards this message to 
 all Document objects, so a Document object will know to close itself if the 
 IACP connection was the only reference to it. Again, the Application 
 object does this whether it is a client or a server.
 
 + If the Application object is forcibly detached, it sends itself 
 MSG_GEN_APPLICATIONIACP_SHUTDOWN_ALL_CONNECTIONS. The 
-default handler for this message will call IACPShutdownAll() to shut 
+default handler for this message will call **IACPShutdownAll()** to shut 
 down all IACP links the Application object has open, whether it is a client 
 or a server on those links. You can subclass this message if you need to 
 take some additional action when the IACP connections are severed.
@@ -1906,24 +1899,20 @@ IACPSendMessage(), IACPSendMessageToServer()
 
 Either a client or a server may send messages over an IACP link. Both clients 
 and servers use the same technique. The message sender encapsulates a 
-message, and passes the encapsulated message to IACPSendMessage(). 
-IACPSendMessage() dispatches the message to every object on the other 
+message, and passes the encapsulated message to **IACPSendMessage()**. 
+**IACPSendMessage()** dispatches the message to every object on the other 
 side of the link. For example, if a client passes a message to 
-IACPSendMessage(), that message will be dispatched to every server 
+**IACPSendMessage()**, that message will be dispatched to every server 
 object for the specified list.
 
 IACPSendMessage() is passed five arguments:
 
 + The token for the IACP link.
-
-+ The EventHandle of an encapsulated message.
-
-+ The TravelOption for that message.
-
++ The **EventHandle** of an encapsulated message.
++ The **TravelOption** for that message.
 + An encapsulated completion message; this will be dispatched once each 
 time the first message has been successfully handled.
-
-+ A member of the IACPSide enumerated type. This tells whether the 
++ A member of the **IACPSide** enumerated type. This tells whether the 
 message is being sent by a client or a server. If you pass the value 
 IACPS_CLIENT, the message will be dispatched to all servers; if you pass 
 IACPS_SERVER, the message will be dispatched to all clients.
@@ -1932,11 +1921,11 @@ The message will be dispatched to all geodes on the other side of a link. Note
 that a client need not send the message to the server object per se. It can use 
 the travel options field to direct the message anywhere within the server 
 object's geode. It can also specify the optr of the recipient when it 
-encapsulates the message; in this case, it should pass a TravelOption of -1.
+encapsulates the message; in this case, it should pass a **TravelOption** of -1.
 
 Every time the encapsulated message is successfully handled, the 
 "completion message" will be dispatched. Typically, the completion message 
-is addressed to the object that called IACPSendMessage(), instructing it to 
+is addressed to the object that called **IACPSendMessage()**, instructing it to 
 free global resources that had been allocated for the message.
 
 The routine returns the number of messages that were dispatched. This lets 
@@ -1944,10 +1933,10 @@ the sender know how many completion messages to expect, and lets it
 properly initialize all reference counts to global resources.
 
 A client may choose to send a message to a specific server. It can do this by 
-calling IACPSendMessageToServer(). This takes almost the same 
-arguments as IACPSendMessage(). However, instead of being passed an 
-IACPSide value, it is passed a server number. GEOS will dispatch a single 
-copy of the message to the specified server. IACPSendMessageToServer() 
+calling **IACPSendMessageToServer()**. This takes almost the same 
+arguments as **IACPSendMessage()**. However, instead of being passed an 
+**IACPSide** value, it is passed a server number. GEOS will dispatch a single 
+copy of the message to the specified server. **IACPSendMessageToServer()** 
 returns the number of times the message was dispatched. This will 
 ordinarily be one; however, if the specified server is no longer registered, it 
 will be zero.
@@ -1962,23 +1951,23 @@ to the servers for that list.
 
 IACPConnect(), IACPCreateDefaultLaucnhBlock()
 
-To register as a client for a list, call the routine IACPConnect(). When you 
+To register as a client for a list, call the routine **IACPConnect()**. When you 
 call this routine, you specify which server list you are interested in. If there 
 is no such server list running, you can instruct the kernel to start up the 
 server list, as well as one of the default applications for that list.
 
-IACPConnect() is passed five arguments:
+**IACPConnect()** is passed five arguments:
 
 + The GeodeToken of the list for which you want to register.
 
-+ A set of IACPConnectFlags. The following flags are available:
++ A set of **IACPConnectFlags**. The following flags are available:
 
 IACPF_OBEY_LAUNCH_MODEL  
 This indicates that if GEOS should follow the launch model, 
 which will specify whether the user should be presented a 
 dialog box, asking the user whether an existing application 
 should be used as the server, or a new application launched. If 
-you set this flag, you must pass an AppLaunchBlock(), with 
+you set this flag, you must pass an **AppLaunchBlock()**, with 
 the ALB_appMode field set to 
 MSG_GEN_PROCESS_OPEN_APPLICATION; you must also set 
 IACPF_SERVER_MODE to IACPSM_USER_INTERACTIBLE.
@@ -1995,7 +1984,7 @@ server list will be passed only to that one server.
 
 IACPSM_SERVER_MODE  
 This field is three bits wide; it holds a member of the 
-IACPServerMode enumerated type. This type specifies how 
+**IACPServerMode** enumerated type. This type specifies how 
 the client expects the server to behave. Currently, only two 
 types are supported:
 
@@ -2018,7 +2007,7 @@ IACPF_CLIENT_OD_SPECIFIED was not passed.
 + A pointer to a word. IACPConnect() will write the number of servers on 
 the list to that word.
 
-IACPConnect() returns a word-sized IACPConnection token. You will 
+**IACPConnect()** returns a word-sized **IACPConnection** token. You will 
 need to pass that token when you call another IACP routine to use the 
 connection. It will also return the number of server objects on the list; it 
 returns this value by writing it to the address indicated by the pointer 
@@ -2026,24 +2015,24 @@ passed.
 
 If the server list you indicate is not currently running, IACP may do one of 
 two different things. If you pass a null handle as the third argument, 
-IACPConnect() will fail. It will return the error value 
+**IACPConnect()** will fail. It will return the error value 
 IACP_NO_CONNECTION, and indicate that there are no servers on the 
 specified list.
 
-If you pass an AppLaunchBlock, IACPConnect() will examine that 
+If you pass an **AppLaunchBlock**, **IACPConnect()** will examine that 
 launch block to see what application should be launched to act as a server. 
 The AppLaunchBlock should specify the location and name of the application 
 to open. If the ALB_appRef.AIR_diskHandle field is non-zero, 
-IACPConnect() will look in the specified disk or standard path for an 
-application with the right GeodeToken; otherwise, it will look in the 
+**IACPConnect()** will look in the specified disk or standard path for an 
+application with the right **GeodeToken**; otherwise, it will look in the 
 standard places for an application.
 
-Note that if you pass a launch block to IACPConnect(), you may not alter 
+Note that if you pass a launch block to **IACPConnect()**, you may not alter 
 or free it afterwards. If the application is created, the block you pass will be 
 its launch block; if not, the kernel will free the block automatically. In any 
 event, the caller no longer has access to the block.
 
-If IACPConnect() launches an application, the caller will block until that 
+If **IACPConnect()** launches an application, the caller will block until that 
 application has been created and registers for the server list. If the 
 application does not register for that list, the caller will never unblock. You 
 must therefore make sure that you are launching the right application for the 
@@ -2051,7 +2040,7 @@ list. Note that every application object will automatically register for the
 server list which shares its token.
 
 To create a launch block, you should call 
-IACPCreateDefaultLaunchBlock(). This routine is passed a single 
+**IACPCreateDefaultLaunchBlock()**. This routine is passed a single 
 argument, which specifies how the application will be opened. That 
 argument must be MSG_GEN_PROCESS_OPEN_APPLICATION (the 
 application will be opened as a standard, user-interactible application); 
@@ -2060,7 +2049,7 @@ engine mode, i.e. with no user interface); or
 MSG_GEN_PROCESS_OPEN_CUSTOM (which has an application-specified 
 meaning).
 
-IACPCreateDefaultLaunchBlock() allocates a launch block and sets up 
+**IACPCreateDefaultLaunchBlock()** allocates a launch block and sets up 
 its fields appropriately. As created, the launch block will have the following 
 characteristics:
 
@@ -2068,7 +2057,7 @@ characteristics:
 ALB_diskHandle field) will be SP_DOCUMENT.
 
 + No application directory will be specified in the launch block (i.e. 
-ALB_appRef.AIR_diskHandle will be zero); IACPConnect() will attempt 
+ALB_appRef.AIR_diskHandle will be zero); **IACPConnect()** will attempt 
 to find the application on its own.
 
 + No initial data file will be specified (i.e. ALB_dataFile will be blank).
@@ -2082,10 +2071,10 @@ will be zero).
 + There will be no output descriptor (i.e. ALB_userLoadAckOutput and 
 ALB_userLoadAckMessage will be null.)
 
-IACPCreateDefaultLaunchBlock() returns the handle of the 
+**IACPCreateDefaultLaunchBlock()** returns the handle of the 
 newly-created launch block. Once the block is created, you can alter any of its 
-fields before passing the launch block to IACPConnect(). (Once you pass the 
-launch block to IACPConnect(), you may not alter it any more.)
+fields before passing the launch block to **IACPConnect()**. (Once you pass the 
+launch block to **IACPConnect()**, you may not alter it any more.)
 
 Often a client will want the server to open a specific document. For example, 
 if a desktop-manager is implementing a "print-file" command, it will need to 
@@ -2099,37 +2088,37 @@ register, and close it when you unregister.
 IACPShutdown(), IACPShutdownAll()
 
 If an application no longer needs to interact with a particular server list, it 
-should call IACPShutdown(). This routine is also used by servers which 
+should call **IACPShutdown()**. This routine is also used by servers which 
 wish to remove themselves from a server list. This section describes how the 
 routine is used by clients; section 6.6.5 of chapter 6 describes how it is used 
 by servers.
 
 The routine is passed two arguments:
 
-+ The IACPConnection token for the link which is being shut down.
++ The **IACPConnection** token for the link which is being shut down.
 
 + An optr. This must be null if the routine is being called by a client.
 
-IACPShutdown() sends MSG_META_IACP_LOST_CONNECTION to all 
+**IACPShutdown()** sends MSG_META_IACP_LOST_CONNECTION to all 
 objects on the other side of the link; that is, if a client calls 
-IACPShutdown(), all servers on the list will be sent this message.
+**IACPShutdown()**, all servers on the list will be sent this message.
 
-IACPShutdownAll() closes all IACP links for the application which calls it. 
+**IACPShutdownAll()** closes all IACP links for the application which calls it. 
 The Application object automatically calls this routine when the application 
 is exiting.
 
 #### 6.6.5 Being a Server
 
 Every time an application is launched, its Application object automatically 
-registers as a server for the server list that shares its GeodeToken. The 
+registers as a server for the server list that shares its **GeodeToken**. The 
 Application class has default handlers for all the notification messages IACP 
 sends to the server objects.
 
 If you wish, you can have another object act as a server. However, if you do 
 this, you will have to do more of the work yourself. While the notification 
-messages are defined for MetaClass, and thus can be handled by any class 
-of object, MetaClass does not come with handlers for these messages; if the 
-server is not subclassed from GenApplicationClass, you will have to write 
+messages are defined for **MetaClass**, and thus can be handled by any class 
+of object, **MetaClass** does not come with handlers for these messages; if the 
+server is not subclassed from **GenApplicationClass**, you will have to write 
 the handlers yourself. This is discussed below.
 
 ##### 6.6.5.1 Registering and Unregistering a Server
@@ -2139,25 +2128,25 @@ IACPRegisterServer(), IACPUnregisterServer()
 You will not generally need to register and unregister a server object 
 explicitly. As noted above, when an application is launched, the application 
 object is automatically registered as a server for the list with its 
-GeodeToken; when the application exits, the Application object is 
+**GeodeToken**; when the application exits, the Application object is 
 automatically unregistered from that list.
 
 However, you may wish to explicitly register an object as a server. For 
 example, you might want your application object to be a server on a list with 
-a different GeodeToken; or you might want to register a non-Application 
+a different **GeodeToken**; or you might want to register a non-Application 
 object as a server. In this case, you will need to explicitly register and 
 unregister the object.
 
-To register an object as a server, call IACPRegisterServer(). This routine 
+To register an object as a server, call **IACPRegisterServer()**. This routine 
 is passed the following arguments:
 
-+ The GeodeToken of the list for which you are registering as a server.
++ The **GeodeToken** of the list for which you are registering as a server.
 
 + The optr of the object which is registering as a server. This object must 
 be able to handle the MSG_META_IACP- messages appropriately (this is 
-built into GenApplicationClass).
+built into **GenApplicationClass**).
 
-+ A member of the IACPServerMode enumerated type. This type 
++ A member of the **IACPServerMode** enumerated type. This type 
 specifies how the client expects the server to behave. Currently, only two 
 types are supported:
 
@@ -2169,31 +2158,31 @@ interact directly with users.
 	This is equal to two. It indicates that the server will be able to 
 interact with the user like any normal application.
 
-+ A set of IACPServerFlags. Currently, only one flag is supported: 
++ A set of **IACPServerFlags**. Currently, only one flag is supported: 
 IACP_MULTIPLE_INSTANCES, indicating that multiple copies of the 
 application might be running at once. (Every multi-launchable 
 application should set this flag.)
 
-IACPRegisterServer() registers the object as a server for the appropriate 
+**IACPRegisterServer()** registers the object as a server for the appropriate 
 list; it creates the server list if necessary.
 
-To unregister an object as a server, call IACPUnregisterServer(). This 
-routine is passed two arguments: the GeodeToken of the server list, and the 
+To unregister an object as a server, call **IACPUnregisterServer()**. This 
+routine is passed two arguments: the **GeodeToken** of the server list, and the 
 optr of the server. The object will be removed immediately from the server 
 list. Note, however, that the server list might have already dispatched some 
 messages to the server being removed; these messages might be waiting on 
 the server object's queue, and thus the server object might get some IACP 
-messages even after it calls IACPUnregisterServer(). One way to deal 
+messages even after it calls **IACPUnregisterServer()**. One way to deal 
 with this is to have the server object send itself a message, via the queue, 
-immediately after it calls IACPUnregisterServer(). When the object 
+immediately after it calls **IACPUnregisterServer()**. When the object 
 receives this message, it will know that it has no more IACP messages on its 
 queue.
 
 Every server object on a given server list has a unique server number. This 
 server number will not change while the server is attached to the list. A 
 server object can find out its server number by calling 
-IACPGetServerNumber(). This routine takes two arguments: the 
-GeodeToken of the server list, and the optr to the server object. It returns 
+**IACPGetServerNumber()**. This routine takes two arguments: the 
+**GeodeToken** of the server list, and the optr to the server object. It returns 
 the object's server number.
 
 ##### 6.6.5.2 Non-Application Servers and Clients
@@ -2203,11 +2192,11 @@ MSG_META_IACP_NEW_CONNECTION,
 MSG_META_IACP_LOST_CONNECTION
 
 Every server and client object must be able to handle certain messages. 
-GenApplicationClass comes with handlers for these messages, so you need 
+**GenApplicationClass** comes with handlers for these messages, so you need 
 not write them yourself. However, if you will be using some other kind of 
 object as the server, you must handle the messages yourself. You may also 
 choose to have your application object subclass any of these messages; in that 
-case, you should generally have your handler use @callsuper.
+case, you should generally have your handler use **@callsuper**.
 
 When a server or client sends an IACP message, the kernel passes the 
 encapsulated message to each object on the other side of the link. It does this 
@@ -2215,33 +2204,33 @@ by sending the message MSG_META_IACP_PROCESS_MESSAGE to each
 object. This message comes with three arguments:
 
 msgToSend  
-The EventHandle of the encapsulated message.
+The **EventHandle** of the encapsulated message.
 
 topt  
-The TravelOption for that message.
+The **TravelOption** for that message.
 
 completionMessage  
-The EventHandle of any message to be sent after msgToSend 
+The **EventHandle** of any message to be sent after msgToSend 
 has been dispatched. (This field may be set to zero, indicating 
 that there is no completion message.)
 
 The recipient of MSG_META_IACP_PROCESS_MESSAGE should call 
-IACPProcessMessage(). This routine is passed four arguments: the optr of 
+**IACPProcessMessage()**. This routine is passed four arguments: the optr of 
 the object calling the routine, and the three arguments passed with 
-MSG_META_IACP_PROCESS_MESSAGE. IACPProcessMessage() 
+MSG_META_IACP_PROCESS_MESSAGE. **IACPProcessMessage()** 
 dispatches both encapsulated messages properly.
 
-Remember, if the client or server is subclassed from GenApplicationClass, 
+Remember, if the client or server is subclassed from **GenApplicationClass**, 
 all of this is done for you. You need only write a handler for the message if the 
-client or server object is not from a subclass of GenApplicationClass.
+client or server object is not from a subclass of **GenApplicationClass**.
 
 Whenever a client registers on an IACP list, the kernel sends 
 MSG_META_IACP_NEW_CONNECTION to all servers on that list. This 
 message comes with three arguments:
 
 appLaunchBlock  
-This is the handle of the AppLaunchBlock which the server 
-passed to IACPConnect().
+This is the handle of the **AppLaunchBlock** which the server 
+passed to **IACPConnect()**.
 
 justLaunched  
 This is a Boolean value. If the server's application has just been 
@@ -2270,7 +2259,7 @@ message comes with three arguments:
 
 appLaunchBlock  
 This is the handle of the application's launch block. The default 
-GenApplicationClass handler examines the launch block to 
+**GenApplicationClass** handler examines the launch block to 
 see if the application should open a document.
 
 justLaunched  

@@ -25,7 +25,7 @@ may respond to different changes on a case by case basis.
 
 The manners in which you sign up for these two types of notification differ 
 although the functionality of the notification process is similar. The most 
-straightforward way is to use a gcnList field in an application's application 
+straightforward way is to use a **gcnList** field in an application's application 
 object; this is the usual approach used to add an application's GenPrimary 
 object to the application's window list. We will assume that you know how to 
 add an object to a GCN list in this manner, as it is shown in most if not all of 
@@ -34,7 +34,7 @@ the sample applications.
 You can also sign up for system-wide notification through the use of certain 
 routines and intercept system messages when the change occurs. Other 
 objects may sign up for application-specific notification supported by 
-GenApplicationClass. These application specific notifications should only 
+**GenApplicationClass**. These application specific notifications should only 
 be sent to the GenApplication object.
 
 ### 9.2 The Mechanics of GCN
@@ -55,15 +55,15 @@ _Organization of a GCN list of lists and several GCN lists._
 
 There are several reasons why you would want to use GCN:
 
-+ Ease of use
++ Ease of use  
 The GCN mechanism eliminates the need to monitor and dispatch 
 messages relating to system changes.
 
-+ Commonality
++ Commonality  
 The GCN mechanism provides a common platform for communication 
 between applications in certain cases.
 
-+ The system expects you to
++ The system expects you to  
 Many messages sent by the system expect a GCN mechanism to intercept 
 them. Although you can intercept these messages manually, it is easier 
 to take advantage of GCN's built-in functions.
@@ -76,12 +76,12 @@ The system provides several lists for common system changes which might
 affect your application. After signing up on one of these lists (for example, the 
 file change list) you will be notified by the kernel whenever the specified 
 change occurs. In most cases, all you need to do is register for notification 
-with GCNListAdd() and intercept the kernel's notification message.
+with **GCNListAdd()** and intercept the kernel's notification message.
 
 The GCN mechanism performs its functions through a common series of 
 steps. These steps are:
 
-1. The object registers for notification with GCNListAdd().
+1. The object registers for notification with **GCNListAdd()**.
 
 2. The change occurs.
 
@@ -90,7 +90,7 @@ most cases this is the system itself, although a library may also send
 notifications). Applications do not send notifications at the system level.
 
 4. The GCN mechanism dispatches notification messages to all interested 
-parties with GCNListSend().
+parties with **GCNListSend()**.
 
 5. The object is informed of the change.  
 If you need to perform some work related to this change, you should have 
@@ -99,8 +99,8 @@ a message handler to intercept the system messages.
 #### 9.3.1 Registering for System Notification
 
 Whenever an object or process needs to be notified of some system change, it 
-must call the routine GCNListAdd() to add itself to the list for that 
-particular change. GCNListAdd() finds the appropriate general change 
+must call the routine **GCNListAdd()** to add itself to the list for that 
+particular change. **GCNListAdd()** finds the appropriate general change 
 notification list-creating a new one if none currently exists-and adds the 
 optr of the new object to the end of that list. You may add the optr to the GCN 
 list at any time during the process' or object's life, but it is usually convenient 
@@ -110,26 +110,26 @@ handler.
 
 Each optr in a GCN list should have a notification ID attached to it. (The 
 combination of a manufacturer ID and a notification type comprises an 
-element's specific notification ID.) GCNListAdd() must be passed the optr of 
+element's specific notification ID.) **GCNListAdd()** must be passed the optr of 
 the object to add, along with a notification ID. For each separate notification 
 ID, a separate GCN list is needed and will be created automatically. 
 
-The GCN routines use a word of data, GCNStandardListType, to represent 
-the notification type. The currently recognized GCNStandardListType 
+The GCN routines use a word of data, **GCNStandardListType**, to represent 
+the notification type. The currently recognized **GCNStandardListType** 
 types for MANUFACTURER_ID_GEOWORKS are
 
 + GCNSLT_FILE_SYSTEM  
-This GCNStandardListType is used for notification of a file system 
+This **GCNStandardListType** is used for notification of a file system 
 change. Parties on this list will receive the system messages 
 MSG_NOTIFY_FILE_CHANGE and MSG_NOTIFY_DRIVE_CHANGE.
 
 + GCNSLT_APPLICATION  
-This GCNStandardListType is used for notification of a starting or 
+This **GCNStandardListType** is used for notification of a starting or 
 exiting application. Parties on this list will receive the system messages 
 MSG_NOTIFY_APP_STARTED and MSG_NOTIFY_APP_EXITED.
 
 + GCNSLT_DATE_TIME  
-This GCNStandardListType is used for notification of a date/time 
+This **GCNStandardListType** is used for notification of a date/time 
 change in the system's internal clock. Note that this will not tell you 
 about timer ticks-the only time changes that will come up are those 
 resulting from system restarts and time changes by the user. Parties on 
@@ -140,7 +140,7 @@ of any changes by itself (such as calling the internal clock for an updated
 value).
 
 + GCNSLT_DICTIONARY  
-This GCNStandardListType is used for notification of a user 
+This **GCNStandardListType** is used for notification of a user 
 dictionary change. Parties on this list will receive the system message 
 MSG_NOTIFY_USER_DICT_CHANGE.
 
@@ -150,26 +150,25 @@ keyboard layout. Parties on this list will receive the system message
 MSG_NOTIFY_KEYBOARD_LAYOUT_CHANGE.
 
 + GCNSLT_EXPRESS_MENU_CHANGE  
-This GCNStandardListType notifies various system utilities that an 
+This **GCNStandardListType** notifies various system utilities that an 
 express menu has been created or destroyed. The recipient receives the 
 optr of the Express Menu Control. This list should be used in conjunction 
 with the GCNSLT_EXPRESS_MENU_OBJECTS list. Objects on this list 
 receive MSG_NOTIFY_EXPRESS_MENU_CHANGE, which itself passes a 
-GCNExpressMenuNotificationType (either GCNEMNT_CREATED or 
-GCNEMNT_DESTROYED) and the optr of the Express Menu Control 
-affected. 
+**GCNExpressMenuNotificationType** (either GCNEMNT_CREATED or 
+GCNEMNT_DESTROYED) and the optr of the Express Menu Control affected. 
 
 + GCNSLT_INSTALLED_PRINTERS  
 This list notifies objects when a printer is either installed or removed. 
 The recipient of MSG_PRINTER_INSTALLED_REMOVED might want to 
-call SpoolGetNumPrinters() to learn if any printer or fax drivers are 
+call **SpoolGetNumPrinters()** to learn if any printer or fax drivers are 
 currently installed.
 
 + GCNSLT_SHUTDOWN_CONTROL  
-This GCNStandardListType is used for system shutdown control. 
+This **GCNStandardListType** is used for system shutdown control. 
 Parties on a list of this type will receive the system message 
 MSG_META_CONFIRM_SHUTDOWN which itself passes a 
-GCNShutdownControlType (either GCNSCT_SUSPEND, 
+**GCNShutdownControlType** (either GCNSCT_SUSPEND, 
 GCNSCT_SHUTDOWN, or GCNSCT_UNSUSPEND). Shutdown Control is 
 documented in "Applications and Geodes," Chapter 6.
 
@@ -184,8 +183,7 @@ MSG_META_CLIPBOARD_NOTIFY_TRANSFER_ITEM_FREED.
 This list contains all Express Menu Control objects in the system. 
 Typically this list is used to add a control panel item or a DOS task list 
 item to all express menu Control objects. This can be done by sending 
-MSG_EXPRESS_MENU_CONTROL_CREATE_ITEM to the GCN list with 
-GCNListSend().
+MSG_EXPRESS_MENU_CONTROL_CREATE_ITEM to the GCN list with **GCNListSend()**.
 
 + GCNSLT_TRANSPARENT_DETACH  
 This list contains all application objects that may be transparently 
@@ -237,36 +235,36 @@ MSG_NOTIFY_USER_DICT_CHANGE,
 MSG_NOTIFY_EXPRESS_MENU_CHANGE
 
 When an identified change occurs, either the system (or a library) will call the 
-routine GCNListSend(), passing it the appropriate notification message. 
+routine **GCNListSend()**, passing it the appropriate notification message. 
 This routine scans the list of all GCN lists and dispatches notification to all 
 appropriate objects that had requested knowledge of the specified change. If 
 any additional information relating to the change cannot be included in the 
-message, the system allows GCNListSend() to pass data in a global heap 
+message, the system allows **GCNListSend()** to pass data in a global heap 
 block. For example, additional information about a file change (name of file, 
 etc.) must be passed in a global heap block.
 
 The object or process originally requesting notification of the change should 
 be required to handle the appropriate message. If additional data about the 
 change is passed in a global heap block, the process should access that 
-information with MemLock() and MemUnlock(). You should always call 
+information with **MemLock()** and **MemUnlock()**. You should always call 
 the process's superclass in your message handler to make sure that the global 
-heap block will be automatically freed by MetaClass. Therefore, do not free 
+heap block will be automatically freed by **MetaClass**. Therefore, do not free 
 a global heap block manually in a notification handler.
 
 The system provides several messages which you may want to handle. These 
 messages provide notification of file system changes, application start-up or 
 shut-down, system clock changes, etc. These messages are mentioned with 
-the list they correspond to in "Registering for System Notification" on page 
-357. Messages which require more detailed explanation are also mentioned 
-below.
+the list they correspond to in ["Registering for System Notification"]
+(#931-registering-for-system-notification). Messages which require more 
+detailed explanation are also mentioned below.
 
 The kernel sends MSG_NOTIFY_FILE_CHANGE whenever a change to the file 
 system occurs. All objects signed up on the GCN list GCNSLT_FILE_CHANGE 
 will receive this message.
 
-MSG_NOTIFY_FILE_CHANGE passes a FileChangeNotificationType 
+MSG_NOTIFY_FILE_CHANGE passes a **FileChangeNotificationType** 
 specifying the change that occurred. Some types indicate the presence of a 
-data block (of type FileChangeNotificationData) containing, if applicable, 
+data block (of type **FileChangeNotificationData**) containing, if applicable, 
 the name of the file changed, the disk handle of the file changed, and the ID 
 of the affected file. 
 
@@ -287,7 +285,7 @@ This type indicates that a file was opened. FCND_id stores the
 ID of the file. FCND_name is undefined, and may or may not be 
 present. (You can check the size of the block to see if it is indeed 
 present.) This notification type is generated after a call to 
-FileEnableOpenCloseNotification().
+**FileEnableOpenCloseNotification()**.
 
 FCNT_DELETE  
 This type indicates that a file or directory was deleted. 
@@ -298,16 +296,15 @@ FCNT_CONTENTS
 This type indicates that a file's contents have changed. 
 FCND_id stores the ID of the file. FCND_name is undefined and 
 may or may not be present. This notification type is generated 
-after a call to FileCommit() or FileClose() that results in a 
+after a call to **FileCommit()** or **FileClose()** that results in a 
 file modification.
 
 FCNT_ATTRIBUTES  
 This type indicates that a file's attributes have changed. 
 FCND_id stores the ID of the file. FCND_name is undefined and 
 may or may not be present. This notification type is generated 
-upon completion of all changes in a FileSetAttributes(), 
-FileSetHandleExtAttributes(), or 
-FileSetPathExtAttributes() call.
+upon completion of all changes in a **FileSetAttributes()**, 
+**FileSetHandleExtAttributes()**, or **FileSetPathExtAttributes()** call.
 
 FCNT_DISK_FORMAT  
 This type indicates that a disk has been formatted. Both 
@@ -318,14 +315,14 @@ FCNT_CLOSE
 This type indicates that a file has been closed. FCND_id stores 
 the identifier of the file. FCND_name is undefined and may not 
 be present. This notification type is generated only after a call 
-to FileEnableOpenCloseNotification().
+to **FileEnableOpenCloseNotification()**.
 
 FCNT_BATCH  
 This type indicates that this file change notification is actually 
 a group of notifications batched together. In this case, 
 MSG_NOTIFY_FILE_CHANGE passes the MemHandle of a 
-FileChangeBatchNotificationData block instead. This data 
-block stores a batch of FileChangeBatchNotificationItem 
+**FileChangeBatchNotificationData** block instead. This data 
+block stores a batch of **FileChangeBatchNotificationItem** 
 structures, each referring to an operation (with its own 
 notification type, disk handle, file name, and file ID). Note that 
 in this batched case, you must assume that all file names and 
@@ -333,22 +330,22 @@ file IDs that are optional (i.e. are undefined) are not present.
 
 FCNT_ADD_SP_DIRECTORY  
 This type indicates that a directory has been added as a 
-StandardPath. FCND_disk contains the StandardPath that 
+**StandardPath**. FCND_disk contains the **StandardPath** that 
 was added. This notification type is generated after a call to 
-FileAddStandardPathDirectory().
+**FileAddStandardPathDirectory()**.
 
 FCNT_DELETE_SP_DIRECTORY  
 This type indicates that a directory has been deleted as a 
-StandardPath. FCND_disk contains the StandardPath that 
+**StandardPath**. FCND_disk contains the **StandardPath** that 
 was deleted. This notification type is generated after a call to 
-FileDeleteStandardPathDirectory().
+**FileDeleteStandardPathDirectory()**.
 
 You may access this data (after locking the block) and perform whatever 
 actions you need within your message handler.
 
 The kernel also sends MSG_NOTIFY_DRIVE_CHANGE to GCN lists of type 
 GCNSLT_FILE_CHANGE. This message passes a 
-GCNDriveChangeNotificationType specifying whether a drive is being 
+**GCNDriveChangeNotificationType** specifying whether a drive is being 
 created or destroyed and the ID of the affected drive.
 
 The kernel sends MSG_NOTIFY_APP_STARTED whenever any application 
@@ -369,8 +366,8 @@ being changed, both of which you may access in your message handler.
 
 #### 9.3.3 Removal from a System List
 
-You should use GCNListRemove() to remove an object from a system GCN 
-list. You must pass the notification ID (GCNStandardListType and 
+You should use **GCNListRemove()** to remove an object from a system GCN 
+list. You must pass the notification ID (**GCNStandardListType** and 
 Manufacturer ID) and the optr of the object to be removed. The optr of the 
 object in question will only be removed from the list of the particular change 
 specified. If the optr is on several GCN lists, those other lists will remain 
@@ -437,7 +434,7 @@ MSG_META_NOTIFY_WITH_DATA_BLOCK, the notification list type to
 use, and the data block to pass (if applicable).
 
 4. Use MSG_GEN_PROCESS_SEND_TO_APP_GCN_LIST to pass the event. 
-You may have to pass some GCNListSendFlags with this message. This 
+You may have to pass some **GCNListSendFlags** with this message. This 
 message acts as a dispatch routine, sending all interested parties the 
 recorded event MSG_META_NOTIFY.
 
@@ -501,7 +498,7 @@ notification ID, a separate GCN list is needed and will be created
 automatically. 
 
 Geoworks has several pre-defined GCN lists of type 
-GeoWorksGenAppGCNListType for use by applications. You will 
+**GeoWorksGenAppGCNListType** for use by applications. You will 
 probably have only limited use for these; these list types are used mostly by 
 the UI controllers. For information on these types and how the various 
 classes use them, see "Generic UI Controllers," Chapter 12 of the Object 
@@ -579,7 +576,7 @@ If instead you need to pass a data block along with the notification, you
 should use MSG_META_NOTIFY_WITH_DATA_BLOCK. You should set up the 
 structure to pass beforehand. You must also make sure to add a reference 
 count to the data block equal to the number of lists (not objects) you wish to 
-send the notification. To do this, call MemInitRefCount() with the data 
+send the notification. To do this, call **MemInitRefCount()** with the data 
 block and the total number of lists you are sending the notification to. (In 
 most cases, you will only send notification to one list, although, of course, that 
 list may have several objects.) 
@@ -642,9 +639,9 @@ The object or process originally requesting notification of the change will
 want to provide a handler for the MSG_META_NOTIFY or 
 MSG_META_NOTIFY_WITH_DATA_BLOCK. If additional data about the 
 change is passed in a data block, the process should access that information 
-with MemLock() and MemUnlock(). You should always call the process's 
+with **MemLock()** and **MemUnlock()**. You should always call the process's 
 superclass in your message handler, to make sure that the global heap block 
-will be automatically freed by MetaClass. Therefore, do not free a 
+will be automatically freed by **MetaClass**. Therefore, do not free a 
 notification data block manually in a notification handler.
 
 ---
