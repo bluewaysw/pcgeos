@@ -19,13 +19,13 @@ library 	math
 library 	ansic
 library 	color
 
-resource APPRESOURCE ui-object
-resource INTERFACE ui-object
-resource FUNKTIONINTERFACE ui-object
-resource TABELLENINTERFACE ui-object
-resource DIAGRAMRESOURCE ui-object
-resource TOOLMONIKERRESOURCE lmem read-only shared
-resource ICONRESOURCE lmem read-only shared
+resource AppResource ui-object
+resource Interface ui-object
+resource FunktionInterface ui-object
+resource TabellenInterface ui-object
+resource DiagramResource ui-object
+resource ToolMonikerResource lmem read-only shared
+resource IconResource lmem read-only shared
 
 export TriggerDataTriggerClass
 export GCalcTextClass
