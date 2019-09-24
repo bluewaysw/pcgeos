@@ -3,9 +3,9 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = Slides
+GEODE           = slides
 ASM_TO_OBJS     = slides.asm
-UI_TO_RDFS      = SLIDES.UI
+UI_TO_RDFS      = slides.ui
 SRCS            = slides.asm slides.ui
 OBJS            = slides.obj
 LOBJS           =
