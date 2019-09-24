@@ -1,37 +1,37 @@
-WC.rdef: GENERIC.UIH PRODUCT.UIH WC.UIH UISTRINGS.UI \
-                ART/MKRWORLDCLOCK.UI
-WCMAIN.obj \
-WCMAIN.eobj: WCGEODE.DEF GEOS.DEF HEAP.DEF GEODE.DEF RESOURCE.DEF \
-                EC.DEF SEM.DEF OBJECT.DEF LMEM.DEF WIN.DEF GRAPHICS.DEF \
-                FONTID.DEF FONT.DEF COLOR.DEF GSTRING.DEF TEXT.DEF \
-                CHAR.DEF FILE.DEF LOCALIZE.DEF SLLANG.DEF TIMER.DEF \
-                TIMEDATE.DEF DBASE.DEF INPUT.DEF HWR.DEF \
-                OBJECTS/INPUTC.DEF OBJECTS/METAC.DEF CHUNKARR.DEF \
-                GEOWORKS.DEF OBJECTS/WINC.DEF UI.DEF VM.DEF \
-                OBJECTS/PROCESSC.DEF GCNLIST.DEF OBJECTS/TEXT/TCOMMON.DEF \
-                STYLESH.DEF IACP.DEF OBJECTS/UIINPUTC.DEF \
-                OBJECTS/VISC.DEF OBJECTS/VCOMPC.DEF OBJECTS/VCNTC.DEF \
-                INTERNAL/VUTILS.DEF OBJECTS/GENC.DEF DISK.DEF DRIVE.DEF \
-                UDIALOG.DEF OBJECTS/GINTERC.DEF TOKEN.DEF \
-                OBJECTS/CLIPBRD.DEF OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF \
-                ALB.DEF OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                OBJECTS/VTEXTC.DEF SPOOL.DEF PRINT.DEF \
-                INTERNAL/PRODFEATURES.DEF HUGEARR.DEF PALM/MACROS.DEF \
-                WCCONSTANT.DEF WCCLASSES.DEF WCAPPLICATION.DEF WC.RDEF \
-                WCINITFILE.ASM INITFILE.DEF WCINIT.ASM WCUI.ASM \
-                WCLISTS.ASM WCUSER.ASM WCALARM.ASM
+wc.rdef: generic.uih product.uih wc.uih uiStrings.ui \
+                Art/mkrWorldClock.ui
+wcMain.obj \
+wcMain.eobj: wcGeode.def geos.def heap.def geode.def resource.def \
+                ec.def sem.def object.def lmem.def win.def graphics.def \
+                fontID.def font.def color.def gstring.def text.def \
+                char.def file.def localize.def sllang.def timer.def \
+                timedate.def dbase.def input.def hwr.def \
+                Objects/inputC.def Objects/metaC.def chunkarr.def \
+                geoworks.def Objects/winC.def ui.def vm.def \
+                Objects/processC.def gcnlist.def Objects/Text/tCommon.def \
+                stylesh.def iacp.def Objects/uiInputC.def \
+                Objects/visC.def Objects/vCompC.def Objects/vCntC.def \
+                Internal/vUtils.def Objects/genC.def disk.def drive.def \
+                uDialog.def Objects/gInterC.def token.def \
+                Objects/clipbrd.def Objects/gSysC.def Objects/gProcC.def \
+                alb.def Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                Objects/vTextC.def spool.def print.def \
+                Internal/prodFeatures.def hugearr.def Palm/macros.def \
+                wcConstant.def wcClasses.def wcApplication.def wc.rdef \
+                wcInitFile.asm initfile.def wcInit.asm wcUI.asm \
+                wcLists.asm wcUser.asm wcAlarm.asm
 
-wclockEC.geo wclock.geo : GEOS.LDF UI.LDF 
+wclockEC.geo wclock.geo : geos.ldf ui.ldf 
