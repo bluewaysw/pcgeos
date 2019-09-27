@@ -37,9 +37,9 @@ library color
 exempt cards
 exempt color
 
-resource APPRESOURCE	ui-object
-resource INTERFACE	ui-object
-resource TABLERESOURCE	object
+resource AppResource	ui-object
+resource Interface	ui-object
+resource TableResource	object
 
 export FreeCellApplicationClass
 export FreeCellClass
