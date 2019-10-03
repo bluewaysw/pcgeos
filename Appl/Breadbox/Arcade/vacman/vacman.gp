@@ -23,22 +23,22 @@ exempt game
 exempt sound
 
 
-resource QTIPSRESOURCE ui-object
-resource APPRESOURCE ui-object
-resource INTERFACE ui-object
-resource ICON0RESOURCE ui-object lmem shared read-only
+resource QTipsResource ui-object
+resource AppResource ui-object
+resource Interface ui-object
+resource Icon0Resource ui-object lmem shared read-only
 #resource SPRITERESOURCE lmem
-resource VACUPRESOURCE data
-resource VACDOWNRESOURCE data
-resource VACLEFTRESOURCE data
-resource VACRIGHTRESOURCE data
-resource CLOUDRESOURCE data
-resource BUNBAGRESOURCE data
+resource VacUpResource data
+resource VacDownResource data
+resource VacLeftResource data
+resource VacRightResource data
+resource CloudResource data
+resource BunBagResource data
 #resource BOARDRESOURCE lmem read-only shared
-resource BOARDRESOURCE data
-resource CURRENTBOARDRESOURCE data
+resource BoardResource data
+resource CurrentBoardResource data
 #resource STRINGSRESOURCE lmem read-only shared
-resource STRINGSRESOURCE data
+resource StringsResource data
 #resource BREADBOXMONIKERRESOURCE ui-object lmem read-only shared
 #resource BREADBOXMONIKERRESOURCE2 ui-object lmem read-only shared
 #resource OPENINGLOGO1RESOURCE ui-object lmem read-only shared
