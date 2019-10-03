@@ -60,11 +60,11 @@ exempt color
 # object blocks, fixed code resources, or data resources that are read-only.
 # Standard discardable code resources do not need to be mentioned.
 #
-resource APPRESOURCE		object
-resource INTERFACE			object
-resource OPTIONSINTERFACE	object
-resource APPMONIKERRESOURCE object
-resource BALLRESOURCE		object
-resource OPPONENTRESOURCE	object
-resource SCOREBRICKRESOURCE	object
-resource FEATUREBRICKRESOURCE	object
+resource AppResource		object
+resource Interface			object
+resource OptionsInterface	object
+resource AppMonikerResource object
+resource BallResource		object
+resource OpponentResource	object
+resource ScoreBrickResource	object
+resource FeatureBrickResource	object
