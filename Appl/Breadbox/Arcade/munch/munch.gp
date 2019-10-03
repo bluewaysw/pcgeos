@@ -66,20 +66,20 @@ exempt borlandc
 # object blocks, fixed code resources, or data resources that are read-only.
 # Standard discardable code resources do not need to be mentioned.
 #
-resource APPRESOURCE object
-resource INTERFACE object
+resource AppResource object
+resource Interface object
 #resource SOUNDOPTIONSINTERFACE object
-resource ENDEINTERFACE object
-resource APPMONIKERRESOURCE ui-object #war: data read-only
-resource SPRITERESOURCE data read-only
-resource GEGNERRESOURCE data read-only
-resource GEGNERRESOURCE2 data read-only
-resource KASTENRESOURCE data read-only
+resource EndeInterface object
+resource AppMonikerResource ui-object #war: data read-only
+resource SpriteResource data read-only
+resource GegnerResource data read-only
+resource GegnerResource2 data read-only
+resource KastenResource data read-only
 #resource POINTERRESOURCE data read-only
-resource HINTERGRRESOURCE data read-only
-resource MOREBILDERRESOURCE data read-only
-resource EXTRASRESOURCE data read-only
+resource HintergrResource data read-only
+resource MoreBilderResource data read-only
+resource ExtrasResource data read-only
 #resource NAMEINTERFACE object
 #resource SCORESINTERFACE object
-resource MUELLINTERFACE object
-resource QTIPSRESOURCE object
+resource MuellInterface object
+resource QTipsResource object
