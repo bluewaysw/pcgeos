@@ -10,8 +10,8 @@ exempt radiolib
 library geos
 library ui
 library radiolib
-resource APPRESOURCE object
-resource INTERFACE object
+resource AppResource object
+resource Interface object
 export FMRadioProcessClass
 export FMTunerContentClass
 export FMClockContentClass
