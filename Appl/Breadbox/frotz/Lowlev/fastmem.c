@@ -14,9 +14,9 @@
 #endif
 
 #ifdef __GEOS__
-#include <ansi/stdio.h>
-#include <ansi/stdlib.h>
-#include <ansi/string.h>
+#include <Ansi/stdio.h>
+#include <Ansi/stdlib.h>
+#include <Ansi/string.h>
 #else
 
 #ifdef __MSDOS__
@@ -297,6 +297,7 @@ Boolean init_memory (void)
     }
 
     no_match:
+    ; //a label must be followed by a statement
 
     }
 

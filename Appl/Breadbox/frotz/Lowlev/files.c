@@ -9,8 +9,8 @@
 #ifdef __GEOS__
 #include <geos.h>
 #include <file.h>
-#include <ansi/stdio.h>
-#include <ansi/string.h>
+#include <Ansi/stdio.h>
+#include <Ansi/string.h>
 #else
 #include <stdio.h>
 #include <string.h>

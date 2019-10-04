@@ -1,8 +1,8 @@
 #include <geos.h>
 #include <file.h>
-#include <ansi/stdio.h>
-#include <ansi/stdlib.h>
-#include <ansi/string.h>
+#include <Ansi/stdio.h>
+#include <Ansi/stdlib.h>
+#include <Ansi/string.h>
 
 #include "frotz.h"
 

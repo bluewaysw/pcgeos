@@ -45,16 +45,16 @@ library text
 #  platform N9000V20
 #  library foam
 #else
-  platform GEOS201
+platform geos201
 #endif
 
-resource APPLICATIONRESOURCE            ui-object
-resource INTERFACERESOURCE              ui-object
-resource MENURESOURCE                   ui-object
+resource ApplicationResource            ui-object
+resource InterfaceResource              ui-object
+resource MenuResource                   ui-object
 # resource DOCUMENTUI                     object
 
 resource MONIKERRESOURCE  data object
-resource STRINGRESOURCE  data object
+resource StringResource  data object
 resource LOGORESOURCE  data object
 
 #export FrotzViewClass
