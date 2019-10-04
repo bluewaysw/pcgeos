@@ -1,5 +1,5 @@
 #
-# FILE:  PalmView.GP
+# FILE:  palmview.gp
 #
 name palmview.app
 longname "Palm Viewer"
@@ -15,9 +15,9 @@ library ui
 library ansic
 library text
 
-resource APPRESOURCE ui-object
-resource INTERFACE ui-object
-resource STRINGRESOURCE lmem read-only swapable shared ui-object
+resource AppResource ui-object
+resource Interface ui-object
+resource StringResource lmem read-only swapable shared ui-object
 
 export PalmViewPrimaryClass
 export PalmViewProcessClass
