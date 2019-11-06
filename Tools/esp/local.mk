@@ -183,7 +183,7 @@ ${MACHINES:S%$%.md/printobj.%g} : $(linuxpoOBJS) $(linuxLIBS)
 			$(.ALLSRC:M*.a:S/^/lib /g) \
 			library $(WATCOM)/lib386/linux/clib3r.lib \
 			library $(WATCOM)/lib386/math387r.lib \
-			library $(WATCOM)/lib386/linux/emu387.lib \
+			library $(WATCOM)/lib386/emu387.lib \
 			FORMAT ELF \
 			$(XLINKFLAGS)
 linux	: ${.TARGET:S%$%.md/printsls.%}    	    .JOIN
@@ -194,7 +194,7 @@ ${MACHINES:S%$%.md/printsls.%g} : $(linuxpslsOBJS) $(linuxLIBS)
 			$(.ALLSRC:M*.a:S/^/lib /g) \
 			library $(WATCOM)/lib386/linux/clib3r.lib \
 			library $(WATCOM)/lib386/math387r.lib \
-			library $(WATCOM)/lib386/linux/emu387.lib \
+			library $(WATCOM)/lib386/emu387.lib \
 			FORMAT ELF \
 			$(XLINKFLAGS)
 

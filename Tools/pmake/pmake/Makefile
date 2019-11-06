@@ -75,7 +75,7 @@ pmake.e: $(o_files)
 	%write pmake.lnk libfile ../lib/sprite/libsprite.a
 	%write pmake.lnk libfile ../lib/lst/liblst.a
 	%write pmake.lnk library $(%WATCOM)/lib386/linux/clib3r.lib
-	%write pmake.lnk library $(%WATCOM)/lib386/linux/emu387.lib
+	%write pmake.lnk library $(%WATCOM)/lib386/emu387.lib
 	%write pmake.lnk library $(%WATCOM)/lib386/math387r.lib
 	%write pmake.lnk FILE   {$(o_files)}
 	wlink  @pmake.lnk
