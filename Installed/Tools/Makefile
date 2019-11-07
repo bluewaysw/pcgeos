@@ -11,7 +11,8 @@ MK_MAKE = mkdir %PARAM% & \
 
 
 BINS = Tools/esp Tools/uicpp Tools/goc Tools/grev Tools/loc Tools/nmkmf Tools/pmake/makedpnd \
-		Tools/glue Tools/uic Tools/pmake/findlbdr Tools/geodump Tools/sym2dis Tools/ldf2sls
+		Tools/glue Tools/uic Tools/pmake/findlbdr 
+# Tools/geodump Tools/sym2dis Tools/ldf2sls
 LIBS = Tools/utils Tools/compat
 
 install		: $(LIBS) $(BINS)
