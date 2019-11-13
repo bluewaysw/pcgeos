@@ -46,7 +46,7 @@ static char *rcsid =
 FILE		  *yyin;
 FILE		  *output;
 
-char		inFile[100] = "";
+char		inFile[256] = "";
 
 char  		*outFile = "uic.out";
 

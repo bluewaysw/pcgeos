@@ -56,7 +56,7 @@ minimalLoader	: textLoader VGALoader
 #
 # Libraries
 #
-minimalLibrary	: kernel swap sound net ui motif spool text mailbox \
+minimalLibrary	: kernel swap sound net ui spool text mailbox \
 		  genpc ansic cdaudio cell chart color compress config hash impex \
 		  borlandc math pen resolver spline ssmeta styles \
 		  wav game cards spreadsheet parse spell convert \
