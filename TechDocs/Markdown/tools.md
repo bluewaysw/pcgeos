@@ -54,180 +54,95 @@
 [6.1 Changing Platforms](Tools/tdebug.md#61-changing-platforms)  
 [6.2 Switching Kernels](Tools/tdebug.md#62-switching-kernels)
 
-7 	Icon Editor 	337
+**[7 Icon Editor](Tools/ticoned.md)**  
+[7.1 Creating Icons](Tools/ticoned.md#71-creating-icons)  
+[7.2 Importing Icons](Tools/ticoned.md#72-importing-icons)  
+[7.3 Editing Icons](Tools/ticoned.md#73-editing-icons)  
+[7.4 Writing Source Code](Tools/ticoned.md#74writing-source-code)  
+[7.5 Icon Databases](Tools/ticoned.md#75-icon-databases)  
+[7.6 Exporting to Database](Tools/ticoned.md#76-exporting-to-database)
+
+**[8 Resource Editor](Tools/tresed.md)**  
+[8.1 Glossary](Tools/tresed.md#81-glossary)  
+[8.2 Getting Started](Tools/tresed.md#82-getting-started)  
+[8.3 What Needs to be Translated?](Tools/tresed.md#83-what-needs-to-be-translated?)  
+[8.4 Translating](Tools/tresed.md#84-translating)  
+[8.4.1 Choosing a new translation file](Tools/tresed.md#841-choosing-a-new-translation-file)  
+[8.4.2 Main translation screen](Tools/tresed.md#842-main-translation-screen)  
+[8.4.3 Translating a Text String](Tools/tresed.md#843-translating-a-text-screen)  
+[8.4.4 Moving between chunks](Tools/tresed.md#844-moving-between-chunks)  
+[8.4.5 Moving between resources](Tools/tresed.md#845-moving-between-resources)  
+[8.5 Resource Editor Menus](Tools/tresed.md#85-resource-editor-menus)  
+[8.5.1 File Menu](Tools/tresed.md#851-file-menu)  
+[8.5.2 Edit Menu](Tools/tresed.md#852-edit-menu)  
+[8.5.3 Project Menu](Tools/tresed.md#853-project-menu)  
+[8.5.4 Filter Menu](Tools/tresed.md#854-filter-menu)  
+[8.5.5 Utilities Menu](Tools/tresed.md#855-utilities-menu)  
+[8.5.6 Window Menu](Tools/tresed.md#856-window-menu)  
+[8.6 Creating an Executable](Tools/tresed.md#86-creating-an-executable)  
+[8.7 Updating an Executable](Tools/tresed.md#87-updating-an-executable)  
+[8.8 Testing Your New Executables](Tools/tresed.md#88-testing-your-new-executable)
+
+**[9 The INI File](Tools/tini.md)**  
+[9.1 How to Use the INI File](Tools/tini.md#91-how-to-use-the-ini-file)  
+[9.2 Categories in the INI File](Tools/tini.md#92-categories-in-the-ini-file)  
+[9.2.1 cards](Tools/tini.md#921-cards)  
+[9.2.2 configure](Tools/tini.md#922-configure)  
+[9.2.3 diskswap](Tools/tini.md#923-diskswap)  
+[9.2.4 envelope](Tools/tini.md#924-envelope)  
+[9.2.5 envel*num*](Tools/tini.md#925-envelnum)  
+[9.2.6 expressMenuControl](Tools/tini.md#926-expressmenucontrol)  
+[9.2.7 fileManager](Tools/tini.md#927-filemanager)  
+[9.2.8 input](Tools/tini.md#928-input)  
+[9.2.9 keyboard](Tools/tini.md#929-keyboard)  
+[9.2.10 label](Tools/tini.md#9210-label)  
+[9.2.11 label*num*](Tools/tini.md#9211-labelnum)  
+[9.2.12 link](Tools/tini.md#9212-link)  
+[9.2.13 localization](Tools/tini.md#9213-localization)  
+[9.2.14 math](Tools/tini.md#9214-math)  
+[9.2.15 modem](Tools/tini.md#9215-modem)  
+[9.2.16 *modem name*](Tools/tini.md#9216-modem-name)  
+[9.2.17 mouse](Tools/tini.md#9217-mouse)  
+[9.2.18 net library](Tools/tini.md#9218-net-library)  
+[9.2.19 paper](Tools/tini.md#9219-paper)  
+[9.2.20 paper*num*](Tools/tini.md#9220-papernum)  
+[9.2.21 parallel](Tools/tini.md#9221-parallel)  
+[9.2.22 paths](Tools/tini.md#9222-paths)  
+[9.2.23 printer](Tools/tini.md#9223-printer)  
+[9.2.24 *printer device name*](Tools/tini.md#9224-printer-device-name)  
+[9.2.25 screen 0](Tools/tini.md#9225-screen-0)  
+[9.2.26 serial](Tools/tini.md#9226-serial)  
+[9.2.27 sound](Tools/tini.md#9227-sound)  
+[9.2.28 spool](Tools/tini.md#9228-spool)  
+[9.2.29 system](Tools/tini.md#9229-system)  
+[9.2.30 text](Tools/tini.md#9230-text)  
+[9.2.31 ui](Tools/tini.md#9231-ui)  
+[9.2.32 *specific ui name*](Tools/tini.md#9232-specific-ui-name)  
+[9.2.33 ui features](Tools/tini.md#9233-ui-features)  
+[9.2.34 welcome](Tools/tini.md#9234-welcome)
+
+**[10 Using Tools](Tools/ttools.md)**  
+[10.1 Tools Summary](Tools/ttools.md#101-tools-summary)  
+[10.2 Typical Development Session](Tools/ttools.md#102-typical-develoopment-session)  
+[10.3 File Types](Tools/ttools.md#103-file-types)  
+[10.4 Esp](Tools/ttools.md#104-esp)  
+[10.5 Glue](Tools/ttools.md#105-glue)  
+[10.6 Goc](Tools/ttools.md#106-goc)  
+[10.7 Grev](Tools/ttools.md#107-grev)  
+[10.8 mkmf](Tools/ttools.md#108-mkmf)  
+[10.9 pccom](Tools/ttools.md#109-pccom)  
+[10.9.1 PCCOM Background](Tools/ttools.md#1091-pccom-background)  
+[10.9.2 Running PCCOM on the Target](Tools/ttools.md#1092-running-pccom-on-the-target)  
+[10.9.3 File Transfer Protocol of PCCOM](Tools/ttools.md#1093-file-transfer-protocol-of-pccom)  
+[10.10 pcget](Tools/ttools.md#1010-pcget)  
+[10.11 pcs](Tools/ttools.md#1011-pcs)  
+[10.12 pcsend](Tools/ttools.md#1012-pcsend)  
+[10.13 pmake](Tools/ttools.md#1013-pmake)  
+[10.13.1 Copyright Notice and Acknowledgment](Tools/ttools.md#10131-copyright-notice-and-acknowledgement)  
+[10.13.2 How to Customize pmake](Tools/ttools.md#10132-how-to-customize-pmake)  
+[10.13.3 Command Line Arguments](Tools/ttools.md#10133-command-line-arguements)  
+[10.13.4 Contents of a Makefile](Tools/ttools.md#10134-contents-of-a-makefile)  
+[10.13.5 Advanced pmake Techniques](Tools/ttools.md#10135-advanced-pmake-techniques)  
+[10.13.6 The Way Things Work](Tools/ttools.md#10136-the-way-things-work)  
+[10.14 Swat Stub](Tools/ttools.md#1014-swat-stub)
 
-	7.1	Creating Icons					 TIconEd : 339
-
-	7.2	Importing Icons					 TIconEd : 340
-
-	7.3	Editing Icons					 TIconEd : 340
-
-	7.4	Writing Source Code					 TIconEd : 341
-
-	7.5	Icon Databases					 TIconEd : 342
-
-	7.6	Exporting to Database					 TIconEd : 343
-
-8 	Resource Editor 	345
-
-	8.1	Glossary					 TResEd : 347
-
-	8.2	Getting Started					 TResEd : 350
-
-	8.3	What Needs to be Translated?					 TResEd : 350
-
-	8.4	Translating					 TResEd : 350
-
-	8.4.1	Choosing a new translation file				TResEd : 351
-
-	8.4.2	Main translation screen				TResEd : 351
-
-	8.4.3	Translating a Text String				TResEd : 352
-
-	8.4.4	Moving between chunks				TResEd : 353
-
-	8.4.5	Moving between resources				TResEd : 353
-
-	8.5	Resource Editor Menus					 TResEd : 354
-
-	8.5.1	File Menu				TResEd : 354
-
-	8.5.2	Edit Menu				TResEd : 355
-
-	8.5.3	Project Menu				TResEd : 355
-
-	8.5.4	Filter Menu				TResEd : 356
-
-	8.5.5	Utilities Menu				TResEd : 356
-
-	8.5.6	Window Menu				TResEd : 357
-
-	8.6	Creating an Executable					 TResEd : 357
-
-	8.7	Updating an Executable					 TResEd : 358
-
-	8.8	Testing Your New Executables					 TResEd : 359
-
-9 	The INI File 	361
-
-	9.1	How to Use the INI File					 TIni : 363
-
-	9.2	Categories in the INI File					 TIni : 364
-
-	9.2.1	[cards]				TIni : 370
-
-	9.2.2	[configure]				TIni : 371
-
-	9.2.3	[diskswap]				TIni : 372
-
-	9.2.4	[envelope]				TIni : 373
-
-	9.2.5	[envel<num>]				TIni : 374
-
-	9.2.6	[expressMenuControl]				TIni : 374
-
-	9.2.7	[fileManager]				TIni : 376
-
-	9.2.8	[input]				TIni : 378
-
-	9.2.9	[keyboard]				TIni : 382
-
-	9.2.10	[label]				TIni : 384
-
-	9.2.11	[label<num>]				TIni : 385
-
-	9.2.12	[link]				TIni : 386
-
-	9.2.13	[localization]				TIni : 387
-
-	9.2.14	[math]				TIni : 387
-
-	9.2.15	[modem]				TIni : 387
-
-	9.2.16	[<modem name>]				TIni : 388
-
-	9.2.17	[mouse]				TIni : 391
-
-	9.2.18	[net library]				TIni : 392
-
-	9.2.19	[paper]				TIni : 392
-
-	9.2.20	[paper<num>]				TIni : 393
-
-	9.2.21	[parallel]				TIni : 394
-
-	9.2.22	[paths]				TIni : 394
-
-	9.2.23	[printer]				TIni : 396
-
-	9.2.24	[<printer device name>]				TIni : 397
-
-	9.2.25	[screen 0]				TIni : 399
-
-	9.2.26	[serial]				TIni : 401
-
-	9.2.27	[sound]				TIni : 402
-
-	9.2.28	[spool]				TIni : 402
-
-	9.2.29	[system]				TIni : 403
-
-	9.2.30	[text]				TIni : 409
-
-	9.2.31	[ui]				TIni : 413
-
-	9.2.32	[<specific ui name>]				TIni : 421
-
-	9.2.33	[ui features]				TIni : 421
-
-	9.2.34	[welcome]				TIni : 428
-
-10 	Using Tools 	431
-
-	10.1	Tools Summary					 TTools : 433
-
-	10.2	Typical Development Session					 TTools : 434
-
-	10.3	File Types					 TTools : 435
-
-	10.4	Esp					 TTools : 439
-
-	10.5	Glue					 TTools : 440
-
-	10.6	Goc					 TTools : 443
-
-	10.7	Grev					 TTools : 444
-
-	10.8	mkmf					 TTools : 447
-
-	10.9	pccom					 TTools : 448
-
-	10.9.1	PCCOM Background				TTools : 448
-
-	10.9.2	Running PCCOM on the Target				TTools : 449
-
-	10.9.3	File Transfer Protocol of PCCOM				TTools : 455
-
-	10.10	pcget					 TTools : 461
-
-	10.11	pcs					 TTools : 462
-
-	10.12	pcsend					 TTools : 465
-
-	10.13	pmake					 TTools : 465
-
-	10.13.1	Copyright Notice and Acknowledgment				TTools : 466
-
-	10.13.2	How to Customize pmake				TTools : 467
-
-	10.13.3	Command Line Arguments				TTools : 469
-
-	10.13.4	Contents of a Makefile				TTools : 471
-
-	10.13.5	Advanced pmake Techniques				TTools : 493
-
-	10.13.6	The Way Things Work				TTools : 497
-
-	10.14	Swat Stub					 TTools : 498
-
-	Index 	ToolsIX : 499
