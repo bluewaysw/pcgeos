@@ -18,6 +18,18 @@ The basement of this repository is the source code used to build Breadbox Ensemb
 
 Document is work in progress.... stay tuned!
 
-# Collaboration
+
+## Building PC/GEOS SDK
+Build pmake tool:
+- cd pcgeos/Tools/pmake/pmake
+- wmake install
+
+Build all the other SDK Tools:
+- cd pcgeos/Installed/Tools
+- pmake
+
+Build all PC/GEOS (target) components:
+- cd pcgeos/Installed
+- pmake
 
 We are on https://bluewaysw.slack.com/ for more efficient collaboration. If you are a collaborator by issuing a pull request and you are registered at blog.bluewaysw.de for MyGEOS you will be invited to join us. Welcome!
