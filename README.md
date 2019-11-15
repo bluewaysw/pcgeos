@@ -10,7 +10,11 @@ The basement of this repository is the source code used to build Breadbox Ensemb
 ## Install WATCOM
 - Unzip WATCOM tools from the latest release-zip for instance to C:\WATCOM-V2
 - add C:\WATCOM-V2\binnt to your system path variable
+- add pcgeos\bin of the checkouf this repo to path variable
+- add perl to path variable
 - add WATCOM env variable: WATCOM=c:\WATCOM-V2
+- set ROOT_DIR=
+- set LOCAL_ROOT if needed
 
 Document is work in progress.... stay tuned!
 
