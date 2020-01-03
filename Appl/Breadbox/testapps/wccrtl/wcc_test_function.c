@@ -64,14 +64,27 @@ Boolean test_function__I4D() {
 }
 
 Boolean test_function__CHP() {
+
+    Boolean result = FALSE;
     
-    return FALSE;
+    result = result && test_scenario__CHP( (long double) .001, (long) 0);
+    result = result && test_scenario__CHP( (long double) .999, (long) 0);
+    result = result && test_scenario__CHP( (long double) 99.9, (long) 99);
+    result = result && test_scenario__CHP( (long double) -0.001, (long) 0);
+    result = result && test_scenario__CHP( (long double) -0.999, (long) 0);
+    result = result && test_scenario__CHP( (long double) -99.9, (long) -99);
+    
+    return result;
 }
 
-Boolean test_scenario__U4M(unsigned long factor1, unsigned long factor2, unsigned long exceptedValue) {
-    return ((factor1 * factor2) == exceptedValue) && ((factor2 * factor1) == exceptedValue);
+Boolean test_scenario__U4M(unsigned long factor1, unsigned long factor2, unsigned long expectedValue) {
+    return ((factor1 * factor2) == expectedValue) && ((factor2 * factor1) == expectedValue);
 }
 
-Boolean test_scenario__I4M(long factor1, long factor2, long exceptedValue) {
-    return ((factor1 * factor2) == exceptedValue) && ((factor2 * factor1) == exceptedValue);
+Boolean test_scenario__I4M(long factor1, long factor2, long expectedValue) {
+    return ((factor1 * factor2) == expectedValue) && ((factor2 * factor1) == expectedValue);
+}
+
+Boolean test_scenario__CHP(long double number, long expectedValue) {
+    return ((long) number) == expectedValue;
 }

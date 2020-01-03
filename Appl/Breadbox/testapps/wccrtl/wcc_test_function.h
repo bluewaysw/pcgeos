@@ -11,5 +11,6 @@ extern Boolean test_function__CHP();
 
 Boolean test_scenario__U4M(unsigned long factor1, unsigned long factor2, unsigned long exceptedValue);
 Boolean test_scenario__I4M(long factor1, long factor2, long exceptedValue);
+Boolean test_scenario__CHP(long double number, long exceptedValue);
 
 #endif

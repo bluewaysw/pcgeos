@@ -19,7 +19,7 @@ appobj WatcomRTLApp
 
 library	geos
 library	ui
-#library ansic
+library ansic
 
 resource AppResource ui-object
 resource Interface   ui-object
