@@ -17,10 +17,6 @@
  *	Release a region of a VM file
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: vmFFree.c,v 1.1 91/04/26 11:52:24 adam Exp $";
-#endif lint
 
 #include <config.h>
 #include "vmInt.h"

@@ -24,10 +24,6 @@
  *	source pass in MASM.
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: assert.c,v 1.12 93/09/09 12:34:45 adam Exp $";
-#endif lint
 
 #include    "esp.h"
 

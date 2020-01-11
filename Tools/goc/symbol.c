@@ -13,10 +13,6 @@
  *	Symbol module for uic
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: symbol.c,v 1.19 96/07/09 17:09:50 jimmy Exp $";
-#endif lint
 
 #include    <config.h>
 #include    "goc.h"
@@ -284,7 +280,7 @@ Symbol_Find(char *name, int allScopes)
 {
     Scope	*sptr, **sptrptr;
     Hash_Entry	  *entry;
-    int	    	    restrict = FALSE;
+    int	    	    restricted = FALSE;
 
     if (symdebug) {
 	fprintf(stderr, "Looking for symbol <%s> in ",name);
@@ -308,9 +304,9 @@ Symbol_Find(char *name, int allScopes)
 		}
 		return (NullSymbol);
 	    }
-	    restrict = restrict || sptr->restrict;
+	    restricted = restricted || sptr->restricted;
 	}
-	if (restrict) {
+	if (restricted) {
 	    if (symdebug) {
 		fprintf(stderr, "restricted => not found\n");
 	    }
@@ -535,13 +531,13 @@ Symbol_ClassUses(Symbol     *class,
  ***********************************************************************/
 Scope *
 Symbol_NewScope(Scope *parent,
-		int    restrict)
+		int    restricted)
 {
     Scope *scope;
 
     scope = (Scope *) malloc(sizeof(Scope));
     scope->parent = parent;
-    scope->restrict = restrict;
+    scope->restricted = restricted;
     scope->symbols = (Hash_Table *) malloc(sizeof(Hash_Table));
     Hash_InitTable(scope->symbols, 0, HASH_ONE_WORD_KEYS, 3);
 

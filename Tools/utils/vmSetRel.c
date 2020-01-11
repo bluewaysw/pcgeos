@@ -17,10 +17,6 @@
  *	Change the relocation routine for a VM File
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: vmSetRel.c,v 1.1 91/04/26 11:53:44 adam Exp $";
-#endif lint
 
 #include <config.h>
 #include "vmInt.h"

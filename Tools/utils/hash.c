@@ -38,12 +38,9 @@
  *
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: hash.c,v 1.4 96/05/20 18:55:46 dbaumann Exp $";
-#endif lint
 
 #include <config.h>
+#include <search.h>
 #include <compat/queue.h>
 #include <compat/string.h>
 
@@ -579,7 +576,7 @@ Hash(register Hash_Table    *tablePtr,
 	    }
 	    break;
 	case HASH_ONE_WORD_KEYS:
-	    i = (int) key;
+	    i = (int)(intptr_t) key;
 	    break;
 	case 2:
 	    i = ((int *) key)[0] + ((int *) key)[1];

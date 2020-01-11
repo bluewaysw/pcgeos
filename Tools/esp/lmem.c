@@ -53,10 +53,6 @@
  *	address to be automatically adjusted when handles are inserted.
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: lmem.c,v 3.10 93/02/12 18:47:58 adam Exp $";
-#endif lint
 
 #include    "esp.h"
 #include    <objfmt.h>

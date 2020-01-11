@@ -17,10 +17,6 @@
  *	Enter a null-terminated string into the table
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: stEntNL.c,v 1.1 91/04/26 11:49:52 adam Exp $";
-#endif lint
 
 #include <config.h>
 #include <compat/string.h>

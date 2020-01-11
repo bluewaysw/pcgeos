@@ -17,15 +17,12 @@
  *	Read a block into new memory from the file
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: vmAlRd.c,v 1.4 92/07/17 19:35:10 adam Exp $";
-#endif lint
 
 #include <config.h>
 #include "vmInt.h"
 
 #include <fcntl.h>
+#include <compat/stdlib.h>
 #include <compat/file.h>
 #include <errno.h>
 

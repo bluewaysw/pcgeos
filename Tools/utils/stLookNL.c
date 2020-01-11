@@ -17,10 +17,6 @@
  *	Lookup a null-terminated string into the table
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: stLookNL.c,v 1.3 96/05/20 18:57:31 dbaumann Exp $";
-#endif lint
 
 #include <config.h>
 #include "stInt.h"

@@ -22,11 +22,6 @@
  *	Change the size of a block and lock it down.
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: memRAlLk.c,v 1.1 91/04/26 11:48:27 adam Exp $";
-#endif lint
-
 #include <config.h>
 #include "memInt.h"
 

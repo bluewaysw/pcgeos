@@ -17,10 +17,6 @@
  *	Allocation of space in a VM file
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: vmFAl.c,v 1.2 92/06/02 21:18:20 adam Exp $";
-#endif lint
 
 #include <config.h>
 #include "vmInt.h"

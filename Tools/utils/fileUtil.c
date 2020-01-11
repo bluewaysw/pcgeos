@@ -27,15 +27,12 @@
  *      Thus, the WIN32 file functions are used here.
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: fileUtil.c,v 1.4 97/05/27 16:40:45 dbaumann Exp $";
-#endif lint
 
 #include <config.h>
 #include <compat/file.h>
 #include <fileUtil.h>
 #include <compat/windows.h>
+#include <compat/string.h>
 #include <errno.h>
 #include <stdarg.h>
 #ifdef _LINUX
@@ -443,11 +440,7 @@ FileUtil_GetTime(FileType file)
 #endif
 
 #if defined(unix) || defined(_LINUX)
-#if defined(_LINUX)
-    i = fstat(file->_handle, &stb);
-#else
-    i = fstat(file->_file, &stb);
-#endif
+    i = fstat(fileno(file), &stb);
     if (i < 0) {
 	return i;
     }
@@ -510,9 +503,7 @@ FileUtil_SprintError(char *result, char *fmt, ...)
 	va_end(argList);
     }
 #if defined(unix) || defined(_MSDOS) || defined(_LINUX)
-    if (errno < sys_nerr) {
-	sprintf(result, ": %s: error #%d\n", sys_errlist[errno], errno);
-    }
+	sprintf(result, ": %s: error #%d\n", strerror(errno), errno);
 #elif defined(_WIN32)
     /*
      * This turns GetLastError() into a human-readable string.

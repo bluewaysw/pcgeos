@@ -17,11 +17,6 @@
  *	Look up a string in a string table.
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: stLook.c,v 1.2 92/04/02 22:20:18 adam Exp $";
-#endif lint
-
 #include <config.h>
 #include "stInt.h"
 

@@ -22,11 +22,6 @@
  *	Lock a block and return its address.
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: memLock.c,v 1.5 91/04/26 11:48:18 adam Exp $";
-#endif lint
-
 #include <config.h>
 #include "memInt.h"
 

@@ -17,10 +17,6 @@
  *	Locate a VM block by user-assigned ID	
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: vmFind.c,v 1.5 91/04/26 11:52:30 adam Exp $";
-#endif lint
 
 #include <config.h>
 #include "vmInt.h"

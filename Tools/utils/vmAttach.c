@@ -17,10 +17,6 @@
  *	Attach a memory block to a vm block
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: vmAttach.c,v 1.5 91/04/26 11:51:25 adam Exp $";
-#endif lint
 
 #include <config.h>
 #include "vmInt.h"

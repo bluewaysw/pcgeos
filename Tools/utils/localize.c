@@ -48,7 +48,7 @@ DESCRIPTION:
 static FILE			*locOut;		/* output file      */
 static Hash_Table 		locHash;		/* all resources    */
 static ResourceSym 		*currentResource = NULL;/* currnet resource */
-static upcaseLinkerResourceNames; /* true iff using MetaWare */
+static int upcaseLinkerResourceNames; /* true iff using MetaWare */
 static char 	    	    	*locName = NULL;
 
 

@@ -17,11 +17,6 @@
  *	Release extra working space allocated for the table 
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: stClose.c,v 1.8 92/06/22 15:07:58 josh Exp $";
-#endif lint
-
 #include <config.h>
 #include "stInt.h"
 

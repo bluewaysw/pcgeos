@@ -33,10 +33,6 @@
  *	have none.
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: object.c,v 1.32 94/05/15 15:07:49 adam Exp $";
-#endif lint
 
 #include    "esp.h"
 #include    "expr.h"
@@ -1295,6 +1291,7 @@ ObjRelocType(SymbolPtr	tag,	    /* VarData tag for which table is
 	    }
 	    break;
 	}
+	default:;
     }
 }
 

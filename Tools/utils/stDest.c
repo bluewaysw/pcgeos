@@ -17,11 +17,6 @@
  *	Free all space occupied by a string table.
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: stDest.c,v 1.1 91/04/26 11:49:37 adam Exp $";
-#endif lint
-
 #include <config.h>
 #include "stInt.h"
 

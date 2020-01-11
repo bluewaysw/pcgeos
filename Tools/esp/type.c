@@ -34,10 +34,6 @@
  *	Functions to deal with type descriptions.
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: type.c,v 1.13 94/05/15 15:09:07 adam Exp $";
-#endif lint
 
 
 #include    "esp.h"
@@ -58,29 +54,29 @@ static struct {
     TypePtr 	    ptrto;
     int	    	    size;
 }	typeInts[] = {
-    TYPE_INT, 	    0,	0,  0,	0,
-    TYPE_INT,	    0,	0,  0,	1,
-    TYPE_INT,	    0,	0,  0,	2,
-    TYPE_INT,	    0,	0,  0,	3,  /* BOGUS */
-    TYPE_INT,	    0,	0,  0,	4,
-    TYPE_INT,	    0,	0,  0,	5,  /* BOGUS */
-    TYPE_INT,	    0,	0,  0,	6,  /* BOGUS */
-    TYPE_INT,	    0,	0,  0,	7,  /* BOGUS */
-    TYPE_INT,	    0,	0,  0,	8,
-    TYPE_INT,	    0,	0,  0,	9,  /* BOGUS */
-    TYPE_INT,	    0,	0,  0,	10,
+    { TYPE_INT, 	    0,	0,  0,	0, },
+    { TYPE_INT,	    0,	0,  0,	1, },
+    { TYPE_INT,	    0,	0,  0,	2, },
+    { TYPE_INT,	    0,	0,  0,	3,  /* BOGUS */ },
+    { TYPE_INT,	    0,	0,  0,	4, },
+    { TYPE_INT,	    0,	0,  0,	5,  /* BOGUS */ },
+    { TYPE_INT,	    0,	0,  0,	6,  /* BOGUS */ },
+    { TYPE_INT,	    0,	0,  0,	7,  /* BOGUS */ },
+    { TYPE_INT,	    0,	0,  0,	8, },
+    { TYPE_INT,	    0,	0,  0,	9,  /* BOGUS */ },
+    { TYPE_INT,	    0,	0,  0,	10, },
 },	typeSInts[] = {
-    TYPE_SIGNED,    0,	0,  0,	0,
-    TYPE_SIGNED,    0,	0,  0,	1,
-    TYPE_SIGNED,    0,	0,  0,	2,
-    TYPE_SIGNED,    0,	0,  0,	3,  /* BOGUS */
-    TYPE_SIGNED,    0,	0,  0,	4,
-    TYPE_SIGNED,    0,	0,  0,	5,  /* BOGUS */
-    TYPE_SIGNED,    0,	0,  0,	6,  /* BOGUS */
-    TYPE_SIGNED,    0,	0,  0,	7,  /* BOGUS */
-    TYPE_SIGNED,    0,	0,  0,	8,
-    TYPE_SIGNED,    0,	0,  0,	9,  /* BOGUS */
-    TYPE_SIGNED,    0,	0,  0,	10,
+    { TYPE_SIGNED,    0,	0,  0,	0, },
+    { TYPE_SIGNED,    0,	0,  0,	1, },
+    { TYPE_SIGNED,    0,	0,  0,	2, },
+    { TYPE_SIGNED,    0,	0,  0,	3,  /* BOGUS */ },
+    { TYPE_SIGNED,    0,	0,  0,	4, },
+    { TYPE_SIGNED,    0,	0,  0,	5,  /* BOGUS */ },
+    { TYPE_SIGNED,    0,	0,  0,	6,  /* BOGUS */ },
+    { TYPE_SIGNED,    0,	0,  0,	7,  /* BOGUS */ },
+    { TYPE_SIGNED,    0,	0,  0,	8, },
+    { TYPE_SIGNED,    0,	0,  0,	9,  /* BOGUS */ },
+    { TYPE_SIGNED,    0,	0,  0,	10, },
 };
 #define NUM_INTS (sizeof(typeInts)/sizeof(typeInts[0]))
 #define NUM_SINTS (sizeof(typeSInts)/sizeof(typeSInts[0]))

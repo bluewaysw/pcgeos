@@ -32,10 +32,6 @@
  *	necessary that is.
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: fixup.c,v 1.22 95/02/17 16:26:00 adam Exp $";
-#endif lint
 
 #include    "esp.h"
 #include    <objfmt.h>

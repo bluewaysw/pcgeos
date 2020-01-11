@@ -25,16 +25,13 @@
  *	BYTE-ORDER. THE CALLER MUST BE AWARE OF THIS.
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: vmHeader.c,v 1.4 92/07/17 19:35:24 adam Exp $";
-#endif lint
 
 #include <config.h>
 
 #include <fcntl.h>
 #include "vmInt.h"
 #include <compat/file.h>
+#include <compat/string.h>
 #if defined(__HIGHC__) || defined(_WIN32) || defined(__WATCOMC__)
 # include <stdio.h>
 #endif
@@ -64,9 +61,9 @@ VMGetHeader(VMHandle	    vmHandle,
     VMFilePtr	    file = (VMFilePtr)vmHandle;
 
     if (file->flags & VM_2_0) {
-	bcopy(&file->fileHdr.v2.VMFH_gfh, gfhPtr, sizeof(GeosFileHeader2));
+	memcpy(gfhPtr, &file->fileHdr.v2.VMFH_gfh, sizeof(GeosFileHeader2));
     } else {
-	bcopy(&file->fileHdr.v1.VMFH_gfh, gfhPtr, sizeof(GeosFileHeader));
+	memcpy(gfhPtr, &file->fileHdr.v1.VMFH_gfh, sizeof(GeosFileHeader));
     }
 }
 
@@ -95,15 +92,14 @@ VMSetHeader(VMHandle	    vmHandle,
 {
     VMFilePtr	file = (VMFilePtr)vmHandle;
     long	bytesWritten = 0;
-    int		seekPos = 0;
 
     FileUtil_Seek(file->fd, 0L, SEEK_SET);
     if (file->flags & VM_2_0) {
-	bcopy(gfhPtr, &file->fileHdr.v2.VMFH_gfh, sizeof(GeosFileHeader2));
+	memcpy(&file->fileHdr.v2.VMFH_gfh, gfhPtr, sizeof(GeosFileHeader2));
 	FileUtil_Write(file->fd, (unsigned const char *)&file->fileHdr.v2.VMFH_gfh,
 		       sizeof(GeosFileHeader2), &bytesWritten);
     } else {
-	bcopy(gfhPtr, &file->fileHdr.v1.VMFH_gfh, sizeof(GeosFileHeader));
+	memcpy(&file->fileHdr.v1.VMFH_gfh, gfhPtr, sizeof(GeosFileHeader));
  	FileUtil_Write(file->fd, (unsigned const char *)&file->fileHdr.v1.VMFH_gfh,
 		       sizeof(GeosFileHeader), &bytesWritten);
     }

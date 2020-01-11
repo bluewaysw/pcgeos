@@ -33,9 +33,6 @@
  *	A grammar to parse code for the assembler.
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid = "$Id: parse.y,v 3.73 95/09/20 14:46:15 weber Exp $";
-#endif lint
 
 #include    <config.h>
 
@@ -305,19 +302,19 @@ static struct {
 			 * for @CurSeg), we just copy the new value into the
 			 * block and alter the length */
 }	    predefs[] = {
-    "@CurSeg",	    NULL,
+    { "@CurSeg",	    NULL, },
 #define PD_CURSEG   	0
-    "@Cpu", 	    NULL,
+    { "@Cpu", 	    NULL, },
 #define PD_CPU	    	1
-    "@CurProc",	    NULL,
+    { "@CurProc",	    NULL, },
 #define PD_CURPROC  	2
-    "@FileName",    NULL,
+    { "@FileName",    NULL, },
 #define PD_FILENAME 	3
-    "@CurClass",    NULL,
+    { "@CurClass",    NULL, },
 #define PD_CURCLASS 	4
-    "@File",	    NULL,						    
+    { "@File",	    NULL, },
 #define PD_FILE	    	5
-    "@ArgSize",	    NULL,
+    { "@ArgSize",	    NULL, },
 #define PD_ARGSIZE  	6
 };
 
@@ -350,8 +347,6 @@ static void 	DupExpr(int num, int start);
 static void 	StoreSubExpr(Expr *);
 
 static void 	FilterGenerated(SymbolPtr   sym);
-void 		yyerror(char *fmt, ...);
-void 		yywarning(char *fmt, ...);
 static int  	ParseAdjustLocals(SymbolPtr, Opaque);
 static int  	ParseCountLocals(SymbolPtr, Opaque);
 
@@ -966,7 +961,8 @@ StoreSubExpr(Expr   *expr)
  * This is now defined as union SemVal in scan.h, to avoid problems with
  * High C.
  *****************************************************************************/
-%pure_parser
+%pure-parser
+%debug
 
 %token <model>	MEMMODEL
 %token <lang>	LANGUAGE
@@ -1008,7 +1004,7 @@ StoreSubExpr(Expr   *expr)
 		MASK MASTER METHOD MOD MODEL
 		NE NEAR NORELOC NOTHING
 		OFFPART OFFSET ON_STACK ORG
-		PRIVATE PROCESSOR PROC PROTOMINOR PROTORESET PTR PUBLIC
+		PRIVATE PROC PROTOMINOR PROTORESET PTR PUBLIC
 		RECORD RELOC REPT RESID
 		SEG SEGMENT SEGREGOF SEGPART SIZE SIZESTR STATIC STRUC 
 		SUBSTR SUPER
@@ -1078,8 +1074,9 @@ StoreSubExpr(Expr   *expr)
  *  interpretation by shifting, which is what we want.
  * 2 other s/r conflicts come from the def/defList definition. It does the
  *  right thing, and I've not the time to do it right.
+ * 3...5 I have no idea about. <dg>
  */
-%expect		3
+%expect		5
 
 %%
 /*
@@ -1550,7 +1547,7 @@ localID		: IDENT
 			yywarning("definition of %i as local variable shadows global symbol",
 				  $1->name);
 		    }
-		    $$ = $1->name
+		    $$ = $1->name;
 		}
 		| /* empty */ { $$ = NullID; }
 		| sym
@@ -5636,7 +5633,7 @@ op		: SHLD operand1 flexiComma operand2 flexiComma CLorCexpr
 op		: DEBUG	    	    { lexdebug = yydebug = $1; }
 		| SHOWM	    	    { showmacro = $1; }
 		| MASM	    	    { masmCompatible = $1; }
-		| BREAK 	    { _asm int 3; }
+		| BREAK 	    { /* _asm int 3; --- not portable <dtrg> */ }
 		| FALLTHRU	    { fall_thru = 1; }
 		| FALLTHRU operand1
 		{
@@ -6292,13 +6289,13 @@ ParseStackOverflow(char		*msg,	    /* Message if we decide not to */
  ***********************************************************************/
 /*VARARGS1*/
 void
-yyerror(char *fmt, ...)
+yyerror(const char *fmt, ...)
 {
     va_list	args;
 
     va_start(args, fmt);
 
-    NotifyInt(NOTIFY_ERROR, curFile->name, yylineno, fmt, args);
+    NotifyInt(NOTIFY_ERROR, curFile->name, yylineno, (char*)fmt, args);
 
     va_end(args);
 }
@@ -6355,13 +6352,13 @@ FilterGenerated(SymbolPtr   sym)
  ***********************************************************************/
 /*VARARGS1*/
 void
-yywarning(char *fmt, ...)
+yywarning(const char *fmt, ...)
 {
     va_list	args;
 
     va_start(args, fmt);
 
-    NotifyInt(NOTIFY_WARNING, curFile->name, yylineno, fmt, args);
+    NotifyInt(NOTIFY_WARNING, curFile->name, yylineno, (char*)fmt, args);
 
     va_end(args);
 }

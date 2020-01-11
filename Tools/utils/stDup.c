@@ -17,11 +17,6 @@
  *	Duplicate a string-table entry from one table to another
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: stDup.c,v 1.5 91/04/26 11:49:45 adam Exp $";
-#endif lint
-
 #include <config.h>
 #include "stInt.h"
 

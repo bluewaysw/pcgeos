@@ -22,11 +22,6 @@
  *	PC/GEOS object file.
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: objSwap.c,v 1.10 96/05/20 18:57:19 dbaumann Exp $";
-#endif lint
-
 #include <config.h>
 #include <os90.h>
 #include "objSwap.h"
@@ -730,7 +725,7 @@ ObjSwap_Reloc(VMHandle	    vmHandle,	/* File from whence it comes */
 	      MemHandle	    handle, 	/* Its memory handle */
 	      genptr block) 	/* The base of the locked block */
 {
-    static const VMRelocRoutine  *relocRoutines[] = {
+    static VMRelocRoutine  *relocRoutines[] = {
 	ST_Reloc,   	      /* OID_STRING_HEAD */
 	ST_Reloc,   	      /* OID_STRING_CHAIN */
 	ObjSwapRelBlock,      /* OID_REL_BLOCK */
@@ -780,7 +775,7 @@ ObjSwap_Reloc_NewFormat(
 	      MemHandle	    handle, 	/* Its memory handle */
 	      genptr block) 	/* The base of the locked block */
 {
-    static const VMRelocRoutine  *relocRoutines_NewFormat[] = {
+    static VMRelocRoutine  *relocRoutines_NewFormat[] = {
 	ST_Reloc, 	  /* OID_STRING_HEAD */
 	ST_Reloc,    	  /* OID_STRING_CHAIN */
 	ObjSwapRelBlock,  /* OID_REL_BLOCK */

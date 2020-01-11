@@ -21,15 +21,12 @@
  *	Open a VM file
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: vmOpen.c,v 1.32 96/05/20 18:58:32 dbaumann Exp $";
-#endif lint
 
 #include <config.h>
 #include "vmInt.h"
 
 #include <os90File.h>
+#include <compat/stdlib.h>
 #include <compat/file.h>
 #include <compat/string.h>
 #include <stdio.h>
@@ -72,7 +69,7 @@ VMInitFile(VMFilePtr	file)
     VMHeader	*hdr;	    /* Allocated header to be filled-in */
     VMBlock 	*block;	    /* General block pointer */
     MemHandle  	hdrHandle;  /* Memory handle of header block */
-    char    	*cp, *cp2;
+    char    	*cp;
     int		returnCode;
     long		bytesWritten = 0;
 
@@ -101,8 +98,10 @@ VMInitFile(VMFilePtr	file)
      */
     cp = rindex(file->name, '/');
 #if defined(_WIN32) || defined(_MSDOS)
-    cp2 = rindex(file->name, '\\');
-    cp = (cp2 > cp) ? cp2 : cp;
+	{
+    	int cp2 = rindex(file->name, '\\');
+		cp = (cp2 > cp) ? cp2 : cp;
+	}
 #endif
     if (cp == NULL) {
 	cp = file->name;
@@ -288,7 +287,6 @@ VMOpen(short	    	flags,      /* Flags for open */
 	    /*
 	     * Find a unique name using the template created above
 	     */
-#if defined(_LINUX)
 	  {
     	int fp = mkstemp(file->name);
     	if(fp == -1) {
@@ -302,15 +300,6 @@ VMOpen(short	    	flags,      /* Flags for open */
 				file->fd = fdopen(fp, "w+");
 			}
     }
-#else
-	    if (mktemp(file->name) != NULL) {
-		returnCode = FileUtil_Open(&(file->fd), file->name,
-					   oflags, sflags, 0666);
-		if (returnCode == TRUE) {
-		    break;
-		}
-	    }
-#endif
 	    break;
 	}
 	case VMO_CREATE_TRUNCATE:
@@ -393,7 +382,7 @@ decode_access:
     FileUtil_Seek(file->fd, 0L, SEEK_SET);
 
     errno = 0;			/* In case file smaller than file header */
-    FileUtil_Read(file->fd, (char *)&file->fileHdr, HEADER_SIZE, &bytesRead);
+    FileUtil_Read(file->fd, (void *)&file->fileHdr, HEADER_SIZE, &bytesRead);
     switch (bytesRead) {
 	case 0:
 	    /*

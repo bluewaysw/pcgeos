@@ -17,10 +17,6 @@
  *	Detach a memory handle from a VM block handle
  *
  ***********************************************************************/
-#ifndef lint
-static char *rcsid =
-"$Id: vmDetach.c,v 1.5 91/04/26 11:51:50 adam Exp $";
-#endif lint
 
 #include <config.h>
 #include "vmInt.h"
@@ -86,7 +82,7 @@ VMDetach(VMHandle   	vmHandle,
 	    /*
 	     * No copy of the block in the file -- choke now.
 	     */
-	    return((MemHandle)NULL);
+	    return 0;
 	}
     }
     
