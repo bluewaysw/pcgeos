@@ -62,9 +62,7 @@ WCC_TEXT        SEGMENT BYTE PUBLIC 'CODE'
 	mul bx				; ax := low( high( int2 ) * low( int2 ) ) --> part4
 						; dx := high( high( int2 ) * low( int2 ) ) --> part3
 
-	xchg ax, dx
-	add ax, cx			; ax := part 3 + part 1 + part 2
-	xchg ax, dx
+	add dx, cx			; dx := part 3 + part 1 + part 2
 
 	ret
 
