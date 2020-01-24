@@ -213,6 +213,45 @@ ustrncmp(const char *s1, const char *s2, unsigned n)
 }
 
 /***********************************************************************
+ *				RenameFileSrcMapEntryy
+ ***********************************************************************
+ * SYNOPSIS:	   Changes the key (source file name) in the sources
+ *                 hash map. We assume that the old name entry is
+ *		   actually there before the call, otherwise assert.
+ * CALLED BY:	    EXTERNAL
+ * RETURN:	    Nothing
+ * SIDE EFFECTS:    ?
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	3/17/91		Initial Revision
+ *
+ ***********************************************************************/
+void
+RenameFileSrcMapEntry(ID oldName, ID newName)
+{
+    Hash_Entry	    *he, *he2;
+    Boolean 	    new;
+    Vector	    v;
+    
+    he = Hash_FindEntry(&tsrcMap, (SpriteAddress)oldName);		
+    if(he) {
+	v = Hash_GetValue(he);
+	Hash_SetValue(he, NULL);
+	he2 = Hash_CreateEntry(&tsrcMap, (SpriteAddress)newName, &new);
+	assert(new);
+	Hash_SetValue(he2, v);
+	Hash_DeleteEntry(&tsrcMap, he);
+    }
+    else {
+    	assert(FALSE);
+    }
+}
+
+/***********************************************************************
  *				AddSrcMapEntry
  ***********************************************************************
  * SYNOPSIS:	    Record another SrcMap entry needed for the passed

@@ -281,6 +281,8 @@ extern SegDesc	    	*globalSeg; /* Descriptor for the nameless global
 extern void AddSrcMapEntry(ID   fileName, SegDesc *sd,
 			   int start, int end);
 
+extern void RenameFileSrcMapEntry(ID   oldName, ID newName);
+
 extern int ustrncmp(const char *s1, const char *s2, unsigned n);
 
 /*

@@ -838,6 +838,107 @@ Pass1MSAddLines(SegDesc	    *sd,    	/* Segment to which to add the lines */
 }
 
 /***********************************************************************
+ *				Pass1MSReplaceFileName
+ ***********************************************************************
+ * SYNOPSIS:	    Add the line number information from the current
+ *	    	    object record to the given segment's table.
+ * CALLED BY:	    Pass1MS_Load
+ * RETURN:	    Nothing
+ * SIDE EFFECTS:    a few.
+ *
+ * STRATEGY:
+ *	If segment has no line information yet, create a line map and
+ *	initial block, pointing the lineH and lineT to it.
+ *
+ *	while there are line number records remaining:
+ *	    Lock down the tail line block. If it's not at capacity, relocate &
+ *	    copy as many line number records as will fit in the block.
+ *
+ *	    If any line numbers remain, allocate and initialize a new block.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	3/ 1/91		Initial Revision
+ *
+ ***********************************************************************/
+static void
+Pass1MSReplaceFileName(
+		ID	    oldName,    	/* First record to add */
+		ID	    newName) 	/* Bytes of data in the whole record */
+{
+    int i;
+    ObjLineHeader   	*olh;	    /* Header for current line block */
+    ObjLine 	    	*ol;	    /* Current line entry being filled */
+    VMBlockHandle	next, last;
+    for (i = Vector_Length(segments)-1; i >= 0; i--) {
+	SegDesc	    	    *sd;
+
+	Vector_Get(segments, i, &sd);
+	
+	next = sd->lineT;
+	if (next != 0) {
+		
+	    word	    curSize;	    /* Size of current line block */
+	    word	    newSize;	    /* Size it should be */
+	    MemHandle   mem;    	    /* Memory handle for resizing it */
+	    word        spaceLeft;	    /* Number of bytes left in it that we
+					     * may fill */
+	    int 	    numLeft;	    /* Number of line entries we have left
+					     * to fill from our buffer */
+	    int 	    prevStart = -1;
+	    int 	    prevLine = -1;
+	    int nlines;
+	    Boolean first = TRUE;
+	
+	    VMInfo(symbols, next, &curSize, (MemHandle *)NULL, (VMID *)NULL);
+	    olh = (ObjLineHeader *)VMLock(symbols, next, &mem);
+
+	    if(olh->num > 0) {
+		ObjLine	*olend;		    
+		
+		ol = ObjFirstEntry(olh, ObjLine);
+		
+		olend = ol + olh->num;
+		nlines = olh->num;
+
+		while (ol < olend) {
+			nlines--;
+
+		    if(first) {
+			
+			    if(*(ID *)ol == oldName) {
+    				
+    			    *(ID *)ol = newName;
+    			    VMDirty(symbols, next);
+    			}
+			first = FALSE;
+			 
+		    } else if (ol->line == 0) {
+			ol++;
+			if(*(ID *)ol == oldName) {
+				
+			    *(ID *)ol = newName;
+			    VMDirty(symbols, next);
+			}
+		    }
+		    ol++;
+		}
+		
+	    }
+	    /*
+	     * Unlock the tail line block, whether we used it or not.
+ 	     */
+	     last = next;
+	     next = olh->next;
+	     VMUnlockDirty(symbols, last);
+	}
+    }
+    
+    RenameFileSrcMapEntry(oldName, newName);    
+}
+
+/***********************************************************************
  *				Pass1MSCountBlocks
  ***********************************************************************
  * SYNOPSIS:	    Count the number of repeated blocks there are holding
@@ -1156,6 +1257,7 @@ Pass1MS_CountRels(const char   	*file,	    /* Object file being read */
 		     */
 		    nrel += 1;
 		    break;
+		default:
 		case FLT_HIGH_BYTE:
 		    Notify(NOTIFY_ERROR,
 			   "%s: unsupported fixup type FLT_HIGH_BYTE",
@@ -1447,7 +1549,6 @@ Pass1MS_ProcessObject(const char  *file,
     int	    	    done = FALSE;
 	int	recno = 0;
 
-printf("Pass1MS_ProcessObject %s\n", file);
     MSObj_Init(f);
     CV_Init(file, f);
 		CV32_Init(file, f);
@@ -1474,15 +1575,36 @@ printf("Pass1MS_ProcessObject %s\n", file);
 		/*
 		 * Extract the source file name out and enter it into the
 		 * string table, recording the ID for LINNUM record translation.
+		 * for WATCOM, only apply if there is actually a name.
 		 */
-		msobj_CurFileName = ST_Enter(symbols, strings, (char *)bp+1,
-					     *bp);
+		 if(*bp) {
+		    msobj_CurFileName = ST_Enter(symbols, strings, (char *)bp+1,
+						*bp);
+		}
 		break;
 	    }
 	    case MO_COMENT:
 		/*
 		 * Handle Turbo C type records here...
 		 */
+		if(
+		 (reclen > 3) &&
+		 (bp[1] == 0x9f) &&	/* class 0 */
+		 (bp[2] == '@'))
+  		{
+		    ID newName;
+		    /*
+		     * Entertaining comment record placed in the output file by
+		     * GOC to tell us the actual source file name under metaware.
+		     */
+		    newName = ST_Enter(symbols, strings, (char *)&bp[3],
+						   reclen-3);
+		    /*
+		     *
+	   	     */
+		    Pass1MSReplaceFileName(msobj_CurFileName, newName);
+						msobj_CurFileName = newName;
+		}		
 		break;
 	    case MO_MODEND:
 		/*
