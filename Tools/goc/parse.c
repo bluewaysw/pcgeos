@@ -2384,7 +2384,16 @@ yyreduce:
 	       */
 	      Output("pragma Comment(\"@%s\");\n", inFile);
 	      break;
-	    case COM_BORL: case COM_MSC: case COM_WATCOM:
+	      
+	    case COM_WATCOM:
+	      /*
+	       * Medium perfect hack to pass the real file name
+	       * to WATCOM.
+	       */
+	      Output("#pragma comment(lib, \"@%s\");\n", inFile);
+	      break;
+		
+	    case COM_BORL: case COM_MSC: 
 	      break;
 	    }
 	    /* output our first line directive */
