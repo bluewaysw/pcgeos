@@ -53,12 +53,13 @@ library math
 library sound
 library color
 library game
+library ansic
 
 exempt color
 exempt game
 exempt math
 exempt sound
-exempt borlandc
+exempt ansic
 
 #
 # Resources: list all resource blocks which are used by the application whose
