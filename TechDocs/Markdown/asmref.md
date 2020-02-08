@@ -13,3 +13,10 @@
 
 **[3 Structures](asmref/asmstrac.md)**  
 [3.1 Structures A-C](asmref/asmstrac.md#31-structures-a-c)  
+[3.2 Structures D-F](asmref/asmstrdf.md#32-structures-d-f)  
+[3.3 Structures G-G](asmref/asmstrgg.md#33-structures-g-g)  
+[3.4 Structures H-M](asmref/asmstrhm.md#34-structures-h-m)  
+[3.5 Structures N-R](asmref/asmstrnr.md#35-structures-n-r)  
+[3.6 Structures S-S](asmref/asmstrss.md#36-structures-s-s)  
+[3.7 Structures T-U](asmref/asmstrtu.md#37-structures-t-u)  
+[3.8 Structures V-Z](asmref/asmstrvz.md#38-structures-v-z)  
