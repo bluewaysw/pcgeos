@@ -49,6 +49,7 @@ library	ui
 library	sound
 library game
 library color
+library ansic
 
 exempt	sound
 exempt game
