@@ -1,39 +1,39 @@
-SLIDES.rdef: GENERIC.UIH PRODUCT.UIH IMPEX.UIH OBJECTS/TEXT/TCTRL.UIH \
-                RULER.UIH OBJECTS/COLORC.UIH OBJECTS/STYLES.UIH \
-                ART/MKRSLIDES.UI ART/MKRTINYAPP.UI ART/MKRSLIDESDOC.UI \
-                ART/MKRTINYDOC.UI ART/MKRPREV.UI ART/MKRNEXT.UI
-SLIDES.obj \
-SLIDES.eobj: GEOS.DEF HEAP.DEF GEODE.DEF RESOURCE.DEF EC.DEF VM.DEF \
-                OBJECT.DEF LMEM.DEF GRAPHICS.DEF FONTID.DEF FONT.DEF \
-                COLOR.DEF WIN.DEF TIMER.DEF FILE.DEF CHAR.DEF \
-                LOCALIZE.DEF SLLANG.DEF GSTRING.DEF TEXT.DEF \
-                OBJECTS/WINC.DEF OBJECTS/METAC.DEF CHUNKARR.DEF \
-                GEOWORKS.DEF INITFILE.DEF LIBRARY.DEF OBJECTS/INPUTC.DEF \
-                UI.DEF INPUT.DEF HWR.DEF OBJECTS/PROCESSC.DEF GCNLIST.DEF \
-                TIMEDATE.DEF OBJECTS/TEXT/TCOMMON.DEF STYLESH.DEF \
-                IACP.DEF OBJECTS/UIINPUTC.DEF OBJECTS/VISC.DEF \
-                OBJECTS/VCOMPC.DEF OBJECTS/VCNTC.DEF INTERNAL/VUTILS.DEF \
-                OBJECTS/GENC.DEF DISK.DEF DRIVE.DEF UDIALOG.DEF \
-                OBJECTS/GINTERC.DEF TOKEN.DEF OBJECTS/CLIPBRD.DEF \
-                OBJECTS/GSYSC.DEF OBJECTS/GPROCC.DEF ALB.DEF \
-                OBJECTS/GFIELDC.DEF OBJECTS/GSCREENC.DEF \
-                OBJECTS/GFSELC.DEF OBJECTS/GVIEWC.DEF OBJECTS/GCONTC.DEF \
-                OBJECTS/GCTRLC.DEF OBJECTS/GDOCC.DEF OBJECTS/GDOCCTRL.DEF \
-                OBJECTS/GDOCGRPC.DEF OBJECTS/GEDITCC.DEF \
-                OBJECTS/GVIEWCC.DEF OBJECTS/GTOOLCC.DEF \
-                OBJECTS/GPAGECC.DEF OBJECTS/GPENICC.DEF \
-                OBJECTS/GGLYPHC.DEF OBJECTS/GTRIGC.DEF \
-                OBJECTS/GBOOLGC.DEF OBJECTS/GITEMGC.DEF \
-                OBJECTS/GDLISTC.DEF OBJECTS/GITEMC.DEF OBJECTS/GBOOLC.DEF \
-                OBJECTS/GDISPC.DEF OBJECTS/GDCTRLC.DEF OBJECTS/GPRIMC.DEF \
-                OBJECTS/GAPPC.DEF OBJECTS/GTEXTC.DEF OBJECTS/GGADGETC.DEF \
-                OBJECTS/GVALUEC.DEF OBJECTS/GTOOLGC.DEF \
-                INTERNAL/GUTILS.DEF OBJECTS/HELPCC.DEF OBJECTS/EMENUC.DEF \
-                OBJECTS/EMOMC.DEF OBJECTS/EMTRIGC.DEF INTERNAL/UPROCC.DEF \
-                OBJECTS/VTEXTC.DEF SPOOL.DEF PRINT.DEF \
-                INTERNAL/PRODFEATURES.DEF HUGEARR.DEF DBASE.DEF IMPEX.DEF \
-                IECOMMON.DEF INTERNAL/CONVERT.DEF SAVER.DEF \
-                OBJECTS/COLORC.DEF INTERNAL/IM.DEF INTERNAL/SEMINT.DEF \
-                SLIDES.RDEF
+slides.rdef: generic.uih product.uih impex.uih Objects/Text/tCtrl.uih \
+                ruler.uih Objects/colorC.uih Objects/styles.uih \
+                Art/mkrSlides.ui Art/mkrTinyApp.ui Art/mkrSlidesDoc.ui \
+                Art/mkrTinyDoc.ui Art/mkrPrev.ui Art/mkrNext.ui
+slides.obj \
+slides.eobj: geos.def heap.def geode.def resource.def ec.def vm.def \
+                object.def lmem.def graphics.def fontID.def font.def \
+                color.def win.def timer.def file.def char.def \
+                localize.def sllang.def gstring.def text.def \
+                Objects/winC.def Objects/metaC.def chunkarr.def \
+                geoworks.def initfile.def library.def Objects/inputC.def \
+                ui.def input.def hwr.def Objects/processC.def gcnlist.def \
+                timedate.def Objects/Text/tCommon.def stylesh.def \
+                iacp.def Objects/uiInputC.def Objects/visC.def \
+                Objects/vCompC.def Objects/vCntC.def Internal/vUtils.def \
+                Objects/genC.def disk.def drive.def uDialog.def \
+                Objects/gInterC.def token.def Objects/clipbrd.def \
+                Objects/gSysC.def Objects/gProcC.def alb.def \
+                Objects/gFieldC.def Objects/gScreenC.def \
+                Objects/gFSelC.def Objects/gViewC.def Objects/gContC.def \
+                Objects/gCtrlC.def Objects/gDocC.def Objects/gDocCtrl.def \
+                Objects/gDocGrpC.def Objects/gEditCC.def \
+                Objects/gViewCC.def Objects/gToolCC.def \
+                Objects/gPageCC.def Objects/gPenICC.def \
+                Objects/gGlyphC.def Objects/gTrigC.def \
+                Objects/gBoolGC.def Objects/gItemGC.def \
+                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
+                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
+                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
+                Objects/gValueC.def Objects/gToolGC.def \
+                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
+                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
+                Objects/vTextC.def spool.def print.def \
+                Internal/prodFeatures.def hugearr.def dbase.def impex.def \
+                ieCommon.def Internal/convert.def saver.def \
+                Objects/colorC.def Internal/im.def Internal/semInt.def \
+                slides.rdef
 
-SlidesEC.geo Slides.geo : GEOS.LDF UI.LDF TEXT.LDF IMPEX.LDF CONVERT.LDF SAVER.LDF COLOR.LDF 
+slidesEC.geo slides.geo : geos.ldf ui.ldf text.ldf impex.ldf convert.ldf saver.ldf color.ldf 

@@ -22,12 +22,12 @@ exempt color
 exempt game
 exempt sound
 
-resource APPRESOURCE	 	object
-resource INTERFACE		 	object
-resource APPMONIKERRESOURCE object
-resource QTIPSRESOURCE	 	object
-resource INTERFACEOPTION 	object
-resource BALLRESOURCE		object
+resource AppResource	 	object
+resource Interface		 	object
+resource AppMonikerResource object
+resource QTipsResource	 	object
+resource InterfaceOption 	object
+resource BallResource		object
 
 export PaddleProcessClass
 

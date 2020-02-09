@@ -6,8 +6,8 @@
 GEODE           = radiolib
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = RADIOLIB.H RADIOLIB.GOC
-OBJS            = RADIOLIB.obj
+SRCS            = radiolib.h radiolib.goc
+OBJS            = radiolib.obj
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = radiolib

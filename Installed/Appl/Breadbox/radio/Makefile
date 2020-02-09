@@ -6,9 +6,9 @@
 GEODE           = radio
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = RADIO.GOC Breadbox.goh Fmnote.goh Icon.goh Onoff.goh\
-                  BBXREG.GOH
-OBJS            = RADIO.obj
+SRCS            = radio.goc onoff.goh bbreg24.goh bbxreg.goh fmnote.goh\
+                  icon.goh
+OBJS            = radio.obj
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk

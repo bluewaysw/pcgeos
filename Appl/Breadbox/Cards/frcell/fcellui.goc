@@ -1,0 +1,664 @@
+/***********************************************************************
+*     Copyright 1994-2002  Breadbox Computer Company LLC
+* PROJECT:	Anarchy
+* MODULE:	FreeCell  (porting from a previous ESP anarchy project using
+*                      Nate's cards.goh header file)
+* FILE:		fcellui.goc
+*
+* AUTHOR:	jfh 12/02
+*
+*			
+*
+***********************************************************************/
+
+/* ----------------------------------------------------------------------------
+		Include files
+-----------------------------------------------------------------------------*/
+
+@include "frcell.goh"
+@include "Art/icons.goh"
+                              
+/*----------------------------------------------------------------------------
+		Application Object
+-----------------------------------------------------------------------------*/
+@start	AppResource;
+
+@object FreeCellApplicationClass FreeCellApp = {
+	GI_visMoniker = list {@LCAppMoniker, @TCAppMoniker,
+								 @FreeCellTextMoniker};
+	GI_comp = @FreeCellPrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS) = @FreeCellPrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS) =
+				@FreeCellColorSelector;
+	ATTR_GEN_HELP_FILE = "FCell Help"; 
+}
+
+@visMoniker FreeCellTextMoniker = "FreeCell";
+
+@end	AppResource
+
+/* ----------------------------------------------------------------------------
+		Primary window.
+-----------------------------------------------------------------------------*/
+@start	Interface;
+
+@object GenPrimaryClass FreeCellPrimary = {
+	GI_comp = @GameMenu, @OptionsMenu, @FreeCellView,
+				 @GameButton, @FinishBox, @StatsBox;
+	HINT_SIZE_WINDOW_AS_DESIRED;
+	ATTR_GEN_HELP_CONTEXT = "TOC";
+}
+
+/*****  Game Menu  *****/
+@object GenInteractionClass GameMenu =  {
+	GI_visMoniker = 'G', "Game";
+	GI_comp = @UndoInteraction, @GameInteraction, @AboutGroup,
+				 @StatsInteraction;
+	GII_visibility = GIV_POPUP;
+	ATTR_GEN_INTERACTION_GROUP_TYPE = GIGT_FILE_MENU;
+}
+
+@object GenInteractionClass UndoInteraction = {
+	GI_comp = @UndoTrigger;
+}
+@object GenTriggerClass UndoTrigger = {
+	GI_visMoniker = 'U', "Undo";
+	GI_kbdAccelerator = ctrl 'U';
+	GTI_destination = @MyPlayingTable;
+	GTI_actionMsg = MSG_FREECELL_UNDO;
+}
+
+@object GenInteractionClass GameInteraction = {
+	GI_comp = @RedealTrigger, @NewGameTrigger;
+}
+@object GenTriggerClass NewGameTrigger = {
+	GI_visMoniker = 'N', "New Game";
+	GI_kbdAccelerator = ctrl 'N';
+	GTI_destination = @MyPlayingTable;
+	GTI_actionMsg = MSG_FREECELL_NEW_GAME_MENU_SELECT;
+}
+
+@object GenTriggerClass RedealTrigger = {
+	GI_visMoniker = 'R', "Redeal";
+	GI_kbdAccelerator = ctrl 'R';
+	GTI_destination = @MyPlayingTable;
+	GTI_actionMsg = MSG_FREECELL_REDEAL_MENU_SELECT;
+}
+
+@object GenInteractionClass AboutGroup = {
+	GI_comp = @AboutDBox;
+	GII_visibility = GIV_SUB_GROUP;
+}
+
+@include "Art/bbxreg.goh"
+
+@object GenInteractionClass AboutDBox = {
+	 GI_visMoniker = 'b', "About";
+	 GI_comp = @AppName, @By, @BreadBoxLogo,
+				  @Visit, @Web, @AboutSpacer1,
+				  @Copyright, @BBoxLLC, @Rights, @AboutSpacer2;
+	 GII_visibility = GIV_DIALOG;
+	 GII_type = GIT_NOTIFICATION;
+	 HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+@object GenTextClass AppName = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_text = "FreeCell Solitaire";
+    ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @AppNameCharAttrs;
+}
+@chunk VisTextCharAttr AppNameCharAttrs =
+	CHAR_ATTR_FONT_SIZE_STYLE(
+		FID_DTC_URW_SANS, 36, TS_BOLD);
+
+@object GenGlyphClass By = {
+  GI_visMoniker = "by";
+}
+@object GenGlyphClass BreadBoxLogo = {
+  GI_visMoniker = list { @BreadboxLogoMoniker}
+}
+@object GenGlyphClass Visit = {
+  GI_visMoniker = "Visit us at...";
+}
+@object GenGlyphClass Web = {
+  GI_visMoniker = "www.breadbox.com";
+}
+@object GenGlyphClass AboutSpacer1 = {
+  GI_visMoniker = "   ";
+}
+@object GenGlyphClass Copyright = {
+  GI_visMoniker = "Copyright 1994-2003";
+}
+@object GenGlyphClass BBoxLLC = {
+  GI_visMoniker = "Breadbox Computer Company LLC";
+}
+@object GenGlyphClass Rights = {
+  GI_visMoniker = "All Rights Reserved";
+}
+@object GenGlyphClass AboutSpacer2 = {
+  GI_visMoniker = "   ";
+}
+/*@object GenInteractionClass AboutInteraction = {
+	GI_comp = @AboutDBox;
+}
+@object GenInteractionClass AboutDBox = {
+	 GI_visMoniker = 'b', "About";
+	 GI_comp = @Line1, @Line2, @Line3,
+				  @Line4, @Line5, @Line6,
+				  @Line7, @Line8, @Line9,
+				  @Line10;
+	 GII_visibility = GIV_DIALOG;
+	 GII_type = GIT_NOTIFICATION;
+	 HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+@object GenGlyphClass Line1 = {
+  GI_visMoniker = "FreeCell -= beta 2 =-";
+}
+@object GenGlyphClass Line2 = {
+  GI_visMoniker = "This anarchy project was written in Goc with a modified";
+}
+@object GenGlyphClass Line3 = {
+  GI_visMoniker = "version of the cards.goh file that Nathan Fiedler";
+}
+@object GenGlyphClass Line4 = {
+  GI_visMoniker = "uploaded to the AOL Geos Forum back in 1996.";
+}
+@object GenGlyphClass Line5 = {
+  GI_visMoniker = "You can find my fixed version of Nate's header and";
+}
+@object GenGlyphClass Line6 = {
+  GI_visMoniker = "the source for beta 1 at ftp.breadbox.com";
+}
+@object GenGlyphClass Line7 = {
+  GI_visMoniker = "Send feature requests, comments, questions, etc.";
+}
+@object GenGlyphClass Line8 = {
+  GI_visMoniker = "to me at johnh@breadbox.com";
+}
+@object GenGlyphClass Line9 = {
+  GI_visMoniker = "   ";
+}
+@object GenGlyphClass Line10 = {
+  GI_visMoniker = "Copyright 1994-2002  Breadbox Computer Company LLC";
+}
+*/
+@object GenInteractionClass StatsInteraction = {
+	GI_comp = @StatsTrigger;
+}
+@object GenTriggerClass StatsTrigger = {
+	GI_visMoniker = 'S', "Show Stats";
+	GI_kbdAccelerator = ctrl 'S';
+	GTI_destination = @MyPlayingTable;
+	GTI_actionMsg = MSG_FREECELL_OPEN_STATS;
+}
+
+/*****  Options Menu  *****/
+@object GenInteractionClass OptionsMenu = {
+	GI_visMoniker = 'O', "Options";
+	GI_comp = @DragInteraction, @ColorInteraction;
+	GII_visibility = GIV_POPUP;
+}
+
+@object GenInteractionClass DragInteraction = {
+	GI_comp = @DragItemGroup;
+}
+@object GenItemGroupClass DragItemGroup = {
+	GI_comp = @DragOutlineItem, @DragFullItem;
+	GIGI_selection = DRAG_OUTLINE;
+	GIGI_destination = @MyPlayingTable;
+	GIGI_applyMsg = MSG_FREECELL_SET_DRAG;
+}
+@object GenItemClass DragOutlineItem =  {
+	GI_visMoniker = "Outline Drag";
+	GII_identifier = DRAG_OUTLINE;
+}
+@object GenItemClass DragFullItem =  {
+	GI_visMoniker = "Full Drag";
+	GII_identifier = DRAG_FULL;
+}
+
+@object GenInteractionClass ColorInteraction = {
+	GI_visMoniker = "Table Color";
+	GII_visibility = GIV_DIALOG;
+//	GII_type = GIT_NOTIFICATION;
+	GII_type = GIT_PROPERTIES;
+	GI_comp = @FreeCellColorSelector;
+}
+
+@object ColorSelectorClass FreeCellColorSelector = {
+	GCI_output = process;
+	ATTR_GEN_CONTROL_PROHIBIT_UI = (CSF_PATTERN |
+												CSF_DRAW_MASK |
+												CSF_OTHER);
+}
+ 
+@object GenViewClass FreeCellView = {
+	GVI_content = @MyPlayingTable;
+	GVI_color = {C_GREEN, 0, 0, 0};
+	GVI_horizAttrs   = @default |
+									GVDA_NO_SMALLER_THAN_CONTENT |
+									GVDA_NO_LARGER_THAN_CONTENT;
+	GVI_vertAttrs    = @default |
+									GVDA_NO_SMALLER_THAN_CONTENT |
+									GVDA_NO_LARGER_THAN_CONTENT;
+	GVI_docBounds    = {0, 0, TABLE_WIDTH, TABLE_HEIGHT};
+	HINT_DEFAULT_TARGET;
+}
+
+@visMoniker GameButtonNewMoniker = 'N', "New Game";
+@visMoniker GameButtonAutoMoniker = 'A', "Auto-Finish";
+@object GenTriggerClass GameButton = {
+	GI_visMoniker = GameButtonNewMoniker;
+	GTI_destination = @MyPlayingTable;
+	GTI_actionMsg = MSG_FREECELL_NEW_GAME_MENU_SELECT;
+	HINT_ALIGN_RIGHT_EDGE_WITH_OBJECT = @FreeCellView;
+}
+
+@object GenInteractionClass FinishBox = {
+	GI_comp = @FinishGlyph1, @FinishGlyph2,
+				 @FinishGlyph3, @FinishGlyph4;
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_AFFIRMATION;
+	GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG
+								| GIA_NOT_USER_INITIATABLE
+								| GIA_MODAL;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenGlyphClass FinishGlyph1 = {
+	GI_visMoniker = "Congratulations!";
+}
+@object GenGlyphClass FinishGlyph2 = {
+	GI_visMoniker = "You've Won!";
+}
+@object GenGlyphClass FinishGlyph3 = {
+	GI_visMoniker = " ";
+}
+@object GenGlyphClass FinishGlyph4 = {
+	GI_visMoniker = "Would you like to play a new game?";
+}
+
+@object GenInteractionClass StatsBox = {
+	GI_visMoniker = "FreeCell Statistics";
+	GI_comp = @SessionStats, @TotalStats, @StreakStats,
+				 @OKButton, @ClearButton;
+	GII_visibility = GIV_DIALOG;
+	GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG
+								| GIA_NOT_USER_INITIATABLE
+								| GIA_MODAL;
+	ATTR_GEN_HELP_CONTEXT = "Stats";
+}
+@object GenInteractionClass SessionStats = {
+	GI_visMoniker = "This Session";
+	GI_comp = @SessionWonText, @SessionLostText, @SessionPct;
+	HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS | 20, 0, 3};
+	HINT_DRAW_IN_BOX;
+	HINT_CENTER_MONIKER;
+	HINT_CENTER_CHILDREN_ON_MONIKERS;
+}
+@object GenTextClass SessionWonText = {
+	GI_visMoniker = "Wins: ";
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	GTXI_text = "0";
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+@object GenTextClass SessionLostText = {
+	GI_visMoniker = "Losses: ";
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	GTXI_text = "0";
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+@object GenTextClass SessionPct = {
+	GI_visMoniker = "Session: ";
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	GTXI_text = "0%";
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+@object GenInteractionClass TotalStats = {
+	GI_visMoniker = "Overall";
+	GI_comp = @TotalWonText, @TotalLostText, @TotalPct;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_DRAW_IN_BOX;
+	HINT_CENTER_MONIKER;
+	HINT_CENTER_CHILDREN_ON_MONIKERS;
+}
+@object GenTextClass TotalWonText = {
+	GI_visMoniker = "Wins: ";
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	GTXI_text = "0";
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+@object GenTextClass TotalLostText = {
+	GI_visMoniker = "Losses: ";
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	GTXI_text = "0";
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+@object GenTextClass TotalPct = {
+	GI_visMoniker = "Overall: ";
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	GTXI_text = "0%";
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+@object GenInteractionClass StreakStats = {
+	GI_visMoniker = "Streaks";
+	GI_comp = @WinStreaksText, @LoseStreaksText, @CurrentStreakText;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_DRAW_IN_BOX;
+	HINT_CENTER_MONIKER;
+	HINT_CENTER_CHILDREN_ON_MONIKERS;
+}
+@object GenTextClass WinStreaksText = {
+	GI_visMoniker = "Wins: ";
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	GTXI_text = "0";
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+@object GenTextClass LoseStreaksText = {
+	GI_visMoniker = "Losses: ";
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	GTXI_text = "0";
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+@object GenTextClass CurrentStreakText = {
+	GI_visMoniker = "Current: ";
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	GTXI_text = "0";
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+@object GenTriggerClass OKButton = {
+	GI_visMoniker = "OK";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	HINT_SEEK_REPLY_BAR;
+	HINT_DEFAULT_DEFAULT_ACTION;
+}
+@object GenTriggerClass ClearButton = {
+	GI_visMoniker = "Clear Stats";
+	GTI_destination = @MyPlayingTable;
+	GTI_actionMsg = MSG_FREECELL_CLEAR_STATS;
+	HINT_SEEK_REPLY_BAR;
+}
+
+
+
+
+
+@end Interface
+
+/*----------------------------------------------------------------------------
+		TableResource
+-----------------------------------------------------------------------------*/
+
+@start TableResource;
+
+@object FreeCellClass MyPlayingTable = {
+	VCI_comp = @Foundation1, @Foundation2, @Foundation3, @Foundation4,
+				 @FreeSpace1, @FreeSpace2, @FreeSpace3, @FreeSpace4,
+				 @WorkSpace1, @WorkSpace2, @WorkSpace3, @WorkSpace4,
+				 @WorkSpace5, @WorkSpace6, @WorkSpace7, @WorkSpace8,
+				 @MyHand;
+	VCI_geoAttrs = @default | VCGA_CUSTOM_MANAGE_CHILDREN;
+	VCNI_attrs = @default | VCNA_SAME_WIDTH_AS_VIEW |
+									VCNA_SAME_HEIGHT_AS_VIEW;
+	VCNI_view = @FreeCellView;
+	GI_hand = @MyHand;
+	GI_userMode = INTERMEDIATE_MODE; 
+	GI_initialFadeMask = SDM_100;      /* no fading */
+	GI_incrementalFadeMask = 0;
+	GI_undoTrigger = @UndoTrigger;  
+}
+
+@object HandClass MyHand = {
+}
+
+
+/*-----------  FreeSpace Deck Declarations ----------------*/
+
+/*
+ *  Characteristics of the FreeSpace decks are:
+ *	1) empty:	- accept one card at a time
+ *			- this card can be any suite
+ *			- this card can be any rank
+ *	2) not empty:	- deck will not accept anymore cards if not empty
+ *	3) removing:	- can only take the top card
+ */
+
+
+@object DeckClass FreeSpace1 = {
+	DI_deckAttrs = ((DDWC_TOP_ONLY << DA_DDWC_OFFSET)
+						 | DA_IGNORE_EXPRESS_DRAG);
+	DI_markerColor = C_WHITE;
+	DI_noCardAC =	CAC_SINGLE_CARD_ONLY
+						| (SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_WILD;
+
+	DI_upCardAC = (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_NONE;
+}
+
+@object DeckClass FreeSpace2 = {
+	DI_deckAttrs = ((DDWC_TOP_ONLY << DA_DDWC_OFFSET)
+						 | DA_IGNORE_EXPRESS_DRAG);
+	DI_markerColor = C_WHITE;
+	DI_noCardAC =	CAC_SINGLE_CARD_ONLY
+						| (SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_WILD;
+
+	DI_upCardAC = (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_NONE;
+}
+
+@object DeckClass FreeSpace3 = {
+	DI_deckAttrs = ((DDWC_TOP_ONLY << DA_DDWC_OFFSET)
+						 | DA_IGNORE_EXPRESS_DRAG);
+	DI_markerColor = C_WHITE;
+	DI_noCardAC =	CAC_SINGLE_CARD_ONLY
+						| (SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_WILD;
+
+	DI_upCardAC = (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_NONE;
+}
+
+@object DeckClass FreeSpace4 = {
+	DI_deckAttrs = ((DDWC_TOP_ONLY << DA_DDWC_OFFSET)
+						 | DA_IGNORE_EXPRESS_DRAG);
+	DI_markerColor = C_WHITE;
+	DI_noCardAC =	CAC_SINGLE_CARD_ONLY
+						| (SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_WILD;
+	DI_upCardAC = (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_NONE;
+}
+
+/*-----------  Foundation Deck Declarations ----------------
+ *  Characteristics of the Foundation decks are:
+ *	1) empty:	- accept one card at a time
+ *			- this card can be any suit
+ *			- this card must be an ace
+ *	2) not empty:	- accept one card at a time
+ *			- this card must be of the same suite as previous card
+ *			- this card must be one greater than previous card
+ *	3) removing:	- can't take any card
+ */
+
+@object DeckClass Foundation1 = {
+	DI_deckAttrs = ((DDWC_NONE << DA_DDWC_OFFSET)
+						 | DA_IGNORE_DOUBLE_CLICKS);
+	DI_markerColor = C_CYAN;
+	DI_noCardAC = CAC_SINGLE_CARD_ONLY
+						| (SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_ACE;
+	DI_upCardAC = CAC_SINGLE_CARD_ONLY
+						| (SAC_SAME_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ONE_GREATER_RANK << CAC_RAC_OFFSET);
+	DI_offsetFromUpCardY = 0;
+}
+
+@object DeckClass Foundation2 = {
+	DI_deckAttrs = ((DDWC_NONE << DA_DDWC_OFFSET)
+						 | DA_IGNORE_DOUBLE_CLICKS);
+	DI_markerColor = C_CYAN;
+	DI_noCardAC = CAC_SINGLE_CARD_ONLY
+						| (SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_ACE;
+	DI_upCardAC = CAC_SINGLE_CARD_ONLY
+						| (SAC_SAME_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ONE_GREATER_RANK << CAC_RAC_OFFSET);
+	DI_offsetFromUpCardY = 0;
+}
+
+@object DeckClass Foundation3 = {
+	DI_deckAttrs = ((DDWC_NONE << DA_DDWC_OFFSET)
+						 | DA_IGNORE_DOUBLE_CLICKS);
+	DI_markerColor = C_CYAN;
+	DI_noCardAC = CAC_SINGLE_CARD_ONLY
+						| (SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_ACE;
+	DI_upCardAC = CAC_SINGLE_CARD_ONLY
+						| (SAC_SAME_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ONE_GREATER_RANK << CAC_RAC_OFFSET);
+	DI_offsetFromUpCardY = 0;
+}
+
+@object DeckClass Foundation4 = {
+	DI_deckAttrs = ((DDWC_NONE << DA_DDWC_OFFSET)
+						 | DA_IGNORE_DOUBLE_CLICKS);
+	DI_markerColor = C_CYAN;
+	DI_noCardAC = CAC_SINGLE_CARD_ONLY
+						| (SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_ACE;
+	DI_upCardAC = CAC_SINGLE_CARD_ONLY
+						| (SAC_SAME_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ONE_GREATER_RANK << CAC_RAC_OFFSET);
+	DI_offsetFromUpCardY = 0;
+}
+
+
+/*-------------- WorkSpace Deck Declarations -----------------
+ *  Characteristics of the WorkSpace decks are:
+ *	1) empty:	- accept one or more cards at a time
+ *			- this card can be any suit
+ *			- this card can be any rank
+ *	2) not empty:	- accept one or more cards at a time
+ *			- this card must be of opposite suit as previous card
+ *			- this card must be one less than previous card
+ *	3) removing:	- can take any cards in order, multiples checked
+ *                  in MSG_GAME_DECK_SELECTED
+ */
+
+@object WorkDeckClass WorkSpace1 = {
+	DI_deckAttrs = ((DDWC_UNTIL_SELECTED << DA_DDWC_OFFSET)
+						 | DA_IGNORE_EXPRESS_DRAG);
+	DI_noCardAC =	(SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_WILD;
+	DI_upCardAC = (SAC_OPPOSITE_COLOR << CAC_SAC_OFFSET)
+						| (RAC_ONE_LESS_RANK << CAC_RAC_OFFSET);
+}
+
+@object WorkDeckClass WorkSpace2 = {
+	DI_deckAttrs = ((DDWC_UNTIL_SELECTED << DA_DDWC_OFFSET)
+						 | DA_IGNORE_EXPRESS_DRAG);
+	DI_noCardAC =	(SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_WILD;
+	DI_upCardAC = (SAC_OPPOSITE_COLOR << CAC_SAC_OFFSET)
+						| (RAC_ONE_LESS_RANK << CAC_RAC_OFFSET);
+}
+
+@object WorkDeckClass WorkSpace3 = {
+	DI_deckAttrs = ((DDWC_UNTIL_SELECTED << DA_DDWC_OFFSET)
+						 | DA_IGNORE_EXPRESS_DRAG);
+	DI_noCardAC =	(SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_WILD;
+	DI_upCardAC = (SAC_OPPOSITE_COLOR << CAC_SAC_OFFSET)
+						| (RAC_ONE_LESS_RANK << CAC_RAC_OFFSET);
+}
+
+@object WorkDeckClass WorkSpace4 = {
+	DI_deckAttrs = ((DDWC_UNTIL_SELECTED << DA_DDWC_OFFSET)
+						 | DA_IGNORE_EXPRESS_DRAG);
+	DI_noCardAC =	(SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_WILD;
+	DI_upCardAC = (SAC_OPPOSITE_COLOR << CAC_SAC_OFFSET)
+						| (RAC_ONE_LESS_RANK << CAC_RAC_OFFSET);
+}
+
+@object WorkDeckClass WorkSpace5 = {
+	DI_deckAttrs = ((DDWC_UNTIL_SELECTED << DA_DDWC_OFFSET)
+						 | DA_IGNORE_EXPRESS_DRAG);
+	DI_noCardAC =	(SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_WILD;
+	DI_upCardAC = (SAC_OPPOSITE_COLOR << CAC_SAC_OFFSET)
+						| (RAC_ONE_LESS_RANK << CAC_RAC_OFFSET);
+}
+
+@object WorkDeckClass WorkSpace6 = {
+	DI_deckAttrs = ((DDWC_UNTIL_SELECTED << DA_DDWC_OFFSET)
+						 | DA_IGNORE_EXPRESS_DRAG);
+	DI_noCardAC =	(SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_WILD;
+	DI_upCardAC = (SAC_OPPOSITE_COLOR << CAC_SAC_OFFSET)
+						| (RAC_ONE_LESS_RANK << CAC_RAC_OFFSET);
+}
+
+@object WorkDeckClass WorkSpace7 = {
+	DI_deckAttrs = ((DDWC_UNTIL_SELECTED << DA_DDWC_OFFSET)
+						 | DA_IGNORE_EXPRESS_DRAG);
+	DI_noCardAC =	(SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_WILD;
+	DI_upCardAC = (SAC_OPPOSITE_COLOR << CAC_SAC_OFFSET)
+						| (RAC_ONE_LESS_RANK << CAC_RAC_OFFSET);
+}
+
+@object WorkDeckClass WorkSpace8 = {
+	DI_deckAttrs = ((DDWC_UNTIL_SELECTED << DA_DDWC_OFFSET)
+						 | DA_IGNORE_EXPRESS_DRAG);
+	DI_noCardAC =	(SAC_ANY_SUIT << CAC_SAC_OFFSET)
+						| (RAC_ABSOLUTE_RANK << CAC_RAC_OFFSET)
+						| CR_WILD;
+	DI_upCardAC = (SAC_OPPOSITE_COLOR << CAC_SAC_OFFSET)
+						| (RAC_ONE_LESS_RANK << CAC_RAC_OFFSET);
+}
+
+@end TableResource
+
+/*----------------------------------------------------------------------------
+		StringBlock
+-----------------------------------------------------------------------------*/
+@start	StringBlock, data;
+
+@chunk char ConfirmDealString[] = "Are you sure you want to end this game?  We'll have to count it as a loss.";
+@chunk char ConfirmRedealString[] = "Are you sure you want to re-start this game?  We'll have to count it as a loss.";
+@chunk char ConfirmClearStats[] = "Are you sure you want to clear all the statistics?";
+@chunk char WinText[] = " win";
+@chunk char WinsText[] = " wins";
+@chunk char LossText[] = " loss";
+@chunk char LossesText[] = " losses";
+
+@end	StringBlock
+
+

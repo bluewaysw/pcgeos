@@ -1,0 +1,141 @@
+/***********************************************************************
+*      Copyright 1994-2002  Breadbox Computer Company LLC
+* PROJECT:	Anarchy
+* MODULE:	FreeCell  (porting from a previous ESP anarchy project using
+*                      Nate's cards.goh header file)
+* FILE:		frcell.goh
+*
+* AUTHOR:	jfh 12/02
+*
+*
+***********************************************************************/
+/*
+ ***************************************************************************
+ *      Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+#include <Ansi/string.h>
+@include <cards.goh>
+#include <timer.h>
+@include <Objects/colorC.goh>
+#include <initfile.h>
+
+/*------------------------------
+	Constants
+ -------------------------------*/
+
+/* Spacing constants are used to position the decks on the playing table.
+	They are used in...  */
+#define STANDARD_SPACING		5		//between decks
+
+#define MY_HAND_SPACING			-100		//hidden off table
+
+#define FREE_SPACE_SPACING_LEFT		2		// FreeSpace decks
+#define FREE_SPACE_SPACING_TOP		5		//  start at (2,5)
+
+#define FOUNDATION_SPACING_LEFT		320		// Foundation decks
+#define FOUNDATION_SPACING_TOP		5		//  start at (320,5)
+
+#define WORK_SPACE_SPACING_LEFT		9		// WorkSpace decks
+#define WORK_SPACE_SPACING_TOP		25		//  start at (9,40)
+
+#define TABLE_WIDTH     (71*8)+(5*7)+9+9
+#define TABLE_HEIGHT    420
+
+/* Workspace deck number constants are used to determine which deck to
+	deal the next card to.  For now, the WorkSpace children are 4 thru 11.
+*/
+#define FIRST_WORKSPACE_DECK			0
+#define LAST_WORKSPACE_DECK			7
+
+/* This constant is used to test whether each foundation deck is full, in
+	other words whether it contains all 13 cards of it's suit.
+*/
+#define FOUNDATION_FULL					13
+
+#define CUR_STREAK_WIN	1
+#define CUR_STREAK_LOSS	2
+
+
+/*------------------------------------------------------------------------------
+				 Globals
+------------------------------------------------------------------------------*/
+
+extern Boolean g_quittingOnWin;
+extern Boolean g_gameInProgress;
+//extern Boolean g_systemShutDown;
+
+
+/*------------------------------------------------------------------------------
+				 Prototypes
+------------------------------------------------------------------------------*/
+
+void FreeCellUpdateStats(Boolean isWin);
+
+/*------------------------------------------------------------------------------
+				 Process Class
+------------------------------------------------------------------------------*/
+@class  FreeCellProcessClass, GenProcessClass;
+
+@endc
+
+/*------------------------------------------------------------------------------
+				 Application Class   to intercept QUIT
+------------------------------------------------------------------------------*/
+@class  FreeCellApplicationClass, GenApplicationClass;
+
+@endc
+
+/*------------------------------------------------------------------------------
+*			      FreeCell Class
+*
+* The FreeCellClass is a GameClass with a few extra messages...
+*
+*------------------------------------------------------------------------------*/
+@class  FreeCellClass, GameClass;
+
+	@message void MSG_FREECELL_NEW_GAME();
+		/* Clears preceding game (if any) and starts a new game */
+	@message void MSG_FREECELL_DEAL_CARDS();
+		/* Distributes the cards from the Hand to the WorkSpace Decks */
+	@message (GEN_TRIGGER_ACTION) MSG_FREECELL_NEW_GAME_MENU_SELECT;
+		/* Called when New Game is selected from the menu or button*/
+	@message void MSG_FREECELL_REDEAL();
+		/* Restart current game from saved state  (can't get this working) */
+	@message void MSG_FREECELL_REDEAL_MENU_SELECT();
+		/* Called when Redeal is selected from the menu  */
+	@message void MSG_FREECELL_UNDO();
+		/* Menu item to undo last move */
+	@message Boolean MSG_FREECELL_CHECK_FOR_WINNER();
+	@message void MSG_FREECELL_DO_WINNER();
+	@message void MSG_FREECELL_CHECK_FOR_AUTO_FINISH();
+	@message void MSG_FREECELL_DO_AUTO_FINISH();
+	@message word MSG_FREECELL_GET_CARD_WIDTH();
+	@message word MSG_FREECELL_GET_CARD_HEIGHT();
+	@message void MSG_FREECELL_SET_DRAG();
+		/* Sets the Drag instance data, according to whether the user
+			wants to drag outline or the full card. */
+	@message void MSG_FREECELL_OPEN_STATS();
+	@message void MSG_FREECELL_CLEAR_STATS();
+
+	@instance word FCI_savedStateHandle = 0;
+	@instance word FCI_savedStateLength	= 0;
+	@instance Boolean FCI_autoFinish = FALSE;
+	@instance Boolean FCI_autoFinishing = FALSE;
+	@instance word FCI_soundMode = 0;		
+
+@endc
+
+/*------------------------------------------------------------------------------
+*			      WorkDeck Class
+*
+*
+*------------------------------------------------------------------------------*/
+@class  WorkDeckClass, DeckClass;
+
+@endc
+
+
+

@@ -1,0 +1,351 @@
+@deflib radiolib
+
+@include <stdapp.goh>
+@include <library.h>
+@include <initfile.h>
+@include "radiolib.h"
+
+#define NO_DATA_BIT     16
+#define NO_CONTROL_BIT  8
+
+#define MAX_RATIO       4748
+#define MIN_RATIO       3948
+#define MIN_FREQ        88.00
+#define MAX_FREQ        108.00
+#define INC_RATIO       1
+#define INC_FM          0.025
+#define INC_BIG_RATIO   4
+#define INC_BIG_FM      0.1
+
+// B0 B1 B2 TB R0 R1 R2 S
+#define BAND_DATA_MUTE  0xC0
+#define BAND_DATA_SB    0x20
+#define BAND_DATA_RADIO 0x80
+#define TIME_BASE       0x00
+#define REF_FREQ        0x04
+#define F_MIN           0x01
+
+// Radio Status as reflected in ControlData (2nd parameter in send)
+#define RADIO_TUNED     0x0001
+#define RADIO_MUTE      0x0002
+
+typedef struct {
+    word RS_controlDataRadio ;
+    word RS_controlDataSB ;
+    word RS_addr ;
+    word RS_mute ;
+} RadioStruct ;
+
+void near FMOutportByte(word addr, byte value) ;
+byte near FMInportByte(word addr) ;
+void near FMRadioSend(
+              word divRatio,
+              word controlData,
+              word mute,
+              word addr) ;
+void FMRadioCEntry(LibraryCallType ty, GeodeHandle client) ;
+
+word data ;
+
+/*-------------------------------------------------------------------------*/
+void FMRadioCEntry(LibraryCallType ty, GeodeHandle client)
+{
+}
+/*-------------------------------------------------------------------------*/
+RadioHandle FMRadioInit()
+{
+    RadioStruct *radio ;
+    MemHandle mem ;
+
+    if ((mem = MemAlloc(sizeof(RadioStruct),
+                        HF_SHARABLE|HF_SWAPABLE,
+                        HAF_ZERO_INIT)) == NullHandle)
+        return NullHandle ;
+
+    radio = (RadioStruct *)MemLock(mem) ;
+
+    /* Control data for radio mode */
+    radio->RS_controlDataRadio = BAND_DATA_RADIO
+                               | TIME_BASE
+                               | REF_FREQ
+                               | F_MIN ;
+
+    /* Control data for soundblaster mode */
+    radio->RS_controlDataSB = BAND_DATA_SB
+                            | TIME_BASE
+                            | REF_FREQ
+                            | F_MIN ;
+
+    radio->RS_addr = 0 ;
+
+    _asm {
+        push ds
+        mov ax, seg data
+        mov ds, ax
+    }
+
+    InitFileReadInteger("fmradio", "port", &radio->RS_addr) ;
+
+    _asm {
+        pop ds
+    }
+
+    /* Bad address, quit while we can. */
+    if(radio->RS_addr == 0)  {
+        MemUnlock(mem) ;
+        MemFree(mem) ;
+        return NullHandle ;
+    }
+
+    MemUnlock(mem) ;
+
+    return mem ;
+}
+/*-------------------------------------------------------------------------*/
+int FMRadioTuneStation(RadioHandle radioMem, word tuneFreq, int mute, Boolean slow)
+/* Station  control */
+{
+    RadioStruct *radio ;
+	unsigned int divRatio;
+	int dataSend=0xc8;
+	int dataIn=0x00;
+	int sTune;
+
+    /* Check if a valid radio handle. */
+    if (radioMem == NullHandle)
+        return -1 ;
+
+    /* Lock it into memory. */
+    radio = (RadioStruct *)MemLock(radioMem) ;
+
+/*
+	divRatio = MIN_RATIO + (int)((tuneFreq - 88.0)/0.025) ;
+*/
+    divRatio = tuneFreq - 8800 ;
+    divRatio *= 4 ;
+    divRatio /= 10 ;
+    divRatio += MIN_RATIO ;
+
+	radio->RS_mute = mute ;
+
+    /* Check if muting radio. */
+	if (mute)
+        FMRadioSend(divRatio, radio->RS_controlDataSB, mute, radio->RS_addr) ;
+    else
+        FMRadioSend(divRatio, radio->RS_controlDataRadio, mute, radio->RS_addr) ;
+
+
+    /* Decide the mute data. */
+	if (mute)
+        dataSend = 0xc0 ;
+	else
+        dataSend = 0xc8 ;
+
+	dataSend |= 0x10;
+	FMOutportByte(radio->RS_addr, dataSend) ;
+
+    if (slow==TRUE)
+        TimerSleep(12) ;
+    else
+        TimerSleep(1) ;
+
+	dataIn = FMInportByte(radio->RS_addr);
+
+	if (dataIn&0x02)
+        sTune=0;
+	else
+        sTune=1;
+
+    /* Set STRQ back to low */
+    dataSend &= 0xef;
+	FMOutportByte(radio->RS_addr, dataSend);
+
+    MemUnlock(radioMem) ;
+
+	return(sTune);
+}
+/*-------------------------------------------------------------------------*/
+/* Station control */
+word FMRadioMuteAudio(RadioHandle radioMem, word mute)
+{
+    RadioStruct *radio ;
+
+    if (radioMem == NullHandle)
+        return -1 ;
+
+    radio = (RadioStruct *)MemLock(radioMem) ;
+
+	if (mute==1) {
+        FMOutportByte(radio->RS_addr, 0xC0) ;
+		radio->RS_mute=1;
+	} else  {
+		FMOutportByte(radio->RS_addr, 0xc8);
+		radio->RS_mute=0;
+	}
+
+    MemUnlock(radioMem) ;
+
+	return 0;
+}
+/*-------------------------------------------------------------------------*/
+word FMRadioVolumeControl(RadioHandle radioMem, word style)
+{
+    RadioStruct *radio ;
+    word addr ;
+    word mute ;
+
+    if (radioMem == NullHandle)
+        return -1 ;
+
+    radio = (RadioStruct *)MemLock(radioMem) ;
+    addr = radio->RS_addr ;
+    mute = radio->RS_mute ;
+
+	if (style == 0) {
+		if (mute==1)
+            FMOutportByte(addr, 0x40) ;
+		else
+            FMOutportByte(addr, 0x48) ;
+
+		TimerSleep(4);
+
+		if (mute==1)
+            FMOutportByte(addr, 0xc0) ;
+		else
+            FMOutportByte(addr, 0xc8) ;
+	} else  {
+		if (mute==1)
+            FMOutportByte(addr, 0x80) ;
+		else
+            FMOutportByte(addr, 0x88) ;
+
+		TimerSleep(4);
+
+		if (mute==1)
+            FMOutportByte(addr, 0xc0) ;
+		else
+            FMOutportByte(addr, 0xc8) ;
+    }
+
+    MemUnlock(radioMem) ;
+
+	return 0;
+}
+/*-------------------------------------------------------------------------*/
+void FMRadioDeinit(RadioHandle radioMem)
+{
+    MemFree(radioMem) ;
+}
+/*-------------------------------------------------------------------------*/
+void near FMRadioSend(
+              word divRatio,
+              word controlData,
+              word mute,
+              word addr)
+{
+	word i ;
+	word dataSend ;
+
+	if (mute)
+        dataSend = 0xc0;
+    else
+        dataSend = 0xc8;
+
+	dataSend |= 0x01;
+
+ 	for (i=0 ; i<NO_DATA_BIT; i++)  {
+/*		dataSend = 0x01; */
+		if ((divRatio >> i) & 1)
+            dataSend |= 0x04;
+		else
+            dataSend &= 0xFB;
+
+		dataSend &= 0xFD;
+		FMOutportByte(addr, dataSend);
+		FMOutportByte(addr, dataSend);
+
+		dataSend |= 0x02;
+		FMOutportByte(addr, dataSend);
+		FMOutportByte(addr, dataSend);
+	}
+
+	for (i=0; i<NO_CONTROL_BIT; i++)  {
+		if ((controlData << i) & 0x80)
+            dataSend |= 0x04;
+		else
+            dataSend &= 0xFB;
+
+		dataSend &= 0xFD;
+		FMOutportByte(addr, dataSend);
+		FMOutportByte(addr, dataSend);
+
+		dataSend |= 0x02;
+		FMOutportByte(addr, dataSend);
+		FMOutportByte(addr, dataSend);
+	}
+
+	dataSend &= 0xF8;
+	FMOutportByte(addr, dataSend);
+
+	TimerSleep(2);
+}
+/*-------------------------------------------------------------------------*/
+void near FMOutportByte(word addr, byte value)
+{
+    _asm {
+        push dx
+        push ax
+        mov al, value
+        mov dx, addr
+        out dx, al
+        pop ax
+        pop dx
+    }
+}
+/*-------------------------------------------------------------------------*/
+byte near FMInportByte(word addr)
+{
+    byte ret_val ;
+
+    _asm {
+        push dx
+        push ax
+        mov dx, addr
+        in al, dx
+        mov ret_val, al
+        pop ax
+        pop dx
+    }
+
+    return ret_val ;
+}
+/*-------------------------------------------------------------------------*/
+/*
+int FMRadioIsTuned(RadioHandle radioMem)
+{
+    RadioStruct *radio ;
+	int dataIn=0x00;
+	int sTune;
+
+    if (radioMem == NullHandle)
+        return -1 ;
+
+    radio = (RadioStruct *)MemLock(radioMem) ;
+
+	TimerSleep(1) ;
+
+	dataIn = FMInportByte(radio->RS_addr);
+
+	if (dataIn&0x02)
+        sTune=0;
+	else
+        sTune=1;
+
+    MemUnlock(radioMem) ;
+
+	return(sTune);
+}
+*/
+/*-------------------------------------------------------------------------*/
+
+@endlib

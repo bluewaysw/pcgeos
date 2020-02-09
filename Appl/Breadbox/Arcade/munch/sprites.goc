@@ -1,0 +1,889 @@
+@include <stdapp.goh>
+/*#include <stdlib.h>  */
+#include <gstring.h>
+#include <graphics.h>
+#include <sound.h>
+#include <math.h>
+#include <geos.h>
+@include "max.goh"
+@include "topten.goh"
+@include <Objects/colorC.goh>
+
+/*aus munch.goc*/
+extern byte laby[20*14];
+extern GStateHandle myGstate;
+extern Boolean bew,nachLinks,bewG,showpills,stillFirst,schuss,pause;
+extern word  pillenzahl;
+extern TimerHandle        HTimer; /* fuer den Timer */
+extern word               timerid;
+extern TimerHandle        MTimer; /* fuer den Timer */
+extern word               Mtimerid;
+extern TimerHandle        EHTimer; /* fuer den Timer */
+extern word               Etimerid;
+extern TimerHandle        THTimer; /* fuer den Timer */
+extern word               Ttimerid;
+extern TimerHandle        H1Timer; /* fuer den Timer */
+extern word               timerid1;
+extern TimerHandle        H2Timer; /* fuer den Timer */
+extern word               timerid2;
+extern TimerHandle        H3Timer; /* fuer den Timer */
+extern word               timerid3;
+extern TimerHandle        H4Timer; /* fuer den Timer */
+extern word               timerid4;
+void   eatIt(byte was);
+void   tot(void);
+void   munchTNT(void);
+@extern object @PunkteVal;
+@extern object @EndeGlyph;
+@extern object @MunchEnde;
+@extern object @MunchColorControl;
+@extern object @MunchView;
+
+int munchX, munchY, geg1X, geg1Y, geg2X, geg2Y, geg3X, geg3Y, geg4X, geg4Y;
+int   tntX,tntY;
+
+Boolean geg1Act=TRUE,geg2Act=TRUE,geg3Act=TRUE,geg4Act=TRUE; /*Gegner aktiv*/
+int oldMunchX,oldMunchY,
+	oldGeg1X,oldGeg1Y,
+	oldGeg2X,oldGeg2Y,
+	oldGeg3X,oldGeg3Y,
+	oldGeg4X,oldGeg4Y;
+
+byte  geg1Dir=0,geg2Dir=0,geg3Dir=0,geg4Dir=0; /*Bew.richtungen der Gegner*/
+/*  1
+   0 2
+	3
+*//*Richtungsrose fÅr geg1Dir*/
+
+const byte bewDistX=31,bewDistY=29,bewDistG=3;
+struct { Bitmap ml; byte mnl[448];} TestBMl1;
+struct { Bitmap ml; byte mnl[441];} TestBMl2;
+struct { Bitmap ml; byte mnl[440];} TestBMr1;
+struct { Bitmap ml; byte mnl[433];} TestBMr2;
+struct { Bitmap ml; byte mnl[415];} TestBMg[4];
+struct { Bitmap ml; byte mnl[116];} Leer;
+struct { Bitmap ml; byte mnl[460];} Kasten;
+struct { Bitmap ml; byte mnl[240];} Pille;
+struct { Bitmap ml; byte mnl[287];} PilleWeg;
+struct { Bitmap ml; byte mnl[407];} Stahl;
+struct { Bitmap ml; byte mnl[559];} Expl;
+struct { Bitmap ml; byte mnl[394];} TNT;
+struct { Bitmap ml; byte mnl[899];} MBG[4];
+struct { Bitmap ml; byte mnl[500];} Ananas;
+struct { Bitmap ml; byte mnl[565];} Bluete;
+struct { Bitmap ml; byte mnl[531];} Geld;
+struct { Bitmap ml; byte mnl[521];} Kirsche;
+
+@extern chunk      blal1;
+@extern chunk      blal2;
+@extern chunk      blar1;
+@extern chunk      blar2;
+@extern chunk      blag1;
+@extern chunk      blag2;
+@extern chunk      blag3;
+@extern chunk      blag4;
+@extern chunk      blaKasten;
+@extern chunk      blaPille;
+@extern chunk      blaPilleWeg;
+@extern chunk      blaStahl;
+//@extern chunk      myPointer;
+@extern chunk      bg1;
+@extern chunk      bg2;
+@extern chunk      bg3;
+@extern chunk      bg4;
+@extern chunk      bLeer;
+@extern chunk      bTNT;
+@extern chunk      bExpl;
+@extern chunk      bAnanas;
+@extern chunk      bBluete;
+@extern chunk      bGeld;
+@extern chunk      bKirsche;
+
+extern ColorQuad   munchcolor;
+extern Boolean	   colorChanged;
+/***************INIT-Routinen*******************/
+
+void initSprites(void)
+{
+	word i;
+	byte *data ;            /* Byte pointer to current data block. */
+	optr block=@blal1;
+
+	/* Lock the block into memory. */
+	MemLock(OptrToHandle(block)) ;
+
+	/* Since the block is an LMem heap, we need to get the particular
+	   start of the block data, not the LMem's index table. */
+
+	data = (byte *)LMemDeref(block) ;
+
+	TestBMl1.ml.B_width = 31;
+	TestBMl1.ml.B_height= 29;
+	TestBMl1.ml.B_compact=BMC_PACKBITS;
+	TestBMl1.ml.B_type= BMT_MASK | BMF_4BIT;
+	for (i=0;i<448;i++)
+		TestBMl1.mnl[i]=data[i];
+
+	/* We are now done with the data block.  Unlock it so that
+	   memory is freed. */
+	MemUnlock(OptrToHandle(block)) ;
+	block=@blal2;
+
+	/* Lock the block into memory. */
+	MemLock(OptrToHandle(block)) ;
+
+	/* Since the block is an LMem heap, we need to get the particular
+	   start of the block data, not the LMem's index table. */
+	data = (byte *)LMemDeref(block) ;
+
+	TestBMl2.ml.B_width = 31;
+	TestBMl2.ml.B_height= 29;
+	TestBMl2.ml.B_compact=BMC_PACKBITS;
+	TestBMl2.ml.B_type= BMT_MASK | BMF_4BIT;
+	for (i=0;i<441;i++)
+		TestBMl2.mnl[i]=data[i];
+
+	/* We are now done with the data block.  Unlock it so that
+	   memory is freed. */
+	MemUnlock(OptrToHandle(block)) ;
+	block=@blar1;
+
+	/* Lock the block into memory. */
+	MemLock(OptrToHandle(block)) ;
+
+	/* Since the block is an LMem heap, we need to get the particular
+	   start of the block data, not the LMem's index table. */
+	data = (byte *)LMemDeref(block) ;
+
+	TestBMr1.ml.B_width = 31;
+	TestBMr1.ml.B_height= 29;
+	TestBMr1.ml.B_compact=BMC_PACKBITS;
+	TestBMr1.ml.B_type= BMT_MASK | BMF_4BIT;
+	for (i=0;i<440;i++)
+		TestBMr1.mnl[i]=data[i];
+
+	/* We are now done with the data block.  Unlock it so that
+	   memory is freed. */
+	MemUnlock(OptrToHandle(block)) ;
+	block=@blar2;
+
+	/* Lock the block into memory. */
+	MemLock(OptrToHandle(block)) ;
+
+	/* Since the block is an LMem heap, we need to get the particular
+	   start of the block data, not the LMem's index table. */
+	data = (byte *)LMemDeref(block) ;
+
+	TestBMr2.ml.B_width = 31;
+	TestBMr2.ml.B_height= 29;
+	TestBMr2.ml.B_compact=BMC_PACKBITS;
+	TestBMr2.ml.B_type= BMT_MASK | BMF_4BIT;
+	for (i=0;i<433;i++)
+		TestBMr2.mnl[i]=data[i];
+
+	/* We are now done with the data block.  Unlock it so that
+	   memory is freed. */
+	MemUnlock(OptrToHandle(block)) ;
+	block=@blag1;
+
+	/* Lock the block into memory. */
+	MemLock(OptrToHandle(block)) ;
+
+	/* Since the block is an LMem heap, we need to get the particular
+	   start of the block data, not the LMem's index table. */
+	data = (byte *)LMemDeref(block) ;
+
+	TestBMg[0].ml.B_width = 31;
+	TestBMg[0].ml.B_height= 29;
+	TestBMg[0].ml.B_compact=BMC_PACKBITS;
+	TestBMg[0].ml.B_type= BMT_MASK | BMF_4BIT;
+	for (i=0;i<415;i++)
+		TestBMg[0].mnl[i]=data[i];
+
+	/* We are now done with the data block.  Unlock it so that
+	   memory is freed. */
+	MemUnlock(OptrToHandle(block)) ;
+	block=@blag2;
+
+	/* Lock the block into memory. */
+	MemLock(OptrToHandle(block)) ;
+
+	/* Since the block is an LMem heap, we need to get the particular
+	   start of the block data, not the LMem's index table. */
+	data = (byte *)LMemDeref(block) ;
+
+	TestBMg[1].ml.B_width = 31;
+	TestBMg[1].ml.B_height= 29;
+	TestBMg[1].ml.B_compact=BMC_PACKBITS;
+	TestBMg[1].ml.B_type= BMT_MASK | BMF_4BIT;
+	for (i=0;i<415;i++)
+		TestBMg[1].mnl[i]=data[i];
+
+	/* We are now done with the data block.  Unlock it so that
+	   memory is freed. */
+	MemUnlock(OptrToHandle(block)) ;
+	block=@blag3;
+
+	/* Lock the block into memory. */
+	MemLock(OptrToHandle(block)) ;
+
+	/* Since the block is an LMem heap, we need to get the particular
+	   start of the block data, not the LMem's index table. */
+	data = (byte *)LMemDeref(block) ;
+
+	TestBMg[2].ml.B_width = 31;
+	TestBMg[2].ml.B_height= 29;
+	TestBMg[2].ml.B_compact=BMC_PACKBITS;
+	TestBMg[2].ml.B_type= BMT_MASK | BMF_4BIT;
+	for (i=0;i<415;i++)
+		TestBMg[2].mnl[i]=data[i];
+
+	/* We are now done with the data block.  Unlock it so that
+	   memory is freed. */
+	MemUnlock(OptrToHandle(block)) ;
+	block=@blag4;
+
+	/* Lock the block into memory. */
+	MemLock(OptrToHandle(block)) ;
+
+	/* Since the block is an LMem heap, we need to get the particular
+	   start of the block data, not the LMem's index table. */
+	data = (byte *)LMemDeref(block) ;
+
+	TestBMg[3].ml.B_width = 31;
+	TestBMg[3].ml.B_height= 29;
+	TestBMg[3].ml.B_compact=BMC_PACKBITS;
+	TestBMg[3].ml.B_type= BMT_MASK | BMF_4BIT;
+	for (i=0;i<415;i++)
+		TestBMg[3].mnl[i]=data[i];
+
+	/* We are now done with the data block.  Unlock it so that
+	   memory is freed. */
+	MemUnlock(OptrToHandle(block)) ;
+	block=@blaKasten;
+
+	/* Lock the block into memory. */
+	MemLock(OptrToHandle(block)) ;
+
+	/* Since the block is an LMem heap, we need to get the particular
+	   start of the block data, not the LMem's index table. */
+	data = (byte *)LMemDeref(block) ;
+
+	Kasten.ml.B_width = 31;
+	Kasten.ml.B_height= 29;
+	Kasten.ml.B_compact=BMC_PACKBITS;
+	Kasten.ml.B_type= BMT_MASK | BMF_4BIT;
+	for (i=0;i<460;i++)
+		Kasten.mnl[i]=data[i];
+
+	/* We are now done with the data block.  Unlock it so that
+	   memory is freed. */
+	MemUnlock(OptrToHandle(block)) ;
+	block=@blaPille;
+
+	/* Lock the block into memory. */
+	MemLock(OptrToHandle(block)) ;
+
+	/* Since the block is an LMem heap, we need to get the particular
+	   start of the block data, not the LMem's index table. */
+
+	data = (byte *)LMemDeref(block) ;
+
+	Pille.ml.B_width = 31;
+	Pille.ml.B_height= 29;
+	Pille.ml.B_compact=BMC_PACKBITS;
+	Pille.ml.B_type= BMT_MASK | BMF_4BIT;
+	for (i=0;i<240;i++)
+		Pille.mnl[i]=data[i];
+
+	/* We are now done with the data block.  Unlock it so that
+	   memory is freed. */
+	MemUnlock(OptrToHandle(block)) ;
+	block=@blaPilleWeg;
+
+	/* Lock the block into memory. */
+	MemLock(OptrToHandle(block)) ;
+
+	/* Since the block is an LMem heap, we need to get the particular
+	   start of the block data, not the LMem's index table. */
+	data = (byte *)LMemDeref(block) ;
+
+	PilleWeg.ml.B_width = 31;
+	PilleWeg.ml.B_height= 29;
+	PilleWeg.ml.B_compact=BMC_PACKBITS;
+	PilleWeg.ml.B_type= BMT_MASK | BMF_4BIT;
+	for (i=0;i<287;i++)
+		PilleWeg.mnl[i]=data[i];
+
+	/* We are now done with the data block.  Unlock it so that
+	   memory is freed. */
+	MemUnlock(OptrToHandle(block)) ;
+	block=@blaStahl;
+
+	/* Lock the block into memory. */
+	MemLock(OptrToHandle(block)) ;
+
+	/* Since the block is an LMem heap, we need to get the particular
+	   start of the block data, not the LMem's index table. */
+	data = (byte *)LMemDeref(block) ;
+
+	Stahl.ml.B_width = 31;
+	Stahl.ml.B_height= 29;
+	Stahl.ml.B_compact=BMC_PACKBITS;
+	Stahl.ml.B_type= BMT_MASK | BMF_4BIT;
+	for (i=0;i<407;i++)
+		Stahl.mnl[i]=data[i];
+
+	/* We are now done with the data block.  Unlock it so that
+	   memory is freed. */
+	MemUnlock(OptrToHandle(block)) ;
+	block=@bg1;
+
+	/* Lock the block into memory. */
+	MemLock(OptrToHandle(block)) ;
+
+   /* Since the block is an LMem heap, we need to get the particular
+	  start of the block data, not the LMem's index table. */
+
+   data = (byte *)LMemDeref(block) ;
+
+  MBG[0].ml.B_width = 31;
+  MBG[0].ml.B_height= 29;
+  MBG[0].ml.B_compact= BMC_UNCOMPACTED;
+  MBG[0].ml.B_type= BMF_8BIT;
+  for (i=0;i<899;i++) MBG[0].mnl[i]=data[i];
+
+   /* We are now done with the data block.  Unlock it so that
+      memory is freed. */
+   MemUnlock(OptrToHandle(block)) ;
+
+   block=@bg2;
+
+   /* Lock the block into memory. */
+   MemLock(OptrToHandle(block)) ;
+
+   /* Since the block is an LMem heap, we need to get the particular
+      start of the block data, not the LMem's index table. */
+
+   data = (byte *)LMemDeref(block) ;
+
+  MBG[1].ml.B_width = 31;
+  MBG[1].ml.B_height= 29;
+  MBG[1].ml.B_compact= BMC_UNCOMPACTED;
+  MBG[1].ml.B_type= BMF_8BIT;
+  for (i=0;i<899;i++) MBG[1].mnl[i]=data[i];
+
+   /* We are now done with the data block.  Unlock it so that
+      memory is freed. */
+   MemUnlock(OptrToHandle(block)) ;
+
+   block=@bg3;
+
+   /* Lock the block into memory. */
+   MemLock(OptrToHandle(block)) ;
+
+   /* Since the block is an LMem heap, we need to get the particular
+	  start of the block data, not the LMem's index table. */
+
+   data = (byte *)LMemDeref(block) ;
+
+  MBG[2].ml.B_width = 31;
+  MBG[2].ml.B_height= 29;
+  MBG[2].ml.B_compact= BMC_UNCOMPACTED;
+  MBG[2].ml.B_type= BMF_8BIT;
+  for (i=0;i<899;i++) MBG[2].mnl[i]=data[i];
+
+   /* We are now done with the data block.  Unlock it so that
+      memory is freed. */
+   MemUnlock(OptrToHandle(block)) ;
+
+   block=@bg4;
+
+   /* Lock the block into memory. */
+   MemLock(OptrToHandle(block)) ;
+
+   /* Since the block is an LMem heap, we need to get the particular
+      start of the block data, not the LMem's index table. */
+
+   data = (byte *)LMemDeref(block) ;
+
+  MBG[3].ml.B_width = 31;
+  MBG[3].ml.B_height= 29;
+  MBG[3].ml.B_compact= BMC_UNCOMPACTED;
+  MBG[3].ml.B_type= BMF_8BIT;
+  for (i=0;i<899;i++) MBG[3].mnl[i]=data[i];
+
+   /* We are now done with the data block.  Unlock it so that
+      memory is freed. */
+   MemUnlock(OptrToHandle(block)) ;
+
+   block=@bExpl;
+
+   /* Lock the block into memory. */
+   MemLock(OptrToHandle(block)) ;
+
+   /* Since the block is an LMem heap, we need to get the particular
+      start of the block data, not the LMem's index table. */
+
+   data = (byte *)LMemDeref(block) ;
+
+  Expl.ml.B_width = 31;
+  Expl.ml.B_height= 29;
+  Expl.ml.B_compact= BMC_PACKBITS;
+  Expl.ml.B_type= BMT_MASK | BMF_4BIT;
+  for (i=0;i<559;i++) Expl.mnl[i]=data[i];
+
+   /* We are now done with the data block.  Unlock it so that
+      memory is freed. */
+   MemUnlock(OptrToHandle(block)) ;
+
+   block=@bTNT;
+
+   /* Lock the block into memory. */
+   MemLock(OptrToHandle(block)) ;
+
+   /* Since the block is an LMem heap, we need to get the particular
+      start of the block data, not the LMem's index table. */
+
+   data = (byte *)LMemDeref(block) ;
+
+  TNT.ml.B_width = 31;
+  TNT.ml.B_height= 29;
+  TNT.ml.B_compact= BMC_PACKBITS;
+  TNT.ml.B_type= BMT_MASK | BMF_4BIT;
+  for (i=0;i<394;i++) TNT.mnl[i]=data[i];
+
+   /* We are now done with the data block.  Unlock it so that
+      memory is freed. */
+   MemUnlock(OptrToHandle(block)) ;
+
+   block=@bAnanas;
+
+   /* Lock the block into memory. */
+   MemLock(OptrToHandle(block)) ;
+
+   /* Since the block is an LMem heap, we need to get the particular
+      start of the block data, not the LMem's index table. */
+
+   data = (byte *)LMemDeref(block) ;
+
+  Ananas.ml.B_width = 31;
+  Ananas.ml.B_height= 29;
+  Ananas.ml.B_compact= BMC_PACKBITS;
+  Ananas.ml.B_type= BMT_MASK | BMF_4BIT;
+  for (i=0;i<500;i++) Ananas.mnl[i]=data[i];
+
+   /* We are now done with the data block.  Unlock it so that
+      memory is freed. */
+   MemUnlock(OptrToHandle(block)) ;
+
+   block=@bBluete;
+
+   /* Lock the block into memory. */
+   MemLock(OptrToHandle(block)) ;
+
+   /* Since the block is an LMem heap, we need to get the particular
+      start of the block data, not the LMem's index table. */
+
+   data = (byte *)LMemDeref(block) ;
+
+  Bluete.ml.B_width = 31;
+  Bluete.ml.B_height= 29;
+  Bluete.ml.B_compact= BMC_PACKBITS;
+  Bluete.ml.B_type= BMT_MASK | BMF_4BIT;
+  for (i=0;i<565;i++) Bluete.mnl[i]=data[i];
+
+   /* We are now done with the data block.  Unlock it so that
+      memory is freed. */
+   MemUnlock(OptrToHandle(block)) ;
+
+   block=@bGeld;
+
+   /* Lock the block into memory. */
+   MemLock(OptrToHandle(block)) ;
+
+   /* Since the block is an LMem heap, we need to get the particular
+      start of the block data, not the LMem's index table. */
+
+   data = (byte *)LMemDeref(block) ;
+
+  Geld.ml.B_width = 31;
+  Geld.ml.B_height= 29;
+  Geld.ml.B_compact= BMC_PACKBITS;
+  Geld.ml.B_type= BMT_MASK | BMF_4BIT;
+  for (i=0;i<531;i++) Geld.mnl[i]=data[i];
+
+   /* We are now done with the data block.  Unlock it so that
+      memory is freed. */
+   MemUnlock(OptrToHandle(block)) ;
+
+   block=@bKirsche;
+
+   /* Lock the block into memory. */
+   MemLock(OptrToHandle(block)) ;
+
+   /* Since the block is an LMem heap, we need to get the particular
+      start of the block data, not the LMem's index table. */
+
+   data = (byte *)LMemDeref(block) ;
+
+  Kirsche.ml.B_width = 31;
+  Kirsche.ml.B_height= 29;
+  Kirsche.ml.B_compact= BMC_PACKBITS;
+  Kirsche.ml.B_type= BMT_MASK | BMF_4BIT;
+  for (i=0;i<521;i++) Kirsche.mnl[i]=data[i];
+
+   /* We are now done with the data block.  Unlock it so that
+      memory is freed. */
+   MemUnlock(OptrToHandle(block)) ;
+
+/*   block=@bLeer;
+
+   /* Lock the block into memory. */
+/*   MemLock(OptrToHandle(block)) ;
+
+   /* Since the block is an LMem heap, we need to get the particular
+	  start of the block data, not the LMem's index table. */
+
+/*   data = (byte *)LMemDeref(block) ;
+
+  Leer.ml.B_width = 31;
+  Leer.ml.B_height= 29;
+  Leer.ml.B_compact=BMC_PACKBITS;
+  Leer.ml.B_type= BMF_4BIT;
+  for (i=0;i<116;i++) Leer.mnl[i]=data[i];
+
+   /* We are now done with the data block.  Unlock it so that
+	  memory is freed. */
+/*   MemUnlock(OptrToHandle(block)) ;*/
+};
+
+/***************Muncher-Bewegungen*******************/
+int labyPos(int x, int y)
+/*Berechnet die Position im "laby"-Array*/
+/* x & y > 0! */
+{
+	if ((x>=0) && (y>=0))
+		return((x/31)+((y/29)*20));
+	else
+		return(0);
+}
+
+void munchUp(void)
+{
+	if (munchY>0)
+	{
+		munchY-=bewDistY;
+		if (munchY<=1)
+			munchY=0;
+		switch (laby[labyPos(munchX,munchY)])
+		{
+			case istHolz:
+				munchY+=bewDistY;break;
+			case istStahl:
+				munchY+=bewDistY;break;
+			case istPille:
+				eatIt(istPille);break;
+			case istAnanas:
+				eatIt(istAnanas);break;
+			case istBluete:
+				eatIt(istBluete);break;
+			case istGeld:
+				eatIt(istGeld);break;
+			case istKirsche:
+				eatIt(istKirsche);break;
+		}
+	}
+}
+
+void munchDown(void)
+{  if (munchY+29<maxY)
+	{ munchY+=bewDistY;
+	  if (munchY+29>=maxY) munchY=maxY-29;
+	  switch (laby[labyPos(munchX,munchY)])
+	  { case istHolz: munchY-=bewDistY;break;
+		case istStahl: munchY-=bewDistY;break;
+		case istPille: eatIt(istPille);break;
+		case istAnanas: eatIt(istAnanas);break;
+		case istBluete: eatIt(istBluete);break;
+        case istGeld: eatIt(istGeld);break;
+        case istKirsche: eatIt(istKirsche);break;
+      }
+    };
+};
+
+void munchLeft(void)
+{ nachLinks=TRUE;
+  if (munchX>0)
+    { munchX-=bewDistX;
+      if (munchX<=1) munchX=0;
+      switch (laby[labyPos(munchX,munchY)])
+      { case istHolz: munchX+=bewDistX;break;
+        case istStahl: munchX+=bewDistX;break;
+        case istPille: eatIt(istPille);break;
+        case istAnanas: eatIt(istAnanas);break;
+        case istBluete: eatIt(istBluete);break;
+		case istGeld: eatIt(istGeld);break;
+        case istKirsche: eatIt(istKirsche);break;
+      }
+    };
+};
+
+void munchRight(void)
+{ nachLinks=FALSE;
+  if (munchX+31<maxX)
+    { munchX+=bewDistX;
+      if (munchX+31>=maxX) munchX=maxX-31;
+      switch (laby[labyPos(munchX,munchY)])
+      { case istHolz: munchX-=bewDistX;break;
+        case istStahl: munchX-=bewDistX;break;
+        case istPille: eatIt(istPille);break;
+        case istAnanas: eatIt(istAnanas);break;
+        case istBluete: eatIt(istBluete);break;
+		case istGeld: eatIt(istGeld);break;
+		case istKirsche: eatIt(istKirsche);break;
+	  }
+	};
+};
+
+/**********************Zeichen-Routinen**************/
+
+/***********************************************************************/
+
+void clearTimerAndGstate(void)
+{
+	if(HTimer)
+	{
+		TimerStop (HTimer, timerid);
+		HTimer = NullHandle;
+	}
+
+	if(H1Timer)
+	{
+		TimerStop (H1Timer, timerid1);
+		H1Timer = NullHandle;
+	}
+
+	if(H2Timer)
+	{
+		TimerStop (H2Timer, timerid2);
+		H2Timer = NullHandle;
+	}
+
+	if(H3Timer)
+	{
+		TimerStop (H3Timer, timerid3);
+		H3Timer = NullHandle;
+	}
+
+	if(H4Timer)
+	{
+		TimerStop (H4Timer, timerid4);
+		H4Timer = NullHandle;
+	}
+
+	if(EHTimer)
+	{
+		TimerStop (EHTimer, Etimerid);
+		EHTimer = NullHandle;
+	}
+
+	if(THTimer)
+	{
+		TimerStop (THTimer, Ttimerid);
+		THTimer = NullHandle;
+	}
+
+	if(MTimer)
+	{
+		TimerStop (MTimer, Mtimerid);
+		MTimer = NullHandle;
+	}
+
+	if (myGstate) GrDestroyState(myGstate);
+}
+
+void drawExpl(void)
+{
+	laby[labyPos(tntX,tntY)]=istExpl;
+	GrDrawImage(myGstate,tntX,tntY,IBS_1, (Bitmap*) &Expl);
+
+	if (tntX>=31)
+		if (laby[labyPos(tntX-31,tntY)]!=istStahl)
+		{
+			laby[labyPos(tntX-31,tntY)]=istExpl;
+			GrDrawImage(myGstate,tntX-31,tntY,IBS_1, (Bitmap*) &Expl);
+		}
+	if (tntX<maxX-31)
+		if (laby[labyPos(tntX+31,tntY)]!=istStahl)
+		{
+				laby[labyPos(tntX+31,tntY)]=istExpl;
+				GrDrawImage(myGstate,tntX+31,tntY,IBS_1, (Bitmap*) &Expl);
+		}
+	if (tntY>=29)
+		if (laby[labyPos(tntX,tntY-29)]!=istStahl)
+		{
+			laby[labyPos(tntX,tntY-29)]=istExpl;
+			GrDrawImage(myGstate,tntX,tntY-29,IBS_1, (Bitmap*) &Expl);
+		}
+	if (tntY<maxY-29)
+		if (laby[labyPos(tntX,tntY+29)]!=istStahl)
+		{
+			laby[labyPos(tntX,tntY+29)]=istExpl;
+			GrDrawImage(myGstate,tntX,tntY+29,IBS_1, (Bitmap*) &Expl);
+		}
+	schuss=FALSE;
+}
+
+/*
+ * This function returns a random integer between 0 and 3.
+ */
+int getRandom(void)
+{
+	long double randomX=4;
+	/*verursacht bei FloatRandomN, Werte <4 zu produzieren*/
+	FloatRandomize(RGIF_GENERATE_SEED,0);
+	FloatPushNumber(&randomX);
+	FloatRandomN();
+	FloatPopNumber(&randomX);
+	return((int)randomX);
+}
+
+byte explode(void) /*returns exploding ghost(s) or zeor*/
+{
+	byte x,y;
+	Boolean stirbt=FALSE;
+	Boolean extra=FALSE;
+	byte erg=0;
+
+	for (y=0;y<14;y++)
+		for (x=0;x<20;x++)
+			if (laby[x+y*20]==istExpl)
+			{ /*Explosionsbilder umwandeln:*/
+				laby[x+y*20]=istLeer;
+				GrInvalRect(myGstate,x*31,y*29,(x+1)*31,(y+1)*29);
+
+				/*Muncher im Einflu·breich?*/
+				if ((munchX==x*31) && (munchY==y*29))
+					stirbt=TRUE;
+
+				/*Gegner im Einflu·breich?*/
+				if (geg1Act)
+					if ((geg1X>=x*31) && (geg1X<=x*31+30))
+						if ((geg1Y>=y*29) && (geg1Y<=y*29+28))
+						{
+							geg1Act=FALSE;
+							GrInvalRect(myGstate,geg1X,geg1Y,geg1X+30,geg1Y+28);
+							erg=erg | 1;
+							extra=TRUE;
+						}
+		if (geg2Act)
+	  if ((geg2X>=x*31) && (geg2X<=x*31+30))
+			if ((geg2Y>=y*29) && (geg2Y<=y*29+28))
+			{ geg2Act=FALSE;
+			  GrInvalRect(myGstate,geg2X,geg2Y,geg2X+30,geg2Y+28);
+              erg=erg | 2;
+              extra=TRUE;
+            };
+        if (geg3Act)
+	  if ((geg3X>=x*31) && (geg3X<=x*31+30))
+            if ((geg3Y>=y*29) && (geg3Y<=y*29+28))
+            { geg3Act=FALSE;
+              GrInvalRect(myGstate,geg3X,geg3Y,geg3X+30,geg3Y+28);
+              erg=erg | 4;
+              extra=TRUE;
+            };
+        if (geg4Act)
+  	  if ((geg4X>=x*31) && (geg4X<=x*31+30))
+            if ((geg4Y>=y*29) && (geg4Y<=y*29+28))
+            { geg4Act=FALSE;
+              GrInvalRect(myGstate,geg4X,geg4Y,geg4X+30,geg4Y+28);
+              erg=erg | 8;
+              extra=TRUE;
+            };
+        if (geg1Act)
+  	  if ((geg1X+30>=x*31) && (geg1X+30<=x*31+30))
+            if ((geg1Y+28>=y*29) && (geg1Y+28<=y*29+28))
+			{ geg1Act=FALSE;
+              GrInvalRect(myGstate,geg1X,geg1Y,geg1X+30,geg1Y+28);
+              if ((erg & 1)!=1) erg=erg | 1;
+              extra=TRUE;
+            };
+        if (geg2Act)
+  	  if ((geg2X+30>=x*31) && (geg2X+30<=x*31+30))
+            if ((geg2Y+28>=y*29) && (geg2Y+28<=y*29+28))
+            { geg2Act=FALSE;
+              GrInvalRect(myGstate,geg2X,geg2Y,geg2X+30,geg2Y+28);
+              if ((erg & 2)!=2) erg=erg | 2;
+              extra=TRUE;
+            };
+        if (geg3Act)
+  	  if ((geg3X+30>=x*31) && (geg3X+30<=x*31+30))
+            if ((geg3Y+28>=y*29) && (geg3Y+28<=y*29+28))
+            { geg3Act=FALSE;
+              GrInvalRect(myGstate,geg3X,geg3Y,geg3X+30,geg3Y+28);
+			  if ((erg & 4)!=4) erg=erg | 4;
+              extra=TRUE;
+            };
+        if (geg4Act)
+  	  if ((geg4X+30>=x*31) && (geg4X+30<=x*31+30))
+            if ((geg4Y+28>=y*29) && (geg4Y+28<=y*29+28))
+            { geg4Act=FALSE;
+              GrInvalRect(myGstate,geg4X,geg4Y,geg4X+30,geg4Y+28);
+              if ((erg & 8)!=8) erg=erg | 8;
+              extra=TRUE;
+            };
+
+        if (extra)
+	{ extra=FALSE;
+          laby[x+y*20]=istAnanas + getRandom();
+          GrInvalRect(myGstate,x*31,y*29,(x+1)*31,(y+1)*29);
+	};
+      }
+   /*War Muncher im Einflu·bereich?*/
+   if (stirbt) tot();
+   return(erg);
+};
+
+
+void initRoteG(byte x)
+{  word i;
+   byte *data;            /* Byte pointer to current data block. */
+   optr block;
+
+   if (x==0)
+   {
+     block=@blag1;
+     MemLock(OptrToHandle(block)) ;
+     data = (byte *)LMemDeref(block) ;
+     for (i=0;i<415;i++) TestBMg[0].mnl[i]=data[i];
+     MemUnlock(OptrToHandle(block)) ;
+	 block=@blag2;
+     MemLock(OptrToHandle(block)) ;
+     data = (byte *)LMemDeref(block) ;
+     for (i=0;i<415;i++) TestBMg[1].mnl[i]=data[i];
+     MemUnlock(OptrToHandle(block)) ;
+   }
+   else {/*laden*/};
+};
+
+void initGrueneG(byte x)
+{  word i;
+   byte *data;            /* Byte pointer to current data block. */
+   optr block;
+
+   if (x==0)
+   {
+     block=@blag3;
+     MemLock(OptrToHandle(block)) ;
+	 data = (byte *)LMemDeref(block) ;
+     for (i=0;i<415;i++) TestBMg[2].mnl[i]=data[i];
+     MemUnlock(OptrToHandle(block)) ;
+     block=@blag4;
+     MemLock(OptrToHandle(block)) ;
+     data = (byte *)LMemDeref(block) ;
+     for (i=0;i<415;i++) TestBMg[3].mnl[i]=data[i];
+     MemUnlock(OptrToHandle(block)) ;
+   }
+   else {/*laden*/};
+};

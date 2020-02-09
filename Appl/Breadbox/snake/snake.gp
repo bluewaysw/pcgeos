@@ -26,10 +26,10 @@ library ui
 library game
 library ansic
 
-resource APPRESOURCE ui-object
-resource INTERFACE ui-object
-resource APPICONS data object
-resource STRINGSRESOURCE  data object
+resource AppResource ui-object
+resource Interface ui-object
+resource AppIcons data object
+resource StringsResource data object
 
 export SnakeApplicationClass
 export SnakePrimaryClass

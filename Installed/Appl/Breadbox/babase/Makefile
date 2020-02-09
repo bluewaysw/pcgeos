@@ -6,11 +6,11 @@
 GEODE           = babase
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = babase.goc DOC_MTDS.GOC DTA_MTDS.GOC NAV_MTDS.GOC\
-                  SCH_MTDS.GOC TXT_STRS.GOC BBLOGO.GOH HBASE.GOH\
-                  HBICONS.GOH
-OBJS            = babase.obj DOC_MTDS.obj DTA_MTDS.obj NAV_MTDS.obj\
-                  SCH_MTDS.obj TXT_STRS.obj
+SRCS            = sch_mtds.goc txt_strs.goc babase.goc doc_mtds.goc\
+                  dta_mtds.goc nav_mtds.goc hbicons.goh hbase.goh\
+                  bblogo.goh
+OBJS            = sch_mtds.obj txt_strs.obj babase.obj doc_mtds.obj\
+                  dta_mtds.obj nav_mtds.obj
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk

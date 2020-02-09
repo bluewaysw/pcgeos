@@ -5,11 +5,11 @@
 #
 GEODE           = wclock
 ASM_TO_OBJS     = wcMain.asm
-UI_TO_RDFS      = WC.UI
-SRCS            = wcAlarm.asm wcInit.asm wcInitFile.asm wcLists.asm\
-                  wcMain.asm wcUI.asm wcUser.asm macros.def\
-                  wcApplication.def wcClasses.def wcConstant.def\
-                  wcGeode.def uiStrings.ui wc.ui
+UI_TO_RDFS      = wc.ui
+SRCS            = wcUI.asm wcUser.asm wcInitFile.asm wcMain.asm wcLists.asm\
+                  wcInit.asm wcAlarm.asm wcGeode.def macros.def\
+                  wcApplication.def wcConstant.def wcClasses.def\
+                  uiStrings.ui wc.ui
 OBJS            = wcMain.obj
 LOBJS           =
 
