@@ -974,7 +974,6 @@ Pass2MS_ProcessObject(const char *file,
 	rectype = MSObj_ReadRecord(f, &reclen, &recno);
 
 	bp = msobjBuf;
-	printf("(2) rec no: %d, len: %d\r\n", recno, reclen);
 
 	if ((*msobjCheck) (file, rectype, reclen, msobjBuf, 2)) {
 	    continue;

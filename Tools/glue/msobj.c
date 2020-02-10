@@ -1571,7 +1571,6 @@ MSObjMapExternal(const char	*file,	    /* Name of object file being read */
 		 int	    	pass,
 		 Boolean    	isLMemHandleSegment)
 {
-	printf("MSObjMapExternal\n"); fflush(stderr);
     if (targMethod == TFM_EXTERNAL) {
 		if (fdataPtr->external & MO_EXT_UNDEFINED) {
 			/*
