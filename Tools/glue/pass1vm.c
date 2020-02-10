@@ -744,11 +744,9 @@ Pass1VM_FileIsNeeded(const char   *file,    /* file for errors */
 	 i > 0;
 	 i--, s++)
     {
-			printf("EEE\n");
 	if ((s->syms != 0) &&
 	    Pass1VMSearchForUndefinedSymbol(file, fh, hdr->strings, s))
 	{
-		printf("EEE\n");
 	    isNeeded = TRUE;
 	    break;
 	}
@@ -756,7 +754,6 @@ Pass1VM_FileIsNeeded(const char   *file,    /* file for errors */
     VMUnlock(fh, map);
     VMClose(fh);
 
-		printf("EEE DONE\n");
     return (isNeeded);
 }
 

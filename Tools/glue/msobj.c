@@ -86,11 +86,8 @@ MSObj_DefCheck(const char   *file,
 	       byte	    *data,
 	       int 	    pass)
 {
-	printf("MSObj_DefCheck %s\r\n", file);
-
     if (rectype == MO_COMENT) {
 	if (data[1] == CC_MSOFT_EXT) {
-		printf("CC_MSOFT_EXT");
 	    /*
 	     * Comment indicates microsoft extensions are being used.
 	     * See if that includes codeview. The letters CV seem to
@@ -98,13 +95,11 @@ MSObj_DefCheck(const char   *file,
 	     * I don't know what other info can be there...
 	     */
 	    if (reclen >= 5 && data[3] == 'C' && data[4] == 'V') {
-				printf("CV TEST");
 		msobjCheck = CV_Check;
 		msobjFinish = CV_Finish;
 		return (CV_Check(file, rectype, reclen, data, pass));
 	    }
 		else {
-			printf("ALWAYS USE CV32");
 			msobjCheck = CV32_Check;
 			msobjFinish = CV32_Finish;
 			return (CV32_Check(file, rectype, reclen, data, pass));
@@ -112,7 +107,6 @@ MSObj_DefCheck(const char   *file,
 	} else if ((data[1] == BCC_DEPENDENCY) ||
 		   (data[1] == BCC_VERSION))
 	{
-		printf("BORLAND");
 	    /*
 	     * Comment indicates Borland symbolic information is being used,
 	     * as this record must precede the first non-comment record,
@@ -126,7 +120,6 @@ MSObj_DefCheck(const char   *file,
 		   (data[0] == 0) &&	/* no special flags */
 		   (data[2] == '@'))
 	{
-		printf("METAWARE");
 	    /*
 	     * Entertaining comment record placed in the output file by
 	     * GOC to tell us the actual source file name under metaware.
@@ -1339,8 +1332,6 @@ MSObj_AllocType(VMBlockHandle   typeBlock,
     word    	    size;
     static ObjType  fakeOT;
 
-printf("MSObj_AllocType %x\n", typeBlock); fflush(stdout);
-
     if (typeBlock == 0) {
 	/*
 	 * Not actually creating a type description, so just return
@@ -1378,7 +1369,7 @@ printf("MSObj_AllocType %x\n", typeBlock); fflush(stdout);
      * Mark the block as dirty and return the pointer to our caller.
      */
     VMDirty(symbols, typeBlock);
-		printf("MSObj_AllocType2 %d\n", *offsetPtr);
+
     return(ot);
 }
 
@@ -2043,8 +2034,6 @@ MSObj_PerformRelocations(const char	*file,	    /* Name of object file */
 	((sd != NULL) &&
 	 (sd->combine==SEG_LMEM) &&
 	 (MSObj_GetLMemSegOrder(sd)==LMEM_HANDLES));
-
-printf("MSObj_PerformRelocations\n"); fflush(stdout);
 
     if (nextRelPtr != NULL) {
 	nextRel = *nextRelPtr;

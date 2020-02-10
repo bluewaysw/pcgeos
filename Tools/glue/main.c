@@ -1736,24 +1736,19 @@ LoadFileIfNeeded(char	*myfile)
     void    	    *handle;
     ObjFileType	    type;
 
-printf("LoadFileIfNeeded\n");
     handle = Obj_Open(myfile, NULL, &type, FALSE);
 
-		printf("LoadFileIfNeeded2\n");
     if (handle == NULL) {
 	/*
 	 * Obj_Open has already given the error message.
 	 */
 	return FALSE;
     }
-		printf("LoadFileIfNeeded3\n");
 
     if (!Pass1VM_FileIsNeeded(myfile, handle)) {
-			printf("not needed\n");
 	return FALSE;
     }
 
-		printf("LoadFileIfNeeded4\n");
     Pass1Load(myfile);
     return TRUE;
 }
@@ -2417,9 +2412,7 @@ main(argc, argv)
      * Now load all the given object files for the first pass.
      */
     for (i = firstobj; i < argc && argv[i][0] != '-'; i++) {
-printf("Pass1Load++ %s\n", argv[i]);
 	Pass1Load(argv[i]);
-	printf("Pass1Load-- %s\n", argv[i]);
     }
 
     if ((i != argc) && (argv[i][1] != 'l')){
@@ -2487,7 +2480,6 @@ printf("Pass1Load++ %s\n", argv[i]);
 	    fprintf(stderr, "pass1 memory stats dumped to %s\n", dumpfile);
 	}
     }
-printf("before InterPass\n");
     InterPass(outfile, paramfile, mapfile);
 
     if (errors) {
