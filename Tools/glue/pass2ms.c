@@ -95,8 +95,6 @@ Pass2MSFixupLMem(const char *file,  	/* File being linked */
 
     lmd = NULL;
 
-    printf("Pass2MSFixupLMem\n");
-
     /*
      * Locate the MSObjLMemData descriptor for this lmem segment.
      */
@@ -316,6 +314,7 @@ Pass2MSFixupLMem(const char *file,  	/* File being linked */
 
 	newHandle--, oldHandle--, i--;
     }
+
     /*
      * We've encountered problems with Borland C, where the size of symbols
      * as stored in the .obj file do not match the size of symbols as
@@ -373,12 +372,10 @@ Pass2MSFixupLMem(const char *file,  	/* File being linked */
      * First find the first in-use chunk handle.
      */
     i = sd->size/2;
-    oldHandle = &lmd->handleData[0];
-    newHandle = newHT;
-    while (((*oldHandle == 0) || (*oldHandle == 0xffff)) && (i > 0)) {
-	oldHandle++, newHandle++;
-	i--;
-    }
+    i--;
+    nextOldHandle = &lmd->handleData[i]; 
+    nextNewHandle = &newHT[i];
+
 
     /*
      * Now find the next in-use chunk handle, so we know the limit of the
@@ -386,15 +383,15 @@ Pass2MSFixupLMem(const char *file,  	/* File being linked */
      * and check to see if the address symbol is within bounds of the current
      * chunk.
      */
-    for (nextOldHandle = oldHandle + 1,
-	 nextNewHandle = newHandle + 1,
+    for (oldHandle = nextOldHandle - 1,
+	 newHandle = nextNewHandle - 1,
 	 i -= 1;
 
 	 i > 0;
 
-	 nextOldHandle++, nextNewHandle++, i--)
+	 oldHandle--, newHandle--, i--)
     {
-	if ((*nextOldHandle != 0) && (*nextOldHandle != 0xffff)) {
+	if ((*oldHandle != 0) && (*newHandle != 0xffff)) {
 	    break;
 	}
     }
@@ -404,8 +401,107 @@ Pass2MSFixupLMem(const char *file,  	/* File being linked */
      * block to the start of the heap, just to be clean.
      */
     lastOff = heap->grpOff;
+    /* ========================================================================
+     * because WATCOM holds not in addressing order we have to
+     * fully loop thought all symbols for every chunk */
 
-    for (cur = heap->addrH; cur != 0; cur = next) {
+    while(i > 0) {
+	    
+	mapEntries = oamh->numEntries;
+	oame = ObjFirstEntry(oamh, ObjAddrMapEntry);
+	lastOff = oame->last;
+	
+	for (cur = heap->addrH; cur != 0; cur = next) { /* block look */
+	    ObjSymHeader    *osh;
+	    ObjSym  	*os, *first;
+	    word	    	n;
+
+	    osh = (ObjSymHeader *)VMLock(symbols, cur, (MemHandle *)NULL);
+
+	    os = ObjFirstEntry(osh, ObjSym);
+	    first = os;
+	    if (!Obj_IsAddrSym(os)) {
+		/*
+		 * Hit the first type block (no need to worry about undefined
+		 * symbols, either, as they'd be an error at this point and would
+		 * have been caught already...)
+		 */
+		VMUnlock(symbols, cur);
+		break;
+	    }
+
+	    for (n = osh->num; n > 0; os++, n--) { /* smybol loop */
+		/*
+		 * If the thing's an address symbol (XXX: what else could it be?
+		 * there are no type or procedure-local symbols here...) relocate
+		 * it by the amount the associated chunk shifted.
+		 */
+		if (Obj_IsAddrSym(os)) {
+		    if ((i == 0) ||
+		    	((os->u.addrSym.address >=
+		    	(swaps(*oldHandle)-LMEM_SIZE_SIZE) + heap->grpOff)
+			&&
+			(os->u.addrSym.address <
+			(swaps(*nextOldHandle)-LMEM_SIZE_SIZE) + heap->grpOff)))
+		    {
+			int newLastOffset = -1;
+			    
+			/*
+			 * Still within the current chunk, so relocate according
+			 * to current chunk's relocation amount. Both *newHandle and
+			 * *oldHandle have LMEM_SIZE_SIZE added into them, so we
+			 * need to add it into the address explicitly.
+			 */
+			newLastOffset = (os->u.addrSym.address +=
+				       (swaps(*newHandle) -
+					(swaps(*oldHandle) + heap->grpOff) +
+					LMEM_SIZE_SIZE));
+			if(newLastOffset > lastOff) {
+			    lastOff = newLastOffset;
+			}
+		    }
+		}
+	    } /* symbol loop */
+	    /*
+	     * Advance to next block, dirtying this one, since we've messed with it
+	     */
+	    next = osh->next;
+	    VMUnlockDirty(symbols, cur);
+	    /*
+	     * Update the offset for the block in the address map to be that of the
+	     * last symbol we relocated.
+	     */
+	    oame->last = lastOff;
+	    oame++, mapEntries--;	
+        }    /* block loop */
+
+	/* move to next chunk */
+	if (i > 0) {
+	    /*
+	     * Symbol is outside the bounds of the current chunk, so
+	     * advance to the next chunk.
+	     */
+	    nextOldHandle = oldHandle;
+	    nextNewHandle = newHandle;
+	
+	    for (oldHandle = nextOldHandle - 1,
+		 newHandle = nextNewHandle - 1,
+		 i -= 1;
+	
+		 i > 0;
+	
+		 oldHandle--, newHandle++, i--)
+	    {
+		if ((*oldHandle != 0) &&
+		    (*oldHandle != 0xffff))
+		{
+		    break;
+		}
+	    }
+        }
+    }
+
+    for (cur = heap->addrH; cur != 0; cur = next) { /* block look */
 	ObjSymHeader    *osh;
 	ObjSym  	*os, *first;
 	word	    	n;
@@ -413,7 +509,7 @@ Pass2MSFixupLMem(const char *file,  	/* File being linked */
 	osh = (ObjSymHeader *)VMLock(symbols, cur, (MemHandle *)NULL);
 
 	os = ObjFirstEntry(osh, ObjSym);
-        first = os;
+	first = os;
 	if (!Obj_IsAddrSym(os)) {
 	    /*
 	     * Hit the first type block (no need to worry about undefined
@@ -423,53 +519,13 @@ Pass2MSFixupLMem(const char *file,  	/* File being linked */
 	    VMUnlock(symbols, cur);
 	    break;
 	}
-	for (n = osh->num; n > 0; os++, n--) {
+	for (n = osh->num; n > 0; os++, n--) { /* smybol loop */
 	    /*
 	     * If the thing's an address symbol (XXX: what else could it be?
 	     * there are no type or procedure-local symbols here...) relocate
 	     * it by the amount the associated chunk shifted.
 	     */
-	    while (Obj_IsAddrSym(os)) {
-		if ((i == 0) ||
-		    (os->u.addrSym.address <
-		     (swaps(*nextOldHandle)-LMEM_SIZE_SIZE) + heap->grpOff))
-		{
-		    /*
-		     * Still within the current chunk, so relocate according
-		     * to current chunk's relocation amount. Both *newHandle and
-		     * *oldHandle have LMEM_SIZE_SIZE added into them, so we
-		     * need to add it into the address explicitly.
-		     */
-		    lastOff = (os->u.addrSym.address +=
-			       (swaps(*newHandle) -
-				(swaps(*oldHandle) + heap->grpOff) +
-				LMEM_SIZE_SIZE));
-		    break;
-		} else if (i > 0) {
-		    /*
-		     * Symbol is outside the bounds of the current chunk, so
-		     * advance to the next chunk.
-		     */
-		    oldHandle = nextOldHandle;
-		    newHandle = nextNewHandle;
-
-		    for (nextOldHandle = oldHandle + 1,
-			 nextNewHandle = newHandle + 1,
-			 i -= 1;
-
-			 i > 0;
-
-			 nextOldHandle++, nextNewHandle++, i--)
-		    {
-			if ((*nextOldHandle != 0) &&
-			    (*nextOldHandle != 0xffff))
-			{
-			    break;
-			}
-		    }
-		}
-	    }
-
+	     
 	    /*
 	     * If the symbol's a variable, see if it's the body of a chunk array
 	     * and fix up the header properly if so.
@@ -490,15 +546,15 @@ Pass2MSFixupLMem(const char *file,  	/* File being linked */
 		     */
 		    genptr  tbase;  	/* Base of associated type block */
 		    word    len;    	/* Length of this portion of the
-					 * array descriptor */
+					     * array descriptor */
 		    word    nels = 0;	/* Number of elements in the array
-					 * total */
+					     * total */
 		    ObjType *t;	    	/* Current piece of the array
-					 * descriptor */
+					     * descriptor */
 		    byte    *bp;    	/* Pointer for storing CAH_count */
-                    int     preceding;  /* index of preceding symbold
-                                         * based on addr offset */
-                    word    pl;         /* preceding loop */
+		    int     preceding;  /* index of preceding symbold
+					     * based on addr offset */
+		    word    pl;         /* preceding loop */
 
 		    /*
 		     * Point to the first descriptor for the array type (this
@@ -506,7 +562,7 @@ Pass2MSFixupLMem(const char *file,  	/* File being linked */
 		     */
 		    assert(!(os->u.variable.type & OTYPE_SPECIAL));
 		    tbase = (genptr)VMLock(symbols, osh->types,
-					   (MemHandle *)NULL);
+					       (MemHandle *)NULL);
 		    t = (ObjType *)(tbase + os->u.variable.type);
 		    assert(OTYPE_IS_ARRAY(t->words[0]));
 
@@ -534,23 +590,23 @@ Pass2MSFixupLMem(const char *file,  	/* File being linked */
 		     * the block, I believe... -- ardeb
 		     */
 
-                    /*
-                     * WATCOM doesn't garantie offset related order of then
-                     * symbols, so we need to lookup the symbols by iterating
-                     * the symbols block and pick the var with the closest
-                     * offset address before ourself.
-                     */
-                     preceding = -1;
-                     for (pl = 0; pl < osh->num; pl++) {
-                        if(first[pl].u.addrSym.address < os->u.addrSym.address) {
-                            if(preceding <  0) {
-                                preceding = pl;
-                            } else if(first[pl].u.addrSym.address >
-                                first[preceding].u.addrSym.address) {
-                                preceding = pl;
-                            }
-                        }
-                     }
+		    /*
+		     * WATCOM doesn't garantie offset related order of then
+		     * symbols, so we need to lookup the symbols by iterating
+		     * the symbols block and pick the var with the closest
+		     * offset address before ourself.
+		     */
+		    preceding = -1;
+		    for (pl = 0; pl < osh->num; pl++) {
+			if(first[pl].u.addrSym.address < os->u.addrSym.address) {
+			    if(preceding <  0) {
+				preceding = pl;
+			    } else if(first[pl].u.addrSym.address >
+				first[preceding].u.addrSym.address) {
+				preceding = pl;
+			    }
+			}
+		    }
 		    assert(preceding >= 0);
 		    assert(first[preceding].type == OSYM_VAR);
 
@@ -566,7 +622,8 @@ Pass2MSFixupLMem(const char *file,  	/* File being linked */
 		}
 		ST_Unlock(symbols, os->name);
 	    }
-	}
+	}	/* symbol loop */
+	
 	/*
 	 * Advance to next block, dirtying this one, since we've messed with it
 	 */
@@ -576,10 +633,10 @@ Pass2MSFixupLMem(const char *file,  	/* File being linked */
 	 * Update the offset for the block in the address map to be that of the
 	 * last symbol we relocated.
 	 */
-	oame->last = lastOff;
-	oame++, mapEntries--;
-    }
-
+    }    /* block loop */
+    
+    
+    /* ================================================================*/
     /*
      * Make the final address map entry cover to the end of the segment and
      * unlock the thing, marking it dirty.

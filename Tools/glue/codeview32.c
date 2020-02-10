@@ -267,7 +267,6 @@ CV32LocateFixup(const char *file,	    	/* Object file being processed */
     MSFixData	    frame;	/* Frame w.r.t. which the fixup's being made */
     word    	    reclen;	/* Length of the fixup record */
 
-printf("CV32LocateFixup\n");
     *realName = NullID;
     /*
      * First find the right fixup record.
@@ -305,6 +304,7 @@ printf("CV32LocateFixup\n");
 		     */
 		    return(FALSE);
 		}
+
 		if ((fixLoc & FL_OFFSET) == recOffset) {
 		    if (!(fixData & FD_NO_TARG_DISP)) {
 			MSObj_GetWord(*extraOffPtr, bp);
@@ -325,7 +325,7 @@ printf("CV32LocateFixup\n");
 			case TFM_EXTERNAL:
 			{
 			    Boolean real;
-
+				printf("FIXUP TFM_EXTERNAL: %x\n", recOffset);
 			    if (!CV32LocatePublic(target.external,
 						sdPtr, extraOffPtr,
 						&real, (ID *)NULL))
@@ -336,14 +336,12 @@ printf("CV32LocateFixup\n");
 				   "%s: cannot locate segment for external symbol %i for codeview fixup",
 				   file, target.external & ~MO_EXT_IN_LIB);
 #endif
-printf("CV32LocateFixup----\n");
 				return(FALSE);
 			    }
 			    *realName = target.external;
 			    break;
 			}
 		    }
-				printf("CV32LocateFixup---\n");
 		    return(TRUE);
 		} else if (!(fixData & FD_NO_TARG_DISP)) {
 		    /*
@@ -351,11 +349,10 @@ printf("CV32LocateFixup----\n");
 		     */
 		    bp += 2;
 		}
-	    }
+	   }
 	}
     }
 
-		printf("CV32LocateFixup--\n");
     return(FALSE);
 }
 
@@ -2875,7 +2872,6 @@ printf("CV32ProcessSymbols %x\n", typeBlock);
 	MSObj_GetWord(len, bp);
 	base = bp;
 	MSObj_GetWord(recType, bp);
-	printf("recType: 0x%x\n", recType); fflush(stdout);
 	switch(recType) {
 	case CST2_END:
 	{
