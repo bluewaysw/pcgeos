@@ -188,7 +188,6 @@ Seg_AddSegment(const char *file,	    /* Object file in which segment was
      */
     if(name) {
 	segName = ST_Lock(symbols, name);
-printf("add_seg %s\n", segName);
 	if (!(strncmp(segName, "_BOGUS", sizeof("_BOGUS") - 1))) {
 	    type = SEG_LIBRARY;
 	} else if (!(strncmp(segName, "_CLASSSEG_", sizeof("_CLASSSEG_") - 1))) {

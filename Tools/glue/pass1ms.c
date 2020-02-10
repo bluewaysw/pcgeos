@@ -1568,8 +1568,6 @@ Pass1MS_ProcessObject(const char  *file,
 	    continue;
 	}
 
-	printf("rec no: %d, len: %d, type: %d\r\n", recno, reclen, rectype);
-
         switch(rectype) {
 	    case MO_THEADR: {
 		/*
