@@ -3014,11 +3014,8 @@ CV_Finish(const char *file,
 	     * Process symbol records
 	     */
 	    CVProcessSymbols(file);
-	printf("CCC\n"); fflush(stdout);
 	    CVProcessUnprocessedTypeRecords(file);
-			printf("CCC2\n"); fflush(stdout);
 	    Pass1MS_Finish((char *)file, happy, pass);
-			printf("CCC3\n"); fflush(stdout);
 	} else {
 	    Pass2MS_Finish((char *)file, happy, pass);
 	}

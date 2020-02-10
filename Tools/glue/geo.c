@@ -656,12 +656,7 @@ GeoPrepare(char	    *outfile,
 	    }
 	}
     }
-#if 0
-    for (i = 0; i < seg_NumSegs; i++)
-    {
-	printf("seg # %d = %d\n", i, seg_Segments[i]->name);
-    }
-#endif
+
     /*
      * Make sure a type is specified for the geode.
      */

@@ -130,13 +130,6 @@ CV32LocatePublic(ID   	name,	    	/* Name to find */
     namestr = ST_Lock(symbols, name);
     namelen = strlen(namestr);
 
-{
-			char tmp = namestr[namelen];
-		namestr[namelen] = 0;
-		printf("**A %s\r\n", namestr);
-		namestr[namelen] = tmp;
-}
-
     for (srp = pubHead.next;
 	 srp != (MSSaveRec *)&pubHead;
 	 srp = srp->links.next)
@@ -189,8 +182,6 @@ CV32LocatePublic(ID   	name,	    	/* Name to find */
 				if (strncmp((char *)bp+1, namestr, namelen) != 0) {
 				*aliasPtr = ST_Enter(symbols, strings,
 							(char *)bp+1, *bp);
-
-								printf("*** %x %s\r\n", *aliasPtr, (char *)bp+1);
 				} else {
 				*aliasPtr = name;
 				}
@@ -325,7 +316,6 @@ CV32LocateFixup(const char *file,	    	/* Object file being processed */
 			case TFM_EXTERNAL:
 			{
 			    Boolean real;
-				printf("FIXUP TFM_EXTERNAL: %x\n", recOffset);
 			    if (!CV32LocatePublic(target.external,
 						sdPtr, extraOffPtr,
 						&real, (ID *)NULL))
@@ -428,15 +418,7 @@ CV32GetString(byte    **bpPtr)
 	len = **bpPtr;
 	*bpPtr += 1;
 
-    if (len != 0) {
-		char tmp = (*bpPtr)[len];
-		(*bpPtr)[len] = 0;
-		printf("CVGetString: %s\r\n", (char *)(*bpPtr));
-		if (strcmp("GPI_longTermMoniker", (char *)(*bpPtr)) == 0) {
-			int a = 0;
-			a++;
-		}
-		(*bpPtr)[len]=tmp;
+    	if (len != 0) {
 		retval = ST_Enter(symbols, strings, (char *)(*bpPtr), len);
 	} else {
 	retval = NullID;
@@ -751,18 +733,11 @@ CV32FinishStructuredType(const char    	*file,	    /* Object file being read */
     /*
      * Unlock and dirty the tsymBlock, as we're done entering symbols.
      */
-		 printf("1\n");fflush(stdout);
     VMUnlockDirty(symbols, tsymBlock);
 
-  /*
+    /*
      * Now enter the whole passel into the global segment.
      */
-		 {
-				 word blkSize;
-				 VMID idPtr;
-			 VMInfo(symbols, tsymBlock, &blkSize, 0, &idPtr);
-		 }
-		printf("Obj_EnterTypeSyms 2\n");fflush(stdout);
     (void)Obj_EnterTypeSyms(file, symbols, globalSeg, tsymBlock,
 			    OETS_TOP_LEVEL_ONLY);
 
@@ -770,16 +745,13 @@ CV32FinishStructuredType(const char    	*file,	    /* Object file being read */
     /*
      * Free the temporary blocks with which we just finished.
      */
-		 printf("3\n");fflush(stdout);
     VMFree(symbols, ttypeBlock);
     VMFree(symbols, tsymBlock);
-		printf("4\n");fflush(stdout);
 
     /*
      * Finally, allocate the type descriptor for this structured type in
      * the passed type block and return the thing's offset to our caller.
      */
-		 printf("MSObj_AllocType1 %x %x %x\n", typeBlock, ttypeBlock, tsymBlock); fflush(stdout);
     ot = MSObj_AllocType(typeBlock, &typeOff);
     OTYPE_ID_TO_STRUCT(name,ot);
     if (typeBlock != 0) {
@@ -1036,8 +1008,6 @@ CV32ProcessStructure(const char  	    *file,
      * structure and field symbols...
      */
     CV32AllocSymAndTypeBlocks(&tsymBlock, &ttypeBlock);
-		printf("::CV32AllocSymAndTypeBlocks %x %x\n", tsymBlock, ttypeBlock);
-		fflush(stdout);
 
     /*
      * Fetch the size and number of fields in the structure.
@@ -1241,7 +1211,6 @@ CV32ProcessStructure(const char  	    *file,
 	os->u.sField.offset = offset;
 	types[i] = CV32FetchType(file, ttypeBlock, typeIndex);
 	os->u.sField.type = types[i];
-	printf("FIELD %x %d\n", ttypeBlock, types[i]); fflush(stdout);
 
 	/*
 	 * If this isn't the last field, point the field to the next one we'll
@@ -1296,9 +1265,6 @@ CV32ProcessStructure(const char  	    *file,
     if (os->flags & OSYM_NAMELESS) {
 	MSObj_AddAnonStruct(os, ttypeBlock, size, nfields);
     }
-
-
-		printf("CV32FinishStructuredType2 %x\n", ttypeBlock); fflush(stdout);
 
     return CV32FinishStructuredType(file, dataBase, len, os,
 				  tsymBlock, ttypeBlock,
@@ -1689,7 +1655,6 @@ error:
 	     * Enter this thing in the global segment. This will also transmute
 	     * the CTL_SCALAR record into a CTL_ID record...
 	     */
-			 printf("CV32FinishStructuredType1\n"); fflush(stdout);
 	    retval = CV32FinishStructuredType(file, *bpPtr, len, esym,
 					    tsymBlock, ttypeBlock,
 					    typeBlock);
@@ -1914,18 +1879,13 @@ CV32FetchType(const char 	    *file,  	/* Object file being read */
     } else {
 	byte	*bp;
 	word	len;
-	printf("CV32LocateType\n");fflush(stdout);
 	bp = CV32LocateType(index, &len);
-	printf("CV32LocateType---\n");fflush(stdout);
 	if (bp == NULL) {
 	    Notify(NOTIFY_ERROR,
 		   "%s: undefined type index 0x%x", file, index);
 	    return (OTYPE_VOID | OTYPE_SPECIAL);
 	}
-
-	printf("CV32FetchType*** %x %d\n", typeBlock, index);fflush(stdout);
 	retval = CV32ProcessTypeRecord(file, &bp, len, typeBlock);
-	printf("CV32FetchType--- %d\n", retval);fflush(stdout);
     }
 
     return(retval);
@@ -1965,15 +1925,12 @@ CV32ProcessTypeRecord(const char 	    *file,  	/* Object file from which
 	byte    *dataBase;
 	dataBase = bp;
 
-printf("CV32ProcessTypeRecord %x\n", typeBlock); fflush(stdout);
 	// process leafs
 	while (bp < endp) {
 
 		word leaf;
 		word argsCount;
 		MSObj_GetWord(leaf, bp);
-
-		printf("lead: %d\r\n", leaf); fflush(stdout);
 
 		// process leaf
 		switch (leaf) {
@@ -2025,7 +1982,6 @@ printf("CV32ProcessTypeRecord %x\n", typeBlock); fflush(stdout);
 			// Move bp past reserved value
 			bp += 2;
 			MSObj_GetWord(argsCount, bp);
-			printf("argsCount: %d\n", argsCount);
 			MSObj_GetWord(argsList, bp); // argsList pointer
 			*bpPtr = bp;
 			return(retval);
@@ -2039,8 +1995,6 @@ printf("CV32ProcessTypeRecord %x\n", typeBlock); fflush(stdout);
 			MSObj_GetWord(index, bp);
 
 			retval = CV32FetchType(file, typeBlock, index);
-
-			printf("VMUnlockDirty::CTL2_MODIFIER\n");fflush(stdout);
 			break;
 		}
 		case CTL2_POINTER:
@@ -2079,13 +2033,11 @@ printf("CV32ProcessTypeRecord %x\n", typeBlock); fflush(stdout);
 				*/
 				ObjType *ot;
 				word	tOffset;
-				printf("MSObj_AllocType2 %x\n", typeBlock); fflush(stdout);
 
 				ot = MSObj_AllocType(typeBlock, &tOffset);
 				ot->words[0] = retval;
 				ot->words[1] = baseType;
 				retval = tOffset;
-				printf("VMUnlockDirty::CTL2_POINTER\n");fflush(stdout);
 				VMUnlockDirty(symbols, typeBlock);
 			}
 
@@ -2105,28 +2057,21 @@ printf("CV32ProcessTypeRecord %x\n", typeBlock); fflush(stdout);
 		break;
 		case CTL2_ARRAY:
 			retval = CV32ProcessArray(file, &bp, len - 2, typeBlock);
-			printf("CV32ProcessTypeRecord::CTL2_ARRAY\n");fflush(stdout);
 			break;
 		case CTL2_CLASS:
 		case CTL2_STRUCTURE:
-			printf("CV32ProcessTypeRecord::CTL2_STRUCTURE+++\n"); fflush(stdout);
 			retval = CV32ProcessStructure(file, &bp, len - 2, typeBlock);
-			printf("CV32ProcessTypeRecord::CTL2_STRUCTURE---\n"); fflush(stdout);
 			break;
 		case CTL2_MEMBER:
-		printf("CV32ProcessTypeRecord::CTL2_MEMBER+++\n"); fflush(stdout);
 			retval = CV32ProcessStructure(file, &bp, len - 2, typeBlock);
-			printf("CV32ProcessTypeRecord::CTL2_MEMBER---\n"); fflush(stdout);
 			break;
 		case CTL2_ID:
 		{
 			ObjType 	*ot;
 
-			printf("MSObj_AllocType3 %x\n", typeBlock); fflush(stdout);
-		ot = MSObj_AllocType(typeBlock, &retval);
+			ot = MSObj_AllocType(typeBlock, &retval);
 			MSObj_GetWord(ot->words[0], bp);
 			MSObj_GetWord(ot->words[1], bp);
-			printf("VMUnlockDirty::CTL2_ID\n");fflush(stdout);
 			VMUnlockDirty(symbols, typeBlock);
 			/*
 			* Skip over left-over bytes
@@ -2142,21 +2087,16 @@ printf("CV32ProcessTypeRecord %x\n", typeBlock); fflush(stdout);
 			unsigned long size;
 			ID name;   	    /* Name of the union */
 
-			printf("CV32ProcessTypeRecord::CTL2_UNION+++\n"); fflush(stdout);
-
 			MSObj_GetWord(count, bp);
 			MSObj_GetWord(baseType, bp);
 			MSObj_GetWord(properties, bp);
 
 			size = CV32GetInteger(&bp);
-			printf("union size: %ld\n", size);
 
 			name = NullID;
 			if ((bp - *bpPtr) < (len-2)) {
 				name = CV32GetString(&bp);
 			}
-			printf("union: %s\n", name);
-			printf("CV32ProcessTypeRecord::CTL2_UNION---\n"); fflush(stdout);
 			break;
 		}
 		case CTL2_ENUMERATION:
@@ -2469,7 +2409,6 @@ CV32ProcessUnprocessedTypeRecords(const char *file)
     bp = typeSeg;
     end = typeSeg + typeSize;
 
-    printf("CV32ProcessUnprocessedTypeRecords++\n");
     while (bp < end) {
 	len = bp[1] | (bp[2] << 8);
 
@@ -2488,7 +2427,6 @@ CV32ProcessUnprocessedTypeRecords(const char *file)
 		break;
 	}
     }
-    printf("CV32ProcessUnprocessedTypeRecords--\n");
 }
 
 /***********************************************************************
@@ -2672,7 +2610,6 @@ CV32DetermineSymbolBlock(const char    	*file,	    	/* Object file being
 	     */
 	    osh = (ObjSymHeader *)VMLock(symbols, symBlock, memPtr);
 	    typeBlock = osh->types;
-			printf("Found symbol block %x %x\n", symBlock, typeBlock); fflush(stdout);
 	} else {
 	    symBlock = 0;
 	}
@@ -2759,7 +2696,6 @@ CV32ProcessSymbols(const char	*file)	/* Object file name (for errors) */
     int	    	    blockCount=0;   /* Next local scope count to use */
 	dword sig;
 
-printf("CV32ProcessSymbols %x\n", typeBlock);
     bp = symSeg;
     end = bp + symSize;
     lastLocal = 0;
@@ -2781,7 +2717,6 @@ printf("CV32ProcessSymbols %x\n", typeBlock);
 	    if ((defSeg != CV_TYPES_SEGMENT) && (defSeg != CV_SYMS_SEGMENT) &&
 		(defSeg->class == CODE))
 	    {
-			printf("CODE segment found\r\n");
 		break;
 	    }
 	}
@@ -3005,7 +2940,6 @@ printf("CV32ProcessSymbols %x\n", typeBlock);
 	{
 		byte data = bp[5 + bp[4]];
 		bp[5 + bp[4]] = NULL;
-		printf("CST2_BPREL16 %s\r\n", (char *)bp + 5);
 		bp[5 + bp[4]] = data;
 		break;
 	}
@@ -3032,12 +2966,6 @@ printf("CV32ProcessSymbols %x\n", typeBlock);
 		ObjSym	    	*os;
 		word	    	symOff;
 		char            *segName;
-		byte 			data;
-
-		data = bp[7 + bp[6]];
-		bp[7 + bp[6]] = NULL;
-		printf("name %s\r\n", (char *)bp + 7);
-		bp[7 + bp[6]] = data;
 
 		if (!CV32DetermineSymbolBlock(file, (char *)bp + 7, bp[6], "variable", bp, procSD,
 			&sd, &addr, &tsymBlock, &ttypeBlock,
@@ -3051,7 +2979,6 @@ printf("CV32ProcessSymbols %x\n", typeBlock);
 		os->name = name;
 		os->flags = 0;
 		os->u.variable.address = addr;
-		printf("CST2_GDATA16 %x\n", ttypeBlock);fflush(stdout);
 		os->u.variable.type = CV32FetchType(file, ttypeBlock,
 			bp[4] | (bp[5] << 8));
 
@@ -3062,8 +2989,6 @@ printf("CV32ProcessSymbols %x\n", typeBlock);
 		* individual segments none of whose symbols can ever be
 		* declared public. -- ardeb 12/12/91
 		*/
-		printf("CST2_GDATA16--\n");fflush(stdout);
-		printf("CHECK GLOBAL %i\r\n", name);
 		if (CV32LocatePublic(name, (SegDesc **)NULL, (word *)NULL,
 			&real, (ID *)NULL) && real)
 		{
@@ -3260,11 +3185,9 @@ printf("CV32ProcessSymbols %x\n", typeBlock);
 		* Mark the thing global if it's really declared public.
 		*/
 		if (recType == CST2_GPROC16) {
-			printf("CHECK GLOBAL %i\r\n", name);
 			if (CV32LocatePublic(name, (SegDesc **)NULL, (word *)NULL,
 				&real, (ID *)NULL) && real)
 			{
-				printf("CHECK GLOBAL %i TRUE\r\n", name);
 				os->flags |= OSYM_GLOBAL;
 #if 0
 				if (alias != name) {
@@ -3274,10 +3197,8 @@ printf("CV32ProcessSymbols %x\n", typeBlock);
 #endif
 			}
 		} else {
-			printf("CHECK LOCAL %i\r\n", name);
 			if (CV32LocatePublic(name, (SegDesc **)NULL, (word *)NULL,
 				&real, (ID *)NULL) && real) {
-					printf("CHECK LOCAL %i TRUE\r\n", name);
 			}
 		}
 
@@ -3302,7 +3223,6 @@ printf("CV32ProcessSymbols %x\n", typeBlock);
 		os->type = OSYM_RETURN_TYPE;
 		os->flags = OSYM_NAMELESS;
 		ptype -= 2;
-		printf("ptype[0-4] %x %x %x %x\n", ptype[0], ptype[1], ptype[2], ptype[3]);
 		os->u.localVar.type =
 			CV32ProcessTypeRecord(file, &ptype,
 				ptype[2] | (ptype[3] << 8),
@@ -3314,7 +3234,6 @@ printf("CV32ProcessSymbols %x\n", typeBlock);
 		* the return type for us by CVProcessTypeRecord.
 		*/
 
-		printf("ptype: 0x%x\n", (int)ptype);
 		ptype -= 6; /* MC: CHECK ME: my math may be off */
 
 		switch (*ptype) {
@@ -3343,7 +3262,6 @@ printf("CV32ProcessSymbols %x\n", typeBlock);
 		break;
 	}
 	default:
-		printf("XXX %d,%d\r\n", recType, len);
 		break;
 #if 0
 
@@ -3918,8 +3836,6 @@ printf("CV32ProcessSymbols %x\n", typeBlock);
 	bp = base + len;
     }
 
-
-printf("---------------------\n");
     /*
      * Process communal vawriables here.
      */
@@ -3989,13 +3905,9 @@ CV32_Finish(const char *file,
 	    /*
 	     * Process symbol records
 	     */
-	printf("CV32ProcessSymbols++\n");
 	    CV32ProcessSymbols(file);
-			printf("CV32ProcessSymbols--\n");
 	    CV32ProcessUnprocessedTypeRecords(file);
-printf("DDD\n"); fflush(stdout);
 	    Pass1MS_Finish((char *)file, happy, pass);
-			printf("DDD2\n"); fflush(stdout);
 	} else {
 	    Pass2MS_Finish((char *)file, happy, pass);
 	}
@@ -4041,7 +3953,6 @@ CV32_Check(const char *file,
 	 byte	    *bp,
 	 int	    pass)   	/* Pass #: 1 if pass 1, 2 if pass 2 */
 {
-	//printf("CV_Check: %x\r\n", rectype);
     switch(rectype) {
 	case MO_SEGDEF32:
 	case MO_SEGDEF:
@@ -4192,11 +4103,6 @@ CV32_Check(const char *file,
 		 */
 		int	datalen = reclen - (bp - msobjBuf);
 
-		if (msobjBuf[reclen] == MO_FIXUPP) {
-
-			printf("CV_TYPES_SEGMENT MO_FIXUPP\r\n");
-		}
-
 		assert(msobjBuf[reclen] != MO_FIXUPP);
 		assert(typeSize != 0);
 		assert(startOff + datalen <= typeSize);
@@ -4231,7 +4137,6 @@ CV32_Check(const char *file,
 	case MO_LPUBDEF1:
 	case MO_LPUBDEF2:
 	case MO_PUBDEF:
-	printf("MO_PUBDEF\r\n");
 	    if (pass == 1) {
 		MSObj_SaveRecord(rectype, reclen, &pubHead);
 	    }
