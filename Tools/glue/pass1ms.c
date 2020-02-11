@@ -1599,8 +1599,10 @@ Pass1MS_ProcessObject(const char  *file,
 		    /*
 		     *
 	   	     */
-		    Pass1MSReplaceFileName(msobj_CurFileName, newName);
+		    if(newName != msobj_CurFileName) {
+			Pass1MSReplaceFileName(msobj_CurFileName, newName);
 						msobj_CurFileName = newName;
+		    }
 		}		
 		break;
 	    case MO_MODEND:
