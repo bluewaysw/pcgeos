@@ -1226,7 +1226,7 @@ Installed/Driver/Socket/PPP:	netutils ansic accpnt MAKELIB
 # WebMagick app
 
 webmagick	: 	Installed/Appl/Breadbox/BbxBrow
-Installed/Appl/Breadbox/BbxBrow:	ui ansic text spool html4par \
+Installed/Appl/Breadbox/BbxBrow:	ui ansic text spool \
 		  			wmg3http wmg3ftp wmg3ext \
 		  			impgraph impdoc \
 		  			modem \
