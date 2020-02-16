@@ -1095,6 +1095,7 @@ JobFinish (Job *job, WAIT_TYPE status)
 	 * the parents. In addition, any saved commands for the node are placed
 	 * on the .END target.
 	 */
+	 printf("Make_Update\n");
 	if (job->tailCmds != NILLNODE) {
 	    Lst_ForEachFrom (job->node->commands, job->tailCmds,
 			     JobSaveCommand,
@@ -1121,6 +1122,7 @@ JobFinish (Job *job, WAIT_TYPE status)
 	 * wasn't given, we set the aborting flag so no more jobs get
 	 * started.
 	 */
+	 printf("Make_Update2\n");
 	aborting = ABORT_ERROR;
     }
 
