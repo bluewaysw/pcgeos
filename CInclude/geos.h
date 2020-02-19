@@ -116,6 +116,12 @@ pragma On(Long_enums);          /* to be compatible with MSC */
 /*
  *      *****   Watcom C   *****
  */
+ 
+#pragma aux __pascal "^"                       \
+           parm reverse routine []             \
+           value struct float routine [ax] \
+           modify [ax bx cx dx es]
+	   	   
 #define _pascal __pascal
 #define _cdecl __cdecl
 
@@ -284,6 +290,7 @@ typedef struct _ClassStruct ClassStruct;
 # define OptrToChunk(op) ((ChunkHandle) (op))
 
 # define ConstructOptr(han,ch) ((((optr) (han)) << 16) | ((dword) (ch)))
+//# define ConstructOptr(han,ch) ((optr)(((__segment) han):>((ChunkHandle)ch)))
 
 # define PtrToSegment(ptr) 	((Segment) (((dword) (ptr)) >> 16))
 # define SegmentOf(ptr) 		((Segment) (((dword) (ptr)) >> 16))
