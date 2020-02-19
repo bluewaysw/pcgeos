@@ -234,7 +234,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 VidTestVGA16	proc	near
-		mov	ax, VM_640x480_16	; mode to check for
+		mov	ax, VD_VESA_640x480_16
 		call	VidTestVESA
 		ret
 VidTestVGA16	endp
@@ -263,7 +263,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 VidTestSVGA16	proc	near
-		mov	ax, VM_800x600_16	; mode to check for
+		mov	ax, VD_VESA_800x600_16
 		call	VidTestVESA
 		ret
 VidTestSVGA16	endp
@@ -292,7 +292,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 VidTestUVGA16	proc	near
-		mov	ax, VM_1Kx768_16	; mode to check for
+		mov	ax, VD_VESA_1Kx768_16
 		call	VidTestVESA
 		ret
 VidTestUVGA16	endp
@@ -320,10 +320,167 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 VidTestHVGA16	proc	near
-		mov	ax, VM_1280x1K_16	; mode to check for
+		mov	ax, VD_VESA_1280x1K_16	
 		call	VidTestVESA
 		ret
 VidTestHVGA16	endp
+
+VidTestVESA_640x350_16	proc	near
+		mov	ax, VD_VESA_640x350_16
+		call	VidTestVESA
+		ret
+VidTestVESA_640x350_16	endp
+		
+VidTestVESA_640x400_16	proc	near
+		mov	ax, VD_VESA_640x400_16
+		call	VidTestVESA
+		ret
+VidTestVESA_640x400_16	endp
+		
+VidTestVESA_720x400_16	proc	near
+		mov	ax, VD_VESA_720x400_16
+		call	VidTestVESA
+		ret
+VidTestVESA_720x400_16	endp
+		
+VidTestVESA_800x480_16	proc	near
+		mov	ax, VD_VESA_800x480_16
+		call	VidTestVESA
+		ret
+VidTestVESA_800x480_16	endp
+		
+VidTestVESA_832x624_16	proc	near
+		mov	ax, VD_VESA_832x624_16
+		call	VidTestVESA
+		ret
+VidTestVESA_832x624_16	endp
+		
+VidTestVESA_1024_600_16	proc	near
+		mov	ax, VD_VESA_1024_600_16
+		call	VidTestVESA
+		ret
+VidTestVESA_1024_600_16	endp
+		
+VidTestVESA_1152x864_16	proc	near
+		mov	ax, VD_VESA_1152x864_16
+		call	VidTestVESA
+		ret
+VidTestVESA_1152x864_16	endp
+		
+VidTestVESA_1280x600_16	proc	near
+		mov	ax, VD_VESA_1280x600_16
+		call	VidTestVESA
+		ret
+VidTestVESA_1280x600_16	endp
+		
+VidTestVESA_1280x720_16	proc	near
+		mov	ax, VD_VESA_1280x720_16
+		call	VidTestVESA
+		ret
+VidTestVESA_1280x720_16	endp
+		
+VidTestVESA_1280x768_16	proc	near
+		mov	ax, VD_VESA_1280x768_16
+		call	VidTestVESA
+		ret
+VidTestVESA_1280x768_16	endp
+		
+VidTestVESA_1280x800_16	proc	near
+		mov	ax, VD_VESA_1280x800_16
+		call	VidTestVESA
+		ret
+VidTestVESA_1280x800_16	endp
+		
+VidTestVESA_1280x854_16	proc	near
+		mov	ax, VD_VESA_1280x854_16
+		call	VidTestVESA
+		ret
+VidTestVESA_1280x854_16	endp
+		
+VidTestVESA_1280x960_16	proc	near
+		mov	ax, VD_VESA_1280x960_16
+		call	VidTestVESA
+		ret
+VidTestVESA_1280x960_16	endp
+		
+VidTestVESA_1360_768_16	proc	near
+		mov	ax, VD_VESA_1360_768_16
+		call	VidTestVESA
+		ret
+VidTestVESA_1360_768_16	endp
+		
+VidTestVESA_1366_768_16	proc	near
+		mov	ax, VD_VESA_1366_768_16
+		call	VidTestVESA
+		ret
+VidTestVESA_1366_768_16	endp
+		
+VidTestVESA_1400_1050_16	proc	near
+		mov	ax, VD_VESA_1400_1050_16
+		call	VidTestVESA
+		ret
+VidTestVESA_1400_1050_16	endp
+		
+VidTestVESA_1440_900_16	proc	near
+		mov	ax, VD_VESA_1440_900_16
+		call	VidTestVESA
+		ret
+VidTestVESA_1440_900_16	endp
+		
+VidTestVESA_1600_900_16	proc	near
+		mov	ax, VD_VESA_1600_900_16
+		call	VidTestVESA
+		ret
+VidTestVESA_1600_900_16	endp
+		
+VidTestVESA_1600_1024_16	proc	near
+		mov	ax, VD_VESA_1600_1024_16
+		call	VidTestVESA
+		ret
+VidTestVESA_1600_1024_16	endp
+		
+VidTestVESA_1600_1200_16	proc	near
+		mov	ax, VD_VESA_1600_1200_16
+		call	VidTestVESA
+		ret
+VidTestVESA_1600_1200_16	endp
+		
+VidTestVESA_1680_1050_16	proc	near
+		mov	ax, VD_VESA_1680_1050_16
+		call	VidTestVESA
+		ret
+VidTestVESA_1680_1050_16	endp
+		
+VidTestVESA_1920_1024_16	proc	near
+		mov	ax, VD_VESA_1920_1024_16
+		call	VidTestVESA
+		ret
+VidTestVESA_1920_1024_16	endp
+		
+VidTestVESA_1920_1080_16	proc	near
+		mov	ax, VD_VESA_1920_1080_16
+		call	VidTestVESA
+		ret
+VidTestVESA_1920_1080_16	endp
+		
+VidTestVESA_1920_1200_16	proc	near
+		mov	ax, VD_VESA_1920_1200_16
+		call	VidTestVESA
+		ret
+VidTestVESA_1920_1200_16	endp
+		
+VidTestVESA_1920_1440_16	proc	near
+		mov	ax, VD_VESA_1920_1440_16
+		call	VidTestVESA
+		ret
+VidTestVESA_1920_1440_16	endp
+		
+VidTestVESA_2048_1536_16	proc	near
+		mov	ax, VD_VESA_2048_1536_16
+		call	VidTestVESA
+		ret
+VidTestVESA_2048_1536_16	endp
+		
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -335,7 +492,7 @@ SYNOPSIS:	Test for VESA compatible board
 CALLED BY:	INTERNAL
 		VidTestDevice
 
-PASS:		ax	- VESA mode to check for
+PASS:		ax	- device index to check for
 
 RETURN:		ax	- DevicePresent enum
 
@@ -374,9 +531,9 @@ else ; NT_DRIVER
 
 		; allocate fixed block to get vesa info
 
-		CheckHack <(size VESAInfoBlock) eq (size VESAModeInfo)>
+		;CheckHack <(size VESAInfoBlock) eq (size VESAModeInfo)>
 
-		mov	ax, size VESAInfoBlock
+		mov	ax, size VESAInfoBlock + size VESAModeInfo
 		mov	cx, ALLOC_FIXED
 		call	MemAlloc
 
@@ -405,32 +562,67 @@ else ; NT_DRIVER
 		; for the correct mode.  
 
 		les	di, es:[di].VIB_modes	; get pointer to mode info
-		mov	ax, ss:[vesaMode]	; mode to check for
 checkLoop:
 		cmp	es:[di], 0xffff		; at mode table terminator?
 		je	notPresent
-		scasw				; check this word
-		jne	checkLoop		;  nope, on to next mode
-
+		mov	ax, es:[di]
+		push	ax
+		push	bx
+		push	es
+		push	di
+		
 		; OK, the mode is supported in the BIOS.  Now check to see if
 		; it is supported by the current card/monitor setup.  To do
 		; this, we need to call the GetModeInfo function.
 
 		call	MemDerefES
-		clr	di			; es:di -> VESAModeInfo
+		mov	di, size VESAInfoBlock	; es:di -> VESAModeInfo
 		mov	cx, ax			; cx = mode number
 		mov	ah, VESA_BIOS_EXT	; BIOS mode number
 		mov	al, VESA_GET_MODE_INFO	; get info about mode
 		int	VIDEO_BIOS		; get mode info
 
 		; now see if the current hardware is cool.
-
+		
 		test	es:[di].VMI_modeAttr, mask VMA_SUPPORTED
-		jz	notPresent
+		jz	checkNext	
+
+		; check for right color
+		mov	al, es:[di].VMI_bitsPerPixel
+		cmp	al, 16
+		jne	checkNext
+		
+		; check for resolution
+		mov	bx, ss:[vesaMode]
+		mov	ax, cs:[vesaWidth][bx]
+		cmp	ax, es:[di].VMI_Xres
+		jne	checkNext
+		
+		mov	ax, cs:[vesaHeight][bx]
+		cmp	ax, es:[di].VMI_Yres
+		jne	checkNext
+
+		; Hit, found matching mode
+		pop	di
+		pop	es
+		pop	bx
+		pop	ax
+		mov	ss:[vesaMode], ax	; remember the VESA mode
 
 		; passed the acid test.  Use it.
-
 		mov	ax, DP_PRESENT		; yep, it's there
+
+		jmp	done
+checkNext::
+		pop	di
+		pop	es
+		pop	bx
+		pop	ax
+		
+		inc	di
+		inc	di
+		jmp	checkLoop
+		
 done:
 		; free allocated memory block
 
@@ -586,17 +778,30 @@ endif
 		; appropriate fields into our own DeviceInfo structure.
 
 		sub	bx, 0x110			; get number start at 0
-		mov	al, cs:[vesaDtype][bx]
-		mov	ss:[DriverTable].VDI_displayType, al
 		shl	bx, 1				; bx = word table index
-		mov	ax, cs:[vesaHeight][bx]
+		mov	ax, ss:[modeInfo].VMI_Yres
 		mov	ss:[DriverTable].VDI_pageH, ax
-		mov	ax, cs:[vesaWidth][bx]
+		mov	ax, ss:[modeInfo].VMI_Xres
 		mov	ss:[DriverTable].VDI_pageW, ax
-		mov	ax, cs:[vesaVres][bx]
-		mov	ss:[DriverTable].VDI_vRes, ax
-		mov	ax, cs:[vesaHres][bx]
-		mov	ss:[DriverTable].VDI_hRes, ax
+		
+		mov	cl, VGA24_DISPLAY_TYPE
+		mov	bx, 72
+		cmp	ax, 640
+		jbe	applyRes
+		mov	cl, SVGA24_DISPLAY_TYPE
+		mov	bx, 80
+		cmp	ax, 800
+		jbe	applyRes
+		mov	bx, 102
+		cmp	ax, 1024
+		jbe	applyRes
+		mov	bx, 136
+		
+applyRes:
+		mov	ss:[DriverTable].VDI_vRes, bx
+		mov	ss:[DriverTable].VDI_hRes, bx
+		mov	ss:[DriverTable].VDI_displayType, cl
+		
 		mov	ax, ss:[modeInfo].VMI_scanSize	; bytes per scan line
 		mov	ss:[DriverTable].VDI_bpScan, ax
 
@@ -669,47 +874,81 @@ winBRead:
 		jmp	storeRWWin
 VidSetVESA	endp
 
-
-vesaDtype	label	DisplayType
-		byte	VGA24_DISPLAY_TYPE
-		byte	VGA24_DISPLAY_TYPE
-		byte	VGA24_DISPLAY_TYPE
-
-		byte	SVGA24_DISPLAY_TYPE
-		byte	SVGA24_DISPLAY_TYPE
-		byte	SVGA24_DISPLAY_TYPE
-
-		byte	SVGA24_DISPLAY_TYPE
-		byte	SVGA24_DISPLAY_TYPE
-		byte	SVGA24_DISPLAY_TYPE
-
-		byte	SVGA24_DISPLAY_TYPE
-		byte	SVGA24_DISPLAY_TYPE
-		byte	SVGA24_DISPLAY_TYPE
-
 vesaHeight	label	word
-		word	480, 480, 480,
-			600, 600, 600,
-			768, 768, 768,
-			1024, 1024, 1024
+		word	480             ; VD_VESA_640x480_16
+		word    600		; VD_VESA_800x600_16
+ifndef PRODUCT_WIN_DEMO
+		word	350		; VD_VESA_640x350_16
+		word	400		; VD_VESA_640x400_16
+		word	400		; VD_VESA_720x400_16
+		word	480		; VD_VESA_800x480_16
+		word	624		; VD_VESA_832x624_16
+		word	600		; VD_VESA_1024_600_16
+
+		word	768		; VD_VESA_1Kx768_16
+
+		word	864		; VD_VESA_1152x864_16
+		word	600		; VD_VESA_1280x600_16
+		word	720		; VD_VESA_1280x720_16
+		word	768		; VD_VESA_1280x768_16
+		word	800		; VD_VESA_1280x800_16
+		word	854		; VD_VESA_1280x854_16
+		word	960		; VD_VESA_1280x960_16
+
+		word	1024		; VD_VESA_1280x1K_16
+
+		word	768		; VD_VESA_1360_768_16
+		word	768		; VD_VESA_1366_768_16
+		word	1050		; VD_VESA_1400_1050_16
+		word	900		; VD_VESA_1440_900_16
+		word	900		; VD_VESA_1600_900_16
+		word	1024		; VD_VESA_1600_1024_16
+		word	1200		; VD_VESA_1600_1200_16
+		word	1050		; VD_VESA_1680_1050_16
+		word	1024		; VD_VESA_1920_1024_16
+		word	1080		; VD_VESA_1920_1080_16
+		word	1200		; VD_VESA_1920_1200_16
+		word	1440		; VD_VESA_1920_1440_16
+		word	1536		; VD_VESA_2048_1536_16
+endif
 
 vesaWidth	label	word
-		word	640, 640, 640,
-			800, 800, 800,
-			1024, 1024, 1024,
-			1280, 1280, 1280
+		word	640             ; VD_VESA_640x480_16
+		word    800		; VD_VESA_800x600_16
+ifndef PRODUCT_WIN_DEMO
+		word	640		; VD_VESA_640x350_16
+		word	640		; VD_VESA_640x400_16
+		word	720		; VD_VESA_720x400_16
+		word	800		; VD_VESA_800x480_16
+		word	832		; VD_VESA_832x624_16
+		word	1024		; VD_VESA_1024_600_16
 
-vesaVres	label	word
-		word	72, 72, 72,
-			80, 80, 80,
-			102, 102, 102,
-			136, 136, 136
+		word	1024		; VD_VESA_1Kx768_16
 
-vesaHres	label	word
-		word	72, 72, 72,
-			80, 80, 80,
-			102, 102, 102,
-			136, 136, 136
+		word	1152		; VD_VESA_1152x864_16
+		word	1280		; VD_VESA_1280x600_16
+		word	1280		; VD_VESA_1280x720_16
+		word	1280		; VD_VESA_1280x768_16
+		word	1280		; VD_VESA_1280x800_16
+		word	1280		; VD_VESA_1280x854_16
+		word	1280		; VD_VESA_1280x960_16
+
+		word	1280		; VD_VESA_1280x1K_16
+
+		word	1360		; VD_VESA_1360_768_16
+		word	1366		; VD_VESA_1366_768_16
+		word	1400		; VD_VESA_1400_1050_16
+		word	1440		; VD_VESA_1440_900_16
+		word	1600		; VD_VESA_1600_900_16
+		word	1600		; VD_VESA_1600_1024_16
+		word	1600		; VD_VESA_1600_1200_16
+		word	1680		; VD_VESA_1680_1050_16
+		word	1920		; VD_VESA_1920_1024_16
+		word	1920		; VD_VESA_1920_1080_16
+		word	1920		; VD_VESA_1920_1200_16
+		word	1920		; VD_VESA_1920_1440_16
+		word	2048		; VD_VESA_2048_1536_16
+endif
 
 VidEnds		Misc
 

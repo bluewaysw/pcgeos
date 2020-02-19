@@ -149,20 +149,80 @@ VidEnds		PutLine
 VidSegment	Misc
 	; this table holds the offsets to the test routines for the devices
 vidTestRoutines	label	nptr
-                nptr    offset VidTestVGA16             ; VD_VESA_640x480_16
-                nptr    offset VidTestSVGA16            ; VD_VESA_800x600_16
+		nptr    offset VidTestVGA16             ; VD_VESA_640x480_16
+		nptr    offset VidTestSVGA16            ; VD_VESA_800x600_16
 ifndef PRODUCT_WIN_DEMO
-					 nptr    offset VidTestUVGA16            ; VD_VESA_1Kx768_16
-                nptr    offset VidTestHVGA16            ; VD_VESA_1280x1K_16
+		nptr    offset VidTestVESA_640x350_16	; VD_VESA_640x350_16
+		nptr    offset VidTestVESA_640x400_16	; VD_VESA_640x400_16
+		nptr    offset VidTestVESA_720x400_16	; VD_VESA_720x400_16
+		nptr    offset VidTestVESA_800x480_16	; VD_VESA_800x480_16
+		nptr    offset VidTestVESA_832x624_16	; VD_VESA_832x624_16
+		nptr    offset VidTestVESA_1024_600_16	; VD_VESA_1024_600_16
+		
+		nptr    offset VidTestUVGA16            ; VD_VESA_1Kx768_16
+
+		nptr    offset VidTestVESA_1152x864_16	; VD_VESA_1152x864_16
+		nptr    offset VidTestVESA_1280x600_16	; VD_VESA_1280x600_16
+		nptr    offset VidTestVESA_1280x720_16	; VD_VESA_1280x720_16
+		nptr    offset VidTestVESA_1280x768_16	; VD_VESA_1280x768_16
+		nptr    offset VidTestVESA_1280x800_16	; VD_VESA_1280x800_16
+		nptr    offset VidTestVESA_1280x854_16	; VD_VESA_1280x854_16
+		nptr    offset VidTestVESA_1280x960_16	; VD_VESA_1280x960_16
+
+		nptr    offset VidTestHVGA16            ; VD_VESA_1280x1K_16
+
+		nptr    offset VidTestVESA_1360_768_16	; VD_VESA_1360_768_16
+		nptr    offset VidTestVESA_1366_768_16	; VD_VESA_1366_768_16
+		nptr    offset VidTestVESA_1400_1050_16	; VD_VESA_1400_1050_16
+		nptr    offset VidTestVESA_1440_900_16	; VD_VESA_1440_900_16
+		nptr    offset VidTestVESA_1600_900_16	; VD_VESA_1600_900_16
+		nptr    offset VidTestVESA_1600_1024_16	; VD_VESA_1600_1024_16
+		nptr    offset VidTestVESA_1600_1200_16	; VD_VESA_1600_1200_16
+		nptr    offset VidTestVESA_1680_1050_16	; VD_VESA_1680_1050_16
+		nptr    offset VidTestVESA_1920_1024_16	; VD_VESA_1920_1024_16
+		nptr    offset VidTestVESA_1920_1080_16	; VD_VESA_1920_1080_16
+		nptr    offset VidTestVESA_1920_1200_16	; VD_VESA_1920_1200_16
+		nptr    offset VidTestVESA_1920_1440_16	; VD_VESA_1920_1440_16
+		nptr    offset VidTestVESA_2048_1536_16	; VD_VESA_2048_1536_16
 endif
 
 	; this table holds the offsets to the test routines for the devices
 vidSetRoutines	label	nptr
-                nptr    offset VidSetVESA               ; VD_VESA_640x480_16
-                nptr    offset VidSetVESA               ; VD_VESA_800x600_16
+		nptr    offset VidSetVESA               ; VD_VESA_640x480_16
+		nptr    offset VidSetVESA               ; VD_VESA_800x600_16
 ifndef PRODUCT_WIN_DEMO
-					 nptr    offset VidSetVESA               ; VD_VESA_1Kx768_16
-                nptr    offset VidSetVESA               ; VD_VESA_1280x1K_16
+		nptr    offset VidSetVESA		; VD_VESA_640x350_16
+		nptr    offset VidSetVESA		; VD_VESA_640x400_16
+		nptr    offset VidSetVESA		; VD_VESA_720x400_16
+		nptr    offset VidSetVESA		; VD_VESA_800x480_16
+		nptr    offset VidSetVESA		; VD_VESA_832x624_16
+		nptr    offset VidSetVESA		; VD_VESA_1024_600_16
+		
+		nptr    offset VidSetVESA               ; VD_VESA_1Kx768_16
+		
+		nptr    offset VidSetVESA		; VD_VESA_1152x864_16
+		nptr    offset VidSetVESA		; VD_VESA_1280x600_16
+		nptr    offset VidSetVESA		; VD_VESA_1280x720_16
+		nptr    offset VidSetVESA		; VD_VESA_1280x768_16
+		nptr    offset VidSetVESA		; VD_VESA_1280x800_16
+		nptr    offset VidSetVESA		; VD_VESA_1280x854_16
+		nptr    offset VidSetVESA		; VD_VESA_1280x960_16
+		
+		nptr    offset VidSetVESA               ; VD_VESA_1280x1K_16
+
+		nptr    offset VidSetVESA		; VD_VESA_1360_768_16
+		nptr    offset VidSetVESA		; VD_VESA_1366_768_16
+		nptr    offset VidSetVESA		; VD_VESA_1400_1050_16
+		nptr    offset VidSetVESA		; VD_VESA_1440_900_16
+		nptr    offset VidSetVESA		; VD_VESA_1600_900_16
+		nptr    offset VidSetVESA		; VD_VESA_1600_1024_16
+		nptr    offset VidSetVESA		; VD_VESA_1600_1200_16
+		nptr    offset VidSetVESA		; VD_VESA_1680_1050_16
+		nptr    offset VidSetVESA		; VD_VESA_1920_1024_16
+		nptr    offset VidSetVESA		; VD_VESA_1920_1080_16
+		nptr    offset VidSetVESA		; VD_VESA_1920_1200_16
+		nptr    offset VidSetVESA		; VD_VESA_1920_1440_16
+		nptr    offset VidSetVESA		; VD_VESA_2048_1536_16
 endif
 
 VidEnds		Misc
