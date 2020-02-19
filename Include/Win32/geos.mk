@@ -589,7 +589,7 @@ CCOM_MODEL	?= -ml
 # -of+ -> The above but more agressive
 
 CCOMFLAGS       += -D__GEOS__ -D__WATCOM__ -Ot -d3 -w4 \
-		   -zu -of -of+ -os -ol -ol+ -hc -s -ecc -zp1 -ei \
+		   -zu -of -of+ -os -ol -ol+ -hc -s -ecc -zp1 -ei -zdp \
 		   $(CCOM_MODEL)
 
 #if defined(linux)
@@ -706,7 +706,7 @@ ASSEMBLE	: .USE
 	    $(.TARGET:X*\\[eobj\\]:S/eobj/-DDO_ERROR_CHECKING/) \
 	    $(.TARGET:X*\\[gobj\\]:S/gobj/-DGCM/) \
 	    $(.TARGET:X\\[*\\]/*:S|^|-I|) $(-IFLAGS) $(.ALLSRC:M*Manager.asm) \
-	    -o $(.TARGET) 
+	    -o $(.TARGET)
 
 #
 # This is a general rule for linking things using glue. It uses the name of the
