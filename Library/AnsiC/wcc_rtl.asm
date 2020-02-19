@@ -12,6 +12,9 @@
 ; See the License for the specific language governing permissions and
 ; limitations under the License.
 
+include ansicGeode.def
+
+
 WCC_TEXT        SEGMENT BYTE PUBLIC 'CODE'
                 ASSUME  CS:WCC_TEXT
 
@@ -69,17 +72,20 @@ WCC_TEXT        SEGMENT BYTE PUBLIC 'CODE'
 	__I4M endp
 
 	__U4D proc far
-
+	WARNING WARNING_ANSIC_UNIMPLEMENTED
+	
 	ret
 	__U4D endp
 	
 	__I4D proc far
-		
+	WARNING WARNING_ANSIC_UNIMPLEMENTED		
+	
 	ret
 	__I4D endp
 	
 	__CHP proc far
-		
+	WARNING WARNING_ANSIC_UNIMPLEMENTED
+	
 	ret
 	__CHP endp	
 	
