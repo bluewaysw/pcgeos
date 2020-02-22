@@ -2938,10 +2938,27 @@ CV32ProcessSymbols(const char	*file)	/* Object file name (for errors) */
 	}
 	case CST2_BPREL16:
 	{
-		byte data = bp[5 + bp[4]];
-		bp[5 + bp[4]] = NULL;
-		bp[5 + bp[4]] = data;
-		break;
+    		ID  	name;
+    		ObjSym	*os;
+    
+    		name = ST_Enter(symbols, strings, (char *)bp+5, bp[4]);
+    
+    		if (scopeTop == 0) {
+    		    Notify(NOTIFY_ERROR,
+    			   "%s: local variable %i outside any scope",
+    			   file, name);
+    		    break;
+    		}
+    
+    		os = CV32AllocLocalSym(symBlock, mem, scopeStack[scopeTop-1],
+    				     &lastLocal, &symBase);
+    		os->type = OSYM_LOCVAR;
+    		os->name = name;
+    		os->flags = 0;
+    		MSObj_GetWord(os->u.localVar.offset, bp);
+    		os->u.localVar.type = CV32FetchType(file, typeBlock,
+    						  MSObj_GetWordImm(bp));
+    		break;
 	}
 	case CST2_UDT:
 		/*
