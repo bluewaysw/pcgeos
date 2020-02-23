@@ -588,8 +588,8 @@ CCOM_MODEL	?= -ml
 # -of -> always output stack frames (helps SWAT, may be necessary in general)
 # -of+ -> The above but more agressive
 
-CCOMFLAGS       += -D__GEOS__ -D__WATCOM__ -d2 -hc -w4 \
-		   -zu -of -of+ -ol -ol+ -s -ecc -zp1 -ei -zdp \
+CCOMFLAGS       += -D__GEOS__ -D__WATCOM__ -w4 \
+		   -zu -of -of+ -ol -ol+ -s -ecc -zp1 -ei -zdp -d2 -hc\
 		   $(CCOM_MODEL)
 
 #if defined(linux)

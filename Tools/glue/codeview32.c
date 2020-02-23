@@ -1585,7 +1585,7 @@ error:
 	     */
 	    esym = CV32AllocSym(tsymBlock, &esymOff);
 	    esym->type = OSYM_ETYPE;
-	    esym->u.sType.size = size / 8;
+	    esym->u.sType.size = 2;
 	    esym->u.sType.first = esymOff + sizeof(ObjSym);
 	    esym->flags = symflags;
 	    esym->name = name;
@@ -1740,6 +1740,7 @@ CV32FetchType(const char 	    *file,  	/* Object file being read */
 		case CSTT2_PFUCHAR:
 		case CSTT2_PFINT2:
 		case CSTT2_PFUINT2:
+		case CSTT2_PFREAL64:
 			retval = OTYPE_PTR | OTYPE_PTR_FAR | OTYPE_SPECIAL;
 			break;
 		case CSTT2_REAL64:

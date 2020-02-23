@@ -217,6 +217,7 @@
 #define CSTT2_BITFIELD          0x0206
 
 #define CSTT2_REAL64		0x0041
+#define CSTT2_PFREAL64		0x0241
 
 #define CCC2_C_NEAR 0
 #define CCC2_C_FAR 1

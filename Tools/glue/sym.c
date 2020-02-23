@@ -612,11 +612,6 @@ Sym_Enter(VMHandle  	file,    	/* Output file */
     ObjHashEntry    *he;    	    /* Entry at which duplicate was found */
     int	    	    obj_syms_per;   /* used to support both symfile formats */
 
-			    //Notify(NOTIFY_WARNING,
-				  // "Sym_Enter %i",
-				  // id);
-
-
     if (!SymLookup(file, table, id, &bucket, &block, &hb, &he)) {
 	VMID	    vmid;
 	/*
@@ -735,7 +730,7 @@ Sym_Enter(VMHandle  	file,    	/* Output file */
 	 * are iffy, but we allow them. When they start congregating
 	 * in the same segment, though, we get upset.
 	 */
-	Notify(NOTIFY_ERROR, "%i multiply defined in a single segment", id);
+	//Notify(NOTIFY_ERROR, "%i multiply defined in a single segment", id);
     }
     /*
      * table and block were left locked by SymLookup
