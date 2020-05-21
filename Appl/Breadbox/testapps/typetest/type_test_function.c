@@ -20,7 +20,7 @@
 Boolean test_datatype_float() {
 
   Boolean result = TRUE;
-  float toFill = 0.0f;
+  float toFill = 0.0;
   
   fill_float(&toFill, (float) 1111.5);
   result = result && (toFill == (float) 1111.5);
@@ -31,7 +31,7 @@ Boolean test_datatype_float() {
 Boolean test_datatype_double() {
 
   Boolean result = TRUE;
-  long double toFill = 0.0f;
+  long double toFill = 0.0;
   
   fill_double(&toFill, (double) 1111.5);
   result = result && (toFill == (double) 1111.5);
@@ -42,9 +42,9 @@ Boolean test_datatype_double() {
 Boolean test_datatype_longdouble() {
 
   Boolean result = TRUE;
-  long double toFill = 0.0f;
+  long double toFill = 0.0;
   
-  fill_double(&toFill, (double) 1111.5);
+  fill_longdouble(&toFill, (double) 1111.5);
   result = result && (toFill == (double) 1111.5);
   
   return result;
