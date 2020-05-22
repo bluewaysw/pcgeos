@@ -31,7 +31,7 @@ Boolean test_datatype_float() {
 Boolean test_datatype_double() {
 
   Boolean result = TRUE;
-  long double toFill = 0.0;
+  double toFill = 0.0;
   
   fill_double(&toFill, (double) 1111.5);
   result = result && (toFill == (double) 1111.5);
@@ -44,8 +44,8 @@ Boolean test_datatype_longdouble() {
   Boolean result = TRUE;
   long double toFill = 0.0;
   
-  fill_longdouble(&toFill, (double) 1111.5);
-  result = result && (toFill == (double) 1111.5);
+  fill_longdouble(&toFill, (long double) 1111.5);
+  result = result && (toFill == (long double) 1111.5);
   
   return result;
 }
