@@ -216,6 +216,9 @@
 #define CSTT2_PFUINT2           0x0273
 #define CSTT2_BITFIELD          0x0206
 
+#define CSTT2_REAL32		0x0040
+#define CSTT2_PFREAL32		0x0240
+
 #define CSTT2_REAL64		0x0041
 #define CSTT2_PFREAL64		0x0241
 
