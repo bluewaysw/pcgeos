@@ -1989,8 +1989,9 @@ CV32ProcessTypeRecord(const char 	    *file,  	/* Object file from which
 			bp += 2;
 			MSObj_GetWord(argsCount, bp);
 			MSObj_GetWord(argsList, bp); // argsList pointer
-			*bpPtr = bp;
-			return(retval);
+			
+			bp = *bpPtr + len;
+			break;
 		}
 
 		case CTL2_MODIFIER:
@@ -2417,20 +2418,24 @@ CV32ProcessUnprocessedTypeRecords(const char *file)
     end = typeSeg + typeSize;
 
     while (bp < end) {
-	len = bp[1] | (bp[2] << 8);
+    	word leaf;
+	len = bp[0] | (bp[1] << 8);
 
-	switch(bp[3]) {
-	    case CTL_TYPEDEF:
-	    case CTL_STRUCTURE:
-	    case CTL_SCALAR:
-		bp += 3;
+	bp += 2;
+	MSObj_GetWord(leaf, bp);
+	bp -= 2;
+
+	switch(leaf) {
+	    //case CTL_TYPEDEF:
+	    case CTL2_STRUCTURE:
+	    //case CTL_SCALAR:
 		(void)CV32ProcessTypeRecord(file,
 					  &bp,
 					  len,
 					  0);
 		break;
 	    default:
-		bp = bp + 3 + len;
+		bp = bp + len;
 		break;
 	}
     }
@@ -3248,7 +3253,7 @@ CV32ProcessSymbols(const char	*file)	/* Object file name (for errors) */
 		ptype -= 2;
 		os->u.localVar.type =
 			CV32ProcessTypeRecord(file, &ptype,
-				ptype[2] | (ptype[3] << 8),
+				ptypeLen,
 				typeBlock);
 
 		/*
