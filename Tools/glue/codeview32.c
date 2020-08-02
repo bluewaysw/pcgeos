@@ -1750,7 +1750,7 @@ CV32FetchType(const char 	    *file,  	/* Object file being read */
 		case CSTT2_REAL64:
     		retval = OTYPE_MAKE_FLOAT(8);
     		break;
-        
+
 		default:
 			Notify(NOTIFY_ERROR,
 				"%s: unsupported special type %02.2x",
@@ -2103,6 +2103,7 @@ CV32ProcessTypeRecord(const char 	    *file,  	/* Object file from which
 			if ((bp - *bpPtr) < (len-2)) {
 				name = CV32GetString(&bp);
 			}
+			bp = *bpPtr + len;
 			break;
 		}
 		case CTL2_ENUMERATION:
@@ -2627,7 +2628,6 @@ CV32DetermineSymbolBlock(const char    	*file,	    	/* Object file being
 	 * type block.
 	 */
 	CV32AllocSymAndTypeBlocks(&symBlock, &typeBlock);
-	printf("Found no symbol block %x %x\n", symBlock, typeBlock); fflush(stdout);
 
 	if ((*sdPtr)->addrT) {
 	    /*
@@ -2946,16 +2946,16 @@ CV32ProcessSymbols(const char	*file)	/* Object file name (for errors) */
 	{
     		ID  	name;
     		ObjSym	*os;
-    
+
     		name = ST_Enter(symbols, strings, (char *)bp+5, bp[4]);
-    
+
     		if (scopeTop == 0) {
     		    Notify(NOTIFY_ERROR,
     			   "%s: local variable %i outside any scope",
     			   file, name);
     		    break;
     		}
-    
+
     		os = CV32AllocLocalSym(symBlock, mem, scopeStack[scopeTop-1],
     				     &lastLocal, &symBase);
     		os->type = OSYM_LOCVAR;
