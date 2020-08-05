@@ -34,7 +34,7 @@
  * DESCRIPTION:
  *	Stac LZS Compression Protocol for PPP.
  *
- * 	A license from Stac Electronics is required before this 
+ * 	A license from Stac Electronics is required before this
  *	code may be used.
  *
  * 	$Id: c_stac.c,v 1.6 97/11/20 18:49:17 jwu Exp $
@@ -58,10 +58,13 @@
 #ifdef __BORLANDC__
 #pragma codeseg STACCODE
 #endif
+#ifdef __WATCOMC__
+#pragma code_seg("STACCODE")
+#endif
 
-/* 
- * Stac LZS overhead per PPP packet: 
- * 	2 bytes max for check field 
+/*
+ * Stac LZS overhead per PPP packet:
+ * 	2 bytes max for check field
  *	0 bytes for history (only supporting single history)
  *	1 byte for lzs end marker
  *	1 byte to make it even.
@@ -72,14 +75,14 @@
 
 #define	INIT_LCB    0xFF	    	/* Initial LCB value */
 
-struct stac_db 
+struct stac_db
 {
     unsigned short mru;
     unsigned char checkMode;	    	    /* check mode */
     union {
-	unsigned char seq;	    	    /* sequence number */ 
+	unsigned char seq;	    	    /* sequence number */
 	struct {
-	    unsigned short flags;	    	    
+	    unsigned short flags;
 	    unsigned short count;  	    /* coherency count */
 	} extended;
     } check;
@@ -110,9 +113,9 @@ ReservationHandle   stac_decompSpaceToken = 0;	/* decompression */
  *	    	stac_decomp
  * RETURN:	new LCB
  *
- * STRATEGY:	LCB is the exclusive-OR of FF (hex) and each byte 
+ * STRATEGY:	LCB is the exclusive-OR of FF (hex) and each byte
  *	    	of the data.
- *	
+ *
  * REVISION HISTORY:
  *	Name	Date		Description
  *	----	----		-----------
@@ -125,7 +128,7 @@ unsigned char stac_lcb (unsigned char lcb,
 {
     while (len--)
 	lcb ^= *cp++;
-    
+
     return (lcb);
 
 }	/* End of ppplcb.	*/
@@ -135,12 +138,12 @@ unsigned char stac_lcb (unsigned char lcb,
 /***********************************************************************
  *			stac_down
  ***********************************************************************
- * SYNOPSIS:	Compression is going down.  Free memory used by 
+ * SYNOPSIS:	Compression is going down.  Free memory used by
  *	    	Stac LZS algorithm.
  * CALLED BY:	ccp_down
  * RETURN:	nothing
  *
- * STRATEGY:	Free the blocks holding the comperssion tables, if 
+ * STRATEGY:	Free the blocks holding the comperssion tables, if
  *	    	they exists.
  *
  * REVISION HISTORY:
@@ -208,7 +211,7 @@ int stac_resetcomp (int unit)
     history = MemDeref(db -> history);
 
     result = LZS_Compress((unsigned char **)NULL, (unsigned char **)NULL,
-			  &nada, &dnada, history, 
+			  &nada, &dnada, history,
 			  LZS_SOURCE_FLUSH | LZS_DEST_FLUSH, 0);
     EC_ERROR_IF((result & LZS_FLUSHED) == 0, -1);
 
@@ -267,7 +270,7 @@ void stac_resetdecomp (int unit)
  * RETURN:	0 if successful
  *	    	-1 if unable to allocate memory for compression history
  *
- * STRATEGY:	If db not allocated, do so now, returning error 
+ * STRATEGY:	If db not allocated, do so now, returning error
  *	    	    if insufficient memory.
  *	    	store mru and check mode
  *	    	If check mode is seq, init sequence number.
@@ -281,9 +284,9 @@ void stac_resetdecomp (int unit)
  *	jwu	8/28/96		Initial Revision
  *
  ***********************************************************************/
-int stac_initcomp (int unit, int mru, unsigned char check) 
+int stac_initcomp (int unit, int mru, unsigned char check)
      /*int unit;*/   	    	/* old-style function declaration needed here */
-     /*int mru;*/ 
+     /*int mru;*/
      /*unsigned char check;*/	    	/* check mode to use */
 {
     unsigned short histSize;
@@ -291,9 +294,9 @@ int stac_initcomp (int unit, int mru, unsigned char check)
     struct stac_db *db;
 
     /*
-     * If stac compression table hasn't been allocated yet, do 
+     * If stac compression table hasn't been allocated yet, do
      * so now.  Return error if insufficient memory.  Initialize
-     * history only when allocated.  
+     * history only when allocated.
      */
     if (stac_tx_db == 0) {
 
@@ -305,7 +308,7 @@ int stac_initcomp (int unit, int mru, unsigned char check)
 	}
 
 	histSize = LZS_SizeOfCompressionHistory();
-	stac_compSpaceToken = GeodeRequestSpace((histSize + 1023)/1024, 
+	stac_compSpaceToken = GeodeRequestSpace((histSize + 1023)/1024,
 						SysGetInfo(SGIT_UI_PROCESS));
 	if (stac_compSpaceToken)
 	    hBlock = MemAlloc(histSize, HF_DYNAMIC, HAF_LOCK);
@@ -320,7 +323,7 @@ int stac_initcomp (int unit, int mru, unsigned char check)
 	    LOG3(LOG_BASE, (LOG_STAC_NO_MEM, "compression"));
 	    return (-1);
 	}
-	
+
 	/*
 	 * Must initialize before use!
 	 */
@@ -337,7 +340,7 @@ int stac_initcomp (int unit, int mru, unsigned char check)
 
     /*
      * If doing sequence numbers, initialize seq to 1.  If extended,
-     * init count to 1 and disable protocol field compression for 
+     * init count to 1 and disable protocol field compression for
      * outgoing packets.
      */
     if (check == STAC_CHECK_SEQ) {
@@ -372,7 +375,7 @@ int stac_initcomp (int unit, int mru, unsigned char check)
  *	    	    	Return error if insufficient memory.
  *	    	store mru and check mode
  *	    	if check mode is seq, init sequence number to 1
- *	    	if check mode is extended, init count 
+ *	    	if check mode is extended, init count
  *	    	Reset decompression history.
  *
  * REVISION HISTORY:
@@ -395,7 +398,7 @@ int stac_initdecomp (int unit, int mru, unsigned char check)
      * now.  Return error if insufficient memory.
      */
     if (stac_rx_db == 0) {
-	
+
 	stac_rx_db = MemAlloc(sizeof (struct stac_db), HF_DYNAMIC,
 			      HAF_ZERO_INIT | HAF_LOCK);
 	if (stac_rx_db == 0) {
@@ -423,7 +426,7 @@ int stac_initdecomp (int unit, int mru, unsigned char check)
     }
 
     db = (struct stac_db *)MemDeref(stac_rx_db);
-    if ( ! db -> history) 
+    if ( ! db -> history)
 	db -> history = hBlock;
 
     db -> mru = mru;
@@ -439,7 +442,7 @@ int stac_initdecomp (int unit, int mru, unsigned char check)
     stac_resetdecomp(0);
 
     return (0);
-    
+
 }
 
 
@@ -457,9 +460,9 @@ int stac_initdecomp (int unit, int mru, unsigned char check)
  *	    	compute lcb or fcs
  *	    	compress protocol field into new buffer
  *	    	compress data into new buffer
- *	    	if data expanded (and not extended mode) 
+ *	    	if data expanded (and not extended mode)
  *	    	    free new buffer and send original
- *	    	else 
+ *	    	else
  *	    	    if expanded in extended mode, reset history, set bit A
  *	    	    	store uncompressed proto & original data in new buffer
  *	    	    else if extended mode, set compressed bit in flag
@@ -468,11 +471,11 @@ int stac_initdecomp (int unit, int mru, unsigned char check)
  *	    	    adjust packet header dataOffset and dataSize fields
  *	    	    free original packet and set return values
  *	    	return success
- *	    	
+ *
  * NOTES:
  *	Data is not considered to have expanded if compression only
  *	added 1 byte to the size.  We can spare 1 byte for the lzs
- *	end marker, and future compression ratios will benefit from 
+ *	end marker, and future compression ratios will benefit from
  *	not resetting history as often.
  *
  *
@@ -493,33 +496,33 @@ int stac_comp (int unit,
 
     int len = *lenp;	    	    	/* original length of packet */
     unsigned short proto = *protop; 	/* original protocol */
-    
+
     unsigned char lcb;
     unsigned short fcs;
 
     PACKET *compr_m;	    	    	/* packet for compressed data */
-    unsigned char *srcPtr, *destPtr, *cp_buf; 
+    unsigned char *srcPtr, *destPtr, *cp_buf;
     unsigned char c_proto[2];	    	/* temp buffer for protocol */
     unsigned short proto_len;
 
-    unsigned short result;  	    	
-    unsigned long srcLen, destLen;        	
+    unsigned short result;
+    unsigned long srcLen, destLen;
 
     /*
      * Allocate a buffer for the compressed data.  If insufficient
-     * memory, send the original packet unaltered. 
+     * memory, send the original packet unaltered.
      */
     if ((compr_m = PACKET_ALLOC(MAX_MTU + MAX_FCS_LEN)) == 0) {
 	LOG3(LOG_BASE, (LOG_STAC_ALLOC_FAILED, "comp"));
 	return (0);
     }
-    
+
     /*
-     * Save room for check field or coherency count at start of 
+     * Save room for check field or coherency count at start of
      * compressed packet.
      */
     cp_buf = PACKET_DATA(compr_m);
-    destPtr = &cp_buf[STAC_DATA_OFFSET];	    
+    destPtr = &cp_buf[STAC_DATA_OFFSET];
     destLen = MAX_MTU - STAC_OVHD;
 
     MemLock(stac_tx_db);
@@ -529,10 +532,10 @@ int stac_comp (int unit,
 
     srcPtr = PACKET_DATA(*packetp);
 
-    /*	
+    /*
      * Store protocol in temp buffer for compression.  If possible,
-     * compress it.  May be compressed whether protocol field 
-     * compression has been negotiated or not, unless doing extended 
+     * compress it.  May be compressed whether protocol field
+     * compression has been negotiated or not, unless doing extended
      * mode.
      */
     if (proto < 256 && db -> checkMode != STAC_CHECK_EXTENDED) {
@@ -547,7 +550,7 @@ int stac_comp (int unit,
 
     /*
      * Compute FCS or LCB over the protocol ID field and all the
-     * uncompressed data at once.  
+     * uncompressed data at once.
      */
     if (db -> checkMode == STAC_CHECK_LCB) {
 	lcb = stac_lcb(INIT_LCB, c_proto, proto_len);
@@ -564,7 +567,7 @@ int stac_comp (int unit,
      */
     srcPtr = c_proto;
     srcLen = (unsigned long)proto_len;
-    result = LZS_Compress(&srcPtr, &destPtr, &srcLen, &destLen, history, 
+    result = LZS_Compress(&srcPtr, &destPtr, &srcLen, &destLen, history,
 			  (LZS_SAVE_HISTORY | perf_mode),
 			  perf);
 
@@ -573,7 +576,7 @@ int stac_comp (int unit,
 
     srcPtr = PACKET_DATA(*packetp);
     srcLen = len;
-    result = LZS_Compress(&srcPtr, &destPtr, &srcLen, &destLen, history, 
+    result = LZS_Compress(&srcPtr, &destPtr, &srcLen, &destLen, history,
 			  (LZS_SOURCE_FLUSH | LZS_SAVE_HISTORY | perf_mode),
 			  perf);
 
@@ -585,19 +588,19 @@ int stac_comp (int unit,
 	 * Compute size of the compressed data by seeing how much
 	 * space was used by LZS_Decompress.
 	 */
-	destLen = (unsigned long)(MAX_MTU - STAC_OVHD) - destLen;	    	
+	destLen = (unsigned long)(MAX_MTU - STAC_OVHD) - destLen;
     }
     else {
-	/* 
+	/*
 	 * Finish processing source data to keep history intact.
-	 * We'll be sending the uncompressed data so overwrite what 
+	 * We'll be sending the uncompressed data so overwrite what
 	 * we've already compressed.
 	 */
 	while (! (result &  LZS_SOURCE_EXHAUSTED)) {
-	    destPtr = &cp_buf[STAC_DATA_OFFSET];	    
+	    destPtr = &cp_buf[STAC_DATA_OFFSET];
 	    destLen = MAX_MTU - STAC_OVHD;
-	    result = LZS_Compress(&srcPtr, &destPtr, &srcLen, &destLen, 
-			     history, 
+	    result = LZS_Compress(&srcPtr, &destPtr, &srcLen, &destLen,
+			     history,
 			     LZS_SOURCE_FLUSH | LZS_SAVE_HISTORY | perf_mode,
 			     perf);
 	}
@@ -610,9 +613,9 @@ int stac_comp (int unit,
     EC_ERROR_IF(srcLen, -1);
 
     /*
-     * Send original packet if compressed data expanded and not 
-     * doing extended check mode.  Data needs to have expanded to 
-     * exceed MRU so only need to check for expansion.    
+     * Send original packet if compressed data expanded and not
+     * doing extended check mode.  Data needs to have expanded to
+     * exceed MRU so only need to check for expansion.
      * Reset the compression history.
      */
     if ((db -> checkMode != STAC_CHECK_EXTENDED) &&
@@ -644,23 +647,23 @@ int stac_comp (int unit,
 	    db -> check.extended.flags = STAC_PACKET_FLUSHED;
 
 	    /*
-	     * Store protocol field and copy original data to the new 
+	     * Store protocol field and copy original data to the new
 	     * buffer.
 	     */
 	    srcPtr = PACKET_DATA(*packetp);
 	    cp_buf[2] = proto >> 8;
 	    cp_buf[3] = proto;
 	    memcpy(&cp_buf[4], srcPtr, len);
-	    destLen = len;	    	
+	    destLen = len;
 	    LOG3(LOG_BASE, (LOG_STAC_EXPANDED));
 	}
 	else if (db -> checkMode == STAC_CHECK_EXTENDED) {
 	    db -> check.extended.flags |= STAC_COMPRESSED;
 	}
 
-	/* 
-	 * Store check field or coherency count in packet.  
-	 * Adjust packet's dataSize and dataOffset.  
+	/*
+	 * Store check field or coherency count in packet.
+	 * Adjust packet's dataSize and dataOffset.
 	 */
 	EC_ERROR_IF((STAC_CHECK_SEQ & 1) == 0, -1);
 	EC_ERROR_IF((STAC_CHECK_LCB & 1) == 0, -1);
@@ -669,11 +672,11 @@ int stac_comp (int unit,
 	    /* quick check relying on lcb & seq check modes being odd */
 	    if (db -> checkMode == STAC_CHECK_SEQ)
 		cp_buf[1] = db -> check.seq++;
-	    else 
+	    else
 		cp_buf[1] = lcb;
 
 	    /* adjust data offset and data size to include check field */
-	    compr_m -> MH_dataOffset += 1;	    
+	    compr_m -> MH_dataOffset += 1;
 	    compr_m -> MH_dataSize = destLen + 1;
 	}
 	else {
@@ -682,7 +685,7 @@ int stac_comp (int unit,
 	    	cp_buf[1] = fcs >> 8;
 	    }
 	    else {
-		result = db -> check.extended.flags | 
+		result = db -> check.extended.flags |
 		    	 db -> check.extended.count;
 		cp_buf[0] = result >> 8;
 		cp_buf[1] = (unsigned char)result;
@@ -701,7 +704,7 @@ int stac_comp (int unit,
 	    /* adjust data size, include size of check field */
 	    compr_m -> MH_dataSize = destLen + 2;
 	}
-	
+
 	/*
 	 * Free original packet and set return values.
 	 */
@@ -740,7 +743,7 @@ int stac_comp (int unit,
  *	    	discard compressed packet
  *	    	check for decompression error
  *	    	get protocol of decompressed data
- *	    	adjust new buffer's dataSize and dataOffset 
+ *	    	adjust new buffer's dataSize and dataOffset
  *	    	deliver packet to PPPInput
  *
  * REVISION HISTORY:
@@ -773,10 +776,10 @@ int stac_decomp (int unit, PACKET *p, int len)
     srcPtr = PACKET_DATA(p);
 
     EC_ERROR_IF((STAC_CHECK_SEQ & 1) == 0, -1);
-    EC_ERROR_IF((STAC_CHECK_LCB & 1) == 0, -1);    
+    EC_ERROR_IF((STAC_CHECK_LCB & 1) == 0, -1);
 
     /*
-     * Get the check field.  LCB and SEQ only use a byte, CRC and 
+     * Get the check field.  LCB and SEQ only use a byte, CRC and
      * EXTENDED is word sized.
      */
     if (db -> checkMode & 1) {
@@ -792,9 +795,9 @@ int stac_decomp (int unit, PACKET *p, int len)
 	    db -> check.seq = checkChar + 1;
 
 	    /*
-	     * Verify seqeunce number. 
+	     * Verify seqeunce number.
 	     */
-	    if (lcb != checkChar) 
+	    if (lcb != checkChar)
 		goto bad;
 	}
     }
@@ -812,10 +815,10 @@ int stac_decomp (int unit, PACKET *p, int len)
 	    db -> check.extended.count = (checkShort & COHERENCY_COUNT_MASK)+1;
 	    ccp_resetack(&ccp_fsm[0], (unsigned char *)NULL, 0, 0);
 	}
-	else if ((checkShort & COHERENCY_COUNT_MASK) == 
+	else if ((checkShort & COHERENCY_COUNT_MASK) ==
 		 db -> check.extended.count)
 	    db -> check.extended.count++;
-	else 
+	else
 	    goto bad;
 
 	/*
@@ -826,13 +829,13 @@ int stac_decomp (int unit, PACKET *p, int len)
 
 	/*
 	 * If packet data is not compressed, extract protocol,
-	 * adjust packet header to exclude check field and protocol, 
+	 * adjust packet header to exclude check field and protocol,
 	 * then deliver.
 	 */
 	if (! (checkShort & STAC_COMPRESSED)) {
-	    LOG3(LOG_IP, (LOG_STAC_UNCOMPRESSED));	    
+	    LOG3(LOG_IP, (LOG_STAC_UNCOMPRESSED));
 	    GETSHORT(protocol, srcPtr);
-	    p -> MH_dataSize -= 4;	    
+	    p -> MH_dataSize -= 4;
 	    p -> MH_dataOffset += 4;
 	    MemUnlock(db -> history);
 	    MemUnlock(stac_rx_db);
@@ -840,7 +843,7 @@ int stac_decomp (int unit, PACKET *p, int len)
 	}
     }
     else {
-	/* 
+	/*
 	 * CRC is transmitted least significant byte first so we
 	 * can't use GETSHORT.
 	 */
@@ -848,17 +851,17 @@ int stac_decomp (int unit, PACKET *p, int len)
 	srcPtr += 2;
 	len -= 2;
     }
-    
-    /*	
-     * If not doing extended mode, insert a zero byte at the end 
-     * of the data. 
+
+    /*
+     * If not doing extended mode, insert a zero byte at the end
+     * of the data.
      */
-    if (db -> checkMode != STAC_CHECK_EXTENDED) 
+    if (db -> checkMode != STAC_CHECK_EXTENDED)
 	srcPtr[len] = 0;
 
     /*
      * Allocate a new buffer for decompressed data.  Must leave room
-     * for VJ uncompression code to prepend 128 (MAX_HDR) bytes of 
+     * for VJ uncompression code to prepend 128 (MAX_HDR) bytes of
      * header.  sl_uncompress_tcp code expects this.
      */
     if ((dmsg = PACKET_ALLOC(MAX_HDR + MAX_MTU)) == 0) {
@@ -878,7 +881,7 @@ int stac_decomp (int unit, PACKET *p, int len)
     srcLen = (unsigned long)len;
     result = LZS_Decompress(&srcPtr, &destPtr, &srcLen, &destLen, history,
 			    LZS_SAVE_HISTORY);
-    
+
     PACKET_FREE(p); 	    	    	    /* free compressed packet */
 
     if ( ! (result & LZS_END_MARKER)) {	    /* did compression work? */
@@ -898,7 +901,7 @@ int stac_decomp (int unit, PACKET *p, int len)
     destPtr = PACKET_DATA(dmsg);
     if (db -> checkMode == STAC_CHECK_LCB) {
 	lcb = stac_lcb(INIT_LCB, destPtr, len);
-	if (lcb != checkChar) {	    	    
+	if (lcb != checkChar) {
 	    LOG3(LOG_BASE, (LOG_STAC_DECOMP_BAD, "lcb"));
 	    goto bad2;
 	}
@@ -910,7 +913,7 @@ int stac_decomp (int unit, PACKET *p, int len)
 	    goto bad2;
 	}
     }
-    
+
     /*
      * Get protcol from decompressed data and deliver.  Protocol field
      * may be compressed.

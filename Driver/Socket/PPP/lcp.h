@@ -64,7 +64,7 @@
 # define CI_N_AUTHTYPE	    	0X0004
 # define CI_N_PAP   	    	0x0008
 # define CI_N_CHAP  	    	0x0010
-# define CI_N_LQM   	    	0x0020	
+# define CI_N_LQM   	    	0x0020
 # define CI_N_MAGICNUMBER   	0x0040
 # define CI_N_PCOMPRESSION 	0x0080
 # define CI_N_ACCOMPRESSION 	0x0100
@@ -75,15 +75,15 @@
 					   cleared */
 #endif
 
-/* 
+/*
  * LCP flags -- is a union of boolean variables used by MST to keep
  * 	    	information about the status or behaviour of LCP.
  */
 # define LF_ECHO_LQM	       	0x01	/* Use Echo-Request instead of LQR */
 # define LF_LOST_LINE	    	0x02	/* line dropped or LQM said it did */
-# define LF_IN_NETWORK_PHASE	0x04	/* True if we are */	
+# define LF_IN_NETWORK_PHASE	0x04	/* True if we are */
 
-/* 
+/*
  * The state of options is described by an lcp_options structure
  */
 typedef struct lcp_options
@@ -99,7 +99,7 @@ typedef struct lcp_options
     unsigned short lqm_k;	/* Must receive k of the last n LQRs */
     unsigned short lqm_n;	/* to consider the link OK */
     int rxnaks[LCP_MAXCI + 1];	/* No. of Configure-Naks peer sent */
-} lcp_options;    
+} lcp_options;
 
 extern fsm lcp_fsm[];
 extern lcp_options lcp_wantoptions[];

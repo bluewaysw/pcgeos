@@ -116,12 +116,12 @@ pragma On(Long_enums);          /* to be compatible with MSC */
 /*
  *      *****   Watcom C   *****
  */
- 
+
 #pragma aux __pascal "^"                       \
            parm reverse routine []             \
            value struct float routine [ax] \
            modify [ax bx cx dx es]
-	   	   
+
 #define _pascal __pascal
 #define _cdecl __cdecl
 
@@ -129,6 +129,7 @@ pragma On(Long_enums);          /* to be compatible with MSC */
 #define _inline_word(val)  inline_doesn_exist_yet_for_watcom
 
 #define _far __far
+#define _near __near
 
 #define PCB(ret,name,args) ret (_pascal *name) args
 #define CCB(ret,name,args) ret (_cdecl *name) args
@@ -151,7 +152,7 @@ pragma On(Long_enums);          /* to be compatible with MSC */
 #define PCB(ret,name,args) ret (*name) args
 #define CCB(ret,name,args) ret (*name) args
 
-#endif   
+#endif
 /*
  * End of compiler dependent definitions
  *
@@ -283,7 +284,7 @@ typedef struct _ClassStruct ClassStruct;
 # define SegmentOf(ptr) 	((Segment) (void __seg *)(void __far *)(ptr))
 # define PtrToOffset(ptr) 	((word) (ptr))
 
-#else 
+#else
 #if defined(__WATCOMC__)
 
 # define OptrToHandle(op) ((MemHandle) ((op) >> 16))

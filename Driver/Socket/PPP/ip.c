@@ -18,7 +18,7 @@
  *
  *	ip_print    	    Log an IP header
  * 	log_buffer  	    Log data in buffer in hex and ascii format
- *	
+ *
  *	ppp_ip_input	    Process received IP packet
  *	ip_vj_comp_input    Process received VJ TCP compressed IP packet
  *	ip_vj_uncomp_input  Process received VJ TCP uncompressed IP packet
@@ -49,15 +49,18 @@
 #ifdef __BORLANDC__
 #pragma codeseg IPCODE
 #endif
+#ifdef __WATCOMC__
+#pragma code_seg ("IPCODE");
+#endif
 
-unsigned short ntohs (unsigned short t) 
+unsigned short ntohs (unsigned short t)
 {
     return ((t << 8) | ((t >> 8) & 0x00ff));
 }
 
 unsigned long ntohl (unsigned long l)
 {
-    return (((l >> 24) & 0x000000ff) | ((l & 0x00ff0000) >> 8) | 
+    return (((l >> 24) & 0x000000ff) | ((l & 0x00ff0000) >> 8) |
 	    ((l & 0x0000ff00) << 8) | (l << 24));
 }
 
@@ -81,7 +84,7 @@ unsigned long ntohl (unsigned long l)
  *	jwu	5/ 8/95		Initial Revision
  *
  ***********************************************************************/
-void ip_print (struct iphdr *iph,  	
+void ip_print (struct iphdr *iph,
 		int len,    	    	/* length of packet */
 		byte send,  	    	/* non-zero if outgoing packet */
 		char *logbuf)	    	/* buffer for log string */
@@ -98,7 +101,7 @@ void ip_print (struct iphdr *iph,
 #endif
 
     /*
-     * Find start of sub protocol header.  Copy port, source address and 
+     * Find start of sub protocol header.  Copy port, source address and
      * type.
      */
     prot_hdr = (unsigned char *)&((dword *)iph)[iph -> ip_hl];
@@ -112,7 +115,7 @@ void ip_print (struct iphdr *iph,
     if (len >= 8 &&
 	(ntohs(iph -> ip_off) & (IP_MF | IP_OFFMASK)))
 	frag = " frag";
-    
+
 
     /*
      * Determine the protocol of the IP datagram.
@@ -125,7 +128,7 @@ void ip_print (struct iphdr *iph,
 	if (ntohs(iph -> ip_off) & IP_OFFMASK)
 	    proto = "icmp";
 	else if (len >= (int)(4 * iph -> ip_hl) + 2)
-	    sprintf(proto = protobuf, "%d/%d/icmp", (int)type[0], 
+	    sprintf(proto = protobuf, "%d/%d/icmp", (int)type[0],
 		    (int)type[1]);
 	else if (len >= (int)(4 * iph -> ip_hl) + 1)
 	    sprintf(proto = protobuf, "%d/?/icmp", (int)type[0]);
@@ -134,14 +137,14 @@ void ip_print (struct iphdr *iph,
     }
     else if (iph -> ip_p == IPPROTO_UDP)
 	proto = "udp";
-    else 
+    else
 	sprintf(proto = protobuf, "%d", (int)iph -> ip_p);
 
     /*
      * Get address into strings.  Address is in network order.
      */
     if (len >= 16) {
-	sprintf(addr_string[0] = addr1, "%lu.%lu.%lu.%lu", 
+	sprintf(addr_string[0] = addr1, "%lu.%lu.%lu.%lu",
 		addr[0] & 0x00ff, (addr[0] >> 8) & 0x00ff,
 		(addr[0] >> 16) & 0x00ff, (addr[0] >> 24) & 0x00ff);
     }
@@ -177,7 +180,7 @@ void ip_print (struct iphdr *iph,
 		(iph -> ip_p == IPPROTO_TCP &&
 		 len >= (int)(4 * iph -> ip_hl) + 14 &&
 		 (prot_hdr[13] & 0x04) == 0x04) ? " rst" : "");
-	if (iph -> ip_p == IPPROTO_TCP && 
+	if (iph -> ip_p == IPPROTO_TCP &&
 	    len >= (int)(4 * iph -> ip_hl) + 16) {
 	    tcpseq = (unsigned long *)&prot_hdr[4];
 	    tcpack = (unsigned long *)&prot_hdr[8];
@@ -223,15 +226,15 @@ void log_buffer (unsigned char *buf,
     char hex[3 * N_COLUMNS + 1], ascii[N_COLUMNS + 1], *hexp, *ascp;
 
     /*
-     * For each character, if it's not printable, then make it's    
-     * ascii form a "." 
+     * For each character, if it's not printable, then make it's
+     * ascii form a "."
      */
-    for (column = 0, hexp = hex, ascp = ascii; 
-	 len; 
+    for (column = 0, hexp = hex, ascp = ascii;
+	 len;
 	 --len, (++column == N_COLUMNS ? column = 0 : 0)) {
 	*ascp++ = ((int)(*buf & 0x7f)) >= ' ' && ((int)(*buf & 0x7f)) <= '~' ?
 	    (*buf & 0x7f) : '.';
-	
+
 	/*
 	 * Add a space between every 4 bytes of hex output.
 	 */
@@ -253,7 +256,7 @@ void log_buffer (unsigned char *buf,
     }
 
     /*
-     * Write our any remaining partial columns.  Padding the end of the 
+     * Write our any remaining partial columns.  Padding the end of the
      * hex output with spaces to align the ascii part.
      */
     if (column > 0) {
@@ -344,7 +347,7 @@ byte ppp_ip_input (int unit, PACKET *packet, int len)
  *	jwu	5/ 8/95		Initial Revision
  *
  ***********************************************************************/
-byte ip_vj_comp_input (int unit, PACKET *packet, int len) 
+byte ip_vj_comp_input (int unit, PACKET *packet, int len)
 {
 #ifdef LOGGING_ENABLED
     char logbuf[MAX_STR_LEN];
@@ -397,7 +400,7 @@ byte ip_vj_comp_input (int unit, PACKET *packet, int len)
 	log("%s (c)\n", logbuf);
     }
 #endif /* LOGGING_ENABLED */
-	  
+
     /*
      * Deliver packet to TCP/IP client if successfully uncompressed.
      */
@@ -405,7 +408,7 @@ byte ip_vj_comp_input (int unit, PACKET *packet, int len)
 	important = 1;
 	PPPDeliverPacket(packet, unit);
     }
-    else 
+    else
 	PACKET_FREE(packet);
 
     return (important);
@@ -449,7 +452,7 @@ byte ip_vj_uncomp_input (int unit, PACKET *packet, int len)
     /*
      * If allowing vj compressed packets, uncompress it.  If there
      * was an FCS error, report it to the uncompressor.
-     */ 
+     */
     if (ppp_mode_flags & SC_RX_VJ_COMP) {
 	if (fcs_error) {
 	    fcs_error = FALSE;
@@ -485,7 +488,7 @@ byte ip_vj_uncomp_input (int unit, PACKET *packet, int len)
      */
     if (important)
 	PPPDeliverPacket(packet, unit);
-    else 
+    else
 	PACKET_FREE(packet);
 
     return(important);
@@ -515,7 +518,7 @@ void ppp_ip_output (int unit, PACKET *packet)
 #endif
     unsigned short protocol = IP;
     struct iphdr *iph = (struct iphdr *)PACKET_DATA(packet);
-    
+
 #ifdef LOGGING_ENABLED
     int logged = 0;
     if (debug >= LOG_IP) {
@@ -530,7 +533,7 @@ void ppp_ip_output (int unit, PACKET *packet)
      */
     if ((ppp_mode_flags & SC_TX_VJ_COMP) &&
 	iph -> ip_p == IPPROTO_TCP) {
-	switch (sl_compress_tcp(packet, iph)) 
+	switch (sl_compress_tcp(packet, iph))
 	    {
 	    case TYPE_UNCOMPRESSED_TCP:
 		protocol = IP_VJ_UNCOMP;

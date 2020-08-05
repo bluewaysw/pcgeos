@@ -13,7 +13,7 @@
  * ROUTINES:
  *	Name	  	    Description
  *	----	  	    -----------
- *	ipcp_init   	       
+ *	ipcp_init
  *	ipcp_open
  *	ipcp_lowerup
  *	ipcp_lowerdown
@@ -74,6 +74,9 @@
 #ifdef __BORLANDC__
 #pragma codeseg IPCPCODE
 #endif
+#ifdef __WATCOMC__
+#pragma code_seg("IPCPCODE")
+#endif
 
 /*
  * 	Forward declarations
@@ -94,12 +97,12 @@ void ipcp_down();		/* We're DOWN */
 static VoidCallback *ipcp_resetci_vfptr = ipcp_resetci;
 static IntCallback *ipcp_cilen_vfptr = ipcp_cilen;
 static VoidCallback *ipcp_addci_vfptr = ipcp_addci;
-static IntCallback *ipcp_ackci_vfptr = ipcp_ackci;	
-static VoidCallback *ipcp_nakci_vfptr = ipcp_nakci;	
+static IntCallback *ipcp_ackci_vfptr = ipcp_ackci;
+static VoidCallback *ipcp_nakci_vfptr = ipcp_nakci;
 static VoidCallback *ipcp_rejci_vfptr = ipcp_rejci;
-static ByteCallback *ipcp_reqci_vfptr = ipcp_reqci;	
+static ByteCallback *ipcp_reqci_vfptr = ipcp_reqci;
 static VoidCallback *ipcp_up_vfptr = ipcp_up;
-static VoidCallback *ipcp_down_vfptr = ipcp_down;	
+static VoidCallback *ipcp_down_vfptr = ipcp_down;
 
 fsm_callbacks ipcp_callbacks; 	/* IPCP callback routines */
 
@@ -111,10 +114,10 @@ fsm_callbacks ipcp_callbacks; 	/* IPCP callback routines */
  * CALLED BY:	PPPSetup using prottbl entry
  * RETURN:	nothing
  *
- * STRATEGY:	Initialize values in IPCP fsm, want optoins and allow 
+ * STRATEGY:	Initialize values in IPCP fsm, want optoins and allow
  *	    	options.
  *
- * NOTES:   	Commented out lines initializing defaults to zero 
+ * NOTES:   	Commented out lines initializing defaults to zero
  *	    	because they are already zero (dgroup).  The lines
  *	    	now serve as comments.
  *
@@ -139,18 +142,18 @@ void ipcp_init (int unit)
     ipcp_callbacks.addci = ipcp_addci_vfptr;
     ipcp_callbacks.ackci = ipcp_ackci_vfptr;
     ipcp_callbacks.nakci = ipcp_nakci_vfptr;
-    ipcp_callbacks.rejci = ipcp_rejci_vfptr; 
+    ipcp_callbacks.rejci = ipcp_rejci_vfptr;
     ipcp_callbacks.reqci = ipcp_reqci_vfptr;
     ipcp_callbacks.up = ipcp_up_vfptr;
     ipcp_callbacks.down = ipcp_down_vfptr;
-    ipcp_callbacks.closed = ipcp_callbacks.protreject = 
-	ipcp_callbacks.retransmit = ipcp_callbacks.echoreply = 
+    ipcp_callbacks.closed = ipcp_callbacks.protreject =
+	ipcp_callbacks.retransmit = ipcp_callbacks.echoreply =
 	    ipcp_callbacks.lqreport = (VoidCallback *)NULL;
     ipcp_callbacks.echorequest = (ByteCallback *)NULL;
 
-#ifdef USE_CCP  
+#ifdef USE_CCP
     ipcp_callbacks.resetrequest = ipcp_callbacks.resetack = (VoidCallback *)NULL;
-#endif 
+#endif
 
     /*
      * Initialize FSM defaults and maximums for IPCP.
@@ -177,12 +180,12 @@ void ipcp_init (int unit)
     wo -> vj_cid = 1;
 
 #if 0
-   wo -> ouraddr = 0;     	    
-   wo -> heraddr = 0;     	    
-   wo -> soft_ouraddr = 0; 	    
+   wo -> ouraddr = 0;
+   wo -> heraddr = 0;
+   wo -> soft_ouraddr = 0;
    wo -> soft_heraddr = 0;
-   wo -> dns1 = 0;	    	    
-   wo -> dns2 = 0;	    	    
+   wo -> dns1 = 0;
+   wo -> dns2 = 0;
 #endif
 
     /*
@@ -303,7 +306,7 @@ void ipcp_protrej (int unit)
  *				ipcp_resetci
  ***********************************************************************
  * SYNOPSIS:	Reset our configuration information. (FSM callback)
- * CALLED BY:	fsm_open 
+ * CALLED BY:	fsm_open
  * RETURN:	nothing
  *
  * STRATEGY:	Clear Nak counts and reset got options to desired
@@ -330,9 +333,9 @@ void ipcp_resetci (fsm *f)
 /***********************************************************************
  *				ipcp_cilen
  ***********************************************************************
- * SYNOPSIS:	Return the size of our configuration information. 
+ * SYNOPSIS:	Return the size of our configuration information.
  *	    	(FSM callback)
- * CALLED BY:	scr 	= Send Configure Request 
+ * CALLED BY:	scr 	= Send Configure Request
  * RETURN:	nothing
  *
  * STRATEGY:	If an option will be negotiated, include its length.
@@ -350,11 +353,11 @@ int ipcp_cilen (fsm *f)
 
     /*
      * If negotiating address, insert the proper length for new
-     * or old style address option.  If negotiating MS-IPCP DNS 
-     * addresses, add length for both secondary and primary DNS 
+     * or old style address option.  If negotiating MS-IPCP DNS
+     * addresses, add length for both secondary and primary DNS
      * option.
      */
-    return ((go -> ipcp_neg & IN_NEG_ADDRS ? 
+    return ((go -> ipcp_neg & IN_NEG_ADDRS ?
 	     (go -> ipcp_neg & IN_OLD_ADDRS ? CI_ADDRS_LEN : CI_ADDR_LEN) : 0)
 	    + (go -> ipcp_neg & IN_NEG_VJ ? CI_VJ_COMP_LEN : 0)
 	    + (go -> ipcp_neg & IN_MS_DNS1 ? CI_MS_DNS_LEN : 0)
@@ -367,7 +370,7 @@ int ipcp_cilen (fsm *f)
  ***********************************************************************
  * SYNOPSIS:	Add our desired configuration information to the packet.
  *	    	(FSM callback)
- * CALLED BY:	scr 	= Send Configure Request 
+ * CALLED BY:	scr 	= Send Configure Request
  * RETURN:	nothing
  *
  * STRATEGY:	If negotiating address and doing old style, add old style
@@ -391,15 +394,15 @@ void ipcp_addci (fsm *f,
      * If negotiating address, add option for old or new style address.
      */
     if (go -> ipcp_neg & IN_NEG_ADDRS) {
-	
+
 	if (go -> ipcp_neg & IN_OLD_ADDRS) {
 	    PUTCHAR(CI_ADDRS, ucp);
 	    PUTCHAR(CI_ADDRS_LEN, ucp);	    	/* insert option length */
 	    PUTLONG(go -> ouraddr, ucp);
 	    PUTLONG(go -> heraddr, ucp);
 
-	    LOG3(LOG_NEG, (LOG_IPCP_SEND_ADDRS, 
-			  BREAKDOWN_ADDR(go -> ouraddr), 
+	    LOG3(LOG_NEG, (LOG_IPCP_SEND_ADDRS,
+			  BREAKDOWN_ADDR(go -> ouraddr),
 			  BREAKDOWN_ADDR(go -> heraddr)));
 
 	}
@@ -416,13 +419,13 @@ void ipcp_addci (fsm *f,
      * If negotiating VJ TCP header compression, add the option for it.
      */
     if (go -> ipcp_neg & IN_NEG_VJ) {
-	
+
 	PUTCHAR(CI_COMPRESSTYPE, ucp);
-	PUTCHAR(CI_VJ_COMP_LEN, ucp);	    	    
+	PUTCHAR(CI_VJ_COMP_LEN, ucp);
 	PUTSHORT(IP_VJ_COMP, ucp);	    /* insert compression type */
 	LOG3(LOG_NEG, (LOG_IPCP_SEND_COMP));
 
-	PUTCHAR(go -> vj_maxslot, ucp); 
+	PUTCHAR(go -> vj_maxslot, ucp);
 	PUTCHAR(go -> vj_cid, ucp);
 	LOG3(LOG_NEG, (LOG_IPCP_SLOTS,
  		      go -> vj_maxslot, go -> vj_cid));
@@ -476,7 +479,7 @@ void ipcp_addci (fsm *f,
  *	    	    	get our address
  *	    	    	    same as above for addresses
  *	    	 If negotiated vj compression, check packet length
- *	    	    get option type and length and verify 
+ *	    	    get option type and length and verify
  *	    	    get compression protocol and verify
  *	    	    get maxslot and cid and verify
  *	    	If negotiated ms-ipcp dns, check packet length
@@ -504,7 +507,7 @@ int ipcp_ackci (fsm *f,
     unsigned long cilong;
     unsigned char cichar;
 
-    /* 
+    /*
      * Configuration options must be in exactly the same order that
      * we sent or else packet is bad.  Code should process options in
      * same order as code that added the options to a Configure-Request.
@@ -540,7 +543,7 @@ int ipcp_ackci (fsm *f,
 		if (go -> heraddr != cilong)
 		    goto bad;
 	    }
-	    else 
+	    else
 		go -> heraddr = cilong;
 	}
 	else {	    	/* new style IP Address option */
@@ -568,7 +571,7 @@ int ipcp_ackci (fsm *f,
      * exactly what we sent.
      */
     if (go -> ipcp_neg & IN_NEG_VJ) {
-	
+
 	if ((len -= CI_VJ_COMP_LEN) < 0)       /* adjusts remaining length */
 	    goto bad;
 
@@ -581,10 +584,10 @@ int ipcp_ackci (fsm *f,
 	/*
 	 * Verify compression protocol, max slot and comp-id.
 	 */
-	GETSHORT(cishort, p);	    	    
+	GETSHORT(cishort, p);
 	if (cishort != IP_VJ_COMP)
 	    goto bad;
-	
+
 	GETCHAR(cichar, p);
 	if (cichar != go -> vj_maxslot)
 	    goto bad;
@@ -596,7 +599,7 @@ int ipcp_ackci (fsm *f,
 
     /*
      * If doing MS-IPCP DNS negotiation, check ack for DNS addresses
-     * options.  
+     * options.
      */
     if (go -> ipcp_neg & IN_MS_DNS1) {
 
@@ -613,7 +616,7 @@ int ipcp_ackci (fsm *f,
 	go -> dns1 = cilong;
 
 	if (go -> ipcp_neg & IN_MS_DNS2) {
-	    
+
 	    if ((len -= CI_MS_DNS_LEN) < 0)
 		goto bad;
 
@@ -638,7 +641,7 @@ int ipcp_ackci (fsm *f,
 
 bad:
     LOG3(LOG_NEG, (LOG_IPCP_BAD, "Ack"));
-    return (0);    
+    return (0);
 }
 
 
@@ -647,10 +650,10 @@ bad:
  *				ipcp_nakci
  ***********************************************************************
  * SYNOPSIS:	Process a received Configure-Nak message. (FSM callback)
- * CALLED BY:	fsm_input 
+ * CALLED BY:	fsm_input
  * RETURN:	nothing
  *
- * STRATEGY:	If received too many naks, close LCP  
+ * STRATEGY:	If received too many naks, close LCP
  *	    	while there are options in the packet {
  *	    	    verify packet length and option length
  *	    	    switch on option type
@@ -659,7 +662,7 @@ bad:
  *	    	    	if too many naks, log warning else just log it
  *	    	If anything left, packet is bad
  *
- * NOTE:    Why bother processing packet if we're closing LCP? 
+ * NOTE:    Why bother processing packet if we're closing LCP?
  *	    I don't get it...
  *
  * REVISION HISTORY:
@@ -695,7 +698,7 @@ void ipcp_nakci (fsm *f,
     while (len > 0) {
 	unsigned char *p1 = p + 2;  	    /* p1 points to option data  */
 	int l = p[1];	    	    	    /* get option length */
-	
+
 	/*
 	 * Verify there is enough data in the packet for the option
 	 * and that the option length is reasonable.
@@ -715,13 +718,13 @@ void ipcp_nakci (fsm *f,
 		    GETLONG(ciaddr1, p1);
 		    GETLONG(ciaddr2, p1);
 
-		    LOG3(LOG_NEG, 
+		    LOG3(LOG_NEG,
 			(LOG_IPCP_NAK_ADDRS,
 			 BREAKDOWN_ADDR(ciaddr1), BREAKDOWN_ADDR(ciaddr2)));
 
 		    /*
-		     * If we didn't know our address or peer provided one, 
-		     * and we're allowing ours to be overriden, use it.  
+		     * If we didn't know our address or peer provided one,
+		     * and we're allowing ours to be overriden, use it.
 		     * Same for her address.
 		     */
 		    if (go -> ouraddr == 0 ||	/* Didn't we know our address? */
@@ -731,10 +734,10 @@ void ipcp_nakci (fsm *f,
 		    if (go -> heraddr == 0 ||	/* Does she know hers? */
 			(ciaddr2 && go -> soft_heraddr))
 		    	go -> heraddr = ciaddr2;
-		    
+
 		    ++go -> rxnaks[CI_ADDRS];
 
-#ifdef LOGGING_ENABLED		    	
+#ifdef LOGGING_ENABLED
 		    if (go -> rxnaks[CI_ADDRS] % ipcp_warnnaks == 0) {
 			LOG3(LOG_BASE, (LOG_IPCP_NO_ADDRS));
 			LOG3(LOG_BASE,
@@ -771,10 +774,10 @@ void ipcp_nakci (fsm *f,
 		     * If we wanted an address assigned to us or if she
 		     * provided one and we allow ours to be overridden, use it.
 		     */
-		    if (go -> ouraddr == 0 || 
+		    if (go -> ouraddr == 0 ||
 			(ciaddr1 && go -> soft_ouraddr))
 			go -> ouraddr = ciaddr1;
-		    
+
 		    ++go -> rxnaks[CI_ADDRS];
 
 #ifdef LOGGING_ENABLED
@@ -851,12 +854,12 @@ void ipcp_nakci (fsm *f,
 		    go -> ipcp_neg |= IN_MS_DNS2;
 dnsCommon:
 		    GETLONG(ciaddr1, p1);
-		    LOG3(LOG_NEG, 
+		    LOG3(LOG_NEG,
 			(LOG_IPCP_NAK_DNS,
 			 p[0] == CI_MS_DNS1 ? "primary" : "secondary"));
-		    LOG3(LOG_NEG, 
+		    LOG3(LOG_NEG,
 			(LOG_IPCP_DNS_ADDR, BREAKDOWN_ADDR(ciaddr1)));
-		    
+
 		    if (ciaddr1)
 			if (p[0] == CI_MS_DNS1)
 			    go -> dns1 = ciaddr1;
@@ -892,7 +895,7 @@ bad:
  *				ipcp_rejci
  ***********************************************************************
  * SYNOPSIS:	Process a received Configure-Reject. (FSM callback)
- * CALLED BY:	fsm_input 
+ * CALLED BY:	fsm_input
  * RETURN:	nothing
  *
  * STRATEGY:	If got options negotiating addresses and length is long enough
@@ -923,24 +926,24 @@ void ipcp_rejci (fsm *f,
     unsigned long cilong;
     unsigned char cichar;
 
-    /* 
-     * Any rejected configuration options must be in exactly the same 
-     * order that we sent.  Check packet length and option length at 
+    /*
+     * Any rejected configuration options must be in exactly the same
+     * order that we sent.  Check packet length and option length at
      * each step.  If we find any deviations, then this packet is bad.
      */
 
     /*
      * If negotiating addresses, the first option must be CI_ADDRS
-     * or CI_ADDR.  Only one may be present in a configuration packet.  
+     * or CI_ADDR.  Only one may be present in a configuration packet.
      */
     if (go -> ipcp_neg & IN_NEG_ADDRS && len >= CI_ADDR_LEN) {
 	/*
-         * Check if IP Addresses option is being rejected. 
+         * Check if IP Addresses option is being rejected.
 	 */
 	if (len >= CI_ADDRS_LEN &&     	/* buffer length okay? */
 	    p[1] == CI_ADDRS_LEN &&    	/* option length okay? */
 	    p[0] == CI_ADDRS) {	    	/* option type okay? */
-	    
+
 	    len -= CI_ADDRS_LEN;	/* adjust remaining length */
 	    INCPTR(2, p);   	    	/* advance ptr past type and length */
 	    GETLONG(cilong, p);
@@ -953,7 +956,7 @@ void ipcp_rejci (fsm *f,
 		    (LOG_IPCP_WRONG_ADDR, "Source-",
 		     BREAKDOWN_ADDR(cilong), BREAKDOWN_ADDR(go -> ouraddr)));
 		goto bad;
-	    }		
+	    }
 
 	    GETLONG(cilong, p);
 	    if (cilong != go -> heraddr) {
@@ -968,7 +971,7 @@ void ipcp_rejci (fsm *f,
 	/*
 	 * Check if IP Address option is being rejected.
 	 */
-	else if (len >= CI_ADDR_LEN && p[1] == CI_ADDR_LEN 
+	else if (len >= CI_ADDR_LEN && p[1] == CI_ADDR_LEN
 		 && p[0] == CI_ADDR) {
 	    len -= CI_ADDR_LEN;	    /* adjust remaining length */
 	    INCPTR(2, p);   	    /* advance ptr past length and type */
@@ -983,7 +986,7 @@ void ipcp_rejci (fsm *f,
 		     BREAKDOWN_ADDR(cilong), BREAKDOWN_ADDR(go -> ouraddr)));
 		goto bad;
 	    }
-	    
+
 	    /*
 	     * Try the old style of address negotiation.
 	     */
@@ -995,8 +998,8 @@ void ipcp_rejci (fsm *f,
     /*
      * Process rejection of VJ compression.
      */
-    if (go -> ipcp_neg & IN_NEG_VJ && 
-	len >= CI_VJ_COMP_LEN && p[1] == CI_VJ_COMP_LEN 
+    if (go -> ipcp_neg & IN_NEG_VJ &&
+	len >= CI_VJ_COMP_LEN && p[1] == CI_VJ_COMP_LEN
 	&& p[0] == CI_COMPRESSTYPE) {
 
 	len -= CI_VJ_COMP_LEN; 	    /* adjust remaining length */
@@ -1010,7 +1013,7 @@ void ipcp_rejci (fsm *f,
 	    LOG3(LOG_NEG, (LOG_IPCP_WRONG_COMP_TYPE, cishort));
 	    goto bad;
 	}
-	
+
 	/* Check maxslot and comp-id. */
 	GETCHAR(cichar, p);
 	if (cichar != go -> vj_maxslot) {
@@ -1025,7 +1028,7 @@ void ipcp_rejci (fsm *f,
 			   cichar, go -> vj_cid));
 	    goto bad;
 	}
-	
+
 	go -> ipcp_neg &= ~IN_NEG_VJ;
     }
 
@@ -1042,12 +1045,12 @@ void ipcp_rejci (fsm *f,
 	LOG3(LOG_NEG, (LOG_IPCP_REJ_DNS, "primary"));
 
 	if (cilong != go -> dns1) {
-	    LOG3(LOG_NEG, 
+	    LOG3(LOG_NEG,
 		(LOG_IPCP_WRONG_ADDR, "DNS ",
 		 BREAKDOWN_ADDR(cilong), BREAKDOWN_ADDR(go -> dns1)));
 	    goto bad;
 	}
-	
+
 	go -> ipcp_neg &= ~IN_MS_DNS1;
     }
 
@@ -1061,7 +1064,7 @@ void ipcp_rejci (fsm *f,
 	LOG3(LOG_NEG, (LOG_IPCP_REJ_DNS, "secondary"));
 
 	if (cilong != go -> dns2) {
-	    LOG3(LOG_NEG, 
+	    LOG3(LOG_NEG,
 		(LOG_IPCP_WRONG_ADDR, "DNS ",
 		 BREAKDOWN_ADDR(cilong), BREAKDOWN_ADDR(go -> dns2)));
 	    goto bad;
@@ -1070,7 +1073,7 @@ void ipcp_rejci (fsm *f,
 	go -> ipcp_neg &= ~IN_MS_DNS2;
     }
 
-    /* 
+    /*
      * If there are any remaining CIs, then this packet is bad.
      */
     if (len == 0)
@@ -1085,9 +1088,9 @@ bad:
 /***********************************************************************
  *				ipcp_reqci
  ***********************************************************************
- * SYNOPSIS:	Check the peer's requested configuration information 
+ * SYNOPSIS:	Check the peer's requested configuration information
  *	    	and send appropriate response. (FSM callback)
- * CALLED BY:	fsm_input 
+ * CALLED BY:	fsm_input
  * RETURN:	0 if no response should be sent, else
  *	    	CONFIGURE_ACK, CONFIGURE_NAK or CONFIGURE_REJECT
  *
@@ -1120,7 +1123,7 @@ unsigned char ipcp_reqci (fsm *f,
     unsigned char *cip;	    	    	/* Pointer to current option */
     unsigned short cilen, citype;   	/* Parsed option length and type */
     unsigned short cishort;		/* Parsed short value */
-    unsigned long ciaddr1, ciaddr2; 	/* Parsed address values */    
+    unsigned long ciaddr1, ciaddr2; 	/* Parsed address values */
     unsigned long heraddr, ouraddr;
 
     int rc = CONFIGURE_ACK; 	    	/* Final packet return code. */
@@ -1128,14 +1131,14 @@ unsigned char ipcp_reqci (fsm *f,
 
     unsigned char *p = inp;		/* Pointer to next char to parse */
     unsigned char *ucp = inp;		/* Pointer to current output char */
-    
+
     int l = *len;			/* Length left */
     unsigned char maxslot, cid;
     int not_converging = f -> tx_naks >= f -> max_failure;
     unsigned char saw_address = 0;     	/* Recvd address option? */
 
 #ifdef LOGGING_ENABLED
-    /* 
+    /*
      * Log a warning if configure-request does not contain any options.
      */
     if (l == 0) {
@@ -1154,7 +1157,7 @@ unsigned char ipcp_reqci (fsm *f,
     while (l) {
 	orc = CONFIGURE_ACK;	    	/* Assume success */
 	cip = p;    	    	    	/* Remember beginning of this option */
-	
+
 	if (l < 2 ||	    	    	/* Not enough data for option hdr or */
 	    p[1] < 2 ||	    	    	/* option length too small */
 	    (p[1] & 0xff) > l) {	/* option length too big? */
@@ -1170,7 +1173,7 @@ unsigned char ipcp_reqci (fsm *f,
 	/*
 	 * Process option according to type.
 	 */
-	switch (citype)     	    	
+	switch (citype)
 	    {
 	    case CI_ADDRS:
 		LOG3(LOG_NEG, (LOG_IPCP_RECV_ADDRS));
@@ -1182,16 +1185,16 @@ unsigned char ipcp_reqci (fsm *f,
 		if ((ao -> ipcp_neg & IN_NEG_ADDRS) == 0 ||
 		    cilen != 8) {
 		    INCPTR(cilen, p);	        /* skip rest of option */
-		    orc = CONFIGURE_REJECT; 
+		    orc = CONFIGURE_REJECT;
 		    break;
 		}
 
 		/*
 		 * Parse source addr (hers) and destination addr (ours).
 		 */
-		GETLONG(ciaddr1, p);	
+		GETLONG(ciaddr1, p);
 		heraddr = ciaddr1;
-		GETLONG(ciaddr2, p);	    	
+		GETLONG(ciaddr2, p);
 		ouraddr = ciaddr2;
 
 		LOG3(LOG_NEG, (LOG_IPCP_ADDRS,
@@ -1201,16 +1204,16 @@ unsigned char ipcp_reqci (fsm *f,
 		/*
 		 * If we want to negotiate addresses, suggest what we
 		 * want her address to be if she doesn't know her own
-		 * address or we are forcing her to use an address of 
+		 * address or we are forcing her to use an address of
 		 * our choosing.
 		 */
-		if (wo -> ipcp_neg & IN_NEG_ADDRS && 	
-		    go -> heraddr &&	    	      
-		    heraddr != go -> heraddr &&	      
-		    (! wo -> soft_heraddr || heraddr == 0)) {  
+		if (wo -> ipcp_neg & IN_NEG_ADDRS &&
+		    go -> heraddr &&
+		    heraddr != go -> heraddr &&
+		    (! wo -> soft_heraddr || heraddr == 0)) {
 
 		    heraddr = go -> heraddr;
-		    
+
 		    if (not_converging)
 			orc = CONFIGURE_REJECT;
 		    else
@@ -1234,7 +1237,7 @@ unsigned char ipcp_reqci (fsm *f,
 		}
 
 		/*
-		 * If nak-ing, put our suggestions for addresses in the 
+		 * If nak-ing, put our suggestions for addresses in the
 		 * packet.  If ack-ing, remember negotiated addresses.
 		 */
 		if (orc == CONFIGURE_NAK) {
@@ -1266,10 +1269,10 @@ unsigned char ipcp_reqci (fsm *f,
 	       LOG3(LOG_NEG, (LOG_IPCP_RECV_COMP));
 
 		/*
-		 * If option length is too small, reject option.    
+		 * If option length is too small, reject option.
 		 */
 		if (cilen < 2) {
-		    LOG3(LOG_NEG, (LOG_IPCP_TOO_SHORT, 2 + cilen)); 
+		    LOG3(LOG_NEG, (LOG_IPCP_TOO_SHORT, 2 + cilen));
 		    INCPTR(cilen, p);
 		    orc = CONFIGURE_REJECT;
 		    break;
@@ -1293,7 +1296,7 @@ unsigned char ipcp_reqci (fsm *f,
 		 * Compression protocol must be IP VJ Compression.
 		 * If it's not and we're still converging, suggest it.
 		 */
-		if (cishort != IP_VJ_COMP) 
+		if (cishort != IP_VJ_COMP)
 		    if (not_converging) {
 			orc = CONFIGURE_REJECT;
 			INCPTR(cilen - 2, p);
@@ -1321,16 +1324,16 @@ unsigned char ipcp_reqci (fsm *f,
 		    LOG3(LOG_NEG, (LOG_IPCP_SLOT_ID, "Max", maxslot));
 
 		    /*
-		     * If maxslot is too big and we're still converging, 
-		     * suggest our maximum.  
+		     * If maxslot is too big and we're still converging,
+		     * suggest our maximum.
 		     */
-		    if ((maxslot & 0xff) > MAX_VJ_SLOTS - 1) 
+		    if ((maxslot & 0xff) > MAX_VJ_SLOTS - 1)
 			if (not_converging) {
 			    orc = CONFIGURE_REJECT;
 			    INCPTR(1, p);   	/* skip rest of option */
 
 			    link_error = SSDE_NEG_FAILED;
-			       
+
 			    LOG3(LOG_BASE, (LOG_IPCP_GIVE_UP_COMP));
 			    DOLOG(negotiation_problem = "Negotiation failed";)
 
@@ -1343,8 +1346,8 @@ unsigned char ipcp_reqci (fsm *f,
 			}
 		    else if ((maxslot & 0xff) < MIN_VJ_SLOTS - 1)
 			/*
-			 * If maxslot is too small and we're still 
-			 * converging, suggest our minimum. 
+			 * If maxslot is too small and we're still
+			 * converging, suggest our minimum.
 			 */
 			if (not_converging) {
 			    orc = CONFIGURE_REJECT;
@@ -1371,12 +1374,12 @@ unsigned char ipcp_reqci (fsm *f,
 			GETCHAR(cid, p);
 			LOG3(LOG_NEG, (LOG_IPCP_SLOT_ID, "Comp", cid));
 
-			if (cid > 1) 
+			if (cid > 1)
 			    if (not_converging) {
 				orc = CONFIGURE_REJECT;
 
 				link_error = SSDE_NEG_FAILED;
-				   
+
 				LOG3(LOG_BASE, (LOG_IPCP_GIVE_UP_COMP));
 			     DOLOG(negotiation_problem = "Negotiation failed";)
 			    }
@@ -1386,7 +1389,7 @@ unsigned char ipcp_reqci (fsm *f,
 				orc = CONFIGURE_NAK;
 				PUTCHAR(wo -> vj_cid, p);
 			    }
-			else 
+			else
 			    ho -> vj_cid = cid;
 		    }
 		}
@@ -1396,7 +1399,7 @@ unsigned char ipcp_reqci (fsm *f,
 	    case CI_ADDR:
 		LOG3(LOG_NEG, (LOG_IPCP_RECV_ADDR));
 		saw_address = 1;
-		
+
 		/*
 		 * If not allowing address negotiation or the option
 		 * length is too short, reject the option.
@@ -1409,9 +1412,9 @@ unsigned char ipcp_reqci (fsm *f,
 		}
 
 		/*
-		 * If negotiating her address and she had one but it 
-		 * now differs and we're forcing her to use our choice 
-		 * of address, or she doesn't know her address, Nak it 
+		 * If negotiating her address and she had one but it
+		 * now differs and we're forcing her to use our choice
+		 * of address, or she doesn't know her address, Nak it
 		 * with our idea.   Else, let her use her address.
 		 */
 		GETLONG(heraddr, p);
@@ -1419,8 +1422,8 @@ unsigned char ipcp_reqci (fsm *f,
 		LOG3(LOG_NEG, (LOG_COLON));
 
 		if (wo -> ipcp_neg & IN_NEG_ADDRS &&
-		    go -> heraddr &&	    	    	
-		    heraddr != wo -> heraddr &&	
+		    go -> heraddr &&
+		    heraddr != wo -> heraddr &&
 		    (! wo -> soft_heraddr || heraddr == 0)) {
 		    if (not_converging) {
 			orc = CONFIGURE_REJECT;
@@ -1433,7 +1436,7 @@ unsigned char ipcp_reqci (fsm *f,
 			     BREAKDOWN_ADDR((wo -> ipcp_neg & IN_NEG_ADDRS) ?
 					    wo -> heraddr : 0L)));
 			LOG3(LOG_BASE,
-			    (LOG_IPCP_ADDR_PEER2, 
+			    (LOG_IPCP_ADDR_PEER2,
 			     BREAKDOWN_ADDR(heraddr)));
 			DOLOG(negotiation_problem = "Negotiation failed";)
 		    }
@@ -1442,7 +1445,7 @@ unsigned char ipcp_reqci (fsm *f,
 			DECPTR(4, p);
 			PUTLONG(wo -> heraddr, p);
 		    }
-		
+
 		}
 		else {
 		    ho -> ipcp_neg |= IN_NEG_ADDRS;
@@ -1455,7 +1458,7 @@ unsigned char ipcp_reqci (fsm *f,
 	    case CI_MS_DNS2:
 		LOG3(LOG_NEG, (LOG_IPCP_RECV_DNS,
 			      citype == CI_MS_DNS1 ? "primary" : "secondary"));
-		
+
 		if ((citype == CI_MS_DNS1 && !(ao -> ipcp_neg & IN_MS_DNS1)) ||
 		    (citype == CI_MS_DNS2 && !(ao -> ipcp_neg & IN_MS_DNS2)) ||
 		    cilen != 4) {
@@ -1468,7 +1471,7 @@ unsigned char ipcp_reqci (fsm *f,
 		GETLONG(ciaddr1, p);
 		LOG3(LOG_NEG, (LOG_IPCP_ADDR, BREAKDOWN_ADDR(ciaddr1)));
 		    /*
-		     * If zero, nak with zero DNS address because we 
+		     * If zero, nak with zero DNS address because we
 		     * don't have any to assign.
 		     */
 		if (ciaddr1 == 0) {
@@ -1479,7 +1482,7 @@ unsigned char ipcp_reqci (fsm *f,
 		break;
 
 	    default:
-		LOG3(LOG_NEG, (LOG_IPCP_UNKNOWN_OPT, citype));   
+		LOG3(LOG_NEG, (LOG_IPCP_UNKNOWN_OPT, citype));
 		INCPTR(cilen, p);
 		orc = CONFIGURE_REJECT;
 		break;
@@ -1521,15 +1524,15 @@ unsigned char ipcp_reqci (fsm *f,
 	}
 
 	/*
-	 * Copy option to new place in packet if this option 
-	 * needs to be moved.  Use memmove because there's a 
+	 * Copy option to new place in packet if this option
+	 * needs to be moved.  Use memmove because there's a
 	 * change of overlap.
 	 */
-	if (ucp != cip) 
+	if (ucp != cip)
 	    memmove (ucp, cip, cilen);
 
 	INCPTR(cilen, ucp); 	    	/* update output pointer */
-	    
+
     }
 
     /*
@@ -1585,22 +1588,22 @@ unsigned char ipcp_reqci (fsm *f,
      * Compute output length (length of reply packet).  Return
      * final result code.
      */
-    *len = ucp - inp;	    	    
+    *len = ucp - inp;
 
     LOG3(LOG_NEG,
 	(LOG_IPCP_REPLY,
 	 rc == CONFIGURE_ACK ? "Configure-Ack" :
 	 (rc == CONFIGURE_NAK ? "Configure-Nak" : "Configure-Reject")));
 
-    return (rc);    	
-}    	
+    return (rc);
+}
 
 
 /***********************************************************************
  *				ipcp_up
  ***********************************************************************
  * SYNOPSIS:	IPCP has come UP.  (FSM callback)
- * CALLED BY:	tlu 	= This Layer Up 
+ * CALLED BY:	tlu 	= This Layer Up
  * RETURN:	nothing
  * SIDE EFFECTS:
  *
@@ -1610,14 +1613,14 @@ unsigned char ipcp_reqci (fsm *f,
  * NOTES:
  * 	    PPP protocol does not require address to be
  * 	    negotiated before allowing link to open, thus we need
- * 	    to check if we have a local address because we cannot do 
+ * 	    to check if we have a local address because we cannot do
  * 	    anything useful without one.
  *
  * REVISION HISTORY:
  *	Name	Date		Description
  *	----	----		-----------
  *	jwu	5/ 5/95		Initial Revision
- *	jwu 	3/20/96	    	Check for zero local address 
+ *	jwu 	3/20/96	    	Check for zero local address
  *
  ***********************************************************************/
 void ipcp_up (fsm *f)
@@ -1651,7 +1654,7 @@ void ipcp_up (fsm *f)
 
 #ifdef LOGGING_ENABLED
 	LOG3(LOG_BASE, (LOG_CONNECTED));
-    
+
 	sess_start = TimerGetCount();
 	sess_rx_octets = lqm[0].InGoodOctets;
 	sess_tx_octets = lqm[0].ifOutOctets;
@@ -1660,15 +1663,15 @@ void ipcp_up (fsm *f)
 	sess_rx_errors = lqm[0].ifInErrors;
 	sess_tx_errors = 0;
 	sess_used_lqm = 0;
-    
+
 	negotiation_problem = (char *)0;
 	rate_timer = RATE_TIMEOUT;
-#endif /* LOGGING_ENABLED */    
+#endif /* LOGGING_ENABLED */
     }
     else {
 	/*
-	 * If we did not successfully negotiate a local address, 
-	 * negotiation failed.  Close the link. 
+	 * If we did not successfully negotiate a local address,
+	 * negotiation failed.  Close the link.
 	 */
 	link_error = SSDE_NEG_FAILED | SDE_CONNECTION_RESET;
 	lcp_close(f -> unit);
@@ -1681,11 +1684,11 @@ void ipcp_up (fsm *f)
  *				ipcp_down
  ***********************************************************************
  * SYNOPSIS:	IPCP has gone DOWN. (FSM callback)
- * CALLED BY:	tld 	= This Layer Down 
+ * CALLED BY:	tld 	= This Layer Down
  * RETURN:	nothing
  *
  * STRATEGY: 	do nothing
- *	
+ *
  * REVISION HISTORY:
  *	Name	Date		Description
  *	----	----		-----------
@@ -1696,9 +1699,3 @@ void ipcp_down (fsm *f)
 {
 
 }
-
-
-
-
-
-

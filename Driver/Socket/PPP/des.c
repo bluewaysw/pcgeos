@@ -572,7 +572,7 @@ int des_is_weak_key(des_cblock *key)
 	}
 
 /* NOW DEFINED IN des.h
- * See ecb_encrypt.c for a pseudo description of these macros. 
+ * See ecb_encrypt.c for a pseudo description of these macros.
  * #define PERM_OP(a,b,t,n,m) ((t)=((((a)>>(n))^(b))&(m)),\
  * 	(b)^=(t),\
  * 	(a)=((a)^((t)<<(n))))
@@ -609,7 +609,7 @@ int des_set_key(des_cblock *key, des_key_schedule schedule)
 	c2l(in,c);
 	c2l(in,d);
 
-	/* do PC1 in 60 simple operations */ 
+	/* do PC1 in 60 simple operations */
 /*	PERM_OP(d,c,t,4,0x0f0f0f0f);
 	HPERM_OP(c,t,-2, 0xcccc0000);
 	HPERM_OP(c,t,-1, 0xaaaa0000);
@@ -658,7 +658,7 @@ int des_set_key(des_cblock *key, des_key_schedule schedule)
 		/* table contained 0213 4657 */
 		*(k++)=((t<<16)|(s&0x0000ffff))&0xffffffff;
 		s=     ((s>>16)|(t&0xffff0000));
-		
+
 		s=(s<<4)|(s>>28);
 		*(k++)=s&0xffffffff;
 		}

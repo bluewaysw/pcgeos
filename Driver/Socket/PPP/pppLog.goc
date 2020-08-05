@@ -15,7 +15,7 @@ ROUTINES:
 	OpenLogFile
  	LogTimestamp
  	new_state   	    Log some state info
- 	log_state   	    
+ 	log_state
  	elapsed_time	    Logs elapsed time since last printing of stats
  	print_acct  	    Log PPP statistics
  	asyncmap_name	    Create ascii string for ACCM
@@ -58,6 +58,9 @@ DESCRIPTION:
 #endif
 #ifdef __BORLANDC__
 #pragma codeseg PPPLOGCODE
+#endif
+#ifdef __WATCOMC__
+#pragma code_seg("PPPLOGCODE")
 #endif
 
 /*----------------------------------------------------------------------
@@ -471,7 +474,7 @@ DESCRIPTION:
 @chunk TCHAR mppcDecompBadCountLogString[] = "mppc_decomp: bad count\n";
         @localize not;
 @chunk TCHAR mppcDecompFailedLogString[] = "mppc_decomp: decomp failed\n";
-	@localize not;        
+	@localize not;
 @chunk TCHAR mppcDecompFlushedLogString[] = "mppc_decomp: flushed\n";
         @localize not;
 @chunk TCHAR mppcDecompHistoryRestartedLogString[] = "mppc_decomp: history restarted\n";
@@ -479,7 +482,7 @@ DESCRIPTION:
 @chunk TCHAR mppcDownLogString[] = "mppc_down\n";
         @localize not;
 @chunk TCHAR mppcExpandedLogString[] = "mppc_comp - data expanded\n";
-	@localize not;        
+	@localize not;
 @chunk TCHAR mppcNoMemLogString[] = "MPPC - no memory for %s\n";
 	@localize not;
 @chunk TCHAR mppcResetCompLogString[] = "mppc_resetcomp\n";
@@ -489,7 +492,7 @@ DESCRIPTION:
 @chunk TCHAR mppcRestartHistoryLogString[] = "mppc_comp: restart history\n";
         @localize not;
 @chunk TCHAR mppcUncompressedLogString[] = "mppc_decomp: rcvd uncompressed data\n";
-	@localize not;	    
+	@localize not;
 
 @chunk TCHAR nakHexLogString[]= " (Nak %xh)\n";
 	@localize not;
@@ -625,7 +628,7 @@ DESCRIPTION:
 @chunk TCHAR upLogString[] = "Set interface up\n";
 	@localize not;
 @chunk TCHAR usingLongPacketLogString[] = "Using too-long packet anyways\n";
-        @localize not;        
+        @localize not;
 
 @chunk TCHAR vjDecompFailedLogString[] = "VJ Decomp failed (%s)\n";
 	@localize not;
@@ -642,12 +645,12 @@ DESCRIPTION:
 
   	    	    Table of Optrs to Log Strings
 
-Enums for logStringTableIndex are defined in pppLog.h.  The order of 
-the strings in this table must match the enums.  
+Enums for logStringTableIndex are defined in pppLog.h.  The order of
+the strings in this table must match the enums.
 
 ----------------------------------------------------------------------*/
 
-optr logStringTable [] = {    
+optr logStringTable [] = {
     /* general strings */
     @ackLogString,
     @clientTimerLogString,
@@ -929,7 +932,7 @@ optr logStringTable [] = {
 void OpenLogFile (void)
 {
     if (debug) {
-      
+
 	/*
      	* Open file in document directory.
 	*/
@@ -941,13 +944,13 @@ void OpenLogFile (void)
     	FileSetStandardPath(SP_DOCUMENT);
 @endif
 
-    	logfile = FileCreate("ppp.log", 
+    	logfile = FileCreate("ppp.log",
 	      FCF_NATIVE | FILE_CREATE_NO_TRUNCATE | FILE_ACCESS_W | FILE_DENY_W,
 			     FILE_ATTR_NORMAL);
 	FilePopDir();
 
 	/*
-	 * If file opened, make sure PPP driver owns it.  Append data at 
+	 * If file opened, make sure PPP driver owns it.  Append data at
 	 * end.
 	 */
 	if (logfile) {
@@ -976,13 +979,13 @@ void OpenLogFile (void)
 void LogTimestamp (void)
 {
     if (logfile) {
-	char logbuf[SHORT_STR_LEN]; 	
+	char logbuf[SHORT_STR_LEN];
 	TimerDateAndTime t;
 	word cnt;
 
 	TimerGetDateAndTime(&t);
-	cnt = sprintf(logbuf, "%d/%d-%02d:%02d:%02d ", 
-		      t.TDAT_month, t.TDAT_day, 
+	cnt = sprintf(logbuf, "%d/%d-%02d:%02d:%02d ",
+		      t.TDAT_month, t.TDAT_day,
 		      t.TDAT_hours, t.TDAT_minutes, t.TDAT_seconds);
 	FileWrite(logfile, logbuf, cnt, FALSE);
     }
@@ -992,7 +995,7 @@ void LogTimestamp (void)
 /***********************************************************************
  *				new_state
  ***********************************************************************
- * SYNOPSIS:	Print logging information about the current state of 
+ * SYNOPSIS:	Print logging information about the current state of
  *	    	the PPP driver.
  * CALLED BY:	log_state
  *	    	time_rates
@@ -1013,7 +1016,7 @@ void new_state (void)
     int len;
 
     len = sprintf(logbufC1, "[%s", current_state);
-    
+
     /*
      * Log the bit rate.
      */
@@ -1040,7 +1043,7 @@ void new_state (void)
      * use a bigger value for MAX_STR_LEN.
      */
     if (len > MAX_STR_LEN) {
-	EC_ERROR(-1);	   
+	EC_ERROR(-1);
     }
 #endif /* ERROR_CHECK */
 
@@ -1092,7 +1095,7 @@ void elapsed_time (char *buffer)
 {
     unsigned long days, hours, minutes, seconds;
     int len = 0;
-    
+
     seconds = (TimerGetCount() - sess_start)/60L;
     minutes = seconds / 60L; seconds -= (60L * minutes);
     hours = minutes / 60L;   minutes -= (60L * hours);
@@ -1131,7 +1134,7 @@ void print_acct (void)
 	strcpy(oerrbuf, "?");
 
     /*
-     * Get peer's username (chap) or peer id (pap). 
+     * Get peer's username (chap) or peer id (pap).
      * Chap's peer username is already locked.
      */
     if (chap[0].us_hername) {
@@ -1193,18 +1196,18 @@ void asyncmap_name (TCHAR *buffer, unsigned long a)
 
     if (a != 0 && a != 0xffffffff) {
 	*s = '(';
-	for (i = 31; i >= 0; --i) 
+	for (i = 31; i >= 0; --i)
 	    if (a & ((unsigned long)1 << i)) {
 		if (s != buffer)
 		    *++s = ',';
-		
+
 		*++s = '^';
 		*++s = '@' + i;
 	    }
 	*++s = ')';
 	*++s = '\0';
     }
-    else 
+    else
 	*s = '\0';
 
 }
@@ -1236,7 +1239,7 @@ void time_rates (void)
 		rx_bps = (rx_bits + 4) / elapsed;
 		tx_bps = (tx_bits + 4) / elapsed;
 		rx_pps = (rx_pkts + 4) / elapsed;
-		tx_pps = (tx_pkts + 4) / elapsed;	    
+		tx_pps = (tx_pkts + 4) / elapsed;
 	}
 
 	rx_bits = tx_bits = rx_pkts = tx_pkts = 0;
@@ -1277,9 +1280,9 @@ void log_idle (int change)
  *
  * CALLED BY:	log, log2, log3
  * RETURN:	nothing
- *	
+ *
  * STRATEGY:	When writing a new line, insert a timestamp.
- *	
+ *
  * REVISION HISTORY:
  *	Name	Date		Description
  *	----	----		-----------
@@ -1298,11 +1301,11 @@ void write_to_file (int len, char *s)
 	 * use a bigger value for MAX_STR_LEN.
 	 */
 	if (len > MAX_STR_LEN) {
-	    EC_ERROR(-1);	   
+	    EC_ERROR(-1);
 	}
-#endif /* ERROR_CHECK */    
+#endif /* ERROR_CHECK */
 
-	/* 
+	/*
 	 * Insert timestamps when writing to log file.
 	 */
 	for (; *s; ++s) {
@@ -1310,7 +1313,7 @@ void write_to_file (int len, char *s)
 		LogTimestamp();
 		need_time = 0;
 	    }
-	    
+
 	    if (*s == '\n') {
 		need_time = 1;
 		FileWrite(logfile, "\r", 1, FALSE);
@@ -1328,7 +1331,7 @@ void write_to_file (int len, char *s)
 /***********************************************************************
  *			    log/log2/log3
  ***********************************************************************
- * SYNOPSIS:	Write a formatted string to the log file, adding a 
+ * SYNOPSIS:	Write a formatted string to the log file, adding a
  * 	    	timestamp as needed. (log)
  *
  *	    	log2 takes an optr to the format string.
@@ -1371,7 +1374,7 @@ int _cdecl log3 (word entry, ...)
 
 	MemUnlock(OptrToHandle(format));
 
-	write_to_file(len, logbufC2); 	    	
+	write_to_file(len, logbufC2);
 
 	va_end(args);
     }
@@ -1387,7 +1390,7 @@ int _cdecl log2 (optr format, ...)
 	static char logbufC3[MAX_STR_LEN];
 	va_list args;
 	char *s;
-	
+
 	va_start(args, format);
 
 	MemLock(OptrToHandle(format));
@@ -1397,7 +1400,7 @@ int _cdecl log2 (optr format, ...)
 
 	MemUnlock(OptrToHandle(format));
 
-	write_to_file(len, logbufC3); 	    	
+	write_to_file(len, logbufC3);
 
 	va_end(args);
     }
@@ -1426,5 +1429,3 @@ int _cdecl log (const char *format, ...)
 }
 
 @endif /* LOGGING_ENABLED */
-
-

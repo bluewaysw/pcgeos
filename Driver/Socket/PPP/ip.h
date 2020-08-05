@@ -41,7 +41,7 @@ struct iphdr {
 	dword	ip_dst;	    	    	/* dest address */
 };
 
-/* 
+/*
  * Definitions for protocol numbers.
  */
 #define	IPPROTO_IP		0		/* dummy for IP */
@@ -56,7 +56,7 @@ struct tcphdr {
     dword   th_ack; 	    /* acknowledgement number */
     byte    th_x2:4,	    /* (unused) */
     	    th_off:4;	    /* data offset (a.k.a. header length) */
-    byte    th_flags;	    
+    byte    th_flags;
 #define TH_FIN	0x01
 #define TH_SYN	0x02
 #define TH_RST	0x04

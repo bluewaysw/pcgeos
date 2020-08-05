@@ -65,6 +65,9 @@
 #ifdef __BORLANDC__
 #pragma codeseg MD5CODE
 #endif
+#ifdef __WATCOMC__
+#pragma code_seg("MD5CODE")
+#endif
 
 /*
  * Constants for MD5Transform routine.
@@ -176,7 +179,7 @@ unsigned int inputLen;                     /* length of input block */
   /* Transform as many times as possible.
    */
   if (inputLen >= partLen) {
-    memcpy ((unsigned char *)&context->buffer[index], 
+    memcpy ((unsigned char *)&context->buffer[index],
 		(unsigned char *)input, partLen);
     MD5Transform (context->state, context->buffer);
 
@@ -189,7 +192,7 @@ unsigned int inputLen;                     /* length of input block */
     i = 0;
 
   /* Buffer remaining input */
-  memcpy ((unsigned char *)&context->buffer[index], 
+  memcpy ((unsigned char *)&context->buffer[index],
 	      (unsigned char *)&input[i],
 	      inputLen-i);
 }
@@ -352,5 +355,3 @@ unsigned int len;
     output[i] = ((unsigned long)input[j]) | (((unsigned long)input[j+1]) << 8) |
       (((unsigned long)input[j+2]) << 16) | (((unsigned long)input[j+3]) << 24);
 }
-
-

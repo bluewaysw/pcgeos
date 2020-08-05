@@ -17,7 +17,7 @@
  * 	predictor1_free_table
  *	predictor1_lock_table
  *	predictor1_unlock_table
- *	predictor1_lookup_table	
+ *	predictor1_lookup_table
  *	predictor1_store_table
  *
  *	predictor1_down
@@ -61,6 +61,9 @@
 #ifdef __BORLANDC__
 #pragma codeseg PRED1CODE
 #endif
+#ifdef __WATCOMC__
+#pragma code_seg("PRED1CODE")
+#endif
 
 
 # define MY_MIN(a, b) (((a) < (b)) ? (a) : (b))
@@ -93,7 +96,7 @@ struct pred_db
 
 /*
  * Handle of memory blocks holding compression/decompression tables.
- * Block must be locked before use. 
+ * Block must be locked before use.
  */
 Handle pred_tx_db = 0;     /* predictor 1 compression info */
 Handle pred_rx_db = 0;	    /* predictor 1 decompression info */
@@ -193,7 +196,7 @@ void predictor1_unlock_table (Handle db_block)
  * CALLED BY:	predictor1_comp
  *	    	predictor1_decomp
  * PASS:    	hash value
- * RETURN:  	value in table	
+ * RETURN:  	value in table
  *
  * STRATEGY:	Get the value from the correct half of the table.
  *
@@ -206,7 +209,7 @@ void predictor1_unlock_table (Handle db_block)
 unsigned char predictor1_lookup_table (struct pred_db *db,
 				       unsigned short hash)
 {
-    if (hash < HALF_PRED_TABLE_SIZE) 
+    if (hash < HALF_PRED_TABLE_SIZE)
 	return (db -> tbl1_ptr[hash]);
     else
 	return (db -> tbl2_ptr[hash - HALF_PRED_TABLE_SIZE]);
@@ -220,7 +223,7 @@ unsigned char predictor1_lookup_table (struct pred_db *db,
  * SYNOPSIS:	Store the value in the hash table
  * CALLED BY:	predictor1_comp
  *	    	predictor1_decomp
- * RETURN:  	nothing	
+ * RETURN:  	nothing
  *
  * STRATEGY:	Store the value in the correct half of the table.
  *
@@ -231,7 +234,7 @@ unsigned char predictor1_lookup_table (struct pred_db *db,
  *
  ***********************************************************************/
 void predictor1_store_table (struct pred_db *db,
-			     unsigned short hash,    
+			     unsigned short hash,
 			     unsigned char value)
 {
     if (hash < HALF_PRED_TABLE_SIZE)
@@ -288,7 +291,7 @@ void predictor1_down (int unit)
  * SYNOPSIS:	Reset predictor1 dictionary.
  * CALLED BY:	predictor1_resetcomp
  *	    	predictor1_resetdecomp
- * RETURN:  	nothing	
+ * RETURN:  	nothing
  *
  * STRATEGY:	zero out hash and dictionary
  *
@@ -308,7 +311,7 @@ void predictor1_reset (int unit, Handle db_block)
     db -> hash = 0;
 
     /*
-     * Zero out the table.  Set tbl_ptr to point to dwords so we 
+     * Zero out the table.  Set tbl_ptr to point to dwords so we
      * loop less.
      */
     for (i = 0; i < EIGTH_PRED_TABLE_SIZE; i++) {
@@ -350,7 +353,7 @@ int predictor1_resetcomp (int unit)
  * SYNOPSIS:	Reset decompression history.
  * CALLED BY:	ccp_resetack
  * RETURN:	nothing
- 
+
  *
  * STRATEGY:	Zero out hash value & decompression table entries.
  *
@@ -387,7 +390,7 @@ void predictor1_resetdecomp (int unit)
  *	jwu	8/26/96		Initial Revision
  *
  ***********************************************************************/
-word predictor1_init (Handle *db_block, 	    
+word predictor1_init (Handle *db_block,
 		     int mru)
 {
     struct pred_db *db;
@@ -397,20 +400,20 @@ word predictor1_init (Handle *db_block,
      * Allocate memory if not already done.
      */
     if (*db_block == 0) {
-	*db_block = MemAlloc(sizeof (struct pred_db), HF_DYNAMIC, 
+	*db_block = MemAlloc(sizeof (struct pred_db), HF_DYNAMIC,
 			     HAF_ZERO_INIT | HAF_LOCK);
 
-	if (*db_block == 0) 
+	if (*db_block == 0)
 	    return (0);
 
 	dict1 = MemAlloc(HALF_PRED_TABLE_SIZE, HF_DYNAMIC, HAF_STANDARD);
 
 	if (dict1)
 	    dict2 = MemAlloc(HALF_PRED_TABLE_SIZE, HF_DYNAMIC, HAF_STANDARD);
-	
+
 	if (dict1 == 0 || dict2 == 0) {
-	    if (dict1) 
-		MemFree(dict1);	    
+	    if (dict1)
+		MemFree(dict1);
 
 	    MemFree(*db_block);
 	    *db_block = 0;
@@ -456,20 +459,20 @@ word predictor1_init (Handle *db_block,
  ***********************************************************************/
 int predictor1_initcomp (int unit, int mru)
 {
-    pred_compSpaceToken = GeodeRequestSpace(PRED_TABLE_SIZE_K, 
+    pred_compSpaceToken = GeodeRequestSpace(PRED_TABLE_SIZE_K,
 					    SysGetInfo(SGIT_UI_PROCESS));
 
     if (pred_compSpaceToken && predictor1_init(&pred_tx_db, mru)) {
-	/* 
+	/*
 	 * Space reservation and init successful.  Reset
-	 * compression history and return success. 
+	 * compression history and return success.
 	 */
 	predictor1_resetcomp(unit);
 	SetInterfaceMTU(mru - PRED_OVHD);
 	return (0);
     }
     else {
-	/* 
+	/*
 	 * Either space reservation failed or init failed.
 	 * If reserved space, return it now. Signal failure.
 	 */
@@ -512,7 +515,7 @@ int predictor1_initdecomp (int unit, int mru)
 
     if (pred_decompSpaceToken && predictor1_init(&pred_rx_db, mru)) {
 	/*
-	 * Space reservation and init successful.  Reset 
+	 * Space reservation and init successful.  Reset
 	 * decompression history and return success.
 	 */
 	predictor1_resetdecomp(unit);
@@ -530,7 +533,7 @@ int predictor1_initdecomp (int unit, int mru)
 
 	return (-1);
     }
-}		
+}
 
 
 
@@ -565,8 +568,8 @@ int predictor1_initdecomp (int unit, int mru)
  *
  *	Predictor works by filling a guess table with values, based on
  *	the hash of the previous characters seen.  Since we are either
- *	emitting the source data, or depending on the guess table, we 
- *	add a flag bit for every byte of input, telling the decompressor 
+ *	emitting the source data, or depending on the guess table, we
+ *	add a flag bit for every byte of input, telling the decompressor
  *	if it should retrieve the byte from the compressed data stream
  *	or the guess table.  Blocking the input into groups of 8
  *	characters means that we don't have to bit-insert the compressed
@@ -580,9 +583,9 @@ int predictor1_initdecomp (int unit, int mru)
  *	jwu	8/22/96		Initial Revision
  *
  ***********************************************************************/
-int predictor1_comp (int unit, 
-		    PACKET **packetp, 
-		    int *lenp, 
+int predictor1_comp (int unit,
+		    PACKET **packetp,
+		    int *lenp,
 		    unsigned short *protop)
 {
 
@@ -596,7 +599,7 @@ int predictor1_comp (int unit,
     unsigned char *rptr, *wptr, *wptr0;
     unsigned char c_proto[2], *cp_buf, *cp;
     PACKET *compr_m;
-    byte have_buf = 1, proto_len;	   
+    byte have_buf = 1, proto_len;
 
     /*
      * Allocate a buffer for the compressed data.  If insufficient
@@ -631,12 +634,12 @@ int predictor1_comp (int unit,
      * we have to compress that first.  Add protocol ID to total
      * uncompressed length.
      */
-    rptr = c_proto;	
-    len += mlim;    	
+    rptr = c_proto;
+    len += mlim;
 
     /*
-     * Initialize FCS computations.  FCS is calculated over the 
-     * uncompressed length, uncompressed protocol ID and each byte 
+     * Initialize FCS computations.  FCS is calculated over the
+     * uncompressed length, uncompressed protocol ID and each byte
      * of the uncompressed data.
      */
     fcs = PPP_INITFCS;
@@ -645,42 +648,42 @@ int predictor1_comp (int unit,
 
     wptr = &cp_buf[2];	    /* write pointer for compressed
 			       data, leaving room for length field */
-				       
+
     /*
      * Keep track of start of compressed data, not counting protocol ID.
      * Used after compression to compute length of compressed data.
      */
-    wptr0 = wptr + mlim; 
+    wptr0 = wptr + mlim;
 
     flags = 0;
     flagsp = wptr++;	    /* place for first flag byte */
     index = 8;
 
     /*
-     * Loop through data, starting with protocol field (separate from 
+     * Loop through data, starting with protocol field (separate from
      * rest of data).  Compress the byte if predicted by the hash table.
      * We will exit the loop when we run out of data to compress.
      */
 
     db = predictor1_lock_table(pred_tx_db);
     hash = db -> hash;	    	    /* Initial hash value */
-    
+
     for (;;) {
 	/*
-	 * If no more input, and no input buffer remaining to work on, 
+	 * If no more input, and no input buffer remaining to work on,
 	 * then compression is done.  Else, start compressing data
 	 * from the input buffer.
 	 */
 	if ( ! mlim) {
 
 	    /*
-	     * If done processing input buffer, write final flags 
+	     * If done processing input buffer, write final flags
 	     * byte, store current hash value and quit compressing.
 	     */
 	    if ( ! have_buf) {
-		*flagsp = flags >> index;   
-		db -> hash = hash;  	    
-		break;	    	    	    
+		*flagsp = flags >> index;
+		db -> hash = hash;
+		break;
 	    }
 
 	    /*
@@ -697,7 +700,7 @@ int predictor1_comp (int unit,
 	     * this compression loop.
 	     */
 	    if ( ! mlim)
-		continue;	    	
+		continue;
 	}
 
 	/*
@@ -715,10 +718,10 @@ int predictor1_comp (int unit,
 	 */
 	slim = MY_MIN(mlim, index);
 	index -= slim;
-	mlim -= slim;	 	
+	mlim -= slim;
 
 	/*
-	 * For each byte, compute FCS, if in hash table, set bit in 
+	 * For each byte, compute FCS, if in hash table, set bit in
 	 * flag for the byte, else write the byte to the output buffer.
 	 * Update hash value for next time through.
 	 */
@@ -751,15 +754,15 @@ int predictor1_comp (int unit,
     }
     else {
 	/*
-	 * Store uncompressed length, followed by protocol ID (may be 
+	 * Store uncompressed length, followed by protocol ID (may be
 	 * compressed), then copy the original data to the new buffer.
 	 */
 
 	cp = cp_buf;
-	PUTSHORT(len, cp);  	
+	PUTSHORT(len, cp);
 
 	if (proto_len == 1) {
-	    cp_buf[2] = proto;	    	    
+	    cp_buf[2] = proto;
 	}
 	else {
 	    cp_buf[2] = proto >> 8;
@@ -778,15 +781,15 @@ int predictor1_comp (int unit,
      * with the compressed buffer, length and protocol.
      */
 
-    PACKET_FREE(m); 	  
+    PACKET_FREE(m);
 
     fcs ^= PPP_INITFCS;
     *wptr++ = fcs;
     *wptr++ = fcs >> 8;
 
-    *packetp = compr_m;	 
-    *lenp = compr_m -> MH_dataSize = wptr - cp_buf;  
-    *protop = COMPRESS;	
+    *packetp = compr_m;
+    *lenp = compr_m -> MH_dataSize = wptr - cp_buf;
+    *protop = COMPRESS;
 
     return (0);
 }
@@ -811,11 +814,11 @@ int predictor1_comp (int unit,
  *	    	Init FCS and compute FCS of uncompresesd length field
  *	    	If data in packet is not compressed, update dictionary
  *	    	    with the uncompressible data
- *	    	Else decompress the data 
- *	    	Verify CCP FCS.  
+ *	    	Else decompress the data
+ *	    	Verify CCP FCS.
  *	    	Free original packet
  *	    	Ensure IP header to at longword boundary in new packet
- *	    	Deliver packet to PPPInput 
+ *	    	Deliver packet to PPPInput
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -832,7 +835,7 @@ int predictor1_decomp (int unit, PACKET *p, int len)
     unsigned char *rptr, *wptr;
     unsigned short fcs, protocol, hash, explen;
     PACKET *dmsg = (PACKET *)NULL;    	/* packet for decompressed data */
-    
+
     rptr = PACKET_DATA(p);
     GETSHORT(comp, rptr);
     explen = comp & PRED_LEN_MASK;     /* mask out compressed bit from length*/
@@ -884,7 +887,7 @@ int predictor1_decomp (int unit, PACKET *p, int len)
 	}
 
 	/*
-	 * If data is not compressed, update dictionary with the 
+	 * If data is not compressed, update dictionary with the
 	 * uncompressible data.
 	 */
 
@@ -903,12 +906,12 @@ int predictor1_decomp (int unit, PACKET *p, int len)
 	    } while (--len != 0);
 
 	    continue;	   	/* let next iteration catch zero length */
-	}   
+	}
 
 	/*
 	 * Decompress the data in 8 byte blocks.  Get flag byte.  For
-	 * each bit, if bit is set, get byte from hash table and put 
-	 * in decompressed buffer, else copy byte from input buffer 
+	 * each bit, if bit is set, get byte from hash table and put
+	 * in decompressed buffer, else copy byte from input buffer
 	 * to decompressed buffer.
 	 */
 	if (index == 0) {
@@ -937,7 +940,7 @@ int predictor1_decomp (int unit, PACKET *p, int len)
 	    }
 	}
 
-	/* 
+	/*
 	 * Handle last dribble at the end of an input buffer
 	 * or the partial block at the start of an input buffer.
 	 */
@@ -1011,16 +1014,16 @@ fin:
     PACKET_FREE(p);
     predictor1_unlock_table(pred_rx_db);
 
-    /* 
+    /*
      * Handle uncompressed PPP protocol field.  Get 1st byte from
      * decompressed data. If protocol ID is 2 bytes, get 2nd byte.
      * Advance data offset in buffer to after protocol ID.
      */
-    rptr = PACKET_DATA(dmsg);	    	
+    rptr = PACKET_DATA(dmsg);
 
-    protocol = *rptr++;	    	    	
+    protocol = *rptr++;
 
-    if ((protocol & 1) == 0)	    	
+    if ((protocol & 1) == 0)
 	protocol = (protocol << 8) | *rptr++;
 
     dmsg -> MH_dataOffset += (word)(rptr - PACKET_DATA(dmsg));

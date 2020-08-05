@@ -16,7 +16,7 @@
  *
  *	ccp_select_comp_type	Choose a compression type to negotiate.
  *
- *	ccp_init    	    
+ *	ccp_init
  *	ccp_open    	    Open CCP.
  *	ccp_close   	    Close CCP.
  *
@@ -43,7 +43,7 @@
  *	ccp_reset   	    Reset our decompressor and peer's compressor.
  *
  *	compress_input	    Process a received compressed packet.
- * 
+ *
  * REVISION HISTORY:
  *	Date	  Name	    Description
  *	----	  ----	    -----------
@@ -52,7 +52,7 @@
  * DESCRIPTION:
  *	PPP Compression Control Protocol.
  *
- *	Ported from MorningStar code, but much has been changed, 
+ *	Ported from MorningStar code, but much has been changed,
  *	especially anything to do with Stac LZS negotiation.
  *
  * 	$Id: ccp.c,v 1.10 98/06/03 19:08:15 jwu Exp $
@@ -72,6 +72,9 @@
 #endif
 #ifdef __BORLANDC__
 #pragma codeseg CCPCODE
+#endif
+#ifdef __WATCOMC__
+#pragma code_seg("CCPCODE")
 #endif
 
 
@@ -148,7 +151,7 @@ static VoidCallback *mppc_resetdecomp_vfptr = mppc_resetdecomp;
  * STRATEGY:	Out of all the options allowed for negotiation, select
  *	    	our favorite.  If we end up with nothing to negotiate,
  *	    	then we will not be decompressing anything.
- *	    
+ *
  *	    	Our preferences start with MPPC, Stac LZS, then predictor.
  *
  * REVISION HISTORY:
@@ -205,7 +208,7 @@ void ccp_select_comp_type (ccp_options *opts)
  *	    	Select a type to negotiate.
  *	    	Let FSM code take care of the rest.
  *
- * NOTES:   	Commented out lines initializing defaults to zero 
+ * NOTES:   	Commented out lines initializing defaults to zero
  *	    	because they are already zero (dgroup).  The lines
  *	    	now server as comments.
  *
@@ -243,7 +246,7 @@ void ccp_init (int unit)
 
     ccp_callbacks.echorequest = (ByteCallback *)NULL;
     ccp_callbacks.closed = ccp_callbacks.echoreply =
-	ccp_callbacks.protreject = ccp_callbacks.retransmit = 
+	ccp_callbacks.protreject = ccp_callbacks.retransmit =
 	    ccp_callbacks.lqreport = (VoidCallback *)NULL;
 
     /*
@@ -255,7 +258,7 @@ void ccp_init (int unit)
     f -> max_configure = MAX_CONFIGURE;
     f -> max_terminate = MAX_TERMINATE;
     f -> max_failure = MAX_FAILURE;
-    f -> max_rx_failure = MAX_RX_FAILURE;    
+    f -> max_rx_failure = MAX_RX_FAILURE;
 /*  f -> tx_naks = 0;	*/
 /*  f -> rx_naks = 0;	*/
 
@@ -265,7 +268,7 @@ void ccp_init (int unit)
     f -> callbacks = &ccp_callbacks;
 
     /*
-     * Initialize want and allow options.  Want and allow all 
+     * Initialize want and allow options.  Want and allow all
      * supported compression types by default.
      */
 #ifdef PRED_1
@@ -274,13 +277,13 @@ void ccp_init (int unit)
 #endif /* PRED_1 */
 
 #ifdef STAC_LZS
-    /* 
+    /*
      * Start off with extended check mode.
      */
-    wo -> ccp_neg |= COMPRESS_STAC;    
+    wo -> ccp_neg |= COMPRESS_STAC;
     ao -> ccp_neg |= COMPRESS_STAC;
 
-    wo -> ccp_stac_check_mode = ao -> ccp_stac_check_mode = 
+    wo -> ccp_stac_check_mode = ao -> ccp_stac_check_mode =
 	STAC_CHECK_EXTENDED;
 #endif /* STAC_LZS */
 
@@ -335,7 +338,7 @@ void ccp_open (int unit)
  * CALLED BY:	ccp_nakopts
  * 	        ccp_up
  *	    	ccp_resettimeout
- *	
+ *
  * RETURN:	nothing
  *
  * REVISION HISTORY:
@@ -395,8 +398,8 @@ void ccp_lowerdown (int unit)
  * SYNOPSIS:	Process a received CCP packet.
  * CALLED BY:	PPPInput using prottbl entry
  * RETURN:	non-zero if packet affects the idle time
- *	    	
- * STRATEGY:	Process the CCP packet if we either allow or 
+ *
+ * STRATEGY:	Process the CCP packet if we either allow or
  *	    	want compression.
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -407,17 +410,17 @@ void ccp_lowerdown (int unit)
 byte ccp_input (int unit, PACKET *p, int len)
 {
     /*
-     * If doing compression, process based on packet type.	
+     * If doing compression, process based on packet type.
      * Else reject CCP protocol.
      */
 
     if ( ccp_allowoptions[0].ccp_neg || ccp_wantoptions[0].ccp_neg) {
 	return (fsm_input(&ccp_fsm[unit], p, len));
     }
-    	
+
     lcp_sprotrej(unit, p, len);
     return (1);
-    
+
 }
 
 
@@ -475,22 +478,22 @@ void ccp_resetopt (fsm *f)
  ***********************************************************************
  * SYNOPSIS:	Return the length of our options.
  *	    	(FSM callback routine)
- * CALLED BY:	scr 
+ * CALLED BY:	scr
  * RETURN:	length of our CCP options
  *
- * STRATEGY:   	We're only sending one option at a time so return 
+ * STRATEGY:   	We're only sending one option at a time so return
  *	    	the length of the option we'll be asking for.
  *
  * REVISION HISTORY:
  *	Name	Date		Description
  *	----	----		-----------
  *	jwu	8/21/96		Initial Revision
- *	jwu	9/23/97		Added MPPC 
+ *	jwu	9/23/97		Added MPPC
  *
  ***********************************************************************/
 int ccp_optlen (fsm *f)
 {
- 
+
 #ifdef MPPC
     if (ccp_gotoptions[0].ccp_comp_type == COMPRESS_MPPC)
 	return (CI_MPPC_LEN);
@@ -520,11 +523,11 @@ int ccp_optlen (fsm *f)
  * RETURN:	nothing
  *
  * STRATEGY:	Send the compression type we wish to negotiate.
- *     	    	Only send one option at a time to make life 
+ *     	    	Only send one option at a time to make life
  *	    	easier for the peer.
  *
- * NOTES:   	The CCP option is an announcement of what method 
- *	    	we are willing to decompress with.  
+ * NOTES:   	The CCP option is an announcement of what method
+ *	    	we are willing to decompress with.
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -533,7 +536,7 @@ int ccp_optlen (fsm *f)
  *	jwu	9/23/97		Added MPPC
  *
  ***********************************************************************/
-void ccp_addopts (fsm *f, 
+void ccp_addopts (fsm *f,
 		  unsigned char *ucp)	 /* pointer to where info is added */
 {
     ccp_options *go = &ccp_gotoptions[f -> unit];
@@ -553,9 +556,9 @@ void ccp_addopts (fsm *f,
 #ifdef STAC_LZS
     if (go -> ccp_comp_type == COMPRESS_STAC) {
 	PUTCHAR(CI_STAC_LZS, ucp);
-	PUTCHAR(CI_STAC_LEN, ucp);  
-	PUTSHORT(STAC_HISTORY_COUNT, ucp);   	
-	PUTCHAR(go -> ccp_stac_check_mode, ucp);    
+	PUTCHAR(CI_STAC_LEN, ucp);
+	PUTSHORT(STAC_HISTORY_COUNT, ucp);
+	PUTCHAR(go -> ccp_stac_check_mode, ucp);
 
 	LOG3(LOG_NEG, (LOG_CCP_SEND_STAC,
 		      STAC_HISTORY_COUNT, go -> ccp_stac_check_mode));
@@ -566,7 +569,7 @@ void ccp_addopts (fsm *f,
 #ifdef PRED_1
     if (go -> ccp_comp_type == COMPRESS_PRED1) {
 	PUTCHAR(CI_PREDICTOR1, ucp);
-	PUTCHAR(CI_PRED1_LEN, ucp);   
+	PUTCHAR(CI_PRED1_LEN, ucp);
 
 	LOG3(LOG_NEG, (LOG_CCP_SEND_PRED1));
 	return;
@@ -597,7 +600,7 @@ void ccp_addopts (fsm *f,
  *	jwu	9/23/97		Added MPPC
  *
  ***********************************************************************/
-int ccp_ackopts (fsm *f, 
+int ccp_ackopts (fsm *f,
 		 unsigned char *p,  	/* pointer to packet data */
 		 int len)   	    	/* length of packet data */
 {
@@ -614,15 +617,15 @@ int ccp_ackopts (fsm *f,
 
     /*
      * There must be only one option in the packet.  After getting
-     * the option we expect to be in the ack, check the length.  
+     * the option we expect to be in the ack, check the length.
      * If there are any remaining options, then this packet is bad.
      * The option length and parameters MUST match exactly what
      * we sent or the packet is bad.
      */
-    
+
 #ifdef MPPC
     if (go -> ccp_comp_type == COMPRESS_MPPC) {
-	
+
 	len -= CI_MPPC_LEN;
 	if (len < 0)
 	    goto bad;
@@ -646,7 +649,7 @@ int ccp_ackopts (fsm *f,
     if (go -> ccp_comp_type == COMPRESS_STAC) {
 
 	len -= CI_STAC_LEN;
-	if (len < 0) 
+	if (len < 0)
 	    goto bad;
 
 	GETCHAR(opttype, p);
@@ -660,7 +663,7 @@ int ccp_ackopts (fsm *f,
 	GETCHAR(optchar1, p);	    	    /* Check-Mode */
 
 	if (optshort != STAC_HISTORY_COUNT ||
-	    optchar1 != go -> ccp_stac_check_mode) 
+	    optchar1 != go -> ccp_stac_check_mode)
 	    goto bad;
 
 	goto checkLen;
@@ -671,10 +674,10 @@ int ccp_ackopts (fsm *f,
 #ifdef PRED_1
     if (go -> ccp_comp_type == COMPRESS_PRED1) {
 
-	len -= CI_PRED1_LEN;	   
+	len -= CI_PRED1_LEN;
 	if (len < 0)
 	    goto bad;
-	
+
 	GETCHAR(opttype, p);
 	GETCHAR(optlen, p);
 
@@ -710,7 +713,7 @@ bad:
  * CALLED BY:	fsm_input
  * RETURN:	nothing
  *
- * STRATEGY:	If peer gives us a choice, pick the desired 
+ * STRATEGY:	If peer gives us a choice, pick the desired
  *	    	compression method.  If nothing left, stop CCP.
  *
  * REVISION HISTORY:
@@ -727,7 +730,7 @@ void ccp_nakopts (fsm *f,
     ccp_options *go = &ccp_gotoptions[f -> unit];
     ccp_options *wo = &ccp_wantoptions[f -> unit];
     byte needChange = 1;
-    
+
 #ifdef STAC_LZS
     unsigned short optshort;
     unsigned char optchar1;
@@ -759,7 +762,7 @@ void ccp_nakopts (fsm *f,
 	unsigned char *p1 = p + 2;  	/* p1 points after opt type and len */
 #endif /* STAC_LZS */
 
-	int optlen = p[1];	      	
+	int optlen = p[1];
 
 	if (optlen > len || optlen < 2)
 	    goto bad;
@@ -786,14 +789,14 @@ void ccp_nakopts (fsm *f,
 
 		break;
 #endif /* PRED_1 */
-		
+
 #ifdef STAC_LZS
 	    case CI_STAC_LZS:
 		if (optlen == CI_STAC_LEN && wo -> ccp_neg & COMPRESS_STAC) {
 		    GETSHORT(optshort, p1); 	    /* History-Count */
 		    GETCHAR(optchar1, p1);  	    /* Check-Mode */
 
-		    LOG3(LOG_NEG, (LOG_CCP_PEER_NAK_STAC, 
+		    LOG3(LOG_NEG, (LOG_CCP_PEER_NAK_STAC,
 				   optshort, optchar1));
 
 		    if (go -> ccp_comp_type == COMPRESS_STAC)
@@ -802,23 +805,23 @@ void ccp_nakopts (fsm *f,
 
 		    /*
 		     * Only listen if peer suggests a single history
-		     * count and a valid check mode.  
+		     * count and a valid check mode.
 		     */
 		    if (optshort == STAC_HISTORY_COUNT &&
 			(optchar1 > 0 && optchar1 <= STAC_CHECK_EXTENDED)) {
 
 			/*
-			 * Use check mode suggested by peer.  
+			 * Use check mode suggested by peer.
 			 */
 			if (optchar1 != go -> ccp_stac_check_mode) {
 			    go -> ccp_stac_check_mode = optchar1;
 			}
 			else {
-			    /* 
-			     * Some peers will nak the check mode 
-			     * without suggesting an alternative. 
+			    /*
+			     * Some peers will nak the check mode
+			     * without suggesting an alternative.
 			     * Try all modes until one works, starting
-			     * from extended, then crc, then lcb, then 
+			     * from extended, then crc, then lcb, then
 			     * sequenced.  Unfortunately these are numbered
 			     * 4, 2, 1, 3.  We can shift right by 1 until
 			     * we get to 0, then reset to 3.  If we start
@@ -938,16 +941,16 @@ void ccp_rejopts (fsm *f,
 
     /*
      * Any Rejected options must be exactly the same as what we sent.
-     * Check packet length and option length.  If we find any deviations, 
+     * Check packet length and option length.  If we find any deviations,
      * then this packet is bad.
      */
 
 #ifdef PRED_1
     if (go -> ccp_comp_type == COMPRESS_PRED1 &&
-	len >= CI_PRED1_LEN && 
+	len >= CI_PRED1_LEN &&
 	p[1] == CI_PRED1_LEN &&
 	p[0] == CI_PREDICTOR1) {
-	
+
 	len -= CI_PRED1_LEN;
 	INCPTR(2, p);	    	    	/* Advance ptr past opt type & len */
 	go -> ccp_neg &= ~COMPRESS_PRED1;
@@ -963,7 +966,7 @@ void ccp_rejopts (fsm *f,
 	len >= CI_STAC_LEN &&
 	p[1] == CI_STAC_LEN &&
 	p[0] == CI_STAC_LZS) {
-	
+
 	len -= CI_STAC_LEN;
 	INCPTR(2, p);
 	GETSHORT(optshort, p);	    	/* History-Count */
@@ -989,7 +992,7 @@ void ccp_rejopts (fsm *f,
     }
 #endif /* STAC_LZS */
 
-#ifdef MPPC 
+#ifdef MPPC
     if (go -> ccp_comp_type == COMPRESS_MPPC &&
 	len >= CI_MPPC_LEN &&
 	p[1] == CI_MPPC_LEN &&
@@ -1041,7 +1044,7 @@ bad:
  * CALLED BY:	fsm_input
  * RETURN:	0 if no response should be sent, else
  *	    	CONFIGURE_ACK, CONFIGURE_NAK, or CONFIGURE_REJECT
- * 
+ *
  * SIDE EFFECTS: Packet is modified to contain the appropriate response.
  *
  * STRATEGY:	Allocate a buffer for work space
@@ -1077,7 +1080,7 @@ unsigned char ccp_reqopts (fsm *f,
     unsigned char *outp;               /* Pointer to current output char */
     unsigned char *optp = inp;	       /* Pointer to current input option */
     unsigned char optlen, opttype;     /* Option len, option type */
-#ifdef STAC_LZS	    	
+#ifdef STAC_LZS
     unsigned short optshort;
     unsigned char optchar1;
     int not_converging = f -> tx_naks >= f -> max_failure;
@@ -1099,10 +1102,10 @@ unsigned char ccp_reqopts (fsm *f,
 	LOG3(LOG_BASE, (LOG_CCP_NO_MEM_WARN));
 	return (0);
     }
-	
+
     reply_p = outoptp = outp = PACKET_DATA(reply_pkt);
 
-    ack = rc = CONFIGURE_ACK;	
+    ack = rc = CONFIGURE_ACK;
 
 # define NAK(len)	{ \
 			orc = CONFIGURE_NAK; \
@@ -1129,7 +1132,7 @@ unsigned char ccp_reqopts (fsm *f,
 			outp += optlen; \
 			}
 
-    
+
     /*
      * Reset all her options.
      */
@@ -1141,7 +1144,7 @@ unsigned char ccp_reqopts (fsm *f,
     while (l) {
 
 	/*
-	 * If more than one option in this packet, we cannot 
+	 * If more than one option in this packet, we cannot
 	 * respond with an ack.
 	 */
 	++options;
@@ -1163,11 +1166,11 @@ unsigned char ccp_reqopts (fsm *f,
 	    return (0);			/* No reply should be sent */
 	}
 
-	GETCHAR(opttype, p);	       
+	GETCHAR(opttype, p);
 	GETCHAR(optlen, p);
 	l -= optlen;			/* Adjust remaining length */
-	
-	switch (opttype) {  	    
+
+	switch (opttype) {
 
 #ifdef PRED_1
 	    case CI_PREDICTOR1:
@@ -1189,7 +1192,7 @@ unsigned char ccp_reqopts (fsm *f,
 #ifdef STAC_LZS
 	    case CI_STAC_LZS:
 		LOG3(LOG_NEG, (LOG_CCP_GOT_OPT, "Stac"));
-		
+
 		if (! (ao -> ccp_neg & COMPRESS_STAC) ||
 		    optlen != CI_STAC_LEN) {
 		    REJECT();
@@ -1199,7 +1202,7 @@ unsigned char ccp_reqopts (fsm *f,
 		GETSHORT(optshort, p);			/* History-Count */
 		GETCHAR(optchar1, p);			/* Check-Mode */
 
-		LOG3(LOG_NEG, (LOG_CCP_HISTORY_CHECK, 
+		LOG3(LOG_NEG, (LOG_CCP_HISTORY_CHECK,
 			      optshort, optchar1));
 
 		/*
@@ -1222,17 +1225,17 @@ unsigned char ccp_reqopts (fsm *f,
 		 */
 		if ((optchar1 == 0 || optchar1 > STAC_CHECK_EXTENDED)) {
 		    optchar1 = ho -> ccp_stac_check_mode;
-		    /* 
+		    /*
 		     * Store the next check mode to try.  Starting from
 		     * extended, then crc, then lcb, then seq.  Unfortunately
-		     * these are numbered 4, 2, 1, 3.  We can shift right 
-		     * by 1 until we get to 0, then reset to 3.  If we 
-		     * start with 3, give up.  
+		     * these are numbered 4, 2, 1, 3.  We can shift right
+		     * by 1 until we get to 0, then reset to 3.  If we
+		     * start with 3, give up.
 		     */
 		    if (optchar1 == STAC_CHECK_SEQ) {
 			ho -> ccp_stac_check_mode = 0;     /* no other modes */
 		    }
-		    else if (optchar1) {	
+		    else if (optchar1) {
 			ho -> ccp_stac_check_mode >>= 1;
 			if (ho -> ccp_stac_check_mode == 0)
 			    ho -> ccp_stac_check_mode = STAC_CHECK_SEQ;
@@ -1259,7 +1262,7 @@ unsigned char ccp_reqopts (fsm *f,
 		    PUTSHORT(STAC_HISTORY_COUNT, outp);
 		    PUTCHAR(optchar1, outp);
 		}
-		LOG3(LOG_NEG, (LOG_CCP_NAK_HISTORY_CHECK, 
+		LOG3(LOG_NEG, (LOG_CCP_NAK_HISTORY_CHECK,
 			       STAC_HISTORY_COUNT, optchar1));
 		break;
 #endif /* STAC_LZS */
@@ -1274,13 +1277,13 @@ unsigned char ccp_reqopts (fsm *f,
 		    break;
 		}
 
-		/* 
-		 * Check the supported bits value.  If bits is correct, 
+		/*
+		 * Check the supported bits value.  If bits is correct,
 		 * give her what she wants.  Else, nak with correct bits
 		 * value.
 		 */
 		GETLONG(optlong, p);
-		
+
 		LOG3(LOG_NEG, (LOG_CCP_MPPC_BITS, optlong));
 
 		if (optlong == MPPC_SUPPORTED_BITS) {
@@ -1290,8 +1293,8 @@ unsigned char ccp_reqopts (fsm *f,
 			ho -> ccp_comp_type = COMPRESS_MPPC;
 
 		    break;
-		} 
-		
+		}
+
 		/*
 		 * Nak the option. If we're already rejecting,
 		 * don't stick the desired params for MPPC in
@@ -1320,13 +1323,13 @@ unsigned char ccp_reqopts (fsm *f,
 #ifdef LOGGING_ENABLED
 	    if (real_orc == CONFIGURE_ACK) {
 		LOG3(LOG_NEG, (LOG_ACK));
-	    }	    
+	    }
 #endif /* LOGGING_ENABLED */
 	    if (rc == ack) {
 		memmove(outp, optp, optlen);
 		outp += optlen;
 	    }
-	}	    
+	}
 
 	optp += optlen;
 	outoptp = outp;
@@ -1348,7 +1351,7 @@ unsigned char ccp_reqopts (fsm *f,
 		  rc == CONFIGURE_ACK ? "Configure-Ack" :
 		  (rc == CONFIGURE_NAK ? "Configure-Nak" : "Configure-Reject")));
 
-    return (rc);				/* Return final code */    
+    return (rc);				/* Return final code */
 
 }
 
@@ -1363,13 +1366,13 @@ unsigned char ccp_reqopts (fsm *f,
  *
  * STRATEGY:	Store the vfptrs of the compressor and decompressor
  *	    	routines in ccp fsm structure.
- *	    	If closing ccp, do not continue with any further 
- *	    	initialization or else memory will be allocated 
+ *	    	If closing ccp, do not continue with any further
+ *	    	initialization or else memory will be allocated
  *	    	and never freed.
  *
  *	    	If nothing negotiated, close ccp.
  *
- *	    	Only one compression protocol can be used for 
+ *	    	Only one compression protocol can be used for
  *	    	each direction of the link.
  *
  * REVISION HISTORY:
@@ -1397,7 +1400,7 @@ void ccp_up (fsm *f)
 	    ccp[f -> unit].ccp_decompressor = predictor1_decomp_vfptr;
 	    ccp[f -> unit].ccp_resetdecompressor = predictor1_resetdecomp_vfptr;
 
-	    if (predictor1_initdecomp(f -> unit, cf_mru) < 0) 
+	    if (predictor1_initdecomp(f -> unit, cf_mru) < 0)
 		goto noComp;
 
 	    break;
@@ -1408,9 +1411,9 @@ void ccp_up (fsm *f)
 	    ccp[f -> unit].ccp_decompressor = stac_decomp_vfptr;
 	    ccp[f -> unit].ccp_resetdecompressor = stac_resetdecomp_vfptr;
 
-	    if (stac_initdecomp(f -> unit, cf_mru, 
+	    if (stac_initdecomp(f -> unit, cf_mru,
 				go -> ccp_stac_check_mode) < 0)
-		goto noComp;	    
+		goto noComp;
 
 	    break;
 #endif /* STAC_LZS */
@@ -1450,7 +1453,7 @@ void ccp_up (fsm *f)
 	    ccp[f -> unit].ccp_compressor = stac_comp_vfptr;
 	    ccp[f -> unit].ccp_resetcompressor = stac_resetcomp_vfptr;
 
-	    if (stac_initcomp(f -> unit, cf_mru, 
+	    if (stac_initcomp(f -> unit, cf_mru,
 			      ho -> ccp_stac_check_mode) < 0)
 		goto noComp;
 
@@ -1471,7 +1474,7 @@ void ccp_up (fsm *f)
 
     }
 
-    return; 	    	    
+    return;
 
 noComp:
     ccp_close(f -> unit);
@@ -1530,12 +1533,12 @@ void ccp_down (fsm *f)
  ***********************************************************************
  * SYNOPSIS:	Timeout expired before receiving a response to our
  *	    	Reset-Request.
- * CALLED BY:	PPPHandleTimeout 
+ * CALLED BY:	PPPHandleTimeout
  * RETURN:	nothing
  *
- * STRATEGY:	If retransmit counter > 0 
+ * STRATEGY:	If retransmit counter > 0
  *	    	    send another reset request and decrement retransmit
- *	    	    counter. 
+ *	    	    counter.
  *	    	Else, bring down ccp.
  *
  * REVISION HISTORY:
@@ -1555,7 +1558,7 @@ void ccp_resettimeout (int unit)
 	 * reset-request with the same ID.
 	 */
 	if (f -> retransmits > 0) {
-	    fsm_sdata(f, RESET_REQUEST, f -> id, (unsigned char *)NULL, 
+	    fsm_sdata(f, RESET_REQUEST, f -> id, (unsigned char *)NULL,
 		    (PACKET *)NULL, 0);
 	    fsm_start_timer(f);
     	}
@@ -1576,7 +1579,7 @@ void ccp_resettimeout (int unit)
  * CALLED BY:	fsm_input
  * RETURN:	nothing
  *
- * STRATEGY:	Let decompressor decide if a reset-ack is needed.  
+ * STRATEGY:	Let decompressor decide if a reset-ack is needed.
  *	    	Predictor1 always needs to reply with an ack, but
  *	    	stac Lzs in extended mode can resynch without an ack.
  *
@@ -1604,12 +1607,12 @@ void ccp_resetrequest (fsm *f, unsigned char *p, unsigned char id, int len)
 	 * Reset compressor dictionary.
 	 */
 	EC_ERROR_IF(ccp[f -> unit].ccp_resetcompressor == 0, -1);
-	ack = ProcCallFixedOrMovable_pascal(f -> unit, 
+	ack = ProcCallFixedOrMovable_pascal(f -> unit,
 					    ccp[f -> unit].ccp_resetcompressor);
 	/*
 	 * Send a Reset-Ack, if needed.
 	 */
-	if (ack) 
+	if (ack)
 	    fsm_sdata(f, RESET_ACK, id, p, (PACKET *)NULL, len);
     }
 }
@@ -1632,7 +1635,7 @@ void ccp_resetrequest (fsm *f, unsigned char *p, unsigned char id, int len)
  ***********************************************************************/
 void ccp_resetack (fsm *f, unsigned char *p, unsigned char id, int len)
      /*fsm *f;*/	    	    	/* old-style function declaration needed here */
-     /*unsigned char *p;   	
+     /*unsigned char *p;
 unsigned char id;
 int len;*/
 {
@@ -1645,7 +1648,7 @@ int len;*/
     	fsm_stop_timer(f);
 
 	EC_ERROR_IF(ccp[f -> unit].ccp_resetdecompressor == 0, -1);
-    	ProcCallFixedOrMovable_pascal(f -> unit, 
+    	ProcCallFixedOrMovable_pascal(f -> unit,
 				      ccp[f -> unit].ccp_resetdecompressor);
 
     	ccp[f -> unit].ccp_resetting = 0;
@@ -1682,8 +1685,8 @@ void ccp_reset (int unit)
     /*
      *	Send a Reset-Request with a new ID.
      */
-    fsm_sdata(f, RESET_REQUEST, ++f -> id, (unsigned char *)NULL, 
-	      (PACKET *)NULL, 0);    
+    fsm_sdata(f, RESET_REQUEST, ++f -> id, (unsigned char *)NULL,
+	      (PACKET *)NULL, 0);
 
     /*
      * Use the maximum number of configure request transmissions
@@ -1705,7 +1708,7 @@ void ccp_reset (int unit)
  * STRATEGY:	Discard packet if CCP isn't opened, else deliver
  *	    	to decompressor.
  *
- * NOTES:    	Deliver packet to decompressor even if resetting 
+ * NOTES:    	Deliver packet to decompressor even if resetting
  *	    	because the decompressor may need to update the
  *	    	sequence number.
  *
@@ -1715,18 +1718,18 @@ void ccp_reset (int unit)
  *	jwu	8/21/96		Initial Revision
  *
  ***********************************************************************/
-byte compress_input (int unit, 
+byte compress_input (int unit,
 		     PACKET *p,
 		     int len)
 {
-    
+
     int important;
     ccp_options *ao = &ccp_allowoptions[unit];
 
     if (ao -> ccp_neg == 0) {
 	lcp_sprotrej(unit, p, len);
 	return (1);
-    }    
+    }
 
     /*
      * Discard received compressed packets if CCP isn't up.
@@ -1736,7 +1739,7 @@ byte compress_input (int unit,
 	return (0);
     }
 
-    important = ProcCallFixedOrMovable_pascal(unit, p, len, 
+    important = ProcCallFixedOrMovable_pascal(unit, p, len,
 					      ccp[unit].ccp_decompressor);
     /*
      * If decompression failed, send a reset-request.
@@ -1753,6 +1756,3 @@ byte compress_input (int unit,
 
 
 #endif /* USE_CCP */
-
-
-

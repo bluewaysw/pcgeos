@@ -20,10 +20,11 @@
 name 	ppp.drvr
 
 #
-type	driver, single, discardable-dgroup
+type	driver, single
+#, discardable-dgroup
 
 #
-longname	"PPP Driver" 	
+longname	"PPP Driver"
 tokenchars	"SKDR"
 tokenid		0
 
@@ -33,7 +34,7 @@ tokenid		0
 library	geos
 library	netutils
 library ansic
-library accpnt 
+library accpnt
 
 #ifdef PRODUCT_RESPONDER
 #library foam
@@ -65,4 +66,3 @@ resource	Strings			shared lmem read-only
 #
 export PPPAddressControlClass
 export PPPSpecialTextClass
-
