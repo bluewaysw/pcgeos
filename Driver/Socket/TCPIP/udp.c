@@ -13,7 +13,7 @@
  * ROUTINES:
  *	Name	  	    Description
  *	----	  	    -----------
- *	UdpInit	    	
+ *	UdpInit
  * 	UdpOutput
  *	UdpInput
  *	UdpError
@@ -87,6 +87,9 @@
 #ifdef __BORLANDC__
 #pragma codeseg UDPCODE
 #endif
+#ifdef __WATCOMC__
+#pragma code_seg("UDPCODE")
+#endif
 
 byte udpcksum	= TRUE;	    	    /* whether udp checksums should be used */
 
@@ -98,7 +101,7 @@ struct udpstat udpstat;
 /***********************************************************************
  *				UdpInit
  ***********************************************************************
- * SYNOPSIS:	Initialize UDP.  
+ * SYNOPSIS:	Initialize UDP.
  * CALLED BY:	TcpipInit
  * RETURN:	nothing
  * STRATEGY:	Find out if the user wants to use checksums for UDP.
@@ -152,11 +155,11 @@ UdpOutput (optr dataBuffer, dword laddr, word link)
     word error = 0;
 
     GeodeLoadDGroup(0);	    	    	/* Should be in driver's thread */
-    
+
     TcpipLock(OptrToHandle(dataBuffer));
     d = (DatagramHeader *)LMemDeref(dataBuffer);
     len = d->DH_common.MH_dataSize;
-    
+
     /*
      * Add extended UDP header to data buffer.
      */
@@ -173,31 +176,31 @@ UdpOutput (optr dataBuffer, dword laddr, word link)
     uihdr->ui_next = uihdr->ui_prev = 0;
     uihdr->ui_x1 = 0;
     uihdr->ui_pr = IPPROTO_UDP;
-    uihdr->ui_len = HostToNetworkWord(len + sizeof(struct udphdr)); 
+    uihdr->ui_len = HostToNetworkWord(len + sizeof(struct udphdr));
     uihdr->ui_src = laddr;
     uihdr->ui_sport = HostToNetworkWord(d->DH_lport);
     uihdr->ui_dport = HostToNetworkWord(d->DH_rport);
     uihdr->ui_ulen = uihdr->ui_len;
 
-    /* 
+    /*
      * Stuff checksum and output datagram.  Calculated zero checksums
      * must be transmitted as all 1s.
      */
     uihdr->ui_cksum = 0;
     if (udpcksum) {
-	if ((uihdr->ui_cksum = Checksum((word *)uihdr, 
+	if ((uihdr->ui_cksum = Checksum((word *)uihdr,
 					sizeof(struct udpiphdr) + len)) == 0)
 	    uihdr->ui_cksum = 0xffff;
     }
-    
+
     /*
-     * Fill in IP length, desired time to live and type of service and 
+     * Fill in IP length, desired time to live and type of service and
      * send to IP level.
      */
     ((struct ip *)uihdr)->ip_len = len + sizeof(struct udpiphdr);
     ((struct ip *)uihdr)->ip_ttl = ip_defttl;
     ((struct ip *)uihdr)->ip_tos = IPTOS_RELIABILITY;
-    
+
     LOG_STAT(udpstat.udps_opackets++;)
     TcpipUnlock(OptrToHandle(dataBuffer));
     error = IpOutput(dataBuffer, link, 0);
@@ -216,10 +219,10 @@ UdpOutput (optr dataBuffer, dword laddr, word link)
  *	    	iphlen	    = IP header length
  * RETURN:	nothing
  * SIDE EFFECTS:
- *	    	Data buffer will either be freed or delivered to the 
+ *	    	Data buffer will either be freed or delivered to the
  *	    	socket library.
  * STRATEGY:
- *	    	Do some basic checks on the datagram and verify 
+ *	    	Do some basic checks on the datagram and verify
  *	    	    checksum, if used.
  *	    	Fill in datagram header and deliver to socket library.
  *
@@ -237,17 +240,17 @@ UdpInput (optr dataBuffer, word iphlen)
     DatagramHeader *d;
     struct ip *iphdr;
     struct udphdr *uh;
-    word len, domain, error = 0; 
+    word len, domain, error = 0;
     byte flags;
     struct ip save_ip;
-    
+
 
     GeodeLoadDGroup(0);	    	/* we should be in the driver's thread */
     LOG_STAT(udpstat.udps_ipackets++;)
 
      /*
       * Strip IP options, if any.  Should skip this and make options
-      * available to user and use on returned packets, but we can't 
+      * available to user and use on returned packets, but we can't
       * compute the checksum with options still present.
       */
     if (iphlen > sizeof(struct ip)) {
@@ -260,12 +263,12 @@ UdpInput (optr dataBuffer, word iphlen)
     iphdr = (struct ip *)mtod((MbufHeader *)d);
     uh = (struct udphdr *)((byte *)iphdr + iphlen);
 
-     /* 
+     /*
       * If not enough data in buffer, drop.  Remove any extra padding.
       * Length must be at least as big as the size of an UDP header.
       */
     len = NetworkToHostWord((word)uh->uh_ulen);
-    
+
     if (len < sizeof(struct udphdr)) {
 	LOG_STAT(udpstat.udps_hdrops++;)
 	LOG_EVENT(LM_UDP_HEADER_LENGTH_TOO_SHORT);
@@ -280,7 +283,7 @@ UdpInput (optr dataBuffer, word iphlen)
 	}
 	d->DH_common.MH_dataSize -= (iphdr->ip_len - len);
     }
-    
+
      /*
       * Save copy of IP header in case we need to reconstruct it
       * to send an ICMP message in response.  Get the flags, too.
@@ -300,10 +303,10 @@ UdpInput (optr dataBuffer, word iphlen)
 	((struct ipovly *)iphdr)->ih_prev = 0;
 	((struct ipovly *)iphdr)->ih_x1 = 0;
 	((struct ipovly *)iphdr)->ih_len = uh->uh_ulen;
-	if ((uh->uh_cksum = Checksum((word *)iphdr, 
+	if ((uh->uh_cksum = Checksum((word *)iphdr,
 				     len + sizeof(struct ip))) != 0) {
 	    LOG_STAT(udpstat.udps_badsum++;)
-	    LOG_EVENT(LM_UDP_DATAGRAM_HAS_BAD_CHECKSUM); 
+	    LOG_EVENT(LM_UDP_DATAGRAM_HAS_BAD_CHECKSUM);
 	    goto bad;
 	}
     }
@@ -312,26 +315,26 @@ UdpInput (optr dataBuffer, word iphlen)
       * Fill in DatagramHeader and drop udp and ip header from data buffer.
       */
     d->DH_addrSize = sizeof(dword);
-    d->DH_addrOffset = (byte *)(&(((struct ipovly *)iphdr)->ih_src)) - 
+    d->DH_addrOffset = (byte *)(&(((struct ipovly *)iphdr)->ih_src)) -
 	    	    	(byte *)d;
     d->DH_lport = NetworkToHostWord(uh->uh_dport);
     d->DH_rport = NetworkToHostWord(uh->uh_sport);
-    
+
     d->DH_common.MH_dataSize -= sizeof(struct udpiphdr);
     d->DH_common.MH_dataOffset += sizeof(struct udpiphdr);
-    
+
     TcpipUnlock(OptrToHandle(dataBuffer));
     error = TSocketRecvUdpInput(dataBuffer);
-    
+
     if (error) {
 	/*
-	 * No need to send ICMP if datagram was a broadcast or multicast. 
+	 * No need to send ICMP if datagram was a broadcast or multicast.
 	 */
 	if (flags & (IF_BCAST | IF_MCAST)) {
 	    LOG_STAT(udpstat.udps_noportbcast++;)
 	    goto drop;
 	}
-	
+
 	/*
 	 * Generate an ICMP error message if could not deliver the datagram.
 	 * Restore IP header in original packet before calling IcmpError.
@@ -346,16 +349,16 @@ UdpInput (optr dataBuffer, word iphlen)
 	d->DH_common.MH_dataSize += sizeof(struct udpiphdr);
 	d->DH_common.MH_dataOffset -= sizeof(struct udpiphdr);
 	iphdr = (struct ip *)mtod((MbufHeader *)d);
-	*iphdr = save_ip;	    	    	    	    
-	IcmpError((MbufHeader *)d, ICMP_UNREACH, ICMP_UNREACH_PORT);  
+	*iphdr = save_ip;
+	IcmpError((MbufHeader *)d, ICMP_UNREACH, ICMP_UNREACH_PORT);
     	goto bad;
     }
-    
+
     return;
 
-bad:    
+bad:
     TcpipUnlock(OptrToHandle(dataBuffer));
-drop:    
+drop:
     LOG_EVENT(LM_UDP_DROPPING_DATAGRAM);
     TcpipFreeDataBuffer(dataBuffer);
     return;
@@ -374,8 +377,8 @@ drop:
  * SIDE EFFECTS:
  *
  * STRATEGY:
- *	    	Parse the data in the iphdr to determine the local 
- *	    	port number and notify the socket library. 
+ *	    	Parse the data in the iphdr to determine the local
+ *	    	port number and notify the socket library.
  *
  *	    	codes handled:  ICMP_SOURCEQUENCH
  *	    	    	    	ICMP_UNREACH
@@ -391,7 +394,7 @@ drop:
 void
 UdpError (word code, struct ip *iphdr)
 {
-    struct udphdr *uh; 
+    struct udphdr *uh;
 
     uh = (struct udphdr *)((byte *)iphdr + (iphdr->ip_hl << 2));
 

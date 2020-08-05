@@ -32,7 +32,7 @@
  *
  * DESCRIPTION:
  *	Code for logging packets.
- * 	
+ *
  *	$Id: tcpipLog.c,v 1.1 97/04/18 11:57:18 newdeal Exp $
  ***********************************************************************/
 
@@ -62,10 +62,13 @@
 #endif
 
 #ifdef __HIGHC__
-#pragma Code("TCPCODE"); 
+#pragma Code("TCPCODE");
 #endif
 #ifdef __BORLANDC__
 #pragma codeseg TCPCODE
+#endif
+#ifdef __WATCOMC__
+#pragma code_seg("TCPCODE")
 #endif
 
 #ifdef LOG_HDRS
@@ -78,9 +81,9 @@
  * CALLED BY:	LogPacket
  * PASS:    	log 	= file handle of log file
  *	    	dataPtr = pointer to beginning of IP header in data
- *	    	proto	= for returning IP protocol 
+ *	    	proto	= for returning IP protocol
  *	    	dataSize = for returning total size of data in packet
- *	    	    	        
+ *
  * RETURN:	number of bytes in the IP header, including IP options
  *
  * REVISION HISTORY:
@@ -90,15 +93,15 @@
  *
  ***********************************************************************/
 word
-LogIpHeader(FileHandle log, 
-	    byte *dataPtr, 
-	    byte *proto, 
+LogIpHeader(FileHandle log,
+	    byte *dataPtr,
+	    byte *proto,
 	    word *dataSize)
 {
     word cnt, hdrSize, ipId, fragOff;
     dword src, dst;
     TCHAR logBuf[MAX_LOG_STRING];
-    
+
     *proto = ((struct ip *)dataPtr)->ip_p;
     *dataSize = NetworkToHostWord(((struct ip *)dataPtr)->ip_len);
     src = ((struct ip *)dataPtr)->ip_src;
@@ -106,19 +109,19 @@ LogIpHeader(FileHandle log,
     hdrSize = ((struct ip *)dataPtr)->ip_hl << 2;
     ipId = NetworkToHostWord(((struct ip *)dataPtr)->ip_id);
     fragOff = NetworkToHostWord(((struct ip *)dataPtr)->ip_off);
-    
+
     /*
      * Write addresses and IP identification to log file.
      */
     cnt = sprintf(logBuf, "  IP Source Addr: %lu.%lu.%lu.%lu\tIP Destination Addr: %lu.%lu.%lu.%lu\n  Identification: %u\t",
 		  src & 0x00ff, (src >> 8) & 0x00ff,
-		  (src >> 16) & 0x00ff, (src >> 24) & 0x00ff, 
-		  dst & 0x00ff, (dst >> 8) & 0x00ff, 
+		  (src >> 16) & 0x00ff, (src >> 24) & 0x00ff,
+		  dst & 0x00ff, (dst >> 8) & 0x00ff,
 		  (dst >> 16) & 0x00ff, (dst >> 24) & 0x00ff,
 		  ipId);
     FileWrite(log, logBuf, cnt, FALSE);
 
-    /* 
+    /*
      * Write the IP protocol to the log file.
      */
     switch (*proto) {
@@ -142,11 +145,11 @@ LogIpHeader(FileHandle log,
 	    *proto = 0;	    	/* so IP options will not be processed */
 	    break;
     }
-    FileWrite(log, logBuf, cnt, FALSE);    
+    FileWrite(log, logBuf, cnt, FALSE);
 
     /*
      * If this is a fragment -- offset is nonzero or IP_MF is set --
-     * then log it.  Do not log the sub-protocol's header if this 
+     * then log it.  Do not log the sub-protocol's header if this
      * fragment is not the first, because it doesn't exist.  Make
      * sure bit 0 of the flags part of the offset is zero.
      */
@@ -155,7 +158,7 @@ LogIpHeader(FileHandle log,
 	    cnt = sprintf(logBuf, "Error:  Bit 0 of IP flags is nonzero.\n");
 	    FileWrite(log, logBuf, cnt, FALSE);
 	}
-	fragOff <<= 3;	    	    
+	fragOff <<= 3;
 	cnt = sprintf(logBuf, "  Datagram is IP fragment.  Offset = %u\n",
 		       fragOff);
 	FileWrite(log, logBuf, cnt, FALSE);
@@ -169,9 +172,9 @@ LogIpHeader(FileHandle log,
     if (hdrSize > sizeof (struct ip) && (*proto != 0)) {
 	byte optCode, optLen, optSize = hdrSize - sizeof(struct ip);
 	dataPtr += sizeof(struct ip);  	    /* now points to options */
-	
+
 	cnt = sprintf(logBuf, "  IP Options: ");
-	
+
 	for (; optSize > 0; optSize -= optLen, dataPtr += optLen) {
 	    optCode = dataPtr[0];
 	    if (optCode == 0)
@@ -181,29 +184,29 @@ LogIpHeader(FileHandle log,
 	    	if (optLen <= 0)
 		    break;
 	    }
-	    
+
 	    switch (optCode) {
-	    	case IPOPT_RR:	    	
+	    	case IPOPT_RR:
 		    cnt += sprintf(&logBuf[cnt], "\tRecord routing");
 		    break;
-		case IPOPT_TS:	    	
+		case IPOPT_TS:
 		    cnt += sprintf(&logBuf[cnt], "\tTimestamp");
 		    break;
-	    	case IPOPT_SECURITY:	
+	    	case IPOPT_SECURITY:
 		    cnt += sprintf(&logBuf[cnt], "\tSecurity");
 		    break;
-		case IPOPT_LSRR:    	
+		case IPOPT_LSRR:
 		    cnt += sprintf(&logBuf[cnt], "\tLoose source routing");
 		    break;
-		case IPOPT_SSRR:    	
+		case IPOPT_SSRR:
 		    cnt += sprintf(&logBuf[cnt], "\tStrict source routing");
-		    break;		
+		    break;
 	    	default:
 		    cnt += sprintf(&logBuf[cnt], "\tUnknown option");
 		    continue;
 	    }
 	}
-	
+
 	cnt += sprintf(&logBuf[cnt], "\n");
 	FileWrite(log, logBuf, cnt, FALSE);
     }
@@ -232,18 +235,18 @@ LogTcpHeader (FileHandle log, byte *dataPtr)
 {
     byte flags;
     word cnt, mss, hdrSize;
-    TCHAR logBuf[MAX_LOG_STRING]; 	
+    TCHAR logBuf[MAX_LOG_STRING];
 
     hdrSize = ((struct tcphdr *)dataPtr)->th_off << 2;
     flags = ((struct tcphdr *)dataPtr)->th_flags;
 
     /*
      * Write port numbers, seq, ack and win to log file.
-     */     
-    cnt = sprintf(logBuf, "  Source Port: %u\tDestination Port: %u\n  Seq: %lu\t Ack: %lu\t Window: %u\n", 
-		  NetworkToHostWord(((struct tcphdr *)dataPtr)->th_sport), 
+     */
+    cnt = sprintf(logBuf, "  Source Port: %u\tDestination Port: %u\n  Seq: %lu\t Ack: %lu\t Window: %u\n",
+		  NetworkToHostWord(((struct tcphdr *)dataPtr)->th_sport),
 		  NetworkToHostWord(((struct tcphdr *)dataPtr)->th_dport),
-		  NetworkToHostDWord(((struct tcphdr *)dataPtr)->th_seq), 
+		  NetworkToHostDWord(((struct tcphdr *)dataPtr)->th_seq),
 		  NetworkToHostDWord(((struct tcphdr *)dataPtr)->th_ack),
 		  NetworkToHostWord(((struct tcphdr *)dataPtr)->th_win));
     FileWrite(log, logBuf, cnt, FALSE);
@@ -257,11 +260,11 @@ LogTcpHeader (FileHandle log, byte *dataPtr)
     if (flags & TH_SYN)
 	cnt += sprintf(&logBuf[cnt], "SYN ");
     if (flags & TH_RST)
-	cnt += sprintf(&logBuf[cnt], "RST ");	
+	cnt += sprintf(&logBuf[cnt], "RST ");
     if (flags & TH_ACK)
-	cnt += sprintf(&logBuf[cnt], "ACK ");	
+	cnt += sprintf(&logBuf[cnt], "ACK ");
     if (flags & TH_URG)
-	cnt += sprintf(&logBuf[cnt], "URG ");	
+	cnt += sprintf(&logBuf[cnt], "URG ");
     cnt += sprintf(&logBuf[cnt], "\n");
     FileWrite(log, logBuf, cnt, FALSE);
 
@@ -269,7 +272,7 @@ LogTcpHeader (FileHandle log, byte *dataPtr)
      * Write urgent pointer to log file, if URG set.
      */
     if (flags & TH_URG) {
-	cnt = sprintf(logBuf, "  Urgent Pointer: %u\n", 
+	cnt = sprintf(logBuf, "  Urgent Pointer: %u\n",
 		      NetworkToHostWord(((struct tcphdr *)dataPtr)->th_urp));
 	FileWrite(log, logBuf, cnt, FALSE);
     }
@@ -280,10 +283,10 @@ LogTcpHeader (FileHandle log, byte *dataPtr)
     if (hdrSize > sizeof(struct tcphdr)) {
 	byte optCode, optLen, optSize = hdrSize - sizeof(struct tcphdr);
 	dataPtr += sizeof(struct tcphdr); 	/* now points at options */
-	
+
 	cnt = sprintf(logBuf, "  TCP Options: ");
 	for (; optSize > 0; optSize -= optLen, dataPtr += optLen) {
-	    optCode = dataPtr[0];   
+	    optCode = dataPtr[0];
 	    if (optCode == TCPOPT_EOL)
 		break;
 	    if (optCode == TCPOPT_NOP)
@@ -295,7 +298,7 @@ LogTcpHeader (FileHandle log, byte *dataPtr)
 	    }
 
 	    switch (optCode) {
-		default: 
+		default:
 		    cnt += sprintf(&logBuf[cnt], "\tUnknown option");
 		    continue;
 		case TCPOPT_MAXSEG:
@@ -307,7 +310,7 @@ LogTcpHeader (FileHandle log, byte *dataPtr)
 
 	cnt += sprintf(&logBuf[cnt], "\n");
 	FileWrite(log, logBuf, cnt, FALSE);
-    }	
+    }
 	return (hdrSize);
 }
 
@@ -332,9 +335,9 @@ word
 LogUdpHeader (FileHandle log, byte *dataPtr)
 {
     word cnt;
-    TCHAR logBuf[MAX_LOG_STRING]; 	    
-    
-    cnt = sprintf(logBuf, "  Source Port: %u\t Destination Port: %u\n", 
+    TCHAR logBuf[MAX_LOG_STRING];
+
+    cnt = sprintf(logBuf, "  Source Port: %u\t Destination Port: %u\n",
 		  NetworkToHostWord(((struct udphdr *)dataPtr)->uh_sport),
 		  NetworkToHostWord(((struct udphdr *)dataPtr)->uh_dport));
     FileWrite(log, logBuf, cnt, FALSE);
@@ -365,8 +368,8 @@ LogIcmpHeader (FileHandle log, byte *dataPtr)
 
     word cnt, hdrSize, id, seq;
     byte icmpType, icmpCode;
-    TCHAR logBuf[MAX_LOG_STRING]; 	    
-    
+    TCHAR logBuf[MAX_LOG_STRING];
+
     hdrSize  = 4;       	/* size of type, code and checksum part */
     icmpType = dataPtr[0];
     icmpCode = dataPtr[1];
@@ -388,18 +391,18 @@ LogIcmpHeader (FileHandle log, byte *dataPtr)
 	    cnt = sprintf(logBuf, "  Icmp source quench\n");
 	    break;
 	case ICMP_REDIRECT:
-	    cnt = sprintf(logBuf, "  Icmp redirect, code: %u\n  Router IP address to use:  %u.%u.%u.%u\n", icmpCode, dataPtr[4], dataPtr[5], dataPtr[6], 
+	    cnt = sprintf(logBuf, "  Icmp redirect, code: %u\n  Router IP address to use:  %u.%u.%u.%u\n", icmpCode, dataPtr[4], dataPtr[5], dataPtr[6],
 			  dataPtr[7]);
 	    hdrSize = 8;
 	    break;
 	case ICMP_ECHO:
 	    cnt = sprintf(logBuf, "  Icmp echo request\n  ID: %u\t Seq: %u\n",
 			  id, seq);
-	    hdrSize = 8;    	
+	    hdrSize = 8;
 	    break;
 	case ICMP_ROUTERADVERT:
 	    cnt = sprintf(logBuf, "  Icmp router advertisement\n  Number of addresses: %u\n", dataPtr[4]);
-	    
+
 	    break;
 	case ICMP_ROUTERSOLICIT:
 	    cnt = sprintf(logBuf, "  Icmp router solicitation\n");
@@ -410,7 +413,7 @@ LogIcmpHeader (FileHandle log, byte *dataPtr)
 	    hdrSize = 8;
 	    break;
 	case ICMP_PARAMPROB:
-	    cnt = sprintf(logBuf, "  Icmp parameter problem, code: %u\n", 
+	    cnt = sprintf(logBuf, "  Icmp parameter problem, code: %u\n",
 			  icmpCode);
 	    break;
 	case ICMP_TSTAMP:
@@ -428,7 +431,7 @@ LogIcmpHeader (FileHandle log, byte *dataPtr)
 	    cnt = sprintf(logBuf, "  Icmp information reply\n");
 	    break;
 	case ICMP_MASKREQ:
-	    cnt = sprintf(logBuf, "  Icmp address mask request\n  ID: %u\t Seq: %u\t Subnet mask:  %u.%u.%u.%u\n", id, seq, dataPtr[8], dataPtr[9], 
+	    cnt = sprintf(logBuf, "  Icmp address mask request\n  ID: %u\t Seq: %u\t Subnet mask:  %u.%u.%u.%u\n", id, seq, dataPtr[8], dataPtr[9],
 			  dataPtr[10], dataPtr[11]);
 	    hdrSize = 12;
 	    break;
@@ -442,9 +445,9 @@ LogIcmpHeader (FileHandle log, byte *dataPtr)
 			  icmpType, icmpCode);
 	    break;
     }
-    
+
     FileWrite(log, logBuf, cnt, FALSE);
-    return (hdrSize);	
+    return (hdrSize);
 }
 
 
@@ -471,7 +474,7 @@ LogPacket (Boolean input, MbufHeader *m)
     byte *dataPtr;
     word dataSize, hdrSize, cnt;
     byte proto;
-    
+
     TCHAR logBuf[20];	    	/* should be plenty */
     const TCHAR recvStr[] = "Receiving:\n";
     const TCHAR sendStr[] = "Sending:\n";
@@ -488,7 +491,7 @@ LogPacket (Boolean input, MbufHeader *m)
 	FileWrite(log, sendStr, strlen(sendStr), FALSE);
 
     /*
-     * Log info about the IP header:  source IP addr, dest IP addr, 
+     * Log info about the IP header:  source IP addr, dest IP addr,
      * and IP protocol.
      */
     dataPtr = mtod(m);
@@ -511,7 +514,7 @@ LogPacket (Boolean input, MbufHeader *m)
 ptrAndSize:
    	    dataPtr += hdrSize;
 	    dataSize -= hdrSize;
-	default:    	    
+	default:
 	    break;
     }
 
@@ -524,13 +527,13 @@ ptrAndSize:
 #ifdef LOG_DATA
     if (dataSize) { 	    	/* don't bother if no data! */
 	/*
-	 * In case the headers were wrong, we want to limit the 
+	 * In case the headers were wrong, we want to limit the
 	 * amount of garbage written to the log file.  The buffer
 	 * size will still give us some garbage as protocol headers
 	 * are included in that size.
 	 */
 	if (dataSize > m->MH_dataSize)  {
-	    dataSize = m->MH_dataSize;	
+	    dataSize = m->MH_dataSize;
 	    cnt = sprintf (logBuf, "  Data size adjusted to: %u\n", dataSize);
 	    FileWrite (log, logBuf, cnt, FALSE);
 	}
@@ -541,7 +544,7 @@ ptrAndSize:
 #endif	/* LOG_DATA */
 
     FileWrite(log, "\n", 1, FALSE); 	   /* makes output easier to read */
-    FileCommit(log, FALSE); 	    	    
+    FileCommit(log, FALSE);
 
 }
 
@@ -564,7 +567,7 @@ ptrAndSize:
  *	jwu	11/22/94		Initial Revision
  *
  ***********************************************************************/
-void 
+void
 LogIpStats (FileHandle log)
 {
    word cnt, i;
@@ -574,9 +577,9 @@ LogIpStats (FileHandle log)
    word stats[NUM_IP_STATS];
 #endif
 
-#ifdef __HIGHC__   
+#ifdef __HIGHC__
    word stats[NUM_IP_STATS] = {
-       ipstat.ips_badsum, 
+       ipstat.ips_badsum,
        ipstat.ips_tooshort,
        ipstat.ips_toosmall,
        ipstat.ips_badhlen,
@@ -592,7 +595,7 @@ LogIpStats (FileHandle log)
        ipstat.ips_cantfrag,
        ipstat.ips_badoptions,
        ipstat.ips_badvers
-    };       
+    };
 #endif
 
     char *statMsg[] = {
@@ -614,7 +617,7 @@ LogIpStats (FileHandle log)
 	"IP version not equal to 4: "
     };
 
-#ifdef __BORLANDC__   
+#ifdef __BORLANDC__
    stats[0] = ipstat.ips_badsum;
    stats[1] = ipstat.ips_tooshort;
    stats[2] = ipstat.ips_toosmall;
@@ -636,14 +639,14 @@ LogIpStats (FileHandle log)
    /*
     * Values that are always printed.
     */
-   cnt = sprintf(logBuf, "  IP Statistics:\n\t%-40s%u\n", 
+   cnt = sprintf(logBuf, "  IP Statistics:\n\t%-40s%u\n",
 		 "Total packet received: ", ipstat.ips_total);
-   cnt += sprintf(&logBuf[cnt], "\t%-40s%u\n", "Total packets sent:", 
+   cnt += sprintf(&logBuf[cnt], "\t%-40s%u\n", "Total packets sent:",
 		  ipstat.ips_out);
-   cnt += sprintf(&logBuf[cnt], "\t%-40s%u\n", 
+   cnt += sprintf(&logBuf[cnt], "\t%-40s%u\n",
 		  "Packets delivered to upper level: ", ipstat.ips_delivered);
    FileWrite(log, logBuf, cnt, FALSE);
- 
+
    /*
     * Values that are only printed if non-zero.
     */
@@ -679,55 +682,55 @@ LogTcpStats(FileHandle log)
 #ifdef __BORLANDC__
     word stats[NUM_TCP_STATS];
 #endif
-#ifdef __HIGHC__    
+#ifdef __HIGHC__
     word stats[NUM_TCP_STATS] = {
     	tcpstat.tcps_connattempt,
     	tcpstat.tcps_accepts,
 	tcpstat.tcps_connects,
 	tcpstat.tcps_drops,
-	tcpstat.tcps_conndrops,	    	
+	tcpstat.tcps_conndrops,
 	tcpstat.tcps_closed,
  	tcpstat.tcps_segstimed,
-	tcpstat.tcps_rttupdated,	
-	tcpstat.tcps_delack,		
-	tcpstat.tcps_timeoutdrop,	
-	tcpstat.tcps_rexmttimeo,	
-	tcpstat.tcps_persisttimeo,	
-	tcpstat.tcps_keeptimeo,		
-	tcpstat.tcps_keepprobe,		
-	tcpstat.tcps_keepdrops,		
+	tcpstat.tcps_rttupdated,
+	tcpstat.tcps_delack,
+	tcpstat.tcps_timeoutdrop,
+	tcpstat.tcps_rexmttimeo,
+	tcpstat.tcps_persisttimeo,
+	tcpstat.tcps_keeptimeo,
+	tcpstat.tcps_keepprobe,
+	tcpstat.tcps_keepdrops,
 
-	tcpstat.tcps_sndtotal,		
-	tcpstat.tcps_sndpack,		
-	tcpstat.tcps_sndbyte,		
-	tcpstat.tcps_sndrexmitpack,	
-	tcpstat.tcps_sndrexmitbyte,	
-	tcpstat.tcps_sndacks,		
-	tcpstat.tcps_sndurg,		
-	tcpstat.tcps_sndprobe,		
-	tcpstat.tcps_sndwinup,		
-	tcpstat.tcps_sndctrl,		
+	tcpstat.tcps_sndtotal,
+	tcpstat.tcps_sndpack,
+	tcpstat.tcps_sndbyte,
+	tcpstat.tcps_sndrexmitpack,
+	tcpstat.tcps_sndrexmitbyte,
+	tcpstat.tcps_sndacks,
+	tcpstat.tcps_sndurg,
+	tcpstat.tcps_sndprobe,
+	tcpstat.tcps_sndwinup,
+	tcpstat.tcps_sndctrl,
 
-	tcpstat.tcps_rcvtotal,		
-	tcpstat.tcps_rcvpack,		
-	tcpstat.tcps_rcvbyte,		
-	tcpstat.tcps_rcvbadsum,		
-	tcpstat.tcps_rcvbadoff,		
-	tcpstat.tcps_rcvshort,		
-	tcpstat.tcps_rcvduppack,	
-	tcpstat.tcps_rcvdupbyte,	
-	tcpstat.tcps_rcvpartduppack,	
-	tcpstat.tcps_rcvpartdupbyte,	
-	tcpstat.tcps_rcvoopack,		
-	tcpstat.tcps_rcvoobyte,		
-	tcpstat.tcps_rcvpackafterwin,	
-	tcpstat.tcps_rcvbyteafterwin,	
-	tcpstat.tcps_rcvafterclose,	
-	tcpstat.tcps_rcvdupack,		
-	tcpstat.tcps_rcvacktoomuch,	
-	tcpstat.tcps_rcvackpack,	
-	tcpstat.tcps_rcvackbyte,	
-	tcpstat.tcps_rcvwinprobe,	
+	tcpstat.tcps_rcvtotal,
+	tcpstat.tcps_rcvpack,
+	tcpstat.tcps_rcvbyte,
+	tcpstat.tcps_rcvbadsum,
+	tcpstat.tcps_rcvbadoff,
+	tcpstat.tcps_rcvshort,
+	tcpstat.tcps_rcvduppack,
+	tcpstat.tcps_rcvdupbyte,
+	tcpstat.tcps_rcvpartduppack,
+	tcpstat.tcps_rcvpartdupbyte,
+	tcpstat.tcps_rcvoopack,
+	tcpstat.tcps_rcvoobyte,
+	tcpstat.tcps_rcvpackafterwin,
+	tcpstat.tcps_rcvbyteafterwin,
+	tcpstat.tcps_rcvafterclose,
+	tcpstat.tcps_rcvdupack,
+	tcpstat.tcps_rcvacktoomuch,
+	tcpstat.tcps_rcvackpack,
+	tcpstat.tcps_rcvackbyte,
+	tcpstat.tcps_rcvwinprobe,
 	tcpstat.tcps_rcvwinupd
     };
 #endif
@@ -748,7 +751,7 @@ LogTcpStats(FileHandle log)
 	"Keepalive timeouts: ",
 	"Keepalive probes sent: ",
 	"Connections dropped by keepalive timeout: ",
-	
+
 	"Total packets sent: ",
 	"Data packet sent: ",
 	"Data bytes sent: ",
@@ -840,14 +843,14 @@ LogTcpStats(FileHandle log)
     if (tcpstat.tcps_sndtotal + tcpstat.tcps_rcvtotal > 0) {
 	cnt = sprintf(logBuf, "  TCP Statistics:\n");
 	FileWrite (log, logBuf, cnt, FALSE);
-	
+
     	for (i = 0; i < NUM_TCP_STATS; i++) {
 	    if (stats[i] > 0) {
 		cnt = sprintf(logBuf, "\t%-45s%u\n", statMsg[i], stats[i]);
-		FileWrite  (log, logBuf, cnt, FALSE);	    
+		FileWrite  (log, logBuf, cnt, FALSE);
 	    }
 	}
-    
+
     }
 }
 
@@ -885,7 +888,7 @@ LogUdpStats(FileHandle log)
 	udpstat.udps_noportbcast
    };
 #endif
-   
+
    char *statMsg[] = {
    	"Total input packets: ",
 	"Total output packets: ",
@@ -912,14 +915,14 @@ LogUdpStats(FileHandle log)
     if (udpstat.udps_ipackets + udpstat.udps_opackets > 0) {
 	cnt = sprintf(logBuf, "  UDP Statistics:\n");
 	FileWrite (log, logBuf, cnt, FALSE);
-	
+
     	for (i = 0; i < NUM_UDP_STATS; i++) {
 	    if (stats[i] > 0) {
 		cnt = sprintf(logBuf, "\t%-45s%u\n", statMsg[i], stats[i]);
-		FileWrite  (log, logBuf, cnt, FALSE);	    
+		FileWrite  (log, logBuf, cnt, FALSE);
 	    }
 	}
-    
+
     }
 }
 
@@ -957,7 +960,7 @@ LogIcmpStats(FileHandle log)
        icmpstat.icps_reflect
    };
 #endif
-   
+
    char *statMsg[] = {
        "Calls to IcmpError: ",
        "Errors not sent for icmp messages: ",
@@ -984,31 +987,31 @@ LogIcmpStats(FileHandle log)
     if (icmpstat.icps_packets > 0) {
 	cnt = sprintf(logBuf, "  ICMP Statistics:\n");
 	FileWrite (log, logBuf, cnt, FALSE);
-	
+
     	for (i = 0; i < NUM_ICMP_STATS; i++) {
 	    if (stats[i] > 0) {
 		cnt = sprintf(logBuf, "\t%-45s%u\n", statMsg[i], stats[i]);
-		FileWrite  (log, logBuf, cnt, FALSE);	    
+		FileWrite  (log, logBuf, cnt, FALSE);
 	    }
 	}
-    
+
     	for (i = 0; i < ICMP_MAXTYPE + 1; i++) {
 	    if (icmpstat.icps_outhist[i] > 0) {
-		cnt = sprintf(logBuf, "\t%s%u%s%u\n", 
+		cnt = sprintf(logBuf, "\t%s%u%s%u\n",
 			      "Icmp messages of type ", i, " sent: \t\t",
 			      icmpstat.icps_outhist[i]);
-		FileWrite  (log, logBuf, cnt, FALSE);	    
+		FileWrite  (log, logBuf, cnt, FALSE);
 	    }
 	}
-	
+
 	for (i = 0; i < ICMP_MAXTYPE + 1; i++) {
 	    if (icmpstat.icps_inhist[i] > 0) {
-		cnt = sprintf(logBuf, "\t%s%u%s%u\n", 
+		cnt = sprintf(logBuf, "\t%s%u%s%u\n",
 			      "Icmp messages of type ", i, " received: \t",
 			      icmpstat.icps_inhist[i]);
-		FileWrite  (log, logBuf, cnt, FALSE);	    
+		FileWrite  (log, logBuf, cnt, FALSE);
 	    }
-	}		
+	}
     }
 }
 
@@ -1033,16 +1036,16 @@ void CALLCONV
 LogWriteStats()
 {
     FileHandle log;
- 
+
     GeodeLoadDGroup(GeodeGetCodeProcessHandle());	/* Set up dgroup */
-    
+
      if ((log = LogGetLogFile()) != 0) {
 	LogIpStats(log);
-	LogTcpStats(log);   	
-	LogUdpStats(log);   	
-	LogIcmpStats(log);  	
+	LogTcpStats(log);
+	LogUdpStats(log);
+	LogIcmpStats(log);
 	FileCommit(log, FALSE);
-    }		
+    }
 }
 
 #endif  /* LOG_STATS */
@@ -1071,12 +1074,12 @@ LogWriteMessage (LogMessage msgCode)
     word cnt;
     TCHAR logBuf[MAX_LOG_STRING];
     FileHandle log;
-    
+
     char *logMsgs[] = {
 	    	    	/* these messages indicate a problem with input */
     	"Dropping received packet.",
 	"Packet is shorter than minimum IP header.",
-	
+
 	"IP datagram bigger than mtu but can't fragment.",
 	"Bad IP version number.",
  	"IP header length is too short.",
@@ -1088,7 +1091,7 @@ LogWriteMessage (LogMessage msgCode)
 	"IP datagram has bad destination address.",
 	"Unknown or unsupported IP protocol.",
 	"IP dropping datagram.",
-	    
+
 	"Tcp segment has bad checksum.",
 	"Tcp header has bad offset.",
 	"Tcp segment is shorter than minimum Tcp header length.",
@@ -1132,7 +1135,7 @@ LogWriteMessage (LogMessage msgCode)
 	"Dropping Tcp connection",
 	"Retransmit timeout and max retransmits sent.",
 	"Keepalive timeout expired."
-	    
+
     };
 
     if ((log = LogGetLogFile()) != 0) {
@@ -1147,9 +1150,9 @@ LogWriteMessage (LogMessage msgCode)
 /***********************************************************************
  *				LogTcpStateChange
  ***********************************************************************
- * SYNOPSIS:	
- * CALLED BY:	
- * RETURN:	
+ * SYNOPSIS:
+ * CALLED BY:
+ * RETURN:
  * SIDE EFFECTS:
  *
  * STRATEGY:
@@ -1182,7 +1185,7 @@ LogTcpStateChange(word oldState, word newState)
     };
 
     if ((log = LogGetLogFile()) != 0) {
-	cnt = sprintf(logBuf, "Tcp state change: %s to %s.\n\n", 
+	cnt = sprintf(logBuf, "Tcp state change: %s to %s.\n\n",
 		      states[oldState], states[newState]);
 	FileWrite(log, logBuf, cnt, FALSE);
     	FileCommit(log, FALSE);
@@ -1193,4 +1196,3 @@ LogTcpStateChange(word oldState, word newState)
 #endif /* LOG_EVENTS */
 
 #endif /* WRITE_LOG_FILE */
-

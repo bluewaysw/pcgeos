@@ -17,7 +17,7 @@
  *	TcpDropHeaders	    Strip IP and TCP headers and TCP options
  *	    	    	    from data buffer
  *	TcpInput    	    Main input handler for TCP protocol
- *	TcpPullOutOfBand    Pull out of band data out of a segment 
+ *	TcpPullOutOfBand    Pull out of band data out of a segment
  *	TcpDoOptions	    Process TCP options
  *
  * REVISION HISTORY:
@@ -87,6 +87,9 @@
 #ifdef __BORLANDC__
 #pragma codeseg TCPINCODE
 #endif
+#ifdef __WATCOMC__
+#pragma code_seg("TCPINCODE")
+#endif
 
 byte 	tcp_keeplen = 1;  	    	/* length of keepalive probes */
 
@@ -96,12 +99,12 @@ word tcp_keepintvl = TCPTV_KEEPINTVL;	/* time between keepalive  probes */
 word tcp_maxidle = TCPTV_KEEPCNT * TCPTV_KEEPINTVL;
                                       /* time to drop after starting probes */
 
-word tcp_backoff[TCP_MAXRXTSHIFT+1] = 
+word tcp_backoff[TCP_MAXRXTSHIFT+1] =
     {1, 2, 4, 8, 16, 32, 64, 64, 64, 64, 64, 64, 64};
 
 /* Default mss and round trip time estimates. */
-word	tcp_mssdflt = TCP_MSS;	    	
-word	tcp_rttdflt = TCPTV_SRTTDFLT;	    
+word	tcp_mssdflt = TCP_MSS;
+word	tcp_rttdflt = TCPTV_SRTTDFLT;
 
 /* Default maximum TCP window size. */
 dword 	tcp_maxwin  = TCP_MAXWIN;
@@ -113,7 +116,7 @@ byte	tcp_outflags[TCP_NSTATES] = {
 };
 
 word	rttShift = TCP_DFLT_RTT_SHIFT;
-word	rttvarShift = TCP_DFLT_RTT_VAR_SHIFT;  	    	
+word	rttvarShift = TCP_DFLT_RTT_VAR_SHIFT;
 
 #ifdef LOG_STATS
 struct tcpstat tcpstat;
@@ -124,7 +127,7 @@ struct tcpstat tcpstat;
  *				TcpReassemble
  ***********************************************************************
  * SYNOPSIS:	Insert segment into reassembly queue of tcp.
- * CALLED BY:	TcpInput 
+ * CALLED BY:	TcpInput
  * PASS:    	tcb 	= TCB of connection
  *	    	ti  	= pointing to tcp/ip hdr of segment
  *	    	dataBuf	= optr of locked buffer containing segment
@@ -142,10 +145,10 @@ struct tcpstat tcpstat;
  *
  ***********************************************************************/
 word
-TcpReassemble (struct tcpcb *tcb, 
-	       struct tcpiphdr *ti, 
+TcpReassemble (struct tcpcb *tcb,
+	       struct tcpiphdr *ti,
 	       optr dataBuf,
-	       word socket) 
+	       word socket)
 {
     struct tcpiphdr *q;
     word flags;
@@ -157,10 +160,10 @@ TcpReassemble (struct tcpcb *tcb,
     struct tcpiphdr *newTI;
 #endif
 
-    GeodeLoadDGroup(0); 	    /* we should be in the driver's thread */    
-    
+    GeodeLoadDGroup(0); 	    /* we should be in the driver's thread */
+
      /*
-      * Call with ti == 0 after become established to force 
+      * Call with ti == 0 after become established to force
       * pre-ESTABLISHED data up to user socket.
       */
     if (ti == 0)
@@ -168,7 +171,7 @@ TcpReassemble (struct tcpcb *tcb,
 
      /*
       * Find a segment which begins after this one does.
-      */    
+      */
     for (q = tcb->seg_next; q != 0; q = (struct tcpiphdr *)q->ti_next) {
 	LOG_EVENT(LM_TCP_USING_REASSEMBLY_QUEUE);
 	if (SEQ_GT(q->ti_seq, ti->ti_seq))
@@ -284,15 +287,15 @@ TcpReassemble (struct tcpcb *tcb,
     }
     LOG_STAT(tcpstat.tcps_rcvoopack++;)
     LOG_STAT(tcpstat.tcps_rcvoobyte += ti->ti_len;)
-	
+
 	/*
 	 * Overlay the source and port numbers in the TCP header
 	 * with the optr of the buffer.
 	 */
     ti->ti_bufMH = OptrToHandle(dataBuf);
     ti->ti_bufCH = OptrToChunk(dataBuf);
-	
- 	/* 
+
+ 	/*
 	 * While we overlap succeeding segments trim them or,
 	 * if they are completely covered, dequeue them.
 	 */
@@ -317,20 +320,20 @@ TcpReassemble (struct tcpcb *tcb,
 
 	    break;
 	}
-	
+
 	LOG_EVENT(LM_TCP_DROPPING_COMPLETELY_OVERLAPPED_SEGMENT);
-	
-	dataBuf = ConstructOptr((MemHandle)q->ti_bufMH, 
+
+	dataBuf = ConstructOptr((MemHandle)q->ti_bufMH,
 				(ChunkHandle)q->ti_bufCH);
 	TcpRemoveQueue(q, tcb);
 	q = (struct tcpiphdr *)q->ti_next;
 	TcpipUnlock(OptrToHandle(dataBuf));
 	TcpipFreeDataBuffer(dataBuf);
     }
-    
+
      /*
       * Stick new segment in its place.  Have to handle special cases
-      * for inserting at front.  BSD uses a circular list with pointers 
+      * for inserting at front.  BSD uses a circular list with pointers
       * to the TCB but our TCB is not always locked so that won't work.
       * ("q" is the element to insert the segment in front of)
       */
@@ -342,7 +345,7 @@ TcpReassemble (struct tcpcb *tcb,
 	tcb->rcv_buf = 0;
 
     ti->ti_next = (byte *)q;
-    if (q == 0) {   	   
+    if (q == 0) {
 	ti->ti_prev = (byte *)tcb->seg_prev;
     	tcb->seg_prev = ti;
     }
@@ -350,9 +353,9 @@ TcpReassemble (struct tcpcb *tcb,
 	ti->ti_prev = q->ti_prev;
     	q->ti_prev = (byte *)ti;
     }
-    if (ti->ti_prev == 0)	    	 
-	tcb->seg_next = ti;	    	
-    else	    	   
+    if (ti->ti_prev == 0)
+	tcb->seg_next = ti;
+    else
 	((struct tcpiphdr *)ti->ti_prev)->ti_next = (byte *)ti;
 
 present:
@@ -366,17 +369,17 @@ present:
     if (ti == 0 || ti->ti_seq != tcb->rcv_nxt ||
 	(tcb->t_state == TCPS_SYN_RECEIVED && ti->ti_len))
 	return (0);
-    
+
     LOG_EVENT(LM_TCP_DELIVERING_SEGMENTS_FROM_REASSEMBLY_QUEUE);
-    
+
     do {
 	tcb->rcv_nxt += ti->ti_len;
-	tcb->rqueue_size -= ti->ti_len;	  /* update reass. queue size */  
+	tcb->rqueue_size -= ti->ti_len;	  /* update reass. queue size */
 
 	flags = ti->ti_flags & TH_FIN;
 	dataBuf = ConstructOptr((MemHandle)ti->ti_bufMH,
 				(ChunkHandle)ti->ti_bufCH);
-	
+
 	TcpRemoveQueue(ti, tcb);
 	ti = (struct tcpiphdr *)ti->ti_next;
 
@@ -384,9 +387,9 @@ present:
 	tcb->rcv_buf = TSocketRecvInput(dataBuf, socket) - tcb->rqueue_size;
 	if (tcb->rcv_buf < 0)
 	    tcb->rcv_buf = 0;
-    
+
     } while (ti != 0  && ti->ti_seq == tcb->rcv_nxt);
-    
+
     return (flags);
 }
 
@@ -394,7 +397,7 @@ present:
 /***********************************************************************
  *				TcpDropHeaders
  ***********************************************************************
- * SYNOPSIS:	Strip IP and TCP headers and TCP options from data buffer 
+ * SYNOPSIS:	Strip IP and TCP headers and TCP options from data buffer
  *	    	before passing to socket library.
  * CALLED BY:	IpInput
  * PASS:    	socket	= connection handle
@@ -410,18 +413,18 @@ present:
  *	jwu	7/21/94		Initial Revision
  *
  ***********************************************************************/
-void 
+void
 TcpDropHeaders (word socket, optr dataBuf)
 {
     MbufHeader *m;
     struct tcpiphdr *ti;
     word adj;
 
-    GeodeLoadDGroup(0); 	    /* we should be in the driver's thread */    
-    
+    GeodeLoadDGroup(0); 	    /* we should be in the driver's thread */
+
     m = (MbufHeader *)LMemDeref(dataBuf);
     ti = (struct tcpiphdr *)mtod(m);
-    
+
     adj = sizeof (struct ip) + (ti->ti_off << 2);
     m->MH_dataSize -= adj;
     m->MH_dataOffset += adj;
@@ -440,10 +443,10 @@ TcpDropHeaders (word socket, optr dataBuf)
  * SIDE EFFECTS:
  *	    	Data buffer will either be freed or delivered
  *	    	to the socket library.
- *	    	
+ *
  * STRATEGY:
  *
- * NOTE:    	hlen has been deducted from ip_len 
+ * NOTE:    	hlen has been deducted from ip_len
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -452,7 +455,7 @@ TcpDropHeaders (word socket, optr dataBuf)
  *
  ***********************************************************************/
 void
-TcpInput (optr dataBuf, word iphlen) 
+TcpInput (optr dataBuf, word iphlen)
 {
     MbufHeader *m;
     struct tcpiphdr *ti;
@@ -466,7 +469,7 @@ TcpInput (optr dataBuf, word iphlen)
     dword tiwin;
     sdword todrop;
 
-    GeodeLoadDGroup(0); 	    /* we should be in the driver's thread */    
+    GeodeLoadDGroup(0); 	    /* we should be in the driver's thread */
     LOG_STAT(tcpstat.tcps_rcvtotal++;)
 
      /*
@@ -503,7 +506,7 @@ TcpInput (optr dataBuf, word iphlen)
     }
 
      /*
-      * Check that TCP offset makes sense, pull out TCP options and 
+      * Check that TCP offset makes sense, pull out TCP options and
       * adjust length.
       */
     off = ti->ti_off << 2;
@@ -512,10 +515,10 @@ TcpInput (optr dataBuf, word iphlen)
 	LOG_EVENT(LM_TCP_BAD_OFFSET);
 	goto dropSeg;
     }
-    
+
     tlen -= off;
     ti->ti_len = tlen;	    	    /* TCP header deducted from ti_len */
-    
+
     if (off > sizeof (struct tcphdr)) {	    /* TCP options exist */
     	if (m->MH_dataSize < sizeof(struct ip) + off) {
 	    LOG_STAT(tcpstat.tcps_rcvshort++;)
@@ -542,26 +545,26 @@ TcpInput (optr dataBuf, word iphlen)
       * Locate the socket for the segment.  If connection does not
       * exist, then have to create a temporary connection and notify
       * socket library of connection request from peer if segment
-      * contains a SYN.  Incoming SYN segments with broadcast or 
-      * multicast address as the destination address must be silently 
+      * contains a SYN.  Incoming SYN segments with broadcast or
+      * multicast address as the destination address must be silently
       * discarded.
       */
-findpcb:    
+findpcb:
     socket = TSocketFindConnection(ti->ti_src, ti->ti_dst, ti->ti_dport,
 				  ti->ti_sport);
     if (socket == 0) {
-	
+
 	if ((tiflags & (TH_RST|TH_ACK)) || m->MH_flags & (IF_BCAST | IF_MCAST)) {
 	    LOG_EVENT(LM_TCP_SEGMENT_HAS_NO_CONNECTION);
 	    goto dropSegWithReset;
 	}
 	if ((tiflags & TH_SYN) == 0) {
 	    LOG_EVENT(LM_TCP_SEGMENT_HAS_NO_CONNECTION);
-	    goto dropSeg;	
+	    goto dropSeg;
 	}
 
-    	socket = TSocketProcessConnectRequest(ti->ti_src, 
-					     ti->ti_sport, 
+    	socket = TSocketProcessConnectRequest(ti->ti_src,
+					     ti->ti_sport,
 					     ti->ti_dport,
 					     m->MH_domain);
     	if (socket == 0)  {
@@ -581,9 +584,9 @@ findpcb:
 	tcb->t_state = TCPS_LISTEN;
 
     tiwin = ti->ti_win;
-     
+
      /*
-      * Segment received on connection.  Reset idle time and keep-alive 
+      * Segment received on connection.  Reset idle time and keep-alive
       * timer.
       */
     tcb->t_idle = 0;
@@ -597,10 +600,10 @@ findpcb:
      /*
       * Header prediction:  check for the two common cases of a
       * uni-directional data xfer.  If the packet has no control
-      * flags, is in-sequence, the window didn't change and we're 
-      * not retransmitting, it's a candidate.  If the length is zero 
+      * flags, is in-sequence, the window didn't change and we're
+      * not retransmitting, it's a candidate.  If the length is zero
       * and the ack moved forward, we're the sender side of the xfer.
-      * Just free the data acked.  If the length is non-zero and the 
+      * Just free the data acked.  If the length is non-zero and the
       * ack didn't move, we're on the receiver side.  If we're getting
       * packets in-order (the reassembly queue is empty), pass the data
       * to the socket and note that we need a delayed ack.
@@ -608,22 +611,22 @@ findpcb:
     if (tcb->t_state == TCPS_ESTABLISHED &&
 	(tiflags & (TH_SYN|TH_FIN|TH_RST|TH_URG|TH_ACK)) == TH_ACK &&
 	ti->ti_seq == tcb->rcv_nxt &&
-	tiwin && tiwin == tcb->snd_wnd && 
+	tiwin && tiwin == tcb->snd_wnd &&
 	tcb->snd_nxt == tcb->snd_max) {
-	    
+
 	if (ti->ti_len == 0) {
 	    if (SEQ_GT(ti->ti_ack, tcb->snd_una) &&
 		SEQ_LEQ(ti->ti_ack, tcb->snd_max) &&
 		tcb->snd_cwnd >= tcb->snd_wnd) {
-		  
+
 		  /*
 	           * this is a pure ack for outstanding data
-		   * Collect new round-trip time estimate 
+		   * Collect new round-trip time estimate
 		   */
 		if (tcb->t_rtt &&
 		    SEQ_GT(ti->ti_ack, tcb->t_rtseq))
 		    TcpXmitTimer(tcb, tcb->t_rtt);
-		  
+
 		  /*
 		   * Have socket level drop the acked data from
 		   * the output queue and destroy input segment.
@@ -635,7 +638,7 @@ findpcb:
 		tcb->snd_una = ti->ti_ack;
 		TcpipUnlock(OptrToHandle(dataBuf));
 		TcpipFreeDataBuffer(dataBuf);
-			   
+
 		 /*
 		  * If all outstanding data are acked, stop
 		  * retransmit timer, otherwise restart timer using
@@ -655,7 +658,7 @@ findpcb:
 	} else if (ti->ti_ack == tcb->snd_una &&
 		   tcb->seg_next == 0 &&
 		   ti->ti_len <= tcb->rcv_buf) {
-	    	/* 
+	    	/*
 		 * This is a pure, in-sequence data packet with
 		 * nothing on the reassembly queue.
 		 */
@@ -663,7 +666,7 @@ findpcb:
 	    LOG_STAT(tcpstat.tcps_rcvpack++;)
 	    LOG_STAT(tcpstat.tcps_rcvbyte += ti->ti_len;)
 	    	/*
-		 * Drop TCP, IP headers and TCP options, then pass data 
+		 * Drop TCP, IP headers and TCP options, then pass data
 		 * to socket level.
 		 */
 	    TcpDropHeaders(socket, dataBuf);
@@ -701,9 +704,9 @@ findpcb:
      */
     TcpDropHeaders(socket, dataBuf);
 
-    
+
     /*
-     * Calculate amount of space in receive window, and then do 
+     * Calculate amount of space in receive window, and then do
      * TCP input processing.  Receive space is amount of space
      * for received data, but not less than advertised window.
      */
@@ -711,12 +714,12 @@ findpcb:
     sdword win = tcb->rcv_buf;
     tcb->rcv_wnd = max(win, (sdword)(tcb->rcv_adv - tcb->rcv_nxt));
     }
-    
+
     switch (tcb->t_state) {
 
 	case TCPS_LISTEN:
 	    /*
-	     * Temporary connection created because of an incoming 
+	     * Temporary connection created because of an incoming
 	     * request.  Not accepted yet.
 	     * Initialize sender and receiver's sequence numbers.
 	     */
@@ -776,7 +779,7 @@ findpcb:
 		TSocketIsConnected(socket);
 		(void) TcpReassemble(tcb, (struct tcpiphdr *)0,
 				     (optr)0, socket);
-		/* 
+		/*
 		 * If we didn't have to retransmit the SYN, use its
 		 * rtt as our initial srrt and rtt var.
 		 */
@@ -790,7 +793,7 @@ findpcb:
 trimThenStep6:
 	    /*
 	     * Advance ti->ti_seq to correspond to first data byte.
-	     * If data, trim to stay within window, dropping FIN if 
+	     * If data, trim to stay within window, dropping FIN if
 	     * necessary.
 	     */
 	    ti->ti_seq++;
@@ -809,10 +812,10 @@ trimThenStep6:
 
      /*
       * States other than LISTEN or SYN_SENT.
-      * If segment begins before rcv_nxt, drop leading data (and SYN); 
+      * If segment begins before rcv_nxt, drop leading data (and SYN);
       * if nothing left, just ack.
       */
-    
+
     todrop = tcb->rcv_nxt - ti->ti_seq;
     if (todrop > 0) {
 	if (tiflags & TH_SYN) {
@@ -850,30 +853,30 @@ trimThenStep6:
 		if (todrop != 0 || (tiflags & TH_ACK) == 0)
 		    goto dropAfterAck;
 		else
-		    needoutput = 1; 	    
+		    needoutput = 1;
 	    }
-	} 
-#ifdef LOG_STATS	
+	}
+#ifdef LOG_STATS
 	else {
 	    tcpstat.tcps_rcvpartduppack++;
 	    tcpstat.tcps_rcvpartdupbyte += todrop;
 	}
 #endif
-	
-	 /* 
+
+	 /*
 	  * Adjust data buffer to drop duplicate bytes.
 	  * All TCP/IP headers have been removed so it's safe to adjust
 	  * dataSize and dataOffset in the PacketHeader.
 	  */
-	m->MH_dataOffset += todrop;  
+	m->MH_dataOffset += todrop;
 	m->MH_dataSize -= todrop;
 	ti->ti_seq += todrop;
 	ti->ti_len -= todrop;
     }
 	 /*
 	  * Check that at least some bytes of segment are within
-	  * receive window.  If segment ends after the window, 
-	  * drop trailing data (and PUSH and FIN); if nothing left, 
+	  * receive window.  If segment ends after the window,
+	  * drop trailing data (and PUSH and FIN); if nothing left,
 	  * just ACK.
 	  */
     todrop = (ti->ti_seq + ti->ti_len) - (tcb->rcv_nxt + tcb->rcv_wnd);
@@ -894,9 +897,9 @@ trimThenStep6:
 		TSocketIsDisconnected (socket, SDE_NO_ERROR, SCT_FULL, TRUE);
 		goto findpcb;
 	    }
-		
+
 	    /*
-	     * If window is closed, can only take segments at 
+	     * If window is closed, can only take segments at
 	     * window edge, and have to drop data and PUSH from
 	     * incoming segments.  Continue processing, but
 	     * remember to ack.  Otherwise, drop segment and ack.
@@ -907,13 +910,13 @@ trimThenStep6:
 	    }
 	    else
 		goto dropAfterAck;
-	} 
-#ifdef LOG_STATS	
+	}
+#ifdef LOG_STATS
 	else
 	    tcpstat.tcps_rcvbyteafterwin += todrop;
 #endif
-	    
-	/* 
+
+	/*
 	 * Adjust data buffer to trim the excess data off the end.
 	 */
 	m->MH_dataSize -= todrop;
@@ -935,18 +938,18 @@ trimThenStep6:
 	word tcbState = tcb->t_state;
 	tcb = (struct tcpcb *)0;    	/* indicate unlocked*/
 	TcpipUnlock(OptrToHandle(tp));
-	    
+
 	switch (tcbState) {
 	    case TCPS_SYN_RECEIVED:
 	        TSocketIsDisconnected (socket, SDE_CONNECTION_REFUSED, SCT_FULL,
 				       TRUE);
 	        goto close;
-		
+
 	    case TCPS_ESTABLISHED:
 	    case TCPS_FIN_WAIT_1:
 	    case TCPS_FIN_WAIT_2:
 	    case TCPS_CLOSE_WAIT:
-	        TSocketIsDisconnected (socket, SDE_CONNECTION_RESET_BY_PEER, 
+	        TSocketIsDisconnected (socket, SDE_CONNECTION_RESET_BY_PEER,
 				      SCT_FULL, TRUE);
 	    close:
 		LOG_STAT(tcpstat.tcps_drops++;)
@@ -966,17 +969,17 @@ trimThenStep6:
      */
     if (tiflags & TH_SYN) {
 	LOG_STATE(TCPS_CLOSED);
-	tcb->t_state = TCPS_CLOSED;	    	
+	tcb->t_state = TCPS_CLOSED;
 	tcb = (struct tcpcb *)0;    	/* indicate unlocked*/
 	TcpipUnlock(OptrToHandle(tp));
 	LOG_EVENT(LM_TCP_SYN_RECEIVED_IN_WINDOW);
 	TcpDrop(socket, tp, SDE_CONNECTION_RESET);
 	goto dropSegWithReset;
     }
-	
+
     /*
      * If the ACK bit is off, we drop the segment and return.
-     */	
+     */
     if ((tiflags & TH_ACK) == 0) {
 	LOG_EVENT(LM_TCP_SEGMENT_MISSING_ACK);
 	goto dropSeg;
@@ -988,7 +991,7 @@ trimThenStep6:
     switch (tcb->t_state) {
 	/*
 	 * In SYN_RECEIVED state, if the ack ACKs our SYN, then
-	 * enter ESTABLISHED state and continue processing, 
+	 * enter ESTABLISHED state and continue processing,
 	 * otherwise send an RST.
 	 */
 	case TCPS_SYN_RECEIVED:
@@ -1001,21 +1004,21 @@ trimThenStep6:
 	    LOG_STATE(TCPS_ESTABLISHED);
 	    tcb->t_state = TCPS_ESTABLISHED;
 	    TSocketIsConnected (socket);
-	    (void) TcpReassemble(tcb, (struct tcpiphdr *)0, 
+	    (void) TcpReassemble(tcb, (struct tcpiphdr *)0,
 				 (optr)0, socket);
 	    tcb->snd_wl1 = ti->ti_seq - 1;
-	    
+
 	    /* fall into ... */
 
 	    /*
 	     * In ESTABLISHED state: drop duplicate ACKs; ACK out of range
-	     * ACKs.  If the ack is in the range   
+	     * ACKs.  If the ack is in the range
 	     *     tcb->snd_una < ti->ti_ack <= tcb->snd_max
 	     * then advance tcb->snd_una to ti->ti_ack and drop data from
 	     * the retransmission queue.  If this ACK reflects more
 	     * up to date window information we update our window info.
 	     */
-	case TCPS_ESTABLISHED: 	
+	case TCPS_ESTABLISHED:
 	case TCPS_FIN_WAIT_1:
 	case TCPS_FIN_WAIT_2:
 	case TCPS_CLOSE_WAIT:
@@ -1031,7 +1034,7 @@ trimThenStep6:
 		     * window info didn't change), the ack is the biggest
 		     * we've seen and we've seen exactly our rexmt threshold
 		     * of them.  So, assume a packet has been dropped and
-		     * retransmit it.  Kludge snd_nxt & the congestion 
+		     * retransmit it.  Kludge snd_nxt & the congestion
 		     * window so we send only this one packet.
 		     *
 		     * We know we're losing at the current window size so
@@ -1051,7 +1054,7 @@ trimThenStep6:
 			tcp_seq onxt = tcb->snd_nxt;
 			word win = min(tcb->snd_wnd, tcb->snd_cwnd) / 2 /
 			    tcb->t_maxseg;
-			    
+
 			if (win < 2)
 			    win = 2;
 			tcb->snd_ssthresh = win * tcb->t_maxseg;
@@ -1061,10 +1064,10 @@ trimThenStep6:
 			tcb->snd_cwnd = tcb->t_maxseg;
 			TcpipUnlock(OptrToHandle(tp));
 			(void) TcpOutput(tp, socket);
-			    
+
 			TcpipLock(OptrToHandle(tp));
 			tcb = (struct tcpcb *)LMemDeref(tp);
-			tcb->snd_cwnd = tcb->snd_ssthresh + tcb->t_maxseg * 
+			tcb->snd_cwnd = tcb->snd_ssthresh + tcb->t_maxseg *
 			    tcb->t_dupacks;
 			if (SEQ_GT(onxt, tcb->snd_nxt))
 			    tcb->snd_nxt = onxt;
@@ -1082,7 +1085,7 @@ trimThenStep6:
 	    }
 
 	    /*
-	     * If the congestion window was inflated to account for 
+	     * If the congestion window was inflated to account for
 	     * the other side's cached packets, retract it.
 	     */
 	    if (tcb->t_dupacks > tcprexmtthresh &&
@@ -1096,10 +1099,10 @@ trimThenStep6:
 	    acked = ti->ti_ack - tcb->snd_una;
 	    LOG_STAT(tcpstat.tcps_rcvackpack++;)
 	    LOG_STAT(tcpstat.tcps_rcvackbyte += acked;)
-		
+
 	    /*
-	     * If transmit timer is running and timed sequence number 
-	     * was acked, update smoothed round trip time. 
+	     * If transmit timer is running and timed sequence number
+	     * was acked, update smoothed round trip time.
 	     */
 	    if (tcb->t_rtt && SEQ_GT(ti->ti_ack, tcb->t_rtseq))
 		TcpXmitTimer(tcb, tcb->t_rtt);
@@ -1118,34 +1121,34 @@ trimThenStep6:
 
 	    /*
 	     * When new data is acked, open the congestion window.
-	     * If the window gives us less than ssthresh packets in 
+	     * If the window gives us less than ssthresh packets in
 	     * flight, open exponentially (maxseg per packet).  Otherwise
 	     * open linearly: maxseg per window (maxseg^2/cwnd per packet),
-	     * plus a constant fraction of a packet (maxseg/8) to help 
+	     * plus a constant fraction of a packet (maxseg/8) to help
 	     * larger windows open quickly enough.
 	     */
 	{
 	    dword cw = tcb->snd_cwnd;
 	    dword incr = (dword) tcb->t_maxseg;
-	    
+
 	    if (cw > tcb->snd_ssthresh)
 		incr = incr * incr / cw + incr / 8;
 	    tcb->snd_cwnd = min(cw + incr, tcp_maxwin);
 	}
-		
+
 	    /*
 	     * Have the socket level drop the acked data and find
 	     * out if our FIN was acked.
 	     */
 	    tcb->snd_wnd -= TSocketDropAckedData(socket, acked,
 						&ourfinisacked);
-		
+
 	    tcb->snd_una = ti->ti_ack;
 	    if (SEQ_LT(tcb->snd_nxt, tcb->snd_una))
 		tcb->snd_nxt = tcb->snd_una;
 
 	    /*
-	     * Do some extra processing for the ESTABLISHED state 
+	     * Do some extra processing for the ESTABLISHED state
 	     * if our FIN is acked.
 	     */
 	    switch (tcb->t_state) {
@@ -1155,7 +1158,7 @@ trimThenStep6:
 			tcb->t_state = TCPS_FIN_WAIT_2;
 		    }
 		    break;
-		
+
 		case TCPS_CLOSING:
 		    if (ourfinisacked) {
 			TSocketIsDisconnected(socket, SDE_NO_ERROR, SCT_FULL,
@@ -1166,7 +1169,7 @@ trimThenStep6:
 			tcb->t_timer[TCPT_2MSL] = 2 * TCPTV_MSL;
 		    }
 		    break;
-		    
+
 		case TCPS_LAST_ACK:
 		    /*
 		     * We may still be waiting for data to drain and/or
@@ -1175,7 +1178,7 @@ trimThenStep6:
 		     * drop the segment.
 		     */
 		    if (ourfinisacked) {
-			LOG_STATE(TCPS_CLOSED);		
+			LOG_STATE(TCPS_CLOSED);
 			tcb->t_state = TCPS_CLOSED;
 			tcb = (struct tcpcb *)0;	    /* unlocked */
 			TcpipUnlock(OptrToHandle(tp));
@@ -1184,23 +1187,23 @@ trimThenStep6:
 			goto dropSeg;
 		    }
 		    break;
-			
+
 		case TCPS_TIME_WAIT:
 		    tcb->t_timer[TCPT_2MSL] = 2 * TCPTV_MSL;
 		    goto dropAfterAck;
 	    }
-	}	
+	}
 step6:
     /*
      * Update window information.
      * Don't look at window if no ACK:  TAC's send garbage on first SYN.
      */
-    if ((tiflags & TH_ACK) && 
+    if ((tiflags & TH_ACK) &&
 	(SEQ_LT(tcb->snd_wl1, ti->ti_seq) || tcb->snd_wl1 == ti->ti_seq &&
 	 (SEQ_LT(tcb->snd_wl2, ti->ti_ack) ||
 	  tcb->snd_wl2 == ti->ti_ack && tiwin > tcb->snd_wnd))) {
 
-#ifdef LOG_STATS	 
+#ifdef LOG_STATS
 	 /* keep track of pure window updates */
 	if (ti->ti_len == 0 &&
 	    tcb->snd_wl2 == ti->ti_ack && tiwin > tcb->snd_wnd)
@@ -1214,7 +1217,7 @@ step6:
 	    tcb->max_sndwnd = tcb->snd_wnd;
 	needoutput = 1;
     }
-	
+
     /*
      * Process segments with URG.
      */
@@ -1229,11 +1232,11 @@ step6:
 	 * CLOSING, LAST_ACK or TIME_WAIT states since a FIN has been
 	 * received from the remote side.
 	 *
-	 * According to RFC961 (Assigned Protocols), the urgent 
+	 * According to RFC961 (Assigned Protocols), the urgent
 	 * pointer points to the last octet of urgent data.  BSD
 	 * continues to consider it to indicate the first byte
-	 * of data past the urgent section as the original spec states. 
-	 * 
+	 * of data past the urgent section as the original spec states.
+	 *
 	 * Deliver urgent data to socket level.  Only do this when urgent
 	 * pointer is within segment so retransmitted urgent data won't
 	 * be delivered to the socket level again.
@@ -1244,17 +1247,17 @@ step6:
 	}
 
 	/*
-	 * If not inline, remove out of band data so doesn't get 
-	 * presented to user. This can happen independent of advancing 
-	 * the URG pointer, but if two urg's are pending at once, 
-	 * some out-of-band data may creep in. 
-	 */   
-	if (urp <= ti->ti_len && !tcb->t_inline) 
+	 * If not inline, remove out of band data so doesn't get
+	 * presented to user. This can happen independent of advancing
+	 * the URG pointer, but if two urg's are pending at once,
+	 * some out-of-band data may creep in.
+	 */
+	if (urp <= ti->ti_len && !tcb->t_inline)
 	    TcpPullOutOfBand(tcb, urp, m);
 
     } else
 	/*
-	 * If no out of band data is expected, pull receive urgent 
+	 * If no out of band data is expected, pull receive urgent
 	 * pointer along with receive window.
 	 */
 	if (SEQ_GT(tcb->rcv_nxt, tcb->rcv_up))
@@ -1263,8 +1266,8 @@ step6:
     /*
      * Process the segment text, merging it into the TCP sequencing queue,
      * and arranging for acknowledgement of receipt if necessary.  This
-     * process logically involves adjusting tcb->rcv_wnd as data is 
-     * presented to the socket level (calling output should do the right 
+     * process logically involves adjusting tcb->rcv_wnd as data is
+     * presented to the socket level (calling output should do the right
      * thing).
      * If a FIN has already been received on this connection, then we just
      * ignore the text.
@@ -1278,7 +1281,7 @@ step6:
 	  */
 	if (ti->ti_seq == tcb->rcv_nxt &&
 	    tcb->seg_next == 0 &&
-	    tcb->t_state >= TCPS_ESTABLISHED) {	    
+	    tcb->t_state >= TCPS_ESTABLISHED) {
 	    tcb->t_flags |= TF_DELACK;
 	    tcb->rcv_nxt += ti->ti_len;
 	    tiflags = ti->ti_flags & TH_FIN;
@@ -1302,7 +1305,7 @@ step6:
 	TcpipFreeDataBuffer(dataBuf);
 	tiflags &= ~TH_FIN;
     }
-	
+
     /*
      * If FIN is received ACK the FIN and transition to the appropriate
      * nex state.
@@ -1317,11 +1320,11 @@ step6:
 	    case TCPS_ESTABLISHED:
 		LOG_STATE(TCPS_CLOSE_WAIT);
 	        tcb->t_state = TCPS_CLOSE_WAIT;
-		 /* 
+		 /*
 		  * Notify socket library so it doesn't expect anymore
 		  * incoming data, although it can still send data.
 		  */
-		TSocketIsDisconnected(socket, SDE_NO_ERROR, SCT_HALF, FALSE);   
+		TSocketIsDisconnected(socket, SDE_NO_ERROR, SCT_HALF, FALSE);
 		break;
 
 	    case TCPS_FIN_WAIT_1:
@@ -1343,7 +1346,7 @@ step6:
 
     /*
      * Return any desired output.
-     */ 
+     */
     if (needoutput || (tcb->t_flags & TF_ACKNOW)) {
 	TcpipUnlock(OptrToHandle(tp));
 	(void) TcpOutput(tp, socket);
@@ -1354,21 +1357,21 @@ step6:
 
 dropAfterAck:
     /*
-     * Generate an ACK dropping incoming segment if it occupies 
+     * Generate an ACK dropping incoming segment if it occupies
      * sequence space, where the ACK reflects our state.
      */
-    if (tiflags & TH_RST) 
+    if (tiflags & TH_RST)
 	goto dropSeg;
-    
+
     TcpipUnlock(OptrToHandle(dataBuf));
     TcpipFreeDataBuffer(dataBuf);
-    
+
     tcb->t_flags |= TF_ACKNOW;
     TcpipUnlock(OptrToHandle(tp));
-    
+
     (void) TcpOutput(tp, socket);
     return;
-		
+
 dropSegWithReset:
     /*
      * Generate a RST, dropping incoming segment.
@@ -1377,13 +1380,13 @@ dropSegWithReset:
      */
     if ((tiflags & TH_RST) || (m->MH_flags & (IF_BCAST | IF_MCAST)))
 	goto dropSeg;
-    if (tiflags & TH_ACK) 
-	TcpRespond(tcb, ti, m, (tcp_seq)0, ti->ti_ack, TH_RST, 
+    if (tiflags & TH_ACK)
+	TcpRespond(tcb, ti, m, (tcp_seq)0, ti->ti_ack, TH_RST,
 		   m->MH_domain);
     else {
-	if (tiflags & TH_SYN) 
+	if (tiflags & TH_SYN)
 	    ti->ti_len++;
-	TcpRespond (tcb, ti, m, ti->ti_seq + ti->ti_len, (tcp_seq)0, 
+	TcpRespond (tcb, ti, m, ti->ti_seq + ti->ti_len, (tcp_seq)0,
 		    TH_RST|TH_ACK, m->MH_domain);
     }
 
@@ -1401,7 +1404,7 @@ dropSeg:
 /***********************************************************************
  *				TcpPullOutOfBand
  ***********************************************************************
- * SYNOPSIS:	Pull out of band byte out of a segment so it doesn't 
+ * SYNOPSIS:	Pull out of band byte out of a segment so it doesn't
  *	    	appear in the user's data queue.  It is still reflected
  *	    	in the segment length for sequencing purposes.  Deliver
  *	    	urgent byte to socket level.
@@ -1425,21 +1428,21 @@ TcpPullOutOfBand (struct tcpcb *tcb, word urp, MbufHeader *m)
      * Extract the urgent byte.
      */
     word cnt = urp - 1;
-    char *cp = (char *)mtod(m) + cnt;   
-    
-    if (cnt) 
+    char *cp = (char *)mtod(m) + cnt;
+
+    if (cnt)
 	/*
 	 * Copy data following urgent byte forward in buffer.
 	 */
 	memcpy(cp, cp+1, (m->MH_dataSize - cnt - 1));
-    else 
+    else
 	/*
-	 * The first byte was the urgent data byte so just 
+	 * The first byte was the urgent data byte so just
 	 * increase the dataOffset to exclude that byte.
 	 */
 	m->MH_dataOffset += 1;
-    
-    m->MH_dataSize -= 1;    
+
+    m->MH_dataSize -= 1;
 }
 
 
@@ -1451,7 +1454,7 @@ TcpPullOutOfBand (struct tcpcb *tcb, word urp, MbufHeader *m)
  * PASS:    	tcb 	= Tcp control block of connection
  *	    	cp	= pointer to the option data in the buffer
  *	    	cnt 	= number of bytes of option data
- *	    	ti  	= TCP/IP header 
+ *	    	ti  	= TCP/IP header
  *	    	link	= domain handle of outgoing interface
  * RETURN:	nothing
  * SIDE EFFECTS:
@@ -1465,8 +1468,8 @@ TcpPullOutOfBand (struct tcpcb *tcb, word urp, MbufHeader *m)
  *	jwu	7/26/94		Initial Revision
  *
  ***********************************************************************/
-void	
-TcpDoOptions (struct tcpcb *tcb, 
+void
+TcpDoOptions (struct tcpcb *tcb,
 	      byte *cp,
 	      sword cnt,
 	      struct tcpiphdr *ti,
@@ -1475,10 +1478,10 @@ TcpDoOptions (struct tcpcb *tcb,
     word mss;
     sword opt, optlen;
 
-    GeodeLoadDGroup(0); 	    /* we should be in the driver's thread */    
-    
+    GeodeLoadDGroup(0); 	    /* we should be in the driver's thread */
+
     for (; cnt > 0; cnt -= optlen, cp += optlen) {
-	opt = cp[0];	
+	opt = cp[0];
 	if (opt == TCPOPT_EOL)
 	    break;
 	if (opt == TCPOPT_NOP)
@@ -1490,10 +1493,10 @@ TcpDoOptions (struct tcpcb *tcb,
 	}
 
 	switch (opt) {
-	    
-	    default: 
+
+	    default:
 	    	continue;
-	    
+
 	    case TCPOPT_MAXSEG:
 		if (optlen != TCPOLEN_MAXSEG)
 		    continue;
@@ -1503,9 +1506,8 @@ TcpDoOptions (struct tcpcb *tcb,
 		mss = NetworkToHostWord(mss);
 		(void) TcpMSS(tcb, mss, link);    	/* sets t_maxseg */
 		break;
-	
+
 	}
     }
 
 }
-

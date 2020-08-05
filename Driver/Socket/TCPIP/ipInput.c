@@ -76,10 +76,13 @@
 #endif
 
 #ifdef __HIGHC__
-#pragma Code("IPCODE"); 
+#pragma Code("IPCODE");
 #endif
 #ifdef __BORLANDC__
 #pragma codeseg IPCODE
+#endif
+#ifdef __WATCOMC__
+#pragma code_seg("IPCODE")
 #endif
 
 #include <geos.h>
@@ -107,7 +110,7 @@ dword	ip_net_host;	    	    	/* complement of netmask for
 					   recognizing {sub}net broadcasts */
 
 #ifdef LOG_STATS
-struct 	ipstat ipstat;	    	    	    	
+struct 	ipstat ipstat;
 #endif
 
 
@@ -118,7 +121,7 @@ struct 	ipstat ipstat;
  * CALLED BY:	TcpipInit
  * RETURN:	nothing
  * SIDE EFFECTS:
- *	
+ *
  * STRATEGY:
  *	Initialize reassembly queue.
  *	Initialize ID value.
@@ -135,7 +138,7 @@ IpInit()
 
     	ipq.next = ipq.prev = &ipq;
 	ip_id = (word) TimerGetCount();
-}    
+}
 
 
 /***********************************************************************
@@ -159,9 +162,9 @@ void CALLCONV
 IpExit()
 {
     struct ipq *p, *q;
-    
+
     GeodeLoadDGroup(GeodeGetCodeProcessHandle());	/* Set up dgroup */
-    
+
     for (q = ipq.next; q != &ipq; q = p) {
 	p = q->next;
 	IpFreeFragmentQueue(q);
@@ -182,8 +185,8 @@ IpExit()
  * RETURN:	nothing
  * SIDE EFFECTS:
  *	    The data buffer is locked in this routine.  If there is
- *	    something wrong with the datagram, it will be freed, 
- *	    otherwise, it will be freed by the socket library when 
+ *	    something wrong with the datagram, it will be freed,
+ *	    otherwise, it will be freed by the socket library when
  * 	    it has been delivered, or by the higher level protocols
  *	    in case of an error.
  * STRATEGY:
@@ -204,22 +207,22 @@ IpInput (optr dataBuffer)
     byte proto;
     MbufHeader *m;
 
-    GeodeLoadDGroup(0); 	    /* we should be in the driver's thread */    
-    
+    GeodeLoadDGroup(0); 	    /* we should be in the driver's thread */
+
     LOG_STAT(ipstat.ips_total++;)
-    
+
      /*
       * Lock down the data buffer so we can access the data.
       */
     TcpipLock(OptrToHandle(dataBuffer));
     m = (MbufHeader *)LMemDeref(dataBuffer);
-    
+
     EC_ERROR_IF( m -> MH_domain > 1, -1);
 
     LOG_PKT(LogPacket(TRUE, m));
-     
+
      /*
-      * Packet must be at least the size of an IP header. 
+      * Packet must be at least the size of an IP header.
       */
     if (m->MH_dataSize < sizeof (struct ip)) {
 	LOG_STAT(ipstat.ips_toosmall++;)
@@ -237,7 +240,7 @@ IpInput (optr dataBuffer)
 	goto bad;
     }
 
-     /* 
+     /*
       * Ensure the header length is at least the size of an IP header.
       */
     hlen = ip->ip_hl << 2;
@@ -246,8 +249,8 @@ IpInput (optr dataBuffer)
 	LOG_EVENT(LM_IP_HEADER_LENGTH_TOO_SHORT);
         goto bad;
     }
-    
-     /* 
+
+     /*
       * Make sure header length does not exceed size of data in buffer.
       */
     if (hlen > m->MH_dataSize) {
@@ -279,7 +282,7 @@ IpInput (optr dataBuffer)
     ip->ip_id = NetworkToHostWord(ip->ip_id);
     ip->ip_off = NetworkToHostWord(ip->ip_off);
 
-     /* 
+     /*
       * Check that the amount of data in the buffer is at least as
       * much as the IP header would have us expect.  Drop any extra
       * padding that may be at the end of the data buffer.
@@ -292,7 +295,7 @@ IpInput (optr dataBuffer)
 
     m->MH_dataSize = ip->ip_len;
     m->MH_flags = 0;
-     
+
      /*
       * Verify that the source address is valid and that the packet is for us.
       */
@@ -302,29 +305,29 @@ IpInput (optr dataBuffer)
 	LOG_EVENT(LM_IP_DATAGRAM_BAD_SOURCE_ADDRESS);
 	goto bad;
     }
-    
+
     addr = NetworkToHostDWord(ip->ip_dst);
     if (IN_BROADCAST(addr))
 	m->MH_flags |= IF_BCAST;
-    else if (IN_MULTICAST(addr)) 
+    else if (IN_MULTICAST(addr))
 	m->MH_flags |= IF_MCAST;
-    else if (! (IN_LOOPBACK(NetworkToHostDWord(ip->ip_src)) || 
-		ip->ip_src == ip->ip_dst) && 
+    else if (! (IN_LOOPBACK(NetworkToHostDWord(ip->ip_src)) ||
+		ip->ip_src == ip->ip_dst) &&
 	     LinkCheckLocalAddr (m->MH_domain, ip->ip_dst)) {
 	LOG_EVENT(LM_IP_DATAGRAM_NOT_FOR_US);
 	goto bad;
     }
   }
-     
+
      /*
       * If the header length is greater than a standard IP header,
-      * it contains options.  Process them.  IpDoOptions returns 1 
+      * it contains options.  Process them.  IpDoOptions returns 1
       * when an error was detected.
-      */     
-    if (hlen > sizeof (struct ip) && IpDoOptions(m)) 
+      */
+    if (hlen > sizeof (struct ip) && IpDoOptions(m))
 	    goto bad;
-     
-     /* 
+
+     /*
       * If offset is nonzero or IP_MF is set, then this is a fragment
       * and reassembly is needed.  Otherwise, nothing needs to be done.
       * (BSD comment:  We could look in the reassembly queue to see if
@@ -356,7 +359,7 @@ found:
 	((struct ipasfrag *)ip)->ipf_mff &= ~1;
 	if (ip->ip_off & IP_MF)
 	    ((struct ipasfrag *)ip)->ipf_mff |= 1;
-	ip->ip_off <<= 3;   
+	ip->ip_off <<= 3;
 
 	/*
 	 * If datagram marked as having more fragments or if
@@ -372,30 +375,30 @@ found:
 		 return;
 	    LOG_STAT(ipstat.ips_reassembled++;)
 	    LOG_EVENT(LM_IP_DATAGRAM_REASSEMBLED);
-	} else 
-	    if (fp) 
+	} else
+	    if (fp)
 	    	IpFreeFragmentQueue(fp);
     } else
 	ip->ip_len -= hlen;
 
      /*
-      * Call the appropriate input routine to process the data based 
+      * Call the appropriate input routine to process the data based
       * on the datagram's protocol.  The data buffer will be freed
       * by the socket library when delivered or by the input routines
       * if an error occurs.
       */
     LOG_STAT(ipstat.ips_delivered++;)
-    
+
     proto = ip->ip_p;
     TcpipUnlock(OptrToHandle(dataBuffer));
-    
+
     switch (proto) {
 	case IPPROTO_ICMP:
-	    IcmpInput(dataBuffer, hlen);    	    
+	    IcmpInput(dataBuffer, hlen);
 	    return;
 	case IPPROTO_TCP:
 	    TcpInput(dataBuffer, hlen);
-	    return;	    
+	    return;
         case IPPROTO_UDP:
 	    UdpInput(dataBuffer, hlen);
 	    return;
@@ -425,9 +428,9 @@ freeBuffer:
  ***********************************************************************
  * SYNOPSIS:	Take incoming datagram fragments and try to reassemble
  *	    	it into a whole datagram.  If a chain for reassembly
- *	    	of this datagram already exists, then it is given in 
+ *	    	of this datagram already exists, then it is given in
  * 	    	fp; otherwise have to make a chain.
- *	    
+ *
  * CALLED BY:	IpInput
  * PASS:    	ip  = IP fragment
  *	    	fp  = fragment queue, or 0 if one needs to be created
@@ -436,7 +439,7 @@ freeBuffer:
  *
  * RETURN:	ip hdr of whole datagram if reassembly successful, 0 if not
  *	    	newBuffer = optr of new data buffer if reassembled
- *	    	    	    
+ *
  * SIDE EFFECTS:
  *
  * STRATEGY:
@@ -448,9 +451,9 @@ freeBuffer:
  *
  ***********************************************************************/
 struct ip *
-IpReassemble(struct ipasfrag *ip, 
-	     struct ipq *fp, 
-	     optr dataBuffer,	    	    
+IpReassemble(struct ipasfrag *ip,
+	     struct ipq *fp,
+	     optr dataBuffer,
 	     optr *newBuffer)
 {
     struct ipasfrag *q;
@@ -467,7 +470,7 @@ IpReassemble(struct ipasfrag *ip,
 	queueHandle = MemAlloc(sizeof (struct ipq), HF_SWAPABLE, HAF_LOCK);
 	fp = (struct ipq *)MemDeref(queueHandle);
 	InsertQueue(fp, &ipq);
-	fp->ipq_block = queueHandle;	    	
+	fp->ipq_block = queueHandle;
 	fp->ipq_ttl = IPFRAGTTL;
 	fp->ipq_p = ((struct ip *)ip)->ip_p;
 	fp->ipq_id = ip->ip_id;
@@ -505,9 +508,9 @@ IpReassemble(struct ipasfrag *ip,
       * While we overlap succeeding segments, trim them or if they
       * are completely covered, dequeue them.
       */
-    while (q != (struct ipasfrag *)fp && 
+    while (q != (struct ipasfrag *)fp &&
 	   ip->ip_off + ip->ip_len > q->ip_off) {
-	   
+
 	   i = (ip->ip_off + ip->ip_len) - q->ip_off;
 	   if (i < q->ip_len) {
 	       q->ip_len -= i;
@@ -535,47 +538,47 @@ insert:
     }
     if (q->ipf_prev->ipf_mff & 1)
 	return (0);
-    
+
      /*
-      * Reassembly is complete; concantenate fragments.  Allocate a 
-      * new data buffer for the whole datagram.  Determine length 
+      * Reassembly is complete; concantenate fragments.  Allocate a
+      * new data buffer for the whole datagram.  Determine length
       * of IP header for original datagram.
       */
-    hlen = fp->ipq_next->ip_hl << 2;	    
+    hlen = fp->ipq_next->ip_hl << 2;
     m = (MbufHeader *)LMemDeref(dataBuffer);
 
      /*
-      * TcpipAllocDataBuffer sets the MH_domain field to TCP's 
+      * TcpipAllocDataBuffer sets the MH_domain field to TCP's
       * client handle, but we want it set to the link's domain
-      * handle because this packet is incoming.  
+      * handle because this packet is incoming.
       */
-    i = m->MH_domain;	    	    	
+    i = m->MH_domain;
     *newBuffer = TcpipAllocDataBuffer(next + hlen, i);
-    
+
     TcpipLock(OptrToHandle(*newBuffer));
-    m = (MbufHeader *)LMemDeref(*newBuffer);	
-    m->MH_domain = i;	    	    	
+    m = (MbufHeader *)LMemDeref(*newBuffer);
+    m->MH_domain = i;
 
     newip = (struct ip *)mtod(m);
 
      /*
       * Go through all the fragments in the fragment queue and copy
-      * the data to the new buffer.  Don't forget to save room for 
+      * the data to the new buffer.  Don't forget to save room for
       * original datagram's IP header and any IP options it contains.
       */
-    p = (byte *)newip + hlen;	 
-    
+    p = (byte *)newip + hlen;
+
     for (q = fp->ipq_next; q != (struct ipasfrag *)fp; q = q->ipf_next) {
 	memcpy(p, (byte *)q + (q->ip_hl << 2), q->ip_len);
 	p += q->ip_len;
     }
 
-     /* 
+     /*
       * Copy IP header and IP options from first fragment of datagram.
-      * Modify the header to create the header for the reassembled IP 
+      * Modify the header to create the header for the reassembled IP
       * datagram.  Restore fields which were overlaid with other data.
-      * Checksum and ttl fields don't need to be restored because they 
-      * aren't used by higher levels.  
+      * Checksum and ttl fields don't need to be restored because they
+      * aren't used by higher levels.
       */
     memcpy((byte *)newip, (byte *)fp->ipq_next, hlen);
     newip->ip_len = next;
@@ -583,7 +586,7 @@ insert:
     newip->ip_dst = fp->ipq_dst;
     newip->ip_tos &= ~1;   	/* restore low bit of tos field */
     newip->ip_p = fp->ipq_p;	/* restore protocol field */
-    
+
       /*
        * Remove the fragment queue from the reassembly queue and free
        * it.
@@ -626,7 +629,7 @@ IpDequeueFrag (struct ipasfrag *f)
 
     f->ipf_next->ipf_prev = f->ipf_prev;
     f->ipf_prev->ipf_next = f->ipf_next;
-    
+
     TcpipUnlock(OptrToHandle(buf));
     TcpipFreeDataBuffer(buf);
 }
@@ -651,7 +654,7 @@ IpDequeueFrag (struct ipasfrag *f)
  *
  ***********************************************************************/
 void
-IpEnqueueFrag (struct ipasfrag *f, 
+IpEnqueueFrag (struct ipasfrag *f,
 	       struct ipasfrag *prev)
 {
     f->ipf_prev = prev;
@@ -683,23 +686,26 @@ void
 IpFreeFragmentQueue(struct ipq *fq)
 {
     struct ipasfrag *q, *p;
-    
-    GeodeLoadDGroup(0); 	    /* we should be in the driver's thread */    
-    
+
+    GeodeLoadDGroup(0); 	    /* we should be in the driver's thread */
+
     RemoveQueue(fq);
     for (q = fq->ipq_next; q != (struct ipasfrag *)fq; q = p) {
 	LOG_EVENT(LM_IP_DISCARDING_FRAGMENT_FROM_QUEUE);
 	p = q->ipf_next;
-	IpDequeueFrag(q);   
+	IpDequeueFrag(q);
     }
     MemFree(fq->ipq_block);
 }
 
 #ifdef __HIGHC__
-#pragma Code("TSOCKETCODE"); 
+#pragma Code("TSOCKETCODE");
 #endif
 #ifdef __BORLANDC__
 #pragma codeseg TSOCKETCODE
+#endif
+#ifdef __WATCOMC__
+#pragma code_seg("TSOCKETCODE")
 #endif
 
 
@@ -719,20 +725,20 @@ IpFreeFragmentQueue(struct ipq *fq)
  *	jwu	7/15/94		Initial Revision
  *
  ***********************************************************************/
-void 
+void
 IpTimeoutHandler ()
 {
     struct ipq *fq;
-    
-    GeodeLoadDGroup(0); 	    /* we should be in the driver's thread */    
-    
+
+    GeodeLoadDGroup(0); 	    /* we should be in the driver's thread */
+
     fq = ipq.next;
-    
+
     if (fq == 0)
 	return;
 
     while (fq != &ipq) {
-	fq->ipq_ttl--;	    	
+	fq->ipq_ttl--;
 	fq = fq->next;
 	if (fq->prev->ipq_ttl == 0) {
 	    LOG_STAT(ipstat.ips_fragtimeout++;)
@@ -744,17 +750,20 @@ IpTimeoutHandler ()
 }
 
 #ifdef __HIGHC__
-#pragma Code("IPCODE"); 
+#pragma Code("IPCODE");
 #endif
 #ifdef __BORLANDC__
 #pragma codeseg IPCODE
+#endif
+#ifdef __WATCOMC__
+#pragma code_seg("IPCODE")
 #endif
 
 
 /***********************************************************************
  *				IpDoOptions
  ***********************************************************************
- * SYNOPSIS:	Do option processing on an IP datagram.  
+ * SYNOPSIS:	Do option processing on an IP datagram.
  *
  * CALLED BY:	IpInput
  * PASS:    	MbufHeader *m
@@ -766,7 +775,7 @@ IpTimeoutHandler ()
  *	   No support for timestamp, record route, source routing
  *	   nor forwarding options.  Hmmm...there's nothing left...
  * 	   I'll leave this stub here so that support for options
- *	   can be added in the future without having to rewrite 
+ *	   can be added in the future without having to rewrite
  *	   the Ip input routine.
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -780,14 +789,14 @@ IpDoOptions (MbufHeader *m)
     struct ip *ip = (struct ip *)mtod(m);
     byte *cp;
     word opt, optlen, cnt, code, type = ICMP_PARAMPROB;
-    
-    GeodeLoadDGroup(0); 	    /* we should be in the driver's thread */    
-    
+
+    GeodeLoadDGroup(0); 	    /* we should be in the driver's thread */
+
     cp = (byte *)(ip + 1);  	    /* increments cp by size of ip hdr */
     cnt = (ip->ip_hl << 2) - sizeof (struct ip);
     for (; cnt > 0; cnt -= optlen, cp += optlen) {
 	opt = cp[IPOPT_OPTVAL];
-	if (opt == IPOPT_EOL) 
+	if (opt == IPOPT_EOL)
 	    break;
 	if (opt == IPOPT_NOP)
 	    optlen = 1;
@@ -822,12 +831,12 @@ bad:
  *
  * STRATEGY:
  *	    	Copy IP header into area in buffer directly preceding
- * 	    	the next protocol level's header.  Adjust the dataSize 
- *	    	and dataOffset in the packet header to point to new start 
+ * 	    	the next protocol level's header.  Adjust the dataSize
+ *	    	and dataOffset in the packet header to point to new start
  *	    	of data.
- *	    NOTE:  Could copy all data after the IP header to the 
+ *	    NOTE:  Could copy all data after the IP header to the
  *	    	area right after the IP header, but that is usually more
- *	    	bytes to copy since the data size is usually >  size 
+ *	    	bytes to copy since the data size is usually >  size
  *	    	of an IP header.
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -843,15 +852,15 @@ IpStripOptions (optr dataBuffer)
     struct ip tempip;
     word hlen, optlen;
 
-    GeodeLoadDGroup(0); 	    /* we should be in the driver's thread */    
-    
+    GeodeLoadDGroup(0); 	    /* we should be in the driver's thread */
+
     TcpipLock(OptrToHandle(dataBuffer));
     m = (MbufHeader *)LMemDeref(dataBuffer);
-    
+
     ip = (struct ip *)mtod(m);
     hlen = ip->ip_hl << 2;
     optlen = hlen - sizeof(struct ip);
-     
+
      /*
       * Copy Ip header without options to a temporary ip header
       * and deduct options from length.
@@ -863,7 +872,7 @@ IpStripOptions (optr dataBuffer)
       * Copy temp Ip header back to data buffer immediately preceding
       * the next protocol level's header.
       */
-    p = (struct ip *)((byte *)(ip) + optlen);	    
+    p = (struct ip *)((byte *)(ip) + optlen);
     *p = tempip;
 
      /*
@@ -873,5 +882,3 @@ IpStripOptions (optr dataBuffer)
     m->MH_dataOffset += optlen;
     TcpipUnlock(OptrToHandle(dataBuffer));
 }
-
-

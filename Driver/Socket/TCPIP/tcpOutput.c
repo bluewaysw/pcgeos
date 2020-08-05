@@ -4,7 +4,7 @@
  *
  *			GEOWORKS CONFIDENTIAL
  *
- * PROJECT:	  Socket 
+ * PROJECT:	  Socket
  * MODULE:	  TCP/IP driver
  * FILE:	  tcpOutput.c
  *
@@ -15,7 +15,7 @@
  *	----	  	    -----------
  *	TcpOutput   	    Main TCP output routine.
  *	TcpRespond  	    Send a single message to the TCP.  Used
- *	    	    	    to force keep alive messages out using TCP 
+ *	    	    	    to force keep alive messages out using TCP
  *	    	    	    template.
  *
  * REVISION HISTORY:
@@ -80,10 +80,13 @@
 #include <tcpipLog.h>
 
 #ifdef __HIGHC__
-#pragma Code("TCPOUTCODE");  
+#pragma Code("TCPOUTCODE");
 #endif
 #ifdef __BORLANDC__
 #pragma codeseg TCPOUTCODE
+#endif
+#ifdef __WATCOMC__
+#pragma code_seg("TCPOUTCODE")
 #endif
 
 #define MAX_TCPOPTLEN 32    	    /* max # bytes that go in options */
@@ -92,7 +95,7 @@
 /***********************************************************************
  *				TcpOutput
  ***********************************************************************
- * SYNOPSIS:	TCP output routine:  figure out what should be sent 
+ * SYNOPSIS:	TCP output routine:  figure out what should be sent
  *	    	and send it.
  * CALLED BY:	EXTERNAL
  * PASS:    	tp  	= optr of TCB for connection
@@ -120,11 +123,11 @@ TcpOutput(optr tp, word socket)
     optr dataBuf;
     MbufHeader *m;
 
-    GeodeLoadDGroup(0); 	    /* we should be in the driver's thread */    
-    
+    GeodeLoadDGroup(0); 	    /* we should be in the driver's thread */
+
      TcpipLock(OptrToHandle(tp));
      tcb = (struct tcpcb *)LMemDeref(tp);
-     
+
      /*
       * Determine length of data that should be transmitted, and flags
       * that will be used.
@@ -133,7 +136,7 @@ TcpOutput(optr tp, word socket)
     if (idle && tcb->t_idle >= tcb->t_rxtcur)
 	 /*
 	  * We have been idle for "a while" and no acks are expected
-	  * to clock out any data we send -- slow start to get ack 
+	  * to clock out any data we send -- slow start to get ack
 	  * "clock" running again.
 	  */
 	tcb->snd_cwnd = tcb->t_maxseg;
@@ -146,7 +149,7 @@ again:
     flags = tcp_outflags[tcb->t_state];
 
      /*
-      * If in persist timeout with window of 0, send 1 byte.  
+      * If in persist timeout with window of 0, send 1 byte.
       * Otherwise, if window is small but nonzero and timer
       * expired, we will send what we can and go to transmit state.
       */
@@ -164,14 +167,14 @@ again:
 	    tcb->t_rxtshift = 0;
 	}
     }
-    
+
     len = min(totalLen, win) - off;
 
     if (len < 0) {
 	/*
 	 * If FIN has been sent but not acked, but we haven't been
 	 * called to retransmit, len will be -1.  Otherwise, window
-	 * shrank after we sent into it.  If window shrank to 0, 
+	 * shrank after we sent into it.  If window shrank to 0,
 	 * cancel pending retransmit and pull snd_nxt back to (closed)
 	 * window.  We will enter persist state below.  If the window
 	 * didn't close completely, just wait for an ACK.
@@ -180,9 +183,9 @@ again:
 	if (win == 0) {
 	    tcb->t_timer[TCPT_REXMT] = 0;
 	    tcb->snd_nxt = tcb->snd_una;
-	}	
+	}
     }
-	
+
     if (len > tcb->t_maxseg) {
 	len = tcb->t_maxseg;
 	sendalot = 1;
@@ -195,11 +198,11 @@ again:
 	flags &= ~TH_FIN;
 
     /*
-     * Determine the receive window.  If we think the amount of 
-     * space is less than a maximum segment, query the socket library 
-     * to see if the window has opened up since then.  Update our 
+     * Determine the receive window.  If we think the amount of
+     * space is less than a maximum segment, query the socket library
+     * to see if the window has opened up since then.  Update our
      * value for the current receive window with the new value.
-     * 
+     *
      * Note: We used to only query if our idea of the window is zero,
      * but if the available space is less than the maximum segment size,
      * the advertised window will be zero to avoid silly window syndrome.
@@ -207,12 +210,12 @@ again:
      * querying the socket library for an update on available space.
      *      	    	    	    	    - jwu 3/29/96
      */
-    if (tcb->rcv_buf < tcb->t_maxseg && 
+    if (tcb->rcv_buf < tcb->t_maxseg &&
 	tcb->t_state != TCPS_TIME_WAIT) {
 	    /*
 	     * Don't call the socket library if in TIME_WAIT state because
 	     * we just told the socket library to destroy the connection
-	     * in TcpInput when we processed the FIN.  Most cases, the 
+	     * in TcpInput when we processed the FIN.  Most cases, the
 	     * receive window will no longer be zero so we wouldn't even
 	     * get here, but let's check the state to be safe.  --jwu  2/29/96
 	     */
@@ -222,22 +225,22 @@ again:
     }
 
     win = tcb->rcv_buf;
-	 
+
     /*
      * Sender silly window avoidance.  If connection is idle and
      * can send all data, a maximum segment, at least a maximum
      * default-size segment, do it.  If we are forcing output, do it.
      * Otherwise don't bother.  If peer's buffer is tiny, then send
      * when window is at least half open.  If retransmitting (possibly
-     * after persist timer forced us to send into a small window), 
+     * after persist timer forced us to send into a small window),
      * then must resend.
-     */	
+     */
     if (len) {
 	if (len == tcb->t_maxseg)
 	    goto send;
-	if ((idle || tcb->t_flags & TF_NODELAY) &&  
-	    len + off >= totalLen)  	    	    
-	    goto send;	    	    	    	   
+	if ((idle || tcb->t_flags & TF_NODELAY) &&
+	    len + off >= totalLen)
+	    goto send;
 	if (tcb->t_force)
 	    goto send;
 	if (len >= tcb->max_sndwnd / 2)     	    /* not a small segment */
@@ -248,7 +251,7 @@ again:
 
     /*
      * Compare available window to amount of window known to peer
-     * (as advertised window less next expected input).  If the 
+     * (as advertised window less next expected input).  If the
      * difference is at least 2 max size segments, or at least 50%
      * of the maximum possible window, then want to send a window
      * update to peer.
@@ -271,15 +274,15 @@ again:
      */
     if (tcb->t_flags & TF_ACKNOW)
 	goto send;
-	
+
     if (flags & (TH_SYN|TH_RST))
 	goto send;
-	
+
     if (SEQ_GT(tcb->snd_up, tcb->snd_una))
 	goto send;
-    
+
     /*
-     * If our state indicates that FIN should be sent and we have 
+     * If our state indicates that FIN should be sent and we have
      * not yet done so, or we're retransmitting the FIN, then send.
      */
     if (flags & TH_FIN &&
@@ -288,11 +291,11 @@ again:
 
     /*
      * TCP window updates are not reliable, rather a polling protocol
-     * using "persist" packets is used to insure receipt of window 
+     * using "persist" packets is used to insure receipt of window
      * updates.  The three "states" for the output side are:
      * 	idle	    	    not doing retransmits or persists
      * 	persisting  	    to move a small or zero window
-     * 	(re)transmitting    
+     * 	(re)transmitting
      *
      * tcb->t_timer[TCPT_PERSIST] is set when in persist state
      * tcb->t_force is set when we are called to send a persist packet
@@ -302,7 +305,7 @@ again:
      * If send window is too small, there is data to transmit, and
      * no retransmit or persist is pending, then go to persist state.
      * If nothing happens soon, send when timer expires:
-     * if window is nonzero, transmit when we can, otherwise force out  
+     * if window is nonzero, transmit when we can, otherwise force out
      * a byte.
      */
     if (totalLen && tcb->t_timer[TCPT_REXMT] == 0 &&
@@ -352,22 +355,22 @@ send:
     /*
      * Allocate a data buffer for the output.
      */
-    dataBuf = TcpipAllocDataBuffer(len + hdrlen, 
+    dataBuf = TcpipAllocDataBuffer(len + hdrlen,
 				   TSocketGetLink(socket));
     if (dataBuf == 0) {
 	error = SDE_INSUFFICIENT_MEMORY;
 	goto out;
     }
-	    
+
     TcpipLock(OptrToHandle(dataBuf));
     m = (MbufHeader *)LMemDeref(dataBuf);
-    
+
      /*
       * If there is data, copy the data to be transmitted to the buffer.
       */
     if (len) {
-	
-#ifdef LOG_STATS	
+
+#ifdef LOG_STATS
 	if (tcb->t_force && len == 1)
 	    tcpstat.tcps_sndprobe++;
 	else if (SEQ_LT(tcb->snd_nxt, tcb->snd_max)) {
@@ -378,8 +381,8 @@ send:
 	    tcpstat.tcps_sndbyte += len;
 	}
 #endif
-	
-	TSocketGetOutputData((byte *)mtod(m) + hdrlen, off, 
+
+	TSocketGetOutputData((byte *)mtod(m) + hdrlen, off,
 				  (word)len, socket);
 	/*
 	 * If we're sending everything we've got, set PUSH.
@@ -388,7 +391,7 @@ send:
 	 */
 	if (off + len == totalLen)
 	    flags |= TH_PUSH;
-    } 
+    }
 
 #ifdef LOG_STATS
     else {
@@ -401,8 +404,8 @@ send:
 	else
 	    tcpstat.tcps_sndwinup++;
     }
-#endif     
-     
+#endif
+
      /*
       * Initialize the header from the template for sends on this connection.
       */
@@ -420,11 +423,11 @@ send:
 
     /*
      * If we are doing retransmissions, then snd_nxt will reflect
-     * oldest unacked seq #.  For ACK only packets, we do not want 
-     * the sequence number of the retransmitted packet, we want the 
+     * oldest unacked seq #.  For ACK only packets, we do not want
+     * the sequence number of the retransmitted packet, we want the
      * sequence number of the next unsent byte.  So, if there is no data
      * (and no SYN or FIN), use snd_max instead of snd_nxt when filling
-     * in ti_seq.  But if we are in persist state, snd_max might reflect 
+     * in ti_seq.  But if we are in persist state, snd_max might reflect
      * one byte beyond the right edge of the window, so use snd_nxt in
      * that case, since we know we aren't doing a retransmission.
      * (retransmit and persist are mutually exclusive...)
@@ -434,7 +437,7 @@ send:
     else
 	ti->ti_seq = HostToNetworkDWord(tcb->snd_max);
     ti->ti_ack = HostToNetworkDWord(tcb->rcv_nxt);
-    
+
      /*
       * Copy options to buffer.
       */
@@ -455,7 +458,7 @@ send:
 	win = tcp_maxwin;
     if (win < (sdword)(tcb->rcv_adv - tcb->rcv_nxt))
 	win = (sdword)(tcb->rcv_adv - tcb->rcv_nxt);
-    
+
     ti->ti_win = HostToNetworkWord((word)win);
 
      /*
@@ -481,10 +484,10 @@ send:
      * header and data.
      */
     if (len + optlen)
-	ti->ti_len = HostToNetworkWord((word)(sizeof (struct tcphdr) + 
+	ti->ti_len = HostToNetworkWord((word)(sizeof (struct tcphdr) +
 					      optlen + len));
     ti->ti_cksum = Checksum((word *)ti, hdrlen + len);
-	
+
      /*
       * In transmit state, time the transmission and arrange for the
       * retransmit.  In persist state, just set snd_max.
@@ -530,8 +533,8 @@ send:
 		tcb->t_timer[TCPT_PERSIST] = 0;
 		tcb->t_rxtshift = 0;
 	    }
-	} 
-    } else 
+	}
+    } else
 	if (SEQ_GT(tcb->snd_nxt + len, tcb->snd_max))
 	    tcb->snd_max = tcb->snd_nxt + len;
 
@@ -541,14 +544,14 @@ send:
     ((struct ip*)ti)->ip_len = hdrlen + len;
     ((struct ip*)ti)->ip_ttl = tcb->t_ttl;
     ((struct ip*)ti)->ip_tos = 0;   	    	/* TCP uses default TOS */
-	
+
     TcpipUnlock(OptrToHandle(dataBuf));
     error = IpOutput(dataBuf, TSocketGetLink(socket), 0);
 
-out:	
+out:
     if (error) {
-	 if (error == SDE_INSUFFICIENT_MEMORY) {    
-	     tcb->snd_cwnd = tcb->t_maxseg; 	
+	 if (error == SDE_INSUFFICIENT_MEMORY) {
+	     tcb->snd_cwnd = tcb->t_maxseg;
 	     error = 0;
 	 }
 	 else if (error == SDE_DESTINATION_UNREACHABLE &&
@@ -556,16 +559,16 @@ out:
 	     tcb->t_softerror = error;
 	     error = 0;
 	 }
-	 
+
 	 TcpipUnlock(OptrToHandle(tp));
 	 return (error);
      }
-    
+
     LOG_STAT(tcpstat.tcps_sndtotal++;)
 
      /*
       * Data sent (as far as we can tell).  If this advertises a larger
-      * window than any other segment, then remember the size of the 
+      * window than any other segment, then remember the size of the
       * advertised window.  Any pending ACK has now been sent.
       */
     if (win > 0 && SEQ_GT(tcb->rcv_nxt + win, tcb->rcv_adv))
@@ -574,7 +577,7 @@ out:
     tcb->t_flags &= ~(TF_ACKNOW|TF_DELACK);
     if (sendalot)
 	goto again;
-    
+
     TcpipUnlock(OptrToHandle(tp));
     return (0);
 
@@ -585,10 +588,10 @@ out:
 /***********************************************************************
  *				TcpRespond
  ***********************************************************************
- * SYNOPSIS:	Send a single message to the TCP at address specified by 
- *	    	the given TCP/IP header.  Used to force keep alive 
- *	    	messages out using the TCP template. Ack and sequence 
- *	    	numbers are as specified.  
+ * SYNOPSIS:	Send a single message to the TCP at address specified by
+ *	    	the given TCP/IP header.  Used to force keep alive
+ *	    	messages out using the TCP template. Ack and sequence
+ *	    	numbers are as specified.
  * CALLED BY:	TcpInput
  * RETURN:	nothing
  * SIDE EFFECTS:
@@ -607,7 +610,7 @@ TcpRespond(struct tcpcb *tcb,
 	   MbufHeader *m,
 	   tcp_seq ack,
 	   tcp_seq seq,
-	   word flags, 
+	   word flags,
 	   word link)
 {
     word tlen;
@@ -615,29 +618,29 @@ TcpRespond(struct tcpcb *tcb,
     optr dataBuf;
     MbufHeader *m2;
 
-    GeodeLoadDGroup(0); 	    /* we should be in the driver's thread */    
-    
+    GeodeLoadDGroup(0); 	    /* we should be in the driver's thread */
+
     if (tcb) {
 	win = tcb->t_maxwin;
     }
 
     if (tcp_keeplen)
 	tlen = 1;
-    else 
+    else
 	tlen = 0;
-    
+
     dataBuf = TcpipAllocDataBuffer(sizeof (struct tcpiphdr) + tlen, link);
     if (dataBuf == 0)
 	return;
-	
+
      /*
       * Make a copy of the tcpiphdr at ti.
       */
     TcpipLock(OptrToHandle(dataBuf));
-    m2 = (MbufHeader *)LMemDeref(dataBuf); 
+    m2 = (MbufHeader *)LMemDeref(dataBuf);
     memcpy((char *)mtod(m2), (char *)ti, sizeof(struct tcpiphdr));
     ti = (struct tcpiphdr *)mtod(m2);
-    
+
      /*
       * Send directly to addressed host.
       */
@@ -645,7 +648,7 @@ TcpRespond(struct tcpcb *tcb,
 	flags = TH_ACK;
     } else {
 	/*
-	 * Return to TCP which originated the segment ti.  Converting 
+	 * Return to TCP which originated the segment ti.  Converting
 	 * port numbers back to network format.
 	 */
 #define xchg(a, b, type) {type t; t=a; a=b; b=t;}
@@ -671,7 +674,7 @@ TcpRespond(struct tcpcb *tcb,
     ti->ti_cksum = Checksum((word *)ti, tlen);
     ((struct ip *)ti)->ip_len = tlen;
     ((struct ip *)ti)->ip_ttl = ip_defttl;
-    
+
     TcpipUnlock(OptrToHandle(dataBuf));
     (void) IpOutput(dataBuf, link, 0);
 
