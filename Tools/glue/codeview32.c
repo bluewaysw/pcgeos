@@ -1014,7 +1014,7 @@ CV32ProcessStructure(const char  	    *file,
      */
     //size = CVGetInteger(&bp) / 8;
 //	MSObj_GetWord(size, bp);
-	MSObj_GetWord(nfields, bp);
+    MSObj_GetWord(nfields, bp);
 
     if (!CV32LocateList(file, &bp, &tlistBase, &tlistLen)) {
 	return(OTYPE_VOID | OTYPE_SPECIAL);
@@ -1024,17 +1024,21 @@ CV32ProcessStructure(const char  	    *file,
 //	return(OTYPE_VOID | OTYPE_SPECIAL);
 //    }
 
-	MSObj_GetWord(prop, bp);
-	MSObj_GetWord(dlist, bp);
-	MSObj_GetWord(shape, bp);
+    MSObj_GetWord(prop, bp);
+    MSObj_GetWord(dlist, bp);
+    MSObj_GetWord(shape, bp);
 
-	size = CV32GetInteger(&bp) /*/ 8*/;
+    size = CV32GetInteger(&bp) /*/ 8*/;
 
+    if(size == 0) {
+
+	return(OTYPE_VOID | OTYPE_SPECIAL);
+    }
 
 //    if ((bp - dataBase < len) && (*bp == CTL_STRING) &&
 //	(strncmp((char *)bp+2, "(untagged)", bp[1]) != 0) &&
 //	(bp[1] != 0))
-	if(bp[0] != 0)
+    if(bp[0] != 0)
     {
 	/*
 	 * The structure actually has a real name that's not the fake string
@@ -1989,7 +1993,7 @@ CV32ProcessTypeRecord(const char 	    *file,  	/* Object file from which
 			bp += 2;
 			MSObj_GetWord(argsCount, bp);
 			MSObj_GetWord(argsList, bp); // argsList pointer
-			
+
 			bp = *bpPtr + len;
 			break;
 		}
