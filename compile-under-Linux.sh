@@ -29,3 +29,8 @@ echo y >>$BUILD_DIR/_temp.dat
 echo n >>$BUILD_DIR/_temp.dat
 echo $BUILD_DIR/_out >> $BUILD_DIR/_temp.dat
 perl -I. buildbbx.pl  <$BUILD_DIR/_temp.dat
+
+cd "$BUILD_DIR"
+mv _out/localpc/ensemble .
+cp ./Installed/fontstuf/BasePack/BERKELEY.FNT ensemble/userdata/font/
+sed -i 's/fs = .*geo/primaryfsd = os2ec.geo/' ensemble/geosec.ini
