@@ -7,6 +7,11 @@ The basement of this repository is the source code used to build Breadbox Ensemb
 
 # How to build?
 
+## Compiling under Debian 10
+
+- Clone the repository
+- Run `bash compile-under-Linux.sh`
+
 ## Install WATCOM
 - Unzip WATCOM tools from the latest release-zip for instance to C:\WATCOM-V2
 - add C:\WATCOM-V2\binnt to your system path variable
