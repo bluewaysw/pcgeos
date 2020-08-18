@@ -96,7 +96,7 @@ static char *rcsid =
 "$Id: type.c,v 4.21 97/04/18 16:55:43 dbaumann Exp $";
 #endif lint
 
-#include <config.h> 
+#include <config.h>
 #include "swat.h"
 #include "buf.h"
 #include "cmd.h"
@@ -168,7 +168,7 @@ typedef struct _Type {
     union {
 	struct {
 	    Type  	    baseType;  	/* Type pointed-to */
-	    int	    	    ptrType;	
+	    int	    	    ptrType;
 	}   	  	Pointer;
 	struct {
 	    word  	    lower;  	/* Lower bound of index */
@@ -273,8 +273,8 @@ Type	    type_Void,
 	    type_Byte,
 	    type_Word,
 	    type_DWord;
-	    
-#if defined(__HIGHC__) || defined(__BORLANDC__)
+
+#if defined(__HIGHC__) || defined(__BORLANDC__) || defined(__WATCOMC__)
 /*
  * High C doesn't have in-line structure constructors, so...
  */
@@ -371,7 +371,7 @@ TypeValid(Type	type)
 	if (!VALIDTPTR(TypeFile(type), TAG_VMFILE)) {
 	    return(0);
 	}
-	
+
 	VMInfo(TypeFile(type), TypeBlock(type), (word *)NULL,
 	       (MemHandle *)NULL, &id);
 	if (id == OID_TYPE_BLOCK) {
@@ -385,7 +385,7 @@ TypeValid(Type	type)
 	}
     }
 }
-    
+
 
 /***********************************************************************
  *				TypeInternalize
@@ -422,7 +422,7 @@ TypeInternalize(Type	    t,
 	    return(malloc_tag((malloc_t)(*tP)) == TAG_TYPE);
 	}
     }
-    
+
     /*
      * Convert from external to internal, if possible.
      */
@@ -558,7 +558,7 @@ TypeInternalize(Type	    t,
 
 	    TypeFile(base) = TypeFile(t);
 	    TypeBlock(base) = TypeBlock(t);
-	    
+
 	    if (OTYPE_IS_PTR(ot->words[0])) {
 		TypeOffset(base) = ot->words[1];
 		new = Type_CreatePointer(base, OTYPE_PTR_TYPE(ot->words[0]));
@@ -579,7 +579,7 @@ TypeInternalize(Type	    t,
 		}
 		nels += len;
 		TypeOffset(base) = ot->words[1];
-		   
+
 		new = Type_CreateArray(0, nels-1, type_Int, base);
 	    }
 	    /*
@@ -594,8 +594,8 @@ TypeInternalize(Type	    t,
     return(1);
 }
 
-	
-    
+
+
 
 /***********************************************************************
  *				Type_Destroy
@@ -629,7 +629,7 @@ Type_Destroy(Type   type)
 	    {
 		FieldPtr	f;
 		int	    	i;
-		
+
 		f = (FieldPtr)Vector_Data(t->data.StructUnion.fields);
 		for (i = Vector_Length(t->data.StructUnion.fields);
 		     i>0;
@@ -692,14 +692,14 @@ TypeCmdPrintField(Type	    base,   	/* Base structure type */
 
     return(0);
 }
-	
+
 
 /***********************************************************************
  *				TypeCmdPrintEnum
  ***********************************************************************
  * SYNOPSIS:	    Add another enum to an expandable buffer for TypeCmd
  * CALLED BY:	    TypeCmd via Type_ForEachEnum
- * RETURN:  	    0 (continue)	
+ * RETURN:  	    0 (continue)
  * SIDE EFFECTS:    None
  *
  * STRATEGY:
@@ -732,7 +732,7 @@ TypeCmdPrintEnum(Type	    type,   	/* Enumerated type */
  ***********************************************************************
  * SYNOPSIS:	    Convert an ASCII symbol token to its internal form
  * CALLED BY:	    SymbolCmd, EXTERNAL
- * RETURN:	    Sym for the symbol. 
+ * RETURN:	    Sym for the symbol.
  * SIDE EFFECTS:    None
  *
  * STRATEGY:	    A TCL-level Sym token is a 3-list
@@ -767,7 +767,7 @@ Type_ToToken(char    *token)
     if (!TypeValid(TypeCast(ftype))) {
 	return NullType;
     }
-    
+
     return (TypeCast(ftype));
 }
 
@@ -1083,7 +1083,7 @@ See also:\n\
 	}
     }
 
-	    
+
     switch((int)clientData) {
 	case (int)TYPE_MAKE:
 	    /*
@@ -1095,14 +1095,14 @@ See also:\n\
 		 */
 		Type    base;
 		int	    length;
-		
+
 		if (argc != 5) {
 		    Tcl_Error(interp, "Usage: type make array <length> <base>");
 		}
-		
+
 		length = cvtnum(argv[3], NULL);
 		base = Type_ToToken(argv[4]);
-		
+
 		if (!TypeValid(base)) {
 		    Tcl_RetPrintf(interp, "type make array: %s not a type",
 				  argv[4]);
@@ -1110,7 +1110,7 @@ See also:\n\
 		} else if (length == 0) {
 		    Tcl_Error(interp, "type make array: zero-length array?");
 		}
-		
+
 		Tcl_Return(interp, Type_ToAscii(Type_CreateArray(0, length - 1,
 								 type_Int,
 								 base)),
@@ -1124,7 +1124,7 @@ See also:\n\
 		int	    offset; /* Current offset into structure */
 		TypePtr t;	    /* New type */
 		Type    rtype;
-		
+
 		/*
 		 * Start with a 0-sized structure -- we'll fill in the size
 		 * later.
@@ -1132,14 +1132,14 @@ See also:\n\
 		rtype = Type_CreateStruct(0);
 		t = TypeInt(rtype);
 		offset = 0;
-		
+
 		/*
 		 * Scan off the fields one at a time.
 		 */
 		for (i = 3; i < argc; i += 2) {
 		    Type    ftype;  /* Field type */
 		    int	size;   /* Size of field */
-		    
+
 		    if (i + 1 >= argc) {
 			Tcl_RetPrintf(interp,
 				      "type make pstruct ... %s: missing type.",
@@ -1147,7 +1147,7 @@ See also:\n\
 			Type_Destroy(rtype);
 			return(TCL_ERROR);
 		    }
-		    
+
 		    ftype = Type_ToToken(argv[i+1]);
 		    if (!TypeValid(ftype)) {
 			Tcl_RetPrintf(interp,
@@ -1156,9 +1156,9 @@ See also:\n\
 			Type_Destroy(rtype);
 			return(TCL_ERROR);
 		    }
-		    
+
 		    size = Type_Sizeof(ftype);
-		    
+
 		    Type_AddField(rtype, argv[i], offset, size*8, ftype);
 		    offset += size*8;
 		    t->data.StructUnion.size += size;
@@ -1170,7 +1170,7 @@ See also:\n\
 		 */
 		type = (Type)t;
 		t = (TypePtr)Type_EndStructUnion(type);
-		
+
 		/*
 		 * If the first field isn't around, create symbols for them all.
 		 * We run into a problem with re-attaching, where the type
@@ -1190,13 +1190,13 @@ See also:\n\
 		     */
 		    for (i = 3; i < argc; i += 2) {
 			Sym fsym = Sym_Make(argv[i], SYM_FIELD);
-			
+
 			Sym_Enter(fsym, (curPatient->scope ?
 					 curPatient->scope :
 					 curPatient->global));
 			Sym_SetFieldData(fsym, (Type)t);
 		    }
-		}	
+		}
 #endif
 		Tcl_Return(interp, Type_ToAscii(rtype), TCL_VOLATILE);
 	    } else if (strcmp(argv[2], "struct") == 0) {
@@ -1210,13 +1210,13 @@ See also:\n\
 		int	    width;  /* Width of field */
 		Type    type;   /* Type of field */
 		Type    stype;  /* Structure being created */
-		
+
 		/*
 		 * Start with a 0-byte structure -- we'll figure the
 		 * real size as we go along.
 		 */
 		stype = Type_CreateStruct(0);
-		
+
 		/*
 		 * Scan off the fields one at a time.
 		 */
@@ -1227,20 +1227,20 @@ See also:\n\
 			Type_Destroy(stype);
 			return(TCL_ERROR);
 		    }
-		    
+
 		    type = Type_ToToken(argv[i+1]);
 		    base = cvtnum(argv[i+2], NULL);
 		    width = cvtnum(argv[i+3], NULL);
 		    if (width < 0) {
 			width = Type_Sizeof(type) * 8;
 		    }
-		    
-		    
+
+
 		    if (((base+width+7)/8)>(TypeInt(stype))->data.StructUnion.size)
 		    {
 			TypeInt(stype)->data.StructUnion.size=((base+width+7)/8);
 		    }
-		    
+
 		    if (!TypeValid(type)) {
 			Tcl_RetPrintf(interp,
 				      "type make struct ... %s %s: not a type",
@@ -1248,7 +1248,7 @@ See also:\n\
 			Type_Destroy(stype);
 			return(TCL_ERROR);
 		    }
-		    
+
 		    Type_AddField(stype, argv[i], base, width, type);
 		}
 #if COMPRESS_DUPLICATE_STRUCTURES
@@ -1258,7 +1258,7 @@ See also:\n\
 		 */
 		type = stype;
 		stype = Type_EndStructUnion(type);
-		
+
 		/*
 		 * If the first field isn't around, create symbols for them all.
 		 * We run into a problem with re-attaching, where the type
@@ -1278,13 +1278,13 @@ See also:\n\
 		     */
 		    for (i = 3; i < argc; i += 4) {
 			Sym fsym = Sym_Make(argv[i], SYM_FIELD);
-			
+
 			Sym_Enter(fsym, (curPatient->scope ?
 					 curPatient->scope :
 					 curPatient->global));
 			Sym_SetFieldData(fsym, (Type)stype);
 		    }
-		}	
+		}
 #endif
 		Tcl_Return(interp, Type_ToAscii(stype), TCL_VOLATILE);
 	    } else if (strcmp(argv[2], "union") == 0) {
@@ -1296,10 +1296,10 @@ See also:\n\
 		int	    i;	    /* Index into argv */
 		Type    type;   /* Type of field */
 		Type    stype;  /* Structure being created */
-		
+
 		assert(argc >= 4);
 		stype = Type_CreateUnion(atoi(argv[3]));
-		
+
 		/*
 		 * Scan off the fields one at a time.
 		 */
@@ -1310,10 +1310,10 @@ See also:\n\
 			Type_Destroy(stype);
 			return(TCL_ERROR);
 		    }
-		    
+
 		    type = Type_ToToken(argv[i+1]);
-		    
-		    
+
+
 		    if (!TypeValid(type)) {
 			Tcl_RetPrintf(interp,
 				      "type make struct ... %s %s: not a type",
@@ -1321,7 +1321,7 @@ See also:\n\
 			Type_Destroy(stype);
 			return(TCL_ERROR);
 		    }
-		    
+
 		    Type_AddField(stype, argv[i], 0, Type_Sizeof(type)*8, type);
 		}
 #if COMPRESS_DUPLICATE_STRUCTURES
@@ -1331,7 +1331,7 @@ See also:\n\
 		 */
 		type = stype;
 		stype = Type_EndStructUnion(type);
-		
+
 		/*
 		 * If the first field isn't around, create symbols for them all.
 		 * We run into a problem with re-attaching, where the type
@@ -1350,13 +1350,13 @@ See also:\n\
 		     */
 		    for (i = 3; i < argc; i += 4) {
 			Sym fsym = Sym_Make(argv[i], SYM_FIELD);
-			
+
 			Sym_Enter(fsym, (curPatient->scope ?
 					 curPatient->scope :
 					 curPatient->global));
 			Sym_SetFieldData(fsym, (Type)stype);
 		    }
-		}	
+		}
 #endif
 		Tcl_Return(interp, Type_ToAscii(stype), TCL_VOLATILE);
 	    } else if ((strcmp(argv[2], "ptr") == 0) ||
@@ -1364,17 +1364,17 @@ See also:\n\
 	    {
 		int	    ptrType;
 		Type    ptype, type;
-		
+
 		if (argc != 4) {
 		    Tcl_Error(interp, "Usage: type make (nptr|sptr|fptr|lptr|hptr|optr) <type>");
 		}
-		
+
 		type = Type_ToToken(argv[3]);
 		if (!TypeValid(type)) {
 		    Tcl_RetPrintf(interp, "type make ptr: %s not a type", argv[3]);
 		    return(TCL_ERROR);
 		}
-		
+
 		switch (argv[2][0]) {
 		    case 's': ptrType = TYPE_PTR_SEG; break;
 		    case 'f': ptrType = TYPE_PTR_FAR; break;
@@ -1402,7 +1402,7 @@ See also:\n\
 	case (int)TYPE_CLASS:
 	{
 	    char	*res;
-	    
+
 	    switch(Type_Class(type)) {
 		case TYPE_CHAR: res = "char"; break;
 		case TYPE_INT:  res = "int"; break;
@@ -1430,7 +1430,7 @@ See also:\n\
 	    char	baseToken[32];
 	    Type	base, index;
 	    int 	lower, upper;
-    
+
 	    MAKE_TYPE_TCL(type,t,sym);
 	    if (Type_Class(type) != TYPE_ARRAY) {
 		Tcl_Error(interp, "not an array type");
@@ -1445,7 +1445,7 @@ See also:\n\
 	case (int)TYPE_FIELDS:
 	{
 	    Buffer	    buf;
-	    
+
 	    MAKE_TYPE_TCL(type, t, sym);
 	    if (t == NULL) {
 		switch (Sym_Type(sym)) {
@@ -1469,7 +1469,7 @@ See also:\n\
 	case (int)TYPE_MEMBERS:
 	{
 	    Buffer	    buf;
-	    
+
 	    MAKE_TYPE_TCL(type, t, sym);
 	    if (t == NULL) {
 		if (Sym_Type(sym) != OSYM_ETYPE) {
@@ -1488,7 +1488,7 @@ See also:\n\
 	case (int)TYPE_PGET:
 	{
 	    char	*ptrType;
-	    
+
 	    MAKE_TYPE_TCL(type, t, sym);
 	    /*
 	     * look up each typedef until we get to the pointer base type
@@ -1511,7 +1511,7 @@ See also:\n\
 		case TYPE_PTR_VM: ptrType = "vm"; break;
 		default: assert(0); ptrType = "unknown"; break;
 	    }
-	    
+
 	    Tcl_RetPrintf(interp, "%s {%s}", ptrType,
 			  Type_ToAscii(t->data.Pointer.baseType));
 	    CLEANUP_TYPE(t);
@@ -1522,7 +1522,7 @@ See also:\n\
 	    Type	type;
 	    TypePtr	t;
 	    char	*name;
-	    
+
 	    type = Type_ToToken(argv[3]);
 	    if (!TypeValid(type)) {
 		Tcl_Error(interp, "not a valid type");
@@ -1575,7 +1575,7 @@ See also:\n\
 		{"double",   &type_Double}
 	    };
 	    int 	i;
-	    
+
 	    /*
 	     * See if it's a predefined type.
 	     */
@@ -1599,7 +1599,7 @@ See also:\n\
 	    char	    *name;
 	    int 	    length;
 	    Type	    ftype;
-	    
+
 	    MAKE_TYPE_TCL(type, t, sym);
 	    if (t == NULL) {
 		switch(Sym_Type(sym)) {
@@ -1616,7 +1616,7 @@ See also:\n\
 		Tcl_Error(interp, "not a struct type");
 	    }
 	    offset = cvtnum(argv[3], NULL);
-	    
+
 	    /*
 	     * Make sure it's not negative -- that would really screw us up.
 	     */
@@ -1624,7 +1624,7 @@ See also:\n\
 		Tcl_Return(interp, NULL, TCL_STATIC);
 		return(TCL_OK);
 	    }
-	    
+
 	    if (!Type_FindFieldData(type, offset * 8, &name, &length,
 				    &ftype, NULL))
 	    {
@@ -1663,7 +1663,7 @@ Type_CreateInt(int	  size,
 	       Boolean	  isSigned)
 {
     TypePtr 	  t;
-    
+
     ALLOC_TYPE(t, TYPE_INT);
     t->data.Int.size = size;
     t->data.Int.isSigned = isSigned;
@@ -1692,7 +1692,7 @@ Type_CreateChar(int	minChar,
 		int 	size)
 {
     TypePtr 	  t;
-    
+
     ALLOC_TYPE(t, TYPE_CHAR);
     t->data.Char.min = minChar;
     t->data.Char.max = maxChar;
@@ -1721,12 +1721,12 @@ Type_GetCharData(Type	type,
 {
     TypePtr 	t;
     Sym	    	sym;
-    
+
     MAKE_TYPE(type, t, sym);
     assert(t != NULL);	    	    /* No external form */
 
     CHECK_CLASS(t, TYPE_CHAR, character, Type_GetCharData, return);
-    
+
     COND_ASSIGN(minPtr, t->data.Char.min);
     COND_ASSIGN(maxPtr, t->data.Char.max);
     CLEANUP_TYPE(t);
@@ -1780,7 +1780,7 @@ Type_GetPointerData(Type    type,
     Sym	    	sym;
 
     MAKE_TYPE(type, t, sym);
-    
+
     CHECK_CLASS(t, TYPE_POINTER, pointer, Type_GetPointerBase, return);
 
     COND_ASSIGN(ptype, t->data.Pointer.ptrType);
@@ -1838,7 +1838,7 @@ Type_CreateArray (int	lower,    	    /* Lower bound for index */
 		  Type	baseType)
 {
     TypePtr	  t;
-    
+
     ALLOC_TYPE(t, TYPE_ARRAY);
 
     t->data.Array.lower = lower;
@@ -1871,9 +1871,9 @@ Type_GetArrayData(Type	type,	    	/* Type to check */
 {
     TypePtr	    t;
     Sym	    	    sym;
-    
+
     MAKE_TYPE(type, t, sym);
-    
+
     again:
 
     if (t != NULL) {
@@ -1918,7 +1918,7 @@ Type_CreateRange(int	lower, 	    	/* Lower bound of range */
 		 Type	baseType)   	/* Base type of range elements */
 {
     TypePtr	  	t;
-    
+
     ALLOC_TYPE(t, TYPE_RANGE);
 
     t->data.Range.lower = lower;
@@ -1949,7 +1949,7 @@ Type_GetRangeData(Type	type,	    	/* Type to check */
 {
     TypePtr	t;
     Sym	    	sym;
-    
+
     MAKE_TYPE(type, t, sym);
     assert(t != NULL);		/* No external form */
 
@@ -2049,7 +2049,7 @@ Type_AddField(Type  type,	    	/* Type to change */
     TypePtr	    t;
     FieldRec	    f;
     Sym	    	    sym;
-    
+
     MAKE_TYPE(type, t, sym);
     assert(t != NULL);	    	    /* No external form when adding */
 
@@ -2095,7 +2095,7 @@ Type_GetFieldData(Type	type,	    	/* Struct/Union type */
     Sym	    	    	sym;
 
     MAKE_TYPE(type, t, sym);
-    
+
     if (t != (TypePtr)NULL) {
 	if ((t->class == TYPE_STRUCT) || (t->class == TYPE_UNION)) {
 	    f = (FieldPtr)Vector_Data(t->data.StructUnion.fields);
@@ -2139,7 +2139,7 @@ Type_GetFieldData(Type	type,	    	/* Struct/Union type */
  *				TFFDCallback
  ***********************************************************************
  * SYNOPSIS:	    Callback function for Type_FindFieldData
- * CALLED BY:	    Type_FindFieldData via Sym_ForEach	
+ * CALLED BY:	    Type_FindFieldData via Sym_ForEach
  * RETURN:	    1 if found a reasonable field.
  * SIDE EFFECTS:    the passed symbol is replaced with the found one
  *
@@ -2161,14 +2161,14 @@ TFFDCallback(Sym    sym,    	/* Field to check */
     int	    	length;
 
     Sym_GetFieldData(sym, &offset, &length, (Type *)NULL, (Type *)NULL);
-    
+
     if (offset <= SymOffset(*sp) && offset + length > SymOffset(*sp)) {
 	*sp = sym;
 	return(1);		/* Stop searching */
     }
     return(0);
 }
-	
+
 
 /*-
  *-----------------------------------------------------------------------
@@ -2200,9 +2200,9 @@ Type_FindFieldData(Type	type,	    	/* Struct/Union type */
     Sym	    	    	sym;
 
     MAKE_TYPE(type, t, sym);
-    
+
     retval = Buf_Init(0);
-	
+
     if (t != NULL) {
 	assert(t->class == TYPE_STRUCT || t->class == TYPE_UNION);
 	return(FALSE);
@@ -2217,7 +2217,7 @@ Type_FindFieldData(Type	type,	    	/* Struct/Union type */
 		return (FALSE);
 	}
     }
-	
+
     while (1) {
 	char	*fname;
 	int    	flen;
@@ -2264,21 +2264,21 @@ Type_FindFieldData(Type	type,	    	/* Struct/Union type */
 	    Buf_AddByte(retval, (Byte)'.');
 	}
 	Buf_AddBytes(retval, strlen(fname), (Byte *)fname);
-		
+
 	/*
 	 * Store the length and type in case we're at a non-structure
 	 * field
 	 */
 	COND_ASSIGN(lengthPtr, flen);
 	COND_ASSIGN(fieldTypePtr, ftype);
-		
+
 	/*
 	 * Change to a real type and convert offset to be relative to the
 	 * field, and loop.
 	 */
 	MAKE_TYPE(ftype, t, sym);
 	offset -= foff;
-		
+
 	COND_ASSIGN(diffPtr, offset);
 
 	if (t != NULL) {
@@ -2366,7 +2366,7 @@ TFEFCallback(Sym    sym,
 
     return ((*dp->func)(struc, name, offset, length, type, dp->clientData));
 }
-    
+
 
 /*-
  *-----------------------------------------------------------------------
@@ -2396,7 +2396,7 @@ Type_ForEachField(Type	    type,    	/* Type through which to iterate */
     Sym	    	    	sym;
 
     MAKE_TYPE(type, t, sym);
-    
+
     if (t != NULL) {
 	if ((t->class == TYPE_STRUCT) || (t->class == TYPE_UNION)) {
 	    f = (FieldPtr)Vector_Data(t->data.StructUnion.fields);
@@ -2576,7 +2576,7 @@ Type_AddEnumMember(Type	type,	    	/* The type to modify */
 
     MAKE_TYPE(type, t, sym);
     assert(t != NULL);	/* Only internal may be added to */
-    
+
     CHECK_CLASS(t, TYPE_ENUM, enum, Type_AddEnumMember, return);
 
     e = (Enum)malloc_tagged(sizeof(EnumRec), TAG_TYPEETC);
@@ -2694,7 +2694,7 @@ Type_GetEnumValue(Type	type,	    	/* Type to check */
  *				TGENCallback
  ***********************************************************************
  * SYNOPSIS:	    Callback function for Type_GetEnumName
- * CALLED BY:	    Type_GetEnumName via Sym_ForEach	
+ * CALLED BY:	    Type_GetEnumName via Sym_ForEach
  * RETURN:	    1 if found a reasonable enum.
  * SIDE EFFECTS:    the passed symbol is replaced with the found one
  *
@@ -2747,10 +2747,10 @@ Type_GetEnumName(Type	type,	    	/* Type to examine */
     Sym	    	    	sym;
 
     MAKE_TYPE(type, t, sym);
-    
+
     if (t != NULL) {
 	CHECK_CLASS(t, TYPE_ENUM, enum, Type_GetEnumValue, return (char *)NULL);
-	
+
 	ln = Lst_Find(t->data.Enum.members, (LstClientData)value,
 		      TypeEnumHasValue);
 	CLEANUP_TYPE(t);
@@ -2837,9 +2837,9 @@ Type_GetEnumData(Type	type,	    	/* Type to check */
 {
     TypePtr	  	t;
     Sym	    	    	sym;
-    
+
     MAKE_TYPE(type, t, sym);
-    
+
     if (t != NULL) {
 	CHECK_CLASS(t, TYPE_ENUM, enum, Type_GetEnumData, return);
 
@@ -2883,7 +2883,7 @@ Type_ForEachEnum(Type	type,	    /* Type through which to iterate */
     Sym	    	    	sym;
 
     MAKE_TYPE(type, t, sym);
-    
+
     if (t != NULL) {
 	CHECK_CLASS(t, TYPE_ENUM, enum, Type_ForEachEnum, return);
 
@@ -2925,7 +2925,7 @@ Type_CreateFunction(Type    retType)    	/* Return type for function */
     Sym	    	    sym;
 
     MAKE_TYPE(retType, rt, sym);
-    
+
 #if CACHE_FUNCTION_RETURNING_TYPE
     if (rt->function) {
 	return ((Type)rt->function);
@@ -2965,7 +2965,7 @@ Type_GetFunctionReturn(Type type)  	    /* The type to investigate */
 
     MAKE_TYPE(type, t, sym);
     assert(t != NULL);		/* No external form (yet) */
-    
+
     CHECK_CLASS(t, TYPE_FUNCTION, function, Type_GetFunctionReturn,
 		return NullType);
 
@@ -3044,7 +3044,7 @@ Type_GetExternalData(Type    	type,
 {
     TypePtr	    t;
     Sym	    	    sym;
-    
+
     MAKE_TYPE(type, t, sym);
     assert (t != NULL);		/* No external form */
 
@@ -3080,7 +3080,7 @@ Type_CreateBitField(unsigned offset, unsigned width, Type type)
     static  TypePtr bits[32];
     TypePtr 	t;
     TypeToken 	tt;
-    
+
     assert(offset < 32);
 
     for (t = bits[offset]; t != NULL; t = t->data.BitField.next) {
@@ -3192,7 +3192,7 @@ Type_Sizeof(Type    	type)	    /* The type to check */
     Sym	    	    	sym;
 
     MAKE_TYPE(type, t, sym);
-    
+
     if (t != NULL) {
 	int   	    size;
 
@@ -3240,7 +3240,7 @@ Type_Sizeof(Type    	type)	    /* The type to check */
 #if USE_TYPE_EXTERNAL
 	    case TYPE_EXTERNAL: {
 		Sym	  sym;
-		
+
 		sym = Sym_Lookup(t->data.External.name, SYM_TAG,
 				 curPatient->global);
 		if (sym == NullSym) {
@@ -3266,9 +3266,9 @@ Type_Sizeof(Type    	type)	    /* The type to check */
 	    case TYPE_RANGE:
 	    {
 		TypePtr	bt;
-		
+
 		MAKE_TYPE(t->data.Range.baseType, bt, sym);
-		
+
 		if (bt == TypeInt(type_Int)) {
 		    /*
 		     * For subranges of int, we figure out how many bits
@@ -3276,7 +3276,7 @@ Type_Sizeof(Type    	type)	    /* The type to check */
 		     */
 		    register unsigned int 	i;
 		    unsigned int	span;
-		    
+
 		    span = t->data.Range.upper - t->data.Range.upper;
 		    for (i = 0x80000000; i != 0; i >>= 1) {
 			if (span & i) {
@@ -3351,7 +3351,7 @@ Type_Class(Type    	type)
     if (Type_IsNull(type)) {
 	return(TYPE_NULL);
     }
-    
+
     MAKE_TYPE(type, t, sym);
     if (t != NULL) {
 	word	class = t->class;
@@ -3546,7 +3546,7 @@ TFSUCallback(Type   type,   	    /* Enclosing type */
      */
     if (*name != '\0') {
 	field = Type_NameOffset(ftype, name, tndp->offset, TRUE);
-	
+
 	Buf_AddBytes(tndp->buf, strlen(field), (Byte *)field);
 	if ((length != Type_Sizeof(ftype)*8) &&
 	    (Type_Class(ftype) != TYPE_BITFIELD))
@@ -3557,7 +3557,7 @@ TFSUCallback(Type   type,   	    /* Enclosing type */
 	} else {
 	    Buf_AddBytes(tndp->buf, 2, (Byte *)";\n");
 	}
-	
+
 	free(field);
     }
 
@@ -3582,7 +3582,7 @@ TypeFormatStructUnion(Type	type,
 {
     TNData  	    	tnd;
     char		*newName;
-    
+
     tnd.buf = Buf_Init(0);
     tnd.first = 1;
     tnd.offset = offset;
@@ -3593,7 +3593,7 @@ TypeFormatStructUnion(Type	type,
 
     tnd.offset += 4;
     Type_ForEachField(type, TFSUCallback, (Opaque)&tnd);
-    
+
     tnd.offset -= 4;
     TNAddOffset(&tnd);
     if (*name) {
@@ -3606,7 +3606,7 @@ TypeFormatStructUnion(Type	type,
     newName = (char *)Buf_GetAll(tnd.buf, NULL);
     Buf_Destroy(tnd.buf, FALSE);
     return (newName);
-}    
+}
 
 /*-
  *-----------------------------------------------------------------------
@@ -3729,7 +3729,7 @@ Type_NameOffset(Type	    type,   /* Type to name */
 	    case TYPE_POINTER:
 	    {
 		char	*distattr;
-		
+
 		tName = (char *)malloc(strlen(name) + 11);
 		switch(t->data.Pointer.ptrType) {
 		    case TYPE_PTR_NEAR:
@@ -3843,7 +3843,7 @@ Type_NameOffset(Type	    type,   /* Type to name */
 		int	len;
 
 		len = strlen(t->data.External.name) + 2;
-		
+
 		switch (t->data.External.class) {
 		    case TYPE_STRUCT:
 			className = "struct";
@@ -3872,7 +3872,7 @@ Type_NameOffset(Type	    type,   /* Type to name */
 		 * fields...
 		 */
 		newName = Type_NameOffset(t->data.BitField.type, name, offset,
-					  expand); 
+					  expand);
 		CLEANUP_TYPE(t);
 		return (newName);
 	    }
@@ -3980,7 +3980,7 @@ Type_Equal(Type    	type1,	    /* First type to compare */
 	return(FALSE);
     }
     t1 = st1; t2 = st2;
-    
+
     if (!t1 || !t2 || t1->class != t2->class) {
 	CLEANUP_TYPE(st1);
 	CLEANUP_TYPE(st2);
@@ -4023,7 +4023,7 @@ Type_Equal(Type    	type1,	    /* First type to compare */
 	    register FieldPtr	f1; 	/* Field from type 1 */
 	    register FieldPtr	f2; 	/* Field from type 2 */
 	    register int	i;
-	    
+
 	    if ((TypeInt(t1->data.StructUnion.checked) == t2) &&
 		(TypeInt(t2->data.StructUnion.checked) == t1))
 	    {
@@ -4046,7 +4046,7 @@ Type_Equal(Type    	type1,	    /* First type to compare */
 		retval = FALSE;
 		break;
 	    }
-	    
+
 	    /*
 	     * Figure out the length of both field vectors and if they don't
 	     * match, the structures cannot be equal.
@@ -4056,7 +4056,7 @@ Type_Equal(Type    	type1,	    /* First type to compare */
 		retval = FALSE;
 		break;
 	    }
-	    
+
 	    TypeInt(t1->data.StructUnion.checked) = t2;
 	    TypeInt(t2->data.StructUnion.checked) = t1;
 
@@ -4098,7 +4098,7 @@ Type_Equal(Type    	type1,	    /* First type to compare */
 	    register Lst  	l1; 	/* Type 1's members list */
 	    register Lst  	l2; 	/* Type 2's members list */
 	    int			n;
-	    
+
 	    l1 = t1->data.Enum.members;
 	    l2 = t2->data.Enum.members;
 	    n = Lst_Length(l1);
@@ -4118,7 +4118,7 @@ Type_Equal(Type    	type1,	    /* First type to compare */
 		retval = FALSE;
 		break;
 	    }
-	    
+
 	    /*
 	     * Schmooz down both lists one member at a time making sure
 	     * each one has the same name and value.
@@ -4128,7 +4128,7 @@ Type_Equal(Type    	type1,	    /* First type to compare */
 		ln2 = Lst_Next(l2);
 		e1 = (Enum)Lst_Datum(ln1);
 		e2 = (Enum)Lst_Datum(ln2);
-		
+
 		if ((e1->value != e2->value) ||
 		    (strcmp(e1->name, e2->name) != 0))
 		{
@@ -4235,7 +4235,7 @@ Type_Init(void)
     CREATE(type_VPtr,	    	(Type_CreatePointer(type_Void, TYPE_PTR_VM)));
     CREATE(type_VFPtr,	    	(Type_CreatePointer(type_Void, TYPE_PTR_VIRTUAL)));
     CREATE(type_VoidProc,   	(Type_CreateFunction(type_Void)));
-    
+
     Cmd_Create(&TypeCmdRec);
 }
 
@@ -4271,7 +4271,7 @@ Type_CreatePackedStruct(char *firstname, ...)
     va_start(args, firstname);
 
     name = firstname;
-    
+
 
     ALLOC_TYPE(t, TYPE_STRUCT);
 
@@ -4314,7 +4314,7 @@ Type_CreatePackedStruct(char *firstname, ...)
 
     RETURN_TYPE(t);
 }
-    
+
 
 /******************************************************************************
  *                                                                            *
@@ -4383,7 +4383,7 @@ Type_Mark(Type	type)
 	{
 	    register FieldPtr	f;
 	    register int	i;
-	    
+
 	    f = (FieldPtr)Vector_Data(t->data.StructUnion.fields);
 	    for (i = Vector_Length(t->data.StructUnion.fields);
 		 i > 0;
@@ -4443,7 +4443,7 @@ Type_Nuke(Opaque    type,
 
 	size += Vector_Size(t->data.StructUnion.fields);
 	num += 1;
-	
+
 	Vector_Destroy(t->data.StructUnion.fields);
 
 	/*
@@ -4541,7 +4541,7 @@ TIRCallback(Sym    sym,
  * RETURN:	    TRUE if it is
  * SIDE EFFECTS:    none
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description

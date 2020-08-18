@@ -88,7 +88,7 @@
  *	When a pointer is indirected through, the token is converted from
  *	TOKEN_POINTER to TOKEN_ADDRESS by copying the GeosAddr at value.ptr
  *	to value.addr; the type is set to the base of the pointer.
- *	
+ *
  *
  ***********************************************************************/
 #ifndef lint
@@ -100,7 +100,7 @@ static char *rcsid =
 #include <compat/stdlib.h>
 
 #ifdef __BORLANDC__
-/* 
+/*
  * !@#!@#!@ Borland hoses us by not defining this unless you pass -A,
  * which we don't want to do because it's too restrictive.  But if _STDC_
  * isn't defined, then bison.simple will #define "const" to nothing.
@@ -402,7 +402,7 @@ expr.return 	: top.expr
 		    }
 		    YYABORT;
 		}
-		    
+
 		;
 
 top.expr	: type.specifier expr
@@ -432,7 +432,7 @@ top.expr	: type.specifier expr
 		| expr
 		;
 
-expr		: ADDRESS 
+expr		: ADDRESS
 		;
 
 expr 		: SYM
@@ -447,7 +447,7 @@ expr 		: SYM
 			$$.type = NullType;
 		    } else if (class & (SYM_FUNCTION|SYM_LABEL)) {
 			Type	retType;
-			
+
 			Sym_GetFuncData($1, (Boolean *)NULL,
 					&$$.value.addr.offset,
 					&retType);
@@ -466,9 +466,9 @@ expr 		: SYM
 			StorageClass	sClass;
 			Address	    	offset;
 			Type	    	type;
-			
+
 			Sym_GetVarData($1, &type, &sClass, &offset);
-			    
+
 			switch(sClass) {
 			    case SC_Static:
 				$$.value.addr.offset = offset;
@@ -486,7 +486,7 @@ expr 		: SYM
 				} else {
 				    word	fp;
                                     regval      fpval ;
-				    
+
 				    MD_GetFrameRegister(state->frame,
 							REG_MACHINE,
 							REG_FP,
@@ -505,7 +505,7 @@ expr 		: SYM
 				    YYERROR;
 				} else {
 				    regval	val;
-				    
+
 				    (*MD_GetFrameRegister)(state->frame,
 							   REG_MACHINE,
 							   (int)offset,
@@ -530,7 +530,7 @@ expr 		: SYM
 		    } else if (class & SYM_FIELD) {
 			int 	offset;
 			Type	type;
-			
+
 			Sym_GetFieldData($1, &offset, (int *)NULL, &type,
 					 (Type *)NULL);
 			ExprSetAsPointer(state, &$$,
@@ -580,7 +580,7 @@ expr 		: SYM
 				 * to an array of infinite size.
 				 */
 				unsigned	  	bound;
-				
+
 				bound = (1<<(Type_Sizeof(type_Int)*8-1))-1;
 				$1.type =
 				    Type_CreateArray(0, bound, type_Int,
@@ -620,7 +620,7 @@ expr 		: SYM
 			    yyerror("second index of array range must be integral");
 			    YYERROR;
 			}
-			
+
 			switch (Type_Class($1.type)) {
 			    default:
 			    {
@@ -629,7 +629,7 @@ expr 		: SYM
 				 * to an array of infinite size.
 				 */
 				unsigned	  	bound;
-				
+
 				bound = (1<<(Type_Sizeof(type_Int)*8-1))-1;
 				$1.type =
 				    Type_CreateArray(0, bound, type_Int,
@@ -643,7 +643,7 @@ expr 		: SYM
 				{
 				    YYERROR;
 				}
-				
+
 				/*
 				 * Now convert the thing back into an array
 				 * starting at the address of the first element.
@@ -725,10 +725,10 @@ expr		: expr struct.op
 			    case TYPE_POINTER:
 			    {
 				Type    baseType;
-				
+
 				Type_GetPointerData($1.type, (int *)NULL,
 						    &baseType);
-				
+
 				switch(Type_Class(baseType)){
 				    case TYPE_STRUCT:
 				    case TYPE_UNION:
@@ -752,9 +752,9 @@ expr		: expr struct.op
 			    default:
 			    {
 				Sym	sym;
-				
+
 				try_for_field_sym:
-				
+
 				sym = Expr_FindSym(state->patient,
 						   $2.value.str);
 				if (Sym_IsNull(sym)) {
@@ -813,7 +813,7 @@ expr		: expr struct.op
 		    if ($1.what == TOKEN_ADDRESS) {
 			/*
 			 * The result is $1 after offseting by the byte offset
-			 * that corresponds to the bit offset. 
+			 * that corresponds to the bit offset.
 			 */
 			$$ = $1;
 			$$.value.addr.offset += offset/8;
@@ -908,12 +908,12 @@ expr 		: '&' expr %prec UNARY
 		| '-' expr %prec UNARY
 		{
 		    ExprToken  zero;
-		    
+
 		    zero.what = TOKEN_LITERAL;
 		    zero.value.literal = 0;
 		    zero.flags = 0;
 		    zero.type = type_Int;
-		    
+
 		    if (!ExprArithOp(state, '-', &zero, &$2, &$$)) {
 			YYERROR;
 		    }
@@ -921,7 +921,7 @@ expr 		: '&' expr %prec UNARY
 		| '~' expr
 		{
 		    ExprFetch(state, &$2);
-		    
+
 		    if (!ExprCoerce(state, &$2, (ExprToken *)NULL, FALSE)) {
 			yyerror("operand of ~ must be integral");
 			YYERROR;
@@ -1125,7 +1125,7 @@ expr 		: '(' type.name ')' expr %prec UNARY
 		    if (!state->noSideEffects) {
 			Boolean	    newSideEffects;
 			int	    val;
-			
+
 			val = ExprEvalBoolean(state, &$1);
 			if (val < 0) {
 			    YYERROR;
@@ -1146,7 +1146,7 @@ expr 		: '(' type.name ')' expr %prec UNARY
 			$$.value.literal = 0;
 		    } else if (!state->noSideEffects) {
 			int	val;
-			
+
 			val = ExprEvalBoolean(state, &$4);
 			if (val < 0) {
 			    YYERROR;
@@ -1168,7 +1168,7 @@ expr 		: '(' type.name ')' expr %prec UNARY
 		    if (!state->noSideEffects) {
 			Boolean	    newSideEffects;
 			int	    val;
-			
+
 			val = ExprEvalBoolean(state, &$1);
 			if (val < 0) {
 			    YYERROR;
@@ -1189,7 +1189,7 @@ expr 		: '(' type.name ')' expr %prec UNARY
 			$$.value.literal = 1;
 		    } else if (!state->noSideEffects) {
 			int	val;
-			
+
 			val = ExprEvalBoolean(state, &$4);
 			if (val < 0) {
 			    YYERROR;
@@ -1207,7 +1207,7 @@ expr 		: '(' type.name ')' expr %prec UNARY
 
 		    ExprFetch(state, &$1);
 		    ExprFetch(state, &$3);
-		    
+
 		    /*
 		     * Cope with fetched pointer values by indirecting
 		     * through them. This reduces the cases with which we
@@ -1219,13 +1219,13 @@ expr 		: '(' type.name ')' expr %prec UNARY
 		    {
 			ExprIndirect(state, &$1, &$1);
 		    }
-		    
+
 		    if (($3.what == TOKEN_POINTER) &&
 			(Type_Class($3.type) == TYPE_POINTER))
 		    {
 			ExprIndirect(state, &$3, &$3);
 		    }
-		    
+
 		    /*
 		     * Find the right handle.
 		     */
@@ -1279,7 +1279,7 @@ expr 		: '(' type.name ')' expr %prec UNARY
 			     * stored in an in-use VM block handle.
 			     * XXX: Make sure block is in-use
 			     */
-			    
+
 			    if ($3.what == TOKEN_ADDRESS) {
 				block = (word)$3.value.addr.offset;
 				$$.type = $3.type;
@@ -1319,7 +1319,7 @@ expr 		: '(' type.name ')' expr %prec UNARY
 			 * than the one whose segment we have...
 			 */
 			word	    segment;
-			
+
 			if ($1.what == TOKEN_ADDRESS) {
 			    segment = (word)$1.value.addr.offset;
 			} else if ($1.what == TOKEN_LITERAL) {
@@ -1360,7 +1360,7 @@ expr 		: '(' type.name ')' expr %prec UNARY
 			     */
 			    dword	off;
 			    dword	diff;
-			    
+
 			    diff = MakeSegOff((segment-Handle_Segment(handle)), 0) ;
 			    if ($3.what == TOKEN_ADDRESS) {
 				off = (dword)$3.value.addr.offset;
@@ -1373,7 +1373,7 @@ expr 		: '(' type.name ')' expr %prec UNARY
 #if GEOS32
 			    handle = NullHandle;
 			    offset = MakeAddress(segment, off) ;
-#else			    
+#else
 			    if (off+diff >= 0x10000) {
 				/*
 				 * More than can be encompassed...
@@ -1515,27 +1515,27 @@ type.specifier : type.modifier.list
 		    }
 		}
 		| TYPE
-		| LPTR 
+		| LPTR
 		{
 		    $$ = Type_CreatePointer(type_Void, TYPE_PTR_LMEM);
 		}
-		| FPTR 
+		| FPTR
 		{
 		    $$ = Type_CreatePointer(type_Void, TYPE_PTR_FAR);
 		}
-		| NPTR 
+		| NPTR
 		{
 		    $$ = Type_CreatePointer(type_Void, TYPE_PTR_NEAR);
 		}
-		| SPTR 
+		| SPTR
 		{
 		    $$ = Type_CreatePointer(type_Void, TYPE_PTR_SEG);
 		}
-		| OPTR 
+		| OPTR
 		{
 		    $$ = Type_CreatePointer(type_Void, TYPE_PTR_OBJECT);
 		}
-		| HPTR 
+		| HPTR
 		{
 		    $$ = Type_CreatePointer(type_Void, TYPE_PTR_HANDLE);
 		}
@@ -1564,27 +1564,27 @@ ptr.decl	: '*'
 		{
 		    $$ = Type_CreatePointer($<type>0, TYPE_PTR_FAR);
 		}
-		| DA_LMEM '*' 
+		| DA_LMEM '*'
 		{
 		    $$ = Type_CreatePointer($<type>0, TYPE_PTR_LMEM);
 		}
-		| DA_FAR '*' 
+		| DA_FAR '*'
 		{
 		    $$ = Type_CreatePointer($<type>0, TYPE_PTR_FAR);
 		}
-		| DA_NEAR '*' 
+		| DA_NEAR '*'
 		{
 		    $$ = Type_CreatePointer($<type>0, TYPE_PTR_NEAR);
 		}
-		| DA_SEG '*' 
+		| DA_SEG '*'
 		{
 		    $$ = Type_CreatePointer($<type>0, TYPE_PTR_SEG);
 		}
-		| DA_OBJECT '*' 
+		| DA_OBJECT '*'
 		{
 		    $$ = Type_CreatePointer($<type>0, TYPE_PTR_OBJECT);
 		}
-		| DA_HANDLE '*' 
+		| DA_HANDLE '*'
 		{
 		    $$ = Type_CreatePointer($<type>0, TYPE_PTR_HANDLE);
 		}
@@ -1615,7 +1615,7 @@ abstract.declarator2 : open.paren abstract.declarator2 ')'
 			{
 			    Type	baseType;
 			    int 	ptrType;
-			
+
 			    Type_GetPointerData($1, &ptrType, &baseType);
 			    $$ = Type_CreatePointer(Type_CreateFunction(baseType),
 						    ptrType);
@@ -1645,7 +1645,7 @@ abstract.declarator2 : open.paren abstract.declarator2 ')'
 			{
 			    Type	baseType;
 			    int 	ptrType;
-			
+
 			    Type_GetPointerData($<type>0, &ptrType, &baseType);
 			    $$ = Type_CreatePointer(Type_CreateFunction(baseType),
 						    ptrType);
@@ -1671,7 +1671,7 @@ abstract.declarator2 : open.paren abstract.declarator2 ')'
 		| abstract.declarator2 '[' ']'			%prec '.'
 		{
 		    unsigned	  	bound;
-		    
+
 		    bound = (1 << (Type_Sizeof(type_Int) * 8 - 1)) - 1;
 		    $$ = Type_CreateArray(0, bound, type_Int, $1);
 		}
@@ -1689,7 +1689,7 @@ abstract.declarator2 : open.paren abstract.declarator2 ')'
 		| '[' ']'					%prec '.'
 		{
 		    unsigned	  	bound;
-		    
+
 		    /*
 		     * Figure max unsigned int and use as upper bound for array.
 		     */
@@ -1747,7 +1747,7 @@ ExprMalloc(ExprState *state, unsigned size)
  * CALLED BY:	  yyparse()
  * RETURN:	  Nothing. *maxDepth left unaltered if we don't want to
  *		  allow the increase. yyerror is called with msg if so.
- * SIDE EFFECTS:  
+ * SIDE EFFECTS:
  *
  * STRATEGY:	  This implementation relies on the "errcheck" rule
  *		  freeing stacks up, if necessary. Sadly, there's no
@@ -1830,7 +1830,7 @@ ExprSetAsPointer(ExprState *state,
     ((GeosAddr *)resultPtr->value.ptr)->offset = offset;
     resultPtr->flags = 0;
 }
-	
+
 
 /***********************************************************************
  *				ExprDebug
@@ -1889,9 +1889,9 @@ ExprModuleToHandle(ExprState   *state,
     Patient	patient;
     ResourcePtr	rp;
     int		i;
-    
+
     patient = Sym_Patient(sym);
-    
+
     /*
      * If the module has a parent that isn't the global
      * scope, it must just be a segment in a group. Its
@@ -1906,16 +1906,16 @@ ExprModuleToHandle(ExprState   *state,
 	    return (NullHandle);
 	}
     }
-    
+
     assert(patient != NullPatient);
     assert(patient->resources != (ResourcePtr)NULL);
-    
+
     for(i = patient->numRes, rp = patient->resources; i > 0; i--, rp++) {
 	if (Sym_Equal(rp->sym,sym)) {
 	    return(rp->handle);
 	}
     }
-    
+
     xyyerror(state, "%s has no handle?", Sym_Name(sym));
     return(NullHandle);
 }
@@ -1940,7 +1940,7 @@ static void
 xyyerror(ExprState *state, const char *fmt, ...)
 {
     va_list args;
-    
+
     if (!state->doneError) {
 	state->doneError = TRUE;
 
@@ -1948,7 +1948,7 @@ xyyerror(ExprState *state, const char *fmt, ...)
 	 * Point to default return area...
 	 */
 	Tcl_Return(interp, NULL, TCL_STATIC);
-	
+
 	va_start(args, fmt);
 	vsprintf((char *)interp->result, fmt, args);
 	va_end(args);
@@ -2009,9 +2009,9 @@ yyfullid(char	**exprPtr,
 	 char	*buffer)
 {
     char    	  *cp;
-    
+
     yyid(exprPtr, buffer);
-    
+
     /*
      * If field is followed by a double colon, we need to get to the
      * part that isn't followed by a double colon so the parser
@@ -2028,7 +2028,7 @@ yyfullid(char	**exprPtr,
 	if (ustrcmp(cp, "kdata") == 0) {
 	    strcpy(cp, "geos::dgroup");
 	}
-	
+
 	if (**exprPtr == ':' && (*exprPtr)[1] == ':') {
 	    cp += strlen(cp);
 	    *cp++ = *(*exprPtr)++;
@@ -2043,7 +2043,7 @@ yyfullid(char	**exprPtr,
 		stOrUnion = "union";
 	    }
 	    strcpy(cp, stOrUnion);
-	    
+
 	    while (**exprPtr == ' ' || **exprPtr == '\t') {
 		(*exprPtr)++;
 	    }
@@ -2065,7 +2065,7 @@ yyfullid(char	**exprPtr,
  * RETURN:	  <0 if s1 is less than s2, 0 if they're equal and >0 if
  *		  s1 is greater than s2. Upper- and lower-case letters are
  *	    	  equivalent in the comparison.
- *		  
+ *
  * SIDE EFFECTS:  None.
  *
  * STRATEGY:
@@ -2089,7 +2089,7 @@ int
 ustrcmp(char *s1, char *s2)
 {
     int	    	  diff;
-    
+
     while (*s1 && *s2) {
 	diff = *s1 - *s2;
 	if (diff < 0) {
@@ -2129,7 +2129,7 @@ ExprLookInScopeChain(const char  *name,
 		      Sym   scope)
 {
     Sym sym = NullSym;
-    
+
     while (!(Sym_Class(scope) & SYM_MODULE)) {
 	sym = Sym_LookupInScope(name, SYM_ANY, scope);
 	if (!Sym_IsNull(sym)) {
@@ -2163,7 +2163,7 @@ Expr_FindSym(Patient	patient,
 	     const char *id)
 {
     Sym	    sym = NullSym;	/* Assume not symbol */
-	    
+
     /*
      * If the patient has a current frame, we need to handle local
      * symbols by looking them up specially.
@@ -2183,7 +2183,7 @@ Expr_FindSym(Patient	patient,
 	 */
 	sym = ExprLookInScopeChain(id, patient->frame->scope);
     }
-    
+
     /*
      * If the current scope for the patient has been set with the
      * "scope" command, look in that scope chain as well.
@@ -2191,7 +2191,7 @@ Expr_FindSym(Patient	patient,
     if (Sym_IsNull(sym) && !Sym_IsNull(patient->scope)) {
 	sym = ExprLookInScopeChain(id, patient->scope);
     }
-    
+
     if (Sym_IsNull(sym)) {
 	sym = Sym_Lookup(id, SYM_ANY, patient->global);
     }
@@ -2259,7 +2259,7 @@ ExprScan(char	    **exprPtr,
 		(*exprPtr)++;
 		return RANGE;
 	    }
-	    
+
 	    yyfullid(exprPtr, id);
 	    yylval->token.what = TOKEN_STRING;
 	    yylval->token.value.str = (char *)malloc(strlen(id)+1);
@@ -2357,9 +2357,9 @@ ExprScan(char	    **exprPtr,
 	     * current frame as a CONSTANT.
 	     */
 	    Reg_Data	*rdp;
-	    
+
 	    yyid(exprPtr, id);
-	    
+
 	    if (*id == '\0') {
 		int	number = 0;
 
@@ -2407,10 +2407,10 @@ ExprScan(char	    **exprPtr,
 		    return(VHIST);
 		}
 	    }
-	    
-		
+
+
 	    rdp = (Reg_Data *)Private_GetData(id);
-	    
+
 	    if (rdp == (Reg_Data *)NULL) {
 		xyyerror(state, "Unknown register %s", id);
 		return(0);
@@ -2479,15 +2479,15 @@ ExprScan(char	    **exprPtr,
 	    Reg_Data	*rdp;
 	    int	    	class;
 	    const struct _ScanToken *st;
-	    
-	    
+
+
 	    /*
 	     * Back up the expression pointer so we get the first character
 	     * (useful thing, that). Save the start in idStart for possible
 	     * numeric conversion.
 	     */
 	    idStart = --*exprPtr;
-	    
+
 	    /*
 	     * Scan the identifier off into the  id  buffer.
 	     */
@@ -2501,7 +2501,7 @@ ExprScan(char	    **exprPtr,
 		xyyerror(state, "unhandled character '%c'", *idStart);
 		return(0);
 	    }
-	    
+
 	    /*
 	     * Check against well-known types & keywords first
 	     */
@@ -2527,7 +2527,7 @@ ExprScan(char	    **exprPtr,
 		yylval->token.flags = 0;
 		return(CONSTANT);
 	    }
-	    
+
 
 	    sym = Expr_FindSym(state->patient, id);
 
@@ -2540,7 +2540,7 @@ ExprScan(char	    **exprPtr,
 		 */
 		int	val;
 		char	*vEnd;
-		    
+
 		val = cvtnum(idStart, &vEnd);
 		if (vEnd == *exprPtr) {
 		    yylval->token.what = TOKEN_LITERAL;
@@ -2570,7 +2570,7 @@ ExprScan(char	    **exprPtr,
 		    }
 		}
 	    }
-	    
+
 	    /*
 	     * Figure out what token to return.
 	     */
@@ -2580,7 +2580,7 @@ ExprScan(char	    **exprPtr,
 		return(TYPE);
 	    } else if (class & SYM_ENUM) {
 		int val;
-		
+
 		Sym_GetEnumData(sym, &val, &yylval->token.type);
 		yylval->token.value.literal = val;
 		yylval->token.what = TOKEN_LITERAL;
@@ -2678,7 +2678,7 @@ Expr_Eval(const char	*expr,
 		 */
 		const char  *next;
 		const char  *var = Tcl_ParseVar(interp, expr, &next);
-		
+
 		Buf_AddBytes(realExpr, strlen(var), (Byte *)var);
 
 		expr = next;
@@ -2687,7 +2687,7 @@ Expr_Eval(const char	*expr,
 		 * Evaluate the nested command.
 		 */
 		const char    *next;
-		
+
 		if (Tcl_Eval(interp, expr+1, ']', &next) == TCL_OK) {
 		    /*
 		     * Happiness -- copy the result into the expression.
@@ -2714,7 +2714,7 @@ Expr_Eval(const char	*expr,
     } else {
 	state.startExpr = expr;
     }
-    
+
     if (frame != NullFrame) {
 	state.frame = frame;
 	state.patient = frame->execPatient;
@@ -2732,7 +2732,7 @@ Expr_Eval(const char	*expr,
     result = (!xyyparse(state.startExpr, &state));
 
     if (result)
-    {		  
+    {
 	if (addrPtr != (GeosAddr *)NULL) {
 	    /*
 	     * Deal with wantAddr when end result is a fetched pointer by
@@ -2745,7 +2745,7 @@ Expr_Eval(const char	*expr,
 	    {
 		ExprIndirect(&state, &state.result, &state.result);
 	    }
-	    
+
 	    switch(state.result.what) {
 		case TOKEN_LITERAL:
 		    if (wantAddr) {
@@ -2773,7 +2773,7 @@ Expr_Eval(const char	*expr,
 			if (Type_Class(state.result.type) == TYPE_POINTER) {
 			    GeosAddr	*gap = state.result.value.ptr;
 			    Type    	baseType;
-			    
+
 			    /* Don't use ExprMalloc here, as we'll be returning
 			     * the allocated memory. */
 			    addrPtr->offset =
@@ -2831,7 +2831,7 @@ Expr_Eval(const char	*expr,
 		    break;
 	    }
 	}
-	
+
 	if (typePtr != NULL) {
 	    *typePtr = state.result.type;
 	}
@@ -2844,7 +2844,7 @@ Expr_Eval(const char	*expr,
 	Buf_Destroy(realExpr, TRUE);
     }
 
-    
+
     Lst_Destroy(state.data, (void (*)())free);
 
     return(result);
@@ -2884,9 +2884,9 @@ ExprCast(ExprState *state,
 	resultPtr->type = type;
     } else {
 	ExprFetch(state, tokenPtr);
-    
+
 	*resultPtr = *tokenPtr;
-    
+
 	if (!ExprTypeCheck(tokenPtr->type, type, TRUE)) {
 	    xyyerror(state, "casting between incompatible types");
 	    return(FALSE);
@@ -2895,7 +2895,7 @@ ExprCast(ExprState *state,
 	    /*
 	     * Special-case casting of one pointer-type to another, as
 	     * Var_Cast doesn't know about the special format we use for
-	     * pointers... 
+	     * pointers...
 	     */
 	    if (Type_Class(tokenPtr->type) != TYPE_POINTER) {
 		resultPtr->value.ptr =
@@ -2977,9 +2977,9 @@ ExprIndirectVMPart1(ExprState	*state,
 		    GeosAddr	*result)
 {
     Handle	handle;
-    
+
     handle = Handle_Lookup((unsigned short)hid);
-		    
+
     if (handle == NullHandle) {
 	xyyerror(state, "%xh not a valid handle ID", hid);
 	return(FALSE);
@@ -3044,7 +3044,7 @@ ExprIndirectVMPart2(ExprState *state,
      */
     Var_FetchInt(2, kernel->resources[1].handle,
 		 (Address)(Handle_ID(handleVM)+4), (genptr)&w);
-			    
+
     /*
      * Lookup header handle
      */
@@ -3053,15 +3053,15 @@ ExprIndirectVMPart2(ExprState *state,
 		 Handle_ID(handleVM));
 	return(FALSE);
     }
-    
+
     handle = Handle_Lookup(w);
-			    
+
     if (handle == NullHandle) {
 	xyyerror(state, "VM header handle %04xh not a valid", w);
 	return(FALSE);
     } else {
 	Var_FetchInt(2, handle, (Address)block, (genptr)&w);
-				
+
 	if (w == 0) {
 	    xyyerror(state, "VM block %04xh not in memory", block);
 	    return(FALSE);
@@ -3123,28 +3123,28 @@ ExprIndirect(ExprState	*state,
 	     * through it. Wheee.
 	     */
 	    int	size;
-	    
+
 	    size = !Type_IsNull(tokenPtr->type) ?
 		Type_Sizeof(tokenPtr->type) : sizeof(word);
 	    resultPtr->value.addr.handle = tokenPtr->value.addr.handle;
 	    resultPtr->type = NullType;
-	    
+
 	    if (size == sizeof(byte)) {
 		byte	b;
-		
+
 		Ibm_ReadBytes(1, tokenPtr->value.addr.handle,
 			      tokenPtr->value.addr.offset, (genptr)&b);
 		resultPtr->value.addr.offset = (Address)b;
 	    } else if (size == sizeof(word)) {
 		word	w;
-		
+
 		Var_FetchInt(2, tokenPtr->value.addr.handle,
 			     tokenPtr->value.addr.offset, (genptr)&w);
 		resultPtr->value.addr.offset = (Address)w;
 	    } else if (size == sizeof(dword)) {
 		dword	d;
 		Address	seg;
-		
+
 		Var_FetchInt(4, tokenPtr->value.addr.handle,
 			     tokenPtr->value.addr.offset, (genptr)&d);
 		/*
@@ -3156,7 +3156,7 @@ ExprIndirect(ExprState	*state,
 		resultPtr->value.addr.offset = (Address)(d & 0xffff);
 		seg = (Address)((d >> 12) & 0xffff0);
 		resultPtr->value.addr.handle = Handle_Find(seg);
-		
+
 		/*
 		 * If couldn't resolve to a handle, make the thing
 		 * absolute.
@@ -3213,7 +3213,7 @@ ExprTypeCheck(Type	type1,
     if ((Type_Class(type1) == TYPE_VOID) || (Type_Class(type2) == TYPE_VOID)) {
 	return(TRUE);
     }
-    
+
     switch (Type_Class(type1)) {
 	case TYPE_INT:
 	    switch(Type_Class(type2)) {
@@ -3290,7 +3290,7 @@ ExprTypeCheck(Type	type1,
 		case TYPE_POINTER:
 		{
 		    Type    baseType;
-		    
+
 		    Type_GetArrayData(type1, (int *)NULL, (int *)NULL,
 				      (Type *)NULL, &type1);
 		    Type_GetPointerData(type2, (int *)NULL, &baseType);
@@ -3306,11 +3306,11 @@ ExprTypeCheck(Type	type1,
 		case TYPE_ARRAY:
 		{
 		    Type    baseType;
-		    
+
 		    Type_GetArrayData(type2, (int *)NULL, (int *)NULL,
 				      (Type *)NULL, &type2);
 		    Type_GetPointerData(type1, (int *)NULL, &baseType);
-		    
+
 		    return(Type_Equal(baseType, type2));
 		}
 		case TYPE_POINTER:
@@ -3322,7 +3322,7 @@ ExprTypeCheck(Type	type1,
 
 			Type_GetPointerData(type1, &ptype1, &btype1);
 			Type_GetPointerData(type2, &ptype2, &btype2);
-			
+
 			return((ptype1 == ptype2) &&
 			       Type_Equal(btype1, btype2));
 		    }
@@ -3401,7 +3401,7 @@ ExprFetch(ExprState	*state,
 		    GeosAddr	*gap;
 
 		    gap = (GeosAddr *)ExprMalloc(state, sizeof(GeosAddr));
-		    
+
 		    Type_GetPointerData(tokenPtr->type, &ptrType, &baseType);
 		    switch(ptrType) {
 			case TYPE_PTR_NEAR:
@@ -3464,7 +3464,7 @@ ExprFetch(ExprState	*state,
 					       tokenPtr->value.addr.offset,
 					       (genptr)&val);
 			    seg = (val>>16) & 0xffff;
-			    
+
 			    /* 0xffff conditional is for things that have kcode
 			     * in the HMA... */
 			    if (seg != 0xffff && seg >= 0xf000) {
@@ -3637,7 +3637,7 @@ ExprFetch(ExprState	*state,
 			    tokenPtr->flags = 0;
 			    break;
 			}
-			    
+
 		    }
 		    tokenPtr->what = TOKEN_POINTER;
 		    tokenPtr->value.ptr = gap;
@@ -3718,7 +3718,7 @@ ExprArithOrPointerOp(ExprState	*state,
 		gap = &lhs->value.addr;
 		size = Type_Sizeof(lhs->type);
 	    }
-	    
+
 	    /*
 	     * Must have been a pointer or array. Play with the offset
 	     * portion of value.addr
@@ -3777,7 +3777,7 @@ ExprArithOrPointerOp(ExprState	*state,
 
 	    if (rhs->what == TOKEN_POINTER) {
 		Type	baseType;
-		
+
 		gap = rhs->value.ptr;
 		Type_GetPointerData(rhs->type, (int *)NULL, &baseType);
 		size = Type_Sizeof(baseType);
@@ -3798,7 +3798,7 @@ ExprArithOrPointerOp(ExprState	*state,
 		rhs->type = baseType;
 		size = Type_Sizeof(baseType);
 	    }
-		
+
 	    if (lhs->what == TOKEN_LITERAL) {
 		if (op == '-') {
 		    xyyerror(state,"invalid operand for operator");
@@ -3866,7 +3866,7 @@ ExprArithOp(ExprState		*state,
 	result->type = type_Double;
 	result->value.ptr = dp;
 	result->flags = 0;
-	
+
 	switch(op) {
 	    case '+':
 		*dp = *(double *)lhs->value.ptr + *(double *)rhs->value.ptr;
@@ -4071,7 +4071,7 @@ ExprRelOp(ExprState	*state,
 	    result->what = TOKEN_LITERAL;
 	    result->type = type_Int;
 	    result->flags = 0;
-	    
+
 	    switch(op) {
 		case '<':
 		    result->value.literal =
@@ -4121,7 +4121,7 @@ ExprRelOp(ExprState	*state,
 	result->what = TOKEN_LITERAL;
 	result->type = type_Int;
 	result->flags = 0;
-	
+
 	switch(op) {
 	    case '<':
 		result->value.literal =
@@ -4181,7 +4181,7 @@ ExprEvalBoolean(ExprState  *state,
 	} else {
 	    short 	  *value;
 	    int 	  retVal;
-	    
+
 	    value = (short *) Var_Cast(token->value.ptr,
 				       token->type, type_Int);
 	    if (*value) {
@@ -4227,7 +4227,7 @@ ExprStandardCoerce(ExprState	*state,
 		   ExprToken	*token)
 {
     ExprFetch(state, token);
-    
+
     switch (Type_Class(token->type)) {
 	case TYPE_CHAR: {
 	    /*
@@ -4421,7 +4421,7 @@ ExprCoerce(ExprState	*state,
 	 */
 	int class1 = Type_Class(token1->type);
 	int class2 = Type_Class(token2->type);
-	
+
 	if (!floatOk && ((class1 == TYPE_FLOAT) || (class2 == TYPE_FLOAT))){
 	    return(FALSE);
 	}
@@ -4489,7 +4489,7 @@ ExprCoerce(ExprState	*state,
 	    if (Type_Equal(token2->type, type_UnsignedLong)) {
 		dst = type_UnsignedLong;
 	    }
-	    
+
 	    if (token1->what == TOKEN_POINTER) {
 		token1->value.ptr = (Opaque)Var_Cast(token1->value.ptr,
 						     token1->type,
@@ -4644,7 +4644,7 @@ See also:\n\
     } else {
 	frame = NullFrame;
     }
-    
+
     if (!Expr_Eval(argv[1], frame, &addr, &type,
 		   (argc > 2) ? atoi(argv[2]) : TRUE))
     {
@@ -4667,7 +4667,7 @@ See also:\n\
 	    retargv[0] = "value";
 	    retargv[1] = Value_ConvertToString(type, (Opaque)addr.offset);
 	    retargv[2] = Type_ToAscii(type);
-	    
+
 	    Tcl_Return(interp, Tcl_Merge(3, retargv), TCL_DYNAMIC);
 	    free(retargv[1]);
 	    free((malloc_t)addr.offset);
@@ -4684,4 +4684,3 @@ See also:\n\
     }
     return(TCL_OK);
 }
-

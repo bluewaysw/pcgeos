@@ -208,8 +208,8 @@ extern int  	    attached;	    /* Set in ibm.c; non-zero if actually
 				     * if this is FALSE */
 extern int  	    tryingToAttach; /* Set in ibm.c; from Ibm_Connect */
 
-int	  	    commMode = CM_NONE;   /* type of comm., 
-					   * eg. serial, netw, dde 
+int	  	    commMode = CM_NONE;   /* type of comm.,
+					   * eg. serial, netw, dde
 					   */
 static int          keyboardFD = 0;
 static int  	    geosFD = -1;    /* serial or netware file descriptor */
@@ -364,12 +364,12 @@ typedef struct RpcEvent {
     struct RpcEvent  	*next;
 #if defined(unix)
     struct timeval	timeout;    	/* Time at which event should occur */
-    struct timeval	interval;   	/* Interval at which event should 
+    struct timeval	interval;   	/* Interval at which event should
 					 * recur. */
 # define etimercmp(tp1, tp2, c) timercmp(tp1, tp2, c)
 #else
     clock_t 	    	timeout;    	/* Time at which event should occur */
-    clock_t 		interval;   	/* Interval at which event should 
+    clock_t 		interval;   	/* Interval at which event should
 					 * recur. */
 # define etimercmp(tp1, tp2, c) (*(tp1) c *(tp2))
 #endif
@@ -391,7 +391,7 @@ typedef struct _RpcStream {
     Rpc_Opaque 	  	data;	    	/* Datum to pass to handler */
     struct _RpcStream	*saved;	    	/* Previous saved state */
 } RpcStream;
-    
+
 static RpcStream   	streams[FD_SETSIZE];
 
 fd_set	    	  	rpc_readMask;	/* Readable stream select mask */
@@ -447,7 +447,7 @@ static char npipeName[256];
 static char ttysetting[25];
 
 static BOOL incomingRead = FALSE;   	  /* incoming data has been read */
-static CHAR incomingBuf[RPC_MAX_DATA];	
+static CHAR incomingBuf[RPC_MAX_DATA];
 static int  incomingLen = 0;
 static BOOL outstandingRead = FALSE;	  /* a read attempt for incoming
 					   * data read has occurred, but
@@ -480,7 +480,7 @@ RpcNewIOV(struct iovec 	**iovPtr,
 	  int	    	len)
 {
     *curIOVPtr += 1;
-    
+
     if (*curIOVPtr == *iovLenPtr) {
 	*iovLenPtr *= 2;
 	*iovPtr = (struct iovec *)realloc((malloc_t)(*iovPtr),
@@ -548,7 +548,7 @@ RpcSendV(int    	fd,
 		MessageFlush(buf);
 	    }
 	    lastError = GetLastError();
-	    if ((lastError == ERROR_BROKEN_PIPE)  
+	    if ((lastError == ERROR_BROKEN_PIPE)
 		|| (lastError == ERROR_INVALID_HANDLE))
 	    {
 		Ibm_LostContact();
@@ -577,7 +577,7 @@ RpcSendV(int    	fd,
      * RPC_MSG_END requires it. Don't want to copy data around, you
      * know.
      */
-    
+
     for (i = 0; i < iov_len; i++) {
 	unsigned char	*bp;
 	int    	    	len;
@@ -675,17 +675,17 @@ RpcSendV(int    	fd,
 	    i = writev(fd, tiov, tiovlen);
 #elif defined(_MSDOS)
 	    i = Serial_WriteV(tiov, tiovlen);
-#elif defined(_WIN32) 
+#elif defined(_WIN32)
 	    i = Ntserial_WriteV(hCommunication, tiov, tiovlen, &overlapWrite);
 #endif
 	    if (i < 0) {
 #if defined(_WIN32)
 		if (win32dbg == TRUE) {
 		    char buf[1000];
-		    
+
 		    WinUtil_SprintError(buf, "Ntserial_WriteV");
 		    MessageFlush(buf);
-		}		    	
+		}
 #endif
 		nwritten = i;
 		break;
@@ -704,17 +704,17 @@ RpcSendV(int    	fd,
 	i = Ntserial_WriteV(hCommunication, newiov, curiov+1, &overlapWrite);
 	if ((i < 0) && (win32dbg == TRUE)) {
 	    char buf[1000];
-		    
+
 	    WinUtil_SprintError(buf, "Ntserial_WriteV");
 	    MessageFlush(buf);
-	}		    	
+	}
 #endif
     }
 
     free((malloc_t)newiov);
     return(i);
 }
-    
+
 
 /***********************************************************************
  *				RpcSend
@@ -744,7 +744,7 @@ RpcSend(int 	    fd,
     iov.iov_len = size;
     return(RpcSendV(fd, &iov, 1));
 }
-							  
+
 
 /*-
  *-----------------------------------------------------------------------
@@ -789,7 +789,7 @@ RpcCacheFlushEntry(CacheEntry	*e, 	/* Entry to flush */
     if (rpcDebug & RD_CACHE) {
 	Message("Flushing entry for %u\n", e->id);
     }
-    
+
     if (e->flushEvent != ev) {
 	Warning("RpcCacheFlushEntry: flushEvent (%x) != ev (%x)\n",
 		e->flushEvent, ev);
@@ -801,7 +801,7 @@ RpcCacheFlushEntry(CacheEntry	*e, 	/* Entry to flush */
     if (e->status == REPLY_PENDING) {
 	return(False);
     }
-    
+
     Rpc_EventDelete(ev);
     if (*((CacheEntry **)e->prev) == e) {
 	/*
@@ -849,7 +849,7 @@ RpcCacheDestroy(RpcServer *s)	/* The server whose cache should be destroyed */
 {
     register int  	i;
     register CacheEntry	*e;
-    
+
     for (i = 0; i < CACHE_THREADS; i++) {
 	for (e = s->cache[i]; e != (CacheEntry *)0; e = e->next) {
 	    if (e->replyData != (Rpc_Opaque)0) {
@@ -892,7 +892,7 @@ RpcCacheFind(RpcServer *server,    	/* Server in whose cache the call
 
     chain = RpcHash(id);
     e = server->cache[chain];
- 
+
     /*
      * Look for existing cache entry.
      */
@@ -951,7 +951,7 @@ RpcCacheFind(RpcServer *server,    	/* Server in whose cache the call
 	}
 	*entryNewPtr = False;
     }
-    
+
     /*
      * The entry was referenced, so reset the flush timer for it. Check
      * for null because Rpc_Broadcast uses a cache and biffs the flush
@@ -1045,7 +1045,7 @@ void DebugRpcCall(RpcCall *p_call)
     i = p_call->message[1].iov_len ;
 
     fprintf(rpcfile, "call %d (proc %d) [%d]:", p_header->rh_id, p_header->rh_procNum, i) ;
-    for (; i; i--)  
+    for (; i; i--)
         fprintf(rpcfile, " %02X", *(p_data++)) ;
     fprintf(rpcfile, "\n") ;
     fflush(rpcfile) ;
@@ -1109,7 +1109,7 @@ RpcProcessMessage(int		stream,
 	    ;
 	}
 	msg.header = &messagePtr->header;
-	
+
 	if (server == (RpcServer *)0) {
 	    if (rpcDebug & RD_SERVE) {
 		Message("%u: no such procedure\n",
@@ -1120,7 +1120,7 @@ RpcProcessMessage(int		stream,
 	    Rpc_Error((Rpc_Message)&msg, RPC_NOPROC);
 	    return;
 	}
-	    
+
 	msg.e =
 	    e = RpcCacheFind(server, messagePtr->header.rh_id, True, &isNew);
 
@@ -1139,14 +1139,14 @@ RpcProcessMessage(int		stream,
 	     */
 	    message = *messagePtr;
 	    msg.header = &message.header;
-	    
+
 	    if (rpcDebug & RD_SERVE) {
 		Message("Call on %d: id %u procedure %d\n",
 			stream,
 			message.header.rh_id,
 			message.header.rh_procNum);
 	    }
-	    
+
 	    /*
 	     * Check their byte-order against ours and call the swap procedure
 	     * if it's not the same.
@@ -1156,7 +1156,7 @@ RpcProcessMessage(int		stream,
 			      message.header.rh_length,
 			      (genptr)&message.buf[sizeof(RpcHeader)]);
 	    }
-	    
+
 	    (*server->serverProc)((Rpc_Message)&msg,
 				  message.header.rh_length,
 				  (Rpc_Opaque)&message.buf[sizeof(RpcHeader)],
@@ -1209,7 +1209,7 @@ RpcProcessMessage(int		stream,
 	if (rpcDebug & RD_CALL) {
 	    Message ("Reply to %u: ", messagePtr->header.rh_id);
 	}
-	
+
 	prev = &rpcCalls[stream];
 	for (call = rpcCalls[stream]; call != (RpcCall *)0; call = call->next){
 	    if (RpcIDEqual(messagePtr->header.rh_id, call->id)) {
@@ -1235,7 +1235,7 @@ RpcProcessMessage(int		stream,
 			call->status = RPC_TOOBIG;
 			if (rpcDebug & RD_CALL) {
 			    Message("too big, %d bytes instead of %d bytes\n",
-				    	messagePtr->header.rh_length, 
+				    	messagePtr->header.rh_length,
 				    	call->replyLen);
 			}
 		    } else {
@@ -1318,10 +1318,10 @@ RpcProcessMessage(int		stream,
  * SIDE EFFECTS: starts up Geos on the remote PC
  * STRATEGY: send the magic sequence to the swat stub
  * REVISION HISTORY:
- *	Name	Date		Description			     
- *	----	----		-----------			     
- *	jimmy	10/ 7/92		Initial version			     
- * 
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jimmy	10/ 7/92		Initial version
+ *
  *********************************************************************/
 void
 Rpc_RsCommon(char c)
@@ -1351,10 +1351,10 @@ Rpc_RsCommon(char c)
  * SIDE EFFECTS: starts up Geos on the remote PC
  * STRATEGY: send the magic sequence to the swat stub
  * REVISION HISTORY:
- *	Name	Date		Description			     
- *	----	----		-----------			     
- *	jimmy	10/ 7/92		Initial version			     
- * 
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jimmy	10/ 7/92		Initial version
+ *
  *********************************************************************/
 void
 Rpc_Rs(void)
@@ -1371,10 +1371,10 @@ Rpc_Rs(void)
  * SIDE EFFECTS: starts up Geos on the remote PC
  * STRATEGY: send the magic sequence to the swat stub
  * REVISION HISTORY:
- *	Name	Date		Description			     
- *	----	----		-----------			     
- *	jimmy	10/ 7/92		Initial version			     
- * 
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jimmy	10/ 7/92		Initial version
+ *
  *********************************************************************/
 void
 Rpc_Rss(void)
@@ -1391,10 +1391,10 @@ Rpc_Rss(void)
  * SIDE EFFECTS: starts up Geos on the remote PC
  * STRATEGY: send the magic sequence to the swat stub
  * REVISION HISTORY:
- *	Name	Date		Description			     
- *	----	----		-----------			     
- *	jimmy	10/ 7/92		Initial version			     
- * 
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jimmy	10/ 7/92		Initial version
+ *
  *********************************************************************/
 void
 Rpc_Rsn(void)
@@ -1411,10 +1411,10 @@ Rpc_Rsn(void)
  * SIDE EFFECTS: starts up Geos on the remote PC
  * STRATEGY: send the magic sequence to the swat stub
  * REVISION HISTORY:
- *	Name	Date		Description			     
- *	----	----		-----------			     
- *	jimmy	10/ 7/92		Initial version			     
- * 
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jimmy	10/ 7/92		Initial version
+ *
  *********************************************************************/
 void
 Rpc_Rssn(void)
@@ -1486,7 +1486,7 @@ RpcHandleStream(int	    stream, /* Stream that's ready */
 #elif defined(_WIN32)
 	if (outstandingRead == TRUE) {
 	    WaitForSingleObject(overlapRead.hEvent, INFINITE);
-	    GetOverlappedResult(hCommunication, &overlapRead, 
+	    GetOverlappedResult(hCommunication, &overlapRead,
 				&numRead, FALSE);
 	    incomingLen = numRead;
 	    outstandingRead = FALSE;
@@ -1497,8 +1497,8 @@ RpcHandleStream(int	    stream, /* Stream that's ready */
 	    incomingBuf[0] = '\0';
 	    bytesRead = incomingLen;
 	    incomingRead = FALSE;
-	} else { 
-	    bytesRead = Ntserial_Read(hCommunication, bp, 1, 
+	} else {
+	    bytesRead = Ntserial_Read(hCommunication, bp, 1,
 				      &overlapRead, TRUE);
 	}
 #endif
@@ -1529,10 +1529,10 @@ RpcHandleStream(int	    stream, /* Stream that's ready */
 		     */
 		    byte    checksum;
 		    byte    *end;
-		    
+
 		    rpcState = RPC_STATE_SYNC;
 		    end = &rpcMsg.buf[rpcMsgLen];
-		    
+
 		    checksum = 0;
 		    for (bp = &rpcMsg.buf[0]; bp < end; bp++)
 		    {
@@ -1630,13 +1630,13 @@ RpcHandleStream(int	    stream, /* Stream that's ready */
 # if defined(_WIN32)
 	    if (bytesRead == -1) {
 # else
-		/* 
+		/*
 		 * errno is set to 0 at the start, so if it's non-zero now,
 		 * there was an error in the reading, not just an end-of-file
 		 */
 	    if (errno != 0) {
 		extern char *sys_errlist[];
-		MessageFlush("RpcHandleStream: read: %s\n", 
+		MessageFlush("RpcHandleStream: read: %s\n",
 			     sys_errlist[errno]);
 # endif
 	    } else {
@@ -1648,14 +1648,14 @@ RpcHandleStream(int	    stream, /* Stream that's ready */
 		 */
 		register RpcServer	*s;
 		register RpcCall	*c;
-		
+
 		Message("Incomplete message received (%d bytes)\n",
 			rpcMsgLen);
-		
+
 		if (rpcDebug & RD_STREAM) {
 		    Message("EOF on %d -- closing\n", stream);
 		}
-		
+
 		for (s = rpcServers[stream];
 		     s != (RpcServer *)0;
 		     s = rpcServers[stream])
@@ -1663,7 +1663,7 @@ RpcHandleStream(int	    stream, /* Stream that's ready */
 			rpcServers[stream] = s->next;
 			free((char *)s);
 		}
-		
+
 		for (c = rpcCalls[stream];
 		     c != (RpcCall *)0;
 		     c = rpcCalls[stream])
@@ -1672,9 +1672,9 @@ RpcHandleStream(int	    stream, /* Stream that's ready */
 		    c->status = RPC_TIMEDOUT;
 		    rpcCalls[stream] = c->next;
 		}
-		
+
 		Rpc_Ignore(stream);
-# if !defined(_WIN32)	    
+# if !defined(_WIN32)
 		(void) close(stream);
 # else
 		Ntserial_Exit(&hCommunication, &overlapRead, &overlapWrite);
@@ -1710,8 +1710,8 @@ RpcHandleStream(int	    stream, /* Stream that's ready */
 	    if (geosFD < 0) {
 		(void)Rpc_Connect();
 	    }
-	    rpcMsgLen = NPipe_Read(hCommunication, 
-				   &rpcMsg.buf, 
+	    rpcMsgLen = NPipe_Read(hCommunication,
+				   &rpcMsg.buf,
 				   sizeof(rpcMsg.buf),
 				   &overlapRead, TRUE);
 	    if (rpcMsgLen > 0) {
@@ -1721,12 +1721,12 @@ RpcHandleStream(int	    stream, /* Stream that's ready */
 
 		if (win32dbg == TRUE) {
 		    char buf[1000];
-		    
+
 		    WinUtil_SprintError(buf, "NPipe_Read");
 		    MessageFlush(buf);
 		}
 		lastError = GetLastError();
-		if ((lastError == ERROR_BROKEN_PIPE)  
+		if ((lastError == ERROR_BROKEN_PIPE)
 		|| (lastError == ERROR_INVALID_HANDLE))
 		{
 		    Ibm_LostContact();
@@ -1768,7 +1768,7 @@ RpcResend(Rpc_Opaque	clientData,	/* Record for message to be sent */
     RpcHeader		*header;    /* Header of message being resent (for
 				     * debug output) */
     RpcCall		*call;	    /* Record for message to be sent */
-    
+
     if (clientData < (Rpc_Opaque)&status) {
 	Warning("RpcResend: call is below current stack, deleting event %x\n",
 		event);
@@ -1783,10 +1783,10 @@ RpcResend(Rpc_Opaque	clientData,	/* Record for message to be sent */
 	Rpc_EventDelete(event);
 	return (FALSE);
     }
-    
+
     header = (RpcHeader *)call->message[0].iov_base;
     status = RPC_SUCCESS;	    /* Assume success */
-    
+
     if (!call->replied) {
 	if (rpcDebug & RD_CALL) {
 	    Message("Resending %u (proc %d): ", call->id, header->rh_procNum);
@@ -1799,11 +1799,11 @@ RpcResend(Rpc_Opaque	clientData,	/* Record for message to be sent */
 	    do {
 		numBytes = RpcSendV(call->sock, call->message, 2);
 	    } while ((numBytes < 0) && (errno == EINTR));
-	    
+
 	    if (numBytes < 0) {
 		if (rpcDebug & (RD_CALL|RD_STREAM)) {
 		    extern char *sys_errlist[];
-		    MessageFlush("RpcResend: writev: %s\n", 
+		    MessageFlush("RpcResend: writev: %s\n",
 				 sys_errlist[errno]);
 		}
 		status = RPC_CANTSEND;
@@ -1826,7 +1826,7 @@ RpcResend(Rpc_Opaque	clientData,	/* Record for message to be sent */
 	     */
 	    call->replied = True;
 	    call->status = status;
-	    
+
 	    prev = &rpcCalls[call->sock];
 	    for (c = rpcCalls[call->sock]; c != (RpcCall *)0; c = c->next) {
 		if (c == call) {
@@ -1879,7 +1879,7 @@ RpcQueueEvent(register RpcEvent	*ev)
 {
     register RpcEvent	*e;
     register RpcEvent	**prev;
-    
+
     if (rpcDebug & RD_EVENT_QUEUE) {
 #if defined(unix)
 	Message ("Queueing event %xh (timeout = %d.%06d)\n", ev,
@@ -1921,7 +1921,7 @@ Rpc_EventCreate(struct timeval	*interval,	/* Timeout period for event */
 		Rpc_Opaque	data)		/* Datum to pass it */
 {
     register RpcEvent	*ev;
-    
+
     ev = (RpcEvent *)malloc_tagged(sizeof(RpcEvent), TAG_RPC);
 #if defined(unix)
     (void)gettimeofday(&ev->timeout, (struct timezone *)0);
@@ -2182,7 +2182,7 @@ RpcWait(int poll)
 	    }
 	    timeout = &tv;
 	}
-	
+
 	readMask = rpc_readMask;
 	writeMask = rpc_writeMask;
 	exceptMask = rpc_exceptMask;
@@ -2200,7 +2200,7 @@ RpcWait(int poll)
 	}
 	nstreams = select(FD_SETSIZE, &readMask, &writeMask, &exceptMask,
 			  timeout);
-#elif defined(_MSDOS)   
+#elif defined(_MSDOS)
 	/*
 	 * In the DOS world, we only look for the keyboard and our serial
 	 * port. There's no way to find other things being ready, so...
@@ -2213,7 +2213,7 @@ RpcWait(int poll)
 	FD_ZERO(&readMask);
 	FD_ZERO(&writeMask);
 	FD_ZERO(&exceptMask);
-	
+
 	if (FD_ISSET(keyboardFD, &rpc_readMask)
 	    && _bios_keybrd(_KEYBRD_READY)) {
 	    nstreams += 1;
@@ -2222,8 +2222,8 @@ RpcWait(int poll)
 	/* now that swat can work over a network or a serial cable, we must
 	 * check for either case
 	 */
-	if (FD_ISSET(geosFD, &rpc_readMask) 
-	    && ( ((commMode == CM_NETWARE) && Ipx_CheckPacket()) || 
+	if (FD_ISSET(geosFD, &rpc_readMask)
+	    && ( ((commMode == CM_NETWARE) && Ipx_CheckPacket()) ||
 		 ((commMode == CM_SERIAL) && Serial_Check(hCommunication)))) {
 	    nstreams += 1;
 	    FD_SET(geosFD, &readMask);
@@ -2253,7 +2253,7 @@ RpcWait(int poll)
 	     */
 	    tv = ev->timeout - now;
 	} else {
-	    /* 
+	    /*
 	     * let's wait for ever, well 5 seconds that is
 	     */
 	    tv = 5000;
@@ -2266,20 +2266,20 @@ RpcWait(int poll)
 	FD_ZERO(&exceptMask);
 
 	nwaits = 0;
-	/* 
-	 * check if we should wait on the keyboard 
+	/*
+	 * check if we should wait on the keyboard
 	 */
 	if ((FD_ISSET(keyboardFD, &rpc_readMask)
 	     || ((mouseFD > 0) && FD_ISSET(mouseFD, &rpc_readMask)))
-	    && (hConIn != NULL)) 
+	    && (hConIn != NULL))
 	{
 	    hwaits[nwaits++] = hConIn;
 	}
-	/* 
+	/*
 	 * check if we should wait on the communications method, eg. npipe
 	 */
 	if ((geosFD >= 0) && (FD_ISSET(geosFD, &rpc_readMask))
-	    && (hCommunication != NULL)) 
+	    && (hCommunication != NULL))
 	{
 	    if (incomingRead == TRUE) {
 		/*
@@ -2290,23 +2290,23 @@ RpcWait(int poll)
 	    } else if (outstandingRead == TRUE) {
 		/*
 		 * if we are already waiting on it, keep waiting
-		 */ 
+		 */
 		hwaits[nwaits++] = overlapRead.hEvent;
 	    } else {
-		/* 
+		/*
 		 * need to request data and wait for it
 		 */
 		switch(commMode) {
 		case CM_NPIPE:
-		    incomingLen = NPipe_Read(hCommunication, 
-					     incomingBuf, 
+		    incomingLen = NPipe_Read(hCommunication,
+					     incomingBuf,
 					     sizeof(incomingBuf),
 					     &overlapRead, FALSE);
 		    if (incomingLen > 0) {
 			if (GetLastError() != ERROR_IO_PENDING) {
-			    /* 
+			    /*
 			     * read hasn't read ALL the data yet
-			     */ 
+			     */
 			    incomingRead = TRUE;
 			    outstandingRead = FALSE;
 			    nstreams += 1;
@@ -2325,19 +2325,19 @@ RpcWait(int poll)
 
 			if (win32dbg == TRUE) {
 			    char buf[1000];
-		    
+
 			    WinUtil_SprintError(buf, "NPipe_Read");
 			    MessageFlush(buf);
 			}
 			lastError = GetLastError();
-			if ((lastError == ERROR_BROKEN_PIPE)  
+			if ((lastError == ERROR_BROKEN_PIPE)
 			    || (lastError == ERROR_INVALID_HANDLE))
 			{
 			    Ibm_LostContact();
 			    goto afterRpcLoop;
 			}
 		    } else {
-			/* 
+			/*
 			 * incomingLen == 0; wait for data to arrive
 			 */
 			outstandingRead = TRUE;
@@ -2348,10 +2348,10 @@ RpcWait(int poll)
 		    }
 		    break;
 		case CM_SERIAL:
-		    incomingLen = Ntserial_Read(hCommunication, 
-						incomingBuf, 
+		    incomingLen = Ntserial_Read(hCommunication,
+						incomingBuf,
 						1,
-						&overlapRead, 
+						&overlapRead,
 						FALSE);
 		    if (incomingLen >= 1) {
 			if ((incomingLen > 1) && (win32dbg == TRUE)) {
@@ -2367,7 +2367,7 @@ RpcWait(int poll)
 		    } else if (incomingLen == -1) {
 			if (win32dbg == TRUE) {
 			    char buf[1000];
-		    
+
 			    WinUtil_SprintError(buf, "Ntserial_Read");
 			    MessageFlush(buf);
 			}
@@ -2376,7 +2376,7 @@ RpcWait(int poll)
 			/*
 			 * waiting for a byte from the serial port
 			 */
-			outstandingRead = TRUE;		
+			outstandingRead = TRUE;
 			/*
 			 * set the wait handle to the overlapped io event
 			 */
@@ -2388,14 +2388,14 @@ RpcWait(int poll)
 		}
 	    }
 	}
-	
+
 	if (nstreams == 0) {
 	    /*
 	     * none of the streams have data right now, so block on them all
 	     */
 	    hwaits[nwaits++] = cntlcEvent;
-	    dWaitResult = WaitForMultipleObjects(nwaits, 
-						 hwaits, 
+	    dWaitResult = WaitForMultipleObjects(nwaits,
+						 hwaits,
 						 FALSE,
 						 millisecs);
 	    if (dWaitResult == WAIT_FAILED) {
@@ -2406,7 +2406,7 @@ RpcWait(int poll)
 		    dWaitResult = WAIT_TIMEOUT;
 	    }
 	    else if ( hwaits[dWaitResult - WAIT_OBJECT_0] == hConIn ) {
-		/* 
+		/*
 		 * check the keyboard & mouse to see what input we got
 		 */
 		peekResult = PeekConsoleInput(hConIn, &inputrec, 1, &dwRead);
@@ -2437,14 +2437,14 @@ RpcWait(int poll)
 		    Punt("Severe problem - Peek Console Input failed");
 		}
 	    }
-	    
+
 	    else if ( hwaits[dWaitResult - WAIT_OBJECT_0] == overlapRead.hEvent )
 	    {
 		/*
 		 * data came in from the overlapped io of the communication
 		 * method
 		 */
-		if (!GetOverlappedResult(hCommunication, &overlapRead, 
+		if (!GetOverlappedResult(hCommunication, &overlapRead,
 				    &numRead, FALSE))
 		    MessageFlush("GetOverlappedResult returned FALSE\n");
 		incomingLen = numRead;
@@ -2452,9 +2452,9 @@ RpcWait(int poll)
 		incomingRead = TRUE;
 		nstreams += 1;
 		FD_SET(geosFD, &readMask);
-		if ((commMode == CM_SERIAL) 
-		    && (incomingBuf[0] == 0) 
-		    && (rpcState == RPC_STATE_SYNC)) 
+		if ((commMode == CM_SERIAL)
+		    && (incomingBuf[0] == 0)
+		    && (rpcState == RPC_STATE_SYNC))
 		{
 		    /*
 		     * problem - wait for a tenth of a second and proceed
@@ -2468,10 +2468,10 @@ RpcWait(int poll)
 
 	    else if ( hwaits[dWaitResult - WAIT_OBJECT_0] == cntlcEvent )
 	    {
-		/* 
+		/*
 		 * cntlc was hit - time to get outta here
 		 */
-		goto afterRpcLoop;	       
+		goto afterRpcLoop;
 	    }
 	}
 #endif  /* _WIN32 */
@@ -2479,7 +2479,7 @@ RpcWait(int poll)
 	if (nstreams > 0) {
 	    /*
 	     * Something is ready. Find it and call its handler function.
-	     * For each stream that's ready, we find all the things it's 
+	     * For each stream that's ready, we find all the things it's
 	     * ready for and stick the appropriate RPC_*ABLE constants in
 	     * 'what', removing the stream from the various masks as we
 	     * go. The handler is called once for each ready stream.
@@ -2493,19 +2493,19 @@ RpcWait(int poll)
 	    register int stream;
 	    register int what;
 	    register fd_mask tmask;
-	    
+
 	    if (rpcDebug & RD_STREAM) {
 		printf("result:\n");
 		fflush(stdout);
 	    }
-	    
+
 	    for (base = 0,
 		     rmask = readMask.fds_bits[0],
 		     wmask = writeMask.fds_bits[0],
 		     emask = exceptMask.fds_bits[0];
-		 
+
 		 base < sizeof(rpc_readMask.fds_bits)/sizeof(fd_mask);
-		 
+
 		 base++,
 		     rmask = readMask.fds_bits[base],
 		     wmask = writeMask.fds_bits[base],
@@ -2515,31 +2515,31 @@ RpcWait(int poll)
 		    Message("\tread(%xh), write(%xh), except(%xh)\n",
 			    rmask, wmask, emask);
 		}
-		
+
 #define CHKSTR(n,mask,what) \
 		if (!FD_ISSET((n), &(mask))) { \
 	            continue; \
 		}
-		
+
 		while(rmask) {
 		    stream = ffs(rmask) - 1;
 		    tmask = 1 << stream;
-		    
+
 		    stream += base * (sizeof(fd_mask) * NBBY);
-		    
+
 		    rmask &= ~tmask;
 		    what = RPC_READABLE;
-		    
+
 		    CHKSTR(stream, rpc_readMask, "reading");
-		    
+
 		    if (rpcDebug & RD_STREAM) {
 			Message("\t%d: read", stream);
-		    }	
+		    }
 		    if (wmask & tmask) {
 			wmask &= ~tmask;
-			
+
 			CHKSTR(stream, rpc_writeMask, "writing");
-			
+
 			what |= RPC_WRITABLE;
 			if (rpcDebug & RD_STREAM) {
 			    Message(",write");
@@ -2547,14 +2547,14 @@ RpcWait(int poll)
 		    }
 		    if (emask & tmask) {
 			emask &= ~tmask;
-			
+
 			CHKSTR(stream, rpc_exceptMask, "excepting");
-			
+
 			what |= RPC_EXCEPTABLE;
 			if(rpcDebug & RD_STREAM) {
 			    Message(",except");
 			}
-			
+
 		    }
 		    if (rpcDebug & RD_STREAM) {
 			Message("\n");
@@ -2569,18 +2569,18 @@ RpcWait(int poll)
 		    stream += base * (sizeof(fd_mask)*NBBY);
 		    wmask &= ~tmask;
 		    what = RPC_WRITABLE;
-		    
+
 		    CHKSTR(stream, rpc_writeMask, "writing");
-		    
+
 		    if (rpcDebug & RD_STREAM) {
 			Message("\t%d: write", stream);
 		    }
 		    if (emask & tmask) {
 			emask &= ~tmask;
 			what |= RPC_EXCEPTABLE;
-			
+
 			CHKSTR(stream, rpc_exceptMask, "excepting");
-			
+
 			if (rpcDebug & RD_STREAM) {
 			    Message(",except");
 			}
@@ -2597,9 +2597,9 @@ RpcWait(int poll)
 		    tmask = 1 << stream;
 		    stream += base * (sizeof(fd_mask)*NBBY);
 		    emask &= ~tmask;
-		    
+
 		    CHKSTR(stream, rpc_exceptMask, "excepting");
-		    
+
 		    if(rpcDebug & RD_STREAM) {
 			Message("\t%d:except\n", stream);
 		    }
@@ -2610,7 +2610,7 @@ RpcWait(int poll)
 	    }
 	    return;
 	}
-	
+
 #if defined(unix)
 	else if (nstreams < 0) {
 	    if (errno == EBADF) {
@@ -2687,7 +2687,7 @@ Rpc_Poll(void)
  * RETURN:	    nothing
  * SIDE EFFECTS:    stuff be allocated
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -2719,7 +2719,7 @@ Rpc_Push(int 	    stream) 	    	/* Stream whose state is to be saved */
  * SIDE EFFECTS:    the state is popped and the stream watching set
  *		    as it was when Rpc_Push was called.
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -2778,7 +2778,7 @@ Rpc_Watch(int		stream,		    /* Stream to observe */
 	Message("Trying to watch stream %d\n", stream);
 	return;
     }
-    
+
     if (streams[stream].state != 0) {
 	FD_CLR(stream, &rpc_readMask);
 	FD_CLR(stream, &rpc_writeMask);
@@ -2927,7 +2927,7 @@ Rpc_Return(Rpc_Message	rpcMsg,	    /* Message to respond to */
 	(realMsg->e->status == REPLY_PENDING))
     {
 	realMsg->e->status = REPLY_SENT;
-	
+
 	if (length == 0) {
 	    if (rpcDebug & RD_CACHE) {
 		Message("Marking zero-length reply\n");
@@ -2942,7 +2942,7 @@ Rpc_Return(Rpc_Message	rpcMsg,	    /* Message to respond to */
 		Var_SwapValue(VAR_STORE, realMsg->server->replyType,
 			      length, (genptr)data);
 	    }
-	    
+
 	    if (rpcDebug & RD_CACHE) {
 		Message("Marking reply of %d bytes\n", length);
 	    }
@@ -2954,7 +2954,7 @@ Rpc_Return(Rpc_Message	rpcMsg,	    /* Message to respond to */
 	Var_SwapValue(VAR_STORE, realMsg->server->replyType,
 		      length, (genptr)data);
     }
-	
+
     bcopy(data, &reply.buf[sizeof(RpcHeader)], length);
 
     /*
@@ -3014,7 +3014,7 @@ Rpc_ServerCreate(Rpc_Proc	procNum,	    /* Procedure number to
 						     * function */
 {
     register RpcServer	*s;
-    
+
     assert(geosFD != 0);
     assert(geosFD > 0);  /* XXXdan debug */
 
@@ -3051,7 +3051,7 @@ Rpc_ServerCreate(Rpc_Proc	procNum,	    /* Procedure number to
      */
     GC_RegisterType(argType);
     GC_RegisterType(replyType);
-    
+
     /*
      * Install new server in server record
      */
@@ -3158,7 +3158,7 @@ Rpc_Call(Rpc_Proc	procNum,    /* Procedure number to call */
     assert(geosFD >= 0);
 
     retry = defaultRetry;
-    
+
     call.sock =			    geosFD;
     call.numRetries =		    NUM_RETRIES;
     call.id =			    RpcUniqueID();
@@ -3188,7 +3188,7 @@ Rpc_Call(Rpc_Proc	procNum,    /* Procedure number to call */
 	    Var_SwapValue(VAR_STORE, inType, inLength, (genptr)inData);
 	}
     }
-	
+
     call.message[0].iov_base =	    (caddr_t)&header;
     call.message[0].iov_len =	    sizeof(header);
     call.message[1].iov_base =	    (caddr_t)inData;
@@ -3446,7 +3446,7 @@ Rpc_Abort(void)
  * SYNOPSIS:	    send a file through rpc
  * CALLED BY:	    Tcl
  * RETURN:	    nothing
- * SIDE EFFECTS:    
+ * SIDE EFFECTS:
  *
  * STRATEGY:
  *
@@ -3465,7 +3465,7 @@ DEFCMD(send-file,RpcSendFile,TCL_EXACT, NULL, obscure,
     FileType fp;
     char   *buf, *cp;
     byte   sync[SYNC_SIZE];
-    int    size, retry;
+    int long    size, retry;
     long   filePos = 0, fileSize;
     struct stat stbuf;
     int    returnCode;
@@ -3477,21 +3477,21 @@ DEFCMD(send-file,RpcSendFile,TCL_EXACT, NULL, obscure,
     }
 
 #if defined(_MSDOS) || defined(_WIN32)
-    /* 
-     * on the PC convert slashes for pathnames on the host machine 
+    /*
+     * on the PC convert slashes for pathnames on the host machine
      */
     for (cp = argv[1]; (cp = index(cp, '/')) != (char *)NULL; *cp = '\\');
 #endif
 
-    /* 
-     * convert slashes for path names on the target PC 
+    /*
+     * convert slashes for path names on the target PC
      */
     for (cp = argv[2]; (cp = index(cp, '/')) != (char *)NULL; *cp = '\\');
 
-    /* 
-     * open up the source file 
+    /*
+     * open up the source file
      */
-    returnCode = FileUtil_Open(&fp, argv[1], O_RDONLY | O_BINARY, 
+    returnCode = FileUtil_Open(&fp, argv[1], O_RDONLY | O_BINARY,
 			       SH_DENYWR, 0);
     if (returnCode == FALSE) {
 	char errmsg[512];
@@ -3501,14 +3501,14 @@ DEFCMD(send-file,RpcSendFile,TCL_EXACT, NULL, obscure,
 	Tcl_RetPrintf(interp, "Error opening file %s.", argv[1]);
 	return(TCL_ERROR);
     }
-    /* 
-     * get file size 
+    /*
+     * get file size
      */
     stat(argv[1], &stbuf);
     fileSize = stbuf.st_size;
 
-    /* 
-     * send down the filename of the destination 
+    /*
+     * send down the filename of the destination
      */
     if (Rpc_Call(RPC_SEND_FILE, strlen(argv[2])+1, type_Void, argv[2],
 	     	    1, type_Void, &sync) != RPC_SUCCESS)
@@ -3517,9 +3517,9 @@ DEFCMD(send-file,RpcSendFile,TCL_EXACT, NULL, obscure,
 	return(TCL_ERROR);
     }
 
-    /* 
+    /*
      * if we don't get back a sync then what probably happened is that
-     * there was a bad filename given (ie. bad path or illegal file name 
+     * there was a bad filename given (ie. bad path or illegal file name
      */
     if (sync[0] != FILE_XFER_SYNC) {
 	if (sync[0] == FILE_XFER_ERROR_DOS_SEM_TAKEN) {
@@ -3531,17 +3531,17 @@ DEFCMD(send-file,RpcSendFile,TCL_EXACT, NULL, obscure,
 	return(TCL_ERROR);
     }
 
-    /* 
+    /*
      * ok, both ends are happy, so go ahead and start sending down the file in
-     * 0.5K blocks 
+     * 0.5K blocks
      */
 
     Message("Sending file %s to %s\n", argv[1], argv[2]);
     buf = malloc(FILE_XFER_BLOCK_SIZE);
 
     do {
-	/* 
-	 * read in next block from source file 
+	/*
+	 * read in next block from source file
 	 */
 	(void)FileUtil_Read(fp, buf, FILE_XFER_BLOCK_SIZE, &size);
 	/* XXXdan-q handle error reading file??? */
@@ -3549,7 +3549,7 @@ DEFCMD(send-file,RpcSendFile,TCL_EXACT, NULL, obscure,
 
 	if (!size)
 	{
-	    /* 
+	    /*
 	     * send out a zero size block so the stub knows to close the
 	     * file
 	     */
@@ -3564,7 +3564,7 @@ DEFCMD(send-file,RpcSendFile,TCL_EXACT, NULL, obscure,
 	}
 	do {
 
-	    if (Rpc_Call(RPC_SEND_FILE_NEXT_BLOCK, size, type_Void, buf, 1, 
+	    if (Rpc_Call(RPC_SEND_FILE_NEXT_BLOCK, size, type_Void, buf, 1,
 		     	type_Void, &sync) != RPC_SUCCESS)
 	    {
 		Message("\nError sending file.\n");
@@ -3603,13 +3603,13 @@ DEFCMD(send-file,RpcSendFile,TCL_EXACT, NULL, obscure,
  * CALLED BY:	    Sym_GetFuncData
  * RETURN:	    converted offset
  * SIDE EFFECTS:    nothing
- * STRATEGY:	    ask to stub to look into the export table of 
+ * STRATEGY:	    ask to stub to look into the export table of
  *		    the geode for us
  * REVISION HISTORY:
- *	Name	Date		Description			     
- *	----	----		-----------			     
- *	jimmy	7/13/93		Initial version			     
- * 
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jimmy	7/13/93		Initial version
+ *
  *********************************************************************/
 Address
 Rpc_IndexToOffset(Patient   patient,	    /* patient whose table to use */
@@ -3644,8 +3644,8 @@ Rpc_IndexToOffset(Patient   patient,	    /* patient whose table to use */
     MessageFlush("Index %04x to offset %04x\n", index, itor.ITOR_offset);
 #endif
 
-    /* 
-     * as an optimization go ahead and adjust the values while in memory 
+    /*
+     * as an optimization go ahead and adjust the values while in memory
      */
     s->flags &= ~OSYM_ENTRY;
     s->u.addrSym.address = itor.ITOR_offset;
@@ -3661,10 +3661,10 @@ Rpc_IndexToOffset(Patient   patient,	    /* patient whose table to use */
  * SIDE EFFECTS:
  * STRATEGY:	the stub will know what data to send from a previous RPC call
  * REVISION HISTORY:
- *	Name	Date		Description			     
- *	----	----		-----------			     
- *	jimmy	11/18/93		Initial version			     
- * 
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jimmy	11/18/93		Initial version
+ *
  *********************************************************************/
 
 int
@@ -3685,7 +3685,7 @@ RpcGetRestOfData(void *buffer, dword size)
 	gndb.GNDB_size = getsize;
     	if (Rpc_Call(RPC_GET_NEXT_DATA_BLOCK,
 		     	    	sizeof(gndb), typeGetNextDataBlock, &gndb,
-				getsize, type_Void, 
+				getsize, type_Void,
 		     	    	(Opaque)((char *)buffer+curpos))
 	    	    != RPC_SUCCESS)
 	{
@@ -3705,10 +3705,10 @@ RpcGetRestOfData(void *buffer, dword size)
  * SIDE EFFECTS:
  * STRATEGY:
  * REVISION HISTORY:
- *	Name	Date		Description			     
- *	----	----		-----------			     
- *	jimmy	6/24/93		Initial version			     
- * 
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jimmy	6/24/93		Initial version
+ *
  *********************************************************************/
 int
 Rpc_ReadFromGeode(Patient   patient,	/* patient whose Geode to read */
@@ -3744,15 +3744,15 @@ Rpc_ReadFromGeode(Patient   patient,	/* patient whose Geode to read */
 	    if (dataType == GEODE_DATA_LOADER)
 	    {
 		/* special case for the loader, we only ask for one thing
-		 * from the loader, and that is the size of the header... 
+		 * from the loader, and that is the size of the header...
 		 */
 	    	rga.RGA_geodeHandle = 1;
-	    } 
+	    }
 	    else
 	    {
 		return(TCL_ERROR);
 	    }
-	} 
+	}
 	else
 	{
 	    rga.RGA_geodeHandle = Handle_ID(patient->core);
@@ -3767,7 +3767,7 @@ Rpc_ReadFromGeode(Patient   patient,	/* patient whose Geode to read */
 	    getsize = FILE_XFER_BLOCK_SIZE;
 	}
 	rga.RGA_size = getsize - sizeof(myrgr.rgr);
-	if (Rpc_Call(RPC_READ_GEODE, sizeof(rga), typeReadGeodeArgs, 
+	if (Rpc_Call(RPC_READ_GEODE, sizeof(rga), typeReadGeodeArgs,
 				 (Opaque)&rga,
 				 getsize, typeReadGeodeReply,
 		     	    	(Opaque)&myrgr)
@@ -3787,7 +3787,7 @@ Rpc_ReadFromGeode(Patient   patient,	/* patient whose Geode to read */
 	{
 	    /* we got the whole thing, so return */
 	    return (TCL_OK);
-	} 
+	}
 	else
 	{
 	    /* we got the first chunk, now lets get the rest */
@@ -3802,14 +3802,14 @@ Rpc_ReadFromGeode(Patient   patient,	/* patient whose Geode to read */
  *********************************************************************
  * SYNOPSIS: 	read data from a geode down on the PC
  * CALLED BY:	Ibm_ReadBytes and others
- * RETURN:  	
+ * RETURN:
  * SIDE EFFECTS:buffer filled with data read from Geode
  * STRATEGY:
  * REVISION HISTORY:
- *	Name	Date		Description			     
- *	----	----		-----------			     
- *	jimmy	6/23/93		Initial version			     
- * 
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jimmy	6/23/93		Initial version
+ *
  *********************************************************************/
 DEFCMD(rpc-read-geode,Rpc_ReadGeode,TCL_EXACT,NULL,obscure,
 "")
@@ -3835,10 +3835,10 @@ DEFCMD(rpc-read-geode,Rpc_ReadGeode,TCL_EXACT,NULL,obscure,
  ***********************************************************************
  * SYNOPSIS:	    find geos application on target machine
  * CALLED BY:	    Tcl
- * RETURN:	    
- * SIDE EFFECTS:    
+ * RETURN:
+ * SIDE EFFECTS:
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -3970,7 +3970,7 @@ See also:\n\
     int	    	set, clear;
 
     set = clear = 0;
-    
+
     for (i = 1; i < argc; i++) {
 	char	*f;
 	int 	j;
@@ -3998,7 +3998,7 @@ See also:\n\
     }
 
     rpcDebug = (rpcDebug | set) & ~clear;
-	
+
     for (i = 0, retargc = 0; i < sizeof(flags)/sizeof(flags[0]); i++) {
 	if (rpcDebug & flags[i].flag) {
 	    retargv[retargc++] = flags[i].name;
@@ -4086,7 +4086,7 @@ RpcTclServer(Rpc_Message    msg,
     free(cmd);
     free(args[1]);
 }
-    
+
 
 /***********************************************************************
  *				RpcTclEvent
@@ -4348,11 +4348,11 @@ See also:\n\
 	    if (Type_IsNull(repType)) {
 		Tcl_Error(interp, "invalid reply type");
 	    }
-	    
+
 	    argData = Value_ConvertFromString(argType, argv[4]);
 	    if (argData == NullOpaque) {
 		/*
-		 * Error message left in return value by 
+		 * Error message left in return value by
 		 * Value_ConvertFromString
 		 */
 		return(TCL_ERROR);
@@ -4376,8 +4376,8 @@ See also:\n\
 		Tcl_RetPrintf(interp, "rpc call: %s", Rpc_LastError());
 		return(TCL_ERROR);
 	    }
-	    
-	    
+
+
 	    /*
 	     * Convert reply data to ascii and return it.
 	     */
@@ -4422,7 +4422,7 @@ See also:\n\
 	    token->procName = (char *)(token+1);
 	    token->data = token->procName + strlen(argv[5]) + 1;
 	    token->other = (Rpc_Opaque)((long)procNum);
-	    
+
 	    strcpy(token->procName, argv[5]);
 	    strcpy(token->data, argc==7 ? argv[6] : "");
 
@@ -4444,7 +4444,9 @@ See also:\n\
 	    RpcTclToken	    *token;
 	    struct timeval  tv;
 	    double  	    tval;
+#ifndef __WATCOMC__
 	    extern double   atof();
+#endif
 
 	    /*
 	     * Convert time from ascii real to number of seconds and useconds
@@ -4454,7 +4456,7 @@ See also:\n\
 	    tv.tv_usec = 1000000 * (tval - tv.tv_sec);
 
 	    /*
-	     * Allocate and initialize token for the event. 
+	     * Allocate and initialize token for the event.
 	     * Again, the procedure name and procedure data
 	     * get placed in the same block.
 	     */
@@ -4464,7 +4466,7 @@ See also:\n\
 						 TAG_RPCEV);
 	    token->procName = (char *)(token+1);
 	    token->data = token->procName + strlen(argv[3]) + 1;
-	    
+
 	    strcpy(token->procName, argv[3]);
 	    strcpy(token->data, argc==5 ? argv[4] : "");
 
@@ -4563,7 +4565,7 @@ RpcOpenModem(char   *modem)
     geosFD = open(modem, O_RDWR, 0);
     if ((geosFD < 0) && (errno == ENOENT) && (index(modem, '/') == 0)){
 	char	realModem[64];
-	
+
 	sprintf(realModem, "/dev/%s", modem);
 	geosFD = open(realModem, O_RDWR, 0);
 	if ((geosFD < 0) && (errno == ENOENT)) {
@@ -4571,7 +4573,7 @@ RpcOpenModem(char   *modem)
 	    geosFD = open(realModem, O_RDWR, 0);
 	}
     }
-    
+
     if (geosFD >= 0) {
 	struct sgttyb	sgb;
 
@@ -4593,7 +4595,7 @@ RpcOpenModem(char   *modem)
 	    }
 	}
     }
-	    
+
     isModem = TRUE; /* Don't close connection between sessions */
 }
 #endif /* unix */
@@ -4628,7 +4630,7 @@ Rpc_Init(int		*argcPtr,
     long		comport = 0;
     long		baudrate = 0;
     BOOL		returnCode;
-    int			retryMult = 0;
+    int long			retryMult = 0;
     char		*npipe=0;
     int			npipeTries;
 #elif defined(unix)
@@ -4729,7 +4731,7 @@ Rpc_Init(int		*argcPtr,
 	}
     }
     if (geosFD < 0) {
-	/* 
+	/*
 	 * no netware. no npipe. lets hope serial comes thru.
 	 */
 	commMode = CM_SERIAL;
@@ -4741,14 +4743,14 @@ Rpc_Init(int		*argcPtr,
 	} else {
 	    if (tty == 0) {
 		char    *ptty = (char *)getenv("PTTY");
-		
+
 		if (ptty == NULL) {
 		    /*
 		     * Needs to give a -t arg the very first time around
 		     * so we know where to spew our garbage
 		     */
 		    need_tty:
-		    
+
 		    MessageFlush("Need a tty for communication "
 				 "(-t <dev> you know)\n");
 		    if (Ui_Exit) {
@@ -4770,7 +4772,7 @@ Rpc_Init(int		*argcPtr,
 		 * opening the thing in the /dev/ directory
 		 */
 		char  realTTY[64];
-		
+
 		sprintf(realTTY, "/dev/%s", tty);
 		geosFD = open(realTTY, O_RDWR, 0);
 		if (geosFD < 0) {
@@ -4779,7 +4781,7 @@ Rpc_Init(int		*argcPtr,
 		}
 	    }
 	}
-	
+
 	if (geosFD < 0) {
 	    /*
 	     * Couldn't find the tty the user wants to use, so we can't
@@ -4822,18 +4824,18 @@ Rpc_Init(int		*argcPtr,
 	 * Arrange for port to be closed before we go away.
 	 */
 	atexit(Serial_Exit);
-	
+
 	geosFD = 1;		/* Fake descriptor number that won't interfere
 				 * with anything... in theory. */
 # endif
     }
 #else /* now handle _WIN32 */
     if (commMode == CM_NONE) {
-	returnCode = Registry_FindStringValue(Tcl_GetVar(interp, 
+	returnCode = Registry_FindStringValue(Tcl_GetVar(interp,
 							 "file-reg-swat",
 							 TRUE),
-					      "COMM_MODE", 
-					      workbuf, 
+					      "COMM_MODE",
+					      workbuf,
 					      sizeof(workbuf));
 	if ((returnCode != FALSE) && (workbuf[0] != '\0')) {
 	    if (strcmpi(workbuf, "Serial") == 0) {
@@ -4850,15 +4852,15 @@ Rpc_Init(int		*argcPtr,
 	    Swat_Death();
 	}
     }
-    
+
     switch (commMode) {
     case CM_NPIPE:
 	if (npipe == NULL) {
-	    returnCode = Registry_FindStringValue(Tcl_GetVar(interp, 
+	    returnCode = Registry_FindStringValue(Tcl_GetVar(interp,
 							     "file-reg-swat",
 							     TRUE),
-						  "NAMED_PIPE", 
-						  workbuf, 
+						  "NAMED_PIPE",
+						  workbuf,
 						  sizeof(workbuf));
 	    if ((returnCode != FALSE) && (workbuf[0] != '\0')) {
 		npipe = workbuf;
@@ -4894,7 +4896,7 @@ Rpc_Init(int		*argcPtr,
 	    }
 	    if (win32dbg == TRUE) {
 		char buf[1000];
-		    
+
 		WinUtil_SprintError(buf, "NPipe_ClientInit");
 		MessageFlush(buf);
 		MessageFlush("Pipe name = %s\n", npipe);
@@ -4905,15 +4907,15 @@ Rpc_Init(int		*argcPtr,
 	break;
     case CM_SERIAL:
 	if (tty == 0) {
-	    returnCode = Registry_FindDWORDValue(Tcl_GetVar(interp, 
-							    "file-reg-ntsdk", 
+	    returnCode = Registry_FindDWORDValue(Tcl_GetVar(interp,
+							    "file-reg-ntsdk",
 							    TRUE),
 						 "SERIAL_COM_PORT", &comport);
 	    if (returnCode != FALSE) {
-		returnCode = Registry_FindDWORDValue(Tcl_GetVar(interp, 
+		returnCode = Registry_FindDWORDValue(Tcl_GetVar(interp,
 							      "file-reg-ntsdk",
 								TRUE),
-						     "SERIAL_BAUD_RATE", 
+						     "SERIAL_BAUD_RATE",
 						     &baudrate);
 		if (returnCode != FALSE) {
 		    sprintf(workbuf, "%d,%d", comport, baudrate);
@@ -4928,12 +4930,12 @@ Rpc_Init(int		*argcPtr,
 		Swat_Death();
 	    }
 	}
-	
+
 	if (Ntserial_Init(&hCommunication, tty, &overlapRead, &overlapWrite)
 	    == FALSE) {
 	    if (win32dbg == TRUE) {
 		char buf[1000];
-		    
+
 		WinUtil_SprintError(buf, "Ntserial_Init");
 		MessageFlush(buf);
 	    }
@@ -4942,9 +4944,9 @@ Rpc_Init(int		*argcPtr,
 	    Swat_Death();
 	}
 	strcpy(ttysetting, tty);
-	geosFD = 1;    /* 
+	geosFD = 1;    /*
 			*Fake descriptor number that won't interfere
-			* with anything... in theory. 
+			* with anything... in theory.
 			*/
 	atexit(RpcExitNtSerial);
 	break;
@@ -4954,10 +4956,10 @@ Rpc_Init(int		*argcPtr,
 	Swat_Death();
     }
 #endif
-    
+
 #if defined(_MSDOS)
     /*
-     * try to init the mouse if its not already active 
+     * try to init the mouse if its not already active
      */
     if (mouseFD < 0) {
 	if (MouseStart()) {
@@ -4965,41 +4967,41 @@ Rpc_Init(int		*argcPtr,
 	}
     }
 #endif
-    
+
     Cmd_Create(&RpcDebugCmdRec);
     Cmd_Create(&RpcCmdRec);
     Cmd_Create(&RpcSendFileCmdRec);
     Cmd_Create(&Rpc_ReadGeodeCmdRec);
     Cmd_Create(&RpcFindGeodeCmdRec);
-    
+
     typeGetNextDataBlock =
 	Type_CreatePackedStruct("GNDB_size", type_Word,
 				0);
     typeReadGeodeArgs =
 	Type_CreatePackedStruct("RGA_size", type_Word,
 				"RGA_geodeHandle", type_Word,
-				"RGA_offset", type_Long, 
+				"RGA_offset", type_Long,
 				"RGA_dataType", type_Word,
 				"RGA_dataValue1", type_Word,
 				"RGA_dataValue2", type_Word,
 				0);
-    
+
     typeReadGeodeReply =
 	Type_CreatePackedStruct("RGR_size", type_Word,
 				"RGR_ok", type_Byte, 0);
     typeIndexToOffsetArgs =
 	Type_CreatePackedStruct("ITOA_geodeHande", type_Word,
-				"ITOA_index", type_Word, 
+				"ITOA_index", type_Word,
 				0);
     typeIndexToOffsetReply =
-	Type_CreatePackedStruct("ITOA_offset", type_Word, 
+	Type_CreatePackedStruct("ITOA_offset", type_Word,
 				0);
     GC_RegisterType(typeGetNextDataBlock);
     GC_RegisterType(typeReadGeodeArgs);
     GC_RegisterType(typeReadGeodeReply);
     GC_RegisterType(typeIndexToOffsetArgs);
     GC_RegisterType(typeIndexToOffsetReply);
-    
+
 #if 0
     typeRpcHeader = Type_CreatePackedStruct("rh_flags", type_Byte,
 					    "rh_procNum", type_Byte,
@@ -5007,9 +5009,9 @@ Rpc_Init(int		*argcPtr,
 					    "rh_id", type_Byte,
 					    (char *)0);
 #endif /* 0 */
-    
+
 #if defined(_WIN32)
-    returnCode = Registry_FindDWORDValue(Tcl_GetVar(interp, "file-reg-swat", 
+    returnCode = Registry_FindDWORDValue(Tcl_GetVar(interp, "file-reg-swat",
 						    TRUE),
 					 "TIMEOUT_MULTIPLIER", &retryMult);
     if (returnCode != FALSE) {
@@ -5065,7 +5067,7 @@ Rpc_Connect(void)
 	 */
 	rpcServers[geosFD] = geosServers;
     }
-    
+
     /*
      * See if the thing is actually a tty and set it up for our use
      * if it is. If the TIOCGETP returns ok, the line is a tty.
@@ -5129,16 +5131,16 @@ Rpc_Connect(void)
 	}
 	npipeTries = 0;
     retrynpipe2:
-        returnCode = NPipe_ClientInit(npipeName, &hCommunication, 
+        returnCode = NPipe_ClientInit(npipeName, &hCommunication,
 				      &overlapRead, &overlapWrite);
 	if (win32dbg == TRUE) {
 	    MessageFlush("done\n");
 	}
         if (returnCode == TRUE) {
-	    geosFD = 1;		/* 
+	    geosFD = 1;		/*
 				 * Fake descriptor number that won't
 				 * interfere with anything... in
-				 * theory. 
+				 * theory.
 				 */
 	    incomingRead = FALSE;
 	    outstandingRead = FALSE;
@@ -5161,7 +5163,7 @@ Rpc_Connect(void)
 	    }
 	    if (win32dbg == TRUE) {
 		char buf[1000];
-		    
+
 		WinUtil_SprintError(buf, "NPipe_ClientInit");
 		MessageFlush(buf);
 		MessageFlush("Pipe name = %s\n", npipeName);
@@ -5186,17 +5188,17 @@ Rpc_Connect(void)
 	    MessageFlush("done\n");
 	}
 	if (returnCode == TRUE) {
-	    geosFD = 1;		/* 
+	    geosFD = 1;		/*
 				 * Fake descriptor number that won't
 				 * interfere with anything... in
-				 * theory. 
+				 * theory.
 				 */
 	    incomingRead = FALSE;
 	    outstandingRead = FALSE;
 	} else {
 	    if (win32dbg == TRUE) {
 		char buf[1000];
-		    
+
 		WinUtil_SprintError(buf, "Ntserial_Init");
 		MessageFlush(buf);
 	    }
@@ -5259,9 +5261,9 @@ Rpc_Disconnect(int wakeup)
      */
     if (!noSig && wakeup) {
 	int	pgrp;
-	
+
 	(void)ioctl(geosFD, TIOCGPGRP, &pgrp);
-	
+
 	if (pgrp != 0 && pgrp != getpid()) {
 	    if (kill(pgrp, 31) < 0) {
 		extern char *sys_errlist[];
@@ -5333,7 +5335,7 @@ Rpc_Disconnect(int wakeup)
 	geosFD = -1;
 	incomingRead = FALSE;
 	outstandingRead = FALSE;
-    }	
+    }
 #endif
 
     /*
@@ -5401,12 +5403,12 @@ Rpc_Exit(Rpc_Proc   exitProcNum)    	/* Procedure to call for the exit */
  *				Rpc_Send
  ***********************************************************************
  *
- * SYNOPSIS:	    
- * CALLED BY:	    
- * RETURN:	    
- * SIDE EFFECTS:    
+ * SYNOPSIS:
+ * CALLED BY:
+ * RETURN:
+ * SIDE EFFECTS:
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -5460,7 +5462,7 @@ Rpc_Send(Rpc_Proc   exitProcNum)    	/* Procedure to call for the exit */
  * RETURN:	    void
  * SIDE EFFECTS:    closes serial port
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -5468,7 +5470,7 @@ Rpc_Send(Rpc_Proc   exitProcNum)    	/* Procedure to call for the exit */
  *	dbaumann	12/02/96   	Initial Revision
  *
  ***********************************************************************/
-void 
+void
 RpcExitNtSerial(void)
 {
     Ntserial_Exit(&hCommunication, &overlapRead, &overlapWrite);
@@ -5486,7 +5488,7 @@ RpcExitNtSerial(void)
  * SIDE EFFECTS:    NOTE:  Don't map REG_IP through this routine,
  *                  it'll return (E)AX
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -5495,7 +5497,7 @@ RpcExitNtSerial(void)
  *
  ***********************************************************************/
 /* Convert REG_AX types to reg_ax types */
-int RegisterMapping(int regIndex) 
+int RegisterMapping(int regIndex)
 {
     static int mapping[] = {
         reg_ax,

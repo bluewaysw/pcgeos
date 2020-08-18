@@ -96,7 +96,9 @@ static char *rcsid =
 
 #if defined(_MSDOS) || defined(_WIN32)
 # include <share.h>
+# ifndef __WATCOMC__
 # include <dir.h>
+# endif
 #endif
 
 extern char const gym_ext[];
@@ -219,7 +221,7 @@ static	char *kernelInternalSymbolNames[] = {
 static Boolean 	inLoader = FALSE;
 static Event	resetEvent = NullEvent;
 
-#if defined(__HIGHC__) || defined(__BORLANDC__)
+#if defined(__HIGHC__) || defined(__BORLANDC__) || defined(__WATCOMC__)
 /*
  * High C doesn't have in-line structure constructors, so...
  */
@@ -241,10 +243,10 @@ Sym	NullSym = {0,0};
  * SIDE EFFECTS:
  * STRATEGY:
  * REVISION HISTORY:
- *	Name	Date		Description			     
- *	----	----		-----------			     
- *	jimmy	8/12/93		Initial version			     
- * 
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jimmy	8/12/93		Initial version
+ *
  *********************************************************************/
 DEFCMD(symbol-kernel-internal,SymbolKernelInternal,TCL_EXACT,NULL,swat_prog,
 "Usage: symbol-kernel-internal <address> \n\n\
@@ -260,13 +262,13 @@ Synopsis: returns the name of an internal kernel routine that contain the \n\
 	return TCL_ERROR;
     }
 
-    if ((kernel != NullPatient) && 
+    if ((kernel != NullPatient) &&
 	Expr_Eval(argv[1], NullFrame, &addr, (Type *)NULL, TRUE))
     {
 	if (addr.handle == kernel->resources[kcodeResID].handle)
 	{
-	    Tcl_Return(interp, 
-		       (char *)Sym_IsKernelInternalRoutine((word)addr.offset), 
+	    Tcl_Return(interp,
+		       (char *)Sym_IsKernelInternalRoutine((word)addr.offset),
 		       TCL_STATIC);
 	    return TCL_OK;
 	}
@@ -284,10 +286,10 @@ Synopsis: returns the name of an internal kernel routine that contain the \n\
  * SIDE EFFECTS:
  * STRATEGY:	HACK for backtracing with gym files
  * REVISION HISTORY:
- *	Name	Date		Description			     
- *	----	----		-----------			     
- *	jimmy	10/12/93	Initial version			     
- * 
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jimmy	10/12/93	Initial version
+ *
  *********************************************************************/
 Boolean
 Sym_IsInternalWeird(Handle   handle, word offset)
@@ -295,7 +297,7 @@ Sym_IsInternalWeird(Handle   handle, word offset)
     /* if the kernel is null we are doing the loader which shouldn't
      * have anything weird going on
      */
-    if (kernel == NullPatient) 
+    if (kernel == NullPatient)
     {
 	return 0;
     }
@@ -313,10 +315,10 @@ Sym_IsInternalWeird(Handle   handle, word offset)
  * SIDE EFFECTS:
  * STRATEGY:
  * REVISION HISTORY:
- *	Name	Date		Description			     
- *	----	----		-----------			     
- *	jimmy	8/12/93		Initial version			     
- * 
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jimmy	8/12/93		Initial version
+ *
  *********************************************************************/
 DEFCMD(kernel-has-table,KernelHasTable,TCL_EXACT,NULL,swat_prog,
 "Usage: kernel-has-table\n\n\
@@ -348,10 +350,10 @@ Synopsis: returns 1 if the kernel has its own internal symbol table\n\
  * SIDE EFFECTS:
  * STRATEGY:
  * REVISION HISTORY:
- *	Name	Date		Description			     
- *	----	----		-----------			     
- *	jimmy	8/12/93		Initial version			     
- * 
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jimmy	8/12/93		Initial version
+ *
  *********************************************************************/
 DEFCMD(address-kernel-internal,AddressKernelInternal,TCL_EXACT,NULL,swat_prog,
 "Usage: symbol-kernel-internal <address> \n\n\
@@ -387,9 +389,9 @@ Synopsis: returns the name of an internal kernel routine that contain the \n\
     /* if the thing starts with a capital letter then its a routine
      * name so put it with kcode
      */
-	sprintf(addr, "%05xh:%05xh", 
+	sprintf(addr, "%05xh:%05xh",
 		(unsigned int)
-		     Handle_Address(kernel->resources[kcodeResID].handle)>>4, 
+		     Handle_Address(kernel->resources[kcodeResID].handle)>>4,
 		offset);
     }
     else
@@ -397,7 +399,7 @@ Synopsis: returns the name of an internal kernel routine that contain the \n\
     /* if the thing starts with a lower case letter then its a variable
      * name so put it with kdata
      */
-	sprintf(addr, "%05xh:%05xh", 
+	sprintf(addr, "%05xh:%05xh",
 		(unsigned int)Handle_Address(kernel->resources[1].handle)>>4,
 		offset);
     }
@@ -415,10 +417,10 @@ Synopsis: returns the name of an internal kernel routine that contain the \n\
  * SIDE EFFECTS:
  * STRATEGY:
  * REVISION HISTORY:
- *	Name	Date		Description			     
- *	----	----		-----------			     
- *	jimmy	8/13/93		Initial version			     
- * 
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jimmy	8/13/93		Initial version
+ *
  *********************************************************************/
 word
 Sym_KernelInternalNameToOffset(char *name)
@@ -444,10 +446,10 @@ Sym_KernelInternalNameToOffset(char *name)
  * SIDE EFFECTS:
  * STRATEGY:
  * REVISION HISTORY:
- *	Name	Date		Description			     
- *	----	----		-----------			     
- *	jimmy	8/11/93		Initial version			     
- * 
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jimmy	8/11/93		Initial version
+ *
  *********************************************************************/
 char *
 Sym_IsKernelInternalRoutine(word  offset)
@@ -455,11 +457,11 @@ Sym_IsKernelInternalRoutine(word  offset)
     int	i;
 
     /* start from middle of table */
-    for (i = FIRST_INTERNAL_WITH_END; 
-	 i <= LAST_INTERNAL_WITH_END && i <= kernelInternalSymbols[1]; 
+    for (i = FIRST_INTERNAL_WITH_END;
+	 i <= LAST_INTERNAL_WITH_END && i <= kernelInternalSymbols[1];
 	 i+=2)
     {
-	if ((offset >= kernelInternalSymbols[i]) && 
+	if ((offset >= kernelInternalSymbols[i]) &&
 	    (offset <= kernelInternalSymbols[i+1]))
 	{
 	    return kernelInternalSymbolNames[i];
@@ -559,15 +561,15 @@ SymSearchLocal(Sym  	scope,	    /* Scope in which we're searching (locked)*/
     MemHandle   	mem;
     ObjSym	    	*lsym;
     SymToken    	fsym = {(VMHandle)NULL, 0, 0};
-    
+
     VMInfo(SymFile(scope), SymBlock(scope), (word *)NULL, &mem, (VMID *)NULL);
     MemInfo(mem, (genptr *)&osh, (word *)NULL);
-    
+
     while (loff != 0 && loff != SymOffset(scope)) {
 	assert(loff >= sizeof(ObjSymHeader) &&
 	       loff < sizeof(ObjSymHeader) + (osh->num*sizeof(ObjSym)));
 	lsym = (ObjSym *)((genptr)osh + loff);
-	
+
 	if (lsym->name == id) {
 	    if (symMap[lsym->type].class & class) {
 		fsym.file = SymFile(scope);
@@ -589,9 +591,9 @@ SymSearchLocal(Sym  	scope,	    /* Scope in which we're searching (locked)*/
 	}
 	loff=lsym->u.procLocal.next;
     }
-    
+
     SymUnlock(scope);
-    
+
     return (*(Sym *)&fsym);
 }
 
@@ -599,7 +601,7 @@ SymSearchLocal(Sym  	scope,	    /* Scope in which we're searching (locked)*/
  *				Sym_SearchTable
  ***********************************************************************
  * SYNOPSIS:	    Search a vm hash table for an entry with the given
- *	    	    ID. 
+ *	    	    ID.
  * CALLED BY:	    SymLookup, SrcFindLine
  * RETURN:	    TRUE if entry found.
  * SIDE EFFECTS:    None
@@ -634,7 +636,7 @@ Sym_SearchTable(VMHandle    	file,
      * Lock down the table header first.
      */
     hdr = (ObjHashHeader *)VMLock(file, table, (MemHandle *)NULL);
-    
+
     /*
      * Now search all the blocks of the proper chain for a symbol whose
      * name matches the given one.
@@ -642,15 +644,15 @@ Sym_SearchTable(VMHandle    	file,
     for (cur = hdr->chains[index]; cur != 0; cur = next) {
 	ObjHashBlock    	*hb;
 	ObjHashEntry    	*he;
-	
+
 	hb = (ObjHashBlock *)VMLock(file, cur, (MemHandle *)NULL);
 	next = hb->next;
-	
+
 	for (he = hb->entries; he < &hb->entries[hb->nextEnt]; he++) {
 	    if (he->name == id) {
 		*blockPtr = he->block;
 		*offsetPtr = he->offset;
-		
+
 		/*
 		 * For now, there's only one entry per name in this table.
 		 * If this changes, we'll want to provide a callback function
@@ -665,7 +667,7 @@ Sym_SearchTable(VMHandle    	file,
 
     return(FALSE);
 }
-    
+
 
 /*-
  *-----------------------------------------------------------------------
@@ -691,11 +693,11 @@ SymLookup(ID   	    	id,	    /* Identifier of symbol to find */
 
     file = SymFile(scope);
     ssym = SymLock(scope);
-    
+
     if (id == NullID) {
 	return NullSym;
     }
-    
+
     switch (ssym->type) {
 	case OSYM_MODULE:
 	{
@@ -743,7 +745,7 @@ SymLookup(ID   	    	id,	    /* Identifier of symbol to find */
 		    return(NullSym);
 		}
 	    }
-				 
+
 	    SymUnlock(scope);
 	    return(NullSym);
 	}
@@ -768,12 +770,12 @@ SymLookup(ID   	    	id,	    /* Identifier of symbol to find */
 	    ObjSym	    *lsym;
 	    SymToken        fsym = {(VMHandle)NULL, 0, 0};
 	    word    	    loff;
-	    
+
 	    osh = (ObjSymHeader *)((genptr)ssym - SymOffset(scope));
 	    loff = ssym->u.sType.first;
-	    
+
 	    /*
-	     * Make sure the type isn't empty (loff != 0) before looping 
+	     * Make sure the type isn't empty (loff != 0) before looping
 	     * through the entire list.
 	     */
 	    if (loff != 0) {
@@ -782,7 +784,7 @@ SymLookup(ID   	    	id,	    /* Identifier of symbol to find */
 			   (osh->num*sizeof(ObjSym)));
 		    assert(loff>sizeof(ObjSymHeader));
 		    lsym = (ObjSym *)((genptr)osh + loff);
-		    
+
 		    if (lsym->name == id) {
 			if (symMap[lsym->type].class & class) {
 			    fsym.file = SymFile(scope);
@@ -796,7 +798,7 @@ SymLookup(ID   	    	id,	    /* Identifier of symbol to find */
 		    loff = lsym->u.tField.next;
 		}
 	    }
-		
+
 	    SymUnlock(scope);
 	    return (SymCast(fsym));
 	}
@@ -870,7 +872,7 @@ SymRealLookupInPatient(const Patient	patient,
 	 */
 	id = SymLookupIDLen(name, len, patient->global);
 
-	if (id != NullID) 
+	if (id != NullID)
 	{
 	    /*
 	     * Well, it's in the thing's string table, but that doesn't mean
@@ -878,12 +880,12 @@ SymRealLookupInPatient(const Patient	patient,
 	     * first block of the global module's table (this also makes us
 	     * search the global scope first...)
 	     */
-	    for (i = 0; i < patient->numRes; i++) 
+	    for (i = 0; i < patient->numRes; i++)
 	    {
 		if (!Sym_IsNull(patient->resources[i].sym))
 		{
 		    sym = SymLookup(id, class, patient->resources[i].sym);
-		    if (!Sym_IsNull(sym)) 
+		    if (!Sym_IsNull(sym))
 		    {
 			return (sym);
 		    }
@@ -891,7 +893,7 @@ SymRealLookupInPatient(const Patient	patient,
 	    }
 	}
     }
-    
+
     if (patient->libraries == NULL) {
 	assert(patient->numLibs == 0);
     } else {
@@ -978,7 +980,7 @@ SymLookupInPatientLen(Patient  	patient,	    /* Patient to examine */
 				     class,
 				     patientsScanned);
     }
-    
+
     Vector_Destroy(patientsScanned);
 
     return(sym);
@@ -1054,7 +1056,7 @@ Sym_Init(Patient patient)   	/* Patient being initialized */
     patient->global = *(Sym *)&fsym;
 
     /* if its a gym file, see how many resources the gym file has by looking
-     * at the user notes field of the header 
+     * at the user notes field of the header
      */
     numRes = patient->numRes;
     if (!strcmp(rindex(patient->path, '.'), gym_ext))
@@ -1082,7 +1084,7 @@ Sym_Init(Patient patient)   	/* Patient being initialized */
 	    s++;
 	}
 	SymUnlock(SymCast(fsym));
-	
+
 	if (patient == loader || patient->dos || s->type != SEG_ABSOLUTE) {
 	    /*
 	     * Don't count absolute segments as resources unless this is the
@@ -1138,7 +1140,7 @@ Sym_Copy(Patient    from,
 	to->resources[i].sym = from->resources[i].sym;
     }
 }
-    
+
 
 /***********************************************************************
  *				SymbolMatch
@@ -1168,21 +1170,21 @@ SymbolMatch(char    	*pattern,
 
     file = SymFile(scope);
     ssym = SymLock(scope);
-    
+
     if (ssym->type == OSYM_MODULE) {
 	/*
 	 * If scope is a module symbol, we need to look through the module's
 	 * symbol list, as stored in the VM file.
 	 */
 	VMBlockHandle	cur, next;
-	
+
 	/*
 	 * If module has no symbol table, can't be a match...
 	 */
 	if (ssym->u.module.table == 0) {
 	    return;
 	}
-	
+
 	for (cur = ssym->u.module.syms; cur != 0; cur = next) {
 	    int 	    	i;
 	    ObjSymHeader	*osh;
@@ -1194,13 +1196,13 @@ SymbolMatch(char    	*pattern,
 		    char    	*name = ST_Lock(file, os->name);
 
 		    if (Tcl_StringMatch(name, pattern)) {
-			SymToken    fsym; /* = {file, cur, 
-					   *    (genptr)os-(genptr)osh}; 
+			SymToken    fsym; /* = {file, cur,
+					   *    (genptr)os-(genptr)osh};
 					   * xxxDan */
 			fsym.file = file;
 			fsym.block = cur;
-			fsym.offset = (genptr)os - (genptr)osh; 
-			
+			fsym.offset = (genptr)os - (genptr)osh;
+
 			Vector_Add(result, VECTOR_END, &fsym);
 		    }
 		    ST_Unlock(file, os->name);
@@ -1214,7 +1216,7 @@ SymbolMatch(char    	*pattern,
 	word	    	loff;
 	ObjSymHeader	*osh;
 	ObjSym	    	*lsym;
-	
+
 	if (ssym->type == OSYM_PROC) {
 	    /*
 	     * Look through the symbols local to the procedure for something
@@ -1232,14 +1234,14 @@ SymbolMatch(char    	*pattern,
 	}
 
 	osh = (ObjSymHeader *)((genptr)ssym - SymOffset(scope));
-	
+
 	while (loff != 0 && loff != SymOffset(scope)) {
 	    char    	*name;
-	    
+
 	    assert(loff >= sizeof(ObjSymHeader) &&
 		   loff < sizeof(ObjSymHeader) + (osh->num*sizeof(ObjSym)));
 	    lsym = (ObjSym *)((genptr)osh + loff);
-	    
+
 	    if (symMap[lsym->type].class & class) {
 		name = ST_Lock(file, lsym->name);
 		if (Tcl_StringMatch(name, pattern)) {
@@ -1357,7 +1359,7 @@ SymParseClass(Tcl_Interp    *interp,
     if (Tcl_SplitList(interp, str, &argc, &argv) != TCL_OK) {
 	return(TCL_ERROR);
     }
-    
+
     class = 0;
     for (i = 0; i < argc; i++) {
 	for (j = 0; j < Number(symclasses); j++) {
@@ -1430,7 +1432,7 @@ Sym_Equal(Sym	sym1,
  ***********************************************************************
  * SYNOPSIS:	    Convert an ASCII symbol token to its internal form
  * CALLED BY:	    SymbolCmd, EXTERNAL
- * RETURN:	    Sym for the symbol. 
+ * RETURN:	    Sym for the symbol.
  * SIDE EFFECTS:    None
  *
  * STRATEGY:	    A TCL-level Sym token is a 3-list
@@ -1472,7 +1474,7 @@ Sym_ToToken(char    *token)
     {
 	return NullSym;
     }
-    
+
     /*
      * Make sure the block refers to a symbol block, returning NullSym if not.
      */
@@ -1484,7 +1486,7 @@ Sym_ToToken(char    *token)
 	    return NullSym;
 	}
     }
-    
+
     return (*(Sym *)&fsym);
 }
 
@@ -1515,7 +1517,7 @@ Sym_ToAscii(Sym	sym)
     if (Sym_IsNull(sym)) {
 	strcpy(token, "nil");
     } else {
-	sprintf(token, "%d %d %d", (int)SymFile(sym), SymBlock(sym), 
+	sprintf(token, "%d %d %d", (int)SymFile(sym), SymBlock(sym),
 		SymOffset(sym));
     }
 
@@ -1679,7 +1681,7 @@ SymGetType(Sym	sym)
 
     return (*(Type *)&ftype);
 }
-    
+
 
 /***********************************************************************
  *				SymLockID
@@ -1714,7 +1716,7 @@ SymLockID(Sym	sym,
  *	    	    file as the symbol.
  * CALLED BY:	    INTERNAL
  * RETURN:	    Nothing
- * SIDE EFFECTS:    
+ * SIDE EFFECTS:
  *
  * STRATEGY:
  *
@@ -2091,7 +2093,7 @@ static const CmdSubRec symbolCmds[] = {
     {"foreach",	SYMBOL_FOREACH,	3, 4, "<scope> <class> <callback> [<data>]"},
     {NULL,	(ClientData)NULL,		0, 0, NULL}
 };
-    
+
 DEFCMD(symbol,Symbol,0,symbolCmds,swat_prog,
 "Usage:\n\
     symbol find <class> <name> [<scope>]\n\
@@ -2313,7 +2315,7 @@ See also:\n\
 	 */
 	ObjSym	*s = SymLock(sym);
 	int 	class = symMap[s->type].class;
-	
+
 	for (i = 0; i < Number(symclasses); i++) {
 	    if (class & symclasses[i].class) {
 		Tcl_Return(interp, symclasses[i].name, TCL_STATIC);
@@ -2330,8 +2332,8 @@ See also:\n\
 	char	*retav[5];
 	char	val1[32], val2[32], val3[32];
 	int 	retac;
-	
-	
+
+
 	switch(s->type) {
 	    case OSYM_CHUNK:
 		sprintf(val1, "%d", s->u.addrSym.address);
@@ -2429,7 +2431,7 @@ See also:\n\
 		Type	retType;
 
 		Sym_GetFuncData(sym, &isFar, &addr, &retType);
-		
+
 		sprintf(val1, "%d", (int)addr);
 		retav[0] = val1;
 		retav[1] = (isFar ? "far" : "near");
@@ -2443,7 +2445,7 @@ See also:\n\
 		genptr	    base;
 		ObjSym	    *ns;
 		SymToken    fsym;
-		
+
 		ftype = SymGetType(sym);
 		sprintf(val1, "%d", s->u.sField.offset * 8);
 		sprintf(val2, "%d", Type_Sizeof(ftype) * 8);
@@ -2473,7 +2475,7 @@ See also:\n\
 		genptr	    base;
 		ObjSym	    *ns;
 		SymToken    fsym;
-		
+
 		ftype = SymGetType(sym);
 		sprintf(val1, "%d", s->u.bField.offset);
 		sprintf(val2, "%d", s->u.bField.width);
@@ -2565,7 +2567,7 @@ See also:\n\
 		retav[0] = val1;
 		retav[1] = (char *)malloc(strlen(data)+1);
 		retac = 2;
-		
+
 		strcpy(retav[1], data);
 		SymUnlockID(sym, OBJ_FETCH_SID(s->u.onStack.desc));
 
@@ -2743,7 +2745,7 @@ See also:\n\
 		if (s->flags & OSYM_ENTRY)
 		{
 		    Rpc_IndexToOffset(Sym_Patient(sym),
-						 (word)s->u.addrSym.address, 
+						 (word)s->u.addrSym.address,
 						s);
 		}
 		Tcl_RetPrintf(interp, "%d", s->u.addrSym.address);
@@ -2800,7 +2802,7 @@ See also:\n\
  *	the symbol belongs to it, or we'll ascribe all symbols for multiple
  *	instances of an application to the first instance, which causes
  *	problems.
- *	
+ *
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -2850,7 +2852,7 @@ Sym_Patient(Sym	    sym)
  * RETURN:	    *addrPtr filled in.
  * SIDE EFFECTS:    none
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -2901,7 +2903,7 @@ Sym_ToAddr(Sym	    sym,
 			(Type *)NULL);
     }
 }
-    
+
 
 
 /***********************************************************************
@@ -2911,20 +2913,20 @@ Sym_ToAddr(Sym	    sym,
  *	    	    with appropriate abbreviations for class (minus the
  *		    trailing Class) and message (minus the leading MSG_)
  * CALLED BY:	    (INTERNAL) Sym_Lookup
- * RETURN:	    
- * SIDE EFFECTS:    
+ * RETURN:
+ * SIDE EFFECTS:
  *
- * STRATEGY:	    
+ * STRATEGY:
  *	if {[null $s]} {
  *	    var colon [string first :: $args]
  *	    if {$colon >= 0} {
  *	    	var class [range $args 0 [expr $colon-1] char]
  *		var msg [range $args [expr $colon+2] end char]
- *		
+ *
  *    	    	var cs [symbol find var $class]
  *		[if {[null $cs] ||
- *		     [type name [index [symbol get $cs] 2] {} 0] != 
- *                                                     {struct ClassStruct}} 
+ *		     [type name [index [symbol get $cs] 2] {} 0] !=
+ *                                                     {struct ClassStruct}}
  *    	    	{
  *		    var cs [symbol find var ${class}Class]
  *		    if {[null $cs]} {
@@ -2944,12 +2946,12 @@ Sym_ToAddr(Sym	    sym,
  *			    	    $msg $msg]
  *    	    	    }
  *    	    	}
- *		
+ *
  *		var s [obj-find-method [index [symbol get $ms] 0]
  *		    	    [symbol fullname $cs] 1]
  *    	    }
  *    	}
- *	
+ *
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -2983,7 +2985,7 @@ SymProcessPossibleMethodPath(const char *name,
     word    	    msgnum; 	    /* Number of the message whose method is
 				     * being sought */
     GeosAddr	    classAddr;	    /* Address of the class being searched */
-    
+
 
     /*
      * Locate the offsets for the various parts of a class structure
@@ -3004,7 +3006,7 @@ SymProcessPossibleMethodPath(const char *name,
 	if (kernel == NullPatient) {
 	    return(NullSym);
 	}
-	
+
 	for (i = 0; i < sizeof(fields)/sizeof(fields[0]); i++) {
 	    sym = Sym_Lookup(fields[i].name, SYM_FIELD, kernel->global);
 	    if (Sym_IsNull(sym)) {
@@ -3019,7 +3021,7 @@ SymProcessPossibleMethodPath(const char *name,
 	    *fields[i].offVar /= 8;
 	}
     }
-	
+
     /*
      * First locate the end of the class name.
      */
@@ -3027,7 +3029,7 @@ SymProcessPossibleMethodPath(const char *name,
     if (colon == NULL) {
 	return NullSym;
     }
-    
+
     /*
      * Allocate a buffer large enough to hold it and the "Class" that we
      * might have to tack onto the end, should we not find the thing under
@@ -3036,7 +3038,7 @@ SymProcessPossibleMethodPath(const char *name,
     className = (char *)malloc(colon - name + 5 + 1);
     bcopy((char *)name, (char *)className, colon - name);
     className[colon - name] = '\0';
-    
+
     if (lookEverywhere) {
 	/*
 	 * If no components in the symbol path before this one, call Sym_Lookup
@@ -3051,7 +3053,7 @@ SymProcessPossibleMethodPath(const char *name,
 	 */
 	classSym = Sym_LookupInScope(className, SYM_VAR, scope);
     }
-    
+
     if (!Sym_IsNull(classSym)) {
 	/*
 	 * Make sure it's a class, not just a variable whose name is
@@ -3076,20 +3078,20 @@ SymProcessPossibleMethodPath(const char *name,
 	    break;
 	}
     }
-    
+
     if (Sym_IsNull(classSym)) {
 	/*
 	 * Couldn't find it by that name, but a rose by any other... I digress.
 	 * Tack "Class" onto the end and perform a search as before.
 	 */
 	strcat(className, "Class");
-	
+
 	if (lookEverywhere) {
 	    classSym = Sym_Lookup(className, SYM_VAR, scope);
 	} else {
 	    classSym = Sym_LookupInScope(className, SYM_VAR, scope);
 	}
-	
+
 	if (Sym_IsNull(classSym)) {
 	    free((malloc_t)className);
 	    return NullSym;
@@ -3097,7 +3099,7 @@ SymProcessPossibleMethodPath(const char *name,
     }
 
     free((malloc_t)className);
-    
+
     /*
      * Find the start of the message name, immediately following the colon
      * (or double colon, as appropriate).
@@ -3108,7 +3110,7 @@ SymProcessPossibleMethodPath(const char *name,
 	msgStart= colon+1;
     }
     colon = index(msgStart, ':');
-    
+
     if (colon == NULL) {
 	/*
 	 * Message name extends to the end of the string.
@@ -3122,7 +3124,7 @@ SymProcessPossibleMethodPath(const char *name,
     msgName = (char *)malloc(4 + colon - msgStart + 1);
     bcopy((char *)msgStart, (char *)msgName, colon - msgStart);
     msgName[colon - msgStart] = '\0';
-    
+
     /*
      * Perform global search using passed scope, regardless of whether there
      * were components before this convoluted thing in the symbol path, as
@@ -3159,7 +3161,7 @@ SymProcessPossibleMethodPath(const char *name,
     while (!found) {
 	word	count;
 	int 	i;
-	
+
 	/*
 	 * Fetch the number of methods implemented by this class.
 	 */
@@ -3180,7 +3182,7 @@ SymProcessPossibleMethodPath(const char *name,
 		break;
 	    }
 	}
-	
+
 	if (i != count) {
 	    /*
 	     * Found our target message in the table. Fetch and decode the
@@ -3197,7 +3199,7 @@ SymProcessPossibleMethodPath(const char *name,
 
 	    /* Offset always in low word */
 	    classAddr.offset = (Address)(method & 0xffff);
-	    
+
 	    if ((method & 0xf0000000) == 0xf0000000) {
 		/*
 		 * Movable memory.
@@ -3243,7 +3245,7 @@ SymProcessPossibleMethodPath(const char *name,
 		classAddr.handle =
 		    Handle_Find((Address)((super >> 12) & 0xffff0));
 		classAddr.offset = (Address)(super & 0xffff);
-		
+
 		if (classAddr.handle == NullHandle) {
 		    /*
 		     * If we can't locate the block in which the superclass
@@ -3269,7 +3271,7 @@ SymProcessPossibleMethodPath(const char *name,
     }
     return result;
 }
-	
+
 
 /*-
  *-----------------------------------------------------------------------
@@ -3322,7 +3324,7 @@ Sym_Lookup(const char  	*name,	    /* Name to search for */
     if (Sym_IsNull(scope)) {
 	return NullSym;
     }
-    
+
     /*
      * Symbols we are passed may look like
      *	patient::module::proc::block::symbol
@@ -3389,9 +3391,9 @@ Sym_Lookup(const char  	*name,	    /* Name to search for */
 			 */
 			char    *pname;
 			Patient patient;
-			
+
 			pname = (char *)malloc(cp-start+1);
-			
+
 			bcopy((char *)start, (char *)pname, cp-start);
 			pname[cp-start] = '\0';
 			patient = Patient_ByName(pname);
@@ -3411,7 +3413,7 @@ Sym_Lookup(const char  	*name,	    /* Name to search for */
 			     * do this last as it will cause blocks to come
 			     * in from all over the place.
 			     */
-			    newscope = 
+			    newscope =
 				SymLookupInPatientLen(Sym_Patient(scope),
 						      start, cp-start,
 						      SYM_SCOPE);
@@ -3425,7 +3427,7 @@ Sym_Lookup(const char  	*name,	    /* Name to search for */
 				(Sym_Patient(scope) != defaultPatient) &&
 				VALIDTPTR(defaultPatient,TAG_PATIENT))
 			    {
-				newscope = 
+				newscope =
 				    SymLookupInPatientLen(defaultPatient,
 							  start,
 							  cp-start,
@@ -3510,10 +3512,10 @@ Sym_Lookup(const char  	*name,	    /* Name to search for */
 	     * having a name of NULL.
 	     */
 	    ObjSym  *s = SymLock(scope);
-	    
+
 	    id = s->name;
 	    SymUnlock(scope);
-	    
+
 	    if (id == NullID) {
 		sym = SymLookupInPatient(Sym_Patient(scope), start, class);
 	    }
@@ -3532,7 +3534,7 @@ Sym_Lookup(const char  	*name,	    /* Name to search for */
 	     */
 	    sym = SymLookupInPatient(Sym_Patient(scope), name, class);
 	}
-	    
+
 	/*
 	 * Handle the defaultPatient here, rather than making everyone else
 	 * do it.
@@ -3544,7 +3546,7 @@ Sym_Lookup(const char  	*name,	    /* Name to search for */
 	    sym = SymLookupInPatient(defaultPatient, name, class);
 	}
     }
-	
+
     /*
      * Return the result, whatever it may be.
      */
@@ -3612,17 +3614,17 @@ Sym_LookupAddrExact(
  * SIDE EFFECTS:
  * STRATEGY:
  * REVISION HISTORY:
- *	Name	Date		Description			     
- *	----	----		-----------			     
- *	jimmy	10/21/93		Initial version			     
- * 
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jimmy	10/21/93		Initial version
+ *
  *********************************************************************/
 GeosAddr *
 Sym_GetCachedMethod(void)
 {
     return &cachedMethod;
 }
- 
+
 /*-
  *-----------------------------------------------------------------------
  * SymLookupAddr --
@@ -3646,12 +3648,12 @@ SymLookupAddr(Handle	handle,	    /* Handle in which address resides */
 	      int   	wantExact)  /* is close enough ok, or not */
 {
     Sym	    	    sym;
-    
+
     sym = NullSym;
 
     class &= (SYM_NAMELESS|SYM_VAR|SYM_MODULE|SYM_FUNCTION|
 	      SYM_LABEL|SYM_ONSTACK|SYM_SCOPE);
-    
+
     if ((handle != NullHandle) && (Handle_State(handle) & (HANDLE_RESOURCE|
 							   HANDLE_KERNEL))) {
 	Sym    	    	module;	    /* Containing module */
@@ -3689,7 +3691,7 @@ SymLookupAddr(Handle	handle,	    /* Handle in which address resides */
 					     * map */
 	    ObjAddrMapHeader	*oamh;	    /* Header for segment's map */
 	    int	    	    	i;
-	    
+
 	    oamh = (ObjAddrMapHeader *)VMLock(patient->symFile,
 					      s->addrMap,
 					      (MemHandle *)NULL);
@@ -3731,11 +3733,11 @@ SymLookupAddr(Handle	handle,	    /* Handle in which address resides */
 	     * rather than stopping once you get an address <= to addr because
 	     * gym files aren't neccessarily in order, even this is a potential
 	     * problem if the thing is in the wrong block, but since there
-	     * are less symbols even kcode seems to fit in one block so 
+	     * are less symbols even kcode seems to fit in one block so
 	     * hopefully this will be good enough, I am not sure how much
 	     * slower this will make things...
 	     */
-	    while (i <= oamh->numEntries) 
+	    while (i <= oamh->numEntries)
 	    {
 		ObjSymHeader	*osh;
 		int 	    	j;
@@ -3746,14 +3748,14 @@ SymLookupAddr(Handle	handle,	    /* Handle in which address resides */
 					     oame->block,
 					     (MemHandle *)NULL);
 		os = &((ObjSym *)(osh+1))[osh->num];
-		for (j = osh->num; j > 0; j--) 
+		for (j = osh->num; j > 0; j--)
 		{
 		    os--;
 
 		    if (os->flags & OSYM_ENTRY)
 		    {
-			Rpc_IndexToOffset(patient, 
-						(word)os->u.addrSym.address, 
+			Rpc_IndexToOffset(patient,
+						(word)os->u.addrSym.address,
 						    os);
 		    }
 
@@ -3783,7 +3785,7 @@ SymLookupAddr(Handle	handle,	    /* Handle in which address resides */
 			     */
 			    s = os;
 			    if (lows == (ObjSym *)NULL ||
-				(word)s->u.addrSym.address > 
+				(word)s->u.addrSym.address >
 				(word)lows->u.addrSym.address)
 			    {
 				lows = s;
@@ -3792,17 +3794,17 @@ SymLookupAddr(Handle	handle,	    /* Handle in which address resides */
 			     * Give preference to procedure symbols. If we find
 			     * one one these then no need to look further.
 			     */
-			    if (s->type == OSYM_PROC && 
+			    if (s->type == OSYM_PROC &&
 				os->u.addrSym.address == (word)addr) {
 				lows = s;
 				break;
 			    }
 
 			}
-			else 
+			else
 			{
 			    if (lows == (ObjSym *)NULL ||
-				(word)os->u.addrSym.address > 
+				(word)os->u.addrSym.address >
 				(word)lows->u.addrSym.address)
 			    {
 				lows = os;
@@ -3814,7 +3816,7 @@ SymLookupAddr(Handle	handle,	    /* Handle in which address resides */
 
 		s = lows;
 		if (((j != 0) || (s != (ObjSym *)NULL)) &&
-		    !(wantExact && 
+		    !(wantExact &&
 		     ((word)s->u.addrSym.address != (word)addr)))
 		{
 		    SymFile(sym) = patient->symFile;
@@ -3822,8 +3824,8 @@ SymLookupAddr(Handle	handle,	    /* Handle in which address resides */
 		    SymOffset(sym) = (genptr)s - (genptr)osh;
 		    VMUnlock(patient->symFile, oame->block);
 		    break;
-		} 
-		else 
+		}
+		else
 		{
 		    /* if we found the thing, but its address was not
 		     * exact, then we must be doing a class::msg lookup
@@ -3853,7 +3855,7 @@ SymLookupAddr(Handle	handle,	    /* Handle in which address resides */
 	}
     }
 /*
-    Message("LookupAddr: %04x:%04x = %s\n", Handle_ID(handle), addr, 
+    Message("LookupAddr: %04x:%04x = %s\n", Handle_ID(handle), addr,
             Sym_IsNull(sym) ? "NULL" : Sym_Name(sym));
 */
     return(sym);
@@ -3877,7 +3879,7 @@ Sym_Class(Sym	    sym)	    	/* Symbol to examine */
 {
     ObjSym  	*s;
     int	    	class;
-    
+
     assert(!Sym_IsNull(sym));
 
     s = SymLock(sym);
@@ -3921,7 +3923,7 @@ Sym_Scope(Sym	    sym,
 	     */
 	    genptr  	    base;
 	    ObjSym  	    *os;
-	    
+
 	    /*
 	     * Point to the base of the symbol's block
 	     */
@@ -4109,25 +4111,25 @@ SymForEach(ObjSym   	*ssym,	    	/* Locked scope symbol */
 	     * module's symbol list, as stored in the VM file.
 	     */
 	    VMBlockHandle	cur, next;
-	    
+
 	    /*
 	     * If module has no symbol table, can't be a match...
 	     */
 	    if (ssym->u.module.table == 0) {
 		return(0);
 	    }
-	    
+
 	    for (cur = ssym->u.module.syms; cur != 0; cur = next) {
 		int 	    	i;
 		ObjSymHeader	*osh;
 		ObjSym  	    	*os;
-		SymToken	    	fsym; /*  = {file, cur, 
+		SymToken	    	fsym; /*  = {file, cur,
 					       *     sizeof(ObjSymHeader)};
 					       * xxxDan */
 		fsym.file = file;
 		fsym.block = cur;
 		fsym.offset = sizeof(ObjSymHeader);
-		
+
 		osh = (ObjSymHeader *)VMLock(file, cur, (MemHandle *)NULL);
 		for (i = osh->num, os = (ObjSym *)(osh+1); i > 0; i--, os++) {
 		    if (symMap[os->type].class & class) {
@@ -4152,7 +4154,7 @@ SymForEach(ObjSym   	*ssym,	    	/* Locked scope symbol */
 	    ObjSymHeader	*osh;
 	    ObjSym	    	*lsym;
 	    SymToken    	fsym;
-	    
+
 	    if (ssym->type == OSYM_PROC) {
 		/*
 		 * Look through the symbols local to the procedure for
@@ -4162,22 +4164,22 @@ SymForEach(ObjSym   	*ssym,	    	/* Locked scope symbol */
 	    } else {
 		loff = ssym->u.blockStart.local;
 	    }
-	    
+
 	    osh = (ObjSymHeader *)((genptr)ssym - SymOffset(scope));
-	    
+
 	    fsym.file = SymFile(scope);
 	    fsym.block = SymBlock(scope);
-	    
+
 	    while (loff != 0 && loff != SymOffset(scope)) {
 		assert(loff >= sizeof(ObjSymHeader) &&
-		       loff < (sizeof(ObjSymHeader) + 
+		       loff < (sizeof(ObjSymHeader) +
 			       (osh->num*sizeof(ObjSym))));
 		lsym = (ObjSym *)((genptr)osh + loff);
 		fsym.offset = loff;
-		
+
 		if (symMap[lsym->type].class & class) {
 		    int	result = (*func)(*(Sym *)&fsym, data);
-		    
+
 		    if (result) {
 			return (result);
 		    }
@@ -4199,18 +4201,18 @@ SymForEach(ObjSym   	*ssym,	    	/* Locked scope symbol */
 	    	    	    	    	    /* complexity of the expression */
 	    	    	    	    	    /* drove me nuts */
 	    int 	    result;
-	    
+
 	    osh = (ObjSymHeader *)((genptr)ssym - SymOffset(scope));
 	    loff = ssym->u.sType.first;
-	    
+
 	    /*
-	     * Make sure the type isn't empty (loff != 0) before looping 
+	     * Make sure the type isn't empty (loff != 0) before looping
 	     * through the entire list.
 	     */
 	    if (loff != 0) {
 		fsym.file = SymFile(scope);
 		fsym.block = SymBlock(scope);
-		
+
 		while (loff != SymOffset(scope)) {
 		    assert(loff<sizeof(ObjSymHeader) +
 			   (osh->num*sizeof(ObjSym)));
@@ -4220,7 +4222,7 @@ SymForEach(ObjSym   	*ssym,	    	/* Locked scope symbol */
 
 		    lsym = (ObjSym *)((genptr)osh + loff);
 		    fsym.offset = loff;
-		    
+
 		    /*
 		     * Note that labels in a structure are not passed off.
 		     * This prevents evil swapping bugs and lets everyone
@@ -4492,7 +4494,7 @@ SymFullName(Sym	    sym,
 		*--cp = ':';
 		*--cp = ':';
 	    }
-	    
+
 	    /*
 	     * Copy the name in w/o its null-terminator
 	     */
@@ -4584,12 +4586,12 @@ Sym_GetVarData(Sym	    	sym,	    	/* Symbol to interrogate */
 	       Address		*addrPtr)	/* Place for address data */
 {
     ObjSym  	*s = SymLock(sym);
-    
+
     CHECK_CLASS(s, SYM_VAR|SYM_LOCALVAR, var, Sym_GetVarData, return);
 
     if (s->type == OSYM_LOCAL_STATIC) {
 	SymToken	vsym;
-	
+
 	vsym.file = SymFile(sym);
 	vsym.block = s->u.localStatic.symBlock;
 	vsym.offset = s->u.localStatic.symOff;
@@ -4597,7 +4599,7 @@ Sym_GetVarData(Sym	    	sym,	    	/* Symbol to interrogate */
 	Sym_GetVarData(SymCast(vsym), typePtr, sClassPtr, addrPtr);
     } else {
 	COND_ASSIGN(typePtr, SymGetType(sym));
-	
+
 	switch(s->type) {
 	    case OSYM_CHUNK:
 	    case OSYM_CLASS:
@@ -4610,7 +4612,7 @@ Sym_GetVarData(Sym	    	sym,	    	/* Symbol to interrogate */
 		if (s->flags & OSYM_ENTRY)
 		{
 		    COND_ASSIGN(addrPtr,
-				(Address)Rpc_IndexToOffset(Sym_Patient(sym), 
+				(Address)Rpc_IndexToOffset(Sym_Patient(sym),
 				           (word)s->u.addrSym.address, s));
 		}
 		else
@@ -4619,7 +4621,7 @@ Sym_GetVarData(Sym	    	sym,	    	/* Symbol to interrogate */
 		}
 		break;
 	    case OSYM_LOCVAR:
-		COND_ASSIGN(sClassPtr, s->u.localVar.offset < 0 ? 
+		COND_ASSIGN(sClassPtr, s->u.localVar.offset < 0 ?
 			    SC_Local : SC_Parameter);
 		COND_ASSIGN(addrPtr, (Address)s->u.localVar.offset);
 		break;
@@ -4637,9 +4639,9 @@ Sym_GetVarData(Sym	    	sym,	    	/* Symbol to interrogate */
 /***********************************************************************
  *				Sym_IsFar
  ***********************************************************************
- * SYNOPSIS:	
- * CALLED BY:	
- * RETURN:	
+ * SYNOPSIS:
+ * CALLED BY:
+ * RETURN:
  * SIDE EFFECTS:
  *
  * STRATEGY:
@@ -4740,7 +4742,7 @@ Sym_GetFuncData(Sym	sym,	    	/* Symbol to interrogate */
 
     if (s->flags & OSYM_ENTRY)
     {
-	COND_ASSIGN(addrPtr, (Address)Rpc_IndexToOffset(Sym_Patient(sym), 
+	COND_ASSIGN(addrPtr, (Address)Rpc_IndexToOffset(Sym_Patient(sym),
 					 (word)s->u.addrSym.address, s));
     }
     else
@@ -4801,7 +4803,7 @@ Sym_GetEnumData(Sym	sym,	    	/* Symbol to interrogate */
 		Type	*sourceTypePtr) /* Place for source type */
 {
     ObjSym  	*s = SymLock(sym);
-    
+
     CHECK_CLASS(s, SYM_ENUM, enum, Sym_GetEnumData, return);
 
     COND_ASSIGN(valuePtr, s->u.eField.value);
@@ -4831,7 +4833,7 @@ Sym_GetAbsData(Sym  sym)
 {
     ObjSym  	*s = SymLock(sym);
     int	    	result;
-    
+
     CHECK_CLASS(s, SYM_ABS, abs, Sym_GetAbsData, return);
 
     result = s->u.constant.value;
@@ -4910,7 +4912,7 @@ Sym_GetFieldData(Sym  	sym,
     if (lengthPtr || fieldTypePtr) {
 	ftype = SymGetType(sym);
     }
-    
+
     stype = s->u.sField.type;
 
     if (s->type == OSYM_BITFIELD) {
@@ -4923,7 +4925,7 @@ Sym_GetFieldData(Sym  	sym,
 	/*
 	 * Bitfield in a structure or union. Fetch the length from the
 	 * type word and calculate the offset from the field's base offset
-	 * plus the offset encoded in the type word. 
+	 * plus the offset encoded in the type word.
 	 */
 	length = (stype & OTYPE_BF_WIDTH) >> OTYPE_BF_WIDTH_SHIFT;
 	offset = (s->u.sField.offset * 8) +
@@ -4946,7 +4948,7 @@ Sym_GetFieldData(Sym  	sym,
     if (sourceTypePtr) {
 	genptr 	base = (genptr)s - SymOffset(sym);
 	ObjSym	*ns;
-	
+
 	if (s->type == OSYM_FIELD) {
 	    for (ns = (ObjSym *)(base + s->u.sField.next);
 		 ns->type == OSYM_FIELD;
@@ -4966,7 +4968,7 @@ Sym_GetFieldData(Sym  	sym,
 	SymBlock(*sourceTypePtr) = SymBlock(sym);
 	SymOffset(*sourceTypePtr) = (genptr)ns - base;
     }
-	
+
     SymUnlock(sym);
 }
 

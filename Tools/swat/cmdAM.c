@@ -1985,111 +1985,11 @@ See also:\n\
 {
     extern char	*getenv();
     char    	*result;
-#if defined(_WIN32)
-    char	workbuf[256];
-    Boolean	retval;
-    static envVarNode *envVarHead = NULL;
-    envVarNode 	*envVarCur, *envVarNew;
-    long 	dw;
-#endif
 
     if (argc != 2) {
 	Tcl_Error(interp, "Usage: getenv <name>");
     }
-#if !defined(_WIN32)
     result = getenv(argv[1]);
-#else /* WIN32*/ 
-    /* 
-     * strategy - use a link list to store env variables retrieved.
-     *            This way each variable is only allocated space once.
-     *            The initial look up is in the registry as a string
-     *            under Swat, next under ntsdk, then as a dword under
-     *            those places, finally to the system to see if the
-     *            nt environment variable is set. 
-     */
-    result = NULL;
-    
-    /*
-     * check if we already have retrieved the value and 
-     * allocated space for it
-     */
-    envVarCur = envVarHead;
-    while (envVarCur != NULL) {
-	if (strcmpi(envVarCur->name, argv[1]) == 0) {
-	    result = envVarCur->value;
-	    break;
-	}
-	envVarCur = envVarCur->next;
-    }
-    
-    if (envVarCur == NULL) {
-	/* 
-	 * haven't yet retrieved the value
-	 */
-	retval = Registry_FindStringValue(Tcl_GetVar(interp, "file-reg-swat", 
-						     TRUE),
-					  argv[1], workbuf, sizeof(workbuf));
-	if ((retval == FALSE) || (workbuf[0] == '\0')) {
-	    retval = Registry_FindStringValue(Tcl_GetVar(interp, 
-							 "file-reg-ntsdk",
-							 TRUE),
-					      argv[1], workbuf, 
-					      sizeof(workbuf));
-	    if ((retval == FALSE) || (workbuf[0] == '\0')) {
-		retval = Registry_FindDWORDValue(Tcl_GetVar(interp, 
-							    "file-reg-swat",
-							    TRUE),
-						 argv[1],
-						 &dw);
-		if (retval == FALSE) {
-		    retval = Registry_FindDWORDValue(Tcl_GetVar(interp, 
-							     "file-reg-ntsdk",
-								TRUE),
-						     argv[1],
-						     &dw);
-		    if (retval == FALSE) {
-			char arg1up[256];
-			int i;
-
-			for (i=0; (i<strlen(argv[1])) && (i<255); i++) {
-			    arg1up[i] = toupper(argv[1][i]);
-			}
-			arg1up[i] = '\0';
-			result = getenv(arg1up);
-		    } else {
-			sprintf(workbuf, "%d", dw);
-			result = workbuf;
-		    }
-		} else {
-		    sprintf(workbuf, "%d", dw);
-		    result = workbuf;
-		}
-	    } else {
-		result = workbuf;
-	    }
-	} else {
-	    result = workbuf;
-	}
-
-	/*
-	 * allocate space for the resulting link list node, 
-	 * this will never get freed
-	 */
-	if (result != NULL) {
-	    envVarNew = (envVarNode *)malloc(sizeof(envVarNode));
-	    envVarNew->name = (char *)malloc((strlen(argv[1]) + 1) 
-					      * sizeof(char));
-	    strcpy(envVarNew->name, argv[1]);
-	    envVarNew->value = (char *)malloc((strlen(result) + 1) 
-					      * sizeof(char));
-	    strcpy(envVarNew->value, result);
-	    result = envVarNew->value;
-	    envVarNew->next = envVarHead;
-	    envVarHead = envVarNew;
-	}
-    }
-
-#endif
     Tcl_Return(interp, result ? result : "", TCL_STATIC);
 
     return(TCL_OK);
