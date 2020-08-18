@@ -13,9 +13,9 @@
 #	all			create the tool for all possible architectures
 #	install			create and install for all architectures
 #	depend			generate dependencies for all architectures
-#	sparc                   create tool for sparc 
-#	installsparc            create and install tool for sparc 
-#	dependsparc             generate dependencies for sparc 
+#	sparc                   create tool for sparc
+#	installsparc            create and install tool for sparc
+#	dependsparc             generate dependencies for sparc
 #
 # DESCRIPTION:
 #	This makefile was automatically generated from:
@@ -31,7 +31,7 @@
 #include	<geos.mk>
 #include	<gpath.mk>
 
-MACHINES	=  sparc
+MACHINES	=  linux win32
 MAKEFILE	= Makefile
 NAME		= tcl
 SYSMAKEFILE	= tool.mk

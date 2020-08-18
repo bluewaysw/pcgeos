@@ -58,7 +58,7 @@ win32OBJS       = win32.md/tcl.obj win32.md/tclBasic.obj\
  		  win32.md/tclBC.obj\
                   win32.md/tclCmdAH.obj win32.md/tclCmdIZ.obj\
                   win32.md/tclExpr.obj win32.md/tclProc.obj\
-		  win32.md/tclUtil.obj win32.md/tsh.obj
+		  win32.md/tclUtil.obj win32.md/tsh.obj win32.md/tclNt.obj
 win32LIBS       =
 
 

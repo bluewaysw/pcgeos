@@ -30,7 +30,7 @@ static char rcsid[] = "$Id: tcl.c,v 1.9 97/04/18 12:14:33 dbaumann Exp $ SPRITE 
 #endif
 
 #include <ctype.h>
-#include "setjmp.h"
+#include <setjmp.h>
 #include <malloc.h>
 #include "tcl.h"
 
