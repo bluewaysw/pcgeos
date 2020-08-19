@@ -39,6 +39,8 @@ TYPE		= library
 
 #if	!defined(linux)
 DEFTARGET	= win32
+#else
+DEFTARGET	= win32
 #endif
 
 MISRCS          = attrib.c \
