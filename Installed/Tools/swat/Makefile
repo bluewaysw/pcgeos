@@ -96,11 +96,11 @@ win32OBJS       = break.obj buf.obj cache.obj\
                   vector.obj version.obj mouse.obj netware.obj npipe.obj \
                   ntserial.obj ibmXms.obj
 
-win32LIBS       = ntcurses\win32.md\ntcurses.lib tcl\win32.md\tcl.lib \
-                  ..\..\..\Tools\pmake\lib\lst\lst.lib \
-                  ..\utils\win32.md\utils.lib \
-                  ..\winutil\win32.md\winutil.lib \
-                  ..\compat\win32.md\compat.lib
+win32LIBS       = ntcurses/win32.md/ntcurses.lib tcl/win32.md/tcl.lib \
+                  ../../../Tools/pmake/lib/lst/lst.lib \
+                  ../utils/win32.md/utils.lib \
+                  ../winutil/win32.md/winutil.lib \
+                  ../compat/win32.md/compat.lib
 
 #if exists(local.mk)
 #include	"local.mk"

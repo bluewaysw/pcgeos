@@ -45,12 +45,13 @@ CFLAGS		= -DISSWAT
 # Extra search paths
 #
 #ifdef linux
-.NULL		: .out
-LIBDIRS		+= curses
+#.NULL		: .out
+LIBDIRS		+= ntcurses
+.SUFFIXES	: .a
 #
 # Lots of optimizations...
 #
-CFLAGS		+= -W -Wreturn-type -Wunused -fcombine-regs -DMEM_TRACE
+#CFLAGS		+= -W -Wreturn-type -Wunused -fcombine-regs -DMEM_TRACE
 #
 # All the libraries we use...
 #
