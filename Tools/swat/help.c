@@ -1205,6 +1205,9 @@ Help_Store(char *topic,
 #elif defined(unix)
 # define NULL_FILE_NAME	"/dev/null"
 # define NULL_FILE_ATTR O_RDONLY
+#elif defined(_LINUX)
+# define NULL_FILE_NAME	"/dev/null"
+# define NULL_FILE_ATTR O_RDONLY
 #endif
 
 /***********************************************************************

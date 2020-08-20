@@ -33,7 +33,7 @@
 #include	<geos.mk>
 #include	<gpath.mk>
 
-MACHINES	= win32
+MACHINES	= win32 linux
 MAKEFILE	= Makefile
 NAME		= swat
 SYSMAKEFILE	= tool.mk
@@ -59,7 +59,7 @@ MISRCS          = serial.asm assert.h break.c break.h buf.c buf.h cache.c \
 
 linuxSRCS       = $(MISRCS)
 
-linuxOBJS       = serial.o break.o buf.o cache.o\
+linuxOBJS       = break.o buf.o cache.o\
                   cmd.o cmdAM.o cmdNZ.o\
                   curses.o event.o expr.o\
                   file.o gc.o handle.o\
@@ -70,9 +70,15 @@ linuxOBJS       = serial.o break.o buf.o cache.o\
                   swat.o sym.o \
                   table.o tclDebug.o type.o\
                   ui.o value.o var.o \
-                  vector.o version.o mouse.o netware.o
+                  vector.o version.o mouse.o netware.o \
+		  ibmXms.o
 
-linuxLIBS		    = curses\curses.lib tcl\tcl.lib lst\lst.lib ..\utils\utils.lib
+linuxLIBS	= curses/linux.md/libcurses.a \
+		  termcap/linux.md/libtermcap.a \
+		  tcl/linux.md/libtcl.a \
+		  ../../../Tools/pmake/lib/lst/liblst.a \
+		  ../utils/linux.md/libutils.a \
+		  ../compat/linux.md/libcompat.a
 
 win32SRCS       = $(MISRCS) win32.md/npipe.c win32.md/ntserial.c
 
@@ -95,7 +101,6 @@ win32LIBS       = ntcurses\win32.md\ntcurses.lib tcl\win32.md\tcl.lib \
                   ..\utils\win32.md\utils.lib \
                   ..\winutil\win32.md\winutil.lib \
                   ..\compat\win32.md\compat.lib
-
 
 #if exists(local.mk)
 #include	"local.mk"

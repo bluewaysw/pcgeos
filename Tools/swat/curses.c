@@ -64,10 +64,14 @@ static char *rcsid =
 #include "src.h"
 #include "shell.h"
 #include "cmdNZ.h"
-#include <curses.h>
+#ifdef _LINUX
+#include <curses/curses.h>
+#else
+#include <ntcurses/curses.h>
+#endif
 #include <compat/file.h>
 
-#if defined(_WIN32)
+#if defined(_WIN32) 
 # include <curspriv.h>
 #endif
 
@@ -85,7 +89,7 @@ static struct ltchars	ltc;	    	/* Original local terminal chars */
 static char 	    	*BL;	    	/* Audible bell, if not ^G */
 #endif
 
-#if defined(_WIN32)
+#if defined(_WIN32) 
 # define _y		_line		/* in the WINDOW structure */
 # define _firstch	_minchng
 # define _lastch	_maxchng
@@ -96,7 +100,7 @@ static char 	    	*BL;	    	/* Audible bell, if not ^G */
 # define NONL FALSE          /* (not do return after linefeed) is FALSE */ 
 #endif
 
-#if defined(_WIN32)
+#if defined(_WIN32) || defined(__WATCOMC__)
 #define WADDSTR_CAST unsigned char *
 #else
 #define WADDSTR_CAST char *
@@ -120,7 +124,7 @@ typedef ntcCell		cursesChar;	/* defined in ntcurses/curses.h */
 # define WPRINTW 			wprintwWide
 #endif
 
-#if defined(_WIN32)
+#if defined(_WIN32) || defined(__WATCOMC__)
 extern  int	_sprintw(WINDOW *win, const char *fmt, va_list args);
 # define _putchar(c) putchar(c)  /* not used in WIN32 */
 #else
@@ -2456,7 +2460,7 @@ CursesShowMatch(char	open,	/* Character to match */
 static void
 CursesHonk(void)
 {
-#if !defined(_WIN32)  
+#if !defined(_WIN32) 
 		    write(_tty_ch, "\007", 1);
 #else
 		    beep();
@@ -4073,7 +4077,7 @@ See also:\n\
     return(TCL_OK);
 }
 
-
+#ifdef _WIN32
 /***********************************************************************
  *				CursesSLogCmd
  ***********************************************************************
@@ -4204,6 +4208,7 @@ See also: \n\
     lineTail = lineHead = lineCur = NullLine;
     return (TCL_OK);
 }
+#endif
 
 
 /***********************************************************************
@@ -4269,7 +4274,7 @@ See also:\n\
     }
     return (TCL_OK);
 }
-
+
 /***********************************************************************
  *				CursesSystemCmd
  ***********************************************************************
@@ -5295,7 +5300,7 @@ See also:\n\
 {
     Boolean	    nWOT;
 
-#if !defined(_WIN32)
+#if !defined(_WIN32) && !defined(__WATCOMC__)
     extern int	    _putchar(char c);
 #endif
     LstNode 	    ln;
@@ -5669,7 +5674,7 @@ DEFCMD(dss_low, DssLow,TCL_EXACT,NULL,swat_prog.patient,
     char    	*curfile, *srcwinmode;
     int	    	notdocwin, found_line;
     int	    	returnVal;
-#if defined(_WIN32)
+#if defined(_WIN32) 
     unsigned short	*screen_text_dblByte;
     cursesChar		sample;
     int			i;
@@ -5696,7 +5701,7 @@ DEFCMD(dss_low, DssLow,TCL_EXACT,NULL,swat_prog.patient,
 
     screen_text = (cursesChar *)malloc(sizeof(cursesChar) * 
 				       (lines * COLS + 1));
-#if defined(_WIN32)
+#if defined(_WIN32) 
     screen_text_dblByte = (unsigned short *)malloc(sizeof(unsigned short) * 
 						   (lines * COLS + 1));
     returnVal = Src_ReadLine(interp, curfile, argv[2], argv[1], 
@@ -6059,8 +6064,8 @@ Curses_Init(void)
 	Cmd_Create(&CursesEchoCmdRec);
 	Cmd_Create(&CursesSystemCmdRec);
 	Cmd_Create(&CursesSaveCmdRec);
-	Cmd_Create(&CursesSLogCmdRec);
-	Cmd_Create(&CursesSBClrCmdRec);
+	/*Cmd_Create(&CursesSLogCmdRec);*/
+	/*Cmd_Create(&CursesSBClrCmdRec);*/
 	Cmd_Create(&CursesWCreateCmdRec);
 	Cmd_Create(&CursesWDeleteCmdRec);
 	Cmd_Create(&CursesWPushCmdRec);

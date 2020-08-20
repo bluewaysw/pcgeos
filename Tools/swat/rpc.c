@@ -119,12 +119,14 @@ static char *rcsid =
  * description
  */
 
-#if defined(unix)
+#if defined(unix) || defined(_LINUX)
 # include <sys/ioctl.h>
 # include <sys/types.h>
-# include <sys/file.h>
 # include <sys/uio.h>
+#endif
+#if defined(unix)
 # include <sys/signal.h>
+# include <sys/file.h>
 #endif
 
 #if defined(_WIN32)
@@ -147,6 +149,8 @@ static char *rcsid =
 # define sleep(s) (Sleep((s) * 1000))
 # include <curses.h>
 extern HANDLE hConIn;
+#else
+# include <curses/curses.h>
 #endif
 
 #include "netware.h"
@@ -171,7 +175,7 @@ void RpcExitNtSerial(void);
 # include "ntserial.h"
 #endif
 
-#if defined(_MSDOS) || defined(_WIN32)
+#if defined(_MSDOS) || defined(_WIN32) || defined(__WATCOMC__)
 typedef long    fd_mask;
 # define NBBY    8               /* number of bits in a byte */
 
@@ -362,7 +366,7 @@ static RpcServer    	*geosServers = (RpcServer *)0;
  */
 typedef struct RpcEvent {
     struct RpcEvent  	*next;
-#if defined(unix)
+#if defined(unix) 
     struct timeval	timeout;    	/* Time at which event should occur */
     struct timeval	interval;   	/* Interval at which event should
 					 * recur. */
@@ -403,7 +407,7 @@ fd_set			rpc_exceptMask;	/* Exceptable stream select mask */
  */
 int			rpcDebug = 0;     /* Print debugging info (RD_ flags
 					   * defined in rpc.h) */
-#if defined(unix)
+#if defined(unix) || defined(_LINUX)
 static Boolean 	    	noSig = FALSE;	/* Don't use IOT signal to keep
 					 * owner of tty from dealing with it */
 #endif
@@ -434,7 +438,7 @@ Type	    typeReadGeodeReply;
 Type	    typeIndexToOffsetArgs;
 Type	    typeIndexToOffsetReply;
 
-#if defined(unix)
+#if defined(unix) || defined(_LINUX)
 static char ttyName[64];
 static int  isModem=0;
 #elif defined(_WIN32)
@@ -671,7 +675,7 @@ RpcSendV(int    	fd,
 		tiovlen = curiov+1;
 	    }
 
-#if defined(unix)
+#if defined(unix) || defined(_LINUX)
 	    i = writev(fd, tiov, tiovlen);
 #elif defined(_MSDOS)
 	    i = Serial_WriteV(tiov, tiovlen);
@@ -696,7 +700,7 @@ RpcSendV(int    	fd,
 	i = nwritten;
     } else {
 
-#if defined(unix)
+#if defined(unix) || defined(_LINUX)
 	i = writev(fd, newiov, curiov+1);
 #elif defined(_MSDOS)
 	i = Serial_WriteV(newiov, curiov+1);
@@ -963,7 +967,7 @@ RpcCacheFind(RpcServer *server,    	/* Server in whose cache the call
     return (e);
 }
 
-#if defined(unix)
+#if defined(unix) || defined(_LINUX)
 
 /*-
  *-----------------------------------------------------------------------
@@ -1479,7 +1483,7 @@ RpcHandleStream(int	    stream, /* Stream that's ready */
     case CM_SERIAL:
     {
 
-#if defined(unix)
+#if defined(unix) || defined(_LINUX)
 	bytesRead = read(stream, bp, 1);
 #elif defined(_MSDOS)
 	bytesRead = Serial_Read(bp, 1);
@@ -1881,7 +1885,7 @@ RpcQueueEvent(register RpcEvent	*ev)
     register RpcEvent	**prev;
 
     if (rpcDebug & RD_EVENT_QUEUE) {
-#if defined(unix)
+#if defined(unix) 
 	Message ("Queueing event %xh (timeout = %d.%06d)\n", ev,
 		 ev->timeout.tv_sec, ev->timeout.tv_usec);
 #else
@@ -2007,7 +2011,7 @@ Rpc_EventReset(Rpc_Event	event,	    /* Event to alter */
     register RpcEvent	*ev;
     register RpcEvent	*e;
     register RpcEvent	**prev;
-#if defined(unix)
+#if defined(unix) || defined(_LINUX)
     struct timeval	now;
 #endif
 
@@ -2611,7 +2615,7 @@ RpcWait(int poll)
 	    return;
 	}
 
-#if defined(unix)
+#if defined(unix) || defined(_LINUX)
 	else if (nstreams < 0) {
 	    if (errno == EBADF) {
 		RpcCheckStreams();
@@ -4633,7 +4637,7 @@ Rpc_Init(int		*argcPtr,
     int long			retryMult = 0;
     char		*npipe=0;
     int			npipeTries;
-#elif defined(unix)
+#elif defined(unix) || defined(_LINUX)
     char    	    	*modem=0;
 #endif
 
@@ -4654,7 +4658,7 @@ Rpc_Init(int		*argcPtr,
 	    }
 	}
 
-#if defined(unix)
+#if defined(unix) || defined(_LINUX)
 	else if (strncmp(*av, "-m", 2) == 0) {      /* look for modem arg */
 	    if ((av[0][2] == '\0') && (ac > 1)) {
 		modem = av[1];
@@ -4735,7 +4739,7 @@ Rpc_Init(int		*argcPtr,
 	 * no netware. no npipe. lets hope serial comes thru.
 	 */
 	commMode = CM_SERIAL;
-# if defined(unix)
+# if defined(unix) 
 	if (modem != 0) {
 	    noSig = TRUE;   	/* Assume noone using the modem, so noone to
 				 * which to send signals */
@@ -4813,6 +4817,7 @@ Rpc_Init(int		*argcPtr,
 		exit(1);
 	    }
 	}
+#if !defined(_LINUX)
 	if (!Serial_Init(tty, 1)) {
 	    Message("Unable to reinitialize serial port \"%s\".", tty);
 	    if (Ui_Exit) {
@@ -4820,10 +4825,21 @@ Rpc_Init(int		*argcPtr,
 	    }
 	    exit(1);
 	}
+#else
+	{
+	    Message("Unable to reinitialize serial port \"%s\".", tty);
+    	    if (Ui_Exit) {
+    		(*Ui_Exit)();
+    	    }
+    	    exit(1);
+	}
+#endif
 	/*
 	 * Arrange for port to be closed before we go away.
 	 */
+#ifndef _LINUX
 	atexit(Serial_Exit);
+#endif
 
 	geosFD = 1;		/* Fake descriptor number that won't interfere
 				 * with anything... in theory. */

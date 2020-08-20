@@ -464,7 +464,7 @@ See also:\n\
     int	    i;
     char    *cp;
 
-#if defined(_WIN32)
+#if defined(_WIN32) || defined(__WATCOMC__)
     typedef int (*compareFunc)(const void *, const void *) ;
 
     static int  (*compare[4])(const void *, const void *) = {

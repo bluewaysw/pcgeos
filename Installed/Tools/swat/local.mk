@@ -44,7 +44,7 @@ CFLAGS		= -DISSWAT
 #
 # Extra search paths
 #
-#ifdef unix
+#ifdef linux
 .NULL		: .out
 LIBDIRS		+= curses
 #

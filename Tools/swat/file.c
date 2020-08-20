@@ -155,7 +155,7 @@ static char *GeodeSearchTree (
 
 static int strncmp_path(char *path1, char *path2, int n);
 
-#if defined(unix)
+#if defined(unix) || defined(_LINUX)
 # define STRNCMP_OS_SPECIFIC strncmp
 # define STRCMP_OS_SPECIFIC strcmp
 #elif defined(_WIN32)
@@ -2438,7 +2438,7 @@ Synopsis:\n\
 }	/* End of FindGeode.	*/
 
 
-#if defined(unix)
+#if defined(unix) || defined(_LINUX)
 /***********************************************************************
  *				FileSetVar
  ***********************************************************************
@@ -2524,7 +2524,7 @@ FileParseConfigFile(CONST char *path)
     FileType  	    cf;	    	/* Stream open to configuration file */
     FileConfigEntry *fce;
     char    	    *cp;
-    int             bytesRead;
+    long int        bytesRead;
     int             indx;
     int             returnCode;
 
@@ -2983,11 +2983,17 @@ read_config:
      * Find the current directory so we can set up the search paths
      * for geodes.
      */
-# if defined(_MSDOS)
+# if defined(_MSDOS) || defined(_LINUX)
+#ifdef _LINUX
+    if (getcwd(cwd, sizeof(cwd)) == NULL) {
+#else
     if (_getcwd(cwd, sizeof(cwd)) == NULL) {
+#endif
 	Punt("could not fetch current directory");
     }
+#ifndef _LINUX
     atexit(FileRestoreWorkingDir);
+#endif
 # else
     if (getwd(cwd) == NULL) {
 	Punt("could not fetch current directory");
@@ -3028,7 +3034,7 @@ read_config:
 	    FileType	cf;
 	    CONST char	*bfile;
 	    int		indx;
-	    int		bytesRead = 0;
+	    long	bytesRead = 0;
 
 	    bfile = File_PathConcat(fileDevel, "BRANCH", 0);
 	    returnCode = FileUtil_Open(&cf, bfile, O_RDONLY|O_TEXT,

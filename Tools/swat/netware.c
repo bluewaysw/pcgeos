@@ -64,7 +64,7 @@ extern int errno;
 
 #define DEFAULT_SOCKET	    0x3f
 
-#if !defined(unix)
+#if !defined(unix) && !defined(_LINUX)
 typedef unsigned short 	u_short;
 typedef char	u_char;
 #endif
@@ -599,3 +599,33 @@ NetWare_WriteV(int fd, struct iovec *iov, int iov_len)
 #endif
 
     
+/* empty Ipx funtion definitions.  Makes the Borland linker happy for now.
+ * Novell will not be supported initially
+ */
+
+#ifdef _LINUX
+int Ipx_Check(void) {
+    return 0;
+}
+
+void Ipx_Init(char *addr) {
+}
+
+void Ipx_Exit(void) {
+}
+
+void Ipx_CopyToSendBuffer(caddr_t a, int b, int c) {
+}
+
+void Ipx_SendLow(int a) {
+}
+
+int Ipx_CheckPacket(void) {
+return 0;
+}
+
+int Ipx_ReadLow(void *buf, int bufSize) {
+return 0;
+}
+
+#endif

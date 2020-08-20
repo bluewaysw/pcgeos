@@ -906,8 +906,10 @@ void
 Ui_Init(int 	*argcPtr,
 	char	**argv)
 {
-#if defined(unix)
+#if defined(unix) || defined(_LINUX)
+#if !defined(_LINUX)
     extern char	*getenv(char *);
+#endif
     char    	*term;
 #elif defined(_WIN32)
     char	term[256];
@@ -938,7 +940,7 @@ Ui_Init(int 	*argcPtr,
 #endif
 
 #if !defined(_MSDOS)
-# if !defined(_WIN32)
+# if defined(unix) || defined(_LINUX)
     term = getenv("TERM");
 # else
     returnCode = Registry_FindStringValue(Tcl_GetVar(interp, "file-reg-swat", 
