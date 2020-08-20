@@ -17,12 +17,14 @@ static char sccsid[] = "@(#)endwin.c	5.1 (Berkeley) 6/7/85";
 
 endwin()
 {
-#if !defined (_MSDOS)
+#if !defined (_MSDOS) && !defined(__WATCOMC__)
 	resetty();
 	_puts(VE);
 	_puts(TE);
 #else
+#if !defined(_LINUX)
 	DosResetScreen();
+#endif
 #endif
 	if (curscr) {
 		if (curscr->_flags & _STANDOUT) {

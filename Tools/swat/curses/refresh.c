@@ -117,7 +117,7 @@ reg WINDOW	*win;
 	if (win == curscr)
 		domvcur(ly, lx, win->_cury, win->_curx);
 	else {
-		if (win->_leave) {
+		if (win->_leavecurs) {
 			curscr->_cury = ly;
 			curscr->_curx = lx;
 			ly -= win->_begy;

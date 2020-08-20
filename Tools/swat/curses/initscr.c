@@ -29,7 +29,7 @@ initscr() {
 # ifdef DEBUG
 	fprintf(outf, "INITSCR()\n");
 # endif
-#if !defined(_MSDOS)
+#if !defined(_MSDOS) && !defined(__WATCOMC__)
 	if (My_term)
 		setterm(Def_term);
 	else {
@@ -50,8 +50,10 @@ initscr() {
 	signal(SIGTSTP, tstp);
 # endif
 #else /* is _MSDOS */
+#if !defined(_LINUX)
 	setterm();
 	DosInitScreen();
+#endif
 #endif
 
 	if (curscr != NULL) {
