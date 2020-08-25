@@ -525,10 +525,11 @@ RpcSendV(int    	fd,
 #if defined(_WIN32)
     int             bytesWritten;
 #endif
-
+#if 0
     if (commMode == CM_NETWARE) {
 	return (NetWare_WriteV(fd, iov, iov_len));
     }
+#endif
 
 #if defined(_WIN32)
     if (commMode == CM_NPIPE) {
@@ -676,7 +677,8 @@ RpcSendV(int    	fd,
 	    }
 
 #if defined(unix) || defined(_LINUX)
-	    i = writev(fd, tiov, tiovlen);
+	    //i = writev(fd, tiov, tiovlen);
+	    i = NetWare_WriteV(fd, tiov, tiovlen);
 #elif defined(_MSDOS)
 	    i = Serial_WriteV(tiov, tiovlen);
 #elif defined(_WIN32)
@@ -701,7 +703,8 @@ RpcSendV(int    	fd,
     } else {
 
 #if defined(unix) || defined(_LINUX)
-	i = writev(fd, newiov, curiov+1);
+	//i = writev(fd, newiov, curiov+1);
+	i = NetWare_WriteV(fd, newiov, curiov+1);
 #elif defined(_MSDOS)
 	i = Serial_WriteV(newiov, curiov+1);
 #else defined(_WIN32)
@@ -1480,11 +1483,15 @@ RpcHandleStream(int	    stream, /* Stream that's ready */
      * If debugging over the net, go read the entire packet and process it.
      */
     switch(commMode) {
+    case CM_NETWARE:
     case CM_SERIAL:
     {
 
 #if defined(unix) || defined(_LINUX)
-	bytesRead = read(stream, bp, 1);
+	//bytesRead = read(stream, bp, 1);
+	bytesRead = NetWare_Read(stream, bp,
+				 1);
+
 #elif defined(_MSDOS)
 	bytesRead = Serial_Read(bp, 1);
 #elif defined(_WIN32)
@@ -1688,6 +1695,7 @@ RpcHandleStream(int	    stream, /* Stream that's ready */
 #endif       /* ends the !MSDOS */
 	break;
     }
+#if 0
     case CM_NETWARE:
 	rpcMsgLen = NetWare_Read(stream, &rpcMsg.buf,
 				 sizeof(rpcMsg.buf));
@@ -1695,6 +1703,7 @@ RpcHandleStream(int	    stream, /* Stream that's ready */
 	    RpcProcessMessage(stream, &rpcMsg, rpcMsgLen);
 	}
 	break;
+#endif
 #if defined(_WIN32)
     case CM_NPIPE:
 	if (outstandingRead == TRUE) {
@@ -2204,6 +2213,42 @@ RpcWait(int poll)
 	}
 	nstreams = select(FD_SETSIZE, &readMask, &writeMask, &exceptMask,
 			  timeout);
+#elif defined(_LINUX)
+	/*
+	 * In the DOS world, we only look for the keyboard and our serial
+	 * port. There's no way to find other things being ready, so...
+	 *
+	 * but wait, there's more, we now have mouse support, so we must look
+	 * for mouse events as well...
+	 * XXX: just return everything else (except exceptMask) set?
+	 */
+	nstreams = 0;
+	FD_ZERO(&readMask);
+	FD_ZERO(&writeMask);
+	FD_ZERO(&exceptMask);
+
+	if (FD_ISSET(keyboardFD, &rpc_readMask)/*
+	    && _bios_keybrd(_KEYBRD_READY)*/) {
+	    nstreams += 1;
+	    FD_SET(keyboardFD, &readMask);
+	}
+
+	/* now that swat can work over a network or a serial cable, we must
+	 * check for either case
+	 */
+	if (FD_ISSET(geosFD, &rpc_readMask)
+	    && ( ((commMode == CM_NETWARE) && Ipx_CheckPacket()))) {
+	    nstreams += 1;
+	    FD_SET(geosFD, &readMask);
+	}
+	errno = 0;
+	/*
+	 * If Ctrl+C typed since we started looping, break out so we can
+	 * process it.
+	 */
+	/*if (Ui_Interrupt() != irqState) {
+	    break;
+    	}*/
 #elif defined(_MSDOS)
 	/*
 	 * In the DOS world, we only look for the keyboard and our serial

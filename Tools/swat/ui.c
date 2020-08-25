@@ -958,7 +958,9 @@ Ui_Init(int 	*argcPtr,
     {
 	Shell_Init();
     } else {
-	Curses_Init();
+	/* TODO actually use curses */
+	/* Curses_Init(); */
+	Shell_Init();
     }
 #else
     Curses_Init();

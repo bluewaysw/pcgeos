@@ -726,6 +726,7 @@ FileExeMatches(char 	*path,
     returnCode = FileUtil_Open(&fd, cpyofpath, O_RDONLY|O_BINARY, SH_DENYWR, 0);
 
     if (returnCode == TRUE) {
+	
 	/*
 	 * Fetch out the checksum while we've got the file open.
 	 */
@@ -1019,7 +1020,7 @@ FileSearchTree(CONST char    	*dir,       /* Directory to search */
 	if (dp->d_fileno == 0) {
 	    continue;
 	}
-	for (suffix = dp->d_name+dp->d_namlen;
+	for (suffix = dp->d_name+strlen(dp->d_name);
 #else
 	if ((strcmp(dp->d_name, ".") == 0) ||
 	    (strcmp(dp->d_name, "..") == 0)) {
@@ -1076,7 +1077,7 @@ FileSearchTree(CONST char    	*dir,       /* Directory to search */
 	if (dp->d_fileno == 0) {
 	    continue;
 	}
-	for (suffix = dp->d_name+dp->d_namlen;
+	for (suffix = dp->d_name+strlen(dp->d_name);
 #else
 	if ((strcmp(dp->d_name, ".") == 0) ||
 	    (strcmp(dp->d_name, "..") == 0)) {
@@ -1134,7 +1135,7 @@ FileSearchTree(CONST char    	*dir,       /* Directory to search */
 	if (dp->d_fileno == 0) {
 	    continue;
 	}
-	for (suffix = dp->d_name+dp->d_namlen;
+	for (suffix = dp->d_name+strlen(dp->d_name);
 #else
 	if ((strcmp(dp->d_name, ".") == 0) ||
 	    (strcmp(dp->d_name, "..") == 0)) {
@@ -1835,7 +1836,6 @@ File_FindGeode(char 	*name,  	/* Permanent name (executable name for
 
     MessageFlush("Looking for \"%s\"...", name);
 
-
     if ((geodeType == 0) || (geodeType == 4)) {
 	check = FileExeMatches;     /* loader */
     } else {
@@ -1891,7 +1891,6 @@ File_FindGeode(char 	*name,  	/* Permanent name (executable name for
 	free((char *)sdfilename);
 	return result;
     }
-
 
     (void)sprintf(match, "%d %.*s.%.*s", geodeType, namelen+1, name,
 		  extlen+1, &name[GEODE_NAME_SIZE]);
@@ -2229,7 +2228,7 @@ GeodeSearchTree (CONST char	*dir,	/* directory to search		   */
 	if (dp->d_fileno == 0) {
 	    continue;
 	}
-	for (suffix = dp->d_name+dp->d_namlen;
+	for (suffix = dp->d_name+strlen(dp->d_name);
 #else
 	if ((strcmp(dp->d_name, ".") == 0) ||
 	    (strcmp(dp->d_name, "..") == 0)) {
@@ -2978,7 +2977,6 @@ read_config:
     }
     rootLen = strlen(fileRoot);
     Tcl_SetVar(interp, "file-root-dir", fileRoot, TRUE);
-
     /*
      * Find the current directory so we can set up the search paths
      * for geodes.
@@ -3147,6 +3145,8 @@ read_config:
     }
 
 # if defined(unix)
+    Tcl_SetVar(interp, "file-os", "unix", TRUE);
+# elif defined(_LINUX)
     Tcl_SetVar(interp, "file-os", "unix", TRUE);
 # elif defined(_MSDOS)
     Tcl_SetVar(interp, "file-os", "dos", TRUE);

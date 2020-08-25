@@ -44,6 +44,12 @@ static char *rcsid =
 #include <sys/uio.h>
 #include <sys/errno.h>
 #endif
+#ifdef _LINUX
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/ioctl.h>
+#include <netinet/in.h>
+#endif
 
 #include <stddef.h>
 #include <compat/string.h>
@@ -101,6 +107,9 @@ static IPXMaxPacket 	ipxOutPacket;
 
 #endif
 
+#ifdef _LINUX
+static int cmdLineSocket = -1;
+#endif
 
 /*********************************************************************
  *			parsehex
@@ -575,6 +584,7 @@ NetWare_WriteV(int fd, struct iovec *iov, int iov_len)
 int
 NetWare_WriteV(int fd, struct iovec *iov, int iov_len)
 {
+#ifndef _LINUX
     int	    	    i, size;
     
     /*
@@ -595,6 +605,41 @@ NetWare_WriteV(int fd, struct iovec *iov, int iov_len)
     /* call the assembly routine to do the dirty work */
     Ipx_SendLow(size);
     return size;
+#else
+	int	    	    i, size;
+
+	/*
+	MessageFlush("NetWare_WriteV");
+	 * First copy the data into sendData to be sent out
+	 * since these data structures are not defined in assembly I just
+	 * did the copying to read-mode inside the loop to make life easy
+	 */
+	for (i = 0, size = 0; i < iov_len; i++) {
+		
+	    int res;
+	    
+	    if (size + iov[i].iov_len > IPX_MAX_PACKET)
+	    {
+		return(-1);
+	    }
+
+	    res = send(cmdLineSocket, iov[i].iov_base, iov[i].iov_len, 0);
+	    
+	    //{
+	//	    int loop=0;
+	//	    while(loop < iov[i].iov_len) {
+	//		    MessageFlush("%x ", iov[i].iov_base[loop]);
+	//		    loop++;
+	//	    }
+	  //  }
+	    
+	    size += iov[i].iov_len;
+	}
+
+	/* call the assembly routine to do the dirty work */
+	//Ipx_SendLow(size);
+	return size;
+#endif
 }
 #endif
 
@@ -605,13 +650,49 @@ NetWare_WriteV(int fd, struct iovec *iov, int iov_len)
 
 #ifdef _LINUX
 int Ipx_Check(void) {
-    return 0;
+    return 1;
 }
 
 void Ipx_Init(char *addr) {
+
+    /* open the socket here */
+    if(cmdLineSocket != -1) {
+	Message("Error: command line socket already open");
+    }
+    cmdLineSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);    
+
+    /* try connectiokn now */
+    if(cmdLineSocket != -1) {
+	    
+	struct sockaddr_in connectAddress;
+	int result;
+	
+	memset(&connectAddress, 0, sizeof(connectAddress));
+	
+	connectAddress.sin_family = AF_INET;
+	connectAddress.sin_port = htons(8079);
+	connectAddress.sin_addr.s_addr = inet_addr("127.0.0.1");
+
+	result =  connect(cmdLineSocket,
+	              (struct sockaddr *) &connectAddress, 
+	              sizeof(connectAddress));
+	if(result == 0) {
+		Message("connect success");
+		send(cmdLineSocket, "abcd", 4, 0);
+	} else {
+		Message("connect failed");
+		
+	}
+    }
+    else {
+	    
+	Message("Error: socket connection failed");
+    }
 }
 
 void Ipx_Exit(void) {
+
+    /* close the socket here */
 }
 
 void Ipx_CopyToSendBuffer(caddr_t a, int b, int c) {
@@ -621,11 +702,21 @@ void Ipx_SendLow(int a) {
 }
 
 int Ipx_CheckPacket(void) {
-return 0;
+	int count;
+	ioctl(cmdLineSocket, FIONREAD, &count);
+	//MessageFlush("read count %d\n", count);
+	    return count;
 }
 
 int Ipx_ReadLow(void *buf, int bufSize) {
-return 0;
+    
+	//MessageFlush("read1\n");
+    if(cmdLineSocket != -1) {
+	    int amount = recv(cmdLineSocket, buf, bufSize, 0);
+	    //MessageFlush("read %d\n", amount);
+    	return amount;
+    }
+    return -1;
 }
 
 #endif
