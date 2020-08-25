@@ -88,6 +88,7 @@ linuxOBJS      	= addch.o \
 		  refresh.o \
 		  scroll.o \
                   scrolnow.o \
+		  tstp.o \
 		  standout.o \
 		  tucholap.o \
 		  touchwin.o \
