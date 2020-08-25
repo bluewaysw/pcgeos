@@ -15,7 +15,7 @@ static char sccsid[] = "@(#)cr_tty.c	5.2 (Berkeley) 11/8/85";
 
 # include	"curses.ext"
 
-#if !defined(_MSDOS) && !defined(__WATCOMC__)
+#if !defined(_MSDOS) 
 static bool	*sflags[] = {
 			&AM, &BS, &DA, &DB, &EO, &HC, &HZ, &IN, &MI,
 			&MS, &NC, &NS, &OS, &UL, &XB, &XN, &XT, &XS,
@@ -49,7 +49,7 @@ short	ospeed = -1;
 static int	destcol, destline;
 
 gettmode() {
-
+#ifndef _LINUX
 	if (gtty(_tty_ch, &_tty) < 0)
 		return;
 	savetty();
@@ -62,6 +62,7 @@ gettmode() {
 	NONL = ((_tty.sg_flags & CRMOD) == 0);
 	_tty.sg_flags &= ~XTABS;
 	stty(_tty_ch, &_tty);
+#endif
 
 # ifdef DEBUG
 	fprintf(outf, "GETTMODE: UPPERCASE = %s\n", UPPERCASE ? "TRUE":"FALSE");

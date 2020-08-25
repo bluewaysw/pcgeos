@@ -23,13 +23,13 @@ WINDOW *
 initscr() {
 
 	reg char	*sp;
-	int		tstp();
+	void		tstp(int p);
 	int 		nfd;
 
 # ifdef DEBUG
 	fprintf(outf, "INITSCR()\n");
 # endif
-#if !defined(_MSDOS) && !defined(__WATCOMC__)
+#if !defined(_MSDOS)
 	if (My_term)
 		setterm(Def_term);
 	else {
