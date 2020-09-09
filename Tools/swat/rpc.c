@@ -2107,7 +2107,7 @@ RpcWait(int poll)
     DWORD		numRead;
 #endif
 
-#if defined(_MSDOS)
+#if defined(_MSDOS) || defined(_LINUX)
     Boolean		irqState;
 
     irqState = Ui_Interrupt();
@@ -2246,9 +2246,9 @@ RpcWait(int poll)
 	 * If Ctrl+C typed since we started looping, break out so we can
 	 * process it.
 	 */
-	/*if (Ui_Interrupt() != irqState) {
+	if (Ui_Interrupt() != irqState) {
 	    break;
-    	}*/
+    	}
 #elif defined(_MSDOS)
 	/*
 	 * In the DOS world, we only look for the keyboard and our serial

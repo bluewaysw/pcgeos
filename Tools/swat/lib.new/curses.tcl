@@ -875,7 +875,7 @@ See also:
 	} else {
 	    dss
 	}
-    	if {[string c ${file-os} unix] != 0} {
+    	#if {[string c ${file-os} unix] != 0} {
     	    # page down
             bind-key \321 [format {dss %d} [expr $numLines/2]]
        	    # arrow down
@@ -892,7 +892,7 @@ See also:
     	    bind-key \307 {dss 1 1}
     	    # end (end of file)
     	    bind-key \317 {dss 1000000}
-    	}
+    	#}
     	return $srcwindisp
     }
 }]

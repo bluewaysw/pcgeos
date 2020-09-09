@@ -897,7 +897,7 @@ Ibm86CurrentFrameCommon(Boolean	usePassedRegisters,
     }
 
     /* TODO check what goes wrong here */
-    /*Ibm_ReadRegister16 (REG_OTHER, (int)"xipPage", &curXIPPage);*/
+    Ibm_ReadRegister16 (REG_OTHER, (int)"xipPage", &curXIPPage);
     
     /*
      * Check for different thread, invalid top-most frame, sp changed

@@ -1224,9 +1224,11 @@ FileCacheSymDir(CONST char *sdfilename, char *name, char *result)
 				   SH_DENYWR, 0666);
 
 	if (returnCode == TRUE)	{
-	    (void)FileUtil_Seek(sdfile, -1L, SEEK_END);
+	    int pos = FileUtil_Seek(sdfile, -1L, SEEK_END);
 	    returnCode = FileUtil_Read(sdfile, lastBytes, 1, &bytesRead);
 	    if (returnCode == TRUE) {
+		(void)FileUtil_Seek(sdfile, pos + 1, SEEK_END);
+
 		if ((lastBytes[0] != '\n') && (bytesRead > 0)) {
 		    /*
 		     * if there isn't a newline at the end of the last line
@@ -1764,7 +1766,7 @@ FileSearchSymdirCache(CONST char **sdfilenamePtr,
     cp = FileSearchSymdirCacheInternal(sdfilename, name, want, check,
 				       serial, ignore, mode, NULL);
 
-#if defined(unix ) || defined(_WIN32)
+#if defined(unix) || defined(_WIN32) || defined(_LINUX)
     if ((ignore == NULL) || ((cp == NULL) && (! *ignore))) {
 	if (geodeType < fileNumTypes && fileDirs[geodeType*2+1]) {
 	    CONST char *sdf2 = File_PathConcat(fileDirs[geodeType*2+1],
@@ -1782,7 +1784,7 @@ FileSearchSymdirCache(CONST char **sdfilenamePtr,
 	    }
 	}
     }
-#endif /* unix || _WIN32 */
+#endif /* unix || _WIN32 || _LINUX */
 
     if (sdfilenamePtr) {
 	*sdfilenamePtr = sdfilename;

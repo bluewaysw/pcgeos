@@ -436,13 +436,16 @@ See also:\n\
 void
 UiInterrupt(void)
 {
-# if defined(_WIN32)   
+
+# if defined(_WIN32) || defined(_LINUX)
     /* 
      * need to remind _WIN32 to catch interrupt each time 
      */
     typedef void (*signal_func)(int) ;
     signal(SIGINT, (signal_func)UiInterrupt);
+# if defined(_WIN32)
     SetEvent(cntlcEvent);
+# endif
 # endif
     uiFlags |= UI_IRQ;
 }
@@ -916,11 +919,11 @@ Ui_Init(int 	*argcPtr,
     Boolean	returnCode;
 #endif
 
-#if defined(unix) || defined(_WIN32)
+#if defined(unix) || defined(_WIN32) || defined(_LINUX)
     typedef void (*signal_func)(int) ;
     signal(SIGINT, (signal_func)UiInterrupt);
-# if defined(unix)
-    signal(SIGQUIT, Ui_TopLevel);
+# if defined(unix) || defined(_LINUX)
+    signal(SIGQUIT, (signal_func)Ui_TopLevel);
 # endif
 #endif
 
@@ -958,9 +961,7 @@ Ui_Init(int 	*argcPtr,
     {
 	Shell_Init();
     } else {
-	/* TODO actually use curses */
-	/* Curses_Init(); */
-	Shell_Init();
+	Curses_Init();
     }
 #else
     Curses_Init();
