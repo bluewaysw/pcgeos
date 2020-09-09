@@ -219,7 +219,7 @@ _sprintw(WINDOW *win, const char *fmt, va_list args)
     char 	    	cfmt[64];   	/* Place to which to copy the format*/
     register const char	*cp;	    	/* Current position in fmt */
     const char		*cpStart;   	/* Start of unprocessed part of fmt */
-    char**		nextArgs;   	/* End of args for current char */
+    va_list		nextArgs;   	/* End of args for current char */
     bool 	  	fancy;
 
     cpStart = cp = fmt;
@@ -232,7 +232,7 @@ _sprintw(WINDOW *win, const char *fmt, va_list args)
 		waddch(win, *cpStart++);
 	    }
 	    cp++;
-	    nextArgs = args;
+	    va_copy(nextArgs, args);
 	    fancy = FALSE;
 	charswitch:
 	    switch(*cp) {
@@ -330,7 +330,7 @@ _sprintw(WINDOW *win, const char *fmt, va_list args)
 		break;
 	    }
 	    cpStart = cp;
-	    args = nextArgs;
+	    va_copy(args, nextArgs);
 	}
     }
     waddstr(win, (unsigned char *)cpStart);
