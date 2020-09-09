@@ -70,12 +70,16 @@ wprintw(WINDOW *win, char *fmt, ...)
  * will have to modify this routine to use the interface that your
  * "sprintf" uses.
  */
-my_snprintf(str, size, fmt, args)
+void my_snprintf(str, size, fmt, args)
     char    	*str;
     int	    	size;
     char    	*fmt;
     va_list 	args;
 {
+
+# if defined(sun) || defined(__HIGHC__) || defined(__WATCOMC__)
+    vsprintf(str, fmt, args);
+# else
     FILE	junk;
 
     junk._flag = _IOWRT + _IOSTRG;
@@ -85,12 +89,7 @@ my_snprintf(str, size, fmt, args)
 #endif
     junk._cnt = size-1;
     junk._file = -1;
-
-# if defined(sun) || defined(__HIGHC__) || defined(__WATCOMC__)
-    vfprintf(&junk, fmt, args);
-# else
     _doprnt(fmt, args, &junk);
-# endif
 
     /*
      * Null-terminate, upping _cnt in case vfprintf filled up all the space
@@ -99,9 +98,10 @@ my_snprintf(str, size, fmt, args)
      */
     junk._cnt++;
     putc('\0', &junk);
+# endif
 }
 
-_sprintw(win, fmt, args)
+int _sprintw(win, fmt, args)
     WINDOW	*win;
     char	*fmt;
     va_list	args;
@@ -110,7 +110,7 @@ _sprintw(win, fmt, args)
     char    	    	cfmt[64];   	/* Place to which to copy the format */
     register char	*cp;	    	/* Current position in fmt */
     char		*cpStart;   	/* Start of unprocessed part of fmt */
-    char**		nextArgs;   	/* End of args for current char */
+    va_list		nextArgs;   	/* End of args for current char */
     bool 	  	fancy;
 
     cpStart = cp = fmt;
@@ -123,7 +123,7 @@ _sprintw(win, fmt, args)
 		waddch(win, *cpStart++);
 	    }
 	    cp++;
-	    nextArgs = args;
+	    va_copy(nextArgs, args);
 	    fancy = FALSE;
 	charswitch:
 	    switch(*cp) {
@@ -222,7 +222,7 @@ _sprintw(win, fmt, args)
 		    break;
 	    }
 	    cpStart = cp;
-	    args = nextArgs;
+	    va_copy(args, nextArgs);
 	}
     }
     waddstr(win, cpStart);

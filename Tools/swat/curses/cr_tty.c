@@ -16,6 +16,8 @@ static char sccsid[] = "@(#)cr_tty.c	5.2 (Berkeley) 11/8/85";
 # include	"curses.ext"
 
 #if !defined(_MSDOS) 
+#include <sys/ioctl.h>
+
 static bool	*sflags[] = {
 			&AM, &BS, &DA, &DB, &EO, &HC, &HZ, &IN, &MI,
 			&MS, &NC, &NS, &OS, &UL, &XB, &XN, &XT, &XS,

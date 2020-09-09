@@ -173,7 +173,7 @@ int	__void__;
 #define baudrate()	(_tty.sg_ospeed)
 
 #else
-#define erasechar() 	('H' & 0x1f)
+#define erasechar() 	(0x7f)
 #define killchar()  	('X' & 0x1f)
 #define echo() 	    	(_echoit = TRUE)
 #define noecho()    	(_echoit = FALSE)
