@@ -3248,6 +3248,7 @@ CursesCheckKeyBinding(unsigned char c)
     return 1;
 }
 
+#if defined(unix) || defined(_LINUX)
 int getch2() {
    static int ch=-1, fd=0;
    struct termios new, old;
@@ -3260,6 +3261,7 @@ int getch2() {
    tcsetattr(fd, TCSANOW, &old);
    return ch;
 }
+#endif
 
 /***********************************************************************
  *				CursesReadInput
