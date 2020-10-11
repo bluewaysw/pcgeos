@@ -29,7 +29,11 @@
 #define FP_MIN_STACK_ELEMENTS	5
 #define FP_MIN_STACK_SIZE   	(FP_MIN_STACK_ELEMENTS*FPSIZE)
 
+#ifdef __WATCOMC__
+#define	FP_NAN	    	    	0x07ff
+#else
 #define	FP_NAN	    	    	0x7fff
+#endif
 
 #define MAX_DIGITS_FOR_NORMAL_NUMBERS		DECIMAL_PRECISION
 #define MAX_CHARS_FOR_COMMAS_IN_NORMAL_NUMBERS	(DECIMAL_PRECISION / 3 + 1)
@@ -119,8 +123,13 @@
  *	FloatExponent	record
  */
 typedef WordFlags FloatExponent;
+#ifdef __WATCOM__
+#define	FE_SIGN		0x0800		
+#define	FE_EXPONENT	0x07ff
+#else
 #define	FE_SIGN		0x8000		
 #define	FE_EXPONENT	0x7fff
+#endif
 
 typedef struct {
 	word	F_mantissa_wd0;	
@@ -140,7 +149,11 @@ typedef struct {
 	word 	IEEE64F_word4;	
 } IEEE64FloatNum;
 
+#ifdef __WATCOM__
+#define FLOAT_EXPONENT(x) (((IEEE64FloatNum *)x)->IEEE64F_word4 >> 4)
+#else
 #define FLOAT_EXPONENT(x) (((FloatNumStruct *)x)->F_exponent)
+#endif
 
 typedef double IEEE64Number;
 typedef long double FloatNumber;
@@ -442,20 +455,6 @@ extern word _pascal FloatLt0(void);
 extern word _pascal FloatGt0(void);
 
 
-/****************************************************
-  	    stack manipulation routines
-*****************************************************/
-extern word _pascal FloatPushNumber(FloatNum *number);
-extern word _pascal FloatPopNumber(FloatNum *number);
-extern void _pascal FloatRoll(word num);
-extern void _pascal FloatRollDown(word num);
-extern void _pascal FloatPick(word num);
-extern void _pascal FloatSwap(void);
-extern void _pascal FloatOver(void);
-extern void _pascal FloatSetStackPointer(word newValue);
-extern int _pascal FloatGetStackPointer(void);
-
-
 /***************************************************************
   conversion routines to and from different formats of numbers
 
@@ -474,6 +473,29 @@ extern void _pascal FloatIEEE32ToGeos80(float *num);
 extern void _pascal FloatDwordToFloat(long num);
 extern void _pascal FloatWordToFloat(word num);
 extern long _pascal FloatFloatToDword(void);
+
+
+/****************************************************
+  	    stack manipulation routines
+*****************************************************/
+#ifdef __WATCOMC__
+inline word FloatPushNumber(FloatNum *number) {
+    FloatIEEE64ToGeos80((double *) number); return 0;
+}
+inline word FloatPopNumber(FloatNum *number) {
+    FloatGeos80ToIEEE64((double *) number); return 0;
+}
+#else
+extern word _pascal FloatPushNumber(FloatNum *number);
+extern word _pascal FloatPopNumber(FloatNum *number);
+#endif
+extern void _pascal FloatRoll(word num);
+extern void _pascal FloatRollDown(word num);
+extern void _pascal FloatPick(word num);
+extern void _pascal FloatSwap(void);
+extern void _pascal FloatOver(void);
+extern void _pascal FloatSetStackPointer(word newValue);
+extern int _pascal FloatGetStackPointer(void);
 
 
 /******************************************************
