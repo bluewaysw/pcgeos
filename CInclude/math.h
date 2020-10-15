@@ -444,17 +444,6 @@ extern void _pascal FloatInit(word stackSize, FloatStackType stackType);
 extern void _pascal FloatExit(void);
 
 
-/*****************************************************
-  	comparison routines
-******************************************************/
-extern word _pascal FloatComp(void);
-extern word _pascal FloatCompAndDrop(void);
-extern word _pascal FloatCompESDI(FloatNum *);
-extern word _pascal FloatEq0(void);
-extern word _pascal FloatLt0(void);
-extern word _pascal FloatGt0(void);
-
-
 /***************************************************************
   conversion routines to and from different formats of numbers
 
@@ -514,6 +503,7 @@ extern void _pascal Float16384(void);
 extern void _pascal Float86400(void);
 extern void _pascal FloatPi(void);
 extern void _pascal FloatPiDiv2(void);
+
 
 /********************************************************
   	    miscellaneous math routines
@@ -575,6 +565,26 @@ extern void _pascal FloatTrunc(void);
 extern void _pascal FloatEpsilon (void);
 
 
+/*****************************************************
+  	comparison routines
+******************************************************/
+extern word _pascal FloatComp(void);
+extern word _pascal FloatCompAndDrop(void);
+#ifdef __WATCOM__
+inline word FloatCompESDI(FloatNum* number) {
+    word result;
+    FloatPushNumber(number); 
+    result = FloatComp();
+    FloatDrop(); 
+    return result;
+}
+#else
+extern word _pascal FloatCompESDI(FloatNum *number);
+#endif
+extern word _pascal FloatEq0(void);
+extern word _pascal FloatLt0(void);
+extern word _pascal FloatGt0(void);
+
 
 /********************************************************
   	    number string routines
@@ -605,10 +615,7 @@ extern Boolean 	/* XXX */
 ;	are "huge" otherwise.
 ;
 ;*****************************************************************************/
-extern word /* XXX */
-    _pascal FloatFloatToAscii_StdFormat(char *string, FloatNum *number,
-				FloatFloatToAsciiFormatFlags format,
-				word numDigits, word numFractionalDigits);
+
 extern word /* XXX */
     _pascal FloatFloatToAscii(FFA_stackFrame *stackFrame, char *resultString, 
 				FloatNum *number);
@@ -617,6 +624,16 @@ extern word /* XXX */
     _pascal FloatFloatIEEE64ToAscii_StdFormat(char *string, IEEE64FloatNum number,
 				FloatFloatToAsciiFormatFlags format,
 				word numDigits, word numFractionalDigits);
+
+#ifdef __WATCOMC__
+inline word FloatFloatToAscii_StdFormat(char *string, FloatNum *number,
+				FloatFloatToAsciiFormatFlags format, word numDigits, word numFractionalDigits) {
+    return loatFloatToAscii_StdFormat(string, *((IEEE64FloatNum*) number), format, numDigits, numFractionalDigits);
+                }
+#elif
+extern word _pascal FloatFloatToAscii_StdFormat(char *string, FloatNum *number,
+				FloatFloatToAsciiFormatFlags format, word numDigits, word numFractionalDigits);
+#endif
 
 extern void _pascal FloatTimeNumberGetSeconds(void);
 extern word	/*XXX*/
