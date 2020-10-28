@@ -20,7 +20,7 @@
 #
 # PROTO_CONFIG_ALLOWED:
 #  Definiting this flag allows configuration of the driver at the protocol
-#  levels.  
+#  levels.
 #
 # MERGE_TCP_SEGMENTS:
 #  Defining this flags allows TCP packets that will be placed in the
@@ -37,13 +37,13 @@
 #  when this flag is used alone.
 #
 # LOG_STATS:
-#  This flags causes the protocols to keep track of statistics and 
+#  This flags causes the protocols to keep track of statistics and
 #  write them to the log file when the driver is exited.
 #
 # LOG_HDRS:
 #  This flag causes the packet headers of incoming and outgoing packets
 #  to be written to the log file.
-#  
+#
 # LOG_DATA:
 #  This flag causes the contents of the packets to also be written to
 #  the log file.  Must be used in conjunction with LOG_HDRS.  If data
@@ -51,8 +51,8 @@
 #  be better not to use this flag.
 #
 # LOG_EVENTS:
-#  This flag causes actions performed by the driver to be logged, e.g. 
-#  dropping a packet, fragmenting a packet, dropping duplicate bytes, 
+#  This flag causes actions performed by the driver to be logged, e.g.
+#  dropping a packet, fragmenting a packet, dropping duplicate bytes,
 #  timeouts, etc.
 #
 
@@ -107,7 +107,3 @@ ASMFLAGS    += -DSTATIC_LINK_RESOLVER
 LINKFLAGS   += -DSTATIC_LINK_RESOLVER
 
 #include <$(SYSMAKEFILE)>
-
-
-
-

@@ -32,9 +32,9 @@
  *
  * DESCRIPTION:
  *	Microsoft Point-to-Point Compression (MPPC) Protocol.
- *	This is based on Stac LZS.  
+ *	This is based on Stac LZS.
  *
- * 	A license from Stac Electronics is required before this 
+ * 	A license from Stac Electronics is required before this
  *	code may be used.
  *
  * 	$Id: c_mppc.c,v 1.2 98/06/15 13:56:43 jwu Exp $
@@ -58,12 +58,15 @@
 #ifdef __BORLANDC__
 #pragma codeseg MPPCCODE
 #endif
+#ifdef __WATCOMC__
+#pragma code_seg("MPPCCODE")
+#endif
 
 /*
- * MPPC overhead per PPP packet: 
- *	2 bytes for coherency count & flags 
+ * MPPC overhead per PPP packet:
+ *	2 bytes for coherency count & flags
  */
-#define MPPC_OVHD   2	    
+#define MPPC_OVHD   2
 #define MPPC_DATA_OFFSET    MPPC_OVHD
 
 struct mppc_db
@@ -96,7 +99,7 @@ ReservationHandle   mppc_decompSpaceToken = 0;	/* decompression */
  * CALLED BY:	ccp_down
  * RETURN:	nothing
  *
- * STRATEGY:	Free the blocks holding the compression tables, if 
+ * STRATEGY:	Free the blocks holding the compression tables, if
  *		they exist.
  *
  * REVISION HISTORY:
@@ -156,7 +159,7 @@ void mppc_down (int unit)
 int mppc_resetcomp (int unit)
 {
     struct mppc_db *db;
-    
+
     LOG3(LOG_BASE, (LOG_MPPC_RESETCOMP));
 
     MemLock(mppc_tx_db);
@@ -170,7 +173,7 @@ int mppc_resetcomp (int unit)
 
     MemUnlock(db -> history);
     MemUnlock(mppc_tx_db);
-    
+
     return (0);			/* no acks needed for MPPC */
 }	/* mppc_resetcomp */
 
@@ -189,10 +192,10 @@ int mppc_resetcomp (int unit)
  *	jwu	9/23/97		Initial Revision
  *
  ***********************************************************************/
-void mppc_resetdecomp (int unit) 
+void mppc_resetdecomp (int unit)
 {
     struct mppc_db *db;
-    
+
     LOG3(LOG_BASE, (LOG_MPPC_RESETDECOMP));
 
     MemLock(mppc_rx_db);
@@ -204,7 +207,7 @@ void mppc_resetdecomp (int unit)
 
     MemUnlock(db -> history);
     MemUnlock(mppc_rx_db);
-    
+
 }	/* mppc_resetdecomp */
 
 
@@ -216,7 +219,7 @@ void mppc_resetdecomp (int unit)
  * RETURN:	0 if successful
  *		-1 if unable to allocate memory for compression history
  *
- * STRATEGY:	If db not allocated, do so now, returning error if 
+ * STRATEGY:	If db not allocated, do so now, returning error if
  *		insufficient memory.
  *		Reset compression history.
  *
@@ -226,16 +229,16 @@ void mppc_resetdecomp (int unit)
  *	jwu	9/23/97		Initial Revision
  *
  ***********************************************************************/
-int mppc_initcomp (int unit, 
-		   int mru) 
+int mppc_initcomp (int unit,
+		   int mru)
 {
     unsigned short histSize;
     Handle hBlock = 0;
     struct mppc_db *db;
 
-    /* 
-     * If MPPC compression history hasn't been allocated yet, 
-     * do so now.  Return error if insufficient memory.  
+    /*
+     * If MPPC compression history hasn't been allocated yet,
+     * do so now.  Return error if insufficient memory.
      */
     if (mppc_tx_db == 0) {
 	mppc_tx_db = MemAlloc(sizeof (struct mppc_db), HF_DYNAMIC,
@@ -244,7 +247,7 @@ int mppc_initcomp (int unit,
 	    LOG3(LOG_BASE, (LOG_MPPC_NO_MEM, "mppc"));
 	    return (-1);
 	}
-	
+
 	histSize = MPPC_SizeOfCompressionHistory();
 	mppc_compSpaceToken = GeodeRequestSpace((histSize + 1023)/1024,
 						SysGetInfo(SGIT_UI_PROCESS));
@@ -276,7 +279,7 @@ int mppc_initcomp (int unit,
     SetInterfaceMTU(mru - MPPC_OVHD);
 
     return (0);
-    
+
 }	/* mppc_initcomp */
 
 
@@ -301,8 +304,8 @@ int mppc_initcomp (int unit,
  *	jwu	9/23/97		Initial Revision
  *
  ***********************************************************************/
-int mppc_initdecomp (int unit, 
-		     int mru) 
+int mppc_initdecomp (int unit,
+		     int mru)
 {
     unsigned short histSize;
     Handle hBlock = 0;
@@ -313,7 +316,7 @@ int mppc_initdecomp (int unit,
      * so now.  Return error if insufficient memory.
      */
     if (mppc_rx_db == 0) {
-	
+
 	mppc_rx_db = MemAlloc(sizeof (struct mppc_db), HF_DYNAMIC,
 			      HAF_ZERO_INIT | HAF_LOCK);
 	if (mppc_rx_db == 0) {
@@ -345,7 +348,7 @@ int mppc_initdecomp (int unit,
 	db -> history = hBlock;
 
     db -> mru = mru;
-    
+
     MemUnlock(mppc_rx_db);
 
     mppc_resetdecomp(0);
@@ -371,14 +374,14 @@ int mppc_initdecomp (int unit,
  *		    reset history
  *		    set bit A
  *		    store uncompressed proto & original data in new buffer
- *		else 
+ *		else
  *		    set compressed bit in flag
  *		    store coherency count, incrementing count and
  *		    adjusting flags as needed
  *		    adjust packet header dataOffset and dataSize fields
  *		    free original packet and set return values
  *		return success
- * 
+ *
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -448,13 +451,13 @@ int mppc_comp (int unit,
      */
     srcPtr = c_proto;
     srcLen = (unsigned long)proto_len;
-    result = MPPC_Compress(&srcPtr, &destPtr, &srcLen, &destLen, history, 
+    result = MPPC_Compress(&srcPtr, &destPtr, &srcLen, &destLen, history,
 			   (MPPC_SAVE_HISTORY | MPPC_MANDATORY_COMPRESS_FLAGS),
 			   MPPC_PERFORMANCE_MODE_0);
-    
+
     EC_ERROR_IF (result & MPPC_INVALID, -1);
     EC_ERROR_IF ((result & MPPC_SOURCE_EXHAUSTED) == 0, -1);
-    
+
     srcPtr = PACKET_DATA(*packetp);
     srcLen = len;
     result = MPPC_Compress(&srcPtr, &destPtr, &srcLen, &destLen, history,
@@ -466,8 +469,8 @@ int mppc_comp (int unit,
     if (result & MPPC_EXPANDED) {
 	/*
 	 * Data expanded. Original data is sent as an uncompressed MPPC
-	 * packet.  Store protocol field and copy original data to the	
-	 * new buffer.  History has already been flushed by MPPC library.   
+	 * packet.  Store protocol field and copy original data to the
+	 * new buffer.  History has already been flushed by MPPC library.
 	 */
 	srcPtr = PACKET_DATA(*packetp);
 	cp_buf[2] = proto >> 8;
@@ -475,16 +478,16 @@ int mppc_comp (int unit,
 	memcpy(&cp_buf[4], srcPtr, len);
 	destLen = len + 2;		/* original length + protocol field */
 	LOG3(LOG_BASE, (LOG_MPPC_EXPANDED));
-	
+
 	/*
 	 * Next packet must set the flushed bit.
 	 */
-	db -> flags |= MPPC_PACKET_FLUSHED;	
-    } 
+	db -> flags |= MPPC_PACKET_FLUSHED;
+    }
     else if (result & (MPPC_SOURCE_EXHAUSTED | MPPC_FLUSHED)) {
 	/*
 	 * Packet was compressed.  Compute compressed length and
-	 * set bits.  
+	 * set bits.
 	 */
 	destLen = (unsigned long)(MAX_MTU - MPPC_OVHD) - destLen;
 
@@ -493,9 +496,9 @@ int mppc_comp (int unit,
 	if (result & MPPC_RESTART_HISTORY) {
 	    LOG3(LOG_BASE, (LOG_MPPC_RESTART_HISTORY));
 
-	    /* 
+	    /*
 	     * MPPC library flushed history before restarting it
-	     * to work around a NT Server bug.  We don't need 
+	     * to work around a NT Server bug.  We don't need
 	     * to set flushed bit because packet is always
 	     * decompressible as long as history ptrs are reset
 	     * after history is flushed.
@@ -503,10 +506,10 @@ int mppc_comp (int unit,
 	    flags |= MPPC_PACKET_AT_FRONT;		/*  bit B */
 	}
 
-	/* 
-	 * Clear flushed bit for next time. 
+	/*
+	 * Clear flushed bit for next time.
 	 */
-	db -> flags = 0;	    
+	db -> flags = 0;
 
     }
     /*
@@ -524,7 +527,7 @@ int mppc_comp (int unit,
 	db -> count = 0;
 
     compr_m -> MH_dataSize = destLen + MPPC_OVHD;
-     
+
     /*
      * Free original packet and set return values.
      */
@@ -556,7 +559,7 @@ int mppc_comp (int unit,
  *		table.
  *
  * STRATEGY:	Do sequence number check on coherency count.
- *		If data not compressed, extract protocol and adjust 
+ *		If data not compressed, extract protocol and adjust
  *		    header, then deliver.
  *		Alloc buffer for decompressed data
  *		Decompress packet
@@ -584,7 +587,7 @@ int mppc_decomp (int unit,
     PACKET *dmsg = (PACKET *)NULL;	/* packet for decompressed data */
     unsigned char *srcPtr, *destPtr;
     unsigned long srcLen, destLen;
-    unsigned short result;		
+    unsigned short result;
 
     /*
      * Set up pointers, etc.
@@ -597,14 +600,14 @@ int mppc_decomp (int unit,
     srcPtr = PACKET_DATA(p);
 
     /*
-     * Get the coherency count.  
+     * Get the coherency count.
      */
     GETSHORT(ccount, srcPtr);
     len -= 2;
 
     /*
      * If flushed bit set, resynchronize coherency count to the
-     * received value in the packet, stop resetting & flush history.  
+     * received value in the packet, stop resetting & flush history.
      * If not set, count must match or packet is bad.
      */
     if (ccount & MPPC_PACKET_FLUSHED) {
@@ -622,10 +625,10 @@ int mppc_decomp (int unit,
     /*
      * Handle coherency count wrapping around.
      */
-    if (db -> count & COHERENCY_FLAGS_MASK)	
+    if (db -> count & COHERENCY_FLAGS_MASK)
 	db -> count = 0;
 
-    /* 
+    /*
      * If packet data is not compressed, extract protocol,
      * adjust packet header to exclude check field and protocol,
      * then deliver.
@@ -641,13 +644,13 @@ int mppc_decomp (int unit,
     }
 
 #ifdef LOGGING_ENABLED
-    if (ccount & MPPC_PACKET_AT_FRONT) 
+    if (ccount & MPPC_PACKET_AT_FRONT)
 	LOG3(LOG_BASE, (LOG_MPPC_DECOMP_HISTORY_RESTARTED));
 #endif /* LOGGING_ENABLED */
 
     /*
      * Allocate a new buffer for decompresssed data.  Must leave room
-     * for VJ uncompression code to prepend 128 (MAX_HDR) bytes of 
+     * for VJ uncompression code to prepend 128 (MAX_HDR) bytes of
      * header.  sl_uncompress_tcp code expects this.
      */
     if ((dmsg = PACKET_ALLOC(MAX_HDR + MAX_MTU)) == 0) {
@@ -668,18 +671,18 @@ int mppc_decomp (int unit,
     srcLen = (unsigned long)len;
     result = MPPC_Decompress(&srcPtr, &destPtr, &srcLen, &destLen, history,
 		    (ccount & MPPC_PACKET_AT_FRONT) ?
-	            (MPPC_RESTART_HISTORY | MPPC_MANDATORY_DECOMPRESS_FLAGS) : 
+	            (MPPC_RESTART_HISTORY | MPPC_MANDATORY_DECOMPRESS_FLAGS) :
 		     MPPC_MANDATORY_DECOMPRESS_FLAGS);
-    
+
     PACKET_FREE(p);	    /* free compressed packet */
 
-    if ((result & (MPPC_SOURCE_EXHAUSTED | MPPC_FLUSHED)) == 0)	{	
+    if ((result & (MPPC_SOURCE_EXHAUSTED | MPPC_FLUSHED)) == 0)	{
 	LOG3(LOG_BASE, (LOG_MPPC_DECOMP_FAILED));
 	goto bad2;
     }
 
     /*
-     * Compute size of decompressed data.  destLen contains remaining 
+     * Compute size of decompressed data.  destLen contains remaining
      * space in destination buffer.
      */
     len = (int)((unsigned long)MAX_MTU - destLen);

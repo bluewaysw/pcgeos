@@ -2,7 +2,7 @@
 
 	Copyright (c) Geoworks 1994 -- All Rights Reserved
 
-PROJECT:	Socket 
+PROJECT:	Socket
 MODULE:		TCP/IP Driver
 FILE:		tcpip.goc
 
@@ -15,7 +15,7 @@ ROUTINES:
 	TcpipConfigureProtocols If protocol level configuration is allowed,
 	    	    	    	this routine reads settings from INI file
 				to alter the behaviour of the protocol.
-	    	    	    	
+
 
 REVISION HISTORY:
 	Name		Date		Description
@@ -48,7 +48,7 @@ DESCRIPTION:
 
 /*---------------------------------------------------------------------------*
  *		     Class & Message Definitions
- *  
+ *
  *  The driver has its own thread for processing events.  Routines for the
  *  driver's interface will usually do some small bookkeeping and then queue
  *  the event for the driver to process.  The TcpipProcessClass is created
@@ -72,7 +72,7 @@ DESCRIPTION:
  */
 @message void MSG_TCPIP_RESET_CONNECTION(word connection = cx, word error = dx);
 
-/* 
+/*
  * Start the process to open a connection requested by the peer.
  */
 @message void MSG_TCPIP_ACCEPT_CONNECTION(word connection = cx);
@@ -87,7 +87,7 @@ DESCRIPTION:
  */
 @message word MSG_TCPIP_SEND_DATAGRAM(word link = cx, optr buffer = dx:bp) = ax;
 
-/* 
+/*
  * Process incoming data from the network.
  */
 @message void MSG_TCPIP_RECEIVE_DATA();
@@ -129,6 +129,9 @@ DESCRIPTION:
 #ifdef __BORLANDC__
 #pragma codeseg TCPCODE
 #endif
+#ifdef __WATCOMC__
+#pragma code_seg("TCPCODE")
+#endif
 
 /*--------------------------------------------------------------------------*
  *			       Methods
@@ -139,35 +142,35 @@ DESCRIPTION:
 		      MSG_TCPIP_OPEN_CONNECTION
 ---------------------------------------------------------------------------
 SYNOPSIS:	Start the process required to open a connection.
- 
+
 PASS:		connection	= handle of connection to open
- 
+
 RETURN:		nothing
 
 SIDE EFFECTS:	Initiates TCP protocol for establishing a connection.
- 
+
 STRATEGY:
 		initialize tcp template header
 		set tcp state to SYN_SENT
 		initialize keep alive timer
 		initialize initial send sequence # and relatives
-		call the TCP output function 
- 
+		call the TCP output function
+
 REVISION HISTORY:
  	Name	Date		Description
  	----	----		-----------
  	jwu	7/ 6/94   	Initial Revision
- 
+
 ---------------------------------------------------------------------------*/
 @method TcpipProcessClass, MSG_TCPIP_OPEN_CONNECTION
 {
 	optr tp;
 	struct tcpcb *tcb;
-	
+
 	if ((tp = TSocketToTCB(connection)) != 0) {
 	    TcpipLock(OptrToHandle(tp));
 	    tcb = (struct tcpcb *)LMemDeref(tp);
-	
+
 	    /*
 	     *  Set TCP state to SYN_SENT, initialize keep alive timer,
 	     *  initialize send sequence # and related numbers.
@@ -194,53 +197,53 @@ REVISION HISTORY:
 			     MSG_TCPIP_CLOSE_CONNECTION
 ---------------------------------------------------------------------------
 SYNOPSIS:	Start the process to close a connection.
-   
+
 PASS:		connection = handle of connection to close
 
 RETURN:		nothing
-   
+
 SIDE EFFECTS:	Initiates TCP protocol for closing a connection.
- 
+
 STRATEGY:
-		if we never got a SYN, just wake up waiter so 
+		if we never got a SYN, just wake up waiter so
 			close can continue
 		if we got a SYN from the peer but haven't sent FIN,
 			go to FIN_WAIT_1
 		if already got a FIN, go to LAST_ACK state
-		
+
 		In all other cases, we have already sent FIN to peer
-		and just have to wait for peer to send FIN or not 
+		and just have to wait for peer to send FIN or not
 		respond to keep-alives.
 REVISION HISTORY:
  	Name	Date		Description
  	----	----		-----------
  	jwu	7/ 6/94   	Initial Revision
- 
+
 -------------------------------------------------------------------------*/
 @method TcpipProcessClass, MSG_TCPIP_CLOSE_CONNECTION
 {
 	optr tp;
 	struct tcpcb *tcb;
-	
+
 	if ((tp = TSocketToTCB(connection)) != 0) {
 	    TcpipLock(OptrToHandle(tp));
 	    tcb = (struct tcpcb *)LMemDeref(tp);
 
 	    switch(tcb->t_state) {
-	
+
 	    	case TCPS_CLOSED:
 	    	case TCPS_LISTEN:
 	    	case TCPS_SYN_SENT:
 		    LOG_STATE(TCPS_CLOSED);
 		    tcb->t_state = TCPS_CLOSED;
 		    /*
-		     * Notify socket level that disconnection is complete so 
+		     * Notify socket level that disconnection is complete so
 		     * waiter can be awoken and socket destroyed.
 		     */
 		    TcpipUnlock(OptrToHandle(tp));
 		    TSocketIsDisconnected(connection, 0, SCT_FULL, TRUE);
 		    return;
-	
+
 		case TCPS_SYN_RECEIVED:
 		case TCPS_ESTABLISHED:
 		    LOG_STATE(TCPS_FIN_WAIT_1);
@@ -268,29 +271,29 @@ REVISION HISTORY:
 			     MSG_TCPIP_RESET_CONNECTION
 ---------------------------------------------------------------------------
 SYNOPSIS:	Start the process to reset a connection.
-   
+
 PASS:		connection = handle of connection to reset.
                 error      = SocketDrError
 		    	      (SDE_CONNECTION_RESET, possibly or-ed with
 			       SpecSocketDrError from link driver)
 
 RETURN:		nothing
-   
+
 SIDE EFFECTS:	Initiates TCP protocol for resetting a connection.
- 
+
 STRATEGY:
-		if have received SYN, set state to CLOSED and 
+		if have received SYN, set state to CLOSED and
 			call tcp output routine
 		wake up waiter now that reset has been sent
 		connection will be destroyed when waiter awakes
-		
+
 		calling	TcpDrop should take care of the above...
 
 REVISION HISTORY:
  	Name	Date		Description
  	----	----		-----------
  	jwu	7/ 6/94   	Initial Revision
- 
+
 -------------------------------------------------------------------------*/
 @method TcpipProcessClass, MSG_TCPIP_RESET_CONNECTION
 {
@@ -300,9 +303,9 @@ REVISION HISTORY:
 	if ((tp = TSocketToTCB(connection)) != 0) {
 	    TcpipLock(OptrToHandle(tp));
 	    tcb = (struct tcpcb *)LMemDeref(tp);
-	
-	    /* 
-	     * If rejecting a requested connection, update TCB state. 
+
+	    /*
+	     * If rejecting a requested connection, update TCB state.
 	     */
 	    if (tcb->t_state == TCPS_LISTEN) {
 		LOG_STATE(TCPS_SYN_RECEIVED);
@@ -312,54 +315,54 @@ REVISION HISTORY:
 	    TcpipUnlock(OptrToHandle(tp));
 	    TcpDrop(connection, tp, error);
 	}
-	
+
 }	/* End of MSG_TCPIP_RESET_CONNECTION.	*/
 
 
 /*-------------------------------------------------------------------------
 			     MSG_TCPIP_ACCEPT_CONNECTION
 ---------------------------------------------------------------------------
-SYNOPSIS:	Start the process to open a connection requested by the 
+SYNOPSIS:	Start the process to open a connection requested by the
 		peer.
-   
+
 PASS:		connection	= connection to open
 
 RETURN:		nothing
-   
-SIDE EFFECTS:	Initiates TCP protocol for responding to a connection 
+
+SIDE EFFECTS:	Initiates TCP protocol for responding to a connection
 		request.
- 
+
 STRATEGY:
 		Initialize tcp template header
 		set tcp state to SYN_RECEIVED
 		initialize keep alive timer
-		initialize initial send sequence # and relatives		
+		initialize initial send sequence # and relatives
 		call the TCP output function
-	 
+
 
 REVISION HISTORY:
  	Name	Date		Description
  	----	----		-----------
  	jwu	7/ 6/94   	Initial Revision
- 
+
 -------------------------------------------------------------------------*/
 @method TcpipProcessClass, MSG_TCPIP_ACCEPT_CONNECTION
 {
-	
+
 	optr tp;
 	struct tcpcb *tcb;
-	
+
 	if ((tp = TSocketToTCB(connection)) != 0) {
 	    TcpipLock(OptrToHandle(tp));
 	    tcb = (struct tcpcb *)LMemDeref(tp);
-	
+
 	    /*
 	     * If tcp state is still closed, then that means connection
 	     * was discarded.
 	     */
 	    if (tcb->t_state == TCPS_CLOSED) {
 		TcpipUnlock(OptrToHandle(tp));
-		TSocketIsDisconnected(connection, SDE_CONNECTION_TIMEOUT, 
+		TSocketIsDisconnected(connection, SDE_CONNECTION_TIMEOUT,
 				     SCT_FULL, TRUE);
 		return;
 	    }
@@ -389,20 +392,20 @@ REVISION HISTORY:
 			     MSG_TCPIP_SEND_DATA
 ---------------------------------------------------------------------------
 SYNOPSIS:	Process outgoing data for a connection.
-   
+
 PASS:		connection	= connection to with data to be sent
 		mode		= SocketSendMode
 
 RETURN:		word            = SocketDrError
-   
+
 STRATEGY:
 		call the tcp output routine
-  
+
 REVISION HISTORY:
  	Name	Date		Description
  	----	----		-----------
  	jwu	7/ 6/94   	Initial Revision
- 
+
 -------------------------------------------------------------------------*/
 @method TcpipProcessClass, MSG_TCPIP_SEND_DATA
 {
@@ -412,15 +415,15 @@ REVISION HISTORY:
         if (!tp) return SDE_CONNECTION_RESET;
 
 	switch (mode) {
-	   
+
 	   case SSM_NORMAL:
 		(void)TcpOutput(tp, connection);
 	   	break;
-	   
+
 	   case SSM_URGENT:
 	   {
 		struct tcpcb *tcb;
-		
+
 		TcpipLock(OptrToHandle(tp));
 		tcb = (struct tcpcb *)LMemDeref(tp);
 
@@ -431,7 +434,7 @@ REVISION HISTORY:
 		tcb->t_force = 1;
 		TcpipUnlock(OptrToHandle(tp));
 		(void)TcpOutput(tp, connection);
-		
+
 		/*
 		 * Clear force flag.
 		 */
@@ -451,12 +454,12 @@ REVISION HISTORY:
 			     MSG_TCPIP_SEND_DATAGRAM
 ---------------------------------------------------------------------------
 SYNOPSIS:	Send a datagram.
-   
+
 PASS:		link	= link domain handle
 		buffer	= optr of data buffer
 
 RETURN:		word 	= SocketDrError
-   
+
 STRATEGY:
 		get the local address for the link
   		call the UDP output routine
@@ -464,11 +467,11 @@ REVISION HISTORY:
  	Name	Date		Description
  	----	----		-----------
  	jwu	10/11/94   	Initial Revision
- 
+
 -------------------------------------------------------------------------*/
 @method TcpipProcessClass, MSG_TCPIP_SEND_DATAGRAM
 {
-	return (UdpOutput(buffer, LinkGetLocalAddr(link), link));	     
+	return (UdpOutput(buffer, LinkGetLocalAddr(link), link));
 
 }	/* End of MSG_TCPIP_SEND_DATAGRAM.	*/
 
@@ -479,14 +482,14 @@ REVISION HISTORY:
 			     MSG_TCPIP_RECEIVE_DATA
 ---------------------------------------------------------------------------
 SYNOPSIS:	Process incoming data from the network.
-   
+
 PASS:		nothing
 
 RETURN:		nothing
-   
+
 SIDE EFFECTS:	data buffer will be freed after data has been passed
 		to the socket library
- 
+
 STRATEGY:   	Increment input counter to allow another packet to
                   be processed
 		call IpInput and let that handle it
@@ -495,7 +498,7 @@ REVISION HISTORY:
  	Name	Date		Description
  	----	----		-----------
  	jwu	7/ 6/94   	Initial Revision
- 
+
 -------------------------------------------------------------------------*/
 @method TcpipProcessClass, MSG_TCPIP_RECEIVE_DATA
 {
@@ -509,10 +512,13 @@ REVISION HISTORY:
 }	/* End of MSG_TCPIP_RECEIVE_DATA.	*/
 
 #ifdef __HIGHC__
-#pragma Code("TSOCKETCODE"); 
+#pragma Code("TSOCKETCODE");
 #endif
 #ifdef __BORLANDC__
 #pragma codeseg TSOCKETCODE
+#endif
+#ifdef __WATCOMC__
+#pragma code_seg("TSOCKETCODE")
 #endif
 
 
@@ -521,21 +527,21 @@ REVISION HISTORY:
 ---------------------------------------------------------------------------
 SYNOPSIS:	Process a timeout of the TCP/IP timer by decrementing
 		counters.
-   
+
 PASS:		nothing
 
 RETURN:		nothing
-   
-SIDE EFFECTS:	May cause other actions to occur if a counter reaches 
+
+SIDE EFFECTS:	May cause other actions to occur if a counter reaches
 		zero, indicating a timeout.  Connections may be destroyed,
 		data may be sent...
- 
+
 STRATEGY:
-		Call SocketTimeoutHanlder which enumerates the chunk 
+		Call SocketTimeoutHanlder which enumerates the chunk
 		array of sockets:
 			if it is rejected, decrement the destoy counter
 			and destroy the connection if it reaches zero
-			else if it is OPEN, DISCONNECTING or CONNECTING, 
+			else if it is OPEN, DISCONNECTING or CONNECTING,
 			call Tcp timeout handler
 		Call Ip timeout handler so it can do timeout processing
 			on the reassembly queue
@@ -544,7 +550,7 @@ REVISION HISTORY:
  	Name	Date		Description
  	----	----		-----------
  	jwu	7/ 7/94   	Initial Revision
- 
+
 -------------------------------------------------------------------------*/
 @method TcpipProcessClass, MSG_TCPIP_TIMEOUT_OCCURRED
 {
@@ -554,22 +560,25 @@ REVISION HISTORY:
 
 
 #ifdef __HIGHC__
-#pragma Code("TCPCODE"); 
+#pragma Code("TCPCODE");
 #endif
 #ifdef __BORLANDC__
 #pragma codeseg TCPCODE
+#endif
+#ifdef __WATCOMC__
+#pragma code_seg("TCPCODE")
 #endif
 
 
 /*-------------------------------------------------------------------------
 			     MSG_TCPIP_DELETE_LINK
 ---------------------------------------------------------------------------
-SYNOPSIS:   Delete a closed link.  
-   
+SYNOPSIS:   Delete a closed link.
+
 PASS:	    link    = domain handle of link to delete
 
 RETURN:	    nothing
-   
+
 SIDE EFFECTS:
  	    TCP's thread will be sent a MSG_META_DETACH if this is the
 	    last remaining link.
@@ -578,7 +587,7 @@ REVISION HISTORY:
  	Name	Date		Description
  	----	----		-----------
  	jwu	1/24/95   	Initial Revision
- 
+
 -------------------------------------------------------------------------*/
 @method TcpipProcessClass, MSG_TCPIP_DELETE_LINK
 {
@@ -593,17 +602,17 @@ REVISION HISTORY:
 			     MSG_TCPIP_DESTROY_CONNECTIONS
 ---------------------------------------------------------------------------
 
-SYNOPSIS:   Destroy all Tcp connections.  
-   
+SYNOPSIS:   Destroy all Tcp connections.
+
 PASS:	    nothing
 
 RETURN:	    nothing
-   
+
 REVISION HISTORY:
  	Name	Date		Description
  	----	----		-----------
  	jwu	10/23/95   	Initial Revision
- 
+
 -------------------------------------------------------------------------*/
 @method TcpipProcessClass, MSG_TCPIP_DESTROY_CONNECTIONS
 {
@@ -618,19 +627,19 @@ REVISION HISTORY:
 			     MSG_TCPIP_SEND_RAW_IP
 ---------------------------------------------------------------------------
 SYNOPSIS:	Send a raw Ip packet.
-   
-PASS:		link	= link domain handle 
+
+PASS:		link	= link domain handle
 		buffer	= optr of data buffer
 
 RETURN:		word = SocketDrError
-   
+
 STRATEGY:
-  
+
 REVISION HISTORY:
  	Name	Date		Description
  	----	----		-----------
  	jwu	10/14/94   	Initial Revision
- 
+
 -------------------------------------------------------------------------*/
 @method TcpipProcessClass, MSG_TCPIP_SEND_RAW_IP
 {
@@ -645,24 +654,24 @@ REVISION HISTORY:
 			     MSG_META_DETACH
 ---------------------------------------------------------------------------
 SYNOPSIS:   Intercepted to prevent TCP from exiting before clients do.
-   
+
 PASS:	    callerID
             caller
 
 RETURN:	    nothing
-   
-STRATEGY:   If it is safe to exit TCP, call superclass.  
+
+STRATEGY:   If it is safe to exit TCP, call superclass.
             Else, do nothing.
-  
+
 REVISION HISTORY:
  	Name	Date		Description
  	----	----		-----------
  	jwu	1/23/95   	Initial Revision
- 
+
 -------------------------------------------------------------------------*/
 @method TcpipProcessClass, MSG_META_DETACH
 {
-    	if (TcpipDetachAllowed()) 
+    	if (TcpipDetachAllowed())
 	    @callsuper();
 
 }	/* End of MSG_META_DETACH.	*/
@@ -674,31 +683,31 @@ REVISION HISTORY:
 ---------------------------------------------------------------------------
 SYNOPSIS:  Process GCN list notification for access point change in
            netmask configuration.
-   
+
 PASS:	   manufID
            notificationType
            Memhandle data
 
 RETURN:	   nothing
-   
+
 STRATEGY:   If type is GWNT_ACCESS_POINT_CHANGE from a geoworks manufacturer {
-	        lock data block 
-		if property change is automatic netmask for internet 
+	        lock data block
+		if property change is automatic netmask for internet
 	    	    access point {
 		   get the new netmask and store it
 		 }
 		 unlock block
 	     }
              call superclass
-		   
-              
+
+
 If netmask is changing, remember new netmask configuration.
-  
+
 REVISION HISTORY:
  	Name	Date		Description
  	----	----		-----------
  	jwu	9/14/95   	Initial Revision
- 
+
 -------------------------------------------------------------------------*/
 @method TcpipProcessClass, MSG_META_NOTIFY_WITH_DATA_BLOCK
 {
@@ -707,15 +716,15 @@ REVISION HISTORY:
     MemHandle maskBlock;
     int maskLen;
     dword mask;
-    
-    if (notificationType == GWNT_ACCESS_POINT_CHANGE && 
+
+    if (notificationType == GWNT_ACCESS_POINT_CHANGE &&
 	manufID == MANUFACTURER_ID_GEOWORKS) {
-       
+
 	MemLock(data);
 	prop = (AccessPointChangeDescription *)MemDeref(data);
 
 	if (prop -> APCD_changeType == APCT_PROPERTY &&
-	    prop -> APCD_stdProperty == (APSP_AUTOMATIC | APSP_MASK) && 
+	    prop -> APCD_stdProperty == (APSP_AUTOMATIC | APSP_MASK) &&
 	    prop -> APCD_accessType == APT_INTERNET) {
 
 	     /*
@@ -725,8 +734,8 @@ REVISION HISTORY:
 				   (char *)((dword)APSP_AUTOMATIC | APSP_MASK),
 				   &maskBlock,
 				   &maskLen)) {
-		/* 
-		 * Convert netmask into 4 byte binary format and  
+		/*
+		 * Convert netmask into 4 byte binary format and
 		 * store the complement as the host mask for detecting
 		 * broadcasts.
 		 */
@@ -736,12 +745,12 @@ REVISION HISTORY:
 		ip_net_host = NetworkToHostDWord(~mask);
 		MemFree(maskBlock);
 	    }
-	    else 
+	    else
 		ip_net_host = 0;
 	}
 
 	MemUnlock(data);
-    } 
+    }
 
     @callsuper();
 
@@ -759,7 +768,7 @@ REVISION HISTORY:
 /*
  * INI key strings.
  */
-@start Strings, data;
+@start StringsGOC, data;
 @chunk char tcpipString[] = {'t','c','p','i','p',0};
     @localize not;
 @chunk char maxTTLString[] = {'m','a','x','T','T','L',0};
@@ -784,7 +793,7 @@ REVISION HISTORY:
     @localize not;
 @chunk char rttvarShiftString[] = {'r','t','t','v','a','r','S','h','i','f','t',0};
     @localize not;
-@end Strings;
+@end StringsGOC;
 
 
 
@@ -798,19 +807,19 @@ REVISION HISTORY:
  * STRATEGY:
  *	    	Read a setting for an option.  If it is valid, allow
  *	    	the configuration.  (very simple)
- *	    	These options are: 
+ *	    	These options are:
  *	    	    	maximum time to live
- *	    	    	default maximum segment size  
+ *	    	    	default maximum segment size
  *	    	    	maximum retransmissions before TCP gives up
  *	    	    	maximum idle time before keep-alive probes start
- *	    	    	maximum # of probes before TCP gives up 
+ *	    	    	maximum # of probes before TCP gives up
  *	    	    	probe length (BSD 4.2 hosts only respond to probes
  *	    	    	    with non-zero length)
  *	    	    	shift for round trip to set alpha in equation
  *	    	    	shift for round trip variance to set alpha
- *	   
+ *
  * HISTORICAL NOTE:
- *	    This routine created so Responder folks can tweak the 
+ *	    This routine created so Responder folks can tweak the
  *	    protocol.  Not for use by the typical user.
  *
  * REVISION HISTORY:
@@ -829,22 +838,22 @@ TcpipConfigureProtocols ()
     MemLock(OptrToHandle(@tcpipString));
     tcpCategory = (char *)LMemDeref(@tcpipString);
 
-    /* 
+    /*
      * TTL values can range from 1 - 255.
      */
     if (!InitFileReadInteger(tcpCategory, LMemDeref(@maxTTLString), &value)) {
-    	if (value && value <= 255) 
+    	if (value && value <= 255)
 	    ip_defttl = value;
     }
 
     /*
-     * Minimum MSS is 512.  
+     * Minimum MSS is 512.
      */
     if (!InitFileReadInteger(tcpCategory, LMemDeref(@mssString), &value)) {
 	if (value >= 512)
 	    tcp_mssdflt = value;
     }
-	
+
     /*
      * Maximum TCP window size can range from 4096 - 65535.
      */
@@ -865,18 +874,18 @@ TcpipConfigureProtocols ()
     /*
      * Maximum # of retransmits is 12.
      */
-    if (!InitFileReadInteger(tcpCategory, LMemDeref(@maxRexmtString), 
+    if (!InitFileReadInteger(tcpCategory, LMemDeref(@maxRexmtString),
 			     &value)) {
 	if (value <= 12)
 	    tcp_maxrxt = value;
     }
-    
+
     /*
      * Maximum idle time is 540 mins (== 9 hrs).
      * tcp_keepidle = value * 60 * TCPIP_TIMEOUT_PER_SEC  (in 500ms intervals)
      */
     if (!InitFileReadInteger(tcpCategory, LMemDeref(@maxIdleString), &value)) {
-	if (value <= 540) 
+	if (value <= 540)
 	    tcp_keepidle = value * 60 * TCPIP_TIMEOUT_PER_SEC;
     }
 
@@ -885,9 +894,9 @@ TcpipConfigureProtocols ()
      * tcp_maxidle is the maximum idle time (# of probes * interval between
      * probes)
      */
-    if (!InitFileReadInteger(tcpCategory, LMemDeref(@maxProbesString), 
+    if (!InitFileReadInteger(tcpCategory, LMemDeref(@maxProbesString),
 			     &value)) {
-	if (value <= 10) 
+	if (value <= 10)
 	    tcp_maxidle = value * tcp_keepintvl;
     }
 
@@ -899,12 +908,12 @@ TcpipConfigureProtocols ()
 	if (!bool)
 	    tcp_keeplen = 0;
     }
-    
+
     /*
      * Default round trip time estimate.  Convert value to timer intervals.
      * This sets the default TCP retransmit interval.  After a measured
      * round trip time is available, the retransmit interval will be
-     * determined by the actual measurement, allowing the behaviour to 
+     * determined by the actual measurement, allowing the behaviour to
      * adjust to the actual conditions of the connection.
      */
     if (!InitFileReadInteger(tcpCategory, LMemDeref(@rttString), &value)) {
@@ -916,13 +925,13 @@ TcpipConfigureProtocols ()
      * Round trip shifts can be 0 - 10.  Anything larger will not change
      * alpha significantly.  Same goes for the shift for variance.
      */
-    if (!InitFileReadInteger(tcpCategory, LMemDeref(@rttShiftString), 
+    if (!InitFileReadInteger(tcpCategory, LMemDeref(@rttShiftString),
 			     &value)) {
 	if (value <= 10)
 	    rttShift = value;
     }
 
-    if (!InitFileReadInteger(tcpCategory, LMemDeref(@rttvarShiftString), 
+    if (!InitFileReadInteger(tcpCategory, LMemDeref(@rttvarShiftString),
 			     &value)) {
 	if (value <= 10)
 	    rttvarShift = value;
@@ -944,11 +953,11 @@ TcpipConfigureProtocols ()
  *		of seconds later.
  *
  * CALLED BY:	TcpipDhcpParseAndSendNotification
- * RETURN:	
+ * RETURN:
  * SIDE EFFECTS:
- *	
+ *
  * STRATEGY:
- *	
+ *
  * REVISION HISTORY:
  *	Name	Date		Description
  *	----	----		-----------

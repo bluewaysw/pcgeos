@@ -28,16 +28,16 @@ DBCS/tcpip.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 parallDr.h hugearr.h fileEnum.h sem.h initfile.h \
                 Internal/socketDr.h sockmisc.h ip.h tcp.h udp.h rawIp.h \
                 tcpip.h tcpipLog.h Ansi/string.h
-DBCS/tcpInput.obj \
-DBCS/tcpInput.eobj: geos.h resource.h Ansi/string.h lmem.h timer.h timedate.h \
+DBCS/tcpOutput.obj \
+DBCS/tcpOutput.eobj: geos.h resource.h Ansi/string.h lmem.h timer.h timedate.h \
                 ec.h Internal/socketDr.h sockmisc.h ip.h tcp.h tcpip.h \
                 tcpipLog.h
 DBCS/ipOutput.obj \
 DBCS/ipOutput.eobj: geos.h resource.h Ansi/string.h timer.h lmem.h ec.h \
                 Internal/socketDr.h sockmisc.h ip.h tcp.h icmp.h tcpip.h \
                 tcpipLog.h
-DBCS/tcpOutput.obj \
-DBCS/tcpOutput.eobj: geos.h resource.h Ansi/string.h lmem.h timer.h timedate.h \
+DBCS/tcpInput.obj \
+DBCS/tcpInput.eobj: geos.h resource.h Ansi/string.h lmem.h timer.h timedate.h \
                 ec.h Internal/socketDr.h sockmisc.h ip.h tcp.h tcpip.h \
                 tcpipLog.h
 DBCS/icmp.obj \
@@ -48,21 +48,21 @@ DBCS/ipInput.obj \
 DBCS/ipInput.eobj: geos.h resource.h geode.h Ansi/string.h timer.h heap.h \
                 lmem.h ec.h Internal/socketDr.h sockmisc.h ip.h tcp.h \
                 icmp.h udp.h rawIp.h tcpip.h tcpipLog.h
-DBCS/tcpUtils.obj \
-DBCS/tcpUtils.eobj: geos.h resource.h geode.h Ansi/string.h lmem.h timer.h \
-                timedate.h ec.h Internal/socketDr.h sockmisc.h ip.h tcp.h \
-                icmp.h tcpip.h tcpipLog.h
 DBCS/rawIp.obj \
 DBCS/rawIp.eobj: geos.h resource.h Ansi/string.h lmem.h ec.h \
                 Internal/socketDr.h sockmisc.h ip.h rawIp.h icmp.h \
                 tcpip.h timer.h
+DBCS/tcpipLog.obj \
+DBCS/tcpipLog.eobj: tcpipLog.c
 DBCS/udp.obj \
 DBCS/udp.eobj: geos.h resource.h Ansi/string.h lmem.h initfile.h ec.h \
                 Internal/socketDr.h sockmisc.h ip.h udp.h icmp.h tcpip.h \
                 timer.h tcpipLog.h
-DBCS/tcpipLog.obj \
-DBCS/tcpipLog.eobj: /home/frehwagen/workspace/pcgeos/Driver/Socket/TCPIP/tcpipLog.c
-DBCS/tcpipStrings.rdef: /home/frehwagen/workspace/pcgeos/Driver/Socket/TCPIP/tcpipStrings.ui
+DBCS/tcpUtils.obj \
+DBCS/tcpUtils.eobj: geos.h resource.h geode.h Ansi/string.h lmem.h timer.h \
+                timedate.h ec.h Internal/socketDr.h sockmisc.h ip.h tcp.h \
+                icmp.h tcpip.h tcpipLog.h
+DBCS/tcpipStrings.rdef: tcpipStrings.ui
 DBCS/tcpipAddrCtrl.rdef: generic.uih product.uih
 DBCS/tcpipManager.obj \
 DBCS/tcpipManager.eobj: geos.def heap.def geode.def resource.def ec.def system.def \
@@ -104,4 +104,4 @@ DBCS/tcpipManager.eobj: geos.def heap.def geode.def resource.def ec.def system.d
                 tcpipSocket.asm tcpipLink.asm tcpipUtils.asm \
                 tcpipAddrCtrl.asm tcpipDhcp.asm
 
-DBCS/tcpipEC.geo DBCS/tcpip.geo : geos.ldf netutils.ldf socket.ldf ansic.ldf accpnt.ldf resolver.ldf resolver.ldf 
+DBCS/tcpipEC.geo DBCS/tcpip.geo : geos.ldf netutils.ldf socket.ldf ansic.ldf accpnt.ldf resolver.ldf resolver.ldf

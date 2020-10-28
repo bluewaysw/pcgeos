@@ -80,14 +80,16 @@ static char *rcsid =
 #if defined(unix)
  #include <sys/signal.h>
  #include <sys/times.h>
-#endif 
+#endif
 
 #if defined(_MSDOS) || defined(_WIN32)
 # include <io.h>
 # include <dos.h>
 # if defined(_WIN32)
 #  include "serial.h"
+# ifndef __WATCOMC__
 #  include <dir.h>
+# endif
 # endif
 #endif
 
@@ -113,7 +115,7 @@ word	curXIPPage; 	/* current virtual mapped in page, this page may or
 			 * may not actually be the currently mapped in page
 			 * on the target, but its the page we want swat to
 			 * think of as mapped in so Handle_Find can find
-			 * handles to a page that isn't mapped in 
+			 * handles to a page that isn't mapped in
 			 */
 word	realXIPPage; 	/* page actually mapped in on target */
 
@@ -298,16 +300,16 @@ IbmEnsureObject(Patient	patient)
 	    strcpy(geodename, patient->path);
 	    cp = rindex(geodename, '.');
 	    strcpy(cp, ".geo");
-	    returnCode = FileUtil_Open(&patient->object, geodename, 
+	    returnCode = FileUtil_Open(&patient->object, geodename,
 				       O_RDONLY|O_BINARY, SH_DENYWR, 0666);
 	    if (returnCode == FALSE) {
 		patient->object = -1;
 		return;
 	    }
 	    /*
-	     * Reset the buffer for the object file. 
-	     * We don't need the thing to be 8k 
-	     * (or whatever size the filesystem blocks are) 
+	     * Reset the buffer for the object file.
+	     * We don't need the thing to be 8k
+	     * (or whatever size the filesystem blocks are)
 	     * as we don't do much I/O to it anyway.
 	     */
 	    buffer = (genptr)malloc(IBM_BUFFER_SIZE);
@@ -315,7 +317,7 @@ IbmEnsureObject(Patient	patient)
 	    setvbuf(patient->object, buffer, _IOFBF, IBM_BUFFER_SIZE);
 #endif
 	    Cache_SetValue(entry, buffer);
-	} 
+	}
     } else {
 	assert(0);
     }
@@ -380,7 +382,7 @@ void
 IbmEnsureClosed(Patient	patient)
 {
     Cache_Entry entry;
-    
+
     entry = Cache_Lookup(objectCache, (Address)patient);
     if (entry != (Cache_Entry)NULL) {
 	Cache_InvalidateOne(objectCache, entry);
@@ -502,9 +504,9 @@ IbmCheckPatient(Patient	    patient)
  * CALLED BY:	    HandleExit, Ibm_NewGeode, IbmBiffPatient
  * RETURN:	    the Patient of the other instance, or NullPatient if
  *		    there is no other instance
- * SIDE EFFECTS:    
+ * SIDE EFFECTS:
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -529,7 +531,7 @@ IbmFindOtherInstance(GeodeName	    *gnPtr,    	/* Salient data about the
     Patient 	first;
     int	    	n;
     LstNode 	ln;
-    
+
     first = NullPatient;
 
 
@@ -682,7 +684,7 @@ IbmSetCurPatient(word	threadID)
 	IbmUseDefaultPatient();
     } else {
 	curPatient = Handle_Patient(curThreadHandle);
-	
+
 	realCurThread = (ThreadPtr)curThreadHandle->otherInfo;
     }
     realCurThread->flags |= IBM_REGS_NEEDED;
@@ -720,10 +722,10 @@ IbmFlushRegs(ThreadPtr	  	thread)	    /* Thread to flush */
 {
     if (thread->flags & IBM_REGS_DIRTY) {
 	WriteRegsArgs   wra;
-	
+
 	wra.wra_thread = Handle_ID(thread->handle);
 	wra.wra_regs = thread->regs;
-	
+
 	if (Rpc_Call(RPC_WRITE_REGS,
 		     sizeof(wra), typeWriteRegsArgs, (Opaque)&wra,
 		     0, NullType, (Opaque)0) != RPC_SUCCESS)
@@ -776,7 +778,7 @@ IbmFlushState(Event event, Opaque callData, Opaque clientData)
 
 	patient->scope = patient->global;
     }
-    
+
     /*
      * Force all dirty data blocks to be flushed.
      */
@@ -810,14 +812,14 @@ IbmFlushState(Event event, Opaque callData, Opaque clientData)
 
 	Lst_Destroy(realCurThread->state, (void (*)())free);
 	Handle_Free(realCurThread->handle);
-	
+
 	/*
 	 * Find and remove realCurThread from the list of all threads.
 	 */
 	ln = Lst_Member(allThreads, (LstClientData)realCurThread);
 	assert(ln != NILLNODE);
 	Lst_Remove(allThreads, ln);
-	
+
 	/*
 	 * Free thread descriptor itself
 	 */
@@ -846,7 +848,7 @@ IbmFlushState(Event event, Opaque callData, Opaque clientData)
 	    IbmBiffPatient(curPatient);
 	}
     }
-    
+
     return(EVENT_HANDLED);
 }
 
@@ -940,13 +942,13 @@ IbmReadThreadRegister(ThreadPtr	    thread,
 		      regval        *valuePtr)
 {
     Boolean 	result = TRUE;
-    
+
     assert(VALIDTPTR(thread, TAG_THREAD));
-    
+
     if (!IbmEnsureRegs(thread)) {
 	return(FALSE);
     }
-    
+
     if (regType == REG_MACHINE) {
 	switch(regNum) {
 	    case REG_AX:
@@ -1006,7 +1008,7 @@ IbmReadThreadRegister(ThreadPtr	    thread,
 		 * 32-bit PC -- shift CS and add IP
 		 */
 		*(Opaque *)valuePtr =
-		    (Opaque)MakeAddress(thread->regs.reg_regs[RegisterMapping(REG_CS)], 
+		    (Opaque)MakeAddress(thread->regs.reg_regs[RegisterMapping(REG_CS)],
 			     thread->regs.reg_ip);
 		break;
 #if REGS_32
@@ -1037,7 +1039,7 @@ IbmReadThreadRegister(ThreadPtr	    thread,
 	}
     } else {
 	char	*regName = (char *)regNum;
-	
+
 	if (strcmp(regName, "curThread") == 0) {
 	    *valuePtr = Handle_ID(realCurThread->handle);
 	} else if (strcmp(regName, "xipPage") == 0) {
@@ -1098,7 +1100,7 @@ Ibm_ReadRegister(RegType    regType,    /* Type of register to read */
 		 regval     *valuePtr)	/* Place to store value */
 {
     ThreadPtr	cur = (ThreadPtr)curPatient->curThread;
-    
+
     if (cur == NullThread) {
 	Warning("Can't read register -- no current thread");
 	return(FALSE);
@@ -1325,7 +1327,7 @@ Ibm_MaybeUnignore(char *name)
 		 * the thing's executable.
 		 */
 		word	coreID = ((dword)Hash_GetValue(entry) >> 16) & 0xffff;
-		
+
 		Hash_DeleteEntry(&ignored, entry);
 		if (Handle_Lookup(coreID) != NullHandle) {
 		    return(TRUE);
@@ -1333,7 +1335,7 @@ Ibm_MaybeUnignore(char *name)
 		    Message("Unable to locate \"%s\", core block handle %04xh\n",
 			    name, coreID);
 		}
-			    
+
 	    }
 	    break;
 	}
@@ -1380,7 +1382,7 @@ Ibm_StackEnd(void)
  * RETURN:	    The handle
  * SIDE EFFECTS:    None
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -1396,7 +1398,7 @@ Ibm_StackHandle(void)
     MD_GetFrameRegister(curPatient->frame, REG_MACHINE, REG_SS, &ss);
     return (Handle_Find(MakeAddress(ss, 0)));
 }
-	    
+
 
 /***********************************************************************
  *				Ibm_SingleStep
@@ -1420,7 +1422,7 @@ Ibm_SingleStep(void)
     ThreadPtr	    cur = realCurThread;
     word    	    tid = Handle_ID(realCurThread->handle);
     Boolean 	    stayStopped;
-    
+
     if (cur != (ThreadPtr)curPatient->curThread) {
 	Warning("%s #%d not really current thread\n", curPatient->name,
 		curPatient->curThread ?
@@ -1431,7 +1433,7 @@ Ibm_SingleStep(void)
 	curPatient = Handle_Patient(cur->handle);
 	curPatient->curThread = (Thread)cur;
     }
-    
+
     do {
 	StepReply   sr;
 
@@ -1439,13 +1441,13 @@ Ibm_SingleStep(void)
 	 * Tell the world we're stepping this patient.
 	 */
 	(void)Event_Dispatch(EVENT_CONTINUE, CONTINUE_STEP);
-	
+
 	/*
 	 * Actually do it.
 	 */
 	sysFlags &= ~PATIENT_STOPPED;
 	sysFlags |= PATIENT_RUNNING;
-	
+
 	if (Rpc_Call(RPC_STEP, 0, NullType, (Opaque)NULL,
 		     sizeof(sr), typeStepReply, (Opaque)&sr) != RPC_SUCCESS)
 	{
@@ -1465,7 +1467,7 @@ Ibm_SingleStep(void)
 	    if (sr.sr_thread != tid) {
 		IbmSetCurPatient(sr.sr_thread);
 	    }
-	    
+
 	    cur->flags &= ~(IBM_REGS_NEEDED|IBM_REGS_DIRTY);
 	    cur->regs = sr.sr_regs;
 	    cur->regs.reg_xipPage = sr.sr_curXIPPage;
@@ -1476,7 +1478,7 @@ Ibm_SingleStep(void)
 
 	    curPatient->frame = MD_CurrentFrame();
 	    (void)IbmSetDir();
-	    
+
 	    if (Event_Dispatch(EVENT_STEP,
 			       (Opaque)&stayStopped) != EVENT_HANDLED)
 	    {
@@ -1498,7 +1500,7 @@ Ibm_SingleStep(void)
 	     * the reason as the piece of data.
 	     */
 	    Event_Dispatch(EVENT_FULLSTOP, (Opaque)stopCodes[1]);
-	    
+
 	    /*
 	     * If actually keeping the thing stopped, abort any calls we have
 	     * in progress.
@@ -1520,7 +1522,7 @@ Ibm_SingleStep(void)
  *				Ibm_Stop
  ***********************************************************************
  * SYNOPSIS:	  Stop the patient, or try to.
- * CALLED BY:	  GLOBAL    
+ * CALLED BY:	  GLOBAL
  * RETURN:	  Nothing
  * SIDE EFFECTS:  The patient be stopped. The actual halt notification
  *	is done via an RPC_HALT call.
@@ -1551,7 +1553,7 @@ Ibm_Stop(void)
 		 (Opaque)&threadID) != RPC_SUCCESS)
     {
 	char	answer[32];
-	
+
 	sysFlags |= PATIENT_RUNNING; /* Nope... */
 	Warning("Couldn't stop GEOS: %s", Rpc_LastError());
 	MessageFlush("Would you like to detach? [yn](y) ");
@@ -1561,7 +1563,7 @@ Ibm_Stop(void)
 	if ((answer[0] != 'n') && (answer[0] != 'N')) {
 	    sysFlags &= ~(PATIENT_RUNNING|PATIENT_BREAKPOINT|PATIENT_SKIPBPT);
 	    sysFlags |= PATIENT_STOPPED;
-	    
+
 	    IbmDisconnect(RPC_GOODBYE);
 	    Tcl_SetVar(interp, "lastHaltCode", "PC Detached", TRUE);
 	}
@@ -1578,12 +1580,12 @@ Ibm_Stop(void)
 	 t here anymore :)
 	assert(cur->flags & IBM_REGS_NEEDED);
 	 */
-	
+
 	sysFlags &= ~(PATIENT_RUNNING|PATIENT_BREAKPOINT|PATIENT_SKIPBPT);
 	sysFlags |= PATIENT_STOPPED;
 	curPatient->frame = MD_CurrentFrame();
 	(void)IbmSetDir();
-	
+
 	if (!noFullStop) {
 	    (void)Event_Dispatch(EVENT_FULLSTOP, (Opaque)"GEOS Halted");
 	}
@@ -1613,7 +1615,7 @@ Ibm_LostContact(void)
     MessageFlush("Lost connection to GEOS\n");
     sysFlags &= ~(PATIENT_RUNNING|PATIENT_BREAKPOINT|PATIENT_SKIPBPT);
     sysFlags |= PATIENT_STOPPED;
-	    
+
     IbmDisconnect(0);
 
     Ui_TopLevel();
@@ -1662,7 +1664,7 @@ Ibm_Continue(void)
 
 	    curPatient = patient;
 	    patient->curThread = (Thread)realCurThread;
-	    
+
 	    (void)Event_Dispatch(EVENT_CHANGE, (Opaque)oldPatient);
 	}
 
@@ -1679,7 +1681,7 @@ Ibm_Continue(void)
 	if (sysFlags & PATIENT_SKIPBPT) {
 	    arg = skipBP;
 	}
-    
+
 	return (Rpc_Call((unsigned short)((sysFlags & PATIENT_SKIPBPT) ?
 			  RPC_SKIPBPT : RPC_CONTINUE),
 			 sizeof(arg), type_Word, (Opaque)&arg,
@@ -1718,7 +1720,7 @@ Ibm_NewThread(word   	id, 	    /* ID for new thread */
     Patient 	patient;    	/* Patient to which thread belongs */
     ThreadPtr	thread;	    	/* New thread descriptor */
     LstNode	ln;
-    
+
     /*
      * Find the Handle and Patient for the patient that owns the thread
      */
@@ -1733,7 +1735,7 @@ Ibm_NewThread(word   	id, 	    /* ID for new thread */
 	     ownerID, id);
 #endif
     }
-    
+
     /*
      * 5/4/94: HACK HACK HACK HACK
      *
@@ -1748,13 +1750,13 @@ Ibm_NewThread(word   	id, 	    /* ID for new thread */
     (void)Handle_Owner(owner);
 
     patient = Handle_Patient(owner);
-    
+
     /*
      * Allocate a new ThreadRec for it and initialize the easy parts --
      * the state stack, flags and handle.
      */
     thread = (ThreadPtr)malloc_tagged(sizeof(ThreadRec), TAG_THREAD);
-    
+
     thread->state = Lst_Init(FALSE);
     thread->flags = IBM_REGS_NEEDED;
     thread->handle = Handle_Create(patient, id,
@@ -1763,12 +1765,12 @@ Ibm_NewThread(word   	id, 	    /* ID for new thread */
 				   0,
 				   HANDLE_THREAD|flags,
 				   (Opaque)thread, HANDLE_NOT_XIP);
-    
+
     realCurThread = thread;
     patient->curThread = (Thread)thread;
     patient->scope = patient->global;
     curPatient = patient;
-    
+
     /*
      * Find the handle for the block in which the thread's stack resides.
      *
@@ -1811,7 +1813,7 @@ Ibm_NewThread(word   	id, 	    /* ID for new thread */
 	MessageFlush("Thread %d created for patient %s\n", thread->number,
 		     patient->name);
     }
-    
+
     /*
      * Append it to the list of threads for the patient.
      */
@@ -1860,7 +1862,7 @@ Ibm_LoaderMoved(word	baseSeg)    /* New base segment of the loader */
 			  HANDLE_ADDRESS|HANDLE_SIZE,
 			  0,
                           MakeAddress(
-                              baseSeg, 
+                              baseSeg,
                               loader->resources[i].offset - exeLoadBase),
 //                              (baseSeg<<4) + loader->resources[i].offset - exeLoadBase,
 			  loader->resources[i].size,
@@ -1914,14 +1916,14 @@ IbmBiffPatient(Patient patient)
     Lst_Open(patient->threads);
     while ((tln = Lst_Next(patient->threads)) != NILLNODE) {
 	ThreadPtr	thread = (ThreadPtr)Lst_Datum(tln);
-	
+
 	if ((patient != loader) || (thread->number != 0)){
 	    if (thread->stack) {
 		Handle_NoInterest(thread->stack,
 				  IbmStackInterest,
 				  (Opaque)thread);
 	    }
-	    
+
 	    Lst_Destroy(thread->state, (void (*)())free);
 	    Handle_Free(thread->handle);
 	    free((malloc_t)thread);
@@ -1929,7 +1931,7 @@ IbmBiffPatient(Patient patient)
 	}
     }
     Lst_Close(patient->threads);
-    
+
     if (Lst_IsEmpty(patient->threads)) {
 	patient->curThread = (Thread)NULL;
     } else {
@@ -1961,7 +1963,7 @@ IbmBiffPatient(Patient patient)
 	VMClose(patient->symFile);
     }
     patient->symFile = (Opaque)NULL;
-	
+
     /*
      * If the patient's a driver, remove it from the array of libraries of the
      * loader.
@@ -2002,7 +2004,7 @@ IbmBiffPatient(Patient patient)
  * RETURN:	    TRUE if successful
  * SIDE EFFECTS:    patient->symFile set to file handle, if successful
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -2014,7 +2016,7 @@ static Boolean
 IbmOpenSymFile(Patient	patient)
 {
     Patient 	    	other;
-    
+
     if (patient->geode.v2) {
 	    other = IbmFindOtherInstance(
 			      (GeodeName *)&patient->geode.v2->geodeFileType,
@@ -2050,11 +2052,11 @@ IbmOpenSymFile(Patient	patient)
 	    return(FALSE);
 	}
 
-	patient->symFile = VMOpen(VMO_OPEN|FILE_DENY_W|FILE_ACCESS_R, 
+	patient->symFile = VMOpen(VMO_OPEN|FILE_DENY_W|FILE_ACCESS_R,
 				  0, path, &status);
 	if (patient->symFile == NULL) {
 	    if (status == EINVAL) {
-		Warning("Could not open \"%s\" -- file is damaged\n", 
+		Warning("Could not open \"%s\" -- file is damaged\n",
 			path);
 	    } else {
 		Warning("Could not open \"%s\"\n", path);
@@ -2063,38 +2065,38 @@ IbmOpenSymFile(Patient	patient)
 	    return(FALSE);
 	}
 	malloc_settag(patient->symFile, TAG_VMFILE);
-	
+
 	/*
 	 * Make sure the thing's got a compatible symbol file protocol.
 	 */
-	
+
 	if (VMGetVersion(patient->symFile) > 1) {
 	    GeosFileHeader2 	gfh;
-	    
+
 	    VMGetHeader(patient->symFile, (genptr)&gfh);
 	    major = swaps(gfh.protocol.major);
 	    minor = swaps(gfh.protocol.minor);
 	} else {
 	    GeosFileHeader  	gfh;
-	    
+
 	    VMGetHeader(patient->symFile, (genptr)&gfh);
 	    major = swaps(gfh.core.protocol.major);
 	    minor = swaps(gfh.core.protocol.minor);
 	}
-	
+
 	if ((major != OBJ_PROTOCOL_MAJOR) || (minor > OBJ_PROTOCOL_MINOR)) {
 	    Warning("\"%s\" is incompatible with this version of Swat\n", path);
 	    VMClose(patient->symFile);
 	    free(path);
 	    return(FALSE);
 	}
-	
+
 	map = VMGetMapBlock(patient->symFile);
 	if (map == 0) {
 	    VMClose(patient->symFile);
 	    return(FALSE);
 	}
-	
+
 	hdr = (ObjHeader *)VMLock(patient->symFile, map, (MemHandle *)NULL);
 	switch (hdr->magic)
 	{
@@ -2166,7 +2168,7 @@ IbmLocateCorpse(Handle	    core,   	    /* Core block handle */
     Patient 	shared=0;   /* Set non-zero when we encounter the patient
 			     * that owns the shared resources for a set
 			     * of patient's we're throwing away. */
-    
+
     (void)Lst_Open(dead);
     while((ln = Lst_Next(dead)) != NILLNODE) {
 	patient = (Patient)Lst_Datum(ln);
@@ -2234,7 +2236,7 @@ IbmLocateCorpse(Handle	    core,   	    /* Core block handle */
 		(void)Lst_Remove(dead, ln);
 		patientsChucked += 1;
 
-		/* if we have send down a new copy of a geode and some its 
+		/* if we have send down a new copy of a geode and some its
 		 * files are open, then we get screwed, so lets just shut
 		 * all files to be safe
 		 */
@@ -2252,7 +2254,7 @@ IbmLocateCorpse(Handle	    core,   	    /* Core block handle */
 		patient->resources[0].handle = patient->core = core;
 		patient->core->otherInfo = 0;
 		Handle_SetOwner(core, patient);
-		
+
 /* CORE		Handle_Interest(patient->core, IbmCoreInterest,
 				(Opaque)patient); */
 
@@ -2288,12 +2290,12 @@ IbmLocateCorpse(Handle	    core,   	    /* Core block handle */
 		 * Re-establish symbol table with newly-open symbol file.
 		 */
 		Sym_Init(patient);
-		
+
 		/*
 		 * Exhume the patient in preparation for its resurrection
 		 */
 		Lst_Remove(dead, ln);
-							   
+
 		/*
 		 * XXX This needs to be re-examined.
 		 */
@@ -2357,7 +2359,7 @@ IbmLocateCorpse(Handle	    core,   	    /* Core block handle */
 	free(shared->path);
 	free((malloc_t)shared->libraries);
     }
-    
+
 
     return(ln != NILLNODE ? patient : NullPatient);
 }
@@ -2416,7 +2418,7 @@ IbmOpenObject(Patient	    patient,	/* Patient whose object is to be
 	 * Mark the path as being allocated by us (for error-checking)
 	 */
 	malloc_settag(patient->path, TAG_PNAME);
-	
+
 	/*
 	 * Open the file
 	 */
@@ -2436,9 +2438,9 @@ IbmOpenObject(Patient	    patient,	/* Patient whose object is to be
  ***********************************************************************
  * SYNOPSIS:	    get info from a geode file one way on another
  * CALLED BY:	    global
- * RETURN:	    
- * SIDE EFFECTS:    
- *	    	    
+ * RETURN:
+ * SIDE EFFECTS:
+ *
  *
  * STRATEGY:
  *
@@ -2458,7 +2460,7 @@ Ibm_ReadFromObjectFile(Patient 	patient,    /* patient whose geode to read */
 		       word 	dataValue1, /* values depend on data type */
 		       word 	dataValue2)
 {
-    int bytesRead = 0;
+    int long bytesRead = 0;
 #if defined(_WIN32)
     int tries;
 #endif
@@ -2476,7 +2478,7 @@ Ibm_ReadFromObjectFile(Patient 	patient,    /* patient whose geode to read */
 	tries = 0;
     tryagain:
 #endif
-	if (Rpc_ReadFromGeode(patient, offset, size, dataType, destination, 
+	if (Rpc_ReadFromGeode(patient, offset, size, dataType, destination,
 			      dataValue1, dataValue2) == TCL_ERROR)
 	{
 #if defined(_WIN32)
@@ -2487,7 +2489,7 @@ Ibm_ReadFromObjectFile(Patient 	patient,    /* patient whose geode to read */
 				     "trying again\n");
 		    }
 		}
-		/* 
+		/*
 		 * wait for a second for the communication to quiet down
 		 * and hopefully the stub will restabilize
 		 */
@@ -2558,7 +2560,7 @@ Ibm_NewGeode(Handle 	core,	    	/* Core block's handle */
     word	    tableOff;       /* Offset of any table in core block.
 				     * Used for fetching resource handle IDs
 				     * and imported library segs */
-    
+
     Lst	    	    *ln;
     long    	    curObjPos;	    /* current position in object file */
 
@@ -2616,7 +2618,7 @@ Ibm_NewGeode(Handle 	core,	    	/* Core block's handle */
 	    Hash_DeleteEntry(&ignored, entry);
 	}
     }
-    
+
     /*
      * See if there's a dead version around
      */
@@ -2625,14 +2627,14 @@ Ibm_NewGeode(Handle 	core,	    	/* Core block's handle */
 	(void)Lst_AtEnd(patients, (LstClientData)patient);
 	goto done;
     }
-    
+
     /*
      * No dead version, so we have to make a new one...
      *
      * First, allocate the patient record itself.
      */
     patient = (Patient)calloc_tagged(1, sizeof(*patient), TAG_PATIENT);
-    
+
     /*
      * Create the handle for the core block so we can use it for reading.
      */
@@ -2640,7 +2642,7 @@ Ibm_NewGeode(Handle 	core,	    	/* Core block's handle */
 /*CORE    Handle_Interest(patient->core, IbmCoreInterest, (Opaque)patient);*/
 
     patient->path = (char *)NULL;
-    
+
     /*
      * Find out how many of this geode are already in the system. The number
      * (0-origin) is left in n. At the same time, we record the first
@@ -2712,7 +2714,7 @@ Ibm_NewGeode(Handle 	core,	    	/* Core block's handle */
 							 TAG_PATIENT);
 	assert(patient->geode.v2 != (Geode2Ptr)NULL);
 	curObjPos = sizeof(GeodeHeader2) - sizeof(GeosFileHeader2);
-	if (Ibm_ReadFromObjectFile(patient, sizeof(GeodeHeader2), 
+	if (Ibm_ReadFromObjectFile(patient, sizeof(GeodeHeader2),
 			  0, (genptr)patient->geode.v2, SEEK_SET,
 			     GEODE_DATA_HEADER, 0, 0) == TCL_ERROR)
 	{
@@ -2788,7 +2790,7 @@ Ibm_NewGeode(Handle 	core,	    	/* Core block's handle */
 	patient->numLibs    = first->numLibs;
 	patient->libraries  = first->libraries;
     }
-    
+
     Handle_SetOwner(core, patient);
 
     /*
@@ -2891,14 +2893,14 @@ Ibm_NewGeode(Handle 	core,	    	/* Core block's handle */
 
 	offsets = (dword *)malloc(patient->numRes * sizeof(dword));
 	if (Ibm_ReadFromObjectFile(patient, (word)(patient->numRes * sizeof(dword)),
-	    			   curObjPos, (genptr)offsets, 
-				   SEEK_SET, GEODE_DATA_OFFSETS, 
+	    			   curObjPos, (genptr)offsets,
+				   SEEK_SET, GEODE_DATA_OFFSETS,
 				   0, 0) != TCL_ERROR)
 	{
 	    for (i = 0; i < patient->numRes; i++) {
 		if (swap) {
 		    dword	d = offsets[i];
-		    
+
 		    patient->resources[i].offset = (((d & 0xff) << 24) |
 						((d & 0xff00) << 8) |
 						((d >> 8) & 0xff00) |
@@ -2921,7 +2923,7 @@ Ibm_NewGeode(Handle 	core,	    	/* Core block's handle */
 	     * positioned. Each size entry is two bytes, so...
 	     */
        	flags = (word *)malloc(patient->numRes * 2);
-	if (Ibm_ReadFromObjectFile(patient, (word)(patient->numRes * 2), 
+	if (Ibm_ReadFromObjectFile(patient, (word)(patient->numRes * 2),
 			    	   curObjPos, (genptr)flags, SEEK_CUR,
 				   GEODE_DATA_FLAGS, 0, 0) == TCL_ERROR)
 	{
@@ -2981,7 +2983,7 @@ done:
 	    system->libraries[i] = patient;
 	}
     }
-    
+
     /*
      * If the defaultPatient is a name and it matches the patient whose core
      * we're returning, point defaultPatient at this patient instead.
@@ -2997,7 +2999,7 @@ done:
      * Set so FlushState doesn't biff us...
      */
     patient->patientPriv = NullOpaque;
-    
+
     Ui_AllowInterrupts(TRUE);
     /*
      * Tell the world this thing's around.
@@ -3012,7 +3014,7 @@ done:
 
     return(patient);
 }
-  
+
 /*****************************************************************************
  *
  *		       CONNECTION/DISCONNECTION
@@ -3047,7 +3049,7 @@ IbmSizeKData(Handle 	    kinit,
 	Sym	    	sym;	    /* For lastHandle variable */
 	Address 	offset;	    /* Offset of same */
 	word    	lastHandle; /* Final value of same */
-	    
+
 	/*
 	 * Locate the lastHandle variable
 	 */
@@ -3059,11 +3061,11 @@ IbmSizeKData(Handle 	    kinit,
 	 * Fetch its value
 	 */
 	assert(Var_FetchInt(2, kernel->core, offset, (genptr)&lastHandle));
-	
+
 	/*
 	 * Adjust kdata's size accordingly
 	 */
-	Handle_Change(kernel->core, HANDLE_SIZE, 0, (Address)0, 
+	Handle_Change(kernel->core, HANDLE_SIZE, 0, (Address)0,
 		      	    	    	lastHandle, 0, -1);
 
 	/*
@@ -3123,7 +3125,7 @@ IbmConnect(void)
 	"FileReadFar", 	    &ha1.ha1_FileRead,	    	SYM_FUNCTION,
 	"FilePosFar", 	    &ha1.ha1_FilePos,	    	SYM_FUNCTION,
     };
-	
+
     /*
      * The symbol module places the segment offset in the offset field of the
      * resource record for its own use, but we need to get kdata's offset
@@ -3138,7 +3140,7 @@ IbmConnect(void)
      */
     for (i = 0; i < Number(initSyms); i++) {
 	Address	offset;
-	
+
 	sym = Sym_Lookup(initSyms[i].name, initSyms[i].class, kernel->global);
 	assert(!Sym_IsNull(sym));
 
@@ -3152,7 +3154,7 @@ IbmConnect(void)
 	}
 	*initSyms[i].storage = (word)offset;
     }
-    
+
     tryingToAttach = TRUE;
 
     if (Rpc_Call(RPC_HELLO,
@@ -3162,16 +3164,16 @@ IbmConnect(void)
 	/*
 	 * Ibm_PingPC will print why this failed...
 	 */
-	
+
 	/*
 	 * we are done trying to attach
 	 */
 	tryingToAttach = FALSE;
-	/* 
-	 * Nope -- don't allow communication 
+	/*
+	 * Nope -- don't allow communication
 	 */
 	attached = FALSE;
-	
+
 	return(FALSE);
     } else {
 	char	varVal[16];
@@ -3180,9 +3182,9 @@ IbmConnect(void)
 	 * we are done trying to attach
 	 */
 	tryingToAttach = FALSE;
-	/* 
-	 * Yep -- allow communication 
-	 */	
+	/*
+	 * Yep -- allow communication
+	 */
 	attached = TRUE;
 
 	kernelLoaded = TRUE;
@@ -3210,11 +3212,11 @@ IbmConnect(void)
 
 	sprintf(varVal, "%d", hr1->hr1_mask2);
 	Tcl_SetVar(interp, "IC2Mask", varVal, TRUE);
-	
+
 	sprintf(varVal, "%04xh:%04xh", hr1->hr1_stubSeg,
 		hr1->hr1_irqHandlers);
 	Tcl_SetVar(interp, "irqhandlers", varVal, TRUE);
-	
+
 	/*
 	 * Finish setting up the handles for the kernel. HID_KDATA and
 	 * HID_KCODE (resources 0 and 1) are always resident and fixed, but
@@ -3306,7 +3308,7 @@ IbmConnect(void)
                       MakeAddress(hr1->hr1_psp, 0),
 		      0,
 		      0, -1);
-	
+
 	if (hr1->hr1_stubSeg < hr1->hr1_baseSeg) {
 	    /*
 	     * Make the SWAT segment cover the rest (up to the kernel)
@@ -3347,7 +3349,7 @@ IbmConnect(void)
 	    {
 		(void)Handle_Lookup(swaps(*hg));
 	    }
-	    
+
 	    /*
 	     * Now handle all the extant threads. The thread list begins with
 	     * the youngest thread, but we want to number from the oldest, so
@@ -3382,7 +3384,7 @@ IbmConnect(void)
 	 * Tell the world we're attached
 	 */
 	(void)Event_Dispatch(EVENT_ATTACH, NullOpaque);
-	
+
 	return(TRUE);
     }
 }
@@ -3412,7 +3414,7 @@ IbmNukeAllPatients(int preserveSystem)
 {
     LstNode	ln, tln;
     Patient 	patient;
-    
+
     for (ln = Lst_Last(patients); ln != NILLNODE; ln = tln) {
 	tln = Lst_Pred(ln);
 	patient = (Patient)Lst_Datum(ln);
@@ -3505,7 +3507,7 @@ IbmDisconnect(Rpc_Proc	procNum)    /* Procedure to call to tell the PC to
      * Reset current patient to be the kernel/loader and nuke all drivers
      * except those patients created with dossym.
      */
-	
+
     curPatient = loader;
     realCurThread =
 	(ThreadPtr)(curPatient->curThread =
@@ -3524,7 +3526,7 @@ IbmDisconnect(Rpc_Proc	procNum)    /* Procedure to call to tell the PC to
      */
     if (procNum != 0) {
 	(void)Event_Dispatch(EVENT_CONTINUE, CONTINUE_DETACH);
-    }    
+    }
     if (procNum != (Rpc_Proc)-1) {
 	if (procNum != 0) {
 	    Rpc_Exit(procNum);
@@ -3547,8 +3549,8 @@ IbmDisconnect(Rpc_Proc	procNum)    /* Procedure to call to tell the PC to
 #endif
     }
 }
-    
-    
+
+
 
 /***********************************************************************
  *				IbmMakeFakeThread
@@ -3594,8 +3596,8 @@ IbmMakeFakeThread(Patient   patient,	/* Patient for which to make the fake
 	IbmEnsureObject(patient);
 	offset = offsetof(ExecutableFileHeader2, udataSize);
 
-	Ibm_ReadFromObjectFile(patient, sizeof(udataSize), offset, 
-			       (char *)&udataSize, SEEK_SET, 
+	Ibm_ReadFromObjectFile(patient, sizeof(udataSize), offset,
+			       (char *)&udataSize, SEEK_SET,
 			       GEODE_DATA_UDATA_SIZE, 0, 0);
 	if (swap) {
 	    udataSize = swaps(udataSize);
@@ -3718,7 +3720,7 @@ IbmInitKernel(void)
      * Read in the symbol table
      */
     Sym_Init(kernel);
-    
+
     /*
      * Create the kernel thread.
      */
@@ -3746,7 +3748,7 @@ IbmInitKernel(void)
 		  kernel->resources[KRES_KINIT].size,
 		  0, -1);
 }
-    
+
 /******************************************************************************
  *	    	    	    	    	    	    	    	    	      *
  *			     RPC HANDLERS				      *
@@ -3788,7 +3790,7 @@ IbmHalt(Rpc_Message 	msg,
     cur->regs = ha->ha_regs;
     cur->regs.reg_xipPage = ha->ha_curXIPPage;
     cur->flags &= ~(IBM_REGS_NEEDED|IBM_REGS_DIRTY);
-    
+
     /*
      * Acknowledge the call
      */
@@ -3811,7 +3813,7 @@ IbmHalt(Rpc_Message 	msg,
      */
     curPatient->frame = MD_CurrentFrame();
     (void)IbmSetDir();
-    
+
     if ((ha->ha_reason == RPC_HALT_BPT) &&
 	(Event_Dispatch(EVENT_STOP,
 			(Opaque)&stayStopped)!=EVENT_NOT_HANDLED) &&
@@ -3831,13 +3833,13 @@ IbmHalt(Rpc_Message 	msg,
 	    return;
 	}
     }
-    
+
     /*
      * If event not handled (the stop was unexpected) or the breakpoint
      * should be taken (stayStopped is set), or the machine stopped for
      * some reason other than a breakpoint, keep it stopped.
      */
-    
+
     if (ha->ha_reason < Number(stopCodes)) {
 	why = stopCodes[ha->ha_reason];
     } else {
@@ -3846,14 +3848,14 @@ IbmHalt(Rpc_Message 	msg,
     }
 
     Tcl_SetVar(interp, "lastHaltCode", why, TRUE);
-    
+
     if (!noFullStop) {
 	/*
 	 * Machine staying stopped -- notify everyone of the fact, giving
 	 * the reason as the piece of data.
 	 */
 	Event_Dispatch(EVENT_FULLSTOP, (Opaque)why);
-	
+
 	/*
 	 * If actually keeping the thing stopped, abort any calls we have
 	 * in progress and go back to the top level.
@@ -3891,7 +3893,7 @@ IbmSpawnCommon(SpawnArgs    *sa)
 		      0);
     } else {
 	Handle	h;
-	
+
 	/*
 	 * Driver/Library load -- need to look up the handle and its Patient
 	 * record and dispatch a START event after setting up the curPatient
@@ -3937,7 +3939,7 @@ IbmSpawnCommon(SpawnArgs    *sa)
  * CALLED BY:	IbmSpawn, IbmKernelLoaded
  * RETURN:	nothing
  * SIDE EFFECTS:reply message sent, EVENT_CONTINUE maybe sent,
- *	    	RPC_INTERRUPT maybe sent. 
+ *	    	RPC_INTERRUPT maybe sent.
  *
  * STRATEGY:
  *
@@ -3962,13 +3964,13 @@ IbmSpawnFinish(Rpc_Message  	msg,	    /* Message to which to reply */
 	 */
 implied_continue:
 	(void)Event_Dispatch(EVENT_CONTINUE, CONTINUE_HALF);
-    
+
 	sysFlags &= ~PATIENT_STOPPED;
 	sysFlags |= PATIENT_RUNNING;
     } else if (sysFlags & PATIENT_STOPPED) {
 	/*
 	 * Machine hasn't been continued yet, so send it an RPC_INTERRUPT
-	 * to tell it to stay stopped once we return from the 
+	 * to tell it to stay stopped once we return from the
 	 * RPC_KERNEL_LOADED
 	 */
 	word	threadID;
@@ -3983,11 +3985,11 @@ implied_continue:
 	}
 	if (!noFullStop) {
 	    char	*spmsg;
-	    
+
 	    spmsg = (char *)malloc(strlen(name) + sizeof(" spawned"));
-	    
+
 	    sprintf(spmsg, "%s spawned", name);
-	    
+
 	    Event_Dispatch(EVENT_FULLSTOP, (Opaque)spmsg);
 	    free(spmsg);
 	}
@@ -4044,15 +4046,15 @@ IbmSpawn(Rpc_Message	msg,
  *			IbmSetCurXIPPage
  *********************************************************************
  * SYNOPSIS: 	set the current xip page
- * CALLED BY:	
+ * CALLED BY:
  * RETURN:
  * SIDE EFFECTS:
  * STRATEGY:
  * REVISION HISTORY:
- *	Name	Date		Description			     
- *	----	----		-----------			     
- *	jimmy	5/18/94		Initial version			     
- * 
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jimmy	5/18/94		Initial version
+ *
  *********************************************************************/
 void
 IbmSetCurXIPPage(word xipPage)
@@ -4075,10 +4077,10 @@ IbmSetCurXIPPage(word xipPage)
  * SIDE EFFECTS:
  * STRATEGY:
  * REVISION HISTORY:
- *	Name	Date		Description			     
- *	----	----		-----------			     
- *	jimmy	7/19/93		Initial version			     
- * 
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jimmy	7/19/93		Initial version
+ *
  *********************************************************************/
 static int
 IbmSetup(Patient kernel)
@@ -4104,10 +4106,10 @@ IbmSetup(Patient kernel)
  * SIDE EFFECTS:
  * STRATEGY:
  * REVISION HISTORY:
- *	Name	Date		Description			     
- *	----	----		-----------			     
- *	jimmy	7/19/93		Initial version			     
- * 
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jimmy	7/19/93		Initial version
+ *
  *********************************************************************/
 static int
 IbmHello(void)
@@ -4125,14 +4127,14 @@ IbmHello(void)
     if (needSetup)
     {
 	IbmSetup(kernel);
-    }    
+    }
 #endif
     /*
      * Figure resource ID for kcode
      */
-    for (i = 1; i < kernel->numRes; i++) 
+    for (i = 1; i < kernel->numRes; i++)
     {
-	if (strcmp(Sym_Name(kernel->resources[i].sym), "kcode") == 0) 
+	if (strcmp(Sym_Name(kernel->resources[i].sym), "kcode") == 0)
 	{
 	    kcodeResID = i;
 	    break;
@@ -4170,7 +4172,7 @@ IbmHello(void)
 	{
 	    (void)Handle_Lookup(swaps(*hg));
 	}
-	    
+
 	/*
 	 * Now handle all the extant threads. The thread list begins with
 	 * the youngest thread, but we want to number from the oldest, so
@@ -4291,13 +4293,13 @@ IbmKernelLoaded(Rpc_Message 	msg,
 			  HANDLE_KERNEL|HANDLE_MEMORY|HANDLE_DISCARDED|HANDLE_DISCARDABLE, -1);   /* flags */
 	}
     }
-    
+
     if (IbmHello() != RPC_SUCCESS)
     {
 	Warning("Could not contact PC: %s", Rpc_LastError());
 	Rpc_Return(msg, 0, (Rpc_Opaque)NULL);
 	return;
-    } 
+    }
     (void)Event_Dispatch(EVENT_START, (Opaque)kernel);
     IbmSpawnFinish(msg, "geos");
 }
@@ -4348,12 +4350,12 @@ IbmThreadDestroy(Rpc_Message	msg,
 	 */
 	IbmSetCurPatient(tea->tea_handle);
 	patient = curPatient;
-	
+
 	/*
 	 * Locate the node for the thread in the patient's threads list
 	 */
 	ln = Lst_Member(curPatient->threads, (LstClientData)realCurThread);
-	
+
 	assert (ln != NILLNODE);
 
 	/*
@@ -4365,7 +4367,7 @@ IbmThreadDestroy(Rpc_Message	msg,
 	 * Note that thread is gone so IbmFlushState will destroy it
 	 */
 	realCurThread->flags |= IBM_THREAD_GONE;
-	
+
 	MessageFlush("Thread %d of %s exited %d\n", realCurThread->number,
 		     patient->name, tea->tea_status);
     }
@@ -4373,7 +4375,7 @@ IbmThreadDestroy(Rpc_Message	msg,
      * Now tell everyone the machine is continuing.
      */
     (void)Event_Dispatch(EVENT_CONTINUE, CONTINUE_HALF);
-     
+
 ret:
     /*
      * And tell the machine to continue
@@ -4433,7 +4435,7 @@ IbmGeodeExit(Rpc_Message	msg,
 	patient = Handle_Patient(handle);
 
 	MessageFlush("%s exited.\n", patient->name);
-	
+
 	if (Lst_IsEmpty(patient->threads)) {
 	    /*
 	     * If there are no threads for the patient, we can biff the thing
@@ -4446,7 +4448,7 @@ IbmGeodeExit(Rpc_Message	msg,
 	    patient->patientPriv = (Opaque)1;
 	}
     }
-    
+
     /*
      * It's somewhat unsanitary to leave the current patient a corpse,
      * as various nasty things can happen (e.g. if the user, who shall remain
@@ -4462,7 +4464,7 @@ IbmGeodeExit(Rpc_Message	msg,
      * Now tell everyone the machine is continuing.
      */
     (void)Event_Dispatch(EVENT_CONTINUE, CONTINUE_HALF);
-     
+
 ret:
     /*
      * And tell the machine to continue
@@ -4494,7 +4496,7 @@ IbmSysExit(Rpc_Message	msg,
 	   Rpc_Opaque 	clientData)
 {
     const char	*autoDetach;
-    
+
     /*
      * Set the current patient to the kernel/loader and set the current frame
      * so commands work as they should.
@@ -4513,14 +4515,14 @@ IbmSysExit(Rpc_Message	msg,
 	strcpy(cp, defaultPatient->name);
 	defaultPatient = (Patient)cp;
     }
-    
+
     /*
      * Notify everyone of the exit of GEOS.
      */
     (void)Event_Dispatch(EVENT_FULLSTOP, (Opaque)"GEOS Exited");
 
     Rpc_Return(msg, 0, (Rpc_Opaque)NULL);
-    
+
     /*
      * See if the autodetach variable is defined. If it is and it's 0,
      * we will remain attached until the user tells us to detach.
@@ -4668,7 +4670,7 @@ IbmReset(Event event, Opaque callData, Opaque clientData)
 	Warning("Current thread can't be determined -- using kernel thread");
 	IbmUseDefaultPatient();
     }
-    
+
     /*XXX*/
     IbmCheckPatient(curPatient);
 
@@ -4718,7 +4720,7 @@ IbmCreateTypes(void)
 				"reg_xipPage", type_Word,
 				(char *)0);
     GC_RegisterType(typeIbmRegs);
-    
+
     typeHaltArgs =
 	Type_CreatePackedStruct("ha_regs", typeIbmRegs,
 				"ha_reason", type_Word,
@@ -4726,40 +4728,40 @@ IbmCreateTypes(void)
 				"ha_curXIPPage", type_Word,
 				(char *)0);
     GC_RegisterType(typeHaltArgs);
-    
+
     typeMaskArgs =
 	Type_CreatePackedStruct("ma_PIC1", type_Byte,
 				"ma_PIC2", type_Byte,
 				(char *)0);
     GC_RegisterType(typeMaskArgs);
-    
+
     typeCallArgs =
 	Type_CreatePackedStruct("ca_thread", type_Word,
 				"ca_offset", type_Word,
 				"ca_segment", type_Word,
 				(char *)0);
     GC_RegisterType(typeCallArgs);
-    
+
     typeStepReply =
 	Type_CreatePackedStruct("sr_regs", typeIbmRegs,
 				"sr_thread", type_Word,
 				"sr_curXIPPage", type_Word,
 				(char *)0);
     GC_RegisterType(typeStepReply);
-    
+
     typeReadArgs =
 	Type_CreatePackedStruct("ra_offset", type_Word,
 				"ra_handle", type_Word,
 				"ra_numBytes", type_Word,
 				(char *)0);
     GC_RegisterType(typeReadArgs);
-    
+
     typeWriteArgs =
 	Type_CreatePackedStruct("wa_offset", type_Word,
 				"wa_handle", type_Word,
 				(char *)0);
     GC_RegisterType(typeWriteArgs);
-    
+
     typeFillArgs =
 	Type_CreatePackedStruct("fa_offset", type_Word,
 				"fa_handle", type_Word,
@@ -4767,26 +4769,26 @@ IbmCreateTypes(void)
 				"fa_value", type_Word,
 				(char *)0);
     GC_RegisterType(typeFillArgs);
-    
+
     typeIOWArgs =
 	Type_CreatePackedStruct("iow_port", type_Word,
 				"iow_value", type_Word,
 				(char *)0);
     GC_RegisterType(typeIOWArgs);
-    
+
     typeAbsReadArgs =
 	Type_CreatePackedStruct("ara_offset", type_Word,
 				"ara_segment", type_Word,
 				"ara_numBytes", type_Word,
 				(char *)0);
     GC_RegisterType(typeAbsReadArgs);
-    
+
     typeAbsWriteArgs =
 	Type_CreatePackedStruct("awa_offset", type_Word,
 				"awa_segment", type_Word,
 				(char *)0);
     GC_RegisterType(typeAbsWriteArgs);
-    
+
     typeAbsFillArgs =
 	Type_CreatePackedStruct("afa_offset", type_Word,
 				"afa_segment", type_Word,
@@ -4794,7 +4796,7 @@ IbmCreateTypes(void)
 				"afa_value", type_Word,
 				(char *)0);
     GC_RegisterType(typeAbsFillArgs);
-    
+
     typeSpawnArgs =
 	Type_CreatePackedStruct("sa_thread", type_Word,
 				"sa_owner", type_Word,
@@ -4803,7 +4805,7 @@ IbmCreateTypes(void)
 				"sa_xipPage", type_Word,
 				(char *)0);
     GC_RegisterType(typeSpawnArgs);
-    
+
     typeThreadExitArgs =
 	Type_CreatePackedStruct("tea_handle", type_Word,
 				"tea_status", type_Word,
@@ -4816,8 +4818,8 @@ IbmCreateTypes(void)
 				(char *)0);
     GC_RegisterType(typeGeodeExitArgs);
 
-#if 0    
-    typeHelloArgs1 = 
+#if 0
+    typeHelloArgs1 =
 	Type_CreatePackedStruct("ha1_kdata", type_Word,
 				"ha1_bootstrap", type_Word,
 				"ha1_HandleTable", type_Word,
@@ -4903,7 +4905,7 @@ IbmCreateTypes(void)
 				"sa_MAPPING_PAGE_ADDRESS", type_Word,
 				(char *)0);
     GC_RegisterType(typeSetupReplyArgs);
-#if 0    
+#if 0
     typeHelloReply1 =
 	Type_CreatePackedStruct("hr_baseSeg", 	    type_Word,
 				"hr_initSeg", 	    type_Word,
@@ -5050,7 +5052,7 @@ IbmCreateTypes(void)
 				"reserved",
 				 Type_CreateArray(0, FILE_FUTURE_USE_SIZE-1,
 						  type_Int, type_Byte),
-				
+
 				(char *)0);
     GC_RegisterType(typeGeosFileHeader2);
 
@@ -5132,7 +5134,7 @@ IbmCreateTypes(void)
 				"br1_rev", type_Word,
 				(char *)0);
     GC_RegisterType(typeBeepReply1);
-#endif    
+#endif
     typeBeepReply =
 	Type_CreatePackedStruct("br_csum", type_Word,
 				"br_rev", type_Word,
@@ -5150,7 +5152,7 @@ IbmCreateTypes(void)
 				(char *)0);
     GC_RegisterType(typeBeepReply);
 
-    typeReadXmsMemArgs = 
+    typeReadXmsMemArgs =
 	Type_CreatePackedStruct("RXMA_size",           type_Long,
 				"RXMA_sourceOffset",   type_Long,
 				"RXMA_sourceHandle",   type_Word,
@@ -5231,7 +5233,7 @@ Ibm_PingPC(Boolean initialized)	    /* TRUE if Swat's been fully initialized */
      */
     rpcDebug &= ~RD_NO_TIMEOUT;
 #endif
-    
+
     /*
      * Save so we know when to re-read things.
      */
@@ -5248,7 +5250,7 @@ Ibm_PingPC(Boolean initialized)	    /* TRUE if Swat's been fully initialized */
     }
 
     /* do this here, before the beep, otherwise things are not good! */
-    if (Rpc_ReadFromGeode(loader, (dword)EXE_HEADERSIZE_OFF, 
+    if (Rpc_ReadFromGeode(loader, (dword)EXE_HEADERSIZE_OFF,
 			  sizeof(headerSize), GEODE_DATA_LOADER,
 			    (char *)&headerSize, 0, 0) == TCL_ERROR)
     {
@@ -5288,7 +5290,7 @@ attach_error_goodbye:
 #if GEOS32
     if (!br.br_stubType & STUB_GEOS32)  {
 	Tcl_RetPrintf(
-            interp, 
+            interp,
             "Can't deal with PC: Stub IS NOT a GEOS32 version.");
 	goto attach_error_goodbye;
     } else {
@@ -5297,7 +5299,7 @@ attach_error_goodbye:
 #else
     if (br.br_stubType & STUB_GEOS32)  {
 	Tcl_RetPrintf(
-            interp, 
+            interp,
             "Can't deal with PC: Stub IS a GEOS32 version.  Swat is not compiled for this mode.");
 	goto attach_error_goodbye;
     } else {
@@ -5309,7 +5311,7 @@ attach_error_goodbye:
     /* Make sure we are using a 32 bit register aware version. */
     if (!(br.br_stubType & STUB_32BIT_REGS))  {
 	Tcl_RetPrintf(
-            interp, 
+            interp,
             "Can't deal with PC: Stub IS NOT a 32-bit register version.");
 	goto attach_error_goodbye;
     } else {
@@ -5319,7 +5321,7 @@ attach_error_goodbye:
     /* Make sure we are NOT using a 32 bit register aware version. */
     if (br.br_stubType & STUB_32BIT_REGS)  {
 	Tcl_RetPrintf(
-            interp, 
+            interp,
             "Can't deal with PC: Stub *IS* a 32-bit register version.  Swat is compiled for only 16-bit registers.");
 	goto attach_error_goodbye;
     } else {
@@ -5336,26 +5338,26 @@ attach_error_goodbye:
     geosRelease = 2;
 
     stubType = br.br_stubType & STUB_TYPE_MASK;
-    
+
     Tcl_SetVar(interp, "stub-type", stubNames[stubType], TRUE);
 
-	
+
     /*
      * Set up the address TCL variables from the patient.
      */
     sprintf(varVal, "%04xh:%04xh", br.br_sysTablesSeg,
 	    br.br_sysTablesOff);
     Tcl_SetVar(interp, "DOSTables", varVal, TRUE);
-	
+
     sprintf(varVal, "%04xh:0", br.br_psp);
     Tcl_SetVar(interp, "PSPAddr", varVal, TRUE);
-	
+
     sprintf(varVal, "%d", br.br_mask1);
     Tcl_SetVar(interp, "IC1Mask", varVal, TRUE);
-	
+
     sprintf(varVal, "%d", br.br_mask2);
     Tcl_SetVar(interp, "IC2Mask", varVal, TRUE);
-	
+
     sprintf(varVal, "%04xh:%04xh", br.br_stubSeg, br.br_irqHandlers);
     Tcl_SetVar(interp, "irqhandlers", varVal, TRUE);
 
@@ -5388,8 +5390,8 @@ attach_error_goodbye:
 	VMBlockHandle	map;
 	ObjHeader   	*hdr;
 	char	    	*sysName = "loader";
-	
-    
+
+
 	oldPath = loader->path;
 	oldSym = loader->symFile;
 	IbmEnsureClosed(loader);
@@ -5428,31 +5430,31 @@ attach_error_goodbye:
 	     */
 	    newSym = loader->symFile;
 	    loader->symFile = oldSym;
-	    
+
 	    /*
 	     * Consistency, consistency...
 	     */
 	    (void)Event_Dispatch(EVENT_DESTROY, (Opaque)loader);
-	    
+
 	    /*
 	     * Free all loader handles to nuke any breakpoints. We start from
 	     * 1 for release 1, b/c resource 0 and 1 are the same (the kernel
-	     * has no real coreblock in release 1, so kdata serves in its 
+	     * has no real coreblock in release 1, so kdata serves in its
 	     * place)
 	     */
 	    for (i = 0; i < loader->numRes; i++) {
 		Handle_Free(loader->resources[i].handle);
 	    }
-	    
+
 	    /*
 	     * Blow away the loader thread so it can arise, phoenix-like, from
 	     * the ashes of the old...
 	     */
 	    kthread = (ThreadPtr)Lst_Datum(Lst_First(loader->threads));
-	    
+
 	    Lst_Destroy(kthread->state, (void (*)())free);
 	    Handle_Free(kthread->handle);
-	    
+
 	    /*
 	     * Find and remove kthread from the list of all threads.
 	     */
@@ -5460,13 +5462,13 @@ attach_error_goodbye:
 	    assert(ln != NILLNODE);
 	    Lst_Remove(allThreads, ln);
 	    Lst_Destroy(loader->threads, NOFREE);
-	    
+
 	    /*
 	     * Free thread descriptor itself
 	     */
 	    free((char *)kthread);
 	    loader->curThread = (Thread)NULL;
-	    
+
 	    loader->symFile = newSym;
 	}
 
@@ -5475,7 +5477,7 @@ attach_error_goodbye:
 	 * Figure the number of loader resources from the .sym file.
 	 */
 	attached = TRUE;
-	
+
 	map = VMGetMapBlock(loader->symFile);
 	hdr = (ObjHeader *)VMLock(loader->symFile, map, (MemHandle *)NULL);
 
@@ -5502,21 +5504,21 @@ attach_error_goodbye:
 					    loader->numRes*sizeof(ResourceRec));
 	    bzero (loader->resources, loader->numRes * sizeof(ResourceRec));
 	}
-							    
+
 
 	/*
 	 * (re-)read the symbol table for the thing.
 	 */
 	curPatient = loader;
 	Sym_Init(loader);
-	    
+
 	/*
 	 * Initialize resources[0].handle to Null so we can use it as the
 	 * owner in the loop (Handle_Create takes a Null owner as meaning it
 	 * owns itself)
 	 */
 	loader->resources[0].handle = NullHandle;
-	    
+
 	/*
 	 * Create handles for all the resources, making them non-resident
 	 * loader memory handles. The "core block" is made a PROCESS handle,
@@ -5533,13 +5535,13 @@ attach_error_goodbye:
 				  (Opaque)i,   	    	    /* other (resid) */
 			      	  HANDLE_NOT_XIP);
 	    }
-	    
+
 	loader->core = loader->resources[0].handle;
 	loader->geode.v2 = (Geode2Ptr)NULL;
 	loader->threads = Lst_Init(FALSE);
 	loader->curThread = (Thread)NULL;
 	loader->name = "loader";
-	    
+
 	/*
 	 * Set up the file offsets for the real segments. Note that absolute
 	 * and library segments have a size of 0, so this s/b ok.
@@ -5571,7 +5573,7 @@ attach_error_goodbye:
 	    patientsChucked += 1;
 	}
     }
-	
+
     curPatient = loader;
     loader->scope = loader->global;
     loader->line = -1;
@@ -5581,7 +5583,7 @@ attach_error_goodbye:
      * the resources for the loader.
      */
     Ibm_LoaderMoved(br.br_baseSeg);
-	
+
     /*
      * Make the DOS segment cover the whole range from 0x400 to the stub.
      * If we were already initialized, leave the size alone, as we assume
@@ -5599,7 +5601,7 @@ attach_error_goodbye:
 	/* so we know it's fake... */
 	loader->resources[i].flags = RESF_READ_ONLY;
     }
-	
+
     /*
      * Set the base address of the PSP segment -- the size is always
      * 256 bytes and set in Ibm_Init.
@@ -5615,7 +5617,7 @@ attach_error_goodbye:
 	/* so we know it's fake... */
 	loader->resources[i].flags = RESF_READ_ONLY;
     }
-	
+
     /*
      * Make the Swat segment cover what it says it covers.
      */
@@ -5630,7 +5632,7 @@ attach_error_goodbye:
 	/* so we know it's fake... */
 	loader->resources[i].flags = RESF_READ_ONLY;
     }
-	
+
     /*
      * Make the BIOS segment cover the 64K at f000
      */
@@ -5694,7 +5696,7 @@ attach_error_goodbye:
     }
 
     Tcl_SetVar(interp, "attached", "1", TRUE);
-    
+
     /*
      * Tell the world the loader has started.
      */
@@ -5704,7 +5706,7 @@ attach_error_goodbye:
      * Tell the world we're attached
      */
     (void)Event_Dispatch(EVENT_ATTACH, NullOpaque);
-	
+
     /*
      * If the stub's about to tell us about the loader, wait until it does
      * so before we return. This avoids ugliness about switching patients
@@ -5712,7 +5714,7 @@ attach_error_goodbye:
      * XXX: what if stub dies at this moment?
      */
     if (br.br_kernelLoaded) {
-	
+
 	while (kernelLoaded == FALSE) {
 #if defined(_WIN32)   /* experiment on WIN32 only - XXXdan */
 	    if (Ui_Interrupt() == TRUE) {
@@ -5730,14 +5732,14 @@ attach_error_goodbye:
 
     sysFlags = PATIENT_STOPPED;
 #if defined(_MSDOS)
-/* 
+/*
  * invalidate the fileCache, this is over kill but its better than
  * not clearing it, and I don't have time to figure out what's wrong with
  * the PC src cache stuff now...
  */
     Cache_InvalidateAll(fileCache, TRUE);
 
-/* 
+/*
  * prevent rpc calls from timing out.  fixes problem where swat will
  * sometimes timeout and die when running under Windoze as a background
  * process.
@@ -5757,15 +5759,15 @@ attach_error_goodbye:
  *			nap
  *********************************************************************
  * SYNOPSIS: sleep in increments of 100th of seconds
- * CALLED BY:	
+ * CALLED BY:
  * RETURN:
  * SIDE EFFECTS:
  * STRATEGY:
  * REVISION HISTORY:
- *	Name	Date		Description			     
- *	----	----		-----------			     
- *	jimmy	7/ 7/93		Initial version			     
- * 
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jimmy	7/ 7/93		Initial version
+ *
  *********************************************************************/
 #if 0
 void nap(short ticks)
@@ -5785,7 +5787,7 @@ void nap(short ticks)
 #else
     struct dostime_t t;
     short    	     ct;
-    
+
     _dos_gettime(&t);
     ct = t.hsecond + ticks;
     if (ct > 100)
@@ -5810,10 +5812,10 @@ void nap(short ticks)
  * SIDE EFFECTS: time passes, what more can I say???
  * STRATEGY: wait for (now) time to equal start time + naptime
  * REVISION HISTORY:
- *	Name	Date		Description			     
- *	----	----		-----------			     
- *	jimmy	10/22/92		Initial version			     
- * 
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jimmy	10/22/92		Initial version
+ *
  *********************************************************************/
 void
 sleep(unsigned long naptime)
@@ -5989,7 +5991,7 @@ Ibm_Init(char 	*file,	    /* File containing kernel */
      */
     objectCache = Cache_Create(CACHE_LRU, MAX_OBJECTS, CACHE_ADDRESS,
 			       IbmObjectClose);
-    
+
     /*
      * Initialize the lists we maintain...
      */
@@ -6035,14 +6037,14 @@ Ibm_Init(char 	*file,	    /* File containing kernel */
      */
     Rpc_ServerCreate(RPC_KERNEL_LOAD, IbmKernelLoaded, typeSpawnArgs,
 		     NullType, (Rpc_Opaque)NULL);
-    
+
     /*
      * Initialize the handle module since we now need to create handles and
      * it can register its Rpc servers.
      */
     Handle_Init();
 
-    /* 
+    /*
      * if the startup flag is non-zero, then send the Stub a signal to
      * crank things up and then do the ping
      */
@@ -6072,8 +6074,8 @@ Ibm_Init(char 	*file,	    /* File containing kernel */
 	if (MessageFlush != NULL) {
 	    MessageFlush((char *)interp->result);
 	    Swat_Death();
-	} else 
-#endif	
+	} else
+#endif
 	{
 	    Punt((char *)interp->result);
 	}
@@ -6138,6 +6140,3 @@ Ibm_Init(char 	*file,	    /* File containing kernel */
     initialized = TRUE;
     Cmd_Create(&AttachLowCmdRec);
 }
-
-
-

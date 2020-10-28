@@ -13,9 +13,9 @@
  * ROUTINES:
  *	Name	  	    Description
  *	----	  	    -----------
- *	lcp_init    	    
- *	lcp_open    	    
- *	lcp_close   	    
+ *	lcp_init
+ *	lcp_open
+ *	lcp_close
  *	lcp_lowerup
  *	lcp_lowerdown
  *	lcp_client_timeout
@@ -38,7 +38,7 @@
  *	lcp_closed  	    LCP has CLOSED
  *
  *	lqm_protrej 	    Process a received Protocol-Reject for LQM
- *	lqm_lowerup 	    
+ *	lqm_lowerup
  *	lqm_lowerdown
  *	lqm_start
  *	lqm_set_lqr_status  Update status and check if link is bad
@@ -62,7 +62,7 @@
  *
  ***********************************************************************/
 
-/* 
+/*
  *
  * Copyright (c) 1989 Carnegie Mellon University.
  * All rights reserved.
@@ -100,9 +100,9 @@ void lcp_up();			/* We're UP */
 void lcp_down();		/* We're DOWN */
 void lcp_closed();		/* We're CLOSED */
 
-void lqm_lowerup(); 	    	
+void lqm_lowerup();
 void lqm_lowerdown();
-void lqm_start(int unit, unsigned long lqrinterval, unsigned char echolqm, 
+void lqm_start(int unit, unsigned long lqrinterval, unsigned char echolqm,
 	       int k, int n);
 
 unsigned char lcp_echorequest();
@@ -114,15 +114,15 @@ void lcp_echoreply();
 static VoidCallback *lcp_resetci_vfptr = lcp_resetci;
 static IntCallback *lcp_cilen_vfptr = lcp_cilen;
 static VoidCallback *lcp_addci_vfptr = lcp_addci;
-static IntCallback *lcp_ackci_vfptr = lcp_ackci;	
-static VoidCallback *lcp_nakci_vfptr = lcp_nakci;	
+static IntCallback *lcp_ackci_vfptr = lcp_ackci;
+static VoidCallback *lcp_nakci_vfptr = lcp_nakci;
 static VoidCallback *lcp_rejci_vfptr = lcp_rejci;
-static ByteCallback *lcp_reqci_vfptr = lcp_reqci;	
+static ByteCallback *lcp_reqci_vfptr = lcp_reqci;
 static VoidCallback *lcp_up_vfptr = lcp_up;
-static VoidCallback *lcp_down_vfptr = lcp_down;	
-static VoidCallback *lcp_closed_vfptr = lcp_closed;	
-static ByteCallback *lcp_echorequest_vfptr = lcp_echorequest;	
-static VoidCallback *lcp_echoreply_vfptr = lcp_echoreply;	
+static VoidCallback *lcp_down_vfptr = lcp_down;
+static VoidCallback *lcp_closed_vfptr = lcp_closed;
+static ByteCallback *lcp_echorequest_vfptr = lcp_echorequest;
+static VoidCallback *lcp_echoreply_vfptr = lcp_echoreply;
 
 fsm_callbacks lcp_callbacks;
 
@@ -131,6 +131,9 @@ fsm_callbacks lcp_callbacks;
 #endif
 #ifdef __BORLANDC__
 #pragma codeseg LCPINIT
+#endif
+#ifdef __WATCOMC__
+#pragma code_seg("LCPINIT")
 #endif
 
 
@@ -141,7 +144,7 @@ fsm_callbacks lcp_callbacks;
  * CALLED BY:	PPPSetup using prottbl entry
  * RETURN:	nothing
  *
- * NOTES:   	Commented out lines initializing defaults to zero 
+ * NOTES:   	Commented out lines initializing defaults to zero
  *	    	because they are already zero (dgroup).  The lines
  *	    	now server as comments.
  *
@@ -172,11 +175,11 @@ void lcp_init (int unit)
     lcp_callbacks.closed = lcp_closed_vfptr;
     lcp_callbacks.echorequest = lcp_echorequest_vfptr;
     lcp_callbacks.echoreply = lcp_echoreply_vfptr;
-    lcp_callbacks.protreject = lcp_callbacks.retransmit = 
+    lcp_callbacks.protreject = lcp_callbacks.retransmit =
 	lcp_callbacks.lqreport = (VoidCallback *)NULL;
 #ifdef USE_CCP
     lcp_callbacks.resetrequest = lcp_callbacks.resetack = (VoidCallback *)NULL;
-#endif 
+#endif
     /*
      * Initialize the FSM values.
      */
@@ -190,12 +193,12 @@ void lcp_init (int unit)
 /*  f -> tx_naks = 0;	    	*/
 /*  f -> rx_naks = 0;	    	*/
     f -> code_mask = 0xffe; 	/* CONFIGURE-REQUEST thru DISCARD-REQUEST */
-    
+
     f -> callbacks = &lcp_callbacks;
 
     /*
-     * Initialize want options.  Default is to escape ^Q and ^S for 
-     * xon/xoff. 
+     * Initialize want options.  Default is to escape ^Q and ^S for
+     * xon/xoff.
      */
 
     wo -> lcp_neg = ( CI_N_MRU | CI_N_ASYNCMAP | CI_N_MAGICNUMBER |
@@ -213,7 +216,7 @@ void lcp_init (int unit)
      * Initialize allow options -- allow everything.
      */
       ao -> lcp_neg = (CI_N_MRU | CI_N_ASYNCMAP | CI_N_PAP | CI_N_CHAP |
-                    CI_N_AUTHTYPE | CI_N_MAGICNUMBER | CI_N_LQM | 
+                    CI_N_AUTHTYPE | CI_N_MAGICNUMBER | CI_N_LQM |
                     CI_N_PCOMPRESSION | CI_N_ACCOMPRESSION);
 
     /*
@@ -282,8 +285,8 @@ void lcp_close (int unit)
  *	    	PPPProcessInput
  * RETURN:	nothing
  *
- * STRATEGY:	Reset some global variables used by code that 
- *	    	reads/writes data from the serial line.  Let FSM 
+ * STRATEGY:	Reset some global variables used by code that
+ *	    	reads/writes data from the serial line.  Let FSM
  * 	    	take care of the rest.
  *
  * REVISION HISTORY:
@@ -296,8 +299,8 @@ void lcp_lowerup (int unit)
 {
 
     DOLOG(lcp_loopback_warned = 0;)
-    
-    /* 
+
+    /*
      * Reset escape and discard maps to the defaults (escape everything),
      * reset compressions to none and then let FSM take care of the rest.
      */
@@ -336,7 +339,7 @@ void lcp_lowerdown (int unit)
 /***********************************************************************
  *				lcp_client_timeout
  ***********************************************************************
- * SYNOPSIS:	Process client timer expiring when attemting to open 
+ * SYNOPSIS:	Process client timer expiring when attemting to open
  *	    	PPP connection.
  * CALLED BY:	PPPTimeout
  * RETURN:	nothing
@@ -395,18 +398,18 @@ void lcp_protrej (int unit)
  *	jwu	5/ 4/95		Initial Revision
  *
  ***********************************************************************/
-void lcp_sprotrej (int unit, 	
+void lcp_sprotrej (int unit,
 		   PACKET *p,
 		   int len)
 {
 
     /*
-     * Back up the data pointer by 2 bytes to include the received 
+     * Back up the data pointer by 2 bytes to include the received
      * protocol in the data, so all fsm_sdata has to do is prepend
      * the PPP header.
      */
     p -> MH_dataOffset -= 2;
-    len += 2;	    	
+    len += 2;
 
     /*
      * Check to see if rejected packet needs to be truncated so as
@@ -441,7 +444,7 @@ void lcp_resetci (fsm *f)
 {
     int i;
     lcp_wantoptions[f -> unit].magicnumber = NetGenerateRandom32();
-    
+
     for (i = 0; i <= LCP_MAXCI; i++)
 	lcp_wantoptions[f -> unit].rxnaks[i] = 0;
 
@@ -456,7 +459,7 @@ void lcp_resetci (fsm *f)
  ***********************************************************************
  * SYNOPSIS:	Return the size of our configuration information.
  *	    	(FSM callback routine)
- * CALLED BY:	scr 	= Send Configure Request 
+ * CALLED BY:	scr 	= Send Configure Request
  * RETURN:	length of our configuration information
  *
  * REVISION HISTORY:
@@ -473,9 +476,9 @@ int lcp_cilen (fsm *f)
 #define LENCISHORT(neg) ((neg) ? 4 : 0)
 #define LENCILONG(neg) ((neg) ? 6 : 0)
 
-    return (LENCISHORT(go -> lcp_neg & CI_N_MRU) +  	  
-	    LENCILONG(go -> lcp_neg & CI_N_ASYNCMAP) +	    
-	    ((go -> lcp_neg & CI_N_AUTHTYPE) ? 
+    return (LENCISHORT(go -> lcp_neg & CI_N_MRU) +
+	    LENCILONG(go -> lcp_neg & CI_N_ASYNCMAP) +
+	    ((go -> lcp_neg & CI_N_AUTHTYPE) ?
 	    	(go -> auth_prot == PAP ? 4 : 5) : 0) +
 	    LENCILONG(go -> lcp_neg & CI_N_MAGICNUMBER) +
 	    ((go -> lcp_neg & CI_N_LQM) ? 8 : 0) +
@@ -490,10 +493,10 @@ int lcp_cilen (fsm *f)
  ***********************************************************************
  * SYNOPSIS:	Add our desired configuration information to the packet.
  *	    	(FSM callback routine)
- * CALLED BY:	scr 	= Send Configure Request 
+ * CALLED BY:	scr 	= Send Configure Request
  * RETURN:	nothing
  *
- * STRATEGY:	Add options we want to negotiate into the buffer pointed 
+ * STRATEGY:	Add options we want to negotiate into the buffer pointed
  *	    	to by ucp.
  *
  * REVISION HISTORY:
@@ -533,7 +536,7 @@ void lcp_addci (fsm *f,
      * The code in the following will leave a ";" when LOGGING_ENABLED
      * is not defined, allowing the above macros to work.
      */
-    ADDCISHORT(CI_MRU, go -> lcp_neg & CI_N_MRU, go -> mru, 
+    ADDCISHORT(CI_MRU, go -> lcp_neg & CI_N_MRU, go -> mru,
 	       LOG3(LOG_NEG, (LOG_LCP_SEND_MRU, go -> mru));
 	       )
 
@@ -561,8 +564,8 @@ void lcp_addci (fsm *f,
 	    PUTCHAR(5, ucp);	    	    /* Use MD5 algorithm */
 	    LOG3(LOG_NEG, (LOG_LCP_SEND_AUTH, "CHAP, MD5"));
 	}
-	    
-    ADDCILONG(CI_MAGICNUMBER, go -> lcp_neg & CI_N_MAGICNUMBER, 
+
+    ADDCILONG(CI_MAGICNUMBER, go -> lcp_neg & CI_N_MAGICNUMBER,
 	      go -> magicnumber,
 	      LOG3(LOG_NEG, (LOG_LCP_SEND_MAGIC,
 			    go -> magicnumber));
@@ -587,7 +590,7 @@ void lcp_addci (fsm *f,
 	}
 #endif /* LOGGING_ENABLED */
     }
-	  
+
     ADDCIVOID(CI_PCOMPRESSION, go -> lcp_neg & CI_N_PCOMPRESSION,
 	      LOG3(LOG_NEG, (LOG_LCP_SEND_PCOMP));
 	      )
@@ -603,7 +606,7 @@ void lcp_addci (fsm *f,
  ***********************************************************************
  * SYNOPSIS:	Process an ACK for our configuration information.
  *	    	(FSM callback routine)
- * CALLED BY:	fsm_input 
+ * CALLED BY:	fsm_input
  * RETURN:	0 if Ack was bad.
  *	    	1 if Ack was good.
  *
@@ -670,19 +673,19 @@ int lcp_ackci (fsm *f,
 
     if (go -> lcp_neg & CI_N_AUTHTYPE) {
 	if (go -> auth_prot == PAP) {
-	    /* 
-	     * We already checked that authentication is negotiated so 
+	    /*
+	     * We already checked that authentication is negotiated so
 	     * pass a 1 to save some work.
-	     */  
+	     */
 	    ACKCISHORT(CI_AUTHTYPE, 1, PAP)
 	}
     	else {
 	    if ((len -= 5) < 0)	   /* make sure packet length is long enough */
 		goto bad;
-	    
+
 	    GETCHAR(citype, p);
 	    GETCHAR(cilen, p);
-	    
+
 	    if (cilen != 5) 	   /* check transmitted length */
 		goto bad;
 
@@ -696,8 +699,8 @@ int lcp_ackci (fsm *f,
 		goto bad;
 	}
     }
-	    
-    ACKCILONG(CI_MAGICNUMBER, go -> lcp_neg & CI_N_MAGICNUMBER, 
+
+    ACKCILONG(CI_MAGICNUMBER, go -> lcp_neg & CI_N_MAGICNUMBER,
 	      go -> magicnumber)
 
     if (go -> lcp_neg & CI_N_LQM) {
@@ -717,7 +720,7 @@ int lcp_ackci (fsm *f,
 	    goto bad;
 
 	GETLONG(cilong, p);
-	
+
 	if (cilong != go -> lqrinterval)   /* check reporting interval */
 	    goto bad;
     }
@@ -746,7 +749,7 @@ bad:
  ***********************************************************************
  * SYNOPSIS:	Process a received Configure-Nak message.
  *	    	(FSM callback routine)
- * CALLED BY:	fsm_input 
+ * CALLED BY:	fsm_input
  * RETURN:	nothing
  *
  * REVISION HISTORY:
@@ -781,10 +784,10 @@ void lcp_nakci (fsm *f,
 	int l = p[1];	    	    	/* get transmitted option length */
 
 	/*
-	 * Make sure transmitted length is less than remaining length and 
-	 * that the length is reasonable.  
+	 * Make sure transmitted length is less than remaining length and
+	 * that the length is reasonable.
 	 */
-	if (l > len || l < 2)	    	
+	if (l > len || l < 2)
 	    goto bad;
 
 	switch (p[0])	    	    	/* by packet type */
@@ -815,13 +818,13 @@ void lcp_nakci (fsm *f,
 		    LOG3(LOG_NEG, (LOG_LCP_MRU_NAK_SIMPLE));
 		}
 #endif /* LOGGING_ENABLED */
-		
+
 		break;
 
 	    case CI_ASYNCMAP:
 		if (l == 6 && (ao -> lcp_neg & CI_N_ASYNCMAP)) {
 		    GETLONG(cilong, p1);
-			
+
 	    	    LOG3(LOG_NEG, (LOG_LCP_AMAP_NAK, cilong));
 
 		    go -> lcp_neg |= CI_N_ASYNCMAP;
@@ -846,7 +849,7 @@ void lcp_nakci (fsm *f,
 	    case CI_AUTHTYPE:
 		if (ao -> lcp_neg & CI_N_AUTHTYPE && l >= 4) {
 		    GETSHORT(cishort, p1);
-		    
+
 		    if (cishort == PAP && wo -> lcp_neg & CI_N_PAP) {
 			LOG3(LOG_NEG, (LOG_LCP_AUTH_NAK, "PAP"));
 			go -> lcp_neg |= (CI_N_AUTHTYPE | CI_N_PAP);
@@ -919,7 +922,7 @@ void lcp_nakci (fsm *f,
 			LOG3(LOG_NEG, (LOG_LCP_LQM_NAK_HEX, cishort));
 		    }
 #endif /* LOGGING_ENABLED */
-		    
+
 		    ++go -> rxnaks[CI_LQM];
 #ifdef LOGGING_ENABLED
 		    if (go -> rxnaks[CI_LQM] % lcp_warnnaks == 0) {
@@ -937,7 +940,7 @@ void lcp_nakci (fsm *f,
 		break;
 
 	    case CI_PCOMPRESSION:
-		if (l == 2 && ao -> lcp_neg & CI_N_PCOMPRESSION) 
+		if (l == 2 && ao -> lcp_neg & CI_N_PCOMPRESSION)
 		    go -> lcp_neg &= ~CI_N_PCOMPRESSION;
 
 		LOG3(LOG_NEG, (LOG_LCP_PCOMP_NAK));
@@ -956,10 +959,10 @@ void lcp_nakci (fsm *f,
 		LOG3(LOG_NEG,  (LOG_LCP_UNKNOWN_NAK, p[0]));
 	    }
 
-	/* 
+	/*
 	 * Set things up for the next option in the nak packet.
 	 */
-	len -= l;   	    	
+	len -= l;
 	p += l;
     }
 
@@ -979,7 +982,7 @@ bad:
  *				lcp_rejci
  ***********************************************************************
  * SYNOPSIS:	Process a received Configure-Reject. (FSM callback routine)
- * CALLED BY:	fsm_input 
+ * CALLED BY:	fsm_input
  * RETURN:	nothing
  *
  * REVISION HISTORY:
@@ -1057,7 +1060,7 @@ void lcp_rejci (fsm *f,
 	go -> lcp_neg &= ~neg; \
 	code \
     }
-    
+
     REJCISHORT(CI_MRU, CI_N_MRU, go -> mru,
 	       LOG3(LOG_NEG, (LOG_LCP_MRU_REJ));
 	      )
@@ -1066,7 +1069,7 @@ void lcp_rejci (fsm *f,
 	      LOG3(LOG_NEG, (LOG_LCP_AMAP_REJ));
 	      )
 
-    if (go -> lcp_neg & CI_N_AUTHTYPE) 
+    if (go -> lcp_neg & CI_N_AUTHTYPE)
 	if (go -> auth_prot == PAP) {
 	    REJCISHORT(CI_AUTHTYPE, CI_N_AUTHTYPE, go -> auth_prot,
 		       link_error = SSDE_AUTH_REFUSED;
@@ -1103,11 +1106,11 @@ void lcp_rejci (fsm *f,
 	go -> lcp_neg &= ~CI_N_LQM;
     }
 
-    REJCIVOID(CI_PCOMPRESSION, CI_N_PCOMPRESSION, 
+    REJCIVOID(CI_PCOMPRESSION, CI_N_PCOMPRESSION,
 	      LOG3(LOG_NEG, (LOG_LCP_PCOMP_REJ));
 	     )
 
-    REJCIVOID(CI_ACCOMPRESSION, CI_N_ACCOMPRESSION, 
+    REJCIVOID(CI_ACCOMPRESSION, CI_N_ACCOMPRESSION,
 	      LOG3(LOG_NEG, (LOG_LCP_ACOMP_REJ));
 	     )
     /*
@@ -1125,9 +1128,9 @@ bad:
  *				lcp_reqci
  ***********************************************************************
  * SYNOPSIS:	Process a received Configure-Request packet. (FSM callback)
- * CALLED BY:	fsm_input 
+ * CALLED BY:	fsm_input
  * RETURN:	0 if no reply should be sent
- *	    	else CONFIGURE_ACK, CONFIGURE_NAK or CONFIGURE_REJECT 
+ *	    	else CONFIGURE_ACK, CONFIGURE_NAK or CONFIGURE_REJECT
  * SIDE EFFECTS: Input packet is modified appropriately.
  *
  * STRATEGY:  Check the peer's requested Configuration Options
@@ -1155,14 +1158,14 @@ unsigned char lcp_reqci (fsm *f,
 
     PACKET *reply_pkt;
     unsigned char *reply_p; 	    	    /* Ptr to head of reply */
-    
+
     unsigned char *outoptp; 		    /* Ptr to current output option */
     unsigned char *outp;    	  	    /* Ptr to current output char */
     unsigned char *optp = inp;	    	    /* Ptr to current recvd option */
 
     unsigned char optlen, opttype;  	    /* option len, option type */
     unsigned short tmpshort;	    	    /* Parsed short value */
-    unsigned long tmplong;	    	    /* Parsed long value */    
+    unsigned long tmplong;	    	    /* Parsed long value */
 
     int rc = CONFIGURE_ACK;	    	    /* Final reply code */
     int orc;			    	    /* Return code of current option */
@@ -1202,7 +1205,7 @@ unsigned char lcp_reqci (fsm *f,
 			outp += optlen; \
 			}
 #ifdef LOGGING_ENABLED
-    /* 
+    /*
      * Log a warning if configure-request does not contain any options.
      */
     if (l == 0) {
@@ -1211,7 +1214,7 @@ unsigned char lcp_reqci (fsm *f,
 #endif /* LOGGING_ENABLED */
 
     /*
-     * Reset all her options, clearing out everything except for 
+     * Reset all her options, clearing out everything except for
      * CI_N_AUTHTYPE.  [XXX: Only do this if we are getting new options
      * to avoid bug in Annex PPP server which sends empty requests after
      * negotiating other options. -jwu 2/2/96]
@@ -1227,7 +1230,7 @@ unsigned char lcp_reqci (fsm *f,
     while (l) {
 	orc = CONFIGURE_ACK;	    /* Assume success for this option */
 	p = optp;   	    	    /* p points to beginning of this option */
-	
+
 	/*
 	 * If not enough data for option header or option length too small
 	 * or option length too big, then give up without sending a reply.
@@ -1246,16 +1249,16 @@ unsigned char lcp_reqci (fsm *f,
 	    {
 	    case CI_MRU:
 		LOG3(LOG_NEG, (LOG_LCP_RECV_MRU));
-		
-		/* 
+
+		/*
 		 * If not allowing negotiation of option, reject it.
 		 */
 		if ((ao -> lcp_neg & CI_N_MRU) == 0)	{
-		    REJECT();	
+		    REJECT();
 		    break;
 		}
 
-		/* 
+		/*
 		 * If option length is bad, Nak with the default MRU.
 		 * Don't stick desired values in packet if we're sending
 		 * a reject!
@@ -1282,7 +1285,7 @@ unsigned char lcp_reqci (fsm *f,
 		    if (not_converging) {
 			REJECT();
 			link_error = SSDE_NEG_FAILED;
-			    
+
 			LOG3(LOG_BASE, (LOG_LCP_CANT_MRU));
 			DOLOG(negotiation_problem = "Negotiation failed";)
 		    }
@@ -1314,7 +1317,7 @@ unsigned char lcp_reqci (fsm *f,
 		}
 
 		break;
-		
+
 	    case CI_ASYNCMAP:
 		LOG3(LOG_NEG, (LOG_LCP_RECV_AMAP));
 
@@ -1326,7 +1329,7 @@ unsigned char lcp_reqci (fsm *f,
 		    break;
 		}
 
-		/* 
+		/*
 		 * If bad option length, Nak it and suggest default ACCM.
 		 * Only put desired value in packet if not rejecting!
 		 */
@@ -1371,7 +1374,7 @@ unsigned char lcp_reqci (fsm *f,
 			      optlen));
 
 		/*
-		 * Authentication type must be PAP or CHAP.  
+		 * Authentication type must be PAP or CHAP.
 		 */
 		if (tmpshort == PAP) {
 		    /*
@@ -1399,18 +1402,18 @@ unsigned char lcp_reqci (fsm *f,
 			if (rc != CONFIGURE_REJECT) {
 			    PUTSHORT(CHAP, outp);
 			    PUTCHAR(5, outp);	    	/* MD5 */
-			}			
+			}
 			ho -> lcp_neg &= ~CI_N_PAP;
 			ho -> lcp_neg |= CI_N_CHAP;
 		    }
 		}
 		else if (tmpshort == CHAP) {
 		    /*
-		     * Allow CHAP if negotiating it as long as MD5 is 
+		     * Allow CHAP if negotiating it as long as MD5 is
 		     * the algorithm used.
 		     */
 		    if (ao -> lcp_neg & CI_N_CHAP) {
-			if (optlen == 5) 
+			if (optlen == 5)
 			    if (p[0] == 5) {	    /* MD5 */
 				ho -> lcp_neg |= CI_N_CHAP;
 #ifdef MSCHAP
@@ -1480,7 +1483,7 @@ unsigned char lcp_reqci (fsm *f,
 		    ho -> lcp_neg &= ~CI_N_PAP;
 		    ho -> lcp_neg |= CI_N_CHAP;
 		}
-		    	
+
 		if (orc == CONFIGURE_REJECT && not_converging) {
 		    link_error = SSDE_NEG_FAILED;
 		    LOG3(LOG_BASE, (LOG_LCP_CANT_AUTH));
@@ -1510,7 +1513,7 @@ unsigned char lcp_reqci (fsm *f,
 		}
 		else tmplong = 0;
 
-		/* 
+		/*
 		 * She must have a different magic number than us.
 		 */
 		if (go -> lcp_neg & CI_N_MAGICNUMBER &&
@@ -1547,13 +1550,13 @@ unsigned char lcp_reqci (fsm *f,
 		    REJECT();
 		    break;
 		}
-		
+
 		GETSHORT(tmpshort, p);
 		LOG3(LOG_NEG, (LOG_FORMAT_MIXED, tmpshort,
 			      tmpshort == LQM ? " (LQM)" : "", optlen));
 
 		if (tmpshort == LQM)
-		    if (optlen == 8) {		    
+		    if (optlen == 8) {
 			GETLONG(tmplong, p);
 
 #ifdef LOGGING_ENABLED
@@ -1567,12 +1570,12 @@ unsigned char lcp_reqci (fsm *f,
 #endif /* LOGGING_ENABLED */
 
 			 /*
-			  * Must nak zero interval if we want zero 
+			  * Must nak zero interval if we want zero
 			  * interval.  RFC 1333 - LQM.
 			  */
 			if (tmplong || go -> lqrinterval) {
 			    /*
-			    * Go ahead and do what she says.  
+			    * Go ahead and do what she says.
 			    */
 			    ho -> lcp_neg |= CI_N_LQM;
 			    ho -> lqrinterval = tmplong;
@@ -1608,11 +1611,11 @@ unsigned char lcp_reqci (fsm *f,
 
 	    case CI_PCOMPRESSION:
 		LOG3(LOG_NEG, (LOG_LCP_RECV_PCOMP));
-		
+
 		if ((ao -> lcp_neg & CI_N_PCOMPRESSION) == 0 || optlen != 2) {
 		    REJECT();
 		}
-		else 
+		else
 		    ho -> lcp_neg |= CI_N_PCOMPRESSION;
 
 		break;
@@ -1664,7 +1667,7 @@ unsigned char lcp_reqci (fsm *f,
      * Compute output length and copy the reply packet's data to the
      * original buffer.  Then free the reply buffer.
      */
-    *len = outp - reply_p;			
+    *len = outp - reply_p;
     memcpy(inp, reply_p, *len);
     PACKET_FREE(reply_pkt);
 
@@ -1675,16 +1678,16 @@ unsigned char lcp_reqci (fsm *f,
     /*
      * Return final result code.
      */
-    return (rc);    
+    return (rc);
 
-}	    	    	
+}
 
 
 /***********************************************************************
  *				lcp_up
  ***********************************************************************
  * SYNOPSIS:	LCP has come up. (FSM callback)
- * CALLED BY:	tlu 	= This Layer Up 
+ * CALLED BY:	tlu 	= This Layer Up
  * RETURN:	nothing
  *
  * STRATEGY:	Start PAP, IPCP, CHAP, etc.
@@ -1700,7 +1703,7 @@ void lcp_up (fsm *f)
     lcp_options *ho = &lcp_heroptions[f -> unit];
     lcp_options *wo = &lcp_wantoptions[f -> unit];
     lcp_options *go = &lcp_gotoptions[f -> unit];
-    int auth = 0;    
+    int auth = 0;
 
     /*
      * If we wanted to negotiate authentication but didn't get it,
@@ -1709,7 +1712,7 @@ void lcp_up (fsm *f)
     if (wo -> lcp_neg & CI_N_AUTHTYPE &&
 	(go -> lcp_neg & CI_N_AUTHTYPE) == 0) {
 	link_error = SSDE_AUTH_REFUSED | SDE_CONNECTION_RESET;
-	LOG3(LOG_BASE, (LOG_LCP_GIVE_UP_AUTH));  
+	LOG3(LOG_BASE, (LOG_LCP_GIVE_UP_AUTH));
 	lcp_close(0);
 	return;
     }
@@ -1724,25 +1727,25 @@ void lcp_up (fsm *f)
     }
 
 
-    /* 
-     * If we got ACCM or peer got ACCM, set the escape and discard 
+    /*
+     * If we got ACCM or peer got ACCM, set the escape and discard
      * character maps.
      */
     if (go -> lcp_neg & CI_N_ASYNCMAP || ho -> lcp_neg & CI_N_ASYNCMAP)
-	SetEscapeMap(f -> unit, 
+	SetEscapeMap(f -> unit,
 	     (go -> lcp_neg & CI_N_ASYNCMAP) ? go -> asyncmap : 0xffffffff,
              (ho -> lcp_neg & CI_N_ASYNCMAP) ? ho -> asyncmap : 0xffffffff);
 
-    /* 
+    /*
      * Set compression if negotiated.
      */
-    if (go -> lcp_neg & CI_N_PCOMPRESSION ||  
-	ho -> lcp_neg & CI_N_PCOMPRESSION) 
+    if (go -> lcp_neg & CI_N_PCOMPRESSION ||
+	ho -> lcp_neg & CI_N_PCOMPRESSION)
 	SetProtoCompression(f -> unit, go -> lcp_neg & CI_N_PCOMPRESSION,
 			    ho -> lcp_neg & CI_N_PCOMPRESSION);
 
-    if (go -> lcp_neg & CI_N_ACCOMPRESSION || 
-	ho -> lcp_neg & CI_N_ACCOMPRESSION) 
+    if (go -> lcp_neg & CI_N_ACCOMPRESSION ||
+	ho -> lcp_neg & CI_N_ACCOMPRESSION)
 	SetACCompression(f -> unit, go -> lcp_neg & CI_N_ACCOMPRESSION,
 			 ho -> lcp_neg & CI_N_ACCOMPRESSION);
 
@@ -1753,14 +1756,14 @@ void lcp_up (fsm *f)
     pap_lowerup(f -> unit);
     chap_lowerup(f -> unit);
 
-    /* 
+    /*
      * If the peer agreed to send LQRs, then she must also process
      * received LQRs.
-     * 
+     *
      * If the peer asked us to send LQRs, then we must send LQRs.
      */
-    lqm[f -> unit].magicnumber = 
-	(go -> lcp_neg & CI_N_MAGICNUMBER) ? go -> magicnumber : 0; 
+    lqm[f -> unit].magicnumber =
+	(go -> lcp_neg & CI_N_MAGICNUMBER) ? go -> magicnumber : 0;
 
     if (go -> lcp_neg & CI_N_LQM || ho -> lcp_neg & CI_N_LQM) {
 	int interval;
@@ -1779,7 +1782,7 @@ void lcp_up (fsm *f)
     else if (wo -> lcp_flags & LF_ECHO_LQM)
 	lqm_start(f -> unit, wo -> lqrinterval, 1, wo -> lqm_k, wo -> lqm_n);
 
-    /* 
+    /*
      * Start up PAP if negotiated.
      */
     if (go -> lcp_neg & CI_N_PAP) {
@@ -1804,7 +1807,7 @@ void lcp_up (fsm *f)
 	chap_authwithpeer(f -> unit);
 	auth = 1;
     }
-    
+
     /*
      * If not doing authentication, then ready for network traffic.
      */
@@ -1819,8 +1822,8 @@ void lcp_up (fsm *f)
  *				lcp_down
  ***********************************************************************
  * SYNOPSIS:	LCP has gone DOWN. (FSM callback)
- * CALLED BY:	tld 	    = This Layer Down 
- * RETURN:  	nothing	
+ * CALLED BY:	tld 	    = This Layer Down
+ * RETURN:  	nothing
  *
  * STRATEGY:	Alert other protocols.
  *
@@ -1832,7 +1835,7 @@ void lcp_up (fsm *f)
  ***********************************************************************/
 void lcp_down (fsm *f)
 {
-    /* 
+    /*
      * Reset escape and discard maps, compression.
      */
     SetEscapeMap(f -> unit, 0xffffffff, 0xffffffff);
@@ -1856,8 +1859,8 @@ void lcp_down (fsm *f)
  *				lcp_closed
  ***********************************************************************
  * SYNOPSIS:	LCP has CLOSED.  (FSM callback routine.)
- * CALLED BY:	fsm_lowerdown 
- *	    	tlf 	= This Layer Finished 
+ * CALLED BY:	fsm_lowerdown
+ *	    	tlf 	= This Layer Finished
  * RETURN:	nothing
  *
  * STRATEGY:	Clean up state and close up physical connection.
@@ -1872,8 +1875,8 @@ void lcp_down (fsm *f)
 void lcp_closed (fsm *f)
 {
     /*
-     * MUST NOT execute this code if already closed device or 
-     * will infinite loop!  
+     * MUST NOT execute this code if already closed device or
+     * will infinite loop!
      */
     if (PPPDeviceClose()) {
 	 /*
@@ -1881,7 +1884,7 @@ void lcp_closed (fsm *f)
 	  * will not generate terminate request packets.  After all,
 	  * we just closed the physical connection.
 	  */
-	if (! passive_waiting) 
+	if (! passive_waiting)
 	    lcp_lowerdown(0);
 	lcp_close(0);
 
@@ -1910,12 +1913,12 @@ void lcp_closed (fsm *f)
 	else if (negotiation_problem) {
 	    sprintf(fail_state, "off (%s)", negotiation_problem);
 	    log_state(fail_state);
-	}	    
+	}
 	else if (shutdown_reason) {
 	    sprintf(fail_state, "off (%s)", shutdown_reason);
 	    log_state(fail_state);
 	}
-	else 
+	else
 	    log_state("off");
 #endif /* LOGGING_ENABLED */
 
@@ -1933,6 +1936,9 @@ void lcp_closed (fsm *f)
 #endif
 #ifdef __BORLANDC__
 #pragma codeseg LQMINIT
+#endif
+#ifdef __WATCOMC__
+#pragma code_seg("LQMINIT")
 #endif
 
 /* -------------------------------------------------------------------------
@@ -2042,7 +2048,7 @@ void lqm_lowerdown (int unit)
  * RETURN:	nothing
  *
  * STRATEGY:    Setting LQR running mode, interval, k and n as requested
- *	    	Initialize in/out counts.  
+ *	    	Initialize in/out counts.
  *	    	If sending reports, send one using the appropriate method
  *
  * REVISION HISTORY:
@@ -2064,7 +2070,7 @@ void lqm_start (int unit,
     lq -> k = k;
     lq -> n = n;
 
-    /* 
+    /*
      * Reset all LQM counters to make a clean start.
      */
 
@@ -2074,14 +2080,14 @@ void lqm_start (int unit,
     lq -> ifOutOctets = lq -> ifOutDiscards = 0;
     lq -> ifInUniPackets = lq -> ifInNUniPackets = 0;
     lq -> ifInDiscards = lq -> ifInErrors = 0;
-    
-    /* 
+
+    /*
      * Also reset saved lastlqr values.  LastOut values can be
-     * indeterminate as long as PeerInLQR is 0, however, to keep 
+     * indeterminate as long as PeerInLQR is 0, however, to keep
      * our implementation clean, we will.  PeerIn values get set
      * only when we receive a LQR.
      */
-    lq -> lastlqr.LastOutLQRs = lq -> lastlqr.LastOutPackets = 
+    lq -> lastlqr.LastOutLQRs = lq -> lastlqr.LastOutPackets =
 	lq -> lastlqr.LastOutOctets = 0;
 
     lq -> lastlqr.PeerOutLQRs = lq -> lastlqr.PeerOutPackets =
@@ -2121,10 +2127,10 @@ void lqm_start (int unit,
 void lqm_failure (lqm_t *lq)
 {
     lcp_wantoptions[lq -> unit].lcp_flags |= LF_LOST_LINE;
-    
+
     link_error = SSDE_LQM_FAILURE | SDE_CONNECTION_RESET;
     DOLOG(shutdown_reason = "LQM failure";)
-    
+
     lcp_close(lq -> unit);
 }
 
@@ -2133,6 +2139,9 @@ void lqm_failure (lqm_t *lq)
 #endif
 #ifdef __BORLANDC__
 #pragma codeseg LCPLQMCOMMON
+#endif
+#ifdef __WATCOMC__
+#pragma code_seg("LCPLQMCOMMON")
 #endif
 
 
@@ -2149,7 +2158,7 @@ void lqm_failure (lqm_t *lq)
  *	jwu	5/ 4/95		Initial Revision
  *
  ***********************************************************************/
-byte lcp_input (int unit, 
+byte lcp_input (int unit,
 		PACKET *p,
 		int len)
 {
@@ -2207,7 +2216,7 @@ unsigned char lqm_set_lqr_status (lqm_t *lq,
  * 	    	lqm_input
  *	    	lqm_send_echo
  * RETURN:	nothing
- * SIDE EFFECTS: buffer filled with formatted string for threshold, if 
+ * SIDE EFFECTS: buffer filled with formatted string for threshold, if
  *	    	 a threshold has been set.
  *
  * STRATEGY:	Count the total number of packets and the total number
@@ -2248,7 +2257,7 @@ void lqm_threshold (lqm_t *lq, char *buffer)
  *				lcp_echorequest
  ***********************************************************************
  * SYNOPSIS:	Process a received Echo-Request message (FSM callback)
- * CALLED BY:	fsm_input 
+ * CALLED BY:	fsm_input
  * RETURN:	ECHO_REPLY if valid request, zero otherwise
  *
  * STRATEGY:	Check magic number and modify packet for echo reply
@@ -2273,7 +2282,7 @@ int len;*/
 	 * Check the magic number before anything else.  Have to get
 	 * it whether we're logging or not to keep the pointer correct.
 	 */
-	GETLONG(tmp_magic_number, p);	    
+	GETLONG(tmp_magic_number, p);
 
 	if (lq -> magicnumber &&
 	    lq -> magicnumber == tmp_magic_number) {
@@ -2411,7 +2420,7 @@ void lqm_send_echo (lqm_t *lq)
 	 * Pass NULL as buffer so fsm_sdata will alloc one for us.
 	 */
 	PUTLONG(lq -> magicnumber, outp);
-	fsm_sdata(&lcp_fsm[lq -> unit], ECHO_REQUEST, 
+	fsm_sdata(&lcp_fsm[lq -> unit], ECHO_REQUEST,
 		  ++lcp_fsm[lq -> unit].id, buf, (PACKET *)NULL, (int)(outp - buf));
 
 	/*
@@ -2421,12 +2430,15 @@ void lqm_send_echo (lqm_t *lq)
 	lq -> timer = (lq -> interval * (long)INTERVALS_PER_SEC) / 100L;
     }
 }
-    
+
 #ifdef __HIGHC__
 #pragma Code("LQMLQR");
 #endif
 #ifdef __BORLANDC__
 #pragma codeseg LQMLQR
+#endif
+#ifdef __WATCOMC__
+#pragma code_seg("LQMLQR")
 #endif
 
 
@@ -2483,7 +2495,7 @@ void lqm_send_lqr (lqm_t *lq)
     }
 
     /*
-     * Remembered that we timed out waiting for an LQR.  Increment the 
+     * Remembered that we timed out waiting for an LQR.  Increment the
      * number of LQRs we sent.
      */
     lq -> timed_out = 1;
@@ -2491,7 +2503,7 @@ void lqm_send_lqr (lqm_t *lq)
 
     /*
      * Build the LQR packet in the buffer.  When sending PeerOut values,
-     * include this LQR.  
+     * include this LQR.
      */
     PUTLONG(lq -> magicnumber, outp);
     PUTLONG(lq -> lastlqr.PeerOutLQRs, outp);	/* LastOutLQRs */
@@ -2539,10 +2551,10 @@ void lqm_send_lqr (lqm_t *lq)
 
     /*
      * Set timer for next one.  Interval is in 100ths of a second so we
-     * have to convert it to number of timer intervals to get the right 
+     * have to convert it to number of timer intervals to get the right
      * time.
      */
-    if (lq -> interval) 
+    if (lq -> interval)
 	lq -> timer = (lq -> interval * (long)INTERVALS_PER_SEC) / 100L;
 }
 
@@ -2564,9 +2576,9 @@ void lqm_send_lqr (lqm_t *lq)
  *	    	    value, bring down the link and return.
  *	    	Update and check status of lqm
  *	    	if lost too many LQRs, bring down PPP link
- *	    	Save lqr struct as lastlqr and remember that we have 
+ *	    	Save lqr struct as lastlqr and remember that we have
  *	    	    received LQRs
- *	    	Clear timed_out 
+ *	    	Clear timed_out
  *	    	Send an LQR if needed
  *
  * REVISION HISTORY:
@@ -2599,7 +2611,7 @@ unsigned char lqm_input (int unit,
     GETLONG(l -> PeerInOctets, ptr);
     GETLONG(l -> PeerOutLQRs, ptr);
     GETLONG(l -> PeerOutPackets, ptr);
-    GETLONG(l -> PeerOutOctets, ptr);    
+    GETLONG(l -> PeerOutOctets, ptr);
 
     ++lq -> InLQRs;
 
@@ -2611,7 +2623,7 @@ unsigned char lqm_input (int unit,
     l -> SaveInDiscards = lq -> ifInDiscards;
     l -> SaveInErrors = lq -> ifInErrors;
     l -> SaveInOctets = lq -> InGoodOctets;
-    
+
 #ifdef LOGGING_ENABLED
 
     if (debug >= LOG_LQMSGS) {
@@ -2645,7 +2657,7 @@ unsigned char lqm_input (int unit,
     }
 #endif /* LOGGING_ENABLED */
 
-    /* 
+    /*
      * If not doing LQR, then reject LQR protocol.
      */
     if (lq -> running != LQ_LQR) {
@@ -2662,7 +2674,7 @@ unsigned char lqm_input (int unit,
     /*
      * Check magic number in packet is correct.
      */
-    if (lq -> magicnumber) 
+    if (lq -> magicnumber)
 	if (lq -> magicnumber == l -> magicnumber) {
 	    LOG3(LOG_BASE, (LOG_LQM_WARN_LOOP));
 	    return (0);
@@ -2685,7 +2697,7 @@ unsigned char lqm_input (int unit,
 	    char *pkt, pktbuf[50], *oct, octbuf[50], *ierr = "", ierrbuf[50],
 	    	 *disc = "", discbuf[50], *lqr_string, lqrbuf[50];
 	    int pktcnt, octcnt;
-#endif /* LOGGING_ENABLED */	    
+#endif /* LOGGING_ENABLED */
 
 	    if (l -> PeerInLQRs == lq -> lastlqr.PeerInLQRs)
 		send_lqr = 1;
@@ -2699,11 +2711,11 @@ unsigned char lqm_input (int unit,
 
 		if (delta2 != delta1)
 		    pktcnt += sprintf(&pkt[pktcnt], "(%lu)", delta2);
-		
+
 		pktcnt += sprintf(&pkt[pktcnt], "/");
 
 		if (lq -> lastlqr.PeerInLQRs) {
-		    delta1 = l -> LastOutPackets 
+		    delta1 = l -> LastOutPackets
 			- lq -> lastlqr.LastOutPackets;
 		    delta2 = l -> PeerInPackets
 			- lq -> lastlqr.PeerInPackets;
@@ -2744,7 +2756,7 @@ unsigned char lqm_input (int unit,
 		       octcnt += sprintf(&oct[octcnt], "(%lu)", delta2);
 		}
 	    }
-	    
+
 	    sess_used_lqm = 1;
 	    sess_tx_errors += l -> PeerInErrors - lq -> lastlqr.PeerInErrors;
 
@@ -2772,7 +2784,7 @@ unsigned char lqm_input (int unit,
 			for (delta3 = delta1 - delta2; delta3 > 0; --delta3)
 			    lqm_set_lqr_status(lq, LQR_LOST);
 		}
-		
+
 		lqm_failed = lqm_set_lqr_status(lq, LQR_FOUND);
 
 #ifdef LOGGING_ENABLED
@@ -2786,7 +2798,7 @@ unsigned char lqm_input (int unit,
 
 	    LOG3(LOG_LQSTAT, (LOG_LQM_PACKET,
 			     pkt, oct, ierr, disc, lqr_string));
-	    
+
 	    if (lqm_failed) {
 		LOG3(LOG_BASE, (LOG_LQM_LOST));
 		lqm_failure(lq);
@@ -2810,5 +2822,3 @@ unsigned char lqm_input (int unit,
     return(0);	    	/* LQM packets don't count against the idle timer */
 
 }  /* End Of lqm_input */
-
-

@@ -13,7 +13,7 @@
  * ROUTINES:
  *	Name	  	    Description
  *	----	  	    -----------
- *	pap_init    	    
+ *	pap_init
  *	pap_authwithpeer    Start PAP client
  *	pap_authpeer	    Start PAP server
  *
@@ -75,6 +75,9 @@
 #ifdef __BORLANDC__
 #pragma codeseg PAPCODE
 #endif
+#ifdef __WATCOMC__
+#pragma code_seg("PAPCODE")
+#endif
 
 void pap_rauth(pap_state *u, unsigned char *inp, unsigned char id, int len);
 void pap_rauthack(pap_state *u, unsigned char *inp, unsigned char id, int len);
@@ -91,7 +94,7 @@ void pap_sauth(pap_state *u);
  * CALLED BY:	PPPSetup using prottbl entry
  * RETURN:	nothing
  *
- * NOTES:   	Commented out lines initializing defaults to zero 
+ * NOTES:   	Commented out lines initializing defaults to zero
  *	    	because they are already zero (dgroup).  The lines
  *	    	now server as comments.
  *
@@ -140,14 +143,14 @@ void pap_init (int unit)
  *	jwu	5/11/95		Initial Revision
  *
  ***********************************************************************/
-void pap_authwithpeer (int unit) 
+void pap_authwithpeer (int unit)
 {
     pap_state *u = &pap[unit];
 
     /*
      * Clear pending flag.
      */
-    u -> us_flags &= ~PAPF_AWPPENDING;	    	
+    u -> us_flags &= ~PAPF_AWPPENDING;
 
     /*
      * If already authenticat{ed, ing}, then don't do anything.
@@ -160,7 +163,7 @@ void pap_authwithpeer (int unit)
      * sending an authentication.
      */
     if (! (u -> us_flags & PAPF_LOWERUP)) {
-	u -> us_flags |= PAPF_AWPPENDING; 
+	u -> us_flags |= PAPF_AWPPENDING;
 	return;
     }
 
@@ -203,7 +206,7 @@ void pap_authpeer (int unit)
     pap_state *u = &pap[unit];
 
     /*
-     * Clear pending flag.  
+     * Clear pending flag.
      */
     u -> us_flags &= ~PAPF_APPENDING;
 
@@ -275,14 +278,14 @@ void pap_timeout (pap_state *u)
 	 * FSM backoff timer behaviour.
 	 */
 	if (u -> us_retransmits > MIN_RX_BEFORE_BACKOFF)
-	  u -> timer = u -> us_timeouttime * 
+	  u -> timer = u -> us_timeouttime *
 	    (u -> us_retransmits - MIN_RX_BEFORE_BACKOFF + 1);
-	else 
+	else
 	  u -> timer = u -> us_timeouttime;
 #else
 	u -> timer = u -> us_timeouttime * u -> us_retransmits;
 #endif /* BACKOFF_TIMER */
-    }    
+    }
 }
 
 
@@ -305,7 +308,7 @@ void pap_lowerup (int unit)
     pap_state *u = &pap[unit];
 
     /*
-     * Remember that the lower layer is up.  If PAP was waiting for 
+     * Remember that the lower layer is up.  If PAP was waiting for
      * the lower layer to come up before starting up, start now.
      */
     u -> us_flags |= PAPF_LOWERUP;
@@ -337,7 +340,7 @@ void pap_lowerup (int unit)
 void pap_lowerdown (int unit)
 {
     pap_state *u = &pap[unit];
-    
+
     u -> us_flags &= ~PAPF_LOWERUP;
     u -> us_clientstate = u -> us_serverstate = PAPSS_CLOSED;
     u -> timer = 0;
@@ -402,7 +405,7 @@ byte pap_input (int unit,
     }
 
     /*
-     * Parse the header for code, id and length.  Verify transmitted 
+     * Parse the header for code, id and length.  Verify transmitted
      * length and that it matches the size of the packet.
      */
     GETCHAR(code, inp);
@@ -418,15 +421,15 @@ byte pap_input (int unit,
 	LOG3(LOG_NEG, (LOG_PAP_MISMATCHED_LEN));
 	goto freepacket;
     }
-    
+
     /*
      * Drop packet header from total length.  Then process packet based
      * on the code.  Free packet when done.  If any of these generate a
      * response, a new packet is allocated for it.
      */
     len -= PAP_HEADERLEN;
-    
-    switch (code) 
+
+    switch (code)
 	{
 	case PAP_AUTH:
 	    pap_rauth(u, inp, id, len);
@@ -462,22 +465,22 @@ freepacket:
  *	    	make sure packet contains at least a byte of data
  *	    	Get the id length and verify it
  *	    	If server is open and we know the peer id and the length
- *	    	    differs or the id differs, the packet is bad so don't 
+ *	    	    differs or the id differs, the packet is bad so don't
  *	    	    do anything with it
  *	    	if we have an old peer id block, free it
  *	    	Allocate a new block for peer id and copy peer id into it
  *	    	Set the peer id length
  *	    	get the password length and verify it
- *	    	get the peer's password from the INI file 
+ *	    	get the peer's password from the INI file
  *	    	if we have the peer's password and the peer name matches
  *	    	    the username and the password is correct, send an ack.
  *	    	    server is open and enter network phase
  *	    	else
- *	    	    send a nak 
+ *	    	    send a nak
  *	    	    close PPP link
  *
  * NOTES:   	We store the username, peerid and password in dynamically
- *	    	allocated memory blocks so they must be locked and 
+ *	    	allocated memory blocks so they must be locked and
  *	    	dereferenced before you.   MST code didn't need this.
  *
  * REVISION HISTORY:
@@ -509,7 +512,7 @@ void pap_rauth (pap_state *u,
 
     /*
      * Make sure packet contains data.  Then parse the peer-id length,
-     * adjusting remaining length to exclude peerid and length bytes.  
+     * adjusting remaining length to exclude peerid and length bytes.
      * Verify peer-id length.
      */
     if (len < 1) {
@@ -518,7 +521,7 @@ void pap_rauth (pap_state *u,
     }
 
     GETCHAR(id_len, inp);
-    len -= 1 + id_len + 1;  	    	
+    len -= 1 + id_len + 1;
     if (len < 0) {
 	/* received peerid length was too big! */
 	LOG3(LOG_NEG, (LOG_PAP_BAD, "Request"));
@@ -535,14 +538,14 @@ void pap_rauth (pap_state *u,
 	    LOG3(LOG_BASE, (LOG_PAP_WRONG_ID));
 	    return;
 	}
-	
+
 	MemLock(u -> us_peerid);
 	peerid = (unsigned char *)MemDeref(u -> us_peerid);
 	result = memcmp(inp, peerid, id_len);
 	MemUnlock(u -> us_peerid);
 	if (result) {
 	    LOG3(LOG_BASE, (LOG_PAP_WRONG_ID));
-	    return;	    
+	    return;
 	}
     }
 
@@ -580,7 +583,7 @@ void pap_rauth (pap_state *u,
 	LOG3(LOG_NEG, (LOG_PAP_BAD, "Request"));
 	MemUnlock(u -> us_peerid);
 	return;
-    }    
+    }
 
     /*
      * Look up peer's password.  If none, NAK.  Else verify password.
@@ -626,16 +629,16 @@ void pap_rauth (pap_state *u,
 	    BeginNetworkPhase(u -> us_unit);
 	    goto done;
 	}
-	else 
+	else
 	    goto sendNak;
     }
-    else {  	    
+    else {
 sendNak:
 	pap_sresp(u, PAP_AUTHNAK, id, "", 0);
 	link_error = SSDE_AUTH_FAILED | SDE_CONNECTION_RESET;
 	DOLOG(authentication_failure = "Authentication failed";)
 	lcp_close(u -> us_unit);
-    }	
+    }
 done:
     PPPFreeBlock(passwdBlk);
     if (u -> us_peerid)
@@ -657,15 +660,15 @@ done:
  *	jwu	7/19/95		Initial Revision
  *
  ***********************************************************************/
-int 
-pap_rauthackornak (pap_state *u, 
-		   unsigned char **inp, 
+int
+pap_rauthackornak (pap_state *u,
+		   unsigned char **inp,
 		   unsigned char id,
 		   int len,
 		   unsigned char code,
 		   unsigned char *msglen)
 {
-    LOG3(LOG_NEG, (LOG_PAP_RECV_AUTH, 
+    LOG3(LOG_NEG, (LOG_PAP_RECV_AUTH,
 		  code == PAP_AUTHACK ? "Ack" : "Nak", id));
 
     /*
@@ -694,7 +697,7 @@ pap_rauthackornak (pap_state *u,
 
     return(id == u ->us_id);
 }
-		   
+
 
 /***********************************************************************
  *				pap_rauthack
@@ -704,7 +707,7 @@ pap_rauthackornak (pap_state *u,
  * RETURN:	nothing
  *
  * STRATEGY:	Verify packet length and length field.
- *	    	Parse message.  
+ *	    	Parse message.
  *	    	If id is correct, begin neetwork phase.
  *
  * REVISION HISTORY:
@@ -787,7 +790,7 @@ void pap_sauth (pap_state *u)
     int outlen;
 
 #ifdef LOGGING_ENABLED
-    if (! u -> us_user || ! u -> us_passwd) 
+    if (! u -> us_user || ! u -> us_passwd)
 	LOG3(LOG_BASE, (LOG_PAP_NO_NAME));
 #endif /* LOGGING_ENABLED */
 

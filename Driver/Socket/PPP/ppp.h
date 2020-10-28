@@ -25,7 +25,7 @@
 #ifndef _PPP_H_
 #define _PPP_H_
 
-/* 
+/*
  * Old-style function declarations (used by MST) may not compile
  * correctly under BORLANDC.
  */
@@ -35,7 +35,7 @@
 
 /*
  * DELAYED_BACKOFF_TIMER: true to use a delayed backoff timer when
- *	                  retransmitting configure-request packets 
+ *	                  retransmitting configure-request packets
  */
 #ifdef PRODUCT_RESPONDER
 #define DELAYED_BACKOFF_TIMER	TRUE
@@ -44,7 +44,7 @@
 #endif
 
 
-/* 
+/*
  *
  * Copyright (c) 1989 Carnegie Mellon University.
  * All rights reserved.
@@ -215,7 +215,7 @@ extern unsigned short pppfcs();
 #endif /* not ERROR_CHECK */
 
 
-/* 
+/*
  * 	Data Link Layer header: Address, Control, Protocol.
  */
 # define ALLSTATIONS	0xff	/* All-Stations Address */
@@ -233,15 +233,15 @@ extern unsigned short pppfcs();
 # define COMPRESS	0x00fd	/* Compressed datagram */
 # define COMPRESS_LINK	0x00fb	/* Individual link compressed datagram */
 
-/* 
+/*
  *  Address = 1 byte, Control = 1 byte, Protocol = 2 bytes.
  */
 # define DLLHEADERLEN	4
 # define MAX_FCS_LEN	4
 
 # define MAX_MTU	    	2048	/* Max MTU */
-# define MRU_MARGIN_OF_ERROR	50	/* accept packets which do not exceed 
-					   the negotiated MTU by more than 
+# define MRU_MARGIN_OF_ERROR	50	/* accept packets which do not exceed
+					   the negotiated MTU by more than
 					   this amount. */
 
 # define DEF_VJ_SLOTS	16	/* Default # of VJ compress slots */
@@ -284,20 +284,20 @@ extern unsigned short pppfcs();
 #ifdef USE_CCP
 # define NUM_PROTOS    	10	    	/* include CCP and COMPRESS */
 #else
-# define NUM_PROTOS 	8   	    
+# define NUM_PROTOS 	8
 #endif /* USE_CCP */
 
 # define OUTPUT_BUFFER_SIZE 	64  	/* arbitrary (copied from MST) */
 
-/* 
+/*
  * A few constants to simplify coding of escape and discard maps.
  * Index indicates the byte in the map containing the bit for the value
  * and the mask is used to set the bit(s) in that byte.
  */
 # define MAP_SIZE   	    32 	    	/* 256 bits */
 # define PPP_FLAG_ESC_INDEX 15	    	/* PPP_FLAG and PPP_ESCAPE */
-# define PPP_FLAG_ESC_MASK  0x60    	
-# define MAP_INDEX(i)	    (i) / 8 	
+# define PPP_FLAG_ESC_MASK  0x60
+# define MAP_INDEX(i)	    (i) / 8
 # define MAP_MASK(i)	    1 << ((i) % 8)
 
 extern char escape_map[MAP_SIZE], discard_map[MAP_SIZE];
@@ -305,7 +305,7 @@ extern char escape_map[MAP_SIZE], discard_map[MAP_SIZE];
 extern unsigned char *frame_buffer_pointer, fsm_code, fsm_reply_code,
     *fsm_ptr, fsm_id, ip_connected, passive_waiting, fcs_error;
 
-extern int max_retransmits, cf_mru, ppp_mode_flags, fsm_len, link_error, 
+extern int max_retransmits, cf_mru, ppp_mode_flags, fsm_len, link_error,
     compressed_bytes, frame_len, idle_timeout, idle_time;
 
 extern unsigned short input_fcs;
@@ -314,11 +314,11 @@ extern unsigned long last_time;
 
 extern PACKET *frame_buffer, *fsm_packet;
 
-extern void EndNetworkPhase (), BeginNetworkPhase (), SetEscapeMap (), 
+extern void EndNetworkPhase (), BeginNetworkPhase (), SetEscapeMap (),
     SetProtoCompression (), PPPSendPacket (), PPPReset ();
 
 extern void demuxprotrej (int unit, unsigned short protocol);
-extern void SetVJCompression (int unit, int rx_slots, int tx_slots, 
+extern void SetVJCompression (int unit, int rx_slots, int tx_slots,
 			      unsigned char cid);
 extern void SetACCompression (int u, word rx_accomp, word tx_accomp);
 extern void SetInterfaceMTU (unsigned short m);
@@ -341,7 +341,7 @@ extern byte PPPInput(unsigned short protocol, PACKET *buffer, int len);
 extern unsigned short perf_mode, perf;
 
 /*
- * For storing default compression values when temporarily overridden 
+ * For storing default compression values when temporarily overridden
  * by accpnt compression setting.
  */
 extern byte default_active_comp;
@@ -381,11 +381,11 @@ extern optr
 extern void
     _pascal PPPFreeBlock (Handle h);
 
-/* 
- * 
+/*
+ *
  */
 extern void
-    _pascal PPPGetPeerPasswd (unsigned char *peername, 
+    _pascal PPPGetPeerPasswd (unsigned char *peername,
 			      Handle *passwd,
 			      int *len);
 
@@ -404,7 +404,7 @@ extern void
     _pascal PPPLinkOpened (void);
 
 /*
- * 
+ *
  */
 extern void
     _pascal PPPLinkClosed (word error);
@@ -435,8 +435,3 @@ pragma Alias(PPPDeviceClose, "PPPDEVICECLOSE");
 #endif /* __HIGHC__ */
 
 #endif /* _PPP_H_ */
-
-
-
-
-

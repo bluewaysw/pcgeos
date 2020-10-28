@@ -64,10 +64,23 @@ static char *rcsid =
 #include "src.h"
 #include "shell.h"
 #include "cmdNZ.h"
-#include <curses.h>
+#ifdef _LINUX
+#include <sys/ioctl.h>
+#include <curses/curses.h>
+#include <termios.h>
+
+#define TIOCGETP        0x7408
+#define TIOCSETP        0x7409
+#define TIOCSETN        0x740a          /* TIOCSETP wo flush */
+#define TIOCGLTC    0x7474          /* get special local chars */
+#define TIOCSLTC    0x7475          /* set special local chars */
+
+#else
+#include <ntcurses/curses.h>
+#endif
 #include <compat/file.h>
 
-#if defined(_WIN32)
+#if defined(_WIN32) 
 # include <curspriv.h>
 #endif
 
@@ -85,7 +98,7 @@ static struct ltchars	ltc;	    	/* Original local terminal chars */
 static char 	    	*BL;	    	/* Audible bell, if not ^G */
 #endif
 
-#if defined(_WIN32)
+#if defined(_WIN32) 
 # define _y		_line		/* in the WINDOW structure */
 # define _firstch	_minchng
 # define _lastch	_maxchng
@@ -96,7 +109,7 @@ static char 	    	*BL;	    	/* Audible bell, if not ^G */
 # define NONL FALSE          /* (not do return after linefeed) is FALSE */ 
 #endif
 
-#if defined(_WIN32)
+#if defined(_WIN32) || defined(__WATCOMC__)
 #define WADDSTR_CAST unsigned char *
 #else
 #define WADDSTR_CAST char *
@@ -120,12 +133,13 @@ typedef ntcCell		cursesChar;	/* defined in ntcurses/curses.h */
 # define WPRINTW 			wprintwWide
 #endif
 
-#if defined(_WIN32)
+#if defined(_WIN32) || defined(__WATCOMC__)
 extern  int	_sprintw(WINDOW *win, const char *fmt, va_list args);
 # define _putchar(c) putchar(c)  /* not used in WIN32 */
 #else
 extern int  	    	_putchar(char c);
 #endif
+extern int wprintw(WINDOW *win, char *fmt, ...);
 
 static char 	    	backPage,   	/* Character to go back a page */
 			forwPage,   	/* Ditto to go forward a page */
@@ -287,18 +301,24 @@ extern DosCopyScreenRegion(char *buf, short start, short end);
 static void
 CursesTstp(void)
 {
+#ifndef _LINUX
     struct sgttyb   osgb;
     struct ltchars  oltc;
+#endif
     int	omask;
 
+#ifndef _LINUX
     osgb = _tty;
+#endif
     mvcur(0, COLS - 1, LINES - 1, 0);
     endwin();
     /*
      * Restore ltchars too (dsuspc...)
      */
+#ifndef _LINUX
     ioctl(_tty_ch, TIOCGLTC, &oltc);
     ioctl(_tty_ch, TIOCSLTC, &ltc);
+#endif
 
     fflush(stdout);
     
@@ -319,9 +339,11 @@ CursesTstp(void)
     signal(SIGTSTP, CursesTstp);
 
     /* Reset terminal modes to what we want */
+#ifndef _LINUX
     _tty = osgb;
     ioctl(_tty_ch, TIOCSETN, &_tty);
     ioctl(_tty_ch, TIOCSLTC, &oltc);
+#endif
 
     /* Redisplay the screen */
     wrefresh(curscr);
@@ -2456,7 +2478,7 @@ CursesShowMatch(char	open,	/* Character to match */
 static void
 CursesHonk(void)
 {
-#if !defined(_WIN32)  
+#if !defined(_WIN32) 
 		    write(_tty_ch, "\007", 1);
 #else
 		    beep();
@@ -3226,6 +3248,21 @@ CursesCheckKeyBinding(unsigned char c)
     return 1;
 }
 
+#if defined(unix) || defined(_LINUX)
+int getch2() {
+   static int ch=-1, fd=0;
+   struct termios new, old;
+   fd=fileno(stdin);
+   tcgetattr(fd, &old);
+   new=old;
+   new.c_lflag &= ~(ICANON|ECHO);
+   tcsetattr(fd, TCSANOW, &new);
+   ch = getchar();
+   tcsetattr(fd, TCSANOW, &old);
+   return ch;
+}
+#endif
+
 /***********************************************************************
  *				CursesReadInput
  ***********************************************************************
@@ -3254,9 +3291,54 @@ CursesReadInput(int 	    stream,
     unsigned long chr;
     CursesInputState	*istate = (CursesInputState *)data;
 
-#if defined(unix)
-    i = read(0, buf, sizeof(buf));
-    chr = buf[0];
+#if defined(unix) || defined(_LINUX)
+    chr = getch2();
+#if defined(_LINUX)
+    /* map ESC code to PC like scan codes for selected codes */
+    if (chr == 0x1B) {
+	(void)getch2();
+	chr = getch2();
+	switch ( chr ) {
+	    case 'A':
+	    	chr = 0xC8;
+		break;
+	    case 'B':
+    	    	chr = 0xD0;
+    		break;
+	    case 'C':
+	    	chr = 0xCD;
+		break;
+	    case 'D':
+    	    	chr = 0xCB;
+    		break;
+	    case 0x35:	/* page up */
+		(void)getch2();	/* skip 0x7E following */
+	    	chr = 0xC9;
+		break;
+	    case 0x36:	/* page down */
+		(void)getch2();	/* skip 0x7E following */
+    	    	chr = 0xD1;
+    		break;
+	    case 0x48:	/* pos1 */
+	 	//(void)getch2();	/* skip 0x7E following */
+        	chr = 0xC7;
+        	break;
+	    case 0x46:	/* end */
+		//(void)getch2();	/* skip 0x7E following */
+            	chr = 0xCF;
+            	break;
+		
+	    default:
+	    	chr = 0x80;
+		break;
+	}
+    }
+#endif
+    buf[0] = chr;
+    i = 1;
+    if (buf[0] == '\r') {
+	buf[0] = '\n';
+    }
 #elif defined(_WIN32)
     chr = getch();
     if ((chr & 0x01000000) != 0) {
@@ -3754,9 +3836,8 @@ CursesReadChar(int 	    stream,
     char    	    buf[1];
 #endif
 
-#if defined(unix)
-    (void)read(0, (char *)data, 1);
-    chr = *(char *)data;
+#if defined(unix) || defined(_LINUX)
+    chr = getch2();
 #elif defined(_WIN32)
     /* is this section going to work right, maybe getchar()? 
      * same as above */
@@ -4073,7 +4154,7 @@ See also:\n\
     return(TCL_OK);
 }
 
-
+#ifdef _WIN32
 /***********************************************************************
  *				CursesSLogCmd
  ***********************************************************************
@@ -4153,6 +4234,7 @@ See also:\n\
 	
 	fprintf(stream->file, "%.*s\n", cp-cmdWin->_y[i] + 1, cmdWin->_y[i]);
     }
+
     return(TCL_OK);
 }
 
@@ -4204,6 +4286,7 @@ See also: \n\
     lineTail = lineHead = lineCur = NullLine;
     return (TCL_OK);
 }
+#endif
 
 
 /***********************************************************************
@@ -4250,9 +4333,10 @@ See also:\n\
     } else {
 	noNL = FALSE;
     }
-    for (i = 1; i < argc; i++) {
+    for (i = 1; i < argc; i++) {    
 	wprintw(curWin, "%s%s", argv[i], i == argc-1 ? "": " ");
     }
+    
     if (!noNL) {
 	/*
 	 * Refreshes here are line-buffered. In addition, we only do the
@@ -4269,7 +4353,7 @@ See also:\n\
     }
     return (TCL_OK);
 }
-
+
 /***********************************************************************
  *				CursesSystemCmd
  ***********************************************************************
@@ -5295,7 +5379,7 @@ See also:\n\
 {
     Boolean	    nWOT;
 
-#if !defined(_WIN32)
+#if !defined(_WIN32) && !defined(__WATCOMC__)
     extern int	    _putchar(char c);
 #endif
     LstNode 	    ln;
@@ -5669,7 +5753,7 @@ DEFCMD(dss_low, DssLow,TCL_EXACT,NULL,swat_prog.patient,
     char    	*curfile, *srcwinmode;
     int	    	notdocwin, found_line;
     int	    	returnVal;
-#if defined(_WIN32)
+#if defined(_WIN32) 
     unsigned short	*screen_text_dblByte;
     cursesChar		sample;
     int			i;
@@ -5696,7 +5780,7 @@ DEFCMD(dss_low, DssLow,TCL_EXACT,NULL,swat_prog.patient,
 
     screen_text = (cursesChar *)malloc(sizeof(cursesChar) * 
 				       (lines * COLS + 1));
-#if defined(_WIN32)
+#if defined(_WIN32) 
     screen_text_dblByte = (unsigned short *)malloc(sizeof(unsigned short) * 
 						   (lines * COLS + 1));
     returnVal = Src_ReadLine(interp, curfile, argv[2], argv[1], 
@@ -5738,11 +5822,13 @@ DEFCMD(dss_low, DssLow,TCL_EXACT,NULL,swat_prog.patient,
     for(lineCount = lines; lineCount > 0; lineCount--, start++) {
 	cursesChar	temp;
 	int 		count, newline;
-	cursesChar	tbuf[180];
+	cursesChar	tbuf[1024];
 	int	 	tcount;
 
 	count = 0;
 	cp = curline;
+
+	memset(tbuf, ' ', sizeof(tbuf));
 
 	while(count < COLS + curcol) {
 	    if (EQUAL_CHARS(*cp, '\0') == TRUE) {
@@ -5821,6 +5907,7 @@ DEFCMD(dss_low, DssLow,TCL_EXACT,NULL,swat_prog.patient,
 
 	while ((EQUAL_CHARS(*cp, '\0') == FALSE) &&
 	       (EQUAL_CHARS(*cp, '\012') == FALSE) &&
+	       (EQUAL_CHARS(*cp, '\r') == FALSE) &&
 	       (count < (COLS - (notdocwin + 1))))
 	{
 	    cp++;
@@ -6059,8 +6146,8 @@ Curses_Init(void)
 	Cmd_Create(&CursesEchoCmdRec);
 	Cmd_Create(&CursesSystemCmdRec);
 	Cmd_Create(&CursesSaveCmdRec);
-	Cmd_Create(&CursesSLogCmdRec);
-	Cmd_Create(&CursesSBClrCmdRec);
+	/*Cmd_Create(&CursesSLogCmdRec);*/
+	/*Cmd_Create(&CursesSBClrCmdRec);*/
 	Cmd_Create(&CursesWCreateCmdRec);
 	Cmd_Create(&CursesWDeleteCmdRec);
 	Cmd_Create(&CursesWPushCmdRec);

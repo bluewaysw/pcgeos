@@ -7,7 +7,7 @@ static char *rcsid = "$Id: egetstr.c,v 1.2 92/07/13 21:38:26 adam Exp $";
 # include <sys/types.h>
 # include <curses.h>
 
-#if defined(_MSDOS)
+#if defined(_MSDOS) || defined(__WATCOMC__)
 #undef getch
 #include <conio.h>
 #endif
@@ -47,7 +47,7 @@ wgetech (win)
 	return(ERR);
     }
 
-#if !defined(_MSDOS)
+#if !defined(_MSDOS) && !defined(__WATCOMC__)
     /*
      * save the current tty modes
      */
@@ -79,7 +79,7 @@ wgetech (win)
 	waddstr (win, "\b \b");
     }
     
-#if !defined(_MSDOS)
+#if !defined(_MSDOS) && !defined(__WATCOMC__)
     /*
      * reset the tty to its original state
      */
@@ -105,7 +105,7 @@ wgetestr (win, str)
     int		bx,
 		by;
     char	*ostr = str;
-#if !defined(_MSDOS)
+#if !defined(_MSDOS) && !defined(__WATCOMC__)
     struct ltchars	ltc;
     short		oflags;
 #define werasechar() ltc.t_werasc
@@ -123,7 +123,7 @@ wgetestr (win, str)
 	return(ERR);
     }
 
-#if !defined(_MSDOS)
+#if !defined(_MSDOS) && !defined(__WATCOMC__)
     /*
      * save the current tty modes
      */
@@ -160,7 +160,7 @@ wgetestr (win, str)
     do {
 	getyx (win, cy, cx);
     
-#if !defined(_MSDOS)
+#if !defined(_MSDOS) && !defined(__WATCOMC__)
 	*str = getchar();
 #else
 	*str = _getch();    /* XXX: EXTENDED CODES */
@@ -224,7 +224,7 @@ wgetestr (win, str)
     
     *str = '\0';
     
-#if !defined(_MSDOS)
+#if !defined(_MSDOS) && !defined(__WATCOMC__)
     /*
      * reset the tty to its original state
      */

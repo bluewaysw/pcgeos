@@ -896,6 +896,7 @@ Ibm86CurrentFrameCommon(Boolean	usePassedRegisters,
 	return(pPrivPtr->top);
     }
 
+    /* TODO check what goes wrong here */
     Ibm_ReadRegister16 (REG_OTHER, (int)"xipPage", &curXIPPage);
     
     /*

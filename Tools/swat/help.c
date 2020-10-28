@@ -86,8 +86,8 @@ static HelpNodeRec  topLevel = {"top", &topHelp, &advLevel, NULL};
 static HelpNodePtr  root = &topLevel;
 static HelpNodePtr  advanced = &advLevel;
 
-static Boolean	helpLoaded;	/* Boolean representing if help has been 
-				 * loaded or not 
+static Boolean	helpLoaded;	/* Boolean representing if help has been
+				 * loaded or not
 				 */
 
 
@@ -128,7 +128,7 @@ HelpFind(char	    *path,  	/* Path to node. Must be writable */
 	    hnp = root;
 	}
     }
-    
+
     if (cp == NULL) {
 	/*
 	 * A degenerate path. Take care of the hidden nature of "top":
@@ -209,7 +209,7 @@ HelpFind(char	    *path,  	/* Path to node. Must be writable */
 
     return(hnp);
 }
-	
+
 
 
 /***********************************************************************
@@ -244,7 +244,7 @@ HelpStoreString(char	    *name,  	/* Topic name */
     result = (HelpString *)malloc_tagged(sizeof(HelpString), TAG_HELP);
     result->flags = flags;
     result->string = string;
-    
+
     /*
      * Hash the string based on the name of the returned node.
      */
@@ -321,7 +321,7 @@ HelpStore(char	    	*topic,	    /* Topic to store */
     char    	**classes;
     int	    	n;
     int	    	i;
-    
+
 
     /*
      * For each class, form up a path and store the puppy.
@@ -440,7 +440,7 @@ HelpInDoc(char	    *topic,
     if (Tcl_SplitList(interp, class, &n, &classes) != TCL_OK) {
 	return(FALSE);
     }
-    
+
     /*
      * For each class, form up a path and find the puppy.
      */
@@ -467,7 +467,7 @@ HelpInDoc(char	    *topic,
     free((char *)classes);
     return(TRUE);
 }
-	
+
 
 /*
  * whether old help should be overwritten when loading
@@ -481,14 +481,14 @@ long totalBytes=0;
  * SYNOPSIS:	get a single character from the file
  * CALLED BY:	HelpLoad
  * RETURN:	integer value of the next character read, EOF if at the end
- *	
+ *
  * STRATEGY:	read in a lot of data at once, return chars from the buffer
- *	
+ *
  * REVISION HISTORY:
  *	Name		Date		Description
  *	----		----		-----------
  *	dbaumann	4/21/97   	Initial Revision
- *	
+ *
  ***********************************************************************/
 int
 HelpGetc(void)
@@ -496,9 +496,9 @@ HelpGetc(void)
     static unsigned char readBuf[BUF_SIZE];  /* Buffer for reading file */
     int returnCode;
     static int bytePos = 0;
-    static bytesInBuf = 0;
+    static long bytesInBuf = 0;
 
-    if (bytePos >= bytesInBuf) { 
+    if (bytePos >= bytesInBuf) {
 	bytesInBuf = 0;
 	bytePos = 0;
 	returnCode = FileUtil_Read(docFile, readBuf, BUF_SIZE, &bytesInBuf);
@@ -532,7 +532,7 @@ HelpLoad(void)
     int	    c; 	    	    /* Current character */
     char    class[132];	    /* Buffer for class(es) */
     char    topic[132];	    /* Buffer for topic */
-    char    *cp;    	    /* General pointer/Pointer 
+    char    *cp;    	    /* General pointer/Pointer
 			     * into class */
     int     dotcount = 0;   /* to display working dots */
     HelpString *doc;    	    /* Doc to pass to HelpStore */
@@ -677,7 +677,7 @@ See also:\n\
 	ClientData  junkClientData;
 	Tcl_DelProc *junkDelProc;
 
-	
+
 	if (!Tcl_FetchCommand(interp, argv[1], &actual,
 			     &junkProc, &junkFlags, &junkClientData,
 			     &junkDelProc))
@@ -944,7 +944,7 @@ See also:\n\
     if (argc != 2) {
 	Tcl_Error(interp, "Usage: help-scan <pattern>");
     }
-    
+
     if (helpLoaded == FALSE) {
        HelpLoad();
     }
@@ -969,7 +969,7 @@ See also:\n\
 	 entry = Hash_EnumNext(&search))
     {
 	int 	use = 0;
-	    
+
 	for (string = (HelpString *)Hash_GetValue(entry);
 	     string && !use;
 	     string = string->next)
@@ -1003,7 +1003,7 @@ See also:\n\
 		 * resize the buffer and reposition rp.
 		 */
 		int offset = rp-result;
-		
+
 		resultSize *= 2;
 		result = (char *)realloc(result, resultSize);
 
@@ -1035,7 +1035,7 @@ See also:\n\
 
     return(TCL_OK);
 }
-    
+
 
 /***********************************************************************
  *				HelpIsLeafCmd
@@ -1137,7 +1137,7 @@ Help_Fetch(char	*name,	    /* Name (from CmdRec) */
 	    return(HelpExtract(hnp->doc));
 	} else {
 	    char    	*cp;
-	    
+
 	    cp = (char *)malloc_tagged(strlen(hnp->doc->string) + 1,
 				       TAG_HELPTS);
 
@@ -1186,7 +1186,7 @@ Help_Store(char *topic,
      */
     str = (char *)malloc_tagged(strlen(string) + 1, TAG_HELPSTR);
     strcpy(str, string);
-    
+
     /*
      * Enter it into the table
      */
@@ -1205,7 +1205,10 @@ Help_Store(char *topic,
 #elif defined(unix)
 # define NULL_FILE_NAME	"/dev/null"
 # define NULL_FILE_ATTR O_RDONLY
-#endif	
+#elif defined(_LINUX)
+# define NULL_FILE_NAME	"/dev/null"
+# define NULL_FILE_ATTR O_RDONLY
+#endif
 
 /***********************************************************************
  *				Help_Init
@@ -1228,7 +1231,7 @@ Help_Init(void)
 {
     char    docPath[512];
     int     returnCode;
-    
+
     /*
      * We up the average chain length to 5 as searching here isn't as
      * crucial -- we're more interested in the table for its organizational
@@ -1238,7 +1241,7 @@ Help_Init(void)
 
     helpLoaded = FALSE;
     docFile = 0;
-    
+
     /*
      * DOS NOTE: We open the thing in binary mode, as the HighC
      * implementation of ftell improperly looks only for newlines to
@@ -1253,7 +1256,7 @@ Help_Init(void)
 #if !defined(_MSDOS) && !defined(_WIN32)
     if (fileDevel && (fileSysLib[0] != '/')) {
 	sprintf(docPath, "%s/%s/DOC.new", fileDevel, fileSysLib);
-	returnCode = FileUtil_Open(&docFile, docPath, O_RDONLY|O_BINARY, 
+	returnCode = FileUtil_Open(&docFile, docPath, O_RDONLY|O_BINARY,
 				  SH_DENYWR, 0);
     }
 #endif
@@ -1261,7 +1264,7 @@ Help_Init(void)
     /* XXX: WHAT ABOUT SHARING OVER THE NET? */
     if (returnCode == FALSE) {
 	sprintf(docPath, "%s/DOC", fileAbsSysLib);
-	returnCode = FileUtil_Open(&docFile, docPath, O_RDONLY|O_BINARY, 
+	returnCode = FileUtil_Open(&docFile, docPath, O_RDONLY|O_BINARY,
 				  SH_DENYWR, 0);
     }
 

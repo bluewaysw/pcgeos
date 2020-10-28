@@ -1014,7 +1014,7 @@ CV32ProcessStructure(const char  	    *file,
      */
     //size = CVGetInteger(&bp) / 8;
 //	MSObj_GetWord(size, bp);
-	MSObj_GetWord(nfields, bp);
+    MSObj_GetWord(nfields, bp);
 
     if (!CV32LocateList(file, &bp, &tlistBase, &tlistLen)) {
 	return(OTYPE_VOID | OTYPE_SPECIAL);
@@ -1024,17 +1024,21 @@ CV32ProcessStructure(const char  	    *file,
 //	return(OTYPE_VOID | OTYPE_SPECIAL);
 //    }
 
-	MSObj_GetWord(prop, bp);
-	MSObj_GetWord(dlist, bp);
-	MSObj_GetWord(shape, bp);
+    MSObj_GetWord(prop, bp);
+    MSObj_GetWord(dlist, bp);
+    MSObj_GetWord(shape, bp);
 
-	size = CV32GetInteger(&bp) /*/ 8*/;
+    size = CV32GetInteger(&bp) /*/ 8*/;
 
+    if(size == 0) {
+
+	return(OTYPE_VOID | OTYPE_SPECIAL);
+    }
 
 //    if ((bp - dataBase < len) && (*bp == CTL_STRING) &&
 //	(strncmp((char *)bp+2, "(untagged)", bp[1]) != 0) &&
 //	(bp[1] != 0))
-	if(bp[0] != 0)
+    if(bp[0] != 0)
     {
 	/*
 	 * The structure actually has a real name that's not the fake string
@@ -1750,7 +1754,7 @@ CV32FetchType(const char 	    *file,  	/* Object file being read */
 		case CSTT2_REAL64:
     		retval = OTYPE_MAKE_FLOAT(8);
     		break;
-        
+
 		default:
 			Notify(NOTIFY_ERROR,
 				"%s: unsupported special type %02.2x",
@@ -1989,8 +1993,9 @@ CV32ProcessTypeRecord(const char 	    *file,  	/* Object file from which
 			bp += 2;
 			MSObj_GetWord(argsCount, bp);
 			MSObj_GetWord(argsList, bp); // argsList pointer
-			*bpPtr = bp;
-			return(retval);
+
+			bp = *bpPtr + len;
+			break;
 		}
 
 		case CTL2_MODIFIER:
@@ -2103,6 +2108,7 @@ CV32ProcessTypeRecord(const char 	    *file,  	/* Object file from which
 			if ((bp - *bpPtr) < (len-2)) {
 				name = CV32GetString(&bp);
 			}
+			bp = *bpPtr + len;
 			break;
 		}
 		case CTL2_ENUMERATION:
@@ -2416,20 +2422,24 @@ CV32ProcessUnprocessedTypeRecords(const char *file)
     end = typeSeg + typeSize;
 
     while (bp < end) {
-	len = bp[1] | (bp[2] << 8);
+    	word leaf;
+	len = bp[0] | (bp[1] << 8);
 
-	switch(bp[3]) {
-	    case CTL_TYPEDEF:
-	    case CTL_STRUCTURE:
-	    case CTL_SCALAR:
-		bp += 3;
+	bp += 2;
+	MSObj_GetWord(leaf, bp);
+	bp -= 2;
+
+	switch(leaf) {
+	    //case CTL_TYPEDEF:
+	    case CTL2_STRUCTURE:
+	    //case CTL_SCALAR:
 		(void)CV32ProcessTypeRecord(file,
 					  &bp,
 					  len,
 					  0);
 		break;
 	    default:
-		bp = bp + 3 + len;
+		bp = bp + len;
 		break;
 	}
     }
@@ -2627,7 +2637,6 @@ CV32DetermineSymbolBlock(const char    	*file,	    	/* Object file being
 	 * type block.
 	 */
 	CV32AllocSymAndTypeBlocks(&symBlock, &typeBlock);
-	printf("Found no symbol block %x %x\n", symBlock, typeBlock); fflush(stdout);
 
 	if ((*sdPtr)->addrT) {
 	    /*
@@ -2946,16 +2955,16 @@ CV32ProcessSymbols(const char	*file)	/* Object file name (for errors) */
 	{
     		ID  	name;
     		ObjSym	*os;
-    
+
     		name = ST_Enter(symbols, strings, (char *)bp+5, bp[4]);
-    
+
     		if (scopeTop == 0) {
     		    Notify(NOTIFY_ERROR,
     			   "%s: local variable %i outside any scope",
     			   file, name);
     		    break;
     		}
-    
+
     		os = CV32AllocLocalSym(symBlock, mem, scopeStack[scopeTop-1],
     				     &lastLocal, &symBase);
     		os->type = OSYM_LOCVAR;
@@ -3248,7 +3257,7 @@ CV32ProcessSymbols(const char	*file)	/* Object file name (for errors) */
 		ptype -= 2;
 		os->u.localVar.type =
 			CV32ProcessTypeRecord(file, &ptype,
-				ptype[2] | (ptype[3] << 8),
+				ptypeLen,
 				typeBlock);
 
 		/*

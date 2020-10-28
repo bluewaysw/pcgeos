@@ -23,7 +23,7 @@ WINDOW *
 initscr() {
 
 	reg char	*sp;
-	int		tstp();
+	void		tstp(int p);
 	int 		nfd;
 
 # ifdef DEBUG
@@ -50,8 +50,10 @@ initscr() {
 	signal(SIGTSTP, tstp);
 # endif
 #else /* is _MSDOS */
+#if !defined(_LINUX)
 	setterm();
 	DosInitScreen();
+#endif
 #endif
 
 	if (curscr != NULL) {

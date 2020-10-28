@@ -158,7 +158,7 @@ See also:\n\
     if (argc == 1) {
 #if !defined(_MSDOS)
 	Tcl_Return(interp, uiFlags & UI_IRQ ? "1" : "0", TCL_STATIC);
-#else	
+#else
 	Tcl_Return(interp, *irq ? "1" : "0", TCL_STATIC);
 #endif
 	return(TCL_OK);
@@ -377,7 +377,7 @@ See also:\n\
 	return(TCL_OK);
     }
 }
-    
+
 
 /***********************************************************************
  *				UiColumnsCmd
@@ -426,7 +426,7 @@ See also:\n\
  * SIDE EFFECTS:    UI_IRQ is set.
  *
  * STRATEGY:	    None
- *	    
+ *
  * REVISION HISTORY:
  *	Name	Date		Description
  *	----	----		-----------
@@ -436,13 +436,16 @@ See also:\n\
 void
 UiInterrupt(void)
 {
-# if defined(_WIN32)   
-    /* 
-     * need to remind _WIN32 to catch interrupt each time 
+
+# if defined(_WIN32) || defined(_LINUX)
+    /*
+     * need to remind _WIN32 to catch interrupt each time
      */
     typedef void (*signal_func)(int) ;
     signal(SIGINT, (signal_func)UiInterrupt);
+# if defined(_WIN32)
     SetEvent(cntlcEvent);
+# endif
 # endif
     uiFlags |= UI_IRQ;
 }
@@ -662,7 +665,7 @@ See also:\n\
     int	    result;
     char    *cmd;
     static char	top_level_read[] = "top-level-read";
-    
+
     current_level++;
     while (1) {
 	/*
@@ -677,7 +680,7 @@ See also:\n\
 	    MessageFlush("Error: %s\n", interp->result);
 	    continue;
 	}
-    
+
 	/*
 	 * Evalute the line we got
 	 */
@@ -688,10 +691,10 @@ See also:\n\
 	    cmd = (char *)malloc_tagged(strlen(interp->result)+1, TAG_ETC);
 	    strcpy(cmd, interp->result);
 	}
-    
+
 	result = Tcl_Eval(interp, cmd, 0, (const char **)NULL);
 	free(cmd);
-    
+
 	/*
 	 * If interrupted, note that
 	 */
@@ -706,7 +709,7 @@ See also:\n\
 	    *irq = FALSE;
 	}
 #endif
-    
+
 	noInterruptCount = 0;
 
 	/*
@@ -818,13 +821,13 @@ Ui_TopLevel(void)
 	longjmp(toplevel, 1);
     } else {
 	uiFlags |= UI_INITIALIZED;
-	/* 
+	/*
 	 *we need to call setjmp before we source swat at it might do
 	 * a continue, so if the user exits GEOS we come back into
 	 * UI_TopLevel and longjmp gets called, so we better havee called
 	 * setjmp
 	 */
-	if (!setjmp(toplevel)) 
+	if (!setjmp(toplevel))
 	{
 	    /*
 	     * Create a default top-level function in case things choke.
@@ -838,7 +841,7 @@ Ui_TopLevel(void)
 	     */
 	    if (Tcl_Eval(interp, "load swat.tcl", 0, 0) != TCL_OK) {
 		static char quit_cmd[] = "quit leave";
-	    
+
 		Warning("\nError in \"load swat.tcl\": %s", interp->result);
 		(void)Tcl_Eval(interp, quit_cmd, 0, 0);
 	    }
@@ -849,7 +852,7 @@ Ui_TopLevel(void)
 	     */
 	    TclDebug_Init();
 
-	    /* 
+	    /*
 	     * if we did a continueStartup, then no need to printout this
 	     * stuff
 	     */
@@ -894,7 +897,7 @@ Ui_TopLevel(void)
  *	    	    If it's "dumb" or "emacs", call Shell_Init, else
  *	    	    call Curses_Init.
  *	    	    Install our commands.
- *	    	    
+ *
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -906,22 +909,36 @@ void
 Ui_Init(int 	*argcPtr,
 	char	**argv)
 {
-#if defined(unix)
+#if defined(unix) || defined(_LINUX)
+#if !defined(_LINUX)
     extern char	*getenv(char *);
+#else
+    const char* rdp;
+    extern int putenv(const char *);
+#endif
     char    	*term;
 #elif defined(_WIN32)
     char	term[256];
     Boolean	returnCode;
 #endif
 
-#if defined(unix) || defined(_WIN32)
+#if defined(unix) || defined(_WIN32) || defined(_LINUX)
     typedef void (*signal_func)(int) ;
     signal(SIGINT, (signal_func)UiInterrupt);
-# if defined(unix)
-    signal(SIGQUIT, Ui_TopLevel);
+# if defined(unix) || defined(_LINUX)
+    signal(SIGQUIT, (signal_func)Ui_TopLevel);
 # endif
 #endif
 
+#if defined(_LINUX)
+    rdp = Tcl_GetVar(interp, "file-root-dir", TRUE);
+    if( rdp ) {
+	char *outstring = (char *) malloc(strlen (rdp) + 30);
+        sprintf(outstring, "TERMCAP=%s/bin/termcap", rdp);
+	printf(outstring); fflush(stdout);
+        putenv(outstring);
+    }
+#endif
     uiFlags = 0;
 
     Cmd_Create(&UiIrqCmdRec);
@@ -938,20 +955,20 @@ Ui_Init(int 	*argcPtr,
 #endif
 
 #if !defined(_MSDOS)
-# if !defined(_WIN32)
+# if defined(unix) || defined(_LINUX)
     term = getenv("TERM");
 # else
-    returnCode = Registry_FindStringValue(Tcl_GetVar(interp, "file-reg-swat", 
+    returnCode = Registry_FindStringValue(Tcl_GetVar(interp, "file-reg-swat",
 						     TRUE),
 					  "TERM", term, sizeof(term));
-    
+
     if (returnCode == FALSE) {
 	term[0] = '\0';
     }
 # endif
-    if ((term == NULL) 
-	|| (term[0] == '\0') 
-	|| (strcmp(term, "dumb") == 0) 
+    if ((term == NULL)
+	|| (term[0] == '\0')
+	|| (strcmp(term, "dumb") == 0)
 	|| (strcmp(term, "emacs") == 0))
     {
 	Shell_Init();

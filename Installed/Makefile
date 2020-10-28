@@ -116,9 +116,8 @@ minimalSavers	: lol blackhole blank bobbin circles dribble dust \
 minimalTools	: prntscrn
 
 otherEnsemble	: conview reader term tedit geofile dirls  \
-		   graphvwr macror dump perf bim ffind bbxcd
+		   graphvwr macror dump perf bim ffind bbxcd webbox
 #geocon3
-#webbox
 
 #
 # Drivers
@@ -1227,12 +1226,12 @@ Installed/Driver/Socket/PPP:	netutils ansic accpnt MAKELIB
 
 webmagick	: 	Installed/Appl/Breadbox/BbxBrow
 Installed/Appl/Breadbox/BbxBrow:	ui ansic text spool \
-		  			wmg3http wmg3ftp wmg3ext \
-		  			impgraph impdoc \
-		  			modem \
-                  			ibms parentc wav mailhub socket \
-                  			js netutils cookies idialc MAKEAPPL
-# ppp  tcpip
+					wmg3http wmg3ftp wmg3ext \
+					impgraph impdoc \
+					modem \
+					ibms parentc wav mailhub socket \
+					js netutils cookies idialc \
+					ppp  tcpip MAKEAPPL
 
 # sorry, executing CLEAN in the global makefile is not only bad style, it forces
 # EVERYONE, even people not working on the browser, to compile the whole stuff

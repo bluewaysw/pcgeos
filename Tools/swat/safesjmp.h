@@ -16,7 +16,7 @@
  *
  * DESCRIPTION:
  *
- *	
+ *
  *
  *	$Id: safesjmp.h,v 1.1 97/04/18 16:30:37 dbaumann Exp $
  *
@@ -26,8 +26,8 @@
 
 #endif /* _SAFESJMP_H_ */
 
-#if !defined(_WIN32)
-typedef int jmp_buf[10+12];
-#else
+//#if !defined(__WATCOMC__)
+//typedef int jmp_buf[10+12];
+//#else
 # include <setjmp.h>
-#endif
+//#endif

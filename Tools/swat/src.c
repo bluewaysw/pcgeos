@@ -1347,7 +1347,7 @@ SrcOpenFileForCurPatient(char *file, Cache_Entry *entry, Boolean *new)
     char    	*buf;
     int	    	must_free = 0;
     int         returnCode;
-#if defined(_MSDOS) || defined(_WIN32)
+#if defined(_MSDOS) || defined(_WIN32) || defined(_LINUX)
     char    	    *inst_path;
 #endif
 #if defined(_WIN32)
@@ -1385,7 +1385,7 @@ SrcOpenFileForCurPatient(char *file, Cache_Entry *entry, Boolean *new)
 	must_free = 1;
     }
 
-#if defined(_MSDOS) || defined(_WIN32)
+#if defined(_MSDOS) || defined(_WIN32) || defined(_LINUX)
 	    /* if there is a local tree, and the path is in the local tree
 	     * try looking in the installed tree
 	     */

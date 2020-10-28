@@ -8,6 +8,22 @@
 static char sccsid[] = "@(#)printw.c	5.1 (Berkeley) 6/7/85";
 #endif not lint
 
+
+#ifdef __WATCOMC__
+/* In WATCOM C (at least under WinNT), the FILE structure is not the
+   same as the Unix/MetaC one.  So here's some hacks to make it look
+   more compatible.  We're still going to have to set "level" as well,
+   see below...  */
+//#define _cnt	bsize
+#define _base	_ptr
+//#define _ptr	curp
+//#define _flag	flags
+#define _file	_handle
+#define _bufsiz	_bufsize
+#define _IOSTRG (0)
+#define _IOWRT	_WRITE
+#endif
+
 /*
  * printw and friends
  *
@@ -54,12 +70,16 @@ wprintw(WINDOW *win, char *fmt, ...)
  * will have to modify this routine to use the interface that your
  * "sprintf" uses.
  */
-_snprintf(str, size, fmt, args)
+void my_snprintf(str, size, fmt, args)
     char    	*str;
     int	    	size;
     char    	*fmt;
     va_list 	args;
 {
+
+# if defined(sun) || defined(__HIGHC__) || defined(__WATCOMC__)
+    vsprintf(str, fmt, args);
+# else
     FILE	junk;
 
     junk._flag = _IOWRT + _IOSTRG;
@@ -69,12 +89,7 @@ _snprintf(str, size, fmt, args)
 #endif
     junk._cnt = size-1;
     junk._file = -1;
-
-# if defined(sun) || defined(__HIGHC__)
-    vfprintf(&junk, fmt, args);
-# else
     _doprnt(fmt, args, &junk);
-# endif
 
     /*
      * Null-terminate, upping _cnt in case vfprintf filled up all the space
@@ -83,9 +98,10 @@ _snprintf(str, size, fmt, args)
      */
     junk._cnt++;
     putc('\0', &junk);
+# endif
 }
 
-_sprintw(win, fmt, args)
+int _sprintw(win, fmt, args)
     WINDOW	*win;
     char	*fmt;
     va_list	args;
@@ -107,7 +123,7 @@ _sprintw(win, fmt, args)
 		waddch(win, *cpStart++);
 	    }
 	    cp++;
-	    nextArgs = args;
+	    va_copy(nextArgs, args);
 	    fancy = FALSE;
 	charswitch:
 	    switch(*cp) {
@@ -149,7 +165,7 @@ _sprintw(win, fmt, args)
 		    strncpy(cfmt, cpStart, cp-cpStart);
 		    cfmt[cp-cpStart] = '\0';
 		    (void)va_arg(nextArgs, int);
-		    _snprintf(string, sizeof(string), cfmt, args);
+		    my_snprintf(string, sizeof(string), cfmt, args);
 		    waddstr(win, string);
 		    break;
 		    
@@ -161,7 +177,7 @@ _sprintw(win, fmt, args)
 		    strncpy(cfmt, cpStart, cp-cpStart);
 		    cfmt[cp-cpStart] = '\0';
 		    (void)va_arg(nextArgs, unsigned int);
-		    _snprintf(string, sizeof(string), cfmt, args);
+		    my_snprintf(string, sizeof(string), cfmt, args);
 		    waddstr(win, string);
 		    break;
 		    
@@ -174,7 +190,7 @@ _sprintw(win, fmt, args)
 		    strncpy(cfmt, cpStart, cp-cpStart);
 		    cfmt[cp-cpStart] = '\0';
 		    (void)va_arg(nextArgs, double);
-		    _snprintf(string, sizeof(string), cfmt, args);
+		    my_snprintf(string, sizeof(string), cfmt, args);
 		    waddstr(win, string);
 		    break;
 		case 'c':
@@ -183,7 +199,7 @@ _sprintw(win, fmt, args)
 		    cp++;
 		    strncpy(cfmt, cpStart, cp-cpStart);
 		    cfmt[cp-cpStart] = '\0';
-		    _snprintf(string, sizeof(string), cfmt, args);
+		    my_snprintf(string, sizeof(string), cfmt, args);
 		    waddstr(win, string);
 		    break;
 		    
@@ -200,13 +216,13 @@ _sprintw(win, fmt, args)
 			strncpy(cfmt, cpStart, cp-cpStart);
 			cfmt[cp-cpStart] = '\0';
 			(void)va_arg(nextArgs, char *);
-			_snprintf(string, sizeof(string), cfmt, args);
+			my_snprintf(string, sizeof(string), cfmt, args);
 			waddstr(win, string);
 		    }
 		    break;
 	    }
 	    cpStart = cp;
-	    args = nextArgs;
+	    va_copy(args, nextArgs);
 	}
     }
     waddstr(win, cpStart);

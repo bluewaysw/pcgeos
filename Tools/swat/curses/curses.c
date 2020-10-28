@@ -38,7 +38,7 @@ WINDOW	*stdscr		= NULL,
 FILE	*outf;			/* debug output file			*/
 # endif
 
-#if !defined(_MSDOS)
+#if !defined(_MSDOS) && !defined(__WATCOMC__)
 SGTTY	_tty;			/* tty modes				*/
 #endif
 

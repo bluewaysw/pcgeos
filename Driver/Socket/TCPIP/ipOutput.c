@@ -66,10 +66,13 @@
 #endif
 
 #ifdef __HIGHC__
-#pragma Code("IPCODE"); 
+#pragma Code("IPCODE");
 #endif
 #ifdef __BORLANDC__
 #pragma codeseg IPCODE
+#endif
+#ifdef __WATCOMC__
+#pragma code_seg("IPCODE")
 #endif
 
 #include <geos.h>
@@ -98,11 +101,11 @@
  *
  * STRATEGY:
  *	    The src and dst addrs are exchanged because TCP will treat
- *	    the packet's src addr as the receiver's dst addr, and the 
+ *	    the packet's src addr as the receiver's dst addr, and the
  *	    packet's dst addr as the receiver's addr when looking for
- *	    the connection the packet belongs to.  
+ *	    the connection the packet belongs to.
  *
- *	    Loopback connections opened by the application will have 
+ *	    Loopback connections opened by the application will have
  *	    the loopback addr as the dst addr, so TCP does not need
  *	    to handle loopback connections as a special case.
  *
@@ -113,15 +116,15 @@
  *
  ***********************************************************************/
 void
-IpLoopback(optr dataBuffer) 
+IpLoopback(optr dataBuffer)
 {
 
      struct ip *ip;
      MbufHeader *m;
      dword taddr;
 
-     GeodeLoadDGroup(0); 	    /* we should be in the driver's thread */    
-    
+     GeodeLoadDGroup(0); 	    /* we should be in the driver's thread */
+
      /*
       * Set MH_domain field to loopback link's domain if loopback.
       * and swap source and destination addresses so that TCP will
@@ -137,7 +140,7 @@ IpLoopback(optr dataBuffer)
 	 ip->ip_dst = taddr;
      }
 
-     /* 
+     /*
       * Convert to network format and compute checksum for IP header.
       */
     ip->ip_len = HostToNetworkWord(ip->ip_len);
@@ -170,7 +173,7 @@ IpLoopback(optr dataBuffer)
  * SIDE EFFECTS:
  *
  * STRATEGY:
- *	    	Routing, forwarding, multicast, and IP options left out 
+ *	    	Routing, forwarding, multicast, and IP options left out
  *	    	of BSD code.
  *
  * REVISION HISTORY:
@@ -187,10 +190,10 @@ IpOutput (optr dataBuffer, word link, byte flags)
 	word hlen = sizeof (struct ip);
 	word len, off, error = 0;
 	word mtu = LinkGetMTU(link);
-	
-        GeodeLoadDGroup(0); 	    /* we should be in the driver's thread */    
-    
-     	 /* 
+
+        GeodeLoadDGroup(0); 	    /* we should be in the driver's thread */
+
+     	 /*
 	  * Get to start of IP header in data buffer.
 	  */
 	TcpipLock(OptrToHandle(dataBuffer));
@@ -205,16 +208,16 @@ IpOutput (optr dataBuffer, word link, byte flags)
 	    ip->ip_off &= IP_DF;
 	    ip->ip_id = HostToNetworkWord(ip_id++);
 	    ip->ip_hl = hlen >> 2;
-        } 
-	else 
+        }
+	else
 	    hlen = ip->ip_hl << 2;
-	
+
 	LOG_STAT(ipstat.ips_out++;)
-	    
+
 	 /*
-	  * If destination address is the loopback address or if 
-	  * it is the same as the source address, then pass 
-	  * data directly to input handler without putting it 
+	  * If destination address is the loopback address or if
+	  * it is the same as the source address, then pass
+	  * data directly to input handler without putting it
 	  * on the network.  Set the domain field to the link handle
 	  * so things won't crash later.
 	  */
@@ -224,10 +227,10 @@ IpOutput (optr dataBuffer, word link, byte flags)
 	    IpLoopback(dataBuffer);
 	    return (0);
 	}
-	
-	/* 
+
+	/*
   	 * If the data is small enough for the interface, can just
-	 * send it directly, converting to network format and 
+	 * send it directly, converting to network format and
 	 * calculating the checksum.
 	 */
 	if (ip->ip_len <= mtu) {
@@ -235,9 +238,9 @@ IpOutput (optr dataBuffer, word link, byte flags)
 	    ip->ip_off = HostToNetworkWord(ip->ip_off);
 	    ip->ip_cksum = 0;
 	    ip->ip_cksum = Checksum((word *)ip, hlen);
-	    
+
 	    LOG_PKT(LogPacket(FALSE, m));
-	    
+
 	    TcpipUnlock(OptrToHandle(dataBuffer));
 	    return (LinkSendData(dataBuffer, link));
 	}
@@ -253,14 +256,14 @@ IpOutput (optr dataBuffer, word link, byte flags)
 	    goto freeBuffer;
 	}
 	len = (mtu - hlen) &~ 7;
-	if (len < 8) 
+	if (len < 8)
 	    goto freeBuffer;
-    
+
     {
 	optr fragBuffer;
 	MbufHeader *f;
-	 
-	 /* 
+
+	 /*
 	  * Loop through length of segment, allocate a data buffer,
 	  * make new header and copy data of each part and send it.
 	  * Original buffer will be freed.
@@ -280,7 +283,7 @@ IpOutput (optr dataBuffer, word link, byte flags)
 	    f = (MbufHeader *)LMemDeref(fragBuffer);
 	    mhip = (struct ip *)mtod(f);
 
-	     /* 
+	     /*
 	      * Copy the IP header and adjust off, IP_MF flag, length,
 	      * checksum.  If this is the last fragment, adjust the
 	      * data size in the data buffer.
@@ -290,7 +293,7 @@ IpOutput (optr dataBuffer, word link, byte flags)
 	    if (ip->ip_off & IP_MF)
 		mhip->ip_off |= IP_MF;
 	    if (off + len >= ip->ip_len)   {		/* last fragment */
-		len = ip->ip_len - off;	    	    
+		len = ip->ip_len - off;
 	    	f->MH_dataSize = len + hlen;
 	    }
 	    else
@@ -299,23 +302,23 @@ IpOutput (optr dataBuffer, word link, byte flags)
 	    mhip->ip_len = HostToNetworkWord(len + hlen);
 	    mhip->ip_cksum = 0;
 	    mhip->ip_cksum = Checksum((word *)mhip, hlen);
-	    
+
 	     /*
 	      * Copy the portion of the data into the fragment, then
 	      * send it off to the network.
 	      */
 	    memcpy((byte *)(mhip) + hlen, (byte *)(ip) + off, len);
-	    
+
 	    LOG_PKT(LogPacket(FALSE, f));
 
 	    TcpipUnlock(OptrToHandle(fragBuffer));
 	    LOG_STAT(ipstat.ips_ofragments++;)
 	    error = LinkSendData(fragBuffer, link);
 	}
-	
+
     	LOG_EVENT(LM_IP_FRAGMENTED_DATAGRAM);
 
-#ifdef LOG_STATS	
+#ifdef LOG_STATS
     	if (error == 0)
     	    ipstat.ips_fragmented++;
 #endif
@@ -327,5 +330,3 @@ freeBuffer:
 	return (error);
 
 }
-
-

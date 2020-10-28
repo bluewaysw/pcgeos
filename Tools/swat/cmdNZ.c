@@ -197,11 +197,11 @@ See also:\n\
     ClientData	data;
     Tcl_DelProc	*delProc;
     const char	*realName;
-    
+
     if (argc < 2) {
 	Tcl_Error(interp, "Usage: require <name> [<file>]");
     }
-    
+
     if (!Tcl_FetchCommand(interp, argv[1], &realName, &cmdProc, &flags,
 			  &data, &delProc) ||
 	(cmdProc == CatchAutoLoad) ||
@@ -268,7 +268,7 @@ See also:\n\
 ")
 {
     Sym	    	  sym;
-    
+
     if (argc == 1) {
 	if (Sym_IsNull(curPatient->scope)) {
 	    Tcl_Return(interp, "nil", TCL_STATIC);
@@ -347,7 +347,9 @@ See also:\n\
     time\n\
 ")
 {
+#ifndef __WATCOMC__
     extern double   atof();
+#endif
     double  	    numSecs;
     struct timeval  interval;
     Rpc_Event	    event;
@@ -405,7 +407,7 @@ See also:\n\
     Tcl_Return(interp, done ? "1" : "0", TCL_STATIC);
     return(TCL_OK);
 }
-    
+
 
 /***********************************************************************
  *				SortCmd
@@ -462,8 +464,9 @@ See also:\n\
     int	    i;
     char    *cp;
 
-#if defined(_WIN32)  
-    typedef int (*compareFunc)(const char **, const char **) ;
+#if defined(_WIN32) || defined(__WATCOMC__)
+    typedef int (*compareFunc)(const void *, const void *) ;
+
     static int  (*compare[4])(const void *, const void *) = {
 	(compareFunc)AlAsc, (compareFunc)NumAsc, (compareFunc)AlDesc, (compareFunc)NumDesc
     };
@@ -476,7 +479,7 @@ See also:\n\
     if (argc < 2) {
 	Tcl_Error(interp, "Usage: sort [-r] [-n] <list>");
     }
-    
+
     for (i = 1; i < argc-1; i++) {
 	for (cp = argv[i]; *cp; cp++) {
 	    if (*cp == 'r') {
@@ -520,8 +523,8 @@ See also:\n\
 	    }
 	}
     }
-		    
-	
+
+
     Tcl_Return(interp, Tcl_Merge(listArgc, listArgv), TCL_DYNAMIC);
 
     free((char *)listArgv);
@@ -581,9 +584,9 @@ StreamWatchCmdHandler(int   	    fd,    	/* Stream that's ready */
      * Form the command string
      */
     stream = (Stream *)data;
-    
+
     sprintf(streamToken, "%d", (int)stream);
-    
+
     cmdArgs[0] = stream->watchProc;
     cmdArgs[1] = streamToken;
     cmdArgs[2] = Tcl_Merge(nconditions, conditions);
@@ -598,14 +601,14 @@ StreamWatchCmdHandler(int   	    fd,    	/* Stream that's ready */
     free(cmdArgs[2]);
     free(cmd);
 }
-    
+
 
 /***********************************************************************
  *				StreamReadChar
  ***********************************************************************
  * SYNOPSIS:	    Fetch a character from a stream.
  * CALLED BY:	    StreamCmd
- * RETURN:	
+ * RETURN:
  * SIDE EFFECTS:
  *
  * STRATEGY:
@@ -631,7 +634,7 @@ StreamReadChar(Stream *stream)
 	return (getc(stream->file));
     }
 }
-    
+
 
 /***********************************************************************
  *				StreamCmd
@@ -832,7 +835,7 @@ See also:\n\
 	     */
 	    argNum = 2;
 	}
-	
+
 	stream = (Stream *)atoi(argv[argNum]);
 	if (!VALIDTPTR(stream,TAG_STREAM)) {
 	    Tcl_RetPrintf(interp, "%s: not a stream", argv[argNum]);
@@ -847,9 +850,9 @@ See also:\n\
 
 	    stream = (Stream *)malloc_tagged(sizeof(Stream), TAG_STREAM);
 	    stream->watchProc = (char *)NULL;
-	    
+
 	    stream->file = fopen(argv[2], argv[3]);
-	    
+
 	    /*
 	     * Special case handling of connecting to a UNIX socket (for use in
 	     * talking to emacs...
@@ -861,11 +864,11 @@ See also:\n\
 		    if (stream->sock >= 0) {
 			struct sockaddr_un  saddr;
 			int 	    	saddrlen;
-		    
+
 			saddr.sun_family = AF_UNIX;
 			(void)strcpy(saddr.sun_path, argv[2]);
 			saddrlen = strlen(argv[2]) + sizeof(saddr.sun_family);
-		    
+
 			if (connect(stream->sock, &saddr, saddrlen) < 0) {
 			    (void)close(stream->sock);
 			} else {
@@ -893,7 +896,7 @@ See also:\n\
 	case STREAM_READ:
 	    if (strcmp(argv[2], "char") == 0) {
 		int	    c = StreamReadChar(stream);
-		
+
 		switch(c) {
 		    case EOF:
 			Tcl_Return(interp, "eof", TCL_STATIC);
@@ -926,9 +929,9 @@ See also:\n\
 	    } else if (strcmp(argv[2], "line") == 0) {
 		Buffer  buf;
 		int	    c;
-		
+
 		buf = Buf_Init(80);
-		
+
 		while(((c = StreamReadChar(stream)) != '\n') && (c != EOF)) {
 		    switch(c) {
 			case '\\':
@@ -955,7 +958,7 @@ See also:\n\
 			default:
 			    if (!isprint(c)) {
 				char	b[5];
-				
+
 				sprintf(b, "\\%03o", c);
 				Buf_AddBytes(buf, 4, (Byte *)b);
 			    } else {
@@ -967,7 +970,7 @@ See also:\n\
 		    Buf_AddBytes(buf, 2, (Byte *)"\\n");
 		}
 		Buf_AddByte(buf, (Byte)'\0');
-		
+
 		Tcl_Return(interp, (char *)Buf_GetAll(buf, NULL), TCL_DYNAMIC);
 		Buf_Destroy(buf, FALSE);
 	    } else if (strcmp(argv[2], "list") == 0) {
@@ -975,14 +978,14 @@ See also:\n\
 		int	    c;
 		int	    level;
 		int	    done;
-		
+
 		level = 0;
 		done = 0;
 		buf = Buf_Init(80);
-		
+
 		while(!done) {
 		    c = StreamReadChar(stream);
-		    
+
 		    switch(c) {
 			case EOF:
 			    done = 1;
@@ -1072,7 +1075,7 @@ See also:\n\
 	{
 	    char	*str;
 	    int	    	len;
-	    
+
 	    /*
 	     * Let Tcl_Merge deal with spaces etc.
 	     */
@@ -1092,7 +1095,7 @@ See also:\n\
 	case STREAM_WRITE:
 	{
 	    int	len = strlen(argv[2]);
-	    
+
 	    if (stream->type == STREAM_SOCKET) {
 		if (write(stream->sock, argv[2], len) < len) {
 		    stream->sockErr = TRUE;
@@ -1111,7 +1114,7 @@ See also:\n\
 	    if (stream->type == STREAM_FILE) {
 		int 	pos;
 		int 	which;
-	    
+
 		switch (argv[2][0]) {
 		    case '+':
 			argv[2] += 1;
@@ -1213,7 +1216,7 @@ See also:\n\
 	    stream->watchProc = (char *)malloc_tagged(strlen(argv[4])+1,
 						      TAG_STREAM);
 	    strcpy(stream->watchProc, argv[4]);
-	    
+
 	    /*
 	     * Finally, tell the RPC system to watch the beast.
 	     */
@@ -1244,7 +1247,7 @@ See also:\n\
 
     return(TCL_OK);
 }
-		
+
 
 /*-
  *-----------------------------------------------------------------------
@@ -1382,7 +1385,7 @@ See also:\n\
     if (!Sym_IsNull(sym)) {
 	Sym_GetFuncData(sym, (Boolean *)NULL, &baseAddr, (Type *)NULL);
     }
-    
+
     /*
      * Actually decode the instruction
      */
@@ -1432,7 +1435,7 @@ See also:\n\
     Tcl_Return(interp, Tcl_Merge(4, retv), TCL_DYNAMIC);
     return(TCL_OK);
 }
-	   
+
 /*-
  *-----------------------------------------------------------------------
  * CmdWait --
@@ -1472,7 +1475,7 @@ See also:\n\
 ")
 {
     int	    result = 0;
-    
+
     Ui_AllowInterrupts(FALSE);
     while(sysFlags & PATIENT_RUNNING) {
 	if (Ui_Interrupt()) {
@@ -1488,5 +1491,3 @@ See also:\n\
     Tcl_RetPrintf(interp, "%d", result);
     return(TCL_OK);
 }
-
-

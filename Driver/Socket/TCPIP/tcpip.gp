@@ -22,7 +22,7 @@ tokenchars	"SKDR"
 tokenid 	0
 #
 library	geos
-library netutils		
+library netutils
 library socket #noload
 library ansic
 library accpnt
@@ -38,10 +38,10 @@ endif
 # Define resources other than standard discardable code
 #
 resource ResidentCode 	fixed code read-only shared
-resource Strings	shared lmem read-only 
+resource Strings	shared lmem read-only
 resource IPAddrCtrlUI	ui-object read-only shared
-resource TcpipClassStructures	fixed read-only shared	
-resource TCPIPCLASSSTRUCTURES 	fixed read-only shared
+resource TcpipClassStructures	fixed read-only shared
+#resource TCPIPCLASSSTRUCTURES 	fixed read-only shared
 
 # other resources
 resource InputQueue	shared lmem

@@ -84,6 +84,9 @@
 #ifdef __BORLANDC__
 #pragma codeseg RAWIPCODE
 #endif
+#ifdef __WATCOMC__
+#pragma code_seg("RAWIPCODE")
+#endif
 
 
 /***********************************************************************
@@ -104,16 +107,16 @@ RawIpInput (optr dataBuffer, word hlen)
 {
     DatagramHeader *d;
     struct ip *iphdr;
-    
+
     /*
      * Restore IP length to include IP header and then deliver it.
      */
     TcpipLock(OptrToHandle(dataBuffer));
     d = (DatagramHeader *)LMemDeref(dataBuffer);
     iphdr = (struct ip *)mtod((MbufHeader *)d);
-    
+
     iphdr->ip_len += hlen;
-    
+
     TcpipUnlock(OptrToHandle(dataBuffer));
     TSocketRecvRawInput(dataBuffer);
 
@@ -123,7 +126,7 @@ RawIpInput (optr dataBuffer, word hlen)
 /***********************************************************************
  *				RawIpOutput
  ***********************************************************************
- * SYNOPSIS:	Send a raw ip packet.  
+ * SYNOPSIS:	Send a raw ip packet.
  *
  * CALLED BY:	EXTERNAL
  * RETURN:	word = SocketDrError
@@ -145,8 +148,8 @@ RawIpOutput (optr dataBuffer, word link)
 
     TcpipLock(OptrToHandle(dataBuffer));
     d = (DatagramHeader *)LMemDeref(dataBuffer);
-    
-    /* 
+
+    /*
      * Add IP header if not included and fill in ttl, tos, protocol,
      * len and IP addresses before sending to IP level.
      */
@@ -157,10 +160,10 @@ RawIpOutput (optr dataBuffer, word link)
 	dword dstAddr = *((dword *)(mtoa(d) + 2 + *(word *)mtoa(d)));
 
 	flags = 0;
-	
+
 	d->DH_common.MH_dataOffset -= sizeof (struct ip);
 	d->DH_common.MH_dataSize += sizeof (struct ip);
-	
+
     	iphdr = (struct ip *)mtod((MbufHeader *)d);
 	iphdr->ip_p = IPPROTO_RAW;
     	iphdr->ip_src = LinkGetLocalAddr(link);
@@ -169,7 +172,7 @@ RawIpOutput (optr dataBuffer, word link)
 	iphdr->ip_ttl = ip_defttl;
 	iphdr->ip_tos = IPTOS_RELIABILITY;
     }
-    
+
     TcpipUnlock(OptrToHandle(dataBuffer));
     return (IpOutput(dataBuffer, link, flags));
 }
@@ -193,9 +196,5 @@ void
 RawIpError (word code)
 {
     if ((code = IcmpDecode(code)) != 0)
-	TSocketNotifyError(code, 0);    
+	TSocketNotifyError(code, 0);
 }
-
-
-
-

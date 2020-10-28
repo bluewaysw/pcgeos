@@ -11,9 +11,10 @@
 
 # include	<stdio.h>
  
-#if !defined(_MSDOS)
+#if !defined(_MSDOS) && !defined(__WATCOMC__)
 # include	<sgtty.h>
 #endif
+#include <sys/ioctl.h>
 
 # define	bool	char
 # define	reg	register
@@ -35,7 +36,7 @@
 
 # define	_puts(s)	tputs(s, 0, _putchar)
 
-#if !defined(_MSDOS)
+#if !defined(_MSDOS) && !defined(__WATCOMC__)
 typedef	struct sgttyb	SGTTY;
 #endif
 
@@ -69,7 +70,7 @@ struct _win_st {
 	short		_flags;
 	short		_ch_off;
 	bool		_clear;
-	bool		_leave;
+	bool		_leavecurs;
 	bool		_scroll;
 	char		**_y;
 	short		*_firstch;
@@ -86,7 +87,7 @@ extern char	*Def_term, ttytype[TTYTYPESIZ];
 
 extern int	LINES, COLS, _tty_ch, _res_flg;
 
-#if !defined(_MSDOS)
+#if !defined(_MSDOS) && !defined(__WATCOMC__)
 extern SGTTY	_tty;
 #endif
 
@@ -147,13 +148,13 @@ int	__void__;
  */
 
 #define	clearok(win,bf)	 (win->_clear = bf)
-#define	leaveok(win,bf)	 (win->_leave = bf)
+#define	leaveok(win,bf)	 (win->_leavecurs = bf)
 #define	scrollok(win,bf) (win->_scroll = bf)
 #define flushok(win,bf)	 (bf ? (win->_flags |= _FLUSH):(win->_flags &= ~_FLUSH))
 #define	getyx(win,y,x)	 y = win->_cury, x = win->_curx
 #define	winch(win)	 (win->_y[win->_cury][win->_curx] & 0177)
 
-#if !defined(_MSDOS)
+#if !defined(_MSDOS) && !defined(__WATCOMC__)
 #define raw()	 (_tty.sg_flags|=RAW, _pfast=_rawmode=TRUE, ioctl(_tty_ch,TIOCSETN,&_tty))
 #define noraw()	 (_tty.sg_flags&=~RAW,_rawmode=FALSE,_pfast=!(_tty.sg_flags&CRMOD),ioctl(_tty_ch,TIOCSETN,&_tty))
 #define cbreak() (_tty.sg_flags |= CBREAK, _rawmode = TRUE, ioctl(_tty_ch,TIOCSETN,&_tty))
@@ -172,7 +173,7 @@ int	__void__;
 #define baudrate()	(_tty.sg_ospeed)
 
 #else
-#define erasechar() 	('H' & 0x1f)
+#define erasechar() 	(0x7f)
 #define killchar()  	('X' & 0x1f)
 #define echo() 	    	(_echoit = TRUE)
 #define noecho()    	(_echoit = FALSE)

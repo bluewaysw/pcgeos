@@ -85,10 +85,13 @@
 #include <tcpipLog.h>
 
 #ifdef __HIGHC__
-#pragma Code("ICMPCODE"); 
+#pragma Code("ICMPCODE");
 #endif
 #ifdef __BORLANDC__
 #pragma codeseg ICMPCODE
+#endif
+#ifdef __WATCOMC__
+#pragma code_seg("ICMPCODE")
 #endif
 
 #ifdef LOG_STATS
@@ -160,27 +163,27 @@ IcmpError(MbufHeader *n, word type, word code)
      *	RFC 1122 :  A host SHOULD NOT send an ICMP Redirect message.
      */
     if (type == ICMP_REDIRECT)
-	return;	    	    	
-#ifdef LOG_STATS    
+	return;
+#ifdef LOG_STATS
     else
 	icmpstat.icps_error++;
 #endif
 
      /*
-      * Don't send error if the packet is not the first fragment of a 
+      * Don't send error if the packet is not the first fragment of a
       * message.  Don't send error if the old packet protocol was ICMP
       * error message.  Only known informational types can cause
       * an ICMP error message to be generated.
       */
     if (oip->ip_off &~ (IP_MF|IP_DF))
 	return;
-    if (oip->ip_p == IPPROTO_ICMP &&  
+    if (oip->ip_p == IPPROTO_ICMP &&
 	n->MH_dataSize >= oiplen + ICMP_MINLEN &&
 	!ICMP_INFOTYPE(((struct icmp *)((byte *)oip + oiplen))->icmp_type)) {
 	LOG_STAT(icmpstat.icps_oldicmp++;)
 	return;
     }
-    
+
      /*
       * Don't send error in response to a multicast or broadcast packet.
       */
@@ -199,7 +202,7 @@ IcmpError(MbufHeader *n, word type, word code)
       * Formulate ICMP message.
       */
     icmplen = min(ICMP_MAXDATA, oip->ip_len) + oiplen;
-    icmpBuf = TcpipAllocDataBuffer(icmplen + ICMP_MINLEN + sizeof(struct ip), 
+    icmpBuf = TcpipAllocDataBuffer(icmplen + ICMP_MINLEN + sizeof(struct ip),
 				   n->MH_domain);
     if (icmpBuf == 0)
 	return;
@@ -208,7 +211,7 @@ IcmpError(MbufHeader *n, word type, word code)
 
     nip = (struct ip *)mtod(m);
     icp = (struct icmp *)((byte *)(nip + 1));     /* increment ptr by  IP hdr */
-    
+
     LOG_STAT(icmpstat.icps_outhist[type]++;)
 
     icp->icmp_type = type;
@@ -222,21 +225,21 @@ IcmpError(MbufHeader *n, word type, word code)
 	icp->icmp_pptr = code;  	    /* points to bad parameter */
 	code = 0;
     }
-    
+
     icp->icmp_code = code;
-    
+
      /*
       * Copy IP header of bad packet and at most 64 bits of data into
       * ICMP message body.
       */
     memcpy((byte *)&icp->icmp_ip, (byte *)oip, icmplen);
-     
+
      /*
-      * Add header length back into the original IP header.  (Was 
+      * Add header length back into the original IP header.  (Was
       * removed before IcmpError was called.)
       */
     icp->icmp_ip.ip_len = HostToNetworkWord(icp->icmp_ip.ip_len + oiplen);
-    
+
      /*
       * Now copy old IP header (without options) in front of ICMP message.
       * Adjust fields of copied IP header.
@@ -259,7 +262,7 @@ IcmpError(MbufHeader *n, word type, word code)
  *	    	icmpBuf = optr of locked hugeLMem chunk holding IP packet
  * RETURN:	nothing
  * SIDE EFFECTS:
- *	    
+ *
  * STRATEGY:
  *	    	IP option handling removed from BSD code.
  * REVISION HISTORY:
@@ -273,22 +276,22 @@ IcmpReflect(MbufHeader *m, optr icmpBuf)
 {
     struct ip *ip = (struct ip *)mtod(m);
     dword taddr;
-     
+
      /*
-      * If the incoming packet was addressed directly to us, 
+      * If the incoming packet was addressed directly to us,
       * use dst as the src for the reply.  Otherwise (broadcast
       * or anonymous), use the address which corresponds to the
       * incoming interface.
       */
     taddr = ip->ip_dst;
     ip->ip_dst = ip->ip_src;
-    
+
     if (m->MH_flags & (IF_BCAST | IF_MCAST))
 	taddr = LinkGetLocalAddr(m->MH_domain);
-    
+
     ip->ip_src = taddr;
     IcmpSend(m, icmpBuf);
-    
+
 }
 
 
@@ -324,7 +327,7 @@ IcmpSend (MbufHeader *m, optr icmpBuf)
       * Compute ICMP checksum and then pass the message to the IP level.
       */
     hlen = ip->ip_hl << 2;
-    icp = (struct icmp *)((byte *)(ip +1)); 
+    icp = (struct icmp *)((byte *)(ip +1));
     icp->icmp_cksum = 0;
     icp->icmp_cksum = Checksum((word *)icp, ip->ip_len - hlen);
 
@@ -347,11 +350,11 @@ IcmpSend (MbufHeader *m, optr icmpBuf)
  * STRATEGY:
  *	    	Length of IP header has been removed from total len
  *	    	field in IP header by IpInput.
- * 	    	
+ *
  *	    	These are not processed because we're not a router or
  *	    	else we don't have to do anything:
  *	    	mask requests, redirects, router advertisement,
- *	    	router solicitation, info request, 
+ *	    	router solicitation, info request,
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -367,9 +370,9 @@ IcmpInput (optr dataBuffer, word hlen)
     struct icmp *icp;
     word icmplen;
     word i, code;
-    
+
     LOG_STAT(icmpstat.icps_packets++;)
-     
+
      /*
       * Locate ICMP structure in the buffer.
       */
@@ -378,7 +381,7 @@ IcmpInput (optr dataBuffer, word hlen)
     iphdr = (struct ip *)mtod(m);
     icp = (struct icmp *)((byte *)(iphdr) + hlen);
     icmplen = iphdr->ip_len;
-     
+
      /*
       * Check that it is not corrupted and of at least the minimum length.
       */
@@ -388,7 +391,7 @@ IcmpInput (optr dataBuffer, word hlen)
 	LOG_STAT(icmpstat.icps_tooshort++;)
 	goto freeit;
     }
-    
+
     if (Checksum((word *)icp, icmplen)) {
 	LOG_EVENT(LM_ICMP_BAD_CHECKSUM);
 	LOG_STAT(icmpstat.icps_badsum++;)
@@ -400,14 +403,14 @@ IcmpInput (optr dataBuffer, word hlen)
       */
     LOG_STAT(icmpstat.icps_inhist[icp->icmp_type]++;)
     code = icp->icmp_code;
-    
+
     switch (icp->icmp_type) {
 	case ICMP_UNREACH:
 	    code = ICMP_UNREACH;
 	    goto deliver;
 
 	case ICMP_TIMXCEED:
-	case ICMP_PARAMPROB:	    
+	case ICMP_PARAMPROB:
 	    if (code > 1) {
 		LOG_STAT(icmpstat.icps_badcode++;)
 		goto freeit;
@@ -415,28 +418,28 @@ IcmpInput (optr dataBuffer, word hlen)
 	    code = icp->icmp_type;
 	    goto deliver;
 
-        case ICMP_SOURCEQUENCH:	    
+        case ICMP_SOURCEQUENCH:
     	    if (code) {
 		LOG_STAT(icmpstat.icps_badcode++;)
 		LOG_EVENT(LM_ICMP_BAD_CODE);
 	    	goto freeit;
 	    }
 	    code = ICMP_SOURCEQUENCH;
-	
+
 deliver:
     	    /*
-	     * Problem with datagram. 
+	     * Problem with datagram.
 	     */
 	    if (icmplen < ICMP_ADVLENMIN || icmplen < ICMP_ADVLEN(icp) ||
 		icp->icmp_ip.ip_hl < (sizeof (struct ip) >> 2)) {
 		LOG_STAT(icmpstat.icps_badlen++;)
 		goto freeit;
 	    }
-	    
+
 	     /*
 	      * Advise higher lever protocol.
 	      */
-	    switch (icp->icmp_ip.ip_p) {    	
+	    switch (icp->icmp_ip.ip_p) {
 		case IPPROTO_TCP:
 		    TSocketDoError(code, icp->icmp_ip.ip_dst);
 		    break;
@@ -449,7 +452,7 @@ deliver:
 	    	    break;
 	    }
    	    break;
-	    
+
         case ICMP_ECHO:
     	    icp->icmp_type = ICMP_ECHOREPLY;
 	    goto reflect;
@@ -464,22 +467,22 @@ deliver:
 	     * Set high order bit of timestamp to indicate time value
 	     * is not provided with respect to midnight UT.
 	     */
-	    icp->icmp_rtime = HostToNetworkWord(0x80 | IcmpTime());  
+	    icp->icmp_rtime = HostToNetworkWord(0x80 | IcmpTime());
 	    icp->icmp_ttime = icp->icmp_rtime;
-reflect:	    
+reflect:
 	    iphdr->ip_len += hlen;	    /* since IpInput deducts this */
     	    LOG_STAT(icmpstat.icps_reflect++;)
 	    LOG_STAT(icmpstat.icps_outhist[icp->icmp_type]++;)
 	    IcmpReflect(m, dataBuffer);
 	    return;
-	    
+
 	case ICMP_ECHOREPLY:
         case ICMP_TSTAMPREPLY:
 	case ICMP_MASKREPLY:
 	    TcpipUnlock(OptrToHandle(dataBuffer));
 	    RawIpInput(dataBuffer, hlen);
 	    return;
-	
+
         default:
     	    break;
     }
@@ -524,8 +527,7 @@ IcmpDecode (word code)
 	    default:
 		code = 0;
 	        break;
-	}    
-	
+	}
+
 	return (code);
 }
-

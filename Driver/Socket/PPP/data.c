@@ -36,13 +36,13 @@
 char escape_map[MAP_SIZE] = { 0 }, discard_map[MAP_SIZE] = { 0 };
 
 unsigned char *frame_buffer_pointer = (unsigned char *)0, fsm_code,
-	 fsm_reply_code, *fsm_ptr, fsm_id, ip_connected = 0, 
+	 fsm_reply_code, *fsm_ptr, fsm_id, ip_connected = 0,
 	 passive_waiting = 0, fcs_error = FALSE;
 
-int max_retransmits = MAX_CONFIGURE, 
+int max_retransmits = MAX_CONFIGURE,
     cf_mru = DEFMRU,	    	   /* default interface MRU */
     ppp_mode_flags = SC_FLUSH, 	   /* require a PPP flag for first frame */
-    fsm_len, link_error = SDE_NO_ERROR, compressed_bytes = 0, 
+    fsm_len, link_error = SDE_NO_ERROR, compressed_bytes = 0,
     frame_len = 0, idle_timeout = 0, idle_time = 0;
 
 unsigned short input_fcs = PPP_INITFCS;
@@ -84,7 +84,7 @@ ccp_options ccp_wantoptions[NPPP], ccp_gotoptions[NPPP],
 struct ccp ccp[NPPP];
 
 /*
- * For storing default compression values when temporarily overridden 
+ * For storing default compression values when temporarily overridden
  * by accpnt compression setting.
  */
 byte default_active_comp;
@@ -113,7 +113,7 @@ char *shutdown_reason = (char *)0, *authentication_failure = (char *)0,
 
 int debug = 0, rx_bps = 0, tx_bps = 0, rx_percent = 100, tx_percent = 100,
     rx_bits = 0, tx_bits = 0, rx_pkts = 0, tx_pkts = 0, rx_pps = 0, tx_pps = 0,
-    idle_seconds = 0, event, lcp_warnnaks = LCP_DEFWARNNAKS, 
+    idle_seconds = 0, event, lcp_warnnaks = LCP_DEFWARNNAKS,
     lcp_loopback_warned = 0, ipcp_warnnaks = IPCP_DEFWARNNAKS,
     need_time = 1, rate_timer = 0;
 
@@ -132,4 +132,3 @@ int ccp_warnnaks = CCP_DEFWARNNAKS;
 #endif /* USE_CCP */
 
 #endif /* LOGGING_ENABLED */
-

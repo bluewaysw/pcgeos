@@ -28,16 +28,16 @@ tcpip.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 parallDr.h hugearr.h fileEnum.h sem.h initfile.h \
                 Internal/socketDr.h sockmisc.h ip.h tcp.h udp.h rawIp.h \
                 tcpip.h tcpipLog.h Ansi/string.h
-tcpInput.obj \
-tcpInput.eobj: geos.h resource.h Ansi/string.h lmem.h timer.h timedate.h \
+tcpOutput.obj \
+tcpOutput.eobj: geos.h resource.h Ansi/string.h lmem.h timer.h timedate.h \
                 ec.h Internal/socketDr.h sockmisc.h ip.h tcp.h tcpip.h \
                 tcpipLog.h
 ipOutput.obj \
 ipOutput.eobj: geos.h resource.h Ansi/string.h timer.h lmem.h ec.h \
                 Internal/socketDr.h sockmisc.h ip.h tcp.h icmp.h tcpip.h \
                 tcpipLog.h
-tcpOutput.obj \
-tcpOutput.eobj: geos.h resource.h Ansi/string.h lmem.h timer.h timedate.h \
+tcpInput.obj \
+tcpInput.eobj: geos.h resource.h Ansi/string.h lmem.h timer.h timedate.h \
                 ec.h Internal/socketDr.h sockmisc.h ip.h tcp.h tcpip.h \
                 tcpipLog.h
 icmp.obj \
@@ -48,21 +48,21 @@ ipInput.obj \
 ipInput.eobj: geos.h resource.h geode.h Ansi/string.h timer.h heap.h \
                 lmem.h ec.h Internal/socketDr.h sockmisc.h ip.h tcp.h \
                 icmp.h udp.h rawIp.h tcpip.h tcpipLog.h
-tcpUtils.obj \
-tcpUtils.eobj: geos.h resource.h geode.h Ansi/string.h lmem.h timer.h \
-                timedate.h ec.h Internal/socketDr.h sockmisc.h ip.h tcp.h \
-                icmp.h tcpip.h tcpipLog.h
 rawIp.obj \
 rawIp.eobj: geos.h resource.h Ansi/string.h lmem.h ec.h \
                 Internal/socketDr.h sockmisc.h ip.h rawIp.h icmp.h \
                 tcpip.h timer.h
+tcpipLog.obj \
+tcpipLog.eobj: tcpipLog.c
 udp.obj \
 udp.eobj: geos.h resource.h Ansi/string.h lmem.h initfile.h ec.h \
                 Internal/socketDr.h sockmisc.h ip.h udp.h icmp.h tcpip.h \
                 timer.h tcpipLog.h
-tcpipLog.obj \
-tcpipLog.eobj: /home/frehwagen/workspace/pcgeos/Driver/Socket/TCPIP/tcpipLog.c
-tcpipStrings.rdef: /home/frehwagen/workspace/pcgeos/Driver/Socket/TCPIP/tcpipStrings.ui
+tcpUtils.obj \
+tcpUtils.eobj: geos.h resource.h geode.h Ansi/string.h lmem.h timer.h \
+                timedate.h ec.h Internal/socketDr.h sockmisc.h ip.h tcp.h \
+                icmp.h tcpip.h tcpipLog.h
+tcpipStrings.rdef: tcpipStrings.ui
 tcpipAddrCtrl.rdef: generic.uih product.uih
 tcpipManager.obj \
 tcpipManager.eobj: geos.def heap.def geode.def resource.def ec.def system.def \
@@ -104,4 +104,4 @@ tcpipManager.eobj: geos.def heap.def geode.def resource.def ec.def system.def \
                 tcpipSocket.asm tcpipLink.asm tcpipUtils.asm \
                 tcpipAddrCtrl.asm tcpipDhcp.asm
 
-tcpipEC.geo tcpip.geo : geos.ldf netutils.ldf socket.ldf ansic.ldf accpnt.ldf resolver.ldf resolver.ldf 
+tcpipEC.geo tcpip.geo : geos.ldf netutils.ldf socket.ldf ansic.ldf accpnt.ldf resolver.ldf resolver.ldf

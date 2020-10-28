@@ -44,13 +44,13 @@
 # define CHAP_SUCCESS	3	/* Success */
 # define CHAP_FAILURE	4	/* Failure */
 
-typedef struct chap_state 
+typedef struct chap_state
 {
     int us_unit;    	    	/* Interface unit number */
     Handle us_myname;	    	/* Block for My Name */
     int us_mynamelen;	    	/* My Name length */
-    Handle us_secret;	    	
-    int us_secretlen;	    	
+    Handle us_secret;
+    int us_secretlen;
 #ifdef LOGGING_ENABLED
     Handle us_hername;	    	/* Her Name */
     int us_hernamelen;	    	/* Her Name length */
@@ -94,7 +94,7 @@ typedef struct chap_state
 
 
 /*
- *	Timeouts.  
+ *	Timeouts.
  */
 # define CHAP_DEFTIMEOUT 6	/* 3 seconds (time in timer intervals) */
 

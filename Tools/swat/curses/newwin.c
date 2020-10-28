@@ -178,7 +178,7 @@ int	num_lines, num_cols, begy, begx; {
 	win->_begy = by;
 	win->_begx = bx;
 	win->_flags = _NOSUBWIN;
-	win->_scroll = win->_leave = FALSE;
+	win->_scroll = win->_leavecurs = FALSE;
 	_swflags_(win);
 # ifdef DEBUG
 	fprintf(outf, "MAKENEW: win->_clear = %d\n", win->_clear);

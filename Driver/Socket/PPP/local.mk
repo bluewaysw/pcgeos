@@ -30,12 +30,12 @@
 #	used in conjunction with at least one of PRED_1 or STAC.
 #
 # PRED_1
-#	Predictor1 compression protocol.  Define this flag to 
-#	compress data or decompress incoming data with Predictor1.  
+#	Predictor1 compression protocol.  Define this flag to
+#	compress data or decompress incoming data with Predictor1.
 #	Must be used in conjunction with USE_CCP to have any effect.
 #
 # STAC_LZS
-#	Stac LZS compression protocol.  Define this flag to 
+#	Stac LZS compression protocol.  Define this flag to
 #	compress data or decompress incoming data with Stac LZS.
 #	Must be used in conjunction with USE_CCP to have any effect.
 #
@@ -81,7 +81,7 @@ GOCFLAGS	+= -DLOGGING_ENABLED
 # - BorlandC doesn't support this, so we use full Pascal convention
 #   and use uppercase name equates in pppGlobal.def
 #
-#CCOMFLAGS	+= -p
+CCOMFLAGS	+= -ecp
 ASMFLAGS	+= -DPASCAL_CONV
 
 #
@@ -95,6 +95,3 @@ ASMFLAGS	+= -DPASCAL_CONV
 _PROTO		= 7.2
 
 #include <$(SYSMAKEFILE)>
-
-
-

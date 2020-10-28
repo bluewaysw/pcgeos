@@ -13,7 +13,7 @@
  * ROUTINES:
  *	Name	  	    Description
  *	----	  	    -----------
- *	chap_packet_name    
+ *	chap_packet_name
  *
  *	chap_init
  *	chap_authwithpeer   Start CHAP client
@@ -22,7 +22,7 @@
  *	chap_servertimeout  Process CHAP server timer expiring
  *	chap_clienttimeout  Process CHAP client timer expiring
  *
- * 	chap_lowerup	    
+ * 	chap_lowerup
  *	chap_lowerdown
  *
  *	chap_protrej	    Process received Protocol-Reject for CHAP
@@ -66,8 +66,11 @@
 #ifdef __BORLANDC__
 #pragma codeseg CHAPCODE
 #endif
+#ifdef __WATCOMC__
+#pragma code_seg("CHAPCODE")
+#endif
 
-/* 
+/*
  * Forward declarations.
  */
 void chap_rchallenge (chap_state *u, unsigned char *inp, unsigned char id,
@@ -79,27 +82,27 @@ void chap_rsuccess (chap_state *u, unsigned char *inp, unsigned char id,
 void chap_rfailure (chap_state *u, unsigned char *inp, unsigned char id,
 		   int len);
 void chap_sresponse (chap_state *u, unsigned char id);
-void chap_sresult (unsigned char result, chap_state *u, unsigned char id, 
+void chap_sresult (unsigned char result, chap_state *u, unsigned char id,
 		   char *msg, int msglen);
 void chap_schallenge(chap_state *u);
 
 #ifdef LOGGING_ENABLED
 
-void chap_packet_name (unsigned char packet_type, 
+void chap_packet_name (unsigned char packet_type,
 		       char *buffer)
 {
     switch (packet_type)
 	{
-	case CHAP_CHALLENGE:	
+	case CHAP_CHALLENGE:
 	    sprintf(buffer, "Challenge");
 	    break;
-	case CHAP_RESPONSE:	
+	case CHAP_RESPONSE:
 	    sprintf(buffer, "Response");
 	    break;
-	case CHAP_SUCCESS:	
+	case CHAP_SUCCESS:
 	    sprintf(buffer, "Success");
 	    break;
-	case CHAP_FAILURE:	
+	case CHAP_FAILURE:
 	    sprintf(buffer, "Failure");
 	    break;
 	default:
@@ -116,7 +119,7 @@ void chap_packet_name (unsigned char packet_type,
  * CALLED BY:	PPPSetup using prottbl entry
  * RETURN:	nothing
  *
- * NOTES:   	Commented out lines initializing defaults to zero 
+ * NOTES:   	Commented out lines initializing defaults to zero
  *	    	because they are already zero (dgroup).  The lines
  *	    	now server as comments.
  *
@@ -142,7 +145,7 @@ void chap_init (int unit)
     u -> us_flags = CHAP_IN_AUTH_PHASE;
 /*    u -> us_id = 0;	    	    	    	    */
 
-    u -> us_timeouttime = CHAP_DEFTIMEOUT;	    
+    u -> us_timeouttime = CHAP_DEFTIMEOUT;
 /*    u -> client_timer = u -> server_timer = 0;    */
 
 /*    u -> us_rechap_period = 0;		    */  /* Off by default */
@@ -153,7 +156,7 @@ void chap_init (int unit)
 /***********************************************************************
  *				chap_authwithpeer
  ***********************************************************************
- * SYNOPSIS:	Our peer is the authentictor.  Wait for her to verify 
+ * SYNOPSIS:	Our peer is the authentictor.  Wait for her to verify
  *	    	that we are who we say we are.
  * CALLED BY:	chap_lowerup
  *	    	lcp_up
@@ -181,7 +184,7 @@ void chap_authwithpeer (int unit)
      */
     if (u -> us_client_state == CHAP_CLOSED) {
 	u -> us_client_state = CHAP_WAITING;
-	u -> client_timer = 0;	    	    	    	
+	u -> client_timer = 0;
     }
 }
 
@@ -225,7 +228,7 @@ void chap_authpeer (int unit)
      * Start server's timer.
      */
     u -> us_server_retransmits = u -> us_client_retransmits = 0;
-    chap_schallenge(u);			
+    chap_schallenge(u);
     u -> server_timer = u -> us_timeouttime;
 }
 
@@ -274,10 +277,10 @@ void chap_servertimeout (chap_state *u)
 	     * starts at 1.  Adjust this backoff algorithm to match
 	     * FSM backoff timer behaviour.
 	     */
-	    if (u -> us_server_retransmits > MIN_RX_BEFORE_BACKOFF) 
-	      u -> server_timer = u -> us_timeouttime * 
+	    if (u -> us_server_retransmits > MIN_RX_BEFORE_BACKOFF)
+	      u -> server_timer = u -> us_timeouttime *
 	          (u -> us_server_retransmits - MIN_RX_BEFORE_BACKOFF + 1);
-	    else 
+	    else
 	      u -> server_timer = u -> us_timeouttime;
 #else
 	    u -> server_timer = u -> us_timeouttime * u -> us_server_retransmits;
@@ -335,7 +338,7 @@ void chap_clienttimeout (chap_state *u)
  * CALLED BY:	lcp_up
  * RETURN:	nothing
  *
- * STRATEGY:	Remember that the lower layer is up.  
+ * STRATEGY:	Remember that the lower layer is up.
  *	    	If server is waiting, start it up.
  *	    	If client is waiting, start it up.
  *
@@ -393,7 +396,7 @@ void chap_lowerdown (int unit)
 /***********************************************************************
  *				chap_protrej
  ***********************************************************************
- * SYNOPSIS:	Peer rejected CHAP protocol.  Process it.  
+ * SYNOPSIS:	Peer rejected CHAP protocol.  Process it.
  * CALLED BY:	demuxprotrej using prottbl entry
  * RETURN:	nothing
  *
@@ -422,7 +425,7 @@ void chap_protrej (int unit)
  * STRATEGY:	Verify length of packet.
  *	    	Parse code, id and length and verify length field.
  *	    	Process according to code.
- *	    	Free packet.  New packets will have been allocated for 
+ *	    	Free packet.  New packets will have been allocated for
  *	    	any needed responses.
  *
  * REVISION HISTORY:
@@ -444,7 +447,7 @@ byte chap_input (int unit,
      * Parse the CHAP packet header (code, id and length)
      */
     inp = PACKET_DATA(inpacket);
-    
+
     if (l < CHAP_HEADERLEN) {
 	LOG3(LOG_NEG, (LOG_CHAP_SHORT_HDR));
 	goto freepacket;
@@ -489,7 +492,7 @@ byte chap_input (int unit,
 	    break;
 	}
 
-freepacket:	    
+freepacket:
     PACKET_FREE(inpacket);
     return(1);
 }
@@ -506,7 +509,7 @@ freepacket:
  * STRATEGY:	If client state is closed, do nothing.
  *	    	Verify length.  Parse value length and verify it.
  *	    	Parse name and use to lookup secret.
- *	    	Do the encryption with MD5.  
+ *	    	Do the encryption with MD5.
  *	    	Send a response.
  *
  * REVISION HISTORY:
@@ -525,7 +528,7 @@ void chap_rchallenge (chap_state *u,
     int valuelen;
     MD5_CTX md_context;
     DOLOG(Handle hernameBlk = NullHandle;)
-    DOLOG(unsigned char *hername;) 
+    DOLOG(unsigned char *hername;)
 
     if (u -> us_client_state == CHAP_CLOSED) {
 	LOG3(LOG_NEG, (LOG_CHAP_UNEXPECTED, "Challenge"));
@@ -536,14 +539,14 @@ void chap_rchallenge (chap_state *u,
      * Get length of value, adjust remaining length and verify length field.
      */
     GETCHAR(valuelen, inp);
-    len -= 1;	    	    
+    len -= 1;
 
     if (len < valuelen) {
 	LOG3(LOG_NEG, (LOG_CHAP_SHORT_CHALLENGE));
 	return;
     }
     value = inp;
-    
+
     /*
      * Advance pointer to name data in packet.  Adjust remaining length.
      */
@@ -557,7 +560,7 @@ void chap_rchallenge (chap_state *u,
     PPPFreeBlock(u -> us_hername);  	    /* Free old block. */
     u -> us_hernamelen = len;		     /* Store new length */
 
-    if (len > 0 && 
+    if (len > 0 &&
 	((hernameBlk = MemAllocSetOwner(GeodeGetProcessHandle(),
 					len, HF_DYNAMIC, HAF_STANDARD)) != 0)) {
 	MemLock(hernameBlk);
@@ -604,7 +607,7 @@ void chap_rchallenge (chap_state *u,
     /*
      * Reset retransmit count and set client state.  Send a response.
      */
-    u -> us_client_retransmits = 1; 	   
+    u -> us_client_retransmits = 1;
     u -> us_client_state = CHAP_WAITING;
     chap_sresponse(u, u -> us_client_id = id);
 }
@@ -676,7 +679,7 @@ void chap_rresponse (chap_state *u,
 	DOLOG(u -> us_hernamelen = len;)
 	DOLOG(u -> us_hername = 0;)
 
-	if (len == 0 || 
+	if (len == 0 ||
 	    ((hernameBlk = MemAllocSetOwner(GeodeGetProcessHandle(),
 				    len, HF_DYNAMIC, HAF_STANDARD)) == 0)) {
 	    hername = (unsigned char *)"";  	    /* prevents us from dying */
@@ -698,10 +701,10 @@ void chap_rresponse (chap_state *u,
 	}
 
 	/*
-	 * Encrypt value to compare against peer's response.  
+	 * Encrypt value to compare against peer's response.
 	 */
 
-	if (secretBlk) {	
+	if (secretBlk) {
 	    MemLock(secretBlk);
 	    secret = (char *)MemDeref(secretBlk);
 	    MD5Init(&md_context);
@@ -709,23 +712,23 @@ void chap_rresponse (chap_state *u,
 	    MD5Update(&md_context, secret, secretLen);
 	    MD5Update(&md_context, u -> us_mychallenge, CHAP_VALUE_SIZE);
 	    MD5Final(digest, &md_context);
-	    MemFree(secretBlk);	    	
+	    MemFree(secretBlk);
 	}
 
 	/*
 	 * Check if our encrypted secret for the peer matches the
-	 * received value.  If we don't know the peer's secret, 
+	 * received value.  If we don't know the peer's secret,
 	 * then send failure.
 	 */
 	if (valuelen == CHAP_VALUE_SIZE &&
 	    memcmp(digest, value, valuelen) == 0 &&
 	    secretBlk) {
-	    /* 
+	    /*
 	     * It matches!  Send success.  Cancel server timeout.
 	     */
 	    chap_sresult(CHAP_SUCCESS, u , id, "", 0);
 	    u -> us_server_state = CHAP_OPEN;
-	    u -> server_timer = 0;  	    
+	    u -> server_timer = 0;
 
 	    if (u -> us_client_state != CHAP_WAITING) {
 #ifdef LOGGING_ENABLED
@@ -742,11 +745,11 @@ void chap_rresponse (chap_state *u,
 		    LOG3(chap_debug, (LOG_NEWLINE_QUOTED));
 		}
 #endif /* LOGGING_ENABLED */
-		
+
 		/*
 		 * Start timer for reauthentication.
 		 */
-		if (u -> us_rechap_period) 
+		if (u -> us_rechap_period)
 		    u -> rechap_timer = u -> us_rechap_period;
 
 		/*
@@ -764,7 +767,7 @@ void chap_rresponse (chap_state *u,
 	     * Didn't match.  Send failure and close LCP.
 	     *
 	     * Set generic error to reset because this may be a
-	     * reauthentication response.  
+	     * reauthentication response.
 	     */
 	    chap_sresult(CHAP_FAILURE, u, id, "", 0);
 	    link_error = SSDE_AUTH_FAILED | SDE_CONNECTION_RESET;
@@ -793,7 +796,7 @@ void chap_rresponse (chap_state *u,
  *
  ***********************************************************************/
 void chap_rsuccess (chap_state *u,
-		    unsigned char *inp, 
+		    unsigned char *inp,
 		    unsigned char id,
 		    int len)
 {
@@ -818,7 +821,7 @@ void chap_rsuccess (chap_state *u,
      * begin network phase and remember that authentication is done so
      * reauthentication doesn't generate redundant notifications.
      */
-    if (u -> us_server_state != CHAP_WAITING) 
+    if (u -> us_server_state != CHAP_WAITING)
 	if (u -> us_flags & CHAP_IN_AUTH_PHASE) {
 	    u -> us_flags |= CHAP_IN_AUTH_PHASE;
 	    BeginNetworkPhase(u -> us_unit);
@@ -863,7 +866,7 @@ void chap_rfailure (chap_state *u,
      * Stop client from sending anymore responses and close LCP.
      */
     u -> client_timer = 0;
-    
+
     link_error = SSDE_AUTH_FAILED | SDE_CONNECTION_RESET;
     LOG3(LOG_BASE, (LOG_CHAP_FAILED));
     DOLOG(authentication_failure = "Authentication failed";)
@@ -909,7 +912,7 @@ chap_schallengeOrResponse (chap_state *u,
     int outlen, mynamelen;
 
     /*
-     * Compute size and allocate packet.  Packet consists of 
+     * Compute size and allocate packet.  Packet consists of
      * chap header, 1 byte for value suze, the value and my name.
      */
     if (u -> us_mynamelen)
@@ -935,18 +938,18 @@ chap_schallengeOrResponse (chap_state *u,
     PUTSHORT(outlen, outp);
 #ifdef MSCHAP
     PUTCHAR(valueLen, outp);
-    
+
     memcpy(outp, value, valueLen);
     INCPTR(valueLen, outp);
 #else
     PUTCHAR(CHAP_VALUE_SIZE, outp);
-    
+
     memcpy(outp, value, CHAP_VALUE_SIZE);
     INCPTR(CHAP_VALUE_SIZE, outp);
 #endif
 
     /*
-     * Place my name in the packet and send it, if known.  
+     * Place my name in the packet and send it, if known.
      */
     if (u -> us_myname) {
 	MemLock(u -> us_myname);
@@ -954,12 +957,12 @@ chap_schallengeOrResponse (chap_state *u,
 	memcpy(outp, myname, mynamelen);
 	MemUnlock(u -> us_myname);
     }
-    else 
+    else
 	memcpy(outp, "?", mynamelen);           /* Use a dummy name */
 
 
     LOG3(u -> us_flags & CHAP_IN_AUTH_PHASE? LOG_NEG : LOG_LQSTAT,
-	(LOG_CHAP_SENDING, 
+	(LOG_CHAP_SENDING,
 	 code == CHAP_CHALLENGE ? "Challenge" : "Response", id));
 
     PPPSendPacket(u -> us_unit, outpacket, CHAP);
@@ -976,7 +979,7 @@ chap_schallengeOrResponse (chap_state *u,
  * RETURN:  	nothing
  *
  * STRATEGY:	If no username, cannot send a challenge packet.
- *	    	    (unless we want to be RFC deviants) 
+ *	    	    (unless we want to be RFC deviants)
  *	    	Allocate a packet, fill it with data
  *	    	Generate a random challenge and stick in packet.
  *	    	Stick name in packet and send it.
@@ -1005,10 +1008,10 @@ void chap_schallenge (chap_state *u)
 	u -> us_mychallenge[i] = (char)NetGenerateRandom8(255);
 
 #ifdef MSCHAP
-    chap_schallengeOrResponse(u, CHAP_CHALLENGE, ++u -> us_id, 
+    chap_schallengeOrResponse(u, CHAP_CHALLENGE, ++u -> us_id,
 			      u -> us_mychallenge, CHAP_VALUE_SIZE);
 #else
-    chap_schallengeOrResponse(u, CHAP_CHALLENGE, ++u -> us_id, 
+    chap_schallengeOrResponse(u, CHAP_CHALLENGE, ++u -> us_id,
 			      u -> us_mychallenge);
 #endif
 
@@ -1024,7 +1027,7 @@ void chap_schallenge (chap_state *u)
  *	    	chap_rchallenge
  * RETURN:	nothing
  *
- * STRATEGY:   	Allocate a packet.  Stick encrypted challenge value 
+ * STRATEGY:   	Allocate a packet.  Stick encrypted challenge value
  *	    	in packet.  Stick name in packet and send it.
  *	    	Start timer for result packet.
  * REVISION HISTORY:
@@ -1053,10 +1056,10 @@ void chap_sresponse (chap_state *u,
      * starts at 1.  Adjust this backoff algorithm to match
      * FSM backoff timer behaviour.
      */
-    if (u -> us_client_retransmits > MIN_RX_BEFORE_BACKOFF) 
-      u -> client_timer = u -> us_timeouttime * 
+    if (u -> us_client_retransmits > MIN_RX_BEFORE_BACKOFF)
+      u -> client_timer = u -> us_timeouttime *
 	(u -> us_client_retransmits - MIN_RX_BEFORE_BACKOFF + 1);
-    else 
+    else
       u -> client_timer = u -> us_timeouttime;
 #else
       u -> client_timer = u -> us_timeouttime * u -> us_client_retransmits;
@@ -1092,7 +1095,7 @@ void chap_sresult (unsigned char result,
     outlen = CHAP_HEADERLEN + msglen;
     outpacket = PACKET_ALLOC(outlen);
 
-    if (outpacket) {	    	    
+    if (outpacket) {
 	outp = PACKET_DATA(outpacket);
 
 	PUTCHAR(result, outp);
@@ -1103,14 +1106,10 @@ void chap_sresult (unsigned char result,
 	    memcpy(outp, msg, msglen);
 
 	LOG3(u -> us_flags & CHAP_IN_AUTH_PHASE ? LOG_NEG : LOG_LQSTAT,
-	    (LOG_CHAP_SENDING, 
-	     result == CHAP_SUCCESS ? "Success" : "Failure", 
+	    (LOG_CHAP_SENDING,
+	     result == CHAP_SUCCESS ? "Success" : "Failure",
 	     id));
 
 	PPPSendPacket(u -> us_unit, outpacket, CHAP);
     }
 }
-
-
-
-

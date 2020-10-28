@@ -29,7 +29,7 @@
  *	and deal with it.
  *
  * 	Modules must always have handles, even if their handle id's are 0.
- *	
+ *
  *	A breakpoint is set in a handle for a given patient -- where a
  *	patient must be a process. If the handle is shared code and
  *	the breakpoint is hit in a different process, the breakpoint will
@@ -46,8 +46,8 @@ static char *rcsid =
 #endif lint
 
 #include <config.h>
-#include "swat.h"
 #include <compat/stdlib.h>
+#include "swat.h"
 #include "break.h"
 #include "cmd.h"
 #include "event.h"
@@ -149,7 +149,7 @@ fstatic int BreakUninstallBP(BreakPtr bp);
 
 /*
  * Private data kept with each tcl-level breakpoint. A TclBreakRec is
- * allocated for each standard tcl breakpoint. 
+ * allocated for each standard tcl breakpoint.
  */
 typedef struct {
     int	    	  	id; 	    	/* ID number */
@@ -257,9 +257,9 @@ BreakSet(BreakPtr   	bp,
  *				BreakFindLastTcl
  ***********************************************************************
  * SYNOPSIS:	    Return the last break point's number
- * CALLED BY:	    
+ * CALLED BY:
  * RETURN:	    break point id
- * SIDE EFFECTS:    
+ * SIDE EFFECTS:
  *
  * STRATEGY:	    walk along the list and return the max id.
  *
@@ -270,7 +270,7 @@ BreakSet(BreakPtr   	bp,
  *
  ***********************************************************************/
 static int
-BreakFindLastTcl(void) 
+BreakFindLastTcl(void)
 {
     LstNode	ln;
     int	    	lastBreak;
@@ -326,15 +326,15 @@ BreakReset(Event    	event,	    /* EVENT_RESET (sort of) */
  *			BreakUpdateMaxBreakPoint
  *********************************************************************
  * SYNOPSIS: 	update maxBreakPoint when a breakpoint is deleted
- * CALLED BY:	
+ * CALLED BY:
  * RETURN:
  * SIDE EFFECTS:
  * STRATEGY:
  * REVISION HISTORY:
- *	Name	Date		Description			     
- *	----	----		-----------			     
- *	jimmy	1/14/94		Initial version			     
- * 
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jimmy	1/14/94		Initial version
+ *
  *********************************************************************/
 static int
 BreakUpdateMaxBreakPoint(BreakPtr bp)
@@ -390,7 +390,7 @@ BreakFree(BreakPtr  bp)
 	     * Need to execute some command before deleting the breakpoint.
 	     */
 	    char    	  	name[20];
-	    
+
 	    sprintf(name, "brk%d", tbPtr->id);
 	    Tcl_SetVar(interp, "breakpoint", name, TRUE);
 
@@ -407,16 +407,16 @@ BreakFree(BreakPtr  bp)
 	 * Break_Clear to remove the actual breakpoint.
 	 */
 	ln = Lst_Member(tclBreaks, (LstClientData)bp);
-	
+
 	assert(ln != NILLNODE);
-	
+
 	Lst_Remove(tclBreaks, ln);
 	free((char *)tbPtr);
 
     }
     if (bp->isCond) {
 	int 	i;
-	    
+
 	/*
 	 * Unregister interest in all handles...
 	 */
@@ -443,11 +443,11 @@ BreakFree(BreakPtr  bp)
 	    free((malloc_t)bp->patient);
 	}
     }
-    
+
     if (bp->handle && !bp->orphan) {
 	Handle_NoInterest(bp->handle, BreakInterest, (Opaque)bp);
     }
-    
+
     /*
      * Make sure the stub knows it's gone.
      */
@@ -543,8 +543,8 @@ BreakSave(BreakPtr  	bp) 	    /* Breakpoint to save, if possible */
 	    MessageFlush("%s+%d...", bp->fullname, bp->symoff);
 	}
     }
-    
-    
+
+
     /*
      * If breakpoint patient-specific, we have to convert the
      * patient handle into a patient name so when things are
@@ -557,7 +557,7 @@ BreakSave(BreakPtr  	bp) 	    /* Breakpoint to save, if possible */
 	strcpy(name, bp->patient->name);
 	bp->patient = (Patient)name;
     }
-    
+
     if (bp->isCond) {
 	/*
 	 * Deal with the various handles tracked for the condition.
@@ -565,7 +565,7 @@ BreakSave(BreakPtr  	bp) 	    /* Breakpoint to save, if possible */
 	for (i = 0; i < CB_MAX_HANDLES; i++) {
 	    if (bp->cb.handles[i].handle != NullHandle) {
 		Address	offset;
-		
+
 		if (bp->cb.handles[i].value == &bp->cb.criteria.cb_seg) {
 		    /*
 		     * If handle is for the word of memory being watched, we
@@ -718,7 +718,7 @@ BreakSave(BreakPtr  	bp) 	    /* Breakpoint to save, if possible */
  * SIDE EFFECTS:    breakpoint will be biffed if the expression
  *		    is in the passed patient.
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -874,7 +874,7 @@ BreakStart(Event    	event,	    /* EVENT_START */
 	    prevBPP = &bp->next;
 	    continue;
 	}
-	
+
 	/*
 	 * Assume restored breakpoint should be enabled.
 	 */
@@ -910,7 +910,7 @@ BreakStart(Event    	event,	    /* EVENT_START */
 		     */
 		    bp->cb.handles[i].handle = addr.handle;
 		    *bp->cb.handles[i].value = Handle_Segment(addr.handle);
-		    
+
 		    /*
 		     * See if the thing is a variable or label so we can
 		     * decide whether it's the memory-word or the cs:ip for
@@ -972,7 +972,7 @@ BreakStart(Event    	event,	    /* EVENT_START */
 	    }
 	    continue;
 	}
-	
+
 	/*
 	 * If the breakpoint is patient-specific, look for the patient handle.
 	 */
@@ -994,7 +994,7 @@ BreakStart(Event    	event,	    /* EVENT_START */
 	if (bp->symoff != 0) {
 	    disable = TRUE;
 	}
-	
+
 	/*
 	 * Now have everything we need to restore the breakpoint.
 	 */
@@ -1054,7 +1054,7 @@ BreakStart(Event    	event,	    /* EVENT_START */
 
 	if (bp->isCond) {
 	    int	    	i;
-	    
+
 	    for (i = 0; i < CB_MAX_HANDLES; i++) {
 		if (bp->cb.handles[i].handle != NullHandle) {
 		    free(bp->cb.handles[i].fullname);
@@ -1074,7 +1074,7 @@ BreakStart(Event    	event,	    /* EVENT_START */
 
     return(EVENT_HANDLED);
 }
-    
+
 
 /***********************************************************************
  *				BreakDestroyed
@@ -1110,7 +1110,7 @@ BreakDestroyed(Event	event,	    /* Event that called us */
 	 * In case breakpoint is saved and deleted...
 	 */
 	nextBP = bp->next;
-	
+
 	if (bp->patient == patient) {
 	    bp->orphan = TRUE;
 	    BreakSave(bp);
@@ -1189,7 +1189,7 @@ BreakStopped(Event  event,	/* EVENT_STOP or EVENT_STEP */
 
     frame = curPatient->frame;
     stayStopped = (Boolean *)callData;
-    
+
     /*
      * Figure out where we stopped. We need to get the PC since the IP is
      * relative to CS, which may not point the same place as the handle.
@@ -1216,12 +1216,12 @@ BreakStopped(Event  event,	/* EVENT_STOP or EVENT_STEP */
 	} else {
 	    pc = diff;
 	}
-    } 
+    }
 
 
     stop = FALSE;		/* Initialize stop flag */
     seenOne = FALSE;
-    
+
     if (breakDebug) {
 	Message("BREAK(%xh [%08xh]) ", pc, handle);
     }
@@ -1315,7 +1315,7 @@ BreakInstallBP(BreakPtr 	bp)
 	 ((Handle_State(bp->handle) & HANDLE_IN) &&
 	  ((word)bp->offset < Handle_Size(bp->handle)))))
     {
-	
+
 	if (bp->isCond) {
 	    CBreakArgs	cba;	    /* Sacrificial lamb (byte-swapping...) */
 
@@ -1337,14 +1337,14 @@ BreakInstallBP(BreakPtr 	bp)
 	    if (bp->handle) {
 
 		sba.sba_ip = (word)bp->offset;
-		
+
 		/* if the thing is an XIP resource, it might not be banked
 		 * in, so to help things out, we pass in the handle instead
 		 * so that when it gets banked in, the bpt module will be
 		 * able to properly install it
 		 */
 		sba.sba_xip = Handle_XipPage(bp->handle);
-		if (sba.sba_xip == HANDLE_NOT_XIP) { 
+		if (sba.sba_xip == HANDLE_NOT_XIP) {
 		    sba.sba_cs = Handle_Segment(bp->handle);
 		} else {
 		    sba.sba_cs = Handle_ID(bp->handle);
@@ -1402,19 +1402,19 @@ BreakInstall(Event  event,	    /* Event that called us */
     if (how == CONTINUE_FULL) {
 	Handle	  handle;
 	BreakPtr    bp;
-	
+
 	Ibm_ReadRegister(REG_MACHINE, REG_PC, (regval *)&pc);
 	handle = Handle_Find(pc);
-	    
+
 	if (handle != NullHandle) {
 	    Address  	offset;
-		
+
 	    /*
 	     * Figure the offset from the handle (again we don't use
 	     * IP since CS may not be pointing at the handle (e.g. in DOS))
 	     */
 	    offset = (Address)(pc - Handle_Address(handle));
-		
+
 	    /*
 	     * q.v. BreakStopped, above, for why this is done.
 	     */
@@ -1525,7 +1525,7 @@ BreakUninstall(Event	event,
 		 * under Lst_Destroy.
 		 */
 		Lst tb = tempBreaks;
-		
+
 		tempBreaks = Lst_Init(FALSE);
 		Lst_Destroy(tb, Break_Clear);
 	    }
@@ -1539,7 +1539,7 @@ BreakUninstall(Event	event,
 	     */
 	    Patient	patient = (Patient)callData;
 	    BreakPtr	next;
-	    
+
 	    for (bp = allBreaks; bp != NULL; bp = next) {
 		/*
 		 * If the breakpoint is specific to the exiting patient,
@@ -1642,7 +1642,7 @@ BreakInterest(Handle  	  	handle,	    /* Handle that changed */
 	    break;
     }
 }
-    
+
 
 /***********************************************************************
  *				CBreakInterest
@@ -1705,7 +1705,7 @@ CBreakInterest(Handle  	  	handle,	    /* Handle that changed */
     for (i = 0; i < CB_MAX_HANDLES; i++) {
 	if (bp->cb.handles[i].handle != NullHandle) {
 	    resident &= Handle_State(bp->cb.handles[i].handle);
-	    *bp->cb.handles[i].value = 
+	    *bp->cb.handles[i].value =
 	                 Handle_Segment(bp->cb.handles[i].handle);
 	}
     }
@@ -1714,7 +1714,7 @@ CBreakInterest(Handle  	  	handle,	    /* Handle that changed */
 	resident = 0;
     }
     resident &= HANDLE_IN;
-    
+
     switch(status) {
 	case HANDLE_SWAPIN:
 	    /*
@@ -1853,13 +1853,13 @@ Break_TSet(Patient 	patient,    	/* Patient for which to set it */
 	  Opaque	data) 	    	/* Data to pass it */
 {
     Break	  	brk; 	    	/* Breakpoint being set */
-    
+
     brk = Break_Set(patient, handle, offset, func, data);
     if (brk != (Break)NULL)
     {
 	Lst_AtEnd(tempBreaks, (LstClientData)brk);
     }
-    
+
     return(brk);
 }
 
@@ -1882,7 +1882,7 @@ Break_Clear(Break	brkpt)
     register BreakPtr	bp,
 			*prevPtr;
     LstNode 	    	ln;
-	
+
     if (((BreakPtr)brkpt)->saved) {
 	prevPtr = &savedBreaks;
     } else {
@@ -1898,7 +1898,7 @@ Break_Clear(Break	brkpt)
     }
 
     assert(bp != NULL);
-    
+
     /*
      * Advance to next element before freeing the breakpoint record.
      */
@@ -1952,11 +1952,11 @@ void
 Break_Enable(Break   	  	brkpt)
 {
     register BreakPtr	bp;
-								 
+
     bp = (BreakPtr)brkpt;
-								 
+
     bp->enabled = TRUE;
-								 
+
     /*
      * If other breakpoints are installed, install this one
      * (it won't have been installed before because it wasn't
@@ -1987,7 +1987,7 @@ Break_Disable(Break		brkpt)
     bp = (BreakPtr)brkpt;
 
     bp->enabled = FALSE;
-    
+
     BreakUninstallBP(bp);
 }
 
@@ -2139,7 +2139,7 @@ BreakTclPrint(BreakPtr	bp)
 				     * symbol-relative */
     char    	    *pname; 	    /* Name of patient for which it's
 				     * specific (NULL if none) */
-    
+
     /*
      * Figure the fullname and offset from the symbol for the breakpoint.
      */
@@ -2166,7 +2166,7 @@ BreakTclPrint(BreakPtr	bp)
 	 * Breakpoint is active, so lookup the symbol closest to the beast.
 	 */
 	sym = Sym_LookupAddr(bp->handle, bp->offset, SYM_LABEL|SYM_FUNCTION);
-	
+
 	if (!Sym_IsNull(sym)) {
 	    /*
 	     * Fetch the full name of the symbol and figure how far away from
@@ -2229,7 +2229,7 @@ BreakTclPrint(BreakPtr	bp)
 	} else {
 	    cp = fullname;
 	}
-	    
+
 	Message("%-3d %c %s%-*s %-11s",
 		tbPtr->id, state, cp, 30 - strlen(cp), diff,
 		pname ? pname : "all");
@@ -2264,7 +2264,7 @@ BreakTclPrint(BreakPtr	bp)
 
 	    if (comp) {
 		assert(cOps[comp] != NULL);
-		
+
 #if REGS_32
 		if (i >= (reg_eax/2)+1 && i < (reg_es/2)+1 && !(i & 1))
 		    Message("%s%s%08xh ", vals[i], cOps[comp],
@@ -2287,7 +2287,7 @@ BreakTclPrint(BreakPtr	bp)
 		    bp->cb.criteria.cb_value);
 	}
     }
-    
+
     /*
      * Finally, print the command to be executed when the breakpoint
      * is hit/taken.
@@ -2299,7 +2299,7 @@ BreakTclPrint(BreakPtr	bp)
 	 */
 	int 	offset = 0;
 	char	*start = tbPtr->command;
-	
+
 	do {
 	    Message("%*s%.*s", offset, "", cp-start+1, start);
 	    offset = 48;	/* MAGIC (see banner) */
@@ -2383,7 +2383,7 @@ BreakInit(Tcl_Interp	*interp,
 	  char	    	**argv)
 {
     TclBreakPtr	tbPtr;
-    
+
     if (argv[start]) {
 	tbPtr = (TclBreakPtr)malloc_tagged(sizeof(TclBreakRec) +
 					   strlen(argv[start])+1,
@@ -2569,7 +2569,7 @@ CBreakParseCriteria(Tcl_Interp	*interp,    /* Interpreter for errors */
     if (bp->patient) {
 	Warning("Can't set patient-specific conditional breakpoints now");
     }
-	    
+
     /*
      * Process the remaining criteria
      */
@@ -2579,7 +2579,7 @@ CBreakParseCriteria(Tcl_Interp	*interp,    /* Interpreter for errors */
 	int 	    opNum;	/* Operator nibble */
 	GeosAddr    value;  	/* Value with which to compare */
 	Type	    valType;	/* Type of data returned, if ValueHandle */
-	
+
 	/*
 	 * Figure out what word of the criteria is being compared, leaving the
 	 * result in wordNum.
@@ -2635,7 +2635,7 @@ CBreakParseCriteria(Tcl_Interp	*interp,    /* Interpreter for errors */
 	    savec = *cp;
 	    *cp = '\0';
 	    rdp = (Reg_Data *)Private_GetData(argv[i]);
-	    
+
 	    if (rdp == NULL) {
 		Tcl_RetPrintf(interp, "%s: unknown register", argv[i]);
 		return (TCL_ERROR);
@@ -2888,12 +2888,12 @@ CBreakParseCriteria(Tcl_Interp	*interp,    /* Interpreter for errors */
 	    }
 	}
     }
-    
+
     /*
      * Now criteria are parsed, mark the thing as a conditional BP
      */
     bp->isCond = TRUE;
-    
+
     return(TCL_OK);
 }
 
@@ -2947,7 +2947,7 @@ CBreakFinishCriteriaChange(BreakPtr 	bp)
 	BreakInstallBP(bp);
     }
 }
-    
+
 
 /***********************************************************************
  *				CBreakInit
@@ -3374,7 +3374,7 @@ See also:\n\
 	patient = argv[1][0] == 'a' ? NullPatient : curPatient;
 
 set_brk:
-	
+
 	if (!Expr_Eval(addrExpr, NullFrame, &addr, (Type *)NULL, TRUE))
 	{
 	    Tcl_Error(interp, "Invalid address");
@@ -3408,13 +3408,13 @@ set_brk:
 	     * Tcl breakpoints.
 	     */
 	    (void)Lst_AtEnd(tclBreaks, (LstClientData)bp);
-			  
+
 	    if (addr.handle == NullHandle && breakDebug) {
 		Warning("Breakpoint %d set at absolute address",
 			((TclBreakPtr)bp->data)->id);
 	    }
-	    /* update the srcwin just in case the break point is in 
-	     * code current being viewed 
+	    /* update the srcwin just in case the break point is in
+	     * code current being viewed
 	     */
 	    if ((int)clientData == (int)BRK_SSET)
 	    {
@@ -3440,7 +3440,7 @@ set_brk:
 	    } else {
 		MessageFlush("Clear all breakpoints for %s?[yn](n) ",
 			     patient->name);
-	    }		
+	    }
 	    Ui_ReadLine(ans);
 	    if ((*ans != 'Y') && (*ans != 'y')) {
 		Tcl_Return(interp, "not confirmed", TCL_STATIC);
@@ -3454,9 +3454,9 @@ set_brk:
 		bp = (BreakPtr)Lst_Datum(ln);
 		tbPtr = (TclBreakPtr)bp->data;
 
-		if (bp->patient == patient) 
+		if (bp->patient == patient)
 		{
-		    /* if we are clearing non-standard breakpoints don't 
+		    /* if we are clearing non-standard breakpoints don't
 		     * refresh as these are usually internal calls in things
 		     * like istep and sstep
 		     */
@@ -3471,8 +3471,8 @@ set_brk:
 	    break;
 	}
 
-	/* update the srcwin just in case the break point is in 
-	 * code current being viewed 
+	/* update the srcwin just in case the break point is in
+	 * code current being viewed
 	 */
 
 	/* BRK_CLEAR falls through */
@@ -3547,7 +3547,7 @@ set_brk:
 			    continue;
 			}
 		    }
-		    
+
 		    if (breakPointRangeBound == 0) {
 			if (i > 1) {
 		    	    Tcl_Return(interp,
@@ -3562,7 +3562,7 @@ set_brk:
 			    breakPointRangeBound = 1;
 			}
 		    }
-		    
+
 		    if (lastBreakPointPtr == NULL) {
 			/*
 			 * End of the range not given -- use the highest
@@ -3570,7 +3570,7 @@ set_brk:
 			 */
 	    		j = BreakFindLastTcl();
 
-			/* if the last break point is less than 
+			/* if the last break point is less than
 			   breakPointRangeBound then they get
 			   reversed and the last breakpoint gets
 			   deleted. This was bad. This fixes it. */
@@ -3590,11 +3590,11 @@ set_brk:
 		    /* if the ranges are backwards, reverse them */
 		    if (j < breakPointRangeBound) {
 			int temp;
-			
+
 			temp = breakPointRangeBound;
 			breakPointRangeBound = j;
 			j = temp;
-		    } 
+		    }
 
 		    /* go do the action on the breakpoints */
 		    for ( ; j >= breakPointRangeBound; j--) {
@@ -3678,7 +3678,7 @@ set_brk:
 		 * numbers of any breakpoints that are ours.
 		 */
 		cp = (char *)interp->result;
-		    
+
 		for (bp = allBreaks; bp != NULL; bp = bp->next) {
 		    if ((bp->handle == addr.handle) &&
 			(bp->offset == addr.offset) &&
@@ -3727,12 +3727,12 @@ set_brk:
 	    Tcl_RetPrintf(interp, "%s: undefined breakpoint", argv[2]);
 	    return(TCL_ERROR);
 	}
-	
+
 	tbPtr = (TclBreakPtr)bp->data;
-	
+
 	if (argc == 3 || strcmp(argv[3], "none") == 0) {
 	    int	    i;
-	    
+
 	    /*
 	     * Remove the breakpoint's condition.
 	     */
@@ -3769,7 +3769,7 @@ set_brk:
 	    if (CBreakParseCriteria(interp, &bp->cb, bp, 3, argv) != TCL_OK) {
 		return(TCL_ERROR);
 	    }
-	    
+
 	    CBreakFinishCriteriaChange(bp);
 	}
 	break;
@@ -3949,15 +3949,15 @@ See also:\n\
  *			BreakGetMaxBreakPointNumber
  *********************************************************************
  * SYNOPSIS: get the highest used break point number
- * CALLED BY:	
+ * CALLED BY:
  * RETURN:
  * SIDE EFFECTS:
  * STRATEGY:
  * REVISION HISTORY:
- *	Name	Date		Description			     
- *	----	----		-----------			     
- *	jimmy	1/13/94		Initial version			     
- * 
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jimmy	1/13/94		Initial version
+ *
  *********************************************************************/
 DEFCMD(get-max-bpt-number, BreakGetMaxBreakPointNumber,1,NULL,swat_prog.breakpoint,
 "")
@@ -3965,7 +3965,7 @@ DEFCMD(get-max-bpt-number, BreakGetMaxBreakPointNumber,1,NULL,swat_prog.breakpoi
     Tcl_RetPrintf(interp, "%d", maxBreakPoint);
     return TCL_OK;
 }
-	    
+
 /******************************************************************************
  *
  *			    INITIALIZATION
@@ -4047,4 +4047,3 @@ Break_Init(void)
 				0);
     GC_RegisterType(typeSetBreakArgs);
 }
-

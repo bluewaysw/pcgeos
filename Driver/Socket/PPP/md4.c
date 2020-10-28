@@ -65,6 +65,9 @@
 #ifdef __BORLANDC__
 #pragma codeseg MD4CODE
 #endif
+#ifdef __WATCOMC__
+#pragma code_seg("MD4CODE")
+#endif
 
 /*
  * Compile-time declarations of MD4 "magic constants".

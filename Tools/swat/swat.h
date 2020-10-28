@@ -95,7 +95,7 @@
 typedef int 	Boolean;
 typedef void	*Opaque;
 
-#if defined(__HIGHC__) || defined(__BORLANDC__)
+#if defined(__HIGHC__) || defined(__BORLANDC__) || defined(__WATCOMC__)
 
 /* (*&()*&Y High C allows almost nothing to be done with void *'s grrrr */
 typedef unsigned long Address;
@@ -227,7 +227,7 @@ typedef struct {
 				 */
 }	    	  *Handle;
 
-#if defined(__HIGHC__) || defined(__BORLANDC__)
+#if defined(__HIGHC__) || defined(__BORLANDC__) || defined(__WATCOMC__)
 extern Type NullType;
 extern Sym  NullSym;
 #else
@@ -460,11 +460,14 @@ extern volatile void	Punt(const char *msg, ...);
 #if defined(_WIN32)
 extern void Swat_Death(void);
 #endif
-
-#if defined(__GNUC__)
+#ifdef __WATCOMC__
+_WCRTLINK _WCNORETURN extern void   abort( void );
+#else
+#if defined(__GNUC__) 
 extern volatile void   	abort(void);
 #else
-extern void   	    	abort(void);
+extern void abort(void);
+#endif
 #endif
 
 extern int  cvtnum(const char *cp, char **endPtr);
