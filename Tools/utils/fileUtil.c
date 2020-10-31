@@ -96,7 +96,7 @@ FileUtil_Open(FileType *file, const char *path, int oflags, int sflags,
 	if (oflags & O_TRUNC) {
 	    sprintf(flags, "w+");
     } else {
-	    sprintf(flags, "w+");
+	    sprintf(flags, "a+");
 	}
 #else
 	sprintf(flags, "a+");

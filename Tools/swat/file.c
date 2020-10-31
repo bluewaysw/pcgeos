@@ -1227,7 +1227,7 @@ FileCacheSymDir(CONST char *sdfilename, char *name, char *result)
 	    int pos = FileUtil_Seek(sdfile, -1L, SEEK_END);
 	    returnCode = FileUtil_Read(sdfile, lastBytes, 1, &bytesRead);
 	    if (returnCode == TRUE) {
-		(void)FileUtil_Seek(sdfile, pos + 1, SEEK_END);
+		(void)FileUtil_Seek(sdfile, pos + 1, SEEK_SET);
 
 		if ((lastBytes[0] != '\n') && (bytesRead > 0)) {
 		    /*
