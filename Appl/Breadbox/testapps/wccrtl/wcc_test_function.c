@@ -19,7 +19,7 @@
 Boolean test_function__U4M() {
     
     Boolean result = TRUE;
-    
+
     //test with elements of the equivalence classes: 0, 1 and 4294967295
     result = result && test_scenario__U4M( (unsigned long) 0, (unsigned long) 0, (unsigned long) 0);
     result = result && test_scenario__U4M( (unsigned long) 1, (unsigned long) 0, (unsigned long) 0);
@@ -70,18 +70,45 @@ Boolean test_function__I4M() {
 }
 
 Boolean test_function__U4D() {
+
+    Boolean result = TRUE;
+
+    result = result && test_scenario__U4D( (unsigned long) 0, (unsigned long) 1, (unsigned long) 0, (unsigned long) 0);
+    result = result && test_scenario__U4D( (unsigned long) 1, (unsigned long) 1, (unsigned long) 1, (unsigned long) 0);
+    result = result && test_scenario__U4D( (unsigned long) 1000, (unsigned long) 201, (unsigned long) 4, (unsigned long) 196);
+    result = result && test_scenario__U4D( (unsigned long) 201, (unsigned long) 1000, (unsigned long) 0, (unsigned long) 201);
     
-    return FALSE;
+    result = result && test_scenario__U4D( (unsigned long) 4294967295, (unsigned long) 69997, (unsigned long) 61359, (unsigned long) 21372);
+    result = result && test_scenario__U4D( (unsigned long) 69997, (unsigned long) 4294967295, (unsigned long) 0, (unsigned long) 69997);
+    result = result && test_scenario__U4D( (unsigned long) 4294967295, (unsigned long) 4294967295, (unsigned long) 1, (unsigned long) 0);
+
+    return result;
 }
 
 Boolean test_function__I4D() {
-    
-    return FALSE;
+
+    Boolean result = TRUE;
+
+    result = result && test_scenario__I4D( (long) 0, (long) 1, (long) 0, (long) 0);
+    result = result && test_scenario__I4D( (long) 1, (long) 1, (long) 1, (long) 0);
+    result = result && test_scenario__I4D( (long) -1, (long) 1, (long) -1, (long) 0);
+    result = result && test_scenario__I4D( (long) 1, (long) -1, (long) -1, (long) 0);
+    result = result && test_scenario__I4D( (long) 0, (long) -1, (long) 0, (long) 0);
+    result = result && test_scenario__I4D( (long) 1000, (long) 201, (long) 4, (long) 196);
+    result = result && test_scenario__I4D( (long) -1000, (long) 201, (long) -4, (long) -196);
+    result = result && test_scenario__I4D( (long) -111111, (long) 111111, (long) -1, (long) 0);
+
+    result = result && test_scenario__I4D( (long) 2147483647, (long) 69997, (long) 30679, (long) 45684);
+    result = result && test_scenario__I4D( (long) 69997, (long) 2147483647, (long) 0, (long) 69997);
+    result = result && test_scenario__I4D( (long) -2147483648, (long) 69997, (long) -30679, (long) -45685);
+    result = result && test_scenario__I4D( (long) 69997, (long) -2147483648, (long) 0, (long) 69997);
+
+    return result;
 }
 
 Boolean test_function__CHP() {
 
-    Boolean result = FALSE;
+    Boolean result = TRUE;
     
     result = result && test_scenario__CHP( (long double) .001, (long) 0);
     result = result && test_scenario__CHP( (long double) .999, (long) 0);
@@ -99,6 +126,14 @@ Boolean test_scenario__U4M(unsigned long factor1, unsigned long factor2, unsigne
 
 Boolean test_scenario__I4M(long factor1, long factor2, long expectedValue) {
     return ((factor1 * factor2) == expectedValue) && ((factor2 * factor1) == expectedValue);
+}
+
+Boolean test_scenario__U4D(unsigned long dividend, unsigned long divisor, unsigned long expectedQutient, unsigned long expectedRemainder) {
+    return( (dividend / divisor == expectedQutient) && (dividend % divisor == expectedRemainder));
+}
+
+Boolean test_scenario__I4D(long dividend, long divisor, long expectedQutient, long expectedRemainder) {
+    return( (dividend / divisor == expectedQutient) && (dividend % divisor == expectedRemainder));
 }
 
 Boolean test_scenario__CHP(long double number, long expectedValue) {
