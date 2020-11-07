@@ -676,13 +676,13 @@ RpcSendV(int    	fd,
 		tiovlen = curiov+1;
 	    }
 
-#if defined(unix) || defined(_LINUX)
+#if defined(unix) || defined(_LINUX) || defined(_WIN32)
 	    //i = writev(fd, tiov, tiovlen);
 	    i = NetWare_WriteV(fd, tiov, tiovlen);
 #elif defined(_MSDOS)
 	    i = Serial_WriteV(tiov, tiovlen);
-#elif defined(_WIN32)
-	    i = Ntserial_WriteV(hCommunication, tiov, tiovlen, &overlapWrite);
+//#elif defined(_WIN32)
+//	    i = Ntserial_WriteV(hCommunication, tiov, tiovlen, &overlapWrite);
 #endif
 	    if (i < 0) {
 #if defined(_WIN32)
@@ -702,19 +702,19 @@ RpcSendV(int    	fd,
 	i = nwritten;
     } else {
 
-#if defined(unix) || defined(_LINUX)
+#if defined(unix) || defined(_LINUX) || defined(_WIN32)
 	//i = writev(fd, newiov, curiov+1);
 	i = NetWare_WriteV(fd, newiov, curiov+1);
 #elif defined(_MSDOS)
 	i = Serial_WriteV(newiov, curiov+1);
-#else defined(_WIN32)
+/*#else defined(_WIN32)
 	i = Ntserial_WriteV(hCommunication, newiov, curiov+1, &overlapWrite);
 	if ((i < 0) && (win32dbg == TRUE)) {
 	    char buf[1000];
 
 	    WinUtil_SprintError(buf, "Ntserial_WriteV");
 	    MessageFlush(buf);
-	}
+    }*/
 #endif
     }
 
@@ -1487,14 +1487,14 @@ RpcHandleStream(int	    stream, /* Stream that's ready */
     case CM_SERIAL:
     {
 
-#if defined(unix) || defined(_LINUX)
+#if defined(unix) || defined(_LINUX) || defined(_WIN32)
 	//bytesRead = read(stream, bp, 1);
 	bytesRead = NetWare_Read(stream, bp,
 				 1);
 
 #elif defined(_MSDOS)
 	bytesRead = Serial_Read(bp, 1);
-#elif defined(_WIN32)
+/*#elif defined(_WIN32)
 	if (outstandingRead == TRUE) {
 	    WaitForSingleObject(overlapRead.hEvent, INFINITE);
 	    GetOverlappedResult(hCommunication, &overlapRead,
@@ -1511,7 +1511,7 @@ RpcHandleStream(int	    stream, /* Stream that's ready */
 	} else {
 	    bytesRead = Ntserial_Read(hCommunication, bp, 1,
 				      &overlapRead, TRUE);
-	}
+	}*/
 #endif
 
 	if (bytesRead == 1) {
@@ -2300,12 +2300,12 @@ RpcWait(int poll)
 	     * There's still an event pending, so figure out the time to its
 	     * expiration and point 'timeout' at it.
 	     */
-	    tv = ev->timeout - now;
+	    tv = 0/*ev->timeout - now*/;
 	} else {
 	    /*
 	     * let's wait for ever, well 5 seconds that is
 	     */
-	    tv = 5000;
+	    tv = 0 /*5000*/;
 	}
 	millisecs = (tv * (long) 1000) / CLK_TCK;
 
@@ -2324,6 +2324,17 @@ RpcWait(int poll)
 	{
 	    hwaits[nwaits++] = hConIn;
 	}
+
+	/* now that swat can work over a network or a serial cable, we must
+	 * check for either case
+	 */
+	if (FD_ISSET(geosFD, &rpc_readMask)
+	    && ( ((commMode == CM_NETWARE) && Ipx_CheckPacket()))) {
+	    nstreams += 1;
+	    FD_SET(geosFD, &readMask);
+	}
+	errno = 0;
+#if 0
 	/*
 	 * check if we should wait on the communications method, eg. npipe
 	 */
@@ -2437,6 +2448,7 @@ RpcWait(int poll)
 		}
 	    }
 	}
+#endif
 
 	if (nstreams == 0) {
 	    /*
@@ -4721,8 +4733,8 @@ Rpc_Init(int		*argcPtr,
 	    *argcPtr -= 1;
 	}
 #endif /* unix */
-#if !defined(_WIN32)
 	else if (strcmp(*av, "-net") == 0) {       /* look for net arg */
+		MessageFlush("-net needs an argument\n");
 	    av++, ac--;
 	    if (ac == 0) {
 		MessageFlush("-net needs an argument\n");
@@ -4736,7 +4748,7 @@ Rpc_Init(int		*argcPtr,
 		exit(1);
 	    }
 	}
-#else
+#if defined(_WIN32)
 	else if (strncmp(*av, "-npipe", 6) == 0) {     /* look for npipe arg */
 	    if ((av[0][6] == '\0') && (ac > 1)) {
 		npipe = av[1];
@@ -4762,7 +4774,6 @@ Rpc_Init(int		*argcPtr,
 	}
     }
 
-#if !defined(_WIN32)
     /*
      * If we don't already have a connection open to a GEOS system, try and
      * open one now.
@@ -4779,6 +4790,7 @@ Rpc_Init(int		*argcPtr,
 	    commMode = CM_NETWARE;
 	}
     }
+#if !defined(_WIN32)
     if (geosFD < 0) {
 	/*
 	 * no netware. no npipe. lets hope serial comes thru.
@@ -4915,7 +4927,9 @@ Rpc_Init(int		*argcPtr,
     }
 
     switch (commMode) {
-    case CM_NPIPE:
+	case CM_NETWARE:
+	    break;
+	case CM_NPIPE:
 	if (npipe == NULL) {
 	    returnCode = Registry_FindStringValue(Tcl_GetVar(interp,
 							     "file-reg-swat",
