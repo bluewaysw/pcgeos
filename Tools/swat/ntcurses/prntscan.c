@@ -134,6 +134,11 @@ extern char *strncpy(char *dest, const char *src, size_t maxlen);
 void
 __snprintf(unsigned char *str, int size, const char *fmt, va_list args)
 {
+	
+# if defined(sun) || defined(__HIGHC__) || defined(__WATCOMC__)
+    vsprintf(str, fmt, args);
+# else
+
     FILE	junk;
 
     junk._flag = _IOWRT + _IOSTRG;
@@ -160,6 +165,7 @@ __snprintf(unsigned char *str, int size, const char *fmt, va_list args)
      */
     junk._cnt++;
     putc('\0', &junk);
+#endif
 }
 
 void
