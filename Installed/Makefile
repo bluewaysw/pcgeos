@@ -58,8 +58,8 @@ MAKESTUB:	.USE
 	if not exist  ..\$(.TARGET:S/\//\\/g) mkdir ..\$(.TARGET:S/\//\\/g)
 	cd ..\$(.TARGET:S/\//\\/g)
 	cd ..
-	set  SUBDIRS=$(.TARGET:X*\\\\Stub\\\\\\[*\\])
-	$(MAKE) -k -I..\$(.TARGET:S/\//\\/g) 
+	set  SUBDIRS=$(.TARGET:X*\/Stub\/\\[*\\])
+	$(MAKE) -k -I..\$(.TARGET:S/\//\\/g)
 #endif
 
 
@@ -75,7 +75,7 @@ minimalStub	: stub stub_netware stub_wincom
 
 stub		: Installed/Tools/swat/Stub/LowMem
 Installed/Tools/swat/Stub/LowMem:	MAKESTUB
-	
+
 stub_netware	: Installed/Tools/swat/Stub/NetWare
 Installed/Tools/swat/Stub/NetWare:	MAKESTUB
 
