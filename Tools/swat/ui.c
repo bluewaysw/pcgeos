@@ -918,7 +918,7 @@ Ui_Init(int 	*argcPtr,
 #endif
     char    	*term;
 #elif defined(_WIN32)
-    char	term[256];
+    char    	*term;
     Boolean	returnCode;
 #endif
 
@@ -955,17 +955,12 @@ Ui_Init(int 	*argcPtr,
 #endif
 
 #if !defined(_MSDOS)
-# if defined(unix) || defined(_LINUX)
+#ifdef _WIN32
+    term = "smart";
+#else
     term = getenv("TERM");
-# else
-    returnCode = Registry_FindStringValue(Tcl_GetVar(interp, "file-reg-swat",
-						     TRUE),
-					  "TERM", term, sizeof(term));
+#endif
 
-    if (returnCode == FALSE) {
-	term[0] = '\0';
-    }
-# endif
     if ((term == NULL)
 	|| (term[0] == '\0')
 	|| (strcmp(term, "dumb") == 0)
