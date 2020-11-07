@@ -1311,37 +1311,12 @@ See also:\n\
 #if defined(_MSDOS)
     if (commMode == CM_SERIAL)
     {
-# if defined(_WIN32)
-	char		workbuf[50];
-	long		comport = 0;
-	long		baudrate = 0;
-	Boolean		retval;
-# endif
 	const char	*tty=0;
 
 	tty = File_FetchConfigData("port");
 	if (tty == NULL)
 	{
-# if defined(_WIN32)
-	    tty = NULL;
-	    retval = Registry_FindDWORDValue(Tcl_GetVar(interp, 
-							"file-reg-swat", 
-							TRUE),
-					     "SERIAL_COM_PORT", &comport);
-	    if (retval != FALSE) {
-		retval = Registry_FindDWORDValue(Tcl_GetVar(interp, 
-							    "file-reg-swat", 
-							    TRUE),
-						 "SERIAL_BAUD_RATE", 
-						 &baudrate);
-		if (retval != FALSE) {
-		    sprintf(workbuf, "%d,%d", comport, baudrate);
-		    tty = workbuf;
-		}
-	    }
-# else
 	    tty = getenv("PTTY");
-# endif
 	    if ((tty == NULL) || (tty[0] == '\0'))
 	    {
 	    	Message("Unable to determine serial port to use\n");
