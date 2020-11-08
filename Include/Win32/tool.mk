@@ -183,6 +183,7 @@ ${MACHINES:S%$%.md/$(NAME).exe%g} : $(win32OBJS) $(win32LIBS)
 			$(.ALLSRC:M*.obj:S/^/file /g) \
 			$(.ALLSRC:M*.lib:S/^/lib /g) \
 			library kernel32 \
+			library ws2_32 \
 			SYSTEM NT_WIN \
 			RU CON \
 			$(XLINKFLAGS)

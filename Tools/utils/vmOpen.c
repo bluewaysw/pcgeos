@@ -278,7 +278,7 @@ VMOpen(short	    	flags,      /* Flags for open */
 	    sprintf(file->name, "%s"QUOTED_SLASH"vmXXXXXX", fileName);
 #endif
 
-#if defined _WIN32
+#if defined(_WIN32) || defined(_LINUX)
 	    /*
 	     * we need to tell windows to create the file if it doesn't exist
 	     */

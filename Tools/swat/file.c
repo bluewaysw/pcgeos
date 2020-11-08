@@ -96,7 +96,7 @@ static char *rcsid =
 #endif
 
 #if defined(_MSDOS) || defined(_WIN32)
-# define CONFIG_SUFFIX "cfg"
+# define CONFIG_SUFFIX "conf"
 #else
 # define CONFIG_SUFFIX "conf"
 #endif
@@ -1227,7 +1227,7 @@ FileCacheSymDir(CONST char *sdfilename, char *name, char *result)
 	    int pos = FileUtil_Seek(sdfile, -1L, SEEK_END);
 	    returnCode = FileUtil_Read(sdfile, lastBytes, 1, &bytesRead);
 	    if (returnCode == TRUE) {
-		(void)FileUtil_Seek(sdfile, pos + 1, SEEK_END);
+		(void)FileUtil_Seek(sdfile, pos + 1, SEEK_SET);
 
 		if ((lastBytes[0] != '\n') && (bytesRead > 0)) {
 		    /*
@@ -2123,16 +2123,26 @@ File_Locate(char	*file,	    /* File name */
 	 * Skip to end of current directory, copying it in.
 	 */
 	cp2 = name;
+#ifdef _WIN32
+	while((*cp != ';') && (*cp != '\0')) {
+#else
 	while((*cp != ':') && (*cp != '\0')) {
+#endif
 	    *cp2++ = *cp++;
 	}
 
 	/*
 	 * Make sure the directory ends in a slash
 	 */
+#ifdef _WIN32
+	if (cp2[-1] != '\\') {
+     	    *cp2++ = '\\';
+ 	}
+#else
 	if (cp2[-1] != '/') {
 	    *cp2++ = '/';
 	}
+#endif
 
 	/*
 	 * Copy in the file being sought
@@ -2439,7 +2449,7 @@ Synopsis:\n\
 }	/* End of FindGeode.	*/
 
 
-#if defined(unix) || defined(_LINUX)
+#if defined(unix) || defined(_LINUX) || defined(_WIN32)
 /***********************************************************************
  *				FileSetVar
  ***********************************************************************
@@ -2499,8 +2509,6 @@ FileSetVar(char	    **var,  	    /* Place to store result */
 }
 #endif /* unix */
 
-
-#if !defined(_WIN32)
 /***********************************************************************
  *				FileParseConfigFile
  ***********************************************************************
@@ -2645,7 +2653,6 @@ FileParseConfigFile(CONST char *path)
     (void)FileUtil_Close(cf);
     return;
 }
-#endif  /* !_WIN32 */
 
 /***********************************************************************
  *				File_FetchConfigData
@@ -2782,32 +2789,12 @@ File_Init(int	    *argcPtr,
     Boolean 	fileerrFound = FALSE;
     int         returnCode;
     char        key[30];
-#if !defined(_WIN32)
     char    	*cp;	    	/* General pointer */
     int	    	rootLen = 0;    /* Length of root directory */
     CONST char	*value;
-#else  /* WIN32 case */
-    long	dbg;
-    char    	workbuf[1024]; 		/* Buffer for doing work stuff */
+#ifdef _WIN32
     char	sdkname[256];		/* name of the sdk in the reg */
-    char	ntsdkRegPos[256];	/* location in registry of ntsdk */
-    char	swatRegPos[256];	/* location in registry of swat */
-    char	fileNumTypesString[256];	/* num types as string */
-
-    fileRoot = fileRootAlloc;
-    fileDefault = fileDefaultAlloc;
-    fileDevel = fileDevelAlloc;
-    fileSysLib = fileSysLibAlloc;
-    fileAbsSysLib = fileAbsSysLibAlloc;
-    fileGym = fileGymAlloc;
-
-    strcpy(sdkname, SDK_NAME);
-    returnCode = Registry_FindStringValue(REG_GEO_NAME, "USE_ALTERNATE_SDK",
-					  workbuf, sizeof(workbuf));
-    if ((returnCode == TRUE) && (workbuf[0] != '\0')) {
-	strcpy(sdkname, workbuf);
-    }
-#endif   /* end of WIN32 case */
+#endif
 
     Message = NULL;
     MessageFlush = NULL;
@@ -2816,6 +2803,8 @@ File_Init(int	    *argcPtr,
     if (argv0++ == NULL) {
 	argv0 = argv[0];
     }
+    printf("PATH %s\n", argv0); fflush(stdout);
+    printf("PATH %s\n", argv[0]); fflush(stdout);
 
     /*
      * Check for flags we support:
@@ -2830,9 +2819,7 @@ File_Init(int	    *argcPtr,
 	    argBranch = &av[0][2];
 	    *argcPtr -= 1;
 	} else if (strcmp(*av, "-c") == 0) {
-#if defined(_WIN32)
-	    Punt("-c argument is not permitted under WIN32, use Geostool\n");
-#endif
+
 	    if (ac > 1) {
 		strcpy(buf, av[1]);
 		*argcPtr -= 2;
@@ -2864,7 +2851,6 @@ File_Init(int	    *argcPtr,
 	}
     }
 
-#if !defined(_WIN32)
     if (buf[0] != '\0') {
 	goto read_config;
     }
@@ -2939,11 +2925,34 @@ File_Init(int	    *argcPtr,
     }
 # endif
 
+#ifdef _WIN32
+    {
+	cp = (char *)getenv("PATH");
+    
+    	if (cp != NULL) {
+    	    sprintf(buf, "%s", argv0);
+	    if((strlen(buf) > 3) && 
+	    		(strncmp(buf + strlen(buf) - 4, ".exe", 4) == 0)) {
+		buf[strlen(buf) - 4] = 0;    
+	    }
+	    strcat(buf, "." CONFIG_SUFFIX);
+    	    printf("PATH %s\n", buf); fflush(stdout);
+    	    cp = File_Locate(buf, cp);
+    	    if (cp != NULL) {
+    		strcpy(buf, cp);
+    		free(cp);
+		printf("PATH found %s\n", buf); fflush(stdout);
+    		goto read_config;
+    	    }
+    	}
+    }
+#else
     if (argv0 == argv[0]) {
 	cp = (char *)getenv("PATH");
 
 	if (cp != NULL) {
 	    sprintf(buf, "%s." CONFIG_SUFFIX, argv0);
+	    printf("PATH %s\n", buf); fflush(stdout);
 	    cp = File_Locate(buf, cp);
 	    if (cp != NULL) {
 		strcpy(buf, cp);
@@ -2952,6 +2961,7 @@ File_Init(int	    *argcPtr,
 	    }
 	}
     }
+#endif
 
     strcpy(buf, "swat." CONFIG_SUFFIX);
     if (access(buf, R_OK) != 0) {
@@ -2964,6 +2974,8 @@ read_config:
      * At this point, "buf" contains the path to the configuration file
      */
     FileParseConfigFile(buf);
+
+    
     /*
      * Fetch the root directory of the development tree
      */
@@ -2979,6 +2991,7 @@ read_config:
     }
     rootLen = strlen(fileRoot);
     Tcl_SetVar(interp, "file-root-dir", fileRoot, TRUE);
+
     /*
      * Find the current directory so we can set up the search paths
      * for geodes.
@@ -2995,7 +3008,7 @@ read_config:
     atexit(FileRestoreWorkingDir);
 #endif
 # else
-    if (getwd(cwd) == NULL) {
+    if (getcwd(cwd, sizeof(cwd)) == NULL) {
 	Punt("could not fetch current directory");
     }
 # endif
@@ -3152,6 +3165,8 @@ read_config:
     Tcl_SetVar(interp, "file-os", "unix", TRUE);
 # elif defined(_MSDOS)
     Tcl_SetVar(interp, "file-os", "dos", TRUE);
+# elif defined(_WIN32)
+    Tcl_SetVar(interp, "file-os", "win32", TRUE);
 # endif
 
     /*
@@ -3171,192 +3186,7 @@ read_config:
     }
     Tcl_SetVar(interp, "file-syslib-dir", fileAbsSysLib, TRUE);
 
-#else  /* else must be _WIN32 */
-    sprintf(ntsdkRegPos, REG_GEO_NAME "\\%s", sdkname);
-    Tcl_SetVar(interp, "file-reg-ntsdk", ntsdkRegPos, TRUE);
-
-    sprintf(swatRegPos, "%s\\Swat", ntsdkRegPos);
-    Tcl_SetVar(interp, "file-reg-swat", swatRegPos, TRUE);
-
-    Tcl_SetVar(interp, "file-os", "win32", TRUE);
-
-    /*
-     * Fetch the root directory of the development tree
-     */
-    returnCode = Registry_FindStringValue(ntsdkRegPos, "ROOT_DIR", fileRoot,
-					  sizeof(fileRootAlloc));
-    if ((returnCode == FALSE) || (fileRoot[0] == '\0')) {
-	Punt("Root directory not specified in registry at position %s",
-	     ntsdkRegPos);
-    }
-    if (!File_CheckAbsolute(fileRoot)) {
-	Punt("Root directory \"%s\" must be absolute path", fileRoot);
-    }
-    if (access(fileRoot, R_OK) != 0) {
-	Punt("Root directory \"%s\" does not exist", fileRoot);
-    }
-    FileMapSeparators(fileRoot, '\\', '/');
-    Tcl_SetVar(interp, "file-root-dir", fileRoot, TRUE);
-
-    /*
-     * Find the current directory so we can set up the search paths
-     * for geodes.
-     */
-
-    if (_getcwd(cwd, sizeof(cwd)) == NULL) {
-	Punt("could not fetch current directory");
-    }
-    /*  !mw 2006-03-16 fails for some reason unknown, I did not further look into that matter, though */
-    /*atexit(FileRestoreWorkingDir);*/
-
-    /*
-     * Store the initial directory away in the init-directory variable
-     */
-    FileMapSeparators(cwd, '\\', '/');
-    Tcl_SetVar(interp, "file-init-dir", cwd, TRUE);
-
-    returnCode = Registry_FindStringValue(ntsdkRegPos, "LOCAL_ROOT",
-					  fileDevel, sizeof(fileDevelAlloc));
-    if ((returnCode == FALSE) || (fileDevel[0] == '\0')) {
-	fileDevel = fileRoot;
-    }
-    FileMapSeparators(fileDevel, '\\', '/');
-    Tcl_SetVar(interp, "file-devel-dir", fileDevel, TRUE);
-
-    fileBranch[0] = '\0';
-    if (argBranch != NULL && *argBranch != '\0') {
-	strcpy(fileBranch, argBranch);
-    } else {
-	returnCode = Registry_FindStringValue(ntsdkRegPos, "BRANCH",
-					      fileBranch,
-					      sizeof(fileBranch));
-	if (returnCode == FALSE) {
-	    fileBranch[0] = '\0';
-	}
-    }
-    FileMapSeparators(fileBranch, '\\', '/');
-    Tcl_SetVar(interp, "file-branch", fileBranch, TRUE);
-
-    /*
-     * See if there's a default tree in which to locate geodes. If not, we
-     * assume the default is just the appropriate subdirs under the root.
-     */
-    returnCode = Registry_FindStringValue(swatRegPos, "GEODE_SUBDIR", workbuf,
-				    sizeof(workbuf));
-    if ((returnCode == FALSE) || (workbuf[0] == '\0')) {
-	strcpy(fileDefault, fileRoot);
-    } else {
-	if (File_CheckAbsolute(workbuf) == FALSE) {
-	    /*
-	     * Form the absolute path for the default tree and store it away.
-	     */
-	    if (fileBranch[0] != '\0') {
-		sprintf(fileDefault, "%s/%s/%s", fileRoot,
-			fileBranch, workbuf);
-	    } else {
-		sprintf(fileDefault, "%s/%s", fileRoot, workbuf);
-	    }
-	} else {
-	    strcpy(fileDefault, workbuf);
-	}
-    }
-    FileMapSeparators(fileDefault, '\\', '/');
-    Tcl_SetVar(interp, "file-default-dir", fileDefault, TRUE);
-
-    /*
-     * Figure where the .gym files are located.
-     */
-    sprintf(fileGym, "%s/GYM", fileDefault);
-
-    /*
-     * Now locate the directories for the various geode types.
-     */
-    returnCode = Registry_FindDWORDValue(swatRegPos, "NUM_GEODE_TYPES",
-					 &fileNumTypes);
-    if ((returnCode == FALSE) || (fileNumTypes < 0)) {
-	Punt("Number of Geodes not specified in registry at position %s",
-	     swatRegPos);
-    }
-    fileDirs = (CONST char **)calloc(fileNumTypes*2, sizeof(char *));
-    for (i = 0; i < fileNumTypes; i++) {
-	if (i == 0) {
-	    returnCode = Registry_FindStringValue(swatRegPos,
-						  "GEODE_TYPE_KERNEL",
-						  workbuf, sizeof(workbuf));
-	} else {
-	    sprintf(key, "GEODE_TYPE_%d", i);
-	    returnCode = Registry_FindStringValue(swatRegPos, key,
-						  workbuf, sizeof(workbuf));
-	}
-	if ((returnCode == TRUE) && (workbuf[0] != '\0')) {
-	    fileDirs[i*2+1] = (CONST char *)malloc(strlen(fileDefault) +
-						   strlen(workbuf) +
-						   2);
-	    sprintf(fileDirs[i*2+1], "%s/%s", fileDefault, workbuf);
-	    if (fileDevel[0] != '\0') {
-		fileDirs[i*2] = (CONST char *)malloc(strlen(fileDevel) +
-						     strlen(workbuf) +
-						     2);
-		sprintf(fileDirs[i*2], "%s/%s", fileDevel, workbuf);
-	    } else {
-		fileDirs[i*2] = NULL;
-		fprintf(stderr, "Problem finding Geode Type %d in registry\n",
-			i);
-	    }
-	} else {
-	    fprintf(stderr, "Problem finding Geode Type %d in registry\n", i);
-	    fileDirs[i*2+1] = NULL;
-	    fileDirs[i*2] = NULL;
-	}
-    }
-
-    /*
-     * Figure where the Tcl library is.
-     */
-    returnCode = Registry_FindStringValue(swatRegPos, "SYSLIB_SUBDIR",
-					  fileSysLib, sizeof(fileSysLibAlloc));
-    if ((returnCode == FALSE) || (fileSysLib[0] == '\0')) {
-	Punt("System library directory not specified in registry under"
-	     " SYSLIB_SUBDIR");
-    } else {
-	char *sysp;
-
-	do {
-	    sysp = (char *)strrchr(fileSysLib, PATHNAME_SLASH);
-	    if (sysp != NULL) {
-		*sysp = '/';
-	    }
-	} while (sysp != NULL);
-    }
-    if (File_CheckAbsolute(fileSysLib)) {
-	fileAbsSysLib = fileSysLib;
-    } else {
-	sprintf(fileAbsSysLib, "%s/%s", fileRoot, fileSysLib);
-    }
-    FileMapSeparators(fileAbsSysLib, '\\', '/');
-    Tcl_SetVar(interp, "file-syslib-dir", fileAbsSysLib, TRUE);
-
-    returnCode = Registry_FindStringValue(swatRegPos, "STAFF_PATH",
-					  workbuf, sizeof(workbuf));
-    if ((returnCode == FALSE) || (workbuf[0] == '\0')) {
-	workbuf[0] = '\0';
-    }
-    FileMapSeparators(workbuf, '\\', '/');
-    Tcl_SetVar(interp, "file-staff-path", workbuf, TRUE);
-
-    /*
-     * Determine if debug messages are requested
-     * this was initialized to FALSE in swat.c
-     */
-    returnCode = Registry_FindDWORDValue(swatRegPos, "DEBUG_MODE", &dbg);
-    if ((returnCode == TRUE) && (dbg != 0)) {
-	win32dbg = TRUE;
-    }
-
-#endif
-
 after_config:
-
     /*
      * Initialize the help system so anything in file-err.tcl that has
      * on-line help won't send us off the deep end.
@@ -3373,46 +3203,6 @@ after_config:
 
     sargv[0] = "source";
     sargv[2] = 0;
-#if defined(_WIN32)
-    ccp = workbuf;
-    returnCode = Registry_FindStringValue(swatRegPos, "SYSLIB_OVERRIDE_PATH",
-					  buf, sizeof(buf));
-    if ((returnCode == TRUE) && (buf[0] != '\0')) {
-	char *curpos, *endpos;
-	int  dirlen;
-
-	curpos = buf;
-	while (*curpos != '\0') {
-	    endpos = strchr(curpos, ';');
-	    if (endpos == NULL) {
-		endpos = strchr(curpos, '\0');
-	    }
-	    dirlen = endpos - curpos;
-	    if (dirlen > 0) {
-		strncpy(workbuf, curpos, dirlen);
-		workbuf[dirlen] = '\0';
-		if (access(workbuf, R_OK) != 0) {
-		    Punt("Cannot access SYSLIB_OVERRIDE_PATH = %s", workbuf);
-		}
-		strcat(workbuf, "/file-err.tcl");
-		if (access((char *)workbuf, R_OK) == 0) {
-		    sargv[1] = (char *)workbuf;
-		    fileerrFound = TRUE;
-		    if (Tcl_SourceCmd((ClientData)0, interp, 2, sargv)
-			== TCL_OK) {
-			return;
-		    } else {
-			fprintf(stderr,
-				"Problem detected while sourcing %s\n\n",
-				workbuf);
-		    }
-		}
-	    } else {
-		Punt("SYSLIB_OVERRIDE_PATH contains an empty path: %s", buf);
-	    }
-	    curpos = endpos + ((*endpos == ';') ? 1 : 0);
-	}
-#else
     if (getenv("SWATPATH") != NULL) {
 	ccp = File_PathConcat((CONST char *)getenv("SWATPATH"),
 			     "file-err.tcl",
@@ -3426,42 +3216,32 @@ after_config:
 	    }
 	}
 	free((char *)ccp);
-#endif
     }
 
+    printf("afterConfig3\n"); fflush(stdout);
     if (fileDevel && !File_CheckAbsolute(fileSysLib)) {
-#if defined(_WIN32)
-	sprintf(ccp, "%s/%s/file-err.tcl", fileDevel, fileSysLib);
-#else
 	ccp = File_PathConcat(fileDevel, fileSysLib, "file-err.tcl", 0);
-#endif
+printf("afterConfig4b\n"); fflush(stdout);
 	if (access((char *)ccp, R_OK) == 0) {
 	    sargv[1] = (char *)ccp;
 	    fileerrFound = TRUE;
 	    if (Tcl_SourceCmd((ClientData)0, interp, 2, sargv) == TCL_OK) {
-#if !defined(_WIN32)
 		free((char *)ccp);
-#endif
+printf("afterConfig4\n"); fflush(stdout);
 		return;
 	    }
 	}
-#if !defined(_WIN32)
+	printf("afterConfig5\n"); fflush(stdout);
 	free((char *)ccp);
-#endif
     }
+    printf("afterConfig6\n"); fflush(stdout);
 
-#if defined(_WIN32)
-    sprintf(ccp, "%s/file-err.tcl", fileAbsSysLib);
-#else
     ccp = File_PathConcat(fileAbsSysLib, "file-err.tcl", 0);
-#endif
     if (access((char *)ccp, R_OK) == 0) {
 	sargv[1] = (char *)ccp;
 	fileerrFound = TRUE;
 	if (Tcl_SourceCmd((ClientData)0, interp, 2, sargv) == TCL_OK) {
-#if !defined(_WIN32)
 	    free((char *)ccp);
-#endif
 	    return;
 	}
     }
@@ -3471,9 +3251,8 @@ after_config:
 	Punt("Parse error in %s", ccp);
     }
 
-#if !defined(_WIN32)
     free((char *)ccp);
-#endif
+printf("afterConfig2\n"); fflush(stdout);
 
     return;
 }

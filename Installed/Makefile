@@ -47,11 +47,41 @@ MAKEAPPL:	.USE
 	$(MAKE) -k -I..\$(.TARGET:S/\//\\/g) full
 #endif
 
+MAKESTUB:	.USE
+#if defined(linux)
+	mkdir -p ../$(.TARGET)
+	cd ../$(.TARGET)
+	cd ..
+	export SUBDIRS=$(.TARGET:X*\/Stub\/\\[*\\])
+	$(MAKE) -k -I../$(.TARGET)
+#else
+	if not exist  ..\$(.TARGET:S/\//\\/g) mkdir ..\$(.TARGET:S/\//\\/g)
+	cd ..\$(.TARGET:S/\//\\/g)
+	cd ..
+	set  SUBDIRS=$(.TARGET:X*\/Stub\/\\[*\\])
+	$(MAKE) -k -I..\$(.TARGET:S/\//\\/g)
+#endif
+
 
 minimal		: minimalLoader minimalLibrary minimalDriver minimalAppl \
-		  otherEnsemble
+		  otherEnsemble minimalStub
 
 minimalLoader	: textLoader VGALoader
+
+#
+# Stubs
+#
+minimalStub	: stub stub_netware stub_wincom
+
+stub		: Installed/Tools/swat/Stub/LowMem
+Installed/Tools/swat/Stub/LowMem:	MAKESTUB
+
+stub_netware	: Installed/Tools/swat/Stub/NetWare
+Installed/Tools/swat/Stub/NetWare:	MAKESTUB
+
+stub_wincom	: Installed/Tools/swat/Stub/WinCom
+Installed/Tools/swat/Stub/WinCom:	MAKESTUB
+
 
 #
 # Libraries

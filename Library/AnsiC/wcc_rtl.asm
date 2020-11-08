@@ -71,14 +71,80 @@ WCC_TEXT        SEGMENT BYTE PUBLIC 'CODE'
 
 	__I4M endp
 
+; __U4D
+;
+; Divide two 32 bit unsigned integers.
+;
+; In:
+;	dx:ax	dividend
+;	cx:bx	divisor
+;
+; Out:
+;	dx:ax	qoutient
+;	cx:bx	remainder
+;
+; Note: This is a temporary implementation. This function must be reimplemented in 8086 assembler instructions.
+
+	.386
 	__U4D proc far
-	WARNING WARNING_ANSIC_UNIMPLEMENTED
+
+	push dx							;push dividend in dx:ax to stack
+	push ax
+	push cx							;push divisor in cx:bx to stack
+	push bx
+	
+	pop ecx							;pop divisor from stack to ecx
+	pop eax							;pop low qword from stack to eax
+	mov edx, 0h						;set high qword of dividend to 0h
+
+	div ecx							;unsigned divide	
+
+	push eax						;push quotient to stack
+	push edx						;push remainder to stack
+
+	pop bx							;pop low word of remainder from stack to bx
+	pop cx							;pop high word of remainder from stack to cx
+	pop ax							;pop low word of qoutient from stack to ax
+	pop dx							;pop high word of qoutient from stack to dx
 	
 	ret
 	__U4D endp
+
+; __I4D
+;
+; Divide two 32 bit signed integers.
+;
+; In:
+;	dx:ax	dividend
+;	cx:bx	divisor
+;
+; Out:
+;	dx:ax	qoutient
+;	cx:bx	remainder
+;
+; Note: This is a temporary implementation. This function must be reimplemented in 8086 assembler instructions.
 	
+	.386
 	__I4D proc far
-	WARNING WARNING_ANSIC_UNIMPLEMENTED		
+
+	push dx							;push dividend in dx:ax to stack
+	push ax
+	push cx							;push divisor in cx:bx to stack
+	push bx
+	
+	pop ecx							;pop divisor from stack to ecx
+	pop eax							;pop low qword from stack to eax
+	
+	cdq								;extend dividend in eax to edx:eax
+	idiv ecx						;signed divide	
+
+	push eax						;push quotient to stack
+	push edx						;push remainder to stack
+
+	pop bx							;pop low word of remainder from stack to bx
+	pop cx							;pop high word of remainder from stack to cx
+	pop ax							;pop low word of quotient from stack to ax
+	pop dx							;pop high word of quotient from stack to dx
 	
 	ret
 	__I4D endp

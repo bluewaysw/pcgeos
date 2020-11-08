@@ -60,10 +60,10 @@ NO_EC		= si, senor
 # symbol indicating the stub type. E.g. Low/kernel.obj generates a -DLOW.
 # Default to -DLOWMEM if target not in a subdir (e.g. dependencies.mk)
 #
-ASMFLAGS        := -i $(INCDIRS:S|^|-I|g) $(ASMFLAGS:N*.INCLUDES*) 
-#\
-#		   -D`perl -e "$$_ = $$ARGV[0];" -e "s/(.*)\/.*/$$1/ or $$_ = \"LOWMEM\";" -e "print uc $$_;" $(.TARGET)`
-#                   "-D`expr $(.TARGET) : '\([^/]*\)/' \| LOWMEM : '\(LOWMEM\)' | tr a-z A-Z`"
+ASMFLAGS        := -i $(INCDIRS:S|^|-I|g) $(ASMFLAGS:N*.INCLUDES*) \
+		-D`perl -e "print uc '$(SUBDIRS)'"`
+#		#-D`perl -e "$$_ = $$ARGV[0];" -e "s/(.*)\/.*/$$1/ or $$_ = \"LOWMEM\";" -e "print uc $$_;" $(.TARGET)` \
+#		#-D`expr $(.TARGET) : '\([^/]*\)/' \| LOWMEM : '\(LOWMEM\)' | tr a-z A-Z`
 
 
 ASMFLAGS	+= -DFULL_EXECUTE_IN_PLACE
@@ -84,10 +84,10 @@ ASMFLAGS	+= -2 -DDO_DBCS -DPRODUCT=DOVE
 #
 # Define the targets and their sources...
 #
-STUBS		:= $(SUBDIRS:S|$|/swat.exe|g) 
+STUBS		:= $(SUBDIRS:S|$|/swat.exe|g)
 all		: $(STUBS)
 
-$(STUBS)	: $(OBJS:S|^|$(.TARGET:H)/|g)  	    	    LINK 
+$(STUBS)	: $(OBJS:S|^|$(.TARGET:H)/|g)  	    	    LINK
 
 $(SUBDIRS)	: $(.TARGET:S|$|/swat.exe|)
 
@@ -121,4 +121,3 @@ EXTRADEP	: .USE
 	rm -f dep.foo.$$$$
 
 $(DEPFILE)	: EXTRADEP
-

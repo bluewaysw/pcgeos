@@ -107,8 +107,11 @@ static IPXMaxPacket 	ipxOutPacket;
 
 #endif
 
-#ifdef _LINUX
+#if defined(_LINUX)
 static int cmdLineSocket = -1;
+#endif
+#if defined(_WIN32)
+extern int cmdLineSocket;
 #endif
 
 /*********************************************************************
@@ -584,7 +587,7 @@ NetWare_WriteV(int fd, struct iovec *iov, int iov_len)
 int
 NetWare_WriteV(int fd, struct iovec *iov, int iov_len)
 {
-#ifndef _LINUX
+#if !defined(_LINUX) 
     int	    	    i, size;
     
     /*
@@ -648,7 +651,7 @@ NetWare_WriteV(int fd, struct iovec *iov, int iov_len)
  * Novell will not be supported initially
  */
 
-#ifdef _LINUX
+#if defined(_LINUX) 
 int Ipx_Check(void) {
     return 1;
 }
