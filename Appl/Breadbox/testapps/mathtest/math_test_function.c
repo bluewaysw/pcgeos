@@ -16,15 +16,19 @@
  
 #include "math_test_function.h"
 #include <math.h>
+#include <string.h>
+
+#define MAX_TEXT_LEN      30
+#define MAX_DIGITS        10
 
 Boolean test_datatypesize() {
     
     Boolean result = TRUE;
     
-    result = result && sizeof(float) == 4;
-    result = result && sizeof(double) == 8;
+    result &= sizeof(float) == 4;
+    result &= sizeof(double) == 8;
     //Yeah, that's right. Under Watcom a long double is 8 byte large.
-    result = result && sizeof(long double) == 8;
+    result &= sizeof(long double) == 8;
     
     return result;
 }
@@ -37,22 +41,22 @@ Boolean test_function_float() {
   float float_result;
 
   float_result = float_1 + float_2;
-  result = result && (float_result == 3.0);
+  result &= (float_result == 3.0);
 
   float_result = float_1 - float_2;
-  result = result && (float_result == -1.0);
+  result &= (float_result == -1.0);
 
   float_result = float_2 - float_1;
-  result = result && (float_result == 1.0);
+  result &= (float_result == 1.0);
 
   float_result = float_2 * float_1;
-  result = result && (float_result == 2.0);
+  result &= (float_result == 2.0);
 
   float_result = float_2 / float_1;
-  result = result && (float_result == 2.0);
+  result &= (float_result == 2.0);
 
   float_result = float_1 / float_2;
-  result = result && (float_result == .5);
+  result &= (float_result == .5);
 
   return result;
 }
@@ -65,7 +69,7 @@ Boolean test_function_double() {
   double double_result;
 
   double_result = double_1 + double_2;
-  result = result && (double_result == 3.0);
+  result &= (double_result == 3.0);
 
   return result;
 }
@@ -79,28 +83,28 @@ Boolean test_function_push_pop() {
     long double ld_3;
 
     //fp-stack is empty
-    result |= result && FloatDepth() == 0;
+    result &= FloatDepth() == 0;
 
     FloatPushNumber(&ld_0);
-    result |= result && FloatDepth() == 1;
+    result &= FloatDepth() == 1;
 
     FloatPushNumber(&ld_1);
-    result |= result && FloatDepth() == 2;
+    result &= FloatDepth() == 2;
 
     FloatPushNumber(&ld_2);
-    result |= result && FloatDepth() == 3;
+    result &= FloatDepth() == 3;
 
     FloatPopNumber(&ld_3);
-    result |= result && FloatDepth() == 2;
-    result |= result && ld_3 == ld_2;
+    result &= FloatDepth() == 2;
+    result &= ld_3 == ld_2;
 
     FloatPopNumber(&ld_3);
-    result |= result && FloatDepth() == 1;
-    result |= result && ld_3 == ld_1;
+    result &= FloatDepth() == 1;
+    result &= ld_3 == ld_1;
 
     FloatPopNumber(&ld_3);
-    result |= result && FloatDepth() == 0;
-    result |= result && ld_3 == ld_0;
+    result &= FloatDepth() == 0;
+    result &= ld_3 == ld_0;
     
     return result;
 }
@@ -113,27 +117,44 @@ Boolean test_function_compESDI() {
   long double ld_1 = 0;
 
   FloatPushNumber(&ld_0);
-  result |= result && FloatCompESDI(&ld_1) == 0;
-  result |= result && FloatDepth() == 1;
+  result &= FloatCompESDI(&ld_1) == 0;
+  result &= FloatDepth() == 1;
 
   ld_1 = 1.0;
-  result |= result && FloatCompESDI(&ld_1) > 0;
-  result |= result && FloatDepth() == 1;
+  result &= FloatCompESDI(&ld_1) > 0;
+  result &= FloatDepth() == 1;
 
   ld_1 = -1.0;
-  result |= result && FloatCompESDI(&ld_1) < 0;
-  result |= result && FloatDepth() == 1;
+  result &= FloatCompESDI(&ld_1) < 0;
+  result &= FloatDepth() == 1;
 
   return result;
 }
 
-/*
-void setFloat(float* f) {
-    float* f2;
-    float abc = 10.0f;
+Boolean test_funktion_floatFloatToAscii_StdFormat() {
 
-    f2 = &abc;
+  Boolean result = TRUE;
+  long double ld = 1.2345;
+  char resultStr[MAX_TEXT_LEN];
 
-    *f = 100.0f;
+  FloatFloatToAscii_StdFormat(resultStr, &ld, FFAF_FROM_ADDR, 2, 5); 
+
+  return result;
 }
-*/
+
+Boolean test_function_floatFormatNumber() {
+
+  Boolean result = TRUE;
+  char numAscii[MAX_TEXT_LEN];
+  long double ld = 1.125;
+
+  FloatFormatNumber(FORMAT_ID_FIXED_WITH_COMMAS,
+				  NullHandle,
+				  NullHandle,
+				  &ld,
+				  numAscii);
+
+  result &= strcmp( numAscii, "1.125");
+
+  return result;
+}

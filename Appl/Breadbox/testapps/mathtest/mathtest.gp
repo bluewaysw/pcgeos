@@ -28,6 +28,7 @@ appobj MathTestApp
 library	geos
 library	ui
 library math
+library ansic
 
 resource AppResource ui-object
 resource Interface   ui-object

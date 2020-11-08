@@ -4,22 +4,22 @@
 # If you edit it, you will lose your changes, should it be regenerated.
 #
 GEODE           = math
-FLOAT           = floatC.asm floatComp.asm floatConstants.asm\
-                  floatConvert.asm floatDateTime.asm floatEC.asm\
-                  floatFixed.asm floatFloatToAscii.asm floatFormat.asm\
-                  floatGlobal.asm floatHigh.asm floatLow.asm floatMain.asm\
-                  floatManager.asm floatStack.asm floatTrans.asm\
-                  floatConstant.def floatMacro.def floatVariable.def
-MAIN            = mainMain.asm mainManager.asm mainThread.asm
-UI              = uiFormatC.asm uiFormatGlobal.asm uiFormatInternal.asm\
-                  uiFormatInternalLow.asm uiFormatMethods.asm\
-                  uiFormatUtils.asm uiManager.asm uiFormat.ui uiMain.ui
+MAIN            = mainThread.asm mainMain.asm mainManager.asm
+FLOAT           = floatFixed.asm floatTrans.asm floatHigh.asm\
+                  floatFormat.asm floatConstants.asm floatConvert.asm\
+                  floatGlobal.asm floatFloatToAscii.asm floatStack.asm\
+                  floatC.asm floatDateTime.asm floatManager.asm\
+                  floatMain.asm floatLow.asm floatComp.asm floatEC.asm\
+                  floatConstant.def floatVariable.def floatMacro.def
+UI              = uiFormatUtils.asm uiFormatInternalLow.asm uiManager.asm\
+                  uiFormatC.asm uiFormatInternal.asm uiFormatGlobal.asm\
+                  uiFormatMethods.asm uiMain.ui uiFormat.ui
 UI_TO_RDFS      = uiMain.ui
 OBJS            =
-COMMON          = mathConstants.def mathGeode.def mathGlobals.def
-MODULES         = Float Main UI
+COMMON          = mathGeode.def mathConstants.def mathGlobals.def
+MODULES         = Main Float UI
 CMODULES        =
-SRCS            = $(FLOAT) $(MAIN) $(UI) $(COMMON)
+SRCS            = $(MAIN) $(FLOAT) $(UI) $(COMMON)
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = math

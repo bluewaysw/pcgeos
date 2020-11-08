@@ -27,6 +27,6 @@ mathtest.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h math_test_function.h
 math_test_function.obj \
-math_test_function.eobj: math_test_function.h geos.h math.h
+math_test_function.eobj: math_test_function.h geos.h math.h Ansi/string.h
 
-mathtestEC.geo mathtest.geo : geos.ldf ui.ldf math.ldf 
+mathtestEC.geo mathtest.geo : geos.ldf ui.ldf math.ldf ansic.ldf 

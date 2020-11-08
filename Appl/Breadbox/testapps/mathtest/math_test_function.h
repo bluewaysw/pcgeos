@@ -22,6 +22,8 @@
 extern Boolean test_datatypesize();
 extern Boolean test_function_push_pop();
 extern Boolean test_function_compESDI();
+extern Boolean test_funktion_floatFloatToAscii_StdFormat();
+extern Boolean test_function_floatFormatNumber();
 
 Boolean test_function_float();
 Boolean test_function_double();
