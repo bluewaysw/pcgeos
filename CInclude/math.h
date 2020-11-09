@@ -30,7 +30,7 @@
 #define FP_MIN_STACK_SIZE   	(FP_MIN_STACK_ELEMENTS*FPSIZE)
 
 #ifdef __WATCOMC__
-#define	FP_NAN	    	    	0x07ff
+#define	FP_NAN	    	    	0x7ff0
 #else
 #define	FP_NAN	    	    	0x7fff
 #endif
@@ -150,7 +150,7 @@ typedef struct {
 } IEEE64FloatNum;
 
 #ifdef __WATCOM__
-#define FLOAT_EXPONENT(x) (((IEEE64FloatNum *)x)->IEEE64F_word4 >> 4)
+#define FLOAT_EXPONENT(x) (((IEEE64FloatNum *)x)->IEEE64F_word4)
 #else
 #define FLOAT_EXPONENT(x) (((FloatNumStruct *)x)->F_exponent)
 #endif
@@ -654,7 +654,7 @@ inline Boolean FloatAsciiToFloat(word floatAtoFflags, word stringLength,
 inline word FloatFloatToAscii(FFA_stackFrame *stackFrame, char *resultString, FloatNum *number) {
     FloatNumStruct _geos80Number;
     FloatPushNumber(number);
-    FloatPopNumber((FloatNum *) &_geos80Number);
+    FloatPopGeos80Number((FloatNum *) &_geos80Number);
     return FloatGeos80ToAscii(stackFrame, resultString, (FloatNum *) &_geos80Number);
 }
 #else
@@ -673,7 +673,7 @@ inline word FloatFloatToAscii_StdFormat(char *string, FloatNum *number,
 				FloatFloatToAsciiFormatFlags format, word numDigits, word numFractionalDigits) {
     FloatNumStruct _geos80Number;
     FloatPushNumber(number);
-    FloatPopNumber((FloatNum *) &_geos80Number);
+    FloatPopGeos80Number((FloatNum *) &_geos80Number);
     return FloatGeos80ToAscii_StdFormat(string, (FloatNum *) &_geos80Number, format, numDigits, numFractionalDigits);
 }
 #else
@@ -704,7 +704,7 @@ inline void FloatFormatNumber(FormatIdType formatToken, word userDefBlkHan, word
 				      FloatNum *floatNum, char *resultLocation) {
     FloatNumStruct _geos80Number;
     FloatPushNumber(floatNum);
-    FloatPopNumber((FloatNum *) &_geos80Number);
+    FloatPopGeos80Number((FloatNum *) &_geos80Number);
     FloatFormatGeos80Number(formatToken, userDefBlkHan, userDefFileHan, (FloatNum *) &_geos80Number, resultLocation);
 }
 #else
