@@ -450,7 +450,7 @@ extern void _pascal FloatExit(void);
 *****************************************************************************/
 extern word _pascal FloatPushGeos80Number(FloatNum *number);
 extern word _pascal FloatPopGeos80Number(FloatNum *number);
-extern word _pascal FloatCompGeos80ESDI(FloatNum *number);
+extern sword _pascal FloatCompGeos80ESDI(FloatNum *number);
 
 extern Boolean _pascal FloatAsciiToGeos80(word floatAtoFflags, word stringLength, 
 			            void *string, void *resultLocation);
@@ -588,17 +588,17 @@ extern void _pascal FloatEpsilon (void);
 /*****************************************************
   	comparison routines
 ******************************************************/
-extern word _pascal FloatComp(void);
-extern word _pascal FloatCompAndDrop(void);
+extern sword _pascal FloatComp(void);
+extern sword _pascal FloatCompAndDrop(void);
 #ifdef __WATCOM__
-inline word FloatCompESDI(FloatNum* number) {
+inline sword FloatCompESDI(FloatNum* number) {
     FloatNumStruct _geos80FloatNum;
     FloatPushNumber(number);
     FloatPopGeos80Number((FloatNum *) &_geos80FloatNum);
     return FloatCompGeos80ESDI((FloatNum *)&_geos80FloatNum);
 }
 #else
-inline word FloatCompESDI(FloatNum* number) {
+inline sword FloatCompESDI(FloatNum* number) {
     return FloatCompGeos80ESDI(number);
 }
 #endif
@@ -653,6 +653,8 @@ inline Boolean FloatAsciiToFloat(word floatAtoFflags, word stringLength,
 #ifdef __WATCOM__
 inline word FloatFloatToAscii(FFA_stackFrame *stackFrame, char *resultString, FloatNum *number) {
     FloatNumStruct _geos80Number;
+    if(number == NULL)
+        return FloatGeos80ToAscii(stackFrame, resultString, number);
     FloatPushNumber(number);
     FloatPopGeos80Number((FloatNum *) &_geos80Number);
     return FloatGeos80ToAscii(stackFrame, resultString, (FloatNum *) &_geos80Number);
@@ -672,6 +674,8 @@ extern word /* XXX */
 inline word FloatFloatToAscii_StdFormat(char *string, FloatNum *number,
 				FloatFloatToAsciiFormatFlags format, word numDigits, word numFractionalDigits) {
     FloatNumStruct _geos80Number;
+    if(number == NULL)
+        return FloatGeos80ToAscii_StdFormat(string, number, format, numDigits, numFractionalDigits);
     FloatPushNumber(number);
     FloatPopGeos80Number((FloatNum *) &_geos80Number);
     return FloatGeos80ToAscii_StdFormat(string, (FloatNum *) &_geos80Number, format, numDigits, numFractionalDigits);
