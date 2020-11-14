@@ -651,116 +651,116 @@ kbd_drivers : kbdb_cf kbde_cf kbd_csa kbde_df kbdn_df kbde_be kbd_dvrk  \
 	kbde_sv kbdn_sv kbdt_sv kbde_uk lbdn_uk t1000
 
 kbd_dvrk	: Installed/Driver/Keyboard/Dvorak
-Installed/Driver/Keyboard/Dvorak:	MAKEDRV
+Installed/Driver/Keyboard/Dvorak:	kernel MAKEDRV
 
 kbdb_cf	: Installed/Driver/Keyboard/Canadian/Bilingual
-Installed/Driver/Keyboard/Canadian/Bilingual:	MAKEDRV
+Installed/Driver/Keyboard/Canadian/Bilingual:	kernel MAKEDRV
 
 kbde_cf	: Installed/Driver/Keyboard/Canadian/FrenchExtended
-Installed/Driver/Keyboard/Canadian/FrenchExtended:	MAKEDRV
+Installed/Driver/Keyboard/Canadian/FrenchExtended:	kernel MAKEDRV
 
 kbd_csa	: Installed/Driver/Keyboard/Canadian/CSA-z243.200-91
-Installed/Driver/Keyboard/Canadian/CSA-z243.200-91:	MAKEDRV
+Installed/Driver/Keyboard/Canadian/CSA-z243.200-91:	kernel MAKEDRV
 
 kbde_df	: Installed/Driver/Keyboard/Danish/Extended
-Installed/Driver/Keyboard/Danish/Extended:		MAKEDRV
+Installed/Driver/Keyboard/Danish/Extended:		kernel MAKEDRV
 
 kbdn_df	: Installed/Driver/Keyboard/Danish/NonExtended
-Installed/Driver/Keyboard/Danish/NonExtended:		MAKEDRV
+Installed/Driver/Keyboard/Danish/NonExtended:		kernel MAKEDRV
 
 kbde_be	: Installed/Driver/Keyboard/Dutch/Extended
-Installed/Driver/Keyboard/Dutch/Extended:		MAKEDRV
+Installed/Driver/Keyboard/Dutch/Extended:		kernel MAKEDRV
 
 kbde_fr	: Installed/Driver/Keyboard/French/Extended
-Installed/Driver/Keyboard/French/Extended:		MAKEDRV
+Installed/Driver/Keyboard/French/Extended:		kernel MAKEDRV
 
 kbdn_fr	: Installed/Driver/Keyboard/French/NonExtended
-Installed/Driver/Keyboard/French/NonExtended:		MAKEDRV
+Installed/Driver/Keyboard/French/NonExtended:		kernel MAKEDRV
 
 kps1_fr	: Installed/Driver/Keyboard/French/PS1
-Installed/Driver/Keyboard/French/PS1:			MAKEDRV
+Installed/Driver/Keyboard/French/PS1:			kernel MAKEDRV
 
 kbde_sf : Installed/Driver/Keyboard/French/SwissExtended
-Installed/Driver/Keyboard/French/SwissExtended:		MAKEDRV
+Installed/Driver/Keyboard/French/SwissExtended:		kernel MAKEDRV
 
 kbde_gr : Installed/Driver/Keyboard/German/Extended
-Installed/Driver/Keyboard/German/Extended:		MAKEDRV
+Installed/Driver/Keyboard/German/Extended:		kernel MAKEDRV
 
 kbdn_gr : Installed/Driver/Keyboard/German/NonExtended
-Installed/Driver/Keyboard/German/NonExtended:		MAKEDRV
+Installed/Driver/Keyboard/German/NonExtended:		kernel MAKEDRV
 
 kbde_sg	: Installed/Driver/Keyboard/German/SwissExtended
-Installed/Driver/Keyboard/German/SwissExtended:		MAKEDRV
 
+Installed/Driver/Keyboard/German/SwissExtended:		kernel MAKEDRV
 kbdn_sg	: Installed/Driver/Keyboard/German/SwissNonExtended
-Installed/Driver/Keyboard/German/SwissNonExtended :	MAKEDRV
+Installed/Driver/Keyboard/German/SwissNonExtended :	kernel MAKEDRV
 
 kbde_it	: Installed/Driver/Keyboard/Italian/Extended
-Installed/Driver/Keyboard/Italian/Extended:		MAKEDRV
+Installed/Driver/Keyboard/Italian/Extended:		kernel MAKEDRV
 
 kbdn_it	: Installed/Driver/Keyboard/Italian/NonExtended
-Installed/Driver/Keyboard/Italian/NonExtended:		MAKEDRV
+Installed/Driver/Keyboard/Italian/NonExtended:		kernel MAKEDRV
 
 kbde_no	: Installed/Driver/Keyboard/Norwegian/Extended
-Installed/Driver/Keyboard/Norwegian/Extended:		MAKEDRV
+Installed/Driver/Keyboard/Norwegian/Extended:		kernel MAKEDRV
 
 kbdn_no	: Installed/Driver/Keyboard/Norwegian/NonExtended
-Installed/Driver/Keyboard/Norwegian/NonExtended:	MAKEDRV
+Installed/Driver/Keyboard/Norwegian/NonExtended:	kernel MAKEDRV
 
 kbde_po	: Installed/Driver/Keyboard/Portuguese/Extended
-Installed/Driver/Keyboard/Portuguese/Extended:		MAKEDRV
+Installed/Driver/Keyboard/Portuguese/Extended:		kernel MAKEDRV
 
 kbde_sp	: Installed/Driver/Keyboard/Spanish/Extended
-Installed/Driver/Keyboard/Spanish/Extended:		MAKEDRV
+Installed/Driver/Keyboard/Spanish/Extended:		kernel MAKEDRV
 
 kbdn_sp	: Installed/Driver/Keyboard/Spanish/NonExtended
-Installed/Driver/Keyboard/Spanish/NonExtended:		MAKEDRV
+Installed/Driver/Keyboard/Spanish/NonExtended:		kernel MAKEDRV
 
 kbde_sv	: Installed/Driver/Keyboard/Swedish/Extended
-Installed/Driver/Keyboard/Swedish/Extended:		MAKEDRV
+Installed/Driver/Keyboard/Swedish/Extended:		kernel MAKEDRV
 
 kbdn_sv	: Installed/Driver/Keyboard/Swedish/NonExtended
-Installed/Driver/Keyboard/Swedish/NonExtended:		MAKEDRV
+Installed/Driver/Keyboard/Swedish/NonExtended:		kernel MAKEDRV
 
 kbdt_sv	: Installed/Driver/Keyboard/Swedish/Typewriter
-Installed/Driver/Keyboard/Swedish/Typewriter:		MAKEDRV
 
+Installed/Driver/Keyboard/Swedish/Typewriter:		kernel MAKEDRV
 kbde_uk	: Installed/Driver/Keyboard/UK/Extended
-Installed/Driver/Keyboard/UK/Extended:			MAKEDRV
 
+Installed/Driver/Keyboard/UK/Extended:			kernel MAKEDRV
 lbdn_uk	: Installed/Driver/Keyboard/UK/NonExtended
-Installed/Driver/Keyboard/UK/NonExtended:		MAKEDRV
+Installed/Driver/Keyboard/UK/NonExtended:		kernel MAKEDRV
 
 t1000	: Installed/Driver/Keyboard/Tandy1000
-Installed/Driver/Keyboard/Tandy1000:			MAKEDRV
 
+Installed/Driver/Keyboard/Tandy1000:			kernel MAKEDRV
 #mousedrivers
 genmouse	: Installed/Driver/Mouse/GenMouse
-Installed/Driver/Mouse/GenMouse:	MAKEDRV
+Installed/Driver/Mouse/GenMouse:	kernel MAKEDRV
 
 absgen	: Installed/Driver/Mouse/AbsGen
-Installed/Driver/Mouse/AbsGen:		MAKEDRV
+Installed/Driver/Mouse/AbsGen:		kernel MAKEDRV
 
 kbmouse	: Installed/Driver/Mouse/KBMouse
-Installed/Driver/Mouse/KBMouse:		MAKEDRV
+Installed/Driver/Mouse/KBMouse:		kernel MAKEDRV
 
 msbus	: Installed/Driver/Mouse/MSBus
-Installed/Driver/Mouse/MSBus:		MAKEDRV
+Installed/Driver/Mouse/MSBus:		kernel MAKEDRV
 
 msser	: Installed/Driver/Mouse/MSSer
-Installed/Driver/Mouse/MSSer:		serial MAKEDRV
+Installed/Driver/Mouse/MSSer:		kernel serial MAKEDRV
 
 logibus	: Installed/Driver/Mouse/LogiBus
-Installed/Driver/Mouse/LogiBus:		MAKEDRV
+Installed/Driver/Mouse/LogiBus:		kernel MAKEDRV
 
 logiser	: Installed/Driver/Mouse/LogiSer
-Installed/Driver/Mouse/LogiSer:		serial MAKEDRV
+Installed/Driver/Mouse/LogiSer:		kernel serial MAKEDRV
 
 dma	: Installed/Driver/DMA/DOSReal
-Installed/Driver/DMA/DOSReal:		MAKEDRV
+Installed/Driver/DMA/DOSReal:		kernel MAKEDRV
 
 msys	:  Installed/Driver/Mouse/MSys
-Installed/Driver/Mouse/MSys:		serial MAKEDRV
+Installed/Driver/Mouse/MSys:		kernel serial MAKEDRV
 
 ps2	: Installed/Driver/Mouse/PS2
 Installed/Driver/Mouse/PS2:		ui MAKEDRV
@@ -768,8 +768,8 @@ Installed/Driver/Mouse/PS2:		ui MAKEDRV
 # Printer Drivers
 
 deskjet	: Installed/Driver/Printer/HP/Deskjet
-Installed/Driver/Printer/HP/Deskjet:	spool MAKEDRV
 
+Installed/Driver/Printer/HP/Deskjet:	spool MAKEDRV
 dj500c	: Installed/Driver/Printer/HP/Dj500c
 Installed/Driver/Printer/HP/Dj500c:	spool MAKEDRV
 
