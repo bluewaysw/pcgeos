@@ -82,7 +82,7 @@
  *	to 0, nothing will ever happen...
  */
 #define DEFMAXJOBS	4
-#define DEFMAXLOCAL	4
+#define DEFMAXLOCAL	1
 
 /*
  * INCLUDES
