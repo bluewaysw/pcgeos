@@ -143,7 +143,7 @@ See also:
     global file-os file-root-dir
 
     if {[string c ${file-os} unix] == 0} {
-	var pathfile /staff/pcgeos/Tools/swat/lib.new/pcs.pat
+	var pathfile ${file-root-dir}/Tools/swat/lib.new/pcs.pat
     } else {
 	if {[string c ${file-os} win32] == 0} {
 	    var pathfile ${file-root-dir}/Tools/swat/lib.new/pcs.pat
