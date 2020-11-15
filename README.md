@@ -7,6 +7,11 @@ The basement of this repository is the source code used to build Breadbox Ensemb
 
 # How to build?
 
+## Compiling under Debian 10
+
+- Clone the repository
+- Run `bash compile-under-Linux.sh`
+
 ## Install WATCOM
 - Unzip WATCOM tools from the latest [release-tar-gz](https://github.com/open-watcom/open-watcom-v2/releases/download/Current-build/ow-snapshot.tar.gz) for instance to C:\WATCOM-V2
 - add C:\WATCOM-V2\binnt to your system path variable
@@ -17,7 +22,6 @@ The basement of this repository is the source code used to build Breadbox Ensemb
 - set LOCAL_ROOT if needed
 
 Document is work in progress.... stay tuned!
-
 
 ## Building PC/GEOS SDK
 Build pmake tool:
@@ -31,5 +35,14 @@ Build all the other SDK Tools:
 Build all PC/GEOS (target) components:
 - cd pcgeos/Installed
 - pmake
+
+## Running PC/GEOS in DOSBox
+
+For running you need fonts in "Nimbus Q" format placed under *ensemble/userdata/font*.
+You can get the font files (*.fnt) from a previous release of PC/GEOS, Geoworks or Breadbox or by downloading (after registration) from http://blog.bluewaysw.de/packages-for-download .
+
+After getting the font files in place, you can start PC/GEOS in DOSBox under Linux with:
+
+	bash start-in-dosbox.sh
 
 We are on https://bluewaysw.slack.com/ for more efficient collaboration. If you are a collaborator by issuing a pull request and you are registered at blog.bluewaysw.de for MyGEOS you will be invited to join us. Welcome!
