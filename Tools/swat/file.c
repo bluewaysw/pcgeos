@@ -3028,6 +3028,9 @@ read_config:
      * we're not in a subdirectory of the root, we have no idea...
      */
 # if !defined(_MSDOS)
+#if defined(_WIN32)
+    	FileMapSeparators((char *)cwd, '\\', '/');
+#endif
     if (STRNCMP_OS_SPECIFIC(cwd, fileRoot, rootLen) == 0) {
 	cp = cwd + rootLen + 1;
 	while(*cp != PATHNAME_SLASH && *cp != '\0') {
@@ -3039,9 +3042,6 @@ read_config:
 	 */
 	*cp = '\0';
 
-#if defined(_WIN32)
-    	FileMapSeparators((char *)cwd, '\\', '/');
-#endif
 	FileSetVar((char **)&fileDevel, "file-devel-dir", cwd, cp);
 
 	/*
