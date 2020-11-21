@@ -29,7 +29,7 @@ Build pmake tool:
 
 Build all the other SDK Tools:
 - cd pcgeos/Installed/Tools
-- pmake
+- pmake install
 
 Build all PC/GEOS (target) components:
 - cd pcgeos/Installed
