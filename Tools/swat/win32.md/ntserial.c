@@ -589,7 +589,7 @@ void Ipx_Init(char *addr) {
 			Message("success");
 			
 			connectAddress.sin_family = AF_INET;
-		    	connectAddress.sin_port = htons(213);
+		    	connectAddress.sin_port = htons(8079);
 		    	connectAddress.sin_addr.s_addr = inet_addr("127.0.0.1");
 						// send registration package to basebox server
 			rc = sendto (cmdLineSocket, 
