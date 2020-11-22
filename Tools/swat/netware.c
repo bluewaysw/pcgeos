@@ -50,6 +50,10 @@ static char *rcsid =
 #include <sys/ioctl.h>
 #include <netinet/in.h>
 #endif
+#ifdef _WIN32
+#include <compat/windows.h>       /* for communications stuff */
+#include <winsock2.h>
+#endif
 
 #include <stddef.h>
 #include <compat/string.h>
@@ -72,7 +76,9 @@ extern int errno;
 
 #if !defined(unix) && !defined(_LINUX)
 typedef unsigned short 	u_short;
+#ifndef _WIN32
 typedef char	u_char;
+#endif
 #endif
 
 #if defined(unix) 
@@ -103,8 +109,42 @@ typedef struct {
     unsigned char   data[IPX_MAX_PACKET];
 } IPXMaxPacket;
 
-static IPXMaxPacket 	ipxOutPacket;
+extern IPXMaxPacket 	ipxOutPacket;
 
+#else
+#if defined(_WIN32)
+
+#define IPX_MAX_PACKET	    546
+
+typedef struct {
+    word 	csum;	    /* 0xffff */
+    word 	len;	    /* big-endian */
+    byte  	xport;	    /* 0 */
+    byte  	ptype;
+#define PT_UNKNOWN  	0
+#define PT_ROUTE    	1
+#define PT_ECHO		2
+#define PT_ERROR    	3
+#define PT_DATA		4
+#define PT_SPX		5 
+#define PT_NCP		17
+    byte  	dstNet[4];
+    byte  	dstNode[6];
+    word  	dstSocket;  /* big-endian */
+    byte  	srcNet[4];
+    byte  	srcNode[6];
+    word 	srcSocket;  /* big-endian */
+} IPXHeader;
+
+
+typedef struct {
+    IPXHeader	    ihdr;
+    byte   data[IPX_MAX_PACKET];
+} IPXMaxPacket;
+
+extern IPXMaxPacket 	ipxOutPacket;
+
+#endif
 #endif
 
 #if defined(_LINUX)
@@ -113,6 +153,8 @@ static int cmdLineSocket = -1;
 #if defined(_WIN32)
 extern int cmdLineSocket;
 #endif
+
+#define IPX_VIA_UDP
 
 /*********************************************************************
  *			parsehex
@@ -129,7 +171,7 @@ extern int cmdLineSocket;
  * 
  *********************************************************************/
 
-static void
+void
 parsehex(char *str, u_char *buf, unsigned ndigits, unsigned len)
 {
     u_char  b=0;		/* initialized to keep GCC from whining */
@@ -588,6 +630,76 @@ int
 NetWare_WriteV(int fd, struct iovec *iov, int iov_len)
 {
 #if !defined(_LINUX) 
+#ifdef IPX_VIA_UDP
+	unsigned char   *bp;
+	int	    	    i;	
+	int 			len;
+	BYTE*			dataStart;
+	int rc;
+	struct sockaddr_in connectAddress;
+
+	/*
+ 	* First copy the data into the data portion of ipxOutPacket.
+ 	* Unfortunately, putmsg doesn't take a gather vector...
+ 	*/
+	dataStart = ((BYTE*) &ipxOutPacket) + 30;
+	for (i = 0, bp = dataStart; i < iov_len; i++) {
+    		if (bp - dataStart + iov[i].iov_len >
+			IPX_MAX_PACKET)
+    		{
+			/*errno = EMSGSIZE;*/
+			return(-1);
+    		}
+    
+    		bcopy(iov[i].iov_base, bp, iov[i].iov_len);
+    		bp += iov[i].iov_len;
+	}
+
+	len = sizeof(IPXHeader) + (bp - dataStart);
+	ipxOutPacket.ihdr.len = htons(len);
+
+	/*printf("LEN %d\n", len); fflush(stdout);*/
+	connectAddress.sin_family = AF_INET;
+	connectAddress.sin_port = htons(213);
+	connectAddress.sin_addr.s_addr = inet_addr("127.0.0.1");
+	
+	*((DWORD*)ipxOutPacket.ihdr.srcNode) = inet_addr("127.0.0.1");
+	*((WORD*)&ipxOutPacket.ihdr.srcNode[4]) =  htons(1234);
+	/*
+	i=0;
+	while(i < len) {
+		printf("%x ",((BYTE*) (&ipxOutPacket))[i] );
+		i++;
+	}
+	printf("\n"); fflush(stdout);
+*/
+	ipxOutPacket.ihdr.csum = 0xFFFF;
+	//ipxOutPacket.ihdr.len = htons(30);
+	/*
+	*((DWORD*)ipxOutPacket.ihdr.dstNet) = htonl(0);
+	*((DWORD*)ipxOutPacket.ihdr.dstNode) = 0x0;
+	*((WORD*)&ipxOutPacket.ihdr.dstNode[4]) = 0x0;
+	ipxOutPacket.ihdr.dstSocket = htons(0x2);
+
+	*((DWORD*)ipxOutPacket.ihdr.srcNet) = htonl(0);
+	*((DWORD*)ipxOutPacket.ihdr.srcNode) = 0x0;
+	*((WORD*)&ipxOutPacket.ihdr.srcNode[4]) = 0x0;
+	ipxOutPacket.ihdr.srcSocket = htons(0x2);
+*/
+	ipxOutPacket.ihdr.xport = 0;	
+				// send registration package to basebox server
+	rc = sendto (cmdLineSocket, 
+			(BYTE*) &ipxOutPacket, 
+			len,
+			0,
+			(struct sockaddr *) &connectAddress,
+			sizeof (connectAddress));
+	if(rc>=0) {
+		//Message("send success");
+	}	
+	return (bp - &ipxOutPacket.data[0]);
+
+#else
     int	    	    i, size;
     
     /*
@@ -608,6 +720,7 @@ NetWare_WriteV(int fd, struct iovec *iov, int iov_len)
     /* call the assembly routine to do the dirty work */
     Ipx_SendLow(size);
     return size;
+#endif
 #else
 	int	    	    i, size;
 
