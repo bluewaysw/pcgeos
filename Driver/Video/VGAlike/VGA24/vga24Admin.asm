@@ -274,9 +274,10 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 VidTestVESA	proc	near
-		uses	es, di, bx, cx
+		uses	di, bx, cx
 		.enter
 
+		push	es
 		; save away the mode number
 
 		mov	ss:[vesaMode], ax	; save it
@@ -343,6 +344,7 @@ checkLoop:
 done:
 		; free allocated memory block
 
+		pop	es
 		call	MemFree
 
 		.leave

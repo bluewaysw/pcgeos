@@ -305,8 +305,10 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 VidTestVESA	proc	near
-		uses	es, di, bx, cx
+		uses	di, bx, cx
 		.enter
+
+		push	es
 
 		; save away the mode number
 
@@ -373,7 +375,7 @@ checkLoop:
  		mov	ax, DP_PRESENT		; yep, it's there
 done:
 		; free allocated memory block
-
+		pop	es
 		call	MemFree
 
 		.leave

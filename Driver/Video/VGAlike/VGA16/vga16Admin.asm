@@ -512,8 +512,10 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 VidTestVESA	proc	near
-		uses	es, di, bx, cx
+		uses	di, bx, cx
 		.enter
+
+		push	es
 if  NT_DRIVER
 	; Be lazy and only return true for the
 	; mode we know we support.
@@ -626,6 +628,7 @@ checkNext::
 done:
 		; free allocated memory block
 
+		pop	es
 		call	MemFree
 endif  ; not NT_DRIVER
 		.leave
