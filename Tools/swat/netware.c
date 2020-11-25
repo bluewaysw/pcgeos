@@ -82,6 +82,9 @@ extern int errno;
 typedef unsigned short 	u_short;
 #ifndef _WIN32
 typedef char	u_char;
+#else
+static BOOL winsockInitialized = FALSE;
+static WSADATA wsaData;
 #endif
 #endif
 
@@ -117,7 +120,10 @@ static IPXMaxPacket 	ipxOutPacket;
 #endif
 
 #if defined(_LINUX) || defined(_WIN32)
-static int cmdLineSocket = -1;
+#if defined(_LINUX)
+#define INVALID_SOCKET -1
+#endif
+static int cmdLineSocket = INVALID_SOCKET;
 #endif
 
 #define IPX_VIA_UDP
@@ -699,6 +705,20 @@ NetWare_WriteV(int fd, struct iovec *iov, int iov_len)
 
 #if defined(_LINUX) || defined(_WIN32)
 int Ipx_Check(void) {
+	
+#if defined(_WIN32)
+    if(!winsockInitialized) {
+	int iResult;
+	
+	// Initialize Winsock
+	iResult = WSAStartup(MAKEWORD(2,2), &wsaData);
+	if (iResult != 0) {
+	    printf("WSAStartup failed: %d\n", iResult);
+	    return 0;
+	}
+	winsockInitialized = TRUE;
+    }
+#endif
     return 1;
 }
 
@@ -714,7 +734,7 @@ void Ipx_Init(char *addr) {
     struct sockaddr_in connectAddress;
 
     /* open the socket here */
-    if(cmdLineSocket != -1 ) {
+    if(cmdLineSocket != INVALID_SOCKET ) {
 	Message("Error: command line socket already open\n");
     }
 	
@@ -776,7 +796,7 @@ void Ipx_Init(char *addr) {
     cmdLineSocket = socket(AF_INET, SOCK_DGRAM, 0);    
 
     /* try connectiokn now */
-    if(cmdLineSocket != -1 ) {
+    if(cmdLineSocket != INVALID_SOCKET ) {
 
 	int rc;
 	const char y = 1;
@@ -826,17 +846,17 @@ void Ipx_Init(char *addr) {
 	
     } else {
 	    
-	Message("Error: socket connection failed\n");
+	Message("Error: socket connection failed2\n");
     }
 #else
     /* open the socket here */
-    if(cmdLineSocket != -1) {
+    if(cmdLineSocket != INVALID_SOCKET) {
 	Message("Error: command line socket already open\n");
     }
     cmdLineSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);    
 
     /* try connectiokn now */
-    if(cmdLineSocket != -1) {
+    if(cmdLineSocket != INVALID_SOCKET) {
 	    
 	struct sockaddr_in connectAddress;
 	int result;
@@ -892,7 +912,7 @@ int Ipx_ReadLow(void *buf, int bufSize) {
 #ifdef IPX_VIA_UDP
     IPXMaxPacket ipkt;
 
-    if(cmdLineSocket != -1) {
+    if(cmdLineSocket != INVALID_SOCKET) {
 	int amount = recv(cmdLineSocket, (byte*) &ipkt, sizeof(ipkt), 0);
 
 	if (amount < sizeof(IPXHeader)) {
@@ -925,7 +945,7 @@ int Ipx_ReadLow(void *buf, int bufSize) {
     }
     return -1;
 #else
-    if(cmdLineSocket != -1) {
+    if(cmdLineSocket != INVALID_SOCKET) {
 	int amount = recv(cmdLineSocket, buf, bufSize, 0);
     	return amount;
     }
