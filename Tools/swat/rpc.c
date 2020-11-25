@@ -525,7 +525,7 @@ RpcSendV(int    	fd,
 #if defined(_WIN32)
     int             bytesWritten;
 #endif
-#if 0
+#if 1
     if (commMode == CM_NETWARE) {
 	return (NetWare_WriteV(fd, iov, iov_len));
     }
@@ -1483,7 +1483,7 @@ RpcHandleStream(int	    stream, /* Stream that's ready */
      * If debugging over the net, go read the entire packet and process it.
      */
     switch(commMode) {
-    case CM_NETWARE:
+    /*case CM_NETWARE:*/
     case CM_SERIAL:
     {
 
@@ -1695,7 +1695,7 @@ RpcHandleStream(int	    stream, /* Stream that's ready */
 #endif       /* ends the !MSDOS */
 	break;
     }
-#if 0
+#if 1
     case CM_NETWARE:
 	rpcMsgLen = NetWare_Read(stream, &rpcMsg.buf,
 				 sizeof(rpcMsg.buf));
