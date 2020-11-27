@@ -4334,7 +4334,33 @@ See also:\n\
 	noNL = FALSE;
     }
     for (i = 1; i < argc; i++) {    
-	wprintw(curWin, "%s%s", argv[i], i == argc-1 ? "": " ");
+	    
+	/* 
+	 * Process line by line, because internal format buffer
+	 * is limited to 512 bytes. 
+	 */
+	char*		ptr = argv[i];
+	while(*ptr) {
+
+	    char*	eol = ptr;
+	    while((*eol != 0) && (*eol != '\n')) eol++;
+	    
+	    {
+	    	char 	saved = *eol;
+
+	    	*eol = NULL;
+	    	wprintw(curWin, ptr);
+	    	*eol = saved;
+            	ptr = eol;
+		if( *ptr != NULL ) {
+		    ptr++;
+		    waddch(curWin, '\n');
+	        }
+	    }
+        }
+	if(i != argc-1) {
+	    waddch(curWin, ' ');
+	}
     }
     
     if (!noNL) {
