@@ -187,10 +187,10 @@ kernel	:	Installed/Library/Kernel
 Installed/Library/Kernel 	:	MAKELIB
 
 swap	:	Installed/Library/Swap
-Installed/Library/Swap	:	MAKELIB
+Installed/Library/Swap	:	kernel MAKELIB
 
 sound	: Installed/Library/Sound
-Installed/Library/Sound	: stream MAKELIB
+Installed/Library/Sound	: kernel stream MAKELIB
 
 # Cannot state true dependency for PCMCIA & Net (they both rely
 # upon the UI library), as we would have a circular dependency.
@@ -199,20 +199,20 @@ Installed/Library/Sound	: stream MAKELIB
 #Installed\Library\PCMCIA : MAKELIB
 
 net	:	Installed/Library/Net
-Installed/Library/Net :	MAKELIB
+Installed/Library/Net :	kernel MAKELIB
 
 # removed pcmcia
 ui	: Installed/Library/User
-Installed/Library/User	:	sound compress net wav MAKELIB
+Installed/Library/User	:	kernel sound compress net wav MAKELIB
 
 isui	: Installed/Library/SpecUI/ISUI
-Installed/Library/SpecUI/ISUI	:	text MAKELIB
+Installed/Library/SpecUI/ISUI	:	kernel text MAKELIB
 
 motif	: Installed/Library/SpecUI/Motif
-Installed/Library/SpecUI/Motif:	text MAKELIB
+Installed/Library/SpecUI/Motif:	kernel text MAKELIB
 
 spool	: Installed/Library/Spool
-Installed/Library/Spool:	text MAKELIB
+Installed/Library/Spool:	kernel text MAKELIB
 
 text	: Installed/Library/Text
 Installed/Library/Text:	ui styles color ruler bitmap MAKELIB
@@ -227,7 +227,7 @@ mailbox	: Installed/Library/Mailbox
 Installed/Library/Mailbox:	ui spool MAKELIB
 
 compress	: Installed/Library/Compress
-Installed/Library/Compress:	MAKELIB
+Installed/Library/Compress:	kernel MAKELIB
 
 ruler	: Installed/Library/Ruler
 Installed/Library/Ruler:	ui MAKELIB
@@ -239,16 +239,16 @@ pen	: Installed/Library/Pen
 Installed/Library/Pen:	ui text MAKELIB
 
 genpc	: Installed/Library/GDI/GenPC
-Installed/Library/GDI/GenPC: MAKELIB
+Installed/Library/GDI/GenPC: kernel MAKELIB
 
 shell	: Installed/Library/Shell
 Installed/Library/Shell: 	ui MAKELIB
 
 ansic	: Installed/Library/AnsiC
-Installed/Library/AnsiC: math borlandc MAKELIB
+Installed/Library/AnsiC: kernel math borlandc MAKELIB
 
 cell	: Installed/Library/Cell
-Installed/Library/Cell: 	MAKELIB
+Installed/Library/Cell: 	kernel MAKELIB
 
 chart	: Installed/Library/Chart
 Installed/Library/Chart:	ui grobj spline text MAKELIB
@@ -261,7 +261,7 @@ Installed/Library/GrObj:	ui text bitmap ruler spline color \
 				styles impex MAKELIB
 
 hash	: Installed/Library/Hash
-Installed/Library/Hash:	MAKELIB
+Installed/Library/Hash:	kernel MAKELIB
 
 impex	: Installed/Library/Impex
 Installed/Library/Impex: 	ui MAKELIB
@@ -297,26 +297,26 @@ msword	: Installed/Library/Trans/Text/MicrosoftWord
 Installed/Library/Trans/Text/MicrosoftWord: 	ui ansic impex msmfile MAKELIB
 
 htmlpars : Installed/Library/Breadbox/HtmlPars
-Installed/Library/Breadbox/HtmlPars: ansic text MAKELIB
+Installed/Library/Breadbox/HtmlPars: kernel ansic text MAKELIB
 
 htmlimpx : Installed/Library/Trans/Web/HtmlImpx
 Installed/Library/Trans/Web/HtmlImpx: htmlpars ansic text impex ui MAKELIB
 
 sstor	: Installed/Library/Breadbox/SStor
-Installed/Library/Breadbox/SStor: 	ansic MAKELIB
+Installed/Library/Breadbox/SStor: 	kernel ansic MAKELIB
 
 wfwlib	: Installed/Library/Breadbox/Impex/WFWLib
-Installed/Library/Breadbox/Impex/WFWLib:	text ansic sstor MAKELIB
+Installed/Library/Breadbox/Impex/WFWLib:	kernel text ansic sstor MAKELIB
 
 winword8 : Installed/Library/Breadbox/Impex/WinWord8
-Installed/Library/Breadbox/Impex/WinWord8: impex ansic text sstor wfwlib MAKELIB
+Installed/Library/Breadbox/Impex/WinWord8: kernel impex ansic text sstor wfwlib MAKELIB
 
 borlandrtl	:
 #	No need to do this because this is sync'ed by morning make script.
 #	p4 sync -f //depot/pcgeos/Installed/Library/BorlandRTL/...
 
 borlandc	: Installed/Library/Math/Compiler/BorlandC
-Installed/Library/Math/Compiler/BorlandC: math MAKELIB
+Installed/Library/Math/Compiler/BorlandC: kernel math MAKELIB
 
 math	: Installed/Library/Math
 Installed/Library/Math:	ui MAKELIB
@@ -332,7 +332,7 @@ Installed/Library/SSMeta:	ui math MAKELIB
 
 # bsnwav will only be compiled (and is only referenced in WAV) if PRODUCT==NDO2000
 wav	: Installed/Library/Wav
-Installed/Library/Wav:	sound MAKELIB
+Installed/Library/Wav:	kernel sound MAKELIB
 
 game	: Installed/Library/Game
 Installed/Library/Game:	ui wav MAKELIB
@@ -378,7 +378,7 @@ eps	: Installed/Library/Trans/Graphics/Vector/EPS
 Installed/Library/Trans/Graphics/Vector/EPS:	ui MAKELIB
 
 ps2pdf	: Installed/Library/Breadbox/ps2pdf
-Installed/Library/Breadbox/ps2pdf:	ansic MAKELIB
+Installed/Library/Breadbox/ps2pdf:	kernel ansic MAKELIB
 
 socket	: Installed/Library/Socket
 Installed/Library/Socket:	ui netutils MAKELIB
@@ -399,46 +399,46 @@ streamc : Installed/Library/StreamC
 Installed/Library/StreamC:	ui MAKELIB
 
 mailhub : Installed/Library/Mail/MailHub
-Installed/Library/Mail/MailHub:	socket ansic MAKELIB
+Installed/Library/Mail/MailHub:	kernel socket ansic MAKELIB
 
 bbxmlib	: Installed/Library/dil/bbxmail
-Installed/Library/dil/bbxmail:	socket ansic MAKELIB
+Installed/Library/dil/bbxmail:	kernel socket ansic MAKELIB
 
 mailsmtp : Installed/Library/Mail/MailSMTP
-Installed/Library/Mail/MailSMTP:	socket ansic mailhub MAKELIB
+Installed/Library/Mail/MailSMTP:	kernel socket ansic mailhub MAKELIB
 
 mailpop3 : Installed/Library/Mail/MailPOP3
-Installed/Library/Mail/MailPOP3:	socket ansic mailhub MAKELIB
 
+Installed/Library/Mail/MailPOP3:	kernel socket ansic mailhub MAKELIB
 #bckrst : Installed/Library/BckRst
 #Installed/Library/BckRst: 	ui ansic MAKELIB
 
 filestr	: Installed/Driver/Stream/Filestr
-Installed/Driver/Stream/Filestr:	stream MAKEDRV
+Installed/Driver/Stream/Filestr:	kernel stream MAKEDRV
 
 nonts	: Installed/Driver/Task/NonTS
-Installed/Driver/Task/NonTS:	MAKEDRV
+Installed/Driver/Task/NonTS:	kernel MAKEDRV
 
 sblaster	: Installed/Driver/Sound/SoundBlaster
-Installed/Driver/Sound/SoundBlaster:	stream MAKEDRV
+Installed/Driver/Sound/SoundBlaster:	kernel stream MAKEDRV
 
 comm	: Installed/Driver/Net/Comm
-Installed/Driver/Net/Comm:	net MAKEDRV
+Installed/Driver/Net/Comm:	kernel net MAKEDRV
 
 spooltd	: Installed/Driver/Mailbox/Transport/SpoolTD
 Installed/Driver/Mailbox/Transport/SpoolTD:	ui mailbox spool MAKEDRV
 
 vmtree	: Installed/Driver/Mailbox/Data/VMTree
-Installed/Driver/Mailbox/Data/VMTree:	mailbox MAKEDRV
+Installed/Driver/Mailbox/Data/VMTree:	kernel mailbox MAKEDRV
 
 filedd	: Installed/Driver/Mailbox/Data/FileDD
-Installed/Driver/Mailbox/Data/FileDD:	mailbox serial MAKEDRV
+Installed/Driver/Mailbox/Data/FileDD:	kernel mailbox serial MAKEDRV
 
 parentc : Installed/Library/ParentC
 Installed/Library/ParentC:	ui config MAKELIB
 
 wmlib	: Installed/Library/Breadbox/WMLib
-Installed/Library/Breadbox/WMLib:	ansic compress MAKELIB
+Installed/Library/Breadbox/WMLib:	kernel ansic compress MAKELIB
 
 n2txt	: Installed/Library/Breadbox/N2Txt
 Installed/Library/Breadbox/N2Txt:	ui ansic text math MAKELIB
@@ -462,11 +462,11 @@ idialc	: Installed/Library/IDialC
 Installed/Library/IDialC:	ui socket MAKELIB
 
 thumbdb : Installed/Library/Breadbox/ThumbDB
-Installed/Library/Breadbox/ThumbDB:	ansic MAKELIB
+Installed/Library/Breadbox/ThumbDB:	kernel ansic MAKELIB
 
 # the EduApp libs
 basicdb : Installed/Library/Breadbox/Basicdb
-Installed/Library/Breadbox/Basicdb:	ansic MAKELIB
+Installed/Library/Breadbox/Basicdb:	kernel ansic MAKELIB
 
 gridlib : Installed/Library/Breadbox/Gridlib
 Installed/Library/Breadbox/Gridlib:	ui ansic text MAKELIB
@@ -475,7 +475,7 @@ treplib : Installed/Library/Breadbox/Treplib
 Installed/Library/Breadbox/Treplib:	ui ansic text spool MAKELIB
 
 gsol	: Installed/Library/Breadbox/Gsol
-Installed/Library/Breadbox/Gsol:	ansic MAKELIB
+Installed/Library/Breadbox/Gsol:	kernel ansic MAKELIB
 
 # Preference libraries
 
@@ -555,94 +555,94 @@ stream	: Installed/Driver/Stream
 Installed/Driver/Stream:		kernel MAKEDRV
 
 nimbus	: Installed/Driver/Font/Nimbus
-Installed/Driver/Font/Nimbus:		MAKEDRV
+Installed/Driver/Font/Nimbus:		kernel MAKEDRV
 
 ms4	: Installed/Driver/IFS/DOS/MS4
-Installed/Driver/IFS/DOS/MS4:		MAKEDRV
+Installed/Driver/IFS/DOS/MS4:		kernel MAKEDRV
 
 os2	: Installed/Driver/IFS/DOS/OS2
-Installed/Driver/IFS/DOS/OS2:		MAKEDRV
+Installed/Driver/IFS/DOS/OS2:		kernel MAKEDRV
 
 ntfat	: Installed/Driver/IFS/DOS/NTFat
-Installed/Driver/IFS/DOS/NTFat:		MAKEDRV
+Installed/Driver/IFS/DOS/NTFat:		kernel MAKEDRV
 
 dri	: Installed/Driver/IFS/DOS/DRI
-Installed/Driver/IFS/DOS/DRI:		MAKEDRV
+Installed/Driver/IFS/DOS/DRI:		kernel MAKEDRV
 
 mslf	: Installed/Driver/IFS/DOS/MSLF
-Installed/Driver/IFS/DOS/MSLF:		MAKEDRV
+Installed/Driver/IFS/DOS/MSLF:		kernel MAKEDRV
 
 cdrom     : Installed/Driver/IFS/DOS/CDROM
-Installed/Driver/IFS/DOS/CDROM:		MAKEDRV
+Installed/Driver/IFS/DOS/CDROM:		kernel MAKEDRV
 
 gdi	: Installed/Driver/Keyboard/GDI
-Installed/Driver/Keyboard/GDI:		genpc MAKEDRV
+Installed/Driver/Keyboard/GDI:		kernel genpc MAKEDRV
 
 msnet     : Installed/Driver/IFS/DOS/MSNet
-Installed/Driver/IFS/DOS/MSNet:		MAKEDRV
+Installed/Driver/IFS/DOS/MSNet:		kernel MAKEDRV
 
 keyboard	: Installed/Driver/Keyboard
-Installed/Driver/Keyboard:		MAKEDRV
+Installed/Driver/Keyboard:		kernel MAKEDRV
 
 modem	: Installed/Driver/Modem
-Installed/Driver/Modem:			MAKEDRV
+Installed/Driver/Modem:			kernel MAKEDRV
 
 gdipointer	: Installed/Driver/Mouse/GDIPointer
-Installed/Driver/Mouse/GDIPointer:	MAKEDRV
+Installed/Driver/Mouse/GDIPointer:	kernel MAKEDRV
 
 standard	: Installed/Driver/Sound/Standard
-Installed/Driver/Sound/Standard:	MAKEDRV
+Installed/Driver/Sound/Standard:	kernel MAKEDRV
 
 winnt	: Installed/Driver/Sound/WinNT
-Installed/Driver/Sound/WinNT:		MAKEDRV
+Installed/Driver/Sound/WinNT:		kernel MAKEDRV
 
 parallel	: Installed/Driver/Stream/Parallel
-Installed/Driver/Stream/Parallel:	stream MAKEDRV
+Installed/Driver/Stream/Parallel:	kernel stream MAKEDRV
 
 serial	: Installed/Driver/Stream/Serial
-Installed/Driver/Stream/Serial:		stream MAKEDRV
+Installed/Driver/Stream/Serial:		kernel stream MAKEDRV
 
 disk	: Installed/Driver/Swap/Disk
-Installed/Driver/Swap/Disk:		MAKEDRV
+Installed/Driver/Swap/Disk:		kernel MAKEDRV
 
 emm	: Installed/Driver/Swap/EMS/EMM
-Installed/Driver/Swap/EMS/EMM:		MAKEDRV
+Installed/Driver/Swap/EMS/EMM:		kernel MAKEDRV
 
 extmem	: Installed/Driver/Swap/ExtMem
-Installed/Driver/Swap/ExtMem:		MAKEDRV
+Installed/Driver/Swap/ExtMem:		kernel MAKEDRV
 
 xms	: Installed/Driver/Swap/XMS
-Installed/Driver/Swap/XMS:		MAKEDRV
+Installed/Driver/Swap/XMS:		kernel MAKEDRV
 
 att6300	: Installed/Driver/Video/Dumb/ATT6300
-Installed/Driver/Video/Dumb/ATT6300:	MAKEDRV
+Installed/Driver/Video/Dumb/ATT6300:	kernel MAKEDRV
 
 vidmem	: Installed/Driver/Video/Dumb/VidMem
-Installed/Driver/Video/Dumb/VidMem:	MAKEDRV
+Installed/Driver/Video/Dumb/VidMem:	kernel MAKEDRV
 
 svga	: Installed/Driver/Video/VGAlike/SVGA
-Installed/Driver/Video/VGAlike/SVGA:	MAKEDRV
+Installed/Driver/Video/VGAlike/SVGA:	kernel MAKEDRV
 
 vga	: Installed/Driver/Video/VGAlike/VGA
-Installed/Driver/Video/VGAlike/VGA:	MAKEDRV
 
+Installed/Driver/Video/VGAlike/VGA:	kernel MAKEDRV
 vga8	: Installed/Driver/Video/VGAlike/VGA8
-Installed/Driver/Video/VGAlike/VGA8:	MAKEDRV
+Installed/Driver/Video/VGAlike/VGA8:	kernel MAKEDRV
 
 vga15	: Installed/Driver/Video/VGAlike/VGA15
-Installed/Driver/Video/VGAlike/VGA15:	MAKEDRV
+Installed/Driver/Video/VGAlike/VGA15:	kernel MAKEDRV
 
 vga16	: Installed/Driver/Video/VGAlike/VGA16
-Installed/Driver/Video/VGAlike/VGA16:	MAKEDRV
+Installed/Driver/Video/VGAlike/VGA16:	kernel MAKEDRV
 
 vga24	: Installed/Driver/Video/VGAlike/VGA24
-Installed/Driver/Video/VGAlike/VGA24:	MAKEDRV
+Installed/Driver/Video/VGAlike/VGA24:	kernel MAKEDRV
 
 etherodi	: Installed/Driver/Socket/EtherODI
-Installed/Driver/Socket/EtherODI:	socket accpnt MAKEDRV
+Installed/Driver/Socket/EtherODI:	kernel socket accpnt MAKEDRV
 
 etherpkt	: Installed/Driver/Socket/EtherPKT
-Installed/Driver/Socket/EtherPKT:	socket accpnt MAKEDRV
+Installed/Driver/Socket/EtherPKT:	kernel socket accpnt MAKEDRV
 
 # International Keyboard Drivers
 kbd_drivers : kbdb_cf kbde_cf kbd_csa kbde_df kbdn_df kbde_be kbd_dvrk  \
@@ -651,116 +651,116 @@ kbd_drivers : kbdb_cf kbde_cf kbd_csa kbde_df kbdn_df kbde_be kbd_dvrk  \
 	kbde_sv kbdn_sv kbdt_sv kbde_uk lbdn_uk t1000
 
 kbd_dvrk	: Installed/Driver/Keyboard/Dvorak
-Installed/Driver/Keyboard/Dvorak:	MAKEDRV
+Installed/Driver/Keyboard/Dvorak:	kernel MAKEDRV
 
 kbdb_cf	: Installed/Driver/Keyboard/Canadian/Bilingual
-Installed/Driver/Keyboard/Canadian/Bilingual:	MAKEDRV
+Installed/Driver/Keyboard/Canadian/Bilingual:	kernel MAKEDRV
 
 kbde_cf	: Installed/Driver/Keyboard/Canadian/FrenchExtended
-Installed/Driver/Keyboard/Canadian/FrenchExtended:	MAKEDRV
+Installed/Driver/Keyboard/Canadian/FrenchExtended:	kernel MAKEDRV
 
 kbd_csa	: Installed/Driver/Keyboard/Canadian/CSA-z243.200-91
-Installed/Driver/Keyboard/Canadian/CSA-z243.200-91:	MAKEDRV
+Installed/Driver/Keyboard/Canadian/CSA-z243.200-91:	kernel MAKEDRV
 
 kbde_df	: Installed/Driver/Keyboard/Danish/Extended
-Installed/Driver/Keyboard/Danish/Extended:		MAKEDRV
+Installed/Driver/Keyboard/Danish/Extended:		kernel MAKEDRV
 
 kbdn_df	: Installed/Driver/Keyboard/Danish/NonExtended
-Installed/Driver/Keyboard/Danish/NonExtended:		MAKEDRV
+Installed/Driver/Keyboard/Danish/NonExtended:		kernel MAKEDRV
 
 kbde_be	: Installed/Driver/Keyboard/Dutch/Extended
-Installed/Driver/Keyboard/Dutch/Extended:		MAKEDRV
+Installed/Driver/Keyboard/Dutch/Extended:		kernel MAKEDRV
 
 kbde_fr	: Installed/Driver/Keyboard/French/Extended
-Installed/Driver/Keyboard/French/Extended:		MAKEDRV
+Installed/Driver/Keyboard/French/Extended:		kernel MAKEDRV
 
 kbdn_fr	: Installed/Driver/Keyboard/French/NonExtended
-Installed/Driver/Keyboard/French/NonExtended:		MAKEDRV
+Installed/Driver/Keyboard/French/NonExtended:		kernel MAKEDRV
 
 kps1_fr	: Installed/Driver/Keyboard/French/PS1
-Installed/Driver/Keyboard/French/PS1:			MAKEDRV
+Installed/Driver/Keyboard/French/PS1:			kernel MAKEDRV
 
 kbde_sf : Installed/Driver/Keyboard/French/SwissExtended
-Installed/Driver/Keyboard/French/SwissExtended:		MAKEDRV
+Installed/Driver/Keyboard/French/SwissExtended:		kernel MAKEDRV
 
 kbde_gr : Installed/Driver/Keyboard/German/Extended
-Installed/Driver/Keyboard/German/Extended:		MAKEDRV
+Installed/Driver/Keyboard/German/Extended:		kernel MAKEDRV
 
 kbdn_gr : Installed/Driver/Keyboard/German/NonExtended
-Installed/Driver/Keyboard/German/NonExtended:		MAKEDRV
+Installed/Driver/Keyboard/German/NonExtended:		kernel MAKEDRV
 
 kbde_sg	: Installed/Driver/Keyboard/German/SwissExtended
-Installed/Driver/Keyboard/German/SwissExtended:		MAKEDRV
 
+Installed/Driver/Keyboard/German/SwissExtended:		kernel MAKEDRV
 kbdn_sg	: Installed/Driver/Keyboard/German/SwissNonExtended
-Installed/Driver/Keyboard/German/SwissNonExtended :	MAKEDRV
+Installed/Driver/Keyboard/German/SwissNonExtended :	kernel MAKEDRV
 
 kbde_it	: Installed/Driver/Keyboard/Italian/Extended
-Installed/Driver/Keyboard/Italian/Extended:		MAKEDRV
+Installed/Driver/Keyboard/Italian/Extended:		kernel MAKEDRV
 
 kbdn_it	: Installed/Driver/Keyboard/Italian/NonExtended
-Installed/Driver/Keyboard/Italian/NonExtended:		MAKEDRV
+Installed/Driver/Keyboard/Italian/NonExtended:		kernel MAKEDRV
 
 kbde_no	: Installed/Driver/Keyboard/Norwegian/Extended
-Installed/Driver/Keyboard/Norwegian/Extended:		MAKEDRV
+Installed/Driver/Keyboard/Norwegian/Extended:		kernel MAKEDRV
 
 kbdn_no	: Installed/Driver/Keyboard/Norwegian/NonExtended
-Installed/Driver/Keyboard/Norwegian/NonExtended:	MAKEDRV
+Installed/Driver/Keyboard/Norwegian/NonExtended:	kernel MAKEDRV
 
 kbde_po	: Installed/Driver/Keyboard/Portuguese/Extended
-Installed/Driver/Keyboard/Portuguese/Extended:		MAKEDRV
+Installed/Driver/Keyboard/Portuguese/Extended:		kernel MAKEDRV
 
 kbde_sp	: Installed/Driver/Keyboard/Spanish/Extended
-Installed/Driver/Keyboard/Spanish/Extended:		MAKEDRV
+Installed/Driver/Keyboard/Spanish/Extended:		kernel MAKEDRV
 
 kbdn_sp	: Installed/Driver/Keyboard/Spanish/NonExtended
-Installed/Driver/Keyboard/Spanish/NonExtended:		MAKEDRV
+Installed/Driver/Keyboard/Spanish/NonExtended:		kernel MAKEDRV
 
 kbde_sv	: Installed/Driver/Keyboard/Swedish/Extended
-Installed/Driver/Keyboard/Swedish/Extended:		MAKEDRV
+Installed/Driver/Keyboard/Swedish/Extended:		kernel MAKEDRV
 
 kbdn_sv	: Installed/Driver/Keyboard/Swedish/NonExtended
-Installed/Driver/Keyboard/Swedish/NonExtended:		MAKEDRV
+Installed/Driver/Keyboard/Swedish/NonExtended:		kernel MAKEDRV
 
 kbdt_sv	: Installed/Driver/Keyboard/Swedish/Typewriter
-Installed/Driver/Keyboard/Swedish/Typewriter:		MAKEDRV
 
+Installed/Driver/Keyboard/Swedish/Typewriter:		kernel MAKEDRV
 kbde_uk	: Installed/Driver/Keyboard/UK/Extended
-Installed/Driver/Keyboard/UK/Extended:			MAKEDRV
 
+Installed/Driver/Keyboard/UK/Extended:			kernel MAKEDRV
 lbdn_uk	: Installed/Driver/Keyboard/UK/NonExtended
-Installed/Driver/Keyboard/UK/NonExtended:		MAKEDRV
+Installed/Driver/Keyboard/UK/NonExtended:		kernel MAKEDRV
 
 t1000	: Installed/Driver/Keyboard/Tandy1000
-Installed/Driver/Keyboard/Tandy1000:			MAKEDRV
 
+Installed/Driver/Keyboard/Tandy1000:			kernel MAKEDRV
 #mousedrivers
 genmouse	: Installed/Driver/Mouse/GenMouse
-Installed/Driver/Mouse/GenMouse:	MAKEDRV
+Installed/Driver/Mouse/GenMouse:	kernel MAKEDRV
 
 absgen	: Installed/Driver/Mouse/AbsGen
-Installed/Driver/Mouse/AbsGen:		MAKEDRV
+Installed/Driver/Mouse/AbsGen:		kernel MAKEDRV
 
 kbmouse	: Installed/Driver/Mouse/KBMouse
-Installed/Driver/Mouse/KBMouse:		MAKEDRV
+Installed/Driver/Mouse/KBMouse:		kernel MAKEDRV
 
 msbus	: Installed/Driver/Mouse/MSBus
-Installed/Driver/Mouse/MSBus:		MAKEDRV
+Installed/Driver/Mouse/MSBus:		kernel MAKEDRV
 
 msser	: Installed/Driver/Mouse/MSSer
-Installed/Driver/Mouse/MSSer:		serial MAKEDRV
+Installed/Driver/Mouse/MSSer:		kernel serial MAKEDRV
 
 logibus	: Installed/Driver/Mouse/LogiBus
-Installed/Driver/Mouse/LogiBus:		MAKEDRV
+Installed/Driver/Mouse/LogiBus:		kernel MAKEDRV
 
 logiser	: Installed/Driver/Mouse/LogiSer
-Installed/Driver/Mouse/LogiSer:		serial MAKEDRV
+Installed/Driver/Mouse/LogiSer:		kernel serial MAKEDRV
 
 dma	: Installed/Driver/DMA/DOSReal
-Installed/Driver/DMA/DOSReal:		MAKEDRV
+Installed/Driver/DMA/DOSReal:		kernel MAKEDRV
 
 msys	:  Installed/Driver/Mouse/MSys
-Installed/Driver/Mouse/MSys:		serial MAKEDRV
+Installed/Driver/Mouse/MSys:		kernel serial MAKEDRV
 
 ps2	: Installed/Driver/Mouse/PS2
 Installed/Driver/Mouse/PS2:		ui MAKEDRV
@@ -768,8 +768,8 @@ Installed/Driver/Mouse/PS2:		ui MAKEDRV
 # Printer Drivers
 
 deskjet	: Installed/Driver/Printer/HP/Deskjet
-Installed/Driver/Printer/HP/Deskjet:	spool MAKEDRV
 
+Installed/Driver/Printer/HP/Deskjet:	spool MAKEDRV
 dj500c	: Installed/Driver/Printer/HP/Dj500c
 Installed/Driver/Printer/HP/Dj500c:	spool MAKEDRV
 
@@ -1028,7 +1028,7 @@ Installed/Appl/Breadbox/HmBase:		ui ansic text spool math MAKEAPPL
 #Installed/Appl/Saver/Album:	saver config MAKEAPPL
 
 lol	: Installed/Appl/LOL
-Installed/Appl/LOL:		saver MAKEAPPL
+Installed/Appl/LOL:		kernel saver MAKEAPPL
 
 blackhole	: 	Installed/Appl/Saver/BlackHole \
 			Installed/Appl/Saver/BlackHole/BlackHolePref
@@ -1316,7 +1316,7 @@ cookies : 	Installed/Library/Cookies
 Installed/Library/Cookies:			ansic netutils MAKELIB
 
 mapheap :	Installed/Library/MapHeap
-Installed/Library/MapHeap:			MAKELIB
+Installed/Library/MapHeap:			kernel MAKELIB
 
 ssl	: 	Installed/Library/SSL
 Installed/Library/SSL:				ansic socket mapheap MAKELIB
@@ -1448,7 +1448,7 @@ cdaudio	: Installed/Library/Breadbox/CDAudio
 Installed/Library/Breadbox/CDAudio:		ansic MAKELIB
 
 cdados	: Installed/Library/Breadbox/CDADOS
-Installed/Library/Breadbox/CDADOS:		MAKELIB
+Installed/Library/Breadbox/CDADOS:		kernel MAKELIB
 
 bbxcd	: Installed/Appl/Breadbox/bbxcd
 Installed/Appl/Breadbox/bbxcd:			ui ansic sound cdaudio MAKEAPPL
@@ -1471,7 +1471,7 @@ perf	: Installed/Appl/Perf
 Installed/Appl/Perf:			ui color MAKEAPPL
 
 dump	: Installed/Appl/Dump
-Installed/Appl/Dump:			spool ijgjpeg giflib MAKEAPPL
+Installed/Appl/Dump:			kernel spool ijgjpeg giflib MAKEAPPL
 
 # Edu Apps
 flash	: Installed/Appl/EduApps/Flash
@@ -1557,22 +1557,22 @@ ndorest:  regis run legos 	\
 	  faxsendtd geosafari slides
 
 ms3     : Installed/Driver/IFS/DOS/MS3
-Installed/Driver/IFS/DOS/MS3:			MAKEDRV
+Installed/Driver/IFS/DOS/MS3:			kernel MAKEDRV
 
 ms7     : Installed/Driver/IFS/DOS/MS7
-Installed/Driver/IFS/DOS/MS7:			MAKEDRV
+Installed/Driver/IFS/DOS/MS7:			kernel MAKEDRV
 
 netware     : Installed/Driver/IFS/DOS/NETWARE
-Installed/Driver/IFS/DOS/NETWARE:		MAKEDRV
+Installed/Driver/IFS/DOS/NETWARE:		kernel MAKEDRV
 
 rfsd     : Installed/Driver/IFS/RFSD
 Installed/Driver/IFS/RFSD:			net ui MAKEDRV
 
 int8087	: Installed/Library/CoProcessor/Int8087
-Installed/Library/CoProcessor/Int8087:		math MAKELIB
+Installed/Library/CoProcessor/Int8087:		kernel math MAKELIB
 
 intx87	: Installed/Library/CoProcessor/Intx87
-Installed/Library/CoProcessor/Intx87:		math MAKELIB
+Installed/Library/CoProcessor/Intx87:		kernel math MAKELIB
 
 taskmax	: Installed/Driver/Task/Taskmax
 Installed/Driver/Task/Taskmax:			ui text MAKEDRV
@@ -1587,31 +1587,31 @@ Installed/Driver/Mailbox/Transport/Faxsendtd:	mailbox faxfile faxctrl ui \
 
 # NewDeal socket drivers
 irlap		: Installed/Driver/Socket/Irlap
-Installed/Driver/Socket/Irlap:			socket serial MAKEDRV
+Installed/Driver/Socket/Irlap:			kernel socket serial MAKEDRV
 
 loopback	: Installed/Driver/Socket/Loopback
-Installed/Driver/Socket/Loopback:		socket MAKEDRV
+Installed/Driver/Socket/Loopback:		kernel socket MAKEDRV
 
 slip	: Installed/Driver/Socket/Slip
-Installed/Driver/Socket/Slip:			netutils MAKEDRV
+Installed/Driver/Socket/Slip:			kernel netutils MAKEDRV
 
 # NewDeal video drivers
-vid_drivers: ega mcga hgc att6300
+vid_drivers: kernel ega mcga hgc att6300
 
 ega	: Installed/Driver/Video/VGAlike/EGA
-Installed/Driver/Video/VGAlike/EGA:		MAKEDRV
+Installed/Driver/Video/VGAlike/EGA:		kernel MAKEDRV
 
 cga	: Installed/Driver/Video/Dumb/CGA
-Installed/Driver/Video/Dumb/CGA:		MAKEDRV
+Installed/Driver/Video/Dumb/CGA:		kernel MAKEDRV
 
 dscga	: Installed/Driver/Video/Dumb/DSCGA
-Installed/Driver/Video/Dumb/DSCGA:		MAKEDRV
+Installed/Driver/Video/Dumb/DSCGA:		kernel MAKEDRV
 
 mcga	: Installed/Driver/Video/Dumb/MCGA
-Installed/Driver/Video/Dumb/MCGA:		MAKEDRV
+Installed/Driver/Video/Dumb/MCGA:		kernel MAKEDRV
 
 hgc	: Installed/Driver/Video/Dumb/HGC
-Installed/Driver/Video/Dumb/HGC:		MAKEDRV
+Installed/Driver/Video/Dumb/HGC:		kernel MAKEDRV
 
 # Terminal application
 regis	: Installed/Appl/Regis
@@ -1630,7 +1630,7 @@ datax	: Installed/Library/DataX
 Installed/Library/DataX:			ui MAKELIB
 
 datastore	:  Installed/Library/Datastore
-Installed/Library/Datastore:			text datax MAKELIB
+Installed/Library/Datastore:			kernel text datax MAKELIB
 
 
 # Printer Drivers
@@ -1660,10 +1660,10 @@ mixlib	: Installed/Library/Audio/MixLib
 Installed/Library/Audio/MixLib:			bsnwav sound ui ansic MAKELIB
 
 bsd16	: Installed/Driver/Sound/BSD16
-Installed/Driver/Sound/BSD16:			stream MAKEDRV
+Installed/Driver/Sound/BSD16:			kernel stream MAKEDRV
 
 bsd8st	: Installed/Driver/Sound/BSD8ST
-Installed/Driver/Sound/BSD8ST:			stream MAKEDRV
+Installed/Driver/Sound/BSD8ST:			kernel stream MAKEDRV
 
 bsqp	: Installed/Appl/Audio/Bsqp
 Installed/Appl/Audio/Bsqp:			bsnwav ansic ui MAKEDRV
@@ -1672,7 +1672,7 @@ sndchk	: Installed/Appl/Audio/SndChk
 Installed/Appl/Audio/SndChk:			bsnwav wav ansic ui MAKEAPPL
 
 # MP3 - audio format decoder
-mp3snd	: mp3 mp3play
+mp3snd	: kernel mp3 mp3play
 
 mp3	: Installed/Library/Audio/Mp3
 Installed/Library/Audio/Mp3:			math ansic MAKELIB

@@ -2803,8 +2803,6 @@ File_Init(int	    *argcPtr,
     if (argv0++ == NULL) {
 	argv0 = argv[0];
     }
-    printf("PATH %s\n", argv0); fflush(stdout);
-    printf("PATH %s\n", argv[0]); fflush(stdout);
 
     /*
      * Check for flags we support:
@@ -2936,12 +2934,10 @@ File_Init(int	    *argcPtr,
 		buf[strlen(buf) - 4] = 0;    
 	    }
 	    strcat(buf, "." CONFIG_SUFFIX);
-    	    printf("PATH %s\n", buf); fflush(stdout);
     	    cp = File_Locate(buf, cp);
     	    if (cp != NULL) {
     		strcpy(buf, cp);
     		free(cp);
-		printf("PATH found %s\n", buf); fflush(stdout);
     		goto read_config;
     	    }
     	}
@@ -2952,7 +2948,6 @@ File_Init(int	    *argcPtr,
 
 	if (cp != NULL) {
 	    sprintf(buf, "%s." CONFIG_SUFFIX, argv0);
-	    printf("PATH %s\n", buf); fflush(stdout);
 	    cp = File_Locate(buf, cp);
 	    if (cp != NULL) {
 		strcpy(buf, cp);
@@ -2990,6 +2985,9 @@ read_config:
 	Punt("Root directory must be absolute path");
     }
     rootLen = strlen(fileRoot);
+#if defined(_WIN32)
+    FileMapSeparators((char *)fileRoot, '\\', '/');
+#endif
     Tcl_SetVar(interp, "file-root-dir", fileRoot, TRUE);
 
     /*
@@ -3016,6 +3014,9 @@ read_config:
     /*
      * Store the initial directory away in the init-directory variable
      */
+#if defined(_WIN32)
+    FileMapSeparators((char *)cwd, '\\', '/');
+#endif
     Tcl_SetVar(interp, "file-init-dir", cwd, TRUE);
 
     fileBranch[0] = '\0';
@@ -3027,6 +3028,9 @@ read_config:
      * we're not in a subdirectory of the root, we have no idea...
      */
 # if !defined(_MSDOS)
+#if defined(_WIN32)
+    	FileMapSeparators((char *)cwd, '\\', '/');
+#endif
     if (STRNCMP_OS_SPECIFIC(cwd, fileRoot, rootLen) == 0) {
 	cp = cwd + rootLen + 1;
 	while(*cp != PATHNAME_SLASH && *cp != '\0') {
@@ -3037,6 +3041,7 @@ read_config:
 	 * Set up the devel-directory variable now too
 	 */
 	*cp = '\0';
+
 	FileSetVar((char **)&fileDevel, "file-devel-dir", cwd, cp);
 
 	/*
@@ -3100,6 +3105,10 @@ read_config:
     if (fileDevel == NULL) {
 	fileDevel = fileRoot;
     }
+
+#if defined(_WIN32)
+    FileMapSeparators((char *)fileDevel, '\\', '/');
+#endif
     Tcl_SetVar(interp, "file-devel-dir", fileDevel, TRUE);
 # endif;
 
@@ -3109,6 +3118,9 @@ read_config:
      * XXX: end with a slash to make life easier? Use "." instead of "" for
      * the trunk?
      */
+#if defined(_WIN32)
+    FileMapSeparators((char *)fileBranch, '\\', '/');
+#endif
     Tcl_SetVar(interp, "file-branch", fileBranch, TRUE);
 
     /*
@@ -3127,6 +3139,10 @@ read_config:
 	 */
 	fileDefault = File_PathConcat(fileRoot, fileBranch, value, 0);
     }
+
+#if defined(_WIN32)
+    FileMapSeparators((char *)fileDefault, '\\', '/');
+#endif
     Tcl_SetVar(interp, "file-default-dir", fileDefault, TRUE);
 
     /*
@@ -3184,6 +3200,9 @@ read_config:
 					fileSysLib,
 					0);
     }
+#if defined(_WIN32)
+    FileMapSeparators((char *)fileAbsSysLib, '\\', '/');
+#endif
     Tcl_SetVar(interp, "file-syslib-dir", fileAbsSysLib, TRUE);
 
 after_config:
@@ -3218,24 +3237,18 @@ after_config:
 	free((char *)ccp);
     }
 
-    printf("afterConfig3\n"); fflush(stdout);
     if (fileDevel && !File_CheckAbsolute(fileSysLib)) {
 	ccp = File_PathConcat(fileDevel, fileSysLib, "file-err.tcl", 0);
-printf("afterConfig4b\n"); fflush(stdout);
 	if (access((char *)ccp, R_OK) == 0) {
 	    sargv[1] = (char *)ccp;
 	    fileerrFound = TRUE;
 	    if (Tcl_SourceCmd((ClientData)0, interp, 2, sargv) == TCL_OK) {
 		free((char *)ccp);
-printf("afterConfig4\n"); fflush(stdout);
 		return;
 	    }
 	}
-	printf("afterConfig5\n"); fflush(stdout);
 	free((char *)ccp);
     }
-    printf("afterConfig6\n"); fflush(stdout);
-
     ccp = File_PathConcat(fileAbsSysLib, "file-err.tcl", 0);
     if (access((char *)ccp, R_OK) == 0) {
 	sargv[1] = (char *)ccp;
@@ -3252,7 +3265,6 @@ printf("afterConfig4\n"); fflush(stdout);
     }
 
     free((char *)ccp);
-printf("afterConfig2\n"); fflush(stdout);
 
     return;
 }

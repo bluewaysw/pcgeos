@@ -10,6 +10,8 @@ script:
 - gzip -d ow-snapshot.tar.gz
 - mkdir _watcom
 - mkdir _out
+- mkdir _out/sdk
+- mkdir _out/sdk/pcgeos
 - cd _watcom
 - tar -xf ../ow-snapshot.tar
 - cd ..
@@ -20,17 +22,40 @@ script:
 - cd $TRAVIS_BUILD_DIR/Tools/pmake/pmake
 - wmake install | tee $TRAVIS_BUILD_DIR/_build.log
 - cd $TRAVIS_BUILD_DIR/Installed/Tools
-- pmake install | tee -a $TRAVIS_BUILD_DIR/_build.log
+- pmake -L 4 install | tee -a $TRAVIS_BUILD_DIR/_build.log
 - cd $TRAVIS_BUILD_DIR/Installed
-- pmake | tee -a $TRAVIS_BUILD_DIR/_build.log | grep -i -v "esp \|goc \|wcc \|wcc32 \|warning\|watcom"
+- pmake -L 4 | tee -a $TRAVIS_BUILD_DIR/_build.log | grep -i -v "esp \|goc \|wcc \|wcc32 \|warning\|watcom\|--- "
+- cd $TRAVIS_BUILD_DIR/Tools/sdk
+- ./makesdk $TRAVIS_BUILD_DIR/_out/sdk/pcgeos | tee -a $TRAVIS_BUILD_DIR/_build.log
+- cd $TRAVIS_BUILD_DIR/_out/sdk
+- mkdir pcgeos/target
+- mkdir pcgeos/target/ensemble.ec
+- mkdir pcgeos/target/ensemble.nc
 - cd $TRAVIS_BUILD_DIR/Tools/build/product/bbxensem/Scripts
-- echo pc >$TRAVIS_BUILD_DIR/_temp.dat
+- echo nt >$TRAVIS_BUILD_DIR/_temp.dat
 - echo y >>$TRAVIS_BUILD_DIR/_temp.dat
 - echo n >>$TRAVIS_BUILD_DIR/_temp.dat
 - echo y >>$TRAVIS_BUILD_DIR/_temp.dat
 - echo n >>$TRAVIS_BUILD_DIR/_temp.dat
-- echo $TRAVIS_BUILD_DIR/_out >> $TRAVIS_BUILD_DIR/_temp.dat
+- echo $TRAVIS_BUILD_DIR/_out/sdk/pcgeos/target/ensemble.ec >> $TRAVIS_BUILD_DIR/_temp.dat
 - perl -I. buildbbx.pl  <$TRAVIS_BUILD_DIR/_temp.dat
+- cd $TRAVIS_BUILD_DIR/Tools/build/product/bbxensem/Scripts
+- echo nt >$TRAVIS_BUILD_DIR/_temp.dat
+- echo n >>$TRAVIS_BUILD_DIR/_temp.dat
+- echo n >>$TRAVIS_BUILD_DIR/_temp.dat
+- echo y >>$TRAVIS_BUILD_DIR/_temp.dat
+- echo n >>$TRAVIS_BUILD_DIR/_temp.dat
+- echo $TRAVIS_BUILD_DIR/_out/sdk/pcgeos/target/ensemble.nc >> $TRAVIS_BUILD_DIR/_temp.dat
+- perl -I. buildbbx.pl  <$TRAVIS_BUILD_DIR/_temp.dat
+- cd $TRAVIS_BUILD_DIR/_out/sdk
+- mv pcgeos/target pcgeos/Target
+- mv pcgeos/Target/ensemble.ec pcgeos/Target/Ensemble.ec
+- mv pcgeos/Target/ensemble.nc pcgeos/Target/Ensemble.nc
+- zip -rq pcgeos-sdk.zip pcgeos 
+- cd pcgeos/Target/Ensemble.ec/localpc
+- zip -rq pcgeos-ensemble_ec.zip ensemble
+- cd $TRAVIS_BUILD_DIR/_out/sdk/pcgeos/Target/Ensemble.nc/localpc
+- zip -rq pcgeos-ensemble_nc.zip ensemble
 before_deploy:
 - |
   if [[ -z "$TRAVIS_TAG" ]]; then
@@ -41,6 +66,9 @@ deploy:
   api_key: $GITHUB_API_KEY
   file: 
   - $TRAVIS_BUILD_DIR/_build.log
+  - $TRAVIS_BUILD_DIR/_out/sdk/pcgeos-sdk.zip
+  - $TRAVIS_BUILD_DIR/_out/sdk/pcgeos/Target/Ensemble.ec/localpc/pcgeos-ensemble_ec.zip
+  - $TRAVIS_BUILD_DIR/_out/sdk/pcgeos/Target/Ensemble.nc/localpc/pcgeos-ensemble_nc.zip
   skip_cleanup: true
   prerelease: true
   draft: false
