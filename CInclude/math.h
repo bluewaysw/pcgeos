@@ -590,12 +590,12 @@ extern void _pascal FloatEpsilon (void);
 ******************************************************/
 extern sword _pascal FloatComp(void);
 extern sword _pascal FloatCompAndDrop(void);
-#ifdef __WATCOM__
+#ifdef __WATCOMC__
 inline sword FloatCompESDI(FloatNum* number) {
     FloatNumStruct _geos80FloatNum;
     FloatPushNumber(number);
     FloatPopGeos80Number((FloatNum *) &_geos80FloatNum);
-    return FloatCompGeos80ESDI((FloatNum *)&_geos80FloatNum);
+    return FloatCompGeos80ESDI((FloatNum *) &_geos80FloatNum);
 }
 #else
 inline sword FloatCompESDI(FloatNum* number) {
@@ -610,7 +610,7 @@ extern word _pascal FloatGt0(void);
 /********************************************************
   	    number string routines
 *********************************************************/
-#ifdef __WATCOM__
+#ifdef __WATCOMC__
 inline Boolean FloatAsciiToFloat(word floatAtoFflags, word stringLength, 
 				void *string, void *resultLocation) {
     FloatNumStruct _geos80FloatNum; Boolean _result;
@@ -650,7 +650,7 @@ inline Boolean FloatAsciiToFloat(word floatAtoFflags, word stringLength,
 ;	are "huge" otherwise.
 ;
 ;*****************************************************************************/
-#ifdef __WATCOM__
+#ifdef __WATCOMC__
 inline word FloatFloatToAscii(FFA_stackFrame *stackFrame, char *resultString, FloatNum *number) {
     FloatNumStruct _geos80Number;
     if(number == NULL)
@@ -703,7 +703,7 @@ extern word _pascal FloatDateNumberGetYear(void);
 extern void _pascal FloatDateNumberGetMonthAndDay(byte *month, byte *day);
 extern word _pascal FloatGetNumDigitsInIntegerPart(void);
 
-#ifdef __WATOM__
+#ifdef __WATCOMC__
 inline void FloatFormatNumber(FormatIdType formatToken, word userDefBlkHan, word userDefFileHan,
 				      FloatNum *floatNum, char *resultLocation) {
     FloatNumStruct _geos80Number;
