@@ -129,7 +129,7 @@ typedef WordFlags FloatExponent;
 #else
 #define	FE_SIGN		0x8000		
 #define	FE_EXPONENT	0x7fff
-#endif
+#endif /* __WATCOM__ */
 
 typedef struct {
 	word	F_mantissa_wd0;	
@@ -153,7 +153,7 @@ typedef struct {
 #define FLOAT_EXPONENT(x) (((IEEE64FloatNum *)x)->IEEE64F_word4)
 #else
 #define FLOAT_EXPONENT(x) (((FloatNumStruct *)x)->F_exponent)
-#endif
+#endif  /* __WATCOM__ */
 
 typedef double IEEE64Number;
 typedef long double FloatNumber;
@@ -483,7 +483,7 @@ extern long _pascal FloatFloatToDword(void);
 /****************************************************
   	    stack manipulation routines
 *****************************************************/
-#ifdef __WATCOMC__
+#ifdef __WATCOM__
 inline word FloatPushNumber(FloatNum *number) {
     FloatIEEE64ToGeos80((double *) number); return 0;
 }
@@ -497,7 +497,7 @@ inline word FloatPushNumber(FloatNum *number) {
 inline word FloatPopNumber(FloatNum *number) {
     return FloatPopGeos80Number(number);
 }
-#endif
+#endif /* __WATCOM__ */
 extern void _pascal FloatRoll(word num);
 extern void _pascal FloatRollDown(word num);
 extern void _pascal FloatPick(word num);
@@ -590,7 +590,7 @@ extern void _pascal FloatEpsilon (void);
 ******************************************************/
 extern sword _pascal FloatComp(void);
 extern sword _pascal FloatCompAndDrop(void);
-#ifdef __WATCOMC__
+#ifdef __WATCOM__
 inline sword FloatCompESDI(FloatNum* number) {
     FloatNumStruct _geos80FloatNum;
     FloatPushNumber(number);
@@ -601,7 +601,7 @@ inline sword FloatCompESDI(FloatNum* number) {
 inline sword FloatCompESDI(FloatNum* number) {
     return FloatCompGeos80ESDI(number);
 }
-#endif
+#endif  /* __WATCOM__ */
 extern word _pascal FloatEq0(void);
 extern word _pascal FloatLt0(void);
 extern word _pascal FloatGt0(void);
@@ -610,7 +610,7 @@ extern word _pascal FloatGt0(void);
 /********************************************************
   	    number string routines
 *********************************************************/
-#ifdef __WATCOMC__
+#ifdef __WATCOM__
 inline Boolean FloatAsciiToFloat(word floatAtoFflags, word stringLength, 
 				void *string, void *resultLocation) {
     FloatNumStruct _geos80FloatNum; Boolean _result;
@@ -626,7 +626,7 @@ inline Boolean FloatAsciiToFloat(word floatAtoFflags, word stringLength,
 				void *string, void *resultLocation) {
     return FloatAsciiToGeos80(floatAtoFflags, stringLength, string, resultLocation);
 }
-#endif
+#endif  /* __WATCOM__ */
 
 
 /******************************************************************************
@@ -650,7 +650,7 @@ inline Boolean FloatAsciiToFloat(word floatAtoFflags, word stringLength,
 ;	are "huge" otherwise.
 ;
 ;*****************************************************************************/
-#ifdef __WATCOMC__
+#ifdef __WATCOM__
 inline word FloatFloatToAscii(FFA_stackFrame *stackFrame, char *resultString, FloatNum *number) {
     FloatNumStruct _geos80Number;
     if(number == NULL)
@@ -663,14 +663,14 @@ inline word FloatFloatToAscii(FFA_stackFrame *stackFrame, char *resultString, Fl
 inline word FloatFloatToAscii(FFA_stackFrame *stackFrame, char *resultString, FloatNum *number) {
     return FloatGeos80ToAscii(stackFrame, resultString, number);
 }
-#endif
+#endif  /* __WATCOM__ */
 
 extern word /* XXX */
     _pascal FloatFloatIEEE64ToAscii_StdFormat(char *string, IEEE64FloatNum number,
 				FloatFloatToAsciiFormatFlags format,
 				word numDigits, word numFractionalDigits);
 
-#ifdef __WATCOMC__
+#ifdef __WATCOM__
 inline word FloatFloatToAscii_StdFormat(char *string, FloatNum *number,
 				FloatFloatToAsciiFormatFlags format, word numDigits, word numFractionalDigits) {
     FloatNumStruct _geos80Number;
@@ -685,7 +685,7 @@ inline word FloatFloatToAscii_StdFormat(char *string, FloatNum *number,
 				FloatFloatToAsciiFormatFlags format, word numDigits, word numFractionalDigits) {
     return FloatGeos80ToAscii_StdFormat(string, number, format, numDigits, numFractionalDigits);               
 }
-#endif
+#endif  /* __WATCOM__ */
 
 extern void _pascal FloatTimeNumberGetSeconds(void);
 extern word	/*XXX*/
@@ -703,7 +703,7 @@ extern word _pascal FloatDateNumberGetYear(void);
 extern void _pascal FloatDateNumberGetMonthAndDay(byte *month, byte *day);
 extern word _pascal FloatGetNumDigitsInIntegerPart(void);
 
-#ifdef __WATCOMC__
+#ifdef __WATCOM__
 inline void FloatFormatNumber(FormatIdType formatToken, word userDefBlkHan, word userDefFileHan,
 				      FloatNum *floatNum, char *resultLocation) {
     FloatNumStruct _geos80Number;
@@ -716,7 +716,7 @@ inline void FloatFormatNumber(FormatIdType formatToken, word userDefBlkHan, word
 				      FloatNum *floatNum, char *resultLocation) {
     FloatFormatGeos80Number(formatToken, userDefBlkHan, userDefFileHan, floatNum, resultLocation);
 }
-#endif
+#endif  /* __WATCOM__ */
 
 #ifdef __HIGHC__
 pragma Alias(Float0, "FLOAT0");

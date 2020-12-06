@@ -1,108 +1,389 @@
-/*
- * Copyright 2020   Jirka Kunze
+/********************************************************************
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * 
- *   http://www.apache.org/licenses/LICENSE-2.0
+ * Testprogramm
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+ *******************************************************************/
 
 @include <stdapp.goh>
-#include "math_test_function.h"
+#include <math.h>
+#include <Ansi/string.h>
+#include <Ansi/stdio.h>
+#include <Ansi/stdlib.h>
 
-@class MathTestProcessClass, GenProcessClass;
-@endc;
+void clearText();
+void appendTextLine(char* textToAppend);
+void appendStringErgebnis(char *result);
+void appendNewLine();
+void appendTopic(char* topic);
+void appendResult(Boolean result);
 
 
-@classdecl MathTestProcessClass, neverSaved;
+@class MathtestProcessClass, GenProcessClass;
+
+    @message void MSG_RUN_TEST_PUSH_POP();
+    @message void MSG_RUN_TEST_COMPESDI();
+    @message void MSG_RUN_TEST_ASCII_TO_FLOAT();
+    @message void MSG_RUN_TEST_FLOAT_TO_ASCII_STD_FORMAT();
+    @message void MSG_RUN_TEST_FLOAT_TO_ASCII();
+    @message void MSG_RUN_TEST_FORMAT_NUMBER();
+
+@endc; 
+@classdecl MathtestProcessClass, neverSaved;
 
 
 @start AppResource;
 
-@object GenApplicationClass MathTestApp = {
+@object GenApplicationClass MathtestApp = {
+    GI_visMoniker = list { @TestTextMoniker };
+    GI_comp = @TestPrimary;
 
-    GI_visMoniker = list { @MathTestMoniker };
-    GI_comp = @MathTestPrimary;
-    gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS ) = @MathTestPrimary;
+    gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS ) = @TestPrimary;
 }
 
-@visMoniker MathTestMoniker = "Math Test";
+@visMoniker TestTextMoniker = "Mathtest";
 
 @end AppResource;
 
 
 @start Interface;
 
-@object GenPrimaryClass MathTestPrimary = {
-    
-    GI_comp = @MathTestResultGlyph_DataTypeSize,
-                @MathTestResultGlyph_PushPop,
-                @MathTestResultGlyph_CompESDI,
-                @MathTestResultGlyph_FloatToAscii,
-                @MathTestResultGlyph_FormatNumber;
+@object GenPrimaryClass TestPrimary  = {
+    GI_comp = @TestInteraction;
 }
 
-@object GenGlyphClass MathTestResultGlyph_DataTypeSize = {
-    
-    GI_visMoniker = "size of datatypes untested";
+@object GenInteractionClass TestInteraction = {
+    GI_comp = @TestButtonPushPop, 
+            @TestButtonComp,
+            @TestButtonAsciiToFloat,
+            @TestButtonFloatToAsciiStdFormat,
+            @TestButtonFloatToAscii,
+            @TestButtonFormatNumber,
+            @TestText;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
 }
 
-@object GenGlyphClass MathTestResultGlyph_PushPop = {
-    
-    GI_visMoniker = "function FloatPushNumber and FloatPopNumber untested";
+@object GenTriggerClass TestButtonPushPop = {
+    GI_visMoniker = "Test FloatPushNumber/FloatPopNumber";
+    GTI_actionMsg = MSG_RUN_TEST_PUSH_POP;
+	GTI_destination = process;
 }
 
-@object GenGlyphClass MathTestResultGlyph_CompESDI = {
-    
-    GI_visMoniker = "function FloatCompESDI untested";
+@object GenTriggerClass TestButtonComp = {
+    GI_visMoniker = "Test FloatCompESDI";
+    GTI_actionMsg = MSG_RUN_TEST_COMPESDI;
+	GTI_destination = process;
 }
 
-@object GenGlyphClass MathTestResultGlyph_FloatToAscii = {
-    
-    GI_visMoniker = "function FloatToAscii untested";
+@object GenTriggerClass TestButtonAsciiToFloat = {
+    GI_visMoniker = "Test AsciiToFloat";
+    GTI_actionMsg = MSG_RUN_TEST_ASCII_TO_FLOAT;
+	GTI_destination = process;
 }
 
-@object GenGlyphClass MathTestResultGlyph_FormatNumber = {
-    
-    GI_visMoniker = "function FloatFormatNumber untested";
+@object GenTriggerClass TestButtonFloatToAsciiStdFormat = {
+    GI_visMoniker = "Test FloatToAsciiStdFormat";
+    GTI_actionMsg = MSG_RUN_TEST_FLOAT_TO_ASCII_STD_FORMAT;
+	GTI_destination = process;
+}
+
+@object GenTriggerClass TestButtonFloatToAscii = {
+    GI_visMoniker = "Test FloatToAscii";
+    GTI_actionMsg = MSG_RUN_TEST_FLOAT_TO_ASCII;
+	GTI_destination = process;
+}
+
+@object GenTriggerClass TestButtonFormatNumber = {
+    GI_visMoniker = "Test FormatNumber";
+    GTI_actionMsg = MSG_RUN_TEST_FORMAT_NUMBER;
+	GTI_destination = process;
+}
+
+@object GenTextClass TestText = {
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
 }
 
 @end Interface;
 
 
-@method MathTestProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION {
+@method MathtestProcessClass, MSG_RUN_TEST_PUSH_POP {
+    long double double_minus_1 = -1.0;
+    long double double_0 = 0;
+    long double double_1 = 1.0;
+    long double double_3141_59 = 3141.59;
+    long double result;
+
+    clearText();
+    appendTopic("=== Start FloatPushNumber Test ===" );
     
-    @callsuper();
+    appendTextLine(" Push double_minus_1 to fp-stack");
+    FloatPushNumber(&double_minus_1);
+    appendResult( FloatDepth() == 1);
+
+    appendTextLine(" Push double_0 to fp-stack");
+    FloatPushNumber(&double_0);
+    appendResult(FloatDepth() == 2);
+
+    appendTextLine(" Push double_1 to sp-stack");
+    FloatPushNumber(&double_1);
+    appendResult(FloatDepth() == 3);
+
+    appendTextLine(" Push double_3141_59 to fp-stack");
+    FloatPushNumber(&double_3141_59);
+    appendResult(FloatDepth() == 4);
+
+    appendTopic("=== Ende FloatPushNumber Test ===");
+
+
+    appendTopic("=== Start FloatPopNumber Test ===");
     
-    if( test_datatypesize() )
-        @call MathTestResultGlyph_DataTypeSize::MSG_GEN_REPLACE_VIS_MONIKER_TEXT( "size of datatypes ok.", VUM_DELAYED_VIA_UI_QUEUE);
-    else
-        @call MathTestResultGlyph_DataTypeSize::MSG_GEN_REPLACE_VIS_MONIKER_TEXT( "size of datatypes nok!", VUM_DELAYED_VIA_UI_QUEUE);
-        
-    if( test_function_push_pop() )
-        @call MathTestResultGlyph_PushPop::MSG_GEN_REPLACE_VIS_MONIKER_TEXT( "function FloatPushNumber and FloatPopNumber ok.", VUM_DELAYED_VIA_UI_QUEUE);
-    else
-        @call MathTestResultGlyph_PushPop::MSG_GEN_REPLACE_VIS_MONIKER_TEXT( "function FloatPushNumber and FloatPopNumber nok!", VUM_DELAYED_VIA_UI_QUEUE);
+    appendTextLine(" Pop long double from fp-stack");
+    FloatPopNumber(&result);
+    appendResult(FloatDepth() == 3 && result == double_3141_59);
 
-    if( test_function_compESDI() )
-        @call MathTestResultGlyph_CompESDI::MSG_GEN_REPLACE_VIS_MONIKER_TEXT( "function FloatCompESDI ok.", VUM_DELAYED_VIA_UI_QUEUE);
-    else
-        @call MathTestResultGlyph_CompESDI::MSG_GEN_REPLACE_VIS_MONIKER_TEXT( "function FloatCompESDI nok!", VUM_DELAYED_VIA_UI_QUEUE);
+    appendTextLine(" Pop long double from fp-stack");
+    FloatPopNumber(&result);
+    appendResult(FloatDepth() == 2 && result == double_1);
 
-     if( test_funktion_floatFloatToAscii_StdFormat() )
-        @call MathTestResultGlyph_FloatToAscii::MSG_GEN_REPLACE_VIS_MONIKER_TEXT( "function FloatToAscii_StdFormat ok.", VUM_DELAYED_VIA_UI_QUEUE);
-    else
-        @call MathTestResultGlyph_FloatToAscii::MSG_GEN_REPLACE_VIS_MONIKER_TEXT( "function FloatToAscii_StdFormat nok!", VUM_DELAYED_VIA_UI_QUEUE);
+    appendTextLine(" Pop long double from fp-stack");
+    FloatPopNumber(&result);
+    appendResult(FloatDepth() == 1 && result == double_0);
 
-    if( test_function_floatFormatNumber() )
-        @call MathTestResultGlyph_FormatNumber::MSG_GEN_REPLACE_VIS_MONIKER_TEXT( "function FloatFormatNumber ok.", VUM_DELAYED_VIA_UI_QUEUE);
+    appendTextLine(" Pop long double from fp-stack");
+    FloatPopNumber(&result);
+    appendResult(FloatDepth() == 0 && result == double_minus_1);
+
+    appendTopic("=== Ende FloatPopNumber Test ===" );
+}
+
+@method MathtestProcessClass, MSG_RUN_TEST_COMPESDI {
+    long double double_minus_1 = -1.0;
+    long double double_0 = 0;
+    long double double_1 = 1.0;
+
+    clearText();
+    appendTopic("=== Starte PushCompESDI Test ===" );
+
+    // szenario: double_minus_1 < double_0
+    //           ^--stack         ^--param
+    appendTextLine(" Push double_minus_1 to fp-stack");
+    FloatPushNumber(&double_minus_1);
+    appendTextLine(" Compare with double_0");
+    appendResult(FloatCompESDI(&double_0) == 1);
+    FloatDrop();
+
+    // szenario: double_1 > double_minus_1
+    //           ^--stack   ^--param
+    appendTextLine(" Push double_1 to fp-stack");
+    FloatPushNumber(&double_1);
+    appendTextLine(" Compare with double_minus_1");
+    appendResult(FloatCompESDI(&double_minus_1) == -1);
+    FloatDrop();
+
+    // szenario: double_1 == double_1
+    //           ^--stack    ^--param
+    appendTextLine(" Push double_1 to fp-stack");
+    FloatPushNumber(&double_1);
+    appendTextLine(" Compare with double_1");
+    appendResult(FloatCompESDI(&double_1) == 0);
+    FloatDrop();
+
+    // szenario: double_0 == double_0
+    //           ^--stack    ^--param
+    appendTextLine(" Push double_0 to fp-stack");
+    FloatPushNumber(&double_0);
+    appendTextLine(" Compare with double_0");
+    appendResult(FloatCompESDI(&double_0) == 0);
+    FloatDrop();
+
+    appendTopic("=== Ende FloatCompESDI Test ===" );
+}
+
+@method MathtestProcessClass, MSG_RUN_TEST_ASCII_TO_FLOAT {
+    long double double_minus_1 = -1.0;
+    long double double_0 = 0;
+    long double double_1 = 1.0;
+    
+    char string_minus_1[] = "-1.0";
+    char string_0[] = "0.0";
+    char string_1[] = "1.0";
+
+    long double result;
+
+    clearText();
+    appendTopic("=== Starte AsciiToFloat Test ===" );
+
+    appendTextLine(" Convert -1.0 via fp-stack");
+    FloatAsciiToFloat( FAF_PUSH_RESULT, strlen(string_minus_1), string_minus_1, NULL );
+    appendResult( FloatCompESDI(&double_minus_1) == 0 );
+    FloatDrop();
+
+    appendTextLine(" Convert 0.0 via fp-stack");
+    FloatAsciiToFloat( FAF_PUSH_RESULT, strlen(string_0), string_0, NULL );
+    appendResult( FloatCompESDI(&double_0) == 0 );
+    FloatDrop();
+
+    appendTextLine(" Convert 1.0 via fp-stack");
+    FloatAsciiToFloat( FAF_PUSH_RESULT, strlen(string_1), string_1, NULL );
+    appendResult( FloatCompESDI(&double_1) == 0 );
+    FloatDrop();
+
+    appendTextLine(" Convert -1.0 via pointer");
+    FloatAsciiToFloat( FAF_STORE_NUMBER, strlen(string_minus_1), string_minus_1, &result );
+    appendResult( result == double_minus_1 );
+
+    appendTextLine(" Convert 0.0 via pointer");
+    FloatAsciiToFloat( FAF_STORE_NUMBER, strlen(string_0), string_0, &result );
+    appendResult( result == double_0 );
+
+    appendTextLine(" Convert 1.0 via pointer");
+    FloatAsciiToFloat( FAF_STORE_NUMBER, strlen(string_1), string_1, &result );
+    appendResult( result == double_1 );
+
+    appendTopic("=== Ende AsciiToFloat Test ===" );
+}
+
+@method MathtestProcessClass, MSG_RUN_TEST_FLOAT_TO_ASCII_STD_FORMAT {
+    long double double_minus_1 = -1.0;
+    long double double_0 = 0;
+    long double double_1 = 1.0;
+    long double double_3141_59 = 3141.59;
+    
+    char result[MAX_CHARS_FOR_NORMAL_NUMBER];
+
+    clearText();
+    appendTopic("=== Starte FloatToAscii Std Format Test ===" );
+
+    appendTextLine(" Convert -1.0 to String");
+    FloatFloatToAscii_StdFormat(result, &double_minus_1, FFAF_FROM_ADDR, 4, 2);
+    appendStringErgebnis(result);
+
+    appendTextLine(" Convert 0.0 to String");
+    FloatFloatToAscii_StdFormat(result, &double_0, FFAF_FROM_ADDR, 4, 2);
+    appendStringErgebnis(result);
+
+    appendTextLine(" Convert 1.0 to String");
+    FloatFloatToAscii_StdFormat(result, &double_1, FFAF_FROM_ADDR, 4, 2);
+    appendStringErgebnis(result);
+
+    appendTextLine(" Convert 3141.59 to String");
+    FloatFloatToAscii_StdFormat(result, &double_3141_59, FFAF_FROM_ADDR, 8, 2);
+    appendStringErgebnis(result);
+
+    appendTopic("=== Ende FloatToAscii Std Format Test ===");
+}
+
+@method MathtestProcessClass, MSG_RUN_TEST_FLOAT_TO_ASCII {
+    long double double_minus_1 = -1.0;
+    long double double_0 = 0;
+    long double double_1 = 1.0;
+    long double double_3141_59 = 3141.59;
+    
+    char result[FLOAT_TO_ASCII_NORMAL_BUF_LEN];
+    FFA_stackFrame stackFrame;
+
+    stackFrame.FFA_float.FFA_params.formatFlags =
+        FFAF_FROM_ADDR |
+        FFAF_USE_COMMAS |
+        FFAF_NO_TRAIL_ZEROS |
+        FFAF_HEADER_PRESENT;
+    stackFrame.FFA_float.FFA_params.decimalOffset = 0;
+    stackFrame.FFA_float.FFA_params.totalDigits = MAX_DIGITS_FOR_NORMAL_NUMBERS;
+    stackFrame.FFA_float.FFA_params.decimalLimit = 8;
+
+    strncpy( stackFrame.FFA_float.FFA_params.preNegative,  "-", 1 );
+    stackFrame.FFA_float.FFA_params.postNegative[0] = 0;
+    stackFrame.FFA_float.FFA_params.prePositive[0]  = 0;
+    stackFrame.FFA_float.FFA_params.postPositive[0] = 0;
+    stackFrame.FFA_float.FFA_params.header[0]       = 0;
+    stackFrame.FFA_float.FFA_params.trailer[0]      = 0;
+
+    clearText();
+    appendTopic("=== Starte FloatToAscii Test ===");
+
+    appendTextLine(" Convert -1.0 to String");
+    FloatFloatToAscii(&stackFrame, result, &double_minus_1);
+    appendStringErgebnis(result);
+
+    appendTextLine(" Convert 0.0 to String");
+    FloatFloatToAscii(&stackFrame, result, &double_0);
+    appendStringErgebnis(result);
+
+    appendTextLine(" Convert 1.0 to String");
+    FloatFloatToAscii(&stackFrame, result, &double_1);
+    appendStringErgebnis(result);
+
+    appendTextLine(" Convert 3141.59 to String");
+    FloatFloatToAscii(&stackFrame, result, &double_3141_59);
+    appendStringErgebnis(result);
+
+    appendTopic("=== Ende FloatToAscii Test ===");
+}
+
+@method MathtestProcessClass, MSG_RUN_TEST_FORMAT_NUMBER {
+    long double double_minus_1 = -1.0;
+    long double double_0 = 0;
+    long double double_1 = 1.0;
+    long double double_3141_59 = 3141.59;
+
+    char result[FLOAT_TO_ASCII_HUGE_BUF_LEN];
+
+    clearText();
+    appendTopic("=== Starte FormatNumber ===" );
+
+    appendTextLine("Format long double -1.0");
+    FloatFormatNumber( FORMAT_ID_FIXED_WITH_COMMAS, NullHandle, NullHandle, &double_minus_1, result);
+    appendStringErgebnis(result);
+
+    appendTextLine("Format long double 1.0");
+    FloatFormatNumber( FORMAT_ID_FIXED_WITH_COMMAS, NullHandle, NullHandle, &double_1, result);
+    appendStringErgebnis(result);
+
+    appendTextLine("Format long double 0.0");
+    FloatFormatNumber( FORMAT_ID_FIXED_WITH_COMMAS, NullHandle, NullHandle, &double_0, result);
+    appendStringErgebnis(result);
+
+    appendTextLine("Format long double 3141.59");
+    FloatFormatNumber( FORMAT_ID_FIXED_WITH_COMMAS, NullHandle, NullHandle, &double_3141_59, result);
+    appendStringErgebnis(result);
+    
+    appendTopic("=== Ende FormatNumber Test ===");
+}
+
+void clearText() {
+    @call TestText::MSG_VIS_TEXT_DELETE_ALL();
+}
+
+void appendText(char* textToAppend) {
+   @call TestText::MSG_VIS_TEXT_APPEND_PTR(textToAppend, 0);
+}
+
+void appendTextLine(char* textToAppend) {
+   appendText(textToAppend);
+   appendText("\n\r");
+}
+
+void appendResult(Boolean result) {
+    if( result )
+        appendText("  Expected result occurred.");
     else
-        @call MathTestResultGlyph_FormatNumber::MSG_GEN_REPLACE_VIS_MONIKER_TEXT( "function FloatFormatNumber nok!", VUM_DELAYED_VIA_UI_QUEUE);
+        appendText("  Expected result not occurred!");
+    appendNewLine();
+}
+
+void appendStringErgebnis(char *result) {
+    appendText("Result as String: ");
+    appendText(result);
+    appendText("\r\n"); 
+}
+
+void appendNewLine() {
+    appendText("\r\n"); 
+}
+
+void appendTopic(char* topic) {
+    appendNewLine();
+    appendTextLine(topic);
+    appendNewLine();
 }

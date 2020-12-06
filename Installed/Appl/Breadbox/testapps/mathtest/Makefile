@@ -6,8 +6,8 @@
 GEODE           = mathtest
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = math_test_function.c math_test_function.h mathtest.goc
-OBJS            = math_test_function.obj mathtest.obj
+SRCS            = mathtest.goc
+OBJS            = mathtest.obj
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk
