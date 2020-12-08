@@ -148,11 +148,31 @@ WCC_TEXT        SEGMENT BYTE PUBLIC 'CODE'
 	
 	ret
 	__I4D endp
-	
+
+
+; __CHP
+;
+; Sets fpu rouding toward zero (truncate) and rounds the top element of fpu stack.
+
 	__CHP proc far
-	WARNING WARNING_ANSIC_UNIMPLEMENTED
-	
+	uses ax, bp
+	.enter
+
+	mov bp, sp
+	push 0000h					;allocate 2byte on stack
+	fstcw -2[bp]				;store fpu control word
+	fwait
+	mov ax, -2[bp]				;store old fpu control word in ax
+	mov byte ptr -1[bp], 1fh	;set fpu control word with rounding toward zero
+	fldcw -2[bp]				;load new fpu control word
+	frndint						;round top element from fpu stack
+	mov -2[bp], ax				;restore old fpu control word
+	fstcw -2[bp]				;set old fpu control word
+	fwait
+	mov sp, bp					;restore stackpointer
+
+	.leave
 	ret
-	__CHP endp	
+	__CHP endp
 	
 WCC_TEXT        ENDS

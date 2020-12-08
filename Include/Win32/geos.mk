@@ -587,8 +587,9 @@ CCOM_MODEL	?= -ml
 # zu ->  SS != DGROUP (i.e., do not assume stack is in data segment)
 # -of -> always output stack frames (helps SWAT, may be necessary in general)
 # -of+ -> The above but more agressive
+# -fpi87 -> generate x87 instructions
 
-CCOMFLAGS       += -D__GEOS__ -D__WATCOM__ -w4 \
+CCOMFLAGS       += -D__GEOS__ -D__WATCOM__ -w4 -fpi87\
 		   -zu -of -of+ -ol -ol+ -s -ecc -zp1 -ei -zdp -d2 -hc\
 		   $(CCOM_MODEL)
 

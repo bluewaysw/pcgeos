@@ -29,7 +29,11 @@
 #define FP_MIN_STACK_ELEMENTS	5
 #define FP_MIN_STACK_SIZE   	(FP_MIN_STACK_ELEMENTS*FPSIZE)
 
+#ifdef __WATCOMC__
+#define	FP_NAN	    	    	0x7ff0
+#else
 #define	FP_NAN	    	    	0x7fff
+#endif
 
 #define MAX_DIGITS_FOR_NORMAL_NUMBERS		DECIMAL_PRECISION
 #define MAX_CHARS_FOR_COMMAS_IN_NORMAL_NUMBERS	(DECIMAL_PRECISION / 3 + 1)
@@ -119,8 +123,13 @@
  *	FloatExponent	record
  */
 typedef WordFlags FloatExponent;
+#ifdef __WATCOM__
+#define	FE_SIGN		0x0800		
+#define	FE_EXPONENT	0x07ff
+#else
 #define	FE_SIGN		0x8000		
 #define	FE_EXPONENT	0x7fff
+#endif /* __WATCOM__ */
 
 typedef struct {
 	word	F_mantissa_wd0;	
@@ -140,7 +149,11 @@ typedef struct {
 	word 	IEEE64F_word4;	
 } IEEE64FloatNum;
 
+#ifdef __WATCOM__
+#define FLOAT_EXPONENT(x) (((IEEE64FloatNum *)x)->IEEE64F_word4)
+#else
 #define FLOAT_EXPONENT(x) (((FloatNumStruct *)x)->F_exponent)
+#endif  /* __WATCOM__ */
 
 typedef double IEEE64Number;
 typedef long double FloatNumber;
@@ -431,30 +444,21 @@ extern void _pascal FloatInit(word stackSize, FloatStackType stackType);
 extern void _pascal FloatExit(void);
 
 
-/*****************************************************
-  	comparison routines
-******************************************************/
-extern word _pascal FloatComp(void);
-extern word _pascal FloatCompAndDrop(void);
-extern word _pascal FloatCompESDI(FloatNum *);
-extern word _pascal FloatEq0(void);
-extern word _pascal FloatLt0(void);
-extern word _pascal FloatGt0(void);
+/*****************************************************************************
+ 	    OpenWatcom does not (currently) support 80bit long doubles. These 
+        functions are required to use the OpenWatcom compiler with the SDK. 
+*****************************************************************************/
+extern word _pascal FloatPushGeos80Number(FloatNum *number);
+extern word _pascal FloatPopGeos80Number(FloatNum *number);
+extern sword _pascal FloatCompGeos80ESDI(FloatNum *number);
 
-
-/****************************************************
-  	    stack manipulation routines
-*****************************************************/
-extern word _pascal FloatPushNumber(FloatNum *number);
-extern word _pascal FloatPopNumber(FloatNum *number);
-extern void _pascal FloatRoll(word num);
-extern void _pascal FloatRollDown(word num);
-extern void _pascal FloatPick(word num);
-extern void _pascal FloatSwap(void);
-extern void _pascal FloatOver(void);
-extern void _pascal FloatSetStackPointer(word newValue);
-extern int _pascal FloatGetStackPointer(void);
-
+extern Boolean _pascal FloatAsciiToGeos80(word floatAtoFflags, word stringLength, 
+			            void *string, void *resultLocation);
+extern word _pascal FloatGeos80ToAscii(FFA_stackFrame *stackFrame, char *resultString, FloatNum *number);
+extern word _pascal FloatGeos80ToAscii_StdFormat(char *string, FloatNum *number,
+				        FloatFloatToAsciiFormatFlags format, word numDigits, word numFractionalDigits);
+extern void _pascal FloatFormatGeos80Number(FormatIdType formatToken, word userDefBlkHan, 
+                        word userDefFileHan, FloatNum *floatNum, char *resultLocation);
 
 /***************************************************************
   conversion routines to and from different formats of numbers
@@ -476,6 +480,33 @@ extern void _pascal FloatWordToFloat(word num);
 extern long _pascal FloatFloatToDword(void);
 
 
+/****************************************************
+  	    stack manipulation routines
+*****************************************************/
+#ifdef __WATCOM__
+inline word FloatPushNumber(FloatNum *number) {
+    FloatIEEE64ToGeos80((double *) number); return 0;
+}
+inline word FloatPopNumber(FloatNum *number) {
+    FloatGeos80ToIEEE64((double *) number); return 0;
+}
+#else
+inline word FloatPushNumber(FloatNum *number) {
+    return FloatPushGeos80Number(number);
+}
+inline word FloatPopNumber(FloatNum *number) {
+    return FloatPopGeos80Number(number);
+}
+#endif /* __WATCOM__ */
+extern void _pascal FloatRoll(word num);
+extern void _pascal FloatRollDown(word num);
+extern void _pascal FloatPick(word num);
+extern void _pascal FloatSwap(void);
+extern void _pascal FloatOver(void);
+extern void _pascal FloatSetStackPointer(word newValue);
+extern int _pascal FloatGetStackPointer(void);
+
+
 /******************************************************
   	    useful constants
 *******************************************************/
@@ -492,6 +523,7 @@ extern void _pascal Float16384(void);
 extern void _pascal Float86400(void);
 extern void _pascal FloatPi(void);
 extern void _pascal FloatPiDiv2(void);
+
 
 /********************************************************
   	    miscellaneous math routines
@@ -553,13 +585,48 @@ extern void _pascal FloatTrunc(void);
 extern void _pascal FloatEpsilon (void);
 
 
+/*****************************************************
+  	comparison routines
+******************************************************/
+extern sword _pascal FloatComp(void);
+extern sword _pascal FloatCompAndDrop(void);
+#ifdef __WATCOM__
+inline sword FloatCompESDI(FloatNum* number) {
+    FloatNumStruct _geos80FloatNum;
+    FloatPushNumber(number);
+    FloatPopGeos80Number((FloatNum *) &_geos80FloatNum);
+    return FloatCompGeos80ESDI((FloatNum *) &_geos80FloatNum);
+}
+#else
+inline sword FloatCompESDI(FloatNum* number) {
+    return FloatCompGeos80ESDI(number);
+}
+#endif  /* __WATCOM__ */
+extern word _pascal FloatEq0(void);
+extern word _pascal FloatLt0(void);
+extern word _pascal FloatGt0(void);
+
 
 /********************************************************
   	    number string routines
 *********************************************************/
-extern Boolean 	/* XXX */
-    _pascal FloatAsciiToFloat(word floatAtoFflags, word stringLength, 
-				void *string, void *resultLocation);
+#ifdef __WATCOM__
+inline Boolean FloatAsciiToFloat(word floatAtoFflags, word stringLength, 
+				void *string, void *resultLocation) {
+    FloatNumStruct _geos80FloatNum; Boolean _result;
+    if(resultLocation == NULL)
+        return FloatAsciiToGeos80(floatAtoFflags, stringLength, string, resultLocation);
+    _result = FloatAsciiToGeos80(floatAtoFflags, stringLength, string, &_geos80FloatNum);
+    FloatPushGeos80Number((FloatNum *) &_geos80FloatNum);
+    FloatPopNumber((FloatNum *) resultLocation);
+    return _result;
+}
+#else
+inline Boolean FloatAsciiToFloat(word floatAtoFflags, word stringLength, 
+				void *string, void *resultLocation) {
+    return FloatAsciiToGeos80(floatAtoFflags, stringLength, string, resultLocation);
+}
+#endif  /* __WATCOM__ */
 
 
 /******************************************************************************
@@ -583,18 +650,42 @@ extern Boolean 	/* XXX */
 ;	are "huge" otherwise.
 ;
 ;*****************************************************************************/
-extern word /* XXX */
-    _pascal FloatFloatToAscii_StdFormat(char *string, FloatNum *number,
-				FloatFloatToAsciiFormatFlags format,
-				word numDigits, word numFractionalDigits);
-extern word /* XXX */
-    _pascal FloatFloatToAscii(FFA_stackFrame *stackFrame, char *resultString, 
-				FloatNum *number);
+#ifdef __WATCOM__
+inline word FloatFloatToAscii(FFA_stackFrame *stackFrame, char *resultString, FloatNum *number) {
+    FloatNumStruct _geos80Number;
+    if(number == NULL)
+        return FloatGeos80ToAscii(stackFrame, resultString, number);
+    FloatPushNumber(number);
+    FloatPopGeos80Number((FloatNum *) &_geos80Number);
+    return FloatGeos80ToAscii(stackFrame, resultString, (FloatNum *) &_geos80Number);
+}
+#else
+inline word FloatFloatToAscii(FFA_stackFrame *stackFrame, char *resultString, FloatNum *number) {
+    return FloatGeos80ToAscii(stackFrame, resultString, number);
+}
+#endif  /* __WATCOM__ */
 
 extern word /* XXX */
     _pascal FloatFloatIEEE64ToAscii_StdFormat(char *string, IEEE64FloatNum number,
 				FloatFloatToAsciiFormatFlags format,
 				word numDigits, word numFractionalDigits);
+
+#ifdef __WATCOM__
+inline word FloatFloatToAscii_StdFormat(char *string, FloatNum *number,
+				FloatFloatToAsciiFormatFlags format, word numDigits, word numFractionalDigits) {
+    FloatNumStruct _geos80Number;
+    if(number == NULL)
+        return FloatGeos80ToAscii_StdFormat(string, number, format, numDigits, numFractionalDigits);
+    FloatPushNumber(number);
+    FloatPopGeos80Number((FloatNum *) &_geos80Number);
+    return FloatGeos80ToAscii_StdFormat(string, (FloatNum *) &_geos80Number, format, numDigits, numFractionalDigits);
+}
+#else
+inline word FloatFloatToAscii_StdFormat(char *string, FloatNum *number,
+				FloatFloatToAsciiFormatFlags format, word numDigits, word numFractionalDigits) {
+    return FloatGeos80ToAscii_StdFormat(string, number, format, numDigits, numFractionalDigits);               
+}
+#endif  /* __WATCOM__ */
 
 extern void _pascal FloatTimeNumberGetSeconds(void);
 extern word	/*XXX*/
@@ -612,29 +703,37 @@ extern word _pascal FloatDateNumberGetYear(void);
 extern void _pascal FloatDateNumberGetMonthAndDay(byte *month, byte *day);
 extern word _pascal FloatGetNumDigitsInIntegerPart(void);
 
-extern void _pascal FloatFormatNumber(FormatIdType formatToken,
-				      word userDefBlkHan,
-				      word userDefFileHan,
-				      FloatNum *floatNum,
-				      char *resultLocation);
-
+#ifdef __WATCOM__
+inline void FloatFormatNumber(FormatIdType formatToken, word userDefBlkHan, word userDefFileHan,
+				      FloatNum *floatNum, char *resultLocation) {
+    FloatNumStruct _geos80Number;
+    FloatPushNumber(floatNum);
+    FloatPopGeos80Number((FloatNum *) &_geos80Number);
+    FloatFormatGeos80Number(formatToken, userDefBlkHan, userDefFileHan, (FloatNum *) &_geos80Number, resultLocation);
+}
+#else
+inline void FloatFormatNumber(FormatIdType formatToken, word userDefBlkHan, word userDefFileHan,
+				      FloatNum *floatNum, char *resultLocation) {
+    FloatFormatGeos80Number(formatToken, userDefBlkHan, userDefFileHan, floatNum, resultLocation);
+}
+#endif  /* __WATCOM__ */
 
 #ifdef __HIGHC__
 pragma Alias(Float0, "FLOAT0");
 pragma Alias(Float1, "FLOAT1");
-pragma Alias(FloatAsciiToFloat, "FLOATASCIITOFLOAT");
+pragma Alias(FloatAsciiToGeos80, "FLOATASCIITOGEOS80");
 pragma Alias(FloatComp, "FLOATCOMP");
 pragma Alias(FloatCompAndDrop, "FLOATCOMPANDDROP");
-pragma Alias(FloatCompESDI, "FLOATCOMPESDI");
+pragma Alias(FloatCompGeos80ESDI, "FLOATCOMPGEOS80ESDI");
 pragma Alias(FloatEq0, "FLOATEQ0");
 pragma Alias(FloatExit, "FLOATEXIT");
 pragma Alias(FloatFloatIEEE64ToAscii_StdFormat,
 	     "FLOATFLOATIEEE64TOASCII_STDFORMAT");
-pragma Alias(FloatFloatToAscii, "FLOATFLOATTOASCII");
-pragma Alias(FloatFloatToAscii_StdFormat, "FLOATFLOATTOASCII_STDFORMAT");
+pragma Alias(FloatGeos80ToAscii, "FLOATGEOS80TOASCII");
+pragma Alias(FloatGeos80ToAscii_StdFormat, "FLOATGEOS80TOASCII_STDFORMAT");
 pragma Alias(FloatInit, "FLOATINIT");
-pragma Alias(FloatPopNumber, "FLOATPOPNUMBER");
-pragma Alias(FloatPushNumber, "FLOATPUSHNUMBER");
+pragma Alias(FloatPopGeos80Number, "FLOATPOPGEOS80NUMBER");
+pragma Alias(FloatPushGeos80Number, "FLOATPUSHGEOS80NUMBER");
 pragma Alias(FloatRound, "FLOATROUND");
 pragma Alias(FloatStringGetDateNumber, "FLOATSTRINGGETDATENUMBER");
 pragma Alias(FloatStringGetTimeNumber, "FLOATSTRINGGETTIMENUMBER");
@@ -732,7 +831,7 @@ pragma Alias(FloatRandomN, "FLOATRANDOMN");
 /******************
 pragma Alias(FloatGenerateFormatStr, "FLOATGENERATEFORMATSTR");
 ******************/
-pragma Alias(FloatFormatNumber, "FLOATFORMATNUMBER");
+pragma Alias(FloatFormatGeos80Number, "FLOATFORMATGEOS80NUMBER");
 
 #undef abs
 #undef labs
