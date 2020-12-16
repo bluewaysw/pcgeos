@@ -47,7 +47,7 @@ SSL_METHOD* _pascal SSLv23_client_method(void);
 /*
  * SSL context.  There only needs to be one per client.
  */
-SSL_CTX* _pascal SSL_CTX_new(SSL_METHOD *meth);
+SSL_CTX* _pascal _export SSL_CTX_new(SSL_METHOD *meth);
 void _pascal SSL_CTX_free(SSL_CTX *);
 
 /*

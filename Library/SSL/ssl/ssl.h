@@ -745,7 +745,7 @@ void BIO_ssl_shutdown(BIO *ssl_bio);
 #endif
 
 int	SSL_CTX_set_cipher_list(SSL_CTX *,char *str);
-SSL_CTX* _pascal SSL_CTX_new(SSL_METHOD *meth);
+SSL_CTX* _pascal _export SSL_CTX_new(SSL_METHOD *meth);
 void	_pascal SSL_CTX_free(SSL_CTX *);
 void	SSL_clear(SSL *s);
 void	SSL_CTX_flush_sessions(SSL_CTX *ctx,long tm);
@@ -870,7 +870,7 @@ SSL_METHOD* _pascal SSLv3_client_method();	/* SSLv3 */
 
 SSL_METHOD *SSLv23_method(void);	/* SSLv3 but can rollback to v2 */
 SSL_METHOD *SSLv23_server_method(void);	/* SSLv3 but can rollback to v2 */
-SSL_METHOD* _pascal SSLv23_client_method(void);	/* SSLv3 but can rollback to v2 */
+SSL_METHOD* _pascal _export SSLv23_client_method(void);	/* SSLv3 but can rollback to v2 */
 
 SSL_METHOD *TLSv1_method(void);		/* TLSv1.0 */
 SSL_METHOD *TLSv1_server_method(void);	/* TLSv1.0 */
@@ -901,7 +901,7 @@ void SSL_set_accept_state(SSL *s);
 
 long SSL_get_default_timeout(SSL *s);
 
-void _pascal SSLeay_add_ssl_algorithms(void );
+void _pascal _export SSLeay_add_ssl_algorithms(void );
 
 char *SSL_CIPHER_description(SSL_CIPHER *,char *buf,int size);
 STACK *SSL_dup_CA_list(STACK *sk);
@@ -1077,7 +1077,7 @@ SSL_METHOD* _pascal SSLv3_client_method();
 
 SSL_METHOD *SSLv23_method();
 SSL_METHOD *SSLv23_server_method();
-SSL_METHOD* _pascal SSLv23_client_method();
+SSL_METHOD* _pascal _export SSLv23_client_method();
 
 SSL_METHOD *TLSv1_method();
 SSL_METHOD *TLSv1_server_method();
@@ -1108,7 +1108,7 @@ void SSL_set_accept_state();
 
 long SSL_get_default_timeout();
 
-void _pascal SSLeay_add_ssl_algorithms();
+void _pascal _export SSLeay_add_ssl_algorithms();
 
 char *SSL_CIPHER_description();
 STACK *SSL_dup_CA_list();

@@ -125,6 +125,8 @@ pragma On(Long_enums);          /* to be compatible with MSC */
 #define _pascal __pascal
 #define _cdecl __cdecl
 
+#define _export __export __loadds
+
 #define _inline_byte(val)  inline_doesn_exist_yet_for_watcom
 #define _inline_word(val)  inline_doesn_exist_yet_for_watcom
 

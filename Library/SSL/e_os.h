@@ -390,7 +390,7 @@ extern HINSTANCE _hInstance;
 #ifndef PUSHDS
 void _PUSHDS();
 #pragma aux _PUSHDS = "push ds";
-#define PUSHDS  _PUSHDS();
+#define PUSHDS  _PUSHDS(); ;GeodeLoadDGroup(GeodeGetCodeProcessHandle());
 #endif
 
 #ifndef PUSHES
