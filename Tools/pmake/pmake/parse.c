@@ -1382,7 +1382,7 @@ Parse_DoVar (char* line0, GNode *ctxt)
 	free(cp);
     } else if (type == VAR_SHELL) {
 
-#if definded(unix) || defined(_LINUX)
+#if defined(unix) || defined(_LINUX)
 	char	result[BUFSIZ];	/* Result of command */
 	char	*args[4];   	/* Args for invoking the shell */
 	Boolean	freeCmd;    	/* TRUE if the command needs to be freed, i.e.
