@@ -3,20 +3,20 @@ This repository is the offical place to hold all the source codes around the PC/
 interface and its sophisticated applications. It is the source to build SDK and release version of PC/GEOS.
 It is the place to collaborate on further developments.
 
-The basement of this repository is the source code used to build Breadbox Ensemble 4.13 reduced by some modules identified as critical in regard to the license choosen for the repository.
+The base of this repository is the source code used to build Breadbox Ensemble 4.13 reduced by some modules identified as critical in regard to the license choosen for the repository.
 
 # How to build?
 
 ## Prerequisites
-The SDK requires "sed" (https://en.wikipedia.org/wiki/Sed) and "perl" (https://en.wikipedia.org/wiki/Perl) to be installed. Both are pre-installed in most Linux-distributions. Windows-users should install "sed" by installing Cygwin (https://www.cygwin.com/) and should use the perl-variant "Strawberry Perl" (http://strawberryperl.com/).
+The SDK requires "sed" (https://en.wikipedia.org/wiki/Sed) and "perl" (https://en.wikipedia.org/wiki/Perl) to be installed. Both are pre-installed in most Linux-distributions. Windows-users should install "sed" by installing Cygwin (https://www.cygwin.com/) or by adding the usr/bin of the official git distribution (https://git-scm.com) to the path, and should use the perl-variant "Strawberry Perl" (http://strawberryperl.com/).
 
 ## Install WATCOM
-- Unzip WATCOM tools from the latest [release-tar-gz](https://github.com/open-watcom/open-watcom-v2/releases/download/Current-build/ow-snapshot.tar.gz) for instance to C:\WATCOM-V2
+- Unzip WATCOM tools from the latest [release-tar-gz](https://github.com/open-watcom/open-watcom-v2/releases/download/2020-12-01-Build/ow-snapshot.tar.gz) for instance to C:\WATCOM-V2
 - add C:\WATCOM-V2\binnt to your system path variable
 - add pcgeos\bin of the checkout of this repo to path variable
 - add sed and perl to path variable
 - add WATCOM env variable: WATCOM=c:\WATCOM-V2
-- set ROOT_DIR=
+- set ROOT_DIR= to the root of the checkout
 - set LOCAL_ROOT if needed
 
 Document is work in progress.... stay tuned!
@@ -46,5 +46,13 @@ Build the target environment:
     - n (for the VM files)
     - and then you'll have to enter the path to a "gbuild"-folder in your LOCAL_ROOT-folder.
   - BTW: It's expected that the current version of the perl-script creates several "Could not find file _name_ in any of the source trees."-messages.
+
+Launch the target environment in dosbox:
+- make sure dosbox is added to your path variable
+- cd pcgeos
+- bin/target
+  - the "swat" debugger stops immediately after the first stage of the boot process
+  - enter "q" at the "=>" prompt to detach the debugger and launch PC/GEOS stand-alone
+    - or: enter "c" to launch with the debugger running in the background (slower)
 
 We are on https://bluewaysw.slack.com/ for more efficient collaboration. If you are a collaborator by issuing a pull request and you are registered at blog.bluewaysw.de for MyGEOS you will be invited to join us. Welcome!
