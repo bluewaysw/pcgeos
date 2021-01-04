@@ -77,7 +77,7 @@
 #ifndef NOPROTO
 int sn_cmp(ASN1_OBJECT **a, ASN1_OBJECT **b);
 int ln_cmp(ASN1_OBJECT **a, ASN1_OBJECT **b);
-int obj_cmp(ASN1_OBJECT **a, ASN1_OBJECT **b);
+int obj_cmp2(ASN1_OBJECT **a, ASN1_OBJECT **b);
 #else
 int sn_cmp();
 int ln_cmp();
@@ -529,7 +529,7 @@ char *s;
 #pragma code_seg(FixedCallbacks)
 #endif
 
-int obj_cmp(ap, bp)
+int obj_cmp2(ap, bp)
 ASN1_OBJECT **ap;
 ASN1_OBJECT **bp;
 	{
