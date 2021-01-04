@@ -874,7 +874,7 @@ SSL_METHOD* _pascal _export SSLv23_client_method(void);	/* SSLv3 but can rollbac
 
 SSL_METHOD *TLSv1_method(void);		/* TLSv1.0 */
 SSL_METHOD *TLSv1_server_method(void);	/* TLSv1.0 */
-SSL_METHOD *TLSv1_client_method(void);	/* TLSv1.0 */
+SSL_METHOD _export _pascal *TLSv1_client_method(void);	/* TLSv1.0 */
 
 STACK *SSL_get_ciphers(SSL *s);
 
@@ -1081,7 +1081,7 @@ SSL_METHOD* _pascal _export SSLv23_client_method();
 
 SSL_METHOD *TLSv1_method();
 SSL_METHOD *TLSv1_server_method();
-SSL_METHOD *TLSv1_client_method();
+SSL_METHOD _export _pascal *TLSv1_client_method();
 
 STACK *SSL_get_ciphers();
 
