@@ -81,7 +81,7 @@ int obj_cmp2(ASN1_OBJECT **a, ASN1_OBJECT **b);
 #else
 int sn_cmp();
 int ln_cmp();
-int obj_cmp();
+int obj_cmp2();
 #endif
 
 #define ADDED_DATA	0
@@ -437,7 +437,7 @@ ASN1_OBJECT *a;
 		if (adp != NULL) {POPDS;return (adp->obj->nid);}
 		}
 	op=(ASN1_OBJECT **)OBJ_bsearch((char *)&a,(char *)obj_objs,NUM_OBJ,
-		sizeof(ASN1_OBJECT *),(int (*)())obj_cmp);
+		sizeof(ASN1_OBJECT *),(int (*)())obj_cmp2);
 	if (op == NULL)
 		{POPDS;return(NID_undef);}
 	POPDS;
