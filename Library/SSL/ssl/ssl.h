@@ -868,7 +868,7 @@ SSL_METHOD *SSLv3_method(void);		/* SSLv3 */
 SSL_METHOD *SSLv3_server_method(void);	/* SSLv3 */
 SSL_METHOD* _pascal SSLv3_client_method();	/* SSLv3 */
 
-SSL_METHOD *SSLv23_method(void);	/* SSLv3 but can rollback to v2 */
+SSL_METHOD  _export _pascal *SSLv23_method(void);	/* SSLv3 but can rollback to v2 */
 SSL_METHOD *SSLv23_server_method(void);	/* SSLv3 but can rollback to v2 */
 SSL_METHOD* _pascal _export SSLv23_client_method(void);	/* SSLv3 but can rollback to v2 */
 
@@ -1075,7 +1075,7 @@ SSL_METHOD *SSLv3_method();
 SSL_METHOD *SSLv3_server_method();
 SSL_METHOD* _pascal SSLv3_client_method();
 
-SSL_METHOD *SSLv23_method();
+SSL_METHOD  _export _pascal *SSLv23_method();
 SSL_METHOD *SSLv23_server_method();
 SSL_METHOD* _pascal _export SSLv23_client_method();
 
