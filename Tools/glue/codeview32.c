@@ -987,9 +987,9 @@ CV32ProcessStructure(const char  	    *file,
     ID	    	    ssymName;
     byte    	    symFlags;
 
-	word			prop;
-	word			dlist;
-	word			shape;
+    word	    prop;
+    word	    dlist;
+    word	    shape;
 
     dataBase = bp = *bpPtr;
 
@@ -1040,6 +1040,12 @@ CV32ProcessStructure(const char  	    *file,
 //	(bp[1] != 0))
     if(bp[0] != 0)
     {
+	char	*tname;
+	char 	*name;
+	char	*prefix;
+        ID	typeName;
+	int	namelen;
+	    
 	/*
 	 * The structure actually has a real name that's not the fake string
 	 * uSoft C 6.0 puts in for untagged structures, and it's not the
@@ -1048,6 +1054,19 @@ CV32ProcessStructure(const char  	    *file,
 	 */
 	ssymName = CV32GetString(&bp);
 	symFlags = 0;
+	
+	tname = ST_Lock(symbols, ssymName);
+	prefix = "struct ";
+        namelen = strlen(prefix) + strlen(tname);
+        name = (char *)malloc(namelen + 1);
+        sprintf(name, "%s%s", prefix, (char *)tname);
+         
+        typeName = ST_Enter(symbols, strings, name, namelen);
+        symFlags = 0;  	/* Not nameless */
+	ST_Unlock(symbols, ssymName);
+        ssymName = typeName;
+        free(name);
+        	
     } else {
 	ssymName = MSObj_MakeString();
 	symFlags = OSYM_NAMELESS;
@@ -1154,7 +1173,7 @@ CV32ProcessStructure(const char  	    *file,
      * A STRUCT for now. If we find non-bitfield fields whose offsets are
      * the same, or bitfield fields whose bit offsets are the same, we'll
      * switch it to be a union...
-     */
+     */     
     os = CV32AllocSym(tsymBlock, &ssymOff);
     ssymType = OSYM_STRUCT;
     os->flags = symFlags;
@@ -1445,16 +1464,15 @@ CV32ProcessScalar(const char    	*file,  	/* Object file from which
     ID	    	    name;   	    /* Name for the scalar */
     byte    	    *bp = *bpPtr;   /* Current position in the record */
     word    	    retval; 	    /* Value we're going to return */
-	word			enumTypeIndex;
-	word			fieldTypeIndex;
+    word			enumTypeIndex;
+    word			fieldTypeIndex;
 
     /*
      * Fetch the size of the scalar (bits)
      */
     MSObj_GetWord(size, bp);
-
-	MSObj_GetWord(enumTypeIndex, bp);
-	/*
+    MSObj_GetWord(enumTypeIndex, bp);
+    /*
      * We only allow scalars based on signed and unsigned integers around here.
      * Set retval to the appropriate special base type according to whether the
      * thing is signed or unsigned, in case there are no members specified.
@@ -1482,7 +1500,29 @@ error:
      */
     name = NullID;
     if ((bp - *bpPtr) < len) {
+	    
 	name = CV32GetString(&bp);
+	
+	if(name != NullID) {
+		
+	    char	*tname;
+	    char	*prefix;
+	    int		namelen;
+	    ID		typeName;
+	    char	*newName;
+
+	    tname = ST_Lock(symbols, name);
+	    prefix = "enum ";
+            namelen = strlen(prefix) + strlen(tname);
+            newName = (char *)malloc(namelen + 1);
+            sprintf(newName, "%s%s", prefix, (char *)tname);
+         
+            typeName = ST_Enter(symbols, strings, newName, namelen);
+	    ST_Unlock(symbols, name);
+	
+            name = typeName;
+            free(newName);
+    	}
     }
 
     if (fieldTypeIndex) {
@@ -3025,20 +3065,26 @@ CV32ProcessSymbols(const char	*file)	/* Object file name (for errors) */
 			&real, (ID *)NULL) && real)
 		{
 			os->flags |= OSYM_GLOBAL;
-			/*
-			 * Do not enter alias for variables to avoid
-			 * conflicts between ChunkHandle and chunk in LMem
-			 */
-#if 0
-			if (alias != name) {
-				Sym_Enter(symbols, sd->syms, alias, tsymBlock, symOff);
+
+			if ((sd->combine == SEG_LMEM) &&
+				(MSObj_GetLMemSegOrder(sd) == 1))
+			{
+				os->type = OSYM_VAR;
+				os->u.variable.type = OTYPE_MAKE_VOID_PTR(OTYPE_PTR_NEAR);
+				os->u.label.near = TRUE;
 			}
+			else 
+			{
+				/*
+			 	 * Do not enter alias for variables to avoid
+			 	* conflicts between ChunkHandle and chunk in LMem
+			 	*/
+#if 0
+				if (alias != name) {
+					Sym_Enter(symbols, sd->syms, alias, tsymBlock, symOff);
+				}
 #endif
-		}
-		else if ((sd->combine == SEG_LMEM) &&
-			(MSObj_GetLMemSegOrder(sd) == 1))
-		{
-			os->flags |= OSYM_GLOBAL;
+			}
 		}
 		/*
 		* If the segment's name is _CLASSSEG_<whatever>, we'll do
@@ -3227,7 +3273,11 @@ CV32ProcessSymbols(const char	*file)	/* Object file name (for errors) */
 						scopeStack[scopeTop - 1]);
 				}
 #endif
-			}
+			} else if ((sd->combine == SEG_LMEM) &&
+				   (MSObj_GetLMemSegOrder(sd) == 1))
+			{
+			    os->flags |= OSYM_GLOBAL;
+			}		
 		} else {
 			if (CV32LocatePublic(name, (SegDesc **)NULL, (word *)NULL,
 				&real, (ID *)NULL) && real) {
