@@ -132,6 +132,8 @@ reg char	*type; {
 	if (IC && EI==NULL) EI="";
 	if (!GT) BT=NULL;	/* If we can't tab, we can't backtab either */
 
+	if (unknown)
+		return ERR;
 	if (tgoto(CM, destcol, destline)[0] == 'O')
 		CA = FALSE, CM = 0;
 	else
@@ -140,8 +142,6 @@ reg char	*type; {
 	PC = _PC ? _PC[0] : FALSE;
 	strncpy(ttytype, longname(genbuf, type), TTYTYPESIZ - 1);
 	ttytype[TTYTYPESIZ - 1] = '\0';
-	if (unknown)
-		return ERR;
 	return OK;
 }
 

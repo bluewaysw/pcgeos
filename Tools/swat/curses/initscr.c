@@ -39,7 +39,9 @@ initscr() {
 		gettmode();
 		if ((sp = getenv("TERM")) == NULL)
 			sp = Def_term;
-		setterm(sp);
+		if(!setterm(sp)){
+			printf("Warning: Terminal type ENV=%s unknown, not found in pcgeos/bin/termcap file. Using pure shell instead.\n", sp);
+		}
 # ifdef DEBUG
 		fprintf(outf, "INITSCR: term = %s\n", sp);
 # endif
