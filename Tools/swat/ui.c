@@ -935,7 +935,6 @@ Ui_Init(int 	*argcPtr,
     if( rdp ) {
 	char *outstring = (char *) malloc(strlen (rdp) + 30);
         sprintf(outstring, "TERMCAP=%s/bin/termcap", rdp);
-	printf(outstring); fflush(stdout);
         putenv(outstring);
     }
 #endif
