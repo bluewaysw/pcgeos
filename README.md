@@ -52,7 +52,7 @@ Launch the target environment in dosbox:
 - cd pcgeos
 - bin/target
   - the "swat" debugger stops immediately after the first stage of the boot process
-  - enter "q" at the "=>" prompt to detach the debugger and launch PC/GEOS stand-alone
+  - enter "quit" at the "=>" prompt to detach the debugger and launch PC/GEOS stand-alone
     - or: enter "c" to launch with the debugger running in the background (slower)
 
 We are on https://bluewaysw.slack.com/ for more efficient collaboration. If you are a collaborator by issuing a pull request and you are registered at blog.bluewaysw.de for MyGEOS you will be invited to join us. Welcome!
