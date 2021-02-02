@@ -92,7 +92,7 @@ minimalLibrary	: kernel swap sound net ui isui motif spool text mailbox \
 		  wav game cards spreadsheet parse spell convert \
 		  saver prefLibs accpnt netutils \
 		  socket dhcp borlandrtl ffile streamc mailhub mailsmtp \
-		  mailpop3 lot123ss csv \
+		  modemc mailpop3 lot123ss csv \
 		  parentc wmlib rtf \
 		  jpeg giflib gif htmlimpx n2txt inetmsg extui \
 		  winword8 zlib dirlist minizip idialc eps impex_libs \
@@ -397,6 +397,9 @@ Installed/Library/FlatFile:	cell ui spreadsheet parse ansic math \
 
 streamc : Installed/Library/StreamC
 Installed/Library/StreamC:	ui MAKELIB
+
+modemc : Installed/Library/ModemC
+Installed/Library/ModemC:	kernel MAKELIB
 
 mailhub : Installed/Library/Mail/MailHub
 Installed/Library/Mail/MailHub:	kernel socket ansic MAKELIB
