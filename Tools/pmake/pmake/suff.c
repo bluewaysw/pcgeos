@@ -2015,9 +2015,16 @@ sfnd_abort:
 	     */
 	    while (bottom && bottom->parent != NULL) {
 		Src *p = bottom->parent;
-
+		p->parent = NULL;
 		SuffFreeSrc(bottom);
-		bottom = p;
+
+		p->children--;
+		if(p->children == 0) {
+		    bottom = p;
+		}
+		else {
+		    bottom = 0;
+		}
 	    }
 	    bottom = src;
 	}
