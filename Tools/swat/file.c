@@ -3092,12 +3092,19 @@ read_config:
 	    strcpy(fileBranch, argBranch);
 	}
     } else {
-	/* XXX: warn if argBranch being ignored */
-	fprintf(stderr, "Current directory (%s) is not under GEOS tree %s\n",
-		cwd, fileRoot);
-	sleep(3);
+	fileDevel = getenv("LOCAL_ROOT");
+        if (fileDevel == NULL) {
+    	    fileDevel = fileRoot;
+	    fprintf(stderr, "Current directory (%s) is not under GEOS tree %s\n",
+			cwd, fileRoot);
+	}
+	else {
+		fprintf(stderr, "Current directory (%s) is not under GEOS tree %s, using LOCAL_ROOT=%s\n",
+        		cwd, fileDevel);
+		
+	}
 
-	fileDevel = (char *)NULL;
+
     }
 # else
 
