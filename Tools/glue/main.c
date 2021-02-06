@@ -58,6 +58,8 @@ static char *rcsid =
 
 #if defined _WIN32
 unsigned long __stdcall GetTickCount(void);
+#else
+#include <time.h>
 #endif /* defined _WIN32 */
 
 /*
@@ -2169,7 +2171,16 @@ main(argc, argv)
 #if defined _WIN32
     serialNumber = (word) (GetTickCount() / 100);
 #else
-    serialNumber = time(0);
+    {
+	struct timespec ts;
+	if(clock_gettime(CLOCK_MONOTONIC, &ts) != 0) {
+	    serialNumber = time(0);
+        }
+	else {
+	    serialNumber = 
+		    (ts.tv_nsec/10000 + ts.tv_sec*1000);
+	}
+    }
 #endif /* defined _WIN32 */
 
     /*
