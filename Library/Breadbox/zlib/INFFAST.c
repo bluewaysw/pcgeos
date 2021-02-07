@@ -18,7 +18,7 @@ struct inflate_codes_state {int dummy;}; /* for buggy compilers */
 
 /* macros for bit input with no checking and for returning unused bytes */
 #define GRABBITS(j) {while(k<(j)){b|=((uLong)NEXTBYTE)<<k;k+=8;}}
-#define UNGRAB {c=z->avail_in-n;c=(k>>3)<c?k>>3:c;n+=c;p-=c;k-=c<<3;}
+#define UNGRAB {c=z->avail_in-n;c=((k>>3)<c)?k>>3:c;n+=c;p-=c;k-=c<<3;}
 
 /* Called with number of bytes left to write in window at least 258
    (the maximum string length) and number of input bytes available
