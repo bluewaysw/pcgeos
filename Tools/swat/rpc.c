@@ -526,6 +526,7 @@ RpcSendV(int    	fd,
     int             bytesWritten;
 #endif
 #if 1
+    /* netware communication mode always use unencoded messages */
     if (commMode == CM_NETWARE) {
 	return (NetWare_WriteV(fd, iov, iov_len));
     }
@@ -1484,6 +1485,7 @@ RpcHandleStream(int	    stream, /* Stream that's ready */
      */
     switch(commMode) {
     /*case CM_NETWARE:*/
+    case CM_SERIAL_TCP:
     case CM_SERIAL:
     {
 
@@ -2237,7 +2239,7 @@ RpcWait(int poll)
 	 * check for either case
 	 */
 	if (FD_ISSET(geosFD, &rpc_readMask)
-	    && ( ((commMode == CM_NETWARE) && Ipx_CheckPacket()))) {
+	    && ( (((commMode == CM_NETWARE) || (commMode == CM_SERIAL_TCP)) && Ipx_CheckPacket()))) {
 	    nstreams += 1;
 	    FD_SET(geosFD, &readMask);
 	}
@@ -2272,7 +2274,7 @@ RpcWait(int poll)
 	 * check for either case
 	 */
 	if (FD_ISSET(geosFD, &rpc_readMask)
-	    && ( ((commMode == CM_NETWARE) && Ipx_CheckPacket()) ||
+	&& ( (((commMode == CM_NETWARE) || (commMode == CM_SERIAL_TCP)) && Ipx_CheckPacket()))) {
 		 ((commMode == CM_SERIAL) && Serial_Check(hCommunication)))) {
 	    nstreams += 1;
 	    FD_SET(geosFD, &readMask);
@@ -2329,7 +2331,7 @@ RpcWait(int poll)
 	 * check for either case
 	 */
 	if (FD_ISSET(geosFD, &rpc_readMask)
-	    && ( ((commMode == CM_NETWARE) && Ipx_CheckPacket()))) {
+	    && ( (((commMode == CM_NETWARE) || (commMode == CM_SERIAL_TCP))  && Ipx_CheckPacket()))) {
 	    nstreams += 1;
 	    FD_SET(geosFD, &readMask);
 	}
@@ -4741,7 +4743,7 @@ Rpc_Init(int		*argcPtr,
 		exit(1);
 	    }
 	    *argcPtr -= 2;
-	    geosFD = NetWare_Init(*av);
+	    geosFD = NetWare_Init(*av, FALSE);
 	    if (geosFD >= 0) {
 		commMode = CM_NETWARE;
 	    } else {
@@ -4784,7 +4786,7 @@ Rpc_Init(int		*argcPtr,
      * connection yet and we're not overridden by a -t flag.
      */
     if ((geosFD < 0 && tty == 0) && (getenv("SWAT_NET") != NULL)) {
-	geosFD = NetWare_Init(getenv("SWAT_NET"));
+	geosFD = NetWare_Init(getenv("SWAT_NET"), FALSE);
 
 	if (geosFD >= 0) {
 	    commMode = CM_NETWARE;
@@ -4795,7 +4797,10 @@ Rpc_Init(int		*argcPtr,
 	/*
 	 * no netware. no npipe. lets hope serial comes thru.
 	 */
-	commMode = CM_SERIAL;
+	commMode = CM_SERIAL_TCP;
+#if 1
+	geosFD = NetWare_Init(getenv("SWAT_NET"), TRUE);
+#else
 # if defined(unix) 
 	if (modem != 0) {
 	    noSig = TRUE;   	/* Assume noone using the modem, so noone to
@@ -4891,15 +4896,17 @@ Rpc_Init(int		*argcPtr,
     	    exit(1);
 	}
 #endif
-	/*
-	 * Arrange for port to be closed before we go away.
-	 */
+/*
+ * Arrange for port to be closed before we go away.
+ */
 #ifndef _LINUX
-	atexit(Serial_Exit);
+atexit(Serial_Exit);
 #endif
 
-	geosFD = 1;		/* Fake descriptor number that won't interfere
-				 * with anything... in theory. */
+geosFD = 1;		/* Fake descriptor number that won't interfere
+			 * with anything... in theory. */
+#endif
+
 # endif
     }
 #else /* now handle _WIN32 */
@@ -4921,8 +4928,10 @@ Rpc_Init(int		*argcPtr,
 		Swat_Death();
 	    }
 	} else {
-	    MessageFlush("Communications mode is not set, check the setup\n");
-	    Swat_Death();
+	    /* MessageFlush("Communications mode is not set, check the setup\n");
+	     * Swat_Death();
+	     */
+	    commMode = CM_SERIAL_TCP;
 	}
     }
 
@@ -5024,6 +5033,9 @@ Rpc_Init(int		*argcPtr,
 			* with anything... in theory.
 			*/
 	atexit(RpcExitNtSerial);
+	break;
+    case CM_SERIAL_TCP:
+    	geosFD = NetWare_Init(getenv("SWAT_NET"), TRUE);
 	break;
     default:
 	MessageFlush("No communications mode was specified, "

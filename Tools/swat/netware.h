@@ -24,7 +24,7 @@
 #ifndef _NETWARE_H_
 #define _NETWARE_H_
 
-extern int NetWare_Init(char *addr);
+extern int NetWare_Init(char *addr, int useTCP);
 extern int NetWare_WriteV(int fd, struct iovec *iov, int iov_len);
 extern int NetWare_Read(int fd, void *buf, int bufSize);
 
