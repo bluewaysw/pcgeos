@@ -3033,7 +3033,7 @@ read_config:
 #endif
     if (STRNCMP_OS_SPECIFIC(cwd, fileRoot, rootLen) == 0) {
 	cp = cwd + rootLen + 1;
-	while(*cp != PATHNAME_SLASH && *cp != '\0') {
+	while(*cp != '/' && *cp != '\0') {
 	    cp++;
 	}
 
