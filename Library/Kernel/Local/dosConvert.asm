@@ -391,6 +391,7 @@ GetCodePage	endp
 codePageList	DosCodePage \
 	CODE_PAGE_US,
 	CODE_PAGE_MULTILINGUAL,
+	CODE_PAGE_MULTILINGUAL_EURO,
 	CODE_PAGE_CANADIAN_FRENCH,
 	CODE_PAGE_NORDIC,
 	CODE_PAGE_PORTUGUESE,
@@ -398,6 +399,7 @@ codePageList	DosCodePage \
 
 codePageHandles	hptr \
 	USMap,					;default must be first
+	MultiMap,
 	MultiMap,
 	FrenchMap,
 	NordicMap,
