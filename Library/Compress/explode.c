@@ -242,7 +242,11 @@ static int WasteBits(TDcmpStruct * pWork, unsigned int nBits)
     if(pWork->in_pos == pWork->in_bytes)
     {
         pWork->in_pos = sizeof(pWork->in_buff);
-        if((pWork->in_bytes = pWork->read_buf((char *)pWork->in_buff, &pWork->in_pos, pWork->param)) == 0)
+        if((pWork->in_bytes = pWork->read_buf((char *)pWork->in_buff, &pWork->in_pos
+#ifndef __GEOS__
+		, pWork->param
+#endif
+	)) == 0)
             return PKDCL_STREAM_END;
         pWork->in_pos = 0;
     }
@@ -448,7 +452,11 @@ static unsigned int Expand(TDcmpStruct * pWork)
         {
             // Copy decompressed data into user buffer
             copyBytes = 0x1000;
-            pWork->write_buf((char *)&pWork->out_buff[0x1000], &copyBytes, pWork->param);
+            pWork->write_buf((char *)&pWork->out_buff[0x1000], &copyBytes
+#ifndef __GEOS__
+		, pWork->param
+#endif
+    	    );
 
             // Now copy the decompressed data to the first half of the buffer.
             // This is needed because the decompression might reuse them as repetitions.
@@ -462,7 +470,11 @@ static unsigned int Expand(TDcmpStruct * pWork)
 
     // Flush any remaining decompressed bytes
     copyBytes = pWork->outputPos - 0x1000;
-    pWork->write_buf((char *)&pWork->out_buff[0x1000], &copyBytes, pWork->param);
+    pWork->write_buf((char *)&pWork->out_buff[0x1000], &copyBytes
+#ifndef __GEOS__
+    	, pWork->param
+#endif
+    );
     return result;
 }
 
@@ -471,10 +483,21 @@ static unsigned int Expand(TDcmpStruct * pWork)
 // Main exploding function.
 
 unsigned int PKEXPORT explode(
-        unsigned int (*read_buf)(char *buf, unsigned  int *size, void *param),
-        void         (*write_buf)(char *buf, unsigned  int *size, void *param),
-        char         *work_buf,
-        void         *param)
+        unsigned int (PKEXPORT *read_buf)(char *buf, unsigned  int *size
+#ifndef __GEOS__
+		, void *param
+#endif
+	),
+        void         (PKEXPORT *write_buf)(char *buf, unsigned  int *size
+#ifndef __GEOS__
+		, void *param
+#endif
+	),
+        char         *work_buf
+#ifndef __GEOS__
+	,void         *param
+#endif
+	)
 {
     TDcmpStruct * pWork = (TDcmpStruct *)work_buf;
 
@@ -482,9 +505,15 @@ unsigned int PKEXPORT explode(
     // Note: The caller must zero the "work_buff" before passing it to explode
     pWork->read_buf   = read_buf;
     pWork->write_buf  = write_buf;
+#ifndef __GEOS__
     pWork->param      = param;
+#endif
     pWork->in_pos     = sizeof(pWork->in_buff);
-    pWork->in_bytes   = pWork->read_buf((char *)pWork->in_buff, &pWork->in_pos, pWork->param);
+    pWork->in_bytes   = pWork->read_buf((char *)pWork->in_buff, &pWork->in_pos
+#ifndef __GEOS__
+    	, pWork->param
+#endif
+    );
     if(pWork->in_bytes <= 4)
         return CMP_BAD_DATA;
 

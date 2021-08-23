@@ -92,7 +92,11 @@ static void FlushBuf(TCmpStruct * pWork)
     unsigned char save_ch2;
     unsigned int size = 0x800;
 
-    pWork->write_buf(pWork->out_buff, &size, pWork->param);
+    pWork->write_buf(pWork->out_buff, &size
+#ifndef __GEOS__
+	    , pWork->param
+#endif
+    );
 
     save_ch1 = pWork->out_buff[0x800];
     save_ch2 = pWork->out_buff[pWork->out_bytes];
@@ -433,8 +437,11 @@ static void WriteCmpData(TCmpStruct * pWork)
         while(bytes_to_load != 0)
         {
             bytes_loaded = pWork->read_buf((char *)pWork->work_buff + pWork->dsize_bytes + 0x204 + total_loaded,
-                                                  &bytes_to_load,
-                                                   pWork->param);
+                                                  &bytes_to_load
+#ifndef __GEOS__
+						  , pWork->param
+#endif
+					  );
             if(bytes_loaded == 0)
             {
                 if(total_loaded == 0 && phase == 0)
@@ -582,7 +589,11 @@ __Exit:
     OutputBits(pWork, pWork->nChBits[0x305], pWork->nChCodes[0x305]);
     if(pWork->out_bits != 0)
         pWork->out_bytes++;
-    pWork->write_buf(pWork->out_buff, &pWork->out_bytes, pWork->param);
+    pWork->write_buf(pWork->out_buff, &pWork->out_bytes
+#ifndef __GEOS__
+	    , pWork->param
+#endif
+    );
     return;
 }
 
@@ -590,10 +601,20 @@ __Exit:
 // Main imploding function
 
 unsigned int PKEXPORT implode(
-    unsigned int (*read_buf)(char *buf, unsigned int *size, void *param),
-    void         (*write_buf)(char *buf, unsigned int *size, void *param),
+    unsigned int (PKEXPORT *read_buf)(char *buf, unsigned int *size
+#ifndef __GEOS__
+	    , void *param
+#endif
+    ),
+    void         (PKEXPORT *write_buf)(char *buf, unsigned int *size
+#ifndef __GEOS__
+	    , void *param
+#endif
+    ),
     char         *work_buf,
+#ifndef __GEOS__
     void         *param,
+#endif
     unsigned int *type,
     unsigned int *dsize)
 {
@@ -609,7 +630,9 @@ unsigned int PKEXPORT implode(
     pWork->write_buf   = write_buf;
     pWork->dsize_bytes = *dsize;
     pWork->ctype       = *type;
+#ifndef __GEOS__    
     pWork->param       = param;
+#endif
     pWork->dsize_bits  = 4;
     pWork->dsize_mask  = 0x0F;
 

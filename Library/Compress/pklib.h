@@ -61,9 +61,19 @@ typedef struct
     unsigned short nChCodes[0x306];         // 03A2: Table of literal codes to be put to the output stream
     unsigned short offs09AE;                // 09AE:
 
+#ifndef __GEOS__
     void         * param;                   // 09B0: User parameter
-    unsigned int (*read_buf)(char *buf, unsigned int *size, void *param);  // 9B4
-    void         (*write_buf)(char *buf, unsigned int *size, void *param); // 9B8
+#endif
+    unsigned int (PKEXPORT *read_buf)(char *buf, unsigned int *size
+#ifndef __GEOS__
+	    , void *param
+#endif
+    );  // 9B4
+    void         (PKEXPORT *write_buf)(char *buf, unsigned int *size
+#ifndef __GEOS__
+	    , void *param
+#endif
+    ); // 9B8
 
     unsigned short offs09BC[0x204];         // 09BC:
     unsigned long  offs0DC4;                // 0DC4:
@@ -90,18 +100,28 @@ typedef struct
 // Decompression structure
 typedef struct
 {
-    unsigned long offs0000;                 // 0000
-    unsigned long ctype;                    // 0004: Compression type (CMP_BINARY or CMP_ASCII)
-    unsigned long outputPos;                // 0008: Position in output buffer
-    unsigned long dsize_bits;               // 000C: Dict size (4, 5, 6 for 0x400, 0x800, 0x1000)
-    unsigned long dsize_mask;               // 0010: Dict size bitmask (0x0F, 0x1F, 0x3F for 0x400, 0x800, 0x1000)
-    unsigned long bit_buff;                 // 0014: 16-bit buffer for processing input data
-    unsigned long extra_bits;               // 0018: Number of extra (above 8) bits in bit buffer
+    unsigned int  offs0000;                 // 0000
+    unsigned int  ctype;                    // 0004: Compression type (CMP_BINARY or CMP_ASCII)
+    unsigned int  outputPos;                // 0008: Position in output buffer
+    unsigned int  dsize_bits;               // 000C: Dict size (4, 5, 6 for 0x400, 0x800, 0x1000)
+    unsigned int  dsize_mask;               // 0010: Dict size bitmask (0x0F, 0x1F, 0x3F for 0x400, 0x800, 0x1000)
+    unsigned int  bit_buff;                 // 0014: 16-bit buffer for processing input data
+    unsigned int  extra_bits;               // 0018: Number of extra (above 8) bits in bit buffer
     unsigned int  in_pos;                   // 001C: Position in in_buff
-    unsigned long in_bytes;                 // 0020: Number of bytes in input buffer
+    unsigned int  in_bytes;                 // 0020: Number of bytes in input buffer
+#ifndef __GEOS__
     void        * param;                    // 0024: Custom parameter
-    unsigned int (*read_buf)(char *buf, unsigned int *size, void *param); // Pointer to function that reads data from the input stream
-    void         (*write_buf)(char *buf, unsigned int *size, void *param);// Pointer to function that writes data to the output stream
+#endif
+    unsigned int (PKEXPORT *read_buf)(char *buf, unsigned int *size
+#ifndef __GEOS__
+	    , void *param
+#endif
+    ); // Pointer to function that reads data from the input stream
+    void         (PKEXPORT *write_buf)(char *buf, unsigned int *size
+#ifndef __GEOS__
+	    , void *param
+#endif
+    );// Pointer to function that writes data to the output stream
 
     unsigned char out_buff[0x2204];         // 0030: Output circle buffer.
                                             //       0x0000 - 0x0FFF: Previous uncompressed data, kept for repetitions
@@ -144,19 +164,40 @@ extern unsigned short ChCodeAsc[0x100];
 #endif
 
 unsigned int PKEXPORT implode(
-   unsigned int (*read_buf)(char *buf, unsigned int *size, void *param),
-   void         (*write_buf)(char *buf, unsigned int *size, void *param),
+   unsigned int (PKEXPORT *read_buf)(char *buf, unsigned int *size
+#ifndef __GEOS__
+	   , void *param
+#endif
+   ),
+   void         (PKEXPORT*write_buf)(char *buf, unsigned int *size
+#ifndef __GEOS__
+	   , void *param
+#endif
+   ),
    char         *work_buf,
+#ifndef __GEOS__
    void         *param,
+#endif
    unsigned int *type,
    unsigned int *dsize);
 
 
 unsigned int PKEXPORT explode(
-   unsigned int (*read_buf)(char *buf, unsigned  int *size, void *param),
-   void         (*write_buf)(char *buf, unsigned  int *size, void *param),
-   char         *work_buf,
-   void         *param);
+   unsigned int (PKEXPORT *read_buf)(char *buf, unsigned  int *size
+#ifndef __GEOS__
+	   , void *param
+#endif
+   ),
+   void         (PKEXPORT *write_buf)(char *buf, unsigned  int *size
+#ifndef __GEOS__
+	   , void *param
+#endif
+   ),
+   char         *work_buf
+#ifndef __GEOS__
+   , void         *param
+#endif
+   );
 
 // The original name "crc32" was changed to "crc32pk" due
 // to compatibility with zlib
