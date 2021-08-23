@@ -34,7 +34,11 @@
 #ifdef WIN32
 #define PKEXPORT  __cdecl                   // Use for normal __cdecl calling
 #else
+#ifdef __GEOS__
+#define PKEXPORT _pascal
+#else
 #define PKEXPORT
+#endif
 #endif
 #endif
 
@@ -69,7 +73,14 @@ typedef struct
     unsigned char  work_buff[0x2204];       // 27CC: Work buffer
                                             //  + DICT_OFFSET  => Dictionary
                                             //  + UNCMP_OFFSET => Uncompressed data
+#ifdef __GEOS__
+    /* looks like glue is having hard types for structures > 32K
+     * this is to workaround this behaviour.
+     */
+    unsigned short phash_offs[1];      // 49D0: Table of offsets for each PAIR_HASH
+#else
     unsigned short phash_offs[0x2204];      // 49D0: Table of offsets for each PAIR_HASH
+#endif
 } TCmpStruct;
 
 #define CMP_BUFFER_SIZE  sizeof(TCmpStruct) // Size of compression structure.
