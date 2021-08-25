@@ -165,7 +165,7 @@ minimalDriver	: nimbus ms4 ntfat os2 cdrom stream dri gdi keyboard modem gdipoin
 		  ps2 msys msser msbus kbmouse absgen genmouse emm extmem \
 		  xms filestr nonts sblaster comm spooltd \
 		  vmtree filedd logibus logiser dma mslf kbd_drivers \
-		  etherodi etherpkt msnet cdados
+		  etherodi etherpkt msnet cdados truetype
 
 printerDriver	: deskjet dj500c lbp mercury pcl4 quietjet canon48 \
 		  canonbjc  epshi24 epson24 epson48 nec24 \
@@ -560,6 +560,9 @@ Installed/Driver/Stream:		kernel MAKEDRV
 nimbus	: Installed/Driver/Font/Nimbus
 Installed/Driver/Font/Nimbus:		kernel MAKEDRV
 
+truetype : Installed/Driver/Font/TrueType
+Installed/Driver/Font/TrueType:		kernel MAKEDRV
+	
 ms4	: Installed/Driver/IFS/DOS/MS4
 Installed/Driver/IFS/DOS/MS4:		kernel MAKEDRV
 
