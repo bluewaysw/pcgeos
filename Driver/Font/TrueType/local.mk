@@ -15,6 +15,8 @@
 ###############################################################################
 ASMFLAGS	+= -i
 
+_PROTO = 3.0
+
 .PATH.asm .PATH.def: ../FontCom $(INSTALL_DIR:H)/FontCom \
 
 #include	<$(SYSMAKEFILE)>

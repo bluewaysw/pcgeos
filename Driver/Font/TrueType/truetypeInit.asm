@@ -246,7 +246,6 @@ fontId			local	FontID
 fontInfoChunk		local	word
 	
 	.enter
-if 0	
 	;
 	; generate font id from file names first character for now
 	;
@@ -256,7 +255,7 @@ if 0
 	mov	fontId, ax
 
 	;
-	; open cached data file
+	; open truetype file
 	;
 	mov	dx, si				; ds:dx = name
 	mov	al, FILE_ACCESS_R or FILE_DENY_W
@@ -275,6 +274,7 @@ if 0
 	call	FileRead	
 	jc	doneClose
 
+if 0	
 
 	;
 	; create a new FontsAvailEntry
@@ -355,11 +355,11 @@ EC <	ERROR_NZ	TRUETYPE_INTERNAL_ERROR			>
 	LocalPutChar	esdi, ax		; ensure null term
 	pop	es, ds, si			; restore FFLH, FontInfo
 
+endif
 
 doneClose:
 	mov	al, FILE_NO_ERRORS
 	call	FileClose
-endif
 done:
 	.leave
 	
