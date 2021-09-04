@@ -20,9 +20,7 @@ include    ../mouseCommon.asm  ; Include common definitions/code.
 
 include    Internal/interrup.def
 include    Internal/dos.def      ; for equipment configuration...
-;include    Internal/mouseDr.def  ; for equipment configuration...
 include    system.def
-;include    ui.def
 
 ;------------------------------------------------------------------------------
 ;        DEVICE STRINGS
@@ -57,11 +55,11 @@ idata    segment
 ;
 MOUSE_ENABLE_DISABLE      equ  0c200h  ; Enable or disable the mouse. BH = 0 to disable, 1 to enable.
 MOUSE_RESET               equ  0c201h  ; Reset the mouse.
-MAX_NUM_RESETS            equ  3       ; # times we will send MOUSE_RESET command
-MOUSE_RESET_RESEND_ERROR  equ  04h     ; Error returned from MOUSE_RESET call if it wants you to resend command
+  MAX_NUM_RESETS            equ  3       ; # times we will send MOUSE_RESET command
+  MOUSE_RESET_RESEND_ERROR  equ  04h     ; Error returned from MOUSE_RESET call if it wants you to resend command
 
 ; Set report rate
-MOUSE_SET_RATE      equ  0c202h  ; Set sample rate:
+MOUSE_SET_RATE  equ  0c202h  ; Set sample rate:
   MOUSE_RATE_10   equ  0
   MOUSE_RATE_20   equ  1
   MOUSE_RATE_40   equ  2
@@ -78,7 +76,7 @@ MOUSE_SET_RESOLUTION  equ  0c203h  ; Set device resolution BH =
   MOUSE_RES_8_PER_MM  equ  3  ; 8 counts per mm
 
 ; Device Type
-MOUSE_GET_TYPE    equ  0c204h  ; Get device ID.
+MOUSE_GET_TYPE    equ 0c204h  ; Get device ID.
   MOUSE_ONE_WHEEL equ 3 ; Device ID returned if Mouse has 1 Wheel
 
 ; Init packet size
@@ -86,8 +84,8 @@ MOUSE_INIT equ  0c205h    ; Set interface parameters. BH = # bytes per packet.
   MOUSE_PACKET_SIZE equ 4 ; We've got at least one wheel, hence 4 bytes!
 
 ; extended commands
-MOUSE_EXTENDED_CMD  equ  0c206h     ; Extended command. BH =
-  MOUSE_EXTC_STATUS       equ  0  ; Get device status
+MOUSE_EXTENDED_CMD  equ  0c206h   ; Extended command. BH =
+  MOUSE_EXTC_STATUS       equ 0   ; Get device status
   MOUSE_EXTC_SINGLE_SCALE equ 1   ; Set scaling to 1:1
   MOUSE_EXTC_DOUBLE_SCALE equ 2   ; Set scaling to 2:1
 
@@ -118,8 +116,8 @@ MDHStatus  record
     MDHS_Y_OVERFLOW:1,    ; Y overflow
     MDHS_X_OVERFLOW:1,    ; X overflow
     MDHS_Y_NEGATIVE:1,    ; Y delta is negative (just need to
-        ;  sign-extend, as delta is already in
-        ;  single-byte two's complement form)
+                          ; sign-extend, as delta is already in
+                          ; single-byte two's complement form)
     MDHS_X_NEGATIVE:1,    ; X delta is negative
     MDHS_MUST_BE_ONE:1=1,
     MDHS_MIDDLE_DOWN:1,    ; Middle button is down
@@ -158,14 +156,14 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-MouseDevHandler proc far  :byte, ; first byte is unused
-                          :byte, ; second byte is unused
-                          deltaZ:sbyte, ; wheel
-                          :byte, ; unused
-                          deltaY:sbyte, ; y axis
-                          :byte, ; unused
+MouseDevHandler proc far  :byte,            ; first byte is unused
+                          :byte,            ; second byte is unused
+                          deltaZ:sbyte,     ; wheel
+                          :byte,            ; unused
+                          deltaY:sbyte,     ; y axis
+                          :byte,            ; unused
                           status:MDHStatus, ; buttons
-                          deltaX:sbyte ; x axis
+                          deltaX:sbyte      ; x axis
 
   uses  ds, ax, bx, cx, dx, si, di
   .enter
@@ -337,7 +335,7 @@ MouseSetDevice  proc  near  uses es, bx, ax
 
   call  SysLockBIOS
 
-  ; packet size
+  ; set packet size - must be called first!
   mov  ax, MOUSE_INIT         ; Init mouse
   mov  bh, MOUSE_PACKET_SIZE  ; We've got at least one wheel, hence 4 bytes!
   int  15h
@@ -421,26 +419,26 @@ MouseTestDevice  proc  near  uses ax, bx, es, cx
   jz  notPresent
 
   ; packet size
-  mov  ax, MOUSE_INIT         ; Init packet size
-  mov  bh, MOUSE_PACKET_SIZE  ; We've got at least one wheel, hence 4 bytes!
-  int  15h
+  ;mov  ax, MOUSE_INIT         ; Init packet size
+  ;mov  bh, MOUSE_PACKET_SIZE  ; We've got at least one wheel, hence 4 bytes!
+  ;int  15h
 
   ;strategy used in "InitializeWheel" by Bret E. Johnson
-  mov  bh, MOUSE_RATE_200    ; Set Sample rate 200
-  mov  ax, MOUSE_SET_RATE
-  int  15h
-  mov  bh, MOUSE_RATE_100    ; Set Sample Rate 100
-  mov  ax, MOUSE_SET_RATE
-  int  15h
-  mov  bh, MOUSE_RATE_80     ; Set Sample Rate 80
-  mov  ax, MOUSE_SET_RATE
-  int  15h
+  ;mov  bh, MOUSE_RATE_200    ; Set Sample rate 200
+  ;mov  ax, MOUSE_SET_RATE
+  ;int  15h
+  ;mov  bh, MOUSE_RATE_100    ; Set Sample Rate 100
+  ;mov  ax, MOUSE_SET_RATE
+  ;int  15h
+  ;mov  bh, MOUSE_RATE_80     ; Set Sample Rate 80
+  ;mov  ax, MOUSE_SET_RATE
+  ;int  15h
 
   ; check if wheel mouse
-  mov ax, MOUSE_GET_TYPE  ; Get the Device ID in BH
-  int 15h
-  cmp bh, MOUSE_ONE_WHEEL ; Is it an intellimouse with one wheel and three buttons?
-  jne notPresent          ; if not, then got to notPresent
+  ;mov ax, MOUSE_GET_TYPE  ; Get the Device ID in BH
+  ;int 15h
+  ;cmp bh, MOUSE_ONE_WHEEL ; Is it an intellimouse with one wheel and three buttons?
+  ;jne notPresent          ; if not, then got to notPresent
 
   ; reset
   mov  cx, MAX_NUM_RESETS  ; # times we will resend this command
