@@ -13,7 +13,7 @@ DESCRIPTION:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-MOUSE_NUM_BUTTONS = 3      ; Wheel mice have at least 3 buttons
+MOUSE_NUM_BUTTONS   = 3    ; Wheel mice have at least 3 buttons
 MOUSE_SEPARATE_INIT = 1    ; We use a separate Init resource
 
 include    ../mouseCommon.asm  ; Include common definitions/code.
