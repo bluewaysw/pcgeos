@@ -248,10 +248,10 @@ MouseDevHandler proc far  :byte,            ; first byte is unused
   jg wheelDown        ; dh value greater than 0 => jump to wheel down
 
   mov  cx, 0x48       ; otherwise => dh < 0 => put up key (0x48) in cx
-  jmp doPress         ; jmp to do the keypress/release
+  jmp doPress         ; jmp to do the keypress
 
   wheelDown:
-  mov  cx, 0x50       ; wheel down => cx => put down key (0x50) in cx
+  mov  cx, 0x50       ; wheel down => put down key (0x50) in cx
 
   doPress:
   mov  di, mask MF_FORCE_QUEUE ; setup ObjMessage
