@@ -34,13 +34,13 @@ mouseExtendedInfo  DriverExtendedInfoTable <
   offset mouseInfoTable
 >
 
-mouseNameTable  lptr.char  wheelMouse
+mouseNameTable  lptr.char  imps2Mouse
   lptr.char  0  ; null-terminator
 
-LocalDefString wheelMouse  <'IntelliMouse-style PS/2 Wheel Mouse', 0>
+LocalDefString imps2Mouse  <'Intellimouse-compatible PS/2 Wheel Mouse', 0>
 
 mouseInfoTable  MouseExtendedInfo  \
-  0    ; wheelMouse
+  0    ; imps2Mouse
 
 MouseExtendedInfoSeg  ends
 
@@ -53,13 +53,16 @@ idata    segment
 ; All the mouse BIOS calls are through interrupt 15h, function c2h.
 ; All functions return CF set on error, ah = MouseStatus
 ;
-MOUSE_ENABLE_DISABLE      equ  0c200h  ; Enable or disable the mouse. BH = 0 to disable, 1 to enable.
-MOUSE_RESET               equ  0c201h  ; Reset the mouse.
+MOUSE_ENABLE_DISABLE      equ 0c200h  ; Enable or disable the mouse. BH = 0 to disable, 1 to enable.
+  MOUSE_ENABLE            equ 1
+  MOUSE_DISABLE           equ 0
+
+MOUSE_RESET                 equ  0c201h  ; Reset the mouse.
   MAX_NUM_RESETS            equ  3       ; # times we will send MOUSE_RESET command
   MOUSE_RESET_RESEND_ERROR  equ  04h     ; Error returned from MOUSE_RESET call if it wants you to resend command
 
 ; Set report rate
-MOUSE_SET_RATE  equ  0c202h  ; Set sample rate:
+MOUSE_SET_RATE    equ  0c202h  ; Set sample rate:
   MOUSE_RATE_10   equ  0
   MOUSE_RATE_20   equ  1
   MOUSE_RATE_40   equ  2
@@ -80,11 +83,11 @@ MOUSE_GET_TYPE    equ 0c204h  ; Get device ID.
   MOUSE_ONE_WHEEL equ 3 ; Device ID returned if Mouse has 1 Wheel
 
 ; Init packet size
-MOUSE_INIT equ  0c205h    ; Set interface parameters. BH = # bytes per packet.
+MOUSE_INIT          equ  0c205h    ; Set interface parameters. BH = # bytes per packet.
   MOUSE_PACKET_SIZE equ 4 ; We've got at least one wheel, hence 4 bytes!
 
 ; extended commands
-MOUSE_EXTENDED_CMD  equ  0c206h   ; Extended command. BH =
+MOUSE_EXTENDED_CMD        equ  0c206h   ; Extended command. BH =
   MOUSE_EXTC_STATUS       equ 0   ; Get device status
   MOUSE_EXTC_SINGLE_SCALE equ 1   ; Set scaling to 1:1
   MOUSE_EXTC_DOUBLE_SCALE equ 2   ; Set scaling to 2:1
@@ -93,12 +96,12 @@ MOUSE_EXTENDED_CMD  equ  0c206h   ; Extended command. BH =
 MOUSE_SET_HANDLER  equ  0c207h  ; Set mouse handler. ES:BX is address of routine
 
 ; original GeoWorks definitions
-MouseStatus    etype  byte
-MS_SUCCESSFUL    enum  MouseStatus, 0
-MS_INVALID_FUNC    enum  MouseStatus, 1
-MS_INVALID_INPUT  enum  MouseStatus, 2
-MS_INTERFACE_ERROR  enum  MouseStatus, 3
-MS_NEED_TO_RESEND  enum  MouseStatus, 4
+MouseStatus              etype  byte
+MS_SUCCESSFUL            enum  MouseStatus, 0
+MS_INVALID_FUNC          enum  MouseStatus, 1
+MS_INVALID_INPUT         enum  MouseStatus, 2
+MS_INTERFACE_ERROR       enum  MouseStatus, 3
+MS_NEED_TO_RESEND        enum  MouseStatus, 4
 MS_NO_HANDLER_INSTALLED  enum  MouseStatus, 5
 
 mouseRates  byte  10, 20, 40, 60, 80, 100, 200, 255
@@ -121,8 +124,8 @@ MDHStatus  record
     MDHS_X_NEGATIVE:1,    ; X delta is negative
     MDHS_MUST_BE_ONE:1=1,
     MDHS_MIDDLE_DOWN:1,    ; Middle button is down
-    MDHS_RIGHT_DOWN:1,    ; Right button is down
-    MDHS_LEFT_DOWN:1,    ; Left button is down
+    MDHS_RIGHT_DOWN:1,     ; Right button is down
+    MDHS_LEFT_DOWN:1,      ; Left button is down
 MDHStatus  end
 
 
@@ -295,7 +298,7 @@ MouseDevExit  proc  near
   ; Disable the mouse by setting the handler to 0
   ; XXX: How can we restore it? Do we need to?
   mov  ax, MOUSE_ENABLE_DISABLE
-  mov  bh, 0    ; Disable it please
+  mov  bh, MOUSE_DISABLE    ; Disable it please
   int  15h
 
   clr  bx
@@ -374,7 +377,7 @@ MouseSetDevice  proc  near  uses es, bx, ax
 
   ; enable
   mov  ax, MOUSE_ENABLE_DISABLE
-  mov  bh, 1    ; Enable it please
+  mov  bh, MOUSE_ENABLE   ; Enable it please
   int  15h
 
   call  SysUnlockBIOS
@@ -442,7 +445,6 @@ MouseTestDevice  proc  near  uses ax, bx, es, cx
 
   ; reset
   mov  cx, MAX_NUM_RESETS  ; # times we will resend this command
-
   resetLoop:
   mov  ax, MOUSE_RESET
   int  15h
