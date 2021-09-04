@@ -160,12 +160,12 @@ REVISION HISTORY:
 
 MouseDevHandler proc far  :byte, ; first byte is unused
                           :byte, ; second byte is unused
-                          deltaZ:sbyte,
+                          deltaZ:sbyte, ; wheel
                           :byte, ; unused
-                          deltaY:sbyte,
+                          deltaY:sbyte, ; y axis
                           :byte, ; unused
-                          status:MDHStatus,
-                          deltaX:sbyte ; unused
+                          status:MDHStatus, ; buttons
+                          deltaX:sbyte ; x axis
 
   uses  ds, ax, bx, cx, dx, si, di
   .enter
@@ -242,22 +242,22 @@ MouseDevHandler proc far  :byte, ; first byte is unused
   ; view (or list or whatever) could handle as it desired.
   mov dh, ss:[deltaZ] ; put wheel data in dh
   cmp dh, 0           ; compare wheel data with 0
-  je packetDone
+  je packetDone       ; if wheel data = 0 => no wheel action, be done
 
   jg wheelDown        ; dh value greater than 0 => jump to wheel down
 
-  mov  cx, 0x48        ; otherwise = dh is smaller than 0 => cx = up key, 0x48
+  mov  cx, 0x48       ; otherwise => dh < 0 => put up key (0x48) in cx
   jmp doPress         ; jmp to do the keypress/release
 
   wheelDown:
-  mov  cx, 0x50        ; wheel down => cx => down key, 0x50
+  mov  cx, 0x50       ; wheel down => cx => put down key (0x50) in cx
 
   doPress:
   mov  di, mask MF_FORCE_QUEUE ; setup ObjMessage
   mov  ax, MSG_IM_KBD_SCAN
   mov  bx, ds:[mouseOutputHandle]
 
-  mov  dx, BW_TRUE      ; set to "press"
+  mov  dx, BW_TRUE    ; set to "press"
   call  ObjMessage    ; press - release not necessary!
 
   packetDone:
