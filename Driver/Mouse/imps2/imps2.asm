@@ -422,26 +422,26 @@ MouseTestDevice  proc  near  uses ax, bx, es, cx
   jz  notPresent
 
   ; packet size
-  ;mov  ax, MOUSE_INIT         ; Init packet size
-  ;mov  bh, MOUSE_PACKET_SIZE  ; We've got at least one wheel, hence 4 bytes!
-  ;int  15h
+  mov  ax, MOUSE_INIT         ; Init packet size
+  mov  bh, MOUSE_PACKET_SIZE  ; We've got at least one wheel, hence 4 bytes!
+  int  15h
 
   ;strategy used in "InitializeWheel" by Bret E. Johnson
-  ;mov  bh, MOUSE_RATE_200    ; Set Sample rate 200
-  ;mov  ax, MOUSE_SET_RATE
-  ;int  15h
-  ;mov  bh, MOUSE_RATE_100    ; Set Sample Rate 100
-  ;mov  ax, MOUSE_SET_RATE
-  ;int  15h
-  ;mov  bh, MOUSE_RATE_80     ; Set Sample Rate 80
-  ;mov  ax, MOUSE_SET_RATE
-  ;int  15h
+  mov  bh, MOUSE_RATE_200    ; Set Sample rate 200
+  mov  ax, MOUSE_SET_RATE
+  int  15h
+  mov  bh, MOUSE_RATE_100    ; Set Sample Rate 100
+  mov  ax, MOUSE_SET_RATE
+  int  15h
+  mov  bh, MOUSE_RATE_80     ; Set Sample Rate 80
+  mov  ax, MOUSE_SET_RATE
+  int  15h
 
   ; check if wheel mouse
-  ;mov ax, MOUSE_GET_TYPE  ; Get the Device ID in BH
-  ;int 15h
-  ;cmp bh, MOUSE_ONE_WHEEL ; Is it an intellimouse with one wheel and three buttons?
-  ;jne notPresent          ; if not, then got to notPresent
+  mov ax, MOUSE_GET_TYPE  ; Get the Device ID in BH
+  int 15h
+  cmp bh, MOUSE_ONE_WHEEL ; Is it an intellimouse with one wheel and three buttons?
+  jne notPresent          ; if not, then got to notPresent
 
   ; reset
   mov  cx, MAX_NUM_RESETS  ; # times we will resend this command
