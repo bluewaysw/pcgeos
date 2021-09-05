@@ -80,17 +80,17 @@ MOUSE_SET_RESOLUTION  equ  0c203h  ; Set device resolution BH =
 
 ; Device Type
 MOUSE_GET_TYPE    equ 0c204h  ; Get device ID.
-  MOUSE_ONE_WHEEL equ 3 ; Device ID returned if Mouse has 1 Wheel
+  MOUSE_ONE_WHEEL equ 3       ; Device ID returned if Mouse has 1 Wheel
 
 ; Init packet size
 MOUSE_INIT          equ  0c205h    ; Set interface parameters. BH = # bytes per packet.
-  MOUSE_PACKET_SIZE equ 4 ; We've got at least one wheel, hence 4 bytes!
+  MOUSE_PACKET_SIZE equ 4          ; We've got at least one wheel, hence 4 bytes!
 
 ; extended commands
 MOUSE_EXTENDED_CMD        equ  0c206h   ; Extended command. BH =
-  MOUSE_EXTC_STATUS       equ 0   ; Get device status
-  MOUSE_EXTC_SINGLE_SCALE equ 1   ; Set scaling to 1:1
-  MOUSE_EXTC_DOUBLE_SCALE equ 2   ; Set scaling to 2:1
+  MOUSE_EXTC_STATUS       equ 0         ; Get device status
+  MOUSE_EXTC_SINGLE_SCALE equ 1         ; Set scaling to 1:1
+  MOUSE_EXTC_DOUBLE_SCALE equ 2         ; Set scaling to 2:1
 
 ; set handler
 MOUSE_SET_HANDLER  equ  0c207h  ; Set mouse handler. ES:BX is address of routine
