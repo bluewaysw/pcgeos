@@ -16,6 +16,8 @@ DESCRIPTION:
 MOUSE_NUM_BUTTONS   = 3    ; Wheel mice have at least 3 buttons
 MOUSE_SEPARATE_INIT = 1    ; We use a separate Init resource
 
+MIDDLE_IS_DOUBLE_PRESS = 1    ; fake double-press with middle button
+
 include    ../mouseCommon.asm  ; Include common definitions/code.
 
 include    Internal/interrup.def

@@ -37,6 +37,8 @@ MOUSE_CANT_SET_RATE   = 1     ; Microsoft driver doesn't specify a function
                               ; to change the report rate.
 MOUSE_SEPARATE_INIT   = 1     ; We use a separate Init resource
 
+MIDDLE_IS_DOUBLE_PRESS = 1    ; fake double-press with middle button
+
 MOUSE_DONT_ACCELERATE   = 1    ; We'll handle acceleration in our monitor
 MOUSE_ACCELERATE_FUNCS  = 1    ; ...so access the acceleration function
 MOUSE_COMBINE_DISCARD   = 1    ; Discard new event if duplicate found.
@@ -78,7 +80,7 @@ MouseExtendedInfoSeg  ends
 idata  segment
 
 
-GEN_MOUSE_MAGIC  = 0adebh ; Magical delta given to MouseSendEvents if there's
+GEN_MOUSE_MAGIC  = 0adebh ;  Magical delta given to MouseSendEvents if there's
                           ;  mouse motion so our input monitor knows to do
                           ;  funky things with the IM_PTR_CHANGE event.
 
