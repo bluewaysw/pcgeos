@@ -237,23 +237,24 @@ MouseDevHandler proc far  :byte,            ; first byte is unused
 
   ; Registers now all loaded properly -- send the event.
   call  MouseSendEvents
-
+  ;
   ; Send the wheel events as keypresses for now.
   ; We'd like to send them as MSG_META_KBD_CHAR with more info,
   ; but the driver isn't happy including Objects/inputC.def.
   ; Ideally we'd send them as low-level scroll events which the
   ; view (or list or whatever) could handle as it desired.
+  ;
   mov dh, ss:[deltaZ] ; put wheel data in dh
   cmp dh, 0           ; compare wheel data with 0
-  je packetDone       ; if wheel data = 0 => no wheel action, be done
+  je packetDone       ; if wheel data equals zero => no wheel action, done
+  jg wheelDown        ; if dh value greater than 0 => jump to wheel down
 
-  jg wheelDown        ; dh value greater than 0 => jump to wheel down
-
-  mov  cx, 0x48       ; otherwise => dh < 0 => put up key (0x48) in cx
+  wheelUp:            ; otherwise continue with wheel up
+  mov  cx, 0xE048     ; dh is smaller than 0 => put up key (0xE048) in cx
   jmp doPress         ; jmp to do the keypress
 
   wheelDown:
-  mov  cx, 0x50       ; wheel down => put down key (0x50) in cx
+  mov  cx, 0xE050     ; wheel down => put down key (0xE050) in cx
 
   doPress:
   mov  di, mask MF_FORCE_QUEUE ; setup ObjMessage

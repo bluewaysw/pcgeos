@@ -502,23 +502,23 @@ MouseDevHandler  proc  far
     pop bx
 
     cmp bh, 0           ; compare wheel data with 0
-    je packetDone       ; if wheel data == 0 there is no wheel action, be done
+    je packetDone       ; if wheel data == 0 there is no wheel action, done
     jg wheelDown        ; bh value greater than 0 => jump to wheel down
 
     wheelUp:
-    mov cx, 0x48        ; otherwise => bh < 0 means wheel up => put up key (0x48) in cx
+    mov cx, 0xE048      ; otherwise => bh < 0 means wheel up => put up key (0xE048) in cx
     jmp doKeyPress      ; jmp to do the keypress
 
     wheelDown:
-    mov  cx, 0x50       ; wheel down => put down key (0x50) in cx
+    mov cx, 0xE050      ; wheel down => put down key (0xE050) in cx
 
     doKeyPress:
-    mov  di, mask MF_FORCE_QUEUE ; setup ObjMessage
-    mov  ax, MSG_IM_KBD_SCAN
-    mov  bx, ds:[mouseOutputHandle]
+    mov di, mask MF_FORCE_QUEUE ; setup ObjMessage
+    mov ax, MSG_IM_KBD_SCAN
+    mov bx, ds:[mouseOutputHandle]
 
-    mov  dx, BW_TRUE    ; set to "press"
-    call  ObjMessage    ; press - release not necessary!
+    mov dx, BW_TRUE    ; set to "press"
+    call ObjMessage    ; press - release not necessary!
 
     packetDone:
     ret
