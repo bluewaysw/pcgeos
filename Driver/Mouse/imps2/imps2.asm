@@ -188,39 +188,39 @@ MouseDevHandler proc far  :byte,            ; first byte is unused
   ; XXX: verify sign against bits in status byte to confirm its validity?
   ; what if overflow bit is set?
 
-  mov  al, ss:[deltaY]
+  mov al, ss:[deltaY]
   cbw
-  xchg  dx, ax      ; (1-byte inst)
+  xchg dx, ax      ; (1-byte inst)
 
-  mov  al, ss:[deltaX]
+  mov al, ss:[deltaX]
   cbw
-  xchg  cx, ax      ; (1-byte inst)
+  xchg cx, ax      ; (1-byte inst)
 
   ; Fetch the status, copying the middle and right button bits
   ; into BH.
-  mov  al, ss:[status]
+  mov   al, ss:[status]
   test  al, mask MDHS_Y_OVERFLOW or mask MDHS_X_OVERFLOW
-  jnz  packetDone  ; if overflow, drop the packet on the
-                   ; floor, since the semantics for such
-                   ; an event are undefined...
-  mov  bh, al
-  and  bh, 00000110b
+  jnz   packetDone  ; if overflow, drop the packet on the
+                    ; floor, since the semantics for such
+                    ; an event are undefined...
+  mov bh, al
+  and bh, 00000110b
 
   ; Make sure the packet makes sense by checking the ?_NEGATIVE bits
   ; against the actual signs of their respective deltas. If the two
   ; don't match (as indicated by the XOR of the sign bit of the delta
   ; with the ?_NEGATIVE bit resulting in a one), then hooey this packet.
-  shl  al
-  shl  al
-  tst  dx
+  shl al
+  shl al
+  tst dx
   lahf
-  xor  ah, al
+  xor ah, al
   js  packetDone
 
-  shl  al
-  tst  cx
+  shl al
+  tst cx
   lahf
-  xor  ah, al
+  xor ah, al
   js  packetDone
 
   ; Mask out all but the left button and merge it into the
@@ -229,10 +229,10 @@ MouseDevHandler proc far  :byte,            ; first byte is unused
   ; in BH, which is one bit off from what we need (and also
   ; the wrong polarity), so shift it right once and complement
   ; the thing.
-  and  al, mask MDHS_LEFT_DOWN shl 3
+  and al, mask MDHS_LEFT_DOWN shl 3
   or  bh, al
-  shr  bh, 1
-  not  bh
+  shr bh, 1
+  not bh
 
   ; Make delta Y be positive if going down, rather than
   ; positive if up, as the BIOS provides it.
@@ -369,10 +369,10 @@ MouseSetDevice  proc  near  uses es, bx, ax, di, ds
 
   ; fetch and save driverVariant id
 	call	MouseMapDevice
-  mov ax, segment dgroup
+  mov ax, segment dgroup ; we trash ax here, because we assume to have a valid device... :-|
   mov ds, ax
-  mov ds:driverVariant, di ; device idx is in in di. first idx is 0 then 2, 4, 6...
-	call	MemUnlock	; release the info block
+  mov ds:driverVariant, di ; device idx is in di. first idx is 0 then 2, 4, 6...
+	call	MemUnlock	; release the info block that has been locked by MouseMapDevice, weird....
 
   call  SysLockBIOS
 
