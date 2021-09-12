@@ -36,13 +36,16 @@ mouseExtendedInfo  DriverExtendedInfoTable <
   offset mouseInfoTable
 >
 
-mouseNameTable  lptr.char  imps2Mouse
-  lptr.char  0  ; null-terminator
+mouseNameTable  lptr.char  imps2CursorMouse,
+                           imps2PageMouse
+lptr.char  0  ; null-terminator
 
-LocalDefString imps2Mouse  <'Intellimouse-compatible PS/2 Wheel Mouse', 0>
+LocalDefString imps2CursorMouse  <'IM PS/2 Wheel Mouse (Wheel = Cursor Up/Down)', 0>
+LocalDefString imps2PageMouse    <'IM PS/2 Wheel Mouse (Wheel = Page Up/Down)', 0>
 
 mouseInfoTable  MouseExtendedInfo  \
-  0    ; imps2Mouse
+  0,    ; imps2CursorMouse
+  0     ; imps2PageMouse
 
 MouseExtendedInfoSeg  ends
 
@@ -114,7 +117,11 @@ mouseRateCmds  byte  MOUSE_RATE_10, MOUSE_RATE_20, MOUSE_RATE_40
 
 idata    ends
 
+;------------------------------------------------------------------------------
+;          UDATA
+;------------------------------------------------------------------------------
 udata    segment
+  driverVariant word
 udata    ends
 
 MDHStatus  record
@@ -170,7 +177,7 @@ MouseDevHandler proc far  :byte,            ; first byte is unused
                           status:MDHStatus, ; buttons
                           deltaX:sbyte      ; x axis
 
-  uses  ds, ax, bx, cx, dx, si, di
+  uses  ds, ax, bx, cx, dx, si, di, es
   .enter
 
   ; Prevent switch while sending
@@ -250,11 +257,32 @@ MouseDevHandler proc far  :byte,            ; first byte is unused
   jg wheelDown        ; if dh value greater than 0 => jump to wheel down
 
   wheelUp:            ; otherwise continue with wheel up
-  mov  cx, 0xE048     ; dh is smaller than 0 => put up key (0xE048) in cx
-  jmp doPress         ; jmp to do the keypress
+  mov ax, segment dgroup  ; load dgroup
+  mov ds, ax
+  cmp ds:driverVariant, 0 ; compare with 0 = first driver variant = use Up/Down keys
+  jg usePgUp              ; if greater than 0 => use Page up key
+
+  useCursorUp:       ; otherwise use cursor up
+  mov cx, 0xE048     ; dh is smaller than 0 => put up key (0xE048) in cx
+  jmp doPress        ; do the press
+
+  usePgUp:
+  mov cx, 0xE049     ; dh is smaller than 0 => put page up key (0xE049) in cx
+  jmp doPress        ; jmp to do the keypress
 
   wheelDown:
+  mov ax, segment dgroup  ; load dgroup
+  mov ds, ax
+  cmp ds:driverVariant, 0 ; compare with 0 = first driver variant = use Up/Down keys
+  jg usePgDown            ; if greater than 0 => use Page down key
+
+  useCursorDown:
   mov  cx, 0xE050     ; wheel down => put down key (0xE050) in cx
+  jmp doPress         ; do the press
+
+  usePgDown:
+  mov cx, 0xE051      ; dh is smaller than 0 => put page up key (0xE051) in cx
+  jmp doPress         ; jmp to do the keypress
 
   doPress:
   mov  di, mask MF_FORCE_QUEUE ; setup ObjMessage
@@ -336,8 +364,15 @@ REVISION HISTORY:
   ayuen  10/17/00  Moved most of the code to MouseDevInit
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-MouseSetDevice  proc  near  uses es, bx, ax
+MouseSetDevice  proc  near  uses es, bx, ax, di, ds
   .enter
+
+  ; fetch and save driverVariant id
+	call	MouseMapDevice
+  mov ax, segment dgroup
+  mov ds, ax
+  mov ds:driverVariant, di ; device idx is in in di. firsidx is 0 then 2, 4, 6...
+	call	MemUnlock	; release the info block
 
   call  SysLockBIOS
 
@@ -470,6 +505,40 @@ MouseTestDevice  proc  near  uses ax, bx, es, cx
 
 MouseTestDevice  endp
 
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    MouseMapDevice
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:  Map a device string to its device index
+
+CALLED BY:  MouseDevTest, MouseDevInit
+PASS:    dx:si  = device string
+RETURN:    carry set if string invalid
+           ax  = DP_INVALID_DEVICE
+           carry clear if string valid
+           di  = device index (offset into mouseNameTable and mouseInfoTable)
+           es  = locked info block
+           bx  = handle of same
+DESTROYED:  nothing
+
+PSEUDO CODE/STRATEGY:
+
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+
+REVISION HISTORY:
+  Name  Date    Description
+  ----  ----    -----------
+  ardeb  10/26/90  Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+MouseMapDevice  proc  near  uses cx, ds
+  .enter
+    EnumerateDevice  MouseExtendedInfoSeg
+  .leave
+  ret
+MouseMapDevice  endp
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     MouseDevSetRate
