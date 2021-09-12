@@ -371,7 +371,7 @@ MouseSetDevice  proc  near  uses es, bx, ax, di, ds
 	call	MouseMapDevice
   mov ax, segment dgroup
   mov ds, ax
-  mov ds:driverVariant, di ; device idx is in in di. firsidx is 0 then 2, 4, 6...
+  mov ds:driverVariant, di ; device idx is in in di. first idx is 0 then 2, 4, 6...
 	call	MemUnlock	; release the info block
 
   call  SysLockBIOS
