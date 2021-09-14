@@ -48,6 +48,7 @@ mouseInfoTable  MouseExtendedInfo  \
   0     ; imps2PageMouse
 
 MouseExtendedInfoSeg  ends
+ForceRef  mouseExtendedInfo
 
 ;------------------------------------------------------------------------------
 ;          VARIABLES/DATA/CONSTANTS
@@ -239,8 +240,8 @@ MouseDevHandler proc far  :byte,            ; first byte is unused
   neg  dx
 
   ; Point ds at our data for MouseSendEvents
-  mov  ax, segment dgroup
-  mov  ds, ax
+  mov ax, segment dgroup
+  mov ds, ax
 
   ; Registers now all loaded properly -- send the event.
   call  MouseSendEvents
@@ -257,9 +258,7 @@ MouseDevHandler proc far  :byte,            ; first byte is unused
   jg wheelDown        ; if dh value greater than 0 => jump to wheel down
 
   wheelUp:            ; otherwise continue with wheel up
-  mov ax, segment dgroup  ; load dgroup
-  mov ds, ax
-  cmp ds:driverVariant, 0 ; compare with 0 = first driver variant = use Up/Down keys
+  cmp ds:[driverVariant], 0 ; compare with 0 = first driver variant = use Up/Down keys
   jg usePgUp              ; if greater than 0 => use Page up key
 
   useCursorUp:       ; otherwise use cursor up
@@ -271,13 +270,11 @@ MouseDevHandler proc far  :byte,            ; first byte is unused
   jmp doPress        ; jmp to do the keypress
 
   wheelDown:
-  mov ax, segment dgroup  ; load dgroup
-  mov ds, ax
-  cmp ds:driverVariant, 0 ; compare with 0 = first driver variant = use Up/Down keys
+  cmp ds:[driverVariant], 0 ; compare with 0 = first driver variant = use Up/Down keys
   jg usePgDown            ; if greater than 0 => use Page down key
 
   useCursorDown:
-  mov  cx, 0xE050     ; wheel down => put down key (0xE050) in cx
+  mov cx, 0xE050     ; wheel down => put down key (0xE050) in cx
   jmp doPress         ; do the press
 
   usePgDown:
@@ -285,12 +282,12 @@ MouseDevHandler proc far  :byte,            ; first byte is unused
   jmp doPress         ; jmp to do the keypress
 
   doPress:
-  mov  di, mask MF_FORCE_QUEUE ; setup ObjMessage
-  mov  ax, MSG_IM_KBD_SCAN
-  mov  bx, ds:[mouseOutputHandle]
+  mov di, mask MF_FORCE_QUEUE ; setup ObjMessage
+  mov ax, MSG_IM_KBD_SCAN
+  mov bx, ds:[mouseOutputHandle]
 
-  mov  dx, BW_TRUE    ; set to "press"
-  call  ObjMessage    ; press - release not necessary!
+  mov dx, BW_TRUE    ; set to "press"
+  call ObjMessage    ; press - release not necessary!
 
   packetDone:
   call  SysExitInterrupt
@@ -368,50 +365,48 @@ MouseSetDevice  proc  near  uses es, bx, ax, di, ds
   .enter
 
   ; fetch and save driverVariant id
-	call	MouseMapDevice
-  mov ax, segment dgroup ; we trash ax here, because we assume to have a valid device... :-|
-  mov ds, ax
-  mov ds:driverVariant, di ; device idx is in di. first idx is 0 then 2, 4, 6...
-	call	MemUnlock	; release the info block that has been locked by MouseMapDevice, weird....
+	call MouseMapDevice
+  mov  ds:[driverVariant], di ; device idx is in di. first idx is 0 then 2, 4, 6...
+	call MemUnlock	; release the info block that has been locked by MouseMapDevice, weird....
 
-  call  SysLockBIOS
+  call SysLockBIOS
 
   ; set packet size - must be called first!
-  mov  ax, MOUSE_INIT         ; Init mouse
-  mov  bh, MOUSE_PACKET_SIZE  ; We've got at least one wheel, hence 4 bytes!
-  int  15h
+  mov ax, MOUSE_INIT         ; Init mouse
+  mov bh, MOUSE_PACKET_SIZE  ; We've got at least one wheel, hence 4 bytes!
+  int 15h
 
   ;strategy for wheel activation used in "InitializeWheel" by Bret E. Johnson
-  mov  bh, MOUSE_RATE_200  ; Set Sample rate 200
-  mov  ax, MOUSE_SET_RATE
-  int  15h
-  mov  bh, MOUSE_RATE_100  ; Set Sample Rate 100
-  mov  ax, MOUSE_SET_RATE
-  int  15h
-  mov  bh, MOUSE_RATE_80   ; Set Sample Rate 80
-  mov  ax, MOUSE_SET_RATE
-  int  15h
+  mov bh, MOUSE_RATE_200  ; Set Sample rate 200
+  mov ax, MOUSE_SET_RATE
+  int 15h
+  mov bh, MOUSE_RATE_100  ; Set Sample Rate 100
+  mov ax, MOUSE_SET_RATE
+  int 15h
+  mov bh, MOUSE_RATE_80   ; Set Sample Rate 80
+  mov ax, MOUSE_SET_RATE
+  int 15h
 
   ; install handler
-  segmov  es, <segment Resident>
-  mov  bx, offset Resident:MouseDevHandler
-  mov  ax, MOUSE_SET_HANDLER
-  int  15h
+  segmov es, <segment Resident>
+  mov bx, offset Resident:MouseDevHandler
+  mov ax, MOUSE_SET_HANDLER
+  int 15h
 
   ; sampling
-  mov  ax, MOUSE_SET_RATE
-  mov  bh, MOUSE_RATE_60
-  int  15h
+  mov ax, MOUSE_SET_RATE
+  mov bh, MOUSE_RATE_60
+  int 15h
 
   ; resolution
-  mov  ax, MOUSE_SET_RESOLUTION
-  mov  bh, MOUSE_RES_8_PER_MM
-  int  15h
+  mov ax, MOUSE_SET_RESOLUTION
+  mov bh, MOUSE_RES_8_PER_MM
+  int 15h
 
   ; scaling
-  mov  ax, MOUSE_EXTENDED_CMD
-  mov  bh, MOUSE_EXTC_SINGLE_SCALE
-  int  15h
+  mov ax, MOUSE_EXTENDED_CMD
+  mov bh, MOUSE_EXTC_SINGLE_SCALE
+  int 15h
 
   ; enable
   mov  ax, MOUSE_ENABLE_DISABLE

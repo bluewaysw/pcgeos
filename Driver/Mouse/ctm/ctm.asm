@@ -62,17 +62,19 @@ mouseExtendedInfo  DriverExtendedInfoTable <
   offset mouseInfoTable
 >
 
-mouseNameTable  lptr.char  ctMouse
-  lptr.char  0  ; null-terminator
+mouseNameTable  lptr.char  ctCursorMouse,
+                           ctPageMouse
+lptr.char  0  ; null-terminator
 
-LocalDefString ctMouse  <'CuteMouse already installed (with wheel support)', 0>
+LocalDefString ctCursorMouse  <'CTMOUSE.EXE /O (Wheel = Cursor Up/Down)', 0>
+LocalDefString ctPageMouse    <'CTMOUSE.EXE /O (Wheel = Page Up/Down)', 0>
 
 mouseInfoTable  MouseExtendedInfo  \
-  0    ; ctMouse
+  0,    ; ctCursorMouse
+  0     ; ctPageMouse
 
 MouseExtendedInfoSeg  ends
-
-;ForceRef  mouseExtendedInfo
+ForceRef  mouseExtendedInfo
 
 ;------------------------------------------------------------------------------
 ;      Variables
@@ -91,6 +93,13 @@ mouseSet  byte  0  ; non-zero if device-type set
 mouseRates  label  byte  ; to avoid assembly errors
 MOUSE_NUM_RATES  equ  0
 idata  ends
+
+;------------------------------------------------------------------------------
+;          UDATA
+;------------------------------------------------------------------------------
+udata    segment
+  driverVariant word
+udata    ends
 
 MouseFuncs  etype  byte
     MF_RESET      enum  MouseFuncs
@@ -254,6 +263,13 @@ REVISION HISTORY:
 
 MouseDevInit  proc  far  uses dx, ax, cx, si, bx
     .enter
+
+  ; fetch and save driverVariant id
+    call	MouseMapDevice
+    mov ds:[driverVariant], di ; device idx is in di. first idx is 0 then 2, 4, 6...
+    call	MemUnlock	; release the info block that has been locked by MouseMapDevice, weird....
+
+  ; Reset
     dec  ds:[mouseSet]
 
     mov  bx, 3    ; Early LogiTech drivers screw up and
@@ -290,6 +306,42 @@ twoButtons:
     .leave
     ret
 MouseDevInit  endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    MouseMapDevice
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:  Map a device string to its device index
+
+CALLED BY:  MouseDevTest, MouseDevInit
+PASS:    dx:si  = device string
+RETURN:    carry set if string invalid
+           ax  = DP_INVALID_DEVICE
+           carry clear if string valid
+           di  = device index (offset into mouseNameTable and mouseInfoTable)
+           es  = locked info block
+           bx  = handle of same
+DESTROYED:  nothing
+
+PSEUDO CODE/STRATEGY:
+
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+
+REVISION HISTORY:
+  Name  Date    Description
+  ----  ----    -----------
+  ardeb  10/26/90  Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+MouseMapDevice  proc  near  uses cx, ds
+  .enter
+    EnumerateDevice  MouseExtendedInfoSeg
+  .leave
+  ret
+MouseMapDevice  endp
 
 Init    ends
 
@@ -502,23 +554,40 @@ MouseDevHandler  proc  far
     pop bx
 
     cmp bh, 0           ; compare wheel data with 0
-    je packetDone       ; if wheel data == 0 there is no wheel action, done
-    jg wheelDown        ; bh value greater than 0 => jump to wheel down
+    je packetDone       ; if wheel data equals zero => no wheel action, done
+    jg wheelDown        ; if dh value greater than 0 => jump to wheel down
 
-    wheelUp:
-    mov cx, 0xE048      ; otherwise => bh < 0 means wheel up => put up key (0xE048) in cx
-    jmp doKeyPress      ; jmp to do the keypress
+    wheelUp:            ; otherwise continue with wheel up
+    cmp ds:[driverVariant], 0 ; compare with 0 = first driver variant = use Up/Down keys
+    jg usePgUp              ; if greater than 0 => use Page up key
+
+    useCursorUp:       ; otherwise use cursor up
+    mov cx, 0xE048     ; dh is smaller than 0 => put up key (0xE048) in cx
+    jmp doPress        ; do the press
+
+    usePgUp:
+    mov cx, 0xE049     ; dh is smaller than 0 => put page up key (0xE049) in cx
+    jmp doPress        ; jmp to do the keypress
 
     wheelDown:
-    mov cx, 0xE050      ; wheel down => put down key (0xE050) in cx
+    cmp ds:[driverVariant], 0 ; compare with 0 = first driver variant = use Up/Down keys
+    jg usePgDown            ; if greater than 0 => use Page down key
 
-    doKeyPress:
-    mov di, mask MF_FORCE_QUEUE ; setup ObjMessage
-    mov ax, MSG_IM_KBD_SCAN
-    mov bx, ds:[mouseOutputHandle]
+    useCursorDown:
+    mov  cx, 0xE050     ; wheel down => put down key (0xE050) in cx
+    jmp doPress         ; do the press
 
-    mov dx, BW_TRUE    ; set to "press"
-    call ObjMessage    ; press - release not necessary!
+    usePgDown:
+    mov cx, 0xE051      ; dh is smaller than 0 => put page up key (0xE051) in cx
+    jmp doPress         ; jmp to do the keypress
+
+    doPress:
+    mov  di, mask MF_FORCE_QUEUE ; setup ObjMessage
+    mov  ax, MSG_IM_KBD_SCAN
+    mov  bx, ds:[mouseOutputHandle]
+
+    mov  dx, BW_TRUE    ; set to "press"
+    call  ObjMessage    ; press - release not necessary!
 
     packetDone:
     ret
