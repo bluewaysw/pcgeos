@@ -3,7 +3,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   Copyright (c) GeoWorks 1989 -- All Rights Reserved
 
 PROJECT:  PC GEOS
-MODULE:    Mouse Driver -- CuteMouse based
+MODULE:    Mouse Driver - CuteMouse based with wheel support
 FILE:    ctm.asm
 
 AUTHOR:    Adam de Boor, Jul 20, 1989
