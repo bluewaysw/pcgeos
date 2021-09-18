@@ -28,12 +28,12 @@
 # library table of a client geode (along with the protocol number). It is also
 # what Swat uses to name the patient.
 #
-name     gcont.app
+name     scroll.app
 #
 # Long filename: this name can be displayed by GeoManager. "EC " is prepended to
 # this when the error-checking version is linked by Glue.
 #
-longname "GenContent"
+longname "Scroll"
 #
 # Specify geode type: is an application, and will have its own thread started
 # for it by the kernel. It may only be launched once.
@@ -44,12 +44,12 @@ type   appl, process, single
 # thread (aka "process" when specified as the output of a UI object) will be
 # handled by the HelloProcessClass, which is defined in hello.goc.
 #
-class  GContProcessClass
+class  ScrollProcessClass
 #
 # Specify application object. This is the object that serves as the top-level
 # UI object in the application. See hello3.goc.
 #
-appobj GContApp
+appobj ScrollApp
 #
 # Token: The four-letter name is used by GeoManager to locate the
 # icon for this application in the token database. The tokenid
@@ -57,7 +57,7 @@ appobj GContApp
 # for uniqueness of the token. Since this is a sample application, we
 # use the manufacturer ID for the SDK, which is 8.
 #
-tokenchars "GCNT"
+tokenchars "SCRL"
 tokenid    8
 #
 # Heapspace: This is roughly the non-discardable memory usage
@@ -82,4 +82,4 @@ resource Interface   ui-object
 #
 # Any classes that are defined in the application should be exported here.
 #
-export GContViewClass
+export ScrollViewClass

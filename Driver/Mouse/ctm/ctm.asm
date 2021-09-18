@@ -551,43 +551,54 @@ MouseDevHandler  proc  far
     ; Ideally we'd send them as low-level scroll events which the
     ; view (or list or whatever) could handle as it desired.
     ;
+
     pop bx
-
-    cmp bh, 0           ; compare wheel data with 0
+    cmp bh, 0
     je packetDone       ; if wheel data equals zero => no wheel action, done
-    jg wheelDown        ; if dh value greater than 0 => jump to wheel down
 
-    wheelUp:            ; otherwise continue with wheel up
-    cmp ds:[driverVariant], 0 ; compare with 0 = first driver variant = use Up/Down keys
-    jg usePgUp              ; if greater than 0 => use Page up key
+    mov dh, bh          ; put wheel data in dh
+    mov	bx, ds:[mouseOutputHandle]
+    mov	di, mask MF_FORCE_QUEUE
+    mov	ax, MSG_IM_WHEEL_CHANGE
+    call ObjMessage		; Send the event
 
-    useCursorUp:       ; otherwise use cursor up
-    mov cx, 0xE048     ; dh is smaller than 0 => put up key (0xE048) in cx
-    jmp doPress        ; do the press
-
-    usePgUp:
-    mov cx, 0xE049     ; dh is smaller than 0 => put page up key (0xE049) in cx
-    jmp doPress        ; jmp to do the keypress
-
-    wheelDown:
-    cmp ds:[driverVariant], 0 ; compare with 0 = first driver variant = use Up/Down keys
-    jg usePgDown            ; if greater than 0 => use Page down key
-
-    useCursorDown:
-    mov  cx, 0xE050     ; wheel down => put down key (0xE050) in cx
-    jmp doPress         ; do the press
-
-    usePgDown:
-    mov cx, 0xE051      ; dh is smaller than 0 => put page up key (0xE051) in cx
-    jmp doPress         ; jmp to do the keypress
-
-    doPress:
-    mov  di, mask MF_FORCE_QUEUE ; setup ObjMessage
-    mov  ax, MSG_IM_KBD_SCAN
-    mov  bx, ds:[mouseOutputHandle]
-
-    mov  dx, BW_TRUE    ; set to "press"
-    call  ObjMessage    ; press - release not necessary!
+;    pop bx
+;
+;    cmp bh, 0           ; compare wheel data with 0
+;    je packetDone       ; if wheel data equals zero => no wheel action, done
+;    jg wheelDown        ; if dh value greater than 0 => jump to wheel down
+;
+;    wheelUp:            ; otherwise continue with wheel up
+;    cmp ds:[driverVariant], 0 ; compare with 0 = first driver variant = use Up/Down keys
+;    jg usePgUp              ; if greater than 0 => use Page up key
+;
+;    useCursorUp:       ; otherwise use cursor up
+;    mov cx, 0xE048     ; dh is smaller than 0 => put up key (0xE048) in cx
+;    jmp doPress        ; do the press
+;
+;    usePgUp:
+;    mov cx, 0xE049     ; dh is smaller than 0 => put page up key (0xE049) in cx
+;    jmp doPress        ; jmp to do the keypress
+;
+;    wheelDown:
+;    cmp ds:[driverVariant], 0 ; compare with 0 = first driver variant = use Up/Down keys
+;    jg usePgDown            ; if greater than 0 => use Page down key
+;
+;    useCursorDown:
+;    mov  cx, 0xE050     ; wheel down => put down key (0xE050) in cx
+;    jmp doPress         ; do the press
+;
+;    usePgDown:
+;    mov cx, 0xE051      ; dh is smaller than 0 => put page up key (0xE051) in cx
+;    jmp doPress         ; jmp to do the keypress
+;
+;    doPress:
+;    mov  di, mask MF_FORCE_QUEUE ; setup ObjMessage
+;    mov  ax, MSG_IM_KBD_SCAN
+;    mov  bx, ds:[mouseOutputHandle]
+;
+;    mov  dx, BW_TRUE    ; set to "press"
+;    call  ObjMessage    ; press - release not necessary!
 
     packetDone:
     ret

@@ -12,7 +12,7 @@ ROUTINES:
 	Name			Description
 	----			-----------
 
-	
+
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
@@ -21,7 +21,7 @@ REVISION HISTORY:
 
 DESCRIPTION:
 	Code for handling the input chain (the bulk of the input manager).
-		
+
 
 	$Id: imMonitors.asm,v 1.1 97/04/05 01:17:17 newdeal Exp $
 
@@ -109,7 +109,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 SYNOPSIS:	Return reciept to IM of MSG_META_MOUSE_BUTTON's having been received
 		by the UI.  Used to keep track of whether the User has gotten
 		ahead of the UI.  Should ONLY be called by the UI's flow object.
-			
+
 CALLED BY:	EXTERNAL
 
 PASS:		cx, dx, bp	- MSG_META_MOUSE_BUTTON event data
@@ -119,7 +119,7 @@ RETURN:
 DESTROYED:	nothing
 
 PSEUDO CODE/STRATEGY:
-				
+
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 	THIS ROUTINE DOES
 
@@ -153,7 +153,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 SYNOPSIS:	Return reciept to IM of MSG_META_KBD_CHAR's having been received
 		by the UI.  Used to keep track of whether the User has gotten
 		ahead of the UI.
-			
+
 CALLED BY:	EXTERNAL
 
 PASS:		cx, dx, bp	- MSG_META_KBD_CHAR event data
@@ -163,7 +163,7 @@ RETURN:
 DESTROYED:	nothing
 
 PSEUDO CODE/STRATEGY:
-				
+
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 	THIS ROUTINE DOES
 
@@ -195,7 +195,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 SYNOPSIS:	Processes all user input before sending on to the focus.
 			Sends events through input monitors
 			Sums pointer position data
-		
+
 
 CALLED BY:	EXTERNAL
 
@@ -242,18 +242,23 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-ProcessUserInput	method	IMClass, MSG_IM_PTR_CHANGE, 
-		MSG_IM_BUTTON_CHANGE, MSG_IM_KBD_SCAN, 
-		MSG_IM_PRESSURE_CHANGE, MSG_IM_DIRECTION_CHANGE, 
-		MSG_META_NOTIFY, MSG_META_NOTIFY_WITH_DATA_BLOCK,
-		MSG_IM_INK_TIMEOUT,
-		MSG_META_KBD_CHAR,
-if INK_DIGITIZER_COORDS
-		MSG_META_EXPOSED,
-		MSG_IM_READ_DIGITIZER_COORDS
-else
-		MSG_META_EXPOSED
-endif
+ProcessUserInput	method	IMClass, MSG_IM_PTR_CHANGE,
+																	 MSG_IM_BUTTON_CHANGE,
+																	 MSG_IM_KBD_SCAN,
+																	 MSG_IM_PRESSURE_CHANGE,
+																	 MSG_IM_DIRECTION_CHANGE,
+																	 MSG_META_NOTIFY,
+																	 MSG_META_NOTIFY_WITH_DATA_BLOCK,
+ 																	 MSG_IM_INK_TIMEOUT,
+ 																	 MSG_META_KBD_CHAR,
+																	 if INK_DIGITIZER_COORDS
+																			MSG_META_EXPOSED,
+																			MSG_IM_READ_DIGITIZER_COORDS,
+																	 else
+																			MSG_META_EXPOSED,
+																	 endif
+																	 MSG_IM_WHEEL_CHANGE
+
 
 ;	(Handle MSG_META_KBD_CHAR to allow keycaps to work)
 
@@ -275,7 +280,7 @@ CallMon:
 					; Set flag showing we're in
 					;	monitor
 	ornf	ds:[bx].M_flags, mask MF_IN_MONITOR
-					
+
 	push	bx
 	push	ds
 	mov	bx, segment idata
@@ -552,7 +557,7 @@ PASS:		ds:bx	- pointer to Monitor structure to remove
 			  processing data.
 
 			  Bits 5-0 - must be 0
-				  
+
 
 RETURN:		ds:bx	- Monitor unlinked, not executing
 
@@ -693,7 +698,7 @@ UnlinkMonitor	proc	far
 	jz	50$			; so skip doing so.
 	mov	es:[di].M_nextMonitor.high, ds
 	mov	es:[di].M_nextMonitor.low, si
-50$:	
+50$:
 					; We can always update the previous
 					;	monitor's linkage.
 	mov	ds:[si].M_prevMonitor.high, es
@@ -703,7 +708,7 @@ UnlinkMonitor	proc	far
 	ret
 
 UnlinkMonitor	endp
-		
+
 
 
 
@@ -754,7 +759,7 @@ RETURN:		AL = MF_DATA, indicating data being returned
 		screen, so we just return 0 here to do that if screen
 		was actually unblanked in MaybeUnblankScreens.
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -779,7 +784,7 @@ PSEUDO CODE/STRATEGY:
 				Bits  1-0 = button #
 		si	- driver handle
 
-		
+
 
 	Events sent to applications from UI:
 	-----------------------------------
@@ -794,7 +799,7 @@ PSEUDO CODE/STRATEGY:
 
 		NOTES:		Position is relative to upper left hand corner
 				of window that event is being sent to. If
-				mouse movements occur faster than the 
+				mouse movements occur faster than the
 				application can read them, consecutive
 				WM_MOUSE_MOVE/WM_PRESSURE_CHANGE/
 				WM_DIRECTION_CHANGE events will
@@ -851,11 +856,13 @@ screenOn1:
 endif
 	cmp	di, MSG_IM_BUTTON_CHANGE
 	je	CIM_Button
+	cmp di, MSG_IM_WHEEL_CHANGE
+	je CIM_Wheel
 	cmp	di, MSG_META_KBD_CHAR
 	je	CIM_Kbd
 
 	tst	ds:[delayedRelease]
-	jz	Nothing			;if no delayed release 
+	jz	Nothing			;if no delayed release
 						;event to send
 
 	mov	cx,ds:[delayedReleaseEvent].HE_cx	;restore data
@@ -876,7 +883,7 @@ endif					; if none of the above, done
 CIM_Button:				; BUTTON change
 	call	ProcessButton
 	jc	ButtonRet		;jmp if al already set
-		
+
 if CONSUME_INPUT_IF_SCREEN_SAVER_ACTIVE
 	mov	al, ds:returnMonitorFlag ;we dont care about dragging and stuff
 else					 ;above
@@ -884,6 +891,11 @@ else					 ;above
 endif
 
 ButtonRet:
+	ret
+
+CIM_Wheel:
+	call ProcessWheel
+	mov	al, mask MF_DATA
 	ret
 
 CIM_Kbd:				; KEYBOARD CHAR
@@ -961,7 +973,7 @@ P30:
 
 	test	ds:[dragState], mask BI_B0_DOWN or mask BI_B1_DOWN or mask BI_B2_DOWN or mask BI_B3_DOWN
 	jnz	P100		;jmp if potential drags happening
-	
+
 
 CMI_P50:				; Change event type to reflect
 					;	changes
@@ -970,7 +982,7 @@ CMI_P50:				; Change event type to reflect
 	mov	bl, ds:[buttonState]	; show state of all buttons
 P60:
 	mov	bh, ds:[shiftState]	; & state of keyboard
-	mov	bp, bx			; put into bp	
+	mov	bp, bx			; put into bp
 	;
 	; Even if CONSUME_INPUT_IF_SCREEN_SAVER_ACTIVE,
 	; we don't need to worry about consuming pointer event.
@@ -1010,10 +1022,10 @@ PASS:		ds	= dgroup
 RETURN:		carry set if screen was already on
 		carry clr if screen was just turned on
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1029,12 +1041,12 @@ MaybeUnblankScreens proc	near
 
 	mov	ax, ds:[screenSaver].SS_maxCount	; get current count
 	xchg	ax, ds:[screenSaver].SS_curCount	; reset, get old count
-		
+
 ;	tst	ax					; if 0, then restart
 ;	jne	done
 
 	test	ds:[screenSaver].SS_state, mask SSS_ACTIVE
-	stc	
+	stc
 	jz	done
 
 	call	UnBlankScreens				; Wake up!
@@ -1150,6 +1162,19 @@ PB_ret:
 
 ProcessButton	endp
 
+ProcessWheel proc near
+	cmp dh, 0
+	jg wheelDown
+
+	wheelUp:
+	mov di, MSG_META_MOUSE_WHEEL_UP
+	ret
+
+	wheelDown:
+	mov di, MSG_META_MOUSE_WHEEL_DOWN
+	ret
+ProcessWheel endp
+
 
 ProcessKbd	proc	near
 ifdef	SYSTEM_SHUTDOWN_CHAR
@@ -1175,7 +1200,7 @@ DBCS <	cmp	cx, SYSTEM_SHUTDOWN_CHAR          			>
 	mov	ds:[alreadyReset], TRUE
 
 	mov	ax,SST_CLEAN_FORCED	; Force applications to shutdown
-	
+
 doShutdown:
 	push	cx, dx, bp
 	call	SysShutdown		; destroys everything but ds,es,si,di
@@ -1209,31 +1234,31 @@ SYNOPSIS:	Determines if a drag event needs to be sent for a given
 CALLED BY:	INTERNAL
 		CombineInputMonitor
 
-PASS:		
+PASS:
 	al - low 2 bits are button number, rest clear
 	bp - time of current IM_PTR_CHANGE event
 	ds - segment of idata
 		ds:[displayXPos] position of current event
 		ds:[displayYPos] position of current event
 		ds:[dragState]
-RETURN:		
+RETURN:
 	clc - event should not be sent
 
 	stc - send that baby
 		di - MSG_META_MOUSE_DRAG
 		al - mask MF_DATA
 		bl - button info
-		bit for button is cleared in ds:[dragState]		
+		bit for button is cleared in ds:[dragState]
 
 	don't destroy cx,dx,bp
-	
-DESTROYED:	
+
+DESTROYED:
 	ah,bx
 
 
 PSEUDO CODE/STRATEGY:
-	A drag event for a button should only be sent if	
-	the corresponding bit in dragState is set and one of the following 
+	A drag event for a button should only be sent if
+	the corresponding bit in dragState is set and one of the following
 	is true.
 
 	The distance between the button press and the position of this
@@ -1275,7 +1300,7 @@ SetDragEventIfNecessary	proc	near
 
 	clr	bh
 	mov	bl,ah			;button number
-	shl	bx,1			
+	shl	bx,1
 	mov	bx,ds:[bx].bpsTable	;offset to button structure
 
 		;CHECK DISTANCE
@@ -1341,41 +1366,41 @@ SYNOPSIS:	Determine if we need to send a drag event before we send
 CALLED BY:	INTERNAL
 		ProcessButton
 
-PASS:		
+PASS:
 	bp - button info
 	cx - low word of time of button event
 	ds - segment of dgroup
 		ds:[displayXPos] position of current button event
 		ds:[displayYPos] position of current button event
 		ds:[dragState]
-		
-RETURN:		
+
+RETURN:
 	clc - no lost drag
 
 	stc - send a lost drag
 		di - MSG_META_MOUSE_DRAG
 		al - mask MF_MORE_TO_DO
 		bp - button info
-		bit for button is cleared in ds:[dragState]		
+		bit for button is cleared in ds:[dragState]
 		ds:[delayedRelease] - 1
 		ds:[delayedReleaseEvent] - delayed event data
-DESTROYED:	
+DESTROYED:
 	nothing
 
 PSEUDO CODE/STRATEGY:
 	Consider this:
 	The user clicks, moves less than the dragDistance but keeps the
-	button pressed for at least the dragTime and then releases. 
-	However, the input manager is backlogged and doesn`t start 
+	button pressed for at least the dragTime and then releases.
+	However, the input manager is backlogged and doesn`t start
 	processing the button press until after the user has released.
 	Since the dragDistance wasn't violated we are depending upon the
 	timer started when processing the button press to send us a ptr
 	event after the dragTime has passed. But since the release has
-	already happened, it will be in the queue before the timer 
+	already happened, it will be in the queue before the timer
 	generated ptr event. And if the button is released we don't send
 	a drag event when the ptr event comes in. Got it. So, upon the
-	release we check and see if we need to send the drag event 
-	before the release event. If so, we save the release event data, 
+	release we check and see if we need to send the drag event
+	before the release event. If so, we save the release event data,
 	send of the drag event and tell the monitor chain to come back
 	to us so we can then send the release event. Yeah.
 
@@ -1393,7 +1418,7 @@ CheckForLostDrag		proc	near
 	mov	ax,bp
 	and	al, mask BI_BUTTON	;clear all but button #
 	mov	bp,cx			;low word of time
-	call	SetDragEventIfNecessary	
+	call	SetDragEventIfNecessary
 	pop	ax,bp
 	jnc	done
 	mov	ds:[delayedRelease],1	;flag that one has been delayed
@@ -1412,22 +1437,22 @@ CheckForLostDrag		endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    		PtrPerturbMonitor	
+    		PtrPerturbMonitor
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	PTR is made to perform snap/ratchet operations, and/or 
+SYNOPSIS:	PTR is made to perform snap/ratchet operations, and/or
 		confined to some region (rectangle only?)
 
 CALLED BY:	ProcessUserInput
 
-PASS:		
+PASS:
 		al 		- MF_DATA
 		di 		- event type
 				  (or 0 if to retrieve additional data)
 		cx, dx, bp, si 	- event data
 		ss:sp 		- stack frame of Input Manager
 
-RETURN:		
+RETURN:
 		al 		- MF_DATA, indicating data being returned
 		di 		- event type
 				  (or 0 if to retrieve additional data)
@@ -1436,7 +1461,7 @@ RETURN:
 DESTROYED:	?
 
 PSEUDO CODE/STRATEGY:
-		If (mouse is constrained) && 
+		If (mouse is constrained) &&
 		   (mousePos = outside constraining box) then
 		    Move x pos within constraints;
 		    Move y pos within constraints;
@@ -1448,7 +1473,7 @@ PSEUDO CODE/STRATEGY:
 		    Move y pos to ratchet (if applicable);
 		Else
 		    Do nothing;
-		    
+
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
@@ -1470,22 +1495,22 @@ PtrPerturbMonitor	proc	far
 	or	ax, PTR_LEAVE_LEFT
 10$:
 	cmp	cx, ds:[constrainXMax]
-	jle	20$		 	
+	jle	20$
 	mov	cx, ds:[constrainXMax]
 	or	ax, PTR_LEAVE_RIGHT
 20$:
-	mov	ds:[pointerXPos], cx	
+	mov	ds:[pointerXPos], cx
 	cmp	dx, ds:[constrainYMin]
-	jge	30$		 	
+	jge	30$
 	mov	dx, ds:[constrainYMin]
 	or	ax, PTR_LEAVE_TOP
 30$:
 	cmp	dx, ds:[constrainYMax]
-	jle	40$		 	
+	jle	40$
 	mov	dx, ds:[constrainYMax]
 	or	ax, PTR_LEAVE_BOTTOM
 40$:
-	mov	ds:[pointerYPos], dx	
+	mov	ds:[pointerYPos], dx
 	cmp	ax, 0				; Check if ptr tried to leave
 	jz	90$				;   constrain
 	cmp	ds:[constrainOD].handle, 0	; If OD=0, don't send anything
@@ -1537,12 +1562,12 @@ PSEUDO CODE/STRATEGY:
 			}
 			If grab not requesting ptr movement, don't pass on to
 				next monitor;
-			Send event to outputProcess using custom combine 
+			Send event to outputProcess using custom combine
 				routine to compress PTR data;
 		} elsif MSG_META_MOUSE_BUTTON {
 			Increment # of unprocessed events regarding this button
 		} else send EVENT to outputProcess;
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 		none
@@ -1623,7 +1648,7 @@ P140:
 	call	OutputUpdateScreenXor
 	mov	ds:[pointerXPos], cx	; update pointer x & y position
 	mov	ds:[pointerYPos], dx	; (may have changed)
-	
+
 AfterScreenXor:
 
 				; UPDATE PTR IMAGE
@@ -1732,7 +1757,7 @@ RETURN:		AL = 0, indicating no more to come, & Nothing being returned
 		es unchanged
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 		none
@@ -1885,7 +1910,7 @@ endif
 ONP_105:					; END SCREEN XOR:
 	push	cx, dx
 	call	ImDoStopScreenXor	;    and stop the screen xor
-					; ### Possibly add code here to 
+					; ### Possibly add code here to
 					; send MSG_META_END_XOR to process.
 	pop	cx, dx
 109$:
@@ -1898,7 +1923,7 @@ ONP_105:					; END SCREEN XOR:
 120$:
 	mov	cx, ds:[drawnXPos]	; move the pointer to the drawn pos
 	mov	dx, ds:[drawnYPos]	;   to handle cases where button actions
-	mov	ax, cx			;   change mouse pos (but aren't 
+	mov	ax, cx			;   change mouse pos (but aren't
 	mov	bx, dx			;   affected by MOVEPTR above)
 	call	CallMovePtr		; & move ptr on screen
 noXor:
@@ -1948,4 +1973,3 @@ OutputNonPtr	endp
 
 
 IMResident	ends
-
