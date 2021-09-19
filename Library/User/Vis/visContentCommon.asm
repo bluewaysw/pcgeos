@@ -10,26 +10,26 @@ FILE:		visContentCommon.asm
 ROUTINES:
 	Name			Description
 	----			-----------
-    MTD MSG_META_CONTENT_VIEW_LOST_GADGET_EXCL 
+    MTD MSG_META_CONTENT_VIEW_LOST_GADGET_EXCL
 				Handles notification that subview we're in
 				has lost the gadget exclusive, meaning
 				someone took it away or the view is
 				closing.  In either case, force loss of
 				gadget exclusive here.
 
-    INT VisContentSendToLargeDocumentLayers 
+    INT VisContentSendToLargeDocumentLayers
 				Send a message to the vis children of a
 				Large VisContent -- children are assumed to
 				be "layers". If VCNA_LARGE_DOCUMENT_MODEL
 				flag isn't set, then do nothing.
 
-    MTD MSG_META_IMPLIED_WIN_CHANGE 
+    MTD MSG_META_IMPLIED_WIN_CHANGE
 				Handles notification that the implied
 				window, or window that the mouse is in,
 				when interacting with this IsoContent, has
 				changed.
 
-    MTD MSG_VIS_CONTENT_TEST_IF_ACTIVE_OR_IMPLIED_WIN 
+    MTD MSG_VIS_CONTENT_TEST_IF_ACTIVE_OR_IMPLIED_WIN
 				Tests to see if the window handle passed is
 				the same as the active or implied window
 				being used to translate button & ptr
@@ -38,12 +38,12 @@ ROUTINES:
 				mouse was in actual port window, or whether
 				it was just over the port border.
 
-    MTD MSG_META_CONTENT_VIEW_ORIGIN_CHANGED 
+    MTD MSG_META_CONTENT_VIEW_ORIGIN_CHANGED
 				Handles notification of document origin
 				changing by storing the new location into
 				instance data for later use
 
-    MTD MSG_VIS_VUP_ALTER_INPUT_FLOW 
+    MTD MSG_VIS_VUP_ALTER_INPUT_FLOW
 				Grab/Release input for a certain object
 				which is a child of ours.
 
@@ -52,7 +52,7 @@ ROUTINES:
 
     INT ChangeGrab              Change grab within VisContent object
 
-    INT CopyVupAlterInputFlowDataToVisMouseGrab 
+    INT CopyVupAlterInputFlowDataToVisMouseGrab
 				Copies data passed in
 				MSG_VIS_VUP_ALTER_INPUT_FLOW into
 				VisMouseGrab structure.  Leaves VMG_object
@@ -61,7 +61,7 @@ ROUTINES:
     INT FindPassiveGrabElement  Search passive VisMouseGrab list, looking
 				for VMG_object passed
 
-    INT FindPassiveGrabElementCallBack 
+    INT FindPassiveGrabElementCallBack
 				Search passive VisMouseGrab list, looking
 				for VMG_object passed
 
@@ -69,11 +69,11 @@ ROUTINES:
 				so as not to provide synchronous behavior
 				where apps normally don't get it.
 
-    MTD MSG_META_NOTIFY_WITH_DATA_BLOCK 
+    MTD MSG_META_NOTIFY_WITH_DATA_BLOCK
 				This method handler queries all the vis
 				children to find one that accepts ink.
 
-    INT VisContentCheckOnInputHoldUpLow 
+    INT VisContentCheckOnInputHoldUpLow
 				Implement UI-hold up scheme.
 
     INT CombineMouseEvent       Implement UI-hold up scheme.
@@ -81,36 +81,36 @@ ROUTINES:
     INT VisContentGetQueue      Return hold up input queue (create if not
 				yet existing)
 
-    INT ECVisContentEnsureEventsNotOutOfOrder 
+    INT ECVisContentEnsureEventsNotOutOfOrder
 				Make sure the hold-up queue is empty
 
-    INT VisSendMouseDataToPassiveGrab 
+    INT VisSendMouseDataToPassiveGrab
 				Send mouse event to passive grab
 
-    INT SendMouseToPassiveGrabElementCallBack 
+    INT SendMouseToPassiveGrabElementCallBack
 				Send mouse event to passive grab
 
-    INT VisSendMouseDataToActiveOrImpliedGrab 
+    INT VisSendMouseDataToActiveOrImpliedGrab
 				Send mouse event to Active/Implied grab
 
-    GLB VisContentTransformCoords 
+    GLB VisContentTransformCoords
 				This routine transforms a point from the
 				IsoContent's coordinate system to the
 				destination coordinate system.
 
     INT VisSendMouseDataToGrab  Send mouse event to VisMouseGrab passed
 
-    INT ConvertSmallMouseEventToLarge 
+    INT ConvertSmallMouseEventToLarge
 				Convert incoming mouse location to 32-bit
 				integer, 16 bit fractional, translated
 				document coordinates
 
-    INT ConvertSmallMouseMethodToLarge 
+    INT ConvertSmallMouseMethodToLarge
 				Convert incoming mouse location to 32-bit
 				integer, 16 bit fractional, translated
 				document coordinates
 
-    INT ConvertSmallWinMouseEventToSmallDoc 
+    INT ConvertSmallWinMouseEventToSmallDoc
 				Convert incoming mouse location to 16-bit
 				translated document coordinates
 
@@ -118,28 +118,28 @@ ROUTINES:
 				16-bit fractional translated document
 				coordinates
 
-    MTD MSG_VIS_CONTENT_DISABLE_HOLD_UP 
+    MTD MSG_VIS_CONTENT_DISABLE_HOLD_UP
 				Change input state to force allowance of
 				input data to flow
 
-    MTD MSG_VIS_CONTENT_ENABLE_HOLD_UP 
+    MTD MSG_VIS_CONTENT_ENABLE_HOLD_UP
 				Change input state to allow hold-up mode
 
-    MTD MSG_VIS_CONTENT_HOLD_UP_INPUT_FLOW 
+    MTD MSG_VIS_CONTENT_HOLD_UP_INPUT_FLOW
 				Start holding up all UI input events, in a
 				separate queue, until VisContentResumeInput
 				is called (A count is kept, so multiple
 				patients can use)
 
-    MTD MSG_VIS_CONTENT_RESUME_INPUT_FLOW 
+    MTD MSG_VIS_CONTENT_RESUME_INPUT_FLOW
 				Allow UI input to flow again.
 
-    INT VisContentFlushHoldUpInputQueue 
+    INT VisContentFlushHoldUpInputQueue
 				Flush the hold-up input queue by moving all
 				events in it to the front of the UI queue,
 				in order.
 
-    MTD MSG_META_LOST_FOCUS_EXCL 
+    MTD MSG_META_LOST_FOCUS_EXCL
 				Provide standard behavior for focus node
 
 				Handled specially here so we can just
@@ -151,7 +151,7 @@ ROUTINES:
 				no knowledge of whether anything has the
 				focus here.
 
-    INT ViewUpdateContentTargetInfo 
+    INT ViewUpdateContentTargetInfo
 				Find a block of memory of the given size
 				and type.
 
@@ -207,7 +207,7 @@ VisContentInvalidate	method VisContentClass, MSG_VIS_INVALIDATE
 					uses si, ds
 	.enter
 
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset			;static handler
 	mov	di, ds:[di].VCI_window
 	tst	di
@@ -236,7 +236,7 @@ METHOD:		VisContentObjFlushInputQueue
 DESCRIPTION:	Extends default window death mechanism by making sure that
 		the hold-up input queue is flushed out as well, before the
 		superclass is called.
-		
+
 
 PASS:		*ds:si 	- instance data
 		es     	- segment of MetaClass
@@ -287,9 +287,9 @@ VisContentObjFlushInputQueue	endm
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		VisContentSubviewLostGadgetExcl -- 
+METHOD:		VisContentSubviewLostGadgetExcl --
 
-DESCRIPTION:	Handles notification that subview we're in has lost the 
+DESCRIPTION:	Handles notification that subview we're in has lost the
 		gadget exclusive, meaning someone took it away or the view
 		is closing.  In either case, force loss of gadget exclusive
 		here.
@@ -331,7 +331,7 @@ VisContentSubviewLostGadgetExcl	endm
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		VisContentSetInteractionBounds -- 
+METHOD:		VisContentSetInteractionBounds --
 		MSG_VIS_VUP_SET_INTERACTION_BOUNDS for VisContentClass
 
 DESCRIPTION:	Sends bounds up to the view so it can constrain any dragging.
@@ -341,11 +341,11 @@ PASS:		*ds:si 	- instance data
 		ax 	- MSG_VIS_VUP_SET_INTERACTION_BOUNDS
 		ss:bp	- {Rect} visible bounds
 		dx	- size Rect
-		
+
 RETURN:		nothing
 		ax, cx, dx, bp - destroyed
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -367,7 +367,7 @@ VisContentSetInteractionBounds	method VisContentClass, \
 	mov	bx, ss:[bp].R_top
 	mov	cx, ss:[bp].R_right
 	mov	dx, ss:[bp].R_bottom		;extract bounds
-	
+
 	sub	sp, size RectDWord
 	mov	bp, sp
 	mov	ss:[bp].RD_left.low, ax
@@ -379,14 +379,14 @@ VisContentSetInteractionBounds	method VisContentClass, \
 	mov	ss:[bp].RD_top.high, dx
 	mov	ss:[bp].RD_right.high, dx
 	mov	ss:[bp].RD_bottom.high, dx
-			
+
 	mov	di, ds:[si]			;point to instance
 	add	di, ds:[di].Vis_offset		;ds:[di] -- VisInstance
 	mov	bx, ds:[di].VCNI_view.handle
 	mov	si, ds:[di].VCNI_view.chunk	;get generic view OD
 	tst	si				;no view, get out
 	jz	exit
-	
+
 	mov	dx, size RectDWord
 	mov	ax, MSG_GEN_VIEW_SET_DRAG_BOUNDS
 	mov	di, mask MF_FIXUP_DS or mask MF_STACK
@@ -397,7 +397,7 @@ exit:
 	ret
 VisContentSetInteractionBounds	endm
 
-				
+
 
 
 
@@ -419,7 +419,7 @@ RETURN:		ax,cx,dx,bp - returned (destroyed) by called methods
 
 DESTROYED:	di
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -434,9 +434,9 @@ VisContentSendToLargeDocumentLayers	proc far
 	.enter
 	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
-	test	ds:[di].VCNI_attrs, mask VCNA_LARGE_DOCUMENT_MODEL	
+	test	ds:[di].VCNI_attrs, mask VCNA_LARGE_DOCUMENT_MODEL
 	jz	done
-	
+
 	call	VisSendToChildren
 
 done:
@@ -464,8 +464,8 @@ PASS:
 		  implied grab.
 	bp      - window that ptr is in
 
-	 
-	  
+
+
 RETURN:
 	carry - ?
 	ax - ?
@@ -520,7 +520,7 @@ endif
 	; implied object.		-- Doug 3/92
 	;
 	; P.S.  This may prove to be a small problem when the UI itself
-	; becomes an application object -- the UI's GenApplication may 
+	; becomes an application object -- the UI's GenApplication may
 	; legitimately be told the implied window is the field that the UI's
 	; GenApp happens to sit on.
 	;
@@ -556,7 +556,7 @@ PASS:		*ds:si	- flow object
 RETURN:
 		carry	- clear if match, set if no match.
 		ax, cx, dx, bp - destroyed
-		
+
 DESTROYED:
 		Nothing
 
@@ -656,7 +656,7 @@ copyLoop:
 	; Now call children if LARGE_DOCUMENT_MODEL
 	;
 	pop	ax					; message #
-	call	VisContentSendToLargeDocumentLayers	
+	call	VisContentSendToLargeDocumentLayers
 
 
 	Destroy	ax, cx, dx, bp
@@ -682,7 +682,7 @@ PASS:		*ds:si 	- instance data
 
 		cx, dx, bp - MSG_VIS_DRAW data
 				(not used here, but passed on)
-		
+
 RETURN:		nothing
 
 DESTROYED:	bx, si, di, ds, es
@@ -709,7 +709,7 @@ VisContentDraw 	method VisContentClass, MSG_VIS_DRAW
 	GOTO	ObjCallSuperNoLock
 
 largeModel:
-	; Before asking all our children to draw, make sure we've got a 
+	; Before asking all our children to draw, make sure we've got a
 	; non-NULL mask region here.
 	;
 	sub	sp, size RectDWord	; create frame for return data
@@ -900,7 +900,7 @@ done:
 	; Notify ourselves that the active window has changed.  This
 	; info is needed by the specific UI's implementation of
 	; GenApplicationClass which is responsible for keeping the window
-	; system abreast as to the current active window within the 
+	; system abreast as to the current active window within the
 	; application.
 	;
 	mov	ax, MSG_VIS_CONTENT_NOTIFY_ACTIVE_MOUSE_GRAB_WIN_CHANGED
@@ -987,7 +987,7 @@ COMMENT @----------------------------------------------------------------------
 
 FUNCTION:	AllocateGrabList
 
-DESCRIPTION:	Allocate new chunk for passive grab list within a 
+DESCRIPTION:	Allocate new chunk for passive grab list within a
 		VisContent object
 
 CALLED BY:	INTERNAL
@@ -1015,19 +1015,19 @@ AllocateGrabList	proc	near	uses	bx
 	; Figure out which ObjChunkFlags to use for new chunk.   (Changed
 	; to use IGNORE_DIRTY for all generic VisContents. 5/26/93 cbh)
 	;
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	test	ds:[di].VI_typeFlags, mask VTF_IS_GEN
 	jz	10$
-	mov	al, mask OCF_IGNORE_DIRTY	; Mark dirty, since newly 
+	mov	al, mask OCF_IGNORE_DIRTY	; Mark dirty, since newly
 	jmp	short 20$			; created
 10$:
-	mov	ax, si				; Pass chunk of VisContent 
+	mov	ax, si				; Pass chunk of VisContent
 	call	ObjGetFlags			; Get current state flags for
 						; VisContent
-	and	al, mask OCF_IGNORE_DIRTY	; Copy over ignore dirty 
+	and	al, mask OCF_IGNORE_DIRTY	; Copy over ignore dirty
 						; request, if there.
-	or	al, mask OCF_DIRTY		; Mark dirty, since newly 
+	or	al, mask OCF_DIRTY		; Mark dirty, since newly
 						; created
 20$:
 	; & create the new chunk, in same block, for storing grab list
@@ -1071,7 +1071,7 @@ RETURN:
 		carry	- set if grab OD changes
 
 DESTROYED:	nothing
-	
+
 
 ------------------------------------------------------------------------------@
 
@@ -1413,6 +1413,8 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 
 VisContentMouseEvent	method	VisContentClass, MSG_META_PTR, \
+								MSG_META_MOUSE_WHEEL_UP, \
+								MSG_META_MOUSE_WHEEL_DOWN, \
 					      MSG_META_START_SELECT, \
 					      MSG_META_START_MOVE_COPY, \
 					      MSG_META_START_FEATURES, \
@@ -1448,7 +1450,7 @@ VisContentMouseEvent	method	VisContentClass, MSG_META_PTR, \
 	call	VisSendMouseDataToPassiveGrab
 	pop	ax
 
-; MORE TO DO -- active message may have changed (Due to termination of 
+; MORE TO DO -- active message may have changed (Due to termination of
 ; active function), so we shouldn't just push & pop ax.  Instead, use
 ; activeMouseMethod.
 
@@ -1603,7 +1605,7 @@ EC <	ERROR_AE	UI_INVALID_INK_RETURN_VALUE			>
 	; be sent by the app later).
 	;
 
-	cmp	bx, IRV_WAIT						
+	cmp	bx, IRV_WAIT
 	jz	exit
 
 sendReply:
@@ -1638,7 +1640,7 @@ CALLED BY:	GLOBAL
 PASS:		same as MSG_META_NOTIFY_WITH_DATA_BLOCK
 RETURN:		nada
 DESTROYED:	nada
- 
+
 PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -1683,7 +1685,7 @@ isInk:
 	call	WinUntransform
 	mov	ss:[bp].VCCIBF_bounds.R_left, ax
 	mov	ss:[bp].VCCIBF_bounds.R_top, bx
-	
+
 	mov	ax, es:[IH_bounds].R_right
 	mov	bx, es:[IH_bounds].R_bottom
 	call	WinUntransform
@@ -1721,7 +1723,7 @@ if 0
 ;	jc	freeInk
 ;	mov	es:[IH_bounds].R_left, cx
 ;	mov	es:[IH_bounds].R_top, dx
-;	
+;
 ;	mov	cx, es:[IH_bounds].R_right
 ;	mov	dx, es:[IH_bounds].R_bottom
 ;	call	VisContentTransformCoords
@@ -1860,8 +1862,8 @@ cantUpdate:
 	ret
 CombineMouseEvent	endp
 
-			
-			
+
+
 
 COMMENT @----------------------------------------------------------------------
 
@@ -1906,8 +1908,8 @@ done:
 VisContentGetQueue	endp
 
 
-			
-			
+
+
 
 COMMENT @----------------------------------------------------------------------
 
@@ -1965,10 +1967,10 @@ COMMENT @----------------------------------------------------------------------
 METHOD:		VisContentUnwantedMouseEvent
 
 DESCRIPTION:	Handler for mouse event with no destination, i.e. being
-		sent to a VisMouseGrab which has a null optr stored for 
+		sent to a VisMouseGrab which has a null optr stored for
 		the destination object.  This happens if there is no active,
 		& no implied mouse grab, most commonly if the ptr has been
-		clicked outside of a modal window or outside the visual 
+		clicked outside of a modal window or outside the visual
 		area of an application.  Default behavior here is to beep,
 		on presses only.
 
@@ -2156,7 +2158,7 @@ VisSendMouseDataToActiveOrImpliedGrab	proc	near	uses	ax, di
 	add	di, offset VCNI_impliedMouseGrab - offset VCNI_activeMouseGrab
 
 					; If no active grab, then convert
-					; all drag & end messages into 
+					; all drag & end messages into
 					; OTHER messages, so as not to confuse
 					; objects that happen to be under the
 					; mouse
@@ -2258,7 +2260,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		VisContentTransformCoords
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	This routine transforms a point from the IsoContent's 
+SYNOPSIS:	This routine transforms a point from the IsoContent's
 		coordinate system to the destination coordinate system.
 
 CALLED BY:	GLOBAL
@@ -2266,7 +2268,7 @@ PASS:		cx, dx - point
 		di - destination window handle
 RETURN:		carry set if window is being destroyed
 DESTROYED:	bx
- 
+
 PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -2288,7 +2290,7 @@ EC <	call	ECCheckWindowHandle				>
 EC <	xchg	bx, di						>
 
 	push	ax		; save ax only -- OK to trash bx
-	push	cx, dx		; Save pointer's screen coords   	
+	push	cx, dx		; Save pointer's screen coords
 	call	WinGetWinScreenBounds
 				; Returns carry set if window is being
 				; destroyed
@@ -2972,7 +2974,7 @@ COMMENT @----------------------------------------------------------------------
 
 METHOD:		VisContentHoldUpInput
 
-DESCRIPTION:	Start holding up all UI input events, in a separate queue, 
+DESCRIPTION:	Start holding up all UI input events, in a separate queue,
 		until VisContentResumeInput is called  (A count is kept, so
 		multiple patients can use)
 
@@ -3044,7 +3046,7 @@ VisContentResumeInput	method	dynamic VisContentClass, \
 			MSG_VIS_CONTENT_RESUME_INPUT_FLOW
 	dec	ds:[di].VCNI_holdUpInputCount	; dec hold up count -- if
 						; back to 0, flush out
-						; hold up queue & allow 
+						; hold up queue & allow
 						; input to proceed.
 EC <	ERROR_S	UI_ERROR_NEGATIVE_HOLD_UP_INPUT_COUNT			>
 	jnz	done
@@ -3062,7 +3064,7 @@ FUNCTION:	VisContentFlushHoldUpInputQueue
 
 DESCRIPTION:	Flush the hold-up input queue by moving all events in it
 		to the front of the UI queue, in order.
-		
+
 CALLED BY:	INTERNAL
 
 PASS:		*ds:si	- VisContentInstance
@@ -3186,7 +3188,7 @@ VisContentConsumeMessage	method	VisContentClass, \
 						MSG_META_RELEASE_KBD,
 						MSG_VIS_RELEASE_MOUSE
 	ret
-	
+
 VisContentConsumeMessage	endm
 
 
@@ -3199,8 +3201,8 @@ DESCRIPTION:	Provide standard behavior for focus node
 		Handled specially here so we can just ignore them if
 		no one has the focus yet.  If we let the messages through,
 		the system will die since an object that doesn't have the focus
-		can't be losing or gaining it, but the view sends these 
-		messages down with no knowledge of whether anything has the 
+		can't be losing or gaining it, but the view sends these
+		messages down with no knowledge of whether anything has the
 		focus here.
 
 PASS:		*ds:si 	- instance data
@@ -3363,7 +3365,7 @@ VisContentAlterFTVMCExcl	method	VisContentClass, \
 
 	; The content is not allowed to grab grabs for itself. In
 	; a sense it always hass all grab because the view sends
-	; it everything. If the content did grab a grab it could 
+	; it everything. If the content did grab a grab it could
 	; end up in an infinite loop sending messages to itself.
 	;
 EC <	test	bp, mask MAEF_FOCUS or mask MAEF_TARGET			>
@@ -3488,7 +3490,7 @@ ViewUpdateContentTargetInfo	proc	far	uses ax, bx, cx, dx, di, bp
 	clr	ax
 	mov	ss:[bp].VTI_target.TR_class.handle, ax	; class not yet known
 	mov	ss:[bp].VTI_target.TR_class.chunk, ax
-	tst	bx	
+	tst	bx
 	jz	nullTarget
 	mov	ax, MSG_META_GET_CLASS
 	mov	di, mask MF_CALL or mask MF_FIXUP_DS
@@ -3529,7 +3531,7 @@ PASS:		*ds:si 	- instance data
 		es     	- segment of class
 		ax 	- MSG_META_GET_FOCUS_EXCL,
 			  MSG_VIS_FUP_QUERY_FOCUS_EXCL
-		
+
 RETURN:		^lcx:dx - handle of object with focus
 		bp 	- HierarchicalGrabFlags (Provided for
 			  MSG_VIS_FUP_QUERY_FOCUS_EXCL only)
@@ -3576,7 +3578,7 @@ PASS:		*ds:si 	- instance data
 		ds:di	- SpecInstance
 		es     	- segment of class
 		ax 	- MSG_META_GET_TARGET
-		
+
 RETURN:		^lcx:dx - handle of object with target
 		ax, bp	- destroyed
 
@@ -3612,7 +3614,7 @@ DESCRIPTION:	Sends message to focus/target object.
 		Any object (Including GenApplicationClass) that wants
 		different behaviors for Focus & Target excl will have
 		to intercept this method & do what they want to see done.
-		
+
 
 PASS:
 	*ds:si - instance data
@@ -3676,12 +3678,12 @@ PASS:		*ds:si 	- instance data
 		ds:di	- VisContentInstance
 		es     	- segment of VisContentClass
 		ax 	-
-		
+
 			  Track scrolling (MUST be responded to):
 
 			  MSG_META_CONTENT_TRACK_SCROLLING
 
-			  Large model implied mouse events.  Should go 
+			  Large model implied mouse events.  Should go
 			  to whatever layer the mouse is "over".  The default
 			  behavior here is to presume that layers are
 			  overlapping, & that the layer having the target is
@@ -3705,7 +3707,7 @@ PASS:		*ds:si 	- instance data
 
 		cx, dx, bp - other message data, if any
 				(not used here, but passed on)
-		
+
 RETURN:		?? (depends on message sent in)
 
 DESTROYED:	bx, si, di, ds, es
@@ -3713,7 +3715,7 @@ DESTROYED:	bx, si, di, ds, es
 REGISTER/STACK USAGE:
 
 PSEUDO CODE/STRATEGY:
-	
+
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 
 REVISION HISTORY:
@@ -3774,7 +3776,7 @@ RETURN:		carry	= clear if no children or target
 			= set if a child or target existed:
 				ax, cx, dx, bp = return values of method called
 DESTROYED:	nothing
- 
+
 PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:

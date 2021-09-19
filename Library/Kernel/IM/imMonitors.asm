@@ -1771,6 +1771,11 @@ REVISION HISTORY:
 
 OutputNonPtr	proc	far
 	class	IMClass
+					; handle wheel
+	cmp di, MSG_META_MOUSE_WHEEL_UP
+	je handleWheel
+	cmp di, MSG_META_MOUSE_WHEEL_DOWN
+	je handleWheel
 					; Check for button method
 	cmp	di, MSG_META_MOUSE_BUTTON	; requires special handling
 	je	handleButton
@@ -1788,6 +1793,16 @@ OutputNonPtr	proc	far
 					; 	processed.
 	jmp	SendNonPtr		; send it!
 
+handleWheel:
+	clr	bx			; can't discard if desperate
+	clr	si			; nothing to inc to show partially
+	call	WinEnsureChangeNotification
+	;mov	cx, ds:[drawnXPos]		; pointerXPos?  / make sure cx is set with X ccord
+	;mov	dx, ds:[drawnYPos]		; pointerYPos?  / make sure dx is set with Y coord
+	mov	cx, ds:[pointerXPos]		; pointerXPos?  / make sure cx is set with X ccord
+	mov	dx, ds:[pointerYPos]		; pointerYPos?  / make sure dx is set with Y coord
+
+	jmp SendNonPtr
 
 handleKbd:
 					; Before sending any kbd events,

@@ -6,7 +6,7 @@
 GEODE           = scroll
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = scroll.goc
+SRCS            = scroll.goc lmacros.goh
 OBJS            = scroll.obj
 LOBJS           =
 

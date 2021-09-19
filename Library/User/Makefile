@@ -47,10 +47,10 @@ USER            = userC.asm userDialog.asm userDocumentSave.asm\
                   userUtils.asm userConstant.def userMacro.def\
                   userVariable.def userManager.ui userPassword.ui
 VIS             = visClass.asm visComp.asm visCompGeometry.asm\
-                  visContentClass.asm visEmpty.asm visGeometry.asm\
-                  visIsoContent.asm visManager.asm visSpec.asm\
-                  visSpecUtils.asm visUtilsClass.asm visUtilsResident.asm\
-                  visContentCommon.asm visConstant.def visMacro.def\
+                  visContentClass.asm visContentCommon.asm visEmpty.asm\
+                  visGeometry.asm visIsoContent.asm visManager.asm\
+                  visSpec.asm visSpecUtils.asm visUtilsClass.asm\
+                  visUtilsResident.asm visConstant.def visMacro.def\
                   visVariable.def
 UI_TO_RDFS      = helpControl.ui uiManager.ui userManager.ui
 OBJS            =
@@ -62,6 +62,8 @@ SRCS            = $(GEN) $(HELP) $(IACP) $(PROC) $(TOKEN) $(UI) $(USER)\
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = ui
+
+PRODUCTS        = DBCS 
 
 SYSMAKEFILE     = geode.mk
 
@@ -76,4 +78,8 @@ SYSMAKEFILE     = geode.mk
 
 #if exists($(DEPFILE))
 #include "$(DEPFILE)"
+#endif
+
+#if exists(DBCS/$(DEPFILE))
+#include "DBCS/$(DEPFILE)"
 #endif

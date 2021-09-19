@@ -83,3 +83,4 @@ resource Interface   ui-object
 # Any classes that are defined in the application should be exported here.
 #
 export ScrollViewClass
+export ScrollViewAppClass
