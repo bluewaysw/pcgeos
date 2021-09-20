@@ -2672,7 +2672,7 @@ PASS:
 
 	cx	- x position, mouse source window coordinates
 	dx	- y position, mouse source window coordinates
-	bp	- high byte shiftState, low byte buttonInfo
+	bp	- high byte shiftState, low byte null
 
 RETURN:		nothing
 
@@ -2685,9 +2685,7 @@ KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
-	Doug	3/89		Initial version
-	Jim	12/89		Added support for screen saver function
-	AY	5/17/94		Added list of no-ink windows
+	MeyerK	3/2021		Initial version
 
 ------------------------------------------------------------------------------@
 FlowWheelUp	method dynamic	FlowClass, MSG_META_MOUSE_WHEEL_UP
@@ -2701,7 +2699,7 @@ FlowWheelUp endm
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		FlowWheelUp -- MSG_META_MOUSE_WHEEL_DOWN for FlowClass
+METHOD:		FlowWheelDown -- MSG_META_MOUSE_WHEEL_DOWN for FlowClass
 
 DESCRIPTION:	Disperses WHEEL to the current mouse grab
 
@@ -2715,7 +2713,7 @@ PASS:
 
 	cx	- x position, mouse source window coordinates
 	dx	- y position, mouse source window coordinates
-	bp	- high byte shiftState, low byte buttonInfo
+	bp	- high byte shiftState, low byte null
 
 RETURN:		nothing
 
@@ -2728,10 +2726,7 @@ KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
-	Doug	3/89		Initial version
-	Jim	12/89		Added support for screen saver function
-	AY	5/17/94		Added list of no-ink windows
-
+	MeyerK	09/2021		initial implementation
 ------------------------------------------------------------------------------@
 FlowWheelDown	method dynamic	FlowClass, MSG_META_MOUSE_WHEEL_DOWN
 

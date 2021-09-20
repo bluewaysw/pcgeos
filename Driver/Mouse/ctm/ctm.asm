@@ -559,7 +559,7 @@ MouseDevHandler  proc  far
     mov dh, bh          ; put wheel data in dh
     mov	bx, ds:[mouseOutputHandle]
     mov	di, mask MF_FORCE_QUEUE
-    mov	ax, MSG_IM_WHEEL_CHANGE
+    mov	ax, MSG_IM_MOUSE_WHEEL_CHANGE
     call ObjMessage		; Send the event
 
 ;    pop bx

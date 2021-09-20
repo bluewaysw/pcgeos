@@ -1409,24 +1409,25 @@ REVISION HISTORY:
 	----	----		-----------
 	Doug	11/89		Initial version
 	Doug	5/91		Revised to handle 32-bit contents
+	MeyerK	09/2021		Add wheel events
 
 ------------------------------------------------------------------------------@
 
 VisContentMouseEvent	method	VisContentClass, MSG_META_PTR, \
-								MSG_META_MOUSE_WHEEL_UP, \
-								MSG_META_MOUSE_WHEEL_DOWN, \
-					      MSG_META_START_SELECT, \
-					      MSG_META_START_MOVE_COPY, \
-					      MSG_META_START_FEATURES, \
-					      MSG_META_START_OTHER, \
-					      MSG_META_DRAG_SELECT, \
-					      MSG_META_DRAG_MOVE_COPY, \
-					      MSG_META_DRAG_FEATURES, \
-					      MSG_META_DRAG_OTHER, \
-					      MSG_META_END_SELECT, \
-					      MSG_META_END_MOVE_COPY, \
-					      MSG_META_END_FEATURES, \
-					      MSG_META_END_OTHER
+						 MSG_META_MOUSE_WHEEL_UP, \
+						 MSG_META_MOUSE_WHEEL_DOWN, \
+						 MSG_META_START_SELECT, \
+						 MSG_META_START_MOVE_COPY, \
+						 MSG_META_START_FEATURES, \
+						 MSG_META_START_OTHER, \
+						 MSG_META_DRAG_SELECT, \
+						 MSG_META_DRAG_MOVE_COPY, \
+						 MSG_META_DRAG_FEATURES, \
+						 MSG_META_DRAG_OTHER, \
+						 MSG_META_END_SELECT, \
+						 MSG_META_END_MOVE_COPY, \
+						 MSG_META_END_FEATURES, \
+						 MSG_META_END_OTHER
 
 	; If holding up UI input, send event to HoldUpInputQueue, to be
 	; processed later

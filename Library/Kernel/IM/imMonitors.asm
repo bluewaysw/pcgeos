@@ -242,23 +242,22 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-ProcessUserInput	method	IMClass, MSG_IM_PTR_CHANGE,
-																	 MSG_IM_BUTTON_CHANGE,
-																	 MSG_IM_KBD_SCAN,
-																	 MSG_IM_PRESSURE_CHANGE,
-																	 MSG_IM_DIRECTION_CHANGE,
-																	 MSG_META_NOTIFY,
-																	 MSG_META_NOTIFY_WITH_DATA_BLOCK,
- 																	 MSG_IM_INK_TIMEOUT,
- 																	 MSG_META_KBD_CHAR,
-																	 if INK_DIGITIZER_COORDS
-																			MSG_META_EXPOSED,
-																			MSG_IM_READ_DIGITIZER_COORDS,
-																	 else
-																			MSG_META_EXPOSED,
-																	 endif
-																	 MSG_IM_WHEEL_CHANGE
-
+ProcessUserInput method	IMClass, MSG_IM_PTR_CHANGE,
+				MSG_IM_BUTTON_CHANGE,
+				MSG_IM_KBD_SCAN,
+				MSG_IM_PRESSURE_CHANGE,
+				MSG_IM_DIRECTION_CHANGE,
+				MSG_META_NOTIFY,
+				MSG_META_NOTIFY_WITH_DATA_BLOCK,
+				MSG_IM_INK_TIMEOUT,
+				MSG_META_KBD_CHAR,
+				if INK_DIGITIZER_COORDS
+					MSG_META_EXPOSED,
+					MSG_IM_READ_DIGITIZER_COORDS,
+				else
+					MSG_META_EXPOSED,
+				endif
+				MSG_IM_MOUSE_WHEEL_CHANGE ; wheel support added
 
 ;	(Handle MSG_META_KBD_CHAR to allow keycaps to work)
 
@@ -738,6 +737,8 @@ SYNOPSIS:	LEVEL 40 user input processing
 		  MSG_IM_PRESSURE_CHANGE   ->		MSG_META_PRESSURE
 		  MSG_IM_DIRECTION_CHANGE 		MSG_META_DIRECTION
 		  MSG_IM_BUTTON_CHANGE			MSG_META_MOUSE_BUTTON
+		  MSG_IM_MOUSE_WHEEL_CHANGE		MSG_META_MOUSE_WHEEL_DOWN
+		  					MSG_META_MOUSE_WHEEL_UP
 
 CALLED BY:	User Input Manager (As a Monitor)
 
@@ -856,14 +857,14 @@ screenOn1:
 endif
 	cmp	di, MSG_IM_BUTTON_CHANGE
 	je	CIM_Button
-	cmp di, MSG_IM_WHEEL_CHANGE
-	je CIM_Wheel
+	cmp 	di, MSG_IM_MOUSE_WHEEL_CHANGE	; check for wheel change
+	je 	CIM_Wheel
 	cmp	di, MSG_META_KBD_CHAR
 	je	CIM_Kbd
 
 	tst	ds:[delayedRelease]
 	jz	Nothing			;if no delayed release
-						;event to send
+					;event to send
 
 	mov	cx,ds:[delayedReleaseEvent].HE_cx	;restore data
 	mov	dx,ds:[delayedReleaseEvent].HE_dx
@@ -894,7 +895,7 @@ ButtonRet:
 	ret
 
 CIM_Wheel:
-	call ProcessWheel
+	call 	ProcessWheel		; process the wheel
 	mov	al, mask MF_DATA
 	ret
 
@@ -919,10 +920,10 @@ CIM_Ptr:				; POINTER change
 					; the screen saver if true...
 
 					; Test for "null" movement, which
-					;  means it's something done by
-					;  the program, not the user, so
-					;  we shouldn't mess with the
-					;  screen saver.
+					; means it's something done by
+					; the program, not the user, so
+					; we shouldn't mess with the
+					; screen saver.
 	push	cx
 	push	dx
 			; cx - x mouse pos
@@ -945,10 +946,10 @@ yRel:
 
 continueAfterScreenSaver:
 
-			; cx - x mouse pos
-			; dx - y mouse pos
-			; bp - flags for abs/relative
-			; si - driver handle
+					; cx - x mouse pos
+					; dx - y mouse pos
+					; bp - flags for abs/relative
+					; si - driver handle
 					; see if x is absolute
 	clr	ds:[changeXPos]
 	clr	ds:[changeYPos]
@@ -976,9 +977,9 @@ P30:
 
 
 CMI_P50:				; Change event type to reflect
-					;	changes
+					; changes
 	mov	di, MSG_META_MOUSE_PTR
-	mov	al, mask MF_DATA		; Return w/data
+	mov	al, mask MF_DATA	; Return w/data
 	mov	bl, ds:[buttonState]	; show state of all buttons
 P60:
 	mov	bh, ds:[shiftState]	; & state of keyboard
@@ -1096,7 +1097,7 @@ PB_5:			; PRESS
 	and	bx, mask BI_BUTTON	; clear all but button #
 	shl	bx, 1			; * 2
 	mov	bx, ds:[bx].bpsTable	; lookup entry for button in
-					;	buttonPressStatus
+					; buttonPressStatus
 
 			;START DRAG TIMER
 	push	bx,cx,si
@@ -1114,7 +1115,7 @@ PB_5:			; PRESS
 	push	cx			; save orig values
 	push	dx
 	sub	cx, ds:[bx].BPS_pressTime.low    ; - t_then
-	sbb	dx, ds:[bx].BPS_pressTime.high    ; - t_then
+	sbb	dx, ds:[bx].BPS_pressTime.high   ; - t_then
 					; Update buttonPressInfo struct
 	pop	ds:[bx].BPS_pressTime.high
 	pop	ds:[bx].BPS_pressTime.low
@@ -1152,7 +1153,7 @@ NoDouble:
 	or	al, ds:[buttonState]	; show state of all buttons
 	mov	ah, ds:[shiftState]	; get shiftState
 	mov	bp, ax
-					; Change event tyee
+					; Change event type
 	mov	di, MSG_META_MOUSE_BUTTON
 	clc				;tell CombineInputMonitor to set al
 PB_ret:
@@ -1162,17 +1163,33 @@ PB_ret:
 
 ProcessButton	endp
 
+;
+; wheel
+; split the wheel into wheel up and wheel down
+; prepare our event data
+;
 ProcessWheel proc near
-	cmp dh, 0
-	jg wheelDown
 
-	wheelUp:
-	mov di, MSG_META_MOUSE_WHEEL_UP
+	cmp 	dh, 0
+	jg 	wheelDown
+
+wheelUp:
+	mov 	di, MSG_META_MOUSE_WHEEL_UP
+	jmp 	finish
+
+wheelDown:
+	mov 	di, MSG_META_MOUSE_WHEEL_DOWN
+
+finish:
+	mov	cx, ds:[displayXPos]	; make sure cx is set with X coord
+	mov	dx, ds:[displayYPos]	; make sure dx is set with Y coord
+
+	clr	bl			; we are not interested in the mouse buttons
+	mov	bh, ds:[shiftState]	; but in the state of the keyboard
+	mov	bp, bx			; put into bp
+
 	ret
 
-	wheelDown:
-	mov di, MSG_META_MOUSE_WHEEL_DOWN
-	ret
 ProcessWheel endp
 
 
@@ -1771,7 +1788,7 @@ REVISION HISTORY:
 
 OutputNonPtr	proc	far
 	class	IMClass
-					; handle wheel
+					; make sure to handle wheel
 	cmp di, MSG_META_MOUSE_WHEEL_UP
 	je handleWheel
 	cmp di, MSG_META_MOUSE_WHEEL_DOWN
@@ -1793,14 +1810,10 @@ OutputNonPtr	proc	far
 					; 	processed.
 	jmp	SendNonPtr		; send it!
 
-handleWheel:
-	clr	bx			; can't discard if desperate
-	clr	si			; nothing to inc to show partially
+handleWheel:				; handle wheel
+	clr	bx			;
+	clr	si			;
 	call	WinEnsureChangeNotification
-	;mov	cx, ds:[drawnXPos]		; pointerXPos?  / make sure cx is set with X ccord
-	;mov	dx, ds:[drawnYPos]		; pointerYPos?  / make sure dx is set with Y coord
-	mov	cx, ds:[pointerXPos]		; pointerXPos?  / make sure cx is set with X ccord
-	mov	dx, ds:[pointerYPos]		; pointerYPos?  / make sure dx is set with Y coord
 
 	jmp SendNonPtr
 
@@ -1822,8 +1835,8 @@ handleKbd:
 10$:
 
 	; We don't want to discard first presses, since that would prevent
-	; users from doing anything (like quitting an app) on a keyboard only
 	; system once we get the "Low on handles" SysNotify. - Joon (7/12/94)
+	; users from doing anything (like quitting an app) on a keyboard only
 
 if	SINGLE_STEP_PROFILING
 	test	dl, mask CF_RELEASE

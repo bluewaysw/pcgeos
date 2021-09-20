@@ -16,11 +16,11 @@ REVISION HISTORY:
 				to make sure stack is cool.
 
 DESCRIPTION:
-	This file contains utility routines for drawing monikers.  These 
+	This file contains utility routines for drawing monikers.  These
 	routines are basically front ends for VisDrawMoniker and
 	VisGetMonikerSize which take care of various other work that you
 	may need to do.  Some of the extra things OpenDrawMoniker handles:
-	
+
 		1.  It handles drawing "..." if the object leads to a
 		    dialog box.
 		2.  It leaves space for a menu mark if it brings up a menu.
@@ -29,7 +29,7 @@ DESCRIPTION:
 		4.  It handles drawing of a keyboard shortcut, if there is one.
 		5.  It will draw the selection cursor (dotted box) around the
 		    object. The size of this box depends on the object type.
-		    
+
 	If you decide this is useful to you,  there are routines for calculating
 	the size, center, and moniker position of the object as well.
 
@@ -96,7 +96,7 @@ REVISION HISTORY:
 	Eric	3/90		More navigation work, lots of cleanup
 
 ------------------------------------------------------------------------------@
- 
+
 NPZ <WINDOW_DOT_TEXT_WIDTH	= 10					>
 PZ <WINDOW_DOT_TEXT_WIDTH	= 24					>
 
@@ -104,8 +104,8 @@ OpenDrawVisMoniker proc far		;*ds:di is VisMoniker
 	push	si, di
 	jmp	startDraw
 OpenDrawVisMoniker endp
-	
-	
+
+
 OpenDrawMoniker	proc	far
 	class	VisClass
 
@@ -155,7 +155,7 @@ endif		;--------------------------------------------------------------
 	LONG	jz exit			;skip if not...
 
 startDraw	label	far	;*ds:di has VisMoniker
-			
+
 	;If we're centering the moniker, let's actually calculate an inset
 	;and use that. Also set max width.
 
@@ -206,7 +206,7 @@ endif
 	;
 	; Before drawing the moniker, modify the leftInset so that it draws to
 	; the right of the accelerator we've just drawn, with a little extra
-	; space.  
+	; space.
 	;	*ds:si = vis object
 	;	*ds:di = gen object
 	;	on stack: VisMoniker
@@ -260,7 +260,7 @@ notBelow:
 CUAS <	ORNF	cl, mask DMF_UNDERLINE_ACCELERATOR			>
 	call	SpecDrawMoniker		;draw the moniker
 					;(returns draw position in ax, bx)
-	mov	ss:[bp].OMA_drawMonikerFlags, cx	
+	mov	ss:[bp].OMA_drawMonikerFlags, cx
 					;save flags returned (changes clip flag
 					;  if clipping was really needed)
 	pop	ss:[bp].OMA_leftInset	;restore leftInset
@@ -274,7 +274,7 @@ CUAS <	ORNF	cl, mask DMF_UNDERLINE_ACCELERATOR			>
 					;	(does nothing for gstring
 					;	 moniker)
 noUnderline::
-	
+
 	pop	di			;get *ds:di = gen object
 
 checkForWinMark::
@@ -341,7 +341,7 @@ if _CUA_STYLE	;--------------------------------------------------------------
 
 if DRAW_SELECTION_CURSOR_FOR_FOCUSED_GADGETS
 	call	OpenDrawSelectionCursor	;draw/erase the cursor image
-					;will return ax,bx = top-right of text 
+					;will return ax,bx = top-right of text
 endif
 
 	pop	cx, dx			;retreive bottom-left
@@ -539,7 +539,7 @@ endif
 	; Get the mnemonic for this moniker. si is pointing at the text.
 	;
 	mov	cl, ds:[si].VMT_mnemonicOffset-VMT_text
-	
+
 	;
 	; If the moniker is not in the text, we'll have to do some special
 	; stuff here.  We'll go to the end of the text so we're pointing
@@ -549,9 +549,9 @@ endif
 	;
 	cmp	cl, VMO_MNEMONIC_NOT_IN_MKR_TEXT
 	jne	10$
-	
+
 	xchg	di, si				;get to the mnemonic
-	mov	cx, -1				
+	mov	cx, -1
 	add	dx, ax				;dx <- width of mkr + x pos
 SBCS <	clr	al							>
 DBCS <	clr	ax							>
@@ -559,14 +559,14 @@ SBCS <	repne	scasb							>
 DBCS <	repne	scasw							>
 	mov	ax, dx				;restore end of moniker
 	xchg	si, di
-	
+
 	push	ax				;save current x position
 	clr	dh
 	mov	dl, ' '
 	call	GrDrawChar
 	mov	dl, '('
 	call	GrDrawCharAtCP
-	
+
 	call	GrGetCurPos			;mnemonic; we'll use it for the
 						;underline
 	mov	dl, ds:[si]
@@ -579,14 +579,14 @@ DBCS <	repne	scasw							>
 	;
    	push	ax				;save the pen pos to be used
 						;  for the underline
-	call	GrGetCurPos			
+	call	GrGetCurPos
 	mov	bp, ax				;put in cx for now
 	pop	ax				;restore underline pen pos
    	pop	cx				;restore original pen pos
 	sub	bp, cx				;calculate the extra amount
 	clr	cx				;underline goes under first
 	jmp	short doUnderline		;   character in ds:si
-	
+
 10$:
    	clr	bp				;no extra width
 	cmp	cl, VMO_CANCEL			;anything to underline?
@@ -595,11 +595,11 @@ DBCS <	repne	scasw							>
 	je	exit
 	clr	ch				;clear high byte
 EC <	call	CheckOffsetInLength		;verify that offset is in mkr >
-   
+
 doUnderline:
 	;
 	; Draw an underline.  ds:[si][cx] points to the character we're going
-	; to underline.   
+	; to underline.
 	;
 	;	ax = X position
 	;	bx = Y position
@@ -617,12 +617,12 @@ if HIGHLIGHT_MNEMONICS	;------------------------------------------------------
 endif	;----------------------------------------------------------------------
 
    	push	ax				;save x position
-	
+
 	push	si				;get offset to underline
 	mov	si, GFMI_ROUNDED or GFMI_UNDER_POS
 	call	GrFontMetrics
 	pop	si
-	
+
 	add	bx, dx				;add to y position
 	clr	dx				;assume no char before underline
 	tst	cx				;any chars before underline?
@@ -678,7 +678,7 @@ useHighlight:
 	add	ax, dx				;add to x position
 	push	ax				; save left
 	call	GrGetMixMode			; al = current draw mode
-	mov	bp, ax				; bp(low) = current draw mode 
+	mov	bp, ax				; bp(low) = current draw mode
 	mov	al, MM_INVERT
 	call	GrSetMixMode
 	push	bx				; save top
@@ -697,7 +697,7 @@ DBCS <	mov	ax, ds:[bx][si]			; ax = mnemonic character >
 	call	GrSetMixMode
 	pop	bp				; restore extra width
 endif	;----------------------------------------------------------------------
-	
+
 exit:
 	pop	cx				;restore vis moniker width
 	add	cx, bp				;add any extra width
@@ -870,7 +870,7 @@ if	DRAW_SHADOWS_ON_BW_GADGETS
 					;  won't be insetting from bounds.
 endif
 	jmp	short haveBounds
-	
+
 useBoundsForRect:
 
 	;is scrolling list, toolbox, or checkbox object: draw box inside
@@ -891,9 +891,9 @@ useBoundsForRect:
 	pop	ax
 
 	call	InsetRect
-;MO <	dec	dx			;move bottom line up one	>
-    					;whoever put this in must have been
-					;  asleep at the wheel...
+;MO <	dec	dx			; move bottom line up one	>
+    					; whoever put this in must have been
+					; asleep...
 	jmp	short drawRect
 
 10$:
@@ -1058,8 +1058,8 @@ if not SOLID_FOCUS_OUTLINE
 	mov	al, SDM_50		;set for dotted line
 else
 	;
-	;For SOLID_FOCUS_OUTLINE we'll use a solid line.   But first, we'll 
-	;   also invert the pixels that are there, in the hopes that graphic 
+	;For SOLID_FOCUS_OUTLINE we'll use a solid line.   But first, we'll
+	;   also invert the pixels that are there, in the hopes that graphic
 	;   monikers show up better.   -cbh 12/19/93
 	;
 	push	ax
@@ -1093,7 +1093,7 @@ if SOLID_FOCUS_OUTLINE
 	call	GrGetLineColor		;get current line color index in ax
 	push	di
 	clr	di
-	call	GrMapColorRGB		
+	call	GrMapColorRGB
 	pop	di
 	mov	al, ah
 	clr	ah
@@ -1139,7 +1139,7 @@ InsetRect	label	near
 	inc	ax
 	inc	bx
 	dec	cx
-	dec	dx	
+	dec	dx
 	retn
 
 OpenDrawSelectionCursor	endp
@@ -1161,10 +1161,10 @@ PASS:		*ds:si = object
 					drawn
 RETURN:		nothing
 DESTROYED:	ax, bx, cx, dx
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1233,11 +1233,11 @@ REVISION HISTORY:
 	----	----		-----------
 	Chris	4/90		initial version
 	Chris 	5/15/91		Updated for new bounds scheme
-	
+
 ------------------------------------------------------------------------------@
 
 if _CUA_STYLE and _USE_KBD_ACCELERATORS ;-------------------------------------
-		  
+
 OpenDrawKbdAccelerator	proc	near
 
 	;now create the text for the keyboard moniker.
@@ -1277,10 +1277,10 @@ EC <	call	CheckForDamagedES	; Make sure *es still object block >
 	jz	noCentering			;not menu item, no centering
 
 menuCentering::
-	push	bx, si			
+	push	bx, si
 	call	SwapLockOLWin		;get to parent menu win
 EC <	ERROR_NC OL_ERROR						>
-	mov	si, ds:[si]			
+	mov	si, ds:[si]
 	add	si, ds:[si].Vis_offset
 	mov	cx, ds:[si].VI_bounds.R_right
 	sub	cx, ds:[si].VI_bounds.R_left
@@ -1325,10 +1325,10 @@ PASS:		ds:si	= keyboard accel string
 RETURN:		ds:si	= keyboard accel string adjusted for bitmaps
 		ax	= draw X position adjusted for bitmaps
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1405,7 +1405,7 @@ SYNOPSIS:	Makes all monikers left justified.
 
 CALLED BY:	OpenDrawMoniker, OpenGetMonikerPos
 
-PASS:		
+PASS:
 	*ds:si - handle of object's vis part (for positions)
 	*es:bx - handle of object's gen part (for vis and kbd monikers)
 
@@ -1413,7 +1413,7 @@ PASS:
 
 RETURN:	ss:[bp].OMA_drawMonikerFlags possibly adjusted for left justification
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1475,9 +1475,9 @@ FCM_checkVert:
 	; can deal correctly with topInset <> bottomInset.  -cbh 2/ 2/93)
 	;
 if	DRAW_SHADOWS_ON_BW_GADGETS
-	call	OpenCheckIfBW			
-	jc	doVert			
-endif	
+	call	OpenCheckIfBW
+	jc	doVert
+endif
 	test	ss:[bp].OMA_monikerAttrs, mask OLMA_IS_MENU_ITEM or \
 						mask OLMA_DRAW_SHORTCUT_TO_RIGHT
 	jnz	FCM_exit			;menu overrides shortcut-below
@@ -1520,13 +1520,13 @@ COMMENT @----------------------------------------------------------------------
 
 ROUTINE:	SetupMaxWidth
 
-SYNOPSIS:	Sets up a maximum width for objects that have their 
+SYNOPSIS:	Sets up a maximum width for objects that have their
 		CLIP_TO_MAX_WIDTH bit set.  The maximum width is the
 		width of the object minus its insets.
 
 CALLED BY:	OpenDrawMoniker
 
-PASS:		
+PASS:
 	*ds:si - handle of object's vis part (for positions)
 	*es:bx - handle of object's gen part (for vis and kbd monikers)
 	ss:bp  - OpenMonikerArgs
@@ -1554,7 +1554,7 @@ EC <	call	ECVerifyOpenMonikerArgs	;make sure passed structure	>
 	test	ss:[bp].OMA_drawMonikerFlags, mask DMF_CLIP_TO_MAX_WIDTH
 						;see if we'll clip
 	jz	exit				;no, exit
-	
+
 	call	VisGetSize			;get object width in cx
 	sub	cx, ss:[bp].OMA_rightInset	;subtract right inset
 	sub	cx, ss:[bp].OMA_leftInset	;and left inset.  Duh. 10/14/92
@@ -1574,7 +1574,7 @@ EC <	call	ECVerifyOpenMonikerArgs	;make sure passed structure	>
 storeMax:
 	mov	ss:[bp].OMA_xMaximum, cx	;and store as maximum length
 	sub	dx, ss:[bp].OMA_bottomInset
-	sub	dx, ss:[bp].OMA_topInset	
+	sub	dx, ss:[bp].OMA_topInset
 	mov	ss:[bp].OMA_yMaximum, dx
 exit:
 	ret
@@ -1589,25 +1589,25 @@ SYNOPSIS:	Returns position of the moniker.
 
 CALLED BY:	utility
 
-PASS:		
+PASS:
 	*ds:si - handle of object's vis part (for positions)
 	*es:bx - handle of object's gen part (for vis and kbd monikers)
 
-	ss:bp  - OpenMonikerArgs:  
+	ss:bp  - OpenMonikerArgs:
 	    ss:[bp].OMA_drawMonikerFlags	word	;justification & clipping flags
 	    ss:[bp].OMA_monikerAttrs	word	;OLMonikerAttrs: cursored etc.
 	    ss:[bp].OMA_drawMonikerFlags	word	;low byte = DrawMonikerFlags <>
 	    ss:[bp].OMA_bottomInset	 	word	;bottom inset
 	    ss:[bp].OMA_rightInset	 	word	;right inset
 	    ss:[bp].OMA_topInset	 	word	;top inset
-	    ss:[bp].OMA_leftInset		word	;left inset 
+	    ss:[bp].OMA_leftInset		word	;left inset
 	    openMkrMaxLen		word    ;max len to draw (internal)
 	    openMkrState		lptr GState ;handle of graphics state
 
-RETURN:		
+RETURN:
 	ax, bx - moniker position
 
-DESTROYED:	
+DESTROYED:
 	ax, bx, cx, dx
 
 PSEUDO CODE/STRATEGY:
@@ -1623,7 +1623,7 @@ REVISION HISTORY:
 
 OpenGetMonikerPos	proc	far
 	class	VisClass
-	
+
 EC <	call	ECVerifyOpenMonikerArgs	;make sure passed structure	>
 
 	call	FixupCenteredMonikers	;make all monikers left justified
@@ -1677,7 +1677,7 @@ GetKbdAcceleratorString	proc	near	uses cx, si, ds, es
 	class	VisClass
 	.enter
 
-	push	di				;save gstate	
+	push	di				;save gstate
 	mov	di, es:[bx]			;point to instance
 	add	di, es:[di].Gen_offset		;ds:[di] -- GenInstance
 	mov	dx, es:[di].GI_kbdAccelerator	;get the keyboard moniker
@@ -1687,7 +1687,7 @@ GetKbdAcceleratorString	proc	near	uses cx, si, ds, es
 
 	segmov	es, ss				;set es to destination buffer
 	mov	di, bp				;point with es:di
-	
+
 	call	ExpandKbdAccelerator		;expand the moniker
 
 	push	ax				; save monikerAttrs
@@ -1783,7 +1783,7 @@ COMMENT @----------------------------------------------------------------------
 
 ROUTINE:	ExpandKbdAccelerator
 
-SYNOPSIS:	Expands keyboard moniker into a non-null terminated string.  
+SYNOPSIS:	Expands keyboard moniker into a non-null terminated string.
 
 CALLED BY:	GetKbdAcceleratorString
 
@@ -1799,7 +1799,7 @@ PSEUDO CODE/STRATEGY:
        		Alt key:				"Alt "
 		Ctrl key:				"Ctrl "
 		Shift key (or uppercase letter:		"Shift "
-		Function key:				"F3", etc.		
+		Function key:				"F3", etc.
 		Escape:					"Esc"
 		Space:					"Space"
 		Insert:					"Ins"
@@ -1820,7 +1820,7 @@ REVISION HISTORY:
 ExpandKbdAccelerator	proc	near		uses ax, bx
 	.enter
 	mov	bx, handle altString		;point to resource block
-	call	MemLock				;  containing expansion text 
+	call	MemLock				;  containing expansion text
 EC <	ERROR_C	OL_ERROR			;shouldn't have failed the lock! >
 
 	mov	ds, ax
@@ -1842,7 +1842,7 @@ DBCS <	jnz	checkCtrl						>
 	jb	checkCtrl			;no, branch
 	cmp	dl, 'Z'
 	ja	checkCtrl
-	
+
 addShift:
 	mov	si, offset shiftString		;else copy the string
 	call	CopyStringFromChunk
@@ -1850,10 +1850,10 @@ addShift:
 checkCtrl:
 	test	dx, mask KS_CTRL		;see if a control char
 	jz	checkFKeys			;no, branch
-	
+
 	mov	si, offset ctrlString		;else add ctrl in
 	call	CopyStringFromChunk
-	
+
 ;	cmp	dl, VC_CTRL_Z			;see if in ctrl-alpha range
 ;	ja	checkFKeys			;no, branch
 ;	add	dl, 'A'- VC_CTRL_A		;convert char to ascii
@@ -1936,14 +1936,14 @@ DBCS <	cmp	dl, C_SYS_ESCAPE and 0x00ff				>
 	jne	checkDel			;no, check space
 	mov	si, offset escString
 	jmp	short copyStringAndQuit		;copy string and exit
-	
+
 checkDel:
 SBCS <	cmp	dl, VC_DEL			;check for delete	>
 DBCS <	cmp	dl, C_SYS_DELETE and 0x00ff	;check for delete	>
 	jne	checkIns
 	mov	si, offset delString
 	jmp	short copyStringAndQuit
-	
+
 checkIns:
 SBCS <	cmp	dl, VC_INS						>
 DBCS <	cmp	dl, C_SYS_INSERT and 0x00ff				>
@@ -1963,21 +1963,21 @@ DBCS <	cmp	dl, C_SYS_BACKSPACE and 0x00ff	;check for backspace	>
 	jz	copyStringAndQuit		;no alt pressed, branch
 	mov	si, offset backspaceString	;else copy in backspace
 	jmp	short copyStringAndQuit		;and exit
-	
+
 checkEnter:
 SBCS <	cmp	dl, VC_ENTER			;check for enter	>
 DBCS <	cmp	dl, C_SYS_ENTER	and 0x00ff	;check for enter	>
 	jne	checkPageUp			;no, branch
 	mov	si, offset enterString		;else copy in enter
 	jmp	short copyStringAndQuit		;and exit
-	
+
 checkPageUp:
 SBCS <	cmp	dl, VC_PREVIOUS			;check for page up	>
 DBCS <	cmp	dl, C_SYS_PREVIOUS and 0x00ff	;check for page up	>
 	jne	checkPageDown			;no, branch
 	mov	si, offset pageUpString		;else copy in enter
 	jmp	short copyStringAndQuit		;and exit
-	
+
 checkPageDown:
 if DBCS_PCGEOS
 EC <	cmp	dl, C_SYS_NEXT and 0x00ff	;check for page down	>
@@ -1994,11 +1994,11 @@ checkSpace:
 	jne	makeUpper			;no, store the character
 	mov	si, offset spaceString		;else store "Space"
 endif
-	
+
 copyStringAndQuit:
 	call	CopyStringFromChunk
 	jmp	short done			;and we're done
-	
+
 
 if DBCS_PCGEOS
 makeUpper:
@@ -2039,7 +2039,7 @@ ROUTINE:	CopyStringFromChunk
 
 SYNOPSIS:	Copies a string.
 
-CALLED BY:	GetKbdAcceleratorString, 
+CALLED BY:	GetKbdAcceleratorString,
 		ExpandKbdAccelerator  <--- only when it's NIKE product
 
 PASS:		ds:si -- source chunk containing string
@@ -2090,14 +2090,14 @@ PASS:
 	*ds:si - handle of object's visual part
 	*es:bx - handle of object's generic part
 
-	ss:bp  - OpenMonikerArgs:  
+	ss:bp  - OpenMonikerArgs:
 	    ss:[bp].OMA_drawMonikerFlags	word	;justification & clipping flags
 	    ss:[bp].OMA_monikerAttrs	word	;OLMonikerAttrs: cursored etc.
 	    ss:[bp].OMA_drawMonikerFlags	word	;low byte = DrawMonikerFlags <>
 	    ss:[bp].OMA_bottomInset	 	word	;bottom inset
 	    ss:[bp].OMA_rightInset	 	word	;right inset
 	    ss:[bp].OMA_topInset	 	word	;top inset
-	    ss:[bp].OMA_leftInset		word	;left inset 
+	    ss:[bp].OMA_leftInset		word	;left inset
 	    openMkrMaxLen		word    ;max len to draw (internal)
 	    openMkrState		lptr GState ;handle of graphics state
 
@@ -2195,14 +2195,14 @@ PASS:
 	*ds:si - handle of object's vis part
 	*es:bx - handle of object's gen part
 
-	ss:bp  - OpenMonikerArgs:  
+	ss:bp  - OpenMonikerArgs:
 	    ss:[bp].OMA_drawMonikerFlags	word	;justification & clipping flags
 	    ss:[bp].OMA_monikerAttrs	word	;OLMonikerAttrs: cursored etc.
 	    ss:[bp].OMA_drawMonikerFlags	word	;low byte = DrawMonikerFlags <>
 	    ss:[bp].OMA_bottomInset	 	word	;bottom inset
 	    ss:[bp].OMA_rightInset	 	word	;right inset
 	    ss:[bp].OMA_topInset	 	word	;top inset
-	    ss:[bp].OMA_leftInset		word	;left inset 
+	    ss:[bp].OMA_leftInset		word	;left inset
 	    openMkrMaxLen		word    ;max len to draw (internal)
 	    openMkrState		lptr GState ;handle of graphics state
 
@@ -2242,7 +2242,7 @@ EC <	call	ECVerifyOpenMonikerArgs	;make sure passed structure	>
 
 	;
 	; If doing a down arrow, I've decided that we'll make sure we're at
-	; least as high as the system text at all times, to facilitate 
+	; least as high as the system text at all times, to facilitate
 	; no-moniker popup list buttons.  -cbh 5/18/92
 	;
 	test	ss:[bp].OMA_monikerAttrs, mask OLMA_DISP_DOWN_ARROW
@@ -2264,17 +2264,17 @@ EC <	call	ECVerifyOpenMonikerArgs	;make sure passed structure	>
 	mov	ax, {word} ds:[di].VM_type	;get moniker type
 	test	ax, mask VMT_GSTRING		;is a GString?
 	jnz	afterAddMnemonic		;yes, branch
-	mov	al, ds:[di].VM_data + VMT_mnemonicOffset 
+	mov	al, ds:[di].VM_data + VMT_mnemonicOffset
 	cmp	al, VMO_MNEMONIC_NOT_IN_MKR_TEXT
 	jne	afterAddMnemonic		;no mnemonic to add on, branch
 
-	; Let's figure out how wide a typical add-on is if we haven't done so 
+	; Let's figure out how wide a typical add-on is if we haven't done so
 	; previously.
 
 	push	dx
 	mov	dx, segment idata		;ds points at idata
 	mov	es, dx
-	
+
 	tst	es:addOnMnemonicWidth		;is there mnemonic width around?
 	jnz	gotMnemonicWidth		;yes, branch
 
@@ -2301,11 +2301,11 @@ FXIP <	add	sp, cx							>
 	call	GrDestroyState			;daddy, make the gstate go away!
 	mov	es:addOnMnemonicWidth, dx	;store it
 	pop	bp, ds, cx, si
-	
-gotMnemonicWidth:	
+
+gotMnemonicWidth:
 	add	cx, es:addOnMnemonicWidth	;add extra width in
 	pop	dx
-	
+
 afterAddMnemonic:
 	pop	es
 	call	AddInsetsAndWinMark		;add in extra stuff to size
@@ -2313,10 +2313,10 @@ afterAddMnemonic:
 	ret
 GetMkrSizeWithInsets	endp
 
-			
+
 SBCS <sampleAddOnMnemonic	char	" (w)"				>
 DBCS <sampleAddOnMnemonic	wchar	" (w)"				>
-			
+
 
 COMMENT @----------------------------------------------------------------------
 
@@ -2326,15 +2326,15 @@ SYNOPSIS:	Adds in the size of the moniker insets, and window mark if any.
 
 CALLED BY:	GetMkrSizeWithInsets, OpenGetMonikerExtraSize
 
-PASS:	cx, dx - size before adding insets	
-	ss:bp  - OpenMonikerArgs:  
+PASS:	cx, dx - size before adding insets
+	ss:bp  - OpenMonikerArgs:
 	    ss:[bp].OMA_drawMonikerFlags	word	;justification & clipping flags
 	    ss:[bp].OMA_monikerAttrs	word	;OLMonikerAttrs: cursored etc.
 	    ss:[bp].OMA_drawMonikerFlags	word	;low byte = DrawMonikerFlags <>
 	    ss:[bp].OMA_bottomInset	 	word	;bottom inset
 	    ss:[bp].OMA_rightInset	 	word	;right inset
 	    ss:[bp].OMA_topInset	 	word	;top inset
-	    ss:[bp].OMA_leftInset		word	;left inset 
+	    ss:[bp].OMA_leftInset		word	;left inset
 	    openMkrMaxLen		word    ;max len to draw (internal)
 	    openMkrState		lptr GState ;handle of graphics state
 
@@ -2357,14 +2357,14 @@ AddInsetsAndWinMark	proc	near
 
 EC <	call	ECVerifyOpenMonikerArgs	;make sure passed structure	>
 
-	; Let's figure out how wide a period is if we haven't done so 
+	; Let's figure out how wide a period is if we haven't done so
 	; previously.
 
 	push	es
 	push	dx
 	mov	dx, segment idata		;ds points at idata
 	mov	es, dx
-	
+
 	tst	es:winMarkWidth			;is there a char width around?
 	jnz	gotWinMarkWidth			;yes, branch
 
@@ -2378,8 +2378,8 @@ EC <	call	ECVerifyOpenMonikerArgs	;make sure passed structure	>
 	add	dl, dh
 	mov	es:winMarkWidth, dl		;store it
 	pop	bp
-	
-gotWinMarkWidth:	
+
+gotWinMarkWidth:
 	pop	dx
 	add	cx, ss:[bp].OMA_leftInset		;add inset to width
 	add	cx, ss:[bp].OMA_rightInset		;add for each side
@@ -2410,12 +2410,12 @@ SYNOPSIS:	Returns offset to end of moniker (start of shortcuts).
 
 CALLED BY:	utility
 
-PASS:	
+PASS:
 	*ds:si - instance data of object
 	*es:bx - gen object
 	ss:bp  - OpenMonikerArgs
 
-RETURN:		
+RETURN:
 	cx 	- minimum amount needed left of center
 	dx	- minimum amount needed right of center
 	ax 	- minimum amount needed above center
@@ -2449,10 +2449,10 @@ EC <	call	ECVerifyOpenMonikerArgs	;make sure passed structure	>
 	push	si, bx
 	call	SwapLockOLWin
 EC <	ERROR_NC	OL_ERROR				>
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
-	mov	cx, ds:[di].OLMWI_monikerSpace	
-	mov	dx, ds:[di].OLMWI_accelSpace	
+	mov	cx, ds:[di].OLMWI_monikerSpace
+	mov	dx, ds:[di].OLMWI_accelSpace
 	call	ObjSwapUnlock
 	pop	si, bx
 exit:
@@ -2478,10 +2478,10 @@ EC <	mov	di, offset OLMenuWinClass			>
 EC <	call	ObjIsObjectInClass				>
 EC <	pop	es, di						>
 EC <	ERROR_NC	OL_ERROR				>
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
-	mov	cx, ds:[di].OLMWI_monikerSpace	
-	mov	dx, ds:[di].OLMWI_accelSpace	
+	mov	cx, ds:[di].OLMWI_monikerSpace
+	mov	dx, ds:[di].OLMWI_accelSpace
 	call	ObjSwapUnlock
 	pop	si, bx, ax
 done:
@@ -2497,14 +2497,14 @@ SYNOPSIS:	Returns area left and right of center.
 
 CALLED BY:	utility
 
-PASS:	
+PASS:
 	*ds:si - instance data of object
 	*es:bx - gen object
 	ss:bp  - OpenMonikerArgs
 	cx	- amoung left of center, so far
 	dx	- amoung right of center, so far
 
-RETURN:		
+RETURN:
 	cx 	- minimum amount needed left of center
 	dx	- minimum amount needed right of center
 
@@ -2548,22 +2548,22 @@ SYNOPSIS:	Returns sizes of vis and keyboard monikers.
 
 CALLED BY:	OpenGetMonikerCenter, OpenGetMonikerSize
 
-PASS:	       
+PASS:
 	*ds:si - instance data of object
 	*es:bx - gen object
 
-	ss:bp  - OpenMonikerArgs:  
+	ss:bp  - OpenMonikerArgs:
 	    ss:[bp].OMA_drawMonikerFlags	word	;justification & clipping flags
 	    ss:[bp].OMA_monikerAttrs	word	;OLMonikerAttrs: cursored etc.
 	    ss:[bp].OMA_drawMonikerFlags	word	;low byte = DrawMonikerFlags <>
 	    ss:[bp].OMA_bottomInset	 	word	;bottom inset
 	    ss:[bp].OMA_rightInset	 	word	;right inset
 	    ss:[bp].OMA_topInset	 	word	;top inset
-	    ss:[bp].OMA_leftInset		word	;left inset 
+	    ss:[bp].OMA_leftInset		word	;left inset
 	    openMkrMaxLen		word    ;max len to draw (internal)
 	    openMkrState		lptr GState ;handle of graphics state
 
-RETURN:		
+RETURN:
 	cx 	- width of visual moniker
 	dx	- width of keyboard moniker
 	ax 	- height of both
@@ -2600,7 +2600,7 @@ EC <	call	ECVerifyOpenMonikerArgs	;make sure passed structure	>
 	test	ss:[bp].OMA_monikerAttrs, mask OLMA_DISP_RT_ARROW
 	jz	5$	   	       ;not doing arrows, branch
 	mov	dx, OL_MARK_WIDTH+OL_MARK_SPACING   ;else leave room for it
-	jmp	short tryKbdAccelerator		
+	jmp	short tryKbdAccelerator
 5$:
 	test	ss:[bp].OMA_monikerAttrs, mask OLMA_DISP_DOWN_ARROW
 	jz	tryKbdAccelerator   	       ;not doing arrows, branch
@@ -2648,7 +2648,7 @@ noDestroy:
 
 finishUp:
 endif		;_USE_KBD_ACCELERATORS
-	
+
 	pop	ax				;restore height
 	ret
 GetMonikerSizes	endp
@@ -2658,24 +2658,24 @@ COMMENT @----------------------------------------------------------------------
 
 ROUTINE:	OpenGetMonikerExtraSize
 
-SYNOPSIS:	Returns size of object without the moniker. 
+SYNOPSIS:	Returns size of object without the moniker.
 
 CALLED BY:	OLButtonGetExtraSize, OLSettingGetExtraSize
 
 PASS:	*ds:si = instance data for object
-	ss:bp  - OpenMonikerArgs:  
+	ss:bp  - OpenMonikerArgs:
 	    ss:[bp].OMA_drawMonikerFlags	word	;justification & clipping flags
 	    ss:[bp].OMA_monikerAttrs	word	;OLMonikerAttrs: cursored etc.
 	    ss:[bp].OMA_drawMonikerFlags	word	;low byte = DrawMonikerFlags <>
 	    ss:[bp].OMA_bottomInset	 	word	;bottom inset
 	    ss:[bp].OMA_rightInset	 	word	;right inset
 	    ss:[bp].OMA_topInset	 	word	;top inset
-	    ss:[bp].OMA_leftInset		word	;left inset 
+	    ss:[bp].OMA_leftInset		word	;left inset
 	    openMkrMaxLen		word    ;max len to draw (internal)
 	    openMkrState		lptr GState ;handle of graphics state
 
 
-RETURN:		
+RETURN:
 	cx, dx - size of non-moniker object
 
 DESTROYED:	nothing
@@ -2748,7 +2748,7 @@ ECInitOpenMonikerArgs	endp
 
 endif
 
-	
+
 
 
 COMMENT @----------------------------------------------------------------------
@@ -2763,7 +2763,7 @@ PASS:	ss:bp -- DrawMonikerArgs
 	*ds:si - instance data
 	*es:bx - moniker to draw   (if bx = 0, then nothing drawn)
 	cl     - how to draw moniker: DrawMonikerFlags
-		
+
 RETURN:		nothing
 
 DESTROYED:	ax, bx, cx, dx, di
@@ -2781,7 +2781,7 @@ REVISION HISTORY:
 
 SpecDrawMoniker	proc	far
 	call	GetSystemFontHeight		;pass system font height
-	mov	ss:[bp].DMA_textHeight, ax		
+	mov	ss:[bp].DMA_textHeight, ax
 	call	VisDrawMoniker
 	ret
 SpecDrawMoniker	endp
@@ -2792,15 +2792,15 @@ COMMENT @----------------------------------------------------------------------
 
 ROUTINE:	SpecGetGenMonikerSize
 
-SYNOPSIS:	Like GenGetMonikerSize, except passes the specific UI's text 
+SYNOPSIS:	Like GenGetMonikerSize, except passes the specific UI's text
 		height.
 
 CALLED BY:	utility
 
-PASS:	
+PASS:
 	*ds:si - instance data for object
 	bp - graphics state (containing font and style) to use
-		
+
 RETURN:		cx, dx -- size
 
 DESTROYED:	nothing
@@ -2825,11 +2825,11 @@ afterSize:
 
 	;
 	; If this moniker requires a mnemonic stuck on the end of the text,
-	; let's figure in our typical width for such a thing.  (Stuck in 
+	; let's figure in our typical width for such a thing.  (Stuck in
 	; here, not just in OpenGetMonikerSize - cbh 4/12/93)
 	;
 	push	di
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Gen_offset
 	mov	di, ds:[di].GI_visMoniker
 	push	es
@@ -2839,17 +2839,17 @@ afterSize:
 	mov	ax, {word} ds:[di].VM_type	;get moniker type
 	test	ax, mask VMT_GSTRING		;is a GString?
 	jnz	afterAddMnemonic		;yes, branch
-	mov	al, ds:[di].VM_data + VMT_mnemonicOffset 
+	mov	al, ds:[di].VM_data + VMT_mnemonicOffset
 	cmp	al, VMO_MNEMONIC_NOT_IN_MKR_TEXT
 	jne	afterAddMnemonic		;no mnemonic to add on, branch
 
-	; Let's figure out how wide a typical add-on is if we haven't done so 
+	; Let's figure out how wide a typical add-on is if we haven't done so
 	; previously.
 
 	push	dx
 	mov	dx, segment idata		;ds points at idata
 	mov	es, dx
-	
+
 	tst	es:addOnMnemonicWidth		;is there mnemonic width around?
 	jnz	gotMnemonicWidth		;yes, branch
 
@@ -2868,16 +2868,16 @@ FXIP <	mov	di, ax				; es:di = buffer on stack>
 FXIP <	LocalCopyString							>
 FXIP <	pop	es, di							>
 FXIP <	segmov	ds, ss, si						>
-FXIP <	mov	si, sp				; ds:si = string	>	
+FXIP <	mov	si, sp				; ds:si = string	>
 	call	GrTextWidth			;width returned in dx
 	call	GrDestroyState			;daddy, make the gstate go away!
 	mov	es:addOnMnemonicWidth, dx	;store it
 	pop	bp, ds, cx, si
-	
-gotMnemonicWidth:	
+
+gotMnemonicWidth:
 	add	cx, es:addOnMnemonicWidth	;add extra width in
 	pop	dx
-	
+
 afterAddMnemonic:
 	pop	es
 	pop	di
@@ -2891,7 +2891,7 @@ COMMENT @----------------------------------------------------------------------
 
 ROUTINE:	SpecGetMonikerPos
 
-SYNOPSIS:	Like VisGetMonikerPos, except fills in specific UI's text 
+SYNOPSIS:	Like VisGetMonikerPos, except fills in specific UI's text
 		height.
 
 CALLED BY:	utility
@@ -2900,10 +2900,10 @@ PASS:	*ds:si - instance data
 	*es:bx - moniker to draw   (if bx = 0, then nothing drawn)
 	cl - how to draw moniker: MatrixJustifications
 	ss:bp  - DrawMonikerArgs
-	
+
 RETURN:		nothing
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -2918,7 +2918,7 @@ REVISION HISTORY:
 
 SpecGetMonikerPos	proc	far
 	call	GetSystemFontHeight		;pass system font height
-	mov	ss:[bp].DMA_textHeight, ax		
+	mov	ss:[bp].DMA_textHeight, ax
 	call	VisGetMonikerPos
 	ret
 SpecGetMonikerPos	endp
@@ -2999,20 +2999,20 @@ COMMENT @----------------------------------------------------------------------
 
 ROUTINE:	SpecGetMonikerSize
 
-SYNOPSIS:	Like VisGetMonikerSize, except passes the specific UI's text 
+SYNOPSIS:	Like VisGetMonikerSize, except passes the specific UI's text
 		height.
 
 CALLED BY:	utility
 
-PASS:	
+PASS:
 	*ds:si - instance data for object
 	*es:di - moniker (if di=0, returns size of 0)
 	bp - graphics state (containing font and style) to use
 
-		
+
 RETURN:		nothing
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -3046,4 +3046,3 @@ initCache:
 SpecGetMonikerSize	endp
 
 Resident ends
-
