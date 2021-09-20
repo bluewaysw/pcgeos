@@ -242,22 +242,23 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-ProcessUserInput method	IMClass, MSG_IM_PTR_CHANGE,
-				MSG_IM_BUTTON_CHANGE,
-				MSG_IM_KBD_SCAN,
-				MSG_IM_PRESSURE_CHANGE,
-				MSG_IM_DIRECTION_CHANGE,
-				MSG_META_NOTIFY,
-				MSG_META_NOTIFY_WITH_DATA_BLOCK,
-				MSG_IM_INK_TIMEOUT,
-				MSG_META_KBD_CHAR,
-				if INK_DIGITIZER_COORDS
-					MSG_META_EXPOSED,
-					MSG_IM_READ_DIGITIZER_COORDS,
-				else
-					MSG_META_EXPOSED,
-				endif
-				MSG_IM_MOUSE_WHEEL_CHANGE ; wheel support added
+ProcessUserInput method	IMClass,	MSG_IM_PTR_CHANGE,
+					MSG_IM_BUTTON_CHANGE,
+					MSG_IM_KBD_SCAN,
+					MSG_IM_PRESSURE_CHANGE,
+					MSG_IM_DIRECTION_CHANGE,
+					MSG_META_NOTIFY,
+					MSG_META_NOTIFY_WITH_DATA_BLOCK,
+					MSG_IM_INK_TIMEOUT,
+					MSG_META_KBD_CHAR,
+					if INK_DIGITIZER_COORDS
+						MSG_META_EXPOSED,
+						MSG_IM_READ_DIGITIZER_COORDS,
+					else
+						MSG_META_EXPOSED,
+					endif
+					MSG_IM_MOUSE_WHEEL_CHANGE
+					; wheel support added
 
 ;	(Handle MSG_META_KBD_CHAR to allow keycaps to work)
 
@@ -1169,7 +1170,9 @@ ProcessButton	endp
 ; prepare our event data
 ;
 ProcessWheel proc near
-
+					; wheel data is in DH: greater 0 = down, smaller 0 = up
+					; it can't be zero because then the Mouse driver would
+					; not have issued an event
 	cmp 	dh, 0
 	jg 	wheelDown
 
@@ -1789,10 +1792,10 @@ REVISION HISTORY:
 OutputNonPtr	proc	far
 	class	IMClass
 					; make sure to handle wheel
-	cmp di, MSG_META_MOUSE_WHEEL_UP
-	je handleWheel
-	cmp di, MSG_META_MOUSE_WHEEL_DOWN
-	je handleWheel
+	cmp 	di, MSG_META_MOUSE_WHEEL_UP
+	je 	handleWheel
+	cmp 	di, MSG_META_MOUSE_WHEEL_DOWN
+	je 	handleWheel
 					; Check for button method
 	cmp	di, MSG_META_MOUSE_BUTTON	; requires special handling
 	je	handleButton
@@ -1800,21 +1803,21 @@ OutputNonPtr	proc	far
 	cmp	di, MSG_META_KBD_CHAR	; requires special handling
 	je	handleKbd
 
-	cmp	di, MSG_IM_INK_TIMEOUT	;If this is an Ink timeout method,
+	cmp	di, MSG_IM_INK_TIMEOUT	; If this is an Ink timeout method,
 	LONG je	exit			; it must've come in after the UI has
 					; exited from pen mode.
 
 					; else handle other non-ptr
 	clr	bx			; can't discard if desperate
 	clr	si			; nothing to inc to show partially
-					; 	processed.
+					; processed.
 	jmp	SendNonPtr		; send it!
 
 handleWheel:				; handle wheel
+	call	WinEnsureChangeNotification	; make sure UI will have correct
+						; implied window
 	clr	bx			;
 	clr	si			;
-	call	WinEnsureChangeNotification
-
 	jmp SendNonPtr
 
 handleKbd:

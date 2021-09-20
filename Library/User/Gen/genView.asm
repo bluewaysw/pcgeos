@@ -1559,14 +1559,14 @@ ScrollView	endp
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		GenViewScrollOnWheelUp / GenViewScrollOnWheelDown for GenViewClass
+METHOD:		GenViewScrollOnWheel for GenViewClass
 
 DESCRIPTION:	Scrolls the view on wheel up / down
 
 PASS:
 		cx = mouse x
 		dx = mouse y
-		bp = ?
+		bp = shiftState in the high byte
 
 RETURN:		ax = wheel event processed
 		ax, bx, di, -- trashed
@@ -1582,32 +1582,33 @@ KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
-	MeyerK	2021/09/20 	initial implementation
+	MeyerK	09/2021 	initial implementation
 
 ------------------------------------------------------------------------------@
 
-GenViewScrollOnWheelUp	method dynamic GenViewClass, MSG_META_MOUSE_WHEEL_UP
+GenViewScrollOnWheel	method dynamic GenViewClass, 	MSG_META_MOUSE_WHEEL_UP, \
+							MSG_META_MOUSE_WHEEL_DOWN
 
-	mov bx, ds:[LMBH_handle]			;	oself
-  	mov ax, MSG_GEN_VIEW_SCROLL_UP
-	mov di, mask MF_CAN_DISCARD_IF_DESPERATE
-	call ObjMessage
-  	mov ax, mask MRF_PROCESSED
+	cmp	ax, MSG_META_MOUSE_WHEEL_DOWN
+	je	scrollDown
+
+scrollUp:
+  	mov 	ax, MSG_GEN_VIEW_SCROLL_UP
+	jmp 	finish
+
+scrollDown:
+  	mov 	ax, MSG_GEN_VIEW_SCROLL_DOWN
+
+finish:
+	mov 	bx, ds:[LMBH_handle]			;	oself
+	mov 	di, mask MF_CAN_DISCARD_IF_DESPERATE
+	call 	ObjMessage
+  	mov 	ax, mask MRF_PROCESSED
+
 	ret
 
-GenViewScrollOnWheelUp	endm
+GenViewScrollOnWheel	endm
 
-
-GenViewScrollOnWheelDown method dynamic GenViewClass, MSG_META_MOUSE_WHEEL_DOWN
-
-	mov bx, ds:[LMBH_handle];
-  	mov ax, MSG_GEN_VIEW_SCROLL_DOWN
-	mov di, mask MF_CAN_DISCARD_IF_DESPERATE
-	call ObjMessage
-  	mov ax, mask MRF_PROCESSED
-	ret
-
-GenViewScrollOnWheelDown	endm
 
 
 

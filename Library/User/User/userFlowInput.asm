@@ -2658,50 +2658,10 @@ FlowInkReply	endp
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		FlowWheelUp -- MSG_META_MOUSE_WHEEL_UP for FlowClass
+METHOD:		FlowWheel -- 	MSG_META_MOUSE_WHEEL_UP
+				MSG_META_MOUSE_WHEEL_DOWN for FlowClass
 
-DESCRIPTION:	Disperses WHEEL to the current mouse grab
-
-CALLED BY:	Input Manager (see Library/IM/imMain.asm)
-
-PASS:
-	*ds:si - instance data
-	es - segment of FlowClass
-
-	ax - MSG_META_MOUSE_WHEEL_UP
-
-	cx	- x position, mouse source window coordinates
-	dx	- y position, mouse source window coordinates
-	bp	- high byte shiftState, low byte null
-
-RETURN:		nothing
-
-DESTROYED:	bx, si, di, ds, es
-
-PSEUDO CODE/STRATEGY:
-
-KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	MeyerK	3/2021		Initial version
-
-------------------------------------------------------------------------------@
-FlowWheelUp	method dynamic	FlowClass, MSG_META_MOUSE_WHEEL_UP
-
-	mov ax, MSG_META_MOUSE_WHEEL_UP
-	call SendMouseToActiveOrImpliedGrab
-	ret
-
-FlowWheelUp endm
-
-
-COMMENT @----------------------------------------------------------------------
-
-METHOD:		FlowWheelDown -- MSG_META_MOUSE_WHEEL_DOWN for FlowClass
-
-DESCRIPTION:	Disperses WHEEL to the current mouse grab
+DESCRIPTION:	Disperses WHEEL events to the current mouse grab
 
 CALLED BY:	Input Manager (see Library/IM/imMain.asm)
 
@@ -2709,7 +2669,7 @@ PASS:
 	*ds:si - instance data
 	es - segment of FlowClass
 
-	ax - MSG_META_MOUSE_WHEEL_DOWN
+	ax - MSG_META_MOUSE_WHEEL_UP / MSG_META_MOUSE_WHEEL_DOWN
 
 	cx	- x position, mouse source window coordinates
 	dx	- y position, mouse source window coordinates
@@ -2728,13 +2688,13 @@ REVISION HISTORY:
 	----	----		-----------
 	MeyerK	09/2021		initial implementation
 ------------------------------------------------------------------------------@
-FlowWheelDown	method dynamic	FlowClass, MSG_META_MOUSE_WHEEL_DOWN
+FlowWheel	method	dynamic	FlowClass, 	MSG_META_MOUSE_WHEEL_UP, \
+					   	MSG_META_MOUSE_WHEEL_DOWN
 
-	mov ax, MSG_META_MOUSE_WHEEL_DOWN
-	call SendMouseToActiveOrImpliedGrab
+	call 	SendMouseToActiveOrImpliedGrab
 	ret
 
-FlowWheelDown endm
+FlowWheel endm
 
 
 COMMENT @----------------------------------------------------------------------
