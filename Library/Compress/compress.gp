@@ -41,14 +41,14 @@ entry	CompressLibraryEntry
 # Access symbols from kernel library
 #
 library	geos
+library ansic
 
 #
 # Define resources other than standard discardable code
 #
 nosort
-#resource PK_TEXT code fixed read-only
-#resource _TEXT code fixed read-only
-#resource CRC325_DATA fixed
+resource explode_TEXT code fixed read-only
+resource implode_TEXT code fixed read-only
 resource CompressCode code read-only shared
 #
 # Exported routines (and classes)
