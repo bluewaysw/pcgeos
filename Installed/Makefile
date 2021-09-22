@@ -107,8 +107,8 @@ prefLibs	: prefvid preftd \
 # prefs not used preflvl prefuic prefui prefts prefspui prefsock preflink preflang
 
 # Geos impex libraries
-impex_libs: dib bmp clp ico pcx tif \
-	    dbase3 dbase4 htmlpars htmlimpx
+impex_libs	: dib bmp clp ico pcx tif \
+		  dbase3 dbase4 htmlpars htmlimpx
 #lot123 msmword msword wordperf5
 
 
