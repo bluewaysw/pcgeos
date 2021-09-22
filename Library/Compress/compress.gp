@@ -6,10 +6,10 @@
 # MODULE:	Compress
 # FILE:		compress.gp
 #
-# AUTHOR:	dloft 4/92	
+# AUTHOR:	dloft 4/92
 #
 #
-# 
+#
 #
 #	$Id: compress.gp,v 1.1 97/04/04 17:49:04 newdeal Exp $
 #
@@ -41,7 +41,6 @@ entry	CompressLibraryEntry
 # Access symbols from kernel library
 #
 library	geos
-library ansic
 
 #
 # Define resources other than standard discardable code
@@ -49,7 +48,9 @@ library ansic
 nosort
 resource explode_TEXT code fixed read-only
 resource implode_TEXT code fixed read-only
+resource STRINGCODE	code read-only shared fixed
 resource CompressCode code read-only shared
+
 #
 # Exported routines (and classes)
 #
