@@ -14,5 +14,11 @@ FINDSTR /r /c:"127.0.0.1 from port" %LOCAL_ROOT%\gbuild\localpc\IPX_STAT.txt | p
 set /p IPX_PORT=<%LOCAL_ROOT%\gbuild\localpc\IPX_PORT.txt
 cls
 mode 120,50
-set CUSTOM_TCL_LOCATION=%cd%\swat.rc
+IF EXIST "%cd%\swat.rc" (
+   set CUSTOM_TCL_LOCATION=%cd%\swat.rc
+) ELSE IF EXIST "%USERPROFILE%\swat.rc" (
+   set CUSTOM_TCL_LOCATION=%USERPROFILE%\swat.rc
+) ELSE (
+   set CUSTOM_TCL_LOCATION=
+)
 swat -net 00000000:7F000001%IPX_PORT%:003F
