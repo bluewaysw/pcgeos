@@ -31,6 +31,9 @@ static char *rcsid = "$Id: tclCmdAH.c,v 1.53 97/05/23 13:53:51 weber Exp $ SPRIT
 #include <compat/file.h>
 #endif
 
+#if defined(_LINUX)
+# include <pwd.h>
+#endif
 #if defined(unix)
 # include <sys/signal.h>
 # include <sys/file.h>
@@ -1309,7 +1312,7 @@ ExpandTilde(char *f,	    	/* Name to expand */
 {
     char *file;
 
-#if defined(unix)
+#if defined(_LINUX)
 
     char *p;
 
@@ -1399,7 +1402,7 @@ ExpandTilde(char *f,	    	/* Name to expand */
 	 * No expansion needed
 	 */
 	file = f;
-#if defined(unix)
+#if defined(_LINUX)
     }
 #endif
 
