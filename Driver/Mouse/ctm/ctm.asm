@@ -32,10 +32,10 @@ DESCRIPTION:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-MOUSE_NUM_BUTTONS	= 3		 ; Assume 3 for now -- we'll set it in MouseDevInit
-MOUSE_CANT_SET_RATE	= 1		 ; Microsoft driver doesn't specify a function
+MOUSE_NUM_BUTTONS	= 3		; Assume 3 for now -- we'll set it in MouseDevInit
+MOUSE_CANT_SET_RATE	= 1		; Microsoft driver doesn't specify a function
 															; to change the report rate.
-MOUSE_SEPARATE_INIT	= 1		 ; We use a separate Init resource
+MOUSE_SEPARATE_INIT	= 1		; We use a separate Init resource
 
 MIDDLE_IS_DOUBLE_PRESS	= 1		; fake double-press with middle button
 
@@ -67,11 +67,12 @@ mouseNameTable	lptr.char	ctNativeMouse,
 				ctPageMouse
 		lptr.char	0	; null-terminator
 
-LocalDefString ctNativeMouse	<'CTMOUSE.EXE /O (GEOS6 Native Wheel Support)', 0>
+LocalDefString ctNativeMouse	<'CTMOUSE.EXE /O (native wheel support)', 0>
 LocalDefString ctCursorMouse	<'CTMOUSE.EXE /O (Wheel = Cursor Up/Down)', 0>
 LocalDefString ctPageMouse	<'CTMOUSE.EXE /O (Wheel = Page Up/Down)', 0>
 
 mouseInfoTable	MouseExtendedInfo	\
+	0,		; ctNativeMouse
 	0,		; ctCursorMouse
 	0		; ctPageMouse
 
@@ -82,25 +83,35 @@ ForceRef	mouseExtendedInfo
 ;			Variables
 ;------------------------------------------------------------------------------
 idata	segment
+					; driver variants for easier code-reading
+					; as constants
+	DRIVER_VARIANT_NATIVE	equ	0;
+	DRIVER_VARIANT_CURSOR	equ	2;
+	DRIVER_VARIANT_PAGE	equ	4;
 
+	GEN_MOUSE_MAGIC	= 0adebh 	; Magical delta given to MouseSendEvents if there's
+					; mouse motion so our input monitor knows to do
+					; funky things with the IM_PTR_CHANGE event.
 
-GEN_MOUSE_MAGIC	= 0adebh 	; Magical delta given to MouseSendEvents if there's
-				; mouse motion so our input monitor knows to do
-				; funky things with the IM_PTR_CHANGE event.
+	mouseMonitor	Monitor	<>
 
-mouseMonitor	Monitor	<>
+	mouseSet	byte	0	; non-zero if device-type set
 
-mouseSet	byte	0	; non-zero if device-type set
+	driverVariant 	word	0	; start with device 0
 
-mouseRates	label	byte	; to avoid assembly errors
-MOUSE_NUM_RATES	equ	0
+	mouseRates	label	byte	; to avoid assembly errors
+	MOUSE_NUM_RATES	equ	0
+
 idata	ends
 
 ;------------------------------------------------------------------------------
 ;		UDATA
 ;------------------------------------------------------------------------------
 udata		segment
-	driverVariant word
+
+	scrollKeyUp	word
+	scrollKeyDown	word
+
 udata		ends
 
 MouseFuncs	etype	byte
@@ -268,10 +279,15 @@ MouseDevInit	proc	far	uses dx, ax, cx, si, bx
 
 	; fetch and save driverVariant id
 		call	MouseMapDevice
-		mov ds:[driverVariant], di ; device idx is in di. first idx is 0 then 2, 4, 6...
+		jnc	noError			; carry set if MouseMapDevice failed
+
+		mov	ds:[driverVariant], 0	; otherwise: set device index back to 0
+		jmp	startReset
+noError:
+		mov 	ds:[driverVariant], di ; device idx is in di. first idx is 0 then 2, 4, 6...
 		call	MemUnlock	; release the info block that has been locked by MouseMapDevice, weird....
 
-	; Reset
+startReset:
 		dec	ds:[mouseSet]
 
 		mov	bx, 3		; Early LogiTech drivers screw up and
@@ -419,10 +435,10 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 MouseSetDevice	proc	near
-		.enter
+	.enter
 		call	MouseDevInit
-		.leave
-		ret
+	.leave
+	ret
 MouseSetDevice	endp
 
 
@@ -451,7 +467,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 MouseTestDevice	proc	near	uses bx
-		.enter
+	.enter
 	; XXX: SOME DRIVERS DON'T DO THIS RIGHT!
 		call	MouseReset
 		tst	ax
@@ -459,8 +475,8 @@ MouseTestDevice	proc	near	uses bx
 		jnz	done
 		mov	ax, DP_NOT_PRESENT
 done:
-		.leave
-		ret
+	.leave
+	ret
 MouseTestDevice	endp
 
 
@@ -547,79 +563,41 @@ mangleButtons:
 		call	MouseSendEvents
 	;
 	; Check the wheel
-	; Send the wheel events as keypresses for now.
-	; We'd like to send them as MSG_META_KBD_CHAR with more info,
-	; but the driver isn't happy including Objects/inputC.def.
-	; Ideally we'd send them as low-level scroll events which the
-	; view (or list or whatever) could handle as it desired.
+	; Send the wheel as keypresses or wheel event.
 	;
+		pop 	bx
 
-	pop 	bx
+		cmp 	ds:[driverVariant], DRIVER_VARIANT_NATIVE
+		je 	nativeEvent
 
-	cmp 	ds:[driverVariant], 0 	; compare with 0 = first driver variant = use Up/Down keys
-	je 	scrollEvent			; if greater than 0 => use Page up key
-	cmp 	ds:[driverVariant], 2 	; compare with 0 = first driver variant = use Up/Down keys
-	je 	cursorKeyEvent		; if greater than 0 => use Page up key
-	cmp 	ds:[driverVariant], 4 	; compare with 0 = first driver variant = use Up/Down keys
-	je 	pageKeyEvent			; if greater than 0 => use Page up key
+		cmp 	ds:[driverVariant], DRIVER_VARIANT_CURSOR
+		je 	cursorKeyEvent
 
-scrollEvent:
-	call	MouseSendScrollEvent
-	jmp	packetDone
+		cmp 	ds:[driverVariant], DRIVER_VARIANT_PAGE
+		je 	pageKeyEvent
+
+nativeEvent:
+		call	MouseSendWheelEvent
+		jmp	packetDone
 
 cursorKeyEvent:
-	call 	MouseSendCursorKeyEvent
-	jmp	packetDone
+		mov 	ds:[scrollKeyUp], 0xE048
+		mov 	ds:[scrollKeyDown], 0xE050
+		call 	MouseSendKeyEvent
+		jmp	packetDone
 
 pageKeyEvent:
-	call 	MouseSendPageKeyEvent
-	jmp	packetDone
-
-
-;		pop bx
-;
-;		cmp bh, 0		 ; compare wheel data with 0
-;		je packetDone			 ; if wheel data equals zero => no wheel action, done
-;		jg wheelDown	; if dh value greater than 0 => jump to wheel down
-;
-;		wheelUp:			; otherwise continue with wheel up
-;		cmp ds:[driverVariant], 0 ; compare with 0 = first driver variant = use Up/Down keys
-;		jg usePgUp				; if greater than 0 => use Page up key
-;
-;		useCursorUp:			 ; otherwise use cursor up
-;		mov cx, 0xE048		 ; dh is smaller than 0 => put up key (0xE048) in cx
-;		jmp doPress	; do the press
-;
-;		usePgUp:
-;		mov cx, 0xE049		 ; dh is smaller than 0 => put page up key (0xE049) in cx
-;		jmp doPress	; jmp to do the keypress
-;
-;		wheelDown:
-;		cmp ds:[driverVariant], 0 ; compare with 0 = first driver variant = use Up/Down keys
-;		jg usePgDown			; if greater than 0 => use Page down key
-;
-;		useCursorDown:
-;		mov	cx, 0xE050		 ; wheel down => put down key (0xE050) in cx
-;		jmp doPress	 ; do the press
-;
-;		usePgDown:
-;		mov cx, 0xE051			; dh is smaller than 0 => put page up key (0xE051) in cx
-;		jmp doPress	 ; jmp to do the keypress
-;
-;		doPress:
-;		mov	di, mask MF_FORCE_QUEUE ; setup ObjMessage
-;		mov	ax, MSG_IM_KBD_SCAN
-;		mov	bx, ds:[mouseOutputHandle]
-;
-;		mov	dx, BW_TRUE		; set to "press"
-;		call	ObjMessage		; press - release not necessary!
+		mov 	ds:[scrollKeyUp], 0xE049
+		mov 	ds:[scrollKeyDown], 0xE051
+		call 	MouseSendKeyEvent
+		jmp	packetDone
 
 packetDone:
-	ret
+		ret
 MouseDevHandler	endp
 
 
-MouseSendScrollEvent	proc	near
+MouseSendWheelEvent	proc	near
 
 	cmp 	bh, 0
 	je 	finish		; if wheel data equals zero => no wheel action, done
@@ -632,21 +610,21 @@ MouseSendScrollEvent	proc	near
 finish:
 	ret
 
-MouseSendScrollEvent	endp
+MouseSendWheelEvent	endp
 
 
-MouseSendCursorKeyEvent	proc	near
+MouseSendKeyEvent	proc	near
 
 	cmp	bh, 0		; compare wheel data with 0
 	je 	finish		; if wheel data equals zero => no wheel action, done
 	jg 	wheelDown	; if bh value greater than 0 => jump to wheel down
 
-wheelUp:			; otherwise continue with wheel up
-	mov 	cx, 0xE048	; bh is smaller than 0 => put up key (0xE048) in cx
-	jmp 	doPress		; do the press
+wheelUp:				; otherwise continue with wheel up
+	mov 	cx, ds:[scrollKeyUp]	; put "up" key in cx
+	jmp 	doPress			; do the press
 
 wheelDown:
-	mov	cx, 0xE050	; wheel down => put down key (0xE050) in cx
+	mov	cx, ds:[scrollKeyDown]	; wheel down => put "down" key in cx
 
 doPress:
 	mov	di, mask MF_FORCE_QUEUE ; setup ObjMessage
@@ -658,33 +636,7 @@ doPress:
 finish:
 	ret
 
-MouseSendCursorKeyEvent	endp
-
-
-MouseSendPageKeyEvent	proc	near
-
-	cmp	bh, 0		; compare wheel data with 0
-	je 	finish		; if wheel data equals zero => no wheel action, done
-	jg 	wheelDown	; if bh value greater than 0 => jump to wheel down
-
-wheelUp:			; otherwise continue with wheel up
-	mov 	cx, 0xE049	; bh is smaller than 0 => put up key (0xE048) in cx
-	jmp 	doPress		; do the press
-
-wheelDown:
-	mov	cx, 0xE051	; wheel down => put down key (0xE050) in cx
-
-doPress:
-	mov	di, mask MF_FORCE_QUEUE ; setup ObjMessage
-	mov	ax, MSG_IM_KBD_SCAN
-	mov	bx, ds:[mouseOutputHandle]
-
-	mov	dx, BW_TRUE		; set to "press"
-	call	ObjMessage		; press - release not necessary!
-finish:
-	ret
-
-MouseSendPageKeyEvent	endp
+MouseSendKeyEvent	endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -704,9 +656,9 @@ PASS:		al	= mask MF_DATA
 			bp<14>	= Y-is-absolute flag
 			bp<0:13>= timestamp
 		si	= event data
-RETURN:		al	 = mask MF_DATA if event is to be passed through
-	0 if we've swallowed the event (as will happen if
-	MF_READ_MOTION returns no motion)
+RETURN:		al	= mask MF_DATA if event is to be passed through
+			0 if we've swallowed the event (as will happen if
+			MF_READ_MOTION returns no motion)
 DESTROYED:	ah, bx, ds, es (possibly)
 		cx, dx, si, bp (if event swallowed)
 
@@ -728,35 +680,35 @@ MouseMonitor	proc	far
 	;
 	; See if the event is one of our IM_PTR_CHANGE events.
 	;
-	cmp	di, MSG_IM_PTR_CHANGE
-	jne	done
-	cmp	cx, GEN_MOUSE_MAGIC
-	jne	done
-	cmp	dx, GEN_MOUSE_MAGIC
-	jne	done
+		cmp	di, MSG_IM_PTR_CHANGE
+		jne	done
+		cmp	cx, GEN_MOUSE_MAGIC
+		jne	done
+		cmp	dx, GEN_MOUSE_MAGIC
+		jne	done
 	;
 	; It seems to be. Read the motion counters. If they are both zero,
 	; just swallow the event (else, return them, of course)
 	;
-	mov	ax, MF_READ_MOTION
-	int	51
-	mov	ax, cx
-	or	ax, dx
-	jz	done		; MF_DATA flag already clear
+		mov	ax, MF_READ_MOTION
+		int	51
+		mov	ax, cx
+		or	ax, dx
+		jz	done		; MF_DATA flag already clear
 
 	;
 	; Accelerate the motion returned.
 	;
-	push	di
-	xchg	ax, cx
-	call	MouseAccelerate
-	xchg	ax, cx
-	xchg	ax, dx
-	call	MouseAccelerate
-	xchg	ax, dx
-	pop	di
+		push	di
+		xchg	ax, cx
+		call	MouseAccelerate
+		xchg	ax, cx
+		xchg	ax, dx
+		call	MouseAccelerate
+		xchg	ax, dx
+		pop	di
 
-	mov	al, mask MF_DATA
+		mov	al, mask MF_DATA
 
 done:
 	.leave
