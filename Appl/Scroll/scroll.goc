@@ -81,7 +81,7 @@
         @GContPrimary;
 }
 
-@visMoniker GContTextMoniker = "Scroll";
+@visMoniker GContTextMoniker = "Mouse Wheel API";
 
 @end AppResource;
 
@@ -92,7 +92,6 @@
 
 @object GenPrimaryClass GContPrimary = {
     GI_comp = @GContView;
-    HINT_SIZE_WINDOW_AS_DESIRED;
 }
 
   /*
@@ -111,7 +110,8 @@
        */
     GVI_attrs = @default | GVA_GENERIC_CONTENTS
                          | GVA_SAME_COLOR_AS_PARENT_WIN;
-    GVI_vertAttrs = @default | GVDA_SCROLLABLE;
+    GVI_vertAttrs = @default;
+    // GVDA_SCROLLABLE
 }
 
   /*
@@ -120,61 +120,27 @@
    * in the GenView.
    */
 @object GenContentClass GContContent = {
-    GI_comp = @GContText1,
-              @GContText2,
-              @GContText3,
-              @GContValue1,
+    GI_comp = @GContValue1,
               @GContValue2,
-              @GContValue3,
-              @GContGlyph1,
-              @GContGlyph2,
-              @GContGlyph3;
+              @GContWheelDirection,
+              @GContModifierKey;
     GCI_genView = @GContView;
 }
 
-  /*
-   * These are just some example Gen objects
-   * that show that this concept really works.
-   */
-@object GenTextClass GContText1 = {
-    GI_visMoniker = "Text 1:";
-    GTXI_text = "Text in Text1 object.";
-}
-
-@object GenTextClass GContText2 = {
-    GI_visMoniker = "Text 2:";
-    GI_attrs = @default | GA_READ_ONLY;
-    GTXI_text = "Text in Text2 object. (Read only)";
-}
-
-@object GenTextClass GContText3 = {
-    GI_visMoniker = "Text 3:";
-    GTXI_text = "Text in Text3 object.";
-}
-
 @object GenValueClass GContValue1 = {
-    GI_visMoniker = "Value 1:";
+    GI_visMoniker = "Mouse X Position:";
 }
 
 @object GenValueClass GContValue2 = {
-    GI_visMoniker = "Value 2:";
+    GI_visMoniker = "Mouse Y Position:";
 }
 
-@object GenValueClass GContValue3 = {
-    GI_visMoniker = "Value 3:";
-    GI_attrs = @default | GA_READ_ONLY;
+@object GenGlyphClass GContWheelDirection = {
+    GI_visMoniker = "Wheel Direction:";
 }
 
-@object GenGlyphClass GContGlyph1 = {
-    GI_visMoniker = "Glyph 1";
-}
-
-@object GenGlyphClass GContGlyph2 = {
-    GI_visMoniker = "Glyph 2";
-}
-
-@object GenGlyphClass GContGlyph3 = {
-    GI_visMoniker = "Glyph 3";
+@object GenGlyphClass GContModifierKey = {
+    GI_visMoniker = "Modifier Key:";
 }
 
 @end Interface;
@@ -184,58 +150,55 @@
  *******************************************************************/
 
 /********************************************************************
- *              MSG_META_KBD_CHAR
- ********************************************************************
- * SYNOPSIS:     The user has pressed a key so lets see if it's the
- *               PgUp and PgDn keys and handle those differently.
- * PARAMETERS:   word character
- *               word flags
- *               word state
- * RETURNS:      void
- * SIDE EFFECTS: none
- * STRATEGY:     Check if the character is the PgUp or PgDn key. If it
- *               is then have the view scroll up or down. If it isn't
- *               then call the superclass to handle it.
- * REVISION HISTORY:
- *      Name    Date            Description
- *      ----    ----            -----------
- *      NF      11/13/96        Initial version
+ *              MSG_META_MOUSE_WHEEL
  *******************************************************************/
 
-/*
-@method ScrollViewClass, MSG_META_MOUSE_PTR
+@method ScrollViewClass, MSG_META_MOUSE_WHEEL
 {
-    //@send self::MSG_GEN_VIEW_SCROLL_UP();
-}
-*/
 
-/*
-@method ScrollViewClass, MSG_META_MOUSE_WHEEL_UP
-{
-    @send self::MSG_GEN_VIEW_SCROLL_UP();
+    @send GContValue1::MSG_GEN_VALUE_SET_INTEGER_VALUE(xPosition, 0);
+    @send GContValue2::MSG_GEN_VALUE_SET_INTEGER_VALUE(yPosition, 0);
+
+    if (GET_BUTTON_INFO(inputState) > 128)
+    {
+        @call GContWheelDirection::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("Wheel Direction: Up.", VUM_NOW);
+    }
+    else
+    {
+        @call GContWheelDirection::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("Wheel Direction: Down.", VUM_NOW);
+    }
+
+
+    if (GET_SHIFT_STATE(inputState) & (SS_LSHIFT))
+    {
+        @call GContModifierKey::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("Modifier Key: Left Shift.", VUM_NOW);
+    }
+
+    if (GET_SHIFT_STATE(inputState) & (SS_RSHIFT))
+    {
+        @call GContModifierKey::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("Modifier Key: Right Shift.", VUM_NOW);
+    }
+
+    if (GET_SHIFT_STATE(inputState) & (SS_LALT))
+    {
+    	@call GContModifierKey::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("Modifier Key: Left Alt.", VUM_NOW);
+    }
+
+    if (GET_SHIFT_STATE(inputState) & (SS_RALT))
+    {
+    	@call GContModifierKey::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("Modifier Key: Right Alt.", VUM_NOW);
+    }
+
+    if (GET_SHIFT_STATE(inputState) & (SS_LCTRL))
+    {
+        @call GContModifierKey::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("Modifier Key: Left Ctrl.", VUM_NOW);
+    }
+
+    if (GET_SHIFT_STATE(inputState) & (SS_RCTRL))
+    {
+        @call GContModifierKey::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("Modifier Key: Right Ctrl.", VUM_NOW);
+    }
+
 
     retVal->flags = MRF_PROCESSED;
 }
-*/
-
-
-@method ScrollViewClass, MSG_META_MOUSE_WHEEL_DOWN
-{
-    //@send self::MSG_GEN_VIEW_SCROLL_DOWN();
-
-	char txt[20];
-
-	LocalFixedToAscii(txt, MakeWWFixed(GET_SHIFT_STATE(shiftState)), 4);
-	UserStandardDialog ((char *)0,(char *)0,(char *)0,(char *)0, txt, (( CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) | ( GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)));
-
-    retVal->flags = MRF_PROCESSED;
-}
-
-
-
-/*
-@method ScrollViewClass, MSG_META_MOUSE_BUTTON
-{
-    @send self::MSG_GEN_VIEW_SCROLL_DOWN();
-}
-*/

@@ -1173,23 +1173,13 @@ ProcessWheel proc near
 					; wheel data is in DH: greater 0 = down, smaller 0 = up
 					; it can't be zero because then the Mouse driver would
 					; not have issued an event
-	cmp 	dh, 0
-	jg 	wheelDown
+	mov 	di, MSG_META_MOUSE_WHEEL
+	mov	bl, dh			; put wheel state in bl
+	mov	bh, ds:[shiftState]	; put state of the keyboard in bh
+	mov	bp, bx			; put both into bp, range is now: < 128 for down, > 128 for up
 
-wheelUp:
-	mov 	di, MSG_META_MOUSE_WHEEL_UP
-	jmp 	finish
-
-wheelDown:
-	mov 	di, MSG_META_MOUSE_WHEEL_DOWN
-
-finish:
 	mov	cx, ds:[displayXPos]	; make sure cx is set with X coord
 	mov	dx, ds:[displayYPos]	; make sure dx is set with Y coord
-
-	clr	bl			; we are not interested in the mouse buttons
-	mov	bh, ds:[shiftState]	; but in the state of the keyboard
-	mov	bp, bx			; put into bp
 
 	ret
 
@@ -1792,11 +1782,8 @@ REVISION HISTORY:
 OutputNonPtr	proc	far
 	class	IMClass
 					; make sure to handle wheel
-	cmp 	di, MSG_META_MOUSE_WHEEL_UP
-	je 	handleWheel
-	cmp 	di, MSG_META_MOUSE_WHEEL_DOWN
-	je 	handleWheel
-					; Check for button method
+	cmp 	di, MSG_META_MOUSE_WHEEL
+						; Check for button method
 	cmp	di, MSG_META_MOUSE_BUTTON	; requires special handling
 	je	handleButton
 					; Or keyboard method
@@ -1818,7 +1805,7 @@ handleWheel:				; handle wheel
 						; implied window
 	clr	bx			;
 	clr	si			;
-	jmp SendNonPtr
+	jmp 	SendNonPtr
 
 handleKbd:
 					; Before sending any kbd events,

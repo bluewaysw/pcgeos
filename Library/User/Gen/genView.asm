@@ -1586,13 +1586,17 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 
-GenViewScrollOnWheel	method dynamic GenViewClass, 	MSG_META_MOUSE_WHEEL_UP, \
-							MSG_META_MOUSE_WHEEL_DOWN
+GenViewScrollOnWheel	method dynamic GenViewClass, 	MSG_META_MOUSE_WHEEL
 
-	cmp	ax, MSG_META_MOUSE_WHEEL_DOWN
-	je	scrollDown
+	test	ds:[di].GVI_vertAttrs, mask GVDA_SCROLLABLE	; test if scrollable
+	jz	exit						; not scrollable, exit
 
-scrollUp:
+	push 	bp			; save bp
+	and	bp, 0000000011111111b	; extract the wheel info, mask out shiftState
+	cmp	bp, 128			; compare with 128
+	js	scrollDown		; smaller than 128 = scroll down
+
+scrollUp:				; not smaller = sroll up
   	mov 	ax, MSG_GEN_VIEW_SCROLL_UP
 	jmp 	finish
 
@@ -1600,11 +1604,13 @@ scrollDown:
   	mov 	ax, MSG_GEN_VIEW_SCROLL_DOWN
 
 finish:
-	mov 	bx, ds:[LMBH_handle]			;	oself
-	mov 	di, mask MF_CAN_DISCARD_IF_DESPERATE
-	call 	ObjMessage
-  	mov 	ax, mask MRF_PROCESSED
+	pop	bp			; restore bp
+	mov 	bx, ds:[LMBH_handle]	; get oself
+	mov 	di, mask MF_CAN_DISCARD_IF_DESPERATE	; if we are under load we are allowed to drop an event
+	call 	ObjMessage		; there he blows
 
+exit:
+  	mov 	ax, mask MRF_PROCESSED	; MUST be set, otherwise GEOS will crash
 	ret
 
 GenViewScrollOnWheel	endm

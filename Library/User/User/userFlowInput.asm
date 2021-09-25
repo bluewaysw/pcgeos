@@ -2658,10 +2658,9 @@ FlowInkReply	endp
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		FlowWheel -- 	MSG_META_MOUSE_WHEEL_UP
-				MSG_META_MOUSE_WHEEL_DOWN for FlowClass
+METHOD:		FlowWheel -- 	MSG_META_MOUSE_WHEEL for FlowClass
 
-DESCRIPTION:	Disperses WHEEL events to the current mouse grab
+DESCRIPTION:	Disperses WHEEL event to the current mouse grab
 
 CALLED BY:	Input Manager (see Library/IM/imMain.asm)
 
@@ -2669,11 +2668,11 @@ PASS:
 	*ds:si - instance data
 	es - segment of FlowClass
 
-	ax - MSG_META_MOUSE_WHEEL_UP / MSG_META_MOUSE_WHEEL_DOWN
+	ax - MSG_META_MOUSE_WHEEL
 
 	cx	- x position, mouse source window coordinates
 	dx	- y position, mouse source window coordinates
-	bp	- high byte shiftState, low byte null
+	bp	- high byte shiftState, low byte wheel data
 
 RETURN:		nothing
 
@@ -2688,8 +2687,7 @@ REVISION HISTORY:
 	----	----		-----------
 	MeyerK	09/2021		initial implementation
 ------------------------------------------------------------------------------@
-FlowWheel	method	dynamic	FlowClass, 	MSG_META_MOUSE_WHEEL_UP, \
-					   	MSG_META_MOUSE_WHEEL_DOWN
+FlowWheel	method	dynamic	FlowClass, 	MSG_META_MOUSE_WHEEL
 
 	call 	SendMouseToActiveOrImpliedGrab
 	ret
