@@ -75,6 +75,9 @@ static char *rcsid =
 #define TIOCGLTC    0x7474          /* get special local chars */
 #define TIOCSLTC    0x7475          /* set special local chars */
 
+#define SWATWCTL_FOCUS		"swatwctl focus >/dev/null 2>&1"
+#define SWATWCTL_RESTORE	"swatwctl restore >/dev/null 2>&1"
+
 #else
 #include <ntcurses/curses.h>
 #endif
@@ -3613,6 +3616,9 @@ See also:\n\
     int	    	    	length;
     CursesInputState	state;
 
+#if defined(_LINUX)
+    system(SWATWCTL_FOCUS);
+#endif
     wrefresh(cmdWin);
     fflush(stdout);
 
@@ -3799,6 +3805,10 @@ See also:\n\
 
     Rpc_Pop(0);
 
+#if defined(_LINUX)
+    system(SWATWCTL_RESTORE");
+#endif
+
     /*
      * Clear the interrrupt-pending flag to avoid annoying people
      */
@@ -3930,6 +3940,10 @@ See also:\n\
     
     Rpc_Push(0);
 
+#if defined(_LINUX)
+    system(SWATWCTL_FOCUS);
+#endif
+
     Rpc_Watch(0, RPC_READABLE, CursesReadChar, (Rpc_Opaque)&c);
 #if defined(_MSDOS)
     Mouse_Watch();
@@ -3947,6 +3961,9 @@ See also:\n\
     Rpc_Pop(0);
 #if defined(_MSDOS)
     Mouse_Ignore();
+#endif
+#if defined(_LINUX)
+    system(SWATWCTL_RESTORE);
 #endif
     Tcl_RetPrintf(interp, "%c", c);
     return(TCL_OK);
