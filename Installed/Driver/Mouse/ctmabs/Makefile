@@ -3,11 +3,11 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = ctm
-ASM_TO_OBJS     = ctm.asm
+GEODE           = ctmabs
+ASM_TO_OBJS     = ctmabs.asm
 UI_TO_RDFS      =
-SRCS            = ctm.asm ../mouseCommon.asm
-OBJS            = ctm.obj
+SRCS            = ctmabs.asm ../mouseCommon.asm
+OBJS            = ctmabs.obj
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk

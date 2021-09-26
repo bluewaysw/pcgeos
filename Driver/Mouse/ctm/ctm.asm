@@ -32,12 +32,15 @@ DESCRIPTION:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
+;
+; The following constants are used in mouseCommon.asm -- see that
+; file for documentation.
+;
 MOUSE_NUM_BUTTONS	= 3		; Assume 3 for now -- we'll set it in MouseDevInit
-MOUSE_CANT_SET_RATE	= 1		; Microsoft driver doesn't specify a function
-															; to change the report rate.
-MOUSE_SEPARATE_INIT	= 1		; We use a separate Init resource
-
 MIDDLE_IS_DOUBLE_PRESS	= 1		; fake double-press with middle button
+MOUSE_CANT_SET_RATE	= 1		; Microsoft driver doesn't specify a function
+					; to change the report rate.
+MOUSE_SEPARATE_INIT	= 1		; We use a separate Init resource
 
 MOUSE_DONT_ACCELERATE	= 1		; We'll handle acceleration in our monitor
 MOUSE_ACCELERATE_FUNCS	= 1		; ...so access the acceleration function
@@ -83,6 +86,9 @@ ForceRef	mouseExtendedInfo
 ;			Variables
 ;------------------------------------------------------------------------------
 idata	segment
+
+	driverVariant 	word	0	; start with device 0
+
 					; driver variants for easier code-reading
 					; as constants
 	DRIVER_VARIANT_NATIVE	equ	0;
@@ -96,8 +102,6 @@ idata	segment
 	mouseMonitor	Monitor	<>
 
 	mouseSet	byte	0	; non-zero if device-type set
-
-	driverVariant 	word	0	; start with device 0
 
 	mouseRates	label	byte	; to avoid assembly errors
 	MOUSE_NUM_RATES	equ	0
@@ -284,8 +288,8 @@ MouseDevInit	proc	far	uses dx, ax, cx, si, bx
 		mov	ds:[driverVariant], 0	; otherwise: set device index back to 0
 		jmp	startReset
 noError:
-		mov 	ds:[driverVariant], di ; device idx is in di. first idx is 0 then 2, 4, 6...
-		call	MemUnlock	; release the info block that has been locked by MouseMapDevice, weird....
+		mov 	ds:[driverVariant], di 	; device idx is in di. first idx is 0 then 2, 4, 6...
+		call	MemUnlock		; release the info block that has been locked by MouseMapDevice, weird....
 
 startReset:
 		dec	ds:[mouseSet]
@@ -566,6 +570,8 @@ mangleButtons:
 	; Send the wheel as keypresses or wheel event.
 	;
 		pop 	bx
+		cmp 	bh, 0
+		je 	packetDone		; if wheel data equals zero => no wheel action, done
 
 		cmp 	ds:[driverVariant], DRIVER_VARIANT_NATIVE
 		je 	nativeEvent
@@ -599,15 +605,11 @@ MouseDevHandler	endp
 
 MouseSendWheelEvent	proc	near
 
-	cmp 	bh, 0
-	je 	finish		; if wheel data equals zero => no wheel action, done
-
 	mov 	dh, bh		; put wheel data in dh
 	mov	bx, ds:[mouseOutputHandle]
 	mov	di, mask MF_FORCE_QUEUE
 	mov	ax, MSG_IM_MOUSE_WHEEL_CHANGE
 	call 	ObjMessage	; Send the event
-finish:
 	ret
 
 MouseSendWheelEvent	endp
@@ -616,7 +618,6 @@ MouseSendWheelEvent	endp
 MouseSendKeyEvent	proc	near
 
 	cmp	bh, 0		; compare wheel data with 0
-	je 	finish		; if wheel data equals zero => no wheel action, done
 	jg 	wheelDown	; if bh value greater than 0 => jump to wheel down
 
 wheelUp:				; otherwise continue with wheel up
@@ -633,7 +634,7 @@ doPress:
 
 	mov	dx, BW_TRUE	; set to "press"
 	call	ObjMessage	; press - release not necessary!
-finish:
+
 	ret
 
 MouseSendKeyEvent	endp

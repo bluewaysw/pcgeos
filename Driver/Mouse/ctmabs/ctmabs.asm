@@ -4,6 +4,8 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 PROJECT:	PC GEOS
 MODULE:		Mouse Driver -- Absolute Generic Mouse Device-dependent routines
+				with Wheel support.
+				Intended for the "Basebox" Dosbox derivat.
 FILE:		absctm.asm
 
 AUTHOR:		Adam de Boor, Jul 16, 1991
@@ -38,6 +40,7 @@ DESCRIPTION:
 ; file for documentation.
 ;
 MOUSE_NUM_BUTTONS 		= 3	; Assume 3 for now -- we'll set it in MouseDevInit
+MIDDLE_IS_DOUBLE_PRESS		= 1	; fake double-press with middle button
 MOUSE_CANT_SET_RATE		= 1	; Microsoft driver doesn't specify a function
 					; to change the report rate.
 MOUSE_SEPARATE_INIT		= 1	; We use a separate Init resource
@@ -56,40 +59,25 @@ include		Internal/videoDr.def	; for gross video-exclusive hack
 MouseExtendedInfoSeg	segment	lmem LMEM_TYPE_GENERAL
 
 mouseExtendedInfo	DriverExtendedInfoTable <
-		{},			; lmem header added by Esp
+		{},				; lmem header added by Esp
 		length mouseNameTable,		; Number of supported devices
 		offset mouseNameTable,
 		offset mouseInfoTable
 >
 
-mouseNameTable	lptr.char	genLightPen,
-				genTouchScreen,
-				genTablet,
-				genDigitizer,
-				unmouse,
-				elodev,
-				summa,
-				wacomArtPad
+mouseNameTable	lptr.char	baseboxNativeMouse,
+				baseboxCursorMouse,
+				baseboxPageMouse
 		lptr.char	0	; null-terminator
 
-genLightPen	chunk.char	'Generic Light Pen', 0
-genTouchScreen	chunk.char	'Generic Touch Screen', 0
-genTablet	chunk.char	'Generic Tablet', 0
-genDigitizer	chunk.char	'Generic Digitizer', 0
-unmouse		chunk.char	'UnMouse Touch Tablet', 0
-elodev		chunk.char	'Elographics Touch Screen', 0
-summa		chunk.char	'SummaGraphics SummaSketch', 0
-wacomArtPad	chunk.char	'Wacom ArtPad', 0
+baseboxNativeMouse	chunk.char	'Basebox Mouse (native wheel support)', 0
+baseboxCursorMouse	chunk.char	'Basebox Mouse (Wheel = Cursor Up/Down)', 0
+baseboxPageMouse	chunk.char	'Basebox Mouse (Wheel = Page Up/Down)', 0
 
 mouseInfoTable	MouseExtendedInfo	\
-		mask MEI_GENERIC,	; genLightPen
-		mask MEI_GENERIC,	; genTouchScreen
-		mask MEI_GENERIC,	; genTablet
-		mask MEI_GENERIC,	; genDigitizer
-		mask MEI_GENERIC,	; unmouse
-		mask MEI_GENERIC,	; elodev
-		mask MEI_GENERIC,	; summa
-		mask MEI_GENERIC	; Wacom ArtPad
+		mask MEI_GENERIC,	; baseboxNativeMouse
+		mask MEI_GENERIC,	; baseboxCursorMouse
+		mask MEI_GENERIC	; baseboxPageMouse
 
 MouseExtendedInfoSeg	ends
 
@@ -98,12 +86,31 @@ MouseExtendedInfoSeg	ends
 ;------------------------------------------------------------------------------
 idata	segment
 
+	driverVariant 	word	0		; start with device 0
 
-mouseSet	byte	0	; non-zero if device-type set
+						; driver variants for easier code-reading
+						; as constants
+	DRIVER_VARIANT_NATIVE	equ	0	;
+	DRIVER_VARIANT_CURSOR	equ	2	;
+	DRIVER_VARIANT_PAGE	equ	4	;
 
-mouseRates	label	byte	; to avoid assembly errors
-MOUSE_NUM_RATES	equ	0
+	mouseSet	byte	0	; non-zero if device-type set
+
+	mouseRates	label	byte	; to avoid assembly errors
+	MOUSE_NUM_RATES	equ	0
+
 idata	ends
+
+;------------------------------------------------------------------------------
+;		UDATA
+;------------------------------------------------------------------------------
+udata		segment
+
+	scrollKeyUp	word
+	scrollKeyDown	word
+
+udata		ends
+
 
 MouseFuncs	etype	byte
     MF_RESET			enum	MouseFuncs
@@ -269,6 +276,19 @@ REVISION HISTORY:
 
 MouseDevInit	proc	far	uses dx, ax, cx, si, bx
 		.enter
+
+						; fetch and save driverVariant id
+		call	MouseMapDevice
+		jnc	noError			; carry set if MouseMapDevice failed
+
+		mov	ds:[driverVariant], 0	; otherwise: set device index back to 0
+		jmp	startReset
+noError:
+		mov 	ds:[driverVariant], di 	; device idx is in di. first idx is 0 then 2, 4, 6...
+		call	MemUnlock		; release the info block that has been locked by MouseMapDevice, weird....
+
+startReset:
+
 		dec	ds:[mouseSet]
 
 		mov	bx, 3		; Early LogiTech drivers screw up and
@@ -285,7 +305,7 @@ MouseDevInit	proc	far	uses dx, ax, cx, si, bx
 		mov	cx, 1fh			;cx <- all events (2 buttons)
 		cmp	bx, 2
 		je	twoButtons
-		mov	cx, 7fh			;cx <- all events (3 buttons)
+		mov	cx, 11111111b		;cx <- all events (3 buttons and the wheel)
 twoButtons:
 		segmov	es, Resident, dx	; Set up Event handler
 		mov	dx, offset Resident:MouseDevHandler
@@ -324,6 +344,42 @@ done:
 		.leave
 		ret
 MouseDevInit	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MouseMapDevice
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Map a device string to its device index
+
+CALLED BY:	MouseDevTest, MouseDevInit
+PASS:		dx:si	= device string
+RETURN:		carry set if string invalid
+		 ax	= DP_INVALID_DEVICE
+		 carry clear if string valid
+		 di	= device index (offset into mouseNameTable and mouseInfoTable)
+		 es	= locked info block
+		 bx	= handle of same
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	10/26/90	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+MouseMapDevice	proc	near	uses cx, ds
+	.enter
+		EnumerateDevice	MouseExtendedInfoSeg
+	.leave
+	ret
+MouseMapDevice	endp
 
 Init		ends
 
@@ -390,10 +446,10 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 MouseSetDevice	proc	near
-		.enter
+	.enter
 		call	MouseDevInit
-		.leave
-		ret
+	.leave
+	ret
 MouseSetDevice	endp
 
 
@@ -422,7 +478,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 MouseTestDevice	proc	near	uses bx
-		.enter
+	.enter
 	; XXX: SOME DRIVERS DON'T DO THIS RIGHT!
 		call	MouseReset
 		tst	ax
@@ -430,10 +486,9 @@ MouseTestDevice	proc	near	uses bx
 		jnz	done
 		mov	ax, DP_NOT_PRESENT
 done:
-		.leave
-		ret
+	.leave
+	ret
 MouseTestDevice	endp
-
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -457,6 +512,7 @@ PASS:		ax	- mask of events that occurred:
 				b0	left
 				b1	right
 				b2	middle
+				Alternatively: bh holds the wheel info
 			  1 => pressed
 		cx	- X position
 		dx	- Y position
@@ -478,6 +534,9 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 MouseDevHandler	proc	far
+
+	;store bx in case of wheel activities
+		push bx;
 	;
 	; Load dgroup into ds. We pay no attention to the event
 	; mask we're passed, since MouseSendEvents just works from the
@@ -506,8 +565,80 @@ MouseDevHandler	proc	far
 	; Ship the events off.
 	;
 		call	MouseSendEvents
+
+	;
+	; Check the wheel
+	; Send the wheel as keypresses or wheel event.
+	;
+		pop 	bx
+		cmp 	bh, 0
+		je 	packetDone		; if wheel data equals zero => no wheel action, done
+
+		cmp 	ds:[driverVariant], DRIVER_VARIANT_NATIVE
+		je 	nativeEvent
+
+		cmp 	ds:[driverVariant], DRIVER_VARIANT_CURSOR
+		je 	cursorKeyEvent
+
+		cmp 	ds:[driverVariant], DRIVER_VARIANT_PAGE
+		je 	pageKeyEvent
+
+nativeEvent:
+		call	MouseSendWheelEvent
+		jmp	packetDone
+
+cursorKeyEvent:
+		mov 	ds:[scrollKeyUp], 0xE048
+		mov 	ds:[scrollKeyDown], 0xE050
+		call 	MouseSendKeyEvent
+		jmp	packetDone
+
+pageKeyEvent:
+		mov 	ds:[scrollKeyUp], 0xE049
+		mov 	ds:[scrollKeyDown], 0xE051
+		call 	MouseSendKeyEvent
+		jmp	packetDone
+
+packetDone:
 		ret
 MouseDevHandler	endp
+
+MouseSendWheelEvent	proc	near
+
+	mov 	dh, bh		; put wheel data in dh
+	mov	bx, ds:[mouseOutputHandle]
+	mov	di, mask MF_FORCE_QUEUE
+	mov	ax, MSG_IM_MOUSE_WHEEL_CHANGE
+	call 	ObjMessage	; Send the event
+	ret
+
+MouseSendWheelEvent	endp
+
+
+MouseSendKeyEvent	proc	near
+
+	cmp	bh, 0		; compare wheel data with 0
+	jg 	wheelDown	; if bh value greater than 0 => jump to wheel down
+
+wheelUp:				; otherwise continue with wheel up
+	mov 	cx, ds:[scrollKeyUp]	; put "up" key in cx
+	jmp 	doPress			; do the press
+
+wheelDown:
+	mov	cx, ds:[scrollKeyDown]	; wheel down => put "down" key in cx
+
+doPress:
+	mov	di, mask MF_FORCE_QUEUE ; setup ObjMessage
+	mov	ax, MSG_IM_KBD_SCAN
+	mov	bx, ds:[mouseOutputHandle]
+
+	mov	dx, BW_TRUE	; set to "press"
+	call	ObjMessage	; press - release not necessary!
+
+	ret
+
+MouseSendKeyEvent	endp
+
 
 Resident ends
 

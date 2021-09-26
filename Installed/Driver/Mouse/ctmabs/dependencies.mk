@@ -1,5 +1,5 @@
-ctm.obj \
-ctm.eobj: ../mouseCommon.asm geos.def heap.def lmem.def geode.def \
+ctmabs.obj \
+ctmabs.eobj: ../mouseCommon.asm geos.def heap.def lmem.def geode.def \
                 resource.def ec.def assert.def disk.def file.def \
                 drive.def driver.def initfile.def char.def timer.def \
                 input.def graphics.def fontID.def font.def color.def \
@@ -12,4 +12,4 @@ ctm.eobj: ../mouseCommon.asm geos.def heap.def lmem.def geode.def \
                 win.def Internal/grWinInt.def Internal/videoDr.def \
                 hugearr.def
 
-ctmEC.geo ctm.geo : geos.ldf 
+ctmabsEC.geo ctmabs.geo : geos.ldf 
