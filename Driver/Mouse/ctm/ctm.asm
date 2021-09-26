@@ -55,7 +55,6 @@ include		Internal/videoDr.def	; for gross video-exclusive hack
 ;------------------------------------------------------------------------------
 ;	DEVICE STRINGS
 ;------------------------------------------------------------------------------
-
 MouseExtendedInfoSeg	segment	lmem LMEM_TYPE_GENERAL
 
 mouseExtendedInfo	DriverExtendedInfoTable <
@@ -65,19 +64,19 @@ mouseExtendedInfo	DriverExtendedInfoTable <
 	offset mouseInfoTable
 >
 
-mouseNameTable	lptr.char	ctNativeMouse,
+mouseNameTable	lptr.char	ctPageMouse,
 				ctCursorMouse,
-				ctPageMouse
+				ctNativeMouse
 		lptr.char	0	; null-terminator
 
-LocalDefString ctNativeMouse	<'CTMOUSE.EXE /O (native wheel support)', 0>
-LocalDefString ctCursorMouse	<'CTMOUSE.EXE /O (Wheel = Cursor Up/Down)', 0>
-LocalDefString ctPageMouse	<'CTMOUSE.EXE /O (Wheel = Page Up/Down)', 0>
+ctPageMouse	chunk.char	'CTMOUSE.EXE /O (Wheel = Page Up/Down)', 0
+ctCursorMouse	chunk.char	'CTMOUSE.EXE /O (Wheel = Cursor Up/Down)', 0
+ctNativeMouse	chunk.char	'CTMOUSE.EXE /O (Native Wheel Support)', 0
 
 mouseInfoTable	MouseExtendedInfo	\
-	0,		; ctNativeMouse
+	0,		; ctPageMouse
 	0,		; ctCursorMouse
-	0		; ctPageMouse
+	0		; ctNativeMouse
 
 MouseExtendedInfoSeg	ends
 ForceRef	mouseExtendedInfo
@@ -86,14 +85,16 @@ ForceRef	mouseExtendedInfo
 ;			Variables
 ;------------------------------------------------------------------------------
 idata	segment
-
-	driverVariant 	word	0	; start with device 0
-
-					; driver variants for easier code-reading
-					; as constants
-	DRIVER_VARIANT_NATIVE	equ	0;
+;
+; driver variants for easier code-reading
+; as constants
+;
+	DRIVER_VARIANT_PAGE	equ	0;
 	DRIVER_VARIANT_CURSOR	equ	2;
-	DRIVER_VARIANT_PAGE	equ	4;
+	DRIVER_VARIANT_NATIVE	equ	4;
+
+	driverVariant 	word	DRIVER_VARIANT_PAGE	; start with device 0
+
 
 	GEN_MOUSE_MAGIC	= 0adebh 	; Magical delta given to MouseSendEvents if there's
 					; mouse motion so our input monitor knows to do
@@ -112,9 +113,11 @@ idata	ends
 ;		UDATA
 ;------------------------------------------------------------------------------
 udata		segment
-
-	scrollKeyUp	word
-	scrollKeyDown	word
+	;
+	; scroll keys
+	;
+		scrollKeyUp	word
+		scrollKeyDown	word
 
 udata		ends
 
@@ -284,7 +287,7 @@ MouseDevInit	proc	far	uses dx, ax, cx, si, bx
 	; fetch and save driverVariant id
 		call	MouseMapDevice
 		jnc	noError			; carry set if MouseMapDevice failed
-
+hasError:
 		mov	ds:[driverVariant], 0	; otherwise: set device index back to 0
 		jmp	startReset
 noError:
@@ -570,6 +573,7 @@ mangleButtons:
 	; Send the wheel as keypresses or wheel event.
 	;
 		pop 	bx
+		mov 	dh, bh			; put wheel data in dh
 		cmp 	bh, 0
 		je 	packetDone		; if wheel data equals zero => no wheel action, done
 
@@ -605,7 +609,6 @@ MouseDevHandler	endp
 
 MouseSendWheelEvent	proc	near
 
-	mov 	dh, bh		; put wheel data in dh
 	mov	bx, ds:[mouseOutputHandle]
 	mov	di, mask MF_FORCE_QUEUE
 	mov	ax, MSG_IM_MOUSE_WHEEL_CHANGE
@@ -617,7 +620,7 @@ MouseSendWheelEvent	endp
 
 MouseSendKeyEvent	proc	near
 
-	cmp	bh, 0		; compare wheel data with 0
+	cmp	dh, 0		; compare wheel data with 0
 	jg 	wheelDown	; if bh value greater than 0 => jump to wheel down
 
 wheelUp:				; otherwise continue with wheel up

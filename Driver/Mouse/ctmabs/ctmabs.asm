@@ -65,19 +65,19 @@ mouseExtendedInfo	DriverExtendedInfoTable <
 		offset mouseInfoTable
 >
 
-mouseNameTable	lptr.char	baseboxNativeMouse,
+mouseNameTable	lptr.char	baseboxPageMouse,
 				baseboxCursorMouse,
-				baseboxPageMouse
+				baseboxNativeMouse
 		lptr.char	0	; null-terminator
 
-baseboxNativeMouse	chunk.char	'Basebox Mouse (native wheel support)', 0
-baseboxCursorMouse	chunk.char	'Basebox Mouse (Wheel = Cursor Up/Down)', 0
 baseboxPageMouse	chunk.char	'Basebox Mouse (Wheel = Page Up/Down)', 0
+baseboxCursorMouse	chunk.char	'Basebox Mouse (Wheel = Cursor Up/Down)', 0
+baseboxNativeMouse	chunk.char	'Basebox Mouse (Native Wheel Support)', 0
 
 mouseInfoTable	MouseExtendedInfo	\
-		mask MEI_GENERIC,	; baseboxNativeMouse
+		mask MEI_GENERIC,	; baseboxPageMouse
 		mask MEI_GENERIC,	; baseboxCursorMouse
-		mask MEI_GENERIC	; baseboxPageMouse
+		mask MEI_GENERIC	; baseboxNativeMouse
 
 MouseExtendedInfoSeg	ends
 
@@ -85,14 +85,16 @@ MouseExtendedInfoSeg	ends
 ;			Variables
 ;------------------------------------------------------------------------------
 idata	segment
+;
+; driver variants for easier code-reading
+; as constants
+;
+	DRIVER_VARIANT_PAGE	equ	0;
+	DRIVER_VARIANT_CURSOR	equ	2;
+	DRIVER_VARIANT_NATIVE	equ	4;
 
-	driverVariant 	word	0		; start with device 0
+	driverVariant 	word	DRIVER_VARIANT_PAGE	; start with device 0
 
-						; driver variants for easier code-reading
-						; as constants
-	DRIVER_VARIANT_NATIVE	equ	0	;
-	DRIVER_VARIANT_CURSOR	equ	2	;
-	DRIVER_VARIANT_PAGE	equ	4	;
 
 	mouseSet	byte	0	; non-zero if device-type set
 
@@ -571,7 +573,8 @@ MouseDevHandler	proc	far
 	; Send the wheel as keypresses or wheel event.
 	;
 		pop 	bx
-		cmp 	bh, 0
+		mov 	dh, bh			; put wheel data in dh
+		cmp 	dh, 0
 		je 	packetDone		; if wheel data equals zero => no wheel action, done
 
 		cmp 	ds:[driverVariant], DRIVER_VARIANT_NATIVE
@@ -605,7 +608,6 @@ MouseDevHandler	endp
 
 MouseSendWheelEvent	proc	near
 
-	mov 	dh, bh		; put wheel data in dh
 	mov	bx, ds:[mouseOutputHandle]
 	mov	di, mask MF_FORCE_QUEUE
 	mov	ax, MSG_IM_MOUSE_WHEEL_CHANGE
@@ -617,7 +619,7 @@ MouseSendWheelEvent	endp
 
 MouseSendKeyEvent	proc	near
 
-	cmp	bh, 0		; compare wheel data with 0
+	cmp	dh, 0		; compare wheel data with 0
 	jg 	wheelDown	; if bh value greater than 0 => jump to wheel down
 
 wheelUp:				; otherwise continue with wheel up

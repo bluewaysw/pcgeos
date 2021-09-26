@@ -5,18 +5,21 @@ MODULE:   Mouse Drivers - IntelliMouse-style PS/2 3-button wheel mice
 FILE:     imps2.asm
 
 DESCRIPTION:
-  Device-dependent support for IntelliMouse PS2 mouse port. The PS2 BIOS
-  defines a protocol that all mice connected to the port employ. Rather
-  than interpreting it ourselves, we trust the BIOS to be efficient
-  and just register a routine with it. Keeps the driver smaller and
-  avoids problems with incompatibility etc.
+	Device-dependent support for IntelliMouse PS2 mouse port. The PS2 BIOS
+	defines a protocol that all mice connected to the port employ. Rather
+	than interpreting it ourselves, we trust the BIOS to be efficient
+	and just register a routine with it. Keeps the driver smaller and
+	avoids problems with incompatibility etc.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-MOUSE_NUM_BUTTONS   = 3    ; Wheel mice have at least 3 buttons
-MOUSE_SEPARATE_INIT = 1    ; We use a separate Init resource
-
-MIDDLE_IS_DOUBLE_PRESS = 1    ; fake double-press with middle button
+;
+; The following constants are used in mouseCommon.asm -- see that
+; file for documentation.
+;
+MOUSE_NUM_BUTTONS	= 3    ; Wheel mice have at least 3 buttons
+MIDDLE_IS_DOUBLE_PRESS	= 1    ; fake double-press with middle button
+MOUSE_SEPARATE_INIT	= 1    ; We use a separate Init resource
 
 include    ../mouseCommon.asm  ; Include common definitions/code.
 
@@ -30,22 +33,25 @@ include    system.def
 MouseExtendedInfoSeg  segment  lmem LMEM_TYPE_GENERAL
 
 mouseExtendedInfo  DriverExtendedInfoTable <
-  {},                       ; lmem header added by Esp
-  length mouseNameTable,    ; Number of supported devices
-  offset mouseNameTable,
-  offset mouseInfoTable
+	{},                       ; lmem header added by Esp
+	length mouseNameTable,    ; Number of supported devices
+	offset mouseNameTable,
+	offset mouseInfoTable
 >
 
-mouseNameTable  lptr.char  imps2CursorMouse,
-                           imps2PageMouse
-lptr.char  0  ; null-terminator
+mouseNameTable  lptr.char  	imps2PageMouse,
+				imps2CursorMouse,
+			 	imps2NativeMouse
+		lptr.char	0  ; null-terminator
 
-LocalDefString imps2CursorMouse  <'IM PS/2 Wheel Mouse (Wheel = Cursor Up/Down)', 0>
-LocalDefString imps2PageMouse    <'IM PS/2 Wheel Mouse (Wheel = Page Up/Down)', 0>
+imps2PageMouse    chunk.char	'IM PS/2 Wheel Mouse (Wheel = Page Up/Down)', 0
+imps2CursorMouse  chunk.char	'IM PS/2 Wheel Mouse (Wheel = Cursor Up/Down)', 0
+imps2NativeMouse  chunk.char	'IM PS/2 Wheel Mouse (Native Wheel Support)', 0
 
 mouseInfoTable  MouseExtendedInfo  \
-  0,    ; imps2CursorMouse
-  0     ; imps2PageMouse
+	0,	; imps2PageMouse
+	0,	; imps2CursorMouse
+	0	; imps2NativeMouse
 
 MouseExtendedInfoSeg  ends
 ForceRef  mouseExtendedInfo
@@ -56,86 +62,104 @@ ForceRef  mouseExtendedInfo
 idata    segment
 
 ;
+; Driver variants
+;
+; driver variants for easier code-reading
+; as constants
+;
+	DRIVER_VARIANT_PAGE	equ	0;
+	DRIVER_VARIANT_CURSOR	equ	2;
+	DRIVER_VARIANT_NATIVE	equ	4;
+
+	driverVariant 	word	DRIVER_VARIANT_PAGE	; start with device 0
+
+;
 ; All the mouse BIOS calls are through interrupt 15h, function c2h.
 ; All functions return CF set on error, ah = MouseStatus
 ;
-MOUSE_ENABLE_DISABLE      equ 0c200h  ; Enable or disable the mouse. BH = 0 to disable, 1 to enable.
-  MOUSE_ENABLE            equ 1
-  MOUSE_DISABLE           equ 0
+MOUSE_ENABLE_DISABLE	equ	0c200h  ; Enable or disable the mouse. BH = 0 to disable, 1 to enable.
+	MOUSE_ENABLE    equ	1
+	MOUSE_DISABLE   equ	0
 
-MOUSE_RESET                 equ  0c201h  ; Reset the mouse.
-  MAX_NUM_RESETS            equ  3       ; # times we will send MOUSE_RESET command
-  MOUSE_RESET_RESEND_ERROR  equ  04h     ; Error returned from MOUSE_RESET call if it wants you to resend command
+MOUSE_RESET				equ	0c201h  ; Reset the mouse.
+	MAX_NUM_RESETS			equ	3       ; # times we will send MOUSE_RESET command
+	MOUSE_RESET_RESEND_ERROR	equ	04h     ; Error returned from MOUSE_RESET call if it wants you to resend command
 
 ; Set report rate
 MOUSE_SET_RATE    equ  0c202h  ; Set sample rate:
-  MOUSE_RATE_10   equ  0
-  MOUSE_RATE_20   equ  1
-  MOUSE_RATE_40   equ  2
-  MOUSE_RATE_60   equ  3
-  MOUSE_RATE_80   equ  4
-  MOUSE_RATE_100  equ  5
-  MOUSE_RATE_200  equ  6
+	MOUSE_RATE_10	equ	0
+	MOUSE_RATE_20	equ	1
+	MOUSE_RATE_40	equ	2
+	MOUSE_RATE_60	equ	3
+	MOUSE_RATE_80	equ	4
+	MOUSE_RATE_100	equ	5
+	MOUSE_RATE_200	equ	6
 
 ; Resolution
-MOUSE_SET_RESOLUTION  equ  0c203h  ; Set device resolution BH =
-  MOUSE_RES_1_PER_MM  equ  0  ; 1 count per mm
-  MOUSE_RES_2_PER_MM  equ  1  ; 2 counts per mm
-  MOUSE_RES_4_PER_MM  equ  2  ; 4 counts per mm
-  MOUSE_RES_8_PER_MM  equ  3  ; 8 counts per mm
+MOUSE_SET_RESOLUTION		equ	0c203h  ; Set device resolution BH =
+	MOUSE_RES_1_PER_MM	equ	0  ; 1 count per mm
+	MOUSE_RES_2_PER_MM	equ	1  ; 2 counts per mm
+	MOUSE_RES_4_PER_MM	equ	2  ; 4 counts per mm
+	MOUSE_RES_8_PER_MM	equ	3  ; 8 counts per mm
 
 ; Device Type
-MOUSE_GET_TYPE    equ 0c204h  ; Get device ID.
-  MOUSE_ONE_WHEEL equ 3       ; Device ID returned if Mouse has 1 Wheel
+MOUSE_GET_TYPE		equ 0c204h  ; Get device ID.
+	MOUSE_ONE_WHEEL	equ 3       ; Device ID returned if Mouse has 1 Wheel
 
 ; Init packet size
-MOUSE_INIT          equ  0c205h    ; Set interface parameters. BH = # bytes per packet.
-  MOUSE_PACKET_SIZE equ 4          ; We've got at least one wheel, hence 4 bytes!
+MOUSE_INIT			equ  0c205h    ; Set interface parameters. BH = # bytes per packet.
+	MOUSE_PACKET_SIZE	equ 4          ; We've got at least one wheel, hence 4 bytes!
 
 ; extended commands
-MOUSE_EXTENDED_CMD        equ  0c206h   ; Extended command. BH =
-  MOUSE_EXTC_STATUS       equ 0         ; Get device status
-  MOUSE_EXTC_SINGLE_SCALE equ 1         ; Set scaling to 1:1
-  MOUSE_EXTC_DOUBLE_SCALE equ 2         ; Set scaling to 2:1
+MOUSE_EXTENDED_CMD		equ  0c206h   ; Extended command. BH =
+	MOUSE_EXTC_STATUS	equ 0         ; Get device status
+	MOUSE_EXTC_SINGLE_SCALE	equ 1         ; Set scaling to 1:1
+	MOUSE_EXTC_DOUBLE_SCALE	equ 2         ; Set scaling to 2:1
 
 ; set handler
-MOUSE_SET_HANDLER  equ  0c207h  ; Set mouse handler. ES:BX is address of routine
+MOUSE_SET_HANDLER	equ	0c207h  ; Set mouse handler. ES:BX is address of routine
 
 ; original GeoWorks definitions
-MouseStatus              etype  byte
-MS_SUCCESSFUL            enum  MouseStatus, 0
-MS_INVALID_FUNC          enum  MouseStatus, 1
-MS_INVALID_INPUT         enum  MouseStatus, 2
-MS_INTERFACE_ERROR       enum  MouseStatus, 3
-MS_NEED_TO_RESEND        enum  MouseStatus, 4
-MS_NO_HANDLER_INSTALLED  enum  MouseStatus, 5
+MouseStatus			etype	byte
+MS_SUCCESSFUL			enum	MouseStatus, 0
+MS_INVALID_FUNC			enum	MouseStatus, 1
+MS_INVALID_INPUT		enum	MouseStatus, 2
+MS_INTERFACE_ERROR		enum	MouseStatus, 3
+MS_NEED_TO_RESEND		enum	MouseStatus, 4
+MS_NO_HANDLER_INSTALLED		enum	MouseStatus, 5
 
 mouseRates  byte  10, 20, 40, 60, 80, 100, 200, 255
 MOUSE_NUM_RATES  equ  size mouseRates
 mouseRateCmds  byte  MOUSE_RATE_10, MOUSE_RATE_20, MOUSE_RATE_40
-    byte  MOUSE_RATE_60, MOUSE_RATE_80, MOUSE_RATE_100
-    byte  MOUSE_RATE_200, MOUSE_RATE_200
+		byte  MOUSE_RATE_60, MOUSE_RATE_80, MOUSE_RATE_100
+		byte  MOUSE_RATE_200, MOUSE_RATE_200
 
 idata    ends
 
 ;------------------------------------------------------------------------------
-;          UDATA
+;		UDATA
 ;------------------------------------------------------------------------------
-udata    segment
-  driverVariant word
-udata    ends
+udata		segment
+	;
+	; scroll keys
+	;
+		scrollKeyUp	word
+		scrollKeyDown	word
+
+udata		ends
+
 
 MDHStatus  record
-    MDHS_Y_OVERFLOW:1,    ; Y overflow
-    MDHS_X_OVERFLOW:1,    ; X overflow
-    MDHS_Y_NEGATIVE:1,    ; Y delta is negative (just need to
-                          ; sign-extend, as delta is already in
-                          ; single-byte two's complement form)
-    MDHS_X_NEGATIVE:1,    ; X delta is negative
-    MDHS_MUST_BE_ONE:1=1,
-    MDHS_MIDDLE_DOWN:1,    ; Middle button is down
-    MDHS_RIGHT_DOWN:1,     ; Right button is down
-    MDHS_LEFT_DOWN:1,      ; Left button is down
+		MDHS_Y_OVERFLOW:1,	; Y overflow
+		MDHS_X_OVERFLOW:1,	; X overflow
+		MDHS_Y_NEGATIVE:1,	; Y delta is negative (just need to
+					; sign-extend, as delta is already in
+					; single-byte two's complement form)
+		MDHS_X_NEGATIVE:1,	; X delta is negative
+		MDHS_MUST_BE_ONE:1=1,
+		MDHS_MIDDLE_DOWN:1,	; Middle button is down
+		MDHS_RIGHT_DOWN:1,	; Right button is down
+		MDHS_LEFT_DOWN:1,	; Left button is down
 MDHStatus  end
 
 
@@ -143,163 +167,187 @@ MDHStatus  end
 Resident segment resource
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    MouseDevHandler
+		MouseDevHandler
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:  HandleMem the receipt of an interrupt
 
-CALLED BY:  BIOS
-PASS:    ON STACK:
-RETURN:    Nothing
-DESTROYED:  Nothing
+CALLED BY:  	BIOS
+PASS:    	ON STACK:
+RETURN:    	Nothing
+DESTROYED:  	Nothing
 
 PSEUDO CODE/STRATEGY:
-  Overflow is ignored.
+	Overflow is ignored.
 
-  For delta Y, positive => up, which is the opposite of what we think
+	For delta Y, positive => up, which is the opposite of what we think
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-  Some BIOSes rely on DS not being altered, while others do not.
-  To err on the side of safety, we save everything we biff.
+	Some BIOSes rely on DS not being altered, while others do not.
+	To err on the side of safety, we save everything we biff.
 
 REVISION HISTORY:
-  Name  Date    Description
-  ----  ----    -----------
-  ardeb  10/12/89  Initial version
+	Name  Date    Description
+	----  ----    -----------
+	ardeb  10/12/89  Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-MouseDevHandler proc far  :byte,            ; first byte is unused
-                          :byte,            ; second byte is unused
-                          deltaZ:sbyte,     ; wheel
-                          :byte,            ; unused
-                          deltaY:sbyte,     ; y axis
-                          :byte,            ; unused
-                          status:MDHStatus, ; buttons
-                          deltaX:sbyte      ; x axis
+MouseDevHandler proc 	far  	:byte,            ; first byte is unused
+				:byte,            ; second byte is unused
+				deltaZ:sbyte,     ; wheel
+				:byte,            ; unused
+				deltaY:sbyte,     ; y axis
+				:byte,            ; unused
+				status:MDHStatus, ; buttons
+				deltaX:sbyte      ; x axis
 
-  uses  ds, ax, bx, cx, dx, si, di, es
-  .enter
+	uses  ds, ax, bx, cx, dx, si, di, es
+	.enter
 
-  ; Prevent switch while sending
-  call  SysEnterInterrupt
+	; Prevent switch while sending
+		call	SysEnterInterrupt
 
-  ; The deltas are already two's-complement, so just sign extend them
-  ; ourselves.
-  ; XXX: verify sign against bits in status byte to confirm its validity?
-  ; what if overflow bit is set?
+	; The deltas are already two's-complement, so just sign extend them
+	; ourselves.
+	; XXX: verify sign against bits in status byte to confirm its validity?
+	; what if overflow bit is set?
 
-  mov al, ss:[deltaY]
-  cbw
-  xchg dx, ax      ; (1-byte inst)
+		mov	al, ss:[deltaY]
+		cbw
+		xchg	dx, ax      ; (1-byte inst)
 
-  mov al, ss:[deltaX]
-  cbw
-  xchg cx, ax      ; (1-byte inst)
+		mov	al, ss:[deltaX]
+		cbw
+		xchg	cx, ax      ; (1-byte inst)
 
-  ; Fetch the status, copying the middle and right button bits
-  ; into BH.
-  mov   al, ss:[status]
-  test  al, mask MDHS_Y_OVERFLOW or mask MDHS_X_OVERFLOW
-  jnz   packetDone  ; if overflow, drop the packet on the
-                    ; floor, since the semantics for such
-                    ; an event are undefined...
-  mov bh, al
-  and bh, 00000110b
+	; Fetch the status, copying the middle and right button bits
+	; into BH.
+		mov	al, ss:[status]
+		test	al, mask MDHS_Y_OVERFLOW or mask MDHS_X_OVERFLOW
+		jnz	packetDone  ; if overflow, drop the packet on the
+										; floor, since the semantics for such
+										; an event are undefined...
+		mov	bh, al
+		and	bh, 00000110b
 
-  ; Make sure the packet makes sense by checking the ?_NEGATIVE bits
-  ; against the actual signs of their respective deltas. If the two
-  ; don't match (as indicated by the XOR of the sign bit of the delta
-  ; with the ?_NEGATIVE bit resulting in a one), then hooey this packet.
-  shl al
-  shl al
-  tst dx
-  lahf
-  xor ah, al
-  js  packetDone
+	; Make sure the packet makes sense by checking the ?_NEGATIVE bits
+	; against the actual signs of their respective deltas. If the two
+	; don't match (as indicated by the XOR of the sign bit of the delta
+	; with the ?_NEGATIVE bit resulting in a one), then hooey this packet.
+		shl	al
+		shl	al
+		tst	dx
+		lahf
+		xor	ah, al
+		js	packetDone
 
-  shl al
-  tst cx
-  lahf
-  xor ah, al
-  js  packetDone
+		shl	al
+		tst	cx
+		lahf
+		xor	ah, al
+		js	packetDone
 
-  ; Mask out all but the left button and merge it into the
-  ; middle and right buttons that are in BH. We then have
-  ;  0000LMR0
-  ; in BH, which is one bit off from what we need (and also
-  ; the wrong polarity), so shift it right once and complement
-  ; the thing.
-  and al, mask MDHS_LEFT_DOWN shl 3
-  or  bh, al
-  shr bh, 1
-  not bh
+	; Mask out all but the left button and merge it into the
+	; middle and right buttons that are in BH. We then have
+	;  0000LMR0
+	; in BH, which is one bit off from what we need (and also
+	; the wrong polarity), so shift it right once and complement
+	; the thing.
+		and 	al, mask MDHS_LEFT_DOWN shl 3
+		or  	bh, al
+		shr 	bh, 1
+		not 	bh
 
-  ; Make delta Y be positive if going down, rather than
-  ; positive if up, as the BIOS provides it.
-  neg  dx
+	; Make delta Y be positive if going down, rather than
+	; positive if up, as the BIOS provides it.
+		neg	dx
 
-  ; Point ds at our data for MouseSendEvents
-  mov ax, segment dgroup
-  mov ds, ax
+	; Point ds at our data for MouseSendEvents
+		mov 	ax, segment dgroup
+		mov 	ds, ax
 
-  ; Registers now all loaded properly -- send the event.
-  call  MouseSendEvents
-  ;
-  ; Send the wheel events as keypresses for now.
-  ; We'd like to send them as MSG_META_KBD_CHAR with more info,
-  ; but the driver isn't happy including Objects/inputC.def.
-  ; Ideally we'd send them as low-level scroll events which the
-  ; view (or list or whatever) could handle as it desired.
-  ;
-  mov dh, ss:[deltaZ] ; put wheel data in dh
-  cmp dh, 0           ; compare wheel data with 0
-  je packetDone       ; if wheel data equals zero => no wheel action, done
-  jg wheelDown        ; if dh value greater than 0 => jump to wheel down
+	; Registers now all loaded properly -- send the event.
+		call  	MouseSendEvents
+	;
+	; Check the wheel
+	; Send the wheel as keypresses or wheel event.
+	;
+		mov 	dh, ss:[deltaZ]
+		cmp 	dh, 0
+		je 	packetDone		; if wheel data equals zero => no wheel action, done
 
-  wheelUp:            ; otherwise continue with wheel up
-  cmp ds:[driverVariant], 0 ; compare with 0 = first driver variant = use Up/Down keys
-  jg usePgUp              ; if greater than 0 => use Page up key
+		cmp 	ds:[driverVariant], DRIVER_VARIANT_NATIVE
+		je 	nativeEvent
 
-  useCursorUp:       ; otherwise use cursor up
-  mov cx, 0xE048     ; dh is smaller than 0 => put up key (0xE048) in cx
-  jmp doPress        ; do the press
+		cmp 	ds:[driverVariant], DRIVER_VARIANT_CURSOR
+		je 	cursorKeyEvent
 
-  usePgUp:
-  mov cx, 0xE049     ; dh is smaller than 0 => put page up key (0xE049) in cx
-  jmp doPress        ; jmp to do the keypress
+		cmp 	ds:[driverVariant], DRIVER_VARIANT_PAGE
+		je 	pageKeyEvent
 
-  wheelDown:
-  cmp ds:[driverVariant], 0 ; compare with 0 = first driver variant = use Up/Down keys
-  jg usePgDown            ; if greater than 0 => use Page down key
+nativeEvent:
+		call	MouseSendWheelEvent
+		jmp	packetDone
 
-  useCursorDown:
-  mov cx, 0xE050     ; wheel down => put down key (0xE050) in cx
-  jmp doPress         ; do the press
+cursorKeyEvent:
+		mov 	ds:[scrollKeyUp], 0xE048
+		mov 	ds:[scrollKeyDown], 0xE050
+		call 	MouseSendKeyEvent
+		jmp	packetDone
 
-  usePgDown:
-  mov cx, 0xE051      ; dh is smaller than 0 => put page up key (0xE051) in cx
-  jmp doPress         ; jmp to do the keypress
+pageKeyEvent:
+		mov 	ds:[scrollKeyUp], 0xE049
+		mov 	ds:[scrollKeyDown], 0xE051
+		call 	MouseSendKeyEvent
+		jmp	packetDone
+packetDone:
+		call  SysExitInterrupt
 
-  doPress:
-  mov di, mask MF_FORCE_QUEUE ; setup ObjMessage
-  mov ax, MSG_IM_KBD_SCAN
-  mov bx, ds:[mouseOutputHandle]
-
-  mov dx, BW_TRUE    ; set to "press"
-  call ObjMessage    ; press - release not necessary!
-
-  packetDone:
-  call  SysExitInterrupt
-
-  ; Recover and return.
-  .leave
-  ret
+	; Recover and return.
+	.leave
+	ret
 
 MouseDevHandler  endp
 
+MouseSendWheelEvent	proc	near
+
+	mov	bx, ds:[mouseOutputHandle]
+	mov	di, mask MF_FORCE_QUEUE
+	mov	ax, MSG_IM_MOUSE_WHEEL_CHANGE
+	call 	ObjMessage	; Send the event
+	ret
+
+MouseSendWheelEvent	endp
+
+
+MouseSendKeyEvent	proc	near
+
+	cmp	dh, 0		; compare wheel data with 0
+	jg 	wheelDown	; if bh value greater than 0 => jump to wheel down
+
+wheelUp:				; otherwise continue with wheel up
+	mov 	cx, ds:[scrollKeyUp]	; put "up" key in cx
+	jmp 	doPress			; do the press
+
+wheelDown:
+	mov	cx, ds:[scrollKeyDown]	; wheel down => put "down" key in cx
+
+doPress:
+	mov	di, mask MF_FORCE_QUEUE ; setup ObjMessage
+	mov	ax, MSG_IM_KBD_SCAN
+	mov	bx, ds:[mouseOutputHandle]
+
+	mov	dx, BW_TRUE	; set to "press"
+	call	ObjMessage	; press - release not necessary!
+
+	ret
+
+MouseSendKeyEvent	endp
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    MouseDevExit
+		MouseDevExit
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:  Finish things out
@@ -310,35 +358,35 @@ RETURN:    Carry clear
 DESTROYED:  BX, AX
 
 PSEUDO CODE/STRATEGY:
-    Just calls the serial driver to close down the port
+		Just calls the serial driver to close down the port
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
 
 REVISION HISTORY:
-  Name  Date    Description
-  ----  ----    -----------
-  ardeb  5/20/89    Initial version
+	Name  Date    Description
+	----  ----    -----------
+	ardeb  5/20/89    Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 MouseDevExit  proc  near
 
-  ; Disable the mouse by setting the handler to 0
-  ; XXX: How can we restore it? Do we need to?
-  mov  ax, MOUSE_ENABLE_DISABLE
-  mov  bh, MOUSE_DISABLE    ; Disable it please
-  int  15h
+	; Disable the mouse by setting the handler to 0
+	; XXX: How can we restore it? Do we need to?
+		mov	ax, MOUSE_ENABLE_DISABLE
+		mov	bh, MOUSE_DISABLE    ; Disable it please
+		int	15h
 
-  clr  bx
-  mov  es, bx
-  mov  ax, MOUSE_SET_HANDLER
-  int  15h
-  ret
+		clr	bx
+		mov	es, bx
+		mov	ax, MOUSE_SET_HANDLER
+		int	15h
+		ret
 
 MouseDevExit  endp
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    MouseSetDevice
+		MouseSetDevice
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:  Turn on the device.
@@ -355,73 +403,79 @@ KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
 
 REVISION HISTORY:
-  Name  Date    Description
-  ----  ----    -----------
-  ardeb  9/27/90    Initial version
-  ayuen  10/17/00  Moved most of the code to MouseDevInit
+	Name  Date    Description
+	----  ----    -----------
+	ardeb  9/27/90    Initial version
+	ayuen  10/17/00  Moved most of the code to MouseDevInit
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 MouseSetDevice  proc  near  uses es, bx, ax, di, ds
-  .enter
+	.enter
 
-  ; fetch and save driverVariant id
-	call MouseMapDevice
-  mov  ds:[driverVariant], di ; device idx is in di. first idx is 0 then 2, 4, 6...
-	call MemUnlock	; release the info block that has been locked by MouseMapDevice, weird....
+	; fetch and save driverVariant id
+		call	MouseMapDevice
+		jnc	noError			; carry set if MouseMapDevice failed
+hasError:
+		mov	ds:[driverVariant], 0	; otherwise: set device index back to 0
+		jmp	startInit
+noError:
+		mov 	ds:[driverVariant], di 	; device idx is in di. first idx is 0 then 2, 4, 6...
+		call	MemUnlock		; release the info block that has been locked by MouseMapDevice, weird....
 
-  call SysLockBIOS
+startInit:
+		call	SysLockBIOS
 
-  ; set packet size - must be called first!
-  mov ax, MOUSE_INIT         ; Init mouse
-  mov bh, MOUSE_PACKET_SIZE  ; We've got at least one wheel, hence 4 bytes!
-  int 15h
+	; set packet size - must be called first!
+		mov	ax, MOUSE_INIT         ; Init mouse
+		mov	bh, MOUSE_PACKET_SIZE  ; We've got at least one wheel, hence 4 bytes!
+		int	15h
 
-  ;strategy for wheel activation used in "InitializeWheel" by Bret E. Johnson
-  mov bh, MOUSE_RATE_200  ; Set Sample rate 200
-  mov ax, MOUSE_SET_RATE
-  int 15h
-  mov bh, MOUSE_RATE_100  ; Set Sample Rate 100
-  mov ax, MOUSE_SET_RATE
-  int 15h
-  mov bh, MOUSE_RATE_80   ; Set Sample Rate 80
-  mov ax, MOUSE_SET_RATE
-  int 15h
+	;strategy for wheel activation used in "InitializeWheel" by Bret E. Johnson
+		mov	bh, MOUSE_RATE_200  ; Set Sample rate 200
+		mov	ax, MOUSE_SET_RATE
+		int	15h
+		mov	bh, MOUSE_RATE_100  ; Set Sample Rate 100
+		mov	ax, MOUSE_SET_RATE
+		int	15h
+		mov	bh, MOUSE_RATE_80   ; Set Sample Rate 80
+		mov	ax, MOUSE_SET_RATE
+		int	15h
 
-  ; install handler
-  segmov es, <segment Resident>
-  mov bx, offset Resident:MouseDevHandler
-  mov ax, MOUSE_SET_HANDLER
-  int 15h
+	; install handler
+		segmov	es, <segment Resident>
+		mov 	bx, offset Resident:MouseDevHandler
+		mov	ax, MOUSE_SET_HANDLER
+		int	15h
 
-  ; sampling
-  mov ax, MOUSE_SET_RATE
-  mov bh, MOUSE_RATE_60
-  int 15h
+	; sampling
+		mov	ax, MOUSE_SET_RATE
+		mov	bh, MOUSE_RATE_60
+		int	15h
 
-  ; resolution
-  mov ax, MOUSE_SET_RESOLUTION
-  mov bh, MOUSE_RES_8_PER_MM
-  int 15h
+	; resolution
+		mov	ax, MOUSE_SET_RESOLUTION
+		mov	bh, MOUSE_RES_8_PER_MM
+		int	15h
 
-  ; scaling
-  mov ax, MOUSE_EXTENDED_CMD
-  mov bh, MOUSE_EXTC_SINGLE_SCALE
-  int 15h
+	; scaling
+		mov	ax, MOUSE_EXTENDED_CMD
+		mov	bh, MOUSE_EXTC_SINGLE_SCALE
+		int	15h
 
-  ; enable
-  mov  ax, MOUSE_ENABLE_DISABLE
-  mov  bh, MOUSE_ENABLE   ; Enable it please
-  int  15h
+	; enable
+		mov	ax, MOUSE_ENABLE_DISABLE
+		mov	bh, MOUSE_ENABLE   ; Enable it please
+		int	15h
 
-  call  SysUnlockBIOS
+		call  SysUnlockBIOS
 
-  .leave
-  ret
+	.leave
+	ret
 MouseSetDevice  endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    MouseTestDevice
+		MouseTestDevice
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:  See if the device specified is present.
@@ -429,7 +483,7 @@ SYNOPSIS:  See if the device specified is present.
 CALLED BY:  DRE_TEST_DEVICE
 PASS:    dx:si  = null-terminated name of device (ignored, here)
 RETURN:    ax  = DevicePresent enum
-    carry set if string invalid, clear otherwise
+		carry set if string invalid, clear otherwise
 DESTROYED:  di
 
 PSEUDO CODE/STRATEGY:
@@ -439,69 +493,69 @@ KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
 
 REVISION HISTORY:
-  Name  Date    Description
-  ----  ----    -----------
-  ardeb  9/27/90    Initial version
+	Name  Date    Description
+	----  ----    -----------
+	ardeb  9/27/90    Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 MouseTestDevice  proc  near  uses ax, bx, es, cx
 
-  .enter
+	.enter
 
-  ; init to see if (wheel) mouse exists
-  mov  ax, BIOS_DATA_SEG
-  mov  es, ax
-  test  es:[BIOS_EQUIPMENT], mask EC_POINTER
-  jz  notPresent
+	; init to see if (wheel) mouse exists
+		mov	ax, BIOS_DATA_SEG
+		mov	es, ax
+		test	es:[BIOS_EQUIPMENT], mask EC_POINTER
+		jz	notPresent
 
-  ; packet size
-  mov  ax, MOUSE_INIT         ; Init packet size
-  mov  bh, MOUSE_PACKET_SIZE  ; We've got at least one wheel, hence 4 bytes!
-  int  15h
+	; packet size
+		mov	ax, MOUSE_INIT         ; Init packet size
+		mov	bh, MOUSE_PACKET_SIZE  ; We've got at least one wheel, hence 4 bytes!
+		int	15h
 
-  ;strategy used in "InitializeWheel" by Bret E. Johnson
-  mov  bh, MOUSE_RATE_200    ; Set Sample rate 200
-  mov  ax, MOUSE_SET_RATE
-  int  15h
-  mov  bh, MOUSE_RATE_100    ; Set Sample Rate 100
-  mov  ax, MOUSE_SET_RATE
-  int  15h
-  mov  bh, MOUSE_RATE_80     ; Set Sample Rate 80
-  mov  ax, MOUSE_SET_RATE
-  int  15h
+	;strategy used in "InitializeWheel" by Bret E. Johnson
+		mov	bh, MOUSE_RATE_200    ; Set Sample rate 200
+		mov	ax, MOUSE_SET_RATE
+		int	15h
+		mov	bh, MOUSE_RATE_100    ; Set Sample Rate 100
+		mov	ax, MOUSE_SET_RATE
+		int	15h
+		mov	bh, MOUSE_RATE_80     ; Set Sample Rate 80
+		mov	ax, MOUSE_SET_RATE
+		int	15h
 
-  ; check if wheel mouse
-  mov ax, MOUSE_GET_TYPE  ; Get the Device ID in BH
-  int 15h
-  cmp bh, MOUSE_ONE_WHEEL ; Is it an intellimouse with one wheel and three buttons?
-  jne notPresent          ; if not, then got to notPresent
+	; check if wheel mouse
+		mov	ax, MOUSE_GET_TYPE  ; Get the Device ID in BH
+		int	15h
+		cmp	bh, MOUSE_ONE_WHEEL ; Is it an intellimouse with one wheel and three buttons?
+		jne	notPresent          ; if not, then got to notPresent
 
-  ; reset
-  mov  cx, MAX_NUM_RESETS  ; # times we will resend this command
-  resetLoop:
-  mov  ax, MOUSE_RESET
-  int  15h
-  jnc  noerror    ;If no error, branch
-  cmp  ah, MS_NEED_TO_RESEND
-  jne  notPresent  ;If not "resend" error, just exit with carry set.
-  loop resetLoop
+	; reset
+		mov	cx, MAX_NUM_RESETS  ; # times we will resend this command
+resetLoop:
+		mov	ax, MOUSE_RESET
+		int	15h
+		jnc	noerror    ;If no error, branch
+		cmp	ah, MS_NEED_TO_RESEND
+		jne	notPresent  ;If not "resend" error, just exit with carry set.
+		loop	resetLoop
 
-  notPresent:
-  mov  ax, DP_NOT_PRESENT
-  jmp  done
+notPresent:
+		mov	ax, DP_NOT_PRESENT
+		jmp	done
 
-  noerror:
-  mov  ax, DP_PRESENT
+noerror:
+		mov	ax, DP_PRESENT
 
-  done:
-  clc
-  .leave
-  ret
+done:
+		clc
+	.leave
+	ret
 
 MouseTestDevice  endp
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    MouseMapDevice
+		MouseMapDevice
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:  Map a device string to its device index
@@ -509,11 +563,11 @@ SYNOPSIS:  Map a device string to its device index
 CALLED BY:  MouseDevTest, MouseDevInit
 PASS:    dx:si  = device string
 RETURN:    carry set if string invalid
-           ax  = DP_INVALID_DEVICE
-           carry clear if string valid
-           di  = device index (offset into mouseNameTable and mouseInfoTable)
-           es  = locked info block
-           bx  = handle of same
+		ax  = DP_INVALID_DEVICE
+		carry clear if string valid
+		di  = device index (offset into mouseNameTable and mouseInfoTable)
+		es  = locked info block
+		bx  = handle of same
 DESTROYED:  nothing
 
 PSEUDO CODE/STRATEGY:
@@ -523,20 +577,20 @@ KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
 
 REVISION HISTORY:
-  Name  Date    Description
-  ----  ----    -----------
-  ardeb  10/26/90  Initial version
+	Name  Date    Description
+	----  ----    -----------
+	ardeb  10/26/90  Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 MouseMapDevice  proc  near  uses cx, ds
-  .enter
-    EnumerateDevice  MouseExtendedInfoSeg
-  .leave
-  ret
+	.enter
+		EnumerateDevice  MouseExtendedInfoSeg
+	.leave
+	ret
 MouseMapDevice  endp
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    MouseDevSetRate
+		MouseDevSetRate
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:  Set the report rate for the mouse
@@ -553,19 +607,21 @@ KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
 
 REVISION HISTORY:
-  Name  Date    Description
-  ----  ----    -----------
-  ardeb  10/12/89  Initial version
+	Name  Date    Description
+	----  ----    -----------
+	ardeb  10/12/89  Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 MouseDevSetRate  proc  near
-    push  ax, bx, cx, si
-    mov  si, cx
-    mov  bh, ds:mouseRateCmds[si]
-    mov  ax, MOUSE_SET_RATE
-    int  15h
-    pop  ax, bx, cx, si
-    ret
+
+		push  ax, bx, cx, si
+		mov  si, cx
+		mov  bh, ds:mouseRateCmds[si]
+		mov  ax, MOUSE_SET_RATE
+		int  15h
+		pop  ax, bx, cx, si
+		ret
+
 MouseDevSetRate  endp
 
 Resident ends
