@@ -84,6 +84,26 @@ static char *rcsid =
 #include <compat/file.h>
 
 #if defined(_WIN32)
+#define _WIN32_WINNT    0x0500
+# undef FIXED
+# undef LONG
+# define LONG LONG_biff
+# define SID SID_biff
+# define timeval timeval_biff
+# undef timercmp
+# define timercmp timercmp_biff
+# define fd_set fd_set_biff
+# include <compat/windows.h>
+# include <winutil.h>
+#include <winresrc.h>
+#include <tlhelp32.h>
+#include <winuser.h>
+# undef fd_set
+# undef timercmp
+# undef timeval
+# undef SID
+# undef LONG
+# define FIXED 0x80
 # include <curspriv.h>
 #endif
 
@@ -280,6 +300,276 @@ static void CursesScrollInput(unsigned char c, CursesInputState *state);
 static void CursesEndScroll(CursesInputState *state);
 extern DosInvertScreenRegion(short start, short end);
 extern DosCopyScreenRegion(char *buf, short start, short end);
+
+
+#if defined(_WIN32)
+
+/***********************************************************************
+ *				FindProcessID
+ ***********************************************************************
+ * SYNOPSIS:	    Find a process with a given id in a snapshot
+ * CALLED BY:	    GetParentProcessId
+ * RETURN:	    TRUE if retValue has been filled by relocated
+ *                  process entry.
+ * SIDE EFFECTS:    None
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	FR	27/ 9/21	Initial Revision
+ *
+ ***********************************************************************/
+BOOL
+FindProcessID(HANDLE snapshot, DWORD id, LPPROCESSENTRY32 retValue)
+{
+    BOOL result;
+    retValue->dwSize = sizeof(PROCESSENTRY32);
+    result = Process32First(snapshot, retValue);
+    while (result)
+    {
+	if (retValue->th32ProcessID == id)
+	{
+	    return TRUE;
+	}
+	result = Process32Next(snapshot, retValue);
+    }
+    return FALSE;
+}
+
+/***********************************************************************
+ *				GetParentProcessId
+ ***********************************************************************
+ * SYNOPSIS:	    Get the parent process id of the current process
+ * CALLED BY:	    FocusSwatWindow
+ * RETURN:	    TRUE if parentPID has been filled by parent
+ *                  process ID.
+ * SIDE EFFECTS:    None
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	FR	27/ 9/21	Initial Revision
+ *
+ ***********************************************************************/
+BOOL
+GetParentProcessId(DWORD* parentPID)
+{
+    HANDLE snapshot;
+    PROCESSENTRY32 processEntry;
+    DWORD currentPID = GetCurrentProcessId();
+
+    /* request snapshot of all windows processed */
+    snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (INVALID_HANDLE_VALUE == snapshot)
+    {
+	return FALSE;
+    }
+
+    /* find current process in the snapshot */
+    if (!FindProcessID(snapshot, currentPID, &processEntry))
+    {
+	CloseHandle(snapshot);
+	return FALSE;
+    }
+
+    /* close the snapshot */
+    if (!CloseHandle(snapshot))
+    {
+	return FALSE;
+    }
+
+    *parentPID = processEntry.th32ParentProcessID;
+    return TRUE;
+}
+
+BOOL
+/***********************************************************************
+*				IsMainWindow
+***********************************************************************
+* SYNOPSIS:	    The windows pointed to by the handle to be an
+*                  main window.
+* CALLED BY:	    EnumWindowsCallback
+* RETURN:	    TRUE if windows is a visible main window.
+* SIDE EFFECTS:    None
+*
+* STRATEGY:
+*
+* REVISION HISTORY:
+*	Name	Date		Description
+*	----	----		-----------
+*	FR	27/ 9/21	Initial Revision
+*
+***********************************************************************/
+IsMainWindow(HWND handle)
+{
+    return GetWindow(handle, GW_OWNER) == (HWND)0 && IsWindowVisible(handle);
+}
+
+/***********************************************************************
+ *				EnumWindowsCallback
+ ***********************************************************************
+ * SYNOPSIS:	    Enumerate all available windows and check for
+ *                  main window for given process..
+ * CALLED BY:	    FindMainWindow
+ * RETURN:	    TRUE if no main windows has with the process id
+ *                  given has been found. Otherwise windowHdl is Filled
+ *                  in the result data structure.
+ * SIDE EFFECTS:    None
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	FR	27/ 9/21	Initial Revision
+ *
+ ***********************************************************************/
+typedef struct HandleDataStruct
+{
+    unsigned long 	processID;
+    HWND 		windowHdl;
+} HandleData;
+
+BOOL CALLBACK
+EnumWindowsCallback(HWND handle, LPARAM lParam)
+{
+    HandleData* data = (HandleData*)lParam;
+    unsigned long processID = 0;
+    GetWindowThreadProcessId(handle, &processID);
+    if (data->processID != processID || !IsMainWindow(handle))
+	return TRUE;
+    data->windowHdl = handle;	/* window of process */
+    return FALSE;
+}
+
+/***********************************************************************
+ *				FindMainWindow
+ ***********************************************************************
+ * SYNOPSIS:	    Find main window handle for given process
+ * CALLED BY:	    FindMainWindow
+ * RETURN:	    HWND of main window found or 0 for no found.
+ * SIDE EFFECTS:    None
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	FR	27/ 9/21	Initial Revision
+ *
+ ***********************************************************************/
+HWND
+FindMainWindow(unsigned long processID)
+{
+    HandleData handleData;
+    handleData.processID = processID;
+    handleData.windowHdl = 0;
+    EnumWindows(EnumWindowsCallback, (LPARAM)&handleData);
+    return handleData.windowHdl;
+}
+
+/***********************************************************************
+ *				FocusSwatWindow
+ ***********************************************************************
+ * SYNOPSIS:	    Find the current process main window (likely the
+ *                  console parent processes main window)
+ * CALLED BY:	    read-line, read-char
+ * RETURN:	    HWND of previous focus window or 0 if none
+ * SIDE EFFECTS:    None
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	FR	27/ 9/21	Initial Revision
+ *
+ ***********************************************************************/
+HWND
+FocusSwatWindow()
+{
+    DWORD parentID;
+    DWORD otherThreadId;
+    DWORD currentThreadId = GetCurrentThreadId();
+    HWND oldForeground;
+    HWND otherWindow;
+
+    oldForeground = GetForegroundWindow();
+    if(!GetParentProcessId(&parentID))
+    {
+	parentID = currentThreadId; /* no parent found, use current process */
+    }
+    otherWindow = FindMainWindow(parentID); /* get swat console window */
+
+    if(otherWindow == 0)
+    {
+	return 0;
+    }
+    otherThreadId = GetWindowThreadProcessId(otherWindow, NULL);
+
+    if( otherThreadId != currentThreadId )
+    {
+	AttachThreadInput(currentThreadId, otherThreadId, TRUE);
+    }
+
+    SwatRestoreWindow(otherWindow); /* actives and focus swat main window */
+
+    if( otherThreadId != currentThreadId )
+    {
+	AttachThreadInput(currentThreadId, otherThreadId, FALSE);
+    }
+
+    return oldForeground;
+}
+
+/***********************************************************************
+ *				FocusSwatWindow
+ ***********************************************************************
+ * SYNOPSIS:	    Restores the focus and activates the window
+ *                  given.
+ * CALLED BY:	    read-line, read-char
+ * RETURN:	    None
+ * SIDE EFFECTS:    None
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	FR	27/ 9/21	Initial Revision
+ *
+ ***********************************************************************/
+VOID
+SwatRestoreWindow(HWND oldForeground)
+{
+    if( oldForeground != 0 )
+    {
+	INPUT keyInput;
+
+	keyInput.type = INPUT_KEYBOARD;
+        keyInput.ki.wScan = 0; /* key hardware scan code */
+        keyInput.ki.time = 0;
+        keyInput.ki.dwExtraInfo = 0;
+
+	//set focus to the hWnd (sending Alt allows to bypass limitation)
+	keyInput.ki.wVk = VK_MENU;
+	keyInput.ki.dwFlags = 0;   /* key press 0 */
+	SendInput(1, &keyInput, sizeof(INPUT));
+
+	SetForegroundWindow(oldForeground); /* restore focus of old window */
+
+	keyInput.ki.wVk = VK_MENU;
+	keyInput.ki.dwFlags = KEYEVENTF_KEYUP;  /* simulate key up event */
+	SendInput(1, &keyInput, sizeof(INPUT));
+
+	Sleep(50); /* otherwise too fast switching may confuse swat */
+    }
+}
+#endif
 
 #if defined(unix)
 
@@ -3616,9 +3906,13 @@ See also:\n\
     int	    	    	length;
     CursesInputState	state;
 
+#ifdef _WIN32
+    HWND oldForeground = FocusSwatWindow();
+#endif
 #if defined(_LINUX)
     system(SWATWCTL_FOCUS);
 #endif
+
     wrefresh(cmdWin);
     fflush(stdout);
 
@@ -3808,6 +4102,9 @@ See also:\n\
 #if defined(_LINUX)
     system(SWATWCTL_RESTORE);
 #endif
+#ifdef _WIN32
+    SwatRestoreWindow(oldForeground);
+#endif
 
     /*
      * Clear the interrrupt-pending flag to avoid annoying people
@@ -3932,6 +4229,13 @@ See also:\n\
 {
     signed char c;
 
+#ifdef _WIN32
+    HWND oldForeground = FocusSwatWindow();
+#endif
+#if defined(_LINUX)
+    system(SWATWCTL_FOCUS);
+#endif
+
     /*
      * Make sure the screen's up-to-date
      */
@@ -3940,9 +4244,6 @@ See also:\n\
 
     Rpc_Push(0);
 
-#if defined(_LINUX)
-    system(SWATWCTL_FOCUS);
-#endif
 
     Rpc_Watch(0, RPC_READABLE, CursesReadChar, (Rpc_Opaque)&c);
 #if defined(_MSDOS)
@@ -3965,7 +4266,12 @@ See also:\n\
 #if defined(_LINUX)
     system(SWATWCTL_RESTORE);
 #endif
+#ifdef _WIN32
+    SwatRestoreWindow(oldForeground);
+#endif
     Tcl_RetPrintf(interp, "%c", c);
+
+
     return(TCL_OK);
 }
 
