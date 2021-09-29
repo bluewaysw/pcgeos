@@ -515,7 +515,7 @@ PASS:		ax	- mask of events that occurred:
 				b1	right
 				b2	middle
 				Alternatively: bh holds the wheel info
-			  1 => pressed
+			  	1 => pressed
 		cx	- X position
 		dx	- Y position
 
@@ -537,8 +537,6 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 MouseDevHandler	proc	far
 
-	;store bx in case of wheel activities
-		push bx;
 	;
 	; Load dgroup into ds. We pay no attention to the event
 	; mask we're passed, since MouseSendEvents just works from the
@@ -547,6 +545,15 @@ MouseDevHandler	proc	far
 		mov	ax, dgroup
 		mov	ds, ax
 	;
+	; check if wheel event and go there if necessary.
+	; for the wheel we don't care about the button states
+	; and x/y position - this stuff should be stored in the IM
+	; from the respective last events...
+	;
+		cmp	bh, 0
+		jne	wheelEvent
+	;
+	; not a wheel event, button stuff or ptr...
 	; Now have to transform the button state. We're given
 	; <M,R,L> with 1 => pressed, which is just about as bad as
 	; we can get, since MouseSendEvents wants <L,M,R> with
@@ -567,12 +574,11 @@ MouseDevHandler	proc	far
 	; Ship the events off.
 	;
 		call	MouseSendEvents
-
+		jmp 	packetDone
 	;
-	; Check the wheel
 	; Send the wheel as keypresses or wheel event.
 	;
-		pop 	bx
+wheelEvent:
 		mov 	dh, bh			; put wheel data in dh
 		cmp 	dh, 0
 		je 	packetDone		; if wheel data equals zero => no wheel action, done
@@ -610,7 +616,7 @@ MouseSendWheelEvent	proc	near
 
 	mov	bx, ds:[mouseOutputHandle]
 	mov	di, mask MF_FORCE_QUEUE
-	mov	ax, MSG_IM_MOUSE_WHEEL_CHANGE
+	mov	ax, MSG_IM_MOUSE_WHEEL_VERTICAL
 	call 	ObjMessage	; Send the event
 	ret
 
@@ -620,14 +626,14 @@ MouseSendWheelEvent	endp
 MouseSendKeyEvent	proc	near
 
 	cmp	dh, 0		; compare wheel data with 0
-	jg 	wheelDown	; if bh value greater than 0 => jump to wheel down
+	jg 	wheelDown	; if value greater than 0 => jump to wheel down
 
 wheelUp:				; otherwise continue with wheel up
-	mov 	cx, ds:[scrollKeyUp]	; put "up" key in cx
+	mov 	cx, ds:[scrollKeyUp]	; put "up" key in
 	jmp 	doPress			; do the press
 
 wheelDown:
-	mov	cx, ds:[scrollKeyDown]	; wheel down => put "down" key in cx
+	mov	cx, ds:[scrollKeyDown]	; wheel down => put "down" key in
 
 doPress:
 	mov	di, mask MF_FORCE_QUEUE ; setup ObjMessage

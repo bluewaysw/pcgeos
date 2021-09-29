@@ -1586,7 +1586,7 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 
-GenViewScrollOnWheel	method dynamic GenViewClass, 	MSG_META_MOUSE_WHEEL
+GenViewScrollOnWheel	method dynamic GenViewClass, 	MSG_META_MOUSE_WHEEL_VERTICAL
 
 	test	ds:[di].GVI_vertAttrs, mask GVDA_SCROLLABLE	; test if scrollable
 	jz	exit						; not scrollable, exit
@@ -1596,7 +1596,7 @@ GenViewScrollOnWheel	method dynamic GenViewClass, 	MSG_META_MOUSE_WHEEL
 	cmp	bp, 128			; compare with 128
 	js	scrollDown		; smaller than 128 = scroll down
 
-scrollUp:				; not smaller = sroll up
+scrollUp:				; greater than 128 = scroll up
   	mov 	ax, MSG_GEN_VIEW_SCROLL_UP
 	jmp 	finish
 

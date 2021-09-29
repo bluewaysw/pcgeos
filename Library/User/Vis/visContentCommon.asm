@@ -1414,7 +1414,7 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 
 VisContentMouseEvent	method	VisContentClass, MSG_META_PTR, \
-						 MSG_META_MOUSE_WHEEL, \
+						 MSG_META_MOUSE_WHEEL_VERTICAL, \
 						 MSG_META_START_SELECT, \
 						 MSG_META_START_MOVE_COPY, \
 						 MSG_META_START_FEATURES, \

@@ -314,7 +314,7 @@ MouseSendWheelEvent	proc	near
 
 	mov	bx, ds:[mouseOutputHandle]
 	mov	di, mask MF_FORCE_QUEUE
-	mov	ax, MSG_IM_MOUSE_WHEEL_CHANGE
+	mov	ax, MSG_IM_MOUSE_WHEEL_VERTICAL
 	call 	ObjMessage	; Send the event
 	ret
 

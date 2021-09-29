@@ -2658,7 +2658,7 @@ FlowInkReply	endp
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		FlowWheel -- 	MSG_META_MOUSE_WHEEL for FlowClass
+METHOD:		FlowWheel -- 	MSG_META_MOUSE_WHEEL_VERTICAL for FlowClass
 
 DESCRIPTION:	Disperses WHEEL event to the current mouse grab
 
@@ -2668,7 +2668,7 @@ PASS:
 	*ds:si - instance data
 	es - segment of FlowClass
 
-	ax - MSG_META_MOUSE_WHEEL
+	ax - MSG_META_MOUSE_WHEEL_VERTICAL
 
 	cx	- x position, mouse source window coordinates
 	dx	- y position, mouse source window coordinates
@@ -2687,7 +2687,7 @@ REVISION HISTORY:
 	----	----		-----------
 	MeyerK	09/2021		initial implementation
 ------------------------------------------------------------------------------@
-FlowWheel	method	dynamic	FlowClass, 	MSG_META_MOUSE_WHEEL
+FlowWheel	method	dynamic	FlowClass, 	MSG_META_MOUSE_WHEEL_VERTICAL
 
 	call 	SendMouseToActiveOrImpliedGrab
 	ret

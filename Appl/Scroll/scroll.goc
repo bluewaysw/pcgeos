@@ -92,6 +92,8 @@
 
 @object GenPrimaryClass GContPrimary = {
     GI_comp = @GContView;
+    HINT_SIZE_WINDOW_AS_DESIRED;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
 }
 
   /*
@@ -112,7 +114,6 @@
                          | GVA_SAME_COLOR_AS_PARENT_WIN;
     GVI_horizAttrs = @default | GVDA_NO_LARGER_THAN_CONTENT;
     GVI_vertAttrs = @default | GVDA_NO_LARGER_THAN_CONTENT;
-    // GVDA_SCROLLABLE
 }
 
   /*
@@ -124,6 +125,7 @@
     GI_comp = @GContValue1,
               @GContValue2,
               @GContWheelDirection,
+              @GContWheelValue,
               @GContModifierKey;
     GCI_genView = @GContView;
 }
@@ -140,6 +142,12 @@
     GI_visMoniker = "Wheel Direction:";
 }
 
+@object GenValueClass GContWheelValue = {
+    GI_visMoniker = "Wheel Value:";
+    GVLI_minimum = MakeWWFixed(-255);
+    GVLI_maximum = MakeWWFixed(255);
+}
+
 @object GenGlyphClass GContModifierKey = {
     GI_visMoniker = "Modifier Key:";
 }
@@ -151,16 +159,21 @@
  *******************************************************************/
 
 /********************************************************************
- *              MSG_META_MOUSE_WHEEL
+ *              MSG_META_MOUSE_WHEEL_VERTICAL
  *******************************************************************/
 
-@method ScrollViewClass, MSG_META_MOUSE_WHEEL
+@method ScrollViewClass, MSG_META_MOUSE_WHEEL_VERTICAL
 {
+    sbyte   wheelInfo;
+    byte    shiftState;
+
+    wheelInfo   = GET_WHEEL_INFO(inputState);
+    shiftState  = GET_SHIFT_STATE(inputState);
 
     @send GContValue1::MSG_GEN_VALUE_SET_INTEGER_VALUE(xPosition, 0);
     @send GContValue2::MSG_GEN_VALUE_SET_INTEGER_VALUE(yPosition, 0);
 
-    if (GET_BUTTON_INFO(inputState) > 128)
+    if (wheelInfo < 0)
     {
         @call GContWheelDirection::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("Wheel Direction: Up.", VUM_NOW);
     }
@@ -168,38 +181,42 @@
     {
         @call GContWheelDirection::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("Wheel Direction: Down.", VUM_NOW);
     }
+    @send GContWheelValue::MSG_GEN_VALUE_SET_INTEGER_VALUE(wheelInfo, 0);
 
 
-    if (GET_SHIFT_STATE(inputState) & (SS_LSHIFT))
+    if (shiftState & SS_LSHIFT)
     {
         @call GContModifierKey::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("Modifier Key: Left Shift.", VUM_NOW);
     }
 
-    if (GET_SHIFT_STATE(inputState) & (SS_RSHIFT))
+
+    if (shiftState & SS_RSHIFT)
     {
         @call GContModifierKey::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("Modifier Key: Right Shift.", VUM_NOW);
     }
 
-    if (GET_SHIFT_STATE(inputState) & (SS_LALT))
+
+    if (shiftState & SS_LALT)
     {
     	@call GContModifierKey::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("Modifier Key: Left Alt.", VUM_NOW);
     }
 
-    if (GET_SHIFT_STATE(inputState) & (SS_RALT))
+
+    if (shiftState & SS_RALT)
     {
     	@call GContModifierKey::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("Modifier Key: Right Alt.", VUM_NOW);
     }
 
-    if (GET_SHIFT_STATE(inputState) & (SS_LCTRL))
+    if (shiftState & SS_LCTRL)
     {
         @call GContModifierKey::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("Modifier Key: Left Ctrl.", VUM_NOW);
     }
 
-    if (GET_SHIFT_STATE(inputState) & (SS_RCTRL))
+
+    if (shiftState & SS_RCTRL)
     {
         @call GContModifierKey::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("Modifier Key: Right Ctrl.", VUM_NOW);
     }
-
 
     retVal->flags = MRF_PROCESSED;
 }

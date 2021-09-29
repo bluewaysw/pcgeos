@@ -257,7 +257,7 @@ ProcessUserInput method	IMClass,	MSG_IM_PTR_CHANGE,
 					else
 						MSG_META_EXPOSED,
 					endif
-					MSG_IM_MOUSE_WHEEL_CHANGE
+					MSG_IM_MOUSE_WHEEL_VERTICAL
 					; wheel support added
 
 ;	(Handle MSG_META_KBD_CHAR to allow keycaps to work)
@@ -738,8 +738,7 @@ SYNOPSIS:	LEVEL 40 user input processing
 		  MSG_IM_PRESSURE_CHANGE   ->		MSG_META_PRESSURE
 		  MSG_IM_DIRECTION_CHANGE 		MSG_META_DIRECTION
 		  MSG_IM_BUTTON_CHANGE			MSG_META_MOUSE_BUTTON
-		  MSG_IM_MOUSE_WHEEL_CHANGE		MSG_META_MOUSE_WHEEL_DOWN
-		  					MSG_META_MOUSE_WHEEL_UP
+		  MSG_IM_MOUSE_WHEEL_VERTICAL		MSG_META_MOUSE_WHEEL_VERTICAL
 
 CALLED BY:	User Input Manager (As a Monitor)
 
@@ -821,6 +820,13 @@ PSEUDO CODE/STRATEGY:
 		si	- window handle
 
 
+		di	- MSG_META_MOUSE_WHEEL_VERTICAL
+		cx	- mouseXPos
+		dx	- mouseYPos
+		bp	- <shiftState><wheelInfo>
+			   wheelInfo: < 0 = up; > 0 = down
+		si	- window handle
+
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 		none
 
@@ -858,7 +864,7 @@ screenOn1:
 endif
 	cmp	di, MSG_IM_BUTTON_CHANGE
 	je	CIM_Button
-	cmp 	di, MSG_IM_MOUSE_WHEEL_CHANGE	; check for wheel change
+	cmp 	di, MSG_IM_MOUSE_WHEEL_VERTICAL	; check for wheel change
 	je 	CIM_Wheel
 	cmp	di, MSG_META_KBD_CHAR
 	je	CIM_Kbd
@@ -1173,7 +1179,7 @@ ProcessWheel proc near
 					; wheel data is in DH: greater 0 = down, smaller 0 = up
 					; it can't be zero because then the Mouse driver would
 					; not have issued an event
-	mov 	di, MSG_META_MOUSE_WHEEL
+	mov 	di, MSG_META_MOUSE_WHEEL_VERTICAL
 	mov	bl, dh			; put wheel state in bl
 	mov	bh, ds:[shiftState]	; put state of the keyboard in bh
 	mov	bp, bx			; put both into bp, range is now: < 128 for down, > 128 for up
@@ -1782,7 +1788,7 @@ REVISION HISTORY:
 OutputNonPtr	proc	far
 	class	IMClass
 					; make sure to handle wheel
-	cmp 	di, MSG_META_MOUSE_WHEEL
+	cmp 	di, MSG_META_MOUSE_WHEEL_VERTICAL
 						; Check for button method
 	cmp	di, MSG_META_MOUSE_BUTTON	; requires special handling
 	je	handleButton
