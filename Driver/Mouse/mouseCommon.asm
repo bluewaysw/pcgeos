@@ -1073,9 +1073,9 @@ else
 		je	afterSendEvent
 sendPtr:
 endif
-		;
-		; Send IM_PTR_CHANGE event...
-		;
+	;
+	; Send IM_PTR_CHANGE event...
+	;
 					; But first, perform any mouse
 					; acceleration needed
 		push	bp		; Preserve passed BP
@@ -1090,9 +1090,9 @@ endif
 ifndef MOUSE_DONT_ACCELERATE
 		call	MousePreparePtrEvent
 endif
-		;
-		; Push address of routine onto the stack
-		;
+	;
+	; Push address of routine onto the stack
+	;
 		mov	di, mask MF_FORCE_QUEUE
 		cmp	ds:[mouseCombineMode], MCM_NO_COMBINE
 		jz	sendEvent
@@ -1134,12 +1134,12 @@ ifdef MOUSE_STORE_FAKE_MOUSE_COORDS
 leftButtonNotDown:
 endif ; MOUSE_STORE_FAKE_MOUSE_COORDS
 
-		;
-		; Store the deltas (if case we need them for combining the
-		; next event), unless the noCombine flag was set (meaning
-		; that the mouse event just sent was combined with the last
-		; event and the delta was updated there)
-		;
+	;
+	; Store the deltas (if case we need them for combining the
+	; next event), unless the noCombine flag was set (meaning
+	; that the mouse event just sent was combined with the last
+	; event and the delta was updated there)
+	;
 		clr	ax
 		xchg	al, ds:noStoreDeltasFlag
 		tst	al
@@ -1162,50 +1162,50 @@ endif
 
 
 afterSendEvent:
-		;
-		; Check for changes in the button state. XOR the current
-		; and previous states together to find any button bits that
-		; changed. A bit is 0 if the button is pressed.
-		;
+	;
+	; Check for changes in the button state. XOR the current
+	; and previous states together to find any button bits that
+	; changed. A bit is 0 if the button is pressed.
+	;
 		and	bh, MouseButtonBits	; Make sure only defined
 						; bits are around...
 		mov	al, bh
 		xor	al, ds:mouseButtons
 		jz	MH_Done			; Nothing changed -- all done.
-		;
-		; Save current button state (do it now since we don't
-		; reference it again and we want to avoid doubled events in
-		; the case of our event sending being interrupted)
-		;
+	;
+	; Save current button state (do it now since we don't
+	; reference it again and we want to avoid doubled events in
+	; the case of our event sending being interrupted)
+	;
 		mov	ds:mouseButtons, bh
 
 		push	bp		; Preserve passed BP
 
 		CheckAndSend B0, 0
-		ifdef MIDDLE_IS_DOUBLE_PRESS
-				;
-				; If mapping the middle button to double presses, just send
-				; a press and release of the left button for each status change.
-				; We'll send one pair on the press and one pair on the release.
-				;
-						test    al, mask MOUSE_B1        ;middle button changed?
-						jz    noMiddle            ;branch if not
-						push    bx
-						clr    bl                ;bl <- left button
-						andnf    bh, not mask MOUSE_B1        ;bh <- button down
-						test    bh, mask MOUSE_B1        ;set Z flag
-						call    MouseSendButtonEvent
-						ornf    bh, mask MOUSE_B1        ;bh <- button up
-						test    bh, mask MOUSE_B1        ;set Z flag
-						call    MouseSendButtonEvent
-						pop    bx
-		noMiddle:
-		else
-						CheckAndSend B1, 1
-		endif
-						CheckAndSend B2, 2
-						CheckAndSend B3, 3
 
+ifdef MIDDLE_IS_DOUBLE_PRESS
+	;
+	; If mapping the middle button to double presses, just send
+	; a press and release of the left button for each status change.
+	; We'll send one pair on the press and one pair on the release.
+	;
+		test	al, mask MOUSE_B1	;middle button changed?
+		jz	noMiddle		;branch if not
+		push	bx
+		clr	bl			;bl <- left button
+		andnf	bh, not mask MOUSE_B1	;bh <- button down
+		test	bh, mask MOUSE_B1	;set Z flag
+		call	MouseSendButtonEvent
+		ornf	bh, mask MOUSE_B1	;bh <- button up
+		test	bh, mask MOUSE_B1	;set Z flag
+		call	MouseSendButtonEvent
+		pop	bx
+noMiddle:
+else
+		CheckAndSend B1, 1
+endif
+		CheckAndSend B2, 2
+		CheckAndSend B3, 3
 
 		;CheckAndSend B0, 0
 		;CheckAndSend B1, 1
