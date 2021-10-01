@@ -3,11 +3,11 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = scroll
+GEODE           = wheel
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = scroll.goc lmacros.goh
-OBJS            = scroll.obj
+SRCS            = wheel.goc lmacros.goh
+OBJS            = wheel.obj
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk

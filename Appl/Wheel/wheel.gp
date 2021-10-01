@@ -1,25 +1,8 @@
 #####################################################################
 #
-#       Copyright (c) Geoworks 1996 -- All Rights Reserved.
+#       Copyright (c) FreeGeos -- All Rights Reserved.
 #
-# PROJECT:      GEOS Sample Applications
-# MODULE:       GenContent Sample
-# FILE:         gcont.gp
-#
-# AUTHOR:       Nathan Fiedler: November 13, 1996
-#
-# REVISION HISTORY:
-#       Name    Date            Description
-#       ----    ----            -----------
-#       NF      11/13/96        Initial version
-#
-# DESCRIPTION:
-#       This file contains Geode definitions for the "GenContent"
-#       sample application. This file is read by the Glue linker to
-#       build this application.
-#
-# RCS STAMP:
-#       $Id: gcont.gp,v 1.1 97/04/04 16:41:44 newdeal Exp $
+# PROJECT:      Wheel API Demonstration App
 #
 #####################################################################
 #
@@ -28,12 +11,12 @@
 # library table of a client geode (along with the protocol number). It is also
 # what Swat uses to name the patient.
 #
-name     scroll.app
+name     wheel.app
 #
 # Long filename: this name can be displayed by GeoManager. "EC " is prepended to
 # this when the error-checking version is linked by Glue.
 #
-longname "Scroll"
+longname "Wheel API Demonstration"
 #
 # Specify geode type: is an application, and will have its own thread started
 # for it by the kernel. It may only be launched once.
@@ -44,12 +27,12 @@ type   appl, process, single
 # thread (aka "process" when specified as the output of a UI object) will be
 # handled by the HelloProcessClass, which is defined in hello.goc.
 #
-class  ScrollProcessClass
+class  WheelProcessClass
 #
 # Specify application object. This is the object that serves as the top-level
 # UI object in the application. See hello3.goc.
 #
-appobj ScrollApp
+appobj WheelApp
 #
 # Token: The four-letter name is used by GeoManager to locate the
 # icon for this application in the token database. The tokenid
@@ -82,5 +65,4 @@ resource Interface   ui-object
 #
 # Any classes that are defined in the application should be exported here.
 #
-export ScrollViewClass
-export ScrollViewAppClass
+export WheelViewClass

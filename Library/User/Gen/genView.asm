@@ -1561,12 +1561,13 @@ COMMENT @----------------------------------------------------------------------
 
 METHOD:		GenViewScrollOnWheel for GenViewClass
 
-DESCRIPTION:	Scrolls the view on wheel up / down
+DESCRIPTION:	Scrolls the view on mouse wheel up / down
 
 PASS:
 		cx = mouse x
 		dx = mouse y
-		bp = shiftState in the high byte
+		bp = shiftState in the high byte,
+		     wheel data in the low byte
 
 RETURN:		ax = wheel event processed
 		ax, bx, di, -- trashed
@@ -1591,12 +1592,11 @@ GenViewScrollOnWheel	method dynamic GenViewClass, 	MSG_META_MOUSE_WHEEL_VERTICAL
 	test	ds:[di].GVI_vertAttrs, mask GVDA_SCROLLABLE	; test if scrollable
 	jz	exit						; not scrollable, exit
 
-	push 	bp			; save bp
-	and	bp, 0000000011111111b	; extract the wheel info, mask out shiftState
-	cmp	bp, 128			; compare with 128
-	js	scrollDown		; smaller than 128 = scroll down
+	mov	ax, bp			; put bp in ax, we can trash ax because we reassign it anyway
+	cmp	al, 0			; compare with 0
+	jg	scrollDown		; > 0 = scroll down
 
-scrollUp:				; greater than 128 = scroll up
+scrollUp:				; < 0 = scroll up
   	mov 	ax, MSG_GEN_VIEW_SCROLL_UP
 	jmp 	finish
 
@@ -1604,10 +1604,9 @@ scrollDown:
   	mov 	ax, MSG_GEN_VIEW_SCROLL_DOWN
 
 finish:
-	pop	bp			; restore bp
 	mov 	bx, ds:[LMBH_handle]	; get oself
-	mov 	di, mask MF_CAN_DISCARD_IF_DESPERATE	; if we are under load we are allowed to drop an event
-	call 	ObjMessage		; there he blows
+	mov 	di, mask MF_CAN_DISCARD_IF_DESPERATE	; if we are under load we allow to drop an event
+	call 	ObjMessage		; there she blows
 
 exit:
   	mov 	ax, mask MRF_PROCESSED	; MUST be set, otherwise GEOS will crash

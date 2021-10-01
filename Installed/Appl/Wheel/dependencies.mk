@@ -1,5 +1,5 @@
-scroll.obj \
-scroll.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
+wheel.obj \
+wheel.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
                 Objects/uiInputC.goh iacp.goh Objects/winC.goh \
                 Objects/gProcC.goh alb.goh Objects/processC.goh \
@@ -17,8 +17,8 @@ scroll.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh
-scroll.obj \
-scroll.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+wheel.obj \
+wheel.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
                 dbase.h localize.h Ansi/ctype.h timedate.h file.h \
                 sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
@@ -27,4 +27,4 @@ scroll.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h
 
-scrollEC.geo scroll.geo : geos.ldf ui.ldf 
+wheelEC.geo wheel.geo : geos.ldf ui.ldf 
