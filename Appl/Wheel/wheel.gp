@@ -48,7 +48,7 @@ tokenid    8
 # plus an additional amount for thread activity. To find the heapspace
 # for an application, use the Swat "heapspace" command.
 #
-heapspace 3269
+heapspace 3072
 #
 # Libraries:  List which libraries are used by the application.
 #
