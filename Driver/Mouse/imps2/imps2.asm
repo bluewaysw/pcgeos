@@ -17,9 +17,10 @@ DESCRIPTION:
 ; The following constants are used in mouseCommon.asm -- see that
 ; file for documentation.
 ;
-MOUSE_NUM_BUTTONS	= 3    ; Wheel mice have at least 3 buttons
-MIDDLE_IS_DOUBLE_PRESS	= 1    ; fake double-press with middle button
-MOUSE_SEPARATE_INIT	= 1    ; We use a separate Init resource
+MOUSE_GEOS_NATIVE_WHEEL_SUPPORT	= TRUE	; enable this if GEOS has true wheel support in the kernel/ui
+MOUSE_NUM_BUTTONS		= 3	; Wheel mice have at least 3 buttons
+MIDDLE_IS_DOUBLE_PRESS		= 1	; fake double-press with middle button
+MOUSE_SEPARATE_INIT		= 1	; We use a separate Init resource
 
 include    ../mouseCommon.asm  ; Include common definitions/code.
 
@@ -39,19 +40,32 @@ mouseExtendedInfo  DriverExtendedInfoTable <
 	offset mouseInfoTable
 >
 
-mouseNameTable  lptr.char  	imps2PageMouse,
-				imps2CursorMouse,
-			 	imps2NativeMouse
-		lptr.char	0  ; null-terminator
+if	MOUSE_GEOS_NATIVE_WHEEL_SUPPORT
+	mouseNameTable  lptr.char  	imps2PageMouse,
+					imps2CursorMouse,
+					imps2NativeMouse
+			lptr.char	0  ; null-terminator
 
-imps2PageMouse    chunk.char	'IM PS/2 Wheel Mouse (Wheel = Page Up/Down)', 0
-imps2CursorMouse  chunk.char	'IM PS/2 Wheel Mouse (Wheel = Cursor Up/Down)', 0
-imps2NativeMouse  chunk.char	'IM PS/2 Wheel Mouse (Native Wheel Support)', 0
+	imps2PageMouse    chunk.char	'IM PS/2 Wheel Mouse (Wheel = Page Up/Down)', 0
+	imps2CursorMouse  chunk.char	'IM PS/2 Wheel Mouse (Wheel = Cursor Up/Down)', 0
+	imps2NativeMouse  chunk.char	'IM PS/2 Wheel Mouse (Native Wheel Support)', 0
 
-mouseInfoTable  MouseExtendedInfo  \
-	0,	; imps2PageMouse
-	0,	; imps2CursorMouse
-	0	; imps2NativeMouse
+	mouseInfoTable  MouseExtendedInfo  \
+		0,	; imps2PageMouse
+		0,	; imps2CursorMouse
+		0	; imps2NativeMouse
+else
+	mouseNameTable  lptr.char  	imps2PageMouse,
+					imps2CursorMouse
+			lptr.char	0  ; null-terminator
+
+	imps2PageMouse    chunk.char	'IM PS/2 Wheel Mouse (Wheel = Page Up/Down)', 0
+	imps2CursorMouse  chunk.char	'IM PS/2 Wheel Mouse (Wheel = Cursor Up/Down)', 0
+
+	mouseInfoTable  MouseExtendedInfo  \
+		0,	; imps2PageMouse
+		0	; imps2CursorMouse
+endif
 
 MouseExtendedInfoSeg  ends
 ForceRef  mouseExtendedInfo
@@ -62,16 +76,21 @@ ForceRef  mouseExtendedInfo
 idata    segment
 
 ;
-; Driver variants
-;
-; driver variants for easier code-reading
-; as constants
+; WHEEL STUFF
+; Driver variants as constants for easier reading
 ;
 	DRIVER_VARIANT_PAGE	equ	0;
 	DRIVER_VARIANT_CURSOR	equ	2;
 	DRIVER_VARIANT_NATIVE	equ	4;
 
 	driverVariant 	word	DRIVER_VARIANT_PAGE	; start with device 0
+;
+; wheel keys
+;
+	WHEEL_KEY_CURSOR_UP	equ	0xE048
+	WHEEL_KEY_CURSOR_DOWN	equ	0xE050
+	WHEEL_KEY_PAGE_UP	equ	0xE049
+	WHEEL_KEY_PAGE_DOWN	equ	0xE051
 
 ;
 ; All the mouse BIOS calls are through interrupt 15h, function c2h.
@@ -225,9 +244,9 @@ MouseDevHandler proc 	far  	:byte,            ; first byte is unused
 	; into BH.
 		mov	al, ss:[status]
 		test	al, mask MDHS_Y_OVERFLOW or mask MDHS_X_OVERFLOW
-		jnz	packetDone  ; if overflow, drop the packet on the
-										; floor, since the semantics for such
-										; an event are undefined...
+		jnz	packetDone  	; if overflow, drop the packet on the
+					; floor, since the semantics for such
+					; an event are undefined...
 		mov	bh, al
 		and	bh, 00000110b
 
@@ -291,14 +310,14 @@ nativeEvent:
 		jmp	packetDone
 
 cursorKeyEvent:
-		mov 	ds:[scrollKeyUp], 0xE048
-		mov 	ds:[scrollKeyDown], 0xE050
+		mov 	ds:[scrollKeyUp], WHEEL_KEY_CURSOR_UP
+		mov 	ds:[scrollKeyDown], WHEEL_KEY_CURSOR_DOWN
 		call 	MouseSendKeyEvent
 		jmp	packetDone
 
 pageKeyEvent:
-		mov 	ds:[scrollKeyUp], 0xE049
-		mov 	ds:[scrollKeyDown], 0xE051
+		mov 	ds:[scrollKeyUp], WHEEL_KEY_PAGE_UP
+		mov 	ds:[scrollKeyDown], WHEEL_KEY_PAGE_DOWN
 		call 	MouseSendKeyEvent
 		jmp	packetDone
 packetDone:
@@ -324,7 +343,7 @@ MouseSendWheelEvent	endp
 MouseSendKeyEvent	proc	near
 
 	cmp	dh, 0		; compare wheel data with 0
-	jg 	wheelDown	; if bh value greater than 0 => jump to wheel down
+	jg 	wheelDown	; if value greater than 0 => jump to wheel down
 
 wheelUp:				; otherwise continue with wheel up
 	mov 	cx, ds:[scrollKeyUp]	; put "up" key in cx
@@ -416,7 +435,7 @@ MouseSetDevice  proc  near  uses es, bx, ax, di, ds
 		call	MouseMapDevice
 		jnc	noError			; carry set if MouseMapDevice failed
 hasError:
-		mov	ds:[driverVariant], 0	; otherwise: set device index back to 0
+		mov	ds:[driverVariant], DRIVER_VARIANT_PAGE	; otherwise: set device index back to 0
 		jmp	startInit
 noError:
 		mov 	ds:[driverVariant], di 	; device idx is in di. first idx is 0 then 2, 4, 6...
@@ -430,7 +449,7 @@ startInit:
 		mov	bh, MOUSE_PACKET_SIZE  ; We've got at least one wheel, hence 4 bytes!
 		int	15h
 
-	;strategy for wheel activation used in "InitializeWheel" by Bret E. Johnson
+	; strategy for wheel activation used in "InitializeWheel" by Bret E. Johnson
 		mov	bh, MOUSE_RATE_200  ; Set Sample rate 200
 		mov	ax, MOUSE_SET_RATE
 		int	15h
@@ -502,6 +521,9 @@ MouseTestDevice  proc  near  uses ax, bx, es, cx
 
 	.enter
 
+	; lock BIOS?
+		call	SysLockBIOS
+
 	; init to see if (wheel) mouse exists
 		mov	ax, BIOS_DATA_SEG
 		mov	es, ax
@@ -548,6 +570,7 @@ noerror:
 		mov	ax, DP_PRESENT
 
 done:
+		call	SysUnlockBIOS
 		clc
 	.leave
 	ret
