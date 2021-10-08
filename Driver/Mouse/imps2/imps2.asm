@@ -17,7 +17,7 @@ DESCRIPTION:
 ; The following constants are used in mouseCommon.asm -- see that
 ; file for documentation.
 ;
-MOUSE_GEOS_NATIVE_WHEEL_SUPPORT	= TRUE	; enable this if GEOS has true wheel support in the kernel/ui
+MOUSE_GEOS_NATIVE_WHEEL_SUPPORT	= TRUE	; enable this if GEOS has native wheel support in the kernel/ui
 MOUSE_NUM_BUTTONS		= 3	; Wheel mice have at least 3 buttons
 MIDDLE_IS_DOUBLE_PRESS		= 1	; fake double-press with middle button
 MOUSE_SEPARATE_INIT		= 1	; We use a separate Init resource
