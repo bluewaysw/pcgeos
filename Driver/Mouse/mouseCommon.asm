@@ -313,7 +313,7 @@ endif
 ;
 ; wheelAction
 ;
-	wheelAction			sbyte	0	; none
+	wheelAction			sbyte	0	; none by default
 
 idata		ends
 
