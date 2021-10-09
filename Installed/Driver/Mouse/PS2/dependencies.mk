@@ -1,9 +1,9 @@
-DBCS/ps2.obj \
-DBCS/ps2.eobj: ../mouseCommon.asm geos.def heap.def lmem.def geode.def \
+ps2.obj \
+ps2.eobj: ../mouseCommon.asm geos.def heap.def lmem.def geode.def \
                 resource.def ec.def assert.def disk.def file.def \
-                drive.def driver.def initfile.def char.def unicode.def \
-                timer.def input.def graphics.def fontID.def font.def \
-                color.def hwr.def timedate.def sem.def Internal/im.def \
+                drive.def driver.def initfile.def char.def timer.def \
+                input.def graphics.def fontID.def font.def color.def \
+                hwr.def timedate.def sem.def Internal/im.def \
                 Internal/semInt.def Objects/processC.def \
                 Objects/metaC.def object.def chunkarr.def geoworks.def \
                 Internal/heapInt.def sysstats.def Internal/interrup.def \
@@ -31,4 +31,4 @@ DBCS/ps2.eobj: ../mouseCommon.asm geos.def heap.def lmem.def geode.def \
                 Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
                 Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def
 
-DBCS/ps2EC.geo DBCS/ps2.geo : geos.ldf 
+ps2EC.geo ps2.geo : geos.ldf 

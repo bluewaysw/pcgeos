@@ -1691,17 +1691,21 @@ MouseSendWheelEvent	proc	near
 	;
 	; check which driver variant to use
 	;
-		cmp 	ds:[driverVariant], MOUSE_WHEEL_DRIVER_VARIANT_NATIVE
-		je 	nativeEvent
+		cmp 	ds:[driverVariant], MOUSE_WHEEL_DRIVER_VARIANT_PAGE
+		je 	pageKeyEvent
 
 		cmp 	ds:[driverVariant], MOUSE_WHEEL_DRIVER_VARIANT_CURSOR
 		je 	cursorKeyEvent
 
-		cmp 	ds:[driverVariant], MOUSE_WHEEL_DRIVER_VARIANT_PAGE
-		je 	pageKeyEvent
+		cmp 	ds:[driverVariant], MOUSE_WHEEL_DRIVER_VARIANT_NATIVE
+		je 	nativeEvent
 
-nativeEvent:
-		call	MouseSendWheelEventNative
+		jmp	packetDone	; we should never get here, but just in case...
+
+pageKeyEvent:
+		mov 	ds:[wheelKeyUp], MOUSE_WHEEL_KEY_PAGE_UP
+		mov 	ds:[wheelKeyDown], MOUSE_WHEEL_KEY_PAGE_DOWN
+		call 	MouseSendWheelEventKey
 		jmp	packetDone
 
 cursorKeyEvent:
@@ -1710,11 +1714,9 @@ cursorKeyEvent:
 		call 	MouseSendWheelEventKey
 		jmp	packetDone
 
-pageKeyEvent:
-		mov 	ds:[wheelKeyUp], MOUSE_WHEEL_KEY_PAGE_UP
-		mov 	ds:[wheelKeyDown], MOUSE_WHEEL_KEY_PAGE_DOWN
-		call 	MouseSendWheelEventKey
-		jmp	packetDone
+nativeEvent:
+		call	MouseSendWheelEventNative
+
 packetDone:
 		mov 	ds:[wheelAction], 0
 
