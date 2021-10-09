@@ -22,7 +22,7 @@ MOUSE_NUM_BUTTONS		= 3	; Wheel mice have at least 3 buttons
 MIDDLE_IS_DOUBLE_PRESS		= 1	; fake double-press with middle button
 MOUSE_SEPARATE_INIT		= 1	; We use a separate Init resource
 
-include    ../mouseCommon.asm  ; Include common definitions/code.
+include    ../mouseCommon.asm  		; Include common definitions/code.
 
 include    Internal/interrup.def
 include    Internal/dos.def      ; for equipment configuration...
@@ -70,28 +70,11 @@ endif
 MouseExtendedInfoSeg  ends
 ForceRef  mouseExtendedInfo
 
+
 ;------------------------------------------------------------------------------
 ;          VARIABLES/DATA/CONSTANTS
 ;------------------------------------------------------------------------------
 idata    segment
-
-;
-; WHEEL STUFF
-; Driver variants as constants for easier reading
-;
-	DRIVER_VARIANT_PAGE	equ	0;
-	DRIVER_VARIANT_CURSOR	equ	2;
-	DRIVER_VARIANT_NATIVE	equ	4;
-
-	driverVariant 	word	DRIVER_VARIANT_PAGE	; start with device 0
-;
-; wheel keys
-;
-	WHEEL_KEY_CURSOR_UP	equ	0xE048
-	WHEEL_KEY_CURSOR_DOWN	equ	0xE050
-	WHEEL_KEY_PAGE_UP	equ	0xE049
-	WHEEL_KEY_PAGE_DOWN	equ	0xE051
-
 ;
 ; All the mouse BIOS calls are through interrupt 15h, function c2h.
 ; All functions return CF set on error, ah = MouseStatus
@@ -122,8 +105,8 @@ MOUSE_SET_RESOLUTION		equ	0c203h  ; Set device resolution BH =
 	MOUSE_RES_8_PER_MM	equ	3  ; 8 counts per mm
 
 ; Device Type
-MOUSE_GET_TYPE		equ 0c204h  ; Get device ID.
-	MOUSE_ONE_WHEEL	equ 3       ; Device ID returned if Mouse has 1 Wheel
+MOUSE_GET_TYPE			equ 0c204h  ; Get device ID.
+	MOUSE_ONE_WHEEL		equ 3       ; Device ID returned if Mouse has 1 Wheel
 
 ; Init packet size
 MOUSE_INIT			equ  0c205h    ; Set interface parameters. BH = # bytes per packet.
@@ -154,19 +137,6 @@ mouseRateCmds  byte  MOUSE_RATE_10, MOUSE_RATE_20, MOUSE_RATE_40
 		byte  MOUSE_RATE_200, MOUSE_RATE_200
 
 idata    ends
-
-;------------------------------------------------------------------------------
-;		UDATA
-;------------------------------------------------------------------------------
-udata		segment
-	;
-	; scroll keys
-	;
-		scrollKeyUp	word
-		scrollKeyDown	word
-
-udata		ends
-
 
 MDHStatus  record
 		MDHS_Y_OVERFLOW:1,	; Y overflow
@@ -226,12 +196,17 @@ MouseDevHandler proc 	far  	:byte,            ; first byte is unused
 
 	; Prevent switch while sending
 		call	SysEnterInterrupt
-
+	;
+	; Store away the wheel info before the action really starts
+	;
+		mov 	dh, ss:[deltaZ]
+		mov	ds:[wheelAction], dh
+	;
 	; The deltas are already two's-complement, so just sign extend them
 	; ourselves.
 	; XXX: verify sign against bits in status byte to confirm its validity?
 	; what if overflow bit is set?
-
+	;
 		mov	al, ss:[deltaY]
 		cbw
 		xchg	dx, ax      ; (1-byte inst)
@@ -288,38 +263,7 @@ MouseDevHandler proc 	far  	:byte,            ; first byte is unused
 
 	; Registers now all loaded properly -- send the event.
 		call  	MouseSendEvents
-	;
-	; Check the wheel
-	; Send the wheel as keypresses or wheel event.
-	;
-		mov 	dh, ss:[deltaZ]
-		cmp 	dh, 0
-		je 	packetDone		; if wheel data equals zero => no wheel action, done
 
-		cmp 	ds:[driverVariant], DRIVER_VARIANT_NATIVE
-		je 	nativeEvent
-
-		cmp 	ds:[driverVariant], DRIVER_VARIANT_CURSOR
-		je 	cursorKeyEvent
-
-		cmp 	ds:[driverVariant], DRIVER_VARIANT_PAGE
-		je 	pageKeyEvent
-
-nativeEvent:
-		call	MouseSendWheelEvent
-		jmp	packetDone
-
-cursorKeyEvent:
-		mov 	ds:[scrollKeyUp], WHEEL_KEY_CURSOR_UP
-		mov 	ds:[scrollKeyDown], WHEEL_KEY_CURSOR_DOWN
-		call 	MouseSendKeyEvent
-		jmp	packetDone
-
-pageKeyEvent:
-		mov 	ds:[scrollKeyUp], WHEEL_KEY_PAGE_UP
-		mov 	ds:[scrollKeyDown], WHEEL_KEY_PAGE_DOWN
-		call 	MouseSendKeyEvent
-		jmp	packetDone
 packetDone:
 		call  SysExitInterrupt
 
@@ -328,41 +272,6 @@ packetDone:
 	ret
 
 MouseDevHandler  endp
-
-MouseSendWheelEvent	proc	near
-
-	mov	bx, ds:[mouseOutputHandle]
-	mov	di, mask MF_FORCE_QUEUE
-	mov	ax, MSG_IM_MOUSE_WHEEL_VERTICAL
-	call 	ObjMessage	; Send the event
-	ret
-
-MouseSendWheelEvent	endp
-
-
-MouseSendKeyEvent	proc	near
-
-	cmp	dh, 0		; compare wheel data with 0
-	jg 	wheelDown	; if value greater than 0 => jump to wheel down
-
-wheelUp:				; otherwise continue with wheel up
-	mov 	cx, ds:[scrollKeyUp]	; put "up" key in cx
-	jmp 	doPress			; do the press
-
-wheelDown:
-	mov	cx, ds:[scrollKeyDown]	; wheel down => put "down" key in cx
-
-doPress:
-	mov	di, mask MF_FORCE_QUEUE ; setup ObjMessage
-	mov	ax, MSG_IM_KBD_SCAN
-	mov	bx, ds:[mouseOutputHandle]
-
-	mov	dx, BW_TRUE	; set to "press"
-	call	ObjMessage	; press - release not necessary!
-
-	ret
-
-MouseSendKeyEvent	endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -431,17 +340,11 @@ REVISION HISTORY:
 MouseSetDevice  proc  near  uses es, bx, ax, di, ds
 	.enter
 
-	; fetch and save driverVariant id
-		call	MouseMapDevice
-		jnc	noError			; carry set if MouseMapDevice failed
-hasError:
-		mov	ds:[driverVariant], DRIVER_VARIANT_PAGE	; otherwise: set device index back to 0
-		jmp	startInit
-noError:
-		mov 	ds:[driverVariant], di 	; device idx is in di. first idx is 0 then 2, 4, 6...
-		call	MemUnlock		; release the info block that has been locked by MouseMapDevice, weird....
+	; fetch and save device variant
+	; if it fails, resets "device" to the PAGE variant (which should always work)
+		call	MouseMapWheelDevice
 
-startInit:
+	; lock BIOS
 		call	SysLockBIOS
 
 	; set packet size - must be called first!
@@ -576,41 +479,6 @@ done:
 	ret
 
 MouseTestDevice  endp
-
-COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		MouseMapDevice
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-SYNOPSIS:  Map a device string to its device index
-
-CALLED BY:  MouseDevTest, MouseDevInit
-PASS:    dx:si  = device string
-RETURN:    carry set if string invalid
-		ax  = DP_INVALID_DEVICE
-		carry clear if string valid
-		di  = device index (offset into mouseNameTable and mouseInfoTable)
-		es  = locked info block
-		bx  = handle of same
-DESTROYED:  nothing
-
-PSEUDO CODE/STRATEGY:
-
-
-KNOWN BUGS/SIDE EFFECTS/IDEAS:
-
-
-REVISION HISTORY:
-	Name  Date    Description
-	----  ----    -----------
-	ardeb  10/26/90  Initial version
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-MouseMapDevice  proc  near  uses cx, ds
-	.enter
-		EnumerateDevice  MouseExtendedInfoSeg
-	.leave
-	ret
-MouseMapDevice  endp
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		MouseDevSetRate

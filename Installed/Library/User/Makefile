@@ -40,12 +40,13 @@ UI              = uiDispCtrl.asm uiEMOM.asm uiEMTrigger.asm uiEdit.asm\
                   uiTool.ui uiView.ui
 USER            = userC.asm userDialog.asm userDocumentSave.asm\
                   userFlow.asm userFlowGrab.asm userFlowGrabLow.asm\
-                  userFlowInput.asm userFlowMisc.asm userFlowUtils.asm\
-                  userLibrary.asm userListUtils.asm userLog.asm\
-                  userMain.asm userManager.asm userQuick.asm userScreen.asm\
+                  userFlowMisc.asm userFlowUtils.asm userLibrary.asm\
+                  userListUtils.asm userLog.asm userMain.asm\
+                  userManager.asm userQuick.asm userScreen.asm\
                   userStrings.asm userTitleScreen.asm userTransfer.asm\
-                  userUtils.asm userConstant.def userMacro.def\
-                  userVariable.def userManager.ui userPassword.ui
+                  userUtils.asm userFlowInput.asm userConstant.def\
+                  userMacro.def userVariable.def userManager.ui\
+                  userPassword.ui
 VIS             = visClass.asm visComp.asm visCompGeometry.asm\
                   visContentClass.asm visEmpty.asm visGeometry.asm\
                   visIsoContent.asm visManager.asm visSpec.asm\

@@ -294,12 +294,35 @@ combineCount		word
 noCombineCount		word
 endif
 
+;
+; WHEEL STUFF
+; Driver variants as constants for easier reading
+;
+	MOUSE_WHEEL_DRIVER_VARIANT_PAGE		equ	0;
+	MOUSE_WHEEL_DRIVER_VARIANT_CURSOR	equ	2;
+	MOUSE_WHEEL_DRIVER_VARIANT_NATIVE	equ	4;
+
+	driverVariant	word	MOUSE_WHEEL_DRIVER_VARIANT_PAGE	; start with device 0
+;
+; wheel keys
+;
+	MOUSE_WHEEL_KEY_CURSOR_UP	equ	0xE048
+	MOUSE_WHEEL_KEY_CURSOR_DOWN	equ	0xE050
+	MOUSE_WHEEL_KEY_PAGE_UP		equ	0xE049
+	MOUSE_WHEEL_KEY_PAGE_DOWN	equ	0xE051
+;
+; wheelAction
+;
+	wheelAction			sbyte	0	; none
+
 idata		ends
 
+;------------------------------------------------------------------------------
+;			Uninitialized Variables
+;------------------------------------------------------------------------------
 udata	segment
 
 oldPtrFlags	PtrFlags
-
 
 
 ifdef	MOUSE_SUPPORT_MOUSE_COORD_BUFFER
@@ -324,6 +347,12 @@ leftButtonDown		BooleanByte	; true if the left mouse button is
 					; currently down.
 endif	; MOUSE_STORE_FAKE_MOUSE_COORDS
 
+;
+; WHEEL STUFF
+; wheel scroll keys
+;
+	wheelKeyUp	word
+	wheelKeyDown	word
 
 udata	ends
 
@@ -1214,6 +1243,9 @@ endif
 
 		pop	bp		; Restore passed BP
 MH_Done:
+	; now send our humble wheel event
+		call	MouseSendWheelEvent
+
 		ret
 MouseSendEvents	endp
 
@@ -1628,6 +1660,168 @@ noCombine:
 		ret
 
 MouseCombineEvent endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MouseSendWheelEvent
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Send wheel movements as keypresses or native wheel event
+
+CALLED BY:	MouseSendEvents
+PASS:		ds:[wheelAction]
+DESTROYED:
+
+PSEUDO CODE/STRATEGY:
+
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+MouseSendWheelEvent	proc	near
+
+	uses  dx
+	.enter
+	;
+	; Check the wheel
+	; Send the wheel as keypresses or wheel event.
+	;
+		cmp 	ds:[wheelAction], 0
+		je 	packetDone		; if wheel data equals zero => no wheel action, done
+	;
+	; check which driver variant to use
+	;
+		cmp 	ds:[driverVariant], MOUSE_WHEEL_DRIVER_VARIANT_NATIVE
+		je 	nativeEvent
+
+		cmp 	ds:[driverVariant], MOUSE_WHEEL_DRIVER_VARIANT_CURSOR
+		je 	cursorKeyEvent
+
+		cmp 	ds:[driverVariant], MOUSE_WHEEL_DRIVER_VARIANT_PAGE
+		je 	pageKeyEvent
+
+nativeEvent:
+		call	MouseSendWheelEventNative
+		jmp	packetDone
+
+cursorKeyEvent:
+		mov 	ds:[wheelKeyUp], MOUSE_WHEEL_KEY_CURSOR_UP
+		mov 	ds:[wheelKeyDown], MOUSE_WHEEL_KEY_CURSOR_DOWN
+		call 	MouseSendWheelEventKey
+		jmp	packetDone
+
+pageKeyEvent:
+		mov 	ds:[wheelKeyUp], MOUSE_WHEEL_KEY_PAGE_UP
+		mov 	ds:[wheelKeyDown], MOUSE_WHEEL_KEY_PAGE_DOWN
+		call 	MouseSendWheelEventKey
+		jmp	packetDone
+packetDone:
+		mov 	ds:[wheelAction], 0
+
+	; Recover and return.
+	.leave
+	ret
+
+MouseSendWheelEvent  endp
+
+MouseSendWheelEventNative	proc	near
+
+	mov	dh, ds:[wheelAction]
+	mov	bx, ds:[mouseOutputHandle]
+	mov	di, mask MF_FORCE_QUEUE
+	mov	ax, MSG_IM_MOUSE_WHEEL_VERTICAL
+	call 	ObjMessage	; Send the event
+	ret
+
+MouseSendWheelEventNative	endp
+
+
+MouseSendWheelEventKey	proc	near
+
+	cmp	ds:[wheelAction], 0	; compare wheel data with 0
+	jg 	wheelDown		; if value greater than 0 => jump to wheel down
+
+;wheelUp:				; otherwise continue with wheel up
+	mov 	cx, ds:[wheelKeyUp]	; put "up" key in cx
+	jmp 	doPress			; push the button
+
+wheelDown:
+	mov	cx, ds:[wheelKeyDown]	; wheel down => put "down" key in cx
+
+doPress:
+	mov	di, mask MF_FORCE_QUEUE ; setup ObjMessage
+	mov	ax, MSG_IM_KBD_SCAN
+	mov	bx, ds:[mouseOutputHandle]
+
+	mov	dx, BW_TRUE	; set to "press"
+	call	ObjMessage	; press - release not necessary!
+
+	ret
+
+MouseSendWheelEventKey	endp
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MouseMapWheelDevice
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:  Map a device string to its device index
+
+CALLED BY:  MouseDevTest, MouseDevInit
+PASS:    dx:si  = device string
+RETURN:    carry set if string invalid
+		ax  = DP_INVALID_DEVICE
+		carry clear if string valid
+		di  = device index (offset into mouseNameTable and mouseInfoTable)
+		es  = locked info block
+		bx  = handle of same
+DESTROYED:  nothing
+
+PSEUDO CODE/STRATEGY:
+
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+
+REVISION HISTORY:
+	Name  Date    Description
+	----  ----    -----------
+	ardeb  10/26/90  Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+MouseMapWheelDevice  proc  far  uses cx, di
+	.enter
+	;
+	; find device
+	;
+		EnumerateDevice MouseExtendedInfoSeg
+	;
+	; make sure we have access to the dgroup
+	;
+		mov	cx, segment dgroup
+		mov	ds, cx
+	;
+	; carry set if EnumerateDevice failed
+	;
+		jc	error
+	;
+	; otherwise, no error:
+	; device idx is in di. first idx is 0 then 2, 4, 6...
+	; copy di into our driverVariant variable
+	; release the info block that has been locked by EnumerateDevice...
+	;
+		mov 	ds:[driverVariant], di
+		call	MemUnlock
+		jmp	exit
+error:
+	;
+	; if error, set device index back to 0
+	;
+		mov	ds:[driverVariant], MOUSE_WHEEL_DRIVER_VARIANT_PAGE
+exit:
+	.leave
+	ret
+MouseMapWheelDevice  endp
+
 
 ifndef		MOUSE_CAN_BE_CALIBRATED
 

@@ -36,6 +36,7 @@ DESCRIPTION:
 ; The following constants are used in mouseCommon.asm -- see that
 ; file for documentation.
 ;
+MOUSE_GEOS_NATIVE_WHEEL_SUPPORT	= TRUE	; enable this if GEOS has native wheel support in the kernel/ui
 MOUSE_NUM_BUTTONS	= 3		; Assume 3 for now -- we'll set it in MouseDevInit
 MIDDLE_IS_DOUBLE_PRESS	= 1		; fake double-press with middle button
 MOUSE_CANT_SET_RATE	= 1		; Microsoft driver doesn't specify a function
@@ -64,19 +65,32 @@ mouseExtendedInfo	DriverExtendedInfoTable <
 	offset mouseInfoTable
 >
 
-mouseNameTable	lptr.char	ctPageMouse,
-				ctCursorMouse,
-				ctNativeMouse
-		lptr.char	0	; null-terminator
+if MOUSE_GEOS_NATIVE_WHEEL_SUPPORT
+	mouseNameTable	lptr.char	ctPageMouse,
+					ctCursorMouse,
+					ctNativeMouse
+			lptr.char	0	; null-terminator
 
-ctPageMouse	chunk.char	'CTMOUSE.EXE /O (Wheel = Page Up/Down)', 0
-ctCursorMouse	chunk.char	'CTMOUSE.EXE /O (Wheel = Cursor Up/Down)', 0
-ctNativeMouse	chunk.char	'CTMOUSE.EXE /O (Native Wheel Support)', 0
+	ctPageMouse	chunk.char	'CTMOUSE.EXE /O (Wheel = Page Up/Down)', 0
+	ctCursorMouse	chunk.char	'CTMOUSE.EXE /O (Wheel = Cursor Up/Down)', 0
+	ctNativeMouse	chunk.char	'CTMOUSE.EXE /O (Native Wheel Support)', 0
 
-mouseInfoTable	MouseExtendedInfo	\
-	0,		; ctPageMouse
-	0,		; ctCursorMouse
-	0		; ctNativeMouse
+	mouseInfoTable	MouseExtendedInfo	\
+		0,		; ctPageMouse
+		0,		; ctCursorMouse
+		0		; ctNativeMouse
+else
+	mouseNameTable	lptr.char	ctPageMouse,
+					ctCursorMouse
+			lptr.char	0	; null-terminator
+
+	ctPageMouse	chunk.char	'CTMOUSE.EXE /O (Wheel = Page Up/Down)', 0
+	ctCursorMouse	chunk.char	'CTMOUSE.EXE /O (Wheel = Cursor Up/Down)', 0
+
+	mouseInfoTable	MouseExtendedInfo	\
+		0,		; ctPageMouse
+		0		; ctCursorMouse
+endif
 
 MouseExtendedInfoSeg	ends
 ForceRef	mouseExtendedInfo
@@ -85,16 +99,6 @@ ForceRef	mouseExtendedInfo
 ;			Variables
 ;------------------------------------------------------------------------------
 idata	segment
-;
-; driver variants for easier code-reading
-; as constants
-;
-	DRIVER_VARIANT_PAGE	equ	0;
-	DRIVER_VARIANT_CURSOR	equ	2;
-	DRIVER_VARIANT_NATIVE	equ	4;
-
-	driverVariant 	word	DRIVER_VARIANT_PAGE	; start with device 0
-
 
 	GEN_MOUSE_MAGIC	= 0adebh 	; Magical delta given to MouseSendEvents if there's
 					; mouse motion so our input monitor knows to do
@@ -109,17 +113,6 @@ idata	segment
 
 idata	ends
 
-;------------------------------------------------------------------------------
-;		UDATA
-;------------------------------------------------------------------------------
-udata		segment
-	;
-	; scroll keys
-	;
-		scrollKeyUp	word
-		scrollKeyDown	word
-
-udata		ends
 
 MouseFuncs	etype	byte
 		MF_RESET			enum	MouseFuncs
@@ -284,17 +277,10 @@ REVISION HISTORY:
 MouseDevInit	proc	far	uses dx, ax, cx, si, bx
 		.enter
 
-	; fetch and save driverVariant id
-		call	MouseMapDevice
-		jnc	noError			; carry set if MouseMapDevice failed
-hasError:
-		mov	ds:[driverVariant], 0	; if error, set device index back to 0
-		jmp	startReset
-noError:
-		mov 	ds:[driverVariant], di 	; device idx is in di. first idx is 0 then 2, 4, 6...
-		call	MemUnlock		; release the info block that has been locked by MouseMapDevice, weird....
+	; fetch and save driver variant
+		call	MouseMapWheelDevice
 
-startReset:
+	; start resetting
 		dec	ds:[mouseSet]
 
 		mov	bx, 3		; Early LogiTech drivers screw up and
@@ -331,42 +317,6 @@ twoButtons:
 		.leave
 		ret
 MouseDevInit	endp
-
-
-COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		MouseMapDevice
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-SYNOPSIS:	Map a device string to its device index
-
-CALLED BY:	MouseDevTest, MouseDevInit
-PASS:		dx:si	= device string
-RETURN:		carry set if string invalid
-		 ax	= DP_INVALID_DEVICE
-		 carry clear if string valid
-		 di	= device index (offset into mouseNameTable and mouseInfoTable)
-		 es	= locked info block
-		 bx	= handle of same
-DESTROYED:	nothing
-
-PSEUDO CODE/STRATEGY:
-
-
-KNOWN BUGS/SIDE EFFECTS/IDEAS:
-
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	ardeb	10/26/90	Initial version
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-MouseMapDevice	proc	near	uses cx, ds
-	.enter
-		EnumerateDevice	MouseExtendedInfoSeg
-	.leave
-	ret
-MouseMapDevice	endp
 
 Init		ends
 
@@ -545,13 +495,9 @@ mangleButtons:
 		mov	ax, dgroup
 		mov	ds, ax
 	;
-	; check if wheel event and go there if necessary.
-	; for the wheel we don't care about the button states
-	; and x/y position - this stuff should be stored in the IM
-	; from the respective last events...
+	; save wheel action, if any
 	;
-		cmp	bh, 0
-		jne	wheelEvent
+		mov	ds:[wheelAction], bh
 	;
 	; not a wheel event, button stuff or ptr...
 	; Now have to transform the button state. We're given
@@ -573,81 +519,8 @@ mangleButtons:
 	; Ship the events off.
 	;
 		call	MouseSendEvents
-		jmp 	packetDone
-	;
-	; Check the wheel
-	; Send the wheel as keypresses or wheel event.
-	;
-wheelEvent:
-		mov 	dh, bh			; put wheel data in dh
-		cmp 	bh, 0
-		je 	packetDone		; if wheel data equals zero => no wheel action, done
-
-		cmp 	ds:[driverVariant], DRIVER_VARIANT_NATIVE
-		je 	nativeEvent
-
-		cmp 	ds:[driverVariant], DRIVER_VARIANT_CURSOR
-		je 	cursorKeyEvent
-
-		cmp 	ds:[driverVariant], DRIVER_VARIANT_PAGE
-		je 	pageKeyEvent
-
-nativeEvent:
-		call	MouseSendWheelEvent
-		jmp	packetDone
-
-cursorKeyEvent:
-		mov 	ds:[scrollKeyUp], 0xE048
-		mov 	ds:[scrollKeyDown], 0xE050
-		call 	MouseSendKeyEvent
-		jmp	packetDone
-
-pageKeyEvent:
-		mov 	ds:[scrollKeyUp], 0xE049
-		mov 	ds:[scrollKeyDown], 0xE051
-		call 	MouseSendKeyEvent
-		jmp	packetDone
-
-packetDone:
 		ret
 MouseDevHandler	endp
-
-
-MouseSendWheelEvent	proc	near
-
-	mov	bx, ds:[mouseOutputHandle]
-	mov	di, mask MF_FORCE_QUEUE
-	mov	ax, MSG_IM_MOUSE_WHEEL_VERTICAL
-	call 	ObjMessage	; Send the event
-	ret
-
-MouseSendWheelEvent	endp
-
-
-MouseSendKeyEvent	proc	near
-
-	cmp	dh, 0		; compare wheel data with 0
-	jg 	wheelDown	; if value greater than 0 => jump to wheel down
-
-wheelUp:				; otherwise continue with wheel up
-	mov 	cx, ds:[scrollKeyUp]	; put "up" key in
-	jmp 	doPress			; do the press
-
-wheelDown:
-	mov	cx, ds:[scrollKeyDown]	; wheel down => put "down" key in
-
-doPress:
-	mov	di, mask MF_FORCE_QUEUE ; setup ObjMessage
-	mov	ax, MSG_IM_KBD_SCAN
-	mov	bx, ds:[mouseOutputHandle]
-
-	mov	dx, BW_TRUE	; set to "press"
-	call	ObjMessage	; press - release not necessary!
-
-	ret
-
-MouseSendKeyEvent	endp
-
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		MouseMonitor
