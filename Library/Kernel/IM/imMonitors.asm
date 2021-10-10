@@ -1789,6 +1789,7 @@ OutputNonPtr	proc	far
 	class	IMClass
 					; make sure to handle wheel
 	cmp 	di, MSG_META_MOUSE_WHEEL_VERTICAL
+	je	handleWheel
 						; Check for button method
 	cmp	di, MSG_META_MOUSE_BUTTON	; requires special handling
 	je	handleButton
