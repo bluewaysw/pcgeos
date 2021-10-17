@@ -6,7 +6,7 @@ PROJECT:	PC GEOS
 MODULE:		Mouse Driver -- Absolute Generic Mouse Device-dependent routines
 				with Wheel support.
 				Intended for the "Basebox" Dosbox derivat.
-FILE:		absctm.asm
+FILE:		ctmabs.asm
 
 AUTHOR:		Adam de Boor, Jul 16, 1991
 		MeyerK, 09/2021
@@ -77,9 +77,10 @@ if MOUSE_GEOS_NATIVE_WHEEL_SUPPORT
 	baseboxNativeMouse	chunk.char	'Basebox Mouse (Native Wheel Support)', 0
 
 	mouseInfoTable	MouseExtendedInfo	\
-			mask MEI_GENERIC,	; baseboxPageMouse
-			mask MEI_GENERIC,	; baseboxCursorMouse
-			mask MEI_GENERIC	; baseboxNativeMouse
+			mask MEI_GENERIC or MOUSE_WHEEL_ACTION_PAGE   shl offset MEI_WHEEL_VERTICAL,	; baseboxPageMouse
+			mask MEI_GENERIC or MOUSE_WHEEL_ACTION_CURSOR shl offset MEI_WHEEL_VERTICAL,	; baseboxCursorMouse
+			mask MEI_GENERIC or MOUSE_WHEEL_ACTION_NATIVE shl offset MEI_WHEEL_VERTICAL	; baseboxNativeMouse
+
 else
 	mouseNameTable	lptr.char	baseboxPageMouse,
 					baseboxCursorMouse
@@ -89,8 +90,8 @@ else
 	baseboxCursorMouse	chunk.char	'Basebox Mouse (Wheel = Cursor Up/Down)', 0
 
 	mouseInfoTable	MouseExtendedInfo	\
-			mask MEI_GENERIC,	; baseboxPageMouse
-			mask MEI_GENERIC	; baseboxCursorMouse
+			mask MEI_GENERIC or 1 shl offset MEI_WHEEL_VERTICAL or 1,	; baseboxPageMouse
+			mask MEI_GENERIC or 1 shl offset MEI_WHEEL_VERTICAL or 2	; baseboxCursorMouse
 endif
 
 
@@ -276,7 +277,7 @@ MouseDevInit	proc	far	uses dx, ax, cx, si, bx
 		.enter
 
 	; fetch and save driver variant
-		call	MouseMapWheelDevice
+		call	MouseSetWheelAction
 
 		dec	ds:[mouseSet]
 
@@ -523,6 +524,80 @@ MouseDevHandler	proc	far
 		call	MouseSendEvents
 		ret
 MouseDevHandler	endp
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MouseSetWheelAction
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:  Extract the wheel action
+
+CALLED BY:  MouseDevInit etc
+PASS:    dx:si  = device string
+DESTROYED:  nothing
+
+PSEUDO CODE/STRATEGY:
+
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+
+REVISION HISTORY:
+	Name  	Date    	Description
+	----  	----    	-----------
+	MeyerK  10/2021  	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+MouseSetWheelAction  proc  far  uses cx, di, es, ds
+	.enter
+	;
+	; find driver variant aka "device"
+	;
+		EnumerateDevice MouseExtendedInfoSeg
+	;
+	; make sure we have access to the dgroup
+	;
+		mov	cx, segment dgroup
+		mov	ds, cx
+	;
+	; carry set if EnumerateDevice failed
+	;
+		jc	error
+	;
+	; read out and store the driver variant
+	;
+		assume	es:MouseExtendedInfoSeg
+		cmp	es:mouseInfoTable[di], mask MEI_GENERIC or MOUSE_WHEEL_ACTION_PAGE shl offset MEI_WHEEL_VERTICAL
+		je	pageKey
+		cmp	es:mouseInfoTable[di], mask MEI_GENERIC or MOUSE_WHEEL_ACTION_CURSOR shl offset MEI_WHEEL_VERTICAL
+		je	cursorKey
+		cmp	es:mouseInfoTable[di], mask MEI_GENERIC or MOUSE_WHEEL_ACTION_NATIVE shl offset MEI_WHEEL_VERTICAL
+		je	native
+
+pageKey:
+		mov	ds:[driverVariant], MOUSE_WHEEL_ACTION_PAGE
+		jmp 	finish
+cursorKey:
+		mov	ds:[driverVariant], MOUSE_WHEEL_ACTION_CURSOR
+		jmp	finish
+native:
+		mov	ds:[driverVariant], MOUSE_WHEEL_ACTION_NATIVE
+		jmp	finish
+
+finish:
+	;
+	; release the info block that has been locked by EnumerateDevice...
+	;
+		call	MemUnlock
+		jmp	exit
+error:
+	;
+	; if error, set device index back to 0
+	;
+		mov	ds:[driverVariant], MOUSE_WHEEL_ACTION_PAGE
+exit:
+	.leave
+	ret
+MouseSetWheelAction  endp
 
 Resident ends
 

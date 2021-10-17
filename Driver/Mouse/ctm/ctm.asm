@@ -76,9 +76,9 @@ if MOUSE_GEOS_NATIVE_WHEEL_SUPPORT
 	ctNativeMouse	chunk.char	'CTMOUSE.EXE /O (Native Wheel Support)', 0
 
 	mouseInfoTable	MouseExtendedInfo	\
-		0,		; ctPageMouse
-		0,		; ctCursorMouse
-		0		; ctNativeMouse
+			mask MEI_GENERIC or MOUSE_WHEEL_ACTION_PAGE   shl offset MEI_WHEEL_VERTICAL,	; pageMouse
+			mask MEI_GENERIC or MOUSE_WHEEL_ACTION_CURSOR shl offset MEI_WHEEL_VERTICAL,	; cursorMouse
+			mask MEI_GENERIC or MOUSE_WHEEL_ACTION_NATIVE shl offset MEI_WHEEL_VERTICAL	; nativeMouse
 else
 	mouseNameTable	lptr.char	ctPageMouse,
 					ctCursorMouse
@@ -88,8 +88,8 @@ else
 	ctCursorMouse	chunk.char	'CTMOUSE.EXE /O (Wheel = Cursor Up/Down)', 0
 
 	mouseInfoTable	MouseExtendedInfo	\
-		0,		; ctPageMouse
-		0		; ctCursorMouse
+			mask MEI_GENERIC or MOUSE_WHEEL_ACTION_PAGE   shl offset MEI_WHEEL_VERTICAL,	; pageMouse
+			mask MEI_GENERIC or MOUSE_WHEEL_ACTION_CURSOR shl offset MEI_WHEEL_VERTICAL	; cursorMouse
 endif
 
 MouseExtendedInfoSeg	ends
@@ -278,7 +278,7 @@ MouseDevInit	proc	far	uses dx, ax, cx, si, bx
 		.enter
 
 	; fetch and save driver variant
-		call	MouseMapWheelDevice
+		call	MouseSetWheelAction
 
 	; start resetting
 		dec	ds:[mouseSet]
@@ -317,6 +317,81 @@ twoButtons:
 		.leave
 		ret
 MouseDevInit	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MouseSetWheelAction
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:  Extract the wheel action
+
+CALLED BY:  MouseDevInit etc
+PASS:    dx:si  = device string
+DESTROYED:  nothing
+
+PSEUDO CODE/STRATEGY:
+
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+
+REVISION HISTORY:
+	Name  	Date    	Description
+	----  	----    	-----------
+	MeyerK  10/2021  	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+MouseSetWheelAction  proc  far  uses cx, di, es, ds
+	.enter
+	;
+	; find driver variant aka "device"
+	;
+		EnumerateDevice MouseExtendedInfoSeg
+	;
+	; make sure we have access to the dgroup
+	;
+		mov	cx, segment dgroup
+		mov	ds, cx
+	;
+	; carry set if EnumerateDevice failed
+	;
+		jc	error
+	;
+	; read out and store the driver variant
+	;
+		assume	es:MouseExtendedInfoSeg
+		cmp	es:mouseInfoTable[di], mask MEI_GENERIC or MOUSE_WHEEL_ACTION_PAGE shl offset MEI_WHEEL_VERTICAL
+		je	pageKey
+		cmp	es:mouseInfoTable[di], mask MEI_GENERIC or MOUSE_WHEEL_ACTION_CURSOR shl offset MEI_WHEEL_VERTICAL
+		je	cursorKey
+		cmp	es:mouseInfoTable[di], mask MEI_GENERIC or MOUSE_WHEEL_ACTION_NATIVE shl offset MEI_WHEEL_VERTICAL
+		je	native
+
+pageKey:
+		mov	ds:[driverVariant], MOUSE_WHEEL_ACTION_PAGE
+		jmp 	finish
+cursorKey:
+		mov	ds:[driverVariant], MOUSE_WHEEL_ACTION_CURSOR
+		jmp	finish
+native:
+		mov	ds:[driverVariant], MOUSE_WHEEL_ACTION_NATIVE
+		jmp	finish
+
+finish:
+	;
+	; release the info block that has been locked by EnumerateDevice...
+	;
+		call	MemUnlock
+		jmp	exit
+error:
+	;
+	; if error, set device index back to 0
+	;
+		mov	ds:[driverVariant], MOUSE_WHEEL_ACTION_PAGE
+exit:
+	.leave
+	ret
+MouseSetWheelAction  endp
 
 Init		ends
 

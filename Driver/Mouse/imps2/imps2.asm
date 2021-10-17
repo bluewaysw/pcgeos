@@ -51,9 +51,9 @@ if	MOUSE_GEOS_NATIVE_WHEEL_SUPPORT
 	imps2NativeMouse  chunk.char	'IM PS/2 Wheel Mouse (Native Wheel Support)', 0
 
 	mouseInfoTable  MouseExtendedInfo  \
-		0,	; imps2PageMouse
-		0,	; imps2CursorMouse
-		0	; imps2NativeMouse
+			0,	; pageMouse
+			0,	; cursorMouse
+			0	; nativeMouse
 else
 	mouseNameTable  lptr.char  	imps2PageMouse,
 					imps2CursorMouse
@@ -63,8 +63,8 @@ else
 	imps2CursorMouse  chunk.char	'IM PS/2 Wheel Mouse (Wheel = Cursor Up/Down)', 0
 
 	mouseInfoTable  MouseExtendedInfo  \
-		0,	; imps2PageMouse
-		0	; imps2CursorMouse
+			0,	; pageMouse
+			0	; cursorMouse
 endif
 
 MouseExtendedInfoSeg  ends
@@ -198,9 +198,13 @@ MouseDevHandler proc 	far  	:byte,            ; first byte is unused
 		call	SysEnterInterrupt
 	;
 	; Store away the wheel info before the action really starts
+	; But first make sure we have access to the dgroup
 	;
+		mov 	ax, segment dgroup
+		mov 	ds, ax
 		mov 	dh, ss:[deltaZ]
 		mov	ds:[wheelAction], dh
+		clr	ax
 	;
 	; The deltas are already two's-complement, so just sign extend them
 	; ourselves.
@@ -256,10 +260,6 @@ MouseDevHandler proc 	far  	:byte,            ; first byte is unused
 	; Make delta Y be positive if going down, rather than
 	; positive if up, as the BIOS provides it.
 		neg	dx
-
-	; Point ds at our data for MouseSendEvents
-		mov 	ax, segment dgroup
-		mov 	ds, ax
 
 	; Registers now all loaded properly -- send the event.
 		call  	MouseSendEvents
@@ -342,7 +342,7 @@ MouseSetDevice  proc  near  uses es, bx, ax, di, ds
 
 	; fetch and save device variant
 	; if it fails, resets "device" to the PAGE variant (which should always work)
-		call	MouseMapWheelDevice
+		call	MouseSetWheelAction
 
 	; lock BIOS
 		call	SysLockBIOS
@@ -424,7 +424,7 @@ MouseTestDevice  proc  near  uses ax, bx, es, cx
 
 	.enter
 
-	; lock BIOS?
+	;lock BIOS
 		call	SysLockBIOS
 
 	; init to see if (wheel) mouse exists
@@ -479,6 +479,85 @@ done:
 	ret
 
 MouseTestDevice  endp
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MouseSetWheelAction
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:  Extract the wheel action
+
+CALLED BY:  MouseDevInit etc
+PASS:    dx:si  = device string
+DESTROYED:  nothing
+
+PSEUDO CODE/STRATEGY:
+
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+
+REVISION HISTORY:
+	Name  	Date    	Description
+	----  	----    	-----------
+	MeyerK  10/2021  	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+MouseSetWheelAction  proc  far  uses cx, di, es, ds
+	.enter
+	;
+	; find driver variant aka "device"
+	;
+		EnumerateDevice MouseExtendedInfoSeg
+	;
+	; make sure we have access to the dgroup
+	;
+		mov	cx, segment dgroup
+		mov	ds, cx
+	;
+	; carry set if EnumerateDevice failed
+	;
+		jc	error
+	;
+	; read out and store the driver variant
+	; we don't need the complicated setup of ct/ctmabs
+	; because the imps2 driver will always be separate
+	; from the other drivers and only offer support
+	; for wheel mice due to the different byte structure
+	; on the event handler...
+	;
+		cmp	di, 0		; pageMouse
+		je	pageKey
+		cmp	di, 2		; cursorMouse
+		je	cursorKey
+		cmp	di, 4		; nativeMouse
+		je	native
+
+pageKey:
+		mov	ds:[driverVariant], MOUSE_WHEEL_ACTION_PAGE
+		jmp 	finish
+cursorKey:
+		mov	ds:[driverVariant], MOUSE_WHEEL_ACTION_CURSOR
+		jmp	finish
+native:
+		mov	ds:[driverVariant], MOUSE_WHEEL_ACTION_NATIVE
+		jmp	finish
+
+finish:
+	;
+	; release the info block that has been locked by EnumerateDevice...
+	;
+		call	MemUnlock
+		jmp	exit
+error:
+	;
+	; if error, set device index back to 0
+	;
+		mov	ds:[driverVariant], MOUSE_WHEEL_ACTION_PAGE
+exit:
+	.leave
+	ret
+MouseSetWheelAction  endp
+
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		MouseDevSetRate
