@@ -1,0 +1,140 @@
+/********************************************************************
+ *
+ *      Copyright (c) FreeGeos -- All Rights Reserved.
+ *
+ *
+ *******************************************************************/
+
+/********************************************************************
+ *              Headers
+ *******************************************************************/
+@include <stdapp.goh>
+
+/********************************************************************
+ *              Class Definitions
+ *******************************************************************/
+@class WheelProcessClass, GenProcessClass;
+@endc;
+
+    /*
+    * Subclass this so we can intercept the
+    * scroll event.
+    */
+@class WheelViewClass, GenViewClass;
+@endc;
+
+/********************************************************************
+ *              Class Declarations
+ *******************************************************************/
+@classdecl WheelProcessClass, neverSaved;
+@classdecl WheelViewClass;
+
+/********************************************************************
+ *              UI Object Resources
+ *******************************************************************/
+
+/********************************************************************
+ *              AppResource Resource
+ *******************************************************************/
+@start AppResource;
+
+    @object GenApplicationClass WheelApp = {
+        GI_visMoniker = "Mouse Wheel API Demonstration";
+        GI_comp = @GContPrimary;
+        gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS ) = @GContPrimary;
+    }
+
+@end AppResource;
+
+/********************************************************************
+ *              Interface Resource
+ *******************************************************************/
+@start Interface;
+
+    @object GenPrimaryClass GContPrimary = {
+        GI_comp = @GContView;
+        HINT_SIZE_WINDOW_AS_DESIRED;
+        HINT_PRIMARY_NO_FILE_MENU;
+        HINT_PRIMARY_NO_HELP_BUTTON;
+    }
+
+    @object WheelViewClass GContView = {
+        GVI_content = @GContContent;
+        GVI_attrs = @default | GVA_GENERIC_CONTENTS | GVA_SAME_COLOR_AS_PARENT_WIN;
+        GVI_horizAttrs = @default | GVDA_NO_LARGER_THAN_CONTENT | GVDA_NO_SMALLER_THAN_CONTENT;
+        GVI_vertAttrs = @default | GVDA_NO_LARGER_THAN_CONTENT | GVDA_NO_SMALLER_THAN_CONTENT;
+    }
+
+    @object GenContentClass GContContent = {
+        GI_comp = @GContMouseXPosition,
+                  @GContMouseYPosition,
+                  @GContWheelDirection,
+                  @GContWheelValue,
+                  @GContModifierKey;
+        GCI_genView = @GContView;
+    }
+
+    @object GenValueClass GContMouseXPosition = {
+        GI_visMoniker = "Mouse X Position:";
+    }
+
+    @object GenValueClass GContMouseYPosition = {
+        GI_visMoniker = "Mouse Y Position:";
+    }
+
+    @object GenGlyphClass GContWheelDirection = {
+        GI_visMoniker = "Wheel Direction:";
+    }
+
+    @object GenValueClass GContWheelValue = {
+        GI_visMoniker = "Wheel Value:";
+        GVLI_minimum = MakeWWFixed(-255);
+        GVLI_maximum = MakeWWFixed(255);
+    }
+
+    @object GenGlyphClass GContModifierKey = {
+        GI_visMoniker = "Modifier Key:";
+    }
+
+@end Interface;
+
+
+/********************************************************************
+ *              MSG_META_MOUSE_WHEEL_VERTICAL
+ *  Parameters:
+ *      word        xPosition   = Mouse X Position
+ *      word        yPosition   = Mouse Y Position
+ *      sbyte       wheelInfo   = Wheel Info: < 0 = UP, > 0 = DOWN
+ *      byte        shiftState  = State of modifier keys.
+ *******************************************************************/
+
+@method WheelViewClass, MSG_META_MOUSE_WHEEL_VERTICAL
+{
+    sbyte       wheelInfo;
+    byte        shiftState;
+
+    wheelInfo   = GET_WHEEL_INFO(inputState);
+    shiftState  = GET_SHIFT_STATE(inputState);
+
+    @send GContMouseXPosition::MSG_GEN_VALUE_SET_INTEGER_VALUE(xPosition, 0);
+    @send GContMouseYPosition::MSG_GEN_VALUE_SET_INTEGER_VALUE(yPosition, 0);
+
+    if (wheelInfo < 0)
+    {
+        @call GContWheelDirection::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("Wheel Direction: Up.", VUM_NOW);
+    }
+    else
+    {
+        @call GContWheelDirection::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("Wheel Direction: Down.", VUM_NOW);
+    }
+    @send GContWheelValue::MSG_GEN_VALUE_SET_INTEGER_VALUE(wheelInfo, 0);
+
+    if (shiftState & SS_LSHIFT) @call GContModifierKey::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("Modifier Key: Left Shift.", VUM_NOW);
+    if (shiftState & SS_RSHIFT) @call GContModifierKey::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("Modifier Key: Right Shift.", VUM_NOW);
+    if (shiftState & SS_LALT)   @call GContModifierKey::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("Modifier Key: Left Alt.", VUM_NOW);
+    if (shiftState & SS_RALT)   @call GContModifierKey::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("Modifier Key: Right Alt.", VUM_NOW);
+    if (shiftState & SS_LCTRL)  @call GContModifierKey::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("Modifier Key: Left Ctrl.", VUM_NOW);
+    if (shiftState & SS_RCTRL)  @call GContModifierKey::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("Modifier Key: Right Ctrl.", VUM_NOW);
+
+    retVal->flags = MRF_PROCESSED;
+}
