@@ -202,9 +202,12 @@ MouseDevHandler proc 	far  	:byte,            ; first byte is unused
 	;
 		mov 	ax, segment dgroup
 		mov 	ds, ax
+		clr	ax
+	;
+	; Store away the wheel info before the action really starts
+	;
 		mov 	dh, ss:[deltaZ]
 		mov	ds:[wheelAction], dh
-		clr	ax
 	;
 	; The deltas are already two's-complement, so just sign extend them
 	; ourselves.
