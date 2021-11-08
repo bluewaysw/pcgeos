@@ -1409,12 +1409,12 @@ REVISION HISTORY:
 	----	----		-----------
 	Doug	11/89		Initial version
 	Doug	5/91		Revised to handle 32-bit contents
-	MeyerK	09/2021		Add wheel events
+	MeyerK	09/2021		Add wheel event.
 
 ------------------------------------------------------------------------------@
 
 VisContentMouseEvent	method	VisContentClass, MSG_META_PTR, \
-						 MSG_META_MOUSE_WHEEL_VERTICAL, \
+						 MSG_META_SCROLL_VERTICAL, \
 						 MSG_META_START_SELECT, \
 						 MSG_META_START_MOVE_COPY, \
 						 MSG_META_START_FEATURES, \

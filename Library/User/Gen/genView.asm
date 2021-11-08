@@ -1587,7 +1587,7 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 
-GenViewScrollOnWheel	method dynamic GenViewClass, 	MSG_META_MOUSE_WHEEL_VERTICAL
+GenViewScrollOnWheel	method dynamic GenViewClass, 	MSG_META_SCROLL_VERTICAL
 
 	test	ds:[di].GVI_vertAttrs, mask GVDA_SCROLLABLE	; test if scrollable
 	jz	exit						; not scrollable, exit

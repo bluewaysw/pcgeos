@@ -34,8 +34,8 @@ ROUTINES:
 	ImRemoveMonitor		Remove a monitor routine from the chain
 
 For use by FlowClass object only:
-	ImBumpMouse		Special synchronous PtrJump 
-	
+	ImBumpMouse		Special synchronous PtrJump
+
 REVISION HISTORY:
 	Name	Date	Description
 	----	----	-----------
@@ -63,7 +63,7 @@ DESCRIPTION:
 		EVENT TYPE					1 word
 		EVENT specific data				3 words
 		unused						1 word (si)
-				
+
 
 	This data will then be processed via input processing modules in
 	the following order:

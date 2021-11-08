@@ -2689,6 +2689,7 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 FlowWheel	method	dynamic	FlowClass, 	MSG_META_MOUSE_WHEEL_VERTICAL
 
+	mov 	ax, MSG_META_SCROLL_VERTICAL
 	call 	SendMouseToActiveOrImpliedGrab
 	ret
 
