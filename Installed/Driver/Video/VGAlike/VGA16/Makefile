@@ -13,17 +13,17 @@ SRCS            = vga16Admin.asm vga16Chars.asm vga16DevInfo.asm\
                   vga16Manager.asm vga16Output.asm vga16Palette.asm\
                   vga16Pointer.asm vga16Raster.asm vga16StringTab.asm\
                   vga16Tables.asm vga16Under.asm vga16Utils.asm\
-                  VIDCOMTABLES.ASM VIDCOMENTRY.ASM VIDCOMOUTPUT.ASM\
-                  VIDCOMCHARS.ASM VIDCOMFONT.ASM VIDCOMUTILS.ASM\
-                  VIDCOMREGION.ASM VIDCOMXOR.ASM VIDCOMINFO.ASM\
-                  VIDCOMESCAPE.ASM VIDCOMPALETTE.ASM VIDCOMPOLYGON.ASM\
-                  VIDCOMLINE.ASM VIDCOMPUTLINE.ASM VIDCOMRASTER.ASM\
-                  VIDCOMEXCLBOUNDS.ASM vga16Constant.def vga16Macro.def\
+                  vidcomTables.asm vidcomEntry.asm vidcomOutput.asm\
+                  vidcomChars.asm vidcomFont.asm vidcomUtils.asm\
+                  vidcomRegion.asm vidcomXOR.asm vidcomInfo.asm\
+                  vidcomEscape.asm vidcomPalette.asm vidcomPolygon.asm\
+                  vidcomLine.asm vidcomPutLine.asm vidcomRaster.asm\
+                  vidcomExclBounds.asm vga16Constant.def vga16Macro.def\
                   vga16Variable.def
 OBJS            = vga16Manager.obj
 LOBJS           =
 
-PRODUCTS        =
+PRODUCTS        = 
 
 SYSMAKEFILE     = geode.mk
 
@@ -38,10 +38,6 @@ SYSMAKEFILE     = geode.mk
 
 #if exists($(DEPFILE))
 #include "$(DEPFILE)"
-#endif
-
-#if exists(WIN32/$(DEPFILE))
-#include "WIN32/$(DEPFILE)"
 #endif
 
 #if exists(WIN32DBCS/$(DEPFILE))
