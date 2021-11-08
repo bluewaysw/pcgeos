@@ -23,7 +23,7 @@ SRCS            = vga16Admin.asm vga16Chars.asm vga16DevInfo.asm\
 OBJS            = vga16Manager.obj
 LOBJS           =
 
-PRODUCTS        = WIN32DBCS 
+PRODUCTS        = 
 
 SYSMAKEFILE     = geode.mk
 
