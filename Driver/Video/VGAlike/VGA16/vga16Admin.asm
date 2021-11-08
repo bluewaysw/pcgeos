@@ -569,11 +569,13 @@ else ; NT_DRIVER
 		; OK, there is a VESA board out there.  Check the mode table
 		; for the correct mode.  
 
-		les	di, es:[di].VIB_modes	; get pointer to mode info
+		mov	di, 0x100		; start scan with modes
+						; starting 0x100, blow are
+						; non high-color modes
 checkLoop:
-		cmp	es:[di], 0xffff		; at mode table terminator?
+		cmp	di, 0x8000		; stop at mode id 0x8000
 		je	notPresent
-		mov	ax, es:[di]
+		mov	ax, di
 		push	ax
 		push	bx
 		push	es
@@ -627,7 +629,6 @@ checkNext::
 		pop	bx
 		pop	ax
 		
-		inc	di
 		inc	di
 		jmp	checkLoop
 		
