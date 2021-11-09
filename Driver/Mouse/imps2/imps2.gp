@@ -24,7 +24,7 @@ type  driver, single
 library  geos
 
 # Desktop-related things
-longname "IntelliMouse PS/2 Wheel Mouse"
+longname "Intellimouse PS/2 Wheel Mouse"
 tokenchars "MOUS"
 tokenid 0
 

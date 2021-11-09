@@ -28,7 +28,7 @@ library	geos
 #
 # Desktop-related things
 #
-longname 	"Basebox Mouse Emulation"
+longname 	"Abs. coord. Wheel Mouse"
 tokenchars 	"MOUS"
 tokenid 	0
 #

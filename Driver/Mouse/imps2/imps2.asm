@@ -17,7 +17,8 @@ DESCRIPTION:
 ; The following constants are used in mouseCommon.asm -- see that
 ; file for documentation.
 ;
-MOUSE_GEOS_NATIVE_WHEEL_SUPPORT	= TRUE	; enable this if GEOS has native wheel support in the kernel/ui
+MOUSE_HAS_WHEEL			= TRUE	; enable this if GEOS has native wheel support in the kernel/ui, disable ...HAS_WHEEL_KEYS
+MOUSE_HAS_WHEEL_KEYS		= FALSE	; enable this for a version of the driver that has the wheel simulate keypresses, disable ...HAS_WHEEL
 MOUSE_NUM_BUTTONS		= 3	; Wheel mice have at least 3 buttons
 MIDDLE_IS_DOUBLE_PRESS		= 1	; fake double-press with middle button
 MOUSE_SEPARATE_INIT		= 1	; We use a separate Init resource
@@ -40,27 +41,23 @@ mouseExtendedInfo  DriverExtendedInfoTable <
 	offset mouseInfoTable
 >
 
-if	MOUSE_GEOS_NATIVE_WHEEL_SUPPORT
-	mouseNameTable  lptr.char  	imps2PageMouse,
-					imps2CursorMouse,
-					imps2NativeMouse
+if MOUSE_HAS_WHEEL
+	mouseNameTable  lptr.char  	imps2NativeMouse
 			lptr.char	0  ; null-terminator
 
-	imps2PageMouse    chunk.char	'IM PS/2 Wheel Mouse (Wheel = Page Up/Down)', 0
-	imps2CursorMouse  chunk.char	'IM PS/2 Wheel Mouse (Wheel = Cursor Up/Down)', 0
-	imps2NativeMouse  chunk.char	'IM PS/2 Wheel Mouse (Native Wheel Support)', 0
+	imps2NativeMouse  chunk.char	'Intellimouse-compatible PS/2 Wheel Mouse', 0
 
 	mouseInfoTable  MouseExtendedInfo  \
-			0,	; pageMouse
-			0,	; cursorMouse
 			0	; nativeMouse
-else
+endif
+
+if MOUSE_HAS_WHEEL_KEYS
 	mouseNameTable  lptr.char  	imps2PageMouse,
 					imps2CursorMouse
 			lptr.char	0  ; null-terminator
 
-	imps2PageMouse    chunk.char	'IM PS/2 Wheel Mouse (Wheel = Page Up/Down)', 0
-	imps2CursorMouse  chunk.char	'IM PS/2 Wheel Mouse (Wheel = Cursor Up/Down)', 0
+	imps2PageMouse    chunk.char	'IM PS/2 Wheel Mouse (Wheel: Page Up/Down)', 0
+	imps2CursorMouse  chunk.char	'IM PS/2 Wheel Mouse (Wheel: Cursor Up/Down)', 0
 
 	mouseInfoTable  MouseExtendedInfo  \
 			0,	; pageMouse
@@ -207,7 +204,7 @@ MouseDevHandler proc 	far  	:byte,            ; first byte is unused
 	; Store away the wheel info before the action really starts
 	;
 		mov 	dh, ss:[deltaZ]
-		mov	ds:[wheelAction], dh
+		mov	ds:[wheelData], dh
 	;
 	; The deltas are already two's-complement, so just sign extend them
 	; ourselves.
@@ -343,9 +340,11 @@ REVISION HISTORY:
 MouseSetDevice  proc  near  uses es, bx, ax, di, ds
 	.enter
 
+if MOUSE_HAS_WHEEL_KEYS
 	; fetch and save device variant
 	; if it fails, resets "device" to the PAGE variant (which should always work)
 		call	MouseSetWheelAction
+endif
 
 	; lock BIOS
 		call	SysLockBIOS
@@ -505,6 +504,7 @@ REVISION HISTORY:
 	MeyerK  10/2021  	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+if MOUSE_HAS_WHEEL_KEYS
 MouseSetWheelAction  proc  far  uses cx, di, es, ds
 	.enter
 	;
@@ -532,18 +532,11 @@ MouseSetWheelAction  proc  far  uses cx, di, es, ds
 		je	pageKey
 		cmp	di, 2		; cursorMouse
 		je	cursorKey
-		cmp	di, 4		; nativeMouse
-		je	native
-
 pageKey:
 		mov	ds:[driverVariant], MOUSE_WHEEL_ACTION_PAGE
 		jmp 	finish
 cursorKey:
 		mov	ds:[driverVariant], MOUSE_WHEEL_ACTION_CURSOR
-		jmp	finish
-native:
-		mov	ds:[driverVariant], MOUSE_WHEEL_ACTION_NATIVE
-		jmp	finish
 
 finish:
 	;
@@ -560,7 +553,7 @@ exit:
 	.leave
 	ret
 MouseSetWheelAction  endp
-
+endif
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		MouseDevSetRate

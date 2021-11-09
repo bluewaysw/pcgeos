@@ -297,14 +297,14 @@ endif
 ;
 ; WHEEL STUFF
 ;
+if	MOUSE_HAS_WHEEL_KEYS
 ;
-; Driver variants as constants for easier reading
+; Wheel actions / keys = driver variants
 ;
-	MOUSE_WHEEL_ACTION_PAGE		equ	1;
+	MOUSE_WHEEL_ACTION_PAGE		equ	0;
 	MOUSE_WHEEL_ACTION_CURSOR	equ	2;
-	MOUSE_WHEEL_ACTION_NATIVE	equ	3;
 
-	driverVariant	word	MOUSE_WHEEL_ACTION_PAGE	; start with device 0
+	driverVariant			word	MOUSE_WHEEL_ACTION_PAGE	; start with device 0
 ;
 ; wheel keys
 ;
@@ -313,9 +313,22 @@ endif
 	MOUSE_WHEEL_KEY_PAGE_UP		equ	0xE049
 	MOUSE_WHEEL_KEY_PAGE_DOWN	equ	0xE051
 ;
-; wheelAction
+; active wheel scroll keys
 ;
-	wheelAction			sbyte	0	; none by default
+	wheelKeyUp			word	MOUSE_WHEEL_KEY_PAGE_UP		; either MOUSE_WHEEL_KEY_CURSOR_UP or MOUSE_WHEEL_KEY_PAGE_UP
+	wheelKeyDown			word	MOUSE_WHEEL_KEY_PAGE_DOWN	; either MOUSE_WHEEL_KEY_CURSOR_DOWN or MOUSE_WHEEL_KEY_PAGE_UP
+;
+; wheelData
+;
+	wheelData			sbyte	0	; wheel turns, none by default
+endif
+
+if MOUSE_HAS_WHEEL
+;
+; wheelData
+;
+	wheelData			sbyte	0	; wheel turns, none by default
+endif
 
 idata		ends
 
@@ -348,13 +361,6 @@ ifdef	MOUSE_STORE_FAKE_MOUSE_COORDS
 leftButtonDown		BooleanByte	; true if the left mouse button is
 					; currently down.
 endif	; MOUSE_STORE_FAKE_MOUSE_COORDS
-
-;
-; WHEEL STUFF
-; wheel scroll keys
-;
-	wheelKeyUp	word
-	wheelKeyDown	word
 
 udata	ends
 
@@ -1246,9 +1252,15 @@ endif
 		pop	bp		; Restore passed BP
 MH_Done:
 	; now send our humble wheel event
-		call	MouseSendWheelEvent
+if MOUSE_HAS_WHEEL
+		call	MouseSendWheelEventNative
+endif
 
+if MOUSE_HAS_WHEEL_KEYS
+		call	MouseSendWheelEventKey
+endif
 		ret
+
 MouseSendEvents	endp
 
 
@@ -1665,13 +1677,13 @@ MouseCombineEvent endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		MouseSendWheelEvent
+		MouseSendWheelEventNative / MouseSendWheelEventKey
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	Send wheel movements as keypresses or native wheel event
 
 CALLED BY:	MouseSendEvents
-PASS:		ds:[wheelAction]
+PASS:		ds:[wheelData]
 DESTROYED:
 
 PSEUDO CODE/STRATEGY:
@@ -1680,69 +1692,56 @@ PSEUDO CODE/STRATEGY:
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-MouseSendWheelEvent	proc	near
-
-	uses  dx
-	.enter
-	;
-	; Check the wheel
-	; Send the wheel as keypresses or wheel event.
-	;
-		cmp 	ds:[wheelAction], 0
-		je 	packetDone		; if wheel data equals zero => no wheel action, done
-	;
-	; check which driver variant to use
-	;
-		cmp 	ds:[driverVariant], MOUSE_WHEEL_ACTION_PAGE
-		je 	pageKeyEvent
-
-		cmp 	ds:[driverVariant], MOUSE_WHEEL_ACTION_CURSOR
-		je 	cursorKeyEvent
-
-		cmp 	ds:[driverVariant], MOUSE_WHEEL_ACTION_NATIVE
-		je 	nativeEvent
-
-		jmp	packetDone	; we should never get here, but just in case...
-
-pageKeyEvent:
-		mov 	ds:[wheelKeyUp], MOUSE_WHEEL_KEY_PAGE_UP
-		mov 	ds:[wheelKeyDown], MOUSE_WHEEL_KEY_PAGE_DOWN
-		call 	MouseSendWheelEventKey
-		jmp	packetDone
-
-cursorKeyEvent:
-		mov 	ds:[wheelKeyUp], MOUSE_WHEEL_KEY_CURSOR_UP
-		mov 	ds:[wheelKeyDown], MOUSE_WHEEL_KEY_CURSOR_DOWN
-		call 	MouseSendWheelEventKey
-		jmp	packetDone
-
-nativeEvent:
-		call	MouseSendWheelEventNative
-
-packetDone:
-		mov 	ds:[wheelAction], 0
-
-	; Recover and return.
-	.leave
-	ret
-
-MouseSendWheelEvent  endp
-
+if MOUSE_HAS_WHEEL
 MouseSendWheelEventNative	proc	near
 
-	mov	dh, ds:[wheelAction]
+	uses  dx, bx, di, ax, ds
+	.enter
+
+	cmp 	ds:[wheelData], 0
+	je 	exit		; if wheel data equals zero => no wheel action, done
+
+	mov	dh, ds:[wheelData]
 	mov	bx, ds:[mouseOutputHandle]
 	mov	di, mask MF_FORCE_QUEUE
 	mov	ax, MSG_IM_MOUSE_WHEEL_VERTICAL
 	call 	ObjMessage	; Send the event
+
+exit:
+	.leave
 	ret
 
 MouseSendWheelEventNative	endp
+endif
 
 
+if MOUSE_HAS_WHEEL_KEYS
 MouseSendWheelEventKey	proc	near
 
-	cmp	ds:[wheelAction], 0	; compare wheel data with 0
+	uses  cx, di, ax, bx, dx, ds
+	.enter
+
+	cmp 	ds:[wheelData], 0
+	je 	exit			; if wheel data equals zero => no wheel action, done
+;
+; check which driver variant to use
+;
+	cmp 	ds:[driverVariant], MOUSE_WHEEL_ACTION_PAGE
+	je 	pageKeyEvent
+	cmp 	ds:[driverVariant], MOUSE_WHEEL_ACTION_CURSOR
+	je 	cursorKeyEvent
+
+pageKeyEvent:
+	mov 	ds:[wheelKeyUp], MOUSE_WHEEL_KEY_PAGE_UP
+	mov 	ds:[wheelKeyDown], MOUSE_WHEEL_KEY_PAGE_DOWN
+	jmp	continue
+
+cursorKeyEvent:
+	mov 	ds:[wheelKeyUp], MOUSE_WHEEL_KEY_CURSOR_UP
+	mov 	ds:[wheelKeyDown], MOUSE_WHEEL_KEY_CURSOR_DOWN
+
+continue:
+	cmp	ds:[wheelData], 0	; compare wheel data with 0
 	jg 	wheelDown		; if value greater than 0 => jump to wheel down
 
 ;wheelUp:				; otherwise continue with wheel up
@@ -1760,9 +1759,11 @@ doPress:
 	mov	dx, BW_TRUE	; set to "press"
 	call	ObjMessage	; press - release not necessary!
 
+exit:
+	.leave
 	ret
-
 MouseSendWheelEventKey	endp
+endif
 
 ifndef		MOUSE_CAN_BE_CALIBRATED
 

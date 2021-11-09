@@ -21,7 +21,7 @@ REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
 	Adam	7/20/89		Initial revision
-	MeyerK 09/05/21		Wheel support
+	MeyerK  09/05/21	Wheel support
 
 
 DESCRIPTION:
@@ -36,7 +36,8 @@ DESCRIPTION:
 ; The following constants are used in mouseCommon.asm -- see that
 ; file for documentation.
 ;
-MOUSE_GEOS_NATIVE_WHEEL_SUPPORT	= TRUE	; enable this if GEOS has native wheel support in the kernel/ui
+MOUSE_HAS_WHEEL		= TRUE		; enable this if GEOS has native wheel support in the kernel/ui, disable ...HAS_WHEEL_KEYS
+MOUSE_HAS_WHEEL_KEYS	= FALSE		; enable this for a version of the driver that has the wheel simulate keypresses, disable ...HAS_WHEEL
 MOUSE_NUM_BUTTONS	= 3		; Assume 3 for now -- we'll set it in MouseDevInit
 MIDDLE_IS_DOUBLE_PRESS	= 1		; fake double-press with middle button
 MOUSE_CANT_SET_RATE	= 1		; Microsoft driver doesn't specify a function
@@ -65,31 +66,27 @@ mouseExtendedInfo	DriverExtendedInfoTable <
 	offset mouseInfoTable
 >
 
-if MOUSE_GEOS_NATIVE_WHEEL_SUPPORT
-	mouseNameTable	lptr.char	ctPageMouse,
-					ctCursorMouse,
-					ctNativeMouse
+if MOUSE_HAS_WHEEL
+	mouseNameTable	lptr.char	ctNativeMouse
 			lptr.char	0	; null-terminator
 
-	ctPageMouse	chunk.char	'CTMOUSE.EXE /O (Wheel = Page Up/Down)', 0
-	ctCursorMouse	chunk.char	'CTMOUSE.EXE /O (Wheel = Cursor Up/Down)', 0
-	ctNativeMouse	chunk.char	'CTMOUSE.EXE /O (Native Wheel Support)', 0
+	ctNativeMouse	chunk.char	'CuteMouse Wheel Mouse', 0
 
 	mouseInfoTable	MouseExtendedInfo	\
-			mask MEI_GENERIC or MOUSE_WHEEL_ACTION_PAGE   shl offset MEI_WHEEL_VERTICAL,	; pageMouse
-			mask MEI_GENERIC or MOUSE_WHEEL_ACTION_CURSOR shl offset MEI_WHEEL_VERTICAL,	; cursorMouse
-			mask MEI_GENERIC or MOUSE_WHEEL_ACTION_NATIVE shl offset MEI_WHEEL_VERTICAL	; nativeMouse
-else
+			mask MEI_GENERIC	; nativeMouse
+endif
+
+if MOUSE_HAS_WHEEL_KEYS
 	mouseNameTable	lptr.char	ctPageMouse,
 					ctCursorMouse
 			lptr.char	0	; null-terminator
 
-	ctPageMouse	chunk.char	'CTMOUSE.EXE /O (Wheel = Page Up/Down)', 0
-	ctCursorMouse	chunk.char	'CTMOUSE.EXE /O (Wheel = Cursor Up/Down)', 0
+	ctPageMouse	chunk.char	'CuteMouse Wheel Mouse (Wheel: Page Up/Down)', 0
+	ctCursorMouse	chunk.char	'CuteMouse Wheel Mouse (Wheel: Cursor Up/Down)', 0
 
 	mouseInfoTable	MouseExtendedInfo	\
-			mask MEI_GENERIC or MOUSE_WHEEL_ACTION_PAGE   shl offset MEI_WHEEL_VERTICAL,	; pageMouse
-			mask MEI_GENERIC or MOUSE_WHEEL_ACTION_CURSOR shl offset MEI_WHEEL_VERTICAL	; cursorMouse
+			mask MEI_GENERIC,	; pageMouse
+			mask MEI_GENERIC	; cursorMouse
 endif
 
 MouseExtendedInfoSeg	ends
@@ -277,8 +274,10 @@ REVISION HISTORY:
 MouseDevInit	proc	far	uses dx, ax, cx, si, bx
 		.enter
 
+if MOUSE_HAS_WHEEL_KEYS
 	; fetch and save driver variant
 		call	MouseSetWheelAction
+endif
 
 	; start resetting
 		dec	ds:[mouseSet]
@@ -341,6 +340,7 @@ REVISION HISTORY:
 	MeyerK  10/2021  	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+if MOUSE_HAS_WHEEL_KEYS
 MouseSetWheelAction  proc  far  uses cx, di, es, ds
 	.enter
 	;
@@ -359,24 +359,16 @@ MouseSetWheelAction  proc  far  uses cx, di, es, ds
 	;
 	; read out and store the driver variant
 	;
-		assume	es:MouseExtendedInfoSeg
-		cmp	es:mouseInfoTable[di], mask MEI_GENERIC or MOUSE_WHEEL_ACTION_PAGE shl offset MEI_WHEEL_VERTICAL
+		cmp	di, 0
 		je	pageKey
-		cmp	es:mouseInfoTable[di], mask MEI_GENERIC or MOUSE_WHEEL_ACTION_CURSOR shl offset MEI_WHEEL_VERTICAL
+		cmp	di, 2
 		je	cursorKey
-		cmp	es:mouseInfoTable[di], mask MEI_GENERIC or MOUSE_WHEEL_ACTION_NATIVE shl offset MEI_WHEEL_VERTICAL
-		je	native
 
 pageKey:
 		mov	ds:[driverVariant], MOUSE_WHEEL_ACTION_PAGE
 		jmp 	finish
 cursorKey:
 		mov	ds:[driverVariant], MOUSE_WHEEL_ACTION_CURSOR
-		jmp	finish
-native:
-		mov	ds:[driverVariant], MOUSE_WHEEL_ACTION_NATIVE
-		jmp	finish
-
 finish:
 	;
 	; release the info block that has been locked by EnumerateDevice...
@@ -392,6 +384,7 @@ exit:
 	.leave
 	ret
 MouseSetWheelAction  endp
+endif
 
 Init		ends
 
@@ -572,7 +565,7 @@ mangleButtons:
 	;
 	; save wheel action, if any
 	;
-		mov	ds:[wheelAction], bh
+		mov	ds:[wheelData], bh
 	;
 	; not a wheel event, button stuff or ptr...
 	; Now have to transform the button state. We're given

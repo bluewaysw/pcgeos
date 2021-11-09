@@ -39,7 +39,8 @@ DESCRIPTION:
 ; The following constants are used in mouseCommon.asm -- see that
 ; file for documentation.
 ;
-MOUSE_GEOS_NATIVE_WHEEL_SUPPORT	= TRUE	; enable this if GEOS has native wheel support in the kernel/ui
+MOUSE_HAS_WHEEL			= TRUE	; enable this if GEOS has native wheel support in the kernel/ui, disable ...HAS_WHEEL_KEYS
+MOUSE_HAS_WHEEL_KEYS		= FALSE	; enable this for a version of the driver that has the wheel simulate keypresses, disable ...HAS_WHEEL
 MOUSE_NUM_BUTTONS 		= 3	; Assume 3 for now -- we'll set it in MouseDevInit
 MIDDLE_IS_DOUBLE_PRESS		= 1	; fake double-press with middle button
 MOUSE_CANT_SET_RATE		= 1	; Microsoft driver doesn't specify a function
@@ -66,34 +67,38 @@ mouseExtendedInfo	DriverExtendedInfoTable <
 		offset mouseInfoTable
 >
 
-if MOUSE_GEOS_NATIVE_WHEEL_SUPPORT
-	mouseNameTable	lptr.char	baseboxPageMouse,
-					baseboxCursorMouse,
-					baseboxNativeMouse
+if MOUSE_HAS_WHEEL
+	mouseNameTable	lptr.char	baseboxNativeMouse,
+					cutemouseNativeMouse
 			lptr.char	0	; null-terminator
 
-	baseboxPageMouse	chunk.char	'Basebox Mouse (Wheel = Page Up/Down)', 0
-	baseboxCursorMouse	chunk.char	'Basebox Mouse (Wheel = Cursor Up/Down)', 0
-	baseboxNativeMouse	chunk.char	'Basebox Mouse (Native Wheel Support)', 0
+	baseboxNativeMouse	chunk.char	'Basebox Mouse', 0
+	cutemouseNativeMouse	chunk.char	'CuteMouse Wheel Mouse (absolute coordinates)', 0
 
 	mouseInfoTable	MouseExtendedInfo	\
-			mask MEI_GENERIC or MOUSE_WHEEL_ACTION_PAGE   shl offset MEI_WHEEL_VERTICAL,	; baseboxPageMouse
-			mask MEI_GENERIC or MOUSE_WHEEL_ACTION_CURSOR shl offset MEI_WHEEL_VERTICAL,	; baseboxCursorMouse
-			mask MEI_GENERIC or MOUSE_WHEEL_ACTION_NATIVE shl offset MEI_WHEEL_VERTICAL	; baseboxNativeMouse
-
-else
-	mouseNameTable	lptr.char	baseboxPageMouse,
-					baseboxCursorMouse
-			lptr.char	0	; null-terminator
-
-	baseboxPageMouse	chunk.char	'Basebox Mouse (Wheel = Page Up/Down)', 0
-	baseboxCursorMouse	chunk.char	'Basebox Mouse (Wheel = Cursor Up/Down)', 0
-
-	mouseInfoTable	MouseExtendedInfo	\
-			mask MEI_GENERIC or 1 shl offset MEI_WHEEL_VERTICAL or 1,	; baseboxPageMouse
-			mask MEI_GENERIC or 1 shl offset MEI_WHEEL_VERTICAL or 2	; baseboxCursorMouse
+			mask MEI_GENERIC,	; baseboxNativeMouse
+			mask MEI_GENERIC	; cutemouseNativeMouse
 endif
 
+if MOUSE_HAS_WHEEL_KEYS
+	mouseNameTable	lptr.char	baseboxPageMouse,
+					baseboxCursorMouse,
+					cutemousePageMouse,
+					cutemouseCursorMouse
+			lptr.char	0	; null-terminator
+
+	baseboxPageMouse	chunk.char	'Basebox Mouse (Wheel: Page Up/Down)', 0
+	baseboxCursorMouse	chunk.char	'Basebox Mouse (Wheel: Cursor Up/Down)', 0
+	cutemousePageMouse	chunk.char	'CuteMouse abs. coord. (Wheel: Page Up/Down)', 0
+	cutemouseCursorMouse	chunk.char	'CuteMouse abs. coord. (Wheel: Cursor Up/Down)', 0
+
+
+	mouseInfoTable	MouseExtendedInfo	\
+			mask MEI_GENERIC,	; baseboxPageMouse
+			mask MEI_GENERIC,	; baseboxCursorMouse
+			mask MEI_GENERIC,
+			mask MEI_GENERIC
+endif
 
 MouseExtendedInfoSeg	ends
 ForceRef  mouseExtendedInfo
@@ -276,9 +281,10 @@ REVISION HISTORY:
 MouseDevInit	proc	far	uses dx, ax, cx, si, bx
 		.enter
 
+if MOUSE_HAS_WHEEL_KEYS
 	; fetch and save driver variant
 		call	MouseSetWheelAction
-
+endif
 		dec	ds:[mouseSet]
 
 		mov	bx, 3		; Early LogiTech drivers screw up and
@@ -499,7 +505,7 @@ MouseDevHandler	proc	far
 	;
 	; save wheel action, if any
 	;
-		mov	ds:[wheelAction], bh
+		mov	ds:[wheelData], bh
 	;
 	; not a wheel event, button stuff or ptr...
 	; Now have to transform the button state. We're given
@@ -547,6 +553,7 @@ REVISION HISTORY:
 	MeyerK  10/2021  	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+if MOUSE_HAS_WHEEL_KEYS
 MouseSetWheelAction  proc  far  uses cx, di, es, ds
 	.enter
 	;
@@ -565,24 +572,20 @@ MouseSetWheelAction  proc  far  uses cx, di, es, ds
 	;
 	; read out and store the driver variant
 	;
-		assume	es:MouseExtendedInfoSeg
-		cmp	es:mouseInfoTable[di], mask MEI_GENERIC or MOUSE_WHEEL_ACTION_PAGE shl offset MEI_WHEEL_VERTICAL
+		cmp	di, 0
 		je	pageKey
-		cmp	es:mouseInfoTable[di], mask MEI_GENERIC or MOUSE_WHEEL_ACTION_CURSOR shl offset MEI_WHEEL_VERTICAL
+		cmp	di, 2
 		je	cursorKey
-		cmp	es:mouseInfoTable[di], mask MEI_GENERIC or MOUSE_WHEEL_ACTION_NATIVE shl offset MEI_WHEEL_VERTICAL
-		je	native
+		cmp	di, 4
+		je	pageKey
+		cmp	di, 6
+		je	cursorKey
 
 pageKey:
 		mov	ds:[driverVariant], MOUSE_WHEEL_ACTION_PAGE
 		jmp 	finish
 cursorKey:
 		mov	ds:[driverVariant], MOUSE_WHEEL_ACTION_CURSOR
-		jmp	finish
-native:
-		mov	ds:[driverVariant], MOUSE_WHEEL_ACTION_NATIVE
-		jmp	finish
-
 finish:
 	;
 	; release the info block that has been locked by EnumerateDevice...
@@ -598,6 +601,7 @@ exit:
 	.leave
 	ret
 MouseSetWheelAction  endp
+endif
 
 Resident ends
 
