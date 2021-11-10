@@ -17,9 +17,12 @@ DESCRIPTION:
 ; The following constants are used in mouseCommon.asm -- see that
 ; file for documentation.
 ;
-MOUSE_HAS_WHEEL			= TRUE	; enable this if GEOS has native wheel support in the kernel/ui, disable ...HAS_WHEEL_KEYS
-MOUSE_HAS_WHEEL_KEYS		= FALSE	; enable this for a version of the driver that has the wheel simulate keypresses, disable ...HAS_WHEEL
-MOUSE_NUM_BUTTONS		= 3	; Wheel mice have at least 3 buttons
+MOUSE_HAS_WHEEL		= 1		; define/uncomment this if GEOS 
+					; has native wheel support in the kernel/ui, 
+					; disable ...HAS_WHEEL_KEYS
+;MOUSE_HAS_WHEEL_KEYS	= 1		; define/uncomment this for a version of the driver 
+					; that has the wheel simulate keypresses, 
+					; disable ...HAS_WHEELMOUSE_NUM_BUTTONS		= 3	; Wheel mice have at least 3 buttons
 MIDDLE_IS_DOUBLE_PRESS		= 1	; fake double-press with middle button
 MOUSE_SEPARATE_INIT		= 1	; We use a separate Init resource
 
@@ -41,7 +44,7 @@ mouseExtendedInfo  DriverExtendedInfoTable <
 	offset mouseInfoTable
 >
 
-if MOUSE_HAS_WHEEL
+ifdef MOUSE_HAS_WHEEL
 	mouseNameTable  lptr.char  	imps2NativeMouse
 			lptr.char	0  ; null-terminator
 
@@ -51,7 +54,7 @@ if MOUSE_HAS_WHEEL
 			0	; nativeMouse
 endif
 
-if MOUSE_HAS_WHEEL_KEYS
+ifdef MOUSE_HAS_WHEEL_KEYS
 	mouseNameTable  lptr.char  	imps2PageMouse,
 					imps2CursorMouse
 			lptr.char	0  ; null-terminator
@@ -340,7 +343,7 @@ REVISION HISTORY:
 MouseSetDevice  proc  near  uses es, bx, ax, di, ds
 	.enter
 
-if MOUSE_HAS_WHEEL_KEYS
+ifdef MOUSE_HAS_WHEEL_KEYS
 	; fetch and save device variant
 	; if it fails, resets "device" to the PAGE variant (which should always work)
 		call	MouseSetWheelAction
@@ -504,7 +507,7 @@ REVISION HISTORY:
 	MeyerK  10/2021  	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-if MOUSE_HAS_WHEEL_KEYS
+ifdef MOUSE_HAS_WHEEL_KEYS
 MouseSetWheelAction  proc  far  uses cx, di, es, ds
 	.enter
 	;

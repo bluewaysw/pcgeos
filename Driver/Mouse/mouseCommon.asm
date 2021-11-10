@@ -297,7 +297,7 @@ endif
 ;
 ; WHEEL STUFF
 ;
-if	MOUSE_HAS_WHEEL_KEYS
+ifdef	MOUSE_HAS_WHEEL_KEYS
 ;
 ; Wheel actions / keys = driver variants
 ;
@@ -323,7 +323,7 @@ if	MOUSE_HAS_WHEEL_KEYS
 	wheelData			sbyte	0	; wheel turns, none by default
 endif
 
-if MOUSE_HAS_WHEEL
+ifdef MOUSE_HAS_WHEEL
 ;
 ; wheelData
 ;
@@ -1252,11 +1252,11 @@ endif
 		pop	bp		; Restore passed BP
 MH_Done:
 	; now send our humble wheel event
-if MOUSE_HAS_WHEEL
+ifdef MOUSE_HAS_WHEEL
 		call	MouseSendWheelEventNative
 endif
 
-if MOUSE_HAS_WHEEL_KEYS
+ifdef MOUSE_HAS_WHEEL_KEYS
 		call	MouseSendWheelEventKey
 endif
 		ret
@@ -1692,7 +1692,7 @@ PSEUDO CODE/STRATEGY:
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-if MOUSE_HAS_WHEEL
+ifdef MOUSE_HAS_WHEEL
 MouseSendWheelEventNative	proc	near
 
 	uses  dx, bx, di, ax, ds
@@ -1715,7 +1715,7 @@ MouseSendWheelEventNative	endp
 endif
 
 
-if MOUSE_HAS_WHEEL_KEYS
+ifdef MOUSE_HAS_WHEEL_KEYS
 MouseSendWheelEventKey	proc	near
 
 	uses  cx, di, ax, bx, dx, ds

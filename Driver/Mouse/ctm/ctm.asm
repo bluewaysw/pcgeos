@@ -36,8 +36,12 @@ DESCRIPTION:
 ; The following constants are used in mouseCommon.asm -- see that
 ; file for documentation.
 ;
-MOUSE_HAS_WHEEL		= TRUE		; enable this if GEOS has native wheel support in the kernel/ui, disable ...HAS_WHEEL_KEYS
-MOUSE_HAS_WHEEL_KEYS	= FALSE		; enable this for a version of the driver that has the wheel simulate keypresses, disable ...HAS_WHEEL
+MOUSE_HAS_WHEEL		= 1		; define/uncomment this if GEOS 
+					; has native wheel support in the kernel/ui, 
+					; disable ...HAS_WHEEL_KEYS
+;MOUSE_HAS_WHEEL_KEYS	= 1		; define/uncomment this for a version of the driver 
+					; that has the wheel simulate keypresses, 
+					; disable ...HAS_WHEEL
 MOUSE_NUM_BUTTONS	= 3		; Assume 3 for now -- we'll set it in MouseDevInit
 MIDDLE_IS_DOUBLE_PRESS	= 1		; fake double-press with middle button
 MOUSE_CANT_SET_RATE	= 1		; Microsoft driver doesn't specify a function
@@ -66,7 +70,7 @@ mouseExtendedInfo	DriverExtendedInfoTable <
 	offset mouseInfoTable
 >
 
-if MOUSE_HAS_WHEEL
+ifdef MOUSE_HAS_WHEEL
 	mouseNameTable	lptr.char	ctNativeMouse
 			lptr.char	0	; null-terminator
 
@@ -76,7 +80,7 @@ if MOUSE_HAS_WHEEL
 			mask MEI_GENERIC	; nativeMouse
 endif
 
-if MOUSE_HAS_WHEEL_KEYS
+ifdef MOUSE_HAS_WHEEL_KEYS
 	mouseNameTable	lptr.char	ctPageMouse,
 					ctCursorMouse
 			lptr.char	0	; null-terminator
@@ -274,7 +278,7 @@ REVISION HISTORY:
 MouseDevInit	proc	far	uses dx, ax, cx, si, bx
 		.enter
 
-if MOUSE_HAS_WHEEL_KEYS
+ifdef MOUSE_HAS_WHEEL_KEYS
 	; fetch and save driver variant
 		call	MouseSetWheelAction
 endif
@@ -340,7 +344,7 @@ REVISION HISTORY:
 	MeyerK  10/2021  	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-if MOUSE_HAS_WHEEL_KEYS
+ifdef MOUSE_HAS_WHEEL_KEYS
 MouseSetWheelAction  proc  far  uses cx, di, es, ds
 	.enter
 	;
