@@ -2555,3 +2555,5 @@ ifdef SIMPLE_RTL_SUPPORT
 export GrSetTextDirection
 export GRSETTEXTDIRECTION
 endif
+
+incminor MouseWheelSupport
