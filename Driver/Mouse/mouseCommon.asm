@@ -25,7 +25,7 @@ ROUTINES:
 	MouseSetAcceleration	Allows setting of mouse acceleration
 
 	routines required of device-specific code:
-	
+
 	MouseDevExit		Deinitialize the device.
 	mouseRates		byte-table of available report rates, in
 				ascending order. Should end with 255 so
@@ -64,7 +64,7 @@ ROUTINES:
 	MOUSE_CANT_TEST_DEVICE	If defined, this file will define a trivial
 				MouseTestDevice that tells the caller the
 				driver is unable to determine if the device
-				is present.	
+				is present.
 
 	MOUSE_CAN_BE_CALIBRATED	If defined, this file will not define the
 				trivial calibration stubs, and instead will
@@ -85,18 +85,18 @@ ROUTINES:
 				escape table.
 
 	MOUSE_STORE_FAKE_MOUSE_COORDS
-				If defined, the driver stores fake mouse 
+				If defined, the driver stores fake mouse
 				coords in the coord buffer and sends off
 				a MSG_IM_READ_DIGITIZER_COORDS after each
-				fake coord is stored. This depends on 
-				MOUSE_SUPPORT_MOUSE_COORD_BUFFER also being 
+				fake coord is stored. This depends on
+				MOUSE_SUPPORT_MOUSE_COORD_BUFFER also being
 				defined. This is useful if you want to use
-				the GenMouse driver to simulate collecting 
-				the mouse coords on a PC demo. 
-				You may also want to modify 
+				the GenMouse driver to simulate collecting
+				the mouse coords on a PC demo.
+				You may also want to modify
 				Kernel/IM/imPen.asm::StoreDigitizerCoords
-				to convert the fake coords into simulated 
-				digitizer coords based on the current 
+				to convert the fake coords into simulated
+				digitizer coords based on the current
 				pointer screen position.
 
 REVISION HISTORY:
@@ -111,7 +111,7 @@ DESCRIPTION:
 	that initializes, turns off and reads the state changes for that
 	device. State changes are communicated to the system via the
 	MouseSendEvents function.
-	
+
 	The device-dependent file includes this one.
 
 	$Id: mouseCommon.asm,v 1.1 97/04/18 11:47:58 newdeal Exp $
@@ -200,7 +200,7 @@ endif
 ;
 ; Driver information table. Mouse driver tables are followed by the number
 ; of buttons supported by the mouse, and the digitizer resolution (or 0,0 if
-; the driver is for a mouse).	
+; the driver is for a mouse).
 ;
 
 ifndef	DIGITIZER_X_RES
@@ -294,12 +294,50 @@ combineCount		word
 noCombineCount		word
 endif
 
+;
+; WHEEL STUFF
+;
+ifdef	MOUSE_HAS_WHEEL_KEYS
+;
+; Wheel actions / keys = driver variants
+;
+	MOUSE_WHEEL_ACTION_PAGE		equ	0;
+	MOUSE_WHEEL_ACTION_CURSOR	equ	2;
+
+	driverVariant			word	MOUSE_WHEEL_ACTION_PAGE	; start with device 0
+;
+; wheel keys
+;
+	MOUSE_WHEEL_KEY_CURSOR_UP	equ	0xE048
+	MOUSE_WHEEL_KEY_CURSOR_DOWN	equ	0xE050
+	MOUSE_WHEEL_KEY_PAGE_UP		equ	0xE049
+	MOUSE_WHEEL_KEY_PAGE_DOWN	equ	0xE051
+;
+; active wheel scroll keys
+;
+	wheelKeyUp			word	MOUSE_WHEEL_KEY_PAGE_UP		; either MOUSE_WHEEL_KEY_CURSOR_UP or MOUSE_WHEEL_KEY_PAGE_UP
+	wheelKeyDown			word	MOUSE_WHEEL_KEY_PAGE_DOWN	; either MOUSE_WHEEL_KEY_CURSOR_DOWN or MOUSE_WHEEL_KEY_PAGE_UP
+;
+; wheelData
+;
+	wheelData			sbyte	0	; wheel turns, none by default
+endif
+
+ifdef MOUSE_HAS_WHEEL
+;
+; wheelData
+;
+	wheelData			sbyte	0	; wheel turns, none by default
+endif
+
 idata		ends
 
+;------------------------------------------------------------------------------
+;			Uninitialized Variables
+;------------------------------------------------------------------------------
 udata	segment
 
 oldPtrFlags	PtrFlags
-
 
 
 ifdef	MOUSE_SUPPORT_MOUSE_COORD_BUFFER
@@ -320,10 +358,9 @@ prevEventIsPenUp	byte		; zero if the previous event is
 endif	; MOUSE_SUPPORT_MOUSE_COORD_BUFFER
 
 ifdef	MOUSE_STORE_FAKE_MOUSE_COORDS
-leftButtonDown		BooleanByte	; true if the left mouse button is 
+leftButtonDown		BooleanByte	; true if the left mouse button is
 					; currently down.
 endif	; MOUSE_STORE_FAKE_MOUSE_COORDS
-
 
 udata	ends
 
@@ -374,13 +411,13 @@ PASS:		di	- DR_MOUSE?  command code.  Operation & other data
 	-----------------------------------------------------------
 	PASS:	di	- DR_MOUSE_SET_RATE
 		cx	- desired report rate (# reports per second)
-		
+
 	RETURN:	carry clear, for no error
 		cx	- actual report rate for mouse.
 
 	-----------------------------------------------------------
 	PASS:	di	- DR_MOUSE_GET_RATES
-	
+
 	RETURN:	carry clear, for no error
 		es:di	- table of available rates (bytes)
 		cx	- length of table
@@ -391,7 +428,7 @@ DESTROYED:	Depends on function, though best to assume all registers
 		Only BP, DS, ES are preserved.
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 		none
@@ -501,7 +538,7 @@ startinitfunc
 		; Make sure mouseButtons is initialized to all UP
 		;
 		mov	ds:mouseButtons, MouseButtonBits
-		
+
 		mov	dx, offset cs:[accelThresholdStr]
 		call	FetchIniInteger
 		jc	afterAccelThreshold
@@ -607,7 +644,7 @@ MouseExit	proc	near
 		mov	ah, al
 		not	ah
 		call	ImSetPtrFlags
-		
+
 		;
 		; Turn off the device
 		;
@@ -642,10 +679,10 @@ RETURN:		carry set if couldn't suspend
 DESTROYED:	ax, di
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -683,10 +720,10 @@ RETURN:		nothing
 DESTROYED:	ax, di
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -699,12 +736,12 @@ MouseUnsuspend	proc	near
 		.enter
 	;
 	; Re-initialize the driver, since we exited it.
-	; 
+	;
 		call	MouseInit
 	;
 	; Pass null pointer as signal that we're re-initializing what we had
 	; before.
-	; 
+	;
 		clr	dx, si
 		call	MouseTestDevice
 		call	MouseSetDevice
@@ -733,7 +770,7 @@ PSEUDO CODE/STRATEGY:
 		easier to implement this way).
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -765,7 +802,7 @@ MSRFound:
 		;
 		sub	cx, MOUSE_NUM_RATES
 		neg	cx
-		
+
 		;
 		; Contact the device-dependent portion to set the rate
 		; MAY NOT MODIFY CX.
@@ -799,10 +836,10 @@ RETURN:		ES:DI	= address byte-table containing available rates
 DESTROYED:	Nothing
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -833,10 +870,10 @@ RETURN:
 DESTROYED:	Nothing
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -866,10 +903,10 @@ RETURN:		CX	= threshold
 DESTROYED:	Nothing
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -898,10 +935,10 @@ RETURN:
 DESTROYED:	Nothing
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -929,10 +966,10 @@ RETURN:		CL	= MouseCombineMode
 DESTROYED:	Nothing
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -962,10 +999,10 @@ RETURN:		ax	= DevicePresent code (always DP_CANT_TELL)
 DESTROYED:	nothing
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1031,7 +1068,7 @@ PSEUDO CODE/STRATEGY:
 					B2 = 2
 		si	- unused
 
-		
+
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
 
@@ -1044,7 +1081,7 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 ;
 ; Macro to test if a button has changed state and call MouseSendButtonEvent to
-; generate the proper MSG_IM_BUTTON_CHANGE event. 
+; generate the proper MSG_IM_BUTTON_CHANGE event.
 ;
 CheckAndSend	macro	bit, num
 		local	noSend
@@ -1073,9 +1110,9 @@ else
 		je	afterSendEvent
 sendPtr:
 endif
-		;
-		; Send IM_PTR_CHANGE event...
-		; 
+	;
+	; Send IM_PTR_CHANGE event...
+	;
 					; But first, perform any mouse
 					; acceleration needed
 		push	bp		; Preserve passed BP
@@ -1090,9 +1127,9 @@ endif
 ifndef MOUSE_DONT_ACCELERATE
 		call	MousePreparePtrEvent
 endif
-		;
-		; Push address of routine onto the stack
-		;
+	;
+	; Push address of routine onto the stack
+	;
 		mov	di, mask MF_FORCE_QUEUE
 		cmp	ds:[mouseCombineMode], MCM_NO_COMBINE
 		jz	sendEvent
@@ -1112,13 +1149,13 @@ sendEvent:
 		pop	bp		; Restore passed BP
 
 ifdef MOUSE_STORE_FAKE_MOUSE_COORDS
-	;	
+	;
 	; Store some fake mouse coords if we're between a left button
 	; down event and up event.
 	;
 	; Note: We can't just check if the MOUSE_B0 bit is clear in BH
 	; because we need to make sure we only collect mouse coords
-	; and send MSG_IM_READ_DIGITIZER_COORDS messages between the 
+	; and send MSG_IM_READ_DIGITIZER_COORDS messages between the
 	; MSG_IM_BUTTON_CHANGEs indicating the button-down and the
 	; button-up because that is what the ink finite state machine is
 	; expecting.
@@ -1134,12 +1171,12 @@ ifdef MOUSE_STORE_FAKE_MOUSE_COORDS
 leftButtonNotDown:
 endif ; MOUSE_STORE_FAKE_MOUSE_COORDS
 
-		;
-		; Store the deltas (if case we need them for combining the
-		; next event), unless the noCombine flag was set (meaning
-		; that the mouse event just sent was combined with the last
-		; event and the delta was updated there)
-		;
+	;
+	; Store the deltas (if case we need them for combining the
+	; next event), unless the noCombine flag was set (meaning
+	; that the mouse event just sent was combined with the last
+	; event and the delta was updated there)
+	;
 		clr	ax
 		xchg	al, ds:noStoreDeltasFlag
 		tst	al
@@ -1162,33 +1199,68 @@ endif
 
 
 afterSendEvent:
-		;
-		; Check for changes in the button state. XOR the current
-		; and previous states together to find any button bits that
-		; changed. A bit is 0 if the button is pressed.
-		;
+	;
+	; Check for changes in the button state. XOR the current
+	; and previous states together to find any button bits that
+	; changed. A bit is 0 if the button is pressed.
+	;
 		and	bh, MouseButtonBits	; Make sure only defined
 						; bits are around...
 		mov	al, bh
 		xor	al, ds:mouseButtons
 		jz	MH_Done			; Nothing changed -- all done.
-		;
-		; Save current button state (do it now since we don't
-		; reference it again and we want to avoid doubled events in 
-		; the case of our event sending being interrupted)
-		;
+	;
+	; Save current button state (do it now since we don't
+	; reference it again and we want to avoid doubled events in
+	; the case of our event sending being interrupted)
+	;
 		mov	ds:mouseButtons, bh
 
 		push	bp		; Preserve passed BP
 
 		CheckAndSend B0, 0
+
+ifdef MIDDLE_IS_DOUBLE_PRESS
+	;
+	; If mapping the middle button to double presses, just send
+	; a press and release of the left button for each status change.
+	; We'll send one pair on the press and one pair on the release.
+	;
+		test	al, mask MOUSE_B1	;middle button changed?
+		jz	noMiddle		;branch if not
+		push	bx
+		clr	bl			;bl <- left button
+		andnf	bh, not mask MOUSE_B1	;bh <- button down
+		test	bh, mask MOUSE_B1	;set Z flag
+		call	MouseSendButtonEvent
+		ornf	bh, mask MOUSE_B1	;bh <- button up
+		test	bh, mask MOUSE_B1	;set Z flag
+		call	MouseSendButtonEvent
+		pop	bx
+noMiddle:
+else
 		CheckAndSend B1, 1
+endif
 		CheckAndSend B2, 2
 		CheckAndSend B3, 3
 
+		;CheckAndSend B0, 0
+		;CheckAndSend B1, 1
+		;CheckAndSend B2, 2
+		;CheckAndSend B3, 3
+
 		pop	bp		; Restore passed BP
 MH_Done:
+	; now send our humble wheel event
+ifdef MOUSE_HAS_WHEEL
+		call	MouseSendWheelEventNative
+endif
+
+ifdef MOUSE_HAS_WHEEL_KEYS
+		call	MouseSendWheelEventKey
+endif
 		ret
+
 MouseSendEvents	endp
 
 
@@ -1245,7 +1317,7 @@ checkThreshold:
 	mov	ah, dl		; recover high byte of result
 	js	afterMultiplier	; SF set => sign change => motion too small to
 				;  accelerate
-	
+
 	imul	ds:[mouseAccelMultiplier]	; Amplify amount over threshold
 afterMultiplier:
 	add	ax, di		; add threshold back in to possibly amplified
@@ -1273,10 +1345,10 @@ RETURN:		Nothing
 DESTROYED:	CX, DX, BP, DI
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1325,7 +1397,7 @@ endif	; MOUSE_STORE_FAKE_MOUSE_COORDS
 ifdef	MOUSE_STORE_FAKE_MOUSE_COORDS
 		; If this is a left-button-DOWN event, store fake mouse coords
 		; bp low = buttonInfo
-		
+
 		test	bp, mask BI_PRESS	; is button down?
 		jz	notLeftButtonDownEvent	; nope --> skip
 		test	bp, mask BI_BUTTON	; left button?
@@ -1365,10 +1437,10 @@ RETURN:		cx, dx, bp properly massaged
 DESTROYED:	ax
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1383,7 +1455,7 @@ MousePreparePtrEvent	proc	near
 	; If the events occurred close enough together (within
 	; MOUSE_ACCEL_THRESH ticks of each other), perform any needed
 	; acceleration on the two.
-	; 
+	;
 		push	bp
 		sub	bp, ds:[mouseLastTime]
 		andnf	bp, mask PI_time	; deal with timer wrap-around
@@ -1401,13 +1473,13 @@ MousePreparePtrEvent	proc	near
 		add	dx, ds:[mouseRawDeltaY]
 		mov	ds:[mouseRawDeltaX], cx
 		mov	ds:[mouseRawDeltaY], dx
-		
+
 	;
 	; Accelerate the resulting cumulative raw deltas, then trim the results
 	; back by the previous accelerated deltas, providing us with continuous
 	; time-based acceleration. We save the new accelerated deltas for the
 	; next time, of course.
-	; 
+	;
 		xchg	ax, cx
 		call	MouseAccelerate
 		mov	cx, ax
@@ -1428,7 +1500,7 @@ notCloseEnough:
 	;
 	; Perform single-event acceleration and setup the state variables for
 	; the next IM_PTR_CHANGE event.
-	; 
+	;
 		mov	ds:[mouseLastTime], bp
 		mov	ds:[mouseRawDeltaX], cx
 		mov	ds:[mouseRawDeltaY], dx
@@ -1436,7 +1508,7 @@ notCloseEnough:
 		call	MouseAccelerate
 		mov	ds:[mouseAccDeltaX], ax	; (smaller than mov from cx)
 		xchg	ax, cx
-		
+
 		xchg	ax, dx
 		call	MouseAccelerate
 		mov	ds:[mouseAccDeltaY], ax	; (smaller than mov from dx)
@@ -1458,20 +1530,20 @@ PASS:		DS:BX	= address of event to check
 		CX	= CX from event being sent
 		DX	= DX from event being sent
 		BP	= BP from event being sent
-		
+
 RETURN:		DI	= PROC_SE_EXIT if combined with existing event
 			  PROC_SE_STORE_AT_BACK if should stop scan and just
 			  	store the event. Since we can only be called
 				for the last event in the queue, we return
 				PROC_SE_STORE_AT_BACK unless we actually
 				have combined things.
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1603,6 +1675,96 @@ noCombine:
 
 MouseCombineEvent endp
 
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MouseSendWheelEventNative / MouseSendWheelEventKey
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Send wheel movements as keypresses or native wheel event
+
+CALLED BY:	MouseSendEvents
+PASS:		ds:[wheelData]
+DESTROYED:
+
+PSEUDO CODE/STRATEGY:
+
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+ifdef MOUSE_HAS_WHEEL
+MouseSendWheelEventNative	proc	near
+
+	uses  dx, bx, di, ax, ds
+	.enter
+
+	cmp 	ds:[wheelData], 0
+	je 	exit		; if wheel data equals zero => no wheel action, done
+
+	mov	dh, ds:[wheelData]
+	mov	bx, ds:[mouseOutputHandle]
+	mov	di, mask MF_FORCE_QUEUE
+	mov	ax, MSG_IM_MOUSE_WHEEL_VERTICAL
+	call 	ObjMessage	; Send the event
+
+exit:
+	.leave
+	ret
+
+MouseSendWheelEventNative	endp
+endif
+
+
+ifdef MOUSE_HAS_WHEEL_KEYS
+MouseSendWheelEventKey	proc	near
+
+	uses  cx, di, ax, bx, dx, ds
+	.enter
+
+	cmp 	ds:[wheelData], 0
+	je 	exit			; if wheel data equals zero => no wheel action, done
+;
+; check which driver variant to use
+;
+	cmp 	ds:[driverVariant], MOUSE_WHEEL_ACTION_PAGE
+	je 	pageKeyEvent
+	cmp 	ds:[driverVariant], MOUSE_WHEEL_ACTION_CURSOR
+	je 	cursorKeyEvent
+
+pageKeyEvent:
+	mov 	ds:[wheelKeyUp], MOUSE_WHEEL_KEY_PAGE_UP
+	mov 	ds:[wheelKeyDown], MOUSE_WHEEL_KEY_PAGE_DOWN
+	jmp	continue
+
+cursorKeyEvent:
+	mov 	ds:[wheelKeyUp], MOUSE_WHEEL_KEY_CURSOR_UP
+	mov 	ds:[wheelKeyDown], MOUSE_WHEEL_KEY_CURSOR_DOWN
+
+continue:
+	cmp	ds:[wheelData], 0	; compare wheel data with 0
+	jg 	wheelDown		; if value greater than 0 => jump to wheel down
+
+;wheelUp:				; otherwise continue with wheel up
+	mov 	cx, ds:[wheelKeyUp]	; put "up" key in cx
+	jmp 	doPress			; push the button
+
+wheelDown:
+	mov	cx, ds:[wheelKeyDown]	; wheel down => put "down" key in cx
+
+doPress:
+	mov	di, mask MF_FORCE_QUEUE ; setup ObjMessage
+	mov	ax, MSG_IM_KBD_SCAN
+	mov	bx, ds:[mouseOutputHandle]
+
+	mov	dx, BW_TRUE	; set to "press"
+	call	ObjMessage	; press - release not necessary!
+
+exit:
+	.leave
+	ret
+MouseSendWheelEventKey	endp
+endif
+
 ifndef		MOUSE_CAN_BE_CALIBRATED
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1705,16 +1867,16 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		MouseStartCalibration
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	
+SYNOPSIS:
 
-CALLED BY:	
-PASS:		
-RETURN:		
+CALLED BY:
+PASS:
+RETURN:
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1731,16 +1893,16 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		MouseStopCalibration
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	
+SYNOPSIS:
 
-CALLED BY:	
-PASS:		
-RETURN:		
+CALLED BY:
+PASS:
+RETURN:
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1763,16 +1925,16 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		MouseStartCalibration
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	
+SYNOPSIS:
 
-CALLED BY:	
-PASS:		
-RETURN:		
+CALLED BY:
+PASS:
+RETURN:
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1788,16 +1950,16 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		MouseStopCalibration
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	
+SYNOPSIS:
 
-CALLED BY:	
-PASS:		
-RETURN:		
+CALLED BY:
+PASS:
+RETURN:
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1861,10 +2023,10 @@ PASS:		cx	= segment of fixed circular buffer
 		es	= dgroup (by MouseStrategy)
 RETURN:		carry clear
 DESTROYED:	di, ds (ds preserved by MouseStrategy)
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1910,10 +2072,10 @@ CALLED BY:	(GLOBAL) DR_MOUSE_ESC_REMOVE_MOUSE_COORD_BUFFER
 PASS:		ds	= dgroup (by MouseStrategy)
 RETURN:		carry clear
 DESTROYED:	di
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
