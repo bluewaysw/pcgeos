@@ -22,7 +22,8 @@ MOUSE_HAS_WHEEL		= 1		; define/uncomment this if GEOS
 					; disable ...HAS_WHEEL_KEYS
 ;MOUSE_HAS_WHEEL_KEYS	= 1		; define/uncomment this for a version of the driver 
 					; that has the wheel simulate keypresses, 
-					; disable ...HAS_WHEELMOUSE_NUM_BUTTONS		= 3	; Wheel mice have at least 3 buttons
+					; disable ...HAS_WHEEL
+MOUSE_NUM_BUTTONS		= 3	; Wheel mice have at least 3 buttons
 MIDDLE_IS_DOUBLE_PRESS		= 1	; fake double-press with middle button
 MOUSE_SEPARATE_INIT		= 1	; We use a separate Init resource
 
