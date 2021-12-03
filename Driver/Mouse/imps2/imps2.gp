@@ -31,3 +31,7 @@ tokenid 0
 # Define resources other than standard discardable code
 resource Resident fixed code read-only
 resource MouseExtendedInfoSeg lmem, read-only, shared, conforming
+
+ifdef PRODUCT_GEOS2X
+platform geos20
+endif
