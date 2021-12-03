@@ -31,6 +31,14 @@ library	geos
 longname 	"CuteMouse-supported Wheel Mouse"
 tokenchars 	"MOUS"
 tokenid 	0
+
+#
+# Platform for product variant
+#
+ifdef PRODUCT_GEOS2X
+platform geos20
+endif
+
 #
 # Define resources other than standard discardable code
 #
