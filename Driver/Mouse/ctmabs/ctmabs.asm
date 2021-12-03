@@ -39,12 +39,16 @@ DESCRIPTION:
 ; The following constants are used in mouseCommon.asm -- see that
 ; file for documentation.
 ;
+ifndef PRODUCT_GEOS2X
 MOUSE_HAS_WHEEL			= 1	; define/uncomment this if GEOS 
 					; has native wheel support in the kernel/ui, 
 					; disable ...HAS_WHEEL_KEYS
-;MOUSE_HAS_WHEEL_KEYS		= 1	; define/uncomment this for a version of the driver 
+else
+MOUSE_HAS_WHEEL_KEYS		= 1	; define/uncomment this for a version of the driver 
 					; that has the wheel simulate keypresses, 
 					; disable ...HAS_WHEEL
+endif
+
 MOUSE_NUM_BUTTONS 		= 3	; Assume 3 for now -- we'll set it in MouseDevInit
 MIDDLE_IS_DOUBLE_PRESS		= 1	; fake double-press with middle button
 MOUSE_CANT_SET_RATE		= 1	; Microsoft driver doesn't specify a function
