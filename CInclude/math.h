@@ -146,6 +146,9 @@ typedef double IEEE64Number;
 #ifndef __WATCOM__ /* Watcom does not (yet) support 80bit long doubles */
 typedef long double FloatNumber;
 typedef long double FloatNum;
+#else
+typedef FloatNumStruct FloatNum;
+typedef FloatNumStruct FloatNumber;
 #endif /* ifndef __WATCOM__ */
 
 /*
@@ -439,7 +442,7 @@ extern void _pascal FloatExit(void);
 ******************************************************/
 extern sword _pascal FloatComp(void);
 extern sword _pascal FloatCompAndDrop(void);
-extern sword _pascal FloatCompESDI(FloatNum *);
+extern sword _pascal FloatCompESDI(FloatNum *number);
 extern word _pascal FloatEq0(void);
 extern word _pascal FloatLt0(void);
 extern word _pascal FloatGt0(void);
