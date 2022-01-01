@@ -1,8 +1,8 @@
 ### Assembly Reference
 
-**[1 Parameters File Keywords](asmref/agp.md)**
+**[1 Parameters File Keywords](Asmref/agp.md)**
 
-**[2 Routines](asmref/asma_d.md)**  
+**[2 Routines](Asmref/asma_d.md)**  
 [2.1 Routines A-D](Asmref/asma_d.md#21-routines-a-d)  
 [2.2 Routines E-F](Asmref/asme_f.md#22-routines-e-f)  
 [2.3 Routines G-G](Asmref/asmg_g.md#23-routines-g-g)  
@@ -11,7 +11,7 @@
 [2.6 Routines R-U](Asmref/asmr_u.md#26-routines-r-u)  
 [2.7 Routines V-Z](Asmref/asmv_z.md#27-routines-v-z)  
 
-**[3 Structures](asmref/asmstrac.md)**  
+**[3 Structures](Asmref/asmstrac.md)**  
 [3.1 Structures A-C](Asmref/asmstrac.md#31-structures-a-c)  
 [3.2 Structures D-F](Asmref/asmstrdf.md#32-structures-d-f)  
 [3.3 Structures G-G](Asmref/asmstrgg.md#33-structures-g-g)  
