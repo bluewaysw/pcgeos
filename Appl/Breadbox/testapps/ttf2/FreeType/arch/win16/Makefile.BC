@@ -1,0 +1,180 @@
+# This file is part of the FreeType project.
+#
+# It builds the library for Borland C++ for 16-bit Windows, large model.
+# Due to size constraints, it does not try to pack all modules into one.
+#
+# You will need Borland MAKE.
+# Tested with Borland C++ v.4.0 and 5.0.
+#
+# Use this file while in the lib directory with the following statement:
+#
+#   make -farch/win16/Makefile.BC
+#
+#
+# A DLL version of the library can be built with
+#
+#   make -DDLL -farch/win16/Makefile.BC dll
+#
+# Debug versions can be obtained with
+#
+#   make -DDEBUG -farch\win16\Makefile.BC
+#
+# Special versions enabled to handle big fonts (with more than 16,384
+# glyphs) can be obtained with
+#
+#   make -DBIGFONTS -farch/win16/Makefile.BC
+
+ARCH = arch\win16
+FT_MAKEFILE = $(ARCH)\Makefile.BC
+FT_DLL = ft13_16.dll
+
+CC = bcc
+LIB = tlib /c /e
+IMPLIB = implib -c -o
+
+SPURIOUS_WARNINGS = -w-nak -w-par -w-use -w-aus -w-stu -w-stv -w-cln -w-sig
+
+# Credits go to Dave Hoo <dhoo@flash.net> for pointing out that modern
+# Borland compilers (from BC++ 3.1 on) can increase the limit on
+# the length of identifiers.
+!if ! $d(DEBUG)
+CFLAGS = -O2 -3 -ml -A -i40 -I$(ARCH);.;extend $(SPURIOUS_WARNINGS)
+DLLFLAGS = -ml -WD -lC
+!else
+CFLAGS =  -v -N -ml -A -i40 -I$(ARCH);.;extend $(SPURIOUS_WARNINGS)
+DLLFLAGS = -v -ml -WD -lC
+!endif
+
+CFLAGS = $(CFLAGS) -W
+
+FT_DEF = $(FT_DLL:.dll=.def)
+!if $d(DLL)
+CFLAGS = $(CFLAGS) -WD
+!endif
+
+
+!if $d(BIGFONTS)
+CFLAGS = $(CFLAGS) -DTT_HUGE_PTR=__huge
+
+TTFILE = $(ARCH)\hugefile.c
+TTMEMORY = $(ARCH)\hugemem.c
+!else
+TTFILE = .\ttfile.c
+TTMEMORY = .\ttmemory.c
+!endif
+TTMUTEX = .\ttmutex.c
+
+PORT = $(TTFILE) $(TTMEMORY) $(TTMUTEX)
+
+# Do not insert spaces before the \ at end of line,
+# otherwise the substitution for TLIB command line will fail.
+SRC_X = extend\ftxgasp.c extend\ftxkern.c  extend\ftxpost.c\
+        extend\ftxcmap.c extend\ftxwidth.c extend\ftxerr18.c\
+        extend\ftxsbit.c extend\ftxgsub.c  extend\ftxgpos.c\
+        extend\ftxopen.c extend\ftxgdef.c
+OBJS_X = $(SRC_X:.c=.obj)
+
+SRC_M = ttapi.c     ttcache.c   ttcalc.c   ttcmap.c\
+        ttgload.c   ttinterp.c  ttload.c   ttobjs.c\
+        ttraster.c  ttextend.c  ttdebug.c  $(PORT)
+OBJS_M = $(SRC_M:.c=.obj) $(OBJS_X)
+
+SRC_S = $(ARCH)\freetype.c
+OBJ_S = $(SRC_S:.c=.obj)
+OBJS_S = $(OBJ_S) $(OBJS_X)
+
+
+# Since Borland make does not handle $($(LIB_FILES)), and using
+# -DLIB_FILES="$(OBJS_S)" will excess the capacity of COMMAND.COM, we cheat
+# by constructing TLIB's response file directly in the `all' target.
+#
+# Another solution, useful during debugging of part of the library,
+# would be to include each .obj in the library as soon as it is compiled.
+# See ../msdos/Makefile.TC for an application.
+.c.obj:
+	@$(CC) -c -o$* @&&|
+	     $(CFLAGS) $<
+|
+
+
+!if ! $d(DEBUG)
+# Skipped if DEBUG build
+#  (but it changes nothing, since we always build in multiple parts).
+all: $(OBJS_M)
+	-del libttf.lib
+	$(LIB) libttf.lib @&&|
++ $(OBJS_M: = + )
+|
+!endif
+
+debug: $(OBJS_M)
+	-del libttf.lib
+	$(LIB) libttf.lib @&&|
++ $(OBJS_M: = + )
+|
+
+$(FT_DEF): $(ARCH)\ttf.def
+	-copy $(ARCH)\ttf.def $(FT_DEF)
+
+dll $(FT_DLL): $(OBJS_M) $(FT_DEF)
+!if $d(DLL)
+	$(CC) -e$(FT_DLL) @&&|
+	    $(DLLFLAGS) $(OBJS_M)
+|
+	$(IMPLIB) libttf $(FT_DEF)
+!else
+# Re-invoke with flag set.  Unfortunately, this discards the other flags.
+	make -DDLL -f$(ARCH)/Makefile.BC dll
+!endif
+
+install: $(FT_DLL)
+!if $d(INSTALL_DIR)
+	copy $(FT_DLL) $(INSTALL_DIR)
+!else
+	copy $(FT_DLL) C:\WINDOWS
+!endif
+
+
+$(OBJ_S): $(SRC_S) $(SRC_M)
+
+# Not used here because it excesses the capacity of COMMAND.COM...
+libttf.lib: $(LIB_FILES)
+	-del libttf.lib
+	echo -+$(**: =-+)> response
+	$(LIB) libttf.lib @&&|
++ $(**: = + )
+|
+
+!if $d(BIGFONTS)
+$(TTMEMORY:.c=.obj): $(TTMEMORY)
+	$(CC) -c -o$* @&&|
+	    $(CFLAGS) -A- $*.c
+|
+
+$(TTFILE:.c=.obj): $(TTFILE)
+	$(CC) -c -o$* @&&|
+	    $(CFLAGS) -A- $*.c
+|
+!endif
+
+
+clean:
+	-del *.obj
+	-del extend\*.obj
+	-del $(ARCH)\*.obj
+	-del libttf.bak
+	-del response
+	-del *.def
+
+distclean: clean
+	-del libttf.lib
+	-del *.dll
+	-del $(FT_DEF)
+	-del C:\WINDOWS\$(FT_DLL)
+!if $d(INSTALL_DIR)
+	-del $(INSTALL_DIR)\$(FT_DLL)
+!endif
+
+!include "$(ARCH)\depend.win"
+
+# end of Makefile

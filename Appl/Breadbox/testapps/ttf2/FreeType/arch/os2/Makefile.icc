@@ -1,0 +1,73 @@
+# This file is part of the FreeType project.
+#
+# It builds the library and test programs for IBM VisualAge C++ under OS/2.
+#
+# You will need nmake.
+#
+# Use this file while in the lib directory with the following statement:
+#
+#   nmake -f arch\os2\Makefile.icc
+#
+
+ARCH = arch\os2
+FT_MAKEFILE = $(ARCH)\Makefile.icc
+FT_MAKE = $(MAKE) -nologo
+
+CC = icc        
+CFLAGS = -O+ -Ti- -Tm- -Sa -W3 -Wpro- -Wcnd- -Q+ -Iarch\os2 -I. -Iextend
+
+# NOTE: Optimizations are discarded, as it seems that Visual Age
+#       is buggy when producing ttraster.obj.  The resulting code
+#       crashes under some circumstances (performing vertical dropout
+#       control when rendering smoothed outlines)!
+
+TTFILE = $(ARCH)\os2file.c
+TTMEMORY = .\ttmemory.c
+TTMUTEX = .\ttmutex.c
+
+PORT = $(TTFILE) $(TTMEMORY) $(TTMUTEX)
+
+SRC_X = extend\ftxgasp.c extend\ftxkern.c  extend\ftxpost.c \
+        extend\ftxcmap.c extend\ftxwidth.c extend\ftxsbit.c \
+        extend\ftxgsub.c extend\ftxgpos.c  extend\ftxopen.c \
+        extend\ftxgdef.c
+OBJS_X = $(SRC_X:.c=.obj)
+
+SRC_M = ttapi.c     ttcache.c   ttcalc.c  ttcmap.c  ttdebug.c  \
+        ttgload.c   ttinterp.c  ttload.c  ttobjs.c  ttraster.c \
+        ttextend.c  $(PORT)
+OBJS_M = $(SRC_M:.c=.obj) $(OBJS_X)
+
+SRC_S = $(ARCH)\freetype.c
+OBJ_S = $(SRC_S:.c=.obj)
+OBJS_S = $(OBJ_S) $(OBJS_X)
+
+
+all:
+  $(FT_MAKE) -f $(FT_MAKEFILE) LIB_FILES="$(OBJS_S)" libttf.lib
+
+debug:
+  $(FT_MAKE) -f $(FT_MAKEFILE) LIB_FILES="$(OBJS_M)" libttf.lib
+
+
+$(OBJ_S): $(SRC_S) $(SRC_M)
+  $(CC) -C $(CFLAGS) /Fo$@ $*.c
+
+$(OBJS_X):
+  $(CC) -C $(CFLAGS) /Fo$@ $*.c
+
+$(ARCH)\os2file.obj:
+  $(CC) -C $(CFLAGS) /Fo$@ $*.c
+
+libttf.lib: $(LIB_FILES)
+  !ilib /nologo /noignorecase /nobackup $@ +$?,,
+
+clean:
+  -del *.obj
+  -del extend\*.obj
+  -del arch\os2\*.obj
+
+distclean: clean
+  -del libttf.lib
+
+# end of Makefile.icc

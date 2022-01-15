@@ -1,0 +1,175 @@
+# This file is part of the FreeType project.
+#
+# It builds the library for Microsoft Visual C++ 1.x for 16-bit Windows,
+# large model.  It also works for Microsoft C/C++ v.7.0 16-bit compiler,
+# but not for previous versions (see Makefile.MS instead).
+#
+# You will need NMAKE.
+#
+# Use this file while in the lib directory with the following statement:
+#
+#   nmake /f arch\win16\Makefile.VC
+#
+#
+# A DLL version of the library can be built with
+#
+#   nmake DLL=1 /f arch\win16\Makefile.VC dll
+#
+# Debug versions can be obtained with
+#
+#   nmake DEBUG=1 /f arch\win16\Makefile.VC
+#
+# Special versions enabled to handle big fonts (with more than 16,384
+# glyphs) can be obtained with
+#
+#   nmake BIGFONTS=1 /f arch\win16\Makefile.VC
+
+ARCH = arch\win16
+FT_MAKEFILE = $(ARCH)\Makefile.VC
+FT_DLL = ft13_16.dll
+
+CC = cl /nologo
+LIB = lib /noignorecase /nologo
+IMPLIB = implib /noignorecase /nologo
+
+# One can also consider using "set MSC_CMD_FLAGS=/Gr /Op- /Gy /YX".
+# With Microsoft C/C++ 7.0, use /G2 instead of /G3.
+!ifndef DEBUG
+CFLAGS =     /Ox /AL /Za /W2 /G3 -I$(ARCH) -I. -Iextend
+DLLFLAGS =  /AL /Ld
+!else
+CFLAGS = /Zi /Ge /AL /Za /W2 /G3 -I$(ARCH) -I. -Iextend
+DLLFLAGS =  /AL /Lw /Zi
+!endif
+
+FT_DEF = $(FT_DLL:.dll=.def)
+!ifdef DLL
+CFLAGS = $(CFLAGS) /GD /GEf
+!else
+CFLAGS = $(CFLAGS) /GA
+!endif
+
+
+!ifdef BIGFONTS
+CFLAGS = $(CFLAGS) /DTT_HUGE_PTR=__huge
+
+TTFILE = $(ARCH)\hugefile.c
+TTMEMORY = $(ARCH)\hugemem.c
+!else
+TTFILE = .\ttfile.c
+TTMEMORY = .\ttmemory.c
+!endif
+TTMUTEX = .\ttmutex.c
+
+PORT = $(TTFILE) $(TTMEMORY) $(TTMUTEX)
+
+# Do not insert spaces between the file names or at end of line, otherwise
+# the substitution for LIB command line will fail. Thank you.
+#
+SRC_X = extend\ftxgasp.c extend\ftxkern.c extend\ftxpost.c\
+extend\ftxcmap.c extend\ftxwidth.c extend\ftxerr18.c extend\ftxsbit.c\
+extend\ftxopen.c extend\ftxgsub.c extend\ftxgpos.c extend\ftxgdef.c
+OBJS_X = $(SRC_X:.c=.obj)
+
+SRC_M = ttapi.c ttcache.c ttcalc.c ttcmap.c ttdebug.c\
+ttgload.c ttinterp.c ttload.c ttobjs.c ttraster.c ttextend.c $(PORT)
+OBJS_M = $(SRC_M:.c=.obj) $(OBJS_X)
+
+SRC_S = $(ARCH)\freetype.c
+OBJ_S = $(SRC_S:.c=.obj)
+OBJS_S = $(OBJ_S) $(OBJS_X)
+
+
+# Since Microsoft's NMAKE does not handle $($(LIB_FILES)), and using
+# LIB_FILES="$(OBJS_S)" will excess the capacity of COMMAND.COM, we cheat
+# by constructing LIB's response file directly in the `all' target.
+#
+# Another solution, useful during debugging of part of the library,
+# would be to include each .obj in the library as soon as it is compiled.
+# See ..\msdos\Makefile.TC for an application.
+.c.obj:
+	@$(CC) /c /Fo$@ @<<
+	    $(CFLAGS) $*.c
+<<
+
+
+!ifndef DEBUG
+# Skipped if DEBUG build
+all: $(OBJS_S)
+	-del libttf.lib
+	$(LIB) libttf.lib @<<response
++ $(OBJS_S: = + );
+<<KEEP
+!endif
+
+
+debug: $(OBJS_M)
+	-del libttf.lib
+	$(LIB) libttf.lib @<<response
++ $(OBJS_M: = + );
+<<KEEP
+
+$(FT_DEF): $(ARCH)\ttf.def
+	-copy $(ARCH)\ttf.def $(FT_DEF)
+
+dll $(FT_DLL): $(OBJS_M) $(FT_DEF)
+!ifdef DLL
+	$(CC) /Fe$(FT_DLL) @<<
+	      $(DLLFLAGS) $**
+<<
+	$(IMPLIB) libttf.lib $(FT_DEF)
+!else
+# Re-invoke with flag set.  Unfortunately, this discards the other flags.
+	$(MAKE) DLL=1 /f $(ARCH)/Makefile.VC dll
+!endif
+
+install: $(FT_DLL)
+!ifdef INSTALL_DIR
+	copy $(FT_DLL) $(INSTALL_DIR)
+!else
+	copy $(FT_DLL) C:\WINDOWS
+!endif
+
+
+$(OBJ_S): $(SRC_S) $(SRC_M)
+
+# Not used here because it excesses the capacity of COMMAND.COM...
+libttf.lib: $(LIB_FILES)
+	$(LIB) $@ +-$(?: =-+);
+
+!ifdef BIGFONTS
+$(TTFILE:.c=.obj):
+	$(CC) /c /Fo$@ @<<
+	         $(CFLAGS) /Ze $*.c
+
+$(TTMEMORY:.c=.obj):
+	$(CC) /c /Fo$@ @<<
+	         $(CFLAGS) /Ze $*.c
+<<
+
+$(OBJ_S):
+	$(CC) /c /Fo$@ @<<
+	         $(CFLAGS) /Ze $*.c
+<<
+!endif
+
+
+clean:
+	-del *.obj
+	-del extend\*.obj
+	-del $(ARCH)\*.obj
+	-del libttf.bak
+	-del response
+
+distclean: clean
+	-del libttf.lib
+	-del *.dll
+	-del $(FT_DLL:.dll=.def)
+	-del C:\WINDOWS\$(FT_DLL)
+!ifdef INSTALL_DIR
+	-del $(INSTALL_DIR)\$(FT_DLL)
+!endif
+
+!include "$(ARCH)\depend.win"
+
+# end of Makefile.VC

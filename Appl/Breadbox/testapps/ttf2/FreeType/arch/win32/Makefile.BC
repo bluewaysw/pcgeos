@@ -1,0 +1,161 @@
+# This file is part of the FreeType project.
+#
+# It builds the library for Borland C++ for Win32.
+#
+# You will need Borland MAKE.
+# Tested with Borland C++ v.5.0 and Borland C++ builder 4.0.
+# Does not work with Borland C++ 4.0, since it needs __declspec.
+#
+# Use this file while in the lib directory with the following statement:
+#
+#   make -farch/win32/Makefile.BC
+#
+#
+# A DLL version of the library can be built with
+#
+#   make -DDLL -farch/win32/Makefile.BC dll
+#
+# A debug version can be obtained with
+#
+#   make -DDEBUG -farch/win32/Makefile.BC
+
+ARCH = arch\win32
+FT_MAKEFILE = $(ARCH)\Makefile.BC
+FT_DLL = ft13_32.dll
+
+CC = bcc32
+LIB = tlib /c /e
+IMPLIB = implib -c
+
+SPURIOUS_WARNINGS = -w-nak -w-par -w-use -w-aus -w-stu -w-stv -w-cln -w-sig
+
+!if ! $d(DEBUG)
+CFLAGS = -O2 -A -i40 -I$(ARCH);.;extend $(SPURIOUS_WARNINGS)
+DLLFLAGS = -WD
+!else
+CFLAGS =  -v -A -i40 -I$(ARCH);.;extend $(SPURIOUS_WARNINGS)
+DLLFLAGS = -v -WD
+!endif
+
+FT_DEF = $(FT_DLL:.dll=.def)
+!if $d(DLL)
+CFLAGS = $(CFLAGS) \
+    -DEXPORT_DEF=__declspec(dllexport) -DEXPORT_FUNC=__declspec(dllexport)
+!endif
+
+
+TTFILE = .\ttfile.c
+TTMEMORY = .\ttmemory.c
+TTMUTEX = .\ttmutex.c
+
+PORT = $(TTFILE) $(TTMEMORY) $(TTMUTEX)
+
+# Do not insert spaces before the \ at end of line,
+# otherwise the substitution for TLIB command line will fail.
+SRC_X = extend\ftxgasp.c extend\ftxkern.c  extend\ftxpost.c\
+        extend\ftxcmap.c extend\ftxwidth.c extend\ftxerr18.c\
+        extend\ftxsbit.c extend\ftxgsub.c  extend\ftxgpos.c\
+        extend\ftxopen.c extend\ftxgdef.c
+OBJS_X = $(SRC_X:.c=.obj)
+
+SRC_M = ttapi.c     ttcache.c   ttcalc.c   ttcmap.c\
+        ttgload.c   ttinterp.c  ttload.c   ttobjs.c\
+        ttraster.c  ttextend.c  ttdebug.c  $(PORT)
+OBJS_M = $(SRC_M:.c=.obj) $(OBJS_X)
+
+SRC_S = $(ARCH)\freetype.c
+OBJ_S = $(SRC_S:.c=.obj)
+OBJS_S = $(OBJ_S) $(OBJS_X)
+
+
+# Since Borland make does not handle $($(LIB_FILES)), and using
+# -DLIB_FILES="$(OBJS_S)" will excess the capacity of COMMAND.COM, we cheat
+# by constructing TLIB's response file directly in the `all' target.
+#
+# Another solution, useful during debugging of part of the library,
+# would be to include each .obj in the library as soon as it is compiled.
+# See ../msdos/Makefile.TC for an application.
+.c.obj:
+	$(CC) -c -o$* @&&|
+	    $(CFLAGS) $<
+|
+
+
+!if ! $d(DEBUG)
+# Skipped if DEBUG build
+all: $(OBJS_S)
+	-del libttf.lib
+	$(LIB) libttf.lib @&&|
++ $(OBJS_S: = + )
+|
+
+dll $(FT_DLL): $(OBJS_S) $(FT_DEF)
+!if $d(DLL)
+	$(CC) @&&|
+	      $(DLLFLAGS) -e$(FT_DLL) $(OBJS_S)
+|
+	$(IMPLIB) libttf $(FT_DLL)
+!else
+	$(MAKE) -DDLL -f$(FT_MAKEFILE) dll   # Re-invoke with flag set.
+!endif
+!endif
+
+debug: $(OBJS_M)
+	-del libttf.lib
+	$(LIB) libttf.lib @&&|
++ $(OBJS_M: = + )
+|
+
+!ifdef DEBUG
+dll $(FT_DLL): $(OBJS_M) $(FT_DEF)
+!if $d(DLL)
+	$(CC) @&&|
+	      $(DLLFLAGS) -e$(FT_DLL) $(OBJS_M)
+|
+	$(IMPLIB) libttf $(FT_DLL)
+!else
+	$(MAKE) -DDEBUG -DDLL -f$(FT_MAKEFILE) dll
+!endif
+!endif
+
+install: $(FT_DLL)
+!ifdef INSTALL_DIR
+	copy $(FT_DLL) $(INSTALL_DIR)
+!else
+	copy $(FT_DLL) C:\WINDOWS
+!endif
+
+$(OBJ_S): $(SRC_S) $(SRC_M)
+
+# Not used here because it excesses the capacity of COMMAND.COM...
+libttf.lib: $(LIB_FILES)
+	-del libttf.lib
+	echo -+$(**: =-+)> response
+	$(LIB) libttf.lib @&&|
++ $(**: = + )
+|
+
+$(FT_DEF): $(ARCH)\ttf.def
+	-copy $(ARCH)\ttf.def $(FT_DEF)
+
+clean:
+	-del *.obj
+	-del extend\*.obj
+	-del $(ARCH)\*.obj
+	-del libttf.bak
+	-del response
+	-del *.def
+	-del *.tds
+
+distclean: clean
+	-del libttf.lib
+	-del *.dll
+	-del $(FT_DEF)
+	-del C:\WINDOWS\$(FT_DLL)
+!if $d(INSTALL_DIR)
+	-del $(INSTALL_DIR)\$(FT_DLL)
+!endif
+
+!include "$(ARCH)\depend.win"
+
+# end of Makefile

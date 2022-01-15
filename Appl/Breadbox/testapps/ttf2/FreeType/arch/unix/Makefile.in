@@ -1,0 +1,244 @@
+# This file is part of the FreeType project.
+#
+# lib/arch/unix/Makefile.in
+
+ARCH = arch/unix
+FT_MAKEFILE = $(ARCH)/Makefile
+
+RM = @RM@
+RMF = @RM@ -f
+RMDIR = @RMDIR@
+LN_S = @LN_S@
+
+INSTALL = @INSTALL@
+INSTALL_DATA = @INSTALL_DATA@
+
+VPATH = @srcdir@/../..
+srcdir = @srcdir@/../..
+
+top_builddir=..
+
+CC = @CC@
+CPP = @CPP@
+
+LIBTOOL = $(top_builddir)/libtool
+MKINSTALLDIRS = $(srcdir)/../mkinstalldirs
+
+version_info = @version_info@
+
+include $(top_builddir)/MakeSub
+
+############### PORTABILITY COMPONENTS ########################
+
+# location of memory component
+MEMSRC = ttmemory.c
+
+# location of file component
+FILESRC = @TT_FILE_COMPONENT@
+
+# location of mutex component
+MUTEXSRC = ttmutex.c
+
+# location of default extensions
+FTEXTDIR = $(srcdir)/extend
+
+
+# default extensions sources
+EXTSRC = $(FTEXTDIR)/ftxkern.c  \
+         $(FTEXTDIR)/ftxgasp.c  \
+         $(FTEXTDIR)/ftxpost.c  \
+         $(FTEXTDIR)/ftxcmap.c  \
+         $(FTEXTDIR)/ftxsbit.c  \
+         $(FTEXTDIR)/ftxwidth.c \
+         $(FTEXTDIR)/ftxerr18.c \
+         $(FTEXTDIR)/ftxgsub.c  \
+         $(FTEXTDIR)/ftxgpos.c  \
+         $(FTEXTDIR)/ftxgdef.c  \
+         $(FTEXTDIR)/ftxopen.c
+
+EXTOBJ = ftxkern.lo  \
+         ftxgasp.lo  \
+         ftxpost.lo  \
+         ftxcmap.lo  \
+         ftxsbit.lo  \
+         ftxwidth.lo \
+         ftxerr18.lo \
+         ftxgsub.lo  \
+         ftxgpos.lo  \
+         ftxgdef.lo  \
+         ftxopen.lo
+
+# all engine sources
+SRC_M = $(srcdir)/ttapi.c     \
+        $(srcdir)/ttcache.c   \
+        $(srcdir)/ttcalc.c    \
+        $(srcdir)/ttcmap.c    \
+        $(srcdir)/ttdebug.c   \
+        $(srcdir)/ttextend.c  \
+        $(srcdir)/ttgload.c   \
+        $(srcdir)/ttinterp.c  \
+        $(srcdir)/ttload.c    \
+        $(srcdir)/ttobjs.c    \
+        $(srcdir)/ttraster.c  \
+        $(srcdir)/$(FILESRC)  \
+        $(srcdir)/$(MEMSRC)   \
+        $(srcdir)/$(MUTEXSRC)
+SRC_S = $(srcdir)/$(ARCH)/freetype.c
+
+# all header files
+HEADERS = $(srcdir)/freetype.h   \
+          $(srcdir)/fterrid.h    \
+          $(srcdir)/ftnameid.h   \
+          $(FTEXTDIR)/ftxkern.h  \
+          $(FTEXTDIR)/ftxgasp.h  \
+          $(FTEXTDIR)/ftxcmap.h  \
+          $(FTEXTDIR)/ftxsbit.h  \
+          $(FTEXTDIR)/ftxpost.h  \
+          $(FTEXTDIR)/ftxwidth.h \
+          $(FTEXTDIR)/ftxerr18.h \
+          $(FTEXTDIR)/ftxgsub.h  \
+          $(FTEXTDIR)/ftxgpos.h  \
+          $(FTEXTDIR)/ftxgdef.h  \
+          $(FTEXTDIR)/ftxopen.h
+
+# all engine objects
+OBJ_M = ttapi.lo    \
+        ttcache.lo  \
+        ttcalc.lo   \
+        ttcmap.lo   \
+        ttdebug.lo  \
+        ttextend.lo \
+        ttgload.lo  \
+        ttinterp.lo \
+        ttload.lo   \
+        ttobjs.lo   \
+        ttraster.lo \
+        file.lo     \
+        memory.lo   \
+        mutex.lo    \
+        $(EXTOBJ)
+OBJ_S = freetype.lo $(EXTOBJ)
+
+
+# include paths
+INCLUDES = -I. -I$(top_builddir) -I$(srcdir) -I$(FTEXTDIR)
+
+# C flags
+CFLAGS = @CFLAGS@ @XX_CFLAGS@
+CPPFLAGS = @CPPFLAGS@
+FT_CFLAGS = $(CFLAGS) $(INCLUDES)
+
+# linker flags
+FT_LIBS = @LIBS@
+
+# i18n stuff
+LOCALEDIR = @LOCALEDIR@
+
+
+all: do_link
+	$(MAKE) -f $(FT_MAKEFILE) LIB_FILES="$(OBJ_S)" libttf.la
+
+debug: do_link
+	$(MAKE) -f $(FT_MAKEFILE) LIB_FILES="$(OBJ_M)" libttf.la
+
+
+do_link:
+	-$(RMF) memory.c file.c mutex.c
+	$(LN_S) $(srcdir)/$(MEMSRC) memory.c
+	$(LN_S) $(srcdir)/$(FILESRC) file.c
+	$(LN_S) $(srcdir)/$(MUTEXSRC) mutex.c
+
+
+.SUFFIXES: .lo
+.c.lo:
+	$(LIBTOOL) --mode=compile $(CC) -c $(FT_CFLAGS) $<
+
+ftxkern.lo: $(FTEXTDIR)/ftxkern.c
+	$(LIBTOOL) --mode=compile $(CC) -c $(FT_CFLAGS) $(FTEXTDIR)/ftxkern.c
+
+ftxgasp.lo: $(FTEXTDIR)/ftxgasp.c
+	$(LIBTOOL) --mode=compile $(CC) -c $(FT_CFLAGS) $(FTEXTDIR)/ftxgasp.c
+
+ftxpost.lo: $(FTEXTDIR)/ftxpost.c
+	$(LIBTOOL) --mode=compile $(CC) -c $(FT_CFLAGS) $(FTEXTDIR)/ftxpost.c
+
+ftxcmap.lo: $(FTEXTDIR)/ftxcmap.c
+	$(LIBTOOL) --mode=compile $(CC) -c $(FT_CFLAGS) $(FTEXTDIR)/ftxcmap.c
+
+ftxsbit.lo: $(FTEXTDIR)/ftxsbit.c
+	$(LIBTOOL) --mode=compile $(CC) -c $(FT_CFLAGS) $(FTEXTDIR)/ftxsbit.c
+
+ftxwidth.lo: $(FTEXTDIR)/ftxwidth.c
+	$(LIBTOOL) --mode=compile $(CC) -c $(FT_CFLAGS) $(FTEXTDIR)/ftxwidth.c
+
+ftxerr18.lo: $(FTEXTDIR)/ftxerr18.c
+	$(LIBTOOL) --mode=compile $(CC) -c $(FT_CFLAGS) \
+                                  -DLOCALEDIR='"$(LOCALEDIR)"' \
+                                  $(FTEXTDIR)/ftxerr18.c
+
+ftxgsub.lo: $(FTEXTDIR)/ftxgsub.c
+	$(LIBTOOL) --mode=compile $(CC) -c $(FT_CFLAGS) $(FTEXTDIR)/ftxgsub.c
+
+ftxgpos.lo: $(FTEXTDIR)/ftxgpos.c
+	$(LIBTOOL) --mode=compile $(CC) -c $(FT_CFLAGS) $(FTEXTDIR)/ftxgpos.c
+
+ftxgdef.lo: $(FTEXTDIR)/ftxgdef.c
+	$(LIBTOOL) --mode=compile $(CC) -c $(FT_CFLAGS) $(FTEXTDIR)/ftxgdef.c
+
+ftxopen.lo: $(FTEXTDIR)/ftxopen.c
+	$(LIBTOOL) --mode=compile $(CC) -c $(FT_CFLAGS) $(FTEXTDIR)/ftxopen.c
+
+freetype.lo: $(SRC_S) $(SRC_M)
+	$(LIBTOOL) --mode=compile $(CC) -c $(FT_CFLAGS) \
+                                        -DLOCALEDIR='"$(LOCALEDIR)"' \
+                                        -DTT_MAKE_OPTION_SINGLE_OBJECT \
+                                        $(SRC_S)
+
+libttf.la: $(LIB_FILES)
+	$(LIBTOOL) --mode=link $(CC) -o libttf.la $(LIB_FILES) \
+                               -rpath $(libdir) \
+                               -version-info $(version_info) $(FT_LIBS)
+
+install: libttf.la
+	$(MKINSTALLDIRS) $(libdir) $(includedir)/freetype
+	$(LIBTOOL) --mode=install $(INSTALL) libttf.la $(libdir)
+	-for P in $(HEADERS) ; do \
+          $(INSTALL_DATA) $$P $(includedir)/freetype ; \
+        done
+
+uninstall: 
+	-$(LIBTOOL) --mode=uninstall $(RM) $(libdir)/libttf.la
+	-$(RMF) $(includedir)/freetype/*
+	-$(RMDIR) $(includedir)/freetype
+
+clean:
+	-$(RMF) $(OBJ_S) $(OBJ_M) *.o
+
+distclean: clean
+	-$(RMF) file.c memory.c mutex.c
+	-$(RMF) libttf.la
+	-$(RMF) *.orig *~ core *.core
+	-$(RMF) $(ARCH)/Makefile
+	-$(RMF) .libs/*
+	-$(RMDIR) .libs
+
+depend: do_link
+	(echo '/^#.* PUT NO STUFF BELOW/,$$d' ; echo w ; echo q) | \
+         ed - $(ARCH)/Makefile
+	echo '# Dependencies generated by make depend: PUT NO STUFF BELOW' \
+          >> $(ARCH)/Makefile
+	for file in $(SRC_S) $(SRC_M) $(EXTSRC) ; do \
+          $(CPP) $(CPPFLAGS) $(INCLUDES) $$file | \
+           sed -n -e 's|^# [1-9][0-9]* "\([^/].*\.h\)".*|\1|p' \
+                  -e 's|^# [1-9][0-9]* "\($(srcdir)/.*\.h\)".*|\1|p' | \
+           sed -e 's|/\./|.|g' -e "s/^/`basename $$file .c`.lo: /" ; \
+        done | \
+         sort -u | \
+         awk '{ if (LINE == 1) \
+                  { line = last = $$1 } \
+                else if ($$1 != last) \
+                  { print line ; line = last = $$1 } \
+                line = line " " $$2 } \
+              END { print line }' >> $(ARCH)/Makefile
+
+# Dependencies generated by make depend: PUT NO STUFF BELOW

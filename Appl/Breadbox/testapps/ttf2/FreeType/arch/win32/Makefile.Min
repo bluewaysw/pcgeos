@@ -1,0 +1,98 @@
+# This file is part of the FreeType project.
+#
+# It builds the library for MinGW32 gcc under Win9x.
+#
+# You will need a port of GNU make; the MinGW32 port works.
+#
+# Use this file while in the lib directory with the following statement:
+#
+#   make -f arch/win32/Makefile.Min
+#
+#
+# When compared to the other Makefiles for gcc, there is a difference
+# here, because COMMAND.COM on Win 9x is not able to process more than
+# 126 characters.  So the command line for ar use the * shell character.
+#
+# This is not as safe as normal, because unnecessary files may be
+# included by mistake in the library.
+# The normal behaviour can be restored by defining NON_LIMITED_SHELL=1
+ 
+ARCH = arch/win32
+FT_MAKEFILE = $(ARCH)/Makefile.Min
+
+CC = gcc
+
+ifdef DEBUG
+CFLAGS = -Wall -O2 -g -ansi -pedantic -I$(ARCH) -I. -Iextend
+else
+CFLAGS = -Wall -ansi -pedantic -O2 -s -I$(ARCH) -I. -Iextend
+endif
+
+
+TTFILE = ./ttfile.c
+TTMEMORY = ./ttmemory.c
+TTMUTEX = ./ttmutex.c
+
+PORT = $(TTFILE) $(TTMEMORY) $(TTMUTEX)
+
+SRC_X = extend/ftxgasp.c extend/ftxkern.c  extend/ftxpost.c \
+        extend/ftxcmap.c extend/ftxwidth.c extend/ftxsbit.c \
+        extend/ftxgsub.c extend/ftxgpos.c  extend/ftxgdef.c \
+        extend/ftxopen.c extend/ftxerr18.c
+OBJS_X = $(SRC_X:.c=.o)
+
+SRC_M = ttapi.c     ttcache.c   ttcalc.c   ttcmap.c  ttdebug.c \
+        ttgload.c   ttinterp.c  ttload.c   ttobjs.c  \
+        ttraster.c  ttextend.c  $(PORT)
+OBJS_M = $(SRC_M:.c=.o) $(OBJS_X)
+
+SRC_S = $(ARCH)/freetype.c
+OBJ_S = $(SRC_S:.c=.o)
+OBJS_S = $(OBJ_S) $(OBJS_X)
+
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+.PHONY: all debug clean distclean depend
+
+
+all:
+	$(MAKE) -f $(FT_MAKEFILE) LIB_FILES=$(OBJS_S) OBJ_LOC=$(ARCH) libttf.a
+
+debug:
+	$(MAKE) -f $(FT_MAKEFILE) LIB_FILES=$(OBJS_M) DEBUG=1 OBJ_LOC=. libttf.a
+
+$(OBJ_S): $(SRC_S) $(SRC_M)
+
+ifdef NOT_LIMITED_SHELL
+libttf.a: $(LIB_FILES)
+	-del $@
+	ar src $@ $^
+else
+# The previous command exceeds the capacity of COMMAND.COM,
+# so we cheat by passing * character to ar
+libttf.a: $(LIB_FILES)
+	-del $@
+	ar src $@ $(OBJ_LOC)/*.o extend/*.o 
+endif
+
+
+clean:
+	-del *.o
+	-del extend\*.o
+	-del $(subst /,\,$(ARCH)\*.o)
+	-del response
+
+distclean: clean
+	-del dep.end
+	-del libttf.a
+
+depend: $(SRS_S) $(SRC_M) $(SRC_X)
+	$(CC) -E -M $^ > dep.end
+
+ifeq (dep.end,$(wildcard dep.end))
+  include dep.end
+endif
+
+# end of Makefile.Min

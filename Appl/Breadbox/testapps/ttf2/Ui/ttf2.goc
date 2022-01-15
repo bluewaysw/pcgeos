@@ -1,0 +1,124 @@
+/********************************************************************
+ *
+ *	Testapp für das Rendern von TTF-Fonts
+ *
+ *******************************************************************/
+@include <stdapp.goh>
+#include <geos.h>
+#include <stdlib.h>
+#include "FreeType/freetype.h"
+
+
+#define FONT_SIZE 16
+
+TT_Engine   engine;
+TT_Face     face;
+
+
+@class TtfProcessClass, GenProcessClass;
+@endc;
+@classdecl TtfProcessClass, neverSaved;
+
+/********************************************************************
+ *		UI Object Resources
+ *******************************************************************/
+@start AppResource;
+
+@object GenApplicationClass TtfApp = {
+    GI_visMoniker = list { @TtfTextMoniker };
+    GI_comp = @TtfPrimary;
+
+    gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS ) = @TtfPrimary;
+}
+
+@visMoniker TtfTextMoniker = "TTF Test";
+
+@end AppResource;
+
+
+@start Interface;
+
+@object GenPrimaryClass TtfPrimary  = {
+    GI_comp = @TtfView,
+              @LogText;
+    ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenViewClass TtfView = {
+    GVI_horizAttrs = @default | GVDA_SCROLLABLE | GVDA_NO_LARGER_THAN_CONTENT;
+    GVI_vertAttrs  = @default | GVDA_SCROLLABLE | GVDA_NO_LARGER_THAN_CONTENT;
+    GVI_content = process;
+    GVI_docBounds = { 0, 0, 500, 450 };
+
+    ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
+}
+
+@object GenTextClass LogText = {
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	  HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@end Interface;
+
+/********************************************************************
+ * Zeichensatz rendern
+ ********************************************************************/
+void TtfDraw( GStateHandle gstate ) {
+    word character;
+
+    // Zeichensatz durchlaufen in einer 16 x 16 Matrix
+    for(character = 32; character <= 255; character++ ) {
+       word posX = ( character % 16 ) * FONT_SIZE + FONT_SIZE/2;
+       word posY = ( character / 16 ) * FONT_SIZE - FONT_SIZE;
+
+       //TODO: Zeichen character an posX, posY ausgeben
+    }
+}
+
+@method TtfProcessClass, MSG_META_EXPOSED {
+    GStateHandle gstate = GrCreateState( win );
+    char tmpStr[40];
+    TT_Face_Properties props;
+    TT_Error error;
+
+
+    error = TT_Init_FreeType(&engine);
+    if(error) {
+        _log("Fehler bei Initialisierung\r");
+        goto Fail;
+    }
+
+    error = TT_Open_Face(engine, "Lib.ttf", &face);
+    if(error) {
+         _log("Fehler beim laden des Fonts\r");
+         goto Fail;
+    }
+
+    error = TT_Get_Face_Properties(face, &props);
+    if(error) {
+        _log("Fehler beim laden der Properties\r");
+        return;
+    }
+
+    sprintf(tmpStr, "num glyphs: %d\r", props.num_Glyphs); _log(tmpStr);
+    sprintf(tmpStr, "num faces: %d\r", props.num_Faces); _log(tmpStr);
+    sprintf(tmpStr, "max points: %d\r", props.max_Points); _log(tmpStr);
+
+    GrBeginUpdate( gstate );
+    TtfDraw( gstate );
+    GrEndUpdate( gstate );
+
+    GrDestroyState( gstate );
+
+    Fail:
+        return;
+}
+
+void _log(char * message) {
+   @call LogText::MSG_VIS_TEXT_APPEND_PTR(message, 0);
+}
+
+void clear_log() {
+  @call LogText::MSG_VIS_TEXT_DELETE_ALL();
+}

@@ -1,0 +1,117 @@
+# This file is part of the FreeType project.
+#
+# It builds the library for Microsoft Visual C++ 1.x for MS-DOS, large model.
+# It also works for Microsoft C/C++ v.7.0 16-bit compiler, but not for
+# previous versions (use Makefile.MS instead).
+#
+# You will need NMAKE.
+#
+# Use this file while in the lib directory with the following statement:
+#
+#   nmake /f arch\msdos\Makefile.VC
+#
+#
+# A debug version can be obtained with
+#
+#   nmake DEBUG=1 /f arch\msdos\Makefile.VC
+#
+# A special version enabled to handle big fonts (with more than 16,384
+# glyphs) can be obtained with
+#
+#   nmake BIGFONTS=1 /f arch\msdos\Makefile.VC
+
+ARCH = arch\msdos
+FT_MAKEFILE = $(ARCH)\Makefile.VC
+
+CC = cl /nologo
+LIB = lib /noignorecase /nologo
+
+# One can also consider using "set MSC_CMD_FLAGS=/Gr /Op- /Gy /YX".
+# With Microsoft C/C++ 7.0, use /G2 instead of /G3.
+!ifndef DEBUG
+CFLAGS = $(CFLAGS) /Ox /AL /W2 /G3 /I$(ARCH) /I. /Iextend
+!else
+CFLAGS = $(CFLAGS) /Zi /Ge /AL /W2 /G3 /I$(ARCH) /I. /Iextend
+!endif
+
+
+!ifndef BIGFONTS
+CFLAGS = $(CFLAGS) /Za
+
+TTFILE = .\ttfile.c
+TTMEMORY = .\ttmemory.c
+!else
+CFLAGS = $(CFLAGS) /DTT_HUGE_PTR=__huge /Ze
+
+TTFILE = $(ARCH)\hugefile.c
+TTMEMORY = $(ARCH)\hugemem.c
+!endif
+
+TTMUTEX = .\ttmutex.c
+
+PORT = $(TTFILE) $(TTMEMORY) $(TTMUTEX)
+
+# Do not insert spaces between the file names or at end of line, otherwise
+# the substitution for LIB command line will fail. Thank you.
+#
+SRC_X = extend\ftxgasp.c extend\ftxkern.c extend\ftxpost.c\
+extend\ftxcmap.c extend\ftxwidth.c extend\ftxerr18.c extend\ftxsbit.c\
+extend\ftxopen.c extend\ftxgsub.c extend\ftxgpos.c extend\ftxgdef.c
+OBJS_X = $(SRC_X:.c=.obj)
+
+SRC_M = ttapi.c ttcache.c ttcalc.c ttcmap.c ttdebug.c\
+ttgload.c ttinterp.c ttload.c ttobjs.c ttraster.c ttextend.c $(PORT)
+OBJS_M = $(SRC_M:.c=.obj) $(OBJS_X)
+
+SRC_S = $(ARCH)\freetype.c
+OBJ_S = $(SRC_S:.c=.obj)
+OBJS_S = $(OBJ_S) $(OBJS_X)
+
+
+# Since Microsoft's NMAKE does not handle $($(LIB_FILES)), and using
+# LIB_FILES="$(OBJS_S)" will excess the capacity of COMMAND.COM, we cheat
+# by constructing LIB's response file directly in the `all' target.
+#
+# Another solution, useful during debugging of part of the library,
+# would be to include each .obj in the library as soon as it is compiled.
+# It is commented out below.  See Makefile.TC for an application.
+.c.obj:
+	@$(CC) /c /Fo$@ @<<
+	    $(CFLAGS) $*.c
+<<
+#	$(LIB) libttf +-$*.obj
+
+
+!ifndef DEBUG
+# Skipped if DEBUG build
+all: $(OBJS_S)
+	-del libttf.lib
+	$(LIB) libttf.lib @<<response
++ $(OBJS_S: = + );
+<<KEEP
+!endif
+
+debug: $(OBJS_M)
+	-del libttf.lib
+	$(LIB) libttf.lib @<<response
++ $(OBJS_M: = + );
+<<KEEP
+
+$(OBJ_S): $(SRC_S) $(SRC_M)
+
+# Not used here because it excesses the capacity of COMMAND.COM...
+libttf.lib: $(LIB_FILES)
+	$(LIB) $@ +-$(?: =-+);
+
+clean:
+	-del *.obj
+	-del extend\*.obj
+	-del $(ARCH)\*.obj
+	-del response
+
+distclean: clean
+	-del libttf.lib
+
+!include "$(ARCH)\depend.dos"
+
+# end of Makefile.VC

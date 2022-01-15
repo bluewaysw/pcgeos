@@ -1,0 +1,86 @@
+# This file is part of the FreeType project.
+#
+# It builds the library for Turbo C for MS-DOS, large model.
+# Due to size constraints, it does not try to pack all modules into one.
+#
+# You will need Borland MAKE.
+# Tested with Turbo C v.1.5, v.2.0,  Turbo C++ v.1.0
+# Turbo C v.1.0 (May '87) is too old (lack of structure assignment)
+#   to compile FreeType.  Update your compiler. ;-)
+#
+# Use this file while in the lib directory with the following statement:
+#
+#   make -farch/msdos/Makefile.TC
+#
+#
+# A debug version can be obtained (except for TC1.5) with
+#
+#   make -DDEBUG -farch/msdos/Makefile.TC
+
+ARCH = arch\msdos
+FT_MAKEFILE = $(ARCH)\Makefile.TC
+
+CC = tcc
+LIB = tlib /c
+
+!if ! $d(DEBUG)
+CFLAGS = -ml -A -a -G -w-par -w-use -w-aus -w-stu -w-stv -w-cln -w-sig -I$(ARCH);.;extend
+!else
+# For Turbo C v.1.5, replace the -v option below by -y.
+CFLAGS = -v -N -ml -A -w-par -w-use -w-aus -w-stu -w-stv -w-cln -w-sig -I$(ARCH);.;extend
+!endif
+
+
+TTFILE = .\ttfile.obj
+TTMEMORY = .\ttmemory.obj
+TTMUTEX = .\ttmutex.obj
+
+PORT = $(TTFILE) $(TTMEMORY) $(TTMUTEX)
+
+OBJS_X = extend\ftxgasp.obj extend\ftxkern.obj  extend\ftxpost.obj \
+         extend\ftxcmap.obj extend\ftxwidth.obj extend\ftxerr18.obj \
+         extend\ftxsbit.obj extend\ftxopen.obj  extend\ftxgsub.obj \
+         extend\ftxgpos.obj extend\ftxgdef.obj
+# the line below does not work with these old versions of make...
+# OBJS_X = $(SRC_X:.c=.obj)
+
+OBJS_M = ttapi.obj     ttcache.obj   ttcalc.obj   ttcmap.obj  ttdebug.obj \
+         ttgload.obj   ttinterp.obj  ttload.obj   ttobjs.obj  \
+         ttraster.obj  ttextend.obj  $(PORT)      $(OBJS_X)
+# OBJS_M = $(SRC_M:.c=.obj) $(OBJS_X)
+
+# Not used here because the compiler runs out of memory...
+OBJ_S = $(ARCH)\freetype.obj
+OBJS_S = $(OBJ_S) $(OBJS_X)
+
+
+# Since Borland's make is very primitive, we include each .obj
+# in the library as soon as it is compiled.
+
+.c.obj:
+	$(CC) $(CFLAGS) -c -o$* $<
+	$(LIB) libttf +-$*.obj
+
+
+!if !$d(DEBUG)
+# Skipped if DEBUG build
+#   (but it changes nothing, since we always build in multiple parts).
+all: $(OBJS_M)
+
+!endif
+
+debug: $(OBJS_M)
+
+clean:
+	-del *.obj
+	-del extend\*.obj
+	-del $(ARCH)\*.obj
+	-del libttf.bak
+#	-del response
+
+distclean: clean
+	-del libttf.lib
+
+!include "$(ARCH)\depend.dos"
+
+# end of Makefile

@@ -1,0 +1,47 @@
+
+This is the readme of the freetype.hqx archive in the contrib/mac
+subdirectory.  Please note that the FreeType team does *not* support the
+Macintosh platform due to lack of knowledge.  All questions regarding the
+code should be sent to both David Williss and the freetype-devel list.
+
+
+----------------------------------------------------------------------------
+
+
+These are CodeWarrior projects for building the FreeType library on a Macintosh
+I've only provided PPC projects here, but building for 68K shouldn't be hard.
+There are two directories here (OK, "folders").  One contains a project for
+building freetype.ppc.lib and the other is for freetype.ppc.dll.  (I havn't
+actually tested the DLL yet.)
+
+The Macintosh stores TrueType fonts in a "Fonts" folder under the "System"
+folder.  There is a standard MacOS API for finding this folder, so I use it.
+However, the fonts aren't normal flat files.  They have all the data in
+resources in the resource fork.  Each font is an 'sfnt' resource, and each
+file can have more than one 'sfnt' resource.  
+
+To get at them, I made a copy of ttmmap.c from the Unix implementation and
+modified it to load/release the resource and lock/unlock the handle as needed.
+This only required a change to the open and close functions.  After that, it
+works just as if it was using Unix memory mapping.
+
+One thing however.  Because of the bizarre scheme for storing the fonts, I
+made up a way of specifying the font filename.  
+
+	fonts:/fontfile/fontname
+	
+Where fonts:/ is a literal string that means "the fonts folder", fontfile is
+the name of the actual file and fontname is the name of the 'sfnt' resource.
+Currently, this is the only thing it understands.  It might be nice if some
+day (2.0 maybe?) ttfile.c and ttmmap.c wern't mutialy exclusive and it could
+decide which method to use based on the filename or something.
+
+Another thing that I had to change to make this work.  It seems that Macintosh
+TrueType fonts have no OS/2 table, so ttload.c needs to be modified to make
+that nonfatal, at least on a Macintosh.
+
+---
+
+David Williss
+MicroImages, Inc.
+dwilliss@microimages.com
