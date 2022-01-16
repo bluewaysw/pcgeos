@@ -304,7 +304,11 @@
 
       current->data = object;
 
+#ifdef __GEOS__
+      error = ProcCallFixedOrMovable_cdecl( build, object, parent_object );
+#else
       error = build( object, parent_object );
+#endif    /* ifdef __GEOS__ */
       if ( error )
       {
         Element_Done( cache->engine, current );
