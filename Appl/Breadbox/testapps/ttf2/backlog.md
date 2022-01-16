@@ -10,8 +10,9 @@
 - ~~Dateihandling auf FileHandle umstellen, übersetzbar und lauffähig~~
 - ~~Font öffnen mit TT_Open_Face, übersetzbar und lauffähig~~
 - ~~Font Properties abfragen mit TT_Get_Face_Properties, übersetzbar und lauffähig~~
-- Instanz eines Face Objekts erzeugen, übersetzbar und lauffähig
-- Pointsize mit TT_Set_Instance_CharSize setzen, übersetbar und lauffähig
+- ~~Instanz eines Face Objekts erzeugen, übersetzbar und lauffähig~~
+- ~~Pointsize mit TT_Set_Instance_CharSize setzen, übersetbar und lauffähig~~
+- ~~Metriken eines Glyphs lesen und anzeigen, übersetzbar und lauffähig~~
 - Glyph als Bitmap erzeugen, übersetzbar und lauffähig
 - Bitmap im Testprogramm anzeigen, übersetzbar und lauffähig
 - Zeichensatz im Testprogramm anzeigen, übersetzbar und lauffähig

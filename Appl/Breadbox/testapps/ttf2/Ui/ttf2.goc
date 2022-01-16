@@ -76,11 +76,35 @@ void TtfDraw( GStateHandle gstate ) {
     }
 }
 
+TT_UShort getWindowsUnicodeCharMap(TT_Face face) {
+    TT_UShort charMap;
+    TT_Error error;
+
+    for(charMap = 0; charMap < TT_Get_CharMap_Count(face); charMap++) {
+        TT_UShort platformID;
+        TT_UShort encodingID;
+
+        error = TT_Get_CharMap_ID(face, charMap, &platformID, &encodingID);
+        if(error)
+            return -1;
+
+        /* platformId = Windows, encodingId = Unicode */
+        if(platformID == 3 && encodingID == 1)
+            return charMap;
+    }
+    return -1;
+}
+
 @method TtfProcessClass, MSG_META_EXPOSED {
     GStateHandle gstate = GrCreateState( win );
     char tmpStr[40];
     TT_Face_Properties props;
     TT_Instance instance;
+    TT_Glyph glyph;
+    TT_UShort charMapId;
+    TT_CharMap charMap;
+    TT_Glyph_Metrics metrics;
+    TT_Raster_Map bitmap;
     TT_Error error;
 
 
@@ -115,6 +139,53 @@ void TtfDraw( GStateHandle gstate ) {
         goto Fail;
     }
 
+    error = TT_Set_Instance_CharSize(instance, 9*64);
+    if(error) {
+        _log("Fehler beim setzen der Pointsize\r");
+        goto Fail;
+    }
+
+    error = TT_New_Glyph(face, &glyph);
+    if(error) {
+        _log("Fehler beim anlegen eines Glyphs\r");
+        goto Fail;
+    }
+
+    charMapId = getWindowsUnicodeCharMap(face);
+    if(charMapId < 0) {
+        _log("Windows Unicode Charmap nicht gefunden\r");
+        goto Fail;
+    }
+
+    error = TT_Get_CharMap(face, charMapId, &charMap);
+    if(error) {
+        _log("Fehler beim laden der CharMap\r");
+        goto Fail;
+    }
+
+    /* TODO: Index aus CharMap benutzen */
+    error = TT_Load_Glyph( instance, glyph, 36, TTLOAD_DEFAULT );
+    if(error) {
+        _log("Fehler beim laden eines Glyphs\r");
+        goto Fail;
+    }
+
+    error = TT_Get_Glyph_Metrics(glyph, &metrics);
+    if(error) {
+        _log("Fehler beim laden der Glyphmetriken\r");
+        goto Fail;
+    }
+
+    sprintf(tmpStr, "bearingX:\t%d\r", metrics.bearingX >> 6); _log(tmpStr);
+    sprintf(tmpStr, "bearingY:\t%d\r", metrics.bearingY >> 6); _log(tmpStr);
+    sprintf(tmpStr, "advance:\t%d\r", metrics.advance >> 6); _log(tmpStr);
+
+    error = TT_Get_Glyph_Bitmap(glyph, &bitmap, 0, 0);
+       if(error) {
+        _log("Fehler beim rendern des Glyphs\r");
+        goto Fail;
+    }
+
     GrBeginUpdate( gstate );
     TtfDraw( gstate );
     GrEndUpdate( gstate );
@@ -122,6 +193,7 @@ void TtfDraw( GStateHandle gstate ) {
     GrDestroyState( gstate );
 
     Fail:
+        /* Resourcen freigeben */
         return;
 }
 
