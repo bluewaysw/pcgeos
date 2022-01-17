@@ -2191,7 +2191,11 @@
 
     /* Now inits the sweep */
 
+#ifdef __GEOS__
+    ProcCallFixedOrMovable_cdecl( ras.Proc_Sweep_Init, RAS_VARS  &min_Y, &max_Y );
+#else
     ras.Proc_Sweep_Init( RAS_VARS  &min_Y, &max_Y );
+#endif    /* ifdef __GEOS__ */
 
     /* Then compute the distance of each profile from min_Y */
 
@@ -2287,7 +2291,11 @@
             }
           }
 
+#ifdef __GEOS__
+          ProcCallFixedOrMovable_cdecl( ras.Proc_Sweep_Span, RAS_VARS  y, x1, x2, P_Left, P_Right );
+#else
           ras.Proc_Sweep_Span( RAS_VARS  y, x1, x2, P_Left, P_Right );
+#endif    /* __GEOS__ */
 
    Skip_To_Next:
 
@@ -2303,7 +2311,11 @@
 
    Next_Line:
 
+#ifdef __GEOS__
+        ProcCallFixedOrMovable_cdecl( ras.Proc_Sweep_Step, RAS_VAR );
+#else
         ras.Proc_Sweep_Step( RAS_VAR );
+#endif    /* ifdef __GEOS__ */
 
         y++;
 
@@ -2344,7 +2356,11 @@
     /* for gray-scaling, flushes the bitmap scanline cache */
     while ( y <= max_Y )
     {
+#ifdef __GEOS__
+      ProcCallFixedOrMovable_cdecl( ras.Proc_Sweep_Step, RAS_VAR );
+#else
       ras.Proc_Sweep_Step( RAS_VAR );
+#endif    /* __GEOS__ */
       y++;
     }
 
@@ -2361,11 +2377,19 @@ Scan_DropOuts :
       {
         P_Left->countL = 0;
         /* dropouts--;    -- this is useful when debugging only */
+#ifdef __GEOS__
+        ProcCallFixedOrMovable_cdecl( ras.Proc_Sweep_Drop, RAS_VARS  y,
+                                       P_Left->X,
+                                       P_Right->X,
+                                       P_Left,
+                                       P_Right );
+#else
         ras.Proc_Sweep_Drop( RAS_VARS  y,
                                        P_Left->X,
                                        P_Right->X,
                                        P_Left,
                                        P_Right );
+#endif    /* ifdef __GEOS__ */
       }
 
       P_Left  = P_Left->link;
