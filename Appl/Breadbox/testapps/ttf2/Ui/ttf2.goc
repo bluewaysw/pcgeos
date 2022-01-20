@@ -6,13 +6,20 @@
 @include <stdapp.goh>
 #include <geos.h>
 #include <stdlib.h>
+#include <graphics.h>
+#include <string.h>
 #include "FreeType/freetype.h"
 
 
-#define FONT_SIZE 16
+#define FONT_SIZE 30
 
 TT_Engine   engine;
 TT_Face     face;
+
+typedef struct {
+  Bitmap b;
+  char data[24 * 3];
+} Bmp;
 
 
 @class TtfProcessClass, GenProcessClass;
@@ -64,35 +71,40 @@ TT_Face     face;
 /********************************************************************
  * Zeichensatz rendern
  ********************************************************************/
-void TtfDraw( GStateHandle gstate ) {
-    word character;
+void TtfDraw( GStateHandle gstate, TT_Instance instance, TT_Glyph glyph ) {
+    word characterId;
+    TT_Raster_Map bitmap;
+    Bmp bmp;
 
     // Zeichensatz durchlaufen in einer 16 x 16 Matrix
-    for(character = 32; character <= 255; character++ ) {
-       word posX = ( character % 16 ) * FONT_SIZE + FONT_SIZE/2;
-       word posY = ( character / 16 ) * FONT_SIZE - FONT_SIZE;
+    for(characterId = 1; characterId <= 200; characterId++ ) {
+       TT_Error error;
+       word posX = ( characterId % 16 ) * FONT_SIZE + FONT_SIZE/2;
+       word posY = ( characterId / 16 ) * FONT_SIZE + FONT_SIZE;
 
-       //TODO: Zeichen character an posX, posY ausgeben
-    }
-}
+        memset(&bmp, 0, sizeof(Bmp));
+        bmp.b.B_compact = BMC_UNCOMPACTED;
+        bmp.b.B_type = BMF_MONO;
+        bmp.b.B_width = 24;
+        bmp.b.B_height = 24;
 
-TT_UShort getWindowsUnicodeCharMap(TT_Face face) {
-    TT_UShort charMap;
-    TT_Error error;
-
-    for(charMap = 0; charMap < TT_Get_CharMap_Count(face); charMap++) {
-        TT_UShort platformID;
-        TT_UShort encodingID;
-
-        error = TT_Get_CharMap_ID(face, charMap, &platformID, &encodingID);
+        bitmap.flow = TT_Flow_Down;
+        bitmap.rows = 24;
+        bitmap.cols = 3;
+        bitmap.width = 24;
+        bitmap.size = 3*24;
+        bitmap.bitmap = &bmp.data;
+        
+        error = TT_Load_Glyph( instance, glyph, characterId, TTLOAD_DEFAULT | TTLOAD_PEDANTIC );
         if(error)
-            return -1;
+            continue;
 
-        /* platformId = Windows, encodingId = Unicode */
-        if(platformID == 3 && encodingID == 1)
-            return charMap;
+        error = TT_Get_Glyph_Bitmap(glyph, &bitmap, 0, 0);
+        if(error)
+            continue;
+
+        GrDrawImage(gstate, posX, posY, IBS_1, (Bitmap *) &bmp);
     }
-    return -1;
 }
 
 @method TtfProcessClass, MSG_META_EXPOSED {
@@ -104,7 +116,6 @@ TT_UShort getWindowsUnicodeCharMap(TT_Face face) {
     TT_UShort charMapId;
     TT_CharMap charMap;
     TT_Glyph_Metrics metrics;
-    TT_Raster_Map bitmap;
     TT_Error error;
 
 
@@ -151,54 +162,14 @@ TT_UShort getWindowsUnicodeCharMap(TT_Face face) {
         goto Fail;
     }
 
-    charMapId = getWindowsUnicodeCharMap(face);
-    if(charMapId < 0) {
-        _log("Windows Unicode Charmap nicht gefunden\r");
-        goto Fail;
-    }
-
-    error = TT_Get_CharMap(face, charMapId, &charMap);
-    if(error) {
-        _log("Fehler beim laden der CharMap\r");
-        goto Fail;
-    }
-
-    /* TODO: Index aus CharMap benutzen */
-    error = TT_Load_Glyph( instance, glyph, 36, TTLOAD_DEFAULT );
-    if(error) {
-        _log("Fehler beim laden eines Glyphs\r");
-        goto Fail;
-    }
-
-    error = TT_Get_Glyph_Metrics(glyph, &metrics);
-    if(error) {
-        _log("Fehler beim laden der Glyphmetriken\r");
-        goto Fail;
-    }
-
-    sprintf(tmpStr, "bearingX:\t%d\r", metrics.bearingX >> 6); _log(tmpStr);
-    sprintf(tmpStr, "bearingY:\t%d\r", metrics.bearingY >> 6); _log(tmpStr);
-    sprintf(tmpStr, "advance:\t%d\r", metrics.advance >> 6); _log(tmpStr);
-
-    error = TT_Get_Glyph_Bitmap(glyph, &bitmap, 0, 0);
-    if(error) {
-        _log("Fehler beim rendern des Glyphs\r");
-        goto Fail;
-    }
-
-    sprintf(tmpStr, "rows:\t%d\r", bitmap.rows); _log(tmpStr);
-    sprintf(tmpStr, "cols:\t%d\r", bitmap.cols); _log(tmpStr);
-    sprintf(tmpStr, "width:\t%d\r", bitmap.width); _log(tmpStr);
-    sprintf(tmpStr, "size:\t%ld\r", bitmap.size); _log(tmpStr);
-
     GrBeginUpdate( gstate );
-    TtfDraw( gstate );
+    TtfDraw( gstate, instance, glyph);
     GrEndUpdate( gstate );
 
     GrDestroyState( gstate );
 
     Fail:
-        /* Resourcen freigeben */
+        TT_Done_FreeType(engine);
         return;
 }
 

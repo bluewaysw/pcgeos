@@ -198,7 +198,11 @@
     while ( current )
     {
       next = current->next;
+#ifdef __GEOS__
+      ProcCallFixedOrMovable_cdecl( destroy, current->data );
+#else
       destroy( current->data );
+#endif
       FREE( current->data );
 
       Element_Done( cache->engine, current );
@@ -211,7 +215,11 @@
     while ( current )
     {
       next = current->next;
+#ifdef __GEOS__
+      ProcCallFixedOrMovable_cdecl( destroy, current->data );
+#else
       destroy( current->data );
+#endif
       FREE( current->data );
 
       Element_Done( cache->engine, current );
@@ -398,7 +406,11 @@
     if ( destroy )
     {
       /* destroy the object when the cache is full */
+#ifdef __GEOS__
+      ProcCallFixedOrMovable_cdecl( cache->clazz->done, element->data );
+#else
       cache->clazz->done( element->data );
+#endif    /* ifdef __GEOS__ */
       FREE( element->data );
       Element_Done( cache->engine, element );
     }
@@ -410,7 +422,11 @@
       finalize = cache->clazz->finalize;
       if ( finalize )
       {
+#ifdef __GEOS__
+        error = ProcCallFixedOrMovable_cdecl( finalize, element->data );
+#else
         error = finalize( element->data );
+#endif    /* ifdef __GEOS__ */
         if ( error )
           goto Exit;
 
