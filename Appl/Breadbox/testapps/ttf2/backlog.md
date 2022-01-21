@@ -26,4 +26,4 @@
 
 ## Fehler
 - ~~freigeben von resiervierten Resoucen führt zum einfrieren~~
-- Teile eines Zeiches die unter der Basislinie liegen werden nicht angezeigt
+- ~~Teile eines Zeichens die unter der Basislinie liegen werden nicht angezeigt~~

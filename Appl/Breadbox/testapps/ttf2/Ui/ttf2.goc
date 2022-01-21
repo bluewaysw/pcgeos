@@ -73,14 +73,16 @@ typedef struct {
  ********************************************************************/
 void TtfDraw( GStateHandle gstate, TT_Instance instance, TT_Glyph glyph ) {
     word characterId;
+    TT_Glyph_Metrics metrics;
     TT_Raster_Map bitmap;
+    int offsetY = 0;
     Bmp bmp;
 
     // Zeichensatz durchlaufen in einer 16 x 16 Matrix
     for(characterId = 1; characterId <= 200; characterId++ ) {
        TT_Error error;
-       word posX = ( characterId % 16 ) * FONT_SIZE + FONT_SIZE/2;
-       word posY = ( characterId / 16 ) * FONT_SIZE + FONT_SIZE;
+       int posX = ( characterId % 16 ) * FONT_SIZE + FONT_SIZE/2;
+       int posY = ( characterId / 16 ) * FONT_SIZE + FONT_SIZE;
 
         memset(&bmp, 0, sizeof(Bmp));
         bmp.b.B_compact = BMC_UNCOMPACTED;
@@ -99,11 +101,17 @@ void TtfDraw( GStateHandle gstate, TT_Instance instance, TT_Glyph glyph ) {
         if(error)
             continue;
 
-        error = TT_Get_Glyph_Bitmap(glyph, &bitmap, 0, 0);
+        error = TT_Get_Glyph_Metrics(glyph, &metrics);
         if(error)
             continue;
 
-        GrDrawImage(gstate, posX, posY, IBS_1, (Bitmap *) &bmp);
+        offsetY = metrics.bbox.yMin;
+
+        error = TT_Get_Glyph_Bitmap(glyph, &bitmap, 0, -offsetY);
+        if(error)
+            continue;
+
+        GrDrawImage(gstate, posX, posY - (offsetY>>6), IBS_1, (Bitmap *) &bmp);
     }
 }
 
