@@ -970,8 +970,13 @@
   EXPORT_FUNC
   TT_Error  TT_Skip_File( STREAM_ARGS Long  distance )
   {
+#ifdef __GEOS__
+    return TT_Seek_File( STREAM_VARS FilePos( CUR_Stream->file, 0, FILE_POS_RELATIVE ) -
+                                    CUR_Stream->base + distance );
+#else
     return TT_Seek_File( STREAM_VARS ftell( CUR_Stream->file ) -
                                      CUR_Stream->base + distance );
+#endif    /* ifdef __GEOS__ */
   }
 
 

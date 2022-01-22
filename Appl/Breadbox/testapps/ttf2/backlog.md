@@ -27,3 +27,6 @@
 ## Fehler
 - ~~freigeben von resiervierten Resoucen führt zum einfrieren~~
 - ~~Teile eines Zeichens die unter der Basislinie liegen werden nicht angezeigt~~
+
+## Bemerkungen
+- die Darstellung keiner Punktgröße ist jetzt wesentlich besser aber stark vom Font abhänging; das ist bei der Font-Selektion zu beachten

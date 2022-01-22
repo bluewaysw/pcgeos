@@ -75,6 +75,7 @@ void TtfDraw( GStateHandle gstate, TT_Instance instance, TT_Glyph glyph ) {
     word characterId;
     TT_Glyph_Metrics metrics;
     TT_Raster_Map bitmap;
+    TT_Outline outline;
     int offsetY = 0;
     Bmp bmp;
 
@@ -100,6 +101,13 @@ void TtfDraw( GStateHandle gstate, TT_Instance instance, TT_Glyph glyph ) {
         error = TT_Load_Glyph( instance, glyph, characterId, TTLOAD_DEFAULT | TTLOAD_PEDANTIC );
         if(error)
             continue;
+
+        error = TT_Get_Glyph_Outline(glyph, &outline);
+        if(error)
+            continue;
+
+        outline.second_pass = TRUE;
+        outline.high_precision = TRUE;
 
         error = TT_Get_Glyph_Metrics(glyph, &metrics);
         if(error)
@@ -133,6 +141,12 @@ void TtfDraw( GStateHandle gstate, TT_Instance instance, TT_Glyph glyph ) {
         goto Fail;
     }
 
+    /* error = TT_Init_Kerning_Extension(&engine);
+    if(error) {
+        _log("Fehler bei der Initialisierung des Kernings\r");
+        goto Fail;
+    } */
+
     error = TT_Open_Face(engine, "Lib.ttf", &face);
     if(error) {
          _log("Fehler beim laden des Fonts\r");
@@ -158,7 +172,7 @@ void TtfDraw( GStateHandle gstate, TT_Instance instance, TT_Glyph glyph ) {
         goto Fail;
     }
 
-    error = TT_Set_Instance_CharSize(instance, 9*64);
+    error = TT_Set_Instance_CharSize(instance, 16*64);
     if(error) {
         _log("Fehler beim setzen der Pointsize\r");
         goto Fail;

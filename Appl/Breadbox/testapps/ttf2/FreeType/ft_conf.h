@@ -11,6 +11,7 @@
 /* Under FreeGEOS we need this for the file operations.  */
 #include <geos.h>
 #include <file.h>
+#include <resource.h>
 
 /* Define to empty if the keyword does not work.  */
 /* #undef const */
