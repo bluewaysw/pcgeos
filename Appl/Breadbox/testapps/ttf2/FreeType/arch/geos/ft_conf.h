@@ -9,7 +9,9 @@
 #define FT_CONF_H
 
 /* Under FreeGEOS we need this for the file operations.  */
+#include <geos.h>
 #include <file.h>
+#include <resource.h>
 
 /* Define to empty if the keyword does not work.  */
 /* #undef const */
@@ -89,7 +91,7 @@
 /* by the engine and need no extensions, undefine this configuration     */
 /* macro to save a few more bytes.                                       */
 
-#define  TT_CONFIG_OPTION_EXTEND_ENGINE
+#undef  TT_CONFIG_OPTION_EXTEND_ENGINE
 
 
 /*************************************************************************/
@@ -109,7 +111,7 @@
 /* emerged recently on the FreeType lists.  We still do not have Apple's */
 /* opinion on the subject and will change this as soon as we have.       */
 
-#undef   TT_CONFIG_OPTION_NO_INTERPRETER
+#define   TT_CONFIG_OPTION_NO_INTERPRETER
 
 
 /*************************************************************************/
@@ -141,7 +143,7 @@
 /*                                                                       */
 /* Do NOT DEFINE THIS is you build a thread-safe version of the engine   */
 /*                                                                       */
-#define TT_CONFIG_OPTION_STATIC_RASTER
+#undef TT_CONFIG_OPTION_STATIC_RASTER
 
 
 /*************************************************************************/
