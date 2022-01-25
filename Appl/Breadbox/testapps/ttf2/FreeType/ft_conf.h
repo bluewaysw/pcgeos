@@ -91,7 +91,7 @@
 /* by the engine and need no extensions, undefine this configuration     */
 /* macro to save a few more bytes.                                       */
 
-#undef  TT_CONFIG_OPTION_EXTEND_ENGINE
+#define  TT_CONFIG_OPTION_EXTEND_ENGINE
 
 
 /*************************************************************************/
@@ -111,7 +111,7 @@
 /* emerged recently on the FreeType lists.  We still do not have Apple's */
 /* opinion on the subject and will change this as soon as we have.       */
 
-#define   TT_CONFIG_OPTION_NO_INTERPRETER
+#undef   TT_CONFIG_OPTION_NO_INTERPRETER
 
 
 /*************************************************************************/

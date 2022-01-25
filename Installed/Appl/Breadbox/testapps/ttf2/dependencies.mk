@@ -135,7 +135,8 @@ ttobjs.eobj: FreeType/ttobjs.h FreeType/ttconfig.h FreeType/ft_conf.h \
                 FreeType/ftnameid.h FreeType/ttmutex.h FreeType/ttcache.h \
                 FreeType/tttables.h FreeType/ttcmap.h FreeType/ttfile.h \
                 FreeType/ttdebug.h FreeType/ttcalc.h FreeType/ttmemory.h \
-                Ansi/string.h FreeType/ttload.h FreeType/ttinterp.h
+                Ansi/string.h FreeType/ttload.h FreeType/ttinterp.h \
+                FreeType/ttextend.h
 ttmemory.obj \
 ttmemory.eobj: FreeType/ttdebug.h FreeType/ttconfig.h FreeType/ft_conf.h \
                 geos.h file.h resource.h Ansi/stdlib.h FreeType/tttypes.h \
