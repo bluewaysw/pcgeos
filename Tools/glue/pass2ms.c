@@ -441,8 +441,8 @@ Pass2MSFixupLMem(const char *file,  	/* File being linked */
 		    	((os->u.addrSym.address >=
 		    	(swaps(*oldHandle)-LMEM_SIZE_SIZE) + heap->grpOff)
 			&&
-			(os->u.addrSym.address <
-			(swaps(*nextOldHandle)-LMEM_SIZE_SIZE) + heap->grpOff)))
+			((os->u.addrSym.address <
+			(swaps(*nextOldHandle)-LMEM_SIZE_SIZE) + heap->grpOff)  || (*nextOldHandle == NULL))))
 		    {
 			int newLastOffset = -1;
 			    
