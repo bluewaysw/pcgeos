@@ -26,6 +26,7 @@ type	driver, single
 # Import kernel routine definitions
 #
 library	geos
+library ansic
 #
 # Desktop-related things
 #

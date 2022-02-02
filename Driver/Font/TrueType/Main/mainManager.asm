@@ -87,7 +87,7 @@ WidthMod segment resource
 include		truetypeWidths.asm
 ;include		nimbusUtils.asm
 ;include		nimbusSetTrans.asm
-include		fontcomUtils.asm
+include		../FontCom/fontcomUtils.asm
 WidthMod ends
 
 CharMod segment resource
@@ -113,7 +113,7 @@ MetricsMod ends
 InitMod	segment resource
 include		truetypeInit.asm
 include		truetypeEscape.asm
-include		fontcomEscape.asm
+include		../FontCom/fontcomEscape.asm
 InitMod ends
 
 include		truetypeEC.asm
