@@ -14,5 +14,10 @@ compressManager.eobj: geos.def geode.def ec.def library.def resource.def \
                 file.def fileEnum.def vm.def chunkarr.def thread.def \
                 sem.def compress.def compressConstant.def \
                 compressVariable.def compressIO.asm compressMain.asm
+memory.obj \
+memory.eobj: memory_asm.asm ansicGeode.def geos.def file.def heap.def \
+                ec.def lmem.def library.def geode.def resource.def \
+                chunkarr.def localize.def sllang.def ansic.def \
+                ansicErrors.def product.def
 
-compressEC.geo compress.geo : geos.ldf ansic.ldf 
+compressEC.geo compress.geo : geos.ldf 

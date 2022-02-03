@@ -4,12 +4,13 @@
 # If you edit it, you will lose your changes, should it be regenerated.
 #
 GEODE           = compress
-ASM_TO_OBJS     = compressManager.asm
+ASM_TO_OBJS     = compressManager.asm memory.asm
 UI_TO_RDFS      =
 SRCS            = compressIO.asm compressMain.asm compressManager.asm\
-                  compressConstant.def compressMacro.def\
-                  compressVariable.def explode.c implode.c pklib.h
-OBJS            = compressManager.obj explode.obj implode.obj
+                  memory.asm memory_asm.asm compressConstant.def\
+                  compressMacro.def compressVariable.def explode.c\
+                  implode.c pklib.h
+OBJS            = compressManager.obj memory.obj explode.obj implode.obj
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = compress
