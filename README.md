@@ -18,6 +18,7 @@ The SDK requires "sed" (https://en.wikipedia.org/wiki/Sed) and "perl" (https://e
 - add WATCOM env variable: WATCOM=c:\WATCOM-V2
 - set ROOT_DIR= to the root of the checkout
 - set LOCAL_ROOT if needed
+- set BASEBOX=basebox to use the advanced emulator backend from [pcgeos-basebox](https://github.com/bluewaysw/pcgeos-basebox.git) if it is on the executable path, alternatively you may provide the full path to the executable as well
 
 Document is work in progress.... stay tuned!
 
@@ -48,7 +49,7 @@ Build the target environment:
   - BTW: It's expected that the current version of the perl-script creates several "Could not find file _name_ in any of the source trees."-messages.
 
 Launch the target environment in dosbox:
-- make sure dosbox is added to your path variable
+- make sure dosbox is added to your path variable, or [pcgeos-basebox](https://github.com/bluewaysw/pcgeos-basebox.git) is installed and configured using BASEBOX environmental variable
 - cd pcgeos
 - bin/target
   - the "swat" debugger stops immediately after the first stage of the boot process

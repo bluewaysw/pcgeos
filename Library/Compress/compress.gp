@@ -6,10 +6,10 @@
 # MODULE:	Compress
 # FILE:		compress.gp
 #
-# AUTHOR:	dloft 4/92	
+# AUTHOR:	dloft 4/92
 #
 #
-# 
+#
 #
 #	$Id: compress.gp,v 1.1 97/04/04 17:49:04 newdeal Exp $
 #
@@ -46,10 +46,11 @@ library	geos
 # Define resources other than standard discardable code
 #
 nosort
-#resource PK_TEXT code fixed read-only
-#resource _TEXT code fixed read-only
-#resource CRC325_DATA fixed
+resource explode_TEXT code fixed read-only
+resource implode_TEXT code fixed read-only
+resource STRINGCODE	code read-only shared fixed
 resource CompressCode code read-only shared
+
 #
 # Exported routines (and classes)
 #

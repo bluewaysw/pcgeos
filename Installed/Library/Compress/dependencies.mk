@@ -1,10 +1,23 @@
-COMPRESSMANAGER.obj \
-COMPRESSMANAGER.eobj: GEOS.DEF GEODE.DEF EC.DEF LIBRARY.DEF RESOURCE.DEF \
-                OBJECT.DEF LMEM.DEF GRAPHICS.DEF FONTID.DEF FONT.DEF \
-                COLOR.DEF GSTRING.DEF TEXT.DEF CHAR.DEF WIN.DEF HEAP.DEF \
-                TIMER.DEF TIMEDATE.DEF SYSTEM.DEF LOCALIZE.DEF SLLANG.DEF \
-                FILE.DEF FILEENUM.DEF VM.DEF CHUNKARR.DEF THREAD.DEF \
-                SEM.DEF COMPRESS.DEF COMPRESSCONSTANT.DEF \
-                COMPRESSVARIABLE.DEF COMPRESSIO.ASM COMPRESSMAIN.ASM
+explode.obj \
+explode.eobj: Ansi/assert.h geos.h ec.h Ansi/string.h pklib.h
+implode.obj \
+implode.eobj: Ansi/assert.h geos.h ec.h Ansi/string.h pklib.h
+explode.obj \
+explode.eobj: Ansi/assert.h geos.h ec.h Ansi/string.h pklib.h
+implode.obj \
+implode.eobj: Ansi/assert.h geos.h ec.h Ansi/string.h pklib.h
+compressManager.obj \
+compressManager.eobj: geos.def geode.def ec.def library.def resource.def \
+                object.def lmem.def graphics.def fontID.def font.def \
+                color.def gstring.def text.def char.def win.def heap.def \
+                timer.def timedate.def system.def localize.def sllang.def \
+                file.def fileEnum.def vm.def chunkarr.def thread.def \
+                sem.def compress.def compressConstant.def \
+                compressVariable.def compressIO.asm compressMain.asm
+memory.obj \
+memory.eobj: memory_asm.asm ansicGeode.def geos.def file.def heap.def \
+                ec.def lmem.def library.def geode.def resource.def \
+                chunkarr.def localize.def sllang.def ansic.def \
+                ansicErrors.def product.def
 
-CompressEC.geo Compress.geo : GEOS.LDF 
+compressEC.geo compress.geo : geos.ldf 

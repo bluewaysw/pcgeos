@@ -1255,16 +1255,16 @@ load debug
 # Read home .swat file first, then local .swat if not in home directory.
 #
 if {[string c ${file-os} unix] == 0} {
-    if {[file exists ~/.swat]} {
-	if {[catch {source [file expand ~/.swat]} res] != 0} {
-	    echo Warning: ~/.swat: $res
+    if {[file exists ~/swat.rc]} {
+	if {[catch {source [file expand ~/swat.rc]} res] != 0} {
+	    echo Warning: ~/swat.rc: $res
 	}
     }
-    [if {[file exists ${file-init-dir}/.swat] && 
+    [if {[file exists ${file-init-dir}/swat.rc] && 
 	 [string c [file expand ~] ${file-init-dir}] != 0}
     {
-	if {[catch {source ${file-init-dir}/.swat} res] != 0} {
-	    echo Warning: ${file-init-dir}/.swat: $res
+	if {[catch {source ${file-init-dir}/swat.rc} res] != 0} {
+	    echo Warning: ${file-init-dir}/swat.rc: $res
 	}
     }]
 } elif {[string c ${file-os} win32] == 0} {

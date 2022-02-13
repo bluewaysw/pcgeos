@@ -1956,6 +1956,8 @@ void OutputMethodAntiWarningCode(Method *meth)
   }
     break;
   case COM_WATCOM:
+  	Output("\n#pragma disable_message(303)\n");
+    	break;
   case COM_MSC:
     break;
   default:
