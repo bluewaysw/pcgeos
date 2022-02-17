@@ -1063,7 +1063,7 @@ OutputClassTable(Symbol *class)
 	}
 	Output("};\n");
 
-    	flag = FALSE;
+	flag = FALSE;
 	cmethEntries = 0;
 	Output("%sCMethodDef%s _htypes_%s[]={", preTypeString,
 	       postTypeString, class->name);
@@ -1963,8 +1963,9 @@ void OutputMethodAntiWarningCode(Method *meth)
   }
     break;
   case COM_WATCOM:
-  	Output("\n#pragma disable_message(303)\n");
-    	break;
+    Output("\n#pragma disable_message(303)\n");
+    OutputLineNumber(yylineno,curFile->name);
+    break;
   case COM_MSC:
     break;
   default:
