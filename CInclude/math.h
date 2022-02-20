@@ -152,6 +152,19 @@ typedef FloatNumStruct FloatNumber;
 #endif /* ifndef __WATCOM__ */
 
 /*
+ * helpful macro for Watcom C to handle FloatNums
+ */
+#ifdef __WATCOM__
+#define FLOAT_SET_FLOATNUM_TO_0(x) ((x).F_mantissa_wd0 = \
+                                (x).F_mantissa_wd1 = \
+                                (x).F_mantissa_wd2 = \
+                                (x).F_mantissa_wd3 = \
+                                (x).F_exponent = 0)
+#else
+#define FLOAT_SET_FLOATNUM_TO_0(x) (((FlaotNum) x) = 0)
+#endif  /* ifdef __WATCOM__ */
+
+/*
  *	FloatAsciiToFloatFlags	record
  */
 typedef ByteFlags FloatAsciiToFloatFlags;
