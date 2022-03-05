@@ -58,13 +58,14 @@ FloatNum EnterTransaction(
  DBGroup		acctgroup, multiGroup;
  DBGroupAndItem	mapitem;
  DBMapStruct*	mapPtr;
- FloatNum		balance = 0;
+ FloatNum		balance;
  TempMultiStruct	*arrayElement;
  word		i;
  char		payTempStr[ENTRY_SIZE+3];
 
 
     /* Do our standard setup */
+	FLOAT_SET_FLOATNUM_TO_0(balance);
     mapitem = DBGetMap(GPCBnkrFile);
     mapPtr = DBLockUngrouped(GPCBnkrFile, mapitem);
     account = (AcctStruct *) (mapPtr + sizeof(DBMapStruct));
@@ -82,7 +83,7 @@ FloatNum EnterTransaction(
     /* check for no more room */
     if (!transItemNum)   {
 	  NotifyDBox(0, @NoRoomMsg);
-	  return(0);
+	  return balance;
 	  }
 
     /* fill in the return value */
@@ -107,7 +108,10 @@ FloatNum EnterTransaction(
 	  FloatPopNumber(&balance);
 	  }
     else  {  /* add deposit/credit amount */
-	  balance = account[currentAcct].AS_balance + amount;
+	  FloatPushNumber(&account[currentAcct].AS_balance);
+	  FloatPushNumber(&amount);
+	  FloatAdd();
+	  FloatPopNumber(&balance);
 	  }
     account[currentAcct].AS_balance = balance;
 
@@ -387,7 +391,7 @@ void TransIndexAdjRunBal(word insertedAt, FloatNum amount)
 				    transListChunkArray,
 				    0,
 				    0);
-	  balance = 0;
+	  FLOAT_SET_FLOATNUM_TO_0(balance);
 	  if ((currentType == TRANS_CK) || (currentType == TRANS_DB)
 			|| (currentType == TRANS_XFM))  {
 		/* sub check/debit amount */
@@ -397,7 +401,10 @@ void TransIndexAdjRunBal(word insertedAt, FloatNum amount)
 		FloatPopNumber(&trArrayElement->TSS_runBal);
 		}
 	  else  {  /* add deposit/credit amount */
-		trArrayElement->TSS_runBal = balance + amount;
+	    FloatPushNumber(&balance);
+		FloatPushNumber(&amount);
+		FloatAdd();
+		FloatPopNumber(&trArrayElement->TSS_runBal);
 		}
 
 	  }
@@ -434,7 +441,10 @@ void TransIndexAdjRunBal(word insertedAt, FloatNum amount)
 		FloatPopNumber(&trArrayElement->TSS_runBal);
 		}
 	  else  {  /* add deposit/credit amount */
-		trArrayElement->TSS_runBal = balance + amount;
+	    FloatPushNumber(&balance);
+		FloatPushNumber(&amount);
+		FloatAdd();
+		FloatPopNumber(&trArrayElement->TSS_runBal);
 		}
 	  /* and now all the later transactions */
 	  for (i = (insertedAt + 1); i < numTrans; i++)  {
@@ -453,7 +463,10 @@ void TransIndexAdjRunBal(word insertedAt, FloatNum amount)
 		   FloatPopNumber(&trArrayElement->TSS_runBal);
 		   }
 		else  {  /* add deposit/credit amount */
-		   trArrayElement->TSS_runBal += amount;
+		   FloatPushNumber(&trArrayElement->TSS_runBal);
+		   FloatPushNumber(&amount);
+		   FloatAdd();
+		   FloatPopNumber(&trArrayElement->TSS_runBal);
 		   }
 		} /* end of later transactions for loop */
 	  }  /* end of more than one trans else */
@@ -1222,14 +1235,18 @@ void TotalAllAccounts (void)
  char			amtString[MAX_TEXT_LEN], totalString[MAX_TEXT_LEN + 10];
  AcctStruct		*acct;
  DBMapStruct*		mapPtr;
- FloatNum			totalAccounts = 0;
+ FloatNum			totalAccounts;
 
 
     /* grab the account balances */
+	FLOAT_SET_FLOATNUM_TO_0(totalAccounts);
     mapPtr = DBLockMap(GPCBnkrFile);
     acct = (AcctStruct *) (mapPtr + sizeof(DBMapStruct));
     for (i = 0; i < numAccounts; i++)  {
-	  totalAccounts += acct[i].AS_balance;
+	  FloatPushNumber(&totalAccounts);
+	  FloatPushNumber(&acct[i].AS_balance);
+	  FloatAdd();
+	  FloatPopNumber(&totalAccounts);
 	  }
     DBUnlock(mapPtr);
     FloatFloatToAscii_StdFormat(amtString,
@@ -1323,7 +1340,9 @@ FloatNum		amount;
 			strlen(amountStr),
 			amountStr,
 			&amount);
-	 if (!amount) checksOK = FALSE;
+	 FloatPushNumber(&amount);
+	 Float0();
+	 if (!FloatCompAndDrop()) checksOK = FALSE;
 	 }
 
     if (!checksOK) NotifyDBox(amountStr, @InvalidAmountMsg);
