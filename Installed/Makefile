@@ -134,7 +134,7 @@ minimalUtils	: prefmgr
 minimalGame	: solitaire cword amateur bjack hearts gwpoker \
                   pyramid sokoban taipei uki mine column
 
-minimalEdu	: flash fontmgck hangman laserl mflash numbers pvault \
+minimalEdu	: flash fontmgck laserl mflash pvault \
                   taide thinker wsm wsplay xwm
 # ttype
 
