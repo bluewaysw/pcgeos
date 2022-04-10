@@ -2663,6 +2663,35 @@ Scan_DropOuts :
 #endif /* TT_CONFIG_OPTION_GRAY_SCALING */
 
 
+#ifdef __GEOS__
+
+/****************************************************************************/
+/*                                                                          */
+/* Function:    Render_Region_Glyph                                         */
+/*                                                                          */
+/* Description: Renders a glyph in a region.  Sub-banding if needed.        */
+/*                                                                          */
+/* Input:       AGlyph   Glyph record                                       */
+/*                                                                          */
+/* Returns:     SUCCESS on success.                                         */
+/*              FAILURE if any error was encountered during rendering.      */
+/*                                                                          */
+/****************************************************************************/
+
+LOCAL_FUNC
+TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
+                                        TT_Region_Map*  target_map )
+{
+  TT_Error  error;
+
+  // TBD
+
+  return error;
+}
+
+#endif /* __GEOS__ */
+
+
 /************************************************/
 /*                                              */
 /* InitRasterizer                               */

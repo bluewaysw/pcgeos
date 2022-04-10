@@ -342,7 +342,7 @@
   typedef struct TT_Raster_Map_  TT_Raster_Map;
 
 #ifdef __GEOS__
-  struct TT_Raster_Region_
+  struct TT_Region_Map_
   {
     int     rows;
     int     cols;
@@ -350,7 +350,7 @@
     long    size;
   };
 
-  typedef struct TT_Raster_Region_  TT_Raster_Region;
+  typedef struct TT_Region_Map_  TT_Region_Map;
 #endif
 
 
@@ -964,7 +964,7 @@
                                  TT_F26Dot6      xOffset,
                                  TT_F26Dot6      yOffset );
 
-#ifdef __GEOS__
+
   /* Render the glyph into a region, with given position offsets.     */
   /*                                                                  */
   /* Note: Only use integer pixel offsets to preserve the fine        */
@@ -974,10 +974,10 @@
   /*       of 64!                                                     */
   EXPORT_DEF
   TT_Error  TT_Get_Glyph_Region( TT_Glyph          glyph,
-                                 TT_Raster_Region* map,
+                                 TT_Region_Map*    map,
                                  TT_F26Dot6        xOffset,
                                  TT_F26Dot6        yOffset );
-#endif  /* ifdef __GEOS__ */
+
 
   /* ----------------------- outline support ------------------------ */
 
@@ -1017,6 +1017,13 @@
   TT_Error  TT_Get_Outline_Pixmap( TT_Engine       engine,
                                    TT_Outline*     outline,
                                    TT_Raster_Map*  map );
+
+  /* Render an outline into a region. */
+
+  EXPORT_DEF
+  TT_Error  TT_Get_Outline_Region( TT_Engine       engine,
+                                   TT_Outline*     outline,
+                                   TT_Region_Map*  map );
 
 
   /* Return an outline's bounding box -- this function is slow as it */

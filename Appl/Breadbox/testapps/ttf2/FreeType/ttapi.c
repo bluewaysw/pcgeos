@@ -58,6 +58,9 @@
 #define RENDER_Gray_Glyph( glyph, target, palette ) \
           Render_Gray_Glyph( RAS_OPS  glyph, target, palette )
 
+#define RENDER_Region_Glyph( glyph, target ) \
+          Render_Region_Glyph( RAS_OPS glyph, target )
+
 
 
 /*******************************************************************
@@ -1439,6 +1442,69 @@
 
 #endif /* TT_CONFIG_OPTION_GRAY_SCALING */
 
+#ifdef __GEOS__
+
+/*******************************************************************
+ *
+ *  Function    :  TT_Get_Glyph_Region
+ *
+ *  Description :  Produces a region from a glyph outline.
+ *
+ *  Input  :  glyph      the glyph container's handle
+ *            region     target region description block
+ *            xOffset    x offset in fractional pixels (26.6 format)
+ *            yOffset    y offset in fractional pixels (26.6 format)
+ *
+ *  Output :  Error code.
+ *
+ *  Note : Only use integer pixel offsets to preserve the fine
+ *         hinting of the glyph and the 'correct' anti-aliasing
+ *         (where vertical and horizontal stems aren't grayed).
+ *         This means that xOffset and yOffset must be multiples
+ *         of 64!
+ *
+ *         You can experiment with offsets of +32 to get 'blurred'
+ *         versions of the glyphs (a nice effect at large sizes that
+ *         some graphic designers may appreciate :)
+ *
+ *  MT-Safe : NO!  Glyph containers can't be shared.
+ *
+ ******************************************************************/
+
+  EXPORT_FUNC
+  TT_Error  TT_Get_Glyph_Region( TT_Glyph        glyph,
+                                 TT_Region_Map*  map,
+                                 TT_F26Dot6      xOffset,
+                                 TT_F26Dot6      yOffset )
+  {
+    PEngine_Instance  _engine;
+    TT_Engine         engine;
+    TT_Error          error;
+    PGlyph            _glyph = HANDLE_Glyph( glyph );
+
+    TT_Outline  outline;
+
+
+    if ( !_glyph )
+      return TT_Err_Invalid_Glyph_Handle;
+
+    _engine = _glyph->face->engine;
+    HANDLE_Set(engine,_engine);
+
+    outline = _glyph->outline;
+    /* XXX : For now, use only dropout mode 2    */
+    /* outline.dropout_mode = _glyph->scan_type; */
+    outline.dropout_mode = 2;
+
+    TT_Translate_Outline( &outline, xOffset, yOffset );
+    error = TT_Get_Outline_Region( engine, &outline, map );
+    TT_Translate_Outline( &outline, -xOffset, -yOffset );
+
+    return error;
+  }
+
+#endif /* __GEOS__ */
+
 
   static const TT_Outline  null_outline
       = { 0, 0, NULL, NULL, NULL, 0, 0, 0, 0 };
@@ -1606,6 +1672,46 @@
   }
 
 #endif /* TT_CONFIG_OPTION_GRAY_SCALING */
+
+#ifdef __GEOS__
+
+/*******************************************************************
+ *
+ *  Function    :  TT_Get_Outline_Region
+ *
+ *  Description :  Render a TrueType outline into a region.
+ *                 Note that the region must be created by the caller.
+ *
+ *  Input  :  outline       the outline to render
+ *            map           the target region
+ *
+ *  Output :  Error code
+ *
+ *  MT-Safe : YES!
+ *
+ ******************************************************************/
+EXPORT_FUNC
+TT_Error  TT_Get_Outline_Region( TT_Engine       engine,
+                                 TT_Outline*     outline,
+                                 TT_Region_Map*  map )
+{
+  PEngine_Instance  _engine = HANDLE_Engine( engine );
+  TT_Error          error;
+
+
+  if ( !_engine )
+    return TT_Err_Invalid_Engine;
+
+  if ( !outline || !map )
+    return TT_Err_Invalid_Argument;
+
+  MUTEX_Lock( _engine->raster_lock );
+  error = RENDER_Region_Glyph( outline, map );
+  MUTEX_Release( _engine->raster_lock );
+  return error;
+}
+
+#endif    /* __GEOS__ */
 
 
 /*******************************************************************
