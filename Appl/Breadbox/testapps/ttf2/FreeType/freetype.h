@@ -341,6 +341,18 @@
 
   typedef struct TT_Raster_Map_  TT_Raster_Map;
 
+#ifdef __GEOS__
+  struct TT_Raster_Region_
+  {
+    int     rows;
+    int     cols;
+    void*   region;
+    long    size;
+  };
+
+  typedef struct TT_Raster_Region_  TT_Raster_Region;
+#endif
+
 
   /* ------ The font header TrueType table structure ------ */
 
@@ -952,7 +964,20 @@
                                  TT_F26Dot6      xOffset,
                                  TT_F26Dot6      yOffset );
 
-
+#ifdef __GEOS__
+  /* Render the glyph into a region, with given position offsets.     */
+  /*                                                                  */
+  /* Note: Only use integer pixel offsets to preserve the fine        */
+  /*       hinting of the glyph and the `correct' anti-aliasing       */
+  /*       (where vertical and horizontal stems aren't grayed).  This */
+  /*       means that `xOffset' and `yOffset' must be multiples       */
+  /*       of 64!                                                     */
+  EXPORT_DEF
+  TT_Error  TT_Get_Glyph_Region( TT_Glyph          glyph,
+                                 TT_Raster_Region* map,
+                                 TT_F26Dot6        xOffset,
+                                 TT_F26Dot6        yOffset );
+#endif  /* ifdef __GEOS__ */
 
   /* ----------------------- outline support ------------------------ */
 

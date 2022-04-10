@@ -1,5 +1,5 @@
 ## TODO
-- ft_conf.h aus /FreeType/arch/geos nutzen und unter /FreeType löschen
+- ~~ft_conf.h aus /FreeType/arch/geos nutzen und unter /FreeType löschen~~
 - ~~Speicherbedarf begrenzen (ttraster.c RASTER_RENDER_POOL)~~
 
 ## Meilensteine
@@ -18,12 +18,13 @@
 - ~~Zeichensatz im Testprogramm anzeigen, übersetzbar und lauffähig~~
 - Memorymanagement auf Geos Spezifika (hugemem.c könnte genügen) umstellen, übersetzbar und lauffähig
 - ~~Extension für Kerning aktivieren~~
-- Bytecodeinterpreter aktivieren
-- angepasstes FreeType in Treibersourcen verschieben
-- Funktionen für DR_FONT_GEN_IN_REGION, DR_FONT_GEN_PATH
+- ~~Bytecodeinterpreter aktivieren~~
+- ~~angepasstes FreeType in Treibersourcen verschieben~~
+- Funktionen für DR_FONT_GEN_IN_REGION, DR_FONT_GEN_PATH anlegen
+- Implementierungen für DR_FONT_GEN_IN_REGION, DR_FONT_GEN_PATH
 - FreeType in Treiber integrieren
 - Registrierung eines Fonts anpassen (FontID, TTC???) 
-- Darstellung kleiner PUnktgrößen weiter verbessern (bspw. high precision & scond pass)
+- ~~Darstellung kleiner PUnktgrößen weiter verbessern (bspw. high precision & scond pass)~~
 
 ## Fehler
 - ~~freigeben von resiervierten Resoucen führt zum einfrieren~~

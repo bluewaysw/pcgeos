@@ -8,7 +8,7 @@
 #ifndef FT_CONF_H
 #define FT_CONF_H
 
-/* Under FreeGEOS we need this for the file operations.  */
+/* Under FreeGEOS we need this for the file operations. */
 #include <geos.h>
 #include <file.h>
 #include <resource.h>
@@ -111,7 +111,7 @@
 /* emerged recently on the FreeType lists.  We still do not have Apple's */
 /* opinion on the subject and will change this as soon as we have.       */
 
-#undef   TT_CONFIG_OPTION_NO_INTERPRETER
+#undef  TT_CONFIG_OPTION_NO_INTERPRETER
 
 
 /*************************************************************************/
