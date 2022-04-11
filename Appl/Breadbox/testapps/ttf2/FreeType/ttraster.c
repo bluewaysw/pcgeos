@@ -270,6 +270,9 @@
     TStates   state;                /* rendering state */
 
     TT_Raster_Map  target;          /* description of target bit/pixmap */
+#ifdef __GEOS__
+    TT_Region_Map  region;          /* description of target region     */
+#endif /* __GEOS__ */
 
     Long      traceOfs;             /* current offset in target bitmap */
     Long      traceG;               /* current offset in target pixmap */
@@ -2680,13 +2683,57 @@ Scan_DropOuts :
 
 LOCAL_FUNC
 TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
-                                        TT_Region_Map*  target_map )
+                                        TT_Region_Map*  map )
 {
   TT_Error  error;
 
-  // TBD
+  if ( glyph->n_points == 0 || glyph->n_contours <= 0 )
+    return TT_Err_Ok;
 
-  return error;
+  if ( !ras.buff )
+  {
+    ras.error = Raster_Err_Not_Ini;
+    return ras.error;
+  }
+
+  if ( glyph->n_points < glyph->contours[glyph->n_contours - 1] )
+  {
+    ras.error = TT_Err_Too_Many_Points;
+    return ras.error;
+  }
+
+  if ( map )
+    ras.region = *map;
+
+  ras.outs      = glyph->contours;
+  ras.flags     = glyph->flags;
+  ras.nPoints   = glyph->n_points;
+  ras.nContours = glyph->n_contours;
+  ras.coords    = glyph->points;
+
+  Set_High_Precision( RAS_VARS glyph->high_precision );
+  ras.scale_shift    = ras.precision_shift;
+  ras.dropOutControl = glyph->dropout_mode;
+  ras.second_pass    = glyph->second_pass;
+
+  /* Vertical Sweep */
+  ras.Proc_Sweep_Init = Vertical_Sweep_Init;   // TODO: Funktionen für das Rendern in eine Region schreiben und hier registrieren
+  ras.Proc_Sweep_Span = Vertical_Sweep_Span;
+  ras.Proc_Sweep_Drop = Vertical_Sweep_Drop;
+  ras.Proc_Sweep_Step = Vertical_Sweep_Step;
+
+  ras.band_top            = 0;
+  ras.band_stack[0].y_min = 0;
+  ras.band_stack[0].y_max = ras.target.rows - 1;
+
+  ras.bWidth  = ras.target.width;
+  ras.bTarget = (Byte*)ras.target.bitmap;     // TODO: Wir benötigen noch eine rTarget in TRaster_Instance für Regions
+ 
+
+  if ( (error = Render_Single_Pass( RAS_VARS 0 )) != 0 )
+    return error;
+
+  return TT_Err_Ok;
 }
 
 #endif /* __GEOS__ */
