@@ -346,7 +346,7 @@
   {
     int     rows;
     int     cols;
-    void*   region;
+    void*   data;
     long    size;
   };
 

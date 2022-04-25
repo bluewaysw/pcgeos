@@ -250,37 +250,40 @@
 
     TPoint*   arc;                  /* current Bezier arc pointer */
 
-    UShort    bWidth;               /* target bitmap width  */
+    UShort    bWidth;               /* target buffer width  */
     PByte     bTarget;              /* target bitmap buffer */
     PByte     gTarget;              /* target pixmap buffer */
+#ifdef __GEOS__
+    PShort    rTarget;              /* target region buffer */
+#endif /* __GEOS__ */
 
     Long      lastX, lastY, minY, maxY;
 
-    UShort    num_Profs;            /* current number of profiles */
+    UShort    num_Profs;        /* current number of profiles */
 
-    Bool      fresh;                /* signals a fresh new profile which */
-                                    /* 'start' field must be completed   */
-    Bool      joint;                /* signals that the last arc ended   */
-                                    /* exactly on a scanline.  Allows    */
-                                    /* removal of doublets               */
-    PProfile  cProfile;             /* current profile                   */
-    PProfile  fProfile;             /* head of linked list of profiles   */
-    PProfile  gProfile;             /* contour's first profile in case   */
-                                    /* of impact                         */
-    TStates   state;                /* rendering state */
+    Bool      fresh;            /* signals a fresh new profile which */
+                                /* 'start' field must be completed   */
+    Bool      joint;            /* signals that the last arc ended   */
+                                /* exactly on a scanline.  Allows    */
+                                /* removal of doublets               */
+    PProfile  cProfile;         /* current profile                   */
+    PProfile  fProfile;         /* head of linked list of profiles   */
+    PProfile  gProfile;         /* contour's first profile in case   */
+                                /* of impact                         */
+    TStates   state;            /* rendering state */
 
-    TT_Raster_Map  target;          /* description of target bit/pixmap */
+    TT_Raster_Map  target;      /* description of target bit/pixmap */
 #ifdef __GEOS__
-    TT_Region_Map  region;          /* description of target region     */
+    TT_Region_Map  region;      /* description of target region     */
 #endif /* __GEOS__ */
 
-    Long      traceOfs;             /* current offset in target bitmap */
-    Long      traceG;               /* current offset in target pixmap */
+    Long      traceOfs;         /* current offset in target bitmap or region */
+    Long      traceG;           /* current offset in target pixmap           */
 
-    Short     traceIncr;            /* sweep's increment in target bitmap */
+    Short     traceIncr;        /* sweep's increment in target bitmap        */
 
-    Short     gray_min_x;           /* current min x during gray rendering */
-    Short     gray_max_x;           /* current max x during gray rendering */
+    Short     gray_min_x;       /* current min x during gray rendering       */
+    Short     gray_max_x;       /* current max x during gray rendering       */
 
     /* dispatch variables */
 
@@ -1778,6 +1781,49 @@
     ras.traceOfs += ras.traceIncr;
   }
 
+#ifdef __GEOS__
+
+/***********************************************************************/
+/*                                                                     */
+/*  Vertical Sweep Procedure Set for regions :                         */
+/*                                                                     */
+/*  These three routines are used during the vertical black/white      */
+/*  sweep phase for regions by the generic Draw_Sweep() function.      */
+/*                                                                     */
+/***********************************************************************/
+
+  static void  Vertical_Region_Sweep_Init( RAS_ARGS 
+                                           Short*  min, 
+                                           Short*  max )
+  {
+    //TBD
+  }
+
+  static void  Vertical_Region_Sweep_Span( RAS_ARGS Short       y,
+                                                    TT_F26Dot6  x1,
+                                                    TT_F26Dot6  x2,
+                                                    PProfile    left,
+                                                    PProfile    right )
+  {
+    //TBD
+  }
+
+  static void  Vertical_Region_Sweep_Drop( RAS_ARGS Short       y,
+                                                    TT_F26Dot6  x1,
+                                                    TT_F26Dot6  x2,
+                                                    PProfile    left,
+                                                    PProfile    right )
+  {
+    //TBD
+  }
+
+  static void  Vertical_Region_Sweep_Step( RAS_ARG )
+  {
+    //TBD
+  }
+
+#endif /* __GEOS__ */
+
 
 /***********************************************************************/
 /*                                                                     */
@@ -2717,18 +2763,17 @@ TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
   ras.second_pass    = glyph->second_pass;
 
   /* Vertical Sweep */
-  ras.Proc_Sweep_Init = Vertical_Sweep_Init;   // TODO: Funktionen für das Rendern in eine Region schreiben und hier registrieren
-  ras.Proc_Sweep_Span = Vertical_Sweep_Span;
-  ras.Proc_Sweep_Drop = Vertical_Sweep_Drop;
-  ras.Proc_Sweep_Step = Vertical_Sweep_Step;
+  ras.Proc_Sweep_Init = Vertical_Region_Sweep_Init;
+  ras.Proc_Sweep_Span = Vertical_Region_Sweep_Span;
+  ras.Proc_Sweep_Drop = Vertical_Region_Sweep_Drop;
+  ras.Proc_Sweep_Step = Vertical_Region_Sweep_Step;
 
   ras.band_top            = 0;
   ras.band_stack[0].y_min = 0;
   ras.band_stack[0].y_max = ras.target.rows - 1;
 
   ras.bWidth  = ras.target.width;
-  ras.bTarget = (Byte*)ras.target.bitmap;     // TODO: Wir benötigen noch eine rTarget in TRaster_Instance für Regions
- 
+  ras.rTarget = (Short*)ras.region.data;
 
   if ( (error = Render_Single_Pass( RAS_VARS 0 )) != 0 )
     return error;
