@@ -1796,7 +1796,11 @@
                                            Short*  min, 
                                            Short*  max )
   {
-    //TBD
+    ras.traceOfs = 0;
+    ras.traceIncr = 0;
+
+    ras.gray_min_x = 0;
+    ras.gray_max_x = 0;
   }
 
   static void  Vertical_Region_Sweep_Span( RAS_ARGS Short       y,
@@ -1805,7 +1809,31 @@
                                                     PProfile    left,
                                                     PProfile    right )
   {
-    //TBD
+    Long   e1, e2;
+    Short*  target;
+
+
+    /* Drop-out control */
+
+    e1 = TRUNC( CEILING( x1 ) );
+
+    if ( x2-x1-ras.precision <= ras.precision_jitter )
+      e2 = e1;
+    else
+      e2 = TRUNC( FLOOR( x2 ) );
+
+    // TODO write current lineindex if new line begins
+
+    if ( e2 >= 0 && e1 < ras.bWidth )   
+    {
+      if ( e1 < 0 )           e1 = 0;
+      if ( e2 >= ras.bWidth ) e2 = ras.bWidth-1;
+
+      target = ras.rTarget + ras.traceOfs;
+
+      target[ras.traceIncr++] = ( Short ) e1;
+      target[ras.traceIncr++] = ( Short ) e2;
+    }
   }
 
   static void  Vertical_Region_Sweep_Drop( RAS_ARGS Short       y,
@@ -2770,9 +2798,9 @@ TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
 
   ras.band_top            = 0;
   ras.band_stack[0].y_min = 0;
-  ras.band_stack[0].y_max = ras.target.rows - 1;
+  ras.band_stack[0].y_max = ras.region.rows - 1;
 
-  ras.bWidth  = ras.target.width;
+  ras.bWidth  = ras.region.cols;
   ras.rTarget = (Short*)ras.region.data;
 
   if ( (error = Render_Single_Pass( RAS_VARS 0 )) != 0 )

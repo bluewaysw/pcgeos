@@ -32,3 +32,8 @@
 
 ## Bemerkungen
 - die Darstellung keiner Punktgröße ist jetzt wesentlich besser aber stark vom Font abhänging; das ist bei der Font-Selektion zu beachten
+
+## Optimierungen
+- diverse Offsets von long auf int ändern
+- diverse sizes von long auf int ändern
+- Elemente der TRaster_Instace_ Struktur die nur für Pixmaps benötig werden entfernen
