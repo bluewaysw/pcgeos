@@ -191,7 +191,9 @@
                                               PProfile    left,
                                               PProfile    right );
 
-  typedef void  Function_Sweep_Step( RAS_ARG );
+  typedef void  Function_Sweep_Step( RAS_ARGS Short y );
+
+  typedef void  Function_Sweep_Finish( RAS_ARG );
 
 
 /* NOTE: These operations are only valid on 2's complement processors */
@@ -287,10 +289,11 @@
 
     /* dispatch variables */
 
-    Function_Sweep_Init*  Proc_Sweep_Init;
-    Function_Sweep_Span*  Proc_Sweep_Span;
-    Function_Sweep_Span*  Proc_Sweep_Drop;
-    Function_Sweep_Step*  Proc_Sweep_Step;
+    Function_Sweep_Init*   Proc_Sweep_Init;
+    Function_Sweep_Span*   Proc_Sweep_Span;
+    Function_Sweep_Span*   Proc_Sweep_Drop;
+    Function_Sweep_Step*   Proc_Sweep_Step;
+    Function_Sweep_Finish* Proc_Sweep_Finish;
 
     TT_Vector*  coords;
 
@@ -1776,10 +1779,19 @@
   }
 
 
-  static void Vertical_Sweep_Step( RAS_ARG )
+  static void Vertical_Sweep_Step( RAS_ARGS Short y )
   {
     ras.traceOfs += ras.traceIncr;
   }
+
+#ifdef __GEOS__
+
+  static void Vertical_Sweep_Finish( RAS_ARG )
+  {
+    /* nothing to do */
+  }
+
+#endif /* __GEOS__ */
 
 #ifdef __GEOS__
 
@@ -1822,14 +1834,15 @@
     else
       e2 = TRUNC( FLOOR( x2 ) );
 
-    // TODO write current lineindex if new line begins
+    target = ras.rTarget + ras.traceOfs;
+
+    if ( ras.traceIncr == 0 )
+      target[ras.traceIncr++] = y;
 
     if ( e2 >= 0 && e1 < ras.bWidth )   
     {
       if ( e1 < 0 )           e1 = 0;
       if ( e2 >= ras.bWidth ) e2 = ras.bWidth-1;
-
-      target = ras.rTarget + ras.traceOfs;
 
       target[ras.traceIncr++] = ( Short ) e1;
       target[ras.traceIncr++] = ( Short ) e2;
@@ -1842,12 +1855,37 @@
                                                     PProfile    left,
                                                     PProfile    right )
   {
-    //TBD
+    /* nothing to do */
   }
 
-  static void  Vertical_Region_Sweep_Step( RAS_ARG )
+  static void  Vertical_Region_Sweep_Step( RAS_ARGS Short y )
   {
-    //TBD
+    if ( ras.traceIncr == 0 )
+    {
+      // schreibe akt. Zeile
+      // schreibe EOREGREC
+      // ras.traceIncr += 2
+    }
+    else
+    {
+      // schreibe EOREGREC
+      // ras.traceIncr++
+    }
+
+    ras.traceOfs += ras.traceIncr;
+    ras.traceIncr = 0;
+  }
+
+  static void Vertical_Region_Sweep_Finish( RAS_ARG )
+  {
+    Short*  target;
+
+
+    /* complete a region */
+
+    target = ras.rTarget + ras.traceOfs;
+
+    target[ras.traceIncr] = EOREGREC;
   }
 
 #endif /* __GEOS__ */
@@ -2007,9 +2045,14 @@
   }
 
 
-  static void Horizontal_Sweep_Step( RAS_ARG )
+  static void Horizontal_Sweep_Step( RAS_ARGS Short y )
   {
     /* Nothing, really */
+  }
+
+  static void Horizontal_Sweep_Finish( RAS_ARG )
+  {
+    /* nothing to do */
   }
 
 
@@ -2056,7 +2099,7 @@
   }
 
 
-  static void  Vertical_Gray_Sweep_Step( RAS_ARG )
+  static void  Vertical_Gray_Sweep_Step( RAS_ARG Short y )
   {
     Int    c1, c2;
     PByte  pix, bit, bit2;
@@ -2389,9 +2432,9 @@
    Next_Line:
 
 #ifdef __GEOS__
-        ProcCallFixedOrMovable_cdecl( ras.Proc_Sweep_Step, RAS_VAR );
+        ProcCallFixedOrMovable_cdecl( ras.Proc_Sweep_Step, RAS_VARS y );
 #else
-        ras.Proc_Sweep_Step( RAS_VAR );
+        ras.Proc_Sweep_Step( RAS_VARS y );
 #endif    /* ifdef __GEOS__ */
 
         y++;
@@ -2434,13 +2477,14 @@
     while ( y <= max_Y )
     {
 #ifdef __GEOS__
-      ProcCallFixedOrMovable_cdecl( ras.Proc_Sweep_Step, RAS_VAR );
+      ProcCallFixedOrMovable_cdecl( ras.Proc_Sweep_Step, RAS_VARS y );
 #else
-      ras.Proc_Sweep_Step( RAS_VAR );
+      ras.Proc_Sweep_Step( RAS_VARS y );
 #endif    /* __GEOS__ */
       y++;
     }
 
+    // TODO finish redered glyph
     return SUCCESS;
 
 Scan_DropOuts :
