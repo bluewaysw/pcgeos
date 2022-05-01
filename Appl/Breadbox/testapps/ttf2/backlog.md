@@ -29,6 +29,8 @@
 ## Fehler
 - ~~freigeben von resiervierten Resoucen führt zum einfrieren~~
 - ~~Teile eines Zeichens die unter der Basislinie liegen werden nicht angezeigt~~
+- die Size einer Region ist fehlerhaft
+- (Testprogramm) TT_Init_Kerning_Extension() darf nur einmalig aufgerufen werden
 
 ## Bemerkungen
 - die Darstellung keiner Punktgröße ist jetzt wesentlich besser aber stark vom Font abhänging; das ist bei der Font-Selektion zu beachten

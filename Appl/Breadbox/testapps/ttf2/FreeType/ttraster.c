@@ -1784,14 +1784,12 @@
     ras.traceOfs += ras.traceIncr;
   }
 
-#ifdef __GEOS__
 
   static void Vertical_Sweep_Finish( RAS_ARG )
   {
     /* nothing to do */
   }
 
-#endif /* __GEOS__ */
 
 #ifdef __GEOS__
 
@@ -1860,17 +1858,19 @@
 
   static void  Vertical_Region_Sweep_Step( RAS_ARGS Short y )
   {
+    Short*  target;
+
+
+    target = ras.rTarget + ras.traceOfs;
+
+    /* special case: the current line was empty */
+
     if ( ras.traceIncr == 0 )
-    {
-      // schreibe akt. Zeile
-      // schreibe EOREGREC
-      // ras.traceIncr += 2
-    }
-    else
-    {
-      // schreibe EOREGREC
-      // ras.traceIncr++
-    }
+      target[ras.traceIncr++] = y;
+
+    /* finish current line and move to the next one */
+
+    target[ras.traceIncr++] = EOREGREC;
 
     ras.traceOfs += ras.traceIncr;
     ras.traceIncr = 0;
@@ -1885,7 +1885,8 @@
 
     target = ras.rTarget + ras.traceOfs;
 
-    target[ras.traceIncr] = EOREGREC;
+    target[ras.traceIncr++] = EOREGREC;
+    ras.region.size = ras.traceOfs + ras.traceIncr;
   }
 
 #endif /* __GEOS__ */
@@ -2484,7 +2485,11 @@
       y++;
     }
 
-    // TODO finish redered glyph
+#ifdef __GEOS__
+    ProcCallFixedOrMovable_cdecl( ras.Proc_Sweep_Finish, RAS_VAR );
+#else
+    ras.Proc_Sweep_Finish( RAS_VAR );
+#endif
     return SUCCESS;
 
 Scan_DropOuts :
@@ -2642,10 +2647,11 @@ Scan_DropOuts :
 
 
     /* Vertical Sweep */
-    ras.Proc_Sweep_Init = Vertical_Sweep_Init;
-    ras.Proc_Sweep_Span = Vertical_Sweep_Span;
-    ras.Proc_Sweep_Drop = Vertical_Sweep_Drop;
-    ras.Proc_Sweep_Step = Vertical_Sweep_Step;
+    ras.Proc_Sweep_Init   = Vertical_Sweep_Init;
+    ras.Proc_Sweep_Span   = Vertical_Sweep_Span;
+    ras.Proc_Sweep_Drop   = Vertical_Sweep_Drop;
+    ras.Proc_Sweep_Step   = Vertical_Sweep_Step;
+    ras.Proc_Sweep_Finish = Vertical_Sweep_Finish;
 
     ras.band_top            = 0;
     ras.band_stack[0].y_min = 0;
@@ -2661,10 +2667,11 @@ Scan_DropOuts :
 
     if ( ras.second_pass && ras.dropOutControl != 0 )
     {
-      ras.Proc_Sweep_Init = Horizontal_Sweep_Init;
-      ras.Proc_Sweep_Span = Horizontal_Sweep_Span;
-      ras.Proc_Sweep_Drop = Horizontal_Sweep_Drop;
-      ras.Proc_Sweep_Step = Horizontal_Sweep_Step;
+      ras.Proc_Sweep_Init   = Horizontal_Sweep_Init;
+      ras.Proc_Sweep_Span   = Horizontal_Sweep_Span;
+      ras.Proc_Sweep_Drop   = Horizontal_Sweep_Drop;
+      ras.Proc_Sweep_Step   = Horizontal_Sweep_Step;
+      ras.Proc_Sweep_Finish = Horizontal_Sweep_Finish;
 
       ras.band_top            = 0;
       ras.band_stack[0].y_min = 0;
@@ -2751,10 +2758,11 @@ Scan_DropOuts :
     ras.bTarget = (Byte*)ras.gray_lines;
     ras.gTarget = (Byte*)ras.target.bitmap;
 
-    ras.Proc_Sweep_Init = Vertical_Gray_Sweep_Init;
-    ras.Proc_Sweep_Span = Vertical_Sweep_Span;
-    ras.Proc_Sweep_Drop = Vertical_Sweep_Drop;
-    ras.Proc_Sweep_Step = Vertical_Gray_Sweep_Step;
+    ras.Proc_Sweep_Init   = Vertical_Gray_Sweep_Init;
+    ras.Proc_Sweep_Span   = Vertical_Sweep_Span;
+    ras.Proc_Sweep_Drop   = Vertical_Sweep_Drop;
+    ras.Proc_Sweep_Step   = Vertical_Gray_Sweep_Step;
+    ras.Proc_Sweep_Finish = Vertical_Sweep_Finish;
 
     error = Render_Single_Pass( RAS_VARS  0 );
     if (error)
@@ -2764,10 +2772,12 @@ Scan_DropOuts :
 
     if ( ras.second_pass && ras.dropOutControl != 0 )
     {
-      ras.Proc_Sweep_Init = Horizontal_Sweep_Init;
-      ras.Proc_Sweep_Span = Horizontal_Gray_Sweep_Span;
-      ras.Proc_Sweep_Drop = Horizontal_Gray_Sweep_Drop;
-      ras.Proc_Sweep_Step = Horizontal_Sweep_Step;
+      ras.Proc_Sweep_Init   = Horizontal_Sweep_Init;
+      ras.Proc_Sweep_Span   = Horizontal_Gray_Sweep_Span;
+      ras.Proc_Sweep_Drop   = Horizontal_Gray_Sweep_Drop;
+      ras.Proc_Sweep_Step   = Horizontal_Sweep_Step;
+      ras.Proc_Sweep_Finish = Horizontal_Sweep_Finish;
+
 
       ras.band_top            = 0;
       ras.band_stack[0].y_min = 0;
@@ -2835,10 +2845,13 @@ TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
   ras.second_pass    = glyph->second_pass;
 
   /* Vertical Sweep */
-  ras.Proc_Sweep_Init = Vertical_Region_Sweep_Init;
-  ras.Proc_Sweep_Span = Vertical_Region_Sweep_Span;
-  ras.Proc_Sweep_Drop = Vertical_Region_Sweep_Drop;
-  ras.Proc_Sweep_Step = Vertical_Region_Sweep_Step;
+  
+  ras.Proc_Sweep_Init   = Vertical_Region_Sweep_Init;
+  ras.Proc_Sweep_Span   = Vertical_Region_Sweep_Span;
+  ras.Proc_Sweep_Drop   = Vertical_Region_Sweep_Drop;
+  ras.Proc_Sweep_Step   = Vertical_Region_Sweep_Step;
+  ras.Proc_Sweep_Finish = Vertical_Region_Sweep_Finish;
+
 
   ras.band_top            = 0;
   ras.band_stack[0].y_min = 0;
