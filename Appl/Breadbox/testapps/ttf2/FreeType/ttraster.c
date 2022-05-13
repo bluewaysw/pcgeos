@@ -275,11 +275,9 @@
     TStates   state;            /* rendering state */
 
     TT_Raster_Map  target;      /* description of target bit/pixmap */
-#ifdef __GEOS__
-    TT_Region_Map  region;      /* description of target region     */
-#endif /* __GEOS__ */
 
     Long      traceOfs;         /* current offset in target bitmap or region */
+    Long      traceOfsLastLine; /* offset in traget region before line step  */
     Long      traceG;           /* current offset in target pixmap           */
 
     Short     traceIncr;        /* sweep's increment in target bitmap        */
@@ -1806,8 +1804,9 @@
                                            Short*  min, 
                                            Short*  max )
   {
-    ras.traceOfs = 0;
-    ras.traceIncr = 0;
+    ras.traceOfs         = 0;
+    ras.traceIncr        = 0;
+    ras.traceOfsLastLine = -1;
 
     ras.gray_min_x = 0;
     ras.gray_max_x = 0;
@@ -1859,21 +1858,40 @@
   static void  Vertical_Region_Sweep_Step( RAS_ARGS Short y )
   {
     Short*  target;
+    Short*  targetLastLine;
 
 
-    target = ras.rTarget + ras.traceOfs;
+    target         = ras.rTarget + ras.traceOfs;
+    targetLastLine = ras.rTarget + ras.traceOfsLastLine;
+
 
     /* special case: the current line was empty */
 
     if ( ras.traceIncr == 0 )
       target[ras.traceIncr++] = y;
+      
 
-    /* finish current line and move to the next one */
+    /* finish current line */
 
     target[ras.traceIncr++] = EOREGREC;
 
-    ras.traceOfs += ras.traceIncr;
-    ras.traceIncr = 0;
+
+    /* special case: no differences between last and current line */
+
+    if ( ( ras.traceOfsLastLine > -1 ) &&
+         ( ras.traceOfs - ras.traceOfsLastLine == ras.traceIncr ) &&
+         ( MEM_Cmp( targetLastLine + 1, target + 1, ( ras.traceIncr - 1 ) * sizeof( Short ) ) == 0 ) )
+    {
+      ras.traceIncr = 0;
+      return;
+    }
+    
+
+    /* move to the next line */
+
+    ras.traceOfsLastLine = ras.traceOfs;
+    ras.traceOfs         += ras.traceIncr;
+    ras.traceIncr        = 0;
   }
 
   static void Vertical_Region_Sweep_Finish( RAS_ARG )
@@ -1886,7 +1904,7 @@
     target = ras.rTarget + ras.traceOfs;
 
     target[ras.traceIncr++] = EOREGREC;
-    ras.region.size = ras.traceOfs + ras.traceIncr;
+    ras.target.size = ( ras.traceOfs + ras.traceIncr ) * sizeof( Short );
   }
 
 #endif /* __GEOS__ */
@@ -2811,7 +2829,7 @@ Scan_DropOuts :
 
 LOCAL_FUNC
 TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
-                                        TT_Region_Map*  map )
+                                        TT_Raster_Map*  map )
 {
   TT_Error  error;
 
@@ -2831,7 +2849,7 @@ TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
   }
 
   if ( map )
-    ras.region = *map;
+    ras.target = *map;
 
   ras.outs      = glyph->contours;
   ras.flags     = glyph->flags;
@@ -2855,13 +2873,15 @@ TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
 
   ras.band_top            = 0;
   ras.band_stack[0].y_min = 0;
-  ras.band_stack[0].y_max = ras.region.rows - 1;
+  ras.band_stack[0].y_max = ras.target.rows - 1;
 
-  ras.bWidth  = ras.region.cols;
-  ras.rTarget = (Short*)ras.region.data;
+  ras.bWidth  = ras.target.cols;
+  ras.rTarget = (Short*)ras.target.bitmap;
 
   if ( (error = Render_Single_Pass( RAS_VARS 0 )) != 0 )
     return error;
+
+  map->size = ras.target.size;
 
   return TT_Err_Ok;
 }

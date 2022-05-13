@@ -1451,7 +1451,7 @@
  *  Description :  Produces a region from a glyph outline.
  *
  *  Input  :  glyph      the glyph container's handle
- *            region     target region description block
+ *            map        target region description block
  *            xOffset    x offset in fractional pixels (26.6 format)
  *            yOffset    y offset in fractional pixels (26.6 format)
  *
@@ -1473,7 +1473,7 @@
 
   EXPORT_FUNC
   TT_Error  TT_Get_Glyph_Region( TT_Glyph        glyph,
-                                 TT_Region_Map*  map,
+                                 TT_Raster_Map*  map,
                                  TT_F26Dot6      xOffset,
                                  TT_F26Dot6      yOffset )
   {
@@ -1693,7 +1693,7 @@
 EXPORT_FUNC
 TT_Error  TT_Get_Outline_Region( TT_Engine       engine,
                                  TT_Outline*     outline,
-                                 TT_Region_Map*  map )
+                                 TT_Raster_Map*  map )
 {
   PEngine_Instance  _engine = HANDLE_Engine( engine );
   TT_Error          error;

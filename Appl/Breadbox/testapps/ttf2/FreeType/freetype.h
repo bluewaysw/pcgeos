@@ -327,6 +327,13 @@
   /*       cols  = (W+3) & ~3                                          */
   /*       width = cols                                                */
   /*       flow  = your_choice                                         */
+  /*                                                                   */
+  /*   - for a WxH region:                                             */
+  /*                                                                   */
+  /*       rows  = H                                                   */
+  /*       cols  = W                                                   */
+  /*       width = cols                                                */
+  /*       flow  = your_choise                                         */
 
   struct  TT_Raster_Map_
   {
@@ -335,23 +342,15 @@
     int    width;   /* number of pixels per line         */
     int    flow;    /* bitmap orientation                */
 
-    void*  bitmap;  /* bit/pixmap buffer                 */
+    void*  bitmap;  /* bit/pixmap/region buffer          */
+#ifndef __GEOS__
     long   size;    /* bit/pixmap size in bytes          */
+#else
+    int    size;    /* bit/pixmap/region size in bytes   */
+#endif /* __GEOS__ */
   };
 
   typedef struct TT_Raster_Map_  TT_Raster_Map;
-
-#ifdef __GEOS__
-  struct TT_Region_Map_
-  {
-    int     rows;
-    int     cols;
-    void*   data;
-    long    size;
-  };
-
-  typedef struct TT_Region_Map_  TT_Region_Map;
-#endif
 
 
   /* ------ The font header TrueType table structure ------ */
@@ -974,7 +973,7 @@
   /*       of 64!                                                     */
   EXPORT_DEF
   TT_Error  TT_Get_Glyph_Region( TT_Glyph          glyph,
-                                 TT_Region_Map*    map,
+                                 TT_Raster_Map*    map,
                                  TT_F26Dot6        xOffset,
                                  TT_F26Dot6        yOffset );
 
@@ -1023,7 +1022,7 @@
   EXPORT_DEF
   TT_Error  TT_Get_Outline_Region( TT_Engine       engine,
                                    TT_Outline*     outline,
-                                   TT_Region_Map*  map );
+                                   TT_Raster_Map*  map );
 
 
   /* Return an outline's bounding box -- this function is slow as it */

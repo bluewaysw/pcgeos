@@ -113,7 +113,9 @@ extern "C" {
   /* mode 'scan'.                                                  */
   LOCAL_DEF
   TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
-                                          TT_Region_Map*  target );
+                                          TT_Raster_Map*  target );
+
+  #define SIZE_EMPTY_LINE   2
 #endif
 
   /* Initialize rasterizer */
