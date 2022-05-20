@@ -1444,6 +1444,8 @@
 
 #ifdef __GEOS__
 
+#define HORIZONTAL_FLIP_MATRIX    { 1 * 1 << 16, 0, 0, -1 * 1 << 16 }
+
 /*******************************************************************
  *
  *  Function    :  TT_Get_Glyph_Region
@@ -1481,7 +1483,7 @@
     TT_Engine         engine;
     TT_Error          error;
     PGlyph            _glyph = HANDLE_Glyph( glyph );
-    TT_Matrix         flipmatrix = { 65536, 0, 0, -65536}; 
+    TT_Matrix         flipmatrix = HORIZONTAL_FLIP_MATRIX; 
 
     TT_Outline  outline;
 

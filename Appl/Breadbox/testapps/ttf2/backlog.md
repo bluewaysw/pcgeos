@@ -31,11 +31,12 @@
 - ~~Teile eines Zeichens die unter der Basislinie liegen werden nicht angezeigt~~
 - ~~die Size einer Region ist fehlerhaft~~
 - (Testprogramm) TT_Init_Kerning_Extension() darf nur einmalig aufgerufen werden
-- das kompakte Ablegen von Region ist fehlerhaft
-- Glyphs werden auf den Kopf stehen in Regions gerendert
+- ~~das kompakte Ablegen von Region ist fehlerhaft~~
+- ~~Glyphs werden auf den Kopf stehen in Regions gerendert~~
 
 ## Bemerkungen
 - die Darstellung keiner Punktgröße ist jetzt wesentlich besser aber stark vom Font abhänging; das ist bei der Font-Selektion zu beachten
+- ~~flipMatix in TT_Get_Glyph_Region in ttapi.c in ein Makro verschieben~~
 
 ## Optimierungen
 - diverse Offsets von long auf int ändern
