@@ -1481,6 +1481,7 @@
     TT_Engine         engine;
     TT_Error          error;
     PGlyph            _glyph = HANDLE_Glyph( glyph );
+    TT_Matrix         flipmatrix = { 65536, 0, 0, -65536}; 
 
     TT_Outline  outline;
 
@@ -1496,9 +1497,11 @@
     /* outline.dropout_mode = _glyph->scan_type; */
     outline.dropout_mode = 2;
 
-    TT_Translate_Outline( &outline, xOffset, yOffset );
+    TT_Transform_Outline( &outline, &flipmatrix );
+    TT_Translate_Outline( &outline, xOffset, yOffset + map->rows * 64 );
     error = TT_Get_Outline_Region( engine, &outline, map );
-    TT_Translate_Outline( &outline, -xOffset, -yOffset );
+    TT_Translate_Outline( &outline, -xOffset, -yOffset - map->rows * 64 );
+    TT_Transform_Outline( &outline, &flipmatrix );
 
     return error;
   }

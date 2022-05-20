@@ -120,7 +120,7 @@ void testRendering(GStateHandle gstate) {
         goto Fail;
     }
 
-    error = TT_Set_Instance_CharSize(instance, 40*64);
+    error = TT_Set_Instance_CharSize(instance, 72*64);
     if(error) {
         _log("Fehler beim setzen der Pointsize\r");
         goto Fail;
@@ -189,28 +189,35 @@ void DrawRegion( GStateHandle gstate, TT_Instance instance, TT_Glyph glyph ) {
     word characterId = 41;
     char tmpStr[40];
     TT_Raster_Map regionmap;
-    Region region[250];
+    TT_Glyph_Metrics metrics;
+    Region*  region = calloc(sizeof(Region), 1000);
 
-    region[0] = 0;
-    region[1] = 0;
-    region[2] = 48;
-    region[3] = 48;
-
-    regionmap.rows = 48;
-    regionmap.cols = 48;
-    regionmap.width = 48;
-    regionmap.flow = TT_Flow_Up;
+    regionmap.flow = TT_Flow_Down;
     regionmap.bitmap = &region[4];
         
     if( TT_Load_Glyph( instance, glyph, characterId, TTLOAD_DEFAULT | TTLOAD_PEDANTIC ) )
         return;
 
-    if( TT_Get_Glyph_Region(glyph, &regionmap, 0, 0) )
+    if( TT_Get_Glyph_Metrics( glyph, &metrics ) )
+        return;
+
+    regionmap.rows = ( metrics.bbox.yMax - metrics.bbox.yMin ) >> 6;
+    regionmap.cols = ( metrics.bbox.xMax - metrics.bbox.yMin ) >> 6;
+    regionmap.width = regionmap.cols;
+
+    region[0] = 0;
+    region[1] = 0;
+    region[2] = regionmap.rows;
+    region[3] = regionmap.cols;
+
+    if( TT_Get_Glyph_Region( glyph, &regionmap, 0, 0 ) )
         return;
 
     sprintf(tmpStr, "region size:\t%d\r", (regionmap.size)); _log(tmpStr);
 
-    GrDrawRegion(gstate, 200, 200, region, 0, 0);
+    GrDrawRegion(gstate, 60, 60, region, 0, 0);
+
+    free(region);
 }
 
 @method TtfProcessClass, MSG_META_EXPOSED {
