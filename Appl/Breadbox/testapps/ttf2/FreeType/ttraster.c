@@ -1881,8 +1881,8 @@
     if ( ( ras.traceOfsLastLine > -1 ) &&
          ( MEM_Cmp( targetLastLine + 1, target + 1, ( ras.traceIncr - 1 ) * sizeof( Short ) ) == 0 ) )
     {
-      MEM_Copy( targetLastLine, target, ras.traceIncr * sizeof( Short ) );
-      ras.traceIncr = 0;
+      *targetLastLine = *target;
+      ras.traceIncr   = 0;
       return;
     }
     
