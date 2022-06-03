@@ -33,6 +33,10 @@
 #include "fterrid.h"
 #include "ftnameid.h"
 
+#ifdef __GEOS__
+#include <geos.h>
+#endif /* __GEOS__ */
+
 /* To make freetype.h independent from configuration files we check */
 /* whether EXPORT_DEF has been defined already.                     */
 
@@ -637,6 +641,15 @@
 
   typedef long  TT_Error;
 
+  #ifdef __GEOS__
+
+  /* Flags for control path generation for FreeGEOS. */
+
+  #define GEOS_TTF_POSTSCRIPT   0x0002
+  #define GEOS_TTF_SAVE_STATE   0x0001
+
+  #endif /* __GEOS__ */
+
 
   /*******************************************************************/
   /*                                                                 */
@@ -971,11 +984,26 @@
   /*       (where vertical and horizontal stems aren't grayed).  This */
   /*       means that `xOffset' and `yOffset' must be multiples       */
   /*       of 64!                                                     */
+  
   EXPORT_DEF
   TT_Error  TT_Get_Glyph_Region( TT_Glyph          glyph,
                                  TT_Raster_Map*    map,
                                  TT_F26Dot6        xOffset,
                                  TT_F26Dot6        yOffset );
+
+
+  /* Render the glyph into the passed GEOS regionpath.                */
+  
+  EXPORT_DEF
+  TT_Error  TT_Get_Glyph_In_Region( TT_Glyph      glyph,
+                                    Handle        regionPath,
+                                    GStateHandle  gstate );
+
+
+  EXPORT_DEF
+  TT_Error  TT_Get_Glyph_Path( TT_Glyph       glyph,
+                               GStateHandle   gstate,
+                               TT_UShort          controlFlags );
 
 
   /* ----------------------- outline support ------------------------ */
