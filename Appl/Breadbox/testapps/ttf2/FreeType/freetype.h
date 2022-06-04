@@ -996,14 +996,14 @@
   
   EXPORT_DEF
   TT_Error  TT_Get_Glyph_In_Region( TT_Glyph      glyph,
-                                    Handle        regionPath,
-                                    GStateHandle  gstate );
+                                    Handle        regionPath );
 
-
+  /* Render the glyphs outline into the passsed GStateHandle          */
+  
   EXPORT_DEF
   TT_Error  TT_Get_Glyph_Path( TT_Glyph       glyph,
                                GStateHandle   gstate,
-                               TT_UShort          controlFlags );
+                               TT_UShort      controlFlags );
 
 
   /* ----------------------- outline support ------------------------ */

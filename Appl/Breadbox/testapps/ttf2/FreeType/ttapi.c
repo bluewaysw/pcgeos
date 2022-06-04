@@ -1508,6 +1508,75 @@
     return error;
   }
 
+  /*******************************************************************
+  *
+  *  Function    :  TT_Get_Glyph_In_Region
+  *
+  *  Description :  Renders a glyph into the given region path.
+  *
+  *  Input  :  glyph         the glyph container's handle
+  *            regionPath    handle into the outline is to be written
+  *
+  *  Output :  Error code.
+  *
+  *  MT-Safe : NO!  Glyph containers can't be shared.
+  *
+  ******************************************************************/
+
+  EXPORT_FUNC
+  TT_Error  TT_Get_Glyph_In_Region( TT_Glyph      glyph,
+                                    Handle        regionPath )
+  {
+    PEngine_Instance  _engine;
+    TT_Engine         engine;
+    TT_Error          error;
+    PGlyph            _glyph = HANDLE_Glyph( glyph );
+
+    TT_Outline  outline;
+
+    if ( !_glyph )
+      return TT_Err_Invalid_Glyph_Handle;
+
+    _engine = _glyph->face->engine;
+    HANDLE_Set(engine,_engine);
+
+    outline = _glyph->outline;
+
+    //TBD Does the outline need to be translated or flipped?
+
+    //TBD Iterate over the outline's contours and write its components to the regionpath.
+
+    return TT_Err_Ok;
+  }
+
+
+ /*******************************************************************
+  *
+  *  Function    :  TT_Get_Glyph_Path
+  *
+  *  Description :  Renders glyphs outline into the given GStateHandle.
+  *
+  *  Input  :  glyph         the glyph container's handle
+  *            gstate        handle to the graphic state
+  *            controlFlags  controls how the outline should be rendered
+  *
+  *  Output :  Error code.
+  *
+  *  MT-Safe : NO!  Glyph containers can't be shared.
+  *
+  ******************************************************************/
+
+  EXPORT_FUNC
+  TT_Error  TT_Get_Glyph_Path( TT_Glyph       glyph,
+                               GStateHandle   gstate,
+                               TT_UShort      controlFlags )
+  {
+
+    //TBD
+
+    return TT_Err_Ok;
+  }
+
 #endif /* __GEOS__ */
 
 

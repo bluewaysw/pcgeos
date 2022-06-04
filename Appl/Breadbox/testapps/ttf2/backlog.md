@@ -20,7 +20,7 @@
 - ~~Extension für Kerning aktivieren~~
 - ~~Bytecodeinterpreter aktivieren~~
 - ~~angepasstes FreeType in Treibersourcen verschieben~~
-- Funktionen für DR_FONT_GEN_IN_REGION, DR_FONT_GEN_PATH anlegen
+- ~~Funktionen für DR_FONT_GEN_IN_REGION, DR_FONT_GEN_PATH anlegen~~
 - Implementierungen für DR_FONT_GEN_IN_REGION, DR_FONT_GEN_PATH
 - FreeType in Treiber integrieren
 - Registrierung eines Fonts anpassen (FontID, TTC???) 
