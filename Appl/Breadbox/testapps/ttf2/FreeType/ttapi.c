@@ -1571,8 +1571,45 @@
                                GStateHandle   gstate,
                                TT_UShort      controlFlags )
   {
+    PEngine_Instance  _engine;
+    TT_Engine         engine;
+    TT_Error          error;
+    PGlyph            _glyph = HANDLE_Glyph( glyph );
 
-    //TBD
+    TT_Outline  outline;
+
+    if ( !_glyph )
+      return TT_Err_Invalid_Glyph_Handle;
+
+    _engine = _glyph->face->engine;
+    HANDLE_Set(engine,_engine);
+
+    outline = _glyph->outline;
+
+    // if SAVE_STATE set save gstate
+
+    // set Comment with glyphs boundig box
+
+    // translate by current x,y position
+
+    // if POSTSCRIPT set flip outline
+
+    // transform by font matrix
+
+    // iterate over contours
+
+      // iterate over parts of current contour
+
+        // switch over current part
+
+            // MOVE_TO
+            // LINE_TO
+            // CURVE_TO
+            // REL...
+
+    // restore glyphs outline
+
+    // if SAVE_STATE set restore gstate
 
     return TT_Err_Ok;
   }
