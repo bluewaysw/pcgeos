@@ -996,6 +996,7 @@
   
   EXPORT_DEF
   TT_Error  TT_Get_Glyph_In_Region( TT_Glyph      glyph,
+                                    MemHandle     bitmapBlock,
                                     Handle        regionPath );
 
   /* Render the glyphs outline into the passsed GStateHandle          */

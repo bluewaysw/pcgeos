@@ -1515,6 +1515,7 @@
   *  Description :  Renders a glyph into the given region path.
   *
   *  Input  :  glyph         the glyph container's handle
+  *            bitmapBlock   handle 
   *            regionPath    handle into the outline is to be written
   *
   *  Output :  Error code.
@@ -1525,6 +1526,7 @@
 
   EXPORT_FUNC
   TT_Error  TT_Get_Glyph_In_Region( TT_Glyph      glyph,
+                                    MemHandle     bitmapBlock,
                                     Handle        regionPath )
   {
     PEngine_Instance  _engine;
@@ -1542,9 +1544,21 @@
 
     outline = _glyph->outline;
 
-    //TBD Does the outline need to be translated or flipped?
+    // calc region size
 
-    //TBD Iterate over the outline's contours and write its components to the regionpath.
+    // alloc bitmapBlock and init regionPath --> GrRegionPathInit
+
+    // translate by current x,y position
+
+    // iterate over contours
+
+      // iterate over segments of current contour
+
+        // switch over current segment
+
+          // LINE_SEGMENT --> GrRegionAddLineAtCP
+          // CURVE_SEGMENT --> GrRegionAddBezierAtCP
+          // ...
 
     return TT_Err_Ok;
   }
@@ -1592,20 +1606,19 @@
 
     // translate by current x,y position
 
-    // if POSTSCRIPT set flip outline
+    // if POSTSCRIPT set -> transform by hight and flip outline
 
     // transform by font matrix
 
     // iterate over contours
 
-      // iterate over parts of current contour
+      // iterate over segments of current contour
 
-        // switch over current part
+        // switch over current segment
 
-            // MOVE_TO
-            // LINE_TO
-            // CURVE_TO
-            // REL...
+          // LINE_SEGMENT --> GrDrawHLine(), GrDrawVLine() or GrDrawLine()
+          // CURVE_SEGMENT --> GrDrawCurve()
+          // ...
 
     // restore glyphs outline
 
