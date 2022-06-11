@@ -33,6 +33,10 @@
 #include "fterrid.h"
 #include "ftnameid.h"
 
+#ifdef __GEOS__
+#include <geos.h>
+#endif /* __GEOS__ */
+
 /* To make freetype.h independent from configuration files we check */
 /* whether EXPORT_DEF has been defined already.                     */
 
@@ -327,6 +331,13 @@
   /*       cols  = (W+3) & ~3                                          */
   /*       width = cols                                                */
   /*       flow  = your_choice                                         */
+  /*                                                                   */
+  /*   - for a WxH region:                                             */
+  /*                                                                   */
+  /*       rows  = H                                                   */
+  /*       cols  = W                                                   */
+  /*       width = cols                                                */
+  /*       flow  = your_choise                                         */
 
   struct  TT_Raster_Map_
   {
@@ -335,8 +346,12 @@
     int    width;   /* number of pixels per line         */
     int    flow;    /* bitmap orientation                */
 
-    void*  bitmap;  /* bit/pixmap buffer                 */
+    void*  bitmap;  /* bit/pixmap/region buffer          */
+#ifndef __GEOS__
     long   size;    /* bit/pixmap size in bytes          */
+#else
+    int    size;    /* bit/pixmap/region size in bytes   */
+#endif /* __GEOS__ */
   };
 
   typedef struct TT_Raster_Map_  TT_Raster_Map;
@@ -625,6 +640,15 @@
   /* Almost all functions return an error code of this type. */
 
   typedef long  TT_Error;
+
+  #ifdef __GEOS__
+
+  /* Flags for control path generation for FreeGEOS. */
+
+  #define GEOS_TTF_POSTSCRIPT   0x0002
+  #define GEOS_TTF_SAVE_STATE   0x0001
+
+  #endif /* __GEOS__ */
 
 
   /*******************************************************************/
@@ -952,6 +976,37 @@
                                  TT_F26Dot6      xOffset,
                                  TT_F26Dot6      yOffset );
 
+
+  /* Render the glyph into a region, with given position offsets.     */
+  /*                                                                  */
+  /* Note: Only use integer pixel offsets to preserve the fine        */
+  /*       hinting of the glyph and the `correct' anti-aliasing       */
+  /*       (where vertical and horizontal stems aren't grayed).  This */
+  /*       means that `xOffset' and `yOffset' must be multiples       */
+  /*       of 64!                                                     */
+  
+  EXPORT_DEF
+  TT_Error  TT_Get_Glyph_Region( TT_Glyph          glyph,
+                                 TT_Raster_Map*    map,
+                                 TT_F26Dot6        xOffset,
+                                 TT_F26Dot6        yOffset );
+
+
+  /* Render the glyph into the passed GEOS regionpath.                */
+  
+  EXPORT_DEF
+  TT_Error  TT_Get_Glyph_In_Region( TT_Glyph      glyph,
+                                    MemHandle     bitmapBlock,
+                                    Handle        regionPath );
+
+  /* Render the glyphs outline into the passsed GStateHandle          */
+  
+  EXPORT_DEF
+  TT_Error  TT_Get_Glyph_Path( TT_Glyph       glyph,
+                               GStateHandle   gstate,
+                               TT_UShort      controlFlags );
+
+
   /* ----------------------- outline support ------------------------ */
 
   /* Allocate a new outline.  Reserve space for `numPoints' and */
@@ -988,6 +1043,13 @@
 
   EXPORT_DEF
   TT_Error  TT_Get_Outline_Pixmap( TT_Engine       engine,
+                                   TT_Outline*     outline,
+                                   TT_Raster_Map*  map );
+
+  /* Render an outline into a region. */
+
+  EXPORT_DEF
+  TT_Error  TT_Get_Outline_Region( TT_Engine       engine,
                                    TT_Outline*     outline,
                                    TT_Raster_Map*  map );
 

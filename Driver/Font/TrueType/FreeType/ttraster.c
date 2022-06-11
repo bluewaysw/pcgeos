@@ -191,7 +191,9 @@
                                               PProfile    left,
                                               PProfile    right );
 
-  typedef void  Function_Sweep_Step( RAS_ARG );
+  typedef void  Function_Sweep_Step( RAS_ARGS Short y );
+
+  typedef void  Function_Sweep_Finish( RAS_ARG );
 
 
 /* NOTE: These operations are only valid on 2's complement processors */
@@ -250,41 +252,46 @@
 
     TPoint*   arc;                  /* current Bezier arc pointer */
 
-    UShort    bWidth;               /* target bitmap width  */
+    UShort    bWidth;               /* target buffer width  */
     PByte     bTarget;              /* target bitmap buffer */
     PByte     gTarget;              /* target pixmap buffer */
+#ifdef __GEOS__
+    PShort    rTarget;              /* target region buffer */
+#endif /* __GEOS__ */
 
     Long      lastX, lastY, minY, maxY;
 
-    UShort    num_Profs;            /* current number of profiles */
+    UShort    num_Profs;        /* current number of profiles */
 
-    Bool      fresh;                /* signals a fresh new profile which */
-                                    /* 'start' field must be completed   */
-    Bool      joint;                /* signals that the last arc ended   */
-                                    /* exactly on a scanline.  Allows    */
-                                    /* removal of doublets               */
-    PProfile  cProfile;             /* current profile                   */
-    PProfile  fProfile;             /* head of linked list of profiles   */
-    PProfile  gProfile;             /* contour's first profile in case   */
-                                    /* of impact                         */
-    TStates   state;                /* rendering state */
+    Bool      fresh;            /* signals a fresh new profile which */
+                                /* 'start' field must be completed   */
+    Bool      joint;            /* signals that the last arc ended   */
+                                /* exactly on a scanline.  Allows    */
+                                /* removal of doublets               */
+    PProfile  cProfile;         /* current profile                   */
+    PProfile  fProfile;         /* head of linked list of profiles   */
+    PProfile  gProfile;         /* contour's first profile in case   */
+                                /* of impact                         */
+    TStates   state;            /* rendering state */
 
-    TT_Raster_Map  target;          /* description of target bit/pixmap */
+    TT_Raster_Map  target;      /* description of target bit/pixmap */
 
-    Long      traceOfs;             /* current offset in target bitmap */
-    Long      traceG;               /* current offset in target pixmap */
+    Long      traceOfs;         /* current offset in target bitmap or region */
+    Long      traceOfsLastLine; /* offset in traget region before line step  */
+    Long      traceG;           /* current offset in target pixmap           */
 
-    Short     traceIncr;            /* sweep's increment in target bitmap */
+    Short     traceIncr;        /* sweep's increment in target bitmap        */
 
-    Short     gray_min_x;           /* current min x during gray rendering */
-    Short     gray_max_x;           /* current max x during gray rendering */
+    Short     gray_min_x;       /* current min x during gray rendering       */
+    Short     gray_max_x;       /* current max x during gray rendering       */
 
     /* dispatch variables */
 
-    Function_Sweep_Init*  Proc_Sweep_Init;
-    Function_Sweep_Span*  Proc_Sweep_Span;
-    Function_Sweep_Span*  Proc_Sweep_Drop;
-    Function_Sweep_Step*  Proc_Sweep_Step;
+    Function_Sweep_Init*   Proc_Sweep_Init;
+    Function_Sweep_Span*   Proc_Sweep_Span;
+    Function_Sweep_Span*   Proc_Sweep_Drop;
+    Function_Sweep_Step*   Proc_Sweep_Step;
+    Function_Sweep_Finish* Proc_Sweep_Finish;
 
     TT_Vector*  coords;
 
@@ -1770,10 +1777,137 @@
   }
 
 
-  static void Vertical_Sweep_Step( RAS_ARG )
+  static void Vertical_Sweep_Step( RAS_ARGS Short y )
   {
     ras.traceOfs += ras.traceIncr;
   }
+
+
+  static void Vertical_Sweep_Finish( RAS_ARG )
+  {
+    /* nothing to do */
+  }
+
+
+#ifdef __GEOS__
+
+/***********************************************************************/
+/*                                                                     */
+/*  Vertical Sweep Procedure Set for regions :                         */
+/*                                                                     */
+/*  These three routines are used during the vertical black/white      */
+/*  sweep phase for regions by the generic Draw_Sweep() function.      */
+/*                                                                     */
+/***********************************************************************/
+
+  static void  Vertical_Region_Sweep_Init( RAS_ARGS 
+                                           Short*  min, 
+                                           Short*  max )
+  {
+    ras.traceOfs         = 0;
+    ras.traceIncr        = 0;
+    ras.traceOfsLastLine = -1;
+
+    ras.gray_min_x = 0;
+    ras.gray_max_x = 0;
+  }
+
+  static void  Vertical_Region_Sweep_Span( RAS_ARGS Short       y,
+                                                    TT_F26Dot6  x1,
+                                                    TT_F26Dot6  x2,
+                                                    PProfile    left,
+                                                    PProfile    right )
+  {
+    Long   e1, e2;
+    Short*  target;
+
+
+    /* Drop-out control */
+
+    e1 = TRUNC( CEILING( x1 ) );
+
+    if ( x2-x1-ras.precision <= ras.precision_jitter )
+      e2 = e1;
+    else
+      e2 = TRUNC( FLOOR( x2 ) );
+
+    target = ras.rTarget + ras.traceOfs;
+
+    if ( ras.traceIncr == 0 )
+      target[ras.traceIncr++] = y;
+
+    if ( e2 >= 0 && e1 < ras.bWidth )   
+    {
+      if ( e1 < 0 )           e1 = 0;
+      if ( e2 >= ras.bWidth ) e2 = ras.bWidth-1;
+
+      target[ras.traceIncr++] = ( Short ) e1;
+      target[ras.traceIncr++] = ( Short ) e2;
+    }
+  }
+
+  static void  Vertical_Region_Sweep_Drop( RAS_ARGS Short       y,
+                                                    TT_F26Dot6  x1,
+                                                    TT_F26Dot6  x2,
+                                                    PProfile    left,
+                                                    PProfile    right )
+  {
+    /* nothing to do */
+  }
+
+  static void  Vertical_Region_Sweep_Step( RAS_ARGS Short y )
+  {
+    Short*  target;
+    Short*  targetLastLine;
+
+
+    target         = ras.rTarget + ras.traceOfs;
+    targetLastLine = ras.rTarget + ras.traceOfsLastLine;
+
+
+    /* special case: the current line was empty */
+
+    if ( ras.traceIncr == 0 )
+      target[ras.traceIncr++] = y;
+      
+
+    /* finish current line */
+
+    target[ras.traceIncr++] = EOREGREC;
+
+
+    /* special case: no differences between last and current line */
+
+    if ( ( ras.traceOfsLastLine > -1 ) &&
+         ( MEM_Cmp( targetLastLine + 1, target + 1, ( ras.traceIncr - 1 ) * sizeof( Short ) ) == 0 ) )
+    {
+      *targetLastLine = *target;
+      ras.traceIncr   = 0;
+      return;
+    }
+    
+
+    /* move to the next line */
+
+    ras.traceOfsLastLine = ras.traceOfs;
+    ras.traceOfs         += ras.traceIncr;
+    ras.traceIncr        = 0;
+  }
+
+  static void Vertical_Region_Sweep_Finish( RAS_ARG )
+  {
+    Short*  target;
+
+
+    /* complete a region */
+
+    target = ras.rTarget + ras.traceOfs;
+
+    target[ras.traceIncr++] = EOREGREC;
+    ras.target.size = ( ras.traceOfs + ras.traceIncr ) * sizeof( Short );
+  }
+
+#endif /* __GEOS__ */
 
 
 /***********************************************************************/
@@ -1930,9 +2064,14 @@
   }
 
 
-  static void Horizontal_Sweep_Step( RAS_ARG )
+  static void Horizontal_Sweep_Step( RAS_ARGS Short y )
   {
     /* Nothing, really */
+  }
+
+  static void Horizontal_Sweep_Finish( RAS_ARG )
+  {
+    /* nothing to do */
   }
 
 
@@ -1979,7 +2118,7 @@
   }
 
 
-  static void  Vertical_Gray_Sweep_Step( RAS_ARG )
+  static void  Vertical_Gray_Sweep_Step( RAS_ARG Short y )
   {
     Int    c1, c2;
     PByte  pix, bit, bit2;
@@ -2312,9 +2451,9 @@
    Next_Line:
 
 #ifdef __GEOS__
-        ProcCallFixedOrMovable_cdecl( ras.Proc_Sweep_Step, RAS_VAR );
+        ProcCallFixedOrMovable_cdecl( ras.Proc_Sweep_Step, RAS_VARS y );
 #else
-        ras.Proc_Sweep_Step( RAS_VAR );
+        ras.Proc_Sweep_Step( RAS_VARS y );
 #endif    /* ifdef __GEOS__ */
 
         y++;
@@ -2357,13 +2496,18 @@
     while ( y <= max_Y )
     {
 #ifdef __GEOS__
-      ProcCallFixedOrMovable_cdecl( ras.Proc_Sweep_Step, RAS_VAR );
+      ProcCallFixedOrMovable_cdecl( ras.Proc_Sweep_Step, RAS_VARS y );
 #else
-      ras.Proc_Sweep_Step( RAS_VAR );
+      ras.Proc_Sweep_Step( RAS_VARS y );
 #endif    /* __GEOS__ */
       y++;
     }
 
+#ifdef __GEOS__
+    ProcCallFixedOrMovable_cdecl( ras.Proc_Sweep_Finish, RAS_VAR );
+#else
+    ras.Proc_Sweep_Finish( RAS_VAR );
+#endif
     return SUCCESS;
 
 Scan_DropOuts :
@@ -2521,10 +2665,11 @@ Scan_DropOuts :
 
 
     /* Vertical Sweep */
-    ras.Proc_Sweep_Init = Vertical_Sweep_Init;
-    ras.Proc_Sweep_Span = Vertical_Sweep_Span;
-    ras.Proc_Sweep_Drop = Vertical_Sweep_Drop;
-    ras.Proc_Sweep_Step = Vertical_Sweep_Step;
+    ras.Proc_Sweep_Init   = Vertical_Sweep_Init;
+    ras.Proc_Sweep_Span   = Vertical_Sweep_Span;
+    ras.Proc_Sweep_Drop   = Vertical_Sweep_Drop;
+    ras.Proc_Sweep_Step   = Vertical_Sweep_Step;
+    ras.Proc_Sweep_Finish = Vertical_Sweep_Finish;
 
     ras.band_top            = 0;
     ras.band_stack[0].y_min = 0;
@@ -2540,10 +2685,11 @@ Scan_DropOuts :
 
     if ( ras.second_pass && ras.dropOutControl != 0 )
     {
-      ras.Proc_Sweep_Init = Horizontal_Sweep_Init;
-      ras.Proc_Sweep_Span = Horizontal_Sweep_Span;
-      ras.Proc_Sweep_Drop = Horizontal_Sweep_Drop;
-      ras.Proc_Sweep_Step = Horizontal_Sweep_Step;
+      ras.Proc_Sweep_Init   = Horizontal_Sweep_Init;
+      ras.Proc_Sweep_Span   = Horizontal_Sweep_Span;
+      ras.Proc_Sweep_Drop   = Horizontal_Sweep_Drop;
+      ras.Proc_Sweep_Step   = Horizontal_Sweep_Step;
+      ras.Proc_Sweep_Finish = Horizontal_Sweep_Finish;
 
       ras.band_top            = 0;
       ras.band_stack[0].y_min = 0;
@@ -2630,10 +2776,11 @@ Scan_DropOuts :
     ras.bTarget = (Byte*)ras.gray_lines;
     ras.gTarget = (Byte*)ras.target.bitmap;
 
-    ras.Proc_Sweep_Init = Vertical_Gray_Sweep_Init;
-    ras.Proc_Sweep_Span = Vertical_Sweep_Span;
-    ras.Proc_Sweep_Drop = Vertical_Sweep_Drop;
-    ras.Proc_Sweep_Step = Vertical_Gray_Sweep_Step;
+    ras.Proc_Sweep_Init   = Vertical_Gray_Sweep_Init;
+    ras.Proc_Sweep_Span   = Vertical_Sweep_Span;
+    ras.Proc_Sweep_Drop   = Vertical_Sweep_Drop;
+    ras.Proc_Sweep_Step   = Vertical_Gray_Sweep_Step;
+    ras.Proc_Sweep_Finish = Vertical_Sweep_Finish;
 
     error = Render_Single_Pass( RAS_VARS  0 );
     if (error)
@@ -2643,10 +2790,12 @@ Scan_DropOuts :
 
     if ( ras.second_pass && ras.dropOutControl != 0 )
     {
-      ras.Proc_Sweep_Init = Horizontal_Sweep_Init;
-      ras.Proc_Sweep_Span = Horizontal_Gray_Sweep_Span;
-      ras.Proc_Sweep_Drop = Horizontal_Gray_Sweep_Drop;
-      ras.Proc_Sweep_Step = Horizontal_Sweep_Step;
+      ras.Proc_Sweep_Init   = Horizontal_Sweep_Init;
+      ras.Proc_Sweep_Span   = Horizontal_Gray_Sweep_Span;
+      ras.Proc_Sweep_Drop   = Horizontal_Gray_Sweep_Drop;
+      ras.Proc_Sweep_Step   = Horizontal_Sweep_Step;
+      ras.Proc_Sweep_Finish = Horizontal_Sweep_Finish;
+
 
       ras.band_top            = 0;
       ras.band_stack[0].y_min = 0;
@@ -2661,6 +2810,83 @@ Scan_DropOuts :
   }
 
 #endif /* TT_CONFIG_OPTION_GRAY_SCALING */
+
+
+#ifdef __GEOS__
+
+/****************************************************************************/
+/*                                                                          */
+/* Function:    Render_Region_Glyph                                         */
+/*                                                                          */
+/* Description: Renders a glyph in a region.  Sub-banding if needed.        */
+/*                                                                          */
+/* Input:       AGlyph   Glyph record                                       */
+/*                                                                          */
+/* Returns:     SUCCESS on success.                                         */
+/*              FAILURE if any error was encountered during rendering.      */
+/*                                                                          */
+/****************************************************************************/
+
+LOCAL_FUNC
+TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
+                                        TT_Raster_Map*  map )
+{
+  TT_Error  error;
+
+  if ( glyph->n_points == 0 || glyph->n_contours <= 0 )
+    return TT_Err_Ok;
+
+  if ( !ras.buff )
+  {
+    ras.error = Raster_Err_Not_Ini;
+    return ras.error;
+  }
+
+  if ( glyph->n_points < glyph->contours[glyph->n_contours - 1] )
+  {
+    ras.error = TT_Err_Too_Many_Points;
+    return ras.error;
+  }
+
+  if ( map )
+    ras.target = *map;
+
+  ras.outs      = glyph->contours;
+  ras.flags     = glyph->flags;
+  ras.nPoints   = glyph->n_points;
+  ras.nContours = glyph->n_contours;
+  ras.coords    = glyph->points;
+
+  Set_High_Precision( RAS_VARS glyph->high_precision );
+  ras.scale_shift    = ras.precision_shift;
+  ras.dropOutControl = glyph->dropout_mode;
+  ras.second_pass    = glyph->second_pass;
+
+  /* Vertical Sweep */
+  
+  ras.Proc_Sweep_Init   = Vertical_Region_Sweep_Init;
+  ras.Proc_Sweep_Span   = Vertical_Region_Sweep_Span;
+  ras.Proc_Sweep_Drop   = Vertical_Region_Sweep_Drop;
+  ras.Proc_Sweep_Step   = Vertical_Region_Sweep_Step;
+  ras.Proc_Sweep_Finish = Vertical_Region_Sweep_Finish;
+
+
+  ras.band_top            = 0;
+  ras.band_stack[0].y_min = 0;
+  ras.band_stack[0].y_max = ras.target.rows - 1;
+
+  ras.bWidth  = ras.target.cols;
+  ras.rTarget = (Short*)ras.target.bitmap;
+
+  if ( (error = Render_Single_Pass( RAS_VARS 0 )) != 0 )
+    return error;
+
+  map->size = ras.target.size;
+
+  return TT_Err_Ok;
+}
+
+#endif /* __GEOS__ */
 
 
 /************************************************/

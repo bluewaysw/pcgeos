@@ -108,6 +108,15 @@ extern "C" {
                                         Byte*           palette );
 #endif
 
+#ifdef __GEOS__
+  /* Render one glyph in the target region, using drop-out control */
+  /* mode 'scan'.                                                  */
+  LOCAL_DEF
+  TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
+                                          TT_Raster_Map*  target );
+                                          
+#endif
+
   /* Initialize rasterizer */
   LOCAL_DEF
   TT_Error  TTRaster_Init( PEngine_Instance  engine );

@@ -40,6 +40,10 @@
 
 #define MEM_Set( dest, byte, count )  memset( dest, byte, count )
 
+#ifdef __GEOS__
+#define MEM_Cmp( left, right, count )  memcmp( left, right, count )
+#endif /* __GEOS__ */
+
 #ifdef HAVE_MEMCPY
 #define MEM_Copy( dest, source, count )  memcpy( dest, source, count )
 #else
