@@ -24,4 +24,4 @@
       [3.1.3 PCMCIA Driver Functions](Ddk/ddkpcmcia.md#313-PCMCIA-Driver-Functions)  
     [3.2 PCMCIA Library Functions](Ddk/ddkpcmcia.md#32-PCMCIA-Library-Functions)  
     [3.3 CardServices Functions](Ddk/ddkpcmcia.md#33-CardServices-Functions)  
-    [3.4 CardServices Events](Ddk/ddkpcmcia.md#34-CardServices Events)  
+    [3.4 CardServices Events](Ddk/ddkpcmcia.md#34-CardServices-Events)  
