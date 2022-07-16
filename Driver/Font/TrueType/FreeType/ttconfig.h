@@ -164,7 +164,7 @@
 /* The number of extensions available.  Don't change this value      */
 /* except if you add new extensions to the engine.                   */
 
-#define TT_MAX_EXTENSIONS  8
+#define TT_MAX_EXTENSIONS  2
 
 
 

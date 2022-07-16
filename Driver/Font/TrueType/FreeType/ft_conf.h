@@ -8,11 +8,13 @@
 #ifndef FT_CONF_H
 #define FT_CONF_H
 
-/* Under FreeGEOS we need this for the file operations and render regions. */
+/* Under FreeGEOS we need this for the file operations, render regions and manage memory. */
 #include <geos.h>
 #include <file.h>
 #include <resource.h>
 #include <graphics.h>
+#include <heap.h>
+#include <ec.h>
 
 /* Define to empty if the keyword does not work.  */
 /* #undef const */

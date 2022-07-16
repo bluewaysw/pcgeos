@@ -81,6 +81,12 @@ ForceRef DriverTable
 
 idata	ends
 
+;TODO: remove dependencys from ansic
+udata	segment
+	mallocOffset	word	(?)
+		public	mallocOffset
+udata	ends
+
 include		truetypeMacros.def
 
 WidthMod segment resource
@@ -105,6 +111,12 @@ NimbusStart	label	near
 AA_NIMBUS_SIZE equ $-NimbusStart
 CharMod ends
 
+;routines form GEOS adapter
+global	INIT_FREETYPE:far
+global	EXIT_FREETYPE:far
+
+global	tt_Engine:TT_Engine
+
 MetricsMod segment resource
 include		truetypeMetrics.asm
 include		truetypePath.asm
@@ -117,6 +129,10 @@ include		../FontCom/fontcomEscape.asm
 InitMod ends
 
 include		truetypeEC.asm
+include	        ansic_runtime.asm
+include		ansic_memory.asm
+include		ansic_malloc.asm
+include		ansic_string.asm
 
 Resident segment resource	;MODULE_FIXED
 

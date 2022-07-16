@@ -85,11 +85,32 @@ TrueTypeInit	proc	far
 		 or (mask HAF_NO_ERR shl 8) 	;cl, ch <- alloc flags
 	call	MemAllocSetOwner
 	mov	ds:variableHandle, bx		;save handle of block
-	clc					;indicate no error
 
+	;
+	; Initialize FreeType engine.
+	;
+
+	call	InitEngine
+noerror:
+	clc					;indicate no error
+done:
 	.leave
 	ret
 TrueTypeInit	endp
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		InitEngine
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+InitEngine	proc	far
+	.enter
+	call	INIT_FREETYPE
+	.leave
+	ret
+
+InitEngine	endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -125,11 +146,34 @@ EC <	clr	ds:bitmapHandle			;>
 	mov	bx, ds:variableHandle
 EC <	clr	ds:variableHandle		;>
 	call	MemFree				;done with variable block
-	clc					;indicate no error
 
+	call	EXIT_FREETYPE			;finish FreeType engine
+						;ax <- FreeType errorcode
+	test	ax, 0				;check for errors
+	jz	noerror
+	stc
+	jmp	exit
+noerror:	
+	clc					;indicate no error
+exit:
 	.leave
 	ret
 TrueTypeExit	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ExitEngine
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+ExitEngine	proc	far
+	.enter
+	call	EXIT_FREETYPE
+	.leave
+	ret
+
+ExitEngine	endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
