@@ -622,12 +622,28 @@
   /*   NOTE:  Some macros are defined in tttypes.h to perform         */
   /*          automatic type conversions for library hackers...       */
 
+  //TODO: soll TT_*_ ersetzen
+  struct GTT_Engine_   { MemHandle  z; };
+  struct GTT_Stream_   { MemHandle  z; };
+  struct GTT_Face_     { MemHandle  z; };
+  struct GTT_Instance_ { MemHandle  z; };
+  struct GTT_Glyph_    { MemHandle  z; };
+  struct GTT_CharMap_  { MemHandle  z; };
+
   struct TT_Engine_   { void*  z; };
   struct TT_Stream_   { void*  z; };
   struct TT_Face_     { void*  z; };
   struct TT_Instance_ { void*  z; };
   struct TT_Glyph_    { void*  z; };
   struct TT_CharMap_  { void*  z; };
+
+  //TODO: soll TT_* ersetzen
+  typedef struct GTT_Engine_    GTT_Engine;
+  typedef struct GTT_Stream_    GTT_Stream;
+  typedef struct GTT_Face_      GTT_Face;
+  typedef struct GTT_Instance_  GTT_Instance;
+  typedef struct GTT_Glyph_     GTT_Glyph;
+  typedef struct GTT_CharMap_   GTT_CharMap;
 
   typedef struct TT_Engine_    TT_Engine;    /* engine instance           */
   typedef struct TT_Stream_    TT_Stream;    /* stream handle type        */
@@ -671,13 +687,13 @@
   /* Initialize the engine. */
 
   EXPORT_DEF
-  TT_Error  TT_Init_FreeType( TT_Engine*  engine );
+  TT_Error  TT_Init_FreeType( GTT_Engine*  engine );
 
 
   /* Finalize the engine, and release all allocated objects. */
 
   EXPORT_DEF
-  TT_Error  TT_Done_FreeType( TT_Engine  engine );
+  TT_Error  TT_Done_FreeType( GTT_Engine  engine );
 
 
   /* Set the gray level palette.  This is an array of 5 bytes used */

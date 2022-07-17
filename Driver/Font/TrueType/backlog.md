@@ -16,45 +16,60 @@ Der Treiber wird in 3 Schichten realisiert:
   + der Code liegt unter /FreeType
 
 ### Speicherverwaltung
-- TT_Engine auf MemHandle umstellen
+- auf MemHandle umstellen
+  - TT_Engine
+  - TT_Stream
+  - TT_Face
+  - TT_Instance
+  - TT_Glyph
+  - TT_CharMap
 - Hilfsfunktionen TT_Alloc, TT_ReAlloc und TT_Free auf MemHandles umstellen
 - Speicherverwaltungsmakros auf MemHandles umstellen
 - Nutzer der Speicherverwaltungsmakros auf MemHandles umstellen
 
 ### DR_INIT
-- Wrapper für DR_INIT schreiben
-- Aufruf in truetypeInit.asm
+~~- Adapterfunktion für DR_INIT schreiben~~
+~~- Aufruf in truetypeInit.asm~~
+- prüfen ob die Adapterfunktion sauber durchlaufen wird
 
 ### DR_EXIT
-- Wrapper für DR_EXIT schreiben
-- Aufruf in truetypeInit.asm
+~~- Adapter für DR_EXIT schreiben~~
+~~- Aufruf in truetypeInit.asm~~
+- prüfen ob die Adapterfunktion sauber durchlaufen wird
 
 ### DR_FONT_GEN_CHAR
-- Wrapper für DR_FONT_GEN_CHAR schreiben
+- Adapterfunktion für DR_FONT_GEN_CHAR schreiben
+- Kerning implementieren
 - Aufruf in truetypeChars.asm
+- prüfen ob die Adapterfunktion sauber durchlaufen wird
 
 ### DR_FONT_GEN_WIDTHS
-- Wrapper für DR_FONT_GEN_WIDTHS schreiben
+- Adapterfunktion für DR_FONT_GEN_WIDTHS schreiben
 - Aufruf in truetypeWidts.asm
+- prüfen ob die Adapterfunktion sauber durchlaufen wird
 
 ### DR_FONT_CHAR_METRICS
-- Wrapper für DR_FONT_CHAR_METRICS schreiben
+- Adapterfunktion für DR_FONT_CHAR_METRICS schreiben
 - Aufruf in truetypeMetrics.asm
+- prüfen ob die Adapterfunktion sauber durchlaufen wird
 
 ### DR_FONT_INIT_FONTS (geringe Priorität)
 Die bisherigen Implementierung in Assembler kann auf die FreeType Engine umgestellt werden, somit vermeiden wir Redundanzen. Die akt. Implementierung scheint nicht korrekt zu funktionieren, das wird gleich mit behoben.
-- Wrapper für DR_FONT_INIT_FONTS schreiben
+- Adapterfunktion für DR_FONT_INIT_FONTS schreiben
 - Aufruf in truetypeInit.asm
+- prüfen ob die Adapterfunktion sauber durchlaufen wird
 
 ### DR_FONT_GEN_PATH
-- Wrapper für DR_FONT_GEN_PATH schreiben
+- Adapterfunktion für DR_FONT_GEN_PATH schreiben
 - Aufruf in truetypePath.asm
 - hier ist die Behandlung der Transformationsmatrizen noch unklar
+- prüfen ob die Adapterfunktion sauber durchlaufen wird
 
 ### DR_FONT_GEN_IN_REGION
-- Wrapper für DR_FONT_GEN_REGION schreiben
+- Adapterfunktion für DR_FONT_GEN_REGION schreiben
 - Aufruf in truetypePath.asm
 - hier ist die Behandlung der Transformationsmatrizen noch unklar
+- prüfen ob die Adapterfunktion sauber durchlaufen wird
 
 ### sonstiges
 - laden eines Fonts auf FileHandle umstellen
@@ -67,6 +82,16 @@ Die bisherigen Implementierung in Assembler kann auf die FreeType Engine umgeste
 - Initalisierung des Graustufenarrays in TT_Init_FreeType entfernen
 - das Graustufenarray kann aus TT_Engine entfernt werden
 - Warnungen entfernen
+- Makros vereinen:
+  - HANDLE_Engine und GHANDLE_Engine
+  - UNHANDLE_Engine und -/-
+- Strukturen vereinen:
+  - GTT_Engine und TT_Engine
+  - GTT_Stream und TT_Stream
+  - GTT_Face und TT_Face
+  - GTT_Instance und TT_Instance
+  - GTT_Glyph und TT_Glyph
+  - GTT_CharMap und TT_CharMap
 
 ### Funktionen die ausgeklammert werden können
 - TT_Open_Collection()

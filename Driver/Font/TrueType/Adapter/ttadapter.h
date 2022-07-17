@@ -15,7 +15,7 @@
  *
  * DESCRIPTION:
  *	Declaration of global objects which are defined in assembler 
- *      and are also needed in the c functions.
+ *      and are also needed in c functions.
  ***********************************************************************/
 #ifndef _TTADAPTER_H_
 #define _TTADAPTER_H_
@@ -26,11 +26,7 @@
 /***********************************************************************
  *      global dgoup objects
  ***********************************************************************/
-extern TT_Engine tt_Engine;
+extern GTT_Engine tt_Engine;
 
-
-/***********************************************************************
- *      adapter functions
- ***********************************************************************/
 
 #endif /* _TTADAPTER_H_ */

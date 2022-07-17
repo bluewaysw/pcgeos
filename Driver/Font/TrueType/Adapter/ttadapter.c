@@ -1,6 +1,6 @@
 /***********************************************************************
  *
- *	Copyright FreeGEOS-Project
+ *                      Copyright FreeGEOS-Project
  *
  * PROJECT:	  FreeGEOS
  * MODULE:	  TrueType font driver
@@ -22,16 +22,64 @@
 #include "ttadapter.h"
 
 
-TT_Error _pascal Init_FreeType() {
+/********************************************************************
+ *                      Init_FreeType
+ ********************************************************************
+ * SYNOPSIS:	  Initialises the FreeType Engine with the kerning 
+ *                extension. This is the adapter function for DR_INIT.
+ * 
+ * PARAMETERS:    void
+ * 
+ * RETURNS:       TT_Error = FreeType errorcode (see tterrid.h)
+ * 
+ * SIDE EFFECTS:  none
+ * 
+ * STRATEGY:      Initialises the FreeType engine by delegating to 
+ *                TT_Init_FreeType() and TT_Init_Kerning().
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      7/15/22   JK        Initial Revision
+ *******************************************************************/
+
+TT_Error _pascal Init_FreeType()
+{
         TT_Error        error;
 
-        error = TT_Init_FreeType(&tt_Engine);
 
-        //TT_Init_Kerning
+        error = TT_Init_FreeType( &tt_Engine );
+        if ( error != TT_Err_Ok )
+                return error;
 
-        return error;
+        //TT_Init_Kerning()
+
+        return TT_Err_Ok;
 }
 
-void _pascal Exit_FreeType() {
-        //TT_Done_FreeType
+
+/********************************************************************
+ *                      Exit_FreeType
+ ********************************************************************
+ * SYNOPSIS:	  Deinitialises the FreeType Engine. This is the 
+ *                adapter function for DR_EXIT.
+ * 
+ * PARAMETERS:    void
+ * 
+ * RETURNS:       TT_Error = FreeType errorcode (see tterrid.h)
+ * 
+ * SIDE EFFECTS:  none
+ * 
+ * STRATEGY:      Deinitialises the FreeType engine by delegating to 
+ *                TT_Done_FreeType().
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      7/15/22   JK        Initial Revision
+ *******************************************************************/
+
+TT_Error _pascal Exit_FreeType() 
+{
+        return TT_Done_FreeType( tt_Engine );
 }
