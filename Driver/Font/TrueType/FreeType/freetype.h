@@ -687,13 +687,13 @@
   /* Initialize the engine. */
 
   EXPORT_DEF
-  TT_Error  TT_Init_FreeType( GTT_Engine*  engine );
+  TT_Error  TT_Init_FreeType( TT_Engine*  engine );
 
 
   /* Finalize the engine, and release all allocated objects. */
 
   EXPORT_DEF
-  TT_Error  TT_Done_FreeType( GTT_Engine  engine );
+  TT_Error  TT_Done_FreeType( TT_Engine  engine );
 
 
   /* Set the gray level palette.  This is an array of 5 bytes used */
