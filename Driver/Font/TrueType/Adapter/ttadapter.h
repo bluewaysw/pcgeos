@@ -26,7 +26,7 @@
 /***********************************************************************
  *      global dgoup objects
  ***********************************************************************/
-extern GTT_Engine tt_Engine;
+extern TT_Engine tt_Engine;
 
 
 #endif /* _TTADAPTER_H_ */

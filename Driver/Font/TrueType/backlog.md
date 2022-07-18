@@ -16,16 +16,32 @@ Der Treiber wird in 3 Schichten realisiert:
   + der Code liegt unter /FreeType
 
 ### Speicherverwaltung
-- auf MemHandle umstellen
+- auf MemHandle/ChunkHandle umstellen
   - TT_Engine
   - TT_Stream
   - TT_Face
   - TT_Instance
   - TT_Glyph
   - TT_CharMap
-- Hilfsfunktionen TT_Alloc, TT_ReAlloc und TT_Free auf MemHandles umstellen
-- Speicherverwaltungsmakros auf MemHandles umstellen
-- Nutzer der Speicherverwaltungsmakros auf MemHandles umstellen
+- Hilfsfunktionen TT_Alloc, TT_ReAlloc und TT_Free auf MemHandles/ChunkHandles umstellen
+- Speicherverwaltungsmakros auf MemHandles/ChunkHandles umstellen
+- Nutzer der Speicherverwaltungsmakros auf MemHandles/ChunkHandles umstellen
+
+**Wie soll die Speicherverwaltung aussehen?**
+
+**Variante a)**
+- alle Pointer werden zu MemHandles
+- vor/nach dem Zugriff muss gelock/geunlockt werden
+
+**Variante b)**
+- die Pointer werden zu ChunkHandles
+- unklar ob ein LMemBlock genügt oder eine Aufteillung notwendig/sinnvoll ist  
+-> währen der gesamten Lebenszeit des Treibers ist nur TT_Engine im Speicher notwendig  
+-> die anderen FreeType Objekte (TT_Face, TT_Glyph ...) können durch die Adapterfunktionen angelegt und abgeräumt werden (das ist ev. eine sinnvolle Trennung)
+
+**Klären:**
+- wieviel Speicher und wieviele Blocks werden beim Rendervorgang belegt?
+- gibt es bei der Speicherbelegung große Unterschieden bei versch. Fonts?
 
 ### DR_INIT
 ~~- Adapterfunktion für DR_INIT schreiben~~
