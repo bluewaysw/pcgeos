@@ -237,15 +237,34 @@ RenameFileSrcMapEntry(ID oldName, ID newName)
 {
     Hash_Entry	    *he, *he2;
     Boolean 	    new;
-    Vector	    v;
+    Vector	    v, v2;
     
     he = Hash_FindEntry(&tsrcMap, (SpriteAddress)oldName);		
     if(he) {
 	v = Hash_GetValue(he);
 	Hash_SetValue(he, NULL);
 	he2 = Hash_CreateEntry(&tsrcMap, (SpriteAddress)newName, &new);
-	assert(new);
-	Hash_SetValue(he2, v);
+
+	if(!new) {
+	    TSrcMapEntry    *tsme;
+	    int		    i;
+	    
+	    /* Append entries from the one entry to the existing
+	     * vector. */
+	    v2 = Hash_GetValue(he2);
+	    
+	    for (tsme = (TSrcMapEntry *)Vector_Data(v), i = 0;
+	         i < Vector_Length(v);
+	         i++, tsme++)
+	    {
+		AddSrcMapEntry(newName, tsme->sd, tsme->start, tsme->end);
+	    }
+	
+	    Vector_Destroy(v);
+	}
+	else {
+	    Hash_SetValue(he2, v);
+        }
 	Hash_DeleteEntry(&tsrcMap, he);
     }
     else {

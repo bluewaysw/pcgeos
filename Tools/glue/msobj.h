@@ -506,6 +506,7 @@ extern Vector	segments,   /* SegDesc *'s for segment indices for this file */
 			     * library. */
 extern Vector	segSizes;   /* Vector of long segment sizes, for pass 2 only */
 extern ID   	msobj_CurFileName;
+extern ID   	msobj_FirstFileName;
 
 /*
  * Fixup thread info.

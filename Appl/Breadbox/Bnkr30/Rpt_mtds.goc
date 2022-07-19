@@ -104,7 +104,7 @@ CatPickStruct	*pickElement;
 char			catString[ENTRY_SIZE], lineBuffer[100];
 char			amtString[MAX_TEXT_LEN], numString[CKNUM_SIZE];
 TransSortStruct	*trArrayElement;
-FloatNum		subTotal=0, total, amount, incTotal, expTotal;
+FloatNum		subTotal, total, amount, incTotal, expTotal;
 Tab typeTab = {1.25 * 8 * PIXELS_PER_INCH, TL_NONE | TT_LEFT, SDM_100, 0, 0, NULL};
 Tab payeeTab = {2 * 8 * PIXELS_PER_INCH, TL_NONE | TT_LEFT, SDM_100, 0, 0, NULL};
 Tab amtTab = {5.5 * 8 * PIXELS_PER_INCH, TL_NONE | TT_ANCHORED, SDM_100, 0, 0, NULL};
@@ -114,6 +114,8 @@ Tab payeeTVTab = {1.5 * 8 * PIXELS_PER_INCH, TL_NONE | TT_LEFT, SDM_100, 0, 0, N
 Tab amtTVTab = {4.5 * 8 * PIXELS_PER_INCH, TL_NONE | TT_ANCHORED, SDM_100, 0, 0, NULL};
 Tab taxTVTab = {4.75 * 8 * PIXELS_PER_INCH, TL_NONE | TT_LEFT, SDM_100, 0, 0, NULL};
 VMFileHandle	fileHan;
+
+	FLOAT_SET_FLOATNUM_TO_0(subTotal);
 
     /* first see if the dates are OK */
     @call RDBTo::MSG_VIS_TEXT_GET_ALL_PTR(dateTString);
@@ -261,7 +263,7 @@ VMFileHandle	fileHan;
 		catNumItems = 0;
 		isSel = TRUE;
 	     }
-	  total = 0;
+	  FLOAT_SET_FLOATNUM_TO_0(total);
 	  if ((ie == 0) && (typeSelection == R_IE)) {
 		MemLock (OptrToHandle(@RptToFromMsg));
 		strcpy(lineBuffer, LMemDeref(@IncomeText));
@@ -494,7 +496,10 @@ VMFileHandle	fileHan;
 								   lineBuffer, 0);
 						    }
 						 /* add the amount here */
-						 subTotal = subTotal + amount;
+						 FloatPushNumber(&amount);
+						 FloatPushNumber(&subTotal);
+						 FloatAdd();
+						 FloatPopNumber(&subTotal);
 						 }  /* end of we want it ie if */
 					   }  /* end of we want it tax if */
 					}  /* end of want it cat if */
@@ -523,8 +528,11 @@ VMFileHandle	fileHan;
 			 ChangeCharAttr(@GPCBnkrTotalsCharAttrs);
 			 @call TextWindow::MSG_VIS_TEXT_APPEND_PTR(lineBuffer, 0);
 			 }
-		   total = total + subTotal;
-		   subTotal = 0;
+		   FloatPushNumber(&total);
+		   FloatPushNumber(&subTotal);
+		   FloatAdd();
+		   FloatPopNumber(&total);
+		   FLOAT_SET_FLOATNUM_TO_0(subTotal);
 		   }  /* end of want this cat if */
 		}  /* end of cycle thru categories for */
 	  if (displaySelection == R_DATE)  {
@@ -563,7 +571,7 @@ VMFileHandle	fileHan;
 		ie = 2;  /* bail out */
 		}
 	  else {
-		total = 0;  /* reset total for expense loop */
+		FLOAT_SET_FLOATNUM_TO_0(total);  /* reset total for expense loop */
 		}
 	  } /* end of IE for loop */
     if (typeSelection == R_IE)  {
@@ -571,7 +579,10 @@ VMFileHandle	fileHan;
 	  MemLock (OptrToHandle(@RptToFromMsg));
 	  strcpy(lineBuffer, LMemDeref(@IETotalText));
 	  MemUnlock (OptrToHandle(@RptToFromMsg));
-	  total = incTotal + expTotal;
+	  FloatPushNumber(&incTotal);
+	  FloatPushNumber(&expTotal);
+	  FloatAdd();
+	  FloatPopNumber(&total);
 	  FloatFormatNumber(FORMAT_ID_CURRENCY_WITH_COMMAS,
 			NullHandle,
 			NullHandle,

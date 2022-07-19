@@ -42,6 +42,7 @@ static char *rcsid =
 #include 		"cv.h"
 
 ID   	    msobj_CurFileName = NullID;
+ID   	    msobj_FirstFileName = NullID;
 
 byte	    *msobjBuf;	    /* Current object record */
 unsigned    msobjBufSize=0; /* Overall size of buffer holding same */
@@ -174,6 +175,9 @@ MSObj_Init(FILE *stream)    	/* Stream open to object file (unused) */
 	Vector_Empty(names);
 	Vector_Empty(externals);
     }
+
+    msobj_CurFileName = NullID;
+    msobj_FirstFileName = NullID;
 
     bzero(&msThreads, sizeof(msThreads));
 }
