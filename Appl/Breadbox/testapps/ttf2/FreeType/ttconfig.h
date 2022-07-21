@@ -40,7 +40,7 @@
 /* Define TT_CONFIG_THREAD_SAFE if you want to build a thread-safe        */
 /* version of the library.                                                */
 
-#define TT_CONFIG_OPTION_THREAD_SAFE
+/* #define TT_CONFIG_OPTION_THREAD_SAFE */
 
 
 
@@ -110,7 +110,7 @@
 /* Please note that probably not all OS-specific versions of ttmemory.c  */
 /* provide this functionality.                                           */
 
-/* #define DEBUG_MEMORY */
+#define DEBUG_MEMORY
 
 
 /*************************************************************************/
@@ -164,7 +164,7 @@
 /* The number of extensions available.  Don't change this value      */
 /* except if you add new extensions to the engine.                   */
 
-#define TT_MAX_EXTENSIONS  8
+#define TT_MAX_EXTENSIONS  2
 
 
 

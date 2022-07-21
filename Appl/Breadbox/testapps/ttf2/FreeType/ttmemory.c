@@ -56,6 +56,11 @@
   static Int  num_realloc; /* counts only `real' reallocations
                               (i.e., an existing buffer will be resized
                               to a value larger than zero */
+  static unsigned int  allocated;
+  static unsigned int  max_allocated;
+  static unsigned int  max_blocksize;
+  static unsigned int  num_blocks;
+  static unsigned int  max_num_blocks;
 
   static Int  fail_alloc;
   static Int  fail_realloc;
@@ -114,6 +119,14 @@
 #ifdef DEBUG_MEMORY
 
       num_alloc++;
+      num_blocks++;
+      allocated += Size;
+      if( num_blocks > max_num_blocks )
+        max_num_blocks = num_alloc;
+      if( allocated > max_allocated )
+        max_allocated = allocated;
+      if( Size > max_blocksize )
+        max_blocksize = Size;
 
       i = 0;
       while ( i < MAX_TRACKED_BLOCKS && pointers[i].base != NULL )
@@ -207,6 +220,13 @@
       fail_realloc++;
     else
     {
+      allocated += Size - pointers[i].size;
+      if( allocated > max_allocated )
+        max_allocated = allocated;
+      if( Size > max_blocksize )
+        max_blocksize = Size;
+
+
 #ifndef TT_CONFIG_OPTION_THREAD_SAFE
       TTMemory_Allocated += Size - pointers[i].size;
       if ( Size > pointers[i].size )
@@ -214,7 +234,7 @@
 #endif
 
       pointers[i].base = Q;
-      pointers[i].size = size;
+      pointers[i].size = Size;
     }
 #endif /* DEBUG_MEMORY */
 
@@ -264,6 +284,10 @@
       fail_free++;
     else
     {
+        allocated -= pointers[i].size;
+        num_blocks--;
+
+
 #ifndef TT_CONFIG_OPTION_THREAD_SAFE
       TTMemory_Allocated -= pointers[i].size;
 #endif
@@ -308,6 +332,11 @@
     num_realloc = 0;
     num_free    = 0;
 
+    allocated     = 0;
+    max_allocated = 0;
+    num_blocks    = 0;
+    max_num_blocks = 0;
+
     fail_alloc   = 0;
     fail_realloc = 0;
     fail_free    = 0;
@@ -351,7 +380,7 @@
         tot_leaked += pointers[i].size;
       }
     }
-
+/*
     fprintf( stderr,
              "%d memory allocations, of which %d failed\n",
              num_alloc,
@@ -366,8 +395,8 @@
              "%d memory frees, of which %d failed\n",
              num_free,
              fail_free );
-
-    if ( num_leaked > 0 )
+*/
+/*    if ( num_leaked > 0 )
     {
       fprintf( stderr,
                "There are %d leaked memory blocks, totalizing %d bytes\n",
@@ -386,7 +415,7 @@
       }
     }
     else
-      fprintf( stderr, "No memory leaks !\n" );
+      fprintf( stderr, "No memory leaks !\n" ); */
 
 #endif /* DEBUG_MEMORY */
 

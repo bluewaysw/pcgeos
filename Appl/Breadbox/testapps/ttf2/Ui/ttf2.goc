@@ -18,9 +18,14 @@ TT_Face     face;
 
 typedef struct {
   Bitmap b;
-  char data[24 * 3];
+  char data[20 * 3];
 } Bmp;
 
+extern int  allocated;
+extern unsigned int  max_allocated;
+extern unsigned int  max_blocksize;
+extern unsigned int  num_blocks;
+extern unsigned int  max_num_blocks;
 
 @class TtfProcessClass, GenProcessClass;
 @endc;
@@ -56,7 +61,7 @@ typedef struct {
     GVI_horizAttrs = @default | GVDA_SCROLLABLE | GVDA_NO_LARGER_THAN_CONTENT;
     GVI_vertAttrs  = @default | GVDA_SCROLLABLE | GVDA_NO_LARGER_THAN_CONTENT;
     GVI_content = process;
-    GVI_docBounds = { 0, 0, 500, 450 };
+    GVI_docBounds = { 0, 0, 400, 450 };
 
     ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
 }
@@ -74,12 +79,13 @@ typedef struct {
 
 void testRendering(GStateHandle gstate) {
     char tmpStr[40];
+    word charIndex;
     TT_Face_Properties props;
     TT_Instance instance;
     TT_Glyph glyph;
     TT_UShort charMapId;
-    TT_CharMap charMap;
     TT_Glyph_Metrics metrics;
+    TT_CharMap charMap;
     TT_Error error;
 
 
@@ -88,52 +94,65 @@ void testRendering(GStateHandle gstate) {
         _log("Fehler bei Initialisierung\r");
         goto Fail;
     }
+    sprintf(tmpStr, "1: \t%u\t%u\t%u\t%u\t%u\r", allocated, max_allocated, max_blocksize, num_blocks, max_num_blocks); _log(tmpStr);
 
     error = TT_Init_Kerning_Extension(&engine);
     if(error) {
         _log("Fehler bei der Initialisierung des Kernings\r");
         goto Fail;
     }
+    sprintf(tmpStr, "2: \t%u\t%u\t%u\t%u\t%u\r", allocated, max_allocated, max_blocksize, num_blocks, max_num_blocks); _log(tmpStr);
 
-    error = TT_Open_Face(engine, "PTSerif.ttf", &face);
+    error = TT_Open_Face(engine, "DejaVu.ttf", &face);
     if(error) {
          _log("Fehler beim laden des Fonts\r");
          goto Fail;
     }
+    sprintf(tmpStr, "3: \t%u\t%u\t%u\t%u\t%u\r", allocated, max_allocated, max_blocksize, num_blocks, max_num_blocks); _log(tmpStr);
 
     error = TT_Get_Face_Properties(face, &props);
     if(error) {
         _log("Fehler beim laden der Properties\r");
         goto Fail;
     }
-
+    sprintf(tmpStr, "4: \t%u\t%u\t%u\t%u\t%u\r", allocated, max_allocated, max_blocksize, num_blocks, max_num_blocks); _log(tmpStr);
+/*
     sprintf(tmpStr, "num glyphs:\t%d\r", props.num_Glyphs); _log(tmpStr);
     sprintf(tmpStr, "num faces:\t%d\r", props.num_Faces); _log(tmpStr);
     sprintf(tmpStr, "num names:\t%d\r", props.num_Names); _log(tmpStr);
     sprintf(tmpStr, "num charMaps:\t%d\r", props.num_CharMaps); _log(tmpStr);
     sprintf(tmpStr, "max points:\t%d\r", props.max_Points); _log(tmpStr);
     sprintf(tmpStr, "max contours:\t%d\r", props.max_Contours); _log(tmpStr);
-
+*/
     error = TT_New_Instance(face, &instance);
     if(error) {
         _log("Fehler beim erzeugen einer Instance\r");
         goto Fail;
     }
+    sprintf(tmpStr, "5: \t%u\t%u\t%u\t%u\t%u\r", allocated, max_allocated, max_blocksize, num_blocks, max_num_blocks); _log(tmpStr);
 
-    error = TT_Set_Instance_CharSize(instance, 72*64);
+    error = TT_Set_Instance_CharSize(instance, 42*64);
     if(error) {
         _log("Fehler beim setzen der Pointsize\r");
         goto Fail;
     }
+    sprintf(tmpStr, "6: \t%u\t%u\t%u\t%u\t%u\r", allocated, max_allocated, max_blocksize, num_blocks, max_num_blocks); _log(tmpStr);
 
     error = TT_New_Glyph(face, &glyph);
     if(error) {
         _log("Fehler beim anlegen eines Glyphs\r");
         goto Fail;
     }
+    sprintf(tmpStr, "7: \t%u\t%u\t%u\t%u\t%u\r", allocated, max_allocated, max_blocksize, num_blocks, max_num_blocks); _log(tmpStr);
+
+    TT_Get_CharMap(face, 0, &charMap);
+    sprintf(tmpStr, "8: \t%u\t%u\t%u\t%u\t%u\r", allocated, max_allocated, max_blocksize, num_blocks, max_num_blocks); _log(tmpStr);
+    
+    charIndex = TT_Char_Index(charMap, 64);
+    sprintf(tmpStr, "9: \t%u\t%u\t%u\t%u\t%u\r", allocated, max_allocated, max_blocksize, num_blocks, max_num_blocks); _log(tmpStr);
 
 //    DrawBitmap( gstate, instance, glyph);
-    DrawRegion( gstate, instance, glyph);
+    DrawRegion( gstate, instance, glyph, charIndex);
 
 Fail:
     TT_Done_FreeType(engine);
@@ -185,11 +204,11 @@ void DrawBitmap( GStateHandle gstate, TT_Instance instance, TT_Glyph glyph ) {
     }
 }
 
-void DrawRegion( GStateHandle gstate, TT_Instance instance, TT_Glyph glyph ) {
-    word characterId = 50;
+void DrawRegion( GStateHandle gstate, TT_Instance instance, TT_Glyph glyph, word characterId ) {
     char tmpStr[40];
     TT_Raster_Map regionmap;
     TT_Glyph_Metrics metrics;
+
     Region*  region = calloc(sizeof(Region), 1000);
 
     regionmap.flow = TT_Flow_Down;
@@ -197,6 +216,7 @@ void DrawRegion( GStateHandle gstate, TT_Instance instance, TT_Glyph glyph ) {
         
     if( TT_Load_Glyph( instance, glyph, characterId, TTLOAD_DEFAULT | TTLOAD_PEDANTIC ) )
         return;
+    sprintf(tmpStr, "10: \t%u\t%u\t%u\t%u\t%u\r", allocated, max_allocated, max_blocksize, num_blocks, max_num_blocks); _log(tmpStr);
 
     if( TT_Get_Glyph_Metrics( glyph, &metrics ) )
         return;
@@ -212,10 +232,11 @@ void DrawRegion( GStateHandle gstate, TT_Instance instance, TT_Glyph glyph ) {
 
     if( TT_Get_Glyph_Region( glyph, &regionmap, 0, 0 ) )
         return;
-
+    sprintf(tmpStr, "11: \t%u\t%u\t%u\t%u\t%u\r", allocated, max_allocated, max_blocksize, num_blocks, max_num_blocks); _log(tmpStr);
+/*
     sprintf(tmpStr, "region size:\t%d\r", (regionmap.size)); _log(tmpStr);
-
-    GrDrawRegion(gstate, 60, 60, region, 0, 0);
+*/
+    //GrDrawRegion(gstate, 60, 60, region, 0, 0);
 
     free(region);
 }
