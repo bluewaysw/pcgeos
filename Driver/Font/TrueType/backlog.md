@@ -29,9 +29,9 @@ Der Treiber wird in 3 Schichten realisiert:
 
 **Wie soll die Speicherverwaltung aussehen?**
 
-**Variante a)**
-- alle Pointer werden zu MemHandles
-- vor/nach dem Zugriff muss gelock/geunlockt werden
+~~**Variante a)**~~
+- ~~alle Pointer werden zu MemHandles~~
+- ~~vor/nach dem Zugriff muss gelock/geunlockt werden~~
 
 **Variante b)**
 - die Pointer werden zu ChunkHandles
@@ -39,9 +39,21 @@ Der Treiber wird in 3 Schichten realisiert:
 -> währen der gesamten Lebenszeit des Treibers ist nur TT_Engine im Speicher notwendig  
 -> die anderen FreeType Objekte (TT_Face, TT_Glyph ...) können durch die Adapterfunktionen angelegt und abgeräumt werden (das ist ev. eine sinnvolle Trennung)
 
-**Klären:**
-- wieviel Speicher und wieviele Blocks werden beim Rendervorgang belegt?
-- gibt es bei der Speicherbelegung große Unterschieden bei versch. Fonts?
+***Entscheidung:***
+- es wird 2 LMem Blöcke geben (Variante b):
+  - ein Block für die Engine (benötigt nach Analyse ca. 10kb)
+    - bleibt die ganze Laufzeit des Treibers erhalten
+    - enthält genau 8 Chunks
+    - wird durch die Adapterfunktion aufgebaut/abgebaut
+  - ein zweiter Block ist für die TrueTypeVars (Face, Instance, Glyph usw.)
+    - kann, je nach Font, bis zu 54kb anwachsen 
+    - enthält bis zu 100 Chunks
+    - wird nur für das Rendern eines Glyphs aufgebaut und danach abgebaut
+    - wird durch die Adapterfunktionen aufgebaut/abgebaut
+
+~~**Klären:**~~
+  - ~~wieviel Speicher und wieviele Blocks werden beim Rendervorgang belegt?~~  
+  - ~~gibt es bei der Speicherbelegung große Unterschieden bei versch. Fonts?~~
 
 ### DR_INIT
 ~~- Adapterfunktion für DR_INIT schreiben~~
