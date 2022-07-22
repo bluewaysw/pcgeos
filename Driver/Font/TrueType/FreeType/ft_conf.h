@@ -15,6 +15,7 @@
 #include <graphics.h>
 #include <heap.h>
 #include <ec.h>
+#include <lmem.h>
 
 /* Define to empty if the keyword does not work.  */
 /* #undef const */

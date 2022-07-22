@@ -137,6 +137,29 @@
     return TT_Err_Ok;
   }
 
+  /* TODO: diese Funktion soll TT_Alloc ablösen */
+  EXPORT_FUNC
+  TT_Error  GTT_Alloc( MemHandle  M, ChunkHandle*  C, unsigned int  Size )
+  {
+    if ( !M || !C )
+      return TT_Err_Invalid_Argument;
+
+    if ( Size > (size_t)-1 )
+      return TT_Err_Out_Of_Memory;
+    if ( Size > 0 )
+    {
+      *C = LMemAlloc( M, Size );
+      if ( !*C )
+        return TT_Err_Out_Of_Memory;
+
+      /* TODO: erstellten Chunkt mit 0 initialisieren */
+    }
+    else
+      *C = NullChunk;
+
+    return TT_Err_Ok;
+  }
+
 
 #ifdef TT_CONFIG_OPTION_EXTEND_ENGINE
 
@@ -223,6 +246,31 @@
     return TT_Err_Ok;
   }
 
+  /* TODO: diese Funktion soll TT_Realloc ablösen */
+  EXPORT_FUNC
+  TT_Error  GTT_Realloc( MemHandle  M, ChunkHandle*  C, unsigned int  Size )
+  {
+    if ( !M || !C )
+      return TT_Err_Invalid_Argument;
+
+    if ( !*C )
+      return GTT_Alloc( M, C, Size );
+
+    if ( Size == 0 )
+      return GTT_Free( M, C );
+
+    if ( Size > (size_t)-1 )
+    {
+      GTT_Free( M, C );
+      return TT_Err_Out_Of_Memory;
+    }
+
+    *C = LMemReAllocHandles( M, *C, Size );
+    if ( !*C )
+      return TT_Err_Out_Of_Memory;
+
+    return TT_Err_Ok;
+  }
 
 #endif /* TT_CONFIG_OPTION_EXTEND_ENGINE */
 
@@ -276,6 +324,21 @@
     free( *P );
 
     *P = NULL;
+
+    return TT_Err_Ok;
+  }
+
+
+  /* TODO: diese Funktion soll TT_Free ablösen */
+  EXPORT_FUNC
+  TT_Error  GTT_Free( MemHandle  M, ChunkHandle*  C )
+  {
+    if ( !M || !C || !*C )
+      return TT_Err_Ok;
+
+    LMemFreeHandles( M, *C );
+
+    *C = NullHandle;
 
     return TT_Err_Ok;
   }

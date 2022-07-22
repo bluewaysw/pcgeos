@@ -23,8 +23,8 @@ Der Treiber wird in 3 Schichten realisiert:
   - TT_Instance
   - TT_Glyph
   - TT_CharMap
-- Hilfsfunktionen TT_Alloc, TT_ReAlloc und TT_Free auf MemHandles/ChunkHandles umstellen
-- Speicherverwaltungsmakros auf MemHandles/ChunkHandles umstellen
+- ~~Hilfsfunktionen TT_Alloc, TT_ReAlloc und TT_Free auf MemHandles/ChunkHandles umstellen~~
+- ~~Speicherverwaltungsmakros auf MemHandles/ChunkHandles umstellen~~
 - Nutzer der Speicherverwaltungsmakros auf MemHandles/ChunkHandles umstellen
 
 **Wie soll die Speicherverwaltung aussehen?**
@@ -56,13 +56,13 @@ Der Treiber wird in 3 Schichten realisiert:
   - ~~gibt es bei der Speicherbelegung große Unterschieden bei versch. Fonts?~~
 
 ### DR_INIT
-~~- Adapterfunktion für DR_INIT schreiben~~
-~~- Aufruf in truetypeInit.asm~~
+- ~~Adapterfunktion für DR_INIT schreiben~~
+- ~~Aufruf in truetypeInit.asm~~
 - prüfen ob die Adapterfunktion sauber durchlaufen wird
 
 ### DR_EXIT
-~~- Adapter für DR_EXIT schreiben~~
-~~- Aufruf in truetypeInit.asm~~
+- ~~Adapter für DR_EXIT schreiben~~
+- ~~Aufruf in truetypeInit.asm~~
 - prüfen ob die Adapterfunktion sauber durchlaufen wird
 
 ### DR_FONT_GEN_CHAR
@@ -70,6 +70,7 @@ Der Treiber wird in 3 Schichten realisiert:
 - Kerning implementieren
 - Aufruf in truetypeChars.asm
 - prüfen ob die Adapterfunktion sauber durchlaufen wird
+- das gerenderte Glyph wird in die GEOS Datenstrukturen einsortiert
 
 ### DR_FONT_GEN_WIDTHS
 - Adapterfunktion für DR_FONT_GEN_WIDTHS schreiben
