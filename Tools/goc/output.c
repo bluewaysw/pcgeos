@@ -812,6 +812,7 @@ OutputClassTable(Symbol *class)
 {
     Reloc     *rel;
     int       flag;
+    int       cmethEntries;
     Method    *meth;
     char      preTypeString[] = "_far ";
     char      postTypeString[] = " far";
@@ -1062,7 +1063,8 @@ OutputClassTable(Symbol *class)
 	}
 	Output("};\n");
 
-    	flag = FALSE;
+	flag = FALSE;
+	cmethEntries = 0;
 	Output("%sCMethodDef%s _htypes_%s[]={", preTypeString,
 	       postTypeString, class->name);
 	for (meth = class->data.symClass.firstMethod; meth != NullMethod;
@@ -1080,8 +1082,13 @@ OutputClassTable(Symbol *class)
 		   GenerateMPDString(meth->message, MPD_PASS_AND_RETURN),
 		   meth->htd);
 	    flag = TRUE;
+	    cmethEntries += 1;
 	}
 	Output("};\n");
+	if((compiler == COM_WATCOM) && (cmethEntries % 2)) {
+	    Output("char _%s_HackByte2 = 0;\n",
+					class->data.symClass.root);
+	}
     }
     /*
      * Output relocation method at the end of the above tables.
@@ -1115,7 +1122,7 @@ OutputClassTable(Symbol *class)
 	 */
 	Output("#pragma option -a-\n");
     }
-
+    
     if (segName) {
 	if (compiler == COM_BORL) {
 	    CompilerEndSegment("", segName);
@@ -1956,6 +1963,9 @@ void OutputMethodAntiWarningCode(Method *meth)
   }
     break;
   case COM_WATCOM:
+    Output("\n#pragma disable_message(303)\n");
+    OutputLineNumber(yylineno,curFile->name);
+    break;
   case COM_MSC:
     break;
   default:

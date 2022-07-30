@@ -21,7 +21,7 @@ DESCRIPTION:
 	This file contains routines to implement the View class
 
 	$Id: genView.asm,v 1.1 97/04/07 11:44:42 newdeal Exp $
-	
+
 -------------------------------------------------------------------------------@
 
 ; see documentation in /staff/pcgeos/Library/User/Doc/GenView.doc
@@ -77,16 +77,16 @@ GenViewInitialize	method static	GenViewClass, MSG_META_INITIALIZE
 	;
 	; Initialize to match .cpp and .esp defaults
 	;
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Gen_offset
 	or	ds:[di].GI_attrs, mask GA_TARGETABLE
 
 	or	ds:[di].GVI_attrs, mask GVA_FOCUSABLE
 	mov	ds:[di].GVI_color.CQ_redOrIndex, C_WHITE
-	
+
 	mov	ax, 1
-	mov	ds:[di].GVI_scaleFactor.PF_x.WWF_int, ax	
-	mov	ds:[di].GVI_scaleFactor.PF_y.WWF_int, ax	
+	mov	ds:[di].GVI_scaleFactor.PF_x.WWF_int, ax
+	mov	ds:[di].GVI_scaleFactor.PF_y.WWF_int, ax
 
 	mov	ds:[di].GVI_increment.PD_x.low, 20
 	mov	ds:[di].GVI_increment.PD_y.low, 15
@@ -156,12 +156,12 @@ PASS:		*ds:si	= GenViewClass object
 		es 	= segment of GenViewClass
 		ax	= message #
 		bp	= SpecBuildFlags
-		
+
 RETURN:		nothing
 
 DESTROYED:	ax, cx, dx, bp
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -398,7 +398,7 @@ noChangeV:
 10$:
 
 	call	ObjMarkDirty
-	
+
 	call	VisCheckIfSpecBuilt			;if not visually built
 	jnc	FinishAttrChange			;then branch
 	mov	ax, MSG_GEN_VIEW_SET_DIMENSION_ATTRS
@@ -410,7 +410,7 @@ noChangeV:
 	FALL_THRU	FinishAttrChange
 
 GenViewSetDimensionAttrs	endm
-	
+
 FinishAttrChange	proc	far	uses cx, dx
 	.enter
 
@@ -420,10 +420,10 @@ FinishAttrChange	proc	far	uses cx, dx
 
 	call	VisCheckIfSpecBuilt			;if not visually built
 	jnc	exit					;then no update needed
-	
+
 	;
 	; Invalidate our geometry, so that DetermineSizes will get to us, and
-	; the pane's parent's geometry, so the pane will have a chance to 
+	; the pane's parent's geometry, so the pane will have a chance to
 	; expand.
 	;
 	push	dx					;save passed update mode
@@ -431,7 +431,7 @@ FinishAttrChange	proc	far	uses cx, dx
 	mov	dl, VUM_MANUAL				;
 	call	VisMarkInvalid				;do view first
 	pop	dx
-	
+
 	mov	cl, mask VOF_GEOMETRY_INVALID
 	mov	ax, MSG_VIS_MARK_INVALID
 	call	VisCallParent
@@ -448,7 +448,7 @@ Build	ends
 ;
 ;---------------
 ;
-		
+
 BuildUncommon	segment	resource
 
 
@@ -496,7 +496,7 @@ GenViewSetBGColor	method	GenViewClass, MSG_GEN_VIEW_SET_COLOR
 	clr	di				;no stack frame
 	call	GenViewSendToLinksIfNeeded	;use linkage if there
 	jc	exit				;we did, we're done now
-   
+
 	mov	bx, offset GVI_color.CQ_redOrIndex
 	xchg	cx, dx				;make into cx:dx
 	call	GenSetDWord
@@ -574,7 +574,7 @@ GetUncommon segment resource
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		GenViewGetAttrs -- 
+METHOD:		GenViewGetAttrs --
 		MSG_GEN_VIEW_GET_ATTRS for GenViewClass
 
 DESCRIPTION:	Returns view attributes.
@@ -606,12 +606,12 @@ EC <	Destroy	ax, dx, bp				;trash things	    >
 	mov	cx, ds:[di].GVI_attrs
 	ret
 GenViewGetAttrs	endm
-			
+
 
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		GenViewGetDimensionAttrs -- 
+METHOD:		GenViewGetDimensionAttrs --
 		MSG_GEN_VIEW_GET_DIMENSION_ATTRS for GenViewClass
 
 DESCRIPTION:	Returns dimension attrs.
@@ -650,7 +650,7 @@ GenViewGetDimensionAttrs endm
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		GenViewGetBGColor -- 
+METHOD:		GenViewGetBGColor --
 		MSG_GEN_VIEW_GET_COLOR for GenViewClass
 
 DESCRIPTION:	Returns background color.
@@ -688,19 +688,19 @@ EC <	Destroy	ax, bp					;trash things	    >
 	ret
 GenViewGetBGColor	endm
 
-			
+
 GetUncommon	ends
 
 ;
 ;---------------
 ;
-		
+
 ViewCommon	segment	resource
 
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		GenViewGetDocBounds -- 
+METHOD:		GenViewGetDocBounds --
 		MSG_GEN_VIEW_GET_DOC_BOUNDS for GenViewClass
 
 DESCRIPTION:	Returns document bounds.
@@ -731,7 +731,7 @@ REVISION HISTORY:
 GenViewGetDocBounds	method	GenViewClass, MSG_GEN_VIEW_GET_DOC_BOUNDS
 	mov	es, cx
 	mov	bp, dx
-	
+
 	mov	ax, ds:[di].GVI_docBounds.RD_left.low
 	mov	es:[bp].RD_left.low, ax
 	mov	ax, ds:[di].GVI_docBounds.RD_left.high
@@ -757,13 +757,13 @@ ViewCommon	ends
 ;
 ;---------------
 ;
-		
+
 GetUncommon	segment	resource
 
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		GenViewGetIncrement -- 
+METHOD:		GenViewGetIncrement --
 		MSG_GEN_VIEW_GET_INCREMENT for GenViewClass
 
 DESCRIPTION:	Returns increment.
@@ -807,7 +807,7 @@ EC <	Destroy	ax, bp					;trash things	    >
 	ret
 GenViewGetIncrement	endm
 
-			
+
 GetUncommon	ends
 ;
 ;-------------------
@@ -817,7 +817,7 @@ ViewCommon	segment resource
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		GenViewGetOrigin -- 
+METHOD:		GenViewGetOrigin --
 		MSG_GEN_VIEW_GET_ORIGIN for GenViewClass
 
 DESCRIPTION:	Returns current origin.
@@ -881,7 +881,7 @@ GetUncommon	segment resource
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		GenViewGetContent -- 
+METHOD:		GenViewGetContent --
 		MSG_GEN_VIEW_GET_CONTENT for GenViewClass
 
 DESCRIPTION:	Returns current content object.
@@ -920,7 +920,7 @@ GetUncommon	ends
 ;
 ;---------------
 ;
-		
+
 Build	segment	resource
 
 
@@ -973,7 +973,7 @@ Build	ends
 ;
 ;---------------
 ;
-		
+
 Ink	segment	resource
 
 
@@ -1015,7 +1015,7 @@ GenViewSetInkType	method	GenViewClass, MSG_GEN_VIEW_SET_INK_TYPE
 	clr	di				;no stack frame
 	call	GenViewSendToLinksIfNeeded	;use linkage if there
 	jc	exit				;we did, we're done now
-   
+
 	call	GenCallSpecIfGrown	; Call specific UI if grown
 	jc	exit			; if called, done
 
@@ -1032,13 +1032,13 @@ Ink	ends
 ;
 ;---------------
 ;
-		
+
 Common	segment	resource
 
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		GenViewSetDocBounds -- 
+METHOD:		GenViewSetDocBounds --
 		MSG_GEN_VIEW_SET_DOC_BOUNDS for GenViewClass
 
 DESCRIPTION:	Sets new document bounds.  Generic handler will set instance
@@ -1073,10 +1073,10 @@ GenViewSetDocBounds	method GenViewClass, \
 	mov	di, mask MF_STACK		;has stack frame
 	call	GenViewSendToLinksIfNeeded	;use linkage if there
 	jc	exit				;we did, we're done now
-   
-	mov	di, ds:[si]			
+
+	mov	di, ds:[si]
 	add	di, ds:[di].Gen_offset
-	
+
 if	ERROR_CHECK
 	push	cx
 	mov	cx, ss:[bp].RD_left.high
@@ -1084,7 +1084,7 @@ if	ERROR_CHECK
 	ERROR_G	UI_VIEW_BAD_DOC_BOUNDS
 	jl	EC10
 	mov	cx, ss:[bp].RD_left.low
-	cmp	cx, ss:[bp].RD_right.low 
+	cmp	cx, ss:[bp].RD_right.low
 	ERROR_A	UI_VIEW_BAD_DOC_BOUNDS
 EC10:
 	mov	cx, ss:[bp].RD_top.high
@@ -1092,13 +1092,13 @@ EC10:
 	ERROR_G	UI_VIEW_BAD_DOC_BOUNDS
 	jl	EC20
 	mov	cx, ss:[bp].RD_top.low
-	cmp	cx, ss:[bp].RD_bottom.low 
+	cmp	cx, ss:[bp].RD_bottom.low
 	ERROR_A	UI_VIEW_BAD_DOC_BOUNDS
 EC20:
 	pop	cx
 endif
-	
-	
+
+
 	push	ax, bp				;save bp
 	clr	bx				;keep offset into instance data
 	clr	cx				;init count of changes
@@ -1115,7 +1115,7 @@ endif
 	cmp	bx, size RectDWord		;done everything?
 	jb	10$				;no, loop
 	pop	ax, bp				;restore bp
-	
+
 	jcxz	exit				;exit if no changes made
 
 	call	ObjMarkDirty			;mark as dirty
@@ -1133,7 +1133,7 @@ Common	ends
 ;
 
 BuildUncommon	segment	resource
-			
+
 
 
 COMMENT @----------------------------------------------------------------------
@@ -1172,15 +1172,15 @@ GenViewSetIncrement	method GenViewClass, MSG_GEN_VIEW_SET_INCREMENT
 	mov	di, mask MF_STACK		;use stack frame
 	call	GenViewSendToLinksIfNeeded	;use linkage if there
 	jc	exit				;we did, we're done now
-   
-	mov	di, ds:[si]			
+
+	mov	di, ds:[si]
 	add	di, ds:[di].Gen_offset
-	
+
 EC <	tst	ss:[bp].PD_x.high					>
 EC <	ERROR_S	UI_VIEW_BAD_INCREMENT					>
 EC <	tst	ss:[bp].PD_y.high					>
 EC <	ERROR_S	UI_VIEW_BAD_INCREMENT					>
-   
+
 	mov	ax, ss:[bp].PD_x.low
 	mov	bx, ss:[bp].PD_x.high
 	mov	cx, ss:[bp].PD_y.low
@@ -1203,7 +1203,7 @@ tryVert:
 	mov	ds:[di].GVI_increment.PD_y.high, dx
 
 callSpecific:
-	
+
 	call	ObjMarkDirty
 	mov	ax, MSG_GEN_VIEW_SET_INCREMENT
 	call	GenCallSpecIfGrown		;Call specific UI if grown
@@ -1218,7 +1218,7 @@ BuildUncommon	ends
 ;
 ;---------------
 ;
-		
+
 ViewCommon	segment	resource
 
 
@@ -1236,9 +1236,9 @@ PASS:		ss:bp -- TrackScrollingParams
 			which ds:[LMBH_handle] = block handle
 
 RETURN:		ss:bp -- updated TrackScrollingParams
-		
+
 DESTROYED:	nothing
-		
+
 WARNING:  	This routine MAY resize LMem and/or object blocks, moving
 		them on the heap and invalidating stored segment pointers
 		to them.
@@ -1257,7 +1257,7 @@ REVISION HISTORY:
 GenSetupTrackingArgs	proc	far	uses	ax, di
 	.enter
 	mov	dx, bp			;pass cx:dx - TrackScrollingParams
-	mov	cx, ss				
+	mov	cx, ss
 	mov	di, mask MF_CALL or mask MF_FIXUP_DS
 	mov	ax, MSG_GEN_VIEW_SETUP_TRACKING_ARGS
 	call	ReturnToCaller
@@ -1283,7 +1283,7 @@ PASS:		ss:bp -- TrackScrollingParams
 RETURN:		ds - updated to point at segment of same block as on entry
 
 DESTROYED:	nothing
-		
+
 	WARNING:  This routine MAY resize LMem and/or object blocks, moving
 		  them on the heap and invalidating stored segment pointers
 		  to them.
@@ -1306,21 +1306,21 @@ GenReturnTrackingArgs	proc	far		uses di, ax
 	; COMPLETE handler can use the newOrigin for scrolling rather than
 	; the change.  We run into problems with the content processing the
 	; same absolute scroll twice before the view has received completion of
-	; either, where the returned change doesn't reflect what the content 
+	; either, where the returned change doesn't reflect what the content
 	; wanted.  -cbh 3/23/92
 	;
-	test	ss:[bp].TSP_flags, mask SF_ABSOLUTE	
+	test	ss:[bp].TSP_flags, mask SF_ABSOLUTE
 	jz	10$				; relative, new origin ignored
 	mov	ax, ss:[bp].TSP_oldOrigin.PD_x.low	;get old origin
 	mov	bx, ss:[bp].TSP_oldOrigin.PD_x.high
 	mov	cx, ss:[bp].TSP_oldOrigin.PD_y.low
 	mov	dx, ss:[bp].TSP_oldOrigin.PD_y.high
-	add	cx, ss:[bp].TSP_change.PD_y.low		;add change,	
+	add	cx, ss:[bp].TSP_change.PD_y.low		;add change,
 	mov	ss:[bp].TSP_newOrigin.PD_y.low, cx	; store as new origin
 	adc	dx, ss:[bp].TSP_change.PD_y.high
 	mov	ss:[bp].TSP_newOrigin.PD_y.high, dx
-	
-	add	ax, ss:[bp].TSP_change.PD_x.low		
+
+	add	ax, ss:[bp].TSP_change.PD_x.low
 	mov	ss:[bp].TSP_newOrigin.PD_x.low, ax
 	adc	bx, ss:[bp].TSP_change.PD_x.high
 	mov	ss:[bp].TSP_newOrigin.PD_x.high, bx
@@ -1379,7 +1379,7 @@ ReturnToCaller	endp
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		GenViewSetOrigin -- 
+METHOD:		GenViewSetOrigin --
 		MSG_GEN_VIEW_SET_ORIGIN for GenViewClass
 
 DESCRIPTION:	Sets the subview origin.  Doesn't force building out of the
@@ -1391,7 +1391,7 @@ PASS:		*ds:si 	- instance data
 		ax 	- MSG_GEN_VIEW_SET_ORIGIN
 		ss:bp   - {PointDWord} - new origin
 
-RETURN:		
+RETURN:
 		ax, cx, dx, bp -- trashed
 
 ALLOWED TO DESTROY:	bx, si, di, ds, es
@@ -1415,17 +1415,17 @@ GenViewSetOrigin method GenViewClass,MSG_GEN_VIEW_SET_ORIGIN
 	jnc	setGenericDataOnly		;then just set instance data
 	mov	di, offset GenViewClass		;else send to specific UI
 	GOTO	ObjCallSuperNoLock
-	
+
 setGenericDataOnly:
 	call	ObjMarkDirty
 	mov	cx, ss:[bp].PD_x.low
-	mov	ds:[di].GVI_origin.PDF_x.DWF_int.low, cx		
+	mov	ds:[di].GVI_origin.PDF_x.DWF_int.low, cx
 	mov	cx, ss:[bp].PD_x.high
-	mov	ds:[di].GVI_origin.PDF_x.DWF_int.high, cx	
+	mov	ds:[di].GVI_origin.PDF_x.DWF_int.high, cx
 	mov	cx, ss:[bp].PD_y.low
-	mov	ds:[di].GVI_origin.PDF_y.DWF_int.low, cx		
+	mov	ds:[di].GVI_origin.PDF_y.DWF_int.low, cx
 	mov	cx, ss:[bp].PD_y.high
-	mov	ds:[di].GVI_origin.PDF_y.DWF_int.high, cx		
+	mov	ds:[di].GVI_origin.PDF_y.DWF_int.high, cx
 	clr	cx
 	mov	ds:[di].GVI_origin.PDF_x.DWF_frac, cx
 	mov	ds:[di].GVI_origin.PDF_y.DWF_frac, cx
@@ -1437,11 +1437,11 @@ GenViewSetOrigin	endm
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		GenViewScroll -- 
+METHOD:		GenViewScroll --
 		MSG_GEN_VIEW_SCROLL for GenViewClass
 
 DESCRIPTION:	Changes the subview origin.  Doesn't force building out of the
-		view.  
+		view.
 
 PASS:		*ds:si 	- instance data
 		es     	- segment of MetaClass
@@ -1472,13 +1472,13 @@ GenViewScroll method GenViewClass,MSG_GEN_VIEW_SCROLL
 	jnc	setGenericDataOnly		;then just set instance data
 	mov	di, offset GenViewClass		;else send to specific UI
 	GOTO	ObjCallSuperNoLock
-	
+
 setGenericDataOnly:
 	mov	di, mask MF_STACK		;use stack frame
 	call	GenViewSendToLinksIfNeeded	;use linkage if there
 	jc	exit				;we did, we're done now
 	call	ScrollView
-exit:	
+exit:
 EC <	Destroy	ax, cx, dx, bp				;trash things	    >
 	ret
 GenViewScroll	endm
@@ -1487,11 +1487,11 @@ GenViewScroll	endm
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		GenViewScrollLow -- 
+METHOD:		GenViewScrollLow --
 		MSG_GEN_VIEW_SET_ORIGIN_LOW for GenViewClass
 
 DESCRIPTION:	Changes the subview origin.  Doesn't force building out of the
-		view.  
+		view.
 
 PASS:		*ds:si 	- instance data
 		es     	- segment of MetaClass
@@ -1522,7 +1522,7 @@ GenViewScrollLow method GenViewClass,MSG_GEN_VIEW_SET_ORIGIN_LOW
 	jnc	setGenericDataOnly		;then just set instance data
 	mov	di, offset GenViewClass		;else send to specific UI
 	GOTO	ObjCallSuperNoLock
-	
+
 setGenericDataOnly:
 	call	ScrollView
 EC <	Destroy	ax, cx, dx, bp				;trash things	    >
@@ -1533,15 +1533,15 @@ GenViewScrollLow	endm
 ScrollView	proc	near
 	class	GenViewClass
 
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Gen_offset
-	
+
 	call	ObjMarkDirty
 
 	cmpdw	ss:[bp].PD_x, GVSOL_NO_CHANGE
 	je	afterX
 	mov	cx, ss:[bp].PD_x.low
-	add	ds:[di].GVI_origin.PDF_x.DWF_int.low, cx		
+	add	ds:[di].GVI_origin.PDF_x.DWF_int.low, cx
 	mov	cx, ss:[bp].PD_x.high
 	adc	ds:[di].GVI_origin.PDF_x.DWF_int.high, cx
 afterX:
@@ -1549,7 +1549,7 @@ afterX:
 	cmpdw	ss:[bp].PD_y, GVSOL_NO_CHANGE
 	je	afterY
 	mov	cx, ss:[bp].PD_y.low
-	add	ds:[di].GVI_origin.PDF_y.DWF_int.low, cx		
+	add	ds:[di].GVI_origin.PDF_y.DWF_int.low, cx
 	mov	cx, ss:[bp].PD_y.high
 	adc	ds:[di].GVI_origin.PDF_y.DWF_int.high, cx
 afterY:
@@ -1557,11 +1557,69 @@ afterY:
 ScrollView	endp
 
 
+COMMENT @----------------------------------------------------------------------
+
+METHOD:		GenViewScrollOnWheel for GenViewClass
+
+DESCRIPTION:	Scrolls the view on mouse wheel up / down
+
+PASS:
+		cx = mouse x
+		dx = mouse y
+		bp = shiftState in the high byte,
+		     wheel data in the low byte
+
+RETURN:		ax = wheel event processed
+		ax, bx, di, -- trashed
+
+ALLOWED TO DESTROY:	?
+
+REGISTER/STACK USAGE:
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	MeyerK	09/2021 	initial implementation
+
+------------------------------------------------------------------------------@
+
+GenViewScrollOnWheel	method dynamic GenViewClass, 	MSG_META_SCROLL_VERTICAL
+
+	test	ds:[di].GVI_vertAttrs, mask GVDA_SCROLLABLE	; test if scrollable
+	jz	exit						; not scrollable, exit
+
+	mov	ax, bp			; put bp in ax, we can trash ax because we reassign it anyway
+	cmp	al, 0			; compare with 0
+	jg	scrollDown		; > 0 = scroll down
+
+scrollUp:				; < 0 = scroll up
+  	mov 	ax, MSG_GEN_VIEW_SCROLL_UP
+	jmp 	finish
+
+scrollDown:
+  	mov 	ax, MSG_GEN_VIEW_SCROLL_DOWN
+
+finish:
+	mov 	bx, ds:[LMBH_handle]	; get oself
+	mov 	di, mask MF_CAN_DISCARD_IF_DESPERATE	; if we are under load we allow to drop an event
+	call 	ObjMessage		; there she blows
+
+exit:
+  	mov 	ax, mask MRF_PROCESSED	; MUST be set, otherwise GEOS will crash
+	ret
+
+GenViewScrollOnWheel	endm
+
+
 
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		GenViewScale -- 
+METHOD:		GenViewScale --
 		MSG_GEN_VIEW_SET_SCALE_FACTOR for GenViewClass
 
 DESCRIPTION:	Sets scale factor.  If not yet built, just changes the
@@ -1594,15 +1652,15 @@ GenViewScale	method GenViewClass, MSG_GEN_VIEW_SET_SCALE_FACTOR
 
 EC <	test	ds:[di].GVI_attrs, mask GVA_GENERIC_CONTENTS		>
 EC <	WARNING_NZ  WARNING_VIEW_SHOULD_NOT_SCALE_UI_GADGETS		>
-   
-	mov	di, ds:[si]			
+
+	mov	di, ds:[si]
 	add	di, ds:[di].Gen_offset
-	
-	mov	dx, ss:[bp].SVP_scaleFactor.PF_x.WWF_int	
+
+	mov	dx, ss:[bp].SVP_scaleFactor.PF_x.WWF_int
 	mov	cx, ss:[bp].SVP_scaleFactor.PF_x.WWF_frac
-	mov	bx, ss:[bp].SVP_scaleFactor.PF_y.WWF_int	
+	mov	bx, ss:[bp].SVP_scaleFactor.PF_y.WWF_int
 	mov	ax, ss:[bp].SVP_scaleFactor.PF_y.WWF_frac
-	
+
 	cmp	dx, ds:[di].GVI_scaleFactor.PF_x.WWF_int
 	jne	10$
 	cmp	cx, ds:[di].GVI_scaleFactor.PF_x.WWF_frac
@@ -1618,12 +1676,12 @@ EC <	WARNING_NZ  WARNING_VIEW_SHOULD_NOT_SCALE_UI_GADGETS		>
 	mov	ax, MSG_GEN_VIEW_SET_SCALE_FACTOR
 	mov	di, offset GenViewClass		;else send to specific UI
 	GOTO	ObjCallSuperNoLock
-	
+
 setGenericDataOnly:
 	mov	ds:[di].GVI_scaleFactor.PF_x.WWF_int, dx
-	mov	ds:[di].GVI_scaleFactor.PF_x.WWF_frac, cx	
-	mov	ds:[di].GVI_scaleFactor.PF_y.WWF_int, bx	
-	mov	ds:[di].GVI_scaleFactor.PF_y.WWF_frac, ax	
+	mov	ds:[di].GVI_scaleFactor.PF_x.WWF_frac, cx
+	mov	ds:[di].GVI_scaleFactor.PF_y.WWF_int, bx
+	mov	ds:[di].GVI_scaleFactor.PF_y.WWF_frac, ax
 exit:
 EC <	Destroy	ax, cx, dx, bp				;trash things	    >
 	ret
@@ -1635,13 +1693,13 @@ ViewCommon	ends
 ;
 ;---------------
 ;
-		
+
 ViewCommon	segment	resource
 
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		GenViewGetScaleFactor -- 
+METHOD:		GenViewGetScaleFactor --
 		MSG_GEN_VIEW_GET_SCALE_FACTOR for GenViewClass
 
 DESCRIPTION:	Returns scale factors for this pane.
@@ -1685,7 +1743,7 @@ GetUncommon	segment resource
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		GenViewGetWindow -- 
+METHOD:		GenViewGetWindow --
 		MSG_GEN_VIEW_GET_WINDOW for GenViewClass
 
 DESCRIPTION:	Returns window handle, of null if none.
@@ -1717,7 +1775,7 @@ GenViewGetWindow	method GenViewClass, MSG_GEN_VIEW_GET_WINDOW
 	call	GenViewOnlyCallIfSpecBuilt
 EC <	Destroy	ax, dx, bp				;trash things	    >
 	ret
-	
+
 GenViewGetWindow	endm
 
 GetUncommon	ends
@@ -1725,7 +1783,7 @@ GetUncommon	ends
 ;
 ;---------------
 ;
-		
+
 ViewCommon	segment	resource
 
 
@@ -1734,7 +1792,7 @@ ViewCommon	segment	resource
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		GenViewSetupTrackingArgs -- 
+METHOD:		GenViewSetupTrackingArgs --
 		MSG_GEN_VIEW_SETUP_TRACKING_ARGS for GenViewClass
 
 DESCRIPTION:	Sets up tracking arguments.
@@ -1747,7 +1805,7 @@ PASS:		*ds:si 	- instance data
 RETURN:		nothing
 		ax, cx, dx, bp - destroyed
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -1773,10 +1831,11 @@ GenViewSetupTrackingArgs	method dynamic	GenViewClass, \
 
 GenViewSetupTrackingArgs	endm
 
+
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		GenViewOnlyCallIfSpecBuilt -- 
+METHOD:		GenViewOnlyCallIfSpecBuilt --
 		MSG_GEN_VIEW_MAKE_RECT_VISIBLE for GenViewClass
 		MSG_GEN_VIEW_TRACKING_COMPLETE for GenViewClass
 
@@ -1831,9 +1890,9 @@ exit:
 	ret
 GenViewOnlyCallIfSpecBuilt	endm
 
-				
-				
-				
+
+
+
 
 
 
@@ -1848,7 +1907,7 @@ CALLED BY:	global
 PASS:		^lbx:si -- view handle
 		cx	-- 16 bit right bound to set (width of your doc)
 		dx	-- 16 bit bottom bound to set (height of your doc)
-		di	-- MessageFlags: 
+		di	-- MessageFlags:
 				MF_FIXUP_DS to fixup DS around call to view
 				MF_FIXUP_ES to fixup ES around call to view
 
@@ -1876,7 +1935,7 @@ EC <	tst	dx							>
 EC <	ERROR_S	UI_VIEW_NEG_HEIGHT_PASSED_TO_SET_SIMPLE_BOUNDS		>
 EC <	test	di, not (mask MF_FIXUP_DS or mask MF_FIXUP_ES)		>
 EC <	ERROR_NZ  UI_VIEW_BAD_MESSAGE_FLAGS_PASSED_TO_SET_SIMPLE_BOUNDS >
-   
+
 	sub	sp, size RectDWord			;set up parameters
 	mov	bp, sp
 	clr	ax
@@ -1902,7 +1961,7 @@ GenViewSetSimpleBounds	endp
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		GenViewGetVisibleRect -- 
+METHOD:		GenViewGetVisibleRect --
 		MSG_GEN_VIEW_GET_VISIBLE_RECT for GenViewClass
 
 DESCRIPTION:	Returns the visible rectangle.
@@ -1943,23 +2002,23 @@ GenViewGetVisibleRect	method GenViewClass, MSG_GEN_VIEW_GET_VISIBLE_RECT
 	clr	es:[di].RD_bottom.low
 	clr	es:[di].RD_bottom.high
 	pop	es
-	GOTO	GenViewOnlyCallIfSpecBuilt	
-	
+	GOTO	GenViewOnlyCallIfSpecBuilt
+
 GenViewGetVisibleRect	endm
 
-			
+
 ViewCommon	ends
 
 ;
 ;---------------
 ;
-		
+
 Build	segment	resource
 
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		GenViewAddGenChild -- 
+METHOD:		GenViewAddGenChild --
 		MSG_GEN_ADD_CHILD for GenViewClass
 		MSG_GEN_REMOVE_CHILD for GenViewClass
 
@@ -1993,19 +2052,19 @@ GenViewAddGenChild	method GenViewClass, MSG_GEN_ADD_CHILD, \
 	mov	di, offset GenClass
 	call	ObjCallSuperNoLock		;first, call specific UI
 	pop	ax, cx, dx, bp
-	
+
 	mov	di, offset GenViewClass		;then do normal GenClass add
 	GOTO	ObjCallSuperNoLock
-	
+
 GenViewAddGenChild	endm
 
-			
+
 Build	ends
 
 ;
 ;---------------
 ;
-		
+
 ViewCommon	segment	resource
 
 
@@ -2014,7 +2073,7 @@ COMMENT @----------------------------------------------------------------------
 
 ROUTINE:	GenViewSendToLinksIfNeeded
 
-SYNOPSIS:	Takes the current message, encapsulates it, and sends it off 
+SYNOPSIS:	Takes the current message, encapsulates it, and sends it off
 		to the linked views, if there are any.
 
 CALLED BY:	GLOBAL, called at the start of handlers for
@@ -2050,7 +2109,7 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 
-GenViewSendToLinksIfNeeded	proc	far		
+GenViewSendToLinksIfNeeded	proc	far
 	uses	bx
 	.enter
 	clr	bx
@@ -2065,7 +2124,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ROUTINE:	GenViewSendToLinksIfNeededDirection
 
-SYNOPSIS:	Takes the current message, encapsulates it, and sends it off 
+SYNOPSIS:	Takes the current message, encapsulates it, and sends it off
 		to the linked views, if there are any.  Changed to
 		only send to the links specified in bx
 
@@ -2106,31 +2165,31 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 GenViewSendToLinksIfNeededDirection	proc	far
-	uses 	si, bx 
+	uses 	si, bx
 	class	GenViewClass
 	.enter
 	push	bx
-	mov	bx, ds:[si]			
+	mov	bx, ds:[si]
 	add	bx, ds:[bx].Gen_offset
 	tst	ds:[bx].GVI_vertLink.handle	;a vertical link, encapsulate
 	jnz	encapsulate
 	tst_clc	ds:[bx].GVI_horizLink.handle	;no vert or horiz link, exit,
 						;   not handled
 	jz	popExit
-	
+
 encapsulate:
 	pop	bx
 	cmp	ax, MSG_GEN_VIEW_SET_ORIGIN_LOW	;is this our scroll guy?
 	je	handleScroll			;yes, handle it specially
-		
+
 	mov	bx, MSG_GEN_VIEW_SEND_TO_LINKS	;send to all links
 	call	SendInLinkMessage
 	jmp	short exitHandled
-	
+
 handleScroll:
 	tst 	bx
 	jg	noHoriz
-	
+
 	push	ss:[bp].PD_y.low		;nuke the vertical portion
 	push	ss:[bp].PD_y.high
 	movdw	ss:[bp].PD_y, GVSOL_NO_CHANGE
@@ -2143,14 +2202,14 @@ handleScroll:
 	pop	ss:[bp].PD_y.high
 	pop	ss:[bp].PD_y.low
 
-	tst	bx 
-noHoriz:	
+	tst	bx
+noHoriz:
 	jl	noVert
 	movdw	ss:[bp].PD_x, GVSOL_NO_CHANGE
-	
+
 	mov	bx, MSG_GEN_VIEW_SEND_TO_HLINK
 	call	SendInLinkMessage		;send to horizontal link
-noVert:	
+noVert:
 exitHandled:
 	stc					;say handled through links
 exit:
@@ -2162,7 +2221,7 @@ popExit:
 	jmp	exit
 GenViewSendToLinksIfNeededDirection	endp
 
-			
+
 
 
 COMMENT @----------------------------------------------------------------------
@@ -2208,12 +2267,12 @@ SendInLinkMessage	proc	near		uses ax, cx, dx, bp, di
 	call	ObjMessage
 	pop	si
 	mov	bp, di				;event handle in bp
-	
+
 	mov	cx, ds:[LMBH_handle]		;pass originator in ^lcx:dx
 	mov	dx, si
 	pop	ax				;restore event message
 	call	ObjCallInstanceNoLock
-	
+
 	mov	bx, di
 	call	ObjFreeMessage			;get rid of the event
 	.leave
@@ -2226,7 +2285,7 @@ SendInLinkMessage	endp
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		GenViewSendToLinks -- 
+METHOD:		GenViewSendToLinks --
 		MSG_GEN_VIEW_SEND_TO_LINKS for GenViewClass
 
 DESCRIPTION:	Sends the event to all the links, by moving horizontally
@@ -2235,14 +2294,14 @@ DESCRIPTION:	Sends the event to all the links, by moving horizontally
 PASS:		*ds:si 	- instance data
 		es     	- segment of MetaClass
 		ax 	- MSG_GEN_VIEW_SEND_TO_LINKS
-		
+
 		bp	- event
 		^lcx:dx	- originator
 
-RETURN:		
+RETURN:
 		ax, cx, dx, bp - destroyed
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -2260,7 +2319,7 @@ REVISION HISTORY:
 
 GenViewSendToLinks	method dynamic	GenViewClass, \
 				MSG_GEN_VIEW_SEND_TO_LINKS
-				
+
 	push	ax, cx, dx, bp			;save original originator
 	;
 	; Send a MSG_GEN_VIEW_SEND_TO_VLINK to ourselves, to call ourselves
@@ -2271,25 +2330,25 @@ GenViewSendToLinks	method dynamic	GenViewClass, \
 	mov	ax, MSG_GEN_VIEW_SEND_TO_VLINK
 	call	ObjCallInstanceNoLock
 	pop	ax, cx, dx, bp
-	
-	;	
+
+	;
 	; Now, pass this message along to the horizontal link, if it doesn't
 	; match the originator.
-	; 
-	mov	di, ds:[si]			
+	;
+	mov	di, ds:[si]
 	add	di, ds:[di].Gen_offset
 	mov	bx, ds:[di].GVI_horizLink.handle
 	mov	di, ds:[di].GVI_horizLink.chunk
 	GOTO	SendToLink
-	
+
 GenViewSendToLinks	endm
 
-			
+
 
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		GenViewSendToVLink -- 
+METHOD:		GenViewSendToVLink --
 		MSG_GEN_VIEW_SEND_TO_VLINK for GenViewClass
 
 DESCRIPTION:	Sends encapsulated message to all nodes in the vertical link.
@@ -2297,14 +2356,14 @@ DESCRIPTION:	Sends encapsulated message to all nodes in the vertical link.
 PASS:		*ds:si 	- instance data
 		es     	- segment of MetaClass
 		ax 	- MSG_GEN_VIEW_SEND_TO_VLINK
-		
+
 		bp	- event
 		^lcx:dx	- originator
 
 RETURN:		nothing
 		ax, cx, dx, bp - destroyed
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -2321,11 +2380,11 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 
 GenViewSendToVLink	method dynamic GenViewClass, MSG_GEN_VIEW_SEND_TO_VLINK
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Gen_offset
 	mov	bx, ds:[di].GVI_vertLink.handle
 	mov	di, ds:[di].GVI_vertLink.chunk
-	
+
 CallOurselvesAndSendToLink	label	far
 	;
 	; Send to ourselves, ignoring any links.
@@ -2333,9 +2392,9 @@ CallOurselvesAndSendToLink	label	far
 	push	ax, cx, dx, bp
 	mov	cx, mask MF_RECORD or mask MF_CALL	;preserve message
 	mov	ax, MSG_GEN_VIEW_CALL_WITHOUT_LINKS
-	call	ObjCallInstanceNoLock		
+	call	ObjCallInstanceNoLock
 	pop	ax, cx, dx, bp
-	
+
 SendToLink			label far
 	;
 	; If no vertical link, or the link matches the originator, nothing
@@ -2344,7 +2403,7 @@ SendToLink			label far
 	mov	si, di
 	tst	bx
 
-EC <	pushf								     >	
+EC <	pushf								     >
 EC <	jnz	EC10					;is linkage, branch  >
 EC <	cmp	si, dx					;no linkage, better  >
 EC <	jne	EC10					;  be originator!    >
@@ -2352,13 +2411,13 @@ EC <	cmp	bx, cx							     >
 EC <	ERROR_E	UI_VIEW_LINKAGE_MUST_BE_CIRCULAR			     >
 EC <EC10:								     >
 EC <	popf								     >
-   
+
 	jz	exit
 	cmp	si, dx
 	jne	sendToLink
 	cmp	bx, cx
 	je	exit
-	
+
 sendToLink:
 	mov	di, mask MF_CALL			;send to link
 	call	ObjMessage
@@ -2367,11 +2426,11 @@ exit:
 GenViewSendToVLink	endm
 
 
-			
+
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		GenViewSendToHLink -- 
+METHOD:		GenViewSendToHLink --
 		MSG_GEN_VIEW_SEND_TO_HLINK for GenViewClass
 
 DESCRIPTION:	Propagates a message through the horizontal links.
@@ -2379,14 +2438,14 @@ DESCRIPTION:	Propagates a message through the horizontal links.
 PASS:		*ds:si 	- instance data
 		es     	- segment of MetaClass
 		ax 	- MSG_GEN_VIEW_SEND_TO_HLINK
-		
+
 		bp	- event
 		^lcx:dx	- originator of the message
 
-RETURN:		
+RETURN:
 		ax, cx, dx, bp - destroyed
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -2403,20 +2462,20 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 
 GenViewSendToHLink	method dynamic	GenViewClass, MSG_GEN_VIEW_SEND_TO_HLINK
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Gen_offset
 	mov	bx, ds:[di].GVI_horizLink.handle
 	mov	di, ds:[di].GVI_horizLink.chunk
 	GOTO	CallOurselvesAndSendToLink
-	
+
 GenViewSendToHLink	endm
 
-			
+
 
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		GenViewCallWithoutLinks -- 
+METHOD:		GenViewCallWithoutLinks --
 		MSG_GEN_VIEW_CALL_WITHOUT_LINKS for GenViewClass
 
 DESCRIPTION:	Dispatches a GenView message that will ignore horizontal
@@ -2425,13 +2484,13 @@ DESCRIPTION:	Dispatches a GenView message that will ignore horizontal
 PASS:		*ds:si 	- instance data
 		es     	- segment of MetaClass
 		ax 	- MSG_GEN_VIEW_CALL_WITHOUT_LINKS
-		
+
 		bp	- ClassedEvent
 		cx	- ObjMessageFlags to pass to MessageDispatch
 
 RETURN:		ax, cx, dx, bp - any return arguments
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -2454,13 +2513,13 @@ GenViewCallWithoutLinks	method dynamic	GenViewClass, \
 	call	ThreadBorrowStackSpace
 	push	di
 
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Gen_offset
 	push	ds:[di].GVI_vertLink.handle,
 		ds:[di].GVI_vertLink.chunk,
 		ds:[di].GVI_horizLink.handle,
 		ds:[di].GVI_horizLink.chunk
-	
+
 	clr	ax
 	mov	ds:[di].GVI_vertLink.handle, ax
 	mov	ds:[di].GVI_vertLink.chunk, ax
@@ -2495,7 +2554,7 @@ dispatch:
 	call	MessageSetDestination	;restore event destination data
 	pop	si
 done:
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Gen_offset
 	pop	ds:[di].GVI_vertLink.handle,
 		ds:[di].GVI_vertLink.chunk,
@@ -2513,7 +2572,7 @@ ViewCommon	ends
 ;
 ;---------------
 ;
-		
+
 Ink	segment	resource
 
 
@@ -2527,7 +2586,7 @@ CALLED BY:	GLOBAL
 PASS:		nada
 RETURN:		nada
 DESTROYED:	nada
- 
+
 PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -2538,7 +2597,7 @@ REVISION HISTORY:
 	atw	2/19/92		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-GenViewResetExtendedInkType	method	GenViewClass, 
+GenViewResetExtendedInkType	method	GenViewClass,
 				MSG_GEN_VIEW_RESET_EXTENDED_INK_TYPE
 	.enter
 	mov	ax, ATTR_GEN_VIEW_INK_DESTINATION_INFO
@@ -2560,7 +2619,7 @@ CALLED BY:	GLOBAL
 PASS:		nada
 RETURN:		nada
 DESTROYED:	nada
- 
+
 PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -2571,7 +2630,7 @@ REVISION HISTORY:
 	atw	2/19/92		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-GenViewSetExtendedInkType	method	GenViewClass, 
+GenViewSetExtendedInkType	method	GenViewClass,
 				MSG_GEN_VIEW_SET_EXTENDED_INK_TYPE
 	.enter
 	clr	bh

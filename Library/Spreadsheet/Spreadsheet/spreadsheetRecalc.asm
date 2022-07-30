@@ -2403,6 +2403,14 @@ CheckAndAllocListBlock	proc	near
 	; exists. It might have been discarded. The only good way to tell
 	; is to call MemLock.
 	;
+if ERROR_CHECK
+	; The MemLock approach is not working for error checking situation
+	; because the EC will fatal first for discarded block
+	mov	ax, MGIT_ADDRESS
+	call	MemGetInfo
+	tst	ax
+	jz	discarded
+endif
 	call	MemLock				; ax <- segment address
 	jc	discarded			; Branch if block is discarded
 	

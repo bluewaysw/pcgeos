@@ -102,12 +102,15 @@ MemHandle			indexMH;
 			   || (transType == TRANS_DB)
 			   || (transType == TRANS_XFM)) {
        /* add back in old amount */
-	  balance = account[currentAcct].AS_balance + amount;
+	   FloatPushNumber(&amount);
+	   FloatPushNumber(&account[currentAcct].AS_balance);
+	   FloatAdd();
+	   FloatPopNumber(&balance);
        }
       else  {  /* a deposit/credit */
        /* subtract out old amount */
        FloatPushNumber(&account[currentAcct].AS_balance);
-	  FloatPushNumber(&amount);
+	   FloatPushNumber(&amount);
        FloatSub();
        FloatPopNumber(&balance);
 	  }
@@ -202,7 +205,9 @@ MemHandle			indexMH;
 		   FloatPopNumber(&trArrayElement->TSS_runBal);
 		   }
 		else  {  /* add deposit/credit amount */
-		   trArrayElement->TSS_runBal += amount;
+		   FloatPushNumber(&amount);
+		   FloatPushNumber(&trArrayElement->TSS_runBal);
+		   FloatPopNumber(&trArrayElement->TSS_runBal);
 		   }
 		} /* end of later transactions for loop */
 	  }  /* end of more than one trans else */
@@ -266,7 +271,10 @@ MemHandle			indexMH;
 				   || (currentType == TRANS_DB)
 				   || (currentType == TRANS_XFM)) {
 	  /* add back in old amount */
-	  balance = account[currentAcct].AS_balance + trans->TS_amount;
+	  FloatPushNumber(&account[currentAcct].AS_balance);
+	  FloatPushNumber(&trans->TS_amount);
+	  FloatAdd();
+	  FloatPopNumber(&balance);
 	  }
 	 else  {  /* a deposit/credit */
 	  /* subtract out old amount */
@@ -298,7 +306,7 @@ MemHandle			indexMH;
     if (!isMulti)  {   /* if it is a multiParent leave cat alone */
 	  strcpy(trans->TS_category, "");
 	  }
-    trans->TS_amount = 0;
+    FLOAT_SET_FLOATNUM_TO_0(trans->TS_amount);
     trans->TS_taxItem = FALSE;
     /* Mark the trans item as dirty and unlock it. */
     DBDirty(trans);
@@ -315,7 +323,7 @@ MemHandle			indexMH;
 		strcpy(trans->TS_memo, LMemDeref(@VoidText));
 		MemUnlock (OptrToHandle(@ModTransMsg));
 		strcpy(trans->TS_category, "");
-		trans->TS_amount = 0;
+		FLOAT_SET_FLOATNUM_TO_0(trans->TS_amount);
 		DBDirty(trans);
 		DBUnlock(trans);
 		}
@@ -335,7 +343,7 @@ MemHandle			indexMH;
 				    0,
 				    0);
 	/*  trArrayElement->TSS_runBal = balance; */
-     balance = 0;
+      FLOAT_SET_FLOATNUM_TO_0(balance);
 	  if ((currentType == TRANS_CK) || (currentType == TRANS_DB)
 			|| (currentType == TRANS_XFM))  {
 		/* sub check/debit amount */
@@ -345,7 +353,10 @@ MemHandle			indexMH;
 		FloatPopNumber(&trArrayElement->TSS_runBal);
 		}
 	  else  {  /* add deposit/credit amount */
-		trArrayElement->TSS_runBal = balance + amount;
+	    FloatPushNumber(&balance);
+		FloatPushNumber(&amount);
+		FloatAdd();
+		FloatPopNumber(&trArrayElement->TSS_runBal);
 		}
 	  }
     else  { /* more than one */
@@ -357,7 +368,7 @@ MemHandle			indexMH;
 				    transListChunkArray,
 				    whichVoid,
 				    0);
-		trArrayElement->TSS_runBal = 0;
+		FLOAT_SET_FLOATNUM_TO_0(trArrayElement->TSS_runBal);
 		}
 	  else {
 		/* first get the previous balance */
@@ -394,7 +405,10 @@ MemHandle			indexMH;
 		   FloatPopNumber(&trArrayElement->TSS_runBal);
 		   }
 		else  {  /* add deposit/credit amount */
-		   trArrayElement->TSS_runBal += amount;
+		   FloatPushNumber(&amount);
+		   FloatPushNumber(&trArrayElement->TSS_runBal);
+		   FloatAdd();
+		   FloatPopNumber(&trArrayElement->TSS_runBal);
 		   }
 		} /* end of later transactions for loop */
 	  }  /* end of more than one trans else */
@@ -885,7 +899,7 @@ Boolean		isCleared;
 
     if (multiFlag)  {
 	  multiFlag = FALSE;
-	  multiAmount = 0;
+	  FLOAT_SET_FLOATNUM_TO_0(multiAmount);
 	  MemFree(multiHeapHandle);
 	  multiHeapHandle = NULL;
 	  }
@@ -1214,7 +1228,7 @@ char		amtInString[DOLLAR_IN_SIZE];
 
     if (multiFlag)  {
 	  multiFlag = FALSE;
-	  multiAmount = 0;
+	  FLOAT_SET_FLOATNUM_TO_0(multiAmount);
 	  MemFree(multiHeapHandle);
 	  }
 

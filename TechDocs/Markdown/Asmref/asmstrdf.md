@@ -680,6 +680,7 @@ Internal.
 	DosCodePage		etype		word
 		CODE_PAGE_US				enum		DosCodePage, 437
 		CODE_PAGE_MULTILINGUAL		enum		DosCodePage, 850
+		CODE_PAGE_MULTILINGUAL_EURO	enum		DosCodePage, 858
 		CODE_PAGE_PORTUGUESE		enum		DosCodePage, 860
 		CODE_PAGE_CANADIAN_FRENCH	enum		DosCodePage, 863
 		CODE_PAGE_NORDIC			enum		DosCodePage, 865

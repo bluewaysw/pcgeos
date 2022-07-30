@@ -124,9 +124,8 @@ static IPXMaxPacket 	ipxOutPacket;
 #define INVALID_SOCKET -1
 #endif
 static int cmdLineSocket = INVALID_SOCKET;
+static int g_useTCP = 0;
 #endif
-
-#define IPX_VIA_UDP
 
 /*********************************************************************
  *			parsehex
@@ -452,9 +451,11 @@ extern void Ipx_Exit(void);
  * 
  *********************************************************************/
 int
-NetWare_Init(char *addr)
+NetWare_Init(char *addr, int useTCP)
 {
     short   ipx;
+
+    g_useTCP = useTCP;
 
     Message("Checking for IPX...");
     ipx = Ipx_Check();
@@ -601,84 +602,88 @@ NetWare_WriteV(int fd, struct iovec *iov, int iov_len)
 int
 NetWare_WriteV(int fd, struct iovec *iov, int iov_len)
 {
-#ifdef IPX_VIA_UDP
-    unsigned char	*bp;
-    int			i;	
-    int 		len;
-    byte*		dataStart;
-    int			rc;
-    struct sockaddr_in 	connectAddress;
+    if(!g_useTCP) {
+	unsigned char	*bp;
+	int			i;	
+	int 		len;
+	byte*		dataStart;
+	int			rc;
+	struct sockaddr_in 	connectAddress;
 
-    /*
-     * First copy the data into the data portion of ipxOutPacket.
-     * Unfortunately, putmsg doesn't take a gather vector...
-     */
-    dataStart = ((byte*) &ipxOutPacket) + sizeof(IPXHeader);
-    for (i = 0, bp = dataStart; i < iov_len; i++) {
+	/*
+	* First copy the data into the data portion of ipxOutPacket.
+	* Unfortunately, putmsg doesn't take a gather vector...
+	*/
+	dataStart = ((byte*) &ipxOutPacket) + sizeof(IPXHeader);
+	for (i = 0, bp = dataStart; i < iov_len; i++) {
 	if (bp - dataStart + iov[i].iov_len > IPX_MAX_PACKET) {
 	    return(-1);
 	}
 	bcopy(iov[i].iov_base, bp, iov[i].iov_len);
 	bp += iov[i].iov_len;
-    }
+	}
 
-    len = sizeof(IPXHeader) + (bp - dataStart);
-    ipxOutPacket.ihdr.len = htons(len);
+	len = sizeof(IPXHeader) + (bp - dataStart);
+	ipxOutPacket.ihdr.len = htons(len);
 
-    connectAddress.sin_family = AF_INET;
-    connectAddress.sin_port = htons(UDP_SERVER_PORT);
-    connectAddress.sin_addr.s_addr = inet_addr("127.0.0.1");
-	
-    *((dword*)ipxOutPacket.ihdr.srcNode) = inet_addr("127.0.0.1");
-    *((word*)&ipxOutPacket.ihdr.srcNode[4]) =  htons(UDP_CLIENT_PORT);
+	connectAddress.sin_family = AF_INET;
+	connectAddress.sin_port = htons(UDP_SERVER_PORT);
+	connectAddress.sin_addr.s_addr = inet_addr("127.0.0.1");
 
-    ipxOutPacket.ihdr.csum = 0xFFFF;
-    ipxOutPacket.ihdr.xport = 0;	
-	
-    /* send registration package to basebox server */
-    rc = sendto (cmdLineSocket, 
+	*((dword*)ipxOutPacket.ihdr.srcNode) = inet_addr("127.0.0.1");
+	*((word*)&ipxOutPacket.ihdr.srcNode[4]) =  htons(UDP_CLIENT_PORT);
+
+	ipxOutPacket.ihdr.csum = 0xFFFF;
+	ipxOutPacket.ihdr.xport = 0;	
+
+	/* send registration package to basebox server */
+	rc = sendto (cmdLineSocket, 
 			(byte*) &ipxOutPacket, 
 			len,
 			0,
 			(struct sockaddr *) &connectAddress,
 			sizeof (connectAddress));
-    if(rc<0) {
+	if(rc<0) {
 	Message("Error: communication failed\n");
-    }	
-    return (bp - dataStart);
-
-#else
+	}	
+	return (bp - dataStart);
+    }
+    else {
 
 #if !defined(_LINUX) 
-    int	    	    i, size;
-    
-    /*
-     * First copy the data into sendData to be sent out
-     * since these data structures are not defined in assembly I just
-     * did the copying to read-mode inside the loop to make life easy
-     */
-    for (i = 0, size = 0; i < iov_len; i++) {
+	int	    	    i, size;
+
+	/*
+	* First copy the data into sendData to be sent out
+	* since these data structures are not defined in assembly I just
+	* did the copying to read-mode inside the loop to make life easy
+	*/
+	for (i = 0, size = 0; i < iov_len; i++) {
+
+	    int res;
+
 	if (size + iov[i].iov_len > IPX_MAX_PACKET)
 	{
 	    return(-1);
 	}
 
-	Ipx_CopyToSendBuffer(iov[i].iov_base, iov[i].iov_len, size);
+	//Ipx_CopyToSendBuffer(iov[i].iov_base, iov[i].iov_len, size);
+	res = send(cmdLineSocket, iov[i].iov_base, iov[i].iov_len, 0);
 	size += iov[i].iov_len;
-    }
+	}
 
-    /* call the assembly routine to do the dirty work */
-    Ipx_SendLow(size);
-    return size;
+	/* call the assembly routine to do the dirty work */
+	//Ipx_SendLow(size);
+	return size;
 #else
-    int	    	    i, size;
+	int	    	    i, size;
 
-    /*
-     * First copy the data into sendData to be sent out
-     * since these data structures are not defined in assembly I just
-     * did the copying to read-mode inside the loop to make life easy
-     */
-    for (i = 0, size = 0; i < iov_len; i++) {
+	/*
+	* First copy the data into sendData to be sent out
+	* since these data structures are not defined in assembly I just
+	* did the copying to read-mode inside the loop to make life easy
+	*/
+	for (i = 0, size = 0; i < iov_len; i++) {
 
 	int res;
 
@@ -688,12 +693,12 @@ NetWare_WriteV(int fd, struct iovec *iov, int iov_len)
 
 	res = send(cmdLineSocket, iov[i].iov_base, iov[i].iov_len, 0);
 	size += iov[i].iov_len;
-    }
+	}
 
-    /* call the assembly routine to do the dirty work */
-    return size;
+	/* call the assembly routine to do the dirty work */
+	return size;
 #endif
-#endif
+    }
 
 }
 #endif
@@ -724,145 +729,146 @@ int Ipx_Check(void) {
 
 void Ipx_Init(char *addr) {
 
-#ifdef IPX_VIA_UDP
-    char    	    *cp;    /* Random character pointer for parsing the
- 			     * address of the PC */
-    char    	    *node;  /* Start of the node address. Ends at
- 			     * sock-1 or with null char */
-    char    	    *sock;  /* Start of the socket number. Ends with
-			     * null char */
-    struct sockaddr_in connectAddress;
+    if(!g_useTCP) {
+	    char    	    *cp;    /* Random character pointer for parsing the
+	 			     * address of the PC */
+	    char    	    *node;  /* Start of the node address. Ends at
+	 			     * sock-1 or with null char */
+	    char    	    *sock;  /* Start of the socket number. Ends with
+				     * null char */
+	    struct sockaddr_in connectAddress;
 
-    /* open the socket here */
-    if(cmdLineSocket != INVALID_SOCKET ) {
-	Message("Error: command line socket already open\n");
-    }
-	
-    /*
-      * Break up the address string into its component parts.
-      */
-    cp = strchr(addr, ':');
-    if (cp == NULL) {
-	Message("Missing node address in PC net address\n");
-	return;
-    }
-    node = cp+1;
-    cp = strchr(node, ':');
-    if (cp == NULL) {
- 	sock = NULL;
-    } else {
-	sock = cp+1;
-    }
-    	
-    *((dword*)ipxOutPacket.ihdr.srcNode) = inet_addr("127.0.0.1");
-    *((word*)&ipxOutPacket.ihdr.srcNode[4]) = UDP_CLIENT_PORT;
-
-    /*
-      * Always comes from the default socket #
-      */
-    ipxOutPacket.ihdr.srcSocket = htons(DEFAULT_SOCKET);
-    
-    /*
-      * Figure out the destination socket #
-      */
-    if (sock == NULL) {
-	ipxOutPacket.ihdr.dstSocket = htons(DEFAULT_SOCKET);
-    } else {
-	parsehex(sock, (u_char *)&ipxOutPacket.ihdr.dstSocket, 4, 0);
-    }
-    
-    /*
-     * Parse out the network number (same for both src and dest; we
-     * assume the PC on which you're debugging is on the same net
-     * as the workstation...)
-     */
-    parsehex(addr, (u_char *)&ipxOutPacket.ihdr.srcNet, 8, node-1-addr);
-    parsehex(addr, (u_char *)&ipxOutPacket.ihdr.dstNet, 8, node-1-addr);
-
-    /*
-     * Parse out the destination node address. This goes in both the
-     * IPX and the ethernet header.
-     */
-    parsehex(node, (u_char *)&ipxOutPacket.ihdr.dstNode, 12,
-						sock ? sock-1-node : 0);
-
-    /*
-     * Set up the parts of the IPX packet that never change.
-     */
-    ipxOutPacket.ihdr.csum = 0xffff;
-    ipxOutPacket.ihdr.xport = 0;
-    ipxOutPacket.ihdr.ptype = PT_DATA;
-	
-    cmdLineSocket = socket(AF_INET, SOCK_DGRAM, 0);    
-
-    /* try connectiokn now */
-    if(cmdLineSocket != INVALID_SOCKET ) {
-
-	int rc;
-	const char y = 1;
-	struct sockaddr_in servAddr;	
+	    /* open the socket here */
+	    if(cmdLineSocket != INVALID_SOCKET ) {
+		Message("Error: command line socket already open\n");
+	    }
 		
-	/* start receiving on port */
-	servAddr.sin_family = AF_INET;
-	servAddr.sin_addr.s_addr = htonl (INADDR_ANY);
-	servAddr.sin_port = htons (UDP_CLIENT_PORT);
-	setsockopt(cmdLineSocket, SOL_SOCKET, SO_REUSEADDR, &y, sizeof(int));
-	rc = bind ( cmdLineSocket, (struct sockaddr *) &servAddr, sizeof (servAddr));		
-	if (rc >= 0) {
-
-	    IPXMaxPacket initPacket;
-			
-	    initPacket.ihdr.csum = 0xFFFF;
-	    initPacket.ihdr.len = htons(sizeof(IPXHeader));
-			
-	    *((dword*)initPacket.ihdr.dstNet) = htonl(0);
-	    *((dword*)initPacket.ihdr.dstNode) = 0x0;
-	    *((word*)&initPacket.ihdr.dstNode[4]) = 0x0;
-	    initPacket.ihdr.dstSocket = htons(0x2);
-
-	    *((dword*)initPacket.ihdr.srcNet) = htonl(0);
-	    *((dword*)initPacket.ihdr.srcNode) = 0x0;
-	    *((word*)&initPacket.ihdr.srcNode[4]) = 0x0;
-	    initPacket.ihdr.srcSocket = htons(0x2);
-			
-	    initPacket.ihdr.xport = 0;
-	
-	    connectAddress.sin_family = AF_INET;
-	    connectAddress.sin_port = htons(UDP_SERVER_PORT);
-	    connectAddress.sin_addr.s_addr = inet_addr("127.0.0.1");
-						// send registration package to basebox server
-	    rc = sendto (cmdLineSocket, 
-				(byte*) &initPacket.ihdr, 
-				sizeof(IPXHeader),
-				0,
-				(struct sockaddr *) &connectAddress,
-				sizeof (connectAddress));
-	    if(rc == 0) {
-		Message("Successfully connected\n");
+	    /*
+	      * Break up the address string into its component parts.
+	      */
+	    cp = strchr(addr, ':');
+	    if (cp == NULL) {
+		Message("Missing node address in PC net address\n");
+		return;
+	    }
+	    node = cp+1;
+	    cp = strchr(node, ':');
+	    if (cp == NULL) {
+	 	sock = NULL;
 	    } else {
-		Message("Error: connection failed\n");
-	     }
-	}
-	
-    } else {
-	    
-	Message("Error: socket connection failed2\n");
-    }
-#else
-    /* open the socket here */
-    if(cmdLineSocket != INVALID_SOCKET) {
-	Message("Error: command line socket already open\n");
-    }
-    cmdLineSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);    
+		sock = cp+1;
+	    }
+	    	
+	    *((dword*)ipxOutPacket.ihdr.srcNode) = inet_addr("127.0.0.1");
+	    *((word*)&ipxOutPacket.ihdr.srcNode[4]) = UDP_CLIENT_PORT;
 
-    /* try connectiokn now */
-    if(cmdLineSocket != INVALID_SOCKET) {
+	    /*
+	      * Always comes from the default socket #
+	      */
+	    ipxOutPacket.ihdr.srcSocket = htons(DEFAULT_SOCKET);
+	    
+	    /*
+	      * Figure out the destination socket #
+	      */
+	    if (sock == NULL) {
+		ipxOutPacket.ihdr.dstSocket = htons(DEFAULT_SOCKET);
+	    } else {
+		parsehex(sock, (u_char *)&ipxOutPacket.ihdr.dstSocket, 4, 0);
+	    }
+	    
+	    /*
+	     * Parse out the network number (same for both src and dest; we
+	     * assume the PC on which you're debugging is on the same net
+	     * as the workstation...)
+	     */
+	    parsehex(addr, (u_char *)&ipxOutPacket.ihdr.srcNet, 8, node-1-addr);
+	    parsehex(addr, (u_char *)&ipxOutPacket.ihdr.dstNet, 8, node-1-addr);
+
+	    /*
+	     * Parse out the destination node address. This goes in both the
+	     * IPX and the ethernet header.
+	     */
+	    parsehex(node, (u_char *)&ipxOutPacket.ihdr.dstNode, 12,
+							sock ? sock-1-node : 0);
+
+	    /*
+	     * Set up the parts of the IPX packet that never change.
+	     */
+	    ipxOutPacket.ihdr.csum = 0xffff;
+	    ipxOutPacket.ihdr.xport = 0;
+	    ipxOutPacket.ihdr.ptype = PT_DATA;
+		
+	    cmdLineSocket = socket(AF_INET, SOCK_DGRAM, 0);    
+
+	    /* try connectiokn now */
+	    if(cmdLineSocket != INVALID_SOCKET ) {
+
+		int rc;
+		const char y = 1;
+		struct sockaddr_in servAddr;	
+			
+		/* start receiving on port */
+		servAddr.sin_family = AF_INET;
+		servAddr.sin_addr.s_addr = htonl (INADDR_ANY);
+		servAddr.sin_port = htons (UDP_CLIENT_PORT);
+		setsockopt(cmdLineSocket, SOL_SOCKET, SO_REUSEADDR, &y, sizeof(int));
+		rc = bind ( cmdLineSocket, (struct sockaddr *) &servAddr, sizeof (servAddr));		
+		if (rc >= 0) {
+
+		    IPXMaxPacket initPacket;
+				
+		    initPacket.ihdr.csum = 0xFFFF;
+		    initPacket.ihdr.len = htons(sizeof(IPXHeader));
+				
+		    *((dword*)initPacket.ihdr.dstNet) = htonl(0);
+		    *((dword*)initPacket.ihdr.dstNode) = 0x0;
+		    *((word*)&initPacket.ihdr.dstNode[4]) = 0x0;
+		    initPacket.ihdr.dstSocket = htons(0x2);
+
+		    *((dword*)initPacket.ihdr.srcNet) = htonl(0);
+		    *((dword*)initPacket.ihdr.srcNode) = 0x0;
+		    *((word*)&initPacket.ihdr.srcNode[4]) = 0x0;
+		    initPacket.ihdr.srcSocket = htons(0x2);
+				
+		    initPacket.ihdr.xport = 0;
+		
+		    connectAddress.sin_family = AF_INET;
+		    connectAddress.sin_port = htons(UDP_SERVER_PORT);
+		    connectAddress.sin_addr.s_addr = inet_addr("127.0.0.1");
+							// send registration package to basebox server
+		    rc = sendto (cmdLineSocket, 
+					(byte*) &initPacket.ihdr, 
+					sizeof(IPXHeader),
+					0,
+					(struct sockaddr *) &connectAddress,
+					sizeof (connectAddress));
+		    if(rc == 0) {
+			Message("Successfully connected\n");
+		    } else {
+			Message("Error: connection failed\n");
+		     }
+		}
+		
+	    } else {
+		    
+		Message("Error: socket connection failed2\n");
+	    }
+    }
+    else {
+	/* open the socket here */
+	if(cmdLineSocket != INVALID_SOCKET) {
+	Message("Error: command line socket already open\n");
+	}
+	cmdLineSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);    
+
+	/* try connectiokn now */
+	if(cmdLineSocket != INVALID_SOCKET) {
 	    
 	struct sockaddr_in connectAddress;
 	int result;
-	
+
 	memset(&connectAddress, 0, sizeof(connectAddress));
-	
+
 	connectAddress.sin_family = AF_INET;
 	connectAddress.sin_port = htons(UDP_SERVER_PORT);
 	connectAddress.sin_addr.s_addr = inet_addr("127.0.0.1");
@@ -877,12 +883,12 @@ void Ipx_Init(char *addr) {
 		Message("connect failed\n");
 		
 	}
-    }
-    else {
+	}
+	else {
 	    
 	Message("Error: socket connection failed\n");
+	}
     }
-#endif
 }
 
 void Ipx_Exit(void) {
@@ -908,24 +914,24 @@ int Ipx_CheckPacket(void) {
 }
 
 int Ipx_ReadLow(void *buf, int bufSize) {
-    
-#ifdef IPX_VIA_UDP
-    IPXMaxPacket ipkt;
 
-    if(cmdLineSocket != INVALID_SOCKET) {
+    if(!g_useTCP) {
+	IPXMaxPacket ipkt;
+
+	if(cmdLineSocket != INVALID_SOCKET) {
 	int amount = recv(cmdLineSocket, (byte*) &ipkt, sizeof(ipkt), 0);
 
 	if (amount < sizeof(IPXHeader)) {
 	    /*
- 	     * Didn't even get a full IPX header, so packet is bogus.
- 	     */
+		     * Didn't even get a full IPX header, so packet is bogus.
+		     */
 	    return -1;
 	}
 
 	if (amount < ntohs(ipkt.ihdr.len)) {
 	    /*
- 	     * Didn't get all the data for the packet (?!)
- 	     */
+		     * Didn't get all the data for the packet (?!)
+		     */
 	    return -1;
 	}	    
 
@@ -933,24 +939,26 @@ int Ipx_ReadLow(void *buf, int bufSize) {
 	if (amount > bufSize) {
 	    amount = bufSize;
 	}
-	
+
 	/*
- 	 * Copy in only as much data as will fit -- the rest are lost.
- 	 */
+		 * Copy in only as much data as will fit -- the rest are lost.
+		 */
 	if(amount > 0) {
 	    bcopy(((byte*)&ipkt) + sizeof(IPXHeader), buf, amount);
 	}
 
 	return amount;
+	}
+	return -1;
     }
-    return -1;
-#else
-    if(cmdLineSocket != INVALID_SOCKET) {
+    else {
+	if(cmdLineSocket != INVALID_SOCKET) {
+
 	int amount = recv(cmdLineSocket, buf, bufSize, 0);
-    	return amount;
+		return amount;
+	}
+	return -1;
     }
-    return -1;
-#endif
 }
 
 #endif

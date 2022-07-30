@@ -129,10 +129,11 @@ typedef byte		Rpc_Stat;   	/* Call status */
 /*
  * communications modes
  */
-#define CM_NONE      0
-#define CM_SERIAL    1
-#define CM_NETWARE   2
-#define CM_NPIPE     3
+#define CM_NONE      	0
+#define CM_SERIAL    	1
+#define CM_NETWARE   	2
+#define CM_NPIPE     	3
+#define CM_SERIAL_TCP   4
 
 /*
  * Function definitions for Swat
