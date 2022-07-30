@@ -154,7 +154,7 @@
 /* Define TT_CONFIG_THREAD_SAFE if you want to build a thread-safe       */
 /* version of the library.                                               */
 
-#undef  TT_CONFIG_OPTION_THREAD_SAFE
+#define  TT_CONFIG_OPTION_THREAD_SAFE
 
 
 /**********************************************************************/

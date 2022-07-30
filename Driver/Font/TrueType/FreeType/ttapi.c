@@ -115,8 +115,7 @@
     PEngine_Instance  _engine;
 
     TT_Error  error;
-    int       n;
-
+ 
 
     /* first of all, initialize memory sub-system */
     error = TTMemory_Init();
@@ -141,10 +140,6 @@
        goto Fail;
 
 #undef TT_FAIL
-
-    /* set the gray palette defaults: 0 to 4 */
-    for ( n = 0; n < 5; n++ )
-      _engine->raster_palette[n] = (Byte)n;  /* Conversion ok, some warn */
 
     /* create the engine lock */
     MUTEX_Create( _engine->lock );

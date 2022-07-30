@@ -54,10 +54,6 @@
 /* The default render pool size */
 #define  RASTER_RENDER_POOL   4096
 
-/* The size of the two-lines intermediate bitmap used */
-/* for anti-aliasing                                  */
-#define  RASTER_GRAY_LINES    2048
-
 
 #define Raster_Err_None              TT_Err_Ok
 #define Raster_Err_Not_Ini           TT_Err_Raster_Not_Initialized
@@ -296,19 +292,6 @@
     TT_Vector*  coords;
 
     Byte      dropOutControl;       /* current drop_out control method */
-
-    Byte      grays[5];         /* Palette of gray levels used for render */
-
-    Byte*     gray_lines;       /* Intermediate table used to render the   */
-                                /* graylevels pixmaps.                     */
-                                /* gray_lines is a buffer holding two      */
-                                /* monochrome scanlines                    */
-    Short     gray_width;       /* width in bytes of one monochrome        */
-                                /* intermediate scanline of gray_lines.    */
-                                /* Each gray pixel takes 2 bits long there */
-
-                        /* The gray_lines must hold 2 lines, thus with size */
-                        /* in bytes of at least 'gray_width*2'              */
 
     Bool      second_pass;      /* indicates wether a horizontal pass      */
                                 /* should be performed to control drop-out */
@@ -2911,7 +2894,6 @@ TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
       return TT_Err_Ok;
 
     FREE( ras->buff );
-    FREE( ras->gray_lines );
 
 #ifndef TT_CONFIG_OPTION_STATIC_RASTER
     FREE( engine->raster_component );
@@ -2926,8 +2908,6 @@ TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
   {
     TT_Error  error;
 
-    Int  i, l, j, c;
-
     TRaster_Instance*  ras;
 
 
@@ -2940,32 +2920,10 @@ TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
     ras = (TRaster_Instance*)engine->raster_component;
 #endif
 
-    if ( ALLOC( ras->buff,       RASTER_RENDER_POOL )  ||
-         ALLOC( ras->gray_lines, RASTER_GRAY_LINES ) )
+    if ( ALLOC( ras->buff,       RASTER_RENDER_POOL ) )
        return error;
 
     ras->sizeBuff   = ras->buff + ( RASTER_RENDER_POOL/sizeof(long) );
-    ras->gray_width = RASTER_GRAY_LINES/2;
-
-    /* Initialization of Count_Table */
-
-    for ( i = 0; i < 256; i++ )
-    {
-      l = 0;
-      j = i;
-
-      for ( c = 0; c < 4; c++ )
-      {
-        l <<= 4;
-
-        if ( j & 0x80 ) l++;
-        if ( j & 0x40 ) l++;
-
-        j = ( j << 2 ) & 0xFF;
-      }
-
-      ras->count_table[i] = l;
-    }
 
     ras->dropOutControl = 2;
     ras->error          = Raster_Err_None;

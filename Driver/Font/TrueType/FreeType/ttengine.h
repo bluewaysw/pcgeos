@@ -66,7 +66,6 @@
 
      TMutex  raster_lock;       /* mutex for this engine's render pool   */
      void*   raster_component;  /* ttraster implementation depedent      */
-     Byte    raster_palette[5]; /* gray-levels palette for anti-aliasing */
 
      void*   extension_component;  /* extensions dependent */
 
