@@ -19,14 +19,14 @@ On Linux if you want to use swat for debugging with good system integration is i
 - add WATCOM env variable: `WATCOM=c:\WATCOM-V2`
 - set `BASEBOX=basebox` to use the advanced emulator backend from [pcgeos-basebox](https://github.com/bluewaysw/pcgeos-basebox/tags) if it is on the executable path, alternatively you may provide the full path to the executable as well
 - set `ROOT_DIR` to the root of the checkout
-- set `LOCAL_ROOT` to a local working directory (can be empty at first)
+- set `LOCAL_ROOT` to a local working directory (can be empty at first, but should be under `pcgeos`, so you can use it for development of your own apps as well)
 - add `C:\WATCOM-V2\binnt` to your system path variable
 - add bin of the checkout of this repo to path variable
 - add sed and perl to path variable - note the order to avoid loading the wrong Perl version. Example:
 
         set WATCOM=c:\WATCOM-V2
         set ROOT_DIR=C:\Geos\pcgeos
-        set LOCAL_ROOT=c:\Geos\Local
+        set LOCAL_ROOT=c:\Geos\pcgeos\Local
         set BASEBOX=basebox
         PATH %WATCOM%\binnt;%ROOT_DIR%\bin;C:\Geos\pcgeos-basebox\binnt;%PATH%;c:\Program Files\Git\usr\bin
 
