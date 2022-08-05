@@ -123,11 +123,11 @@
       return error;
 
     /* Allocate engine instance */
-    if ( ALLOC( _engine, sizeof ( TEngine_Instance ) ) )
+    if ( GALLOC( *engine, sizeof ( TEngine_Instance ) ) )
       return error;
 
 #undef  TT_FAIL
-#define TT_FAIL( x )  ( error = x (_engine) ) != TT_Err_Ok
+#define TT_FAIL( x )  ( error = x (*engine) ) != TT_Err_Ok
 
     /* Initalize components */
     if ( TT_FAIL( TTFile_Init  )  ||
@@ -142,14 +142,14 @@
 #undef TT_FAIL
 
     /* create the engine lock */
+    _engine = (PEngine_Instance)DEREF( engine );
     MUTEX_Create( _engine->lock );
 
-    HANDLE_Set( *engine, _engine );
     return TT_Err_Ok;
 
   Fail:
     TT_Done_FreeType( *engine );
-    HANDLE_Set( *engine, NULL );
+    *engine = NullChunk;
     return error;
   }
 
@@ -176,22 +176,23 @@
   EXPORT_FUNC
   TT_Error  TT_Done_FreeType( TT_Engine  engine )
   {
-    PEngine_Instance  _engine = HANDLE_Engine( engine );
+    PEngine_Instance  _engine;
 
 
-    if ( !_engine )
+    if ( !engine )
       return TT_Err_Ok;
 
+    _engine = (PEngine_Instance)DEREF( engine );
     MUTEX_Destroy( _engine->lock );
 
-    TTRaster_Done( _engine );
-    TTObjs_Done  ( _engine );
+    TTRaster_Done( engine );
+    TTObjs_Done  ( engine );
 #ifdef TT_CONFIG_OPTION_EXTEND_ENGINE
-    TTExtend_Done( _engine );
+    TTExtend_Done( engine );
 #endif
-    TTCache_Done ( _engine );
-    TTFile_Done  ( _engine );
-    FREE( _engine );
+    TTCache_Done ( engine );
+    TTFile_Done  ( engine );
+    GFREE( engine );
 
     TTMemory_Done();
 
@@ -259,7 +260,7 @@
                           const TT_Text*  fontPathName,
                           TT_Face*        face )
   {
-    PEngine_Instance  _engine = HANDLE_Engine( engine );
+    PEngine_Instance  _engine;
 
     TFont_Input  input;
     TT_Error     error;
@@ -267,7 +268,7 @@
     PFace        _face;
 
 
-    if ( !_engine )
+    if ( !engine )
       return TT_Err_Invalid_Engine;
 
     /* open the file */
@@ -280,6 +281,7 @@
     input.engine    = _engine;
 
     /* Create and load the new face object - this is thread-safe */
+    _engine = (PEngine_Instance)DEREF( engine );
     error = CACHE_New( _engine->objs_face_cache,
                        _face,
                        &input );
@@ -294,71 +296,6 @@
 
   Fail:
     TT_Close_Stream( &stream );
-    return error;
-  }
-
-
-/*******************************************************************
- *
- *  Function    :  TT_Open_Collection
- *
- *  Description :  Creates a new face object from a given font file.
- *
- *  Input  :  engine                FreeType engine instance
- *            collectionPathName    the font file's pathname
- *            fontIndex             index of font in TrueType collection
- *            face                  adress of returned face handle
- *
- *  Output :  Error code.
- *
- *  Note :    The face handle is set to NULL in case of failure.
- *
- *  MT-Note : YES!
- *
- ******************************************************************/
-
-  EXPORT_FUNC
-  TT_Error  TT_Open_Collection( TT_Engine       engine,
-                                const TT_Text*  collectionPathName,
-                                TT_ULong        fontIndex,
-                                TT_Face*        face )
-  {
-    PEngine_Instance  _engine = HANDLE_Engine( engine );
-
-    TFont_Input  input;
-    TT_Error     error;
-    TT_Stream    stream;
-    PFace        _face;
-
-
-    if ( !_engine )
-      return TT_Err_Invalid_Engine;
-
-    /* open the file */
-    error = TT_Open_Stream( collectionPathName, &stream );
-    if ( error )
-      return error;
-
-    input.stream    = stream;
-    input.fontIndex = fontIndex;
-    input.engine    = _engine;
-
-    /* Create and load the new face object - this is thread-safe */
-    error = CACHE_New( _engine->objs_face_cache,
-                       _face,
-                       &input );
-
-    /* Set the handle */
-    HANDLE_Set( *face, _face );
-
-    if ( error )
-      goto Fail;
-
-    return TT_Err_Ok;
-
-  Fail:
-    TT_Close_Stream( &stream );
-
     return error;
   }
 
@@ -1358,7 +1295,7 @@
       return TT_Err_Invalid_Glyph_Handle;
 
     _engine = _glyph->face->engine;
-    HANDLE_Set( engine, _engine );
+  //  HANDLE_Set( engine, _engine );
 
     outline = _glyph->outline;
     /* XXX : For now, use only dropout mode 2    */
@@ -1487,7 +1424,7 @@
       return TT_Err_Invalid_Glyph_Handle;
 
     _engine = _glyph->face->engine;
-    HANDLE_Set(engine,_engine);
+  //  HANDLE_Set(engine,_engine);
 
     outline = _glyph->outline;
     /* XXX : For now, use only dropout mode 2    */
@@ -1535,7 +1472,7 @@
       return TT_Err_Invalid_Glyph_Handle;
 
     _engine = _glyph->face->engine;
-    HANDLE_Set(engine,_engine);
+  //  HANDLE_Set(engine,_engine);
 
     outline = _glyph->outline;
 
@@ -1591,7 +1528,7 @@
       return TT_Err_Invalid_Glyph_Handle;
 
     _engine = _glyph->face->engine;
-    HANDLE_Set(engine,_engine);
+  //  HANDLE_Set(engine,_engine);
 
     outline = _glyph->outline;
 
@@ -1733,7 +1670,7 @@
                                    TT_Outline*     outline,
                                    TT_Raster_Map*  map )
   {
-    PEngine_Instance  _engine = HANDLE_Engine( engine );
+    PEngine_Instance  _engine; // = HANDLE_Engine( engine );
     TT_Error          error;
 
 
@@ -1814,7 +1751,7 @@ TT_Error  TT_Get_Outline_Region( TT_Engine       engine,
                                  TT_Outline*     outline,
                                  TT_Raster_Map*  map )
 {
-  PEngine_Instance  _engine = HANDLE_Engine( engine );
+  PEngine_Instance  _engine; // = HANDLE_Engine( engine );
   TT_Error          error;
 
 

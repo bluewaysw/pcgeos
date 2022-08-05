@@ -464,7 +464,7 @@
  ******************************************************************/
 
   LOCAL_FUNC
-  TT_Error  TTFile_Init( PEngine_Instance  engine )
+  TT_Error  TTFile_Init( TT_Engine  engine )
   {
     return TT_Err_Ok;
   }

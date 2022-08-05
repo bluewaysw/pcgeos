@@ -623,14 +623,12 @@
   /*          automatic type conversions for library hackers...       */
 
   //TODO: soll TT_*_ ersetzen
-  struct GTT_Engine_   { MemHandle  z; };
   struct GTT_Stream_   { MemHandle  z; };
   struct GTT_Face_     { MemHandle  z; };
   struct GTT_Instance_ { MemHandle  z; };
   struct GTT_Glyph_    { MemHandle  z; };
   struct GTT_CharMap_  { MemHandle  z; };
 
-  struct TT_Engine_   { void*  z; };
   struct TT_Stream_   { void*  z; };
   struct TT_Face_     { void*  z; };
   struct TT_Instance_ { void*  z; };
@@ -638,14 +636,13 @@
   struct TT_CharMap_  { void*  z; };
 
   //TODO: soll TT_* ersetzen
-  typedef struct GTT_Engine_    GTT_Engine;
   typedef struct GTT_Stream_    GTT_Stream;
   typedef struct GTT_Face_      GTT_Face;
   typedef struct GTT_Instance_  GTT_Instance;
   typedef struct GTT_Glyph_     GTT_Glyph;
   typedef struct GTT_CharMap_   GTT_CharMap;
 
-  typedef struct TT_Engine_    TT_Engine;    /* engine instance           */
+  typedef ChunkHandle          TT_Engine;    /* handle to engine instance */
   typedef struct TT_Stream_    TT_Stream;    /* stream handle type        */
   typedef struct TT_Face_      TT_Face;      /* face handle type          */
   typedef struct TT_Instance_  TT_Instance;  /* instance handle type      */
@@ -727,16 +724,6 @@
   TT_Error  TT_Open_Face( TT_Engine       engine,
                           const TT_Text*  fontPathName,
                           TT_Face*        face );
-
-
-  /* Open a TrueType font file located inside a collection. */
-  /* The font is assigned by its index in `fontIndex'.      */
-
-  EXPORT_DEF
-  TT_Error  TT_Open_Collection( TT_Engine       engine,
-                                const TT_Text*  collectionPathName,
-                                TT_ULong        fontIndex,
-                                TT_Face*        face );
 
 
   /* Return face properties in the `properties' structure.          */

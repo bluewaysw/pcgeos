@@ -26,7 +26,8 @@
 /***********************************************************************
  *      global dgoup objects
  ***********************************************************************/
-extern TT_Engine tt_Engine;
+extern MemHandle    trueTypeHandle;
+extern ChunkHandle  engineHandle;
 
 
 #endif /* _TTADAPTER_H_ */

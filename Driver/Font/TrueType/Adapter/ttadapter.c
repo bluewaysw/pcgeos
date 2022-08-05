@@ -48,7 +48,7 @@ TT_Error _pascal Init_FreeType()
         TT_Error        error;
 
 
-        error = TT_Init_FreeType( &tt_Engine );
+        error = TT_Init_FreeType( &engineHandle );
         if ( error != TT_Err_Ok )
                 return error;
 
@@ -81,5 +81,5 @@ TT_Error _pascal Init_FreeType()
 
 TT_Error _pascal Exit_FreeType() 
 {
-        return TT_Done_FreeType( tt_Engine );
+        return TT_Done_FreeType( engineHandle );
 }

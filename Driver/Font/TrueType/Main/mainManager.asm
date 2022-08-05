@@ -115,7 +115,8 @@ CharMod ends
 global	INIT_FREETYPE:far
 global	EXIT_FREETYPE:far
 
-global	tt_Engine:TT_Engine
+global	engineHandle:lptr;
+global  trueTypeHandle:hptr;
 
 MetricsMod segment resource
 include		truetypeMetrics.asm

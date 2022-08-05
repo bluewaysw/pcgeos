@@ -88,7 +88,7 @@
 #define MEM_UNLOCK MemUnlock( _memBlock )
 
 #define GMEM_Alloc( _handle_, _size_ ) \
-  GTT_Alloc( _memBlock, (ChunkHandle*)&(_handle_), _size_ )
+  GTT_Alloc( trueTypeHandle, (ChunkHandle*)&(_handle_), _size_ )
 
 #define GMEM_Realloc( _handle_, _size_ ) \
   GTT_Realloc( _memBlock, (ChunkHandle*)&(_handle_), _size_ )
@@ -108,7 +108,13 @@
                           (_count_) * sizeof ( _type_ ) ) ) != TT_Err_Ok )
 
 #define GFREE( _handle_ ) \
-  GTT_Free( (ChunkHandle*)&(_handle_) )
+  GTT_Free( trueTypeHandle, (ChunkHandle*)&(_handle_) )
+
+#define DEREF( _handle_ ) LMemDerefHandles( trueTypeHandle, _handle_ )
+
+#define FIELD( _type_, _chunk_, _field_)  (((_type_*)DEREF(_chunk_))->_field_)
+
+#define ARRAY( _type_, _chunk_, _field_, _array_)  ((_array_*)FIELD( _type_, _chunk_, _field_))
 
 /* ENDE: diese Makros sollen die o.g. ablösen */
 
