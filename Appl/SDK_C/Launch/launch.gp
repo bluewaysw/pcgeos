@@ -13,6 +13,7 @@
 #       ----    ----            -----------
 #       NF      11/12/95        Initial version of BRLauncher
 #       NF      11/14/96        Turned into Launch sample
+#		RainerB	4/27/2022		Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:
 #       This file contains the geode parameters for the "Launcher"
@@ -79,7 +80,7 @@ library ansic
 # object blocks, fixed code resources, or data resources that are read-only.
 # Standard discardable code resources do not need to be mentioned.
 #
-resource APPLICATION ui-object
-resource INTERFACE   ui-object
-resource STRINGS     lmem shared read-only
+resource Application ui-object
+resource Interface   ui-object
+resource Strings     lmem shared read-only
 

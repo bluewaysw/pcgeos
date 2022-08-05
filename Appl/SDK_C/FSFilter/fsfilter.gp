@@ -14,6 +14,7 @@
 #       brianc  9/26/91         Initial version
 #       NF      9/26/96         Corrected heapspace value
 #                               Made tokenchars unique
+#		RainerB	4/27/2022		Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:
 #       This file contains Geode definitions for the "FSFilter" sample
@@ -82,8 +83,8 @@ library	ui
 # object resources, so we mark them "ui-object". Had we wanted the
 # application thread to run them, we would have marked them "object".
 #
-resource APPRESOURCE ui-object
-resource INTERFACE   ui-object
+resource AppResource ui-object
+resource Interface   ui-object
 #
 # Exported classes
 #

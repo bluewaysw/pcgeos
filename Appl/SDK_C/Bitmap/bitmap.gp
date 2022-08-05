@@ -8,6 +8,12 @@
 #
 # AUTHOR:	Ed Ballot, 7/96
 #
+# REVISION HISTORY:
+#       Name    Date            Description
+#       ----    ----            -----------
+#       EB   	7/96	        Initial version
+#		RainerB	4/21/2022		Resource names adjusted for Watcom compatibility
+#
 # DESCRIPTION:	Your basic GP file for the bitmap sample application
 #
 # RCS STAMP:
@@ -34,9 +40,9 @@ library	geos
 library	ui
 library math
 #
-resource APPRESOURCE object
-resource INTERFACE object
-resource DOGGYBITMAP data read-only
+resource AppResource object
+resource Interface object
+resource DoggyBitmap data read-only
 
 #
 # new classes must be exported.  
