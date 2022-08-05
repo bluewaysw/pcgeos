@@ -680,21 +680,6 @@
   TT_Error  TT_Done_FreeType( TT_Engine  engine );
 
 
-  /* Set the gray level palette.  This is an array of 5 bytes used */
-  /* to produce the font smoothed pixmaps.  By convention:         */
-  /*                                                               */
-  /*  palette[0] = background (white)                              */
-  /*  palette[1] = light                                           */
-  /*  palette[2] = medium                                          */
-  /*  palette[3] = dark                                            */
-  /*  palette[4] = foreground (black)                              */
-  /*                                                               */
-
-  EXPORT_DEF
-  TT_Error  TT_Set_Raster_Gray_Palette( TT_Engine  engine,
-                                        TT_Byte*   palette );
-
-
   /* ----------------------- face management ----------------------- */
 
   /* Open a new TrueType font file, and returns a handle for  */
@@ -711,16 +696,6 @@
   TT_Error  TT_Open_Face( TT_Engine       engine,
                           const TT_Text*  fontPathName,
                           TT_Face*        face );
-
-
-  /* Open a TrueType font file located inside a collection. */
-  /* The font is assigned by its index in `fontIndex'.      */
-
-  EXPORT_DEF
-  TT_Error  TT_Open_Collection( TT_Engine       engine,
-                                const TT_Text*  collectionPathName,
-                                TT_ULong        fontIndex,
-                                TT_Face*        face );
 
 
   /* Return face properties in the `properties' structure.          */

@@ -16,6 +16,10 @@
 TT_Engine   engine;
 TT_Face     face;
 
+/* Umstellung auf LMemBlock */
+MemHandle       trueTypeHandle;
+ChunkHandle     engineChunk;
+
 typedef struct {
   Bitmap b;
   char data[20 * 3];
@@ -233,9 +237,7 @@ void DrawRegion( GStateHandle gstate, TT_Instance instance, TT_Glyph glyph, word
     if( TT_Get_Glyph_Region( glyph, &regionmap, 0, 0 ) )
         return;
     sprintf(tmpStr, "11: \t%u\t%u\t%u\t%u\t%u\r", allocated, max_allocated, max_blocksize, num_blocks, max_num_blocks); _log(tmpStr);
-/*
-    sprintf(tmpStr, "region size:\t%d\r", (regionmap.size)); _log(tmpStr);
-*/
+
     //GrDrawRegion(gstate, 60, 60, region, 0, 0);
 
     free(region);
@@ -243,12 +245,23 @@ void DrawRegion( GStateHandle gstate, TT_Instance instance, TT_Glyph glyph, word
 
 @method TtfProcessClass, MSG_META_EXPOSED {
     GStateHandle gstate = GrCreateState( win );
-
+    Init();
     GrBeginUpdate( gstate );
     testRendering( gstate );
     GrEndUpdate( gstate );
-
+    Free();
     GrDestroyState( gstate );
+}
+
+void Init() {
+    trueTypeHandle = MemAlloc( 2048, HF_SWAPABLE, HAF_ZERO_INIT | HAF_LOCK );
+    LMemInitHeap(trueTypeHandle, LMEM_TYPE_GENERAL, 0, 
+        sizeof(LMemBlockHeader), STD_INIT_HANDLES, STD_INIT_HEAP);		
+}
+
+void Free() {
+    MemUnlock(trueTypeHandle);
+    MemFree(trueTypeHandle);
 }
 
 void _log(char * message) {

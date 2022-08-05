@@ -142,10 +142,6 @@
 
 #undef TT_FAIL
 
-    /* set the gray palette defaults: 0 to 4 */
-    for ( n = 0; n < 5; n++ )
-      _engine->raster_palette[n] = (Byte)n;  /* Conversion ok, some warn */
-
     /* create the engine lock */
     MUTEX_Create( _engine->lock );
 
@@ -202,43 +198,6 @@
 
     return TT_Err_Ok;
   }
-
-
-#ifdef TT_CONFIG_OPTION_GRAY_SCALING
-
-/*******************************************************************
- *
- *  Function    :  TT_Set_Raster_Gray_Palette
- *
- *  Description :  Sets the gray-levels palette used for font
- *                 smoothing.
- *
- *  Input  :  engine        FreeType engine instance
- *            palette       address of palette (a 5 byte array)
- *
- *  Output :  Invalid argument if 'palette' is NULL.
- *
- *  MT-Note:  NO!  Unprotected modification of an engine's palette.
- *
- ******************************************************************/
-
-  EXPORT_FUNC
-  TT_Error  TT_Set_Raster_Gray_Palette( TT_Engine  engine,
-                                        Byte*      palette )
-  {
-    int  i;
-
-
-    if ( !palette )
-      return TT_Err_Invalid_Argument;
-
-    for ( i = 0; i < 5; i++ )
-      HANDLE_Engine( engine )->raster_palette[i] = (Byte)palette[i];
-
-    return TT_Err_Ok;
-  }
-
-#endif /* TT_CONFIG_OPTION_GRAY_SCALING */
 
 
 /*******************************************************************
@@ -299,71 +258,6 @@
 
   Fail:
     TT_Close_Stream( &stream );
-    return error;
-  }
-
-
-/*******************************************************************
- *
- *  Function    :  TT_Open_Collection
- *
- *  Description :  Creates a new face object from a given font file.
- *
- *  Input  :  engine                FreeType engine instance
- *            collectionPathName    the font file's pathname
- *            fontIndex             index of font in TrueType collection
- *            face                  adress of returned face handle
- *
- *  Output :  Error code.
- *
- *  Note :    The face handle is set to NULL in case of failure.
- *
- *  MT-Note : YES!
- *
- ******************************************************************/
-
-  EXPORT_FUNC
-  TT_Error  TT_Open_Collection( TT_Engine       engine,
-                                const TT_Text*  collectionPathName,
-                                TT_ULong        fontIndex,
-                                TT_Face*        face )
-  {
-    PEngine_Instance  _engine = HANDLE_Engine( engine );
-
-    TFont_Input  input;
-    TT_Error     error;
-    TT_Stream    stream;
-    PFace        _face;
-
-
-    if ( !_engine )
-      return TT_Err_Invalid_Engine;
-
-    /* open the file */
-    error = TT_Open_Stream( collectionPathName, &stream );
-    if ( error )
-      return error;
-
-    input.stream    = stream;
-    input.fontIndex = fontIndex;
-    input.engine    = _engine;
-
-    /* Create and load the new face object - this is thread-safe */
-    error = CACHE_New( _engine->objs_face_cache,
-                       _face,
-                       &input );
-
-    /* Set the handle */
-    HANDLE_Set( *face, _face );
-
-    if ( error )
-      goto Fail;
-
-    return TT_Err_Ok;
-
-  Fail:
-    TT_Close_Stream( &stream );
-
     return error;
   }
 
