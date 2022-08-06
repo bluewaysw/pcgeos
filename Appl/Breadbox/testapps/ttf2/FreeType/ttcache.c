@@ -286,7 +286,11 @@
       reset  = cache->clazz->reset;
       if ( reset )
       {
+#ifdef __GEOS__
+        error = ProcCallFixedOrMovable_cdecl( reset, object, parent_object );
+#else
         error = reset( object, parent_object );
+#endif 
         if ( error )
         {
           LOCK();

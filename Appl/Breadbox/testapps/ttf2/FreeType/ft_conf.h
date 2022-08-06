@@ -13,6 +13,12 @@
 #include <file.h>
 #include <resource.h>
 #include <graphics.h>
+#include <heap.h>
+#include <lmem.h>
+
+/* MemHandle to our global memory block under FreeGEOS. In this memory block */
+/* we hold all dynamically allocated FreeType structures we need.            */
+extern MemHandle    trueTypeHandle;
 
 /* Define to empty if the keyword does not work.  */
 /* #undef const */

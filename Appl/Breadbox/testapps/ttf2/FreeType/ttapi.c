@@ -115,7 +115,6 @@
     PEngine_Instance  _engine;
 
     TT_Error  error;
-    int       n;
 
 
     /* first of all, initialize memory sub-system */

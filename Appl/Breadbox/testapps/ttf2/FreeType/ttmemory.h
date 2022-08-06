@@ -84,10 +84,10 @@
   /* Macros needed to port FreeType for FreeGEOS */
 
 #define GMEM_Alloc( _handle_, _size_ ) \
-  GTT_Alloc( _memBlock, (ChunkHandle*)&(_handle_), _size_ )
+  GTT_Alloc( trueTypeHandle, (ChunkHandle*)&(_handle_), _size_ )
 
 #define GMEM_Realloc( _handle_, _size_ ) \
-  GTT_Realloc( _memBlock, (ChunkHandle*)&(_handle_), _size_ )
+  GTT_Realloc( trueTypeHandle, (ChunkHandle*)&(_handle_), _size_ )
 
 #define GALLOC( _handle_, _size_ ) \
   ( ( error = GMEM_Alloc( _handle_, _size_ ) ) != TT_Err_Ok )
@@ -104,7 +104,9 @@
                           (_count_) * sizeof ( _type_ ) ) ) != TT_Err_Ok )
 
 #define GFREE( _handle_ ) \
-  GTT_Free( (ChunkHandle*)&(_handle_) )
+  GTT_Free( trueTypeHandle, (ChunkHandle*)&(_handle_) )
+
+#define DEREF( _handle_ ) LMemDerefHandles( trueTypeHandle, _handle_ )
 
 
 
