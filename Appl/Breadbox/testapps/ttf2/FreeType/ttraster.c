@@ -317,68 +317,6 @@
 #endif /* TT_STATIC_RASTER */
 
 
-#ifdef DEBUG_RASTER
-
-  /************************************************/
-  /*                                              */
-  /* Pset:                                        */
-  /*                                              */
-  /*  Used for debugging only.  Plots a point     */
-  /*  in VRAM during rendering (not afterwards).  */
-  /*                                              */
-  /* NOTE:  This procedure relies on the value    */
-  /*        of cProfile->start, which may not     */
-  /*        be set when Pset is called sometimes. */
-  /*        This will usually result in a dot     */
-  /*        plotted on the first screen scanline  */
-  /*        (far away its original position).     */
-  /*                                              */
-  /*        This "bug" reflects nothing wrong     */
-  /*        in the current implementation, and    */
-  /*        the bitmap is rendered correctly,     */
-  /*        so don't panic if you see 'flying'    */
-  /*        dots in debugging mode.               */
-  /*                                              */
-  /*  - David                                     */
-  /*                                              */
-  /************************************************/
-
-  static void  Pset( RAS_ARG )
-  {
-    Long  o;
-    Long  x;
-
-
-    x = ras.top[-1];
-
-    switch ( ras.cProfile->flow )
-    {
-    case TT_Flow_Up:
-      o = Vio_ScanLineWidth *
-         ( ras.top-ras.cProfile->offset + ras.cProfile->start ) +
-         ( x / (ras.precision*8) );
-      break;
-
-    case TT_Flow_Down:
-      o = Vio_ScanLineWidth *
-         ( ras.cProfile->start-ras.top + ras.cProfile->offset ) +
-         ( x / (ras.precision*8) );
-      break;
-    }
-
-    if ( o > 0 )
-      Vio[o] |= (unsigned)0x80 >> ( (x/ras.precision) & 7 );
-  }
-
-
-  static void  Clear_Band( RAS_ARGS Int  y1, Int  y2 )
-  {
-    MEM_Set( Vio + y1*Vio_ScanLineWidth, (y2-y1+1)*Vio_ScanLineWidth, 0 );
-  }
-
-#endif /* DEBUG_RASTER */
-
-
 /************************************************************************/
 /*                                                                      */
 /* Function:    Set_High_Precision                                      */
@@ -2683,115 +2621,6 @@ Scan_DropOuts :
   }
 
 
-#ifdef TT_CONFIG_OPTION_GRAY_SCALING
-
-/****************************************************************************/
-/*                                                                          */
-/* Function:    Render_Gray_Glyph                                           */
-/*                                                                          */
-/* Description: Renders a glyph with grayscaling. Sub-banding if needed.    */
-/*                                                                          */
-/* Input:       AGlyph   Glyph record                                       */
-/*                                                                          */
-/* Returns:     SUCCESS on success                                          */
-/*              FAILURE if any error was encountered during rendering.      */
-/*                                                                          */
-/****************************************************************************/
-
-  LOCAL_FUNC
-  TT_Error  Render_Gray_Glyph( RAS_ARGS  TT_Outline*     glyph,
-                                         TT_Raster_Map*  target_map,
-                                         Byte*           palette )
-  {
-    Int       i;
-    TT_Error  error;
-
-    if ( !ras.buff )
-    {
-      ras.error = Raster_Err_Not_Ini;
-      return ras.error;
-    }
-
-    if ( glyph->n_points == 0 || glyph->n_contours <= 0 )
-      return TT_Err_Ok;
-
-    if ( glyph->n_points < glyph->contours[glyph->n_contours - 1] )
-    {
-      ras.error = TT_Err_Too_Many_Points;
-      return ras.error;
-    }
-
-    if ( palette )
-    {
-      for ( i = 0; i < 5; i++ )
-        ras.grays[i] = palette[i];
-    }
-
-    if ( target_map )
-      ras.target = *target_map;
-
-    ras.outs      = glyph->contours;
-    ras.flags     = glyph->flags;
-    ras.nPoints   = glyph->n_points;
-    ras.nContours = glyph->n_contours;
-    ras.coords    = glyph->points;
-
-    Set_High_Precision( RAS_VARS glyph->high_precision );
-    ras.scale_shift    = ras.precision_shift+1;
-    ras.dropOutControl = glyph->dropout_mode;
-    ras.second_pass    = glyph->second_pass;
-
-
-    /* Vertical Sweep */
-
-    ras.band_top            = 0;
-    ras.band_stack[0].y_min = 0;
-    ras.band_stack[0].y_max = 2 * ras.target.rows - 1;
-
-    ras.bWidth  = ras.gray_width;
-    if ( ras.bWidth > ras.target.cols/4 )
-      ras.bWidth = ras.target.cols/4;
-
-    ras.bWidth  = ras.bWidth * 8;
-    ras.bTarget = (Byte*)ras.gray_lines;
-    ras.gTarget = (Byte*)ras.target.bitmap;
-
-    ras.Proc_Sweep_Init   = Vertical_Gray_Sweep_Init;
-    ras.Proc_Sweep_Span   = Vertical_Sweep_Span;
-    ras.Proc_Sweep_Drop   = Vertical_Sweep_Drop;
-    ras.Proc_Sweep_Step   = Vertical_Gray_Sweep_Step;
-    ras.Proc_Sweep_Finish = Vertical_Sweep_Finish;
-
-    error = Render_Single_Pass( RAS_VARS  0 );
-    if (error)
-      return error;
-
-    /* Horizontal Sweep */
-
-    if ( ras.second_pass && ras.dropOutControl != 0 )
-    {
-      ras.Proc_Sweep_Init   = Horizontal_Sweep_Init;
-      ras.Proc_Sweep_Span   = Horizontal_Gray_Sweep_Span;
-      ras.Proc_Sweep_Drop   = Horizontal_Gray_Sweep_Drop;
-      ras.Proc_Sweep_Step   = Horizontal_Sweep_Step;
-      ras.Proc_Sweep_Finish = Horizontal_Sweep_Finish;
-
-
-      ras.band_top            = 0;
-      ras.band_stack[0].y_min = 0;
-      ras.band_stack[0].y_max = ras.target.width * 2 - 1;
-
-      error = Render_Single_Pass( RAS_VARS  1 );
-      if (error)
-        return error;
-    }
-
-    return TT_Err_Ok;
-  }
-
-#endif /* TT_CONFIG_OPTION_GRAY_SCALING */
-
-
 #ifdef __GEOS__
 
 /****************************************************************************/
@@ -2905,8 +2734,6 @@ TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
   {
     TT_Error  error;
 
-    Int  i, l, j, c;
-
     TRaster_Instance*  ras;
 
 
@@ -2919,7 +2746,7 @@ TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
     ras = (TRaster_Instance*)engine->raster_component;
 #endif
 
-    if ( ALLOC( ras->buff,       RASTER_RENDER_POOL ) )
+    if ( ALLOC( ras->buff, RASTER_RENDER_POOL ) )
        return error;
 
     ras->sizeBuff   = ras->buff + ( RASTER_RENDER_POOL/sizeof(long) );
