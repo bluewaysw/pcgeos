@@ -81,21 +81,21 @@
 
 #ifdef TT_CONFIG_OPTION_THREAD_SAFE  /* for re-entrant builds */
 
-#define ENGINE_ARG    TEngine_Instance*  _engine
-#define ENGINE_ARGS   TEngine_Instance*  _engine,
+//#define ENGINE_ARG    TEngine_Instance*  _engine
+//#define ENGINE_ARGS   TEngine_Instance*  _engine,
 
-#define ENGINE_VAR   _engine
-#define ENGINE_VARS  _engine,
+//#define ENGINE_VAR   _engine
+//#define ENGINE_VARS  _engine,
 
-#define ENGINE  _engine
+//#define ENGINE  _engine
 
 #else                       /* for thread-safe builds */
 
-#define ENGINE_ARG    /* void */
-#define ENGINE_ARGS
+//#define ENGINE_ARG    /* void */
+//#define ENGINE_ARGS
 
-#define ENGINE_VAR
-#define ENGINE_VARS
+//#define ENGINE_VAR
+//#define ENGINE_VARS
 
 #endif /* TT_CONFIG_OPTION_THREAD_SAFE */
 

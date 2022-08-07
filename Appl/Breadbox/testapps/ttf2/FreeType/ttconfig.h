@@ -103,7 +103,7 @@
 /* Please note that probably not all OS-specific versions of ttmemory.c  */
 /* provide this functionality.                                           */
 
-#define DEBUG_MEMORY
+/* #define DEBUG_MEMORY */
 
 
 /*************************************************************************/
