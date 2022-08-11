@@ -8,6 +8,12 @@
 #
 # AUTHOR:	Eric E. Del Sesto, 11/90
 #
+# REVISION HISTORY:
+#       Name    Date            Description
+#       ----    ----            -----------
+#       Eric	11/90	        Initial version
+#		RainerB	4/27/2022		Resource names adjusted for Watcom compatibility
+#
 # DESCRIPTION:	This file contains Geode definitions for the "VisSamp3" sample
 #		application. This file is read by the GLUE linker to
 #		build this application.
@@ -68,8 +74,8 @@ library	ui
 # Resources: list all resource blocks which are used by the application.
 # (standard discardable code resources do not need to be mentioned).
 #
-resource APPRESOURCE ui-object
-resource INTERFACE ui-object
+resource AppResource ui-object
+resource Interface ui-object
 
 # Export any app-defined object classes.
 export	VisSampNumberClass

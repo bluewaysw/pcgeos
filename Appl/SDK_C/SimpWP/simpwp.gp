@@ -14,6 +14,7 @@
 #       LH                      Initial version
 #       NF      9/23/96         Corrected heapspace value,
 #                               made tokenchars unique
+#		RainerB	8/6/2022		Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:
 #       This file contains Geode definitions for the SimpWP sample
@@ -41,11 +42,11 @@ library	geos
 library	ui
 library text
 
-resource APPRESOURCE      ui-object
-resource INTERFACE        ui-object
-resource DOCGROUPRESOURCE object
-resource DISPLAYRESOURCE  ui-object read-only shared
-resource TEMPLATERESOURCE object read-only shared
+resource AppResource      ui-object
+resource Interface        ui-object
+resource DocGroupResource object
+resource DisplayResource  ui-object read-only shared
+resource TemplateResource object read-only shared
 
 export SWPDocumentClass
 
