@@ -622,14 +622,15 @@
   /*   NOTE:  Some macros are defined in tttypes.h to perform         */
   /*          automatic type conversions for library hackers...       */
 
-  struct TT_Engine_   { void*  z; };
+  //struct TT_Engine_   { void*  z; };
   struct TT_Stream_   { void*  z; };
   struct TT_Face_     { void*  z; };
   struct TT_Instance_ { void*  z; };
   struct TT_Glyph_    { void*  z; };
   struct TT_CharMap_  { void*  z; };
 
-  typedef struct TT_Engine_    TT_Engine;    /* engine instance           */
+  //typedef struct TT_Engine_    TT_Engine;    /* engine instance           */
+  typedef ChunkHandle          TT_Engine;    /* engine instance           */
   typedef struct TT_Stream_    TT_Stream;    /* stream handle type        */
   typedef struct TT_Face_      TT_Face;      /* face handle type          */
   typedef struct TT_Instance_  TT_Instance;  /* instance handle type      */

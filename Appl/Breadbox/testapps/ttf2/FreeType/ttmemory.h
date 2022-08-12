@@ -108,6 +108,12 @@
 
 #define DEREF( _handle_ ) LMemDerefHandles( trueTypeHandle, _handle_ )
 
+#define ELEMENT( _typ_, _handle_, _element_ ) \
+  ( ((_typ_)DEREF(_handle_))->_element_ )
+
+#define ENGINE_ELEMENT( _handle_, _element_ ) \
+  ELEMENT( PEngine_Instance, _handle_, _element_ )
+
 
 
   /* Allocate a block of memory of 'Size' bytes from the heap, and */

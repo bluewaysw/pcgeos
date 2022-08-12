@@ -155,6 +155,8 @@
   EXPORT_FUNC
   TT_Error  GTT_Alloc( MemHandle  M, ChunkHandle*  C, unsigned int  Size )
   {
+    ECCheckLMemHandle( M );
+
     if ( !M || !C )
       return TT_Err_Invalid_Argument;
 
@@ -163,10 +165,12 @@
     if ( Size > 0 )
     {
       *C = LMemAlloc( M, Size );
+      ECCheckLMemChunk( C );
+
       if ( !*C )
         return TT_Err_Out_Of_Memory;
 
-      MEM_Set( DEREF( C ), 0, Size );
+      MEM_Set( LMemDerefHandles( M, *C ), 0, Size );
     }
     else
       *C = NullChunk;

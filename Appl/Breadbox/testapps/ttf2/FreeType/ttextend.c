@@ -124,7 +124,7 @@
     if ( !face->extension )
       return TT_Err_Extensions_Unsupported;
 
-    registry = (PExtension_Registry)face->engine->extension_component;
+    registry = (PExtension_Registry)ENGINE_ELEMENT(face->engine, extension_component);
 
     for ( n = 0; n < face->n_extensions; n++ )
     {

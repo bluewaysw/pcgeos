@@ -544,12 +544,16 @@
   EXPORT_FUNC
   TT_Error  TT_Init_Kerning_Extension( TT_Engine  engine )
   {
-    PEngine_Instance  _engine = HANDLE_Engine( engine );
+    PEngine_Instance  _engine;
+    TT_Error          error;
 
-    TT_Error  error;
 
+    ECCheckLMemChunk( engine );
+    
+    _engine = DEREF( engine );
+    ECCheckBounds( _engine );
 
-    if ( !_engine )
+    if ( !engine || !_engine )
       return TT_Err_Invalid_Engine;
 
     error = TT_Register_Extension( _engine,

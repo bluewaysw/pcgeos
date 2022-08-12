@@ -113,23 +113,34 @@
   TT_Error  TT_Init_FreeType( TT_Engine*  engine )
   {
     PEngine_Instance  _engine;
+    TT_Engine         newEngine;
+    TT_Error          error;
+    MemHandle         t = trueTypeHandle;
 
-    TT_Error  error;
-
-
+    ECCheckLMemHandle( trueTypeHandle );
+  
     /* first of all, initialize memory sub-system */
     error = TTMemory_Init();
     if ( error )
       return error;
 
     /* Allocate engine instance */
-    if ( ALLOC( _engine, sizeof ( TEngine_Instance ) ) )
+    if ( GALLOC( newEngine, sizeof ( TEngine_Instance ) ) )
       return error;
+
+    ECCheckLMemChunk( newEngine );
+
+    if ( !newEngine )
+      return TT_Err_Invalid_Engine;
+
+    *engine = newEngine;
 
 #undef  TT_FAIL
 #define TT_FAIL( x )  ( error = x (_engine) ) != TT_Err_Ok
 
     /* Initalize components */
+    _engine = DEREF( *engine );
+    ECCheckBounds( _engine );
     if ( TT_FAIL( TTFile_Init  )  ||
          TT_FAIL( TTCache_Init )  ||
 #ifdef TT_CONFIG_OPTION_EXTEND_ENGINE
@@ -143,13 +154,11 @@
 
     /* create the engine lock */
     MUTEX_Create( _engine->lock );
-
-    HANDLE_Set( *engine, _engine );
     return TT_Err_Ok;
 
   Fail:
     TT_Done_FreeType( *engine );
-    HANDLE_Set( *engine, NULL );
+    *engine = NullChunk;
     return error;
   }
 
@@ -176,10 +185,14 @@
   EXPORT_FUNC
   TT_Error  TT_Done_FreeType( TT_Engine  engine )
   {
-    PEngine_Instance  _engine = HANDLE_Engine( engine );
+    PEngine_Instance  _engine;
+    
+    
+    ECCheckLMemChunk( &engine );
+    _engine = DEREF( engine );
+    ECCheckBounds( _engine );
 
-
-    if ( !_engine )
+    if ( !engine || !_engine )
       return TT_Err_Ok;
 
     MUTEX_Destroy( _engine->lock );
@@ -191,7 +204,7 @@
 #endif
     TTCache_Done ( _engine );
     TTFile_Done  ( _engine );
-    FREE( _engine );
+    GFREE( engine );
 
     TTMemory_Done();
 
@@ -222,15 +235,18 @@
                           const TT_Text*  fontPathName,
                           TT_Face*        face )
   {
-    PEngine_Instance  _engine = HANDLE_Engine( engine );
+    PEngine_Instance  _engine;
+    TFont_Input       input;
+    TT_Error          error;
+    TT_Stream         stream;
+    PFace             _face;
 
-    TFont_Input  input;
-    TT_Error     error;
-    TT_Stream    stream;
-    PFace        _face;
 
+    ECCheckLMemChunk( &engine );
+    _engine = DEREF( engine );
+    ECCheckBounds( _engine );
 
-    if ( !_engine )
+    if ( !engine || !_engine )
       return TT_Err_Invalid_Engine;
 
     /* open the file */
@@ -565,7 +581,7 @@
     TT_Close_Stream( &_face->stream );
 
     /* delete the face object -- this is thread-safe */
-    return CACHE_Done( _face->engine->objs_face_cache, _face );
+    return CACHE_Done( ENGINE_ELEMENT(_face->engine, objs_face_cache), _face );
   }
 
 
@@ -1244,7 +1260,7 @@
                                  TT_F26Dot6      xOffset,
                                  TT_F26Dot6      yOffset )
   {
-    PEngine_Instance  _engine;
+    //PEngine_Instance  _engine;
     TT_Engine         engine;
     TT_Error          error;
     PGlyph            _glyph = HANDLE_Glyph( glyph );
@@ -1255,8 +1271,9 @@
     if ( !_glyph )
       return TT_Err_Invalid_Glyph_Handle;
 
-    _engine = _glyph->face->engine;
-    HANDLE_Set( engine, _engine );
+   // _engine = _glyph->face->engine;
+   // HANDLE_Set( engine, _engine );
+   engine = _glyph->face->engine;
 
     outline = _glyph->outline;
     /* XXX : For now, use only dropout mode 2    */
@@ -1384,8 +1401,8 @@
     if ( !_glyph )
       return TT_Err_Invalid_Glyph_Handle;
 
-    _engine = _glyph->face->engine;
-    HANDLE_Set(engine,_engine);
+    engine = _glyph->face->engine;
+    //HANDLE_Set(engine,_engine);
 
     outline = _glyph->outline;
     /* XXX : For now, use only dropout mode 2    */
@@ -1432,8 +1449,8 @@
     if ( !_glyph )
       return TT_Err_Invalid_Glyph_Handle;
 
-    _engine = _glyph->face->engine;
-    HANDLE_Set(engine,_engine);
+    engine = _glyph->face->engine;
+    //HANDLE_Set(engine,_engine);
 
     outline = _glyph->outline;
 
@@ -1488,8 +1505,8 @@
     if ( !_glyph )
       return TT_Err_Invalid_Glyph_Handle;
 
-    _engine = _glyph->face->engine;
-    HANDLE_Set(engine,_engine);
+    engine = _glyph->face->engine;
+    //HANDLE_Set(engine,_engine);
 
     outline = _glyph->outline;
 
@@ -1631,7 +1648,7 @@
                                    TT_Outline*     outline,
                                    TT_Raster_Map*  map )
   {
-    PEngine_Instance  _engine = HANDLE_Engine( engine );
+    PEngine_Instance  _engine = DEREF( engine );
     TT_Error          error;
 
 
@@ -1712,7 +1729,7 @@ TT_Error  TT_Get_Outline_Region( TT_Engine       engine,
                                  TT_Outline*     outline,
                                  TT_Raster_Map*  map )
 {
-  PEngine_Instance  _engine = HANDLE_Engine( engine );
+  PEngine_Instance  _engine = DEREF( engine );
   TT_Error          error;
 
 
