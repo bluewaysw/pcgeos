@@ -1,4 +1,0 @@
-#include <$(SYSMAKEFILE)>
-
-XCCOMFLAGS = -zu
-

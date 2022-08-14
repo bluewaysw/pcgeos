@@ -160,12 +160,12 @@
     if ( !M || !C )
       return TT_Err_Invalid_Argument;
 
-    if ( Size > (size_t)-1 )
+    if ( Size > MAX_LMEM_CHUNKSIZE )
       return TT_Err_Out_Of_Memory;
     if ( Size > 0 )
     {
       *C = LMemAlloc( M, Size );
-      ECCheckLMemChunk( C );
+      ECCheckLMemChunk( LMemDerefHandles( M, *C ) );
 
       if ( !*C )
         return TT_Err_Out_Of_Memory;

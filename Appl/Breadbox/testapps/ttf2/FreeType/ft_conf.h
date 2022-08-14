@@ -8,17 +8,22 @@
 #ifndef FT_CONF_H
 #define FT_CONF_H
 
-/* Under FreeGEOS we need this for the file operations and render regions. */
+/* Under FreeGEOS we need some special includes. */
 #include <geos.h>
 #include <file.h>
 #include <resource.h>
 #include <graphics.h>
 #include <heap.h>
 #include <lmem.h>
+#include <ec.h>
+
+/* FreeGEOS specific constants and definitions. */
+#define MAX_LMEM_CHUNKSIZE        32000
 
 /* MemHandle to our global memory block under FreeGEOS. In this memory block */
 /* we hold all dynamically allocated FreeType structures we need.            */
 extern MemHandle    trueTypeHandle;
+extern void*        enginePtr; //nur temprär bis die Umstellung abgeschlossen ist
 
 /* Define to empty if the keyword does not work.  */
 /* #undef const */
@@ -98,7 +103,7 @@ extern MemHandle    trueTypeHandle;
 /* by the engine and need no extensions, undefine this configuration     */
 /* macro to save a few more bytes.                                       */
 
-#define  TT_CONFIG_OPTION_EXTEND_ENGINE
+//#define  TT_CONFIG_OPTION_EXTEND_ENGINE
 
 
 /*************************************************************************/

@@ -115,7 +115,6 @@
     PEngine_Instance  _engine;
     TT_Engine         newEngine;
     TT_Error          error;
-    MemHandle         t = trueTypeHandle;
 
     ECCheckLMemHandle( trueTypeHandle );
   
@@ -128,7 +127,7 @@
     if ( GALLOC( newEngine, sizeof ( TEngine_Instance ) ) )
       return error;
 
-    ECCheckLMemChunk( newEngine );
+    ECCheckLMemChunk( DEREF( newEngine ) );
 
     if ( !newEngine )
       return TT_Err_Invalid_Engine;
@@ -188,9 +187,8 @@
     PEngine_Instance  _engine;
     
     
-    ECCheckLMemChunk( &engine );
+    ECCheckLMemChunk( DEREF( engine ) );
     _engine = DEREF( engine );
-    ECCheckBounds( _engine );
 
     if ( !engine || !_engine )
       return TT_Err_Ok;
@@ -242,9 +240,8 @@
     PFace             _face;
 
 
-    ECCheckLMemChunk( &engine );
+    ECCheckLMemChunk( DEREF( engine ) );
     _engine = DEREF( engine );
-    ECCheckBounds( _engine );
 
     if ( !engine || !_engine )
       return TT_Err_Invalid_Engine;
@@ -1401,8 +1398,9 @@
     if ( !_glyph )
       return TT_Err_Invalid_Glyph_Handle;
 
-    engine = _glyph->face->engine;
+    //engine = _glyph->face->engine;
     //HANDLE_Set(engine,_engine);
+    _engine = _glyph->face->engine;
 
     outline = _glyph->outline;
     /* XXX : For now, use only dropout mode 2    */
@@ -1729,7 +1727,8 @@ TT_Error  TT_Get_Outline_Region( TT_Engine       engine,
                                  TT_Outline*     outline,
                                  TT_Raster_Map*  map )
 {
-  PEngine_Instance  _engine = DEREF( engine );
+  //PEngine_Instance  _engine = DEREF( engine );
+  PEngine_Instance  _engine = enginePtr; // nur temporär
   TT_Error          error;
 
 
