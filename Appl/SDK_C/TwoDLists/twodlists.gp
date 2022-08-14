@@ -70,11 +70,12 @@ heapspace 3254
 #
 library	geos
 library	ui
+library ansic
 #
 # Resources: list all resource blocks which are used by the application.
 # (standard discardable code resources do not need to be mentioned).
 #
-resource APPRESOURCE ui-object
-resource INTERFACE   ui-object
-resource ITEMTEXT    object
+resource AppResource ui-object
+resource Interface   ui-object
+resource ItemText    object
 

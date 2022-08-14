@@ -26,12 +26,19 @@
  *		Include Files
  *******************************************************************/
     @include <stdapp.goh>
+    @include <ansi/string.h>	/* strcpy() */
 
 /********************************************************************
- *		Constants
+ *		Constants and types
  *******************************************************************/
     #define NUM_TOTAL_COLORS        16
     #define LIST_ITEM_NEEDS_REMOVAL ( (word) - 1 )
+    
+    /* 
+     * Declare a string type that holds up to 29 characters. 
+     * Because we want to create a table, we need a fixed length string type.
+     */
+    typedef char ColorText[30];
 
 /********************************************************************
  *		Class Definitions
@@ -118,6 +125,7 @@
               @TransferTriggers,
               @SecondDList;
     HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
 }
 
 @object GenDynamicListClass FirstDList = {
@@ -150,6 +158,13 @@
        * Make scrollable.
        */
     HINT_ITEM_GROUP_SCROLLABLE;
+      /*
+       * Make somewhat larger. 
+       */
+    HINT_INITIAL_SIZE = { SST_AVG_CHAR_WIDTHS | 15 , 
+    					  SST_LINES_OF_TEXT | 12, 12 };
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    
 }
 
 @object GenInteractionClass TransferTriggers = {
@@ -183,6 +198,9 @@
     GIGI_destination = process;
     GDLI_queryMsg = MSG_TDLP_SECOND_DLIST_MONIKER_QUERY;
     HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_INITIAL_SIZE = { SST_AVG_CHAR_WIDTHS | 15 , 
+    					  SST_LINES_OF_TEXT | 12, 12 };
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
 }
 
 @end Interface
@@ -190,26 +208,24 @@
 /********************************************************************
  *		ItemText Resource
  *******************************************************************/
+ 
+
+ 
 @start ItemText, data ;
 
-@chunk char BlackText[] = "Black";
-@chunk char DkBlueText[] = "Dark Blue";
-@chunk char DkGreenText[] = "Dark Green";
-@chunk char DkCyanText[] = "Dark Cyan";
-@chunk char DkRedText[] = "Dark Red";
-@chunk char DkVioletText[] = "Dark Violet";
-@chunk char BrownText[] = "Brown";
-@chunk char LtGrayText[] = "Light Grey";
-@chunk char DkGrayText[] = "Dark Grey";
-@chunk char LtBlueText[] = "Light Blue";
-@chunk char LtGreenText[] = "Light Green";
-@chunk char LtCyanText[] = "Light Cyan";
-@chunk char LtRedText[] = "Light Red";
-@chunk char LtVioletText[] = "Light Violet";
-@chunk char YellowText[] = "Yellow";
-@chunk char WhiteText[] = "White";
+	/*
+	 *	Set up an array of ColorText items that holds the list monikers.
+	 *  ColorText has been defined above.
+	 */
+
+@chunk ColorText ColorTextList[] = { 	"Black",
+	"Dark Blue", "Dark Green", "Dark Cyan", "Dark Red", "Dark Violet",
+	"Brown", "Light Grey","Dark Grey", "Light Blue", "Light Green", 
+	"Light Cyan", "Light Red", "Light Violet", "Yellow", "White" };
 
 @end ItemText;
+
+
 
 /********************************************************************
  *		Code for TwoDListsProcessClass
@@ -236,31 +252,28 @@
       /*
        * textPtr - Pointer to the color text in the chunk.
        */
-    char * textPtr;
+    ColorText * textPtr, text;
 
       /*
-       * We'll get a pointer to the appropriate text by looking
-       * up the appropriate item in firstListItems, then using
-       * that to get an offset from the first (C_BLACK) text
-       * chunk to the text chunk we want, keeping in mind that
-       * the handles for each text chunk go up by increments of 2.
+       * In this example handler, we'll get the appropriate text by 
+       * looking up the appropriate item in firstListItems, then 
+       * copying the text to a local variable.
        * We have to lock the block that the text is in to actually
        * get at the text.
        */
-    textPtr = (char*)MemLock( OptrToHandle( @BlackText ) );
-    textPtr = LMemDerefHandles( OptrToHandle( @BlackText ),
-                                OptrToChunk( @BlackText ) +
-                                firstListItems[item] * 2 );
-
+    MemLock( OptrToHandle( @ColorTextList ) );
+    textPtr = LMemDeref(@ColorTextList);
+    strcpy(text, textPtr[firstListItems[item]]);
+    
       /*
        * Send the text on to the list.
        */
-    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT( item, textPtr );
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT( item, text );
 
       /*
        * Unlock the block.
        */
-    MemUnlock( OptrToHandle( @BlackText ) );
+    MemUnlock( OptrToHandle( @ColorTextList ) );
 } /* MSG_TDLP_FIRST_DLIST_MONIKER_QUERY */
 
 /********************************************************************
@@ -280,21 +293,19 @@
  *******************************************************************/
 @method TwoDListsProcessClass, MSG_TDLP_SECOND_DLIST_MONIKER_QUERY
 {
-    char *textPtr;
+    ColorText *textPtr;
 
       /*
-       * We'll get a pointer to the appropriate text by looking
-       * up the appropriate item in firstListItems, then using
-       * that to get an offset from the first (C_BLACK) text
-       * chunk to the text chunk we want, keeping in mind that
-       * the handles for each text chunk go up by increments of 2.
+       * Here, we'll not copy the text to a local variable first.
+       * We get a pointer to the appropriate text by looking
+       * up the appropriate item in secondListItems and moving
+       * the pointer accordingly.
        * We have to lock the block that the text is in to actually
        * get at the text.
        */
-    textPtr = (char*)MemLock( OptrToHandle( @BlackText ) );
-    textPtr = LMemDerefHandles( OptrToHandle( @BlackText ),
-                                OptrToChunk( @BlackText ) +
-                                secondListItems[item] * 2 );
+    MemLock( OptrToHandle( @ColorTextList ) );
+    textPtr = LMemDeref(@ColorTextList);
+    textPtr += secondListItems[item];
 
       /*
        * Send the text on to the list.
@@ -304,7 +315,7 @@
       /*
        * Unlock the block.
        */
-    MemUnlock( OptrToHandle( @BlackText ) );
+    MemUnlock( OptrToHandle( @ColorTextList ) );
 } /* MSG_TDLP_SECOND_DLIST_MONIKER_QUERY */
 
 /********************************************************************
