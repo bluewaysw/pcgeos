@@ -34,16 +34,16 @@
 
 /* The macro FREE_Elements aliases the current engine instance's */
 /* free list_elements recycle list.                              */
-#define FREE_Elements  ( engine->list_free_elements )
+#define FREE_Elements  ( _engine->list_free_elements )
 
 /* Redefinition of LOCK and UNLOCK macros for New_Element and Done_Element */
 /* Note: The macros are redefined below for the cache functions            */
 
 #undef  LOCK
-#define LOCK()    MUTEX_Lock   ( engine->lock )
+#define LOCK()    MUTEX_Lock   ( _engine->lock )
 
 #undef  UNLOCK
-#define UNLOCK()  MUTEX_Release( engine->lock )
+#define UNLOCK()  MUTEX_Release( _engine->lock )
 
 /*******************************************************************
  *
@@ -59,7 +59,7 @@
  ******************************************************************/
 
   static
-  PList_Element  Element_New( PEngine_Instance  engine )
+  PList_Element  Element_New( PEngine_Instance  _engine )
   {
     PList_Element  element;
 
@@ -101,7 +101,7 @@
  ******************************************************************/
 
   static
-  void  Element_Done( PEngine_Instance  engine,
+  void  Element_Done( PEngine_Instance  _engine,
                       PList_Element     element )
   {
     LOCK();
@@ -146,12 +146,12 @@
  ******************************************************************/
 
   LOCAL_FUNC
-  TT_Error  Cache_Create( PEngine_Instance  engine,
+  TT_Error  Cache_Create( PEngine_Instance  _engine,
                           PCache_Class      clazz,
                           TCache*           cache,
                           TMutex*           lock )
   {
-    cache->engine     = engine;
+    cache->engine     = _engine;
     cache->clazz      = clazz;
     cache->lock       = lock;
     cache->idle_count = 0;
@@ -456,8 +456,12 @@
 
 
   LOCAL_FUNC
-  TT_Error  TTCache_Init( PEngine_Instance  engine )
+  TT_Error  TTCache_Init( TT_Engine  engine )
   {
+    PEngine_Instance  _engine = (PEngine_Instance)DEREF( engine );
+
+    ECCheckLMemChunk( _engine );
+
     /* Create list elements mutex */
     FREE_Elements = NULL;
     return TT_Err_Ok;
@@ -465,7 +469,7 @@
 
 
   LOCAL_FUNC
-  TT_Error  TTCache_Done( PEngine_Instance  engine )
+  TT_Error  TTCache_Done( PEngine_Instance  _engine )
   {
     /* We don't protect this function, as this is the end of the engine's */
     /* execution..                                                        */

@@ -52,6 +52,8 @@
 
     if ( ALLOC( exts, sizeof ( TExtension_Registry ) ) )
       return error;
+    
+    ECCheckBounds( exts );
 
     exts->num_extensions        = 0;
     exts->cur_offset            = 0;
@@ -94,12 +96,11 @@
     if ( p >= TT_MAX_EXTENSIONS )
       return TT_Err_Too_Many_Extensions;
 
+    
     clazz          = exts->classes + p;
-    clazz->id      = id;
     clazz->size    = size;
     clazz->build   = create;
     clazz->destroy = destroy;
-
     clazz->offset  = exts->cur_offset;
 
     exts->num_extensions++;
@@ -124,7 +125,7 @@
     if ( !face->extension )
       return TT_Err_Extensions_Unsupported;
 
-    registry = (PExtension_Registry)ENGINE_ELEMENT(face->engine, extension_component);
+    registry = face->engine->extension_component;
 
     for ( n = 0; n < face->n_extensions; n++ )
     {

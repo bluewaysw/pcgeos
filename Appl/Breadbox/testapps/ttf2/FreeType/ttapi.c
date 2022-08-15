@@ -135,13 +135,15 @@
     *engine = newEngine;
 
 #undef  TT_FAIL
+#undef  GTT_FAIL
 #define TT_FAIL( x )  ( error = x (_engine) ) != TT_Err_Ok
+#define GTT_FAIL( x )  ( error = x (*engine) ) != TT_Err_Ok
 
     /* Initalize components */
     _engine = DEREF( *engine );
     ECCheckBounds( _engine );
-    if ( TT_FAIL( TTFile_Init  )  ||
-         TT_FAIL( TTCache_Init )  ||
+    if ( GTT_FAIL( TTFile_Init  )  ||
+         GTT_FAIL( TTCache_Init )  ||
 #ifdef TT_CONFIG_OPTION_EXTEND_ENGINE
          TT_FAIL( TTExtend_Init ) ||
 #endif
@@ -150,6 +152,7 @@
        goto Fail;
 
 #undef TT_FAIL
+#undef GTT_FAIL
 
     /* create the engine lock */
     MUTEX_Create( _engine->lock );

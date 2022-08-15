@@ -548,10 +548,9 @@
     TT_Error          error;
 
 
-    ECCheckLMemChunk( engine );
+    ECCheckLMemChunk( DEREF( engine ) );
     
     _engine = DEREF( engine );
-    ECCheckBounds( _engine );
 
     if ( !engine || !_engine )
       return TT_Err_Invalid_Engine;

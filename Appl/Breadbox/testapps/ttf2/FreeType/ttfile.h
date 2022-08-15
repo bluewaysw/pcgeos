@@ -42,7 +42,7 @@
 
   /* Initialize file component */
   LOCAL_DEF
-  TT_Error  TTFile_Init( PEngine_Instance  engine );
+  TT_Error  TTFile_Init( TT_Engine  engine );
 
   /* Done with file component */
   LOCAL_DEF
