@@ -68,9 +68,9 @@
   /* Finalize the extension component */
 
   LOCAL_FUNC
-  TT_Error  TTExtend_Done( PEngine_Instance  engine )
+  TT_Error  TTExtend_Done( TT_Engine  engine )
   {
-    FREE( engine->extension_component );
+    FREE( ELEMENT( PEngine_Instance, engine, extension_component ) );
     return TT_Err_Ok;
   }
 

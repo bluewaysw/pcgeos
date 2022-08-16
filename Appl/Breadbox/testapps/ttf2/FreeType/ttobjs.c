@@ -1477,16 +1477,19 @@
  ******************************************************************/
 
   LOCAL_FUNC
-  TT_Error  TTObjs_Done( PEngine_Instance  engine )
+  TT_Error  TTObjs_Done( TT_Engine  engine )
   {
+    CHECK_CHUNK( engine );
+
+    
     /* destroy all active faces and contexts before releasing the */
     /* caches                                                     */
-    Cache_Destroy( (TCache*)engine->objs_exec_cache );
-    Cache_Destroy( (TCache*)engine->objs_face_cache );
+    Cache_Destroy( (TCache*)ELEMENT( PEngine_Instance, engine, objs_exec_cache ) );
+    Cache_Destroy( (TCache*)ELEMENT( PEngine_Instance, engine, objs_face_cache ) );
 
     /* Now frees caches and cache classes */
-    FREE( engine->objs_exec_cache );
-    FREE( engine->objs_face_cache );
+    FREE( ELEMENT( PEngine_Instance, engine, objs_exec_cache ) );
+    FREE( ELEMENT( PEngine_Instance, engine, objs_face_cache ) );
 
     return TT_Err_Ok;
   }

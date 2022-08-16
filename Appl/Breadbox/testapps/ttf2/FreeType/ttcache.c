@@ -35,6 +35,7 @@
 /* The macro FREE_Elements aliases the current engine instance's */
 /* free list_elements recycle list.                              */
 #define FREE_Elements  ( _engine->list_free_elements )
+#define GFREE_Elements ( ELEMENT( PEngine_Instance, engine, list_free_elements ) )
 
 /* Redefinition of LOCK and UNLOCK macros for New_Element and Done_Element */
 /* Note: The macros are redefined below for the cache functions            */
@@ -458,18 +459,16 @@
   LOCAL_FUNC
   TT_Error  TTCache_Init( TT_Engine  engine )
   {
-    PEngine_Instance  _engine = (PEngine_Instance)DEREF( engine );
-
-    ECCheckLMemChunk( _engine );
+    CHECK_CHUNK( engine );
 
     /* Create list elements mutex */
-    FREE_Elements = NULL;
+    GFREE_Elements = NULL;
     return TT_Err_Ok;
   }
 
 
   LOCAL_FUNC
-  TT_Error  TTCache_Done( PEngine_Instance  _engine )
+  TT_Error  TTCache_Done( TT_Engine  engine )
   {
     /* We don't protect this function, as this is the end of the engine's */
     /* execution..                                                        */
@@ -477,7 +476,7 @@
 
 
     /* frees the recycled list elements */
-    element = FREE_Elements;
+    element = GFREE_Elements;
     while ( element )
     {
       next = element->next;

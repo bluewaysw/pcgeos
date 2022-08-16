@@ -115,7 +115,6 @@
     TT_Engine         newEngine;
     TT_Error          error;
 
-    CHECK_LMEM( trueTypeHandle );
   
     /* first of all, initialize memory sub-system */
     error = TTMemory_Init();
@@ -181,24 +180,20 @@
   EXPORT_FUNC
   TT_Error  TT_Done_FreeType( TT_Engine  engine )
   {
-    PEngine_Instance  _engine;
-    
-    
-    ECCheckLMemChunk( DEREF( engine ) );
-    _engine = DEREF( engine );
+    CHECK_CHUNK( engine );
 
-    if ( !engine || !_engine )
+    if ( !engine )
       return TT_Err_Ok;
 
-    MUTEX_Destroy( _engine->lock );
+    MUTEX_Destroy( ELEMENT( PEngine_Instance, engine, lock ) );
 
     TTRaster_Done( engine );
-    TTObjs_Done  ( _engine );
+    TTObjs_Done  ( engine );
 #ifdef TT_CONFIG_OPTION_EXTEND_ENGINE
-    TTExtend_Done( _engine );
+    TTExtend_Done( engine );
 #endif
-    TTCache_Done ( _engine );
-    TTFile_Done  ( _engine );
+    TTCache_Done ( engine );
+    TTFile_Done  ( engine );
     GFREE( engine );
 
     TTMemory_Done();

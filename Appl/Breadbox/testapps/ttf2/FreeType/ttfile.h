@@ -46,7 +46,7 @@
 
   /* Done with file component */
   LOCAL_DEF
-  TT_Error  TTFile_Done( PEngine_Instance  engine );
+  TT_Error  TTFile_Done( TT_Engine  engine );
 
 
   /**********************************************************************/

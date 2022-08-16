@@ -203,7 +203,7 @@
   TT_Error  TTCache_Init( TT_Engine  engine );
 
   LOCAL_DEF
-  TT_Error  TTCache_Done( PEngine_Instance  engine );
+  TT_Error  TTCache_Done( TT_Engine  engine );
 
 
 #ifdef __cplusplus
