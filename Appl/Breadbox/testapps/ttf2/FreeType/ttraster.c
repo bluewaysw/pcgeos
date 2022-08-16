@@ -2711,10 +2711,16 @@ TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
 #undef ras
 
   LOCAL_FUNC
-  TT_Error  TTRaster_Done( PEngine_Instance  engine )
+  TT_Error  TTRaster_Done( TT_Engine  engine )
   {
-    TRaster_Instance*  ras = (TRaster_Instance*)engine->raster_component;
+    TRaster_Instance*  ras;
 
+
+    CHECK_CHUNK( engine );
+
+    ras = (TRaster_Instance*)ELEMENT( PEngine_Instance, engine, raster_component );
+
+    CHECK_POINTER( ras );
 
     if ( !ras )
       return TT_Err_Ok;
@@ -2722,7 +2728,7 @@ TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
     FREE( ras->buff );
 
 #ifndef TT_CONFIG_OPTION_STATIC_RASTER
-    FREE( engine->raster_component );
+    FREE( ELEMENT( PEngine_Instance, engine, raster_component ) );
 #endif
 
     return TT_Err_Ok;
@@ -2730,20 +2736,20 @@ TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
 
 
   LOCAL_FUNC
-  TT_Error  TTRaster_Init( PEngine_Instance  engine )
+  TT_Error  TTRaster_Init( TT_Engine  engine )
   {
-    TT_Error  error;
-
+    TT_Error           error;
     TRaster_Instance*  ras;
+    PEngine_Instance   _engine = DEREF( engine );
 
 
 #ifdef TT_CONFIG_OPTION_STATIC_RASTER
     ras = engine->raster_component = &cur_ras;
 #else
-    if ( ALLOC( engine->raster_component, sizeof ( TRaster_Instance ) ) )
+    if ( ALLOC( _engine->raster_component, sizeof ( TRaster_Instance ) ) )
       return error;
 
-    ras = (TRaster_Instance*)engine->raster_component;
+    ras = (TRaster_Instance*)_engine->raster_component;
 #endif
 
     if ( ALLOC( ras->buff, RASTER_RENDER_POOL ) )

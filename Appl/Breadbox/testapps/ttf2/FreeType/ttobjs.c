@@ -1419,10 +1419,11 @@
   };
 
   LOCAL_FUNC
-  TT_Error  TTObjs_Init( PEngine_Instance  engine )
+  TT_Error  TTObjs_Init( TT_Engine  engine )
   {
-    PCache        face_cache, exec_cache;
-    TT_Error      error;
+    PCache           face_cache, exec_cache;
+    TT_Error         error;
+    PEngine_Instance  _engine = DEREF( engine );
 
     face_cache = 0;
     exec_cache = 0;
@@ -1432,25 +1433,25 @@
       goto Fail;
 
     /* create face cache */
-    error = Cache_Create( engine, (PCache_Class)&objs_face_class,
-                          face_cache, &engine->lock );
+    error = Cache_Create( _engine, (PCache_Class)&objs_face_class,
+                          face_cache, &_engine->lock );
 
     if ( error )
       goto Fail;
 
-    engine->objs_face_cache = face_cache;
+    _engine->objs_face_cache = face_cache;
 
-    error = Cache_Create( engine, (PCache_Class)&objs_exec_class,
-                          exec_cache, &engine->lock );
+    error = Cache_Create( _engine, (PCache_Class)&objs_exec_class,
+                          exec_cache, &_engine->lock );
     if ( error )
       goto Fail;
 
-    engine->objs_exec_cache = exec_cache;
+    _engine->objs_exec_cache = exec_cache;
 
-    engine->objs_face_class      = (PCache_Class)&objs_face_class;
-    engine->objs_instance_class  = (PCache_Class)&objs_instance_class;
-    engine->objs_execution_class = (PCache_Class)&objs_exec_class;
-    engine->objs_glyph_class     = (PCache_Class)&objs_glyph_class;
+    _engine->objs_face_class      = (PCache_Class)&objs_face_class;
+    _engine->objs_instance_class  = (PCache_Class)&objs_instance_class;
+    _engine->objs_execution_class = (PCache_Class)&objs_exec_class;
+    _engine->objs_glyph_class     = (PCache_Class)&objs_glyph_class;
 
     goto Exit;
 

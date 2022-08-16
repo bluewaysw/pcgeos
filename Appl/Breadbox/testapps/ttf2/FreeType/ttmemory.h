@@ -114,6 +114,11 @@
 #define ENGINE_ELEMENT( _handle_, _element_ ) \
   ELEMENT( PEngine_Instance, _handle_, _element_ )
 
+#define CHECK_POINTER( _ptr_ )  ECCheckBounds( _ptr_ )
+
+#define CHECK_LMEM( _handle_ )  ECCheckLMemHandle( _handle_ )
+
+#define CHECK_CHUNK( _chunk_ )  ECCheckLMemChunk( DEREF( _chunk_ ) )
 
 
   /* Allocate a block of memory of 'Size' bytes from the heap, and */

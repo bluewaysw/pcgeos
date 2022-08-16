@@ -861,7 +861,7 @@
   /*                                                                  */
   /********************************************************************/
 
-  LOCAL_DEF TT_Error  TTObjs_Init( PEngine_Instance  engine );
+  LOCAL_DEF TT_Error  TTObjs_Init( TT_Engine  engine );
   LOCAL_DEF TT_Error  TTObjs_Done( PEngine_Instance  engine );
 
 #ifdef __cplusplus

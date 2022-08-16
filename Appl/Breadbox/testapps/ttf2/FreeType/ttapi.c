@@ -112,11 +112,10 @@
   EXPORT_FUNC
   TT_Error  TT_Init_FreeType( TT_Engine*  engine )
   {
-    PEngine_Instance  _engine;
     TT_Engine         newEngine;
     TT_Error          error;
 
-    ECCheckLMemHandle( trueTypeHandle );
+    CHECK_LMEM( trueTypeHandle );
   
     /* first of all, initialize memory sub-system */
     error = TTMemory_Init();
@@ -124,10 +123,10 @@
       return error;
 
     /* Allocate engine instance */
-    if ( GALLOC( newEngine, sizeof ( TEngine_Instance ) ) )
+    if ( GALLOC( newEngine, sizeof( TEngine_Instance ) ) )
       return error;
 
-    ECCheckLMemChunk( DEREF( newEngine ) );
+    CHECK_CHUNK( newEngine );
 
     if ( !newEngine )
       return TT_Err_Invalid_Engine;
@@ -135,15 +134,11 @@
     *engine = newEngine;
 
 #undef  TT_FAIL
-#undef  GTT_FAIL
-#define TT_FAIL( x )  ( error = x (_engine) ) != TT_Err_Ok
-#define GTT_FAIL( x )  ( error = x (*engine) ) != TT_Err_Ok
+#define TT_FAIL( x )  ( error = x (*engine) ) != TT_Err_Ok
 
     /* Initalize components */
-    _engine = DEREF( *engine );
-    ECCheckBounds( _engine );
-    if ( GTT_FAIL( TTFile_Init  )  ||
-         GTT_FAIL( TTCache_Init )  ||
+    if ( TT_FAIL( TTFile_Init  )  ||
+         TT_FAIL( TTCache_Init )  ||
 #ifdef TT_CONFIG_OPTION_EXTEND_ENGINE
          TT_FAIL( TTExtend_Init ) ||
 #endif
@@ -152,10 +147,9 @@
        goto Fail;
 
 #undef TT_FAIL
-#undef GTT_FAIL
 
     /* create the engine lock */
-    MUTEX_Create( _engine->lock );
+    MUTEX_Create( ELEMENT( PEngine_Instance, engine, lock ) );
     return TT_Err_Ok;
 
   Fail:
@@ -198,7 +192,7 @@
 
     MUTEX_Destroy( _engine->lock );
 
-    TTRaster_Done( _engine );
+    TTRaster_Done( engine );
     TTObjs_Done  ( _engine );
 #ifdef TT_CONFIG_OPTION_EXTEND_ENGINE
     TTExtend_Done( _engine );

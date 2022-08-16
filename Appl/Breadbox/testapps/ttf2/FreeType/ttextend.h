@@ -133,7 +133,7 @@
 #ifdef TT_CONFIG_OPTION_EXTEND_ENGINE
   /* Initialize the extension component */
   LOCAL_DEF
-  TT_Error  TTExtend_Init( PEngine_Instance  engine );
+  TT_Error  TTExtend_Init( TT_Engine  engine );
 
   /* Finalize the extension component */
   LOCAL_DEF

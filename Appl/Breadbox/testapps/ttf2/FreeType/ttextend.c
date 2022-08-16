@@ -44,20 +44,22 @@
   /* Initialize the extension component */
 
   LOCAL_FUNC
-  TT_Error  TTExtend_Init( PEngine_Instance  engine )
+  TT_Error  TTExtend_Init( TT_Engine  engine )
   {
     TT_Error             error;
     PExtension_Registry  exts;
+    
 
+    CHECK_CHUNK( engine );
 
     if ( ALLOC( exts, sizeof ( TExtension_Registry ) ) )
       return error;
     
-    ECCheckBounds( exts );
+    CHECK_POINTER( exts );
 
     exts->num_extensions        = 0;
     exts->cur_offset            = 0;
-    engine->extension_component = (void*)exts;
+    ELEMENT( PEngine_Instance, engine, extension_component ) = (void*)exts;
 
     return TT_Err_Ok;
   }
@@ -98,6 +100,7 @@
 
     
     clazz          = exts->classes + p;
+    clazz->id      = id;
     clazz->size    = size;
     clazz->build   = create;
     clazz->destroy = destroy;
