@@ -512,13 +512,22 @@ static void _pascal SetBarState (LevelsBarStates levelsBarStates);
 	GTXI_text	= "Random text for the style menus";
 	HINT_DEFAULT_FOCUS;
 	HINT_DEFAULT_TARGET;
+	/*
+	 * Set up a VisTextCharAttr chunk to specify another font and size.
+	 * This is necessary because the applying of certain styles to bitmap fonts fails.
+	 */
+	ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @FooCharAttrs;
 }
+
+@chunk VisTextCharAttr FooCharAttrs = CHAR_ATTR_FONT_SIZE(FID_DTC_URW_SANS, 18);
 
 @end	Interface;
 
 /*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		Global Data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+#define vfar  _far 
 
 #ifdef __HIGHC__
 _pragma_const_in_code;
@@ -765,7 +774,7 @@ REVISION HISTORY:
     @callsuper ();
 
     /* Get ahold of the application's init. file features key.	*/
-    featuresIniKey = MemLockFixedOrMovable (featuresKey);
+    featuresIniKey = MemLockFixedOrMovable ((void*)featuresKey);
 
     /* Get the category */
     @call self::MSG_META_GET_INI_CATEGORY(category);
@@ -779,7 +788,7 @@ REVISION HISTORY:
 	defaultUserLevel = UserGetDefaultLaunchLevel ();
 
 	/* Extract the feature settings data from the table.	*/
-	featuresTable = MemLockFixedOrMovable (settingsTable);
+	featuresTable = MemLockFixedOrMovable ((void*)settingsTable);
 	tableFeaturesValue = featuresTable [defaultUserLevel].LSE_features;
 	tableBarStates = featuresTable [defaultUserLevel].LSE_barStates;
 
@@ -797,12 +806,12 @@ REVISION HISTORY:
 	SetBarState (tableBarStates);
 
 	/* Unlock the levels settings table.	*/
-	MemUnlockFixedOrMovable (settingsTable);
+	MemUnlockFixedOrMovable ((void*)settingsTable);
 
     }	/* End of if Not InitFileReadInteger...	*/
 
     /* Nuke the application's features init. file key.	*/
-    MemUnlockFixedOrMovable (featuresKey);
+    MemUnlockFixedOrMovable ((void*)featuresKey);
 }	/* End of MSG_META_{LOAD,RESET}_OPTIONS.	*/
 
 
@@ -861,7 +870,7 @@ REVISION HISTORY:
 		 GeodeGetOptrNS(@AMenu),
 		 (GenAppUsabilityTuple *) levelsTable,
 		 sizeof (usabilityTable) / sizeof (usabilityTable [0]),
-		 usabilityTable,
+		 (void*)usabilityTable,
 		 appOpeningFlag,
 		 oldLevel,
 		 level,
@@ -1006,7 +1015,7 @@ REVISION HISTORY:
     LevelsSettingsEntry	*featuresTable;
 
     /* First, lock down the block containing the tables.	*/
-    featuresTable = MemLockFixedOrMovable (settingsTable);
+    featuresTable = MemLockFixedOrMovable ((void*)settingsTable);
 
     /*
      * Figure out bar and level/features that correspond to the given
@@ -1064,7 +1073,7 @@ REVISION HISTORY:
     SetBarState (featuresTable [closestLevel].LSE_barStates);
 
     /* Unlock the levels settings table.	*/
-    MemUnlockFixedOrMovable (settingsTable);
+    MemUnlockFixedOrMovable ((void*)settingsTable);
 }	/* End of MSG_LEVELS_APPLICATION_SET_USER_LEVEL.	*/
 
 
