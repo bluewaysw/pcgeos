@@ -12,6 +12,7 @@
 #       Name    Date            Description
 #       ----    ----            -----------
 #       NF      9/4/96          Initial version
+#		RainerB	8/5/2022		Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:
 #      This file contains the geode parameters for the Print sample
@@ -79,9 +80,9 @@ library spool
 # object blocks, fixed code resources, or data resources that are read-only.
 # Standard discardable code resources do not need to be mentioned.
 #
-resource APPLICATION ui-object
-resource INTERFACE   ui-object
-resource CONTENT     object
+resource Application ui-object
+resource Interface   ui-object
+resource Content     object
 #
 # Classes defined for this geode.
 #
