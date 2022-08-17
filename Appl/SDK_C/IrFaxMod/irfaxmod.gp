@@ -7,6 +7,11 @@
 #
 # AUTHOR:	Edwin Yu, Feb  1, 1996
 #
+#       Name    Date            Description
+#       ----    ----            -----------
+#       ??		??		        Initial version
+#		RainerB	4/27/2022		Resource names adjusted for Watcom compatibility
+#
 # Description:  This is an app testing the Ircomm library.
 # 
 #
@@ -57,9 +62,9 @@ library	streamc
 # Resources: list all resource blocks which are used by the application.
 # (standard discardable code resources do not need to be mentioned).
 #
-resource APPRESOURCE	ui-object
-resource INTERFACE	ui-object
-resource CONSTANTDATA	shared, lmem, read-only
+resource AppResource	ui-object
+resource Interface	ui-object
+resource ConstantData	shared, lmem, read-only
 #
 # Exported Classes
 #
