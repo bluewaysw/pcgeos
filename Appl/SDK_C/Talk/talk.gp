@@ -7,6 +7,11 @@
 #
 # AUTHOR:	Eric Weber, Dec  7, 1994
 #
+# REVISION HISTORY:
+#       Name    Date            Description
+#       ----    ----            -----------
+#       EW		7/12/94	        Initial version
+#		RainerB	4/27/2022		Resource names adjusted for Watcom compatibility
 #
 # 
 #
@@ -72,8 +77,8 @@ library netutils noload
 # object blocks, fixed code resources, or data resources that are read-only.
 # Standard discardable code resources do not need to be mentioned.
 #
-resource APPRESOURCE ui-object
-resource INTERFACE ui-object
+resource AppResource ui-object
+resource Interface ui-object
 
 export TalkProcessClass
 export TalkThreadClass

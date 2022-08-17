@@ -8,6 +8,12 @@
 #
 # AUTHOR:	Ed Ballot 2/95
 #
+# REVISION HISTORY:
+#       Name    Date            Description
+#       ----    ----            -----------
+#       EB		2/95	        Initial version
+#		RainerB	4/27/2022		Resource names adjusted for Watcom compatibility
+#
 # DESCRIPTION:	Standard .gp stuff.
 #
 # RCS STAMP:
@@ -33,5 +39,5 @@ appobj	FloatKbdApp
 library	geos
 library	ui
 #
-resource APPRESOURCE object
-resource INTERFACE object
+resource AppResource object
+resource Interface object

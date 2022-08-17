@@ -8,6 +8,12 @@
 #
 # AUTHOR:	Insik Rhee, 11/92
 #
+# REVISION HISTORY:
+#       Name    Date            Description
+#       ----    ----            -----------
+#       IR		11/92	        Initial version
+#		RainerB	4/27/2022		Resource names adjusted for Watcom compatibility
+#
 # DESCRIPTION:	This app tests the network library and the comm driver
 #
 # RCS STAMP:
@@ -28,7 +34,7 @@ library		ui
 # this app uses the network library, so we declare it here
 library		net
 
-resource APPRESOURCE 	ui-object
-resource INTERFACE 	ui-object
-resource MENUINTERFACE	ui-object
-resource DISPLAYINTERFACE ui-object
+resource AppResource 	ui-object
+resource Interface 	ui-object
+resource MenuInterface	ui-object
+resource DisplayInterface ui-object
