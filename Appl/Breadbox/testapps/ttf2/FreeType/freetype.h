@@ -1078,22 +1078,6 @@
 
   /* ----------------- character mapping support --------------- */
 
-  /* Return the number of character mappings found in this file. */
-  /* Returns -1 in case of failure (invalid face handle).        */
-  /*                                                             */
-  /* DON'T USE THIS FUNCTION!  IT HAS BEEN DEPRECATED!           */
-  /*                                                             */
-  /* It is retained for backwards compatibility only and will    */
-  /* fail on 16bit systems.                                      */
-  /*                                                             */
-  /* You can now get the charmap count in the `num_CharMaps'     */
-  /* field of a face's properties.                               */
-  /*                                                             */
-
-  EXPORT_DEF
-  int  TT_Get_CharMap_Count( TT_Face  face );
-
-
   /* Return the ID of charmap number `charmapIndex' of a given face */
   /* used to enumerate the charmaps present in a TrueType file.     */
 
@@ -1128,21 +1112,6 @@
 
 
   /* --------------------- names table support ------------------- */
-
-  /* Return the number of name strings found in the name table.  */
-  /* Returns -1 in case of failure (invalid face handle).        */
-  /*                                                             */
-  /* DON'T USE THIS FUNCTION!  IT HAS BEEN DEPRECATED!           */
-  /*                                                             */
-  /* It is retained for backwards compatibility only and will    */
-  /* fail on 16bit systems.                                      */
-  /*                                                             */
-  /* You can now get the number of name strings in a face with   */
-  /* the `num_Names' field of its properties.                    */
-
-  EXPORT_DEF
-  int  TT_Get_Name_Count( TT_Face  face );
-
 
   /* Return the ID of the name number `nameIndex' of a given face */
   /* used to enumerate the charmaps present in a TrueType file.   */

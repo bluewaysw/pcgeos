@@ -1962,34 +1962,6 @@ TT_Error  TT_Get_Outline_Region( TT_Engine       engine,
 
 /*******************************************************************
  *
- *  Function    :  TT_Get_CharMap_Count
- *
- *  Description :  Returns the number of charmaps in a given face.
- *
- *  Input  :  face   face object handle
- *
- *  Output :  Number of tables. -1 in case of error (bad handle).
- *
- *  Note   :  DON'T USE THIS FUNCTION! IT HAS BEEN DEPRECATED!
- *
- *            It is retained for backwards compatibility only and will
- *            fail on 16bit systems.
- *
- *  MT-Safe : YES !
- *
- ******************************************************************/
-
-  EXPORT_FUNC
-  int  TT_Get_CharMap_Count( TT_Face  face )
-  {
-    PFace  faze = HANDLE_Face( face );
-
-    return ( faze ? faze->numCMaps : -1 );
-  }
-
-
-/*******************************************************************
- *
  *  Function    :  TT_Get_CharMap_ID
  *
  *  Description :  Returns the ID of a given charmap.
@@ -2123,41 +2095,6 @@ TT_Error  TT_Get_Outline_Region( TT_Engine       engine,
       return 0;  /* we return 0 in case of invalid char map */
 
     return CharMap_Index( cmap, charCode );
-  }
-
-
-/*******************************************************************
- *
- *  Function    :  TT_Get_Name_Count
- *
- *  Description :  Returns the number of strings found in the
- *                 name table.
- *
- *  Input  :  face   face handle
- *
- *  Output :  number of strings.
- *
- *  Notes  :  Returns -1 on error (invalid handle).
- *
- *            DON'T USE THIS FUNCTION! IT HAS BEEN DEPRECATED!
- *
- *            It is retained for backwards compatibility only and will
- *            fail on 16bit systems.
- *
- *  MT-Safe : YES!
- *
- ******************************************************************/
-
-  EXPORT_FUNC
-  int  TT_Get_Name_Count( TT_Face  face )
-  {
-    PFace  faze = HANDLE_Face( face );
-
-
-    if ( !faze )
-      return -1;
-
-    return faze->nameTable.numNameRecords;
   }
 
 
@@ -2317,36 +2254,6 @@ TT_Error  TT_Get_Outline_Region( TT_Engine       engine,
 
     return Load_TrueType_Any( faze, tag, offset, buffer, length );
   }
-
-
-  /************************ callback definition ******************/
-
-  /* Register a new callback to the TrueType engine -- this should */
-  /* only be used by higher-level libraries, not typical clients   */
-  /*                                                               */
-  /* This is not part of the current FreeType release, thus        */
-  /* undefined...                                                  */
-
-#if 0
-  EXPORT_FUNC
-  TT_Error  TT_Register_Callback( TT_Engine  engine,
-                                  int        callback_id,
-                                  void*      callback_ptr )
-  {
-    PEngine_Instance  eng = HANDLE_Engine( engine );
-
-
-    if ( !eng )
-      return TT_Err_Invalid_Argument;
-
-    /* currently, we only support one callback */
-    if (callback_id != TT_Callback_Glyph_Outline_Load)
-      return TT_Err_Invalid_Argument;
-
-    eng->glCallback = (TT_Glyph_Loader_Callback)callback_ptr;
-    return TT_Err_Ok;
-  }
-#endif /* 0 */
 
 
 /* END */
