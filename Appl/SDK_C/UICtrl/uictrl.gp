@@ -8,6 +8,12 @@
 #
 # AUTHOR:	Tony Requist
 #
+# REVISION HISTORY:
+#       Name    Date            Description
+#       ----    ----            -----------
+#       Tony	4/1/91	        Initial version
+#		RainerB	8/7/2022		Resource names adjusted for Watcom compatibility
+#
 # DESCRIPTION:	This file contains Geode definitions for the "UICtrl" sample
 #		application. This file is read by the GLUE linker to
 #		build this application.
@@ -39,11 +45,11 @@ library ansic
 library	ui
 library text
 #
-resource APPRESOURCE ui-object
-resource INTERFACE ui-object
-resource CONTROLSTRINGS lmem read-only shared
-resource TEXTSTYLECONTROLTOOLBOXUI ui-object read-only shared
-resource TEXTSTYLECONTROLUI ui-object read-only shared
+resource AppResource ui-object
+resource Interface ui-object
+resource ControlStrings lmem read-only shared
+resource TextStyleControlToolboxUI ui-object read-only shared
+resource TextStyleControlUI ui-object read-only shared
 #
 # Exported entry points
 #
