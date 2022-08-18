@@ -59,7 +59,7 @@
   /* Should only be used for a new face object's main stream. */
 
   LOCAL_DEF
-  TT_Error  TT_Open_Stream( const TT_Text* name,
+  TT_Error  TT_Open_Stream( FileHandle     file,
                             TT_Stream*     stream );
 
 
@@ -198,6 +198,9 @@
         (frame).cursor  = NULL; \
         (frame).size    = 0;    \
       }
+
+
+#define CHECK_FILE( _handle_ )  ECCheckFileHandle( _handle_ )
 
 
 /* The macros FRAME_ARGS and FRAME_ARG let us build a thread-safe   */

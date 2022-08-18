@@ -693,7 +693,7 @@
 
   EXPORT_DEF
   TT_Error  TT_Open_Face( TT_Engine       engine,
-                          const TT_Text*  fontPathName,
+                          FileHandle      file,
                           TT_Face*        face );
 
 

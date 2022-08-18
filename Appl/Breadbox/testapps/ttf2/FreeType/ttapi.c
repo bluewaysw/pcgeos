@@ -222,7 +222,7 @@
 
   EXPORT_FUNC
   TT_Error  TT_Open_Face( TT_Engine       engine,
-                          const TT_Text*  fontPathName,
+                          FileHandle      file,
                           TT_Face*        face )
   {
     PEngine_Instance  _engine;
@@ -232,14 +232,16 @@
     PFace             _face;
 
 
-    ECCheckLMemChunk( DEREF( engine ) );
+    CHECK_FILE( file );
+    CHECK_CHUNK( engine );
+    
     _engine = DEREF( engine );
 
     if ( !engine || !_engine )
       return TT_Err_Invalid_Engine;
 
     /* open the file */
-    error = TT_Open_Stream( fontPathName, &stream );
+    error = TT_Open_Stream( file, &stream );
     if ( error )
       return error;
 

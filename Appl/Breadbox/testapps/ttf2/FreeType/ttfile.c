@@ -56,10 +56,6 @@
 #include "ttmemory.h"
 #include "ttfile.h"     /* our prototypes */
 
-#ifdef __GEOS__
-#include <geos.h>
-#include <file.h>
-#endif    /* ifdef __GEOS__ */
 
 /* required by the tracing mode */
 #undef  TT_COMPONENT
@@ -99,15 +95,8 @@
 
   struct  TStream_Rec_
   {
-    Bool        opened;              /* is the stream handle opened ?    */
-    TT_Text*    name;                /* the file's pathname              */
     Long        position;            /* current position within the file */
-
-#ifdef __GEOS__
     FileHandle  file;                /* FreeGEOS file handle             */
-#else
-    FILE*       file;                /* file handle                      */
-#endif    /* ifdef __GEOS__ */
     Long        base;                /* stream base in file              */
     Long        size;                /* stream size in file              */
   };
@@ -505,7 +494,7 @@
   {
     PStream_Rec  rec = STREAM2REC( input_stream );
 
-    return TT_Open_Stream( rec->name, copy );
+    return TT_Open_Stream( rec->file, copy );
   }
 
 
@@ -692,48 +681,19 @@
 
   TT_Error  Stream_Activate( PStream_Rec  stream )
   {
-    if ( !stream->opened )
+    if ( !stream->file )
+      return TT_Err_Could_Not_ReOpen_File;
+
+    /* A newly created stream has a size field of -1 */
+    if ( stream->size < 0 )
+      stream->size = FileSize( stream->file );
+
+    /* Reset cursor in file */
+    if ( stream->position )
     {
-#ifdef __GEOS__
-      if ( (stream->file = FileOpen( (TT_Text*)stream->name, FILE_ACCESS_R | FILE_DENY_W)) == NullHandle )
-#else
-      if ( (stream->file = fopen( (TT_Text*)stream->name, "rb" )) == 0 )
-#endif    /* ifdef __GEOS__ */
-        return TT_Err_Could_Not_ReOpen_File;
-
-      stream->opened = TRUE;
-
-      /* A newly created stream has a size field of -1 */
-      if ( stream->size < 0 )
-      {
-#ifdef __GEOS__
-        stream->size = FileSize( stream->file );
-#else
-        fseek( stream->file, 0, SEEK_END );
-        stream->size = ftell( stream->file );
-        fseek( stream->file, 0, SEEK_SET );
-#endif    /* ifdef __GEOS__ */
-      }
-
-      /* Reset cursor in file */
-      if ( stream->position )
-      {
-#ifdef __GEOS__
-        FilePos( stream->file, stream->position, FILE_POS_START);
-        if ( ThreadGetError() != NO_ERROR_RETURNED )
-        {
-          /* error during seek */
-          FileClose( stream->file, FALSE );
-#else
-        if ( fseek( stream->file, stream->position, SEEK_SET ) != 0 )
-        {
-          /* error during seek */
-          fclose( stream->file );
-#endif    /* ifdef __GEOS__ */
-          stream->opened = FALSE;
-          return TT_Err_Could_Not_ReSeek_File;
-        }
-      }
+      FilePos( stream->file, stream->position, FILE_POS_START);
+      if ( ThreadGetError() != NO_ERROR_RETURNED )
+        return TT_Err_Could_Not_ReSeek_File;
     }
     return TT_Err_Ok;
   }
@@ -760,19 +720,8 @@
 
   static  TT_Error  Stream_Deactivate( PStream_Rec  stream )
   {
-    if ( stream->opened )
-    {
-      /* Save its current position within the file */
-#ifdef __GEOS__
-      stream->position = FilePos( stream->file, 0, FILE_POS_RELATIVE );  
-      FileClose( stream->file, FALSE );
-#else
-      stream->position = ftell( stream->file );
-      fclose( stream->file );
-#endif    /* ifdef __GEOS__ */
-      stream->file   = 0;
-      stream->opened = FALSE;
-    }
+    /* Save its current position within the file */
+    stream->position = FilePos( stream->file, 0, FILE_POS_RELATIVE );  
 
     return TT_Err_Ok;
   }
@@ -821,37 +770,28 @@
  ******************************************************************/
 
   LOCAL_FUNC
-  TT_Error  TT_Open_Stream( const TT_Text*  filepathname,
+  TT_Error  TT_Open_Stream( FileHandle      file,
                             TT_Stream*      stream )
   {
     Int          len;
     TT_Error     error;
     PStream_Rec  stream_rec;
 
+    CHECK_FILE( file );
+
     if ( ALLOC( *stream, sizeof ( TStream_Rec ) ) )
       return error;
 
     stream_rec = STREAM2REC( *stream );
 
-#ifdef __GEOS__
-    stream_rec->file     = NullHandle;
-#else
-    stream_rec->file     = NULL;
-#endif    /* ifdef __GEOS__ */
+    stream_rec->file     = file;
     stream_rec->size     = -1L;
     stream_rec->base     = 0;
-    stream_rec->opened   = FALSE;
     stream_rec->position = 0;
-
-    len = strlen( filepathname ) + 1;
-    if ( ALLOC( stream_rec->name, len ) )
-      goto Fail;
-
-    strncpy( stream_rec->name, filepathname, len );
 
     error = Stream_Activate( stream_rec );
     if ( error )
-      goto Fail_Activate;
+      goto Fail;
 
 #ifndef TT_CONFIG_OPTION_THREAD_SAFE
     CUR_Stream = stream_rec;
@@ -859,8 +799,6 @@
 
     return TT_Err_Ok;
 
-  Fail_Activate:
-    FREE( stream_rec->name );
   Fail:
     FREE( stream_rec );
     return error;
@@ -886,7 +824,6 @@
 
 
     Stream_Deactivate( rec );
-    FREE( rec->name );
     FREE( rec );
 
     HANDLE_Set( *stream, NULL );
@@ -943,12 +880,8 @@
   {
     position += CUR_Stream->base;
 
-#ifdef __GEOS__
     FilePos( CUR_Stream->file, position, FILE_POS_START );
     if ( ThreadGetError() != NO_ERROR_RETURNED )  
-#else
-    if ( fseek( CUR_Stream->file, position, SEEK_SET ) )
-#endif    /* ifdef __GEOS__ */
       return TT_Err_Invalid_File_Offset;
 
     return TT_Err_Ok;
@@ -1190,38 +1123,6 @@
 
     return getlong;
   }
-
-
-/*******************************************************************
- *
- *  Function    :  GET_ULong
- *
- *  Description :  Extracts an unsigned long from the frame.
- *
- *  Input  :  None or current frame
- *
- *  Output :  Extracted ulong.
- *
- ******************************************************************/
-#if 0
-  EXPORT_FUNC
-  ULong  TT_Get_ULong( FRAME_ARG )
-  {
-    ULong  getlong;
-
-
-    CHECK_FRAME( CUR_Frame, 4 );
-
-    getlong = ( ((ULong)CUR_Frame.cursor[0] << 24) |
-                ((ULong)CUR_Frame.cursor[1] << 16) |
-                ((ULong)CUR_Frame.cursor[2] << 8 ) |
-                 (ULong)CUR_Frame.cursor[3] );
-
-    CUR_Frame.cursor += 4;
-
-    return getlong;
-  }
-#endif
 
 
 /* END */
