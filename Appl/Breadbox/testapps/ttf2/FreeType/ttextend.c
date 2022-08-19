@@ -59,7 +59,7 @@
 
     exts->num_extensions        = 0;
     exts->cur_offset            = 0;
-    ELEMENT( PEngine_Instance, engine, extension_component ) = (void*)exts;
+    ENGINE_ELEMENT( extension_component ) = (void*)exts;
 
     return TT_Err_Ok;
   }
@@ -70,7 +70,7 @@
   LOCAL_FUNC
   TT_Error  TTExtend_Done( TT_Engine  engine )
   {
-    FREE( ELEMENT( PEngine_Instance, engine, extension_component ) );
+    FREE( ENGINE_ELEMENT( extension_component ) );
     return TT_Err_Ok;
   }
 
@@ -78,7 +78,7 @@
   /* Register a new extension */
 
   EXPORT_FUNC
-  TT_Error  TT_Register_Extension( PEngine_Instance  engine,
+  TT_Error  TT_Register_Extension( TT_Engine         engine,
                                    Long              id,
                                    Long              size,
                                    PExt_Constructor  create,
@@ -89,7 +89,7 @@
     Int                  p;
 
 
-    exts = (PExtension_Registry)engine->extension_component;
+    exts = (PExtension_Registry)ENGINE_ELEMENT( extension_component );
     if ( !exts )
       return TT_Err_Ok;
 
@@ -120,6 +120,7 @@
                               Long    extension_id,
                               void**  extension_block )
   {
+    TT_Engine            engine = face->engine;
     PExtension_Registry  registry;
     PExtension_Class     clazz;
     Int                  n;
@@ -128,7 +129,7 @@
     if ( !face->extension )
       return TT_Err_Extensions_Unsupported;
 
-    registry = face->engine->extension_component;
+    registry = ENGINE_ELEMENT( extension_component );
 
     for ( n = 0; n < face->n_extensions; n++ )
     {
@@ -150,14 +151,14 @@
   LOCAL_FUNC
   TT_Error  Extension_Destroy( PFace  face )
   {
-    PEngine_Instance     engine = face->engine;
+    TT_Engine            engine = face->engine;
     PExtension_Registry  registry;
     PExtension_Class     clazz;
     Int                  n;
     PByte                ext;
 
 
-    registry = (PExtension_Registry)engine->extension_component;
+    registry = (PExtension_Registry)ENGINE_ELEMENT( extension_component );
 
     for ( n = 0; n < face->n_extensions; n++ )
     {
@@ -183,7 +184,7 @@
   LOCAL_FUNC
   TT_Error  Extension_Create( PFace  face )
   {
-    PEngine_Instance     engine = face->engine;
+    TT_Engine            engine = face->engine;
     PExtension_Registry  registry;
     PExtension_Class     clazz;
     TT_Error             error;
@@ -191,7 +192,7 @@
     PByte                ext;
 
 
-    registry = (PExtension_Registry)engine->extension_component;
+    registry = (PExtension_Registry)ENGINE_ELEMENT( extension_component );
 
     face->n_extensions = registry->num_extensions;
     if ( ALLOC( face->extension, registry->cur_offset ) )

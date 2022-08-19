@@ -478,8 +478,7 @@
   struct  TFace_
   {
     /* parent engine instance for the face object */
-    PEngine_Instance  engine;
-    //TT_Engine  engine;
+    TT_Engine  engine;
 
     /* i/o stream */
     TT_Stream  stream;
@@ -775,8 +774,7 @@
   {
     TT_Stream         stream;     /* input stream                */
     ULong             fontIndex;  /* index of font in collection */
-    PEngine_Instance  engine;     /* parent engine instance      */
-
+    TT_Engine         engine;     /* parent engine instance      */
   };
 
   typedef struct TFont_Input_  TFont_Input;

@@ -45,7 +45,7 @@
   LOCAL_FUNC
   PExecution_Context  New_Context( PFace  face )
   {
-    PEngine_Instance    engine;
+    TT_Engine           engine;
     PExecution_Context  exec;
 
 
@@ -53,7 +53,7 @@
       return NULL;
 
     engine = face->engine;
-    CACHE_New( engine->objs_exec_cache, exec, face );
+    CACHE_New( ENGINE_ELEMENT( objs_exec_cache ), exec, face );
     return exec;
   }
 
@@ -69,57 +69,15 @@
   LOCAL_FUNC
   TT_Error  Done_Context( PExecution_Context  exec )
   {
-    PEngine_Instance  engine;
+    TT_Engine  engine;
 
 
     if ( !exec )
       return TT_Err_Ok;
 
     engine = exec->face->engine;
-    return CACHE_Done( engine->objs_exec_cache, exec );
+    return CACHE_Done( ENGINE_ELEMENT( objs_exec_cache ), exec );
   }
-
-
-#if 0
-
-/*******************************************************************
- *
- *  Function    :  New_Instance
- *
- *  Description :  Creates a new instance for a given face object.
- *
- ******************************************************************/
-
-  LOCAL_FUNC
-  PInstance  New_Instance( PFace  face )
-  {
-    PInstance  ins;
-
-
-    if ( !face )
-      return NULL;
-
-    CACHE_New( &face->instances, ins, face );
-
-    return ins;
-  }
-
-
-/*******************************************************************
- *
- *  Function    :  Done_Instance
- *
- *  Description :  Discards an instance.
- *
- ******************************************************************/
-
-  LOCAL_FUNC
-  TT_Error  Done_Instance( PInstance  instance )
-  {
-    return CACHE_Done( &instance->owner->instances, instance );
-  }
-
-#endif
 
 
 /*******************************************************************
@@ -1182,7 +1140,7 @@
   TT_Error  Face_Create( void*  _face,
                          void*  _input )
   {
-    PEngine_Instance  engine;
+    TT_Engine  engine;
 
     TFont_Input*  input = (TFont_Input*)_input;
     PFace         face  = (PFace)_face;
@@ -1196,13 +1154,13 @@
 
     MUTEX_Create( face->lock );
 
-    Cache_Create( engine,
-                  engine->objs_instance_class,
+    Cache_Create( DEREF( engine ),
+                  ENGINE_ELEMENT( objs_instance_class ),
                   &face->instances,
                   &face->lock );
 
-    Cache_Create( engine,
-                  engine->objs_glyph_class,
+    Cache_Create( DEREF( engine ),
+                  ENGINE_ELEMENT( objs_glyph_class ),
                   &face->glyphs,
                   &face->lock );
 
@@ -1484,12 +1442,12 @@
     
     /* destroy all active faces and contexts before releasing the */
     /* caches                                                     */
-    Cache_Destroy( (TCache*)ELEMENT( PEngine_Instance, engine, objs_exec_cache ) );
-    Cache_Destroy( (TCache*)ELEMENT( PEngine_Instance, engine, objs_face_cache ) );
+    Cache_Destroy( (TCache*)ENGINE_ELEMENT( objs_exec_cache ) );
+    Cache_Destroy( (TCache*)ENGINE_ELEMENT( objs_face_cache ) );
 
     /* Now frees caches and cache classes */
-    FREE( ELEMENT( PEngine_Instance, engine, objs_exec_cache ) );
-    FREE( ELEMENT( PEngine_Instance, engine, objs_face_cache ) );
+    FREE( ENGINE_ELEMENT( objs_exec_cache ) );
+    FREE( ENGINE_ELEMENT( objs_face_cache ) );
 
     return TT_Err_Ok;
   }

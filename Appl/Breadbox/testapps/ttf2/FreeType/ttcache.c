@@ -35,7 +35,7 @@
 /* The macro FREE_Elements aliases the current engine instance's */
 /* free list_elements recycle list.                              */
 #define FREE_Elements  ( _engine->list_free_elements )
-#define GFREE_Elements ( ELEMENT( PEngine_Instance, engine, list_free_elements ) )
+#define GFREE_Elements ( ENGINE_ELEMENT( list_free_elements ) )
 
 /* Redefinition of LOCK and UNLOCK macros for New_Element and Done_Element */
 /* Note: The macros are redefined below for the cache functions            */

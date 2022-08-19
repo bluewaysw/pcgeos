@@ -148,7 +148,7 @@
 #undef TT_FAIL
 
     /* create the engine lock */
-    MUTEX_Create( ELEMENT( PEngine_Instance, engine, lock ) );
+    MUTEX_Create( ENGINE_ELEMENT( lock ) );
     return TT_Err_Ok;
 
   Fail:
@@ -185,7 +185,7 @@
     if ( !engine )
       return TT_Err_Ok;
 
-    MUTEX_Destroy( ELEMENT( PEngine_Instance, engine, lock ) );
+    MUTEX_Destroy( ENGINE_ELEMENT( lock ) );
 
     TTRaster_Done( engine );
     TTObjs_Done  ( engine );
@@ -225,7 +225,6 @@
                           FileHandle      file,
                           TT_Face*        face )
   {
-    PEngine_Instance  _engine;
     TFont_Input       input;
     TT_Error          error;
     TT_Stream         stream;
@@ -235,9 +234,7 @@
     CHECK_FILE( file );
     CHECK_CHUNK( engine );
     
-    _engine = DEREF( engine );
-
-    if ( !engine || !_engine )
+    if ( !engine )
       return TT_Err_Invalid_Engine;
 
     /* open the file */
@@ -247,10 +244,10 @@
 
     input.stream    = stream;
     input.fontIndex = 0;
-    input.engine    = _engine;
+    input.engine    = engine;
 
     /* Create and load the new face object - this is thread-safe */
-    error = CACHE_New( _engine->objs_face_cache,
+    error = CACHE_New( ENGINE_ELEMENT( objs_face_cache ),
                        _face,
                        &input );
 
@@ -563,7 +560,8 @@
   EXPORT_FUNC
   TT_Error  TT_Close_Face( TT_Face  face )
   {
-    PFace  _face = HANDLE_Face( face );
+    PFace      _face  = HANDLE_Face( face );
+    TT_Engine  engine = _face->engine;
 
 
     if ( !_face )
@@ -572,7 +570,7 @@
     TT_Close_Stream( &_face->stream );
 
     /* delete the face object -- this is thread-safe */
-    return CACHE_Done( ENGINE_ELEMENT(_face->engine, objs_face_cache), _face );
+    return CACHE_Done( ENGINE_ELEMENT( objs_face_cache ), _face );
   }
 
 
@@ -1380,7 +1378,6 @@
                                  TT_F26Dot6      xOffset,
                                  TT_F26Dot6      yOffset )
   {
-    PEngine_Instance  _engine;
     TT_Engine         engine;
     TT_Error          error;
     PGlyph            _glyph = HANDLE_Glyph( glyph );
@@ -1394,7 +1391,7 @@
 
     //engine = _glyph->face->engine;
     //HANDLE_Set(engine,_engine);
-    _engine = _glyph->face->engine;
+    engine = _glyph->face->engine;
 
     outline = _glyph->outline;
     /* XXX : For now, use only dropout mode 2    */
@@ -1431,7 +1428,6 @@
                                     MemHandle     bitmapBlock,
                                     Handle        regionPath )
   {
-    PEngine_Instance  _engine;
     TT_Engine         engine;
     TT_Error          error;
     PGlyph            _glyph = HANDLE_Glyph( glyph );
@@ -1487,7 +1483,6 @@
                                GStateHandle   gstate,
                                TT_UShort      controlFlags )
   {
-    PEngine_Instance  _engine;
     TT_Engine         engine;
     TT_Error          error;
     PGlyph            _glyph = HANDLE_Glyph( glyph );
@@ -1640,19 +1635,18 @@
                                    TT_Outline*     outline,
                                    TT_Raster_Map*  map )
   {
-    PEngine_Instance  _engine = DEREF( engine );
     TT_Error          error;
 
 
-    if ( !_engine )
+    if ( !engine )
       return TT_Err_Invalid_Engine;
 
     if ( !outline || !map )
       return TT_Err_Invalid_Argument;
 
-    MUTEX_Lock( _engine->raster_lock );
-    error = RENDER_Glyph( outline, map );
-    MUTEX_Release( _engine->raster_lock );
+    MUTEX_Lock( ENGINE_ELEMENT( raster_lock ) );
+    error = Render_Glyph( ENGINE_ELEMENT( raster_component ), outline, map );
+    MUTEX_Release( ENGINE_ELEMENT( raster_lock ) );
 
     return error;
   }

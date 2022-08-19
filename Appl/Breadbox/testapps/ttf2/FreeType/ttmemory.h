@@ -111,9 +111,6 @@
 #define ELEMENT( _typ_, _handle_, _element_ ) \
   ( ((_typ_)DEREF(_handle_))->_element_ )
 
-#define ENGINE_ELEMENT( _handle_, _element_ ) \
-  ELEMENT( PEngine_Instance, _handle_, _element_ )
-
 #define CHECK_POINTER( _ptr_ )  ECCheckBounds( _ptr_ )
 
 #define CHECK_LMEM( _handle_ )  ECCheckLMemHandle( _handle_ )

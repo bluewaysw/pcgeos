@@ -78,6 +78,7 @@
   typedef struct TEngine_Instance_  TEngine_Instance;
   typedef TEngine_Instance*         PEngine_Instance;
 
+#define ENGINE_ELEMENT( _element_ ) ELEMENT( PEngine_Instance, engine, _element_ )
 
 #ifdef TT_CONFIG_OPTION_THREAD_SAFE  /* for re-entrant builds */
 

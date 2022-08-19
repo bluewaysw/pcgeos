@@ -123,7 +123,7 @@
   /* Register a new extension.  Called by extension */
   /* service initializers.                          */
   EXPORT_DEF
-  TT_Error  TT_Register_Extension( PEngine_Instance  engine,
+  TT_Error  TT_Register_Extension( TT_Engine         engine,
                                    Long              id,
                                    Long              size,
                                    PExt_Constructor  create,
