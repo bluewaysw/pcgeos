@@ -13,7 +13,6 @@
 #       ----    ----            -----------
 #       PjD     1/22/93         Initial version
 #       NF      10/7/96         Corrected heapspace value
-#		RainerB	4/27/2022		Resource names adjusted for Watcom compatibility
 #
 # RCS STAMP:
 #	$Id: helpsamp.gp,v 1.1 97/04/04 16:38:56 newdeal Exp $
@@ -74,6 +73,6 @@ library	ui
 # object blocks, fixed code resources, or data resources that are read-only.
 # Standard discardable code resources do not need to be mentioned.
 #
-resource AppResource object
-resource Interface   object
+resource APPRESOURCE object
+resource INTERFACE   object
 
