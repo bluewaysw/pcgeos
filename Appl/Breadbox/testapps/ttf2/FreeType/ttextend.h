@@ -137,7 +137,7 @@
 
   /* Finalize the extension component */
   LOCAL_DEF
-  TT_Error  TTExtend_Done( PEngine_Instance  engine );
+  TT_Error  TTExtend_Done( TT_Engine  engine );
 
   /* Create an extension within a face object.  Called by the */
   /* face object constructor.                                 */

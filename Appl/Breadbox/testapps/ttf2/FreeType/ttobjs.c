@@ -1154,12 +1154,12 @@
 
     MUTEX_Create( face->lock );
 
-    Cache_Create( DEREF( engine ),
+    Cache_Create( engine,
                   ENGINE_ELEMENT( objs_instance_class ),
                   &face->instances,
                   &face->lock );
 
-    Cache_Create( DEREF( engine ),
+    Cache_Create( engine,
                   ENGINE_ELEMENT( objs_glyph_class ),
                   &face->glyphs,
                   &face->lock );
@@ -1381,7 +1381,9 @@
   {
     PCache           face_cache, exec_cache;
     TT_Error         error;
-    PEngine_Instance  _engine = DEREF( engine );
+
+
+    CHECK_CHUNK( engine );
 
     face_cache = 0;
     exec_cache = 0;
@@ -1391,25 +1393,25 @@
       goto Fail;
 
     /* create face cache */
-    error = Cache_Create( _engine, (PCache_Class)&objs_face_class,
-                          face_cache, &_engine->lock );
+    error = Cache_Create( engine, (PCache_Class)&objs_face_class,
+                          face_cache, &ENGINE_ELEMENT( lock ) );
 
     if ( error )
       goto Fail;
 
-    _engine->objs_face_cache = face_cache;
+    ENGINE_ELEMENT( objs_face_cache ) = face_cache;
 
-    error = Cache_Create( _engine, (PCache_Class)&objs_exec_class,
-                          exec_cache, &_engine->lock );
+    error = Cache_Create( engine, (PCache_Class)&objs_exec_class,
+                          exec_cache, &ENGINE_ELEMENT( lock ) );
     if ( error )
       goto Fail;
 
-    _engine->objs_exec_cache = exec_cache;
+    ENGINE_ELEMENT( objs_exec_cache )      = exec_cache;
 
-    _engine->objs_face_class      = (PCache_Class)&objs_face_class;
-    _engine->objs_instance_class  = (PCache_Class)&objs_instance_class;
-    _engine->objs_execution_class = (PCache_Class)&objs_exec_class;
-    _engine->objs_glyph_class     = (PCache_Class)&objs_glyph_class;
+    ENGINE_ELEMENT( objs_face_class )      = (PCache_Class)&objs_face_class;
+    ENGINE_ELEMENT( objs_instance_class )  = (PCache_Class)&objs_instance_class;
+    ENGINE_ELEMENT( objs_execution_class ) = (PCache_Class)&objs_exec_class;
+    ENGINE_ELEMENT( objs_glyph_class )     = (PCache_Class)&objs_glyph_class;
 
     goto Exit;
 

@@ -60,16 +60,16 @@
  ******************************************************************/
 
   static
-  PList_Element  Element_New( PEngine_Instance  _engine )
+  PList_Element  Element_New( TT_Engine  engine )
   {
     PList_Element  element;
 
 
-    LOCK();
-    if ( FREE_Elements )
+    MUTEX_Lock( ENGINE_ELEMENT( lock ) );
+    if ( GFREE_Elements )
     {
-      element       = (PList_Element)FREE_Elements;
-      FREE_Elements = element->next;
+      element       = (PList_Element)GFREE_Elements;
+      GFREE_Elements = element->next;
     }
     else
     {
@@ -81,7 +81,7 @@
     }
 
     /* Note: in case of failure, Alloc sets the pointer to NULL */
-    UNLOCK();
+    MUTEX_Release( ENGINE_ELEMENT( lock ) );
 
     return element;
   }
@@ -102,14 +102,14 @@
  ******************************************************************/
 
   static
-  void  Element_Done( PEngine_Instance  _engine,
-                      PList_Element     element )
+  void  Element_Done( TT_Engine      engine,
+                      PList_Element  element )
   {
-    LOCK();
+    MUTEX_Lock( ENGINE_ELEMENT( lock ) );
     /* Simply add the list element to the recycle list */
-    element->next = (PList_Element)FREE_Elements;
-    FREE_Elements = element;
-    UNLOCK();
+    element->next = (PList_Element)GFREE_Elements;
+    GFREE_Elements = element;
+    MUTEX_Release( ENGINE_ELEMENT( lock ) );
   }
 
 
@@ -147,12 +147,12 @@
  ******************************************************************/
 
   LOCAL_FUNC
-  TT_Error  Cache_Create( PEngine_Instance  _engine,
-                          PCache_Class      clazz,
-                          TCache*           cache,
-                          TMutex*           lock )
+  TT_Error  Cache_Create( TT_Engine     engine,
+                          PCache_Class  clazz,
+                          TCache*       cache,
+                          TMutex*       lock )
   {
-    cache->engine     = _engine;
+    cache->engine     = engine;
     cache->clazz      = clazz;
     cache->lock       = lock;
     cache->idle_count = 0;

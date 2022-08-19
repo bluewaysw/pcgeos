@@ -143,7 +143,7 @@
 
   struct  TCache_
   {
-    PEngine_Instance  engine;
+    TT_Engine         engine;
     PCache_Class      clazz;      /* 'class' is a reserved word in C++ */
     TMutex*           lock;
     TSingle_List      active;
@@ -166,10 +166,10 @@
   /* doesn't need protection                                        */
 
   LOCAL_DEF
-  TT_Error  Cache_Create( PEngine_Instance  engine,
-                          PCache_Class      clazz,
-                          TCache*           cache,
-                          TMutex*           lock );
+  TT_Error  Cache_Create( TT_Engine     engine,
+                          PCache_Class  clazz,
+                          TCache*       cache,
+                          TMutex*       lock );
 
   /* Destroys a cache and all its listed objects */
 
