@@ -38,7 +38,10 @@
 
   typedef struct TExtension_Registry_  TExtension_Registry;
   typedef TExtension_Registry*         PExtension_Registry;
+  typedef ChunkHandle                  CExtension_Registry;
 
+  #define EXTENSION_ELEMENT( _ext_element_ )  \
+    ELEMENT( PExtension_Registry, registry, _ext_element_ )
 
 
   /* Initialize the extension component */
@@ -47,19 +50,19 @@
   TT_Error  TTExtend_Init( TT_Engine  engine )
   {
     TT_Error             error;
-    PExtension_Registry  exts;
+    CExtension_Registry  registry;
     
 
     CHECK_CHUNK( engine );
 
-    if ( ALLOC( exts, sizeof ( TExtension_Registry ) ) )
+    if ( GALLOC( registry, sizeof ( TExtension_Registry ) ) )
       return error;
     
-    CHECK_POINTER( exts );
+    CHECK_CHUNK( registry );
 
-    exts->num_extensions        = 0;
-    exts->cur_offset            = 0;
-    ENGINE_ELEMENT( extension_component ) = (void*)exts;
+    EXTENSION_ELEMENT( num_extensions )   = 0;
+    EXTENSION_ELEMENT( cur_offset )       = 0;
+    ENGINE_ELEMENT( extension_component ) = registry;
 
     return TT_Err_Ok;
   }
@@ -70,7 +73,9 @@
   LOCAL_FUNC
   TT_Error  TTExtend_Done( TT_Engine  engine )
   {
-    FREE( ENGINE_ELEMENT( extension_component ) );
+    CHECK_CHUNK( engine );
+
+    GFREE( ENGINE_ELEMENT( extension_component ) );
     return TT_Err_Ok;
   }
 
@@ -84,30 +89,32 @@
                                    PExt_Constructor  create,
                                    PExt_Destructor   destroy )
   {
-    PExtension_Registry  exts;
+    CExtension_Registry  registry;
     PExtension_Class     clazz;
     Int                  p;
 
 
-    exts = (PExtension_Registry)ENGINE_ELEMENT( extension_component );
-    if ( !exts )
+    CHECK_CHUNK( engine );
+
+    registry = (CExtension_Registry)ENGINE_ELEMENT( extension_component );
+    if ( !registry )
       return TT_Err_Ok;
 
-    p = exts->num_extensions;
+    p = EXTENSION_ELEMENT( num_extensions );
 
     if ( p >= TT_MAX_EXTENSIONS )
       return TT_Err_Too_Many_Extensions;
 
     
-    clazz          = exts->classes + p;
+    clazz          = EXTENSION_ELEMENT( classes + p );
     clazz->id      = id;
     clazz->size    = size;
     clazz->build   = create;
     clazz->destroy = destroy;
-    clazz->offset  = exts->cur_offset;
+    clazz->offset  = EXTENSION_ELEMENT( cur_offset );
 
-    exts->num_extensions++;
-    exts->cur_offset += ( size + ALIGNMENT-1 ) & -ALIGNMENT;
+    EXTENSION_ELEMENT( num_extensions++ );
+    EXTENSION_ELEMENT( cur_offset ) += ( size + ALIGNMENT-1 ) & -ALIGNMENT;
 
     return TT_Err_Ok;
   }
@@ -121,7 +128,7 @@
                               void**  extension_block )
   {
     TT_Engine            engine = face->engine;
-    PExtension_Registry  registry;
+    CExtension_Registry  registry;
     PExtension_Class     clazz;
     Int                  n;
 
@@ -133,10 +140,10 @@
 
     for ( n = 0; n < face->n_extensions; n++ )
     {
-      clazz = registry->classes + n;
+      clazz = EXTENSION_ELEMENT( classes + n );
       if ( clazz->id == extension_id )
       {
-        *extension_block = (PByte)face->extension + clazz->offset;
+        *extension_block = (PByte)DEREF( face->extension ) + clazz->offset;
         return TT_Err_Ok;
       }
     }
@@ -152,7 +159,7 @@
   TT_Error  Extension_Destroy( PFace  face )
   {
     TT_Engine            engine = face->engine;
-    PExtension_Registry  registry;
+    CExtension_Registry  registry;
     PExtension_Class     clazz;
     Int                  n;
     PByte                ext;
@@ -162,8 +169,8 @@
 
     for ( n = 0; n < face->n_extensions; n++ )
     {
-      clazz = registry->classes + n;
-      ext   = (PByte)face->extension + clazz->offset;
+      clazz = EXTENSION_ELEMENT( classes + n );
+      ext   = (PByte)DEREF( face->extension ) + clazz->offset;
 
       /* the destructor is optional */
       if ( clazz->destroy )
@@ -171,7 +178,7 @@
     }
 
     /* destroy the face's extension block too */
-    FREE( face->extension );
+    GFREE( face->extension );
     face->n_extensions = 0;
 
     return TT_Err_Ok;
@@ -185,23 +192,23 @@
   TT_Error  Extension_Create( PFace  face )
   {
     TT_Engine            engine = face->engine;
-    PExtension_Registry  registry;
+    CExtension_Registry  registry;
     PExtension_Class     clazz;
     TT_Error             error;
     Int                  n;
     PByte                ext;
 
 
-    registry = (PExtension_Registry)ENGINE_ELEMENT( extension_component );
+    registry = (CExtension_Registry)ENGINE_ELEMENT( extension_component );
 
-    face->n_extensions = registry->num_extensions;
-    if ( ALLOC( face->extension, registry->cur_offset ) )
+    face->n_extensions = EXTENSION_ELEMENT( num_extensions );
+    if ( GALLOC( face->extension, EXTENSION_ELEMENT( cur_offset ) ) )
       return error;
 
     for ( n = 0; n < face->n_extensions; n++ )
     {
-      clazz = registry->classes + n;
-      ext   = (PByte)face->extension + clazz->offset;
+      clazz = EXTENSION_ELEMENT( classes + n );
+      ext   = (PByte)DEREF( face->extension ) + clazz->offset;
       error = clazz->build( (void*)ext, face );
       if ( error )
         goto Fail;

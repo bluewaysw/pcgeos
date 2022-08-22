@@ -569,7 +569,7 @@
 
     /* A typeless pointer to the face object extensions defined */
     /* in the 'ttextend.*' files.                               */
-    void*  extension;
+    ChunkHandle  extension;
     Int    n_extensions;    /* number of extensions */
 
     /* Use extensions to provide additional capabilities to the */
