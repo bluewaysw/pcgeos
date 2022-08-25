@@ -165,7 +165,7 @@
     PByte                ext;
 
 
-    registry = (PExtension_Registry)ENGINE_ELEMENT( extension_component );
+    registry = (CExtension_Registry)ENGINE_ELEMENT( extension_component );
 
     for ( n = 0; n < face->n_extensions; n++ )
     {
