@@ -45,10 +45,8 @@
 
 #ifdef TT_STATIC_RASTER
 #define RAS_OPS  /* void */
-#define RAS_OP   /* void */
 #else
 #define RAS_OPS  ((TRaster_Instance*)_engine->raster_component),
-#define RAS_OP   ((TRaster_Instance*)_engine->raster_component)
 #endif /* TT_STATIC_RASTER */
 
 

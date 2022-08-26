@@ -62,8 +62,6 @@
      void*        objs_exec_cache;  /* the current face and execution */
                                     /* context objects                */
 
-     void*        file_component;       /* ttfile implementation dependent   */
-
      TMutex       raster_lock;          /* mutex for this engine's render pool */
      void*        raster_component;     /* ttraster implementation depedent    */
      ChunkHandle  extension_component;  /* extensions dependent */

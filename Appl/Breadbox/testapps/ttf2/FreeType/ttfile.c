@@ -434,9 +434,6 @@
   /*******************************************************************/
   /*******************************************************************/
 
-/* a simple macro to access the file component's data */
-#define files  ( *((TFile_Component*)engine.file_component) )
-
 #define CUR_Stream   STREAM2REC( stream )    /* re-entrant macros */
 #define CUR_Frame    (*frame)
 
