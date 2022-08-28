@@ -76,20 +76,22 @@
 
     FORGET_Frame();
 
-    if ( ALLOC_ARRAY( kern0->pairs, num_pairs, TT_Kern_0_Pair ) )
+    if ( GALLOC_ARRAY( kern0->pairs, num_pairs, TT_Kern_0_Pair ) )
       return error;
+
+    CHECK_CHUNK( kern0->pairs );
 
     if ( ACCESS_Frame( num_pairs * 6L ) )
       goto Fail;
 
     for ( n = 0; n < num_pairs; n++ )
     {
-      kern0->pairs[n].left  = GET_UShort();
-      kern0->pairs[n].right = GET_UShort();
-      kern0->pairs[n].value = GET_UShort();
+      ((TT_Kern_0_Pair*)DEREF(kern0->pairs))[n].left  = GET_UShort();
+      ((TT_Kern_0_Pair*)DEREF(kern0->pairs))[n].right = GET_UShort();
+      ((TT_Kern_0_Pair*)DEREF(kern0->pairs))[n].value = GET_UShort();
 
-      if ( kern0->pairs[n].left >= input->numGlyphs ||
-           kern0->pairs[n].right >= input->numGlyphs )
+      if (((TT_Kern_0_Pair*)DEREF(kern0->pairs))[n].left  >= input->numGlyphs ||
+          ((TT_Kern_0_Pair*)DEREF(kern0->pairs))[n].right >= input->numGlyphs )
       {
         FORGET_Frame();
         error = TT_Err_Invalid_Kerning_Table;
@@ -105,7 +107,7 @@
     return TT_Err_Ok;
 
     Fail:
-      FREE( kern0->pairs );
+      GFREE( kern0->pairs );
       return error;
   }
 
@@ -391,7 +393,7 @@
         switch ( sub->format )
         {
         case 0:
-          FREE( sub->t.kern0.pairs );
+          GFREE( sub->t.kern0.pairs );
           sub->t.kern0.nPairs        = 0;
           sub->t.kern0.searchRange   = 0;
           sub->t.kern0.entrySelector = 0;

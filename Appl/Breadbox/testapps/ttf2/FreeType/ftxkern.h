@@ -72,13 +72,12 @@ extern "C" {
 
   struct  TT_Kern_0_
   {
-    TT_UShort  nPairs;          /* number of kerning pairs */
+    TT_UShort    nPairs;          /* number of kerning pairs */
 
-    TT_UShort  searchRange;     /* these values are defined by the TT spec */
-    TT_UShort  entrySelector;   /* for table searchs.                      */
-    TT_UShort  rangeShift;
-
-    TT_Kern_0_Pair*  pairs;     /* a table of nPairs `pairs' */
+    TT_UShort    searchRange;     /* these values are defined by the TT spec */
+    TT_UShort    entrySelector;   /* for table searchs.                      */
+    TT_UShort    rangeShift;
+    ChunkHandle  pairs;           /* a table of nPairs `pairs' */
   };
 
   typedef struct TT_Kern_0_  TT_Kern_0;
