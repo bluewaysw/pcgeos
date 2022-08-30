@@ -104,7 +104,7 @@ extern "C" {
     TT_UShort        rowWidth;   /* length of one row in bytes         */
     TT_Kern_2_Class  leftClass;  /* left class table                   */
     TT_Kern_2_Class  rightClass; /* right class table                  */
-    TT_FWord*        array;      /* 2-dimensional kerning values array */
+    ChunkHandle      array;      /* 2-dimensional kerning values array */
   };
 
   typedef struct TT_Kern_2_  TT_Kern_2;
@@ -137,7 +137,7 @@ extern "C" {
     TT_UShort          version;  /* kern table version number. starts at 0 */
     TT_UShort          nTables;  /* number of tables                       */
 
-    TT_Kern_Subtable*  tables;   /* the kerning sub-tables                 */
+    ChunkHandle        tables;   /* the kerning sub-tables                 */
   };
 
   typedef struct TT_Kerning_  TT_Kerning;

@@ -227,14 +227,16 @@
 
     array_size = left_max + right_max + 2;
 
-    if ( ALLOC( kern2->array, array_size ) )
+    if ( GALLOC( kern2->array, array_size ) )
       goto Fail_Right;
+
+    CHECK_CHUNK( kern2->array );
 
     if ( ACCESS_Frame( array_size ) )
       goto Fail_Array;
 
     for ( n = 0; n < array_size/2; n++ )
-      kern2->array[n] = GET_Short();
+      ((TT_FWord*)DEREF( kern2->array ))[n] = GET_Short();
 
     FORGET_Frame();
 
@@ -243,7 +245,7 @@
     return TT_Err_Ok;
 
   Fail_Array:
-    FREE( kern2->array );
+    GFREE( kern2->array );
 
   Fail_Right:
     FREE( kern2->rightClass.classes );
@@ -298,7 +300,7 @@
 
     kern->version = 0;
     kern->nTables = 0;
-    kern->tables  = NULL;
+    kern->tables  = NullChunk;
 
     table = TT_LookUp_Table( face, TTAG_kern );
     if ( table < 0 )
@@ -315,14 +317,14 @@
 
     /* we don't set kern->nTables until we have allocated the array */
 
-    if ( ALLOC_ARRAY( kern->tables, num_tables, TT_Kern_Subtable ) )
+    if ( GALLOC_ARRAY( kern->tables, num_tables, TT_Kern_Subtable ) )
       return error;
 
     kern->nTables = num_tables;
 
     /* now load the directory entries, but do _not_ load the tables ! */
 
-    sub = kern->tables;
+    sub = (TT_Kern_Subtable*)DEREF(kern->tables);
 
     for ( table = 0; table < num_tables; table++ )
     {
@@ -385,7 +387,7 @@
 
     /* scan the table directory and release loaded entries */
 
-    sub = kern->tables;
+    sub = (TT_Kern_Subtable*)DEREF( kern->tables );
     for ( n = 0; n < kern->nTables; n++ )
     {
       if ( sub->loaded )
@@ -409,7 +411,7 @@
           sub->t.kern2.rightClass.firstGlyph = 0;
           sub->t.kern2.rightClass.nGlyphs    = 0;
 
-          FREE( sub->t.kern2.array );
+          GFREE( sub->t.kern2.array );
           sub->t.kern2.rowWidth = 0;
           break;
 
@@ -427,7 +429,7 @@
       sub++;
     }
 
-    FREE( kern->tables );
+    GFREE( kern->tables );
     kern->nTables = 0;
 
     return TT_Err_Ok;
@@ -515,7 +517,7 @@
     if ( kern_index >= kern->nTables )
       return TT_Err_Invalid_Argument;
 
-    sub = kern->tables + kern_index;
+    sub = (TT_Kern_Subtable*)DEREF( kern->tables ) + kern_index;
 
     if ( sub->format != 0 && sub->format != 2 )
       return TT_Err_Invalid_Kerning_Table_Format;
