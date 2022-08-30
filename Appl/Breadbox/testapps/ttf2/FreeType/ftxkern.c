@@ -170,10 +170,12 @@
 
     FORGET_Frame();
 
-    if ( ALLOC_ARRAY( kern2->leftClass.classes,
-                      kern2->leftClass.nGlyphs,
-                      UShort ) )
+    if ( GALLOC_ARRAY( kern2->leftClass.classes,
+                       kern2->leftClass.nGlyphs,
+                       UShort ) )
       return error;
+
+    CHECK_CHUNK( kern2->leftClass.classes );
 
     /* load left offsets */
 
@@ -181,7 +183,7 @@
       goto Fail_Left;
 
     for ( n = 0; n < kern2->leftClass.nGlyphs; n++ )
-      kern2->leftClass.classes[n] = GET_UShort();
+      ((TT_UShort*)DEREF( kern2->leftClass.classes ))[n] = GET_UShort();
 
     FORGET_Frame();
 
@@ -196,10 +198,12 @@
 
     FORGET_Frame();
 
-    if ( ALLOC_ARRAY( kern2->rightClass.classes,
-                      kern2->rightClass.nGlyphs,
-                      UShort ) )
+    if ( GALLOC_ARRAY( kern2->rightClass.classes,
+                       kern2->rightClass.nGlyphs,
+                       UShort ) )
       goto Fail_Left;
+
+    CHECK_CHUNK( kern2->rightClass.classes );
 
     /* load right offsets */
 
@@ -207,7 +211,7 @@
       goto Fail_Right;
 
     for ( n = 0; n < kern2->rightClass.nGlyphs; n++ )
-      kern2->rightClass.classes[n] = GET_UShort();
+      ((TT_UShort*)DEREF( kern2->rightClass.classes ))[n] = GET_UShort();
 
     FORGET_Frame();
 
@@ -220,10 +224,10 @@
     left_max = right_max = 0;
 
     for ( n = 0; n < kern2->leftClass.nGlyphs; n++ )
-      left_max = MAX( left_max, kern2->leftClass.classes[n] );
+      left_max = MAX( left_max, ((TT_UShort*)DEREF( kern2->leftClass.classes ))[n] );
 
     for ( n = 0; n < kern2->rightClass.nGlyphs; n++ )
-      right_max = MAX( right_max, kern2->leftClass.classes[n] );
+      right_max = MAX( right_max, ((TT_UShort*)DEREF( kern2->leftClass.classes ))[n] );
 
     array_size = left_max + right_max + 2;
 
@@ -248,11 +252,11 @@
     GFREE( kern2->array );
 
   Fail_Right:
-    FREE( kern2->rightClass.classes );
+    GFREE( kern2->rightClass.classes );
     kern2->rightClass.nGlyphs = 0;
 
   Fail_Left:
-    FREE( kern2->leftClass.classes );
+    GFREE( kern2->leftClass.classes );
     kern2->leftClass.nGlyphs = 0;
 
     return error;
@@ -403,11 +407,11 @@
           break;
 
         case 2:
-          FREE( sub->t.kern2.leftClass.classes );
+          GFREE( sub->t.kern2.leftClass.classes );
           sub->t.kern2.leftClass.firstGlyph = 0;
           sub->t.kern2.leftClass.nGlyphs    = 0;
 
-          FREE( sub->t.kern2.rightClass.classes );
+          GFREE( sub->t.kern2.rightClass.classes );
           sub->t.kern2.rightClass.firstGlyph = 0;
           sub->t.kern2.rightClass.nGlyphs    = 0;
 

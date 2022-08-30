@@ -87,11 +87,11 @@ extern "C" {
 
   struct  TT_Kern_2_Class_
   {
-    TT_UShort   firstGlyph;   /* first glyph in range                    */
-    TT_UShort   nGlyphs;      /* number of glyphs in range               */
-    TT_UShort*  classes;      /* a table giving for each ranged glyph    */
-                              /* its class offset in the subtable pairs  */
-                              /* two-dimensional array                   */
+    TT_UShort    firstGlyph;   /* first glyph in range                    */
+    TT_UShort    nGlyphs;      /* number of glyphs in range               */
+    ChunkHandle  classes;      /* a table giving for each ranged glyph    */
+                               /* its class offset in the subtable pairs  */
+                               /* two-dimensional array                   */
   };
 
   typedef struct TT_Kern_2_Class_  TT_Kern_2_Class;
