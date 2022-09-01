@@ -1013,16 +1013,18 @@
       PTRACE2(( "is missing!\n" ));
 
       face->cvtSize = 0;
-      face->cvt     = NULL;
+      face->cvt     = NullHandle;
       return TT_Err_Ok;
     }
 
     face->cvtSize = face->dirTables[n].Length / 2;
 
-    if ( ALLOC_ARRAY( face->cvt,
-                      face->cvtSize,
-                      Short ) )
+    if ( GALLOC_ARRAY( face->cvt,
+                       face->cvtSize,
+                       Short ) )
       return error;
+
+    CHECK_CHUNK( face->cvt );
 
     if ( FILE_Seek( face->dirTables[n].Offset ) ||
          ACCESS_Frame( face->cvtSize * 2L ) )
@@ -1031,7 +1033,7 @@
     limit = face->cvtSize;
 
     for ( n = 0; n < limit; n++ )
-      face->cvt[n] = GET_Short();
+      ((PByte)DEREF( face->cvt ))[n] = GET_Short();
 
     FORGET_Frame();
 
@@ -1160,7 +1162,7 @@
     /* The font program is optional */
     if ( ( n = TT_LookUp_Table( face, TTAG_fpgm ) ) < 0 )
     {
-      face->fontProgram = NULL;
+      face->fontProgram = NullHandle;
       face->fontPgmSize = 0;
 
       PTRACE2(( "is missing!\n" ));
@@ -1169,10 +1171,10 @@
     {
       face->fontPgmSize = face->dirTables[n].Length;
 
-      if ( ALLOC( face->fontProgram,
-                  face->fontPgmSize )              ||
+      if ( GALLOC( face->fontProgram,
+                   face->fontPgmSize )              ||
            FILE_Read_At( face->dirTables[n].Offset,
-                         (void*)face->fontProgram,
+                         DEREF( face->fontProgram ),
                          face->fontPgmSize )       )
         return error;
 
@@ -1183,7 +1185,7 @@
 
     if ( ( n = TT_LookUp_Table( face, TTAG_prep ) ) < 0 )
     {
-      face->cvtProgram = NULL;
+      face->cvtProgram = NullHandle;
       face->cvtPgmSize = 0;
 
       PTRACE2(( "is missing!\n" ));
@@ -1192,10 +1194,10 @@
     {
       face->cvtPgmSize = face->dirTables[n].Length;
 
-      if ( ALLOC( face->cvtProgram,
-                  face->cvtPgmSize )               ||
+      if ( GALLOC( face->cvtProgram,
+                   face->cvtPgmSize )               ||
            FILE_Read_At( face->dirTables[n].Offset,
-                         (void*)face->cvtProgram,
+                         DEREF( face->cvtProgram ),
                          face->cvtPgmSize )        )
         return error;
 

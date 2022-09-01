@@ -846,7 +846,7 @@
     /* allow font program execution */
     Set_CodeRange( exec,
                    TT_CodeRange_Font,
-                   face->fontProgram,
+                   DEREF( face->fontProgram ),
                    face->fontPgmSize );
 
     /* disable CVT and glyph programs coderange */
@@ -939,7 +939,7 @@
     /* We use by default the y ppem to scale the CVT. */
 
     for ( i = 0; i < ins->cvtSize; i++ )
-      ins->cvt[i] = TT_MulDiv( face->cvt[i],
+      ins->cvt[i] = TT_MulDiv( ((PByte)DEREF( face->cvt ))[i],
                                ins->metrics.scale1,
                                ins->metrics.scale2 );
 
@@ -973,7 +973,7 @@
 
     Set_CodeRange( exec,
                    TT_CodeRange_Cvt,
-                   face->cvtProgram,
+                   DEREF( face->cvtProgram ),
                    face->cvtPgmSize );
 
     Clear_CodeRange( exec, TT_CodeRange_Glyph );
@@ -1075,7 +1075,7 @@
     face->numCMaps = 0;
 
     /* freeing the CVT */
-    FREE( face->cvt );
+    GFREE( face->cvt );
     face->cvtSize = 0;
 
     /* freeing the horizontal metrics */
@@ -1085,14 +1085,14 @@
     /* freeing the vertical ones, if any */
     if (face->verticalInfo)
     {
-      FREE( face->verticalHeader.long_metrics  );
+      //FREE( face->verticalHeader.long_metrics  );
       FREE( face->verticalHeader.short_metrics );
       face->verticalInfo = 0;
     }
 
     /* freeing the programs */
-    FREE( face->fontProgram );
-    FREE( face->cvtProgram );
+    GFREE( face->fontProgram );
+    GFREE( face->cvtProgram );
     face->fontPgmSize = 0;
     face->cvtPgmSize  = 0;
 

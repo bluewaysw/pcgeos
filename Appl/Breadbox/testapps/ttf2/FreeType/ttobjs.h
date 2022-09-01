@@ -540,16 +540,16 @@
     /* NOTE : The "hmtx" is now part of the horizontal header */
 
     /* the font program, if any */
-    ULong   fontPgmSize;
-    PByte   fontProgram;
+    ULong        fontPgmSize;
+    ChunkHandle  fontProgram;
 
     /* the cvt program, if any */
-    ULong   cvtPgmSize;
-    PByte   cvtProgram;
+    ULong        cvtPgmSize;
+    ChunkHandle  cvtProgram;
 
     /* the original, unscaled, control value table */
-    ULong   cvtSize;
-    PShort  cvt;
+    ULong        cvtSize;
+    ChunkHandle  cvt;
 
     /* The following values _must_ be set by the */
     /* maximum profile loader                    */
@@ -570,7 +570,7 @@
     /* A typeless pointer to the face object extensions defined */
     /* in the 'ttextend.*' files.                               */
     ChunkHandle  extension;
-    Int    n_extensions;    /* number of extensions */
+    Int          n_extensions;    /* number of extensions */
 
     /* Use extensions to provide additional capabilities to the */
     /* engine.  Read the developer's guide in the documentation */
