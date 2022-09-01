@@ -939,7 +939,7 @@
     /* We use by default the y ppem to scale the CVT. */
 
     for ( i = 0; i < ins->cvtSize; i++ )
-      ins->cvt[i] = TT_MulDiv( ((PByte)DEREF( face->cvt ))[i],
+      ins->cvt[i] = TT_MulDiv( ((PShort)DEREF( face->cvt ))[i],
                                ins->metrics.scale1,
                                ins->metrics.scale2 );
 
@@ -973,7 +973,7 @@
 
     Set_CodeRange( exec,
                    TT_CodeRange_Cvt,
-                   DEREF( face->cvtProgram ),
+                   (PByte)DEREF( face->cvtProgram ),
                    face->cvtPgmSize );
 
     Clear_CodeRange( exec, TT_CodeRange_Glyph );
@@ -1085,7 +1085,7 @@
     /* freeing the vertical ones, if any */
     if (face->verticalInfo)
     {
-      //FREE( face->verticalHeader.long_metrics  );
+      FREE( face->verticalHeader.long_metrics  );
       FREE( face->verticalHeader.short_metrics );
       face->verticalInfo = 0;
     }

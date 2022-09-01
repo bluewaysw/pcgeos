@@ -1033,7 +1033,7 @@
     limit = face->cvtSize;
 
     for ( n = 0; n < limit; n++ )
-      ((PByte)DEREF( face->cvt ))[n] = GET_Short();
+      ((PShort)DEREF( face->cvt ))[n] = GET_Short();
 
     FORGET_Frame();
 
@@ -1174,7 +1174,7 @@
       if ( GALLOC( face->fontProgram,
                    face->fontPgmSize )              ||
            FILE_Read_At( face->dirTables[n].Offset,
-                         DEREF( face->fontProgram ),
+                         (PByte)DEREF( face->fontProgram ),
                          face->fontPgmSize )       )
         return error;
 
@@ -1197,7 +1197,7 @@
       if ( GALLOC( face->cvtProgram,
                    face->cvtPgmSize )               ||
            FILE_Read_At( face->dirTables[n].Offset,
-                         DEREF( face->cvtProgram ),
+                         (PByte)DEREF( face->cvtProgram ),
                          face->cvtPgmSize )        )
         return error;
 
