@@ -1,0 +1,3080 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1988 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+FILE:		pmlib.def
+
+AUTHOR:		Tony Requist
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	2/89		Initial version
+
+DESCRIPTION:
+	This file contains the definitions for the PM library.
+
+	$Id: pmlib.temp,v 1.1 92/08/14 17:27:01 dlitwin Exp $
+
+------------------------------------------------------------------------------@
+
+StartLibrary	pmlib
+
+;------------------------------------------------------------------------------
+;			Routines called by the generic UI
+;------------------------------------------------------------------------------
+
+;	NOTE:	The routines defined here must exactly match the enumerated
+;		type "SpecificUIRoutines" defined in uilib.def
+
+;	NOTE:	The routines defined here ALSO must exactly match the table
+;		in cspecExportTable.asm
+
+global	OLBuildTrigger:far
+global	OLBuildDisplay:far
+global	OLBuildApplication:far
+global	OLBuildField:far
+global	OLBuildScreen:far
+global	OLBuildSystem:far
+global	OLBuildPane:far
+global	OLBuildInteraction:far
+global	OLBuildGlyphDisplay:far
+global	OLBuildText:far
+global	OLBuildSummons:far
+global	OLBuildDisplayControl:far
+global	OLBuildPrimary:far
+global	OLBuildGadget:far
+global	OLBuildContent:far
+global	OLBuildUIDocumentControl:far
+global	OLBuildAppDocumentControl:far
+global	OLBuildDocument:far
+global	OLBuildFileSelector:far
+global	OLBuildBooleanGroup:far
+global	OLBuildItemGroup:far
+global	OLBuildDynamicList:far
+global	OLBuildItem:far
+global	OLBuildBoolean:far
+global  OLBuildValue:far
+
+;********* Window classes
+
+;### OLCtrlClass
+; Extracted from /staff/pcgeos/Library/CommonUI/CComp/copenCtrl.asm:
+
+
+OLCtrlClass	class VisCompClass
+	uses	GenInteractionClass
+
+
+MSG_BAR_BUILD_INFO		message
+
+MSG_OL_CTRL_SET_VIS_PARENT	message
+
+MSG_QUERY_CENTER_BY_MONIKERS		message	VisSpecMessages
+
+MSG_OL_GET_CHILDS_TREE_POS		message
+
+MSG_VUP_GET_BUILD_FLAGS	message	VisSpecMessages
+
+
+MSG_GET_FIRST_MKR_POS	message	VisSpecMessages
+
+MSG_SPEC_GET_TYPICAL_CHILD_EXTRA_SIZE	message
+
+
+OLBuildTargets		etype	byte
+OLBT_NO_TARGET		enum	OLBuildTargets
+	;NOT USED!!!
+
+OLBT_SYS_MENU	enum	OLBuildTargets
+	;Set for HINT_SYS_MENU. Indicates object is a system menu. Reserved
+	;for Motif/CUA use only. Prevents BUILD_INFO query from occurring,
+	;so menu button is first child in GenPrimary.
+
+OLBT_REPLY_BAR	enum	OLBuildTargets
+	;Set for HINT_MAKE_REPLY_BAR.  Used to create reply bar. tested
+	;many times later on in OLCtrlClass to see if is reply bar or not.
+	;Set for HINT_REPLY_BAR. GenInteraction or GenTrigger should go into
+	;the reply bar if one exists
+
+OLBT_FOR_REPLY_BAR	enum	OLBuildTargets
+	;Set for HINT_SEEK_REPLY_BAR, HINT_INTERACTION_APPLY,
+	;HINT_INTERACTION_RESET, HINT_INTERACTION_CANCEL.  Put this object in
+	;the interaction reply bar.
+
+OLBT_IS_EXPRESS_MENU	enum	OLBuildTargets
+	;Used internally.  This item is the express menu and should be made the
+	;second child (in Motif), or the first child (in OpenLook).
+	;IMPORTANT: this implies that OLBT_SYS_MENU is true, so it has the
+	;same effects as HINT_SYS_MENU, plus some.
+
+OLBT_IS_POPUP_LIST	enum	OLBuildTargets
+	;Used internally, for building popup lists.  Causes the trigger to
+	;be placed underneath its generic parent, rather than in a menu bar.
+
+OLBuildReplies		etype byte
+OLBR_NO_REPLY		enum OLBuildReplies			;NOT USED!
+	;Returned when query was not answered.
+OLBR_TOP_MENU		enum OLBuildReplies
+	;Returned when object has been placed inside menu bar.
+OLBR_SUB_MENU		enum OLBuildReplies
+	;Returned when object has been placed inside a menu.
+OLBR_REPLY_BAR		enum OLBuildReplies
+	;Returned when object has been placed inside reply bar.
+
+OLBuildFlags	record
+    OLBF_MENUABLE:1		;Set for GIV_POPUP GenInteractions. Indicates
+				;this is a GenInteraction which contains items
+				;that can be placed in a menu. If not set, is a
+				;GenTrigger.
+    OLBF_TRIGGER:1		;Set if is GenTrigger query
+				;(only set in OLButtonGetVisParent --
+				;	in copenButton.asm;
+				; 	never tested)
+    OLBF_SEEK_MENU_BAR:1	;Set for HINT_SEEK_MENU_BAR. Indicates this
+				;GenTrigger should be forced into the menu
+				;bar, even if that is stupid in this specific
+				;UI.
+    OLBF_AVOID_MENU_BAR:1	;Set for HINT_AVOID_MENU_BAR. Indicates this
+				;GenTrigger should not be placed into the menu
+				;bar, even if this specific UI generally does
+				;that.
+
+    OLBF_MENU_IN_DISPLAY:1	;Set for GIV_POPUP GenInteractions which
+				;are inside a GenDisplay, as the Display sends
+				;the query upwards to the DisplayControl.
+				;The forces an OLCtrlClass object to be created
+				;inside the GenPrimary's menu bar, so that
+				;when this menu button appears and disappears,
+				;the entire menu bar will not flash.
+    OLBF_ALWAYS_ADOPT:1		;TRUE when is MENU_IN_DISPLAY and this
+				;menu button is permanent - does not change
+				;with TARGET exclusive.
+    OLBF_TOOLBOX:1		;Set if HINT_TOOLBOX set for this object or the
+				;object above it, says that this object and all 
+    				;and all objects below it are part of a toolbox.
+    OLBF_DELAYED_MODE:1		;Set in SPEC_BUILD based on the parent object's
+				;   delayed mode flag.
+    OLBF_TARGET OLBuildTargets:4
+    OLBF_ABOVE_DISP_CTRL:1	;Returned when querying from inside a Display
+				;window, and the object has been placed inside
+				;a menu or trigger bar in GenPrimary window.
+    OLBF_REPLY OLBuildReplies:3	;Must be the last entry
+OLBuildFlags	end
+
+OLCtrlOptFlags record
+	OLCOF_DISPLAY_MONIKER:1		
+	OLCOF_DISPLAY_MKR_ABOVE:1
+	OLCOF_DISPLAY_BORDER:1
+	OLCOF_IN_MENU:1
+	OLCOF_CENTER_ON_MONIKER:1
+	OLCOF_CUSTOM_SPACING:1
+	OLCOF_IGNORE_DESIRED_SIZE_HINTS:1
+	OLCOF_LEFT_JUSTIFY_MONIKERS:1
+
+			     
+	
+OLCtrlOptFlags end
+
+		  
+
+OLMapGroupDataEntry	struct
+    OLMGDE_visParent	optr			;vis parent (if menu)
+    OLMGDE_flags	OLBuildFlags
+    OLMGDE_optFlags	OLCtrlOptFlags		;optimization flags
+OLMapGroupDataEntry	ends
+
+MAP_GROUP_DATA	vardata	OLMapGroupDataEntry
+
+
+    OLCI_visParent	optr		;vis parent to use (if menu)
+    OLCI_buildFlags	OLBuildFlags
+    OLCI_optFlags	OLCtrlOptFlags	;optimizing flags
+
+OLCtrlClass	endc
+
+
+OL_CONTENT_MARGIN	=	3
+
+
+STD_OL_LEFT_MARGIN	=	7	;standard left margin for all but panes
+STD_OL_RIGHT_MARGIN	=	7	;standard right margin for all but panes
+
+			
+
+;### OLWinClass
+; Extracted from /staff/pcgeos/Library/CommonUI/CWin/cwinClass.asm:
+
+
+OLWinClass	class	OLCtrlClass
+	uses	GenClass
+
+
+MSG_OL_WIN_STARTUP_GRAB	message
+
+MSG_OL_WIN_END_GRAB	message
+
+
+
+MSG_OL_BASE_WIN_SET_APPLICATION_MENU_BUTTON	message
+
+MSG_OL_WIN_UPDATE_HEADER	message
+
+MSG_OL_WIN_REDRAW_HEADER	message
+
+MSG_OL_POPUP_ACTIVATE	message
+
+MSG_OL_POPUP_REQUEST_DISMISS	message
+
+MSG_OL_POPUP_TOGGLE_PUSHPIN	message	MetaSpecificUIMessages
+
+MSG_MO_SYSMENU_MOVE	message
+MSG_MO_SYSMENU_SIZE	message
+
+MSG_MO_NEXT_WIN		message
+
+MSG_OL_RESTORE_WIN	message
+
+MSG_OL_WIN_MINIMIZE	message
+MSG_OL_WIN_MAXIMIZE	message
+
+MSG_OL_WIN_CLOSE	message
+
+MSG_OL_WINDOW_REFRESH	message
+
+MSG_OL_WINDOW_BACK	message
+
+MSG_GET_MENU_BAR_WIN	message	VisSpecMessages
+
+
+MSG_OL_WIN_IS_VISIBLE_WIN_TYPE	message
+
+MSG_OL_WIN_TOGGLE_MENU_NAVIGATION	message
+ 
+MSG_OL_WIN_QUERY_MENU_BAR		message
+
+MSG_OL_WIN_RESTORE_PREVIOUS_FOCUS_EXCL	message
+
+MSG_VIS_VUP_RELEASE_MENU_FOCUS	message	VisSpecMessages
+
+	
+MSG_OL_QUERY_IS_MENU	message	VisSpecMessages
+	
+MSG_OL_WIN_QUERY_MENU_BAR_HAS_FOCUS	message
+	
+MSG_OL_VUP_MAKE_APPLYABLE	message	VisSpecMessages
+
+MSG_OL_MAKE_APPLYABLE	message	VisSpecMessages
+	
+MSG_OL_MAKE_NOT_APPLYABLE	message	VisSpecMessages
+
+MSG_OL_WIN_IS_MAXIMIZED		message	
+
+MSG_OL_WIN_GET_HEADER_TITLE_BOUNDS	message	
+
+MSG_OL_WIN_NOTIFY_OF_REPLY_BAR		message
+
+MSG_OL_WIN_GET_DESIRED_SIZE		message
+
+MSG_OL_WIN_IS_DEFAULT_ACTION_NAVIGATE_TO_NEXT_FIELD	message
+
+MSG_OL_WIN_SET_CUSTOM_SYSTEM_MENU_MONIKER	message
+
+    HINT_EXPRESS_MENU		vardata
+		;this is used internally in the specific UI when creating
+		;a button for the express menu.
+
+
+
+
+OLWinFixedAttr	record
+    ;flags to describe which subclass is in use:
+
+    OWFA_IS_WIN_ICON:1	;if this is actually an OLWinIcon object, subclassing
+			;the functionality of OLWinClass. OLWinIcon directly
+			;overrides some methods, the remainder of its specific
+			;functionality is implemented in OLWinClass by checking
+			;for this flag.
+
+    OWFA_IS_MENU:1	; Set if this object belongs to OLMenuWinClass
+
+    ;permanent attribute flags for this object
+
+    OWFA_GCM_TITLED:1	; Set for GCM windows.  Indicates that the title area
+			; for the window, if titled, should have GCM
+			; characteristics. See OLBaseWinClass for specifics.
+
+    OWFA_OPEN_ON_TOP:1	; Set to open window on top, when WinOpen'd.
+			; Flag used temporarily between initiation &
+			; MSG_VIS_OPEN_WIN.
+
+    OWFA_PREVENT_DEFAULT_OVERRIDES:1
+			; Set with HINT_PREVENT_DEFAULT_OVERRIDES. Prevents the
+			; default exclusive from moving to non-default triggers.
+
+    OWFA_RESTORABLE:1	; Set by default, reset via
+			; ATTR_GEN_DISPLAY_NOT_RESTORABLE.
+			; Allows creation of maximized windows which cannot
+			; be "restored" by the user.
+    OWFA_LONG_TERM:1	; In cwinPopup.asm, Set by default, reset via
+		        ; HINT_IS_TEMPORARY. Indicates whether window
+			; is pinned when it opens.
+    OWFA_PRESERVE_FOCUS:1
+			; Set by default in GenPrimary and GenDisplays,
+			; reset by default in command windows and summons.
+			; If set, means that when this window is reopened,
+			; or regains the focus via navigation, should keep
+			; focus on same object within window that had focus
+			; before this window lost the focus window exclusive.
+			; Set via HINT_PRESERVE_FOCUS, reset via
+			; HINT_DO_NOT_PRESERVE_FOCUS.
+
+
+OLWinFixedAttr	end
+
+OLWinMoreFixedAttr	record
+    OWMFA_NO_DISTURB:1	; Set with HINT_INTERACTION_NO_DISTURB for
+			; dialog GenInteractions that should not take the
+			; focus and target when user interacts with them.
+    OWMFA_IS_POPUP:1	; Set if this object belongs to OLPopupWinClass
+    OWMFA_DEFAULT_ACTION_IS_NAVIGATE_TO_NEXT_FIELD:1
+			; Set if the default action for this window should be
+			; to navigate to the next field instead of the
+			; activating the object with the default exclusive
+    OWMFA_CUSTOM_WINDOW:1
+			; Set with HINT_GEN_WINDOW_CUSTOM_WINDOW
+			; If set, then gadget area (title bar, menus, etc.)
+			; isn't created.
+    :4
+OLWinMoreFixedAttr      end
+
+
+if _OL_STYLE	;--------------------------------------------------------------
+
+OLWinAttr	record
+    :1
+	OWA_DISMISS_WHEN_DISABLED:1
+				;window should be dismissed when disabled.
+    ;attribute flags for this object:
+	OWA_MOVABLE:1		;set if window is movable (can be picked up by
+				;bg area)
+	OWA_RESIZABLE:1		;set if window is resizable (is given resize
+				;corners)
+	OWA_PINNABLE:1		;if can be pinned (NOTE: if Pinnable, object
+				;MUST be subclassed from OLPopupWinClass)
+	OWA_MINIMIZABLE:1	;if the window can be "minimized" to an icon
+				;i.e.  (Note that even though this bit is
+				;set, the user may not be offered this feature)
+	OWA_MAXIMIZABLE:1	;if the window is allowed to be "maximized" to
+				;fill the screen.  (Note that even though this
+				;bit is set, the user may not be offered this
+				;feature)
+	OWA_CLOSABLE:1		;if is closable: this does not affect the
+				;functionality; it only determines which
+				;gadgets/glyphs are added to the window to allow
+				;the user to close it.
+	OWA_FOCUSABLE:1		;if window may be given the input focus.  If
+				;the window may not be given the focus, then
+				;no components within it may grab the keyboard
+				;focus.
+	OWA_TARGETABLE:1	;if contains data which may be given the
+				;active selected data exclusive.  Any window
+				;containing data which may be selected & then
+				;acted on by the application must be targetable.
+    ;descriptive flags for this object:
+	OWA_HEADER:1		;if window has header, which might contain
+				;a title, system icons, pins, etc.
+	OWA_TITLED:1		;if window shows its title in the header area.
+	OWA_THICK_LINE_BORDER:1	;if there is a thick line border (notice window)
+	OWA_SHADOW:1		;if there is a shadow (shadows are always
+				;rounded, this implies that the border width
+				;is 1 and is also rounded)
+    ;OpenLook - specific
+	OWA_HAS_WIN_MENU:1	;if there is a menu associated w/window,
+				;available by clicking MENU on background
+	OWA_HAS_POPUP_MENU:1	;
+
+OLWinAttr	end
+
+
+OL_ATTRS_BASE_WIN = mask OWA_HEADER or mask OWA_TITLED or mask OWA_FOCUSABLE \
+	or mask OWA_MOVABLE or mask OWA_RESIZABLE \
+	or mask OWA_HAS_WIN_MENU \
+	or mask OWA_MINIMIZABLE or mask OWA_MAXIMIZABLE
+
+endif		;END of OPEN LOOK specific code -------------------------------
+
+
+if _CUA_STYLE or _MAC	;---------------------------------------------------------------
+
+OLWinAttr	record
+    	OWA_REAL_MARGINS:1
+				;for windows that want some serious margins
+				;for their children, not just one pixel inside
+				;the border. (Belongs with KIDS_INSIDE_BORDER)
+	OWA_DISMISS_WHEN_DISABLED:1
+				;window should be dismissed when disabled.
+    ;attribute flags for this object:
+
+	OWA_MOVABLE:1		;set if window is movable (can be picked up by
+				;bg area)
+	OWA_RESIZABLE:1		;set if window is resizable (is given resize
+				;corners)
+	OWA_PINNABLE:1		;if can be pinned (NOTE: if Pinnable, object
+				;MUST be subclassed from OLPopupWinClass)
+	OWA_MINIMIZABLE:1	;if the window can be "minimized" to an icon
+				;i.e. during its lifetime -- this
+				;functionality is not allowed when the window
+				;is MINIMIZED, even if this flag is TRUE.
+	OWA_MAXIMIZABLE:1	;if the window can be "maximized" to fill the
+				;screen i.e. during its lifetime -- this
+				;functionality is not allowed when the window
+				;is MAXIMIZED, even if this flag is TRUE.
+	OWA_CLOSABLE:1		;if is closable: this does not affect the
+				;functionality; it only determines which
+				;gadgets/glyphs are added to the window to allow
+				;the user to close it.
+	OWA_FOCUSABLE:1		;if window may be given the input focus.  If
+				;the window may not be given the focus, then
+				;no components within it may grab the keyboard
+				;focus.
+	OWA_TARGETABLE:1	;if contains data which may be given the
+				;active selected data exclusive.  Any window
+				;containing data which may be selected & then
+				;acted on by the application must be targetable.
+    ;descriptive flags for this object:
+	OWA_HEADER:1		;if window has header, which might contain
+				;a title, system icons, pins, etc.
+	OWA_TITLED:1		;if window shows its title in the header area.
+	OWA_THICK_LINE_BORDER:1	;if there is a thick line border (notice window)
+    ;CUA/Motif- specific
+	OWA_HAS_WIN_MENU:1	;if there is a menu associated w/window,
+				;available by clicking MENU on background
+	OWA_HAS_SYS_MENU:1	;if the window has a system menu icon in the
+				;upper-left corner, which opens to the system
+				;menu.  Implies that three system menu icons
+				;should also appear.
+	OWA_KIDS_INSIDE_BORDER:1;if children should be located INSIDE the
+				;frame border, instead of on it. This bit set
+				;for menus.  
+				
+OLWinAttr	end
+
+
+MO_ATTR1	= mask OWA_HEADER or \
+		  mask OWA_TITLED or \
+		  mask OWA_HAS_SYS_MENU or \
+		  mask OWA_MOVABLE
+					;most windows support these, because of
+					;keyboard navigation)
+
+MO_ATTR2	= mask OWA_RESIZABLE or \
+		  mask OWA_MINIMIZABLE or \
+		  mask OWA_MAXIMIZABLE
+					;general resize flags
+
+
+MO_ATTRS_PRIMARY_WINDOW = MO_ATTR1 or MO_ATTR2 or \
+			  mask OWA_FOCUSABLE or \
+			  mask OWA_HAS_WIN_MENU or \
+			  mask OWA_THICK_LINE_BORDER
+
+MO_ATTRS_DISPLAY_WINDOW = MO_ATTR1 or MO_ATTR2 or \
+			  mask OWA_FOCUSABLE or \
+			  mask OWA_THICK_LINE_BORDER \
+			  and not (mask OWA_MINIMIZABLE)
+			  ; Change default display to NOT be minimizable,
+			  ; since our MDI implementation does not support it.
+
+MO_ATTRS_NOTICE_WINDOW = mask OWA_HEADER or \
+			 mask OWA_CLOSABLE or \
+			 mask OWA_FOCUSABLE or mask OWA_THICK_LINE_BORDER \
+			  or mask OWA_KIDS_INSIDE_BORDER \
+			  or mask OWA_REAL_MARGINS
+
+MO_ATTRS_COMMAND_WINDOW = MO_ATTR1 or mask OWA_CLOSABLE or mask OWA_FOCUSABLE \
+			or mask OWA_THICK_LINE_BORDER \
+			or mask OWA_KIDS_INSIDE_BORDER \
+			or mask OWA_REAL_MARGINS
+			  
+
+endif		;END of MOTIF specific code -----------------------------------
+
+OL_ATTRS_WIN_ICON	= mask OWA_FOCUSABLE or mask OWA_MOVABLE
+
+
+OLWinSpecState	record
+    OLWSS_SYS_ICONS_ATTACHED:1	;set if OpenWinEnsureSysMenuIcons has
+				;set one-way upward generic links for icons,
+				;& spec-built them.
+
+    OLWSS_MAXIMIZED:1		;if the window is currently full-screen
+    OLWSS_MINIMIZED:1		;if the window is presently an icon
+
+    OLWSS_PTR_IN_RAW_UNIV:1	;is set if ptr is in this window's universe
+
+    OLWSS_GRABBED:1		;if window controls are in active use
+				;-- window is grabbed for mouse input.
+				;See "SelectMyControlsOnly".
+
+    OLWSS_PINNED:1		;if window is pinned
+    OLWSS_DRAWN_PINNED:1	;OpenLook only: if pin is drawn in but not
+				;actually pinned
+    OLWSS_NOTIFY_TRIGGERS_IS_PINNED:1
+				;if window is pinned (OL menus only) and have
+				;not yet notified children GenTriggers to set
+				;themselves bordered
+
+OLWinSpecState	end
+
+
+
+OLWinMenuState	record
+    OLWMS_MENU_WINDOW_GRABS_ARE_TEMPORARY:1
+			; If set, it means that when a menu window requests
+			; the FOCUS or TARGET window exclusive, the current
+			; owner of the exclusive should be saved so can be
+			; restored later.
+
+    OLWMS_OD_IS_OWNER_BEFORE_MENU:1
+			; If set, indicates that OLWI_prevFocusExcl
+			; holds the OD & HierarchicalGrabFlags of an
+			; object that would have the focus were it not
+			; for a menu currently being up.
+
+    OLWMS_HAS_MENU_IN_STAY_UP_MODE:1
+			;if this window (GenPrimary, GenDisplay, command
+			;window, or menu) has a menu which is in
+			;stay-up mode. This prevents us from taking the
+			;GADGET exclusive when the mouse button is
+			;released in this window.
+
+    OLWMS_TOGGLE_MENU_NAV_PENDING:1
+			;waiting for release of menu nav key
+
+    :4
+
+OLWinMenuState	end
+
+
+
+OLWinHeaderState	record
+    OLWHS_UPDATE_PENDING:1		;TRUE if OpenWinHeaderMarkInvalid has
+					;been called, and there already in a
+					;MSG_OL_WIN_UPDATE_HEADER for this
+					;object on the UI queue.
+
+    ;these invalid flags start with the most general, and lead up the most
+    ;specific. For example, if the HEADER area is invalid, that implies that
+    ;the title area and icon images are invalid.
+
+    OLWHS_HEADER_AREA_INVALID:1		;TRUE if the entire header area is
+					;invalid - has changed height, etc.
+
+    OLWHS_FOCUS_AREA_INVALID:1		;TRUE if focus state has changed,
+					;and so we need to redraw that portion
+					;of the header that indicates the
+					;focus state. For OpenLook, this is the
+					;entire header area. For Motif, this
+					;is the title area alone.
+
+    OLWHS_TITLE_AREA_INVALID:1		;TRUE if the the color or size of the
+					;title background has changed. Should
+					;redraw title BG and moniker.
+
+    OLWHS_TITLE_IMAGE_INVALID:1		;TRUE if the title moniker has changed
+
+    OLWHS_HEADER_MARK_IMAGES_INVALID:1	;TRUE if the Close icon or Pin icon
+					;{OpenLook only) need redrawing.
+
+    OLWHS_SYS_ICON_IMAGES_INVALID:1	;TRUE if the System Icons (Motif only)
+					;need redrawing.
+
+    OLWHS_FIELD_ICON_IMAGES_INVALID:1	;TRUE if the Workspace and Applications
+					;menu buttons need to be drawn.
+OLWinHeaderState	end
+
+OLWHS_FULLY_INVALID =	mask OLWHS_HEADER_AREA_INVALID or \
+			mask OLWHS_FOCUS_AREA_INVALID or \
+			mask OLWHS_TITLE_AREA_INVALID or \
+			mask OLWHS_TITLE_IMAGE_INVALID or \
+			mask OLWHS_HEADER_MARK_IMAGES_INVALID or \
+			mask OLWHS_SYS_ICON_IMAGES_INVALID or \
+			mask OLWHS_FIELD_ICON_IMAGES_INVALID
+
+
+if _OL_STYLE	;START of OPEN LOOK specific code -----------------------------
+
+OLWinMoveResizeState	record
+    OLWMRS_MOVE_RESIZE_PENDING:1 ;set when a START_SELECT is interpreted as
+				 ;the beginning of a move and resize. cleared
+				 ;when a DRAG_SELECT is received and the
+				 ;operation begins. If still set when get
+				 ;END_SELECT, means void the operation.
+    OLWMRS_MOVING:1		;if window is being moved
+    OLWMRS_RESIZING_UL:1	;if window is resizing from the upper left
+    OLWMRS_RESIZING_UR:1	;if window is resizing from the upper right
+    OLWMRS_RESIZING_LL:1	;if window is resizing from the lower left
+    OLWMRS_RESIZING_LR:1	;if window is resizing from the lower right
+    :2
+OLWinMoveResizeState	end
+
+OLWMRS_RESIZING_MASK	= mask OLWMRS_RESIZING_UL or mask OLWMRS_RESIZING_UR \
+			  or mask OLWMRS_RESIZING_LL or mask OLWMRS_RESIZING_LR
+OLWMRS_MOVING_OR_RESIZING_MASK	= OLWMRS_RESIZING_MASK or mask OLWMRS_MOVING
+endif		;END of OPEN LOOK specific code -------------------------------
+
+
+if _CUA_STYLE or _MAC	;START of MOTIF specific code ---------------------------------
+
+
+OLWinMoveResizeState	record
+    OLWMRS_MOVE_RESIZE_PENDING:1 ;set when a START_SELECT is interpreted as
+				 ;the beginning of a move and resize. cleared
+				 ;when a DRAG_SELECT is received and the
+				 ;operation begins. If still set when get
+				 ;END_SELECT, means void the operation.
+    OLWMRS_MOVING:1		;if window is being moved
+    OLWMRS_RESIZING_UP:1	;if window is resizing upwards
+    OLWMRS_RESIZING_DOWN:1	;if window is resizing downwards
+    OLWMRS_RESIZING_LEFT:1	;if window is resizing to the left
+    OLWMRS_RESIZING_RIGHT:1	;if window is resizing to the right
+    :2
+OLWinMoveResizeState	end
+
+OLWMRS_RESIZING_MASK	= mask OLWMRS_RESIZING_UP or mask OLWMRS_RESIZING_DOWN \
+			  or mask OLWMRS_RESIZING_LEFT or mask OLWMRS_RESIZING_RIGHT
+
+OLWMRS_MOVING_OR_RESIZING_MASK	= OLWMRS_RESIZING_MASK or mask OLWMRS_MOVING
+
+endif		;END of MOTIF specific code -----------------------------------
+
+
+
+
+WinPosSizeState	record
+    ;this must line up with WPSF_PERSIST
+
+    WPSS_HAS_MOVED_OR_RESIZED:1
+			;window has been moved or resized by user or app.
+
+    ;this field should be in bits 6-0 of the higher byte of this word record
+    					;COULD MAKE THIS SMALLER
+    WPSS_STAGGERED_SLOT:7
+			;if this window has ever appeared in a staggered
+			;manner, which slot it occupied (0=has not)
+			;(high bit of field indicates is staggered icon)
+
+    WPSS_HAS_RESTARTED:1
+			;TRUE if this window was ATTACHED with extra data
+			;on the active list, meaning that the window was
+			;previously shut-down (AND it was staggered or
+			;moved by the user.) This is reset after a new
+			;stagger position is determined.
+
+    :2
+
+    WPSS_VIS_POS_IS_SPEC_PAIR:1
+			;TRUE if VI_bounds.R_left and R_top contain
+			;a SpecWinSizePair structure which describes the
+			;window's position in terms of a ratio of the
+			;Parent or Field window's size. During SPEC_BUILD,
+			;this structure will be converted into a coordinate
+			;pair. IMPORTANT: when this is true, the R_right and
+			;R_bottom fields contains actual size info, which is
+			;either in pixels or a SpecWinSizePair, as indicated
+			;by the WPSS_VIS_SIZE_IS_SPEC_PAIR... flags.
+
+    WPSS_VIS_SIZE_IS_SPEC_PAIR_PARENT:1
+			;TRUE if VI_bounds.R_left and R_top contain
+			;a SpecWinSizePair structure which describes the
+			;window's position in terms of pixels or a ratio of the
+			;Parent window's size.
+
+    WPSS_VIS_SIZE_IS_SPEC_PAIR_FIELD:1
+			;this is used in cases where the user has specified
+			;the size as a ratio of the field, and we have
+			;stuff the VI_bounds with the size info.
+
+    WPSS_POSITION_INVALID:1
+			;window position needs to be recalculated
+
+    WPSS_SIZE_INVALID:1
+			;window size needs to be recalculated
+
+WinPosSizeState	end
+
+	.assert	offset WPSS_STAGGERED_SLOT eq 8
+	.assert	offset WPSS_HAS_MOVED_OR_RESIZED eq offset WPSF_PERSIST
+
+
+
+if _OL_STYLE	;START of OPEN LOOK specific code -----------------------------
+OLWinType etype byte, 0
+OLWT_BASE_WINDOW		enum OLWinType	; Application base win
+OLWT_DISPLAY_WINDOW		enum OLWinType	; MDI secondary win
+OLWT_COMMAND_WINDOW		enum OLWinType
+OLWT_PROPERTIES_WINDOW		enum OLWinType
+OLWT_NOTICE_WINDOW		enum OLWinType
+OLWT_HELP_WINDOW		enum OLWinType
+OLWT_MENU			enum OLWinType
+OLWT_SUBMENU			enum OLWinType
+OLWT_SYSTEM_MENU		enum OLWinType
+OLWT_WINDOW_ICON		enum OLWinType
+endif		;END of OPEN LOOK specific code -------------------------------
+
+if _CUA_STYLE or _MAC	;START of MOTIF specific code ---------------------------------
+OLWinType etype byte, 0
+MOWT_PRIMARY_WINDOW		enum OLWinType
+MOWT_DISPLAY_WINDOW		enum OLWinType
+MOWT_COMMAND_WINDOW		enum OLWinType
+MOWT_PROPERTIES_WINDOW		enum OLWinType		;nuke this
+MOWT_NOTICE_WINDOW		enum OLWinType
+MOWT_HELP_WINDOW		enum OLWinType
+MOWT_MENU			enum OLWinType
+MOWT_SUBMENU			enum OLWinType
+MOWT_SYSTEM_MENU		enum OLWinType
+MOWT_WINDOW_ICON		enum OLWinType
+endif		;END of MOTIF specific code -----------------------------------
+
+
+    OLWI_type		OLWinType <>
+    OLWI_fixedAttr	OLWinFixedAttr <>	;fixed attributes (can't change)
+    OLWI_moreFixedAttr	OLWinMoreFixedAttr <>
+
+    ;THESE THREE MUST BE IN ORDER FOR OpenWinSwapState to work:
+
+    OLWI_attrs		OLWinAttr <>
+    OLWI_winPosSizeFlags WinPosSizeFlags <>	;window position and size
+						;preferences.
+    OLWI_winPosSizeState WinPosSizeState <>	;current state, including
+						;stagger slot number
+
+    OLWI_specState	OLWinSpecState <>
+    OLWI_menuState	OLWinMenuState <>
+    OLWI_headerState	OLWinHeaderState <>
+    OLWI_moveResizeState OLWinMoveResizeState <>
+
+    ;Whenever this window is created, moved, or resized, we get
+    ;MSG_VIS_UPDATE_GEOMETRY. We check window attributes flags (min, max,
+    ;closable, etc) and store the calculated size of the title area here.
+
+    OLWI_titleBarBounds	Rectangle <>
+
+if _OL_STYLE	;START of OPEN LOOK specific code -----------------------------
+    OLWI_menu		lptr			;popup window menu
+endif		;END of OPEN LOOK specific code -------------------------------
+
+if _CUA_STYLE or _MAC	;START of MOTIF specific code ---------------------------------
+    ; Since we create the System menu on the fly when OLWinClass gets
+    ; UPDATE_SPEC_BUILD, we need to send this method on to them.  When the
+    ; SystemMenuButton is created, it will tell OLWinClass its handle, so
+    ; OLWinClass can update the button's position.
+
+    OLWI_sysMenu	hptr
+    ; Block that StandardWindowMenuResource/DisplayWindowMenuResource has
+    ; been copied into, if any.
+
+    OLWI_sysMenuButton	lptr			;system menu button
+    ; OLMenuButton object created for StandardWindowMenu within above block.
+
+endif
+
+    OLWI_focusExcl	FTVMCGrab <>
+    ; focusExcl is a "HierarhicalGrab" (defined in User/userFlow.asm).  It
+    ; contains an OD, a word of data which may be stored w/whomever has
+    ; grab.  THIS instance of a BasicGrab is for the object within the
+    ; window which currently has the focus (such as a text object or view).
+
+    OLWI_targetExcl	FTVMCGrab <>
+    ; targetExcl is also a "HierarchicalGrab", but is used to indicate which
+    ; object in the window has the target exclusive - the object which may have
+    ; the active target selection with which an application may perform an
+    ; operation on.
+
+    OLWI_defaultExcl	HierarchicalGrab <>
+    ; this is also a "HierarchicalGrab". Is used to indicate the GenTrigger
+    ; within the window which has the DEFAULT exclusive: the trigger which is
+    ; activated when ENTER or RETURN is pressed in the window.
+
+    OLWI_masterDefault	optr
+    ; This is the OD of the GenTrigger or GenItem in the window which,
+    ; by virtue of HINT_DEFAULT, has been appointed as the default trigger
+    ; in the window, WHEN not overriden by OLWI_defaultExcl = OD of some
+    ; other GenTrigger which has a temporary default exclusive.
+
+    ;Here we save some of this window's position, size, and state information
+    ;when it is MAXIMIZED. THESE MUST BE IN ORDER for OpenWinSwapState.
+    ;(Note: OLWI_prevWinBounds is also used for pinned menus: When the button
+    ;for a pinned menu is pressed on, the menu's pinned location is saved here
+    ;so that when the menu button is release, the menu can be restored
+    ;to the pinned state in its old location.)
+
+    OLWI_prevAttrs		OLWinAttr <>
+    OLWI_prevWinPosSizeFlags	WinPosSizeFlags <>
+    OLWI_prevWinPosSizeState	WinPosSizeState <>
+    OLWI_prevWinBounds		Rectangle <>
+
+    ;Grab info (OD, flags, methods) for object which had focus exclusive
+    ;in this window BEFORE we started navigating through the menu bar or
+    ;before a menu opened.
+
+    OLWI_prevFocusExcl		FTVMCGrab <>
+
+OLWinClass	endc
+
+
+;### OLPopupWinClass
+; Extracted from /staff/pcgeos/Library/CommonUI/CWin/cwinPopup.asm:
+
+
+OLPopupWinClass	class	OLWinClass
+	uses	GenInteractionClass
+
+
+MSG_OL_DISMISS_SELECTED	message
+MSG_OL_DISMISS_ALL_POPUPS	message
+MSG_OL_POPUP_OWNER		message
+
+
+MSG_OL_POPUP_FIND_BUTTON	message
+
+MSG_SHOW_MENU_BUTTON	message	VisSpecMessages
+MSG_HIDE_MENU_BUTTON	message	VisSpecMessages
+MSG_KILL_MENU_BUTTON	message	VisSpecMessages
+
+MSG_OL_POPUP_IS_THREAD_BLOCKING_DIALOG	message
+
+
+OLPopupWinFlags	record
+    OLPWF_APP_MODAL:1			;set if HINT_INTERACTION_MODAL is present or if
+					;	GIA_MODAL is present
+    OLPWF_SYS_MODAL:1			;set if GIA_SYS_MODAL is present
+    OLPWF_FORCED_MODAL:1		;set if we set OLPWF_APP_MODAL internal
+					;	(i.e. for keyboard only mode)
+    OLPWF_FILE_MENU:1			;set if this is "File" menu
+					;	(GIGT_FILE_MENU)
+OLPopupWinFlags	end
+
+    OLPWI_button	lptr		;handle of button associated
+						;with this popup window.
+    OLPWI_pinTrigger	lptr		;if this is a menu, GenTrigger which
+					;starts PINNED mode
+
+    OLPWI_semPtr	fptr		;Far ptr to semaphore set up in
+					;GenDoDialog routine.
+
+    OLPWI_flags		OLPopupWinFlags
+
+OLPopupWinClass	endc
+
+
+;### OLMenuWinClass
+; Extracted from ../CommonUI/CWin/cwinMenu.asm:
+
+
+OLMenuWinClass	class	OLPopupWinClass
+	uses	GenClass
+
+
+MSG_MO_MW_ENTER_STAY_UP_MODE	message
+
+MSG_MO_MW_LEAVE_STAY_UP_MODE	message
+
+MSG_MO_MW_GET_MENU_CENTER	message
+
+HINT_IS_EXPRESS_MENU	vardata
+
+ATTR_OL_MENU_WIN_EXIT_TRIGGER	vardata	optr
+
+
+OLMenuWinSpecState	record
+    :1
+    OMWSS_WAS_PINNED:1	;set if menu was pinned, then opened as a regular
+			;menu. When menu closes, will be restored to pinned
+			;state in old location.
+
+    OMWSS_RE_PINNING:1	;set TRUE when a pinned menu, which has been opened
+			;under the menu button, is now returning to regular
+			;pinned state. This flag is required so that the
+			;gadget exclusive does not cause menu to close.
+
+    OMWSS_IN_STAY_UP_MODE:1
+			;set when this menu is in stay-up mode. Causes us
+			;to hold onto the WindowGrab when the user releases
+			;the mouse button. When the button is pressed again,
+			;we determine if it is 1) over the menu, 2) over the
+			;menu button, or 3) somewhere else. We do the right thg.
+    OMWSS_FILE_MENU:1
+			;set if this is a file menu (this should really be an
+			;attribute, but why waste these free bits?)
+    OMWSS_EXIT_CREATED:1
+			;set if this is a file menu and we created an exit
+			;trigger for it
+    OMWSS_INFREQUENT_USAGE:1
+			;set for submenus in PM which do not cascade
+			;automatically.  The mouse pointer must be moved over
+			;the right arrow mark to open the submenu.
+    :1
+OLMenuWinSpecState	end
+
+
+    OLMWI_specState	OLMenuWinSpecState <>
+    OLMWI_monikerSpace	sword
+    OLMWI_accelSpace	sword
+
+OLMenuWinClass	endc
+
+
+;### OLDialogWinClass
+; Extracted from /staff/pcgeos/Library/CommonUI/CWin/cwinDialog.asm:
+
+
+OLDialogWinClass	class	OLPopupWinClass
+
+
+MSG_OL_DIALOG_WIN_FIND_STANDARD_TRIGGER	message
+
+
+OLDialogOptFlags	record
+	OLDOF_BUILT:1			; TRUE if window is built
+	OLDOF_SINGLE_USAGE:1		; TRUE if single usage (close on
+					;	activation, Apply->OK)
+	OLDOF_COMPLEX_PROPERTIES:1	; TRUE if complex (use Reset)
+	OLDOF_DELAYED_MODE:1		; TRUE if delayed mode (use Apply)
+	OLDOF_REPLY_BAR_CREATED:1	; TRUE if we created reply bar (not
+					;	supplied by application)
+	OLDOF_DOING_COMPLETE:1		; TRUE if we are doing IC_DISMISS for
+					;	IC_INTERACTION_COMPLETE
+	:2
+OLDialogOptFlags	end
+
+
+	OLDWI_replyBar		optr
+	OLDWI_triggerList	lptr
+	OLDWI_optFlags		OLDialogOptFlags
+	OLDWI_gadgetArea	lptr
+	OLDWI_responseAD	ActionDescriptor
+
+OLDialogWinClass	endc
+
+
+;### OLMenuedWinClass
+; Extracted from /staff/pcgeos/Library/CommonUI/CWin/cwinMenuedWin.asm:
+
+
+OLMenuedWinClass	class	OLWinClass
+	uses	GenDisplayClass
+
+
+MSG_OL_MW_SET_ICON_POS	message
+
+MSG_OL_MENUED_WIN_UPDATE_ICON_MONIKER	message
+
+
+
+    OLMDWI_menuBar	lptr
+    OLMDWI_triggerBar	lptr
+    OLMDWI_gadgetArea	lptr		;composite that holds our gadgets
+
+    ;This is the handle of the OLWinIcon object associated with this
+    ;window. See OpenWinGenSetMinimized on how this object is instantiated.
+    ;(This object is in the GenApp resource, therefore we use an OPTR).
+   
+    OLMDWI_icon		optr		;icon
+
+    ;The following variables are filled in during MSG_META_INITIALIZE, where
+    ;the specific UI and the application can indicate their desired behavior.
+    ;OpenWinGenSetMinimized will send this info to the new icon as it is
+    ;created.  These may be updated via methods from the icon if it gets
+    ;moved around.
+
+    OLMDWI_iconWinPosSizeFlags	WinPosSizeFlags <>
+    OLMDWI_iconWinPosSizeState	WinPosSizeState <>
+    OLMDWI_iconPosLeft	sword
+    OLMDWI_iconPosTop	sword
+
+    ; These are the monikers to use for the icon, in case this window 
+    ; gets iconified.  They must be resolved ahead of time from this window's
+    ; moniker list because that moniker list is replaced with the most
+    ; appropriate moniker for the window itself.  We only keep an optr to the
+    ; moniker as the moniker sits in some resource somewhere, even after the
+    ; moniker list is replaced with a single moniker.
+
+    OLMDWI_iconMoniker		optr
+    OLMDWI_iconCaptionMoniker	optr
+
+OLMenuedWinClass	endc
+
+
+;### OLBaseWinClass
+; Extracted from /staff/pcgeos/Library/CommonUI/CWin/cwinBase.asm:
+
+
+OLBaseWinClass	class	OLMenuedWinClass
+	uses	GenPrimaryClass
+
+
+MSG_OL_BW_OPEN_CLOSE			message
+MSG_OL_BW_SIZE				message
+MSG_OL_BW_PROPERTIES			message
+MSG_OL_BASE_WIN_ADD_FIELD_ICONS		message
+MSG_OL_BASE_WIN_REMOVE_FIELD_ICONS	message
+
+MSG_OL_BASE_WIN_NOTIFY_OF_FILE_MENU	message
+
+
+ATTR_OL_BASE_WIN_HAVE_FILE_MENU		vardata
+
+
+OLBaseWinFlags	record
+	OLBWF_HAS_EXPRESS_TOOL_AREA:1
+	; Set if this primary is the one which currently "has" the express tool
+	; area associated with it, & so must position it as the window moves,
+	; changes shape, etc.
+
+	:7
+
+OLBaseWinFlags	end
+
+
+    OLBWI_longTermString	lptr
+    OLBWI_statusString		lptr
+    OLBWI_modeString		lptr
+    OLBWI_gcmFlags		GeneralConsumerModeFlags <>
+					;indicates which icons to use,
+					;and other GCM-specific info.
+
+
+    OLBWI_gcmLeftIcon		lptr	;icon for left side of header
+    OLBWI_gcmRightIcon		lptr	;icon for right side of header
+    OLBWI_flags			OLBaseWinFlags
+
+OLBaseWinClass	endc
+
+
+;### OLDisplayWinClass
+; Extracted from /staff/pcgeos/Library/CommonUI/CWin/cwinDisplay.asm:
+
+
+OLDisplayWinClass	class	OLMenuedWinClass
+	uses	GenDisplayClass
+
+
+MSG_OL_DISPLAY_RE_MAXIMIZE		message
+
+MSG_OL_DISPLAY_SEND_NOTIFICATION	message
+
+
+OLDisplayWinFlags	record
+    OLDWF_ON_FIELD:1	;TRUE if this GenDisplay is not inside its
+			;GenDisplayGroup (visually). This is set when
+			;the GenDisplayGroup gets a hint.
+
+    ;The following two flags are set by hints, and are mutually exclusive.
+    ;If both are false, it means the GenPrimary adopts menus only when
+    ;this GenDisplay has the TARGET exclusive.
+
+    OLDWF_ALWAYS_ADOPT_MENUS:1
+			;TRUE for the GenPrimary to always adopt our menus,
+			;regardless of the TARGET exclusive state
+    OLDWF_NEVER_ADOPT_MENUS:1
+			;TRUE for the GenPrimary to never adopt our menus,
+			;regardless of the TARGET exclusive state
+    OLDWF_TARGET:1	;TRUE is we have the target
+    :4
+OLDisplayWinFlags	end
+
+
+    OLDW_flags		OLDisplayWinFlags <>
+OLDisplayWinClass	endc
+
+
+;*** Other
+
+;### copenTrace
+; Extracted from /staff/pcgeos/Library/CommonUI/CUtils/copenTrace.asm:
+
+
+
+TraceCmds etype byte
+END_TRACE 		enum TraceCmds
+VERT_LINE 		enum TraceCmds
+HORIZ_LINE 	 	enum TraceCmds
+VERT_LINE_MOVE 		enum TraceCmds
+HORIZ_LINE_MOVE 	enum TraceCmds
+VERT_MOVE 		enum TraceCmds
+HORIZ_MOVE		enum TraceCmds
+DIAG_MOVE 		enum TraceCmds
+LINE_PATTERN 		enum TraceCmds
+AREA_PATTERN 		enum TraceCmds
+SET_DX 			enum TraceCmds
+SKIP 			enum TraceCmds
+SET_SELECTED 		enum TraceCmds
+FILL_IF_SELECTED 	enum TraceCmds
+FRECT 			enum TraceCmds
+RECT_MOVE 		enum TraceCmds
+FLIP_ORIENTATION	enum TraceCmds
+
+ColorTypes etype byte		;
+BOTTOM_EDGE_COLOR 	enum ColorTypes
+RIGHT_EDGE_COLOR 	enum ColorTypes
+TOP_EDGE_COLOR 		enum ColorTypes
+LEFT_EDGE_COLOR 	enum ColorTypes
+AREA_COLOR 		enum ColorTypes
+TEXT_COLOR 		enum ColorTypes
+BLACK_COLOR 		enum ColorTypes
+JOIN_EDGE_COLOR 	enum ColorTypes
+
+WORD_BP 	= 	40h	;try to pick a number that won't be used!
+BYTE_SIZE	=	20h
+BYTE_BP		=	WORD_BP or BYTE_SIZE
+NOTHING_SELECTED=	OLSS_BOGUS ;a number that won't match sel flags
+
+TraceFlags 	record  TRF_UNUSED:5, TRF_NEXT_SEL:1, TRF_SELECTED:1, TRF_ROTATED:1
+
+
+
+TraceArgs	struct				;
+	TA_routOffset		word		;
+	TA_curLineClr		Color
+	TA_curAreaClr		Color
+	TA_flags		TraceFlags  	;
+	TA_state		byte		;
+TraceArgs	ends
+
+
+
+;### OLButtonClass
+; Extracted from /staff/pcgeos/Library/CommonUI/CButton/copenButton.asm:
+
+
+OLButtonClass	class VisClass
+	uses	GenTriggerClass
+
+REDRAW_VIA_QUEUE = TRUE	;if this seems OK in non-error checking code, 
+			;make it permanent.
+
+
+MSG_OL_BUTTON_REDRAW		message
+
+MSG_OL_BUTTON_SET_DRAW_STATE_UNKNOWN	message
+
+MSG_OL_BUTTON_SETUP	message
+
+MSG_OL_BUTTON_GET_GEN_PART	message
+
+if _OL_STYLE	;---------------------------------------------------------------
+
+MSG_OL_BUTTON_SET_BORDERED	message	VisSpecMessages
+
+endif		;---------------------------------------------------------------
+
+MSG_OL_BUTTON_QUERY_IS_TRIGGER		message
+
+MSG_OL_BUTTON_SET_WIN_FLAG		message
+
+MSG_OL_BUTTON_CLEAR_WIN_FLAG		message
+
+MSG_OL_BUTTON_KBD_ACTIVATE		message
+
+
+    HINT_SYS_ICON		vardata
+		;this is used internally in the specific UI when creating
+		;a button for the title area of a window.
+
+    HINT_GCM_SYS_ICON		vardata
+		;this is used internally in the specific UI when creating
+		;a button for a GCM Primary window. Is same as HINT_SYS_ICON,
+		;but sets an additional attribute flag.
+
+    HINT_MDI_LIST_ENTRY vardata
+    ; This hint is used internally by the specific UI when creating a list
+    ; entry which will appear in the MDI windows menu.  The specific UI
+    ; uses this hint to set certain flags for appropriate behavior.
+    ; 
+    ; Has 1 word of data following, which is the chunk handle of the generic
+    ; object in the same block which should be used for its generic
+    ; moniker/enable bit.  This should be stuffed in before the first method
+    ; is sent to the object, as this data is copied out in MSG_META_INITIALIZE.
+
+
+OLButtonFixedAttrs	record
+    OLBFA_GCM_SYS_ICON:1	;set if button is a GCM icon in the header area
+				;(implies OLBSS_SYS_ICON)
+    OLBFA_DEFAULT_FOCUS:1	;set if button has HINT_DEFAULT_FOCUS on it.
+  
+    ;these two are mutually exclusive.
+
+    OLBFA_MASTER_DEFAULT_TRIGGER:1 ;set if HINT_DEFAULT is present. During
+				;SpecBuild, will notify window that this trigger
+				;gets the DEFAULT exclusive if no other trigger
+				;has requested it.
+
+    OLBFA_CAN_BE_TEMP_DEFAULT_TRIGGER:1
+				;set by default, except in for non-reply
+				;bar buttons in Motif.
+				;Reset with HINT_TRIGGER_DESTRUCTIVE_ACTION;
+				;set with HINT_ENSURE_TEMPORARY_DEFAULT.
+				;When gain the FOCUS exclusive, prevents this
+				;trigger from grabbing the DEFAULT exclusive.
+
+    OLBFA_IMMEDIATE_ACTION:1	;set if ATTR_GEN_TRIGGER_IMMEDIATE_ACTION (should send the
+				;MSG_GEN_TRIGGER_SEND_ACTION before it takes the menu down.)
+
+    OLBFA_IN_REPLY_BAR:1	;set if GenTrigger is located inside reply bar,
+				;and so needs larger margins, etc.
+    OLBFA_FORCE_SHORTCUT:1
+    ;set if shortcut should be shown even if it would otherwise not be
+    ;(i.e. gstring, not in a menu)
+    ;(set by HINT_SHOW_SHORTCUT, used if not keyboard-only or no-keyboard modes)
+
+    OLBFA_FORCE_NO_SHORTCUT:1
+    ;set if shortcut should *not* be shown even if it would otherwise be
+
+OLButtonFixedAttrs	end
+
+			
+OLButtonMoreAttrs	record
+    OLBMA_EXPAND_WIDTH_TO_FIT_PARENT:1
+    OLBMA_EXPAND_HEIGHT_TO_FIT_PARENT:1
+    OLBMA_CAN_CLIP_MONIKER_WIDTH:1
+    OLBMA_CAN_CLIP_MONIKER_HEIGHT:1
+    OLBMA_CENTER_MONIKER:1
+    ;Various geometry attributes for the button.  Must be in same order as in
+    ;OLGlyphDisplay!
+
+    OLBMA_IN_TOOLBOX:1		;set if in toolbox
+    OLBMA_DRAW_SHORTCUT_BELOW:1
+    ;set if keyboard accelerator should be draw below moniker instead of
+    ;to the right
+
+    OLBMA_WAS_DOUBLE_CLICKED:1	;set if was double-clicked on last press
+OLButtonMoreAttrs	end
+
+
+
+OLButtonSpecState	record
+    ;MOVE SOME OF THESE TO OLButtonFixedAttrs to gain some space.
+    OLBSS_IN_MENU:1		;set if button is inside a menu or sub-menu.
+    OLBSS_IN_MENU_BAR:1		;set if button is in the menu bar
+    OLBSS_SETTING:1		;set if subclassed by OLSettingClass
+    OLBSS_SYS_ICON:1		;set if button is an system icon: border is
+				;square and hugs bitmap passed as VisMoniker,
+				;GenPrimary is visdad.
+
+    ;The following two flags are copied from OLBSS_BORDERED and OLBSS_DEPRESSED
+    ;when the user begins to interact with a button. When the user is done,
+    ;this flags are copied back, greatly simplifying our code across spec uis.
+
+    OLBSS_WAS_BORDERED:1	;set if button was bordered before pressed. 
+
+    OLBSS_DEFAULT_TRIGGER:1	;set if HINT_DEFAULT is present. During
+				;SpecBuild, will notify window that this trigger
+				;gets the DEFAULT exclusive if no other trigger
+				;has requested it.
+
+    OLBSS_WAS_DEPRESSED:1	;set if button was depressed before pressed. 
+
+    OLBSS_HAS_MOUSE_GRAB:1	;set if button has active mouse grab
+
+    ;the following 8 flags must be in the lower byte of this record
+
+    OLBSS_MENU_DOWN_MARK:1	;set if button leads to a vertical menu
+    OLBSS_MENU_RIGHT_MARK:1	;set if button leads to a submenu
+    OLBSS_WINDOW_MARK:1		;set if button leads to a dialog box
+
+    ;the following flags match flags in OLButtonOptFlags
+
+    OLBSS_DEFAULT:1		;set if this button has the DEFAULT exclusive
+				;for this window.
+    OLBSS_BORDERED:1		;set if button should not be drawn with a
+    				;border
+    OLBSS_SELECTED:1		;set if the button should be drawn selected
+				;(checkmark to left of button)
+    OLBSS_DEPRESSED:1		;set if button should be drawn depressed (the
+    				;mouse is over the button, OR the keyboard
+				;selection cursor is on this button AND this
+				;button type does not show cursored emphasis
+				;as a dotted outline box.)
+    OLBSS_CURSORED:1		;set if the button should be drawn selected
+OLButtonSpecState	end
+
+
+.assert (mask OLBSS_MENU_DOWN_MARK eq mask OLMA_DISP_DOWN_ARROW), \
+		"ERROR: OLButtonSpecState does not match OpenMonikerFlags"
+.assert (mask OLBSS_MENU_RIGHT_MARK eq mask OLMA_DISP_RT_ARROW), \
+		"ERROR: OLButtonSpecState does not match OpenMonikerFlags"
+.assert (mask OLBSS_WINDOW_MARK eq mask OLMA_DISP_WIN_MARK), \
+		"ERROR: OLButtonSpecState does not match OpenMonikerFlags"
+
+.assert ((mask OLBSS_WAS_BORDERED shr 8) eq mask OLBSS_BORDERED), \
+		"ERROR: OLButtonSpecState is fucked."
+.assert ((mask OLBSS_WAS_DEPRESSED shr 8) eq mask OLBSS_DEPRESSED), \
+		"ERROR: OLButtonSpecState is fucked."
+
+OLBSS_OPENS_POPUP_WINDOW_MASK = mask OLBSS_MENU_DOWN_MARK or \
+				mask OLBSS_MENU_RIGHT_MARK or \
+				mask OLBSS_WINDOW_MARK
+
+OLBSS_NON_STD_BUTTON_MASK = mask OLBSS_IN_MENU or \
+			    mask OLBSS_IN_MENU_BAR or \
+			    mask OLBSS_SYS_ICON
+
+
+OLButtonOptFlags	record
+    OLBOF_EC_OLD_STATE_SAVED:1	;TEMPORARY
+
+    OLBOF_ENABLED:1		;set if button is enabled
+    OLBOF_DRAW_STATE_KNOWN:1	;set if state is known to be valid
+    OLBOF_DRAWN_DEFAULT:1	;set if button is drawn as the default button
+    OLBOF_DRAWN_BORDERED:1	;set if button is drawn with a border
+    OLBOF_DRAWN_SELECTED:1	;set if button is drawn with checkmark
+    OLBOF_DRAWN_DEPRESSED:1	;set if button is drawn and unhappy
+    OLBOF_DRAWN_CURSORED:1	;TRUE if this button has the FOCUS
+				;exclusive (for kybd navigation)
+OLButtonOptFlags	end
+
+
+OLBOF_STATE_FLAGS_MASK =   mask OLBOF_DRAWN_DEFAULT \
+			or mask OLBOF_DRAWN_BORDERED \
+			or mask OLBOF_DRAWN_SELECTED \
+			or mask OLBOF_DRAWN_DEPRESSED \
+			or mask OLBOF_DRAWN_CURSORED
+
+.assert (mask OLBOF_ENABLED eq mask VA_FULLY_ENABLED), \
+		"ERROR: OLBOF_ENABLED does not match VA_FULLY_ENABLED"
+.assert (mask OLBOF_DRAWN_SELECTED eq mask OLBSS_SELECTED), \
+		"ERROR: OLBOF_DRAWN_SELECTED does not match OLBSS_SELECTED"
+.assert (mask OLBOF_DRAWN_BORDERED eq mask OLBSS_BORDERED), \
+		"ERROR: OLBOF_DRAWN_BORDERED does not match OLBSS_BORDERED"
+.assert (mask OLBOF_DRAWN_SELECTED eq mask OLBSS_SELECTED), \
+		"ERROR: OLBOF_DRAWN_SELECTED does not match OLBSS_SELECTED"
+.assert (mask OLBOF_DRAWN_DEPRESSED eq mask OLBSS_DEPRESSED), \
+		"ERROR: OLBOF_DRAWN_DEPRESSED does not match OLBSS_DEPRESSED"
+.assert (mask OLBOF_DRAWN_CURSORED eq mask OLBSS_CURSORED), \
+		"ERROR: OLBOF_DRAWN_CURSORED does not match OLBSS_CURSORED"
+
+	
+if _OL_STYLE	;---------------------------------------------------------------
+
+BWButtonRegionSetStruct	struct
+    BWBRSS_borderPtr		nptr.Region	;pointer to border region def.
+    BWBRSS_interiorPtr		nptr.Region	;pointer to interior region def.
+    BWBRSS_monikerFlags		DrawMonikerFlags <> ;flags for moniker drawing
+    BWBRSS_monikerXInset	byte	(?)	;x inset for moniker drawing
+    BWBRSS_monikerYInset	byte	(?)	;y inset for moniker drawing
+    BWBRSS_monikerYInsetCGA	byte	(?)	;y inset for CGA
+BWButtonRegionSetStruct	ends
+
+endif
+	
+if (_CUA_STYLE and (not _DESKMATE)) or _MAC ;-----------------------------------
+
+BWButtonRegionSetStruct	struct
+    BWBRSS_borderPtr	nptr.Region	;pointer to border region def.
+    BWBRSS_interiorPtr	nptr.Region	;pointer to interior region def.
+    BWBRSS_monikerFlags		DrawMonikerFlags <> ;flags for moniker drawing
+    BWBRSS_monikerXInset	byte	(?)	;x inset for moniker drawing
+    BWBRSS_monikerYInset	byte	(?)	;y inset for moniker drawing
+    BWBRSS_minHeight		byte	(?)	;min height for button
+    BWBRSS_monikerYInsetCGA	byte	(?)	;y inset for CGA
+BWButtonRegionSetStruct	ends
+
+endif
+	
+if	_OL_STYLE or _MOTIF ;-----------------------------
+
+ColorButtonRegions	struct
+    CBR_leftTop		nptr.Region	;left/top of border
+    CBR_rightBottom	nptr.Region	;right/bottom of border
+    CBR_interior	nptr.Region	;interior of border
+ColorButtonRegions	ends
+
+endif
+
+if	_PM ;---------------------------------------------
+
+ColorButtonRegions	struct
+    CBR_leftTop		nptr.Region	;left/top of border
+    CBR_rightBottom	nptr.Region	;right/bottom of border
+    CBR_interior	nptr.Region	;interior of border
+    CBR_exterior	nptr.Region	;exterior of border
+ColorButtonRegions	ends
+
+endif
+
+
+    OLBI_genChunk	lptr			;chunk holding generic data
+    OLBI_fixedAttrs	OLButtonFixedAttrs	;permanent attributes
+    OLBI_moreAttrs	OLButtonMoreAttrs	;more of them.
+    OLBI_optFlags	OLButtonOptFlags	;keep these two flags
+    OLBI_specState	OLButtonSpecState	;bytes in this order
+
+OLButtonClass	endc
+
+
+;### OLMenuButtonClass
+; Extracted from ../CommonUI/CButton/copenMenuButton.asm:
+
+
+OLMenuButtonClass	class	OLButtonClass
+	uses	GenClass
+
+
+MSG_MO_MB_LEAVE_STAY_UP_MODE	message
+
+MSG_OL_MENU_BUTTON_SET_IS_SYS_MENU_ICON	message
+
+MSG_OL_MENU_BUTTON_KBD_ACTIVATE		message
+
+MSG_OL_MENU_BUTTON_SEND_RIGHT_ARROW_TO_PARENT_MENU	message
+
+MSG_OL_MENU_BUTTON_NOTIFY_MENU_DISMISSED	message
+
+MSG_OL_MENU_BUTTON_CLOSE_MENU		message
+
+MSG_OL_MENU_BUTTON_INIT_POPUP_ORIENTATION	message
+
+OLMenuButtonSpecState	record
+    OLMBSS_MENU_FUNCTION_PENDING:1
+			;set when a menu function is in progress. Means that
+			;the correct mouse button is pressed, and the menu
+			;is displayed or will be displayed shortly.
+			;THIS MUST MATCH UIFA_SELECT in UIFunctionsActive.
+
+    OLMBSS_OPENS_POPUP_LIST:1
+			;Set when a menu button opens a popup list.
+    OLMBSS_DEFAULT_FUNCTION_PENDING:1
+			;set when a default function is in progress. Means that
+			;the correct mouse button is pressed, and the default
+			;button moniker is displayed in the menu button.
+			;THIS MUST MATCH UIFA_FEATURES in UIFunctionsActive.
+
+    OLMBSS_ORIENT_POPUP_HORIZONTALLY:1
+			;Usually popups are vertical.  Popup lists currently
+			;can be made horizontal if this button is in a vertical
+			;composite.
+    OLMBSS_POPUP_OPEN:1	;set if menu is opened and visible on screen.
+    OLMBSS_CLOSING_MENU:1
+			;for stay-up-mode support: this is set when a MENU
+			;function ends, and the window is displayed.
+
+    OLMBSS_CLOSE_MENU_ON_LOST_GADGET_EXCL:1
+			;set when GAIN gadget exclusive. If we lose the gadget
+			;exclusive, and this is set, we close our menu.
+			;If our menu passes a SVQT_REMOTE_GRAB_GADGET_EXCL
+			;through this menu, we clear this flag, so that
+			;we don't drop our menu as we lose the gadget excl.
+    OLMBSS_SYS_MENU_ICON:1
+			;set if is Motif system menu icon, so that a double-
+			;click operation causes the window to be dismissed.
+OLMenuButtonSpecState	end
+
+.assert (mask OLMBSS_MENU_FUNCTION_PENDING eq mask UIFA_SELECT), \
+		"ERROR: OLMenuButtonSpecState must match UIFunctionsActive"
+.assert (mask OLMBSS_DEFAULT_FUNCTION_PENDING eq mask UIFA_FEATURES), \
+		"ERROR: OLMenuButtonSpecState must match UIFunctionsActive"
+
+
+OLMenuButtonFunctionsActive	record
+    OLMBFA_MENU:1	;set when the MENU button is pressed (SELECT button
+			;in CUA, can be either SELECT or FEATURES in OpenLook)
+			;THIS MUST MATCH UIFA_SELECT in UIFunctionsActive.
+    :1
+    OLMBFA_DEFAULT:1	;set when the DEFAULT button is pressed (can be
+			;either SELECT or FEATURES buttons in OpenLook)
+			;THIS MUST MATCH UIFA_FEATURES in UIFunctionsActive.
+    :4
+    OLMBFA_IN_BOUNDS:1	;set when mouse pointer is in menu button bounds
+OLMenuButtonFunctionsActive	end
+
+.assert (mask OLMBFA_MENU eq mask UIFA_SELECT), \
+	"ERROR: OLMenuButtonFunctionsActive must match UIFunctionsActive"
+.assert (mask OLMBFA_DEFAULT eq mask UIFA_FEATURES), \
+	"ERROR: OLMenuButtonFunctionsActive must match UIFunctionsActive"
+.assert (mask OLMBFA_IN_BOUNDS eq mask UIFA_IN), \
+	"ERROR: OLMenuButtonFunctionsActive must match UIFunctionsActive"
+
+
+OLS <	OLMBI_menuTimer	dword	(?)	;time at menu start select	>
+	OLMBI_popupType	OLWinType <>
+	OLMBI_specState	OLMenuButtonSpecState <>
+
+OLMenuButtonClass	endc
+
+
+;### OLApplicationClass
+; Extracted from /staff/pcgeos/Library/CommonUI/CUtils/copenApplication.asm:
+
+
+OLApplicationClass	class	VisContentClass
+	uses	GenApplicationClass
+
+MSG_OL_APP_NAVIGATE_TO_NEXT_WINDOW	message
+
+MSG_OL_APP_DO_DIALOG_RESPONSE		message
+
+MSG_OL_APP_DO_DIALOG_NULL		message
+
+MSG_OL_APP_UPDATE_TASK_ENTRY		method
+
+
+MSG_OL_APP_START_TIMER		message
+	
+MSG_OL_APP_STOP_TIMER		message
+	
+MSG_TIMER_EXPIRED	message	MetaUIMessages
+	
+
+
+AppFlowFlags	record
+	AFF_FLOW_HOLDING_INPUT_FOR_APP:1
+	; Set if we've called FlowHoldUpInput, but not FlowRestoreInput yet.
+	; Used exclusively by the routine OLAppUpdateFlowHoldUpState
+
+	AFF_FOCUS_APP:1
+	; Set if this is the current active application
+
+	AFF_OVERRIDE_INPUT_RESTRICTIONS:1
+	; Set if current active/implied window requests that input hold up,
+	; ignore & busy states be overriden, so that the user can interact
+	; with it.
+
+	:5
+AppFlowFlags	end
+
+
+
+    OLAI_impliedWin		MouseGrab
+    ; Window of application that mouse is over
+
+    OLAI_modalWin		optr
+    ; InputOD of current modal window within application, if any, whether
+    ; system or app modal.  0 if none.
+    ; PLEASE NOTE that an OD may have the modal window exclusive while
+    ; its window is not on screen.  This allows a window to cleanly close,
+    ; & then transfer the modal exclusive to a different window.
+    ; If APP MODAL, the window must have priority WIN_PRIO_MODAL & be 
+    ; placed on the field that the application resides on.
+    ; If SYS MODAL, the window must also have priority WIN_PRIO_MODAL, but
+    ; must additionally have it's own LAYER_ID, & have a layer priority
+    ; of LAYER_PRIO_MODEL.  It must be placed on the system default screen.
+
+    OLAI_fieldWin		hptr
+    ; Handle of field win this app is placed on
+
+    OLAI_screenWin		hptr
+    ; Handle of default screen window, where any system-modal dialogs that
+    ; this app has should be placed.
+
+    OLAI_flowFlags		AppFlowFlags
+    ; Flags used to moniter input flow
+
+    OLAI_busyCount		word
+    ; # of outstanding requests for the application to be marked as "Busy",
+    ; which causes only a cursor change while over the application.
+
+    OLAI_holdUpInputCount	word
+    ; # of outstanding requests for the application to be marked as requiring
+    ; all input for it to be held up.
+
+    OLAI_ignoreInputCount	word
+    ; # of outstanding requests for the application to EAT all input (i.e.,
+    ; enter a fake modal state, in which the application blocks input to
+    ; all windows, even though there is no active window
+
+    OLAI_completelyBusyCount	byte
+    ; # of outstanding requests for any modal window to be marked as "Busy",
+    ; which causes only a cursor change while over an app modal window
+
+    OLAI_nonModalFocus	optr
+    ; Optr of last object to have or request the focus exclusive, that was
+    ; not for the implementation of a modal window state.
+
+    ; Top node within application for Focus hiearchy.  OD holds
+    ; the window within the application which is the focus window -
+    ; that is, it modifies it's appearance to the user to indicate that
+    ; it is the place that it is active, & allows 1 of the text objects
+    ; within it to grab the keyboard, & display a text insertion point, &
+    ; any selected area within the text.
+
+    ; Top node within the application for Target hiearchy.  OD holds
+    ; the window within the application which the user has selected, or made
+    ; a selection in, for making some operation.
+
+    OLAI_modelExcl	FTVMCGrab <>
+    ; Override hierarchy for MSG_META_SEND_CLASSED_EVENT "TO_MODEL" option.
+    ; Such messages are normally sent down the Target hierarchy, but if an
+    ; object has grabbed this exclusive, such messages will be sent here 
+    ; instead.  Should only be grabbed by legitimate current "Model" objects
+    ; if they can't be on the Target hiearchy for some reason.
+    ; Objects gaining this exclusive will receive
+    ; "MSG_META_GAINED_MODEL_EXCL", & those losing it
+    ; "MSG_META_LOST_MODEL_EXCL".
+
+    OLAI_prevPriority		byte	(?)
+    ; prevPriority is the priority of the first thread of the application
+    ; BEFORE we modify it to be at level FOCUS, when this application
+    ; becomes the active application.  It is stored here so that the old
+    ; priority may be recovered when the application exclusive ends.
+
+    OLAI_appMenuItemEntry 	optr
+    ; GenListEntry which represents this application in the Application Menu
+    ; which the GenField maintains.
+
+    OLAI_stdDialogSummons	optr
+    OLAI_stdDialogOD		optr
+    OLAI_stdDialogMethod	word
+    ; Current MSG_GEN_APP_DO_STANDARD_DIALOG dialog box summons,
+    ; destination OD and method
+    
+    OLAI_timerOD		optr	
+    OLAI_timerID		word
+    OLAI_timerHandle		word
+    ; Instance data used by timer methods.  
+
+    OLAI_units			AppMeasurementType
+    ; Current units used by applications
+
+OLApplicationClass	endc
+
+OLAppTaskItemClass	class	GenItemClass
+
+MSG_OL_APP_TASK_ITEM_SET_OPERATING_PARAMS	message
+
+	OLATI_appObj		optr
+	OLATI_parentWin		hptr.Window
+
+OLAppTaskItemClass	endc
+
+
+;### OLFieldClass
+; Extracted from /staff/pcgeos/Library/CommonUI/CWin/cwinField.asm:
+
+
+OLFieldClass	class	VisCompClass
+	uses	GenFieldClass
+
+
+MSG_OL_WORKSPACE_REFRESH	message
+MSG_OL_WORKSPACE_CLIPBOARD	message
+MSG_OL_WORKSPACE_PRINT_SCREEN	message
+
+MSG_OL_FIELD_SELECT_APPLICATION	method
+
+FieldBGDrawAttr	etype	byte
+	FBGDA_UPPER_LEFT	enum	FieldBGDrawAttr
+	;Just draw the graphic in the upper left of the screen
+
+	FBGDA_CENTER		enum	FieldBGDrawAttr
+	;Center the graphic on the screen
+
+	FBGDA_TILE		enum	FieldBGDrawAttr
+	;Tile the graphic to fill the screen
+
+FieldBGFlags	record
+	FBGF_DRAW_ATTR FieldBGDrawAttr:4
+	;Set if we want to fill the display by tiling the BG
+
+	:4
+FieldBGFlags	end
+
+MSG_OL_FIELD_RELEASE_EXPRESS_MENU	message
+
+MSG_OL_FIELD_POPUP_EXPRESS_MENU		message
+
+MSG_OL_FIELD_MOVE_TOOL_AREA		message
+
+MSG_OL_FIELD_GET_TOOL_AREA_SIZE		message
+
+MSG_OL_FIELD_SIZE_TOOL_AREA		message
+
+
+
+    OLFI_staggerSlotMap word	8 dup (?) ;16 bit X 8 bit map indicating used
+					  ;stagger slots (63 for windows,
+					  ;63 for icons).
+    OLFI_BGFile	hptr		; VM handle of file containing BG to
+    				; display (0 if none wnated).
+    OLFI_BGData	word		; if FBGFT_STANDARD_GSTRING, GString handle of
+				; BG to display (0 if no BG wanted)
+    OLFI_BGFlags	FieldBGFlags
+				;How to display the BG 
+
+    OLFI_toolArea	lptr	;FloatingToolArea that Express menu is placed in
+
+    ;note: these lptrs must be in this order: menu, menu button.
+
+    OLFI_expressMenu	lptr	;ExpressMenu object for this field.
+    OLFI_expressMenuButton lptr	;menu button for ExpressMenu object
+
+    OLFI_expressMenuTaskList lptr ;Task GenList object within the ExpressMenu
+
+    OLFI_focusedAppPrimary optr	;OD of GenPrimary which has focus exclusive,
+				;and therefore has Application Menu Button
+				;installed in its title bar.
+
+    OLFI_focusExcl	FTVMCGrab <>
+    OLFI_targetExcl	FTVMCGrab <>
+
+    OLFI_nonModalFocus	optr
+    ; Optr of last object to have or request the focus exclusive, that was
+    ; not for the implementation of a modal geode state.
+
+OLFieldClass	endc
+
+TaskItemClass	class	GenItemClass
+
+MSG_TASK_ITEM_SET_DESTINATION	message
+
+    TII_destination	optr
+
+TaskItemClass	endc
+
+
+ToolAreaClass	class	GenInteractionClass
+ToolAreaClass	endc
+
+
+
+;### OLScreenClass
+; Extracted from /staff/pcgeos/Library/CommonUI/CWin/cwinScreen.asm:
+
+
+OLScreenClass	class	VisCompClass
+		uses	GenScreenClass	; builds from GenScreenClass
+
+OLScreenClass	endc
+
+
+;### OLSystemClass
+; Extracted from /staff/pcgeos/Library/CommonUI/CUtils/copenSystem.asm:
+
+
+OLSystemClass	class	VisCompClass
+		uses	GenSystemClass
+
+
+
+
+
+    OLSYI_focusExcl		HierarchicalGrab
+    OLSYI_targetExcl		HierarchicalGrab
+    OLSYI_modelExcl		HierarchicalGrab
+    ; The System object is a node for every hierarchy under the sun.  The
+    ; Field object normally grabs the focus & target exclusives.
+
+    OLSYI_modalGeode		BasicGrab
+    ; InputObj of current sys-modal geode, if any
+
+    OLSYI_modalParentObj	optr
+    ; Parent Obj of modalGeode above
+
+    OLSYI_nonModalFocus		optr
+    ; InputObj of last non-modal geode to request/have requested for it,
+    ; the focus.  Focus will be restored to this object once all system modal
+    ; dialogs have been played out.
+
+
+
+OLSystemClass	endc
+
+
+;### OLAdministratorClass
+
+;### OLPaneClass
+; Extracted from /staff/pcgeos/Library/CommonUI/CView/cviewPane.asm:
+
+
+OLPaneClass	class	OLCtrlClass
+	uses	GenViewClass
+		
+		
+global	textKbdBindings:word
+	
+	
+					
+MSG_SPEC_VIEW_PAN			message
+	
+MSG_SPEC_VIEW_INIT_ORIGIN		message
+
+
+OLPaneScrollFlags record 
+	OLPSF_DONT_SEND_TO_SCROLLBARS:1, 
+		
+	OLPSF_DONT_REDRAW_SCROLLBARS:1,
+		
+	OLPSF_ALWAYS_SEND_NORMALIZE:1,
+	OLPSF_DONT_NORMALIZE:1
+	OLPSF_ALWAYS_UPDATE_SCROLLBARS:1
+	OLPSF_DONT_SEND_TO_LINKS:1,
+	:2,
+	OLPSF_VERTICAL:1, 
+	OLPSF_ABSOLUTE:1, 
+	OLPSF_DOC_SIZE_CHANGE:1,
+	:1,
+	OLPSF_SCROLL_ACTION	ScrollAction:4
+end
+
+ CheckHack <(offset OLPSF_VERTICAL) eq (offset SF_VERTICAL)>
+ CheckHack <(offset OLPSF_ABSOLUTE) eq (offset SF_ABSOLUTE)>
+ CheckHack <(offset OLPSF_DOC_SIZE_CHANGE) eq (offset SF_DOC_SIZE_CHANGE)>
+		
+MSG_SPEC_VIEW_DRAG_SCROLL		message
+
+
+	     
+
+OLPaneAttrs	record
+	OLPA_SPECIAL_BORDER:1
+		; Set if color is same as background, so pane will know
+		; to draw a special border.  In open look, this means a 
+		; chiseled border; in motif, it's an inset rect.
+	OLPA_WHITE_BORDER:1
+		; In some cases, we'll use a white border.
+	OLPA_NON_SCROLLING:1
+		; Set if the view never actually scrolls its window.
+	OLPA_TARGET:1
+		; Set if view is target window
+	OLPA_FOCUS:1
+		; Set if view is focus window
+	:3
+end
+	
+OLPaneFlags	record
+	OLPF_SUSPENDED_FOR_SCALING:1,	
+	; Set if the view has suspended updates to the window because of a
+	; scale function being started.  The window will be unsuspended in
+	; the notify-geometry-valid handler if this flag is set.
+	
+	OLPF_SUSPENDED_FOR_SIZE_CHANGE:1,
+	; Set if the view has suspended updates to the window because of a
+	; change in the view window size.  (Not for just a view window move.)
+	; The window is suspended in OLPaneNotifyGeometryValid and unsuspended
+	; in OLPaneMoveResizeWin.
+	
+	OLPF_AT_RIGHT_EDGE:1,		;set if scrolled to the right
+	OLPF_AT_BOTTOM_EDGE:1,		;set if scrolled to the bottom
+	
+	OLPF_LEAVE_ROOM_FOR_VERT_SCROLLER:1,
+	OLPF_LEAVE_ROOM_FOR_HORIZ_SCROLLER:1,
+	; This flags are used to leave room for scrollbars, even if they're
+	; not being used.  They can be turned on by the splitter mechanism,
+	; or set manually via HINT_LEAVE_ROOM_FOR_VERTICAL/HORIZONTAL_SCROLLER.
+	; (currently not used)
+	
+	OLPF_MAKE_DEFAULT_FOCUS:1,
+	; Set if we're trying to make this object the default focus.
+	:1
+OLPaneFlags	end
+
+		
+OLPaneOptFlags	record
+	OLPOF_PRESS_GRAB:1
+	; Set if mouse was pressed inside of the view AND grabs have been
+	; requested for this case.
+	; Mouse will be grabbed while this is set.
+	; Requires GADGET_EXCL while set.
+	; Cleared when all buttons come up, or on a LOST_GADGET_EXCL.
+
+	OLPOF_PANNING_GRAB:1
+	; If set, user pressed "Pan" option over window.
+	; Requires OLPOF_PRESS_GRAB while set.
+	; Cleared when all buttons come up, or on a LOST_GADGET_EXCL.
+
+	OLPOF_DRAG_SCROLLING:1
+	; If set, user is holding down the mouse and dragging out of the
+	; bounds of the window.  We will scroll the window on
+	; MSG_META_WIN_UPDATE_COMPLETE's if this flag is set.
+	; Requires OLPOF_PRESS_GRAB while set.
+	; Cleared on on buttons coming up, or on a LOST_GADGET_EXCL.
+
+	OLPOF_DRAG_SCROLL_ON_ANY_BUTTON:1
+	; Causes "Select" scrolling to occur while the current mouse button is
+	; still down.  Allows programs to enable drag-scrolling for non-SELECT
+	; mouse buttons temporarily, as in Draw's control points w/DIRECT_
+	; ACTION button.
+	; Requires OLPOF_PRESS_GRAB while set.
+	; Cleared when all buttons come up, or on a LOST_GADGET_EXCL.
+
+	OLPOF_WANDERING_GRAB:1
+	; Set if the current PRESS_GRAB is a result of the mouse wandering
+	; into the view with a button down, i.e. such as a quick-transfer
+	; coming to this view.  Set also if ALLOW_GLOBAL_TRANSFER is called
+	; on the view.  If set, the gadget exclusive will be forced off the
+	; view if the mouse leaves the view window, thereby terminating the
+	; PRESS_GRAB, & allowing the mouse to continue wandering.
+
+	OLPOF_PTR_IN_RAW_UNIV:1
+	; Set if ptr is in the raw universe of this pane window
+
+	OLPOF_DRAG_SCROLL_PENDING:1
+	OLPOF_TIMER_EXPIRED_PENDING:1
+	; When we do a select-scroll, we set both of these flags, expecting a 
+	; MSG_META_WIN_UPDATE_COMPLETE and a MSG_TIMER_EXPIRED.
+	; The pane window won't initiate another event until both of these
+	; flags are cleared.
+	
+	OLPOF_LIMIT_DRAG_SCROLLING:1
+	; Limits drag scrolling to the drag bounds.  Set if a non-zero drag
+	; bounds comes in, cleared if a zeroed bounds comes in.
+	;
+
+	OLPOF_CONSTRAIN:1
+	; Last reported value of the "CONSTRAIN" bit passed in ptr & button
+	; messages.
+
+	OLPOF_ENTERED:1
+	; Set if we've sent out a MSG_META_CONTENT_ENTER, but not yet a
+	; MSG_META_CONTENT_LEAVE.
+
+	:5
+	
+OLPaneWinOptFlags	end
+
+
+DONT_SCROLL	=  8000h		 ;passed to OLPortScrollAbsolute
+		
+
+    OLPI_horizScrollbar		lptr 	 ;handle of child scrollbar
+    OLPI_vertScrollbar		lptr     ;handle of child scrollbar
+    OLPI_normalizeCount		sword	 ;keeps track of normalizes pending
+    OLPI_pageWidth		sword	 ;subview width in doc coords
+    OLPI_pageHeight		sword	
+    OLPI_flags			OLPaneFlags  ;see cviewSimplePane.asm
+    OLPI_targetInfo		ViewTargetInfo
+    OLPI_ptrImage		optr.PointerDef	;pointer image
+    OLPI_attrs			OLPaneAttrs
+    
+    ;
+    ; Previously, OLPaneWindow instance data:
+    ;
+    OLPI_window			hptr.Window	;window handle
+    OLPI_optFlags		OLPaneOptFlags
+    OLPI_mouseX			sword		;previous mouse position
+    OLPI_mouseY			sword
+    OLPI_winWidth		sword		;dimensions of pane window
+    OLPI_winHeight		sword		;  (not including win frame)
+    
+    OLPI_leftObj		lptr		;where children are located,
+    OLPI_topObj			lptr		;  for doing geometry
+    OLPI_rightObj		lptr
+    OLPI_bottomObj		lptr
+    
+    OLPI_horizScrArea		sword		;offset to area variable where
+						;  horiz scroller is found
+    OLPI_vertScrArea		sword		;offset to area variable where 
+						;  vert scroller is found
+    OLPI_dragBounds		RectDWord		;draggable bounds, set by
+    						;  content when different
+						;  objects get the focus, zeroed
+						;  if no constrain requested
+OLPaneClass	endc
+		
+
+
+;### OLContentClass
+; Extracted from /staff/pcgeos/Library/CommonUI/CComp/copenContent.asm:
+
+
+OLContentClass	class	VisContentClass
+	uses	GenContentClass
+
+      
+
+
+
+
+OLContentClass	endc
+
+
+
+;### OLIsoContentClass
+
+;### OLGaugeClass
+; Extracted from /staff/pcgeos/Library/CommonUI/CGadget/copenGauge.asm:
+
+
+OLGaugeClass	class VisClass
+
+
+
+
+OLGaugeOptFlags	record
+	OLGOF_VERTICAL:1,		;If gauge is to be drawn vertically
+	OLGOF_DISP_MNKR:1,		;If we're to display the main moniker
+	OLGOF_DISP_TICKS:1,		;Whether to display tick marks
+	OLGOF_DISP_END_MNKRS:1,		;Whether to display end monikers
+	:4
+OLGaugeOptFlags	end
+
+    OLGI_optFlags	byte	OLGaugeOptFlags		;keep these two flags
+
+OLGaugeClass	endc
+
+
+PROP_WIN_TEXT_SPACING	=	12	;space between text and gadget in
+ 					;property windows -- should be  						;defined in the openPropWin.asm
+
+
+
+;### OLGlyphDisplayClass
+; Extracted from /staff/pcgeos/Library/CommonUI/CGadget/copenGlyphDisplay.asm:
+
+
+OLGlyphDisplayClass	class	VisClass
+			
+OLGlyphDisplayFlags	record
+	OLGDF_EXPAND_WIDTH_TO_FIT_PARENT:1,
+	OLGDF_EXPAND_HEIGHT_TO_FIT_PARENT:1,
+        OLGDF_CAN_CLIP_MONIKER_WIDTH:1
+        OLGDF_CAN_CLIP_MONIKER_HEIGHT:1
+        OLGDF_CENTER_MONIKER:1
+	:3
+OLGlyphDisplayFlags	end
+
+.assert (offset OLBMA_EXPAND_WIDTH_TO_FIT_PARENT eq \
+	 offset OLGDF_EXPAND_WIDTH_TO_FIT_PARENT)
+			
+.assert (offset OLBMA_EXPAND_HEIGHT_TO_FIT_PARENT eq \
+	 offset OLGDF_EXPAND_HEIGHT_TO_FIT_PARENT)
+			
+.assert (offset OLBMA_CAN_CLIP_MONIKER_WIDTH eq \
+	 offset OLGDF_CAN_CLIP_MONIKER_WIDTH)
+
+.assert (offset OLBMA_CAN_CLIP_MONIKER_HEIGHT eq \
+	 offset OLGDF_CAN_CLIP_MONIKER_HEIGHT)
+
+.assert (offset OLBMA_CENTER_MONIKER eq \
+	 offset OLGDF_CENTER_MONIKER)
+			
+			
+	
+	OLGDI_flags	OLGlyphDisplayFlags
+
+OLGlyphDisplayClass	endc
+
+
+;### OLScrollbarClass
+; Extracted from /staff/pcgeos/Library/CommonUI/CView/cviewScrollbar.asm:
+
+
+OLScrollbarClass 	class	VisClass
+	uses	GenValueClass		
+			
+			
+if	_OL_STYLE
+MSG_STOP_SHIFTING_MOUSE	message
+
+endif
+
+MSG_SET_ORIENTATION	message
+	
+MSG_REPEAT_SCROLL	message
+
+
+
+
+
+OLScrollbarAttrs record 
+	OLSA_SUPPRESS_DRAW:1, 
+		
+	OLSA_VERTICAL:1, 
+		
+	:1, 
+	OLSA_NORMALIZED_SCROLLING:1, 
+		
+	OLSA_STUPID:1, 
+		
+	OLSA_TWISTED:1, 
+		
+	OLSA_ENABLED:1,  
+		
+	OLSA_DRAWN_ENABLED:1,
+end
+	
+
+
+DownFlags etype byte
+OLSS_NOTHING 		enum DownFlags		;nothing pressed
+OLSS_BEG_ANCHOR 	enum DownFlags		;top of document pressed
+OLSS_PAGE_UP 		enum DownFlags		;page up pressed
+OLSS_INC_UP 		enum DownFlags		;increment up pressed
+OLSS_DRAG_AREA 		enum DownFlags		;drag area, or thumb pressed
+OLSS_INC_DOWN 		enum DownFlags		;increment down pressed
+OLSS_PAGE_DOWN 		enum DownFlags		;page down pressed
+OLSS_END_ANCHOR 	enum DownFlags		;bottom of document pressed
+
+OLSS_BOGUS 	equ	OLSS_END_ANCHOR + 1	;illegal value
+
+
+OLScrollbarState record 
+	OLSS_SPLITTER_ON:1,
+		
+	OLSS_INVALID_IMAGE:1, 
+		
+	OLSS_AT_TOP:1, 
+		
+	OLSS_AT_BOTTOM:1, 
+		
+	OLSS_INVALID_OFFSETS:1, 
+		
+	OLSS_DOWN_FLAGS:3=DownFlags
+		
+OLScrollbarState end
+
+		 
+OLScrollbarOptFlags record
+	OLSOF_REPEAT_SCROLL_PENDING:1,
+		
+	OLSOF_TIMER_EXPIRED_PENDING:1,
+	:6
+OLScrollbarOptFlags end
+
+
+    	OLSBI_drawnDocRatio	dword		;offset currently drawn
+    	OLSBI_elevOffset	sword		;offset of elevator
+MO   <	OLSBI_elevLen		sword		;length of elevator	      >
+PMAN <	OLSBI_elevLen		sword		;length of elevator	      >
+OLS  <	OLSBI_propIndOffset	sword		;offset of proportional indctr>
+OLS  <	OLSBI_propIndLen	sword		;size of proportional indicator>
+    	OLSBI_scrArea		sword		;length of scrollable bar
+	OLSBI_mousePos		sword		;mouse pos
+    	OLSBI_clickXOff		sword		;x offset to original press
+    	OLSBI_clickYOff		sword		;y offset to original press
+    	OLSBI_attrs		OLScrollbarAttrs    ;attributes
+    	OLSBI_state		OLScrollbarState    ;state flags
+   	OLSBI_optFlags		OLScrollbarOptFlags ;optimization flags
+OLS < 	OLSBI_shift		sword		    ;amt of mouse pos shift   >
+CUAS < 	OLSBI_startState 	OLScrollbarState    ;state at initial press   >
+CUAS <	OLSBI_xorElevOff	sword		    ;position of xor elevator >
+CUAS <						    ;  (or -1 if none)        >
+CUAS <	OLSBI_xorDocRatio	dword		    ;doc offset during xor    >
+
+		
+OLScrollbarClass	endc
+
+			
+			
+	     
+;### OLTextClass
+; Extracted from /staff/pcgeos/Library/CommonUI/CGadget/copenText.asm:
+
+
+OLTextClass	class VisTextClass
+
+	uses GenTextClass
+
+MSG_OL_PLACE_IN_VIEW			message
+
+MSG_SPEC_TEXT_SET_FROM_ITEM_GROUP	message
+
+
+TextDisplaySpecificState	record
+	TDSS_IN_VIEW:1		;set if a GenView & GenContent objects have
+				;been created as a result of a decision that
+				;this object should appear in a view.
+	TDSS_IN_FRAME:1		;set if object appears inside a drawn frame, &
+				;not in a view.  If this bit is not set, then
+				;there is not even a frame - we're just using
+				;the VisTextClass to draw this object on a UI
+				;window somewhere.
+	TDSS_EDITABLE:1		;set if object is allowed to be edited.
+	TDSS_IN_COMPOSITE:1	;set if we stuck this in a composite for
+				;moniker purposes.
+	TDSS_NO_MONIKER:1	;set if we don't want a moniker.
+	TDSS_GOING_INTO_VIEW:1	;set if we're in the process of 
+				;putting this thing into a view.
+	TDSS_COLOR_SET:1	;wash color now set, to something presumably
+				;different from the background color.
+	TDSS_NEEDS_GADGET_EXCL:1 ;set when removing from a composite, so we can
+				;restore the gadget exclusive.
+TextDisplaySpecificState	end
+
+TextDisplayMoreState		record
+	TDSS_MAKE_DEFAULT_FOCUS:1,	
+				;if set makes this the default focus
+	TDSS_GENERAL_CONSUMER_MODE:1,	
+				;gcm mode text object
+	TDSS_EXPAND_WIDTH_TO_FIT_PARENT:1
+				;can expand the text object's width to fit what
+				;is passed.
+	TDSS_EXPAND_HEIGHT_TO_FIT_PARENT:1
+				;can expand the text object's height to fit what
+				;is passed.
+	TDSS_STAY_OUT_OF_VIEW:1
+				;set if it has been determined that this text
+				;object can't possibly be popped into its own
+				;View.  This is the case if we started out
+				;already below a GenView. (The system does
+				;not support nested views)
+	TDSS_RUNS_ITEM_GROUP:1
+				;Set if this text object runs an item group
+	TDSS_SELECTABLE:1	;Set if object is selectable
+	TDSS_DELAYED:1		;Set if in delayed mode.
+				;Set if default action is navigate to next field
+	TDSS_DEFAULT_ACTION_IS_NAVIGATE_TO_NEXT_FIELD:1
+	:7
+TextDisplayMoreState		end
+				
+    OLTDI_specState	TextDisplaySpecificState
+    OLTDI_moreState	TextDisplayMoreState
+    OLTDI_viewObj	lptr		; view that this object is in,  if any
+
+OLTextClass	endc
+
+
+;### OLDisplayGroupClass
+; Extracted from /staff/pcgeos/Library/CommonUI/CWin/cwinDisplayControl.asm:
+
+
+OLDisplayGroupClass	class	VisCompClass
+	uses	GenDisplayGroupClass
+
+
+MSG_OL_DISPLAY_GROUP_BRING_FIRST_DISPLAY_TO_TOP	message
+
+
+
+OLDisplayGroupStates	record
+
+
+    OLDGS_MAXIMIZED:1	 	;TRUE if this DC is in maximized mode:
+
+    OLDGS_PTR_IN_RAW_UNIV:1	;TRUE if mouse pointer is within the DC area.
+
+    OLDGS_DEFAULT_FOCUS:1	;TRUE if this object has HINT_MAKE_DEFAULT_
+				;FOCUS
+
+    OLDGS_TILED:1		;TRUE if tiled
+    :4
+OLDisplayGroupStates	end
+
+
+    OLDGI_states	OLDisplayGroupStates <>
+
+    OLDGI_mdiWindowMenuGenList	optr
+				;OD of the ItemGroup object in the MDIWindowMenu
+				;which sits below the GenPrimary object.
+
+    OLDGI_staggerSlotMap word	8 dup (?)
+				;16 bit X 8 bit map indicating used
+				;stagger slots (63 for windows, 63 for icons).
+
+    OLDGI_focusExcl	FTVMCGrab <>
+    ; focusExcl is a Grab (defined in User/userFlow.asm).  It
+    ; contains an OD, a word of data which may be stored w/ however has the
+    ; grab, and two methods, one which is the "loss" method & is sent out
+    ; when the OD loses the grab, & the other the "gain" method, which is
+    ; sent out when an OD gains the grab.  THIS instance of a Grab is
+    ; for the window within the application which is the focus window -
+    ; that is, it modifies it's appearance to the user to indicate that
+    ; it is the place that it is active, & allows 1 of the text objects
+    ; within it to grab the keyboard, & display a text insertion point, &
+    ; any selected area within the text.
+
+    OLDGI_targetExcl	FTVMCGrab <>
+    ; targetExcl is also a Grab, used for keeping track of the window
+    ; whose data may be displayed as selected & that any operations pertaining
+    ; to the "current selection" would be applied to.
+
+    OLDGI_notifyCounter	word
+OLDisplayGroupClass	endc
+
+
+;### OLMenuBarClass
+; Extracted from /staff/pcgeos/Library/CommonUI/CComp/copenMenuBar.asm:
+
+
+OLMenuBarClass	class OLCtrlClass
+	uses	GenClass
+
+
+
+TEMP_MENU_ACTIVATOR_WIDTH	vardata
+
+
+if _MAC
+OLMenuBarState	record
+    OLMBARS_UNDER_PRIMARY:1,	; non-zero if menu bar is for a primary
+    :6
+OLMenuBarState	end
+endif
+
+
+if _MAC
+ 	OLMBAR_state	OLMenuBarState
+endif
+	
+OLMenuBarClass	endc
+
+
+;### OLGadgetAreaClass
+; Extracted from /staff/pcgeos/Library/CommonUI/CComp/copenGadgetArea.asm:
+
+
+OLGadgetAreaClass	class OLCtrlClass
+
+	
+MSG_SPEC_CHECK_IF_NEEDS_MARGINS		message	VisSpecMessages	
+
+
+OLGadgetAreaFlags	record
+	OLGAF_HAS_DISP_CTRL:1
+		;Set if there's a display control around.
+	OLGAF_DISP_CTRL_FIRST:1
+	OLGAF_DISP_CTRL_LAST:1
+		;Set based on position of display control.
+OLGadgetAreaFlags	end
+		
+	OLGAI_flags	OLGadgetAreaFlags
+	
+OLGadgetAreaClass	endc
+
+
+;### OLReplyBarClass
+; Extracted from /staff/pcgeos/Library/CommonUI/CComp/copenReplyBar.asm:
+
+
+OLReplyBarClass	class	OLCtrlClass
+
+
+MSG_OL_REPLY_BAR_SET_DIALOG	message
+
+
+OLReplyBarFlags	record
+	OLRBF_UNDER_DIALOG:1		; TRUE if under a OLDialogWin object,
+					; will be false if HINT_MAKE_REPLY_BAR
+					; is used to provide a reply in a
+					; primary, for example
+OLReplyBarFlags	end
+
+
+	OLRBI_dialog	optr
+	OLRBI_flags	OLReplyBarFlags
+
+OLReplyBarClass	endc
+
+
+;### OLGadgetClass
+; Extracted from /staff/pcgeos/Library/CommonUI/CGadget/copenGadget.asm:
+
+
+OLGadgetClass	class	VisClass
+
+OLGadgetClass	endc
+
+
+;### OLGadgetCompClass
+; Extracted from /staff/pcgeos/Library/CommonUI/CGadget/copenGadgetComp.asm:
+
+
+OLGadgetCompClass	class	VisCompClass
+	uses	GenClass
+
+	
+OLGadgetCompClass	endc
+
+
+;### OLMenuItemGroupClass
+; Extracted from /staff/pcgeos/Library/CommonUI/CComp/copenMenuItemGroup.asm:
+
+
+OLMenuItemGroupClass	class	OLCtrlClass
+	uses	GenClass
+
+
+OLMenuItemGroupSpecState	record
+
+    ;state flags used during MSG_SPEC_MENU_SEP_QUERY
+
+    OLMIGSS_ABOVE_SEP:1	 ;Copied from MSF_SEP when the query arrives at this
+			 ;composite. Restored when passing query on to next
+			 ;sibling, if this composite is not USABLE.
+
+    OLMIGSS_ABOVE_USABLE:1
+			 ;Copied from MSF_USABLE when the query arrives at this
+			 ;composite. Restored when passing query on to next
+			 ;sibling, if this composite is not USABLE.
+
+    OLMIGSS_HAS_USABLE_CHILD:1
+			 ;Set when the query is sent from the last child of
+			 ;this composite, with the MSF_USABLE flag set.
+			 ;Indicates that this composite has at least one
+			 ;usable child, a requirement for showing separators
+			 ;at all (this could be set via hint, to force
+			 ;separators when no kids are usable).
+
+    ;misc state flags for this group:
+
+    OLMIGSS_MENU_PINNED:1 ;set TRUE (OpenLook only) when the menu is PINNED.
+			  ;this affects the spacing between items.
+    :1
+
+    ;state flags for this group: (set by MSG_SPEC_MENU_SEP_QUERY)
+
+    OLMIGSS_TOP_SEP:1	 ;if this menu item group needs a separator
+			 ;drawn above it (the previous sibling is a menu item
+			 ;or other menu item group).
+
+    OLMIGSS_BOTTOM_SEP:1 ;if this menu item group needs a separator
+			 ;drawn below it (the next sibling is a menu item).
+
+    ;command flags for this group:
+
+    OLMIGSS_SEPARATORS:1 ;TRUE by default, FALSE if HINT_SAME_CATEGORY_AS_PARENT
+			 ;is present. Prevents separator lines from begin drawn.
+OLMenuItemGroupSpecState	end
+
+.assert (mask OLMIGSS_ABOVE_SEP eq mask MSF_SEP)
+.assert (mask OLMIGSS_ABOVE_USABLE eq mask MSF_USABLE)
+
+
+    OLMIGI_specState	OLMenuItemGroupSpecState <>
+
+OLMenuItemGroupClass	endc
+
+
+;### OLWinIconClass
+; Extracted from /staff/pcgeos/Library/CommonUI/CWin/cwinWinIcon.asm:
+
+
+OLWinIconClass	class	OLWinClass
+	uses	GenClass, VisClass
+
+
+HINT_WIN_ICON vardata		;Since we create the OLWinIcon object
+				;by duplicating a GenPrimary from the
+				;specific UI resource, we need to tell the
+				;the Primary that it really is an icon.
+
+
+MSG_OL_WIN_ICON_SET_USABLE	message
+
+MSG_OL_WIN_ICON_SET_STATE	message
+
+MSG_OL_WIN_ICON_UPDATE_MONIKER	message
+
+MSG_OL_MAXIMIZE_FROM_ICON	message
+
+
+    OLWII_window	optr		;GenPrimary which is opened by this icon
+    OLWII_titleGlyphWin lptr		;OLWinGlyph object which
+					;shows title below icon.
+    OLWII_iconMoniker	lptr.VisMoniker	;moniker for icon
+    OLWII_iconCaptionMoniker lptr.VisMoniker	;moniker for caption below icon
+OLWinIconClass	endc
+
+
+
+IconPassData	struct
+	IPD_window		optr
+	IPD_top			word
+	IPD_left		word
+	IPD_winPosSizeState	WinPosSizeState <>
+	IPD_winPosSizeFlags	WinPosSizeFlags <>
+IconPassData	ends
+
+
+IconMonikerPassData	struct
+	IMPD_iconMoniker	optr
+	IMPD_iconCaptionMoniker	optr
+IconMonikerPassData	ends
+
+
+;### OLWinGlyphDisplayClass
+; Extracted from /staff/pcgeos/Library/CommonUI/CWin/cwinGlyphDisplay.asm:
+
+
+OLWinGlyphDisplayClass	class VisCompClass
+
+MSG_OL_WIN_GLYPH_DISP_SET_MONIKER	message
+
+MSG_OL_WIN_GLYPH_DISP_MOVE		message
+
+MSG_OL_WIN_GLYPH_BRING_TO_TOP		message
+
+
+OLWinGDAttr	record	OWGDA_UNUSED:8
+
+
+    OLWGDI_attrs	OLWinGDAttr
+    OLWGDI_glyph	lptr.VisMoniker
+    OLWGDI_icon		lptr
+
+OLWinGlyphDisplayClass	endc
+
+
+;### OLSpinGadgetClass
+; Extracted from /staff/pcgeos/Library/CommonUI/CGadget/copenSpinGadget.asm:
+
+
+OLSpinGadgetClass	class OLCtrlClass
+	uses	GenSpinGadgetClass
+
+MSG_SPIN_DISCARD_TEXT	message
+	
+MSG_SPIN_GIVE_TEXT_FOCUS	message
+	
+MSG_SPIN_UNBUILD		message
+
+
+MSG_SPEC_SPIN_MINIMUM		message
+MSG_SPEC_SPIN_UP_PAGE		message
+MSG_SPEC_SPIN_UP_ARROW		message
+MSG_SPEC_SPIN_VALUE_CHANGED		message
+MSG_SPEC_SPIN_DOWN_ARROW		message
+MSG_SPEC_SPIN_DOWN_PAGE		message
+MSG_SPEC_SPIN_MAXIMUM		message
+SPIN_MSG_BASE equ MSG_SPEC_SPIN_MINIMUM
+				
+OLSpinGadgetStates	record
+	OLSGS_HAS_FOCUS:1		;set if spin gadget has the focus
+	OLSGS_MAKE_DEFAULT_FOCUS:1	;set if we want default focus
+	:6
+OLSpinGadgetStates	end
+			
+	OLSGI_attrs		GenSpinGadgetAttrs	;keep locally
+	OLSGI_desHeight		word			;desired height
+	OLSGI_desWidth		word			;desired width
+	OLSGI_text		lptr VisTextInstance	;text obj, if any
+	OLSGI_repeatCount	word			;repeat count
+	OLSGI_timerID		word			;timer stuff
+	OLSGI_timerHandle	word
+	OLSGI_states		OLSpinGadgetStates	;state
+	OLSGI_scrollbar		lptr GenRangeClass	;scrollbar, if any
+
+OLSpinGadgetClass	endc
+
+
+
+;### OLDocumentControlClass
+; Extracted from /staff/pcgeos/Library/CommonUI/CMain/cmainUIDocumentControl.asm:
+
+
+OLDocumentControlClass	class OLCtrlClass
+	uses GenDocumentControlClass
+
+
+MSG_OLDC_OPEN_FILE_SELECTED	message
+
+MSG_OLDC_USE_TEMPLATE_FILE_SELECTED	message
+
+MSG_OLDC_SAVE_AS_DIR_SELECTED	message
+
+MSG_OLDC_OPEN_SELECTED	message
+
+MSG_OLDC_USE_TEMPLATE_SELECTED	message
+
+MSG_OLDC_SAVE_AS_FILE_ENTERED	message
+
+MSG_OLDC_COPY_TO_FILE_ENTERED	message
+
+MSG_OLDC_COPY_TO_DIR_SELECTED	message
+
+MSG_OLDC_TEST_FOR_DISPLAY_MAIN_DIALOG	message
+MSG_OLDC_TEST_FOR_DISPLAY_MAIN_DIALOG2	message
+
+MSG_OLDC_TYPE_CHANGED		message
+MSG_OLDC_PASSWORD_CHANGED		message
+
+MSG_OLDC_TYPE_USER_CHANGE		message
+
+
+OLDCFlags	record
+    OLDCF_QUIT_COMPLETED:1
+OLDCFlags	end
+
+
+    OLDCI_currentSummons	hptr	;currently active summons
+    OLDCI_currentFileType	lptr	;use for displaying file type
+    OLDCI_quitOD		optr	;object to send MSG_META_QUIT_ACK to
+    OLDCI_flags			OLDCFlags
+    OLDCI_fileFlags		GenFileSelectorEntryFlags
+OLDocumentControlClass	endc
+
+
+;### OLDocumentGroupClass
+; Extracted from /staff/pcgeos/Library/CommonUI/CMain/cmainAppDocumentControl.asm:
+
+
+OLDocumentGroupClass	class VisClass
+	uses GenDocumentGroupClass
+
+
+MSG_OLDG_REMOVE_DOC			message
+
+MSG_OLDG_USER_CLOSE_CANCELLED	message
+
+MSG_OLDG_USER_CLOSE_OK	message
+
+MSG_OLDG_FILE_CHANGED			message
+
+
+
+    OLDGI_quitObj	optr
+    OLDGI_modelExcl	HierarchicalGrab
+OLDocumentGroupClass	endc
+
+
+
+;### OLDocumentClass
+; Extracted from /staff/pcgeos/Library/CommonUI/CMain/cmainDocument.asm:
+
+
+OLDocumentClass	class OLContentClass
+	uses GenDocumentClass
+
+
+MSG_OL_DOCUMENT_CONTINUE_REVERT		message
+
+MSG_OL_DOCUMENT_CONTINUE_REVERT_QUICK	message
+
+MSG_OL_DOCUMENT_UPDATE_UI		message
+
+MSG_OL_DOCUMENT_CONTINUE_CHANGE_TYPE	message
+
+MSG_OL_DOCUMENT_CONTINUE_RENAME	message
+
+
+
+    OLDI_autoSaveTimer		word
+    OLDI_autoSaveTimerID	word
+
+    OLDI_changeTimer		word
+    OLDI_changeTimerID		word
+
+OLDocumentClass	endc
+
+
+
+;### OLFileSelectorClass
+; Extracted from /staff/pcgeos/Library/CommonUI/CUtils/copenFileSelector.asm:
+
+
+OLFileSelectorClass	class OLCtrlClass
+	uses GenFileSelectorClass
+
+
+
+MSG_OL_FILE_SELECTOR_LIST_MESSAGE		message
+
+MSG_OL_FILE_SELECTOR_DOUBLE_PRESS		message
+
+MSG_OL_FILE_SELECTOR_ITEM_QUERY			message
+
+MSG_OL_FILE_SELECTOR_DRIVE_BUTTON		message
+
+MSG_OL_FILE_SELECTOR_PATH_BUTTON		message
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+OLFileSelectorState	record
+	OLFSS_VOLUMES:1,		; set if showing volumes instead
+					;	of the usual files/
+					;	directories
+	OLFSS_FORCE_OPEN:1,		; set when handling
+					;	MSG_GEN_FILE_SELECTOR_OPEN_ENTRY
+	OLFSS_RESCAN_ERROR:1,		; set if error encountered building
+					;	file list
+	OLFSS_SUSPENDED:1,		; set if rescanning is temporarily
+					;	suspended with
+					;	MSG_GEN_FILE_SELECTOR_SUSPEND
+	:12
+OLFileSelectorState	end
+
+OLFileSelectorEntry	struct
+    OLFSE_fileAttrs	FileAttrs		; FEA_FILE_ATTR for file
+    OLFSE_fileFlags	GeosFileHeaderFlags	; FEA_FLAGS for file
+    OLFSE_name		char	FILE_LONGNAME_BUFFER_SIZE dup(?)
+OLFileSelectorEntry	ends
+
+OLFS_UP_DIRECTORY_ENTRY_NUM	equ	-1
+OLFS_CHANGE_DRIVE_ENTRY_NUM	equ	-2
+
+OLFS_FILE_SELECTOR	equ	1		; value stored in outputs of
+						;  the various objects in the
+						;  duplicated block to send
+						;  their messages to the
+						;  file selector.
+
+
+    OLFSI_state		OLFileSelectorState	; state of OL File Selector
+    OLFSI_fileBuffer	hptr.OLFileSelectorEntry; handle of buffer for filenames
+    OLFSI_indexBuffer	hptr.word		; handle of index buffer
+    OLFSI_numFiles	word			; number of files in list
+
+    OLFSI_uiBlock	hptr			; handle of duplicated block
+						;  holding the actual visual
+						;  UI components of the beast.
+
+    OLFSI_dirCount	word			; num dirs (used internally)
+    OLFSI_fileCount	word			; num files (used internally)
+
+OLFileSelectorClass	endc
+
+
+
+;### OLItemGroupClass
+; Extracted from ../CommonUI/CItem/citemItemGroup.asm:
+
+
+OLItemGroupClass	class	OLCtrlClass
+	uses	GenDynamicListClass
+
+
+
+MSG_OL_IGROUP_NOTIFY_GROUP_HAS_MOUSE_GRAB	message
+
+MSG_OL_IGROUP_NOTIFY_ITEM_WILL_GRAB_FOCUS_EXCL	message
+
+MSG_OL_IGROUP_NOTIFY_ITEM_GAINED_FOCUS_EXCL	message
+
+MSG_OL_IGROUP_NOTIFY_ITEM_LOST_FOCUS_EXCL	message
+
+MSG_OL_IGROUP_NOTIFY_ITEM_SET_USABLE		message
+
+MSG_OL_IGROUP_NOTIFY_ITEM_SET_NOT_USABLE	message
+
+MSG_OL_IGROUP_NOTIFY_ITEM_SET_NOT_ENABLED	message
+
+MSG_OL_IGROUP_NOTIFY_DOUBLE_PRESS	message
+
+MSG_OL_IGROUP_START_INTERMEDIATE_MODE	message
+
+MSG_OL_IGROUP_END_INTERMEDIATE_MODE	message
+
+MSG_OL_IGROUP_RESELECT_EXCL		message
+
+MSG_OL_IGROUP_SET_MODIFIED_ITEM_STATE	message
+
+MSG_OL_IGROUP_SET_MODIFIED_SELECTION	message
+
+MSG_OL_IGROUP_SET_SELECTION_TO_NEXT	message
+MSG_OL_IGROUP_SET_SELECTION_TO_PREVIOUS	message
+
+MSG_OL_IGROUP_TOGGLE_FOCUS_EXCL_ITEM	message
+
+MSG_OL_IGROUP_GET_ITEM_STATE	message
+
+MSG_OL_IGROUP_RESET_POPUP_LIST_MONIKER 	message
+
+if	ERROR_CHECK
+MSG_OL_IGROUP_EC_CHECK_ALL_CHILDREN_UNIQUE message
+endif
+
+
+
+
+OLItemGroupState	record 
+
+    ;attribute flags
+
+    OLIGS_DYNAMIC:1		;dynamic list
+    OLIGS_CHECKBOXES:1		;being used for whether this is an OLBoolean-
+				;  Group type object.
+    OLIGS_SCROLLABLE:1		;marked if HINT_SCROLLABLE was present
+    OLIGS_DEFAULT_FOCUS:1	;set for HINT_DEFAULT_FOCUS.
+
+    ;state flags
+
+    OLIGS_HAS_FOCUS_ITEM:1	;set if has a focus item.  Routines like Get
+				;FocusOptr will return null is this is clear.
+				;Likewise, passing null to SetFocusItemFromOptr
+				;will clear this flag.
+
+    OLIGS_GROUP_HAS_MOUSE_GRAB:1
+				;this is SET when the mouse button is pressed
+				;on a child. Another child will only respond
+				;to mouse drag events if this flag is set.
+				;This ensures that this GenList will only
+				;respond to mouse events if the user pressed
+				;on this GenList.
+
+    OLIGS_INTERMEDIATE:1	;this is set when the user is dragging the mouse
+				;across an entry. The effect is to temporarily
+				;deselect the selection. When the
+				;mouse is dragged of the item, this flag is
+				;reset and the previously selected item is 
+				;re-selected.
+
+    OLIGS_LIST_HAS_FOCUS_EXCL:1	;TRUE if the focus exclusive for this
+				;window is on this GenList or one of its
+				;children GenListEntries.
+OLItemGroupState	end
+
+
+OLItemGroupMoreState	record
+    OLIGMS_POPUP_LIST:1		;TRUE if we're now a popup list (we've put
+				;  ourselves under a menu of some kind.)
+    OLIGMS_DISPLAYS_CURRENT_SELECTION:1
+				;TRUE if we're supposed to display the current
+				;  selection.  OLIGMS_POPUP_LIST must also be
+				;  set.
+    OLIGMS_DISPLAYING_SELECTION:1
+				;TRUE if the item group found an item to display
+				;  in the popup list button.  The item 
+				;  identifier is kept in OLIGI_displayedItem.
+    OLIGMS_WRAPPED_AROUND_ON_LAST_NAVIGATE:1
+				;TRUE if on the last navigation function, we
+				;  were wrapping around.  We need this 
+				;  information (along with the item's OLIS_-
+				;  NAVIGATE_BACKWARD flag) so we'll know how
+				;  to continue navigation in a dynamic list if
+				;  the item we navigated to turns out to be
+				;  disabled.
+OLItemGroupMoreState	end
+
+OLItemUpdateFlags record
+	OLIUF_SUPPRESS_DRAW:1	
+				;Have the draw suppressed.
+	OLIUF_SUPPRESS_DRAW_IF_CURSORED:1
+				;Have the draw suppressed if the list item
+				;is cursored.
+	OLIUF_DIRECT_USER_ACTION:1
+				;This is caused by a direct action by the
+				;user.  Special things *may* be done to avoid
+				;holding up status messages...
+				
+				;Temporarily being used to suppress apply.
+				;Change to OLIUF_SUPPRESS_APPLY!
+	OLIUF_LEAVE_FOCUS_AND_GRAB_ALONE:1
+				;This is set to avoid the focus being moved
+				;or the grab being released, things that 
+				;generally happen with the application is 
+				;sending a select message.
+	:4
+OLItemUpdateFlags end
+
+
+
+
+    OLIGI_state		OLItemGroupState
+    OLIGI_moreState	OLItemGroupMoreState
+
+    OLIGI_focusItem	word
+        ;this is the identifier of the item that has the "FOCUS Exclusive", 
+	;meaning it is CURSORED, but only if OLIGS_HAS_FOCUS_ITEM is set.
+
+    OLIGI_updateFlags	OLItemUpdateFlags
+        ;These are special flags used for updating.  These can be set before
+        ;calling some function that changes the selection state of the item 
+        ;group, and are cleared automatically by the message handler afterwards
+        ;so that by default no flags are set.
+
+    OLIGI_prevSelections	lptr
+    OLIGI_prevState		GenItemGroupStateFlags
+	;Set in MSG_OL_IGROUP_START_INTERMEDIATE_MODE, cleared in END_INTERMED-
+	;IATE_MODE, keeps track of the previous selections before intermediate
+	;mode began, so it can possibly reselect them afterwards.
+
+    OLIGI_anchorItem		word
+	;The current anchor for using extended selection.  This is the place of
+	;the last normal mouse click.
+
+    OLIGI_displayedItem		word
+	;The identifier of the currently displayed item, if this is a popup
+	;list and OLIGMS_DISPLAYING_SELECTION is set.
+
+OLItemGroupClass	endc
+
+
+
+
+;### OLScrollListClass
+; Extracted from ../CommonUI/CItem/citemScrollList.asm:
+
+
+OLScrollListClass	class	OLItemGroupClass
+	uses	GenItemGroupClass
+
+
+MSG_OL_SLIST_PAGE_UP		message
+MSG_OL_SLIST_PAGE_DOWN	message
+
+MSG_OL_SLIST_RECALC_ITEM_SIZE	message
+
+
+
+OLScrollListAttrs	record
+	OLSLA_VERTICAL:1		;orientation of scrollbars, basically
+OLScrollListAttrs	end
+
+
+	OLSLI_attrs		OLScrollListAttrs 
+	OLSLI_numVisibleItems	word		;number of visible children
+	OLSLI_itemLength	word		;size, along orientation
+						; direction, of children
+	OLSLI_topItem		word		;keeps track of top item,mostly
+						; for the sake of dynamic lists
+	OLSLI_view		lptr		;handle of view
+	
+OLScrollListClass	endc
+
+
+;### OLItemClass
+; Extracted from /staff/pcgeos/Library/CommonUI/CItem/citemItem.asm:
+
+
+OLItemClass	class	OLButtonClass		;temp
+	uses	GenItemClass, GenBooleanClass
+
+
+MSG_OL_ITEM_ENSURE_IS_PRESSED	message
+
+MSG_OL_ITEM_ENSURE_IS_NOT_PRESSED	message
+
+OLItemEnsureNotPressedFlags	record
+    OIENPF_MAINTAIN_INTERMEDIATE_MODE:1
+		;set this to PREVENT exiting from intermediate mode.
+		;This is useful in cases where an item is losing the FOCUS
+		;exclusive, and must redraw, but we don't want to biff the
+		;intermediate mode which was started by another item.
+
+    OIENPF_RESTORE_SELECTION_TO_ORIGINAL_OWNER:1
+		;set this to restore the OLIS_SELECTED state flag in the
+		;item which had the selection before intermediate mode
+		;began. This implies that the item will be redrawn also.
+		;(OIENPF_MAINTAIN_INTERMEDIATE_MODE must be false)
+
+    OIENPF_RESTORE_FOCUS_EXCL_STATE_TO_ORIGINAL_OWNER:1
+		;set this to restore the FOCUS exclusive to the item which
+		;had the USER exclusive before intermediate mode began.
+
+    OIENPF_REDRAW_PRESSED_ITEM:1
+		;set this to redraw the currently focused item. This is only
+		;reset in cases where the USER exclusive is being forced
+		;to the focused item via keybaord navigation or the
+		;application sending the SELECT method. Since the SetExcl
+		;handler routine will soon set the OLIS_SELECTED state flag
+		;in this item and draw it, there is no need for us to redraw
+		;the item after turning off the IS_PRESSED flag.
+    OIENPF_SIMULATE_PRESS_AND_RELEASE:1
+		;set this when calling this routine to handle SELECT key
+		;space bar) presses on an item. Will quickly draw the item
+		;as pressed, then unpressed, then will update the selected
+		;state according to the type of list.
+    :11
+OLItemEnsureNotPressedFlags	end
+
+MSG_OL_ITEM_ENSURE_IS_RELEASED	message
+
+MSG_OL_ITEM_SET_STATE	message
+
+MSG_OL_ITEM_NAVIGATE_IF_DISABLED	message
+
+MSG_OL_ITEM_REDRAW	message
+
+
+
+
+OLItemState	record 
+    OLIS_IS_CHECKBOX:1		;TRUE if is OLCheckboxClass object:
+				;is non-exclusive item.
+   
+    OLIS_IS_SCROLL_ITEM:1	;TRUE if is OLScrollItemClass object.
+
+    OLIS_PRESSING_ON_ITEM:1	;TRUE when the user is pressing on the item.
+				;This cause some list types (checkboxes) to
+				;show a special emphasis
+
+    OLIS_MONIKER_INVALID:1	;Set if you shouldn't draw the moniker
+
+    OLIS_SELECTED:1		;Set if selected
+    OLIS_INDETERMINATE:1	;Set if indeterminate
+
+    OLIS_NAVIGATE_IF_DISABLED:1
+    OLIS_NAVIGATE_BACKWARD:1
+				;These bits are set when we should navigate 
+				;when we find ourselves disabled.
+				;These flags are set by OLItemGroup-
+				;SetUserCommon when an item to navigate to is
+				;chosen, then passed to MSG_OL_IGROUP_NOTIFY_-
+				;ITEM_NOT_ENABLED.  They are cleared anytime
+				;a draw occurs and OLIS_MONIKER_INVALID is clear
+				;(which means the coast is clear for normal
+				;navigation).  Used by the dynamic list to skip
+				;over disabled items while navigating.
+OLItemState	end 
+
+
+
+
+	OLII_state	OLItemState
+	OLII_behavior	GenItemGroupBehaviorType
+
+OLItemClass	endc
+
+
+;### OLCheckedItemClass
+; Extracted from /staff/pcgeos/Library/CommonUI/CItem/citemCheckedItem.asm:
+
+
+OLCheckedItemClass		class	OLItemClass
+	uses	GenBooleanClass, GenItemClass
+
+
+
+
+
+OLCheckedItemClass	endc
+
+
+;### OLScrollableItemClass
+; Extracted from /staff/pcgeos/Library/CommonUI/CItem/citemScrollableItem.asm:
+
+
+OLScrollableItemClass	class OLItemClass
+	uses	GenItemClass
+
+
+
+
+
+OLScrollableItemClass	endc
+
+
+;### OLValueClass
+; Extracted from /staff/pcgeos/Library/CommonUI/CGadget/copenValue.asm:
+
+
+OLValueClass	class OLSpinGadgetClass
+	uses	GenValueClass
+
+MSG_SPEC_VALUE_SET_FROM_ITEM_GROUP		method
+
+OLValueFlags	record
+	OLVF_CUSTOM_RETURN_PRESS:1
+		;Set when we're using a custom return press.
+	OLVF_NAVIGATE_ON_RETURN_PRESS:1
+		;Set when we're navigating on the return press.
+	:6
+OLValueFlags	end
+
+	OLVLI_item		lptr	;handle of spin moniker/text chunk
+	OLVLI_maxLength		word	;keep the maximum length here
+	OLVLI_flags		OLValueFlags
+
+OLValueClass	endc
+
+
+
+EndLibrary	pmlib
