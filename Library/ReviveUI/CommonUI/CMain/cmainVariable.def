@@ -1,0 +1,800 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1988 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		CommonUI/CMain (common code for several specific UIs)
+FILE:		cmainVariable.def
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	2/89		Initial version
+	Eric	8/89		more documentation, Motif extensions
+
+DESCRIPTION:
+	This file contains variables for the Main module.
+
+	$Id: cmainVariable.def,v 2.63 97/03/11 18:02:47 cassie Exp $
+
+------------------------------------------------------------------------------@
+
+
+
+;------------------------------------------------------------------------------
+;		Initialized variables
+;------------------------------------------------------------------------------
+
+idata	segment
+
+
+;------------------------------------------------------------------------------
+;		Workspace properties
+;------------------------------------------------------------------------------
+
+					; Amount that you must drag right
+					; before submenus appear when wandering
+					; down a menu
+					; *** CURRENTLY_UNUSED
+;olMenuPropDragRight	byte	0
+
+					; # of 1/60 sec ticks within which
+					; button must be released in order to
+					; keep menu up in stay-up mode
+					; (OpenLook)
+					; *** CURRENTLY_UNUSED
+;olMenuPropTimeout	byte	5
+
+					; OLBeep value (from OpenLook)
+					;	OLB_ALWAYS
+					;	OLB_NOTICES_ONLY
+					;	OLB_NEVER
+					; *** CURRENTLY_UNUSED
+;olMiscPropBeep		byte	OLB_ALWAYS
+
+					; OLScale value (from OpenLook).
+					; This is the "size" that an
+					; application should appear
+					;	OLB_SMALL
+					;	OLB_MED_SMALL
+					;	OLB_MED
+					;	OLB_MED_LARGE
+					;	OLB_LARGE
+					; *** CURRENTLY_UNUSED
+;olMiscPropScale		byte	OLB_MED
+
+					; To be used for Open Look virtual
+					; work space (I can't recall, see
+					; the spec)
+					; *** CURRENTLY_UNUSED
+;olMiscVirtual		byte	size Rectangle dup (0)
+
+					; Number of ticks between repeated 
+					; scroll (or other gadget) events.
+olGadgetRepeatDelay	word		;
+
+					; Whether we want gadgets to
+					; accelerate when their up/down arrows
+olGadgetAccelerate	byte		; are held down for a while.
+
+					; Whether drive popup moniker changes
+					; with drive selection
+
+olFileSelectorStaticDrivePopupMoniker	byte	FALSE
+
+olFileSelectorSingleClickToOpen		byte	FALSE
+
+olNoDefaultRing				byte	FALSE
+
+olSystemAttrs		SystemAttrs	; system attrs calc'ed and kept here
+
+if	_RUDY
+	olArrowSize	word	15	; scrollbar arrow size
+elif	_ODIE and 0
+	olArrowSize	word	16
+elif	_MOTIF
+	olArrowSize	word	12	; scrollbar arrow size
+endif
+			
+olWindowOptions		UIWindowOptions	;Flags for various window effects
+
+olExpressOptions	UIExpressOptions
+
+olHelpOptions		UIHelpOptions
+
+olButtonInvertDelay	word		; Number of ticks to invert buttons
+					;	on pen tap
+
+olPDA			word		; Whether we are running on a PDA
+
+if _ODIE
+;
+; allow keyboard activation to invert button long enough to be seen by user
+;
+olButtonActivateDelay	word	DEFAULT_BUTTON_INVERT_DELAY
+else
+olButtonActivateDelay	word	0	; Number of ticks between inversion
+					;	and re-daw on MSG_GEN_ACTIVATE
+endif
+
+olExtWinAttrs		ExtWinAttrs	; .INI file control over system
+					; window menu features
+
+if BUBBLE_HELP
+olBubbleOptions		BubbleOptions	(mask BO_HELP or mask BO_DISPLAY)
+					; .ini control for bubble help and
+					; bubble display.  Both on by default.
+olBubbleHelpDelayTime	word	BUBBLE_HELP_DEFAULT_DELAY_TIME
+					; ticks before bubble help opens
+					; (set via .ini file)
+olBubbleHelpTime	word	BUBBLE_HELP_DEFAULT_TIME
+					; ticks that bubble help remains open
+					; 0 to not close automatically
+					; (set via .ini file)
+olBubbleDisplayTime	word	BUBBLE_DISPLAY_DEFAULT_TIME
+					; ticks that bubble display (text)
+					; remains open, 0 to not close
+					; automatically (set via .ini file)
+endif
+
+if SHORT_LONG_TOUCH
+olShortLongTouchTime	word	SHORT_LONG_TOUCH_DEFAULT_TIME
+endif
+
+;------------------------------------------------------------------------------
+;		Misc initialized variables for all specific UIs
+;------------------------------------------------------------------------------
+
+lastKbdCharCX		word	0	;value of CX register upon last
+					;receipt of MSG_META_KBD_CHAR. Saved
+					;so that menus & GenLists know whether
+					;to start navigation at top or bottom.
+					;Is reset to 0 by mouse start-select
+					;and pointer code which opens menus.
+
+resizeBarHeight	word	4		;Variable width & height of the resize
+resizeBarWidth	word	6		;  bar surrounding a window
+
+specDoClickSound	byte	0	;If set, makes a click noise when you
+					;  click on various gadgets.
+
+
+;------------------------------------------------------------------------------
+;		UI Color Schemes (OL, Motif & CUA)
+;------------------------------------------------------------------------------
+
+
+if _MOTIF  ;-------------------------------------------------------------------
+
+;These variables hold the current color scheme for Motif. They are
+;initialized to the default values for a color monitor, and overwritten
+;with B&W values on a monochrome monitor (see cmainAdministrator.asm).
+;The names use below directly match the names given by the Windows
+;Control Panel accessory.
+;DO NOT CHANGE THE ORDER OF THESE ITEMS!
+
+CUA_ColorSchemeVars	label	byte
+moCS_flags		ColorSchemeFlags	;no color, assume not CGA
+moCS_displayType	byte	0		;not yet known
+moCS_dsLightColor	byte	C_LIGHT_GREY		;that value to be passed as the
+						;DisplayScheme "Light" color
+moCS_dsDarkColor	byte	C_DARK_GREY		;that value to be passed as the
+						;DisplayScheme "Dark" color
+
+
+moCS_screenBG		byte	C_DARK_GREY		;field color (C_LIGHT_BLUE)
+moCS_appWorkspace	byte	C_DARK_GREY		;behind views in windows
+						;(should be medium blue)
+moCS_windowBG		byte	C_LIGHT_GREY		;view color
+moCS_windowText		byte	C_BLACK		;text inside a view
+moCS_menuBar		byte	C_LIGHT_GREY		;menu bar
+moCS_menuText		byte	C_BLACK		;text in menus, menu bar
+
+if _ODIE
+moCS_activeTitleBar	byte	C_LIGHT_GREY	;left and right side
+						;of title bar, when active
+else
+moCS_activeTitleBar	byte	C_DARK_GREY	;left and right side
+						;of title bar, when active
+endif
+
+moCS_inactiveTitleBar	byte	C_LIGHT_GREY	;left and right side of title
+						;bar, when inactive
+moCS_titleBarText	byte	C_BLACK		;text in title bar,
+						;BG for icons!
+moCS_activeBorder	byte	C_LIGHT_GREY	;resize border, when active
+moCS_inactiveBorder	byte	C_LIGHT_GREY	;resize border, when inactive
+
+if _MOTIF	;--------------------------------------------------------------
+moCS_windowFrame	byte	MO_ETCH_COLOR	;thin line around field,
+						;resize borders, window,
+						;and separating items such
+						;as line between title
+						;and menu bar. Also used for
+						;region behind title text!
+else		;--------------------------------------------------------------
+PrintMessage <POSSIBLE OPENLOOK BUG!>
+PrintMessage <See CMain/cmainVariable.def for color hack>
+;somebody changed this constant to MO_ETCH_COLOR, without realizing that
+;that constant is motif specific. I will guess it should be:
+moCS_windowFrame	byte	C_DARK_GREY		;thin line around field,
+						;resize borders, window,
+						;and separating items such
+						;as line between title
+						;and menu bar. Also used for
+						;region behind title text!
+endif		;--------------------------------------------------------------
+
+moCS_scrollBars		byte	C_DARK_GREY		;inside of scroll bar -
+						;slider runs over this area
+
+;Eric added these:
+
+moCS_menuSelection	byte	C_DARK_GREY		;for current selection in menu
+moCS_iconFG		byte	C_BLACK		;foreground for icons
+						;(appear black on white BG)
+moCS_selBkgdColor	byte	C_CYAN		;color used for background of
+						;  selected gadgets (moCS_
+						;  darkColor no longer used)
+	
+						;not yet used 11/14/92 cbh:
+moCS_textColor		byte	C_BLACK		;color used for drawing text
+moCS_lightEdgeColor	byte	C_WHITE		;color used for L/T edges
+moCS_darkEdgeColor	byte	C_DARK_GREY	;color used for R/B edges
+
+CUA_EndColorSchemeVars	label	byte
+moCS_numVars		byte	CUA_EndColorSchemeVars-CUA_ColorSchemeVars
+
+
+;When Motif is run on a system with a monochrome monitor, the following table
+;is copied over the variables listed above.
+
+;DO NOT CHANGE THE ORDER OF THESE ITEMS!
+
+CUA_MonochromeColorTable	label	byte
+
+;moCS_flags	
+			byte	mask CSF_BW	;B&W, assume not CGA
+;moCS_displayType
+			byte	0		;not yet known
+;moCS_dsLightColor
+			byte	C_WHITE		;that value to be passed as the
+						;DisplayScheme "Light" color
+;moCS_dsDarkColor
+			byte	C_BLACK		;that value to be passed as the
+						;DisplayScheme "Dark" color
+
+
+;moCS_screenBG
+			byte	C_WHITE		;field color
+;moCS_appWorkspace
+			byte	C_WHITE		;behind views in windows
+						;(should be medium blue)
+;moCS_windowBG
+			byte	C_WHITE		;view color
+;moCS_windowText
+			byte	C_BLACK		;text inside a view
+;moCS_menuBar
+			byte	C_WHITE		;menu bar
+;moCS_menuText
+			byte	C_BLACK		;text in menus, menu bar
+;moCS_activeTitleBar
+			byte	C_BLACK		;left and right side
+						;of title bar, when active
+;moCS_inactiveTitleBar
+			byte	C_WHITE		;left and right side of title
+						;bar, when inactive
+;moCS_titleBarText
+			byte	C_BLACK		;text in title bar,
+						;BG for icons!
+;moCS_activeBorder
+			byte	C_DARK_GREY		;resize border, when active
+;moCS_inactiveBorder
+			byte	C_DARK_GREY		;resize border, when inactive
+;moCS_windowFrame
+			byte	C_BLACK		;thin line around field,
+						;resize borders, window,
+						;and separating items such
+						;as line between title
+						;and menu bar. Also used for
+						;region behind title text!
+;moCS_scrollBars
+			byte	C_DARK_GREY		;inside of scroll bar -
+						;slider runs over this area
+
+;Eric added these:
+
+;moCS_menuSelection
+			byte	C_BLACK		;for current selection in menu
+;moCS_iconFG
+			byte	C_BLACK		;foreground for icons
+						;(appear black on white BG)
+
+;moCS_selBkgdColor	
+			byte	C_BLACK		;color used for background of
+						;  selected gadgets (moCS_
+						;  darkColor no longer used)
+	
+						;not yet used 11/14/92 cbh:
+;moCS_textColor		
+			byte	C_BLACK		;color used for drawing text
+;moCS_lightEdgeColor	
+			byte	C_BLACK		;color used for L/T edges
+;moCS_darkEdgeColor	
+			byte	C_BLACK		;color used for R/B edges
+
+
+endif		;MOTIF ---------------------------------------------------------
+
+if _PM		;---------------------------------------------------------------
+
+;These variables hold the current color scheme for Motif. They are
+;initialized to the default values for a color monitor, and overwritten
+;with B&W values on a monochrome monitor (see cmainAdministrator.asm).
+;The names use below directly match the names given by the Windows
+;Control Panel accessory.
+;DO NOT CHANGE THE ORDER OF THESE ITEMS!
+
+CUA_ColorSchemeVars	label	byte
+moCS_flags		ColorSchemeFlags	;no color, assume not CGA
+moCS_displayType	byte	0		;not yet known
+moCS_dsLightColor	byte	C_LIGHT_GREY	;that value to be passed as the
+						;DisplayScheme "Light" color
+moCS_dsDarkColor	byte	C_DARK_GREY	;that value to be passed as the
+						;DisplayScheme "Dark" color
+
+moCS_screenBG		byte	C_LIGHT_GREY	;field color (C_LIGHT_BLUE)
+
+; moCS_appWorkspace does not appear to be used anywhere.  (JS 7/9/92)
+moCS_appWorkspace	byte	C_DARK_GREY	;behind views in windows
+						;(should be medium blue)
+moCS_windowBG		byte	C_WHITE		;view color
+moCS_windowText		byte	C_BLACK		;text inside a view
+moCS_menuBar		byte	C_LIGHT_GREY	;menu bar
+moCS_menuText		byte	C_BLACK		;text in menus, menu bar
+moCS_activeTitleBar	byte	C_CYAN;&C_BLACK	;left and right side
+						;of title bar, when active
+moCS_inactiveTitleBar	byte	C_LIGHT_GREY	;left and right side of title
+						;bar, when inactive
+moCS_titleBarText	byte	C_WHITE		;text in title bar,
+						;BG for icons!
+moCS_activeBorder	byte	C_YELLOW	;resize border, when active
+moCS_inactiveBorder	byte	C_LIGHT_GREY	;resize border, when inactive
+
+moCS_windowFrame	byte	MO_ETCH_COLOR	;thin line around field,
+						;resize borders, window,
+						;and separating items such
+						;as line between title
+						;and menu bar. Also used for
+						;region behind title text!
+
+; moCS_scrollBars does not appear to be used anywhere.  (JS 7/9/92)
+moCS_scrollBars		byte	C_DARK_GREY	;inside of scroll bar -
+						;slider runs over this area
+
+;Eric added these:
+
+moCS_menuSelection	byte	C_LIGHT_GREY	;for current selection in menu
+moCS_iconFG		byte	C_BLACK		;foreground for icons
+						;(appear black on white BG)
+
+moCS_selBkgdColor	byte	C_LIGHT_GREY	;color used for background of
+						;  selected gadgets (moCS_
+						;  darkColor no longer used)
+	
+						;not yet used 11/14/92 cbh:
+moCS_textColor		byte	C_BLACK		;color used for drawing text
+moCS_lightEdgeColor	byte	C_WHITE		;color used for L/T edges
+moCS_darkEdgeColor	byte	C_DARK_GREY	;color used for R/B edges
+
+
+CUA_EndColorSchemeVars	label	byte
+moCS_numVars		byte	CUA_EndColorSchemeVars-CUA_ColorSchemeVars
+
+
+;When Motif is run on a system with a monochrome monitor, the following table
+;is copied over the variables listed above.
+
+;DO NOT CHANGE THE ORDER OF THESE ITEMS!
+
+CUA_MonochromeColorTable	label	byte
+
+;moCS_flags	
+			byte	mask CSF_BW	;B&W, assume not CGA
+;moCS_displayType
+			byte	0		;not yet known
+;moCS_dsLightColor
+			byte	C_WHITE		;that value to be passed as the
+						;DisplayScheme "Light" color
+;moCS_dsDarkColor
+			byte	C_BLACK		;that value to be passed as the
+						;DisplayScheme "Dark" color
+
+
+;moCS_screenBG
+			byte	C_WHITE		;field color
+;moCS_appWorkspace
+			byte	C_WHITE		;behind views in windows
+						;(should be medium blue)
+;moCS_windowBG
+			byte	C_WHITE		;view color
+;moCS_windowText
+			byte	C_BLACK		;text inside a view
+;moCS_menuBar
+			byte	C_WHITE		;menu bar
+;moCS_menuText
+			byte	C_BLACK		;text in menus, menu bar
+;moCS_activeTitleBar
+			byte	C_BLACK		;left and right side
+						;of title bar, when active
+;moCS_inactiveTitleBar
+			byte	C_WHITE		;left and right side of title
+						;bar, when inactive
+;moCS_titleBarText
+			byte	C_WHITE		;text in title bar,
+						;BG for icons!
+;moCS_activeBorder
+			byte	C_WHITE		;resize border, when active
+;moCS_inactiveBorder
+			byte	C_WHITE		;resize border, when inactive
+;moCS_windowFrame
+			byte	C_BLACK		;thin line around field,
+						;resize borders, window,
+						;and separating items such
+						;as line between title
+						;and menu bar. Also used for
+						;region behind title text!
+;moCS_scrollBars
+			byte	C_DARK_GREY	;inside of scroll bar -
+						;slider runs over this area
+
+;Eric added these:
+
+;moCS_menuSelection
+			byte	C_BLACK		;for current selection in menu
+;moCS_iconFG
+			byte	C_BLACK		;foreground for icons
+						;(appear black on white BG)
+;moCS_selBkgdColor	
+			byte	C_BLACK		;color used for background of
+						;  selected gadgets (moCS_
+						;  darkColor no longer used)
+	
+						;not yet used 11/14/92 cbh:
+;moCS_textColor		
+			byte	C_BLACK		;color used for drawing text
+;moCS_lightEdgeColor	
+			byte	C_BLACK		;color used for L/T edges
+;moCS_darkEdgeColor	
+			byte	C_BLACK		;color used for R/B edges
+
+
+
+endif		;PM ------------------------------------------------------------
+
+if _CUA	;-----------------------------------------------------------------------
+
+;These variables hold the current color scheme for CUA. They are
+;initialized to the default values for a color monitor, and overwritten
+;with B&W values on a monochrome monitor (see cmainAdministrator.asm).
+;The names use below directly match the names given by the Windows
+;Control Panel accessory.
+;DO NOT CHANGE THE ORDER OF THESE ITEMS!
+
+CUA_ColorSchemeVars	label	byte
+moCS_flags		byte	0
+moCS_displayType	byte	0		;not yet known
+moCS_dsLightColor	byte	C_WHITE		;that value to be passed as the
+						;DisplayScheme "Light" color
+moCS_dsDarkColor	byte	C_BLACK		;that value to be passed as the
+						;DisplayScheme "Dark" color
+
+moCS_screenBG		byte	C_LIGHT_CYAN		;field color (C_LIGHT_BLUE)
+moCS_appWorkspace	byte	C_LIGHT_CYAN		;behind views in windows
+						;(should be medium blue)
+moCS_windowBG		byte	C_WHITE		;view color
+moCS_windowText		byte	C_BLACK		;text inside a view
+moCS_menuBar		byte	C_LIGHT_CYAN		;menu bar
+moCS_menuText		byte	C_BLACK		;text in menus, menu bar
+moCS_activeTitleBar	byte	C_LIGHT_BLUE		;left and right side
+						;of title bar, when active
+moCS_inactiveTitleBar	byte	C_WHITE		;left and right side of title
+						;bar, when inactive
+moCS_titleBarText	byte	C_WHITE		;text in title bar,
+						;BG for icons!
+moCS_activeBorder	byte	C_LIGHT_GREY		;resize border, when active
+moCS_inactiveBorder	byte	C_LIGHT_GREY		;resize border, when inactive
+moCS_windowFrame	byte	C_BLACK		;thin line around field,
+						;resize borders, window,
+						;and separating items such
+						;as line between title
+						;and menu bar. Also used for
+						;region behind title text!
+moCS_scrollBars		byte	C_DARK_GREY		;inside of scroll bar -
+						;slider runs over this area
+
+;Eric added these:
+
+moCS_menuSelection	byte	C_LIGHT_RED		;for current selection in menu
+moCS_iconFG		byte	C_BLACK		;foreground for icons
+						;(appear black on white BG)
+moCS_selBkgdColor	byte	LIGHT_GREY	;color used for background of
+						;  selected gadgets (moCS_
+						;  darkColor no longer used)
+	
+						;not yet used 11/14/92 cbh:
+moCS_textColor		byte	C_BLACK		;color used for drawing text
+moCS_lightEdgeColor	byte	C_WHITE		;color used for L/T edges
+moCS_darkEdgeColor	byte	C_DARK_GREY	;color used for R/B edges
+
+
+CUA_EndColorSchemeVars	label	byte
+moCS_numVars		byte	CUA_EndColorSchemeVars-CUA_ColorSchemeVars
+
+
+;When Motif is run on a system with a monochrome monitor, the following table
+;is copied over the variables listed above.
+
+;DO NOT CHANGE THE ORDER OF THESE ITEMS!
+
+CUA_MonochromeColorTable	label	byte
+
+;moCS_flags
+			byte	mask CSF_BW	;B&W, assume not CGA
+;moCS_displayType
+			byte	0		;not yet known
+;moCS_dsLightColor
+			byte	C_WHITE		;that value to be passed as the
+						;DisplayScheme "Light" color
+;moCS_dsDarkColor
+			byte	C_BLACK		;that value to be passed as the
+						;DisplayScheme "Dark" color
+
+
+;moCS_screenBG
+			byte	C_LIGHT_GREY		;field color
+;moCS_appWorkspace
+			byte	C_WHITE		;behind views in windows
+						;(should be medium blue)
+;moCS_windowBG
+			byte	C_WHITE		;view color
+;moCS_windowText
+			byte	C_BLACK		;text inside a view
+;moCS_menuBar
+			byte	C_WHITE		;menu bar
+;moCS_menuText
+			byte	C_BLACK		;text in menus, menu bar
+;moCS_activeTitleBar
+			byte	C_BLACK		;left and right side
+						;of title bar, when active
+;moCS_inactiveTitleBar
+			byte	C_WHITE		;left and right side of title
+						;bar, when inactive
+;moCS_titleBarText
+			byte	C_WHITE		;text in title bar,
+						;BG for icons!
+;moCS_activeBorder
+			byte	C_DARK_GREY		;resize border, when active
+;moCS_inactiveBorder
+			byte	C_DARK_GREY		;resize border, when inactive
+;moCS_windowFrame
+			byte	C_BLACK		;thin line around field,
+						;resize borders, window,
+						;and separating items such
+						;as line between title
+						;and menu bar. Also used for
+						;region behind title text!
+;moCS_scrollBars
+			byte	C_DARK_GREY		;inside of scroll bar -
+						;slider runs over this area
+
+;Eric added these:
+
+;moCS_menuSelection
+			byte	C_BLACK		;for current selection in menu
+;moCS_iconFG
+			byte	C_BLACK		;foreground for icons
+						;(appear black on white BG)
+;moCS_selBkgdColor	
+			byte	C_BLACK		;color used for background of
+						;  selected gadgets (moCS_
+						;  darkColor no longer used)
+	
+						;not yet used 11/14/92 cbh:
+;moCS_textColor		
+			byte	C_BLACK		;color used for drawing text
+;moCS_lightEdgeColor	
+			byte	C_BLACK		;color used for L/T edges
+;moCS_darkEdgeColor	
+			byte	C_BLACK		;color used for R/B edges
+
+
+
+endif		;CUA -----------------------------------------------------------
+
+if _MAC	;-----------------------------------------------------------------------
+
+;These variables hold the current color scheme for MAC. They are
+;initialized to the default values for a color monitor, and overwritten
+;with B&W values on a monochrome monitor (see cmainAdministrator.asm).
+;The names use below directly match the names given by the Windows
+;Control Panel accessory.
+;DO NOT CHANGE THE ORDER OF THESE ITEMS!
+
+CUA_ColorSchemeVars	label	byte
+moCS_flags		byte	0
+moCS_displayType	byte	0		;not yet known
+moCS_dsLightColor	byte	C_WHITE		;that value to be passed as the
+						;DisplayScheme "Light" color
+moCS_dsDarkColor	byte	C_BLACK		;that value to be passed as the
+						;DisplayScheme "Dark" color
+
+moCS_screenBG		byte	C_LIGHT_GREY		;field color (light grey)
+moCS_appWorkspace	byte	C_WHITE		;behind views in windows
+						;(should be medium blue)
+moCS_windowBG		byte	C_WHITE		;view color
+moCS_windowText		byte	C_BLACK		;text inside a view
+moCS_menuBar		byte	C_WHITE		;menu bar
+moCS_menuText		byte	C_BLACK		;text in menus, menu bar
+moCS_activeTitleBar	byte	C_WHITE		;left and right side
+						;of title bar, when active
+moCS_inactiveTitleBar	byte	C_WHITE		;left and right side of title
+						;bar, when inactive
+moCS_titleBarText	byte	C_WHITE		;text in title bar,
+						;BG for icons!
+moCS_activeBorder	byte	C_DARK_GREY		;resize border, when active
+moCS_inactiveBorder	byte	C_DARK_GREY		;resize border, when inactive
+moCS_windowFrame	byte	C_BLACK		;thin line around field,
+						;resize borders, window,
+						;and separating items such
+						;as line between title
+						;and menu bar. Also used for
+						;region behind title text!
+moCS_scrollBars		byte	C_DARK_GREY		;inside of scroll bar -
+						;slider runs over this area
+
+;Eric added these:
+
+moCS_menuSelection	byte	C_BLACK		;for current selection in menu
+moCS_iconFG		byte	C_BLACK		;foreground for icons
+						;(appear black on white BG)
+CUA_EndColorSchemeVars	label	byte
+moCS_numVars		byte	CUA_EndColorSchemeVars-CUA_ColorSchemeVars
+
+
+;When Mac is run on a system with a monochrome monitor, the following table
+;is copied over the variables listed above.
+
+;DO NOT CHANGE THE ORDER OF THESE ITEMS!
+
+CUA_MonochromeColorTable	label	byte
+
+;moCS_flags
+			byte	mask CSF_BW	;B&W, assume not CGA
+;moCS_displayType
+			byte	0		;not yet known
+;moCS_dsLightColor
+			byte	C_WHITE		;that value to be passed as the
+						;DisplayScheme "Light" color
+;moCS_dsDarkColor
+			byte	C_BLACK		;that value to be passed as the
+						;DisplayScheme "Dark" color
+
+
+;moCS_screenBG
+			byte	C_LIGHT_GREY		;field color
+;moCS_appWorkspace
+			byte	C_WHITE		;behind views in windows
+						;(should be medium blue)
+;moCS_windowBG
+			byte	C_WHITE		;view color
+;moCS_windowText
+			byte	C_BLACK		;text inside a view
+;moCS_menuBar
+			byte	C_WHITE		;menu bar
+;moCS_menuText
+			byte	C_BLACK		;text in menus, menu bar
+;moCS_activeTitleBar
+			byte	C_BLACK		;left and right side
+						;of title bar, when active
+;moCS_inactiveTitleBar
+			byte	C_WHITE		;left and right side of title
+						;bar, when inactive
+;moCS_titleBarText
+			byte	C_WHITE		;text in title bar,
+						;BG for icons!
+;moCS_activeBorder
+			byte	C_DARK_GREY		;resize border, when active
+;moCS_inactiveBorder
+			byte	C_DARK_GREY		;resize border, when inactive
+;moCS_windowFrame
+			byte	C_BLACK		;thin line around field,
+						;resize borders, window,
+						;and separating items such
+						;as line between title
+						;and menu bar. Also used for
+						;region behind title text!
+;moCS_scrollBars
+			byte	C_DARK_GREY		;inside of scroll bar -
+						;slider runs over this area
+
+;Eric added these:
+
+;moCS_menuSelection
+			byte	C_BLACK		;for current selection in menu
+;moCS_iconFG
+			byte	C_BLACK		;foreground for icons
+						;(appear black on white BG)
+
+endif		;MAC -----------------------------------------------------------
+
+idata	ends
+
+
+;------------------------------------------------------------------------------
+;		Uninitialized variables
+;------------------------------------------------------------------------------
+
+udata	segment
+
+						; Display scheme for use
+						; by Generic objects, gadgets,
+						; applications, & the specific
+						; UI.  Ends up being passed
+						; around in GStates, though
+						; specific UI elements can
+						; look directly at the 
+						; variables stored here in
+						; dgroup.
+specDisplayScheme	DisplayScheme
+
+kbdRequired		BooleanByte
+
+	; Editable Text FontID and FontSize (JimG - 3/8/94)
+editableTextFontID	FontID
+editableTextFontsize	sword
+
+if (not _GRAFFITI_UI)
+foundStartSelectMsg	BooleanByte	; This variable is shared by floating
+					; keyboard classes.
+					; True if more MSG_META_START_SELECT's
+					; are found in the event queue when
+					; floating keyboard is handling one of
+					; of them
+endif
+
+udata	ends
+
+;------------------------------------------------------------------------------
+;		Misc
+;------------------------------------------------------------------------------
+
+idata	segment
+
+;
+; Cache for current field dimensions.  Gives a more accurate account
+; of what the "actual" screen dimensions are.  Used by GetFieldDimensions.
+;
+fieldWidth		word	0
+fieldHeight		word	0
+
+idata	ends
+
+;------------------------------------------------------------------------------
+;		Document Control
+;------------------------------------------------------------------------------
+
+idata segment
+
+docControlOptions	DocControlOptions
+
+docControlFSLevel	UIInterfaceLevel	UIIL_ADVANCED
+
+if DBCS_PCGEOS
+backupDirPath		PathName	"", 0
+else
+backupDirPath		PathName	"", 0
+endif
+backupDirDisk		hptr	SP_BACKUP
+
+idata ends
