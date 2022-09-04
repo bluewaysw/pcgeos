@@ -1,0 +1,143 @@
+
+			Changes for Consumer Line
+
+How to add support for the "canlaunchusingexpressmenu" .INI file flag.
+
+###############################################################################
+			geosec.ini
+###############################################################################
+
+===============================================================================
+			INSERT THIS
+===============================================================================
+
+;	canlaunchusingexpressmenu = {true,false} - whether the launcher
+;				sub-menu appears in the Express Menu.
+canlaunchusingexpressmenu = true
+
+(into the [ui] category)
+
+###############################################################################
+			cwinField.asm
+###############################################################################
+
+===============================================================================
+			EXISTING
+===============================================================================
+
+OLFieldCreateExpressMenu	method	dynamic OLFieldClass, \
+				METHOD_GEN_FIELD_CREATE_WORKSPACE_MENU
+======skipping lines...
+	push	si
+	mov	si, dx
+	clr	cx			;set cx,dx = child #
+	mov	dx, OL_WORKSPACE_MENU_RUN_PROGRAMS_SUBMENU_OBJ
+	mov	ax, METHOD_FIND_GEN_CHILD
+	push	bp
+	call	ObjCallInstanceNoLock
+	pop	bp
+EC <	ERROR_C	OL_ERROR		;fatal error if no submen	>
+	pop	si
+
+===============================================================================
+			INSERT THIS
+===============================================================================
+testForLaunchability:
+	;look for "canlaunchfromexpressmenu = FALSE" in the GEOS.INI file.
+	;If it is there, disable the Run Menu.
+	;*ds:dx = Run Menu
+
+	call	OLFieldTestINIFileForLaunchability
+	jc	60$			;skip if is TRUE...
+
+	DoPush	si, bp
+	mov	si, dx
+	mov	ax, METHOD_GEN_SET_NOT_USABLE
+	mov	dl, VUM_NOW
+	call	ObjCallInstanceNoLock
+	DoPopRV	si, bp
+
+	clr	dx			;there is no Run Menu as far
+					;as we are concerned.
+
+60$:
+===============================================================================
+			EXISTING
+===============================================================================
+	mov	runMenuChunk, dx
+
+	;INITIALIZE the applications list (Set OD & Method)
+
+==========skipping lines...
+
+	; INITIALIZE the run programs/startup menu
+
+	mov	cx, ds:[LMBH_handle]
+	mov	dx, runMenuChunk
+	call	ObjSwapUnlock
+
+	mov	si, fieldOD.chunk	; Restore *ds:si to be field
+
+	;Call method of Field object, to add in list of runnable applications
+
+===============================================================================
+			INSERT THIS
+===============================================================================
+
+	tst	dx
+	jz	70$
+
+===============================================================================
+			EXISTING
+===============================================================================
+	mov	ax, METHOD_GEN_FIELD_ADD_APPS_TO_RUN_MENU
+	push	bp
+	call	ObjCallInstanceNoLock
+	pop	bp
+===============================================================================
+			INSERT THIS
+===============================================================================
+70$:	;Return req'd info
+
+===============================================================================
+			EXISTING
+===============================================================================
+	;Return req'd info
+
+	mov	cx, menuOD.handle
+	mov	dx, menuOD.chunk
+	mov	ax, appListChunk
+
+	.leave
+	ret
+OLFieldCreateExpressMenu	endm
+
+===============================================================================
+			INSERT THIS
+===============================================================================
+
+;look for "canlaunchfromexpressmenu = TRUE" in the GEOS.INI file,
+;and return the carry set if it does not exist, or if it is TRUE.
+
+OLFieldTestINIFileForLaunchability	proc	near
+
+	DoPush	ds, ax, cx, dx, si
+	segmov	ds, cs
+	mov	si, offset uiCategoryInInitRes
+					;ds:si = category
+	mov	cx, cs
+	mov	dx, offset canLaunchUsingExpresMenuKey
+					;cx:dx = key
+	call	InitFileGetBoolean	;ax = value
+	jc	done			;skip if cannot find (return TRUE)...
+
+	cmp	ax, TRUE		;resets carry if ax = TRUE
+	cmc				;if TRUE, return carry set
+
+done:
+	DoPopRV	ds, ax, cx, dx, si
+	ret
+OLFieldTestINIFileForLaunchability	endp
+
+uiCategoryInInitRes		char	"ui", 0
+canLaunchUsingExpresMenuKey	char	"canlaunchusingexpressmenu", 0
