@@ -31,7 +31,7 @@
 
   struct  TCMap0_
   {
-    PByte  glyphIdArray;
+    ChunkHandle  glyphIdArray;
   };
 
   typedef struct TCMap0_  TCMap0;

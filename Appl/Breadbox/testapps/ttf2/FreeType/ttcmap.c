@@ -74,7 +74,7 @@
     case 0:
       cmap0 = &cmap->c.cmap0;
 
-      if ( ALLOC( cmap0->glyphIdArray, 256L )            ||
+      if ( GALLOC( cmap0->glyphIdArray, 256L )            ||
            FILE_Read( (void*)cmap0->glyphIdArray, 256L ) )
          goto Fail;
 
@@ -255,7 +255,7 @@
     switch ( cmap->format )
     {
       case 0:
-        FREE( cmap->c.cmap0.glyphIdArray );
+        GFREE( cmap->c.cmap0.glyphIdArray );
         break;
 
       case 2:
@@ -344,7 +344,7 @@
                                  PCMap0  cmap0 )
   {
     if ( charCode <= 0xFF )
-      return cmap0->glyphIdArray[charCode];
+      return ((PByte)DEREF( cmap0->glyphIdArray ))[charCode];
     else
       return 0;
   }
