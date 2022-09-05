@@ -117,6 +117,11 @@ impex_libs	: dib bmp clp ico pcx tif \
 extraPrefLibs	: prefpag prefjfep
 
 #
+# Revived specigic UI libraries
+#
+revivedUI	: openlpook
+
+#
 # Applications
 #
 minimalAppl	: minimalGame minimalUtils minimalTools minimalSavers \
@@ -210,6 +215,9 @@ Installed/Library/SpecUI/ISUI	:	kernel text MAKELIB
 
 motif	: Installed/Library/SpecUI/Motif
 Installed/Library/SpecUI/Motif:	kernel text MAKELIB
+
+motif	: Installed/Library/ReviveUI/OpenLook
+Installed/Library/ReviveUI/OpenLook:	kernel text MAKELIB
 
 spool	: Installed/Library/Spool
 Installed/Library/Spool:	kernel text MAKELIB
