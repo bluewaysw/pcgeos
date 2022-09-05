@@ -974,7 +974,7 @@ if	 _RUDY and ASSUME_BOLD_STYLE_FOR_MONIKERS
 doneWithBoldMoniker:
 endif	;_RUDY and ASSUME_BOLD_STYLE_FOR_MONIKERS
 
-	jcxz	10$				;no spacing if no moniker
+CUAS <	jcxz	10$				;no spacing if no moniker    >
 
 OLS <	add	cx, OL_CONTROL_MKR_X_SPACING		     		     >
 CUAS <	add	cx, MO_CONTROL_MKR_X_SPACING		                     >

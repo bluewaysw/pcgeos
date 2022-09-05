@@ -307,6 +307,44 @@ OpenWinGetSpacing	endp
 
 endif		;END of MOTIF/CUA specific code -----------------------
 
+if 	_OL_STYLE	;START of OPEN LOOK specific code ---------------------
+
+OpenWinGetSpacing	method OLWinClass, MSG_VIS_COMP_GET_CHILD_SPACING
+			
+	;set up margins for inside the window
+
+	mov	cx, OLS_WIN_CHILD_SPACING
+	mov	dx, OLS_WIN_CHILD_WRAP_SPACING 
+
+	call	OpenCtrlCheckCustomSpacing
+	
+	mov	di, ds:[si]
+	add	di, ds:[di].Vis_offset
+	test	ds:[di].VCI_geoAttrs, mask VCGA_ORIENT_CHILDREN_VERTICALLY
+	pushf
+	jz	10$			;if so, spacing is in correct regs
+	xchg	cx, dx			;restore registers for width, length
+10$:
+	call	OpenCheckIfCGA		;ax zeroed on CGA's
+	jnc	20$
+	mov	dx, 1
+20$:
+	call	OpenCheckIfNarrow
+	jnc	30$
+	mov	cx, 1
+30$:
+	popf
+	jz	40$			;if so, spacing is in correct regs
+	xchg	cx, dx			;swap registers back
+40$:
+	ret
+
+OpenWinGetSpacing	endp
+
+endif		;END of OPEN LOOK specific code -------------------------------
+
+		
+	
 
 COMMENT @----------------------------------------------------------------------
 
@@ -734,6 +772,112 @@ endif	;BUBBLE_DIALOGS
 OpenWinGetMargins	endp
 
 endif		;END of MOTIF/CUA specific code -----------------------
+
+if 	_OL_STYLE	;START of OPEN LOOK specific code ---------------------
+
+OpenWinGetMargins	method OLWinClass, MSG_VIS_COMP_GET_MARGINS
+	mov	di, ds:[si]		;ds:si = instance
+	add	di, ds:[di].Vis_offset	;ds:di = SpecificInstance
+
+	mov	ax, ds:[di].OLWI_attrs
+
+PrintMessage <POSSIBLE OPENLOOK BUG!>
+;a guess by Eric to get OpenLook onto demo disk
+;					;bx = pointSize
+;	mov	bx, es:[displayScheme.DS_pointSize]
+	push	es
+	segmov	es, dgroup, bx		;es = dgroup
+					;bx = pointSize
+	mov	bx, es:[specDisplayScheme.DS_pointSize]
+	pop	es
+
+					;Start with just basic margins
+					;(for thin outline)
+	mov	dx, (OLS_WIN_LINE_BORDER_X_MARGIN shl 8) + OLS_WIN_LINE_BORDER_X_MARGIN
+	mov	cx, (OLS_WIN_LINE_BORDER_Y_MARGIN shl 8) + OLS_WIN_LINE_BORDER_Y_MARGIN
+
+	;If window is shadowed then add shadow size on right & bottom
+
+	test	ax, mask OWA_SHADOW
+	jz	noShadow
+
+	add	dh, OLS_WIN_SHADOW_SIZE	;add spacing on right
+	add	ch, OLS_WIN_SHADOW_SIZE	;add spacing on bottom
+
+noShadow:
+	;If window has a thick line border (is NoticeWindow)
+	;then increase margins for it.
+
+	test	ax, mask OWA_THICK_LINE_BORDER
+	jz	noLineBorder
+
+	add	dx, (OLS_WIN_THICK_BORDER_EXTRA_X_MARGIN shl 8) \
+		   + OLS_WIN_THICK_BORDER_EXTRA_X_MARGIN
+	add	cx, (OLS_WIN_THICK_BORDER_EXTRA_Y_MARGIN shl 8) \
+		   + OLS_WIN_THICK_BORDER_EXTRA_Y_MARGIN
+
+noLineBorder:
+
+	;check if resizable...
+
+	test	ax, mask OWA_RESIZABLE	;see if resizable
+	jz	noResize
+
+ifdef	OWA_FOOTER
+	test	ax, mask OWA_FOOTER	;is there a footer also?
+	jnz	noResize		;skip if so (do not need extra room)...
+endif
+
+	add	ch, OLS_WIN_RESIZE_BOTTOM_MARGIN
+					;add space at bottom
+
+noResize:
+	;If header area needed then add its size
+	test	ax, mask OWA_HEADER
+	jz	noHeader
+
+if _GCM
+	; if GCM header, force it to be 30 lines high (SAVE BYTES here)
+	;
+	test	ds:[di].OLWI_fixedAttr, mask OWFA_GCM_TITLED
+	jnz	30$			;skip if so...
+
+endif	; _GCM
+
+	add	cl, bl		; add in point size
+	add	cl, OLS_WIN_HEADER_Y_SPACING + \
+		    OLS_WIN_HEADER_BOTTOM_LINE_HEIGHT + \
+		    OLS_WIN_HEADER_BELOW_LINE_MARGIN
+	jmp	short noHeader
+
+if _GCM
+30$:	;for GCM headers: ignore font size (for now)
+
+	add	cl, OLS_GCM_HEADER_HEIGHT + \
+			OLS_WIN_HEADER_BOTTOM_LINE_HEIGHT + \
+			OLS_WIN_HEADER_BELOW_LINE_MARGIN
+endif	; _GCM
+		
+noHeader:
+	;check for footer
+
+ifdef OWA_FOOTER
+	test	ax, mask OWA_FOOTER
+	jz	noFooter
+
+	;remove the bottom assumed margin, and add in the size of the footer
+
+	add	cl, (OLS_WIN_FOOTER_Y_MARGIN * 2) - OLS_WIN_LINE_BORDER_Y_MARGIN
+	add	ch, bl
+endif
+
+noFooter:
+	call	ReturnAxBpCxDx		;put margins in right registers
+	ret
+
+OpenWinGetMargins	endp
+
+endif		;END of OPEN LOOK specific code -------------------------------
 
 
 COMMENT @----------------------------------------------------------------------
@@ -1379,6 +1523,93 @@ noSysMenu:
 OpenWinCalcMinWidth	endp
 
 endif		;END of MOTIF specific code -----------------------------------
+
+
+if _OL_STYLE	;--------------------------------------------------------------
+	
+OpenWinCalcMinWidth	proc	near		
+	;Returns header area, minus title, in cx.
+
+	push	dx, di, bp
+	mov	di, ds:[si]		;point to specific instance
+	add	di, ds:[di].Vis_offset
+
+	mov	cx, OLS_WIN_LINE_BORDER_X_MARGIN*2 ;setup default width
+
+	;Add in shadow size, if shadowed
+
+	test	ds:[di].OLWI_attrs, mask OWA_SHADOW
+	jz	notShadowed
+
+	add	cx, OLS_WIN_SHADOW_SIZE ;if has shadow, add it in
+
+notShadowed:
+	;see if there is a header
+
+	test	ds:[di].OLWI_attrs, mask OWA_HEADER
+	jz	afterHeader		;skip if not...
+
+	add	cx, OLS_WIN_HEADER_MARK_X_POSITION ;Add in header X margins
+
+	;If pinnable, add in pin amount
+
+	test	ds:[di].OLWI_attrs, mask OWA_PINNABLE
+	jz	notPinnable
+
+	add	cx, OLS_PUSHPIN_MAX_WIDTH
+
+notPinnable:
+	;If closable, add in win mark amount
+
+	test	ds:[di].OLWI_attrs, mask OWA_CLOSABLE
+	jz	afterHeader
+
+	add	cx, OLS_CLOSE_MARK_WIDTH + OLS_CLOSE_MARK_SPACING
+
+afterHeader:
+	pop	dx, di, bp
+	ret
+OpenWinCalcMinWidth	endp
+
+endif		;--------------------------------------------------------------
+
+if 	_OL_STYLE	;START of OPEN LOOK specific code ---------------------
+
+;NOTE: ERIC: CenterIfNotice seems old... remove it
+;If notice window, center on screen.
+
+CenterIfNotice	proc	near
+	push	cx
+	push	dx
+						; See if Notice window
+	mov	di, ds:[si]
+	add	di, ds:[di].Vis_offset
+
+	cmp	ds:[di].OLWI_type, OLWT_NOTICE_WINDOW
+	jne	CIF_NotNotice			; skip if not.
+
+	shr	cx, 1				; get center of screen
+	shr	dx, 1
+	mov	ax, cx				; put in ax, bx
+	mov	bx, dx
+	call	VisGetSize			; assume we keep current size
+	shr	cx, 1
+	shr	dx, 1
+	sub	ax, cx				; calc new left, top
+	sub	bx, dx
+	mov	cx, ax
+	mov	dx, bx
+
+	call	VisSetPosition				; let's hope not subclassed
+
+CIF_NotNotice:
+	pop	dx
+	pop	cx
+	ret
+
+CenterIfNotice	endp
+
+endif
 
 
 COMMENT @----------------------------------------------------------------------

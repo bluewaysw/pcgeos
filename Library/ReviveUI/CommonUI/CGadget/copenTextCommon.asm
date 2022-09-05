@@ -302,10 +302,10 @@ OLTextDraw	method dynamic OLTextClass, MSG_VIS_DRAW
 	mov	ax, (C_BLACK shl 8) or C_WHITE	; dark color in ah, wash in al
 	mov	di, ds:[si]			; point to instance
 	add	di, ds:[di].Vis_offset		; ds:[di] -- VisInstance
-	cmp	ds:[di].VTI_washColor.SCP_index.SCPI_info, CF_INDEX
+	cmp	ds:[di].VTI_washColor.CQ_info, CF_INDEX
 	jne	40$				; some RGB color, forget it
 						; else use as wash color here
-	mov	al, ds:[di].VTI_washColor.SCP_index.SCPI_index
+	mov	al, ds:[di].VTI_washColor.CQ_redOrIndex
 	cmp	al, C_BLACK			; is the wash color black?
 	jne	40$				; no, branch
 	mov	ah, C_WHITE			; else we'll use a white frame

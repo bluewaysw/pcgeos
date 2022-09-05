@@ -1681,7 +1681,7 @@ if _OL_STYLE	;--------------------------------------------------------------
 	mov	ax, C_WHITE
 	call	GrSetLineColor
 	pop	ax
-	call	DrawBottomRightEdges	; Draw bottom/right edges
+	call	ItemDrawBottomRightEdges	; Draw bottom/right edges
 endif		;--------------------------------------------------------------
 
 	push	bx

@@ -173,11 +173,11 @@ REVISION HISTORY:
 OpenWinCheckIfInteractableObject	method	OLWinClass,
 					MSG_META_CHECK_IF_INTERACTABLE_OBJECT
 	.enter
-	cmp	cx, ds:[di].OLWI_sysMenu
-	stc
-	je	exit
+CUAS <	cmp	cx, ds:[di].OLWI_sysMenu 			>
+CUAS <	stc							>
+CUAS <	je	exit						>
 	clc
-exit:
+CUAS < exit:							>
 	.leave
 	ret
 OpenWinCheckIfInteractableObject	endp
@@ -769,23 +769,24 @@ haveLeftRight:
 haveUpDown:
 	cmp	ax, bx
 	jge	resizeLeftRight
-	mov	bl, mask OLWMRS_RESIZING_DOWN
+CUAS <	mov	bl, mask OLWMRS_RESIZING_DOWN >
 	cmp	dx, 3
 	jge	haveResizeDir
-	mov	bl, mask OLWMRS_RESIZING_UP
+CUAS <	mov	bl, mask OLWMRS_RESIZING_UP >
 	cmp	dx, -3
 	jle	haveResizeDir
 	jmp	short OWP_QuitProcessed
 resizeLeftRight:
-	mov	bl, mask OLWMRS_RESIZING_RIGHT
+CUAS <	mov	bl, mask OLWMRS_RESIZING_RIGHT >
 	cmp	cx, 3
 	jge	haveResizeDir
-	mov	bl, mask OLWMRS_RESIZING_LEFT
+CUAS <	mov	bl, mask OLWMRS_RESIZING_LEFT >
 	cmp	cx, -3
 	jle	haveResizeDir
 	jmp	short OWP_QuitProcessed
+
 haveResizeDir:
-	call	OLWMRStartResize		; only handles one direction
+CUAS <	call	OLWMRStartResize		; only handles one direction >
 	jmp	short OWP_QuitProcessed
 
 notResizePending:
@@ -2022,7 +2023,8 @@ OpenWinEnsureMenu	proc	near
 
 	mov	bx, handle WindowMenuResource
 	mov	dx, offset WindowMenu
-	call	OpenWinCreateChildObject
+	call	FatalError
+	;call	OpenWinCreateChildObject
 
 	;update the "Close", "FullSize", "Restore", and "Quit" items
 	;in this menu.
@@ -2039,7 +2041,8 @@ testForPopupMenu:
 
 	mov	bx, handle PopupMenuResource
 	mov	dx, offset PopupMenu
-	call	OpenWinCreateChildObject
+	;call	OpenWinCreateChildObject
+	call FatalError
 
 done:
 	ret
@@ -2290,7 +2293,7 @@ REVISION HISTORY:
 
 if 	_OL_STYLE	;START of OPEN LOOK specific code ---------------------
 
-CheckIfInMarkBounds	proc	near
+CheckIfInMarkBounds	proc	far
 	push	cx, dx
 	call	WinOther_DerefVisSpec_DI
 

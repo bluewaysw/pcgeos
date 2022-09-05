@@ -225,7 +225,7 @@ EC<	call	GenCheckGenAssumption	; Make sure gen data exists >
 	;
 	mov	di, ds:[si]		;point at instance data
 	add	di, ds:[di].Gen_offset		; ds:di = GenInstance
-	mov	di, ds:[di][GRI_minMoniker]	;pass handle of min moniker
+	;mov	di, ds:[di][GRI_minMoniker]	;pass handle of min moniker
 	mov	bx, di				; (also keep in bx)
 	call	VisGetMonikerSize		;get size of min moniker
 	shr	cx, 1				;divide width by 2
@@ -248,7 +248,7 @@ EC<	call	GenCheckGenAssumption	; Make sure gen data exists >
 	;
 	mov	di, ds:[si]			;again point to instance data
 	add	di, ds:[di].Gen_offset		; ds:di = GenInstance
-	mov	bx, ds:[di][GRI_maxMoniker]	;pass handle of min moniker
+	;mov	bx, ds:[di][GRI_maxMoniker]	;pass handle of min moniker
 	mov	di, bx				;  (also keep in bx)
 	call	VisGetMonikerSize		;get size of moniker
 	mov	ax, GAUGE_RIGHT_MARGIN		;start with right margin

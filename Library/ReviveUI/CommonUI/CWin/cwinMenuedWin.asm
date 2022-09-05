@@ -2931,6 +2931,7 @@ notTitleBarLeft:
 	je	exitNoSpecialChild
 notTitleBarRight:
 
+if not _OL_STYLE
 	cmp	cx, ds:[di].OLWI_sysMenu	;same block as system menu?
 	jne	checkTitleGroup			;no, not a window button
 
@@ -2946,6 +2947,7 @@ if not _REDMOTIF ;----------------------- Not needed for Redwood project
 	cmp	dx, offset SMI_RestoreIcon
 	je	exitNoSpecialChild
 endif ; not _REDMOTIF ;------------------- Not needed for Redwood project
+endif
 
 checkTitleGroup:
 	;

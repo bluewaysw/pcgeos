@@ -63,7 +63,7 @@ OpenWinUpdatePinnedMenu	proc	far
 	;now is a good time to tell our kids to get borders
 
 	mov	di, ds:[si]
-	add	di, ds:[di].Spec_offset
+	add	di, ds:[di].Vis_offset
 	test	ds:[di].OLWI_specState, mask OLWSS_NOTIFY_TRIGGERS_IS_PINNED
 	jz	done			;skip if not (cy=0)...
 
@@ -80,7 +80,7 @@ OpenWinUpdatePinnedMenu	proc	far
 
 	push	bp
 	mov	cx, TRUE		; make them all bordered
-	mov	ax, METHOD_OL_BUTTON_SET_BORDERED
+	mov	ax, MSG_OL_BUTTON_SET_BORDERED
 	clr	dx
 	push	dx			; initial child (first
 	push	dx			; child of composite)
@@ -110,7 +110,7 @@ PASS:
 	*ds:si - instance data
 	es - segment of OLWinClass
 
-	ax - METHOD_OL_WINDOW_REFRESH
+	ax - MSG_OL_WINDOW_REFRESH
 
 	cx - ?
 	dx - ?
@@ -140,8 +140,8 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 
 
-OpenWinRefresh	method	OLWinClass, METHOD_OL_WINDOW_REFRESH
-	call	VisQueryGWin	; get graphics window
+OpenWinRefresh	method	OLWinClass, MSG_OL_WINDOW_REFRESH
+	call	VisQueryWindow	; get graphics window
 	tst	di
 	jz	OWR_90		; skip if no window
 	clr	ax		; INVALIDATE everything in window
@@ -165,7 +165,7 @@ PASS:
 	*ds:si - instance data
 	es - segment of MetaClass
 
-	ax - METHOD_OL_WINDOW_BACK
+	ax - MSG_OL_WINDOW_BACK
 
 	cx - ?
 	dx - ?
@@ -195,8 +195,8 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 
 
-OpenWinBack	method	OLWinClass, METHOD_OL_WINDOW_BACK
-	call	VisQueryGWin	; get graphics window
+OpenWinBack	method	OLWinClass, MSG_OL_WINDOW_BACK
+	call	VisQueryWindow	; get graphics window
 	tst	di
 	jz	OWB_90		; skip if no window
 
@@ -235,7 +235,7 @@ REVISION HISTORY:
 
 OpenWinAdjustTitleForHeaderMarks	proc	near
 	mov	di, ds:[si]
-	add	di, ds:[di].Spec_offset
+	add	di, ds:[di].Vis_offset
 	test	ds:[di].OLWI_attrs, mask OWA_CLOSABLE or mask OWA_PINNABLE
 	jz	done			;skip if neither...
 

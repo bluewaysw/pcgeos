@@ -273,6 +273,15 @@ DESCRIPTION:
 -------------------------------------------------------------------------------@
 ItemCommon segment resource
 
+
+OLExtendedKbdFlags	record
+	:5
+	OLEKF_USE_PREVIOUS:1		;go on whatever previous presses were
+	OLEKF_CTRL_PRESSED:1		;must stay in this position
+	OLEKF_SHIFT_PRESSED:1		;must stay in this position
+OLExtendedKbdFlags	end
+
+
 
 COMMENT @----------------------------------------------------------------------
 
@@ -2895,14 +2904,6 @@ OLExtendedKbdMethods	label word
 	word	MSG_OL_IGROUP_SET_SELECTION_TO_END
 
 endif ;_RUDY ------------------------------------------------------------
-
-
-OLExtendedKbdFlags	record
-	:5
-	OLEKF_USE_PREVIOUS:1		;go on whatever previous presses were
-	OLEKF_CTRL_PRESSED:1		;must stay in this position
-	OLEKF_SHIFT_PRESSED:1		;must stay in this position
-OLExtendedKbdFlags	end
 
 
 if _USE_KBD_ACCELERATORS

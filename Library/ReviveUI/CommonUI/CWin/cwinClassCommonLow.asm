@@ -3606,8 +3606,10 @@ afterLayerPrio:
 
 if _CUA_STYLE or _MAC
 	cmp	ds:[bx].OLWI_type, MOWT_WINDOW_ICON			
+elseif _OL_STYLE
+	cmp	ds:[bx].OLWI_type, OLWT_WINDOW_ICON			
 else
-	.err	<Must choose either CUA_STYLE or MAC>
+	.err	<Must choose either CUA_STYLE or MAC or OL_STYLE>
 endif
 	je	afterAttrSetLayerID
 	;
@@ -3684,6 +3686,25 @@ winPriorityTable WinPriorityData \
 				;  below WIN_PRIO_STD windows that remain open
 				;  when the app is iconified - brianc 3/17/93
 endif		;END of MOTIF specific code -----------------------------------
+
+if _OL_STYLE	;START of OPEN LOOK specific code -----------------------------
+winPriorityTable WinPriorityData \
+	< 0, WIN_PRIO_STD >,	; OLWT_BASE_WINDOW
+	< 0, WIN_PRIO_STD >,	; OLWT_DISPLAY_WINDOW
+	< 0, WIN_PRIO_COMMAND >,; OLWT_COMMAND_WINDOW
+	< 0, WIN_PRIO_COMMAND >,; OLWT_PROPERTIES_WINDOW
+	< 0, WIN_PRIO_COMMAND >,; OLWT_NOTICE_WINDOW
+	< 0, WIN_PRIO_COMMAND >,; OLWT_HELP_WINDOW
+	< 0, WIN_PRIO_POPUP >,	; OLWT_MENU
+	< 0, WIN_PRIO_POPUP >,	; OLWT_SUBMENU
+	< 0, WIN_PRIO_POPUP >,	; OLWT_SYSTEM_MENU
+	< 0, WIN_PRIO_STD+1 >	; OLWT_WINDOW_ICON
+				;  slightly lower priority so we can
+				;  distinguish icons in EnsureActiveFTCommon
+				;  has acceptable side-effect of placing icon
+				;  below WIN_PRIO_STD windows that remain open
+				;  when the app is iconified - brianc 3/17/93
+endif		;END of OPEN LOOK specific code -------------------------------
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -4041,6 +4062,141 @@ done:
 endif
 	ret
 OpenWinGetState	endp
+
+COMMENT @----------------------------------------------------------------------
+
+FUNCTION:	OpenWinUpdateWindowMenuItems
+
+DESCRIPTION:	This OpenLook specific procedure enables/disables the
+		appropriate menu items in the WindowMenu (popup menu)
+		for this window.
+
+CALLED BY:	OpenWinCalcWinHdrGeometry
+
+PASS:		ds:*si	- instance data
+
+RETURN:		nothing
+
+DESTROYED:	?
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Eric	3/90		split from parent routine, more doc
+
+------------------------------------------------------------------------------@
+
+if _OL_STYLE	;--------------------------------------------------------------
+
+;These are a HACK... see cspecOpenLook.ui file.
+
+OLS_WINDOW_MENU_CLOSE_INDEX	= 1	;GenTrigger is 1st in menu
+OLS_WINDOW_MENU_FULL_SIZE_INDEX	= 2	;GenTrigger is 2nd in menu
+OLS_WINDOW_MENU_RESTORE_INDEX	= 3	;GenTrigger is 3rd in menu
+OLS_WINDOW_MENU_QUIT_INDEX	= 7	;GenTrigger is 7th in menu
+
+OpenWinUpdateWindowMenuItems	proc	far
+
+	;see if this window has a WindowMenu (popup menu)
+
+	call	WinCommon_DerefVisSpec_DI
+	test	ds:[di].OLWI_attrs, mask OWA_HAS_WIN_MENU
+	jz	done			;skip if not...
+
+	mov	bx, ds:[di].OLWI_attrs
+	mov	cl, ds:[di].OLWI_specState
+
+	;the "Close" item is used to minimize the window
+
+	mov	bp, OLS_WINDOW_MENU_CLOSE_INDEX
+	test	bx, mask OWA_MINIMIZABLE
+	jz	10$				;skip if not (CY=0)...
+	stc
+10$:	call	OpenWinEnableOrDisableWindowMenuItem
+
+	;the "FullSize" item is used to maximize the window
+
+	mov	bp, OLS_WINDOW_MENU_FULL_SIZE_INDEX
+	test	bx, mask OWA_MAXIMIZABLE
+	jz	20$				;skip if not (CY=0)...
+	test	cl, mask OLWSS_MAXIMIZED
+	jnz	20$				;skip if already maxed (CY=0)...
+						;skip if user not allowed
+	call	OpenWinCheckIfMinMaxRestoreControls
+	jnc	20$
+	stc
+20$:	call	OpenWinEnableOrDisableWindowMenuItem
+
+	;the "Restore" item is used to restore a maximized window
+
+	mov	bp, OLS_WINDOW_MENU_RESTORE_INDEX
+	call	WinCommon_DerefVisSpec_DI
+	test	ds:[di].OLWI_fixedAttr, mask OWFA_RESTORABLE
+	jz	30$				;skip if not (CY=0)...
+	test	cl, mask OLWSS_MAXIMIZED
+	jz	30$				;skip if not maxed (CY=0)...
+						;skip if user not allowed
+	call	OpenWinCheckIfMinMaxRestoreControls
+	jnc	30$
+	stc
+30$:	call	OpenWinEnableOrDisableWindowMenuItem
+
+	;the "Quit" item is used to close a window
+
+	mov	bp, OLS_WINDOW_MENU_QUIT_INDEX
+	test	bx, mask OWA_CLOSABLE
+	jz	40$				;skip if not closable (CY=0)...
+	stc
+40$:	call	OpenWinEnableOrDisableWindowMenuItem
+
+done:
+	ret
+OpenWinUpdateWindowMenuItems	endp
+
+;call the Nth child of the popup menu.
+
+OpenWinEnableOrDisableWindowMenuItem	proc	near
+	push	si, bx, cx
+	mov	ax, MSG_GEN_SET_ENABLED	;make this menu item enabled
+	jc	10$
+
+	mov	ax, MSG_GEN_SET_NOT_ENABLED	;make this menu item disabled
+
+10$:
+	call	WinCommon_DerefVisSpec_DI
+	mov	si, ds:[di].OLWI_menu	;get handle for popup WindowMenu
+	tst	si
+	jz	done
+
+	;ds:*si = system menu object
+
+	dec	bp			;0 means first child
+
+	clr	dx
+	push	dx			;pass: start at Nth child
+	push	bp			;pass N
+	mov	bx, offset GI_link
+	push	bx			;Push offset to LinkPart
+
+	clr	bx			;push index of Pre-Defined
+	push	bx			;call-back routine to use
+	mov	bx, OCCT_ABORT_AFTER_FIRST
+	push	bx			;pushed: seg = 0, offset = index
+
+	mov	dl, VUM_NOW		;dx = data to pass with method
+
+	mov	bx, offset Gen_offset
+	mov	di, offset GI_comp
+	call	ObjCompProcessChildren		;call that child
+
+done:
+	pop	si, bx, cx
+	ret
+OpenWinEnableOrDisableWindowMenuItem	endp
+
+endif		;--------------------------------------------------------------
 
 
 WinCommon	ends
@@ -5231,10 +5387,17 @@ if _JEDIMOTIF
 	clr	ch				;now, not submenu
 	mov	cl, ds:[di].VCI_geoAttrs	;use orientation for check
 endif
+if not _OL_STYLE
 	cmp     ds:[di].OLWI_type, MOWT_SYSTEM_MENU	;menus are always a
 	je      doit					;  vertical check
 	cmp     ds:[di].OLWI_type, MOWT_MENU		;other types of 
 	jne     exit					;  windows, exit
+else
+	cmp     ds:[di].OLWI_type, OLWT_SYSTEM_MENU	;menus are always a
+	je      doit					;  vertical check
+	cmp     ds:[di].OLWI_type, OLWT_MENU		;other types of 
+	jne     exit					;  windows, exit
+endif
 doit:
 	;let's make sure this is a menu before we go screwing with instance data
 
@@ -5356,7 +5519,8 @@ KeepMenuOnscreen	endp
 WinCommon	ends
 WinCommon	segment resource
 
-
+if 0
+
 COMMENT @----------------------------------------------------------------------
 
 METHOD:		OLWinGetHeaderTitleBounds -- 
@@ -5468,6 +5632,7 @@ haveRightWidth:
 	.leave
 	ret
 OLWinGetHeaderTitleBounds	endm
+endif
 
 WinCommon	ends
 WinCommon	segment resource
@@ -5692,5 +5857,6 @@ OpenWinDrawMoniker	endp
 SBCS <longTermStr	db	" - ",0					>
 
 endif ; (not _RUDY)
+
 
 WinCommon	ends

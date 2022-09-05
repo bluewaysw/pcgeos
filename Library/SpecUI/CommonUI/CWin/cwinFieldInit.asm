@@ -1320,7 +1320,8 @@ if _OL_STYLE	;START of OPEN LOOK specific code -----------------------------
 OLFieldCreateExpressSubGroup	method	dynamic OLFieldClass, MSG_GEN_FIELD_CREATE_SPECIFIC_WORKSPACE_SUBGROUP
 				; Setup object to add menu to generically
 	mov	bx, handle ExpressMenuResource
-	mov	si, offset ExpressProperties
+	;mov	si, offset ExpressProperties
+	jsr	FatalError
 	mov	ax, MSG_GEN_COPY_TREE
 	mov	di, mask MF_CALL or mask MF_FIXUP_DS
 	GOTO	ObjMessage

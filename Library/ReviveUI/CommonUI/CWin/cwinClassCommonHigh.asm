@@ -1014,10 +1014,16 @@ HintWindowNoTitleBar	proc	far
 
 	; nuke title bar
 	call	WinCommon_DerefVisSpec_DI
+if not _OL_STYLE
 	andnf	ds:[di].OLWI_attrs, not (mask OWA_HEADER or \
 					mask OWA_HAS_SYS_MENU or \
 					mask OWA_TITLED or \
 					mask OWA_MOVABLE)
+else
+	andnf	ds:[di].OLWI_attrs, not (mask OWA_HEADER or \
+					mask OWA_TITLED or \
+					mask OWA_MOVABLE)
+endif
 	ret
 HintWindowNoTitleBar	endp
 
@@ -1026,7 +1032,9 @@ HintWindowNoSysMenu	proc	far
 
 	; nuke system menu
 	call	WinCommon_DerefVisSpec_DI
+if not _OL_STYLE
 	andnf	ds:[di].OLWI_attrs, not mask OWA_HAS_SYS_MENU
+endif 
 	ret
 HintWindowNoSysMenu	endp
 

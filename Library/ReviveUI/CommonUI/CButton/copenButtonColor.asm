@@ -2405,7 +2405,7 @@ if DRAW_STYLES
 	;
 	mov	ah, C_BLACK
 else
-if (not _PM)		; Button text color is never white in PM
+if (not _PM) and (not _OL_STYLE)	; Button text color is never white in PM
 
 	mov	ah, C_BLACK			;assume selected color black
 

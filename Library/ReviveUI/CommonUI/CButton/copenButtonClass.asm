@@ -1419,11 +1419,12 @@ textMoniker:
 else
 	clr	dh
 endif
+if (not _OPEN_LOOK)
 	call	OpenCheckIfNarrow		 ;check if narrow
 	jnc	8$				 ;it's not, branch
 	mov	dl, ds:[bp].BWBRSS_monikerXInsetNarrow
 8$:
-
+endif
 	mov	bl, ds:[bp].BWBRSS_monikerYInset
 if _PCV
 	mov	bh, ds:[bp].BWBRSS_monikerBottomInset

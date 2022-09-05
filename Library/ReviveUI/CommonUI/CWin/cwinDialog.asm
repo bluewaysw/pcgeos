@@ -797,6 +797,12 @@ OLDialogAlignHintHandlers	VarDataHandler \
 	<HINT_INTERACTION_MAXIMIZABLE, offset OLDialogAlignMaximizable>
 endif		;END of MOTIF specific code -----------------------------------
 
+if	_OL_STYLE	;START of OPEN LOOK specific code ---------------------
+OLDialogAlignHintHandlers	VarDataHandler \
+	<HINT_INTERACTION_SINGLE_USAGE, offset OLDialogAlignInitNotPinned>,
+	<HINT_INTERACTION_MAKE_RESIZABLE, offset OLDialogAlignMakeResizable>
+endif		;END of OPEN LOOK specific code -------------------------------
+
 OLDialogAlignMakeResizable	proc	far
 	class	OLWinClass
 
@@ -910,6 +916,17 @@ HintDialogDefaultActionIsNavigateToNextField	proc	far
 			mask OWMFA_DEFAULT_ACTION_IS_NAVIGATE_TO_NEXT_FIELD
 	ret
 HintDialogDefaultActionIsNavigateToNextField	endp
+
+if	_OL_STYLE	;START of OPEN LOOK specific code ---------------------
+
+OLDialogAlignInitNotPinned	proc	far
+	call	OLWinClass
+
+	call	WinClasses_DerefVisSpec_DI
+	ANDNF	ds:[di].OLWI_fixedAttr, not (mask OWFA_LONG_TERM)
+	ret
+OLDialogAlignInitNotPinned	endp
+endif		;END of OPEN LOOK specific code -------------------------------
 
 
 
@@ -1722,8 +1739,10 @@ RemoveReplyBarIfPossible	proc	near
 	LONG jne	done
 	mov	bp, si				; *ds:bp = OLDialogWin
 	call	WinDialog_DerefVisSpec_DI	; ds:di = OLDialogWin
+if not _OL_STYLE
 	test	ds:[di].OLWI_attrs, mask OWA_HAS_SYS_MENU	; any sys menu?
 	jz	done				; no, can't remove close
+endif
 	;
 	; can't remove if reply bar has other triggers
 	;
@@ -2956,6 +2975,7 @@ notTitleBarLeft:
 	je	exitNoSpecialChild
 notTitleBarRight:
 
+if not _OL_STYLE
 	cmp	cx, ds:[di].OLWI_sysMenu
 	jne	notWindowButton
 
@@ -2967,6 +2987,7 @@ if not _REDMOTIF ;----------------------- Not needed for Redwood project
 	cmp	dx, offset SMI_RestoreIcon
 	je	exitNoSpecialChild
 endif ;not _REDMOTIF ;------------------- Not needed for Redwood project
+endif
 
 notWindowButton:
 	cmp	cx, ds:[LMBH_handle]
