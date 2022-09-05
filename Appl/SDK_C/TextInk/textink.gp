@@ -14,6 +14,7 @@
 #       drew    6/12/91         Initial version
 #       NF      9/23/96         Added heapspace value,
 #                               Made tokenchars unique
+#		RainerB	4/27/2022		Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:
 #       This file contains Geode definitions for the "TextInk" sample
@@ -44,13 +45,13 @@ library	ui
 library pen
 library text
 
-resource APPRESOURCE         ui-object
-resource DISPLAYUI           ui-object
-resource INTERFACE           ui-object
-resource DOCGROUP            object
-resource DOCUMENTRESOURCE    object read-only shared
-resource INKMONIKERRESOURCE  lmem data read-only
-resource TEXTMONIKERRESOURCE lmem data read-only
+resource AppResource         ui-object
+resource DisplayUI           ui-object
+resource Interface           ui-object
+resource DocGroup            object
+resource DocumentResource    object read-only shared
+resource InkMonikerResource  lmem data read-only
+resource TextMonikerResource lmem data read-only
 
 export TextInkProcessClass
 export TextInkDocumentClass
