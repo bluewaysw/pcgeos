@@ -97,7 +97,7 @@ minimalLibrary	: kernel swap sound net ui isui motif spool text mailbox \
 		  jpeg giflib gif htmlimpx n2txt inetmsg extui \
 		  winword8 zlib dirlist minizip idialc eps impex_libs \
 		  thumbdb ftplib flllib sitelist int8087 intx87\
-		  basicdb gridlib gsol treplib
+		  basicdb gridlib gsol treplib openlook
 #ascii
 
 prefLibs	: prefvid preftd \
@@ -119,7 +119,7 @@ extraPrefLibs	: prefpag prefjfep
 #
 # Revived specigic UI libraries
 #
-revivedUI	: openlpook
+revivedUI	: openlook
 
 #
 # Applications
@@ -216,7 +216,7 @@ Installed/Library/SpecUI/ISUI	:	kernel text MAKELIB
 motif	: Installed/Library/SpecUI/Motif
 Installed/Library/SpecUI/Motif:	kernel text MAKELIB
 
-motif	: Installed/Library/ReviveUI/OpenLook
+openlook	: Installed/Library/ReviveUI/OpenLook
 Installed/Library/ReviveUI/OpenLook:	kernel text MAKELIB
 
 spool	: Installed/Library/Spool
