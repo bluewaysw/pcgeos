@@ -2277,6 +2277,30 @@ endif
 CTRL_ROUNDED_BOX_CORNERS	=	FALSE
 
 ;
+; TOOL_AREA_IS_TASK_BAR uses the tool area as a task bar.
+; (also set TOOL_AREA_IS_TASK_BAR in cGeode.uih)
+;
+if _ISUI
+TOOL_AREA_IS_TASK_BAR		=	TRUE
+else
+TOOL_AREA_IS_TASK_BAR		=	FALSE
+endif
+
+;
+; allow extending the system tray via the mechanisms to extend the Express
+; menu. also turn on EXTENDIBLE_SYSTEM_TRAY in cGeode.uih
+;
+if _ISUI
+EXTENDIBLE_SYSTEM_TRAY	=	TRUE
+else
+EXTENDIBLE_SYSTEM_TRAY	=	FALSE
+endif
+
+if EXTENDIBLE_SYSTEM_TRAY and ERROR_CHECK
+OL_ERROR_CANT_FIND_SYSTRAY_OBJECT			enum FatalErrors
+endif
+
+;
 ; Constants primarily for the dedicated word processor UI's.
 ;
 ; LIMITED_HEAPSPACE
@@ -2950,6 +2974,13 @@ NO_THUMB_ELEV_OFFSET		=	-(MO_THUMB_HEIGHT-1)
 MO_MIN_NORMALIZING_HEIGHT	=	MO_MIN_HEIGHT
 endif		;--------------------------------------------------------------
 	
+if _OPEN_LOOK
+    MO_ARROW_WIDTH		=	10
+    MO_SCROLLBAR_WIDTH		=	MO_ARROW_WIDTH+1
+    MO_THUMB_HEIGHT		=	12
+    CGA_HORIZ_ARROW_WIDTH		=	8
+    CGA_HORIZ_SCROLLBAR_WIDTH	=	CGA_HORIZ_ARROW_WIDTH+2
+endif
 	
 if (_MOTIF or _PM)	;------------------------------------------------------
 if not _JEDIMOTIF
@@ -3051,6 +3082,12 @@ OLPI_SCROLL	= OLPI_NONE		; No special cursor for scroll
 OLPI_COPY	= OLPI_NONE		; No special cursor for copy
 endif		;--------------------------------------------------------------
 
+if _OPEN_LOOK
+OLPtrImage etype byte, 0
+OLPI_NONE		enum OLPtrImage
+OLPI_BUSY		enum OLPtrImage	; Stopwatch
+OLPI_MODAL		enum OLPtrImage	; "?"
+endif
 
 if _MOTIF or _PM	;------------------------------------------------------
 ;NOTE: if you change the order of declarations in this Enum, or add any new
@@ -3309,8 +3346,23 @@ OLTPT_FIELD		enum OLTemplateParamType
 TitleGroupType	etype	word, 0, 4
 	TGT_LEFT_GROUP		enum	TitleGroupType
 	TGT_RIGHT_GROUP		enum	TitleGroupType
-
 
+if _OL_STYLE	;START of OPEN LOOK specific code -----------------------------
+BUTTON_MIN_WIDTH	=	12		;minimum size before blowing up
+BUTTON_MIN_HEIGHT	=	11		;minimum size before blowing up
+
+;For OLMenuItemGroup:
+
+OL_MENU_ITEM_SEP_TOP_INSET_NOT_PINNED = 3	;distance from top bound and
+						;separator line
+OL_MENU_ITEM_SEP_TOP_INSET_PINNED = 1
+
+OL_MENU_ITEM_SEP_BOTTOM_INSET_NOT_PINNED= 3	;distance from bottom bound and
+						;separator line
+OL_MENU_ITEM_SEP_BOTTOM_INSET_PINNED= 1
+endif		;END of OPEN LOOK specific code -------------------------------
+
+
 ;------------------------------------------------------------------------------
 ; Motif/PM-specific constants
 ;------------------------------------------------------------------------------ 
@@ -3339,6 +3391,9 @@ PMAN <OL_WIN_NON_MENU_Y_MARGIN		=	4	 		>
 MAC <OL_WIN_NON_PANE_X_MARGIN	=	6				>
 MAC <OL_WIN_NON_MENU_Y_MARGIN	=	5	 			>
 
+OLS <OL_WIN_NON_PANE_X_MARGIN	=	6				>
+OLS <OL_WIN_NON_MENU_Y_MARGIN	=	5	 			>
+
 if _RUDY or _ODIE
 GADGET_AREA_MARGINS		=	0
 elif _PM or _JEDIMOTIF
@@ -3354,6 +3409,66 @@ endif
 
 MINIMAL_Y_SPACING		=	1
 MINIMAL_X_SPACING		=	2	;was 4, 2/22/93 cbh
+
+if _OL_STYLE 	;--------------------------------------------------------------
+;Space between children objects which are in window (below header)
+OLS_BASE_WIN_CHILD_SPACING =	3	;for base windows
+OLS_WIN_CHILD_SPACING	=	5	;for non-base windows
+REDO_GEOMETRY_FOR_EXPRESS_MENU = FALSE
+endif		;--------------------------------------------------------------
+
+if _OL_STYLE 	;--------------------------------------------------------------
+BW_TEST			=	0
+
+CABLE_WIDTH		=	3	;width of cable
+
+ANCHOR_HEIGHT		=	5	;height of anchors
+CGA_ANCHOR_HEIGHT	=	4	;height of anchors on CGA vertical
+
+ARROW_XOFF		=	5	;x offset to arrow in buttons
+CGA_ARROW_XOFF		=	4	;x offset in horizontal Scrolls
+
+ARROW_YOFF		=	5	;y offset to arrow in buttons
+CGA_ARROW_YOFF		=	3	;y offset in vertical CGA scrollbars
+
+ARROW_WIDTH		=	6	;width of the arrow at largest point
+
+SCROLLBAR_WIDTH		=	13	;width of scrollbar
+CGA_SCROLLBAR_WIDTH	=	11	;width of horizontal CGA scrollbar
+
+CABLE_XOFF		=	(SCROLLBAR_WIDTH-CABLE_WIDTH)/2
+CGA_CABLE_XOFF		=	(CGA_SCROLLBAR_WIDTH-CABLE_WIDTH)/2
+
+SCR_BUTTON_HEIGHT	=	13	;height of scroll buttons
+CGA_SCR_BUTTON_HEIGHT	=	9
+
+ELEV_HEIGHT		=	SCR_BUTTON_HEIGHT * 3 + 2
+CGA_ELEV_HEIGHT		=	CGA_SCR_BUTTON_HEIGHT * 3 + 2
+
+UNUSED_HEIGHT		=	(ANCHOR_HEIGHT+1)*2
+CGA_UNUSED_HEIGHT 	=	(CGA_ANCHOR_HEIGHT+1)*2
+
+;Height of full scrollbar with no cables
+MIN_FULL_HEIGHT		=	ELEV_HEIGHT + UNUSED_HEIGHT
+CGA_MIN_FULL_HEIGHT	=	CGA_ELEV_HEIGHT + CGA_UNUSED_HEIGHT
+
+DRAG_AREA_HEIGHT	=	SCR_BUTTON_HEIGHT	;height of drag area
+CGA_DRAG_AREA_HEIGHT	=	CGA_SCR_BUTTON_HEIGHT	;height of drag area
+
+;height of abbreviated scrollbar
+ABBR_HEIGHT		=	MIN_FULL_HEIGHT - DRAG_AREA_HEIGHT
+CGA_ABBR_HEIGHT		=	CGA_MIN_FULL_HEIGHT - CGA_DRAG_AREA_HEIGHT
+
+;height of minimum scrollbar
+MIN_HEIGHT		=	ABBR_HEIGHT - UNUSED_HEIGHT
+CGA_MIN_HEIGHT		=	CGA_ABBR_HEIGHT - UNUSED_HEIGHT
+
+MIN_NORMALIZING_HEIGHT	=	MIN_FULL_HEIGHT
+
+MASK_50			=	SDM_50
+MASK_100		=	SDM_100
+
+endif	 	;--------------------------------------------------------------
 
 if _ODIE				
 MENU_SPACING			=	1	;1 pixel spacing between items
@@ -3412,6 +3527,7 @@ MO_MENU_BUTTON_INSET_Y	= 2		;distance from top edge of
 ;Menu mark size & spacing
 
 MAC <OL_MARK_WIDTH	=	8					>
+OL <OL_MARK_WIDTH	=	8					>
 
 ;
 ;  Menu-right (or left-) arrow sizes & spacing.
@@ -3894,6 +4010,7 @@ if _CUA_STYLE
 	MO_CONTROL_MKR_X_SPACING_NARROW =	4		
   endif
 endif
+OLS <	OL_CONTROL_MKR_X_SPACING=	8			>
 
    
 if _RUDY
@@ -3902,6 +4019,7 @@ else ; not _RUDY
 CUAS <	MO_CONTROL_MKR_Y_SPACING	=	5		>
 endif ; not _RUDY
 CUAS <	MO_CONTROL_MKR_Y_SPACING_CGA	=	2		>
+OLS <	OL_CONTROL_MKR_Y_SPACING	=	5		>
 
 ;
 ; Set if we want to find windows of a higher layer priority than passed

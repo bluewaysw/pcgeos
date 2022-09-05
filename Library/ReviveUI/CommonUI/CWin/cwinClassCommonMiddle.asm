@@ -299,8 +299,10 @@ CUAS <	mov	ds:[di].OLWI_sysMenu, 0					>
 
 	test	ds:[di].OLWI_menuState, mask OWA_SYS_MENU_IS_CLOSE_BUTTON
 	push	bp
+
+if not _OL_STYLE
 	pushf
-	push	ds:[di].OLWI_sysMenuButton
+	push	ds:[di].OLWI_sysMenuButton				
 CUAS <	clr	ds:[di].OLWI_sysMenuButton				>
 	call	ObjSwapLock
 	pop	si				; *ds:si = sys menu close button
@@ -322,6 +324,7 @@ haveObjectToDestroy:
 	mov	ax, MSG_META_BLOCK_FREE		; Then, start process to
 	call	ObjCallInstanceNoLock		; NUKE the block
 	call	ObjSwapUnlock
+endif
 
 	pop	bp
 else
@@ -388,7 +391,7 @@ if not _REDMOTIF
 CUAS <	xchg	bx, ds:[di].OLWI_sysMenu		;get system menu >
 	tst	bx
 	jz	exit
-
+if not _OL_STYLE
 ;	Set BX:SI to be either the "close button" or the top of the "sys menu
 
 	mov	si, ds:[di].OLWI_sysMenuButton
@@ -407,6 +410,7 @@ nukeMenu:
 	mov	ax, MSG_META_BLOCK_FREE
 	mov	di, mask MF_FIXUP_DS
 	call	ObjMessage
+endif
 endif
 
 exit:

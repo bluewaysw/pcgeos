@@ -1582,6 +1582,7 @@ MO <optionsCatString	char	"motif options",0			>
 PMAN <optionsCatString	char	"pm options",0				>
 CUA <optionsCatString	char	"cua options",0				>
 MAC <optionsCatString	char	"mac options",0				>
+OL <optionsCatString	char	"ol options",0				>
 
 endif	;_STYLUS
 

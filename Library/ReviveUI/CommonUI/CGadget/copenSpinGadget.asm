@@ -5462,7 +5462,8 @@ if	_OL_STYLE
 GetTextPosition	proc	far
 	class	OLSpinGadgetClass
 
-	call	GetSpinLineThickness		;return thickness of line
+	;call	GetSpinLineThickness		;return thickness of line
+	mov	ax, 1				; TODO
 	push	dx				;save height
 	push	ax				;and line thickness	    
 	call	OLSpinGadgetGetBounds		;get bounds of display area

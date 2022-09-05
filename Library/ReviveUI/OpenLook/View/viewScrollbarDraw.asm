@@ -184,7 +184,7 @@ UpdateBWScrollbar	endp
 			
 DrawBW			ends
 
-ViewCommon	segment	resource
+ScrollbarCommon	segment	resource
 
 
 COMMENT @----------------------------------------------------------------------
@@ -218,7 +218,7 @@ SetScrollDrawParams	proc	near
 	class	OLScrollbarClass
 	
 	push	si				;save pointer to instance
-	add	si, ds:[si].Spec_offset
+	add	si, ds:[si].Vis_offset
 	mov	al, MASK_50			;assume not enabled, use 50%
 	ANDNF	ds:[si].OLSBI_attrs, not mask OLSA_DRAWN_ENABLED
 	test	ds:[si].OLSBI_attrs, mask OLSA_ENABLED
@@ -372,12 +372,12 @@ SetScrollDrawParams	proc	near
 70$:
 	mov	[bp].SA_greyCable2Ht, dx	;and store
 90$:
-	mov	bl, ds:[si].OLSBI_attrs		;get attributes byte
+	mov	bx, ds:[si].OLSBI_attrs		;get attributes byte
 	pop	si				;restore pointer to instance
 	add	si, ds:[si].Vis_offset
 	mov	cx, ds:[si].VI_bounds.R_left	;where to draw
 	mov	dx, ds:[si].VI_bounds.R_top
-	test	bl, mask OLSA_VERTICAL
+	test	bx, mask OLSA_VERTICAL
 	jnz	92$
 	mov	dx, ds:[si].VI_bounds.R_bottom	;and bottom
 92$:
@@ -464,9 +464,9 @@ US_Local	struc
 	US_oldPropStart	sword			;old top of black cable
 	US_oldPropEnd	sword			;old bottom of black
 	US_left		sword			;left edge of scrollbar
-	US_attrs	byte	OLScrollbarAttrs	;save state here
-	US_foreColor	Colors			;foreground color to use
-	US_backColor	Colors			;background color to use
+	US_attrs	word OLScrollbarAttrs	;save state here
+	US_foreColor	Color			;foreground color to use
+	US_backColor	Color			;background color to use
 US_Local	ends
 
 US_local	equ	<[bp - (size US_Local)]>
@@ -483,8 +483,8 @@ UpdateScroll	proc	near
 	and	bh, mask DF_DISPLAY_TYPE	;see if color or BW display
 	cmp	bh, DC_GRAY_1
 	jnz	5$
-	mov	US_local.US_foreColor, BLACK	;Use as the foreground color
-	mov	US_local.US_backColor, WHITE	;Use as the background color
+	mov	US_local.US_foreColor, C_BLACK	;Use as the foreground color
+	mov	US_local.US_backColor, C_WHITE	;Use as the background color
 	jmp	short 6$
 5$:
 	push	ax
@@ -500,7 +500,7 @@ UpdateScroll	proc	near
 6$:
 
 	mov	bx, ds:[si]
-	add	bx, ds:[bx].Spec_offset		;vis stuff in bx
+	add	bx, ds:[bx].Vis_offset		;vis stuff in bx
 	;
 	; If not a full scrollbar, this stuff is unnecessary.
 	;
@@ -516,8 +516,8 @@ UpdateScroll	proc	near
 	push	di				;save gstate
 	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset		;di points to vis
-	mov	dl, ds:[bx].OLSBI_attrs  	;need to keep orientation
-	mov	US_local.US_attrs, dl
+	mov	dX, ds:[bx].OLSBI_attrs  	;need to keep orientation
+	mov	US_local.US_attrs, dX
 	mov	dx, ds:[di].VI_bounds.R_left	;get left
 	mov	cx, ds:[di].VI_bounds.R_top	;save top + anchor height
 	mov	di, bx				;now di points to specific
@@ -534,8 +534,8 @@ UpdateScroll	proc	near
 	add	cx, ds:[di].OLSBI_propIndLen	;add length to get end
 	mov	US_local.US_oldPropEnd, cx	;store
 	push	ax
-	mov	ax, ds:[di].OLSBI_docOffset	;get true doc offset
-	mov	ds:[di].OLSBI_drawnDocOff, ax	;and set as drawn offset
+	;mov	ax, ds:[di].OLSBI_docOffset	;get true doc offset
+	;mov	ds:[di].OLSBI_drawnDocOff, ax	;and set as drawn offset
         call	SetElevOffset			;set position of elevator
 OLS <	call	SetPropIndLen			;maybe resize the prop ind >
 	call	SetPropIndOffset		;set proportion indicator pos
@@ -747,7 +747,7 @@ TwoSwapIfHoriz	endp
 
 
 
-ViewCommon	ends
+ScrollbarCommon	ends
 
 			
 			

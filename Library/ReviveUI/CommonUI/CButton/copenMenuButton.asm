@@ -120,7 +120,8 @@ afterTransientCheck:
 					;and bordered status
 					;returns ds:di = VisSpec instance data
 
-	cmp	dl, MOWT_SYSTEM_MENU
+OLS <	cmp	dl, OLWT_SYSTEM_MENU	;if opens a system menu		>
+CUAS <	cmp	dl, MOWT_SYSTEM_MENU					>
 	je	isSystemMenuButton	;then skip ahead to handle...
 
 	;now set the OLBSS_MENU_DOWN_MARK, etc. according to which type of
@@ -128,7 +129,9 @@ afterTransientCheck:
 	;only set when we want to use it, i.e. in popup lists.)
 
 	mov	ax, mask OLBSS_MENU_RIGHT_MARK
-	cmp	dl, MOWT_SUBMENU
+OLS <	cmp	dl, OLWT_SUBMENU	;if opens a sub			>
+CUAS <	cmp	dl, MOWT_SUBMENU					>
+
 	je 	setWindowFlagAndMakeEnabled	;submenu, use right arrow
 
 	; For Odie, the OLMBSS_OPENS_POPUP_LIST flag denotes a 
@@ -2748,7 +2751,8 @@ if (_CUA or _MOTIF) and (not _JEDIMOTIF) and (not _ODIE)
 	; OpenLook, Motif: only activate menu if mouse pointer is over 
 	; right side of menu button.
 	;
-	cmp	cl, MOWT_SUBMENU
+OLS <	cmp	cl, OLWT_SUBMENU					>
+CUAS <	cmp	cl, MOWT_SUBMENU					>
 	jne	10$			;skip if does not open sub-menu...
 
 	mov	bx, ds:[di].VI_bounds.R_right
@@ -2937,7 +2941,8 @@ endif
 
 CUA <	dec	bx			;overlap menu button		>
 
-	cmp	cl, MOWT_SUBMENU
+OLS <	cmp	cl, OLWT_SUBMENU					>
+CUAS <	cmp	cl, MOWT_SUBMENU					>
 	je	positionToRight		;send off right side if submenu...
 
 	;
@@ -3000,7 +3005,8 @@ else	;_SUBMENU_ALWAYS_OVERLAPS_PARENT is FALSE
 
 	;submenus actually overlap a bit.
 
-	cmp	cl, MOWT_SUBMENU
+OLS <	cmp	cl, OLWT_SUBMENU					>
+CUAS <	cmp	cl, MOWT_SUBMENU					>
 	jne	havePosition
 
 if _PM	;----------------------------------------------------------------------

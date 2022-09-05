@@ -4,30 +4,38 @@ COMMENT @----------------------------------------------------------------------
 
 PROJECT:	PC GEOS
 MODULE:		CommonUI/CWin (common code for several specific ui's)
-FILE:		cwinMenuedWin.asm
+FILE:		cwinMenu.asm
 
 ROUTINES:
 	Name			Description
 	----			-----------
-   GLB	OLMenuedWinClass	Open look window class
+   GLB	OLMenuWinClass		Open Look/CUA/Motif window class
 
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
-	Tony	8/89		Initial version
-	Eric	9/89		Renamed from cwinMenuBar -> cwinMenuedWin
-				and OLMenuedWinClass -> OLMenuedWinClass
+	Doug	2/89		Initial version
+	Doug	6/89		Moved to winMenu.asm from openMenuWin.asm
+	Eric	7/89		Motif extensions, more documentation
+	Joon	9/92		PM extensions
 
 DESCRIPTION:
 
-	$Id: cwinMenuedWin.asm,v 2.171 96/12/27 21:12:10 brianc Exp $
+	$Id: cwinMenu.asm,v 1.2 98/05/04 07:35:25 joon Exp $
 
 ------------------------------------------------------------------------------@
 
+	;
+	;	For documentation of the OLMenuWinClass see:
+	;	/staff/pcgeos/Spec/olMenuWinClass.doc
+	; 
 
 CommonUIClassStructures segment resource
 
-	OLMenuedWinClass	mask CLASSF_DISCARD_ON_SAVE or \
+	OLMenuWinClass		mask CLASSF_DISCARD_ON_SAVE or \
+				mask CLASSF_NEVER_SAVED
+
+	MenuWinScrollerClass	mask CLASSF_DISCARD_ON_SAVE or \
 				mask CLASSF_NEVER_SAVED
 
 CommonUIClassStructures ends
@@ -35,22 +43,21 @@ CommonUIClassStructures ends
 
 ;---------------------------------------------------
 
-WinClasses segment resource
+MenuBuild segment resource
 
 
 COMMENT @----------------------------------------------------------------------
 
-FUNCTION:	OLMenuedWinInitialize -- MSG_META_INITIALIZE handler for
-			OLMenuedWinClass
+METHOD:		OLMenuWinInitialize -- MSG_META_INITIALIZE for OLMenuWinClass
 
-DESCRIPTION:	We intercept this method here to set a flag in the window's
-		FOCUS exclusive HierarchicalGrab structure. This flag
-		causes the exclusion mechanism to consider menus
-		temporary.
+DESCRIPTION:	Initialize an OLMenuWin object for the GenInteraction.
 
-PASS:		*ds:si	= instance data for object
+PASS:		*ds:si - instance data
+		es - segment of OlMenuClass
+		ax - MSG_META_INITIALIZE
+		cx, dx, bp	- ?
 
-RETURN:		nothing
+RETURN:		ax, cx, dx, bp - ?
 
 DESTROYED:	?
 
@@ -59,275 +66,268 @@ PSEUDO CODE/STRATEGY:
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
-	Eric	2/90		initial version
+	Doug	2/89		Initial version
+
+------------------------------------------------------------------------------@
+
+
+OLMenuWinInitialize	method dynamic	OLMenuWinClass, MSG_META_INITIALIZE
+
+	;Do superclass initialization
+
+	mov	di, offset OLMenuWinClass
+	CallSuper	MSG_META_INITIALIZE
+
+	;Setup our geometry preferences before calling superclass which will
+	;process hints
+
+	;set menu attributes (SAVE BYTES here)
+
+	call	MenuBuild_DerefVisSpec_DI
+	ORNF	ds:[di].OLWI_fixedAttr, mask OWFA_IS_MENU
+
+OLS <	mov	ds:[di].OLWI_attrs, mask OWA_SHADOW or mask OWA_FOCUSABLE >
+CUAS <	ORNF	ds:[di].OLWI_attrs, mask OWA_THICK_LINE_BORDER \
+			or mask OWA_KIDS_INSIDE_BORDER or mask OWA_FOCUSABLE \
+			or mask OWA_CLOSABLE >
+
+if _MENUS_PINNABLE	;------------------------------------------------------
+
+	;CUA/MOTIF: only allow pinnable menus if not in strict-compatibility mde
+CUAS <	call	FlowGetUIButtonFlags	;get args from geosec.ini file	>
+CUAS <	test	al, mask UIBF_SPECIFIC_UI_COMPATIBLE			>
+CUAS <	jnz	noLawsuit						>
+
+OLS <	ORNF	ds:[di].OLWI_attrs, mask OWA_PINNABLE or mask OWA_HEADER >
+CUAS <	ORNF	ds:[di].OLWI_attrs, mask OWA_PINNABLE >
+
+noLawsuit:
+
+	;
+	; If keyboard-only, or UI concept of Pinnable menus isn't allowed,
+	; turn off pinnable menus altogether.
+	;
+	call	OpenCheckIfKeyboardOnly		; carry set if so
+	jc	notPinnable
+
+	push	es, cx
+	segmov	es, dgroup, cx
+	test	es:[olWindowOptions], mask UIWO_PINNABLE_MENUS
+	pop	es, cx
+	jnz	afterNotPinnable
+
+notPinnable:
+	andnf	ds:[di].OLWI_attrs, not mask OWA_PINNABLE	; clear flag
+
+afterNotPinnable:
+
+endif			;------------------------------------------------------
+
+	;now set menu type
+
+OLS <	mov	ds:[di].OLWI_type, OLWT_MENU				>
+CUAS <	mov	ds:[di].OLWI_type, MOWT_MENU	;set window type = MENU	>
+
+if _SUB_MENUS	;--------------------------------------------------------------
+	mov	cx, ds:[di].OLCI_buildFlags
+	and	cx, mask OLBF_REPLY
+	cmp	cx, OLBR_SUB_MENU shl offset OLBF_REPLY
+	jnz	winPosSize
+
+OLS <	mov	ds:[di].OLWI_type, OLWT_SUBMENU				>
+CUAS <	mov	ds:[di].OLWI_type, MOWT_SUBMENU				>
+endif		;--------------------------------------------------------------
+
+winPosSize:
+	;do geometry handling
+	call	OLMenuWinScanGeometryHints
+
+	;Process hints from GenInteraction object. We want to know if the
+	;CUA/Motif - specific hint HINT_SYSTEM_MENU was specified.
+
+						;setup es:di to be ptr to
+						;Hint handler table
+	segmov	es, cs, di
+	mov	di, offset cs:OLMenuWinHintHandlers
+	mov	ax, length (cs:OLMenuWinHintHandlers)
+	call	ObjVarScanData
+	ret
+OLMenuWinInitialize	endp
+
+;Hint handler table
+
+OLMenuWinHintHandlers	VarDataHandler \
+	<HINT_INFREQUENTLY_USED, offset HintNotPinnable>,
+	<HINT_SYS_MENU, offset OLMenuWinHintIsSystemMenu>,
+	<HINT_IS_EXPRESS_MENU,offset OLMenuWinHintIsExpressMenu>,
+	<HINT_CUSTOM_SYS_MENU, offset OLMenuWinHintCustomSysMenu>,
+	<HINT_INTERACTION_INFREQUENT_USAGE,offset OLMenuWinHintInfrequentUsage>
+
+HintNotPinnable	proc	far
+	class	OLMenuWinClass
+	call	MenuBuild_DerefVisSpec_DI
+OLS <	ANDNF	ds:[di].OLWI_attrs, not (mask OWA_PINNABLE or mask OWA_HEADER)>
+CUAS <	ANDNF	ds:[di].OLWI_attrs, not mask OWA_PINNABLE >
+	ret
+HintNotPinnable	endp
+
+OLMenuWinHintCustomSysMenu	proc	far
+	class	OLMenuWinClass
+	call	MenuBuild_DerefVisSpec_DI
+	ORNF	ds:[di].OLMWI_specState, mask OMWSS_CUSTOM_SYS_MENU
+	ret
+OLMenuWinHintCustomSysMenu	endp
+
+OLMenuWinHintInfrequentUsage	proc	far
+	class	OLMenuWinClass
+	call	MenuBuild_DerefVisSpec_DI
+	ORNF	ds:[di].OLMWI_specState, mask OMWSS_INFREQUENT_USAGE
+	ret
+OLMenuWinHintInfrequentUsage	endp
+
+
+
+COMMENT @----------------------------------------------------------------------
+
+METHOD:		OLMenuWinScanGeometryHints -- 
+		MSG_SPEC_SCAN_GEOMETRY_HINTS for OLMenuWinClass
+
+DESCRIPTION:	Scans geometry hints.
+
+PASS:		*ds:si 	- instance data
+		es     	- segment of MetaClass
+		ax 	- MSG_SPEC_SCAN_GEOMETRY_HINTS
+
+RETURN:		nothing
+		ax, cx, dx, bp - destroyed
+
+ALLOWED TO DESTROY:	
+		bx, si, di, ds, es
+
+REGISTER/STACK USAGE:
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	chris	2/ 5/92		Initial Version
 
 ------------------------------------------------------------------------------@
 
-OLMenuedWinInitialize	method private static OLMenuedWinClass, 
-							MSG_META_INITIALIZE
+OLMenuWinScanGeometryHints	method static OLMenuWinClass, \
+				MSG_SPEC_SCAN_GEOMETRY_HINTS
 	uses	bx, di, es		; To comply w/static call requirements
 	.enter				; that bx, si, di, & es are preserved.
 					; NOTE that es is NOT segment of class
-
-EC <	push	es, di							>
-EC <	mov	di, segment GenDisplayClass				>
-EC <	mov	es, di							>
-EC <	mov	di, offset GenDisplayClass				>
-EC <	call	ObjIsObjectInClass					>
-EC <	pop	es, di							>
-EC <	ERROR_NC	OL_ERROR					>
-
-					;call super (OLWinClass) for init
-	mov	di, segment OLMenuedWinClass
+	mov	di, segment OLMenuWinClass
 	mov	es, di
-	mov	di, offset OLMenuedWinClass
-	CallSuper	MSG_META_INITIALIZE
 
-	;set the HGF_MENU_WINDOW_GRABS_ARE_TEMPORARY flag, so that GenPrimary
-	;and GenDisplay windows will restore the focus after a menu closes.
-	;DO NOT do this at OLWinClass! We don't want this behaviour in menus!
+	;handle superclass geometry stuff first
 
-	call	WinClasses_DerefVisSpec_DI
-if MENU_BAR_IS_A_MENU
-	mov	ds:[di].OLMDWI_menuCenter, 0
-endif
-	ORNF	ds:[di].OLWI_menuState, \
-				mask OLWMS_MENU_WINDOW_GRABS_ARE_TEMPORARY
+	mov	di, offset OLMenuWinClass
+	CallSuper	MSG_SPEC_SCAN_GEOMETRY_HINTS
 
-	;
-	; Before replacing moniker list with most appropriate moniker (in
-	; OLMenuedWinSpecBuild), find and store the monikers we'll need to use
-	; for the icon if this window is iconified.  Doing this here also
-	; allows minimizied GenPrimary to be restored from state correctly as
-	; the OLMenuedWin never gets built, yet the icon monikers are needed.
-	;
-	; (Correctly handles case where this window has no moniker, will use
-	; GenApplication moniker list).
-	;
+	;Setup our geometry preferences before calling superclass which will
+	;process hints
 
-ifndef NO_WIN_ICONS	;------------------------------------------------------
+	;Make all buttons the width of the smallest
 
-	call	FindIconMonikers
+	call	MenuBuild_DerefVisSpec_DI
 
-endif			; ifndef NO_WIN_ICONS ---------------------------------
+	;override OLWinClass positioning/sizing behavior
+	;(We set the PERSIST flags so that if this menu is pinned, and then
+	;closed, PrepForReOpen does not set anything invalid.)
 
-	;
-	; handling of minimized state is done in OLMenuedWinAttach and
-	; OLMenuedWinSpecSetUsable
-	;
+	mov	ds:[di].OLWI_winPosSizeFlags, \
+		   mask WPSF_PERSIST \
+		or (WCT_KEEP_VISIBLE shl offset WPSF_CONSTRAIN_TYPE) \
+		or (WPT_AS_REQUIRED shl offset WPSF_POSITION_TYPE) \
+		or (WST_AS_DESIRED shl offset WPSF_SIZE_TYPE)
 
+	;process positioning and sizing hints - might not allow this
+
+	clr	cx			;pass flag: no icon for this window
+	call	OpenWinProcessHints
 	.leave
 	ret
-OLMenuedWinInitialize	endm
-
-
-
-COMMENT @----------------------------------------------------------------------
-
-FUNCTION:	OLMenuedWinVisAddChild
-
-DESCRIPTION:	We intercept this to ensure that our menu bar is always at
-		the end.
-
-PASS:		*ds:si	= instance data for object
-		ds:di	= specific instance (OLMenuedWin)
-
-		ax	= MSG_VIS_ADD_CHILD
-
-		^lcx:dx	= child to add
-		bp	= CompChildFlags
-
-RETURN:		nothing
-		cx, dx unchanged
-
-DESTROYED:	ax, bp
-
-PSEUDO CODE/STRATEGY:
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	Eric	5/90		initial version
-
-------------------------------------------------------------------------------@
-
-if MENU_BAR_AT_BOTTOM
-
-OLMenuedWinVisAddChild	method dynamic	OLMenuedWinClass, MSG_VIS_ADD_CHILD
-	push	cx, dx			; save child
-	;
-	; first add child normally
-	;
-	mov	di, offset OLMenuedWinClass
-	CallSuper	MSG_VIS_ADD_CHILD
-
-	;
-	; then force our menu bar to the end
-	;	(menu bar optr is guaranteed to be stored before it is added)
-	;
-	call	WinClasses_DerefVisSpec_DI
-	mov	dx, ds:[di].OLMDWI_menuBar	; ^lcx:dx = menu bar
-	mov	cx, ds:[LMBH_handle]
-	call	MoveToEnd
-	pop	cx, dx				; restore child
-	ret
-
-MoveToEnd:
-	mov	ax, MSG_VIS_FIND_CHILD
-	call	WinClasses_ObjCallInstanceNoLock	; ^lcx:dx preserved
-	jc	noMove				; not added yet, nothing to fix
-	mov	ax, MSG_VIS_MOVE_CHILD
-	mov	bp, CCO_LAST			; make it the last one
-	call	WinClasses_ObjCallInstanceNoLock
-noMove:
-	retn
-OLMenuedWinVisAddChild	endm
-
-endif
+OLMenuWinScanGeometryHints	endm
 
 
 COMMENT @----------------------------------------------------------------------
 
-FUNCTION:	FindIconMonikers
+FUNCTION:	OLMenuWinHintIsSystemMenu
 
-DESCRIPTION:	Search this window's (GenPrimary) moniker list, if any,
-		for icon and icon caption monikers.  If not appropriate, search
-		GenApplication's moniker list.
+DESCRIPTION:	Hint handler for HINT_SYS_MENU.  Internal hint to indicate
+		that this generic interaction group was actually created by
+		the specific UI, & should be turned into the CUA system
+		menu.
 
 CALLED BY:	INTERNAL
-			OLMenuedWinInitialize
 
-PASS:		*ds:si	- OLMenuedWin instance data
+PASS:
+	*ds:si	- window object
+	ds:bx	- ptr to hint structure
+	ax	- hint = (ds:bx).HE_type
 
-RETURN:		*ds:[si].OLMDWI_iconCaptionMoniker updated
-		*ds:[si].OLMDWI_iconMoniker updated
-		updates ds
+RETURN:
+	ds	- new segment of object block
 
-DESTROYED:	ax, bx, cx, dx, di, bp
+OK TO DESTROY in hint handler:
+		ax, bx, si, di, es
+
+REGISTER/STACK USAGE:
 
 PSEUDO CODE/STRATEGY:
-		If we find the gstring or textual moniker in the OLMenuedWin,
-		it may be because it has a single gstring or textual moniker or
-		because it has a moniker list with a gstring or textual
-		moniker.  In either case, that gstring or textual moniker will
-		always be around for us to reference it via our optr, even if
-		the moniker list is resolved into a single moniker.  If we
-		have to go the GenApplication object for the gstring or textual
-		moniker, that moniker will always be around because a GenApp's
-		moniker is never resolved.
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
-	brianc	3/30/92		initial version
+	Eric			Initial version
+	Doug	10/89		Added header
+	Eric	6/90		Added OLMenuWinHintIsExpressMenu.
 
 ------------------------------------------------------------------------------@
 
-ifndef NO_WIN_ICONS	;------------------------------------------------------
+OLMenuWinHintIsExpressMenu	proc	far
+	FALL_THRU OLMenuWinHintIsSystemMenu	;for now, no diff.
+OLMenuWinHintIsExpressMenu	endp
 
-FindIconMonikers	proc	near
-	call	WinClasses_DerefVisSpec_DI
-OLS <	cmp	ds:[di].OLWI_type, OLWT_DISPLAY_WINDOW			>
-CUAS <	cmp	ds:[di].OLWI_type, MOWT_DISPLAY_WINDOW			>
-	je	done			;GenDisplay, not GenPrimary, don't
-					;	bother with icon monikers
-	;
-	; if hint specifies, go directly to GenApp for moniker
-	;
-	mov	ax, HINT_DISPLAY_USE_APPLICATION_MONIKER_WHEN_MINIMIZED
-	call	ObjVarFindData		; carry set if found
-	jc	useGenAppForIcon	; (carry set)
-	;
-	; check this window for graphics string moniker for icon
-	;
-	mov	bp, mask VMSF_GSTRING \
-		    or (VMS_ICON shl offset VMSF_STYLE)
-	clc
-	call	GenFindMoniker		; ^lcx:dx = moniker
-	;
-	; make sure we found a gstring moniker
-	;
-	tst	cx			; any moniker found?
-	jz	useGenAppForIcon	; nope, use GenApplication
-					; (carry clear)
-	push	es
-	mov	bx, cx			; bx = moniker resource
-	call	ObjLockObjBlock
-	mov	es, ax
-	mov	di, dx			; *es:di = moniker
-	mov	di, es:[di]		; es:di = moniker
-	test	es:[di].VM_type, mask VMT_GSTRING
-	call	MemUnlock		; preserves flags
-	pop	es
-	jnz	haveIconMoniker		; yes (carry cleared by 'test')
-	;
-	; gstring moniker not found in this window, use GenApplication's
-	; moniker list
-	;
-useGenAppForIcon:
-	pushf				; save use GenApp flag
-	mov	bp, mask VMSF_GSTRING \
-		    or (VMS_ICON shl offset VMSF_STYLE)
-	stc				;use moniker list from GenApp object
-	call	GenFindMoniker		;^lcx:dx = moniker
-					;don't care if it's not a gstring,
-					;or even if it doesn't exist
-	popf				; restore use GenApp flag
-haveIconMoniker:
-	;
-	; carry set if we should go straight to GenApp for moniker
-	;
-	pushdw	cxdx			;save icon moniker
-	jc	useGenAppForCaption
+OLMenuWinHintIsSystemMenu	proc	far
+	class	OLMenuWinClass
+	;set the OMWA_IS_SYSTEM_MENU attribute bit for this menu window
 
-	;For caption: look for abbreviated text, or text, or textual GString,
-	;or GString. Copy moniker to this object block.
+	call	MenuBuild_DerefVisSpec_DI
 
-	mov	bp, (VMS_ABBREV_TEXT shl offset VMSF_STYLE)
-	clc
-	call	GenFindMoniker		; ^lcx:dx = moniker
-	;
-	; make sure we found something
-	;
-	tst	cx			; anything?
-	jnz	haveIconCaptionMoniker
-	;
-	; gstring moniker not found in this window, use GenApplication's
-	; moniker list (don't care if there is any)
-	;
-useGenAppForCaption:
-	mov	bp, (VMS_ABBREV_TEXT shl offset VMSF_STYLE)
-	stc				;use moniker list from GenApp object
-	call	GenFindMoniker
-haveIconCaptionMoniker:
-					;^lcx:dx = icon caption moniker
-
-	call	WinClasses_DerefVisSpec_DI
-	movdw	ds:[di].OLMDWI_iconCaptionMoniker, cxdx	; save icon caption mkr
-	popdw	ds:[di].OLMDWI_iconMoniker		; save icon moniker
-done:
+;SAVE BYTES: may not be necessary
+	ORNF	ds:[di].OLWI_fixedAttr, mask OWFA_IS_MENU
+OLS <	mov	ds:[di].OLWI_type, OLWT_SYSTEM_MENU			>
+CUAS <	mov	ds:[di].OLWI_type, MOWT_SYSTEM_MENU			>
+						;set window type = SYSTEM_MENU
 	ret
-FindIconMonikers	endp
-
-endif		; ifndef NO_WIN_ICONS -----------------------------------------
-
+OLMenuWinHintIsSystemMenu	endp
 
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLMenuedWinUpdateWindow -- MSG_META_UPDATE_WINDOW for
-		OLMenuedWinClass
+METHOD:		OLMenuWinUpdateSpecBuild -- MSG_SPEC_BUILD_BRANCH
 
-DESCRIPTION:	Handle *_ON_STARTUP stuff.
+DESCRIPTION:	We intercept UPDATE_SPEC_BUILD here so that menus which are
+		pinnable can add a PIN button. (CUA style only).
 
 PASS:
 	*ds:si - instance data
-	es - segment of OLMenuedWinClass
+	es - segment of OLMenuWinClass
 
-	ax - MSG_META_UPDATE_WINDOW
+	ax - MSG_SPEC_BUILD_BRANCH
 
-	cx - UpdateWindowFlags
-	dl - VisUpdateMode
+	cx - ?
+	dx - ?
+	bp - SpecBuildFlags (SBF_WIN_GROUP, etc)
 
 RETURN:
 	carry - ?
@@ -345,1708 +345,119 @@ KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
-	brianc	6/9/92		Initial version
+	Eric	12/89		Initial version
 
 ------------------------------------------------------------------------------@
+
 
-OLMenuedWinUpdateWindow	method dynamic	OLMenuedWinClass, 
-					MSG_META_UPDATE_WINDOW
+OLMenuWinUpdateSpecBuild	method dynamic	OLMenuWinClass,
+					MSG_SPEC_BUILD_BRANCH
+			
+if	ALLOW_ACTIVATION_OF_DISABLED_MENUS
+	;
+	; Make sure this is set.  System menus are always enabled regardless
+	; of their parent's status.   (Changed to always enable menus of
+	; any kind.  -cbh 12/10/92)
+	;
+;OLS <	cmp	ds:[di].OLWI_type, OLWT_SYSTEM_MENU			>
+;CUAS <	cmp	ds:[di].OLWI_type, MOWT_SYSTEM_MENU			>
+;	jne	10$
+	or	bp, mask SBF_VIS_PARENT_FULLY_ENABLED
+;10$:
+endif
 
-	test	cx, mask UWF_ATTACHING
-	jz	notAttaching
+if _MENUS_PINNABLE	;------------------------------------------------------
+if _CUA_STYLE		;------------------------------------------------------
 
-	; Attaching:
-	;
-	; If GenDisplay/GenPrimary specified in .ui file and placed on active
-	; list, handle HINT_DISPLAY_MINIMIZED_ON_STARTUP.
-	; (HINT_DISPLAY_NOT_MINIMIZED_ON_STARTUP is the default)
-	; If restoring from state file, handle ATTR_GEN_DISPLAY_MINIMIZED_STATE.
-	; (HINT_DISPLAY_MAXIMIZED_ON_STARTUP,
-	; HINT_DISPLAY_NOT_MAXIMIZED_ON_STARTUP, and
-	; ATTR_GEN_DISPLAY_MAXIMIZED_STATE are ignored for GenDisplay
-	; and are handled in OLBaseWinClass' MSG_META_ATTACH for GenPrimary.
-	; Maximized states for GenDisplay are dictated by parent
-	; GenDisplayGroup.)
-	;
-	; The actual minimization is handled in OpenWinAttach via
-	; MSG_GEN_DISPLAY_SET_MINIMIZED.  OLMenuedWinCheckForGensMinimized
-	; will clear ATTR_GEN_DISPLAY_MINIMIZED_STATE so that the generic
-	; handler for MSG_GEN_DISPLAY_SET_MINIMIZED will work.
-	;
-	push	ax, cx, dx
-						; assume restoring from state
-	mov	ax, ATTR_GEN_DISPLAY_MINIMIZED_STATE
-	test	cx, mask UWF_RESTORING_FROM_STATE	; state?
-	jnz	haveVarData			; yes
-						; else, use startup hint
-	mov	ax, HINT_DISPLAY_MINIMIZED_ON_STARTUP
-haveVarData:
-	call	OLMenuedWinCheckForGensMinimized
+	mov	di, ds:[di].OLCI_buildFlags
+	and	di, mask OLBF_TARGET
+	cmp	di, OLBT_IS_POPUP_LIST shl offset OLBF_TARGET
+	je	callSuper		;popup list, cannot pin (for now)
 
-	pop	ax, cx, dx
-	jmp	short callSuper
+	;first test if this MSG_SPEC_BUILD_BRANCH has been recursively
+	;descending the visible tree. If not, it means we are opening this menu
 
-notAttaching:
-	test	cx, mask UWF_DETACHING
-	jnz	callSuper			; let super handle detach
+	test	bp, mask SBF_WIN_GROUP	;at top of tree?
+	jz	callSuper		;skip if not...
 
-	; Runtime update:
-	;
-	; Must deal with minimized state
-
-	push	ax, cx, dx
-	;
-	; OLMenuedWinCheckForGensMinimized will clear
-	; ATTR_GEN_DISPLAY_MINIMIZED_STATE so that the generic handler for
-	; MSG_GEN_DISPLAY_SET_MINIMIZED (sent below) will work.
-	;
-	mov	ax, ATTR_GEN_DISPLAY_MINIMIZED_STATE
-	call	OLMenuedWinCheckForGensMinimized
-	jnc	notMinimized
-	;
-	; if minimized on startup or minimized when set not-usable (or set
-	; minimized while not-usable), do the normal
-	; MSG_GEN_DISPLAY_SET_MINIMIZED handling
-	;
-	mov	ax, MSG_GEN_DISPLAY_SET_MINIMIZED
-	mov	dl, VUM_NOW
-	call	WinClasses_ObjCallInstanceNoLock
-notMinimized:
-	pop	ax, cx, dx
+	push	bp
+	call	OLMenuWinEnsurePinTrigger
+	pop	bp
+endif		;--------------------------------------------------------------
+endif		;--------------------------------------------------------------
 
 callSuper:
-	call	WinClasses_ObjCallSuperNoLock_OLMenuedWinClass
 
+
+	mov	ax, MSG_SPEC_BUILD_BRANCH
+	push	bp
+	mov	di, offset OLMenuWinClass
+	call	ObjCallSuperNoLock
+	pop	bp
+
+alreadyBuilt:
+	;get our orientation correct.  We'll be horizontal if our button 
+	;desires it.
+
+	call	MenuBuild_DerefVisSpec_DI
+	or	ds:[di].VCI_geoAttrs, mask VCGA_ORIENT_CHILDREN_VERTICALLY
+	mov	ax, ds:[di].OLCI_buildFlags
+	and	ax, mask OLBF_TARGET
+	cmp	ax, OLBT_IS_POPUP_LIST shl offset OLBF_TARGET
+	jne	20$			;not popup list, leave vertical
+
+	push	si
+	mov	si, ds:[di].OLPWI_button
+	tst	si
+	clc				;assume no button, choose vertical
+	jz	15$			;no button, skip this, after popping si
+	mov	ax, MSG_OL_MENU_BUTTON_INIT_POPUP_ORIENTATION
+	call	ObjCallInstanceNoLock	;returns carry set if horizontal
+15$:
+	pop	si
+	jnc	20$			;button wants us vertical, branch
+	call	MenuBuild_DerefVisSpec_DI
+	and	ds:[di].VCI_geoAttrs, not mask VCGA_ORIENT_CHILDREN_VERTICALLY
+20$:
+	;if File menu, ensure File:Exit exists and has moniker
+
+	test	bp, mask SBF_WIN_GROUP
+	jz	noFileExitYet
+	call	EnsureFileExit
+noFileExitYet:
+
+	;update separators in this menu
+
+	mov	ax, MSG_SPEC_UPDATE_MENU_SEPARATORS
+	GOTO	ObjCallInstanceNoLock
+
+OLMenuWinUpdateSpecBuild	endp
+
+
+MenuBuild_DerefVisSpec_DI	proc	near
+	mov	di, ds:[si]			
+	add	di, ds:[di].Vis_offset
 	ret
-OLMenuedWinUpdateWindow	endp
-
+MenuBuild_DerefVisSpec_DI	endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		OLMenuedWinSetCustomSystemMenuMoniker
+		CheckForCustomSystemMenu
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	Search this window's moniker list, if any, for a VMS_TINY
-		gstring moniker.  If not found, search the GenApplication's
-		moniker list.  If a suitable moniker is found, use it to
-		replace the default system menu moniker.
+SYNOPSIS:	Checks to see if the application has provided a custom
+		system menu.  If yes, we use it as the system menu.
+		The standard system menu becomes a submenu of the app
+		provided sys menu.
 
-CALLED BY:	OpenWinEnsureSysMenu
+CALLED BY:	OLMenuWinUpdateSpecBuild
+PASS:		*ds:si -	Instance data
+		bp     -	SpecBuildFlags
 
-PASS:		*ds:si	= OLMenuedWinClass object
-		ds:di	= OLMenuedWinClass instance data
-		ds:bx	= OLMenuedWinClass object (same as *ds:si)
-		es 	= segment of OLMenuedWinClass
-		ax	= message #
+RETURN:		carry set if we called our superclass to do SPEC_BUILD_BRANCH
 
-RETURN:		nothing
+DESTROYED:	ax, bx, cx, dx, di
 
-DESTROYED:	nothing
-
-PSEUDO CODE/STRATEGY:
-
-KNOWN BUGS/SIDE EFFECTS/IDEAS:
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	JS	7/30/92   	Initial version taken from FindIconMonikers
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-
-if _PM	;----------------------------------------------------------------------
-
-OLMenuedWinSetCustomSystemMenuMoniker	method dynamic OLMenuedWinClass, 
-				MSG_OL_WIN_SET_CUSTOM_SYSTEM_MENU_MONIKER
-	uses	ax, cx, dx, bp
-	.enter
-	;
-	; check this window for a VMS_TINY, gstring moniker
-	;
-	clc				;use window's moniker list
-	call	SearchForVMSTinyGstringMoniker	;returns carry set if found
-						; ^lcx:dx = moniker
-	jc	haveMoniker
-
-	;
-	; gstring moniker not found in this window, use GenApplication's
-	; moniker list
-	;
-	stc				;use moniker list from GenApp object
-	call	SearchForVMSTinyGstringMoniker	;returns carry set if found
-						; ^lcx:dx = moniker
-	jnc	done			; didn't find what we're looking for
-
-haveMoniker:
-	;
-	; Now replace the system menu moniker - new moniker is cx:dx
-	;
-	call	WinClasses_DerefVisSpec_DI
-	test	ds:[di].OLWI_menuState, mask OWA_SYS_MENU_IS_CLOSE_BUTTON
-	jnz	done			; not needed if just a close button
-
-	call	GetSystemMenuBlockHandle
-	mov	si, offset StandardWindowMenu
-	jz	haveSysMenu
-	mov	si, ds:[di].OLBWI_titleBarMenu.chunk
-haveSysMenu:
-	mov	bp, VUM_MANUAL
-	mov	di, mask MF_CALL or mask MF_FIXUP_DS
-	mov	ax, MSG_GEN_REPLACE_VIS_MONIKER_OPTR
-	call	ObjMessage
-done:
-	.leave
-	ret
-OLMenuedWinSetCustomSystemMenuMoniker	endm
-
-
-SearchForVMSTinyGstringMoniker	proc	near
-	mov	bp, mask VMSF_GSTRING \
-		    or (VMS_TOOL shl offset VMSF_STYLE)
-	call	GenFindMoniker		; ^lcx:dx = moniker
-
-	tst	cx			; any moniker found?
-	jz	done			; if zero then not carry
-	push	es
-	mov	bx, cx			; bx = moniker resource
-	call	ObjLockObjBlock
-	mov	es, ax
-	mov	di, dx			; *es:di = moniker
-	mov	di, es:[di]		; es:di = moniker
-	cmp	es:[di].VM_width, CUAS_WIN_ICON_WIDTH
-	jg	notFound		; if greater then not carry
-	test	es:[di].VM_type, mask VMT_GSTRING
-	jz	notFound		; if zero then not carry
-found:
-	stc				; set carry to indicate that we
-notFound:				;  have found a suitable moniker
-	call	MemUnlock		; preserves flags
-	pop	es
-done:
-	ret
-SearchForVMSTinyGstringMoniker	endp
-
-
-OLMenuedWinFindTitleMonikerFar	proc	far
-	call	OLMenuedWinFindTitleMoniker
-	ret
-OLMenuedWinFindTitleMonikerFar	endp
-
-endif	; if _PM --------------------------------------------------------------
-
-
-
-COMMENT @----------------------------------------------------------------------
-
-FUNCTION:	OLMenuedWinCheckForGensMinimized
-
-DESCRIPTION:	see below
-
-CALLED BY:	OLMenuedWinAttach, OLMenuedWinSpecSetUsable
-
-PASS:		ds:*si	- instance data
-		ax - hint or attr vardata type to check for (and set
-			minimized on existance of)
-
-RETURN:		carry set if minimized flags set
-		carry clear if not
-
-DESTROYED:
-
-PSEUDO CODE/STRATEGY:
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	Eric	11/89		initial version
-	brianc	3/12/92		modified for 2.0
-
-------------------------------------------------------------------------------@
-
-OLMenuedWinCheckForGensMinimized	proc	near
-	class	OLMenuedWinClass
-
-	;if this window is marked as minimized and the specific UI
-	;allows this, set as not SA_REALIZABLE and SA_BRANCH_MINIMIZED
-	;so visible build will not occur. (This could be handled
-	;in OLMenuedWinClass, but there is no INITIALIZE handler there.)
-
-EC <	call	GenCheckGenAssumption	; Make sure gen data exists >
-EC <	call	VisCheckVisAssumption	; Make sure vis data exists >
-
-	call	ObjVarFindData		; carry set if found
-	jnc	done			; if not minimized, done
-					; (carry is clear)
-
-	call	WinClasses_DerefVisSpec_DI
-	test	ds:[di].OLWI_attrs, mask OWA_MINIMIZABLE
-	jz	done			; skip if not minimizable...
-					; (carry is clear)
-
-	;
-	; If called from OLMenuedWinAttach, generic state flag is set when we
-	; evaluate SA_BRANCH_MINIMIZED in OpenWinAttach.  If called from
-	; OLMenuedWinSpecSetUsable, generic state flag is set there.
-	;
-
-;moved to end
-;	;
-;	; In either case, since the actual minimization is done with the
-;	; generic MSG_GEN_DISPLAY_SET_MINIMIZED, we need to clear the
-;	; minimized state flag, ATTR_GEN_DISPLAY_MINIMIZED_STATE.
-;	;
-;	mov	ax, ATTR_GEN_DISPLAY_MINIMIZED_STATE
-;	call	ObjVarDeleteData
-
-	;Set this OLMenuedWin NOT REALIZABLE (do not touch generic state -
-	;application has control of that info).
-
-	call	WinClasses_DerefVisSpec_DI
-	ANDNF	ds:[di].VI_specAttrs, not mask SA_REALIZABLE
-	ORNF	ds:[di].VI_specAttrs, mask SA_BRANCH_MINIMIZED
-
-	stc				; indicate minimized flags set
-
-done:
-
-;moved here from above to handle case where HINT_DISPLAY_MINIMIZED_ON_STARTUP
-;is passed and not found, we still want to clear
-;ATTR_GEN_DISPLAY_MINIMIZED_STATE (failcase: GenAppLazarus on minimized app)
-;- brianc 3/8/93
-	;
-	; In either case, since the actual minimization is done with the
-	; generic MSG_GEN_DISPLAY_SET_MINIMIZED, we need to clear the
-	; minimized state flag, ATTR_GEN_DISPLAY_MINIMIZED_STATE.
-	;
-	pushf				; save results
-	mov	ax, ATTR_GEN_DISPLAY_MINIMIZED_STATE
-	call	ObjVarDeleteData
-	popf				; restore results
-
-	ret
-OLMenuedWinCheckForGensMinimized	endp
-
-
-
-COMMENT @----------------------------------------------------------------------
-
-METHOD:		OLMenuedWinUpdateSpecBuild
-
-DESCRIPTION:	Intercept branch build to make certain that at the end of
-		this whole build that our menu & trigger bars, if any, have
-		been vis built.
-
-PASS:		*ds:si - instance data
-		es - segment of OLMenuedWinClass
-
-		ax - MSG_SPEC_BUILD_BRANCH
-		cx - ?
-		dx - ?
-		bp - SpecBuildFlags
-
-RETURN:		carry - ?
-		ax, cx, dx, bp - ?
-
-DESTROYED:	bx, si, di, ds, es
-
-REGISTER/STACK USAGE:
-
-PSEUDO CODE/STRATEGY:
-
-KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	Doug	6/91		Initial version.
-
-------------------------------------------------------------------------------@
-
-OLMenuedWinUpdateSpecBuild	method	dynamic OLMenuedWinClass,
-					MSG_SPEC_BUILD_BRANCH
-EC <	call	VisCheckVisAssumption	;Make sure vis data exists >
-
-	; If this is a "custom" window, don't need a gadget area.
-	;
-	test	ds:[di].OLWI_moreFixedAttr, mask OWMFA_CUSTOM_WINDOW
-	jnz	haveGadgetArea
-	;
-	;if there ain't a gadget area then create one.  Reasoning:
-	;Menued wins build a gadget area object to put non-view,
-	;non-display-control children in.  The GadgetAreaCtrl basically
-	;exists for the purpose of providing margins for these objects so
-	;they're not up against the edges of the menued win (which has
-	;no margins other than the resize area).  cbh 5/18/91
-
-	tst	ds:[di].OLMDWI_gadgetArea
-	jnz	haveGadgetArea
-
-	push	ax
-	mov	di, offset OLGadgetAreaClass
-	call	OpenWinCreateBarObject		;creates object, sets visible
-
-	call	WinClasses_DerefVisSpec_DI
-	mov	ds:[di].OLMDWI_gadgetArea, ax	;save handle of gadget area 
-						;   object
-
-if INDENT_BOXED_CHILDREN
-	;
-	; if desired, tell gadget area not to indent HINT_DRAW_IN_BOX
-	; children
-	;
-	push	si				; save window
-	push	ax				; save gadget area
-	mov	cx, mask OLGAF_NEEDS_TOP_MARGIN
-	mov	ax, HINT_DONT_INDENT_BOX
-	call	ObjVarFindData
-	pop	si				; *ds:si = gadget area
-	jnc	leaveIndent
-	ornf	cx, mask OLGAF_PREVENT_LEFT_MARGIN
-leaveIndent:
-	;
-	; tell gadget area to use top margin
-	;
-	mov	ax, MSG_SPEC_GADGET_AREA_SET_FLAGS
-	call	ObjCallInstanceNoLock
-	pop	si				; *ds:si = window
-endif
-	pop	ax				;parent = this OLWinClass obj,
-						;and sends SPEC_BUILD to object
-						;if this OLWinClass has already
-						;been visbuilt. (which it
-						;likely hasn't)
-haveGadgetArea:						
-	; Send to superclass to cause visual buildout of everything
-	; under the Primary, so that app menus, created menus such as
-	; "file" & "windows" etc. have been created.
-	;
-	push	bp
-	call	WinClasses_ObjCallSuperNoLock_OLMenuedWinClass
-	pop	bp
-
-exit:
-	ret
-
-OLMenuedWinUpdateSpecBuild	endm
-
-
-
-COMMENT @----------------------------------------------------------------------
-
-METHOD:		OLMenuedWinSpecBuild -- MSG_SPEC_BUILD for OLMenuedWinClass
-
-DESCRIPTION:	Do the standard OLWin SPEC_BUILD and if a menu bar is already
-		existing (from OLMapGroup earlier) then spec build it
-
-PASS:		*ds:si - instance data
-		es - segment of OLMenuedWinClass
-
-		ax - MSG_SPEC_BUILD
-		cx - ?
-		dx - ?
-		bp - SpecBuildFlags
-
-RETURN:		carry - ?
-		ax, cx, dx, bp - ?
-
-DESTROYED:	bx, si, di, ds, es
-
-REGISTER/STACK USAGE:
-
-PSEUDO CODE/STRATEGY:
-
-KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	Doug	2/89		Initial version
-	Eric	7/89		Motif extensions, more documentation
-	Eric	11/89		Now overrides OLWinClass handler.
-
-------------------------------------------------------------------------------@
-
-OLMenuedWinSpecBuild	method	dynamic OLMenuedWinClass, MSG_SPEC_BUILD
-EC <	call	VisCheckVisAssumption	       ;Make sure vis data exists >
-
-	call	VisSpecBuildSetEnabledState    ;set fully-enabled flag
-
-;==============================================================================
-;COPIED FROM OLWINCLASS SPEC_BUILD HANDLER:
-	push	bp
-	call	OpenWinSetVisParent	;query for visual parent and visually
-					;attach self to that object.
-
-	;PM will find the title moniker after it has built the system menu.
-	;That way we can make a copy a system menu moniker from the window's
-	;moniker list before OLMenuedWinFindTitleMoniker destroys the window's
-	;moniker list.  JS (8/92)
-
-if (not _PM)
-	;search the VisMonikerList to find the moniker best suited for
-	;the title of this window.
-
-	call	OLMenuedWinFindTitleMoniker
-endif
-
-	;first: if the visible bounds for this object are actually
-	;ratios of the Parent/Field window, convert to pixel coordinates now.
-
-	call	ConvertSpecWinSizePairsToPixels
-
-	;now update the window according to hints passed from the application
-	;or specific-ui determined behavior (this does not actually run
-	;geometry - it just sets the VIS bounds and flags so that when geometry
-	;runs, it does the right thing.)
-
-	call	UpdateWinPosSize	;update window position and size if
-					;have enough info. If not, then wait
-					;until MSG_VIS_MOVE_RESIZE_WIN to
-					;do this.
-	pop	bp
-	push	bp
-
-skipExpand:
-	;FINALLY, PROCESS HINTS.  The hints requesting that the window be
-	;made the default focus or target are processed here.
-
-	call	ScanFocusTargetHintHandlers
-
-	;now check the generic state data for this object to see if it
-	;should be maximized (this is required when the window is first
-	;appearing, or when it is restarting after a shutdown.)
-
-if not _RUDY
-					; this msg allows GenDisplay to
-					; check with parent GenDisplayGroup
-					; and GenPrimary to check its own attrs
-	mov	ax, MSG_GEN_DISPLAY_GET_MAXIMIZED
-	call	WinClasses_ObjCallInstanceNoLock	; carry set if maximized
-	jnc	notMaximized
-	mov	al, VUM_MANUAL		; don't update
-	call	SetMaximized
-notMaximized:
-endif
-
-
-
-;END OF COPY
-;==============================================================================
-
-	pop	bp			;restore BuildFlags
-
-	; Vis-build out the menu, trigger bar, & gadget area, so that they
-	; are specifically built out before things below attempt to vis-build on
-	; to them.  This is the law!  Unfortunately, a bug appears to result
-	; in which menus adopted by the Primary from Displays with adoptable
-	; menus end up appearing to the LEFT of main menus, instead of to 
-	; their RIGHT.  A fix was made awhile back in which the following
-	; code was added at the end of this objects' SPEC_BUILD_BRANCH handler,
-	; thereby vis-building the menu bar AFTER the children had been
-	; vis-built!  This amazingly didn't blow up, as most things adding
-	; themselves to the menu or windows hanging off of them (OLPopup) 
-	; were'nt checking for parents that weren't vis-built.   I'm changing
-	; the code back, expecting the strangely placed adopted menus to
-	; come back, but I think this bug should be dealt with in a better
-	; manner.  The bug, by the way, evidences itself when an app such
-	; as America Online w/adopted menus is brought back from state
-	; iconified, & then uniconified.  -- Doug 12/10/91
-
-	;if there are titlebar objects then spec build them
-
-	mov	ax, OLWI_titleBarLeftGroup.offset
-	call	OLWinSendVBToBar
-
-	mov	ax, OLWI_titleBarRightGroup.offset
-	call	OLWinSendVBToBar
-
-if (not _JEDIMOTIF)
-	;if there is a menu bar then spec build it
-
-	mov	ax, OLMDWI_menuBar
-	call	OLWinSendVBToBar
-endif
-
-	; What's a triggerBar?  Is it used anywhere? JS.
-
-	;if there is a trigger bar then spec build it
-
-	mov	ax, OLMDWI_triggerBar
-	call	OLWinSendVBToBar
-
-	; build gadget area
-
-	mov	ax, OLMDWI_gadgetArea
-	call	OLWinSendVBToBar
-
-if _JEDIMOTIF	
-	;if there is a menu bar then spec build it
-
-	mov	ax, OLMDWI_menuBar
-	call	OLWinSendVBToBar
-endif
-
-	ret
-
-OLMenuedWinSpecBuild	endp
-
-
-
-;Pass ax = offset to field in OLWinClass specific data
-
-OLWinSendVBToBar	proc	near
-	push	si
-	call	WinClasses_DerefVisSpec_DI
-	add	di, ax				;point to _menuBar or
-						;_triggerBar field
-	mov	si, ds:[di]			;get handle of bar object
-	tst	si
-	jz	OLMWVBTB_noBarObject
-
-	;SPEC_BUILD the menu bar object (it does this itsself since it is
-	;not a generic object)
-
-	push	bp
-	mov	ax, MSG_SPEC_BUILD
-	call	WinClasses_ObjCallInstanceNoLock
-	pop	bp
-
-OLMWVBTB_noBarObject:
-	pop	si				;get handle
-	ret
-OLWinSendVBToBar	endp
-
-WinClasses	ends
-
-
-Unbuild	segment resource
-
-
-COMMENT @----------------------------------------------------------------------
-
-METHOD:		OLMenuedWinVisUnbuild -- MSG_SPEC_UNBUILD
-		for OLMenuedWinClass
-
-DESCRIPTION:	Visibly unbuilds & destroys a menued window
-
-PASS:		*ds:si 	- instance data
-		es     	- segment of MetaClass
-		di 	- MSG_SPEC_UNBUILD
-
-RETURN:		nothing
-
-DESTROYED:	ax, bx, cx, dx, si, di, ds, es, bp
-
-REGISTER/STACK USAGE:
-
-PSEUDO CODE/STRATEGY:
-
-KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	Doug	1/90		Initial version
-
-------------------------------------------------------------------------------@
-
-OLMenuedWinVisUnbuild	method dynamic OLMenuedWinClass, 
-						MSG_SPEC_UNBUILD
-					; Then, unbuild visible objects
-					; we created. (menu bars)
-
-					; Null out references to menu bars
-					; MSG_SPEC_UNBUILD_BRANCH will
-					; send MSG_SPEC_UNBUILD's
-					; to them, where they will destroy
-					; themselves.
-	clr	bx
-	mov	ds:[di].OLMDWI_menuBar, bx
-	mov	ds:[di].OLMDWI_triggerBar, bx
-	mov	ds:[di].OLMDWI_gadgetArea, bx
-
-	mov	di, offset OLMenuedWinClass
-	GOTO	ObjCallSuperNoLock
-
-OLMenuedWinVisUnbuild	endm
-
-Unbuild	ends
-
-
-WinClasses	segment resource
-
-
-COMMENT @----------------------------------------------------------------------
-
-FUNCTION:	OLMenuedWinFindTitleMoniker
-
-DESCRIPTION:	This procedure finds the correct moniker to use for the
-		title bar in this GenPrimary or GenDisplay. This moniker
-		will come from the moniker list of this window, or
-		of the GenApplication object.
-
-CALLED BY:	OLMenuedWinSpecBuild
-		UpdateAllMonikers
-
-PASS:		*ds:si	- instance data
-
-RETURN:		*ds:si	- same
-
-DESTROYED:	ax, bx, cx, dx, di, es
-
-PSEUDO CODE/STRATEGY:
-	call GenFindMoniker to find moniker for title, using this window
-	if none found & this is GenPrimary, try again with GenApplication's
-		moniker list
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	Eric	11/89		initial version
-	Eric	10/90		removed icon-related code, as OLWinIconClass'
-				SPEC_BUILD handler now searches for those
-				monikers. See cwinWinIcon.asm.
-	brianc	4/3/92		Fix to allow moniker lists
-
-------------------------------------------------------------------------------@
-
-OLMenuedWinFindTitleMoniker	proc	near
-	class	OLMenuedWinClass	;can touch instance data
-	;
-	; Replace the moniker list, with the most appropriate text moniker
-	;
-	mov	bp, mask VMSF_REPLACE_LIST \
-		    or (VMS_TEXT shl offset VMSF_STYLE)
-					;return non-abbreviated text string,
-					;otherwise abbreviated text string,
-					;otherwise textual GString, otherwise
-					;non-textual GString.
-	clc
-	call	GenFindMoniker		;*ds:dx = moniker
-	;
-	; If this is a GenPrimary and we don't have a moniker, use one
-	; from the GenApplication object
-	;
-	tst	dx			;have moniker?
-	jnz	done			;yes
-	call	WinClasses_DerefVisSpec_DI
-OLS <	cmp	ds:[di].OLWI_type, OLWT_DISPLAY_WINDOW			>
-CUAS <	cmp	ds:[di].OLWI_type, MOWT_DISPLAY_WINDOW			>
-	je	done			;GenDisplay, not GenPrimary, leave no
-					;	moniker
-
-	mov	bp, mask VMSF_COPY_CHUNK \
-		    or (VMS_TEXT shl offset VMSF_STYLE)
-					;return non-abbreviated text string,
-					;otherwise abbreviated text string,
-					;otherwise textual GString, otherwise
-					;non-textual GString.
-	mov	cx, ds:[LMBH_handle]	;pass handle of destination chunk
-	stc				;get from GenApplication
-	call	GenFindMoniker		;*ds:dx = moniker
-	;
-	; store VisMoniker found in GenApplication object
-	;	*ds:si = OLMenuedWin
-	;	dx = VisMoniker chunk
-	;
-EC <	call	GenCheckGenAssumption					>
-	call	WinClasses_DerefGen_DI
-	mov	ds:[di].GI_visMoniker, dx
-done:
-	ret
-OLMenuedWinFindTitleMoniker	endp
-
-
-COMMENT @----------------------------------------------------------------------
-
-METHOD:		OLMenuedWinGenSetMinimized -- MSG_GEN_DISPLAY_SET_MINIMIZED
-
-DESCRIPTION:	This method is passed on to us after the Generic UI has handled
-		it. This whole process starts when the user selects "minimize"
-		from the window's system menu, or when he clicks on the
-		Minimize icon. Each of these triggers sends
-		MSG_GEN_DISPLAY_SET_MINIMIZED to the GenPrimary object.
-
-PASS:		*ds:si - instance data
-		es - segment of OLWinClass
-
-		ax - METHOD
-		dl - VisUpdateMode
-
-RETURN:		carry - ?
-		ax, cx, dx, bp - ?
-
-DESTROYED:
-	bx, si, di, ds, es
-
-PSEUDO CODE/STRATEGY:
-	Set the GenPrimary object as SA_BRANCH_MINIMIZED so it and its
-	children will close down temporarily (they will remain on the
-	window list, so that if the application is restored, they will
-	be like they were).
-
-	Create an OLWinIcon object if necessary, and make it usable.
-
-	Note: this even works if the GenPrimary was MAXIMIZED.
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	Eric	11/89		Initial version
-
-------------------------------------------------------------------------------@
-
-OLMenuedWinGenSetMinimized	method	OLMenuedWinClass, 
-						MSG_GEN_DISPLAY_SET_MINIMIZED
-
-	test	ds:[di].OLWI_specState, mask OLWSS_MINIMIZED
-	jnz	bail			;already minimized, do nothing
-	test	ds:[di].OLWI_attrs, mask OWA_MINIMIZABLE
-	jnz	10$			;minimizable, continue
-
-bail:	;forget it!
-	stc
-	ret
-
-10$:	;minimize window: enable icon, make this object unusable
-
-	ORNF	ds:[di].OLWI_specState, mask OLWSS_MINIMIZED
-					;set flag: this window is minimized
-					;(not really important, since window
-					;will be set UNUSABLE also, until the
-					;OLWinIcon object sets us USABLE
-					;again.)
-
-; Doesn't do any good, since events can't be processed until we return
-; anyway...
-;	;mark the UI as busy, so we don't get any more button presses
-;
-;	mov	ax, MSG_GEN_APPLICATION_HOLD_UP_INPUT
-;	call	GenCallApplication
-
-	;Set this GenPrimary NOT REALIZABLE (do not touch generic state -
-	;application has control of that info).
-
-	mov	cx, (mask SA_REALIZABLE shl 8) or (mask SA_BRANCH_MINIMIZED)
-					;turn off SA_REALIZABLE flag
-					;and turn on BRANCH_MINIMIZED flag
-
-	call	WinClasses_CallSelf_SET_VIS_SPEC_ATTR_VUM_NOW
-
-ifndef NO_WIN_ICONS	;------------------------------------------------------
-
-	;See if there is an OLWinIcon object associated with this window
-
-	call	WinClasses_DerefVisSpec_DI
-	tst	ds:[di].OLMDWI_icon.handle	;See if already built
-	jnz	OMWGSM_50		;skip if so...
-
-	;create object, by duplicating from .UI file resource to object block
-
-	push	si
-	mov	dx, si			;set *ds:dx = OLMenuedWinClass object
-	clr	bx
-	call	GeodeGetAppObject	;get ^lbx:si = GenApplication.
-
-	push	bx, si			;save for later
-	push	dx			;save chunk handle of this object
-
-	mov	cx, bx			;set cx = block to place icon in
-					;(resource which contains GenApp)
-
-					;object to a generic parent
-	clr	bp
-if	(0)
-	clr	dx			;do not attempt to add new
-					;set ^lbx:si = template in UI resource
-	mov	bx, handle WindowIcon
-	mov	si, offset WindowIcon
-	mov	ax, MSG_GEN_COPY_TREE
-	call	WinClasses_ObjMessageCallFixupDS
-					;returns ^lcx:dx = handle of icon object
-else
-	call	ObjSwapLock		; Need *ds:dx = app object
-	push	bx
-
-	; CREATE new icon object, placing it in the same block as the
-	; GenApplication object.  Note that an icon is actually a 
-	; GenPrimary w/HINT_WIN_ICON.
-	;
-	mov	dx, si			; add below GenApplication object
-	mov	di, segment GenPrimaryClass
-	mov	es, di
-	mov	di, offset GenPrimaryClass
-	mov	al, -1			; init USABLE
-	mov	ah, -1			; add to parent using one-way linkage
-	mov	bx, HINT_WIN_ICON	; Set hint to become OLWinIconClass
-	call	OpenCreateChildObject
-
-	pop	bx
-	call	ObjSwapUnlock
-endif
-	pop	si
-
-	;save OD of this new icon object (^lcx:dx)
-
-	call	WinClasses_DerefVisSpec_DI
-	mov	ds:[di].OLMDWI_icon.handle, cx
-	mov	ds:[di].OLMDWI_icon.chunk, dx
-
-	mov	bx, cx			;get ^lbx:ax = OLWinIconClass object
-	mov	ax, dx
-	pop	cx, dx			;^lcx:dx = OD of GenApplication
-	pop	si			;*ds:si = OLMenuedWinClass object
-
-	;send MSG_OL_WIN_ICON_SET_STATE to icon, to give it info
-	;on its window, and to allow it to perform special initialization.
-	;	*ds:si = window
-	;	^lbx:ax = OLWinIconClass object
-
-	push	si			;save window chunk on stack again
-					;PASS PARAMETERS ON STACK:
-	call	WinClasses_DerefVisSpec_DI
-	push	ds:[di].OLMDWI_iconWinPosSizeFlags
-	push	ds:[di].OLMDWI_iconWinPosSizeState
-	push	ds:[di].OLMDWI_iconPosLeft
-	push	ds:[di].OLMDWI_iconPosTop
-	push	ds:[LMBH_handle]	;pass OD of this GenPrimary
-	push	si
-
-	mov	bp, sp			;ds:bp points to bottom of args
-					;(80XXX stack builds downwards)
-	mov	dx, size IconPassData	;pass size of passed data
-
-	mov	si, ax			;set ^lbx:si = OLWinIconClass object
-	mov	ax, MSG_OL_WIN_ICON_SET_STATE
-	mov	di, mask MF_CALL or mask MF_FIXUP_DS or mask MF_STACK
-	call	ObjMessage
-
-	add	sp, size IconPassData	;fixup stack
-	pop	si			;get handle of window object again
-
-	; Tell the icon which monikers to use for icon and icon caption
-
-	call	OLMenuedWinSendIconMonikers
-
-	;When this object is generic->specific built, the BUILD_INFO query
-	;will be sent up the generic tree to find a generic parent for the icon.
-
-OMWGSM_50: ;make the Icon SA_REALIZABLE so will appear on-screen.
-	  ;(We can touch specific-visible state data since we have created
-	  ;this generic object.)
-
-	mov	ax, MSG_OL_WIN_ICON_SET_USABLE
-	call	OLMenuedWinCallIconObject
-
-	;lower ourselves to the bottom of the application stack within the
-	;field, so the next application can have the focus
-
-	push	si
-	clr	bx
-	call	GeodeGetAppObject
-	mov	ax, MSG_GEN_LOWER_TO_BOTTOM
-	mov	di, mask MF_FORCE_QUEUE		; (but do this after the window
-	call	ObjMessage			; is actually up on screen)
-	pop	si
-
-	;make sure that icon is the focus within the application, so that
-	;it can be interacted with if the application gets the focus
-
-	mov	ax, MSG_META_GRAB_FOCUS_EXCL
-	call	OLMenuedWinCallIconObject
-
-endif	; ifndef NO_WIN_ICONS -------------------------------------------------
-
-;	;release input
-;
-;	mov	ax, MSG_GEN_APPLICATION_RESUME_INPUT
-;	call	GenCallApplication
-
-	stc
-	ret
-OLMenuedWinGenSetMinimized	endp
-
-
-COMMENT @----------------------------------------------------------------------
-
-METHOD:		OLMenuedWinSetNotMinimized --
-		MSG_GEN_DISPLAY_SET_NOT_MINIMIZED
-
-DESCRIPTION:	This method is passed on to us after the Generic UI has
-		handled it.
-		
-		This whole process starts when the user selects "restore"
-		from the window's system menu, or when he clicks on the
-		Minimize icon. Each of these triggers sends
-		MSG_OL_RESTORE_WIN to the GenPrimary object.
-		OpenWinRestoreWin handles this, and decides whether restore
-		means "un-maximize" or "un-iconify". In this case, it
-		decides for the latter and sends MSG_GEN_SET_NOT_MINIMIZED
-		to the GenPrimary. The Generic UI handles this, and sends
-		the method on to this handler.
-
-PASS:		*ds:si - instance data
-		es - segment of OLWinClass
-
-		ax - METHOD
-		cx:dx	- ?
-		bp	- ?
-
-RETURN:		carry set if un-minimized window
-		ax, cx, dx, bp - ?
-
-DESTROYED:
-	bx, si, di, ds, es
-
-PSEUDO CODE/STRATEGY:
-	Set the GenPrimary object as NOT SA_BRANCH_MINIMIZED so it and its
-	children will re-open.
-
-	Make the OLWinIcon object NOT USABLE.
-
-	Note: this even works if the GenPrimary was MAXIMIZED.
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	Eric	11/89		Initial version
-
-------------------------------------------------------------------------------@
-
-OLMenuedWinSetNotMinimized	method	dynamic OLMenuedWinClass, \
-					MSG_GEN_DISPLAY_SET_NOT_MINIMIZED
-
-	test	ds:[di].OLWI_specState, mask OLWSS_MINIMIZED
-	jz	done			;already not-minimized, do nothing
-					;	(carry cleared)
-
-	;restore window: make this object usable
-
-	ANDNF	ds:[di].OLWI_specState, not (mask OLWSS_MINIMIZED)
-					;set flag: this window is minimized
-					;(not really important, since window
-					;will be set UNUSABLE also, until the
-					;OLWinIcon object sets us USABLE
-					;again.)
-
-ifndef NO_WIN_ICONS	;------------------------------------------------------
-
-	;make OLWinIcon object NOT_USABLE (can set generic state of
-	;this object since was created by specific UI and not application)
-	;	ds:di = instance data
-
-	mov	ax, MSG_SPEC_SET_ATTRS
-	mov	dl, VUM_NOW
-	mov	cx, mask SA_REALIZABLE shl 8
-					;turn off SA_REALIZABLE flag
-	call	OLMenuedWinCallIconObject
-
-endif			; ifndef NO_WIN_ICONS ---------------------------------
-
-	;mark window as invalid
-
-	mov     cl, mask VOF_GEOMETRY_INVALID or mask VOF_WINDOW_INVALID \
-			or mask VOF_IMAGE_INVALID
-	mov     dl, VUM_MANUAL
-	mov     ax, MSG_VIS_MARK_INVALID
-	call    WinClasses_ObjCallInstanceNoLock
-
-	;set this window REALIZABLE (do not touch generic state data)
-
-;SAVE BYTES: Can we turn on and turn off stuff at the same time?	
-	mov	cx, mask SA_REALIZABLE
-					;turn on SA_REALIZABLE flag
-	call	WinClasses_CallSelf_SET_VIS_SPEC_ATTR_VUM_NOW
-
-	mov	cx, (mask SA_BRANCH_MINIMIZED shl 8)
-					;turn off BRANCH_MINIMIZED flag
-	call	WinClasses_CallSelf_SET_VIS_SPEC_ATTR_VUM_NOW
-
-	mov	ax, MSG_META_ENSURE_ACTIVE_FT
-	call	GenCallApplication
-
-	stc
-done:
-	ret
-OLMenuedWinSetNotMinimized	endp
-
-
-ifndef NO_WIN_ICONS	;------------------------------------------------------
-
-;pass:	*ds:si = OLMenuedWinClass object instance data
-;	ax = message
-;	cx, dx, bp = message data
-OLMenuedWinCallIconObject	proc	far
-	push	si
-	call	WinClasses_DerefVisSpec_DI	;set ds:di = instance data
-	mov	bx, ds:[di].OLMDWI_icon.handle	;set ^lbx:si = OLWinIcon object
-	mov	si, ds:[di].OLMDWI_icon.chunk
-	tst	si
-	jz	done
-	call	WinClasses_ObjMessageCallFixupDS
-done:
-	pop	si
-	ret
-OLMenuedWinCallIconObject	endp
-
-endif			; ifndef NO_WIN_ICONS ---------------------------------
-
-
-
-COMMENT @----------------------------------------------------------------------
-
-FUNCTION:	OLMenuedWinSetMaximized -- MSG_GEN_DISPLAY_SET_MAXIMIZED
-
-DESCRIPTION:	Handle what the specific-UI thinks MAXIMIZED means.
-
-CALLED BY:	MSG_GEN_DISPLAY_SET_MAXIMIZED
-
-PASS:		*ds:si	- instance data
-
-RETURN:		nothing
-
-DESTROYED:
-
-PSEUDO CODE/STRATEGY:
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	Eric	11/89		initial version
-	Chris	4/91		Updated for new graphics, bounds conventions
-	brianc	3/5/92		Changed to MSG_GEN_DISPLAY_SET_MAXIMIZED handler
-
-------------------------------------------------------------------------------@
-
-if not _RUDY		;no need to do this stuff in Rudy -- already maxed
-
-OLMenuedWinSetMaximized	method dynamic	OLMenuedWinClass, \
-					MSG_GEN_DISPLAY_SET_MAXIMIZED
-	mov	al, VUM_NOW
-	GOTO	SetMaximized
-OLMenuedWinSetMaximized	endp
-
-OLMenuedWinInternalSetMaximized	method dynamic	OLMenuedWinClass, \
-					MSG_GEN_DISPLAY_INTERNAL_SET_FULL_SIZED
-	mov	al, dl			; al = VisUpdateMode
-	FALL_THRU	SetMaximized
-OLMenuedWinInternalSetMaximized	endp
-
-endif
-
-COMMENT @----------------------------------------------------------------------
-
-FUNCTION:	SetMaximized
-
-DESCRIPTION:	Common routine to maximized OLMenuedWin
-
-CALLED BY:	OLMenuedWinSetMaximized
-		OLMenuedWinSpecBuild
-
-PASS:		*ds:si	- instance data
-		al	- VisUpdateMode
-
-RETURN:		nothing
-
-DESTROYED:	ax, bx, cx, dx, bp, di
-
-PSEUDO CODE/STRATEGY:
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	brianc	4/7/92		Initial revision
-	joon	7/92		PM extensions
-
-------------------------------------------------------------------------------@
-
-if not _RUDY
-
-SetMaximized	proc	far
-	;if this object is not yet VIS_BUILT, abort now. When VIS_BUILT,
-	;will do specific-UI work for maximizing.
-
-	call	VisCheckIfSpecBuilt
-	jnc	abort			;skip if not yet VIS_BUILT...
-
-					; GenDisplay's don't clear this even if
-					; they are marked with M_G_D_NOT_MAX,
-					; so this check is okay
-	call	WinClasses_DerefVisSpec_DI
-	test	ds:[di].OLWI_attrs, mask OWA_MAXIMIZABLE
-	jz	abort			;skip if not...
-
-	test	ds:[di].OLWI_specState, mask OLWSS_MAXIMIZED
-	jz 	maximize		;skip if not already maximized...
-
-abort:
-	jmp	done
-
-maximize:
-	push	ax			; save VisUpdateMode
-
-	;maximize window: save present position and size, expand to full screen
-
-	ORNF	ds:[di].OLWI_specState, mask OLWSS_MAXIMIZED
-					;set flag: prevents resize borders
-					;from appearing
-
-	call	OpenWinSwapState	;save current position, size, and
-					;state information in instance data
-
-	;now set state so that SPEC_BUILD will maximize this window,
-	;and so user can't screw things up.
-	;SAVE BYTES HERE: stuff into "previous" area before swap
-
-	call	WinClasses_DerefVisSpec_DI
-	mov	ds:[di].OLWI_winPosSizeFlags, \
-		   (WCT_NONE shl offset WPSF_CONSTRAIN_TYPE) \
-		or (WPT_AT_RATIO shl offset WPSF_POSITION_TYPE) \
-		or (WST_EXTEND_TO_BOTTOM_RIGHT shl offset WPSF_SIZE_TYPE)
-
-	mov	ds:[di].OLWI_winPosSizeState, mask WPSS_POSITION_INVALID \
-			or mask WPSS_SIZE_INVALID
-					;clear all other flags
-
-	;preserve OLWinAttrs value, except for movable and resizable flags
-
-	mov	ax, ds:[di].OLWI_prevAttrs
-	and	ax, not (mask OWA_MOVABLE or mask OWA_RESIZABLE)
-	mov	ds:[di].OLWI_attrs, ax
-
-	;set visible bounds invalid here, in case UpdateWinPosSize is not
-	;yet able to determine position and size given our new flags
-	;
-	;(changed to position the window at -1 on B/W systems in order to
-	; inset the window.  We can't do this in  UpdateWinPosition, since the 
-	; position is never actually calculated via a specSizePair (WPSS_VIS_-
-	; POS_IS_SPEC_PAIR is never set here).  -cbh 2/14/92)
-
-	clr	ax
-if	(not _MOTIF)
-	call	OpenCheckIfBW
-	jnc	dontInset
-	dec	ax
-dontInset:			
-else
-	dec	ax			;Motif always does this now, to get nice
-					;etched MDI borders in color. 12/12/92
-endif
-	
-	call	WinClasses_DerefVisSpec_DI
-if THREE_DIMENSIONAL_BORDERS
-	;
-	; Maximized windows need to hide their 3-d borders.  Make sure
-	; that the position is off-screen enough so that top & left
-	; sides don't show shadows.
-	;
-	mov	ds:[di].VI_bounds.R_right, ax
-	mov	ds:[di].VI_bounds.R_bottom, ax
-	sub	ax, THREE_D_BORDER_THICKNESS-1
-	mov	ds:[di].VI_bounds.R_left, ax
-	mov	ds:[di].VI_bounds.R_top, ax
-else
-	mov	ds:[di].VI_bounds.R_left, ax
-	mov	ds:[di].VI_bounds.R_top, ax
-	mov	ds:[di].VI_bounds.R_right, ax
-	mov	ds:[di].VI_bounds.R_bottom, ax
-endif
-	call	UpdateWinPosSize	;update window position and size if
-					;have enough info. If not, then wait
-					;until MSG_VIS_MOVE_RESIZE_WIN to
-					;do this.
-
-
-if _NIKE
-	mov	di, ds:[si]
-	add	di, ds:[di].Vis_offset
-	cmp	ds:[di].OLWI_type, MOWT_DISPLAY_WINDOW
-	jne	noTitle
-	mov	cx, ds:[di].OLDW_titleObject
-	jcxz	noTitle
-
-	push	si
-	mov	si, cx
-	mov	ax, MSG_GEN_SET_NOT_USABLE
-	mov	dl, VUM_DELAYED_VIA_UI_QUEUE
-	call	ObjCallInstanceNoLock
-	pop	si
-noTitle:
-endif
-
-if (not _PM)	; PM GenDisplays keep their title bars and icons --------------
-
-	;See if this GenDisplay is inside a GenDisplayGroup.
-
-	push	si, es
-	call	GenSwapLockParent	; *ds:si = parent, bx = our block
-EC <	ERROR_NC	OL_ERROR					>
-	mov	di, segment GenDisplayGroupClass
-	mov	es, di
-	mov	di, offset GenDisplayGroupClass
-	call	ObjIsObjectInClass	; carry set if GenDisplayGroup
-	call	ObjSwapUnlock		; (preserves carry)
-	pop	si, es
-	jnc	updateWindow		;skip if not in DC...
-
-	;This is a GenDisplay within a GenDisplayGroup: turn off our title
-	;bar and nuke the icons up there.
-
-	call	WinClasses_DerefVisSpec_DI
-
-CUAS <	ANDNF	ds:[di].OLWI_attrs, not (mask OWA_HEADER or mask OWA_TITLED or mask OWA_HAS_SYS_MENU) >
-
-if _CUA_STYLE	;--------------------------------------------------------------
-	;This could be improved. We are trying to defeat
-	;OpenWinCalcWinHdrGeometry
-
-	push	si, dx
-	call	WinClasses_DerefVisSpec_DI
-	mov	bx, ds:[di].OLWI_sysMenu
-	tst	bx
-	jz	afterDisable
-	mov	si, ds:[di].OLWI_sysMenuButton
-	call	ObjSwapLock
-
-if not _REDMOTIF ;----------------------- Not needed for Redwood project
-	call	DisableSysMenuIcon
-	mov	si, offset SMI_MinimizeIcon
-	call	DisableSysMenuIcon
-	mov	si, offset SMI_MaximizeIcon
-	call	DisableSysMenuIcon
-	mov	si, offset SMI_RestoreIcon
-	call	DisableSysMenuIcon
-endif ;not _REDMOTIF ;------------------- Not needed for Redwood project
-
-	call	ObjSwapUnlock
-afterDisable:
-	pop	si, dx
-endif		;--------------------------------------------------------------
-
-endif		; if (not _PM) ------------------------------------------------
-
-updateWindow:
-	pop	dx				; restore update mode
-	mov	ax, MSG_VIS_VUP_UPDATE_WIN_GROUP
-	call	WinClasses_ObjCallInstanceNoLock
-
-done:
-	ret
-SetMaximized	endp
-
-if not _REDMOTIF ;----------------------- Not needed for Redwood project
-if _CUA_STYLE	;--------------------------------------------------------------
-DisableSysMenuIcon	proc	near
-	tst	si
-	jz	done
-	mov	cx, (mask VA_DRAWABLE or mask VA_DETECTABLE) shl 8
-	mov	ax, MSG_VIS_SET_ATTRS
-	mov	dl, VUM_MANUAL			;object will be updated later
-	call	WinClasses_ObjCallInstanceNoLock
-done:
-	ret
-DisableSysMenuIcon	endp
-endif		;--------------------------------------------------------------
-endif ;not _REDMOTIF ;------------------- Not needed for Redwood project
-
-endif 	;not _RUDY
-
-
-COMMENT @----------------------------------------------------------------------
-
-FUNCTION:	OLMenuedWinSetNotMaximized -- MSG_GEN_DISPLAY_SET_NOT_MAXIMIZED
-
-DESCRIPTION:	Handle what the specific-UI thinks un-MAXIMIZED means.
-
-CALLED BY:	
-
-PASS:		ds:*si	- instance data
-
-RETURN:		ds, si = same
-
-DESTROYED:	?
-
-PSEUDO CODE/STRATEGY:
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	Eric	10/89		initial version
-	brianc	3/5/92		Changed to MSG_GEN_DISPLAY_SET_NOT_MAXIMIZED
-					handler
-
-------------------------------------------------------------------------------@
-
-if not _RUDY		;not needed in Rudy
-
-OLMenuedWinSetNotMaximized	method dynamic	OLMenuedWinClass,
-					MSG_GEN_DISPLAY_SET_NOT_MAXIMIZED
-	mov	al, VUM_NOW
-	GOTO	SetNotMaximized
-OLMenuedWinSetNotMaximized	endm
-
-OLMenuedWinInternalSetNotMaximized	method dynamic	OLMenuedWinClass,
-					MSG_GEN_DISPLAY_INTERNAL_SET_OVERLAPPING
-	mov	al, dl			; al = VisUpdateMode
-	FALL_THRU	SetNotMaximized
-OLMenuedWinInternalSetNotMaximized	endm
-
-SetNotMaximized	proc	far
-
-	;if this object is not yet VIS_BUILT, abort now. When VIS_BUILT,
-	;will do specific-UI work for un-maximizing.
-
-	call	VisCheckIfSpecBuilt
-	jnc	done			;skip if not yet VIS_BUILT...
-
-	test	ds:[di].OLWI_specState, mask OLWSS_MAXIMIZED
-	jz	done			;skip if already not maximized...
-
-	push	ax			; save VisUpdateMode
-
-;unMaximize:
-	;unmaximize window: restore previous position and size
-
-	ANDNF	ds:[di].OLWI_specState, not mask OLWSS_MAXIMIZED
-
-	call	OpenWinSwapState	;restore previous position, size, and
-					;state information in instance data
-
-	;in case this window was MAXIMIZED when first VIS_BUILT,
-	;must create the system menu icons now. (Do this before the
-	;MSG_VIS_VUP_UPDATE_WIN_GROUP)
-	
-CUAS <	mov	bp, mask SBF_IN_UPDATE_WIN_GROUP or mask SBF_WIN_GROUP \
-							or VUM_NOW	>
-CUAS <	call	OpenWinEnsureSysMenu					>
-CUAS <	call	OpenWinEnsureSysMenuIcons				>
-
-	;first: if the visible bounds for this object are actually
-	;ratios of the Parent/Field window, convert to pixel coordinates now.
-	;(This is VITAL if the window was originally opened maximized, and
-	;so its _prevBounds has held ratios and not pixel values.)
-
-	call	ConvertSpecWinSizePairsToPixels
-
-	;set the position and size of this window INVALID so that
-	;UpdateWinPosSize will re-stuff the visible bounds according to
-	;the WST_AS_DESIRED or WPT_STAGGER, etc, flags.
-
-	call	WinClasses_DerefVisSpec_DI
-	ORNF	ds:[di].OLWI_winPosSizeState, mask WPSS_POSITION_INVALID \
-					   or mask WPSS_SIZE_INVALID
-
-	;now update the window according to hints passed from the application
-	;or specific-ui determined behavior. IMPORTANT: if this sets
-	;visible size = 4000h (DESIRED), it will set geometry invalid
-	;so that this is converted into a pixel value before we try to display
-	;or convert into a Ratio as window closes...
-
-	call	UpdateWinPosSize	;update window position and size if
-					;have enough info. If not, then wait
-					;until OpenWinOpenWin to;do this.
-
-if _NIKE
-	mov	di, ds:[si]
-	add	di, ds:[di].Vis_offset
-	cmp	ds:[di].OLWI_type, MOWT_DISPLAY_WINDOW
-	jne	noTitle
-	mov	cx, ds:[di].OLDW_titleObject
-	jcxz	noTitle
-
-	push	si
-	mov	si, cx
-	mov	ax, MSG_GEN_SET_USABLE
-	mov	dl, VUM_DELAYED_VIA_UI_QUEUE
-	call	ObjCallInstanceNoLock
-	pop	si
-noTitle:
-endif
-
-	;Mark everything as invalid: will cause SPEC_BUILD of window,
-	;which will use new positioning and size flags, and will
-	;enable the MAXIMIZE menu item.
-
-	call	VisMarkFullyInvalid
-
-	pop	dx			; dl = VisUpdateMode
-	mov	ax, MSG_VIS_VUP_UPDATE_WIN_GROUP
-	call	WinClasses_ObjCallInstanceNoLock
-
-done:
-	ret
-SetNotMaximized	endp
-
-endif
-
-
-
-
-COMMENT @----------------------------------------------------------------------
-
-METHOD:		OLMenuedWinRestoreWin -- MSG_OL_RESTORE_WIN
-
-DESCRIPTION:	This method is sent when the user selects "restore"
-		from the window's system menu, or when he clicks on the
-		Minimize icon.
-
-		We have to decide if this means "un-maximize" or "un-iconify",
-		and send the correct generic method back to this object,
-		so that the Generic UI and this specific UI can work
-		together to do the right thing.
-
-PASS:		*ds:si - instance data
-		es - segment of OLMenuedWinClass
-
-		ax	- MSG_OL_RESTORE_WIN
-		cx, dx	- ?
-		bp	- ?
-
-RETURN:		carry - ?
-		ax, cx, dx, bp - ?
-
-DESTROYED:	?
-
-PSEUDO CODE/STRATEGY:
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	Eric	11/89		Initial version
-	brianc	3/5/92		moved from OLWin to OLMenuedWin
-
-------------------------------------------------------------------------------@
-
-OLMenuedWinRestoreWin	method dynamic	OLMenuedWinClass, MSG_OL_RESTORE_WIN
-
-	test	ds:[di].OLWI_fixedAttr, mask OWFA_RESTORABLE
-	jz	done			; not restorable, do nothing
-
-	mov	ax, MSG_GEN_DISPLAY_SET_NOT_MINIMIZED
-					;assume window is minimized
-
-	test	ds:[di].OLWI_specState, mask OLWSS_MINIMIZED
-	jnz	OWRW_50			;skip if is minimized...
-
-	;This window must be MAXIMIZED, since the RESTORE function was enabled.
-
-	mov	ax, MSG_GEN_DISPLAY_SET_NOT_MAXIMIZED
-
-OWRW_50:
-	call	WinClasses_ObjCallInstanceNoLock
-done:
-	ret
-OLMenuedWinRestoreWin	endp
-
-
-
-COMMENT @----------------------------------------------------------------------
-
-METHOD:		OLMenuedWinGupQuery -- MSG_SPEC_GUP_QUERY for OLMenuedWinClass
-
-DESCRIPTION:	Respond to a query traveling up the generic composite tree
-
-PASS:
-	*ds:si - instance data
-	es - segment of OLMenuedWinClass
-
-	ax - MSG_SPEC_GUP_QUERY
-	cx - Query type (GenQueryTypes or SpecGenQueryTypes)
-	dx -?
-	bp - OLBuildFlags
-RETURN:
-	carry - set if query acknowledged, clear if not
-	bp - OLBuildFlags
-	cx:dx - vis parent
-
-DESTROYED:
-	bx, si, di, ds, es
-
-REGISTER/STACK USAGE:
-
-PSEUDO CODE/STRATEGY:
-
-	WARNING: see OLMapGroup for up-to-date details
-
-	if (query = SGQT_BUILD_INFO) {
-		;Is below a window with a menu bar or trigger bar. Note that
-		;if this window has GenFile or GenEdit type objects, then
-		;the menu bar will already have been created.
-		;(The important thing is we don't want GenTriggers with
-		;HINT_FILE, etc, forcing the creation of a menu bar just to
-		;find that there is no GenFile-type object to grab the Trigger.
-		;OpenLook: all GenTriggers go into menu bar.
-
-	    if (MENUABLE or HINT_SEEK_MENU_BAR
-				or (OL and not HINT_AVOID_MENU_BAR) )
-		and (menu not created yet) {
-			create menu
-	    }
-
-	    if (menu bar has been created) and (not HINT_AVOID_MENU_BAR) {
-	        MSG_SPEC_GUP_QUERY(menu bar, SGQT_BUILD_INFO);
-		if (menu bar returned TOP_MENU or SUB_MENU true) {
-	    	    return(stuff from parent)
-		}
-
-	    ;Return NULL so that GenParent will be used as visParent.
-	    TOP_MENU = 0;
-	    SUB_MENU = 0;
-	    visParent = NULL;
-
-	} else {
-		send query to superclass (will send to generic parent)
-	}
-
-KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	Eric	7/89		Initial version
-
-------------------------------------------------------------------------------@
-
-OLMenuedWinGupQuery	method	dynamic OLMenuedWinClass, MSG_SPEC_GUP_QUERY
-	cmp	cx, SGQT_BUILD_INFO		;can we answer this query?
-	je	buildInfo			;skip if so...
-
-	cmp	cx, SGQT_FIND_MENU_BAR
-	je	findMenuBar
-
-	;we can't answer this query: call super class to handle
-
-	call	WinClasses_ObjCallSuperNoLock_OLMenuedWinClass
-	ret
-
-findMenuBar:
-	mov	cx, ds:[LMBH_handle]
-	mov	dx, ds:[di].OLMDWI_menuBar	;may be null
-	stc
-	ret
-
-buildInfo:
-	;Don't build menu bar if this is a custom window
-
-	test	ds:[di].OLWI_moreFixedAttr, mask OWMFA_CUSTOM_WINDOW
-	jnz	afterMenuBar
-
-	;see if we want to create a menu bar
-	;OpenLook defaults to placing trigger in the menu bar, unless there
-	;is a HINT to prevent it. CUA/Motif default to placing the trigger
-	;in the TriggerBar, unless hints say otherwise, or is case where
-	;trigger is looking for a specific menu, such as the file menu.
-	;(Rudy, menus are dialog boxes, leave it up to programmer.)
-	;
-	test	bp, mask OLBF_MENUABLE	;can object be placed in a menu?
-	jnz	createMenuBar		;skip if so...
-
-	;Is not MENUABLE, or seeking specific menu. OpenLook defaults to place
-	;item in menu bar. CUA and MOTIF prefer it to be in the trigger bar.
-
-OLS <	test	bp, mask OLBF_AVOID_MENU_BAR ;is hint present?		>
-OLS <	jnz	afterMenuBar		;skip if so...			>
-
-CUAS <	test	bp, mask OLBF_SEEK_MENU_BAR ;is hint present?		>
-CUAS <	jz	afterMenuBar		;skip if not so...		>
-
-createMenuBar: ;create a menu bar object
-	;Does menu exist yet?
-
-	tst	ds:[di].OLMDWI_menuBar
-	jnz	menuBarExists
-
-	push	bp
-
-if MENU_BAR_IS_A_MENU
-
-	call	OLMenuedWinCreateMenuBar
-	call	WinClasses_DerefVisSpec_DI
-else
-	mov	di, offset OLMenuBarClass
-	call	OpenWinCreateBarObject		;creates object, sets visible
-						;parent = this OLWinClass obj,
-						;and sends SPEC_BUILD to object
-						;if this OLWinClass has already
-						;been visbuilt.
-	call	WinClasses_DerefVisSpec_DI
-	mov	ds:[di].OLMDWI_menuBar, ax	;save handle of menu bar object
-
-endif	;MENU_BAR_IS_A_MENU
-
-if	(0)	; Having a little fun w/colors
-	push	ax, bx, si
-	mov	si, ax
-	mov	ax, HINT_GADGET_BACKGROUND_COLORS 
-	call	ObjVarAddData
-	mov	ds:[bx].BC_unselectedColor1, C_LIGHT_GRAY
-	mov	ds:[bx].BC_unselectedColor2, C_WHITE
-	mov	ds:[bx].BC_selectedColor1, C_DARK_GRAY
-	mov	ds:[bx].BC_selectedColor2, C_DARK_GRAY
-	pop	ax, bx, si
-endif
-
-	;set OLWinClass = vertical composite
-
-if _RUDY
-	ANDNF	ds:[di].VCI_geoAttrs, not mask VCGA_ORIENT_CHILDREN_VERTICALLY
-else
-	ORNF	ds:[di].VCI_geoAttrs, mask VCGA_ORIENT_CHILDREN_VERTICALLY
-endif
-	pop	bp
-
-menuBarExists:
-	;send query to the menu bar
-
-if MENU_BAR_IS_A_MENU
-
-	; There is no menu bar in Odie so we'll have to handle the query here.
-
-	test	bp, mask OLBF_MENUABLE or mask OLBF_SEEK_MENU_BAR or \
-		    mask OLBF_MENU_IN_DISPLAY
-	jz	afterMenuBar		; are we menuable or seeking menu bar
-
-	mov	cx, ds:[LMBH_handle]
-	mov	dx, ds:[di].OLMDWI_menuBar
-	or	bp, OLBR_TOP_MENU shl offset OLBF_REPLY
-	jmp	done
-else
-	push	si
-	mov	si, ds:[di].OLMDWI_menuBar
-	mov	ax, MSG_BAR_BUILD_INFO
-	call	WinClasses_ObjCallInstanceNoLock	;returns updated bp
-	pop	si
-
-	mov	bx, bp
-	ANDNF	bx, mask OLBF_REPLY
-	cmp	bx, OLBR_TOP_MENU shl offset OLBF_REPLY
-	LONG jz	done
-	cmp	bx, OLBR_SUB_MENU shl offset OLBF_REPLY
-	LONG jz	done			;skip if parent grabbed...
-
-endif	;MENU_BAR_IS_A_MENU
-
-afterMenuBar:
-	clr	cx				;return NULL
-						;so that GenParent will
-						;be used as visParent
-
-done:
-	stc				;query answered
-	ret
-OLMenuedWinGupQuery	endp
-
-
-COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		OLMenuedWinCreateMenuBar
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-SYNOPSIS:	Create menu bar object - the menu bar is itself a menu
-
-CALLED BY:	OLMenuedWinGupQuery
-PASS:		*ds:si	= OLMenuedWinClass object
-RETURN:		nothing
-DESTROYED:	nothing
 SIDE EFFECTS:	
 
 PSEUDO CODE/STRATEGY:
@@ -2055,209 +466,1993 @@ PSEUDO CODE/STRATEGY:
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
-	Joon	6/10/96    	Initial version
+	JS	8/24/92		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if MENU_BAR_IS_A_MENU
 
-OLMenuedWinCreateMenuBar	proc	near
-	uses	bx,cx,dx,si,di,bp
-	.enter
 
-	mov	dx, si				;*ds:dx = OLMenuedWin
-	mov	di, segment GenInteractionClass
-	mov	es, di
-	mov	di, offset GenInteractionClass	;instantiate a GenInteraction
-	mov	ax, 0ffffh			;one-way upward & usable
-	mov	bx, HINT_AVOID_MENU_BAR		;avoid menu bar
-	mov	cx, ds:[LMBH_handle]		;instantiate in this block
-	clr	bp				;no CompChildFlags
-	call	OpenCreateChildObject		;^lcx:dx = GenInteraction
+MenuBuild_DerefGen_DI	proc	near	
+	mov	di, ds:[si]			
+	add	di, ds:[di].Gen_offset
+	ret	
+MenuBuild_DerefGen_DI	endp
 
-	call	WinClasses_DerefVisSpec_DI
-	mov	ds:[di].OLMDWI_menuBar, dx	;save handle of menu bar object
+if not	(_DISABLE_APP_EXIT_UI)
 
-	mov	cx, (C_DARK_GRAY shl 8) or C_LIGHT_GRAY
-	mov	ax, HINT_GADGET_BACKGROUND_COLORS
-	call	ObjVarFindData
-	jnc	getBuildFlags
-;	mov	cl, ds:[bx].BC_unselectedColor1
-;	mov	ch, ds:[bx].BC_selectedColor1
-	;
-	; if we have a custom background color for the title bar (which is
-	; what HINT_GADGET_BACKGROUND_COLORS on a menued window does), we'll
-	; use the selected (i.e. focused color) for the unselected menu color
-	; to give the menu button the right background color.  We'll invert
-	; that for the selected menu color.
-	;
-	mov	cl, ds:[bx].BC_selectedColor1	; menu's unselected color
-	mov	ch, cl
-	not	ch				; menu's selected color
-	and	ch, 0x0f			; low nibble only
+MenuBuild_ObjMessageCallFixupDS	proc	near
+	mov	di, mask MF_CALL or mask MF_FIXUP_DS 
+	call	ObjMessage
+	ret
+MenuBuild_ObjMessageCallFixupDS	endp
 
-getBuildFlags:
-	clr	bp
-	call	VisCheckIfFullyEnabled
-	jnc	build
-	ornf	bp, mask SBF_VIS_PARENT_FULLY_ENABLED
-
-build:
-	mov	si, dx				;*ds:si = GenInteraction
-	call	WinClasses_DerefGen_DI
-	mov	ds:[di].GII_visibility, GIV_POPUP ; visibility = popup
-
-	mov	dx, cx				;dx = Background color
-	clr	cx
-	mov	ax, HINT_SEEK_TITLE_BAR_RIGHT
-	call	ObjVarAddData
-	mov	ax, HINT_CAN_CLIP_MONIKER_HEIGHT
-	call	ObjVarAddData
-	mov	ax, HINT_EXPAND_HEIGHT_TO_FIT_PARENT
-	call	ObjVarAddData
-	mov	ax, HINT_ORIENT_CHILDREN_HORIZONTALLY
-	call	ObjVarAddData
-	mov	ax, HINT_MENU_BAR
-	call	ObjVarAddData
-
-	mov	ax, HINT_GADGET_BACKGROUND_COLORS
-	mov	cx, size BackgroundColors
-	call	ObjVarAddData
-	mov	ds:[bx].BC_unselectedColor1, dl
-	mov	ds:[bx].BC_unselectedColor2, dl
-	mov	ds:[bx].BC_selectedColor1, dh
-	mov	ds:[bx].BC_selectedColor2, dh
-
-	push	bp
-	mov	ax, MSG_GEN_REPLACE_VIS_MONIKER_OPTR
-	mov	cx, handle MenuBarMoniker
-	mov	dx, offset MenuBarMoniker
-	mov	bp, VUM_MANUAL
-	call	ObjCallInstanceNoLock
-	pop	bp
-
-	push	bp
-	mov	ax, MSG_SPEC_BUILD
-	call	ObjCallInstanceNoLock
-	pop	bp
-	;
-	; let's build the win group too, so menu items can be set
-	; usable (and correctly attached to menu bar via spec-build)
-	; before the menu bar is opened
-	;
-	ornf	bp, mask SBF_WIN_GROUP
-	mov	ax, MSG_SPEC_BUILD
-	call	ObjCallInstanceNoLock
-
-	mov	ax, HINT_INTERACTION_ACTIVATED_BY
-	call	ObjVarDeleteData		; delete activated_by vardata
-
-	call	WinClasses_DerefVisSpec_DI
-	mov	si, ds:[di].OLPWI_button
-	call	WinClasses_DerefVisSpec_DI
-	ornf	ds:[di].OLBI_moreAttrs, mask OLBMA_IN_TOOLBOX 
-	ornf	ds:[di].OLBI_specState, mask OLBSS_SYS_ICON
-	andnf	ds:[di].OLBI_specState, not mask OLBSS_MENU_DOWN_MARK
-if _ODIE and DRAW_STYLES
-	;
-	; set flat draw style and no border for menu bar menu button
-	;
-	mov	ds:[di].OLBI_drawStyle, DS_FLAT
-	andnf	ds:[di].OLBI_specState, not mask OLBSS_BORDERED
 endif
 
-	.leave
-	ret
-OLMenuedWinCreateMenuBar	endp
-
-endif	; MENU_BAR_IS_A_MENU
 
 
-COMMENT @----------------------------------------------------------------------
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		OLMenuWinVisAddChild
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-FUNCTION:	OpenWinCreateBarObject
+SYNOPSIS:	Intercept MSG_VIS_ADD_CHILD to place the standard system
+		menu at the correct position in the app provided sys menu
 
-DESCRIPTION:	This procedure creates a trigger or menu bar object,
-		sets its visible parent, and sends a SPEC_BUILD on to
-		it if necessary.
+CALLED BY:	MSG_VIS_ADD_CHILD
+PASS:		*ds:si	= OLMenuWinClass object
+		ds:di	= OLMenuWinClass instance data
+		ds:bx	= OLMenuWinClass object (same as *ds:si)
+		es 	= segment of OLMenuWinClass
+		ax	= message #
 
-CALLED BY:	OLMenuedWinGupQuery, OLMenuBarBuildInfo
+RETURN:		cx, dx	= unchanged
 
-PASS:		ds - handle of block to create object in
-		es:di	= class of object to create (OLTriggerBarClass
-				or OLMenuBarObject)
+DESTROYED:	ax, bp
 
-RETURN:		ds, si = same
-		ax	= handle of bar object
-
-DESTROYED:	bx, cx, dx, bp
+SIDE EFFECTS:	
 
 PSEUDO CODE/STRATEGY:
 
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
-	Eric	10/89		initial version
+	JS	8/30/92   	Initial version
+	brianc	10/8/92		force Exit to end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OLMenuWinVisAddChild	method dynamic OLMenuWinClass, MSG_VIS_ADD_CHILD
+	uses	bp
+	.enter
+
+
+	mov	di, offset OLMenuWinClass
+	call	ObjCallSuperNoLock
+
+	;
+	; after adding whatever it was we added, make sure the Exit trigger
+	; is last
+	;	*ds:si = OLMenuWin
+	;	^lcx:dx = child added
+	;
+	call	MenuBuild_DerefVisSpec_DI
+	test	ds:[di].OLMWI_specState, mask OMWSS_EXIT_CREATED
+	jz	noExit
+	mov	ax, ATTR_OL_MENU_WIN_EXIT_TRIGGER
+	call	ObjVarFindData			; carry set if found
+	jnc	noExit
+	push	cx, dx				; save child for exit
+	mov	cx, ({optr} ds:[bx]).handle	; ^lcx:dx = exit trigger if any
+	mov	dx, ({optr} ds:[bx]).chunk
+	mov	ax, MSG_VIS_MOVE_CHILD
+	mov	bp, CCO_LAST			; move to end, not dirty
+	call	ObjCallInstanceNoLock
+	pop	cx, dx				; restore child for return
+noExit:
+
+	.leave
+	ret
+OLMenuWinVisAddChild	endm
+
+
+if _MENUS_PINNABLE	;------------------------------------------------------
+if _CUA_STYLE		;------------------------------------------------------
+
+
+COMMENT @----------------------------------------------------------------------
+
+FUNCTION:	OLMenuWinEnsurePinTrigger
+
+DESCRIPTION:	Create a pushpin trigger, if one is needed & doesn't yet
+		exist.
+
+CALLED BY:	INTERNAL
+		OLMenuWinUpdateSpecBuild
+
+PASS:		*ds:si	- 	OLMenuWin objec
+
+RETURN:		nothing
+
+DESTROYED:	ax, bx, cx, dx, bp, di
+
+REGISTER/STACK USAGE:
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Doug	5/92		Added header
+------------------------------------------------------------------------------@
+
+
+OLMenuWinEnsurePinTrigger	proc	far
+	class	OLMenuWinClass
+	.enter
+
+	;see if we already have a PinTrigger object for this menu
+
+	call	MenuBuild_DerefVisSpec_DI
+	test	ds:[di].OLWI_attrs, mask OWA_PINNABLE
+	jz	done				;skip if not pinnable...
+	test	ds:[di].OLWI_specState, mask OLWSS_PINNED
+	jnz	done				;skip if already pinned...
+
+	tst	ds:[di].OLPWI_pinTrigger	;See if already created
+	jnz	done				;skip to end if so...
+
+	;create a group to hold pin trigger
+
+	push	es, si
+	mov	cx, ds:[LMBH_handle]
+	mov	dx, si				; add to ourselves
+	mov	di, segment GenInteractionClass
+	mov	es, di
+	mov	di, offset GenInteractionClass
+	mov	ax, -1				; init USABLE, one-way up link
+	mov	bx, 0				; no hints
+	mov	bp, 0				; ignore dirty
+	call	OpenCreateChildObject		; ^lcx:dx = new object
+	pop	es, si
+	call	MenuBuild_DerefVisSpec_DI
+	mov	ds:[di].OLPWI_pinTrigger, dx	; save chunk handle, so we
+						; can find it later.
+	push	dx				; save again for short term use
+
+	push	si				; save OLMenuWin chunk
+
+EC <	cmp	cx, ds:[LMBH_handle]					>
+EC <	ERROR_NE	OL_ERROR					>
+	mov	si, dx				; *ds:si = pin group
+	mov	bp, mask SBF_IN_UPDATE_WIN_GROUP or mask SBF_TREE_BUILD or \
+			mask SBF_VIS_PARENT_FULLY_ENABLED or VUM_NOW
+	mov	ax, MSG_SPEC_BUILD_BRANCH
+	call	ObjCallInstanceNoLock
+
+	;create a GenTrigger object, and place at the top of this menu
+	;	*ds:si = pin group (parent for pin trigger)
+
+	mov	cx, ds:[LMBH_handle]
+	pop	dx				; ^lcx:dx = *ds:dx = OLMenuWin
+						;	(destination of message)
+	push	dx				; save OLMenuWin chunk again
+	mov	ax, MSG_OL_POPUP_TOGGLE_PUSHPIN	; action message
+	mov	di, handle PinMoniker		; VisualMoniker to use
+	mov	bp, offset PinMoniker
+	mov	bx, ATTR_GEN_TRIGGER_IMMEDIATE_ACTION	; hint to add
+	clc					; full gen linkage
+						; (we use this when we destroy
+						;	the pin group/trigger)
+	call	OpenCreateChildTrigger		; ^lcx:dx = new trigger
+
+	;now since we had virtually no control over where this object
+	;was placed in the visible tree, move it to be the first child now.
+
+	pop	si				; *ds:si = OLMenuWin
+	mov	cx, ds:[LMBH_handle]		; ^lcx:dx = pin group
+	pop	dx
+	mov	bp, CCO_FIRST		;make it the first child
+	mov	ax, MSG_VIS_MOVE_CHILD
+	call	ObjCallInstanceNoLock
+
+done:
+	.leave
+	ret
+OLMenuWinEnsurePinTrigger	endp
+
+endif		;--------------------------------------------------------------
+endif		;--------------------------------------------------------------
+
+
+COMMENT @----------------------------------------------------------------------
+
+FUNCTION:	EnsureFileExit
+
+DESCRIPTION:	If this is GenInteraction is marked with
+		ATTR_GEN_INTERACTION_GROUP_TYPE {GIGT_FILE_MENU},
+		make sure we have an Exit item.
+
+CALLED BY:	INTERNAL
+			OLMenuWinUpdateSpecBuild
+
+PASS:
+	*ds:si	- OLDialogWin object
+
+RETURN:
+	nothing
+
+DESTROYED:
+	ax, bx, cx, dx, di, bp
+
+REGISTER/STACK USAGE:
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	brianc	5/13/92		Initial version
+	VL	7/11/95		Comment out this proc if
+				_DISABLE_APP_EXIT_UI if true.
 
 ------------------------------------------------------------------------------@
+EnsureFileExit	proc	near	
+	; Don't want a File Exit if _DISABLE_APP_EXIT_UI is true.
+if not	(_DISABLE_APP_EXIT_UI) ;-----------------------------------------------
+	uses	si
+	.enter
 
-OpenWinCreateBarObject	proc	far
-	push	si				;save handle of OLWinClass
-	mov	bx, ds:[LMBH_handle]		;pass block to place obj in
-	call	GenInstantiateIgnoreDirty	;create object
-						;(returns si = bar object)
+	call	MenuBuild_DerefVisSpec_DI
+	test	ds:[di].OLMWI_specState, mask OMWSS_FILE_MENU
+	LONG jz	done
+	;
+	; do not create Exit trigger if we are running in UILM_TRANSPARENT
+	; mode and we are not a Desk Accessory
+	; Changed to allow .ini-file override via UILO_CLOSABLE_APPS flag
+	;  (9/9/93 -atw)
 
-	mov	cx, ds:[LMBH_handle]		;pass cx:dx = parent obj
-	pop	dx				;(parent of new object)
-	push	dx				;save handle of parent
-	mov	ax, MSG_OL_CTRL_SET_VIS_PARENT
-	call	WinClasses_ObjCallInstanceNoLock	;set vis parent of object
+	call	UserGetLaunchModel		; ax = UILaunchModel
+	cmp	ax, UILM_TRANSPARENT
+	jne	addExit				; not UILM_TRANSPARENT, add
+	call	UserGetLaunchOptions
+	test	ax, mask UILO_CLOSABLE_APPS	;In transparent mode, but 
+	jnz	addExit				; override flag present, so add
+						; exit trigger.
+	mov	ax, MSG_GEN_APPLICATION_GET_LAUNCH_FLAGS
+	call	GenCallApplication		; al = AppLaunchFlags
+	test	al, mask ALF_DESK_ACCESSORY
+	LONG jz	done				; not DA, no Exit item
+addExit:
+	;
+	; this is file menu and we want to add Exit trigger
+	;
+	mov	ax, ATTR_OL_MENU_WIN_EXIT_TRIGGER
+	call	ObjVarFindData			; carry set if found
+	mov	cx, ({optr} ds:[bx]).handle	; ^lcx:dx = exit trigger if any
+	mov	dx, ({optr} ds:[bx]).chunk
+	jc	haveTrigger
+	push	es
+	mov	cx, ds:[LMBH_handle]		; add to this object
+	mov	dx, si
+	mov	di, segment GenTriggerClass
+	mov	es, di
+	mov	di, offset GenTriggerClass
+	mov	al, -1				; init USABLE
+	mov	ah, -1				; one-way upward generic link
+	clr	bx
+	mov	bp, CCO_LAST			; (not dirty)
+	call	OpenCreateChildObject		; ^lcx:dx = new trigger
+	pop	es
+	push	si, cx, dx			; save OLMenuWin
+	mov	si, dx				; *ds:si = new trigger
+	mov	ax, ATTR_GEN_TRIGGER_INTERACTION_COMMAND or \
+						mask VDF_SAVE_TO_STATE
+	mov	cx, size InteractionCommand
+	call	ObjVarAddData			; ds:dx = pointer to extra data
+	mov	{InteractionCommand} ds:[bx], IC_EXIT
+	mov	ax, si				; *ds:ax = exit trigger
+	mov	bx, mask OCF_DIRTY shl 8
+	call	ObjSetFlags			; undo dirtying by ObjVarAddData
+	clr	bp				; basic build
+	call	VisSendSpecBuild		; build it
+	pop	si, cx, dx			; *ds:si = OLMenuWin
+	call	SaveExitTriggerInfo		; preserves cx, dx
+	call	MenuBuild_DerefVisSpec_DI
+	ornf	ds:[di].OLMWI_specState, mask OMWSS_EXIT_CREATED
+haveTrigger:
+	;
+	; ^lcx:dx = exit trigger
+	;
+	mov	bx, cx
+	mov	si, dx
+	mov	ax, MSG_GEN_GET_VIS_MONIKER
+	call	MenuBuild_ObjMessageCallFixupDS	; ax = moniker (if any)
+	tst	ax
+	LONG jnz	done				; have moniker already
+if _MOTIF or _ISUI
+	mov	dx, -1			; get appname from app
+	mov	bp, (VMS_TEXT shl offset VMSF_STYLE) or mask VMSF_COPY_CHUNK
+	mov	cx, ds:[LMBH_handle]	; copy into menu block
+	mov	ax, MSG_GEN_FIND_MONIKER
+	call	MenuBuild_ObjMessageCallFixupDS	; ^lcx:dx = moniker (call trig.)
+	LONG jcxz	exitDone		; not found leave plain "Exit" moniker
+	mov	di, dx
+	mov	di, ds:[di]		; ds:di = app name moniker
+	test	ds:[di].VM_type, mask VMT_GSTRING
+	jnz	monikerDone		; carry clear
 
-	mov	ax, si				;save handle of menu bar
-	pop	si				;get handle of parent
-
-	;if window has been specifically built, spec build the menu bar
-
-	call	VisCheckIfSpecBuilt
-	jnc	OWCBO_endCreate			;skip if not vis built...
-
-	;we need to "Vis build" this visible object
-
-	clr	bp
-	call	VisCheckIfFullyEnabled
-	jnc	10$				;not fully enabled, branch
-	or	bp, mask SBF_VIS_PARENT_FULLY_ENABLED
-10$:
-	push	si
-	mov	si, ax				;si = handle of bar object
-	mov	ax, MSG_SPEC_BUILD		;and spec build it
-	call	WinClasses_ObjCallInstanceNoLock
-	mov	ax, si				;ax = bar object
-	pop	si
-
-OWCBO_endCreate:
+	push	si, es, bx
+	mov	bx, handle StandardMonikers
+	call	ObjLockObjBlock
+	mov	es, ax
+	mov	di, offset FileExitMoniker
+	mov	di, es:[di]
+	mov	bl, es:[di].VM_data.VMT_mnemonicOffset
+	add	di, offset VM_data.VMT_text
+	push	bx
+	push	di
+	LocalStrLength includeNull	; cx = length w/null (for separator)
+	pop	di
+	mov	ax, dx
+	mov	bx, offset VM_data.VMT_text
+DBCS <	shl	cx, 1						>
+	call	LMemInsertAt		; insert space in app name chunk for Exit
+DBCS <	shr	cx, 1						>
+	pop	bx			; bl = mnemonic offset
+	mov	si, di	
+	mov	di, dx
+	mov	di, ds:[di]
+	mov	ds:[di].VM_width, 0	; recompute size
+	mov	ds:[di].VM_data.VMT_mnemonicOffset, bl
+	add	di, offset VM_data.VMT_text
+	segxchg	ds, es			; ds:si = "Exit"  es:di = app name
+	LocalCopyString			; insert "Exit" before app name
+	segmov	ds, es			; ds:di = app name
+	mov	{TCHAR}ds:[di-(size TCHAR)], C_SPACE	; separator
+	mov	bx, handle StandardMonikers
+	call	MemUnlock		; unlock moniker resource
+	pop	si, es, bx
+	mov	cx, ds:[LMBH_handle]
+	mov	bp, VUM_MANUAL
+	push	dx
+	mov	ax, MSG_GEN_REPLACE_VIS_MONIKER_OPTR
+	call	MenuBuild_ObjMessageCallFixupDS
+	pop	dx
+	stc				; moniker already set
+monikerDone:
+	pushf
+	mov	ax, dx
+	call	LMemFree
+	popf
+	jc	short afterExit
+exitDone:
+endif
+	mov	cx, handle StandardMonikers
+	mov	dx, offset FileExitMoniker
+setMoniker::
+	mov	bp, VUM_MANUAL
+	mov	ax, MSG_GEN_REPLACE_VIS_MONIKER_OPTR
+	call	MenuBuild_ObjMessageCallFixupDS
+afterExit::
+	;
+	; do keyboard shortcut
+	;
+	mov	ax, MSG_GEN_GET_KBD_ACCELERATOR
+	call	MenuBuild_ObjMessageCallFixupDS
+	tst	cx
+	jnz	done				; something set already
+if DBCS_PCGEOS
+	mov	cx, KeyboardShortcut <0, 0, 0, 0, C_SYS_F3 and mask KS_CHAR>
+else
+	mov	cx, KeyboardShortcut <0, 0, 0, 0, 0xf, VC_F3>
+endif
+	mov	dl, VUM_MANUAL
+	mov	ax, MSG_GEN_SET_KBD_ACCELERATOR
+	call	MenuBuild_ObjMessageCallFixupDS
+done:
+	.leave
+endif	;not (_DISABLE_APP_EXIT_UI) -------------------------------------------
 	ret
-OpenWinCreateBarObject	endp
+EnsureFileExit	endp
+
+;
+; pass:
+;	*ds:si = OLMenuWin
+;	^lcx:dx = exit trigger
+; return:
+;	nothing
+; destroy:
+;	ax, bx
+;
+SaveExitTriggerInfo	proc	near
+	mov	ax, ATTR_OL_MENU_WIN_EXIT_TRIGGER	; don't save to state
+	push	cx
+	mov	cx, size optr
+	call	ObjVarAddData			; ds:bx = extra data
+	pop	cx				; restore handle (returned)
+	mov	({optr} ds:[bx]).handle, cx
+	mov	({optr} ds:[bx]).chunk, dx
+done:
+	ret
+SaveExitTriggerInfo	endp
+
+
+COMMENT @----------------------------------------------------------------------
+
+METHOD:		OLMenuWinSpecBuild -- MSG_SPEC_BUILD
+
+DESCRIPTION:	Ensure moniker if ATTR_GEN_INTERACTION_GROUP_TYPE set.
+
+PASS:
+	*ds:si - instance data
+	es - segment of OLMenuWinClass
+
+	ax - MSG_SPEC_BUILD
+
+	cx - ?
+	dx - ?
+	bp - SpecBuildFlags (SBF_WIN_GROUP, etc)
+
+RETURN:
+	carry - ?
+	ax, cx, dx, bp - ?
+
+DESTROYED:
+	bx, si, di, ds, es
+
+REGISTER/STACK USAGE:
+
+PSEUDO CODE/STRATEGY:
+	Moniker must be set before calling superclass as the moniker is needed
+	at that time.  Don't care whether SBF_WIN_GROUP or not, we need to do
+	this the first time through.
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	brianc	5/12/92		Initial version
+
+------------------------------------------------------------------------------@
+OLMenuWinSpecBuild	method	OLMenuWinClass, MSG_SPEC_BUILD
+
+if	ALLOW_ACTIVATION_OF_DISABLED_MENUS
+	;
+	; Enable menus of any kind.  -cbh 12/10/92   (Actually, only those in
+	; a menu bar. -cbh 12/17/92)
+	;
+	mov	di, ds:[di].OLCI_buildFlags			
+	test	di, mask OLBF_AVOID_MENU_BAR
+	jz	notInMenuBar
+	and	di, mask OLBF_TARGET					
+	cmp	di, OLBT_IS_POPUP_LIST shl offset OLBF_TARGET		
+	jne	notInMenuBar
+	or	bp, mask SBF_VIS_PARENT_FULLY_ENABLED
+notInMenuBar:
+
+endif
+
+	;
+	; ensure moniker if ATTR_GEN_INTERACTION_GROUP_TYPE set
+	;
+	push	ax, bp
+	mov	ax, ATTR_GEN_INTERACTION_GROUP_TYPE
+	call	ObjVarFindData			; ds:bx = data, if found
+	LONG	jnc	done				; not found, done
+EC <	VarDataSizePtr	ds, bx, ax					>
+EC <	cmp	ax, size GenInteractionGroupType			>
+EC <	ERROR_NE	OL_ERROR_BAD_GEN_INTERACTION_GROUP_TYPE		>
+	mov	bl, ds:[bx]			; bl = GenInteractionGroupType
+EC <	cmp	bl, GenInteractionGroupType				>
+EC <	ERROR_AE	OL_ERROR_BAD_GEN_INTERACTION_GROUP_TYPE		>
+	;
+	; if GIGT_FILE_MENU, set flag so we know this fact later
+	;
+	cmp	bl, GIGT_FILE_MENU
+	jne	notFileMenu
+	call	MenuBuild_DerefVisSpec_DI
+	ornf	ds:[di].OLMWI_specState, mask OMWSS_FILE_MENU
+						; set this so OLPopupWinClass
+						;	can know this
+	ornf	ds:[di].OLPWI_flags, mask OLPWF_FILE_MENU
+	;
+	; let GenPrimary know about us
+	;
+	push	es, bx, si			; save "File" menu chunk
+	call	GenSwapLockParent		; *ds:si = parent
+						; bx = "File" menu block
+	mov	di, segment GenPrimaryClass
+	mov	es, di
+	mov	di, offset GenPrimaryClass
+	call	ObjIsObjectInClass		; carry set if so
+	call	ObjSwapUnlock			; *ds - this block
+						; (preserves flags)
+	pop	es, bx, si			; restore "File" menu chunk
+	jnc	notFileMenu			; not under GenPrimary, ignore
+						;	as "File" menu
+	mov	cx, ds:[LMBH_handle]		; ^lcx:dx = "File" menu
+	mov	dx, si
+	mov	ax, MSG_OL_BASE_WIN_NOTIFY_OF_FILE_MENU
+	call	GenCallParent			; let GenPrimary know of us
+notFileMenu:
+	;
+	; check if moniker exists
+	;	*ds:si = OLMenuWin
+	;
+	call	MenuBuild_DerefGen_DI		; ds:di = gen instance
+	tst	ds:[di].GI_visMoniker		; have vis moniker?
+	jnz	done				; yes, leave alone
+	;
+	; add moniker based on GenInteractionGroupType
+	;	bl = GenInteractionGroupType
+	;
+	clr	bh
+	shl	bx, 1				; convert to word table offset
+	mov	dx, cs:[groupTypeMonikerTable][bx]	; dx = moniker
+	mov	cx, handle StandardMonikers	; ^lcx:dx = moniker
+	mov	bp, VUM_MANUAL
+	mov	ax, MSG_GEN_REPLACE_VIS_MONIKER_OPTR
+	call	ObjCallInstanceNoLock
+	;
+	; let superclass finish up
+	;
+done:
+	pop	ax, bp
+	mov	di, offset OLMenuWinClass
+	GOTO	ObjCallSuperNoLock
+OLMenuWinSpecBuild	endm
+
+groupTypeMonikerTable	label	word
+	word	offset GroupTypeFileMoniker	; GIGT_FILE_MENU
+	word	offset GroupTypeEditMoniker	; GIGT_EDIT_MENU
+	word	offset GroupTypeViewMoniker	; GIGT_VIEW_MENU
+	word	offset GroupTypeOptionsMoniker	; GIGT_OPTIONS_MENU
+	word	offset GroupTypeWindowMoniker	; GIGT_WINDOW_MENU
+	word	offset GroupTypeHelpMoniker	; GIGT_HELP_MENU
+	word	offset GroupTypePrintMoniker	; GIGT_PRINT_GROUP
+GROUP_TYPE_MONIKER_TABLE_SIZE equ $-groupTypeMonikerTable
+.assert (((GIGT_PRINT_GROUP+1)*2) eq GROUP_TYPE_MONIKER_TABLE_SIZE)
 
 
 
 COMMENT @----------------------------------------------------------------------
 
-FUNCTION:	OLMenuedWinSpecNavigateToNext - MSG_SPEC_NAVIGATE_TO_NEXT
-		OLMenuedWinSpecNavigateToPrevious -
-			MSG_SPEC_NAVIGATE_TO_PREVIOUS
+METHOD:		OLMenuWinNotifyOfInteractionCommand --
+		MSG_OL_WIN_NOTIFY_OF_INTERACTION_COMMAND for OLMenuWinClass
 
-DESCRIPTION:	This method is used to implement the keyboard navigation
-		within-a-window mechanism. See method declaration for full
-		details.
+DESCRIPTION:	Respond to MSG_OL_WIN_NOTIFY_OF_INTERACTION_COMMAND.
 
-CALLED BY:	utility
+PASS:		*ds:si	= instance data for object
+		ds:di	= specific instance (OLMenuWin)
+
+		dx:bp = NotifyOfInteractionCommandStruct
+
+RETURN:		nothing
+
+DESTROYED:	?
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Eric	4/90		initial version
+
+------------------------------------------------------------------------------@
+
+OLMenuWinNotifyOfInteractionCommand	method dynamic	OLMenuWinClass,
+					MSG_OL_WIN_NOTIFY_OF_INTERACTION_COMMAND
+
+	;
+	; notification of MSG_GEN_TRIGGER_INTERACTION_COMMAND
+	;
+	mov	es, dx				; es:bp = NOICS_
+	cmp	es:[bp].NOICS_ic, IC_EXIT
+	jne	done				; if non-EXIT IC trigger in 
+						;	menu, ignore it
+						; did we create one?
+	test	ds:[di].OLMWI_specState, mask OMWSS_EXIT_CREATED
+	jnz	done				; yes, don't save again
+	mov	cx, es:[bp].NOICS_optr.handle
+	mov	dx, es:[bp].NOICS_optr.chunk
+	call	SaveExitTriggerInfo
+done:
+	ret
+
+OLMenuWinNotifyOfInteractionCommand	endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		OLMenuWinECCheckCascadeData
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	EC only code which checks consistency of the IS_CASCADING
+		bit and ATTR_OL_MENU_WIN_CASCADED_MENU vardata.
+
+CALLED BY:	Cascade menu code
+PASS:		*ds:si = object ptr
+RETURN:		nothing
+DESTROYED:	nothing, even flags are maintained.
+SIDE EFFECTS:	Dies if inconsistent.
+
+PSEUDO CODE/STRATEGY:
+		
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JimG	4/27/94    	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+if	 _CASCADING_MENUS and ERROR_CHECK
+OLMenuWinECCheckCascadeData	proc	far
+	uses	ax,bx,cx,dx,di,ds,es
+	.enter
+	
+	pushf
+	
+	mov	ax, ATTR_OL_MENU_WIN_CASCADED_MENU
+	call	ObjVarFindData			; if data, ds:bx = ptr
+	mov	dl, TRUE			; found var data?
+	jc	lookAtBit
+	mov	dl, FALSE			; no.. didn't find it
+	
+lookAtBit:
+	mov	di, ds:[si]
+	add	di, ds:[di].Vis_offset
+	test	ds:[di].OLMWI_moreSpecState, mask OMWMSS_IS_CASCADING
+	mov	dh, TRUE			; bit set?
+	jnz	doTests
+	mov	dh, FALSE			; no, bit clear
+
+doTests:
+	; dl = is there var data? TRUE/FALSE
+	; dh = is the CASCADING bit set? TRUE/FALSE
+	cmp	dl, dh
+	ERROR_NE	OL_ERROR		; INCONSISTENT dl & dh
+	tst	dl
+	jz	done
+	
+	; check var data's contents -- should be valid optr
+	push	si
+	mov	si, ds:[bx].offset
+	mov	bx, ds:[bx].handle
+	call	ECCheckLMemOD
+	pop	si
+done:
+	popf
+	
+	.leave
+	ret
+OLMenuWinECCheckCascadeData	endp
+endif	;_CASCADING_MENUS and ERROR_CHECK
+
+MenuBuild	ends
+
+WinClasses	segment resource
+
+
+COMMENT @----------------------------------------------------------------------
+
+METHOD:		OLMenuWinGupQuery -- MSG_SPEC_GUP_QUERY for OLMenuWinClass
+
+DESCRIPTION:	Respond to a query traveling up the generic composite tree -
+		see OLMapGroup (in CSpec/cspecInteraction.asm) for info.
+
+PASS:		*ds:si - instance data
+		es - segment of OLMenuWinClass
+		ax - MSG_SPEC_GUP_QUERY
+		cx - Query type (GenQueryType or SpecGenQueryType)
+		dx -?
+		bp - OLBuildFlags
+
+RETURN:		carry - set if query acknowledged, clear if not
+		bp - OLBuildFlags
+		cx:dx - vis parent
+
+DESTROYED:	?
+
+PSEUDO CODE/STRATEGY:
+
+	see OLMapGroup for details
+
+	if (query = SGQT_BUILD_INFO) {
+		respond:
+			TOP_MENU = 0
+			SUB_MENU = 1
+			visParent = this object
+	} else {
+		send query to superclass (will send to generic parent)
+	}
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Eric	7/89		Adapted from Tony's new handler.
+
+------------------------------------------------------------------------------@
+
+
+OLMenuWinGupQuery	method dynamic	OLMenuWinClass, MSG_SPEC_GUP_QUERY
+	cmp	cx, SGQT_BUILD_INFO		;can we answer this query?
+	jne	noAnswer			;skip if so...
+
+EC <	test	bp, mask OLBF_REPLY					>
+EC <	ERROR_NZ	OL_BUILD_FLAGS_MULTIPLE_REPLIES			>
+	or	bp, OLBR_SUB_MENU shl offset OLBF_REPLY
+
+	;
+	; We'll return ourselves, but if an OLCtrl was the generic parent
+	; of the querying object, it will set itself as the visual parent
+	; rather than this object.  -cbh 5/11/92
+	;
+	call	WinClasses_Mov_CXDX_Self	
+	stc					;return query acknowledged
+	ret
+
+noAnswer:
+	FALL_THRU	WinClasses_ObjCallSuperNoLock_OLMenuWinClass_Far
+
+OLMenuWinGupQuery	endp
+
+WinClasses_ObjCallSuperNoLock_OLMenuWinClass_Far	proc	far
+	call	WinClasses_ObjCallSuperNoLock_OLMenuWinClass
+	ret
+WinClasses_ObjCallSuperNoLock_OLMenuWinClass_Far	endp
+
+
+WinClasses	ends
+
+;-------------------------------
+
+MenuSepQuery	segment resource
+
+
+COMMENT @----------------------------------------------------------------------
+
+FUNCTION:	OLMenuWinUpdateMenuSeparators --
+			MSG_SPEC_UPDATE_MENU_SEPARATORS handler
+
+DESCRIPTION:	This method is sent when an object in the menu decides that
+		a separator in the menu might need to change. We start a
+		wandering query, which updates the appropriate items
+		in the menu.
 
 PASS:		*ds:si	= instance data for object
 
-RETURN:		ds, si	= same
+RETURN:		nothing
 
-DESTROYED:	ax, bx, cx, dx, bp, es, di
+DESTROYED:	?
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Eric	3/90		initial version
+
+------------------------------------------------------------------------------@
+
+OLMenuWinUpdateMenuSeparators	method dynamic	OLMenuWinClass, \
+					MSG_SPEC_UPDATE_MENU_SEPARATORS
+
+	clr	ch			;pass flags: initiate query
+	mov	ax, MSG_SPEC_MENU_SEP_QUERY
+	GOTO	ObjCallInstanceNoLock
+OLMenuWinUpdateMenuSeparators	endm
+
+
+
+COMMENT @----------------------------------------------------------------------
+
+FUNCTION:	OLMenuWinSpecMenuSepQuery -- MSG_SPEC_MENU_SEP_QUERY handler
+
+DESCRIPTION:	This method travels the visible tree within a menu,
+		to determine which OLMenuItemGroups need top and bottom
+		separators to be drawn.
+
+PASS:		*ds:si	= instance data for object
+		ch	= MenuSepFlags
+
+RETURN:		ch	= MenuSepFlags (updated)
+
+DESTROYED:	?
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Eric	3/90		initial version
+
+------------------------------------------------------------------------------@
+
+OLMenuWinSpecMenuSepQuery	method dynamic	OLMenuWinClass, \
+						MSG_SPEC_MENU_SEP_QUERY
+
+	;see if we are initiating this query, or if it has travelled the
+	;entire visible tree in the menu already.
+
+	test	ch, mask MSF_FROM_CHILD
+	jnz	fromChild		;skip if reached end of visible tree...
+
+	GOTO	VisCallFirstChild
+
+fromChild:
+	;this method has travelled the entire visible tree in the menu,
+	;and was sent by the last child to this root node. Begin the
+	;process of un-recursing.
+
+	ANDNF	ch, not (mask MSF_SEP or mask MSF_USABLE or mask MSF_FROM_CHILD)
+					;indicate no need for separator yet
+	stc
+	ret
+OLMenuWinSpecMenuSepQuery endm
+
+MenuSepQuery	ends
+
+;-------------------------------
+
+WinClasses	segment resource
+
+
+COMMENT @----------------------------------------------------------------------
+
+METHOD:		OLMenuWinActivate -- MSG_OL_POPUP_ACTIVATE for OLMenuWinClass
+
+DESCRIPTION:	Open this menu, allowing it to be active
+
+PASS:		*ds:si - instance data
+		es - segment of OlMenuClass
+		ax - MSG_ACTIVATE_MENU
+		cx, dx	- location to make active (field coordinates)
+		bp	- ?
+
+RETURN:		ax, cx, dx, bp - ?
+
+DESTROYED:	?
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Doug	2/89		Initial version
+
+------------------------------------------------------------------------------@
+
+
+OLMenuWinActivate	method dynamic	OLMenuWinClass, MSG_OL_POPUP_ACTIVATE
+
+	mov	bp, VUM_MANUAL		;assume menu is not visible
+
+if _MENUS_PINNABLE	;------------------------------------------------------
+	;if menu is pinned, un-pin it
+
+	test	ds:[di].OLWI_specState, mask OLWSS_PINNED
+	jz	afterPinned		;skip if not pinned (not visible)...
+
+	;first save menu's current position so that it can be restored when
+	;the menu button is released. Start by stuffing the desired location
+	;of the menu into our "OLWI_prevWinBounds" variable, so the Swap
+	;routine stuffs them into the visible bounds.
+
+	push	cx, dx
+	call	WinClasses_DerefVisSpec_DI
+	clr	ds:[di].OLWI_prevWinBounds.R_left
+	clr	ds:[di].OLWI_prevWinBounds.R_top
+	mov	ds:[di].OLWI_prevWinBounds.R_right, -1
+	mov	ds:[di].OLWI_prevWinBounds.R_bottom, -1
+
+	ORNF	ds:[di].OLMWI_specState, mask OMWSS_WAS_PINNED
+					;indicate was pinned, so want to
+					;restore to old location when closes
+	push	ds:[di].OLWI_attrs
+	call	OpenWinSwapState	;swap attributes, position and size
+					;flags, and visible bounds
+					;restore attributes trashed during swap
+	call	WinClasses_DerefVisSpec_DI
+	pop	ds:[di].OLWI_attrs
+
+OLS <	ANDNF	ds:[di].OLWI_attrs, not (mask OWA_PINNABLE or mask OWA_HEADER) >
+CUAS <	ANDNF	ds:[di].OLWI_attrs, not (mask OWA_PINNABLE) >
+					;set temporarily not pinnable
+
+	;make menu unpinned, but DO NOT CLOSE IT!
+
+	clr	bp			;pass FALSE flag
+	mov	ax, MSG_OL_POPUP_TOGGLE_PUSHPIN
+	call	WinClasses_ObjCallSuperNoLock_OLMenuWinClass
+
+	;borders and header attributes have been updated, and children
+	;marked as invalid if necessary. Now resize window to desired size
+	;again, and update it.
+	
+	mov	cx, mask RSA_CHOOSE_OWN_SIZE	;set win group to desired size
+	mov	dx, mask RSA_CHOOSE_OWN_SIZE	;(just changes bounds)
+	call	VisSetSize
+
+	mov	cl, mask VOF_GEOMETRY_INVALID	;set geometry invalid here
+	call	WinClasses_VisMarkInvalid_MANUAL
+	pop	cx, dx
+
+	mov	bp, VUM_NOW		;force an update below
+endif			;------------------------------------------------------
+
+afterPinned:
+	;enforce positioning behavior: keep menu visible, and place below
+	;our menu button. (bp = VisUpdateMode)
+
+	;Preserve WPSF_SHRINK_DESIRED_SIZE_TO_FIT_IN_PARENT flag when setting
+	;this stuff up.  -cbh 1/18/93
+
+	call	WinClasses_DerefVisSpec_DI
+	and	ds:[di].OLWI_winPosSizeFlags, \
+			mask WPSF_SHRINK_DESIRED_SIZE_TO_FIT_IN_PARENT
+
+	or	ds:[di].OLWI_winPosSizeFlags, \
+		   mask WPSF_PERSIST \
+		or (WCT_KEEP_VISIBLE shl offset WPSF_CONSTRAIN_TYPE) \
+		or (WPT_AS_REQUIRED shl offset WPSF_POSITION_TYPE) \
+		or (WST_AS_DESIRED shl offset WPSF_SIZE_TYPE)
+
+	;make popup lists redo their geometry, if necessary, to stay onscreen
+	;(No, let's do this for all menus.  We can't have menus trailing off
+	; the screen!)
+
+;	push	cx
+;	mov	cx, ds:[di].OLCI_buildFlags
+;	and	cx, mask OLBF_TARGET
+;	cmp	cx, OLBT_IS_POPUP_LIST shl offset OLBF_TARGET
+;	jne	10$			;not popup list, branch
+	or	ds:[di].OLWI_winPosSizeFlags, \
+			mask WPSF_SHRINK_DESIRED_SIZE_TO_FIT_IN_PARENT
+;10$:
+;	pop	cx
+
+	;not yet in stay-up mode
+
+	ANDNF	ds:[di].OLMWI_specState, not (mask OMWSS_IN_STAY_UP_MODE)
+
+	;Position menu based on cx, dx passed
+
+
+
+	push	bp
+	call	VisSetPosition
+	pop	dx			;set dl = VisUpdateMode
+					; Mark window as invalid, from move
+	mov	cl, mask VOF_WINDOW_INVALID	;set this flag
+	call	WinClasses_VisMarkInvalid
+
+	;Send method to do vis update, bring to top.
+
+	mov	ax, MSG_GEN_INTERACTION_INITIATE
+	call	WinClasses_ObjCallSuperNoLock_OLMenuWinClass
+
+	;start SelectMyControlsOnly mechanism for menu window.
+	;(See documentation for OLWinClass)
+
+	mov	ax, MSG_OL_WIN_STARTUP_GRAB
+	call	WinClasses_ObjCallInstanceNoLock
+
+	;if this is a popup-menu (no menu button), then grab the Gadget
+	;exclusive from the parent window, so that we know to close
+	;if the parent closes unexpectedly.
+
+	call	WinClasses_DerefVisSpec_DI
+	tst	ds:[di].OLPWI_button	;do we have a menu button?
+	jnz	done			;skip if so...
+
+	call	OLMenuWinGrabRemoteGadgetExcl
+
+done:
+	ret
+OLMenuWinActivate	endp
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		OLMenuWinInitiate
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Startup a menu window in stay-up-mode.
+
+CALLED BY:	MSG_GEN_INTERACTION_INITIATE
+PASS:		*ds:si	= OLMenuWinClass object
+		ds:di	= OLMenuWinClass instance data
+		ds:bx	= OLMenuWinClass object (same as *ds:si)
+		es 	= segment of OLMenuWinClass
+		ax	= message #
+RETURN:		nothing
+DESTROYED:	ax, cx, dx, bp
+SIDE EFFECTS:	
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JS	9/18/92   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+OLMenuWinInitiate	method dynamic OLMenuWinClass,
+					MSG_GEN_INTERACTION_INITIATE
+	;not yet in stay-up mode
+
+	ANDNF	ds:[di].OLMWI_specState, not (mask OMWSS_IN_STAY_UP_MODE)
+
+	;Send method to do vis update, bring to top.
+
+	mov	ax, MSG_GEN_INTERACTION_INITIATE
+	call	WinClasses_ObjCallSuperNoLock_OLMenuWinClass
+
+	;start SelectMyControlsOnly mechanism for menu window.
+	;(See documentation for OLWinClass)
+
+	mov	ax, MSG_OL_WIN_STARTUP_GRAB
+	call	WinClasses_ObjCallInstanceNoLock
+
+	;enter stay-up mode
+
+	mov	ax, MSG_MO_MW_ENTER_STAY_UP_MODE
+	mov	cx, TRUE				; grab gadget exclusive
+	GOTO	ObjCallInstanceNoLock
+
+OLMenuWinInitiate	endm
+
+
+COMMENT @----------------------------------------------------------------------
+
+METHOD:		OLMenuWinInteractionCommand
+
+DESCRIPTION:	If IC_DISMISS, dismiss the menu.  If IC_EXIT, exit the app.
+
+
+PASS:
+	*ds:si - instance data
+	es - segment of OLMenuWinClass
+
+	ax 	- MSG_GEN_GUP_INTERACTION_COMMAND
+
+	cx	- InteractionCommand
+
+RETURN:
+	carry - set (query answered)
+	ax, cx, dx, bp - ?
+
+DESTROYED:
+	bx, si, di, ds, es
+
+REGISTER/STACK USAGE:
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Doug	8/89		Initial version
+
+------------------------------------------------------------------------------@
+
+OLMenuWinInteractionCommand	method dynamic	OLMenuWinClass,
+					MSG_GEN_GUP_INTERACTION_COMMAND
+
+	;
+	; handle only IC_DISMISS and IC_EXIT
+	;
+	cmp	cx, IC_DISMISS
+	je	dismiss
+
+	cmp	cx, IC_EXIT
+	je	exit
+
+					; else, let superclass handle
+	mov	di, offset OLMenuWinClass
+	GOTO	ObjCallSuperNoLock	; need tail recurse here
+
+dismiss:
+	;first: see if this menu is transitioning from pinned & opened from
+	;menu button to just pinned. If so, abort - there is already
+	;a MSG_OL_POPUP_TOGGLE_PUSHPIN in progress; we arrived here
+	;because the toggle operation restores the focus to an object which
+	;grabs the gadget exclusive from the menu button, and so the menu button
+	;is asking the menu to close. Just ignore it.
+
+	test	ds:[di].OLMWI_specState, mask OMWSS_RE_PINNING
+	jnz	done			;skip to abort...
+
+notRePinning:
+	ForceRef notRePinning
+
+	;If this menu is pinned, toggle its pushpin status.
+
+	test	ds:[di].OLWI_specState, mask OLWSS_PINNED
+	jz	notPinned		;skip if not pinned...
+
+isPinnedSoToggle:
+	ForceRef isPinnedSoToggle
+
+	;menu is pinned: toggle the pinned status: this will
+	;send a MSG_GEN_GUP_INTERACTION_COMMAND {IC_DISMISS} to the menu.
+
+	mov	bp, TRUE		;pass flag: dismiss menu
+	mov	ax, MSG_OL_POPUP_TOGGLE_PUSHPIN
+	call	WinClasses_ObjCallInstanceNoLock
+	jmp	short done
+
+notPinned: ;if this menu was pinned before it was opened under the menu button,
+	   ;then restore it to that state now. (Keeps the focus)
+
+	test	ds:[di].OLMWI_specState, mask OMWSS_WAS_PINNED
+	jz	notPinnedWasNotPinned	;skip if was not pinned...
+
+;notPinnedButWasPinned:
+	;HACK: the toggle pushpin code is going to release the FOCUS exclusive
+	;from this window, and so the base window may restore the FOCUS 
+	;to an object on the base window which will take the gadget exclusive,
+	;such as a GenTrigger. The menu button which opens this menu will
+	;lose the gadget exclusive, and tell this menu to close. To prevent the
+	;menu from closing, set OMWSS_RE_PINNING)
+
+	ANDNF	ds:[di].OLMWI_specState, not (mask OMWSS_WAS_PINNED)
+	ORNF	ds:[di].OLMWI_specState, mask OMWSS_RE_PINNING
+	call	OpenWinSwapState	;restore old attrs, position flags,
+					;and position
+
+	mov	ax, MSG_OL_POPUP_TOGGLE_PUSHPIN
+	call	WinClasses_ObjCallInstanceNoLock
+
+	call	WinClasses_DerefVisSpec_DI
+	ANDNF	ds:[di].OLMWI_specState, not (mask OMWSS_RE_PINNING)
+
+	;
+	;DO NOT call superclass- OLPopupWinClass will close this window!
+	;
+	jmp	short done
+
+exit:
+	;
+	; exit associated application
+	;
+	mov	ax, MSG_META_QUIT
+	call	GenCallApplication
+	jmp	short done
+
+notPinnedWasNotPinned:
+	;menu is NOT pinned, and WAS NOT pinned.
+
+	mov	di, 500
+	call	ThreadBorrowStackSpace
+	push	di
+
+	;Call superclass so that window is CLOSED (set not REALIZABLE)
+
+	mov	ax, MSG_GEN_GUP_INTERACTION_COMMAND
+	mov	cx, IC_DISMISS
+	call	WinClasses_ObjCallSuperNoLock_OLMenuWinClass
+
+	;tell our menu button to make sure that it is reset visually
+
+	mov	ax, MSG_OL_MENU_BUTTON_NOTIFY_MENU_DISMISSED
+	call	OLPopupWinSendToButton
+
+	pop	di
+	call	ThreadReturnStackSpace
+
+done:
+	stc				; gup query handled
+	ret
+
+OLMenuWinInteractionCommand	endp
+
+
+COMMENT @----------------------------------------------------------------------
+
+METHOD:		OLMenuWinPrePassiveButton -- MSG_META_PRE_PASSIVE_BUTTON
+
+DESCRIPTION:	Handler for mouse button being pressed while we have a
+		passive mouse grab. This grab is set up when the menu
+		window is told by the menu button that it is in stay-up mode.
+
+		First we tell the base window that we are leaving
+		stay-up mode, and reset our own state bits, so that the
+		SelectMyControlsOnly mechanism in the base window and here
+		will take the menu down.
+
+PASS:		*ds:si - instance data
+		es - segment of OLMenuWinClass
+		ax 	- method
+		cx, dx	- ptr position
+		bp	- [ UIFunctionsActive | buttonInfo ]
+			(for menu window - indicates if pointer is inside menu)
+
+RETURN:		ax, cx, dx, bp - ?
+
+DESTROYED:	?
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Eric	8/89		Initial version
+	Joon	9/92		Added check for scrollable popup list
+
+------------------------------------------------------------------------------@
+
+OLMenuWinPrePassiveButton	method dynamic	OLMenuWinClass, \
+						MSG_META_PRE_PASSIVE_BUTTON
+
+	;if we were in stay-up mode, send MSG_MO_MW_LEAVE_STAY_UP_MODE
+	;to self, so will send to menu button and base window.
+
+	test	ds:[di].OLMWI_specState, mask OMWSS_IN_STAY_UP_MODE
+	jz	done			;skip if not...
+
+
+ifdef	ALLOW_SCROLLABLE_POPUP_LISTS
+
+	;if this is a popup list and the ptr is in bounds, then just return
+	;processed.  Mouse interactions needs to be handled by the items in
+	;the popup list.
+
+	mov	di, ds:[di].OLCI_buildFlags			
+	and	di, mask OLBF_TARGET					
+	cmp	di, OLBT_IS_POPUP_LIST shl offset OLBF_TARGET		
+	jne	notPopupList						
+	call	VisTestPointInBounds					
+	jc	returnProcessed						
+notPopupList:								
+
+endif
+
+	; don't leave stay up mode if press is not UIFA_IN and 
+	; VisTestPointInBounds is true
+
+	test	bp, (mask UIFA_IN) shl 8
+	jnz	continue
+
+	call	VisTestPointInBounds
+	jc	returnProcessed
+continue:
+
+	;we are in stay-up mode. Send method to self so will be sent
+	;to BaseWindow and MenuButton. MenuButton will return cx = TRUE/FALSE
+	;telling us if we should keep menu up.
+	;Pass: cx, dx = mouse position (in window coords)
+	;	bp = [ UIFunctionsActive | buttonInfo ]
+
+	test	bp, mask BI_PRESS	;any button pressed?
+	jz	done			;skip if not...
+
+if BUBBLE_HELP
+	test	bp, (mask UIFA_IN) shl 8
+	jz	leaveStayUpMode		
+
+	; button press inside menu
+
+	mov	ax, bp			
+	andnf	ax, mask BI_BUTTON	;is it BUTTON_2?
+	cmp	ax, BUTTON_2 shl offset BI_BUTTON		
+	je	done			;skip if so...
+
+leaveStayUpMode:		
+endif	; BUBBLE_HELP
+
+	mov	ax, cx
+	mov	bx, dx
+	call	VisQueryWindow		; get window we're on
+
+EC <	push	bx							>
+EC <	mov	bx, di							>
+EC <	call	ECCheckWindowHandle	; ensure good window		>
+EC <	pop	bx							>
+
+	call	WinTransform	; get screen coords
+	mov	cx, ax			; cx, dx = ptr position in screen coords
+	mov	dx, bx
+
+	push	bp				;save UIFA_IN flags from Flow
+						;pass bp...
+	mov	ax, MSG_MO_MW_LEAVE_STAY_UP_MODE
+	call	WinClasses_ObjCallInstanceNoLock	;send to self
+						;returns cx = TRUE if mouse
+						;over menu button AND is correct
+						;mouse button for this specific
+						;UI. (Will restart base window
+						;grab if over mouse button)
+	pop	bp
+
+	;If mouse is pressed outside of menu window AND menu button
+	;bounds, kill menu immediately.
+
+	test	bp, (mask UIFA_IN) shl 8	;is mouse ptr in menu window?
+	jnz	returnProcessed			;skip if so...
+
+;notInBounds: ;Mouse pointer is not over menu window.
+	tst	cx				;over menu button?
+	jnz	returnProcessed			;skip if so...
+
+	;kill menu immediately (if not pinned)! Send method to self.
+
+	;Cascading menus cannot have the pre-passive grab forcing the
+	;closure of the menus.  The bad case is where two or more menus are
+	;open, and the user clicks on a menu that is not the "top" menu (the
+	;one that has the pre-passive grab).  This will get called first,
+	;bringing down the "top" menu, which will cause the other menus to
+	;go down since the "top" menu will send a SUBMENU_REQUESTS_CLOSE
+	;message up the gen tree.  But this is not desired since the user
+	;may have clicked on another menu button.  The other mechanisms,
+	;post-passive grab and gadget exclusive, will do the work.
+	;  --JimG 4/29/94
+
+if	 not _CASCADING_MENUS
+	push	bp				;save UIFunctionsActive etc
+	mov	ax, MSG_GEN_GUP_INTERACTION_COMMAND
+	mov	cx, IC_INTERACTION_COMPLETE
+	call	WinClasses_ObjCallInstanceNoLock	;send to self
+	pop	bp
+endif	;not _CASCADING_MENUS
+
+	; Replay button, just in case the pre-passive list has changed as a
+	; result of the above
+
+	mov	ax, mask MRF_REPLAY
+	ret
+
+returnProcessed: ;return with ax = MRF_*** flag
+	mov	ax, mask MRF_PROCESSED
+	ret
+
+done:	;send event to superclass (OLWinClass) so that its
+	;mechanisms operate properly.
+	GOTO	WinClasses_ObjCallSuperNoLock_OLMenuWinClass_Far
+OLMenuWinPrePassiveButton	endp
+
+
+COMMENT @----------------------------------------------------------------------
+
+METHOD:		OLMenuWinPostPassiveButton -- MSG_META_POST_PASSIVE_BUTTON
+
+DESCRIPTION:	See OLWinClass for complete description of how this
+		fits into the SelectMyConrolsOnly mechanism. We have
+		subclassed this method here so that a menu can decide
+		whether to kill itself when leaving stay-up mode.
+		IMPORTANT: we are concerned with the button PRESS here,
+		not the release. We want the press because we may want the
+		menu to close the instant we leave stay-up mode.
+
+PASS:		*ds:si - instance data
+		es - segment of OLMenuWinClass
+		ax 	- method
+		cx, dx	- ptr position
+		bp	- [ UIFunctionsActive | buttonInfo ]
+
+RETURN:		ax, cx, dx, bp - ?
+
+DESTROYED:	?
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Eric	8/89		Initial version
+
+------------------------------------------------------------------------------@
+
+OLMenuWinPostPassiveButton	method dynamic	OLMenuWinClass, \
+						MSG_META_POST_PASSIVE_BUTTON
+	push	ax, bp				;save method and flags
+						;for superclass call
+
+	;are any buttons pressed?
+
+	test	bp, mask BI_PRESS	;any button pressed?
+	jnz	callSuper		;skip if so...
+
+	;are any buttons pressed?
+
+	test	bp, mask BI_B3_DOWN or mask BI_B2_DOWN or \
+		    mask BI_B1_DOWN or mask BI_B0_DOWN
+	jnz	callSuper		;skip if so...
+
+	;all buttons released: if not in stay-up-mode or pinned, close menu now.
+
+	test	ds:[di].OLMWI_specState, mask OMWSS_IN_STAY_UP_MODE
+	jnz	callSuper		;skip if so...
+
+	;If using cascading menus, call OLMenuWinCloseOrCascade which will
+	;take care of checking if this menu is currently cascading.
+if	 _CASCADING_MENUS
+	call	OLMenuWinCloseOrCascade		;destroys:ax,bx,cx,dx,bp,di
+else	;_CASCADING_MENUS is FALSE
+	mov	ax, MSG_GEN_GUP_INTERACTION_COMMAND
+	mov	cx, IC_INTERACTION_COMPLETE
+	call	WinClasses_ObjCallInstanceNoLock	;send to self
+endif	;_CASCADING_MENUS
+
+callSuper:
+	pop	ax, bp			;get method and flags
+
+	;call superclass to handle remainder of work (EndGrab, etc)
+
+	GOTO	WinClasses_ObjCallSuperNoLock_OLMenuWinClass_Far
+OLMenuWinPostPassiveButton	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		OLMenuWinEnterStayUpMode
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+METHOD:		MSG_MO_MW_ENTER_STAY_UP_MODE
+
+DESCRIPTION:	This is sent by the MOMenuButton object when it realizes
+		that we are entering stay-up mode. This procedure sets some
+		state flags in this object.
+
+PASS:		*ds:si - instance data
+		es - segment of OLMenuWinClass
+		ax 	- method
+		cx	= TRUE to force release of current GADGET EXCL owner,
+			  so that higher-level menus close.
+
+RETURN:		ds:*si, es = same
+
+DESTROYED:	?
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	eric	8/89		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OLMenuWinEnterStayUpMode	method dynamic	OLMenuWinClass,
+					MSG_MO_MW_ENTER_STAY_UP_MODE
+
+EC <	cmp	cx, TRUE						>
+EC <	je	1$							>
+EC <	cmp	cx, FALSE						>
+EC <	ERROR_NE OL_ERROR						>
+EC <1$:									>
+
+	;is ENTER_STAY_UP_MODE: set our state info, and start a pre-passive
+	;mouse grab so that we can exit stay-up mode when the button is
+	;next pressed.
+
+	ORNF	ds:[di].OLMWI_specState, mask OMWSS_IN_STAY_UP_MODE
+
+	;inform our parent window that it has a menu in stay-up mode.
+	;(If this is a menu or sub-menu, inform GenPrimary/GenDisplay/
+	;GenSummons, etc. If is a sys-menu for a pinned menu, inform
+	;the menu.) This will cause OpenWinEndGrab to NOT force the release
+	;of the gadget exclusive as the mouse button is released.
+
+	push	cx
+	mov	ax, MSG_VIS_VUP_QUERY
+	mov	cx, SVQT_HAS_MENU_IN_STAY_UP_MODE
+	call	OLMenuWinCallButtonOrGenParent
+	pop	cx
+
+	;if we want to force the release of high-level menus, send a VUP
+	;query through our menu button, so that 1) this menu gets the GADGET
+	;exclusive directly from the parent window (GenPrimary), and
+	;2) so that as the high-level menus close, our menu button does not
+	;force this menu to close.
+
+	tst	cx
+	jz	10$
+
+	call	OLMenuWinGrabRemoteGadgetExcl
+
+10$:	;tell the Flow Object that we want to be notified of ANY button press,
+	;even if not on menu.
+
+	call	VisAddButtonPrePassive
+
+if _KBD_NAVIGATION and _MENU_NAVIGATION	;------------------------------
+
+	;CUA/Motif: set focus to first object in menu (is currently 0:0).
+
+	mov	ax, MSG_GEN_NAVIGATE_TO_NEXT_FIELD
+	call	WinClasses_ObjCallInstanceNoLock
+endif		;--------------------------------------------------------------
+
+		ret
+OLMenuWinEnterStayUpMode	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		OLMenuWinLeaveStayUpMode
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+METHOD:		MSG_MO_MW_LEAVE_STAY_UP_MODE
+
+DESCRIPTION:	This method is sent by this object to itself when
+		a pre-passive button event is received, indicating that
+		we should exit stay-up mode.
+
+PASS:		*ds:si - instance data
+		es - segment of OLMenuWinClass
+		ax - method
+		cx, dx	- mouse position in screen coordinates
+		bp	- [ UIFunctionsActive | buttonInfo ]
+			(for menu window - indicates if pointer is inside menu)
+
+RETURN:		ds:*si, es = same
+		cx = TRUE if mouse over menu button
+
+DESTROYED:	?
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	eric	8/89		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OLMenuWinLeaveStayUpMode	method dynamic	OLMenuWinClass,
+					MSG_MO_MW_LEAVE_STAY_UP_MODE
+
+EC <	call	VisCheckVisAssumption	;make sure ds:*si ok		>
+   
+	;FIRST: make sure that we are in stay-up-mode, so that we don't
+	;mess up the state of the parent window (GenPrimary) by telling it
+	;that we are leaving stay-up-mode when we aren't.
+
+;Do we ever have a case where the OMWSS_IN_STAY_UP_MODE has been reset already,
+;so that we don't release our VisRemoveButtonPrePassive before the window
+;goes away??? Seems to happen 1/100 times that menu navigation is used.
+;
+;Should not be a problem, as VisRemoveButtonPrePasive is called from VisClose,
+;just to make sure that it is gene -- Doug
+;
+	test	ds:[di].OLMWI_specState, mask OMWSS_IN_STAY_UP_MODE
+	jz	done			;skip if not in stay-up mode...
+
+	;reset state bit, remove passive grab, ;and send
+	;MSG_MO_MB_LEAVE_STAY_UP_MODE to OLMenuButton, so it knows to set
+	;closing = TRUE
+
+	ANDNF	ds:[di].OLMWI_specState, not (mask OMWSS_IN_STAY_UP_MODE)
+
+	call	VisRemoveButtonPrePassive
+
+	;inform our parent window that it has no menu in stay-up mode.
+	;(If this is a menu or sub-menu, inform GenPrimary/GenDisplay/
+	;GenSummons, etc. If is a sys-menu for a pinned menu, inform
+	;the menu.)
+
+	push	cx, dx, bp
+	mov	ax, MSG_VIS_VUP_QUERY
+	mov	cx, SVQT_NO_MENU_IN_STAY_UP_MODE
+	call	OLMenuWinCallButtonOrGenParent
+	pop	cx, dx, bp
+
+	;First: send method to menu button which opens this menu,
+	;so it will reset its state bit
+	;Pass: bp - [ UIFunctionsActive | buttonInfo ]
+	;	(for menu window - indicates if pointer is inside menu)
+
+	tst	ds:[di].OLPWI_button	;make sure we have a button
+	jnz	sendToButton		;if yes, send to button
+
+	clr	cx			;else return cx = FALSE
+	ret 
+	
+sendToButton:
+	mov	ax, MSG_MO_MB_LEAVE_STAY_UP_MODE
+	call	OLPopupWinSendToButton
+done:
+	ret
+OLMenuWinLeaveStayUpMode	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		OLMenuWinCascadeMode
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Enables/disables cascade mode.
+		Will cause submenu's to be killed if disabling cascade mode
+		or cascading with a different submenu optr.
+		Will automatically start the grab for this window if the
+		result of this call closes a menu.
+
+CALLED BY:	MSG_MO_MW_CASCADE_MODE
+PASS:		*ds:si	= OLMenuWinClass object
+		ds:di	= OLMenuWinClass instance data
+		ds:bx	= OLMenuWinClass object (same as *ds:si)
+		es 	= segment of OLMenuWinClass
+		ax	= message #
+		cl	= OLMenuWinCascadeModeOptions
+			    OMWCMO_CASCADE
+				True=Enable/False=Disable cascade mode.
+			    OMWCMO_START_GRAB
+			    	If TRUE, will take the grabs and take the gadget
+				exclusive after setting the cascade mode.
+			
+		if OMWCMO_CASCADE = TRUE
+		    ^ldx:bp = optr to submenu
+		else
+		    dx, bp are ignored
+		    
+RETURN:		Nothing
+DESTROYED:	ax, cx
+SIDE EFFECTS:	
+	If cascade mode is enabled, the menu will NOT be closed when a
+	lost gadget exclusive is received, nor when the passive grab wants
+	to close it.  It will, however, still be closed by a
+	MSG_MO_MW_GUP_SUBMENU_REQUESTS_CLOSE message if the ignore bit
+	is not set.
+
+PSEUDO CODE/STRATEGY:
+	None
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JimG	4/21/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+if	 _CASCADING_MENUS
+OLMenuWinCascadeMode	method dynamic OLMenuWinClass, 
+					MSG_MO_MW_CASCADE_MODE
+	.enter
+	
+	push	cx				; save for last	(cl)
+	
+	; set cascading information based upon argument
+	
+	; ensure original cascade data is correct before changing (EC)
+EC <	call	OLMenuWinECCheckCascadeData				>
+	
+	mov	ch, ds:[di].OLMWI_moreSpecState	; save original state
+	clr	ax				; use ah to keep cascade bit
+	
+	; Here we put the new cascade bit into ah, later into ch.
+	; This value is or'ed back into instance data after the "done"
+	; label.  This is done this way because some routines called below
+	; depend upon the moreSpecState's CASCADE bit to be consistent with
+	; the vardata which hasn't been changed yet.
+	
+	test	cl, mask OMWCMO_CASCADE
+	jz	handleVarData
+	ornf	ah, mask OMWMSS_IS_CASCADING
+
+handleVarData:
+	; check to see if the cascading bit changed
+	
+	xor	ch, ah
+	test	ch, mask OMWMSS_IS_CASCADING	; test if bit changed
+	push	cx				; case "changed" info (ch)
+	mov	ch, ah				; new state is now in ch
+	mov	ax, ATTR_OL_MENU_WIN_CASCADED_MENU
+	jnz	updateVarData			; bit changed - fix var data
+	
+	; cascade bit hasn't change.  Check to see if the bit is true.
+	test	cl, mask OMWCMO_CASCADE
+	jz	done				; not cascading, we're done
+	
+	; We are cascading.  Make sure that the handle passed is the same as
+	; the handle stored.
+	
+	call	ObjVarFindData			; ds:bx = ptr to data
+EC <	ERROR_NC	OL_ERROR		; SHOULD HAVE VAR DATA	>
+	
+	; compare handle already in var data with ^ldx:bp (handle passed in)
+	
+	cmp	ds:[bx].handle, dx		; ^ldx:bp = handle passed in
+	jne	changeVarData			; nope, need to change vardata
+	cmp	ds:[bx].offset, bp
+	je	done				; handle is the same, we're done
+	
+changeVarData:
+	; handle not the same.  we need to force the close of the submenu
+	; tree starting with the old handle, and then update the stored handle.
+	
+	; Close "old" submenus below this menu
+	push	ax, cx, dx, bp, bx
+	mov	cx, TRUE
+	call	OLMenuWinSendCloseRequestToLastMenu	; destroy:ax,bx,cx,dx,bp
+	pop	ax, cx, dx, bp, bx
+	
+	; change var data to reflect the new submenu.  Then we're done.
+	call	ObjVarFindData				; may have moved
+	movdw	ds:[bx], dxbp
+	jmp	short done
+	
+updateVarData:
+	; the bit has changed.. adjust the var data accordingly
+	
+	test	cl, mask OMWCMO_CASCADE
+	jz	deleteVarData
+	
+	; add var data
+	push	cx
+	mov	cx, size optr			; size of data
+	call	ObjVarAddData			; ds:bx = ptr to data
+	movdw	ds:[bx], dxbp			; ^ldx:bp = handle passed in
+	pop	cx
+	jmp	short done
+
+deleteVarData:
+	; Close all submenus below current menu
+	push	ax, cx
+	mov	cx, TRUE
+	call	OLMenuWinSendCloseRequestToLastMenu
+	pop	ax, cx
+	
+	; Delete the var data
+	call	ObjVarDeleteData
+EC <	ERROR_C	OL_ERROR	; nothing deleted? should have var data!>
+	
+done:
+	
+	; ONLY the cascade bit should be set in ch.
+EC <	test	ch, not (mask OMWMSS_IS_CASCADING)			>
+EC <	ERROR_NZ	OL_ERROR			;ch got trashed >
+
+	mov	di, ds:[si]
+	add	di, ds:[di].Vis_offset
+	; store new cascade bit
+	andnf	ds:[di].OLMWI_moreSpecState, not mask OMWMSS_IS_CASCADING
+	ornf	ds:[di].OLMWI_moreSpecState, ch
+	
+	; check to make sure that we didn't screw up the data consistency
+EC <	call	OLMenuWinECCheckCascadeData				>
+	
+	; Decide to start up grabs and/or enter stay up mode.
+	
+	pop	cx					; "change" info (ch)
+	pop	ax					; get passed flags (al)
+	
+	; If we are cascading, then don't do any of this.. we don't want to
+	; take the gadget exclusive away from someone else...
+
+	test	al, mask OMWCMO_CASCADE			; cascading?
+	jnz	dontGrab				; yes.. done
+
+	; ch = the OLMWI_moreSpecState cascading information that has changed.
+	; We know that we aren't currently cascading.  So, IF we were
+	; cascading (i.e. we closed submenus) OR we were told to start the
+	; grab, then ask the window to startup grab.
+	mov	cl, al
+	test	cx, (mask OMWMSS_IS_CASCADING shl 8) or mask OMWCMO_START_GRAB
+	jz	dontGrab				; nope.. done
+	
+	push	ax					; preserve passed flags
+	mov	ax, MSG_OL_WIN_STARTUP_GRAB
+	call	ObjCallInstanceNoLock
+	pop	ax
+	
+	; Were we told to start grab? If so, then we also enter stay up
+	; mode.  Otherwise, we just bail.
+	test	al, mask OMWCMO_START_GRAB
+	jz	dontGrab				; skip stay up mode...
+	
+	mov	cx, TRUE				; grab gadget exclusive
+	mov	ax, MSG_MO_MW_ENTER_STAY_UP_MODE
+	call	ObjCallInstanceNoLock
+
+dontGrab:
+	.leave
+	ret
+OLMenuWinCascadeMode	endm
+endif	;_CASCADING_MENUS
+
+
+COMMENT @----------------------------------------------------------------------
+
+METHOD:		OLMenuWinMoveResizeWin -- MSG_VIS_MOVE_RESIZE_WIN for OLWinClass
+
+DESCRIPTION:	Intercepts the method which does final positioning & resizing
+		of a window, in order to allow pinned menu to be moved
+		off-screen.
+
+PASS:		*ds:si 	- instance data
+		es     	- segment of OLMenuWinClass
+
+		ax 	- MSG_VIS_MOVE_RESIZE_WIN
+
+RETURN:		nothing
+
+DESTROYED:	?
+
+REGISTER/STACK USAGE:
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Eric	1/90		Initial version
+
+------------------------------------------------------------------------------@
+
+
+OLMenuWinMoveResizeWin	method dynamic	OLMenuWinClass, MSG_VIS_MOVE_RESIZE_WIN
+	test	ds:[di].OLWI_specState, mask OLWSS_PINNED
+	jz	callSuper		;skip if not...
+
+	;relax positioning behavior somewhat - allow menu to be
+	;partially obscured.
+
+	ANDNF	ds:[di].OLWI_winPosSizeFlags, not (mask WPSF_CONSTRAIN_TYPE)
+	ORNF	ds:[di].OLWI_winPosSizeFlags, \
+		   WCT_KEEP_PARTIALLY_VISIBLE shl offset WPSF_CONSTRAIN_TYPE
+
+callSuper:
+	;finally, call superclass to do move/resize
+
+	call	WinClasses_ObjCallSuperNoLock_OLMenuWinClass_Far
+
+	;and update scrollers if needed
+
+	call	ImGetButtonState		; non-zero if pressed
+	call	OLMenuWinUpdateUpDownScrollers
+
+	ret
+OLMenuWinMoveResizeWin	endp
+
+
+COMMENT @----------------------------------------------------------------------
+
+FUNCTION:	OLMenuWinVisClose -- MSG_VIS_CLOSE for OLMenuWinClass
+
+DESCRIPTION:	We intercept this method here so that we can release
+		any remote gadget exclusives that we might have.
+
+PASS:		*ds:si - instance data
+
+RETURN:
+
+DESTROYED:
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Eric	6/90		initial version
+
+------------------------------------------------------------------------------@
+
+OLMenuWinVisClose	method dynamic	OLMenuWinClass, MSG_VIS_CLOSE
+
+	;send query to generic parent (do not send to self, in the hope
+	;of deciding whether to send to button or genparent, because self
+	;will handle as if a child had called!)
+
+	push	ax, cx, dx, bp
+	call	OLMenuWinReleaseRemoteGadgetExcl
+	pop	ax, cx, dx, bp
+
+	;call superclass (OLPopupWinClass) for default handling
+
+	call	WinClasses_ObjCallSuperNoLock_OLMenuWinClass_Far
+
+	; Update up/down scrollers as needed
+
+	mov	al, 0
+	call	OLMenuWinUpdateUpDownScrollers
+	
+	ret
+OLMenuWinVisClose	endp
+
+
+COMMENT @----------------------------------------------------------------------
+
+METHOD:		OLMenuWinEnsureNoMenusInStayUpMode
+
+DESCRIPTION:	This method is sent from the Flow object to all objects
+		which have active or passive mouse grabs.
+
+PASS:		*ds:si - instance data
+		es - segment of OLWinClass
+
+		cx:dx - EnsureNoMenusInStayUpModeParams, of null if no buffer
+			passed
+
+RETURN:		ax = 0 (due to byte-saving measure in FlowObject)
+
+DESTROYED:	
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Eric	6/90		Initial version
+
+------------------------------------------------------------------------------@
+
+OLMenuWinEnsureNoMenusInStayUpMode method dynamic OLMenuWinClass, \
+				MSG_META_ENSURE_NO_MENUS_IN_STAY_UP_MODE
+
+	;if PINNED = TRUE, it means that we are entering pinned mode.
+	;Do not close menu if so.
+
+	test	ds:[di].OLWI_specState, mask OLWSS_PINNED
+	jnz	done
+
+	;Otherwise, if the menu is in stay-up-mode, force it to close now.
+
+	test	ds:[di].OLMWI_specState, mask OMWSS_IN_STAY_UP_MODE
+	jz	done			;exit if not stay up mode
+
+	tst	cx
+	jnz	incDismissCount
+	push	cx, dx, bp
+	mov	ax, MSG_GEN_GUP_INTERACTION_COMMAND
+	mov	cx, IC_DISMISS
+        call    WinClasses_ObjCallInstanceNoLock
+	pop	cx, dx, bp
+	jmp	short sendToKids
+
+incDismissCount:
+	tst	cx				;no buffer, branch
+	jz	sendToKids
+EC <	push	ds, si							>
+EC <	movdw	dssi, cxdx						>
+EC <	call	ECCheckBounds						>
+EC <	pop	ds, si							>
+	mov	es, cx
+	mov	bx, dx
+	inc	es:[bx].ENMISUMP_menuCount	;increment menu count
+
+sendToKids:
+	;
+	; Now, to close any of our submenus, send to our children
+	;
+	mov	ax, MSG_META_ENSURE_NO_MENUS_IN_STAY_UP_MODE
+	call	GenSendToChildren
+
+done:
+	clr	ax			;Return "MouseFlags" null
+	ret
+OLMenuWinEnsureNoMenusInStayUpMode endm
+
+WinClasses	ends
+
+
+KbdNavigation	segment resource
+
+
+COMMENT @----------------------------------------------------------------------
+
+FUNCTION:	OLMenuWinFupKbdChar - MSG_META_FUP_KBD_CHAR handler
+			for OLMenuWinClass
+
+DESCRIPTION:	This method is sent by child which 1) is the focused object
+		and 2) has received a MSG_META_FUP_KBD_CHAR
+		which is does not care about. Since we also don't care
+		about the character, we forward this method up to the
+		parent in the focus hierarchy.
+
+PASS:		*ds:si	= instance data for object
+		cx = character value
+		dl = CharFlags
+		dh = ShiftState (ModBits)
+		bp low = ToggleState
+		bp high = scan code
+
+RETURN:		carry set if handled
+
+DESTROYED:	?
 
 PSEUDO CODE/STRATEGY:
 
@@ -2268,64 +2463,1204 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 
-OLMenuedWinSpecNavigateToNextField	method dynamic OLMenuedWinClass, \
-					MSG_SPEC_NAVIGATE_TO_NEXT_FIELD
+if _KBD_NAVIGATION	;------------------------------------------------------
+OLMenuWinFupKbdChar	method dynamic	OLMenuWinClass, MSG_META_FUP_KBD_CHAR
 
-	;default flags to pass: we are trying to navigate backards.
+	push	ax			;save method
+	test	dl, mask CF_FIRST_PRESS or mask CF_REPEAT_PRESS
+	LONG jz	callSuper		;skip if not press event...
 
-	clr	bp			;pass flags: navigate forwards
-	test	ds:[di].OLWI_focusExcl.FTVMC_flags, mask MAEF_OD_IS_MENU_RELATED
-	jz	callCommon			;skip if not doing menus
+;ADDED 10/23/90 by Eric to prevent pinned menus from interpreting keyboard
+;navigation keys which would try to close the menu.
 
-	;the user has been navigating the menu bar: pass flag so that
-	;query is kept within these items.
+	;if this menu is pinned (the user must have pinned it using
+	;keyboard navigation, for the focus to be inside the menu),
+	;then ignore key at this class level.
 
-	mov	bp, mask NF_NAV_MENU_BAR ;pass flags: navigate forwards
-					 ;through the menu bar.
+	test	ds:[di].OLWI_specState, mask OLWSS_PINNED
+	jnz	checkControlMenuNavigationThenInternalKeys ;skip if is pinned...
 
-callCommon:
-					;pass ds:di = VisSpec instance data
-	call	OpenWinNavigateCommon
+	;if this menu has a menu button (i.e. is not a popup menu), then
+	;first check for the keys which cause us to send methods to the button.
+
+	tst	ds:[di].OLPWI_button	;is there a menu button?
+	jz	checkInternalKeys	;skip if not...
+
+	;we will check these keys using two tables: one for menus, one
+	;for sub-menus.
+
+	mov	bx, ds:[di].OLCI_buildFlags
+	ANDNF	bx, mask OLBF_REPLY
+	cmp	bx, OLBR_SUB_MENU shl offset OLBF_REPLY
+
+	push	es			;set es:di = table of shortcuts
+	segmov	es, cs
+	mov	di, offset cs:OLMenuWinKbdBindings
+	jne	10$			;skip if is menu...
+
+	;is a sub-menu
+
+	mov	di, offset cs:OLMenuWinKbdBindings2
+
+10$:
+	call	ConvertKeyToMethod
+	pop	es
+	jnc	checkInternalKeys	;skip if none found...
+
+
+	cmp	ax, MSG_META_DUMMY	 ;left-arrow in sub-menu?
+	je	closeSubMenuToParentMenu ;skip if so...
+
+sendToButton:
+	ForceRef sendToButton
+
+	;
+	; Code put in here to do nothing with left and right arrows for express
+	; menus, so we won't have complicated deaths in express submenus.  
+	; There's probably a cleaner solution than this.  -cbh 11/ 4/92
+	;
+if EVENT_MENU
+	push	ax
+	mov	ax, HINT_EVENT_MENU
+	call	ObjVarFindData
+	pop	ax
+	jc	19$
+endif
+	push	ax
+	mov	ax, HINT_EXPRESS_MENU
+	call	ObjVarFindData
+	pop	ax
+	jnc	20$
+19$::
+SBCS <	mov	cx, (CS_CONTROL shl 8) or VC_ESCAPE	;make an escape key >
+DBCS <	mov	cx, C_SYS_ESCAPE			;make an escape key >
+	mov	ax, MSG_META_FUP_KBD_CHAR	
+20$:
+
+	call	OLMenuWinFocusAndCallButton ;trashes si
+
+popExit:
+	pop	ax
+	stc				;say handled
 	ret
-OLMenuedWinSpecNavigateToNextField	endm
 
-WinClasses	ends
-
-
-KbdNavigation	segment resource
-
-OLMenuedWinSpecNavigateToPreviousField	method dynamic OLMenuedWinClass, \
-					MSG_SPEC_NAVIGATE_TO_PREVIOUS_FIELD
-
-	;default flags to pass: we are trying to navigate backards.
-
-	mov	bp, mask NF_TRAVEL_CIRCUIT or \
-		    mask NF_BACKTRACK_AFTER_TRAVELING
-	test	ds:[di].OLWI_focusExcl.FTVMC_flags, mask MAEF_OD_IS_MENU_RELATED
-	jz	callCommon			;skip if not doing menus
-
-	;the user has been navigating the menu bar: pass flag so that
-	;query is kept within these items.
-
-	mov	bp, mask NF_TRAVEL_CIRCUIT or \
-		    mask NF_BACKTRACK_AFTER_TRAVELING or \
-		    mask NF_NAV_MENU_BAR
-
-callCommon:
-					;pass ds:di = VisSpec instance data
-	call	OpenWinNavigateCommon
+closeSubMenuToParentMenu:
+	call	OLMenuWinKbdCloseSubMenuToParentMenu ;trashes si
+	pop	ax
+	stc				;say handled
 	ret
-OLMenuedWinSpecNavigateToPreviousField	endm
+
+;ADDED 10/23/90 by Eric to allow usage of the System Menu Button in a
+;pinned menu.
+
+checkControlMenuNavigationThenInternalKeys:
+					;pass ds:di = instance data
+	call	HandleMenuNavigation	;do menu navigation, if needed
+	jnc	checkInternalKeys	;skip if not handled...
+	pop	ax
+	ret
+
+checkInternalKeys:
+	;now check for keys which we can handle by navigating within
+	;this menu.
+
+	push	es			;set es:di = table of shortcuts
+	segmov	es, cs
+	mov	di, offset cs:OLMenuWinKbdBindings3
+	call	ConvertKeyToMethod
+	pop	es
+	jnc	callSuper		;skip if none found...
+
+
+sendToSelf::
+
+	push	ds			;save KBD char in idata so that when
+	mov	bp, segment idata
+	segmov	ds, bp			;new child item (possibly a genlist)
+	mov	ds:[lastKbdCharCX], cx	;gains focus, it knows whether to start
+	pop	ds			;at top or bottom item in list.
+
+	mov	cx, IC_INTERACTION_COMPLETE	;in case we send
+						;MSG_GEN_GUP_INTERACTION_COMMAND
+	call	ObjCallInstanceNoLock
+	
+	push	ds			;reset our saved KBD char to "none"
+	mov	bp, segment idata	;so that if a genlist gains the focus
+	segmov	ds, bp
+	clr	ds:[lastKbdCharCX]	;because the menu regains focus,
+	pop	ds			;it starts at the top item in the list
+handled::
+	pop	ax
+	stc				;say handled
+	ret
+
+
+callSuper:
+	;we don't care about this keyboard event. Call our superclass
+	;so it will be forwarded up the focus hierarchy.
+
+	pop	ax			;get method
+	mov	di, offset OLMenuWinClass
+	GOTO	ObjCallSuperNoLock
+
+OLMenuWinFupKbdChar	endm
+
+
+;Keyboard shortcut bindings for OLMenuWinClass (do not separate tables)
+
+;*** KEYS FOR MENU, WHICH WILL SEND METHODS TO THE MENU BUTTON ***
+
+
+OLMenuWinKbdBindings	label	word
+	word	length OLMWShortcutList
+		 ;P     C  S     C
+		 ;h  A  t  h  S  h
+		 ;y  l  r  f  e  a
+	         ;s  t  l  t  t  r
+
+if DBCS_PCGEOS
+OLMWShortcutList KeyboardShortcut \
+	<0, 0, 0, 0, C_SYS_LEFT and mask KS_CHAR>,	;previous menu
+	<0, 0, 0, 0, C_SYS_RIGHT and mask KS_CHAR>,	;next menu
+	<0, 0, 0, 0, C_SYS_ESCAPE and mask KS_CHAR>	;close menu, go up
+else
+OLMWShortcutList KeyboardShortcut \
+	<0, 0, 0, 0, 0xf, VC_LEFT>,	;NAVIGATE TO PREVIOUS (MENU)
+	<0, 0, 0, 0, 0xf, VC_RIGHT>,	;NAVIGATE TO NEXT (MENU)
+	<0, 0, 0, 0, 0xf, VC_ESCAPE>	;CLOSE MENU (will continue up tree)
+endif
+
+	;insert additional shortcuts here.
+
+;OLMWMethodList	label word
+	word	MSG_SPEC_NAVIGATE_TO_PREVIOUS_FIELD
+	word	MSG_SPEC_NAVIGATE_TO_NEXT_FIELD
+					;use SPEC instead of GEN method since
+					;we are sending to non-generic objects.
+	word	MSG_META_FUP_KBD_CHAR	;will send cx, dx, bp up to menu button
+					;disguised as MSG_META_FUP_KBD_CHAR.
+					;Button will close this menu and those
+					;above it.
+
+
+;*** KEYS FOR SUB-MENU, WHICH WILL SEND METHODS TO THE MENU BUTTON ***
+
+OLMenuWinKbdBindings2	label	word
+	word	length OLMWShortcutList2
+		 ;P     C  S     C
+		 ;h  A  t  h  S  h
+		 ;y  l  r  f  e  a
+	         ;s  t  l  t  t  r
+
+if DBCS_PCGEOS
+OLMWShortcutList2 KeyboardShortcut \
+	<0, 0, 0, 0, C_SYS_LEFT and mask KS_CHAR>,	;close sub-menu
+	<0, 0, 0, 0, C_SYS_RIGHT and mask KS_CHAR>,	;close, go to next
+	<0, 0, 0, 0, C_SYS_ESCAPE and mask KS_CHAR>	;close menu, go up
+else
+OLMWShortcutList2 KeyboardShortcut \
+	<0, 0, 0, 0, 0xf, VC_LEFT>,	;CLOSE THIS SUB-MENU (ONLY)
+	<0, 0, 0, 0, 0xf, VC_RIGHT>,	;CLOSE THIS SUB-MENU AND THE PARENT
+					;MENU, OPEN THE NEXT TOP-LEVEL MENU.
+	<0, 0, 0, 0, 0xf, VC_ESCAPE>	;CLOSE MENU (will continue up tree)
+endif
+
+	;insert additional shortcuts here.
+
+;OLMWMethodList2	label word
+	word	MSG_META_DUMMY		;we will handle this specially: see
+					;OLMenuWinKbdCloseSubMenuToParentMenu
+	word	MSG_OL_MENU_BUTTON_SEND_RIGHT_ARROW_TO_PARENT_MENU
+					;send method to menu button, so it will
+					;send a MSG_META_FUP_KBD_CHAR to the
+					;menu it is in, simulating the RIGHT
+					;arrow being pressed. Will close parent
+					;menu, and open next top-level menu.
+	word	MSG_META_FUP_KBD_CHAR	;will send cx, dx, bp up to menu button
+					;disguised as MSG_META_FUP_KBD_CHAR.
+					;Button will close this menu and those
+					;above it.
+
+
+
+;*** KEYS FOR MENU, WHICH ARE SENT TO THIS MENU ***
+
+OLMenuWinKbdBindings3	label	word
+	word	length OLMWShortcutList3
+		 ;P     C  S     C
+		 ;h  A  t  h  S  h
+		 ;y  l  r  f  e  a
+	         ;s  t  l  t  t  r
+ if DBCS_PCGEOS
+OLMWShortcutList3 KeyboardShortcut \
+	<0, 0, 0, 0, C_SYS_UP and mask KS_CHAR>,	;previous menu item
+	<0, 0, 0, 0, C_SYS_DOWN and mask KS_CHAR>,	;next menu item
+	<0, 0, 0, 0, C_SYS_ESCAPE and mask KS_CHAR>	;close popup
+ else
+OLMWShortcutList3 KeyboardShortcut \
+	<0, 0, 0, 0, 0xf, VC_UP>,	;NAVIGATE TO PREVIOUS menu item
+	<0, 0, 0, 0, 0xf, VC_DOWN>,	;NAVIGATE TO NEXT menu item
+	<0, 0, 0, 0, 0xf, VC_ESCAPE>	;CLOSE THIS POPUP MENU (has no button)
+ endif
+
+
+	;insert additional shortcuts here.
+
+;OLMWMethodList3	label word
+	word	MSG_GEN_NAVIGATE_TO_PREVIOUS_FIELD
+	word	MSG_GEN_NAVIGATE_TO_NEXT_FIELD
+	word	MSG_GEN_GUP_INTERACTION_COMMAND
+;ODIE: adding items here requires change in code above
+
+
+endif	;----------------------------------------------------------------------
+
+
+COMMENT @----------------------------------------------------------------------
+
+ROUTINE:	OLMenuWinFocusAndCallButton
+
+SYNOPSIS:	Places the FOCUS exclusive on the menu button, and then
+		forwards the passed method on to it.
+
+		IMPORTANT: this is not called for popup menus, since they
+		DO NOT have a menu button!
+
+CALLED BY:	OLMenuWinFupKbdChar
+
+PASS:		*ds:si -- handle
+		ax     -- navigation method to call button's parent with
+
+RETURN:		nothing
+
+DESTROYED:	ax, cx, dx, bp, di
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Chris	5/ 2/90		Initial version
+	Eric	6/90		update, more doc.
+
+------------------------------------------------------------------------------@
+
+OLMenuWinFocusAndCallButton	proc	near
+	class	OLMenuWinClass
+	;set *ds:si = OLMenuButtonClass object, and send some methods to it.
+
+	call	KN_DerefVisSpec_DI
+	mov	si, ds:[di].OLPWI_button	;set *ds:si = menu button
+
+EC <	tst	si							>
+EC <	ERROR_Z OL_ERROR			;we MUST have a button	>
+EC <	call	VisCheckVisAssumption		;make sure everything's OK >
+
+	;
+	; skip giving focus to menu button if kbd-char (ESCAPE)
+	;
+	cmp	ax, MSG_META_FUP_KBD_CHAR
+	je	afterFocus
+
+	;first move the focus inside the Primary to the menu button.
+	;(must indicate that is MENU_RELATED!)
+
+	push	ax, cx, dx, bp
+	mov	bp, mask MAEF_OD_IS_MENU_RELATED or \
+		    mask MAEF_GRAB or mask MAEF_FOCUS or mask MAEF_NOT_HERE
+	mov	cx, ds:[LMBH_handle]
+	mov	dx, si
+	mov	ax, MSG_META_MUP_ALTER_FTVMC_EXCL
+	call	ObjCallInstanceNoLock
+	pop	ax, cx, dx, bp			;restore method args
+afterFocus:
+
+	;Do whatever navigation is called for at the menu bar level.
+	;(send to menu button, not its parent, since we might be sending
+	;MSG_META_FUP_KBD_CHAR.)
+	
+	push	ax
+	call	ObjCallInstanceNoLock		;navigate / handle ESCAPE
+	pop	ax
+
+	cmp	ax, MSG_OL_MENU_BUTTON_SEND_RIGHT_ARROW_TO_PARENT_MENU
+	je	exit				;skip if not navigating...
+
+	cmp	ax, MSG_META_FUP_KBD_CHAR		;if not navigating,
+	je	exit				;skip to end...
+
+	;else, was navigating: Find out which object in the window
+	;was navigated to, and send a method which will only activate
+	;menu buttons. Standard OLButtonClass objects will ignore.
+
+	mov	ax, MSG_VIS_VUP_QUERY_FOCUS_EXCL
+	call	VisCallParent		  	;returns focus in cx:dx
+
+	mov	bx, cx				  ;set up focus in ^lbx:si
+	mov	si, dx
+	mov	ax, MSG_OL_MENU_BUTTON_KBD_ACTIVATE
+	mov	di, mask MF_FIXUP_DS
+	call	ObjMessage
+
+exit:
+	ret
+OLMenuWinFocusAndCallButton	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		OLMenuWinSendCloseRequestToParentMenu
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Looks up the generic tree to find an object of class
+		OLMenuWinClass.  The search is continued until an
+		object that is not a subclass of GenInteractionClass is
+		found.  If it finds the menu window, the message
+		MSG_MO_MW_CASCADE_MODE(OMWCMO_START_GRAB) is called.
+		The menu window object's vis part MUST already be built.
+
+CALLED BY:	OLMenuWinKbdCloseSubMenuToParentMenu
+PASS:		*ds:si	= menu object
+RETURN:		*ds:si = current menu object.  (ds is fixed up).
+DESTROYED:	ax, bx, cx, dx, bp, di
+SIDE EFFECTS:
+	WARNING:  This routine MAY resize LMem and/or object blocks, moving
+		  them on the heap and invalidating stored segment pointers
+		  and current register or stored offsets to them.
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	brianc	8/6/99    	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+if	 _CASCADING_MENUS
+OLMenuWinSendCloseRequestToParentMenu	proc	near
+	uses	si, es
+	.enter
+
+	mov	bx, ds:[LMBH_handle]
+	mov	di, ds:[si]
+	add	di, ds:[di].Vis_offset
+	mov	si, ds:[di].OLPWI_button	; ^lbx:si = menu button
+	tst	si
+	jz	done
+
+searchLoop:
+	mov	ax, MSG_VIS_FIND_PARENT
+	mov	di, mask MF_CALL or mask MF_FIXUP_DS
+	call	ObjMessage
+	jcxz	done	
+
+	movdw	bxsi, cxdx			; ^lbx:si = parent
+	call	ObjSwapLock
+
+	segmov	es, <segment GenInteractionClass>, di
+	mov	di, offset GenInteractionClass
+	call	ObjIsObjectInClass
+	jnc	unlock				; break out of loop
+
+	segmov	es, <segment OLMenuWinClass>, di
+	mov	di, offset OLMenuWinClass
+	call	ObjIsObjectInClass
+	cmc
+	jc	unlock				; continue up tree
+
+	mov	cl, mask OMWCMO_START_GRAB
+	mov	ax, MSG_MO_MW_CASCADE_MODE
+	call	ObjCallInstanceNoLock
+	clc
+unlock:
+	call	ObjSwapUnlock
+	jc	searchLoop			; continue if carry set
+done:
+	.leave
+	ret
+OLMenuWinSendCloseRequestToParentMenu	endp
+endif	;_CASCADING_MENUS
+
+
+COMMENT @----------------------------------------------------------------------
+
+FUNCTION:	OLMenuWinKbdCloseSubMenuToParentMenu
+
+DESCRIPTION:	This procedure is used when the left-arrow key is pressed
+		inside the menu. If this menu is not pinned, we close this
+		menu, and place the focus on our menu button,
+		inside the parent menu.
+
+CALLED BY:	OLMenuWinFupKbdChar
+
+PASS:		*ds:si	= instance data for object
+
+RETURN:		nothing
+
+DESTROYED:	?
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Eric	6/90		initial version
+
+------------------------------------------------------------------------------@
+
+OLMenuWinKbdCloseSubMenuToParentMenu	proc	far
+	class	OLMenuWinClass
+
+	call	KN_DerefVisSpec_DI
+	test	ds:[di].OLWI_specState, mask OLWSS_PINNED
+	LONG jnz	done
+
+if ERROR_CHECK
+
+;Do NOT test for WAS_PINNED case.
+;	fail case: pin a sub-menu, then try to navigate to it by going through
+;	the parent menu. Once the sub-menu is visible, press left-arrow to
+;	get back to parent.
+;
+;	test	ds:[di].OLMWI_specState, mask OMWSS_WAS_PINNED 
+;	ERROR_NZ OL_ERROR
+
+	;make sure this menu is a sub-menu
+
+	mov	bx, ds:[di].OLCI_buildFlags	;will be used below
+	ANDNF	bx, mask OLBF_REPLY		;see if we are sub-menu or menu
+	cmp	bx, OLBR_SUB_MENU shl offset OLBF_REPLY
+	ERROR_NE OL_ERROR
+endif
+
+
+
+	;set *ds:si = OLMenuButtonClass object, and send some methods to it.
+
+	push	si			;save *ds:si = submenu
+	mov	si, ds:[di].OLPWI_button ;set *ds:si = menu button
+	push	si			;save menu button
+	call	KN_DerefVisSpec_DI 	;set ds:di = menu button
+
+	;make sure that we have a valid menu button, and that it thinks
+	;this menu is opened
+
+EC <	tst	si							>
+EC <	ERROR_Z OL_ERROR			;we MUST have a button	>
+EC <	call	VisCheckVisAssumption		;make sure everything's OK >
+
+EC <	test	ds:[di].OLMBI_specState, mask OLMBSS_POPUP_OPEN	>
+EC <	ERROR_Z OL_ERROR					>
+
+	;reset OLButton and OLMenuButton state flags for this menu button
+
+	.warn	-private
+
+	ANDNF	ds:[di].OLMBI_specState, not (mask OLMBSS_POPUP_OPEN)
+
+	.warn	@private
+
+	;hack: force the button to reset itself visually (without redrawing),
+	;so that when it gains the focus, it can save this state again.
+
+					;pass ds:di = instance data
+	call	OLButtonRestoreBorderedAndDepressedStatus
+
+	;now make sure that the parent menu that this menu button is inside
+	;gets the focus window exclusive from the GenPrimary.
+
+	mov	ax, MSG_META_GRAB_FOCUS_EXCL
+	call	CallOLWin
+	pop	si			;restore *ds:si = menu button
+
+	;dismiss this menu. It has already lost the focus. This will
+	;cause the menu button to redraw properly.
+
+	pop	di			;set *ds:si = submenu
+	xchg	si, di			;set *ds:di = menu button, *ds:si=menu
+
+	push	si
+	push	di
+if _CASCADING_MENUS
+	;
+	; close last menu only
+	;
+	call	OLMenuWinSendCloseRequestToParentMenu
+else
+	mov	ax, MSG_GEN_GUP_INTERACTION_COMMAND
+	mov	cx, IC_DISMISS
+	call	ObjCallInstanceNoLock
+endif
+	pop	si			;set *ds:si = menu button
+
+
+	;now move the focus inside the parent menu to the menu button.
+	;(DO NOT pass IS_MENU_RELATED flag!) This will cause the menu button
+	;to draw properly. (*ds:si = menu button)
+
+	call	MetaGrabFocusExclLow
+afterGrab:
+	pop	si			;restore *ds:si = menu
+
+done:
+	ret
+OLMenuWinKbdCloseSubMenuToParentMenu	endp
+
+KbdNavigation	ends
+
+
+WinClasses	segment resource
+
+
+COMMENT @----------------------------------------------------------------------
+
+METHOD:		OLMenuWinBringToTop
+
+DESCRIPTION:	Intercepts default handler to check to see if this is an
+		app modal window.  If it is, & it is coming to the top of
+		the screen, then it should be made THE modal window within
+		the application.
+
+PASS:
+	*ds:si - instance data
+	es - segment of MetaClass
+
+	ax - MSG_GEN_BRING_TO_TOP
+
+	cx, dx, bp - ?
+
+RETURN:
+	carry - ?
+	ax, cx, dx, bp - ?
+
+DESTROYED:
+	bx, si, di, ds, es
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Doug	3/90		Initial version
+
+------------------------------------------------------------------------------@
+
+
+;IMPORTANT: this method handler must match OpenWinBringToTop in functionality,
+;except for FOCUS handling.
+
+OLMenuWinBringToTop	method dynamic	OLMenuWinClass, MSG_GEN_BRING_TO_TOP
+
+	;if this window is not opened then abort: the user or application
+	;caused the window to close before this method arrived via the queue.
+
+	call	VisQueryWindow
+	tst	di
+	jz	setGenState		; Skip if window not opened...
+
+	;Raise window to top of window group
+
+	clr	ax
+	clr	dx			; Leave LayerID unchanged
+	call	WinChangePriority
+
+	call	MenuWinScrollerEnsureOnTop
+
+	;if this menu is pinned, DO NOT grab the FOCUS exclusive.
+	;During MSG_META_START_BUTTON, we will determine if a menu item is
+	;being pressed on, and will decide whether to grab the focus.
+	;Note: no need to grab the target exclusive.
+
+	call	WinClasses_DerefVisSpec_DI
+	test	ds:[di].OLWI_specState, mask OLWSS_PINNED
+	jnz	setGenState		;skip if is pinned...
+
+	call	OpenCheckIfMenusTakeFocus
+	jnc	setGenState
+
+	;
+	; Let's try grabbing the mouse.  The problem is that when this menu
+	; comes up, the menu button that created it gets a MSG_META_PTR out
+	; of its bounds, which causes it to release the mouse, and realizing
+	; that it did have the mouse beforehand, causes it to give the focus
+	; back to its parent window.  So submenus never get the focus.
+	; -cbh 6/22/92  (Removed -- causes problems when clicking and 
+	; releasing on the left-edge of submenu menu buttons -- the submenu
+	; goes away without doing anyway when you click on it. -cbh 10/13/92)
+	;
+;	call	VisGrabMouse		
+
+	mov	ax, MSG_META_GRAB_FOCUS_EXCL
+	call	WinClasses_ObjCallInstanceNoLock
+					;Make it the focus window, if posible
+
+setGenState:
+					; Raise the active list entry to
+					; the top, to reflect new/desired
+					; position in window hierarchy.
+					; (If no active list entry, window
+					; isn't up & nothing will be done)
+	mov	cx, ds:[LMBH_handle]
+	mov	dx, si
+	mov	ax, MSG_GEN_APPLICATION_BRING_WINDOW_TO_TOP
+	call	GenCallApplication
+	ret
+OLMenuWinBringToTop	endm
+
+MenuWinScrollerEnsureOnTop	proc	near
+		uses	bx, si, di
+		.enter
+		mov	ax, TEMP_OL_MENU_WIN_SCROLLERS
+		call	ObjVarFindData
+		jnc	done
+		push	ds:[bx].MWSS_downScroller
+		mov	si, ds:[bx].MWSS_upScroller
+		call	ensureScrollerOnTop
+		pop	si
+		call	ensureScrollerOnTop
+done:
+		.leave
+		ret
+
+ensureScrollerOnTop	label	near
+		tst	si
+		jz	ensureDone
+		mov	di, ds:[si]
+		mov	di, ds:[di].MWSI_window
+		tst	di
+		jz	ensureDone
+		clr	ax, dx			; just bring to top of layer
+		call	WinChangePriority
+ensureDone:
+		retn
+MenuWinScrollerEnsureOnTop	endp
+
+
+COMMENT @----------------------------------------------------------------------
+
+FUNCTION:	OLMenuWinGrabGadgetExcl
+
+DESCRIPTION:	This routine ensures that the gadget exclusive mechanism
+		is set up to that it will close this menu if the parent
+		window (GenPrimary) suddenly goes away. Note that this routine
+		works according to whether the mouse or keyboard was used
+		to place the menu in stay-up-mode:
+
+		MOUSE: we send a VUP query through our menu button, so that
+		it will eventually reach the GenPrimary. We grab the gadget
+		exclusive directly from the primary, forcing any higher-level
+		or same-level menus to close.
+
+		KBD: we do absolutely nothing. Since this menu was placed
+		in stay-up mode via the keyboard, the user must have of
+		activated our menu button. Therefore that button has the
+		gadget exclusive, and will close this menu if the button
+		loses the gadget.
+
+PASS:		*ds:si	= instance data for object
+
+RETURN:		nothing
+
+DESTROYED:	?
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Eric	3/90		initial version
+
+------------------------------------------------------------------------------@
+
+OLMenuWinGrabRemoteGadgetExcl	proc	far		; uses GOTO
+	;send query to button or generic parent (do not send to self, in the
+	;hope of deciding whether to send to button or genparent, because self
+	;will handle as if a child had called!) If this query passes through
+	;our menu button, it will reset a state flag and then be sent up the
+	;tree as a standard SVQT_REMOTE_GRAB_GADGET_EXCL query.
+
+	mov	cx, SVQT_NOTIFY_MENU_BUTTON_AND_REMOTE_GRAB_GADGET_EXCL
+	mov	ax, MSG_VIS_VUP_QUERY
+	mov	bp, ds:[LMBH_handle]	;pass ^lbp:dx = this object
+	mov	dx, si
+	GOTO	OLMenuWinCallButtonOrGenParent
+OLMenuWinGrabRemoteGadgetExcl	endp
+
+OLMenuWinReleaseRemoteGadgetExcl	proc	far	; uses GOTO
+
+	mov	cx, SVQT_REMOTE_RELEASE_GADGET_EXCL
+	mov	ax, MSG_VIS_VUP_QUERY
+	mov	bp, ds:[LMBH_handle]	;pass ^lbp:dx = this object
+	mov	dx, si
+	GOTO	OLMenuWinCallButtonOrGenParent
+
+OLMenuWinReleaseRemoteGadgetExcl	endp
+
+
+COMMENT @----------------------------------------------------------------------
+
+METHOD:		OLMenuWinVupQuery -- MSG_VIS_VUP_QUERY for OLMenuWinClass
+
+DESCRIPTION:	Respond to MSG_VIS_VUP_QUERY.
+
+PASS:		*ds:si	= instance data for object
+		ds:di	= specific instance (OLMenuWin)
+		cx	= SpecVisQueryType (see cConstant.def)
+
+RETURN:		carry set if answered query
+
+DESTROYED:	?
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Eric	4/90		initial version
+
+------------------------------------------------------------------------------@
+
+OLMenuWinVupQuery	method dynamic	OLMenuWinClass, MSG_VIS_VUP_QUERY
+
+	cmp	cx, SVQT_HAS_MENU_IN_STAY_UP_MODE
+	je	callSuperIfPinned
+	cmp	cx, SVQT_NO_MENU_IN_STAY_UP_MODE
+	je	callSuperIfPinned	;Both changed from callSuperIfPinned
+					;  so this function actually does
+					;  what it's supposed to in non-pinned
+					;  menus.  -cbh 12/30/93
+					;Changed back to callSuperIfPinned
+					;  to fix problem with submenus not
+					;  staying up if parent menu is not in
+					;  stay up mode. - Joon (7/28/94)
+
+	cmp	cx, SVQT_REMOTE_GRAB_GADGET_EXCL
+	je	callSuperIfPinned		;skip if cannot handle query...
+
+	cmp	cx, SVQT_REMOTE_RELEASE_GADGET_EXCL
+	je	callSuperIfPinned
+
+callSuper:
+	GOTO	WinClasses_ObjCallSuperNoLock_OLMenuWinClass_Far
+
+callSuperIfPinned:
+	;if this is a pinned menu (or will revert back to being a pinned
+	;menu shortly), behave as a base window: call superclass,
+	;so that OLWinClass handles this query as if this window was
+	;a GenPrimary. Otherwise (is normal menu), send query up tree.
+
+	FALL_THRU OLMenuWinCallSuperIfPinned
+OLMenuWinVupQuery	endm
+
+
+COMMENT @----------------------------------------------------------------------
+
+FUNCTION:	OLMenuWinCallSuperIfPinned
+
+DESCRIPTION:	If this menu is pinned (or will shortly revert back to being
+		pinned), then behave as a base window: call superclass,
+		so that OLWinClass handles this query as if this window was
+		a GenPrimary.
+
+CALLED BY:	OLMenuWinVupQuery, OLMenuWinVupGrabFocusWinExcl
+
+PASS:		*ds:si	= instance data for object
+		es	= segment of OLMenuWinClass
+		ax	= method to send
+		cx, dx, bp = data to send with method
+
+RETURN:		nothing
+
+DESTROYED:	?
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Eric	6/90		initial version
+
+------------------------------------------------------------------------------@
+
+OLMenuWinCallSuperIfPinned	proc	far
+	class	OLMenuWinClass
+	call	WinClasses_DerefVisSpec_DI
+	test	ds:[di].OLWI_specState, mask OLWSS_PINNED 
+	jnz	callSuper		;skip if pinned (cy=0)...
+
+	test	ds:[di].OLMWI_specState, mask OMWSS_WAS_PINNED 
+	jnz	callSuper		;skip if pinned (cy=0)...
+
+	;this menu is not pinned: is an intermediate menu inbetween the
+	;requesting submenu, and the base window. Forward up the tree:
+	;if has a menu button, send VUP_QUERY from that button. Otherwise,
+	;send to generic parent and pray!
+
+	GOTO	OLMenuWinCallButtonOrGenParent
+
+callSuper:
+	GOTO	WinClasses_ObjCallSuperNoLock_OLMenuWinClass_Far
+OLMenuWinCallSuperIfPinned	endp
+
+OLMenuWinCallButtonOrGenParent	proc	far	;called via GOTO
+	class	OLMenuWinClass
+	;this menu is not pinned: is an intermediate menu inbetween the
+	;requesting submenu, and the base window. Forward up the tree:
+	;if has a menu button, send VUP_QUERY from that button. Otherwise,
+	;send to generic parent and pray!
+
+	call	WinClasses_DerefVisSpec_DI
+
+	.warn	-private
+
+	tst	ds:[di].OLPWI_button	;do we have a menu button?
+
+	.warn	@private
+
+	jz	callGenParent		;skip if not...
+
+	call	OLPopupWinSendToButton	; (is movable, so no GOTO)
+	ret
+
+callGenParent:
+	GOTO	GenCallParent
+OLMenuWinCallButtonOrGenParent	endp
+
 
 
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLMenuedWinFindKbdAccelerator -- 
-		MSG_GEN_FIND_KBD_ACCELERATOR for OLMenuedWinClass
+METHOD:		OLMenuWinAlterFTVMCExcl
 
-DESCRIPTION:	Finds any keyboard accelerators.  Subclassed here to find
-		anything in the MDI windows menu, a child of the menu bar.
+DESCRIPTION:	We intercept this method here so that if a sub-menu requests
+		the focus window exclusive from an un-pinned menu,
+		we forward the request on up to the parent window (GenPrimary
+		or GenDisplay).
+
+PASS:		*ds:si - instance data
+		ax - MSG_VIS_VUP_ALTER_FTVMC_Excl
+		^lcx:dx	- OD of object
+		bp	- MetaAlterFTVMCExclFlags for object
+
+RETURN:
+
+DESTROYED:	bx, si, di, ds, es
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Eric	6/90		initial version
+	Doug	10/91		merged VUP_GRAB & VUP_RELEASE handlers here
+
+------------------------------------------------------------------------------@
+
+OLMenuWinAlterFTVMCExcl	method dynamic	OLMenuWinClass,	\
+					MSG_META_MUP_ALTER_FTVMC_EXCL
+
+	test	bp, mask MAEF_NOT_HERE	; if asking for exclusive ourself,
+	jnz	callSuper		; let superclass do right thing
+
+	; If a child object, however, decide what to do with request
+	;
+	test	bp, mask MAEF_FOCUS	; If not focus,
+	jz	callSuper		; send request to superclass
+
+	; Otherwise, figure out if we should redirect request
+	;
+	test	bp, mask MAEF_GRAB
+	jz	release
+
+;grab:
+	; First, see if sub-menu requesting grab.  If not, just pass on
+	; request to superclass for normal handling
+	;
+	test	bp, mask MAEF_OD_IS_WINDOW
+	jz	callSuper
+	test	bp, mask MAEF_OD_IS_MENU_RELATED
+	jz	callSuper
+
+	;if this is a pinned menu (or will revert back to being a pinned
+	;menu shortly), behave as a base window: call superclass,
+	;so that OLWinClass handles this query as if this window was
+	;a GenPrimary. Otherwise (is normal menu), send query up tree.
+
+	GOTO	OLMenuWinCallSuperIfPinned
+
+release:
+	;Typically, we could just call OLMenuWinCallSuperIfPinned, and
+	;it would decide whether this menu should handle this VUP, or if it
+	;should forward it up to the Primary. But we have a situation where
+	;as this pinned menu is CLOSING, its system menu closes, and releases
+	;the focus window exclusive from this pinned menu. The problem is that
+	;since this menu is closing, the PINNED flag has been reset,
+	;and so we would forward this VUP to the Primary, when in fact we
+	;should handle it here, since this menu was recently pinned.
+
+	test	ds:[di].OLWI_specState, mask OLWSS_PINNED 
+	jnz	callSuper		;skip if pinned (cy=0)...
+
+	test	ds:[di].OLMWI_specState, mask OMWSS_WAS_PINNED 
+	jnz	callSuper		;skip if pinned (cy=0)...
+
+	;If not pinned, might have been recently pinned, or object releasing
+	;is not a sub-menu which grabbed the focus from the primary, so
+	;check to see if object actually does have grab here before sending
+	;on to primary.
+
+	cmp	cx, ds:[di].OLWI_focusExcl.FTVMC_OD.handle
+	jne	10$
+	cmp	dx, ds:[di].OLWI_focusExcl.FTVMC_OD.chunk
+	je	callSuper		;skip to release exclusive from THIS
+					;windowed object...
+
+	;(no need to check the OLWI_prevFocusExcl, since menu ODs are not
+	;stored there: just gadgets, and they don't send RELEASE_FOCUS_EXCL)
+
+10$:	;this menu is not pinned: is an intermediate menu inbetween the
+	;requesting submenu, and the base window. Forward up the tree:
+	;if has a menu button, send VUP_QUERY from that button. Otherwise,
+	;send to generic parent and pray!
+
+	GOTO	OLMenuWinCallButtonOrGenParent
+
+callSuper:
+	;
+	; fix problem of opening and pinning a submenu from a pinned menu
+	; resulting in the focus being returned to the pinned menu instead
+	; of the previous focus in the Primary -- if after release the focus
+	; for the becoming-pinned sub-menu, we are focus-less, then release
+	; the focus from ourselves.  We will still have a focus if you open
+	; the submenu, then close it via kbd navigation.  - brianc 1/22/93
+	;
+	push	bp
+	call	WinClasses_ObjCallSuperNoLock_OLMenuWinClass
+	pop	bp
+	test	bp, mask MAEF_GRAB or mask MAEF_NOT_HERE
+	jnz	done			; not submenu release
+	test	bp, mask MAEF_FOCUS
+	jz	done			; not focus
+	call	WinClasses_DerefVisSpec_DI
+	tst	ds:[di].OLWI_focusExcl.FTVMC_OD.handle
+	jnz	done			; have focus
+
+; Should we do this test also - brianc 1/22/93
+; Yes.  2/24/94 cbh (
+
+	test	ds:[di].OLWI_specState, mask OLWSS_PINNED 
+	jz	done			; wasn't pinned
+; )
+
+	call	MetaReleaseFocusExclLow
+	;
+	; Give focus to next best window (will usually turn out to be the
+	; current target window)
+	;
+	mov	ax, MSG_META_ENSURE_ACTIVE_FT
+	call	GenCallApplication
+done:
+	ret
+OLMenuWinAlterFTVMCExcl	endm
+
+
+COMMENT @----------------------------------------------------------------------
+
+METHOD:		OLMenuWinRecalcSize -- 
+		MSG_VIS_RECALC_SIZE for OLMenuWinClass
+
+DESCRIPTION:	Recalc's size.
+
+PASS:		*ds:si 	- instance data
+		es     	- segment of MetaClass
+		ax 	- MSG_VIS_RECALC_SIZE
+
+		cx, dx  - size suggestions
+
+RETURN:		cx, dx  - size to use
+		ax, bp - destroyed
+
+ALLOWED TO DESTROY:	
+		bx, si, di, ds, es
+
+REGISTER/STACK USAGE:
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	chris	5/ 1/92		Initial Version
+
+------------------------------------------------------------------------------@
+
+OLMenuWinRecalcSize	method dynamic OLMenuWinClass, MSG_VIS_RECALC_SIZE
+	call	MenuWinPassMarginInfo
+	call	OpenRecalcCtrlSize
+	ret
+OLMenuWinRecalcSize	endm
+
+
+
+
+
+COMMENT @----------------------------------------------------------------------
+
+METHOD:		OLMenuWinVisPositionBranch -- 
+		MSG_VIS_POSITION_BRANCH for OLMenuWinClass
+
+DESCRIPTION:	Positions the object.
+
+PASS:		*ds:si 	- instance data
+		es     	- segment of MetaClass
+		ax 	- MSG_VIS_POSITION_BRANCH
+		cx, dx  - position
+
+RETURN:		nothing
+		ax, cx, dx, bp - destroyed
+
+ALLOWED TO DESTROY:	
+		bx, si, di, ds, es
+
+REGISTER/STACK USAGE:
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	chris	5/ 1/92		Initial Version
+
+------------------------------------------------------------------------------@
+
+OLMenuWinVisPositionBranch	method dynamic	OLMenuWinClass, \
+				MSG_VIS_POSITION_BRANCH
+
+	call	MenuWinPassMarginInfo	
+	call	VisCompPosition
+	ret
+OLMenuWinVisPositionBranch	endm
+
+
+
+
+COMMENT @----------------------------------------------------------------------
+
+ROUTINE:	MenuWinPassMarginInfo
+
+SYNOPSIS:	Passes margin info for OpenRecalcCtrlSize.
+
+CALLED BY:	OLMenuWinRecalcSize, OLMenuWinPositionBranch
+
+PASS:		*ds:si -- MenuWin bar
+
+RETURN:		bp -- VisCompMarginSpacingInfo
+
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Chris	5/ 1/92		Initial version
+
+------------------------------------------------------------------------------@
+
+MenuWinPassMarginInfo	proc	near		uses	cx, dx
+	.enter
+	call	OLMenuWinGetSpacing		;first, get spacing
+
+	push	cx, dx				;save spacing
+	call	OpenWinGetMargins		;margins in ax/bp/cx/dx
+	pop	di, bx
+	call	OpenPassMarginInfo
+exit:
+	.leave
+	ret
+MenuWinPassMarginInfo	endp
+
+WinClasses	ends
+
+;-------------------------------
+
+WinMethods	segment resource
+
+
+COMMENT @----------------------------------------------------------------------
+
+METHOD:		OLMenuWinGetSpacing --
+		MSG_VIS_COMP_GET_CHILD_SPACING for OLMenuWinClass
+
+DESCRIPTION:	Handles spacing for the OLMenuWinClass.  Makes very small
+		spacing between the non-outlined buttons in unpinned menus.
+
+PASS:		*ds:si 	- instance data
+		es     	- segment of MetaClass
+		ax 	- MSG_VIS_COMP_GET_CHILD_SPACING
+
+RETURN:		cx	- spacing between children
+		dx	- spacing between lines of wrapped children
+
+DESTROYED:	bx, si, di, ds, es
+
+REGISTER/STACK USAGE:
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Chris	9/18/89		Initial version
+
+------------------------------------------------------------------------------@
+
+OLMenuWinGetSpacing method OLMenuWinClass, MSG_VIS_COMP_GET_CHILD_SPACING
+	;
+	; Do normal window stuff.
+	;
+	mov	cx, MENU_SPACING		;no spacing between menu items
+	mov	dx, cx
+
+if _MENUS_PINNABLE	;------------------------------------------------------
+if _OL_STYLE	;START of OPEN_LOOK specific code -----------------------------
+
+	mov	di, ds:[si]			;point to instance
+	add	di, ds:[di].Vis_offset		;ds:[di] -- SpecInstance
+	test	ds:[di].OLWI_specState, mask OLWSS_PINNED   ;if pinned, exit
+	jnz	OLMWGS_exit
+	mov	cx, 1				;else very minimal spacing
+OLMWGS_exit:
+endif
+endif
+	ret
+OLMenuWinGetSpacing	endp
+
+WinMethods	ends
+
+;-------------------------------
+
+KbdNavigation	segment resource
+
+
+COMMENT @----------------------------------------------------------------------
+
+METHOD:		OLMenuWinFindKbdAccelerator -- 
+		MSG_GEN_FIND_KBD_ACCELERATOR for OLMenuWinClass
+
+DESCRIPTION:	Looks for keyboard accelerator.  The only reason this is
+		subclassed is to set the gadget exclusive when we activate
+		the menu button.
 
 PASS:		*ds:si 	- instance data
 		es     	- segment of MetaClass
@@ -2351,971 +3686,976 @@ KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
-	Chris	5/ 2/90		Initial version
+	Chris	5/ 4/90		Initial version
 
 ------------------------------------------------------------------------------@
 
-if (0)	; OLMenuBarClass doesn't intercept MSG_GEN_FIND_KBD_ACCELERATOR
+OLMenuWinFindKbdAccelerator method OLMenuWinClass, \
+				   MSG_GEN_FIND_KBD_ACCELERATOR
+	call	GenCheckKbdAccelerator		;see if we have a match
+	jnc	exit				;nope, exit
+	
+	call	KN_DerefVisSpec_DI
+	mov	si, ds:[di].OLPWI_button	;application releasing the
+	tst	si				;no button, exit
+	jz	exit			
 
-OLMenuedWinFindKbdAccelerator	method dynamic OLMenuedWinClass, \
-				MSG_GEN_FIND_KBD_ACCELERATOR
-	mov	si, ds:[di].OLMDWI_menuBar	;else find menu bar	
-	tst	si				;is there one?
-	jz	exit				;no, exit (carry should be 
-						;  clear from tst)
-	call	ObjCallInstanceNoLock		;else send to menu bar.
+	mov	bx, ds:[LMBH_handle]
+	mov	ax, MSG_OL_BUTTON_KBD_ACTIVATE
+	mov	di, mask MF_FORCE_QUEUE
+	call	ObjMessage
+	stc
 exit:
 	ret
-OLMenuedWinFindKbdAccelerator	endm
-
-endif	; if (0)
-
-
-
-COMMENT @----------------------------------------------------------------------
-
-METHOD:		OLMenuedWinQueryMenuBar -- 
-		MSG_OL_WIN_QUERY_MENU_BAR for OLMenuedWinClass
-
-DESCRIPTION:	Returns menu bar handle in cx.  
-
-PASS:		*ds:si 	- instance data
-		es     	- segment of MetaClass
-		ax 	- MSG_OL_WIN_QUERY_MENU_BAR
-
-RETURN:		cx 	- menu bar handle, of zero if none
-
-DESTROYED:	bx, si, di, ds, es
-
-REGISTER/STACK USAGE:
-
-PSEUDO CODE/STRATEGY:
-
-KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	Chris	5/18/90		Initial version
-
-------------------------------------------------------------------------------@
-
-OLMenuedWinQueryMenuBar	method dynamic OLMenuedWinClass, \
-						MSG_OL_WIN_QUERY_MENU_BAR
-	mov	cx, ds:[di].OLMDWI_menuBar	;get the menu bar handle	
-	ret
-OLMenuedWinQueryMenuBar	endm
-
-KbdNavigation ends
-
-Geometry	segment resource
-
-
-COMMENT @----------------------------------------------------------------------
-
-METHOD:		OLMenuedWinSetIconPos -- 
-		MSG_OL_MW_SET_ICON_POS for OLMenuedWinClass
-
-DESCRIPTION:	Sets a new slot and position (if there is a slot) for the icon.
-
-PASS:		*ds:si 	- instance data
-		es     	- segment of MetaClass
-		ax 	- MSG_OL_MW_SET_ICON_POS
-		cx, dx  - new icon position
-		bp low  - new slot
-
-RETURN:		nothing
-
-DESTROYED:	bx, si, di, ds, es
-
-REGISTER/STACK USAGE:
-
-PSEUDO CODE/STRATEGY:
-
-KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	Chris	6/29/90		Initial version
-
-------------------------------------------------------------------------------@
-
-ifndef NO_WIN_ICONS	;------------------------------------------------------
-
-OLMenuedWinSetIconPos	method OLMenuedWinClass, MSG_OL_MW_SET_ICON_POS
-
-	;Store new icon position.
-
-	mov	di, ds:[si]
-	add	di, ds:[di].Vis_offset
-	test	bp, mask WPSS_STAGGERED_SLOT shr 8
-	jz	10$				;no slot, don't set icon pos
-	
-	mov	ds:[di].OLMDWI_iconPosLeft, cx	;store new position
-	mov	ds:[di].OLMDWI_iconPosTop, dx
-
-10$:	;Store new slot number.
-
-	mov	dl, {byte} ds:[di].OLMDWI_iconWinPosSizeState+1
-	and	dl, not (mask WPSS_STAGGERED_SLOT shr 8)
-	mov	cx, bp				;put slot in cl
-	or	cl, dl				;or in new slot
-	mov	{byte} ds:[di].OLMDWI_iconWinPosSizeState+1, cl
-	ret
-OLMenuedWinSetIconPos	endm
-
-endif			; ifndef NO_WIN_ICONS ---------------------------------
-
-Geometry	ends
-
-
-Unbuild	segment resource
-
-
-COMMENT @----------------------------------------------------------------------
-
-METHOD:		OLMenuedWinQuit -- 
-		MSG_META_QUIT for OLMenuedWinClass
-
-DESCRIPTION:	Handles a quit.  Frees its corresponding icon.
-
-PASS:		*ds:si 	- instance data
-		es     	- segment of MetaClass
-		ax 	- MSG_META_QUIT
-
-RETURN:		nothing
-
-DESTROYED:	bx, si, di, ds, es
-
-REGISTER/STACK USAGE:
-
-PSEUDO CODE/STRATEGY:
-
-KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	Chris	6/28/90		Initial version
-
-------------------------------------------------------------------------------@
-
-OLMenuedWinQuit	method OLMenuedWinClass, MSG_META_QUIT
-	mov	di, offset OLMenuedWinClass
-	call	ObjCallSuperNoLock
-	
-	;Release its staggered slot # if it has one.
-	;This will affect both the instance data for the object
-	;and the data that might be saved.
-
-	call	OpenWinFreeStaggeredSlot
-	
-ifndef NO_WIN_ICONS	;------------------------------------------------------
-
-	;Release the icon slot as well.
-	
-	mov	di, ds:[si]			
-	add	di, ds:[di].Vis_offset
-	mov	dl, {byte} ds:[di].OLMDWI_iconWinPosSizeState+1
-	ANDNF	dl, mask WPSS_STAGGERED_SLOT shr 8
-					;only keep slot # (including ICON flag)
-	test	dl, mask SSPR_SLOT	;test for slot # (ignore ICON flag)
-	jz	done			;skip if not STAGGERED...
-	mov	cx, SVQT_FREE_STAGGER_SLOT
-	mov	ax, MSG_VIS_VUP_QUERY
-	call	VisCallParent
-done:
-endif			; ifndef NO_WIN_ICONS ---------------------------------
-
-	ret
-OLMenuedWinQuit	endm
-
-Unbuild	ends
-
-
-WinCommon	segment resource
-
-
-COMMENT @----------------------------------------------------------------------
-
-METHOD:		OLMenuedWinStartSelect -- 
-		MSG_META_START_SELECT for OLMenuedWinClass
-
-DESCRIPTION:	Handles a mouse press.   Handles if doubleclick; otherwise
-		sends to superclass.
-
-PASS:		*ds:si 	- instance data
-		es     	- segment of MetaClass
-		ax 	- MSG_META_START_SELECT
-
-		ax	- method
-		cx, dx	- ptr position
-		bp	- [ UIFunctionsActive | buttonInfo ]
-
-
-RETURN:		ax 	- MRF_PROCESSED, etc.
-
-DESTROYED:	bx, si, di, ds, es
-
-REGISTER/STACK USAGE:
-
-PSEUDO CODE/STRATEGY:
-
-KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	Chris	7/16/90		Initial version
-
-------------------------------------------------------------------------------@
-
-if	_CUA_STYLE
-	
-OLMenuedWinStartSelect	method OLMenuedWinClass, MSG_META_START_SELECT
-
-if not KEYBOARD_ONLY_UI
-	test	bp, (mask UIFA_SELECT) shl 8
-	jz	callSuper			;nope, skip
-	test	bp, mask BI_DOUBLE_PRESS	;see if doublepress
-	jz	callSuper			;nope, skip
-
-	mov	di, ds:[si]			
-	add	di, ds:[di].Vis_offset
-	call	MouseInTitleBounds?		;see if in title area
-	jnc	callSuper			;no, skip
-if _GCM
-	test	ds:[di].OLWI_fixedAttr, mask OWFA_GCM_TITLED
-	jnz	callSuper			;no doubleclicks in GCM mode
-endif
-	;
-	; Toggle the maximized state.
-	;
-	test	ds:[di].OLWI_specState, mask OLWSS_MAXIMIZED
-	jz	10$				;not currently max'ed, branch
-	;
-	; Currently maximized.  We want to restore it.
-	;
-	test	ds:[di].OLWI_fixedAttr, mask OWFA_RESTORABLE
-	jz	callSuper			;not restorable, skip
-	mov	ax, MSG_OL_RESTORE_WIN	;else we want to restore
-	jmp	short 20$
-10$:
-	;
-	; Currently unmaximized.
-	;
-	test	ds:[di].OLWI_attrs, mask OWA_MAXIMIZABLE	
-	jz	callSuper			;not maximizable, skip
-EC <	;before we load up MSG_GEN_DISPLAY_SET_MAXIMIZED, make sure it	>
-EC <	;is a GenDisplay...						>
-EC <	push	es, di							>
-EC <	mov	di, segment GenDisplayClass				>
-EC <	mov	es, di							>
-EC <	mov	di, offset GenDisplayClass				>
-EC <	call	ObjIsObjectInClass					>
-EC <	pop	es, di							>
-EC <	ERROR_NC	OL_ERROR					>
-	mov	ax, MSG_GEN_DISPLAY_SET_MAXIMIZED	;we want to maximize
-20$:
-	call	ObjCallInstanceNoLock
-	mov	ax, mask MRF_PROCESSED
-	ret
-	
-callSuper:
-endif
-
-	mov	ax, MSG_META_START_SELECT		;reset method	
-	mov	di, offset OLMenuedWinClass
-	CallSuper	MSG_META_START_SELECT	;send to superclass
-	ret
-OLMenuedWinStartSelect	endm
-
-endif
-
-WinCommon	ends
-
-
-KbdNavigation	segment resource
-	
-
-COMMENT @----------------------------------------------------------------------
-
-METHOD:		OLMenuedWinKbdChar -- 
-		MSG_META_FUP_KBD_CHAR for OLMenuedWinClass
-
-DESCRIPTION:	Handles keyboard characters, in order to do MenuedWin 
-		shortcuts.
-
-PASS:		*ds:si 	- instance data
-		es     	- segment of MetaClass
-		ax 	- MSG_META_FUP_KBD_CHAR
-		cx = character value
-		dl = CharFlags
-		dh = ShiftState (ModBits)
-		bp low = ToggleState
-		bp high = scan code
-
-RETURN:		carry set if handled
-
-DESTROYED:	bx, si, di, ds, es
-
-REGISTER/STACK USAGE:
-
-PSEUDO CODE/STRATEGY:
-
-KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	Chris	4/12/90		Initial version
-
-------------------------------------------------------------------------------@
-
-OLMenuedWinKbdChar	method OLMenuedWinClass, MSG_META_FUP_KBD_CHAR
-						; If a modal window is up,
-						; go ahead & process kbd input
-						; for it (ignore input
-						; overridden)
-if _KBD_NAVIGATION and _USE_KBD_ACCELERATORS
- 
-	mov	di, ds:[si]			
-	add	di, ds:[di].Vis_offset
-if _GCM
-	test	ds:[di].OLWI_fixedAttr, mask OWFA_GCM_TITLED
-	jz	afterLocalShortcuts		; not GCM, local shortcuts
-						;   handled by system menu
-endif
-
-if not _JEDIMOTIF ;------------------------------------------------------------
-	;
-	; See if there is currently a modal window up.  If there is, we
-	; want to just do accelerators for that window.
-	;
-	;Don't handle state keys (shift, ctrl, etc).
-	;
-	test	dl, mask CF_FIRST_PRESS or mask CF_REPEAT_PRESS
-	jz	afterLocalShortcuts		;skip if not press event...
-
-	push	es
-						;set es:di = table of shortcuts
-						;and matching methods
-	mov	di, cs
-	mov	es, di
-	mov	di, offset cs:OLMenuedWinKbdBindings
-	call	ConvertKeyToMethod
-	pop	es
-	jnc	afterLocalShortcuts		;no match, branch
-
-	;found a shortcut: send method to self.
-	;
-	call	ObjCallInstanceNoLock
-	stc					;say handled
-	jmp	short done
-
-endif	; !_JEDIMOTIF ----------------------------------------------------------
-
-afterLocalShortcuts:
-
-endif	; _KBD_NAVIGATION and _USE_KBD_ACCELERATORS ----------------------------
-
-if FUNCTION_KEYS_MAPPED_TO_MENU_BAR_BUTTONS
-	;
-	; If between F1-F4, pass number from 0 to 3 to menu bar...
-	;
-	test	dl, mask CF_FIRST_PRESS
-	jz	callField		;skip if not press event...
-
-	test	dh, mask SS_LCTRL or mask SS_RCTRL or mask SS_LALT or mask SS_RALT
-	jnz	callField
-if _JEDIMOTIF	;--------------------------------------------------------------
-	;
-	;  If it's the UC_MENU key, activate the app menu.
-	;
-DBCS <PrintMessage<checking for UC_MENU doesn't work in DBCS>>
-	cmp	cx, (CS_UI_FUNCS shl 8) or UC_MENU
-	jne	doneMenu
-SBCS <	mov	cx, 5 + ((CS_CONTROL shl 8) or VC_F1)	; no time for beauty>
-DBCS <	mov	cx, 5 + C_SYS_F1)			; no time for beauty>
-	jmp	callMenu
-doneMenu:
-endif	;-----------------------------------------------------------------------
-SBCS <	cmp	cx, (CS_CONTROL shl 8) or VC_F1		;F1  key?	>
-DBCS <	cmp	cx, C_SYS_F1				;F1 key?	>
-	jb	callField
-
-if _JEDIMOTIF ;--------------------
-
-	;
-	; F1-F5 plus F6 for App Menu
-	;
-SBCS <	cmp	cx, (CS_CONTROL shl 8) or VC_F6		;go up to F6	>
-DBCS <	cmp	cx, C_SYS_F6				;F6 key?	>
-	ja	callField
-else
-
-SBCS <	cmp	cx, (CS_CONTROL shl 8) or VC_F4		;F4  key?	>
-DBCS <	cmp	cx, C_SYS_F4				;F4 key?	>
-	ja	callField
-
-endif	; _JEDIMOTIF ---------------
-
-callMenu::
-	mov	di, ds:[si]			
-	add	di, ds:[di].Vis_offset
-	tst	ds:[di].OLMDWI_menuBar
-	jz	sendItUp
-
-SBCS <	sub	cx, (CS_CONTROL shl 8) or VC_F1				>
-DBCS <	sub	cx, C_SYS_F1						>
-
-	mov	si, ds:[di].OLMDWI_menuBar
-	mov	ax, MSG_OL_MENU_BAR_ACTIVATE_TRIGGER
-	call	ObjCallInstanceNoLock
-	stc
-	jmp	short done
-endif
-
-callField:
-
-sendItUp::
-	mov	ax, MSG_META_FUP_KBD_CHAR
-	mov	di, offset OLMenuedWinClass
-	call	ObjCallSuperNoLock
-done:
-	ret
-	
-OLMenuedWinKbdChar	endm
-
-
-if _KBD_NAVIGATION and _USE_KBD_ACCELERATORS ; --------------------------------
-
-;Keyboard shortcut bindings for OLMenuedWinClass
-
-if not _JEDIMOTIF
-
-OLMenuedWinKbdBindings	label	word
-	word	length OLMWinShortcutList
-if DBCS_PCGEOS
-	;p  a  c  s   c
-	;h  l  t  h   h
-	;y  t  r  f   a
-	;s     l  t   r
-	;
-OLMWinShortcutList KeyboardShortcut \
-	<0, 1, 0, 0, C_SYS_F4 and mask KS_CHAR>		;F4 = close window
-else
-	 ;P     C  S     C
-	 ;h  A  t  h  S  h
-	 ;y  l  r  f  e  a
-	 ;s  t  l  t  t  r
-OLMWinShortcutList	KeyboardShortcut \
-	<0, 1, 0, 0, 0xf, VC_F4>	;close window
-endif
-;OLMWinMethodList	label word
-	word	MSG_OL_WIN_CLOSE
-
-endif	; not _JEDIMOTIF
-
-endif	; _KBD_NAVIGATION and _USE_KBD_ACCELERATORS ---------------------------
+OLMenuWinFindKbdAccelerator	endm
 
 KbdNavigation	ends
 
 
-WinClasses	segment resource
+WinMethods	segment resource
 
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLMenuedWinLostSysExcl -- MSG_META_LOST_SYS_FOCUS_EXCL
+FUNCTION:	OLMenuWinLostGadgetExcl
 
-DESCRIPTION:	We've just lost the sys focus exclusive. This is mainly
-		handled by CWin/cwinExcl.asm (OLWinClass), but at this level
-		we want to reset the gadget exclusive within this window,
-		to ensure that the user is not interacting with any
-		gadgets or menus inside this Primary or Display.
+DESCRIPTION:	This method is sent when some other object in the parent window
+		(GenPrimary or pinned parent menu) grabs the gadget exclusive.
 
-PASS:		*ds:si - instance data
-		ax - MSG_META_LOST_SYS_FOCUS_EXCL
-		cx, dx, bp = ?
+		NOTE: if we get this method, it means that we HAVE the
+		gadget exclusive; so therefore this menu is in stay-up-mode,
+		or is a popup menu which is being held open.
+		If the menu button which opens this menu is grabbing the
+		gadget exclusive, we ignore this loss, because we know
+		this button is going to open this menu shortly.
 
-RETURN:
+PASS:		*ds:si	= instance data for object
 
-DESTROYED:	bx, di, es
+RETURN:		nothing
+
+DESTROYED:	ax, cx, dx, bp
 
 PSEUDO CODE/STRATEGY:
 
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
-	Eric	10/90		Initial version
+	Eric	5/90		initial version
 
 ------------------------------------------------------------------------------@
 
-OLMenuedWinLostSysExcl	method dynamic	OLMenuedWinClass, \
-						MSG_META_LOST_SYS_FOCUS_EXCL
-	push	ax
+OLMenuWinLostGadgetExcl	method dynamic	OLMenuWinClass, MSG_VIS_LOST_GADGET_EXCL
 
-	; Make sure the user isn't interacting with any gadgets or menus.
-	; As we're in the middle of updating the focus hierarchy, wait until
-	; that has completed, before nuked the gadget excl, otherwise we can
-	; end up in some nested update situations.	-- Doug 9/17/92
-	;
-	mov	ax, MSG_VIS_TAKE_GADGET_EXCL
-	clr	cx			;grab active exclusive semaphore:
-	clr	dx			;will notify open menu and force it to
-					;close up toute suite.
-	mov	bx, ds:[LMBH_handle]
-	mov	di, mask MF_FORCE_QUEUE or mask MF_INSERT_AT_FRONT
-	call	ObjMessage
+	mov	di, ds:[di].OLPWI_button
+	tst	di			;do we have a menu button?
+	jz	genDismissInteraction	;skip if not (is popup menu)...
 
-	pop	ax
-	mov	di, offset OLMenuedWinClass
-	GOTO	ObjCallSuperNoLock
+	;this is a standard menu: if menu button is going to open menu,
+	;DO NOT close menu now! (*ds:di = OLMenuButtonClass object)
 
-OLMenuedWinLostSysExcl	endp
+	.warn	-private
 
-			
+	mov	di, ds:[di]		;set ds:di = Spec instance data for
+	add	di, ds:[di].Vis_offset	;the OLMenuButtonClass object
+	test	ds:[di].OLBI_specState, mask OLBSS_HAS_MOUSE_GRAB
 
-
-COMMENT @----------------------------------------------------------------------
+	.warn	@private
 
-METHOD:		OLMenuedWinDetermineVisParentForChild -- 
-		MSG_SPEC_DETERMINE_VIS_PARENT_FOR_CHILD for OLMenuedWinClass
+	jz	genDismissInteraction	;skip if button not pressed...
 
-DESCRIPTION:	Determines a child's visible parent.
+	;ignore this LOST_GADGET event, since the button will shortly
+	;open this menu again.
 
-PASS:		*ds:si 	- instance data
-		es     	- segment of MetaClass
-		ax 	- MSG_SPEC_DETERMINE_VIS_PARENT_FOR_CHILD
-		^lcx:dx - child
-		bp -- SpecBuildFlags
-
-RETURN:		carry set if something special found
-		^lcx:dx - vis parent to use, or null if nothing found
-		bp -- SpecBuildFlags
-		ax -- destroyed
-
-ALLOWED TO DESTROY:	
-		bx, si, di, ds, es
-
-REGISTER/STACK USAGE:
-
-PSEUDO CODE/STRATEGY:
-
-KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	Chris	5/18/91		Initial version
-
-------------------------------------------------------------------------------@
-OLMenuedWinDetermineVisParentForChild	method OLMenuedWinClass, \
-				MSG_SPEC_DETERMINE_VIS_PARENT_FOR_CHILD
-	
-	;
-	;  Check for title-bar left/right group, which should
-	;  be directly below us.
-	;
-	call	WinClasses_DerefVisSpec_DI 
-	cmp	cx, ds:[di].OLWI_titleBarLeftGroup.handle
-	jne	notTitleBarLeft
-	cmp	dx, ds:[di].OLWI_titleBarLeftGroup.chunk
-	je	exitNoSpecialChild
-notTitleBarLeft:
-	cmp	cx, ds:[di].OLWI_titleBarRightGroup.handle
-	jne	notTitleBarRight
-	cmp	dx, ds:[di].OLWI_titleBarRightGroup.chunk
-	je	exitNoSpecialChild
-notTitleBarRight:
-
-	cmp	cx, ds:[di].OLWI_sysMenu	;same block as system menu?
-	jne	checkTitleGroup			;no, not a window button
-
-	;
-	; Check for various window buttons, and let them be directly
-	; below us.
-	;
-if not _REDMOTIF ;----------------------- Not needed for Redwood project
-	cmp	dx, offset SMI_MinimizeIcon
-	je	exitNoSpecialChild
-	cmp	dx, offset SMI_MaximizeIcon
-	je	exitNoSpecialChild
-	cmp	dx, offset SMI_RestoreIcon
-	je	exitNoSpecialChild
-endif ; not _REDMOTIF ;------------------- Not needed for Redwood project
-
-checkTitleGroup:
-	;
-	;  If this object wants to be in the title bar, return
-	;  the appropriate title-bar group as the parent.
-	;
-	call	MaybeInTitleBar			; carry set if in title bar
-	jc	exit				; ^lcx:dx = parent
-
-if _ALLOW_MISC_GADGETS_IN_MENU_BAR	;--------------------------------------
-	;
-	;  If this object wants to be in the menu bar, return
-	;  the menu-bar group as the parent.
-	;
-	call	MaybeInMenuBar
-	jc	exit		
-endif	; _ALLOW_MISC_GADGETS_IN_MENU_BAR ------------------------------------
-
-putUnderGadgetArea::
-	;
-	;  By default the object goes in the gadget area.
-	;
-	mov	si, ds:[di].OLMDWI_gadgetArea	;see if there is anything
-	tst	si
-	jz	exit				;exit (carry should be clear)
-	
-	mov	dx, si
-	mov	cx, ds:[LMBH_handle]		;else return ^lbx:si
-	stc					;say found
-	jmp	short exit
-	
-exitNoSpecialChild:
-	clr	cx				;(will clear carry)
-	mov	dx, cx				;return null
-exit:
-	Destroy	ax
 	ret
-OLMenuedWinDetermineVisParentForChild	endm
+
+genDismissInteraction:
+	;if this menu is not PINNED, will send MSG_GEN_GUP_INTERACTION_COMMAND
+	;with IC_DISMISS to self.
+
+	;If using cascading menus, call OLMenuWinCloseOrCascade which will
+	;take care of checking if this menu is currently cascading.
+if	 _CASCADING_MENUS
+	call	OLMenuWinCloseOrCascade		;destroys:ax,bx,cx,dx,bp,di
+else	;_CASCADING_MENUS is FALSE
+	mov	ax, MSG_GEN_GUP_INTERACTION_COMMAND
+	mov	cx, IC_INTERACTION_COMPLETE
+	call	ObjCallInstanceNoLock
+endif	;_CASCADING_MENUS
+
+	ret
+OLMenuWinLostGadgetExcl	endm
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		MaybeInTitleBar
+		OLMenuMarkForCloseOneLevel
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	See if this object wants to be in the title bar.
+SYNOPSIS:	used to close last menu in cascading set
 
-CALLED BY:	OLMenuedWinDetermineVisParentForChild
-
-PASS:		^lcx:dx = object for which to determine parent
-		*ds:[si] = OLMenuedWin instance data
-
-RETURN:		carry set if it should be in a title group
-			^lcx:dx = parent (title group)
-		carry clear if not in a title group
-			cx, dx = same
-
-		object block may have moved (ds updated)
-
-DESTROYED:	nothing
+CALLED BY:	MSG_OL_MENU_MARK_FOR_CLOSE_ONE_LEVEL
+PASS:		*ds:si	= OLMenuWinClass object
+		ds:di	= OLMenuWinClass instance data
+		ds:bx	= OLMenuWinClass object (same as *ds:si)
+		es 	= segment of OLMenuWinClass
+		ax	= message #
+RETURN:		
+DESTROYED:	
+SIDE EFFECTS:	
 
 PSEUDO CODE/STRATEGY:
 
 REVISION HISTORY:
-	Name	Date			Description
-	----	----			-----------
-	stevey	9/28/94			Initial version
-	Joon	11/14/94		Simplified and allow
-					^hcx != ds:[LMBH_handle]
+	Name	Date		Description
+	----	----		-----------
+	brianc	6/21/95   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-MaybeInTitleBar	proc	near
-		uses	ax,bx,si,di
-		.enter
-	;
-	; Search the child object for titlebar hints
-	;
-		push	si
-		movdw	bxsi, cxdx
-		call	ObjSwapLock
-		push	bx
 
-		mov	ax, HINT_SEEK_TITLE_BAR_LEFT
-		call	ObjVarFindData
-		mov	ax, TGT_LEFT_GROUP
-		jc	unlock
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		OLMenuWinGupSubmenuRequestsClose
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-		mov	ax, HINT_SEEK_TITLE_BAR_RIGHT
-		call	ObjVarFindData
-		mov	ax, TGT_RIGHT_GROUP
+SYNOPSIS:	Checks the OMWMSS_IGNORE_SUBMENU_CLOSE_REQUEST flag.
+		If the flag is true, then the flag is cleared, and the
+		method returns.  If the flag is false, then this menu
+		is closed, and the message is sent to the Gen parent
+		if the parent's vis part is an OLMenuWinClass.
+
+CALLED BY:	MSG_MO_MW_GUP_SUBMENU_REQUESTS_CLOSE
+PASS:		*ds:si	= OLMenuWinClass object
+		ds:di	= OLMenuWinClass instance data
+		ds:bx	= OLMenuWinClass object (same as *ds:si)
+		es 	= segment of OLMenuWinClass
+		ax	= message #
+
+RETURN:		Nothing
+DESTROYED:	ax
+SIDE EFFECTS:	None.
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JimG	4/21/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+if	 _CASCADING_MENUS
+OLMenuWinGupSubmenuRequestsClose	method dynamic OLMenuWinClass, 
+					MSG_MO_MW_GUP_SUBMENU_REQUESTS_CLOSE
+	
+	; check this before saving the passed args since it would be a waste
+	; of time if the jump was followed.
+	
+	test	ds:[di].OLMWI_moreSpecState, \
+			mask OMWMSS_IGNORE_SUBMENU_CLOSE_REQUEST
+	jnz	done
+	
+	push	cx, dx, bp			; save args
+	
+	; ensure cascade data is consistent
+EC <	call	OLMenuWinECCheckCascadeData				>
+
+	; since this menu is going down, disable the cascading bit.
+	test	ds:[di].OLMWI_moreSpecState, mask OMWMSS_IS_CASCADING
+	jz	notCascading
+	
+	andnf	ds:[di].OLMWI_moreSpecState, not (mask OMWMSS_IS_CASCADING)
+	
+	; Delete the cascaded var data
+	mov	ax, ATTR_OL_MENU_WIN_CASCADED_MENU
+	call	ObjVarDeleteData
+EC <	ERROR_C	OL_ERROR			; no var data-inconsistent >
+
+
+notCascading:
+	; prevent this message from being resent by lost_gadget_excl handler.
+	ornf	ds:[di].OLMWI_moreSpecState, mask OMWMSS_DONT_SEND_REQUEST
+	
+	; close this menu
+	mov	ax, MSG_GEN_GUP_INTERACTION_COMMAND
+	mov	cx, IC_INTERACTION_COMPLETE
+	call	ObjCallInstanceNoLock
+	
+	call	OLMenuWinSendCloseRequest	; Destroys ax, bx, cx, dx, bp
+
+	mov	di, ds:[si]
+	add	di, ds:[di].Vis_offset
+
+donePop::	
+	pop	cx, dx, bp			; restore args
+	
+	; ONLY JUMP HERE FROM BEFORE PUSHING THE ARGS
+done:
+	; the ignore is only valid for one request at a time.  also,
+	; allow this request to be sent again.
+	andnf	ds:[di].OLMWI_moreSpecState, \
+			not (mask OMWMSS_IGNORE_SUBMENU_CLOSE_REQUEST or \
+			     mask OMWMSS_DONT_SEND_REQUEST)
+	ret
+OLMenuWinGupSubmenuRequestsClose	endm
+endif	;_CASCADING_MENUS
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		OLMenuWinCloseOrCascade
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Closes the current menu and sends the submenu close request
+		message to the parent if the current menu is not cascading.
+
+CALLED BY:	OLMenuWinLostGadgetExcl, OLMenuWinPostPassiveButton
+PASS:		*ds:si	= menu object
+		
+RETURN:		None.
+DESTROYED:	ax, bx, cx, dx, bp, di
+SIDE EFFECTS:	
+	WARNING:  This routine MAY resize LMem and/or object blocks, moving
+		  them on the heap and invalidating stored segment pointers
+		  and current register or stored offsets to them.
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JimG	4/21/94    	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+if	 _CASCADING_MENUS
+OLMenuWinCloseOrCascade	proc	far
+	class	OLMenuWinClass
+	.enter
+	mov	di, ds:[si]
+	add	di, ds:[di].Vis_offset
+	
+	test	ds:[di].OLMWI_moreSpecState, mask OMWMSS_IS_CASCADING
+	jnz	done				; menu is cascading..
+						; don't close
+	
+	; be sure to always clear this flag if the menu is going down
+	andnf	ds:[di].OLMWI_moreSpecState, \
+			not mask OMWMSS_IGNORE_SUBMENU_CLOSE_REQUEST
+	
+	; prevent close request from being resent by lost_gadget_excl handler.
+	mov	bl, ds:[di].OLMWI_moreSpecState	; store original state for later
+	ornf	ds:[di].OLMWI_moreSpecState, mask OMWMSS_DONT_SEND_REQUEST
+	
+	; close this menu
+	mov	ax, MSG_GEN_GUP_INTERACTION_COMMAND
+	mov	cx, IC_INTERACTION_COMPLETE
+	call	ObjCallInstanceNoLock
+	
+	; okay, send the request.  restore the flag first.
+	mov	di, ds:[si]
+	add	di, ds:[di].Vis_offset
+	andnf	ds:[di].OLMWI_moreSpecState, not mask OMWMSS_DONT_SEND_REQUEST
+	
+	; told not to send request.. skip to end.
+	test	bl, mask OMWMSS_DONT_SEND_REQUEST
+	jnz	done
+	
+	; send close request to menu parents, if they exists.
+	call	OLMenuWinSendCloseRequest	; destroys: ax,bx,cx,dx,bp
+	
+done:
+	.leave
+	ret
+OLMenuWinCloseOrCascade	endp
+endif	;_CASCADING_MENUS
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		OLMenuWinSendCloseRequest
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Looks up the generic tree to find an object of class
+		OLMenuWinClass.  The search is continued until an
+		object that is not a subclass of GenInteractionClass is
+		found.  If it finds the menu window, the message
+		MSG_MO_MW_GUP_SUBMENU_REQUESTS_CLOSE is sent.
+		The menu window object's vis part MUST already be built.
+
+CALLED BY:	OLMenuWinCloseOrCascade and OLMenuWinGupSubmenuRequestClose
+PASS:		*ds:si	= menu object
+RETURN:		*ds:si = current menu object.  (ds is fixed up).
+DESTROYED:	ax, bx, cx, dx, bp, di
+SIDE EFFECTS:
+	WARNING:  This routine MAY resize LMem and/or object blocks, moving
+		  them on the heap and invalidating stored segment pointers
+		  and current register or stored offsets to them.
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JimG	4/21/94    	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+if	 _CASCADING_MENUS
+OLMenuWinSendCloseRequest	proc	near
+	uses	si, es
+	.enter
+
+	mov	bx, ds:[LMBH_handle]
+	mov	di, ds:[si]
+	add	di, ds:[di].Vis_offset
+	mov	si, ds:[di].OLPWI_button	; ^lbx:si = menu button
+	tst	si
+	jz	done
+
+searchLoop:
+	mov	ax, MSG_VIS_FIND_PARENT
+	mov	di, mask MF_CALL or mask MF_FIXUP_DS
+	call	ObjMessage
+	jcxz	done	
+
+	movdw	bxsi, cxdx			; ^lbx:si = parent
+	call	ObjSwapLock
+
+	segmov	es, <segment GenInteractionClass>, di
+	mov	di, offset GenInteractionClass
+	call	ObjIsObjectInClass
+	jnc	unlock				; break out of loop
+
+	segmov	es, <segment OLMenuWinClass>, di
+	mov	di, offset OLMenuWinClass
+	call	ObjIsObjectInClass
+	cmc
+	jc	unlock				; continue up tree
+
+	mov	ax, MSG_MO_MW_GUP_SUBMENU_REQUESTS_CLOSE
+	call	ObjCallInstanceNoLock		; Destroys: ax
+	clc
 unlock:
-		pop	bx
-		call	ObjSwapUnlock
-		pop	si
-		jnc	done				; not in titlebar
-	;
-	;  Object wants to be in the title bar.
-	;
-		mov_tr	bx, ax				; bx <- TitleGroupType
-
-		mov	di, ds:[si]
-		add	di, ds:[di].Vis_offset
-		movdw	cxdx, ds:[di+bx].OLWI_titleBarLeftGroup
-		tst	cx				; any group yet?
-		jnz	inTitleBar
-	;
-	;  We don't have this title group yet, so make one and return
-	;  it as the vis parent.
-	;
-		call	CreateTitleBarGroup
-
-		mov	di, ds:[si]
-		add	di, ds:[di].Vis_offset		; ds:di = instance
-		movdw	ds:[di+bx].OLWI_titleBarLeftGroup, cxdx
-inTitleBar:
-		stc					; found parent
+	call	ObjSwapUnlock
+	jc	searchLoop			; continue if carry set
 done:
-		.leave
-		ret
-MaybeInTitleBar	endp
+	.leave
+	ret
+OLMenuWinSendCloseRequest	endp
+endif	;_CASCADING_MENUS
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		CreateTitleBarGroup
+		OLMenuWinSendCloseRequestToLastMenu
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	Create an interaction to hold stuff in.
+SYNOPSIS:	Sends a MSG_MO_MW_GUP_SUBMENU_REQUESTS_CLOSE to the last
+		menu of the currently cascaded menus.  May close all menus
+		in the this chain of menus or may close only the menus BELOW
+		the current menu depending upon the value of cx.
 
-CALLED BY:	MaybeInTitleBar
+CALLED BY:	
+PASS:		*ds:si	= current menu object
+		cx	= Preserve current menu and those above it
+			  TRUE: Only close menus BELOW the current menu
+			  FALSE: Close all menus in this chain
 
-PASS:		*ds:si	= window object
-		bx	= TitleGroupType
+RETURN:		*ds:si = current menu object.  (ds is fixed up).
+DESTROYED:	ax, bx, cx, dx, bp, di
+SIDE EFFECTS:	
+	WARNING:  This routine MAY resize LMem and/or object blocks, moving
+		  them on the heap and invalidating stored segment pointers
+		  and current register or stored offsets to them.
 
-RETURN:		^lcx:dx = title group
+PSEUDO CODE/STRATEGY:
+		
 
-DESTROYED:	nothing (block may move -- ds updated)
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JimG	4/27/94    	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+if	 _CASCADING_MENUS
+OLMenuWinSendCloseRequestToLastMenu	proc	far
+	.enter
+	
+	; Set ignore bit to preserve the current menu based upon cx.
+	mov	di, ds:[si]
+	add	di, ds:[di].Vis_offset
+	
+	; Assume we close all menus.
+	andnf	ds:[di].OLMWI_moreSpecState, \
+			not (mask OMWMSS_IGNORE_SUBMENU_CLOSE_REQUEST)
+	jcxz	beginLoop
+	
+	; Nope, preserve current menu.
+	ornf	ds:[di].OLMWI_moreSpecState, \
+			mask OMWMSS_IGNORE_SUBMENU_CLOSE_REQUEST
+	
+beginLoop:
+	; Add extra lock to original object to make loop work correctly.
+	mov	bx, ds:[LMBH_handle]		; ^lbx = orig obj handle
+	push	bx, si				; SAVE original object OPTR
+	call	ObjLockObjBlock			; ax = segment
+EC <	mov	dx, ds							>
+EC <	cmp	ax, dx							>
+EC <	ERROR_NE	OL_ERROR		; SHOULD BE EQUAL!	>
+
+tryAgain:
+	; *ds:si = current menu, locked
+	
+	; ensure cascade data consistency
+EC <	call	OLMenuWinECCheckCascadeData				>
+
+	; Ensure the object's vis part is built!
+EC <	call	VisCheckVisAssumption					>
+
+	; Check if the object is of class OLMenuWinClass
+EC <	mov	cx, segment OLMenuWinClass				>
+EC <	mov	dx, offset OLMenuWinClass				>
+EC <	mov	ax, MSG_META_IS_OBJECT_IN_CLASS				>
+EC <	call	ObjCallInstanceNoLock		; Destroys: ax, cx, dx, bp>
+EC <	ERROR_NC	OL_ERROR		; NOT OLMenuWinClass !!	>
+
+	; Is this the last child?
+	mov	di, ds:[si]
+	add	di, ds:[di].Vis_offset
+	test	ds:[di].OLMWI_moreSpecState, mask OMWMSS_IS_CASCADING
+	jz	sendMessage			; Yes -- send message
+	
+	; No -- find next child in cascade.
+	mov	ax, ATTR_OL_MENU_WIN_CASCADED_MENU
+	call	ObjVarFindData			; if data, ds:bx = ptr
+						; (ds still ptr to our block)
+EC <	ERROR_NC	OL_ERROR		; no var data - that's bad >
+	
+	; Get optr from vardata of next child.
+	mov	si, ds:[bx].offset
+	mov	bx, ds:[bx].handle		; ^lbx:si = next child menu
+	call	ObjLockObjBlock			; *ax:si = next child, locked
+	
+	mov	bx, ds:[LMBH_handle]		; ^lbx = parent menu handle
+	call	MemUnlock			; unlock parent menu
+	mov	ds, ax				; *ds:si = next child, locked
+	
+	; Continue looking for child
+	jmp	tryAgain
+	
+sendMessage:
+	; *ds:si = correct object to send message to, locked.
+	mov	ax, MSG_MO_MW_GUP_SUBMENU_REQUESTS_CLOSE
+	call	ObjCallInstanceNoLock
+	
+	; unlock last block
+	mov	bx, ds:[LMBH_handle]
+	call	MemUnlock
+	
+	pop	bx, si				; ^lbx:si = original obj optr
+	call	MemDerefDS			; fixup ds.. *ds:si = orig obj
+	
+	.leave
+	ret
+OLMenuWinSendCloseRequestToLastMenu	endp
+endif	;_CASCADING_MENUS
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		OLMenuWinCloseAllMenusInCascade
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	All the menus in the cascade that the destination menu
+		belongs to will be closed.  Basically just calls
+		OLMenuWinSendCloseRquestToLastMenu.
+
+CALLED BY:	MSG_MO_MW_CLOSE_ALL_MENUS_IN_CASCADE
+PASS:		*ds:si	= OLMenuWinClass object
+		ds:di	= OLMenuWinClass instance data
+		ds:bx	= OLMenuWinClass object (same as *ds:si)
+		es 	= segment of OLMenuWinClass
+		ax	= message #
+
+RETURN:		None
+DESTROYED:	ax, cx, bp
+SIDE EFFECTS:	
+	May close all menus in cascade!
 
 PSEUDO CODE/STRATEGY:
 
 REVISION HISTORY:
-	Name	Date			Description
-	----	----			-----------
-	stevey	9/21/94			Initial version
-	Joon	11/14/94		Delay vis add of titlebar group
+	Name	Date		Description
+	----	----		-----------
+	JimG	6/10/94   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-CreateTitleBarGroup	proc	far
-		uses	ax,di,si,bp,es
-		.enter
-	;
-	;  Create the empty object.
-	;
-		push	bx
-		mov	di, segment OLTitleGroupClass
-		mov	es, di
-		mov	di, offset OLTitleGroupClass	; es:di = class
-		call	OpenWinCreateBarObject		; ax <- titleGroup
-		pop	bx
-	;
-	;  Turn geometry management OFF.  We'll turn it back on
-	;  (temporarily) when the title bar is managing its own
-	;  geometry (OpenWinPositionTitleBarGroup).
-	;
-		push	ax				; save new object
-		mov	si, ax				; *ds:si = object
-		mov	ax, MSG_VIS_SET_ATTRS
-		mov	cx, mask VA_MANAGED shl 8	; bits to clear
-		mov	dl, VUM_DELAYED_VIA_UI_QUEUE
-		call	ObjCallInstanceNoLock
-		pop	dx
+if	 _CASCADING_MENUS
+OLMenuWinCloseAllMenusInCascade	method dynamic OLMenuWinClass, 
+					MSG_MO_MW_CLOSE_ALL_MENUS_IN_CASCADE
+	uses	dx
+	.enter
+	
+	; send close request to last menu.  do not preserve the current menu.
+	clr	cx
+	call	OLMenuWinSendCloseRequestToLastMenu
+	
+	.leave
+	ret
+OLMenuWinCloseAllMenusInCascade	endm
+endif	;_CASCADING_MENUS
 
-		mov	cx, ds:[LMBH_handle]		; ^lcx:dx = titleGroup
-	;
-	;  Set some flags in the new object.  It got vis-grown by
-	;  the message we just sent it.
-	;
-		mov	di, ds:[si]
-		add	di, ds:[di].Vis_offset		; ds:di = instance
-
-		cmp	bx, TGT_RIGHT_GROUP
-		je	rightGroup
-
-		ornf	ds:[di].OLCI_buildFlags, OLBT_FOR_TITLE_BAR_LEFT \
-			shl offset OLBF_TARGET
-		jmp	done
-rightGroup:
-		ornf	ds:[di].OLCI_buildFlags, OLBT_FOR_TITLE_BAR_RIGHT \
-			shl offset OLBF_TARGET		
-done:
-		.leave
-		ret
-CreateTitleBarGroup	endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		MaybeInMenuBar
+		OLMenuWinVisOpen
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	See if object should be in menu bar.
+SYNOPSIS:	Sets up some flags used for cascading menus, calls superclass.
 
-CALLED BY:	OLMenuedWinDetermineVisParentForChild
+CALLED BY:	MSG_VIS_OPEN
+PASS:		*ds:si	= OLMenuWinClass object
+		ds:di	= OLMenuWinClass instance data
+		ds:bx	= OLMenuWinClass object (same as *ds:si)
+		es 	= segment of OLMenuWinClass
+		ax	= message #
+		bp	= 0 if top window, else window for obejct to open on
+		
+RETURN:		Nothing
+DESTROYED:	ax, cx, dx, bp
+SIDE EFFECTS:
 
-PASS:		^lcx:dx = object for which to determine parent
-		*ds:si	= OLMenuedWin object
+PSEUDO CODE/STRATEGY:
 
-RETURN:		carry set if it should be in a title group
-			^lcx:dx = parent (title group)
-		carry clear if not in a title group
-			cx, dx = same
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JimG	4/21/94   	Initial version
 
-		object block may have moved (ds updated)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+OLMenuWinVisOpen	method dynamic OLMenuWinClass, 
+					MSG_VIS_OPEN
+	.enter
+	
+if	 _CASCADING_MENUS
 
+	; ensure cascade data is consistent
+EC <	call	OLMenuWinECCheckCascadeData				>
+	
+	; clear cascade var data, if any remaining.
+	test	ds:[di].OLMWI_moreSpecState, mask OMWMSS_IS_CASCADING
+	jz	notCascading
+	
+	; Delete the cascaded var data
+	push	ax
+	mov	ax, ATTR_OL_MENU_WIN_CASCADED_MENU
+	call	ObjVarDeleteData
+EC <	ERROR_C	OL_ERROR			; no var data-inconsistent >
+	pop	ax
+
+notCascading:
+	; Clears all cascade state bits
+	clr	ds:[di].OLMWI_moreSpecState
+
+endif	;_CASCADING_MENUS
+
+	; Call superclass
+	mov	di, offset OLMenuWinClass
+	call	ObjCallSuperNoLock
+	
+	; Update up/down scrollers as needed
+
+	mov	al, 0
+	call	OLMenuWinUpdateUpDownScrollers
+
+	.leave
+	ret
+OLMenuWinVisOpen	endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		OLMenuWinUpdateUpDownScrollers
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Update up/down scrollers for menu window
+
+CALLED BY:	OLMenuWinVisOpen, OLMenuWinVisClose, OLMenuWinMoveResizeWin
+PASS:		*ds:si	= OLMenuWinClass object
+		al = non-zero to delay closing until END_SELECT
+RETURN:		nothing
 DESTROYED:	nothing
+SIDE EFFECTS:	
 
 PSEUDO CODE/STRATEGY:
+		
 
 REVISION HISTORY:
-	Name	Date			Description
-	----	----			-----------
-	stevey	10/14/94			Initial version
+	Name	Date		Description
+	----	----		-----------
+	joon	3/02/99    	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-if _ALLOW_MISC_GADGETS_IN_MENU_BAR	;---------------------------------------
 
-MaybeInMenuBar	proc	near
-		uses	ax,bx,si,di,bp
-		.enter
+MENU_WIN_SCROLL_DELTA	equ	23
 
-	Assert	optr cxdx				; check child
-	Assert	objectPtr  dssi, OLMenuedWinClass	; check parent
+OLMenuWinUpdateUpDownScrollers	proc	far
+delayClose	local	word	push	ax	; only al used
+scrollers	local	word	push	0	; assume no scrollers needed
+upScroller	local	lptr	push	0	; assume no up scroller exists
+downScroller	local	lptr	push	0	; assume no dn scroller exists
+parent		local	Rectangle
+parentWin	local	hptr
+menu		local	Rectangle
+menuWin		local	hptr
+	uses	ax,bx,cx,dx,si,di,bp,es
+	.enter
 
-if _ODIE
+	; not needed for pinned menus
 
-	;
-	; Why limit to same block?
-	;
-	mov	bp, si				; save OLMenuedWin
-	movdw	bxsi, cxdx			; ^lbx:si = object
-	call	ObjSwapLock			; *ds:si = object
-	push	bx				; save OLMenuedWin block
-	mov	ax, HINT_SEEK_MENU_BAR
-	call	ObjVarFindData			; carry set if found
-	pop	bx				; bx = our block
-	call	ObjSwapUnlock			; *ds:bp = OLMenuedWin
-						; (preserves flags)
-	jnc	done				; not in menu bar
-	mov	cx, ds:[LMBH_handle]		; menu bar in same block as
-						;	OLMenuedWin
+	mov	di, ds:[si]			
+	add	di, ds:[di].Vis_offset
+	test	ds:[di].OLWI_specState, mask OLWSS_PINNED
+	LONG jnz	done
 
-else
+	; first figure out what needs to be updated
 
-	;
-	;  Deal with the child not being in the same block as
-	;  the parent.  (If it's not, then exit -- the object
-	;  will wind up in the gadget area instead of the menu
-	;  bar.)
-	;
-		cmp	cx, ds:[LMBH_handle]
-		clc					; assume not same block
-		jne	done
-	;
-	;  See if the child wants to be in the menu bar.
-	;
-		mov	bp, si				; *ds:bp = parent
-		mov	si, dx				; *ds:si = object
-		mov	ax, HINT_SEEK_MENU_BAR
-		call	ObjVarFindData			; carry set if found
-		jnc	done				; nope, bail
+	call	VisQueryParentWin		; di = window handle
+	tst	di
+	jz	checkUpdate
 
+	call	WinGetWinScreenBounds
+	mov	ss:[parent].R_top, bx
+	mov	ss:[parent].R_bottom, dx
+	mov	ss:[parentWin], di
+if TOOL_AREA_IS_TASK_BAR
+	call	OLWinGetToolAreaSize		; dx = height
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarAutoHide]
+	jnz	doneTaskBar
+	tst	ds:[taskBarPosition]
+	jg	atBottom
+	add	ss:[parent].R_top, dx
+	jmp	short doneTaskBar
+atBottom:
+	sub	ss:[parent].R_bottom, dx
+doneTaskBar:
+	pop	ds
 endif
 
-	;
-	;  Return optr of menu bar.
-	;
-		mov	si, bp				; *ds:si = window
-		call	WinClasses_DerefVisSpec_DI	; ds:di = instance
-		mov	dx, ds:[di].OLMDWI_menuBar
+	call	VisQueryWindow			; di = window handle
+	tst	di
+	jz	checkUpdate
 
-		Assert	optr cxdx			; check menu bar
-		stc					; found parent
+	call	WinGetWinScreenBounds
+	add	ax, 2
+	sub	cx, 2
+	mov	ss:[menu].R_left, ax
+	mov	ss:[menu].R_top, bx
+	mov	ss:[menu].R_right, cx
+	mov	ss:[menu].R_bottom, dx
+	mov	ss:[menuWin], di
+
+	cmp	bx, ss:[parent].R_top
+	jge	checkDown
+	mov	ss:[scrollers].high, TRUE		; need up scroller
+checkDown:
+	cmp	dx, ss:[parent].R_bottom
+	jle	checkUpdate
+	mov	ss:[scrollers].low, TRUE		; need down scroller
+
+	; now update the scrollers
+checkUpdate:
+	tst	ss:[scrollers]		
+	jnz	update
+
+	mov	ax, TEMP_OL_MENU_WIN_SCROLLERS	; if no hint and no scrollers
+	call	ObjVarFindData			; are needed, then we're done
+	jnc	done
+
+update:
+	call	EnsureMenuWinUpDownScrollers
+
+handleUpScroller:
+	mov	si, ss:[upScroller]
+	tst	ss:[scrollers].high
+	call	openClose
+
+	mov	si, ss:[downScroller]
+	tst	ss:[scrollers].low
+	call	openClose
 done:
-		.leave
-		ret
-MaybeInMenuBar	endp
+	.leave
+	ret
 
-endif	; _ALLOW_MISC_GADGETS_IN_MENU_BAR ------------------------------------
+openClose:
+	jz	close
+	call	OpenMenuWinScrollerWindow
+	retn
+close:
+	call	CloseMenuWinScrollerWindow
+	retn
 
-WinClasses	ends
-
-
-ActionObscure	segment resource
+OLMenuWinUpdateUpDownScrollers	endp
 
 
-COMMENT @----------------------------------------------------------------------
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		EnsureMenuWinUpDownScrollers
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-METHOD:		OLMenuedWinTranslateToGenMessage
+SYNOPSIS:	Ensure up/down scroller objects exist
 
-DESCRIPTION:	Handle specific UI messages by sending
-		MSG_GEN_DISPLAY_* to self.
-
-PASS:
-	*ds:si - instance data
-	es - segment of OLMenuedWinClass
-
-	ax 	- MSG_OL_WIN_CLOSE
-		  MSG_OL_WIN_MAXIMIZE
-		  MSG_OL_WIN_MINIMIZE
-
-RETURN:
-	carry - ?
-	ax, cx, dx, bp - ?
-
-DESTROYED:
-	bx, si, di, ds, es
-
-REGISTER/STACK USAGE:
+CALLED BY:	OLMenuWinUpdateUpDownScrollers
+PASS:		*ds:si	= OLMenuWinClass object
+		OLMenuWinUpdateUpDownScrollers stack frame
+RETURN:		nothing
+DESTROYED:	ax,bx,cx,dx,di,es
+SIDE EFFECTS:	
 
 PSEUDO CODE/STRATEGY:
-
-KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+		
 
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
-	brianc	3/3/92		Initial version
+	Joon	3/2/99    	Initial version
 
-------------------------------------------------------------------------------@
-OLMenuedWinTranslateToGenMessage	method	dynamic	OLMenuedWinClass,
-							MSG_OL_WIN_CLOSE,
-							MSG_OL_WIN_MINIMIZE,
-							MSG_OL_WIN_MAXIMIZE
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+EnsureMenuWinUpDownScrollers	proc	near
+	.enter	inherit OLMenuWinUpdateUpDownScrollers
+
+	mov	ax, TEMP_OL_MENU_WIN_SCROLLERS
+	call	ObjVarFindData
+	jnc	createScrollers
+
+	mov	ax, ds:[bx].MWSS_upScroller
+	mov	ss:[upScroller], ax
+	mov	ax, ds:[bx].MWSS_downScroller
+	mov	ss:[downScroller], ax
+	jmp	done
+
+createScrollers:
+	mov	ax, MENU_WIN_SCROLL_DELTA
+	mov	dx, offset menuWinScrollerUpBitmap
+	call	createScroller
+	mov	ss:[upScroller], ax
+
+	mov	ax, -MENU_WIN_SCROLL_DELTA
+	mov	dx, offset menuWinScrollerDownBitmap
+	call	createScroller
+	mov	ss:[downScroller], ax
+
+	mov	ax, TEMP_OL_MENU_WIN_SCROLLERS
+	mov	cx, size MenuWinScrollerStruct
+	call	ObjVarAddData
+
+	mov	ax, ss:[upScroller]
+	mov	ds:[bx].MWSS_upScroller, ax
+	mov	ax, ss:[downScroller]
+	mov	ds:[bx].MWSS_downScroller, ax
+done:
+	.leave
+	ret
+
+createScroller:
+	push	si
+	segmov	es, <segment MenuWinScrollerClass>
+	mov	di, offset MenuWinScrollerClass
+	mov	bx, ds:[LMBH_handle]
+	call	GenInstantiateIgnoreDirty
+	mov	di, ds:[si]
+	mov	ds:[di].MWSI_delta, ax
+	mov	ds:[di].MWSI_bitmap, dx
+	mov	ax, si
+	pop	si
+	mov	ds:[di].MWSI_menu, si
+	retn
+
+EnsureMenuWinUpDownScrollers	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		OpenMenuWinScrollerWindow
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Open menu window up/down scroller
+
+CALLED BY:	OLMenuWinUpdateUpDownScrollers
+PASS:		*ds:si	= MenuWinScrollerClass object
+		OLMenuWinUpdateUpDownScrollers stack frame
+RETURN:		nothing
+DESTROYED:	ax,bx,cx,dx,di
+SIDE EFFECTS:	
+
+PSEUDO CODE/STRATEGY:
+		
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Joon	3/3/99    	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+OpenMenuWinScrollerWindow	proc	near
+	.enter	inherit OLMenuWinUpdateUpDownScrollers
 
 EC <	push	es, di							>
-EC <	mov	di, segment GenDisplayClass				>
-EC <	mov	es, di							>
-EC <	mov	di, offset GenDisplayClass				>
+EC <	segmov	es, <segment MenuWinScrollerClass>			>
+EC <	mov	di, offset MenuWinScrollerClass				>
 EC <	call	ObjIsObjectInClass					>
+EC <	ERROR_NC OL_ERROR		; not a MenuWinScroller		>
 EC <	pop	es, di							>
-EC <	ERROR_NC	OL_ERROR					>
 
-	mov	cx, MSG_GEN_DISPLAY_CLOSE
-	cmp	ax, MSG_OL_WIN_CLOSE
-	je	sendIt
-	mov	cx, MSG_GEN_DISPLAY_SET_MINIMIZED
-	cmp	ax, MSG_OL_WIN_MINIMIZE
-	je	sendIt
-	mov	cx, MSG_GEN_DISPLAY_SET_MAXIMIZED
-EC <	cmp	ax, MSG_OL_WIN_MAXIMIZE					>
-EC <	ERROR_NE	OL_ERROR					>
-sendIt:
+	mov	di, ds:[si]
+	tst	ds:[di].MWSI_window
+	jnz	done
+
+if (0)
+	push	si, bp
+	mov	bx, si
+	mov	di, ss:[menuWin]
+	mov	si, WIT_LAYER_ID
+	call	WinGetInfo
+	mov	si, bx
+	push	ax			; layer ID to use
+	call	GeodeGetProcessHandle	; Get owner for window
+	push	bx			; owner to use
+	push	ss:[parentWin]		; parent window handle
+	push	0			; window region segment
+	push	0			; window region offset
+	mov	bx, ss:[parent].R_top
+	mov	dx, bx
+	add	dx, MENU_WIN_SCROLL_DELTA
+	mov	di, ds:[si]
+	tst	ds:[di].MWSI_delta
+	jg	gotBounds
+	mov	dx, ss:[parent].R_bottom
+	mov	bx, dx
+	sub	bx, MENU_WIN_SCROLL_DELTA
+gotBounds:
+	push	dx			; window bottom
+	push	ss:[menu].R_right	; window right
+	push	bx			; window top
+	push	ss:[menu].R_left	; window left
+	mov	di, ss:[menuWin]	; ^hdi = menu Window
+	mov	bp, si			; *ds:bp = expose OD
+	mov	si, WIT_PRIORITY
+	call	WinGetInfo		; al = WinPriorityData
+	clr	ah			; ax = WinPassFlags
+	push	ax			; save WinPassFlags
+	mov	si, WIT_COLOR
+	call	WinGetInfo		; ax,bx = color
+	pop	si			; si = WinPassFlags
+	mov	di, ds:[LMBH_handle]	; ^ldi:bp = expose OD
+	movdw	cxdx, dibp		; ^lcx:dx = mouse OD
+	call	WinOpen
+	pop	si, bp
+else
+	mov	ax, ss:[parent].R_top
+	mov	cx, ax
+	add	cx, MENU_WIN_SCROLL_DELTA
+	tst	ds:[di].MWSI_delta
+	jg	createWindow
+	mov	cx, ss:[parent].R_bottom
 	mov	ax, cx
-	call	ObjCallInstanceNoLock
+	sub	ax, MENU_WIN_SCROLL_DELTA
+
+createWindow:
+	push	si, bp
+	call	GeodeGetProcessHandle	; Get owner for window
+	push	bx			; layer ID to use
+	push	bx			; owner to use
+	push	ss:[parentWin]		; parent window handle
+	push	0			; window region segment
+	push	0			; window region offset
+	push	cx			; window bottom
+	mov	ss:[menu].R_bottom, cx	; store for later
+	push	ss:[menu].R_right	; window right
+	push	ax			; window top
+	mov	ss:[menu].R_top, ax	; store for later
+	push	ss:[menu].R_left	; window left
+	mov	di, ss:[menuWin]	; ^hdi = menu Window
+	mov	bp, si			; *ds:bp = expose OD
+	mov	si, WIT_PRIORITY
+	call	WinGetInfo		; al = WinPriorityData
+	clr	ah			; ax = WinPassFlags
+	push	ax			; save WinPassFlags
+	mov	si, WIT_COLOR
+	call	WinGetInfo		; ax,bx = color
+	pop	si			; si = WinPassFlags
+	mov	di, ds:[LMBH_handle]	; ^ldi:bp = expose OD
+	movdw	cxdx, dibp		; ^lcx:dx = mouse OD
+	call	WinOpen
+	pop	si, bp
+endif
+
+	mov	di, ds:[si]
+	mov	ds:[di].MWSI_window, bx
+	mov	ax, ss:[menu].R_top
+	mov	ds:[di].MWSI_top, ax
+	mov	ax, ss:[menu].R_bottom
+	mov	ds:[di].MWSI_bottom, ax
+done:
+	.leave
 	ret
-OLMenuedWinTranslateToGenMessage	endm
+OpenMenuWinScrollerWindow	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		CloseMenuWinScrollerWindow
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Close menu window up/down scroller
+
+CALLED BY:	INTERNAL
+PASS:		*ds:si	= MenuWinScrollerClass
+RETURN:		nothing
+DESTROYED:	ax,di
+SIDE EFFECTS:	
+
+PSEUDO CODE/STRATEGY:
+		
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Joon	3/3/99    	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+CloseMenuWinScrollerWindow	proc	near
+	.enter	inherit OLMenuWinUpdateUpDownScrollers
+
+EC <	push	es, di							>
+EC <	segmov	es, <segment MenuWinScrollerClass>			>
+EC <	mov	di, offset MenuWinScrollerClass				>
+EC <	call	ObjIsObjectInClass					>
+EC <	ERROR_NC OL_ERROR		; not a MenuWinScroller		>
+EC <	pop	es, di							>
+
+	tst	ss:[delayClose].low
+	jnz	done
+
+	clr	ax
+	mov	di, ds:[si]
+	xchg	ax, ds:[di].MWSI_window
+	tst	ax
+	jz	done
+
+	mov	di, ax
+	call	WinClose		; close the MenuWinScroller window
+done:
+	.leave
+	ret
+CloseMenuWinScrollerWindow	endp
+
+WinMethods	ends
+
+LessUsedGeometry	segment resource
+
 
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLMenuedWinNotifyEnabled -- 
-		MSG_SPEC_NOTIFY_ENABLED and MSG_SPEC_NOTIFY_NOT_ENABLED for
-		OLWinClass
+METHOD:		OLMenuWinUpdateGeometry -- 
+		MSG_VIS_UPDATE_GEOMETRY for OLMenuWinClass
 
-DESCRIPTION:	Handles notifying an object that it is enabled or not.
+DESCRIPTION:	Updates geometry.
 
 PASS:		*ds:si 	- instance data
 		es     	- segment of MetaClass
-		ax 	- MSG_SPEC_NOTIFY_ENABLED or MSG_SPEC_NOTIFY_NOT_ENABLED
-		dl	- VisUpdateMode
-		dh	- NotifyEnabledFlags:
-				mask NEF_STATE_CHANGING if this is the object
-					getting its enabled state changed
+		ax 	- MSG_VIS_UPDATE_GEOMETRY
 
 RETURN:		nothing
 		ax, cx, dx, bp - destroyed
@@ -3332,82 +4672,141 @@ KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
-	brianc	12/5/92		Initial Version
+	chris	4/21/92		Initial Version
 
 ------------------------------------------------------------------------------@
 
-OLMenuedWinNotifyEnabled	method dynamic	OLMenuedWinClass,
-			MSG_SPEC_NOTIFY_ENABLED, MSG_SPEC_NOTIFY_NOT_ENABLED
+OLMenuWinUpdateGeometry	method dynamic	OLMenuWinClass, MSG_VIS_UPDATE_GEOMETRY
+	push	ax, es
+	test	ds:[di].VI_optFlags, mask VOF_GEO_UPDATE_PATH or \
+				     mask VOF_GEOMETRY_INVALID
+	jz	callSuper
 
-	push	ax, dx				;save method and flag
-	mov	di, offset OLMenuedWinClass
-	call	ObjCallSuperNoLock		;call superclass
-	DoPop	dx, ax				;restore method and flag
-	jnc	exit				;no state change, exit
+	call	OLMenuCalcCenters
+	jnc	callSuper		  ;nothing to do, branch
+
+	test	bp, mask SGMCF_NEED_TO_RESET_GEO  ;any item have valid geometry?
+	jz	callSuper		  ;no, no need to reset stuff.
+	mov	dl, VUM_MANUAL
+	mov	ax, MSG_VIS_RESET_TO_INITIAL_SIZE
+	call	ObjCallInstanceNoLock
+
+callSuper:
+	pop	ax, es
+	mov	di, offset OLMenuWinClass
+	CallSuper	MSG_VIS_UPDATE_GEOMETRY
+	ret
+OLMenuWinUpdateGeometry	endm
+
+
+
+
+
+
+COMMENT @----------------------------------------------------------------------
+
+ROUTINE:	OLMenuCalcCenters
+
+SYNOPSIS:	Calculates left and right portions of a menu.
+
+CALLED BY:	OLMenuWinUpdateGeometry, OLMenuWinResetSizeToStayOnscreen
+
+PASS:		*ds:si -- menu
+
+RETURN:		carry set if values changed
+		bp -- SpecGetMenuCenterFlags
+
+DESTROYED:	cx, dx, di
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Chris	2/ 4/93		Initial version
+
+------------------------------------------------------------------------------@
+
+OLMenuCalcCenters	proc	near
+	;
+	; Before we do geometry, we'll go through all the child menu items and
+	; determinate who is the biggest one.    (We'll make two passes if the
+	; first pass yields an object allowing wrapping, so that all the 
+	; children can clear their optimization bits and set expand-width-to-fit
+	; bits correctly. -cbh 1/18/93)
+	;
+	; If this is a pinned menu, we need the items to expand to fit whatever
+	; minimum width might be needed for the menu, so we'll set the ALLOWING_
+	; WRAPPING flag now, which effectively turns off geometry optizations.
+	; -cbh 2/12/93
+	;
+	clr	bp
+	mov	di, ds:[si]			
+	add	di, ds:[di].Vis_offset
+	test	ds:[di].OLWI_specState, mask OLWSS_PINNED
+	jz	5$
+	or	bp, mask SGMCF_ALLOWING_WRAPPING
+5$:
+	call	GetMenuCenter
+	test	bp, mask SGMCF_ALLOWING_WRAPPING
+	jz	10$
+	call	GetMenuCenter
+10$:
+	cmp	cx, ds:[di].OLMWI_monikerSpace
+	jne	sizesChanged
+	cmp	dx, ds:[di].OLMWI_accelSpace
+	clc					;assume sizes not changing
+	je	exit				;nope, exit
 	
-	push	si
+sizesChanged:
+	;
+	; If the menu item sizes changed, we'll store the new values and 
+	; reset the geometry of all the objects in the window, so the menus
+	; will get their sizes recalculated.  (We could also do this via
+	; VGA_ALWAYS_RECALC_SIZE in the buttons, but this will be more efficient
+	; for most situations.)
+	;
 	mov	di, ds:[si]			
 	add	di, ds:[di].Vis_offset
-	mov	si, ds:[di].OLMDWI_gadgetArea	;get gadget area
-	tst	si
-	jz	doneGadgetArea			;none
-	push	ax, dx
-	call	ObjCallInstanceNoLock
-	pop	ax, dx
-doneGadgetArea:
-	pop	si
-
-	push	si
-	mov	di, ds:[si]			
-	add	di, ds:[di].Vis_offset
-	mov	si, ds:[di].OLMDWI_menuBar	;get menu bar
-	tst	si
-	jz	doneMenuBar			;none
-	push	ax, dx
-	call	ObjCallInstanceNoLock
-	pop	ax, dx
-doneMenuBar:
-	pop	si
-
-	mov	di, ds:[si]			
-	add	di, ds:[di].Vis_offset
-	mov	si, ds:[di].OLMDWI_triggerBar	;get trigger bar
-	tst	si
-	jz	doneTriggerBar			;none
-	call	ObjCallInstanceNoLock
-doneTriggerBar:
-
-	stc					;return state changed
+	mov	ds:[di].OLMWI_monikerSpace, cx
+	mov	ds:[di].OLMWI_accelSpace, dx
+	stc
 exit:
 	ret
-OLMenuedWinNotifyEnabled	endm
-
-ActionObscure	ends
+OLMenuCalcCenters	endp
 
 
-WinClasses	segment resource
+GetMenuCenter	proc	near
+	clr	cx			;moniker space
+	mov	dx, cx			;accelerator space
+	mov	ax, MSG_SPEC_GET_MENU_CENTER
+	call	ObjCallInstanceNoLock
+	ret
+GetMenuCenter	endp
+
 
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLMenuedWinSpecSetUsable
+METHOD:		OLMenuWinConvertDesiredSizeHint -- 
+		MSG_SPEC_CONVERT_DESIRED_SIZE_HINT for OLMenuWinClass
 
-DESCRIPTION:	Handle set-usable by bring OLMenuedWin (GenDisplay and
-		GenPrimary to the top).
+DESCRIPTION:	Converts desired size for this object.
 
-PASS:
-	*ds:si - instance data
-	es - segment of OLMenuedWinClass
+PASS:		*ds:si 	- instance data
+		es     	- segment of MetaClass
+		ax 	- MSG_SPEC_CONVERT_DESIRED_SIZE_HINT
+		cx	- SpecSizeSpec: width
+		dx	- SpecSizeSpec: height
+		bp	- number of childre
 
-	ax 	- MSG_SPEC_SET_USABLE
-	dl	- VisUpdateMode
+RETURN:		cx, dx  - converted size
+		ax, bp - destroyed
 
-RETURN:
-	carry - ?
-	ax, cx, dx, bp - ?
-
-DESTROYED:
-	bx, si, di, ds, es
+ALLOWED TO DESTROY:	
+		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
 
@@ -3418,225 +4817,64 @@ KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
-	brianc	3/10/92		Initial version
+	chris	5/20/92		Initial Version
 
 ------------------------------------------------------------------------------@
-OLMenuedWinSpecSetUsable	method	dynamic	OLMenuedWinClass,
-							MSG_SPEC_SET_USABLE
-if 0		; "on-startup" no longer includes setting usable
-		; - brianc 7/9/92
+
+OLMenuWinConvertDesiredSizeHint	method dynamic	OLMenuWinClass, \
+				MSG_SPEC_CONVERT_DESIRED_SIZE_HINT
+
 	;
-	; First, check if we should be minimized on startup (additional
-	; interpretation of this is to minimize on usable).  If so, set
-	; appropriate spui stuff (see OLMenuedWinCheckForGensMinimized)
+	; Hack to get the buttons of popup lists to get correct desired size
+	; calculations (it derives its hint from this object).
+	; (Changed 11/11/92 cbh to do the conversion at the button.)
 	;
-	; OLMenuedWinCheckForGensMinimized will clear
-	; ATTR_GEN_DISPLAY_MINIMIZED_STATE so that the generic handler for
-	; MSG_GEN_DISPLAY_SET_MINIMIZED (sent below) will work.
-	;
-	push	ax, cx, dx, bp
-	mov	ax, HINT_DISPLAY_MINIMIZED_ON_STARTUP
-	call	OLMenuedWinCheckForGensMinimized
-	jc	minimizeNow
-	;
-	; if not HINT_DISPLAY_MINIMIZED_ON_STARTUP, check for minimized
-	; state when set not-usable (or set minimized while not-usable).  We
-	; want to preserve this across the not-usable/usable boundary.
-	;
-	; OLMenuedWinCheckForGensMinimized will clear
-	; ATTR_GEN_DISPLAY_MINIMIZED_STATE so that the generic handler for
-	; MSG_GEN_DISPLAY_SET_MINIMIZED (sent below) will work.
-	;
-	mov	ax, ATTR_GEN_DISPLAY_MINIMIZED_STATE
-	call	OLMenuedWinCheckForGensMinimized
-	jnc	notMinimized
-minimizeNow:
-	;
-	; if minimized on startup or minimized when set not-usable (or set
-	; minimized while not-usable), do the normal
-	; MSG_GEN_DISPLAY_SET_MINIMIZED handling
-	;
-	mov	ax, MSG_GEN_DISPLAY_SET_MINIMIZED
-	mov	dl, VUM_NOW
-	call	WinClasses_ObjCallInstanceNoLock
-notMinimized:
-	pop	ax, cx, dx, bp
+	mov	bx, ds:[di].OLCI_buildFlags
+	and	bx, mask OLBF_TARGET
+	cmp	bx, OLBT_IS_POPUP_LIST shl offset OLBF_TARGET
+	je	isPopupList
+
+callSuper:
+	mov	di, offset OLMenuWinClass
+	GOTO	ObjCallSuperNoLock		;do normal OLCtrl stuff
+
+isPopupList:	
+	mov	di, ds:[di].OLPWI_button
+	tst	di
+	jz	callSuper			;no button, call superclass
+						; (why, I don't know.)
+	mov	si, di
+	call	ObjCallInstanceNoLock		;send to the button
+if not SELECTION_BOX
+ 	tst	cx				;no width hint, exit
+	jz	exit
+	add	cx, OL_DOWN_MARK_WIDTH + OL_MARK_SPACING
 endif
-	;
-	; then, let superclass handle
-	;
-	call	WinClasses_ObjCallSuperNoLock_OLMenuedWinClass
-	;
-	; then bring to top, give focus and target, etc
-	;
-	mov	ax, MSG_GEN_BRING_TO_TOP
-	call	WinClasses_ObjCallInstanceNoLock
+exit::						;add width of arrow plus margin
 	ret
-OLMenuedWinSpecSetUsable	endm
 
-WinClasses	ends
+OLMenuWinConvertDesiredSizeHint	endm
 
 
-Unbuild	segment resource
 
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLMenuedWinSpecSetNotUsable
+METHOD:		OLMenuWinResetSizeToStayOnscreen -- 
+		MSG_SPEC_RESET_SIZE_TO_STAY_ONSCREEN for OLMenuWinClass
 
-DESCRIPTION:	Handle set-not-usable by freeing the associated icon
-		GenPrimary, if any.  This is okay as it will be reconstructed
-		when this OLMenued made usable again.
-
-PASS:
-	*ds:si - instance data
-	es - segment of OLMenuedWinClass
-
-	ax 	- MSG_SPEC_SET_NOT_USABLE
-	dl	- VisUpdateMode
-
-RETURN:
-	carry - ?
-	ax, cx, dx, bp - ?
-
-DESTROYED:
-	bx, si, di, ds, es
-
-REGISTER/STACK USAGE:
-
-PSEUDO CODE/STRATEGY:
-
-KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	brianc	3/13/92		Initial version
-	joon	12/31/92	Release stagger slots
-
-------------------------------------------------------------------------------@
-OLMenuedWinSpecSetNotUsable	method	dynamic	OLMenuedWinClass,
-							MSG_SPEC_SET_NOT_USABLE
-	push	ax, dx
-
-	;Release its staggered slot # if it has one.
-	;This will affect both the instance data for the object
-	;and the data that might be saved.
-
-	call	OpenWinFreeStaggeredSlot
-	
-ifndef NO_WIN_ICONS	;------------------------------------------------------
-
-	;Release the icon slot as well.
-	
-	mov	di, ds:[si]			
-	add	di, ds:[di].Vis_offset
-	mov	dl, {byte} ds:[di].OLMDWI_iconWinPosSizeState+1
-	ANDNF	dl, mask WPSS_STAGGERED_SLOT shr 8
-					;only keep slot # (including ICON flag)
-	test	dl, mask SSPR_SLOT	;test for slot # (ignore ICON flag)
-	jz	10$			;skip if not STAGGERED...
-	mov	cx, SVQT_FREE_STAGGER_SLOT
-	mov	ax, MSG_VIS_VUP_QUERY
-	call	VisCallParent
-10$:
-	;
-	;make OLWinIcon object NOT_USABLE (can set generic state of
-	;this object since was created by specific UI and not application)
-	;	ds:di = instance data
-
-	mov	ax, MSG_SPEC_SET_ATTRS
-	mov	dl, VUM_NOW
-	mov	cx, mask SA_REALIZABLE shl 8
-					;turn off SA_REALIZABLE flag
-	call	OLMenuedWinCallIconObject
-
-endif	; ifndef NO_WIN_ICONS -------------------------------------------------
-
-	pop	ax, dx
-	;
-	; let superclass handle
-	;
-	mov	di, offset OLMenuedWinClass
-	call	ObjCallSuperNoLock
-	ret
-OLMenuedWinSpecSetNotUsable	endm
-
-Unbuild ends
-
-
-ActionObscure segment resource
-
-
-COMMENT @----------------------------------------------------------------------
-
-METHOD:		OLMenuedWinUpdateIconMoniker
-
-DESCRIPTION:	If we have an icon, update its moniker.
+DESCRIPTION:	Resets size to keep itself onscreen.
 
 PASS:		*ds:si 	- instance data
-		es     	- segment of OLMenuedWinClass
-		ax 	- MSG_OL_MENUED_WIN_UPDATE_ICON_MONIKER
-
-RETURN:		nothing
-
-DESTROYED:	bx, si, di, ds, es
-
-REGISTER/STACK USAGE:
-
-PSEUDO CODE/STRATEGY:
-
-KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	brianc	3/23/92		Initial version
-
-------------------------------------------------------------------------------@
-
-ifndef NO_WIN_ICONS	;------------------------------------------------------
-	
-OLMenuedWinUpdateIconMoniker	method dynamic OLMenuedWinClass,
-				MSG_OL_MENUED_WIN_UPDATE_ICON_MONIKER
-	;
-	; If GenApplication moniker changes, resolve moniker list, and redo
-	; icon and icon caption monikers as if our moniker were changed.
-	;
-	call	UpdateAllMonikers
-	ret
-OLMenuedWinUpdateIconMoniker endm
-
-endif			; ifndef NO_WIN_ICONS ---------------------------------
-
-ActionObscure	ends
-
-
-WinClasses	segment resource
-
-
-COMMENT @----------------------------------------------------------------------
-
-METHOD:		OLMenuedWinSpecUpdateVisMoniker
-
-DESCRIPTION:	OLMenuedWin's moniker has been changed.  If the new moniker
-		is a moniker list, we'll need to resolve it (we prevented it
-		from being resolved earlier by intercepting
-		MSG_SPEC_RESOLVE_MONIKER_LIST).  Before resolving, however,
-		we re-compute the icon and icon caption monikers, and tell
-		our icon, if any, about them.
-
-PASS:		*ds:si 	- instance data
-		es     	- segment of OLMenuedWinClass
-		ax 	- MSG_SPEC_UPDATE_VIS_MONIKER
-
+		es     	- segment of MetaClass
+		ax 	- MSG_SPEC_RESET_SIZE_TO_STAY_ONSCREEN
 		dl	- VisUpdateMode
-		cx	- old moniker width
-		bp	- old moniker height
 
 RETURN:		nothing
+		ax, cx, dx, bp - destroyed
 
-DESTROYED:	bx, si, di, ds, es
+ALLOWED TO DESTROY:	
+		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
 
@@ -3647,132 +4885,56 @@ KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
-	brianc	4/3/92		Initial version
+	chris	2/ 4/93		Initial Version
 
 ------------------------------------------------------------------------------@
 
-ifndef NO_WIN_ICONS	;------------------------------------------------------
-	
-OLMenuedWinSpecUpdateVisMoniker	method dynamic OLMenuedWinClass,
-					MSG_SPEC_UPDATE_VIS_MONIKER
+OLMenuWinResetSizeToStayOnscreen	method dynamic	OLMenuWinClass, \
+				MSG_SPEC_RESET_SIZE_TO_STAY_ONSCREEN
+
 	;
-	; First, resolve moniker list and redo monikers for icon and icon
-	; caption
+	; Wrap the puppy if it doesn't fit, and hope for the best. -2/ 5/93
+	; (Not working yet.  -cbh 2/ 6/93)
 	;
-	push	ax, cx, dx, bp		; save MSG_SPEC_UPDATE_VIS_MONIKER data
-	call	UpdateAllMonikers
-	pop	ax, cx, dx, bp		; get MSG_SPEC_UPDATE_VIS_MONIKER data
-	;
-	; Then, call superclass to update window header
-	;
-	call	WinClasses_ObjCallSuperNoLock_OLMenuedWinClass
-	ret
-OLMenuedWinSpecUpdateVisMoniker endm
+;	or	ds:[di].VCI_geoAttrs, mask VCGA_ALLOW_CHILDREN_TO_WRAP
 
-endif			; ifndef NO_WIN_ICONS ---------------------------------
+	mov	di, offset OLMenuWinClass
+	call	ObjCallSuperNoLock
+
+	call	OLMenuCalcCenters		;this needs to be redone now,
+						;  mainly so that the ONE_PASS
+						;  OPTIMIZATION flag is cleared.
+	ret	
+
+OLMenuWinResetSizeToStayOnscreen	endm
 
 
-
-COMMENT @----------------------------------------------------------------------
 
-FUNCTION:	UpdateAllMonikers
+LessUsedGeometry	ends
 
-DESCRIPTION:	Resolve moniker list, if any, and find icon and icon caption
-		monikers, in case this window is iconified.
 
-CALLED BY:	INTERNAL
-			OLMenuedWinUpdateIconMoniker
-			OLMenuedWinSpecUpdateVisMoniker
-
-PASS:		*ds:si	- OLMenuedWin instance data
-		es	- segment of OLMenuedWinClass
-
-RETURN:		*ds:[si].OLMDWI_iconCaptionMoniker updated
-		*ds:[si].OLMDWI_iconMoniker updated
-		icon and icon caption objects, if any, updated
-		updates ds
-
-DESTROYED:	ax, bx, cx, dx, bp, di
-
-PSEUDO CODE/STRATEGY:
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	brianc	3/30/92		initial version
-
-------------------------------------------------------------------------------@
-
-ifndef NO_WIN_ICONS	;------------------------------------------------------
-
-UpdateAllMonikers	proc	far		;also called from diff resource
-	;
-	; get optrs of monikers for icon moniker and icon caption moniker
-	;
-	call	FindIconMonikers
-	;
-	; tell icon, if any, about new monikers
-	;
-	call	OLMenuedWinSendIconMonikers
-	;
-	; resolve moniker list, if any
-	;
-	call	OLMenuedWinFindTitleMoniker
-	ret
-UpdateAllMonikers	endp
-
-OLMenuedWinSendIconMonikers	proc	near	uses	si
-	.enter
-	call	WinClasses_DerefVisSpec_DI
-	sub	sp, size IconMonikerPassData
-	mov	bp, sp
-	push	es, di
-.assert ((offset OLMDWI_iconMoniker-OLMDWI_iconMoniker) eq IMPD_iconMoniker)
-.assert ((offset OLMDWI_iconCaptionMoniker-OLMDWI_iconMoniker) eq IMPD_iconCaptionMoniker)
-	mov	si, di				; ds:si = source
-	add	si, offset OLMDWI_iconMoniker
-	segmov	es, ss				; es:di = dest.
-	mov	di, bp
-	mov	cx, (2*(size optr))/2		; using movsw
-	rep movsw				; copy over two optrs
-	mov	ax, MSG_OL_WIN_ICON_UPDATE_MONIKER
-	pop	es, di
-	mov	bx, ds:[di].OLMDWI_icon.handle	;set ^lbx:si = OLWinIcon object
-	mov	si, ds:[di].OLMDWI_icon.chunk
-	tst	si
-	jz	done
-EC <	;must have monikers, if we have icon				>
-EC <	tst	ss:[bp].IMPD_iconMoniker.handle				>
-EC <	ERROR_Z	OL_ERROR						>
-EC <	tst	ss:[bp].IMPD_iconCaptionMoniker.handle			>
-EC <	ERROR_Z	OL_ERROR						>
-	mov	dx, size IconMonikerPassData
-	mov	di, mask MF_CALL or mask MF_STACK or mask MF_FIXUP_DS
-	call	ObjMessage
-done:
-	add	sp, size IconMonikerPassData
-	.leave
-	ret
-OLMenuedWinSendIconMonikers	endp
-
-endif			; ifndef NO_WIN_ICONS ---------------------------------
+WinMethods	segment	resource
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		OLMenuedWinSetMenuCenter
+		MenuWinScrollerStartSelect
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	set menu center
+SYNOPSIS:	Handle start select on scroller
 
-CALLED BY:	MSG_OL_MENUED_WIN_SET_MENU_CENTER
-PASS:		*ds:si	= OLMenuedWinClass object
-		ds:di	= OLMenuedWinClass instance data
-		ds:bx	= OLMenuedWinClass object (same as *ds:si)
-		es 	= segment of OLMenuedWinClass
+CALLED BY:	MSG_META_START_SELECT
+
+PASS:		*ds:si	= MenuWinScrollerClass object
+		ds:di	= MenuWinScrollerClass instance data
+		ds:bx	= MenuWinScrollerClass object (same as *ds:si)
+		es 	= segment of MenuWinScrollerClass
 		ax	= message #
-		cx	= menu center, 0 for screen center
-RETURN:		nothing
-DESTROYED:	
+		cx	= X position of mouse
+		dx	= X position of mouse
+		bp low	= ButtonInfo		(In input.def)
+		bp high	= UIFunctionsActive	(In Objects/uiInputC.def)
+RETURN:		ax	= MouseReturnFlags	(In Objects/uiInputC.def)
+DESTROYED:	bp
 SIDE EFFECTS:	
 
 PSEUDO CODE/STRATEGY:
@@ -3780,89 +4942,424 @@ PSEUDO CODE/STRATEGY:
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
-	brianc	9/26/96   	Initial version
+	joon	3/03/99   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+MenuWinScrollerStartSelect	method dynamic MenuWinScrollerClass, 
+					MSG_META_START_SELECT
+MenuWinScrollerScroll	label	far
+	push	si
+	call	MenuWinScrollerScrollOnly
 
-if MENU_BAR_IS_A_MENU
+	call	ImGetButtonState
+	call	OLMenuWinUpdateUpDownScrollers
+	pop	si
 
-OLMenuedWinSetMenuCenter	method dynamic OLMenuedWinClass, 
-					MSG_OL_MENUED_WIN_SET_MENU_CENTER
-	mov	ds:[di].OLMDWI_menuCenter, cx
+	call	MenuWinScrollerStartTimer
+
+	mov	ax, mask MRF_PROCESSED
 	ret
-OLMenuedWinSetMenuCenter	endm
+MenuWinScrollerStartSelect	endm
 
-
-COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		OLMenuedWinGetMenuCenter
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-SYNOPSIS:	get menu center
-
-CALLED BY:	MSG_OL_MENUED_WIN_GET_MENU_CENTER
-PASS:		*ds:si	= OLMenuedWinClass object
-		ds:di	= OLMenuedWinClass instance data
-		ds:bx	= OLMenuedWinClass object (same as *ds:si)
-		es 	= segment of OLMenuedWinClass
-		ax	= message #
-RETURN:		cx	= menu center, 0 for screen center
-DESTROYED:	
-SIDE EFFECTS:	
-
-PSEUDO CODE/STRATEGY:
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	brianc	9/26/96   	Initial version
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-
-OLMenuedWinGetMenuCenter	method dynamic OLMenuedWinClass, 
-					MSG_OL_MENUED_WIN_GET_MENU_CENTER
-	mov	cx, ds:[di].OLMDWI_menuCenter
-	ret
-OLMenuedWinGetMenuCenter	endm
-
+;
+; returns: C set if actually scrolled
+;
+MenuWinScrollerScrollOnly	proc	near
+	mov	di, ds:[si]
+	mov	bp, ds:[di].MWSI_delta
+	mov	si, ds:[di].MWSI_menu
+	;
+	; check if already at top or bottom
+	;
+	call	VisQueryParentWin		; di = window handle
+	tst	di
+	jz	update
+	call	WinGetWinScreenBounds
+if TOOL_AREA_IS_TASK_BAR
+	; bx = top, dx = bottom
+	mov	ax, dx				; ax = bottom
+	call	OLWinGetToolAreaSize		; cx = width, dx = height
+	push	ds
+	segmov	ds, dgroup
+	tst	ds:[taskBarAutoHide]
+	jnz	doneTaskBar
+	tst	ds:[taskBarPosition]
+	jg	atBottom
+	add	bx, dx
+	jmp	short doneTaskBar
+atBottom:
+	sub	ax, dx
+doneTaskBar:
+	pop	ds
+	push	bx, ax				; save top, bottom
+else
+	push	bx, dx				; save top, bottom
 endif
+	call	VisQueryWindow			; di = window handle
+	tst	di
+	jz	update
+	call	WinGetWinScreenBounds
+	pop	ax, cx				; ax = scrn top, cx = scrn bot
+	tst	bp
+	jns	scrollDown
+	cmp	dx, cx
+	jle	update
+	jmp	short moveIt
 
-WinClasses	ends
+scrollDown:
+	cmp	bx, ax
+	jge	update
+moveIt:
+	call	VisGetBounds
 
-;-------------------------------
+	mov	cx, ax
+	mov	dx, bx
+	add	dx, bp
+	call	VisSetPosition
 
-WinMethods	segment resource
+	mov	ax, MSG_VIS_MOVE_RESIZE_WIN
+	mov	di, offset OLWinClass
+	call	ObjCallSuperNoLock
+	stc
+	jmp	short exit
+
+update:
+	clc
+exit:
+	ret
+MenuWinScrollerScrollOnly	endp
 
 
-COMMENT @----------------------------------------------------------------------
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MenuWinScrollerEndSelect
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-FUNCTION:	OLMenuedWinSpecResolveMonikerList - 
-		MSG_SPEC_RESOLVE_MONIKER_LIST handler.
+SYNOPSIS:	Handle end select on scroller
 
-DESCRIPTION:	Intercept MSG_SPEC_RESOLVE_MONIKER_LIST to NOT resolve moniker
-		list.  We will delay this until MSG_SPEC_UPDATE_VIS_MONIKER
-		comes in, at which time, we'll update our icon and icon caption
-		monikers, tell the icon, if any, about them, then finally
-		resolve the moniker list in-place.
+CALLED BY:	MSG_META_END_SELECT
 
-PASS:		*ds:si	- instance data
-		*ds:cx	- moniker list to resolve
-
-RETURNS:	moniker list unchanged
-
-DESTROYED:
+PASS:		*ds:si	= MenuWinScrollerClass object
+		ds:di	= MenuWinScrollerClass instance data
+		ds:bx	= MenuWinScrollerClass object (same as *ds:si)
+		es 	= segment of MenuWinScrollerClass
+		ax	= message #
+		cx	= X position of mouse
+		dx	= X position of mouse
+		bp low	= ButtonInfo		(In input.def)
+		bp high	= UIFunctionsActive	(In Objects/uiInputC.def)
+RETURN:		ax	= MouseReturnFlags	(In Objects/uiInputC.def)
+DESTROYED:	bp
+SIDE EFFECTS:	
 
 PSEUDO CODE/STRATEGY:
 
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
-	brianc	4/3/92		initial version
+	joon	3/03/99   	Initial version
 
-------------------------------------------------------------------------------@
-
-OLMenuedWinSpecResolveMonikerList	method dynamic	OLMenuedWinClass, \
-					MSG_SPEC_RESOLVE_MONIKER_LIST
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+MenuWinScrollerEndSelect	method dynamic MenuWinScrollerClass, 
+					MSG_META_END_SELECT, MSG_META_END_OTHER
+	call	MenuWinScrollerStopTimer
+	;
+	; update pending close
+	;
+	mov	di, ds:[si]
+	mov	si, ds:[di].MWSI_menu
+	mov	al, 0
+	call	OLMenuWinUpdateUpDownScrollers
+	mov	ax, mask MRF_PROCESSED
 	ret
-OLMenuedWinSpecResolveMonikerList	endm
+MenuWinScrollerEndSelect	endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MenuWinScrollerRawUnivEnter
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Mouse pointer entered scroller window
+
+CALLED BY:	MSG_META_RAW_UNIV_ENTER
+
+PASS:		*ds:si	= MenuWinScrollerClass object
+		ds:di	= MenuWinScrollerClass instance data
+		ds:bx	= MenuWinScrollerClass object (same as *ds:si)
+		es 	= segment of MenuWinScrollerClass
+		ax	= message #
+		^lcx:dx	= InputObj of window method refers to
+		^hbp	= Window that method refers to
+RETURN:		nothing
+DESTROYED:	ax, cx, dx, bp
+SIDE EFFECTS:	
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	joon	3/03/99   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+MenuWinScrollerRawUnivEnter	method dynamic MenuWinScrollerClass, 
+					MSG_META_RAW_UNIV_ENTER
+	mov	di, offset MenuWinScrollerClass
+	call	ObjCallSuperNoLock
+
+	call	ImGetButtonState
+	test	al, mask BI_B0_DOWN
+	jz	done
+
+MenuWinScrollerStartTimer	label	far
+	push	ds
+	segmov	ds, <segment idata>
+	mov	cx, ds:[olGadgetRepeatDelay]
+	pop	ds
+
+	mov	al, TIMER_EVENT_ONE_SHOT
+	mov	bx, ds:[LMBH_handle]
+	mov	dx, MSG_MENU_WIN_SCROLLER_TIMER_EXPIRED
+	call	TimerStart
+
+	mov	di, ds:[si]
+	mov	ds:[di].MWSI_timerID, ax
+	mov	ds:[di].MWSI_timerHandle, bx
+done:
+	ret
+MenuWinScrollerRawUnivEnter	endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MenuWinScrollerRawUnivLeave
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Mouse pointer left scroller window
+
+CALLED BY:	MSG_META_RAW_UNIV_LEAVE
+
+PASS:		*ds:si	= MenuWinScrollerClass object
+		ds:di	= MenuWinScrollerClass instance data
+		ds:bx	= MenuWinScrollerClass object (same as *ds:si)
+		es 	= segment of MenuWinScrollerClass
+		ax	= message #
+		^lcx:dx	= InputObj of window method refers to
+		^hbp	= Window that method refers to
+RETURN:		nothing
+DESTROYED:	ax, cx, dx, bp
+SIDE EFFECTS:	
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	joon	3/03/99   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+MenuWinScrollerRawUnivLeave	method dynamic MenuWinScrollerClass, 
+					MSG_META_RAW_UNIV_LEAVE
+	mov	di, offset MenuWinScrollerClass
+	call	ObjCallSuperNoLock
+
+MenuWinScrollerStopTimer	label	far
+	clr	ax, bx
+	mov	di, ds:[si]
+	xchg	ax, ds:[di].MWSI_timerID
+	xchg	bx, ds:[di].MWSI_timerHandle
+	tst	bx
+	jz	done
+
+	call	TimerStop
+done:
+	;
+	; update pending close
+	;
+	mov	di, ds:[si]
+	push	si
+	mov	si, ds:[di].MWSI_menu
+	mov	al, 0
+	call	OLMenuWinUpdateUpDownScrollers
+	pop	si
+	ret
+MenuWinScrollerRawUnivLeave	endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MenuWinScrollerTimerExpired
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Handle timer expired
+
+CALLED BY:	MSG_MENU_WIN_SCROLLER_TIMER_EXPIRED
+
+PASS:		*ds:si	= MenuWinScrollerClass object
+		ds:di	= MenuWinScrollerClass instance data
+		ds:bx	= MenuWinScrollerClass object (same as *ds:si)
+		es 	= segment of MenuWinScrollerClass
+		ax	= message #
+RETURN:		
+DESTROYED:	
+SIDE EFFECTS:	
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	joon	3/03/99   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+MenuWinScrollerTimerExpired	method dynamic MenuWinScrollerClass, 
+					MSG_MENU_WIN_SCROLLER_TIMER_EXPIRED
+	clr	ax, bx
+	xchg	ax, ds:[di].MWSI_timerID
+	xchg	bx, ds:[di].MWSI_timerHandle
+	cmp	ax, bp
+	jne	done
+	tst	bx
+	jz	done
+
+	call	ImGetButtonState
+	test	al, mask BI_B0_DOWN
+	jz	done
+
+	call	MenuWinScrollerScroll
+	call	MenuWinScrollerStartTimer
+done:
+	ret
+MenuWinScrollerTimerExpired	endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MenuWinScrollerExposed
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw
+
+CALLED BY:	MSG_META_EXPOSED
+
+PASS:		*ds:si	= MenuWinScrollerClass object
+		ds:di	= MenuWinScrollerClass instance data
+		ds:bx	= MenuWinScrollerClass object (same as *ds:si)
+		es 	= segment of MenuWinScrollerClass
+		ax	= message #
+		^hcx	= Window
+RETURN:		nothing
+DESTROYED:	ax, cx, dx, bp
+SIDE EFFECTS:	
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	joon	3/03/99   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+MenuWinScrollerExposed	method dynamic MenuWinScrollerClass, 
+					MSG_META_EXPOSED
+	mov	di, cx
+	call	GrCreateState
+	call	GrBeginUpdate
+
+	call	GrGetWinBounds
+	sub	cx, ax
+	sub	cx, 7
+	shr	cx, 1
+	mov	ax, cx
+	sub	dx, bx
+	sub	dx, 4
+	shr	dx, 1
+	mov	bx, dx
+
+	mov	si, ds:[si]
+	mov	si, ds:[si].MWSI_bitmap
+	segmov	ds, cs
+	clr	dx
+	call	GrFillBitmap
+
+	call	GrEndUpdate
+	call	GrDestroyState
+	ret
+MenuWinScrollerExposed	endm
+
+menuWinScrollerUpBitmap Bitmap <7, 4, 0, BMF_MONO>
+	db	00010000b
+	db	00111000b
+	db	01111100b
+	db	11111110b
+
+menuWinScrollerDownBitmap Bitmap <7, 4, 0, BMF_MONO>
+	db	11111110b
+	db	01111100b
+	db	00111000b
+	db	00010000b
+
+;
+; ensure keyboard navigation item remains on-screen
+;
+OLMenuWinNavigate	method	dynamic	OLMenuWinClass, MSG_SPEC_NAVIGATE_TO_NEXT_FIELD, MSG_SPEC_NAVIGATE_TO_PREVIOUS_FIELD, MSG_OL_MENU_WIN_UPDATE_SCROLLABLE_MENU
+		cmp	ax, MSG_OL_MENU_WIN_UPDATE_SCROLLABLE_MENU
+		je	checkAgain
+		mov	di, offset OLMenuWinClass
+		call	ObjCallSuperNoLock
+checkAgain:
+		mov	ax, TEMP_OL_MENU_WIN_SCROLLERS
+		call	ObjVarFindData
+		jnc	done			; no scrollers
+		mov	di, ds:[si]
+		add	di, ds:[di].Vis_offset
+		mov	ax, ds:[di].OLWI_focusExcl.FTVMC_OD.handle
+		tst	ax
+		jz	done			; no focus
+		mov	si, ds:[di].VCI_window
+		tst	si
+		jz	done			; no menu window
+		push	bx			; save vardata
+		push	si			; save window
+		mov	bx, ax
+		mov	si, ds:[di].OLWI_focusExcl.FTVMC_OD.chunk
+		mov	ax, MSG_VIS_GET_BOUNDS
+		mov	di, mask MF_CALL or mask MF_FIXUP_DS
+		call	ObjMessage		; bp = top, dx = bottom
+		pop	di			; di = window
+		mov	bx, bp
+		call	WinTransform
+		push	ax, bx
+		movdw	axbx, cxdx
+		call	WinTransform
+		movdw	cxdx, axbx		; dx = bottom (scr)
+		pop	bx, ax			; ax = top (scr)
+		pop	bx			; ds:bx = vardata
+		mov	si, ds:[bx].MWSS_upScroller
+		mov	di, ds:[si]
+		tst	ds:[di].MWSI_window
+		jz	doneUp
+		cmp	ax, ds:[di].MWSI_bottom
+		jge	doneUp
+scrollMenu:
+		push	si			; save scroller
+		call	MenuWinScrollerScrollOnly	; *ds:si = menu win
+		pushf				; save scroll result
+		clr	al			; update immediately
+		call	OLMenuWinUpdateUpDownScrollers
+		popf				; C set if scrolled
+		pop	si			; *ds:si = scroller
+		jnc	done			; no scroll, done
+		mov	di, ds:[si]
+		mov	si, ds:[di].MWSI_menu
+		jmp	checkAgain
+
+doneUp:
+		mov	si, ds:[bx].MWSS_downScroller
+		mov	di, ds:[si]
+		tst	ds:[di].MWSI_window
+		jz	done
+		cmp	dx, ds:[di].MWSI_top
+		jg	scrollMenu
+done:
+		ret
+OLMenuWinNavigate	endm
 
 WinMethods	ends

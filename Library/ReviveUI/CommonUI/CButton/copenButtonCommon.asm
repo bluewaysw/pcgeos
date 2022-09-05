@@ -248,9 +248,6 @@ OLButtonDetermineIfNewState	proc	near
 	mov	al, {byte}ds:[di].OLBI_specState ;get new state
 	xor	al, ds:[di].OLBI_optFlags 	 ;compare to old state
 
-	call	OpenCheckIfKeyboard		 ;no keyboard, ignore cursored
-	jnc	dontCheckCursored		 ;   state.  -cbh 
-
 if _OL_STYLE	;--------------------------------------------------------------
 	test	al, mask OLBSS_BORDERED or \
 		    mask OLBSS_DEPRESSED or \
@@ -259,6 +256,9 @@ if _OL_STYLE	;--------------------------------------------------------------
 endif		;--------------------------------------------------------------
 
 if _CUA_STYLE	;--------------------------------------------------------------
+
+	call	OpenCheckIfKeyboard		 ;no keyboard, ignore cursored
+	jnc	dontCheckCursored		 ;   state.  -cbh 
 
 if _PM	;PM: if inside a menu, or if is a menu button, ignore the cursored
 	;flag, because we set the BORDERED/DEPRESSED flag to show something

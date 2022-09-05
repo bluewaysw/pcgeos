@@ -570,6 +570,62 @@ OLScrollbarEndPress	endp
 
 endif	; _CUA_STYLE
 
+	
+if	_OL_STYLE
+	
+OLScrollbarEndPress	proc near
+	call	CancelScrollbarTimer		;turn off timer
+	mov	di, ds:[si]
+	add	di, ds:[di].Vis_offset	; ds:di = SpecificInstance
+						;See if already up
+	test	ds:[di].OLSBI_state, mask OLSS_DOWN_FLAGS
+	LONG	jz	noChange		; if up, OK, done
+						; ELSE need to change state
+	;
+	; Make sure scrollbar is released.
+	;
+	push	cx, dx, si, bp
+	call	ImUnconstrainMouse		; turn off constraining
+	DoPop	bp, si, dx, cx
+	;
+	; Clear down flags and invalidate image if necessary.
+	;
+	mov	di, ds:[si]
+	add	di, ds:[di].Vis_offset		; ds:di = SpecificInstance
+	mov	al, ds:[di].OLSBI_state		;get current state
+	and	al, mask OLSS_DOWN_FLAGS	;just look at down flags
+
+	cmp	al, OLSS_PAGE_DOWN		;if page down, don't invalidate
+	je	clearDownFlags
+	cmp	al, OLSS_PAGE_UP		;don't invalidate on page up
+	je	clearDownFlags
+	or	ds:[di].OLSBI_state, mask OLSS_INVALID_IMAGE
+
+clearDownFlags:
+	and	ds:[di].OLSBI_state, not (mask OLSS_DOWN_FLAGS)
+	call	OpenDrawObject		  	;redraw the scrollbar
+
+releaseMouse:
+;	mov	di, ds:[si]
+;	add	di, ds:[di].Vis_offset
+;	call	RescrollScrollbar		;scroll, if needed
+	call	VisReleaseMouse			;Release the mouse
+	mov	ax, mask MRF_REPLAY		;Replay this, since we didn't
+	jmp	short exit			;	want it.
+
+noChange:
+	clr	ax
+	test	bp, (mask UIFA_IN) shl 8	;is point in bounds?
+	jz	exit				;if not, skip
+
+OLSS_processed:					;if enter/leave of button
+	mov	ax, mask MRF_PROCESSED or mask MRF_CLEAR_POINTER_IMAGE
+						;Say processed if ptr in bounds
+exit:
+	ret
+OLScrollbarEndPress	endp
+
+endif
 
 
 COMMENT @----------------------------------------------------------------------
@@ -1887,10 +1943,12 @@ if	_CUA_STYLE ;--------------------------------------------------------
 	test	ds:[di].OLSBI_attrs, mask OLSA_UPDATE_DURING_DRAGS
 	jz	exit
 	call	FinishDrag
+
+endif ;----------------------------------------------------------------------
+
 exit:
 	pop	cx, dx			     ;we won't change doc offset here
 	clc				     ;no normalizing
-endif ;----------------------------------------------------------------------
 	
 	ret
 	

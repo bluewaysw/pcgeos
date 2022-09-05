@@ -132,7 +132,7 @@ OpenWinGetInsideLineBorderBounds	endp
 
 ;This procedure returns the bounds of the header area.
 
-OpenWinGetHeaderBounds	proc	near
+OpenWinGetHeaderBounds	proc	far
 	push	di
 
 	push	ds
@@ -204,8 +204,9 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 
 
-OpenWinDraw	method	OLWinClass, METHOD_DRAW
-	DoPush	es, cx
+OpenWinDraw	method	OLWinClass, MSG_VIS_DRAW
+	push	es
+	push	cx
 	mov	di, bp			;di = GState
 
 	call	OpenWinInitGState
@@ -244,9 +245,10 @@ afterBackground:
 
 	;call superclass, to do children
 
-	DoPopRV	es, cx
+	pop	cx
+	pop	es
 	mov	bp, di			;bp = GState
-	mov	ax, METHOD_DRAW
+	mov	ax, MSG_VIS_DRAW
 	mov	di, offset OLWinClass
 	GOTO	ObjCallSuperNoLock
 OpenWinDraw	endp
@@ -285,7 +287,7 @@ REVISION HISTORY:
 OpenWinInitGState	proc	near
 
 	mov	bp, ds:[si]		;ds:bp = instance
-	add	bp, ds:[bp].Spec_offset	;ds:bp = SpecificInstance
+	add	bp, ds:[bp].Vis_offset	;ds:bp = SpecificInstance
 
 	;get display scheme data
 
@@ -302,7 +304,7 @@ OpenWinInitGState	proc	near
 	cmp	ah, DC_GRAY_1		;is this a B@W display?
 	jnz	color			;skip if not...
 
-	mov	al, (WHITE shl 4) or BLACK	;use black and white
+	mov	al, (C_WHITE shl 4) or C_BLACK	;use black and white
 color:
 
 	ret
@@ -431,13 +433,13 @@ OpenWinDrawHeaderLine	proc	near
 	inc	dx
 
 	push	ax
-	mov	ax, WHITE
+	mov	ax, C_WHITE
 	call	GrSetLineColor
 	pop	ax
 
 	call	GrDrawLine
 
-	mov	ax, BLACK		; & set back
+	mov	ax, C_BLACK		; & set back
 	call	GrSetLineColor
 
 done:
@@ -552,11 +554,13 @@ OpenWinDrawHeaderMarks	proc	near
 	test	ds:[bp].OLWI_attrs, mask OWA_CLOSABLE
 	jz	checkPinnable		;skip if not closable...
 
-	DoPush	ds, bp
+	push	ds
+	push	bp
 	segmov	ds, cs			;set ds:bp = BitmapPlaneDefs structure
 	mov	bp, offset CloseMarkBitmapPlaneDefs
 	call	OpenWinDrawMultiPlaneBitmap
-	DoPopRV	ds, bp
+	pop	bp
+	pop	ds
 	add	ax, OLS_CLOSE_MARK_WIDTH + OLS_CLOSE_MARK_SPACING
 
 checkPinnable: ;draw push-pin: ax, bx = position, cx = color scheme
@@ -565,7 +569,8 @@ checkPinnable: ;draw push-pin: ax, bx = position, cx = color scheme
 
 	test	ds:[bp].OLWI_specState, mask OLWSS_DRAWN_PINNED or \
 					mask OLWSS_PINNED
-	DoPush	ds, bp			;assume is unpinned; setup args
+	push	ds
+	push	bp
 	mov	bp, offset PushpinBitmapPlaneDefs
 	jz	drawPin			;skip if is unpinned...
 
@@ -574,7 +579,8 @@ checkPinnable: ;draw push-pin: ax, bx = position, cx = color scheme
 drawPin:
 	segmov	ds, cs			;set ds:bp = BitmapPlaneDefs structure
 	call	OpenWinDrawMultiPlaneBitmap
-	DoPopRV	ds, bp
+	pop	bp
+	pop	ds
 
 done:
 	mov	ax, cx			;return ax = color scheme
@@ -666,23 +672,35 @@ OpenWinDrawHeaderTitle	proc	near
 	pop	di			 ;restore gstate
 		
 	push	bp
-	mov	bp, sp			 ;pass pointer in bp
-	sub	sp, size DrawMonikerArgs ;make room for args
-	mov	drawMkrGState, di	 ;pass gstate
-	push	di			 ;save gstate
-	mov	drawMkrXInset, dx	 ;pass x inset
-	mov	drawMkrYInset, bx	 ;and y inset
-	mov	drawMkrMaxWidth, ax	 ;maximum width       		      
-	call	OpenWinDrawMoniker	 ;draw the moniker
-	pop	di			 ;restore gstate
-	mov	sp, bp			 ;unload args
+	sub	sp, size DrawMonikerArgs		;make room for args
+	mov	bp, sp					;pass pointer in bp
+	mov	ss:[bp].DMA_gState, di			;pass gstate
+	push	di					;save it
+	mov	ss:[bp].DMA_xInset, dx			;pass x inset
+	mov	ss:[bp].DMA_yInset, bx			;and y inset
+	sub	cx, (CUAS_TITLE_TEXT_MARGIN*2)		;allow for margins
+	tst	cx					;did it do negative?
+	jns	45$					;no, branch
+	clr	cx
+45$:
+	mov	ss:[bp].DMA_xMaximum, cx		;title area is max width
+	mov	ss:[bp].DMA_yMaximum, MAX_COORD		;don't clip Y
+	
+	mov	cl, (J_LEFT shl offset DMF_X_JUST) or \
+		    (J_LEFT shl offset DMF_Y_JUST) or \
+		    mask DMF_CLIP_TO_MAX_WIDTH or \
+		    mask DMF_TEXT_ONLY
+		    
+	call	OpenWinDrawMoniker			;draw it
+	pop	di					;restore gstate
+	add	sp, size DrawMonikerArgs		;dump args
 	pop	bp
 
 	mov	ax,(mask TM_DRAW_ACCENT) shl 8
 	call	GrSetTextMode
 
 done:
-	mov	ax, BLACK		; reset text color
+	mov	ax, C_BLACK		; reset text color
 	call	GrSetTextColor
 
 	pop	ax			;restore color
@@ -732,19 +750,19 @@ OpenWinGetHeaderColors	proc	near
 	push	cx
 	mov	bx, ax			;set bx = color scheme
 	call	OpenWinTestForFocusAndTarget
-	test	ax, mask HGF_HAS_EXCLUSIVE
+	test	ax, mask HGF_SYS_EXCL
 					;get FOCUS || TARGET exclusive status
 	jnz	hasFocus		;skip if has focus or target...
 
 	and	bx, mask CS_lightColor	;set to light color		
 	mov	cl, 4							
 	shr	bl, cl							
-	mov	ax, BLACK		;default: black text on light-grey
+	mov	ax, C_BLACK		;default: black text on light-grey
 	jmp	short done
 
 hasFocus:
 	and	bx, mask CS_darkColor	;set to dark color
-	mov	ax, WHITE		;draw white text on dark-grey
+	mov	ax, C_WHITE		;draw white text on dark-grey
 
 done:
 	pop	cx
@@ -778,7 +796,9 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 
 OpenWinDrawMultiPlaneBitmap	proc	near
-	DoPush	ax, bx, si		;save bounds info
+	push	ax
+	push	bx
+	push	si			;save bounds info
 
 	mov	dx, ax			;pass dx = x position
 
@@ -805,20 +825,22 @@ OpenWinDrawMultiPlaneBitmap	proc	near
 	mov	si, ds:[bp].BPD_colorDark ;set ds:si = dark color bitmap
 	call	OpenWinDrawBitmapPlane
 
-	mov	ax, WHITE
+	mov	ax, C_WHITE
 	mov	si, ds:[bp].BPD_colorWhite ;set ds:si = white color bitmap
 	call	OpenWinDrawBitmapPlane
 
-	mov	ax, BLACK
+	mov	ax, C_BLACK
 	mov	si, ds:[bp].BPD_colorBlack ;set ds:si = black color bitmap
 
 drawLastPlane:
 	call	OpenWinDrawBitmapPlane
 
-	mov	ax, BLACK		;set back to black
+	mov	ax, C_BLACK		;set back to black
 	call	GrSetAreaColor
 
-	DoPopRV	ax, bx, si		;get top and bottom bounds
+	pop	si
+	pop	bx
+	pop	ax			;get top and bottom bounds
 	ret
 OpenWinDrawMultiPlaneBitmap	endp
 
@@ -883,7 +905,7 @@ OpenWinDrawShadowBackground	proc	near
 	mov	si, offset MenuSolidRegion
 					;region = VisBounds minus room
 					;for shadow at right and bottom
-	call	DrawRegionAtOrigin
+	call	GrDrawRegionAtCP
 	pop	si
 	pop	ds
 
@@ -891,14 +913,14 @@ OpenWinDrawShadowBackground	proc	near
 	;be drawn outside of this border).
 
 	push	ax
-	mov	ax, BLACK
+	mov	ax, C_BLACK
 	call	GrSetAreaColor
 	pop	ax
 	push	ds
 	push	si
 	segmov	ds, cs
 	mov	si, offset MenuBorderRegion
-	call	DrawRegionAtOrigin
+	call	GrDrawRegionAtCP
 	pop	si
 	pop	ds
 
@@ -916,7 +938,7 @@ OpenWinDrawShadowBackground	proc	near
 	push	si
 	segmov	ds, cs
 	mov	si, offset ShadowRegion
-	call	DrawRegionAtOrigin
+	call	GrDrawRegionAtCP
 	pop	si
 	pop	ds
 
@@ -1009,7 +1031,7 @@ REVISION HISTORY:
 
 OpenWinDrawBorder	proc	near
 	push	ax		;preserve color scheme
-	mov	ax, BLACK
+	mov	ax, C_BLACK
 	call	GrSetAreaColor
 
 	;See if doing shadowed window
@@ -1038,7 +1060,7 @@ OpenWinDrawBorder	proc	near
 	push	ds
 	segmov	ds,cs
 	mov	si,offset ResizeRegionBlack
-	call	DrawRegionAtOrigin
+	call	GrDrawRegionAtCP
 	pop	ds
 	pop	si
 	jmp	short afterResize

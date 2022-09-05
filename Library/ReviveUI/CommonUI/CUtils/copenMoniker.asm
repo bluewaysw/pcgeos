@@ -1411,7 +1411,7 @@ REVISION HISTORY:
 	
 ------------------------------------------------------------------------------@
 
-if _CUA_STYLE and _USE_KBD_ACCELERATORS ;-------------------------------------
+if _USE_KBD_ACCELERATORS ;-------------------------------------
 		  
 OpenDrawKbdAccelerator	proc	near
 

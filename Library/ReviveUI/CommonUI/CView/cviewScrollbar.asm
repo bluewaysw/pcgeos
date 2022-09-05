@@ -2453,4 +2453,142 @@ FloatingScrollerStartSelect	endm
 
 endif	; FLOATING_SCROLLERS
 
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SetPropIndLen
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Sets the length of the proportion indicator.  Depends upon
+		the size of the scroll bar, the size of the window, and the
+		length of the document.
+
+CALLED BY:	INTERNAL
+
+PASS:		*ds:si -- scrollbar
+
+RETURN:		nothing
+
+DESTROYED:	cx, dx, ax
+
+PSEUDO CODE/STRATEGY:
+                if (winLen > docRange) or (scrArea < ELEV_HEIGHT+4)
+		      propIndLen = scrArea
+       		else
+		      propIndLen = winLen * (scrArea / docRange)
+		if propIndLen < ELEV_HEIGHT + 4
+			propIndLen = ELEV_HEIGHT + 4
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Chris	12/13/88	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@@
+
+if _OL_STYLE ;================================
+
+   	;NOT updated for 32 bits!!!
+	
+SetPropIndLen	proc	near
+	class	OLScrollbarClass
+	
+	mov	di, ds:[si]			
+	add	di, ds:[di].Gen_offset
+	;mov	dx, ds:[di].GRI_maxValue     ;get range
+	mov	di, ds:[si]			
+	add	di, ds:[di].Vis_offset
+	;mov	cx, ds:[di].OLSBI_winLen     ;get length of window
+      	mov	ax, ds:[di].OLSBI_scrArea    ;get area in scroll bar
+	cmp	dx, cx			     ;see if scrollable
+	jbe	setElevHt	     	     ;nope, propIndLen = scrArea
+	cmp	ax, ELEV_HEIGHT+4	     ;see if small scroll area	    
+	jbe	setElevHt		     ;yes, just use scroll area
+
+	mul	cx			     ;result in dx:ax
+	mov	di, ds:[si]			
+	add	di, ds:[di].Gen_offset
+	;div	ds:[di].GRI_maxValue	     ;result in ax
+
+	cmp	ax, ELEV_HEIGHT+4	     ;smaller than elevator?	    
+	jae	setElevHt 	     	     ;no, branch
+	mov	ax, ELEV_HEIGHT+4	     ;else use this size	    
+
+setElevHt:
+	mov	di, ds:[si]			
+	add	di, ds:[di].Vis_offset
+	mov	ds:[di].OLSBI_propIndLen,ax  ;store
+	ret
+SetPropIndLen	endp
+
+endif ;==========================================
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SetPropIndOffset
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Sets the offset to the proportional indicator.   Takes the
+		elevator position and subtracts off the right amount so the
+		proportion indicator is centered on the elevator.  The offset
+		is adjusted to avoid overlapping on the ends of the scroll
+		bar.
+
+CALLED BY:	INTERNAL
+
+PASS:		*ds:si -- scrollbar
+		Expects elevOff, propIndLen, top, bottom to be set
+
+RETURN:		nothing
+
+DESTROYED:	ax, cx, dx
+
+PSEUDO CODE/STRATEGY:
+       		propIndOff = elevOff - (propIndLen - ELEV_LEN / 2)
+		if propIndOff < 0
+			propIndOff = 0
+		if propIndOff > scrArea - propIndLen
+			propIndOff = scrArea - propIndLen
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Chris	12/13/88	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@@
+if _OL_STYLE ;================================
+
+   	;NOT UPDATED FOR 32 BITS!
+	
+SetPropIndOffset	proc	near
+	class	OLScrollbarClass
+	
+	mov	di, ds:[si]			
+	add	di, ds:[di].Vis_offset
+	mov	ax, ds:[di].OLSBI_elevOffset   ;get position of elevator
+	mov	cx, ds:[di].OLSBI_propIndLen   ;get length of prop indicator
+	sub	cx, ELEV_HEIGHT		       ;subtract elevator length    
+	shr	cx, 1			       ;divide by two
+	sub	ax, cx			       ;subtract from elevator offset
+	clr	cx			       ;(set to zero if negative)
+	tst	ax
+	js	SPIO50			       ;branch if negative
+
+	mov	cx, ds:[di].OLSBI_scrArea      ;get bottom of scroll bar
+	sub	cx, ds:[di].OLSBI_propIndLen   ;subtract length of indicator
+	cmp	ax, cx			       ;see if propIndOff is above
+	jl	SPIO60			       ;no, branch
+SPIO50:
+	mov_tr	ax, cx			       ;use boundary for value
+SPIO60:
+	mov	ds:[di].OLSBI_propIndOffset, ax  ;store
+	ret
+SetPropIndOffset	endp
+
+endif ;==========================================
+
+
+
 ScrollbarCommon ends

@@ -3167,8 +3167,10 @@ RemoveTitleBarIfPossible	proc	far
 	jnc	leaveTitleBar
 10$:	; if OWA_HAS_SYS_MENU is clear, then we definitely don't have header
 	; gadgets, and can nuke title bar
+if not _OL_STYLE
 	test	ds:[di].OLWI_attrs, mask OWA_HAS_SYS_MENU
 	jz	nukeTitleBar
+endif
 	; if a window menu is allowed, we have title bar
 	call	SpecGetWindowOptions	;al = UIWindowOptions
 	test	al, mask UIWO_WINDOW_MENU

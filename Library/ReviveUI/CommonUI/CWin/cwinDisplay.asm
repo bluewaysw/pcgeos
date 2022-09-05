@@ -1579,7 +1579,8 @@ OLDisplayWinTogglePushpin	method dynamic	OLDisplayWinClass, \
 					; user wishes to CLOSE this display,
 					; a behavior which the application may
 					; wish to intercept & change.
-	mov	ax, MSG_GEN_CLOSE_INTERACTION
+	mov	cx, IC_DISMISS
+	mov	ax, MSG_GEN_GUP_INTERACTION_COMMAND
 	GOTO	ObjCallInstanceNoLock
 OLDisplayWinTogglePushpin	endp
 

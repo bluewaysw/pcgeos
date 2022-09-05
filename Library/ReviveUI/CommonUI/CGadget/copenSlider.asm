@@ -502,9 +502,13 @@ CalcHashMarkOffset	proc	near
 	stc
 	jg	exit
 
+if	_MOTIF
 	mov	ax, ds:[di].OLSBI_elevLen		;start with -elevLen
 	neg	ax
-
+else
+	mov	ax, 0
+							;TODO
+endif
 	test	ds:[di].OLSBI_attrs, mask OLSA_VERTICAL
 	jz	horiz
 	add	di, R_top - R_left			;vertical, get top/bot

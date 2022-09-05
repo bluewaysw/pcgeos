@@ -1206,6 +1206,7 @@ CUAS <	mov	bx, ds:[di].OLWI_sysMenu	;get system menu button handle>
 	tst	bx				;is there one?
 	jz	10$				;no, branch
 
+if not _OL_STYLE
 if not _REDMOTIF ;----------------------- Not needed for Redwood project
 	test	ds:[di].OLWI_menuState, mask OWA_SYS_MENU_IS_CLOSE_BUTTON
 	jnz	10$
@@ -1224,6 +1225,7 @@ foundKbdAccel:
 	call	OLReleaseAllStayUpModeMenus
 	jmp	short handled
 endif ;not _REDMOTIF ;------------------- Not needed for Redwood project
+endif
 
 10$:
 
@@ -2028,9 +2030,11 @@ if _PM	;----------------------------------------------------------------------
 	push	si
 	mov	si, ax
 else	;----------------------------------------------------------------------
+if not _OL_STYLE
 	mov	bx, ds:[di].OLWI_sysMenu	;start pointing to sys menu
 	tst	bx				;any sys menu?
 	jz	exitMenuBar			;none, let's give up on this
+endif
 
 	test	ds:[di].OLWI_menuState, mask OWA_SYS_MENU_IS_CLOSE_BUTTON
 	jnz	exitMenuBar
@@ -2213,6 +2217,7 @@ if NORMAL_HEADERS_ON_DISABLED_WINDOWS
 	cmp	ax, MSG_SPEC_NOTIFY_NOT_ENABLED
 	je	afterNotifications
 endif
+if not _OL_STYLE
 	mov	di, ds:[si]			
 	add	di, ds:[di].Vis_offset
 	mov	bx, ds:[di].OLWI_sysMenu	;get block that objects are in
@@ -2238,6 +2243,7 @@ doneButtonNotify:
 	call	SendToChild
 	call	ObjSwapUnlock
 endif ;not _REDMOTIF ;------------------- Not needed for Redwood project
+endif
 
 afterNotifications:
 	stc					;return state changed

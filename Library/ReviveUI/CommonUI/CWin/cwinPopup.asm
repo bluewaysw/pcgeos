@@ -2380,7 +2380,7 @@ endif		;--------------------------------------------------------------
 
 	;recalc geometry in this window, so will appear correctly next time.
 
-OLS <	mov	ax, MSG_VIS_RESET_WIN_GROUP_GEOMETRY	;reset the geometry of window >
+OLS <	mov	ax, MSG_GEN_RESET_TO_INITIAL_SIZE ;reset the geometry of window >
 OLS <	clr	bp				;use DESIRED_SIZE	>
 OLS <	mov	dl, VUM_NOW						>
 OLS <	call	WinClasses_ObjCallInstanceNoLock				>

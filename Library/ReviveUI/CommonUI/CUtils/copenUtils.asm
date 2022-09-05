@@ -207,13 +207,14 @@ REVISION HISTORY:
 	Doug	10/90		Initial version
 
 ------------------------------------------------------------------------------@
+DS_unused	equ	<{word}DS_lightColor>
 global SpecGetDisplayScheme:far
 SpecGetDisplayScheme	proc	far		uses ds
 	.enter
 	mov	ax, segment specDisplayScheme
 	mov	ds, ax
 	mov	ax, {word} ds:[specDisplayScheme.DS_colorScheme]
-	mov	bx, ds:[specDisplayScheme.DS_unused]
+	mov	bx, {word} ds:[specDisplayScheme.DS_unused]
 	mov	cx, ds:[specDisplayScheme.DS_fontID]
 	mov	dx, ds:[specDisplayScheme.DS_pointSize]
 	.leave

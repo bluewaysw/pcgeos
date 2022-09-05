@@ -1121,7 +1121,7 @@ endif
 
 OLS <	test	bx, mask OLBSS_SYS_ICON		;is this an icon?	>
 OLS <	jz	standardErase			;skip if not...		>
-OLS <	call	DrawBWButtonNormalInteriorForHeaderIcons		>
+OLS <	;call	DrawBWButtonNormalInteriorForHeaderIcons		>
 OLS <	jmp	short drawBorder					>
 
 standardErase:
@@ -1408,10 +1408,12 @@ endif	; PCV
 	jnc	28$				 ;it's not, branch
 	mov	dh, ds:[si].BWBRSS_monikerYInsetCGA
 28$:
+if (not _OPEN_LOOK)
 	call	OpenCheckIfNarrow		 ;check if narrow
 	jnc	285$				 ;it's not, branch
 	mov	dl, ds:[si].BWBRSS_monikerXInsetNarrow
 285$:
+endif
 	mov	al, ds:[si].BWBRSS_monikerFlags	; get DrawMonikerFlags
 
 	segmov	ds, es, si
