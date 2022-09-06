@@ -222,7 +222,8 @@ EC <	call	GenCheckGenAssumption	; Make sure gen data exists 	>
 	; if the CheckedItem has a mark in it add size for the mark
 
 	clr	bp			;do not optionally expand CheckedItems
-	GOTO	VisHandleMinResize
+	call	VisHandleMinResize
+	ret
 endif		;---------------------------------------------------------------
        
 OLCheckedItemRerecalcSize	endp
