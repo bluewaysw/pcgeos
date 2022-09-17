@@ -8,6 +8,12 @@
 #
 # AUTHOR:	David J. Noha, 3/94
 #
+# REVISION HISTORY:
+#       Name    Date            Description
+#       ----    ----            -----------
+#       David  	3/94	        Initial version
+#		RainerB	4/21/2022		Resource names adjusted for Watcom compatibility
+#
 # DESCRIPTION:	This file contains Geode definitions for the "DBSamp" sample
 #		application. This file is read by the GLUE linker to
 #		build this application.
@@ -33,6 +39,6 @@ library	geos
 library	ui
 library ansic
 
-resource APPRESOURCE ui-object
-resource INTERFACE   ui-object
+resource AppResource ui-object
+resource Interface   ui-object
 

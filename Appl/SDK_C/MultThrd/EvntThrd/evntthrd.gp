@@ -8,6 +8,11 @@
 #
 # AUTHOR:       EB 1/96
 #
+#       Name    Date            Description
+#       ----    ----            -----------
+#       EB		1/96	        Initial version
+#		RainerB	4/27/2022		Resource names adjusted for Watcom compatibility
+#
 # DESCRIPTION:  This file contains Geode definitions for the "Event Thread"
 #		sample application. This file is read by the Glue linker to
 #               build this application.
@@ -71,10 +76,10 @@ library ui
 # object blocks, fixed code resources, or data resources that are read-only.
 # Standard discardable code resources do not need to be mentioned.
 #
-resource APPRESOURCE	ui-object
-resource INTERFACE 	ui-object
-resource SECONDARYTHREADOBJECTSRESOURCE object, discard-only
-resource CONSTANTDATA 	lmem, data
+resource AppResource	ui-object
+resource Interface 	ui-object
+resource SecondaryThreadObjectsResource object, discard-only
+resource ConstantData 	lmem, data
 #
 # New classes: export any new classes created in the application.
 #

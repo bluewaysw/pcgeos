@@ -14,6 +14,7 @@
 #       AS      3/6/92          Initial version
 #       NF      9/18/96         Corrected heapspace and tokenchars
 #       NF      10/4/96         Corrected heapspace value again
+#		RainerB	4/27/2022		Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:
 #       This file contains Geode definitions for the "DupGrObj" sample
@@ -82,11 +83,11 @@ library grobj
 # object blocks, fixed code resources, or data resources that are read-only.
 # Standard discardable code resources do not need to be mentioned.
 #
-resource APPRESOURCE ui-object
-resource INTERFACE   ui-object
-resource DISPLAYUI   ui-object
-resource DOCUMENTUI  object
-resource BODYGOAM    object read-only shared
+resource AppResource ui-object
+resource Interface   ui-object
+resource DisplayUI   ui-object
+resource DocumentUI  object
+resource BodyGOAM    object read-only shared
 #
 # Define extra object classes here.
 #

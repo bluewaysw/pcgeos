@@ -13,7 +13,8 @@
 #	Name	Date		Description
 #	----	----		-----------
 #	LH	4/14/93       	Initial MyChart #4 sample
-#	NF	8/9/96		Made into EC sample
+#	NF	8/9/96			Made into EC sample
+#	RB	4/27/2022		Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:
 #	These are the parameters for the glue linker which describe
@@ -38,12 +39,12 @@ heapspace 5k
 library	geos
 library	ui
 
-resource APPLICATION ui-object
-resource INTERFACE   ui-object
-resource DOCGROUP    object
-resource DISPLAY     ui-object read-only shared
-resource CONTENT     object read-only shared
-resource STRINGS     lmem shared read-only
+resource Application ui-object
+resource Interface   ui-object
+resource DocGroup    object
+resource Display     ui-object read-only shared
+resource Content     object read-only shared
+resource Strings     lmem shared read-only
 
 export EChkProcessClass
 export EChkChartClass
