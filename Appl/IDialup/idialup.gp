@@ -4,7 +4,7 @@
 # FILE:		idial.gp 
 #
 # AUTHOR:	Mingzhe Zhu, Nov 21, 1998
-#
+# 
 #
 # 
 #
