@@ -38,9 +38,8 @@ DESCRIPTION:
 #include <ec.h>
 #include <Internal/socketDr.h>
 #include <tcpip.h>
-#include <tcpipLog.h>
 @include <accpnt.goh>
-#include <ansi/string.h>
+#include <Ansi/string.h>
 
 /*---------------------------------------------------------------------------*
  *		     Class & Message Definitions
@@ -108,11 +107,10 @@ DESCRIPTION:
  */
 @message word MSG_TCPIP_SEND_RAW_IP(word link = cx, optr buffer = dx:bp) = ax;
 
-/*
- * DHCP lease renewal messages
- */
-@message void MSG_TCPIP_DHCP_RENEW_TIMER();
-@message void MSG_TCPIP_DHCP_RENEW_NOW();
+@message MSG_TCPIP_DHCP_RENEW_TIMER_ASM();
+@message MSG_TCPIP_DHCP_RENEW_NOW_ASM();
+
+
 @message void MSG_TCPIP_START_RECEIVE(word link = cx);
 
 @endc
@@ -126,6 +124,9 @@ DESCRIPTION:
 #endif
 #ifdef __BORLANDC__
 #pragma codeseg TCPCODE
+#endif
+#ifdef __WATCOMC__
+#pragma code_seg("TCPCODE")
 #endif
 
 /*--------------------------------------------------------------------------*
@@ -346,7 +347,9 @@ REVISION HISTORY:
 {
     	optr buffer;
 
-    	buffer = TcpipDequeuePacket();
+	TcpipReceiveStart(0);
+
+    	//buffer = TcpipDequeuePacket();
 
 	//if (buffer)
 	//    IpInput(buffer);
@@ -358,6 +361,9 @@ REVISION HISTORY:
 #endif
 #ifdef __BORLANDC__
 #pragma codeseg TSOCKETCODE
+#endif
+#ifdef __WATCOMC__
+#pragma code_seg("TSOCKETCODE")
 #endif
 
 
@@ -405,7 +411,9 @@ REVISION HISTORY:
 #ifdef __BORLANDC__
 #pragma codeseg TCPCODE
 #endif
-
+#ifdef __WATCOMC__
+#pragma code_seg("TCPCODE")
+#endif
 
 /*-------------------------------------------------------------------------
 			     MSG_TCPIP_DELETE_LINK
@@ -428,7 +436,7 @@ REVISION HISTORY:
 -------------------------------------------------------------------------*/
 @method TcpipProcessClass, MSG_TCPIP_DELETE_LINK
 {
-    	LinkTableDeleteEntry(link);
+    	/*LinkTableDeleteEntry(link);*/
 
 }	/* End of MSG_TCPIP_DELETE_LINK.	*/
 
@@ -526,7 +534,7 @@ REVISION HISTORY:
 /*
  * INI key strings.
  */
-@start Strings, data;
+@start StringsGOC, data;
 @chunk char tcpipString[] = {'t','c','p','i','p',0};
     @localize not;
 @chunk char maxTTLString[] = {'m','a','x','T','T','L',0};
@@ -551,178 +559,13 @@ REVISION HISTORY:
     @localize not;
 @chunk char rttvarShiftString[] = {'r','t','t','v','a','r','S','h','i','f','t',0};
     @localize not;
-@end Strings;
+@end StringsGOC;
 
 
 
 @endif
 
 
-/***********************************************************************
- *		TcpipDhcpConvertTime
- ***********************************************************************
- *
- * SYNOPSIS:	Takes a TimerDateAndTime struct, and fills in another
- * 		TimerDateAndTime struct with a time a specified number
- *		of seconds later.
- *
- * CALLED BY:	TcpipDhcpParseAndSendNotification
- * RETURN:	
- * SIDE EFFECTS:
- *	
- * STRATEGY:
- *	
- * REVISION HISTORY:
- *	Name	Date		Description
- *	----	----		-----------
- *      ed	7/07/00   	Initial Revision
- *
- ***********************************************************************/
-void CALLCONV
-TcpipDhcpConvertTime (TimerDateAndTime *start, TimerDateAndTime *end,
-		      dword secs)
-{
-    word days;
-    memcpy(end, start, sizeof(TimerDateAndTime));
-
-    while (secs > ((dword)365*24*60*60)) {
-	secs -= ((dword)365*24*60*60);
-	days = LocalCalcDaysInMonth((end->TDAT_month > 2) ?
-				    (++end->TDAT_year) :
-				    (end->TDAT_year++), 2);
-	if (days == 28) continue;
-
-	if (end->TDAT_month == 2 && end->TDAT_day == 29) {
-	    end->TDAT_day = 1;
-	    end->TDAT_month = 3;
-	}
-	else {
-	    if (secs > ((dword)24*60*60)) {
-		secs -= ((dword)24*60*60);
-	    }
-	    else {
-		if (--end->TDAT_day == 0) {
-		    if (--end->TDAT_month == 0) {
-			end->TDAT_year--;
-			end->TDAT_month = 12;
-			end->TDAT_day = 31;
-		    }
-		    else {
-			end->TDAT_day = LocalCalcDaysInMonth(end->TDAT_year,
-							     end->TDAT_month);
-		    }
-		}
-	    }
-	}
-    } /* while > 1 year remaining */
-
-
-    /* Move the date up to the 1st of the next month, if we can */
-
-    if (end->TDAT_day != 1) {
-	days = LocalCalcDaysInMonth(end->TDAT_year, end->TDAT_month) -
-	    end->TDAT_day + 1;
-	if (secs > (days * (dword)24*60*60)) {
-	    secs -= (days * (dword)24*60*60);
-	    end->TDAT_day = 1;
-	    if (end->TDAT_month != 12) {
-		end->TDAT_month++;
-	    }
-	    else {
-		end->TDAT_month = 1;
-		end->TDAT_year++;
-	    }
-	}
-	else {
-	    days = secs / ((dword)24*60*60);
-	    end->TDAT_day += days;
-	    secs -= (days * (dword)24*60*60);
-	    goto checkHours;
-	}
-    }
-
-    /* Check the months */
-    while (secs > ((days = LocalCalcDaysInMonth(end->TDAT_year,
-						end->TDAT_month))*24*60*60)) {
-	secs -= (days * (dword)24*60*60);
-	if (end->TDAT_month != 12) {
-	    end->TDAT_month++;
-	}
-	else {
-	    end->TDAT_month = 1;
-	}
-    }
-
-    /* Check the days */
-    days = secs / ((dword)24*60*60);
-    end->TDAT_day += days;
-    secs -= (days * (dword)24*60*60);
-
-    /* Note: From here on, I'm still using the variable days, even tho it's
-       not really storing days anymore as it's pointless to make more
-       variables. */
-checkHours:
-    /* Check the hours */
-    if (secs > ((dword)60*60)) {
-	days = secs / ((dword)60*60);
-	end->TDAT_hours += days;
-	secs -= (days * (dword)60*60);
-    }
-
-    /* Check the minutes */
-    if (secs > 60) {
-	days = secs / ((dword)60);
-	end->TDAT_minutes += days;
-	secs -= (days * (dword)60);
-    }
-
-    /* Account for any remaining seconds */
-    end->TDAT_seconds += secs;
-
-    /* Now check for overflows */
-    if (end->TDAT_seconds > 59) {
-	end->TDAT_minutes++;
-	end->TDAT_seconds -= 60;
-    }
-
-    if (end->TDAT_minutes > 59) {
-	end->TDAT_minutes -= 60;
-	end->TDAT_hours++;
-    }
-
-    if (end->TDAT_hours > 23) {
-	end->TDAT_hours -= 24;
-	if (end->TDAT_day == LocalCalcDaysInMonth(end->TDAT_year,
-						  end->TDAT_month)) {
-	    if (end->TDAT_month < 12) {
-		end->TDAT_month++;
-	    }
-	    else {
-		end->TDAT_month = 1;
-		end->TDAT_year++;
-	    }
-	    end->TDAT_day = 1;
-	}
-	else {
-	    end->TDAT_day++;
-	}
-    }
-
-    end->TDAT_dayOfWeek = LocalCalcDayOfWeek(end->TDAT_year, end->TDAT_month,
-					     end->TDAT_day);
-}	/* End of TcpipDhcpConvertTime.	*/
-
-@method TcpipProcessClass, MSG_TCPIP_DHCP_RENEW_TIMER,
-    MSG_TCPIP_DHCP_RENEW_NOW
-{
-    if (message == MSG_TCPIP_DHCP_RENEW_TIMER) {
-	TcpipDhcpTimerHandler();
-    }
-    else {
-	TcpipDhcpStartRenew();
-    }
-}
-
 @method TcpipProcessClass, MSG_TCPIP_START_RECEIVE
 {
 	TcpipReceiveStart(link);

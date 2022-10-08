@@ -577,7 +577,7 @@ linkStrategy	local	fptr
 		mov	linkDrvr, 0
 		push	ds
 		mov	bx, MAIN_LINK_DOMAIN_HANDLE
-		call	LinkTableGetEntry	; ds:di = LCB
+		;call	LinkTableGetEntry	; ds:di = LCB
 						; ^hbx = link table
 		movdw	linkStrategy, ds:[di].LCB_strategy, ax
 		mov	ax, ds:[di].LCB_drvr
@@ -587,7 +587,7 @@ linkStrategy	local	fptr
 		tst	ax
 		jnz	driverLoaded
 
-		call	LinkLoadLinkDriverFar	; bx = driver handle
+		;call	LinkLoadLinkDriverFar	; bx = driver handle
 		LONG	jc	exit
 		mov	linkDrvr, bx
 
@@ -610,7 +610,7 @@ driverLoaded:
 		jz	checkChild
 
 		mov	bx, linkDrvr
-		call	LinkUnloadLinkDriverFar
+		;call	LinkUnloadLinkDriverFar
 checkChild:
 	;
 	; If there is a child, instantiate the controller in this object
@@ -1167,10 +1167,3 @@ IPAddressTextEmptyStatusChanged	endm
 
 
 AddressCode	ends
-
-
-
-
-
-
-

@@ -26,8 +26,7 @@ tcpip.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h sem.h initfile.h \
-                Internal/socketDr.h sockmisc.h tcpip.h tcpipLog.h \
-                ansi/string.h
+                Internal/socketDr.h sockmisc.h tcpip.h Ansi/string.h
 tcpip.obj \
 tcpip.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -56,12 +55,7 @@ tcpip.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h sem.h initfile.h \
-                Internal/socketDr.h sockmisc.h tcpip.h tcpipLog.h \
-                ansi/string.h
-tcpipLog.obj \
-tcpipLog.eobj: c:/workspace/bluewaysw/_149/pcgeos/Driver/Socket/HstTCPIP/tcpipLog.c
-tcpipLog.obj \
-tcpipLog.eobj: c:/workspace/bluewaysw/_149/pcgeos/Driver/Socket/HstTCPIP/tcpipLog.c
+                Internal/socketDr.h sockmisc.h tcpip.h Ansi/string.h
 tcpipStrings.rdef: c:/workspace/bluewaysw/_149/pcgeos/Driver/Socket/HstTCPIP/tcpipStrings.ui
 tcpipAddrCtrl.rdef: generic.uih product.uih
 tcpipManager.obj \
@@ -71,11 +65,11 @@ tcpipManager.eobj: geos.def heap.def geode.def Internal/interrup.def \
                 driver.def thread.def Internal/semInt.def sem.def \
                 Internal/heapInt.def sysstats.def Internal/im.def \
                 Objects/processC.def Objects/metaC.def chunkarr.def \
-                geoworks.def Internal/threadIn.def file.def initfile.def \
-                assert.def disk.def drive.def medium.def ui.def vm.def \
-                text.def fontID.def graphics.def font.def color.def \
-                char.def win.def input.def hwr.def gcnlist.def \
-                Objects/Text/tCommon.def stylesh.def iacp.def \
+                geoworks.def Internal/threadIn.def Internal/host.def \
+                file.def initfile.def assert.def disk.def drive.def \
+                medium.def ui.def vm.def text.def fontID.def graphics.def \
+                font.def color.def char.def win.def input.def hwr.def \
+                gcnlist.def Objects/Text/tCommon.def stylesh.def iacp.def \
                 Objects/uiInputC.def Objects/visC.def Objects/vCompC.def \
                 Objects/vCntC.def Internal/vUtils.def Objects/genC.def \
                 uDialog.def Objects/gInterC.def token.def \
@@ -101,7 +95,6 @@ tcpipManager.eobj: geos.def heap.def geode.def Internal/interrup.def \
                 Internal/socketDr.def sockmisc.def tcpip.def \
                 tcpipGlobal.def tcpipAddrCtrl.def dhcpConstant.def \
                 tcpipStrings.rdef tcpipAddrCtrl.rdef tcpipEntry.asm \
-                tcpipSocket.asm tcpipLink.asm tcpipUtils.asm \
-                tcpipAddrCtrl.asm tcpipDhcp.asm
+                tcpipAddrCtrl.asm
 
 hsttcpipEC.geo hsttcpip.geo : geos.ldf netutils.ldf socket.ldf ansic.ldf accpnt.ldf resolver.ldf resolver.ldf 

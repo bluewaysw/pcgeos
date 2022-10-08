@@ -70,6 +70,7 @@
 #include <socket.goh>
 #endif
 #include "ssl_locl.h"
+#include "ssl_host.h"
 
 #ifndef GEOS_CLIENT
 char *SSL_version_str="SSLeay 0.9.0b 29-Jun-1998";
@@ -79,6 +80,13 @@ static STACK *ssl_meth=NULL;
 static STACK *ssl_ctx_meth=NULL;
 static int ssl_meth_num=0;
 static int ssl_ctx_meth_num=0;
+
+#ifdef COMPILE_OPTION_HOST_SERVICE
+static MemHandle ssl_hostExchangeBuffer = NullHandle;
+
+void* SSLHostExchangeBuffer();
+
+#endif
 
 SSL3_ENC_METHOD ssl3_undef_enc_method={
 	ssl_undefined_function,
@@ -161,8 +169,15 @@ SSL * _export _pascal SSL_new(ctx)
 SSL_CTX *ctx;
 	{
 	SSL *s;
-        SSLEnter() ;
 
+#ifdef COMPILE_OPTION_HOST_SERVICE
+	if(SSLCheckHost())
+		{
+		return (SSL *) SSLCallHost(
+			SSLHFN_SSL_NEW, (dword) ctx, (dword) NULL, 0);
+		}
+#endif
+        SSLEnter() ;
 	if (ctx == NULL)
 		{
 		SSLerr(SSL_F_SSL_NEW,SSL_R_NULL_SSL_CTX);
@@ -229,6 +244,16 @@ void _export _pascal SSL_free(s)
 SSL *s;
 	{
 	int i;
+
+#ifdef COMPILE_OPTION_HOST_SERVICE
+	if(SSLCheckHost())
+		{
+		SSLCallHost(
+			SSLHFN_SSL_FREE, (dword) s, (dword) NULL, 0);
+		return;
+		}
+#endif
+
         SSLEnter() ;
 
 	i=CRYPTO_add(&s->references,-1,CRYPTO_LOCK_SSL);
@@ -355,6 +380,15 @@ int fd;
 	int ret=0;
 	BIO *bio=NULL;
 
+#ifdef COMPILE_OPTION_HOST_SERVICE
+	if(SSLCheckHost())
+		{
+		return (int) SSLCallHost(
+			SSLHFN_SSL_SET_FD, (dword) s, (dword)  
+			SSLHostExchangeBuffer(), (word) fd);
+		}
+#endif
+
         SSLEnter() ;
 	bio=BIO_new(BIO_s_socket());
 
@@ -370,6 +404,23 @@ err:
         SSLLeave() ;
 	return(ret);
 	}
+
+#ifdef COMPILE_OPTION_HOST_SERVICE
+
+void* SSLHostExchangeBuffer() 
+	{
+	void* retValue;
+	PUSHDS;
+	if (ssl_hostExchangeBuffer == NullHandle)
+		{
+		ssl_hostExchangeBuffer = MemAlloc(8192, HF_FIXED, 0);
+		}
+	retValue = MemDeref(ssl_hostExchangeBuffer);
+	POPDS;
+	return retValue;
+	}
+
+#endif
 
 #ifndef GEOS_CLIENT
 
@@ -612,6 +663,15 @@ int _export _pascal SSL_connect(s)
 SSL *s;
 	{
         int result ;
+	
+#ifdef COMPILE_OPTION_HOST_SERVICE
+	if(SSLCheckHost())
+		{
+		return (int) SSLCallHost(
+			SSLHFN_SSL_CONNECT, (dword) s, (dword) NULL, 0);
+		}
+#endif
+	
         SSLEnter() ;
 #ifdef __GEOS__
 	result = CALLCB1(s->method->ssl_connect,s);
@@ -638,6 +698,14 @@ char *buf;
 int num;
 {
 	int report ;
+
+#ifdef COMPILE_OPTION_HOST_SERVICE
+	if(SSLCheckHost())
+		{
+		return (int) SSLCallHost(
+			SSLHFN_SSL_READ, (dword) s, (dword) buf, num);
+		}
+#endif
 
 	SSLEnter() ;
 #ifdef GEOS_ERROR
@@ -688,6 +756,15 @@ char *buf;
 int num;
 {
 	int report ;
+
+#ifdef COMPILE_OPTION_HOST_SERVICE
+	if(SSLCheckHost())
+		{
+		return (int) SSLCallHost(
+			SSLHFN_SSL_WRITE, (dword) s, (dword) buf, num);
+		}
+#endif
+
 	SSLEnter() ;
 #ifdef GEOS_ERROR
 	ThreadSetError(SE_NORMAL);
@@ -716,6 +793,15 @@ int _export _pascal SSL_shutdown(s)
 SSL *s;
 	{
 		int report = 1 ;
+
+#ifdef COMPILE_OPTION_HOST_SERVICE
+	if(SSLCheckHost())
+		{
+		return (int) SSLCallHost(
+			SSLHFN_SSL_SHUTDOWN, (dword) s, (dword) NULL, 0);
+		}
+#endif
+
 		SSLEnter() ;
 	if ((s != NULL) && !SSL_in_init(s))
 #ifdef __GEOS__
@@ -1042,10 +1128,26 @@ SSL_SESSION *b;
 #pragma code_seg()
 #endif
 
+#ifdef COMPILE_OPTION_HOST_SERVICE
+dword SSLHostCallback() {
+	
+}
+#endif
+
 SSL_CTX * _export _pascal SSL_CTX_new(meth)
 SSL_METHOD *meth;
 	{
 	SSL_CTX *ret;
+
+#ifdef COMPILE_OPTION_HOST_SERVICE
+	if(SSLCheckHost())
+		{
+		SSLCallHost(
+			SSLHFN_SET_CALLBACK, (dword) SSLHostCallback, (dword) NULL, 0);
+		return (SSL_CTX *) SSLCallHost(
+			SSLHFN_SSL_CTX_NEW, (dword) NULL, (dword) NULL, 0);
+		}
+#endif
 
         SSLEnter() ;
 	if (meth == NULL)
@@ -1172,6 +1274,15 @@ SSL_CTX *a;
 	int i;
 
 	if (a == NULL) return;
+
+#ifdef COMPILE_OPTION_HOST_SERVICE
+	if(SSLCheckHost())
+		{
+		SSLCallHost(
+			SSLHFN_SSL_CTX_FREE, (dword) a, (dword) NULL, 0);
+		return;
+		}
+#endif
 
         SSLEnter() ;
 	i=CRYPTO_add(&a->references,-1,CRYPTO_LOCK_SSL_CTX);
@@ -1467,6 +1578,15 @@ SSL_METHOD * _export _pascal SSL_get_ssl_method(s)
 SSL *s;
 	{
 	SSL_METHOD *ret;
+
+#ifdef COMPILE_OPTION_HOST_SERVICE
+	if(SSLCheckHost())
+		{
+		return (SSL_METHOD *) SSLCallHost(
+			SSLHFN_SSL_GET_SSL_METHOD, (dword) s, (dword) NULL, 0);
+		}
+#endif
+	
 	SSLEnter();
 	ret = s->method;
 	SSLLeave();
