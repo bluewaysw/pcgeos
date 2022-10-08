@@ -120,7 +120,7 @@ skip 2
 # unused enums for the classes exported after OLBuildPenInputControl, so
 # anyone adding new .gp file entries after us will not have to think about
 # this stuff.
-#
+# 
 export OLBuildPenInputControl
 # these must be exported because they are in the ui resource built out
 # for the PenInputControl.
