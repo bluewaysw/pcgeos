@@ -292,7 +292,7 @@ typedef struct _ClassStruct ClassStruct;
 # define OptrToHandle(op) ((MemHandle) ((op) >> 16))
 # define OptrToChunk(op) ((ChunkHandle) (op))
 
-# define ConstructOptr(han,ch) ((((optr) (han)) << 16) | ((dword) (ch)))
+# define ConstructOptr(han,ch) ((((optr) (han)) << 16) | ((word) (ch)))
 //# define ConstructOptr(han,ch) ((optr)(((__segment) han):>((ChunkHandle)ch)))
 
 # define PtrToSegment(ptr) 	((Segment) (((dword) (ptr)) >> 16))

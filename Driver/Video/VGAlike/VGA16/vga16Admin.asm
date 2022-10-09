@@ -355,6 +355,12 @@ VidTestVESA_832x624_16	proc	near
 		ret
 VidTestVESA_832x624_16	endp
 		
+VidTestVESA_848x480_16	proc	near
+		mov	ax, VD_VESA_848x480_16
+		call	VidTestVESA
+		ret
+VidTestVESA_848x480_16	endp
+
 VidTestVESA_1024_600_16	proc	near
 		mov	ax, VD_VESA_1024_600_16
 		call	VidTestVESA
@@ -563,11 +569,13 @@ else ; NT_DRIVER
 		; OK, there is a VESA board out there.  Check the mode table
 		; for the correct mode.  
 
-		les	di, es:[di].VIB_modes	; get pointer to mode info
+		mov	di, 0x100		; start scan with modes
+						; starting 0x100, blow are
+						; non high-color modes
 checkLoop:
-		cmp	es:[di], 0xffff		; at mode table terminator?
+		cmp	di, 0x8000		; stop at mode id 0x8000
 		je	notPresent
-		mov	ax, es:[di]
+		mov	ax, di
 		push	ax
 		push	bx
 		push	es
@@ -621,7 +629,6 @@ checkNext::
 		pop	bx
 		pop	ax
 		
-		inc	di
 		inc	di
 		jmp	checkLoop
 		
@@ -886,6 +893,7 @@ ifndef PRODUCT_WIN_DEMO
 		word	400		; VD_VESA_720x400_16
 		word	480		; VD_VESA_800x480_16
 		word	624		; VD_VESA_832x624_16
+		word	480		; VD_VESA_848x480_16
 		word	600		; VD_VESA_1024_600_16
 
 		word	768		; VD_VESA_1Kx768_16
@@ -924,6 +932,7 @@ ifndef PRODUCT_WIN_DEMO
 		word	720		; VD_VESA_720x400_16
 		word	800		; VD_VESA_800x480_16
 		word	832		; VD_VESA_832x624_16
+		word	848		; VD_VESA_848x480_16
 		word	1024		; VD_VESA_1024_600_16
 
 		word	1024		; VD_VESA_1Kx768_16
@@ -954,4 +963,3 @@ ifndef PRODUCT_WIN_DEMO
 endif
 
 VidEnds		Misc
-

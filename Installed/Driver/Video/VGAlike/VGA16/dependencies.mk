@@ -1,24 +1,24 @@
-VGA16MANAGER.obj \
-VGA16MANAGER.eobj: VIDCOMGEODE.DEF GEOS.DEF HEAP.DEF GEODE.DEF RESOURCE.DEF \
-                EC.DEF DRIVER.DEF LMEM.DEF INTERNAL/SEMINT.DEF \
-                GRAPHICS.DEF FONTID.DEF FONT.DEF COLOR.DEF WIN.DEF \
-                CHAR.DEF LOCALIZE.DEF SLLANG.DEF SYSTEM.DEF \
-                INTERNAL/HEAPINT.DEF SYSSTATS.DEF INTERNAL/GSTATE.DEF \
-                INTERNAL/TMATRIX.DEF INTERNAL/FONTDR.DEF FILE.DEF \
-                INTERNAL/WINDOW.DEF INTERNAL/INTERRUP.DEF \
-                INTERNAL/THREADIN.DEF INTERNAL/VIDEODR.DEF HUGEARR.DEF \
-                INITFILE.DEF VGA16CONSTANT.DEF VIDCOMCONSTANT.DEF \
-                VGA16MACRO.DEF VIDCOMMACRO.DEF VGA16DEVINFO.ASM \
-                VIDCOMTABLES.ASM VGA16TABLES.ASM VIDCOMVARIABLE.DEF \
-                VGA16VARIABLE.DEF VGA16STRINGTAB.ASM VIDCOMENTRY.ASM \
-                VIDCOMOUTPUT.ASM VIDCOMCHARS.ASM VIDCOMFONT.ASM \
-                VGA16UNDER.ASM VIDCOMUTILS.ASM VIDCOMREGION.ASM \
-                VIDCOMXOR.ASM VIDCOMINFO.ASM VIDCOMESCAPE.ASM \
-                VIDCOMPALETTE.ASM VGA16OUTPUT.ASM VGA16GENCHAR.ASM \
-                VGA16UTILS.ASM VGA16CHARS.ASM VGA16POINTER.ASM \
-                VGA16ESCTAB.ASM VGA16PALETTE.ASM VGA16DITHER.ASM \
-                VIDCOMPOLYGON.ASM VIDCOMLINE.ASM VIDCOMPUTLINE.ASM \
-                VIDCOMRASTER.ASM VGA16RASTER.ASM VGA16ADMIN.ASM \
-                VIDCOMEXCLBOUNDS.ASM
+vga16Manager.obj \
+vga16Manager.eobj: vidcomGeode.def geos.def heap.def geode.def resource.def \
+                ec.def driver.def lmem.def Internal/semInt.def \
+                graphics.def fontID.def font.def color.def win.def \
+                char.def localize.def sllang.def system.def \
+                Internal/heapInt.def sysstats.def Internal/gstate.def \
+                Internal/tmatrix.def Internal/fontDr.def file.def \
+                Internal/window.def Internal/interrup.def \
+                Internal/threadIn.def Internal/videoDr.def hugearr.def \
+                initfile.def vga16Constant.def vidcomConstant.def \
+                vga16Macro.def vidcomMacro.def vga16DevInfo.asm \
+                vidcomTables.asm vga16Tables.asm vidcomVariable.def \
+                vga16Variable.def vga16StringTab.asm vidcomEntry.asm \
+                vidcomOutput.asm vidcomChars.asm vidcomFont.asm \
+                vga16Under.asm vidcomUtils.asm vidcomRegion.asm \
+                vidcomXOR.asm vidcomInfo.asm vidcomEscape.asm \
+                vidcomPalette.asm vga16Output.asm vga16GenChar.asm \
+                vga16Utils.asm vga16Chars.asm vga16Pointer.asm \
+                vga16EscTab.asm vga16Palette.asm vga16Dither.asm \
+                vidcomPolygon.asm vidcomLine.asm vidcomPutLine.asm \
+                vidcomRaster.asm vga16Raster.asm vga16Admin.asm \
+                vidcomExclBounds.asm
 
-VGA16EC.geo VGA16.geo : GEOS.LDF 
+vga16EC.geo vga16.geo : geos.ldf 

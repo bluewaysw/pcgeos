@@ -4,22 +4,22 @@
 # If you edit it, you will lose your changes, should it be regenerated.
 #
 GEODE           = geofile
-UI              = uiLayout.goc uiMarked.goc uiTmplat.goc uiModify.goc\
-                  uiMain.goc
+DOCASM          = docasmManager.asm docButtn.asm
 DOCUMENT        = docGroup.goc document.goc
-MAIN            = mFldOrdr.goc mProcess.goc mFldOrgz.goc mModes.goc\
-                  mLayouts.goc mAppl.goc mSorting.goc mSubsets.goc
-DOCASM          = docButtn.asm docasmManager.asm
 LOCALIZE        = strings.goc
+MAIN            = mAppl.goc mFldOrdr.goc mFldOrgz.goc mLayouts.goc\
+                  mModes.goc mProcess.goc mSorting.goc mSubsets.goc
+UI              = uiLayout.goc uiMain.goc uiMarked.goc uiModify.goc\
+                  uiTmplat.goc
 UI_TO_RDFS      = uiButton.ui
-OBJS            = uiLayout.obj uiMarked.obj uiTmplat.obj uiModify.obj\
-                  uiMain.obj docGroup.obj document.obj mFldOrdr.obj\
-                  mProcess.obj mFldOrgz.obj mModes.obj mLayouts.obj\
-                  mAppl.obj mSorting.obj mSubsets.obj strings.obj
-COMMON          = gfButton.goh geofile.goh gfButton.def
+OBJS            = docGroup.obj document.obj strings.obj mAppl.obj\
+                  mFldOrdr.obj mFldOrgz.obj mLayouts.obj mModes.obj\
+                  mProcess.obj mSorting.obj mSubsets.obj uiLayout.obj\
+                  uiMain.obj uiMarked.obj uiModify.obj uiTmplat.obj
+COMMON          = geofile.goh gfButton.def gfButton.goh
 MODULES         = DocAsm
-CMODULES        = UI Document Main Localize
-SRCS            = $(UI) $(DOCUMENT) $(MAIN) $(DOCASM) $(LOCALIZE) $(COMMON)
+CMODULES        = Document Localize Main UI
+SRCS            = $(DOCASM) $(DOCUMENT) $(LOCALIZE) $(MAIN) $(UI) $(COMMON)
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk

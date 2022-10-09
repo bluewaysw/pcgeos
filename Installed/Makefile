@@ -161,7 +161,7 @@ otherEnsemble	: conview reader term tedit geofile dirls  \
 minimalDriver	: nimbus ms4 ntfat os2 cdrom stream dri gdi keyboard modem gdipointer \
 		  standard winnt parallel serial disk vidmem svga \
 		  vga vga8 vga15 vga16 vga24 ega cga mcga hgc att6300 dscga \
-		  printerDriver \
+		  printerDriver ctm ctmabs imps2 \
 		  ps2 msys msser msbus kbmouse absgen genmouse emm extmem \
 		  xms filestr nonts sblaster comm spooltd \
 		  vmtree filedd logibus logiser dma mslf kbd_drivers \
@@ -770,6 +770,15 @@ Installed/Driver/Mouse/MSys:		kernel serial MAKEDRV
 
 ps2	: Installed/Driver/Mouse/PS2
 Installed/Driver/Mouse/PS2:		ui MAKEDRV
+
+imps2	: Installed/Driver/Mouse/imps2
+Installed/Driver/Mouse/imps2:		ui MAKEDRV
+
+ctm	: Installed/Driver/Mouse/ctm
+Installed/Driver/Mouse/ctm:		ui MAKEDRV
+
+ctmabs	: Installed/Driver/Mouse/ctmabs
+Installed/Driver/Mouse/ctmabs:		ui MAKEDRV
 
 # Printer Drivers
 

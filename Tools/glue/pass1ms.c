@@ -1577,7 +1577,11 @@ Pass1MS_ProcessObject(const char  *file,
 		 if(*bp) {
 		    msobj_CurFileName = ST_Enter(symbols, strings, (char *)bp+1,
 						*bp);
+		if(msobj_FirstFileName ==  NullID) {
+		
+		    msobj_FirstFileName = msobj_CurFileName;
 		}
+	}
 		break;
 	    }
 	    case MO_COMENT:
@@ -1590,6 +1594,8 @@ Pass1MS_ProcessObject(const char  *file,
 		 (bp[2] == '@'))
   		{
 		    ID newName;
+
+
 		    /*
 		     * Entertaining comment record placed in the output file by
 		     * GOC to tell us the actual source file name under metaware.
@@ -1599,9 +1605,9 @@ Pass1MS_ProcessObject(const char  *file,
 		    /*
 		     *
 	   	     */
-		    if(newName != msobj_CurFileName) {
-			Pass1MSReplaceFileName(msobj_CurFileName, newName);
-						msobj_CurFileName = newName;
+		    if((msobj_FirstFileName != NullID) && (newName != msobj_FirstFileName)) {
+
+			Pass1MSReplaceFileName(msobj_FirstFileName, newName);
 		    }
 		}		
 		break;
