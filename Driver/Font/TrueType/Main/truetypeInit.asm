@@ -189,7 +189,8 @@ TrueTypeInitFonts	proc	far	uses	ax,bx,cx,dx,si,di,es,bp
 	clr	bx			; relative to CWD
 	call	FileSetCurrentPath
 	pop	ds
-
+	jc	done			; branch if error
+	
 	;
 	; Lookup all .ttf files
 	sub	sp, size FileEnumParams
@@ -268,6 +269,7 @@ fontFile		local	hptr
 fontName		local	FONT_NAME_LEN dup (char)
 fontStyle		local	TextStyle
 fontWeight		local	FontWeight
+tablesProcessed		local	word
 
 	.enter
 	;
@@ -308,6 +310,7 @@ fontWeight		local	FontWeight
 	mov	ah, subTableHeader.TTST_numTables.low
 	mov	al, subTableHeader.TTST_numTables.high
 	mov	tableCount, ax
+	mov	tablesProcessed, 0
 nextEntry:
 	mov	bx, fontFile
 	segmov  ds, ss
@@ -351,8 +354,7 @@ nextEntry:
 	jnc	parseName
 
 	; free the block we don't keep it, bx handle of block
-	call	MemFree
-	jmp	doneClose
+	jmp	freeAndClose
 	
 parseName:
 	; get relevant data from name table
@@ -364,11 +366,11 @@ parseName:
 	mov	cx, FONT_NAME_LEN		; buffer size
 	mov	ax, 2				; sub family name of the font
 	call	GetNameFromTable
-	jc	doneClose			; jump if no name found
+	jc	freeAndClose			; jump if no name found
 	
 	lea	si, fontName			; ss:si point to buffer
 	call 	MapFontStyle
-	jc	doneClose			; fail if style mapping fails
+	jc	freeAndClose			; fail if style mapping fails
 
 	mov	fontStyle, al			; save fontStyle 
 						; (type TextStyle)
@@ -377,10 +379,13 @@ parseName:
 	mov	cx, FONT_NAME_LEN		; buffer size
 	mov	ax, 1				; family name of the font
 	call	GetNameFromTable
-	jc	doneClose			; jump if no name found
+	jc	freeAndClose			; jump if no name found
 	
 	; free the block we don't keep it, bx handle of block
+	inc	tablesProcessed
 	call	MemFree
+	jmp	cont
+
 tryOS_2:
 	mov	ax, 'OS'
 	cmp	ax, tableDirectory.TTTD_tag.low
@@ -422,10 +427,16 @@ getWeight:
 	mov	si, ax
 	mov	al, cs:weightAdjustTable[si]
 	mov	fontWeight, al
+	inc	tablesProcessed
 	
+	call	MemFree
 cont:
 	dec	tableCount
 	jnz	nextEntry
+
+	mov	ax, tablesProcessed
+	cmp	ax, 0
+	je	doneClose
 
 	; we have one font and collected required meta data
 	; let compute/determ the fontid to be used for the font
