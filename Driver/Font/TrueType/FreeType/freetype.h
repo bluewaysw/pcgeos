@@ -26,16 +26,13 @@
 #define FREETYPE_H
 
 
-#define TT_FREETYPE_MAJOR  1
-#define TT_FREETYPE_MINOR  3
-
-
 #include "fterrid.h"
 #include "ftnameid.h"
 
+
 #ifdef __GEOS__
 #include <geos.h>
-#endif /* __GEOS__ */
+#endif  /* __GEOS__ */
 
 /* To make freetype.h independent from configuration files we check */
 /* whether EXPORT_DEF has been defined already.                     */
@@ -108,7 +105,7 @@
                                       /* in 26.6 fractional pixels if it  */
                                       /* was.                             */
 
-
+  
   struct  TT_UnitVector_      /* guess what...  */
   {
     TT_F2Dot14  x;
@@ -346,12 +343,12 @@
     int    width;   /* number of pixels per line         */
     int    flow;    /* bitmap orientation                */
 
-    void*  bitmap;  /* bit/pixmap/region buffer          */
+    void*  bitmap;  /* bit/pixmap buffer                 */
 #ifndef __GEOS__
     long   size;    /* bit/pixmap size in bytes          */
 #else
     int    size;    /* bit/pixmap/region size in bytes   */
-#endif /* __GEOS__ */
+#endif  /* __GEOS__ */
   };
 
   typedef struct TT_Raster_Map_  TT_Raster_Map;
@@ -622,27 +619,12 @@
   /*   NOTE:  Some macros are defined in tttypes.h to perform         */
   /*          automatic type conversions for library hackers...       */
 
-  //TODO: soll TT_*_ ersetzen
-  struct GTT_Stream_   { MemHandle  z; };
-  struct GTT_Face_     { MemHandle  z; };
-  struct GTT_Instance_ { MemHandle  z; };
-  struct GTT_Glyph_    { MemHandle  z; };
-  struct GTT_CharMap_  { MemHandle  z; };
-
   struct TT_Stream_   { void*  z; };
   struct TT_Face_     { void*  z; };
   struct TT_Instance_ { void*  z; };
   struct TT_Glyph_    { void*  z; };
   struct TT_CharMap_  { void*  z; };
 
-  //TODO: soll TT_* ersetzen
-  typedef struct GTT_Stream_    GTT_Stream;
-  typedef struct GTT_Face_      GTT_Face;
-  typedef struct GTT_Instance_  GTT_Instance;
-  typedef struct GTT_Glyph_     GTT_Glyph;
-  typedef struct GTT_CharMap_   GTT_CharMap;
-
-  typedef ChunkHandle          TT_Engine;    /* handle to engine instance */
   typedef struct TT_Stream_    TT_Stream;    /* stream handle type        */
   typedef struct TT_Face_      TT_Face;      /* face handle type          */
   typedef struct TT_Instance_  TT_Instance;  /* instance handle type      */
@@ -654,9 +636,10 @@
 
   typedef long  TT_Error;
 
-  #ifdef __GEOS__
 
   /* Flags for control path generation for FreeGEOS. */
+
+  #ifdef __GEOS__
 
   #define GEOS_TTF_POSTSCRIPT   0x0002
   #define GEOS_TTF_SAVE_STATE   0x0001
@@ -674,38 +657,17 @@
   /*                                                                 */
   /*******************************************************************/
 
-  /* Get version information. */
-
-  EXPORT_DEF
-  TT_Error  TT_FreeType_Version( int  *major,
-                                 int  *minor );
-
 
   /* Initialize the engine. */
 
   EXPORT_DEF
-  TT_Error  TT_Init_FreeType( TT_Engine*  engine );
+  TT_Error  TT_Init_FreeType( void );
 
 
   /* Finalize the engine, and release all allocated objects. */
 
   EXPORT_DEF
-  TT_Error  TT_Done_FreeType( TT_Engine  engine );
-
-
-  /* Set the gray level palette.  This is an array of 5 bytes used */
-  /* to produce the font smoothed pixmaps.  By convention:         */
-  /*                                                               */
-  /*  palette[0] = background (white)                              */
-  /*  palette[1] = light                                           */
-  /*  palette[2] = medium                                          */
-  /*  palette[3] = dark                                            */
-  /*  palette[4] = foreground (black)                              */
-  /*                                                               */
-
-  EXPORT_DEF
-  TT_Error  TT_Set_Raster_Gray_Palette( TT_Engine  engine,
-                                        TT_Byte*   palette );
+  TT_Error  TT_Done_FreeType( void );
 
 
   /* ----------------------- face management ----------------------- */
@@ -721,9 +683,8 @@
   /*       `max_Faces' field.                                 */
 
   EXPORT_DEF
-  TT_Error  TT_Open_Face( TT_Engine       engine,
-                          const TT_Text*  fontPathName,
-                          TT_Face*        face );
+  TT_Error  TT_Open_Face( const FileHandle  file,
+                          TT_Face*          face );
 
 
   /* Return face properties in the `properties' structure.          */
@@ -965,21 +926,6 @@
                                  TT_F26Dot6      yOffset );
 
 
-  /* Render the glyph into a pixmap, with given position offsets.     */
-  /*                                                                  */
-  /* Note: Only use integer pixel offsets to preserve the fine        */
-  /*       hinting of the glyph and the `correct' anti-aliasing       */
-  /*       (where vertical and horizontal stems aren't grayed).  This */
-  /*       means that `xOffset' and `yOffset' must be multiples       */
-  /*       of 64!                                                     */
-
-  EXPORT_DEF
-  TT_Error  TT_Get_Glyph_Pixmap( TT_Glyph        glyph,
-                                 TT_Raster_Map*  map,
-                                 TT_F26Dot6      xOffset,
-                                 TT_F26Dot6      yOffset );
-
-
   /* Render the glyph into a region, with given position offsets.     */
   /*                                                                  */
   /* Note: Only use integer pixel offsets to preserve the fine        */
@@ -1037,23 +983,14 @@
   /* Render an outline into a bitmap. */
 
   EXPORT_DEF
-  TT_Error  TT_Get_Outline_Bitmap( TT_Engine       engine,
-                                   TT_Outline*     outline,
+  TT_Error  TT_Get_Outline_Bitmap( TT_Outline*     outline,
                                    TT_Raster_Map*  map );
 
-
-  /* Render an outline into a pixmap. */
-
-  EXPORT_DEF
-  TT_Error  TT_Get_Outline_Pixmap( TT_Engine       engine,
-                                   TT_Outline*     outline,
-                                   TT_Raster_Map*  map );
 
   /* Render an outline into a region. */
 
   EXPORT_DEF
-  TT_Error  TT_Get_Outline_Region( TT_Engine       engine,
-                                   TT_Outline*     outline,
+  TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
                                    TT_Raster_Map*  map );
 
 
@@ -1107,22 +1044,6 @@
 
   /* ----------------- character mapping support --------------- */
 
-  /* Return the number of character mappings found in this file. */
-  /* Returns -1 in case of failure (invalid face handle).        */
-  /*                                                             */
-  /* DON'T USE THIS FUNCTION!  IT HAS BEEN DEPRECATED!           */
-  /*                                                             */
-  /* It is retained for backwards compatibility only and will    */
-  /* fail on 16bit systems.                                      */
-  /*                                                             */
-  /* You can now get the charmap count in the `num_CharMaps'     */
-  /* field of a face's properties.                               */
-  /*                                                             */
-
-  EXPORT_DEF
-  int  TT_Get_CharMap_Count( TT_Face  face );
-
-
   /* Return the ID of charmap number `charmapIndex' of a given face */
   /* used to enumerate the charmaps present in a TrueType file.     */
 
@@ -1157,21 +1078,6 @@
 
 
   /* --------------------- names table support ------------------- */
-
-  /* Return the number of name strings found in the name table.  */
-  /* Returns -1 in case of failure (invalid face handle).        */
-  /*                                                             */
-  /* DON'T USE THIS FUNCTION!  IT HAS BEEN DEPRECATED!           */
-  /*                                                             */
-  /* It is retained for backwards compatibility only and will    */
-  /* fail on 16bit systems.                                      */
-  /*                                                             */
-  /* You can now get the number of name strings in a face with   */
-  /* the `num_Names' field of its properties.                    */
-
-  EXPORT_DEF
-  int  TT_Get_Name_Count( TT_Face  face );
-
 
   /* Return the ID of the name number `nameIndex' of a given face */
   /* used to enumerate the charmaps present in a TrueType file.   */

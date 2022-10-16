@@ -16,7 +16,6 @@
  ******************************************************************/
 
 #include "tttypes.h"
-#include "ttdebug.h"
 #include "ttcalc.h"
 #include "ttfile.h"
 
@@ -204,11 +203,7 @@
 
     /* simple check */
     if ( n_contours > left_contours )
-    {
-      PTRACE0(( "ERROR: Glyph index %ld has %d contours > left %d\n",
-                   subg->index, n_contours, left_contours ));
       return TT_Err_Too_Many_Contours;
-    }
 
 
     /* preparing the execution context */
@@ -218,14 +213,9 @@
     if ( ACCESS_Frame( (n_contours + 1) * 2L ) )
       return error;
 
-    PTRACE4(( " Contour endpoints:" ));
-
     for ( k = 0; k < n_contours; k++ )
-    {
       exec->pts.contours[k] = GET_UShort();
-      PTRACE4(( " %d", exec->pts.contours[k] ));
-    }
-    PTRACE4(( "\n" ));
+
 
     if ( n_contours > 0 )
       n_points = exec->pts.contours[n_contours - 1] + 1;
@@ -237,20 +227,12 @@
     FORGET_Frame();
 
     if ( n_points > left_points )
-    {
-      PTRACE0(( "ERROR: Too many points in glyph %ld\n", subg->index ));
       return TT_Err_Too_Many_Points;
-    }
 
     /* loading instructions */
 
-    PTRACE4(( " Instructions size: %d\n", n_ins ));
-
     if ( n_ins > face->maxProfile.maxSizeOfInstructions )
-    {
-      PTRACE0(( "ERROR: Too many instructions!\n" ));
       return TT_Err_Too_Many_Ins;
-    }
 
     if ( FILE_Read( exec->glyphIns, n_ins ) )
       return error;
@@ -447,14 +429,8 @@
       n_ins = GET_UShort();     /* read size of instructions */
       FORGET_Frame();
 
-      PTRACE4(( " Instructions size: %d\n", n_ins ));
-
       if ( n_ins > exec->face->maxProfile.maxSizeOfInstructions )
-      {
-        PTRACE0(( "ERROR: Too many instructions in composite glyph %ld\n",
-                  subg->index ));
         return TT_Err_Too_Many_Ins;
-      }
 
       if ( FILE_Read( exec->glyphIns, n_ins ) )
         return error;
@@ -633,10 +609,7 @@
 
     table = TT_LookUp_Table( face, TTAG_glyf );
     if ( table < 0 )
-    {
-      PTRACE0(( "ERROR: There is no glyph table in this font file!\n" ));
       return TT_Err_Glyf_Table_Missing;
-    }
 
     glyph_offset = face->dirTables[table].Offset;
 
@@ -740,32 +713,6 @@
 
         phase = Load_Header;
 
-
-        /* The cache callback isn't part of the FreeType release yet */
-        /* It is discarded for the moment..                          */
-        /*                                                           */
-#if 0
-        if ( instance )
-        {
-          /* is the glyph in an outline cache ? */
-          cacheCb = instance->owner->engine->glCallback;
-          if ( cacheCb && 0 )   /* disabled */
-          {
-            /* we have a callback */
-            error = cacheCb( instance->generic,
-                             index, &cached_outline, &x, &y );
-            if ( !error )
-            {
-              /* no error, then append the outline to the current subglyph */
-              /* error = Append_Outline( subglyph,
-                                         &left_points,
-                                         &left_contours,
-                                         &cached_outline ); */
-              phase = Load_End;
-            }
-          }
-        }
-#endif
         break;
 
 
@@ -821,18 +768,8 @@
 
         FORGET_Frame();
 
-        PTRACE6(( "Glyph %ld:\n", index ));
-        PTRACE6(( " # of contours: %d\n", num_contours ));
-        PTRACE6(( " xMin: %4d  xMax: %4d\n",
-                     subglyph->metrics.bbox.xMin,
-                     subglyph->metrics.bbox.xMax ));
-        PTRACE6(( " yMin: %4d  yMax: %4d\n",
-                     subglyph->metrics.bbox.yMin,
-                     subglyph->metrics.bbox.yMax ));
-
         if ( num_contours > left_contours )
         {
-          PTRACE0(( "ERROR: Too many contours for glyph %ld\n", index ));
           error = TT_Err_Too_Many_Contours;
           goto Fail;
         }

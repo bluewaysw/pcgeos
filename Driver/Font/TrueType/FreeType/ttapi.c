@@ -42,13 +42,15 @@
 #undef  TT_COMPONENT
 #define TT_COMPONENT  trace_api
 
+#ifdef __GEOS__
+extern TEngine_Instance engineInstance;
+#endif  /* __GEOS__ */
+
 
 #ifdef TT_STATIC_RASTER
 #define RAS_OPS  /* void */
-#define RAS_OP   /* void */
 #else
 #define RAS_OPS  ((TRaster_Instance*)_engine->raster_component),
-#define RAS_OP   ((TRaster_Instance*)_engine->raster_component)
 #endif /* TT_STATIC_RASTER */
 
 
@@ -65,69 +67,37 @@
 
 /*******************************************************************
  *
- *  Function    :  TT_FreeType_Version
- *
- *  Description :  Returns the major and minor version of the library.
- *
- *  Input  :  major, minor addresses
- *
- *  Output :  Error code.
- *
- *  MT-Note : YES!
- *
- ******************************************************************/
-
-  EXPORT_FUNC
-  TT_Error  TT_FreeType_Version( int  *major, int  *minor )
-  {
-    if ( !major || !minor )
-      return TT_Err_Invalid_Argument;
-
-    *major = TT_FREETYPE_MAJOR;
-    *minor = TT_FREETYPE_MINOR;
-
-    return TT_Err_Ok;
-  }
-
-
-/*******************************************************************
- *
  *  Function    : TT_Init_FreeType
  *
  *  Description : The library's engine initializer.  This function
  *                must be called prior to any call.
  *
- *  Input  :  engine        pointer to a FreeType engine instance
+ *  Input  :  void
  *
  *  Output :  Error code.
  *
  *  MT-Note : This function should be called each time you want
- *            to create a TT_Engine.  It is not necessarily thread
- *            safe depending on the implementations of ttmemory,
+ *            to create an TEngine_Instance. It is not necessarily 
+ *            thread safe depending on the implementations of ttmemory,
  *            ttfile and ttmutex, so take care.  Their default
  *            implementations are safe, however.
  *
  ******************************************************************/
 
   EXPORT_FUNC
-  TT_Error  TT_Init_FreeType( TT_Engine*  engine )
+  TT_Error  TT_Init_FreeType( void )
   {
-    PEngine_Instance  _engine;
+    PEngine_Instance  _engine = &engineInstance;
+    TT_Error          error;
 
-    TT_Error  error;
- 
 
     /* first of all, initialize memory sub-system */
     error = TTMemory_Init();
     if ( error )
       return error;
 
-    /* Allocate engine instance */
-    if ( GALLOC( *engine, sizeof ( TEngine_Instance ) ) )
-      return error;
-
 #undef  TT_FAIL
-#define TT_FAIL( x )  ( error = x (*engine) ) != TT_Err_Ok
+#define TT_FAIL( x )  ( error = x (_engine) ) != TT_Err_Ok
 
     /* Initalize components */
     if ( TT_FAIL( TTFile_Init  )  ||
@@ -142,14 +112,11 @@
 #undef TT_FAIL
 
     /* create the engine lock */
-    _engine = (PEngine_Instance)DEREF( engine );
     MUTEX_Create( _engine->lock );
-
     return TT_Err_Ok;
 
   Fail:
-    TT_Done_FreeType( *engine );
-    *engine = NullChunk;
+    TT_Done_FreeType();
     return error;
   }
 
@@ -162,7 +129,7 @@
  *                will discard all active face and glyph objects
  *                from the heap.
  *
- *  Input  :  engine        FreeType engine instance
+ *  Input  :  void
  *
  *  Output :  Error code.
  *
@@ -174,67 +141,28 @@
  ******************************************************************/
 
   EXPORT_FUNC
-  TT_Error  TT_Done_FreeType( TT_Engine  engine )
+  TT_Error  TT_Done_FreeType( void )
   {
-    PEngine_Instance  _engine;
+    PEngine_Instance  _engine = &engineInstance;
 
 
-    if ( !engine )
+    if ( !_engine )
       return TT_Err_Ok;
 
-    _engine = (PEngine_Instance)DEREF( engine );
     MUTEX_Destroy( _engine->lock );
 
-    TTRaster_Done( engine );
-    TTObjs_Done  ( engine );
+    TTRaster_Done( _engine );
+    TTObjs_Done  ( _engine );
 #ifdef TT_CONFIG_OPTION_EXTEND_ENGINE
-    TTExtend_Done( engine );
+    TTExtend_Done( _engine );
 #endif
-    TTCache_Done ( engine );
-    TTFile_Done  ( engine );
-    GFREE( engine );
+    TTCache_Done ( _engine );
+    TTFile_Done  ( _engine );
 
     TTMemory_Done();
 
     return TT_Err_Ok;
   }
-
-
-#ifdef TT_CONFIG_OPTION_GRAY_SCALING
-
-/*******************************************************************
- *
- *  Function    :  TT_Set_Raster_Gray_Palette
- *
- *  Description :  Sets the gray-levels palette used for font
- *                 smoothing.
- *
- *  Input  :  engine        FreeType engine instance
- *            palette       address of palette (a 5 byte array)
- *
- *  Output :  Invalid argument if 'palette' is NULL.
- *
- *  MT-Note:  NO!  Unprotected modification of an engine's palette.
- *
- ******************************************************************/
-
-  EXPORT_FUNC
-  TT_Error  TT_Set_Raster_Gray_Palette( TT_Engine  engine,
-                                        Byte*      palette )
-  {
-    int  i;
-
-
-    if ( !palette )
-      return TT_Err_Invalid_Argument;
-
-    for ( i = 0; i < 5; i++ )
-      HANDLE_Engine( engine )->raster_palette[i] = (Byte)palette[i];
-
-    return TT_Err_Ok;
-  }
-
-#endif /* TT_CONFIG_OPTION_GRAY_SCALING */
 
 
 /*******************************************************************
@@ -243,8 +171,7 @@
  *
  *  Description :  Creates a new face object from a given font file.
  *
- *  Input  :  engine        FreeType engine instance
- *            fontPathName  the font file's pathname
+ *  Input  :  fontPathName  the font file's pathname
  *            face          adress of returned face handle
  *
  *  Output :  Error code.
@@ -256,11 +183,10 @@
  ******************************************************************/
 
   EXPORT_FUNC
-  TT_Error  TT_Open_Face( TT_Engine       engine,
-                          const TT_Text*  fontPathName,
-                          TT_Face*        face )
+  TT_Error  TT_Open_Face( const FileHandle  file,
+                          TT_Face*          face )
   {
-    PEngine_Instance  _engine;
+    PEngine_Instance  _engine = &engineInstance;
 
     TFont_Input  input;
     TT_Error     error;
@@ -268,11 +194,11 @@
     PFace        _face;
 
 
-    if ( !engine )
+    if ( !_engine )
       return TT_Err_Invalid_Engine;
 
     /* open the file */
-    error = TT_Open_Stream( fontPathName, &stream );
+    error = TT_Open_Stream( file, &stream );
     if ( error )
       return error;
 
@@ -281,7 +207,6 @@
     input.engine    = _engine;
 
     /* Create and load the new face object - this is thread-safe */
-    _engine = (PEngine_Instance)DEREF( engine );
     error = CACHE_New( _engine->objs_face_cache,
                        _face,
                        &input );
@@ -1284,7 +1209,6 @@
                                  TT_F26Dot6      yOffset )
   {
     PEngine_Instance  _engine;
-    TT_Engine         engine;
     TT_Error          error;
     PGlyph            _glyph = HANDLE_Glyph( glyph );
 
@@ -1295,7 +1219,6 @@
       return TT_Err_Invalid_Glyph_Handle;
 
     _engine = _glyph->face->engine;
-  //  HANDLE_Set( engine, _engine );
 
     outline = _glyph->outline;
     /* XXX : For now, use only dropout mode 2    */
@@ -1303,76 +1226,12 @@
     outline.dropout_mode = 2;
 
     TT_Translate_Outline( &outline, xOffset, yOffset );
-    error = TT_Get_Outline_Bitmap( engine, &outline, map );
+    error = TT_Get_Outline_Bitmap( &outline, map );
     TT_Translate_Outline( &outline, -xOffset, -yOffset );
 
     return error;
   }
 
-
-#ifdef TT_CONFIG_OPTION_GRAY_SCALING
-
-/*******************************************************************
- *
- *  Function    :  TT_Get_Glyph_Pixmap
- *
- *  Description :  Produces a grayscaled pixmap from a glyph
- *                 outline.
- *
- *  Input  :  glyph      the glyph container's handle
- *            map        target pixmap description block
- *            xOffset    x offset in fractional pixels (26.6 format)
- *            yOffset    y offset in fractional pixels (26.6 format)
- *
- *  Output :  Error code.
- *
- *  Note : Only use integer pixel offsets to preserve the fine
- *         hinting of the glyph and the 'correct' anti-aliasing
- *         (where vertical and horizontal stems aren't grayed).
- *         This means that xOffset and yOffset must be multiples
- *         of 64!
- *
- *         You can experiment with offsets of +32 to get 'blurred'
- *         versions of the glyphs (a nice effect at large sizes that
- *         some graphic designers may appreciate :)
- *
- *  MT-Safe : NO!  Glyph containers can't be shared.
- *
- ******************************************************************/
-
-  EXPORT_FUNC
-  TT_Error  TT_Get_Glyph_Pixmap( TT_Glyph        glyph,
-                                 TT_Raster_Map*  map,
-                                 TT_F26Dot6      xOffset,
-                                 TT_F26Dot6      yOffset )
-  {
-    PEngine_Instance  _engine;
-    TT_Engine         engine;
-    TT_Error          error;
-    PGlyph            _glyph = HANDLE_Glyph( glyph );
-
-    TT_Outline  outline;
-
-
-    if ( !_glyph )
-      return TT_Err_Invalid_Glyph_Handle;
-
-    _engine = _glyph->face->engine;
-    HANDLE_Set(engine,_engine);
-
-    outline = _glyph->outline;
-    /* XXX : For now, use only dropout mode 2    */
-    /* outline.dropout_mode = _glyph->scan_type; */
-    outline.dropout_mode = 2;
-
-    TT_Translate_Outline( &outline, xOffset, yOffset );
-    error = TT_Get_Outline_Pixmap( engine, &outline, map );
-    TT_Translate_Outline( &outline, -xOffset, -yOffset );
-
-    return error;
-  }
-
-#endif /* TT_CONFIG_OPTION_GRAY_SCALING */
 
 #ifdef __GEOS__
 
@@ -1412,7 +1271,6 @@
                                  TT_F26Dot6      yOffset )
   {
     PEngine_Instance  _engine;
-    TT_Engine         engine;
     TT_Error          error;
     PGlyph            _glyph = HANDLE_Glyph( glyph );
     TT_Matrix         flipmatrix = HORIZONTAL_FLIP_MATRIX; 
@@ -1424,7 +1282,6 @@
       return TT_Err_Invalid_Glyph_Handle;
 
     _engine = _glyph->face->engine;
-  //  HANDLE_Set(engine,_engine);
 
     outline = _glyph->outline;
     /* XXX : For now, use only dropout mode 2    */
@@ -1433,14 +1290,15 @@
 
     TT_Transform_Outline( &outline, &flipmatrix );
     TT_Translate_Outline( &outline, xOffset, yOffset + map->rows * 64 );
-    error = TT_Get_Outline_Region( engine, &outline, map );
+    error = TT_Get_Outline_Region( &outline, map );
     TT_Translate_Outline( &outline, -xOffset, -yOffset - map->rows * 64 );
     TT_Transform_Outline( &outline, &flipmatrix );
 
     return error;
   }
 
-  /*******************************************************************
+
+ /*******************************************************************
   *
   *  Function    :  TT_Get_Glyph_In_Region
   *
@@ -1462,7 +1320,6 @@
                                     Handle        regionPath )
   {
     PEngine_Instance  _engine;
-    TT_Engine         engine;
     TT_Error          error;
     PGlyph            _glyph = HANDLE_Glyph( glyph );
 
@@ -1472,7 +1329,6 @@
       return TT_Err_Invalid_Glyph_Handle;
 
     _engine = _glyph->face->engine;
-  //  HANDLE_Set(engine,_engine);
 
     outline = _glyph->outline;
 
@@ -1518,7 +1374,6 @@
                                TT_UShort      controlFlags )
   {
     PEngine_Instance  _engine;
-    TT_Engine         engine;
     TT_Error          error;
     PGlyph            _glyph = HANDLE_Glyph( glyph );
 
@@ -1528,7 +1383,6 @@
       return TT_Err_Invalid_Glyph_Handle;
 
     _engine = _glyph->face->engine;
-  //  HANDLE_Set(engine,_engine);
 
     outline = _glyph->outline;
 
@@ -1666,11 +1520,10 @@
  ******************************************************************/
 
   EXPORT_FUNC
-  TT_Error  TT_Get_Outline_Bitmap( TT_Engine       engine,
-                                   TT_Outline*     outline,
+  TT_Error  TT_Get_Outline_Bitmap( TT_Outline*     outline,
                                    TT_Raster_Map*  map )
   {
-    PEngine_Instance  _engine; // = HANDLE_Engine( engine );
+    PEngine_Instance  _engine = &engineInstance;
     TT_Error          error;
 
 
@@ -1687,47 +1540,6 @@
     return error;
   }
 
-
-#ifdef TT_CONFIG_OPTION_GRAY_SCALING
-
-/*******************************************************************
- *
- *  Function    :  TT_Get_Outline_Pixmap
- *
- *  Description :  Render a TrueType outline into a pixmap.
- *                 Note that the pixmap must be created by the caller.
- *
- *  Input  :  outline       the outline to render
- *            map           the target bitmap
- *
- *  Output :  Error code
- *
- *  MT-Safe : YES!
- *
- ******************************************************************/
-
-  EXPORT_FUNC
-  TT_Error  TT_Get_Outline_Pixmap( TT_Engine       engine,
-                                   TT_Outline*     outline,
-                                   TT_Raster_Map*  map )
-  {
-    PEngine_Instance  _engine = HANDLE_Engine( engine );
-    TT_Error          error;
-
-
-    if ( !_engine )
-      return TT_Err_Invalid_Engine;
-
-    if ( !outline || !map )
-      return TT_Err_Invalid_Argument;
-
-    MUTEX_Lock( _engine->raster_lock );
-    error = RENDER_Gray_Glyph( outline, map, _engine->raster_palette );
-    MUTEX_Release( _engine->raster_lock );
-    return error;
-  }
-
-#endif /* TT_CONFIG_OPTION_GRAY_SCALING */
 
 #ifdef __GEOS__
 
@@ -1747,11 +1559,10 @@
  *
  ******************************************************************/
 EXPORT_FUNC
-TT_Error  TT_Get_Outline_Region( TT_Engine       engine,
-                                 TT_Outline*     outline,
+TT_Error  TT_Get_Outline_Region( TT_Outline*     outline,
                                  TT_Raster_Map*  map )
 {
-  PEngine_Instance  _engine; // = HANDLE_Engine( engine );
+  PEngine_Instance  _engine = &engineInstance;
   TT_Error          error;
 
 
@@ -1991,34 +1802,6 @@ TT_Error  TT_Get_Outline_Region( TT_Engine       engine,
 
 /*******************************************************************
  *
- *  Function    :  TT_Get_CharMap_Count
- *
- *  Description :  Returns the number of charmaps in a given face.
- *
- *  Input  :  face   face object handle
- *
- *  Output :  Number of tables. -1 in case of error (bad handle).
- *
- *  Note   :  DON'T USE THIS FUNCTION! IT HAS BEEN DEPRECATED!
- *
- *            It is retained for backwards compatibility only and will
- *            fail on 16bit systems.
- *
- *  MT-Safe : YES !
- *
- ******************************************************************/
-
-  EXPORT_FUNC
-  int  TT_Get_CharMap_Count( TT_Face  face )
-  {
-    PFace  faze = HANDLE_Face( face );
-
-    return ( faze ? faze->numCMaps : -1 );
-  }
-
-
-/*******************************************************************
- *
  *  Function    :  TT_Get_CharMap_ID
  *
  *  Description :  Returns the ID of a given charmap.
@@ -2152,41 +1935,6 @@ TT_Error  TT_Get_Outline_Region( TT_Engine       engine,
       return 0;  /* we return 0 in case of invalid char map */
 
     return CharMap_Index( cmap, charCode );
-  }
-
-
-/*******************************************************************
- *
- *  Function    :  TT_Get_Name_Count
- *
- *  Description :  Returns the number of strings found in the
- *                 name table.
- *
- *  Input  :  face   face handle
- *
- *  Output :  number of strings.
- *
- *  Notes  :  Returns -1 on error (invalid handle).
- *
- *            DON'T USE THIS FUNCTION! IT HAS BEEN DEPRECATED!
- *
- *            It is retained for backwards compatibility only and will
- *            fail on 16bit systems.
- *
- *  MT-Safe : YES!
- *
- ******************************************************************/
-
-  EXPORT_FUNC
-  int  TT_Get_Name_Count( TT_Face  face )
-  {
-    PFace  faze = HANDLE_Face( face );
-
-
-    if ( !faze )
-      return -1;
-
-    return faze->nameTable.numNameRecords;
   }
 
 
@@ -2346,36 +2094,6 @@ TT_Error  TT_Get_Outline_Region( TT_Engine       engine,
 
     return Load_TrueType_Any( faze, tag, offset, buffer, length );
   }
-
-
-  /************************ callback definition ******************/
-
-  /* Register a new callback to the TrueType engine -- this should */
-  /* only be used by higher-level libraries, not typical clients   */
-  /*                                                               */
-  /* This is not part of the current FreeType release, thus        */
-  /* undefined...                                                  */
-
-#if 0
-  EXPORT_FUNC
-  TT_Error  TT_Register_Callback( TT_Engine  engine,
-                                  int        callback_id,
-                                  void*      callback_ptr )
-  {
-    PEngine_Instance  eng = HANDLE_Engine( engine );
-
-
-    if ( !eng )
-      return TT_Err_Invalid_Argument;
-
-    /* currently, we only support one callback */
-    if (callback_id != TT_Callback_Glyph_Outline_Load)
-      return TT_Err_Invalid_Argument;
-
-    eng->glCallback = (TT_Glyph_Loader_Callback)callback_ptr;
-    return TT_Err_Ok;
-  }
-#endif /* 0 */
 
 
 /* END */

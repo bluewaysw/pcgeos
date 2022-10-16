@@ -31,7 +31,6 @@
 
 #include "freetype.h"
 #include "tttypes.h"
-#include "ttdebug.h"
 #include "ttcalc.h"
 #include "ttmemory.h"
 #include "ttinterp.h"
@@ -52,7 +51,6 @@
 
 #ifdef DEBUG_INTERPRETER
 #include <memory.h>
-#include "ttdebug.h"
 
 /* Define the `getch()' function.  On Unix systems, it is an alias  */
 /* for `getchar()', and the debugger front end must ensure that the */
@@ -172,49 +170,49 @@
 #define CUR_Func_project( x, y )   ProcCallFixedOrMovable_cdecl( CUR.func_project, EXEC_ARGS x, y )
 #else
 #define CUR_Func_project( x, y )   CUR.func_project( EXEC_ARGS x, y )
-#endif    /* ifdef __GEOS__ */
+#endif  /* __GEOS__ */
 
 #ifdef __GEOS__
 #define CUR_Func_move( z, p, d )   ProcCallFixedOrMovable_cdecl( CUR.func_move, EXEC_ARGS z, p, d )
 #else
 #define CUR_Func_move( z, p, d )   CUR.func_move( EXEC_ARGS z, p, d )
-#endif    /* ifdef __GEOS__ */
+#endif  /* __GEOS__ */
 
 #ifdef __GEOS__
 #define CUR_Func_dualproj( x, y )  ProcCallFixedOrMovable_cdecl( CUR.func_dualproj, EXEC_ARGS x, y )
 #else
 #define CUR_Func_dualproj( x, y )  CUR.func_dualproj( EXEC_ARGS x, y )
-#endif    /* ifdef __GEOS__ */
+#endif  /* __GEOS__ */
 
 #ifdef __GEOS__
 #define CUR_Func_freeProj( x, y )  ProcCallFixedOrMovable_cdecl( CUR.func_freeProj, EXEC_ARGS x, y )
 #else
 #define CUR_Func_freeProj( x, y )  CUR.func_freeProj( EXEC_ARGS x, y )
-#endif    /* ifdef __GEOS__ */
+#endif  /* __GEOS__ */
 
 #ifdef __GEOS__
 #define CUR_Func_round( d, c )     ProcCallFixedOrMovable_cdecl( CUR.func_round, EXEC_ARGS d, c )
 #else
 #define CUR_Func_round( d, c )     CUR.func_round( EXEC_ARGS d, c )
-#endif    /* ifdef __GEOS__ */
+#endif  /* __GEOS__ */
 
 #ifdef __GEOS__
 #define CUR_Func_read_cvt( index )  ProcCallFixedOrMovable_cdecl( CUR.func_read_cvt, EXEC_ARGS index ) 
 #else
 #define CUR_Func_read_cvt( index )  CUR.func_read_cvt( EXEC_ARGS index )
-#endif    /* ifdef __GEOS__ */
+#endif  /* __GEOS__ */
 
 #ifdef __GEOS__
 #define CUR_Func_write_cvt( index, val ) ProcCallFixedOrMovable_cdecl( CUR.func_write_cvt, EXEC_ARGS index, val )
 #else
 #define CUR_Func_write_cvt( index, val ) CUR.func_write_cvt( EXEC_ARGS index, val )
-#endif    /* ifdef __GEOS__ */
+#endif  /* __GEOS__ */
 
 #ifdef __GEOS__
 #define CUR_Func_move_cvt( index, val ) ProcCallFixedOrMovable_cdecl( CUR.func_move_cvt, EXEC_ARGS index, val )
 #else
 #define CUR_Func_move_cvt( index, val ) CUR.func_move_cvt( EXEC_ARGS index, val )
-#endif    /* ifdef __GEOS__ */
+#endif  /* __GEOS__ */
 
 #define CURRENT_Ratio()  Current_Ratio( EXEC_ARG )
 #define CURRENT_Ppem()   Current_Ppem( EXEC_ARG )

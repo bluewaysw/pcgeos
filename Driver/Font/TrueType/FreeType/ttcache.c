@@ -24,7 +24,6 @@
 #include "ttmemory.h"
 #include "ttcache.h"
 #include "ttobjs.h"
-#include "ttdebug.h"
 
 /* required by the tracing mode */
 #undef  TT_COMPONENT
@@ -202,7 +201,7 @@
       ProcCallFixedOrMovable_cdecl( destroy, current->data );
 #else
       destroy( current->data );
-#endif
+#endif  /* __GEOS__ */  
       FREE( current->data );
 
       Element_Done( cache->engine, current );
@@ -286,7 +285,11 @@
       reset  = cache->clazz->reset;
       if ( reset )
       {
+#ifdef __GEOS__
+        error = ProcCallFixedOrMovable_cdecl( reset, object, parent_object );
+#else
         error = reset( object, parent_object );
+#endif  /* __GEOS__ */
         if ( error )
         {
           LOCK();
@@ -316,7 +319,7 @@
       error = ProcCallFixedOrMovable_cdecl( build, object, parent_object );
 #else
       error = build( object, parent_object );
-#endif    /* ifdef __GEOS__ */
+#endif    /* __GEOS__ */
       if ( error )
       {
         Element_Done( cache->engine, current );
@@ -410,7 +413,7 @@
       ProcCallFixedOrMovable_cdecl( cache->clazz->done, element->data );
 #else
       cache->clazz->done( element->data );
-#endif    /* ifdef __GEOS__ */
+#endif  /* __GEOS__ */
       FREE( element->data );
       Element_Done( cache->engine, element );
     }
@@ -426,7 +429,7 @@
         error = ProcCallFixedOrMovable_cdecl( finalize, element->data );
 #else
         error = finalize( element->data );
-#endif    /* ifdef __GEOS__ */
+#endif  /* __GEOS__ */
         if ( error )
           goto Exit;
 

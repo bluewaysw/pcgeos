@@ -40,7 +40,6 @@
   typedef TExtension_Registry*         PExtension_Registry;
 
 
-
   /* Initialize the extension component */
 
   LOCAL_FUNC

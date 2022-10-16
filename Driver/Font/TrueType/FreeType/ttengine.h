@@ -62,16 +62,9 @@
      void*   objs_exec_cache;  /* the current face and execution */
                                /* context objects                */
 
-     void*   file_component;    /* ttfile implementation dependent   */
-
-     TMutex  raster_lock;       /* mutex for this engine's render pool   */
-     void*   raster_component;  /* ttraster implementation depedent      */
-
+     TMutex  raster_lock;          /* mutex for this engine's render pool */
+     void*   raster_component;     /* ttraster implementation depedent    */
      void*   extension_component;  /* extensions dependent */
-
-#if 0
-     TT_Glyph_Loader_Callback  glCallback; /* glyph loader callback, if any */
-#endif
   };
 
   /* NOTE : The raster's lock is only acquired by the Render_Glyph and     */

@@ -34,7 +34,6 @@
 #include "ttconfig.h"
 #include "freetype.h"
 #include "ttengine.h"
-#include "ttdebug.h"
 
 #ifdef __cplusplus
   extern "C" {
@@ -59,8 +58,8 @@
   /* Should only be used for a new face object's main stream. */
 
   LOCAL_DEF
-  TT_Error  TT_Open_Stream( const TT_Text* name,
-                            TT_Stream*     stream );
+  TT_Error  TT_Open_Stream( const FileHandle  file,
+                            TT_Stream*        stream );
 
 
   /* Closes, then discards, a stream when it's no longer needed.   */
@@ -198,6 +197,9 @@
         (frame).cursor  = NULL; \
         (frame).size    = 0;    \
       }
+
+
+#define CHECK_FILE( _handle_ )  ECCheckFileHandle( _handle_ )
 
 
 /* The macros FRAME_ARGS and FRAME_ARG let us build a thread-safe   */

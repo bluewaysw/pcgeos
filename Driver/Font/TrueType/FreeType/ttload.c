@@ -1,4 +1,3 @@
-
 /*******************************************************************
  *
  *  ttload.c                                                    1.0
@@ -17,7 +16,6 @@
  ******************************************************************/
 
 #include "tttypes.h"
-#include "ttdebug.h"
 #include "ttcalc.h"
 #include "ttfile.h"
 
@@ -57,18 +55,10 @@
     UShort  i;
 
 
-    PTRACE4(( "TT_LookUp_Table( %08lx, %c%c%c%c )\n",
-                  (Long)face,
-                  (Char)(tag >> 24),
-                  (Char)(tag >> 16),
-                  (Char)(tag >> 8),
-                  (Char)(tag) ));
-
     for ( i = 0; i < face->numTables; i++ )
       if ( face->dirTables[i].Tag == tag )
         return i;
 
-    PTRACE4(( "    Could not find table!\n" ));
     return -1;
   }
 
@@ -92,8 +82,6 @@
     ULong  n;
 
 
-    PTRACE3(( "Load_TrueType_Collection( %08lx )\n", (long)face ));
-
     if ( FILE_Seek   ( 0L ) ||
          ACCESS_Frame( 12L ) )
       return error;
@@ -112,8 +100,6 @@
 
       face->ttcHeader.TableDirectory = NULL;
 
-      PTRACE3(("skipped.\n"));
-
       return TT_Err_File_Is_Not_Collection;
     }
 
@@ -128,7 +114,6 @@
 
     FORGET_Frame();
 
-    PTRACE3(( "collections directory loaded.\n" ));
     return TT_Err_Ok;
   }
 
@@ -158,8 +143,6 @@
 
     PTableDirEntry  entry;
 
-
-    PTRACE2(("Load_TT_Directory( %08lx, %ld )\n", (long)face, faceIndex));
 
     error = Load_TrueType_Collection( face );
 
@@ -200,16 +183,12 @@
 
     FORGET_Frame();
 
-    PTRACE2(( "-- Tables count   : %12u\n", tableDir.numTables ));
-    PTRACE2(( "-- Format version : %08lx\n", tableDir.version ));
-
     /* Check that we have a 'sfnt' format there */
 
     if ( tableDir.version != 0x00010000  &&      /* MS fonts */
          tableDir.version != 0x74727565  &&      /* Mac fonts */
          tableDir.version != 0x00000000  )       /* some Korean fonts */
     {
-      PERROR(( "!! invalid file format" ));
       return TT_Err_Invalid_File_Format;
     }
 
@@ -233,19 +212,11 @@
       entry->Offset   = GET_Long();
       entry->Length   = GET_Long();
 
-      PTRACE2(( "  %c%c%c%c  -  %08lx  -  %08lx\n",
-                (Char)(entry->Tag >> 24),
-                (Char)(entry->Tag >> 16),
-                (Char)(entry->Tag >> 8 ),
-                (Char)(entry->Tag),
-                entry->Offset,
-                entry->Length ));
       entry++;
     }
 
     FORGET_Frame();
 
-    PTRACE2(( "Directory loaded\n\n" ));
     return TT_Err_Ok;
   }
 
@@ -270,8 +241,6 @@
     Long         i;
     PMaxProfile  maxProfile = &face->maxProfile;
 
-
-    PTRACE2(( "Load_TT_MaxProfile( %08lx )\n", (long)face ));
 
     if ( ( i = TT_LookUp_Table( face, TTAG_maxp ) ) < 0 )
       return TT_Err_Max_Profile_Missing;
@@ -333,7 +302,6 @@
     face->maxPoints   += 8;
     face->maxContours += 4;
 
-    PTRACE2(( "GASP loaded.\n" ));
     return TT_Err_Ok;
   }
 
@@ -362,8 +330,6 @@
     GaspRange*  gaspranges;
 
 
-    PTRACE2(( "Load_TT_Gasp( %08lx )\n", (long)face ));
-
     if ( ( i = TT_LookUp_Table( face, TTAG_gasp ) ) < 0 )
       return TT_Err_Ok; /* gasp table is not required */
 
@@ -378,8 +344,6 @@
 
     FORGET_Frame();
 
-    PTRACE3(( "number of ranges = %d\n", gas->numRanges ));
-
     if ( ALLOC_ARRAY( gaspranges, gas->numRanges, GaspRange ) ||
          ACCESS_Frame( gas->numRanges * 4L ) )
       goto Fail;
@@ -390,16 +354,9 @@
     {
       gaspranges[j].maxPPEM  = GET_UShort();
       gaspranges[j].gaspFlag = GET_UShort();
-
-      PTRACE3(( " [max:%d flag:%d]",
-                gaspranges[j].maxPPEM,
-                gaspranges[j].gaspFlag ));
     }
-    PTRACE3(("\n"));
 
     FORGET_Frame();
-
-    PTRACE2(( "GASP loaded\n" ));
     return TT_Err_Ok;
 
   Fail:
@@ -431,13 +388,8 @@
     TT_Header*  header;
 
 
-    PTRACE2(( "Load_TT_Header( %08lx )\n", (long)face ));
-
     if ( ( i = TT_LookUp_Table( face, TTAG_head ) ) < 0 )
-    {
-      PTRACE0(( "Font Header is missing !!\n" ));
       return TT_Err_Header_Table_Missing;
-    }
 
     if ( FILE_Seek( face->dirTables[i].Offset ) ||
          ACCESS_Frame( 54L ) )
@@ -473,9 +425,6 @@
 
     FORGET_Frame();
 
-    PTRACE2(( "    Units per EM : %8u\n", header->Units_Per_EM ));
-    PTRACE2(( "    IndexToLoc   : %8d\n", header->Index_To_Loc_Format ));
-    PTRACE2(( "Font Header Loaded.\n" ));
     return TT_Err_Ok;
   }
 
@@ -509,10 +458,6 @@
     PLongMetrics      long_metric;
 
 
-    PTRACE2(( "Load_TT_%s_Metrics( %08lx )\n",
-              vertical ? "Vertical" : "Horizontal",
-              (long)face ));
-
     if ( vertical )
     {
       /* The table is optional, quit silently if it wasn't found       */
@@ -526,7 +471,6 @@
       if ( n < 0 )
       {
         /* Set the number_Of_VMetrics to 0! */
-        PTRACE2(( "  no vertical header in file.\n" ));
         face->verticalHeader.number_Of_VMetrics = 0;
         return TT_Err_Ok;
       }
@@ -538,10 +482,7 @@
     else
     {
       if ( ( n = TT_LookUp_Table( face, TTAG_hmtx ) ) < 0 )
-      {
-        PERROR(( "!! No Horizontal metrics in file !!\n" ));
         return TT_Err_Hmtx_Table_Missing;
-      }
 
       num_longs = face->horizontalHeader.number_Of_HMetrics;
       longs     = (PLongMetrics*)&face->horizontalHeader.long_metrics;
@@ -555,7 +496,6 @@
 
     if ( num_shorts < 0 )            /* sanity check */
     {
-      PERROR(( "!! more metrics than glyphs!\n" ));
       if ( vertical )
         return TT_Err_Invalid_Vert_Metrics;
       else
@@ -600,7 +540,6 @@
 
     FORGET_Frame();
 
-    PTRACE2(( "loaded\n" ));
     return TT_Err_Ok;
   }
 
@@ -633,8 +572,6 @@
 
     TT_Horizontal_Header*  header;
 
-
-    PTRACE2(( vertical ? "Vertical header" : "Horizontal header " ));
 
     if ( vertical )
     {
@@ -690,8 +627,6 @@
     header->long_metrics  = NULL;
     header->short_metrics = NULL;
 
-    PTRACE2(( "loaded\n" ));
-
     /* Now try to load the corresponding metrics */
 
     return Load_TrueType_Metrics( face, vertical );
@@ -723,8 +658,6 @@
     Short  LongOffsets;
 
 
-    PTRACE2(( "Locations " ));
-
     LongOffsets = face->fontHeader.Index_To_Loc_Format;
 
     if ( ( n = TT_LookUp_Table( face, TTAG_loca ) ) < 0 )
@@ -736,9 +669,6 @@
     if ( LongOffsets != 0 )
     {
       face->numLocations = face->dirTables[n].Length >> 2;
-
-      PTRACE2(( "(32 bit offsets): %12lu ",
-                   face->numLocations ));
 
       if ( ALLOC_ARRAY( face->glyphLocations,
                         face->numLocations,
@@ -759,9 +689,6 @@
     {
       face->numLocations = face->dirTables[n].Length >> 1;
 
-      PTRACE2(( "(16 bit offsets): %12lu ",
-                   face->numLocations ));
-
       if ( ALLOC_ARRAY( face->glyphLocations,
                         face->numLocations,
                         Long ) )
@@ -778,8 +705,6 @@
 
       FORGET_Frame();
     }
-
-    PTRACE2(( "loaded\n" ));
 
     return TT_Err_Ok;
   }
@@ -810,15 +735,8 @@
     TNameRec*     namerec;
 
 
-    PTRACE2(( "Names " ));
-
     if ( ( n = TT_LookUp_Table( face, TTAG_name ) ) < 0 )
-    {
-      /* The name table is required so indicate failure. */
-      PTRACE2(( "is missing!\n" ));
-
       return TT_Err_Name_Table_Missing;
-    }
 
     /* Seek to the beginning of the table and check the frame access. */
     /* The names table has a 6 byte header.                           */
@@ -858,18 +776,10 @@
       namerec->stringLength = GET_UShort();
       namerec->stringOffset = GET_UShort();
 
-#if 0
-      /* check the ids */
-      if ( namerec->platformID <= 3 )
-      {
-#endif
         /* this test takes care of 'holes' in the names tables, as */
         /* reported by Erwin                                       */
         if ( (namerec->stringOffset + namerec->stringLength) > bytes )
           bytes = namerec->stringOffset + namerec->stringLength;
-#if 0
-      }
-#endif
     }
 
     FORGET_Frame();
@@ -898,51 +808,9 @@
 /* It is possible (but rather unlikely) that a new platform ID will be */
 /* added by Apple, so we can't rule out IDs > 3.                       */
 
-#if 0
-        if ( namerec->platformID <= 3 )
-          namerec->string = storage + names->names[i].stringOffset;
-        else
-        {
-          namerec->string       = NULL;
-          namerec->stringLength = 0;
-        }
-#endif
       }
     }
 
-#ifdef DEBUG_LEVEL_TRACE
-
-    for ( i = 0; i < names->numNameRecords; i++ )
-    {
-      int  j;
-
-
-      PTRACE2(( "%d %d %x %d ",
-                   names->names[i].platformID,
-                   names->names[i].encodingID,
-                   names->names[i].languageID,
-                   names->names[i].nameID ));
-
-      /* I know that M$ encoded strings are Unicode,            */
-      /* but this works reasonable well for debugging purposes. */
-      for ( j = 0; j < names->names[i].stringLength; j++ )
-      {
-        if (names->names[i].string)
-        {
-          Char  c = *(names->names[i].string + j);
-
-
-          if ( (Byte)c < 128 )
-            PTRACE2(( "%c", c ));
-        }
-      }
-
-      PTRACE2(( "\n" ));
-    }
-
-#endif /* DEBUG_LEVEL_TRACE */
-
-    PTRACE2(( "loaded\n" ));
     return TT_Err_Ok;
 
   Fail_Storage:
@@ -1006,12 +874,8 @@
     Long  n, limit;
 
 
-    PTRACE2(( "CVT " ));
-
     if ( ( n = TT_LookUp_Table( face, TTAG_cvt ) ) < 0 )
     {
-      PTRACE2(( "is missing!\n" ));
-
       face->cvtSize = 0;
       face->cvt     = NULL;
       return TT_Err_Ok;
@@ -1034,8 +898,6 @@
       face->cvt[n] = GET_Short();
 
     FORGET_Frame();
-
-    PTRACE2(( "loaded\n" ));
 
     return TT_Err_Ok;
   }
@@ -1066,8 +928,6 @@
     TCMapDirEntry  entry_;
     PCMapTable     cmap;
 
-
-    PTRACE2(( "CMaps " ));
 
     if ( ( n = TT_LookUp_Table( face, TTAG_cmap ) ) < 0 )
       return TT_Err_CMap_Table_Missing;
@@ -1128,8 +988,6 @@
       cmap++;
     }
 
-    PTRACE2(( "loaded\n" ));
-
     return TT_Err_Ok;
   }
 
@@ -1155,15 +1013,11 @@
     Long  n;
 
 
-    PTRACE2(( "Font program " ));
-
     /* The font program is optional */
     if ( ( n = TT_LookUp_Table( face, TTAG_fpgm ) ) < 0 )
     {
       face->fontProgram = NULL;
       face->fontPgmSize = 0;
-
-      PTRACE2(( "is missing!\n" ));
     }
     else
     {
@@ -1175,18 +1029,12 @@
                          (void*)face->fontProgram,
                          face->fontPgmSize )       )
         return error;
-
-      PTRACE2(( "loaded, %12d bytes\n", face->fontPgmSize ));
     }
-
-    PTRACE2(( "Prep program " ));
 
     if ( ( n = TT_LookUp_Table( face, TTAG_prep ) ) < 0 )
     {
       face->cvtProgram = NULL;
       face->cvtPgmSize = 0;
-
-      PTRACE2(( "is missing!\n" ));
     }
     else
     {
@@ -1198,8 +1046,6 @@
                          (void*)face->cvtProgram,
                          face->cvtPgmSize )        )
         return error;
-
-      PTRACE2(( "loaded, %12d bytes\n", face->cvtPgmSize ));
     }
 
     return TT_Err_Ok;
@@ -1227,14 +1073,11 @@
     TT_OS2*  os2;
 
 
-    PTRACE2(( "OS/2 Table " ));
-
     /* We now support old Mac fonts where the OS/2 table doesn't  */
     /* exist.  Simply put, we set the `version' field to 0xFFFF   */
     /* and test this value each time we need to access the table. */
     if ( ( i = TT_LookUp_Table( face, TTAG_OS2 ) ) < 0 )
     {
-      PTRACE2(( "is missing\n!" ));
       face->os2.version = 0xFFFF;
       error = TT_Err_Ok;
       return TT_Err_Ok;
@@ -1303,8 +1146,6 @@
       os2->ulCodePageRange2 = 0;
     }
 
-    PTRACE2(( "loaded\n" ));
-
     return TT_Err_Ok;
   }
 
@@ -1331,8 +1172,6 @@
     TT_Postscript*  post = &face->postscript;
 
 
-    PTRACE2(( "PostScript " ));
-
     if ( ( i = TT_LookUp_Table( face, TTAG_post ) ) < 0 )
       return TT_Err_Post_Table_Missing;
 
@@ -1356,8 +1195,6 @@
 
     /* we don't load the glyph names, we do that in a */
     /* library extension (ftxpost).                   */
-
-    PTRACE2(( "loaded\n" ));
 
     return TT_Err_Ok;
   }

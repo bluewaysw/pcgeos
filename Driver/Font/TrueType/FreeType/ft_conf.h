@@ -1,6 +1,6 @@
 /* This file is part of the FreeType project */
 
-/* ft_conf.h for the FreeGEOS Build */
+/* ft_conf.h for FreeGEOS build */
 
 
 /* we need the following because there are some typedefs in this file */
@@ -8,18 +8,22 @@
 #ifndef FT_CONF_H
 #define FT_CONF_H
 
-/* Under FreeGEOS we need this for the file operations, render regions and manage memory. */
+/* Under FreeGEOS we need some special includes. */
 #include <geos.h>
 #include <file.h>
 #include <resource.h>
 #include <graphics.h>
 #include <heap.h>
-#include <ec.h>
 #include <lmem.h>
+#include <ec.h>
+
+
+/* FreeGEOS specific constants and definitions. */
+#define MAX_LMEM_CHUNKSIZE        32000
 
 /* MemHandle to our global memory block under FreeGEOS. In this memory block */
 /* we hold all dynamically allocated FreeType structures we need.            */
-extern MemHandle    trueTypeHandle;
+extern MemHandle         trueTypeHandle;
 
 /* Define to empty if the keyword does not work.  */
 /* #undef const */
@@ -42,8 +46,8 @@ extern MemHandle    trueTypeHandle;
 /* Define if you have the valloc function.  */
 #undef HAVE_VALLOC
 
-/* Define if you have the <fcntl.h> header file. Unix-specific  */
-#undef  HAVE_FCNTL_H
+/* Define if you have the <fcntl.h> header file.  */
+#define HAVE_FCNTL_H
 
 /* command.com can't pipe stderr into a file; any message would be */
 /* written into the graphics screen.                               */
@@ -119,7 +123,7 @@ extern MemHandle    trueTypeHandle;
 /* emerged recently on the FreeType lists.  We still do not have Apple's */
 /* opinion on the subject and will change this as soon as we have.       */
 
-#undef  TT_CONFIG_OPTION_NO_INTERPRETER
+#undef   TT_CONFIG_OPTION_NO_INTERPRETER
 
 
 /*************************************************************************/
@@ -151,7 +155,7 @@ extern MemHandle    trueTypeHandle;
 /*                                                                       */
 /* Do NOT DEFINE THIS is you build a thread-safe version of the engine   */
 /*                                                                       */
-#undef TT_CONFIG_OPTION_STATIC_RASTER
+#undef  TT_CONFIG_OPTION_STATIC_RASTER
 
 
 /*************************************************************************/

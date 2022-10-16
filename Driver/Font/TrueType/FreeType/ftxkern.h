@@ -150,7 +150,7 @@ extern "C" {
   /* Initialize Kerning extension, must be called after                 */
   /* TT_Init_FreeType(). There is no need for a finalizer               */
   EXPORT_DEF
-  TT_Error  TT_Init_Kerning_Extension( TT_Engine  engine );
+  TT_Error  TT_Init_Kerning_Extension( void );
 
   /* Note on the implemented mechanism:                                 */
 

@@ -20,6 +20,7 @@
  ***********************************************************************/
 
 #include "ttadapter.h"
+#include <heap.h>
 
 
 /********************************************************************
@@ -46,9 +47,9 @@
 TT_Error _pascal Init_FreeType()
 {
         TT_Error        error;
-
-
-        error = TT_Init_FreeType( &engineHandle );
+ 
+ 
+        error = TT_Init_FreeType();
         if ( error != TT_Err_Ok )
                 return error;
 
@@ -81,5 +82,28 @@ TT_Error _pascal Init_FreeType()
 
 TT_Error _pascal Exit_FreeType() 
 {
-        return TT_Done_FreeType( engineHandle );
+        return TT_Done_FreeType();
+}
+
+
+/********************************************************************
+ *                      Char_Metrics
+ ********************************************************************
+ * SYNOPSIS:	  
+ * 
+ * PARAMETERS:    
+ * 
+ * RETURNS:       
+ * 
+ * SIDE EFFECTS:  none
+ * 
+ * STRATEGY:      
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *       / /22   JK        Initial Revision
+ *******************************************************************/
+TT_Error _pascal Char_Metrics() {
+        return TT_Err_Ok;
 }

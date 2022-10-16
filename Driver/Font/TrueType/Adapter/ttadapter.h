@@ -21,13 +21,15 @@
 #define _TTADAPTER_H_
 
 #include <geos.h>
+#include <ec.h>
+#include <Ansi/stdlib.h>
 #include "../FreeType/freetype.h"
+#include "../FreeType/ttengine.h"
 
 /***********************************************************************
  *      global dgoup objects
  ***********************************************************************/
-extern MemHandle    trueTypeHandle;
-extern ChunkHandle  engineHandle;
+extern TEngine_Instance engineInstance;
 
 
 #endif /* _TTADAPTER_H_ */

@@ -115,8 +115,7 @@ CharMod ends
 global	INIT_FREETYPE:far
 global	EXIT_FREETYPE:far
 
-global	engineHandle:lptr;
-global  trueTypeHandle:hptr;
+global  engineInstance:TrueTypeEngineInstance
 
 MetricsMod segment resource
 include		truetypeMetrics.asm
@@ -132,8 +131,6 @@ InitMod ends
 include		truetypeEC.asm
 include	        ansic_runtime.asm
 include		ansic_memory.asm
-include		ansic_malloc.asm
-include		ansic_string.asm
 
 Resident segment resource	;MODULE_FIXED
 

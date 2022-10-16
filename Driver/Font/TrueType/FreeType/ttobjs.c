@@ -21,7 +21,6 @@
 #include "ttmemory.h"
 #include "ttload.h"
 #include "ttinterp.h"
-#include "ttdebug.h"
 
 
 /* Add extensions definition */
@@ -78,48 +77,6 @@
     engine = exec->face->engine;
     return CACHE_Done( engine->objs_exec_cache, exec );
   }
-
-
-#if 0
-
-/*******************************************************************
- *
- *  Function    :  New_Instance
- *
- *  Description :  Creates a new instance for a given face object.
- *
- ******************************************************************/
-
-  LOCAL_FUNC
-  PInstance  New_Instance( PFace  face )
-  {
-    PInstance  ins;
-
-
-    if ( !face )
-      return NULL;
-
-    CACHE_New( &face->instances, ins, face );
-
-    return ins;
-  }
-
-
-/*******************************************************************
- *
- *  Function    :  Done_Instance
- *
- *  Description :  Discards an instance.
- *
- ******************************************************************/
-
-  LOCAL_FUNC
-  TT_Error  Done_Instance( PInstance  instance )
-  {
-    return CACHE_Done( &instance->owner->instances, instance );
-  }
-
-#endif
 
 
 /*******************************************************************
@@ -1178,7 +1135,7 @@
           (error = Load_TrueType_##table (face)) != TT_Err_Ok
 
 
-  /* LOCAL_FUNC */
+  LOCAL_FUNC
   TT_Error  Face_Create( void*  _face,
                          void*  _input )
   {
@@ -1408,7 +1365,7 @@
   };
 
   static
-  const TCache_Class objs_glyph_class =
+  const TCache_Class  objs_glyph_class =
   {
     sizeof ( TGlyph ),
     -1,
@@ -1418,11 +1375,13 @@
     NULL
   };
 
+
   LOCAL_FUNC
   TT_Error  TTObjs_Init( PEngine_Instance  engine )
   {
     PCache        face_cache, exec_cache;
     TT_Error      error;
+
 
     face_cache = 0;
     exec_cache = 0;
@@ -1431,10 +1390,9 @@
          ALLOC( exec_cache, sizeof ( TCache ) ) )
       goto Fail;
 
-    /* create face cache */
+      /* create face cache */
     error = Cache_Create( engine, (PCache_Class)&objs_face_class,
                           face_cache, &engine->lock );
-
     if ( error )
       goto Fail;
 

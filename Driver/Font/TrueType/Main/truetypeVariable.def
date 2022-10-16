@@ -68,6 +68,26 @@ TrueTypeOutlineEntry	struct
 	TTOE_fontFileName	DosDotFileName
 TrueTypeOutlineEntry	ends
 
+;
+; TrueTypeEngineInstance corresponds to TEngine_Instance of the FreeType
+; library. With the adaptation of the memory management, further static 
+; components of the FreeType structures are integrated into this structure.
+;
+TrueTypeEngineInstance	struct
+	TTEI_lock		fptr  	;engine lock
+	list_free_elements	fptr	
+	objs_face_class		fptr	;the face cache class
+     	objs_instance_class	fptr	;the instance cache class
+	objs_execution_class	fptr	;the context cache class
+	objs_glyph_classfptr	fptr	;the glyph cache class
+	objs_face_cache		fptr	;these caches are used to track
+	objs_exec_cache		fptr	;the current face and execution
+ 					;context objects
+	raster_lock		fptr	;mutex for this engine's render pool
+	raster_component	fptr	;ttraster implementation depedent
+	extension_component	fptr	;extensions dependent
+TrueTypeEngineInstance	ends
+
 ;------------------------------------------------------------------------------
 
 ;------------------------------------------------------------------------------
@@ -93,10 +113,12 @@ udata	segment
 bitmapHandle	hptr			;handle of our bitmap block
 bitmapSize	word			;size of our bitmap block (in bytes)
 
+;After refactoring the memory management, the TrueTypeEngineInstance struct is
+;stored in this block.
 variableHandle	hptr			;handle of our variable block
 
-trueTypeHandle	hptr			;MemHandle to hold all FreeType structures
-engineHandle	lptr			;ChunkHandle to TT_EngineInstance
+;This structure is later moved to the variable block.
+engineInstance	TrueTypeEngineInstance	<>
 
 udata	ends
 

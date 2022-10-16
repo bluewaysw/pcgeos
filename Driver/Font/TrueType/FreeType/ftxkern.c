@@ -22,7 +22,6 @@
 
 #include "ttextend.h"
 #include "tttypes.h"
-#include "ttdebug.h"
 #include "ttmemory.h"
 #include "ttfile.h"
 #include "ttobjs.h"
@@ -34,6 +33,10 @@
 #define TT_COMPONENT  trace_any
 
 #define KERNING_ID  Build_Extension_ID( 'k', 'e', 'r', 'n' )
+
+#ifdef __GEOS__
+extern TEngine_Instance engineInstance;
+#endif  /* __GEOS__ */
 
 
 /*******************************************************************
@@ -542,11 +545,10 @@
 
 
   EXPORT_FUNC
-  TT_Error  TT_Init_Kerning_Extension( TT_Engine  engine )
+  TT_Error  TT_Init_Kerning_Extension( void )
   {
-    PEngine_Instance  _engine = HANDLE_Engine( engine );
-
-    TT_Error  error;
+    PEngine_Instance  _engine = &engineInstance;
+    TT_Error          error;
 
 
     if ( !_engine )

@@ -40,7 +40,7 @@
 /* Define TT_CONFIG_THREAD_SAFE if you want to build a thread-safe        */
 /* version of the library.                                                */
 
-#define TT_CONFIG_OPTION_THREAD_SAFE
+/* #define TT_CONFIG_OPTION_THREAD_SAFE */
 
 
 
@@ -72,10 +72,6 @@
  * in case either DEBUG_LEVEL_TRACE or DEBUG_LEVEL_ERROR is defined.
  *
  * Please consult ttdebug.h for more details.                           */
-
-/* #define DEBUG_LEVEL_TRACE */
-/* #define DEBUG_LEVEL_ERROR */
-
 
 
 /* ------------ special debugging -------------------------------------- */
@@ -164,7 +160,7 @@
 /* The number of extensions available.  Don't change this value      */
 /* except if you add new extensions to the engine.                   */
 
-#define TT_MAX_EXTENSIONS  2
+#define TT_MAX_EXTENSIONS  1
 
 
 
@@ -236,13 +232,13 @@
 /*  any developer to quickly switch from one mode to the other      */
 /*  without messing with "ttconfig.h" each time.                    */
 /*                                                                  */
-//#ifndef TT_MAKE_OPTION_SINGLE_OBJECT
+#ifndef TT_MAKE_OPTION_SINGLE_OBJECT
 #define LOCAL_FUNC  /* void */
 #define LOCAL_DEF   extern
-// #else
-// #define LOCAL_FUNC  static
-// #define LOCAL_DEF   static
-// #endif
+#else
+#define LOCAL_FUNC  static
+#define LOCAL_DEF   static
+#endif
 
 
 /*************************************************************************/

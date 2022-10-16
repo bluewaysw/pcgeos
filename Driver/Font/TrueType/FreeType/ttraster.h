@@ -115,15 +115,15 @@ extern "C" {
   TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
                                           TT_Raster_Map*  target );
                                           
-#endif
+#endif  /* __GEOS__ */
 
   /* Initialize rasterizer */
   LOCAL_DEF
-  TT_Error  TTRaster_Init( TT_Engine  engine );
+  TT_Error  TTRaster_Init( PEngine_Instance  engine );
 
   /* Finalize it */
   LOCAL_DEF
-  TT_Error  TTRaster_Done( TT_Engine  engine );
+  TT_Error  TTRaster_Done( PEngine_Instance  engine );
 
 
 #ifdef __cplusplus

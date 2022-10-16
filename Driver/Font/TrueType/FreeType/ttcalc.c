@@ -16,7 +16,6 @@
  ******************************************************************/
 
 #include "ttcalc.h"
-#include "ttdebug.h"
 #include "tttables.h"
 
 /* required by the tracing mode */
