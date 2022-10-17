@@ -22,7 +22,6 @@
 
 #include <geos.h>
 #include <ec.h>
-#include <Ansi/stdlib.h>
 #include "../FreeType/freetype.h"
 #include "../FreeType/ttengine.h"
 

@@ -87,9 +87,66 @@ TT_Error _pascal Exit_FreeType()
 
 
 /********************************************************************
- *                      Char_Metrics
+ *                      Get_Font_Info
  ********************************************************************
- * SYNOPSIS:	  
+ * SYNOPSIS:	  Returns the FontID, FontWeight and FontStyle of the 
+ *                font with the given FileHandle.
+ * 
+ * PARAMETERS:    FileHandle    Handle of the font.
+ *                FontID*       Pointer in which the ID of the 
+ *                              font returned.
+ *                FontWeight*   Pointer in which the weight of the 
+ *                              font returned.
+ *                TextStyle*    Pointer in which the style of the 
+ *                              font returned.
+ * 
+ * RETURNS:       TT_Error = FreeType errorcode (see tterrid.h)
+ * 
+ * SIDE EFFECTS:  none
+ * 
+ * STRATEGY:      
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *       / /22  JK        Initial Revision
+ *******************************************************************/
+
+TT_Error _pascal Get_Font_Info( const FileHandle  fileHandle, 
+                                FontID* fontID, 
+                                FontWeight* fontWeight,
+                                TextStyle* textStyle )
+{
+        TT_Error        error;
+        TT_Face         face;
+
+
+        ECCheckFileHandle( fileHandle );
+
+        error = TT_Open_Face( fileHandle, &face );
+        if ( error != TT_Err_Ok )
+                return error;
+
+        /* load font family name for ID generation */
+        //TODO
+
+        /* load font weight */
+        //TODO
+
+        /* load text style */
+        //TODO
+
+
+        TT_Flush_Face( face );
+
+        return TT_Err_Ok;
+}
+
+
+/********************************************************************
+ *                      Get_Char_Metrics
+ ********************************************************************
+ * SYNOPSIS:	  Returns the metrics of the passed glyph of the font. 
  * 
  * PARAMETERS:    
  * 
@@ -104,6 +161,7 @@ TT_Error _pascal Exit_FreeType()
  *      ----      ----      -----------
  *       / /22   JK        Initial Revision
  *******************************************************************/
-TT_Error _pascal Char_Metrics() {
+TT_Error _pascal Get_Char_Metrics( const FileHandle  fileHandle )
+{
         return TT_Err_Ok;
 }
