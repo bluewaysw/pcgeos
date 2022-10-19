@@ -148,9 +148,14 @@ TT_Error _pascal Get_Font_Info( const FileHandle  fileHandle,
  ********************************************************************
  * SYNOPSIS:	  Returns the metrics of the passed glyph of the font. 
  * 
- * PARAMETERS:    
+ * PARAMETERS:    FileHandle    Handle of the font.
+ *                word          Character to get metrics of.
+ *                WBFixed*      Pointer in wich the minimum of x returned.
+ *                WBFixed*      Pointer in wich the minimum of y returned.
+ *                WBFixed*      Pointer in wich the maximum of x returned.
+ *                WBFixed*      Pointer in wich the maximum of y returned.
  * 
- * RETURNS:       
+ * RETURNS:       TT_Error = FreeType errorcode (see tterrid.h)
  * 
  * SIDE EFFECTS:  none
  * 
@@ -161,7 +166,12 @@ TT_Error _pascal Get_Font_Info( const FileHandle  fileHandle,
  *      ----      ----      -----------
  *       / /22   JK        Initial Revision
  *******************************************************************/
-TT_Error _pascal Get_Char_Metrics( const FileHandle  fileHandle )
+TT_Error _pascal Get_Char_Metrics( const FileHandle  fileHandle,
+                                   const word        character,
+                                   WBFixed*          minX,
+                                   WBFixed*          minY,
+                                   WBFixed*          maxX,
+                                   WBFixed*          maxY )
 {
         return TT_Err_Ok;
 }
