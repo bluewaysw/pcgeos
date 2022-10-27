@@ -315,14 +315,22 @@ WINDOW* resizewin(WINDOW* win, int num_lines, int num_columns)
         /* fill new chars */
         for(j=0; j < num_lines; j++) {
             int x=0;
-            for(x=win->_maxx; x < num_columns; x++) {
+            if(win->_maxx< num_columns)
+            {
+                for(x=win->_maxx; x < num_columns; x++) {
 
-                (void *)makeNtcCell(&win->_line[j][x], ' ');
+                    (void *)makeNtcCell(&win->_line[j][x], ' ');
+                }
             }
             if(j >= win->_maxy)
             {
+                int width = win->_maxx;
                 int a=0;
-                for(a=0; a < win->_maxx; a++) 
+                if(width >= num_columns)
+                {
+                    width = num_columns;
+                }
+                for(a=0; a < width; a++) 
                 {
 
                     (void *)makeNtcCell(&win->_line[j][a], ' ');

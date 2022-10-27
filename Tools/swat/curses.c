@@ -5360,7 +5360,7 @@ See also:\n\
      * lastch
      */
     wrefresh(cmdWin);
-
+#if 0
     /*
      * Shift the top lines into the save buffer.
      */
@@ -5408,6 +5408,7 @@ See also:\n\
 	    cmdWin->_cury += 1;
 	}
     }
+#endif
 
     /*
      * Adjust max and beginning y, then copy the remaining lines to the
@@ -5738,28 +5739,34 @@ See also:\n\
      */
     if (windowsOnTop) {
 	i = cmdWin->_begy-y;
+#if 0
 	cmdWin->_begy = y;
 	/*
 	 * Shift the lines up to make room at the top.
 	 */
-#if 0
 	bcopy((char *)&cmdWin->_y[0], (char *)&cmdWin->_y[i],
 	      cmdWin->_maxy * sizeof(cursesChar *));
 #endif
 #ifdef _WIN32
 	resizewin(cmdWin, cmdWin->_maxy+i, COLS);
+	mvwin(cmdWin, y, 0);
 #endif
-
+#if  0
 	for (lp = lineHead, i--; i >= 0; i--, lp = lineHead) {
 	    cmdWin->_y[i] = lp->line;
 	    touchline(cmdWin,i,0,cmdWin->_maxx-1);
 	    lineHead = lineHead->next;
 	    free((char *)lp);
 	}
-
+#endif
     } else {
 
 	i = y - cmdWin->_maxy;
+#ifdef _WIN32
+	resizewin(cmdWin, cmdWin->_maxy+i, COLS);
+#endif
+
+#if 0
 
 	/*
 	 * Scroll in the lines from the scroll buffer.
@@ -5820,6 +5827,7 @@ See also:\n\
 	     */
 	    cmdWin->_cury += 1;
 	}
+#endif
 #if defined(_MSDOS)
 	/*
 	 * Check if there's a highlight onscreen (lines <= 0) and if it
