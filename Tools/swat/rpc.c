@@ -2525,6 +2525,15 @@ RpcWait(int poll)
 			     * the other input records
 			     */
 			    ReadConsoleInput(hConIn, &inputrec, 1, &dwRead);
+				if( dwRead == 1) {
+					if(inputrec.EventType == WINDOW_BUFFER_SIZE_EVENT) {
+						//consoleBeep();
+						if(reinitscr() == OK)
+						{
+							CursesRedoLayout();
+						}
+					}
+				}
 			}
 		    }
 		} else {
