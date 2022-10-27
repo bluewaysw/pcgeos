@@ -149,6 +149,9 @@ wgetch(WINDOW *win)
 	    waddch(w, key);
 	    wrefresh(w);
 	}
+	if(key == KEY_RESIZE) {
+		return key;
+	}
 	if (_cursvar.raw || _cursvar.cbreak) {	/* if no buffering */
 	    return(key);
 	}

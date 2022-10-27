@@ -179,7 +179,7 @@ int	__void__;
 #define noecho()    	(_echoit = FALSE)
 #endif
 
-WINDOW	*initscr(), *newwin(), *subwin();
+WINDOW	*initscr(), *reinitscr(), *newwin(), *subwin();
 char	*longname(), *getcap();
 
 /*

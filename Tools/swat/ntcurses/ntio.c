@@ -252,6 +252,7 @@ consoleKeytst(void)
 	    if ((inputrec[i].EventType == KEY_EVENT) && 
 		(inputrec[i].Event.KeyEvent.bKeyDown == TRUE)) 
 	    {
+            consoleBeep();
 		return (TRUE);
 	    }
 	    if ((inputrec[i].EventType == MOUSE_EVENT) && 
@@ -259,6 +260,11 @@ consoleKeytst(void)
 		((inputrec[i].Event.MouseEvent.dwButtonState == 1) ||
 		 (inputrec[i].Event.MouseEvent.dwButtonState == 2)))
 		return (TRUE);
+        if (inputrec[i].EventType == WINDOW_BUFFER_SIZE_EVENT)
+        {
+            consoleBeep();
+            return (TRUE); 
+        }
 	}
     }
     return (FALSE);
@@ -332,7 +338,11 @@ consoleGetChar(void)
 		  ((inputEvent.Event.MouseEvent.dwMousePosition.X & 0xff));
 		break;
 	    }
-	}
+	} else if (inputEvent.EventType == WINDOW_BUFFER_SIZE_EVENT ) {
+        consoleBeep();
+        valueReturned = KEY_RESIZE;
+        break;
+    }
 	/* 
 	 * else, we discard the event and get another one
 	 */

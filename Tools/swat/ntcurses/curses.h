@@ -156,6 +156,8 @@ typedef struct {
 #define KEY_SHELP      0x15d        /* Short help */
 #define KEY_LHELP      0x15e        /* Long help */
 
+#define KEY_RESIZE     0x200		/* special key event for changed console size */
+
 /* type declarations */
 
 typedef struct
@@ -271,6 +273,7 @@ extern	int	 gettmode(void);
 extern	void	 idlok(void);
 	/* curses initialization */
 extern	int	 initscr(void);
+extern	int	 reinitscr(void);
 	/* get char at stdscr cursor */
 extern  ntcCell *inch(void);
 	/* insert character in stdscr */

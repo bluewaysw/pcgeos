@@ -92,8 +92,8 @@ Initscr_PrepConsole(void)
     if (GetConsoleMode(hConIn, &dwMode)) {
 	dwMode &= ~ENABLE_LINE_INPUT;
         dwMode &= ~ENABLE_ECHO_INPUT;
-	dwMode &= ~ENABLE_WINDOW_INPUT;
 	dwMode |= ENABLE_MOUSE_INPUT;
+    dwMode |= ENABLE_WINDOW_INPUT ;
 	SetConsoleMode(hConIn, dwMode);
     }
 }
@@ -156,4 +156,23 @@ initscr(void)
     curscr->_clear = FALSE;
     consoleClearRect(0, 0, LINES - 1, COLS - 1);
     return(OK);
-  } /* initscr */
+} /* initscr */
+
+int 
+reinitscr(void)
+{
+    int newLINES = InitscrGetLines();
+    int newCOLS = InitscrGetCols();
+    if((newLINES != LINES) || (newCOLS != COLS)) {
+    
+        LINES = newLINES;
+        COLS = newCOLS;
+        if ((curscr = resizewin(curscr,LINES,COLS)) == (WINDOW *)ERR) {
+            exit(1);
+        }
+        wrefresh(curscr);
+        return(OK);
+    }
+    return (ERR);
+} /* reinitscr */
+

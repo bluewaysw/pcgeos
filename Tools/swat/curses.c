@@ -3638,6 +3638,13 @@ CursesReadInput(int 	    stream,
 	Tcl_Eval(interp, execString, 0, NULL);
 	return;
     }
+	else if(chr == KEY_RESIZE) {
+		if(reinitscr() == OK) 
+		{
+			CursesRedoLayout();	
+		}
+		return;
+	}
     buf[0] = chr;
     i = 1;
     if (buf[0] == '\r') {
@@ -4962,12 +4969,15 @@ See also:\n\
      * top of the window -- no need to refresh since they're still the
      * same on-screen.
      */
-    cmdWin->_maxy -= height;
-    cmdWin->_cury -= height;
+#ifdef _WIN32
+    resizewin(cmdWin, cmdWin->_maxy-height, COLS);
+#endif
     if (windowsOnTop) {
 	cmdWin->_begy += height;
+#if 0
 	bcopy((char *)&cmdWin->_y[height], (char *)&cmdWin->_y[0],
 	      cmdWin->_maxy * sizeof(cursesChar *));
+#endif
 	/*
 	 * Shift the border to just above the command window and redraw it
 	 */
@@ -4976,9 +4986,11 @@ See also:\n\
 	/*
 	 * Free up excess lines allocated by scrolling.
 	 */
+#if 0
 	for (i = cmdWin->_maxy; i < cmdWin->_maxy+height; i++) {
 	    free((void *)cmdWin->_y[i]);
 	}
+#endif
 	/*
 	 * Shift the border to just below the command window and redraw it
 	 */
@@ -5285,10 +5297,13 @@ See also:\n\
 	/*
 	 * Shift the lines up to make room at the top.
 	 */
+#if 0
 	bcopy((char *)&cmdWin->_y[0], (char *)&cmdWin->_y[i],
 	      cmdWin->_maxy * sizeof(cursesChar *));
-	cmdWin->_maxy += i;
-	cmdWin->_cury += i;
+#endif
+#ifdef _WIN32
+	resizewin(cmdWin, cmdWin->_maxy+i, COLS);
+#endif
 
 	for (lp = lineHead, i--; i >= 0; i--, lp = lineHead) {
 	    cmdWin->_y[i] = lp->line;
@@ -5674,6 +5689,100 @@ See also:\n\
 {
     wrefresh(curWin);
     return(TCL_OK);
+}
+
+/***********************************************************************
+ *				CursesRedoLayout
+ ***********************************************************************
+ * SYNOPSIS:	    Set the windowsOnTop flag and move windows if nec'y
+ * CALLED BY:	    Tcl
+ * RETURN:	    Nothing
+ * SIDE EFFECTS:    All known windows could change sides of the screen.
+ *
+ * STRATEGY:
+ *	    If no windows defined, just change windowsOnTop.
+ *	    Otherwise, delete or insert lines at the top of the screen
+ *	    	to position cmdWin at the proper place, then shift
+ *	    	all current windows into place.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	ardeb	12/12/88	Initial Revision
+ *
+ ***********************************************************************/
+int
+CursesRedoLayout() 
+{
+    int 		height;
+    LstNode 	ln;
+    WINDOW  	*w;
+    int	    	y;
+	int 		i;
+
+	y = 0;
+	height = 0;
+	if(!windowsOnTop) 
+	{
+		y = LINES;
+	}
+
+	for (ln = Lst_First(windows); ln != NILLNODE; ln = Lst_Succ(ln)) {
+		int i;
+		
+		w = (WINDOW *)Lst_Datum(ln);
+
+#if defined(_WIN32)
+		resizewin(w, w->_maxy, COLS);
+		if(!windowsOnTop)
+		{
+			y -= w->_maxy;
+		}
+		mvwin(w, y, 0);
+		if(windowsOnTop)
+		{
+			y += w->_maxy;
+		}
+		height += w->_maxy;
+#endif
+		wrefresh(w);
+	}
+
+#if defined(_WIN32)
+
+		if(borderWin != NULL) {
+			resizewin(borderWin, borderWin->_maxy, COLS); 
+			if(windowsOnTop) {
+
+				mvwin(borderWin, height, 0);
+			}
+			else {
+
+				mvwin(borderWin, LINES-height-1, 0);
+			}
+
+			wclear(borderWin);
+			for (i = 0; i < COLS; i++) {
+				waddch(borderWin, '=');
+			}
+			wrefresh(borderWin);
+			height+=borderWin->_maxy;
+		}
+
+		resizewin(cmdWin, LINES-height, COLS);
+		if(windowsOnTop) {
+
+			mvwin(cmdWin, height, 0);
+		}
+		else {
+
+			mvwin(cmdWin, 0, 0);
+		}
+		wrefresh(cmdWin);
+
+		//resizewin(curWin, curWin->_maxy, COLS);
+		//wrefresh(curWin);
+#endif
 }
 
 /***********************************************************************
