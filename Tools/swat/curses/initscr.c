@@ -108,3 +108,7 @@ initscr() {
 	stdscr = newwin(LINES, COLS, 0, 0);
 	return stdscr;
 }
+
+WINDOW * reinitscr() {
+	return OK;
+}
