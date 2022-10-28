@@ -144,6 +144,140 @@ Pass2MSFixupLMem(const char *file,  	/* File being linked */
 				 * checked) */
     }
 
+    for (cur = heap->addrH; cur != 0; cur = next) { /* block look */
+	ObjSymHeader    *osh;
+	ObjSym  	*os, *first;
+	word	    	n;
+
+	osh = (ObjSymHeader *)VMLock(symbols, cur, (MemHandle *)NULL);
+
+	os = ObjFirstEntry(osh, ObjSym);
+	first = os;
+	if (!Obj_IsAddrSym(os)) {
+	    /*
+	     * Hit the first type block (no need to worry about undefined
+	     * symbols, either, as they'd be an error at this point and would
+	     * have been caught already...)
+	     */
+	    VMUnlock(symbols, cur);
+	    break;
+	}
+	for (n = osh->num; n > 0; os++, n--) { /* smybol loop */
+	    /*
+	     * If the thing's an address symbol (XXX: what else could it be?
+	     * there are no type or procedure-local symbols here...) relocate
+	     * it by the amount the associated chunk shifted.
+	     */
+	     
+	    /*
+	     * If the symbol's a variable, see if it's the body of a chunk array
+	     * and fix up the header properly if so.
+	     */
+	    if (os->type == OSYM_VAR) {
+		char	*name = ST_Lock(symbols, os->name);
+
+		/* must check for both the _carray_ and __carray_ because
+		 * GOC puts out an _carray_ and some compilers will add
+		 * an underscore to that
+		 */
+		if (strncmp(name, "_carray_", 8) == 0 ||
+		    strncmp(name, "__carray_", 9) == 0) {
+		    /*
+		     * This is the actual array symbol. The preceding symbol
+		     * is the thing that contains the chunk array header whose
+		     * CAH_count we must fill in
+		     */
+		    genptr  tbase;  	/* Base of associated type block */
+		    word    len;    	/* Length of this portion of the
+					     * array descriptor */
+		    word    nels = 0;	/* Number of elements in the array
+					     * total */
+		    ObjType *t;	    	/* Current piece of the array
+					     * descriptor */
+		    byte    *bp;    	/* Pointer for storing CAH_count */
+		    int     preceding;  /* index of preceding symbold
+					     * based on addr offset */
+		    word    pl;         /* preceding loop */
+
+		    /*
+		     * Point to the first descriptor for the array type (this
+		     * symbol *must* be of an array type, by definition).
+		     */
+		    assert(!(os->u.variable.type & OTYPE_SPECIAL));
+		    tbase = (genptr)VMLock(symbols, osh->types,
+					       (MemHandle *)NULL);
+		    t = (ObjType *)(tbase + os->u.variable.type);
+		    assert(OTYPE_IS_ARRAY(t->words[0]));
+
+		    /*
+		     * Deal with arrays > OTYPE_MAX_ARRAY_LEN by moving down the
+		     * chain of ObjType's, summing the lengths from each until
+		     * we get to one that has <= OTYPE_MAX_ARRAY_LEN elements.
+		     */
+		    len = OTYPE_ARRAY_LEN(t->words[0]);
+		    while (len == OTYPE_MAX_ARRAY_LEN+1) {
+			nels += len;
+
+			t = (ObjType *)(tbase + t->words[1]);
+			len = OTYPE_ARRAY_LEN(t->words[0]);
+		    }
+		    nels += len;
+
+		    VMUnlock(symbols, osh->types);
+
+		    /*
+		     * The symbol for the header must be the preceding one.
+		     * 4/17/96: changed first assertion to check that os-1
+		     * is >= ObjFirstEntry, rather than != ObjFirstEntry, as
+		     * it's legal for the header to be the first symbol in
+		     * the block, I believe... -- ardeb
+		     */
+
+		    /*
+		     * WATCOM doesn't garantie offset related order of then
+		     * symbols, so we need to lookup the symbols by iterating
+		     * the symbols block and pick the var with the closest
+		     * offset address before ourself.
+		     */
+		    preceding = -1;
+		    for (pl = 0; pl < osh->num; pl++) {
+			if(first[pl].u.addrSym.address < os->u.addrSym.address) {
+			    if(preceding <  0) {
+				preceding = pl;
+			    } else if(first[pl].u.addrSym.address >
+				first[preceding].u.addrSym.address) {
+				preceding = pl;
+			    }
+			}
+		    }
+		    assert(preceding >= 0);
+		    assert(first[preceding].type == OSYM_VAR);
+
+		    /*
+		     * Point to the CAH_count (first field) of the preceding
+		     * variable in the block of heap data we've already got
+		     * around and set that word to the number of elements in
+		     * the array.
+		     */
+		    bp = heapData + first[preceding].u.addrSym.address - heap->grpOff;
+		    *bp++ = nels;
+		    *bp = nels >> 8;
+		}
+		ST_Unlock(symbols, os->name);
+	    }
+	}	/* symbol loop */
+	
+	/*
+	 * Advance to next block, dirtying this one, since we've messed with it
+	 */
+	next = osh->next;
+	VMUnlockDirty(symbols, cur);
+	/*
+	 * Update the offset for the block in the address map to be that of the
+	 * last symbol we relocated.
+	 */
+    }    /* block loop */
+    
     /*
      * All the pieces are primed. We now want to loop from the end of the
      * handle table performing the following services for each chunk:
@@ -501,141 +635,6 @@ Pass2MSFixupLMem(const char *file,  	/* File being linked */
         }
     }
 
-    for (cur = heap->addrH; cur != 0; cur = next) { /* block look */
-	ObjSymHeader    *osh;
-	ObjSym  	*os, *first;
-	word	    	n;
-
-	osh = (ObjSymHeader *)VMLock(symbols, cur, (MemHandle *)NULL);
-
-	os = ObjFirstEntry(osh, ObjSym);
-	first = os;
-	if (!Obj_IsAddrSym(os)) {
-	    /*
-	     * Hit the first type block (no need to worry about undefined
-	     * symbols, either, as they'd be an error at this point and would
-	     * have been caught already...)
-	     */
-	    VMUnlock(symbols, cur);
-	    break;
-	}
-	for (n = osh->num; n > 0; os++, n--) { /* smybol loop */
-	    /*
-	     * If the thing's an address symbol (XXX: what else could it be?
-	     * there are no type or procedure-local symbols here...) relocate
-	     * it by the amount the associated chunk shifted.
-	     */
-	     
-	    /*
-	     * If the symbol's a variable, see if it's the body of a chunk array
-	     * and fix up the header properly if so.
-	     */
-	    if (os->type == OSYM_VAR) {
-		char	*name = ST_Lock(symbols, os->name);
-
-		/* must check for both the _carray_ and __carray_ because
-		 * GOC puts out an _carray_ and some compilers will add
-		 * an underscore to that
-		 */
-		if (strncmp(name, "_carray_", 8) == 0 ||
-		    strncmp(name, "__carray_", 9) == 0) {
-		    /*
-		     * This is the actual array symbol. The preceding symbol
-		     * is the thing that contains the chunk array header whose
-		     * CAH_count we must fill in
-		     */
-		    genptr  tbase;  	/* Base of associated type block */
-		    word    len;    	/* Length of this portion of the
-					     * array descriptor */
-		    word    nels = 0;	/* Number of elements in the array
-					     * total */
-		    ObjType *t;	    	/* Current piece of the array
-					     * descriptor */
-		    byte    *bp;    	/* Pointer for storing CAH_count */
-		    int     preceding;  /* index of preceding symbold
-					     * based on addr offset */
-		    word    pl;         /* preceding loop */
-
-		    /*
-		     * Point to the first descriptor for the array type (this
-		     * symbol *must* be of an array type, by definition).
-		     */
-		    assert(!(os->u.variable.type & OTYPE_SPECIAL));
-		    tbase = (genptr)VMLock(symbols, osh->types,
-					       (MemHandle *)NULL);
-		    t = (ObjType *)(tbase + os->u.variable.type);
-		    assert(OTYPE_IS_ARRAY(t->words[0]));
-
-		    /*
-		     * Deal with arrays > OTYPE_MAX_ARRAY_LEN by moving down the
-		     * chain of ObjType's, summing the lengths from each until
-		     * we get to one that has <= OTYPE_MAX_ARRAY_LEN elements.
-		     */
-		    len = OTYPE_ARRAY_LEN(t->words[0]);
-		    while (len == OTYPE_MAX_ARRAY_LEN+1) {
-			nels += len;
-
-			t = (ObjType *)(tbase + t->words[1]);
-			len = OTYPE_ARRAY_LEN(t->words[0]);
-		    }
-		    nels += len;
-
-		    VMUnlock(symbols, osh->types);
-
-		    /*
-		     * The symbol for the header must be the preceding one.
-		     * 4/17/96: changed first assertion to check that os-1
-		     * is >= ObjFirstEntry, rather than != ObjFirstEntry, as
-		     * it's legal for the header to be the first symbol in
-		     * the block, I believe... -- ardeb
-		     */
-
-		    /*
-		     * WATCOM doesn't garantie offset related order of then
-		     * symbols, so we need to lookup the symbols by iterating
-		     * the symbols block and pick the var with the closest
-		     * offset address before ourself.
-		     */
-		    preceding = -1;
-		    for (pl = 0; pl < osh->num; pl++) {
-			if(first[pl].u.addrSym.address < os->u.addrSym.address) {
-			    if(preceding <  0) {
-				preceding = pl;
-			    } else if(first[pl].u.addrSym.address >
-				first[preceding].u.addrSym.address) {
-				preceding = pl;
-			    }
-			}
-		    }
-		    assert(preceding >= 0);
-		    assert(first[preceding].type == OSYM_VAR);
-
-		    /*
-		     * Point to the CAH_count (first field) of the preceding
-		     * variable in the block of heap data we've already got
-		     * around and set that word to the number of elements in
-		     * the array.
-		     */
-		    bp = heapData + first[preceding].u.addrSym.address - heap->grpOff;
-		    *bp++ = nels;
-		    *bp = nels >> 8;
-		}
-		ST_Unlock(symbols, os->name);
-	    }
-	}	/* symbol loop */
-	
-	/*
-	 * Advance to next block, dirtying this one, since we've messed with it
-	 */
-	next = osh->next;
-	VMUnlockDirty(symbols, cur);
-	/*
-	 * Update the offset for the block in the address map to be that of the
-	 * last symbol we relocated.
-	 */
-    }    /* block loop */
-    
-    
     /* ================================================================*/
     /*
      * Make the final address map entry cover to the end of the segment and
