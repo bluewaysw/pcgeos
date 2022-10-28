@@ -12,7 +12,7 @@
 #       Name    Date            Description
 #       ----    ----            -----------
 #       Eric	11/90	        Initial version
-#		RainerB	4/27/2022		Resource names adjusted for Watcom compatibility
+#	RainerB	4/27/2022	Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:	Tests multiply-linked GenViews and their scrolling
 #		capabilities. 

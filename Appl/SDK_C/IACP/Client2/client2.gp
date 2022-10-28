@@ -15,7 +15,7 @@
 #       NF      10/7/96         Added heapspace value,
 #                               changed name to client2.app,
 #                               changed resources to ui-object.
-#		RainerB	4/21/2022		Resource names adjusted for Watcom compatibility
+#	RainerB	4/21/2022	Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:
 #       This file contains Geode definitions for the "Client2" sample

@@ -14,7 +14,7 @@
 #       LH                      Initial version
 #       NF      9/23/96         Corrected heapspace value,
 #                               made tokenchars unique
-#		RainerB	8/6/2022		Resource names adjusted for Watcom compatibility
+#	RainerB	8/6/2022	Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:
 #       This file contains Geode definitions for the SimpWP sample

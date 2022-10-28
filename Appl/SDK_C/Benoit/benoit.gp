@@ -11,8 +11,8 @@
 # REVISION HISTORY:
 #       Name    Date            Description
 #       ----    ----            -----------
-#       TL      8/3/93			Initial version
-#		RainerB	8/11/2022		Resource names adjusted for Watcom compatibility
+#       TL      8/3/93		Initial version
+#	RainerB	8/11/2022	Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:	This file contains Geode definitions for the "Benoit" sample
 #		application. This file is read by the GLUE linker to

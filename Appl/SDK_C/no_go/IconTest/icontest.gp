@@ -10,8 +10,8 @@
 # REVISION HISTORY:
 #       Name    Date            Description
 #       ----    ----            -----------
-#       TL		12/27/93	    Initial version
-#		RainerB	4/27/2022		Resource names adjusted for Watcom compatibility
+#       TL	12/27/93	Initial version
+#	RainerB	4/27/2022	Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:
 #

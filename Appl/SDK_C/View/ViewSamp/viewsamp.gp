@@ -11,8 +11,8 @@
 # REVISION HISTORY:
 #       Name    Date            Description
 #       ----    ----            -----------
-#       CH		8/20/91	        Initial version
-#		RainerB	4/27/2022		Resource names adjusted for Watcom compatibility
+#       CH	8/20/91	        Initial version
+#	RainerB	4/27/2022	Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:	This file contains Geode definitions for the "ViewSamp" sample
 #		application. This file is read by the GLUE linker to

@@ -12,7 +12,8 @@
 #       Name    Date            Description
 #       ----    ----            -----------
 #       tony    4/1/91          Initial version
-#
+#	RainerB	10/28/2022	Resource names adjusted for Watcom compatibility
+
 # DESCRIPTION:
 #       This file contains Geode definitions for the "TwoDLists" sample
 #       application. This file is read by the GLUE linker to

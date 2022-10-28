@@ -13,7 +13,7 @@
 #       ----    ----            -----------
 #       tony    1994            Initial version
 #       NF      3/19/97         Made tokenchars unique
-#		RainerB	4/27/2022		Resource names adjusted for Watcom compatibility
+#	RainerB	4/27/2022	Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:
 #       This file contains Geode definitions for the "SubUI" sample

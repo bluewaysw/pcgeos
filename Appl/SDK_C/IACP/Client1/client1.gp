@@ -14,7 +14,7 @@
 #       EB      2/23/94         Initial version
 #       NF      10/7/96         Changed tokenid to 8 and name to
 #                               client1.app. Added heapspace value.
-#		RainerB	4/21/2022		Resource names adjusted for Watcom compatibility
+#	RainerB	4/21/2022	Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:
 #       This file contains Geode definitions for the "Client1" sample

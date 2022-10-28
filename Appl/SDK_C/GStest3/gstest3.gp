@@ -13,7 +13,7 @@
 #       ----    ----            -----------
 #       tom     6/92            Initial version
 #       NF      9/26/96         Made tokenchars unique
-#		RainerB	4/27/2022		Resource names adjusted for Watcom compatibility
+#	RainerB	4/27/2022	Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:
 #       This file contains Geode definitions for the "GStest3" sample

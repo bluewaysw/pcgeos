@@ -11,8 +11,8 @@
 # REVISION HISTORY:
 #       Name    Date            Description
 #       ----    ----            -----------
-#       Ed		2/11/01	        Initial version
-#		RainerB	4/27/2022		Resource names adjusted for Watcom compatibility
+#       Ed	2/11/01	        Initial version
+#	RainerB	4/27/2022	Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:	Your basic GP file for the tabs sample application
 #

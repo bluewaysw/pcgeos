@@ -11,8 +11,8 @@
 # REVISION HISTORY:
 #       Name    Date            Description
 #       ----    ----            -----------
-#       PD		1/92	        Initial version
-#		RainerB	4/27/2022		Resource names adjusted for Watcom compatibility
+#       PD	1/92	        Initial version
+#	RainerB	4/27/2022	Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:	This file contains the geode parameters for the Tic Tac Toe
 #		sample application.  This application demonstrates the use

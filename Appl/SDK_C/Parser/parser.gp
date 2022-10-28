@@ -16,7 +16,7 @@
 #       NF      10/17/96        Put comments in,
 #                               made tokenchars unique,
 #                               corrected heapspace value.
-#		RainerB	4/27/2022		Resource names adjusted for Watcom compatibility
+#	RainerB	4/27/2022	Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:
 #	This file contains Geode definitions for the "Parser" sample
