@@ -11,8 +11,8 @@
 # REVISION HISTORY:
 #       Name    Date            Description
 #       ----    ----            -----------
-#       JDM		??		        Initial version
-#		RainerB	4/27/2022		Resource names adjusted for Watcom compatibility
+#       JDM	??	        Initial version
+#	RainerB	4/27/2022	Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:	This file contains Geode definitions for the "Serial" sample
 #		application. This file is read by the GLUE linker to

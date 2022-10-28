@@ -11,8 +11,8 @@
 # REVISION HISTORY:
 #       Name    Date            Description
 #       ----    ----            -----------
-#       EB		2/95	        Initial version
-#		RainerB	4/27/2022		Resource names adjusted for Watcom compatibility
+#       EB	2/95	        Initial version
+#	RainerB	4/27/2022	Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:	Standard .gp stuff.
 #

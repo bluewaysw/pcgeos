@@ -11,8 +11,8 @@
 # REVISION HISTORY:
 #       Name    Date            Description
 #       ----    ----            -----------
-#       IR		11/92	        Initial version
-#		RainerB	4/27/2022		Resource names adjusted for Watcom compatibility
+#       IR	11/92	        Initial version
+#	RainerB	4/27/2022	Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:	This app tests the network library and the comm driver
 #

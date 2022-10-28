@@ -11,8 +11,8 @@
 # REVISION HISTORY:
 #       Name    Date            Description
 #       ----    ----            -----------
-#       EB		??		        Initial version
-#		RainerB	4/27/2022		Resource names adjusted for Watcom compatibility
+#       EB	??		Initial version
+#	RainerB	4/27/2022	Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:	This sample application illustrates use of
 #		event driven serial notification

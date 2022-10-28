@@ -9,8 +9,8 @@
 #
 #       Name    Date            Description
 #       ----    ----            -----------
-#       ??		??		        Initial version
-#		RainerB	4/27/2022		Resource names adjusted for Watcom compatibility
+#       Edwin	2/1/1996        Initial version
+#	RainerB	4/27/2022	Resource names adjusted for Watcom compatibility
 #
 # Description:  This is an app testing the Ircomm library.
 # 
