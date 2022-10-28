@@ -9,8 +9,8 @@
 #
 #       Name    Date            Description
 #       ----    ----            -----------
-#       ??		??		        Initial version
-#		RainerB	4/21/2022		Resource names adjusted for Watcom compatibility
+#       CL	3/12/1995       Initial version
+#	RainerB	4/21/2022	Resource names adjusted for Watcom compatibility
 #
 # Geode definitions for ClientIR test application.
 #

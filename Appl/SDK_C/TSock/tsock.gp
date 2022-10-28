@@ -11,8 +11,8 @@
 # REVISION HISTORY:
 #       Name    Date            Description
 #       ----    ----            -----------
-#       KKK		8/7/96	        Initial version
-#		RainerB	8/6/2022		Resource names adjusted for Watcom compatibility
+#       KKK	8/7/96	        Initial version
+#	RainerB	8/6/2022	Resource names adjusted for Watcom compatibility
 # 
 #
 #	$Id: tsock.gp,v 1.1 97/04/04 16:41:21 newdeal Exp $

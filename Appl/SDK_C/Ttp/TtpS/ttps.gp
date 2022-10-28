@@ -10,8 +10,8 @@
 # REVISION HISTORY:
 #       Name    Date            Description
 #       ----    ----            -----------
-#       CL		4/12/95	        Initial version
-#		RainerB	8/6/2022		Resource names adjusted for Watcom compatibility
+#       CL	4/12/95	        Initial version
+#	RainerB	8/6/2022	Resource names adjusted for Watcom compatibility
 #
 #	Geode definitions for TinyTP server test application.
 #

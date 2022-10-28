@@ -14,7 +14,7 @@
 #       AS      7/9/92          Initial version
 #       NF      9/19/96         Corrected some common errors
 #       NF      10/7/96         Corrected heapspace value.
-#		RainerB	4/27/2022		Resource names adjusted for Watcom compatibility
+#	RainerB	4/27/2022	Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:
 #       This file contains Geode definitions for the "InkTest" sample

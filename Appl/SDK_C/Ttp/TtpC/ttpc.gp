@@ -10,8 +10,8 @@
 # REVISION HISTORY:
 #       Name    Date            Description
 #       ----    ----            -----------
-#       CL		3/13/95	        Initial version
-#		RainerB	6/8/2022		Resource names adjusted for Watcom compatibility
+#       CL	3/13/95	        Initial version
+#	RainerB	6/8/2022	Resource names adjusted for Watcom compatibility
 #
 # Geode definitions for TtpC test application.
 #
