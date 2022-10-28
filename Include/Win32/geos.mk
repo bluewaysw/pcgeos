@@ -772,7 +772,7 @@ LINK		: .USE
 #if defined(linux)
 	rm -f $(.TARGET)
 #else
-	del -f $(.TARGET:S|/|\\|g)
+	del /F $(.TARGET:S|/|\\|g)
 #endif
 	$(LINK) \
 	  $(.TARGET:M*ec.geo:S/$(.TARGET)/-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL) -E/)\
@@ -790,7 +790,7 @@ LINK		: .USE
 #if defined(linux)
 	rm -f $(.TARGET)
 #else
-	del -f $(.TARGET:S|/|\\|g)
+	del /F $(.TARGET:S|/|\\|g)
 #endif
 	$(LINK) \
 	  $(.TARGET:M*EC.geo:S/$(.TARGET)/-Og $(.ALLSRC:M*.gp) -P $(_PROTO) -R $(_REL) -E/)\
