@@ -11,7 +11,7 @@
 #       Name    Date            Description
 #       ----    ----            -----------
 #       Joon   	9/21/94	        Initial version
-#		RainerB	4/21/2022		Resource names adjusted for Watcom compatibility
+#	RainerB	4/21/2022	Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:	This file contains Geode definitions for the "Dictionary"
 #		sample application. This file is read by the Glue linker to

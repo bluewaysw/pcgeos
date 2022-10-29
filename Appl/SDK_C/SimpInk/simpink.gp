@@ -10,8 +10,8 @@
 # REVISION HISTORY:
 #       Name    Date            Description
 #       ----    ----            -----------
-#       ??		??		        Initial version
-#		RainerB	4/27/2022		Resource names adjusted for Watcom compatibility
+#       DJN	4/22/94	        Initial version
+#	RainerB	4/27/2022	Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:  This file contains Geode definitions for the "SimpInk"
 #               sample application. This file is read by the Glue linker

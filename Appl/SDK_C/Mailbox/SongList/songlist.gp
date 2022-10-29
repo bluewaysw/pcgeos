@@ -9,8 +9,8 @@
 #
 #       Name    Date            Description
 #       ----    ----            -----------
-#       CL		1/12/94		        Initial version
-#		RainerB	4/27/2022		Resource names adjusted for Watcom compatibility
+#       CL	1/12/94		Initial version
+#	RainerB	4/27/2022	Resource names adjusted for Watcom compatibility
 #
 # 
 #

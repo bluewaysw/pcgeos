@@ -12,7 +12,7 @@
 #       Name    Date            Description
 #       ----    ----            -----------
 #       EB      4/12/96         Initial version
-#		RainerB	4/27/2022		Resource names adjusted for Watcom compatibility
+#	RainerB	4/27/2022	Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:
 #       This file contains Geode definitions for the "ParaAttr" sample

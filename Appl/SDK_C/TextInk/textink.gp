@@ -14,7 +14,7 @@
 #       drew    6/12/91         Initial version
 #       NF      9/23/96         Added heapspace value,
 #                               Made tokenchars unique
-#		RainerB	4/27/2022		Resource names adjusted for Watcom compatibility
+#	RainerB	4/27/2022	Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:
 #       This file contains Geode definitions for the "TextInk" sample

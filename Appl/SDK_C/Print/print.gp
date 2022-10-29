@@ -12,7 +12,7 @@
 #       Name    Date            Description
 #       ----    ----            -----------
 #       NF      9/4/96          Initial version
-#		RainerB	8/5/2022		Resource names adjusted for Watcom compatibility
+#	RainerB	8/5/2022	Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:
 #      This file contains the geode parameters for the Print sample

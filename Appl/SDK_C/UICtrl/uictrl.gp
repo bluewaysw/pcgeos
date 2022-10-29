@@ -12,7 +12,7 @@
 #       Name    Date            Description
 #       ----    ----            -----------
 #       Tony	4/1/91	        Initial version
-#		RainerB	8/7/2022		Resource names adjusted for Watcom compatibility
+#	RainerB	8/7/2022	Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:	This file contains Geode definitions for the "UICtrl" sample
 #		application. This file is read by the GLUE linker to

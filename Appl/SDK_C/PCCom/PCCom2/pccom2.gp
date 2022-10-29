@@ -11,8 +11,8 @@
 # REVISION HISTORY:
 #       Name    Date            Description
 #       ----    ----            -----------
-#       CH		1/20/94	        Initial version
-#		RainerB	4/27/2022		Resource names adjusted for Watcom compatibility
+#       CH	1/20/94	        Initial version
+#	RainerB	4/27/2022	Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:	This file contains Geode definitions for the "PCCom2" sample
 #		application. This file is read by the Glue linker to
