@@ -258,11 +258,6 @@ extern TEngine_Instance engineInstance;
     properties->num_CharMaps = _face->numCMaps;
     properties->num_Names    = _face->nameTable.numNameRecords;
 
-    if ( _face->ttcHeader.DirCount == 0 )
-      properties->num_Faces = 1;
-    else
-      properties->num_Faces = _face->ttcHeader.DirCount;
-
     properties->header       = &_face->fontHeader;
     properties->horizontal   = &_face->horizontalHeader;
 

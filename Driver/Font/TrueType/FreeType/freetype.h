@@ -576,10 +576,6 @@
     TT_UShort  num_CharMaps;    /* number of charmaps in the face     */
     TT_UShort  num_Names;       /* number of name records in the face */
 
-    TT_ULong   num_Faces;  /* 1 for normal TrueType files, and the  */
-                           /* number of embedded faces for TrueType */
-                           /* collections                           */
-
     TT_Header*             header;        /* TrueType header table          */
     TT_Horizontal_Header*  horizontal;    /* TrueType horizontal header     */
     TT_OS2*                os2;           /* TrueType OS/2 table            */

@@ -486,9 +486,6 @@
     /* used only by the threaded builds of the library */
     TMutex  lock;
 
-    /* TrueType collection header, if any was found */
-    TTTCHeader  ttcHeader;
-
     /* maximum profile table, as found in the TrueType file */
     TMaxProfile  maxProfile;
 

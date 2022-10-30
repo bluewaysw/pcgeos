@@ -21,6 +21,8 @@
 
 #include "ttadapter.h"
 #include <heap.h>
+#include <font.h>
+#include <graphics.h>
 
 
 /********************************************************************
@@ -95,6 +97,7 @@ TT_Error _pascal Exit_FreeType()
  * PARAMETERS:    FileHandle    Handle of the font.
  *                FontID*       Pointer in which the ID of the 
  *                              font returned.
+ *                char*         Pointer to name of font family.
  *                FontWeight*   Pointer in which the weight of the 
  *                              font returned.
  *                TextStyle*    Pointer in which the style of the 
@@ -113,12 +116,19 @@ TT_Error _pascal Exit_FreeType()
  *******************************************************************/
 
 TT_Error _pascal Get_Font_Info( const FileHandle  fileHandle, 
-                                FontID* fontID, 
-                                FontWeight* fontWeight,
-                                TextStyle* textStyle )
+                                FontID*           fontID, 
+                                char*             fontFamilyName, 
+                                FontWeight*       fontWeight,
+                                TextStyle*        textStyle )
 {
-        TT_Error        error;
-        TT_Face         face;
+        TT_Error            error;
+        TT_Face             face;
+        TT_Face_Properties  props;
+        TT_UShort           nameIndexFamily;
+        TT_UShort           nameIndexStyle;
+        TT_UShort           nameIndex;
+        TT_String*          stringPtr;
+        TT_UShort*          length;
 
 
         ECCheckFileHandle( fileHandle );
@@ -127,18 +137,60 @@ TT_Error _pascal Get_Font_Info( const FileHandle  fileHandle,
         if ( error != TT_Err_Ok )
                 return error;
 
-        /* load font family name for ID generation */
-        //TODO
+        error = TT_Get_Face_Properties( face, &props );
+        if ( error != TT_Err_Ok )
+                return error;
 
-        /* load font weight */
-        //TODO
+        /* process fontweight */
+        *fontWeight = mapFontWeight( props.os2->usWeightClass );
 
-        /* load text style */
-        //TODO
+        /* find index for name and family in name table */
+        for( nameIndex = 0; nameIndex < props.num_Names; ++nameIndex )
+        {
+                TT_UShort  platformID;
+                TT_UShort  encodingID;
+                TT_UShort  languageID;
+                TT_UShort  nameID;
 
+                error = TT_Get_Name_ID( face,
+                                        nameIndex,
+                                        &platformID,
+                                        &encodingID,
+                                        &languageID,
+                                        &nameID );
+                if ( error != TT_Err_Ok )
+                        return error;
 
+                if ( nameID == NAME_ID_FAMILY )
+                        nameIndexFamily = nameIndex;
+
+                if ( nameID == NAME_ID_STYLE )
+                        nameIndexStyle = nameIndex;
+        }
+
+        /* process font family name */
+        error = TT_Get_Name_String( face,
+                                    nameIndexFamily,
+                                    &stringPtr,
+                                    &length );
+        if ( error != TT_Err_Ok )
+                return error;
+
+        //*fontID = calculateFontID( stringPtr );
+        copyFamilyName( stringPtr, fontFamilyName );
+
+        /* process text style */
+        error = TT_Get_Name_String( face,
+                                    nameIndexStyle,
+                                    &stringPtr,
+                                    &length );
+        if ( error != TT_Err_Ok )
+                return error;
+
+        *textStyle = mapTextStyle( stringPtr );
+
+        /* free resouces and exit */
         TT_Flush_Face( face );
-
         return TT_Err_Ok;
 }
 
@@ -150,6 +202,7 @@ TT_Error _pascal Get_Font_Info( const FileHandle  fileHandle,
  * 
  * PARAMETERS:    FileHandle    Handle of the font.
  *                word          Character to get metrics of.
+ *                boolean       Indicates that the rounded results are expected.
  *                WBFixed*      Pointer in wich the minimum of x returned.
  *                WBFixed*      Pointer in wich the minimum of y returned.
  *                WBFixed*      Pointer in wich the maximum of x returned.
@@ -168,10 +221,41 @@ TT_Error _pascal Get_Font_Info( const FileHandle  fileHandle,
  *******************************************************************/
 TT_Error _pascal Get_Char_Metrics( const FileHandle  fileHandle,
                                    const word        character,
+                                   Boolean           rounded,
                                    WBFixed*          minX,
                                    WBFixed*          minY,
                                    WBFixed*          maxX,
                                    WBFixed*          maxY )
 {
         return TT_Err_Ok;
+}
+
+
+static
+int /* TextStyle */  
+mapTextStyle( TT_String*  style )
+{
+        return TS_BOLD;
+}
+
+static
+int /* FontWeight */  
+mapFontWeight( TT_UShort  weight )
+{
+        //TODO: definition of FontWeight in font.h is incomplete
+        return FW_NORMAL;
+}
+
+/*static
+FontID
+calculateFontID( TT_String*  familyName ) 
+{
+        return 0;
+}*/
+
+static 
+void 
+copyFamilyName( TT_String* familyNameFromFile, char* fontFamilyName ) 
+{
+
 }

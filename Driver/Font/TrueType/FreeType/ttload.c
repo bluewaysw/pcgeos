@@ -65,61 +65,6 @@
 
 /*******************************************************************
  *
- *  Function    :  Load_TrueType_Collection
- *
- *  Description :  Loads the TTC table directory into face table.
- *
- *  Input  :  face    face record to look for
- *
- *  Output :  Error code.
- *
- ******************************************************************/
-
-  static TT_Error  Load_TrueType_Collection( PFace  face )
-  {
-    DEFINE_LOCALS;
-
-    ULong  n;
-
-
-    if ( FILE_Seek   ( 0L ) ||
-         ACCESS_Frame( 12L ) )
-      return error;
-
-    face->ttcHeader.Tag      = GET_Tag4();
-    face->ttcHeader.version  = GET_Long();
-    face->ttcHeader.DirCount = GET_Long();
-
-    FORGET_Frame();
-
-    if ( face->ttcHeader.Tag != TTAG_ttcf )
-    {
-      face->ttcHeader.Tag      = 0;
-      face->ttcHeader.version  = 0;
-      face->ttcHeader.DirCount = 0;
-
-      face->ttcHeader.TableDirectory = NULL;
-
-      return TT_Err_File_Is_Not_Collection;
-    }
-
-    if ( ALLOC_ARRAY( face->ttcHeader.TableDirectory,
-                      face->ttcHeader.DirCount,
-                      ULong )                         ||
-         ACCESS_Frame( face->ttcHeader.DirCount * 4L ) )
-      return error;
-
-    for ( n = 0; n < face->ttcHeader.DirCount; n++ )
-      face->ttcHeader.TableDirectory[n] = GET_ULong();
-
-    FORGET_Frame();
-
-    return TT_Err_Ok;
-  }
-
-
-/*******************************************************************
- *
  *  Function    :  Load_TrueType_Directory
  *
  *  Description :  Loads the table directory into face table.
@@ -143,33 +88,6 @@
 
     PTableDirEntry  entry;
 
-
-    error = Load_TrueType_Collection( face );
-
-    if ( error )
-    {
-      if ( error != TT_Err_File_Is_Not_Collection )
-        return error;
-
-      /* the file isn't a collection, exit if we're asking */
-      /* for a collected font                              */
-      if ( faceIndex != 0 )
-        return error;
-
-      /* Now skip to the beginning of the file */
-      if ( FILE_Seek( 0L ) )
-        return error;
-    }
-    else
-    {
-      /* The file is a collection. Check the font index */
-      if ( faceIndex >= face->ttcHeader.DirCount )
-        return TT_Err_Invalid_Argument;
-
-      /* select a TrueType font in the ttc file   */
-      if ( FILE_Seek( face->ttcHeader.TableDirectory[faceIndex] ) )
-        return error;
-    }
 
     if ( ACCESS_Frame( 12L ) )
       return error;

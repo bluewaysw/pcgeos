@@ -31,4 +31,11 @@
 extern TEngine_Instance engineInstance;
 
 
+/***********************************************************************
+ *      parameters for search in name table
+ ***********************************************************************/
+#define NAME_ID_FAMILY          1       // font family name
+#define NAME_ID_STYLE           2       // font style
+
+
 #endif /* _TTADAPTER_H_ */

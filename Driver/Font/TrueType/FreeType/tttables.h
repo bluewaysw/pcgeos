@@ -31,20 +31,6 @@
   /*                                                                     */
   /***********************************************************************/
 
-  /* TrueType Collection Header */
-
-  struct  TTTCHeader_
-  {
-    ULong     Tag;
-    TT_Fixed  version;
-    ULong     DirCount;
-    PULong    TableDirectory;
-  };
-
-  typedef struct TTTCHeader_  TTTCHeader;
-  typedef TTTCHeader*         PTTCHeader;
-
-
   /* TrueType Table Directory type */
 
   struct  TTableDir_

@@ -1054,10 +1054,6 @@
     Extension_Destroy( face );
 #endif
 
-    /* freeing the collection table */
-    FREE( face->ttcHeader.TableDirectory );
-    face->ttcHeader.DirCount = 0;
-
     /* freeing table directory */
     FREE( face->dirTables );
     face->numTables = 0;
