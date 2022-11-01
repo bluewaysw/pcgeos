@@ -8,6 +8,12 @@
 #
 # AUTHOR:	Tom Lester, Aug  3, 1993
 #
+# REVISION HISTORY:
+#       Name    Date            Description
+#       ----    ----            -----------
+#       TL      8/3/93		Initial version
+#	RainerB	8/11/2022	Resource names adjusted for Watcom compatibility
+#
 # DESCRIPTION:	This file contains Geode definitions for the "Benoit" sample
 #		application. This file is read by the GLUE linker to
 #		build this application.
@@ -65,31 +71,31 @@ library mset		# use the Mandelbrot Set Library
 #
 # Resources: list all resource blocks which are used by the application.
 #
-# Mark the DISPLAYUI resource as shared and read-only so its handle will be
+# Mark the DisplayUI resource as shared and read-only so its handle will be
 # shared between instances of this application. The resource will never come
 # into memory as itself, but always as a copy of itself, so it can safely be
 # shared.
 #
-resource DISPLAYUI ui-object shared read-only
-resource APPRESOURCE ui-object
-resource DOCUMENTUI object
-resource INTERFACE ui-object
-resource BENOITERRORSTRINGS	lmem discardable read-only shared
+resource DisplayUI ui-object shared read-only
+resource AppResource ui-object
+resource DocumentUI object
+resource Interface ui-object
+resource BenoitErrorStrings	lmem discardable read-only shared
 
 # this resource contains the MSet object template that is duplicated
 # for each document
-resource MSETTEMPLATERESOURCE object shared read-only
+resource MSetTemplateResource object shared read-only
 
 # these resources contain the icon monikers
-resource BENOITSCMONIKERRESOURCE lmem read-only shared
-resource BENOITSMMONIKERRESOURCE lmem read-only shared
-resource BENOITYCMONIKERRESOURCE lmem read-only shared
-resource BENOITYMMONIKERRESOURCE lmem read-only shared
+resource BenoitSCMonikerResource lmem read-only shared
+resource BenoitSMMonikerResource lmem read-only shared
+resource BenoitYCMonikerResource lmem read-only shared
+resource BenoitYMMonikerResource lmem read-only shared
 
 
 #
 #
-# Exported entry points. To allow the relocation of the DOCUMENTUI resource
+# Exported entry points. To allow the relocation of the DocumentUI resource
 # to occur and be independent of insignificant (as far as the operation of
 # the application is concerned) changes in the physical location of the
 # BDocumentClass class record, the relocation information for the

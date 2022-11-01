@@ -7,6 +7,12 @@
 #
 # AUTHOR:	Tom Lester, Dec 27, 1993
 #
+# REVISION HISTORY:
+#       Name    Date            Description
+#       ----    ----            -----------
+#       TL	12/27/93	Initial version
+#	RainerB	4/27/2022	Resource names adjusted for Watcom compatibility
+#
 # DESCRIPTION:
 #
 # RCS STAMP
@@ -59,6 +65,6 @@ library	ui
 # object blocks, fixed code resources, or data resources that are read-only.
 # Standard discardable code resources do not need to be mentioned.
 #
-resource APPRESOURCE object
-resource INTERFACE object
-resource ICONRESOURCE lmem read-only shared
+resource AppResource object
+resource Interface object
+resource IconResource lmem read-only shared
