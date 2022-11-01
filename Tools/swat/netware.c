@@ -450,6 +450,13 @@ extern void Ipx_Exit(void);
  *	jimmy	3/25/94		Initial version			     
  * 
  *********************************************************************/
+
+int
+NetWare_Socket()
+{
+	return cmdLineSocket;
+}
+
 int
 NetWare_Init(char *addr, int useTCP)
 {

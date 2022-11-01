@@ -443,9 +443,15 @@ static char ttyName[64];
 static int  isModem=0;
 #elif defined(_WIN32)
 # include "npipe.h"
+#define FD_READ 1
+HANDLE WINAPI WSACreateEvent( void );
+int WINAPI WSAEventSelect( int, HANDLE, long  );
+BOOL WINAPI WSAResetEvent( int  );
+
 extern HANDLE cntlcEvent;
 HANDLE hCommunication = NULL;
 OVERLAPPED overlapRead, overlapWrite;
+HANDLE wevent = NULL;
 
 static char npipeName[256];
 static char ttysetting[25];
@@ -2302,12 +2308,12 @@ RpcWait(int poll)
 	     * There's still an event pending, so figure out the time to its
 	     * expiration and point 'timeout' at it.
 	     */
-	    tv = 0/*ev->timeout - now*/;
+	    tv = ev->timeout - now;
 	} else {
 	    /*
 	     * let's wait for ever, well 5 seconds that is
 	     */
-	    tv = 0 /*5000*/;
+	    tv = 5000;
 	}
 	millisecs = (tv * (long) 1000) / CLK_TCK;
 
@@ -2336,6 +2342,23 @@ RpcWait(int poll)
 	    FD_SET(geosFD, &readMask);
 	}
 	errno = 0;
+
+
+	/*
+	 * check if we should wait on the communications method, eg. npipe
+	 */
+	if ((geosFD >= 0) && (FD_ISSET(geosFD, &rpc_readMask)))
+	{
+		/*
+			* set the wait handle to the overlapped io event
+			*/
+		if(wevent == NULL) {
+			wevent = WSACreateEvent();
+		}
+		hwaits[nwaits++] = wevent;
+		WSAResetEvent(wevent);
+		WSAEventSelect(NetWare_Socket(), wevent, FD_READ);
+	}
 #if 0
 	/*
 	 * check if we should wait on the communications method, eg. npipe
@@ -2528,7 +2551,10 @@ RpcWait(int poll)
 		    Sleep(100);
 		}
 	    }
+	    else if ( hwaits[dWaitResult - WAIT_OBJECT_0] == wevent )
+	    {
 
+		}
 	    else if ( hwaits[dWaitResult - WAIT_OBJECT_0] == cntlcEvent )
 	    {
 		/*
