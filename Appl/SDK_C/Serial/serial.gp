@@ -8,6 +8,12 @@
 #
 # AUTHOR:	John D. Mitchell
 #
+# REVISION HISTORY:
+#       Name    Date            Description
+#       ----    ----            -----------
+#       JDM	??	        Initial version
+#	RainerB	4/27/2022	Resource names adjusted for Watcom compatibility
+#
 # DESCRIPTION:	This file contains Geode definitions for the "Serial" sample
 #		application. This file is read by the GLUE linker to
 #		build this application.
@@ -61,9 +67,9 @@ library	streamc
 # Resources: list all resource blocks which are used by the application.
 # (standard discardable code resources do not need to be mentioned).
 #
-resource APPRESOURCE	ui-object
-resource INTERFACE	ui-object
-resource CONSTANTDATA	shared, lmem, read-only
+resource AppResource	ui-object
+resource Interface	ui-object
+resource ConstantData	shared, lmem, read-only
 #
 # Exported Classes
 #
