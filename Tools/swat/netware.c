@@ -477,7 +477,11 @@ NetWare_Init(char *addr, int useTCP)
     /* we need to clean up when we exit if we are using the network */
     atexit(Ipx_Exit);
 
-    return 1;
+#ifdef _LINUX
+    return cmdLineSocket;
+#else
+	return 1;
+#endif
 }
 #endif
 
