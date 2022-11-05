@@ -123,6 +123,14 @@ static char *rcsid =
 # include <sys/ioctl.h>
 # include <sys/types.h>
 # include <sys/uio.h>
+# include <sys/time.h>
+
+       #include <termios.h>
+       #include <unistd.h>
+
+#define timercmp(tvp, uvp, cmp) (((tvp)->tv_sec cmp (uvp)->tv_sec) || \
+    (tvp)->tv_sec == (uvp)->tv_sec && (tvp)->tv_usec cmp (uvp)->tv_usec )
+
 #endif
 #if defined(unix)
 # include <sys/signal.h>
@@ -366,11 +374,11 @@ static RpcServer    	*geosServers = (RpcServer *)0;
  */
 typedef struct RpcEvent {
     struct RpcEvent  	*next;
-#if defined(unix) 
+#if defined(_LINUX) 
     struct timeval	timeout;    	/* Time at which event should occur */
     struct timeval	interval;   	/* Interval at which event should
 					 * recur. */
-# define etimercmp(tp1, tp2, c) timercmp(tp1, tp2, c)
+# define etimercmp(tp1, tp2, c)  timercmp(tp1, tp2, c)
 #else
     clock_t 	    	timeout;    	/* Time at which event should occur */
     clock_t 		interval;   	/* Interval at which event should
@@ -443,9 +451,15 @@ static char ttyName[64];
 static int  isModem=0;
 #elif defined(_WIN32)
 # include "npipe.h"
+#define FD_READ 1
+HANDLE WINAPI WSACreateEvent( void );
+int WINAPI WSAEventSelect( int, HANDLE, long  );
+BOOL WINAPI WSAResetEvent( int  );
+
 extern HANDLE cntlcEvent;
 HANDLE hCommunication = NULL;
 OVERLAPPED overlapRead, overlapWrite;
+HANDLE wevent = NULL;
 
 static char npipeName[256];
 static char ttysetting[25];
@@ -1896,7 +1910,7 @@ RpcQueueEvent(register RpcEvent	*ev)
     register RpcEvent	**prev;
 
     if (rpcDebug & RD_EVENT_QUEUE) {
-#if defined(unix) 
+#if defined(_LINUX) 
 	Message ("Queueing event %xh (timeout = %d.%06d)\n", ev,
 		 ev->timeout.tv_sec, ev->timeout.tv_usec);
 #else
@@ -1906,7 +1920,7 @@ RpcQueueEvent(register RpcEvent	*ev)
     }
     prev = &events;
     for (e = *prev; e != (RpcEvent *)0; e = *prev) {
-	if (etimercmp(&(ev->timeout), &(e->timeout), <)) {
+	if (etimercmp(&(ev->timeout), &(e->timeout), < )) {
 	    break;
 	} else {
 	    prev = &(e->next);
@@ -1938,7 +1952,7 @@ Rpc_EventCreate(struct timeval	*interval,	/* Timeout period for event */
     register RpcEvent	*ev;
 
     ev = (RpcEvent *)malloc_tagged(sizeof(RpcEvent), TAG_RPC);
-#if defined(unix)
+#if defined(_LINUX)
     (void)gettimeofday(&ev->timeout, (struct timezone *)0);
     timeadd(&ev->timeout,interval,&ev->timeout);
     ev->interval = *interval;
@@ -2049,7 +2063,7 @@ Rpc_EventReset(Rpc_Event	event,	    /* Event to alter */
 	Message("nonexistent\n");
     }
 
-#if defined(unix)
+#if defined(_LINUX)
     ev->interval = *interval;
     (void)gettimeofday(&now, (struct timezone *)0);
     timeadd(&now, &ev->interval, &ev->timeout);
@@ -2080,13 +2094,13 @@ Rpc_EventReset(Rpc_Event	event,	    /* Event to alter */
 static void
 RpcWait(int poll)
 {
-#if defined(unix)
+#if defined(_LINUX)
     struct timeval	now;		/* Current time */
     struct timeval	tv;		/* Actual interval to wait */
     struct timeval	*timeout;	/* Pointer to interval to wait */
 #else
     clock_t		now;		/* Current time */
-# if defined(_WIN32)
+# if defined(_WIN32) 
     clock_t		tv;		/* Actual interval to wait */
     DWORD		millisecs;	/* interval in milliseconds */
 # endif
@@ -2119,7 +2133,7 @@ RpcWait(int poll)
     }
     while (1) {
 	stayAwake = False;
-#if defined(unix)
+#if defined(_LINUX)
 	timeout = (struct timeval *)0;
 #endif
 
@@ -2131,7 +2145,7 @@ RpcWait(int poll)
 	 * than we really want. It's only 100 usecs per gettimeofday call,
 	 * anyway...
 	 */
-#if !defined(unix)
+#if !defined(_LINUX)
 # define gettimeofday(tvp, tzp)	(*(tvp) = clock())
 #endif
 	for (ev = events, (void)gettimeofday(&now, (struct timezone *)0);
@@ -2147,7 +2161,7 @@ RpcWait(int poll)
 	     * event is taken late, it will be taken again after the
 	     * given delay.
 	     */
-#if defined(unix)
+#if defined(_LINUX)
 	    timeadd(&ev->interval,&now,&ev->timeout);
 #else
 	    ev->timeout = now + ev->interval;
@@ -2155,7 +2169,7 @@ RpcWait(int poll)
 
 	    RpcQueueEvent(ev);
 	    if (rpcDebug & RD_EVENT_TAKEN) {
-#if defined(unix)
+#if defined(unit)
 		Message("\ttaking event %xh (%d.%06d, now = %d.%06d)\n", ev,
 			ev->timeout.tv_sec, ev->timeout.tv_usec,
 			now.tv_sec, now.tv_usec);
@@ -2176,7 +2190,7 @@ RpcWait(int poll)
 	    return;
 	}
 
-#if defined(unix)
+#if defined(_LINUX)
 	if (poll) {
 	    /*
 	     * If just polling, timeout immediately
@@ -2215,7 +2229,7 @@ RpcWait(int poll)
 	}
 	nstreams = select(FD_SETSIZE, &readMask, &writeMask, &exceptMask,
 			  timeout);
-#elif defined(_LINUX)
+#elif defined(_LINUX2)
 	/*
 	 * In the DOS world, we only look for the keyboard and our serial
 	 * port. There's no way to find other things being ready, so...
@@ -2302,12 +2316,12 @@ RpcWait(int poll)
 	     * There's still an event pending, so figure out the time to its
 	     * expiration and point 'timeout' at it.
 	     */
-	    tv = 0/*ev->timeout - now*/;
+	    tv = ev->timeout - now;
 	} else {
 	    /*
 	     * let's wait for ever, well 5 seconds that is
 	     */
-	    tv = 0 /*5000*/;
+	    tv = 5000;
 	}
 	millisecs = (tv * (long) 1000) / CLK_TCK;
 
@@ -2336,6 +2350,23 @@ RpcWait(int poll)
 	    FD_SET(geosFD, &readMask);
 	}
 	errno = 0;
+
+
+	/*
+	 * check if we should wait on the communications method, eg. npipe
+	 */
+	if ((geosFD >= 0) && (FD_ISSET(geosFD, &rpc_readMask)))
+	{
+		/*
+			* set the wait handle to the overlapped io event
+			*/
+		if(wevent == NULL) {
+			wevent = WSACreateEvent();
+		}
+		hwaits[nwaits++] = wevent;
+		WSAResetEvent(wevent);
+		WSAEventSelect(NetWare_Socket(), wevent, FD_READ);
+	}
 #if 0
 	/*
 	 * check if we should wait on the communications method, eg. npipe
@@ -2528,7 +2559,10 @@ RpcWait(int poll)
 		    Sleep(100);
 		}
 	    }
+	    else if ( hwaits[dWaitResult - WAIT_OBJECT_0] == wevent )
+	    {
 
+		}
 	    else if ( hwaits[dWaitResult - WAIT_OBJECT_0] == cntlcEvent )
 	    {
 		/*
@@ -5307,7 +5341,7 @@ Rpc_Connect(void)
      */
     if (rpcServers[geosFD]) {
 	rpcState = RPC_STATE_SYNC;
-	Rpc_Watch(geosFD, RPC_READABLE, RpcHandleStream, (Rpc_Opaque)0);
+	Rpc_Watch(4, RPC_READABLE, RpcHandleStream, (Rpc_Opaque)0);
     }
     return TRUE;
 }
