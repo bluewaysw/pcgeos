@@ -110,5 +110,49 @@ initscr() {
 }
 
 WINDOW * reinitscr() {
+
+    int newLINES = 0;
+    int newCOLS = 0;
+
+# ifdef TIOCGWINSZ
+	struct winsize win;
+# endif
+
+# ifdef TIOCGWINSZ
+	if (ioctl(_tty_ch, TIOCGWINSZ, &win) >= 0) {
+		if (newLINES == 0)
+			newLINES = win.ws_row;
+		if (newCOLS == 0)
+			newCOLS = win.ws_col;
+	}
+# endif
+
+	if (newLINES == 0)
+		newLINES = tgetnum("li");
+	if (newLINES <= 5)
+		newLINES = 24;
+
+	if (newCOLS == 0)
+		newCOLS = tgetnum("co");
+	if (newCOLS <= 4)
+		newCOLS = 80;
+
+
+    if((newLINES != LINES) || (newCOLS != COLS)) {
+    
+        LINES = newLINES;
+        COLS = newCOLS;
+
+		printf("NEW_SIZE %d %d,", COLS, LINES); fflush(stdout);
+
+
+        if ((curscr = resizewin(curscr,LINES,COLS)) == (WINDOW *)ERR) {
+            exit(1);
+        }
+        wrefresh(curscr);
+        return(OK);
+    }
+    return (ERR);
+
 	return OK;
 }
