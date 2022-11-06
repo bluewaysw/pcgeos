@@ -123,10 +123,6 @@ static char *rcsid =
 # include <sys/ioctl.h>
 # include <sys/types.h>
 # include <sys/uio.h>
-# include <sys/time.h>
-
-       #include <termios.h>
-       #include <unistd.h>
 
 #define timercmp(tvp, uvp, cmp) (((tvp)->tv_sec cmp (uvp)->tv_sec) || \
     (tvp)->tv_sec == (uvp)->tv_sec && (tvp)->tv_usec cmp (uvp)->tv_usec )
@@ -378,7 +374,7 @@ typedef struct RpcEvent {
     struct timeval	timeout;    	/* Time at which event should occur */
     struct timeval	interval;   	/* Interval at which event should
 					 * recur. */
-# define etimercmp(tp1, tp2, c)  timercmp(tp1, tp2, c)
+# define etimercmp(tp1, tp2, c) timercmp(tp1, tp2, c)
 #else
     clock_t 	    	timeout;    	/* Time at which event should occur */
     clock_t 		interval;   	/* Interval at which event should
@@ -1920,7 +1916,7 @@ RpcQueueEvent(register RpcEvent	*ev)
     }
     prev = &events;
     for (e = *prev; e != (RpcEvent *)0; e = *prev) {
-	if (etimercmp(&(ev->timeout), &(e->timeout), < )) {
+	if (etimercmp(&(ev->timeout), &(e->timeout), <)) {
 	    break;
 	} else {
 	    prev = &(e->next);
@@ -2100,7 +2096,7 @@ RpcWait(int poll)
     struct timeval	*timeout;	/* Pointer to interval to wait */
 #else
     clock_t		now;		/* Current time */
-# if defined(_WIN32) 
+# if defined(_WIN32)
     clock_t		tv;		/* Actual interval to wait */
     DWORD		millisecs;	/* interval in milliseconds */
 # endif
@@ -2169,7 +2165,7 @@ RpcWait(int poll)
 
 	    RpcQueueEvent(ev);
 	    if (rpcDebug & RD_EVENT_TAKEN) {
-#if defined(unit)
+#if defined(_LINUX)
 		Message("\ttaking event %xh (%d.%06d, now = %d.%06d)\n", ev,
 			ev->timeout.tv_sec, ev->timeout.tv_usec,
 			now.tv_sec, now.tv_usec);
@@ -2229,42 +2225,6 @@ RpcWait(int poll)
 	}
 	nstreams = select(FD_SETSIZE, &readMask, &writeMask, &exceptMask,
 			  timeout);
-#elif defined(_LINUX2)
-	/*
-	 * In the DOS world, we only look for the keyboard and our serial
-	 * port. There's no way to find other things being ready, so...
-	 *
-	 * but wait, there's more, we now have mouse support, so we must look
-	 * for mouse events as well...
-	 * XXX: just return everything else (except exceptMask) set?
-	 */
-	nstreams = 0;
-	FD_ZERO(&readMask);
-	FD_ZERO(&writeMask);
-	FD_ZERO(&exceptMask);
-
-	if (FD_ISSET(keyboardFD, &rpc_readMask)/*
-	    && _bios_keybrd(_KEYBRD_READY)*/) {
-	    nstreams += 1;
-	    FD_SET(keyboardFD, &readMask);
-	}
-
-	/* now that swat can work over a network or a serial cable, we must
-	 * check for either case
-	 */
-	if (FD_ISSET(geosFD, &rpc_readMask)
-	    && ( (((commMode == CM_NETWARE) || (commMode == CM_SERIAL_TCP)) && Ipx_CheckPacket()))) {
-	    nstreams += 1;
-	    FD_SET(geosFD, &readMask);
-	}
-	errno = 0;
-	/*
-	 * If Ctrl+C typed since we started looping, break out so we can
-	 * process it.
-	 */
-	if (Ui_Interrupt() != irqState) {
-	    break;
-    	}
 #elif defined(_MSDOS)
 	/*
 	 * In the DOS world, we only look for the keyboard and our serial
@@ -5350,7 +5310,7 @@ Rpc_Connect(void)
      */
     if (rpcServers[geosFD]) {
 	rpcState = RPC_STATE_SYNC;
-	Rpc_Watch(4, RPC_READABLE, RpcHandleStream, (Rpc_Opaque)0);
+	Rpc_Watch(geosFD, RPC_READABLE, RpcHandleStream, (Rpc_Opaque)0);
     }
     return TRUE;
 }
