@@ -81,6 +81,155 @@ int	num_lines, num_cols, begy, begx;
 	return win;
 }
 
+WINDOW* resizewin(WINDOW* win, int num_lines, int num_columns) 
+{
+    int j;
+    if(num_lines < win->_maxy) {
+
+        /* remove lines at the beginning */
+        while(win->_cury >= num_lines) {
+
+            int c=1;
+            free(win->_y[0]);
+            for(c=1; c < win->_maxy; c++)
+            {
+                win->_y[c-1] = win->_y[c];
+            }
+            win->_maxy--;
+            win->_cury--;
+        }
+
+        /* free removed lines */
+	    for (j = num_lines; j < win->_maxy; j++) 
+        {
+            free(win->_y[j]);
+        }
+
+        /* realloc the others */
+        for(j = 0; j < num_lines; j++)
+        {
+            void *newLine = realloc(win->_y[j], num_columns);
+            if(newLine == NULL)
+            {
+    	        return((WINDOW *) ERR);
+            }
+            win->_y[j] = newLine;
+        }
+
+        /* fill new chars */
+        for(j=0; j < num_lines; j++) {
+            int x=0;
+            for(x=win->_maxx; x < num_columns; x++) {
+
+                win->_y[j][x] = ' ';
+            }
+
+            win->_firstch[j]=0;
+            win->_lastch[j]=num_columns-1;
+        }
+
+        win->_maxx = num_columns;
+        win->_maxy = num_lines;
+    }
+    else /*if(num_lines > win->_maxy)*/ 
+    {
+        void *newMinChg;
+        void *newMaxChg;
+
+        /* more lines now */
+        void** newLines = realloc(win->_y, sizeof(win->_y[0]) * num_lines);
+        if(newLines == NULL)
+        {
+	        return((WINDOW *) ERR);
+        }
+        win->_y = newLines;
+
+        newMinChg = realloc(win->_firstch, sizeof(win->_firstch[0]) * num_lines);
+        if(newMinChg == NULL)
+        {
+	        return((WINDOW *) ERR);
+        }
+        win->_firstch = newMinChg;
+
+        newMaxChg = realloc(win->_lastch, sizeof(win->_lastch[0]) * num_lines);
+        if(newMaxChg == NULL)
+        {
+	        return((WINDOW *) ERR);
+        }
+        win->_lastch = newMaxChg;
+
+        /* allocate new lines*/
+        for(j = win->_maxy; j < num_lines; j++)
+        {
+            newLines[j] = calloc(num_columns,
+					    sizeof(win->_y[0]));
+            if(newLines[j] == NULL)
+            {
+                /* free all new lines*/
+                j--;
+                while(j >= num_lines)
+                {
+                    free(newLines[j]);
+                    j--;
+                }
+    	        return((WINDOW *) ERR);
+            }
+        }
+
+        /* realloc the others */
+        for(j = 0; j < win->_maxy; j++)
+        {
+            void *newLine = realloc(win->_y[j], sizeof(win->_y[0]) *num_columns);
+            if(newLine == NULL)
+            {
+                /* free all new lines*/
+                j = num_lines;
+                j--;
+                while(j >= 0)
+                {
+                    free(win->_y[j]);
+                    j--;
+                }
+    	        return((WINDOW *) ERR);
+            }
+            win->_y[j] = newLine;
+        }
+
+        /* fill new chars */
+        for(j=0; j < num_lines; j++) {
+            int x=0;
+            if(win->_maxx< num_columns)
+            {
+                for(x=win->_maxx; x < num_columns; x++) {
+
+                    win->_y[j][x] = ' ';
+                }
+            }
+            if(j >= win->_maxy)
+            {
+                int width = win->_maxx;
+                int a=0;
+                if(width >= num_columns)
+                {
+                    width = num_columns;
+                }
+                for(a=0; a < width; a++) 
+                {
+
+                    win->_y[j][a] = ' ';
+                }
+            }
+
+            win->_firstch[j]=0;
+            win->_lastch[j]=num_columns-1;
+        }
+
+        win->_maxx = num_columns;
+        win->_maxy = num_lines;
+    }
+    return win;
+}
+
 WINDOW *
 subwin(orig, num_lines, num_cols, begy, begx)
 reg WINDOW	*orig;

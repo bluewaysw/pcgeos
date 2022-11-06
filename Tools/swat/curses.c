@@ -643,6 +643,17 @@ CursesTstp(void)
 }
 #endif
 
+#if defined(_LINUX)
+void
+CursesResize(int sig) 
+{
+	if(reinitscr() == OK) 
+	{
+		CursesRedoLayout();	
+	}
+}
+#endif
+
 #if defined(_MSDOS)
 #define	scrollnow_hideMouse(win, lines) (Mouse_HideCursor(),scrollnow(win,lines),Mouse_ShowCursor())
 #else
@@ -4970,9 +4981,7 @@ See also:\n\
      * top of the window -- no need to refresh since they're still the
      * same on-screen.
      */
-#ifdef _WIN32
     resizewin(cmdWin, cmdWin->_maxy-height, COLS);
-#endif
     if (windowsOnTop) {
 	cmdWin->_begy += height;
 #if 0
@@ -5740,7 +5749,6 @@ CursesRedoLayout()
 		
 		w = (WINDOW *)Lst_Datum(ln);
 
-#if defined(_WIN32)
 		resizewin(w, w->_maxy, COLS);
 		if(!windowsOnTop)
 		{
@@ -5752,45 +5760,38 @@ CursesRedoLayout()
 			y += w->_maxy;
 		}
 		height += w->_maxy;
-#endif
 		wrefresh(w);
 	}
 
-#if defined(_WIN32)
-
-		if(borderWin != NULL) {
-			resizewin(borderWin, borderWin->_maxy, COLS); 
-			if(windowsOnTop) {
-
-				mvwin(borderWin, height, 0);
-			}
-			else {
-
-				mvwin(borderWin, LINES-height-1, 0);
-			}
-
-			wclear(borderWin);
-			for (i = 0; i < COLS; i++) {
-				waddch(borderWin, '=');
-			}
-			wrefresh(borderWin);
-			height+=borderWin->_maxy;
-		}
-
-		resizewin(cmdWin, LINES-height, COLS);
+	if(borderWin != NULL) {
+		resizewin(borderWin, borderWin->_maxy, COLS); 
 		if(windowsOnTop) {
 
-			mvwin(cmdWin, height, 0);
+			mvwin(borderWin, height, 0);
 		}
 		else {
 
-			mvwin(cmdWin, 0, 0);
+			mvwin(borderWin, LINES-height-1, 0);
 		}
-		wrefresh(cmdWin);
 
-		//resizewin(curWin, curWin->_maxy, COLS);
-		//wrefresh(curWin);
-#endif
+		wclear(borderWin);
+		for (i = 0; i < COLS; i++) {
+			waddch(borderWin, '=');
+		}
+		wrefresh(borderWin);
+		height+=borderWin->_maxy;
+	}
+
+	resizewin(cmdWin, LINES-height, COLS);
+	if(windowsOnTop) {
+
+		mvwin(cmdWin, height, 0);
+	}
+	else {
+
+		mvwin(cmdWin, 0, 0);
+	}
+	wrefresh(cmdWin);
 }
 
 /***********************************************************************
@@ -6596,7 +6597,16 @@ Curses_Init(void)
 #if defined(unix)
 	(void)signal(SIGTSTP, CursesTstp);
 #endif
-
+#if defined(_LINUX)
+	{
+		struct sigaction act, oact;
+		memset(&act, 0, sizeof(act));
+		act.sa_handler = CursesResize;
+		sigemptyset(&act.sa_mask);
+		act.sa_flags = SA_RESTART;
+		sigaction(SIGWINCH, &act, &oact);
+	}
+#endif
 	/*
 	 * Install the commands we support
 	 */
