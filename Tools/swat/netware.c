@@ -853,7 +853,7 @@ void Ipx_Init(char *addr) {
 					0,
 					(struct sockaddr *) &connectAddress,
 					sizeof (connectAddress));
-		    if(rc == 0) {
+		    if(rc != -1) {
 			Message("Successfully connected\n");
 		    } else {
 			Message("Error: connection failed\n");
