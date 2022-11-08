@@ -4770,7 +4770,6 @@ Rpc_Init(int		*argcPtr,
 	}
 #endif /* unix */
 	else if (strcmp(*av, "-net") == 0) {       /* look for net arg */
-		MessageFlush("-net needs an argument\n");
 	    av++, ac--;
 	    if (ac == 0) {
 		MessageFlush("-net needs an argument\n");
