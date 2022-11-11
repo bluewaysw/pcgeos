@@ -88,6 +88,87 @@ TT_Error _pascal Exit_FreeType()
         return TT_Done_FreeType();
 }
 
+/* Vorschlag C-API für den TTF-Treiber*/
+
+/* Teil I relevante Strukturen füllen */
+TT_Error Fill_FontsAvialEntry( const char* file, fontsAvialEntry* fontsAvialEntry )
+{
+        /* das ChunkHandle auf die FontInfo Struktur wird nicht gefüllt*/
+        return TT_Err_Ok;
+}
+
+TT_Error Fill_FontInfo( const FontAvailEntry* fontAvailEntry, FontInfo* fontInfo )
+{
+        return TT_Err_Ok;
+}
+
+TT_Error Fill_OutlineDataEntry( const FontInfo* fontInfo, OutlineDataEntry* outlineDataEntry) 
+{
+        /* unklar: OutlineDataEntry, OutlineData */
+        return TT_Err_Ok
+}
+
+TT_Error Fill_FontBuf( const FontInfo* fontInfo, FontBuf* fontBuf ) 
+{
+        /* Hier ist für einige Felder der FontBuf Struktur nicht klar was erwartet wird.  */
+        /* Vielleicht hilft hier ein Blick in die Bitstream Sourcen. Ggf. müssen wir hier */
+        /* mit via try and error die richtgen Werte herausfinden.                         */
+        /* Beschreibung der TrueType Tabellen:                                            */
+        /* https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6.html    */
+        return TT_Err_Ok;
+}
+
+/* offen: Kerning */
+
+/* Teil II Metriken */
+TT_Error Get_Char_Metrics( const FontInfo* fontInfo, word character,  GCM_info	info, dword* result ) 
+{
+        /* Api-Funktion für DR_FONT_GET_METRICS                                              */
+        /* Transformationen werden nicht beachtet!!!                                         */
+        /* The information is in document coordinates, which is to say it is not affected by */
+        /* scaling, rotation, etc. that modifies the way the document is viewed, but simply  */
+        /* by the pointsize and font attributes requested.                                   */
+        /* siehe GrCharMetrics()                                                             */
+        return TT_Err_Ok;
+}
+
+/*****************************/
+/*   Teil III Glyph rendern  */
+/*****************************/
+
+TT_Error Gen_Char( const FontInfo* fontInfo, GState gstate, word character )
+{
+        /* Das Zeichen wird als Bitmap/Region gerendert. Die Transformationsmatix und       */
+        /* PointSize wird aus den GState geholt. Die gerenderte Bitmap wird in den          */
+        /* bitmapBlock und die belegte Größe in bitmapSize abgelegt. Das Format entspricht  */
+        /* CharData bzw. RegionCharData.                                                    */
+
+        /* offen: Was machen wir mit dem CharTableEntry?                                    */
+        /* Da das Flag welches anzeigt ob ein Glyph als Bitmap oder Region abgelegt wird    */
+        /* in FontInfo liegt, gilt: alle Zeichen als Bitmap oder als Region, Auf welcher    */
+        /* Basis wollen wir entscheiden ob wir ein Glyph als Bitmap oder als Region rendern?*/
+
+        return TT_Err_Ok;
+}
+
+TT_Error Gen_In_Region( const FontInfo* fontInfo, GState gstate, RegionPathHandle regionPath, word character )
+{
+        /* Das Zeichen wird als RegionPath gerendert. Die Transformationsmatix und          */
+        /* PointSize wird aus den GState geholt. Das gerenderte Glyph wird in den           */
+        /* übergebenen RegionPath gelegt.                                                   */
+
+        return TT_Err_Ok;
+}
+
+TT_Error Gen_Path( const FontInfo* fontInfo, GState gstate, FontGenPathFlags flags, word character )
+{
+        /* Das Zeichen wird als Path gerendert. Die Transformationsmatix und PointSize wird  */
+        /* aus den GState geholt. Das gerenderte Glyph wird in den übergebenen GState gelegt.*/                                            */
+        
+        return TT_Err_Ok;
+}
+
+
 
 //füllen der fontsAvialEntry Struktur:
 //      FAE_fontID      (FontID)        := wird berechnet aus Fontfamily
@@ -104,10 +185,10 @@ TT_Error _pascal Exit_FreeType()
 //      FI_maker  (FontMaker)           := FontMaker.FM_TRUETYPE
 //      FI_family (FontAttrs)           :=
 //              FA_USEFUL 	(FontUseful:1)		:= FU_USEFUL/FU_NOT_USEFUL?
-//              FA_FIXED_WIDTH	(FontPitch:1)	:= FP_PROPORTIONAL
+//              FA_FIXED_WIDTH	(FontPitch:1)	        := FP_PROPORTIONAL
 //              FA_ORIENT	(FontOrientation:1)	:= FO_NORMAL
 //              FA_OUTLINE	(FontSource:1)		:= FS_OUTLINE
-//              FA_FAMILY	(FontFamily:4)		:= gemappt aus FontProperties -> OS2 -> sWeightClass
+//              FA_FAMILY	(FontFamily:4)		:= gemappt aus FaceProperties -> OS2 -> sWeightClass
 //                                                         (high byte = class; low byte = subclass)
 //                      class  0 (no classification)    -> FF_NON_PORTABLE?
 //                      class  1 (old style serifs)     -> FF_SERIF
@@ -126,9 +207,9 @@ TT_Error _pascal Exit_FreeType()
 //                      class 12 (symbolic)             -> FF_SYMBOL
 //                      Achtung: für FF_SPECIAL gibt es keine Zuordnung 
 //      FI_faceName (char/wchar)        := NameTable ID 1 (Font Family) (Prüfung auf max. 20 Zeichen)
-//      FI_pointSizeTab  (word?)	    := 0 (keine Unterstützung für Bitmaps)
+//      FI_pointSizeTab  (word?)        := 0 (keine Unterstützung für Bitmaps)
 //      FI_pointSizeEnd  (word?)        := 0 ( -"- )
-//      FI_outlineTab    (word?)	    := wird nicht verändert; muss in der asm-Schicht gefüllt werden
+//      FI_outlineTab    (word?)	:= wird nicht verändert; muss in der asm-Schicht gefüllt werden
 //      FI_outlineEnd    (word?)        := ( -"- )
 
 //füllen des OutlineDataEntry (im TTF Treiber gibt es nur einen Entry je Fontfile)
@@ -139,7 +220,7 @@ TT_Error _pascal Exit_FreeType()
 //              "Bold Italic"           := TS_BOLD | TS_ITALIC
 //              "Oblique"               := TS_ITALIC
 //              "Bold Oblique"          := TS_BOLD | TS_ITALIC
-//      ODE_weight  (FontWeight)        := gemappt aus gemappt aus FontProperties -> OS2 -> usWeightClass
+//      ODE_weight  (FontWeight)        := gemappt aus gemappt aus FaceProperties -> OS2 -> usWeightClass
 //              1 (Ultra-light)         := FWE_ULTRA_LIGHT
 //              2 (Extra-light)         := FWE_EXTRA_LIGHT
 //              3 (Light)               := FWE_LIGHT
@@ -156,10 +237,10 @@ TT_Error _pascal Exit_FreeType()
 //füllen der FontBuf Struktur
 //      FB_dataSize     (word)          := berechnet
 //      FB_maker        (FontMaker)     := FontMaker.FM_TRUETYPE
-//      FB_avgwidth     (WBFixed)       := 
-//      FB_maxwidth	    (WBFixed)		; width of widest character
-//      FB_heightAdjust	(WBFixed)		; offset to top of font box
-//      FB_height		(WBFixed) 	    ; height of characters
+//      FB_avgwidth     (WBFixed)       := FaceProperties -> OS2 -> xAvgCharWidth
+//      FB_maxwidth	(WBFixed)	:= muss berechnet werden; wird im BS Teiber nicht gefüllt
+//      FB_heightAdjust	(WBFixed)	:= BS-Treiber: pointsize
+//      FB_height	(WBFixed) 	:=    ; height of characters
 //      FB_accent       (WBFixed) 	    ; height of accent portion.
 //      FB_mean         (WBFixed) 	    ; top of lower case character boxes.
 //      FB_baseAdjust   (WBFixed)		; offset to top of ascent
@@ -170,16 +251,16 @@ TT_Error _pascal Exit_FreeType()
 //                                         directory->nTables
 //      FB_kernPairPtr	nptr.KernPair	:= Ptr zur KernpairTabelle
 //      FB_kernValuePtr	nptr.BBFixed	:= Ptr zur KernvalueTabelle
-//      FB_firstChar	byte/Chars		; first char in section
-//      FB_lastChar		byte/Chars		; last char in section
-//      FB_defaultChar	byte/Chars		; default character
-//      FB_underPos		WBFixed		    ; underline position (from baseline)
-//      FB_underThickness	WBFixed		; underline thickness
-//      FB_strikePos	WBFixed		    ; position of the strike-thru
-//      FB_aboveBox		WBFixed		    ; maximum above font box
-//      FB_belowBox		WBFixed		    ; maximum below font box
-//      FB_minLSB		sword		    ; minimum left side bearing
-//      FB_minTSB		sword		    ; minimum top side bound
+//      FB_firstChar	(byte/Chars)		; first char in section
+//      FB_lastChar	(byte/Chars)		; last char in section
+//      FB_defaultChar	(byte/Chars)		; default character
+//      FB_underPos	(WBFixed)		    ; underline position (from baseline)
+//      FB_underThickness   (WBFixed)		; underline thickness
+//      FB_strikePos	(WBFixed)	    ; position of the strike-thru
+//      FB_aboveBox	(WBFixed)		    ; maximum above font box
+//      FB_belowBox	(WBFixed)		    ; maximum below font box
+//      FB_minLSB	(sword)		    ; minimum left side bearing
+//      FB_minTSB	(sword)		    ; minimum top side bound
 //      FB_maxBSB*		sword		    ; maximum bottom side bound
 //      FB_maxRSB*		sword		    ; maximum right side bound
 //      FB_pixHeight	word		    ; height of font (invalid for rotation)
