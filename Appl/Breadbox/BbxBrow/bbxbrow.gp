@@ -156,8 +156,10 @@ endif
 #
 #these two only needed for COMPILE_OPTION_PARENTAL_CONTROL
 #
+ifdef COMPILE_OPTION_PARENTAL_CONTROL
 resource   PCResource		ui-object
 resource   PCRootResource	object
+endif
 
 resource   ViewGroupTemplateResource    ui-object
 resource   ViewTemplateResource         ui-object
