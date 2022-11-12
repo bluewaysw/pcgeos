@@ -88,27 +88,122 @@ TT_Error _pascal Exit_FreeType()
         return TT_Done_FreeType();
 }
 
-/* Vorschlag C-API für den TTF-Treiber*/
 
-/* Teil I relevante Strukturen füllen */
-TT_Error Fill_FontsAvialEntry( const char* file, fontsAvialEntry* fontsAvialEntry )
+/********************************************************************
+ *                      Fill_FontsAvialEntry
+ ********************************************************************
+ * SYNOPSIS:	  Fills the FontsAvialEntry structure with infomations 
+ *                of the passed font file.
+ * 
+ * PARAMETERS:    file                  Name of font file
+ *                fontsAvailEntry       Pointer to FontsAvialEntry
+ *                                      structure to fill.
+ * 
+ * RETURNS:       TT_Error = FreeType errorcode (see tterrid.h)
+ * 
+ * SIDE EFFECTS:  none
+ * 
+ * STRATEGY:      
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      11/12/22  JK        Initial Revision
+ *******************************************************************/
+
+TT_Error _pascal Fill_FontsAvailEntry( const char* file, FontsAvailEntry* fontsAvailEntry )
 {
-        /* das ChunkHandle auf die FontInfo Struktur wird nicht gefüllt*/
+        //FAE_fontID
+        //FAE_fileName
+        //ChunkHandle --> wird nicht gefüllt
         return TT_Err_Ok;
 }
 
-TT_Error Fill_FontInfo( const FontAvailEntry* fontAvailEntry, FontInfo* fontInfo )
+
+/********************************************************************
+ *                      Fill_FontInfo
+ ********************************************************************
+ * SYNOPSIS:	  Fills the FontsInfo structure with infomations 
+ *                of the passed in FontsAvailEntry.
+ * 
+ * PARAMETERS:    fontAvailEntry        Entry of font file
+ *                fontInfo              Pointer to FontInfo structure 
+ *                                      to fill.
+ * 
+ * RETURNS:       TT_Error = FreeType errorcode (see tterrid.h)
+ * 
+ * SIDE EFFECTS:  none
+ * 
+ * STRATEGY:      
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      11/12/22  JK        Initial Revision
+ *******************************************************************/
+
+TT_Error _pascal Fill_FontInfo( const FontsAvailEntry* fontAvailEntry, FontInfo* fontInfo )
 {
+        //TBD
         return TT_Err_Ok;
 }
 
-TT_Error Fill_OutlineDataEntry( const FontInfo* fontInfo, OutlineDataEntry* outlineDataEntry) 
+
+/********************************************************************
+ *                      Fill_OutlineDataEntry
+ ********************************************************************
+ * SYNOPSIS:	  Fills the OutlineDataEntry structure with infomations 
+ *                of the passed in FontInfo.
+ * 
+ * PARAMETERS:    fontInfo              Pointer to FontInfo structure.
+ *                OutlineDataEntry      Pointer to OutlineDataEntry 
+ *                                      structure to fill.
+ * 
+ * RETURNS:       TT_Error = FreeType errorcode (see tterrid.h)
+ * 
+ * SIDE EFFECTS:  none
+ * 
+ * STRATEGY:      
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      11/12/22  JK        Initial Revision
+ *******************************************************************/
+
+TT_Error _pascal Fill_OutlineDataEntry( const FontInfo* fontInfo, OutlineDataEntry* outlineDataEntry) 
 {
         /* unklar: OutlineDataEntry, OutlineData */
-        return TT_Err_Ok
+
+        /* Warum wird im TrueTypeOutlineEntry der Filename gehalten? 
+           Wäre nicht das FileHandle sinvoller?
+           In der FontInfo steckt auch ein Filehandle! */
+        return TT_Err_Ok;
 }
 
-TT_Error Fill_FontBuf( const FontInfo* fontInfo, FontBuf* fontBuf ) 
+
+/********************************************************************
+ *                      Fill_FontBuf
+ ********************************************************************
+ * SYNOPSIS:	  Fills the FontBuf structure with infomations 
+ *                of the passed in FontInfo.
+ * 
+ * PARAMETERS:    fontInfo              Pointer to FontInfo structure.
+ *                fontBuf               Pointer to FontBuf structure 
+ *                                      to fill.
+ * 
+ * RETURNS:       TT_Error = FreeType errorcode (see tterrid.h)
+ * 
+ * SIDE EFFECTS:  none
+ * 
+ * STRATEGY:      
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      11/12/22  JK        Initial Revision
+ *******************************************************************/
+TT_Error _pascal Fill_FontBuf( const FontInfo* fontInfo, FontBuf* fontBuf ) 
 {
         /* Hier ist für einige Felder der FontBuf Struktur nicht klar was erwartet wird.  */
         /* Vielleicht hilft hier ein Blick in die Bitstream Sourcen. Ggf. müssen wir hier */
@@ -118,9 +213,56 @@ TT_Error Fill_FontBuf( const FontInfo* fontInfo, FontBuf* fontBuf )
         return TT_Err_Ok;
 }
 
+/********************************************************************
+ *                      Fill_CharTableEntry
+ ********************************************************************
+ * SYNOPSIS:	  Fills the FontBuf structure with infomations 
+ *                of the passed in FontInfo.
+ * 
+ * PARAMETERS:    fontInfo              Pointer to FontInfo structure.
+ *                gstate                Handle to current gstate.
+ * 
+ * RETURNS:       TT_Error = FreeType errorcode (see tterrid.h)
+ * 
+ * SIDE EFFECTS:  none
+ * 
+ * STRATEGY:      Pointsize, scale and rotation will read from gstate.
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      11/12/22  JK        Initial Revision
+ *******************************************************************/
+TT_Error _pascal Fill_CharTableEntry( const FontInfo* fontInfo, GStateHandle gstate, word character )
+{
+
+        return TT_Err_Ok;
+}
+
 /* offen: Kerning */
 
-/* Teil II Metriken */
+/********************************************************************
+ *                      Fill_CharTableEntry
+ ********************************************************************
+ * SYNOPSIS:	  Fills the FontBuf structure with infomations 
+ *                of the passed in FontInfo.
+ * 
+ * PARAMETERS:    fontInfo              Pointer to FontInfo structure.
+ *                gstate                Handle to current gstate.
+ *                result                Pointer in wicht the result will 
+ *                                      stored.
+ * 
+ * RETURNS:       TT_Error = FreeType errorcode (see tterrid.h)
+ * 
+ * SIDE EFFECTS:  none
+ * 
+ * STRATEGY:      Pointsize, scale and rotation will read from gstate.
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      11/12/22  JK        Initial Revision
+ *******************************************************************/
 TT_Error Get_Char_Metrics( const FontInfo* fontInfo, word character,  GCM_info	info, dword* result ) 
 {
         /* Api-Funktion für DR_FONT_GET_METRICS                                              */
@@ -132,11 +274,28 @@ TT_Error Get_Char_Metrics( const FontInfo* fontInfo, word character,  GCM_info	i
         return TT_Err_Ok;
 }
 
-/*****************************/
-/*   Teil III Glyph rendern  */
-/*****************************/
-
-TT_Error Gen_Char( const FontInfo* fontInfo, GState gstate, word character )
+/********************************************************************
+ *                      Gen_Char
+ ********************************************************************
+ * SYNOPSIS:	  Renders the given character as bitmap or region to 
+ *                bitmap block.
+ * 
+ * PARAMETERS:    fontInfo              Pointer to FontInfo structure.
+ *                gstate                Handle to current gstate.
+ *                word                  Character to render.
+ * 
+ * RETURNS:       TT_Error = FreeType errorcode (see tterrid.h)
+ * 
+ * SIDE EFFECTS:  none
+ * 
+ * STRATEGY:      Pointsize, scale and rotation will read from gstate.
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      11/12/22  JK        Initial Revision
+ *******************************************************************/
+TT_Error _pascal Gen_Char( const FontInfo* fontInfo, GStateHandle gstate, word character )
 {
         /* Das Zeichen wird als Bitmap/Region gerendert. Die Transformationsmatix und       */
         /* PointSize wird aus den GState geholt. Die gerenderte Bitmap wird in den          */
@@ -147,11 +306,33 @@ TT_Error Gen_Char( const FontInfo* fontInfo, GState gstate, word character )
         /* Da das Flag welches anzeigt ob ein Glyph als Bitmap oder Region abgelegt wird    */
         /* in FontInfo liegt, gilt: alle Zeichen als Bitmap oder als Region, Auf welcher    */
         /* Basis wollen wir entscheiden ob wir ein Glyph als Bitmap oder als Region rendern?*/
+        // --> im NibusTreiber prüfen
 
         return TT_Err_Ok;
 }
 
-TT_Error Gen_In_Region( const FontInfo* fontInfo, GState gstate, RegionPathHandle regionPath, word character )
+/********************************************************************
+ *                      Gen_InRegion
+ ********************************************************************
+ * SYNOPSIS:	  Renders the given character into the RegionPath.
+ * 
+ * PARAMETERS:    fontInfo              Pointer to FontInfo structure.
+ *                gstate                Handle to current gstate.
+ *                regionPath            Handle in wich the character 
+ *                                      will rendered.
+ * 
+ * RETURNS:       TT_Error = FreeType errorcode (see tterrid.h)
+ * 
+ * SIDE EFFECTS:  none
+ * 
+ * STRATEGY:      Pointsize, scale and rotation will read from gstate.
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      11/12/22  JK        Initial Revision
+ *******************************************************************/
+TT_Error _pascal Gen_In_Region( const FontInfo* fontInfo, GStateHandle gstate, Handle regionPath, word character )
 {
         /* Das Zeichen wird als RegionPath gerendert. Die Transformationsmatix und          */
         /* PointSize wird aus den GState geholt. Das gerenderte Glyph wird in den           */
@@ -160,17 +341,38 @@ TT_Error Gen_In_Region( const FontInfo* fontInfo, GState gstate, RegionPathHandl
         return TT_Err_Ok;
 }
 
-TT_Error Gen_Path( const FontInfo* fontInfo, GState gstate, FontGenPathFlags flags, word character )
+/********************************************************************
+ *                      Gen_Path
+ ********************************************************************
+ * SYNOPSIS:	  Renders the given character into the GStateHandle.
+ * 
+ * PARAMETERS:    fontInfo              Pointer to FontInfo structure.
+ *                gstate                Handle to current gstate.
+ *                flags                 Transformation flags.
+ *                word                  Character to render.
+ * 
+ * RETURNS:       TT_Error = FreeType errorcode (see tterrid.h)
+ * 
+ * SIDE EFFECTS:  none
+ * 
+ * STRATEGY:      Pointsize, scale and rotation will read from gstate.
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      11/12/22  JK        Initial Revision
+ *******************************************************************/
+TT_Error _pascal Gen_Path( const FontInfo* fontInfo, GStateHandle gstate, FontGenPathFlags flags, word character )
 {
         /* Das Zeichen wird als Path gerendert. Die Transformationsmatix und PointSize wird  */
-        /* aus den GState geholt. Das gerenderte Glyph wird in den übergebenen GState gelegt.*/                                            */
-        
+        /* aus den GState geholt. Das gerenderte Glyph wird in den übergebenen GState gelegt.*/
+
         return TT_Err_Ok;
 }
 
 
 
-//füllen der fontsAvialEntry Struktur:
+//füllen der fontsAvailEntry Struktur:
 //      FAE_fontID      (FontID)        := wird berechnet aus Fontfamily
 //                                         Fontfamily := NameTable ID 1 (Font Family)
 //                                         Wie ist der Bildungsalgorithmus?
