@@ -36,11 +36,12 @@ extern TEngine_Instance engineInstance;
 /***********************************************************************
  *      parameters for search in name table
  ***********************************************************************/
-#define NAME_ID_FAMILY          1       // font family name
-#define NAME_ID_STYLE           2       // font style
+#define NAME_INDEX_FAMILY          1       // font family name
+#define NAME_INDEX_STYLE           2       // font style
 
+#define FONT_FILE_LENGTH           FILE_LONGNAME_BUFFER_SIZE
 
-#define FONT_FILE_LENGTH        FILE_LONGNAME_BUFFER_SIZE
+#define FAMILY_NAME_LENGTH         20
 
 /***********************************************************************
  *      structures
@@ -104,19 +105,16 @@ typedef	struct
 {
     word                        FB_dataSize;
     FontMaker                   FB_maker;
-/*  FB_avgwidth		WBFixed 	; average character width
-    FB_maxwidth		WBFixed		; width of widest character
-    FB_heightAdjust	WBFixed		; offset to top of font box
-    FB_height		WBFixed 	; height of characters
-    FB_accent		WBFixed 	; height of accent portion.
+    WBFixed                     FB_avgwidth;
+    WBFixed                     FB_maxwidth;
+    WBFixed                     FB_heightAdjust;
+    WBFixed                     FB_height;
+/*    FB_accent		WBFixed 	; height of accent portion.
     FB_mean		WBFixed 	; top of lower case character boxes.
     FB_baseAdjust	WBFixed		; offset to top of ascent
     FB_baselinePos	WBFixed 	; position of baseline from top of font
     FB_descent		WBFixed 	; maximum descent (from baseline)
     FB_extLeading	WBFixed 	; recommended external leading
-					;   line spacing = FB_height +
-					;		   FB_extLeading +
-					;		   FB_heightAdjust
     FB_kernCount	word		; number of kerning pairs
     FB_kernPairPtr	nptr.KernPair	; offset to kerning pair table
     FB_kernValuePtr	nptr.BBFixed	; offset to kerning value table
@@ -164,5 +162,16 @@ typedef struct
 #endif
 } OutlineDataEntry;
 
+/***********************************************************************
+ *      helperfunctions
+ ***********************************************************************/
+
+static Boolean isMappedFont( const char* familiyName );
+static FontID  getMappedFontID( const char* familyName );
+static int     toHash( const char* str );
+
+static int     strlen( const char* str );
+static void    strcpy( char* dest, const char* source );
 
 #endif /* _TTADAPTER_H_ */
+

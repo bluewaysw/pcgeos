@@ -20,10 +20,6 @@
  ***********************************************************************/
 
 #include "ttadapter.h"
-#include <heap.h>
-#include <font.h>
-#include <fontID.h>
-#include <graphics.h>
 
 
 /********************************************************************
@@ -95,7 +91,7 @@ TT_Error _pascal Exit_FreeType()
  * SYNOPSIS:	  Fills the FontsAvialEntry structure with infomations 
  *                of the passed font file.
  * 
- * PARAMETERS:    file                  Name of font file
+ * PARAMETERS:    fileName              Name of font file
  *                fontsAvailEntry       Pointer to FontsAvialEntry
  *                                      structure to fill.
  * 
@@ -103,7 +99,9 @@ TT_Error _pascal Exit_FreeType()
  * 
  * SIDE EFFECTS:  none
  * 
- * STRATEGY:      
+ * STRATEGY: 
+ * 
+ * TODO:          Prepare it for dbcs.  
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
@@ -111,12 +109,45 @@ TT_Error _pascal Exit_FreeType()
  *      11/12/22  JK        Initial Revision
  *******************************************************************/
 
-TT_Error _pascal Fill_FontsAvailEntry( const char* file, FontsAvailEntry* fontsAvailEntry )
+TT_Error _pascal Fill_FontsAvailEntry( const char*       fileName, 
+                                       FontsAvailEntry*  fontsAvailEntry )
 {
-        //FAE_fontID
-        //FAE_fileName
-        //ChunkHandle --> wird nicht gefüllt
-        return TT_Err_Ok;
+        FileHandle          fileHandle;
+        TT_Error            error;
+        TT_Face             face;
+        char                familyName[FAMILY_NAME_LENGTH];
+        word                familyNameLength;
+
+        ECCheckBounds( fileName );
+        ECCheckBounds( fontsAvailEntry );
+
+        if ( strlen( fileName ) >= FONT_FILE_LENGTH )
+                return TT_Err_Invalid_Argument;
+
+        fileHandle = FileOpen( fileName, FILE_ACCESS_R | FILE_DENY_W );
+        ECCheckFileHandle( fileHandle );
+
+        error = TT_Open_Face( fileHandle, &face );
+        if ( error != TT_Err_Ok )
+                goto Fail;
+
+        error = TT_Get_Name_String( face, NAME_INDEX_FAMILY, familyName, &familyNameLength );
+        if ( error != TT_Err_Ok )
+                goto Fin;
+
+        if ( isMappedFont( familyName ) )
+                fontsAvailEntry->FAE_fontID = getMappedFontID( familyName );
+        else
+                fontsAvailEntry->FAE_fontID = FM_TRUETYPE | ( 0x0fff & toHash ( familyName ));
+
+        strcpy ( fontsAvailEntry->FAE_fileName, fileName );
+        error = TT_Err_Ok;
+
+Fin:
+        TT_Close_Face( face );
+Fail:
+        FileClose( fileHandle, FALSE );
+        return error;
 }
 
 
@@ -370,6 +401,52 @@ TT_Error _pascal Gen_Path( const FontInfo* fontInfo, GStateHandle gstate, FontGe
         return TT_Err_Ok;
 }
 
+/*******************************************************************/
+/* Implemetation of helperfunctions                                */
+/*******************************************************************/
+
+static int toHash( const char* str )
+{
+        word    i;
+        dword   hash = strlen( str );
+
+        for ( i = 0; i < strlen( str ) ; i++ )
+		hash = ( hash * 7 ) % ( 2^16 ) + str[i];
+
+        return (int) hash;
+}
+
+static Boolean isMappedFont( const char* familiyName ) 
+{
+        //TODO: implement it
+        return FALSE;
+}
+
+static FontID getMappedFontID( const char* familyName )
+{ 
+        //TODO: implement it
+        //TODO: FontMaker austauschen
+        return (FontID) FID_DTC_URW_SANS;
+}
+
+/*******************************************************************/
+/* We cannot use functions from the Ansic library, which causes a  */
+/* cycle. Therefore, the required functions are reimplemented here.*/
+/*******************************************************************/
+
+static int strlen( const char* str )
+{
+        const char  *s;
+
+        for ( s = str; *s; ++s )
+                ;
+        return( s - str );
+}
+
+static void strcpy( char* dest, const char* source )
+{
+        while ((*dest++ = *source++) != '\0');
+}
 
 
 //füllen der fontsAvailEntry Struktur:
