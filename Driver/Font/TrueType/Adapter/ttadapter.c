@@ -135,10 +135,16 @@ TT_Error _pascal Fill_FontsAvailEntry( const char*       fileName,
         if ( error != TT_Err_Ok )
                 goto Fin;
 
+        if ( familyNameLength >= FAMILY_NAME_LENGTH )
+        {
+                error = TT_Err_Invalid_Argument;
+                goto Fin;
+        }
+
         if ( isMappedFont( familyName ) )
                 fontsAvailEntry->FAE_fontID = getMappedFontID( familyName );
         else
-                fontsAvailEntry->FAE_fontID = FM_TRUETYPE | ( 0x0fff & toHash ( familyName ));
+                fontsAvailEntry->FAE_fontID = MAKE_FONTID( familyName );
 
         strcpy ( fontsAvailEntry->FAE_fileName, fileName );
         error = TT_Err_Ok;
@@ -157,7 +163,7 @@ Fail:
  * SYNOPSIS:	  Fills the FontsInfo structure with infomations 
  *                of the passed in FontsAvailEntry.
  * 
- * PARAMETERS:    fontAvailEntry        Entry of font file
+ * PARAMETERS:    fileName              Name of font file
  *                fontInfo              Pointer to FontInfo structure 
  *                                      to fill.
  * 
@@ -173,10 +179,59 @@ Fail:
  *      11/12/22  JK        Initial Revision
  *******************************************************************/
 
-TT_Error _pascal Fill_FontInfo( const FontsAvailEntry* fontAvailEntry, FontInfo* fontInfo )
+TT_Error _pascal Fill_FontInfo( const char* fileName, FontInfo* fontInfo )
 {
-        //TBD
-        return TT_Err_Ok;
+        FileHandle          fileHandle;
+        TT_Error            error;
+        TT_Face             face;
+        TT_Face_Properties  faceProperties;
+        char                familyName[FAMILY_NAME_LENGTH];
+        word                familyNameLength;
+        
+        ECCheckBounds( fileName );
+        ECCheckBounds( fontInfo );
+
+        fileHandle = FileOpen( fileName, FILE_ACCESS_R | FILE_DENY_W );
+        ECCheckFileHandle( fileHandle );
+
+        error = TT_Open_Face( fileHandle, &face );
+        if ( error != TT_Err_Ok )
+                goto Fail;
+
+        error = TT_Get_Name_String( face, NAME_INDEX_FAMILY, familyName, &familyNameLength );
+        if ( error != TT_Err_Ok )
+                goto Fin;
+
+        if ( familyNameLength >= FAMILY_NAME_LENGTH )
+        {
+                error = TT_Err_Invalid_Argument;
+                goto Fin;
+        }
+
+        error = TT_Get_Face_Properties( face, &faceProperties );
+        if ( error != TT_Err_Ok )
+                goto Fin;
+
+        fontInfo->FI_family = mapFamilyClass( faceProperties.os2->sFamilyClass );
+
+        if ( isMappedFont( familyName ) )
+                fontInfo->FI_fontID = getMappedFontID( familyName );
+        else
+                fontInfo->FI_fontID = MAKE_FONTID( familyName );
+
+        fontInfo->FI_maker        = FM_TRUETYPE;
+        fontInfo->FI_pointSizeTab = 0;
+        fontInfo->FI_pointSizeEnd = 0;
+        fontInfo->FI_outlineTab   = 0;
+        fontInfo->FI_outlineEnd   = 0; 
+
+        error = TT_Err_Ok;
+        
+Fin:
+        TT_Close_Face( face );
+Fail:
+        FileClose( fileHandle, FALSE );
+        return error;
 }
 
 
@@ -427,6 +482,11 @@ static FontID getMappedFontID( const char* familyName )
         //TODO: implement it
         //TODO: FontMaker austauschen
         return (FontID) FID_DTC_URW_SANS;
+}
+
+static FontAttrs mapFamilyClass( TT_Short familyClass ) 
+{
+        return FA_OUTLINE;   
 }
 
 /*******************************************************************/

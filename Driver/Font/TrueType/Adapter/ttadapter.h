@@ -43,6 +43,9 @@ extern TEngine_Instance engineInstance;
 
 #define FAMILY_NAME_LENGTH         20
 
+
+#define MAKE_FONTID( family )      ( FM_TRUETYPE | ( 0x0fff & toHash ( family )))
+
 /***********************************************************************
  *      structures
  ***********************************************************************/
@@ -166,12 +169,19 @@ typedef struct
  *      helperfunctions
  ***********************************************************************/
 
-static Boolean isMappedFont( const char* familiyName );
-static FontID  getMappedFontID( const char* familyName );
-static int     toHash( const char* str );
+static Boolean  isMappedFont( const char* familiyName );
 
-static int     strlen( const char* str );
-static void    strcpy( char* dest, const char* source );
+static FontID   getMappedFontID( const char* familyName );
+
+static int      toHash( const char* str );
+
+static FontAttrs mapFamilyClass( TT_Short familyClass );
+
+
+
+static int       strlen( const char* str );
+
+static void      strcpy( char* dest, const char* source );
 
 #endif /* _TTADAPTER_H_ */
 
