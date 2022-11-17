@@ -241,7 +241,7 @@ Fail:
  * SYNOPSIS:	  Fills the OutlineDataEntry structure with infomations 
  *                of the passed in FontInfo.
  * 
- * PARAMETERS:    fontInfo              Pointer to FontInfo structure.
+ * PARAMETERS:    fontInfo              Name of font file.
  *                OutlineDataEntry      Pointer to OutlineDataEntry 
  *                                      structure to fill.
  * 
@@ -259,12 +259,19 @@ Fail:
 
 TT_Error _pascal Fill_OutlineDataEntry( const FontInfo* fontInfo, OutlineDataEntry* outlineDataEntry) 
 {
-        /* unklar: OutlineDataEntry, OutlineData */
+        FileHandle          fileHandle;
+        TT_Face             face;
+        TT_Error            error;
 
-        /* Warum wird im TrueTypeOutlineEntry der Filename gehalten? 
-           Wäre nicht das FileHandle sinvoller?
-           In der FontInfo steckt auch ein Filehandle! */
-        return TT_Err_Ok;
+
+
+        error = TT_Err_Ok;
+
+Fin:
+        TT_Close_Face( face );
+Fail:
+        FileClose( fileHandle, FALSE );
+        return error;
 }
 
 
@@ -274,7 +281,7 @@ TT_Error _pascal Fill_OutlineDataEntry( const FontInfo* fontInfo, OutlineDataEnt
  * SYNOPSIS:	  Fills the FontBuf structure with infomations 
  *                of the passed in FontInfo.
  * 
- * PARAMETERS:    fontInfo              Pointer to FontInfo structure.
+ * PARAMETERS:    fontName              Name of font file.
  *                fontBuf               Pointer to FontBuf structure 
  *                                      to fill.
  * 
@@ -289,14 +296,30 @@ TT_Error _pascal Fill_OutlineDataEntry( const FontInfo* fontInfo, OutlineDataEnt
  *      ----      ----      -----------
  *      11/12/22  JK        Initial Revision
  *******************************************************************/
-TT_Error _pascal Fill_FontBuf( const FontInfo* fontInfo, FontBuf* fontBuf ) 
+TT_Error _pascal Fill_FontBuf( const char* fileName, FontBuf* fontBuf ) 
 {
-        /* Hier ist für einige Felder der FontBuf Struktur nicht klar was erwartet wird.  */
-        /* Vielleicht hilft hier ein Blick in die Bitstream Sourcen. Ggf. müssen wir hier */
-        /* mit via try and error die richtgen Werte herausfinden.                         */
-        /* Beschreibung der TrueType Tabellen:                                            */
-        /* https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6.html    */
-        return TT_Err_Ok;
+        FileHandle          fileHandle;
+        TT_Error            error;
+        TT_Face             face;
+        TT_Face_Properties  faceProperties;
+        
+        ECCheckBounds( fileName );
+        ECCheckBounds( fontBuf );
+
+        fileHandle = FileOpen( fileName, FILE_ACCESS_R | FILE_DENY_W );
+        ECCheckFileHandle( fileHandle );
+
+        error = TT_Open_Face( fileHandle, &face );
+        if ( error != TT_Err_Ok )
+                goto Fail;
+
+        error = TT_Err_Ok;
+
+Fin:
+        TT_Close_Face( face );
+Fail:
+        FileClose( fileHandle, FALSE );
+        return error;
 }
 
 /********************************************************************
@@ -486,7 +509,45 @@ static FontID getMappedFontID( const char* familyName )
 
 static FontAttrs mapFamilyClass( TT_Short familyClass ) 
 {
-        return FA_OUTLINE;   
+        byte        class    = familyClass >> 8;
+        byte        subclass = (byte) familyClass & 0x00ff;
+        FontFamily  family;
+
+        switch ( class )
+        {
+        case 1:         //old style serifs
+        case 2:         //transitional serifs
+        case 3:         //modern serifs
+                family = FF_SERIF;
+                break;
+        case 4:         //clarendon serifs
+                family = subclass == 6 ? FF_MONO : FF_SERIF;
+                break;
+        case 5:         //slab serifs
+                family = subclass == 1 ? FF_MONO : FF_SERIF;
+                break;
+                        //6 = reserved
+        case 7:         //freeform serfis
+                family = FF_SERIF;
+                break;
+        case 8:         //sans serif
+                family = FF_SANS_SERIF;
+                break;
+        case 9:         //ornamentals
+                family = FF_ORNAMENT;
+                break;
+        case 10:        //scripts
+                family = FF_SCRIPT;
+                break;
+                        //11 = reserved
+        case 12:        //symbolic
+                family = FF_SYMBOL;
+                break;
+        default:
+                family = FF_NON_PORTABLE;
+        } 
+
+        return  FA_USEFUL | FA_OUTLINE | family;   
 }
 
 /*******************************************************************/

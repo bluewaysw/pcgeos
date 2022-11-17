@@ -112,9 +112,9 @@ typedef	struct
     WBFixed                     FB_maxwidth;
     WBFixed                     FB_heightAdjust;
     WBFixed                     FB_height;
-/*    FB_accent		WBFixed 	; height of accent portion.
-    FB_mean		WBFixed 	; top of lower case character boxes.
-    FB_baseAdjust	WBFixed		; offset to top of ascent
+    WBFixed                     FB_accent;
+    WBFixed                     FB_mean;
+/*    FB_baseAdjust	WBFixed		; offset to top of ascent
     FB_baselinePos	WBFixed 	; position of baseline from top of font
     FB_descent		WBFixed 	; maximum descent (from baseline)
     FB_extLeading	WBFixed 	; recommended external leading
