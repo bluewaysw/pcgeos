@@ -15,7 +15,7 @@
  *
  * DESCRIPTION:
  *	Declaration of global objects which are defined in assembler 
- *      and are also needed in c functions.
+ *  and are also needed in c functions.
  ***********************************************************************/
 #ifndef _TTADAPTER_H_
 #define _TTADAPTER_H_
@@ -50,6 +50,9 @@ extern TEngine_Instance engineInstance;
  *      structures
  ***********************************************************************/
 
+/*
+ * drivers FontsAvialEntry structure (see fontDr.def)
+ */
 typedef struct
 {
     FontID                      FAE_fontID;
@@ -62,6 +65,9 @@ typedef struct
 } FontsAvailEntry;
 
 
+/*
+ * drivers FontInfo structure (see fontDr.def)
+ */
 typedef struct
 {
     word                        FI_fileHandle;
@@ -84,26 +90,70 @@ typedef struct
 #endif
 } FontInfo;
 
+
+/*
+ * drivers TrueTypeOutlineEntry structure (see truetypeVariable.def)
+ */
 typedef struct
 {
-    char x;  //TBD
+#if DBCS_PCGEOS
+    wchar                       TTOE_fontFileName[FONT_FILE_LENGTH]
+#else
+    char                        TTOE_fontFileName[FONT_FILE_LENGTH];
+#endif
 } TrueTypeOutlineEntry;
 
+
+/*
+ * flags for describing rendered char (see fontDr.def)
+ */
+typedef ByteFlags CharTableFlags;
+#define CTF_NEGATIVE_LSB    0x40
+#define	CTF_ABOVE_ASCENT    0x20
+#define CTF_BELOW_DESCENT   0x10
+#define CTF_NO_DATA         0x08
+#define CTF_IS_FIRST_KERN   0x04
+#define	CTF_IS_SECOND_KERN  0x02
+#define	CTF_NOT_VISIBLE     0x01
+
+
+/*
+ * driver CharTableEntry structure (see fontDr.def)
+ */
 typedef struct 
 {
-    char x; //TBD
+    word                        CTE_dataOffset;   //nptr to data
+    WBFixed                     CTE_width;
+    CharTableFlags              CTE_flags;
+#ifndef  DBCS_PCGEOS
+    word                        CTE_usage;
+#endif
 } CharTableEntry;
 
 
-typedef enum
-{
-    //TBD
-    FGPF_SAVE_STATE = 0x00,
-    FGPF_POSTSCRIPT = 0x00,
-} FontGenPathFlags;
+/*
+ * flags for font transforming (see fontDr.def)
+ */
+typedef ByteFlags FontGenPathFlags;
+#define FGPF_SAVE_STATE     0x02
+#define FGPF_POSTSCRIPT     0x01
 
 
+/*
+ * flags for font information (see fontDr.def)
+ */
+typedef ByteFlags FontBufFlags;
+#define FBF_DEFAULT_FONT    0x80
+#define FBF_MAPPED_FONT     0x40
+#define FBF_IS_OUTLINE      0x10
+#define FBF_IS_REGION       0x08
+#define FBF_IS_COMPLEX      0x04
+#define	FBF_IS_INVALID      0x02
 
+
+/*
+ * drivers FontBuf structure (see frontDr.def)
+ */
 typedef	struct
 {
     word                        FB_dataSize;
@@ -114,44 +164,42 @@ typedef	struct
     WBFixed                     FB_height;
     WBFixed                     FB_accent;
     WBFixed                     FB_mean;
-/*    FB_baseAdjust	WBFixed		; offset to top of ascent
-    FB_baselinePos	WBFixed 	; position of baseline from top of font
-    FB_descent		WBFixed 	; maximum descent (from baseline)
-    FB_extLeading	WBFixed 	; recommended external leading
-    FB_kernCount	word		; number of kerning pairs
-    FB_kernPairPtr	nptr.KernPair	; offset to kerning pair table
-    FB_kernValuePtr	nptr.BBFixed	; offset to kerning value table
-if DBCS_PCGEOS
-    FB_firstChar	Chars		; first char in section
-    FB_lastChar		Chars		; last char in section
-    FB_defaultChar	Chars		; default character
-else
-    FB_firstChar	byte		; first char defined
-    FB_lastChar		byte		; last char defined
-    FB_defaultChar	byte		; default character
-endif
-    FB_underPos		WBFixed		; underline position (from baseline)
-    FB_underThickness	WBFixed		; underline thickness
-    FB_strikePos	WBFixed		; position of the strike-thru
-    FB_aboveBox		WBFixed		; maximum above font box
-    FB_belowBox		WBFixed		; maximum below font box
-	; Bounds are signed integers, in device coords, and are
-	; measured from the upper left of the font box where
-	; character drawing starts from.
-    FB_minLSB		sword		; minimum left side bearing
-    FB_minTSB		sword		; minimum top side bound
-if not DBCS_PCGEOS
-    FB_maxBSB		sword		; maximum bottom side bound
-    FB_maxRSB		sword		; maximum right side bound
-endif
-    FB_pixHeight	word		; height of font (invalid for rotation)
-    FB_flags		FontBufFlags	; special flags
-    FB_heapCount	word		; usage counter for this font
-    FB_charTable	CharTableEntry <>
-    */
+    WBFixed                     FB_baseAdjust;
+    WBFixed                     FB_baselinePos;
+    WBFixed                     FB_descent;
+    WBFixed                     FB_extLeading;
+    word                        FB_kernCount;
+    word                        FB_kernPairPtr;         //offset to kerning pair table
+    word                        FB_kernValuePtr;        //offset to kerning value table
+#ifdef DBCS_PCGEOS
+    wchar                       FB_firstChar;
+    wchar                       FB_lastChar;
+    wchar                       FB_defaultChar;
+#else
+    char                        FB_firstChar;
+    char                        FB_lastChar;
+    char                        FB_defaultChar;
+#endif
+    WBFixed                     FB_underPos;
+    WBFixed                     FB_underThickness;
+    WBFixed                     FB_strikePos;
+    WBFixed                     FB_aboveBox;
+    WBFixed                     FB_belowBox;
+    sword                       FB_minLSB;
+    sword                       FB_minTSB;
+#ifndef DBCS_PCGEOS
+    sword                       FB_maxBSB;
+    sword                       FB_maxRSB;
+#endif
+    word                        FB_pixHeight;
+    FontBufFlags                FB_flags;
+    word                        FB_heapCount;
 } FontBuf;
 
 
+/*
+ * drivers OutlineDataEntry structure (see fontDr.def)
+ */
 typedef struct
 {
     TextStyle                   ODE_style;
@@ -159,9 +207,9 @@ typedef struct
 #ifdef DBCS_PCGEOS
     word                        ODE_extraData;
 #else
-    TrueTypeOutlineEntry       ODE_header;
-    TrueTypeOutlineEntry       ODE_first;
-    TrueTypeOutlineEntry       ODE_second;
+    TrueTypeOutlineEntry        ODE_header;
+    TrueTypeOutlineEntry        ODE_first;
+    TrueTypeOutlineEntry        ODE_second;
 #endif
 } OutlineDataEntry;
 
@@ -169,19 +217,19 @@ typedef struct
  *      helperfunctions
  ***********************************************************************/
 
-static Boolean  isMappedFont( const char* familiyName );
+static Boolean      isMappedFont( const char* familiyName );
 
-static FontID   getMappedFontID( const char* familyName );
+static FontID       getMappedFontID( const char* familyName );
 
-static int      toHash( const char* str );
+static int          toHash( const char* str );
 
-static FontAttrs mapFamilyClass( TT_Short familyClass );
+static FontAttrs    mapFamilyClass( TT_Short familyClass );
 
 
 
-static int       strlen( const char* str );
+static int          strlen( const char* str );
 
-static void      strcpy( char* dest, const char* source );
+static void         strcpy( char* dest, const char* source );
 
 #endif /* _TTADAPTER_H_ */
 
