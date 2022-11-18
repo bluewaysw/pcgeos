@@ -3335,10 +3335,31 @@ PMAN <	mov	al, ds:[moCS_dsLightColor]	;else use light color	>
 OWOW_haveColor:
 	pop	ds
 endif		;END of CUA_STYLE specific code -------------------------------
+if _OL_STYLE
+	push	ds
+	mov	ax, dgroup			;get segment of core block
+	mov	ds, ax
+PrintMessage <POSSIBLE OPENLOOK BUG!>
+;a guess by Eric to get OpenLook onto Demo disk
+;	mov	al, ds:[moCS_lightColor]
+	mov	al, ds:[moCS_dsLightColor]
+	pop	ds
+endif
 
 afterColor::
 	mov	ah, mask CMM_ON_BLACK or CMT_CLOSEST
 afterWinColorFlagsSet::
+
+if _OL_STYLE	;START of OPEN LOOK specific code -----------------------------
+	; If shadowed, set transparent, because of non-rectangular drawing
+	; we do to make the neat shadow.
+	call	WinCommon_DerefVisSpec_DI
+	test	ds:[di].OLWI_attrs, mask OWA_SHADOW
+	jz	afterShadowTest
+
+	ORNF	ah, mask WCF_TRANSPARENT
+afterShadowTest:
+endif			;------------------------------------------------------
 
 	clr	bx			; no green or blue colors
 

@@ -145,6 +145,12 @@ EC <	call	VisCheckVisAssumption	;Make sure vis data exists	>
 
 	push	cx			;save OLBI_optFlags (in cl)
 
+OLS <	mov	bp, offset NormalCBR	;assume is normal button	>
+OLS <	test	bx, mask OLBSS_DEFAULT					>
+OLS <	jz	10$			;skip if is normal...		>
+OLS <	mov	bp, offset DefaultCBR	;is default button		>
+OLS <10$:								>
+
 if _MOTIF and (not _ODIE) ;----------------------------------------------------
 	;if this button can get the temporary default emphasis, draw using
 	;different region definitions (since we made the button bigger
@@ -477,6 +483,30 @@ if CURSOR_ON_BACKGROUND_COLOR and (not CURSOR_OUTSIDE_BOUNDS)	;--------------
 endif	; CURSOR_ON_BACKGROUND_COLOR and (not CURSOR_OUTSIDE_BOUNDS) ----------
 
 	;Draw moniker offset in X and centered in Y
+
+if _OL_STYLE	;--------------------------------------------------------------
+	mov	al, (J_LEFT shl offset DMF_X_JUST) or \
+		    (J_CENTER shl offset DMF_Y_JUST)
+	mov	dx, (BUTTON_INSET_Y shl 8)
+
+	push	di
+	mov	di, ds:[si]
+	add	di, ds:[di].Vis_offset	;ds:di = specificInstance
+if _GCM
+	test	ds:[di].OLBI_fixedAttrs, mask OLBFA_GCM_SYS_ICON
+	jnz	50$			;skip if is GCM header icon
+					;(want 0 spacing)...
+endif	; _GCM
+		
+	mov	dl, 6			;assume is Field Icon in header area
+	test	ds:[di].OLBI_specState, mask OLBSS_SYS_ICON
+	jnz	50$
+
+	mov	dl, BUTTON_INSET_X*2	;not system icon, use margin
+
+50$:
+	pop	di
+endif		;--------------------------------------------------------------
 
 if _MOTIF	;--------------------------------------------------------------
 	push	di
@@ -2176,17 +2206,26 @@ endif		;--------------------------------------------------------------
 
 	;Have ^lax:si point to the light colored portion of the mark bitmap
 	;and ^lax:bp point to the dark colored portion of the mark bitmap
-
+if _OL_STYLE
+	mov	bp, offset MenuDownMarkLightBitmap	;assume menu down mark
+	mov	si, offset MenuDownMarkDarkBitmap	;		       
+else
 MO <	mov	si, offset MenuDownMarkLightBitmap	;assume menu down mark>
 	mov	bp, offset MenuDownMarkDarkBitmap	;		       
+endif
 
 	test	bx, mask OLBSS_MENU_DOWN_MARK
 PMAN <	push	bx			;need to check for depressed later    >
 	pushf
 	jnz	10$							       
 
+if _OL_STYLE
+	mov	bp, offset MenuRightMarkLightBitmap	;assme menu right mark>
+	mov	si, offset MenuRightMarkDarkBitmap	;
+else
 MO <	mov	si, offset MenuRightMarkLightBitmap	;assme menu right mark>
 	mov	bp, offset MenuRightMarkDarkBitmap	;
+endif
 
 10$:
 
@@ -2214,8 +2253,9 @@ endif
 	add	bx, dx			;now centered in Y
 	add	ax, cx			;compute X position
 	sub	ax, OL_MARK_WIDTH + BUTTON_INSET_X
+OLS <	sub	ax, BUTTON_INSET_X >
 
-if _MOTIF		;------------------------------------------------------
+if _MOTIF or _OL_STYLE ;------------------------------------------------------
 	;Draw the lighter colored part of the bitmap (always in white)
 
 FXIP <	push	ax, bx							>

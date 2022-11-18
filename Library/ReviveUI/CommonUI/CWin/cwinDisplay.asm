@@ -80,6 +80,7 @@ OLDisplayWinInitialize	method dynamic	OLDisplayWinClass, MSG_META_INITIALIZE
 	;reset by superclass, so we set them again later
 
 CUAS <	mov	ds:[di].OLWI_type, MOWT_DISPLAY_WINDOW			>
+OLS <	mov	ds:[di].OLWI_type, OLWT_DISPLAY_WINDOW			>
 
 	;call superclass (do not call OpenWinInitialize directly!)
 
@@ -100,6 +101,17 @@ ODIE <	ANDNF	ds:[di].OLWI_attrs, not mask OWA_HAS_SYS_MENU		>
 CUAS <	mov	ds:[di].OLWI_type, MOWT_DISPLAY_WINDOW			>
 					; Store is base window
 
+OLS <	ORNF	ds:[di].OLWI_attrs, \
+					mask OWA_HEADER or \
+					mask OWA_TITLED or \
+					mask OWA_FOCUSABLE or \
+					mask OWA_MOVABLE or \
+					mask OWA_RESIZABLE or \
+					mask OWA_HAS_WIN_MENU or \
+					mask OWA_MINIMIZABLE or \
+					mask OWA_MAXIMIZABLE >
+OLS <	mov		ds:[di].OLWI_type, OLWT_DISPLAY_WINDOW			>
+
 	;See if GenDisplay is marked as allowing the user to be able to
 	;dismiss it.
 
@@ -113,6 +125,9 @@ CUAS <	mov	ds:[di].OLWI_type, MOWT_DISPLAY_WINDOW			>
 	;is dismissable:
 CUAS <					; Mark as closable		>
 CUAS <	ORNF	ds:[di].OLWI_attrs, mask OWA_CLOSABLE			>
+OLS <					; Mark as pinnable & pinned	>
+OLS <	ORNF	ds:[di].OLWI_attrs, mask OWA_PINNABLE			>
+OLS <	ORNF	ds:[di].OLWI_specState, mask OLWSS_PINNED		>
 
 OLDWI_30:
 

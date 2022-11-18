@@ -575,6 +575,16 @@ CUAS <	ORNF	ds:[di].OLWI_attrs, MO_ATTRS_COMMAND_WINDOW		>
 CUAS <	mov	ds:[di].OLWI_type, MOWT_COMMAND_WINDOW			>
 ODIE <	ANDNF	ds:[di].OLWI_attrs, not (mask OWA_MOVABLE or mask OWA_THICK_LINE_BORDER) >
 
+OLS <	ORNF	ds:[di].OLWI_attrs, mask OWA_HEADER or mask OWA_TITLED \
+			or mask OWA_FOCUSABLE or mask OWA_MOVABLE \
+			or mask OWA_PINNABLE or mask OWA_HAS_POPUP_MENU	>
+OLS <	ORNF	ds:[di].OLWI_fixedAttr, mask OWFA_LONG_TERM		>
+					; initialize as pinned
+
+					; Store is command window
+OLS <	mov	ds:[di].OLWI_type, OLWT_COMMAND_WINDOW			>
+
+
 	call	OLDialogWinScanGeometryHints
 
 	;Process alignment hints
@@ -665,6 +675,7 @@ endif
 
 					;Store is notice
 CUAS <	mov	ds:[di].OLWI_type, MOWT_NOTICE_WINDOW			>
+OLS <	mov	ds:[di].OLWI_type, OLWT_NOTICE_WINDOW			>
 
 	; Set visible instance data bit to override branch minimize
 	; behavior for this window -- i.e. if the primary it is within is

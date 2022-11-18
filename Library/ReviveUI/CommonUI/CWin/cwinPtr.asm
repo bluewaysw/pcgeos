@@ -1364,8 +1364,12 @@ calcPosition: ;get pointer position in document coords
 
 if	_OL_STYLE	;START of OPEN LOOK specific code ---------------------
 	;just a thin line
-	clr	bp			; rectangle, not a region
-	push	bp			;   (pass 0 address)
+;	clr	bp			; rectangle, not a region
+;	push	bp			;   (pass 0 address)
+;	push	bp
+	mov	bp, offset PrimaryResizeRegion
+	mov	si, handle PrimaryResizeRegion
+	push	si			; ^hsi:bp = region definition, push
 	push	bp
 endif		;END of OPEN LOOK specific code -------------------------------
 
@@ -1411,6 +1415,29 @@ done:
 	ret
 
 OpenWinDragSelect	endp
+
+if _OL_STYLE
+
+RESIZE_WIDTH	= 1
+
+;resize region for GenPrimaries, etc...
+
+FXIP<RegionResourceXIP	segment resource				>
+
+PrimaryResizeRegion	label	Region
+	word	PARAM_0, PARAM_1, PARAM_2-1, PARAM_3-1		;bounds
+
+	word	PARAM_1-1,					EOREGREC
+	word	PARAM_1+RESIZE_WIDTH-1, PARAM_0, PARAM_2-1,	EOREGREC
+	word	PARAM_3-RESIZE_WIDTH-1
+	word	    PARAM_0, PARAM_0+RESIZE_WIDTH-1
+	word	    PARAM_2-RESIZE_WIDTH, PARAM_2-1,		EOREGREC
+	word	PARAM_3-1, PARAM_0, PARAM_2-1,			EOREGREC
+	word	EOREGREC
+
+FXIP<RegionResourceXIP	ends				>
+
+endif
 
 if	_CUA_STYLE		;START of CUA/MOTIF specific code -----
 

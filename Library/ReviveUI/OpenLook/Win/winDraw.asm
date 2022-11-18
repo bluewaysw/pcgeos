@@ -1055,12 +1055,11 @@ OpenWinDrawBorder	proc	near
 	jz	noResize
 
 	;Draw resize border, from region def
-
 	push	si
 	push	ds
 	segmov	ds,cs
 	mov	si,offset ResizeRegionBlack
-	call	GrDrawRegionAtCP
+	call	GrDrawRegion
 	pop	ds
 	pop	si
 	jmp	short afterResize

@@ -1779,10 +1779,19 @@ removeOldVarData:
 doneWithRoundedCorner:
 endif	;_ROUND_THICK_DIALOGS
 
+OLS <	call	OpenWinAdjustTitleForHeaderMarks ;see OpenLook/Win/winClassSpec>
+
+	;OpenLook: enable and disable items in the Windows menu for this window.
+OLS <	call	OpenWinUpdateWindowMenuItems ;see OpenLook/Win/winClassSpec>
+
 	;and finally, if this is a GenPrimary window (OLBaseWin) which
 	;has the focus, then position the "Workspace" and "Applications" icons
 	;on the header area, further reducing the size of the title.
+if	 _OL_STYLE
+	call	WinCommon_DerefVisSpec_DI
+endif	;_OL_STYLE
 
+OLS <	cmp	ds:[di].OLWI_type, OLWT_BASE_WINDOW			>
 CUAS <	cmp	ds:[di].OLWI_type, MOWT_PRIMARY_WINDOW			>
 	jne	done
 
