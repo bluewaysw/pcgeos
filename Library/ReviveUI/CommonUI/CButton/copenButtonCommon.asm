@@ -2721,6 +2721,8 @@ endif
 if not _ASSUME_BW_ONLY 
 MO <	jnz	color				;skip to draw color button... >
 PMAN <	jnz	color				;skip to draw color button... >
+OL <	jnz	color				;skip to draw color button... >
+
 endif
 bw:
 						;draw black & white button

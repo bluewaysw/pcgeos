@@ -895,11 +895,13 @@ OLS <	ORNF	ds:[di].OLBI_specState, mask OLBSS_IN_MENU_BAR \
 
 CUAS <	ORNF	ds:[di].OLBI_specState, mask OLBSS_IN_MENU_BAR		>
 MAC <	ORNF	ds:[di].OLBI_specState, mask OLBSS_IN_MENU_BAR		>
+OLS < 	ORNF	ds:[di].OLBI_specState, mask OLBSS_IN_MENU_BAR or \
+					mask OLBSS_MENU_DOWN_MARK						>
 
 	; Odie: the menubar is also a menu
 ODIE <	ORNF	ds:[di].OLBI_specState, mask OLBSS_IN_MENU		>
 
-if (not _JEDIMOTIF) and (not _ODIE)	; menu bar buttons are bordered
+if (not _JEDIMOTIF) and (not _ODIE)	and (not _OPEN_LOOK); menu bar buttons are bordered
 	ANDNF	ds:[di].OLBI_specState, not mask OLBSS_BORDERED
 endif
 	ret

@@ -910,19 +910,23 @@ ReturnAxBpCxDx	proc	near
 	; Move margins from dl/dh/cl/ch to bp/dx/ax/cx.
 	;
 	clr	ax
-	mov	al, dl
+	mov	al, cl
 	tst	al
 	jns	1$
 	dec	ah
 1$:
 	mov	bp, ax
 	
-	mov	dl, dh
+	mov ax, dx
+
+	mov	dl, ch
 	clr	dh
 	tst	dl
 	jns	2$
 	dec	dh
 2$:
+	mov cx, ax
+	
 	clr	ax
 	mov	al, cl
 	tst	al

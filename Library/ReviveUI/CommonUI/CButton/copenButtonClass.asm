@@ -779,6 +779,12 @@ endif ; DRAW_STYLES
 5$:
 endif		;--------------------------------------------------------------
 
+if _OL_STYLE ;-------------------------------------------------------------
+
+	add	ax,BUTTON_INSET_X * 2
+5$:
+endif
+
 if _PM		;--------------------------------------------------------------
 	;if this button can get the temporary default emphasis, make it
 	;larger. The button draw code will chose the correct region to use.

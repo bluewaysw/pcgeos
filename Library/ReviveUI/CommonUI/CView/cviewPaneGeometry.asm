@@ -838,7 +838,7 @@ notText:
 	
 else ;=========================================================================
 
-if _CUA_STYLE	;-------------------------------------------------------------
+if _CUA_STYLE or _OL_STYLE	;-------------------------------------------------------------
 	clr	ax				;assume no frame
 	mov	di, ds:[si]			;point to instance
 	add	di, ds:[di].Gen_offset		;ds:[di] -- GenInstance
