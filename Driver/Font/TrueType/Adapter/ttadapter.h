@@ -42,6 +42,7 @@ extern TEngine_Instance engineInstance;
 #define FONT_FILE_LENGTH           FILE_LONGNAME_BUFFER_SIZE
 
 #define FAMILY_NAME_LENGTH         20
+#define STYLE_NAME_LENGTH          16
 
 
 #define MAKE_FONTID( family )      ( FM_TRUETYPE | ( 0x0fff & toHash ( family )))
@@ -70,7 +71,7 @@ typedef struct
  */
 typedef struct
 {
-    word                        FI_fileHandle;
+    FileHandle                  FI_fileHandle;
     word                        FI_RESIDENT;
     word                        FI_fontID;
     FontMaker                   FI_maker;
@@ -169,8 +170,8 @@ typedef	struct
     WBFixed                     FB_descent;
     WBFixed                     FB_extLeading;
     word                        FB_kernCount;
-    word                        FB_kernPairPtr;         //offset to kerning pair table
-    word                        FB_kernValuePtr;        //offset to kerning value table
+    word                        FB_kernPairPtr;     //offset to kerning pair table
+    word                        FB_kernValuePtr;    //offset to kerning value table
 #ifdef DBCS_PCGEOS
     wchar                       FB_firstChar;
     wchar                       FB_lastChar;
@@ -224,6 +225,10 @@ static FontID       getMappedFontID( const char* familyName );
 static int          toHash( const char* str );
 
 static FontAttrs    mapFamilyClass( TT_Short familyClass );
+
+static FontWeight   mapFontWeight( TT_Short weightClass );
+
+static TextStyle    mapTextStyle( const char* subfamily );
 
 
 

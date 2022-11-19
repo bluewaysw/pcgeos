@@ -99,6 +99,8 @@ TT_Error _pascal Exit_FreeType()
  * 
  * SIDE EFFECTS:  none
  * 
+ * CONDITION:     The current directory must be the ttf font directory.
+ * 
  * STRATEGY: 
  * 
  * TODO:          Prepare it for dbcs.  
@@ -146,7 +148,12 @@ TT_Error _pascal Fill_FontsAvailEntry( const char*       fileName,
         else
                 fontsAvailEntry->FAE_fontID = MAKE_FONTID( familyName );
 
+        /* We probably don't need this because we keep the file name in the */
+        /* TrueTypeOutlineEntry for each style.                             */
         strcpy ( fontsAvailEntry->FAE_fileName, fileName );
+
+        fontsAvailEntry->FAE_infoHandle = NullChunk;
+
         error = TT_Err_Ok;
 
 Fin:
@@ -170,6 +177,8 @@ Fail:
  * RETURNS:       TT_Error = FreeType errorcode (see tterrid.h)
  * 
  * SIDE EFFECTS:  none
+ * 
+ * CONDITION:     The current directory must be the ttf font directory.
  * 
  * STRATEGY:      
  * 
@@ -236,18 +245,22 @@ Fail:
 
 
 /********************************************************************
- *                      Fill_OutlineDataEntry
+ *                      Fill_OutlineData
  ********************************************************************
- * SYNOPSIS:	  Fills the OutlineDataEntry structure with infomations 
- *                of the passed in FontInfo.
+ * SYNOPSIS:	  Fills OutlineDataEntry and TrueTypeOutlineEntry
+ *                structure with infomations of the passed file.
  * 
- * PARAMETERS:    fontInfo              Name of font file.
- *                OutlineDataEntry      Pointer to OutlineDataEntry 
+ * PARAMETERS:    fileName              Name of font file.
+ *                outlineDataEntry      Pointer to OutlineDataEntry 
+ *                                      structure to fill.
+ *                trueTypeOutlineEntry  Pointer to TrueTypeOutlineEntry
  *                                      structure to fill.
  * 
  * RETURNS:       TT_Error = FreeType errorcode (see tterrid.h)
  * 
  * SIDE EFFECTS:  none
+ * 
+ * CONDITION:     The current directory must be the ttf font directory.
  * 
  * STRATEGY:      
  * 
@@ -257,13 +270,48 @@ Fail:
  *      11/12/22  JK        Initial Revision
  *******************************************************************/
 
-TT_Error _pascal Fill_OutlineDataEntry( const FontInfo* fontInfo, OutlineDataEntry* outlineDataEntry) 
+TT_Error _pascal Fill_OutlineData( const char*            fileName, 
+                                   OutlineDataEntry*      outlineDataEntry,
+                                   TrueTypeOutlineEntry*  trueTypeOutlineEntry ) 
 {
         FileHandle          fileHandle;
         TT_Face             face;
+        TT_Face_Properties  faceProperties;
+        char                styleName[STYLE_NAME_LENGTH];
+        word                styleNameLength;
         TT_Error            error;
 
+        ECCheckBounds( fileName );
+        ECCheckBounds( outlineDataEntry );
+        ECCheckBounds( trueTypeOutlineEntry );
 
+        fileHandle = FileOpen( fileName, FILE_ACCESS_R | FILE_DENY_W );
+        ECCheckFileHandle( fileHandle );
+
+        error = TT_Open_Face( fileHandle, &face );
+        if ( error != TT_Err_Ok )
+                goto Fail;
+
+        error = TT_Get_Name_String( face, NAME_INDEX_STYLE, styleName, &styleNameLength );
+        if ( error != TT_Err_Ok )
+                goto Fin;
+
+        if ( styleNameLength >= STYLE_NAME_LENGTH )
+        {
+                error = TT_Err_Invalid_Argument;
+                goto Fin;
+        }
+
+        error = TT_Get_Face_Properties( face, &faceProperties );
+        if ( error != TT_Err_Ok )
+                goto Fin;
+
+        /* fill outlineDataEntry */
+        outlineDataEntry->ODE_style  = mapTextStyle( styleName );
+        outlineDataEntry->ODE_weight = mapFontWeight( faceProperties.os2->usWeightClass );
+
+        /* fill trueTypeOutlineEntry */
+        strcpy( trueTypeOutlineEntry->TTOE_fontFileName, fileName );
 
         error = TT_Err_Ok;
 
@@ -278,16 +326,18 @@ Fail:
 /********************************************************************
  *                      Fill_FontBuf
  ********************************************************************
- * SYNOPSIS:	  Fills the FontBuf structure with infomations 
- *                of the passed in FontInfo.
+ * SYNOPSIS:	  Fills the FontBuf structure with informations 
+ *                of the passed in ttf fileo.
  * 
- * PARAMETERS:    fontName              Name of font file.
+ * PARAMETERS:    fileName              Name of font file.
  *                fontBuf               Pointer to FontBuf structure 
  *                                      to fill.
  * 
  * RETURNS:       TT_Error = FreeType errorcode (see tterrid.h)
  * 
  * SIDE EFFECTS:  none
+ * 
+ * CONDITION:     The current directory must be the ttf font directory.
  * 
  * STRATEGY:      
  * 
@@ -312,6 +362,13 @@ TT_Error _pascal Fill_FontBuf( const char* fileName, FontBuf* fontBuf )
         error = TT_Open_Face( fileHandle, &face );
         if ( error != TT_Err_Ok )
                 goto Fail;
+
+        fontBuf->FB_dataSize = sizeof( FontBuf );
+        fontBuf->FB_maker    = FM_TRUETYPE;
+
+        /*
+         * TBD
+         */
 
         error = TT_Err_Ok;
 
@@ -351,28 +408,42 @@ TT_Error _pascal Fill_CharTableEntry( const FontInfo* fontInfo, GStateHandle gst
 /* offen: Kerning */
 
 /********************************************************************
- *                      Fill_CharTableEntry
+ *                      Get_Char_Metrics
  ********************************************************************
- * SYNOPSIS:	  Fills the FontBuf structure with infomations 
- *                of the passed in FontInfo.
+ * SYNOPSIS:	  Returns the metics of the given char.
  * 
  * PARAMETERS:    fontInfo              Pointer to FontInfo structure.
  *                gstate                Handle to current gstate.
- *                result                Pointer in wicht the result will 
- *                                      stored.
+ *                character             Character from which the metrics 
+ *                                      are requested.
+ *                info                  Information to return.
+ *                result                Pointer in wich the result will 
+ *                                      stored. The result is not affected
+ *                                      by scaling, rotation, etc.
  * 
  * RETURNS:       TT_Error = FreeType errorcode (see tterrid.h)
  * 
  * SIDE EFFECTS:  none
  * 
- * STRATEGY:      Pointsize, scale and rotation will read from gstate.
+ * CONDITION:     The current directory must be the ttf font directory.
+ * 
+ * STRATEGY:      - find font-file for the requested style from fontInfo
+ *                - open outline of character in founded font-file
+ *                - calculate requested metrics and return it
+ * 
+ * TODO:          If we want to support fake styles, this must also 
+ *                be implemented here.
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
  *      11/12/22  JK        Initial Revision
  *******************************************************************/
-TT_Error Get_Char_Metrics( const FontInfo* fontInfo, word character,  GCM_info	info, dword* result ) 
+TT_Error Get_Char_Metrics( const FontInfo*  fontInfo, 
+                           GStateHandle     gstate, 
+                           word             character, 
+                           GCM_info         info, 
+                           dword*           result ) 
 {
         /* Api-Funktion für DR_FONT_GET_METRICS                                              */
         /* Transformationen werden nicht beachtet!!!                                         */
@@ -548,6 +619,18 @@ static FontAttrs mapFamilyClass( TT_Short familyClass )
         } 
 
         return  FA_USEFUL | FA_OUTLINE | family;   
+}
+
+static FontWeight mapFontWeight( TT_Short weightClass ) 
+{
+        //TBD
+        return FW_NORMAL;
+}
+
+static TextStyle mapTextStyle( const char* subfamily )
+{
+        //TBD
+        return TS_BOLD;
 }
 
 /*******************************************************************/
