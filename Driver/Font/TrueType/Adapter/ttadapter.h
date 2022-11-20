@@ -199,12 +199,27 @@ typedef	struct
 
 
 /*
+ * drivers AdjustedWeight structure
+ */
+typedef ByteEnum AdjustedWeight;
+#define AW_ULTRA_LIGHT          80
+#define AW_EXTRA_LIGHT		    85
+#define AW_LIGHT		        90
+#define AW_SEMI_LIGHT	        95
+#define AW_MEDIUM		        100
+#define AW_SEMI_BOLD	        105
+#define AW_BOLD		            110
+#define AW_EXTRA_BOLD	        115
+#define AW_ULTRA_BOLD	        120
+
+
+/*
  * drivers OutlineDataEntry structure (see fontDr.def)
  */
 typedef struct
 {
     TextStyle                   ODE_style;
-    FontWeight                  ODE_weight;
+    AdjustedWeight              ODE_weight;
 #ifdef DBCS_PCGEOS
     word                        ODE_extraData;
 #else

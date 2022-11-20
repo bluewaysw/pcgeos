@@ -368,6 +368,44 @@ TT_Error _pascal Fill_FontBuf( const char* fileName, FontBuf* fontBuf )
 
         /*
          * TBD
+
+        fontBuf->FB_avgwidth     = FaceProperties -> OS2 -> xAvgCharWidth
+        fontBuf->FB_maxwidth     = Kann wie folgt berechnet werden?
+                                   FaceProperties -> header -> 
+                                   ((xMax - xMin)/Units_Per_EM) * PointSize
+                                   (Wenn der Wert in Dokumentkoordinaten erwartet wird)
+        fontBuf->FB_heightAdjust = offset to top of font box -> ??? 
+        fontBuf->FB_height       = height of characters -> ??? Die Pointsize?
+        fontBuf->FB_accent       = height of accent point -> ???
+        fontBuf->FB_mean         = top of lower case character boxes -> ???
+        fontBuf->FB_baseAdjust   = offset to top of ascent -> ???
+        fontBuf->FB_baselinePos  = position of baseline from top of font -> ???
+        fontBuf->FB_descent      = maximum descent from baseline -> ???
+        fontBuf->FB_extLeading   = recommended external leading -> ???
+        fontBuf->FB_kernCount    = TT_Get_Kerning_Directory -> nTables
+        fontBuf->FB_kernPairPtr  = Pointer zu den KerningPairs
+        fontBuf->FB_kernValuePtr = Pointer zu den KerningValues
+
+        fontBuf->FB_firstChar    = FaceProperties -> OS2 -> usFirstCharIndex (TT_UShort)
+                                   (SBCS: Müssen wir die Anzahl der Zeichen im Font begrenzen?)
+        fontBuf->FB_lastChar     = FaceProperties -> OS2 -> usLastCharIndex (TT_UShort)
+                                   (SBCS: Müssen wir die Anzahl der Zeichen im Font begrenzen?)
+        fontBuf->FB_defaultChar  = default character -> ???
+                                   Hier können wir ein festes Zeichen vorgeben.
+
+        fontBuf->FB_underPos     = FacePorperties -> postscript -> underlinePosition (TT_FWord)
+        fontBuf->FB_underThickness = FaceProperties -> postscript -> underlineThickness (TT_FWord)
+        fontBuf->FB_strikePos    = FaceProperties -> OS2 -> yStrikeoutPosition (TT_Word)
+        fontBuf->FB_aboveBox     = maximum above box -> ???
+        fontBuf->FB_belowBox     = maximum below box -> ???
+        fontBuf->FB_minLSB       = FaceProperties -> horizontal -> min_Left_Side_Bearing (TT_FWord)
+        fontBuf->FB_minTSB       = FaceProperties -> vertical -> min_Top_Side_Bearing (TT_FWord)
+
+        fontBuf->FB_pixHeight    = height of font (invalid for rotation) -> ???
+                                   Vergleichbar wie FB_maxWidth berechnen?
+        fontBuf->FB_flags        = FBF_IS_OUTLINE | (je nach Bedarf FBF_IS_REGION) Weitere?
+        fontBuf->FB_heapCount    = ???
+
          */
 
         error = TT_Err_Ok;
@@ -621,10 +659,29 @@ static FontAttrs mapFamilyClass( TT_Short familyClass )
         return  FA_USEFUL | FA_OUTLINE | family;   
 }
 
-static FontWeight mapFontWeight( TT_Short weightClass ) 
+static AdjustedWeight mapFontWeight( TT_Short weightClass ) 
 {
-        //TBD
-        return FW_NORMAL;
+        switch (weightClass)
+        {
+        case 1:
+                return AW_ULTRA_LIGHT;
+        case 2:
+                return AW_EXTRA_LIGHT;
+        case 3:
+                return AW_LIGHT;
+        case 4:
+                return AW_SEMI_LIGHT;
+        case 5:
+                return AW_MEDIUM;
+        case 6:
+                return AW_SEMI_BOLD;
+        case 7:
+                return AW_BOLD;
+        case 8:
+                return AW_EXTRA_BOLD;
+        default:
+                return AW_ULTRA_BOLD;
+        }
 }
 
 static TextStyle mapTextStyle( const char* subfamily )
