@@ -374,7 +374,7 @@ TT_Error _pascal Fill_FontBuf( const char* fileName, FontBuf* fontBuf )
                                    FaceProperties -> header -> 
                                    ((xMax - xMin)/Units_Per_EM) * PointSize
                                    (Wenn der Wert in Dokumentkoordinaten erwartet wird)
-        fontBuf->FB_heightAdjust = offset to top of font box -> ??? 
+        fontBuf->FB_heightAdjust = Pointsize (siehe nimbusWidths.asm line 156) 
         fontBuf->FB_height       = height of characters -> ??? Die Pointsize?
         fontBuf->FB_accent       = height of accent point -> ???
         fontBuf->FB_mean         = top of lower case character boxes -> ???
@@ -442,6 +442,7 @@ TT_Error _pascal Fill_CharTableEntry( const FontInfo* fontInfo, GStateHandle gst
 
         return TT_Err_Ok;
 }
+
 
 /* offen: Kerning */
 
@@ -686,8 +687,19 @@ static AdjustedWeight mapFontWeight( TT_Short weightClass )
 
 static TextStyle mapTextStyle( const char* subfamily )
 {
-        //TBD
-        return TS_BOLD;
+        if ( strcmp( subfamily, "Regular" ) == 0 )
+                return 0x00;
+        if ( strcmp( subfamily, "Bold" ) == 0 )
+                return TS_BOLD;
+        if ( strcmp( subfamily, "Italic" ) == 0 )
+                return TS_ITALIC;
+        if ( strcmp( subfamily, "Bold Italic" ) == 0 )
+                return TS_BOLD | TS_ITALIC;
+        if ( strcmp( subfamily, "Oblique" ) == 0 )
+                return TS_ITALIC;
+        
+        /* only Bold Oblique remains */
+        return TS_BOLD | TS_ITALIC;
 }
 
 /*******************************************************************/
@@ -707,6 +719,16 @@ static int strlen( const char* str )
 static void strcpy( char* dest, const char* source )
 {
         while ((*dest++ = *source++) != '\0');
+}
+
+static int strcmp( const char* s1, const char* s2 )
+{
+    while ( *s1 && ( *s1 == *s2 ) )
+    {
+        s1++;
+        s2++;
+    }
+    return *(const unsigned char*)s1 - *(const unsigned char*)s2;
 }
 
 
