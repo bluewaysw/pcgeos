@@ -3,7 +3,7 @@
 # PROJECT:      gpcbrow
 # FILE:         WebMagi2.gp
 #
-# AUTHOR:       Marcus Gr�ber and Lysle Shields
+# AUTHOR:       Marcus Gröber and Lysle Shields
 #
 ##############################################################################
 
@@ -126,6 +126,7 @@ resource   TopIcons4Resource    lmem read-only shared
 resource   IconBarResource      ui-object
 
 resource   SimpleToolbarResource ui-object
+resource   ToolMonikerResource   ui-object
 
 ifdef GLOBAL_INTERNET_BUILD
 resource   HelpUIResource       ui-object
@@ -168,6 +169,7 @@ resource   FrameTemplateResource        object
 resource   CacheCleanupDialogResource   ui-object
 # only needed for COMPILE_OPTION_DOWNLOAD_PROGRESS_DIALOG
 resource   DownloadProgressDialogResource ui-object
+
 
 export     URLDocumentGroupClass
 export	   FastStatusClass
