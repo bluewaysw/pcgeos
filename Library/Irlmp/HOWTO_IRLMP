@@ -1,0 +1,184 @@
+
+Quick Programming Guide to IRLMP
+================================
+
+Author:		Steve Jang
+Date:		02/05/96
+Description:
+	This document quickly goes over general IRDA protocol and provides
+	a quick guide to programming with IrLMP.  Also, TinyTP guide should
+	be added to this document in due course.
+
+	I am writing to help people get started when writing applications for
+        IR medium, and also for those who are simply curious.  If you want
+	to find out more, get IrDA specification from somebody who has it
+	printed out or ftp it from hplose.hpl.hp.com( used id: irda, passwd:
+	TRansfeR ).
+
+	$Id: HOWTO_IRLMP,v 1.1.9.1 97/03/29 06:05:44 canavese Exp $
+
+-----------------------------------------------------------------------------
+
+Index
+=====
+
+1. What is IrLMP
+2. IrLMP service interface
+3. Programming with IrLMP
+
+
+
+1. What is IrLMP
+
+   IrLMP is the link management layer of IRDA communication protocol.  IRDA
+   stands for Infra-Red Data Association.  IRDA standard consists of physical
+   layer specification, IrLAP(Link Access Protocol), IrLMP/IrIAS, and
+   optionally TinyTP on top of it.  Physical Layer Specification specifies
+   acceptable hardware configuration( such as power outage, range, etc. which
+   only hardware manufacturers care about ).  IrLAP is the data link layer
+   that implements reliable data link over these IR ports specified in physical
+   layer.  IrLMP multiplexes link connection established by IrLAP and allows
+   multiple data connections over the same link.  IrIAS is a database that
+   stores services provided by a device, and can be queried from remote device
+   over an IrLMP connection.
+
+   Each IrLMP connection has 2 end points, local and remote( of course! ).
+   And these end points are called LSAPs.  You can send data from a local LSAP
+   to a remote LSAP that it is connected to.
+
+
+2. IrLMP service interface
+
+   [ Just read through even if you don't get it at first, but you will by the
+     time you reach the end of this section. ]
+
+   Each service may have the following actions:
+   req	= request	( local application makes a request )
+   ind	= indication	( remote application gets notified )
+   rsp	= response	( remote application replies to indication )
+   cnf	= confirmation	( local application received reply from remote )
+
+   I mean, 
+   data connection = IrLMP connection
+   link connection = IrLAP connection
+
+   Application API for services provided by IrLMP
+
+   2.1  discovery:   used to find out what applications are on the remote side
+   2.2  sniff:	     detect a remote device using least power
+   2.3  connect:     establish a data connection
+   2.4  disconnect:  terminate a data connection
+   2.5  status:	     check status of link connection
+   2.6  idle:	     indicate that a data connection is idle
+   2.7  access-mode: change between exclusive and multiplexed modes
+   2.8  data:	     send data
+   2.9  u-data:      send unreliable data to a certain end-point
+   2.10 connectionless-data: broadcast data
+
+   2.11 where things happen
+
+   The following diagram shows flow of information.
+   ---> indicates information flow and | means that information is processed.
+
+   For instance, for discovery, LSAP1 initiates discovery action, and query is
+   sent over to the other side, and it is processed by IrIAS/LMP layer, and
+   LSAP1 gets a reply from remote IrIAS/LMP.  Meanwhile, LSAP2 may be notified
+   by remote IrIAS/LMP layer, that discovery happened.
+
+   LSAP1/2 are equivalent to applications that use IrLMP layer.  This means
+   that if you get an indication from IrLMP that requires your response you
+   should respond to that indication by calling appropriate IrLMP routine
+   (see connect.req -> .ind -> .rsp -> .cnf sequence ).
+
+		IrIAS/					IrIAS/
+   LSAP1	IrLMP1	IrLAP1	<phy. medium>	IrLAP2	IrLMP2	LSAP2
+
+   discover.req ------------------------------------------>|-----> discover.ind
+   discover.cnf <------------------------------------------|
+   sniff.req    ---------------------------------->|
+   sniff.cnf    <----------------------------------|
+   connect.req  ------------------------------------------------>| connect.ind
+   connect.cnf  <------------------------------------------------|
+   disconn.req  -------------------------------------------------> disconn.ind
+   status.req   --------->|
+   status.cnf   <---------|
+   status.ind   <---------| if something happened at IrLAP layer
+   idle.req     ----|------------------------------------->|-----> idle.ind
+   idle.cnf     <---|
+   accessM.req  --->|------------------------------------->|-----> accessM.ind
+   accessM.cnf  <---|
+   data.req	-------------------------------------------------> data.ind
+   u-data.req	-------------------------------------------------> u-data.ind
+   cl-data.req  -------------------------------------------------> cl-data.ind
+
+
+3. Programming with IrLMP
+
+   This section illustrates how to use these IrLMP services to create an
+   application.  You can refer to irlmp.def in Include directory for the
+   current API.
+
+   3.1 Echoing a string
+
+   I will just take IrLMP test app to illustarte how to do things.  Let's
+   say, we want to implement an app that echoes back certain strings.
+   The app will compare the string it receives from the remote side and
+   compare it with echo string and if they are the same, it will send echo
+   string back to the sender.  To do this,
+
+   3.1.1 we need to register
+
+      call IrlmpRegister	; and provide callback routine and local
+				; LSAP id( see irlmp.def, certain numbers are
+				; already reserved for special purposes )
+
+      you will be receiving indications and confirmations through the callback
+      routine you provide in this step.  You are supposed to make this callback
+      routine as small as possible, so that lower level driver threads don't
+      get stuck in your callback for too long--this could be bad.  Save the
+      client handle that you get back from this routine.
+
+   3.1.2 we wait until the other side connects to us
+
+      When the other side connects to us, our callback routine will be called
+      with
+		di = IIC_CONNECT_INDICATION
+		si = client handle (you got this from IrlmpRegister)
+      You need to be ready to handle this case.  When you get this indication
+      you reply by:
+
+      call IrlmpConnectResponse	; cx:dx should point to a IrlmpDataArg
+				; this is used to send a small amount of
+				; data along with connect acknowledgement.
+				; this is used as signature or simply to
+				; piggyback some data.  The data size should be
+				; less than or equal to 60 bytes.
+
+      If we wanted to reject the connection, we would have done:
+
+      call IrlmpDisconnectRequest ; we need to do request if we didn't receive
+				  ; any indication for the same service.
+
+  3.1.3 now we are expecting some data to come over the data connection
+
+      Your callback will now be called with
+		di = IIC_DATA_INDICATION
+		si = client handle
+		cx:dx = IrlmpDataArgs
+      cx:dx.IDA_data contains the optr to real data.  You have to lock this
+      chunk(cx is block handle, dx is chunk handle )using HugeLMemLock, and
+      dereference in usual way.  Then you add IDA_dataOffset to the fptr and
+      you have the data at that address.  It is very IMPORTANT that you free
+      the chunk after using it by calling HugeLMemFree.  Or our memory will
+      get filled up and we'll die.
+
+  3.1.4 when you need to disconnect, you just request disconnect
+
+      call IrlmpDisconnetRequest ; this will terminate data connetion to your
+				 ; LSAP( the id you provided in register )
+
+  3.1.5 and make sure you unregister before quitting
+
+      call IrlmpUnregister
+   
+

@@ -14,6 +14,7 @@
 #       EB      2/23/94         Initial version
 #       NF      10/7/96         Changed tokenid to 8 and name to
 #                               client1.app. Added heapspace value.
+#	RainerB	4/21/2022	Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:
 #       This file contains Geode definitions for the "Client1" sample
@@ -76,7 +77,7 @@ library ui
 # object blocks, fixed code resources, or data resources that are read-only.
 # Standard discardable code resources do not need to be mentioned.
 #
-resource APPRESOURCE ui-object
-resource INTERFACE   ui-object
-resource STRINGS     lmem read-only shared
+resource AppResource ui-object
+resource Interface   ui-object
+resource Strings     lmem read-only shared
 

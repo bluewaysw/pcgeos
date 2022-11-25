@@ -12,6 +12,7 @@
 #       Name    Date            Description
 #       ----    ----            -----------
 #       TM      10/14/92        Initial version
+#	RainerB	4/27/2022	Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:
 #       This file contains Geode definitions for the "VarData" sample
@@ -74,8 +75,8 @@ library	ui
 # Resources: list all resource blocks which are used by the application.
 # (standard discardable code resources do not need to be mentioned).
 #
-resource APPRESOURCE ui-object
-resource INTERFACE   ui-object
+resource AppResource ui-object
+resource Interface   ui-object
 #
 # Any classed defined in this application must be exported here.
 #

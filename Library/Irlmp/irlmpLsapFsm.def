@@ -1,0 +1,249 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:	GEOS
+MODULE:		IrLMP Library
+FILE:		irlmpLsapFsm.def
+
+AUTHOR:		Chung Liu, Mar 15, 1995
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	CL	3/15/95   	Initial revision
+
+
+DESCRIPTION:
+	Class definition for LSAP Connection Control FSM.
+		
+	$Id: irlmpLsapFsm.def,v 1.1 97/04/05 01:07:32 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+LsapFsmClass		class	MetaClass
+
+;-------------------------------------------------------------------------
+;				Messages
+;-------------------------------------------------------------------------
+
+MSG_LF_CHECK_IF_CONNECTED			message
+;
+; Pass:		nothing
+; Return:	carry clear if not connected
+;		carry set if connected
+;
+
+MSG_LF_SET_ENDPOINT				message
+; Set the endpoint associated with the FSM.
+;
+; Pass:		dx 	= lptr endpoint
+; Return	nothing
+;
+
+LSAP_WATCHDOG_TIMER_INTERVAL	equ	1200		;30 secs.
+
+MSG_LF_WATCHDOG_TIMEOUT				message
+; Watchdog timer has expired.
+;
+; Pass:		nothing
+; Return: 	nothing
+;
+
+;-------------------------------------------------------------------------
+;			IrLMP primitives
+;-------------------------------------------------------------------------
+
+MSG_LF_LM_CONNECT_REQUEST			message
+; LM_Connect.request service primitive
+;
+; Source:	IrlmpConnectRequest
+; Pass:		cx:dx	= IrlmpConnectArgs
+; Return:	carry clear if okay:
+;			ax	= IE_SUCCESS
+;		carry set if error:
+;			ax	= IrlmpError
+;
+
+MSG_LF_LM_CONNECT_RESPONSE			message
+; LM_Connect.response service primitive
+;
+; Source:	IrlmpConnectResponse
+; Pass:		cx:dx	= IrlmpDataArgs
+; Return:	carry clear if okay:
+;			ax	= IE_SUCCESS
+;		carry set if error:
+;			ax	= IrlmpError
+;
+
+MSG_LF_LM_DISCONNECT_REQUEST			message
+; LM_Disconnect.request
+;
+; Source:	IrlmpDisconnectRequest
+; Pass:		cx:dx	= IrlmpDataArgs
+;		bp.low	= IrlmpDisconnectReason
+; Return:	carry clear if okay:
+;			ax	= IE_SUCCESS
+;		carry set if error:
+;			ax	= IrlmpError
+;
+
+MSG_LF_LM_DATA_REQUEST				message
+; LM_Data.request
+;
+; Source:	IrlmpDataRequest
+; Pass:		cx:dx	= IrlmpDataArgs
+; Return:	carry clear if okay:
+;			ax	= IE_SUCCESS
+;		carry set if error:
+;			ax	= IrlmpError
+;
+
+MSG_LF_LM_UDATA_REQUEST				message
+; LM_UData.request
+;
+; Source:	IrlmpUDataRequest
+; Pass:		cx:dx	= IrlmpDataArgs
+; Return:	carry clear if okay:
+;			ax	= IE_SUCCESS
+;		carry set if error:
+;			ax	= IrlmpError
+;
+
+MSG_LF_LM_STATUS_REQUEST			message
+; LM_Status.request
+;
+; Source:	IrlmpStatusRequest
+; Pass:		nothing
+; Return:	carry clear if okay:
+;			ax	= IE_SUCCESS
+;		carry set if error:
+;			ax	= IrlmpError
+;
+
+;--------------------------------------------------------------------------
+;			Inter-FSM messages
+;--------------------------------------------------------------------------
+MSG_LF_LS_CONNECT_CONFIRM			message
+;
+; Desc:		LS_Connect.confirm
+; Pass:		cxdx	= 32-bit IrLAP address
+; Return:	nothing
+;
+
+MSG_LF_LS_DISCONNECT_INDICATION			message
+;
+; Desc:		LS_Disconnect.indication
+; Pass:		dx	= IrlmpDisconnectReason
+; Return:	nothing
+;
+
+MSG_LF_LS_STATUS_INDICATION			message
+;
+; Desc:		LS_Status.indication
+; Pass:		cx	= IrlapStatusIndicationType
+; Return:	nothing
+;
+
+MSG_LF_LS_STATUS_CONFIRM			message
+;
+; Desc:		LS_Status.confirm
+; Pass:		cx	= ConnectionStatus
+; Return:	nothing
+;
+
+;-------------------------------------------------------------------------
+;			IrLAP Data Indication
+;-------------------------------------------------------------------------
+MSG_LF_IRLAP_DATA_INDICATION			message
+;
+; Desc:		IrLAP_Data.indication
+; Pass:		ss:bp	= IrlmpDataArgs
+;		ch	= dest. IrlmpLsapSel
+;		cl	= source IrlmpLsapSel
+; Return:	nothing
+;
+
+MSG_LF_IRLAP_EXPEDITED_DATA_INDICATION		message
+;
+; Desc:		IrLAP_Data.indication for expedited data.
+; Pass:		ss:bp	= IrlmpDataArgs for Data LM-PDU, expedited = true.
+;		ch	= dest. IrlmpLsapSel
+;		cl	= source IrlmpLsapSel
+; Return:	nothing
+;
+
+;-------------------------------------------------------------------------
+;			LSAP FSM states
+;-------------------------------------------------------------------------
+
+LsapFsmState		etype	word, 0
+	LFS_DISCONNECTED		enum LsapFsmState
+	; LSAP Connection does not exist.
+
+	LFS_CONNECT_PEND		enum LsapFsmState
+	; A Connect LM-PDU has been received and an LS_Connect.request has
+	; been issued to Station Control to bind the LSAP-connection to the 
+	; underlying IrLAP connection.  A response is awaited from Station
+	; Control. In practice the response will be nearly instantaneous
+	; since the IrLAP connection must have been open in order for the
+	; Connect LM-PDU to have been received.
+
+	LFS_CONNECT			enum LsapFsmState
+	; A LM_Connect.indication has been posted to the registered service
+	; user. Awaiting response from service user.
+
+	LFS_DATA_TRANSFER_READY	enum LsapFsmState
+	; An LSAP-connection has been established.  Ready for data transfer.
+
+	LFS_SETUP_PEND			enum LsapFsmState
+	; An LM_Connect.request has been received from the service user.
+	; A request has been sent to the Station Control FSM to set up the
+	; underlying IrLAP connection.
+
+	LFS_SETUP			enum LsapFsmState
+	; Station Control has set up the underlying IrLAP connection. A 
+	; request to open an LSAP connection has been transmitted to the 
+	; peer LSAP-connection control FSM.
+
+;-------------------------------------------------------------------------
+;			Instance data
+;-------------------------------------------------------------------------
+
+	LFI_state		LsapFsmState
+	LFI_clientHandle	word		0
+	; endpoint associated with this LsapFsm.
+
+	; user data to be transmitted with connect.
+	LFI_connectData		dword		0	;HugeLMem data
+	LFI_connectDataOffset	word		0
+	LFI_connectDataSize	word		0
+
+	; timer
+	LFI_watchdogTimer	hptr		0
+	LFI_watchdogTimerID	word		0
+
+LsapFsmClass		endc
+
+;-------------------------------------------------------------------------
+;
+;			Global Routines
+;
+;-------------------------------------------------------------------------
+
+LsapFsmCode	segment resource
+
+global	LsapFsmCreate:far
+global	LsapFsmDestroy:far
+global	LsapFsmGetByEndpoint:far
+global	LsapFsmCallByEndpoint:far
+global	LsapFsmCallByEndpointFixupDS:far
+global	LsapFsmSendByEndpointFixupDS:far
+global	LsapFsmSendByEndpointStack:far
+
+LsapFsmCode	ends
+

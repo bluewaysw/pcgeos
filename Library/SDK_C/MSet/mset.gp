@@ -45,20 +45,20 @@ library ui
 library ansic
 
 # this resource holds text strings for the controllers
-resource CONTROLSTRINGS         lmem      read-only shared
+resource ControlStrings         lmem      read-only shared
 
 # these resources hold monikers for the controllers
-resource COLORTOOLMONIKERRESOURCE lmem read-only shared
+resource ColorToolMonikerResource lmem read-only shared
 
 #   template resources for the MSetColorControlClass
 #   these resources are described in colorCtr.goc 
-resource MSETCOLORCONTROLUI     ui-object read-only shared
-resource MSETCOLORCONTROLTOOLUI ui-object read-only shared
+resource MSetColorControlUI     ui-object read-only shared
+resource MSetColorControlToolUI ui-object read-only shared
 
 #   template resources for the MSetPrecisionControlClass
 #   these resources are described in preciCtr.goc 
-resource MSETPRECISIONCONTROLUI     ui-object read-only shared
-resource MSETPRECISIONCONTROLTOOLUI ui-object read-only shared
+resource MSetPrecisionControlUI     ui-object read-only shared
+resource MSetPrecisionControlToolUI ui-object read-only shared
 
 #
 # Export classes
