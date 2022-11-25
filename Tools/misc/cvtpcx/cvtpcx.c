@@ -78,13 +78,8 @@ typedef struct {
 typedef struct {
     byte    	    PCXH_id;	    	/* Magic number: 0xa */
 
-#if defined _MSC_VER /* msc doesn't calculate size correctly with bit fields */
     byte            PCXH_version;       /* Version number */
     byte            PCXH_encoding;      /* Encoding style */
-#else
-    PCXVersions     PCXH_version:8; 	/* Version number */
-    PCXEncoding	    PCXH_encoding:8;	/* Encoding style */
-#endif /* defined _MSC_VER */
 
     byte    	    PCXH_bitsPerPixel;	/* Number of bits per pixel per plane*/
     word    	    PCXH_upLeftX,
@@ -94,21 +89,13 @@ typedef struct {
     word    	    PCXH_dispXRes,
 		    PCXH_dispYRes;
 
-#if 0
-    RGBValue	    PCXH_palette[16]; /* doesn't work on sun3 */
-#else
     byte    	    PCXH_palette[16*3];
-#endif /* 0 */
 
     byte    	    PCXH_reserved;
     byte    	    PCXH_planes;        /* planes per pixel */
     word    	    PCXH_bytesPerPlane;	/* Number of bytes in a line */
 
-#if defined _WIN32
     word            PCXH_paletteInfo;
-#else
-    PCXPaletteTypes PCXH_paletteInfo:16;
-#endif /* defined _WIN32 */
 
     byte    	    PCXH_reserved2[58];
 } PCXHeader;
@@ -134,12 +121,12 @@ typedef struct {
 #define C_YELLOW 14
 #define C_WHITE 15
 
-#define RC_BLACK 	0 
-#define RC_DARK_GRAY	2 
+#define RC_BLACK 	0
+#define RC_DARK_GRAY	2
 #define RC_LIGHT_GRAY	13
 #define RC_WHITE 	15
 
-static const byte GeosColorTable[] = { 
+static const byte GeosColorTable[] = {
 	0x00, 0x00, 0x00, 	/* C_BLACK	  */
 	0x00, 0x00, 0xaa,	/* C_BLUE	  */
 	0x00, 0xaa, 0x00,	/* C_GREEN	  */
@@ -181,11 +168,11 @@ static const byte GeosColorTable[] = {
 	0x00, 0x00, 0x00,	/* index 20 */
 	0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00,	
 	0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00,	
+	0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00,
 
 	/* 216 entries, evenly spaced throughout the RGB space */
 
@@ -469,12 +456,12 @@ char    	*mname = "";	    /* Name to give moniker */
 
 #define BITMAP_SIZE (6)	    /* Size of a simple bitmap header */
 
-/* 
- * allows us to print for ui or goc easily -- usually everything is the same 
- * but the string 
+/*
+ * allows us to print for ui or goc easily -- usually everything is the same
+ * but the string
  */
 #define UIC_OR_GOC_STRING(ui_string, goc_string)  \
-        ((flags & CVT_GOC_MODE) ? goc_string : ui_string) 
+        ((flags & CVT_GOC_MODE) ? goc_string : ui_string)
 
 #define UIC_FILE_SUFFIX "ui"
 #define GOC_FILE_SUFFIX "goh"
@@ -688,7 +675,7 @@ typedef struct {
  *	    	    and BitmapSpew
  * SIDE EFFECTS:    something be created, of course.
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -714,7 +701,7 @@ IconCreate(int	    width,
      */
     size = ((hasMask ? (width+7)/8 : 0) + ((width * bitsPerPixel) + 7)/8) *
 	height;
-    
+
 
     /*
      * Allocate everything we need in one block, so caller can just free
@@ -749,7 +736,7 @@ IconCreate(int	    width,
 	(byte **)(retval->compacted.data + (((2 * size) + 3) & ~3));
     retval->uncompacted.scanlines =
 	&retval->compacted.scanlines[height + (hasMask ? height : 0)];
-    
+
     /*
      * Initialize scanline 0 for each to point to the start of their data.
      */
@@ -767,7 +754,7 @@ IconCreate(int	    width,
 	height + (hasMask ? height : 0);
 
     retval->cvalid = TRUE;	/* Assume it will fit */
-			    
+
 
     return(retval);
 }
@@ -779,9 +766,9 @@ IconCreate(int	    width,
  * SYNOPSIS:	    Add another byte to the passed bitmap
  * CALLED BY:	    (INTERNAL)
  * RETURN:	    TRUE if byte could be added
- * SIDE EFFECTS:    
+ * SIDE EFFECTS:
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -791,8 +778,8 @@ IconCreate(int	    width,
  ***********************************************************************/
 #define BitmapAddByte(bm, b) \
 	((bm)->next != (bm)->end ? *(bm)->next++ = (b), TRUE : FALSE)
-								   
-	   
+
+
 #define BitmapEndScanline(bm) ((bm)->scanlines[++(bm)->curscan] = (bm)->next)
 
 
@@ -803,7 +790,7 @@ IconCreate(int	    width,
  *	    	    scanline by scanline.
  * CALLED BY:	    (INTERNAL)
  * RETURN:	    nothing
- * SIDE EFFECTS:    
+ * SIDE EFFECTS:
  *
  * STRATEGY:	    If we're in GOC mode, we can just spew things out
  *	    	    as 0x.. separated by commas, with no intro. For Esp,
@@ -830,7 +817,7 @@ BitmapSpew(Bitmap   *bm,
 	} else {
 	    fputs("\t\t", outf);
 	}
-	
+
 	for (i = 0; bp < bm->scanlines[scan+1]; bp++) {
 	    fprintf(outf, "0x%02x", *bp);
 	    if (bp+1 == bm->scanlines[scan+1]) {
@@ -849,7 +836,7 @@ BitmapSpew(Bitmap   *bm,
 	}
     }
 }
-    
+
 /******************************************************************************
  *
  *		      PCX -> PC/GEOS CONVERSION
@@ -943,12 +930,12 @@ CompactBytes(byte	    *bytes,
 
 
     nrp = nonrun;
-	
+
     while (j > 0) {
 	j--;
 	match = *bp++;
 	matchCount = 1;
-	    
+
 	while (j > 0 && *bp == match) {
 	    bp++;
 	    matchCount++;
@@ -957,14 +944,14 @@ CompactBytes(byte	    *bytes,
 		break;
 	    }
 	}
-	    
+
 	if (matchCount > 2) {
 	    /*
 	     * Flush previous non-run, if any.
 	     */
 	    if (nrp != nonrun) {
 		byte	*p;
-		    
+
 		for (p = nonrun; p != nrp; p++) {
 		    notfull = notfull && BitmapAddByte(bm, *p);
 		}
@@ -982,7 +969,7 @@ CompactBytes(byte	    *bytes,
 		 */
 		if (nrp != nonrun) {
 		    byte	*p;
-			
+
 		    for (p = nonrun; p != nrp; p++) {
 			notfull = notfull && BitmapAddByte(bm, *p);
 		    }
@@ -995,7 +982,7 @@ CompactBytes(byte	    *bytes,
 		 */
 		nonrun[0] += matchCount;
 	    }
-		
+
 	    /*
 	     * Copy the data into the non-run packet.
 	     */
@@ -1015,7 +1002,7 @@ CompactBytes(byte	    *bytes,
     }
     if (nrp != nonrun) {
 	byte    *p;
-	    
+
 	for (p = nonrun; p != nrp; p++) {
 	    notfull = notfull && BitmapAddByte(bm, *p);
 	}
@@ -1059,7 +1046,7 @@ static const byte responderMap[] = {
     RC_LIGHT_GRAY,     	/* C_YELLOW  */
     RC_WHITE     	/* C_WHITE  */
 };
-    
+
 byte
 MapPixelToResponder(byte rawPixel)
 {
@@ -1068,8 +1055,8 @@ MapPixelToResponder(byte rawPixel)
 	return(rawPixel);
     }
     if (responderMap[rawPixel] == 0xff) {
-	fprintf(stderr, 
-		"**** Error: Unmappable pixel value: %d ****\n", 
+	fprintf(stderr,
+		"**** Error: Unmappable pixel value: %d ****\n",
 		(int) rawPixel);
 	exit(1);
     }
@@ -1310,7 +1297,7 @@ readvga(FILE       *stream,
 	byte	*mp;	    /* Pointer into the mask array */
 	byte    b,  	    /* Current byte for the pixels array */
 		m;  	    /* Current byte for the mask array */
-	
+
 	/*
 	 * Fetch the next line of data.
 	 */
@@ -1396,12 +1383,12 @@ readvga(FILE       *stream,
 	    /*
 	     * Loop while we've got pixels to get
 	     */
-	    
+
 	    /*
 	     * fetch the next byte into b
 	     */
 	    b = *bp0;
-		
+
 	    /*
 	     * If current pixel matches the one we're masking out,
 	     * or if we've gone beyond the bounds of the picture, mask it
@@ -1409,7 +1396,7 @@ readvga(FILE       *stream,
 	     */
 	    m <<= 1;
 	    m |= ((b & 0xff) == maskout) ? 0 : ((y >= maxy) ? 0 : 1);
-		
+
 	    /*
 	     * If that finishes off the mask byte, store it.
 	     */
@@ -1417,7 +1404,7 @@ readvga(FILE       *stream,
 		*mp++ = m;
 		k = 8;
 	    }
-		
+
 	    /*
 	     * store b
 	     */
@@ -1480,7 +1467,7 @@ readvga(FILE       *stream,
 		 * If a pixel is white or the mask pixel, make the pixel 0.
 		 * Else make the pixel 1.
 		 */
-		
+
 		/*
 		 * Figure mask pixel for low and high nibbles (if pixel is
 		 * white or the mask, it gets a 0 in the bitmap). Since maskout
@@ -1545,7 +1532,7 @@ readvga(FILE       *stream,
 		    BitmapAddByte(&result->uncompacted, *bp0);
 		}
 		BitmapEndScanline(&result->uncompacted);
-		
+
 		result->cvalid = result->cvalid &&
 		    CompactBytes(mask, mp-mask, &result->compacted);
 
@@ -1562,11 +1549,11 @@ readvga(FILE       *stream,
 		             CompactBytes(pixels,
 					  pp-pixels,
 					  &result->compacted);
-	    
+
 	}
 	BitmapEndScanline(&result->uncompacted);
 	BitmapEndScanline(&result->compacted);
-	
+
     }
     free(planes);
     free(pixels);
@@ -1670,7 +1657,7 @@ readega(FILE	    *stream,
 			     * if b holds only the leftmost pixel, or
 			     * 1 if b holds both pixels */
 	int	bk; 	    /* The number of bits left at *bp[0-3] */
-	
+
 	/*
 	 * Fetch the next line of data.
 	 */
@@ -1696,7 +1683,7 @@ readega(FILE	    *stream,
 
 	pp = pixels;
 	mp = mask;
-	
+
 	if (xoffset < 0) {
 	    /*
 	     * Deal with negative x offset by zeroing the mask and the pixel
@@ -1792,7 +1779,7 @@ readega(FILE	    *stream,
 		b |= (*bp1 & 0x80) ? 1 : 0;
 		b <<= 1;
 		b |= (*bp0 & 0x80) ? 1 : 0;
-		
+
 		/*
 		 * If current pixel matches the one we're masking out,
 		 * or if we've gone beyond the bounds of the picture, mask it
@@ -1800,7 +1787,7 @@ readega(FILE	    *stream,
 		 */
 		m <<= 1;
 		m |= ((b&0xf) == maskout) ? 0 : ((y >= maxy) ? 0 : 1);
-		
+
 		/*
 		 * If that finishes off the mask byte, store it.
 		 */
@@ -1808,7 +1795,7 @@ readega(FILE	    *stream,
 		    *mp++ = m;
 		    k = 8;
 		}
-		
+
 		/*
 		 * If b contains a full pixel, store it
 		 */
@@ -1881,7 +1868,7 @@ readega(FILE	    *stream,
 		 * Else make the pixel 1.
 		 */
 		byte highmask, lowmask;
-		
+
 		/*
 		 * Figure mask pixel for low and high nibbles (if pixel is
 		 * white or the mask, it gets a 0 in the bitmap). Since maskout
@@ -1890,7 +1877,7 @@ readega(FILE	    *stream,
 		 * Added 10/19/90 for card decks... -- ardeb
 		 */
 		highmask = maskout << 4; lowmask = maskout & 0xf;
-		
+
 		m = 0;
 		for (pp = pixels, j = format->width, k = 8; j > 0; j -= 2) {
 		    m <<= 1;
@@ -1951,7 +1938,7 @@ readega(FILE	    *stream,
 		    BitmapAddByte(&result->uncompacted, *bp0);
 		}
 		BitmapEndScanline(&result->uncompacted);
-		
+
 		result->cvalid = result->cvalid &&
 		    CompactBytes(mask, mp-mask, &result->compacted);
 
@@ -1982,11 +1969,11 @@ readega(FILE	    *stream,
 	    }
 	    result->cvalid = result->cvalid &&
 		CompactBytes(pixels, pp-pixels, &result->compacted);
-	    
+
 	}
 	BitmapEndScanline(&result->uncompacted);
 	BitmapEndScanline(&result->compacted);
-	
+
     }
     free(planes);
     free(pixels);
@@ -2004,9 +1991,9 @@ readega(FILE	    *stream,
  * CALLED BY:	    (INTERNAL) EnterResource, ExitResource
  * RETURN:	    dynamically-allocated string with nary a lowercase
  *		    letter to be seen.
- * SIDE EFFECTS:    
+ * SIDE EFFECTS:
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -2042,7 +2029,7 @@ UpCase(const char *str)
  * RETURN:	    nothing
  * SIDE EFFECTS:    none
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -2082,7 +2069,7 @@ OutputCommentary(IconFormat *format, FILE *outf)
  * RETURN:	    nothing
  * SIDE EFFECTS:    none
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -2092,7 +2079,7 @@ OutputCommentary(IconFormat *format, FILE *outf)
  ***********************************************************************/
 static void
 EnterResource(IconFormat *format, FILE *outf)
-{    
+{
     if (!(flags & CVT_NO_RESOURCES)) {
 	switch(flags & CVT_MODE_FLAGS) {
 	case CVT_ESP_MODE:
@@ -2134,7 +2121,7 @@ EnterResource(IconFormat *format, FILE *outf)
  *		    some of the lines.
  * SIDE EFFECTS:    none
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -2287,7 +2274,7 @@ OpenChunk(IconFormat *format, int yoffset, int size, FILE *outf)
  * RETURN:	    nothing
  * SIDE EFFECTS:    none
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -2451,7 +2438,7 @@ OutputHeader(IconFormat *format,
  * RETURN:	    nothing
  * SIDE EFFECTS:    none
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -2503,7 +2490,7 @@ CloseChunk(IconFormat *format, FILE *outf)
  * RETURN:	    nothing
  * SIDE EFFECTS:    none
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -2513,7 +2500,7 @@ CloseChunk(IconFormat *format, FILE *outf)
  ***********************************************************************/
 static void
 ExitResource(IconFormat *format, FILE *outf)
-{    
+{
     if (!(flags & CVT_NO_RESOURCES)) {
 	switch(flags & CVT_MODE_FLAGS) {
 	case CVT_ESP_MODE:
@@ -2540,7 +2527,7 @@ ExitResource(IconFormat *format, FILE *outf)
  * RETURN:	    nothing
  * SIDE EFFECTS:    stuff is written to the output file.
  *
- * STRATEGY:	    
+ * STRATEGY:
  *
  * REVISION HISTORY:
  *	Name	Date		Description
@@ -2593,8 +2580,8 @@ ConvertFormat(FILE  	 *stream,  /* Input stream, positioned at start of
      * Figure how many bytes that is.
      */
     size = bm->next - bm->data;
-    
-    
+
+
     /*
      * Put out commentary saying where the thing came from.
      */
@@ -2776,7 +2763,7 @@ The following parameters are useful only for converting single icons:\n\
     -N	    	    	map the colors to the indices for the Nokia device\n\
 \n\
 \n");
-    fprintf(stderr, 
+    fprintf(stderr,
 	    "Once given, these parameters apply to all subsequent files, "
 	    "unless they\nare given again.\n");
     exit(1);
@@ -2803,7 +2790,7 @@ The following parameters are useful only for converting single icons:\n\
  *	    	    in which case the moniker is named <outfileRoot>Moniker,
  *	    	    where <outfileRoot> is all characters in <outfile> up to
  *	    	    the first period.
- *	    	    	
+ *
  * CALLED BY:	    User
  * RETURN:	    0, unless the user screwed up
  * SIDE EFFECTS:
@@ -2921,7 +2908,7 @@ main(int argc, char **argv)
 	    {
 		int	    	i;
 		char    	*abbrev;
-		
+
 		for (abbrev = &argv[ac][2]; *abbrev != '\0'; abbrev=cp) {
 		    /*
 		     * Find the next format abbreviation in the argument (up
@@ -2933,7 +2920,7 @@ main(int argc, char **argv)
 		    } else {
 			cp = abbrev + strlen(abbrev);
 		    }
-		    
+
 		    /*
 		     * Look for that format in the list of all known formats.
 		     */
@@ -2988,7 +2975,7 @@ main(int argc, char **argv)
 	    }
 
 	    inname = argv[ac];
-	    
+
 	    /*
 	     * ERROR-CHECKING
 	     */
@@ -3003,7 +2990,7 @@ main(int argc, char **argv)
 			    format.width);
 		    exit(1);
 		}
-	    
+
 		if (-yoffset > format.height) {
 		    fprintf(stderr,
 			    "What is the point of producing a completely blank "
@@ -3017,7 +3004,7 @@ main(int argc, char **argv)
 		flags |= CVT_NO_RESOURCES;
 	    }
 
-	    
+
 	    /*
 	     * Read in the header and make sure it makes sense.
 	     */
@@ -3037,7 +3024,7 @@ main(int argc, char **argv)
 			"bitmaps at this time. Sorry.\n");
 		goto file_err;
 	    }
-	    
+
 	    cp = index(argv[ac], '.');
 
 	    /*
@@ -3128,9 +3115,9 @@ main(int argc, char **argv)
 		}
 		ConvertFormat(stream, outf, xoffset, yoffset, &format);
 	    }
-	    
+
 	    fclose(outf);
-	    
+
 	    if (!ofile) {
 		free(outname);
 	    } else {

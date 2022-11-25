@@ -1,0 +1,377 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+
+PROJECT:	GEOS
+MODULE:		IAS
+FILE:		irlmpIas.def
+
+AUTHOR:		Chung Liu, May  2, 1995
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	CL	5/ 2/95   	Initial revision
+
+
+DESCRIPTION:
+	Information Access Service.
+		
+	$Id: irlmpIas.def,v 1.1 97/04/05 01:07:40 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+IasClientFsmClass		class	MetaClass
+
+MSG_ICF_INITIALIZE			message
+; Create secondary queue, clear pending event flag, create requesting set.
+;
+;	Pass:		nothing
+;	Return:		nothing
+;
+
+MSG_ICF_EXIT				message
+; Free the secondary queue, free requesting set.
+;
+;	Pass:		nothing
+;	Return:		nothing
+;
+
+MSG_ICF_CHANGE_STATE				message
+;
+; 	Pass:		dx = IasClientFsmState next state
+;	Return:		nothing
+;
+
+MSG_ICF_CALL_REQUEST				message
+;
+; 	Pass:		ss:bp	= ICFCallRequestArgs
+;				  contains:
+;				  Client handle of requesting endpoint.
+;				  IrlmpConnectArgs - Data arguments are for 
+;				  control byte plus arguments.
+;			dx	= number of parameters in bytes
+;	Return:		carry clear if okay:
+;				ax	= IE_SUCCESS
+;			carry set if error:
+;				ax	= IrlmpError
+
+ICFCallRequestArgs	struct
+
+	ICFCRA_connectArgs	IrlmpConnectArgs
+	ICFCRA_clientHandle	word
+
+ICFCallRequestArgs	ends
+
+
+MSG_ICF_GET_VALUE_BY_CLASS_REQUEST		message
+;
+;	Pass:		bp	= client handle
+;			cx:dx	= IrlmpGetValueByClassArgs
+;	Return:		carry clear if okay:
+;				ax	= IE_SUCCESS
+;			carry set if error:
+;				ax	= IrlmpError
+;
+
+MSG_ICF_LM_DISCONNECT_INDICATION		message
+;
+; 	Pass:
+;	Return:
+;
+
+MSG_ICF_LM_CONNECT_CONFIRM			message
+
+MSG_ICF_LM_DATA_INDICATION			message
+;
+;	Pass:		cx:dx	= IrlmpDataArgs
+;	Return:		nothing
+
+MSG_ICF_DISCONNECT_IAS				message
+;
+;	Pass:		bp	= client handle of requesting endpoint.
+;	Return:
+;
+
+	
+;-------------------------------------------------------------------------
+;			IAS Client FSM states
+;-------------------------------------------------------------------------
+
+IasClientFsmState	etype	word, 0
+	ICFS_DISCONNECTED		enum IasClientFsmState
+	; The device has no connection to a particular remote device
+
+	ICFS_CONNECTING			enum IasClientFsmState
+	; The device is waiting for the LSAP connection to be established
+
+	ICFS_MAKE_CALL			enum IasClientFsmState
+	; Processing the beginning of a call
+
+	ICFS_CALLING			enum IasClientFsmState
+	; Sending a multiple frame command
+
+	ICFS_OUTSTANDING		enum IasClientFsmState
+	; Waiting for the response to a command
+
+	ICFS_REPLYING			enum IasClientFsmState
+	; Collecting a multiple part response
+
+	ICFS_WAIT_FOR_CALL		enum IasClientFsmState
+	; waiting for a call-request primitive
+
+	ICFS_WAIT_ACTIVE		enum IasClientFsmState
+	; waiting for its connection to become active
+
+;-------------------------------------------------------------------------
+;			Instance data
+;-------------------------------------------------------------------------
+
+	ICFI_state			IasClientFsmState
+	; current state of the IAS Client FSM.
+
+	ICFI_secondaryQueue		hptr			0
+	; queue to hold pending events
+
+	ICFI_pendingFlag		word			0
+	; non-zero if pending events exist in ICFI_secondaryQueue
+
+	ICFI_clientHandle		word			0
+	; IAS's client handle with the Irlmp Library
+
+	ICFI_requestingClient		word			0
+	; client handle of endpoint which made IAS request
+
+	ICFI_dataSize			word		
+	ICFI_dataOffset			word		
+	ICFI_data			optr
+	; Used to store the IAP frame data for making the call request
+	; between the ICFS_DISCONNECTED and ICFS_MAKE_CALL states.
+
+	ICFI_frameSize			IrlapParamDataSize
+	ICFI_irlapAddr			dword
+	ICFI_requestingSet		word			0
+
+IasClientFsmClass		endc
+
+IasCode		segment resource
+
+global IasClientFsmSend:far
+
+IasCode		ends
+
+
+
+IasServerFsmClass		class	MetaClass
+
+MSG_ISF_CHANGE_STATE				message
+;
+; 	Pass:		dx = IasServerFsmState next state
+;	Return:		nothing
+;	Destroyed:	nothing
+;
+
+MSG_ISF_LM_DISCONNECT_INDICATION		message
+;
+; 	Pass:		cx = client handle
+;			ss:bp	= IrlmpDataArgs
+;			dx	= size IrlmpDataArgs
+;	Return:		nothing
+;	Destoryed:	nothing
+;
+
+MSG_ISF_CALL_RESPONSE				message
+;
+; Results of the current operation to be returned
+;
+; 	Pass:		cx:dx 	= IrlmpDataArgs
+;			bp	= client handle
+; 	Return:		carry clear on success
+;
+
+MSG_ISF_LM_CONNECT_INDICATION			message
+;
+; 	Pass:		cx	= client handle
+;			ss:bp	= IrlmpConnectArgs
+;			dx	= size IrlmpConnectArgs
+; 	Return:		nothing
+;
+
+MSG_ISF_LM_DATA_INDICATION			message
+;
+;	Pass:		cx	= client handle
+;			ss:bp	= IrlmpDataArgs
+;			dx	= size IrlmpDataArgs
+;	Return:		nothing
+;	Destoryed:	nothing
+;
+
+MSG_ISF_SET_SERVER_IRLMP_HANDLE			message
+;
+; Set the server's handle to the irlmp library
+;
+;	Pass:		cx	= handle to irlmp library
+;	Return:		nothing
+;	Destoryed:	nothing
+;
+
+;-----------------------------------------------------------------
+; The next few messages are for the buffers that hold
+; our response for the IAS query.  They will write data
+; to the buffers and send the data.
+;-----------------------------------------------------------------
+
+MSG_ISF_SEND_DATA				message
+;
+; Send some data to whoever we have a connection too.
+; The data will get buffered, and be sent out either after
+; a packet is full, or MSG_ISF_FLUSH_DATA is called
+;
+;	Pass:		dx:bp	= Data to pass
+; 			cx	= size of data
+;	Return:		nothing
+;	Destoryed:	nothing
+;
+
+MSG_ISF_FLUSH_DATA				message
+;
+; Send the data that we have flushed out to whoever we
+; are connected too.
+;
+;	Pass:		nothing
+; 	Return:		nothing
+;	Destoryed:	nothing
+;
+
+MSG_ISF_INSERT_DATA				message
+;
+; Insert some data into the stream. Used to write the control byte
+; or a count of the number of parameters.
+;
+;	Pass:		cx	= offset of data 
+;			dx	= data to write
+;			bp	= FALSE if writing byte
+;				= TRUE if writing word
+;	Return:		nothing
+;	Destroyed:	nothing
+;
+
+
+MSG_ISF_SEND_BYTE_OR_WORD			message
+;
+; Write one byte to the string.  This routine
+; is useful for just writing something quick,
+; without having to pass a buffer
+;
+;	Pass:		dx	= data to send
+;			bp	= FALSE if writing byte
+; 				= TRUE if writing word
+;	Return:		nothing
+;	Destoryed:	nothing
+
+MSG_ISF_SET_DATA_SIZE				message
+; Used when we don't want to start writing at the begining
+; of the data stream.  For stuff like the argument count
+; where we don't know what the value is until after
+; writing some stuff.  So we move the pointer up
+; so we can start writing data at a later point.
+;
+;	Pass:		cx	= size of data
+;	Return:		nothing
+;	Destoryed:	nothing
+;
+
+
+;-------------------------------------------------------------------------
+;			IAS Server FSM states
+;-------------------------------------------------------------------------
+
+IasServerFsmState	etype	word, 0
+	ISFS_DISCONNECTED		enum IasServerFsmState
+	; The device has no connection to a particular remote device
+
+	ISFS_WAITING			enum IasServerFsmState	
+	; The device is waiting for the frist frame of a command.
+	; The LSAP-connection is idle while in this state even 
+	; though the LM-idle.confirm(sucess, idle) event is only
+	; consumed when the state is left.
+
+	ISFS_WAIT_ACTIVE		enum IasServerFsmState	
+	; The device is waiting for the connection to become active.
+
+	ISFS_RECEIVING			enum IasServerFsmState
+	; The device is gathering the arguments of a multiple frame
+	; command.
+
+	ISFS_EXECUTE			enum IasServerFsmState	
+	; The device is performing an operation.
+
+	ISFS_RETURNING			enum IasServerFsmState	
+	; The device is sending a multiple frame response.
+	
+;-------------------------------------------------------------------------
+;			Instance data
+;-------------------------------------------------------------------------
+
+	ISFI_state			IasServerFsmState
+	; current state of the IAS Server FSM.
+
+	ISFI_serverHandle		word			0
+	; IAS's Server handle with the Irlmp Library
+
+	ISFI_frameSize			IrlapParamDataSize
+
+	ISFI_lastRequest		byte			0
+		
+	ISFI_packetList			lptr
+	; Lptr to a chunk array that keeps the list of packets
+
+	;
+	; These two guys hold the fptr to our buffered data
+	; and the optr to the buffered data.  The data is stored
+	; in a HugeLMem.  Being a fptr, the data shouldn't be around
+	; very long.
+	ISFI_currentPacket		fptr
+	ISFI_currentPacketOptr		optr
+	;
+	; Size of the data that's been written.
+	ISFI_currentPacketSize		word
+
+IasServerFsmClass		endc
+
+;
+; We make our own process class because after creating our IAS Server
+; Event thread we need to create an new object block run by that
+; thread.
+;
+
+IasServerProcessClass		class	ProcessClass
+
+IasServerProcessClass		endc
+
+IasCode		segment resource
+
+global IasServerCallback:far
+
+IasCode		ends
+
+idata	segment
+
+global iasServerSem:Semaphore	; semaphore to access these variables
+
+idata	ends
+
+udata	segment
+
+global iasServerThread:word
+global iasServerBlock:hptr
+global iasServerCount:word
+
+udata	ends
+
+

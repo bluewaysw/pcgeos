@@ -1,0 +1,278 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:	GEOS
+MODULE:		IrLMP Library
+FILE:		irlmpStationFsm.def
+
+AUTHOR:		Chung Liu, Mar 15, 1995
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	CL	3/15/95   	Initial revision
+
+
+DESCRIPTION:
+	Class definition for Station Control FSM.
+		
+NOTE ON PENDING EVENTS:
+	In the Station Control FSM, some events are not supposed to be 
+ 	handled while in certain states.  For example, 
+	LM_DiscoverDevices.request is supposed to be "left pending" 
+ 	in the DISCOVER and RESOLVE_ADDR states.  This means the event is
+ 	left alone on the queue, until a transition occurs to another state
+ 	that can handle the event.
+
+	Whenever an event is supposed to be "left pending", we actually 
+ 	add it to a secondary queue for the Station Control FSM.  Then,
+ 	each time there is a state transition, we take the secondary queue
+	and stuff its events back into the main queue.
+
+	$Id: irlmpStationFsm.def,v 1.1 97/04/05 01:07:30 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+StationFsmClass		class	MetaClass
+
+;---------------------------------------------------------------------------
+;			   Misc. Messages
+;---------------------------------------------------------------------------
+
+MSG_SF_INITIALIZE			message
+; Create a secondary queue, clear the pending event flag, and create the
+; DiscoveryLog chunk array.
+;
+; Pass:		nothing
+; Return:	nothing
+;
+
+MSG_SF_CLEANUP				message
+; Free the secondary queue and the DiscoveryLog chunk array.
+;
+; Pass:		nothing
+; Return:	nothing
+;
+
+MSG_SF_CHANGE_STATE			message
+; Change state, and check the pending event flag, flushing the secondary
+; queue if necessary.
+;
+; Pass:		dx 	= StationFsmState
+; Return: 	nothing
+;
+
+;---------------------------------------------------------------------------
+;			 User Requests
+;---------------------------------------------------------------------------
+
+MSG_SF_LM_DISCOVER_DEVICES_REQUEST		message
+; Initiate IrLAP discovery, or, if already connected, return results of 
+; last discovery.  
+;
+; Source:	IrlmpDiscoverDevicesRequest
+; Pass:		dx	= client handle
+;		cl	= IrlapUserTimeSlot
+; Return:	nothing
+; Destroy:	nothing
+;
+
+;-----------------------------------------------------------------------------
+;		IrLAP Indications and Confirmations
+;-----------------------------------------------------------------------------
+
+MSG_SF_IRLAP_CONNECT_INDICATION			message
+; IrLAP_CONNECT.indication 
+;
+; Pass:		cxdx	= 32-bit IrLAP address
+;		QOS in mystery register
+; Return:	nothing
+;
+
+MSG_SF_IRLAP_CONNECT_CONFIRM			message
+; IrLAP_CONNECT.confirm
+;
+; Pass:		QOS in mystery register
+; Return:	nothing
+; Destroy:	nothing
+;
+
+MSG_SF_IRLAP_DISCONNECT_INDICATION		message
+; IrLAP_DISCONNECT.indication 
+;
+; Pass:		dx	= IrlapCondition
+;				IC_CONECTION_FAILURE
+;				IC_CONNECTION_TIMEOUT
+;				IC_REMOTE_DISCONNECTION
+;				IC_MEDIA_BUSY
+;				IC_PRIMARY_CONFLICT
+; Return:	nothing
+; Destroy:	nothing
+;
+
+MSG_SF_IRLAP_DISCOVER_CONFIRM			message
+; IrLAP_DISCOVER.confirm
+;
+; Pass:		^hdx	= DiscoveryLogBlock
+; Return:	nothing
+;
+
+MSG_SF_IRLAP_DISCOVER_INDICATION		message
+; IrLAP_DISCOVER.indication
+;
+; Pass:		cx:dx	= DiscoveryLog from remote machine.
+; Return:	nothing
+;
+
+MSG_SF_IRLAP_STATUS_INDICATION			message
+; IrLAP_STATUS.indication
+;
+; Pass:		cx 	= IrlapStatusIndicationType
+; Return:	nothing
+; Destroy:	nothing
+;
+
+MSG_SF_IRLAP_STATUS_CONFIRM			message
+; IrLAP_STATUS.confirm
+;
+; Pass:		cx	= ConnectionStatus
+; Return:	nothing
+; Destroy:	nothing
+;
+
+MSG_SF_IRLAP_RESET_INDICATION			message
+; IrLAP_RESET.indication
+;
+; Pass:		nothing
+; Return:	nothing
+; Destroy:	nothing
+;
+
+MSG_SF_IRLAP_RESET_CONFIRM			message
+; IrLAP_RESET.confirm
+;
+; Pass:		nothing
+; Return:	nothing
+; Destroy:	nothing
+;
+
+MSG_SF_IRLAP_NEW_ADDRESS_CONFIRM		message
+; IrLAP_NEW_ADDRESS.confirm
+;
+; The IrLAP Driver issues a NII_DISCOVERY_CONFIRMATION for both discovery
+; and new address.  Thus this message is never called.
+;
+; Pass:		
+; Return:	nothing
+; Destroy:	nothing
+;
+
+;----------------------------------------------------------------------
+;   		     	Inter-FSM messages
+;----------------------------------------------------------------------
+	
+MSG_SF_LS_CONNECT_REQUEST			message
+; LS_Connect.request
+;
+; Source:	LSAP Connection Control FSM of client
+; Pass:		cxdx	= 32-bit IrLAP address
+;		bp	= lptr of endpoint which initiated request
+; Return:	nothing
+;
+
+MSG_SF_LS_DISCONNECT_REQUEST			message
+;
+; Desc:		LS_Disconnect.request
+; Source:	LSAP Connection Control FSM of client
+; Pass:		bp	= lptr of endpoint which initiated request
+;		cx	= non-zero to force IrLAP disconnect if bp is the
+;			  last connected endpoint.
+; Return:	nothing
+;
+
+MSG_SF_LS_STATUS_REQUEST			message
+;
+; Desc:		LS_Status.request
+; Source:	LSAP Connection Control FSM of client
+; Pass:		bp	= lptr of endpoint which initiated request
+; Return:	nothing
+;
+
+;---------------------------------------------------------------------------
+;			Station Control FSM states
+;---------------------------------------------------------------------------
+
+StationFsmState		etype	word, 0
+	SFS_READY		enum StationFsmState
+	; Station is ready for requests
+
+	SFS_DISCOVERY		enum StationFsmState
+	; A discovery request has been passed to IrLAP. Awaiting response
+	; from IrLAP.
+
+	SFS_RESOLVE_ADDRESS	enum StationFsmState
+	; One or more address conflicts were present in the discovery log.
+	; IrLAP address resolution process has been started to resolve one 
+	; of the conflicts.
+
+;---------------------------------------------------------------------------
+;			Instance data
+;---------------------------------------------------------------------------
+
+	SFI_state		StationFsmState	
+	; current state of the Station Control FSM
+	
+	SFI_secondaryQueue	hptr			0
+	; queue to hold pending events.
+
+	SFI_pendingFlag		word			0
+	; non-zero if pending events exist in ISC_secondaryQueue
+
+	SFI_discoveryCache	lptr.ChunkArrayHandle	0
+	; Chunk array of DiscoveryLog is cache of what was returned from 
+	; the last discovery performed.  Array is in the same block as the 
+	; StationFsm object.
+
+	SFI_discoveryRequester	word			0
+	; last endpoint to request discover, and thus due to receive
+	; a LM_discover.confirm.  
+
+StationFsmClass		endc
+
+;---------------------------------------------------------------------------
+;
+;				Global Routines
+;
+;---------------------------------------------------------------------------
+
+StationFsmCode	segment resource
+
+global	StationFsmCall:far
+global	StationFsmCallFixupDS:far
+;	Desc:	Call the Station Control FSM.
+;	Pass:	ax		= message
+;		cx,dx,bp	= arguments for message
+;	Return:	ax, bx, dx, bp	= depending on message
+;
+
+global	StationFsmSend:far
+global	StationFsmSendFixupDS:far
+;	Desc:	Send message to Station Control FSM.
+;	Pass:	ax		= message
+;		cx,dx,bp	= arguments for message
+;	Return:	nothing
+;
+global	StationFsmSendStack:far
+;	Desc:	Send message to Station Control FSM.
+;	Pass:	ax		= message
+;		ss:bp		= arguments on stack
+;		dx		= argument sizee
+;	Return:	nothing
+;
+
+StationFsmCode	ends
