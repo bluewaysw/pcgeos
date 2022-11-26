@@ -26,6 +26,7 @@
 #include <file.h>
 #include "../FreeType/freetype.h"
 #include "../FreeType/ttengine.h"
+#include "../FreeType/ttcalc.h"
 
 /***********************************************************************
  *      global dgoup objects
@@ -229,6 +230,12 @@ typedef struct
 #endif
 } OutlineDataEntry;
 
+
+/***********************************************************************
+ *      macros
+ ***********************************************************************/
+
+
 /***********************************************************************
  *      helperfunctions
  ***********************************************************************/
@@ -246,10 +253,18 @@ static FontWeight   mapFontWeight( TT_Short weightClass );
 static TextStyle    mapTextStyle( const char* subfamily );
 
 
-
 static int          strlen( const char* str );
 
 static void         strcpy( char* dest, const char* source );
+
+
+static void         f26dot6ToWBFixed( TT_F26Dot6 f26Dot6, WBFixed* wbFixed );
+
+static TT_F26Dot6   wBFixedToF26Dot6( WBFixed wbFixed );
+
+static TT_F26Dot6   scaleShort( TT_Short value, TT_F26Dot6 scale );
+
+static word         roundWBFixedToNearestWord( WBFixed wbFixed );
 
 #endif /* _TTADAPTER_H_ */
 

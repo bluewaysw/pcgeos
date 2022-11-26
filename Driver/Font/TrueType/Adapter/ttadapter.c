@@ -327,9 +327,10 @@ Fail:
  *                      Fill_FontBuf
  ********************************************************************
  * SYNOPSIS:	  Fills the FontBuf structure with informations 
- *                of the passed in ttf fileo.
+ *                of the passed in ttf file.
  * 
  * PARAMETERS:    fileName              Name of font file.
+ *                pointSize             Current Pointsize.
  *                fontBuf               Pointer to FontBuf structure 
  *                                      to fill.
  * 
@@ -346,12 +347,16 @@ Fail:
  *      ----      ----      -----------
  *      11/12/22  JK        Initial Revision
  *******************************************************************/
-TT_Error _pascal Fill_FontBuf( const char* fileName, FontBuf* fontBuf ) 
+TT_Error _pascal Fill_FontBuf( const char*  fileName, 
+                               WBFixed      pointSize, 
+                               FontBuf*     fontBuf ) 
 {
         FileHandle          fileHandle;
         TT_Error            error;
         TT_Face             face;
+        TT_Instance         instance;
         TT_Face_Properties  faceProperties;
+        TT_Instance_Metrics instanceMetrics;
         
         ECCheckBounds( fileName );
         ECCheckBounds( fontBuf );
@@ -363,28 +368,52 @@ TT_Error _pascal Fill_FontBuf( const char* fileName, FontBuf* fontBuf )
         if ( error != TT_Err_Ok )
                 goto Fail;
 
-        fontBuf->FB_dataSize = sizeof( FontBuf );
-        fontBuf->FB_maker    = FM_TRUETYPE;
+        //TODO: load instance and get scalefactor
+        error = TT_New_Instance( face, &instance );
+        if ( error )
+                goto Fail;
 
+        error = TT_Set_Instance_CharSize( instance, wBFixedToF26Dot6( pointSize ) );
+        if ( error )
+                goto Fail;
+
+        error = TT_Get_Instance_Metrics( instance, &instanceMetrics );
+        if ( error )
+                goto Fail;
+
+        /* Fill elements in FontBuf structure.                               */
+
+        fontBuf->FB_maker        = FM_TRUETYPE;
+        fontBuf->FB_kernPairPtr  = 0;
+        fontBuf->FB_kernValuePtr = 0;
+        fontBuf->FB_kernCount    = 0;
+        fontBuf->FB_heapCount    = 0;
+	
+        //TODO: mov	es:FB_flags, mask FBF_IS_OUTLINE
+
+        /* heightAdjust := size_per_em - fontSize                            */
+
+        /* height := height of characters aka current pointsize              */
+        fontBuf->FB_height.WBF_int  = pointSize.WBF_int;
+        fontBuf->FB_height.WBF_frac = pointSize.WBF_frac;
+
+        /* pixHeight := rounded pointsize to nearest word                    */
+        fontBuf->FB_pixHeight       = roundWBFixedToNearestWord( pointSize );
+        
         /*
          * TBD
-
-        fontBuf->FB_avgwidth     = FaceProperties -> OS2 -> xAvgCharWidth
+        fontBuf->FB_avgwidth     = scale ( FaceProperties -> OS2 -> xAvgCharWidth )
         fontBuf->FB_maxwidth     = Kann wie folgt berechnet werden?
                                    FaceProperties -> header -> 
                                    ((xMax - xMin)/Units_Per_EM) * PointSize
                                    (Wenn der Wert in Dokumentkoordinaten erwartet wird)
         fontBuf->FB_heightAdjust = Pointsize (siehe nimbusWidths.asm line 156) 
-        fontBuf->FB_height       = height of characters -> ??? Die Pointsize?
         fontBuf->FB_accent       = height of accent point -> ???
         fontBuf->FB_mean         = top of lower case character boxes -> ???
         fontBuf->FB_baseAdjust   = offset to top of ascent -> ???
         fontBuf->FB_baselinePos  = position of baseline from top of font -> ???
         fontBuf->FB_descent      = maximum descent from baseline -> ???
         fontBuf->FB_extLeading   = recommended external leading -> ???
-        fontBuf->FB_kernCount    = TT_Get_Kerning_Directory -> nTables
-        fontBuf->FB_kernPairPtr  = Pointer zu den KerningPairs
-        fontBuf->FB_kernValuePtr = Pointer zu den KerningValues
 
         fontBuf->FB_firstChar    = FaceProperties -> OS2 -> usFirstCharIndex (TT_UShort)
                                    (SBCS: Müssen wir die Anzahl der Zeichen im Font begrenzen?)
@@ -400,12 +429,7 @@ TT_Error _pascal Fill_FontBuf( const char* fileName, FontBuf* fontBuf )
         fontBuf->FB_belowBox     = maximum below box -> ???
         fontBuf->FB_minLSB       = FaceProperties -> horizontal -> min_Left_Side_Bearing (TT_FWord)
         fontBuf->FB_minTSB       = FaceProperties -> vertical -> min_Top_Side_Bearing (TT_FWord)
-
-        fontBuf->FB_pixHeight    = height of font (invalid for rotation) -> ???
-                                   Vergleichbar wie FB_maxWidth berechnen?
         fontBuf->FB_flags        = FBF_IS_OUTLINE | (je nach Bedarf FBF_IS_REGION) Weitere?
-        fontBuf->FB_heapCount    = ???
-
          */
 
         error = TT_Err_Ok;
@@ -684,6 +708,28 @@ static AdjustedWeight mapFontWeight( TT_Short weightClass )
                 return AW_ULTRA_BOLD;
         }
 }
+
+static void f26dot6ToWBFixed( TT_F26Dot6 f26Dot6, WBFixed* wbFixed )
+{
+        wbFixed->WBF_frac = f26Dot6 << 2;
+        wbFixed->WBF_int  = f26Dot6 >> 6;
+}
+
+static TT_F26Dot6 wBFixedToF26Dot6( WBFixed wbFixed )
+{
+        return ( ( (long)wbFixed.WBF_int ) * 1024 ) | wbFixed.WBF_frac >> 2;
+}
+
+static TT_F26Dot6 scaleShort( TT_Short value, TT_F26Dot6 scale )
+{
+        return TT_MulFix( INT_TO_F26DOT6( value ), scale );
+}
+
+static word roundWBFixedToNearestWord( WBFixed wbFixed ) 
+{
+        return wbFixed.WBF_frac >= 0x10 ? wbFixed.WBF_int + 1 : wbFixed.WBF_int;
+}
+
 
 static TextStyle mapTextStyle( const char* subfamily )
 {
