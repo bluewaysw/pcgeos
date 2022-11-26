@@ -115,7 +115,7 @@ export     FavoriteCreateDialogClass
 export     FavoriteCreateGroupDialogClass
 endif
 
-resource   ExpireDialogResource ui-object
+#resource   ExpireDialogResource ui-object
 resource   LocalUIResource      ui-object
 resource   HTMLMenuResource     ui-object
 
@@ -139,7 +139,7 @@ export     URLFrameClass
 export     URLTextClass
 export     URLFetchEngineClass
 export     ImportThreadEngineClass
-export     ExpireDialogClass
+#export     ExpireDialogClass
 export     StatusTextClass
 export     URLEntryClass
 ## ifndef GLOBAL_INTERNET_BUILD
