@@ -391,7 +391,7 @@ TT_Error _pascal Fill_FontBuf( const char*  fileName,
 	
         //TODO: mov	es:FB_flags, mask FBF_IS_OUTLINE
 
-        /* heightAdjust := size_per_em - fontSize                            */
+        /* heightAdjust := pointsize - hightSize                             */
 
         /* height := height of characters aka current pointsize              */
         fontBuf->FB_height.WBF_int  = pointSize.WBF_int;
