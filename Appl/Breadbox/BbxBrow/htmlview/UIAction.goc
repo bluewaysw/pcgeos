@@ -110,6 +110,17 @@ extern Boolean G_progressStatus;
 @extern object MainToolbar;
 @endif
 
+@ifdef COMPILE_OPTION_BIG_BUTTON_TOOLBAR
+@extern object IconBarBack;
+@extern object IconBarForward;
+@extern object IconBarReload;
+@extern object IconBarPrint;
+@extern object IconBarHome;
+@extern object IconBarHistory;
+@extern object IconBar;
+@extern object IconBarStop;
+@endif
+
 @ifdef COMPILE_OPTION_DOWNLOAD_PROGRESS_DIALOG
 @extern @object DownloadProgressDialog;
 @endif
@@ -122,98 +133,92 @@ extern Boolean G_progressStatus;
 @extern object CFSOpen;
 @extern object CustomFileSelDBox;
 
+
 void LOCAL EnabledOrNot(optr obj, word enable)
 {
     if(enable)
-      @send obj::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+        @send obj::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
     else
-      @send obj::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+        @send obj::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
 }
 
 void LOCAL UsableOrNot(optr obj, word enable)
 {
     if(enable)
-      @send obj::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+        @send obj::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
     else
-      @send obj::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+        @send obj::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
 }
 
 void UpdateNavigation(WordFlags flags)
 {
     word num;
 
+    num = HistoryGetEntryNum();
+
 @ifdef COMPILE_OPTION_SIMPLE_BUTTON_TOOLBAR
     EnabledOrNot(@SimpleToolbarBack,    (flags & HTML_HIST_BACK)) ;
+    EnabledOrNot(@SimpleToolbarNext,    (flags & HTML_HIST_FORWARD)) ;
+    EnabledOrNot(@SimpleToolbarReload,  (flags & HTML_HIST_CURRENT)) ;
+    EnabledOrNot(@SimpleToolbarHome,    (flags & HTML_HIST_HOME)) ;
 @endif
-    EnabledOrNot(@NavigateBack,         (flags & HTML_HIST_BACK));
+
 @ifdef COMPILE_OPTION_BIG_BUTTON_TOOLBAR
     EnabledOrNot(@IconBarBack,          (flags & HTML_HIST_BACK));
-@endif
-    EnabledOrNot(@NavigateBackBut,      (flags & HTML_HIST_BACK));
-    EnabledOrNot(@NavigateBackBut2,     (flags & HTML_HIST_BACK));
-
-@ifdef COMPILE_OPTION_SIMPLE_BUTTON_TOOLBAR
-    EnabledOrNot(@SimpleToolbarNext,    (flags & HTML_HIST_FORWARD)) ;
-@endif
-    EnabledOrNot(@NavigateForward,      (flags & HTML_HIST_FORWARD));
-@ifdef COMPILE_OPTION_BIG_BUTTON_TOOLBAR
     EnabledOrNot(@IconBarForward,       (flags & HTML_HIST_FORWARD));
-@endif
-    EnabledOrNot(@NavigateFwdBut,       (flags & HTML_HIST_FORWARD));
-    EnabledOrNot(@NavigateFwdBut2,      (flags & HTML_HIST_FORWARD));
-
-@ifdef COMPILE_OPTION_SIMPLE_BUTTON_TOOLBAR
-    EnabledOrNot(@SimpleToolbarReload,  (flags & HTML_HIST_CURRENT)) ;
-@endif
-    EnabledOrNot(@NavigateReload,       (flags & HTML_HIST_CURRENT));
-    EnabledOrNot(@newHomeTrigger,       (flags & HTML_HIST_CURRENT));
-@ifdef COMPILE_OPTION_BIG_BUTTON_TOOLBAR
     EnabledOrNot(@IconBarReload,        (flags & HTML_HIST_CURRENT));
     EnabledOrNot(@IconBarPrint,         (flags & HTML_HIST_CURRENT));
+    EnabledOrNot(@IconBarHome,          (flags & HTML_HIST_HOME));
+    EnabledOrNot(@IconBarHistory,       num);
+    EnabledOrNot(@HistoryList2,         num);
+    @send HistoryList2::MSG_GEN_DYNAMIC_LIST_INITIALIZE( num?num:1 );
+    if(num)                             /* first entry reflects current page */
+    {
+        @send HistoryList2::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE);
+    }
 @endif
-@ifdef COMPILE_OPTION_HTML_EDITOR
-    EnabledOrNot(@EditTrigger,          (flags & HTML_HIST_CURRENT));
-@endif
+
+@ifdef COMPILE_OPTION_LITTLE_BUTTON_TOOLBAR
+    EnabledOrNot(@NavigateBackBut,      (flags & HTML_HIST_BACK));
+    EnabledOrNot(@NavigateBackBut2,     (flags & HTML_HIST_BACK));
+    EnabledOrNot(@NavigateFwdBut,       (flags & HTML_HIST_FORWARD));
+    EnabledOrNot(@NavigateFwdBut2,      (flags & HTML_HIST_FORWARD));
     EnabledOrNot(@NavigateReloadBut,    (flags & HTML_HIST_CURRENT));
+    EnabledOrNot(@NavigateHomeBut,      (flags & HTML_HIST_HOME));
 @ifdef COMPILE_OPTION_HTML_EDITOR
     EnabledOrNot(@EditTriggerBut,       (flags & HTML_HIST_CURRENT));
 @endif
+    EnabledOrNot(@NavigateLoadGraphicsBut, (flags & HTML_HIST_LOAD_GR));
+    EnabledOrNot(@HistoryList2,         num);
+    @send HistoryList2::MSG_GEN_DYNAMIC_LIST_INITIALIZE( num?num:1 );
+    if(num)                             /* first entry reflects current page */
+    {
+        @send HistoryList2::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE);
+    }
+@endif
+
+    EnabledOrNot(@NavigateBack,         (flags & HTML_HIST_BACK));
+    EnabledOrNot(@NavigateForward,      (flags & HTML_HIST_FORWARD));
+    EnabledOrNot(@NavigateReload,       (flags & HTML_HIST_CURRENT));
+    EnabledOrNot(@NavigateHome,         (flags & HTML_HIST_HOME));
+    EnabledOrNot(@newHomeTrigger,       (flags & HTML_HIST_CURRENT));
+
+@ifdef COMPILE_OPTION_HTML_EDITOR
+    EnabledOrNot(@EditTrigger,          (flags & HTML_HIST_CURRENT));
+@endif
+
 @ifdef COMPILE_OPTION_LOCAL_PAGES
     EnabledOrNot(@LocalSaveTrigger,     (flags & HTML_HIST_CURRENT));
 @endif
+
     EnabledOrNot(@PrintControl,         (flags & HTML_HIST_CURRENT));
-
-@ifdef COMPILE_OPTION_SIMPLE_BUTTON_TOOLBAR
-    EnabledOrNot(@SimpleToolbarHome,    (flags & HTML_HIST_HOME)) ;
-@endif
-    EnabledOrNot(@NavigateHome,         (flags & HTML_HIST_HOME));
-@ifdef COMPILE_OPTION_BIG_BUTTON_TOOLBAR
-    EnabledOrNot(@IconBarHome,          (flags & HTML_HIST_HOME));
-@endif
-    EnabledOrNot(@NavigateHomeBut,      (flags & HTML_HIST_HOME));
-
-    EnabledOrNot(@NavigateLoadGraphicsNow,
-      (flags & HTML_HIST_LOAD_GR));
-    EnabledOrNot(@NavigateLoadGraphicsBut,
-      (flags & HTML_HIST_LOAD_GR));
-
-    num = HistoryGetEntryNum();
-
-@ifdef COMPILE_OPTION_BIG_BUTTON_TOOLBAR
-    EnabledOrNot(@IconBarHistory,       num);
-@endif
+    EnabledOrNot(@NavigateLoadGraphicsNow, (flags & HTML_HIST_LOAD_GR));
     EnabledOrNot(@HistoryList,          num);
-    EnabledOrNot(@HistoryList2,         num);
     @send HistoryList::MSG_GEN_DYNAMIC_LIST_INITIALIZE( num?num:1 );
-@ifdef COMPILE_OPTION_LITTLE_BUTTON_TOOLBAR
-    @send HistoryList2::MSG_GEN_DYNAMIC_LIST_INITIALIZE( num?num:1 );
-@endif
+
     if(num)                             /* first entry reflects current page */
     {
-      @send HistoryList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE);
-@ifdef COMPILE_OPTION_LITTLE_BUTTON_TOOLBAR
-      @send HistoryList2::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE);
-@endif
+        @send HistoryList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE);
     }
 }
 
@@ -240,37 +245,33 @@ void UpdateToggleBars(word toggleBars)
     /* Goto bar */
 @ifdef COMPILE_OPTION_TOGGLE_GOTO_BAR
     if (toggleBars & TOGGLE_BARS_GOTO_ON) {
-	/* update moniker */
-	@send ToggleGotoBar::MSG_GEN_USE_VIS_MONIKER(
-	    OptrToChunk(@HideGotoBarMoniker), VUM_DELAYED_VIA_APP_QUEUE);
-	/* add URL toolbar */
-	@send SimpleURLToolbar::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
-	/* remove Goto button in toolbar */
-	@send SimpleToolbarGoto::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+        /* update moniker */
+        @send ToggleGotoBar::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(@HideGotoBarMoniker), VUM_DELAYED_VIA_APP_QUEUE);
+        /* add URL toolbar */
+        @send SimpleURLToolbar::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+        /* remove Goto button in toolbar */
+        @send SimpleToolbarGoto::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
     } else {
-	/* update moniker */
-	@send ToggleGotoBar::MSG_GEN_USE_VIS_MONIKER(
-	    OptrToChunk(@ShowGotoBarMoniker), VUM_DELAYED_VIA_APP_QUEUE);
-	/* remove URL toolbar */
-	@send SimpleURLToolbar::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
-	/* add Goto button in toolbar */
-	@send SimpleToolbarGoto::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+        /* update moniker */
+        @send ToggleGotoBar::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(@ShowGotoBarMoniker), VUM_DELAYED_VIA_APP_QUEUE);
+        /* remove URL toolbar */
+        @send SimpleURLToolbar::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+        /* add Goto button in toolbar */
+        @send SimpleToolbarGoto::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
     }
 @endif
 @ifdef COMPILE_OPTION_TOGGLE_STATUS_BAR
     /* status bar */
     if (toggleBars & TOGGLE_BARS_STATUS_ON) {
-	/* update moniker */
-	@send ToggleStatusBar::MSG_GEN_USE_VIS_MONIKER(
-	    OptrToChunk(@HideStatusBarMoniker), VUM_DELAYED_VIA_APP_QUEUE);
-	/* add status bar */
-	@send StatusBar::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+        /* update moniker */
+        @send ToggleStatusBar::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(@HideStatusBarMoniker), VUM_DELAYED_VIA_APP_QUEUE);
+        /* add status bar */
+        @send StatusBar::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
     } else {
-	/* update moniker */
-	@send ToggleStatusBar::MSG_GEN_USE_VIS_MONIKER(
-	    OptrToChunk(@ShowStatusBarMoniker), VUM_NOW);
-	/* remove status bar */
-	@send StatusBar::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+        /* update moniker */
+        @send ToggleStatusBar::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(@ShowStatusBarMoniker), VUM_NOW);
+        /* remove status bar */
+        @send StatusBar::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
     }
 @endif
 }
@@ -286,23 +287,22 @@ Boolean HandleJumpword(TCHAR *url)
 {
     Boolean handled = FALSE;
 
-    if (!strchr(url, ':') && !strchr(url, '/') &&
-	!strchr(url, '.')) {
-	@call JumpEntry::MSG_VIS_TEXT_REPLACE_ALL_PTR(url, 0);
-	@call process::MSG_HMLVP_JUMP();
-	handled = TRUE;
+    if (!strchr(url, ':') && !strchr(url, '/') && !strchr(url, '.')) {
+        @call JumpEntry::MSG_VIS_TEXT_REPLACE_ALL_PTR(url, 0);
+        @call process::MSG_HMLVP_JUMP();
+        handled = TRUE;
     } else {
-	TCHAR *p = url, *q = url;
+        TCHAR *p = url, *q = url;
 
-	/* strip all spaces */
-	while (p && *p) {
-	    if (*p != C_SPACE) {
-		*q++ = *p++;
-	    } else {
-		p++;
-	    }
-	}
-	*q = C_NULL;
+        /* strip all spaces */
+        while (p && *p) {
+            if (*p != C_SPACE) {
+                *q++ = *p++;
+            } else {
+                p++;
+            }
+        }
+        *q = C_NULL;
     }
     return handled;
 }
@@ -319,18 +319,18 @@ Boolean HandleJumpword(TCHAR *url)
 @extern method HTMLVProcessClass, MSG_CUSTOM_OPEN_SELECTOR_ACTION
 {
 
-	/* was it a double click? */
-	if (GFS_GET_ENTRY_FLAGS(entryFlags) == GFSEF_OPEN) {
-		if (GFS_GET_ENTRY_TYPE(entryFlags) == GFSET_FILE)  {
-			@send, forceQueue process::MSG_CUSTOM_OPEN_HTML_DOC();
-			}
-		}
-	else  {  /* if not dbl click see if we're on a file */
-		if (GFS_GET_ENTRY_TYPE(entryFlags) == GFSET_FILE)
-			@send CFSOpen::MSG_GEN_SET_ENABLED(VUM_NOW);
-		else
-			@send CFSOpen::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
-		}
+    /* was it a double click? */
+    if (GFS_GET_ENTRY_FLAGS(entryFlags) == GFSEF_OPEN) {
+        if (GFS_GET_ENTRY_TYPE(entryFlags) == GFSET_FILE)  {
+            @send, forceQueue process::MSG_CUSTOM_OPEN_HTML_DOC();
+        }
+    }
+    else  {  /* if not dbl click see if we're on a file */
+        if (GFS_GET_ENTRY_TYPE(entryFlags) == GFSET_FILE)
+            @send CFSOpen::MSG_GEN_SET_ENABLED(VUM_NOW);
+        else
+            @send CFSOpen::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    }
 
 }
 
@@ -348,46 +348,43 @@ Boolean HandleJumpword(TCHAR *url)
  ***********************************************************************/
 @extern method HTMLVProcessClass, MSG_CUSTOM_OPEN_HTML_DOC
 {
- char				*relativePath, *standardPath, *endOfFullPath;
- word				bufSize = (2*PATH_LENGTH) + FILE_LONGNAME_BUFFER_SIZE;
+ char			*relativePath, *standardPath, *endOfFullPath;
+ word			bufSize = (2*PATH_LENGTH) + FILE_LONGNAME_BUFFER_SIZE;
  MemHandle		mh;
  ChunkHandle	chRelative, chStandard;
  DiskHandle		dhStandard;
  dword			relativePathInfo;
 
+    /* enter the file stuff */
+    @call CurrentURLText::MSG_VIS_TEXT_REPLACE_ALL_PTR("FILE:///", 8);
 
-	/* enter the file stuff */
-	@call CurrentURLText::MSG_VIS_TEXT_REPLACE_ALL_PTR("FILE:///", 8);
+    /* put together the drive ltr, path and file name stuff */
+    mh = MemAlloc((2*bufSize), HF_SWAPABLE, HAF_LOCK);
+    LMemInitHeap(mh, LMEM_TYPE_GENERAL, 0, sizeof(LMemBlockHeader),
+                                        2, STD_INIT_HEAP);
+    chRelative = LMemAlloc(mh, bufSize);
+    chStandard = LMemAlloc(mh, bufSize);
 
-	/* put together the drive ltr, path and file name stuff */
-	mh = MemAlloc((2*bufSize), HF_SWAPABLE, HAF_LOCK);
-	LMemInitHeap(mh, LMEM_TYPE_GENERAL, 0, sizeof(LMemBlockHeader),
-										2, STD_INIT_HEAP);
-	chRelative = LMemAlloc(mh, bufSize);
-	chStandard = LMemAlloc(mh, bufSize);
+    relativePath = LMemDeref(ConstructOptr(mh, chRelative));
+    standardPath = LMemDeref(ConstructOptr(mh, chStandard));
 
-	relativePath = LMemDeref(ConstructOptr(mh, chRelative));
-	standardPath = LMemDeref(ConstructOptr(mh, chStandard));
+    relativePathInfo = @call CustomFileSel::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(relativePath);
 
-	relativePathInfo = @call CustomFileSel::
-	     MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(relativePath);
+    dhStandard = GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE(relativePathInfo);
+    endOfFullPath = standardPath;
+    FileConstructFullPath(&endOfFullPath, bufSize, dhStandard, relativePath, TRUE);
 
-	dhStandard = GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE(relativePathInfo);
-	endOfFullPath = standardPath;
-	FileConstructFullPath(&endOfFullPath, bufSize, dhStandard,
-			  relativePath, TRUE);
+    /* and put it in the entry field */
+    @call CurrentURLText::MSG_VIS_TEXT_APPEND_PTR(standardPath, 0);
 
-	/* and put it in the entry field */
-	@call CurrentURLText::MSG_VIS_TEXT_APPEND_PTR(standardPath, 0);
+    MemUnlock(mh);   /*now unlock & free the block  */
+    MemFree(mh);
 
-	MemUnlock(mh);   /*now unlock & free the block  */
-	MemFree(mh);
+    /* dismiss the file selector box */
+    @send CustomFileSelDBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
 
-	/* dismiss the file selector box */
-	@send CustomFileSelDBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
-
-	/* and send the text apply message simulating the user pressing Enter */
-	@send process::MSG_HMLVP_URL_CHANGED(GTSF_MODIFIED);
+    /* and send the text apply message simulating the user pressing Enter */
+    @send process::MSG_HMLVP_URL_CHANGED(GTSF_MODIFIED);
 
 } /* MSG_CUSTOM_OPEN_HTML_DOC */
 
@@ -401,19 +398,21 @@ Boolean HandleJumpword(TCHAR *url)
     HWChecksumCheck() ;
     urlH = @call CurrentURLText::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
     urlP = MemLock(urlH);
+
     /* clear mod state so we can detect user changes during operation */
     @call CurrentURLText::MSG_VIS_TEXT_SET_NOT_USER_MODIFIED();
     HWChecksumCheck() ;
+
 @ifdef GLOBAL_INTERNET_BUILD
-     if (HandleJumpword(urlP)) {
-	 MemFree(urlH);
-	 return;
-     }
+    if (HandleJumpword(urlP)) {
+        MemFree(urlH);
+        return;
+    }
 @endif
+
     url = NamePoolTokenize(namePool, urlP, TRUE);
     MemFree(urlH);
-    evt = @record
-      URLDocumentClass::MSG_URL_DOCUMENT_LOAD_URL(url, DIR_GO);
+    evt = @record URLDocumentClass::MSG_URL_DOCUMENT_LOAD_URL(url, DIR_GO);
     HWChecksumCheck() ;
     @send application::MSG_META_SEND_CLASSED_EVENT(evt, TO_APP_MODEL);
                                         /* load new URL */
@@ -430,16 +429,15 @@ Boolean HandleJumpword(TCHAR *url)
     HWChecksumCheck() ;
     if(NavigateGetHome(&homeH))
     {
-      HWChecksumCheck() ;
-      homeP = MemLock(homeH);
-      /* clear mod state so we'll update URL with current page */
-      @call CurrentURLText::MSG_VIS_TEXT_SET_NOT_USER_MODIFIED();
-      url = NamePoolTokenize(namePool, homeP, TRUE);
-      MemFree(homeH);
-      evt = @record
-        URLDocumentClass::MSG_URL_DOCUMENT_LOAD_URL(url, DIR_GO);
-      @send application::MSG_META_SEND_CLASSED_EVENT(evt, TO_APP_MODEL);
-                                             /* load home URL if defined */
+        HWChecksumCheck() ;
+        homeP = MemLock(homeH);
+        /* clear mod state so we'll update URL with current page */
+        @call CurrentURLText::MSG_VIS_TEXT_SET_NOT_USER_MODIFIED();
+        url = NamePoolTokenize(namePool, homeP, TRUE);
+        MemFree(homeH);
+        evt = @record URLDocumentClass::MSG_URL_DOCUMENT_LOAD_URL(url, DIR_GO);
+        @send application::MSG_META_SEND_CLASSED_EVENT(evt, TO_APP_MODEL);
+                                                /* load home URL if defined */
     }
     HWChecksumCheck() ;
 }
@@ -454,18 +452,21 @@ Boolean HandleJumpword(TCHAR *url)
 
     gotoH = @call GotoEntry::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
     gotoP = MemLock(gotoH);
+
     if (!(*gotoP)) {
-	MemFree(gotoH);
-	return;
+        MemFree(gotoH);
+        return;
     }
+
 @ifdef GLOBAL_INTERNET_BUILD
-     if (HandleJumpword(gotoP)) {
-	 MemFree(gotoH);
-	 return;
-     }
+    if (HandleJumpword(gotoP)) {
+        MemFree(gotoH);
+        return;
+    }
     /* update with space-stripped version */
     @call GotoEntry::MSG_VIS_TEXT_REPLACE_ALL_PTR(gotoP, 0);
 @endif
+
     url = NamePoolTokenize(namePool, gotoP, TRUE);
     MemFree(gotoH);
     evt = @record URLDocumentClass::MSG_URL_DOCUMENT_LOAD_URL(url, DIR_GO);
@@ -481,61 +482,60 @@ Boolean HandleJumpword(TCHAR *url)
     TCHAR *jumpURL, *jumpArgP;
     NameToken url;
     EventHandle evt;
+
 #ifdef SECURE_INI_URLS
     word secureFlag = 0;
     static TCHAR defJumpURL[] = SECURE_INI_JUMP;
 #endif
 
-    if (!(InitFileReadStringBlock(HTMLVIEW_CATEGORY, "jumpURL",
-				  &jumpBlk, 0, &jumpSize)) && jumpBlk) {
+    if (!(InitFileReadStringBlock(HTMLVIEW_CATEGORY, "jumpURL", &jumpBlk, 0, &jumpSize)) && jumpBlk) {
 #ifdef SECURE_INI_URLS
-	InitFileReadInteger(HTMLVIEW_CATEGORY, SECURE_INI_KEY, &secureFlag);
-	if (secureFlag != SECURE_INI_FLAG) {
-	    MemFree(jumpBlk);
-	    jumpBlk = 0;
-	}
+        InitFileReadInteger(HTMLVIEW_CATEGORY, SECURE_INI_KEY, &secureFlag);
+        if (secureFlag != SECURE_INI_FLAG) {
+            MemFree(jumpBlk);
+            jumpBlk = 0;
+        }
     }
     /* if none or not valid, use default */
     if (!jumpBlk) {
-	jumpBlk = MemAlloc((strlen(defJumpURL)+1)*sizeof(TCHAR), HF_DYNAMIC, HAF_STANDARD);
-	if (jumpBlk) {
-	    jumpURL = MemLock(jumpBlk);
-	    strcpy(jumpURL, defJumpURL);
-	    jumpSize = strlen(jumpURL);
-	    MemUnlock(jumpBlk);
-	}
+        jumpBlk = MemAlloc((strlen(defJumpURL)+1)*sizeof(TCHAR), HF_DYNAMIC, HAF_STANDARD);
+        if (jumpBlk) {
+            jumpURL = MemLock(jumpBlk);
+            strcpy(jumpURL, defJumpURL);
+            jumpSize = strlen(jumpURL);
+            MemUnlock(jumpBlk);
+        }
     }
     /* process */
     if (jumpBlk) {
 #endif
-	if (jumpSize) {
-	    int jLen;
-	    jLen = @call JumpEntry::MSG_VIS_TEXT_GET_TEXT_SIZE();
-	    MemReAlloc(jumpBlk, jumpSize+((jLen+1)*sizeof(TCHAR)), HAF_STANDARD);
-	    jumpURL = MemLock(jumpBlk);
-	    jumpURLLen = strlen(jumpURL);
-	    /* append jumpword to jump URL, temporarily */
-	    @call JumpEntry::MSG_VIS_TEXT_GET_ALL_PTR(
-		jumpURL+jumpURLLen);
-	    /* URL-encode jumpword, if any */
-	    if (*(jumpURL+jumpURLLen)) {
-		jumpArgs = FormStringCreate();
-		FormStringConvertAndAppend(jumpArgs, jumpURL+jumpURLLen);
-		jumpArgP = MemLock(jumpArgs);
-		if (jumpArgP) {
-		    jumpArgP = FormStringDerefData(jumpArgs);
-		    /* append URL-encoded jumpword */
-		    strcpy(jumpURL+jumpURLLen, jumpArgP);
-		    url = NamePoolTokenize(namePool, jumpURL, TRUE);
-		    evt = @record URLDocumentClass::
-			MSG_URL_DOCUMENT_LOAD_URL(url, DIR_GO);
-		    @send application::MSG_META_SEND_CLASSED_EVENT(
-			evt, TO_APP_MODEL);
-		}
-		MemFree(jumpArgs);
-	    }
-	}
-	MemFree(jumpBlk);
+    if (jumpSize) {
+        int jLen;
+        jLen = @call JumpEntry::MSG_VIS_TEXT_GET_TEXT_SIZE();
+        MemReAlloc(jumpBlk, jumpSize+((jLen+1)*sizeof(TCHAR)), HAF_STANDARD);
+        jumpURL = MemLock(jumpBlk);
+        jumpURLLen = strlen(jumpURL);
+        /* append jumpword to jump URL, temporarily */
+        @call JumpEntry::MSG_VIS_TEXT_GET_ALL_PTR(
+        jumpURL+jumpURLLen);
+        /* URL-encode jumpword, if any */
+        if (*(jumpURL+jumpURLLen)) {
+            jumpArgs = FormStringCreate();
+            FormStringConvertAndAppend(jumpArgs, jumpURL+jumpURLLen);
+            jumpArgP = MemLock(jumpArgs);
+            if (jumpArgP) {
+                jumpArgP = FormStringDerefData(jumpArgs);
+                /* append URL-encoded jumpword */
+                strcpy(jumpURL+jumpURLLen, jumpArgP);
+                url = NamePoolTokenize(namePool, jumpURL, TRUE);
+                evt = @record URLDocumentClass::
+                MSG_URL_DOCUMENT_LOAD_URL(url, DIR_GO);
+                @send application::MSG_META_SEND_CLASSED_EVENT(evt, TO_APP_MODEL);
+            }
+            MemFree(jumpArgs);
+        }
+    }
+    MemFree(jumpBlk);
     }
 }
 
@@ -553,19 +553,16 @@ Boolean HandleJumpword(TCHAR *url)
 @else
     sprintf(searchKey, SEARCH_URL_TEMPLATE, type);
 @endif
-    if (!(InitFileReadStringBlock(HTMLVIEW_CATEGORY, searchKey,
-                &searchBlk, 0, &searchSize)) && searchBlk) {
-    if (searchSize) {
-        searchURL = MemLock(searchBlk);
-        if (searchURL) {
-        url = NamePoolTokenize(namePool, searchURL, TRUE);
-        evt = @record URLDocumentClass::MSG_URL_DOCUMENT_LOAD_URL(
-            url, DIR_GO);
-        @send application::MSG_META_SEND_CLASSED_EVENT(evt,
-                                   TO_APP_MODEL);
+    if (!(InitFileReadStringBlock(HTMLVIEW_CATEGORY, searchKey, &searchBlk, 0, &searchSize)) && searchBlk) {
+        if (searchSize) {
+            searchURL = MemLock(searchBlk);
+            if (searchURL) {
+                url = NamePoolTokenize(namePool, searchURL, TRUE);
+                evt = @record URLDocumentClass::MSG_URL_DOCUMENT_LOAD_URL(url, DIR_GO);
+                @send application::MSG_META_SEND_CLASSED_EVENT(evt, TO_APP_MODEL);
+            }
         }
-    }
-    MemFree(searchBlk);
+        MemFree(searchBlk);
     }
 }
 @endif
@@ -591,10 +588,10 @@ void MarkBusy(HTMLVApplicationInstance *p, optr app)
 {
 @ifdef JAVASCRIPT_SUPPORT
     if (@call WindowOpenWindow::MSG_VIS_GET_ATTRS() & VA_VISIBLE) {
-	@call app::MSG_GEN_APPLICATION_MARK_APP_COMPLETELY_BUSY();
-	p->HVAI_busy |= BF_COMPLETELY;
+        @call app::MSG_GEN_APPLICATION_MARK_APP_COMPLETELY_BUSY();
+        p->HVAI_busy |= BF_COMPLETELY;
     } else {
-	@call app::MSG_GEN_APPLICATION_MARK_BUSY();
+        @call app::MSG_GEN_APPLICATION_MARK_BUSY();
     }
 @else
     @call app::MSG_GEN_APPLICATION_MARK_BUSY();
@@ -605,10 +602,10 @@ void MarkNotBusy(HTMLVApplicationInstance *p, optr app)
 {
 @ifdef JAVASCRIPT_SUPPORT
     if (p->HVAI_busy & BF_COMPLETELY) {
-	@call app::MSG_GEN_APPLICATION_MARK_APP_NOT_COMPLETELY_BUSY();
-	p->HVAI_busy &= ~BF_COMPLETELY;
+        @call app::MSG_GEN_APPLICATION_MARK_APP_NOT_COMPLETELY_BUSY();
+        p->HVAI_busy &= ~BF_COMPLETELY;
     } else {
-	@call app::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+        @call app::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
     }
 @else
     @call app::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
@@ -618,14 +615,14 @@ void MarkNotBusy(HTMLVApplicationInstance *p, optr app)
 @extern method HTMLVApplicationClass, MSG_HMLVA_MARK_BUSY
 {
     if (!(pself->HVAI_busy & BF_BUSY)) {
-	if (!(pself->HVAI_busy & BF_OVERRIDE)) {
-	    MarkBusy(pself, oself);
-	}
-	pself->HVAI_busy |= BF_BUSY;
+        if (!(pself->HVAI_busy & BF_OVERRIDE)) {
+            MarkBusy(pself, oself);
+        }
+        pself->HVAI_busy |= BF_BUSY;
     } else {
-	if (pself->HVAI_busy & BF_OVERRIDE) {
-	    MarkBusy(pself, oself);
-	}
+        if (pself->HVAI_busy & BF_OVERRIDE) {
+            MarkBusy(pself, oself);
+        }
     }
     pself->HVAI_busy &= ~BF_OVERRIDE;
 }
@@ -633,10 +630,10 @@ void MarkNotBusy(HTMLVApplicationInstance *p, optr app)
 @extern method HTMLVApplicationClass, MSG_HMLVA_MARK_NOT_BUSY
 {
     if (pself->HVAI_busy & BF_BUSY) {
-	if (!(pself->HVAI_busy & BF_OVERRIDE)) {
-	    MarkNotBusy(pself, oself);
-	}
-	pself->HVAI_busy &= ~BF_BUSY;
+        if (!(pself->HVAI_busy & BF_OVERRIDE)) {
+            MarkNotBusy(pself, oself);
+        }
+        pself->HVAI_busy &= ~BF_BUSY;
     }
     pself->HVAI_busy &= ~BF_OVERRIDE;
 }
@@ -644,16 +641,16 @@ void MarkNotBusy(HTMLVApplicationInstance *p, optr app)
 @extern method HTMLVApplicationClass, MSG_HMLVA_OVERRIDE_BUSY
 {
     if ((pself->HVAI_busy & BF_BUSY) && !(pself->HVAI_busy & BF_OVERRIDE)) {
-	MarkNotBusy(pself, oself);
-	pself->HVAI_busy |= BF_OVERRIDE;
+        MarkNotBusy(pself, oself);
+        pself->HVAI_busy |= BF_OVERRIDE;
     }
 }
 
 @extern method HTMLVApplicationClass, MSG_HMLVA_RESTORE_BUSY
 {
     if ((pself->HVAI_busy & BF_BUSY) && (pself->HVAI_busy & BF_OVERRIDE)) {
-	MarkBusy(pself, oself);
-	pself->HVAI_busy &= ~BF_OVERRIDE;
+        MarkBusy(pself, oself);
+        pself->HVAI_busy &= ~BF_OVERRIDE;
     }
 }
 
@@ -697,8 +694,10 @@ void UpdateStop(Boolean enabled)
 @ifdef COMPILE_OPTION_BIG_BUTTON_TOOLBAR
     EnabledOrNot(@IconBarStop,       enabled);
 @endif
+@ifdef COMPILE_OPTION_LITTLE_BUTTON_TOOLBAR
     EnabledOrNot(@NavigateStopBut,   enabled);
     EnabledOrNot(@NavigateStopBut2,  enabled);
+@endif
 }
 
 
@@ -709,17 +708,19 @@ void UpdateStop(Boolean enabled)
 
     /* get current bar states */
     if (@call SimpleURLToolbar::MSG_GEN_GET_USABLE()) {
-	toggleBars |= TOGGLE_BARS_GOTO_ON;
+        toggleBars |= TOGGLE_BARS_GOTO_ON;
     }
     if (@call StatusBar::MSG_GEN_GET_USABLE()) {
-	toggleBars |= TOGGLE_BARS_STATUS_ON;
+        toggleBars |= TOGGLE_BARS_STATUS_ON;
     }
+
     /* toggle desired one */
     if (message == MSG_HMLVP_TOGGLE_GOTO_BAR) {
-	toggleBars ^= TOGGLE_BARS_GOTO_ON;
+        toggleBars ^= TOGGLE_BARS_GOTO_ON;
     } else {
-	toggleBars ^= TOGGLE_BARS_STATUS_ON;
+        toggleBars ^= TOGGLE_BARS_STATUS_ON;
     }
+
     /* update with new bar state */
     UpdateToggleBars(toggleBars);
 }
@@ -729,8 +730,7 @@ void UpdateStop(Boolean enabled)
 @extern method HTMLVProcessClass, MSG_HMLVP_OPTIONS_CHANGED
 {
     HWChecksumCheck() ;
-    if(modifiedBooleans & HTMLV_ENABLE_TOOLBAR)
-      UpdateToolbar(selectedBooleans & HTMLV_ENABLE_TOOLBAR);
+    if(modifiedBooleans & HTMLV_ENABLE_TOOLBAR) UpdateToolbar(selectedBooleans & HTMLV_ENABLE_TOOLBAR);
     HWChecksumCheck() ;
 }
 @endif
