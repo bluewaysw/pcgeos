@@ -368,7 +368,6 @@ TT_Error _pascal Fill_FontBuf( const char*  fileName,
         if ( error != TT_Err_Ok )
                 goto Fail;
 
-        //TODO: load instance and get scalefactor
         error = TT_New_Instance( face, &instance );
         if ( error )
                 goto Fail;
@@ -378,6 +377,10 @@ TT_Error _pascal Fill_FontBuf( const char*  fileName,
                 goto Fail;
 
         error = TT_Get_Instance_Metrics( instance, &instanceMetrics );
+        if ( error )
+                goto Fail;
+
+        error = TT_Get_Face_Properties( face, &faceProperties );
         if ( error )
                 goto Fail;
 
@@ -391,49 +394,52 @@ TT_Error _pascal Fill_FontBuf( const char*  fileName,
 	
         //TODO: mov	es:FB_flags, mask FBF_IS_OUTLINE
 
-        /* heightAdjust := pointsize - hightSize                             */
+        /* FB_minLSB       := scale( TT_Face_Properties->horizontal->min_Left_Side_Bearing )*/
 
-        /* height := height of characters aka current pointsize              */
-        fontBuf->FB_height.WBF_int  = pointSize.WBF_int;
-        fontBuf->FB_height.WBF_frac = pointSize.WBF_frac;
+        /* FB_avgWidth     := scale( TT_Face_Properties->OS2->aAvgCharWidth )  */
 
-        /* pixHeight := rounded pointsize to nearest word                    */
-        fontBuf->FB_pixHeight       = roundWBFixedToNearestWord( pointSize );
-        
-        /*
-         * TBD
-        fontBuf->FB_avgwidth     = scale ( FaceProperties -> OS2 -> xAvgCharWidth )
-        fontBuf->FB_maxwidth     = Kann wie folgt berechnet werden?
-                                   FaceProperties -> header -> 
-                                   ((xMax - xMin)/Units_Per_EM) * PointSize
-                                   (Wenn der Wert in Dokumentkoordinaten erwartet wird)
-        fontBuf->FB_heightAdjust = Pointsize (siehe nimbusWidths.asm line 156) 
-        fontBuf->FB_accent       = height of accent point -> ???
-        fontBuf->FB_mean         = top of lower case character boxes -> ???
-        fontBuf->FB_baseAdjust   = offset to top of ascent -> ???
-        fontBuf->FB_baselinePos  = position of baseline from top of font -> ???
-        fontBuf->FB_descent      = maximum descent from baseline -> ???
-        fontBuf->FB_extLeading   = recommended external leading -> ???
+        /* FB_maxWidth     := scale( TT_Face_Properties->header->yMax - yMin ) */
 
-        fontBuf->FB_firstChar    = FaceProperties -> OS2 -> usFirstCharIndex (TT_UShort)
-                                   (SBCS: Müssen wir die Anzahl der Zeichen im Font begrenzen?)
-        fontBuf->FB_lastChar     = FaceProperties -> OS2 -> usLastCharIndex (TT_UShort)
-                                   (SBCS: Müssen wir die Anzahl der Zeichen im Font begrenzen?)
-        fontBuf->FB_defaultChar  = default character -> ???
-                                   Hier können wir ein festes Zeichen vorgeben.
+        /* FB_maxRSB ??? gibt es in TT_Vertical_Header nicht */
 
-        fontBuf->FB_underPos     = FacePorperties -> postscript -> underlinePosition (TT_FWord)
-        fontBuf->FB_underThickness = FaceProperties -> postscript -> underlineThickness (TT_FWord)
-        fontBuf->FB_strikePos    = FaceProperties -> OS2 -> yStrikeoutPosition (TT_Word)
-        fontBuf->FB_aboveBox     = maximum above box -> ???
-        fontBuf->FB_belowBox     = maximum below box -> ???
-        fontBuf->FB_minLSB       = FaceProperties -> horizontal -> min_Left_Side_Bearing (TT_FWord)
-        fontBuf->FB_minTSB       = FaceProperties -> vertical -> min_Top_Side_Bearing (TT_FWord)
-        fontBuf->FB_flags        = FBF_IS_OUTLINE | (je nach Bedarf FBF_IS_REGION) Weitere?
-         */
+        /* FB_height       := scale( TT_Face_Properties->header->yMax )      */
 
+        /* FB_pixHeight    := round( pointsize )                             */
+        /*                  + scale( TT_Face_Properties->vertical->min_Top_Side_Bearing ) */
+
+        /* FB_heightAdjust := pointsize - FB_height                          */
+
+        /* FB_baseAdjust ??? gibt es in den TrueType Strukturen nicht */
+
+        /* FB_baselinePos  := scale( TT_Face_Properties->OS2->sTypoAscender )             */
+        /*                  + scale( TT_Face_Properties->OS2->usWinDescend )              */
+
+        /* FB_minTSB       := scale( TT_Face_Properties->vertical->min_Top_Side_Bearing ) */
+
+        /* FB_maxBSB ??? gibt es in den TrueType Strukturen nicht */
+
+        /* FB_underPos     := scale( TT_Face_Properties->postscript->underlinePosition )  */
+
+        /* FB_underThick   := scale( TT_Face_Properties->postscript->underlineThickness ) */
+
+        /* FB_strikePos    := scale( TT_Face_Properties->OS2->yStrikeoutPosition )        */
+
+        /* FB_mean         := scale( TT_Face_Properties->OS2->sCapHeight )                */
+
+        /* FB_descent      := scale( TT_Face_Properties->OS2->usWinDescent )              */
+
+        /* FB_accent       := FB_height - FB_baseline - FB_descent           */
+
+        /* FB_aboveBox ??? gibt es in den TrueType Strukturen nicht */
+
+        /* FB_belowBox ??? gibt es in den TrueType Strukturen nicht */
+
+        /* Nimbus and TrueType has no external leading                       */
+        fontBuf->FB_extLeading.WBF_int  = 0;
+        fontBuf->FB_extLeading.WBF_frac = 0;
+
+        TT_Done_Instance( instance );
         error = TT_Err_Ok;
-
 Fin:
         TT_Close_Face( face );
 Fail:
@@ -725,7 +731,7 @@ static TT_F26Dot6 scaleShort( TT_Short value, TT_F26Dot6 scale )
         return TT_MulFix( INT_TO_F26DOT6( value ), scale );
 }
 
-static word roundWBFixedToNearestWord( WBFixed wbFixed ) 
+static word roundWBFixedToWord( WBFixed wbFixed ) 
 {
         return wbFixed.WBF_frac >= 0x10 ? wbFixed.WBF_int + 1 : wbFixed.WBF_int;
 }
@@ -776,15 +782,6 @@ static int strcmp( const char* s1, const char* s2 )
     }
     return *(const unsigned char*)s1 - *(const unsigned char*)s2;
 }
-
-
-//füllen der fontsAvailEntry Struktur:
-//      FAE_fontID      (FontID)        := wird berechnet aus Fontfamily
-//                                         Fontfamily := NameTable ID 1 (Font Family)
-//                                         Wie ist der Bildungsalgorithmus?
-//      FAE_fileName    (char/wchar)    := Dateiname des Fonts (Prüfung auf max. 36 Zeichen; sbcs/dbcs beachten)
-//      FAE_infoHandle  (ChunkHandle)   := Handle auf u.g. fontInfo
-
 
 //füllen der fontInfo Struktur
 //      FI_fileHandle (word)	        := FileOpen( fileName ... )
@@ -841,41 +838,6 @@ static int strcmp( const char* s1, const char* s2 )
 //      ODE_header	(OutlineEntry)      := 0?
 //      ODE_first	(OutlineEntry)      := 0?
 //      ODE_second	(OutlineEntry)      := 0?
-
-//füllen der FontBuf Struktur
-//      FB_dataSize     (word)          := berechnet
-//      FB_maker        (FontMaker)     := FontMaker.FM_TRUETYPE
-//      FB_avgwidth     (WBFixed)       := FaceProperties -> OS2 -> xAvgCharWidth
-//      FB_maxwidth	(WBFixed)	:= muss berechnet werden; wird im BS Teiber nicht gefüllt
-//      FB_heightAdjust	(WBFixed)	:= BS-Treiber: pointsize
-//      FB_height	(WBFixed) 	:=    ; height of characters
-//      FB_accent       (WBFixed) 	    ; height of accent portion.
-//      FB_mean         (WBFixed) 	    ; top of lower case character boxes.
-//      FB_baseAdjust   (WBFixed)		; offset to top of ascent
-//      FB_baselinePos  (WBFixed)   	; position of baseline from top of font
-//      FB_descent      (WBFixed)   	; maximum descent (from baseline)
-//      FB_extLeading	(WBFixed)    	; recommended external leading
-//      FB_kernCount	(word)          := TT_Get_Kerning_Directory()
-//                                         directory->nTables
-//      FB_kernPairPtr	nptr.KernPair	:= Ptr zur KernpairTabelle
-//      FB_kernValuePtr	nptr.BBFixed	:= Ptr zur KernvalueTabelle
-//      FB_firstChar	(byte/Chars)		; first char in section
-//      FB_lastChar	(byte/Chars)		; last char in section
-//      FB_defaultChar	(byte/Chars)		; default character
-//      FB_underPos	(WBFixed)		    ; underline position (from baseline)
-//      FB_underThickness   (WBFixed)		; underline thickness
-//      FB_strikePos	(WBFixed)	    ; position of the strike-thru
-//      FB_aboveBox	(WBFixed)		    ; maximum above font box
-//      FB_belowBox	(WBFixed)		    ; maximum below font box
-//      FB_minLSB	(sword)		    ; minimum left side bearing
-//      FB_minTSB	(sword)		    ; minimum top side bound
-//      FB_maxBSB*		sword		    ; maximum bottom side bound
-//      FB_maxRSB*		sword		    ; maximum right side bound
-//      FB_pixHeight	word		    ; height of font (invalid for rotation)
-//      FB_flags		FontBufFlags	; special flags
-//      FB_heapCount	word		    ; usage counter for this font
-//      FB_charTable	CharTableEntry <>
-//      *nicht DBCS
 
 //füllen eines CharTableEntries
 //      CTE_dataOffset	nptr.CharData	;Offset to data

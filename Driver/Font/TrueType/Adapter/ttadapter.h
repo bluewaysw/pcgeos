@@ -264,7 +264,7 @@ static TT_F26Dot6   wBFixedToF26Dot6( WBFixed wbFixed );
 
 static TT_F26Dot6   scaleShort( TT_Short value, TT_F26Dot6 scale );
 
-static word         roundWBFixedToNearestWord( WBFixed wbFixed );
+static word         roundWBFixedToWord( WBFixed wbFixed );
 
 #endif /* _TTADAPTER_H_ */
 
