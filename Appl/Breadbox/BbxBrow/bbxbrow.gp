@@ -109,9 +109,9 @@ resource   TopIcons1Resource    ui-object
 resource   TopIcons2Resource    ui-object
 resource   TopIcons3Resource    ui-object
 resource   TopIcons4Resource    lmem read-only shared
-resource   IconBarResource      ui-object
+#resource   IconBarResource      ui-object
 
-resource   SimpleToolbarResource ui-object
+#resource   SimpleToolbarResource ui-object
 resource   ToolMonikerResource   ui-object
 
 ifdef GLOBAL_INTERNET_BUILD

@@ -141,9 +141,22 @@
 @end LocalUIResource;
 @endif
 
+/*
+ * HTML Menu
+ */
 @start HTMLMenuResource;
     @include "htmlv_ui_men_html.goh"
 @end HTMLMenuResource;
+
+/*
+ * Search Menu
+ */
+@start SearchResource;
+@ifdef COMPILE_OPTION_SEARCH_MENU
+    @include "htmlv_ui_men_search.goh"
+@endif
+@end SearchResource;
+
 
 /*
  *              Window Menu
@@ -155,26 +168,63 @@
 @endif
 @end WindowResource;
 
+/*
+ * Download Dialog
+ */
+@start DownloadDialogResource;
+@include "htmlv_ui_dlg_dwnl.goh"
+@object GenInteractionClass DownloadDlg = {
+    GI_visMoniker = "Save Web File";
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = @default | GIA_NOT_USER_INITIATABLE
+                         | GIA_INITIATED_VIA_USER_DO_DIALOG
+                         | GIA_MODAL;
+    GI_comp = @DownloadFileSel,@DownloadBtn,@DownloadAbortBtn,@DownloadNameText;
+}
+@end DownloadDialogResource;
 
-@start Interface;
-@chunk TCHAR HomeHelp[]           = _TEXT("Display home page") ;
-@chunk TCHAR BackHelp[]           = _TEXT("Display previous page") ;
-@chunk TCHAR BackDisabledHelp[]   = _TEXT("No previous page to display") ;
-@chunk TCHAR NextHelp[]           = _TEXT("Display the next page") ;
-@chunk TCHAR NextDisabledHelp[]   = _TEXT("A next page does not exist") ;
-@chunk TCHAR StopHelp[]           = _TEXT("Stop the current download") ;
-@chunk TCHAR ReloadHelp[]         = _TEXT("Update the current page") ;
-@chunk TCHAR ReloadDisabledHelp[] = _TEXT("No page is available to update") ;
-@chunk TCHAR LoadGHelp[]          = _TEXT("Load graphics for current page") ;
-@chunk TCHAR LoadGDisabledHelp[]  = _TEXT("No graphics are available for loading") ;
+/*
+ * Cache Cleanup Dialog
+ */
+@start CacheCleanupDialogResource;
+@object GenInteractionClass CacheCleanupDialog = {
+    GI_visMoniker = "Cache Cleanup";
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = @default | GIA_NOT_USER_INITIATABLE
+                         | GIA_MODAL;
+    GI_comp = @CacheCleanupText;
+}
 
-@ifdef COMPILE_OPTION_HTML_EDITOR
-@chunk TCHAR EditHelp[]           = _TEXT("Edit the current page") ;
-@chunk TCHAR EditDisabledHelp[]   = _TEXT("No page is available to edit") ;
-@endif
+@object GenTextClass CacheCleanupText = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_text = "Cleaning up previous browsing data. Please wait a moment.";
+    HINT_FIXED_SIZE = {
+        SST_AVG_CHAR_WIDTHS | 40,
+        0,
+        0
+    };
+}
+@end CacheCleanupDialogResource;
+
+/*
+ * Status indicators, to be used in the status bar or elsewhere
+ */
+@start StatusResource;
+    @include "htmlv_ui_status_indctrs.goh"
+@end StatusResource;
+
+
+/*
+ * the mighty toolbars and URL entry field
+ */
+@start ToolbarResource;
 
 @ifdef COMPILE_OPTION_LITTLE_BUTTON_TOOLBAR
     @include "htmlv_ui_toolb_small.goh"
+@endif
+
+@ifdef COMPILE_OPTION_BIG_BUTTON_TOOLBAR
+    @include "htmlv_ui_toolb_big.goh"
 @endif
 
 @object URLEntryClass CurrentURLText = {
@@ -202,118 +252,8 @@
 }
 @chunk TCHAR CurrentURLTextHelp[] = _TEXT("Enter the desired internet web page address") ;
 
-@end Interface;
-
-@start StatusResource;
-
-/* The status bar objects */
-@object GenInteractionClass LinkTextBox = {
-    GI_comp = @LinkText/*, @ProgressIndicatorBox*/;
-    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-    HINT_ORIENT_CHILDREN_HORIZONTALLY;
-    HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
-    HINT_FIXED_SIZE = {0, 1 | SST_LINES_OF_TEXT, 0};
-}
-
-@object FastStatusClass LinkText = {
-    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
-@ifdef JAVASCRIPT_SUPPORT
-@ifndef JS_ERROR_DIALOG
-    FSI_dblClickMsg = MSG_HMLVP_REPORT_JS_ERROR;
-    FSI_destination = process;
-@endif
-@endif
-}
-
-@object StatusTextClass LinkStatus = {
-    STI_textLink = @LinkText ;
-}
-
-@ifdef COMPILE_OPTION_SHOW_ALLOC_WATCHER_READ_OUT
-@object GenTextClass AllocWatcherReadout = {
-    GI_attrs = (@default | GA_READ_ONLY) & ~GA_TARGETABLE;
-    GTXI_maxLength = 15 ;
-    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
-    HINT_FIXED_SIZE = {100, 0, 0} ;
-    HINT_TEXT_FRAME;
-}
-@endif
-
-@ifdef COMPILE_OPTION_SECURE_STATUS
-@include "Art/lock.goh"
-@include "Art/unlock.goh"
-@chunk TCHAR SecureStatusOnHelp[] = _TEXT("Page is secure");
-@chunk TCHAR SecureStatusOffHelp[] = _TEXT("Page is not secure");
-@object GenTriggerClass SecureStatus = {
-    GI_visMoniker = @SecureStatusOffMoniker;
-    HINT_NO_BORDERS_ON_MONIKERS;
-    ATTR_GEN_FOCUS_HELP = @SecureStatusOffHelp;
-@ifdef TITLE_BAR_STATUS
-    HINT_GADGET_BACKGROUND_COLORS = {
-        C_LIGHT_GREY, C_LIGHT_GREY,
-        C_LIGHT_GREY, C_LIGHT_GREY
-    };
-@endif
-}
-@endif
-
-@ifdef COMPILE_OPTION_PARENTAL_CONTROL
-@object GenInteractionClass ParentalControlStatus = {
-    GI_comp = @PCStatusLight;
-    HINT_ORIENT_CHILDREN_HORIZONTALLY;
-    HINT_CENTER_CHILDREN_VERTICALLY;
-}
-@include "Art/green.goh"
-@include "Art/red.goh"
-@include "Art/yellow.goh"
-@ifdef GLOBAL_INTERNET_BUILD
-@chunk TCHAR PCStatusLightOnHelp[] = _TEXT("KidGuard is On");
-@chunk TCHAR PCStatusLightOffHelp[] = _TEXT("KidGuard is Off");
-@chunk TCHAR PCStatusLightLimitedHelp[] = _TEXT("KidGuard is On (Limited Access)");
-@else
-@chunk TCHAR PCStatusLightOnHelp[] = _TEXT("Parental Control is On");
-@chunk TCHAR PCStatusLightOffHelp[] = _TEXT("Parental Control is Off");
-@chunk TCHAR PCStatusLightLimitedHelp[] = _TEXT("Parental Control is On (Limited Access)");
-@endif
-@object GenTriggerClass PCStatusLight = {
-    GI_visMoniker = @PCStatusLightOffMoniker;
-    GTI_actionMsg = MSG_HMLVP_PC_TOGGLE;
-    GTI_destination = process;
-    HINT_NO_BORDERS_ON_MONIKERS;
-    ATTR_GEN_FOCUS_HELP = @PCStatusLightOffHelp;
-@ifdef TITLE_BAR_STATUS
-    HINT_GADGET_BACKGROUND_COLORS = {
-        C_LIGHT_GREY, C_LIGHT_GREY,
-        C_LIGHT_GREY, C_LIGHT_GREY
-    };
-@endif
-}
-@endif
-
-@end StatusResource;
-
-@start ToolbarResource;
-
-@ifdef COMPILE_OPTION_LITTLE_BUTTON_TOOLBAR
-@object GenInteractionClass MainToolbar = {
-    GI_states = @default & ~GS_USABLE ;
-    GII_visibility = GIV_POPOUT;
-    HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
-    HINT_ORIENT_CHILDREN_HORIZONTALLY ;
-    HINT_ALLOW_CHILDREN_TO_WRAP ;
-    HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY ;
-    HINT_TOOLBOX ;
-    GI_comp = @DocToolGroup,@PrintToolGroup,@EditToolGroup,@SearchToolGroup,
-              @ViewToolGroup,@htmlv_ui_obj0058,@htmlv_ui_obj0061
-@ifndef COMPILE_OPTION_BIG_BUTTON_TOOLBAR
-                ,@HistoryList2
-@endif
-              ;
-}
-@endif
-
 @ifdef COMPILE_OPTION_SIMPLE_BUTTON_TOOLBAR
+@include "htmlv_ui_toolb_simple.goh"
 @object GenInteractionClass SimpleURLToolbar = {
     GI_comp = @SimpleToolbarGo, @URLToolbar ;
     HINT_ORIENT_CHILDREN_HORIZONTALLY;
@@ -322,25 +262,7 @@
     HINT_EXPAND_WIDTH_TO_FIT_PARENT;
     HINT_CUSTOM_CHILD_SPACING = { 0 };
 }
-@ifdef COMPILE_OPTION_TOGGLE_BARS
-@object GenGlyphClass SimpleToolbarGo = {
-@else
-@object GenTriggerClass SimpleToolbarGo = {
 @endif
-    GI_visMoniker = list {
-@ifndef COMPILE_OPTION_GOTO_HOTKEY
-      @GoMoniker,
-@endif
-      @GPCGoIconMoniker } ;
-@ifndef COMPILE_OPTION_TOGGLE_BARS
-    GTI_actionMsg = MSG_HMLVP_URL_CHANGED;
-    GTI_destination = process;
-@endif
-    HINT_USE_ICON_TEXT_COMBINATION_MONIKER = { 0, 2 } ;
-    ATTR_GEN_FOCUS_HELP = @GoHelp ;
-}
-@chunk TCHAR GoHelp[] = _TEXT("Retrieve the page for the address list in Web Page") ;
-@endif /* COMPILE_OPTION_SIMPLE_BUTTON_TOOLBAR */
 
 @object GenInteractionClass URLToolbar = {
     HINT_ORIENT_CHILDREN_HORIZONTALLY;
@@ -356,7 +278,25 @@
 
 @end ToolbarResource;
 
+/*
+* Interface
+*/
 @start Interface;
+@chunk TCHAR HomeHelp[]           = _TEXT("Display home page") ;
+@chunk TCHAR BackHelp[]           = _TEXT("Display previous page") ;
+@chunk TCHAR BackDisabledHelp[]   = _TEXT("No previous page to display") ;
+@chunk TCHAR NextHelp[]           = _TEXT("Display the next page") ;
+@chunk TCHAR NextDisabledHelp[]   = _TEXT("A next page does not exist") ;
+@chunk TCHAR StopHelp[]           = _TEXT("Stop the current download") ;
+@chunk TCHAR ReloadHelp[]         = _TEXT("Update the current page") ;
+@chunk TCHAR ReloadDisabledHelp[] = _TEXT("No page is available to update") ;
+@chunk TCHAR LoadGHelp[]          = _TEXT("Load graphics for current page") ;
+@chunk TCHAR LoadGDisabledHelp[]  = _TEXT("No graphics are available for loading") ;
+
+@ifdef COMPILE_OPTION_HTML_EDITOR
+@chunk TCHAR EditHelp[]           = _TEXT("Edit the current page") ;
+@chunk TCHAR EditDisabledHelp[]   = _TEXT("No page is available to edit") ;
+@endif
 
 @object GenDisplayGroupClass HTMLDisplayGroup = {
     HINT_INITIAL_SIZE = {
@@ -389,15 +329,10 @@
                 @LinkTextBox;
 }
 
-@end Interface;
-
-
-@start Interface;
-
 @object GenInteractionClass htmlv_top_bar_left = {
 @ifdef COMPILE_OPTION_SIMPLE_BUTTON_TOOLBAR
-    //GI_comp = @SimpleToolbar, @SimpleURLToolbar ;
-    GI_comp = @SimpleToolbar ;
+    GI_comp = @SimpleToolbar, @SimpleURLToolbar ;
+    //GI_comp = @SimpleToolbar ;
     HINT_CUSTOM_CHILD_SPACING = { SST_PIXELS|0 };
     HINT_CENTER_CHILDREN_VERTICALLY ;
 @endif
@@ -441,41 +376,6 @@
     GI_comp = @htmlv_top_bar, @HTMLDisplayGroup, @StatusBar;
 }
 
-@end Interface;
-
-@start DownloadDialogResource;
-@include "htmlv_ui_dlg_dwnl.goh"
-@object GenInteractionClass DownloadDlg = {
-    GI_visMoniker = "Save Web File";
-    GII_visibility = GIV_DIALOG;
-    GII_attrs = @default | GIA_NOT_USER_INITIATABLE
-                         | GIA_INITIATED_VIA_USER_DO_DIALOG
-                         | GIA_MODAL;
-    GI_comp = @DownloadFileSel,@DownloadBtn,@DownloadAbortBtn,@DownloadNameText;
-}
-@end DownloadDialogResource;
-
-@start CacheCleanupDialogResource;
-@object GenInteractionClass CacheCleanupDialog = {
-    GI_visMoniker = "Cache Cleanup";
-    GII_visibility = GIV_DIALOG;
-    GII_attrs = @default | GIA_NOT_USER_INITIATABLE
-                         | GIA_MODAL;
-    GI_comp = @CacheCleanupText;
-}
-
-@object GenTextClass CacheCleanupText = {
-    GI_attrs = @default | GA_READ_ONLY;
-    GTXI_text = "Cleaning up previous browsing data. Please wait a moment.";
-    HINT_FIXED_SIZE = {
-        SST_AVG_CHAR_WIDTHS | 40,
-        0,
-        0
-    };
-}
-@end CacheCleanupDialogResource;
-
-@start Interface;
 
 @object GenPrimaryClass HTMLVPrimary = {
     /*
@@ -526,11 +426,11 @@
               @LocalSaveDlg,
 @endif
 @ifdef GLOBAL_INTERNET_BUILD
-//              @JumpDialog,
+              @JumpDialog,
               @HelpWindow,
 @endif
 @ifdef COMPILE_OPTION_TOGGLE_BARS
-//              @GotoDialog,
+              @GotoDialog,
 @endif
 @ifdef COMPILE_OPTION_PARENTAL_CONTROL
               @PCToggleOffDlg, @PCToggleOnDlg,
@@ -785,12 +685,6 @@
 
 @end Interface;
 
-@start SearchResource;
-@ifdef COMPILE_OPTION_SEARCH_MENU
-    @include "htmlv_ui_men_search.goh"
-@endif
-@end SearchResource;
-
 @ifndef COMPILE_OPTION_TURN_OFF_LOGO
 @start Interface;
     @object GlobeAnimClass SpinningLogo = {
@@ -799,9 +693,8 @@
 @end Interface;
 @endif
 
-@start SimpleToolbarResource ;
-@include "htmlv_ui_toolb_simple.goh"
-@end SimpleToolbarResource ;
+//@start SimpleToolbarResource ;
+//@end SimpleToolbarResource ;
 
 @ifdef GLOBAL_INTERNET_BUILD
 @start HelpUIResource;
@@ -831,9 +724,9 @@
 @include "Art/toolicon.goh"
 @include "icons/icons.goh"
 
-@start IconBarResource ;
-@include "htmlv_ui_toolb_big.goh"
-@end IconBarResource ;
+//@start IconBarResource ;
+//@include "htmlv_ui_toolb_big.goh"
+//@end IconBarResource ;
 
 //@include "init/expireui.goh"
 
