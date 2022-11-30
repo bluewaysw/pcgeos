@@ -357,6 +357,8 @@ TT_Error _pascal Fill_FontBuf( const char*  fileName,
         TT_Instance         instance;
         TT_Face_Properties  faceProperties;
         TT_Instance_Metrics instanceMetrics;
+        WWFixedAsDWord      scaleFactor;
+        WWFixedAsDWord      ttfElement;
         
         ECCheckBounds( fileName );
         ECCheckBounds( fontBuf );
@@ -384,6 +386,8 @@ TT_Error _pascal Fill_FontBuf( const char*  fileName,
         if ( error )
                 goto Fail;
 
+        scaleFactor = instanceMetrics.x_scale;
+
         /* Fill elements in FontBuf structure.                               */
 
         fontBuf->FB_maker        = FM_TRUETYPE;
@@ -394,7 +398,8 @@ TT_Error _pascal Fill_FontBuf( const char*  fileName,
 	
         //TODO: mov	es:FB_flags, mask FBF_IS_OUTLINE
 
-        /* FB_minLSB       := scale( TT_Face_Properties->horizontal->min_Left_Side_Bearing )*/
+        ttfElement = SCALE_WORD( faceProperties.horizontal->min_Left_Side_Bearing, scaleFactor );
+        fontBuf->FB_minLSB = ROUND_WWFIXEDASDWORD( ttfElement ); 
 
         /* FB_avgWidth     := scale( TT_Face_Properties->OS2->aAvgCharWidth )  */
 

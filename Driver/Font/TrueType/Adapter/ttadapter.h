@@ -257,8 +257,16 @@ typedef struct
 /*
  * scale value (word) by factor (WWFixedAsDWord)
  */
-#define SCALE( value, factor )                   \
-        (   GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( value ), factor ) )
+#define SCALE_WORD( value, factor )              \
+        ( GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( value ), factor ) )
+
+/*
+ * round value (WWFixedAsDWord) to nearest word
+ */
+#define ROUND_WWFIXEDASDWORD( value )            \
+        ( value & 0x8000 ?                       \
+            ( value & 0x0080 ? (((word)value >> 16) - 1 ) : ((word)value >> 16 )) : \
+            ( value & 0x0080 ? (((word)value >> 16) + 1 ) : ((word)value >> 16 )) )
 
 /*
  * convert value (WBFixed) to TT_F26DOT6 
