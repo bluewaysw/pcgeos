@@ -128,8 +128,8 @@ export     ImportThreadEngineClass
 #export     ExpireDialogClass
 export     StatusTextClass
 export     URLEntryClass
-#if not COMPILE_OPTION_TURN_OFF_LOGO...
-export     GlobeAnimClass
+#if NOT COMPILE_OPTION_TURN_OFF_LOGO...
+#export     GlobeAnimClass
 export     WMViewControlClass
 export     WMSearchReplaceControlClass
 
