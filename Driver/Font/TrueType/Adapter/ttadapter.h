@@ -235,6 +235,36 @@ typedef struct
  *      macros
  ***********************************************************************/
 
+/*
+ * convert value (word) to WWFixedAsDWord
+ */
+#define WORD_TO_WWFIXEDASDWORD( value )          \
+        ( (WWFixedAsDWord)value << 16 )
+
+/*
+ * convert value (TT_F26DOT6) to WWFixedAsDWord
+ */
+#define FIXED26DOT6_TO_WWFIXEDASDWORD( value )   \
+        ( (WWFixedAsDWord)value << 10 )
+
+/*
+ * copy from (WWFixedAsDWord) into to (WBFixed)
+ */
+#define FILL_WBFIXED( to, from )                 \
+        ( to.WBF_int  = (sword)(from >> 16);     \
+          to.WBF_frac = (byte)(from >> 8); )
+
+/*
+ * scale value (word) by factor (WWFixedAsDWord)
+ */
+#define SCALE( value, factor )                   \
+        (   GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( value ), factor ) )
+
+/*
+ * convert value (WBFixed) to TT_F26DOT6 
+ */
+#define WBFIXED_TO_FIXED26DOT6( value )          \
+        ( ( ( (long)value.WBF_int ) * 1024 ) | value.WBF_frac >> 2 )
 
 /***********************************************************************
  *      helperfunctions
@@ -257,14 +287,6 @@ static int          strlen( const char* str );
 
 static void         strcpy( char* dest, const char* source );
 
-
-static void         f26dot6ToWBFixed( TT_F26Dot6 f26Dot6, WBFixed* wbFixed );
-
-static TT_F26Dot6   wBFixedToF26Dot6( WBFixed wbFixed );
-
-static TT_F26Dot6   scaleShort( TT_Short value, TT_F26Dot6 scale );
-
-static word         roundWBFixedToWord( WBFixed wbFixed );
 
 #endif /* _TTADAPTER_H_ */
 

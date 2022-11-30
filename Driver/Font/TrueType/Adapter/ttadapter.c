@@ -372,7 +372,7 @@ TT_Error _pascal Fill_FontBuf( const char*  fileName,
         if ( error )
                 goto Fail;
 
-        error = TT_Set_Instance_CharSize( instance, wBFixedToF26Dot6( pointSize ) );
+        error = TT_Set_Instance_CharSize( instance, WBFIXED_TO_FIXED26DOT6( pointSize ) );
         if ( error )
                 goto Fail;
 
@@ -714,28 +714,6 @@ static AdjustedWeight mapFontWeight( TT_Short weightClass )
                 return AW_ULTRA_BOLD;
         }
 }
-
-static void f26dot6ToWBFixed( TT_F26Dot6 f26Dot6, WBFixed* wbFixed )
-{
-        wbFixed->WBF_frac = f26Dot6 << 2;
-        wbFixed->WBF_int  = f26Dot6 >> 6;
-}
-
-static TT_F26Dot6 wBFixedToF26Dot6( WBFixed wbFixed )
-{
-        return ( ( (long)wbFixed.WBF_int ) * 1024 ) | wbFixed.WBF_frac >> 2;
-}
-
-static TT_F26Dot6 scaleShort( TT_Short value, TT_F26Dot6 scale )
-{
-        return TT_MulFix( INT_TO_F26DOT6( value ), scale );
-}
-
-static word roundWBFixedToWord( WBFixed wbFixed ) 
-{
-        return wbFixed.WBF_frac >= 0x10 ? wbFixed.WBF_int + 1 : wbFixed.WBF_int;
-}
-
 
 static TextStyle mapTextStyle( const char* subfamily )
 {
