@@ -248,13 +248,6 @@ typedef struct
         ( (WWFixedAsDWord)value << 10 )
 
 /*
- * copy from (WWFixedAsDWord) into to (WBFixed)
- */
-#define FILL_WBFIXED( to, from )                 \
-        ( to.WBF_int  = (sword)(from >> 16);     \
-          to.WBF_frac = (byte)(from >> 8); )
-
-/*
  * scale value (word) by factor (WWFixedAsDWord)
  */
 #define SCALE_WORD( value, factor )              \
@@ -265,8 +258,20 @@ typedef struct
  */
 #define ROUND_WWFIXEDASDWORD( value )            \
         ( value & 0x8000 ?                       \
-            ( value & 0x0080 ? (((word)value >> 16) - 1 ) : ((word)value >> 16 )) : \
-            ( value & 0x0080 ? (((word)value >> 16) + 1 ) : ((word)value >> 16 )) )
+            ( value & 0x0080 ? ( ( (word)value >> 16 ) - 1 ) : ( (word)value >> 16 )) : \
+            ( value & 0x0080 ? ( ( (word)value >> 16 ) + 1 ) : ( (word)value >> 16 )) )
+
+/*
+ * get integral part of value (WWFixedAsDWord)
+ */
+#define INTEGER_OF_WWFIXEDASDWORD( value )       \
+        ( (word) ( (WWFixedAsDWord)value >> 16 ) )
+
+/*
+ * get fractional part (reduced to 8 bit) of value (WWFixedAsDWord)
+ */
+#define FRACTION_OF_WWFIXEDASDWORD( value )      \
+        ( (byte) ( (WWFixedAsDWord)value >> 8 ) )
 
 /*
  * convert value (WBFixed) to TT_F26DOT6 

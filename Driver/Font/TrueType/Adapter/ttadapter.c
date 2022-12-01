@@ -398,16 +398,28 @@ TT_Error _pascal Fill_FontBuf( const char*  fileName,
 	
         //TODO: mov	es:FB_flags, mask FBF_IS_OUTLINE
 
-        ttfElement = SCALE_WORD( faceProperties.horizontal->min_Left_Side_Bearing, scaleFactor );
+        ttfElement = SCALE_WORD( faceProperties.horizontal->min_Left_Side_Bearing, 
+                                 scaleFactor );
         fontBuf->FB_minLSB = ROUND_WWFIXEDASDWORD( ttfElement ); 
 
-        /* FB_avgWidth     := scale( TT_Face_Properties->OS2->aAvgCharWidth )  */
+        ttfElement = SCALE_WORD( faceProperties.os2->xAvgCharWidth, scaleFactor );
+        fontBuf->FB_avgwidth.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
+        fontBuf->FB_avgwidth.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
 
-        /* FB_maxWidth     := scale( TT_Face_Properties->header->yMax - yMin ) */
+        ttfElement = SCALE_WORD( faceProperties.header->xMax -
+                                 faceProperties.header->xMin,
+                                 scaleFactor );
+        fontBuf->FB_maxwidth.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
+        fontBuf->FB_maxwidth.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
 
         /* FB_maxRSB ??? gibt es in TT_Vertical_Header nicht */
 
-        /* FB_height       := scale( TT_Face_Properties->header->yMax )      */
+        ttfElement = SCALE_WORD( faceProperties.header->yMax -
+                                 faceProperties.header->yMin,
+                                 scaleFactor );
+        fontBuf->FB_height.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
+        fontBuf->FB_height.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
+
 
         /* FB_pixHeight    := round( pointsize )                             */
         /*                  + scale( TT_Face_Properties->vertical->min_Top_Side_Bearing ) */
