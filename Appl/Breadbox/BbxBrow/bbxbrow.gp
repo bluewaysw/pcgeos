@@ -129,7 +129,7 @@ export     ImportThreadEngineClass
 export     StatusTextClass
 export     URLEntryClass
 #if NOT COMPILE_OPTION_TURN_OFF_LOGO...
-#export     GlobeAnimClass
+export     GlobeAnimClass
 export     WMViewControlClass
 export     WMSearchReplaceControlClass
 

@@ -213,11 +213,16 @@
     @include "htmlv_ui_status_indctrs.goh"
 @end StatusResource;
 
-
 /*
  * the mighty toolbars and URL entry field
  */
 @start ToolbarResource;
+
+@include "htmlv_ui_url.goh" // FIXME: make an additional compile flag for old and new simple variants
+
+@ifdef COMPILE_OPTION_SIMPLE_BUTTON_TOOLBAR
+    @include "htmlv_ui_toolb_simple.goh" // FIXME: make an additional compile flag for old and new simple variants
+@endif
 
 @ifdef COMPILE_OPTION_LITTLE_BUTTON_TOOLBAR
     @include "htmlv_ui_toolb_small.goh"
@@ -227,63 +232,71 @@
     @include "htmlv_ui_toolb_big.goh"
 @endif
 
-@object URLEntryClass CurrentURLText = {
-@ifndef GLOBAL_INTERNET_BUILD
-@ifdef COMPILE_OPTION_SIMPLE_BUTTON_TOOLBAR
-    GI_visMoniker = 'W',"Web Page:";
-@else
-    GI_visMoniker = 'U',"URL";
-@endif
-@endif
-@ifdef GLOBAL_INTERNET_BUILD
-    GI_attrs = @default | GA_TARGETABLE;
-/* allow URL entry to forward search request to HTML area */
-/*    ATTR_GEN_TEXT_DO_NOT_INTERACT_WITH_SEARCH_CONTROL;*/
-@endif
-    GTXI_maxLength = HTML_MAX_BUF-1;
-    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT | GTA_TAIL_ORIENTED;
-    GTXI_applyMsg = MSG_HMLVP_URL_CHANGED;
-    GTXI_destination = process;
-    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-    HINT_TEXT_DO_NOT_MAKE_LARGER_ON_PEN_SYSTEMS;
-    ATTR_GEN_FOCUS_HELP = @CurrentURLTextHelp ;
-    /* to allow user to press return after loading error */
-    ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED;
-}
-@chunk TCHAR CurrentURLTextHelp[] = _TEXT("Enter the desired internet web page address") ;
-
-
-// the darn go button variant of the toolbar. one day i'm gonna kill it with fire.
-@ifdef COMPILE_OPTION_SIMPLE_BUTTON_TOOLBAR
-@include "htmlv_ui_toolb_simple_fg.goh"
-@object GenInteractionClass SimpleURLToolbar = {
-    GI_comp = @SimpleToolbarGo, @URLToolbar ;
-    HINT_ORIENT_CHILDREN_HORIZONTALLY;
-    HINT_ALLOW_CHILDREN_TO_WRAP;
-    HINT_CENTER_CHILDREN_VERTICALLY;
-    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-    HINT_CUSTOM_CHILD_SPACING = { 0 };
-}
-@endif
-
-@object GenInteractionClass URLToolbar = {
-    HINT_ORIENT_CHILDREN_HORIZONTALLY;
-    HINT_ALLOW_CHILDREN_TO_WRAP;
-    HINT_CENTER_CHILDREN_VERTICALLY;
-    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-    HINT_TOOLBOX;
-@ifdef COMPILE_OPTION_GOTO_HOTKEY
-    GI_visMoniker = 'G',"Goto:";
-@endif
-    GI_comp = @CurrentURLText;
-}
-
 @end ToolbarResource;
 
 /*
-* Interface
+ * Help UI resources
+ */
+@ifdef GLOBAL_INTERNET_BUILD
+@start HelpUIResource;
+    @visMoniker HelpWindowMoniker = "Help";
+    @object GenInteractionClass HelpWindow = {
+        GI_comp = @HelpTop;
+        GII_visibility = GIV_DIALOG;
+        GII_attrs = @default  | GIA_NOT_USER_INITIATABLE;
+        HINT_INTERACTION_MAKE_RESIZABLE;
+        HINT_SIZE_WINDOW_AS_RATIO_OF_PARENT = {
+            SWSS_RATIO | PCT_50,
+            SWSS_RATIO | PCT_80
+        };
+        HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT = {
+            SWSS_RATIO | PCT_50,
+            SWSS_RATIO | PCT_15
+        };
+    }
+    @object GenInteractionClass HelpTop = {}
+@end HelpUIResource;
+
+@start HelpFrameResource;
+    @object URLFrameClass HelpFrame = {}
+@end HelpFrameResource;
+@endif
+
+//@include "init/expireui.goh"
+
+/*
+ * Parental control stuff
+ */
+
+@ifdef COMPILE_OPTION_PARENTAL_CONTROL
+@start PCRootResource;
+    @object ParentalControlClass PCRoot = {}
+@end PCRootResource;
+
+@start PCResource;
+    @include "htmlv_ui_dlg_kidguard.goh"
+@end PCResource;
+@endif
+
+
+/*
+ * load the tool monikers
+ */
+@start ToolMonikerResource, data;
+@include "Art/toolicon.goh"
+@end ToolMonikerResource;
+
+/*
+ * load other icons
+ * FIXME: find out what we really need in which UI
+ */
+@include "icons/icons.goh"
+
+/*
+* Interface - bringing it all together
 */
 @start Interface;
+
 @chunk TCHAR HomeHelp[]           = _TEXT("Display home page") ;
 @chunk TCHAR BackHelp[]           = _TEXT("Display previous page") ;
 @chunk TCHAR BackDisabledHelp[]   = _TEXT("No previous page to display") ;
@@ -299,96 +312,6 @@
 @chunk TCHAR EditHelp[]           = _TEXT("Edit the current page") ;
 @chunk TCHAR EditDisabledHelp[]   = _TEXT("No page is available to edit") ;
 @endif
-
-/*
- * The HTML Content
- */
-@object GenDisplayGroupClass HTMLDisplayGroup = {
-    HINT_INITIAL_SIZE = {
-      SST_PCT_OF_FIELD_WIDTH | PCT_70,
-      SST_PCT_OF_FIELD_HEIGHT | PCT_55,
-      0
-    };
-    HINT_DEFAULT_FOCUS;
-    HINT_DEFAULT_TARGET;
-    HINT_DISPLAY_GROUP_TILE_VERTICALLY;
-}
-
-/*
- * the status bar
- */
-@object GenInteractionClass StatusBar = {
-    HINT_ORIENT_CHILDREN_HORIZONTALLY;
-    HINT_CENTER_CHILDREN_VERTICALLY;
-    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-    HINT_TOOLBOX;
-    GI_comp =
-                @LinkTextBox,
-@ifndef COMPILE_OPTION_TOGGLE_BARS
-@ifdef COMPILE_OPTION_SECURE_STATUS
-                @SecureStatus,
-@endif
-@ifdef COMPILE_OPTION_PARENTAL_CONTROL
-                @ParentalControlStatus,
-@endif
-@endif
-@ifdef COMPILE_OPTION_SHOW_ALLOC_WATCHER_READ_OUT
-                @AllocWatcherReadout,
-@endif
-                @ProgressIndicatorBox;
-}
-
-/*
- * setting up the top bar and the whole UI wrapper
- */
-@object GenInteractionClass htmlv_top_bar_left = {
-@ifdef COMPILE_OPTION_SIMPLE_BUTTON_TOOLBAR
-    GI_comp = @SimpleToolbar, @URLToolbar, @SecureStatus ;
-    //GI_comp = @SimpleToolbar, @SimpleURLToolbar ;
-    //GI_comp = @SimpleToolbar ;
-    HINT_CUSTOM_CHILD_SPACING = { SST_PIXELS|0 };
-    HINT_CENTER_CHILDREN_VERTICALLY ;
-@endif
-@ifdef COMPILE_OPTION_LITTLE_BUTTON_TOOLBAR
-    GI_comp = @MainToolbar, @URLToolbar ;
-@endif
-@ifdef COMPILE_OPTION_BIG_BUTTON_TOOLBAR
-    GI_comp = @IconBar, @URLToolbar ;
-    HINT_CUSTOM_CHILD_SPACING = { SST_PIXELS|0 };
-@endif
-    HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
-    HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
-    HINT_ORIENT_CHILDREN_HORIZONTALLY;
-    //HINT_ORIENT_CHILDREN_VERTICALLY;
-}
-
-@object GenInteractionClass htmlv_top_bar = {
-@ifdef COMPILE_OPTION_TOGGLE_BARS
-    GI_comp = @htmlv_top_bar_left
-@ifndef COMPILE_OPTION_TURN_OFF_LOGO
-                    ,@SpinningLogo
-@endif
-                ;
-@else
-    GI_comp = @htmlv_top_bar_left, @SpinningLogo ;
-@endif
-    HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
-@ifdef COMPILE_OPTION_BIG_BUTTON_TOOLBAR
-    HINT_BOTTOM_JUSTIFY_CHILDREN;
-@else
-    HINT_CENTER_CHILDREN_VERTICALLY ;
-@endif
-    HINT_ORIENT_CHILDREN_HORIZONTALLY ;
-    HINT_TOOLBOX;
-}
-
-@object GenInteractionClass htmlv_ui_obj0051 = {
-    GI_attrs = @default | GA_TARGETABLE;
-    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
-    HINT_ORIENT_CHILDREN_VERTICALLY;
-    GI_comp = @htmlv_top_bar, @HTMLDisplayGroup, @StatusBar;
-}
 
 
 @object GenPrimaryClass HTMLVPrimary = {
@@ -459,6 +382,10 @@
     ATTR_GEN_WINDOW_KBD_OVERRIDE = KO_KEYBOARD_REQUIRED;
 }
 
+/*
+ * the menus
+ */
+
 @object GenInteractionClass FileMenu = {
     GI_visMoniker = 'F', "File" ;   /* need moniker now jfh 10/11/02 */
     GI_attrs = @default | GA_KBD_SEARCH_PATH;
@@ -469,54 +396,6 @@
     GI_comp = @DocCtrlHolder, @CustomFileSelDBox,
               @ClearCacheTrigger, @AboutGroup,
               @htmlv_ui_obj0005, @FileExitTrigger;
-}
-
-/* I need the DocCtrl so put it here an make it !USABLE.  jfh - 10/11/02 */
-@object GenInteractionClass DocCtrlHolder = {
-        GI_comp = @DocumentControl;
-        GI_states = @default & ~GS_USABLE;
-        GII_visibility = GIV_SUB_GROUP;
-}
-/* here's the dbox replacing GenDoc's file sel.  jfh - 10/11/02 */
-@object GenInteractionClass CustomFileSelDBox = {
-        GI_visMoniker = "Open";
-        GI_comp = @CustomFileSel, @CFSOpen, @CFSCancel;
-        GII_visibility = GIV_DIALOG;
-}
-@object GenFileSelectorClass CustomFileSel = {
-        GFSI_fileCriteria = FSFC_DIRS | FSFC_NON_GEOS_FILES;
-        GFSI_destination = process;
-        GFSI_notificationMsg = MSG_CUSTOM_OPEN_SELECTOR_ACTION;
-        ATTR_GEN_PATH_DATA = {SP_DOCUMENT, "."};
-        ATTR_GEN_FILE_SELECTOR_NAME_MASK = {"*.HTM"};
-        HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 12;
-        HINT_FILE_SELECTOR_FILE_LIST_WIDTH = 40;
-}
-@object GenTriggerClass CFSOpen = {
-        GI_visMoniker = "Open";
-        GI_states = @default & ~GS_ENABLED;
-        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
-        GTI_destination = process;
-        GTI_actionMsg = MSG_CUSTOM_OPEN_HTML_DOC;
-        HINT_SEEK_REPLY_BAR;
-        HINT_DEFAULT_DEFAULT_ACTION;
-}
-@object GenTriggerClass CFSCancel = {
-        GI_visMoniker = "Cancel";
-        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
-        HINT_SEEK_REPLY_BAR;
-}
-
-@include "htmlv_ui_dlg_about.goh"
-@object GenInteractionClass AboutGroup = {
-        GI_comp = @AboutDBox;
-        GII_visibility = GIV_SUB_GROUP;
-}
-
-@object GenTriggerClass FileExitTrigger = {
-    GI_visMoniker = 'x', "Exit WebMagick" ;
-    GTI_actionMsg = MSG_META_QUIT ;
-    GTI_destination = @HTMLVApp ;
 }
 
 
@@ -553,26 +432,6 @@
 @endif
               ;
 }
-
-@ifdef COMPILE_OPTION_TOGGLE_BARS
-@object GenInteractionClass GraphicsGroup = {
-    GI_attrs = @default | GA_KBD_SEARCH_PATH;
-    GI_comp = @HTMLSettingsGroup, @LoadGraphicsGroup;
-    ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
-}
-
-@object GenInteractionClass ToggleToolbarGroup = {
-@ifdef COMPILE_OPTION_TOGGLE_GOTO_BAR
-@ifdef COMPILE_OPTION_TOGGLE_STATUS_BAR
-    GI_comp = @ToggleGotoBar, @ToggleStatusBar;
-@else
-    GI_comp = @ToggleGotoBar ;
-@endif
-@else
-    GI_comp = @ToggleStatusBar;
-@endif
-}
-@endif
 
 @object GenInteractionClass NavigateMenu = {
     GI_attrs = @default | GA_KBD_SEARCH_PATH;
@@ -697,67 +556,115 @@
 }
 @endif
 
-@end Interface;
+/*
+ * main UI wrapper
+ */
+ @object GenInteractionClass htmlv_ui_obj0051 = {
+    GI_attrs = @default | GA_TARGETABLE;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    GI_comp = @htmlv_top_bar, @HTMLDisplayGroup, @StatusBar;
+}
 
+/*
+ * construct top bar from topbarLeft + spinning globe (or not)
+ */
+@object GenInteractionClass htmlv_top_bar = {
 @ifndef COMPILE_OPTION_TURN_OFF_LOGO
-@start Interface;
+    GI_comp = @htmlv_top_bar_left, @SpinningLogo ;
+@else
+    GI_comp = @htmlv_top_bar_left ;
+@endif
+@ifdef COMPILE_OPTION_BIG_BUTTON_TOOLBAR
+    HINT_BOTTOM_JUSTIFY_CHILDREN;
+@else
+    HINT_CENTER_CHILDREN_VERTICALLY ;
+@endif
+    HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    //HINT_ALLOW_CHILDREN_TO_WRAP;
+    HINT_TOOLBOX;
+}
+
+/*
+ * left side of the top bar: navigational buttons and URL bar
+ */
+@object GenInteractionClass htmlv_top_bar_left = {
+@ifdef COMPILE_OPTION_SIMPLE_BUTTON_TOOLBAR
+    //GI_comp = @SimpleToolbar, @URLToolbar, @SecureStatus ;
+    GI_comp = @SimpleToolbar, @SimpleURLToolbar;
+    //GI_comp = @SimpleToolbar ;
+    HINT_CUSTOM_CHILD_SPACING = { SST_PIXELS|0 };
+    HINT_CENTER_CHILDREN_VERTICALLY ;
+    //HINT_ORIENT_CHILDREN_VERTICALLY;
+    //HINT_ORIENT_CHILDREN_HORIZONTALLY;
+@endif
+@ifdef COMPILE_OPTION_LITTLE_BUTTON_TOOLBAR
+    GI_comp = @MainToolbar, @URLToolbar ;
+@endif
+@ifdef COMPILE_OPTION_BIG_BUTTON_TOOLBAR
+    GI_comp = @IconBar, @URLToolbar ;
+    HINT_CUSTOM_CHILD_SPACING = { SST_PIXELS|0 };
+@endif
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+    HINT_ORIENT_CHILDREN_VERTICALLY ;
+}
+
+/*
+ * The HTML Content
+ */
+@object GenDisplayGroupClass HTMLDisplayGroup = {
+    HINT_INITIAL_SIZE = {
+      SST_PCT_OF_FIELD_WIDTH | PCT_70,
+      SST_PCT_OF_FIELD_HEIGHT | PCT_55,
+      0
+    };
+    HINT_DEFAULT_FOCUS;
+    HINT_DEFAULT_TARGET;
+    HINT_DISPLAY_GROUP_TILE_VERTICALLY;
+}
+
+/*
+ * the status bar
+ */
+@object GenInteractionClass StatusBar = {
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_TOOLBOX;
+    GI_comp =     @LinkTextBox,
+@ifndef COMPILE_OPTION_TOGGLE_BARS
+@ifdef COMPILE_OPTION_SECURE_STATUS
+                @SecureStatus,
+@endif
+@ifdef COMPILE_OPTION_PARENTAL_CONTROL
+                @ParentalControlStatus,
+@endif
+@endif
+@ifdef COMPILE_OPTION_SHOW_ALLOC_WATCHER_READ_OUT
+                @AllocWatcherReadout,
+@endif
+                //@SimpleToolbarViewGroup,
+                @ProgressIndicatorBox;
+}
+
+/*
+ * setup idial control
+ */
+@ifdef COMPILE_OPTION_IDIAL_CONTROL
+    @object IDialControlClass IDialControl = {};
+@endif
+
+/*
+ * set up logo
+ */
+@ifndef COMPILE_OPTION_TURN_OFF_LOGO
     @object GlobeAnimClass SpinningLogo = {
         GAI_autoRun = FALSE;
-}
-@end Interface;
-@endif
-
-//@start SimpleToolbarResource ;
-//@end SimpleToolbarResource ;
-
-@ifdef GLOBAL_INTERNET_BUILD
-@start HelpUIResource;
-    @visMoniker HelpWindowMoniker = "Help";
-    @object GenInteractionClass HelpWindow = {
-        GI_comp = @HelpTop;
-        GII_visibility = GIV_DIALOG;
-        GII_attrs = @default  | GIA_NOT_USER_INITIATABLE;
-        HINT_INTERACTION_MAKE_RESIZABLE;
-        HINT_SIZE_WINDOW_AS_RATIO_OF_PARENT = {
-            SWSS_RATIO | PCT_50,
-            SWSS_RATIO | PCT_80
-        };
-        HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT = {
-            SWSS_RATIO | PCT_50,
-            SWSS_RATIO | PCT_15
-        };
     }
-    @object GenInteractionClass HelpTop = {}
-@end HelpUIResource;
-
-@start HelpFrameResource;
-    @object URLFrameClass HelpFrame = {}
-@end HelpFrameResource;
 @endif
 
-@include "Art/toolicon.goh"
-@include "icons/icons.goh"
-
-//@start IconBarResource ;
-//@include "htmlv_ui_toolb_big.goh"
-//@end IconBarResource ;
-
-//@include "init/expireui.goh"
-
-
-@ifdef COMPILE_OPTION_PARENTAL_CONTROL
-@start PCRootResource;
-    @object ParentalControlClass PCRoot = {}
-@end PCRootResource;
-
-@start PCResource;
-    @include "htmlv_ui_dlg_kidguard.goh"
-@end PCResource;
-@endif
-
-@ifdef COMPILE_OPTION_IDIAL_CONTROL
-@start Interface;
-    @object IDialControlClass IDialControl = {};
 @end Interface;
 
-@endif
