@@ -109,9 +109,6 @@ resource   TopIcons1Resource    ui-object
 resource   TopIcons2Resource    ui-object
 resource   TopIcons3Resource    ui-object
 resource   TopIcons4Resource    lmem read-only shared
-#resource   IconBarResource      ui-object
-
-#resource   SimpleToolbarResource ui-object
 resource   ToolMonikerResource   ui-object
 
 ifdef GLOBAL_INTERNET_BUILD
@@ -128,8 +125,10 @@ export     ImportThreadEngineClass
 #export     ExpireDialogClass
 export     StatusTextClass
 export     URLEntryClass
-#if NOT COMPILE_OPTION_TURN_OFF_LOGO...
-export     GlobeAnimClass
+
+#if NOT COMPILE_OPTION_TURN_OFF_LOGO... ifndef doesn't work
+#export     GlobeAnimClass
+
 export     WMViewControlClass
 export     WMSearchReplaceControlClass
 
