@@ -1064,6 +1064,28 @@
       os2->ulCodePageRange2 = 0;
     }
 
+    if ( os2->version >= 0x0003 )
+    {
+      /* only version 3 tables */
+
+      if ( ACCESS_Frame( 8L ) )
+        return error;
+
+      os2->sxHeight      = GET_Short();
+      os2->sCapHeight    = GET_Short();
+      os2->usDefaultChar = GET_UShort();
+      os2->usBreakChar   = GET_UShort();
+
+      FORGET_Frame();
+    }
+    else
+    {
+      os2->sxHeight      = 0;
+      os2->sCapHeight    = 0;
+      os2->usDefaultChar = 0;
+      os2->usBreakChar   = 0;
+    }
+    
     return TT_Err_Ok;
   }
 

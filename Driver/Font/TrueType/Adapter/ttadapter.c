@@ -442,6 +442,9 @@ TT_Error _pascal Fill_FontBuf( const char*  fileName,
         /* FB_strikePos    := scale( TT_Face_Properties->OS2->yStrikeoutPosition )        */
 
         /* FB_mean         := scale( TT_Face_Properties->OS2->sCapHeight )                */
+        ttfElement = SCALE_WORD( faceProperties.os2->sCapHeight, scaleFactor );
+        fontBuf->FB_mean.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
+        fontBuf->FB_mean.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
 
         /* FB_descent      := scale( TT_Face_Properties->OS2->usWinDescent )              */
 
