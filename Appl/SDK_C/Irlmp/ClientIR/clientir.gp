@@ -7,6 +7,10 @@
 #
 # AUTHOR:	Chung Liu, Mar 13, 1995
 #
+#       Name    Date            Description
+#       ----    ----            -----------
+#       CL	3/12/1995       Initial version
+#	RainerB	4/21/2022	Resource names adjusted for Watcom compatibility
 #
 # Geode definitions for ClientIR test application.
 #
@@ -48,6 +52,6 @@ library netutils
 # Resources: list all resource blocks which are used by the application.
 # (standard discardable code resources do not need to be mentioned).
 #
-resource APPRESOURCE ui-object
-resource INTERFACE ui-object
-resource CLIENTIRSTRINGS lmem read-only shared
+resource AppResource ui-object
+resource Interface ui-object
+resource ClientirStrings lmem read-only shared

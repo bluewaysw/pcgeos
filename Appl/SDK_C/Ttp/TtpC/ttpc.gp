@@ -7,6 +7,11 @@
 #
 # AUTHOR:	Chung Liu, Mar 13, 1995
 #
+# REVISION HISTORY:
+#       Name    Date            Description
+#       ----    ----            -----------
+#       CL	3/13/95	        Initial version
+#	RainerB	6/8/2022	Resource names adjusted for Watcom compatibility
 #
 # Geode definitions for TtpC test application.
 #
@@ -48,6 +53,6 @@ library netutils
 # Resources: list all resource blocks which are used by the application.
 # (standard discardable code resources do not need to be mentioned).
 #
-resource APPRESOURCE ui-object
-resource INTERFACE ui-object
-resource TTPCSTRINGS lmem read-only shared
+resource AppResource ui-object
+resource Interface ui-object
+resource TtpcStrings lmem read-only shared
