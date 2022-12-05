@@ -3543,16 +3543,7 @@ CursesCheckKeyBinding(unsigned char c)
 
 #if defined(unix) || defined(_LINUX)
 int getch2() {
-   static int ch=-1, fd=0;
-   struct termios new, old;
-   fd=fileno(stdin);
-   tcgetattr(fd, &old);
-   new=old;
-   new.c_lflag &= ~(ICANON|ECHO);
-   tcsetattr(fd, TCSANOW, &new);
-   ch = getchar();
-   tcsetattr(fd, TCSANOW, &old);
-   return ch;
+   return getchar();
 }
 #endif
 
@@ -3911,6 +3902,7 @@ See also:\n\
 #endif
 #if defined(_LINUX)
     system(SWATWCTL_FOCUS);
+    setvbuf(stdin, NULL, _IONBF, 0);
 #endif
 
     wrefresh(cmdWin);
@@ -4234,6 +4226,7 @@ See also:\n\
 #endif
 #if defined(_LINUX)
     system(SWATWCTL_FOCUS);
+    setvbuf(stdin, NULL, _IONBF, 0);
 #endif
 
     /*

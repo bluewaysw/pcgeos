@@ -6,6 +6,11 @@
 # MODULE:	Hello (Sample GEOS application)
 # FILE:		hello3.gp (Hello Application Geode Parameters File)
 #
+#       Name    Date            Description
+#       ----    ----            -----------
+#       ??		?? 				Initial version
+#		RainerB	4/27/2022		Resource names adjusted for Watcom compatibility
+#
 # DESCRIPTION:	This file contains Geode definitions for the "Hello World" 
 #		sample application. This file is read by the Glue linker to
 #		build this application.
@@ -73,9 +78,9 @@ heapspace 456
 # user-interface thread (as opposed to our application thread), so we mark
 # them all as ui-object resources.
 #
-resource APPRESOURCE  ui-object
-resource INTERFACE    ui-object
-resource MENURESOURCE ui-object
+resource AppResource  ui-object
+resource Interface    ui-object
+resource MenuResource ui-object
 #
 # Libraries:  List which libraries are used by the application.
 #

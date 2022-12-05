@@ -12,6 +12,7 @@
 #       Name    Date            Description
 #       ----    ----            -----------
 #       jenny   1/26/94         Initial version
+#		RainerB	4/21/2022		Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:
 #       This file contains Geode definitions for the "AppIcon" sample
@@ -72,8 +73,8 @@ library	ui
 # Resources: list all resource blocks which are used by the application.
 # (standard discardable code resources do not need to be mentioned).
 #
-resource APPRESOURCE ui-object
-resource INTERFACE   ui-object
+resource AppResource ui-object
+resource Interface   ui-object
 #
 # These resources contain the bitmap monikers for use
 # under different display types.

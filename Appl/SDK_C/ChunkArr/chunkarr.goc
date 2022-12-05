@@ -13,6 +13,7 @@
  *      ----      ----      -----------
  *      1/4/96    EB        Initial version
  *      1/19/96	  PPC	    Added Replace, Insert, Show functions
+ *		4/21/2022 RainerB	Some geometry issues fixed
  *
  * DESCRIPTION:
  *	This file illustrates creating a chunk array, manipulating it,
@@ -148,8 +149,7 @@ Boolean _pascal DisplayElementText (void *el,
 
 @object CAAppClass CAApp = {
     GI_visMoniker = list { @CATextMoniker };
-    GI_comp = @CAPrimary,
-	      @CAAppMenu;
+    GI_comp = @CAPrimary;
     gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @CAPrimary;
 }
 
@@ -168,6 +168,8 @@ Boolean _pascal DisplayElementText (void *el,
 @object GenInteractionClass CAAppMenu = {
     GI_comp = @HelpDBox;
     GII_visibility = GIV_POPUP;
+    /* Make the box a child of the file menu */
+    ATTR_GEN_INTERACTION_GROUP_TYPE = GIGT_FILE_MENU;
 }
 
 @object GenInteractionClass HelpDBox = {
@@ -181,16 +183,17 @@ Boolean _pascal DisplayElementText (void *el,
 @object GenTextClass HelpText = {
     GI_attrs = @default | GA_READ_ONLY;
     GTXI_text =
-"    Enter text in the text field.\r\
-  Append: Append text as new element of\r\
-	  the ChunkArray.\r\
-  Replce: Replace text of an element.\r\
-  Insert: Insert text as new element at the\r\
-	  current index.\r\
-  Delete: Delete a ChunkArray item.\r\
-  Show:   Display array elements in dialog box.\r\
-    Change 'Array Index' to see the contents of the ChunkArray \
-at any index.\r";
+"        Enter text in the text field.\r\
+Append: Append text as new element of\r\
+	    the ChunkArray.\r\
+Replace: Replace text of an element.\r\
+Insert: Insert text as new element at the\r\
+	    current index.\r\
+Delete: Delete a ChunkArray item.\r\
+Show:   Display array elements in dialog box.\r\
+        Change 'Array Index' to see the contents\r\
+        of the ChunkArray at any index.";
+    HINT_MINIMUM_SIZE = 45 | SST_AVG_CHAR_WIDTHS , 10 | SST_LINES_OF_TEXT;
 }
 
 @end	AppMenuResource;
@@ -216,7 +219,8 @@ at any index.\r";
 	      @F4_DeleteElementTrig,
 	      @F5_ShowArrayTrig,
 	      /* Program-controlled dialog box */
-	      @EnumDisplayDBox;
+	      @EnumDisplayDBox,
+	      @CAAppMenu;
 
     ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;
     HINT_ORIENT_CHILDREN_VERTICALLY;
@@ -226,7 +230,7 @@ at any index.\r";
 @object GenTextClass SeeHelp = {
     GI_attrs = @default | GA_READ_ONLY;
     GTXI_text = "\rFor instructions on how to use this application, \
-open the Help dialog box from the App Menu.\r";
+open the Help dialog box from the File Menu.\r";
 }
 
 /*
@@ -276,7 +280,7 @@ open the Help dialog box from the App Menu.\r";
  * This object allows the user to replace the text of an element.
  */
 @object GenTriggerClass F2_ReplaceElementTrig = {
-    GI_visMoniker = "Replce";
+    GI_visMoniker = "Replace";
     GI_states = (@default) & ~GS_ENABLED;
     GTI_destination = process;
     GTI_actionMsg = MSG_CAPROCESS_REPLACE_ELEMENT;
@@ -363,7 +367,7 @@ open the Help dialog box from the App Menu.\r";
     GI_visMoniker = "Text:";
     GI_attrs = @default | GA_READ_ONLY;
     GTXI_text = "";
-
+	HINT_MINIMUM_SIZE = 200, 100;	/* Pixels */
     HINT_PLACE_MONIKER_ABOVE;
     HINT_CENTER_MONIKER;
     HINT_TEXT_FRAME;
@@ -439,7 +443,7 @@ EC( ECVMCheckVMBlockHandle( vmfile, vmBlock ); )
     ptrLMemBlockHeader = VMLock(vmfile, vmBlock, mh);
 EC( ECCheckMemHandle( *mh ); )
 EC( ECCheckBounds( ptrLMemBlockHeader ); )
-    *ch = ptrLMemBlockHeader->LMBH_offset;
+    *ch = (ChunkHandle)ptrLMemBlockHeader->LMBH_offset;
 
 } /* End of GetChunkArrayHandleAndChunk */
 

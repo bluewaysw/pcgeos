@@ -50,10 +50,10 @@ FLOATINIT	endp
 
 COMMENT @----------------------------------------------------------------------
 
-C FUNCTION:	FloatAsciiToGeos80
+C FUNCTION:	FloatAsciiToFloat
 
 C DECLARATION:	extern void Boolean
-			_far _pascal FloatAsciiToGeos80
+			_far _pascal FloatAsciiToFloat
     				    (word floatAtoFflags, word stringLength,
 				     void *string, void *resultLocation);
 
@@ -66,7 +66,7 @@ REVISION HISTORY:
 	Anna	2/92		Initial version
 
 ------------------------------------------------------------------------------@
-FLOATASCIITOGEOS80	proc	far	floatAtoFflags:word, stringLength:word,
+FLOATASCIITOFLOAT	proc	far	floatAtoFflags:word, stringLength:word,
 					string:fptr, resultLocation:fptr
 			uses ds,di,si
 
@@ -84,7 +84,7 @@ FLOATASCIITOGEOS80	proc	far	floatAtoFflags:word, stringLength:word,
 done:
 	.leave
 	ret
-FLOATASCIITOGEOS80	endp
+FLOATASCIITOFLOAT	endp
 
 COMMENT @----------------------------------------------------------------------
 
@@ -158,10 +158,10 @@ FLOATCOMPANDDROP	endp
 
 COMMENT @----------------------------------------------------------------------
 
-C FUNCTION:	FloatCompGeos80ESDI
+C FUNCTION:	FloatCompESDI
 
 C DECLARATION:	extern word 
-			_far FloatCompGeos80ESDI()
+			_far FloatCompESDI()
 	Returns: 0  if X1 = X2
 		 1  if X1 > X2
 		-1  if X1 < X2
@@ -175,7 +175,7 @@ REVISION HISTORY:
 	Anna	3/92		Initial version
 
 ------------------------------------------------------------------------------@
-FLOATCOMPGEOS80ESDI	proc	far 	floatPtr:fptr
+FLOATCOMPESDI	proc	far 	floatPtr:fptr
 	uses	es, di
 	.enter
 	les	di, floatPtr
@@ -190,7 +190,7 @@ done:
 	popf
 	.leave
 	ret
-FLOATCOMPGEOS80ESDI	endp
+FLOATCOMPESDI	endp
 
 
 COMMENT @----------------------------------------------------------------------
@@ -280,10 +280,10 @@ FLOATGT0	endp
 
 COMMENT @----------------------------------------------------------------------
 
-C FUNCTION:	FloatPushGeos80Number
+C FUNCTION:	FloatPushNumber
 
 C DECLARATION:	extern word 
-			_far FloatPushGeos80Number(FloatNum *number)
+			_far FloatPushNumber(FloatNum *number)
 
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -294,7 +294,7 @@ REVISION HISTORY:
 	Anna	3/92		Initial version
 
 ------------------------------------------------------------------------------@
-FLOATPUSHGEOS80NUMBER	proc	far 	number:fptr 
+FLOATPUSHNUMBER	proc	far 	number:fptr 
 	
 				uses ds, si, es
 		.enter
@@ -307,14 +307,14 @@ done:
 		.leave
 		ret
 
-FLOATPUSHGEOS80NUMBER	endp
+FLOATPUSHNUMBER	endp
 
 COMMENT @----------------------------------------------------------------------
 
-C FUNCTION:	FloatPopGeos80Number
+C FUNCTION:	FloatPopNumber
 
 C DECLARATION:	extern word 
-			_far FloatPopGeos80Number(FloatNum *number)
+			_far FloatPopNumber(FloatNum *number)
 
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -325,7 +325,7 @@ REVISION HISTORY:
 	Anna	3/92		Initial version
 
 ------------------------------------------------------------------------------@
-FLOATPOPGEOS80NUMBER	proc	far 	number:fptr 
+FLOATPOPNUMBER	proc	far 	number:fptr 
 	
 				uses di, es
 		.enter
@@ -338,7 +338,7 @@ done:
 		.leave
 		ret
 
-FLOATPOPGEOS80NUMBER	endp
+FLOATPOPNUMBER	endp
 
 COMMENT @----------------------------------------------------------------------
 
@@ -401,10 +401,10 @@ FLOATSTRINGGETDATENUMBER	endp
 
 COMMENT @----------------------------------------------------------------------
 
-C FUNCTION:	FloatGeos80ToAscii_StdFormat
+C FUNCTION:	FloatFloatToAscii_StdFormat
 
 C DECLARATION:	extern word
-			_far _pascal FloatGeos80ToAscii_StdFormat
+			_far _pascal FloatFloatToAscii_StdFormat
 			(char *string, FloatNum *number,
 			 FloatFloatToAsciiFormatFlags format,
 			 word numDigits, word numFractionalDigits)
@@ -418,7 +418,7 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 
-FLOATGEOS80TOASCII_STDFORMAT	proc	far 	string:fptr,
+FLOATFLOATTOASCII_STDFORMAT	proc	far 	string:fptr,
 						number:fptr,
 						format:word,
 						numDigits:word,
@@ -437,14 +437,14 @@ FLOATGEOS80TOASCII_STDFORMAT	proc	far 	string:fptr,
 	mov	ax, cx			; put number of digits in ax
 	.leave
 	ret
-FLOATGEOS80TOASCII_STDFORMAT	endp
+FLOATFLOATTOASCII_STDFORMAT	endp
 
 COMMENT @----------------------------------------------------------------------
 
-C FUNCTION:	FloatGeos80ToAscii
+C FUNCTION:	FloatFloatToAscii
 
 C DECLARATION:	extern word
-			_far _pascal FloatGeos80ToAscii_StdFormat
+			_far _pascal FloatFloatToAscii_StdFormat
 			(FFA_stackFrame *stackFrame,
 			 char *resultString,
 			 FloatNum *number)
@@ -463,10 +463,10 @@ REVISION HISTORY:
 ;
 global FLOATFLOATTOASCII_OLD:far
 FLOATFLOATTOASCII_OLD	proc	far
-	FALL_THRU	FLOATGEOS80TOASCII
+	FALL_THRU	FLOATFLOATTOASCII
 FLOATFLOATTOASCII_OLD	endp
 
-FLOATGEOS80TOASCII	proc	far 		stackFrame:fptr,
+FLOATFLOATTOASCII	proc	far 		stackFrame:fptr,
 						resultString:fptr,
 						number:fptr
 
@@ -490,14 +490,14 @@ EC <	ERROR_NE POINTER_SEGMENT_NOT_SAME_AS_STACK_FRAME		>
 	mov	ax, cx			; put number of digits in ax
 	.leave
 	ret
-FLOATGEOS80TOASCII	endp
+FLOATFLOATTOASCII	endp
 
 COMMENT @----------------------------------------------------------------------
 
 C FUNCTION:	FloatFloatIEEE64ToAscii_StdFormat
 
 C DECLARATION:	extern word
-			_far _pascal FloatIEEE64ToAscii_StdFormat
+			_far _pascal FloatFloatToAscii_StdFormat
 			(char *string, IEEE64FloatNum number,
 			 FloatFloatToAsciiFormatFlags format,
 			 word numDigits, word numFractionalDigits)
@@ -1034,10 +1034,10 @@ FLOATRANDOMIZE	endp
 
 COMMENT @----------------------------------------------------------------------
 
-C FUNCTION:	FloatFormatGeos80Number
+C FUNCTION:	FloatFormatNumber
 
 C DECLARATION:	extern void Boolean
-			_far _pascal FloatFormatGeos80Number
+			_far _pascal FloatFormatNumber
     				    (word formatToken, 
 				     word userDefBlkHan,
 				     word userDefFileHan,
@@ -1055,7 +1055,7 @@ REVISION HISTORY:
 	Anna	3/92		Initial version
 
 ------------------------------------------------------------------------------@
-FLOATFORMATGEOS80NUMBER	proc	far 	formatToken:word, 
+FLOATFORMATNUMBER	proc	far 	formatToken:word, 
 					userDefBlkHan:word,
 					userDefFileHan:word,
 					floatNum:fptr,
@@ -1076,7 +1076,7 @@ FLOATFORMATGEOS80NUMBER	proc	far 	formatToken:word,
 done:
 	.leave
 	ret
-FLOATFORMATGEOS80NUMBER	endp
+FLOATFORMATNUMBER	endp
 
 C_Float	ends
 

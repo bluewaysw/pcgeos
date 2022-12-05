@@ -1,0 +1,162 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	GEOS	
+MODULE:		IR Object database
+FILE:		irdbConstant.def
+
+AUTHOR:		Andy Chiu, Jan 11, 1996
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	AC	1/11/96   	Initial revision
+
+
+DESCRIPTION:
+
+	Here is a description of the IAS database file.
+	It is stored in SP_USERDATA.
+
+	In it's map block it contains the vm block handle that
+	holds our Object Array.  The map block also holds the chunk
+	handle to the object array.  It also holds another word of
+	data which used to be used, but isn't any longer.
+	I`m keeping the space there just in case.
+
+	The Object Array is a variable size chunk array of type
+	IrdbObjArrayEntry.  It holds information about the object.
+	Those being the object ID, the client handle (if any) to
+	irlmp of the object, IrdbCreateFlags (there's only one right now),
+	a VMBlock handle and chunk handle to the attributes array.
+
+	The class name size and class name bring up the rear on this structure.
+	It's the class name that keeps this chunk array of variable size.
+
+	The attributes array is fixed size, it's name is stored in
+	the same block, and a chunk handle to the name is saved.
+	The attribute data depends on the attribute type.
+	See OctetSeqData, UserStrData, and AttrData.
+	
+	$Id: irdbConstant.def,v 1.1 97/04/05 01:08:07 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+IrdbFileMapBlock	struc
+
+	IFMB_objArrayVMBlockHandle	word
+	IFMB_objArrayChunkHandle	lptr
+	IFMB_unused			word
+
+IrdbFileMapBlock	ends
+
+IrdbObjLMemBlockHeader	struc
+
+	IOLBH_header	LMemBlockHeader		; default block header
+	IOLBH_objectId	word			; object id
+	IOLBH_attrs	lptr			; chunk handle to attrs array
+	IOLBH_classNameLength	byte		; class name length
+	IOLBH_className	label	byte		; class name is here
+
+IrdbObjLMemBlockHeader	ends
+
+IrdbObjArrayEntry	struc
+
+	IOAE_objectID		word		; object ID
+	IOAE_clientHandle	word		; client
+	IOAE_flags		byte		; IrdbEntryFlags
+	IOAE_attrsBlockHandle	word		; chunk handle to the attrs
+	IOAE_attrsChunkHandle	lptr		; chunk handle to the attrs
+	IOAE_classNameSize	byte		; class name size (without null)
+	IOAE_className	label	byte		; class name goes here
+
+IrdbObjArrayEntry	ends
+
+;
+; This is the structure for an element that holds the array
+; of attributes for an entry.
+;
+
+OctetSeqData	struc
+	OSD_size		word		; size of sequence
+	OSD_data		lptr		; lptr to data
+OctetSeqData	ends
+
+UserStrData	struc
+	USD_charSet		byte		; Character set
+	USD_size		byte		; size of string
+	USD_data		lptr		; lptr to data
+UserStrData	end
+
+AttrData		union
+
+	AD_integer		dword		; if integer
+	AD_octetSequence	OctetSeqData	; if octet sequence
+	AD_userString		UserStrData	; if a user string
+
+AttrData	end
+
+
+IrdbAttrArrayEntry	struc
+	IAAE_attrType		IrlmpIasValueType	; attribute type
+	IAAE_attrName		lptr			; attribute name
+	IAAE_attrNameSize	byte			; attribute name size
+	IAAE_attrData		AttrData		; Attribute data
+IrdbAttrArrayEntry	ends
+
+IrdbReturnHeader	struc
+	IRH_irlmpIasHeader	IrlmpIasFrame
+	IRH_returnValue		byte
+	IRH_data		label	word
+IrdbReturnHeader	ends
+
+
+;-----------------------------------------------------------
+;                          Constants
+;------------------------------------------------------------
+
+
+;
+; The max length for the object name in the ini file is the prefix plus
+;the length of the largest possible number (65536)
+IRDB_INI_OBJECT_NAME_MAX_LENGTH		equ	13 + 5
+
+;
+; The max length for an attribute name.
+IRDB_ATTRIBUTE_AND_CLASS_NAME_MAX_LENGTH		equ	0xff
+
+;
+; The max length of the suffix added to the attribute
+; to find out information in the ini file about the attribute
+; The only two suffixes I have so far is "_type", and "_data"
+IRDB_ATTRIBUTE_INI_SUFFIX_MAX_LENGTH		equ	5
+
+IRDB_FILE_MAJOR_PROTOCOL		equ	1
+IRDB_FILE_MINOR_PROTOCOL		equ	0
+IRDB_FILE_TOKEN				equ	'IRDB'
+
+;-----------------------------------------------------------
+;                          Fatal Errors
+;------------------------------------------------------------
+
+;
+; An invalide IrdbAttributeType was passed to a routine
+;
+IRDB_INVALID_ATTRIBUTE_TYPE	enum	FatalErrors
+
+;-----------------------------------------------------------
+;                          Warnings
+;------------------------------------------------------------
+
+IRDB_WARNING_INVALID_INTEGER_FROM_INI_FILE	enum	Warnings
+
+
+;-----------------------------------------------------------
+;                          Net Utils Stuff
+;------------------------------------------------------------
+

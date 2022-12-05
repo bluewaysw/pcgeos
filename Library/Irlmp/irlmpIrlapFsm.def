@@ -1,0 +1,161 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:	GEOS
+MODULE:		IrLMP Library
+FILE:		irlmpIrlapFsm.def
+
+AUTHOR:		Chung Liu, Mar 15, 1995
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	CL	3/15/95   	Initial revision
+
+
+DESCRIPTION:
+	Class definition for IrLAP Connection Control FSM.
+		
+	$Id: irlmpIrlapFsm.def,v 1.1 97/04/05 01:07:31 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+IrlapFsmClass	class	MetaClass
+
+;--------------------------------------------------------------------------
+;				Messages
+;--------------------------------------------------------------------------
+
+MSG_IAF_INITIALIZE			message
+; Create endpoint set for associated set.
+;
+; Pass:		nothing
+; Return:	nothing
+;
+
+MSG_IAF_EXIT				message
+;
+; Pass:		nothing
+; Return:	nothing
+;
+
+MSG_IAF_CHECK_IF_CONNECTED		message
+; If IrLAP layer is connected, return the peer address.
+;
+; Pass:		nothing
+; Return: 	carry clear if not connected
+;			cx, dx destroyed
+;		carry set if connected
+;			cxdx	= 32-bit IrLAP address of peer
+
+;--------------------------------------------------------------------------
+;				Events
+;--------------------------------------------------------------------------
+MSG_IAF_LS_CONNECT_REQUEST		message
+;
+; Pass:		cxdx	= 32-bit IrLAP address
+;		bp	= lptr of endpoint which initiated request
+; Return:	nothing
+;
+
+MSG_IAF_LS_DISCONNECT_REQUEST		message
+;
+; Pass:		bp	= lptr of endpoint which initiated request
+;		cx	= non-zero to force IrLAP disconnect if bp is the
+;			  last connected endpoint.
+; Return:	nothing
+;
+
+MSG_IAF_LS_STATUS_REQUEST		message
+;
+; Pass:		bp	= lptr of endpoint which initiated request
+; Return:	nothing
+;
+
+MSG_IAF_IRLAP_CONNECT_CONFIRM		message
+;
+; Pass:		nothing
+; Return:	nothing
+;
+
+MSG_IAF_IRLAP_CONNECT_INDICATION	message
+;
+; Pass:		cxdx	= 32-bit IrLAP address of remote device
+; Return:	nothing
+;
+
+MSG_IAF_IRLAP_DISCONNECT_INDICATION	message
+;
+; Pass:		dx	= IrlapCondition
+; Return	nothing
+;
+
+MSG_IAF_IRLAP_STATUS_INDICATION		message
+;
+; Pass:		cx	= IrlapStatusIndicationType
+; Return	nothing
+;
+
+MSG_IAF_IRLAP_STATUS_CONFIRM		message
+;
+; Pass:		cx	= ConnectionStatus
+; Return	nothing
+;
+
+MSG_IAF_IRLAP_RESET_INDICATION		message
+;
+; Pass:		nothing
+; Return	nothing
+;
+
+;--------------------------------------------------------------------------
+;			IrLAP FSM states
+;--------------------------------------------------------------------------
+
+IrlapFsmState	etype	word, 0
+	IFS_STANDBY		enum IrlapFsmState
+	; The IrLAP connection does not exist.
+
+	IFS_ACTIVE		enum IrlapFsmState
+	; IrLAP connection is active.
+
+	IFS_U_CONNECT		enum IrlapFsmState
+	; Service user implicit IrLAP connection request initiated as
+	; a result of trying to open an LSAP connection.  Awaiting 
+	; response from IrLAP.
+
+;--------------------------------------------------------------------------
+;			Instance data
+;--------------------------------------------------------------------------
+
+	IFI_state		IrlapFsmState	
+	; current state of IrLAP Control FSM
+
+	IFI_peerAddress		dword			0
+	; 32-bit IrLAP address of peer, or 0 if not connected.
+
+	IFI_associatedSet	word			0
+	; chunk array in endpoint block
+
+	IFI_statusSet		word
+	; chunk array in endpoint block.  Endpoints which requested status.
+
+IrlapFsmClass	endc
+
+;--------------------------------------------------------------------------
+;			Global Routines
+;--------------------------------------------------------------------------
+
+IrlapFsmCode	segment resource
+
+global	IrlapFsmCallFixupDS:far
+global	IrlapFsmCall:far
+global	IrlapFsmSendFixupDS:far
+global	IrlapFsmSend:far
+
+IrlapFsmCode	ends

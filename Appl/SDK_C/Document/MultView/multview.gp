@@ -8,6 +8,12 @@
 #
 # AUTHOR:	Tony Requist
 #
+# REVISION HISTORY:
+#       Name    Date            Description
+#       ----    ----            -----------
+#       Tony   	4/4/97	        Initial version
+#		RainerB	4/27/2022		Resource names adjusted for Watcom compatibility
+#
 # DESCRIPTION:	This file contains Geode definitions for the "MultView" sample
 #		application. This file is read by the GLUE linker to
 #		build this application.
@@ -41,18 +47,18 @@ heapspace 4643
 library	geos
 library	ui
 #
-# Mark the DISPLAYUI resource as shared and read-only so its handle will be
+# Mark the DisplayUI resource as shared and read-only so its handle will be
 # shared between instances of this application. The resource will never come
 # into memory as itself, but always as a copy of itself, so it can safely be
 # shared.
 #
-resource DISPLAYUI object shared read-only
-resource APPRESOURCE ui-object
-resource INTERFACE ui-object
-resource DOCUMENTUI object
+resource DisplayUI object shared read-only
+resource AppResource ui-object
+resource Interface ui-object
+resource DocumentUI object
 #
 #
-# Exported entry points. To allow the relocation of the DOCUMENTUI resource
+# Exported entry points. To allow the relocation of the DocumentUI resource
 # to occur and be independent of insignificant (as far as the operation of
 # the application is concerned) changes in the physical location of the
 # DVDocumentClass class record, the relocation information for the

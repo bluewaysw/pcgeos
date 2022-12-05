@@ -14,6 +14,7 @@
 #       EB      2/23/94         Initial version
 #       NF      10/7/96         Added heapspace value and
 #                               changed tokenid to 8.
+#	RainerB	4/27/2022	Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:
 #       This file contains Geode definitions for the "Server" sample
@@ -76,7 +77,7 @@ library ui
 # object blocks, fixed code resources, or data resources that are read-only.
 # Standard discardable code resources do not need to be mentioned.
 #
-resource APPRESOURCE ui-object, discardable
-resource INTERFACE   ui-object, discardable
-resource STRINGS     lmem read-only shared
+resource AppResource ui-object, discardable
+resource Interface   ui-object, discardable
+resource Strings     lmem read-only shared
 

@@ -10,6 +10,8 @@ SRCS            = ctmabs.asm ../mouseCommon.asm
 OBJS            = ctmabs.obj
 LOBJS           =
 
+PRODUCTS        = GEOS2X 
+
 SYSMAKEFILE     = geode.mk
 
 #include <geos.mk>
@@ -23,4 +25,8 @@ SYSMAKEFILE     = geode.mk
 
 #if exists($(DEPFILE))
 #include "$(DEPFILE)"
+#endif
+
+#if exists(GEOS2X/$(DEPFILE))
+#include "GEOS2X/$(DEPFILE)"
 #endif

@@ -246,7 +246,8 @@ word FindCatPlaceInList(char catString[ENTRY_SIZE])
 
 	  /* set the multi flag */
 	  multiFlag = TRUE;
-	  multiAmount = 0;
+	  /* set multiAmount to 0 */
+	  FLOAT_SET_FLOATNUM_TO_0(multiAmount);
 	  numMultis = 0;
 
     /* see if user is modifying the transaction */
@@ -280,7 +281,13 @@ word FindCatPlaceInList(char catString[ENTRY_SIZE])
 		strcpy(arrayElement->TMS_note, trans->TS_memo);
 		strcpy(arrayElement->TMS_cat, trans->TS_category);
 		arrayElement->TMS_amount = trans->TS_amount;
-		multiAmount += trans->TS_amount;
+		// Under Watcom, FloatNum is not the same type as long double. 
+		// So we cannot use operands like +,-,*,/ on FloatNum anymore.
+		//multiAmount += trans->TS_amount;
+		FloatPushNumber(&multiAmount);
+		FloatPushNumber(&trans->TS_amount);
+		FloatAdd();
+		FloatPopNumber(&multiAmount);
 		MemUnlock(multiHeapHandle);
 		multiTrans = trans->TS_multiItem;
 		DBUnlock(trans);
@@ -610,7 +617,13 @@ word			which;
 		}
 
 	  /* update the amount and number of multis */
-	  multiAmount += amount;
+	  // Under Watcom, FloatNum is not the same type as long double. 
+	  // So we cannot use operands like +,-,*,/ on FloatNum anymore.
+	  //multiAmount += amount;
+	  FloatPushNumber(&multiAmount);
+	  FloatPushNumber(&amount);
+	  FloatAdd();
+	  FloatPopNumber(&multiAmount);
 	  numMultis++;
 	  } /* end of new multi */
     else {
@@ -628,15 +641,18 @@ word			which;
 	  strcpy(arrayElement->TMS_note, memo);
 	  strcpy(arrayElement->TMS_cat, cat);
 	  MemUnlock(multiHeapHandle);
-	  if (oldAmount != amount)  {
+	  FloatPushNumber(&oldAmount);
+	  FloatPushNumber(&amount);
+	  if (!FloatCompAndDrop())  {
 		/* gotta redo the total */
 		/* sub out old amount */
 		FloatPushNumber(&multiAmount);
 		FloatPushNumber(&oldAmount);
 		FloatSub();
-		FloatPopNumber(&multiAmount);
 		/* add back the new */
-		multiAmount += amount;
+		FloatPushNumber(&amount);
+		FloatAdd();
+		FloatPopNumber(&multiAmount);
 		}
 	  } /* end of mod multi */
 
@@ -677,7 +693,10 @@ TempMultiStruct	*arrayElement;
 				  transaction,
 				  0);
     /* subtract the amount */
-    multiAmount -= arrayElement->TMS_amount;
+	FloatPushNumber(&multiAmount);
+	FloatPushNumber(&arrayElement->TMS_amount);
+	FloatSub();
+    FloatPopNumber(&multiAmount);
     TotalMultis();
     /* delete the element */
     ChunkArrayDeleteHandle(multiChunkArray, arrayElement);

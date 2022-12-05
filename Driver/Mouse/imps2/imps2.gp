@@ -28,6 +28,11 @@ longname "Intellimouse PS/2 Wheel Mouse"
 tokenchars "MOUS"
 tokenid 0
 
+# Platform for product variant
+ifdef PRODUCT_GEOS2X
+platform geos20
+endif
+
 # Define resources other than standard discardable code
 resource Resident fixed code read-only
 resource MouseExtendedInfoSeg lmem, read-only, shared, conforming
