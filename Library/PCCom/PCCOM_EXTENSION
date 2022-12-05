@@ -1,0 +1,85 @@
+
+PCCOM EXTENSION							jang	6/94
+
+$Id: PCCOM_EXTENSION,v 1.1.6.1 97/03/29 05:30:37 canavese Exp $
+
+	Some new commands were added to DOS version and GEOS version of PCCom.
+The following is the new commands and their syntax:
+
+<ESC>LL<path>!	
+	Long listing of files. LL command displays the following in addition to
+        normal LS command:
+
+	  DOS attributes, a: archive
+			  d: sub directory
+			  v: volume file
+			  s: system
+			  h: hidden
+			  r: read only
+	  GEOS name, 	  32 char file name
+	  release number,  
+	  creator,
+	  token,
+	  protocol number,
+
+	Creator and other geode token are displayed in the following format:
+
+		"4-letter token"[Manufacturer's name]
+
+	The following is the known manufacturers, and I thought I would 
+	translate it for the user.  But if ID is larger than 9, it will 
+	display the ID itself.
+
+	ManufacturerTable	dword \
+		'GEO', 0,		; GEOWORKS 		0
+		'APP', 0,		; APP_LOCAK		1
+		'PLM', 0,		; PALM_COMPUTING	2
+		'WIZ', 0,		; WIZARD		3
+		'CLB', 0,		; CREATIVE_LABS		4
+		'DSL', 0,		; DOS_LAUNCHER		5
+		'AOL', 0,		; AMERICA_ONLINE	6
+		'ITU', 0,		; INTUIT		7
+		'SDK', 0,		; SDK			8
+		'AGD', 0		; AGD			9
+
+<ESC>LM<path>!
+	Medium listing of files. This is LL without creator, geode token, and
+	protocol number.  As you will notice, LL will display 2 lines of info
+	per file.  LM displays one line per file.
+
+<ESC>AD 
+	Available drives.  Displays all the drives known to the system with
+	their disk labels.
+
+<ESC>FS<driveLetter>:!
+	Displays the amount of free space in the specified driver.  If path is
+	omitted, displays free space on current driver.
+
+<ESC>EB(On|Off)!
+	Turns echo back on or off.  If echo back is on, all the output to the
+	server side is echoed back to client.  If argument is omitted, displays
+	the current status of echo back.  On/off string is case insensitive.
+
+<ESC>AK(On|Off)!
+	Turns acknowledgement on or off.  If ack is on, <ESC>ACK sequence is 
+	sent from server to client when a command is successful, or <ESC>NAK
+	if command is unsuccessful.  By omitting On|Off arg, you can get the 
+	current status of acknowledgement.
+
+Original specification for pccom extension is found in:
+	mudslide\eng:\eng\tech.doc\network
+
+
+TECHNICAL NOTE
+
+	One implementation change is that, in PCCom library, output strings are
+gathered into one string block and sent out at once when a command ends or 
+when the string block gets too big.  See StringBlockStart/Write/Send functions.
+
+
+BUG
+
+	In DOS version of PCCom, AD function does not check A: and B: drives.
+But, it just assumes that they exist.  Before we make it check A:/B: drives,
+we need to intercept critical error handler.
+

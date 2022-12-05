@@ -1,0 +1,243 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:	GEOS
+MODULE:		IrLMP Driver
+FILE:		irlmpConstant.def
+
+AUTHOR:		Chung Liu, Feb 24, 1995
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	CL	2/24/95   	Initial revision
+
+
+DESCRIPTION:
+	Constants and structures.
+		
+	$Id: irlmpConstant.def,v 1.1 97/04/05 01:07:37 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;----------------------------------------------------------------------------
+;			Endpoint
+;----------------------------------------------------------------------------
+
+; Multiple Irlmp connection endpoints can share the same local LSAP-Sel,
+; as long as they don't connect to the same remote LSAP-ID.  IrlmpEndpoint
+; structures are allocated as chunks inside the irlmpEndpointBlock.  Their
+; chunk handles are stored in a table in the lmem block's header, used to
+; lookup endpoints by their IE_lsapSel.  Multiple IrlmpEndpoint chunks with
+; the same IE_lsapSel are linked together via the IE_next field.
+;
+IrlmpEndpointFlags	record
+	:7
+	IEF_TINY_TP:1			;indicates that endpoint is TinyTP
+					;  entity.
+IrlmpEndpointFlags	end
+
+IrlmpEndpoint	struct
+	;
+	; Used by Irlmp and TinyTP
+	;
+	IE_next		lptr		;other IrlmEndpoints with same 
+					;  IE_lsapSel values, or 0 if none.
+	IE_flags	IrlmpEndpointFlags
+	IE_lsapSel	IrlmpLsapSel	;local LSAP-Sel
+	IE_destLsapID	IrlmpLsapID	;remote LSAP-ID; filled in when 
+					;  connected.
+	IE_callback	vfptr		;client callback for indications and
+					;  confirmations to the endpoint.
+	IE_lsapFsm	optr		;LSAP Connection Control FSM
+	IE_extraWord	word		;extra word to pass to callback
+
+	;
+	; Used only by TinyTP.
+	;
+	IE_availCredit	word		;credit available to advance to
+					;  the peer TTP entity
+	IE_remoteCredit	word		;credit held by peer TTP entity
+	IE_sendCredit	word		;credit held by local TTP entity
+	IE_txQueue	lptr		;transmit queue
+	IE_callbackC	vfptr		;used by cstub to hold the C callback
+
+	align word
+IrlmpEndpoint	ends
+
+;
+; Table that sits in the lmem header of irlmpEndpointBlock, used to lookup
+; IrlmpEndpoint by IE_lsapSel.
+;
+IrlmpEndpointByLsapTable	type	\
+				(IRLMP_MAX_LEGAL_LSAP_SEL + 3) dup (lptr)
+IrlmpEndpointBlockHeader struct
+	IEBH_standardHeader	LMemBlockHeader
+	IEBH_endpointTable	IrlmpEndpointByLsapTable
+IrlmpEndpointBlockHeader ends
+
+;-------------------------------------------------------------------------
+;			IrLMP PDUs
+;-------------------------------------------------------------------------
+
+IrlmpFrameHeader	record
+	IFH_RESERVED:1
+	; should always be set to 0
+
+	IFH_SLSAP_SEL IrlmpLsapSel:7
+	; source LSAP-Sel
+
+	IFH_CONTROL:1
+	; control bit is 0 for data, or 1 for command frames
+
+	IFH_DLSAP_SEL IrlmpLsapSel:7
+	; destination LSAP-Sel
+IrlmpFrameHeader	end
+
+IrlmpOpCode	etype	byte
+	IOC_CONNECT		enum IrlmpOpCode, 0x01
+	IOC_DISCONNECT		enum IrlmpOpCode, 0x02
+	IOC_CONNECT_CONFIRM	enum IrlmpOpCode, 0x81
+
+	IOC_DATA		enum IrlmpOpCode, 0xFF
+	; not a real IrLMP OpCode -- defined for internal use.
+
+IrlmpStatus	etype	byte
+	IS_SUCCESS		enum IrlmpStatus, 0x00
+	IS_FAILURE		enum IrlmpStatus, 0x01
+	IS_UNSUPPORTED		enum IrlmpStatus, 0xFF
+
+IrlmpParameter	union
+	IP_status	IrlmpStatus
+	IP_reason	IrlmpDisconnectReason
+IrlmpParameter	end
+
+IrlmpPDU	struct
+	IPDU_header	IrlmpFrameHeader
+	IPDU_opCode	IrlmpOpCode
+	IPDU_parameter	IrlmpParameter
+	IPDU_data	label	byte
+IrlmpPDU	ends
+
+.assert size IrlmpPDU eq IRLMP_HEADER_SIZE
+
+;-------------------------------------------------------------------------
+;				IAS
+;-------------------------------------------------------------------------
+
+IrlmpIasOpCode		etype	byte
+	IIOC_GET_INFO_BASE_DETAILS	enum IrlmpIasOpCode, 1
+	; Arguments:	none
+
+	IIOC_GET_OBJECTS		enum IrlmpIasOpCode, 2
+	; Arguments:	IrlmpIasObjectIdentifier of first object
+	;		Max. length of result list (16-bit unsigned integer)
+	; 		IrlmpIasNameHeader + class name
+
+	IIOC_GET_VALUE_BY_CLASS		enum IrlmpIasOpCode, 4
+	; Arguments:	IrlmpIasNameHeader + class name
+	;		IrlmpIasNameHeader + attribute name
+	;
+
+IrlmpIasControlByte	record
+	IICB_LAST:1
+	; set if this is the last frame in a multiframe command or result,
+	; or the only frame in a command or result.
+
+	IICB_ACK:1
+	; set to indicate an acknowledgement frame.  If set, there is no
+	; data in the frame.
+
+	IICB_OPCODE IrlmpIasOpCode:6
+	; IrlmpIasOpCode
+IrlmpIasControlByte	end
+
+IrlmpIasFrame	struct	
+	IIF_header	IrlmpFrameHeader
+	; Same old two-byte Irlmp MUX header
+
+	IIF_iasControlByte	IrlmpIasControlByte
+
+	IIF_iasArgs		label	byte
+	; depends on IrlmpIasOpCode in IIF_iasControlByte.
+IrlmpIasFrame	ends
+
+;-------------------------------------------------------------------------
+;
+;				TinyTP
+;
+;-------------------------------------------------------------------------
+
+TTP_MAX_TX_QUEUE_COUNT		equ	4
+; This is the maximum number of entries in TxQueue.
+
+;
+; Each TinyTP endpoint's TxQueue and RxQueue are chunk arrays of
+; TTPQueueEntry.
+;
+TTPQueueEntryType	etype 	byte
+	TQET_DATA_REQUEST	enum TTPQueueEntryType
+	TQET_DISCONNECT_REQUEST	enum TTPQueueEntryType
+
+TTPQueueEntry	struct
+	TQE_data	IrlmpDataArgs
+	TQE_type	TTPQueueEntryType
+TTPQueueEntry	ends
+
+;-------------------------------------------------------------------------
+;
+; 			Fatal Errors
+;
+;-------------------------------------------------------------------------
+IRLMP_ILLEGAL_STATE				enum 	FatalErrors
+; FSM is in an invalid state.
+
+IRLMP_ILLEGAL_CLIENT_HANDLE			enum	FatalErrors
+; Client handle out of range
+
+IRLMP_ENDPOINT_TABLE_IS_CORRUPTED		enum 	FatalErrors
+; Something doesn't add up in the endpoint table.
+
+IRLMP_IRLAP_USE_COUNT_UNDERFLOW			enum	FatalErrors
+IRLMP_STATION_FSM_ERROR				enum	FatalErrors
+IRLMP_NOT_ENOUGH_HEADER_SPACE			enum	FatalErrors
+IRLMP_INVALID_PDU_OP_CODE			enum 	FatalErrors
+IRLMP_SEVERE_FSM_ERROR				enum 	FatalErrors
+IRLMP_IRLAP_SHOULD_BE_CONNECTED			enum	FatalErrors
+IRLMP_EXPEDITED_DATA_IS_NOT_DATA_PDU		enum	FatalErrors
+IRLMP_WATCHDOG_TIMEOUT_IN_UNEXPECTED_STATE	enum	FatalErrors
+IRLMP_NO_TIMER_TO_CANCEL			enum	FatalErrors
+IRLMP_IAS_UNEXPECTED_INDICATION_OR_CONFIRMATION enum	FatalErrors
+IRLMP_CANNOT_CREATE_SERVER_THREAD		enum	FatalErrors
+
+IRLMP_CANNOT_CREATE_IAS_SERVER_THREAD		enum	FatalErrors
+IRLMP_CANNOT_CONNECT_RESPONSE			enum	FatalErrors
+
+IRLMP_SENT_DISCONNECT_PDU			enum	Warnings
+IRLMP_RECV_DISCONNECT_PDU			enum	Warnings
+IRLMP_IRLAP_DISCONNECT_REQUEST			enum	Warnings
+IRLMP_IRLAP_DATA_REQUEST			enum	Warnings
+IRLMP_IRLAP_DISCONNECT_INDICATION		enum	Warnings
+IRLMP_DISCONNECT_INDICATION			enum	Warnings
+IRLMP_ILLEGAL_STATE_AND_EVENT_COMBINATION	enum	Warnings
+
+IRLMP_IAS_LOST_DATA_DUE_TO_ERROR		enum	Warnings
+IRLMP_IAS_FLUSH_WITH_NO_DATA			enum	Warnings
+IRLMP_IAS_RECEIVED_PACKET_FOR_DIFFERENT_OPCODE	enum	Warnings
+
+IRLMP_TINY_TP_DATA_HEADER_TOO_SMALL		enum	FatalErrors
+IRLMP_TINY_TP_DATA_DATA_REQUEST_WITH_NO_DATA	enum	FatalErrors
+IRLMP_TINY_TP_ILLEGAL_DELTA_CREDIT		enum	FatalErrors
+IRLMP_TINY_TP_ILLEGAL_INITIAL_CREDIT		enum	FatalErrors
+IRLMP_TINY_TP_INVALID_DATA_PDU			enum	FatalErrors
+
+IRLMP_HUGE_LMEM_BLOCKS_NOT_FREED		enum	FatalErrors
+
+IRLMP_IRDB_CANNOT_DELETE_DATABASE_FILE		enum	Warnings
+
+

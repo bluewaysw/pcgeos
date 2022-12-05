@@ -12,8 +12,23 @@ static char sccsid[] = "@(#)initscr.c	5.1 (Berkeley) 6/7/85";
 #if !defined(_MSDOS)
 # include	<signal.h>
 #endif /* !_MSDOS */
+#include <termios.h>
 
 extern char	*getenv();
+
+#ifdef _LINUX
+struct termios old_termios;
+#endif
+
+#ifdef _LINUX
+void
+exitscr() {
+	static int fd=0;
+	fd=fileno(stdin);	
+	tcsetattr(fd, TCSANOW, &old_termios);
+}
+#endif
+
 
 /*
  *	This routine initializes the current and standard screen.
@@ -56,6 +71,19 @@ initscr() {
 	setterm();
 	DosInitScreen();
 #endif
+#endif
+#ifdef _LINUX
+	{
+		static int fd=0;
+		struct termios new;
+		fd=fileno(stdin);	
+		tcgetattr(fd, &old_termios);
+		new=old_termios;
+		new.c_lflag &= ~(ICANON|ECHO);
+   		tcsetattr(fd, TCSANOW, &new);
+
+		atexit(exitscr);
+	}
 #endif
 
 	if (curscr != NULL) {

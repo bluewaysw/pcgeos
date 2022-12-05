@@ -12,7 +12,8 @@
 #       Name    Date            Description
 #       ----    ----            -----------
 #       tony    4/1/91          Initial version
-#
+#	RainerB	10/28/2022	Resource names adjusted for Watcom compatibility
+
 # DESCRIPTION:
 #       This file contains Geode definitions for the "TwoDLists" sample
 #       application. This file is read by the GLUE linker to
@@ -70,11 +71,12 @@ heapspace 3254
 #
 library	geos
 library	ui
+library ansic
 #
 # Resources: list all resource blocks which are used by the application.
 # (standard discardable code resources do not need to be mentioned).
 #
-resource APPRESOURCE ui-object
-resource INTERFACE   ui-object
-resource ITEMTEXT    object
+resource AppResource ui-object
+resource Interface   ui-object
+resource ItemText    object
 

@@ -1,0 +1,137 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		PCCom library
+FILE:		pccomMacro.def
+
+AUTHOR:		Cassie Hartzog, Nov 10, 1993
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Cassie	11/10/93		Initial revision
+
+
+DESCRIPTION:
+	
+		
+	$Id: pccomMacro.def,v 1.1 97/04/05 01:25:47 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;
+; Load dgroup into a segment register
+;
+if FULL_EXECUTE_IN_PLACE ;-----------------------
+
+LoadDGroup	macro	segment, trashreg
+if <trashreg> ne <bx>
+		push	bx
+endif
+		mov	bx, handle dgroup
+if <segment> eq <ds>
+		call	MemDerefDS
+elseif <segment> eq <es>
+		call	MemDerefES
+else
+	ErrMessage <op : segment must be ds or es>
+endif
+if <trashreg> ne <bx>
+		pop	bx
+endif
+		endm
+
+else	;----------------------------------------
+
+LoadDGroup	macro	segment, trashreg
+ifnb <trashreg>
+		mov	trashreg, dgroup
+		mov	segment, trashreg
+else
+		push	ax
+		mov	ax, dgroup
+		mov	segment, ax
+		pop	ax
+endif
+		endm
+
+endif	; FULL_EXECUTE_IN_PLACE-------------------
+
+;
+; macros for manipulating state flags
+;
+set		macro	flag
+		;;
+		;; Set the flag TRUE. isset? will set ZF = 0 after this
+		;;
+		or	comFlags, MASK flag
+		endm
+reset		macro	flag
+		;;
+		;; Reset the flag to FALSE. isset? will set ZF = 1.
+		;;
+		and	comFlags, NOT MASK flag
+		endm
+isset?		macro	flag
+		;;
+		;; Set the flags so jnz will take if the flag is true
+		;;
+		test	comFlags, MASK flag
+		endm
+
+;
+; Macro to call the serial driver with the given function.
+;	Pass:	bx - stream token
+;		other parameters, depending on function
+;
+CallSer	macro	func, segreg
+	local	done
+	cmp	bx, NO_PORT
+	stc
+	jz	done
+	push	di
+ifnb <segreg>
+	mov	di, func
+	call	segreg:serialDriver
+else
+	push	ds
+	LoadDGroup	ds, di
+	mov	di, func
+	call	ds:serialDriver
+	pop	ds
+endif
+	pop	di
+done:
+	endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Assert_PCComReturnType
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Assert the PCComReturnType
+
+PASS:		testType	(byte size register like AL, BH, etc)
+RETURN:		nothing
+DESTROYED:	nothing (flags preserved)
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	simon	3/ 9/95   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+Assert_PCComReturnType		macro	testType
+		Assert etype	testType, PCComReturnType
+endm
+
+
+
+
