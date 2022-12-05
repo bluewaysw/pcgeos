@@ -7,6 +7,12 @@
 #
 # AUTHOR:	Chung Liu, Apr 12, 1995
 #
+# REVISION HISTORY:
+#       Name    Date            Description
+#       ----    ----            -----------
+#       CL	4/12/95	        Initial version
+#	RainerB	8/6/2022	Resource names adjusted for Watcom compatibility
+#
 #	Geode definitions for TinyTP server test application.
 #
 #	$Id: ttps.gp,v 1.1 97/04/04 16:41:12 newdeal Exp $
@@ -45,6 +51,6 @@ library netutils
 # Resources: list all resource blocks which are used by the application.
 # (standard discardable code resources do not need to be mentioned).
 #
-resource APPRESOURCE ui-object
-resource INTERFACE ui-object
-resource TTPSSTRINGS lmem read-only shared
+resource AppResource ui-object
+resource Interface ui-object
+#resource TtpcStrings lmem read-only shared
