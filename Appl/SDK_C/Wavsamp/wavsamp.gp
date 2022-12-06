@@ -12,6 +12,7 @@
 #       Name    Date            Description
 #       ----    ----            -----------
 #       dubois  12/6/93         Initial version
+#	RainerB	4/27/2022	Resource names adjusted for Watcom compatibility
 #
 # DESCRIPTION:
 #       This file contatins Geode definitions for the "Wavsamp"
@@ -90,9 +91,9 @@ library wav
 # object blocks, fixed code resources, or data resources that are read-only.
 # Standard discardable code resources do not need to be mentioned.
 #
-resource APPRESOURCE ui-object
-resource INTERFACE   ui-object
-resource CONTENT     object
+resource AppResource ui-object
+resource Interface   ui-object
+resource Content     object
 #
 # Any classes defined in this application must be exported here.
 #
