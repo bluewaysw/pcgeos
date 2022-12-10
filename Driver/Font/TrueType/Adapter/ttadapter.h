@@ -231,6 +231,37 @@ typedef struct
 } OutlineDataEntry;
 
 
+/*
+ * structure to hold information necessary to fill FontBuf structure 
+ */
+typedef struct
+{
+    word                        FH_h_height;        //top of 'H'
+    word                        FH_x_height;        //top of 'x'
+    word                        FH_ascender;        //top of 'd'
+    word                        FH_descender;       //bottom of 'p'
+    word                        FH_avgwidth;        //average character width
+    word                        FH_maxwidth;        //widest character width
+    word                        FH_height;          //height of font box
+    word                        FH_accent;          //height of accents
+    word                        FH_ascent;          //height of caps
+    word                        FH_descent;         //descent (from baseline)
+    word                        FH_baseAdjust;      //adjustment for baseline
+    word                        FH_firstChar;       //first char defined
+    word                        FH_lastChar;        //last char defined
+    word                        FH_defaultChar;     //default character
+    word                        FH_underPos;        //position of underline   		
+    word                        FH_underThick;      //thickness of underline
+    word                        FH_strikePos;       //position of strikethrough
+    word                        FH_numChars;        //number of characters
+    sword                       FH_minLSB;          //minimum left side bearing
+    sword                       FH_minTSB;          //minimum top side bound
+    sword                       FH_maxBSB;          //maximum bottom side bound
+    sword                       FH_maxRSB;          //maximum right side bound
+    sword                       FH_continuitySize;  //continuity cutoff
+} FontHeader;
+
+
 /***********************************************************************
  *      macros
  ***********************************************************************/
@@ -258,14 +289,22 @@ typedef struct
  */
 #define ROUND_WWFIXEDASDWORD( value )            \
         ( value & 0x8000 ?                       \
-            ( value & 0x0080 ? ( ( (word)value >> 16 ) - 1 ) : ( (word)value >> 16 )) : \
-            ( value & 0x0080 ? ( ( (word)value >> 16 ) + 1 ) : ( (word)value >> 16 )) )
+            ( value & 0x0080 ? ( ( (sword)(value >> 16) ) - 1 ) : ( (sword)(value >> 16) ) ) : \
+            ( value & 0x0080 ? ( ( (sword)(value >> 16) ) + 1 ) : ( (sword)(value >> 16) ) ) )
+
+/*
+ * round value (WWFixedAsDWord) to negativ infinity (word) 
+ */
+#define CEIL_WWFIXEDASDWORD( value )             \
+        ( value & 0x8000 ?                       \
+            ( value & 0x00ff ? ( ( (sword)value >> 16 - 1 ) ) : ( (sword)value >> 16 ) ) : \
+            ( (sword)value >> 16 ) )
 
 /*
  * get integral part of value (WWFixedAsDWord)
  */
 #define INTEGER_OF_WWFIXEDASDWORD( value )       \
-        ( (word) ( (WWFixedAsDWord)value >> 16 ) )
+        ( (sword) ( (WWFixedAsDWord)value >> 16 ) )
 
 /*
  * get fractional part (reduced to 8 bit) of value (WWFixedAsDWord)
@@ -278,6 +317,9 @@ typedef struct
  */
 #define WBFIXED_TO_FIXED26DOT6( value )          \
         ( ( ( (long)value.WBF_int ) * 1024 ) | value.WBF_frac >> 2 )
+
+#define WBFIXED_TO_WWFIXEDASDWORD( value )       \
+        ( ( (long)(value.WBF_int << 16 ) ) | value.WBF_frac << 8 )
 
 /***********************************************************************
  *      helperfunctions
@@ -294,6 +336,8 @@ static FontAttrs    mapFamilyClass( TT_Short familyClass );
 static FontWeight   mapFontWeight( TT_Short weightClass );
 
 static TextStyle    mapTextStyle( const char* subfamily );
+
+static TT_Error     fillFontHeader( TT_Face face, FontHeader* fontHeader );
 
 
 static int          strlen( const char* str );

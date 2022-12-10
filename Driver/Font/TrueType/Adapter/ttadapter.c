@@ -352,10 +352,10 @@ TT_Error _pascal Fill_FontBuf( const char*  fileName,
                                FontBuf*     fontBuf ) 
 {
         FileHandle          fileHandle;
+        FontHeader          fontHeader;
         TT_Error            error;
         TT_Face             face;
         TT_Instance         instance;
-        TT_Face_Properties  faceProperties;
         TT_Instance_Metrics instanceMetrics;
         WWFixedAsDWord      scaleFactor;
         WWFixedAsDWord      ttfElement;
@@ -382,7 +382,7 @@ TT_Error _pascal Fill_FontBuf( const char*  fileName,
         if ( error )
                 goto Fail;
 
-        error = TT_Get_Face_Properties( face, &faceProperties );
+        error = fillFontHeader( face, &fontHeader );
         if ( error )
                 goto Fail;
 
@@ -395,68 +395,90 @@ TT_Error _pascal Fill_FontBuf( const char*  fileName,
         fontBuf->FB_kernValuePtr = 0;
         fontBuf->FB_kernCount    = 0;
         fontBuf->FB_heapCount    = 0;
-	
-        //TODO: mov	es:FB_flags, mask FBF_IS_OUTLINE
+	fontBuf->FB_flags        = FBF_IS_OUTLINE;
 
-        ttfElement = SCALE_WORD( faceProperties.horizontal->min_Left_Side_Bearing, 
-                                 scaleFactor );
+        ttfElement = SCALE_WORD( fontHeader.FH_minLSB, scaleFactor );
         fontBuf->FB_minLSB = ROUND_WWFIXEDASDWORD( ttfElement ); 
 
-        ttfElement = SCALE_WORD( faceProperties.os2->xAvgCharWidth, scaleFactor );
+        ttfElement = SCALE_WORD( fontHeader.FH_avgwidth, scaleFactor );
         fontBuf->FB_avgwidth.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
         fontBuf->FB_avgwidth.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
 
-        ttfElement = SCALE_WORD( faceProperties.header->xMax -
-                                 faceProperties.header->xMin,
-                                 scaleFactor );
+        ttfElement = SCALE_WORD( fontHeader.FH_maxwidth, scaleFactor );
         fontBuf->FB_maxwidth.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
         fontBuf->FB_maxwidth.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
 
-        /* FB_maxRSB ??? gibt es in TT_Vertical_Header nicht */
+#ifndef DBCS_PCGEOS
+        ttfElement = SCALE_WORD( fontHeader.FH_maxRSB, scaleFactor );
+        fontBuf->FB_maxRSB  = ROUND_WWFIXEDASDWORD( ttfElement );
+#endif  /* DBCS_PCGEOS */
 
-        ttfElement = SCALE_WORD( faceProperties.header->yMax -
-                                 faceProperties.header->yMin,
-                                 scaleFactor );
+        scaleFactor = instanceMetrics.y_scale;
+
+        ttfElement = SCALE_WORD( fontHeader.FH_height, scaleFactor );
         fontBuf->FB_height.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
         fontBuf->FB_height.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
 
+        /* FB_heightAdjust = pointSize - FH_height                           */
+        ttfElement = WBFIXED_TO_WWFIXEDASDWORD( pointSize ) -
+                     WORD_TO_WWFIXEDASDWORD( fontHeader.FH_height );
+        fontBuf->FB_heightAdjust.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
+        fontBuf->FB_heightAdjust.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
+        fontBuf->FB_pixHeight = ROUND_WWFIXEDASDWORD( ttfElement );
 
-        /* FB_pixHeight    := round( pointsize )                             */
-        /*                  + scale( TT_Face_Properties->vertical->min_Top_Side_Bearing ) */
+        ttfElement = SCALE_WORD( fontHeader.FH_baseAdjust, scaleFactor );
+        fontBuf->FB_baseAdjust.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ROUND_WWFIXEDASDWORD( ttfElement ) );
+        fontBuf->FB_baseAdjust.WBF_frac = 0;
 
-        /* FB_heightAdjust := pointsize - FB_height                          */
+        ttfElement = SCALE_WORD( fontHeader.FH_minTSB, scaleFactor );
+        fontBuf->FB_aboveBox.WBF_int  = CEIL_WWFIXEDASDWORD( ttfElement );
+        fontBuf->FB_aboveBox.WBF_frac = 0;
+        fontBuf->FB_minTSB = CEIL_WWFIXEDASDWORD( ttfElement );
+        fontBuf->FB_pixHeight += CEIL_WWFIXEDASDWORD( ttfElement );
 
-        /* FB_baseAdjust ??? gibt es in den TrueType Strukturen nicht */
+        ttfElement = SCALE_WORD( fontHeader.FH_maxBSB, scaleFactor );
+        fontBuf->FB_belowBox.WBF_int  = CEIL_WWFIXEDASDWORD( ttfElement );
+        fontBuf->FB_belowBox.WBF_frac = 0;
+#ifdef SBCS_PCGEOS
+        fontBuf->FB_maxBSB = CEIL_WWFIXEDASDWORD( ttfElement );
+#endif  /* SBCS_PCGEOS */
 
-        /* FB_baselinePos  := scale( TT_Face_Properties->OS2->sTypoAscender )             */
-        /*                  + scale( TT_Face_Properties->OS2->usWinDescend )              */
+        ttfElement = SCALE_WORD( fontHeader.FH_underPos, scaleFactor );
+        fontBuf->FB_underPos.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
+        fontBuf->FB_underPos.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
 
-        /* FB_minTSB       := scale( TT_Face_Properties->vertical->min_Top_Side_Bearing ) */
+        ttfElement = SCALE_WORD( fontHeader.FH_underThick, scaleFactor );
+        fontBuf->FB_underThickness.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
+        fontBuf->FB_underThickness.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
 
-        /* FB_maxBSB ??? gibt es in den TrueType Strukturen nicht */
+        ttfElement = SCALE_WORD( fontHeader.FH_strikePos, scaleFactor );
+        fontBuf->FB_strikePos.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
+        fontBuf->FB_strikePos.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
 
-        /* FB_underPos     := scale( TT_Face_Properties->postscript->underlinePosition )  */
-
-        /* FB_underThick   := scale( TT_Face_Properties->postscript->underlineThickness ) */
-
-        /* FB_strikePos    := scale( TT_Face_Properties->OS2->yStrikeoutPosition )        */
-
-        /* FB_mean         := scale( TT_Face_Properties->OS2->sCapHeight )                */
-        ttfElement = SCALE_WORD( faceProperties.os2->sCapHeight, scaleFactor );
+        ttfElement = SCALE_WORD( fontHeader.FH_x_height, scaleFactor );
         fontBuf->FB_mean.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
         fontBuf->FB_mean.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
 
-        /* FB_descent      := scale( TT_Face_Properties->OS2->usWinDescent )              */
+        ttfElement = SCALE_WORD( fontHeader.FH_descent, scaleFactor );
+        fontBuf->FB_descent.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
+        fontBuf->FB_descent.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
 
-        /* FB_accent       := FB_height - FB_baseline - FB_descent           */
+        ttfElement = SCALE_WORD( fontHeader.FH_accent, scaleFactor );
+        fontBuf->FB_accent.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
+        fontBuf->FB_accent.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
 
-        /* FB_aboveBox ??? gibt es in den TrueType Strukturen nicht */
+        /* baslinepos = accent + ascent                                      */
+        ttfElement = SCALE_WORD( fontHeader.FH_ascent + fontHeader.FH_accent, scaleFactor );
+        fontBuf->FB_baselinePos.WBF_int  = ROUND_WWFIXEDASDWORD( ttfElement );
+        fontBuf->FB_baselinePos.WBF_frac = 0;
 
-        /* FB_belowBox ??? gibt es in den TrueType Strukturen nicht */
-
-        /* Nimbus and TrueType has no external leading                       */
+        /* Nimbus fonts and TrueType fonts has no external leading           */
         fontBuf->FB_extLeading.WBF_int  = 0;
         fontBuf->FB_extLeading.WBF_frac = 0;
+
+        fontBuf->FB_firstChar   = fontHeader.FH_firstChar;
+        fontBuf->FB_lastChar    = fontHeader.FH_lastChar;
+        fontBuf->FB_defaultChar = fontHeader.FH_defaultChar;
 
         TT_Done_Instance( instance );
         error = TT_Err_Ok;
@@ -750,6 +772,11 @@ static TextStyle mapTextStyle( const char* subfamily )
         
         /* only Bold Oblique remains */
         return TS_BOLD | TS_ITALIC;
+}
+
+static TT_Error fillFontHeader( TT_Face face, FontHeader* fontHeader )
+{
+        return TT_Err_Ok;
 }
 
 /*******************************************************************/

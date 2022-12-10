@@ -9,20 +9,19 @@ MAIN            = truetypeEscape.asm ansic_runtime.asm mainManager.asm\
                   truetypeInit.asm truetypeEC.asm truetypeChars.asm\
                   truetypePath.asm truetypeMacros.def truetypeVariable.def\
                   truetypeConstant.def
-ADAPTER         = ttadapter.c ttadapter.h
+ADAPTER         = ttcharmapper.c ttadapter.c ttcharmapper.h ttadapter.h
 FREETYPE        = ttcache.c ttraster.c ttmutex.c ttgload.c ttextend.c\
                   ttcalc.c ttapi.c ftxkern.c ttinterp.c ttload.c ttfile.c\
                   ttcmap.c ttobjs.c ttmemory.c ttcache.h ttcmap.h\
-                  ttconfig.h freetype.h ttgload.h ttfile.h header.h\
-                  ttinterp.h ttload.h tttables.h ttobjs.h fterrid.h\
-                  ttraster.h ttengine.h tttypes.h ttmutex.h ft_conf.h\
-                  ttextend.h ftnameid.h ttcalc.h ftxkern.h ttmemory.h\
-                  tttags.h
+                  ttconfig.h freetype.h ttgload.h ttfile.h ttinterp.h\
+                  ttload.h tttables.h ttobjs.h fterrid.h ttraster.h\
+                  ttengine.h tttypes.h ttmutex.h ft_conf.h ttextend.h\
+                  ftnameid.h ttcalc.h ftxkern.h ttmemory.h tttags.h
 UI_TO_RDFS      =
-OBJS            = ttadapter.obj ttcache.obj ttraster.obj ttmutex.obj\
-                  ttgload.obj ttextend.obj ttcalc.obj ttapi.obj ftxkern.obj\
-                  ttinterp.obj ttload.obj ttfile.obj ttcmap.obj ttobjs.obj\
-                  ttmemory.obj
+OBJS            = ttcharmapper.obj ttadapter.obj ttcache.obj ttraster.obj\
+                  ttmutex.obj ttgload.obj ttextend.obj ttcalc.obj ttapi.obj\
+                  ftxkern.obj ttinterp.obj ttload.obj ttfile.obj ttcmap.obj\
+                  ttobjs.obj ttmemory.obj
 COMMON          =
 MODULES         = Main
 CMODULES        = Adapter FreeType
