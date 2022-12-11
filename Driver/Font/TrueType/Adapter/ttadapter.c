@@ -776,6 +776,18 @@ static TextStyle mapTextStyle( const char* subfamily )
 
 static TT_Error fillFontHeader( TT_Face face, FontHeader* fontHeader )
 {
+        //Chartable holen
+
+        //numChars, fistChar, lastChar füllen
+
+        //iteriere über die Zeichen des Zeichensatzes
+                //Zeichen vorhanden?
+                //Whidth
+                //xMin
+                //xMax
+                //yMin
+                //yMax
+
         return TT_Err_Ok;
 }
 

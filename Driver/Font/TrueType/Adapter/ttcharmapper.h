@@ -22,8 +22,14 @@
 
 #include <geos.h>
 
+
 typedef ByteFlags CharMapFlags;
-#define CMF_                0x40
+#define CMF_CAP         0x10
+#define CMF_ASCENT      0x08
+#define CMF_DESCENT     0x04
+#define CMF_MEAN        0x02
+#define CMF_ACCENT      0x01
+
 
 typedef struct 
 {
