@@ -20,6 +20,7 @@
 
 #include <ttcharmapper.h>
 #include <freetype.h>
+#include <geos.h>
 #include <unicode.h>
 
 #define NUM_CHARMAPENTRIES      ( sizeof(geosCharMap) / sizeof(CharMapEntry) )
@@ -239,7 +240,7 @@ CharMapEntry geosCharMap[] =
         C_LATIN_CAPITAL_LETTER_I_GRAVE,         0,             CMF_ACCENT,
         C_LATIN_CAPITAL_LETTER_O_ACUTE,         0,             CMF_ACCENT,
         C_LATIN_CAPITAL_LETTER_O_CIRCUMFLEX,    0,             CMF_ACCENT,
-        0,                                      0,             0,       //no character
+        0,                                      0,             0,               //no character
         C_LATIN_CAPITAL_LETTER_O_GRAVE,         0,             CMF_ACCENT,
         C_LATIN_CAPITAL_LETTER_U_ACUTE,         0,             CMF_ACCENT,
         C_LATIN_CAPITAL_LETTER_U_CIRCUMFLEX,    0,             CMF_ACCENT,
@@ -267,6 +268,66 @@ word GeosCharToUnicode( word geosChar )
 }
 
 
+TT_Error fillFontHeader( TT_Face face, FontHeader* fontHeader )
+{
+        TT_CharMap  charMap;
+        TT_Error    error;
+        TT_UShort   charIndex;
+        word        geosChar;
+
+        
+        error = getCharMap( face, &charMap );
+        if ( error != TT_Err_Ok )
+                return error;
+
+        fontHeader->FH_numChars = CountGeosCharsInCharMap( charMap, 
+                                                           &fontHeader->FH_firstChar, 
+                                                           &fontHeader->FH_lastChar );
+
+        for ( geosChar = fontHeader->FH_firstChar; geosChar < fontHeader->FH_lastChar; ++geosChar )
+        {
+                charIndex = TT_Char_Index( charMap, GeosCharToUnicode( geosChar ) );
+                if ( charIndex == 0 )
+                        break;
+
+                //Whidth
+                //xMin
+                //xMax
+                //yMin
+                //yMax
+        }
+
+        return TT_Err_Ok;
+}
+
+
+static 
+TT_Error getCharMap( TT_Face face, TT_CharMap* charMap )
+{
+        TT_Face_Properties  face_Properties;
+        TT_UShort           platform;
+        TT_UShort           encoding;
+        int                 i;
+
+
+        TT_Get_Face_Properties( face, &face_Properties );
+
+	for ( i = 0; i < face_Properties.num_CharMaps; ++i ) 
+        {
+		TT_Get_CharMap_ID( face, i, &platform, &encoding );
+		if ( platform == TT_PLATFORM_MICROSOFT && encoding == TT_MS_ID_UNICODE_CS )
+                {
+		        TT_Get_CharMap(face, i, charMap);
+			break;
+		}
+	}
+
+        if ( i == face_Properties.num_CharMaps ) return TT_Err_CMap_Table_Missing;
+        else                                     return TT_Err_Ok;
+}
+
+
+static 
 word CountGeosCharsInCharMap( TT_CharMap map, word *firstChar, word *lastChar )
 {
         word charIndex;

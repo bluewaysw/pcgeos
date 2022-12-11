@@ -231,37 +231,6 @@ typedef struct
 } OutlineDataEntry;
 
 
-/*
- * structure to hold information necessary to fill FontBuf structure 
- */
-typedef struct
-{
-    word                        FH_h_height;        //top of 'H'
-    word                        FH_x_height;        //top of 'x'
-    word                        FH_ascender;        //top of 'd'
-    word                        FH_descender;       //bottom of 'p'
-    word                        FH_avgwidth;        //average character width
-    word                        FH_maxwidth;        //widest character width
-    word                        FH_height;          //height of font box
-    word                        FH_accent;          //height of accents
-    word                        FH_ascent;          //height of caps
-    word                        FH_descent;         //descent (from baseline)
-    word                        FH_baseAdjust;      //adjustment for baseline
-    word                        FH_firstChar;       //first char defined
-    word                        FH_lastChar;        //last char defined
-    word                        FH_defaultChar;     //default character
-    word                        FH_underPos;        //position of underline   		
-    word                        FH_underThick;      //thickness of underline
-    word                        FH_strikePos;       //position of strikethrough
-    word                        FH_numChars;        //number of characters
-    sword                       FH_minLSB;          //minimum left side bearing
-    sword                       FH_minTSB;          //minimum top side bound
-    sword                       FH_maxBSB;          //maximum bottom side bound
-    sword                       FH_maxRSB;          //maximum right side bound
-    sword                       FH_continuitySize;  //continuity cutoff
-} FontHeader;
-
-
 /***********************************************************************
  *      macros
  ***********************************************************************/
@@ -336,10 +305,6 @@ static FontAttrs    mapFamilyClass( TT_Short familyClass );
 static FontWeight   mapFontWeight( TT_Short weightClass );
 
 static TextStyle    mapTextStyle( const char* subfamily );
-
-static TT_Error     fillFontHeader( TT_Face face, FontHeader* fontHeader );
-
-static TT_Error     getCharMap( TT_Face face, TT_CharMap* charMap );
 
 
 static int          strlen( const char* str );

@@ -775,59 +775,6 @@ static TextStyle mapTextStyle( const char* subfamily )
         return TS_BOLD | TS_ITALIC;
 }
 
-//TODO: better in ttcharmapper.c ?
-static TT_Error fillFontHeader( TT_Face face, FontHeader* fontHeader )
-{
-        TT_CharMap  charMap;
-        TT_Error    error;
-        word        i;
-
-        
-        error = getCharMap( face, &charMap );
-        if ( error != TT_Err_Ok )
-                return error;
-
-        fontHeader->FH_numChars = CountGeosCharsInCharMap( charMap, 
-                                                           &fontHeader->FH_firstChar, 
-                                                           &fontHeader->FH_lastChar );
-
-        for ( i = fontHeader->FH_firstChar; i < fontHeader->FH_lastChar; ++i )
-        {
-                //Zeichen vorhanden?
-                //Whidth
-                //xMin
-                //xMax
-                //yMin
-                //yMax
-        }
-
-        return TT_Err_Ok;
-}
-
-static TT_Error getCharMap( TT_Face face, TT_CharMap* charMap )
-{
-        TT_Face_Properties  face_Properties;
-        TT_UShort           platform;
-        TT_UShort           encoding;
-        int                 i;
-
-
-        TT_Get_Face_Properties( face, &face_Properties );
-
-	for ( i = 0; i < face_Properties.num_CharMaps; ++i ) 
-        {
-		TT_Get_CharMap_ID( face, i, &platform, &encoding );
-		if ( platform == TT_PLATFORM_MICROSOFT && encoding == TT_MS_ID_UNICODE_CS )
-                {
-		        TT_Get_CharMap(face, i, charMap);
-			break;
-		}
-	}
-
-        if ( i == face_Properties.num_CharMaps ) return TT_Err_CMap_Table_Missing;
-        else                                     return TT_Err_Ok;
-}
-
 
 /*******************************************************************/
 /* We cannot use functions from the Ansic library, which causes a  */
