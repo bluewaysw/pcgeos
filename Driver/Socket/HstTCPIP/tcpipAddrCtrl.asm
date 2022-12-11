@@ -47,7 +47,8 @@ DESCRIPTION:
 
 AddressCode	segment resource
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		IPAddressControlGetInfo
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -130,7 +131,8 @@ if _FXIP
 ControlInfoXIP	ends
 endif
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		IPAddressControlGenerateUI
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -208,7 +210,8 @@ setOutput:
 		ret
 IPAddressControlGenerateUI	endm
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		IPAddressControlInitialize
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -248,7 +251,8 @@ IPAddressControlInitialize	method dynamic IPAddressControlClass,
 		ret
 IPAddressControlInitialize	endm
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		IPAddressControlDestroy
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -300,7 +304,8 @@ callSuper:
 		ret
 IPAddressControlDestroy	endm
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		IPAddressControlGetAddresses
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -391,7 +396,8 @@ getIPAddr:
 		ret
 IPAddressControlGetAddresses	endm
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		IPAddressControlSetAddresses
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -522,7 +528,8 @@ IPAddressControlSetAddresses	endm
 ;			Subroutines
 ;--------------------------------------------------------------------------
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		IPAddressControlAddChild
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -577,7 +584,7 @@ linkStrategy	local	fptr
 		mov	linkDrvr, 0
 		push	ds
 		mov	bx, MAIN_LINK_DOMAIN_HANDLE
-		call	LinkTableGetEntry	; ds:di = LCB
+		;call	LinkTableGetEntry	; ds:di = LCB
 						; ^hbx = link table
 		movdw	linkStrategy, ds:[di].LCB_strategy, ax
 		mov	ax, ds:[di].LCB_drvr
@@ -587,7 +594,7 @@ linkStrategy	local	fptr
 		tst	ax
 		jnz	driverLoaded
 
-		call	LinkLoadLinkDriverFar	; bx = driver handle
+		;call	LinkLoadLinkDriverFar	; bx = driver handle
 		LONG	jc	exit
 		mov	linkDrvr, bx
 
@@ -610,7 +617,7 @@ driverLoaded:
 		jz	checkChild
 
 		mov	bx, linkDrvr
-		call	LinkUnloadLinkDriverFar
+		;call	LinkUnloadLinkDriverFar
 checkChild:
 	;
 	; If there is a child, instantiate the controller in this object
@@ -659,7 +666,8 @@ exit:
 		ret
 IPAddressControlAddChild	endp
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		IPAddressControlBuildAddress
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -745,7 +753,8 @@ exit:
 		ret
 IPAddressControlBuildAddress	endp
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		IPAddressControlComputeSize
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -811,7 +820,8 @@ done:
 IPAddressControlComputeSize	endp
 
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		IPAddressControlCopyInfo
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -992,7 +1002,8 @@ exit:
 IPPARSEDECIMALADDR	endp
 	SetDefaultConvention
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		IPParseDecimalAddr
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1118,7 +1129,8 @@ IPParseDecimalAddr	endp
 
 
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		IPAddressTextEmptyStatusChanged
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1167,10 +1179,3 @@ IPAddressTextEmptyStatusChanged	endm
 
 
 AddressCode	ends
-
-
-
-
-
-
-

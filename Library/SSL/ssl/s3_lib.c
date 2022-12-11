@@ -408,6 +408,7 @@ static SSL_METHOD SSLv3_data= {
 	&SSLv3_enc_data,
 	};
 
+
 static long ssl3_default_timeout()
 	{
 	/* 2 hours, the 24 hours mentioned in the SSLv3 spec

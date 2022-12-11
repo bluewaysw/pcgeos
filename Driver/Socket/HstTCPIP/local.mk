@@ -92,7 +92,7 @@ _PROTO		= 7.2
 #
 # Do not comment out this line.  Used to make dgroup discardable.
 #
-GOCFLAGS	+= -CTcpipClassStructures
+#GOCFLAGS	+= -CTcpipClassStructures
 
 # STATIC_LINK_RESOLVER
 #  This flag causes the resolver library to be statically linked to the
@@ -107,7 +107,3 @@ ASMFLAGS    += -DSTATIC_LINK_RESOLVER
 LINKFLAGS   += -DSTATIC_LINK_RESOLVER
 
 #include <$(SYSMAKEFILE)>
-
-
-
-

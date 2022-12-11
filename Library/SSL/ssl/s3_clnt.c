@@ -66,6 +66,7 @@
 #include "objects.h"
 #include "evp.h"
 #include "ssl_locl.h"
+#include "ssl_host.h"
 
 #define BREAK break
 /* SSLerr(SSL_F_SSL3_GET_SERVER_HELLO,ERR_R_MALLOC_FAILURE);
@@ -116,6 +117,15 @@ SSL_METHOD*  _export _pascal SSLv3_client_method()
 	{
 	static int init=1;
 	static SSL_METHOD SSLv3_client_data;
+
+#ifdef COMPILE_OPTION_HOST_SERVICE
+	if(SSLCheckHost())
+		{
+		return (SSL_METHOD *) SSLCallHost(
+			SSLHFN_SSLV3_CLIENT_METHOD, 
+			(dword) NULL, (dword) NULL, 0);
+		}
+#endif
 
 	SSLEnter();
 	if (init)

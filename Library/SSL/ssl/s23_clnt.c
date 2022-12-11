@@ -66,6 +66,7 @@
 #include "objects.h"
 #include "evp.h"
 #include "ssl_locl.h"
+#include "ssl_host.h"
 
 #define BREAK break
 
@@ -95,6 +96,14 @@ SSL_METHOD* _export _pascal SSLv23_client_method()
 	static int SSLV23CM_init=1;
 	static SSL_METHOD SSLv23_client_data;
 
+#ifdef COMPILE_OPTION_HOST_SERVICE
+	if(SSLCheckHost())
+		{
+		return (SSL_METHOD *) SSLCallHost(
+			SSLHFN_SSLV23_CLIENT_METHOD, 
+			(dword) NULL, (dword) NULL, 0);
+		}
+#endif
 	if (SSLV23CM_init)
 		{
 		SSLV23CM_init=0;

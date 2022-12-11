@@ -4,7 +4,8 @@
 # If you edit it, you will lose your changes, should it be regenerated.
 #
 GEODE           = hsttcpip
-ASM_TO_OBJS     = tcpipManager.asm
+ASM_TO_OBJS     = tcpipDhcp.asm tcpipLink.asm tcpipLog.asm tcpipManager.asm\
+                  tcpipSocket.asm tcpipUtils.asm
 UI_TO_RDFS      = tcpipStrings.ui tcpipAddrCtrl.ui
 SRCS            = tcpipAddrCtrl.asm tcpipDhcp.asm tcpipEntry.asm\
                   tcpipLink.asm tcpipLog.asm tcpipManager.asm\
@@ -12,7 +13,8 @@ SRCS            = tcpipAddrCtrl.asm tcpipDhcp.asm tcpipEntry.asm\
                   tcpipAddrCtrl.def tcpipGlobal.def tcpipAddrCtrl.ui\
                   tcpipStrings.ui tcpipLog.c tcp.h tcpip.h tcpipLog.h\
                   tcpip.goc
-OBJS            = tcpipManager.obj tcpipLog.obj tcpip.obj
+OBJS            = tcpipDhcp.obj tcpipLink.obj tcpipLog.obj tcpipManager.obj\
+                  tcpipSocket.obj tcpipUtils.obj tcpipLog.obj tcpip.obj
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk

@@ -221,7 +221,8 @@ Strings	ends
 
 ResidentCode	segment resource
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipStrategy
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -317,7 +318,8 @@ driverProcTable		fptr.far	\
 	
 tcpipProcTable		fptr.far	\
 		TcpipSendRawIp			; DR_TCPIP_SEND_RAW_IP		
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipClientStrategy
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -375,12 +377,12 @@ TcpipClientStrategy	endp
 clientProcTable		fptr.far	\
 		TcpipGetProtocol,		; SCO_GET_PROTOCOL
 		TcpipAddDomain,			; SCO_ADD_DOMAIN
-		TcpipLinkOpened,		; SCO_LINK_OPENED
-		TcpipLinkClosed,		; SCO_LINK_CLOSED
+		TcpipError,			; SCO_LINK_OPENED
+		TcpipError,			; SCO_LINK_CLOSED
 		TcpipReceivePacket,		; SCO_RECEIVE_PACKET
 		TcpipError,			; SCO_CONNECT_REQUESTED
-		TcpipLinkOpened,		; SCO_CONNECT_CONFIRMED
-		TcpipLinkClosed,		; SCO_CONNECT_FAILED
+		TcpipError,			; SCO_CONNECT_CONFIRMED
+		TcpipError,			; SCO_CONNECT_FAILED
 		TcpipError,			; SCO_EXCEPTION
 		TcpipError,			; SCO_RECEIVE_URGENT_DATA
 		TcpipError			; SCO_GET_INFO
@@ -393,7 +395,8 @@ clientProcTable		fptr.far	\
 ; Put this in fixed resource because we use this as the dummy 
 ; strategy routine for the loopback link driver.
 ;
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipDoNothing
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -461,7 +464,7 @@ TcpipReceiveInterrupt	proc	far
 
 	pushf
 	push	ax, bx, cx, dx, si, di, bp, ds, es
-	call	SysEnterInterrupt
+	;call	SysEnterInterrupt
 	cld					;clear direction flag
 
 	; scheduled receiving data
@@ -479,7 +482,7 @@ EC <		Assert	thread	bx				>
 	call	ObjMessage
 	pop	bx
 
-	call	SysExitInterrupt
+	;call	SysExitInterrupt
 	pop	ax, bx, cx, dx, si, di, bp, ds, es
 	popf
 	ret
@@ -490,7 +493,7 @@ TcpipReceiveInterrupt	endp
 	SetGeosConvention
 
 TCPIPRECEIVESTOP	proc	far	connection:word
-regs		local	PMRealModeRegister
+;regs		local	PMRealModeRegister
 								uses	cx, ax, ds
 newBuffer 	local	optr		
 		.enter
@@ -511,7 +514,7 @@ TCPIPRECEIVESTOP	endp
 
 
 TCPIPRECEIVESTART	proc	far	connection:word
-regs		local	PMRealModeRegister
+;regs		local	PMRealModeRegister
 								uses	di, si, ds
 newBuffer 	local	optr		
 		.enter
@@ -525,7 +528,7 @@ closeLoop:
 		int	0xB0
 
 		cmp	cx, 0
-		je	recvLoop
+		je	recvLoop		; branch, no more closed links
 
 	; send close to socket library
 
@@ -556,7 +559,7 @@ closeLoop:
 		jmp	closeLoop
 
 recvLoop:
-EC <		WARNING	TCPIP_RECEIVE_START_LOOP		>
+;EC <		WARNING	TCPIP_RECEIVE_START_LOOP		>
 
 
 	; get next receive buffer size
@@ -595,95 +598,25 @@ doRecv:
 				size SequencedPacketHeader
 		mov	es:[di].PH_dataSize, ax
 		mov	es:[di].PH_domain, cx
-		mov dx, connection
+		mov	dx, connection
 		mov	es:[di].SPH_link, dx	
 	;
 	; Copy packetSize bytes of input data into the new buffer.
 	;
 		push	ax, dx				
-		push di
+		push 	di
 		add	di, size SequencedPacketHeader	; es:di = place for data
 		; ax is size in bytes
 
-		mov	bx, ax
-		shr	bx, 4
-		inc	bx
-
 		mov	cx, ax
-
-		call SysAllocDOSBlock
-		;TODO 
-		;jc		errDone
-
-		; now ax = real mode, dx = selector
-		; copy data to dos buffer
-
-		; get next buffer
-		; cx is data size in bytes
-
-	;
-	; setup regs
-	;
-        mov     ss:[regs.PMRMR_edi], 0 
-        ;mov     ss:[regs.PMRMR_esi], 0 
-        ;mov     ss:[regs.PMRMR_ebp], 0 
-        ;mov     ss:[regs.PMRMR_reseverd], 0 
-        ;mov     ss:[regs.PMRMR_ebx], ebx 
-        ;mov     ss:[regs.PMRMR_edx], 0 
-        mov     ss:[regs.PMRMR_ecx], ecx 
-        mov     ss:[regs.PMRMR_eax], 1005
-        mov     ss:[regs.PMRMR_flags], 0 
-        mov     ss:[regs.PMRMR_es], ax 
-        ;mov     ss:[regs.PMRMR_ds], ax 
-		;mov     ss:[regs.PMRMR_fs], 0 
-        ;mov     ss:[regs.PMRMR_gs], 0 
-        ;mov     ss:[regs.PMRMR_ip], 0 
-        ;mov     ss:[regs.PMRMR_cs], 0 
-        mov     ss:[regs.PMRMR_sp], 0
-        mov     ss:[regs.PMRMR_ss], 0
-
-		push	es
-		push	di
-		push	cx
-		push	dx
-		lea	di, ss:regs
-		mov	dx, ss
-		mov	es, dx
-
-		mov	cx, 0
-		mov	bh, 0
-		mov 	bl, 0xB0 ; GEOS host
-
-		;mov ax, 1000		; resolve address
-		;int	0xB0
-		call    SysRealInterrupt		
-		;mov	ax, 1003
-		;int	0xB0
-		pop	dx
-		pop	cx
-		pop	di
-		pop es
-		mov	ds, dx
-		push	dx
-		mov	si, 0
-
-		mov	edx, ss:[regs.PMRMR_edx] 
-		clc
-
-		;mov	ax, 1005		; get recv buf size
-		;int	0xB0
-
-		; copy block to real target
-		rep movsb
-
-		clr	eax
-		pop	ax
-		call SysFreeDOSBlock
+		mov	ax, 1005		; get recv buf size
+		int	0xB0
 
 		pop	di
-		mov	es:[di].SPH_link, dx	
 
 		; fill in link
+		mov	es:[di].SPH_link, dx	
+
 		movdw	bxdx, newBuffer
 		call	HugeLMemUnlock
 
@@ -714,7 +647,8 @@ TCPIPRECEIVESTART	endp
 ResidentCode	ends
 
 CommonCode	segment resource
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipError
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -745,7 +679,8 @@ TcpipError	proc	far
 		ret
 TcpipError	endp
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipInit
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -816,10 +751,10 @@ TcpipInit	proc	far
 	;
 	; Create the socket list, link table and semaphores.
 	;
-		call	TSocketCreateSocketList
+		;call	TSocketCreateSocketList
 		jc	error
 		
-		call	LinkCreateLinkTable	; (expects es = dgroup)
+		;call	LinkCreateLinkTable	; (expects es = dgroup)
 		jc	error
 	
 		mov	bx, 1
@@ -864,7 +799,8 @@ exit:
 		ret
 TcpipInit	endp
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipExit
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -926,7 +862,7 @@ TcpipExit	proc	far
 EC <		tst	ds:[regStatus]					>
 EC <		WARNING_NE TCPIP_EXITING_WITH_CLIENTS_REGISTERED	>
 
-EC <		call	TSocketGetNumSockets				>
+EC <		;call	TSocketGetNumSockets				>
 EC <		tst	cx						>
 EC <		WARNING_NE TCPIP_EXITING_WITH_CONNECTIONS_OPEN		>
 	;	
@@ -944,7 +880,7 @@ ifdef WRITE_LOG_FILE
 		call	LogCloseFile
 endif
 
-		call	LinkTableDestroyTable
+		;call	LinkTableDestroyTable
 
 		mov	bx, ds:[dhcpTimerHandle]
 		tst	bx
@@ -961,7 +897,8 @@ exit:
 		ret
 TcpipExit	endp
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipSuspend
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1000,7 +937,7 @@ TcpipSuspend	proc	far
 	;
 	; Find out if any connections exist.
 	;
-		call	TSocketGetNumSockets		; cx <- # connections
+		;call	TSocketGetNumSockets		; cx <- # connections
 		clc					; assume okay
 		jcxz	exit
 	
@@ -1026,7 +963,8 @@ exit:
 		ret
 TcpipSuspend	endp
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipRegister
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1105,7 +1043,8 @@ exit:
 
 TcpipRegister	endp
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipUnregister
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1174,7 +1113,7 @@ EC <		ERROR_Z	TCPIP_NOT_REGISTERED				>
 		mov	bx, offset TCI_link
 		mov	ax, SDT_LINK
 findIt:
-		call	TSocketFindSocketOfDomain	
+		;call	TSocketFindSocketOfDomain	
 		jc	freeSem				; connection exists
 allowUnreg:
 	;
@@ -1200,7 +1139,8 @@ freeSem:
 
 TcpipUnregister	endp
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipAllocConnection
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1228,22 +1168,24 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 TcpipAllocConnection	proc	far
 
-
+		push	bx
 EC <		call	ECCheckCallerThread				>
 EC <		call	ECCheckClientHandle				>
 
 		;call	TSocketCreateConnection		; ax = error or handle
-		mov	ax, 1001
-		int	0xB0
-
-		jnc	success
+		mov	ax, HF_NC_ALLOC_CONNECTION
+		int	HOST_INT
+		cmp	bx, 0
+		je	success
 		mov	ax, SDE_INSUFFICIENT_MEMORY
 success:
+		pop	bx
 		ret
 TcpipAllocConnection	endp
 
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipLinkConnectRequest
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1330,7 +1272,7 @@ notLoopback:
 		cmp	ax, SDE_CONNECTION_EXISTS
 		jne	error
 
-		call	TSocketFindOpenConnection	; bx = connection handle
+		;call	TSocketFindOpenConnection	; bx = connection handle
 		jnc	error
 		mov	ax, SDE_TEMPORARY_ERROR
 error:
@@ -1340,7 +1282,8 @@ exit:
 		ret		
 TcpipLinkConnectRequest	endp
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipDataConnectRequest
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1469,7 +1412,8 @@ exit:
 
 TcpipDataConnectRequest	endp
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipStopDataConnect
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1521,7 +1465,7 @@ TcpipStopDataConnect	proc	far
 	; Make sure connection exists.
 	;
 		mov	ax, bx
-		call	TSocketFindHandle		; destroys cx
+		;call	TSocketFindHandle		; destroys cx
 		mov	ax, SDE_INVALID_CONNECTION_HANDLE
 		jc	exit
 	;
@@ -1562,7 +1506,8 @@ exit:
 TcpipStopDataConnect	endp
 
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipDisconnectRequest
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1696,7 +1641,8 @@ exit:
 
 TcpipDisconnectRequest	endp
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipSendData
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1736,7 +1682,7 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 TcpipSendData	proc	far
 savebp		local	word	push	bp
-regs		local	PMRealModeRegister
+;regs		local	PMRealModeRegister
 		uses	bx, cx, dx, ds
 		.enter
 
@@ -1769,87 +1715,14 @@ EC <		call	ECCheckCallerThread			>
 		pop	bp
 
 	; skip header
-		mov bx, es:[si].PH_dataSize
+		mov 	bx, es:[si].PH_dataSize
 		add	si, es:[si].PH_dataOffset
 
 		; es:si ptr to data to sent
 		; bx connection handle
-				
-		; alloc dos mem with cx size
-		mov	bx, cx
-		shr	bx, 4
-		inc	bx
-
-		call	SysAllocDOSBlock
 		pop	bx
-		jc		errDone
-		
-		; now ax = real mode, dx = selector
-		; copy data to dos buffer
-
-		push	ds
-		push	es
-		push	di
-
-		mov	di, es
-		mov	ds, di
-
-		push	cx
-		push	ax
-		mov	es, dx
-		mov di, 0
-
-		rep	movsb
-		pop	ax
-		pop	cx
-		pop	di
-		pop	es
-		pop	ds
-
-	;
-	; setup regs
-	;
-        ;mov     ss:[regs.PMRMR_edi], 0 
-        mov     ss:[regs.PMRMR_esi], 0 
-        ;mov     ss:[regs.PMRMR_ebp], 0 
-        ;mov     ss:[regs.PMRMR_reseverd], 0 
-        mov     ss:[regs.PMRMR_ebx], ebx 
-        ;mov     ss:[regs.PMRMR_edx], 0 
-        mov     ss:[regs.PMRMR_ecx], ecx 
-        mov     ss:[regs.PMRMR_eax], 1003
-        mov     ss:[regs.PMRMR_flags], 0 
-        mov     ss:[regs.PMRMR_es], ax 
-        ;mov     ss:[regs.PMRMR_ds], ax 
-		;mov     ss:[regs.PMRMR_fs], 0 
-        ;mov     ss:[regs.PMRMR_gs], 0 
-        ;mov     ss:[regs.PMRMR_ip], 0 
-        ;mov     ss:[regs.PMRMR_cs], 0 
-        mov     ss:[regs.PMRMR_sp], 0
-        mov     ss:[regs.PMRMR_ss], 0
-
-		lea	di, ss:regs
-		mov	dx, ss
-		mov	es, dx
-
-		mov	cx, 0
-		mov	bh, 0
-		mov 	bl, 0xB0 ; GEOS host
-
-		;mov ax, 1000		; resolve address
-		;int	0xB0
-		call    SysRealInterrupt		
-		;mov	ax, 1003
-		;int	0xB0
-
-		mov	eax, ss:[regs.PMRMR_eax] 
-		clc
-
-		; TODO error handling
-
-		; free the dos block
-		call	SysFreeDOSBlock
-		clc
-
+		mov	ax, 1003
+		int	0xB0
 errDone:
 		pop	dx
 		mov		bx, dx
@@ -1880,7 +1753,8 @@ exit:
 
 TcpipSendData	endp
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipStopSendData
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1919,9 +1793,9 @@ TcpipStopSendData	proc	far
 		mov	di, ax				; di = handle
 
 		call	TcpipGainAccess
-		call	TSocketLockInfoListFar		; *ds:si = socket list
+		;call	TSocketLockInfoListFar		; *ds:si = socket list
 
-		call	TSocketFindHandleNoLock		; destroys cx
+		;call	TSocketFindHandleNoLock		; destroys cx
 		mov	ax, SDE_INVALID_CONNECTION_HANDLE
 		jc	exit
 
@@ -1937,7 +1811,7 @@ TcpipStopSendData	proc	far
 		call	ThreadVSem
 		clc
 exit:
-		call	TSocketUnlockInfoExcl		
+		;call	TSocketUnlockInfoExcl		
 		call	TcpipReleaseAccess
 
 		.leave
@@ -1946,7 +1820,8 @@ TcpipStopSendData	endp
 
 
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipSendDatagram
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1999,7 +1874,8 @@ EC <		pop	bx					>
 
 TcpipSendDatagram	endp
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipResetRequest
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2032,7 +1908,7 @@ TcpipResetRequest	proc	far
 		.enter
 EC <		call	ECCheckCallerThread				>
 
-		call	TSocketFindHandle		; destroys cx		
+		;call	TSocketFindHandle		; destroys cx		
 EC <		WARNING_C TCPIP_CONNECTION_DOES_NOT_EXIST		>
 		jc	noSocket
 	;
@@ -2089,12 +1965,13 @@ noSocket:
 		ret
 
 noSocketUnlock:
-		call	TSocketUnlockInfoExcl
+		;call	TSocketUnlockInfoExcl
 		jmp	short exit
 
 TcpipResetRequest	endp
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipAttach
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2136,7 +2013,7 @@ TcpipAttach	proc	far
 EC <		call	ECCheckCallerThread				>
 
 EC <		push	cx					>
-EC <		call	TSocketFindHandle	; destroys cx	>
+;EC <		call	TSocketFindHandle	; destroys cx	>
 EC <		pop	cx					>
 EC <		ERROR_C TCPIP_INVALID_CONNECTION_HANDLE		>
 
@@ -2145,7 +2022,7 @@ EC <		ERROR_C TCPIP_INVALID_CONNECTION_HANDLE		>
 	; caller's thread.
 	;
 		mov	bl, TSS_CONNECTING
-		call	TSocketSetStateAndGetSem		; bx = sem handle
+		;call	TSocketSetStateAndGetSem		; bx = sem handle
 	;
 	; Tell the driver's thread to accept the connection, then wait.
 	;
@@ -2158,14 +2035,15 @@ EC <		ERROR_C TCPIP_INVALID_CONNECTION_HANDLE		>
 	; Check if the connection has been successfully established or not.
 	;
 		mov	cx, di				; cx = connection handle
-		call	TSocketCheckIfConnected		; ax = SocketDrError
+		;call	TSocketCheckIfConnected		; ax = SocketDrError
 exit::
 		.leave
 		ret
 
 TcpipAttach	endp
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipReject
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2205,7 +2083,7 @@ EC <		call	ECCheckCallerThread				>
 	;
 	; Verify that the connection exists.
 	;
-EC <		call	TSocketFindHandle	; destroys cx	>
+;EC <		call	TSocketFindHandle	; destroys cx	>
 EC <		ERROR_C TCPIP_INVALID_CONNECTION_HANDLE		>
 
 	;
@@ -2245,7 +2123,8 @@ exit::
 
 TcpipReject	endp
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipGetInfo
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2308,7 +2187,8 @@ infoProcTable	nptr	\
 
 TcpipGetInfo	endp
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipGetNothing
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2336,7 +2216,8 @@ TcpipGetNothing	proc	near
 TcpipGetNothing	endp
 
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipGetMediaList
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2394,7 +2275,8 @@ mediaTable	word \
 
 TcpipGetMediaList	endp
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipGetMediumAndUnit
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2423,11 +2305,12 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 TcpipGetMediumAndUnit	proc	near
-		call	LinkGetMediumAndUnit
+		;call	LinkGetMediumAndUnit
 		ret
 TcpipGetMediumAndUnit	endp
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipGetAddrCtrl
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2470,7 +2353,8 @@ TcpipGetAddrCtrl	proc	near
 TcpipGetAddrCtrl	endp
 
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipGetAddrSize
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2500,7 +2384,8 @@ TcpipGetAddrSize	proc	near
 		ret
 TcpipGetAddrSize	endp
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipGetLocalAddr/TcpipGetRemoteAddr
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2558,7 +2443,7 @@ noAddr:
 		push	si, es, ds
 		movdw	essi, dsbx			; es:si = buffer
 		mov	bx, MAIN_LINK_DOMAIN_HANDLE
-		call	LinkTableGetEntry		; ds:di = LCB
+		;call	LinkTableGetEntry		; ds:di = LCB
 							; ^hbx = table
 		movdw	es:[si], ds:[di].LCB_localAddr, cx
 		mov	cl, ds:[di].LCB_state
@@ -2589,7 +2474,8 @@ exit:
 		ret
 TcpipGetRemoteAddr	endp
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipGetAddrCommon
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2621,18 +2507,18 @@ TcpipGetAddrCommon	proc	near
 
 EC <		push	ax					>
 EC <		mov_tr	ax, cx					>
-EC <		call	TSocketFindHandle	; destroys cx	>
+;EC <		call	TSocketFindHandle	; destroys cx	>
 EC <		ERROR_C TCPIP_INVALID_CONNECTION_HANDLE		>
 EC <		mov_tr	cx, ax					>
 EC <		pop	ax					>
 
 		push	ds
-		call	TSocketLockInfoShared
+		;call	TSocketLockInfoShared
 		mov	si, cx				; si = connection handle
 		mov	si, ds:[si]			; ds:si = TcpSocket
 		add	si, di				; ds:si = desired address
 		movdw	cxdi, ds:[si]			; cxdi = IP address
-		call	TSocketUnlockInfoShared
+		;call	TSocketUnlockInfoShared
 		pop	ds
 
 		movdw	ds:[bx], cxdi
@@ -2642,7 +2528,8 @@ EC <		pop	ax					>
 		ret
 TcpipGetAddrCommon	endp
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipGetMediumConnection
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2688,7 +2575,7 @@ EC <		call	ECAssertValidFarPointerXIP		>
 EC <		mov	bx, si					>
 EC <		pop	si					>
 
-		call	LinkGetMediumAndUnitConnection	; cx = link domain handle
+		;call	LinkGetMediumAndUnitConnection	; cx = link domain handle
 		jc	exit				; no link
 		mov_tr	cx, ax				; cx <- addr size
 							;  (carry remains
@@ -2698,7 +2585,8 @@ exit:
 		ret
 TcpipGetMediumConnection	endp
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipGetMediumLocalAddr
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2747,7 +2635,8 @@ TcpipGetMediumLocalAddr	proc	near
 TcpipGetMediumLocalAddr	endp
 
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipSetOption
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2788,7 +2677,7 @@ TcpipSetOption	proc	far
 	;
 		push	cx					
 		xchg	ax, bx					
-		call	TSocketFindHandle	; destroys CX	
+		;call	TSocketFindHandle	; destroys CX	
 		xchg	ax, bx					
 		pop	cx					
 EC <		WARNING_C TCPIP_CONNECTION_HANDLE_IS_BAD	>
@@ -2813,7 +2702,8 @@ exit:
 		ret
 TcpipSetOption	endp
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipGetOption
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2844,7 +2734,7 @@ TcpipGetOption	proc	far
 		Assert	etype ax, SocketOptionType		
 
 		xchg	ax, bx					
-		call	TSocketFindHandle	; destroys CX	
+		;call	TSocketFindHandle	; destroys CX	
 		xchg	ax, bx					
 EC <		WARNING_C TCPIP_CONNECTION_HANDLE_IS_BAD	>
 		mov	cx, 0			; assume worst... preserve carry!
@@ -2863,7 +2753,8 @@ exit:
 TcpipGetOption	endp
 
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipResolveAddr
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2922,7 +2813,7 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 TcpipResolveAddr	proc	far
 savebp		local	word	push	bp
-regs		local	PMRealModeRegister
+;regs		local	PMRealModeRegister
 
 		uses	bx, dx, bp, si, ds, es
 		.enter
@@ -2968,7 +2859,8 @@ EC <		ERROR_E TCPIP_INVALID_IP_ADDRESS		>
 
 		;sub	bp, size word		; es:bp = start of buffer
 
-		mov	cx, 3
+		mov	cx, 3			; HstTcpip, assume same size
+						; LT_ID
 afterLink:
 	;
 	; Store resolved link address size.  
@@ -2988,6 +2880,8 @@ afterLink:
 		mov	cx, di			; cx = unresolved IP addr size
 		mov	di, bp			; es:di = resolved IP addr dest
 		pop	bp
+
+if 0
 	;
 	; Now resolve the IP part of the address.  If no IP address is 
 	; provided, return the default IP address.
@@ -3003,7 +2897,7 @@ afterLink:
 		shr	bx, 4		; div by 16 to have paragraphs
 		inc	bx
 
-		call	SysAllocDOSBlock
+		;call	SysAllocDOSBlock
 		pop	bx
 
 		jc	exit
@@ -3028,6 +2922,8 @@ afterLink:
 	;
 	; setup regs
 	;
+endif
+if 0
         ;mov     ss:[regs.PMRMR_edi], 0 
         mov     ss:[regs.PMRMR_esi], 0 
         ;mov     ss:[regs.PMRMR_ebp], 0 
@@ -3045,8 +2941,9 @@ afterLink:
         ;mov     ss:[regs.PMRMR_cs], 0 
         mov     ss:[regs.PMRMR_sp], 0
         mov     ss:[regs.PMRMR_ss], 0
-
-		lea	di, ss:regs
+endif
+if 0
+		;lea	di, ss:regs
 		mov	dx, ss
 		mov	es, dx
 
@@ -3055,14 +2952,15 @@ afterLink:
 		mov	bh, 0
 		mov 	bl, 0xB0 ; GEOS host
 
-		;mov ax, 1000		; resolve address
-		;int	0xB0
-		call    SysRealInterrupt		
+		mov ax, 1000		; resolve address
+		int	0xB0
+		
+		;call    SysRealInterrupt		
 		pushf
 	; free dos mem buffer
 		
 		mov	dx, es
-		call	SysFreeDOSBlock
+		;call	SysFreeDOSBlock
 
 
 		;call	TcpipResolveIPAddr	; dxax = address or 
@@ -3072,10 +2970,20 @@ afterLink:
 		pop	di
 		pop es
 		jc	exit			;  ax = SocketDrError
-		mov		eax, regs.PMRMR_eax
-		mov		edx, regs.PMRMR_edx
+		;mov		eax, regs.PMRMR_eax
+		;mov		edx, regs.PMRMR_edx
+endif
+	;
+	; Now resolve the IP part of the address.  If no IP address is 
+	; provided, return the default IP address.
+	;
+		jcxz	getDefault		
+
+		call	TcpipResolveIPAddr	; dxax = address or 
+		jc	exit			;  ax = SocketDrError
 haveAddr:
 		movdw	es:[di], dxax
+		mov	cx, bx			; cx = resolved link addr size
 setSize:
 		add	cx, IP_ADDR_SIZE + size word
 		clc
@@ -3090,9 +2998,11 @@ getDefault:
 		call	TcpipGetDefaultIPAddr	; dxax = address
 		jmp	haveAddr	
 
+
 TcpipResolveAddr	endp
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipStopResolve
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -3143,7 +3053,7 @@ EC <		ERROR_E TCPIP_INVALID_IP_ADDRESS		>
 		xchg	cx, ax			; ax = total addr size
 		jcxz	doIP			; no link address
 
-		call	LinkStopLinkResolve
+		;call	LinkStopLinkResolve
 doIP:
 	;
 	; Make sure address even needed resolving.  Address
@@ -3192,7 +3102,8 @@ endif
 TcpipStopResolve	endp
 
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipCloseMedium
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -3253,7 +3164,7 @@ EC <		pop	bx, si					>
 
 		mov	bx, cx				; dx:bx = MediumAndUnit
 		clr	cx				; no buffer for address
-		call	LinkGetMediumAndUnitConnection	; cx = link handle
+		;call	LinkGetMediumAndUnitConnection	; cx = link handle
 		LONG	jc	clcExit			
 	;
 	; If link is busy and client is forcing close, reset
@@ -3262,12 +3173,12 @@ EC <		pop	bx, si					>
 		mov_tr	ax, cx				; ax = link handle
 
 		mov	bx, ax
-		call	LinkTableGetEntry
+		;call	LinkTableGetEntry
 		test	ds:[di].LCB_options, mask LO_ALWAYS_BUSY
 		call	MemUnlockExcl
 		jnz	busyLink
 			
-		call	TSocketCheckLinkBusy
+		;call	TSocketCheckLinkBusy
 		jnc	unusedLink
 busyLink:		
 		mov	cx, force
@@ -3280,7 +3191,7 @@ busyLink:
 	; should be displayed.)
 	;
 		mov	dx, (SSDE_CANCEL or SDE_CONNECTION_RESET)
-		call	TSocketResetConnectionsOnLink
+		;call	TSocketResetConnectionsOnLink
 unusedLink:
 	;
 	; If link is still being opened, interrupt it.  Set state to
@@ -3288,7 +3199,7 @@ unusedLink:
 	;
 		mov	cx, ax				; cx = link handle
 		mov_tr	bx, ax				
-		call	LinkTableGetEntry
+		;call	LinkTableGetEntry
 
 		mov	si, ds:[di].LCB_connection
 		BitClr	ds:[di].LCB_options, LO_ALWAYS_BUSY
@@ -3315,7 +3226,7 @@ stopLinkOpen:
 		call	MemUnlockExcl
 
 		mov	ax, TSNT_CLOSING
-		call	LinkSendNotification
+		;call	LinkSendNotification
 
 		mov	bx, si
 		mov	di, DR_SOCKET_STOP_LINK_CONNECT
@@ -3337,7 +3248,7 @@ closeLink:
 
 		push	ax
 		mov	ax, TSNT_CLOSED
-		call	LinkSendNotification
+		;call	LinkSendNotification
 		pop	ax
 
 		tst_clc	dx
@@ -3362,7 +3273,7 @@ closed:
 		mov	bx, dx
 	    cmp cx, MAIN_LINK_DOMAIN_HANDLE
 	    jne notMain
-	    call    LinkUnloadLinkDriverFar
+	    ;call    LinkUnloadLinkDriverFar
 	    jmp delete
 notMain:
 		call	GeodeFreeDriver
@@ -3388,7 +3299,8 @@ exit:
 		ret
 TcpipCloseMedium	endp
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipMediumConnectRequest
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -3442,14 +3354,15 @@ EC <		mov	bx, ds					>
 EC <		call	ECAssertValidFarPointerXIP		>
 EC <		pop	bx					>
 
-		call	LinkOpenConnection		; ax = SocketDrError
+		;call	LinkOpenConnection		; ax = SocketDrError
 		jc	exit
 		clr	ax				
 exit:
 		ret
 TcpipMediumConnectRequest	endp
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipSetMediumOption
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -3503,14 +3416,14 @@ EC <		pop	bx, si					>
 
 		mov	bx, cx				; dx:bx = MediumAndUnit
 		clr	cx				; no buffer for address
-		call	LinkGetMediumAndUnitConnection	; cx = link handle
+		;call	LinkGetMediumAndUnitConnection	; cx = link handle
 		mov	bx, cx
 		pop	cx				; true/false
 		LONG	jc	exit
 	;
 	; Set/clear option for link.
 	;
-		call	LinkTableGetEntry		; bx = link table
+		;call	LinkTableGetEntry		; bx = link table
 							; ds:di = LCB
 		CheckHack < FALSE eq 0 >
 		jcxz	clearBusy
@@ -3531,7 +3444,8 @@ TcpipSetMediumOption	endp
 ;---------------------------------------------------------------------------
 ;		Tcpip Extended Socket Driver Functions
 ;---------------------------------------------------------------------------
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipSendRawIp
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -3589,7 +3503,8 @@ TcpipSendRawIp	endp
 ;		Client Operations
 ;---------------------------------------------------------------------------
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipGetProtocol
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -3622,7 +3537,8 @@ TcpipGetProtocol	proc	far
 TcpipGetProtocol	endp
 
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipAddDomain
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -3701,375 +3617,14 @@ haveSize:
 
 		mov	bx, handle dgroup
 		call	MemDerefDS
-		call	LinkTableAddEntry	; bx = domain handle
+		;call	LinkTableAddEntry	; bx = domain handle
 		clc
 exit:
 		.leave
 		ret
 TcpipAddDomain	endp
 
-
-COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		TcpipLinkOpened
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	TCP/IP driver is being informed that a link has been 
-		opened by the peer.
-
-CALLED BY:	TcpipClientStrategy (SCO_LINK_OPENED)
-
-PASS: 		bx	= domain handle	 
-		ax	= link handle
-
-		di	= SCO_LINK_OPENED 
-			ds:si	= local IP address of link
-			cx	= address size	(should be size of IPAddr)
-		- or -
-		di	=  SCO_CONNECT_CONFIRMED
-
-RETURN:		nothing
-DESTROYED:	di (allowed)
-
-PSEUDO CODE/STRATEGY:
-		gain access
-		lock link table
-		set state to OPEN
-		get MTU
-		if SCO_LINK_OPENED
-			store link handle
-			store local address
-		else if SCO_CONNECT_CONFIRMED
-			EC (verify link connection handle matches)
-			get local address
-			V LCB_sem enough times to wake everyone up
-		unlock link table
-		release access
-
-NOTES:	
-		Okay to leave link table locked when calling link
-		driver to get info because these are nonblocking
-		operations.
-
-REVISION HISTORY:
-	Name	Date			Description
-	----	----			-----------
-	jwu	7/ 7/94			Initial version
-	jwu	7/29/96			interruptable version
-	jwu	4/19/97			queue link open requests
-	ed	6/13/00			DHCP support, GCN notification
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-TcpipLinkOpened	proc	far
-		uses	ax, bx, cx, dx, si, ds, es, bp
-		.enter
-
-EC <		call	ECCheckLinkDomainHandle				>
-EC <		ERROR_C	TCPIP_INVALID_LINK_DOMAIN_HANDLE		>
-
-	;
-	; Set state to LS_OPEN.
-	;
-		call	TcpipGainAccess
-
-		segmov	es, ds, dx
-		mov	dx, di				; dx = SCO
-		mov	bp, bx				; save domain handle
-		call	LinkTableGetEntry		; ds:di = LCB
-							; ^hbx = link table
-		segxchg	es, ds				; ds:si = address
-							; es:di = LCB
-	; Don't do this now, as we might have to unlock the block
-	;		mov	es:[di].LCB_state, LS_OPEN
-	;
-	; Get MTU.  
-	;				
-		push	ax
-		push	di
-		pushdw	es:[di].LCB_strategy
-		mov	ax, SGIT_MTU
-		mov	di, DR_SOCKET_GET_INFO
-		call	PROCCALLFIXEDORMOVABLE_PASCAL	; ax = value
-		pop	di
-		jnc	haveMTU
-		mov	ax, DEFAULT_LINK_MTU
-haveMTU:
-		mov	es:[di].LCB_mtu, ax
-		pop	ax				; ax = link handle
-	;
-	; If SCO_LINK_OPENED, store link connection handle and address.
-	;
-		cmp	dx, SCO_LINK_OPENED
-		jne	openConfirmed
-
-		mov	es:[di].LCB_connection, ax
-
-EC <		cmp	cx, size IPAddr					>
-EC <		ERROR_NE TCPIP_INVALID_IP_ADDRESS			>
-
-EC <		push	bx						>
-EC <		mov	bx, ds						>
-EC <		call	ECAssertValidFarPointerXIP			>
-EC <		pop	bx						>
-
-		add	di, offset LCB_localAddr	
-		rep	movsb
-		push	ax
-		mov	ax, TSNT_OPEN
-		call	LinkSendNotification
-		pop	ax
-		jmp	unlockTable
-openConfirmed:
-	;
-	; Get local IP address of link.
-	; 
-EC <		cmp	dx, SCO_CONNECT_CONFIRMED			>
-EC <		ERROR_NE TCPIP_INTERNAL_ERROR				>
-
-EC <		cmp	ax, es:[di].LCB_connection			>
-EC <		ERROR_NE TCPIP_INTERNAL_ERROR				>
-
-		push	bx
-		push	di
-
-		pushdw	es:[di].LCB_strategy
-		mov_tr	cx, ax				; cx = connection handle
-		segmov	ds, es, ax
-		mov	bx, di
-		add	bx, offset LCB_localAddr	; ds:bx = place for addr
-		mov	dx, IP_ADDR_SIZE		; dx = size of buffer
-		mov	ax, SGIT_LOCAL_ADDR
-		mov	di, DR_SOCKET_GET_INFO
-		call	PROCCALLFIXEDORMOVABLE_PASCAL
-		jnc	gotIP
-		clrdw	ds:[bx]	; Error, make sure no old ip still stored
-
-gotIP:
-		pop	di				; es:di = LCB
-
-	; Check if our ip address is 0.0.0.0. If it is, we have to call
-	; DHCP.
-		cmpdw	es:[di].LCB_localAddr, 0
-		jne	skipDhcp
-		mov	bx, handle dgroup
-		call	MemDerefDS
-	;		mov	ds:[dhcpDomain], bp
-	;		mov	ax, es:[di].LCB_clientHan
-	;		mov	ds:[dhcpClientHan], ax
-		movdw	axbx, es:[di].LCB_strategy
-		movdw	ds:[dhcpStrategy], axbx
-		pop	bx
-		call	MemUnlockExcl
-		mov	dx, bp
-		call	TcpipStartDhcp
-		jmp	abortLinkOpened
-
-	;
-	; Wake up all blocked clients.  Link table is locked so clients
-	; can't proceed until we're done here.
-	;
-skipDhcp:
-EC <		tst	es:[di].LCB_semCount				>
-EC <		ERROR_Z TCPIP_INTERNAL_ERROR	; must have a waiter!	>
-
-		
-		mov	es:[di].LCB_state, LS_OPEN
-		mov	cx, es:[di].LCB_semCount
-		mov	bx, es:[di].LCB_sem
-wakeLoop:
-		call	ThreadVSem
-		loop	wakeLoop
-
-		mov	ax, TSNT_OPEN
-		call	LinkSendNotification
-
-		mov	es:[di].LCB_semCount, cx	; no waiters left
-		pop	bx				; ^hbx = link table
-unlockTable:
-		call	MemUnlockExcl
-abortLinkOpened:
-		call	TcpipReleaseAccess
-
-		.leave
-		ret
-TcpipLinkOpened	endp
-
-
-COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		TcpipLinkClosed
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-SYNOPSIS:	TCP/IP driver is being informed that a link has been
-		closed by the peer.
-
-CALLED BY:	TcpipClientStrategy (SCO_LINK_CLOSED)
-
-PASS:		ax	= link handle
-		bx	= domain handle
-		cx	= SocketCloseType  (ignored by us)
-		dx	= SocketDrError (SDE_NO_ERROR if none)
-			(if dx != SDE_NO_ERROR, all conections on the 
-			link will be destroyed)
-		di	= SCO_LINK_CLOSED or SCO_CONNECT_FAILED
-
-RETURN:		nothing
-
-DESTROYED:	di (allowed)
-
-PSEUDO CODE/STRATEGY:
-		gain access
-		lock table
-		Set state in LCB to CLOSED.
-
-		if connect failed,
-			EC (verify link handle)
-			store error in LCB_error if not SDE_INTERRUPTED
-			clr LCB_connection
-			if prior LCB_connectino != zero 
-				(have to check because extra notifications
-				 may arrive)
-				V LCB_sem to wake all waiters
-		else if link closed
-			V LCB_closeSem enough times to get LCB_closeCount
-				back to zero
-		unlock table
-
-		If not registered, queue message for driver's thread
-		to unregister and free link driver, deleting its entry
-		from the link table if not the main link.
-
-		If registered, destroy all connections on the link.
-		release access
-
-NOTES:		Don't need to V LCB_sem if SCO_LINK_CLOSED because
-		disconnect requests are synchronous, blocking in PPP
-		until complete.
-
-REVISION HISTORY:
-	Name	Date			Description
-	----	----			-----------
-	jwu	7/ 7/94			Initial version
-	jwu	7/29/96			interruptable version
-	jwu	4/19/97			queue link open requests
-	ed	6/30/00			GCN notification
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-TcpipLinkClosed	proc	far
-		uses	ax, bx, cx, ds
-		.enter
-
-EC <		call	ECCheckLinkDomainHandle			>
-EC <		ERROR_C	TCPIP_INVALID_LINK_DOMAIN_HANDLE	>
-	;
-	; Mark the link as closed.
-	;
-		call	TcpipGainAccess
-		mov	si, di				; si = SCO
-		mov	cx, bx				; cx = domain handle
-		call	LinkTableGetEntry		; ds:di = LCB
-							; ^hbx = table's block
-		mov	ds:[di].LCB_state, LS_CLOSED
-		BitClr	ds:[di].LCB_options, LO_ALWAYS_BUSY
-
-		cmp	si, SCO_CONNECT_FAILED
-		jne	linkClosed
-connectFailed::
-	;
-	; Connect failed, store error unless the error is already
-	; SDE_INTERRUPTED.  
-	;
-		cmp	ds:[di].LCB_error, SDE_INTERRUPTED
-		je	afterError
-		mov	ds:[di].LCB_error, dx		
-afterError:
-	;
-	; If connection is already zero, then this is an extra
-	; notification and there's no need to wake blocked clients.
-	; Keep link table locked while waking clients so they can't
-	; proceed until we're done.
-	;
-		tst	ds:[di].LCB_connection
-		jz	unlockTable
-
-EC <		cmp	ax, ds:[di].LCB_connection			>
-EC <		ERROR_NE TCPIP_INTERNAL_ERROR				>
-
-		push	cx				; save link domain
-		mov	cx, ds:[di].LCB_semCount
-		jcxz	afterWake
-
-		mov	dx, bx				; ^hdx = link table
-		mov	bx, ds:[di].LCB_sem
-wakeLoop:
-		call	ThreadVSem
-		loop	wakeLoop
-
-		mov	bx, dx				; ^hbx = link table
-		mov	ds:[di].LCB_semCount, cx	; no waiters left
-afterWake:
-		mov	ds:[di].LCB_connection, cx	; no connection
-		pop	cx				; cx = link domain
-		clr	dx				; nothing to reset
-		jmp	unlockTable
-linkClosed:
-	;
-	; Link has closed.  If there are clients waiting for link 
-	; to close before opening a new link, wake them up here.
-	; We have link table locked so they can't proceed until we're
-	; done here.
-	;
-		push	cx				; save link domain
-		mov	cx, ds:[di].LCB_closeCount
-		jcxz	afterWake2			; no waiters
-
-		push	bx
-		mov	bx, ds:[di].LCB_closeSem
-wake2Loop:
-		call	ThreadVSem
-		loop	wake2Loop
-		mov	ds:[di].LCB_closeCount, cx	; no waiters left
-		pop	bx				; ^hbx = table's block
-afterWake2:
-		pop	cx				; cx = link domain
-unlockTable:
-		call	MemUnlockExcl
-		call	TcpipReleaseAccess
-	;
-	; If no registered clients, queue a message for driver's 
-	; thread to unregister and free the link driver, deleting its
-	; entry from the link table.    
-	;
-		mov	bx, handle dgroup
-		call	MemDerefDS
-		tst	ds:[regStatus]
-		jnz	checkError
-
-		mov	bx, ds:[driverThread]
-		mov	ax, MSG_TCPIP_DELETE_LINK_ASM
-		mov	di, mask MF_FORCE_QUEUE
-		call	ObjMessage
-		jmp	exit
-checkError:
-	;
-	; Destroy all connections using the link if there is an error.
-	; Can't do this without a client because there is noone to notify.
-	;
-		CheckHack <SDE_NO_ERROR eq 0>
-		tst	dx
-		je	exit	
-
-		mov_tr	ax, cx				; ax = link domain 
-		call	TSocketGetNumSockets		; cx = # of connections
-		jcxz	exit				
-		call	TSocketResetConnectionsOnLink
-exit:
-		mov	ax, TSNT_CLOSED
-		call	LinkSendNotification
-
-		.leave
-		ret
-TcpipLinkClosed	endp
-
-
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipReceivePacket
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -4093,7 +3648,8 @@ TCPIPRECEIVEPACKET	proc	far
 TCPIPRECEIVEPACKET	endp
 	SetDefaultConvention
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipReceivePacket
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -4140,7 +3696,7 @@ if ERROR_CHECK
 		mov	di, es:[di]		; es:di =  PH of buffer	
 logBrkPt::								
 		mov	bx, es:[di].PH_domain				
-		call	ECCheckLinkDomainHandle	; carry set if invalid	
+		;call	ECCheckLinkDomainHandle	; carry set if invalid	
 		mov	bx, cx						
 		call	HugeLMemUnlock					
 		pop	cx						
@@ -4199,7 +3755,8 @@ TcpipReceivePacket	endp
 ;		Subroutines
 ;---------------------------------------------------------------------------
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipGainAccess/TcpipReleaseAccess
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -4276,7 +3833,8 @@ TcpipReleaseAccess	proc	near
 TcpipReleaseAccess	endp
 
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipGetMinDgramHdr
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -4308,12 +3866,12 @@ TcpipGetMinDgramHdr	proc	near
 		.enter
 
 		clr	ax			; assume no extra space
-		call	LinkLoadLinkDriverFar	; bx = driver handle
+		;call	LinkLoadLinkDriverFar	; bx = driver handle
 		jc	done		
 
 		call	GeodeInfoDriver		; ds:si = DriverInfoStruct
 		mov	al, ds:[si].SDIS_minDgramHdr
-		call	LinkUnloadLinkDriverFar
+		;call	LinkUnloadLinkDriverFar
 done:
 		add	es:[minDgramHdr], al
 
@@ -4322,7 +3880,8 @@ done:
 TcpipGetMinDgramHdr	endp
 
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipRegisterNewClient
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -4416,7 +3975,8 @@ clientOffsetTable	byte \
 	TCI_rawIp
 
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipCheckLinkIsMain
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -4505,7 +4065,7 @@ EC <		WARNING_C TCPIP_MISSING_LINK_DOMAIN_INI_SETTING	>
 	; Get main link entry and fill in the info.
 	;
 		mov	bx, MAIN_LINK_DOMAIN_HANDLE
-		call	LinkTableGetEntry		; ds:di = LCB
+		;call	LinkTableGetEntry		; ds:di = LCB
 							; ^hbx = table
 EC <		tst	ds:[di].LCB_drvr				>
 EC <		ERROR_NE TCPIP_MAIN_LINK_ALREADY_REGISTERED		>
@@ -4528,7 +4088,8 @@ exit:
 		ret
 TcpipCheckLinkIsMain	endp
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipCreateInputQueue
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -4572,7 +4133,8 @@ exit:
 		ret
 TcpipCreateInputQueue	endp
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipDestroyInputQueue
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -4621,7 +4183,8 @@ exit:
 		ret
 TcpipDestroyInputQueue	endp
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipDestroyInputQueueCB
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -4655,7 +4218,8 @@ EC <		WARNING TCPIP_DISCARDING_OUTPUT_BUFFER		>
 TcpipDestroyInputQueueCB	endp
 
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipCreateThreadAndTimer
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -4730,7 +4294,7 @@ EC <		Assert	thread	bx				>
 		mov	di, cx				; same interval always
 		mov	dx, MSG_TCPIP_TIMEOUT_OCCURRED_ASM
 		mov	bp, handle 0
-		call	TimerStartSetOwner
+		;call	TimerStartSetOwner
 
 		mov	ds:[timerHandle], bx
 	;
@@ -4747,7 +4311,8 @@ done:
 		ret
 TcpipCreateThreadAndTimer	endp
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipDestroyThreadAndTimer
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -4820,7 +4385,8 @@ EC <		Assert	thread	bx				>
 		ret
 TcpipDestroyThreadAndTimer	endp
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipSendMsgToDriverThread
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -4867,7 +4433,8 @@ EC <		Assert	thread	bx				>
 		ret
 TcpipSendMsgToDriverThread	endp
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipQueueSendDataRequest
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -4925,10 +4492,10 @@ dataBuffer	local	optr		push dx, si
 	;
 	; Only queue if connection still exists and is open.
 	;
-		call	TSocketLockInfoListFar	; *ds:si = socket list
+		;call	TSocketLockInfoListFar	; *ds:si = socket list
 
 		push	cx
-		call	TSocketFindHandleNoLock	; destroys cx
+		;call	TSocketFindHandleNoLock	; destroys cx
 		pop	cx
 EC <		WARNING_C TCPIP_CONNECTION_DOES_NOT_EXIST	>
 		jc	noQueue	
@@ -4938,7 +4505,7 @@ EC <		WARNING_C TCPIP_CONNECTION_DOES_NOT_EXIST	>
 		cmp	ds:[di].TS_state, TSS_OPEN
 		je	goAhead
 noQueue:
-		call	TSocketUnlockInfoExcl
+		;call	TSocketUnlockInfoExcl
 		mov	ax, SDE_CONNECTION_RESET
 		stc
 		jmp	exit
@@ -4952,7 +4519,7 @@ goAhead:
 		clr	bx
 		call	ThreadAllocSem		; bx = semaphore handle
 		mov	ds:[di].TS_sendSem, bx	
-		call	TSocketUnlockInfoExcl
+		;call	TSocketUnlockInfoExcl
 
 		call	TcpipReleaseAccess
 
@@ -4994,7 +4561,7 @@ okayToSend:
 		mov	cx, dataSize
 		mov	ax, connection
 		movdw	dxbp, dataBuffer
-		call	TSocketNewOutputData	; carry set if failed
+		;call	TSocketNewOutputData	; carry set if failed
 		pop	bp
 freeSem:
 		call	ThreadFreeSem		; preserves flags
@@ -5005,7 +4572,8 @@ exit:
 TcpipQueueSendDataRequest	endp
 
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipSendDatagramCommon
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -5102,14 +4670,14 @@ endif
 
 		mov	bx, cx				; bx = msg
 		jnz	openLink
-		call	LinkCheckOpen			; ax = link handle
+		;call	LinkCheckOpen			; ax = link handle
 		jmp	checkResult
 openLink:
 	;
 	; Open link connection.
 	;
 		mov	cx, TCP_LINK_OPEN_WAIT_TIME
-		call	LinkOpenConnection		; ax = link handle
+		;call	LinkOpenConnection		; ax = link handle
 checkResult:
 		jnc	sendIt
 	; 
@@ -5189,7 +4757,7 @@ TCPIPDETACHALLOWED		proc	far
 		tst	es:[regStatus]
 		jnz	checkThread
 
-		call	CloseAllLinks
+		;call	CloseAllLinks
 		jmp	done
 checkThread:
 		mov	ax, ss:[TPD_threadHandle]
@@ -5205,7 +4773,8 @@ TCPIPDETACHALLOWED		endp
 	SetDefaultConvention
 
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipResolveIPAddr
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -5292,37 +4861,25 @@ doQuery:
 	;
 	; Query address from resolver.
 	; 
-ifdef STATIC_LINK_RESOLVER
-	    mov bx, handle resolver
-else
-		call	TcpipLoadResolver		; ax = library handle
-		jc	exit				;  or SocketDrError
-		push	ax
-		mov_tr	bx, ax				; bx = library handle
-endif
-
-		mov	ax, enum ResolverResolveAddress
-		call	ProcGetLibraryEntry		; bxax = vfptr
-		call	ProcCallFixedOrMovable		; dxbp = addr or 
+		mov	ax, 1000			; resolve address
+							; dxbp = addr or
 							;  dx = ResolverError
-		lahf
+		int	0xB0
+		
+		;lahf
 
-ifndef STATIC_LINK_RESOLVER
-		pop	bx				; bx = library handle
-		call	GeodeFreeLibrary
-endif
-		sahf
-		mov	ax, bp				; dxax = resolved addr
+		;sahf
+		;mov	ax, bp				; dxax = resolved addr
 		jnc	checkValid
 	;
 	; Convert ResolverError to SocketDrError.
 	;
-		mov	ax, SDE_DESTINATION_UNREACHABLE
-		cmp	dx, size ResolverToSDETable
-		jae	setC
+		;mov	ax, SDE_DESTINATION_UNREACHABLE
+		;cmp	dx, size ResolverToSDETable
+		;jae	setC
 
-		mov	bx, dx				; bx = ResolverError
-		mov	al, cs:ResolverToSDETable[bx]
+		;mov	bx, dx				; bx = ResolverError
+		;mov	al, cs:ResolverToSDETable[bx]
 setC:
 		stc
 exit:
@@ -5330,22 +4887,9 @@ exit:
 		ret
 TcpipResolveIPAddr	endp
 
-ResolverToSDETable	byte	\
-	SDE_NO_ERROR,			; RE_NO_ERROR
-	SDE_TEMPORARY_ERROR,		; RE_TIMEOUT
-	SDE_INSUFFICIENT_MEMORY,	; RE_OUT_OF_RESOURCE
-	SDE_TEMPORARY_ERROR,		; RE_TEMPORARY
-	SDE_DESTINATION_UNREACHABLE,	; RE_INFO_NOT_AVAILABLE
-	SDE_DESTINATION_UNREACHABLE,	; RE_HOST_NOT_AVAILABLE
-	SDE_INSUFFICIENT_MEMORY,	; RE_MEMORY_ERROR
-	SDE_UNSUPPORTED_FUNCTION,	; RE_UNSUPPORTED_FUNCTION
-	SDE_DESTINATION_UNREACHABLE,	; RE_INTERNAL_FAILURE
-	SDE_DESTINATION_UNREACHABLE,	; RE_NO_NAME_SERVER
-	SDE_INTERRUPTED,		; RE_INTERRUPTED
-	SDE_LINK_OPEN_FAILED		; RE_OPEN_DOMAIN_MEDIUM
-
 ifndef STATIC_LINK_RESOLVER
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipLoadResolver
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -5400,7 +4944,8 @@ TcpipLoadResolver	endp
 
 endif   ; not STATIC_LINK_RESOLVER
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipGetDefaultIPAddr
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -5436,7 +4981,7 @@ TcpipGetDefaultIPAddr	proc	near
 		.enter
 
 		mov	bx, MAIN_LINK_DOMAIN_HANDLE
-		call	LinkTableGetEntry		; ds:di = LCB
+		;call	LinkTableGetEntry		; ds:di = LCB
 							; ^hbx = tabke
 		cmp	ds:[di].LCB_state, LS_OPEN
 		jne	useServer
@@ -5462,7 +5007,8 @@ EC <okay:								  >
 TcpipGetDefaultIPAddr	endp
 
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TcpipCheckValidIPAddr
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -5556,7 +5102,8 @@ resultTable	dword \
 
 if ERROR_CHECK
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		ECCheckClientHandle
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -5603,7 +5150,8 @@ checkReg:
 ECCheckClientHandle	endp
 
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		ECCheckIPAddrSize
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -5640,7 +5188,8 @@ ECCheckIPAddrSize	proc	near
 ECCheckIPAddrSize	endp
 
 
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		ECCheckIPAddr
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -5683,7 +5232,8 @@ ECCheckIPAddr	proc	near
 		ret
 ECCheckIPAddr	endp
 	
-
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		ECCheckCallerThread
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -5748,7 +5298,7 @@ TcpipResolveLinkLevelAddress	proc	far
 		.enter
 
 		mov	bx, MAIN_LINK_DOMAIN_HANDLE
-		call	LinkTableGetEntry	; ds:di = LCB
+		;call	LinkTableGetEntry	; ds:di = LCB
 		push	bx
 		mov	bl, ds:[di].LCB_state
 		mov	si, bx

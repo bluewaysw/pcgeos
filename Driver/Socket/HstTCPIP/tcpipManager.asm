@@ -54,6 +54,7 @@ include sem.def
 include Internal/heapInt.def
 include Internal/im.def
 include Internal/threadIn.def
+include Internal/host.def
 
 include file.def
 include localize.def
@@ -102,12 +103,5 @@ include tcpipAddrCtrl.rdef
 ;---------------------------------------------------------------------------
 
 include tcpipEntry.asm
-include tcpipSocket.asm
-include tcpipLink.asm
-include tcpipUtils.asm
 include tcpipAddrCtrl.asm
-include	tcpipDhcp.asm
 
-ifdef WRITE_LOG_FILE
-include tcpipLog.asm
-endif
