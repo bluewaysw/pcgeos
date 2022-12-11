@@ -270,7 +270,7 @@ typedef struct
  * convert value (word) to WWFixedAsDWord
  */
 #define WORD_TO_WWFIXEDASDWORD( value )          \
-        ( (WWFixedAsDWord)value << 16 )
+        ( (WWFixedAsDWord) ( (long)value ) << 16 )
 
 /*
  * convert value (TT_F26DOT6) to WWFixedAsDWord
@@ -297,8 +297,8 @@ typedef struct
  */
 #define CEIL_WWFIXEDASDWORD( value )             \
         ( value & 0x8000 ?                       \
-            ( value & 0x00ff ? ( ( (sword)value >> 16 - 1 ) ) : ( (sword)value >> 16 ) ) : \
-            ( (sword)value >> 16 ) )
+            ( value & 0x00ff ? ( ( value >> 16 ) - 1 ) : ( ( value >> 16 ) ) ) : \
+            ( value >> 16 ) )
 
 /*
  * get integral part of value (WWFixedAsDWord)
@@ -338,6 +338,8 @@ static FontWeight   mapFontWeight( TT_Short weightClass );
 static TextStyle    mapTextStyle( const char* subfamily );
 
 static TT_Error     fillFontHeader( TT_Face face, FontHeader* fontHeader );
+
+static TT_Error     getCharMap( TT_Face face, TT_CharMap* charMap );
 
 
 static int          strlen( const char* str );

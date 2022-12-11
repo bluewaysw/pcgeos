@@ -21,6 +21,7 @@
 #define _TTCHARMAPPER_H_
 
 #include <geos.h>
+#include <freetype.h>
 
 
 typedef ByteFlags CharMapFlags;
@@ -37,6 +38,9 @@ typedef struct
         byte            weight;
         CharMapFlags    flags;
 } CharMapEntry;
+
+
+word CountGeosCharsInCharMap( TT_CharMap map, word *firstChar, word *lastChar );
 
 
 #endif  /* _TTCHARMAPPER_H_ */

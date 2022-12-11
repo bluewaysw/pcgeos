@@ -258,10 +258,10 @@ CharMapEntry geosCharMap[] =
 };
 
 
-sword GeosCharToUnicode( word geosChar )
+word GeosCharToUnicode( word geosChar )
 {
         if( geosChar < MIN_GEOS_CHAR || geosChar > MAX_GEOS_CHAR )
-                return -1;
+                return 0;
 
         return geosCharMap[ GEOS_CHAR_INDEX( geosChar ) ].unicode;
 }

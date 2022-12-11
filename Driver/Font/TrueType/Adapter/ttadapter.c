@@ -20,6 +20,7 @@
  ***********************************************************************/
 
 #include "ttadapter.h"
+#include "ttcharmapper.h"
 
 
 /********************************************************************
@@ -117,11 +118,11 @@ TT_Error _pascal Fill_FontsAvailEntry( const char*       fileName,
         FileHandle          fileHandle;
         TT_Error            error;
         TT_Face             face;
-        char                familyName[FAMILY_NAME_LENGTH];
+        TT_String*          familyName;
         word                familyNameLength;
 
-        ECCheckBounds( fileName );
-        ECCheckBounds( fontsAvailEntry );
+        ECCheckBounds( (void*)fileName );
+        ECCheckBounds( (void*)fontsAvailEntry );
 
         if ( strlen( fileName ) >= FONT_FILE_LENGTH )
                 return TT_Err_Invalid_Argument;
@@ -133,7 +134,7 @@ TT_Error _pascal Fill_FontsAvailEntry( const char*       fileName,
         if ( error != TT_Err_Ok )
                 goto Fail;
 
-        error = TT_Get_Name_String( face, NAME_INDEX_FAMILY, familyName, &familyNameLength );
+        error = TT_Get_Name_String( face, NAME_INDEX_FAMILY, &familyName, &familyNameLength );
         if ( error != TT_Err_Ok )
                 goto Fin;
 
@@ -194,11 +195,11 @@ TT_Error _pascal Fill_FontInfo( const char* fileName, FontInfo* fontInfo )
         TT_Error            error;
         TT_Face             face;
         TT_Face_Properties  faceProperties;
-        char                familyName[FAMILY_NAME_LENGTH];
+        TT_String*          familyName;
         word                familyNameLength;
         
-        ECCheckBounds( fileName );
-        ECCheckBounds( fontInfo );
+        ECCheckBounds( (void*)fileName );
+        ECCheckBounds( (void*)fontInfo );
 
         fileHandle = FileOpen( fileName, FILE_ACCESS_R | FILE_DENY_W );
         ECCheckFileHandle( fileHandle );
@@ -207,7 +208,7 @@ TT_Error _pascal Fill_FontInfo( const char* fileName, FontInfo* fontInfo )
         if ( error != TT_Err_Ok )
                 goto Fail;
 
-        error = TT_Get_Name_String( face, NAME_INDEX_FAMILY, familyName, &familyNameLength );
+        error = TT_Get_Name_String( face, NAME_INDEX_FAMILY, &familyName, &familyNameLength );
         if ( error != TT_Err_Ok )
                 goto Fin;
 
@@ -277,13 +278,13 @@ TT_Error _pascal Fill_OutlineData( const char*            fileName,
         FileHandle          fileHandle;
         TT_Face             face;
         TT_Face_Properties  faceProperties;
-        char                styleName[STYLE_NAME_LENGTH];
+        TT_String*          styleName;
         word                styleNameLength;
         TT_Error            error;
 
-        ECCheckBounds( fileName );
-        ECCheckBounds( outlineDataEntry );
-        ECCheckBounds( trueTypeOutlineEntry );
+        ECCheckBounds( (void*)fileName );
+        ECCheckBounds( (void*)outlineDataEntry );
+        ECCheckBounds( (void*)trueTypeOutlineEntry );
 
         fileHandle = FileOpen( fileName, FILE_ACCESS_R | FILE_DENY_W );
         ECCheckFileHandle( fileHandle );
@@ -292,7 +293,7 @@ TT_Error _pascal Fill_OutlineData( const char*            fileName,
         if ( error != TT_Err_Ok )
                 goto Fail;
 
-        error = TT_Get_Name_String( face, NAME_INDEX_STYLE, styleName, &styleNameLength );
+        error = TT_Get_Name_String( face, NAME_INDEX_STYLE, &styleName, &styleNameLength );
         if ( error != TT_Err_Ok )
                 goto Fin;
 
@@ -360,8 +361,8 @@ TT_Error _pascal Fill_FontBuf( const char*  fileName,
         WWFixedAsDWord      scaleFactor;
         WWFixedAsDWord      ttfElement;
         
-        ECCheckBounds( fileName );
-        ECCheckBounds( fontBuf );
+        ECCheckBounds( (void*)fileName );
+        ECCheckBounds( (void*)fontBuf );
 
         fileHandle = FileOpen( fileName, FILE_ACCESS_R | FILE_DENY_W );
         ECCheckFileHandle( fileHandle );
@@ -372,19 +373,19 @@ TT_Error _pascal Fill_FontBuf( const char*  fileName,
 
         error = TT_New_Instance( face, &instance );
         if ( error )
-                goto Fail;
+                goto Fin;
 
         error = TT_Set_Instance_CharSize( instance, WBFIXED_TO_FIXED26DOT6( pointSize ) );
         if ( error )
-                goto Fail;
+                goto Fin;
 
         error = TT_Get_Instance_Metrics( instance, &instanceMetrics );
         if ( error )
-                goto Fail;
+                goto Fin;
 
         error = fillFontHeader( face, &fontHeader );
         if ( error )
-                goto Fail;
+                goto Fin;
 
         scaleFactor = instanceMetrics.x_scale;
 
@@ -774,22 +775,59 @@ static TextStyle mapTextStyle( const char* subfamily )
         return TS_BOLD | TS_ITALIC;
 }
 
+//TODO: better in ttcharmapper.c ?
 static TT_Error fillFontHeader( TT_Face face, FontHeader* fontHeader )
 {
-        //Chartable holen
+        TT_CharMap  charMap;
+        TT_Error    error;
+        word        i;
 
-        //numChars, fistChar, lastChar füllen
+        
+        error = getCharMap( face, &charMap );
+        if ( error != TT_Err_Ok )
+                return error;
 
-        //iteriere über die Zeichen des Zeichensatzes
+        fontHeader->FH_numChars = CountGeosCharsInCharMap( charMap, 
+                                                           &fontHeader->FH_firstChar, 
+                                                           &fontHeader->FH_lastChar );
+
+        for ( i = fontHeader->FH_firstChar; i < fontHeader->FH_lastChar; ++i )
+        {
                 //Zeichen vorhanden?
                 //Whidth
                 //xMin
                 //xMax
                 //yMin
                 //yMax
+        }
 
         return TT_Err_Ok;
 }
+
+static TT_Error getCharMap( TT_Face face, TT_CharMap* charMap )
+{
+        TT_Face_Properties  face_Properties;
+        TT_UShort           platform;
+        TT_UShort           encoding;
+        int                 i;
+
+
+        TT_Get_Face_Properties( face, &face_Properties );
+
+	for ( i = 0; i < face_Properties.num_CharMaps; ++i ) 
+        {
+		TT_Get_CharMap_ID( face, i, &platform, &encoding );
+		if ( platform == TT_PLATFORM_MICROSOFT && encoding == TT_MS_ID_UNICODE_CS )
+                {
+		        TT_Get_CharMap(face, i, charMap);
+			break;
+		}
+	}
+
+        if ( i == face_Properties.num_CharMaps ) return TT_Err_CMap_Table_Missing;
+        else                                     return TT_Err_Ok;
+}
+
 
 /*******************************************************************/
 /* We cannot use functions from the Ansic library, which causes a  */
