@@ -1,3 +1,7 @@
+ssl.obj \
+ssl.eobj: ssl/sslManager.asm \
+                geos.def heap.def geode.def ec.def file.def \
+                Internal/host.def
 asn1_lib.obj \
 asn1_lib.eobj: Ansi/stdio.h geos.h crypto/cryptlib.h Ansi/stdlib.h \
                 Ansi/string.h e_os.h resource.h geode.h heap.h ec.h \

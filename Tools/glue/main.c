@@ -2624,9 +2624,11 @@ main(argc, argv)
 	}
     }
 
+    printf("DONE1\n"); fflush(stdout);
     exit(0);
 
 err_exit:
+    printf("DONE2\n"); fflush(stdout);
 
     /*
      * Remove the symbol file on error, not bothering to close and

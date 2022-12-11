@@ -1947,6 +1947,7 @@ GeoWrite(void	    *base,  	/* Base of file buffer */
 	}
     }
 
+   
     fflush(stdout);
 }
 

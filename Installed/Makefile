@@ -1277,7 +1277,7 @@ Installed/Appl/Breadbox/BbxBrow:	ui ansic text spool \
 					modem \
 					ibms parentc wav mailhub socket \
 					js netutils cookies idialc \
-					ppp  tcpip  hsttcpip MAKEAPPL
+					ppp  tcpip hsttcpip MAKEAPPL
 
 # sorry, executing CLEAN in the global makefile is not only bad style, it forces
 # EVERYONE, even people not working on the browser, to compile the whole stuff

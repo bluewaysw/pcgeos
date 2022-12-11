@@ -16,7 +16,7 @@ tcpip.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh accpnt.goh
+                Objects/helpCC.goh
 tcpip.obj \
 tcpip.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -25,8 +25,7 @@ tcpip.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h sem.h initfile.h \
-                Internal/socketDr.h sockmisc.h tcpip.h Ansi/string.h
+                parallDr.h hugearr.h fileEnum.h
 tcpip.obj \
 tcpip.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -45,7 +44,7 @@ tcpip.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh accpnt.goh
+                Objects/helpCC.goh
 tcpip.obj \
 tcpip.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -54,20 +53,9 @@ tcpip.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h sem.h initfile.h \
-                Internal/socketDr.h sockmisc.h tcpip.h Ansi/string.h
-tcpipLog.obj \
-tcpipLog.eobj: c:/workspace/bluewaysw/pcgeos/Driver/Socket/HstTCPIP/tcpipLog.c
-tcpipLog.obj \
-tcpipLog.eobj: c:/workspace/bluewaysw/pcgeos/Driver/Socket/HstTCPIP/tcpipLog.c
+                parallDr.h hugearr.h fileEnum.h
 tcpipStrings.rdef: c:/workspace/bluewaysw/pcgeos/Driver/Socket/HstTCPIP/tcpipStrings.ui
 tcpipAddrCtrl.rdef: generic.uih product.uih
-tcpipDhcp.obj \
-tcpipDhcp.eobj: 
-tcpipLink.obj \
-tcpipLink.eobj: 
-tcpipLog.obj \
-tcpipLog.eobj: 
 tcpipManager.obj \
 tcpipManager.eobj: geos.def heap.def geode.def Internal/interrup.def \
                 resource.def ec.def system.def localize.def sllang.def \
@@ -106,9 +94,5 @@ tcpipManager.eobj: geos.def heap.def geode.def Internal/interrup.def \
                 tcpipGlobal.def tcpipAddrCtrl.def dhcpConstant.def \
                 tcpipStrings.rdef tcpipAddrCtrl.rdef tcpipEntry.asm \
                 tcpipAddrCtrl.asm
-tcpipSocket.obj \
-tcpipSocket.eobj: 
-tcpipUtils.obj \
-tcpipUtils.eobj: 
 
 hsttcpipEC.geo hsttcpip.geo : geos.ldf netutils.ldf socket.ldf ansic.ldf accpnt.ldf resolver.ldf resolver.ldf 

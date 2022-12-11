@@ -7,7 +7,7 @@ if "%~1"=="-fcc" (
 IF NOT DEFINED BASEBOX (SET BASEBOX=dosbox)
 set OLD_PATH=%cd%
 cd /D %LOCAL_ROOT%\gbuild\localpc 
-start cmd %BASEBOX% -conf %ROOT_DIR%\bin\basebox.conf 
+start cmd /C %BASEBOX% -conf %ROOT_DIR%\bin\basebox.conf 
 cd %OLD_PATH%
 sleep 2s
 FINDSTR /r /c:"127.0.0.1 from port" %LOCAL_ROOT%\gbuild\localpc\IPX_STAT.txt | perl -e "my $status = <>; $status =~  m/(\d+)$/; printf('%%04X', $1);" > %LOCAL_ROOT%\gbuild\localpc\IPX_PORT.txt
