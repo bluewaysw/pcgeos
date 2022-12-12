@@ -54,10 +54,10 @@ tcpip.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h
-tcpipStrings.rdef: c:/workspace/bluewaysw/pcgeos/Driver/Socket/HstTCPIP/tcpipStrings.ui
+tcpipStrings.rdef: tcpipStrings.ui
 tcpipAddrCtrl.rdef: generic.uih product.uih
-tcpipManager.obj \
-tcpipManager.eobj: geos.def heap.def geode.def Internal/interrup.def \
+hsttcpipManager.obj \
+hsttcpipManager.eobj: geos.def heap.def geode.def Internal/interrup.def \
                 resource.def ec.def system.def localize.def sllang.def \
                 library.def object.def lmem.def timer.def timedate.def \
                 driver.def thread.def Internal/semInt.def sem.def \
