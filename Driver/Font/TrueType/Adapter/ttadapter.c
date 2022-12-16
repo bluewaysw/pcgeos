@@ -383,7 +383,7 @@ TT_Error _pascal Fill_FontBuf( const char*  fileName,
         if ( error )
                 goto Fin;
 
-        error = fillFontHeader( face, &fontHeader );
+        error = fillFontHeader( face, instance, &fontHeader );
         if ( error )
                 goto Fin;
 

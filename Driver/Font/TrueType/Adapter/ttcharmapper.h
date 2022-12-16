@@ -74,11 +74,24 @@ typedef struct
 } FontHeader;
 
 
+/*
+ * constants for calculating values in FontHeader
+ */
+#define DEFAULT_CONTINUITY_CUTOFF( value )  ( value / 40 )      // 2.5% of size
+#define DEFAULT_DEFAULT_CHAR                '.'
+#define BASELINE( value )                   ( 3 * value / 4 )	// 75% of size
+#define DESCENT( value )            	    ( value / 4 )       // 25% of size
+#define DEFAULT_UNDER_THICK( value )	    ( value / 10 )      // 10% of size
+#define DEFAULT_UNDER_POSITION( value )	    ( value / -10 )     // -10% of size
+#define SAFETY( value )			            ( value / 40 )      // 2.5% of size
+
+
 word CountGeosCharsInCharMap( TT_CharMap map, word *firstChar, word *lastChar );
 
 TT_Error getCharMap( TT_Face face, TT_CharMap* charMap );
 
-TT_Error fillFontHeader( TT_Face face, FontHeader* fontHeader );
+TT_Error fillFontHeader( TT_Face face, TT_Instance instance, FontHeader* fontHeader );
 
+void ScanCharXMin( TT_Glyph glyph, FontHeader* fontHeader );
 
 #endif  /* _TTCHARMAPPER_H_ */

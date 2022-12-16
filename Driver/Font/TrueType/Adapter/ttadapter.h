@@ -239,7 +239,7 @@ typedef struct
  * convert value (word) to WWFixedAsDWord
  */
 #define WORD_TO_WWFIXEDASDWORD( value )          \
-        ( (WWFixedAsDWord) ( (long)value ) << 16 )
+        ( (WWFixedAsDWord) MakeWWFixed( value ) )
 
 /*
  * convert value (TT_F26DOT6) to WWFixedAsDWord
@@ -288,7 +288,7 @@ typedef struct
         ( ( ( (long)value.WBF_int ) * 1024 ) | value.WBF_frac >> 2 )
 
 #define WBFIXED_TO_WWFIXEDASDWORD( value )       \
-        ( ( (long)(value.WBF_int << 16 ) ) | value.WBF_frac << 8 )
+        ( ( (long)value.WBF_int << 16 ) | ( value.WBF_frac << 8 ) )
 
 /***********************************************************************
  *      helperfunctions
