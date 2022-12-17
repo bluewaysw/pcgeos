@@ -137,19 +137,19 @@ extern jseVariable globalObject;
     optr interactionObj, contObj, docObj;
     MemHandle uiThread;
 
-    /* create text */
+    // create text
     textBlock = ObjDuplicateResource(OptrToHandle(@URLText), 0, 0);
     textObj = ConstructOptr(textBlock, OptrToChunk(@URLText));
-    /* create frame */
+    // create frame
     frameBlock = ObjDuplicateResource(OptrToHandle(@FrameTemplate), 0, 0);
     frameObj = ConstructOptr(frameBlock, OptrToChunk(@FrameTemplate));
-    /* point frame to document object */
+    // point frame to document object
     @call HTMLDocumentGroup::MSG_META_GET_MODEL_EXCL(&docObj);
     @send frameObj::MSG_URL_FRAME_SET_DOCUMENT_OBJ(docObj);
-    /* hook text object to frame and vice versa */
+    // hook text object to frame and vice versa
     @send frameObj::MSG_URL_FRAME_SET_TEXT_OBJ(textObj);
     @send textObj::MSG_URL_TEXT_SET_FRAME_OBJ(frameObj);
-    /* Tell HTML Text object about the file to store its data in. */
+    // Tell HTML Text object about the file to store its data in.
 @ifdef GLOBAL_INTERNET_BUILD
     @send textObj::MSG_HTML_TEXT_INIT_STORAGE(textObjFile);
 @else
@@ -159,20 +159,20 @@ extern jseVariable globalObject;
 @ifdef COMPILE_OPTION_PAGE_SIZE_CONTROL
     @send textObj::MSG_HTML_TEXT_SET_PAGE_SIZE_CONTROLLER(@PageSizeControl) ;
 @endif
-    /* attach new frame as child */
+    // attach new frame as child
     ObjCompAddChild(oself, frameObj,
 		    CCO_LAST,
 		    0,
 		    word_offsetof(URLFrameInstance, UFI_comp),
 		    word_offsetof(URLFrameInstance, UFI_link));
-    /* create associated view */
+    // create associated view
     uiThread = MemGetInfo(OptrToHandle(@HTMLVApp), MGIT_EXEC_THREAD);
     viewBlock = ObjDuplicateResource(OptrToHandle(@ViewTemplate), 0, uiThread);
     viewObj = ConstructOptr(viewBlock, OptrToChunk(@ViewTemplate));
-    /* attach to our associated interaction obj */
+    // attach to our associated interaction obj
     interactionObj = @call oself::MSG_URL_FRAME_GET_INTERACTION_OBJ();
     @call interactionObj::MSG_GEN_ADD_CHILD(viewObj, CCO_LAST);
-    /* hook view, content, and frame together */
+    // hook view, content, and frame together
     contObj = ConstructOptr(OptrToHandle(textObj), OptrToChunk(@URLContent));
     @call viewObj::MSG_GEN_VIEW_SET_CONTENT(contObj);
     @call frameObj::MSG_URL_FRAME_SET_INTERACTION_OBJ(viewObj);
@@ -188,27 +188,27 @@ extern jseVariable globalObject;
     MemHandle uiThread;
 
     textObj = @call self::MSG_URL_FRAME_GET_TEXT_OBJ();
-    /* all done if already a group */
+    // all done if already a group
     if (textObj) {
 	viewObj = @call self::MSG_URL_FRAME_GET_INTERACTION_OBJ();
-	/* unhook content object from view */
+	// unhook content object from view
 	@call viewObj::MSG_GEN_VIEW_SET_CONTENT(NullOptr);
-        /* detach text object from the page it is showing */
+        // detach text object from the page it is showing
         @call self::MSG_URL_FRAME_FLIP_PAGE(OCT_NULL, FALSE);
-	/* unhook text object from frame */
+	// unhook text object from frame
 	@call self::MSG_URL_FRAME_SET_TEXT_OBJ(NullOptr);
-	/* free text object block */
+	// free text object block
 	@send, forceQueue textObj::MSG_URL_TEXT_SELF_DESTRUCT();
-	/* destroy current view */
+	// destroy current view
 	parentObj = @call viewObj::MSG_GEN_FIND_PARENT();
 	parentPos = @call parentObj::MSG_GEN_FIND_CHILD(viewObj);
 	@send, forceQueue viewObj::MSG_GEN_DESTROY_AND_FREE_BLOCK();
-	/* create new one */
+	// create new one
 	uiThread = MemGetInfo(OptrToHandle(@HTMLVApp), MGIT_EXEC_THREAD);
 	groupBlock = ObjDuplicateResource(OptrToHandle(@ViewGroupTemplate), 0,
 					  uiThread);
 	groupObj = ConstructOptr(groupBlock, OptrToChunk(@ViewGroupTemplate));
-	/* set as interaction object */
+	// set as interaction object
 	@call parentObj::MSG_GEN_ADD_CHILD(groupObj, parentPos);
 	@call groupObj::MSG_GEN_SET_USABLE(VUM_NOW);
 	@call oself::MSG_URL_FRAME_SET_INTERACTION_OBJ(groupObj);
@@ -753,7 +753,7 @@ extern jseVariable globalObject;
     HWChecksumCheck() ;
 
 @ifdef COMPILE_OPTION_PROGRESS_INDICATOR
-     @SendUpdateProgress(PI_NUM_FRAMES, ChunkArrayGetCount(frameArray));
+     @SendUpdateProgress(PI_NUM_FRAMES, ChunkArrayGetCount(frameSet));
 @endif
 
     /*
@@ -771,7 +771,7 @@ extern jseVariable globalObject;
 
     @call document::MSG_URL_DOCUMENT_SET_LOCAL_PAGE(localPage);
 
-    @call self::MSG_URL_FRAME_ESTABLISH_FRAMES_WITH_ITEMS(frameSet, 0, vmf);
+    @call self::MSG_URL_FRAME_ESTABLISH_FRAMES_WITH_ITEMS(frameSet, (word) 0, vmf);
 
     /*
      * Update controllers etc.
@@ -788,7 +788,7 @@ extern jseVariable globalObject;
     optr child;
 
     HWChecksumCheck() ;
-    @call self::MSG_URL_FRAME_ACTIVATE(FALSE, FALSE);
+    @call self::MSG_URL_FRAME_ACTIVATE(FALSE);
 
     frec = ChunkArrayElementToPtr(frameArray, framePtr, &size);
 
@@ -799,14 +799,14 @@ extern jseVariable globalObject;
      * attributes from the frame it is loaded it rather than using those
      * specified for it.
      */
-    if(framePtr)
+    if(framePtr != 0)
       @call self::MSG_URL_FRAME_SET_FLAGS_SIZE_NAME(
-        frec->HF_flags, frec->HF_size, frec->HF_name);
+        frec->HFRWI_rec.HF_flags, frec->HFRWI_rec.HF_size, frec->HFRWI_rec.HF_name);
     else
     {
       pself = ObjDeref(oself, 0);
       pself->UFI_frameFlags &= ~(FRF_FLAGS_FROM_CHILD);
-      pself->UFI_frameFlags |= (frec->HF_flags & FRF_FLAGS_FROM_CHILD);
+      pself->UFI_frameFlags |= (frec->HFRWI_rec.HF_flags & FRF_FLAGS_FROM_CHILD);
     }
 
     /* Restore URL, Title and Base URL to the current frame */
@@ -851,10 +851,23 @@ extern jseVariable globalObject;
         @call child::MSG_URL_FRAME_DELETE_ALL(TRUE);
       }
     }
-    else                                /* level specifying a URL frame */
-      @call self::MSG_URL_FRAME_GOT_PAGE_NOFRAME(vmf,
-        VMCHAIN_GET_VM_BLOCK(frec->HFRWI_item), NAME_POOL_NONE,
-        GUF_CACHABLE, FALSE, 0);
+    else                                // level specifying a URL frame
+    /*
+      @call self::MSG_URL_FRAME_GOT_PAGE_NOFRAME(
+        vmf,
+        VMCHAIN_GET_VM_BLOCK(frec->HFRWI_item),
+        NAME_POOL_NONE,
+        GUF_CACHABLE,
+        FALSE,
+        0);
+        */
+
+      @call self::MSG_URL_FRAME_GOT_PAGE_NOFRAME(
+        VMCHAIN_GET_VM_BLOCK(frec->HFRWI_item),
+        NAME_POOL_NONE,
+        GUF_RELOAD, // GUF_CACHABLE = not defined?
+        FALSE);
+
 }
 @endif
 
