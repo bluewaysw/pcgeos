@@ -171,20 +171,22 @@ void LoadMimeTypes(void)
     NameAssocAssociate(assocExtType, _TEXT("JS"), _TEXT("application/x-javascript"));
 
     while (!InitFileReadStringSectionBlock(HTMLVIEW_CATEGORY, "mimeDrivers",
-					   i++, &iniData, IFRF_READ_ALL,
-					   &iniDataSize)) {
-	if (iniData) {
-	    drvP = MemLock(iniData);
-	    mimeP = strchr(drvP, ',');
-	    extP = strchr(mimeP+1, ',');
-	    if (mimeP && extP) {
-		*mimeP = 0;
-		*extP = 0;
-		NameAssocAssociate(assocTypeDriver, mimeP+1, drvP);
-		NameAssocAssociate(assocExtType, extP+1, mimeP+1);
-	    }
-	    MemFree(iniData);
-	}
+                                           i++, &iniData, IFRF_READ_ALL,
+                                           &iniDataSize))
+    {
+        if (iniData)
+        {
+            drvP = MemLock(iniData);
+            mimeP = strchr(drvP, ',');
+            extP = strchr(mimeP+1, ',');
+            if (mimeP && extP) {
+                *mimeP = 0;
+                *extP = 0;
+                NameAssocAssociate(assocTypeDriver, mimeP+1, drvP);
+                NameAssocAssociate(assocExtType, extP+1, mimeP+1);
+            }
+            MemFree(iniData);
+        }
     }
 }
 @else
@@ -278,17 +280,17 @@ void LoadURLDrivers(void)
     TCHAR *urlP;
 
     while (!InitFileReadStringSectionBlock(HTMLVIEW_CATEGORY, "urlDrivers",
-					   i++, &iniData, IFRF_READ_ALL,
-					   &iniDataSize)) {
-	if (iniData) {
-	    drvP = MemLock(iniData);
-	    urlP = strchr(drvP, ',');
-	    if (urlP) {
-		*urlP = 0;
-		NameAssocAssociate(assocSchemeDriver, urlP+1, drvP);
-	    }
-	    MemFree(iniData);
-	}
+                                           i++, &iniData, IFRF_READ_ALL,
+                                           &iniDataSize)) {
+        if (iniData) {
+            drvP = MemLock(iniData);
+            urlP = strchr(drvP, ',');
+            if (urlP) {
+                *urlP = 0;
+                NameAssocAssociate(assocSchemeDriver, urlP+1, drvP);
+            }
+            MemFree(iniData);
+        }
     }
 }
 @else
@@ -378,9 +380,9 @@ void AddCacheFileReference(void)
 
 #ifdef GLOBAL_INTERNET_BUILD
       /* create separate file for text object storage, share cache file ref
-	 count */
+         count */
       textObjFile = VMOpen(TEXT_OBJ_FILE_NAME, VMAF_FORCE_READ_WRITE,
-			   VMO_CREATE_TRUNCATE, 1);
+                           VMO_CREATE_TRUNCATE, 1);
       /* Set the required object attributes for storing objects in a VM file.
          But, we MUST not set VMA_OBJECT_RELOC since relocation fails on the
          URLContent object for some odd reason, and there's currently no
@@ -498,13 +500,13 @@ void CleanupImpDoc(void)
 
     FileSetCurrentPath(SP_PRIVATE_DATA, _TEXT("impdoc"));
     if (!ThreadGetError()) {  /* only we CD'ed correctly */
-	found = FileEnum(&findCacheFEP, &mh, &notHandled);
-	if (found) {
-	    for (impdocFile = MemLock(mh); found; found--, impdocFile++ ) {
-		FileDelete((char*)impdocFile);
-	    }
-	    MemFree(mh);
-	}
+        found = FileEnum(&findCacheFEP, &mh, &notHandled);
+        if (found) {
+            for (impdocFile = MemLock(mh); found; found--, impdocFile++ ) {
+                FileDelete((char*)impdocFile);
+            }
+            MemFree(mh);
+        }
     }
 }
 
@@ -529,74 +531,74 @@ void SetPortalCookie(void)
 @endif
 
     if (InitFileReadStringBuffer("browserSetup", "portal",
-				 portalDomain, 100, &dataSize)) return;
+                                 portalDomain, 100, &dataSize)) return;
     if (!(*portalDomain)) return;
 @ifdef DO_DBCS
     dataSize = strlen(portalDomain) + 1;  /* include null */
     LocalGeosToDos(portalDomain, portalDomain, &dataSize, DEFCHAR, &cp, 0,
-		   &status, &backup);
+                   &status, &backup);
 @endif
 
     if (InitFileReadDataBlock("browserSetup", "userInfo",
-			      &userInfo, &dataSize)) return;
+                              &userInfo, &dataSize)) return;
     if (!userInfo) return;
 
     userInfoP = MemLock(userInfo);
     if (userInfoP) {
-	formUserInfo = FormStringCreate();
-	if (formUserInfo) {
-	    FormStringConvertAndAppend(formUserInfo, userInfoP);
-	    formUserInfoP = MemLock(formUserInfo);
-	    if (formUserInfoP) {
-		FileSetStandardPath(SP_PRIVATE_DATA);
-		cookieFile = FileOpen(_TEXT("cookies.txt"),
-				      FILE_DENY_W | FILE_ACCESS_RW);
-		if (!cookieFile) {
-		    cookieFile = FileCreate(_TEXT("cookies.txt"), FCF_NATIVE |
-					    FILE_CREATE_TRUNCATE |
-					    FILE_DENY_RW |
-					    FILE_ACCESS_RW,
-					    FILE_ATTR_NORMAL);
-		} else {
-		    /* opened existing cookie file, move to end */
-		    /* !!we assume that there's no other cookie for the
-		       portal domain!! */
-		    (void)FilePos(cookieFile, 0, FILE_POS_END);
-		    /* if error, moving to end, don't write anything */
-		    if (ThreadGetError()) {
-			FileClose(cookieFile, FALSE);
-			cookieFile = 0;
-		    }
-		}
-		if (cookieFile) {
-		    /* domain */
+        formUserInfo = FormStringCreate();
+        if (formUserInfo) {
+            FormStringConvertAndAppend(formUserInfo, userInfoP);
+            formUserInfoP = MemLock(formUserInfo);
+            if (formUserInfoP) {
+                FileSetStandardPath(SP_PRIVATE_DATA);
+                cookieFile = FileOpen(_TEXT("cookies.txt"),
+                                      FILE_DENY_W | FILE_ACCESS_RW);
+                if (!cookieFile) {
+                    cookieFile = FileCreate(_TEXT("cookies.txt"), FCF_NATIVE |
+                                            FILE_CREATE_TRUNCATE |
+                                            FILE_DENY_RW |
+                                            FILE_ACCESS_RW,
+                                            FILE_ATTR_NORMAL);
+                } else {
+                    /* opened existing cookie file, move to end */
+                    /* !!we assume that there's no other cookie for the
+                       portal domain!! */
+                    (void)FilePos(cookieFile, 0, FILE_POS_END);
+                    /* if error, moving to end, don't write anything */
+                    if (ThreadGetError()) {
+                        FileClose(cookieFile, FALSE);
+                        cookieFile = 0;
+                    }
+                }
+                if (cookieFile) {
+                    /* domain */
 @ifdef DO_DBCS
-		    FileWrite(cookieFile, portalDomain,
-			      strlensbcs(portalDomain), FALSE);
-		    /* flag, path, secure, expiration, and name */
-		    FileWrite(cookieFile, cookieStatic,
-			      strlensbcs(cookieStatic), FALSE);
+                    FileWrite(cookieFile, portalDomain,
+                              strlensbcs(portalDomain), FALSE);
+                    /* flag, path, secure, expiration, and name */
+                    FileWrite(cookieFile, cookieStatic,
+                              strlensbcs(cookieStatic), FALSE);
 @else
-		    FileWrite(cookieFile, portalDomain,
-			      strlen(portalDomain), FALSE);
-		    /* flag, path, secure, expiration, and name */
-		    FileWrite(cookieFile, cookieStatic,
-			      strlen(cookieStatic), FALSE);
+                    FileWrite(cookieFile, portalDomain,
+                              strlen(portalDomain), FALSE);
+                    /* flag, path, secure, expiration, and name */
+                    FileWrite(cookieFile, cookieStatic,
+                              strlen(cookieStatic), FALSE);
 @endif
-		    /* value */
-		    cookieValue = FormStringDerefData(formUserInfo);
-		    FileWrite(cookieFile, cookieValue,
-			      formUserInfoP->numChars-1, FALSE);
-		    /* newline */
-		    FileWrite(cookieFile, "\n", 1, FALSE);
-		    FileClose(cookieFile, FALSE);
-		    /* successfully wrote cookie, don't do it again */
-		    InitFileDeleteEntry("browserSetup", "userInfo");
-		}
-	    }
-	    MemFree(formUserInfo);
-	}
-	MemUnlock(userInfo);
+                    /* value */
+                    cookieValue = FormStringDerefData(formUserInfo);
+                    FileWrite(cookieFile, cookieValue,
+                              formUserInfoP->numChars-1, FALSE);
+                    /* newline */
+                    FileWrite(cookieFile, "\n", 1, FALSE);
+                    FileClose(cookieFile, FALSE);
+                    /* successfully wrote cookie, don't do it again */
+                    InitFileDeleteEntry("browserSetup", "userInfo");
+                }
+            }
+            MemFree(formUserInfo);
+        }
+        MemUnlock(userInfo);
     }
     MemFree(userInfo);
 }
@@ -630,9 +632,9 @@ void InitNavigation(void)
     /* setup VM cache directory */
     InitFileReadInteger(HTMLVIEW_CATEGORY, "vmCacheSP", &vmCacheSP);
     if (InitFileReadStringBuffer(HTMLVIEW_CATEGORY, "vmCacheDir",
-				 vmCacheDir, sizeof(vmCacheDir), &dataSize)) {
-	/* not found in .ini, use default */
-	xstrncpy(vmCacheDir, HTML_VMCACHE_DIR, sizeof(vmCacheDir)/sizeof(TCHAR));
+                                 vmCacheDir, sizeof(vmCacheDir), &dataSize)) {
+        /* not found in .ini, use default */
+        xstrncpy(vmCacheDir, HTML_VMCACHE_DIR, sizeof(vmCacheDir)/sizeof(TCHAR));
     }
 #endif
 
@@ -667,25 +669,25 @@ void InitNavigation(void)
 #ifdef ALT_SRC_CACHE
     /* read alt source cache info, freed on exit */
     if (InitFileReadStringBlock(HTMLVIEW_CATEGORY, "altSrcCacheHosts",
-				&altSrcCacheHosts, 0, &dataSize)) {
-	altSrcCacheHosts = NullHandle;
+                                &altSrcCacheHosts, 0, &dataSize)) {
+        altSrcCacheHosts = NullHandle;
     }
     if (InitFileReadStringBlock(HTMLVIEW_CATEGORY, "altSrcCacheExts",
-				&altSrcCacheExts, 0, &dataSize)) {
-	altSrcCacheExts = NullHandle;
+                                &altSrcCacheExts, 0, &dataSize)) {
+        altSrcCacheExts = NullHandle;
     }
 #endif
 
 #ifdef CACHE_VALIDATION
     InitFileReadBoolean(HTMLVIEW_CATEGORY, "weakCacheExpiration",
-			&weakCacheExpiration);
+                        &weakCacheExpiration);
 #endif
 
 #ifdef UNSUPPORTED_EXTS
     /* read unsupported extensions, freed on exit */
     if (InitFileReadStringBlock(HTMLVIEW_CATEGORY, "unSupportedExts",
-				&unSupportedExts, 0, &dataSize)) {
-	unSupportedExts = NullHandle;
+                                &unSupportedExts, 0, &dataSize)) {
+        unSupportedExts = NullHandle;
     }
 #endif
 
@@ -756,10 +758,10 @@ void InitNavigation(void)
     InitFileReadBoolean(HTMLVIEW_CATEGORY, "progressDisplay", &progressDisplay);
     /* get wait before sending load progress notification */
     InitFileReadInteger(PROGRESS_INI_CAT, PROGRESS_INI_WAIT_KEY,
-			&progressLoadWait);
+                        &progressLoadWait);
     /* get minimum graphic height to use progress display */
     InitFileReadInteger(PROGRESS_INI_CAT, PROGRESS_INI_HEIGHT_KEY,
-			&progressMinHeight);
+                        &progressMinHeight);
 #endif
 @ifdef COPY_TO_SCRAPBOOK
      @call application::MSG_META_GCN_LIST_ADD(@HTMLVApp, GAGCNLT_APP_TARGET_NOTIFY_SELECT_STATE_CHANGE, MANUFACTURER_ID_GEOWORKS);
@@ -877,23 +879,23 @@ void DisableInappropriateOptions(void)
     /* check ini file to see if the system is in B&W mode */
     InitFileReadInteger("screen0", "tvOptions", &tvBW);
     if (dsr == DAR_TV && !(tvBW & 2)) {
-	@send NavigateTVBW::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
-	/* set selected mode */
-	SetVidBW(@call NavigateTVBW::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS());
+        @send NavigateTVBW::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+        /* set selected mode */
+        SetVidBW(@call NavigateTVBW::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS());
     } else {
-	@send NavigateTVBW::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+        @send NavigateTVBW::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
     }
 @endif
 
 @ifdef TITLE_BAR_STATUS
     dsr = (ds.DS_displayType & DT_DISP_ASPECT_RATIO) >> DT_DISP_ASPECT_RATIO_OFFSET;
     if (dsr == DAR_TV && UserGetDefaultUILevel() == UIIL_INTRODUCTORY) {
-	@call SimpleToolbar::MSG_GEN_REMOVE_CHILD(@StatusIndicators, 0);
-	@call HTMLVPrimary::MSG_GEN_ADD_CHILD(@StatusIndicators, 0);
-	@call SecureStatus::MSG_META_DELETE_VAR_DATA(HINT_NO_BORDERS_ON_MONIKERS);
-	@call PCStatusLight::MSG_META_DELETE_VAR_DATA(HINT_NO_BORDERS_ON_MONIKERS);
+        @call SimpleToolbar::MSG_GEN_REMOVE_CHILD(@StatusIndicators, 0);
+        @call HTMLVPrimary::MSG_GEN_ADD_CHILD(@StatusIndicators, 0);
+        @call SecureStatus::MSG_META_DELETE_VAR_DATA(HINT_NO_BORDERS_ON_MONIKERS);
+        @call PCStatusLight::MSG_META_DELETE_VAR_DATA(HINT_NO_BORDERS_ON_MONIKERS);
     } else {
-	@call StatusIndicators::MSG_META_DELETE_VAR_DATA(HINT_SEEK_TITLE_BAR_RIGHT);
+        @call StatusIndicators::MSG_META_DELETE_VAR_DATA(HINT_SEEK_TITLE_BAR_RIGHT);
     }
     @send StatusIndicators::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
 @endif
@@ -1012,12 +1014,12 @@ void EnsureINISettings(AppAttachFlags attachFlags)
 
     /* Copy the home page UI name into the current URL text, if no datafile */
      if (!(attachFlags & AAF_DATA_FILE_PASSED) &&
-	 !(@call application::MSG_HMLVA_GET_LAUNCH_URL())) {
-	 NavigateGetHome(&homeH) ;
+         !(@call application::MSG_HMLVA_GET_LAUNCH_URL())) {
+         NavigateGetHome(&homeH) ;
          if(homeH)
          {
-	   @call CurrentURLText::MSG_VIS_TEXT_REPLACE_ALL_BLOCK(homeH, 0) ;
-	   MemFree(homeH);
+           @call CurrentURLText::MSG_VIS_TEXT_REPLACE_ALL_BLOCK(homeH, 0) ;
+           MemFree(homeH);
          }
      }
 
