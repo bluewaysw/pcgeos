@@ -277,6 +277,14 @@ CharMapFlags GeosCharMapFlag( word geosChar )
        return geosCharMap[ GEOS_CHAR_INDEX( geosChar ) ].flags;
 }
 
+byte GeosAvgWidth( word geosChar )
+{
+        if( geosChar < MIN_GEOS_CHAR || geosChar > MAX_GEOS_CHAR )
+                return 0;
+
+       return geosCharMap[ GEOS_CHAR_INDEX( geosChar ) ].weight;
+}
+
 
 TT_Error fillFontHeader( TT_Face face, TT_Instance instance, FontHeader* fontHeader )
 {
@@ -288,17 +296,19 @@ TT_Error fillFontHeader( TT_Face face, TT_Instance instance, FontHeader* fontHea
         TT_Face_Properties  faceProperties;
         word                geosChar;
         word                unitsPerEM;
+        sword               maxAccentOrAscent;
 
         
         error = getCharMap( face, &charMap );
         if ( error != TT_Err_Ok )
                 return error;
 
-        /* initialize max and min values in fontHeader */
-        fontHeader->FH_minLSB =  9999;
-        fontHeader->FH_maxBSB = -9999;
-        fontHeader->FH_minTSB = -9999;
-        fontHeader->FH_maxRSB = -9999;
+        /* initialize min, max and avg values in fontHeader */
+        fontHeader->FH_minLSB   =  9999;
+        fontHeader->FH_maxBSB   = -9999;
+        fontHeader->FH_minTSB   = -9999;
+        fontHeader->FH_maxRSB   = -9999;
+        fontHeader->FH_avgwidth = 0;
 
         fontHeader->FH_numChars = CountGeosCharsInCharMap( charMap, 
                                                            &fontHeader->FH_firstChar, 
@@ -331,11 +341,18 @@ TT_Error fillFontHeader( TT_Face face, TT_Instance instance, FontHeader* fontHea
 
                 //descender
                 if ( unicode == C_LATIN_SMALL_LETTER_P )
-                        fontHeader->FH_descender = metrics.bbox.yMax;
+                        fontHeader->FH_descender = metrics.bbox.yMin;
 
-                //Whidth
+                //width
                 if ( fontHeader->FH_maxwidth < ( metrics.bbox.xMax - metrics.bbox.xMin ) )
                         fontHeader->FH_maxwidth = metrics.bbox.xMax - metrics.bbox.xMin;
+
+                //avg width
+                if ( GeosAvgWidth( geosChar ) ) 
+                {
+                        fontHeader->FH_avgwidth = fontHeader->FH_avgwidth + (
+                                  ( metrics.bbox.xMax - metrics.bbox.xMin ) * GeosAvgWidth( geosChar ) / 1000 );
+                }
                 
                 /* scan xMin */
                 if( fontHeader->FH_minLSB > metrics.bbox.xMin )
@@ -361,7 +378,41 @@ TT_Error fillFontHeader( TT_Face face, TT_Instance instance, FontHeader* fontHea
         TT_Get_Face_Properties( face, &faceProperties );
         unitsPerEM = faceProperties.header->Units_Per_EM;
 
-        //basline
+        //baseline
+        if ( fontHeader->FH_accent <= 0 )
+        {
+                fontHeader->FH_accent = 0;
+                maxAccentOrAscent = fontHeader->FH_ascent;
+        }
+        else
+        {
+                maxAccentOrAscent = fontHeader->FH_accent;
+                fontHeader->FH_accent = fontHeader->FH_accent - fontHeader->FH_ascent;
+        }
+                
+        fontHeader->FH_baseAdjust = BASELINE( unitsPerEM )- maxAccentOrAscent;
+        fontHeader->FH_height = fontHeader->FH_maxBSB + maxAccentOrAscent;
+        fontHeader->FH_minTSB = fontHeader->FH_minTSB - BASELINE( unitsPerEM );
+        fontHeader->FH_maxBSB = fontHeader->FH_maxBSB - ( DESCENT( unitsPerEM ) -
+                                                          SAFETY( unitsPerEM ) );
+
+        fontHeader->FH_underPos = faceProperties.postscript->underlinePosition;
+        if( fontHeader->FH_underPos == 0 )
+                fontHeader->FH_underPos = DEFAULT_UNDER_POSITION( unitsPerEM );
+
+        fontHeader->FH_underPos = maxAccentOrAscent - fontHeader->FH_underPos;
+
+        fontHeader->FH_underThick = faceProperties.postscript->underlineThickness; 
+        if( fontHeader->FH_underThick == 0 )
+                fontHeader->FH_underThick = DEFAULT_UNDER_THICK( unitsPerEM );
+        
+        if( fontHeader->FH_x_height > 0 )
+                fontHeader->FH_strikePos = 3 * fontHeader->FH_x_height / 5;
+        else
+                fontHeader->FH_strikePos = 3 * fontHeader->FH_ascent / 5;
+
+        fontHeader->FH_continuitySize = DEFAULT_CONTINUITY_CUTOFF( unitsPerEM );
+
 
         return TT_Err_Ok;
 }
