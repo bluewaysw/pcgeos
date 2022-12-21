@@ -497,7 +497,9 @@ Fail:
  *                of the passed in FontInfo.
  * 
  * PARAMETERS:    fontInfo              Pointer to FontInfo structure.
- *                gstate                Handle to current gstate.
+ *                word                  Character to which the entry 
+ *                                      is to be filled.
+ *                charTableEntry        Pointer to entry to be filled.
  * 
  * RETURNS:       TT_Error = FreeType errorcode (see tterrid.h)
  * 
@@ -510,9 +512,27 @@ Fail:
  *      ----      ----      -----------
  *      11/12/22  JK        Initial Revision
  *******************************************************************/
-TT_Error _pascal Fill_CharTableEntry( const FontInfo* fontInfo, GStateHandle gstate, word character )
+TT_Error _pascal Fill_CharTableEntry( const FontInfo*  fontInfo, 
+                                      word             character,
+                                      CharTableEntry*  charTableEntry )
 {
+        TT_CharMap          charMap;
+        word                geosChar;
 
+
+        ECCheckBounds( (void*)fontInfo );
+        ECCheckBounds( (void*)charTableEntry );
+
+        geosChar = GeosCharToUnicode( character );
+        if ( geosChar == 0 )
+        {
+                charTableEntry->CTE_width.WBF_int  = 0;
+                charTableEntry->CTE_width.WBF_frac = 0;
+                charTableEntry->CTE_flags          = CTF_NO_DATA;
+        }
+
+
+Fin:
         return TT_Err_Ok;
 }
 

@@ -13,9 +13,14 @@ Main.eobj: Main/mainManager.asm \
                 truetypeMetrics.asm truetypePath.asm truetypeInit.asm \
                 truetypeEscape.asm ../FontCom/fontcomEscape.asm \
                 truetypeEC.asm ansic_runtime.asm ansic_memory.asm
+ttinit.obj \
+ttinit.eobj: Adapter/ttinit.h geos.h Adapter/../FreeType/freetype.h \
+                Adapter/../FreeType/fterrid.h \
+                Adapter/../FreeType/ftnameid.h fileEnum.h file.h heap.h \
+                ec.h
 ttcharmapper.obj \
-ttcharmapper.eobj: Adapter/ttcharmapper.h FreeType/freetype.h \
-                FreeType/fterrid.h FreeType/ftnameid.h geos.h unicode.h
+ttcharmapper.eobj: Adapter/ttcharmapper.h geos.h FreeType/freetype.h \
+                FreeType/fterrid.h FreeType/ftnameid.h unicode.h
 ttadapter.obj \
 ttadapter.eobj: Adapter/ttadapter.h geos.h ec.h fontID.h file.h \
                 Adapter/../FreeType/freetype.h \
@@ -27,7 +32,13 @@ ttadapter.eobj: Adapter/ttadapter.h geos.h ec.h fontID.h file.h \
                 Adapter/../FreeType/ft_conf.h resource.h graphics.h \
                 font.h color.h heap.h lmem.h Ansi/stdlib.h \
                 Adapter/../FreeType/ttmutex.h \
-                Adapter/../FreeType/ttcalc.h
+                Adapter/../FreeType/ttcalc.h Adapter/ttcharmapper.h \
+                FreeType/freetype.h
+ttwidths.obj \
+ttwidths.eobj: Adapter/ttwidths.h Adapter/../FreeType/freetype.h \
+                Adapter/../FreeType/fterrid.h \
+                Adapter/../FreeType/ftnameid.h geos.h \
+                Adapter/../FreeType/ftxkern.h
 ttcache.obj \
 ttcache.eobj: FreeType/ttengine.h FreeType/tttypes.h FreeType/ttconfig.h \
                 FreeType/ft_conf.h geos.h file.h resource.h graphics.h \

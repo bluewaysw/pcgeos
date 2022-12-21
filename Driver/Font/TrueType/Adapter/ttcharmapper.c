@@ -418,7 +418,6 @@ TT_Error fillFontHeader( TT_Face face, TT_Instance instance, FontHeader* fontHea
 }
 
 
-static 
 TT_Error getCharMap( TT_Face face, TT_CharMap* charMap )
 {
         TT_Face_Properties  face_Properties;
