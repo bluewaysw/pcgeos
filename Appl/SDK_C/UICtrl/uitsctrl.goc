@@ -7,8 +7,15 @@
  * FILE:	uitsctrl.goc
  * AUTHOR:	Tony Requist: April 1, 1991
  *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      tony    4/1/91		Initial version
+ *	RainerB	11/19/2022	Paramters for MSG_VIS_TEXT_SET_TEXT_STYLE fixed
+ *
  * DESCRIPTION:
  *	This file implements the UI controller class UICTextStyleControlClass.
+ *
  *
  * RCS STAMP:
  *	$Id: uitsctrl.goc,v 1.1 97/04/04 16:37:07 newdeal Exp $
@@ -243,8 +250,8 @@ _pragma_const_in_code;
     /* --- */
 
     static const GenControlChildInfo TSC_childList[] = {
-	{@PlainTextList, TSCF_PLAIN, GCCF_IS_DIRECTLY_A_FEATURE},
-	{@TextStyleList, TSCF_BOLD|TSCF_ITALIC|TSCF_UNDERLINE|TSCF_STRIKE_THRU|
+	{OptrToChunk(@PlainTextList), TSCF_PLAIN, GCCF_IS_DIRECTLY_A_FEATURE},
+	{OptrToChunk(@TextStyleList), TSCF_BOLD|TSCF_ITALIC|TSCF_UNDERLINE|TSCF_STRIKE_THRU|
 				    TSCF_SUBSCRIPT|TSCF_SUPERSCRIPT, 0}
     };
 
@@ -254,20 +261,20 @@ _pragma_const_in_code;
      */
 
     static const GenControlFeaturesInfo TSC_featuresList[] = {
-	{@SuperscriptEntry, @SuperscriptName, 0},
-	{@SubscriptEntry, @SubscriptName, 0},
-	{@StrikeThruEntry, @StrikeThruName, 0},
-	{@UnderlineEntry, @UnderlineName, 0},
-	{@ItalicEntry, @ItalicName, 0},
-	{@BoldEntry, @BoldName, 0},
-	{@PlainTextList, @PlainTextName, 0}
+	{OptrToChunk(@SuperscriptEntry), @SuperscriptName, 0},
+	{OptrToChunk(@SubscriptEntry), @SubscriptName, 0},
+	{OptrToChunk(@StrikeThruEntry), @StrikeThruName, 0},
+	{OptrToChunk(@UnderlineEntry), @UnderlineName, 0},
+	{OptrToChunk(@ItalicEntry), @ItalicName, 0},
+	{OptrToChunk(@BoldEntry), @BoldName, 0},
+	{OptrToChunk(@PlainTextList), @PlainTextName, 0}
     };
 
     /* --- */
 
     static const GenControlChildInfo TSC_toolList[] = {
-	{@PlainTextToolList, TSCTF_PLAIN, GCCF_IS_DIRECTLY_A_FEATURE},
-	{@TextStyleToolList, TSCTF_BOLD|TSCTF_ITALIC|TSCTF_UNDERLINE|
+	{OptrToChunk(@PlainTextToolList), TSCTF_PLAIN, GCCF_IS_DIRECTLY_A_FEATURE},
+	{OptrToChunk(@TextStyleToolList), TSCTF_BOLD|TSCTF_ITALIC|TSCTF_UNDERLINE|
 			TSCTF_STRIKE_THRU|TSCTF_SUBSCRIPT|TSCTF_SUPERSCRIPT, 0}
     };
 
@@ -277,13 +284,13 @@ _pragma_const_in_code;
      */
 
     static const GenControlFeaturesInfo TSC_toolFeaturesList[] = {
-	{@SuperscriptToolEntry, @SuperscriptName, 0},
-	{@SubscriptToolEntry, @SubscriptName, 0},
-	{@StrikeThruToolEntry, @StrikeThruName, 0},
-	{@UnderlineToolEntry, @UnderlineName, 0},
-	{@ItalicToolEntry, @ItalicName, 0},
-	{@BoldToolEntry, @BoldName, 0},
-	{@PlainTextToolList, @PlainTextName, 0}
+	{OptrToChunk(@SuperscriptToolEntry), @SuperscriptName, 0},
+	{OptrToChunk(@SubscriptToolEntry), @SubscriptName, 0},
+	{OptrToChunk(@StrikeThruToolEntry), @StrikeThruName, 0},
+	{OptrToChunk(@UnderlineToolEntry), @UnderlineName, 0},
+	{OptrToChunk(@ItalicToolEntry), @ItalicName, 0},
+	{OptrToChunk(@BoldToolEntry), @BoldName, 0},
+	{OptrToChunk(@PlainTextToolList), @PlainTextName, 0}
     };
 
     /* The ## denote fields filled in dynamically */
@@ -325,9 +332,9 @@ _pragma_end_const_in_code;
      * Copy our structure which contains most of the correct
      * fields (everything that can be correct given compiler limitations)
      */
-    memcpy(info, MemLockFixedOrMovable(&TSC_dupInfo),
+    memcpy(info, MemLockFixedOrMovable((void*)(&TSC_dupInfo)),
 					sizeof(GenControlBuildInfo));
-    MemUnlockFixedOrMovable(&TSC_dupInfo);
+    MemUnlockFixedOrMovable((void*)&TSC_dupInfo);
     /*
      * Fill in the rest of the fields by hand
      */
@@ -353,6 +360,7 @@ _pragma_end_const_in_code;
  *	----	----		-----------
  *	tony	11/18/91	Initial Revision
  *	eb	11/21/94	swapped order of VisTextRange params
+ *	RainerB 11/19/2022	VIS_TEXT_RANGE_SELECTION must be the last parameter
  *
  ***********************************************************************/
 @method UICTextStyleControlClass, MSG_TSC_PLAIN_TEXT_CHANGE
@@ -361,7 +369,7 @@ _pragma_end_const_in_code;
 
     msg = @record VisTextClass::MSG_VIS_TEXT_SET_TEXT_STYLE(0, 0,
 					     0xff, 0,
-					     VIS_TEXT_RANGE_SELECTION, 0L);
+					     0, VIS_TEXT_RANGE_SELECTION);
     @send self::MSG_GEN_OUTPUT_ACTION(msg, pself->GCI_output);
 }
 
@@ -382,6 +390,7 @@ _pragma_end_const_in_code;
  *	----	----		-----------
  *	tony	11/18/91	Initial Revision
  *	eb	11/21/94	swapped order of VisTextRange params
+ *	RainerB 11/19/2022	VIS_TEXT_RANGE_SELECTION must be the last parameter
  *
  ***********************************************************************/
 @method UICTextStyleControlClass, MSG_TSC_STYLE_CHANGE
@@ -391,7 +400,10 @@ _pragma_end_const_in_code;
     msg = @record VisTextClass::MSG_VIS_TEXT_SET_TEXT_STYLE(0, 0,
 					 ~selectedBooleans & modifiedBooleans,
 					 selectedBooleans & modifiedBooleans,
-					 VIS_TEXT_RANGE_SELECTION, 0L);
+					 0, VIS_TEXT_RANGE_SELECTION);
+					 /* Pass VIS_TEXT_RANGE_SELECTION as rangeStart and zero as
+					  * rangeEnd to use the selected text range as target range. RB
+					  */
     @send self::MSG_GEN_OUTPUT_ACTION(msg, pself->GCI_output);
 }
 
