@@ -310,6 +310,8 @@ TT_Error _pascal Fill_FontInfo( TT_Face    face,
         ECCheckBounds( (void*)fontInfo );
 
 
+        //TODO: der Namestring kann ASCII oder auch UNICODE codiert sein
+        //      die Implementierung muss damit umgehen können
         error = TT_Get_Name_String( face, FAMILY_NAME_INDEX, &familyName, &familyNameLength );
         if ( error )
                 return error;
@@ -378,6 +380,8 @@ TT_Error _pascal Fill_OutlineData( const char*            fileName,
         ECCheckBounds( (void*)trueTypeOutlineEntry );
 
 
+        //TODO: der Namestring kann ASCII oder auch UNICODE codiert sein
+        //      die Implementierung muss damit umgehen können
         error = TT_Get_Name_String( face, STYLE_NAME_INDEX, &styleName, &styleNameLength );
         if ( error != TT_Err_Ok )
                 return error;
@@ -503,12 +507,21 @@ static TextStyle mapTextStyle( const char* subfamily )
 
 static Boolean isMappedFont( const char* familiyName ) 
 {
+        //Idee:
+        //  -für das Fontmapping gibt es einen Abschnitt in der geos.ini [fontmapping]
+        //  -das Mapping kann für einen Font dann so aussehen:
+        //       familiyName = ID des Nimbus-Fonts
+        //  diese Funktion soll prüfen ob es zu familyName einen Eintrag gibt
         //TODO: implement it
         return FALSE;
 }
 
 static FontID getMappedFontID( const char* familyName )
 { 
+        //Idee:
+        //  -siehe oben
+        //  diese Funktion gibt die FontID zum übergebenen familyName zurück
+        //  wenn der familyName nicht vorhanden ist dann 0
         //TODO: implement it
         //TODO: FontMaker austauschen
         return (FontID) FID_DTC_URW_SANS;
@@ -518,8 +531,10 @@ static Boolean isRegistredFontID( FontID fontID, MemHandle fontInfoBlock )
 {
         byte*  fontsAvailEntry;
 
-        /* set fontsAvailEntry to first Element */
+        /* set fontsAvailEntry to first Element after LMemBlock */
         fontsAvailEntry = MemDeref( fontInfoBlock );
+
+        // 
         return FALSE;
 }
 
