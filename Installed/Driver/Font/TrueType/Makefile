@@ -9,8 +9,9 @@ MAIN            = truetypeEscape.asm ansic_runtime.asm mainManager.asm\
                   truetypeInit.asm truetypeEC.asm truetypeChars.asm\
                   truetypePath.asm truetypeMacros.def truetypeVariable.def\
                   truetypeConstant.def
-ADAPTER         = ttinit.c ttcharmapper.c ttadapter.c ttwidths.c\
-                  ttcharmapper.h ttwidths.h ttinit.h ttadapter.h
+ADAPTER         = ttinit.c ttmetrics.c ttcharmapper.c ttwidths.c\
+                  ttcharmapper.h ttwidths.h ttinit.h ttmetrics.h\
+                  ttadapter.h
 FREETYPE        = ttcache.c ttraster.c ttmutex.c ttgload.c ttextend.c\
                   ttcalc.c ttapi.c ftxkern.c ttinterp.c ttload.c ttfile.c\
                   ttcmap.c ttobjs.c ttmemory.c ttcache.h ttcmap.h\
@@ -19,7 +20,7 @@ FREETYPE        = ttcache.c ttraster.c ttmutex.c ttgload.c ttextend.c\
                   ttengine.h tttypes.h ttmutex.h ft_conf.h ttextend.h\
                   ftnameid.h ttcalc.h ftxkern.h ttmemory.h tttags.h
 UI_TO_RDFS      =
-OBJS            = ttinit.obj ttcharmapper.obj ttadapter.obj ttwidths.obj\
+OBJS            = ttinit.obj ttmetrics.obj ttcharmapper.obj ttwidths.obj\
                   ttcache.obj ttraster.obj ttmutex.obj ttgload.obj\
                   ttextend.obj ttcalc.obj ttapi.obj ftxkern.obj\
                   ttinterp.obj ttload.obj ttfile.obj ttcmap.obj ttobjs.obj\

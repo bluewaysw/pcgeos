@@ -22,6 +22,9 @@
 #define _TTINIT_H_
 
 #include <geos.h>
+#include <fontID.h>
+#include <font.h>
+#include <graphics.h>
 #include "../FreeType/freetype.h"
 
 
@@ -30,27 +33,47 @@
  ***********************************************************************/
 
 #define TTF_DIRECTORY           "TTF"
+#define FAMILY_NAME_INDEX       1       // font family name
+#define STYLE_NAME_INDEX        2       // font style
+
+#define FONT_FILE_LENGTH        FILE_LONGNAME_BUFFER_SIZE
+
+#define FAMILY_NAME_LENGTH      20
+#define STYLE_NAME_LENGTH       16
+
+#define MAKE_FONTID( family )   ( FM_TRUETYPE | ( 0x0fff & toHash ( family )))
 
 
 /***********************************************************************
  *      functions called by driver
  ***********************************************************************/
 
-void _pascal TrueType_Init();
+void _pascal  TrueType_InitFonts( MemHandle fontInfoBlock );
 
+TT_Error  TrueType_ProcessFont( const char* file, MemHandle fontInfoBlock );
 
-void _pascal TrueType_Exit();
+Boolean  isRegistredFontID( FontID fontID, MemHandle fontInfoBlock );
 
+Boolean  isMappedFont( const char* familiyName );
 
-void _pascal TrueType_InitFonts( MemHandle fontInfoBlock );
-
-
-TT_Error TrueType_ProcessFont( const char* file, MemHandle fontInfoBlock );
+FontID  getMappedFontID( const char* familyName );
 
 
 /***********************************************************************
  *      internal functions
  ***********************************************************************/
+
+static FontAttrs    mapFamilyClass( TT_Short familyClass );
+
+static FontWeight   mapFontWeight( TT_Short weightClass );
+
+static TextStyle    mapTextStyle( const char* subfamily );
+
+static int  toHash( const char* str );
+
+static int  strlen( const char* str );
+
+static void strcpy( char* dest, const char* source );
 
 
 #endif  /* _TTINT_H_ */

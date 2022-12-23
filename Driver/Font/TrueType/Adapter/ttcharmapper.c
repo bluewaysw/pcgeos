@@ -286,138 +286,9 @@ byte GeosAvgWidth( word geosChar )
 }
 
 
-TT_Error fillFontHeader( TT_Face face, TT_Instance instance, FontHeader* fontHeader )
-{
-        TT_CharMap          charMap;
-        TT_Error            error;
-        TT_UShort           charIndex;
-        TT_Glyph            glyph;
-        TT_Glyph_Metrics    metrics;
-        TT_Face_Properties  faceProperties;
-        word                geosChar;
-        word                unitsPerEM;
-        sword               maxAccentOrAscent;
-
-        
-        error = getCharMap( face, &charMap );
-        if ( error != TT_Err_Ok )
-                return error;
-
-        /* initialize min, max and avg values in fontHeader */
-        fontHeader->FH_minLSB   =  9999;
-        fontHeader->FH_maxBSB   = -9999;
-        fontHeader->FH_minTSB   = -9999;
-        fontHeader->FH_maxRSB   = -9999;
-        fontHeader->FH_avgwidth = 0;
-
-        fontHeader->FH_numChars = CountGeosCharsInCharMap( charMap, 
-                                                           &fontHeader->FH_firstChar, 
-                                                           &fontHeader->FH_lastChar );
-
-        for ( geosChar = fontHeader->FH_firstChar; geosChar < fontHeader->FH_lastChar; ++geosChar )
-        {
-                word unicode = GeosCharToUnicode( geosChar );
-
-                charIndex = TT_Char_Index( charMap, unicode );
-                if ( charIndex == 0 )
-                        break;
-
-                /* load glyph without scaling or hinting */
-                TT_New_Glyph( face, &glyph );
-                TT_Load_Glyph( instance, glyph, charIndex, 0 );
-                TT_Get_Glyph_Metrics( glyph, &metrics );
-
-                //h_height
-                if( unicode == C_LATIN_CAPITAL_LETTER_H )
-                        fontHeader->FH_h_height = metrics.bbox.yMax;
-
-                //x_height
-                if ( unicode == C_LATIN_SMALL_LETTER_X )
-                        fontHeader->FH_x_height = metrics.bbox.yMax;
-
-                //ascender
-                if ( unicode == C_LATIN_SMALL_LETTER_D )
-                        fontHeader->FH_ascender = metrics.bbox.yMax;
-
-                //descender
-                if ( unicode == C_LATIN_SMALL_LETTER_P )
-                        fontHeader->FH_descender = metrics.bbox.yMin;
-
-                //width
-                if ( fontHeader->FH_maxwidth < ( metrics.bbox.xMax - metrics.bbox.xMin ) )
-                        fontHeader->FH_maxwidth = metrics.bbox.xMax - metrics.bbox.xMin;
-
-                //avg width
-                if ( GeosAvgWidth( geosChar ) ) 
-                {
-                        fontHeader->FH_avgwidth = fontHeader->FH_avgwidth + (
-                                  ( metrics.bbox.xMax - metrics.bbox.xMin ) * GeosAvgWidth( geosChar ) / 1000 );
-                }
-                
-                /* scan xMin */
-                if( fontHeader->FH_minLSB > metrics.bbox.xMin )
-                        fontHeader->FH_minLSB = (sword) metrics.bbox.xMin;
-
-                /* scan xMax */
-                if ( fontHeader->FH_maxRSB < metrics.bbox.xMax )
-                        fontHeader->FH_maxRSB = metrics.bbox.xMax;
-                /* scan yMin */
-                if ( fontHeader->FH_maxBSB < metrics.bbox.yMin )
-                        fontHeader->FH_maxBSB = metrics.bbox.yMin;
-
-                //yMax
-                if ( fontHeader->FH_minTSB < metrics.bbox.yMax )
-                {
-                        fontHeader->FH_minTSB = metrics.bbox.yMax;
-                        if ( GeosCharMapFlag( geosChar ) == CMF_ACCENT && 
-                             fontHeader->FH_accent < metrics.bbox.yMax )
-                             fontHeader->FH_accent = metrics.bbox.yMax;
-                }
-        }
-
-        TT_Get_Face_Properties( face, &faceProperties );
-        unitsPerEM = faceProperties.header->Units_Per_EM;
-
-        //baseline
-        if ( fontHeader->FH_accent <= 0 )
-        {
-                fontHeader->FH_accent = 0;
-                maxAccentOrAscent = fontHeader->FH_ascent;
-        }
-        else
-        {
-                maxAccentOrAscent = fontHeader->FH_accent;
-                fontHeader->FH_accent = fontHeader->FH_accent - fontHeader->FH_ascent;
-        }
-                
-        fontHeader->FH_baseAdjust = BASELINE( unitsPerEM )- maxAccentOrAscent;
-        fontHeader->FH_height = fontHeader->FH_maxBSB + maxAccentOrAscent;
-        fontHeader->FH_minTSB = fontHeader->FH_minTSB - BASELINE( unitsPerEM );
-        fontHeader->FH_maxBSB = fontHeader->FH_maxBSB - ( DESCENT( unitsPerEM ) -
-                                                          SAFETY( unitsPerEM ) );
-
-        fontHeader->FH_underPos = faceProperties.postscript->underlinePosition;
-        if( fontHeader->FH_underPos == 0 )
-                fontHeader->FH_underPos = DEFAULT_UNDER_POSITION( unitsPerEM );
-
-        fontHeader->FH_underPos = maxAccentOrAscent - fontHeader->FH_underPos;
-
-        fontHeader->FH_underThick = faceProperties.postscript->underlineThickness; 
-        if( fontHeader->FH_underThick == 0 )
-                fontHeader->FH_underThick = DEFAULT_UNDER_THICK( unitsPerEM );
-        
-        if( fontHeader->FH_x_height > 0 )
-                fontHeader->FH_strikePos = 3 * fontHeader->FH_x_height / 5;
-        else
-                fontHeader->FH_strikePos = 3 * fontHeader->FH_ascent / 5;
-
-        fontHeader->FH_continuitySize = DEFAULT_CONTINUITY_CUTOFF( unitsPerEM );
-
-
-        return TT_Err_Ok;
-}
-
-
+/*
+ * Get microsoft unicode charmap in face.
+ */
 TT_Error getCharMap( TT_Face face, TT_CharMap* charMap )
 {
         TT_Face_Properties  face_Properties;
@@ -443,7 +314,9 @@ TT_Error getCharMap( TT_Face face, TT_CharMap* charMap )
 }
 
 
-static 
+/*
+ * Counts the GEOS characters that are present in the font.
+ */
 word CountGeosCharsInCharMap( TT_CharMap map, word *firstChar, word *lastChar )
 {
         word charIndex;

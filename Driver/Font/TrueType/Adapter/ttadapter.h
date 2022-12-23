@@ -35,20 +35,6 @@ extern TEngine_Instance engineInstance;
 
 
 /***********************************************************************
- *      parameters for search in name table
- ***********************************************************************/
-#define NAME_INDEX_FAMILY          1       // font family name
-#define NAME_INDEX_STYLE           2       // font style
-
-#define FONT_FILE_LENGTH           FILE_LONGNAME_BUFFER_SIZE
-
-#define FAMILY_NAME_LENGTH         20
-#define STYLE_NAME_LENGTH          16
-
-
-#define MAKE_FONTID( family )      ( FM_TRUETYPE | ( 0x0fff & toHash ( family )))
-
-/***********************************************************************
  *      structures
  ***********************************************************************/
 
@@ -59,9 +45,9 @@ typedef struct
 {
     FontID                      FAE_fontID;
 #ifdef DBCS_PCGEOS
-    wchar                       FAE_fileName[FONT_FILE_LENGTH];
+    wchar                       FAE_fileName[FILE_LONGNAME_BUFFER_SIZE];
 #else
-    char                        FAE_fileName[FONT_FILE_LENGTH];
+    char                        FAE_fileName[FILE_LONGNAME_BUFFER_SIZE];
 #endif
     ChunkHandle                 FAE_infoHandle;
 } FontsAvailEntry;
@@ -99,9 +85,9 @@ typedef struct
 typedef struct
 {
 #if DBCS_PCGEOS
-    wchar                       TTOE_fontFileName[FONT_FILE_LENGTH]
+    wchar                       TTOE_fontFileName[FILE_LONGNAME_BUFFER_SIZE]
 #else
-    char                        TTOE_fontFileName[FONT_FILE_LENGTH];
+    char                        TTOE_fontFileName[FILE_LONGNAME_BUFFER_SIZE];
 #endif
 } TrueTypeOutlineEntry;
 
@@ -290,27 +276,5 @@ typedef struct
 #define WBFIXED_TO_WWFIXEDASDWORD( value )       \
         ( ( (long)value.WBF_int << 16 ) | ( value.WBF_frac << 8 ) )
 
-/***********************************************************************
- *      helperfunctions
- ***********************************************************************/
-
-static Boolean      isMappedFont( const char* familiyName );
-
-static FontID       getMappedFontID( const char* familyName );
-
-static int          toHash( const char* str );
-
-static FontAttrs    mapFamilyClass( TT_Short familyClass );
-
-static FontWeight   mapFontWeight( TT_Short weightClass );
-
-static TextStyle    mapTextStyle( const char* subfamily );
-
-
-static int          strlen( const char* str );
-
-static void         strcpy( char* dest, const char* source );
-
 
 #endif /* _TTADAPTER_H_ */
-
