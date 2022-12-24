@@ -8,7 +8,7 @@ IF NOT DEFINED BASEBOX (SET BASEBOX=dosbox)
 set OLD_PATH=%cd%
 cd /D %LOCAL_ROOT%\gbuild\localpc 
 del /F %LOCAL_ROOT%\gbuild\localpc\IPX_STAT.txt
-start /B %BASEBOX% -conf %ROOT_DIR%\bin\basebox.conf -conf %ROOT_DIR%\bin\user.conf -noconsole
+start /B %BASEBOX% -conf %ROOT_DIR%\bin\basebox.conf -conf %LOCAL_ROOT%\basebox_user.conf -noconsole
 cd %OLD_PATH%
 @cls
 :waitForFile

@@ -68,12 +68,11 @@ Launch the target environment in dosbox:
 
 
 ## Customize target environment
-If you want to customize the target environment settings only for yourself, you should not change the file %LOCAL_ROOT%/bin/basbox.conf.
-- Create a file called user.conf in %ROOT_DIR%/bin.
+If you want to customize the target environment settings only for yourself, you should not change the file %ROOT_DIR%/bin/basbox.conf.
+- Create a file called basebox_user.conf in %LOCAL_ROOT% folder.
 - Enter the new settings here. These settings overwrite those from basebox.conf. Example:
   - [cpu]
   - cycles=55000
-- GIT ignores this file (see .gitignore)
 
 ##
 We are on https://bluewaysw.slack.com/ for more efficient collaboration. Please register at https://blog.bluewaysw.de for MyGEOS and use the Slack section and receive access to our developer community. Welcome!
