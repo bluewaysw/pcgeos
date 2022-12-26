@@ -183,9 +183,7 @@ TT_Error TrueType_ProcessFont( const char* fileName, MemHandle fontInfoBlock )
         if ( getNameFromNameTable( familyName, face, FAMILY_NAME_INDEX ) == 0 )
                 goto Fin;
 
-        if ( isMappedFont( familyName ) )
-                fontID = getMappedFontID( familyName );
-        else
+        if ( !isMappedFont( familyName, &fontID ) )
                 fontID = MAKE_FONTID( familyName );
 
         if ( !isRegistredFontID( fontID, fontInfoBlock ) )
@@ -491,36 +489,33 @@ static TextStyle mapTextStyle( const char* subfamily )
         return TS_BOLD | TS_ITALIC;
 }
 
-static Boolean isMappedFont( const char* familiyName ) 
+static Boolean isMappedFont( const char* familiyName, FontID* fontID ) 
 {
-        //Idee:
-        //  -für das Fontmapping gibt es einen Abschnitt in der geos.ini [fontmapping]
-        //  -das Mapping kann für einen Font dann so aussehen:
-        //       familiyName = ID des Nimbus-Fonts
-        //  diese Funktion soll prüfen ob es zu familyName einen Eintrag gibt
-        //TODO: implement it
-        return FALSE;
-}
+        Boolean result;
 
-static FontID getMappedFontID( const char* familyName )
-{ 
-        //Idee:
-        //  -siehe oben
-        //  diese Funktion gibt die FontID zum übergebenen familyName zurück
-        //  wenn der familyName nicht vorhanden ist dann 0
-        //TODO: implement it
-        //TODO: FontMaker austauschen
-        return (FontID) FID_DTC_URW_SANS;
+        result = !InitFileReadInteger( FONTMAPPING_CATEGORY, 
+		                       familiyName, 
+                                       fontID );
+
+        //ensure FM_TRUETYPE is set
+        *fontID = FM_TRUETYPE || (*fontID && 0x0fff);
+        return result;
 }
 
 static Boolean isRegistredFontID( FontID fontID, MemHandle fontInfoBlock )
 {
-        byte*  fontsAvailEntry;
+        FontsAvailEntry*  fontsAvailEntrys;
+        word   elements;
+        word   element;
 
-        /* set fontsAvailEntry to first Element after LMemBlock */
-        fontsAvailEntry = MemDeref( fontInfoBlock );
+        /* set fontsAvailEntrys to first Element after LMemBlockHeader */
+        fontsAvailEntrys = ( (byte*)MemDeref( fontInfoBlock ) + sizeof( LMemBlockHeader ) );
+        elements = LMemGetChunkSizePtr( fontsAvailEntrys ) / sizeof( FontsAvailEntry );
 
-        // 
+        for( element = 0; element < elements; element++ )
+                if( fontsAvailEntrys[element].FAE_fontID == fontID )
+                        return TRUE;
+
         return FALSE;
 }
 

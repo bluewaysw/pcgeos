@@ -32,16 +32,18 @@
  *      constants
  ***********************************************************************/
 
-#define TTF_DIRECTORY           "TTF"
-#define FAMILY_NAME_INDEX       1       // font family name
-#define STYLE_NAME_INDEX        2       // font style
+#define TTF_DIRECTORY                   "TTF"
+#define FONTMAPPING_CATEGORY            "FontMapping"
 
-#define FONT_FILE_LENGTH        FILE_LONGNAME_BUFFER_SIZE
+#define FAMILY_NAME_INDEX               1       // font family name
+#define STYLE_NAME_INDEX                2       // font style
 
-#define FAMILY_NAME_LENGTH      20
-#define STYLE_NAME_LENGTH       16
+#define FONT_FILE_LENGTH                FILE_LONGNAME_BUFFER_SIZE
 
-#define MAKE_FONTID( family )   ( FM_TRUETYPE | ( 0x0fff & toHash ( family )))
+#define FAMILY_NAME_LENGTH              20
+#define STYLE_NAME_LENGTH               16
+
+#define MAKE_FONTID( family )           ( FM_TRUETYPE | ( 0x0fff & toHash ( family )))
 
 
 #define PLATFORM_ID_MAC                 1
@@ -64,9 +66,7 @@ TT_Error  TrueType_ProcessFont( const char* file, MemHandle fontInfoBlock );
 
 Boolean  isRegistredFontID( FontID fontID, MemHandle fontInfoBlock );
 
-Boolean  isMappedFont( const char* familiyName );
-
-FontID  getMappedFontID( const char* familyName );
+static Boolean  isMappedFont( const char* familiyName, FontID* font );
 
 
 /***********************************************************************
