@@ -524,13 +524,14 @@ static Boolean isRegistredFontID( FontID fontID, MemHandle fontInfoBlock )
         return FALSE;
 }
 
-static word getNameFromNameTable( char* name, TT_Face face, TT_UShort nameIndex )
+static word getNameFromNameTable( char* name, TT_Face face, TT_UShort nameID )
 {
         TT_Face_Properties  faceProperties;
         TT_UShort           platformID;
         TT_UShort           encodingID;
         TT_UShort           languageID;
         word                nameLength;
+        word                id;
         word                i, n;
         char*               str;
         
@@ -539,7 +540,9 @@ static word getNameFromNameTable( char* name, TT_Face face, TT_UShort nameIndex 
 
         for( n = 0; n < faceProperties.num_Names; n++ )
         {
-                TT_Get_Name_ID( face, n, nameIndex, platformID, encodingID, languageID );
+                TT_Get_Name_ID( face, n, &platformID, &encodingID, &languageID, &id );
+                if( id != nameID )
+                        continue;
 
                 if( platformID == PLATFORM_ID_MS && 
                     encodingID == ENCODING_ID_MS_UNICODE_BMP && 
