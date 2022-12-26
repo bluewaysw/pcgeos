@@ -535,6 +535,7 @@ closeLoop:
 	;
 	; close sockets.
 	;		
+if 0
 		push	ax, dx
 
 		mov	bx, handle dgroup
@@ -555,9 +556,9 @@ closeLoop:
 
 		pop	ax, dx				; ax = data size
 							; dx = connection
+endif
 
 		jmp	closeLoop
-
 recvLoop:
 ;EC <		WARNING	TCPIP_RECEIVE_START_LOOP		>
 
@@ -4861,6 +4862,7 @@ doQuery:
 	;
 	; Query address from resolver.
 	; 
+		push	bx
 		mov	ax, 1000			; resolve address
 							; dxbp = addr or
 							;  dx = ResolverError
@@ -4870,6 +4872,12 @@ doQuery:
 
 		;sahf
 		;mov	ax, bp				; dxax = resolved addr
+		clc
+		cmp	bx, 0
+		je	noC
+		stc
+noC:
+		pop 	bx
 		jnc	checkValid
 	;
 	; Convert ResolverError to SocketDrError.

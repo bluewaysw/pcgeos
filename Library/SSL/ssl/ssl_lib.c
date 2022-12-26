@@ -383,9 +383,11 @@ int fd;
 #ifdef COMPILE_OPTION_HOST_SERVICE
 	if(SSLCheckHost())
 		{
+		word intHdl = SocketGetIntSocketOption(fd, SO_CONNECTION_HDL);
+			
 		return (int) SSLCallHost(
 			SSLHFN_SSL_SET_FD, (dword) s, (dword)  
-			SSLHostExchangeBuffer(), (word) fd);
+			SSLHostExchangeBuffer(), (word) intHdl);
 		}
 #endif
 
@@ -1599,6 +1601,14 @@ SSL_METHOD *meth;
 	{
 	int conn= -1;
 	int ret=1;
+
+	#ifdef COMPILE_OPTION_HOST_SERVICE
+		if(SSLCheckHost())
+			{
+			return (SSL_METHOD *) SSLCallHost(
+				SSLHFN_SSL_GET_SSL_METHOD, (dword) s, (dword) NULL, 0);
+			}
+	#endif
 
 	SSLEnter();
 	if (s->method != meth)
