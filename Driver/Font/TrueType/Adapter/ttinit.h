@@ -44,6 +44,16 @@
 #define MAKE_FONTID( family )   ( FM_TRUETYPE | ( 0x0fff & toHash ( family )))
 
 
+#define PLATFORM_ID_MAC                 1
+#define PLATFORM_ID_MS                  3
+
+#define ENCODING_ID_MAC_ROMAN           0
+#define ENCODING_ID_MS_UNICODE_BMP      1
+
+#define LANGUAGE_ID_MAC_EN              0
+#define LANGUAGE_ID_WIN_EN_US           0x0409
+
+
 /***********************************************************************
  *      functions called by driver
  ***********************************************************************/
@@ -68,6 +78,8 @@ static FontAttrs    mapFamilyClass( TT_Short familyClass );
 static FontWeight   mapFontWeight( TT_Short weightClass );
 
 static TextStyle    mapTextStyle( const char* subfamily );
+
+static word         getNameFromNameTable( char* name, TT_Face face, TT_UShort nameIndex );
 
 static int  toHash( const char* str );
 

@@ -163,7 +163,7 @@ TT_Error TrueType_ProcessFont( const char* fileName, MemHandle fontInfoBlock )
         FileHandle      truetypeFile;
         TT_Face         face;
         TT_Error        error;
-        TT_String*      familyName;
+        char            familyName[FID_NAME_LEN];
         word            familyNameLength;
         FontID          fontID;
 
@@ -180,10 +180,7 @@ TT_Error TrueType_ProcessFont( const char* fileName, MemHandle fontInfoBlock )
         if( error )
                 goto Fin;
 
-        //TODO: der Namestring kann ASCII oder auch UNICODE codiert sein
-        //      die Implementierung muss damit umgehen können
-        error = TT_Get_Name_String( face, FAMILY_NAME_INDEX, &familyName, &familyNameLength );
-        if ( error != TT_Err_Ok )
+        if ( getNameFromNameTable( familyName, face, FAMILY_NAME_INDEX ) == 0 )
                 goto Fin;
 
         if ( isMappedFont( familyName ) )
@@ -303,27 +300,16 @@ TT_Error _pascal Fill_FontInfo( TT_Face    face,
 {
         TT_Error            error;
         TT_Face_Properties  faceProperties;
-        TT_String*          familyName;
-        word                familyNameLength;
         
 
         ECCheckBounds( (void*)fontInfo );
 
 
-        //TODO: der Namestring kann ASCII oder auch UNICODE codiert sein
-        //      die Implementierung muss damit umgehen können
-        error = TT_Get_Name_String( face, FAMILY_NAME_INDEX, &familyName, &familyNameLength );
-        if ( error )
-                return error;
-
-        if ( familyNameLength >= FAMILY_NAME_LENGTH )
-                return TT_Err_Invalid_Argument;
-
         error = TT_Get_Face_Properties( face, &faceProperties );
         if ( error )
                 return error;
 
-        strcpy( fontInfo->FI_faceName, familyName );
+        getNameFromNameTable( fontInfo->FI_faceName, face, FAMILY_NAME_INDEX );
 
         fontInfo->FI_family       = mapFamilyClass( faceProperties.os2->sFamilyClass );
         fontInfo->FI_fontID       = fontID;
@@ -536,6 +522,50 @@ static Boolean isRegistredFontID( FontID fontID, MemHandle fontInfoBlock )
 
         // 
         return FALSE;
+}
+
+static word getNameFromNameTable( char* name, TT_Face face, TT_UShort nameIndex )
+{
+        TT_Face_Properties  faceProperties;
+        TT_UShort           platformID;
+        TT_UShort           encodingID;
+        TT_UShort           languageID;
+        word                nameLength;
+        word                i, n;
+        char*               str;
+        
+        
+        TT_Get_Face_Properties( face, &faceProperties );
+
+        for( n = 0; n < faceProperties.num_Names; n++ )
+        {
+                TT_Get_Name_ID( face, n, nameIndex, platformID, encodingID, languageID );
+
+                if( platformID == PLATFORM_ID_MS && 
+                    encodingID == ENCODING_ID_MS_UNICODE_BMP && 
+                    languageID == LANGUAGE_ID_WIN_EN_US )
+                {
+                        TT_Get_Name_String( face, n, &str, &nameLength );
+
+                        for (i = 1; str != 0 && i < nameLength; i += 2)
+                                *name++ = str[i];
+                        *name = 0;
+                        return nameLength >> 1;
+                }
+                else if( platformID == PLATFORM_ID_MAC && 
+                         encodingID == ENCODING_ID_MAC_ROMAN &&
+                         languageID == LANGUAGE_ID_MAC_EN )
+                {
+                        TT_Get_Name_String( face, n, &str, &nameLength );
+
+                        for (i = 1; str != 0 && i < nameLength; i ++)
+                                *name++ = str[i];
+                        *name = 0;
+                        return nameLength;
+                }
+        }
+
+        return 0;
 }
 
 
