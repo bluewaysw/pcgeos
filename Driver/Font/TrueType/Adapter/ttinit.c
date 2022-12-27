@@ -127,12 +127,11 @@ void _pascal TrueType_InitFonts( MemHandle fontInfoBlock )
         FilePushDir();
 
         /* go to font/ttf directory */
-        if( FileSetCurrentPath( SP_FONT, TTF_DIRECTORY ) == NullHandle )
-                goto Fin;
+        FileSetCurrentPath( SP_FONT, TTF_DIRECTORY );
 
         /* get all filenames contained in current directory */
         ttfEnumParams.FEP_searchFlags   = FESF_NON_GEOS;
-        ttfEnumParams.FEP_returnAttrs   = &ttfExtAttrDesc;
+        ttfEnumParams.FEP_returnAttrs   = ttfExtAttrDesc;
         ttfEnumParams.FEP_returnSize    = sizeof( FileLongName );
         ttfEnumParams.FEP_matchAttrs    = NullHandle;
         ttfEnumParams.FEP_bufSize       = FE_BUFSIZE_UNLIMITED;
@@ -150,7 +149,7 @@ void _pascal TrueType_InitFonts( MemHandle fontInfoBlock )
         /* iterate over all filenames and try to register a font.*/
         ptrFileName = MemLock( fileEnumBlock );
         for( file = 0; file < numFiles; file++ )
-                TrueType_ProcessFont( ptrFileName++, fontInfoBlock );
+                TrueType_ProcessFont( ptrFileName[file], fontInfoBlock );
 
         MemFree( fileEnumBlock );
 
