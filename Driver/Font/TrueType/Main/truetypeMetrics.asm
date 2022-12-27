@@ -56,7 +56,33 @@ REVISION HISTORY:
 
 TrueTypeCharMetrics	proc	far
 	uses	bx, cx, si, di, ds
+
+resultAXDX	local	dword
+
 	.enter
+
+	push	dx		; character code
+	push	ds		; ptr to fontInfo
+	mov	bx, 0		; segment offset 0
+	push	bx
+	push	es		; ptr to gstate
+	push	bx		; segment offset 0
+	push	cx		; GCM_info
+
+	push 	ss		; pass ptr to result dword in ss
+	lea	cx, resultAXDX
+	push	cx
+
+	segmov	ds, dgroup, cx
+	call	TRUETYPE_CHAR_METRICS
+
+	clc
+	cmp	ax, 0
+	jnc	ok
+	stc
+ok:
+	mov	ax, {word} resultAXDX
+	mov	dx, {word} resultAXDX+2
 
 	.leave
 	ret

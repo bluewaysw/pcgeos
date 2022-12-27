@@ -26,6 +26,7 @@
 #include <font.h>
 #include <graphics.h>
 #include "../FreeType/freetype.h"
+#include "ttadapter.h"
 
 
 /***********************************************************************

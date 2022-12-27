@@ -75,7 +75,12 @@ typedef struct
  *      functions called by driver
  ***********************************************************************/
 
-void _pascal TrueType_Gen_Widths();
+MemHandle _pascal TrueType_Gen_Widths(
+                                MemHandle           fontHandle,
+                                void*               gstatePtr,
+                                void*               tMaxtrix,
+                                const FontInfo*     fontInfo
+);
 
 
 /***********************************************************************

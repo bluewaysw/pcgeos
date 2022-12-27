@@ -21,9 +21,10 @@
 #define _TTMETRICS_H_
 
 
-TT_Error _pascal Get_Char_Metrics( const FontInfo*  fontInfo, 
-                                   GStateHandle     gstate, 
+TT_Error _pascal TrueType_Char_Metrics( 
                                    word             character, 
+                                   const FontInfo*  fontInfo, 
+                                   void*            gstatePtr, 
                                    GCM_info         info, 
                                    dword*           result );
 

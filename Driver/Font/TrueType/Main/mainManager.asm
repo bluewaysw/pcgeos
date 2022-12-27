@@ -111,9 +111,13 @@ NimbusStart	label	near
 AA_NIMBUS_SIZE equ $-NimbusStart
 CharMod ends
 
-;routines form GEOS adapter
+;routines from GEOS adapter
 global	INIT_FREETYPE:far
 global	EXIT_FREETYPE:far
+global TRUETYPE_INITFONTS:far
+global TRUETYPE_GEN_CHARS:far
+global TRUETYPE_CHAR_METRICS:far
+global TRUETYPE_GEN_WIDTHS:far
 
 global  engineInstance:TrueTypeEngineInstance
 

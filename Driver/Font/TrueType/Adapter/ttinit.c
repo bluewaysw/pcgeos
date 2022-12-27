@@ -24,6 +24,7 @@
 #include <heap.h>
 #include <lmem.h>
 #include <ec.h>
+#include <initfile.h>
 
 
 /********************************************************************

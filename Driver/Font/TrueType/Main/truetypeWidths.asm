@@ -61,6 +61,22 @@ TrueTypeGenWidths	proc	far
 
 	mov	bx, bp
 	.enter
+	
+	push	di		; font handle or 0
+	push	es		; pass gstate ptr
+	mov	dx, 0		; with segment offset 0
+	push	dx
+	push	bx		; send tMatrix ptr
+	push 	cx
+	push	ds		; pass font info ptr
+	push	dx		; segment offset 0
+	
+	segmov	ds, dgroup, dx
+	call	TRUETYPE_GEN_WIDTHS
+
+	mov	bx, ax		; mov font hdl to bx
+	call	MemDerefDS
+	segmov	ax, ds
 
 	clc					;indicate no error
 

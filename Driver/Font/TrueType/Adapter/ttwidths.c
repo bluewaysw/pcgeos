@@ -45,7 +45,11 @@
  *      20/12/22  JK        Initial Revision
  *******************************************************************/
 
-void _pascal TrueType_Gen_Widths( )
+MemHandle _pascal TrueType_Gen_Widths(
+                            MemHandle           fontHandle,
+                            void*               gstatePtr,
+                            void*               tMaxtrix,
+                            const FontInfo*     fontInfo )
 {
         word            numKernPairs;
         word            numCharacters;
@@ -54,7 +58,7 @@ void _pascal TrueType_Gen_Widths( )
         //Anzahl KernPairs ermitteln
         //Anzahl der Zeichen ermitteln
 
-
+	return fontHandle;
 }
 
 

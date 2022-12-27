@@ -176,7 +176,20 @@ initFontReturnAttr	FileExtAttrDesc \
 TrueTypeInitFonts	proc	far	uses	ax,bx,cx,dx,si,di,es,bp
 
 	.enter
+ifndef USE_OLD_FONT_LOADER
+	segmov	cx, ds
+	call	MemSegmentToHandle
+	jnc	err
+	push	ds
 
+	push	cx			; handle to font info block
+	segmov	ds, dgroup, cx
+	call 	TRUETYPE_INITFONTS
+
+	pop	ds
+err:
+
+else
 	;
 	; Enumerate files in SP_FONT
 	;
@@ -220,13 +233,15 @@ fontLoop:
 	call	MemFree			; free file block
 done:
 	call	FilePopDir
+endif
 	clc
+	
 	.leave
 	ret
 
 TrueTypeInitFonts	endp
 
-
+ifdef USE_OLD_FONT_LOADER
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		ProcessFont
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -986,3 +1001,4 @@ notFound:
 	jmp	done
 
 MapFontStyle	endp
+endif

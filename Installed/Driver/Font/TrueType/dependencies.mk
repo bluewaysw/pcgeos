@@ -13,163 +13,85 @@ Main.eobj: Main/mainManager.asm \
                 truetypeMetrics.asm truetypePath.asm truetypeInit.asm \
                 truetypeEscape.asm ../FontCom/fontcomEscape.asm \
                 truetypeEC.asm ansic_runtime.asm ansic_memory.asm
-ttinit.obj \
-ttinit.eobj: Adapter/ttinit.h geos.h fontID.h font.h graphics.h color.h \
-                Adapter/../FreeType/freetype.h \
-                Adapter/../FreeType/fterrid.h \
-                Adapter/../FreeType/ftnameid.h Adapter/ttadapter.h ec.h \
-                file.h Adapter/../FreeType/ttengine.h \
-                Adapter/../FreeType/tttypes.h \
-                Adapter/../FreeType/ttconfig.h \
-                Adapter/../FreeType/ft_conf.h resource.h heap.h lmem.h \
-                Ansi/stdlib.h Adapter/../FreeType/ttmutex.h \
-                Adapter/../FreeType/ttcalc.h fileEnum.h
-ttmetrics.obj \
-ttmetrics.eobj: Adapter/ttadapter.h geos.h ec.h fontID.h file.h \
-                Adapter/../FreeType/freetype.h \
-                Adapter/../FreeType/fterrid.h \
-                Adapter/../FreeType/ftnameid.h \
-                Adapter/../FreeType/ttengine.h \
-                Adapter/../FreeType/tttypes.h \
-                Adapter/../FreeType/ttconfig.h \
-                Adapter/../FreeType/ft_conf.h resource.h graphics.h \
-                font.h color.h heap.h lmem.h Ansi/stdlib.h \
-                Adapter/../FreeType/ttmutex.h \
-                Adapter/../FreeType/ttcalc.h Adapter/ttmetrics.h
 ttcharmapper.obj \
-ttcharmapper.eobj: Adapter/ttcharmapper.h geos.h FreeType/freetype.h \
-                FreeType/fterrid.h FreeType/ftnameid.h unicode.h
+ttcharmapper.eobj: 
+ttchars.obj \
+ttchars.eobj: 
+ttinit.obj \
+ttinit.eobj: 
+ttmetrics.obj \
+ttmetrics.eobj: 
+ttpath.obj \
+ttpath.eobj: 
 ttwidths.obj \
-ttwidths.eobj: geos.h unicode.h Adapter/ttwidths.h \
-                Adapter/../FreeType/freetype.h \
-                Adapter/../FreeType/fterrid.h \
-                Adapter/../FreeType/ftnameid.h Adapter/ttadapter.h ec.h \
-                fontID.h file.h Adapter/../FreeType/ttengine.h \
-                Adapter/../FreeType/tttypes.h \
-                Adapter/../FreeType/ttconfig.h \
-                Adapter/../FreeType/ft_conf.h resource.h graphics.h \
-                font.h color.h heap.h lmem.h Ansi/stdlib.h \
-                Adapter/../FreeType/ttmutex.h \
-                Adapter/../FreeType/ttcalc.h Adapter/ttcharmapper.h \
-                FreeType/freetype.h Adapter/../FreeType/ftxkern.h
-ttcache.obj \
-ttcache.eobj: FreeType/ttengine.h FreeType/tttypes.h FreeType/ttconfig.h \
-                FreeType/ft_conf.h geos.h file.h resource.h graphics.h \
-                fontID.h font.h color.h heap.h lmem.h ec.h Ansi/stdlib.h \
-                FreeType/freetype.h FreeType/fterrid.h \
-                FreeType/ftnameid.h FreeType/ttmutex.h \
-                FreeType/ttmemory.h Ansi/string.h FreeType/ttcache.h \
-                FreeType/ttobjs.h FreeType/tttables.h FreeType/ttcmap.h
-ttraster.obj \
-ttraster.eobj: FreeType/ttraster.h FreeType/ttconfig.h FreeType/ft_conf.h \
-                geos.h file.h resource.h graphics.h fontID.h font.h \
-                color.h heap.h lmem.h ec.h Ansi/stdlib.h \
-                FreeType/freetype.h FreeType/fterrid.h \
-                FreeType/ftnameid.h FreeType/ttengine.h \
-                FreeType/tttypes.h FreeType/ttmutex.h FreeType/ttcalc.h \
-                FreeType/ttmemory.h Ansi/string.h
-ttmutex.obj \
-ttmutex.eobj: FreeType/ttmutex.h FreeType/ttconfig.h FreeType/ft_conf.h \
-                geos.h file.h resource.h graphics.h fontID.h font.h \
-                color.h heap.h lmem.h ec.h Ansi/stdlib.h
-ttgload.obj \
-ttgload.eobj: FreeType/tttypes.h FreeType/ttconfig.h FreeType/ft_conf.h \
-                geos.h file.h resource.h graphics.h fontID.h font.h \
-                color.h heap.h lmem.h ec.h Ansi/stdlib.h \
-                FreeType/freetype.h FreeType/fterrid.h \
-                FreeType/ftnameid.h FreeType/ttcalc.h FreeType/ttfile.h \
-                FreeType/ttengine.h FreeType/ttmutex.h \
-                FreeType/tttables.h FreeType/ttobjs.h FreeType/ttcache.h \
-                FreeType/ttcmap.h FreeType/ttgload.h FreeType/ttmemory.h \
-                Ansi/string.h FreeType/tttags.h FreeType/ttload.h
-ttextend.obj \
-ttextend.eobj: FreeType/ttextend.h FreeType/ttconfig.h FreeType/ft_conf.h \
-                geos.h file.h resource.h graphics.h fontID.h font.h \
-                color.h heap.h lmem.h ec.h Ansi/stdlib.h \
-                FreeType/tttypes.h FreeType/freetype.h FreeType/fterrid.h \
-                FreeType/ftnameid.h FreeType/ttobjs.h FreeType/ttengine.h \
-                FreeType/ttmutex.h FreeType/ttcache.h FreeType/tttables.h \
-                FreeType/ttcmap.h FreeType/ttmemory.h Ansi/string.h
-ttcalc.obj \
-ttcalc.eobj: FreeType/ttcalc.h FreeType/ttconfig.h FreeType/ft_conf.h \
-                geos.h file.h resource.h graphics.h fontID.h font.h \
-                color.h heap.h lmem.h ec.h Ansi/stdlib.h \
-                FreeType/freetype.h FreeType/fterrid.h \
-                FreeType/ftnameid.h FreeType/tttables.h \
-                FreeType/tttypes.h
-ttapi.obj \
-ttapi.eobj: FreeType/ttconfig.h FreeType/ft_conf.h geos.h file.h \
-                resource.h graphics.h fontID.h font.h color.h heap.h \
-                lmem.h ec.h Ansi/stdlib.h FreeType/freetype.h \
-                FreeType/fterrid.h FreeType/ftnameid.h \
-                FreeType/ttengine.h FreeType/tttypes.h FreeType/ttmutex.h \
-                FreeType/ttcalc.h FreeType/ttmemory.h Ansi/string.h \
-                FreeType/ttcache.h FreeType/ttfile.h FreeType/ttobjs.h \
-                FreeType/tttables.h FreeType/ttcmap.h FreeType/ttload.h \
-                FreeType/ttgload.h FreeType/ttraster.h \
-                FreeType/ttextend.h
+ttwidths.eobj: 
 ftxkern.obj \
-ftxkern.eobj: FreeType/ftxkern.h FreeType/freetype.h FreeType/fterrid.h \
-                FreeType/ftnameid.h geos.h FreeType/ttextend.h \
-                FreeType/ttconfig.h FreeType/ft_conf.h file.h resource.h \
-                graphics.h fontID.h font.h color.h heap.h lmem.h ec.h \
-                Ansi/stdlib.h FreeType/tttypes.h FreeType/ttobjs.h \
-                FreeType/ttengine.h FreeType/ttmutex.h FreeType/ttcache.h \
-                FreeType/tttables.h FreeType/ttcmap.h FreeType/ttmemory.h \
-                Ansi/string.h FreeType/ttfile.h FreeType/ttload.h \
-                FreeType/tttags.h
-ttinterp.obj \
-ttinterp.eobj: FreeType/freetype.h FreeType/fterrid.h FreeType/ftnameid.h \
-                geos.h FreeType/tttypes.h FreeType/ttconfig.h \
-                FreeType/ft_conf.h file.h resource.h graphics.h fontID.h \
-                font.h color.h heap.h lmem.h ec.h Ansi/stdlib.h \
-                FreeType/ttcalc.h FreeType/ttmemory.h Ansi/string.h \
-                FreeType/ttinterp.h FreeType/ttobjs.h FreeType/ttengine.h \
-                FreeType/ttmutex.h FreeType/ttcache.h FreeType/tttables.h \
-                FreeType/ttcmap.h
-ttload.obj \
-ttload.eobj: FreeType/tttypes.h FreeType/ttconfig.h FreeType/ft_conf.h \
-                geos.h file.h resource.h graphics.h fontID.h font.h \
-                color.h heap.h lmem.h ec.h Ansi/stdlib.h \
-                FreeType/freetype.h FreeType/fterrid.h \
-                FreeType/ftnameid.h FreeType/ttcalc.h FreeType/ttfile.h \
-                FreeType/ttengine.h FreeType/ttmutex.h \
-                FreeType/tttables.h FreeType/ttobjs.h FreeType/ttcache.h \
-                FreeType/ttcmap.h FreeType/ttmemory.h Ansi/string.h \
-                FreeType/tttags.h FreeType/ttload.h
-ttfile.obj \
-ttfile.eobj: FreeType/ttconfig.h FreeType/ft_conf.h geos.h file.h \
-                resource.h graphics.h fontID.h font.h color.h heap.h \
-                lmem.h ec.h Ansi/stdlib.h Ansi/stdio.h Ansi/string.h \
-                FreeType/freetype.h FreeType/fterrid.h \
-                FreeType/ftnameid.h FreeType/tttypes.h \
-                FreeType/ttengine.h FreeType/ttmutex.h \
-                FreeType/ttmemory.h FreeType/ttfile.h
+ftxkern.eobj: 
+ttapi.obj \
+ttapi.eobj: 
+ttcache.obj \
+ttcache.eobj: 
+ttcalc.obj \
+ttcalc.eobj: 
 ttcmap.obj \
-ttcmap.eobj: FreeType/ttobjs.h FreeType/ttconfig.h FreeType/ft_conf.h \
-                geos.h file.h resource.h graphics.h fontID.h font.h \
-                color.h heap.h lmem.h ec.h Ansi/stdlib.h \
-                FreeType/ttengine.h FreeType/tttypes.h \
-                FreeType/freetype.h FreeType/fterrid.h \
-                FreeType/ftnameid.h FreeType/ttmutex.h FreeType/ttcache.h \
-                FreeType/tttables.h FreeType/ttcmap.h FreeType/ttfile.h \
-                FreeType/ttmemory.h Ansi/string.h FreeType/ttload.h
-ttobjs.obj \
-ttobjs.eobj: FreeType/ttobjs.h FreeType/ttconfig.h FreeType/ft_conf.h \
-                geos.h file.h resource.h graphics.h fontID.h font.h \
-                color.h heap.h lmem.h ec.h Ansi/stdlib.h \
-                FreeType/ttengine.h FreeType/tttypes.h \
-                FreeType/freetype.h FreeType/fterrid.h \
-                FreeType/ftnameid.h FreeType/ttmutex.h FreeType/ttcache.h \
-                FreeType/tttables.h FreeType/ttcmap.h FreeType/ttfile.h \
-                FreeType/ttcalc.h FreeType/ttmemory.h Ansi/string.h \
-                FreeType/ttload.h FreeType/ttinterp.h FreeType/ttextend.h
+ttcmap.eobj: 
+ttextend.obj \
+ttextend.eobj: 
+ttfile.obj \
+ttfile.eobj: 
+ttgload.obj \
+ttgload.eobj: 
+ttinterp.obj \
+ttinterp.eobj: 
+ttload.obj \
+ttload.eobj: 
 ttmemory.obj \
-ttmemory.eobj: FreeType/ttmemory.h FreeType/ttconfig.h FreeType/ft_conf.h \
-                geos.h file.h resource.h graphics.h fontID.h font.h \
-                color.h heap.h lmem.h ec.h Ansi/stdlib.h \
-                FreeType/tttypes.h FreeType/freetype.h FreeType/fterrid.h \
-                FreeType/ftnameid.h Ansi/string.h FreeType/ttengine.h \
-                FreeType/ttmutex.h
+ttmemory.eobj: 
+ttmutex.obj \
+ttmutex.eobj: 
+ttobjs.obj \
+ttobjs.eobj: 
+ttraster.obj \
+ttraster.eobj: 
+ttcharmapper.obj \
+ttcharmapper.eobj: 
+ttchars.obj \
+ttchars.eobj: 
+ttinit.obj \
+ttinit.eobj: 
+ttmetrics.obj \
+ttmetrics.eobj: 
+ttpath.obj \
+ttpath.eobj: 
+ttwidths.obj \
+ttwidths.eobj: 
+ftxkern.obj \
+ftxkern.eobj: 
+ttapi.obj \
+ttapi.eobj: 
+ttcache.obj \
+ttcache.eobj: 
+ttcalc.obj \
+ttcalc.eobj: 
+ttcmap.obj \
+ttcmap.eobj: 
+ttextend.obj \
+ttextend.eobj: 
+ttfile.obj \
+ttfile.eobj: 
+ttgload.obj \
+ttgload.eobj: 
+ttinterp.obj \
+ttinterp.eobj: 
+ttload.obj \
+ttload.eobj: 
+ttmemory.obj \
+ttmemory.eobj: 
+ttmutex.obj \
+ttmutex.eobj: 
+ttobjs.obj \
+ttobjs.eobj: 
+ttraster.obj \
+ttraster.eobj: 
 
 truetypeEC.geo truetype.geo : geos.ldf 

@@ -53,9 +53,31 @@ TrueTypeGenChar	proc	far
 	uses	ax, bx, cx, dx, ds, si, di, bp
 	.enter
 
+	segmov	cx, es
+	call	MemSegmentToHandle
+	jnc	err
 
+	push	cx		; remember handle
+
+	push	dx		; pass character code
+	push	es		; pass font ptr
+	mov	ax, 0		; with segment offset 0
+	push	ax
+	push	bp		; pass gstate ptr
+	push	ax		; with segment offset 0
+	push	ds		; pass font info block
+	push	ax		; with segment offset 0
+
+	segmov	ds, dgroup, ax
+	call	TRUETYPE_GEN_CHARS
+
+	; deref font block (may have moved)
+	pop	bx
+	call	MemDerefES
+
+err:
+	clc
 	.leave
-	stc					;indicate no error
 	ret
 TrueTypeGenChar	endp
 

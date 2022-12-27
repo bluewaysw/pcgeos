@@ -21,7 +21,7 @@
 #include "ttmetrics.h"
 
 /********************************************************************
- *                      Get_Char_Metrics
+ *                      TrueType_Char_Metrics
  ********************************************************************
  * SYNOPSIS:	  Returns the metics of the given char.
  * 
@@ -53,9 +53,10 @@
  *      23/12/22  JK        Initial Revision
  * 
  *******************************************************************/
-TT_Error _pascal Get_Char_Metrics( const FontInfo*  fontInfo, 
-                                   GStateHandle     gstate, 
+TT_Error _pascal TrueType_Char_Metrics( 
                                    word             character, 
+	                           const FontInfo*  fontInfo, 
+                                   void*            gstatePtr, 
                                    GCM_info         info, 
                                    dword*           result ) 
 {
