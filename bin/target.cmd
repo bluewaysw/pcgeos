@@ -7,8 +7,7 @@ if "%~1"=="-fcc" (
 IF NOT DEFINED BASEBOX (SET BASEBOX=dosbox)
 set OLD_PATH=%cd%
 cd /D %LOCAL_ROOT%\gbuild\localpc 
-del /F %LOCAL_ROOT%\gbuild\localpc\IPX_STAT.txt
-start /B %BASEBOX% -conf %ROOT_DIR%\bin\basebox.conf -conf %LOCAL_ROOT%\basebox_user.conf -noconsole
+start cmd /C %BASEBOX% -conf %ROOT_DIR%\bin\basebox.conf 
 cd %OLD_PATH%
 @cls
 :waitForFile
