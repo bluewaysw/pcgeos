@@ -27,6 +27,26 @@
 #include <initfile.h>
 
 
+TT_Error Fill_FontsAvailEntry( const char *      fileName,
+                               TT_Face           face, 
+                               FontID            fontID,
+                               FontsAvailEntry*  fontsAvailEntry );
+
+TT_Error _pascal Fill_FontInfo( TT_Face    face, 
+                               FontID     fontID,
+                               FontInfo*  fontInfo );
+
+TT_Error _pascal Fill_OutlineData( const char*            fileName, 
+                                  TT_Face                face,
+                                  OutlineDataEntry*      outlineDataEntry,
+                                  TrueTypeOutlineEntry*  trueTypeOutlineEntry ); 
+
+static sword getFontIDAvailIndex( FontID fontID, MemHandle fontInfoBlock );
+
+static Boolean isIdenticalStyle(TT_Face face, TextStyle style, AdjustedWeight weight);
+
+static word getNameFromNameTableByIndex( char* name, TT_Face face, TT_UShort index );
+
 /********************************************************************
  *                      Init_FreeType
  ********************************************************************
@@ -162,11 +182,11 @@ TT_Error TrueType_ProcessFont( const char* fileName, MemHandle fontInfoBlock )
 {
         FileHandle      truetypeFile;
         TT_Face         face;
-        TT_Error        error;
+        TT_Error        error = TT_Err_Ok;
         char            familyName[FID_NAME_LEN];
         word            familyNameLength;
         FontID          fontID;
-
+        sword           availIndex;
 
         ECCheckBounds( (void*)fileName );
         ECCheckMemHandle( fontInfoBlock );
@@ -186,19 +206,136 @@ TT_Error TrueType_ProcessFont( const char* fileName, MemHandle fontInfoBlock )
         if ( !isMappedFont( familyName, &fontID ) )
                 fontID = MAKE_FONTID( familyName );
 
-        if ( !isRegistredFontID( fontID, fontInfoBlock ) )
+	availIndex = getFontIDAvailIndex( fontID, fontInfoBlock );
+        if ( availIndex < 0 )
         {
-                //FontsAvailEntry erzeugen und füllen
-                //FontInfo erzeugen und füllen
+		ChunkHandle fontInfoChunk;
+		FontsAvailEntry* newEntry;
+		FontInfo* fontInfo;
+		
+		// allocate FontInfo chunk
+		if( LMemInsertAtHandles( fontInfoBlock, sizeof(LMemBlockHeader), 0, sizeof(FontsAvailEntry) ) ) 
+		{
+			error = TT_Err_Out_Of_Memory;
+			goto Fin;
+		}
+		newEntry = LMemDeref( ConstructOptr(fontInfoBlock, sizeof(LMemBlockHeader)) );
+		error = Fill_FontsAvailEntry( fileName, face, fontID, newEntry );
+
+		//FontInfo erzeugen und füllen
+		if( !error)
+		{
+			fontInfoChunk = LMemAlloc( fontInfoBlock, sizeof(OutlineDataEntry) + sizeof(FontInfo) );
+		}
+		if( error || (fontInfoChunk == NullChunk) )
+		{
+			// revert previous allocation
+			LMemDeleteAtHandles( fontInfoBlock, sizeof(LMemBlockHeader), 0, sizeof(FontsAvailEntry) );
+			error = TT_Err_Out_Of_Memory;
+			goto Fin;
+		}
+
+		fontInfo = LMemDerefHandles( fontInfoBlock, fontInfoChunk );
+		error = Fill_FontInfo( face, fontID, fontInfo );
+		if( !error )
+		{
+			//Outline anhängen und füllen
+			TrueTypeOutlineEntry* trueTypeOutlineEntry;
+			ChunkHandle trueTypeOutlineChunk = 
+				LMemAlloc( fontInfoBlock, sizeof(TrueTypeOutlineEntry) );
+			
+			if( trueTypeOutlineChunk == NullChunk)
+			{
+				LMemFreeHandles( fontInfoBlock, fontInfoChunk );
+				LMemDeleteAtHandles( fontInfoBlock, sizeof(LMemBlockHeader), 0, sizeof(FontsAvailEntry) );
+				goto Fin;			
+			}
+			fontInfo = LMemDerefHandles( fontInfoBlock, fontInfoChunk );
+			trueTypeOutlineEntry = LMemDerefHandles( fontInfoBlock, trueTypeOutlineChunk );
+			error = Fill_OutlineData( fileName, 
+			                          face,
+			                          (OutlineDataEntry*) (fontInfo + 1),
+			                          trueTypeOutlineEntry );			
+			if( error ) {
+				
+				LMemFreeHandles( fontInfoBlock, trueTypeOutlineChunk );
+			}
+			
+			*((ChunkHandle*)&(((OutlineDataEntry*) (fontInfo + 1))->ODE_header)) = trueTypeOutlineChunk;
+			
+			fontInfo->FI_outlineTab = sizeof( FontInfo );
+			fontInfo->FI_outlineEnd = sizeof( FontInfo ) + sizeof( OutlineDataEntry );
+		}
+		if( error )
+		{
+			LMemFreeHandles( fontInfoBlock, fontInfoChunk );
+			LMemDeleteAtHandles( fontInfoBlock, sizeof(LMemBlockHeader), 0, sizeof(FontsAvailEntry) );
+			goto Fin;			
+		}
+
                 //Referenz auf FontInfo in FontsAvailEntry füllen
-                //Outline anhängen und füllen
-        }
+		newEntry = LMemDeref( ConstructOptr(fontInfoBlock, sizeof(LMemBlockHeader)) );
+                newEntry->FAE_infoHandle = fontInfoChunk;
+	}
         else
         {
+		word outlineOffset;
+		ChunkHandle trueTypeOutlineChunk;
+		OutlineDataEntry *outlineEntry;
+		
                 //Gibt es schon noch keine Outline für den Style?
                         //Outline anhängen und füllen
+                FontsAvailEntry* availEntries = LMemDeref( ConstructOptr(fontInfoBlock, sizeof(LMemBlockHeader)) );
+                ChunkHandle fontInfoChunk = availEntries[availIndex].FAE_infoHandle;
+		
+		FontInfo* fontInfo = LMemDeref( ConstructOptr(fontInfoBlock, fontInfoChunk) );
+		OutlineDataEntry* outlineData = (OutlineDataEntry*) (((byte*)fontInfo) + fontInfo->FI_outlineTab);
 
-        }
+		while( outlineData < fontInfo->FI_outlineEnd)
+		{
+			if(isIdenticalStyle(
+					face,
+					outlineData->ODE_style,
+					outlineData->ODE_weight))
+			{
+				goto Fin;
+			}
+			outlineData++;
+		}
+
+		/* not found append new outline entry */
+		trueTypeOutlineChunk = 
+			LMemAlloc( fontInfoBlock, sizeof(TrueTypeOutlineEntry) );
+		if( trueTypeOutlineChunk == NullChunk )
+		{
+			error = TT_Err_Out_Of_Memory;
+			goto Fin;			
+		}
+	
+		outlineOffset =  fontInfo->FI_outlineTab;
+		if( LMemInsertAtHandles( fontInfoBlock, fontInfoChunk, outlineOffset, sizeof( OutlineDataEntry ) ) )
+		{
+			LMemFreeHandles( fontInfoBlock, trueTypeOutlineChunk );
+			error = TT_Err_Out_Of_Memory;
+			goto Fin;
+		}
+
+		outlineEntry = (OutlineDataEntry*) (((byte*) LMemDerefHandles( fontInfoBlock, fontInfoChunk )) + outlineOffset);
+		error = Fill_OutlineData( fileName, 
+					  face,
+					  outlineEntry,
+					  LMemDerefHandles( fontInfoBlock, trueTypeOutlineChunk ) );			
+		if( error ) {
+
+			LMemDeleteAtHandles( fontInfoBlock, fontInfoChunk, outlineOffset, sizeof( OutlineDataEntry ) );
+			LMemFreeHandles( fontInfoBlock, trueTypeOutlineChunk );
+		}
+		
+		fontInfo = LMemDeref( ConstructOptr(fontInfoBlock, fontInfoChunk) );
+        	fontInfo->FI_outlineEnd += sizeof( OutlineDataEntry );
+
+		*((ChunkHandle*)&(outlineEntry->ODE_header)) = trueTypeOutlineChunk;
+	}
 
 Fin:        
         FileClose( truetypeFile, FALSE );
@@ -240,19 +377,9 @@ TT_Error Fill_FontsAvailEntry( const char *      fileName,
                                FontsAvailEntry*  fontsAvailEntry )
 {
         TT_Error            error;
-        TT_String*          familyName;
-        word                familyNameLength;
 
 
         ECCheckBounds( (void*)fontsAvailEntry );
-
-
-        error = TT_Get_Name_String( face, FAMILY_NAME_INDEX, &familyName, &familyNameLength );
-        if ( error )
-                return error;
-
-        if ( familyNameLength >= FAMILY_NAME_LENGTH )
-                return TT_Err_Invalid_Argument;
 
         fontsAvailEntry->FAE_fontID = fontID;
 
@@ -354,7 +481,7 @@ TT_Error _pascal Fill_OutlineData( const char*            fileName,
                                    TrueTypeOutlineEntry*  trueTypeOutlineEntry ) 
 {
         TT_Face_Properties  faceProperties;
-        TT_String*          styleName;
+	char                styleName[STYLE_NAME_LENGTH+1];
         word                styleNameLength;
         TT_Error            error;
 
@@ -366,9 +493,8 @@ TT_Error _pascal Fill_OutlineData( const char*            fileName,
 
         //TODO: der Namestring kann ASCII oder auch UNICODE codiert sein
         //      die Implementierung muss damit umgehen können
-        error = TT_Get_Name_String( face, STYLE_NAME_INDEX, &styleName, &styleNameLength );
-        if ( error != TT_Err_Ok )
-                return error;
+        //error = TT_Get_Name_String( face, STYLE_NAME_INDEX, &styleName, &styleNameLength );
+	styleNameLength = getNameFromNameTableByIndex(styleName, face, STYLE_NAME_INDEX);	
 
         if ( styleNameLength >= STYLE_NAME_LENGTH )
                 return TT_Err_Invalid_Argument;
@@ -449,7 +575,7 @@ static FontAttrs mapFamilyClass( TT_Short familyClass )
 
 static AdjustedWeight mapFontWeight( TT_Short weightClass ) 
 {
-        switch (weightClass)
+        switch (weightClass / 100)
         {
         case 1:
                 return AW_ULTRA_LIGHT;
@@ -502,21 +628,99 @@ static Boolean isMappedFont( const char* familiyName, FontID* fontID )
         return result;
 }
 
-static Boolean isRegistredFontID( FontID fontID, MemHandle fontInfoBlock )
+static Boolean isIdenticalStyle(TT_Face face, TextStyle style, AdjustedWeight weight)
+{
+        TT_Error error;
+	TT_Face_Properties  faceProperties;
+        TT_String*          styleName;
+        word                styleNameLength;
+	
+	//TODO: der Namestring kann ASCII oder auch UNICODE codiert sein
+        //      die Implementierung muss damit umgehen können
+        error = TT_Get_Name_String( face, STYLE_NAME_INDEX, &styleName, &styleNameLength );
+        if ( error != TT_Err_Ok )
+                return FALSE;
+
+        if ( styleNameLength >= STYLE_NAME_LENGTH )
+                return FALSE;
+
+
+        error = TT_Get_Face_Properties( face, &faceProperties );
+        if ( error != TT_Err_Ok )
+                return FALSE;
+
+        /* fill outlineDataEntry */
+        if( ( mapTextStyle( styleName ) == style ) &&
+	    ( mapFontWeight( faceProperties.os2->usWeightClass ) == weight ) )
+	{
+		return TRUE;
+	}
+	return FALSE;
+}
+
+static sword getFontIDAvailIndex( FontID fontID, MemHandle fontInfoBlock )
 {
         FontsAvailEntry*  fontsAvailEntrys;
         word   elements;
-        word   element;
+        sword   element;
 
         /* set fontsAvailEntrys to first Element after LMemBlockHeader */
-        fontsAvailEntrys = ( (byte*)MemDeref( fontInfoBlock ) + sizeof( LMemBlockHeader ) );
+        fontsAvailEntrys = ( (byte*)LMemDeref( 
+			ConstructOptr(fontInfoBlock, sizeof(LMemBlockHeader))) );
         elements = LMemGetChunkSizePtr( fontsAvailEntrys ) / sizeof( FontsAvailEntry );
 
         for( element = 0; element < elements; element++ )
                 if( fontsAvailEntrys[element].FAE_fontID == fontID )
-                        return TRUE;
+                        return element;
 
-        return FALSE;
+        return -1;
+}
+
+static word getNameFromNameTableByIndex( char* name, TT_Face face, TT_UShort index )
+{
+	TT_UShort           platformID;
+        TT_UShort           encodingID;
+        TT_UShort           languageID;
+	word                nameLength;
+        char*               str;
+	word                i;
+	word                id;
+
+	TT_Get_Name_ID( face, index, &platformID, &encodingID, &languageID, &id );
+	
+	if( platformID == PLATFORM_ID_MS && 
+	    encodingID == ENCODING_ID_MS_UNICODE_BMP && 
+	    languageID == LANGUAGE_ID_WIN_EN_US )
+	{
+		TT_Get_Name_String( face, index, &str, &nameLength );
+
+		for (i = 0; str != 0 && i < nameLength; i += 2)
+			*name++ = str[i];
+		*name = 0;
+		return nameLength >> 1;
+	}
+	else if( platformID == PLATFORM_ID_MAC && 
+		 encodingID == ENCODING_ID_MAC_ROMAN &&
+		 languageID == LANGUAGE_ID_MAC_EN )
+	{
+		TT_Get_Name_String( face, index, &str, &nameLength );
+
+		for (i = 0; str != 0 && i < nameLength; i ++)
+			*name++ = str[i];
+		*name = 0;
+		return nameLength;
+	}
+	else if( encodingID == ENCODING_ID_UNICODE )
+	{
+		TT_Get_Name_String( face, index, &str, &nameLength );
+
+		for (i = 1; str != 0 && i < nameLength; i += 2)
+			*name++ = str[i];
+		*name = 0;
+		return nameLength >> 1;
+	}
+	
+	return 0;
 }
 
 static word getNameFromNameTable( char* name, TT_Face face, TT_UShort nameID )
@@ -545,7 +749,7 @@ static word getNameFromNameTable( char* name, TT_Face face, TT_UShort nameID )
                 {
                         TT_Get_Name_String( face, n, &str, &nameLength );
 
-                        for (i = 1; str != 0 && i < nameLength; i += 2)
+                        for (i = 0; str != 0 && i < nameLength; i += 2)
                                 *name++ = str[i];
                         *name = 0;
                         return nameLength >> 1;
@@ -556,11 +760,20 @@ static word getNameFromNameTable( char* name, TT_Face face, TT_UShort nameID )
                 {
                         TT_Get_Name_String( face, n, &str, &nameLength );
 
-                        for (i = 1; str != 0 && i < nameLength; i ++)
+                        for (i = 0; str != 0 && i < nameLength; i ++)
                                 *name++ = str[i];
                         *name = 0;
                         return nameLength;
                 }
+		else if( encodingID == ENCODING_ID_UNICODE )
+		{
+			TT_Get_Name_String( face, n, &str, &nameLength );
+	
+			for (i = 1; str != 0 && i < nameLength; i += 2)
+				*name++ = str[i];
+			*name = 0;
+			return nameLength >> 1;
+		}
         }
 
         return 0;

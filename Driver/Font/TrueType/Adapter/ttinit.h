@@ -52,6 +52,7 @@
 
 #define ENCODING_ID_MAC_ROMAN           0
 #define ENCODING_ID_MS_UNICODE_BMP      1
+#define ENCODING_ID_UNICODE		3
 
 #define LANGUAGE_ID_MAC_EN              0
 #define LANGUAGE_ID_WIN_EN_US           0x0409

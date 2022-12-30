@@ -59,7 +59,6 @@ typedef struct
 typedef struct
 {
     FileHandle                  FI_fileHandle;
-    word                        FI_RESIDENT;
     word                        FI_fontID;
     FontMaker                   FI_maker;
     FontAttrs                   FI_family;
@@ -200,6 +199,13 @@ typedef ByteEnum AdjustedWeight;
 #define AW_ULTRA_BOLD	        120
 
 
+typedef struct 
+{
+    dword    OE_offset;                         /* offset in file */
+    word     OE_size;                           /* size in bytes) */
+    Handle   OE_handle;                         /* handle (if loaded) */
+} OutlineEntry;
+
 /*
  * drivers OutlineDataEntry structure (see fontDr.def)
  */
@@ -210,9 +216,9 @@ typedef struct
 #ifdef DBCS_PCGEOS
     word                        ODE_extraData;
 #else
-    TrueTypeOutlineEntry        ODE_header;
-    TrueTypeOutlineEntry        ODE_first;
-    TrueTypeOutlineEntry        ODE_second;
+    OutlineEntry                ODE_header;
+    OutlineEntry                ODE_first;
+    OutlineEntry                ODE_second;
 #endif
 } OutlineDataEntry;
 
