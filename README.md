@@ -80,7 +80,7 @@ If you want to customize the target environment settings only for yourself, you 
 PC/GEOS comes with extensive technical documentation that describes tools, programming languages and API calls from the perspective of an SDK user. This documentation can be found in the `TechDocs` folder and is available in Markdown format. Here are some entry points to the main volumes:
 
 - Introduction
-  - [Tutorial](TechDocs/Markdown/tutorial.md) - the initial chapters describing the development environment are somewhat outdated, and still refer to the original two-machine setup for debugbing, but this nevertheless gives a good idea of overall development process.
+  - [Tutorial](TechDocs/Markdown/tutorial.md) - the initial chapters describing the development environment are somewhat outdated, and still refer to the original two-machine setup for debugging, but this nevertheless gives a good idea of overall development process.
   - [Concepts](TechDocs/Markdown/concepts.md)
   - [Tools](TechDocs/Markdown/tools.md)
 - C development
