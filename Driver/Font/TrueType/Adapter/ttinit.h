@@ -36,8 +36,8 @@
 #define TTF_DIRECTORY                   "TTF"
 #define FONTMAPPING_CATEGORY            "FontMapping"
 
-#define FAMILY_NAME_INDEX               1       // font family name
-#define STYLE_NAME_INDEX                2       // font style
+#define FAMILY_NAME_ID                  1       // id for font family name
+#define STYLE_NAME_ID                   2       // id for font style
 
 #define FONT_FILE_LENGTH                FILE_LONGNAME_BUFFER_SIZE
 
@@ -64,24 +64,10 @@
 
 void _pascal  TrueType_InitFonts( MemHandle fontInfoBlock );
 
-TT_Error  TrueType_ProcessFont( const char* file, MemHandle fontInfoBlock );
-
-Boolean  isRegistredFontID( FontID fontID, MemHandle fontInfoBlock );
-
-static Boolean  isMappedFont( const char* familiyName, FontID* font );
-
 
 /***********************************************************************
  *      internal functions
  ***********************************************************************/
-
-static FontAttrs    mapFamilyClass( TT_Short familyClass );
-
-static FontWeight   mapFontWeight( TT_Short weightClass );
-
-static TextStyle    mapTextStyle( const char* subfamily );
-
-static word         getNameFromNameTable( char* name, TT_Face face, TT_UShort nameIndex );
 
 static int  toHash( const char* str );
 
