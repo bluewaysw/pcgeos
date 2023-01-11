@@ -69,41 +69,18 @@ typedef struct
 #define SAFETY( value )			            ( value / 40 )      // 2.5% of size
 
 
-
-
 /***********************************************************************
  *      functions called by driver
  ***********************************************************************/
 
 MemHandle _pascal TrueType_Gen_Widths(
-                                MemHandle           fontHandle,
-                                void*               gstatePtr,
-                                void*               tMaxtrix,
-                                const FontInfo*     fontInfo
+                                MemHandle        fontHandle,
+                                void*            tMatrix,
+                                const FontInfo*  fontInfo,
+                                WWFixedAsDWord   pointSize,
+                                word             textStyle,
+                                word             fontWeight
 );
-
-
-/***********************************************************************
- *      internal functions
- ***********************************************************************/
-
-TT_Error Fill_CharTableEntry( const FontInfo*  fontInfo, 
-                              word             character,
-                              CharTableEntry*  charTableEntry );
-
-TT_Error Fill_FontBuf( TT_Face face, WBFixed pointSize, FontBuf* fontBuf );
-
-TT_Error fillFontHeader( TT_Face face, TT_Instance instance, FontHeader* fontHeader );
-
-word GetNumKernPairs( TT_Face face);
-
-void ConvertHeader();
-
-void ConvertKernPairs();
-
-void CalcTransform();
-
-void CalcRoutines();
 
 
 #endif  /* _TTWIDTHS_H_ */

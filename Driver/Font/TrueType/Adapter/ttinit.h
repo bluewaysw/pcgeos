@@ -69,7 +69,7 @@ void _pascal  TrueType_InitFonts( MemHandle fontInfoBlock );
  *      internal functions
  ***********************************************************************/
 
-static int  toHash( const char* str );
+static word toHash( const char* str );
 
 static int  strlen( const char* str );
 

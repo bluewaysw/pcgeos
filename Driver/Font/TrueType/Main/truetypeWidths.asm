@@ -63,14 +63,29 @@ TrueTypeGenWidths	proc	far
 	.enter
 	
 	push	di		; font handle or 0
-	push	es		; pass gstate ptr
-	mov	dx, 0		; with segment offset 0
-	push	dx
+
 	push	bx		; send tMatrix ptr
 	push 	cx
+		
+				; find font info
+	mov	cx, es:GS_fontAttr.FCA_fontID
+	call	FontDrFindFontInfo
 	push	ds		; pass font info ptr
-	push	dx		; segment offset 0
-	
+	push 	di
+
+	clr	al		; pointsize from gstate
+	movwbf	dxah, es:GS_fontAttr.FCA_pointsize
+	push	dx		; pass point size
+	push 	ax
+
+	clr	ah		; text style from gstate
+	mov	al, es:GS_fontAttr.FCA_textStyle
+	push	ax		; pass text style
+
+	clr	ah		; font weight from gstate
+	mov	al, es:GS_fontAttr.FCA_weight
+	push	ax		; pass font weight
+
 	segmov	ds, dgroup, dx
 	call	TRUETYPE_GEN_WIDTHS
 
@@ -78,7 +93,7 @@ TrueTypeGenWidths	proc	far
 	call	MemDerefDS
 	segmov	ax, ds
 
-	clc					;indicate no error
+	clc			;indicate no error
 
 	.leave
 	ret

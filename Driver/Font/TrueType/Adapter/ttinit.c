@@ -349,7 +349,7 @@ Fin:
 /* Implemetation of helperfunctions                                */
 /*******************************************************************/
 
-static int toHash( const char* str )
+static word toHash( const char* str )
 {
         word    i;
         dword   hash = strlen( str );
@@ -357,7 +357,7 @@ static int toHash( const char* str )
         for ( i = 0; i < strlen( str ) ; i++ )
 		hash = ( hash * 7 ) % ( 2^16 ) + str[i];
 
-        return (int) hash;
+        return (word) hash;
 }
 
 static FontAttrs mapFamilyClass( TT_Short familyClass ) 

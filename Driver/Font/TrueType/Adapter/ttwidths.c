@@ -18,10 +18,37 @@
  ***********************************************************************/
 
 #include <geos.h>
+#include <ec.h>
 #include <unicode.h>
+#include <graphics.h>
 #include "ttwidths.h"
 #include "ttcharmapper.h"
 #include "../FreeType/ftxkern.h"
+
+
+static OutlineDataEntry*  findOutlineData( 
+                                TextStyle* stylesToImplement,
+                                const FontInfo* fontInfo, 
+                                word textStyle, 
+                                word fontWeight );
+
+TT_Error Fill_CharTableEntry( const FontInfo*  fontInfo, 
+                              word             character,
+                              CharTableEntry*  charTableEntry );
+
+TT_Error Fill_FontBuf( TT_Face face, WBFixed pointSize, FontBuf* fontBuf );
+
+TT_Error fillFontHeader( TT_Face face, TT_Instance instance, FontHeader* fontHeader );
+
+word GetNumKernPairs( TT_Face face);
+
+void ConvertHeader();
+
+void ConvertKernPairs();
+
+void CalcTransform();
+
+void CalcRoutines();
 
 
 /********************************************************************
@@ -46,19 +73,67 @@
  *******************************************************************/
 
 MemHandle _pascal TrueType_Gen_Widths(
-                            MemHandle           fontHandle,
-                            void*               gstatePtr,
-                            void*               tMaxtrix,
-                            const FontInfo*     fontInfo )
+                            MemHandle        fontHandle,
+                            void*            tMatrix,
+                            const FontInfo*  fontInfo,
+                            WWFixedAsDWord   pointSize,
+                            word             textStyle,
+                            word             fontWeight )
 {
-        word            numKernPairs;
-        word            numCharacters;
+        FileHandle         truetypeFile;
+        OutlineDataEntry*  OutlineDataEntry;
+        TT_Face            face;
+        char*              fileName;
+        TT_Error           error;
+        
 
-	//Font öffenen und Face laden
+        ECCheckMemHandle( fontHandle );
+        ECCheckBounds( tMatrix );
+        ECCheckBounds( (void*)fontInfo );
+        
+
+        // finde passende Outline
+
+        // ermittle Dateinamen der Outline
+        
+
+	//Font öffnen und Face laden
+        truetypeFile = FileOpen( fileName, FILE_ACCESS_R | FILE_DENY_W );
+
+        ECCheckFileHandle( truetypeFile );
+
+        error = TT_Open_Face( truetypeFile, &face );
+        if( error )
+                goto Fail;
+
         //Anzahl KernPairs ermitteln
-        //Anzahl der Zeichen ermitteln
 
+        //FontBlock allocieren
+
+        //FontBuf füllen
+
+        //Kernpairs anhängen
+
+        //Transformation (fehlende Styles)
+
+        TT_Close_Face( face );
+Fail:
+        FileClose( truetypeFile, FALSE );
+
+Fin:
 	return fontHandle;
+}
+
+
+static OutlineDataEntry* findOutlineData( 
+                        TextStyle*       stylesToImplement,
+                        const FontInfo*  fontInfo, 
+                        word             textStyle, 
+                        word             fontWeight )
+{
+        //finde die zum TextStyle und fontWeight passende Outline
+        //falls keine Übereinstimmung gefunden wurde ermittle die
+        //nächst beste Outline und bestimme die zu implementierenden Styles
 }
 
 
