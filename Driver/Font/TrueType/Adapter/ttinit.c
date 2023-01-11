@@ -315,7 +315,12 @@ TT_Error TrueType_ProcessFont( const char* fileName, MemHandle fontInfoBlock )
 		}
 	
 		outlineOffset = fontInfo->FI_outlineTab;
-                LMemInsertAtHandles( fontInfoBlock, fontInfoChunk, outlineOffset, sizeof( OutlineDataEntry ));
+                if( LMemInsertAtHandles( fontInfoBlock, fontInfoChunk, outlineOffset, sizeof( OutlineDataEntry ) ) )
+		{
+			LMemFreeHandles( fontInfoBlock, trueTypeOutlineChunk );
+			error = TT_Err_Out_Of_Memory;
+			goto Fail;
+		}
 
                 /* fill TrueTypeOutlineEntry */
                 trueTypeOutlineEntry = LMemDerefHandles( fontInfoBlock, trueTypeOutlineChunk );
