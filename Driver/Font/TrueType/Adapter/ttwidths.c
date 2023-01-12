@@ -29,8 +29,8 @@
 static OutlineDataEntry*  findOutlineData( 
                                 TextStyle* stylesToImplement,
                                 const FontInfo* fontInfo, 
-                                word textStyle, 
-                                word fontWeight );
+                                TextStyle textStyle, 
+                                FontWeight fontWeight );
 
 TT_Error Fill_CharTableEntry( const FontInfo*  fontInfo, 
                               word             character,
@@ -54,7 +54,8 @@ void CalcRoutines();
 /********************************************************************
  *                      TrueType_Gen_Widths
  ********************************************************************
- * SYNOPSIS:	  
+ * SYNOPSIS:	  Generate header width infomation about a front 
+ *                in a given pointsize, style and weight.
  * 
  * PARAMETERS:    
  * 
@@ -77,8 +78,8 @@ MemHandle _pascal TrueType_Gen_Widths(
                             void*            tMatrix,
                             const FontInfo*  fontInfo,
                             WWFixedAsDWord   pointSize,
-                            word             textStyle,
-                            word             fontWeight )
+                            TextStyle        textStyle,
+                            FontWeight       fontWeight )
 {
         FileHandle         truetypeFile;
         OutlineDataEntry*  OutlineDataEntry;
@@ -128,8 +129,8 @@ Fin:
 static OutlineDataEntry* findOutlineData( 
                         TextStyle*       stylesToImplement,
                         const FontInfo*  fontInfo, 
-                        word             textStyle, 
-                        word             fontWeight )
+                        TextStyle        textStyle, 
+                        FontWeight       fontWeight )
 {
         //finde die zum TextStyle und fontWeight passende Outline
         //falls keine Übereinstimmung gefunden wurde ermittle die
@@ -621,4 +622,24 @@ TT_Error fillFontHeader( TT_Face face, TT_Instance instance, FontHeader* fontHea
 
 
         return TT_Err_Ok;
+}
+
+static FontWeight convertAdjustedWeightToFontWeight(AdjustedWeight weight)
+{
+        switch (weight)
+        {
+        case AW_ULTRA_LIGHT:
+        case AW_EXTRA_LIGHT:
+        case AW_LIGHT:
+                return FW_MINIMUM;
+        case AW_SEMI_LIGHT:
+        case AW_MEDIUM:
+        case AW_SEMI_BOLD:
+                return FW_NORMAL;
+        case AW_BOLD:
+        case AW_EXTRA_BOLD:
+        case AW_ULTRA_BOLD:
+                return FW_MAXIMUM;
+        }
+        return 0;
 }

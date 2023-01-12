@@ -82,7 +82,7 @@ TrueTypeGenWidths	proc	far
 	mov	al, es:GS_fontAttr.FCA_textStyle
 	push	ax		; pass text style
 
-	clr	ah		; font weight from gstate
+				; font weight from gstate
 	mov	al, es:GS_fontAttr.FCA_weight
 	push	ax		; pass font weight
 

@@ -78,8 +78,8 @@ MemHandle _pascal TrueType_Gen_Widths(
                                 void*            tMatrix,
                                 const FontInfo*  fontInfo,
                                 WWFixedAsDWord   pointSize,
-                                word             textStyle,
-                                word             fontWeight
+                                TextStyle        textStyle,
+                                FontWeight       fontWeight
 );
 
 
