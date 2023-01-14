@@ -34,6 +34,8 @@
 extern TEngine_Instance engineInstance;
 
 
+#define TTF_DIRECTORY                   "TTF"
+
 /***********************************************************************
  *      structures
  ***********************************************************************/
@@ -197,6 +199,7 @@ typedef ByteEnum AdjustedWeight;
 #define AW_BOLD		            110
 #define AW_EXTRA_BOLD	        115
 #define AW_ULTRA_BOLD	        120
+#define AW_BLACK                125
 
 
 typedef struct 

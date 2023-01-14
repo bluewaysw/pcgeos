@@ -26,11 +26,11 @@
 #include "../FreeType/ftxkern.h"
 
 
-static OutlineDataEntry*  findOutlineData( 
-                                TextStyle* stylesToImplement,
-                                const FontInfo* fontInfo, 
-                                TextStyle textStyle, 
-                                FontWeight fontWeight );
+static TextStyle  findOutlineData( 
+                        ChunkHandle*     truetypeOutlineEntryChunk,
+                        const FontInfo*  fontInfo, 
+                        TextStyle        textStyle, 
+                        FontWeight       fontWeight );
 
 TT_Error Fill_CharTableEntry( const FontInfo*  fontInfo, 
                               word             character,
@@ -81,25 +81,27 @@ MemHandle _pascal TrueType_Gen_Widths(
                             TextStyle        textStyle,
                             FontWeight       fontWeight )
 {
-        FileHandle         truetypeFile;
-        OutlineDataEntry*  OutlineDataEntry;
-        TT_Face            face;
-        char*              fileName;
-        TT_Error           error;
+        FileHandle             truetypeFile;
+        ChunkHandle            truetypeChunkHandle;
+        TrueTypeOutlineEntry*  trueTypeOutlineEntry;
+        TextStyle              stylesToImplement;
+        TT_Face                face;
+        TT_Error               error;
         
 
         ECCheckMemHandle( fontHandle );
         ECCheckBounds( tMatrix );
         ECCheckBounds( (void*)fontInfo );
-        
 
-        // finde passende Outline
+        /* find outline for textStyle and fontWeight */
+        stylesToImplement = findOutlineData( &truetypeChunkHandle, fontInfo, textStyle, fontWeight );
 
-        // ermittle Dateinamen der Outline
-        
+        /* get filename an load ttf file */
+        FilePushDir();
+        FileSetCurrentPath( SP_FONT, TTF_DIRECTORY );
 
-	//Font öffnen und Face laden
-        truetypeFile = FileOpen( fileName, FILE_ACCESS_R | FILE_DENY_W );
+        trueTypeOutlineEntry = LMemDerefHandles( MemPtrToHandle( (void*)fontInfo ), truetypeChunkHandle );
+        truetypeFile = FileOpen( trueTypeOutlineEntry->TTOE_fontFileName, FILE_ACCESS_R | FILE_DENY_W );
 
         ECCheckFileHandle( truetypeFile );
 
@@ -122,19 +124,67 @@ Fail:
         FileClose( truetypeFile, FALSE );
 
 Fin:
+        FilePopDir();
 	return fontHandle;
 }
 
 
-static OutlineDataEntry* findOutlineData( 
-                        TextStyle*       stylesToImplement,
+static TextStyle  findOutlineData( 
+                        ChunkHandle*     truetypeOutlineEntryChunk,
                         const FontInfo*  fontInfo, 
                         TextStyle        textStyle, 
                         FontWeight       fontWeight )
 {
-        //finde die zum TextStyle und fontWeight passende Outline
-        //falls keine Übereinstimmung gefunden wurde ermittle die
-        //nächst beste Outline und bestimme die zu implementierenden Styles
+        ChunkHandle        chunkToUse;
+        OutlineDataEntry*  outlineData = (OutlineDataEntry*) (((byte*)fontInfo) + fontInfo->FI_outlineTab);
+        OutlineDataEntry*  outlineDataEnd = (OutlineDataEntry*) (((byte*)fontInfo) + fontInfo->FI_outlineEnd);
+        TextStyle          styleDiff = 127;
+        byte               weightDiff = 127;
+
+
+        /* adjust textWeight for AW_BOLD */
+        if( textStyle >= AW_BOLD )
+                textStyle = AW_BLACK;
+
+        while( outlineData < outlineDataEnd)
+	{
+                /* exact match? */
+                if( outlineData->ODE_style == textStyle &&
+	            outlineData->ODE_weight == fontWeight )
+		{
+			*truetypeOutlineEntryChunk = outlineData->ODE_header.OE_handle;
+                        return 0;  // no styles to implement
+		}
+
+                /* style match? */
+                if( outlineData->ODE_style == textStyle )
+                {
+                        byte currentWeightDiff = ABS( fontWeight - outlineData->ODE_weight );
+
+                        styleDiff = 0;
+                        if( weightDiff >= currentWeightDiff )
+                        {
+                                chunkToUse = outlineData->ODE_header.OE_handle;
+                                weightDiff = currentWeightDiff;
+                        }
+
+                }
+
+                /* try to find nearest style */
+                if( ( ( textStyle & outlineData->ODE_style ) ^ outlineData->ODE_style ) == 0 )
+                {
+                        byte currentStyleDiff = textStyle ^ outlineData->ODE_style;
+                        if( styleDiff >= currentStyleDiff )
+                        {
+                                chunkToUse = outlineData->ODE_header.OE_handle;
+                                styleDiff = currentStyleDiff;
+                        }
+                }
+		outlineData++;
+	}
+
+        *truetypeOutlineEntryChunk = chunkToUse;
+        return styleDiff;
 }
 
 
@@ -622,24 +672,4 @@ TT_Error fillFontHeader( TT_Face face, TT_Instance instance, FontHeader* fontHea
 
 
         return TT_Err_Ok;
-}
-
-static FontWeight convertAdjustedWeightToFontWeight(AdjustedWeight weight)
-{
-        switch (weight)
-        {
-        case AW_ULTRA_LIGHT:
-        case AW_EXTRA_LIGHT:
-        case AW_LIGHT:
-                return FW_MINIMUM;
-        case AW_SEMI_LIGHT:
-        case AW_MEDIUM:
-        case AW_SEMI_BOLD:
-                return FW_NORMAL;
-        case AW_BOLD:
-        case AW_EXTRA_BOLD:
-        case AW_ULTRA_BOLD:
-                return FW_MAXIMUM;
-        }
-        return 0;
 }

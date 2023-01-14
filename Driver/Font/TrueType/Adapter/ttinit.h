@@ -33,7 +33,6 @@
  *      constants
  ***********************************************************************/
 
-#define TTF_DIRECTORY                   "TTF"
 #define FONTMAPPING_CATEGORY            "FontMapping"
 
 #define FAMILY_NAME_ID                  1       // id for font family name
