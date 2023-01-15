@@ -110,17 +110,16 @@ TT_Error _pascal Exit_FreeType()
 /********************************************************************
  *                      TrueType_InitFonts
  ********************************************************************
- * SYNOPSIS:	  Deinitialises the FreeType Engine. This is the 
- *                adapter function for DR_EXIT.
+ * SYNOPSIS:	  Search for TTF fonts and register them. This is the 
+ *                adapter function for DR_FONT_INIT_FONTS.
  * 
- * PARAMETERS:    void
+ * PARAMETERS:    fontInfoBlock         MemHandle to fontInfo.
  * 
- * RETURNS:       TT_Error = FreeType errorcode (see tterrid.h)
+ * RETURNS:       void
  * 
  * SIDE EFFECTS:  none
  * 
- * STRATEGY:      Deinitialises the FreeType engine by delegating to 
- *                TT_Done_FreeType().
+ * STRATEGY:      
  * 
  * REVISION HISTORY:
  *      Date      Name      Description

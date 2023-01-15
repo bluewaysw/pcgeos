@@ -35,6 +35,7 @@ extern TEngine_Instance engineInstance;
 
 
 #define TTF_DIRECTORY                   "TTF"
+#define FONT_MAN_ID                     0x20
 
 /***********************************************************************
  *      structures
@@ -224,6 +225,15 @@ typedef struct
     OutlineEntry                ODE_second;
 #endif
 } OutlineDataEntry;
+
+/*
+ * drivers KernPair stucture (see fontDr.def)
+ */
+typedef struct
+{
+    char                        KB_char1;
+    char                        KB_char2;
+} KernPair;
 
 
 /***********************************************************************

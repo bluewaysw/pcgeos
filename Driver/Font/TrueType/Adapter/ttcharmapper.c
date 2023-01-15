@@ -317,7 +317,7 @@ TT_Error getCharMap( TT_Face face, TT_CharMap* charMap )
 /*
  * Counts the GEOS characters that are present in the font.
  */
-word CountGeosCharsInCharMap( TT_CharMap map, word *firstChar, word *lastChar )
+word InitGeosCharsInCharMap( TT_CharMap map, word *firstChar, word *lastChar )
 {
         word charIndex;
         word charCount = 0;
@@ -337,4 +337,10 @@ word CountGeosCharsInCharMap( TT_CharMap map, word *firstChar, word *lastChar )
         }
 
         return charCount;
+}
+
+
+word CountKernPairsWithGeosChars( TT_Face face )
+{
+        return 0;
 }

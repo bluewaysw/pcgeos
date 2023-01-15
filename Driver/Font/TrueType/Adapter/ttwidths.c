@@ -21,6 +21,7 @@
 #include <ec.h>
 #include <unicode.h>
 #include <graphics.h>
+#include <heap.h>
 #include "ttwidths.h"
 #include "ttcharmapper.h"
 #include "../FreeType/ftxkern.h"
@@ -32,15 +33,20 @@ static TextStyle  findOutlineData(
                         TextStyle        textStyle, 
                         FontWeight       fontWeight );
 
-TT_Error Fill_CharTableEntry( const FontInfo*  fontInfo, 
-                              word             character,
-                              CharTableEntry*  charTableEntry );
+static word  AllocFontBlock( 
+                        word        additionalSpace,
+                        word        numOfCharacters,
+                        word        numOfKernPairs,
+                        MemHandle*  fontHandle );
+
+TT_Error Fill_CharTableEntry( 
+                        const FontInfo*  fontInfo, 
+                        word             character,
+                        CharTableEntry*  charTableEntry );
 
 TT_Error Fill_FontBuf( TT_Face face, WBFixed pointSize, FontBuf* fontBuf );
 
 TT_Error fillFontHeader( TT_Face face, TT_Instance instance, FontHeader* fontHeader );
-
-word GetNumKernPairs( TT_Face face);
 
 void ConvertHeader();
 
@@ -57,9 +63,14 @@ void CalcRoutines();
  * SYNOPSIS:	  Generate header width infomation about a front 
  *                in a given pointsize, style and weight.
  * 
- * PARAMETERS:    
+ * PARAMETERS:    fontHandle
+ *                tMatrix
+ *                fontInfo
+ *                pointSize
+ *                textStyle
+ *                fontWeight
  * 
- * RETURNS:       
+ * RETURNS:       MemHandle
  * 
  * SIDE EFFECTS:  none
  * 
@@ -86,7 +97,12 @@ MemHandle _pascal TrueType_Gen_Widths(
         TrueTypeOutlineEntry*  trueTypeOutlineEntry;
         TextStyle              stylesToImplement;
         TT_Face                face;
+        TT_CharMap             charMap;
         TT_Error               error;
+        word                   numChars;
+        word                   numKernPairs;
+        word                   firstChar;
+        word                   lastChar;
         
 
         ECCheckMemHandle( fontHandle );
@@ -107,22 +123,31 @@ MemHandle _pascal TrueType_Gen_Widths(
 
         error = TT_Open_Face( truetypeFile, &face );
         if( error )
-                goto Fail;
+                goto Fail_Face;
 
-        //Anzahl KernPairs ermitteln
+        error = getCharMap( face, &charMap );
+        if( error )
+                goto Fail_Map;
 
-        //FontBlock allocieren
+        numChars = InitGeosCharsInCharMap( charMap, &firstChar, &lastChar );
+        numKernPairs = CountKernPairsWithGeosChars( face );
+        
+        /* alloc Block for FontBuf, CharTableEntries, KernPairs and kerning values */
+        AllocFontBlock( 0, numChars, numKernPairs, &fontHandle );
+        ECCheckMemHandle( fontHandle );
 
         //FontBuf füllen
 
         //Kernpairs anhängen
 
+        //Chartableentries anhängen
+
         //Transformation (fehlende Styles)
 
+Fail_Map:
         TT_Close_Face( face );
-Fail:
+Fail_Face:
         FileClose( truetypeFile, FALSE );
-
 Fin:
         FilePopDir();
 	return fontHandle;
@@ -185,42 +210,6 @@ static TextStyle  findOutlineData(
 
         *truetypeOutlineEntryChunk = chunkToUse;
         return styleDiff;
-}
-
-
-/********************************************************************
- *                      GenNumKernPairs
- ********************************************************************
- * SYNOPSIS:	  Gets number of kerning pairs.
- * 
- * PARAMETERS:    TT_Face       Face from which the number of kerning 
- *                              pairs is to be determined.
- * 
- * RETURNS:       word          number of kerning pairs
- * 
- * SIDE EFFECTS:  none
- * 
- * CONDITION:     
- * 
- * STRATEGY:      A TrueType font usually has a larger number of 
- *                characters than are used in FreeGEOS. Therefore, the
- *                kerning pairs must be filtered so that only pairs 
- *                containing characters from the FreeGEOS character 
- *                set are delivered.
- * 
- * REVISION HISTORY:
- *      Date      Name      Description
- *      ----      ----      -----------
- *      20/12/22  JK        Initial Revision
- *******************************************************************/
-
-word GetNumKernPairs( TT_Face face )
-{
-        TT_Kerning      directory;
-
-        //TODO: implement
-
-        return 0;
 }
 
 
@@ -332,15 +321,57 @@ void CalcRoutines()
 }
 
 
-
-void AllocFontBlock( word additionSpaceInBlock,
-                     word numOfCharacters,
-                     word numOf)
+/********************************************************************
+ *                      AllocFontBlock
+ ********************************************************************
+ * SYNOPSIS:	  Allocate or reallocate memory block for font.
+ * 
+ * PARAMETERS:    additionalSpace       additional space in block
+ *                                      for driver
+ *                numOfCharacters       number of characters
+ *                numOfKernPairs        number of kerning pairs
+ *                fontHandle*           pointer to MemHandle of font block
+ *                                      if NullHandle alloc new block, if not
+ *                                      realloc existing block
+ * 
+ * RETURNS:       word                  size of allocated block              
+ * 
+ * SIDE EFFECTS:  none
+ * 
+ * CONDITION:     
+ * 
+ * STRATEGY:      
+ * 
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      14/01/23  JK        Initial Revision
+ *******************************************************************/
+static word AllocFontBlock( 
+                word        additionalSpace,
+                word        numOfCharacters,
+                word        numOfKernPairs,
+                MemHandle*  fontHandle )
 {
-        /* Geamtgröße berechnen */
+        word size = sizeof( FontBuf ) +
+                numOfCharacters * sizeof( CharTableEntry ) +
+                numOfKernPairs * ( sizeof( KernPair ) + sizeof( WBFixed ) ) +
+                additionalSpace; 
+                     
+        /* allocate memory for FontBuf, CharTableEntries, KernPairs and additional space */
+        if( fontHandle == NullHandle )
+        {
+                *fontHandle = MemAllocSetOwner( FONT_MAN_ID, size, 
+                        HF_SWAPABLE | HF_SHARABLE | HF_DISCARDABLE,
+                        HAF_NO_ERR | HAF_LOCK );
+                HandleP( *fontHandle );
+        }
+        else
+        {
+                MemReAlloc( *fontHandle, size, HAF_NO_ERR | HAF_LOCK );
+        }
 
-
-        /* wenn alter Block ReAlloc sonst Alloc */
+        return size;
 }
 
 /********************************************************************
@@ -567,9 +598,9 @@ TT_Error fillFontHeader( TT_Face face, TT_Instance instance, FontHeader* fontHea
         fontHeader->FH_maxRSB   = -9999;
         fontHeader->FH_avgwidth = 0;
 
-        fontHeader->FH_numChars = CountGeosCharsInCharMap( charMap, 
+   /*     fontHeader->FH_numChars = CountGeosCharsInCharMap( charMap, 
                                                            &fontHeader->FH_firstChar, 
-                                                           &fontHeader->FH_lastChar );
+                                                           &fontHeader->FH_lastChar ); */
 
         for ( geosChar = fontHeader->FH_firstChar; geosChar < fontHeader->FH_lastChar; ++geosChar )
         {
