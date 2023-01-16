@@ -39,6 +39,13 @@ static word  AllocFontBlock(
                         word        numOfKernPairs,
                         MemHandle*  fontHandle );
 
+static WWFixedAsDWord CalcScaleForWidths( 
+                        WWFixedAsDWord  pointSize,
+                        FontWidth       fontWidth,
+                        FontWeight      fontWeight,
+                        TextStyle       stylesToImplement,
+                        word            unitsPerEM );
+
 TT_Error Fill_CharTableEntry( 
                         const FontInfo*  fontInfo, 
                         word             character,
@@ -63,14 +70,14 @@ void CalcRoutines();
  * SYNOPSIS:	  Generate header width infomation about a front 
  *                in a given pointsize, style and weight.
  * 
- * PARAMETERS:    fontHandle
- *                tMatrix
- *                fontInfo
- *                pointSize
- *                textStyle
- *                fontWeight
+ * PARAMETERS:    fontHandle            Memory handle to font block.
+ *                tMatrix               Pointer to tranformation matrix.
+ *                fontInfo              Pointer to font info block.
+ *                pointSize             Desired point size.
+ *                textStyle             Desired text style.
+ *                fontWeight            Desired font weight.
  * 
- * RETURNS:       MemHandle
+ * RETURNS:       MemHandle             Memory handle to font block.
  * 
  * SIDE EFFECTS:  none
  * 
@@ -103,6 +110,11 @@ MemHandle _pascal TrueType_Gen_Widths(
         word                   numKernPairs;
         word                   firstChar;
         word                   lastChar;
+        word                   size;
+        FontBuf*               fontBuf;
+        CharTableEntry*        charTableEntry;
+        KernPair*              kernPair;
+        WBFixed*               kernValue;
         
 
         ECCheckMemHandle( fontHandle );
@@ -136,19 +148,22 @@ MemHandle _pascal TrueType_Gen_Widths(
         AllocFontBlock( 0, numChars, numKernPairs, &fontHandle );
         ECCheckMemHandle( fontHandle );
 
-        //FontBuf füllen
+        //Scalefaktor für widths berechnen
 
-        //Kernpairs anhängen
+        //Header konvertieren
+        
+        //Widths berechen und einfügen
 
-        //Chartableentries anhängen
+        //Kernpairs konvertieren und einfügen
 
-        //Transformation (fehlende Styles)
+        //Mapping konvertieren und einfügen
+
+        //Transformation (und fehlende Styles)
 
 Fail_Map:
         TT_Close_Face( face );
 Fail_Face:
         FileClose( truetypeFile, FALSE );
-Fin:
         FilePopDir();
 	return fontHandle;
 }
@@ -210,6 +225,16 @@ static TextStyle  findOutlineData(
 
         *truetypeOutlineEntryChunk = chunkToUse;
         return styleDiff;
+}
+
+static WWFixedAsDWord CalcScaleForWidths( 
+                        WWFixedAsDWord  pointSize,
+                        FontWidth       fontWidth,
+                        FontWeight      fontWeight,
+                        TextStyle       stylesToImplement,
+                        word            unitsPerEM )
+{
+        return 0;
 }
 
 
