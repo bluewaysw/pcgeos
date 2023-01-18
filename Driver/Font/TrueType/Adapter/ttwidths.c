@@ -234,7 +234,25 @@ static WWFixedAsDWord CalcScaleForWidths(
                         TextStyle       stylesToImplement,
                         word            unitsPerEM )
 {
-        return 0;
+        WWFixedAsDWord scaleWidth = GrUDivWWFixed( pointSize, WORD_TO_WWFIXEDASDWORD( unitsPerEM ) );
+
+        /* do bold need to be added? */
+        if( stylesToImplement & TS_BOLD )
+                scaleWidth = GrMulWWFixed( scaleWidth, WWFIXED_1_POINR_1 );
+
+        /* do subscript or superscript to be added? */
+        if( stylesToImplement & ( TS_SUBSCRIPT | TS_SUPERSCRIPT ) )
+                scaleWidth = GrMulWWFixed( scaleWidth, WWFIXED_0_POINT_5 );
+
+        /* adjust for fontWeight */
+        if( fontWeight != FWI_MEDIUM )
+                scaleWidth = GrMulWWFixed( scaleWidth, MakeWWFixed( fontWeight ) );
+
+        /* adjust für fontWidht */
+        if( fontWidth != FW_NORMAL )
+                scaleWidth = GrMulWWFixed( scaleWidth, MakeWWFixed( fontWidth ) );
+
+        return scaleWidth;
 }
 
 

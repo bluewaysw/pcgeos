@@ -41,9 +41,9 @@ typedef struct
     word                        FH_ascent;          //height of caps
     sword                       FH_descent;         //descent (from baseline)
     sword                       FH_baseAdjust;      //adjustment for baseline
-    word                        FH_firstChar;       //first char defined
-    word                        FH_lastChar;        //last char defined
-    word                        FH_defaultChar;     //default character
+    char                        FH_firstChar;       //first char defined
+    char                        FH_lastChar;        //last char defined
+    char                        FH_defaultChar;     //default character
     sword                       FH_underPos;        //position of underline   		
     sword                       FH_underThick;      //thickness of underline
     word                        FH_strikePos;       //position of strikethrough
@@ -67,6 +67,10 @@ typedef struct
 #define DEFAULT_UNDER_THICK( value )	    ( value / 10 )      // 10% of size
 #define DEFAULT_UNDER_POSITION( value )	    ( value / -10 )     // -10% of size
 #define SAFETY( value )			            ( value / 40 )      // 2.5% of size
+
+
+#define WWFIXED_0_POINT_5                   0x00008000
+#define WWFIXED_1_POINR_1                   0x00012000
 
 
 /***********************************************************************
