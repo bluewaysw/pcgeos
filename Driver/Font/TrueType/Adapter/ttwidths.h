@@ -33,19 +33,19 @@ typedef struct
     word                        FH_h_height;        //top of 'H'
     word                        FH_x_height;        //top of 'x'
     word                        FH_ascender;        //top of 'd'
-    sword                       FH_descender;       //bottom of 'p'
+    word                        FH_descender;       //bottom of 'p'
     word                        FH_avgwidth;        //average character width
     word                        FH_maxwidth;        //widest character width
     word                        FH_height;          //height of font box
-    sword                       FH_accent;          //height of accents
+    word                        FH_accent;          //height of accents
     word                        FH_ascent;          //height of caps
-    sword                       FH_descent;         //descent (from baseline)
-    sword                       FH_baseAdjust;      //adjustment for baseline
+    word                        FH_descent;         //descent (from baseline)
+    word                        FH_baseAdjust;      //adjustment for baseline
     char                        FH_firstChar;       //first char defined
     char                        FH_lastChar;        //last char defined
     char                        FH_defaultChar;     //default character
-    sword                       FH_underPos;        //position of underline   		
-    sword                       FH_underThick;      //thickness of underline
+    word                        FH_underPos;        //position of underline   		
+    word                        FH_underThick;      //thickness of underline
     word                        FH_strikePos;       //position of strikethrough
     word                        FH_numChars;        //number of characters
     sword                       FH_minLSB;          //minimum left side bearing
@@ -54,7 +54,6 @@ typedef struct
     sword                       FH_maxRSB;          //maximum right side bound
     sword                       FH_continuitySize;  //continuity cutoff
 } FontHeader;
-
 
 
 /*

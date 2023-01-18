@@ -28,11 +28,16 @@
 
 
 static TT_Error TrueType_ProcessFont( 
-                        const char* file, MemHandle fontInfoBlock );
+                        const char*     file, 
+                        MemHandle       fontInfoBlock );
 
-static sword getFontIDAvailIndex( FontID fontID, MemHandle fontInfoBlock );
+static sword getFontIDAvailIndex( 
+                        FontID          fontID, 
+                        MemHandle       fontInfoBlock );
 
-static Boolean isMappedFont( const char* familiyName, FontID* font );
+static Boolean isMappedFont( 
+                        const char*     familiyName, 
+                        FontID*         font );
 
 static FontAttrs mapFamilyClass( TT_Short familyClass );
 
@@ -40,7 +45,15 @@ static FontWeight mapFontWeight( TT_Short weightClass );
 
 static TextStyle mapTextStyle( const char* subfamily );
 
-static word getNameFromNameTable( char* name, TT_Face face, TT_UShort nameIndex );
+static word getNameFromNameTable( 
+                        char*           name, 
+                        TT_Face         face, 
+                        TT_UShort       nameIndex );
+
+static void convertHeader( 
+                        TT_Face         face, 
+                        TT_Instance     instance, 
+                        FontHeader*     fontHeader );
 
 
 /********************************************************************
@@ -177,6 +190,7 @@ TT_Error TrueType_ProcessFont( const char* fileName, MemHandle fontInfoBlock )
 {
         FileHandle          truetypeFile;
         TT_Face             face;
+        TT_Instance         instance;
         TT_Face_Properties  faceProperties;
         TT_Error            error = TT_Err_Ok;
         char                familyName[FID_NAME_LEN];
@@ -223,6 +237,8 @@ TT_Error TrueType_ProcessFont( const char* fileName, MemHandle fontInfoBlock )
                 TrueTypeOutlineEntry*  trueTypeOutlineEntry;
                 ChunkHandle            trueTypeOutlineChunk;
                 OutlineDataEntry*      outlineDataEntry;
+                ChunkHandle            fontHeaderChunk;
+                FontHeader*            fontHeader;
 		
 		/* allocate chunk for FontsAvailEntry and fill it */
 		if( LMemInsertAtHandles( fontInfoBlock, sizeof(LMemBlockHeader), 0, sizeof(FontsAvailEntry) ) ) 
@@ -265,8 +281,20 @@ TT_Error TrueType_ProcessFont( const char* fileName, MemHandle fontInfoBlock )
 			LMemDeleteAtHandles( fontInfoBlock, sizeof(LMemBlockHeader), 0, sizeof(FontsAvailEntry) );
 			goto Fail;
 		}
+
+                /* add chunk for FontHeader */
+                fontHeaderChunk = LMemAlloc( fontInfoBlock, sizeof(FontHeader) );
+                if( fontHeaderChunk == NullChunk )
+                {
+                        LMemFreeHandles( fontInfoBlock, trueTypeOutlineChunk );
+                        LMemFreeHandles( fontInfoBlock, fontInfoChunk );
+                        LMemDeleteAtHandles( fontInfoBlock, sizeof(LMemBlockHeader), 0, sizeof(FontsAvailEntry) );
+                        goto Fail;
+                }
+
 		fontInfo = LMemDerefHandles( fontInfoBlock, fontInfoChunk );
 		trueTypeOutlineEntry = LMemDerefHandles( fontInfoBlock, trueTypeOutlineChunk );
+                fontHeader = LMemDerefHandles( fontInfoBlock, fontHeaderChunk );
 
                 /* fill TrueTypeOutlineEntry */
                 strcpy( trueTypeOutlineEntry->TTOE_fontFileName, fileName );
@@ -276,7 +304,11 @@ TT_Error TrueType_ProcessFont( const char* fileName, MemHandle fontInfoBlock )
                 outlineDataEntry->ODE_style  = mapTextStyle( styleName );
                 outlineDataEntry->ODE_weight = mapFontWeight( faceProperties.os2->usWeightClass );
                 outlineDataEntry->ODE_header.OE_handle = trueTypeOutlineChunk;
+                outlineDataEntry->ODE_first.OE_handle = fontHeaderChunk;
 	
+                /* fill FontHeader */
+                convertHeader( face, instance, fontHeader );
+
 		fontInfo->FI_outlineTab = sizeof( FontInfo );
 		fontInfo->FI_outlineEnd = sizeof( FontInfo ) + sizeof( OutlineDataEntry );
 
@@ -286,9 +318,10 @@ TT_Error TrueType_ProcessFont( const char* fileName, MemHandle fontInfoBlock )
 	}
         else
         {
-		word                  outlineOffset;
 		ChunkHandle           trueTypeOutlineChunk;
                 TrueTypeOutlineEntry* trueTypeOutlineEntry;
+                ChunkHandle           fontHeaderChunk;
+                FontHeader*           fontHeader;
                 FontsAvailEntry*      availEntries = LMemDeref( ConstructOptr(fontInfoBlock, sizeof(LMemBlockHeader)) );
                 ChunkHandle           fontInfoChunk = availEntries[availIndex].FAE_infoHandle;
 		FontInfo*             fontInfo = LMemDeref( ConstructOptr(fontInfoBlock, fontInfoChunk) );
@@ -312,9 +345,17 @@ TT_Error TrueType_ProcessFont( const char* fileName, MemHandle fontInfoBlock )
 			error = TT_Err_Out_Of_Memory;
 			goto Fail;			
 		}
+
+                /* add chunk for FontHeader */
+                fontHeaderChunk = LMemAlloc( fontInfoBlock, sizeof(FontHeader) );
+                if( fontHeaderChunk == NullChunk )
+                {
+                        LMemFreeHandles( fontInfoBlock, trueTypeOutlineChunk );
+                        error = TT_Err_Out_Of_Memory;
+                        goto Fail;
+                }
 	
-		outlineOffset = fontInfo->FI_outlineTab;
-                if( LMemInsertAtHandles( fontInfoBlock, fontInfoChunk, outlineOffset, sizeof( OutlineDataEntry ) ) )
+                if( LMemInsertAtHandles( fontInfoBlock, fontInfoChunk, fontInfo->FI_outlineTab, sizeof( OutlineDataEntry ) ) )
 		{
 			LMemFreeHandles( fontInfoBlock, trueTypeOutlineChunk );
 			error = TT_Err_Out_Of_Memory;
@@ -331,6 +372,10 @@ TT_Error TrueType_ProcessFont( const char* fileName, MemHandle fontInfoBlock )
                 outlineData->ODE_style  = mapTextStyle( styleName );
                 outlineData->ODE_weight = mapFontWeight( faceProperties.os2->usWeightClass );
                 outlineData->ODE_header.OE_handle = trueTypeOutlineChunk;
+                outlineData->ODE_first.OE_handle = fontHeaderChunk;
+
+                /* fill FontHeader */
+                convertHeader( face, instance, fontHeader );
 		
 		fontInfo = LMemDeref( ConstructOptr(fontInfoBlock, fontInfoChunk) );
         	fontInfo->FI_outlineEnd += sizeof( OutlineDataEntry );
@@ -512,7 +557,7 @@ static word getNameFromNameTable( char* name, TT_Face face, TT_UShort nameID )
                 {
                         TT_Get_Name_String( face, n, &str, &nameLength );
 
-                        for (i = 0; str != 0 && i < nameLength; i ++)
+                        for (i = 0; str != 0 && i < nameLength; i++)
                                 *name++ = str[i];
                         *name = 0;
                         return nameLength;
@@ -529,6 +574,11 @@ static word getNameFromNameTable( char* name, TT_Face face, TT_UShort nameID )
         }
 
         return 0;
+}
+
+static void convertHeader( TT_Face face, TT_Instance instance, FontHeader* fontHeader )
+{
+        // TODO: Funktion von ttwidhts.c hierher verschieben
 }
 
 
