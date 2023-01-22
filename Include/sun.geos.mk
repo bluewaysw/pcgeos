@@ -324,11 +324,11 @@ GREV		?= grev
 GREVCMD		= RFILE=$(INSTALL_DIR)/$(_GEODE).rev \
                   $(GREV) -B$(BRANCH) $(GREVTREE)
 
-_REL	!=	$(GREVCMD) neweng $(GEODE).rev
+_REL	!=	$(GREVCMD) neweng $(GEODE).rev -s
 #if	defined(NPM) || exists(NPM)
-_PROTO	!=	$(GREVCMD) newprotomajor $(GEODE).rev
+_PROTO	!=	$(GREVCMD) newprotomajor $(GEODE).rev -s
 #elif	defined(npm) || exists(npm)
-_PROTO	!=	$(GREVCMD) newprotominor $(GEODE).rev
+_PROTO	!=	$(GREVCMD) newprotominor $(GEODE).rev -s
 #else
 _PROTO	!=	$(GREVCMD) getproto $(GEODE).rev
 #endif

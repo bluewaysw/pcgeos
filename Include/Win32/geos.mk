@@ -358,7 +358,7 @@ GREVFLAGS	=
 GREVFLAGS	+= -B $(BRANCH)
 #endif
 
-_REL	!=	$(GREV) neweng $(REVFILE) $(GREVFLAGS) -R
+_REL	!=	$(GREV) neweng $(REVFILE) $(GREVFLAGS) -R -s 
 _PROTO	!=	$(GREV) getproto $(REVFILE) $(GREVFLAGS) -P
 
 #else

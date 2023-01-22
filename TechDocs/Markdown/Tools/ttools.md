@@ -605,47 +605,63 @@ user name, the date, and an optional comment.
 
 The grev utility takes the following arguments:
 
-**new** ***file*** **["*****comment*****"|-P|-R]** - Create a new revision record, listing comment as an initial revision for 
+**grev command** ***file*** **[-P|-R|-s] [-B branch]** **[rev] ["comment"]**
+
+- ***file*** is the name of the revision file (ending in .REV)
+- **rev** is only used for the newrev command, see below.
+- The **-P** option causes grev to give minimal output, printing only the protocol number. 
+- The **-R** option causes grev to print only the revision number. 
+- The **-s** option **MUST** be given to save changes to file. If this flag is not 
+       passed, the change will only be displayed to the screen.
+- The **-B** option causes grev to use branch rather than the trunk.
+- These options are referred to as ***[flags]*** in the list below.
+
+Possible commands are:
+
+**new** ***file*** ***[flags]*** **["comment"]**   
+Create a new revision record, listing comment as an initial revision for 
 the base (0.0.0.0 release, 0.0 protocol). This command may only be 
-executed in the geode's development directory. The -P option causes grev 
-to give minimal output, printing only the protocol number. The -R option 
-causes grev to print only the revision number. These last two options are 
-normally used by **pmake** to extract the relevant numbers.
+executed in the geode's development directory. [flags] can be given, but 
+will have no effect.
 
-**info** ***file*** - Print the current release and protocol from the revision file.
+**info** ***file*** ***[flags]***   
+Print the current release and protocol from the revision file.
 
-**getproto** ***file*** - Print only the current protocol from the revision file.
+**getproto** ***file*** ***[flags]***   
+Print only the current protocol from the revision file.
+The **-P** option works as stated above.
 
-newprotomajor file ["comment"|-P|-R]
-
-**NPM** ***file*** **["*****comment*****"|-P|-R]** - Increase the major protocol number by one, setting the minor number to 
+**newprotomajor** ***file*** ***[flags]*** **["comment"]**   
+**NPM** ***file*** ***[flags]*** **["comment"]**   
+Increase the major protocol number by one, setting the minor number to 
 zero. The comment argument is listed as the reason for the change in the 
-file. The -P and -R options work as they do for **grev new**.
+file. You must give the **-s** option to save changes to file. The **-P** option 
+works as stated above.
 
-newprotominor file ["comment"|-P|-R]
+**newprotominor** ***file*** ***[flags]*** **["comment"]**   
+**npm** ***file*** ***[flags]*** **["comment"]**   
+Increase the minor protocol number by one. The comment string is listed 
+as the reason for the change in the file. You must give the **-s** option to 
+save changes to file. The **-P** option works as stated above.
 
-**npm** ***file*** **["*****comment*****"|-P|-R]** - Increase the minor protocol number by one. The comment string is listed 
-as the reason for the change in the file. The -P and -R options work as 
-they do for **grev new**.
+**newrev** ***file*** ***[flags]*** **A.B.C ["comment"]**   
+Update release number to A.B.C.0 The comment is listed as the reason for 
+the change. You must give the **-s** option to save changes to file.
 
-**newrev** ***file number1.number2*** **["*****comment*****"|-P|-R]** - 
-Increase release number from A.B.C.D to number1.number2.0.0. The 
-comment is listed as the reason for the change. The -P and -R options 
-work as they do for grev new.
+**newchange** ***file*** ***[flags]*** **["comment"]**   
+Up release number from A.B.**C.D** to A.B.**C+1.0**. The comment is listed as 
+the reason for the change. You must give the **-s** option to save changes 
+to file. The **-R** option works as stated above.
 
-newchange file ["comment"|-P|-R]
+**neweng** ***file*** ***[flags]*** **["comment"]**   
+**ne** ***file*** ***[flags]*** **["comment"]**   
+Increase release number from A.B.C.**D** to A.B.C.**D+1**. The comment is 
+listed as the reason for the change. You must give the **-s** option to save
+changes to file. The **-R** option works as stated above.
 
-**nc** ***file*** **["*****comment*****"|-P|-R]** - 
-Up release number from A.B.C.D to A.B.C+1.0. The comment is listed as 
-the reason for the change. The -P and -R options work as they do for grev 
-new.
-
-neweng file ["comment"|-P|-R]
-
-**ne** ***file*** **["*****comment*****"|-P|-R]** - Increase release number from A.B.C.D to A.B.C.D+1. The comment is 
-listed as the reason for the change. The -P and -R options work as they 
-do for grev new.
-
+**help**   
+Print out a detailed help.
+ 
 ### 10.8 mkmf
 
 The mkmf tool exists to create a file named MAKEFILE. The **pmake** program 

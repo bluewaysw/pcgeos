@@ -205,11 +205,11 @@ _GEODE  :=      $(GEODE)
 GREV            ?= grev
 GREVCMD         := $(GREV) 
 
-_REL    !=      $(GREVCMD) neweng $(REVFILE) -R
+_REL    !=      $(GREVCMD) neweng $(REVFILE) -R -s
 # if    defined(NPM) || exists(NPM)
-_PROTO  !=      $(GREVCMD) newprotomajor $(REVFILE) -P
+_PROTO  !=      $(GREVCMD) newprotomajor $(REVFILE) -P -s 
 # elif  defined(npm) || exists(npm)
-_PROTO  !=      $(GREVCMD) newprotominor $(REVFILE) -P
+_PROTO  !=      $(GREVCMD) newprotominor $(REVFILE) -P -s
 # else
 _PROTO  !=      $(GREVCMD) getproto $(REVFILE) -P
 # endif
