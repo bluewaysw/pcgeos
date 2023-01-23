@@ -207,7 +207,7 @@ typedef struct
 {
     dword    OE_offset;                         /* offset in file */
     word     OE_size;                           /* size in bytes) */
-    Handle   OE_handle;                         /* handle (if loaded) */
+    ChunkHandle                 OE_handle;      /* handle (if loaded) */
 } OutlineEntry;
 
 /*

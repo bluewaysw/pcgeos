@@ -317,26 +317,24 @@ TT_Error getCharMap( TT_Face face, TT_CharMap* charMap )
 /*
  * Counts the GEOS characters that are present in the font.
  */
-word InitGeosCharsInCharMap( TT_CharMap map, word *firstChar, word *lastChar )
+word InitGeosCharsInCharMap( TT_CharMap map, char *firstChar, char *lastChar )
 {
         word charIndex;
-        word charCount = 0;
 
 
-        *firstChar = 9999;
+        *firstChar = 255;
         *lastChar  = 0;
 
         for( charIndex = 0; charIndex < NUM_CHARMAPENTRIES; ++charIndex )
         {
                 if( TT_Char_Index( map, geosCharMap[ charIndex ].unicode ) )
                 {
-                        ++charCount;
                         if ( *firstChar > ( charIndex + C_SPACE ) ) *firstChar = charIndex + C_SPACE;
                         if ( *lastChar  < ( charIndex + C_SPACE ) ) *lastChar  = charIndex + C_SPACE;
                 }
         }
 
-        return charCount;
+        return lastChar - firstChar;
 }
 
 

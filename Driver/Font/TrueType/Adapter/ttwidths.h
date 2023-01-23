@@ -25,51 +25,21 @@
 #include "ttadapter.h"
 
 
-/*
- * Structure to hold information necessary to fill FontBuf structure. 
- */
-typedef struct
-{
-    word                        FH_h_height;        //top of 'H'
-    word                        FH_x_height;        //top of 'x'
-    word                        FH_ascender;        //top of 'd'
-    word                        FH_descender;       //bottom of 'p'
-    word                        FH_avgwidth;        //average character width
-    word                        FH_maxwidth;        //widest character width
-    word                        FH_height;          //height of font box
-    word                        FH_accent;          //height of accents
-    word                        FH_ascent;          //height of caps
-    word                        FH_descent;         //descent (from baseline)
-    word                        FH_baseAdjust;      //adjustment for baseline
-    char                        FH_firstChar;       //first char defined
-    char                        FH_lastChar;        //last char defined
-    char                        FH_defaultChar;     //default character
-    word                        FH_underPos;        //position of underline   		
-    word                        FH_underThick;      //thickness of underline
-    word                        FH_strikePos;       //position of strikethrough
-    word                        FH_numChars;        //number of characters
-    sword                       FH_minLSB;          //minimum left side bearing
-    sword                       FH_minTSB;          //minimum top side bound
-    sword                       FH_maxBSB;          //maximum bottom side bound
-    sword                       FH_maxRSB;          //maximum right side bound
-    sword                       FH_continuitySize;  //continuity cutoff
-} FontHeader;
-
-
-/*
- * constants for calculating values in FontHeader
- */
-#define DEFAULT_CONTINUITY_CUTOFF( value )  ( value / 40 )      // 2.5% of size
-#define DEFAULT_DEFAULT_CHAR                '.'
-#define BASELINE( value )                   ( 3 * value / 4 )	// 75% of size
-#define DESCENT( value )            	    ( value / 4 )       // 25% of size
-#define DEFAULT_UNDER_THICK( value )	    ( value / 10 )      // 10% of size
-#define DEFAULT_UNDER_POSITION( value )	    ( value / -10 )     // -10% of size
-#define SAFETY( value )			            ( value / 40 )      // 2.5% of size
-
-
 #define WWFIXED_0_POINT_5                   0x00008000
 #define WWFIXED_1_POINR_1                   0x00012000
+
+
+/***********************************************************************
+ *      structues
+ ***********************************************************************/
+
+typedef	struct
+{
+        WWFixed                 FM_11;
+        WWFixed                 FM_12;
+        WWFixed                 FM_21;
+        WWFixed                 FM_22;
+} FontMatrix;
 
 
 /***********************************************************************
@@ -78,10 +48,11 @@ typedef struct
 
 MemHandle _pascal TrueType_Gen_Widths(
                                 MemHandle        fontHandle,
-                                void*            tMatrix,
+                                FontMatrix*      fontMatrix,
                                 const FontInfo*  fontInfo,
                                 WWFixedAsDWord   pointSize,
                                 TextStyle        textStyle,
+                                FontWidth        fontWidth,
                                 FontWeight       fontWeight
 );
 

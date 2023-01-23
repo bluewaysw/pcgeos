@@ -14,8 +14,7 @@
  *	20/12/22  JK	    Initial version
  *
  * DESCRIPTION:
- *	Declarations of types and functions for the driver function 
- *      DR_INIT.
+ *	Declarations of types and functions for the driver function DR_INIT.
  ***********************************************************************/
 
 #ifndef _TTINIT_H_
@@ -30,31 +29,57 @@
 
 
 /***********************************************************************
- *      constants
+ *      constants for font mapping
  ***********************************************************************/
 
-#define FONTMAPPING_CATEGORY            "FontMapping"
+#define FONTMAPPING_CATEGORY            "FontMapping"   
 
-#define FAMILY_NAME_ID                  1       // id for font family name
-#define STYLE_NAME_ID                   2       // id for font style
 
-#define FONT_FILE_LENGTH                FILE_LONGNAME_BUFFER_SIZE
+/***********************************************************************
+ *      constants for ttf name tables
+ ***********************************************************************/
 
-#define FAMILY_NAME_LENGTH              20
-#define STYLE_NAME_LENGTH               16
-
-#define MAKE_FONTID( family )           ( FM_TRUETYPE | ( 0x0fff & toHash ( family )))
-
+#define FAMILY_NAME_ID                  1 
+#define STYLE_NAME_ID                   2
 
 #define PLATFORM_ID_MAC                 1
 #define PLATFORM_ID_MS                  3
 
 #define ENCODING_ID_MAC_ROMAN           0
 #define ENCODING_ID_MS_UNICODE_BMP      1
-#define ENCODING_ID_UNICODE		3
+#define ENCODING_ID_UNICODE		        3
 
 #define LANGUAGE_ID_MAC_EN              0
 #define LANGUAGE_ID_WIN_EN_US           0x0409
+
+
+/***********************************************************************
+ *      constants for string length
+ ***********************************************************************/
+
+#define FAMILY_NAME_LENGTH              20
+#define STYLE_NAME_LENGTH               16
+#define FONT_FILE_LENGTH                FILE_LONGNAME_BUFFER_SIZE
+
+
+/***********************************************************************
+ *      macros for calculating values in FontHeader
+ ***********************************************************************/
+
+#define DEFAULT_CONTINUITY_CUTOFF( value )  ( value / 40 )      // 2.5% of size
+#define DEFAULT_DEFAULT_CHAR                '.'
+#define BASELINE( value )                   ( 3 * value / 4 )	// 75% of size
+#define DESCENT( value )            	    ( value / 4 )       // 25% of size
+#define DEFAULT_UNDER_THICK( value )	    ( value / 10 )      // 10% of size
+#define DEFAULT_UNDER_POSITION( value )	    ( value / -10 )     // -10% of size
+#define SAFETY( value )			            ( value / 40 )      // 2.5% of size
+
+
+/***********************************************************************
+ *      macro for calculating font ID
+ ***********************************************************************/
+
+#define MAKE_FONTID( family )               ( FM_TRUETYPE | ( 0x0fff & toHash ( family )))
 
 
 /***********************************************************************
@@ -94,17 +119,6 @@ typedef struct
  ***********************************************************************/
 
 void _pascal  TrueType_InitFonts( MemHandle fontInfoBlock );
-
-
-/***********************************************************************
- *      internal functions
- ***********************************************************************/
-
-static word toHash( const char* str );
-
-static int  strlen( const char* str );
-
-static void strcpy( char* dest, const char* source );
 
 
 #endif  /* _TTINT_H_ */

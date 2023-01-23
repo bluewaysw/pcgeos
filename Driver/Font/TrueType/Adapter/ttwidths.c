@@ -24,11 +24,13 @@
 #include <heap.h>
 #include "ttwidths.h"
 #include "ttcharmapper.h"
+#include "ttinit.h"
 #include "../FreeType/ftxkern.h"
 
 
 static TextStyle  findOutlineData( 
                         ChunkHandle*     truetypeOutlineEntryChunk,
+                        ChunkHandle*     fontHeaderChunk,
                         const FontInfo*  fontInfo, 
                         TextStyle        textStyle, 
                         FontWeight       fontWeight );
@@ -53,15 +55,13 @@ TT_Error Fill_CharTableEntry(
 
 TT_Error Fill_FontBuf( TT_Face face, WBFixed pointSize, FontBuf* fontBuf );
 
-TT_Error fillFontHeader( TT_Face face, TT_Instance instance, FontHeader* fontHeader );
-
 void ConvertHeader();
 
 void ConvertKernPairs();
 
-void CalcTransform();
-
-void CalcRoutines();
+void CalcTransform(     TT_Matrix*   resultMatrix, 
+                        FontMatrix*  transformMatrix, 
+                        TextStyle    styleToImplement );
 
 
 /********************************************************************
@@ -81,8 +81,6 @@ void CalcRoutines();
  * 
  * SIDE EFFECTS:  none
  * 
- * CONDITION:     
- * 
  * STRATEGY:      
  * 
  * REVISION HISTORY:
@@ -93,36 +91,41 @@ void CalcRoutines();
 
 MemHandle _pascal TrueType_Gen_Widths(
                             MemHandle        fontHandle,
-                            void*            tMatrix,
+                            FontMatrix*      fontMatrix,
                             const FontInfo*  fontInfo,
                             WWFixedAsDWord   pointSize,
                             TextStyle        textStyle,
+                            FontWidth        fontWidth,
                             FontWeight       fontWeight )
 {
         FileHandle             truetypeFile;
         ChunkHandle            truetypeChunkHandle;
+        ChunkHandle            fontHeaderChunkHandle;
         TrueTypeOutlineEntry*  trueTypeOutlineEntry;
         TextStyle              stylesToImplement;
         TT_Face                face;
+        TT_Face_Properties     faceProperties;
         TT_CharMap             charMap;
         TT_Error               error;
         word                   numChars;
         word                   numKernPairs;
-        word                   firstChar;
-        word                   lastChar;
+        char                   firstChar;
+        char                   lastChar;
         word                   size;
+        FontHeader*            fontHeader;
         FontBuf*               fontBuf;
         CharTableEntry*        charTableEntry;
         KernPair*              kernPair;
         WBFixed*               kernValue;
+        WWFixedAsDWord         scaleFactor;
         
 
         ECCheckMemHandle( fontHandle );
-        ECCheckBounds( tMatrix );
+        ECCheckBounds( fontMatrix );
         ECCheckBounds( (void*)fontInfo );
 
         /* find outline for textStyle and fontWeight */
-        stylesToImplement = findOutlineData( &truetypeChunkHandle, fontInfo, textStyle, fontWeight );
+        stylesToImplement = findOutlineData( &truetypeChunkHandle, &fontHeaderChunkHandle, fontInfo, textStyle, fontWeight );
 
         /* get filename an load ttf file */
         FilePushDir();
@@ -137,6 +140,10 @@ MemHandle _pascal TrueType_Gen_Widths(
         if( error )
                 goto Fail_Face;
 
+        error = TT_Get_Face_Properties( face, &faceProperties );
+        if( error )
+                goto Fail_Map;
+
         error = getCharMap( face, &charMap );
         if( error )
                 goto Fail_Map;
@@ -148,17 +155,21 @@ MemHandle _pascal TrueType_Gen_Widths(
         AllocFontBlock( 0, numChars, numKernPairs, &fontHandle );
         ECCheckMemHandle( fontHandle );
 
-        //Scalefaktor für widths berechnen
+        /* calculate scale factor and transformation matrix */
+        scaleFactor = CalcScaleForWidths( pointSize, 
+                                          fontWidth, 
+                                          fontWeight, 
+                                          stylesToImplement, 
+                                          faceProperties.header->Units_Per_EM );
+
+        //Widths berechen und einfügen (CharTableEntries)
+
 
         //Header konvertieren
-        
-        //Widths berechen und einfügen
+
 
         //Kernpairs konvertieren und einfügen
 
-        //Mapping konvertieren und einfügen
-
-        //Transformation (und fehlende Styles)
 
 Fail_Map:
         TT_Close_Face( face );
@@ -171,11 +182,12 @@ Fail_Face:
 
 static TextStyle  findOutlineData( 
                         ChunkHandle*     truetypeOutlineEntryChunk,
+                        ChunkHandle*     fontHeaderChunk,
                         const FontInfo*  fontInfo, 
                         TextStyle        textStyle, 
                         FontWeight       fontWeight )
 {
-        ChunkHandle        chunkToUse;
+        OutlineDataEntry*  outlineToUse;
         OutlineDataEntry*  outlineData = (OutlineDataEntry*) (((byte*)fontInfo) + fontInfo->FI_outlineTab);
         OutlineDataEntry*  outlineDataEnd = (OutlineDataEntry*) (((byte*)fontInfo) + fontInfo->FI_outlineEnd);
         TextStyle          styleDiff = 127;
@@ -193,6 +205,7 @@ static TextStyle  findOutlineData(
 	            outlineData->ODE_weight == fontWeight )
 		{
 			*truetypeOutlineEntryChunk = outlineData->ODE_header.OE_handle;
+                        *fontHeaderChunk = outlineData->ODE_first.OE_handle;
                         return 0;  // no styles to implement
 		}
 
@@ -204,7 +217,7 @@ static TextStyle  findOutlineData(
                         styleDiff = 0;
                         if( weightDiff >= currentWeightDiff )
                         {
-                                chunkToUse = outlineData->ODE_header.OE_handle;
+                                outlineToUse = outlineData;
                                 weightDiff = currentWeightDiff;
                         }
 
@@ -216,14 +229,15 @@ static TextStyle  findOutlineData(
                         byte currentStyleDiff = textStyle ^ outlineData->ODE_style;
                         if( styleDiff >= currentStyleDiff )
                         {
-                                chunkToUse = outlineData->ODE_header.OE_handle;
+                                outlineToUse = outlineData;
                                 styleDiff = currentStyleDiff;
                         }
                 }
 		outlineData++;
 	}
 
-        *truetypeOutlineEntryChunk = chunkToUse;
+        *truetypeOutlineEntryChunk = outlineToUse->ODE_header.OE_handle;
+        *fontHeaderChunk = outlineToUse->ODE_first.OE_handle;
         return styleDiff;
 }
 
@@ -244,13 +258,13 @@ static WWFixedAsDWord CalcScaleForWidths(
         if( stylesToImplement & ( TS_SUBSCRIPT | TS_SUPERSCRIPT ) )
                 scaleWidth = GrMulWWFixed( scaleWidth, WWFIXED_0_POINT_5 );
 
-        /* adjust for fontWeight */
+        /* adjust for fontWidth */
         if( fontWeight != FWI_MEDIUM )
-                scaleWidth = GrMulWWFixed( scaleWidth, MakeWWFixed( fontWeight ) );
-
-        /* adjust für fontWidht */
-        if( fontWidth != FW_NORMAL )
                 scaleWidth = GrMulWWFixed( scaleWidth, MakeWWFixed( fontWidth ) );
+
+        /* adjust für fontWeight */
+        if( fontWidth != FW_NORMAL )
+                scaleWidth = GrMulWWFixed( scaleWidth, MakeWWFixed( fontWeight ) );
 
         return scaleWidth;
 }
@@ -313,15 +327,16 @@ void ConvertKernPairs()
 /********************************************************************
  *                      CalcTransform
  ********************************************************************
- * SYNOPSIS:	  
+ * SYNOPSIS:	        Calculates the transformation matrix to 
+ *                      calculate missing style attributes and weights.
  * 
- * PARAMETERS:    
+ * PARAMETERS:          resultMatrix*
+ *                      styleToImplement
+ *                      
  * 
  * RETURNS:       
  * 
  * SIDE EFFECTS:  none
- * 
- * CONDITION:     
  * 
  * STRATEGY:      
  * 
@@ -331,34 +346,9 @@ void ConvertKernPairs()
  *      20/12/22  JK        Initial Revision
  *******************************************************************/
 
-void CalcTransform()
-{
-
-}
-
-
-/********************************************************************
- *                      CalcRoutines
- ********************************************************************
- * SYNOPSIS:	  
- * 
- * PARAMETERS:    
- * 
- * RETURNS:       
- * 
- * SIDE EFFECTS:  none
- * 
- * CONDITION:     
- * 
- * STRATEGY:      
- * 
- * REVISION HISTORY:
- *      Date      Name      Description
- *      ----      ----      -----------
- *      20/12/22  JK        Initial Revision
- *******************************************************************/
-
-void CalcRoutines()
+static void CalcTransform(      TT_Matrix*   resultMatrix, 
+                                FontMatrix*  fontMatrix, 
+                                TextStyle    styleToImplement )
 {
 
 }
@@ -465,7 +455,7 @@ Fin:
 
 
 /********************************************************************
- *                      Fill_FontBuf
+ *                      ConvertHeader
  ********************************************************************
  * SYNOPSIS:	  Fills the FontBuf structure with informations 
  *                of the passed in ttf file.
@@ -511,10 +501,6 @@ TT_Error Fill_FontBuf( TT_Face face, WBFixed pointSize, FontBuf* fontBuf )
                 return error;
 
         error = TT_Get_Instance_Metrics( instance, &instanceMetrics );
-        if ( error )
-                return error;
-
-        error = fillFontHeader( face, instance, &fontHeader );
         if ( error )
                 return error;
 
@@ -613,137 +599,6 @@ TT_Error Fill_FontBuf( TT_Face face, WBFixed pointSize, FontBuf* fontBuf )
         fontBuf->FB_defaultChar = fontHeader.FH_defaultChar;
 
         TT_Done_Instance( instance );
-
-        return TT_Err_Ok;
-}
-
-TT_Error fillFontHeader( TT_Face face, TT_Instance instance, FontHeader* fontHeader )
-{
-        TT_CharMap          charMap;
-        TT_Error            error;
-        TT_UShort           charIndex;
-        TT_Glyph            glyph;
-        TT_Glyph_Metrics    metrics;
-        TT_Face_Properties  faceProperties;
-        word                geosChar;
-        word                unitsPerEM;
-        sword               maxAccentOrAscent;
-
-        
-        error = getCharMap( face, &charMap );
-        if ( error != TT_Err_Ok )
-                return error;
-
-        /* initialize min, max and avg values in fontHeader */
-        fontHeader->FH_minLSB   =  9999;
-        fontHeader->FH_maxBSB   = -9999;
-        fontHeader->FH_minTSB   = -9999;
-        fontHeader->FH_maxRSB   = -9999;
-        fontHeader->FH_avgwidth = 0;
-
-   /*     fontHeader->FH_numChars = CountGeosCharsInCharMap( charMap, 
-                                                           &fontHeader->FH_firstChar, 
-                                                           &fontHeader->FH_lastChar ); */
-
-        for ( geosChar = fontHeader->FH_firstChar; geosChar < fontHeader->FH_lastChar; ++geosChar )
-        {
-                word unicode = GeosCharToUnicode( geosChar );
-
-                charIndex = TT_Char_Index( charMap, unicode );
-                if ( charIndex == 0 )
-                        break;
-
-                /* load glyph without scaling or hinting */
-                TT_New_Glyph( face, &glyph );
-                TT_Load_Glyph( instance, glyph, charIndex, 0 );
-                TT_Get_Glyph_Metrics( glyph, &metrics );
-
-                //h_height
-                if( unicode == C_LATIN_CAPITAL_LETTER_H )
-                        fontHeader->FH_h_height = metrics.bbox.yMax;
-
-                //x_height
-                if ( unicode == C_LATIN_SMALL_LETTER_X )
-                        fontHeader->FH_x_height = metrics.bbox.yMax;
-
-                //ascender
-                if ( unicode == C_LATIN_SMALL_LETTER_D )
-                        fontHeader->FH_ascender = metrics.bbox.yMax;
-
-                //descender
-                if ( unicode == C_LATIN_SMALL_LETTER_P )
-                        fontHeader->FH_descender = metrics.bbox.yMin;
-
-                //width
-                if ( fontHeader->FH_maxwidth < ( metrics.bbox.xMax - metrics.bbox.xMin ) )
-                        fontHeader->FH_maxwidth = metrics.bbox.xMax - metrics.bbox.xMin;
-
-                //avg width
-                if ( GeosAvgWidth( geosChar ) ) 
-                {
-                        fontHeader->FH_avgwidth = fontHeader->FH_avgwidth + (
-                                  ( metrics.bbox.xMax - metrics.bbox.xMin ) * GeosAvgWidth( geosChar ) / 1000 );
-                }
-                
-                /* scan xMin */
-                if( fontHeader->FH_minLSB > metrics.bbox.xMin )
-                        fontHeader->FH_minLSB = (sword) metrics.bbox.xMin;
-
-                /* scan xMax */
-                if ( fontHeader->FH_maxRSB < metrics.bbox.xMax )
-                        fontHeader->FH_maxRSB = metrics.bbox.xMax;
-                /* scan yMin */
-                if ( fontHeader->FH_maxBSB < metrics.bbox.yMin )
-                        fontHeader->FH_maxBSB = metrics.bbox.yMin;
-
-                //yMax
-                if ( fontHeader->FH_minTSB < metrics.bbox.yMax )
-                {
-                        fontHeader->FH_minTSB = metrics.bbox.yMax;
-                        if ( GeosCharMapFlag( geosChar ) == CMF_ACCENT && 
-                             fontHeader->FH_accent < metrics.bbox.yMax )
-                             fontHeader->FH_accent = metrics.bbox.yMax;
-                }
-        }
-
-        TT_Get_Face_Properties( face, &faceProperties );
-        unitsPerEM = faceProperties.header->Units_Per_EM;
-
-        //baseline
-        if ( fontHeader->FH_accent <= 0 )
-        {
-                fontHeader->FH_accent = 0;
-                maxAccentOrAscent = fontHeader->FH_ascent;
-        }
-        else
-        {
-                maxAccentOrAscent = fontHeader->FH_accent;
-                fontHeader->FH_accent = fontHeader->FH_accent - fontHeader->FH_ascent;
-        }
-                
-        fontHeader->FH_baseAdjust = BASELINE( unitsPerEM )- maxAccentOrAscent;
-        fontHeader->FH_height = fontHeader->FH_maxBSB + maxAccentOrAscent;
-        fontHeader->FH_minTSB = fontHeader->FH_minTSB - BASELINE( unitsPerEM );
-        fontHeader->FH_maxBSB = fontHeader->FH_maxBSB - ( DESCENT( unitsPerEM ) -
-                                                          SAFETY( unitsPerEM ) );
-
-        fontHeader->FH_underPos = faceProperties.postscript->underlinePosition;
-        if( fontHeader->FH_underPos == 0 )
-                fontHeader->FH_underPos = DEFAULT_UNDER_POSITION( unitsPerEM );
-
-        fontHeader->FH_underPos = maxAccentOrAscent - fontHeader->FH_underPos;
-
-        fontHeader->FH_underThick = faceProperties.postscript->underlineThickness; 
-        if( fontHeader->FH_underThick == 0 )
-                fontHeader->FH_underThick = DEFAULT_UNDER_THICK( unitsPerEM );
-        
-        if( fontHeader->FH_x_height > 0 )
-                fontHeader->FH_strikePos = 3 * fontHeader->FH_x_height / 5;
-        else
-                fontHeader->FH_strikePos = 3 * fontHeader->FH_ascent / 5;
-
-        fontHeader->FH_continuitySize = DEFAULT_CONTINUITY_CUTOFF( unitsPerEM );
-
 
         return TT_Err_Ok;
 }

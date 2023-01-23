@@ -47,7 +47,7 @@ typedef struct
  *      internal functions
  ***********************************************************************/
 
-word InitGeosCharsInCharMap( TT_CharMap map, word* firstChar, word* lastChar );
+word InitGeosCharsInCharMap( TT_CharMap map, char* firstChar, char* lastChar );
 
 word CountKernPairsWithGeosChars( TT_Face face );
 

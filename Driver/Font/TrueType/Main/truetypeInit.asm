@@ -235,7 +235,6 @@ done:
 	call	FilePopDir
 endif
 	clc
-	
 	.leave
 	ret
 

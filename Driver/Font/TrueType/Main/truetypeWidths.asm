@@ -86,6 +86,10 @@ TrueTypeGenWidths	proc	far
 	mov	al, es:GS_fontAttr.FCA_weight
 	push	ax		; pass font weight
 
+				; font width from gstate
+	mov     al, es:GS_fontAttr.FCA_width
+	push    ax		; pass font width
+
 	segmov	ds, dgroup, dx
 	call	TRUETYPE_GEN_WIDTHS
 
