@@ -802,12 +802,12 @@ static void convertHeader(
                                                            &fontHeader->FH_firstChar, 
                                                            &fontHeader->FH_lastChar ); 
 
-        TT_New_Glyph( face, &glyph ); //TEST
+        TT_New_Glyph( face, &glyph );
         TT_New_Instance( face, &instance );
 
         for ( geosChar = fontHeader->FH_firstChar; geosChar < fontHeader->FH_lastChar; ++geosChar )
         {
-                word unicode = GeosCharToUnicode( geosChar + 1 );
+                word unicode = GeosCharToUnicode( geosChar );
 
                 charIndex = TT_Char_Index( charMap, unicode );
                 if ( charIndex == 0 )
@@ -865,8 +865,8 @@ static void convertHeader(
                 }
 
         }
-                TT_Done_Glyph( glyph ); // TEST
-                TT_Done_Instance( instance );
+        TT_Done_Glyph( glyph );
+        TT_Done_Instance( instance );
 
         unitsPerEM = faceProperties.header->Units_Per_EM;
 

@@ -37,6 +37,8 @@ extern TEngine_Instance engineInstance;
 #define TTF_DIRECTORY                   "TTF"
 #define FONT_MAN_ID                     0x20
 
+#define CHAR_NOT_BUILT                  2	
+
 /***********************************************************************
  *      structures
  ***********************************************************************/
@@ -98,13 +100,13 @@ typedef struct
  * flags for describing rendered char (see fontDr.def)
  */
 typedef ByteFlags CharTableFlags;
-#define CTF_NEGATIVE_LSB    0x40
+#define CTF_NEGATIVE_LSB    0x40    //set is negativ left side bearing
 #define	CTF_ABOVE_ASCENT    0x20
 #define CTF_BELOW_DESCENT   0x10
-#define CTF_NO_DATA         0x08
+#define CTF_NO_DATA         0x08    //set if char is missing in chracter set
 #define CTF_IS_FIRST_KERN   0x04
 #define	CTF_IS_SECOND_KERN  0x02
-#define	CTF_NOT_VISIBLE     0x01
+#define	CTF_NOT_VISIBLE     0x01    //set if char is normally invisible
 
 
 /*
