@@ -249,7 +249,6 @@
 
     UShort    bWidth;               /* target bitmap width  */
     PByte     bTarget;              /* target bitmap buffer */
-    PByte     gTarget;              /* target pixmap buffer */
 #ifdef __GEOS__
     PShort    rTarget;              /* target region buffer */
 #endif /* __GEOS__ */
@@ -273,12 +272,7 @@
 
     Long      traceOfs;             /* current offset in target bitmap */
     Long      traceOfsLastLine;     /* offset in traget region before line step */
-    Long      traceG;               /* current offset in target pixmap */
-
     Short     traceIncr;            /* sweep's increment in target bitmap */
-
-    Short     gray_min_x;           /* current min x during gray rendering */
-    Short     gray_max_x;           /* current max x during gray rendering */
 
     /* dispatch variables */
 
@@ -1519,8 +1513,6 @@
       ras.traceIncr = -ras.target.cols;
     }
 
-    ras.gray_min_x = 0;
-    ras.gray_max_x = 0;
   }
 
 
@@ -1555,9 +1547,6 @@
 
       f1 = e1 & 7;
       f2 = e2 & 7;
-
-      if ( ras.gray_min_x > c1 ) ras.gray_min_x = c1;
-      if ( ras.gray_max_x < c2 ) ras.gray_max_x = c2;
 
       target = ras.bTarget + ras.traceOfs + c1;
 
@@ -1676,9 +1665,6 @@
       c1 = (Short)(e1 >> 3);
       f1 = e1 & 7;
 
-      if ( ras.gray_min_x > c1 ) ras.gray_min_x = c1;
-      if ( ras.gray_max_x < c1 ) ras.gray_max_x = c1;
-
       ras.bTarget[ras.traceOfs + c1] |= (Char)(0x80 >> f1);
     }
   }
@@ -1714,9 +1700,6 @@
     ras.traceOfs         = 0;
     ras.traceIncr        = 0;
     ras.traceOfsLastLine = -1;
-
-    ras.gray_min_x = 0;
-    ras.gray_max_x = 0;
   }
 
   static void  Vertical_Region_Sweep_Span( RAS_ARGS Short       y,
