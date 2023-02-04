@@ -444,8 +444,8 @@ static word toHash( const char* str )
         word    i;
         dword   hash = strlen( str );
 
-        for ( i = 0; i < strlen( str ) ; i++ )
-		hash = ( hash * 7 ) % ( 2^16 ) + str[i];
+        for ( i = 0; i < strlen( str ) ; ++i )
+		hash = ( ( hash * 7 ) % 65535 ) + str[i];
 
         return (word) hash;
 }
@@ -785,8 +785,8 @@ static void convertHeader(
         TT_Glyph_Metrics    metrics;
         TT_Instance         instance;
         word                geosChar;
-        word                unitsPerEM;
         sword               maxAccentOrAscent;
+        word                unitsPerEM = faceProperties.header->Units_Per_EM;
 
 
         ECCheckBounds( (void*)fontHeader );
@@ -867,8 +867,6 @@ static void convertHeader(
         }
         TT_Done_Glyph( glyph );
         TT_Done_Instance( instance );
-
-        unitsPerEM = faceProperties.header->Units_Per_EM;
 
         //baseline
         if ( fontHeader->FH_accent <= 0 )

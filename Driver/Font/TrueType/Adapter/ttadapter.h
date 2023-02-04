@@ -37,6 +37,7 @@ extern TEngine_Instance engineInstance;
 #define TTF_DIRECTORY                   "TTF"
 #define FONT_MAN_ID                     0x20
 
+#define CHAR_NOT_EXIST                  0
 #define CHAR_NOT_BUILT                  2	
 
 /***********************************************************************
@@ -207,8 +208,8 @@ typedef ByteEnum AdjustedWeight;
 
 typedef struct 
 {
-    dword    OE_offset;                         /* offset in file */
-    word     OE_size;                           /* size in bytes) */
+    dword                       OE_offset;      /* offset in file */
+    word                        OE_size;        /* size in bytes) */
     ChunkHandle                 OE_handle;      /* handle (if loaded) */
 } OutlineEntry;
 
