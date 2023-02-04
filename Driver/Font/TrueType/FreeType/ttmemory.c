@@ -25,6 +25,9 @@
 
 #include "ttmemory.h"
 #include "ttengine.h"
+#include <geode.h>
+#include <lmem.h>
+#include <ec.h>
 
 /* required by the tracing mode */
 #undef  TT_COMPONENT
@@ -38,6 +41,13 @@
 
 
 #define MAX_BLOCK_SIZE  32000
+#define MAX_LMEM_BLOCKS 32
+
+/* Block for small allocs */
+MemHandle lmem;
+
+ChunkHandle   lmemBlock[MAX_LMEM_BLOCKS];
+void*         ptrToBlock[MAX_LMEM_BLOCKS];
 
 
 /*******************************************************************
@@ -67,11 +77,17 @@
       return TT_Err_Invalid_Argument;
 
     if ( Size > MAX_BLOCK_SIZE )
+    {
+      EC_ERROR( 100 );
       return TT_Err_Out_Of_Memory;
+    }
 
     if ( Size > 0 )
     {
-      handle = MemAlloc( Size, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT | HAF_LOCK );
+      handle = MemAllocSetOwner( GeodeGetCodeProcessHandle(), 
+                                 Size,
+                                 HF_SHARABLE | HF_SWAPABLE, 
+                                 HAF_ZERO_INIT | HAF_LOCK );
       if ( !handle )
         return TT_Err_Out_Of_Memory;
       
@@ -125,6 +141,16 @@
   LOCAL_FUNC
   TT_Error  TTMemory_Init( void )
   {
+   /* lmem = MemAllocSetOwner(GeodeGetCodeProcessHandle(), 
+                            10 * 1024,
+                            HF_SHARABLE | HF_SWAPABLE, 
+                            HAF_ZERO_INIT | HAF_NO_ERR | HAF_LOCK );
+    
+    LMemInitHeap(block, LMEM_TYPE_GENERAL, 
+                     LMF_NO_HANDLES | LMF_NO_ENLARGE | LMF_RETURN_ERRORS, 
+                     sizeof(LMemBlockHeader), 0, 
+		     newSize - sizeof(LMemBlockHeader));*/
+
     return TT_Err_Ok;
   }
 
@@ -142,6 +168,8 @@
   LOCAL_FUNC
   TT_Error  TTMemory_Done( void )
   {
+    //MemFree( lmem );
+
     return TT_Err_Ok;
   }
 

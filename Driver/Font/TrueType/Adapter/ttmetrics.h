@@ -28,4 +28,4 @@ TT_Error _pascal TrueType_Char_Metrics(
                                    GCM_info         info, 
                                    dword*           result );
 
-#endif _TTMETRICS_H_
+#endif /* _TTMETRICS_H_ */

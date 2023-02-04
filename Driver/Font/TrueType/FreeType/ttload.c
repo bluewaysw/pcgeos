@@ -71,15 +71,13 @@
  *
  *  Input  :  face       face record to look for
  *
- *            faceIndex  the index of the TrueType font, when
- *                       we're opening a collection.
  *
  *  Output :  SUCCESS on success.  FAILURE on error.
  *
  ******************************************************************/
 
   LOCAL_FUNC
-  TT_Error  Load_TrueType_Directory( PFace  face, ULong  faceIndex )
+  TT_Error  Load_TrueType_Directory( PFace  face )
   {
     DEFINE_LOCALS;
 

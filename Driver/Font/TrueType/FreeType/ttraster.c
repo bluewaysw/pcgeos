@@ -270,8 +270,8 @@
 
     TT_Raster_Map  target;          /* description of target bit/pixmap */
 
-    Long      traceOfs;             /* current offset in target bitmap */
-    Long      traceOfsLastLine;     /* offset in traget region before line step */
+    Short     traceOfs;             /* current offset in target bitmap */
+    Short     traceOfsLastLine;     /* offset in traget region before line step */
     Short     traceIncr;            /* sweep's increment in target bitmap */
 
     /* dispatch variables */

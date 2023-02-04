@@ -203,7 +203,6 @@ extern TEngine_Instance engineInstance;
       return error;
 
     input.stream    = stream;
-    input.fontIndex = 0;
     input.engine    = _engine;
 
     /* Create and load the new face object - this is thread-safe */

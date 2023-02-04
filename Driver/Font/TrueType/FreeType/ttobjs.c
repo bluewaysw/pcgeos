@@ -1161,7 +1161,7 @@
 
     /* Load collection directory if present, then font directory */
 
-    error = Load_TrueType_Directory( face, input->fontIndex );
+    error = Load_TrueType_Directory( face );
     if ( error )
       goto Fail;
 

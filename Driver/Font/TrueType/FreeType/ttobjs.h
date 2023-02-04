@@ -770,7 +770,6 @@
   struct  TFont_Input_
   {
     TT_Stream         stream;     /* input stream                */
-    ULong             fontIndex;  /* index of font in collection */
     PEngine_Instance  engine;     /* parent engine instance      */
 
   };

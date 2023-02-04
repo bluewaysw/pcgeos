@@ -70,7 +70,7 @@ static void CalcTransform(     TT_Matrix*   resultMatrix,
  * 
  * PARAMETERS:    fontHandle            Memory handle to font block.
  *                tMatrix               Pointer to tranformation matrix.
- *                fontInfo              Pointer to font info block.
+ *                fontInfo              Pointer to font info structure.
  *                pointSize             Desired point size.
  *                textStyle             Desired text style.
  *                fontWeight            Desired font weight.
@@ -103,7 +103,6 @@ MemHandle _pascal TrueType_Gen_Widths(
         TT_Face                face;
         TT_Face_Properties     faceProperties;
         TT_Error               error;
-        word                   numKernPairs;
         word                   size;
         FontHeader*            fontHeader;
         FontBuf*               fontBuf;
@@ -140,11 +139,12 @@ MemHandle _pascal TrueType_Gen_Widths(
         error = TT_Get_Face_Properties( face, &faceProperties );
         if( error )
                 goto Fail;
-
-        numKernPairs = CountKernPairsWithGeosChars( face );
         
         /* alloc Block for FontBuf, CharTableEntries, KernPairs and kerning values */
-        size = AllocFontBlock( 0, fontHeader->FH_numChars, numKernPairs, &fontHandle );
+        size = AllocFontBlock( 0, 
+                                fontHeader->FH_numChars, 
+                                CountKernPairsWithGeosChars( face ), 
+                                &fontHandle );
 
         /* calculate scale factor and transformation matrix */
         scaleFactor = CalcScaleForWidths( pointSize, 
@@ -155,6 +155,8 @@ MemHandle _pascal TrueType_Gen_Widths(
 
         /* convert FontHeader */
         fontBuf = MemDeref( fontHandle );
+        fontBuf->FB_dataSize = size;
+
         ConvertHeader( face, pointSize, fontHeader, fontBuf );
 
         /* convert Widths */
@@ -200,7 +202,7 @@ static void ConvertWidths( TT_Face face, FontHeader* fontHeader, WWFixedAsDWord 
                 if ( charIndex == 0 )
                 {
                         charTableEntry->CTE_flags          = CTF_NO_DATA;
-                        charTableEntry->CTE_dataOffset     = CHAR_NOT_BUILT;
+                        charTableEntry->CTE_dataOffset     = CHAR_NOT_EXIST;
                         charTableEntry->CTE_width.WBF_int  = 0;
                         charTableEntry->CTE_width.WBF_frac = 0;
 
@@ -220,23 +222,27 @@ static void ConvertWidths( TT_Face face, FontHeader* fontHeader, WWFixedAsDWord 
                 charTableEntry->CTE_dataOffset     = CHAR_NOT_BUILT;
                 charTableEntry->CTE_flags          = 0;
                 
-                /* set flags in CTE_flags if needed */
-
-                //negativ lsb
-
-                //above ascent
+                // set flags in CTE_flags if needed
+                if( metrics.bbox.xMin < 0 )
+                        charTableEntry->CTE_flags |= CTF_NEGATIVE_LSB;
 
                 //below descent
+                if( -metrics.bbox.yMin > fontHeader->FH_descent )
+                        charTableEntry->CTE_flags |= CTF_BELOW_DESCENT;
+
+                //above ascent
+                if( metrics.bbox.yMax > fontHeader->FH_accent )
+                        charTableEntry->CTE_flags |= CTF_ABOVE_ASCENT;
 
                 //first kern
 
                 //second kern
 
                 charTableEntry++;
-        }
+        } 
 
-        TT_Done_Glyph( glyph );
         TT_Done_Instance( instance );
+        TT_Done_Glyph( glyph );
 }
 
 
@@ -293,7 +299,6 @@ static TextStyle  findOutlineData(
                 }
 		outlineData++;
 	}
-
         *outline = outlineToUse;
         return styleDiff;
 }
