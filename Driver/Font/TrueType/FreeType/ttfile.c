@@ -94,10 +94,10 @@
 
   struct  TStream_Rec_
   {
-    Long      position;                /* current position within the file */
-    FILE*     file;                    /* file handle                      */
-    Long      base;                    /* stream base in file              */
-    Long      size;                    /* stream size in file              */
+    Long        position;                /* current position within the file */
+    FileHandle  file;                    /* file handle                      */
+    Long        base;                    /* stream base in file              */
+    Long        size;                    /* stream size in file              */
   };
 
   /* We support embedded TrueType files by allowing them to be       */
