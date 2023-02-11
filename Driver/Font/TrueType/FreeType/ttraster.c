@@ -223,7 +223,6 @@
     Int       precision_bits;       /* precision related variables */
     Int       precision;
     Int       precision_half;
-    Long      precision_mask;
     Int       precision_shift;
     Int       precision_step;
     Int       precision_jitter;
@@ -339,7 +338,6 @@
     ras.precision       = 1 << ras.precision_bits;
     ras.precision_half  = ras.precision / 2;
     ras.precision_shift = ras.precision_bits - Pixel_Bits;
-    ras.precision_mask  = -ras.precision;
   }
 
 
@@ -2695,6 +2693,7 @@ TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
 
 #ifndef TT_CONFIG_OPTION_STATIC_RASTER
     FREE( engine->raster_component );
+    //GFREE( engine->raster_component );
 #endif
 
     return TT_Err_Ok;
@@ -2712,6 +2711,7 @@ TT_Error  Render_Region_Glyph( RAS_ARGS TT_Outline*     glyph,
     ras = engine->raster_component = &cur_ras;
 #else
     if ( ALLOC( engine->raster_component, sizeof ( TRaster_Instance ) ) )
+    //if ( GALLOC( engine->raster_component, sizeof ( TRaster_Instance ) ) )
       return error;
 
     ras = (TRaster_Instance*)engine->raster_component;
